@@ -1,0 +1,53 @@
+{
+	"source_commit": "a10a7e3888037eb7c1fb30ffa066800d8473ff7a",
+	"archives": [
+		{
+			"file": "archive-and-sparkle.tar.gz",
+			"sha256": "88bf1834f4ff7c3af348269af15f03944a2636c4a2f3ab7ce8f755119cd63386",
+			"bytes": 510544,
+			"kind": "inactive reviewed recovery evidence"
+		},
+		{
+			"file": "validation-tools.tar.gz",
+			"sha256": "40284c728cdaabd9eab8715a25931181644b07c5a625e0a9906a5623aa4682f5",
+			"bytes": 181248,
+			"kind": "inactive reviewed recovery evidence"
+		},
+		{
+			"file": "updater-sources.tar.gz",
+			"sha256": "7bcf44052e6719a208608321af7294c1d1a92cd37ea3e0f9fa0636db2554dbac",
+			"bytes": 381318,
+			"kind": "inactive reviewed recovery evidence"
+		},
+		{
+			"file": "updater-control-correction.tar.gz",
+			"sha256": "7516639abdaf6783456944373e897e9d39072cbb1b93322f20d11cbf89a441fc",
+			"bytes": 17214,
+			"kind": "inactive reviewed recovery evidence"
+		},
+		{
+			"file": "network-sources.tar.gz",
+			"sha256": "a5ce4363bd51046f3ad45d821d07ac4b4db133310143993f953a8010e07315f2",
+			"bytes": 356227,
+			"kind": "inactive reviewed recovery evidence"
+		},
+		{
+			"file": "updater-model-receipts.tar.gz",
+			"sha256": "ac7f1ad4f2cc7292907ea02461a58c1e92f29b4543616b5df7e4dbdff090de83",
+			"bytes": 466731,
+			"kind": "byte-exact executed controlled-model receipts; no native composite credit"
+		},
+		{
+			"file": "network-qualified-application.tar.gz",
+			"sha256": "da0ca2f0f26d026a183c222930a3a249550ddb262d90ba0b420b98192a4492ac",
+			"bytes": 191896,
+			"kind": "reviewed ordinary application and immutable scoped native receipts; pending compositions inactive"
+		},
+		{
+			"file": "prepared-fixture-isolation.tar.gz",
+			"sha256": "b160bbd48a5f1a22795283ea1a83db30a1edee51d150a66f400fe3c319643f3d",
+			"bytes": 17836,
+			"kind": "reviewed fixture cache isolation; unchanged seven receiving controls fail before and pass after on both Lua ABIs"
+		}
+	]
+}

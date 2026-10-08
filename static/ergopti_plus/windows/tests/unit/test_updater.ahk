@@ -259,7 +259,8 @@ _UpdaterTest_SyncFetchTimeoutsPrecedeSend() {
 			"m)^\h*Req\.SetTimeouts\(\s*UPDATER_HTTP_RESOLVE_TIMEOUT_MS\s*,\s*"
 			. "UPDATER_HTTP_CONNECT_TIMEOUT_MS\s*,\s*UPDATER_HTTP_SEND_TIMEOUT_MS\s*,\s*"
 			. "UPDATER_HTTP_RECEIVE_TIMEOUT_MS\s*\)")
-		SendPos := RegExMatch(FnBody, "m)^\h*Req\.Send\(\s*\)")
+		SendPos := RegExMatch(FnBody,
+			"m)^\h*(?:Req\.Send\(\h*\)|if !Req\.Send\(\h*\) \|\| !_HTTP_ManagedWait\(Req\))\h*$")
 		AssertTrue(TimeoutPos > 0, Name . ": the request must use all four canonical budgets")
 		AssertTrue(SendPos > 0, Name . ": Send must not disappear from the scanned subject")
 		AssertTrue(TimeoutPos < SendPos, Name . ": finite timeouts must precede Send")

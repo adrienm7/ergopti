@@ -67,19 +67,48 @@ Http.get_owned = function(url, headers, options, callback)
 	if options.output_path then archive_operation = operation end
 	return operation
 end
-local Files = require("modules.llm.ollama_install_files")
-local original_files_new = Files.new
-Files.new = function(...)
-	local owner, reason = original_files_new(...)
-	if owner then
-		local admit = owner.admit_checksum
-		owner.admit_checksum = function(asset, result)
-			local accepted, refusal = admit(asset, result)
-			checksum_receipt = { accepted = accepted, bytes = type(asset) == "table" and asset.bytes, digest = type(result) == "table" and type(result.stdout) == "string" and result.stdout:match("^([0-9a-f]+)  .+%z$") }
-			return accepted, refusal
+local original_download_output_owned = Http.download_output_owned
+Http.download_output_owned = function(url, headers, target, options, callback)
+	archive_dispatches = archive_dispatches + 1
+	archive_options = { url = url, https_only = options.https_only, bytes = options.max_download_bytes }
+	observed_urls[#observed_urls + 1] = url
+	local operation = original_download_output_owned(url, headers, target, options, callback)
+	owned_get_operations[#owned_get_operations + 1] = operation
+	archive_operation = operation
+	return operation
+end
+local Digest, Archive = require("infra.fd_sha256"), require("infra.archive_output")
+local original_digest_native, original_artifact_new = Digest.native, Archive.native_ollama_artifact
+local observed_digest_workers, observed_artifact_factories = {}, {}
+-- Observe the real same-FD digest callback; never echo the expected asset hash.
+Digest.native = function(...)
+	local worker = original_digest_native(...)
+	local start = worker.start
+	observed_digest_workers[#observed_digest_workers + 1] = { owner = worker, start = start }
+	worker.start = function(fd, length, current, deadline, callback)
+		return start(fd, length, current, deadline, function(digest, receipt)
+			checksum_receipt = { accepted = false, bytes = length, digest = digest, receipt = receipt }
+			return callback(digest, receipt)
+		end)
+	end
+	return worker
+end
+Archive.native_ollama_artifact = function(...)
+	local factory, reason = original_artifact_new(...)
+	if factory then
+		local seal = factory.seal_and_adopt
+		observed_artifact_factories[#observed_artifact_factories + 1] = { owner = factory, seal = seal }
+		factory.seal_and_adopt = function(brand, completion, expected, deadline, callback)
+			return seal(brand, completion, expected, deadline, function(path, refusal, receipt)
+				if checksum_receipt then
+					checksum_receipt.accepted = type(path) == "string" and path ~= ""
+						and refusal == nil and receipt == nil and checksum_receipt.receipt == nil
+				end
+				return callback(path, refusal, receipt)
+			end)
 		end
 	end
-	return owner, reason
+	return factory, reason
 end
 -- Explicit scripted UI input is isolated from actual engine/profiles/writer.
 -- This fixture does not fabricate a physical keyboard/modal restoration receipt.
@@ -306,7 +335,10 @@ while uv.loop_alive() do uv.run("once") end
 assert(not Download.is_active() and not Engine.runtime_pending(), "model HTTP and application cleanup debt retired")
 if #native_services == 1 then assert(native_services[1].operation:is_settled() == true, "exact owned serve physically retired") end
 Http.get_owned, Http.postStream, Http.post_stream_owned = original_get_owned, original_post, original_owned_post
-Files.new = original_files_new
+Http.download_output_owned = original_download_output_owned
+Digest.native, Archive.native_ollama_artifact = original_digest_native, original_artifact_new
+for _, item in ipairs(observed_digest_workers) do item.owner.start = item.start end
+for _, item in ipairs(observed_artifact_factories) do item.owner.seal_and_adopt = item.seal end
 Native.start, Profiles.enable, Window.complete, Window.show = original_native_start, original_profile_enable, original_complete, original_show
 Offer._reset_for_test()
 if not ok then error(diagnostic) end

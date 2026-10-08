@@ -543,6 +543,10 @@ hesitation_cooldown_ms = 10000
 
 [ui]
 
+# Native document challenge, bridge ACK and initialization share the original budget.
+# Linux Versions and network progress documents refuse unavailable prerequisites.
+document_initialization_ack_timeout_ms = 5000
+
 # Delay before the post-install keyboard-layout menu refresh fires.
 # HS: menu_keyboard_layout.lua POST_INSTALL_REFRESH_DELAY.
 post_install_refresh_ms = 1500

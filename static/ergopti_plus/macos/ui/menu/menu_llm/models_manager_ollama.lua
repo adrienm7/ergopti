@@ -19,6 +19,8 @@ local i18n          = require("infra.i18n")
 local text_utils    = require("infra.text_utils")
 local OllamaBinary = require("modules.llm.ollama_binary")
 local OllamaServerCommand = require("modules.llm.ollama_server_command")
+local NetworkEnv = require("modules.llm.network_env")
+local NetworkAdmission = require("modules.llm.opaque_network_admission")
 local OllamaEndpoint = require("modules.llm.ollama_endpoint")
 local ShellRunner = require("adapters.shell_runner")
 local TaskLifecycle = require("adapters.task_lifecycle")
@@ -30,7 +32,7 @@ local RequirementRegistry = require("ui.menu.menu_llm.requirement_operation_regi
 local _active_tasks = {}
 
 local LOG = "menu_llm.ollama"
-local BASH_BIN = "/bin/bash"                         -- Shell used only as an async daemon-launch worker.
+local BASH_BIN = "/bin/bash"                         -- Async daemon worker and exact exec wrapper for an outgoing pull.
 local CURL_BIN = "/usr/bin/curl"                    -- Absolute path: Hammerspoon does not inherit login PATH reliably.
 local OLLAMA_READINESS_PROBE_TIMEOUT_SEC = 5         -- Bound each worker without blocking the Lua runloop.
 local OLLAMA_READINESS_RETRY_DELAY_SEC = 0.5         -- Preserve the established daemon-start polling cadence.
@@ -1373,6 +1375,19 @@ function M.new(deps, presets, ram_getter)
 			settle_cancel("binary_unavailable")
 			return false
 		end
+		local network, network_err = NetworkEnv.opaque_prelude("OLLAMA-PULL")
+		if not network then
+			Logger.error(LOG, "The Ollama model pull cannot start: %s.", tostring(network_err))
+			settle_cancel("network_policy_missing")
+			return false
+		end
+		-- This is the original pull task, not a separate preflight lifecycle.
+		-- exec preserves its PID, cancellation, adoption and retry ownership.
+		-- The daemon retains its existing static environment; this refuses an
+		-- unsupported automatic route before asking that daemon to fetch.
+		local pull_command = network .. "exec " .. text_utils.shell_quote(bin)
+			.. " pull " .. text_utils.shell_quote(repo)
+		local network_admission = NetworkAdmission.new()
 		local pull_output = ""
 		local maybe_release_pull_owner
 		local launch_retry
@@ -1546,7 +1561,7 @@ function M.new(deps, presets, ram_getter)
 		local start_in_progress = true
 		local pending_completion = nil
 		local pending_chunks = {}
-		local function finish_pull(code)
+		local function finish_pull(code, _stdout, stderr)
 			if owner.completion_seen then return false end
 			if deps.active_tasks["ollama_pull"] ~= task then return false end
 			owner.completion_seen = true
@@ -1568,6 +1583,15 @@ function M.new(deps, presets, ram_getter)
 			end
 			if not authorized then return finish_result(true) end
 			if not current_or_cancel() then return finish_result(false) end
+			network_admission.push(stderr or "")
+			local network_receipt = network_admission.finish(code)
+			local network_report
+			if network_receipt then
+				local reported, report = Logger.callback(LOG, "Ollama owned network admission report",
+					NetworkAdmission.report, network_receipt, {})
+				if reported then network_report = report end
+			end
+			if not current_or_cancel() then return finish_result(false) end
 			if code == 0 then
 				pcall(notifications.notify, i18n.get("ollama.model_installed_title"), string.format(i18n.get("ollama.model_ready"), target_model), "success")
 				complete_progress_ui(owner, true, target_model)
@@ -1587,7 +1611,11 @@ function M.new(deps, presets, ram_getter)
 				local requires_upgrade = needs_ollama_upgrade(pull_output)
 				local connection_error = pull_output:lower():find("could not connect") or pull_output:lower():find("connection refused")
 				
-				if requires_upgrade then
+				if network_report then
+					pcall(notifications.notify, i18n.get("ollama.fail_title"),
+						i18n.get(network_report.message_key), "error")
+					complete_progress_ui(owner, false, target_model)
+				elseif requires_upgrade then
 					pcall(notifications.notify, i18n.get("ollama.upgrade_required_title"),
 						i18n.get("ollama.upgrade_required_body"), "warning")
 				elseif connection_error then
@@ -1611,6 +1639,7 @@ function M.new(deps, presets, ram_getter)
 				return true
 			end
 			if not current_or_cancel() then return false end
+			network_admission.push(stderr or "")
 			local out = sanitize_terminal_stream((stdout or "") .. (stderr or ""))
 			pull_output = pull_output .. out
 			if out ~= "" then
@@ -1625,15 +1654,15 @@ function M.new(deps, presets, ram_getter)
 			return true
 		end
 
-		task = TaskLifecycle.native("Ollama model pull", bin, function(code)
+		task = TaskLifecycle.native("Ollama model pull", BASH_BIN, function(code, stdout, stderr)
 			-- A native-faithful double can invoke completion from inside :start()
 			-- before :start() reports whether launch committed. Buffer that result so
 			-- a refused launch cannot publish model state from an unowned callback.
 			if start_in_progress then
-				if pending_completion == nil then pending_completion = table.pack(code) end
+				if pending_completion == nil then pending_completion = table.pack(code, stdout, stderr) end
 				return true
 			end
-			return finish_pull(code)
+			return finish_pull(code, stdout, stderr)
 		end, function(...)
 			if start_in_progress == true then
 				if pending_completion == nil then
@@ -1642,7 +1671,7 @@ function M.new(deps, presets, ram_getter)
 				return true
 			end
 			return process_pull_stream(...)
-		end, {"pull", repo})
+		end, {"-c", pull_command})
 		
 		if task then
 			if not current_or_cancel() then return false end

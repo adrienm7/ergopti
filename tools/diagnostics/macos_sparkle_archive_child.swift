@@ -22,6 +22,29 @@ final class PrivateArchiveChild: NSObject, NSApplicationDelegate, SPUUserDriver,
 		self.version = version
 	}
 
+
+	/// Optional fixed diagnostics use the already owned child stdout, never a
+	/// new path or receipt. Missing/noisy output grants no updater progress.
+	private func progress(_ event: String) {
+		let allowed: Set<String> = [
+			"started-1", "started-2", "updater-start-attempt", "updater-started",
+			"updater-policy-admitted", "check-requested-1", "check-requested-2", "user-check-1",
+			"user-check-2", "start-refused", "unexpected-permission-1", "unexpected-permission-2",
+			"offer-refused-1", "offer-refused-2", "offered-1", "offered-2",
+			"not-found-1", "not-found-2", "refused-1", "refused-2",
+			"routed-1", "routed-2", "download-1", "download-2",
+			"extracting-1", "extracting-2", "ready-1", "ready-2",
+			"installing-1", "installing-2", "relaunch-requested-2", "cycle-refused-1",
+			"cycle-refused-2", "retry-accepted", "terminated-1", "terminated-2",
+			"transport-refused-1", "transport-refused-2", "control-refused-1", "control-refused-2",
+			"deadline-1", "deadline-2"
+		]
+		guard allowed.contains(event) else { return }
+		_ = fputs("SPARKLE_PROGRESS/1 pid=" + String(ProcessInfo.processInfo.processIdentifier)
+			+ " event=" + event + "\n", stdout)
+		_ = fflush(stdout)
+	}
+
 	/// Exclusive final links prevent another callback from replacing evidence.
 	private func record(_ event: String, details: [String: Any] = [:]) {
 		do {
@@ -40,13 +63,31 @@ final class PrivateArchiveChild: NSObject, NSApplicationDelegate, SPUUserDriver,
 			let target = root.appendingPathComponent(event + ".json")
 			guard link(stage.path, target.path) == 0 else { throw Failure.refused }
 			guard unlink(stage.path) == 0 else { throw Failure.refused }
+			progress(event)
 		} catch {
+			fputs("SPARKLE_CHILD_REFUSAL/1 receipt-publication\n", stderr)
 			fputs("Private Sparkle receipt publication refused.\n", stderr)
 			exit(78)
 		}
 	}
 
 	private enum Failure: Error { case refused }
+
+	/// The original startup admission catch. Labels are fixed; NSError descriptions and
+	/// arbitrary domains never enter the original owned stdout capture.
+	private func startupAdmissionRefusal(_ error: Error, startReturned: Bool) {
+		let native = error as NSError
+		let domain: String
+		switch native.domain {
+		case SUSparkleErrorDomain: domain = "sparkle"
+		case NSCocoaErrorDomain: domain = "cocoa"
+		default: domain = "other"
+		}
+		_ = fputs("SPARKLE_STARTUP_ADMISSION_REFUSAL/1 pid=" + String(ProcessInfo.processInfo.processIdentifier)
+			+ " stage=" + (startReturned ? "policy-validation" : "native-start")
+			+ " domain=" + domain + " code=" + String(native.code) + "\n", stdout)
+		_ = fflush(stdout)
+	}
 
 	/// Capture only typed error identities, not descriptions or signing inputs.
 	private func identities(_ error: Error) -> [[String: Any]] {
@@ -72,13 +113,20 @@ final class PrivateArchiveChild: NSObject, NSApplicationDelegate, SPUUserDriver,
 		let owner = SPUUpdater(hostBundle: Bundle.main, applicationBundle: Bundle.main,
 			userDriver: self, delegate: self)
 		updater = owner
+		var startReturned = false
 		do {
+			progress("updater-start-attempt")
 			try owner.start()
+			progress("updater-started")
+			startReturned = true
 			guard !owner.automaticallyChecksForUpdates, !owner.automaticallyDownloadsUpdates,
 				!owner.allowsAutomaticUpdates else { throw Failure.refused }
+			progress("updater-policy-admitted")
+			progress("check-requested-1")
 			owner.checkForUpdates()
 		} catch {
 			record("start-refused", details: ["errors": identities(error)])
+			startupAdmissionRefusal(error, startReturned: startReturned)
 			NSApplication.shared.terminate(nil)
 		}
 	}
@@ -87,6 +135,7 @@ final class PrivateArchiveChild: NSObject, NSApplicationDelegate, SPUUserDriver,
 		let stop = root.appendingPathComponent("retire")
 		if FileManager.default.fileExists(atPath: stop.path) {
 			guard (try? Data(contentsOf: stop)) == Data(nonce.utf8) else {
+				fputs("SPARKLE_CHILD_REFUSAL/1 control\n", stderr)
 				record("control-refused-" + version)
 				exit(78)
 			}
@@ -99,6 +148,7 @@ final class PrivateArchiveChild: NSObject, NSApplicationDelegate, SPUUserDriver,
 				let owner = updater, !owner.sessionInProgress else { return }
 			phase = 2
 			record("retry-accepted")
+			progress("check-requested-2")
 			owner.checkForUpdates()
 		}
 	}
@@ -114,7 +164,7 @@ final class PrivateArchiveChild: NSObject, NSApplicationDelegate, SPUUserDriver,
 		reply(SUUpdatePermissionResponse(automaticUpdateChecks: false, sendSystemProfile: false))
 	}
 
-	func showUserInitiatedUpdateCheck(cancellation: @escaping () -> Void) {}
+	func showUserInitiatedUpdateCheck(cancellation: @escaping () -> Void) { progress("user-check-" + String(phase)) }
 
 	func showUpdateFound(with appcastItem: SUAppcastItem, state: SPUUserUpdateState,
 		reply: @escaping @Sendable (SPUUserUpdateChoice) -> Void) {
@@ -155,6 +205,7 @@ final class PrivateArchiveChild: NSObject, NSApplicationDelegate, SPUUserDriver,
 			let port = transport.port, (1...65535).contains(port), transport.path == "/archive.tar.xz",
 			transport.user == nil, transport.password == nil, transport.query == nil, transport.fragment == nil,
 			Bundle.main.object(forInfoDictionaryKey: "SUFeedURL") as? String == "http://localhost:" + String(port) + "/feed.xml" else {
+			fputs("SPARKLE_CHILD_REFUSAL/1 transport\n", stderr)
 			record("transport-refused-" + String(phase))
 			exit(78) // The native downloader has not started, so no foreign origin is acquired.
 		}
@@ -210,15 +261,31 @@ guard let rootPath = Bundle.main.object(forInfoDictionaryKey: "FixtureRoot") as?
 	let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String,
 	["1", "2"].contains(version),
 	Bundle.main.bundleIdentifier == "org.ergoptiplus.archive-acceptance." + nonce else {
+	fputs("SPARKLE_CHILD_REFUSAL/1 configuration\n", stderr)
 	fputs("Private Sparkle child configuration refused.\n", stderr)
 	exit(78)
 }
-let root = URL(fileURLWithPath: rootPath).resolvingSymlinksInPath()
-guard root.path == rootPath,
-	Bundle.main.bundleURL.resolvingSymlinksInPath() == root.appendingPathComponent("installed/ErgoptiPlus.app") else {
+// Keep native path spelling as a String. Foundation can project a /private
+// path back to its alias even after resolving a URL; that is not a new root.
+private func nativeDirectoryPath(_ path: String) -> String? {
+	guard let resolved = Darwin.realpath(path, nil) else { return nil }
+	defer { free(resolved) }
+	var metadata = stat()
+	guard Darwin.lstat(resolved, &metadata) == 0,
+		metadata.st_mode & mode_t(S_IFMT) == mode_t(S_IFDIR) else { return nil }
+	return String(validatingUTF8: resolved)
+}
+guard let nativeRoot = nativeDirectoryPath(rootPath), nativeRoot == rootPath else {
+	fputs("SPARKLE_CHILD_REFUSAL/1 target-root\n", stderr)
 	fputs("Private Sparkle child target refused.\n", stderr)
 	exit(78)
 }
+guard nativeDirectoryPath(Bundle.main.bundleURL.path) == nativeRoot + "/installed/ErgoptiPlus.app" else {
+	fputs("SPARKLE_CHILD_REFUSAL/1 target-bundle\n", stderr)
+	fputs("Private Sparkle child target refused.\n", stderr)
+	exit(78)
+}
+let root = URL(fileURLWithPath: nativeRoot)
 let application = NSApplication.shared
 application.setActivationPolicy(.accessory)
 let delegate = PrivateArchiveChild(root: root, nonce: nonce, version: version)

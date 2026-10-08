@@ -209,12 +209,23 @@ helpers.describe("changelog_bridge: native fetch push", function()
 	end
 
 	--- Installs scripted seams and returns their records.
+	local raw_bridge, document_fixture = Bridge, nil
+	local native_push = Bridge._push
 	local function install()
+		if document_fixture then document_fixture.close() end
+		Bridge = raw_bridge
 		Bridge._reset()
 		local get, calls = scripted_get()
 		local pushed = {}
 		Bridge._http_get = get
 		Bridge._push = function(payload) pushed[#pushed + 1] = payload; return true end
+		-- Complete native initialization with a setup-only inert transport. The
+		-- test's scripted transport starts after genuine document admission.
+		raw_bridge._http_get = function() end
+		document_fixture = require("tests.support.document_fixture").new("changelog", raw_bridge, {})
+		document_fixture.handshake()
+		raw_bridge._http_get = get
+		Bridge = document_fixture.proxy()
 		return calls, pushed
 	end
 
@@ -226,6 +237,8 @@ helpers.describe("changelog_bridge: native fetch push", function()
 			get_channel = function() return channel end,
 		}, { __index = real })
 		local ok, err = pcall(body)
+		-- The caller may release transport callbacks after this configuration scope.
+		-- Keep its actual document lease until the next install() or group teardown.
 		package.loaded["modules.updater.manager"] = previous
 		if not ok then error(err, 0) end
 	end
@@ -327,18 +340,18 @@ helpers.describe("changelog_bridge: native fetch push", function()
 	end)
 
 	helpers.it("encodes the push for the page response hook", function()
-		Bridge._reset()
-		local previous = package.loaded["ui.webview_manager"]
-		local evaluated = {}
-		package.loaded["ui.webview_manager"] = {
-			eval_js = function(app, code) evaluated[#evaluated + 1] = { app = app, code = code }; return true end,
-		}
+		if document_fixture then document_fixture.close(); document_fixture = nil end
+		Bridge = raw_bridge; Bridge._reset(); Bridge._push = native_push
+		Bridge._http_get = function() end
+		local native = require("tests.support.document_fixture").new("changelog", raw_bridge, {})
+		native.handshake()
+		local evaluated = native.effects
 		local get, calls = scripted_get()
 		Bridge._http_get = get
 		Bridge.start_fetch("main")
 		calls[1].callback(0, "", "timeout")
 		calls[2].callback(0, "", "timeout")
-		package.loaded["ui.webview_manager"] = previous
+		native.close()
 		helpers.assert_eq(#evaluated, 1)
 		helpers.assert_eq(evaluated[1].app, "changelog")
 		local encoded = evaluated[1].code:match("__hostBridgeResponse%('changelog_bridge',true,'([^']+)'%)")
@@ -347,6 +360,7 @@ helpers.describe("changelog_bridge: native fetch push", function()
 		helpers.assert_eq(decoded.action, "releases_error")
 		Bridge._reset()
 	end)
+	if document_fixture then document_fixture.close(); document_fixture = nil end
 end)
 
 -- The page's tabs used to be the only channel control the window had, and the
@@ -377,7 +391,11 @@ helpers.describe("changelog_bridge: subscription", function()
 		Bridge._http_get = function() end
 		Bridge._push = function(payload) pushed[#pushed + 1] = payload; return true end
 		record.pushed = pushed
+		local native = require("tests.support.document_fixture").new("changelog", Bridge, {})
+		local original = Bridge
+		Bridge = native.proxy()
 		local ok, err = pcall(body, record)
+		native.close(); Bridge = original
 		package.loaded["modules.updater.manager"] = previous
 		Bridge._reset()
 		if not ok then error(err, 0) end

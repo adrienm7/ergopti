@@ -5,6 +5,15 @@ local Fakes = helpers.load_module("tests.fakes")
 local Installer = helpers.load_module("modules.updater.installer")
 local Fs = helpers.load_module("adapters.file_system")
 
+--- Authors native evidence for controlled responses independently of request options.
+--- Each literal endpoint names one fixture representation, including bodyless 304s.
+local function etag_response(result, endpoint, validator, conditional)
+	result.etag_receipt = { format = "curl-etag-final-v1", effective_url = endpoint,
+		validator = validator, associated = true, conditional_sent = conditional == true,
+		sent_validator = conditional == true and validator or nil }
+	return result
+end
+
 helpers.describe("modules/updater/manager.lua", function()
 	helpers.it("module loads without error", function()
 		local ok, mod = pcall(require, "modules.updater.manager")
@@ -13,6 +22,20 @@ helpers.describe("modules/updater/manager.lua", function()
 	end)
 
 	local M = helpers.load_module("modules.updater.manager")
+
+	-- Explicit portable native-port model only for the original controlled
+	-- download tests below. Real Manager/Transfer execute their ownership laws.
+	local function with_native_download_model(body)
+		local previous = M
+		local ok, failure = xpcall(function()
+			require("tests.support.updater_native_model").with_fixture(function(fresh, prepare)
+				M = fresh
+				body(prepare)
+			end)
+		end, debug.traceback)
+		M = previous
+		if not ok then error(failure, 0) end
+	end
 
 	helpers.it("exposes public API surface", function()
 		helpers.assert_true(type(M.check_for_updates) == "function", "check_for_updates")
@@ -511,16 +534,19 @@ helpers.describe("modules/updater/manager.lua", function()
 			fresh._http_client = {
 				get = function(_, _, options, callback)
 					requests[#requests + 1] = options
-					if #requests == 1 then callback({ ok = true, status = 200, body = old })
+					if #requests == 1 then callback(etag_response({ ok = true, status = 200, body = old },
+						"https://etag-fixture.invalid/releases/page-1", '"OLD"', false))
 					elseif #requests == 2 then
 						if mode == "dispatch-refusal" then return false end
 						if mode == "cancel" then return true end
 						callback(failure[mode])
-					else callback({ ok = true, status = 200, body = new }) end
+					else callback(etag_response({ ok = true, status = 200, body = new },
+						"https://etag-fixture.invalid/releases/page-1", '"NEW"', false)) end
 					return true
 				end,
 				cancel = function() return true end,
 			}
+			fresh._http_client = require("tests.support.release_http_fixture").attach(fresh._http_client)
 			fresh._file_digest = { cancel = function() return true end }
 			for index = 1, 3 do
 				local count = 0
@@ -531,6 +557,7 @@ helpers.describe("modules/updater/manager.lua", function()
 				helpers.assert_eq(count, 1)
 			end
 			helpers.assert_nil(requests[1].etag_compare)
+			helpers.assert_eq(requests[1].etag_affinity, true, "cold pages explicitly request final-endpoint evidence")
 			helpers.assert_true(requests[2].etag_compare ~= nil, "accepted page retains its conditional association")
 			helpers.assert_nil(requests[3].etag_compare, "failed page cannot associate a changed validator with its old body")
 			helpers.assert_eq(completions[1].body, old)
@@ -562,10 +589,17 @@ helpers.describe("modules/updater/manager.lua", function()
 			{ ok = false, status = 304, body = "", error = "HTTP 304", error_body = "" }, { ok = false, status = 200, body = "", error = "truncated page" },
 			{ ok = false, status = 304, body = "", error = "HTTP 304", error_body = "" }, { ok = true, status = 200, body = final_page },
 		}
+		local page_one, page_two = "https://etag-fixture.invalid/releases/page-1", "https://etag-fixture.invalid/releases/page-2"
+		etag_response(responses[1], page_one, '"PAGE-ONE"', false)
+		etag_response(responses[2], page_two, '"PAGE-TWO"', false)
+		etag_response(responses[3], page_one, '"PAGE-ONE"', true)
+		etag_response(responses[5], page_one, '"PAGE-ONE"', true)
+		etag_response(responses[6], page_two, '"PAGE-TWO-NEW"', false)
 		local requests, results = {}, {}
 		fresh._http_client = { get = function(_, _, options, callback)
 			requests[#requests + 1] = options; callback(assert(table.remove(responses, 1))); return true
 		end }
+		fresh._http_client = require("tests.support.release_http_fixture").attach(fresh._http_client)
 		for index = 1, 3 do
 			local callbacks = 0
 			helpers.assert_true(fresh._fetch_releases("main", function(body, status, err)
@@ -605,6 +639,8 @@ helpers.describe("modules/updater/manager.lua", function()
 			{ ok = true, status = 200, body = list },
 			{ ok = false, status = 304, body = "", error = "HTTP 304", error_body = "" },
 		}
+		etag_response(responses[1], "https://etag-fixture.invalid/releases/page-1", '"AVAILABLE"', false)
+		etag_response(responses[2], "https://etag-fixture.invalid/releases/page-1", '"AVAILABLE"', true)
 		local requests = {}
 		fresh._http_client = {
 			get = function(_, _, options, callback)
@@ -614,6 +650,7 @@ helpers.describe("modules/updater/manager.lua", function()
 			end,
 			cancel = function() return true end,
 		}
+		fresh._http_client = require("tests.support.release_http_fixture").attach(fresh._http_client)
 		fresh.current_version = function() return "local" end
 
 		local results = {}
@@ -701,6 +738,7 @@ helpers.describe("modules/updater/manager.lua", function()
 	for _, suffix in ipairs({ ".tar.gz", ".tar.gz.part" }) do
 		for _, alias in ipairs({ "regular", "dangling" }) do
 			helpers.it("linux-updater-temp-ownership: preserves unrelated " .. alias .. " " .. suffix, function()
+				with_native_download_model(function(prepare_owned_http)
 				M.cancel_update()
 				local base = os.tmpname()
 				local candidate, target = base .. suffix, base .. ".missing"
@@ -718,6 +756,7 @@ helpers.describe("modules/updater/manager.lua", function()
 					download = function() error("failed checksum must not download an archive") end,
 					cancel = function() return true end,
 				}
+				prepare_owned_http()
 				local ok, err = xpcall(function()
 					helpers.assert_true(M.download_release({ tag = "v4.0.0", download_url = "https://example.invalid/archive",
 						checksum_url = "https://example.invalid/checksum" }, function(path, failure)
@@ -737,6 +776,7 @@ helpers.describe("modules/updater/manager.lua", function()
 				M.cancel_update()
 				os.remove(base); os.remove(candidate); os.remove(target)
 				helpers.assert_true(ok, tostring(err))
+				end)
 			end)
 		end
 	end
@@ -744,6 +784,7 @@ helpers.describe("modules/updater/manager.lua", function()
 	for _, api in ipairs({ "update", "release" }) do
 		for _, wants_callback in ipairs({ true, false }) do
 			helpers.it("linux-updater-temp-allocation: " .. api .. " acknowledges allocator refusal with callback " .. tostring(wants_callback), function()
+				with_native_download_model(function(prepare_owned_http)
 				M.cancel_update()
 				local release = { tag = "v4.0.0", download_url = "https://example.invalid/archive",
 					checksum_url = "https://example.invalid/checksum" }
@@ -754,6 +795,7 @@ helpers.describe("modules/updater/manager.lua", function()
 				local callbacks, received_error = 0, nil
 				local callback
 				if wants_callback then callback = function(path, err) callbacks = callbacks + 1; received_error = err; helpers.assert_nil(path) end end
+				prepare_owned_http()
 				local ok, err = xpcall(function()
 					local dispatched
 					if api == "update" then dispatched = M.download_update(nil, callback)
@@ -767,11 +809,13 @@ helpers.describe("modules/updater/manager.lua", function()
 				os.tmpname, M._http_client = real_tmpname, real_http
 				M.cancel_update()
 				helpers.assert_true(ok, tostring(err))
+				end)
 			end)
 		end
 	end
 
 	helpers.it("linux-digest-owner: downloads and hashes a verified archive under the updater owner", function()
+		with_native_download_model(function(prepare_owned_http)
 		local real_http = M._http_client
 		local real_digest = M._file_digest
 		local expected = string.rep("cd", 32)
@@ -811,6 +855,7 @@ helpers.describe("modules/updater/manager.lua", function()
 		})
 		local verified_path = nil
 		local completion_error = nil
+		prepare_owned_http()
 		local ok, dispatched = pcall(M.download_update, nil, function(path, err)
 			verified_path = path
 			completion_error = err
@@ -827,9 +872,11 @@ helpers.describe("modules/updater/manager.lua", function()
 		helpers.assert_eq(M.get_state(), "available")
 		Fs.delete(verified_path)
 		M.clear_cached_release()
+		end)
 	end)
 
 	helpers.it("removes a downloaded archive when SHA-256 does not match", function()
+		with_native_download_model(function(prepare_owned_http)
 		local real_http = M._http_client
 		local real_digest = M._file_digest
 		local expected = string.rep("ef", 32)
@@ -864,6 +911,7 @@ helpers.describe("modules/updater/manager.lua", function()
 		})
 		local verified_path = nil
 		local completion_error = nil
+		prepare_owned_http()
 		local ok, dispatched = pcall(M.download_update, nil, function(path, err)
 			verified_path = path
 			completion_error = err
@@ -881,6 +929,7 @@ helpers.describe("modules/updater/manager.lua", function()
 			"a mismatched archive must never be published")
 		helpers.assert_eq(M.get_state(), "idle")
 		M.clear_cached_release()
+		end)
 	end)
 
 	helpers.it("cancel-update: a verified archive does not survive cancellation", function()
@@ -1232,7 +1281,12 @@ helpers.describe("updater bounded pagination", function()
 	end
 
 	helpers.it("collects all 100 candidates through bounded pages and keeps conditional page caches", function()
-		local M = helpers.load_module("modules.updater.manager")
+		local real_fs = require("adapters.file_system")
+		local controlled_fs = setmetatable({ exists = function(path)
+			if path:match("/%.cache$") or path:match("/%.cache/ergopti_updater_etag_[^/]+%.txt$") then return true end
+			return real_fs.exists(path)
+		end }, { __index = real_fs })
+		local M = helpers.load_module_with_dependency("modules.updater.manager", "adapters.file_system", controlled_fs)
 		local requests, completions, result = 0, 0, nil
 		local cached = false
 		M._http_client = { get = function(url, _, options, cb)
@@ -1242,10 +1296,13 @@ helpers.describe("updater bounded pagination", function()
 			helpers.assert_contains(url, "per_page=20")
 			helpers.assert_eq(options.max_body_bytes, 2 * 1024 * 1024)
 			local response = cached and { ok = false, status = 304, body = "", error = "HTTP 304", error_body = "" } or { ok = true, status = 200, body = page((index - 1) * 20 + 1, 20) }
+			etag_response(response, "https://etag-fixture.invalid/releases/page-" .. index, '"PAGE-' .. index .. '"', cached)
+			if cached then helpers.assert_true(options.etag_compare ~= nil, "the controlled 304 sent a cached validator") end
 			cb(response)
 			cb(response)
 			return true
 		end }
+		M._http_client = require("tests.support.release_http_fixture").attach(M._http_client)
 		for _ = 1, 2 do
 			M._fetch_releases("dev", function(body, _, err)
 				completions = completions + 1
@@ -1278,6 +1335,7 @@ helpers.describe("updater bounded pagination", function()
 				end,
 				cancel = function() return true end,
 			}
+			M._http_client = require("tests.support.release_http_fixture").attach(M._http_client)
 			M._file_digest = { cancel = function() return true end }
 			M._fetch_releases("dev", function(body, _, err)
 				completions = completions + 1

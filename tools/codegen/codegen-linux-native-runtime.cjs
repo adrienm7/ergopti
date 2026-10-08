@@ -9,6 +9,7 @@ const SOURCE = 'static/ergopti_plus/_shared/data/linux_native_runtime.json';
 const LUA_OUTPUT = 'static/ergopti_plus/linux/_generated/native_runtime.lua';
 const MANAGERS = ['apt', 'dnf', 'zypper', 'pacman', 'xbps', 'apk'];
 const KEYS = ['xkbcommon', 'xkbcommon_x11', 'x11', 'x11_xcb'];
+const NETWORK_KEYS = ['gio', 'gobject', 'glib'];
 
 /** Reject data that could escape native metadata, shell literals or Lua strings. */
 function validate(data) {
@@ -36,6 +37,84 @@ function validate(data) {
 			)
 				throw new TypeError(`Invalid preserved ${name} requirement.`);
 	}
+	const digest = data.archive_digest_runtime;
+	if (!digest || digest.soname !== 'libcrypto.so.3' || digest.nix_package !== 'openssl')
+		throw new TypeError('Missing or invalid OpenSSL3 digest runtime identity.');
+	if (
+		!Array.isArray(digest.deb_dependency_alternatives) ||
+		digest.deb_dependency_alternatives.join(',') !== 'libssl3t64,libssl3'
+	)
+		throw new TypeError('Invalid ordered Debian OpenSSL3 alternatives.');
+	if (Object.keys(digest.package_alternatives || {}).join(',') !== MANAGERS.join(','))
+		throw new TypeError('Incomplete digest runtime repair availability.');
+	for (const [manager, packages] of Object.entries(digest.package_alternatives)) {
+		if (packages === null) continue;
+		if (
+			manager !== 'apt' ||
+			!Array.isArray(packages) ||
+			packages.join(',') !== digest.deb_dependency_alternatives.join(',')
+		)
+			throw new TypeError('Unreviewed digest runtime repair provider.');
+	}
+	if (
+		!Array.isArray(digest.portable_dlopen_roots) ||
+		digest.portable_dlopen_roots.join(',') !== digest.soname
+	)
+		throw new TypeError('Missing explicit portable OpenSSL3 dlopen root.');
+	const network = data.network_runtime;
+	if (!network || Object.keys(network.libraries || {}).join(',') !== NETWORK_KEYS.join(','))
+		throw new TypeError('Missing ordered native network library identities.');
+	for (const soname of Object.values(network.libraries))
+		if (typeof soname !== 'string' || !/^lib[A-Za-z0-9_.-]+\.so\.[0-9]+$/.test(soname))
+			throw new TypeError('Invalid native network SONAME.');
+	if (network.proxy_schema !== 'org.gnome.system.proxy' || network.curl_package !== 'curl')
+		throw new TypeError('Invalid network schema or curl package identity.');
+	if (Object.keys(network.providers || {}).join(',') !== MANAGERS.join(','))
+		throw new TypeError('Incomplete explicit network provider availability.');
+	for (const packages of Object.values(network.providers)) {
+		if (packages === null) continue;
+		if (!Array.isArray(packages) || !packages.length || new Set(packages).size !== packages.length)
+			throw new TypeError('Invalid native network provider list.');
+		for (const pkg of packages)
+			if (typeof pkg !== 'string' || !/^[A-Za-z0-9][A-Za-z0-9+_.-]*$/.test(pkg))
+				throw new TypeError('Invalid native network provider package.');
+	}
+	const portable = network.portable;
+	if (
+		!portable ||
+		!Array.isArray(portable.gio_modules) ||
+		portable.gio_modules.join(',') !== 'libgiognomeproxy.so,libgiolibproxy.so,libdconfsettings.so'
+	)
+		throw new TypeError('Missing explicit portable GIO modules.');
+	if (
+		!Array.isArray(portable.system_ca_files) ||
+		!portable.system_ca_files.length ||
+		new Set(portable.system_ca_files).size !== portable.system_ca_files.length ||
+		portable.system_ca_files.some(
+			(file) =>
+				typeof file !== 'string' || !/^\/[A-Za-z0-9_./-]+$/.test(file) || file.includes('..')
+		)
+	)
+		throw new TypeError('Invalid recipient system trust candidates.');
+	const sources = portable.flatpak_sources;
+	if (
+		!sources ||
+		Object.keys(sources).join(',') !== 'luv,schemas,curl,duktape,libproxy,glib_networking'
+	)
+		throw new TypeError('Incomplete portable native source inventory.');
+	for (const [name, source] of Object.entries(sources)) {
+		if (
+			!/^https:\/\/github\.com\/[A-Za-z0-9_.-]+\/[A-Za-z0-9_./-]+$/.test(source.url) ||
+			source.url.includes('..')
+		)
+			throw new TypeError('Invalid portable native source identity.');
+		if (
+			name === 'duktape'
+				? !/^[a-f0-9]{64}$/.test(source.sha256)
+				: !/^[a-f0-9]{40}$/.test(source.commit)
+		)
+			throw new TypeError('Unpinned portable native source.');
+	}
 	return data;
 }
 
@@ -46,7 +125,104 @@ function requirements(data, format) {
 	const native = manager
 		? KEYS.map((key) => data.libraries[key].packages[manager])
 		: KEYS.map((key) => data.libraries[key].nix_package);
-	return [...new Set([...data.package_requirements[format], ...native])];
+	const network = manager ? data.network_runtime.providers[manager] || [] : [];
+	const digest =
+		format === 'deb'
+			? [data.archive_digest_runtime.deb_dependency_alternatives.join(' | ')]
+			: format === 'nix_library_path'
+				? [data.archive_digest_runtime.nix_package]
+				: [];
+	return [...new Set([...data.package_requirements[format], ...native, ...network, ...digest])];
+}
+
+/** Native Flatpak recipes use pinned canonical sources, never the build host ABI. */
+function flatpakModules(data) {
+	validate(data);
+	const sources = data.network_runtime.portable.flatpak_sources;
+	const modules = [
+		{
+			name: 'network-luv',
+			buildsystem: 'cmake-ninja',
+			'config-opts': [
+				'-DLUA_BUILD_TYPE=System',
+				'-DWITH_LUA_ENGINE=LuaJIT',
+				'-DBUILD_MODULE=ON',
+				'-DBUILD_SHARED_LIBS=OFF',
+				'-DBUILD_STATIC_LIBS=OFF',
+				'-DWITH_SHARED_LIBUV=OFF'
+			],
+			'post-install': ['test -f /app/lib/lua/5.1/luv.so'],
+			source: 'luv'
+		},
+		{
+			name: 'network-schemas',
+			buildsystem: 'meson',
+			'config-opts': ['-Dintrospection=false'],
+			'post-install': ['glib-compile-schemas /app/share/glib-2.0/schemas'],
+			source: 'schemas'
+		},
+		{
+			name: 'network-curl',
+			buildsystem: 'cmake-ninja',
+			'config-opts': [
+				'-DBUILD_CURL_EXE=ON',
+				'-DBUILD_SHARED_LIBS=ON',
+				'-DBUILD_TESTING=OFF',
+				'-DCURL_USE_OPENSSL=ON',
+				'-DCURL_USE_GSSAPI=ON'
+			],
+			'post-install': ['test -x /app/bin/curl'],
+			source: 'curl'
+		},
+		{
+			name: 'network-duktape',
+			buildsystem: 'simple',
+			'build-commands': [
+				'make -f Makefile.sharedlibrary INSTALL_PREFIX=/app',
+				'make -f Makefile.sharedlibrary INSTALL_PREFIX=/app install'
+			],
+			source: 'duktape'
+		},
+		{
+			name: 'network-libproxy',
+			buildsystem: 'meson',
+			'config-opts': [
+				'-Ddocs=false',
+				'-Dtests=false',
+				'-Dvapi=false',
+				'-Dintrospection=false',
+				'-Dconfig-xdp=true',
+				'-Dpacrunner-duktape=true',
+				'-Dcurl=true'
+			],
+			source: 'libproxy'
+		},
+		// The Flatpak proxy selection goes through libproxy, whose native XDP
+		// implementation is built above. A private GNOME dconf view is not
+		// promoted to host settings; portal delivery still needs native proof.
+		{
+			name: 'network-gio-proxy',
+			buildsystem: 'meson',
+			'config-opts': [
+				'-Dlibproxy=enabled',
+				'-Dgnome_proxy=disabled',
+				'-Dgnutls=enabled',
+				'-Denvironment_proxy=disabled',
+				'-Dtests=false'
+			],
+			source: 'glib_networking'
+		}
+	];
+	return modules
+		.map(({ source, ...recipe }) => {
+			const input = sources[source];
+			const pinned =
+				source === 'duktape'
+					? { type: 'archive', url: input.url, sha256: input.sha256 }
+					: { type: 'git', url: input.url, commit: input.commit };
+			return '  - ' + JSON.stringify({ ...recipe, sources: [pinned] }) + '\n';
+		})
+		.join('');
 }
 
 /** Replace exactly one owned region without altering the surrounding installer or recipe. */
@@ -64,20 +240,57 @@ function projectRegion(source, label, body) {
 function render(data, read) {
 	validate(data);
 	const result = {};
+	const template = 'tools/build/templates/linux-portable-runtime-env.sh';
+	result[template] = projectRegion(
+		read(template),
+		'LINUX PORTABLE TRUST',
+		'ERGOPTI_SYSTEM_CA_FILES=(' +
+			data.network_runtime.portable.system_ca_files.map((file) => `"${file}"`).join(' ') +
+			')'
+	);
 	const rows = MANAGERS.flatMap((manager) =>
 		KEYS.map((key) => {
 			const lib = data.libraries[key];
 			return `\t\t${manager}:${lib.soname}) echo "${lib.packages[manager]}" ;;`;
 		})
 	);
+	for (const manager of MANAGERS)
+		rows.push(`\t\t${manager}:curl) echo "${data.network_runtime.curl_package}" ;;`);
+	const providerRows = MANAGERS.map((manager) => {
+		const packages = data.network_runtime.providers[manager];
+		return packages === null
+			? `\t\t${manager}) return 1 ;;`
+			: `\t\t${manager}) echo "${packages.join(' ')}" ;;`;
+	});
+	// Ordered alternatives are arguments to the actual metadata selector, not a
+	// command-line request to install both mutually transitioning providers.
+	rows.push(
+		data.archive_digest_runtime.package_alternatives.apt === null
+			? `\t\tapt:${data.archive_digest_runtime.soname}) return 1 ;;`
+			: `\t\tapt:${data.archive_digest_runtime.soname}) _available_apt_runtime_package ${data.archive_digest_runtime.package_alternatives.apt.join(' ')} ;;`
+	);
 	const installer = 'static/ergopti_plus/linux/install.sh';
 	result[installer] = projectRegion(
 		projectRegion(read(installer), 'LINUX NATIVE PACKAGES', rows.join('\n')),
 		'LINUX NATIVE CAPABILITIES',
-		KEYS.map((key) => `_check_or_install_library ${data.libraries[key].soname}`).join('\n')
+		[
+			...KEYS.map((key) => `_check_or_install_library ${data.libraries[key].soname}`),
+			'_check_or_install curl'
+		].join('\n')
 	);
+	result[installer] = projectRegion(
+		result[installer],
+		'LINUX NETWORK PROVIDERS',
+		`_network_runtime_packages() {\n\tcase "$1" in\n${providerRows.join('\n')}\n\t\t*) return 1 ;;\n\tesac\n}`
+	);
+	result[installer] = projectRegion(
+		result[installer],
+		'LINUX ARCHIVE DIGEST',
+		'ARCHIVE_DIGEST_SONAME=' + JSON.stringify(data.archive_digest_runtime.soname)
+	);
+	const nativeNetwork = `\tnetwork_runtime = {\n\t\tlibraries = {\n${NETWORK_KEYS.map((key) => `\t\t\t${key} = ${JSON.stringify(data.network_runtime.libraries[key])},`).join('\n')}\n\t\t},\n\t\tproxy_schema = ${JSON.stringify(data.network_runtime.proxy_schema)},\n\t},\n`;
 	result[LUA_OUTPUT] =
-		`--- _generated/native_runtime.lua\n\n--- Generated by tools/codegen/codegen-linux-native-runtime.cjs; do not edit.\n--- Source: _shared/data/linux_native_runtime.json.\nreturn {\n${KEYS.map((key) => `\t${key} = ${JSON.stringify(data.libraries[key].soname)},`).join('\n')}\n}\n`;
+		`--- _generated/native_runtime.lua\n\n--- Generated by tools/codegen/codegen-linux-native-runtime.cjs; do not edit.\n--- Source: _shared/data/linux_native_runtime.json.\nreturn {\n${KEYS.map((key) => `\t${key} = ${JSON.stringify(data.libraries[key].soname)},`).join('\n')}\n${nativeNetwork}\tarchive_digest_runtime = {\n\t\tschema_version = 1,\n\t\tsoname = ${JSON.stringify(data.archive_digest_runtime.soname)},\n\t},\n}\n`;
 	for (const [file, format] of [
 		['tools/build/build-linux-deb.sh', 'deb'],
 		['tools/build/build-linux-rpm.sh', 'rpm'],
@@ -121,7 +334,9 @@ module.exports = {
 	LUA_OUTPUT,
 	MANAGERS,
 	KEYS,
+	NETWORK_KEYS,
 	validate,
+	flatpakModules,
 	requirements,
 	projectRegion,
 	render

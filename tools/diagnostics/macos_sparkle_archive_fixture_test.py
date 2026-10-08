@@ -271,6 +271,76 @@ class PrivateSparkleTransportTests(unittest.TestCase):
             json.loads((self.root / "server-retired.json").read_bytes())["requests"], 0
         )
 
+    @unittest.skipUnless(hasattr(os, "geteuid"), "Physical parent aliases need a POSIX host")
+    def testActualParentAliasRefusesButRetainedPhysicalDirectoryServesAndRetires(self):
+        physical = self.root / "physical-parent"
+        physical.mkdir(mode=0o700)
+        www = physical / "www"
+        www.mkdir(mode=0o700)
+        alias = self.root / "parent-alias"
+        alias.symlink_to(physical, target_is_directory=True)
+        logical = alias / "www"
+        observed = www.stat()
+        refused = subprocess.run(
+            [sys.executable, str(HELPER), "serve", str(logical), NONCE],
+            capture_output=True,
+            timeout=5,
+        )
+        self.assertEqual(
+            (refused.returncode, refused.stdout, refused.stderr),
+            (1, b"", b"Private Sparkle fixture refused.\n"),
+        )
+        self.assertFalse((www / "server-start.json").exists())
+        self.assertFalse((www / "server-retired.json").exists())
+        # The producer must hand over its already-retained physical identity;
+        # the helper keeps rejecting the independent lexical parent alias.
+        retained = www.resolve(strict=True)
+        self.assertEqual(retained.stat().st_dev, observed.st_dev)
+        self.assertEqual(retained.stat().st_ino, observed.st_ino)
+        self.assertNotEqual(str(logical), str(retained))
+        payload = b"independent physical alias feed\n"
+        (retained / "feed.xml").write_bytes(payload)
+        self.child = subprocess.Popen(
+            [sys.executable, str(HELPER), "serve", str(retained), NONCE],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+        )
+        target = retained / "server-start.json"
+        deadline = time.monotonic() + 5
+        while not target.exists() and self.child.poll() is None and time.monotonic() < deadline:
+            time.sleep(0.02)
+        self.assertTrue(target.exists(), "Only the retained physical input may publish readiness")
+        started = json.loads(target.read_bytes())
+        self.assertEqual((started["nonce"], started["pid"]), (NONCE, self.child.pid))
+        connection = http.client.HTTPConnection("127.0.0.1", started["port"], timeout=5)
+        try:
+            connection.request("GET", "/feed.xml")
+            response = connection.getresponse()
+            self.assertEqual(response.status, 200)
+            self.assertEqual(response.read(), payload)
+        finally:
+            connection.close()
+        request = json.loads((retained / "request-000001.json").read_bytes())
+        self.assertEqual(
+            request,
+            {
+                "nonce": NONCE,
+                "path": "/feed.xml",
+                "bytes": len(payload),
+                "sha256": hashlib.sha256(payload).hexdigest(),
+            },
+        )
+        self.child.terminate()
+        stdout, stderr = self.child.communicate(timeout=5)
+        self.assertEqual((self.child.returncode, stdout, stderr), (0, b"", b""))
+        self.assertEqual(
+            json.loads((retained / "server-retired.json").read_bytes()),
+            {"nonce": NONCE, "pid": self.child.pid, "requests": 1},
+        )
+        self.assertEqual(
+            (retained.stat().st_dev, retained.stat().st_ino), (observed.st_dev, observed.st_ino)
+        )
+
 
 class NativeCensusDiagnosticControls(unittest.TestCase):
     """Model diagnostic projection only; these do not qualify Darwin census."""
@@ -501,6 +571,713 @@ class NativeBSDDiagnosticControls(unittest.TestCase):
             with self.subTest(packet=packet):
                 with self.assertRaisesRegex(RuntimeError, "Native Sparkle diagnostic refused"):
                     self.helper.NativeCensusRefusal(errno.ESRCH, packet)
+
+
+class NativeCensusStageControls(unittest.TestCase):
+    """Observe real helper failure boundaries with independent fixed expectations."""
+
+    def setUp(self):
+        spec = importlib.util.spec_from_file_location("sparkle_census_stage", HELPER)
+        self.helper = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(self.helper)
+
+    def boundary(self, library):
+        helper = self.helper
+        stack = contextlib.ExitStack()
+        stack.enter_context(mock.patch.object(helper.sys, "platform", "darwin"))
+        stack.enter_context(mock.patch.object(helper.os, "geteuid", return_value=1000, create=True))
+        stack.enter_context(
+            mock.patch.object(helper, "private_directory", return_value=Path("/PRIVATE_ROOT"))
+        )
+        stack.enter_context(mock.patch.object(helper.ctypes, "CDLL", return_value=library))
+        stack.enter_context(
+            mock.patch.object(
+                helper.subprocess,
+                "run",
+                return_value=subprocess.CompletedProcess([], 0, stdout="91234 1000\n"),
+            )
+        )
+        return stack
+
+    def capture(self):
+        stdout, stderr = io.StringIO(), io.StringIO()
+        with contextlib.redirect_stdout(stdout), contextlib.redirect_stderr(stderr):
+            status = self.helper.entrypoint(["census", "/PRIVATE_ROOT"])
+        self.assertEqual(status, 1)
+        self.assertEqual(stderr.getvalue(), "Private Sparkle fixture refused.\n")
+        self.assertNotIn("PRIVATE", stdout.getvalue() + stderr.getvalue())
+        self.assertLessEqual(len(stdout.getvalue().encode()), 512)
+        return stdout.getvalue()
+
+    def testDirectoryLibraryInventoryAndUnforeseenErrorsKeepTheirExactOriginalException(self):
+        helper = self.helper
+        cases = [
+            ("private-root", "root", PermissionError("PRIVATE_KEY_PATH")),
+            ("library", "library", OSError("PRIVATE_NATIVE_PATH")),
+            ("inventory", "inventory", subprocess.TimeoutExpired("PRIVATE_ARGV", 5)),
+            ("inventory", "inventory", subprocess.CalledProcessError(71, "PRIVATE_ARGV")),
+            ("unexpected", "native", PermissionError("PRIVATE_NATIVE_PATH")),
+        ]
+        for stage, boundary, failure in cases:
+            with self.subTest(stage=stage, boundary=boundary):
+                library = mock.Mock()
+                with self.boundary(library):
+                    target = {
+                        "root": (helper, "private_directory"),
+                        "library": (helper.ctypes, "CDLL"),
+                        "inventory": (helper.subprocess, "run"),
+                        "native": (library, "proc_pidpath"),
+                    }[boundary]
+                    with mock.patch.object(*target, side_effect=failure):
+                        with self.assertRaises(type(failure)) as caught:
+                            helper.census(["/PRIVATE_ROOT"])
+                        self.assertIs(caught.exception, failure)
+                        packet = json.loads(self.capture())
+                self.assertEqual(
+                    packet,
+                    {
+                        "schema": 3,
+                        "code": "stage-refused",
+                        "helper_pid": os.getpid(),
+                        "stage": stage,
+                    },
+                )
+
+    def testMalformedNativeInventoryStillFailsBeforeAnyExecutableObservation(self):
+        helper = self.helper
+        library = mock.Mock()
+        with self.boundary(library):
+            with mock.patch.object(
+                helper.subprocess,
+                "run",
+                return_value=subprocess.CompletedProcess([], 0, stdout="PRIVATE_INVALID_RECORD\n"),
+            ):
+                packet = json.loads(self.capture())
+        self.assertEqual(
+            packet,
+            {"schema": 3, "code": "stage-refused", "helper_pid": os.getpid(), "stage": "inventory"},
+        )
+        library.proc_pidpath.assert_not_called()
+
+    def testForeignStageTextAndInvalidHelperIdentityCannotBecomePublicFacts(self):
+        helper = self.helper
+        for stage in [None, True, ["inventory"], "PRIVATE_KEY_PATH", "inventory\nPRIVATE_ARGV"]:
+            failure = RuntimeError("PRIVATE_KEY_PATH")
+            failure._sparkle_census_stage = stage
+            with mock.patch.object(helper, "main", side_effect=failure):
+                self.assertEqual(self.capture(), "")
+        failure = RuntimeError("PRIVATE_KEY_PATH")
+        failure._sparkle_census_stage = "inventory"
+        for pid in [0, True, 2147483648, "PRIVATE_KEY_PATH"]:
+            with (
+                mock.patch.object(helper, "main", side_effect=failure),
+                mock.patch.object(helper.os, "getpid", return_value=pid),
+            ):
+                self.assertEqual(self.capture(), "")
+        failure = RuntimeError("PRIVATE_KEY_PATH")
+        failure._sparkle_census_stage = "unexpected"
+        failure.argv = "PRIVATE_ARGV"
+        failure.path = "PRIVATE_NATIVE_PATH"
+        with mock.patch.object(helper, "main", side_effect=failure):
+            self.assertEqual(
+                json.loads(self.capture()),
+                {
+                    "schema": 3,
+                    "code": "stage-refused",
+                    "helper_pid": os.getpid(),
+                    "stage": "unexpected",
+                },
+            )
+
+
+class NativeDirectoryReasonControls(unittest.TestCase):
+    """Reason projection observes unchanged native admission and exact exceptions."""
+
+    def setUp(self):
+        spec = importlib.util.spec_from_file_location("sparkle_directory_reason", HELPER)
+        self.helper = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(self.helper)
+
+    def testAllSevenDirectoryRefusalsKeepTheirOriginalExceptionAndBoundedReceipt(self):
+        helper = self.helper
+        cases = [
+            ("metadata", PermissionError(13, "PRIVATE_METADATA", "/PRIVATE_KEY")),
+            ("missing", FileNotFoundError(2, "PRIVATE_MISSING", "/PRIVATE_KEY")),
+            ("not-absolute", None),
+            ("not-directory", None),
+            ("mode", None),
+            ("owner", None),
+            ("canonical", None),
+        ]
+        for reason, original in cases:
+            with self.subTest(reason=reason):
+                path = mock.MagicMock()
+                path.is_absolute.return_value = reason != "not-absolute"
+                path.resolve.return_value = object() if reason == "canonical" else path
+                metadata = mock.Mock()
+                metadata.st_mode = (0o100000 if reason == "not-directory" else 0o040000) | (
+                    0o755 if reason == "mode" else 0o700
+                )
+                metadata.st_uid = 1001 if reason == "owner" else 1000
+                path.lstat.return_value = metadata
+                if original is not None:
+                    path.lstat.side_effect = original
+                with (
+                    mock.patch.object(helper, "Path", return_value=path),
+                    mock.patch.object(helper.sys, "platform", "darwin"),
+                    mock.patch.object(helper.os, "geteuid", return_value=1000, create=True),
+                    mock.patch.object(helper.ctypes, "CDLL") as library,
+                ):
+                    expected = type(original) if original is not None else RuntimeError
+                    with self.assertRaises(expected) as caught:
+                        helper.census(["/PRIVATE_KEY"])
+                    if original is not None:
+                        self.assertIs(caught.exception, original)
+                        self.assertEqual(caught.exception.errno, original.errno)
+                    else:
+                        self.assertEqual(str(caught.exception), "Private Sparkle directory refused")
+                    self.assertEqual(caught.exception._sparkle_directory_reason, reason)
+                    stdout, stderr = io.StringIO(), io.StringIO()
+                    with (
+                        contextlib.redirect_stdout(stdout),
+                        contextlib.redirect_stderr(stderr),
+                    ):
+                        status = helper.entrypoint(["census", "/PRIVATE_KEY"])
+                    self.assertEqual(status, 1)
+                    self.assertEqual(stderr.getvalue(), "Private Sparkle fixture refused.\n")
+                    self.assertEqual(
+                        json.loads(stdout.getvalue()),
+                        {
+                            "schema": 4,
+                            "code": "directory-refused",
+                            "helper_pid": os.getpid(),
+                            "reason": reason,
+                        },
+                    )
+                    self.assertNotIn("PRIVATE", stdout.getvalue() + stderr.getvalue())
+                    self.assertLessEqual(len(stdout.getvalue().encode()), 512)
+                    library.assert_not_called()
+                    self.assertEqual(
+                        path.lstat.call_count, 2, "one metadata snapshot per admission"
+                    )
+
+    def testPredicateOrderAndShortCircuitKeepOneMetadataSnapshotAndNoExtraReads(self):
+        helper = self.helper
+        ordered = [
+            "metadata",
+            "not-absolute",
+            "not-directory",
+            "mode",
+            "owner",
+            "canonical",
+        ]
+        for failure_index in range(1, 6):
+            with self.subTest(first_refusal=ordered[failure_index]):
+                calls = []
+                path = mock.MagicMock()
+                metadata = mock.Mock(st_mode=0o040700, st_uid=1000)
+                path.lstat.side_effect = lambda: (calls.append("metadata"), metadata)[1]
+                path.is_absolute.side_effect = lambda: (
+                    calls.append("not-absolute"),
+                    failure_index != 1,
+                )[1]
+                path.resolve.side_effect = lambda: (
+                    calls.append("canonical"),
+                    object(),
+                )[1]
+                with (
+                    mock.patch.object(helper, "Path", return_value=path),
+                    mock.patch.object(
+                        helper.stat,
+                        "S_ISDIR",
+                        side_effect=lambda _: (
+                            calls.append("not-directory"),
+                            failure_index != 2,
+                        )[1],
+                    ),
+                    mock.patch.object(
+                        helper.stat,
+                        "S_IMODE",
+                        side_effect=lambda _: (
+                            calls.append("mode"),
+                            0o755 if failure_index == 3 else 0o700,
+                        )[1],
+                    ),
+                    mock.patch.object(
+                        helper.os,
+                        "geteuid",
+                        side_effect=lambda: (
+                            calls.append("owner"),
+                            1001 if failure_index == 4 else 1000,
+                        )[1],
+                        create=True,
+                    ),
+                ):
+                    with self.assertRaisesRegex(
+                        RuntimeError, "^Private Sparkle directory refused$"
+                    ) as caught:
+                        helper.private_directory("/PRIVATE_KEY")
+                self.assertEqual(calls, ordered[: failure_index + 1])
+                self.assertEqual(caught.exception._sparkle_directory_reason, ordered[failure_index])
+                path.lstat.assert_called_once()
+
+    def testPhysicalDirectoryRefusalsAndForeignReasonTextCannotAdmitOrLeak(self):
+        helper = self.helper
+        with tempfile.TemporaryDirectory(prefix="sparkle-directory-control-") as temporary:
+            root = Path(temporary).resolve()
+            root.chmod(0o700)
+            self.assertEqual(helper.private_directory(root), root)
+            root.chmod(0o755)
+            with self.assertRaisesRegex(
+                RuntimeError, "^Private Sparkle directory refused$"
+            ) as caught:
+                helper.private_directory(root)
+            self.assertEqual(caught.exception._sparkle_directory_reason, "mode")
+            root.chmod(0o700)
+            with self.assertRaises(FileNotFoundError) as caught:
+                helper.private_directory(root / "PRIVATE_MISSING")
+            self.assertEqual(caught.exception._sparkle_directory_reason, "missing")
+            if os.name != "nt":
+                (root / "physical").mkdir(mode=0o700)
+                (root / "alias").symlink_to(root / "physical", target_is_directory=True)
+                (root / "physical" / "child").mkdir(mode=0o700)
+                with self.assertRaisesRegex(
+                    RuntimeError, "^Private Sparkle directory refused$"
+                ) as caught:
+                    helper.private_directory(root / "alias" / "child")
+                self.assertEqual(caught.exception._sparkle_directory_reason, "canonical")
+        for reason in [None, True, ["mode"], "PRIVATE_KEY", "mode\nPRIVATE_ARGV"]:
+            failure = RuntimeError("PRIVATE_METADATA")
+            failure._sparkle_census_stage = "private-root"
+            failure._sparkle_directory_reason = reason
+            self.assertEqual(
+                helper.census_stage_packet(failure),
+                {
+                    "schema": 3,
+                    "code": "stage-refused",
+                    "helper_pid": os.getpid(),
+                    "stage": "private-root",
+                },
+            )
+        failure._sparkle_directory_reason = "mode"
+        for pid in [0, True, 2147483648, "PRIVATE_KEY"]:
+            with mock.patch.object(helper.os, "getpid", return_value=pid):
+                self.assertIsNone(helper.census_stage_packet(failure))
+        failure._sparkle_census_stage = "library"
+        self.assertEqual(
+            helper.census_stage_packet(failure),
+            {
+                "schema": 3,
+                "code": "stage-refused",
+                "helper_pid": os.getpid(),
+                "stage": "library",
+            },
+        )
+
+
+@unittest.skipUnless(os.name == "posix", "Graceful native SIGTERM requires POSIX")
+class NativeIdleConnectionRetirementControls(unittest.TestCase):
+    """Real accepted sockets must not hold TERM retirement before do_GET."""
+
+    # Instrument only entry into the actual native accepted-socket handler.
+    # The original handler, socket operations, timeouts and server stay real.
+    OBSERVED_SERVER = """
+import http.server, importlib.util, os, sys
+from pathlib import Path
+spec = importlib.util.spec_from_file_location("observed_sparkle", sys.argv[1])
+helper = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(helper)
+root, nonce = Path(sys.argv[2]), sys.argv[3]
+original = http.server.HTTPServer.finish_request
+def witnessed(server, request, address):
+    helper.publish(root / "accepted.json", {"nonce": nonce, "pid": os.getpid()})
+    return original(server, request, address)
+http.server.HTTPServer.finish_request = witnessed
+sys.exit(helper.entrypoint(["serve", str(root), nonce]))
+"""
+
+    def setUp(self):
+        self.root = Path(tempfile.mkdtemp(prefix="sparkle-idle-retirement-")).resolve()
+        self.child = None
+        self.connection = None
+        self.passed = False
+
+    def tearDown(self):
+        # Every acquired owner receives retirement even if another close fails.
+        client_closed = self.connection is None
+        if self.connection is not None:
+            try:
+                self.connection.close()
+                client_closed = self.connection.fileno() == -1
+            except OSError:
+                client_closed = False
+        child_closed = self.child is None
+        forced = False
+        if self.child is not None:
+            if self.child.poll() is None:
+                self.child.terminate()
+            try:
+                self.child.communicate(timeout=5)
+            except subprocess.TimeoutExpired:
+                forced = True
+                self.child.kill()
+                self.child.communicate(timeout=5)
+            child_closed = (
+                self.child.returncode is not None
+                and self.child.stdout.closed
+                and self.child.stderr.closed
+            )
+        owner = {
+            "pid": self.child.pid if self.child is not None else None,
+            "child_closed": child_closed,
+            "client_closed": client_closed,
+            "forced": forced,
+            "exit_status": self.child.returncode if self.child is not None else None,
+        }
+        (self.root / "control-retirement.json").write_text(json.dumps(owner, sort_keys=True) + "\n")
+        if client_closed and child_closed and not forced and self.passed:
+            shutil.rmtree(self.root)
+        else:
+            print(
+                "Failed idle-server control inputs retained at " + str(self.root), file=sys.stderr
+            )
+        self.assertTrue(
+            client_closed and child_closed and not forced,
+            "Owned idle-server retirement debt; inputs retained",
+        )
+
+    def receipt(self, name):
+        path = self.root / (name + ".json")
+        deadline = time.monotonic() + 5
+        while not path.exists() and self.child.poll() is None and time.monotonic() < deadline:
+            time.sleep(0.01)
+        self.assertTrue(path.exists(), "Actual native socket receipt must exist: " + name)
+        packet = json.loads(path.read_bytes())
+        self.assertEqual(packet["nonce"], NONCE)
+        self.assertEqual(packet["pid"], self.child.pid)
+        return packet
+
+    def retire_accepted_connection(self, initial_bytes):
+        (self.root / "feed.xml").write_bytes(b"independent bounded feed\n")
+        self.child = subprocess.Popen(
+            [sys.executable, "-c", self.OBSERVED_SERVER, str(HELPER), str(self.root), NONCE],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+        )
+        started = self.receipt("server-start")
+        self.connection = socket.create_connection(("127.0.0.1", started["port"]), timeout=5)
+        if initial_bytes:
+            self.connection.sendall(initial_bytes)
+        # This is actual accept ownership before the original handler blocks.
+        self.receipt("accepted")
+        self.child.terminate()
+        try:
+            stdout, stderr = self.child.communicate(timeout=7)
+        except subprocess.TimeoutExpired:
+            self.fail("An accepted pre-request socket exceeded the original TERM retirement budget")
+        self.assertEqual((self.child.returncode, stdout, stderr), (0, b"", b""))
+        terminal = self.receipt("server-retired")
+        self.assertEqual(terminal, {"nonce": NONCE, "pid": self.child.pid, "requests": 0})
+        self.assertEqual(
+            self.connection.recv(1), b"", "The server must physically close its accepted socket"
+        )
+        self.connection.close()
+        self.connection = None
+        self.passed = True
+
+    def testActualIdleAcceptedSocketCannotBlockTERMExitAndTerminalAcknowledgement(self):
+        self.retire_accepted_connection(b"")
+
+    def testActualPartialHeadersCannotBlockTERMExitAndTerminalAcknowledgement(self):
+        self.retire_accepted_connection(b"GET /feed.xml HTTP/1.1\r\nHost: localhost\r\n")
+
+
+class PrivateStartupTraceTests(unittest.TestCase):
+    def load_trace(self, enabled=True, serve=True):
+        frames = []
+        arguments = (
+            ["owned-helper", "serve", "unused-owned-root", NONCE] if serve else ["owned-control"]
+        )
+        with (
+            mock.patch.dict(
+                os.environ, {"ERGOPTI_SPARKLE_STARTUP_DIAGNOSTICS": "1" if enabled else "0"}
+            ),
+            mock.patch.object(sys, "argv", arguments),
+            mock.patch(
+                "os.write", side_effect=lambda fd, data: frames.append((fd, data)) or len(data)
+            ),
+        ):
+            spec = importlib.util.spec_from_file_location("private_startup_control", HELPER)
+            module = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(module)
+        return module, frames
+
+    def testNativeServeOptInEmitsIndependentClosedFramesBeforeHeavyImports(self):
+        module, frames = self.load_trace()
+        self.assertEqual(
+            frames,
+            [(1, b"SPARKLE_STARTUP/1 python-entry\n"), (1, b"SPARKLE_STARTUP/1 imports-ready\n")],
+        )
+        with mock.patch(
+            "os.write", side_effect=lambda fd, data: frames.append((fd, data)) or len(data)
+        ):
+            module.startup_phase("socket-bound")
+        self.assertEqual(frames[-1], (1, b"SPARKLE_STARTUP/1 socket-bound\n"))
+
+    def testDefaultOrNonServeInvocationCannotChangeExistingEmptyCapture(self):
+        for enabled, serve in [(False, True), (True, False)]:
+            module, frames = self.load_trace(enabled=enabled, serve=serve)
+            with mock.patch("os.write") as write:
+                module.startup_phase("socket-bound")
+            self.assertEqual(frames, [])
+            write.assert_not_called()
+
+    def testUnknownPrivateOrMalformedStageRefusesWithoutExport(self):
+        module, _frames = self.load_trace()
+        for value in ["private-path/nonce", "", "socket-bound\nprivate", None, True]:
+            with mock.patch("os.write") as write:
+                with self.assertRaisesRegex(RuntimeError, "Private Sparkle startup phase refused"):
+                    module.startup_phase(value)
+            write.assert_not_called()
+
+    def testPartialNativeCaptureWriteCannotPretendCompleteStage(self):
+        module, _frames = self.load_trace()
+        with mock.patch("os.write", return_value=1) as write:
+            with self.assertRaisesRegex(RuntimeError, "Private Sparkle startup capture refused"):
+                module.startup_phase("handlers-installed")
+        write.assert_called_once_with(1, b"SPARKLE_STARTUP/1 handlers-installed\n")
+
+
+@unittest.skipUnless(hasattr(os, "geteuid"), "Physical private sockets need a POSIX host")
+class PrivateStartupPrimaryTests(unittest.TestCase):
+    def exercise_retirement(self, phase, primary=None):
+        spec = importlib.util.spec_from_file_location("private_startup_primary", HELPER)
+        helper = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(helper)
+        original = helper.http.server.HTTPServer.__init__
+        acquired = []
+        trace_failure = RuntimeError("independent trace refusal")
+        phases = []
+
+        def capture(server, *args, **kwargs):
+            original(server, *args, **kwargs)
+            acquired.append(server)
+
+        def emit(observed):
+            phases.append(observed)
+            if observed == phase:
+                raise trace_failure
+
+        def register(number, callback):
+            if primary is not None:
+                raise primary
+            # A successful body exits without a timer, transport or close stub.
+            callback(number, None)
+
+        with tempfile.TemporaryDirectory(prefix="sparkle-primary-") as directory:
+            root = Path(directory).resolve()
+            root.chmod(0o700)
+            with (
+                mock.patch.object(helper.http.server.HTTPServer, "__init__", capture),
+                mock.patch.object(helper.signal, "signal", side_effect=register),
+                mock.patch.object(helper, "startup_phase", side_effect=emit),
+            ):
+                with self.assertRaises(BaseException) as observed:
+                    helper.serve(str(root), NONCE)
+            self.assertIs(observed.exception, primary if primary is not None else trace_failure)
+            self.assertEqual(len(acquired), 1)
+            self.assertEqual(acquired[0].socket.fileno(), -1)
+            terminal = json.loads((root / "server-retired.json").read_bytes())
+            self.assertEqual(terminal, {"nonce": NONCE, "pid": os.getpid(), "requests": 0})
+            self.assertIn("retirement-begin", phases)
+            self.assertIn("retired-published", phases)
+
+    def testRetirementFrameRefusalPreservesExactBodyPrimaryAndRealSocketClose(self):
+        self.exercise_retirement("retirement-begin", RuntimeError("independent body refusal"))
+
+    def testFinalFrameRefusalPreservesExactBodyCancellationAndRealSocketClose(self):
+        self.exercise_retirement("retired-published", KeyboardInterrupt("independent cancellation"))
+
+    def testTraceOnlyRefusalRemainsFailureAfterActualRetirementReceipt(self):
+        self.exercise_retirement("retirement-begin")
+
+    def testInheritedCallerExceptionCannotSuppressTraceOnlyRefusal(self):
+        try:
+            raise RuntimeError("independent caller context")
+        except RuntimeError:
+            self.exercise_retirement("retirement-begin")
+
+
+@unittest.skipUnless(hasattr(os, "geteuid"), "Physical private sockets need a POSIX host")
+class PrivateNumericLoopbackBindTests(unittest.TestCase):
+    retained_owners = []  # Keep uncertain native socket owners beyond a failed frame.
+
+    def exercise(self, fault=None):
+        # Only failure ports and signal registration are controlled. The actual
+        # PrivateServer constructor, TCP bind/listen and close remain native.
+        spec = importlib.util.spec_from_file_location("private_numeric_bind", HELPER)
+        helper = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(helper)
+        original_init = helper.http.server.HTTPServer.__init__
+        original_bind = helper.http.server.socketserver.TCPServer.server_bind
+        original_activate = helper.http.server.socketserver.TCPServer.server_activate
+        acquired = []
+        native_failures = []
+        observation = {}
+        blocker = None
+        directory = Path(tempfile.mkdtemp(prefix="sparkle-numeric-bind-")).resolve()
+        directory.chmod(0o700)
+        primary = None
+        cleanup_failure = None
+        signal_failure = KeyboardInterrupt("independent signal registration refusal")
+        ownership = {"servers": acquired, "blocker": None, "directory": directory}
+        self.retained_owners.append(ownership)
+
+        def initialize(server, *args, **kwargs):
+            acquired.append(server)  # Retain even partial native acquisition.
+            original_init(server, *args, **kwargs)
+            observation["address"] = server.socket.getsockname()
+            observation["listening"] = server.socket.getsockopt(
+                socket.SOL_SOCKET, socket.SO_ACCEPTCONN
+            )
+            observation["name"] = server.server_name
+            observation["port"] = server.server_port
+
+        def bind(server):
+            if fault == "occupied-bind":
+                server.server_address = blocker.getsockname()
+            try:
+                return original_bind(server)
+            except OSError as error:
+                native_failures.append(error)
+                raise
+
+        def activate(server):
+            if fault == "closed-listen":
+                observation["bound_before_listen"] = server.socket.getsockname()
+                server.socket.close()
+            try:
+                return original_activate(server)
+            except OSError as error:
+                native_failures.append(error)
+                raise
+
+        def register(number, callback):
+            if fault == "signal-refusal":
+                raise signal_failure
+            callback(number, None)  # Call the producer's actual graceful owner.
+
+        try:
+            if fault == "occupied-bind":
+                blocker = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                ownership["blocker"] = blocker
+                blocker.bind(("127.0.0.1", 0))
+                blocker.listen(1)
+            observed_error = None
+            with (
+                mock.patch.object(helper.http.server.HTTPServer, "__init__", initialize),
+                mock.patch.object(helper.http.server.socketserver.TCPServer, "server_bind", bind),
+                mock.patch.object(
+                    helper.http.server.socketserver.TCPServer, "server_activate", activate
+                ),
+                mock.patch.object(helper.signal, "signal", side_effect=register),
+                mock.patch.object(
+                    helper.http.server.socket,
+                    "getfqdn",
+                    side_effect=RuntimeError("independent reverse DNS refusal"),
+                ) as dns,
+            ):
+                try:
+                    helper.serve(str(directory), NONCE)
+                except BaseException as error:
+                    observed_error = error
+                dns.assert_not_called()
+            self.assertEqual(len(acquired), 1)
+            self.assertEqual(
+                acquired[0].socket.fileno(), -1, "The real constructor/body must close its socket"
+            )
+            if fault in ("occupied-bind", "closed-listen"):
+                self.assertIsInstance(observed_error, OSError)
+                self.assertEqual(
+                    observed_error.errno,
+                    errno.EADDRINUSE if fault == "occupied-bind" else errno.EBADF,
+                )
+                self.assertEqual(len(native_failures), 1)
+                self.assertIs(
+                    observed_error,
+                    native_failures[0],
+                    "The actual native primary cannot be replaced",
+                )
+                self.assertFalse((directory / "server-start.json").exists())
+                self.assertFalse((directory / "server-retired.json").exists())
+                if fault == "closed-listen":
+                    self.assertEqual(observation["bound_before_listen"][0], "127.0.0.1")
+                    self.assertGreater(observation["bound_before_listen"][1], 0)
+            else:
+                self.assertEqual(observation["address"][0], "127.0.0.1")
+                self.assertGreater(observation["address"][1], 0)
+                self.assertEqual(observation["name"], "127.0.0.1")
+                self.assertEqual(observation["port"], observation["address"][1])
+                self.assertEqual(observation["listening"], 1)
+                self.assertEqual(
+                    json.loads((directory / "server-retired.json").read_bytes()),
+                    {"nonce": NONCE, "pid": os.getpid(), "requests": 0},
+                )
+                if fault == "signal-refusal":
+                    self.assertIs(observed_error, signal_failure)
+                    self.assertFalse((directory / "server-start.json").exists())
+                else:
+                    self.assertIsNone(observed_error)
+                    started = json.loads((directory / "server-start.json").read_bytes())
+                    self.assertEqual(
+                        started, {"nonce": NONCE, "pid": os.getpid(), "port": observation["port"]}
+                    )
+        except BaseException as error:
+            primary = error
+        finally:
+            # Every real acquired socket is attempted independently, including
+            # native constructor failure. Never close a guessed descriptor.
+            for server in acquired:
+                try:
+                    if hasattr(server, "socket") and server.socket.fileno() >= 0:
+                        server.server_close()
+                    if hasattr(server, "socket"):
+                        self.assertEqual(server.socket.fileno(), -1)
+                except BaseException as error:
+                    if cleanup_failure is None:
+                        cleanup_failure = error
+            if blocker is not None:
+                try:
+                    blocker.close()
+                    self.assertEqual(blocker.fileno(), -1)
+                except BaseException as error:
+                    if cleanup_failure is None:
+                        cleanup_failure = error
+            if cleanup_failure is None:
+                self.retained_owners[:] = [
+                    item for item in self.retained_owners if item is not ownership
+                ]
+            if primary is None and cleanup_failure is None:
+                shutil.rmtree(directory)
+        if primary is not None:
+            raise primary
+        if cleanup_failure is not None:
+            raise cleanup_failure
+
+    def testActualNumericLoopbackBindListenAndKernelPortReadback(self):
+        self.exercise()
+
+    def testRefusedReverseDNSCannotPreventActualBindListenAndRetirement(self):
+        self.exercise("dns-refusal")
+
+    def testActualOccupiedPortRefusesAndPhysicallyClosesPartialConstructor(self):
+        self.exercise("occupied-bind")
+
+    def testActualClosedSocketListenRefusesAndPreservesNativePrimary(self):
+        self.exercise("closed-listen")
+
+    def testSignalRegistrationRefusalPreservesPrimaryAndRealBoundSocketRetirement(self):
+        self.exercise("signal-refusal")
 
 
 class AcceptedSocketStopControls(unittest.TestCase):
