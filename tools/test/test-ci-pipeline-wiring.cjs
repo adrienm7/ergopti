@@ -93,6 +93,9 @@ const RELEASE_INPUT = `\${{ needs.${ROOT}.outputs.release == 'true' }}`;
 const RELEASE_IF = `github.event_name == 'push' && needs.${ROOT}.outputs.release == 'true'`;
 const NOT_CANCELLED = '${{ !cancelled() }}';
 const EARLY_MANAGER_IF = "${{ !cancelled() && steps.linux_unit.outcome == 'success' }}";
+const FAILED_UNIT_MANAGER_IF = "${{ !cancelled() && steps.linux_unit.outcome == 'failure' }}";
+const FAILED_UNIT_MANAGER_NAME =
+	'Saved ordered-pair Manager \u2014 independent observation after failed units';
 const MANUAL_RUNTIME_IF =
 	"${{ github.event_name == 'workflow_dispatch' && !inputs.release && !cancelled() }}";
 const MANUAL_RUNTIME_EVIDENCE_IF =
@@ -168,6 +171,7 @@ const PLAN_STEPS = ['Load the Linux release artifact contract', 'Compute tag and
 // accepted value. Every other step runs whenever its job runs, so no edit can
 // skip a gate while its job stays green.
 const STEP_CONDITIONS = [
+	[LINUX_BOX, 'test-linux', FAILED_UNIT_MANAGER_NAME, FAILED_UNIT_MANAGER_IF],
 	[
 		LINUX_BOX,
 		'test-linux',
@@ -1048,8 +1052,22 @@ function linuxUpstreamResultProblems(files) {
 	const steps = pipeline.steps(job.body);
 	const name = 'Preserve the mandatory upstream unit result';
 	const matches = steps.filter((candidate) => candidate.name === name);
-	if (matches.length !== 1 || steps.at(-1).name !== name)
-		return ['Linux E2E must reject failed units once, after all observations and evidence'];
+	if (
+		matches.length !== 1 ||
+		steps.at(-3).name !== name ||
+		steps.at(-2).name !== 'Record mandatory E2E evidence' ||
+		steps.at(-1).name !== 'Upload mandatory E2E evidence'
+	)
+		return [
+			'Linux E2E must reject failed units once, before recording or uploading its certificate'
+		];
+	for (const certificate of steps.slice(-2)) {
+		if (
+			pipeline.stepField(certificate.body, 'if') !== null ||
+			pipeline.stepField(certificate.body, 'continue-on-error') !== null
+		)
+			return ['Linux E2E certificate steps require successful native and upstream admission'];
+	}
 	const body = matches[0].body;
 	if (
 		pipeline.stepField(body, 'if') !== NOT_CANCELLED ||
@@ -1127,7 +1145,10 @@ function earlyManagerProblems(files) {
 		original.length !== 1 ||
 		early.length !== 1 ||
 		manual.length !== 1 ||
-		steps.indexOf(early[0]) !== steps.indexOf(original[0]) + 1 ||
+		steps.indexOf(early[0]) !== steps.indexOf(original[0]) + 3 ||
+		steps[steps.indexOf(original[0]) + 1].name !== 'Upload failed unit log' ||
+		steps[steps.indexOf(original[0]) + 2].name !==
+			'Emit Configuration assertion from failed unit log' ||
 		steps.indexOf(early[0]) >= steps.indexOf(manual[0])
 	)
 		return [
@@ -1188,13 +1209,22 @@ const originalManagerUnitBody = pipeline.step(
 	pipeline.job('test-linux'),
 	'Run the driver unit test suite'
 );
+const originalManagerUnitOffset = pipeline.file(LINUX_BOX).indexOf(originalManagerUnitBody);
+const earlyManagerOffset = pipeline
+	.file(LINUX_BOX)
+	.indexOf(earlyManagerStep, originalManagerUnitOffset);
+assert.ok(
+	originalManagerUnitOffset >= 0 && earlyManagerOffset > originalManagerUnitOffset,
+	'the actual unit/diagnostic/early-observation span must exist'
+);
+const originalUnitObservationSpan = pipeline
+	.file(LINUX_BOX)
+	.slice(originalManagerUnitOffset, earlyManagerOffset + earlyManagerStep.length);
 mustCatch(
 	'early Manager moved before actual units',
 	LINUX_BOX,
-	originalManagerUnitBody +
-		'\n\n      # Observe genuine native input before unrelated external IA acquisition.\n' +
-		earlyManagerStep,
-	earlyManagerStep + '\n\n' + originalManagerUnitBody,
+	originalUnitObservationSpan,
+	earlyManagerStep + '\n\n' + originalUnitObservationSpan.replace(earlyManagerStep, ''),
 	earlyManagerProblems
 );
 
@@ -1293,6 +1323,167 @@ for (const condition of [
 	);
 }
 
+/** Keeps failed-unit observations separate from mandatory success and late admission. */
+function failedUnitManagerObservationProblems(files) {
+	const inherited = [...earlyManagerProblems(files), ...linuxUpstreamResultProblems(files)];
+	const entry = files.find((item) => item.rel === LINUX_BOX);
+	const job =
+		entry && pipeline.jobsOfText(entry.text, LINUX_BOX).find((item) => item.id === 'test-linux');
+	if (!job)
+		return [...inherited, 'the failed-unit Manager observation must retain the original unit job'];
+	const steps = pipeline.steps(job.body);
+	const failures = steps.filter((step) => step.name === FAILED_UNIT_MANAGER_NAME);
+	const successes = steps.filter((step) => step.name === EARLY_MANAGER_NAME);
+	if (
+		FAILED_UNIT_MANAGER_NAME === EARLY_MANAGER_NAME ||
+		failures.length !== 1 ||
+		successes.length !== 1 ||
+		steps.indexOf(failures[0]) !== steps.indexOf(successes[0]) + 1
+	)
+		return [
+			...inherited,
+			'failed-unit Manager observation must be unique and follow its unchanged success-only sibling'
+		];
+	const body = failures[0].body;
+	const expected = EARLY_MANAGER_SCRIPT.map((line) =>
+		line.replaceAll(
+			'linux-manager-input-owner-early.log',
+			'linux-manager-input-owner-unit-failure.log'
+		)
+	);
+	if (
+		pipeline.stepField(body, 'if') !== FAILED_UNIT_MANAGER_IF ||
+		pipeline.stepField(body, 'continue-on-error') !== null ||
+		pipeline.stepField(body, 'timeout-minutes') !== '3' ||
+		pipeline.stepField(body, 'working-directory') !== 'static/ergopti_plus/linux' ||
+		pipeline.stepField(body, 'shell') !== null ||
+		pipeline.stepField(body, 'env') !== null ||
+		JSON.stringify(pipeline.runOf(body)) !== JSON.stringify(expected)
+	)
+		inherited.push(
+			'failed-unit Manager observation must retain failure-only admission, genuine native prerequisites and actual exit without certificate credit'
+		);
+	return inherited;
+}
+
+errors.push(...failedUnitManagerObservationProblems(pipeline.files()));
+const failedUnitManagerStep = pipeline.step(pipeline.job('test-linux'), FAILED_UNIT_MANAGER_NAME);
+for (const [what, from, to] of [
+	['failed-unit Manager observation omitted', failedUnitManagerStep, ''],
+	[
+		'failed-unit Manager observation renamed to success-only sibling',
+		failedUnitManagerStep,
+		failedUnitManagerStep.replace(FAILED_UNIT_MANAGER_NAME, EARLY_MANAGER_NAME)
+	],
+	[
+		'failed-unit Manager failure forgiven',
+		failedUnitManagerStep,
+		failedUnitManagerStep + '\n        continue-on-error: true'
+	],
+	[
+		'failed-unit Manager false success',
+		failedUnitManagerStep,
+		failedUnitManagerStep.replace('exit "$manager_status"', 'exit 0')
+	],
+	[
+		'failed-unit Manager native command removed',
+		failedUnitManagerStep,
+		failedUnitManagerStep.replace(
+			'sudo python3 tests/hardware/run_manager_input_owner_real.py',
+			'true'
+		)
+	],
+	[
+		'failed-unit Manager native module load removed',
+		failedUnitManagerStep,
+		failedUnitManagerStep.replace('sudo modprobe uinput', 'true')
+	],
+	[
+		'failed-unit Manager native module load forgiven',
+		failedUnitManagerStep,
+		failedUnitManagerStep.replace('sudo modprobe uinput', 'sudo modprobe uinput || true')
+	],
+	[
+		'failed-unit Manager Xvfb prerequisite removed',
+		failedUnitManagerStep,
+		failedUnitManagerStep.replace('command -v Xvfb', 'true')
+	],
+	[
+		'failed-unit Manager Xvfb refusal read as success',
+		failedUnitManagerStep,
+		failedUnitManagerStep.replace('exit 2', 'exit 0')
+	],
+	[
+		'failed-unit Manager clock increased',
+		failedUnitManagerStep,
+		failedUnitManagerStep.replace('timeout-minutes: 3', 'timeout-minutes: 4')
+	],
+	[
+		'failed-unit Manager native status discarded',
+		failedUnitManagerStep,
+		failedUnitManagerStep.replace('manager_status=$?', 'manager_status=0')
+	],
+	[
+		'failed-unit Manager log replaces success evidence',
+		failedUnitManagerStep,
+		failedUnitManagerStep.replaceAll(
+			'linux-manager-input-owner-unit-failure.log',
+			'linux-manager-input-owner-early.log'
+		)
+	],
+	[
+		'failed-unit Manager command context replaced',
+		failedUnitManagerStep,
+		failedUnitManagerStep + '\n        shell: bash -c true'
+	],
+	[
+		'failed-unit Manager fake environment authority',
+		failedUnitManagerStep,
+		failedUnitManagerStep + '\n        env:\n          ERGOPTI_MANAGER_TEST_LUA: true'
+	],
+	[
+		'failed-unit Manager continued original units',
+		'      - name: Run the driver unit test suite\n',
+		'      - name: Run the driver unit test suite\n        continue-on-error: true\n'
+	],
+	[
+		'failed-unit Manager original units switched off',
+		'      - name: Run the driver unit test suite\n',
+		'      - name: Run the driver unit test suite\n        if: false\n'
+	]
+]) {
+	mustCatch(what, LINUX_BOX, from, to, failedUnitManagerObservationProblems);
+}
+for (const condition of [
+	'',
+	'false',
+	'success()',
+	NOT_CANCELLED,
+	EARLY_MANAGER_IF,
+	"${{ !cancelled() && steps.linux_unit.outcome == 'skipped' }}",
+	"${{ !cancelled() && steps.linux_unit.outcome != 'success' }}"
+]) {
+	mustCatch(
+		'failed-unit Manager observation condition changed ' + condition,
+		LINUX_BOX,
+		failedUnitManagerStep,
+		failedUnitManagerStep.replace(
+			'        if: ' + FAILED_UNIT_MANAGER_IF + '\n',
+			condition ? '        if: ' + condition + '\n' : ''
+		),
+		failedUnitManagerObservationProblems
+	);
+}
+mustCatch(
+	'failed-unit Manager observation moved before success sibling',
+	LINUX_BOX,
+	earlyManagerStep +
+		'\n\n      # This independent observation grants no success to the failed unit suite.\n' +
+		failedUnitManagerStep,
+	failedUnitManagerStep + '\n\n' + earlyManagerStep,
+	failedUnitManagerObservationProblems
+);
+
 errors.push(...linuxUpstreamResultProblems(pipeline.files()));
 const upstreamResultStep = pipeline.step(
 	pipeline.job(HARNESS_JOB),
@@ -1368,15 +1559,33 @@ const upstreamEvidenceStep = pipeline.step(
 	pipeline.job(HARNESS_JOB),
 	'Upload mandatory E2E evidence'
 );
+const upstreamRecordStep = pipeline.step(
+	pipeline.job(HARNESS_JOB),
+	'Record mandatory E2E evidence'
+);
 mustCatch(
-	'upstream unit check moved before E2E evidence',
+	'upstream unit check moved after E2E certification',
 	LINUX_BOX,
-	upstreamEvidenceStep +
-		'\n\n      # A supplementary observation never grants success to a failed prerequisite.\n' +
-		upstreamResultStep,
-	upstreamResultStep + '\n\n' + upstreamEvidenceStep,
+	upstreamResultStep + '\n\n' + upstreamRecordStep + '\n\n' + upstreamEvidenceStep,
+	upstreamRecordStep + '\n\n' + upstreamEvidenceStep + '\n\n' + upstreamResultStep,
 	linuxUpstreamResultProblems
 );
+for (const certificate of [upstreamRecordStep, upstreamEvidenceStep]) {
+	mustCatch(
+		'certificate admits failed upstream units',
+		LINUX_BOX,
+		certificate,
+		certificate.replace('\n', '\n        if: ' + NOT_CANCELLED + '\n'),
+		linuxUpstreamResultProblems
+	);
+	mustCatch(
+		'certificate forgives failure',
+		LINUX_BOX,
+		certificate,
+		certificate + '\n        continue-on-error: true',
+		linuxUpstreamResultProblems
+	);
+}
 
 errors.push(...graphProblems(pipeline.files()));
 for (const [what, rel, from, to] of [
