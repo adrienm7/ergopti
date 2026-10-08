@@ -408,6 +408,7 @@
 		"test:source-run-single-owner": "node ./tools/test/test-source-run-single-owner.cjs",
 		"test:download-window-session": "node ./tools/test/test-download-window-session.cjs",
 		"test:managed-network-failure-ui": "node ./tools/test/test-managed-network-failure-ui.cjs",
+		"test:managed-remote-retirement": "node ./tools/test/test-managed-remote-retirement.cjs",
 		"test:model-browser-session": "node ./tools/test/test-model-browser-session.cjs",
 		"test:onboarding-wizard-page": "node ./tools/test/test-onboarding-wizard-page.cjs",
 		"test:metrics-manifest-contract": "node ./tools/test/test-metrics-manifest-contract.cjs",
