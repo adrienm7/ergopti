@@ -43,9 +43,10 @@ permissions:
 
 concurrency:
   # Manual validations retain their own group when one CI branch advances.
-  # Automatic branch runs still supersede an older automatic run.
+  # Dev pushes finish their release; newer work waits instead of starving it.
+  # Pull requests and other automatic branches still supersede older runs.
   group: ci-${{ github.ref }}-${{ github.event_name == 'workflow_dispatch' && github.run_id || 'automatic' }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.ref != 'refs/heads/dev' || github.event_name != 'push' }}
 
 # ========================================================
 # ========================================================
