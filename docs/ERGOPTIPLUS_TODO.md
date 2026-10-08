@@ -3247,9 +3247,17 @@ WP3 prerequisite: the actual macOS physical accounting owner now requires exact 
   metadata and unaddressable older stamps refuse before backup or publication.
   Twelve independent registered native cases preserve the complete old test
   prefix and cover exact source, typed foreign neighbors and retained no-op/write
-  refusal. Native execution remains unrun until the targeted Windows CI; this
-  bounded classification correction does not grant a constructor-issued source
-  journal or close item 33.
+  refusal. Targeted native CI 37666660242 reaches 10,176 passing assertions
+  and three failures. Its original physical-namespace assertion exposes a
+  status-contract regression: a supported older version with an unaddressable
+  physical owner must be failed, while unsupported denotes a missing migration
+  route. Planning and execution now retain that failed outcome and strengthen
+  the physical-owner reason checks without changing read-only refusal, source,
+  backup or publication assertions. Corrected native execution remains pending.
+  The other two failures are an unclassified process-wide ERROR in the outdated
+  load fixture and the native brightness worker; neither cause is inferred from
+  missing artifact access. This bounded correction does not grant a genuine
+  constructor-issued source journal or close item 33.
 
   Linux and macOS filesystem modules now expose their genuine initializer
   identity and seven original function or nil identities through a pure tuple.
