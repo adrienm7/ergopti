@@ -32,6 +32,9 @@ fail() { printf '  FAIL %s\n' "$*"; FAILURES=$((FAILURES + 1)); }
 info() { printf '  ..   %s\n' "$*"; }
 section() { printf '\n=== %s ===\n' "$*"; }
 
+# One vector owns acquisition arguments and the bounded capability projection.
+readonly -a ZYPPER_TEST_TOOLING_PACKAGES=(sudo curl python3 python3-gobject typelib-1_0-Gio-2_0 dbus-1 dbus-1-daemon xorg-x11-server-Xvfb procps shadow)
+
 # Everything installed here is TEST tooling (a user with sudo, a D-Bus bus, an
 # X server, PyGObject for the panel stand-in) — never a dependency of the
 # product. The product's own dependencies are the installer's job, and
@@ -41,6 +44,9 @@ section() { printf '\n=== %s ===\n' "$*"; }
 # An unexpected locale remains unknown; these flags do not prove a root cause.
 zypper_tooling_flags() {
 	local chunk tail="" text solver=0 download=0 tls=0 unknown=0
+	local index package_name missing_requested=""
+	local missing_flags=()
+	for package_name in "${ZYPPER_TEST_TOOLING_PACKAGES[@]}"; do missing_flags+=(0); done
 	local solver_pattern='Problem:|nothing provides|conflicts with|cannot install both|No provider of'
 	local download_pattern='Download \(curl\) error:|Download failed:|Failed to download|Error retrieving|Connection failed|Temporary failure in name resolution'
 	local tls_pattern='SSL certificate problem:|certificate verify failed|SSL peer certificate|certificate has expired|SSL connect error'
@@ -49,6 +55,12 @@ zypper_tooling_flags() {
 		[[ "$text" =~ $solver_pattern ]] && solver=1
 		[[ "$text" =~ $download_pattern ]] && download=1
 		[[ "$text" =~ $tls_pattern ]] && tls=1
+		for ((index=0; index<${#ZYPPER_TEST_TOOLING_PACKAGES[@]}; index++)); do
+			package_name="${ZYPPER_TEST_TOOLING_PACKAGES[$index]}"
+			if [[ "$text" == *"No provider of '$package_name' found."* ]]; then
+				missing_flags[$index]=1
+			fi
+		done
 		# A short read ends a line: never assemble a token across that boundary.
 		if [ "${#chunk}" -lt 4096 ]; then
 			tail=""
@@ -57,7 +69,15 @@ zypper_tooling_flags() {
 		fi
 	done
 	[ "$solver$download$tls" = "000" ] && unknown=1
-	printf 'solver=%s download=%s tls=%s unknown=%s ' "$solver" "$download" "$tls" "$unknown"
+	for ((index=0; index<${#ZYPPER_TEST_TOOLING_PACKAGES[@]}; index++)); do
+		if [ "${missing_flags[$index]}" -eq 1 ]; then
+			[ -z "$missing_requested" ] || missing_requested+=","
+			missing_requested+="${ZYPPER_TEST_TOOLING_PACKAGES[$index]}"
+		fi
+	done
+	[ -n "$missing_requested" ] || missing_requested="unknown"
+	printf 'solver=%s download=%s tls=%s unknown=%s missing_requested=%s ' \
+		"$solver" "$download" "$tls" "$unknown" "$missing_requested"
 }
 
 # Preserve zypper's exact exit independently of the draining classifier. The
@@ -65,8 +85,7 @@ zypper_tooling_flags() {
 prepare_zypper_test_tooling() {
 	local receipt native_exit
 	receipt="$(
-		zypper --non-interactive install -y sudo curl python3 python3-gobject \
-			typelib-1_0-Gio-2_0 dbus-1 dbus-1-daemon xorg-x11-server-Xvfb procps shadow 2>&1 | zypper_tooling_flags
+		zypper --non-interactive install -y "${ZYPPER_TEST_TOOLING_PACKAGES[@]}" 2>&1 | zypper_tooling_flags
 		native_codes=( "${PIPESTATUS[@]}" )
 		printf 'native_exit=%s' "${native_codes[0]}"
 		exit "${native_codes[0]}"
@@ -149,12 +168,16 @@ mkdir -p "${E2E_HOME}/ergopti/static/layouts"
 cp -r "${SRC}/static/ergopti_plus" "${E2E_HOME}/ergopti/static/"
 cp -r "${SRC}/static/layouts/registry" "${E2E_HOME}/ergopti/static/layouts/"
 cp "${SRC}/package.json" "${E2E_HOME}/ergopti/"
+# Source installs require the reviewed canonical builder, not a host binary.
+# Its explicit source/output arguments need no other tools-tree files.
+mkdir -p "${E2E_HOME}/ergopti/tools/build"
+cp "${SRC}/tools/build/build-linux-native-output.sh" "${E2E_HOME}/ergopti/tools/build/"
 chown -R "${E2E_USER}" "${E2E_HOME}/ergopti"
 
 as_user() {
 	# A login shell without a session bus: the shape of a first install over
 	# SSH or from a container, where systemd --user is unreachable.
-	su - "${E2E_USER}" -c "export https_proxy='${https_proxy:-}' HTTPS_PROXY='${HTTPS_PROXY:-}'; $1"
+	su - "${E2E_USER}" -c "export LUA_CPATH='${INSTALLED_LUA_CPATH:-;;}' https_proxy='${https_proxy:-}' HTTPS_PROXY='${HTTPS_PROXY:-}'; $1"
 }
 
 
@@ -170,11 +193,17 @@ grep -E '✔|✗|⚠|→' "${INSTALL_LOG}" | sed 's/^/       /'
 
 LAUNCHER="${E2E_HOME}/.local/bin/ergopti-hotstrings"
 LIB_ROOT="${E2E_HOME}/.local/lib/ergopti"
+INSTALLED_LUA_CPATH="${LIB_ROOT}/linux/native_modules/?.so;;"
 if [ -x "${LAUNCHER}" ]; then ok "launcher installed at ~/.local/bin/ergopti-hotstrings"; else fail "no launcher"; fi
 if as_user "${LAUNCHER} --help" >/dev/null 2>&1; then
 	ok "the launcher runs (--help)"
 else
 	fail "the launcher does not run: $(as_user "${LAUNCHER} --help" 2>&1 | tail -3)"
+fi
+if as_user "luajit ${LIB_ROOT}/linux/platform/network/runtime_probe.lua ${LIB_ROOT}/_shared" >/dev/null 2>&1; then
+	ok "installed networking admits actual LuaJIT luv, GIO and resolver/schema prerequisites"
+else
+	fail "installed native networking prerequisites are unavailable"
 fi
 
 # The installed wrapper's own LUA_PATH, replayed rather than re-typed, so a

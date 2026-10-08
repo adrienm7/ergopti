@@ -1,0 +1,62 @@
+{
+	"complete_section": "tap_hold_key_rows",
+	"complete": [
+		{
+			"type": "include",
+			"section": "tap_hold_key_head"
+		},
+		{
+			"type": "include",
+			"section": "tap_hold_key_delay_tail"
+		}
+	],
+	"tail_section": "tap_hold_key_delay_tail",
+	"tail": [
+		{
+			"type": "---",
+			"platforms": ["hs"],
+			"unavailable": "hide"
+		},
+		{
+			"type": "group",
+			"id": "tap_hold_key_delay",
+			"i18n": "menu.tapholds.key_tap_delay",
+			"caption_getter": "tap_hold_key_delay_caption"
+		}
+	],
+	"children_section": "tap_hold_key_delay_rows",
+	"children": [
+		{
+			"type": "command",
+			"id": "tap_hold_key_delay_set",
+			"i18n": "menu.tapholds.key_tap_delay_set"
+		},
+		{
+			"type": "check",
+			"id": "tap_hold_key_delay_use_global",
+			"i18n": "menu.tapholds.key_tap_delay_use_global",
+			"caption_getter": "tap_hold_key_global_delay_caption",
+			"checked_when": ["tap_hold_key_delay_is_global"],
+			"disabled_when": ["tap_hold_key_delay_has_override"],
+			"platforms": ["hs"],
+			"unavailable": "hide"
+		}
+	],
+	"platforms": {
+		"ahk": {
+			"key_rows": 5,
+			"delay_children": 1,
+			"delay_index": 5
+		},
+		"hs": {
+			"key_rows": 6,
+			"delay_children": 2,
+			"delay_index": 6
+		},
+		"linux": {
+			"key_rows": 5,
+			"delay_children": 1,
+			"delay_index": 5
+		}
+	}
+}

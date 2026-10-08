@@ -921,6 +921,7 @@ _RemoteCancelPublication_Poll(State, ReqId) {
 _RemoteCancelPublication_CurlPort(State, RunFn) {
 	return Map(
 		"resolve_proxy", _Stub_CurlResolveProxyDirect.Bind(State),
+		"create_curl_capability", _CurlAuthIntegration_CreateImmediate,
 		"file_exists", (*) => true,
 		"temp_dir", (*) => A_Temp,
 		"write", (*) => true,
@@ -1468,6 +1469,11 @@ Test("api_remote: deadline_ms falls back to 30 s when LLM_REMOTE_TIMEOUT_MS is 0
 
 
 _RemoteProxy_CaptureResolve(State, Url, Callback) {
+	State["proxy_resolves"] := State.Get("proxy_resolves", 0) + 1
+	if State["proxy_resolves"] > 1 {
+		Callback.Call(Map("ok", true, "inherit", false, "proxy", "http://managed.corp:3128"))
+		return true
+	}
 	State["url"] := Url
 	State["continue"] := Callback
 	return true
@@ -1524,7 +1530,8 @@ _RemoteProxy_DeferredGeneration(ProbeCase := "success") {
 		AssertEqual(1, State["runs"], "duplicate resolver completion must launch exactly once")
 		AssertEqual(2, State["writes"].Length, "one payload and one private config are staged")
 		AssertContains(State["writes"][2]["text"], 'proxy = "http://managed.corp:3128"')
-		AssertContains(State["writes"][2]["text"], "proxy-anyauth")
+		AssertContains(State["writes"][2]["text"], "proxy-negotiate")
+		AssertFalse(InStr(State["writes"][2]["text"], "proxy-anyauth"), "the negotiated native scheme must not allow Basic/Digest downgrade")
 		AssertContains(State["writes"][2]["text"], 'proxy-user = ":"')
 		AssertFalse(InStr(State["command"]["command_line"], "private-api-key") > 0, "API credentials must remain outside argv")
 		AssertFalse(InStr(State["command"]["command_line"], "private-context") > 0, "typed text must remain outside argv")

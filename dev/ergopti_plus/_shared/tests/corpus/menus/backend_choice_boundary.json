@@ -1,0 +1,34 @@
+{
+	"section": "llm_backend_choice_boundary",
+	"rows": [
+		{
+			"type": "---",
+			"platforms": ["ahk", "linux"],
+			"unavailable": "hide"
+		}
+	],
+	"platform_rows": {
+		"ahk": [
+			{
+				"separator": true
+			}
+		],
+		"hs": [],
+		"linux": [
+			{
+				"separator": true
+			}
+		]
+	},
+	"marker_key": "button.cancel",
+	"marker_english": "Cancel",
+	"windows_next_key": "menu.llm.ollama_port_label",
+	"linux_choice_keys": ["menu.llm.backend_ollama_suffix", "menu.llm.backend_api_suffix"],
+	"positions": {
+		"ahk": "after all backend choices, before existing port controls",
+		"hs": "no boundary allocated",
+		"linux": "after selected-model readout and both backend choices, before local-server/model rows"
+	},
+	"windows_next_english": "Ollama server port: %s",
+	"linux_choice_english": ["Standard", "Remote provider"]
+}

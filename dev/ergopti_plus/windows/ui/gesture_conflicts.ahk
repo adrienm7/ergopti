@@ -95,7 +95,12 @@ GestureSystemRows() {
 				: Configured ? "gestures.system.configured" : "gestures.system.not_configured"),
 			"action", (*) => GestureOpenTouchpadSettings()))
 	}
-	Children.Push(Map("label", t("ui_apps.btn_refresh"), "action", GestureSystemRequestRefresh))
+	Controls := MenuRenderer_TemplateRows("gesture_system_status_controls",
+		Map("gesture_system_refresh", GestureSystemRequestRefresh), Map(), Map())
+	if !(Controls is Array)
+		return []
+	for Row in Controls
+		Children.Push(Row)
 	Label := !State["ready"] ? t("gestures.system.unknown")
 		: Conflicts ? Format(t("gestures.system.conflicts"), Conflicts) : t("gestures.system.clear")
 	return [Map("label", Label, "items", Children)]

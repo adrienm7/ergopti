@@ -529,3 +529,221 @@ tap_3 = "none"
 	end)
 
 end)
+
+-- Actual native catalogue identity, not runtime assignment presence, owns
+-- retirement. Every file fixture is retained until explicit caller cleanup.
+local function binding_source_fixture(source, test)
+	local path = os.tmpname()
+	local function write(content)
+		local file = assert(io.open(path, "wb")); assert(file:write(content)); assert(file:close())
+	end
+	local function read()
+		local file = assert(io.open(path, "rb")); local content = file:read("*a"); assert(file:close()); return content
+	end
+	write(source)
+	local manager = helpers.load_module("modules.gestures.manager")
+	local okay, detail = xpcall(function() test(manager, path, read, write) end, debug.traceback)
+	pcall(os.remove, path)
+	if not okay then error(detail, 0) end
+end
+
+helpers.describe("gesture parameter binding publication", function()
+	local source = [[# Independent source: ignored entries must remain on disk.
+[linux.action_parameters]
+removed_gesture_slot__open_url = "https://retired-legacy.example"
+tap_3__open_url = "https://legacy.example"
+keyboard__ctrl_k__open_url = "https://keyboard.example"
+[gesture_parameters]
+removed_gesture_slot__open_url = "https://retired-canonical.example"
+tap_3__open_url = "https://canonical.example"
+swipe_3_horiz__open_url = "https://axis.example"
+script__script_altgr_enter__open_url = "https://script.example"
+]]
+	helpers.it("binding-identity: real source ignores both retired leaves and preserves full source bytes", function()
+		binding_source_fixture(source, function(manager, path, read)
+			manager.init({ persist = true, config_path = path, enabled = false })
+			helpers.assert_eq(manager.get_action_parameter("removed_gesture_slot", "open_url"), "")
+			helpers.assert_nil(manager.get_all_action_parameters().removed_gesture_slot__open_url)
+			helpers.assert_eq(manager.get_action_parameter("tap_3", "open_url"), "https://canonical.example")
+			helpers.assert_eq(manager.get_action_parameter("swipe_3_horiz", "open_url"), "https://axis.example")
+			helpers.assert_eq(manager.get_action_parameter("keyboard__ctrl_k", "open_url"), "https://keyboard.example")
+			helpers.assert_eq(manager.get_action_parameter("script__script_altgr_enter", "open_url"), "https://script.example")
+			helpers.assert_eq(read(), source)
+		end)
+	end)
+	helpers.it("binding-identity: actual reporter and cleanup marks agree for both namespaces", function()
+		local manager = helpers.load_module("modules.gestures.manager")
+		local outdated = require("config_outdated"); outdated.reset_for_tests()
+		local logger = require("logger.shim"); local warn, messages = logger.warn, {}
+		logger.warn = function(tag, text, ...) messages[#messages + 1] = string.format(text, ...) end
+		local marks, reports
+		local okay, detail = pcall(function()
+			marks = {}
+			reports = outdated.collect_reports(function()
+				manager.mark_config_reads(TomlCodec.decode(source), function(...)
+					marks[table.concat({ ... }, ".")] = true
+				end)
+			end)
+		end)
+		logger.warn = warn
+		helpers.assert_true(okay, detail)
+		helpers.assert_eq(reports, {
+			["linux.action_parameters.removed_gesture_slot__open_url"] = true,
+			["gesture_parameters.removed_gesture_slot__open_url"] = true,
+		})
+		helpers.assert_eq(marks, {
+			["linux.action_parameters.tap_3__open_url"] = true,
+			["linux.action_parameters.keyboard__ctrl_k__open_url"] = true,
+			["gesture_parameters.tap_3__open_url"] = true,
+			["gesture_parameters.swipe_3_horiz__open_url"] = true,
+			["gesture_parameters.script__script_altgr_enter__open_url"] = true,
+		})
+		helpers.assert_eq(#messages, 2)
+		for _, message in ipairs(messages) do
+			helpers.assert_true(message:find("no gesture slot of this build has this name", 1, true) ~= nil)
+		end
+	end)
+	helpers.it("binding-identity: scoped legacy deletion owns only consumed current native slots", function()
+		local manager = helpers.load_module("modules.gestures.manager")
+		helpers.assert_eq(manager.scope_legacy_operations(TomlCodec.decode(source)), {
+			{ section = "linux.action_parameters", key = "tap_3__open_url", delete = true },
+		})
+	end)
+	helpers.it("binding-identity: ordinary setter refuses retired binding before invoking its writer", function()
+		binding_source_fixture(source, function(manager, path, read)
+			manager.init({ persist = true, config_path = path, enabled = false })
+			local native_writer, calls = manager._persist_updates, 0
+			manager._persist_updates = function(...) calls = calls + 1; return native_writer(...) end
+			helpers.assert_eq(manager.set_action_parameter("removed_gesture_slot", "open_url", "https://new.example"), false)
+			helpers.assert_eq(calls, 0); helpers.assert_eq(read(), source)
+			helpers.assert_eq(manager.get_action_parameter("removed_gesture_slot", "open_url"), "")
+			helpers.assert_nil(manager.get_all_action_parameters().removed_gesture_slot__open_url)
+			helpers.assert_true(manager.set_action_parameter("tap_3", "open_url", "https://saved.example"))
+			helpers.assert_eq(calls, 1)
+			local parsed = TomlCodec.decode(read())
+			helpers.assert_eq(parsed.linux.action_parameters.removed_gesture_slot__open_url, "https://retired-legacy.example")
+			helpers.assert_eq(parsed.gesture_parameters.removed_gesture_slot__open_url, "https://retired-canonical.example")
+			helpers.assert_eq(parsed.gesture_parameters.tap_3__open_url, "https://saved.example")
+			local restarted = helpers.load_module("modules.gestures.manager")
+			restarted.init({ persist = true, config_path = path, enabled = false })
+			helpers.assert_eq(restarted.get_action_parameter("removed_gesture_slot", "open_url"), "")
+			helpers.assert_nil(restarted.get_all_action_parameters().removed_gesture_slot__open_url)
+			helpers.assert_eq(restarted.get_action_parameter("tap_3", "open_url"), "https://saved.example")
+		end)
+	end)
+	helpers.it("binding-identity: current and qualified domains retain ordinary setters and exact compensation", function()
+		local manager = helpers.load_module("modules.gestures.manager")
+		manager.init({ persist = false, enabled = false })
+		for _, binding in ipairs({ "tap_3", "swipe_3_horiz", "keyboard__ctrl_k", "tap_hold__caps_lock", "script__script_altgr_enter" }) do
+			helpers.assert_true(manager.set_action_parameter(binding, "open_url", "https://valid.example"))
+		end
+		local owner = {}; helpers.assert_true(manager.acquire_parameter_configuration(owner))
+		local prior = { removed_gesture_slot__open_url = "https://inverse.example" }
+		helpers.assert_true(manager.apply_parameter_configuration(owner, prior))
+		helpers.assert_eq(manager.parameter_configuration_snapshot(owner), prior)
+		helpers.assert_true(manager.release_parameter_configuration(owner))
+	end)
+
+	local original = require("_generated.action_catalogue")
+	local invalid = {
+		{ label = "missing single", single = false, axis = original.slots.axis },
+		{ label = "missing axis", single = original.slots.single, axis = false },
+		{ label = "empty single", single = {}, axis = original.slots.axis },
+		{ label = "empty axis", single = original.slots.single, axis = {} },
+		{ label = "sparse", single = { [1] = "tap_3", [3] = "tap_4" }, axis = original.slots.axis },
+		{ label = "map", single = { slot = "tap_3" }, axis = original.slots.axis },
+		{ label = "nontext", single = { "tap_3", false }, axis = original.slots.axis },
+		{ label = "empty id", single = { "" }, axis = original.slots.axis },
+		{ label = "qualified id", single = { "keyboard__cmd_k" }, axis = original.slots.axis },
+		{ label = "duplicate", single = { "tap_3", "tap_3" }, axis = original.slots.axis },
+		{ label = "cross-family duplicate", single = { "tap_3" }, axis = { "tap_3" } },
+	}
+	for _, vector in ipairs(invalid) do
+		helpers.it("binding-identity: rejects incomplete native catalogue " .. vector.label, function()
+			local catalogue = {}
+			for key, value in pairs(original) do catalogue[key] = value end
+			catalogue.slots = { single = vector.single or nil, axis = vector.axis or nil }
+			helpers.assert_throws(function()
+				helpers.load_module_with_dependency("modules.gestures.manager", "_generated.action_catalogue", catalogue)
+			end)
+		end)
+	end
+end)
+
+helpers.describe("gesture parameter binding source authority", function()
+	helpers.it("binding-identity: mutable public defaults and slot copies cannot declare a retired parameter current", function()
+		local manager = helpers.load_module("modules.gestures.manager")
+		manager.init({ persist = false, enabled = false })
+		manager.DEFAULT_GESTURES.removed_gesture_slot = "none"
+		manager.SINGLE_SLOTS[#manager.SINGLE_SLOTS + 1] = "removed_gesture_slot"
+		helpers.assert_eq(manager.set_action_parameter("removed_gesture_slot", "open_url", "https://retired.example"), false)
+		helpers.assert_nil(manager.get_all_action_parameters().removed_gesture_slot__open_url)
+		helpers.assert_eq(manager.set_action_parameter("Tap_3", "open_url", "https://wrong-case.example"), false)
+		helpers.assert_true(manager.set_action_parameter("tap_3", "open_url", "https://current.example"))
+	end)
+	helpers.it("binding-identity: genuine unused-key scan offers only retired parameters and explicit removal preserves neighbors", function()
+		local source = [[# Native marker and actual cleanup scanner
+[linux.action_parameters]
+removed_gesture_slot__open_url = "https://legacy-retired.example"
+tap_3__open_url = "https://current-legacy.example"
+[gesture_parameters]
+removed_gesture_slot__open_url = "https://canonical-retired.example"
+swipe_3_horiz__open_url = "https://current-axis.example"
+keyboard__ctrl_k__open_url = "https://other-owner.example"
+]]
+		binding_source_fixture(source, function(manager, path, read)
+			local cleanup = require("config_unused_keys")
+			local scan = cleanup.find_in_source(source, function(decoded, mark) manager.mark_config_reads(decoded, mark) end)
+			helpers.assert_eq(scan.status, "ok"); helpers.assert_eq(#scan.keys, 2)
+			local paths = {}
+			for _, entry in ipairs(scan.keys) do paths[#paths + 1] = table.concat(entry.path, ".") end
+			table.sort(paths)
+			helpers.assert_eq(paths, { "gesture_parameters.removed_gesture_slot__open_url", "linux.action_parameters.removed_gesture_slot__open_url" })
+			helpers.assert_eq(read(), source)
+			local cleaned = cleanup.remove_from_source(source, scan.keys)
+			helpers.assert_eq(TomlCodec.decode(cleaned), {
+				linux = { action_parameters = { tap_3__open_url = "https://current-legacy.example" } },
+				gesture_parameters = { swipe_3_horiz__open_url = "https://current-axis.example", keyboard__ctrl_k__open_url = "https://other-owner.example" },
+			})
+		end)
+	end)
+end)
+
+-- Independently authored shared identity vectors, also consumed by macOS and
+-- Windows. This native registration never regenerates their expectations.
+do
+	local handle = assert(io.open(helpers.driver_root() .. "/../_shared/tests/corpus/config_binding_identity/vectors.json", "rb"))
+	local source = assert(handle:read("*a")); assert(handle:close())
+	require("test.config_binding_identity_contract").register(helpers, require("json").decode(source))
+end
+
+
+require("test.script_binding_publication_contract").register(require("tests.helpers"), "linux")
+
+helpers.describe("gesture parameter binding publication with the real script owner", function()
+	helpers.it("binding-identity: actual script publication distinguishes current and retired qualified domains", function()
+		local owner = require("modules.shortcuts.script_chords")
+		owner.catalogue()
+		local publication = owner.published_binding_catalogue()
+		helpers.assert_true(type(publication) == "table")
+		helpers.assert_eq(publication.slots.script_altgr_enter, true)
+		helpers.assert_nil(publication.slots.reload)
+		local manager = helpers.load_module("modules.gestures.manager")
+		helpers.assert_eq(manager.action_parameter_binding_fits("script__script_altgr_enter"), true)
+		helpers.assert_eq(manager.action_parameter_binding_fits("script__reload"), false)
+		helpers.assert_nil(manager.action_parameter_binding_fits("tap_hold__future_unjudged"))
+		manager.init({ persist = false, enabled = false })
+		helpers.assert_true(manager.set_action_parameter("script__script_altgr_enter", "open_url", "https://current.example"))
+		helpers.assert_eq(manager.set_action_parameter("script__reload", "open_url", "https://must-not-activate.example"), false)
+		helpers.assert_eq(manager.get_action_parameter("script__script_altgr_enter", "open_url"), "https://current.example")
+		helpers.assert_eq(manager.get_action_parameter("script__reload", "open_url"), "")
+	end)
+end)
+
+require("test.tap_binding_publication_contract").register(require("tests.helpers"), "linux")
+
+require("test.binding_publication_authority_contract").register(require("tests.helpers"), "linux")
+
+require("test.keyboard_binding_publication_contract").register(require("tests.helpers"), "linux")
+
+require("test.script_binding_publication_contract").register_late(require("tests.helpers"), "linux")

@@ -64,6 +64,7 @@ HealthCheck_StartProbes(Epoch, Schema, Publish) {
 
 ; Cancels the current run: its curl children are stopped, its answers dropped.
 HealthCheck_CancelProbes() {
+	ManagedNetworkTerminalFailure.Retire("diagnostics")
 	global _HC_ProbeRun
 	if !IsObject(_HC_ProbeRun)
 		return
@@ -120,33 +121,49 @@ _HC_ProbeFinish(Run, Id, Started, Result, Sections := 0, NowTick := unset) {
 _HC_ProbeHttp(Run, Id, Url, Headers, TimeoutMs, Interpret) {
 	Started := A_TickCount
 	_HC_ProbeStarted(Id, "timeout " . TimeoutMs . " ms")
-	; curl ignores the Windows proxy: resolve it first (static settings answer at
-	; once, a PAC script in a bounded child) and re-enter with the answer
-	SystemProxy_ResolveAsync([Url], (Resolved) => _HC_ProbeSend(Run, Id, Url, Headers, TimeoutMs, Interpret,
-		Started, Resolved[Url]))
+	_HC_ProbeSend(Run, Id, Url, Headers, TimeoutMs, Interpret, Started)
 }
 
 ; Sends the request of an HTTP probe through curl and arms its poll.
-_HC_ProbeSend(Run, Id, Url, Headers, TimeoutMs, Interpret, Started, Proxy) {
+_HC_ProbeSend(Run, Id, Url, Headers, TimeoutMs, Interpret, Started, Port := 0) {
+	Request := 0
 	if Run.Cancelled {
 		_HC_ProbeFinish(Run, Id, Started, Map("state", "cancelled"))
 		return
 	}
 	try {
-		Request := CurlAsyncRequest()
+		CreateFn := Port is Map ? Port.Get("create_http", 0) : 0
+		Request := IsObject(CreateFn) ? CreateFn.Call() : CurlAsyncRequest()
+		Run.Requests.Push(Request)
+		Request.SetManagedRouting(Port is Map ? Port.Get("managed_settings", 0) : 0, () => _HC_ManagedRunCurrent(Run))
+		Request.SetDeadline(Started, TimeoutMs)
 		Request.Open("GET", Url, true)
 		for Name, Value in Headers
 			Request.SetRequestHeader(Name, Value)
-		Request.SetProxy(Proxy)
 		; One budget for the whole request: half to connect, the rest to answer
 		Request.SetTimeouts(TimeoutMs // 2, 0, 0, TimeoutMs - TimeoutMs // 2)
-		Run.Requests.Push(Request)
-		Request.Send()
+		if !_HC_ManagedRunCurrent(Run) {
+			Request.Abort()
+			return
+		}
+		if !Request.Send()
+			throw Error("The exact managed diagnostics request refused dispatch.")
 	} catch as Err {
-		_HC_ProbeFinish(Run, Id, Started, Map("state", "error", "detail", Err.Message))
+		if IsObject(Request)
+			Request.Abort()
+		_HC_ProbeFinish(Run, Id, Started, Map("state", "error", "detail", "managed probe refused"))
 		return
 	}
-	_HC_ProbeArmPoll(Run, Id, Request, Interpret, Started, TimeoutMs)
+	ArmFn := Port is Map ? Port.Get("arm_poll", 0) : 0
+	if IsObject(ArmFn)
+		ArmFn.Call(Run, Id, Request, Interpret, Started, TimeoutMs)
+	else
+		_HC_ProbeArmPoll(Run, Id, Request, Interpret, Started, TimeoutMs)
+}
+
+_HC_ManagedRunCurrent(Run) {
+	global _HC_ProbeRun
+	return IsObject(_HC_ProbeRun) && IsObject(Run) && ObjPtr(_HC_ProbeRun) == ObjPtr(Run) && !Run.Cancelled
 }
 
 ; Asks an HTTP probe's curl child again after one poll interval.
@@ -162,6 +179,14 @@ _HC_ProbePoll(Run, Id, Request, Interpret, Started, TimeoutMs, NowTick := unset,
 	}
 	if Request.WaitForResponse(0) {
 		Answer := Interpret.Call(Request.Status, Request.ResponseText)
+		if Answer["result"].Get("state", "") != "ok" {
+			Report := ManagedNetworkFailureWindows_FromTransport(Request, () => _HC_ManagedRunCurrent(Run))
+			Key := ManagedNetworkFailureWindows_MessageKey(Report)
+			if Key != "" {
+				Answer["result"]["detail"] := t(Key)
+				Answer["result"]["network_report"] := Report
+			}
+		}
 		_HC_ProbeFinish(Run, Id, Started, Answer["result"], Answer.Get("sections", 0), NowTick?)
 		return
 	}

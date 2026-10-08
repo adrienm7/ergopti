@@ -321,3 +321,116 @@ test("native spawn refusal waits for handles and completes exactly once", functi
 	assert(operation:is_settled() and callbacks == 1)
 	assert(result and not result.ok and result.error == "native process dispatch failed")
 end)
+
+-- These exercise the actual existing supervisor against fixed independent bytes.
+test("default process limit still refuses the measured archive names output", function(owner, _, state)
+ local result
+ local operation = owner.start("tar", { "-tzf", "-" }, { owner = "listing-default" }, function(value) result = value end)
+ state.output(string.rep("n", 117004))
+ assert(result == nil and not operation:is_settled())
+ state.absent = true; state.finish(0); state.acknowledge()
+ assert(operation:is_settled() and result and not result.ok and result.error == "process output exceeds its bound")
+end)
+
+test("captured updater limit admits both measured listing outputs", function(owner, _, state)
+ local path = assert(require("infra.paths").shared("modules/updater/defaults.json"))
+ local file = assert(io.open(path, "rb")); local raw = file:read("*a"); assert(file:close())
+ local defaults = assert(require("json").decode(raw))
+ local cap = assert(require("updater.install_budget").capture_listing(defaults))
+ local result
+ local operation = owner.start("tar", { "-tvzf", "-" }, { owner = "listing-captured", max_output_bytes = cap },
+  function(value) result = value end)
+ defaults.release_install.listing_max_output_bytes = 1
+ local output = string.rep("n", 117004) .. string.rep("v", 229756)
+ state.output(output); assert(result == nil and not operation:is_settled())
+ state.absent = true; state.finish(0); state.acknowledge()
+ assert(operation:is_settled() and result and result.ok and result.stdout == output)
+end)
+
+test("explicit updater listing ceiling still rejects one byte beyond its cap", function(owner, _, state)
+ local path = assert(require("infra.paths").shared("modules/updater/defaults.json"))
+ local file = assert(io.open(path, "rb")); local raw = file:read("*a"); assert(file:close())
+ local defaults = assert(require("json").decode(raw))
+ local cap = assert(require("updater.install_budget").capture_listing(defaults))
+ local result
+ local operation = owner.start("tar", { "-tzf", "-" }, { owner = "listing-bound", max_output_bytes = cap },
+  function(value) result = value end)
+ state.output(string.rep("x", cap)); state.output("y")
+ assert(result == nil and not operation:is_settled())
+ state.absent = true; state.finish(0); state.acknowledge()
+ assert(operation:is_settled() and result and not result.ok and result.error == "process output exceeds its bound")
+ assert(#result.stdout == cap and result.stdout:sub(-1) == "x")
+end)
+
+-- Actual private feeder calls with modeled process/reader ports. The only real
+-- handle is a fixture-owned pipe, independently closed on every exit path.
+local function feeder_options(mode, cap)
+ local actual_uv = require("luv")
+ local paths = require("infra.paths")
+ local file = assert(io.open(paths.driver_root() .. "/infra/archive_output.lua", "rb"))
+ local source = assert(file:read("*a")); assert(file:close())
+ local first = assert(source:find("local retained_tar_operations =", 1, true))
+ local last = assert(source:find("--- Constructs only the fixed native registry;", first, true))
+ local part = source:sub(first, last - 1)
+ local names = { "luv", "infra.managed_http_deadline", "adapters.owned_process" }
+ local saved = {}; for _, name in ipairs(names) do saved[name] = package.loaded[name] end
+ local pipe, close_ack, captured, starts, reads = nil, false, nil, 0, 0
+ local ok, err = xpcall(function()
+  pipe = assert(actual_uv.new_pipe(false))
+  local uv = { hrtime = function() return 100000000 end, new_pipe = function() return pipe end }
+  for _, name in ipairs({ "fs_read", "fs_close", "write", "shutdown" }) do
+   uv[name] = function() error("no reader acquired in listing option model") end
+  end
+  local timer = { started = true }
+  function timer:cancel() return true end
+  function timer:is_settled() return true end
+  function timer:on_settled(listener) listener(); return true end
+  local process = {}
+  function process.start(executable, args, options)
+   starts = starts + 1; assert(executable == "tar")
+   assert(args[2] == "-" and options.stdin_owner.handle == pipe)
+   captured = options
+   local actor = { started = true }
+   function actor:cancel() options.stdin_owner:cancel(); return true end
+   function actor:is_settled() return false end
+   function actor:on_settled() return true end
+   return actor -- Modeled unresolved child; never a physical ACK assertion.
+  end
+  package.loaded.luv = uv
+  package.loaded["infra.managed_http_deadline"] = { start = function() return timer end }
+  package.loaded["adapters.owned_process"] = process
+  local compile = loadstring or _G.load
+  local construct = assert(compile(part .. "\nreturn new_private_tar_feeder\n", "@private-tar-listing-model"))()
+  local start = assert(construct({ ffi = { new = function() return { [0] = -1 } end },
+   symbols = { allocate_reader = function() reads = reads + 1; return -1 end } }, cap))
+  assert(start({ pointer = {}, committed = true }, mode, "/controlled/extract", 3,
+   function() return true end, 200, function() end))
+  assert(starts == 1 and reads == 1 and captured ~= nil)
+ end, debug.traceback)
+ for _, name in ipairs(names) do package.loaded[name] = saved[name] end
+ local cleanup_ok, cleanup_err = pcall(function()
+  if pipe then
+   actual_uv.close(pipe, function() close_ack = true end)
+   actual_uv.run("nowait")
+   assert(close_ack, "fixture-owned pipe physical close ACK unavailable")
+  end
+ end)
+ if not ok then error(err, 0) end
+ if not cleanup_ok then error(cleanup_err, 0) end
+ return captured.max_output_bytes
+end
+
+helpers.describe("Actual Private Tar Listing Options", function()
+ helpers.it("names receive the scalar captured before later policy mutation", function()
+  local policy = { release_install = { listing_max_output_bytes = 8388608 } }
+  local cap = assert(require("updater.install_budget").capture_listing(policy))
+  policy.release_install.listing_max_output_bytes = 1
+  assert(feeder_options("names", cap) == 8388608)
+ end)
+ helpers.it("verbose receives the captured explicit listing ceiling", function()
+  assert(feeder_options("verbose", 8388608) == 8388608)
+ end)
+ helpers.it("extraction leaves the existing supervisor output ceiling unchanged", function()
+  assert(feeder_options("extract", 8388608) == nil)
+ end)
+end)

@@ -23,6 +23,9 @@
 --- ==============================================================================
 
 local M = {}
+local SourceIdentity = require("module_source_identity")
+local source_sibling, source_same = SourceIdentity.sibling, SourceIdentity.same
+local source_directory = require("module_source_directory").capture()
 -- Logger / i18n are resolved SOFTLY so this shared module genuinely loads on every
 -- Lua runtime (the Linux daemon, LuaJIT test runners, build scripts), not only the
 -- macOS driver. macOS still gets its real ring-buffer logger and localised section
@@ -41,8 +44,66 @@ local LOG    = "toml_writer"
 local ENOENT_ERROR_CODE = 2
 local BasicString = require("toml_codec.basic_string")
 local RecordScanner = require("toml_codec.record_scanner")
+local Bom = require("toml_codec.bom")
 local KeyPath = require("toml_codec.key_path")
 local Codec = require("toml_codec.codec")
+local inline_member_spans = Codec.inline_member_spans
+-- Capture the genuine constructor while this module is being initialized.
+-- Its factory returns only checks; public callers cannot set journal phases.
+-- This assumes the normal cooperative loader, not hostile searcher/debug code.
+local SchemaOwner = require("config_migrate")
+local schema_factory = rawget(SchemaOwner, "writer_admission_factory")
+assert(type(schema_factory) == "function", "configuration admission constructor is unavailable")
+local constructor_source = debug.getinfo(1, "S").source
+local schema_source = source_sibling(constructor_source, "toml_codec/writer.lua", "config_migrate.lua", source_directory)
+assert(source_same(debug.getinfo(schema_factory, "S").source, schema_source, source_directory),
+	"configuration admission must come from its canonical constructor")
+local constructed_read, constructed_publish, constructed_preparation
+local function constructor_ports() return M, constructed_read, constructed_publish, constructed_preparation end
+local schema_origin, schema_capture, schema_read = schema_factory(M, constructor_ports)
+assert(rawequal(schema_origin, SchemaOwner) and type(schema_capture) == "function"
+	and type(schema_read) == "function", "configuration admission origin is invalid")
+local function schema_live()
+	return rawequal(rawget(package.loaded, "toml_codec.writer"), M)
+		and rawequal(rawget(package.loaded, "config_migrate"), SchemaOwner)
+		and rawequal(rawget(SchemaOwner, "writer_admission_factory"), schema_factory)
+end
+local function source_admission(path, source, candidate, operation, file_adapter)
+	local admission, snapshot = schema_capture(path, source, candidate, operation, file_adapter)
+	if admission == nil then return nil end
+	if admission == false or not schema_live() then return false end
+	return function() return schema_live() and admission() == true end, snapshot
+end
+-- Authentic preparation snapshots retain the original schema epoch. The weak
+-- journal issues only from prepare_batch; lookup cannot mint readiness.
+local prepared_sources = setmetatable({}, { __mode = "k" })
+local preparation_lookup
+preparation_lookup = function(path, source, candidate)
+	local record = type(source) == "table" and prepared_sources[source]
+	if record == nil then
+		-- Generic data files keep their historical plain source contract. A
+		-- registered configuration requires its actual producer's receipt.
+		if schema_read(path) == nil then return nil end
+		return false
+	end
+	if record.path ~= path or record.candidate ~= candidate then return false end
+	return function()
+		return schema_live() and rawequal(rawget(M, "preparation_admission"), preparation_lookup)
+			and getmetatable(source) == nil and rawget(source, "status") == record.status
+			and rawget(source, "content") == record.content
+			and record.admission() == true
+	end
+end
+
+--- Looks up an authentic preparation's captured schema epoch without issuing it.
+--- Generic data files return nil; registered configuration refuses forged copies.
+--- @param path string Destination path.
+--- @param source table Exact source returned by prepare_batch.
+--- @param candidate string Exact prepared candidate.
+--- @return function|boolean|nil admission
+M.preparation_admission = preparation_lookup
+
+local math_type = math.type
 local OperationReporter = require("diagnostics.operation_reporter")
 
 
@@ -261,12 +322,65 @@ local function publish_content(path, content, file_adapter, expected_source, on_
 	if admission ~= nil and type(admission) ~= "function" then
 		return false, "publication admission must be a function"
 	end
+	local prepared_admission
+	if type(expected_source) == "table" and prepared_sources[expected_source] then
+		prepared_admission = preparation_lookup(path, expected_source, content)
+	end
+	if prepared_admission ~= nil then
+		if not publication_admitted(prepared_admission) then return false, "configuration preparation epoch refused" end
+		local caller_admission = admission
+		admission = function()
+			return publication_admitted(caller_admission) and publication_admitted(prepared_admission)
+		end
+	end
+	local acquired_source = expected_source
+	if acquired_source == nil then
+		local check = schema_read(path, file_adapter)
+		if check == false or check ~= nil and not schema_live() then
+			return false, "configuration schema admission refused"
+		end
+		if check ~= nil then
+			local current, status, detail = read_existing(path, file_adapter, on_error)
+			if status ~= "ok" and status ~= "absent" then return false, tostring(detail or status) end
+			acquired_source = { status = status, content = current }
+			expected_source = acquired_source
+		end
+	end
+	local schema_admission, admitted_source = source_admission(path, acquired_source or {}, content, "publish", file_adapter)
+	if schema_admission == false then return false, "configuration schema admission refused" end
+	-- Native configuration crosses callbacks with detached source fields; generic
+	-- adapters retain their historical exact source-reference/receipt contract.
+	if schema_admission ~= nil then
+		expected_source = admitted_source
+	elseif type(expected_source) == "table" and prepared_admission ~= nil then
+		expected_source = { status = expected_source.status, content = expected_source.content }
+	end
+	if schema_admission ~= nil then
+		local caller_admission = admission
+		admission = function()
+			return publication_admitted(caller_admission) and schema_admission() == true
+		end
+	end
 	local admitted_publisher
+	local captured_reader = type(file_adapter) == "table" and rawget(file_adapter, "read_with_status")
+	local adapter_alias
+	if type(file_adapter) == "table" and rawequal(rawget(package.loaded, "adapters.file_system"), file_adapter) then
+		adapter_alias = "adapters.file_system"
+	end
 	if admission ~= nil and type(file_adapter) == "table" then
 		-- Capture the advertised owner before its classified reader can reenter.
-		admitted_publisher = type(expected_source) == "table" and file_adapter.write_if_unchanged_admitted
+		admitted_publisher = type(expected_source) == "table" and rawget(file_adapter, "write_if_unchanged_admitted")
 		if type(admitted_publisher) ~= "function" then
 			return false, "explicit file adapter has no final publication admission"
+		end
+	end
+	if schema_admission ~= nil and admission ~= nil and type(file_adapter) == "table" then
+		local logical_admission = admission
+		admission = function()
+			return publication_admitted(logical_admission)
+				and rawequal(rawget(file_adapter, "read_with_status"), captured_reader)
+				and rawequal(rawget(file_adapter, "write_if_unchanged_admitted"), admitted_publisher)
+				and (adapter_alias == nil or rawequal(rawget(package.loaded, adapter_alias), file_adapter))
 		end
 	end
 	local refusal = _refused_writes[refusal_key(path)]
@@ -492,7 +606,21 @@ function M.write(path, data, file_adapter, create_only, expected_source)
 	local payload = table.concat(L, "\n")
 	local published, publish_err
 	local committed_payload = nil
-	if create_only == true and type(file_adapter) == "table"
+	local create_admission
+	if create_only == true then create_admission = schema_read(path, file_adapter) end
+	if create_admission == false or create_admission ~= nil and not schema_live() then
+		return false, "configuration schema admission refused"
+	end
+	if create_only == true and create_admission ~= nil then
+		local current, status, detail = read_existing(path, file_adapter)
+		local check = source_admission(path, { status = status, content = current }, status == "ok" and current or payload, "publish", file_adapter)
+		if check == false or not publication_admitted(check) then return false, "configuration schema admission refused" end
+		if status == "ok" then
+			published = publication_admitted(check)
+		elseif status == "absent" then
+			published, publish_err = publish_content(path, payload, file_adapter, { status = "absent" })
+		else return false, tostring(detail or status) end
+	elseif create_only == true and type(file_adapter) == "table"
 			and type(file_adapter.create_if_absent) == "function" then
 		local call_ok, created, create_status, create_detail = pcall(
 			file_adapter.create_if_absent,
@@ -537,6 +665,33 @@ local function same_value(left, right)
 	return true
 end
 
+--- Proves an integer token against an explicit native numeric intent.
+--- The canonical decoder already validated the token grammar. Above the exact
+--- double integer range, decoded equality cannot prove source integer identity.
+--- This comparison grants no source, row, or native publication authority.
+local function numeric_source_matches(document, shapes, path, value)
+	if type(value) ~= "number" then return true end
+	local parent = document
+	for index = 1, #path - 1 do
+		if type(parent) ~= "table" then return false end
+		parent = parent[path[index]]
+	end
+	local saved = shapes.numbers[parent]
+	saved = saved and saved[path[#path]]
+	if not saved then return false end
+	if saved.value > -9007199254740992 and saved.value < 9007199254740992 then return true end
+	local token = saved.token
+	local based = token:sub(1, 2):match("^0[box]$") ~= nil
+	if not based and token:find("[%.eE]") then return true end
+	-- Authenticated scalar literal precedence cannot replace proof of the
+	-- explicit native numeric intent. Carried whole models keep their receipts.
+	local desired = math_type and math_type(value) == "integer" and tostring(value)
+		or string.format("%.0f", value)
+	-- Rendering normalization is applied only to an already parsed decimal
+	-- integer. Base-prefixed large integers require a real owned replacement.
+	return not based and token:gsub("_", ""):gsub("^%+", "") == desired
+end
+
 --- The decoded key path a normalized batch row addresses.
 --- @param row table Row with `segments` and `key`.
 --- @return table path Table segments followed by the key.
@@ -562,6 +717,148 @@ local function has_prefix(segments, prefix, fold)
 	return true
 end
 
+--- Classifies an existing scalar, absent deletion or direct scalar insertion.
+--- This is descriptive source evidence; publication still owns every fence.
+local function inline_scalar_state(document, path, row, shapes, allow_absent)
+	if row.key == "" or row.key:find(".", 1, true) then return nil end
+	local value = document
+	for index, segment in ipairs(path) do
+		if type(value) ~= "table" or shapes and shapes.arrays[value] then return nil end
+		local matches = 0
+		for key in pairs(value) do
+			if type(key) == "string" and key:lower() == segment:lower() then matches = matches + 1 end
+		end
+		local child = value[segment]
+		if child == nil then
+			if allow_absent and matches == 0 then
+				if row.delete then return "absent" end
+				local desired, kind = row.value, type(row.value)
+				if index == #path and (kind == "string" or kind == "boolean"
+					or kind == "number" and desired == desired and math.abs(desired) ~= math.huge) then
+					return "insert"
+				end
+			end
+			return nil
+		end
+		if matches ~= 1 then return nil, nil, "ambiguous inline scalar case identity" end
+		value = child
+	end
+	local kind, desired = type(value), row.value
+	local scalar = kind == "string" or kind == "boolean"
+		or kind == "number" and value == value and math.abs(value) ~= math.huge
+	local desired_kind = type(desired)
+	local desired_scalar = desired_kind == "string" or desired_kind == "boolean"
+		or desired_kind == "number" and desired == desired and math.abs(desired) ~= math.huge
+	if scalar and (row.delete or desired_scalar and desired_kind == kind) then return "scalar", value end
+	return nil
+end
+
+--- Whether canonical fragments actually name one selected inline scalar.
+local function inline_has_leaf(raw, path)
+	local spans = inline_member_spans(raw)
+	if not spans then return false end
+	for _, member in ipairs(spans.members) do
+		if has_prefix(path, member.segments, false) then
+			if #path == #member.segments then return true end
+			local remaining = {}
+			for index = #member.segments + 1, #path do remaining[#remaining + 1] = path[index] end
+			return inline_has_leaf(member.value_source, remaining)
+		end
+	end
+	return false
+end
+
+--- Whether existing canonical inline parents own a proven absent final member.
+--- Missing intermediate namespaces, dotted aliases and case twins are refused.
+local function inline_can_insert(raw, path)
+	local spans = inline_member_spans(raw)
+	if not spans or #path == 0 then return false end
+	for _, member in ipairs(spans.members) do
+		if has_prefix(path, member.segments, true) or has_prefix(member.segments, path, true) then
+			if not has_prefix(path, member.segments, false) or #path <= #member.segments then return false end
+			local remaining = {}
+			for index = #member.segments + 1, #path do remaining[#remaining + 1] = path[index] end
+			return inline_can_insert(member.value_source, remaining)
+		end
+	end
+	return #path == 1
+end
+
+--- Describes inline parents whose whole intersecting batch can retain leaves.
+--- A returned path is a forwarding hint, never file or publication authority.
+--- Unsupported groups retain their existing native whole-parent policy.
+--- @param content string Complete exact TOML source.
+--- @param updates table Explicit writer row array.
+--- @return table|nil parents Detached canonical parent path set.
+--- @return string|nil detail Invalid source or row description.
+function M.source_inline_scalar_parents(content, updates)
+	if type(content) ~= "string" or type(updates) ~= "table" then return nil, "inline source and rows are required" end
+	local rows, identities, count = {}, {}, 0
+	for key in pairs(updates) do
+		if type(key) ~= "number" or key < 1 or key % 1 ~= 0 then return nil, "inline rows must be a dense array" end
+		count = count + 1
+	end
+	for index = 1, count do
+		local row = updates[index]
+		if type(row) ~= "table" or type(row.section) ~= "string" or row.section == ""
+			or type(row.key) ~= "string"
+			or row.delete ~= nil and row.delete ~= true
+			or row.delete and row.value ~= nil or not row.delete and row.value == nil then
+			return nil, "invalid inline row at " .. index
+		end
+		local segments = KeyPath.parse(row.section, true)
+		if not segments then return nil, "invalid inline row section" end
+		local path = {}
+		for part, segment in ipairs(segments) do path[part] = segment end
+		path[#path + 1] = row.key
+		local identity = KeyPath.render(segments):lower() .. "\0" .. row.key:lower()
+		if identities[identity] then return nil, "duplicate inline row identity" end
+		identities[identity] = true
+		rows[#rows + 1] = { path = path, row = row }
+	end
+	local overlapping = {}
+	for index, request in ipairs(rows) do
+		for other_index = index + 1, #rows do
+			local other = rows[other_index]
+			if has_prefix(request.path, other.path, true) or has_prefix(other.path, request.path, true) then
+				overlapping[index], overlapping[other_index] = true, true
+			end
+		end
+	end
+	local decoded, shapes = require("toml_codec.leaf_rows").decode_source(content)
+	if type(decoded) ~= "table" or type(shapes) ~= "table" or type(shapes.arrays) ~= "table" then
+		return nil, "inline source has no canonical shape evidence"
+	end
+	local scanned, detail = RecordScanner.scan_records(content, { quoted_headers = true })
+	if not scanned then return nil, detail end
+	local parents = {}
+	for _, record in ipairs(scanned.records) do
+		if record.addressable and #record.key_segments == 1 and record.first == record.last then
+			local _, _, raw = RecordScanner.split_assignment(Bom.strip_prefix(scanned.lines[record.first].text))
+			if raw and inline_member_spans(raw) then
+				local parent_path = record.path
+				local admitted, intersected = true, false
+				for index, request in ipairs(rows) do
+					local path, row = request.path, request.row
+					if has_prefix(path, parent_path, true) or has_prefix(parent_path, path, true) then
+						intersected = true
+						if overlapping[index] or #path <= #parent_path or not has_prefix(path, parent_path, false) then admitted = false
+						else
+							local state = inline_scalar_state(decoded, path, row, shapes, true)
+							local remaining = {}
+							for index = #parent_path + 1, #path do remaining[#remaining + 1] = path[index] end
+							if not state or state == "scalar" and not inline_has_leaf(raw, remaining)
+								or state == "insert" and not inline_can_insert(raw, remaining) then admitted = false end
+						end
+					end
+				end
+				if admitted and intersected then parents[KeyPath.render(parent_path)] = true end
+			end
+		end
+	end
+	return parents
+end
+
 --- Prepares updates to a simple INI-style TOML file without publishing it
 --- (the driver config.toml used by config_overrides and the onboarding wizard).
 --- Each entry in `updates` is a table `{section, key, value}` where:
@@ -576,7 +873,9 @@ end
 --- by table headers (`[t.key]`, `[t.key.sub]`, `[[t.key]]`) is replaced as one
 --- value: those header lines and their assignments go, comments stay. A value
 --- the file already holds in any spelling is left untouched, and a changed key
---- inside an inline table or a root-level entry is refused with its path.
+--- inside an unsupported container is refused with its path. Existing root inline
+--- scalar tokens have canonical source spans; unrelated members stay exact. Strict
+--- root dotted scalar records are replaced or removed through their own span.
 --- @param path    string Absolute path to the config.toml to write.
 --- @param updates table  Array of `{section=string, key=string, value=any}` tables.
 --- @param file_adapter table|nil Classified platform file adapter.
@@ -592,6 +891,7 @@ function M.prepare_batch(path, updates, file_adapter, expected_source, on_error)
 		report("validation", "error", "batch_write: invalid path.")
 		return false, "Invalid path."
 	end
+	if _refused_writes[refusal_key(path)] then return false, "configuration writes remain refused for this session" end
 	if type(updates) ~= "table" then
 		report("validation", "error", "batch_write: updates must be a table.")
 		return false, "updates must be a table."
@@ -628,6 +928,7 @@ function M.prepare_batch(path, updates, file_adapter, expected_source, on_error)
 		return false, detail
 	end
 	for index, u in ipairs(updates) do
+		local source_row = u
 		if type(u) ~= "table" then return reject_row(index, "row must be a table") end
 		if type(u.section) ~= "string" or u.section == "" then
 			return reject_row(index, "section must be a non-empty string")
@@ -651,7 +952,9 @@ function M.prepare_batch(path, updates, file_adapter, expected_source, on_error)
 		if not segments then return reject_row(index, "section is not a valid table path") end
 		-- Manifest paths use semantic dots; a quoted literal dot must never inherit
 		-- the neutral value of a different, nested configuration key.
+		local literal_key = source_row.literal_key == true or source_row.source_shape ~= nil
 		local manifest_path = table.concat(segments, ".") .. "." .. u.key
+		if literal_key and u.key:find(".", 1, true) then manifest_path = nil end
 		for _, segment in ipairs(segments) do
 			if segment:find(".", 1, true) then manifest_path = nil; break end
 		end
@@ -659,12 +962,14 @@ function M.prepare_batch(path, updates, file_adapter, expected_source, on_error)
 		if not intent_ok then return reject_row(index, tostring(intentional)) end
 		local personal_ok, personal_intent = pcall(require("hotstrings.personal_adoption").is_preference_intent, u)
 		if not personal_ok then return reject_row(index, tostring(personal_intent)) end
-		intentional = intentional or personal_intent
+		local model_ok, model_intent = pcall(require("toml_codec.record_list").authentic, source_row, nil, path)
+		if not model_ok then return reject_row(index, tostring(model_intent)) end
+		intentional = intentional or personal_intent or model_intent
 		if defaults and manifest_path and not u.delete and not intentional and defaults.has_default(manifest_path) then
 			u = defaults.sparse_operation(manifest_path, u.value)
 		end
 		u = { section = KeyPath.render(segments), segments = segments, key = u.key, value = u.value, delete = u.delete,
-			literal_key = u.literal_key == true }
+			literal_key = literal_key, source_row = source_row }
 		normalized[#normalized + 1] = u
 
 		local sl = u.section:lower()
@@ -676,11 +981,20 @@ function M.prepare_batch(path, updates, file_adapter, expected_source, on_error)
 	updates = normalized
 
 	-- Serialise a Lua value to a TOML literal
-	local to_toml_value = Codec.encode_value
+	local function to_toml_value(row)
+		return row.source_literal or row.precise_literal or Codec.encode_value(row.value)
+	end
 
 	-- Read existing lines (empty table only when absence is proven).
 	local lines = {}
+	local read_admission = schema_read(path, file_adapter)
+	if read_admission == false or read_admission ~= nil and not schema_live() then
+		return false, "configuration preparation reader admission refused"
+	end
 	local source, read_status, read_detail = read_existing(path, file_adapter, on_error)
+	if read_admission ~= nil and (not schema_live() or read_admission(source, read_status) ~= true) then
+		return false, "configuration preparation source admission refused"
+	end
 	if read_status == "error" then
 		report("read", "error", "batch_write: refusing unreadable destination '%s' — %s.", path, tostring(read_detail))
 		return false, tostring(read_detail)
@@ -691,8 +1005,39 @@ function M.prepare_batch(path, updates, file_adapter, expected_source, on_error)
 			return false, "source changed before preparing the batch"
 		end
 	end
-	local decoded_ok, decoded = pcall(Codec.decode, source or "")
-	if not decoded_ok or type(decoded) ~= "table" then
+	local preparation_admission = source_admission(path, { status = read_status, content = source }, nil, "prepare", file_adapter)
+	if preparation_admission == false then return false, "configuration source schema admission refused" end
+	for _, row in ipairs(updates) do
+		local called, literal = pcall(require("toml_codec.leaf_rows").publication_literal, row.source_row, source or "")
+		if not called then return false, tostring(literal) end
+		row.source_literal = literal
+		if require("toml_codec.leaf_rows").publication_capability(row.source_row) then row.literal_key = true end
+	end
+	local model_row
+	local ordinary = {}
+	for _, row in ipairs(updates) do
+		local checked, owned = pcall(require("toml_codec.record_list").authentic, row.source_row, source or "", path)
+		if not checked then return false, tostring(owned) end
+		if owned then
+			model_row = row.source_row
+			lookup[row.section:lower()][row.key:lower()] = nil
+		else ordinary[#ordinary + 1] = row end
+	end
+	if model_row then
+		local target = { "llm", "models", "user_models" }
+		for _, row in ipairs(ordinary) do
+			local path_segments = row_path(row)
+			local collides = true
+			for index = 1, math.min(#target, #path_segments) do
+				if target[index] ~= path_segments[index]:lower() then collides = false; break end
+			end
+			if collides then return false, "another batch row collides with saved model record ownership" end
+		end
+	end
+	updates = ordinary
+	local decoded_ok, decoded, source_shapes = pcall(require("toml_codec.leaf_rows").decode_source, source or "")
+	if not decoded_ok or type(decoded) ~= "table" or type(source_shapes) ~= "table"
+		or type(source_shapes.numbers) ~= "table" then
 		return false, "the existing destination is not valid TOML"
 	end
 	if read_status == "absent" then
@@ -712,6 +1057,19 @@ function M.prepare_batch(path, updates, file_adapter, expected_source, on_error)
 		if #seeds > 0 then
 			for _, u in ipairs(updates) do seeds[#seeds + 1] = u end
 			updates = seeds
+		end
+	end
+	-- Finite scalar publication must retain the requested native numeric value.
+	-- Reuse the optional codec; authentic source literals retain precedence and
+	-- default encoding of every other value remains unchanged.
+	local finite_owned = {}
+	for _, row in ipairs(updates) do
+		local value = row.value
+		if not row.delete and type(value) == "number" and value == value and math.abs(value) ~= math.huge then
+			local called, literal = pcall(require("toml_codec.leaf_rows").value_literal, value)
+			if not called or type(literal) ~= "string" then return false, "the numeric scalar cannot be encoded exactly" end
+			row.precise_literal = literal
+			finite_owned[#finite_owned + 1] = { path = row_path(row), value = value }
 		end
 	end
 	local scanned, scan_error = RecordScanner.scan_records(source, { quoted_headers = true })
@@ -741,8 +1099,198 @@ function M.prepare_batch(path, updates, file_adapter, expected_source, on_error)
 		if key:match(literal and "^[A-Za-z0-9_%-]+$" or "^[A-Za-z0-9_%-%.]+$") then return key end
 		return KeyPath.render({ key })
 	end
+	--- Edits only selected scalar tokens inside one authentic inline value.
+	--- Canonical member spans retain all surviving fragments and delimiters;
+	--- deleting a leaf never prunes or serializes its explicit parent value.
+	local function edit_inline(raw, requests)
+		local spans = inline_member_spans(raw)
+		if not spans then return nil, "the inline scalar has no canonical source spans" end
+		local fragments, claimed = {}, {}
+		for _, member in ipairs(spans.members) do
+			local direct, nested = nil, {}
+			for index, request in ipairs(requests) do
+				if has_prefix(request.path, member.segments, false) then
+					if claimed[index] then return nil, "ambiguous inline scalar identity" end
+					claimed[index] = true
+					if #request.path == #member.segments then direct = request.row
+					else
+						local remaining = {}
+						for part = #member.segments + 1, #request.path do remaining[#remaining + 1] = request.path[part] end
+						nested[#nested + 1] = { path = remaining, row = request.row }
+					end
+				end
+			end
+			if direct and #nested > 0 then return nil, "the batch replaces an inline parent and its child" end
+			local fragment = raw:sub(member.first, member.last)
+			local replacement
+			if direct and not direct.delete and not direct.inline_unchanged then replacement = to_toml_value(direct) end
+			if #nested > 0 then
+				local detail
+				replacement, detail = edit_inline(member.value_source, nested)
+				if not replacement then return nil, detail end
+			end
+			if replacement then
+				fragment = raw:sub(member.first, member.value_first - 1) .. replacement
+					.. raw:sub(member.value_last + 1, member.last)
+			end
+			if not direct or not direct.delete then fragments[#fragments + 1] = fragment end
+		end
+		local additions = {}
+		for index, request in ipairs(requests) do
+			if not claimed[index] then
+				if request.row.delete or #request.path ~= 1 or not inline_can_insert(raw, request.path) then
+					return nil, "the inline scalar has no exact existing parent"
+				end
+				additions[#additions + 1] = request
+			end
+		end
+		table.sort(additions, function(left, right) return left.path[1] < right.path[1] end)
+		local interior = #spans.members == 0 and raw:sub(spans.first + 1, spans.last - 1) or ""
+		for _, request in ipairs(additions) do
+			fragments[#fragments + 1] = key_text(request.path[1], true) .. " = " .. to_toml_value(request.row)
+		end
+		return raw:sub(1, spans.first) .. interior .. table.concat(fragments, ",") .. raw:sub(spans.last)
+	end
+
 	local applied, replacements, removed = {}, {}, {}
+	local root_owned = {}
 	for _, record in ipairs(scanned.records) do
+		-- A strict root dotted assignment names one scalar leaf without a header.
+		-- Its physical record owns only that leaf; inline scalar members use the
+		-- canonical span capability below, and array elements remain unsupported.
+		local root_path = record.header == nil and record.key_text and KeyPath.parse(record.key_text) or nil
+		local inline_path, relative_inline = root_path, false
+		if record.addressable and #record.key_segments == 1 then
+			inline_path, relative_inline = record.path, true
+		end
+		if inline_path and (relative_inline or #inline_path == 1) and record.first == record.last then
+			local first_text = scanned.lines[record.first].text
+			local _, _, rhs = RecordScanner.split_assignment(Bom.strip_prefix(first_text))
+			local spans = rhs and inline_member_spans(rhs)
+			if spans then
+				local requests = {}
+				for _, u in ipairs(updates) do
+					local path = row_path(u)
+					if relative_inline and has_prefix(path, inline_path, true) and not has_prefix(path, inline_path, false) then
+						return false, "the section inline scalar has no exact case identity"
+					end
+					if #path > #inline_path and has_prefix(path, inline_path, false) and not u.key:find(".", 1, true) then
+						local state, existing, state_detail = inline_scalar_state(decoded, path, u, source_shapes, true)
+						if state_detail then return false, state_detail end
+						local kind, desired = type(existing), u.value
+						local remaining = {}
+						for index = #inline_path + 1, #path do remaining[#remaining + 1] = path[index] end
+						if state == "insert" and not inline_can_insert(rhs, remaining) then
+							return false, "the inline scalar has no exact existing parent"
+						end
+						if state == "scalar" or state == "insert" then
+							for _, other in ipairs(updates) do
+								local other_path = row_path(other)
+								if other ~= u and (has_prefix(path, other_path, true) or has_prefix(other_path, path, true)) then
+									return false, "the batch replaces an inline parent and its child"
+								end
+							end
+							local identity = u.section:lower() .. "\0" .. u.key:lower()
+							if applied[identity] then return false, "ambiguous batch key identity" end
+							applied[identity] = true
+							root_owned[#root_owned + 1] = { path = path, row = u }
+							u.inline_unchanged = not u.delete and same_value(existing, desired)
+								and (kind ~= "number" or existing ~= 0 or 1 / existing == 1 / desired)
+								and (not u.source_literal or require("toml_codec.leaf_rows").value_literal(existing) == u.source_literal)
+								and numeric_source_matches(decoded, source_shapes, path, desired)
+							requests[#requests + 1] = { path = remaining, row = u }
+						end
+					end
+				end
+				if #requests > 0 then
+					local called, patched, detail = pcall(edit_inline, rhs, requests)
+					if not called then return false, "the inline scalar cannot be encoded exactly" end
+					if not patched then return false, detail end
+					replacements[record.first] = first_text:sub(1, #first_text - #rhs) .. patched
+						.. scanned.lines[record.first].eol
+				end
+			end
+		end
+		-- A section-relative dotted record has the same physical scalar owner:
+		-- its authentic, non-array header contributes the leading path segments.
+		-- Keep single keys, literal dotted leaves, and unaddressable records on
+		-- their existing paths rather than inferring a new table or parent.
+		local scalar_path, relative_scalar = root_path, false
+		if record.addressable and #record.key_segments > 1 then
+			local relative = KeyPath.parse(record.key_text)
+			if relative then
+				scalar_path, relative_scalar = {}, true
+				for _, segment in ipairs(record.header.segments) do scalar_path[#scalar_path + 1] = segment end
+				for _, segment in ipairs(relative) do scalar_path[#scalar_path + 1] = segment end
+			end
+		end
+		if scalar_path and #scalar_path > 1 and not scalar_path[#scalar_path]:find(".", 1, true) then
+			local parents = {}
+			for index = 1, #scalar_path - 1 do parents[index] = scalar_path[index] end
+			local sl, kl = KeyPath.render(parents):lower(), scalar_path[#scalar_path]:lower()
+			local u = lookup[sl] and lookup[sl][kl]
+			local exact = u ~= nil and u.key == scalar_path[#scalar_path] and #u.segments == #parents
+			for index, segment in ipairs(parents) do
+				if not u or u.segments[index] ~= segment then exact = false end
+			end
+			if relative_scalar and u and not exact then return false, "the section scalar has no exact case identity" end
+			local existing = decoded
+			for _, segment in ipairs(scalar_path) do
+				if type(existing) ~= "table" then existing = nil; break end
+				existing = existing[segment]
+			end
+			local kind = type(existing)
+			local scalar = kind == "string" or kind == "boolean"
+				or (kind == "number" and existing == existing and math.abs(existing) ~= math.huge)
+			local desired = u and u.value
+			local desired_kind = type(desired)
+			local desired_scalar = desired_kind == "string" or desired_kind == "boolean"
+				or (desired_kind == "number" and desired == desired and math.abs(desired) ~= math.huge)
+			if exact and scalar and (u.delete or desired_scalar and (not relative_scalar or desired_kind == kind)) then
+				if relative_scalar then
+					local parent = decoded
+					for _, segment in ipairs(scalar_path) do
+						local matches = 0
+						for key in pairs(parent) do
+							if type(key) == "string" and key:lower() == segment:lower() then matches = matches + 1 end
+						end
+						if matches ~= 1 then return false, "ambiguous section scalar case identity" end
+						parent = parent[segment]
+					end
+				end
+				local identity = sl .. "\0" .. kl
+				if applied[identity] then return false, "ambiguous batch key identity" end
+				applied[identity] = true
+				root_owned[#root_owned + 1] = { path = scalar_path, row = u }
+				local unchanged = not u.delete and same_value(existing, u.value)
+					and (kind ~= "number" or existing ~= 0 or 1 / existing == 1 / u.value)
+					and (not u.source_literal or require("toml_codec.leaf_rows").value_literal(existing) == u.source_literal)
+					and numeric_source_matches(decoded, source_shapes, scalar_path, u.value)
+				if not unchanged then
+					for _, other in ipairs(updates) do
+						local inner = row_path(other)
+						if other ~= u and #inner > #scalar_path and has_prefix(inner, scalar_path, true) then
+							return false, "the batch replaces " .. KeyPath.render(scalar_path)
+								.. " and also writes " .. KeyPath.render(inner) .. " inside it"
+						end
+					end
+					for index = record.first, record.last do removed[index] = true end
+					local first_text = scanned.lines[record.first].text
+					local prefix = record.first == 1 and first_text:sub(1, #first_text - #Bom.strip_prefix(first_text)) or ""
+					if u.delete and prefix ~= "" then replacements[record.first] = prefix end
+					if not u.delete then
+						-- This new scalar capability uses the existing optional precise codec;
+						-- default encoding of other value kinds remains unchanged.
+						local literal_ok, literal = pcall(function()
+							return u.source_literal or require("toml_codec.leaf_rows").value_literal(u.value)
+						end)
+						if not literal_ok then return false, "the root scalar cannot be encoded exactly" end
+						replacements[record.first] = prefix .. record.key_text .. " = " .. literal
+							.. scanned.lines[record.last].eol
+					end
+				end
+			end
+		end
 		local section, key = record.section, record.key
 		if not record.addressable and record.quoted then section, key = record.quoted.section, record.quoted.key end
 		if record.quoted or (record.addressable and #record.key_segments == 1) then
@@ -753,7 +1301,7 @@ function M.prepare_batch(path, updates, file_adapter, expected_source, on_error)
 				applied[sl .. "\0" .. kl] = true
 				for index = record.first, record.last do removed[index] = true end
 				if not u.delete then
-					replacements[record.first] = key_text(u.key, u.literal_key) .. " = " .. to_toml_value(u.value)
+					replacements[record.first] = key_text(u.key, u.literal_key) .. " = " .. to_toml_value(u)
 						.. scanned.lines[record.last].eol
 				end
 			end
@@ -779,7 +1327,9 @@ function M.prepare_batch(path, updates, file_adapter, expected_source, on_error)
 			end
 			local existing = nil
 			if type(node) == "table" then existing = node[u.key] end
-			if existing ~= nil and not u.delete and same_value(existing, u.value) then
+			if existing ~= nil and not u.delete and same_value(existing, u.value)
+				and (not u.source_literal or require("toml_codec.leaf_rows").value_literal(existing) == u.source_literal)
+				and numeric_source_matches(decoded, source_shapes, row_path(u), u.value) then
 				applied[identity] = true
 			elseif existing ~= nil then
 				local path = row_path(u)
@@ -830,7 +1380,7 @@ function M.prepare_batch(path, updates, file_adapter, expected_source, on_error)
 		if insertions[index] then
 			if line.eol == "" then lines[#lines + 1] = "\n" end
 			for _, u in ipairs(insertions[index]) do
-				lines[#lines + 1] = key_text(u.key, u.literal_key) .. " = " .. to_toml_value(u.value) .. "\n"
+				lines[#lines + 1] = key_text(u.key, u.literal_key) .. " = " .. to_toml_value(u) .. "\n"
 			end
 		end
 	end
@@ -842,19 +1392,62 @@ function M.prepare_batch(path, updates, file_adapter, expected_source, on_error)
 		local entries = pending[section]
 		lines[#lines + 1] = "\n[" .. section .. "]\n"
 		for _, u in ipairs(entries) do
-			lines[#lines + 1] = key_text(u.key, u.literal_key) .. " = " .. to_toml_value(u.value) .. "\n"
+			lines[#lines + 1] = key_text(u.key, u.literal_key) .. " = " .. to_toml_value(u) .. "\n"
 		end
 	end
 
 	local content = table.concat(lines)
-	local content_ok, content_value = pcall(Codec.decode, content)
-	if not content_ok or type(content_value) ~= "table" then
+	if model_row then
+		local applied, candidate = pcall(require("toml_codec.record_list").apply, model_row, source, content)
+		if not applied then return false, tostring(candidate) end
+		content = candidate
+	end
+	local content_ok, content_value, candidate_shapes = pcall(require("toml_codec.leaf_rows").decode_source, content)
+	if not content_ok or type(content_value) ~= "table" or type(candidate_shapes) ~= "table"
+		or type(candidate_shapes.numbers) ~= "table" then
 		return false, "the batch cannot address the destination without ambiguous TOML keys"
 	end
-	return true, nil, content, {
-		status = read_status,
-		content = source,
-	}
+	-- Parsing proves syntax; this capability additionally proves the requested
+	-- owned scalar before a native publisher can acknowledge the candidate.
+	for _, owned in ipairs(root_owned) do
+		local actual = content_value
+		for _, segment in ipairs(owned.path) do
+			if type(actual) ~= "table" then actual = nil; break end
+			actual = actual[segment]
+		end
+		local wanted = owned.row.value
+		local exact = owned.row.delete and actual == nil or not owned.row.delete
+			and type(actual) == type(wanted) and actual == wanted
+			and (type(wanted) ~= "number" or wanted ~= 0 or 1 / actual == 1 / wanted)
+		if not exact then return false, "the root scalar candidate differs from the requested value" end
+	end
+	for _, owned in ipairs(finite_owned) do
+		local actual = content_value
+		for _, segment in ipairs(owned.path) do
+			if type(actual) ~= "table" then actual = nil; break end
+			actual = actual[segment]
+		end
+		if type(actual) ~= "number" or actual ~= owned.value
+			or owned.value == 0 and 1 / actual ~= 1 / owned.value
+			or not numeric_source_matches(content_value, candidate_shapes, owned.path, owned.value) then
+			return false, "the numeric scalar candidate differs from the requested value"
+		end
+	end
+	local candidate_admission = source_admission(path, { status = read_status, content = source }, content, "prepare", file_adapter)
+	if candidate_admission == false or preparation_admission ~= nil and not publication_admitted(preparation_admission)
+		or candidate_admission ~= nil and not publication_admitted(candidate_admission) then
+		return false, "configuration candidate schema admission refused"
+	end
+	local snapshot = { status = read_status, content = source }
+	if preparation_admission ~= nil then
+		prepared_sources[snapshot] = {
+			path = path, status = read_status, content = source, candidate = content,
+			admission = function()
+				return publication_admitted(preparation_admission) and publication_admitted(candidate_admission)
+			end,
+		}
+	end
+	return true, nil, content, snapshot
 end
 
 --- Prepares and atomically publishes one explicit set/delete batch.
@@ -900,7 +1493,15 @@ end
 --- @return string status `ok`, `absent`, or `error`.
 --- @return string|nil detail Failure detail.
 function M.read_classified(path, file_adapter, on_error)
-	return read_existing(path, file_adapter, on_error)
+	local admission = schema_read(path, file_adapter)
+	if admission == false or admission ~= nil and not schema_live() then
+		return nil, "error", "configuration schema reader admission refused"
+	end
+	local content, status, detail = read_existing(path, file_adapter, on_error)
+	if admission ~= nil and (not schema_live() or admission(content, status) ~= true) then
+		return nil, "error", "configuration source schema admission refused"
+	end
+	return content, status, detail
 end
 
 --- @param admission function|nil Captured final logical admission.
@@ -961,9 +1562,31 @@ function M.remove_if_unchanged(path, file_adapter, expected_source, operation_po
 	if refusal then
 		return false, "writes to this file are refused for the session: " .. refusal
 	end
+	expected_source = { status = expected_source.status, content = expected_source.content }
 	local on_error = operation_policy and operation_policy.on_error
-	if type(file_adapter) == "table" and type(file_adapter.remove_if_unchanged) == "function" then
-		local called, removed, detail, receipt, retry_cleanup = pcall(file_adapter.remove_if_unchanged, path, expected_source, on_error)
+	local admission = source_admission(path, expected_source, nil, "remove", file_adapter)
+	if admission == false then return false, "configuration removal schema admission refused" end
+	local conditional_remover
+	if type(file_adapter) == "table" then
+		if admission ~= nil then
+			conditional_remover = rawget(file_adapter, "remove_if_unchanged_admitted")
+			if type(file_adapter.remove_if_unchanged) == "function" and type(conditional_remover) ~= "function" then
+				return false, "final removal admission unavailable"
+			end
+		else conditional_remover = file_adapter.remove_if_unchanged end
+	end
+	if admission ~= nil and type(conditional_remover) == "function" then
+		local schema_check = admission
+		local reader = rawget(file_adapter, "read_with_status")
+		local native_alias = rawequal(rawget(package.loaded, "adapters.file_system"), file_adapter)
+		admission = function()
+			return schema_check() == true and rawequal(rawget(file_adapter, "read_with_status"), reader)
+				and rawequal(rawget(file_adapter, "remove_if_unchanged_admitted"), conditional_remover)
+				and (not native_alias or rawequal(rawget(package.loaded, "adapters.file_system"), file_adapter))
+		end
+	end
+	if type(conditional_remover) == "function" then
+		local called, removed, detail, receipt, retry_cleanup = pcall(conditional_remover, path, expected_source, on_error, admission)
 		if not called then return false, tostring(removed) end
 		if operation_policy and operation_policy.require_conditional == true then
 			return removed == true, detail, receipt
@@ -989,11 +1612,14 @@ function M.remove_if_unchanged(path, file_adapter, expected_source, operation_po
 	end
 	local remover = os.remove
 	if type(file_adapter) == "table" then
-		remover = file_adapter.remove_exact or file_adapter.delete
+		if admission ~= nil then
+			remover = rawget(file_adapter, "remove_exact") or rawget(file_adapter, "delete")
+		else remover = file_adapter.remove_exact or file_adapter.delete end
 		if type(remover) ~= "function" then
 			return false, "explicit file adapter has no removal method"
 		end
 	end
+	if not publication_admitted(admission) then return false, "configuration removal schema admission refused" end
 	local call_ok, removed, remove_detail = pcall(remover, path)
 	if call_ok and removed == true then return true end
 	return false, tostring((call_ok and remove_detail) or removed or "removal failed")
@@ -1069,4 +1695,5 @@ function M.create_rows(path)
 	return copy
 end
 
+constructed_read, constructed_publish, constructed_preparation = M.read_classified, M.publish_if_unchanged, preparation_lookup
 return M

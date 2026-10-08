@@ -99,13 +99,24 @@ local function await(done)
 	return false
 end
 
+local current_adoption
+
 local function running(pid)
+	if current_adoption and current_adoption.child == pid and current_adoption.consumed then return false end
 	local file = io.open("/proc/" .. pid .. "/stat", "rb")
 	if not file then return false end
 	local stat = assert(file:read("*a"))
 	assert(file:close())
 	local state = assert(stat:match("^%d+ %(.+%) (%a) "))
-	return state ~= "Z" and state ~= "X"
+	local observed, suffix = stat:match("^(%d+) %(.+%) %a (.*)$")
+	local fields = {}
+	if suffix then for value in suffix:gmatch("%S+") do fields[#fields + 1] = value end end
+	local fact
+	if observed and #fields >= 19 and fields[1]:match("^%d+$")
+		and fields[2]:match("^%d+$") and fields[19]:match("^%d+$") then
+		fact = { pid = observed, parent = fields[1], group = fields[2], birth = fields[19], state = state }
+	end
+	return state ~= "Z" and state ~= "X", fact
 end
 
 local function identities(path)
@@ -117,22 +128,58 @@ local function identities(path)
 	return tonumber(leader), tonumber(child)
 end
 
-local function reap(child)
+-- The same exact-child syscall serves intermediate adoption and final cleanup.
+local function reap_once(child)
+	local receipt = current_adoption
+	if receipt and receipt.child == child and receipt.consumed then return true end
 	local status = ffi.new("int[1]")
+	local pid = ffi.C.waitpid(child, status, 1) -- WNOHANG; only this owned PID.
+	local acknowledged = pid == child or (pid == -1 and ffi.errno() == 10) -- ECHILD: this owner already reaped it.
+	if acknowledged and receipt and receipt.child == child then receipt.consumed = true end
+	return acknowledged
+end
+
+local function reap(child)
 	assert(await(function()
-		local pid = ffi.C.waitpid(child, status, 1) -- WNOHANG; only this owned PID.
-		return pid == child or (pid == -1 and ffi.errno() == 10) -- ECHILD: libuv already reaped it.
+		return reap_once(child)
 	end), "owned native descendant did not reap")
 end
 
-local function settle(done)
+local function capture_adoption(child, leader)
+	local alive, initial = running(child)
+	local _, own = running("self")
+	local self_pid = tostring(uv.os_getpid())
+	if not alive or not initial or not own or initial.pid ~= tostring(child)
+		or initial.group ~= tostring(leader) or initial.parent ~= self_pid or own.pid ~= self_pid then return nil end
+	return { child = child, leader = leader, birth = initial.birth, self_pid = self_pid, self_birth = own.birth }
+end
+
+local function reap_adopted(receipt)
+	if not receipt then return end
+	local _, own_before = running("self")
+	local _, current = running(receipt.child)
+	local _, own_after = running("self")
+	-- The fixture is the actual adopting parent. A zombie retains its PID until
+	-- this exact waitpid, allowing curl's unchanged ESRCH group proof to finish.
+	if not own_before or not own_after or not current
+		or own_before.pid ~= receipt.self_pid or own_after.pid ~= receipt.self_pid
+		or own_before.birth ~= receipt.self_birth or own_after.birth ~= receipt.self_birth
+		or current.pid ~= tostring(receipt.child) or current.birth ~= receipt.birth
+		or current.parent ~= receipt.self_pid or current.group ~= tostring(receipt.leader)
+		or current.state ~= "Z" then return end
+	reap_once(receipt.child)
+end
+
+local function settle(done, adoption)
 	local deadline = uv.hrtime() + 5000000000
 	repeat
 		uv.run("nowait")
+		reap_adopted(adoption)
 		local request_live = false
 		uv.walk(function(handle)
 			local kind = uv.handle_get_type(handle)
-			if not uv.is_closing(handle) and (kind == "process" or kind == "pipe" or kind == "timer") then
+			-- A closing transport handle still owes its actual close callback.
+			if kind == "process" or kind == "pipe" or kind == "timer" then
 				request_live = true
 			end
 		end)
@@ -150,6 +197,8 @@ for _, method in ipairs({ "get", "post", "download", "stream", "sha256" }) do
 		local orphan = mode:sub(1, 7) == "orphan-"
 		local cancelled = mode:find("cancel", 1, true) ~= nil
 		local leader, child
+		local adoption
+		current_adoption = nil
 		if orphan then
 			files[#files + 1] = receipt
 			if mode:find("stubborn", 1, true) then files[#files + 1] = receipt .. ".ready" end
@@ -182,6 +231,8 @@ for _, method in ipairs({ "get", "post", "download", "stream", "sha256" }) do
 					return leader and not running(leader)
 				end), "native wrapper did not exit before its deadline")
 				assert(running(child), "positive native descendant control is absent")
+				adoption = capture_adoption(child, leader)
+				current_adoption = adoption
 				if cancelled then
 					local cancel = method == "sha256" and Digest.cancel or Http.cancel
 					assert(cancel() == true)
@@ -190,7 +241,7 @@ for _, method in ipairs({ "get", "post", "download", "stream", "sha256" }) do
 			settle(function()
 				if cancelled then return not Http.isActive() and not Digest.isActive() end
 				return callbacks > 0
-			end)
+			end, adoption)
 			assert(callbacks == (cancelled and 0 or 1) and not Http.isActive() and not Digest.isActive())
 			if orphan then
 				assert(await(function() return not running(child) end), "native descendant survived leader retirement")
@@ -216,10 +267,12 @@ for _, method in ipairs({ "get", "post", "download", "stream", "sha256" }) do
 			end
 		end, debug.traceback)
 		if orphan then
-			leader, child = identities(receipt)
-			if leader then uv.kill(-leader, "sigkill") end
+			-- Consumed PID/group identity must never signal or wait on a reused integer.
+			local consumed = adoption and adoption.consumed
+			if not consumed then leader, child = identities(receipt) end
+			if leader and not consumed then uv.kill(-leader, "sigkill") end
 			if child then
-				if running(child) then uv.kill(child, "sigkill") end
+				if not consumed and running(child) then uv.kill(child, "sigkill") end
 				reap(child)
 			end
 		end

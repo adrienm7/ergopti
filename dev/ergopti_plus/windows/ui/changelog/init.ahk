@@ -555,6 +555,8 @@ _CLW_OnWebMessage(ExpectedWindowEpoch, ExpectedSession, ExpectedSource, Handler,
 		Tag := (Payload.Has("tag") && Payload["tag"] is String) ? Payload["tag"] : ""
 		Channel := (Payload.Has("channel") && Payload["channel"] is String) ? Payload["channel"] : ""
 		ReleaseInstall_Start(Tag, Channel, _CLW_InstallDeps(Request))
+	} else if (Action == "install_failure_action") {
+		ReleaseInstall_FailureAction(Payload.Get("operation", 0), Payload.Get("epoch", 0), Payload.Get("id", ""))
 	} else if (Action == "restore_backup") {
 		_CLW_RestoreBackup((Payload.Has("id") && Payload["id"] is String) ? Payload["id"] : "")
 	}
@@ -621,53 +623,46 @@ _CLW_FetchAndInject(Channel, Request := unset, ExpectedWindowEpoch := 0) {
 	return true
 }
 
-_CLW_DoFetch(Context, Proxy := unset) {
-	global UPDATER_GH_OWNER, UPDATER_GH_REPO
+_CLW_DoFetch(Context, Port := 0) {
+	SourceStart := A_TickCount
 	global CHANGELOG_SOURCE_TIMEOUT_MS, CHANGELOG_CONNECT_TIMEOUT_MS
 	global UPDATER_HTTP_RESOLVE_TIMEOUT_MS
 	if !_CLW_RequestIsCurrent(Context)
 		return
 	Channel := Context.Channel
 	Url := _CLW_SourceUrl(Context.Stage)
-
-	; curl ignores the Windows proxy; resolve it first (static settings answer at
-	; once, a PAC script in a bounded child) and re-enter with the answer.
-	if !IsSet(Proxy) {
-		SystemProxy_ResolveAsync([Url],
-			(Resolved) => _CLW_DoFetch(Context, Resolved[Url]))
-		return
-	}
-
-	try LoggerTrace("Changelog", "Fetching releases from {1} (channel={2}, proxy={3})…",
-		Context.Stage, Channel, Proxy == "" ? "direct" : "system")
-
+	Req := 0
 	try {
-		Req := CurlAsyncRequest()
-		; The child owns DNS, connect, Send and response wait. Completion is
-		; harvested via the existing non-blocking SetTimer poll.
-		Req.Open("GET", Url, true)
-		Req.SetRequestHeader("Accept", Context.Stage == "feed"
-			? "application/atom+xml" : "application/vnd.github+json")
-		Req.SetRequestHeader("User-Agent", "ErgoptiPlus-Changelog/1.0")
-		Req.SetProxy(Proxy)
-		; One bounded budget per source: connection within
-		; CHANGELOG_CONNECT_TIMEOUT_MS, the whole transfer within
-		; CHANGELOG_SOURCE_TIMEOUT_MS, so the page watchdog outlasts both sources.
-		Req.SetTimeouts(UPDATER_HTTP_RESOLVE_TIMEOUT_MS,
-			CHANGELOG_CONNECT_TIMEOUT_MS - UPDATER_HTTP_RESOLVE_TIMEOUT_MS, 0,
-			CHANGELOG_SOURCE_TIMEOUT_MS - CHANGELOG_CONNECT_TIMEOUT_MS)
-		; Publish ownership immediately before Send.  A superseding fetch or a
-		; close can now abort this exact request even if Send pumps messages.
+		CreateFn := Port is Map ? Port.Get("create_http", 0) : 0
+		Req := IsObject(CreateFn) ? CreateFn.Call() : CurlAsyncRequest()
+		; Publish immediately after construction, before any effect can reenter.
 		if !_CLW_RegisterActiveRequest(Context, Req) {
 			_CLW_AbortRequest(Req)
 			return
 		}
-		Req.Send()
+		Req.SetManagedRouting(Port is Map ? Port.Get("managed_settings", 0) : 0,
+			() => _CLW_ManagedOwnerCurrent(Context))
+		Req.SetDeadline(SourceStart, CHANGELOG_SOURCE_TIMEOUT_MS)
+		Req.Open("GET", Url, true)
+		Req.SetRequestHeader("Accept", Context.Stage == "feed"
+			? "application/atom+xml" : "application/vnd.github+json")
+		Req.SetRequestHeader("User-Agent", "ErgoptiPlus-Changelog/1.0")
+		Req.SetTimeouts(UPDATER_HTTP_RESOLVE_TIMEOUT_MS,
+			CHANGELOG_CONNECT_TIMEOUT_MS - UPDATER_HTTP_RESOLVE_TIMEOUT_MS, 0,
+			CHANGELOG_SOURCE_TIMEOUT_MS - CHANGELOG_CONNECT_TIMEOUT_MS)
+		if !_CLW_RequestIsCurrent(Context) {
+			_CLW_AbortRequest(Req)
+			_CLW_ReleaseActiveRequest(Context)
+			return
+		}
+		if !Req.Send()
+			throw Error("The exact managed Versions request refused dispatch.")
 	} catch as Err {
+		_CLW_AbortRequest(Req)
 		_CLW_ReleaseActiveRequest(Context)
 		if !_CLW_RequestIsCurrent(Context)
 			return
-		_CLW_SourceFailed(Context, 0, "dispatch failed: " . Err.Message)
+		_CLW_SourceFailed(Context, 0, "managed dispatch refused")
 		return
 	}
 	if !_CLW_RequestIsCurrent(Context) {
@@ -675,9 +670,17 @@ _CLW_DoFetch(Context, Proxy := unset) {
 		_CLW_ReleaseActiveRequest(Context)
 		return
 	}
+	PollFn := Port is Map ? Port.Get("poll", 0) : 0
+	if IsObject(PollFn)
+		PollFn.Call(Req, Context, 0)
+	else
+		_CLW_PollFetch(Req, Context, 0)
+}
 
-	; Arm the non-blocking completion poll for this request.
-	_CLW_PollFetch(Req, Context, 0)
+_CLW_ManagedOwnerCurrent(Context) {
+	global UPDATER_REQUEST_POLICY_ALLOW
+	return _CLW_RequestEpochIsCurrent(Context) && IsObject(Context) && Context.HasProp("Request")
+		&& _Updater_RequestPolicy(Context.Request) == UPDATER_REQUEST_POLICY_ALLOW
 }
 
 /**
@@ -740,6 +743,9 @@ _CLW_SourceFailed(Context, Status, Reason) {
 	ErrKey := (Context.ApiStatus == 403 or Context.ApiStatus == 429)
 		? "changelog_window.error_rate_limited"
 		: "changelog_window.error_network"
+	NetworkKey := Context.HasProp("NetworkReport") ? ManagedNetworkFailureWindows_MessageKey(Context.NetworkReport) : ""
+	if NetworkKey != "" && Context.ApiStatus != 403 && Context.ApiStatus != 429
+		ErrKey := NetworkKey
 	_CLW_Eval("injectError(" . _CLW_JsStr(t(ErrKey)) . ")", Context)
 }
 
@@ -799,6 +805,8 @@ _CLW_PollFetch(Req, Context, Polls) {
 			Reason := "response read failed: " . Err.Message
 		}
 	}
+	if Json == ""
+		Context.NetworkReport := ManagedNetworkFailureWindows_FromTransport(Req, () => _CLW_ManagedOwnerCurrent(Context))
 	_CLW_ReleaseActiveRequest(Context)
 	if !_CLW_RequestIsCurrent(Context)
 		return
@@ -870,6 +878,9 @@ _CLW_InstallBlocked() {
  * @returns {Map}
  */
 _CLW_InstallDeps(Request) {
+	global _CLW_LastList, _CLW_WindowEpoch, _CLW_BridgeSessionToken
+	Owner := Map("list", _CLW_LastList, "window_epoch", _CLW_WindowEpoch,
+		"session", _CLW_BridgeSessionToken, "request", Request)
 	return Map(
 		"busy", () => _UpdaterDownloadInProgress || _UpdaterRecoveryPublishTarget != "",
 		"blocked", _CLW_InstallBlocked,
@@ -877,7 +888,28 @@ _CLW_InstallDeps(Request) {
 		"backup", (Release) => ConfigBackup_Create(_ConfigDir, "pre_install", Release.Tag, Updater_CurrentVersion()),
 		"asset", (Release) => _Updater_FindAsset(Release.RawJson, BUNDLE_RELEASE_ASSET, Release.Tag),
 		"install", (Release, Observer) => _CLW_StartUpdatePath(Release, Observer, Request),
-		"report", _CLW_ReportInstall)
+		"report", _CLW_ReportInstall,
+		"failure_owner", () => Owner,
+		"failure_stage_owner", (Release) => _Updater_GetManagedFailureOwnerFor(Request, Release),
+		"failure_current", _CLW_ManagedFailureCurrent,
+		"failure_classify", ManagedNetworkFailureWindows_Classify,
+		"failure_action", ManagedNetworkFailureWindows_PerformAction,
+		"failure_retry", _CLW_RetryUpdatePath)
+}
+
+; This native owner is never serialized. A refreshed list or replaced window
+; cannot lend an older staging intent its action authority.
+_CLW_ManagedFailureCurrent(Current) {
+	global _CLW_LastList
+	Owner := Current["native_owner"]
+	return Owner is Map && IsObject(Owner["list"]) && IsObject(_CLW_LastList)
+		&& ObjPtr(Owner["list"]) == ObjPtr(_CLW_LastList)
+		&& _CLW_BridgeSessionIsCurrent(Owner["window_epoch"], Owner["session"])
+		&& _Updater_ManagedFailureOwnerIsCurrent(Current["stage_owner"])
+}
+
+_CLW_RetryUpdatePath(Owner, Observer) {
+	return _Updater_RetryManagedFailure(Owner, Observer) == true
 }
 
 /**
@@ -907,14 +939,15 @@ _CLW_FindRelease(Tag) {
  * @returns {boolean} Whether the update path started.
  */
 _CLW_StartUpdatePath(Release, Observer, Request) {
-	global _UpdaterInstallObserver
-	_UpdaterInstallObserver := Observer
+	Admission := _Updater_AdmitInstallObserver(Release, Observer, Request)
+	if !(Admission is Map)
+		return false
 	Started := false
 	try {
 		Started := Updater_DownloadAndInstall(Release, Request) == true
 	} finally {
-		if !Started && IsObject(_UpdaterInstallObserver) && ObjPtr(_UpdaterInstallObserver) == ObjPtr(Observer)
-			_UpdaterInstallObserver := 0
+		if !Started
+			_Updater_RestoreInstallObserver(Admission)
 	}
 	return Started
 }

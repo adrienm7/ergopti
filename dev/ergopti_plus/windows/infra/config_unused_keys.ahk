@@ -13,15 +13,15 @@
 ;    key is outdated exactly when TomlConfigOutdatedReason says its value is no
 ;    longer accepted. There is no second schema here, so the list matches the
 ;    unused-key and outdated-value warnings at startup.
-;    Sections the loader skips on purpose
-;    (``[_*]`` metadata, ``[updater]``, the obsolete ``[ahk.*]`` silo) and the
-;    dynamic personal namespaces are never offered for removal.
+;    Reserved sections the loader skips on purpose (``[_*]`` metadata and
+;    ``[updater]``) and dynamic personal namespaces are never offered for
+;    removal. Retired ``[ahk]`` sections are offered only for explicit cleanup.
 ; 2. Backup before change. The removal holds the config.toml write lease, copies
 ;    the exact current bytes to a new, never-overwritten
 ;    ``<name>.backup-<timestamp>.<ext>`` file and reads that copy back before any
 ;    update reaches the writer. A backup failure aborts with the file untouched.
 ; 3. The rewrite is a batch of deletions through the ordinary atomic TOML
-;    writer: every other key keeps its value, in the writer's canonical layout.
+;    writer: every other source record keeps its exact physical spelling.
 ;    An unknown section emptied by the removal loses its header too.
 ; ==============================================================================
 
@@ -40,29 +40,134 @@ global CONFIG_UNUSED_KEYS_DISPLAY_LIMIT := 30
 ; ============================
 ; ============================
 
+; Retired ownership is a semantic segment, never a case-folded textual prefix.
+_ConfigUnusedKeysRetiredSection(Section) {
+	Parts := TOML_ParseKeyPath(Section, true)
+	return Parts.Length > 0 && Parts[1] == "ahk"
+}
+
+; A privately emitted root preview owns only its exact native record and source.
+; Pointer identity avoids a global receipt registry or an entry/receipt cycle.
+class _ConfigUnusedKeysRetiredRootReceipt {
+	__New(Entry, Path, Source) {
+		this.EntryId := ObjPtr(Entry)
+		this.Path := Path
+		this.Source := Source
+		this.Section := Entry["section"]
+		this.Key := Entry["key"]
+		this.Kind := Entry["kind"]
+		this.Value := Entry["value"]
+		this.Consumed := false
+	}
+
+	Accepts(Entry, Path, Source) {
+		if this.Consumed || !(Entry is Map) || ObjPtr(Entry) != this.EntryId
+				|| Entry.Count != 5 || Entry.CaseSense != "On" || !(Path is String) || !(Source is String)
+				|| StrCompare(Path, this.Path, true) != 0 || !(Source == this.Source)
+			return false
+		for Name in ["section", "key", "kind", "value"] {
+			if !Entry.Has(Name) || !(Entry[Name] is String)
+					|| StrCompare(Entry[Name], this.%Name%, true) != 0
+				return false
+		}
+		return this.Section == "ahk" && this.Key == "" && this.Kind == "section"
+			&& _ConfigUnusedKeysRetiredSection(this.Section)
+			&& TomlConfigSectionSkipKind(this.Section) == "obsolete"
+			&& Entry.Has("retired_root_receipt")
+			&& (Entry["retired_root_receipt"] is _ConfigUnusedKeysRetiredRootReceipt)
+			&& ObjPtr(Entry["retired_root_receipt"]) == ObjPtr(this)
+	}
+}
+
+; The existing typed source decides when a flat row cannot identify the retired
+; namespace. A whole-root preview never grants an individual table-array slot.
+_ConfigUnusedKeysNeedsRetiredRoot(Document, Records, Physical, Sections := unset) {
+	for Record in Records {
+		if !(Record.Path[1] == "ahk")
+			continue
+		if Record.NativeSection == "" || !_ConfigUnusedKeysRetiredSection(Record.NativeSection)
+				|| _ConfigTomlArrayMember(Document, Record.Path)
+				|| !TOML_SameValue(_TOML_ConfigPath(Record.NativeSection, Record.Key), Record.Path)
+			return true
+		if IsSet(Sections) && (!Sections.Has(Record.NativeSection)
+				|| !Sections[Record.NativeSection].Has(Record.Key)
+				|| !TOML_SameValue(Sections[Record.NativeSection][Record.Key], Record.Value))
+			return true
+	}
+	for Record in Physical {
+		if Record.Kind != "header" || !_ConfigUnusedKeysRetiredSection(Record.Section)
+			continue
+		Actual := _TOML_DocumentLookup(Document, TOML_ParseKeyPath(Record.Section, true))
+		if SubStr(Trim(Record.Text), 1, 2) == "[["
+				|| !Actual["found"] || !(Actual["value"] is Map)
+			return true
+	}
+	return false
+}
+
 ; Scans FilePath against SchemaTree (the manifest-built Features tree by
 ; default, the same tree boot applies the file onto). Returns a Map with
-; "status" ("ok", "unreadable" or "malformed") and "keys", an Array of Maps
-; carrying "section", "key", "kind" (TomlConfigUnknownKind's "section" or
-; "leaf"; an outdated value of a known key is a "leaf") and "value" (the value
-; rendered as a TOML literal). A missing file is "ok" with no keys: there is
-; nothing to clean.
+; "status" ("ok", "unreadable", "malformed" or "unsupported") and "keys", an
+; Array of Maps carrying "section", "key", "kind" and rendered "value". An
+; empty retired physical table has a private section_only Integer 1 marker:
+; its preview owns that whole semantic section, never an empty-name leaf.
+; A missing file is "ok" with no keys. Unaddressable retired root projections
+; use one private, source-bound whole-root preview. No scan writes or changes
+; boot/session persistence authority.
 ConfigUnusedKeysFind(FilePath, SchemaTree := unset) {
 	Keys := []
 	Tree := IsSet(SchemaTree) ? SchemaTree : ManifestBuildFeaturesMap()
-	Sections := TOML_ParseFreshFileTyped(FilePath, &DiscardedArrays)
+	if !FileExist(FilePath)
+		return Map("status", "ok", "keys", Keys)
+	Source := FSReadUtf8Exact(FilePath)
+	if !(Source is String)
+		return Map("status", "unreadable", "keys", Keys)
+	try Document := TOML_ParseDocument(Source, &Records, &Physical)
+	catch as Err {
+		try LoggerWarn("ConfigUnusedKeys", "Cleanup cannot admit '{1}': {2}.", FilePath, Err.Message)
+		return Map("status", "malformed", "keys", Keys)
+	}
+	Sections := _ParseTomlFileImpl(FilePath, false, false, Source, true, &DiscardedArrays)
 	if TOML_ReadFailed(FilePath)
 		return Map("status", "unreadable", "keys", Keys)
 	if DiscardedArrays
 		return Map("status", "malformed", "keys", Keys)
+	; Only this already-retired root can release an unrepresentable flat view.
+	; The complete source stays private; the page receives descriptive fields.
+	RootPreview := _ConfigUnusedKeysNeedsRetiredRoot(Document, Records, Physical, Sections)
+	if RootPreview {
+		if !Document.Has("ahk") || !_ConfigUnusedKeysRetiredSection("ahk")
+				|| TomlConfigSectionSkipKind("ahk") != "obsolete"
+			return Map("status", "unsupported", "keys", [])
+		Entry := Map()
+		Entry.CaseSense := "On"
+		Entry.Set("section", "ahk", "key", "", "kind", "section",
+			"value", TOML_RenderValue(Document["ahk"]))
+		Entry["retired_root_receipt"] := _ConfigUnusedKeysRetiredRootReceipt(Entry, FilePath, Source)
+		Keys.Push(Entry)
+	}
 	for SectionPath, Entries in Sections {
-		if (SectionPath == "" || TomlConfigSectionSkipKind(SectionPath) != "")
+		if SectionPath == ""
 			continue
+		Retired := _ConfigUnusedKeysRetiredSection(SectionPath)
+		if Retired && RootPreview
+			continue
+		if !Retired && TomlConfigSectionSkipKind(SectionPath) != ""
+			continue
+		if Retired {
+			Actual := _TOML_DocumentLookup(Document, TOML_ParseKeyPath(SectionPath, true))
+			if !Actual["found"] || !(Actual["value"] is Map)
+				return Map("status", "unsupported", "keys", [])
+			if Entries.Count == 0 {
+				Keys.Push(Map("section", SectionPath, "key", "", "kind", "section",
+					"value", "{}", "section_only", 1))
+				continue
+			}
+		}
 		for Key, Value in Entries {
-			Kind := TomlConfigUnknownKind(Tree, SectionPath, Key, &ForeignOwner)
+			Kind := Retired ? "section"
+				: TomlConfigUnknownKind(Tree, SectionPath, Key, &ForeignOwner)
 			if (Kind == "") {
-				; The typed parse keeps the literal's type, so its rendering is the
-				; literal the boot loader judged.
 				Native := Value is TOML_Bool ? Value.Value : Value
 				if (TomlConfigOutdatedReason(Tree, SectionPath, Key, Native,
 						TOML_RenderValue(Value), ForeignOwner) == "")
@@ -110,42 +215,91 @@ ConfigUnusedKeysBackupPath(FilePath, Stamp) {
 	return Dir . "\" . NameNoExt . ".backup-" . Stamp . (Ext != "" ? "." . Ext : "")
 }
 
-; Mirrors TOML_BatchWrite's ExactSectionPrefixes match, which compares without
-; case: a prefix drops the section itself and every dotted child.
-_ConfigUnusedKeysUnderSection(Name, Section) {
-	return Name = Section || InStr(Name, Section . ".") == 1
+; A section marker is a typed, native preview identity, not an empty key.
+_ConfigUnusedKeysSectionOnly(Entry) {
+	if !Entry.Has("section_only")
+		return false
+	Marker := Entry["section_only"]
+	if !(Marker is Integer) || Marker != 1 || Entry["kind"] != "section"
+			|| Entry["key"] != "" || !_ConfigUnusedKeysRetiredSection(Entry["section"])
+		throw ValueError("An empty retired section needs its exact native preview marker")
+	return true
 }
 
-; Unknown-path sections (kind "section") that the removal leaves without a
-; single key, including every dotted child section. Coverage uses the writer's
-; own case-insensitive match, so a known ``[layout]`` can never be dropped along
-; with an unknown ``[Layout]``. A section that still holds a key outside Keys
-; (added after the scan) keeps its header and that key.
-_ConfigUnusedKeysEmptiedSections(FilePath, Keys) {
-	Parsed := TOML_ParseFreshFileTyped(FilePath, &DiscardedArrays)
-	if TOML_ReadFailed(FilePath) || DiscardedArrays
-		throw Error("the configuration file could not be parsed for section cleanup")
-	Listed := Map()
-	Candidates := Map()
+; Mirrors the semantic writer's exact segment and case identity.
+_ConfigUnusedKeysUnderSection(Name, Section) {
+	return _TOML_ConfigPathUnder(TOML_ParseKeyPath(Name, true),
+		TOML_ParseKeyPath(Section, true))
+}
+
+; A whole section is removable only when every actual semantic source record
+; beneath it was offered. An added child or case/literal twin cannot borrow
+; another preview entry's ownership. Table-array flat projections still refuse;
+; only an exact private retired-root receipt can own their complete namespace.
+_ConfigUnusedKeysEmptiedSections(FilePath, Keys, Source := unset) {
+	if !IsSet(Source)
+		Source := FSReadUtf8Exact(FilePath)
+	if !(Source is String)
+		throw Error("the configuration file could not be read for section cleanup")
+	Document := TOML_ParseDocument(Source, &Records, &Physical)
+	WholeRoots := Map()
 	for Entry in Keys {
-		Listed[Entry["section"] . "`n" . Entry["key"]] := true
-		if (Entry["kind"] == "section")
+		if !Entry.Has("retired_root_receipt")
+			continue
+		Receipt := Entry["retired_root_receipt"]
+		if !(Receipt is _ConfigUnusedKeysRetiredRootReceipt) || !Receipt.Accepts(Entry, FilePath, Source)
+			throw ValueError("The retired root preview is not its exact privately captured generation")
+		WholeRoots[Entry["section"]] := true
+	}
+	if _ConfigUnusedKeysNeedsRetiredRoot(Document, Records, Physical) && !WholeRoots.Has("ahk")
+		throw ValueError("A flat cleanup preview cannot own the complete retired root")
+	Listed := Map(), ListedHeaders := Map(), Candidates := Map()
+	Listed.CaseSense := "On"
+	ListedHeaders.CaseSense := "On"
+	Candidates.CaseSense := "On"
+	for Entry in Keys {
+		if Entry.Has("retired_root_receipt") {
 			Candidates[Entry["section"]] := true
+			continue
+		}
+		if !_ConfigUnusedKeysSectionOnly(Entry)
+			Listed[_TOML_ConfigPathName(_TOML_ConfigPath(Entry["section"], Entry["key"]))] := true
+		if (Entry["kind"] == "section") {
+			Candidates[Entry["section"]] := true
+			ListedHeaders[_TOML_ConfigPathName(TOML_ParseKeyPath(Entry["section"], true))] := true
+		}
 	}
 	Emptied := []
 	for Section in Candidates {
+		if WholeRoots.Has(Section) {
+			Emptied.Push(Section)
+			continue
+		}
 		Covered := true
-		for Name, Entries in Parsed {
-			if !_ConfigUnusedKeysUnderSection(Name, Section)
+		Parts := TOML_ParseKeyPath(Section, true)
+		for Record in Records {
+			if !_TOML_ConfigPathUnder(Record.Path, Parts)
 				continue
-			for Key in Entries {
-				if !Listed.Has(Name . "`n" . Key) {
+			if _ConfigTomlArrayMember(Document, Record.Path)
+				throw Error("the cleanup preview cannot own table-array generations")
+			if !Listed.Has(_TOML_ConfigPathName(Record.Path)) {
+				Covered := false
+				break
+			}
+		}
+		if Covered {
+			; An empty child table has no assignment record. Its exact header
+			; must also have been offered before an ancestor can own its removal.
+			for Record in Physical {
+				if Record.Kind != "header"
+					continue
+				HeaderParts := TOML_ParseKeyPath(Record.Section, true)
+				if _TOML_ConfigPathUnder(HeaderParts, Parts)
+						&& !ListedHeaders.Has(_TOML_ConfigPathName(HeaderParts)) {
 					Covered := false
 					break
 				}
 			}
-			if !Covered
-				break
 		}
 		if Covered
 			Emptied.Push(Section)
@@ -168,11 +322,43 @@ ConfigUnusedKeysRemove(FilePath, Keys, Stamp := "", BackupFn := 0, WriterFn := 0
 	WriteBackup := HasMethod(BackupFn, "Call") ? BackupFn : FSWriteCreateDurable
 	; Unknown sections whose every key is removed go away with their header
 	; instead of lingering as empty ``[section]`` lines.
-	DropSections := []
-	WriteUpdates(Path, Updates) {
-		return TOML_BatchWrite(Path, Updates, DropSections)
+	DropSections := [], SourceImage := ""
+	CapturedKeys := Keys.Clone()
+	RootEntries := []
+	for Entry in CapturedKeys {
+		if Entry.Has("retired_root_receipt")
+			RootEntries.Push(Entry)
 	}
-	Writer := HasMethod(WriterFn, "Call") ? WriterFn : WriteUpdates
+	ValidateRootReceipts(Source) {
+		if RootEntries.Length > 1
+			throw ValueError("The complete retired root preview may be selected only once")
+		if RootEntries.Length {
+			if Keys.Length != CapturedKeys.Length
+				throw ValueError("The retired root preview collection changed before cleanup publication")
+			loop CapturedKeys.Length {
+				if !(Keys[A_Index] is Map) || ObjPtr(Keys[A_Index]) != ObjPtr(CapturedKeys[A_Index])
+					throw ValueError("The retired root preview collection lost its captured native record")
+			}
+		}
+		for Entry in RootEntries {
+			if !Entry.Has("retired_root_receipt")
+				throw ValueError("The retired root preview lost its private source receipt")
+			Receipt := Entry["retired_root_receipt"]
+			if !(Receipt is _ConfigUnusedKeysRetiredRootReceipt) || !Receipt.Accepts(Entry, FilePath, Source)
+				throw ValueError("The retired root preview changed before cleanup publication")
+		}
+	}
+	WriteUpdates(Path, Updates) {
+		; The existing semantic owner validates the exact backed-up generation
+		; again before publication, including a foreign change during backup.
+		return _TOML_BatchWriteImpl(Path, Updates, DropSections, "write",
+			SourceImage, 1, true)
+	}
+	Publish := HasMethod(WriterFn, "Call") ? WriterFn : WriteUpdates
+	Writer(Path, Updates) {
+		ValidateRootReceipts(SourceImage)
+		return Publish.Call(Path, Updates)
+	}
 	Outcome := "write_failed"
 	try LoggerStart("ConfigUnusedKeys", "Removing {1} unused key(s) from '{2}'…",
 		Keys.Length, FilePath)
@@ -189,14 +375,32 @@ ConfigUnusedKeysRemove(FilePath, Keys, Stamp := "", BackupFn := 0, WriterFn := 0
 			Outcome := "changed"
 			return { noop: true }
 		}
+		SourceImage := Source
+		ValidateRootReceipts(Source)
+		for Section in _ConfigUnusedKeysEmptiedSections(FilePath, Keys, Source)
+			DropSections.Push(Section)
+		for Entry in Keys {
+			if !_ConfigUnusedKeysSectionOnly(Entry)
+				continue
+			Covered := false
+			for Section in DropSections {
+				if _ConfigUnusedKeysUnderSection(Entry["section"], Section) {
+					Covered := true
+					break
+				}
+			}
+			if !Covered {
+				Outcome := "changed"
+				return { noop: true }
+			}
+		}
 		Written := WriteBackup.Call(BackupPath, Source)
 		if !((Written is Integer) && Written == 1)
 				|| !FSUtf8ExactMatches(BackupPath, Source) {
 			Outcome := "backup_failed"
 			throw Error("the backup '" . BackupPath . "' could not be written and verified")
 		}
-		for Section in _ConfigUnusedKeysEmptiedSections(FilePath, Keys)
-			DropSections.Push(Section)
+		ValidateRootReceipts(Source)
 		; A key inside a dropped section needs no deletion of its own, and the
 		; writer would recreate the section as an empty header to delete it.
 		Updates := []
@@ -220,6 +424,8 @@ ConfigUnusedKeysRemove(FilePath, Keys, Stamp := "", BackupFn := 0, WriterFn := 0
 	Committed := ConfigCommitBuilt(FilePath, "the unused configuration key cleanup",
 		BuildPlan, Writer, (*) => 0)
 	if Committed && Outcome != "changed" {
+		for Entry in RootEntries
+			Entry["retired_root_receipt"].Consumed := true
 		Outcome := "removed"
 		try LoggerSuccess("ConfigUnusedKeys",
 			"Removed {1} unused key(s) from '{2}'; backup at '{3}'.",

@@ -27,9 +27,28 @@
 			"extensions": ["py"],
 			"commands": {
 				"linux": ["python3"],
-				"hs": ["python3"]
+				"hs": ["python3"],
+				"ahk": ["python3.exe", "python.exe"]
 			},
 			"prefix": []
+		},
+		{
+			"id": "powershell",
+			"mode": "script",
+			"extensions": ["ps1"],
+			"commands": {
+				"ahk": ["pwsh.exe", "powershell.exe"]
+			},
+			"prefix": ["-NoProfile", "-NonInteractive", "-File"]
+		},
+		{
+			"id": "autohotkey",
+			"mode": "script",
+			"extensions": ["ahk"],
+			"commands": {
+				"ahk": ["AutoHotkey64.exe", "AutoHotkey.exe"]
+			},
+			"prefix": ["/ErrorStdOut=UTF-8"]
 		},
 		{
 			"id": "executable",
@@ -37,7 +56,8 @@
 			"extensions": [],
 			"commands": {
 				"linux": [],
-				"hs": []
+				"hs": [],
+				"ahk": []
 			},
 			"prefix": []
 		}

@@ -538,6 +538,15 @@ local function failure_detail(result)
 	return tostring(type(result) == "table" and result.error or "transport failed")
 end
 
+--- Retains actual transport evidence privately for the current caller.
+--- Application refusals and successful malformed replies create no evidence.
+--- @param result any The native transport result.
+--- @return table|nil receipt
+local function failure_receipt(result)
+	if type(result) ~= "table" or result.ok == true then return nil end
+	return type(result.failure_receipt) == "table" and result.failure_receipt or nil
+end
+
 --- The sorted top-level keys of a decoded answer, never its values: they may
 --- hold the user's text.
 --- @param root table
@@ -551,7 +560,7 @@ end
 
 --- Posts one JSON body within an exchange. on_answer(root) runs with the
 --- decoded answer while the exchange is current; a transport or HTTP failure,
---- or an answer that is not a JSON object, goes to fail(detail).
+--- or an answer that is not a JSON object, goes to fail(detail, failure_receipt?).
 --- @param epoch integer The exchange.
 --- @param url string
 --- @param headers table
@@ -567,7 +576,7 @@ local function post_json(epoch, url, headers, payload, fail, on_answer)
 	local dispatched = HttpClient.post(url, headers, body, function(result)
 		if epoch ~= _epoch then return end
 		if type(result) ~= "table" or result.ok ~= true then
-			fail(failure_detail(result))
+			fail(failure_detail(result), failure_receipt(result))
 			return
 		end
 		local root = type(result.body) == "string" and Json.decode(result.body) or nil
@@ -601,7 +610,7 @@ end
 --- @param epoch integer The exchange.
 --- @param prepared table prepare_backboard() output.
 --- @param spec table { system, text, questions? }
---- @param fail function fail(detail)
+--- @param fail function fail(detail, failure_receipt?)
 --- @param on_answer function on_answer(root)
 local function backboard_send(epoch, prepared, spec, fail, on_answer)
 	local endpoint = prepared.endpoint
@@ -620,8 +629,8 @@ local function backboard_send(epoch, prepared, spec, fail, on_answer)
 	local creation = Formats.backboard_assistant_request(endpoint.url)
 	Logger.info(LOG, "Creating the Backboard assistant for this key.")
 	-- fail() logs the reason with the request it fails.
-	post_json(epoch, creation.url, endpoint.headers, creation.body, function(detail)
-		fail("the Backboard assistant could not be created: " .. detail)
+	post_json(epoch, creation.url, endpoint.headers, creation.body, function(detail, receipt)
+		fail("the Backboard assistant could not be created: " .. detail, receipt)
 	end, function(root)
 		local assistant_id = Formats.backboard_assistant_id(root)
 		if not assistant_id then
@@ -637,7 +646,7 @@ local function backboard_send(epoch, prepared, spec, fail, on_answer)
 end
 
 --- Sends one completion. Same shape as api_ollama.chat, with the entry in
---- place of the base URL: on_done(full_text, err) is called exactly once.
+--- place of the base URL: on_done(full_text, err, failure_receipt?) is called exactly once.
 --- A Backboard entry sends one message (its assistant created first when
 --- needed); a decisions entry is refused, Jev being no chat model.
 --- @param entry table
@@ -656,9 +665,9 @@ function M.chat(entry, model, messages, opts, on_chunk, on_done)
 		done("", reason)
 		return false
 	end
-	local function fail(detail)
+	local function fail(detail, receipt)
 		Logger.warn(LOG, "Remote request failed: %s.", detail)
-		done("", detail)
+		if receipt == nil then done("", detail) else done("", detail, receipt) end
 	end
 	local started = Monotonic.now_ms()
 	local function deliver(text)
@@ -690,7 +699,7 @@ function M.chat(entry, model, messages, opts, on_chunk, on_done)
 	local dispatched = HttpClient.post(request.url, request.headers, request.body, function(result)
 		if epoch ~= _epoch then return end
 		if type(result) ~= "table" or result.ok ~= true then
-			fail(failure_detail(result))
+			fail(failure_detail(result), failure_receipt(result))
 			return
 		end
 		deliver(M.extract_text(request.format, result.body))
@@ -705,7 +714,7 @@ end
 --- Asks Jev one set of typed questions for the agent's System 1: a decisions
 --- provider receives decisions_body(); a Backboard entry sends a message with
 --- the questions in system_one, and where Backboard put the answers is logged
---- (its clients do not document it). on_done(answers, err) is called once.
+--- (its clients do not document it). on_done(answers, err, failure_receipt?) is called once.
 --- @param entry table A decisions or Backboard entry.
 --- @param state string|table What the questions are about.
 --- @param questions table { [id] = { type, instructions, criteria? } }
@@ -719,9 +728,9 @@ function M.decide(entry, state, questions, on_done)
 		done(nil, reason)
 		return false
 	end
-	local function fail(detail)
+	local function fail(detail, receipt)
 		Logger.warn(LOG, "Decision request failed: %s.", detail)
-		done(nil, detail)
+		if receipt == nil then done(nil, detail) else done(nil, detail, receipt) end
 	end
 	local provider = type(entry) == "table" and M.provider(entry.provider) or nil
 	if not provider then return refuse("unknown provider " .. tostring(type(entry) == "table" and entry.provider)) end
@@ -780,7 +789,7 @@ end
 
 --- Lists models for a manually configured local API through the existing owner.
 --- @param entry table Provider, configured base URL, token and model identity.
---- @param on_done function Receives (model_ids, reason).
+--- @param on_done function Receives (model_ids, reason, failure_receipt?).
 --- @return boolean dispatched
 function M.models(entry, on_done)
 	local epoch, done = open_exchange(on_done)
@@ -801,7 +810,8 @@ function M.models(entry, on_done)
 				if entry[key] ~= captured[key] then done(nil, "identity_changed"); return end
 			end
 			local ids, refusal = AuthPolicy.models_receipt(result)
-			done(ids, refusal)
+			local receipt = failure_receipt(result)
+			if receipt == nil then done(ids, refusal) else done(ids, refusal, receipt) end
 		end)
 	if dispatched ~= true then done(nil, "HTTP transport unavailable"); return false end
 	return true
@@ -811,7 +821,8 @@ end
 --- chat (a Backboard entry as one message), or decisions_test to a decisions
 --- provider, which passes when the answer holds answers.
 --- @param entry table
---- @param on_done function Called with (ok, detail, elapsed_ms): detail is the reply or the error.
+--- @param on_done function Called with (ok, detail, elapsed_ms, failure_receipt?): detail is the reply or the error.
+--- The optional receipt is private transport data, not a page-safe report.
 --- @return boolean Whether the probe was dispatched.
 function M.test(entry, on_done)
 	local started = Monotonic.now_ms()
@@ -822,8 +833,11 @@ function M.test(entry, on_done)
 			on_done(false, "the API provider list is invalid", 0)
 			return false
 		end
-		return M.decide(entry, probe.state, probe.questions, function(answers, err)
-			on_done(err == nil, err or Json.encode(answers) or "", Monotonic.now_ms() - started)
+		return M.decide(entry, probe.state, probe.questions, function(answers, err, receipt)
+			local detail = err or Json.encode(answers) or ""
+			local elapsed = Monotonic.now_ms() - started
+			if receipt == nil then on_done(err == nil, detail, elapsed)
+			else on_done(err == nil, detail, elapsed, receipt) end
 		end)
 	end
 	local spec = M.test_request_spec()
@@ -834,8 +848,10 @@ function M.test(entry, on_done)
 	return M.chat(entry, nil, {
 		{ role = "system", content = spec.system_prompt },
 		{ role = "user", content = spec.user_text },
-	}, { temperature = spec.temperature, max_tokens = spec.max_tokens }, nil, function(text, err)
-		on_done(err == nil, err or text, Monotonic.now_ms() - started)
+	}, { temperature = spec.temperature, max_tokens = spec.max_tokens }, nil, function(text, err, receipt)
+		local elapsed = Monotonic.now_ms() - started
+		if receipt == nil then on_done(err == nil, err or text, elapsed)
+		else on_done(err == nil, err or text, elapsed, receipt) end
 	end)
 end
 

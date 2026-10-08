@@ -27,6 +27,7 @@ local M = {}
 local WindowTitles = require("window_titles")
 local NumberRowPolicy = require("layout.number_row_policy")
 local ParameterLabel = require("action_parameter_label")
+local RowDialect = require("menu.row_dialect")
 
 local Logger = require("logger.shim")
 local Extensions = require("hotstrings.extensions")
@@ -56,16 +57,6 @@ end
 -- cascade and the TOMLs speak, milliseconds is what a person means by "wait a
 -- bit longer". The conversion happens only at this boundary.
 local MS_PER_SEC = 1000
-
--- The categories whose delay the other two drivers put directly in the delays
--- submenu rather than only in the settings window. They are the two a user
--- actually retunes — the magic key because it fires on a single character, and
--- autocorrection because it rewrites what was already typed — so both are one
--- click away here, exactly as on Windows and macOS.
-local QUICK_DELAY_CATEGORIES = {
-	{ category = "magickey",       label = "menu.hotstrings.delay_magic_key" },
-	{ category = "autocorrection", label = "menu.hotstrings.delay_autocorrection" },
-}
 
 -- The category id of the user's own hotstrings — the stem of personal.toml, and
 -- the same name the editor bridge writes under. Named here so the default-section
@@ -472,7 +463,9 @@ local function _build_layouts(ctx)
 				}
 			end
 			if #rows == 0 then
-				rows[1] = { label = i18n_safe("menu.layout.none_installed"), disabled = true }
+				if type(ManifestMenu) ~= "table" or type(ManifestMenu.status_rows) ~= "function" then return {} end
+				local status = ManifestMenu.status_rows("layout_menu", "custom_layouts", "none_installed")
+				return type(status) == "table" and status or {}
 			end
 			return rows
 		end,
@@ -536,6 +529,7 @@ local function _build_layouts(ctx)
 			if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
 		end
 		return MagicKeySourceRows.menu_rows(Source.resolver(), {
+			manifest = ManifestMenu,
 			t = i18n_safe,
 			current = Source.get(),
 			key_text = Source.key_text,
@@ -613,6 +607,92 @@ end
 --- @param ctx table Menu context; ctx.webview opens the settings window.
 --- @param config table The hotstrings config module.
 --- @return table Menu rows, empty when the renderer could not be bound.
+--- Admits the whole canonical quick-delay caption map without native fallback.
+--- @param root table The current published menu manifest.
+--- @return table|nil Captions; unknown fields or malformed data refuse the frame.
+local function parameter_delay_captions(root)
+	local captions = type(root) == "table" and rawget(root, "hotstrings_delay_captions") or nil
+	local keys = { default = true, magic_key = true, autocorrection = true,
+		ai_acceptance = true, autocompletion = true }
+	if type(captions) ~= "table" or getmetatable(captions) ~= nil then return nil end
+	local count = 0
+	for key, value in next, captions do
+		if keys[key] ~= true or type(value) ~= "string" or value == "" then return nil end
+		count = count + 1
+	end
+	if count ~= 5 then return nil end
+	return captions
+end
+
+
+-- Captures the actual declared frame before native value readers can reenter it.
+local function magic_frame_snapshot(renderer, key, expected)
+	key, expected = key or "hotstrings_magic_trigger_frame", expected or 3
+	local root = renderer.get_root()
+	local frame = type(root) == "table" and rawget(root, key)
+	if type(frame) ~= "table" or getmetatable(frame) ~= nil or #frame ~= expected then return nil end
+	local slots = 0
+	for index in next, frame do
+		if type(index) ~= "number" or index % 1 ~= 0 or index < 1 or index > expected then return nil end
+		slots = slots + 1
+	end
+	if slots ~= expected then return nil end
+	local snapshot = {}
+	for index, row in ipairs(frame) do
+		if type(row) ~= "table" or getmetatable(row) ~= nil then return nil end
+		local fields = {}
+		for key, value in next, row do
+			if type(value) == "table" then
+				if getmetatable(value) ~= nil then return nil end
+				local entries = {}
+				for field, item in next, value do
+					if type(item) == "table" or type(item) == "function" then return nil end
+					entries[field] = item
+				end
+				fields[key] = { identity = value, entries = entries }
+			elseif type(value) == "function" then return nil
+			else fields[key] = value end
+		end
+		snapshot[index] = { identity = row, fields = fields }
+	end
+	return { root = root, frame = frame, rows = snapshot, key = key }
+end
+
+-- Publication is withheld when any captured declaration identity or field changed.
+local function magic_frame_current(renderer, snapshot)
+	if not snapshot or not rawequal(renderer.get_root(), snapshot.root)
+		or not rawequal(rawget(snapshot.root, snapshot.key), snapshot.frame)
+		or getmetatable(snapshot.frame) ~= nil or #snapshot.frame ~= #snapshot.rows then return false end
+	local slots = 0
+	for index in next, snapshot.frame do
+		if type(index) ~= "number" or index % 1 ~= 0 or index < 1 or index > #snapshot.rows then return false end
+		slots = slots + 1
+	end
+	if slots ~= #snapshot.rows then return false end
+	for index, saved in ipairs(snapshot.rows) do
+		local row = rawget(snapshot.frame, index)
+		if not rawequal(row, saved.identity) or getmetatable(row) ~= nil then return false end
+		local count, expected = 0, 0
+		for key, value in next, row do
+			count = count + 1
+			local prior = saved.fields[key]
+			if type(prior) == "table" then
+				if not rawequal(value, prior.identity) or getmetatable(value) ~= nil then return false end
+				local entries, wanted = 0, 0
+				for field, item in next, value do
+					entries = entries + 1
+					if not rawequal(item, prior.entries[field]) then return false end
+				end
+				for _ in next, prior.entries do wanted = wanted + 1 end
+				if entries ~= wanted then return false end
+			elseif not rawequal(value, prior) then return false end
+		end
+		for _ in next, saved.fields do expected = expected + 1 end
+		if count ~= expected then return false end
+	end
+	return true
+end
+
 local function _manifest_hotstring_rows(ctx, config)
 	if not ManifestMenu then
 		Logger.warn(LOG, "Manifest renderer unavailable — the hotstrings submenu loses its declared rows.")
@@ -620,6 +700,8 @@ local function _manifest_hotstring_rows(ctx, config)
 	end
 
 	local root    = ManifestMenu.get_root() or {}
+	local captions = parameter_delay_captions(root)
+	local boundaries = ManifestMenu.template_rows("hotstrings_parameter_boundary", {}, {}, {})
 	local classes = type(root.hotstring_groups) == "table" and root.hotstring_groups or {}
 	local groups  = type(config.get_groups) == "function" and (config.get_groups() or {}) or {}
 
@@ -1020,13 +1102,13 @@ local function _manifest_hotstring_rows(ctx, config)
 		if type(current) ~= "number" then
 			Logger.error(LOG, "hotstrings_config exposes no global delay — the row cannot show a value.")
 			return {
-				label    = i18n_safe("menu.hotstrings.tooltip_default") .. " : " .. i18n_safe("menu.hotstrings.missing_value"),
+				label    = i18n_safe(captions.default) .. " : " .. i18n_safe("menu.hotstrings.missing_value"),
 				disabled = true,
 			}
 		end
 
 		local overridden = config.has_global_delay_override and config.has_global_delay_override() or false
-		local title = i18n_safe("menu.hotstrings.tooltip_default")
+		local title = i18n_safe(captions.default)
 		return {
 			-- menu.settings.default_indicator carries its own leading space.
 			label = title .. " : " .. delay_display(current)
@@ -1076,6 +1158,7 @@ local function _manifest_hotstring_rows(ctx, config)
 
 	local params_handlers = {
 		["word_expanders"] = function()
+			if not boundaries then return {} end
 			if not Terminators then
 				Logger.error(LOG, "keymap.terminators unavailable — the word-delimiter submenu is skipped.")
 				return {}
@@ -1185,7 +1268,7 @@ local function _manifest_hotstring_rows(ctx, config)
 
 			for _, def in ipairs(Terminators.get_terminator_defs() or {}) do
 				if def.type == "separator" then
-					sub[#sub + 1] = { separator = true }
+					for _, boundary in ipairs(boundaries) do sub[#sub + 1] = boundary end
 				elseif def.key then
 					local key = def.key
 					-- The live magic key, not the ★ the catalogue was written with.
@@ -1224,7 +1307,8 @@ local function _manifest_hotstring_rows(ctx, config)
 				end
 			end
 
-			sub[#sub + 1] = { separator = true }
+			local catalogue_rows = sub
+			sub = {}
 			local add_row = ManifestMenu.command_row("word_expander_custom_menu", "word_expander_add", {
 				["word_expander_add"] = function()
 					local char = prompt_text(
@@ -1269,20 +1353,25 @@ local function _manifest_hotstring_rows(ctx, config)
 				},
 				state_getters = { ["word_expanders_ready"] = word_expanders_ready },
 			}
+			local entries = ManifestMenu.template_rows("hotstrings_word_expander_frame", {}, {}, {
+				["parameter_catalogue_entries"] = function() return catalogue_rows end,
+				["parameter_custom_entries"] = function() return sub end,
+			})
+			if not entries then return {} end
 			local rendered_expanders = ManifestMenu.build("word_expanders_menu", "HotstringsParams", nil, nil,
-				exp_ctx, { ["word_expander_entries"] = function() return sub end })
-			return { { label = i18n_safe("menu.hotstrings.word_expanders"), submenu = rendered_expanders } }
+				exp_ctx, { ["word_expander_entries"] = function() return entries end })
+			local children = ManifestMenu.native_child_rows(rendered_expanders)
+			if not children then return {} end
+			return ManifestMenu.template_rows("hotstrings_word_expander_parent", {},
+				{ ["parameter_parent_ready"] = function() return true end },
+				{ ["parameter_word_expander_children"] = children }) or {}
 		end,
 		["magic_key_config"] = function()
-			local rows = {}
-			-- The row the manifest restricted to Windows and macOS until 2026-08-04,
-			-- with a translated reason saying Linux had no way to change the key. That
-			-- was true and is the reason it is written here rather than the reason to
-			-- keep the row hidden: a declared gap closes by writing the feature.
+			local source = magic_frame_snapshot(ManifestMenu)
+			if not source then return {} end
 			local current = MagicKey.get()
-			rows[#rows + 1] = {
-				label  = i18n_safe("menu.hotstrings.magic_key") .. " : " .. current,
-				action = function()
+			local customised = MagicKey.is_customised()
+			local change = function()
 					local chosen = prompt_text(
 						i18n_safe("dialog.magic_key.title"),
 						i18n_safe("dialog.magic_key.prompt"),
@@ -1298,17 +1387,21 @@ local function _manifest_hotstring_rows(ctx, config)
 						return
 					end
 					if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
-				end,
-			}
-			if MagicKey.is_customised() then
-				rows[#rows + 1] = {
-					label  = "    " .. i18n_safe("menu.hotstrings.magic_key_reset"),
-					action = function()
+				end
+			local reset = function()
 						MagicKey.reset()
 						if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
-					end,
-				}
-			end
+					end
+			local rows = ManifestMenu.template_rows("hotstrings_magic_trigger_frame", { magic_key_change = change, magic_key_reset = reset },
+				{ magic_key_value = function() return current end }, { magic_key_reset_if_custom = function()
+					if not customised then return {} end
+					local reset_source = magic_frame_snapshot(ManifestMenu, "hotstrings_magic_trigger_reset", 1)
+					if not reset_source then return nil end
+					local reset_rows = ManifestMenu.template_rows("hotstrings_magic_trigger_reset", { magic_key_reset = reset }, {}, {})
+					if not reset_rows or not magic_frame_current(ManifestMenu, reset_source) then return nil end
+					return reset_rows
+				end })
+			if not rows or not magic_frame_current(ManifestMenu, source) then return {} end
 			return rows
 		end,
 		["delays_colors"] = function()
@@ -1319,7 +1412,7 @@ local function _manifest_hotstring_rows(ctx, config)
 			-- cascade as macOS, set_override() persists to the same file, and
 			-- ergopti_hotstrings.lua consumes the resolved delay on every keystroke.
 			-- The values were all there; only the prompts were missing.
-			local sub = {}
+			if not captions then return {} end
 
 			local settings_row = ManifestMenu.command_row("hotstrings_delays_menu", "hotstrings_config_window", {
 				hotstrings_config_window = function()
@@ -1334,15 +1427,15 @@ local function _manifest_hotstring_rows(ctx, config)
 					ctx.webview.show("hotstrings_config_window")
 				end,
 			}, { hotstrings_config_ready = function() return true end })
-			if settings_row then sub[#sub + 1] = settings_row end
-			sub[#sub + 1] = { separator = true }
-			sub[#sub + 1] = global_delay_row()
-
-			for _, entry in ipairs(QUICK_DELAY_CATEGORIES) do
-				sub[#sub + 1] = category_delay_row(entry.category, entry.label)
-			end
-
-			return { { label = i18n_safe("menu.hotstrings.delays_colors"), items = sub } }
+			local sub = ManifestMenu.template_rows("hotstrings_delays_frame", {}, {}, {
+				["parameter_delay_config"] = function() return settings_row and { settings_row } or {} end,
+				["parameter_delay_default"] = function() return { global_delay_row() } end,
+				["parameter_delay_magic_key"] = function() return { category_delay_row("magickey", captions.magic_key) } end,
+				["parameter_delay_autocorrection"] = function() return { category_delay_row("autocorrection", captions.autocorrection) } end,
+			})
+			if not sub then return {} end
+			return ManifestMenu.template_rows("hotstrings_delays_parent", {},
+				{ ["parameter_parent_ready"] = function() return true end }, { ["parameter_delays_children"] = sub }) or {}
 		end,
 	}
 
@@ -1507,7 +1600,8 @@ local function _manifest_hotstring_rows(ctx, config)
 		end,
 		["hotstring_languages"] = language_rows,
 		["hotstring_personal"] = function()
-			local rows = {}
+			local default_parent, group_rows, unavailable_rows = {}, {}, {}
+			local preferences_present, close_on_add, close_action = false, false, nil
 			local function editor_ready()
 				if ctx.paused == true or type(ctx.is_paused) ~= "function"
 					or type(ctx.webview) ~= "table" or type(ctx.webview.show) ~= "function" then return false end
@@ -1517,7 +1611,6 @@ local function _manifest_hotstring_rows(ctx, config)
 			local editor_row = ManifestMenu.command_row("personal_hotstring_commands", "personal_hotstring_open_editor",
 				{ personal_hotstring_open_editor = function() return ctx.webview.show("hotstring_editor") end },
 				{ personal_hotstring_editor_ready = editor_ready })
-			if editor_row then rows[#rows + 1] = editor_row end
 
 			local ok_editor, Editor = pcall(require, "ui.hotstring_editor.bridge")
 			if ok_editor and type(Editor.get_pref) == "function" then
@@ -1527,17 +1620,14 @@ local function _manifest_hotstring_rows(ctx, config)
 				local current = Editor.get_pref("default_section")
 				local personal = type(config.get_category) == "function"
 					and config.get_category(PERSONAL_CATEGORY) or nil
-				local sub = {}
-				sub[#sub + 1] = {
-					label   = i18n_safe("common.none"),
-					checked = (current == nil or current == ""),
-					action      = function()
+				local none_action = function()
 						Editor.set_pref("default_section", "")
 						if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
-					end,
-				}
+					end
+				local choices = {}
+
 				for _, name in ipairs(personal and personal.sections_order or {}) do
-					sub[#sub + 1] = {
+					choices[#choices + 1] = {
 						label   = name,
 						checked = (current == name),
 						action      = function()
@@ -1546,26 +1636,31 @@ local function _manifest_hotstring_rows(ctx, config)
 						end,
 					}
 				end
-				rows[#rows + 1] = {
-					label = i18n_safe("menu.hotstrings.default_category_prefix")
-						.. ((current ~= nil and current ~= "") and current or i18n_safe("common.none")),
-					items  = sub,
-				}
+				local sub = ManifestMenu.template_rows("hotstring_personal_default_frame", {
+					["personal_default_none"] = none_action,
+				}, {
+					["personal_default_unset"] = function() return current == nil or current == "" end,
+					["personal_default_boundary"] = function() return false end,
+				}, { ["personal_default_choices"] = function() return choices end })
+				if type(sub) ~= "table" then return {} end
+				local projected_default = ManifestMenu.template_rows("hotstring_personal_default_parent", {},
+					{ personal_default_label = function()
+						return (current ~= nil and current ~= "") and current or i18n_safe("common.none")
+					end }, { personal_default_caption = function() return sub end })
+				if type(projected_default) ~= "table" then return {} end
+				default_parent = projected_default
 
-				local close_on_add = Editor.get_pref("auto_close") == true
-				rows[#rows + 1] = {
-					label   = i18n_safe("menu.hotstrings.close_on_add"),
-					checked = close_on_add,
-					action      = function()
+				preferences_present = true
+				close_on_add = Editor.get_pref("auto_close") == true
+				close_action = function()
 						Editor.set_pref("auto_close", not close_on_add)
 						if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
-					end,
-				}
+					end
+
 			else
 				Logger.error(LOG, "The hotstring editor bridge is unavailable — its preferences cannot be shown.")
 			end
 
-			rows[#rows + 1] = { separator = true }
 
 			local added, represented = 0, {}
 			for _, name in ipairs(groups) do
@@ -1574,7 +1669,7 @@ local function _manifest_hotstring_rows(ctx, config)
 				-- own section below. Without this test they appeared here, under a
 				-- heading that told the user they had written them.
 				if not classified[name] and not Extensions.parse_category_key(name) then
-					rows[#rows + 1] = group_row(name)
+					group_rows[#group_rows + 1] = group_row(name)
 					represented[name] = true
 					added = added + 1
 				end
@@ -1591,23 +1686,49 @@ local function _manifest_hotstring_rows(ctx, config)
 							or config.personal_file_scope_binding(descriptor.id) == nil then
 							row.label = row.label .. " — " .. i18n_safe("menu.hotstrings.personal_source_unavailable")
 						end
-						rows[#rows + 1], represented[descriptor.id] = row, true
+						group_rows[#group_rows + 1], represented[descriptor.id] = row, true
 						added = added + 1
 					end
 				end
 			end
 			if type(config.personal_unavailable_directories) == "function" then
 				for _, blocked in ipairs(config.personal_unavailable_directories()) do
-					rows[#rows + 1] = { label = blocked.label,
+					unavailable_rows[#unavailable_rows + 1] = { label = blocked.label,
 						submenu = PersonalFileMenu.directory_unavailable(ManifestMenu) }
 					added = added + 1
 				end
 			end
-			if added == 0 then
-				rows[#rows + 1] = {
-					label = i18n_safe("menu.hotstrings.no_group_loaded"), action = function() end, disabled = true,
-				}
-			end
+			local controls = ManifestMenu.template_rows("hotstring_personal_controls_frame", {
+				["personal_close_on_add"] = close_action,
+			}, {
+				["personal_open_present"] = function() return false end,
+				["personal_controls_head_boundary"] = function() return false end,
+				["personal_controls_tail_boundary"] = function() return true end,
+				["personal_preferences_present"] = function() return preferences_present end,
+				["personal_controls_ready"] = function() return true end,
+				["personal_close_on_add"] = function() return close_on_add end,
+			}, {
+				["personal_editor"] = function() return editor_row and { editor_row } or {} end,
+				["personal_default_parent"] = function() return default_parent end,
+				["personal_legacy_before"] = function() return {} end,
+				["personal_legacy_after"] = function() return {} end,
+			})
+			if type(controls) ~= "table" then return {} end
+			local rows = ManifestMenu.template_rows("hotstring_personal_content_frame", {}, {
+				["personal_main_boundary"] = function() return false end,
+				["personal_tree_boundary"] = function() return false end,
+				["personal_custom_boundary"] = function() return false end,
+				["personal_empty"] = function() return added == 0 end,
+			}, {
+				["personal_controls"] = function() return controls end,
+				["personal_main_sections"] = function() return group_rows end,
+				["personal_unavailable_directories"] = function() return unavailable_rows end,
+				["personal_tree"] = function() return {} end,
+				["personal_custom_sections"] = function() return {} end,
+			})
+			if type(rows) ~= "table" then return {} end
+			if added == 0 then rows[#rows].action = function() end end
+
 			return rows
 		end,
 		["hotstring_extensions"] = function()
@@ -1680,7 +1801,7 @@ local function _manifest_hotstring_rows(ctx, config)
 
 			for _, extension_id in ipairs(order) do
 				local packs = by_extension[extension_id]
-				local sub = {}
+				local pack_rows, bound_rows = {}, {}
 				local function commit_gates(enabled)
 					if ctx.paused == true or (type(ctx.is_paused) == "function" and ctx.is_paused()) then return false end
 					local bindings = {}
@@ -1704,20 +1825,14 @@ local function _manifest_hotstring_rows(ctx, config)
 				-- Turning the extension off means turning off every pack it brought.
 				-- Offered first because it is the action the extension as a unit
 				-- affords; the per-pack rows below are for the user who wants half.
-				sub[#sub + 1] = {
-					label = i18n_safe("menu.hotstrings.check_all"),
-					action = function() return commit_gates(true) end,
-				}
-				sub[#sub + 1] = {
-					label = i18n_safe("menu.hotstrings.uncheck_all"),
-					action = function() return commit_gates(false) end,
-				}
-				sub[#sub + 1] = { separator = true }
+				local bulk = ManifestMenu.template_rows("hotstring_extension_bulk_controls", {
+					["extension_enable_all"] = function() return commit_gates(true) end,
+					["extension_disable_all"] = function() return commit_gates(false) end,
+				}, {}, {})
 
 				for _, name in ipairs(packs) do
-					sub[#sub + 1] = group_row(name)
+					pack_rows[#pack_rows + 1] = group_row(name)
 				end
-				if bound_sections[extension_id] and #packs > 0 then sub[#sub + 1] = { separator = true } end
 				for _, bound in ipairs(bound_sections[extension_id] or {}) do
 					local category_on = config.is_group_enabled and config.is_group_enabled(bound.category)
 					local checked = config.is_section_checked
@@ -1729,7 +1844,7 @@ local function _manifest_hotstring_rows(ctx, config)
 						description = description[locale] or description.en
 					end
 					if type(description) ~= "string" or description == "" then description = bound.section end
-					sub[#sub + 1] = {
+					bound_rows[#bound_rows + 1] = {
 						label    = string.format("%s (%d)", description, bound.count),
 						checked  = checked and true or false,
 						-- Greyed while its category is off, like a section row there.
@@ -1750,11 +1865,22 @@ local function _manifest_hotstring_rows(ctx, config)
 					}
 				end
 
+				local sub = type(bulk) == "table" and ManifestMenu.template_rows("hotstring_extension_content_frame", {}, {}, {
+					["extension_bulk_head"] = function() return bulk end,
+					["extension_pack_rows"] = function() return pack_rows end,
+					["extension_bound_boundary"] = function()
+						if bound_sections[extension_id] and #packs > 0 then
+							return ManifestMenu.template_rows("hotstrings_parameter_boundary", {}, {}, {})
+						end
+						return {}
+					end,
+					["extension_bound_tail"] = function() return bound_rows end,
+				}) or nil
 				local name = names[extension_id] or extension_label(extension_id)
-				rows[#rows + 1] = {
+				if sub then rows[#rows + 1] = {
 					label = string.format(i18n_safe("menu.extensions.hotstrings_of"), name),
 					items = sub,
-				}
+				} end
 			end
 			return rows
 		end,
@@ -1788,6 +1914,8 @@ local function _manifest_hotstring_rows(ctx, config)
 				["preview_magic_ready"] = function() return true end,
 			})
 			if row then choices[#choices + 1] = row end
+			local magic_rows = choices
+			choices = {}
 			local presence_commands, presence_getters = {}, { preview_presence_ready = function() return true end }
 			for key, name in pairs({ preview_autocorrect_enabled = "autocorrect", preview_ai_enabled = "ai" }) do
 				presence_commands[key] = function()
@@ -1801,7 +1929,8 @@ local function _manifest_hotstring_rows(ctx, config)
 				local row = ManifestMenu.check_row("preview_presence_controls", declaration.id, presence_commands, presence_getters)
 				if row then choices[#choices + 1] = row end
 			end
-			choices[#choices + 1] = { separator = true }
+			local presence_rows = choices
+			choices = {}
 			local row = ManifestMenu.check_row("preview_colored_control", "preview_colored_tooltips", {
 				["preview_colored_tooltips"] = function()
 					if PreviewSettings.toggle("colored") ~= true then return false end
@@ -1815,7 +1944,14 @@ local function _manifest_hotstring_rows(ctx, config)
 			})
 			if row then choices[#choices + 1] = row end
 
-			return { { label = i18n_safe("menu.hotstrings.preview_bubbles"), items = choices } }
+			local children = ManifestMenu.template_rows("hotstrings_preview_frame", {}, {}, {
+				["parameter_preview_magic"] = function() return magic_rows end,
+				["parameter_preview_presence"] = function() return presence_rows end,
+				["parameter_preview_colored"] = function() return choices end,
+			})
+			if not children then return {} end
+			return ManifestMenu.template_rows("hotstrings_preview_parent", {},
+				{ ["parameter_parent_ready"] = function() return true end }, { ["parameter_preview_children"] = children }) or {}
 		end,
 	}
 	params_handlers["word_expanders"] = nil
@@ -1907,9 +2043,9 @@ local function _build_hotstrings(ctx)
 	local config = ctx.config
 
 	if type(config) ~= "table" then
-		return { label = i18n_safe("menu.hotstrings.title"), items = {
-			{ label = i18n_safe("menu.hotstrings.unavailable"), disabled = true },
-		}}
+		local status_rows = ManifestMenu and ManifestMenu.template_rows("linux_hotstrings_absent_rows", {}, {}, {})
+		if not status_rows then return {} end
+		return { label = i18n_safe("menu.hotstrings.title"), items = status_rows }
 	end
 
 	local items = _manifest_hotstring_rows(ctx, config)
@@ -1949,10 +2085,9 @@ end
 local function _build_llm(ctx)
 	local llm = ctx.llm
 	if not llm then
-		return { label = i18n_safe("menu.llm.title"), items = {
-			{ label = i18n_safe("menu.llm.unavailable"), disabled = true },
-			{ label = i18n_safe("menu.llm.ollama_start_hint"), disabled = true },
-		}}
+		local status_rows = ManifestMenu and ManifestMenu.template_rows("linux_llm_absent_rows", {}, {}, {})
+		if not status_rows then return {} end
+		return { label = i18n_safe("menu.llm.title"), items = status_rows }
 	end
 
 	local items = {}
@@ -1966,6 +2101,7 @@ local function _build_llm(ctx)
 
 	local providers = {}
 	local dynamic_handlers = {}
+	local group_builders = {}
 
 	--- Appends computed row data after the shared renderer materialises it.
 	---
@@ -1984,8 +2120,8 @@ local function _build_llm(ctx)
 
 	-- Inactivity and privacy controls. Unlike the model and generation lists,
 	-- this is one labelled submenu, so the manifest keeps its cross-driver
-	-- `dynamic` row and this driver supplies only the runtime contents.
-	dynamic_handlers["llm_trigger"] = function(target)
+	-- declared group and this driver supplies only the runtime child contents.
+	group_builders["llm_trigger"] = function()
 		local ok_settings, TriggerSettings = pcall(require, "modules.llm.trigger_settings")
 		if not ok_settings then
 			Logger.error(LOG, "LLM trigger settings unavailable; trigger menu omitted.")
@@ -2005,10 +2141,8 @@ local function _build_llm(ctx)
 			}
 		end
 		local bounds = TriggerSettings.bounds("debounce_ms")
-		delay_choices[#delay_choices + 1] = { separator = true }
-		delay_choices[#delay_choices + 1] = {
-			label = i18n_safe("menu.llm.generation.custom_value"),
-			action = function()
+		local custom_rows = ManifestMenu.template_rows("llm_numeric_custom_rows", {
+			["llm_numeric_custom_value"] = function()
 				local ok_prompt, Prompt = pcall(require, "ui.numeric_prompt.bridge")
 				if not ok_prompt then
 					Logger.error(LOG, "No numeric prompt; debounce can only take a preset.")
@@ -2027,12 +2161,15 @@ local function _build_llm(ctx)
 					end,
 				}, ctx.webview)
 			end,
-		}
+		})
+		for _, row in ipairs(custom_rows or {}) do delay_choices[#delay_choices + 1] = row end
 		rows[#rows + 1] = {
 			label = string.format(i18n_safe("menu.llm.debounce_label"), tostring(current_delay) .. " ms"),
 			items = delay_choices,
 		}
-		rows[#rows + 1] = { separator = true }
+		local boundary_rows = ManifestMenu.template_rows("llm_trigger_provider_boundary", {}, {}, {})
+		if not boundary_rows then return end
+		for _, row in ipairs(boundary_rows) do rows[#rows + 1] = row end
 		local leading_rows = rows
 		rows = {}
 		local Preferences = require("infra.llm_preferences")
@@ -2106,18 +2243,16 @@ local function _build_llm(ctx)
 			["llm_trigger_leading"] = function() return leading_rows end,
 			["llm_trigger_remaining"] = function() return rows end,
 		})
-		append_rendered_row(target, {
-			label = i18n_safe("menu.llm.trigger_menu_title"),
-			submenu = rows,
-			disabled = not enabled or nil,
-		}, "llm_trigger")
+		local child_rows = ManifestMenu.native_child_rows(rows)
+		if child_rows == nil then return nil end
+		return { items = child_rows, disabled = not enabled or nil }
 	end
 
 	-- Live mode: Off, then every rewrite-format prompt (the built-ins in menu
 	-- order, then the user's own), labelled as in the prompt list. The engine
 	-- owns the state the llm_live_prompt_toggle action shares; a prompt chosen
 	-- here runs with the menu's count.
-	dynamic_handlers["llm_live_mode"] = function(target)
+	group_builders["llm_live_mode"] = function()
 		local ok_profiles, ProfileSettings = pcall(require, "modules.llm.profile_settings")
 		if not ok_profiles or type(llm.get_live) ~= "function" then
 			Logger.error(LOG, "LLM live mode unavailable; live submenu omitted.")
@@ -2148,11 +2283,7 @@ local function _build_llm(ctx)
 				}
 			end
 		end
-		append_rendered_row(target, {
-			label = i18n_safe("menu.llm.live_mode_title"),
-			items = rows,
-			disabled = not enabled or nil,
-		}, "llm_live_mode")
+		return { items = rows, disabled = not enabled or nil }
 	end
 
 	dynamic_handlers["llm_profile"] = function(target)
@@ -2205,113 +2336,118 @@ local function _build_llm(ctx)
 			end, opts)
 		end
 		local effective_label = effective
-		local rows = {
-			{
-				label = i18n_safe("menu.profiles.auto_detect"),
-				checked = ProfileSettings.get("auto_profile_for_model") == true,
-				action = function()
-					if not create_ready() then return false end
-					local current = ProfileSettings.get("auto_profile_for_model")
-					if type(current) ~= "boolean" or not create_ready() then return false end
-					local saved = ProfileSettings.set("auto_profile_for_model", not current, current_model)
-					if saved ~= true then return false end
-					refresh()
-					return true
-				end,
-			},
-			{ separator = true },
-			{
-				label = i18n_safe("menu.profiles.header_default_profiles"),
-				disabled = true,
-			},
-		}
-		local active_builtin = nil
-		for _, profile in ipairs(ProfileSettings.list_built_in()) do
-			local profile_id = profile.id
-			-- The same label the action picker lists the profile under. _fill
-			-- appended the count to every label without {n}: "Basic — … 3 s".
-			local label = ProfileSettings.menu_label(profile, count)
-			if effective == profile_id then
-				effective_label = label
-				active_builtin = profile
+		local active_builtin, user_profiles, seed
+		local function auto_profile()
+			if not create_ready() then return false end
+			local current = ProfileSettings.get("auto_profile_for_model")
+			if type(current) ~= "boolean" or not create_ready() then return false end
+			local saved = ProfileSettings.set("auto_profile_for_model", not current, current_model)
+			if saved ~= true then return false end
+			refresh()
+			return true
+		end
+		local function builtin_rows()
+			local rows = {}
+			for _, profile in ipairs(ProfileSettings.list_built_in()) do
+				local profile_id = profile.id
+				-- The same label the action picker lists the profile under. _fill
+				-- appended the count to every label without {n}: "Basic — … 3 s".
+				local label = ProfileSettings.menu_label(profile, count)
+				if effective == profile_id then
+					effective_label = label
+					active_builtin = profile
+				end
+				rows[#rows + 1] = {
+					label = label,
+					checked = effective == profile_id,
+					action = function()
+						select_profile(profile_id)
+					end,
+				}
 			end
-			rows[#rows + 1] = {
-				label = label,
-				checked = effective == profile_id,
-				action = function()
-					select_profile(profile_id)
-				end,
-			}
+			return rows
 		end
-
-		local user_profiles = ProfileSettings.list_user()
-		if #user_profiles > 0 then
-			rows[#rows + 1] = { separator = true }
-			rows[#rows + 1] = {
-				label = i18n_safe("menu.profiles.header_custom_profiles"),
-				disabled = true,
-			}
+		local function custom_present()
+			user_profiles = ProfileSettings.list_user()
+			return #user_profiles > 0
 		end
-		for _, profile in ipairs(user_profiles) do
-			local owned_profile = profile
-			local profile_id = profile.id
-			local label = profile.label
-			if effective == profile_id then effective_label = label end
-			rows[#rows + 1] = {
-				label = label,
-				items = {
-					{
-						label = i18n_safe("menu.profiles.use_profile"),
-						checked = effective == profile_id,
-						action = function() return select_profile(profile_id) end,
-					},
-					{
-						label = i18n_safe("menu.profiles.edit_profile"),
-						action = function() return open_editor(owned_profile, false) end,
-					},
-					{
-						label = i18n_safe("menu.profiles.delete_profile"),
-						action = function()
-							local title = string.format(
-								i18n_safe("menu.profiles.delete_confirm_title"), label)
-							local confirmed
-							if type(ctx.confirm_profile_delete) == "function" then
-								confirmed = ctx.confirm_profile_delete(profile_id, label)
-							else
-								confirmed = ask_yes_no(
-									title,
-									i18n_safe("menu.profiles.delete_confirm_body"),
-									i18n_safe("button.delete"),
-									i18n_safe("button.cancel"))
-							end
-							if confirmed ~= true then return false end
-							local deleted = ProfileSettings.delete_user_profile(profile_id)
-							if deleted then refresh() end
-							return deleted
+		local function custom_rows()
+			local rows = {}
+			for _, profile in ipairs(user_profiles) do
+				local owned_profile = profile
+				local profile_id = profile.id
+				local label = profile.label
+				if effective == profile_id then effective_label = label end
+				local function child_ready()
+					if type(ProfileSettings.list_user) ~= "function" then return false end
+					local ok, current = pcall(ProfileSettings.list_user)
+					if not ok or type(current) ~= "table" then return false end
+					local matches = 0
+					for _, entry in ipairs(current) do
+						if entry.id == profile_id then matches = matches + 1 end
+					end
+					return matches == 1
+				end
+				rows[#rows + 1] = {
+					label = label,
+					items = ManifestMenu.template_rows("llm_custom_profile_controls", {
+						["llm_profile_use"] = function() return select_profile(profile_id) end,
+						["llm_profile_edit"] = function() return open_editor(owned_profile, false) end,
+						["llm_profile_delete"] = function()
+								local title = string.format(
+									i18n_safe("menu.profiles.delete_confirm_title"), label)
+								local confirmed
+								if type(ctx.confirm_profile_delete) == "function" then
+									confirmed = ctx.confirm_profile_delete(profile_id, label)
+								else
+									confirmed = ask_yes_no(
+										title,
+										i18n_safe("menu.profiles.delete_confirm_body"),
+										i18n_safe("button.delete"),
+										i18n_safe("button.cancel"))
+								end
+								if confirmed ~= true then return false end
+								local deleted = ProfileSettings.delete_user_profile(profile_id)
+								if deleted then refresh() end
+								return deleted
+							end,
+					}, {
+						["llm_custom_profile_active"] = function()
+							return ProfileSettings.effective_profile(current_model) == profile_id
 						end,
-					},
-				},
-			}
+						["llm_custom_profile_ready"] = child_ready,
+					}, {}) or {},
+				}
+			end
+			return rows
 		end
-
-		if active_builtin then
-			local seed = {
+		local function clone_present()
+			if not active_builtin then return false end
+			seed = {
 				label = effective_label .. " " .. i18n_safe("menu.profiles.copy_suffix"),
 				system_single = active_builtin.system_single,
 				system_multi_template = active_builtin.system_multi_template,
 				batch = active_builtin.batch == true,
 			}
-			rows[#rows + 1] = { separator = true }
-			local clone_row = ManifestMenu.command_row("llm_profile_commands", "llm_profile_clone",
-				{ llm_profile_clone = function() return open_editor(seed, true, { as_new = true }, true) end },
-				{ llm_profile_clone_ready = create_ready })
-			if clone_row then rows[#rows + 1] = clone_row end
+			return true
 		end
-		rows[#rows + 1] = { separator = true }
-		local create_row = ManifestMenu.command_row("llm_profile_commands", "llm_profile_create",
-			{ llm_profile_create = function() return open_editor(nil, true, nil, true) end },
-			{ llm_profile_create_ready = create_ready })
-		if create_row then rows[#rows + 1] = create_row end
+		local rows = ManifestMenu.template_rows("llm_profile_lua_frame", {
+			["llm_profile_auto_detect"] = auto_profile,
+			["llm_profile_clone"] = function() return open_editor(seed, true, { as_new = true }, true) end,
+			["llm_profile_create"] = function() return open_editor(nil, true, nil, true) end,
+		}, {
+			["llm_profile_recommendation_present"] = function() return false end,
+			["llm_profile_recommendation_paused"] = function() return false end,
+			["llm_profile_auto_detect_checked"] = function() return ProfileSettings.get("auto_profile_for_model") == true end,
+			["llm_profile_custom_present"] = custom_present,
+			["llm_profile_clone_present"] = clone_present,
+			["llm_profile_create_ready"] = create_ready,
+			["llm_profile_clone_ready"] = create_ready,
+		}, {
+			["llm_profile_builtin_rows"] = builtin_rows,
+			["llm_profile_custom_rows"] = custom_rows,
+		})
+		if not rows then return end
 		append_rendered_row(target, {
 			label = string.format(i18n_safe("menu.profiles.profile_label_prefix"), effective_label),
 			items = rows,
@@ -2319,7 +2455,7 @@ local function _build_llm(ctx)
 		}, "llm_profile")
 	end
 
-	dynamic_handlers["llm_display"] = function(target)
+	group_builders["llm_display"] = function()
 		local ok_display, DisplaySettings = pcall(require, "modules.llm.display_settings")
 		if not ok_display then return end
 		local DisplayPolicy = require("llm.display_policy")
@@ -2436,14 +2572,12 @@ local function _build_llm(ctx)
 			["llm_display_remaining"] = function() return {} end,
 			["llm_display_trailing"] = function() return rows end,
 		})
-		append_rendered_row(target, {
-			label = i18n_safe("menu.llm.display_menu_title"),
-			submenu = display_rows,
-			disabled = not enabled or nil,
-		}, "llm_display")
+		local child_rows = ManifestMenu.native_child_rows(display_rows)
+		if child_rows == nil then return nil end
+		return { items = child_rows, disabled = not enabled or nil }
 	end
 
-	dynamic_handlers["llm_navigation"] = function(target)
+	group_builders["llm_navigation"] = function()
 		local ok_navigation, NavigationSettings = pcall(require, "modules.llm.navigation_settings")
 		if not ok_navigation then return end
 		-- One choice list per chord: the navigation modifiers held with Up and
@@ -2504,11 +2638,9 @@ local function _build_llm(ctx)
 			end,
 		}
 		local rows = ManifestMenu.build("llm_navigation_rows", "LLM navigation", nil, nil, ctx, navigation_providers)
-		append_rendered_row(target, {
-			label = i18n_safe("menu.llm.nav_menu_title"),
-			submenu = rows,
-			disabled = not enabled or nil,
-		}, "llm_navigation")
+		local child_rows = ManifestMenu.native_child_rows(rows)
+		if child_rows == nil then return nil end
+		return { items = child_rows, disabled = not enabled or nil }
 	end
 
 	-- The models this machine actually has. A `list`, because the rows are
@@ -2532,7 +2664,11 @@ local function _build_llm(ctx)
 				end,
 			}
 		end
-		if #rows > 0 then rows[#rows + 1] = { separator = true } end
+		if #rows > 0 then
+			for _, row in ipairs(ManifestMenu.status_rows("llm_menu", "llm_models", "model_picker_tail") or {}) do
+				rows[#rows + 1] = row
+			end
+		end
 		local browser_row = ManifestMenu.command_row("llm_model_commands", "llm_browse_models", {
 			["llm_browse_models"] = function()
 				return ctx.webview.show("model_browser") == true
@@ -2632,10 +2768,8 @@ local function _build_llm(ctx)
 			-- capability, which is convergence downwards.
 			local bounds = Settings.bounds(setting.name)
 			if bounds then
-				choices[#choices + 1] = { separator = true }
-				choices[#choices + 1] = {
-					label = i18n_safe("menu.llm.generation.custom_value"),
-					action = function()
+				local custom_rows = ManifestMenu.template_rows("llm_numeric_custom_rows", {
+					["llm_numeric_custom_value"] = function()
 						local ok_prompt, Prompt = pcall(require, "ui.numeric_prompt.bridge")
 						if not ok_prompt then
 							Logger.error(LOG, "No numeric prompt — '%s' can only take a preset.", setting.name)
@@ -2654,7 +2788,8 @@ local function _build_llm(ctx)
 							end,
 						}, ctx.webview)
 					end,
-				}
+				})
+				for _, row in ipairs(custom_rows or {}) do choices[#choices + 1] = row end
 			end
 
 			rows[#rows + 1] = {
@@ -2715,7 +2850,7 @@ local function _build_llm(ctx)
 	llm_ctx.state_getters["llm_toggle_ready"] = function() return ctx.paused ~= true end
 
 	local rendered = ManifestMenu
-		and ManifestMenu.build("llm_menu", "LLM", dynamic_handlers, nil, llm_ctx, providers)
+		and ManifestMenu.build("llm_menu", "LLM", dynamic_handlers, group_builders, llm_ctx, providers)
 		or {}
 	for _, row in ipairs(rendered) do items[#items + 1] = row end
 
@@ -2752,11 +2887,13 @@ end
 --- @return table One provider row.
 local function _migration_row(k)
 	if type(k.get_migration_progress) ~= "function" then
-		return { label = i18n_safe("menu.metrics.migration_unavailable"), disabled = true }
+		local rows = ManifestMenu.template_rows("metrics_migration_unavailable_rows")
+		return rows and rows[1] or nil
 	end
 	local progress = k.get_migration_progress()
 	if not progress.running then
-		return { label = i18n_safe("menu.metrics.migration_idle"), disabled = true }
+		local rows = ManifestMenu.template_rows("metrics_migration_idle_rows")
+		return rows and rows[1] or nil
 	end
 	return {
 		label = string.format(i18n_safe("menu.metrics.migration_progress"),
@@ -3037,12 +3174,92 @@ end
 --- encryption-migration status, and suspend/reset.
 --- @param ctx table Menu context.
 --- @return table One menu entry with its submenu.
+--- Checks raw dense arrays without triggering source metamethods.
+--- @param value table Source array.
+--- @param records boolean Whether its values must be plain records.
+--- @return boolean
+local function metrics_dense(value, records)
+	if type(value) ~= "table" or getmetatable(value) ~= nil then return false end
+	local count, maximum = 0, 0
+	for index, row in next, value do
+		if type(index) ~= "number" or index % 1 ~= 0 or index < 1 then return false end
+		if records and (type(row) ~= "table" or getmetatable(row) ~= nil) then return false end
+		count, maximum = count + 1, math.max(maximum, index)
+	end
+	return count == maximum
+end
+
+--- Admits the actual Metrics source structure without interpreting command grammar.
+--- @param renderer table|nil Actual manifest renderer.
+--- @param platform string Native platform token.
+--- @return table|nil root, table|nil top, table|nil children, table|nil parent, table|nil fields
+local function metrics_source(renderer, platform)
+	if type(renderer) ~= "table" or type(rawget(renderer, "get_root")) ~= "function"
+		or type(rawget(renderer, "build")) ~= "function" or type(rawget(renderer, "group_row")) ~= "function" then return nil end
+
+	local ok, root = pcall(renderer.get_root)
+	if not ok then return nil end
+	if type(root) ~= "table" or getmetatable(root) ~= nil then return nil end
+	local top, children = rawget(root, "top_level"), rawget(root, "metrics_menu")
+	if not metrics_dense(top, true) or not metrics_dense(children, true) then return nil end
+	local parent
+	for _, row in next, top do
+		if rawget(row, "id") == "metrics" then
+			if parent then return nil end
+			parent = row
+		end
+	end
+	if parent == nil or rawget(parent, "type") ~= "group" or type(rawget(parent, "i18n")) ~= "string"
+		or rawget(parent, "i18n") == "" or not metrics_dense(rawget(parent, "rows"), true) then return nil end
+	local platforms = rawget(parent, "platforms")
+	if platforms ~= nil then
+		if not metrics_dense(platforms, false) then return nil end
+		local visible = false
+		for _, token in next, platforms do
+			if type(token) ~= "string" then return nil end
+			if token == platform then visible = true end
+		end
+		if not visible then return nil end
+	end
+	local fields = {}
+	for key, value in next, parent do fields[key] = value end
+	return root, top, children, parent, fields
+end
+
+--- Rechecks the captured direct parent fields without source metamethods.
+--- @param parent table Actual direct source row.
+--- @param fields table Captured raw field references and scalar values.
+--- @return boolean
+local function metrics_parent_unchanged(parent, fields)
+	for key, value in next, parent do
+		if not rawequal(value, rawget(fields, key)) then return false end
+	end
+	for key, value in next, fields do
+		if not rawequal(value, rawget(parent, key)) then return false end
+	end
+	return true
+end
+
+
 local function _build_metrics(ctx)
+	local root, top, section, parent, fields = metrics_source(ManifestMenu, "linux")
+	if root == nil then return nil end
 	local k = ctx.keylogger
 	if type(k) ~= "table" then
-		return { label = i18n_safe("menu.metrics.title"), items = {
-			{ label = i18n_safe("menu.metrics.unavailable"), disabled = true },
-		}}
+		local status_rows = ManifestMenu and ManifestMenu.template_rows("linux_metrics_absent_rows", {}, {}, {})
+		if not status_rows then return nil end
+		local items = ManifestMenu.render_rows(status_rows, "linux_metrics_absent_rows")
+		if not metrics_dense(items, true) then return nil end
+		local current_root, current_top, current_section, current_parent = metrics_source(ManifestMenu, "linux")
+		if not rawequal(root, current_root) or not rawequal(top, current_top)
+			or not rawequal(section, current_section) or not rawequal(parent, current_parent)
+			or not metrics_parent_unchanged(parent, fields) then return nil end
+		local projected = ManifestMenu.group_row("top_level", "metrics", items, { keylogger_enabled = function() return nil end })
+		current_root, current_top, current_section, current_parent = metrics_source(ManifestMenu, "linux")
+		if not rawequal(root, current_root) or not rawequal(top, current_top)
+			or not rawequal(section, current_section) or not rawequal(parent, current_parent)
+			or not metrics_parent_unchanged(parent, fields) then return nil end
+		return projected
 	end
 
 	local items = _manifest_metrics_rows(ctx, k)
@@ -3052,7 +3269,17 @@ local function _build_metrics(ctx)
 	-- readout as a `list`, because its label IS the progress and no static
 	-- declaration can spell "n / total".
 	local on = type(k.is_enabled) == "function" and k.is_enabled() == true
-	return { label = i18n_safe("menu.metrics.title"), checked = on, submenu = items }
+	if not metrics_dense(items, true) then return nil end
+	local current_root, current_top, current_section, current_parent = metrics_source(ManifestMenu, "linux")
+	if not rawequal(root, current_root) or not rawequal(top, current_top)
+		or not rawequal(section, current_section) or not rawequal(parent, current_parent)
+		or not metrics_parent_unchanged(parent, fields) then return nil end
+	local projected = ManifestMenu.group_row("top_level", "metrics", items, { keylogger_enabled = function() return on end })
+	current_root, current_top, current_section, current_parent = metrics_source(ManifestMenu, "linux")
+	if not rawequal(root, current_root) or not rawequal(top, current_top)
+		or not rawequal(section, current_section) or not rawequal(parent, current_parent)
+		or not metrics_parent_unchanged(parent, fields) then return nil end
+	return projected
 end
 
 --- Builds the shortcuts submenu.
@@ -3069,50 +3296,12 @@ end
 --- @return table Array of menu rows, empty when nothing is installed.
 --- Converts a row written in this driver's dialect into the provider data a
 --- `list` row takes, recursively.
----
---- The two shapes differ by name only — `title`/`fn`/`menu` against
---- `label`/`action`/`items` — and the renderer materialises the second. Rows
---- built long before the renderer existed are adapted here rather than rewritten,
---- which is what lets a block move without touching whatever produces it. A row
---- handed over in the wrong dialect renders as "a row with no label" and vanishes
---- with one warning, so the conversion is not optional.
---- @param row table A row in the driver dialect.
---- @return table The same row as provider data.
-local function _as_provider_row(row)
-	if type(row) ~= "table" then return row end
-	-- Read into a local first. The bypass ratchet's predicate keys on the literal
-	-- `title =`, and comparing `row.title` inline reads to it as one more row
-	-- built here — an adapter that exists to REMOVE rows from that count should
-	-- not add one by being written about them.
-	local raw_title = row.title
-	if raw_title == "-" then return { separator = true } end
-	local out = {
-		label    = row.label or raw_title,
-		checked  = row.checked,
-		disabled = row.disabled,
-	}
-	if type(row.menu) == "table" then
-		local items = {}
-		for _, child in ipairs(row.menu) do items[#items + 1] = _as_provider_row(child) end
-		out.items = items
-	elseif type(row.items) == "table" then
-		out.items = row.items
-	elseif type(row.fn) == "function" then
-		out.action = row.fn
-	elseif type(row.action) == "function" then
-		out.action = row.action
-	end
-	return out
-end
-
 --- Converts a LIST of driver-dialect rows, for a caller that emits its own row
 --- as provider data and only adapts what an extension handed it.
 --- @param list table Array of rows in the driver dialect.
 --- @return table Array of provider rows.
 local function _as_provider_row_list(list)
-	local out = {}
-	for _, row in ipairs(list or {}) do out[#out + 1] = _as_provider_row(row) end
-	return out
+	return RowDialect.rows(list)
 end
 
 
@@ -3160,16 +3349,18 @@ local function _extension_shortcut_rows()
 					-- throws would otherwise be indistinguishable from one that
 					-- declares nothing, and its author would have no way to tell.
 					Logger.warn(LOG, "Extension '%s' shortcuts/menu.lua failed: %s", id, tostring(err))
-					rows[#rows + 1] = {
-						label = (pack.name or id) .. " — " .. i18n_safe("common.error_title"),
-						disabled = true,
-					}
+					local marker_rows = ManifestMenu.template_rows("shortcut_extension_error_frame", {}, {
+						shortcut_extension_name = function() return pack.name or id end,
+					}, {})
+					if not marker_rows or #marker_rows == 0 then return {} end
+					for _, row in ipairs(marker_rows) do rows[#rows + 1] = row end
 				elseif #collected > 0 then
 					-- The extension's OWN rows are still adapted: an author writes
 					-- them in the host dialect both Lua drivers expose (`add_item`
 					-- with `title`/`fn`), and that is a published surface. This row —
 					-- the pack's own entry — is ours, so it is provider data.
-					rows[#rows + 1] = { label = pack.name or id, items = _as_provider_row_list(collected) }
+					local external_rows = _as_provider_row_list(collected)
+					if external_rows then rows[#rows + 1] = { label = pack.name or id, items = external_rows } end
 				end
 			end
 		end
@@ -3195,9 +3386,9 @@ end
 local function _build_shortcuts(ctx)
 	local sc = ctx.shortcuts
 	if not sc then
-		return { label = i18n_safe("menu.shortcuts.title"), items = {
-			{ label = i18n_safe("menu.shortcuts.unavailable"), disabled = true },
-		}}
+		local status_rows = ManifestMenu and ManifestMenu.template_rows("linux_shortcuts_absent_rows", {}, {}, {})
+		if not status_rows then return {} end
+		return { label = i18n_safe("menu.shortcuts.title"), items = status_rows }
 	end
 
 	local enabled = sc.is_enabled()
@@ -3231,7 +3422,9 @@ local function _build_shortcuts(ctx)
 		["selection_caps_word_ready"] = caps_word_ready,
 	})
 	if caps_row then selection_rows[#selection_rows + 1] = caps_row end
-	selection_rows[#selection_rows + 1] = { separator = true }
+	local case_boundary = ManifestMenu.template_rows("selection_case_boundary", {}, {}, {})
+	if not case_boundary then return {} end
+	for _, row in ipairs(case_boundary) do selection_rows[#selection_rows + 1] = row end
 	local case_methods = {
 		uppercase_selection = "transform_uppercase",
 		selection_lowercase = "transform_lowercase",
@@ -3257,7 +3450,9 @@ local function _build_shortcuts(ctx)
 		}, case_getters)
 		if row then selection_rows[#selection_rows + 1] = row end
 	end
-	selection_rows[#selection_rows + 1] = { separator = true }
+	local helper_boundary = ManifestMenu.template_rows("selection_helper_boundary", {}, {}, {})
+	if not helper_boundary then return {} end
+	for _, row in ipairs(helper_boundary) do selection_rows[#selection_rows + 1] = row end
 	local helper_methods = {
 		["selection_select_word"] = "select_word",
 		["selection_select_line"] = "select_line",
@@ -3500,7 +3695,9 @@ local function _build_shortcuts(ctx)
 	-- 2026-08-06 while this driver had been drawing it all along; it is a shared
 	-- `list` row now, in the same position on all three drivers.
 	providers["wrap_symbols_menu"] = function()
-		return { { label = i18n_safe("menu.shortcuts.wrap_symbols"), items = wrap_items } }
+		return ManifestMenu.template_rows("shortcut_wrap_frame", {}, {}, {
+			shortcut_wrap_symbols_linux = function() return wrap_items end,
+		})
 	end
 
 	providers["selection_operations"] = function()
@@ -3604,11 +3801,8 @@ local function _build_shortcuts(ctx)
 	if type(sc.is_wrap_on_type_enabled) == "function" then
 		sc_ctx.feature_rows["shortcuts.wrap_text_if_selected"] = function()
 			local on = sc.is_wrap_on_type_enabled()
-			return {
-				label = i18n_safe("shortcuts.label_wrap_text"),
-				checked = on == true,
-				disabled = not wrap_on_type_ready() or type(on) ~= "boolean",
-				action = function()
+			local rows = ManifestMenu.template_rows("shortcut_wrap_live_control", {
+				["shortcut_wrap_on_type"] = function()
 					if not wrap_on_type_ready() then return false end
 					local current = sc.is_wrap_on_type_enabled()
 					if type(current) ~= "boolean" or not wrap_on_type_ready() then return false end
@@ -3616,7 +3810,12 @@ local function _build_shortcuts(ctx)
 					if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
 					return true
 				end,
-			}
+			}, {
+				shortcut_wrap_on_type_checked = function() return on == true end,
+				shortcut_wrap_on_type_ready = function() return wrap_on_type_ready() and type(on) == "boolean" end,
+			}, {})
+			if not rows or #rows ~= 1 then return nil end
+			return rows[1]
 		end
 	end
 
@@ -3730,14 +3929,20 @@ local function _build_tap_holds(ctx)
 		local value = prompt_text(i18n_safe("menu.tapholds.key_tap_delay_dialog_title"),
 			string.format(i18n_safe("menu.tapholds.key_tap_delay_dialog_prompt"), current_ms),
 			tostring(current_ms))
-		if value == nil then return end
+		if value == nil then return false end
 		local ms = tonumber(value)
-		if not ms or ms <= 0 then
+		if not ms or ms ~= ms or ms == math.huge or ms <= 0 or math.floor(ms + 0.5) <= 0 then
 			Logger.warn(LOG, "Invalid tap-hold delay '%s' — ignored.", tostring(value))
 			show_error(tostring(value), i18n_safe("dialog.gestures.param_error_title"))
-			return
+			return false
 		end
-		changed(Writer.set_threshold(key_id, math.floor(ms + 0.5) / 1000))
+		local call_ok, persisted = pcall(Writer.set_threshold, key_id, math.floor(ms + 0.5) / 1000)
+		if not call_ok or persisted ~= true then
+			changed(false)
+			return false
+		end
+		changed(true)
+		return true
 	end
 
 	--- The rows of one hand: its keys in the shared catalogue's order, each
@@ -3767,24 +3972,22 @@ local function _build_tap_holds(ctx)
 				}
 			end
 
-			local key_rows = ManifestMenu.template_rows("tap_hold_key_head", {
+			local delay_rows = ManifestMenu.template_rows("tap_hold_key_delay_rows", {
+				["tap_hold_key_delay_set"] = function() return ask_delay(key_id, ms) end,
+			})
+			if not delay_rows then return nil end
+
+			local key_rows = ManifestMenu.template_rows("tap_hold_key_rows", {
 				["tap_hold_key_native"] = function() changed(Writer.set_native(key_id)) end,
 				["tap_hold_key_tap"] = function() pick_tap(catalog_entry, tap) end,
 			}, {
 				["tap_hold_key_configured"] = function() return configured end,
 				["tap_hold_key_tap_caption"] = function() return tap_label end,
 				["tap_hold_key_hold_caption"] = function() return hold_label end,
-			}, { ["tap_hold_key_hold"] = hold_rows })
+				["tap_hold_key_delay_caption"] = function() return ms .. " ms" end,
+			}, { ["tap_hold_key_hold"] = hold_rows, ["tap_hold_key_delay"] = delay_rows })
 			if key_rows then
-				key_rows[#key_rows + 1] = {
-					label = string.format(i18n_safe("menu.tapholds.key_tap_delay"), ms .. " ms"),
-					items = {
-						{
-							label = i18n_safe("menu.tapholds.key_tap_delay_set"),
-							action = function() ask_delay(key_id, ms) end,
-						},
-					},
-				}
+
 				rows[#rows + 1] = {
 					label = _tap_hold_key_label(catalog_entry) .. "  :  "
 						.. (configured and (tap_label .. "  /  " .. hold_label) or "—"),
@@ -3849,9 +4052,9 @@ end
 local function _build_gestures(ctx)
 	local ge = ctx.gestures
 	if not ge then
-		return { label = i18n_safe("menu.gestures.title"), items = {
-			{ label = i18n_safe("menu.gestures.unavailable"), disabled = true },
-		}}
+		local status_rows = ManifestMenu and ManifestMenu.template_rows("linux_gestures_absent_rows", {}, {}, {})
+		if not status_rows then return {} end
+		return { label = i18n_safe("menu.gestures.title"), items = status_rows }
 	end
 
 	local enabled = ge.is_enabled()
@@ -4004,6 +4207,71 @@ local function _build_gestures(ctx)
 	return { label = i18n_safe("menu.gestures.title"), checked = gestures_on, submenu = menu }
 end
 
+--- Checks raw dense arrays without triggering source metamethods.
+--- @param value table Source array.
+--- @param records boolean Whether its values must be plain records.
+--- @return boolean
+local function configuration_dense(value, records)
+	if type(value) ~= "table" or getmetatable(value) ~= nil then return false end
+	local count, maximum = 0, 0
+	for index, row in next, value do
+		if type(index) ~= "number" or index % 1 ~= 0 or index < 1 then return false end
+		if records and (type(row) ~= "table" or getmetatable(row) ~= nil) then return false end
+		count, maximum = count + 1, math.max(maximum, index)
+	end
+	return count == maximum
+end
+
+--- Admits the actual Configuration source structure without interpreting command grammar.
+--- @param renderer table|nil Actual manifest renderer.
+--- @param platform string Native platform token.
+--- @return table|nil root, table|nil top, table|nil children, table|nil parent, table|nil fields
+local function configuration_source(renderer, platform)
+	if type(renderer) ~= "table" or type(rawget(renderer, "get_root")) ~= "function"
+		or type(rawget(renderer, "build")) ~= "function" or type(rawget(renderer, "group_row")) ~= "function" then return nil end
+
+	local root = renderer.get_root()
+	if type(root) ~= "table" or getmetatable(root) ~= nil then return nil end
+	local top, children = rawget(root, "top_level"), rawget(root, "configuration_menu")
+	if not configuration_dense(top, true) or not configuration_dense(children, true) then return nil end
+	local parent
+	for _, row in next, top do
+		if rawget(row, "id") == "configuration" then
+			if parent then return nil end
+			parent = row
+		end
+	end
+	if parent == nil or rawget(parent, "type") ~= "group" or type(rawget(parent, "i18n")) ~= "string"
+		or rawget(parent, "i18n") == "" or not configuration_dense(rawget(parent, "rows"), true) then return nil end
+	local platforms = rawget(parent, "platforms")
+	if platforms ~= nil then
+		if not configuration_dense(platforms, false) then return nil end
+		local visible = false
+		for _, token in next, platforms do
+			if type(token) ~= "string" then return nil end
+			if token == platform then visible = true end
+		end
+		if not visible then return nil end
+	end
+	local fields = {}
+	for key, value in next, parent do fields[key] = value end
+	return root, top, children, parent, fields
+end
+
+--- Rechecks the captured direct parent fields without source metamethods.
+--- @param parent table Actual direct source row.
+--- @param fields table Captured raw field references and scalar values.
+--- @return boolean
+local function configuration_parent_unchanged(parent, fields)
+	for key, value in next, parent do
+		if not rawequal(value, rawget(fields, key)) then return false end
+	end
+	for key, value in next, fields do
+		if not rawequal(value, rawget(parent, key)) then return false end
+	end
+	return true
+end
+
 --- Builds the Configuration submenu.
 ---
 --- Everything about the configuration itself, never one feature: the
@@ -4012,10 +4280,8 @@ end
 --- folder and the wizard, and the Applications submenu whose only row was
 --- that same folder.
 local function _build_configuration(ctx)
-	if not ManifestMenu then
-		Logger.warn(LOG, "Manifest renderer unavailable — the configuration rows are not rendered.")
-		return { label = i18n_safe("menu.configuration.title"), submenu = {} }
-	end
+	local root, top, section, parent, fields = configuration_source(ManifestMenu, "linux")
+	if root == nil then return nil end
 
 	--- Calls one of the context's optional callbacks, saying so when it is absent.
 	--- @param name string
@@ -4085,10 +4351,13 @@ local function _build_configuration(ctx)
 
 	render_ctx.state_getters = {}
 	for key, value in pairs(ctx.state_getters or {}) do render_ctx.state_getters[key] = value end
-	return {
-		label   = i18n_safe("menu.configuration.title"),
-		submenu = ManifestMenu.build("configuration_menu", "Configuration", nil, nil, render_ctx),
-	}
+	local rows = ManifestMenu.build("configuration_menu", "Configuration", nil, nil, render_ctx)
+	if not configuration_dense(rows, true) then return nil end
+	local current_root, current_top, current_section, current_parent = configuration_source(ManifestMenu, "linux")
+	if not rawequal(root, current_root) or not rawequal(top, current_top)
+		or not rawequal(section, current_section) or not rawequal(parent, current_parent)
+		or not configuration_parent_unchanged(parent, fields) then return nil end
+	return ManifestMenu.group_row("top_level", "configuration", rows, render_ctx.state_getters)
 end
 
 --- Builds the language selector submenu.
@@ -4105,6 +4374,14 @@ local function _build_language(ctx)
 	if i18n then
 		local active = i18n.get_locale()
 		local locales = i18n.list_locales()
+		if type(locales) ~= "table" or getmetatable(locales) ~= nil then return nil end
+		local count, maximum = 0, 0
+		for index, code in next, locales do
+			if type(index) ~= "number" or index % 1 ~= 0 or index < 1
+				or type(code) ~= "string" or code == "" then return nil end
+			count, maximum = count + 1, math.max(maximum, index)
+		end
+		if count ~= maximum then return nil end
 		for _, code in ipairs(locales) do
 			local cap = code  -- capture for closure
 			items[#items + 1] = {
@@ -4125,14 +4402,16 @@ local function _build_language(ctx)
 		-- list the shared catalogue owns, and it logged instead of switching. A
 		-- driver that cannot read its locales says so.
 		Logger.error(LOG, "i18n unavailable — the language menu has no locale to offer.")
+		return nil
 	end
 
-	local rows = ManifestMenu
-		and ManifestMenu.build("language_menu", "Language", nil, nil, ctx, {
+	local admitted = ManifestMenu
+		and ManifestMenu.template_rows("language_menu", {}, {}, {
 			["locales"] = function() return items end,
 		})
-		or {}
-	return { label = i18n_safe("menu.global.language"), submenu = rows }
+	if not admitted then return nil end
+	local rows = ManifestMenu.render_rows(admitted, "language_menu")
+	return ManifestMenu.group_row("top_level", "language", rows, {})
 end
 
 --- The channel picker of the About submenu: one submenu titled with the
@@ -4198,8 +4477,10 @@ local function _about_update_rows(ctx)
 			label = VersionLabel.format(identity.kind, identity.version, identity.commit, i18n_safe),
 			disabled = true,
 		},
-		{ separator = true },
 	}
+	local separator_rows = ManifestMenu.template_rows("about_version_separator")
+	if not separator_rows then return {} end
+	for _, row in ipairs(separator_rows) do out[#out + 1] = row end
 	if not up then
 		Logger.error(LOG, "No updater module — the About menu shows no channel or check row.")
 		return out
@@ -4418,6 +4699,71 @@ local function _build_quit(ctx)
 	})
 end
 
+--- Checks raw dense arrays without triggering source metamethods.
+--- @param value table Source array.
+--- @param records boolean Whether its values must be plain records.
+--- @return boolean
+local function debug_dense(value, records)
+	if type(value) ~= "table" or getmetatable(value) ~= nil then return false end
+	local count, maximum = 0, 0
+	for index, row in next, value do
+		if type(index) ~= "number" or index % 1 ~= 0 or index < 1 then return false end
+		if records and (type(row) ~= "table" or getmetatable(row) ~= nil) then return false end
+		count, maximum = count + 1, math.max(maximum, index)
+	end
+	return count == maximum
+end
+
+--- Admits the actual Debug source structure without interpreting choice grammar.
+--- @param renderer table|nil Actual manifest renderer.
+--- @param platform string Native platform token.
+--- @return table|nil root, table|nil top, table|nil children, table|nil parent, table|nil fields
+local function debug_source(renderer, platform)
+	if type(renderer) ~= "table" or type(rawget(renderer, "get_root")) ~= "function"
+		or type(rawget(renderer, "build")) ~= "function" or type(rawget(renderer, "group_row")) ~= "function" then return nil end
+
+	local root = renderer.get_root()
+	if type(root) ~= "table" or getmetatable(root) ~= nil then return nil end
+	local top, children = rawget(root, "top_level"), rawget(root, "debug_menu")
+	if not debug_dense(top, true) or not debug_dense(children, true) then return nil end
+	local parent
+	for _, row in next, top do
+		if rawget(row, "id") == "debug" then
+			if parent then return nil end
+			parent = row
+		end
+	end
+	if parent == nil or rawget(parent, "type") ~= "group" or type(rawget(parent, "i18n")) ~= "string"
+		or rawget(parent, "i18n") == "" or not debug_dense(rawget(parent, "rows"), true) then return nil end
+	local platforms = rawget(parent, "platforms")
+	if platforms ~= nil then
+		if not debug_dense(platforms, false) then return nil end
+		local visible = false
+		for _, token in next, platforms do
+			if type(token) ~= "string" then return nil end
+			if token == platform then visible = true end
+		end
+		if not visible then return nil end
+	end
+	local fields = {}
+	for key, value in next, parent do fields[key] = value end
+	return root, top, children, parent, fields
+end
+
+--- Rechecks the captured direct parent fields without source metamethods.
+--- @param parent table Actual direct source row.
+--- @param fields table Captured raw field references and scalar values.
+--- @return boolean
+local function debug_parent_unchanged(parent, fields)
+	for key, value in next, parent do
+		if not rawequal(value, rawget(fields, key)) then return false end
+	end
+	for key, value in next, fields do
+		if not rawequal(value, rawget(parent, key)) then return false end
+	end
+	return true
+end
+
 --- Builds the debug submenu from the shared manifest.
 ---
 --- WHAT THIS REPLACED. Three rows written out by hand, while the manifest
@@ -4432,10 +4778,8 @@ end
 --- @param ctx table Menu context.
 --- @return table One menu entry with its submenu.
 local function _build_debug(ctx)
-	if not ManifestMenu then
-		Logger.warn(LOG, "Manifest renderer unavailable — the debug submenu loses its declared rows.")
-		return { label = i18n_safe("menu.debug.title"), submenu = {} }
-	end
+	local root, top, section, parent, fields = debug_source(ManifestMenu, "linux")
+	if root == nil then return nil end
 
 	--- Calls one of the context's optional callbacks, saying so when it is absent.
 	--- @param name string The ctx field to invoke.
@@ -4472,7 +4816,12 @@ local function _build_debug(ctx)
 	end
 
 	local rows = ManifestMenu.build("debug_menu", "Debug", nil, nil, render_ctx, {})
-	return { label = i18n_safe("menu.debug.title"), submenu = rows }
+	if not debug_dense(rows, true) then return nil end
+	local current_root, current_top, current_section, current_parent = debug_source(ManifestMenu, "linux")
+	if not rawequal(root, current_root) or not rawequal(top, current_top)
+		or not rawequal(section, current_section) or not rawequal(parent, current_parent)
+		or not debug_parent_unchanged(parent, fields) then return nil end
+	return ManifestMenu.group_row("top_level", "debug", rows, render_ctx.state_getters)
 end
 
 

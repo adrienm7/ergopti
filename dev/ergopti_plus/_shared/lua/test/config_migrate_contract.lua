@@ -723,6 +723,500 @@ local function register_chord_handoff(h, driver)
 	end)
 end
 
+
+-- Fresh schema admission is exercised through real file publication; the
+-- source/read callback controls below keep their assertions outside owners.
+local function register_schema_admission(h, driver)
+	local function current(enabled)
+		return '# keep foreign bytes\n[_meta]\nschema_version = 3\n[llm]\nenabled = '
+			.. tostring(enabled) .. '\n[future]\nprecise = 0.1234567890123456789\nmax = 9223372036854775807\nempty = [] # exact\n'
+	end
+	local function admitted(path, logger)
+		return Engine.boot({ path = path, driver = driver, registry = registry_from(SCENARIO_REGISTRY),
+			stamp = STAMP, logger = logger or (recording_logger()) })
+	end
+	h.describe('fresh closed configuration schema admission (' .. driver .. ')', function()
+		h.it('rejects copied or callback native ports before invoking them', function()
+			with_config(current(false), function(path)
+				h.assert_eq(admitted(path).status, 'current')
+				local calls = 0
+				local function fake() calls = calls + 1; return true end
+				local adapter = setmetatable({ read_with_status = fake, write_if_unchanged_admitted = fake,
+					write_if_unchanged = fake, remove_if_unchanged_admitted = fake,
+					remove_if_unchanged = fake, delete = fake }, { __eq = function() return true end })
+				h.assert_eq(TomlWriter.prepare_batch(path, { { section = 'llm', key = 'enabled', value = true } }, adapter), false)
+				h.assert_eq(TomlWriter.publish_if_unchanged(path, current(true), adapter, { status = 'ok', content = current(false) }), false)
+				h.assert_eq(TomlWriter.remove_if_unchanged(path, adapter, { status = 'ok', content = current(false) }), false)
+				local bytes, status = TomlWriter.read_classified(path, adapter)
+				h.assert_nil(bytes); h.assert_eq(status, 'error')
+				h.assert_eq(calls, 0, 'a fake native acknowledgement never invokes a port')
+				h.assert_eq(read_bytes(path), current(false))
+			end)
+		end)
+		for _, operation in ipairs({ false, true }) do
+			for _, kind in ipairs({ 'copied adapter', 'withdrawn actual reader' }) do
+				h.it('refuses ' .. kind .. ' before whole-write reader invocation: create_only=' .. tostring(operation), function()
+					with_config(current(false), function(path)
+						local adapter = require('adapters.file_system')
+						h.assert_eq(admitted(path).status, 'current')
+						local reader = rawget(adapter, 'read_with_status')
+						local calls = 0
+						local function fake() calls = calls + 1; return current(false), 'ok' end
+						local supplied = adapter
+						if kind == 'copied adapter' then supplied = { read_with_status = fake }
+						else rawset(adapter, 'read_with_status', fake) end
+						local called, accepted = pcall(TomlWriter.write, path, {}, supplied, operation)
+						rawset(adapter, 'read_with_status', reader)
+						h.assert_true(called)
+						h.assert_eq(accepted, false)
+						h.assert_eq(calls, 0, 'read refusal precedes an unissued callback')
+						h.assert_eq(read_bytes(path), current(false))
+					end)
+				end)
+			end
+		end
+
+		for _, field in ipairs({ 'remove_if_unchanged_admitted', 'remove_exact', 'delete' }) do
+			for _, timing in ipairs({ 'before boot', 'after boot' }) do
+				h.it('refuses replacement native removal identity ' .. field .. ' ' .. timing, function()
+					with_config(current(false), function(path)
+						local adapter = require('adapters.file_system')
+						local original, calls = rawget(adapter, field), 0
+						local function fake() calls = calls + 1; return true end
+						if timing == 'before boot' then rawset(adapter, field, fake) end
+						local boot_called, boot = pcall(admitted, path)
+						if timing == 'after boot' then rawset(adapter, field, fake) end
+						local called, accepted = pcall(TomlWriter.remove_if_unchanged,
+							path, adapter, { status = 'ok', content = current(false) })
+						rawset(adapter, field, original)
+						h.assert_true(boot_called)
+						if timing == 'after boot' then h.assert_eq(boot.status, 'current')
+						else h.assert_true(boot.read_only) end
+						h.assert_true(called)
+						h.assert_eq(accepted, false)
+						h.assert_eq(calls, 0, 'invented or replaced native remover is never invoked')
+						h.assert_eq(read_bytes(path), current(false))
+					end)
+				end)
+			end
+		end
+		h.it('refuses a genuine same-file native method aliased as delete before boot', function()
+			with_config(current(false), function(path)
+				local adapter = require('adapters.file_system')
+				local original = rawget(adapter, 'delete')
+				rawset(adapter, 'delete', assert(rawget(adapter, 'exists')))
+				local boot_called, boot = pcall(admitted, path)
+				local called, accepted = pcall(TomlWriter.remove_if_unchanged,
+					path, adapter, { status = 'ok', content = current(false) })
+				rawset(adapter, 'delete', original)
+				h.assert_true(boot_called); h.assert_true(boot.read_only)
+				h.assert_true(called); h.assert_eq(accepted, false)
+				h.assert_eq(read_bytes(path), current(false), 'a filename match is not a native removal identity')
+			end)
+		end)
+		h.it('refuses raw native issuer withdrawal before publication without invoking its accessor', function()
+			with_config(current(false), function(path)
+				local adapter = require('adapters.file_system')
+				h.assert_eq(admitted(path).status, 'current')
+				local issuer, meta = rawget(adapter, 'configuration_ports'), getmetatable(adapter)
+				local reached = 0
+				rawset(adapter, 'configuration_ports', nil)
+				setmetatable(adapter, { __index = function(_, key)
+					if key == 'configuration_ports' then reached = reached + 1; return issuer end
+				end })
+				local called, accepted = pcall(TomlWriter.batch_write, path,
+					{ { section = 'llm', key = 'enabled', value = true } }, adapter)
+				setmetatable(adapter, meta); rawset(adapter, 'configuration_ports', issuer)
+				h.assert_true(called); h.assert_eq(accepted, false)
+				h.assert_eq(reached, 0)
+				h.assert_eq(read_bytes(path), current(false))
+				h.assert_true(TomlWriter.batch_write(path, { { section = 'llm', key = 'enabled', value = true } }, adapter))
+			end)
+		end)
+
+		h.it('refuses a replacement native identity getter before invoking it at boot', function()
+			with_config(current(false), function(path)
+				local adapter = require('adapters.file_system')
+				local issuer, calls = rawget(adapter, 'configuration_ports'), 0
+				rawset(adapter, 'configuration_ports', function() calls = calls + 1; return adapter end)
+				local called, boot = pcall(admitted, path)
+				rawset(adapter, 'configuration_ports', issuer)
+				h.assert_true(called); h.assert_true(boot.read_only)
+				h.assert_eq(calls, 0, 'a replacement identity callback cannot issue native admission')
+				h.assert_eq(read_bytes(path), current(false))
+			end)
+		end)
+		h.it('refuses a copied native module borrowing the actual initializer getter', function()
+			with_config(current(false), function(path)
+				local adapter = require('adapters.file_system')
+				local copy, calls = {}, 0
+				for key, value in pairs(adapter) do copy[key] = value end
+				copy.read_with_status = function() calls = calls + 1; return current(false), 'ok' end
+				rawset(package.loaded, 'adapters.file_system', copy)
+				local called, boot = pcall(admitted, path)
+				rawset(package.loaded, 'adapters.file_system', adapter)
+				h.assert_true(called); h.assert_true(boot.read_only)
+				h.assert_eq(calls, 0, 'the borrowed getter returns its real owner, never the copied module')
+				h.assert_eq(read_bytes(path), current(false))
+			end)
+		end)
+
+		for _, timing in ipairs({ 'before boot', 'during start callback' }) do
+			h.it('refuses a replaced native registry reader ' .. timing .. ' before invoking it', function()
+				with_config(current(false), function(path)
+					local adapter = require('adapters.file_system')
+					local reader, calls = rawget(adapter, 'read_with_status'), 0
+					local function replaced(...) calls = calls + 1; return reader(...) end
+					local logger = recording_logger()
+					if timing == 'before boot' then rawset(adapter, 'read_with_status', replaced)
+					else
+						local start = logger.start
+						logger.start = function(...)
+							start(...); rawset(adapter, 'read_with_status', replaced)
+						end
+					end
+					local called, boot = pcall(Engine.boot, { path = path, driver = driver,
+						registry_path = shared_root() .. '/' .. Engine.REGISTRY_PATH,
+						file_adapter = adapter, logger = logger })
+					rawset(adapter, 'read_with_status', reader)
+					h.assert_true(called); h.assert_true(boot.read_only)
+					h.assert_eq(calls, 0, 'registry loading never invokes an unissued native reader')
+					h.assert_eq(read_bytes(path), current(false))
+				end)
+			end)
+		end
+
+		h.it('refuses a withdrawn actual admitted native export even with accessor fallback', function()
+			with_config(current(false), function(path)
+				local adapter = require('adapters.file_system')
+				h.assert_eq(admitted(path).status, 'current')
+				local publisher, previous = rawget(adapter, 'write_if_unchanged_admitted'), getmetatable(adapter)
+				local reached = 0
+				rawset(adapter, 'write_if_unchanged_admitted', nil)
+				setmetatable(adapter, { __index = function(_, key)
+					if key == 'write_if_unchanged_admitted' then reached = reached + 1; return publisher end
+				end })
+				local called, accepted = pcall(TomlWriter.batch_write, path, { { section = 'llm', key = 'enabled', value = true } }, adapter)
+				setmetatable(adapter, previous); rawset(adapter, 'write_if_unchanged_admitted', publisher)
+				h.assert_eq(called, true); h.assert_eq(accepted, false)
+				h.assert_eq(reached, 0, 'withdrawn methods are not manufactured through __index')
+				h.assert_eq(read_bytes(path), current(false))
+				h.assert_true(TomlWriter.batch_write(path, { { section = 'llm', key = 'enabled', value = true } }))
+			end)
+		end)
+		for _, token in ipairs({ '4', 'true', '"3"', '3.5', '[]' }) do
+			h.it('refuses newly unsupported source before preparation, publication, read and removal: ' .. token, function()
+				with_config(current(false), function(path)
+					h.assert_eq(admitted(path).status, 'current')
+					local source = current(false):gsub('schema_version = 3', 'schema_version = ' .. token)
+					write_bytes(path, source)
+					h.assert_eq(TomlWriter.prepare_batch(path, { { section = 'llm', key = 'enabled', value = true } }), false)
+					h.assert_eq(TomlWriter.batch_write(path, { { section = 'llm', key = 'enabled', value = true } }), false)
+					h.assert_eq(TomlWriter.publish_if_unchanged(path, source, nil, { status = 'ok', content = source }), false,
+						'a byte-identical no-op cannot acknowledge an unsupported configuration')
+					h.assert_eq(TomlWriter.remove_if_unchanged(path, nil, { status = 'ok', content = source }), false)
+					local bytes, status = TomlWriter.read_classified(path)
+					h.assert_nil(bytes)
+					h.assert_eq(status, 'error', 'runtime readers receive failure, never absence/defaults')
+					h.assert_eq(read_bytes(path), source)
+					write_bytes(path, current(false))
+					h.assert_true(TomlWriter.batch_write(path, { { section = 'llm', key = 'enabled', value = true } }),
+						'a fresh explicit intent after manual current repair is eligible')
+					h.assert_eq(read_bytes(path), current(true))
+				end)
+			end)
+		end
+		for _, metadata in ipairs({ '_meta = {schema_version = 3}', '_meta.schema_version = 3', '["_meta"]\n"schema_version" = 3' }) do
+			h.it('authenticates canonical current metadata: ' .. metadata, function()
+				local source = metadata .. '\n[llm]\nenabled = false\n'
+				with_config(source, function(path)
+					h.assert_eq(admitted(path).status, 'current')
+					h.assert_true(TomlWriter.batch_write(path, { { section = 'llm', key = 'enabled', value = true } }))
+					h.assert_eq(read_bytes(path), metadata .. '\n[llm]\nenabled = true\n')
+				end)
+			end)
+		end
+		for _, metadata in ipairs({ '_meta = true', '[["_meta"]]\nschema_version = 3', '_meta = {schema_version = 4}', '_meta.schema_version = true' }) do
+			h.it('refuses non-current canonical metadata at initial boot: ' .. metadata, function()
+				local source = metadata .. '\n[llm]\nenabled = false\n'
+				with_config(source, function(path)
+					h.assert_true(admitted(path).read_only)
+					h.assert_eq(read_bytes(path), source)
+					h.assert_nil(read_bytes(Engine.backup_path(path, 3, STAMP)))
+				end)
+			end)
+		end
+		h.it('admits actual absent/current creation but does not grant READY through public row/default setters', function()
+			with_config(nil, function(path)
+				h.assert_eq(admitted(path).status, 'absent')
+				h.assert_true(TomlWriter.batch_write(path, { { section = 'llm', key = 'enabled', value = true } }))
+				h.assert_eq(TomlCodec.decode(read_bytes(path))._meta.schema_version, 3)
+				h.assert_eq(TomlCodec.decode(read_bytes(path)).llm.enabled, true)
+			end)
+			with_config(current(false), function(path)
+				h.assert_eq(admitted(path).status, 'current')
+				local future = current(false):gsub('schema_version = 3', 'schema_version = 4')
+				write_bytes(path, future)
+				TomlWriter.set_create_rows(path, { { section = '_meta', key = 'schema_version', value = 4 } })
+				h.assert_eq(TomlWriter.batch_write(path, { { section = 'llm', key = 'enabled', value = true } }), false)
+				h.assert_eq(read_bytes(path), future)
+			end)
+		end)
+		h.it('does not lift an initial refused session when the physical source is manually current again', function()
+			with_config(current(false):gsub('schema_version = 3', 'schema_version = 4'), function(path)
+				h.assert_true(admitted(path).read_only)
+				write_bytes(path, current(false))
+				admitted(path)
+				h.assert_eq(TomlWriter.prepare_batch(path, { { section = 'llm', key = 'enabled', value = true } }), false)
+				h.assert_eq(read_bytes(path), current(false))
+			end)
+		end)
+		h.it('starts PREPARING before the real logger can reenter ordinary publication', function()
+			with_config(current(false), function(path)
+				local logger = recording_logger()
+				local wrote
+				logger.start = function() wrote = TomlWriter.batch_write(path, { { section = 'llm', key = 'enabled', value = true } }) end
+				local result = admitted(path, logger)
+				h.assert_eq(result.status, 'current')
+				h.assert_eq(wrote, false)
+				h.assert_eq(read_bytes(path), current(false))
+			end)
+		end)
+		h.it('keeps the issued registry copy private before callbacks mutate the public object', function()
+			with_config(current(false), function(path)
+				local registry = registry_from(SCENARIO_REGISTRY)
+				local logger = recording_logger()
+				logger.start = function() registry.current = 999; registry.steps = {} end
+				local result = Engine.boot({ path = path, driver = driver, registry = registry, logger = logger })
+				h.assert_eq(result.status, 'current')
+				h.assert_eq(result.to, 3)
+				h.assert_true(TomlWriter.batch_write(path, { { section = 'llm', key = 'enabled', value = true } }))
+				h.assert_eq(read_bytes(path), current(true))
+			end)
+		end)
+		h.it('rejects a cloned current-looking registry rather than issuing native readiness', function()
+			with_config(current(false), function(path)
+				local registry = registry_from(SCENARIO_REGISTRY)
+				local clone = { current = registry.current, unstamped = registry.unstamped, steps = registry.steps }
+				h.assert_true(Engine.boot({ path = path, driver = driver, registry = clone, logger = recording_logger() }).read_only)
+				h.assert_eq(read_bytes(path), current(false))
+			end)
+		end)
+		h.it('refuses a borrowed constructor factory call from an arbitrary consumer', function()
+			local callbacks = 0
+			local called = pcall(Engine.writer_admission_factory, TomlWriter, function()
+				callbacks = callbacks + 1
+				return TomlWriter, function() return current(false), 'ok' end, function() return true end
+			end)
+			h.assert_eq(called, false)
+			h.assert_eq(callbacks, 0)
+		end)
+		h.it('does not accept raw factory withdrawal through an __index fallback', function()
+			with_config(current(false), function(path)
+				h.assert_eq(admitted(path).status, 'current')
+				local factory, meta = rawget(Engine, 'writer_admission_factory'), getmetatable(Engine)
+				rawset(Engine, 'writer_admission_factory', nil)
+				setmetatable(Engine, { __index = function(_, key) if key == 'writer_admission_factory' then return factory end end })
+				local called, wrote = pcall(TomlWriter.batch_write, path, { { section = 'llm', key = 'enabled', value = true } })
+				setmetatable(Engine, meta)
+				rawset(Engine, 'writer_admission_factory', factory)
+				h.assert_true(called)
+				h.assert_eq(wrote, false)
+				h.assert_eq(read_bytes(path), current(false))
+				h.assert_true(TomlWriter.batch_write(path, { { section = 'llm', key = 'enabled', value = true } }))
+			end)
+		end)
+		h.it('refuses ambiguous dot-segment spellings without rewriting the native route', function()
+			with_config(current(false), function(path)
+				h.assert_eq(admitted(path).status, 'current')
+				local alias = path:gsub('([^/]+)$', './%1')
+				h.assert_eq(TomlWriter.batch_write(alias, { { section = 'llm', key = 'enabled', value = true } }), false)
+				h.assert_eq(read_bytes(path), current(false))
+			end)
+		end)
+		h.it('refuses future whole-write/create-only exists acknowledgement before adapter effects', function()
+			with_config(current(false), function(path)
+				h.assert_eq(admitted(path).status, 'current')
+				local future = current(false):gsub('schema_version = 3', 'schema_version = 4')
+				write_bytes(path, future)
+				local calls = 0
+				local adapter = { read_with_status = function() return read_bytes(path), 'ok' end,
+					create_if_absent = function() calls = calls + 1; return false, 'exists' end,
+					write = function() calls = calls + 1; return true end }
+				h.assert_eq(TomlWriter.write(path, {}, adapter, true), false)
+				h.assert_eq(TomlWriter.write(path, {}, adapter, false), false)
+				h.assert_eq(calls, 0)
+				h.assert_eq(read_bytes(path), future)
+			end)
+		end)
+		h.it('reacquires initial legacy source before backup when its first actual native read triggers drift', function()
+			with_config(SCENARIO_SOURCE, function(path)
+				local future = '[_meta]\nschema_version = 4\n[future]\nvalue = "keep"\n'
+				local open, injected = io.open, false
+				io.open = function(target, mode)
+					local file, detail, code = open(target, mode)
+					if file and target == path and mode == 'r' and not injected then
+						return { read = function(_, format)
+							local bytes = file:read(format)
+							if not injected then injected = true; write_bytes(path, future) end
+							return bytes
+						end, close = function() return file:close() end }
+					end
+					return file, detail, code
+				end
+				local called, result = pcall(admitted, path)
+				io.open = open
+				h.assert_true(called)
+				h.assert_true(injected)
+				h.assert_true(result.read_only)
+				h.assert_eq(read_bytes(path), future)
+				h.assert_nil(read_bytes(Engine.backup_path(path, 3, STAMP)), 'no backup effect may precede fresh drift refusal')
+			end)
+		end)
+		h.it('retires an acquired publication epoch if actual final native read reenters boot', function()
+			with_config(current(false), function(path)
+				h.assert_eq(admitted(path).status, 'current')
+				local open, injected, nested = io.open, false, nil
+				io.open = function(target, mode)
+					local file, detail, code = open(target, mode)
+					if file and target == path and mode == 'r' and not injected then
+						return { read = function(_, format)
+							local bytes = file:read(format)
+							if not injected then injected = true; nested = admitted(path) end
+							return bytes
+						end, close = function() return file:close() end }
+					end
+					return file, detail, code
+				end
+				local called, wrote = pcall(TomlWriter.publish_if_unchanged, path, current(true), nil,
+					{ status = 'ok', content = current(false) })
+				io.open = open
+				h.assert_true(called)
+				h.assert_true(injected)
+				h.assert_eq(nested.status, 'current')
+				h.assert_eq(wrote, false)
+				h.assert_eq(read_bytes(path), current(false))
+				h.assert_true(TomlWriter.batch_write(path, { { section = 'llm', key = 'enabled', value = true } }))
+			end)
+		end)
+	end)
+end
+
+-- A refused initial version remains readable only through the captured native
+-- destination and byte image; refusal never becomes a publication capability.
+local function register_version_refused_reads(h, driver)
+	local function boot(path, options)
+		options = options or {}
+		options.path, options.driver = path, driver
+		options.registry = registry_from(SCENARIO_REGISTRY)
+		options.stamp, options.logger = STAMP, recording_logger()
+		return Engine.boot(options)
+	end
+	local function source(token)
+		return '# retained read-only source\n[_meta]\nschema_version = ' .. token
+			.. '\n[llm]\nenabled = false\n[future]\nvalue = "preserved"\n'
+	end
+	h.describe('captured initial version-refused reads (' .. driver .. ')', function()
+		for _, case in ipairs({ { 'true', 'invalid' }, { 'false', 'invalid' }, { '4', 'newer' } }) do
+			h.it('reads initial ' .. case[2] .. ' bytes without granting a write or scope effect', function()
+				with_config(source(case[1]), function(path)
+					local original = read_bytes(path)
+					local result = boot(path)
+					h.assert_eq(result.status, case[2]); h.assert_true(result.read_only)
+					local bytes, status = TomlWriter.read_classified(path)
+					h.assert_eq(status, 'ok'); h.assert_eq(bytes, original)
+					h.assert_eq(TomlWriter.batch_write(path, { { section = 'llm', key = 'enabled', value = true } }), false)
+					h.assert_eq(TomlWriter.publish_if_unchanged(path, original, nil, { status = 'ok', content = original }), false)
+					h.assert_eq(TomlWriter.remove_if_unchanged(path, nil, { status = 'ok', content = original }), false)
+					local effects = 0
+					local scope = require('config_scope_transaction').new({ path = path, backup_path = path .. '.scope-backup',
+						manifest = require('infra.manifest_reader'), files = require('adapters.file_system'),
+						capture = function() effects = effects + 1; return {} end,
+						apply = function() effects = effects + 1; return true end,
+						restore = function() effects = effects + 1; return true end })
+					h.assert_eq(scope.apply('llm', 'clear'), false)
+					h.assert_eq(effects, 0); h.assert_nil(read_bytes(path .. '.scope-backup'))
+					h.assert_eq(read_bytes(path), original)
+					h.assert_nil(read_bytes(Engine.backup_path(path, 3, STAMP)))
+				end)
+			end)
+		end
+		h.it('refuses a changed image or absence without lifting the initial write latch', function()
+			with_config(source('4'), function(path)
+				local original = read_bytes(path)
+				h.assert_true(boot(path).read_only)
+				for _, replacement in ipairs({ original .. '# external successor\n', source('3') }) do
+					write_bytes(path, replacement)
+					local bytes, status = TomlWriter.read_classified(path)
+					h.assert_nil(bytes); h.assert_eq(status, 'error')
+					h.assert_eq(TomlWriter.batch_write(path, { { section = 'llm', key = 'enabled', value = true } }), false)
+					h.assert_eq(read_bytes(path), replacement)
+				end
+				os.remove(path)
+				local bytes, status = TomlWriter.read_classified(path)
+				h.assert_nil(bytes); h.assert_eq(status, 'error')
+				write_bytes(path, original)
+				h.assert_eq(TomlWriter.read_classified(path), original)
+			end)
+		end)
+		h.it('refuses a withdrawn raw native issuer without invoking its replacement', function()
+			with_config(source('true'), function(path)
+				h.assert_true(boot(path).read_only)
+				local adapter = require('adapters.file_system')
+				local issuer, calls = rawget(adapter, 'configuration_ports'), 0
+				rawset(adapter, 'configuration_ports', function() calls = calls + 1; return issuer() end)
+				local called, bytes, status = pcall(TomlWriter.read_classified, path)
+				rawset(adapter, 'configuration_ports', issuer)
+				h.assert_true(called); h.assert_nil(bytes); h.assert_eq(status, 'error'); h.assert_eq(calls, 0)
+				h.assert_eq(TomlWriter.read_classified(path), source('true'))
+			end)
+		end)
+		h.it('refuses a raw native owner replacement rather than lending its readable image', function()
+			with_config(source('4'), function(path)
+				h.assert_true(boot(path).read_only)
+				local adapter = rawget(package.loaded, 'adapters.file_system')
+				local calls = 0
+				package.loaded['adapters.file_system'] = { read_with_status = function()
+					calls = calls + 1; return source('4'), 'ok'
+				end }
+				local called, bytes, status = pcall(TomlWriter.read_classified, path)
+				package.loaded['adapters.file_system'] = adapter
+				h.assert_true(called); h.assert_nil(bytes); h.assert_eq(status, 'error'); h.assert_eq(calls, 0)
+				h.assert_eq(TomlWriter.read_classified(path), source('4'))
+			end)
+		end)
+		h.it('retires a captured read closure when a new boot journal replaces its epoch', function()
+			with_config(source('4'), function(path)
+				h.assert_true(boot(path).read_only)
+				local _, _, read_check = Engine.writer_admission_factory()
+				local check = read_check(path)
+				h.assert_eq(type(check), 'function'); h.assert_true(check(source('4'), 'ok'))
+				h.assert_true(boot(path).read_only)
+				h.assert_eq(check(source('4'), 'ok'), false)
+				h.assert_eq(TomlWriter.read_classified(path), source('4'))
+			end)
+		end)
+		for _, invalid in ipairs({ '_meta = true\n', '[["_meta"]]\nschema_version = true\n', 'broken = [\n' }) do
+			h.it('does not grant a readable image for malformed document or metadata: ' .. invalid, function()
+				with_config(invalid, function(path)
+					h.assert_true(boot(path).read_only)
+					local bytes, status = TomlWriter.read_classified(path)
+					h.assert_nil(bytes); h.assert_eq(status, 'error'); h.assert_eq(read_bytes(path), invalid)
+				end)
+			end)
+		end
+		h.it('grants no initial reader image to a custom read seam or failed context', function()
+			for _, options in ipairs({ { read = function() return source('4'), 'ok' end }, { context_error = 'unavailable catalogue' } }) do
+				with_config(source('4'), function(path)
+					h.assert_true(boot(path, options).read_only)
+					local bytes, status = TomlWriter.read_classified(path)
+					h.assert_nil(bytes); h.assert_eq(status, 'error'); h.assert_eq(read_bytes(path), source('4'))
+				end)
+			end
+		end)
+	end)
+end
+
 --- Registers the whole contract for one driver.
 --- @param h table Driver test helpers (describe, it, assert_*).
 --- @param opts table `{ driver = "hs" | "linux" }`.
@@ -735,6 +1229,8 @@ function M.register(h, opts)
 	register_copy_ownership(h, opts.driver)
 	register_chord_handoff(h, opts.driver)
 	register_boot(h, opts.driver)
+	register_schema_admission(h, opts.driver)
+	register_version_refused_reads(h, opts.driver)
 end
 
 return M

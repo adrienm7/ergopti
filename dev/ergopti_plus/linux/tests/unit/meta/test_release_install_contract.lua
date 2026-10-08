@@ -17,3 +17,8 @@ handle:close()
 
 require("test.config_backup_contract").register(helpers, { defaults = defaults })
 require("test.release_install_contract").register(helpers)
+
+local policy_handle = assert(io.open(helpers.driver_root() .. "/../_shared/modules/network/managed_network.json", "rb"))
+local policy = assert(Json.decode(policy_handle:read("*a")), "managed network policy must decode")
+policy_handle:close()
+require("test.release_install_network_contract").register(helpers, policy)

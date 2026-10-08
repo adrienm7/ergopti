@@ -195,8 +195,9 @@ end
 --- installed, the one of the current input source checked; choosing one
 --- makes it the current input source.
 --- @param update_menu function|nil Menu rebuild callback.
+--- @param renderer table Native manifest binding.
 --- @return table Rows for the `custom_layouts` provider.
-local function custom_layout_rows(update_menu)
+local function custom_layout_rows(update_menu, renderer)
 	local rows = {}
 	local ok, LayoutRegistry = pcall(require, "modules.keymap.layout_registry")
 	local picked_ok, picker = false, nil
@@ -223,7 +224,9 @@ local function custom_layout_rows(update_menu)
 		}
 	end
 	if #rows == 0 then
-		rows[1] = { label = i18n.get("menu.layout.none_installed"), disabled = true }
+		if type(renderer) ~= "table" or type(renderer.status_rows) ~= "function" then return {} end
+		local status = renderer.status_rows("layout_menu", "custom_layouts", "none_installed")
+		return type(status) == "table" and status or {}
 	end
 	return rows
 end
@@ -354,10 +357,6 @@ function M.build(ctx)
 		)
 	else
 		Logger.warn(LOG, "No Ergopti bundle found in %s.", bundles_dir)
-		bundle_rows[#bundle_rows + 1] = {
-			label    = i18n.get("menu.layout.no_bundle"),
-			disabled = true,
-		}
 	end
 
 	-- Add / upgrade Ergopti in the macOS input-source list.
@@ -516,10 +515,10 @@ function M.build(ctx)
 	local function active_layout_rows()
 		local rows = {}
 	if #records == 0 then
-		rows[#rows + 1] = {
-			label = i18n.get("menu.layout.open_prefs"),
-			action    = function() pcall(hs.execute, "open '" .. KEYBOARD_PREFS_URL .. "'") end,
-		}
+		local ManifestMenu = require("infra.manifest_menu")
+		return ManifestMenu.template_rows("layout_active_source_empty_commands", {
+			["layout_open_preferences"] = function() pcall(hs.execute, "open '" .. KEYBOARD_PREFS_URL .. "'") end,
+		}, {}, {}) or {}
 	else
 		for _, r in ipairs(records) do
 			local row_label = display_for_record(r)
@@ -673,12 +672,17 @@ function M.build(ctx)
 	end
 	-- Native-only status never acquires a preference or forced-input writer.
 	render_ctx.commands["number_row_mode"] = function() return false end
-	local custom_rows = custom_layout_rows(update_menu)
+	local custom_rows = custom_layout_rows(update_menu, ManifestMenu)
 	local submenu = ManifestMenu.build("layout_menu", "Layout", nil, nil, render_ctx, {
 		["number_row_policy"] = function() return NumberRowPolicy.native_rows(ManifestMenu, render_ctx.commands) end,
 		["custom_layouts"]   = function() return custom_rows end,
 		["active_layouts"]   = active_layout_rows,
-		["layout_bundle"]    = function() return bundle_rows end,
+		["layout_bundle"]    = function()
+			if latest then return bundle_rows end
+			local rows = ManifestMenu.status_rows("layout_menu", "layout_bundle", "no_bundle") or {}
+			for _, row in ipairs(bundle_rows) do rows[#rows + 1] = row end
+			return rows
+		end,
 		["layout_switching"] = function() return switching_rows end,
 		-- The physical magic key, chosen by pressing it or from the candidates.
 		["magic_key_source"] = function()

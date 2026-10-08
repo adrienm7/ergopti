@@ -11,6 +11,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
+local CaptionFixture = require("tests.support.personal_menu_caption_fixture")
 
 local START_OUTCOMES = { "false", "nil", "throw" }
 
@@ -126,7 +127,7 @@ local function custom_fixture(outcome, action_kind)
 		return publish()
 	end
 
-	local built = Custom.build_custom(ctx, { group_counts = {} })
+	local built = CaptionFixture.build_custom(Custom, ctx, { group_counts = {} })
 	helpers.assert_type(built, "table", "the real custom builder must return a provider row")
 	helpers.assert_nil(built.action, "the personal parent row must carry no action")
 	local action

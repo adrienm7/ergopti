@@ -1864,10 +1864,13 @@ helpers.describe("ui.bridge_handlers", function()
 
   helpers.describe("changelog_bridge", function()
     local handler = helpers.load_module("ui.changelog.bridge")
+    local original_handler = handler
+    local native_document = require("tests.support.document_fixture").new("changelog", original_handler, build_mock_state())
+    handler = native_document.proxy()
     local state = build_mock_state()
     -- The native fetch is covered by test_changelog_release_sources; keep these
     -- protocol cases off the network.
-    handler._http_get = function() end
+    original_handler._http_get = function() end
     handler._push = function() return true end
 
     helpers.it("has correct bridge_name", function()
@@ -1954,6 +1957,7 @@ helpers.describe("ui.bridge_handlers", function()
       local result = handler.on_message("close", state)
       helpers.assert_eq(result, nil)
     end)
+    native_document.close()
   end)
 
   -- ==========================================================================
@@ -1965,11 +1969,10 @@ helpers.describe("ui.bridge_handlers", function()
 	helpers.it("linux-model-pull-retry-retirement: progress retries preserve successful settlement", function()
 		local previous_manager = package.loaded["ui.webview_manager"]
 		local evaluated, retries = {}, 0
-		package.loaded["ui.webview_manager"] = {
-			show = function() return true end,
-			hide = function() return true end,
-			eval_js = function(_, code) evaluated[#evaluated + 1] = code; return true end,
-		}
+		local native_document = require("tests.support.document_fixture").new("download_window", handler, {})
+      native_document.on_effect = function(code) evaluated[#evaluated + 1] = code end
+      local original_handler = handler
+      handler = native_document.proxy()
 		local ok, err = xpcall(function()
 			handler._reset()
 			local session_id = handler.show({ kind = "ollama_model", label = "Successful fixture",
@@ -1982,7 +1985,8 @@ helpers.describe("ui.bridge_handlers", function()
 				"stale retry must preserve the successful terminal receipt")
 		end, debug.traceback)
 		handler._reset()
-		package.loaded["ui.webview_manager"] = previous_manager
+		native_document.close(); handler = original_handler
+      package.loaded["ui.webview_manager"] = previous_manager
 		if not ok then error(err) end
 	end)
 
@@ -1992,14 +1996,10 @@ helpers.describe("ui.bridge_handlers", function()
     helpers.it("owns ready, progress, cancel, and retry for one exact session", function()
       local previous_manager = package.loaded["ui.webview_manager"]
       local evaluated, cancelled, retried = {}, 0, 0
-      package.loaded["ui.webview_manager"] = {
-        show = function(app) return app == "download_window" end,
-        hide = function() return true end,
-        eval_js = function(app, code)
-          evaluated[#evaluated + 1] = { app = app, code = code }
-          return true
-        end,
-      }
+      local native_document = require("tests.support.document_fixture").new("download_window", handler, {})
+      native_document.on_effect = function(code) evaluated[#evaluated + 1] = { app = "download_window", code = code } end
+      local original_handler = handler
+      handler = native_document.proxy()
       handler._reset()
       local session_id = handler.show({
 		kind = "ollama_model",
@@ -2030,17 +2030,17 @@ helpers.describe("ui.bridge_handlers", function()
         session = retry_id, epoch = failure_epoch })
       helpers.assert_true(retry.retried)
       helpers.assert_eq(retried, 1)
+      native_document.close(); handler = original_handler
       package.loaded["ui.webview_manager"] = previous_manager
     end)
 
     helpers.it("replays terminal state when transport finishes before page ready", function()
       local previous_manager = package.loaded["ui.webview_manager"]
       local evaluated = {}
-      package.loaded["ui.webview_manager"] = {
-        show = function() return true end,
-        hide = function() return true end,
-        eval_js = function(_, code) evaluated[#evaluated + 1] = code; return true end,
-      }
+      local native_document = require("tests.support.document_fixture").new("download_window", handler, {})
+      native_document.on_effect = function(code) evaluated[#evaluated + 1] = code end
+      local original_handler = handler
+      handler = native_document.proxy()
       handler._reset()
       local session_id = handler.show({ kind = "ollama_model", label = "Fast fixture" })
       helpers.assert_true(handler.complete(session_id, true, "Installed"))
@@ -2048,17 +2048,17 @@ helpers.describe("ui.bridge_handlers", function()
       helpers.assert_true(handler.on_message("ready").pushed)
       helpers.assert_true(evaluated[1]:find("done(true", 1, true) ~= nil)
       helpers.assert_true(evaluated[1]:find("Installed", 1, true) ~= nil)
+      native_document.close(); handler = original_handler
       package.loaded["ui.webview_manager"] = previous_manager
     end)
 
     helpers.it("titles the window by its kind and refuses a kind the page does not know", function()
       local previous_manager = package.loaded["ui.webview_manager"]
       local evaluated = {}
-      package.loaded["ui.webview_manager"] = {
-        show = function() return true end,
-        hide = function() return true end,
-        eval_js = function(_, code) evaluated[#evaluated + 1] = code; return true end,
-      }
+      local native_document = require("tests.support.document_fixture").new("download_window", handler, {})
+      native_document.on_effect = function(code) evaluated[#evaluated + 1] = code end
+      local original_handler = handler
+      handler = native_document.proxy()
       handler._reset()
       helpers.assert_nil(handler.show({ label = "No kind" }), "a producer must name its kind")
       helpers.assert_nil(handler.show({ kind = "firmware", label = "Unknown kind" }))
@@ -2067,6 +2067,7 @@ helpers.describe("ui.bridge_handlers", function()
       helpers.assert_true(handler.on_message("ready").pushed)
       helpers.assert_true(evaluated[1]:find('setKind("app_update"', 1, true) ~= nil,
         "the page shows the app-update heading: " .. tostring(evaluated[1]))
+      native_document.close(); handler = original_handler
       package.loaded["ui.webview_manager"] = previous_manager
       handler._reset()
     end)

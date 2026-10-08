@@ -167,3 +167,82 @@ helpers.describe("model browser factory capability", function()
 		end)
 	end)
 end)
+
+
+-- Handwritten physical tail: boundary, real shared browser, original native Add.
+local function boundary_owner(renderer, id)
+	for _, row in ipairs(renderer.get_array("llm_menu")) do
+		if row.id == id then return row end
+	end
+	error("actual model provider declaration is absent")
+end
+
+helpers.describe("declared model picker tail boundary", function()
+	helpers.it("keeps the physical browser and Add order in both captured pause states", function()
+		for _, paused in ipairs({false, true}) do
+			with_browser(function(f)
+				f.ctx.paused, f.controls.paused = paused, paused
+				local owner = boundary_owner(f.renderer, "llm_model")
+				helpers.assert_eq(owner.status_rows.model_picker_tail, {{type = "---"}})
+				local rows = f.selector.build(f.ctx)
+				local at
+				for i, row in ipairs(rows) do if row.label == "menu.llm.browse_models_entry" then at = i end end
+				helpers.assert_type(at, "number")
+				helpers.assert_eq(rows[at - 1].separator, true)
+				helpers.assert_eq(rows[at + 1].label, "menu.llm.add_model_entry")
+				helpers.assert_eq(rows[at + 1].disabled, paused or nil)
+				helpers.assert_type(rows[at + 1].action, "function")
+				helpers.assert_eq(#rows, 5, "No model, original head boundary, declared tail boundary, browser, Add")
+				local rendered = f.renderer.render_rows(rows, "llm_model")
+				local native_at
+				for i, row in ipairs(rendered) do if row.title == "menu.llm.browse_models_entry" then native_at = i end end
+				helpers.assert_eq(rendered[native_at - 1].title, "-")
+				helpers.assert_eq(rendered[native_at + 1].title, "menu.llm.add_model_entry")
+
+				helpers.assert_eq(#f.controls.deferred, 0)
+				helpers.assert_eq(f.controls.shows, 0)
+				helpers.assert_eq(f.controls.writes, nil)
+			end)
+		end
+	end)
+
+	helpers.it("consumes the actual inert declaration before the unchanged browser owner", function()
+		with_browser(function(f)
+			boundary_owner(f.renderer, "llm_model").status_rows.model_picker_tail = {{type="label", i18n="common.restore_recommended"}}
+			local rows = f.selector.build(f.ctx)
+			local at
+			for i, row in ipairs(rows) do if row.label == "menu.llm.browse_models_entry" then at = i end end
+			helpers.assert_eq(rows[at - 1].label, "common.restore_recommended")
+			helpers.assert_eq(rows[at - 1].disabled, true)
+			helpers.assert_eq(rows[at - 1].action, nil)
+			helpers.assert_eq(rows[at + 1].label, "menu.llm.add_model_entry")
+			rows[at].action()
+			helpers.assert_eq(#f.controls.deferred, 1)
+			f.controls.deferred[1]()
+			helpers.assert_eq(f.controls.shows, 1)
+		end)
+	end)
+
+	for _, mode in ipairs({"missing", "wrong_owner", "clicked", "extra_callback"}) do
+		helpers.it("refuses " .. mode .. " boundary data while keeping both real neighboring owners", function()
+			with_browser(function(f)
+				local owner = boundary_owner(f.renderer, "llm_model")
+				local effects = 0
+				if mode == "missing" then owner.status_rows.model_picker_tail = nil
+				elseif mode == "wrong_owner" then owner.id = "foreign_model"
+				elseif mode == "clicked" then owner.status_rows.model_picker_tail = {{type="command", id="foreign", action=function() effects=effects+1 end}}
+				else owner.status_rows.model_picker_tail = {{type="---", action=function() effects=effects+1 end}} end
+				local rows = f.selector.build(f.ctx)
+				local at
+				for i, row in ipairs(rows) do if row.label == "menu.llm.browse_models_entry" then at = i end end
+				helpers.assert_type(at, "number")
+				helpers.assert_eq(#rows, 4, "only the original head boundary survives; refused tail cannot fabricate another")
+				helpers.assert_eq(rows[at + 1].label, "menu.llm.add_model_entry")
+				helpers.assert_type(rows[at + 1].action, "function")
+				helpers.assert_eq(effects, 0)
+				helpers.assert_eq(#f.controls.deferred, 0)
+				helpers.assert_eq(f.controls.writes, nil)
+			end)
+		end)
+	end
+end)

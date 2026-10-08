@@ -54,7 +54,11 @@ _LLM_Menu_ApiEntriesRows() {
 	Rows := []
 	entries := _LLM_Menu["api_entries"]
 	if (Type(entries) != "Array" or entries.Length == 0) {
-		Rows.Push(Map("label", t("menu.llm.api_no_entry")))
+		EmptyRows := MenuRenderer_TemplateRows("llm_api_empty_status", Map(), Map(), Map())
+		if !(EmptyRows is Array)
+			return []
+		for Row in EmptyRows
+			Rows.Push(Row)
 	} else {
 		active_id := _LLM_Menu.Has("api_entry_id") ? _LLM_Menu["api_entry_id"] : ""
 		Names := _LLM_Menu_ApiEntryNameList(entries)
@@ -69,19 +73,32 @@ _LLM_Menu_ApiEntriesRows() {
 	; Add sits before the separator so creating an entry is one glance
 	; away; the separator only appears with the management rows, never
 	; dangling when no entry exists.
-	Rows.Push(Map("label", t("menu.llm.api_add_entry"), "action", (*) => _LLM_Menu_PromptApiEntry("")))
+	AddRows := MenuRenderer_TemplateRows("llm_api_add_command",
+		Map("api_add_entry", (*) => _LLM_Menu_PromptApiEntry("")), Map(), Map())
+	if !(AddRows is Array)
+		return []
+	for Row in AddRows
+		Rows.Push(Row)
 	if (Type(entries) == "Array" and entries.Length > 0) {
 		; Management rows: most frequent first, destructive delete last.
-		Rows.Push(Map("separator", true))
+		Separators := MenuRenderer_TemplateRows("llm_api_add_separator", Map(), Map(), Map())
+		if !(Separators is Array)
+			return []
+		for Row in Separators
+			Rows.Push(Row)
 		Commands := Map("api_test_active", (*) => _LLM_Menu_TestActiveApiEntry(),
 			"api_remove_active", (*) => _LLM_Menu_RemoveActiveApiEntry())
 		Getters := Map("llm_api_active_ready", _LLM_Menu_ActiveApiCommandsReady)
 		for Declaration in _MR_GetMenuDef("llm_api_active_commands") {
-			; Keep the existing native Edit action immediately before removal.
-			if Declaration["id"] == "api_remove_active"
-				Rows.Push(Map(
-					"label",  t("menu.llm.api_edit_entry"),
-					"action", (*) => _LLM_Menu_PromptApiEntry(_LLM_Menu["api_entry_id"])))
+			; Keep the existing lazy Edit owner immediately before removal.
+			if Declaration["id"] == "api_remove_active" {
+				EditRows := MenuRenderer_TemplateRows("llm_api_edit_command",
+					Map("api_edit_entry", (*) => _LLM_Menu_PromptApiEntry(_LLM_Menu["api_entry_id"])), Map(), Map())
+				if !(EditRows is Array)
+					return []
+				for EditRow in EditRows
+					Rows.Push(EditRow)
+			}
 			Row := MenuRenderer_CommandRow("llm_api_active_commands", Declaration["id"], Commands, Getters)
 			if Row is Map
 				Rows.Push(Row)
@@ -724,6 +741,7 @@ _LLM_Menu_ApiTestSurface(Title, Body, Icon, Ok, NotifyFn := 0) {
 ; (not a chat model) asks api_providers.json's decisions_test questions and
 ; succeeds when answers come back.
 _LLM_Menu_TestActiveApiEntry(NotifyFn := 0, EntryId := "") {
+	global _LLM_Menu_ApiFailureEpoch, _LLM_Menu_ApiPrivateAuthorityGeneration
 	global _LLM_Menu, LLM_REMOTE_TEST_REQUEST, LLM_REMOTE_KIND_API_TEST,
 		LLM_API_TEST_TIMEOUT_MS, LLM_REMOTE_DECISIONS_TEST
 	active_id := (EntryId != "") ? EntryId
@@ -779,6 +797,10 @@ _LLM_Menu_TestActiveApiEntry(NotifyFn := 0, EntryId := "") {
 		try LoggerError("LLM", "API test owner acquisition failed: {1}.", Err.Message)
 		return false
 	}
+	Owner["api_failure_epoch"] := ++_LLM_Menu_ApiFailureEpoch
+	Owner["api_failure_authority"] := _LLM_Menu_ApiPrivateAuthorityGeneration
+	Owner["api_failure_snapshot"] := snapshot.Clone()
+	ManagedNetworkTerminalFailure.Retire("api_test")
 	StartedTick := A_TickCount
 	; Immediate visible feedback at click time; the Cancel button and the
 	; request id are attached below once dispatch owns them.
@@ -841,6 +863,9 @@ _LLM_Menu_ApiTestTip(Ok, Name, Ms, Text, Info := "") {
 			"body", Format(t("menu.llm.api_test_ok_body"), Name, Ms, Excerpt))
 	}
 	Body := StrReplace(t("menu.llm.api_unreachable_body"), "%s", Name)
+	NetworkKey := Info is Map ? ManagedNetworkFailureWindows_MessageKey(Info.Get("network_report", 0)) : ""
+	if NetworkKey != ""
+		Body .= "`n" . t(NetworkKey)
 	ServerLine := _LLM_Menu_ApiTestServerLine(Info)
 	if (ServerLine != "")
 		Body .= "`n" . ServerLine
@@ -894,6 +919,8 @@ _LLM_Menu_OnApiTestDone(Ok, Text, EntryId, Name, StartedTick, Owner,
 	Tip := _LLM_Menu_ApiTestTip(Ok, Name, Ms, Text, Info)
 	_LLM_Menu_ApiTestSurface(Tip["title"], Tip["body"],
 		Tip["ok"] ? "Iconi" : "Icon!", Tip["ok"], NotifyFn)
+	if !Tip["ok"]
+		_LLM_Menu_ShowApiManagedFailure(Owner, Info, NotifyFn)
 	if (Tip["ok"]) {
 		try LoggerInfo("LLM", "API test for '{1}' succeeded in {2} ms ({3} reply chars).",
 			Name, Ms, StrLen(Text))
@@ -1934,4 +1961,40 @@ class LLM_Menu_ApiPrivateSourceOwner {
 			Candidate["backend"] := "api"
 		return true
 	}
+}
+
+
+global _LLM_Menu_ApiFailureEpoch := 0
+
+_LLM_Menu_ApiFailureCurrent(Owner) {
+	global _LLM_Menu, _LLM_Menu_ApiFailureEpoch, _LLM_Menu_ApiPrivateAuthorityGeneration
+	if !(Owner is Map) || Owner.Get("api_failure_epoch", 0) != _LLM_Menu_ApiFailureEpoch
+		|| Owner.Get("api_failure_authority", -1) != _LLM_Menu_ApiPrivateAuthorityGeneration
+		|| Owner.Get("backend_generation", -1) != LLM_AuxGeneration()
+		|| Owner.Get("endpoint_generation", -1) != LLM_AuxGeneration()
+		|| Owner.Get("lifecycle_generation", -1) != LLM_AuxGeneration()
+		|| !(Owner.Get("api_failure_snapshot", 0) is Map)
+		return false
+	Snapshot := Owner["api_failure_snapshot"]
+	Matches := 0
+	if _LLM_Menu is Map && _LLM_Menu.Get("api_entries", 0) is Array {
+		for Entry in _LLM_Menu["api_entries"] {
+			if !_ManagedNetwork_Equal(_LLM_MenuApiEntryGet(Entry, "Id", ""), Snapshot["Id"])
+				continue
+			for Field, Value in Snapshot
+				if !_ManagedNetwork_Equal(_LLM_MenuApiEntryGet(Entry, Field, ""), Value)
+					return false
+			Matches += 1
+		}
+	}
+	return Matches == 1 && !A_IsSuspended
+}
+
+_LLM_Menu_ShowApiManagedFailure(Owner, Info, NotifyFn := 0, PresentFn := 0) {
+	if !(Info is Map) || !_LLM_Menu_ApiFailureCurrent(Owner)
+		return false
+	EntryId := Owner["api_failure_snapshot"]["Id"]
+	return ManagedNetworkTerminalFailure.Publish("api_test", Info.Get("network_report", 0),
+		() => _LLM_Menu_ApiFailureCurrent(Owner), "menu.llm.api_unreachable_title",
+		() => _LLM_Menu_TestActiveApiEntry(NotifyFn, EntryId), PresentFn)
 }

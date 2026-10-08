@@ -69,7 +69,7 @@ local function manifest_rows()
 		"menu_manifest.json must have an 'llm_menu' array")
 	local rows = {}
 	for _, row in ipairs(data.llm_menu) do
-		if type(row) == "table" and row.type == "dynamic" then
+		if type(row) == "table" and (row.type == "dynamic" or row.type == "group") then
 			local visible = true
 			if type(row.platforms) == "table" then
 				visible = false
@@ -179,5 +179,31 @@ helpers.describe("llm-menu-layout-shared (macOS): the shared spec + its consumer
 		helpers.assert_true(fh == nil,
 			"_shared/modules/llm/menu_layout.json must not exist — the IA menu is described in the " ..
 			"menu manifest's llm_menu key, and a second shared description would drift from it")
+	end)
+end)
+
+
+helpers.describe("shared fixed LLM group declarations", function()
+	helpers.it("the selected parents are genuine groups with unchanged native policy", function()
+		local groups = { llm_trigger = true, llm_display = true, llm_navigation = true }
+		local count = 0
+		local additional_groups = 0
+		for _, row in ipairs(manifest_rows()) do
+			if groups[row.id] then
+				helpers.assert_eq(row.type, "group")
+				helpers.assert_eq(row.disabled_when_off, true)
+				helpers.assert_eq(row.health_dot, false)
+				count = count + 1
+			elseif row.id == "llm_live_mode" or row.id == "llm_generation_settings" then
+				helpers.assert_eq(row.type, "group")
+				helpers.assert_eq(row.disabled_when_off, true)
+				helpers.assert_eq(row.health_dot, false)
+				additional_groups = additional_groups + 1
+			else
+				helpers.assert_eq(row.type, "dynamic", "all other native parent contracts retain their existing shape")
+			end
+		end
+		helpers.assert_eq(count, 3)
+		helpers.assert_eq(additional_groups, 2)
 	end)
 end)

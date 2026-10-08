@@ -317,7 +317,7 @@ Test("curl: a request can write its body to a file, byte for byte (layout-regist
 _KLT_CurlOutputFileCase() {
 	Configs := []
 	; Reads the curl config at the spawn boundary, then refuses to start a child.
-	Capture := (Exe, Args, *) => (Configs.Push(FileRead(Args[2], "UTF-8")), 0)
+	Capture := (Exe, Args, *) => (Configs.Push(FileRead(Args[3], "UTF-8")), 0)
 	Target := A_Temp . "\ergopti_keylayout_output_" . A_TickCount . ".test"
 	for OutputPath in [Target, ""] {
 		Req := CurlAsyncRequest(Map("spawn", Capture))

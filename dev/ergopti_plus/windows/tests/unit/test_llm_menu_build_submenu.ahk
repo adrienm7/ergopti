@@ -186,3 +186,210 @@ _LBMS_BootPredicate() {
 }
 Test("llm menu: boot projections skip a populated handle (llm-menu-build-submenu)",
 	_LBMS_BootPredicate)
+
+; This fixture invokes the actual main builder and existing child constructors.
+_LBMS_GroupDeclaration(Rows, Id) {
+	for Row in Rows
+		if Row is Map && _MR_Get(Row, "id") == Id
+			return Row
+	throw Error("A genuine group declaration is missing: " . Id)
+}
+_LBMS_ParentPosition(Labels, Label) {
+	for Position, Present in Labels
+		if Present == Label
+			return Position - 1
+	return -1
+}
+_LBMS_ActualGroupParents() {
+	global _LLM_Menu, _LLM_Menu_Handle
+	Root := _MR_GetManifestRoot(), SavedRows := Root["llm_menu"]
+	SavedMenu := _LBMS_Fixture()
+	SavedHandle := _LLM_Menu_Handle
+	try {
+		for Id, Key in Map("llm_trigger", "menu.llm.trigger_menu_title",
+				"llm_display", "menu.llm.display_menu_title", "llm_navigation", "menu.llm.nav_menu_title") {
+			Declaration := _LBMS_GroupDeclaration(SavedRows, Id)
+			AssertEqual("group", Declaration["type"], "the real declaration owns a submenu parent")
+			OriginalKey := Declaration["i18n"]
+			try {
+				Declaration["i18n"] := "button.cancel"
+				Built := LLM_Menu_BuildSubmenu()
+				try {
+					Labels := _LBMS_Labels(Built)
+					Position := _LBMS_ParentPosition(Labels, t("button.cancel"))
+					AssertTrue(Position >= 0, "the current declaration reaches the actual native main menu")
+					AssertEqual(-1, _LBMS_ParentPosition(Labels, t(Key)), "no old literal constructs a second parent")
+					Child := DllCall("GetSubMenu", "ptr", Built.Handle, "int", Position, "ptr")
+					AssertTrue(Child != 0, "the real parent retains an actual native submenu handle")
+					AssertTrue(DllCall("GetMenuItemCount", "ptr", Child, "int") > 0)
+				} finally Built.Delete()
+			} finally Declaration["i18n"] := OriginalKey
+		}
+		AssertTrue(ObjPtr(_LLM_Menu_Handle) == ObjPtr(SavedHandle), "staging leaves the published native owner intact")
+	} finally {
+		Root["llm_menu"] := SavedRows
+		_LLM_Menu := SavedMenu
+		_LLM_Menu_Handle := SavedHandle
+	}
+}
+Test("llm fixed parents: actual main builder reads current shared captions and real children", _LBMS_ActualGroupParents)
+
+_LBMS_GroupMenuReturn(NativeMenu) {
+	return NativeMenu
+}
+_LBMS_GroupLeaf(Observed) {
+	Observed["calls"] += 1
+	return "genuine native action"
+}
+_LBMS_GroupHandleAndFlags() {
+	Root := _MR_GetManifestRoot(), SavedRows := Root["llm_menu"]
+	Declarations := []
+	for Id in ["llm_trigger", "llm_display", "llm_navigation"]
+		Declarations.Push(_LBMS_GroupDeclaration(SavedRows, Id))
+	Root["llm_menu"] := Declarations
+	Observed := Map("calls", 0)
+	Action := _LBMS_GroupLeaf.Bind(Observed)
+	Children := [], Destination := Menu()
+	Loop 3 {
+		NativeChild := Menu()
+		NativeChild.Add("Genuine checked leaf", Action)
+		NativeChild.Check("Genuine checked leaf")
+		NativeChild.Add("Genuine disabled leaf", Action)
+		NativeChild.Disable("Genuine disabled leaf")
+		Children.Push(NativeChild)
+	}
+	try {
+		Builders := Map()
+		Disabled := Map("llm_trigger", false, "llm_display", true, "llm_navigation", false)
+		for Index, Declaration in Declarations
+			Builders[Declaration["id"]] := _LBMS_GroupMenuReturn.Bind(Children[Index])
+		Returned := MenuRenderer_Build("llm_menu", "LLM", Map(), Builders,
+			"", "", "", Destination, Disabled)
+		AssertTrue(ObjPtr(Returned) == ObjPtr(Destination), "the renderer populates the exact detached native destination")
+		AssertEqual(3, DllCall("GetMenuItemCount", "ptr", Destination.Handle, "int"))
+		for Position in [0, 1, 2] {
+			AssertEqual(Children[Position + 1].Handle, DllCall("GetSubMenu", "ptr", Destination.Handle, "int", Position, "ptr"),
+				"every actual parent keeps the original child Menu identity")
+			Flags := DllCall("GetMenuState", "ptr", Destination.Handle, "uint", Position, "uint", 0x400, "uint")
+			AssertFalse(Flags == 0xFFFFFFFF, "native flags require a genuine Win32 receipt")
+			AssertEqual(Position == 1, (Flags & 3) != 0, "resolved native parent greying is retained exactly")
+		}
+		AssertTrue((DllCall("GetMenuState", "ptr", Children[1].Handle, "uint", 0, "uint", 0x400, "uint") & 8) != 0)
+		AssertTrue((DllCall("GetMenuState", "ptr", Children[1].Handle, "uint", 1, "uint", 0x400, "uint") & 3) != 0)
+		AssertEqual(0, Observed["calls"], "building does not invoke native child commands")
+		AssertEqual("genuine native action", Action.Call())
+		AssertEqual(1, Observed["calls"])
+	} finally {
+		Destination.Delete()
+		for NativeChild in Children
+			NativeChild.Delete()
+		Root["llm_menu"] := SavedRows
+	}
+}
+Test("llm fixed parents: actual native handles ticks greying and callback lifetime survive", _LBMS_GroupHandleAndFlags)
+
+_LBMS_GroupRefusedChild() {
+	return false
+}
+_LBMS_GroupEmptyAndRefusal() {
+	Root := _MR_GetManifestRoot(), SavedRows := Root["llm_menu"]
+	Row := _LBMS_GroupDeclaration(SavedRows, "llm_navigation")
+	Root["llm_menu"] := [Row]
+	Child := Menu(), Destination := Menu(), Refused := Menu()
+	try {
+		MenuRenderer_Build("llm_menu", "LLM", Map(),
+			Map("llm_navigation", _LBMS_GroupMenuReturn.Bind(Child)), "", "", "", Destination,
+			Map("llm_navigation", false))
+		AssertEqual(1, DllCall("GetMenuItemCount", "ptr", Destination.Handle, "int"))
+		AssertEqual(Child.Handle, DllCall("GetSubMenu", "ptr", Destination.Handle, "int", 0, "ptr"))
+		AssertEqual(0, DllCall("GetMenuItemCount", "ptr", Child.Handle, "int"), "proper native empty navigation remains valid")
+		Called := false, Refusal := ""
+		try MenuRenderer_Build("llm_menu", "LLM", Map(),
+			Map("llm_navigation", _LBMS_GroupRefusedChild), "", "", "", Refused,
+			Map("llm_navigation", false))
+		catch as ErrorInfo {
+			Called := true
+			Refusal := ErrorInfo.Message
+		}
+		AssertTrue(Called)
+		AssertTrue(InStr(Refusal, "Declared native group 'llm_navigation' was refused.") > 0)
+		AssertEqual(0, DllCall("GetMenuItemCount", "ptr", Refused.Handle, "int"), "an invalid child never publishes a fallback parent")
+	} finally {
+		Destination.Delete()
+		Refused.Delete()
+		Child.Delete()
+		Root["llm_menu"] := SavedRows
+	}
+}
+Test("llm fixed parents: valid empty native navigation and missing-child refusal remain distinct", _LBMS_GroupEmptyAndRefusal)
+
+_LBMS_ActualOffGroupsAndSourceWithdrawal() {
+	global _LLM_Menu, _LLM_Menu_Handle
+	Root := _MR_GetManifestRoot(), SavedRows := Root["llm_menu"]
+	SavedMenu := _LBMS_Fixture(), SavedHandle := _LLM_Menu_Handle
+	try {
+		_LLM_Menu["enabled"] := false
+		Built := LLM_Menu_BuildSubmenu()
+		try {
+			Labels := _LBMS_Labels(Built)
+			for Key in ["menu.llm.trigger_menu_title", "menu.llm.display_menu_title", "menu.llm.nav_menu_title"] {
+				Position := _LBMS_ParentPosition(Labels, t(Key))
+				AssertTrue(Position >= 0)
+				Flags := DllCall("GetMenuState", "ptr", Built.Handle, "uint", Position, "uint", 0x400, "uint")
+				AssertFalse(Flags == 0xFFFFFFFF)
+				AssertTrue((Flags & 3) != 0, "off keeps the native parent greyed")
+				AssertTrue(DllCall("GetSubMenu", "ptr", Built.Handle, "int", Position, "ptr") != 0)
+			}
+			ToggleFlags := DllCall("GetMenuState", "ptr", Built.Handle, "uint", 0, "uint", 0x400, "uint")
+			AssertFalse((ToggleFlags & 8) != 0, "the category checkbox keeps exact user intent while off")
+		} finally Built.Delete()
+		Withdrawn := []
+		for Row in SavedRows
+			if _MR_Get(Row, "id") != "llm_navigation"
+				Withdrawn.Push(Row)
+		Root["llm_menu"] := Withdrawn
+		Built := LLM_Menu_BuildSubmenu()
+		try {
+			Labels := _LBMS_Labels(Built)
+			AssertEqual(-1, _LBMS_ParentPosition(Labels, t("menu.llm.nav_menu_title")), "a missing group declaration is genuine absence")
+			AssertTrue(_LBMS_ParentPosition(Labels, t("menu.llm.trigger_menu_title")) >= 0, "unrelated actual group remains published")
+		} finally Built.Delete()
+		Root["llm_menu"] := SavedRows
+		Built := LLM_Menu_BuildSubmenu()
+		try AssertTrue(_LBMS_ParentPosition(_LBMS_Labels(Built), t("menu.llm.nav_menu_title")) >= 0,
+			"the same real declaration restores its existing native child constructor")
+		finally Built.Delete()
+		AssertTrue(ObjPtr(_LLM_Menu_Handle) == ObjPtr(SavedHandle))
+	} finally {
+		Root["llm_menu"] := SavedRows
+		_LLM_Menu := SavedMenu
+		_LLM_Menu_Handle := SavedHandle
+	}
+}
+Test("llm fixed parents: real off-state and withdrawal retain unrelated native owners", _LBMS_ActualOffGroupsAndSourceWithdrawal)
+
+_LBMS_ActualWarningAnchor() {
+	global _LLM_Menu, _LLM_Menu_Handle
+	SavedMenu := _LBMS_Fixture(), SavedHandle := _LLM_Menu_Handle
+	Destination := Menu()
+	_LLM_Menu_Handle := Destination
+	try {
+		WarningRows := [Map("label", t("menu.llm.warning_install_ollama"),
+			"action", _LLM_Menu_OnWarningInstallClick)]
+		_LLM_Menu_EmitCapturedRow("llm_backend", false, false, false,
+			WarningRows, Destination, "LLM")
+		Labels := _LBMS_Labels(Destination)
+		AssertEqual(t("menu.llm.warning_install_ollama"), Labels[1],
+			"the retained native warning precedes its actual backend anchor")
+		AssertEqual("API 🌐", Labels[2], "the genuine backend follows the warning")
+		AssertTrue(DllCall("GetSubMenu", "ptr", Destination.Handle, "int", 1, "ptr") != 0,
+			"the captured dispatch retains the real backend submenu")
+		AssertTrue(ObjPtr(_LLM_Menu_Handle) == ObjPtr(Destination),
+			"the warning dispatch remains inside its detached native owner")
+	} finally {
+		Destination.Delete()
+		_LLM_Menu := SavedMenu
+		_LLM_Menu_Handle := SavedHandle
+	}
+}
+Test("llm fixed parents: retained native warning keeps its actual backend anchor", _LBMS_ActualWarningAnchor)

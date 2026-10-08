@@ -110,6 +110,7 @@ local function install(args)
 	}))
 	package.loaded["infra.manifest_menu"] = {
 		command_row = command_renderer.command_row,
+		template_rows = command_renderer.template_rows,
 		get_array = command_renderer.get_array, render_rows = function(rows) return rows end }
 	package.loaded["ui.menu.menu_llm.api_panel"] = nil
 	world.panel = require("ui.menu.menu_llm.api_panel")
@@ -232,4 +233,39 @@ helpers.describe("API panel: providers and System 1-only entries (macOS)", funct
 				"the probe's verdict is shown")
 		end)
 	end)
+end)
+
+
+helpers.describe("complete API presentation frames", function()
+	for _, section in ipairs({ "llm_api_selection_frame", "llm_api_active_boundary", "llm_api_system1_frame" }) do
+		helpers.it("refuses an unowned declared API frame and repairs the same genuine entries: " .. section, function()
+			helpers.with_fresh_modules(FRESH, function()
+				local world = install({ entries = { OPENAI, JEV }, active_id = "chat" })
+				local owner = package.loaded["infra.manifest_menu"]
+				local frame = assert(owner.get_array(section))
+				local original = frame[1]
+				local function build()
+					if section == "llm_api_selection_frame" then return world.panel.build_model_picker(world.ctx) end
+					local _, rows = world.panel.build(world.ctx)
+					return rows
+				end
+				local original_entries, original_active = world.entries, world.active_id
+				local ok, err = xpcall(function()
+					helpers.assert_true(#build() > 0, "the real original entries produce this complete frame")
+					frame[1] = { type = "command", id = "unbound_api_frame", i18n = "button.cancel" }
+					helpers.assert_eq(build(), {}, "a declared command without its native owner refuses the whole frame")
+					helpers.assert_true(rawequal(world.entries, original_entries))
+					helpers.assert_eq(world.active_id, original_active)
+					helpers.assert_eq(#world.persisted, 0)
+					helpers.assert_eq(#world.tests, 0)
+					helpers.assert_eq(world.warmups, 0)
+				end, debug.traceback)
+				frame[1] = original
+				helpers.assert_true(rawequal(package.loaded["infra.manifest_menu"], owner))
+				helpers.assert_true(rawequal(frame[1], original))
+				if not ok then error(err, 0) end
+				helpers.assert_true(#build() > 0, "exact original declaration repair uses the retained entry owner")
+			end)
+		end)
+	end
 end)

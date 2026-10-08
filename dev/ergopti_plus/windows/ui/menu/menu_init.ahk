@@ -42,10 +42,11 @@ _AppendPersonalShortcutsSubmenuIfAny(ShortcutsMenu) {
 			PersonalRows.Push(Row)
 		}
 	}
-	MenuRenderer_AppendRows(ShortcutsMenu, "shortcuts_menu", "personal_shortcuts", [
-		Map("separator", true),
-		Map("label", t("menu.shortcuts.personal"), "items", PersonalRows)
-	])
+	FrameRows := MenuRenderer_TemplateRows("personal_shortcuts_frame", Map(), Map(), Map("personal_shortcuts_registered", PersonalRows))
+	if !(FrameRows is Array)
+		return 0
+	MenuRenderer_AppendTemplate(ShortcutsMenu, "personal_shortcuts_frame", Map(), Map(),
+		Map("personal_shortcuts_registered", PersonalRows))
 }
 
 
@@ -510,7 +511,11 @@ _MI_AboutUpdateRows(IsLocal := Updater_IsLocalSource(), SetChannelFn := Updater_
 	} else {
 		Rows.Push(Map("label", VerLabel, "action", Updater_OpenCurrentRelease))
 	}
-	Rows.Push(Map("separator", true))
+	SeparatorRows := MenuRenderer_TemplateRows("about_version_separator", Map(), Map(), Map())
+	if !(SeparatorRows is Array)
+		return []
+	for Row in SeparatorRows
+		Rows.Push(Row)
 
 	Rows.Push(_MI_ChannelPickerRow(SetChannelFn))
 
