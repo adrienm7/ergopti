@@ -5769,6 +5769,25 @@ The complete macOS Layout presentation family now consumes 17 canonical shared s
       open. macOS system trust and explicit proxy relays are integrated, while
       opaque-client full-URL PAC/WPAD/fallback/redirect routing remains CODE.
 
+Native Windows receiving follow-up (2026-10-08): manual37850871117 at
+`dea3ec72fb11df9780424dcb735c99d7bca8a70c` terminates with failure after the
+unchanged native watchdog:8,135 passed and9 failed results,8,144 of10,438
+registered controls completed; the live partial-source-reader control and all
+later controls remain unqualified. The canonical live PAC/401 control passes,
+and all three SSPI accepts now report status0; their physical cleanup still
+fails. Core JavaScript/properties pass; E2E, packaging, installation and
+Release are skipped. The canonical upstream parser-owner correction at
+`9447c35f439552d6450c829f6c0a050dfe74e583` replaces the duplicate local
+preparation and must be retained when updating this branch. The bounded
+partial-stage diagnostic control now receives the existing canonical
+failure-contract wrapper. The
+legacy retirement fixture adds an enumerated, bounded source-cause notice:
+controlled PowerShell missing-property and missing-hash-command failures are
+now distinguishable, but neither proves the actual Windows cause. Every
+original assertion, authorization guard and watchdog is retained. BOM/LF and
+source-preservation checks pass; candidate Windows replay remains required.
+These corrections do not close item62 or transversal items16/38.
+
 The actual cold receiver now transports device/inode identities as canonical uint64 decimal strings, preserving the observed APFS inode1152921500312523020 without JavaScript rounding. The official installer also disables native AppleDouble consumption for its exact tar child so literal pinned archive members survive. Original physical sandbox, mode, whole-archive and retirement assertions remain; 31 Python controls, eight exact identity admissions, sixty additional refusals and three ordinary-user extraction cases pass portably. Successor native cold receiving remains required.
 
 The native listener worker now records bounded debug-only lexical/physical path and inode-match scalars for its known fixture PID, from the same native snapshot. This evidence does not authorize listener admission, and all twelve original API methods remain byte-identical. Sixteen portable C controls and independent privacy/refusal controls pass; actual ARM and Intel SDK observation must establish the remaining listener refusal before changing any production path predicate.
