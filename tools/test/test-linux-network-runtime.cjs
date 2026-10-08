@@ -43,6 +43,245 @@ function nativeEnvironment(extra) {
 
 /** Tests actual generated installer decisions with private package/runtime witnesses. */
 function portable() {
+	check(
+		'native module parents refuse source and installation symlink aliases without writes',
+		() => {
+			if (process.platform !== 'linux') {
+				skipped++;
+				return;
+			}
+			const root = fs.mkdtempSync(path.join(os.tmpdir(), 'ergopti-native-module-parents-'));
+			const installer = outputs[`${DRIVER}/install.sh`];
+			const functions = ['_native_output_ordinary_directory', '_native_output_bin_parents']
+				.map((name) => shellFunction(installer, name))
+				.join('\n');
+			try {
+				const outside = path.join(root, 'outside');
+				fs.mkdirSync(outside);
+				const sentinel = path.join(outside, 'luv.so');
+				fs.writeFileSync(sentinel, 'foreign unchanged bytes');
+				for (const alias of ['source', 'installed', 'ordinary']) {
+					const sourceRoot = path.join(root, alias, 'source');
+					const installed = path.join(root, alias, 'installed');
+					fs.mkdirSync(sourceRoot, { recursive: true });
+					fs.mkdirSync(path.join(installed, 'linux'), { recursive: true });
+					const target =
+						alias === 'source'
+							? path.join(sourceRoot, 'native_modules')
+							: path.join(installed, 'linux/native_modules');
+					if (alias !== 'ordinary') fs.symlinkSync(outside, target, 'dir');
+					const result = spawnSync(bashExecutable(), ['-s'], {
+						input:
+							'set -eu\n' +
+							functions +
+							'\nSRC_DRIVER=' +
+							JSON.stringify(sourceRoot) +
+							'\nLIB_DIR=' +
+							JSON.stringify(installed) +
+							'\n_native_output_bin_parents\n',
+						encoding: 'utf8',
+						timeout: 5000
+					});
+					assert.ifError(result.error);
+					assert.equal(result.signal, null);
+					assert.equal(result.status, alias === 'ordinary' ? 0 : 1);
+					assert.equal(fs.readFileSync(sentinel, 'utf8'), 'foreign unchanged bytes');
+				}
+			} finally {
+				fs.rmSync(root, { recursive: true, force: true });
+			}
+		}
+	);
+	check(
+		'source luv producer refuses malformed pins and occupied output before Git or compilation',
+		() => {
+			const root = fs.mkdtempSync(path.join(os.tmpdir(), 'ergopti-luv-refusal-'));
+			try {
+				for (const [url, revision, occupied] of [
+					['http://github.com/luvit/luv.git', '26e62e49b0230891ece45a78cc1f63c074e60020', false],
+					['https://github.com/luvit/luv.git', 'not-a-commit', false],
+					['https://github.com/luvit/luv.git', '26e62e49b0230891ece45a78cc1f63c074e60020', true]
+				]) {
+					if (occupied) fs.writeFileSync(path.join(root, 'luv.so'), 'foreign');
+					const result = spawnSync(
+						bashExecutable(),
+						[
+							path.join(ROOT, DRIVER, 'install/build_native_luv.sh'),
+							root,
+							url,
+							revision,
+							'-DLUA_BUILD_TYPE=System'
+						],
+						{ encoding: 'utf8', timeout: 5000 }
+					);
+					assert.ifError(result.error);
+					assert.equal(result.signal, null);
+					assert.equal(result.status, 2);
+					assert.equal(fs.existsSync(path.join(root, 'source')), false);
+				}
+				assert.equal(fs.readFileSync(path.join(root, 'luv.so'), 'utf8'), 'foreign');
+			} finally {
+				fs.rmSync(root, { recursive: true, force: true });
+			}
+		}
+	);
+	check(
+		'Fedora source installs bootstrap the pinned LuaJIT module without guessing an archive package',
+		() => {
+			assert.deepEqual(source.network_runtime.source_luv_build_packages, {
+				apt: null,
+				dnf: [
+					'git',
+					'gcc',
+					'glibc-devel',
+					'make',
+					'cmake',
+					'pkgconf-pkg-config',
+					'luajit-devel',
+					'glib-networking',
+					'gsettings-desktop-schemas',
+					'dconf'
+				],
+				zypper: null,
+				pacman: null,
+				xbps: null,
+				apk: null
+			});
+			assert.equal(
+				source.network_runtime.providers.dnf,
+				null,
+				'no invented distribution LuaJIT package'
+			);
+			for (const mutate of [
+				(data) => delete data.network_runtime.source_luv_build_packages,
+				(data) => delete data.network_runtime.source_luv_build_packages.dnf,
+				(data) => (data.network_runtime.source_luv_build_packages.dnf = []),
+				(data) => (data.network_runtime.source_luv_build_packages.dnf = ['git', 'git']),
+				(data) => (data.network_runtime.source_luv_build_packages.dnf = ['git; exit 0'])
+			]) {
+				const invalid = structuredClone(source);
+				mutate(invalid);
+				assert.throws(() => generator.validate(invalid), /source luv build/);
+			}
+			const installer = outputs[`${DRIVER}/install.sh`];
+			const prepare = shellFunction(installer, '_prepare_source_network_runtime');
+			assert.ok(
+				prepare.indexOf('_native_output_bin_parents || return 1') <
+					prepare.indexOf('NATIVE_LUV_STAGE="$(mktemp -d)"')
+			);
+			assert.match(prepare, /_network_runtime_available; then return 0; fi/);
+			assert.match(
+				prepare,
+				/if \[ "\$SRC_DRIVER" != "\$\{repository\}\/static\/ergopti_plus\/linux" \]; then return 0; fi/
+			);
+			assert.match(prepare, /NATIVE_LUV_CMAKE_OPTIONS\[@\]/);
+			const admission = installer.indexOf(
+				'_prepare_source_network_runtime\n_ensure_network_runtime'
+			);
+			assert.ok(admission > installer.indexOf('if $SKIP_DEPS; then'));
+			const builder = read(`${DRIVER}/install/build_native_luv.sh`);
+			for (const guard of [
+				'git -C "$SOURCE" fetch --depth=1 "$SOURCE_URL" "$SOURCE_REVISION"',
+				'[ "$(git -C "$SOURCE" rev-parse HEAD)" = "$SOURCE_REVISION" ]',
+				'git -C "$SOURCE" fsck --strict',
+				'git -C "$SOURCE" submodule update --init --depth=1 -- deps/libuv deps/lua-compat-5.3',
+				'cmake -S "$SOURCE" -B "$BUILD"',
+				'package.loadlib(arg[1], "luaopen_luv")',
+				'assert(debug.getinfo(uv.fs_stat, "S").what == "C")'
+			])
+				assert.ok(builder.includes(guard), `Missing native producer guard: ${guard}`);
+			assert.deepEqual(generator.LUV_CMAKE_OPTIONS, [
+				'-DLUA_BUILD_TYPE=System',
+				'-DWITH_LUA_ENGINE=LuaJIT',
+				'-DBUILD_MODULE=ON',
+				'-DBUILD_SHARED_LIBS=OFF',
+				'-DBUILD_STATIC_LIBS=OFF',
+				'-DWITH_SHARED_LIBUV=OFF'
+			]);
+			assert.match(installer, /linux\/native_modules\/luv\.so/);
+			assert.match(
+				read(`${DRIVER}/install/standalone_launcher.sh`),
+				/export LUA_CPATH="\$DRIVER_ROOT\/native_modules\/\?\.so;\$\{LUA_CPATH:-;;\}"/
+			);
+			assert.match(read(`${DRIVER}/tests/distro/e2e_install.sh`), /runtime_probe\.lua/);
+		}
+	);
+	check(
+		'source archive builds declare complete compiler and libc headers separately from runtime',
+		() => {
+			assert.deepEqual(source.archive_build_packages, {
+				apt: ['gcc', 'libc6-dev'],
+				dnf: ['gcc', 'glibc-devel'],
+				zypper: ['gcc', 'glibc-devel'],
+				pacman: ['gcc', 'glibc'],
+				xbps: null,
+				apk: ['gcc', 'musl-dev', 'linux-headers']
+			});
+			for (const mutate of [
+				(data) => delete data.archive_build_packages,
+				(data) => delete data.archive_build_packages.apk,
+				(data) => (data.archive_build_packages.apt = []),
+				(data) => (data.archive_build_packages.apt = ['gcc', 'gcc']),
+				(data) => (data.archive_build_packages.apt = ['gcc; exit 0'])
+			]) {
+				const invalid = structuredClone(source);
+				mutate(invalid);
+				assert.throws(() => generator.validate(invalid), /archive build/);
+			}
+			const installer = outputs[`${DRIVER}/install.sh`];
+			const functions = ['_native_output_build_packages', '_ensure_native_output_toolchain']
+				.map((name) => shellFunction(installer, name))
+				.join('\n');
+			for (const [manager, packages] of Object.entries(source.archive_build_packages)) {
+				for (const skip of [false, true]) {
+					for (const installStatus of [0, 7]) {
+						const result = spawnSync(bashExecutable(), ['-s'], {
+							input:
+								'set -u\n' +
+								functions +
+								'\n' +
+								`SKIP_DEPS=${skip}\n_detect_pkg_manager() { echo ${manager}; }\n` +
+								`_install_required_package() { printf 'INSTALL %s %s\\n' "$1" "$2"; return ${installStatus}; }\n` +
+								'_ensure_native_output_toolchain\n',
+							encoding: 'utf8',
+							timeout: 5000
+						});
+						assert.ifError(result.error);
+						assert.equal(result.signal, null);
+						assert.equal(result.status, skip || (packages && !installStatus) ? 0 : 1);
+						const expected =
+							skip || !packages ? [] : installStatus ? packages.slice(0, 1) : packages;
+						assert.deepEqual(
+							result.stdout.trim().split('\n').filter(Boolean),
+							expected.map((pkg) => `INSTALL ${manager} ${pkg}`)
+						);
+					}
+				}
+			}
+			const sourceBranch = installer.slice(
+				installer.indexOf('NATIVE_OUTPUT_REPO='),
+				installer.indexOf('# Create destination directories.')
+			);
+			assert.match(
+				sourceBranch,
+				/if \[ "\$SRC_DRIVER" = "\$\{NATIVE_OUTPUT_REPO\}\/static\/ergopti_plus\/linux" \]; then/
+			);
+			assert.ok(
+				sourceBranch.indexOf('_ensure_native_output_toolchain || exit 1') <
+					sourceBranch.indexOf('NATIVE_OUTPUT_STAGE="$(mktemp -d)"')
+			);
+			assert.ok(
+				sourceBranch.indexOf('_ensure_native_output_toolchain || exit 1') >
+					sourceBranch.indexOf('Canonical native archive build helper unavailable')
+			);
+			for (const format of ['deb', 'rpm', 'arch'])
+				assert.ok(
+					generator
+						.requirements(source, format)
+						.every((name) => !['gcc', 'libc6-dev', 'glibc-devel', 'musl-dev'].includes(name))
+				);
+		}
+	);
 	check('original library identities and all historical package requirements survive', () => {
 		assert.deepEqual(generator.KEYS, ['xkbcommon', 'xkbcommon_x11', 'x11', 'x11_xcb']);
 		for (const [format, old] of Object.entries({

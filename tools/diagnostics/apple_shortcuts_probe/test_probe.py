@@ -378,5 +378,202 @@ class ObservationPriorityControls(unittest.TestCase):
         self.assertEqual(observation["metadata_failure"], "capture_io")
 
 
+class PermissionPreflightControls(unittest.TestCase):
+    capture_case = CaptureDiagnosticControls.capture_case
+    first = b"ASCP:1\nASCP:P:BEGIN\n"
+    attempted = first + b"ASCP:P:CALL_ATTEMPT\n"
+    tail = b"ASCP:2\nASCP:3\nASCP:4\n"
+
+    def returned(self, code):
+        return self.attempted + b"ASCP:P:RETURN:" + str(code).encode("ascii") + b"\n"
+
+    def test_original_absence_is_exact_original_checkpoint_and_metadata_shape(self):
+        for markers in (b"", b"ASCP:1\n", b"ASCP:1\n" + self.tail):
+            raw, observation = subject.permission_preflight_summary(markers, "discovery")
+            self.assertEqual(raw, markers)
+            self.assertEqual(
+                observation, {"state": "absent", "call_attempted": False, "native_returned": False}
+            )
+        _, failure, evidence = self.capture_case(
+            SimpleNamespace(si_pid=321, si_code=1, si_status=0)
+        )
+        self.assertIsNone(failure)
+        self.assertNotIn("permission_preflight", evidence["observation"])
+
+    def test_native_returned_signed32_is_observation_not_catalogue_or_authority(self):
+        for code in (0, -600, -1743, -1744, -2147483648, 2147483647, 71):
+            markers = self.returned(code) + self.tail
+            raw, observation = subject.permission_preflight_summary(markers, "discovery")
+            self.assertEqual(raw, b"ASCP:1\n" + self.tail)
+            self.assertEqual(
+                observation,
+                {
+                    "state": "observed",
+                    "call_attempted": True,
+                    "native_returned": True,
+                    "code": code,
+                },
+            )
+            self.assertEqual(
+                subject.checkpoint_summary(markers, "discovery"), {"valid": True, "last": 4}
+            )
+            self.assertNotIn("permission_granted", observation)
+            self.assertNotIn("catalogue_observed", observation)
+            self.assertNotIn("invocation_qualified", observation)
+
+    def test_incomplete_bridge_and_unreturned_call_are_distinct_not_native_status(self):
+        for markers, state, attempted in (
+            (self.first, "preparing", False),
+            (self.attempted, "call_unreturned", True),
+        ):
+            raw, observation = subject.permission_preflight_summary(markers, "discovery")
+            self.assertEqual(raw, b"ASCP:1\n")
+            self.assertEqual(
+                observation, {"state": state, "call_attempted": attempted, "native_returned": False}
+            )
+            self.assertNotIn("code", observation)
+
+    def test_closed_refusals_preserve_ordered_original_catalogue_checkpoints(self):
+        for start, ending, state, attempted in (
+            (self.first, b"UNAVAILABLE", "bridge_unavailable", False),
+            (self.first, b"REFUSED", "bridge_refused", False),
+            (self.attempted, b"REFUSED", "bridge_refused", True),
+            (self.attempted, b"INVALID", "invalid_native_status", True),
+        ):
+            for tail in (b"", b"ASCP:2\n", self.tail):
+                markers = start + b"ASCP:P:" + ending + b"\n" + tail
+                raw, observation = subject.permission_preflight_summary(markers, "discovery")
+                self.assertEqual(raw, b"ASCP:1\n" + tail)
+                self.assertEqual(
+                    observation,
+                    {"state": state, "call_attempted": attempted, "native_returned": False},
+                )
+
+    def test_noncanonical_or_non_osstatus_codes_cannot_enter_evidence(self):
+        for code in (
+            b"+0",
+            b"-0",
+            b"00",
+            b" 0",
+            b"0 ",
+            b"0.0",
+            b"True",
+            b"2147483648",
+            b"-2147483649",
+            b"PRIVATE",
+            b"\xff",
+            b"1_0",
+        ):
+            markers = self.attempted + b"ASCP:P:RETURN:" + code + b"\n"
+            raw, observation = subject.permission_preflight_summary(markers, "discovery")
+            self.assertIsNone(raw)
+            self.assertEqual(observation["state"], "invalid_grammar")
+            self.assertNotIn("code", observation)
+            self.assertNotIn("PRIVATE", json.dumps(observation))
+            self.assertEqual(
+                subject.checkpoint_summary(markers, "discovery"), {"valid": False, "last": 0}
+            )
+
+    def test_duplicate_foreign_wrong_phase_and_truncated_line_refuse(self):
+        for markers in (
+            b"ASCP:P:BEGIN\n",
+            b"ASCP:1\nASCP:2\nASCP:P:BEGIN\n",
+            self.first + b"ASCP:P:BEGIN\n",
+            self.first + b"ASCP:P:RETURN:0\n",
+            self.attempted + b"ASCP:P:UNAVAILABLE\n",
+            self.first + b"ASCP:P:INVALID\n",
+            self.returned(0) + self.returned(0),
+            self.returned(0) + b"ASCP:3\n",
+            self.returned(0) + b"ASCP:2\nASCP:2\n",
+            self.attempted + b"ASCP:P:RETURN:0",
+            self.returned(0) + b"PRIVATE",
+            self.first + b"ASCP:P:REFUSED:PRIVATE\n",
+            self.attempted + b"ASCP:P:CALL_ATTEMPT\n",
+            self.returned(0) + b"ASCP:1\n",
+        ):
+            raw, observation = subject.permission_preflight_summary(markers, "discovery")
+            self.assertIsNone(raw)
+            self.assertEqual(observation["state"], "invalid_grammar")
+            self.assertEqual(
+                subject.checkpoint_summary(markers, "discovery"), {"valid": False, "last": 0}
+            )
+
+    def test_wrong_role_types_and_stream_cap_remain_refused(self):
+        markers = self.returned(0) + self.tail
+        for role in ("help", "foreign", None):
+            self.assertEqual(subject.checkpoint_summary(markers, role), {"valid": False, "last": 0})
+        for malformed in (bytearray(markers), "ASCP:1\n", None, b" " * 65537):
+            raw, observation = subject.permission_preflight_summary(malformed, "discovery")
+            self.assertIsNone(raw)
+            self.assertEqual(observation["state"], "invalid_grammar")
+
+    def test_actual_owned_capture_zero_observation_keeps_payload_and_original_exit_oracle(self):
+        for code in (0, -600, -1744):
+            raw, failure, evidence = self.capture_case(
+                SimpleNamespace(si_pid=321, si_code=1, si_status=0),
+                errors=self.returned(code) + self.tail,
+                output=b"ORIGINAL payload",
+            )
+            self.assertEqual(raw, b"ORIGINAL payload")
+            self.assertIsNone(failure)
+            self.assertTrue(evidence["retirement_ack"])
+            self.assertEqual(evidence["registered"], 1)
+            self.assertEqual(evidence["observation"]["permission_preflight"]["code"], code)
+            self.assertEqual(evidence["observation"]["checkpoint"], {"valid": True, "last": 4})
+        raw, failure, evidence = self.capture_case(
+            SimpleNamespace(si_pid=321, si_code=1, si_status=3),
+            code=3,
+            errors=self.returned(0) + self.tail,
+        )
+        self.assertIsNone(raw)
+        self.assertEqual(failure, "native_exit")
+        self.assertTrue(evidence["retirement_ack"])
+
+    def test_unreturned_capture_preserves_original_deadline_and_exact_retirement(self):
+        raw, failure, evidence = self.capture_case(
+            None, code=-15, timeout=True, errors=self.attempted
+        )
+        self.assertIsNone(raw)
+        self.assertEqual(failure, "deadline")
+        self.assertTrue(evidence["retirement_ack"])
+        self.assertEqual(evidence["observation"]["checkpoint"], {"valid": True, "last": 1})
+        self.assertEqual(
+            evidence["observation"]["permission_preflight"],
+            {"state": "call_unreturned", "call_attempted": True, "native_returned": False},
+        )
+
+    def test_malformed_optional_stream_cannot_turn_owned_capture_into_success(self):
+        raw, failure, evidence = self.capture_case(
+            SimpleNamespace(si_pid=321, si_code=1, si_status=0),
+            errors=self.returned(2147483648) + self.tail,
+        )
+        self.assertIsNone(raw)
+        self.assertEqual(failure, "diagnostic_shape")
+        self.assertTrue(evidence["retirement_ack"])
+        self.assertFalse(evidence["observation"]["metadata_available"])
+
+    def test_exact_existing_owned_terminal_binding_remains_mandatory(self):
+        for sample in (
+            SimpleNamespace(si_pid=999, si_code=1, si_status=0),
+            SimpleNamespace(si_pid=321, si_code=True, si_status=0),
+        ):
+            raw, failure, evidence = self.capture_case(sample, errors=self.returned(0) + self.tail)
+            self.assertIsNone(raw)
+            self.assertEqual(failure, "terminal_shape")
+            self.assertTrue(evidence["retirement_ack"])
+
+    def test_parser_observation_does_not_replace_original_catalogue_schema(self):
+        self.assertEqual(
+            subject.validate(
+                b'{"version":1,"status":"refused","stage":1,"reason":"native_refused"}'
+            ),
+            {"observed": False, "status": "refused", "stage": 1, "reason": "native_refused"},
+        )
+        with self.assertRaises(ValueError):
+            subject.validate(
+                b'{"version":1,"status":"observed","choices":[],"truncated":false,"permission_granted":true}'
+            )
+
+
 if __name__ == "__main__":
     unittest.main()

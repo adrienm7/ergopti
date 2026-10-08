@@ -1394,6 +1394,40 @@ assert.throws(() =>
 	)
 );
 const prepare = pipeline.step(installJob, 'Prepare the container');
+// --no-deps is deliberately preserved: these five source installs require a
+// compiler supplied by their caller, whereas first-run provisioning belongs
+// to the real installer. Runtime packages must remain absent from preparation.
+for (const [id, buildPackages] of [
+	['distro-debian', ['gcc', 'libc6-dev']],
+	['distro-fedora', ['gcc', 'glibc-devel']],
+	['distro-arch', ['gcc', 'glibc']],
+	['distro-alpine', ['gcc', 'musl-dev', 'linux-headers']],
+	['distro-opensuse', ['gcc', 'glibc-devel']]
+]) {
+	const entry = installJob.match(
+		new RegExp(`^          - id: ${id}\\n([\\s\\S]*?)(?=^          - id:|^    container:)`, 'm')
+	);
+	assert.ok(entry, `Missing original source-install lane: ${id}`);
+	const prep = entry[1].match(/^            prep: (.+)$/m);
+	assert.ok(prep, `Missing actual preparation: ${id}`);
+	const words = prep[1].split(/\s+/);
+	for (const pkg of buildPackages)
+		assert.ok(words.includes(pkg), `${id} lacks source-build prerequisite ${pkg}`);
+	assert.ok(!words.includes('luajit'), `${id} preparation hides a missing runtime dependency`);
+}
+const firstInstallFixture = fs.readFileSync(
+	path.join(ROOT, 'static/ergopti_plus/linux/tests/distro/e2e_install.sh'),
+	'utf8'
+);
+assert.match(firstInstallFixture, /^mkdir -p "\$\{E2E_HOME\}\/ergopti\/tools\/build"$/m);
+assert.match(
+	firstInstallFixture,
+	/^cp "\$\{SRC\}\/tools\/build\/build-linux-native-output\.sh" "\$\{E2E_HOME\}\/ergopti\/tools\/build\/"$/m
+);
+assert.ok(
+	firstInstallFixture.indexOf('cp "${SRC}/tools/build/build-linux-native-output.sh"') <
+		firstInstallFixture.indexOf('section "Installer"')
+);
 assert.strictEqual(
 	pipeline.stepField(prepare, 'shell'),
 	'sh',
@@ -1431,6 +1465,202 @@ assert.deepStrictEqual(
 	PACKAGE_SUBJECTS,
 	'package-linux must be the mandatory owner of the six packaging subjects'
 );
+// Manual diagnostics can qualify packages after failed E2E receiving, while
+// both the mandatory verdict and automatic release admission remain strict.
+const manualPackageJob = pipeline.job('package-linux');
+assert.deepStrictEqual(pipeline.needsOf(manualPackageJob), ['e2e-linux']);
+assert.deepStrictEqual(pipeline.needsOf(pipeline.job('e2e-linux')), ['test-linux']);
+assert.strictEqual(pipeline.field(pipeline.job('e2e-linux'), 'if'), '${{ !cancelled() }}');
+assert.strictEqual(
+	pipeline.field(manualPackageJob, 'if'),
+	"${{ !cancelled() && (needs.e2e-linux.result == 'success' || (github.event_name == 'workflow_dispatch' && needs.e2e-linux.result == 'failure')) }}",
+	'manual packaging must retain unit admission, cancellation and automatic E2E admission'
+);
+// Supplementary receiving must retain native family/preflight ownership and
+// reject the real upstream result before either successful E2E certificate.
+function assertLinuxSupplementalE2E(job) {
+	assert.strictEqual(pipeline.field(job, 'if'), '${{ !cancelled() }}');
+	assert.strictEqual(pipeline.field(job, 'continue-on-error'), null);
+	assert.deepStrictEqual(pipeline.needsOf(job), ['test-linux']);
+	const steps = pipeline.steps(job);
+	const upstream = pipeline.step(job, 'Preserve the mandatory upstream unit result');
+	assert.strictEqual(steps.at(-3).body, upstream);
+	assert.deepStrictEqual(
+		steps.slice(-2).map((step) => step.name),
+		['Record mandatory E2E evidence', 'Upload mandatory E2E evidence']
+	);
+	assert.strictEqual(pipeline.stepField(upstream, 'if'), '${{ !cancelled() }}');
+	assert.strictEqual(pipeline.stepField(upstream, 'timeout-minutes'), '1');
+	assert.strictEqual(pipeline.stepField(upstream, 'shell'), null);
+	assert.strictEqual(pipeline.stepField(upstream, 'working-directory'), null);
+	assert.strictEqual(pipeline.stepField(upstream, 'continue-on-error'), null);
+	assert.strictEqual(
+		pipeline.stepField(upstream, 'env'),
+		'ERGOPTI_UPSTREAM_UNIT_RESULT: ${{ needs.test-linux.result }}'
+	);
+	assert.strictEqual(
+		pipeline.stepField(upstream, 'run'),
+		'test "$ERGOPTI_UPSTREAM_UNIT_RESULT" = success'
+	);
+	for (const certificate of steps.slice(-2)) {
+		assert.strictEqual(pipeline.stepField(certificate.body, 'if'), null);
+		assert.strictEqual(pipeline.stepField(certificate.body, 'continue-on-error'), null);
+	}
+	for (const [name, clock, commands] of [
+		[
+			'Qualify actual cursor-display window switching',
+			'4',
+			[
+				'set -euo pipefail',
+				'sudo python3 "$GITHUB_WORKSPACE/tools/ci/ubuntu_apt.py" -y --no-install-recommends luajit lua-luv python3 xvfb openbox xdotool x11-utils x11-xserver-utils coreutils xfonts-base',
+				'npm run test:linux:window-switch | tee "$RUNNER_TEMP/linux-window-switch.log"'
+			]
+		],
+		[
+			'Qualify native runtime prerequisites',
+			'5',
+			[
+				'set -euo pipefail',
+				'sudo python3 "$GITHUB_WORKSPACE/tools/ci/ubuntu_apt.py" -y --no-install-recommends zstd',
+				'npm run test:linux:runtime-native | tee "$RUNNER_TEMP/linux-runtime-native.log"'
+			]
+		]
+	]) {
+		const body = pipeline.step(job, name);
+		assert.strictEqual(pipeline.stepField(body, 'if'), '${{ !cancelled() }}');
+		assert.strictEqual(pipeline.stepField(body, 'continue-on-error'), null);
+		assert.strictEqual(pipeline.stepField(body, 'timeout-minutes'), clock);
+		assert.deepStrictEqual(pipeline.runOf(body), commands);
+	}
+}
+const supplementalE2E = pipeline.job('e2e-linux');
+assertLinuxSupplementalE2E(supplementalE2E);
+const supplementalUpstream = pipeline.step(
+	supplementalE2E,
+	'Preserve the mandatory upstream unit result'
+);
+for (const [name, from, to] of [
+	[
+		'condition omitted',
+		'    needs: [test-linux]\n    if: ${{ !cancelled() }}\n',
+		'    needs: [test-linux]\n'
+	],
+	[
+		'skipped job',
+		'    needs: [test-linux]\n    if: ${{ !cancelled() }}',
+		'    needs: [test-linux]\n    if: false'
+	],
+	[
+		'cancelled receiving',
+		'    needs: [test-linux]\n    if: ${{ !cancelled() }}',
+		'    needs: [test-linux]\n    if: always()'
+	],
+	['upstream need omitted', '    needs: [test-linux]\n', ''],
+	[
+		'job failure forgiven',
+		"    name: 'E2E tests'\n",
+		"    name: 'E2E tests'\n    continue-on-error: true\n"
+	],
+	['upstream refusal omitted', supplementalUpstream, ''],
+	[
+		'upstream result fabricated',
+		'ERGOPTI_UPSTREAM_UNIT_RESULT: ${{ needs.test-linux.result }}',
+		'ERGOPTI_UPSTREAM_UNIT_RESULT: success'
+	],
+	[
+		'upstream result borrowed',
+		'ERGOPTI_UPSTREAM_UNIT_RESULT: ${{ needs.test-linux.result }}',
+		'ERGOPTI_UPSTREAM_UNIT_RESULT: ${{ needs.e2e-linux.result }}'
+	],
+	[
+		'upstream refusal swallowed',
+		'run: test "$ERGOPTI_UPSTREAM_UNIT_RESULT" = success',
+		'run: test "$ERGOPTI_UPSTREAM_UNIT_RESULT" = success || true'
+	],
+	[
+		'upstream budget extended',
+		supplementalUpstream,
+		supplementalUpstream.replace('timeout-minutes: 1', 'timeout-minutes: 2')
+	],
+	[
+		'native family replaced by success',
+		'npm run test:linux:window-switch | tee "$RUNNER_TEMP/linux-window-switch.log"',
+		'true'
+	],
+	[
+		'native preflight replaced by success',
+		'npm run test:linux:runtime-native | tee "$RUNNER_TEMP/linux-runtime-native.log"',
+		'true'
+	]
+]) {
+	assert.strictEqual(
+		supplementalE2E.split(from).length - 1,
+		1,
+		'supplement mutation ' + name + ' needs the unique actual anchor'
+	);
+	assert.throws(
+		() => assertLinuxSupplementalE2E(supplementalE2E.replace(from, () => to)),
+		'supplement mutation ' + name + ' must be refused'
+	);
+}
+for (const step of pipeline.steps(supplementalE2E).slice(-2)) {
+	assert.strictEqual(supplementalE2E.split(step.body).length - 1, 1);
+	for (const addition of ['        if: always()\n', '        continue-on-error: true\n']) {
+		assert.throws(() =>
+			assertLinuxSupplementalE2E(
+				supplementalE2E.replace(step.body, step.body.replace('\n', '\n' + addition))
+			)
+		);
+	}
+}
+
+// The frozen acceptance table is independent of the workflow expression.
+// Evaluate only after the exact source guard above admits this closed predicate.
+const diagnosticEvents = ['push', 'pull_request', 'workflow_dispatch', 'schedule', 'unknown'];
+const diagnosticResults = ['success', 'failure', 'cancelled', 'skipped', null, 'unknown'];
+const admittedPackageCases = new Set([
+	'push:success:false',
+	'pull_request:success:false',
+	'workflow_dispatch:success:false',
+	'workflow_dispatch:failure:false',
+	'schedule:success:false',
+	'unknown:success:false'
+]);
+const diagnosticExpression = pipeline
+	.field(manualPackageJob, 'if')
+	.slice(3, -2)
+	.replace('needs.e2e-linux.result', "needs['e2e-linux'].result")
+	.replace('needs.e2e-linux.result', "needs['e2e-linux'].result");
+let diagnosticCaseCount = 0;
+for (const event of diagnosticEvents) {
+	for (const result of diagnosticResults) {
+		for (const cancelled of [false, true]) {
+			const actual = require('node:vm').runInNewContext(
+				diagnosticExpression,
+				{
+					cancelled: () => cancelled,
+					needs: { 'e2e-linux': { result } },
+					github: { event_name: event }
+				},
+				{ timeout: 100 }
+			);
+			assert.strictEqual(actual, admittedPackageCases.has(`${event}:${result}:${cancelled}`));
+			diagnosticCaseCount++;
+		}
+	}
+}
+assert.strictEqual(diagnosticCaseCount, 60);
+
+assert.strictEqual(
+	pipeline.field(pipeline.job('release'), 'if'),
+	"github.event_name == 'push' && needs.validate.outputs.release == 'true'",
+	'manual package diagnostics must never publish a release'
+);
+rejects(({ needs }) => {
+	assert.strictEqual(needs['package-linux'].result, 'success');
+	needs['e2e-linux'].result = 'failure';
+}, /mandatory job e2e-linux concluded/);
+
 const packageRecord = pipeline.step(
 	pipeline.job('package-linux'),
 	'Record mandatory package evidence'
