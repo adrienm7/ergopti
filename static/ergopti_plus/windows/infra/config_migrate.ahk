@@ -1042,8 +1042,11 @@ ConfigMigrateBoot(FilePath, Request := "boot", Candidate := unset, OwnerBundle :
 			return "failed"
 		if !Image.present
 			return "fresh-missing"
-		try return Native.classify.Call(Native.decode.Call(Image.source), Row.registry_shadow, &Version)
-		catch return "failed"
+		try {
+			return Native.classify.Call(Native.decode.Call(Image.source), Row.registry_shadow, &Version)
+		} catch {
+			return "failed"
+		}
 	}
 
 	if !(Request is String) || !(Request == "boot" || Request == "prepare" || Request == "prepare_owned"
