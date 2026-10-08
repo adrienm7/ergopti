@@ -342,8 +342,10 @@ owned-runner apt-get process remains at PID58097 and holds dpkg's frontend
 lock; later acquisitions fail. The exact E2E census is123 successful,
 32 failed/two skipped steps. Package/install and Release are skipped. Attempt2
 uses the same source on a fresh runner: audio acquisition/native receiving pass,
-while native window qualification fails again; its terminal cause and remaining
-receiving are pending. These failures do not prove the Flatpak SDK recipe.
+but the initial owned GTK window misses its unchanged readiness deadline.
+The terminal census is154 successful, one failed/two skipped E2E steps;
+package/install and Release are skipped. The34-case native window cohort is
+unqualified. No source cause or Flatpak SDK result is inferred from this failure.
 
 Group6 takes only the package-linux job condition/comment in ci-linux.yml.
 Manual diagnostics may receive packaging after E2E failure; the unchanged
@@ -398,6 +400,24 @@ Installed krb5-config reports1.22.2 and the expected GSS libraries; the owned ph
 ends with status0, no signal/error and no retained physical debt. Initial isolated
 Autoconf relocation failures are retained separately. This host-source PASS does
 not prove the Flatpak SDK build, recipient trust or authenticated Kerberos traffic.
+
+Manual [37709350150](https://github.com/adrienm7/ergopti/actions/runs/37709350150)
+receives exactly3161aada974499852a30bff5ac2374ee614996b0 and ends in failure.
+Shared checks,11,644 Linux unit assertions and all157 E2E steps pass, with no
+E2E failure or skip. Native window and genuine Nix receiving pass under their
+original assertions; this does not establish the earlier window failure's cause.
+The SDK actually compiles/installs MIT1.22.2 and curl with GSS-API, Kerberos and
+SPNEGO. Package then stops at network-gio-proxy: Meson rejects unknown option
+tests. Installation and Release are skipped; there is no complete package credit.
+
+Group6 owns only the network-gio-proxy option vector in the shared generator.
+The pinned upstream1417a8dd98c46c208853c5ed95de61c384acea21 declares
+installed_tests, so the generator now uses installed_tests=false. Native GnuTLS,
+libproxy/environment/GNOME provider choices, source pins and all other module
+bytes remain exact. An additive independent full-vector regression fails before
+the correction; every old assertion is retained. Generated projections are
+regenerated through their owner. Complete SDK/package/install receiving on the
+new source remains required; built GSS support is not an authenticated session.
 
 - **Windows62:** Join one packaged owned curl attempt engine to both the real
   request consumer and artifact staging producer. Bare NTLM-only CONNECT must

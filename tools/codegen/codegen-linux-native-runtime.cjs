@@ -225,7 +225,7 @@ function flatpakModules(data) {
 				'-Dgnome_proxy=disabled',
 				'-Dgnutls=enabled',
 				'-Denvironment_proxy=disabled',
-				'-Dtests=false'
+				'-Dinstalled_tests=false'
 			],
 			source: 'glib_networking'
 		}
