@@ -211,7 +211,23 @@ check(
 	'the guardian plist lint step must not swallow malformed XML'
 );
 
-const buildLine = swiftJob.split(/\r?\n/).find((line) => /\brun:\s*swift build\b/.test(line)) || '';
+// Read the exact package step, independently of native bootstrap jobs and
+// whether YAML represents its run as one line or a literal block. A piped build
+// is admitted only with the exact original errexit/pipefail owner and log sink.
+function releaseBuildInvocation(step) {
+	const lines = (pipeline.runOf(step) || []).map((line) => line.trim()).filter(Boolean);
+	const commands = lines.filter((line) => /^swift build\b/.test(line));
+	if (commands.length !== 1) return '';
+	const command = commands[0];
+	const capture = ' 2>&1 | tee "$RUNNER_TEMP/macos-release-launcher-build.log"';
+	if (command.endsWith(capture)) {
+		if (lines.length !== 2 || lines[0] !== 'set -euo pipefail') return '';
+		return command.slice(0, -capture.length);
+	}
+	return lines.length === 1 ? command : '';
+}
+const releaseBuildStep = pipeline.step(swiftJob, 'Build release launcher');
+const buildLine = releaseBuildInvocation(releaseBuildStep);
 check(
 	buildLine.includes('--package-path static/ergopti_plus/macos/launcher'),
 	'the Swift build step must compile the packaged launcher directory'
@@ -229,6 +245,50 @@ check(
 	'the Swift build step must compile the ErgoptiPlus executable product'
 );
 check(!buildLine.includes('|| true'), 'the Swift build step must not swallow compilation failure');
+
+const literalBuild =
+	'swift build -c release --product ErgoptiPlus --package-path static/ergopti_plus/macos/launcher --scratch-path "$RUNNER_TEMP/swift-launcher-ci"';
+const literalCapture = ' 2>&1 | tee "$RUNNER_TEMP/macos-release-launcher-build.log"';
+const inlineBuildFixture = [
+	'      - name: Build release launcher',
+	`        run: ${literalBuild}`
+].join('\n');
+const blockBuildFixture = [
+	'      - name: Build release launcher',
+	'        shell: bash',
+	'        run: |',
+	'          set -euo pipefail',
+	`          ${literalBuild}${literalCapture}`
+].join('\n');
+check(
+	releaseBuildInvocation(inlineBuildFixture) === literalBuild &&
+		releaseBuildInvocation(blockBuildFixture) === literalBuild,
+	'the exact package build receiver must admit both inline and captured literal scripts'
+);
+for (const refusedBuild of [
+	blockBuildFixture.replace('set -euo pipefail', 'set -eu'),
+	blockBuildFixture.replace('set -euo pipefail', 'set +e'),
+	blockBuildFixture.replace('set -euo pipefail', 'set -euo pipefail\n          set +e'),
+	blockBuildFixture.replace(literalCapture, ' || true'),
+	blockBuildFixture.replace(literalCapture, literalCapture + ' || true'),
+	blockBuildFixture + `\n          ${literalBuild}`
+]) {
+	check(
+		releaseBuildInvocation(refusedBuild) === '',
+		'the literal package build receiver must reject swallowed pipeline failure or duplicate compilation'
+	);
+}
+const independentBuildFixture = [
+	'    steps:',
+	'      - name: Build the actual launcher native transport roles',
+	'        run: swift build -c debug --product ForeignProduct --package-path unrelated',
+	blockBuildFixture
+].join('\n');
+check(
+	releaseBuildInvocation(pipeline.step(independentBuildFixture, 'Build release launcher')) ===
+		literalBuild,
+	'a preceding independent native build must not replace the exact package launcher build'
+);
 
 const testStep = pipeline.step(swiftJob, 'Run Swift launcher tests');
 check(

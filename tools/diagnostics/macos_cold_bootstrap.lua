@@ -23,11 +23,23 @@ guarded(function()
 	assert(os.getenv("HOME") == config.home)
 	assert(hs.fs.attributes(config.venv) == nil, "Cold venv already exists")
 	assert(hs.fs.attributes(config.uv_root) == nil, "Cold uv cache already exists")
-	-- Only backend selection and presentation are replaced. Native task, file,
-	-- hash, timer, environment and process ownership remain production ports.
+	-- The inherited kernel sandbox denies stock runtimes. Resolve through the
+	-- actual production adapter; no fake Python edge can qualify native receiving.
 	local python = require("adapters.python_interpreter")
-	python.resolve = function() result.absent_python_selected = true; return nil, { kind = "missing" } end
-	python.native_candidates = function() return {} end
+	for _, path in ipairs(config.denied_runtime_paths) do
+		local file = io.open(path, "rb")
+		if file then file:close(); error("Cold sandbox allowed a stock runtime read") end
+	end
+	local selected, state = python.resolve()
+	assert(selected == nil and state.kind == "python_missing", "Production resolver is not cold")
+	result.native_python_candidates_count = #python.native_candidates()
+	assert(result.native_python_candidates_count == 0, "Production resolver found a stock native Python")
+	result.absent_python_selected = true
+	result.python_state = state.kind
+	result.python_resolver = "unmodified production resolver"
+	result.denied_runtime_paths = config.denied_runtime_paths
+	-- Presentation alone is replaced; tasks, files, hashes, timers, environment,
+	-- runtime resolution and process ownership remain genuine production ports.
 	local session, visible = 0, false
 	package.loaded["ui.download_window"] = {
 		show = function() session = session + 1; visible = true; return true end,

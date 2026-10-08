@@ -16,6 +16,10 @@ on:
         description: True when ci.yml's plan resolved a free release tag
         required: true
         type: boolean
+      tag:
+        description: Actual ci.yml release tag; empty for unpublished manual CI
+        required: true
+        type: string
       version:
         description: Release version without the leading v; empty unless release, so the build stamps 0.0.0-dev
         required: true
@@ -42,6 +46,225 @@ permissions:
   contents: read
 
 jobs:
+  # Native producer and receiving run independently of the Brew/package branch.
+  # Both advertised architectures are mandatory even for unpublished manual CI.
+  managed-ollama-native:
+    name: 'Managed Ollama native · ${{ matrix.architecture }}'
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: macos-15
+            architecture: arm64
+          - runner: macos-15-intel
+            architecture: amd64
+    env:
+      GOTOOLCHAIN: local
+      ERGOPTI_RELEASE: ${{ inputs.release && 'true' || 'false' }}
+      ERGOPTI_RELEASE_TAG: ${{ inputs.tag }}
+      ERGOPTI_RELEASE_VERSION: ${{ inputs.version }}
+      ERGOPTI_RELEASE_CHANNEL: ${{ inputs.channel }}
+      ERGOPTI_OLLAMA_EXPECTED_ARCHITECTURE: ${{ matrix.architecture }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: '.node-version'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Admit the canonical native toolchain and public inputs
+        id: ollama-toolchain
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json
+          import os
+          import platform
+          import re
+          import tempfile
+          from pathlib import Path
+          contract = json.loads(Path('static/ergopti_plus/_shared/modules/llm/managed_ollama_runtime.json').read_text())
+          official = json.loads(Path('static/ergopti_plus/_shared/modules/llm/ollama_release.json').read_text())
+          architecture = {'arm64': 'arm64', 'x86_64': 'amd64'}[platform.machine()]
+          assert platform.system() == 'Darwin'
+          assert architecture == os.environ['ERGOPTI_OLLAMA_EXPECTED_ARCHITECTURE']
+          assert official['version'] == contract['version']
+          assert set(contract['assets']) == {'macos-arm64', 'macos-amd64'}
+          identity = official['assets'][contract['official_asset_key']]
+          version = contract['go_version']
+          assert re.fullmatch(r'go[0-9]+\.[0-9]+\.[0-9]+', version)
+          root = Path(tempfile.mkdtemp(prefix='managed-ollama-native-', dir=os.environ['RUNNER_TEMP']))
+          values = {
+              'ERGOPTI_OLLAMA_BUILD_ROOT': str(root),
+              'ERGOPTI_OLLAMA_SOURCE': str(root / 'source'),
+              'ERGOPTI_OLLAMA_SOURCE_COMMIT': contract['source_commit'],
+              'ERGOPTI_OLLAMA_OFFICIAL_ARCHIVE': str(root / identity['filename']),
+              'ERGOPTI_OLLAMA_OFFICIAL_URL': 'https://github.com/ollama/ollama/releases/download/v' + official['version'] + '/' + identity['filename'],
+              'ERGOPTI_OLLAMA_ASSET': str(root / 'assets' / contract['assets']['macos-' + architecture]['filename']),
+              'ERGOPTI_OLLAMA_CATALOGUE': str(root / 'staged/_shared/modules/llm/managed_ollama_release.json'),
+          }
+          with (root / 'public-inputs.json').open('x', encoding='utf-8') as stream:
+              json.dump({'contract': contract, 'official_identity': identity, 'architecture': architecture, 'tested_sha': os.environ['GITHUB_SHA'], 'inputs': values}, stream, sort_keys=True)
+              stream.write('\n')
+          with open(os.environ['GITHUB_OUTPUT'], 'a', encoding='utf-8') as stream:
+              stream.write('version=' + version[2:] + '\n')
+          with open(os.environ['GITHUB_ENV'], 'a', encoding='utf-8') as stream:
+              for key, value in values.items():
+                  assert '\n' not in value and '\r' not in value
+                  stream.write(key + '=' + value + '\n')
+          PY
+      - name: Build the actual launcher native transport roles
+        shell: bash
+        run: |
+          set -euo pipefail
+          swift build -c release --product ErgoptiPlus --package-path static/ergopti_plus/macos/launcher \
+            --scratch-path "$ERGOPTI_OLLAMA_BUILD_ROOT/swift" 2>&1 | tee "$RUNNER_TEMP/managed-ollama-launcher-build.log"
+          launcher_bin="$(swift build -c release --show-bin-path --package-path static/ergopti_plus/macos/launcher --scratch-path "$ERGOPTI_OLLAMA_BUILD_ROOT/swift")"
+          test -x "$launcher_bin/ErgoptiPlus"
+          echo "ERGOPTI_OLLAMA_LAUNCHER=$launcher_bin/ErgoptiPlus" >> "$GITHUB_ENV"
+          test -d "$launcher_bin/Sparkle.framework"
+          echo "ERGOPTI_OLLAMA_FRAMEWORK=$launcher_bin/Sparkle.framework" >> "$GITHUB_ENV"
+        timeout-minutes: 10
+      - name: Retain independent native launcher compiler diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          overwrite: true
+          name: managed-ollama-launcher-build-${{ matrix.architecture }}-${{ github.run_id }}
+          if-no-files-found: warn
+          retention-days: 7
+          path: ${{ runner.temp }}/managed-ollama-launcher-build.log
+      - name: Prepare locked native HTTP receiving clients
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m venv "$ERGOPTI_OLLAMA_BUILD_ROOT/native-clients"
+          python3 tools/test/export-macos-managed-http-test-deps.py static/ergopti_plus/macos/uv.lock > "$ERGOPTI_OLLAMA_BUILD_ROOT/native-clients.requirements"
+          "$ERGOPTI_OLLAMA_BUILD_ROOT/native-clients/bin/python" -m pip install --require-hashes --only-binary=:all: -r "$ERGOPTI_OLLAMA_BUILD_ROOT/native-clients.requirements"
+          echo "ERGOPTI_NATIVE_HTTP_PYTHON=$ERGOPTI_OLLAMA_BUILD_ROOT/native-clients/bin/python" >> "$GITHUB_ENV"
+      - name: Qualify actual SDK accepted-owner and deadline XCTest controls
+        shell: bash
+        run: |
+          set -euo pipefail
+          transcript="$ERGOPTI_OLLAMA_BUILD_ROOT/listener-xctest.log"
+          set +e
+          swift test --package-path static/ergopti_plus/macos/launcher \
+            --scratch-path "$ERGOPTI_OLLAMA_BUILD_ROOT/swift" \
+            --filter 'ManagedOllamaAPIWorkerTests|ManagedPTYWorkerTests' 2>&1 | tee "$transcript"
+          statuses=("${PIPESTATUS[@]}")
+          set -e
+          test "${statuses[0]}" -eq 0
+          test "${statuses[1]}" -eq 0
+          if grep -Eq "^Test Case.* skipped|with [1-9][0-9]* tests? skipped" "$transcript"; then
+            echo "::error::native XCTest skipped a mandatory receiving case"
+            exit 1
+          fi
+          grep -Fq "Test Suite 'ManagedOllamaAPIWorkerTests' passed" "$transcript"
+          grep -Fq 'Executed 12 tests, with 0 failures' "$transcript"
+          grep -Fq "Test Suite 'ManagedPTYWorkerTests' passed" "$transcript"
+          grep -Fq 'Executed 11 tests, with 0 failures' "$transcript"
+        timeout-minutes: 10
+      - name: Retain independent native SDK XCTest diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          overwrite: true
+          name: managed-ollama-sdk-xctest-${{ matrix.architecture }}-${{ github.run_id }}
+          if-no-files-found: warn
+          retention-days: 7
+          path: ${{ env.ERGOPTI_OLLAMA_BUILD_ROOT }}/listener-xctest.log
+      - uses: actions/setup-go@v5
+        with:
+          go-version: ${{ steps.ollama-toolchain.outputs.version }}
+          check-latest: false
+          cache: false
+      - name: Acquire and verify genuine pinned upstream inputs
+        shell: bash
+        run: |
+          set -euo pipefail
+          test ! -e "$ERGOPTI_OLLAMA_SOURCE"
+          test ! -e "$ERGOPTI_OLLAMA_OFFICIAL_ARCHIVE"
+          git init "$ERGOPTI_OLLAMA_SOURCE"
+          git -C "$ERGOPTI_OLLAMA_SOURCE" remote add origin https://github.com/ollama/ollama.git
+          git -C "$ERGOPTI_OLLAMA_SOURCE" fetch --depth=1 --no-tags origin "$ERGOPTI_OLLAMA_SOURCE_COMMIT"
+          git -C "$ERGOPTI_OLLAMA_SOURCE" checkout --detach FETCH_HEAD
+          test "$(git -C "$ERGOPTI_OLLAMA_SOURCE" rev-parse HEAD)" = "$ERGOPTI_OLLAMA_SOURCE_COMMIT"
+          test -z "$(git -C "$ERGOPTI_OLLAMA_SOURCE" status --porcelain --untracked-files=all)"
+          curl --proto '=https' --proto-redir '=https' --fail --location --retry 3 --max-time 600 \
+            --output "$ERGOPTI_OLLAMA_OFFICIAL_ARCHIVE" "$ERGOPTI_OLLAMA_OFFICIAL_URL"
+          python3 - <<'PY'
+          import hashlib
+          import json
+          import os
+          from pathlib import Path
+          contract = json.loads(Path('static/ergopti_plus/_shared/modules/llm/managed_ollama_runtime.json').read_text())
+          identity = json.loads(Path('static/ergopti_plus/_shared/modules/llm/ollama_release.json').read_text())['assets'][contract['official_asset_key']]
+          archive = Path(os.environ['ERGOPTI_OLLAMA_OFFICIAL_ARCHIVE'])
+          assert archive.stat().st_size == identity['bytes']
+          with archive.open('rb') as stream:
+              actual = hashlib.file_digest(stream, 'sha256').hexdigest()
+          assert actual == identity['sha256']
+          receipt = {'filename': archive.name, 'sha256': actual, 'bytes': archive.stat().st_size}
+          with (Path(os.environ['ERGOPTI_OLLAMA_BUILD_ROOT']) / 'official-input-receipt.json').open('x', encoding='utf-8') as stream:
+              json.dump(receipt, stream, sort_keys=True)
+              stream.write('\n')
+          PY
+      - name: Build and admit the actual native source asset
+        shell: bash
+        run: |
+          set -euo pipefail
+          {
+            ollama_native_go="$(command -v go)"
+            python3 tools/build/build-macos-managed-ollama.py \
+              --repository "$GITHUB_WORKSPACE" --source "$ERGOPTI_OLLAMA_SOURCE" \
+              --official-archive "$ERGOPTI_OLLAMA_OFFICIAL_ARCHIVE" \
+              --go "$ollama_native_go" --output "$ERGOPTI_OLLAMA_BUILD_ROOT/assets"
+            python3 tools/test/macos_managed_ollama_catalogue_test.py --native \
+              --source "$ERGOPTI_OLLAMA_SOURCE" --official-archive "$ERGOPTI_OLLAMA_OFFICIAL_ARCHIVE" \
+              --producer-receipt "$ERGOPTI_OLLAMA_ASSET.provenance.json" \
+              --archive "$ERGOPTI_OLLAMA_ASSET" --go "$ollama_native_go"
+            python3 tools/build/stage-macos-managed-ollama-catalogue.py \
+              --repository "$GITHUB_WORKSPACE" --source "$ERGOPTI_OLLAMA_SOURCE" \
+              --official-archive "$ERGOPTI_OLLAMA_OFFICIAL_ARCHIVE" \
+              --producer-receipt "$ERGOPTI_OLLAMA_ASSET.provenance.json" \
+              --archive "$ERGOPTI_OLLAMA_ASSET" --go "$ollama_native_go" \
+              --release "$ERGOPTI_RELEASE" --release-tag "$ERGOPTI_RELEASE_TAG" \
+              --release-version "$ERGOPTI_RELEASE_VERSION" --release-channel "$ERGOPTI_RELEASE_CHANNEL" \
+              --output "$ERGOPTI_OLLAMA_CATALOGUE"
+          } 2>&1 | tee "$RUNNER_TEMP/managed-ollama-producer-build.log"
+      - name: Receive actual native model create, pull, inference and retirement
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -f tools/diagnostics/macos_managed_ollama_receiving.py
+          mkdir "$ERGOPTI_OLLAMA_BUILD_ROOT/receiving"
+          for profile in pac-inline pac-url explicit-proxy; do
+            "$ERGOPTI_NATIVE_HTTP_PYTHON" tools/diagnostics/macos_managed_ollama_receiving.py \
+              --archive "$ERGOPTI_OLLAMA_ASSET" --catalogue "$ERGOPTI_OLLAMA_CATALOGUE" \
+              --launcher "$ERGOPTI_OLLAMA_LAUNCHER" --framework "$ERGOPTI_OLLAMA_FRAMEWORK" \
+              --output "$ERGOPTI_OLLAMA_BUILD_ROOT/receiving/$profile" --profile "$profile"
+          done
+      - name: Retain actual native producer, catalogue and receiving evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: managed-ollama-native-${{ matrix.architecture }}-${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}
+          if-no-files-found: error
+          retention-days: ${{ inputs.release && 7 || 1 }}
+          path: |
+            ${{ env.ERGOPTI_OLLAMA_BUILD_ROOT }}/public-inputs.json
+            ${{ env.ERGOPTI_OLLAMA_BUILD_ROOT }}/official-input-receipt.json
+            ${{ env.ERGOPTI_OLLAMA_BUILD_ROOT }}/listener-xctest.log
+            ${{ env.ERGOPTI_OLLAMA_BUILD_ROOT }}/assets
+            ${{ env.ERGOPTI_OLLAMA_BUILD_ROOT }}/staged
+            ${{ env.ERGOPTI_OLLAMA_BUILD_ROOT }}/receiving/*/native-receiving.json
+            ${{ runner.temp }}/managed-ollama-launcher-build.log
+            ${{ runner.temp }}/managed-ollama-producer-build.log
+
   # ─────────────────────────────────────────────────
   # 1) Hammerspoon unit and contract tests
   # ─────────────────────────────────────────────────
@@ -262,8 +485,21 @@ jobs:
         run: plutil -lint static/ergopti_plus/macos/launcher/com.ergoptiplus.remap-guardian.plist
 
       - name: Build release launcher
-        run: swift build -c release --product ErgoptiPlus --package-path static/ergopti_plus/macos/launcher --scratch-path "$RUNNER_TEMP/swift-launcher-ci"
+        shell: bash
+        run: |
+          set -euo pipefail
+          swift build -c release --product ErgoptiPlus --package-path static/ergopti_plus/macos/launcher --scratch-path "$RUNNER_TEMP/swift-launcher-ci" 2>&1 | tee "$RUNNER_TEMP/macos-release-launcher-build.log"
         timeout-minutes: 10
+
+      - name: Retain launcher build diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          overwrite: true
+          name: macos-release-launcher-build-${{ github.run_id }}
+          if-no-files-found: warn
+          retention-days: 7
+          path: ${{ runner.temp }}/macos-release-launcher-build.log
 
       # The native archive fixture uses disposable file keys on every run.
       - name: Install Sparkle signing tool
@@ -553,7 +789,17 @@ jobs:
               SPARKLE_PUBLIC_KEY="$(head -c 32 /dev/urandom | base64)"
               export SPARKLE_PUBLIC_KEY
           fi
-          bash tools/build/build_macos_app.sh
+          bash tools/build/build_macos_app.sh 2>&1 | tee "$RUNNER_TEMP/macos-application-build.log"
+
+      - name: Retain application build diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          overwrite: true
+          name: macos-application-build-${{ github.run_id }}
+          if-no-files-found: warn
+          retention-days: 7
+          path: ${{ runner.temp }}/macos-application-build.log
 
       - name: Record signed CI archive source
         shell: bash
@@ -749,9 +995,180 @@ jobs:
           path: ${{ runner.temp }}/launch-gate
           if-no-files-found: warn
 
+  # A fresh signed app receives the cold runtime even when unrelated package
+  # or Homebrew tests fail. This job never publishes a release.
+  cold-bootstrap-native:
+    name: 'Native cold MLX bootstrap · macos-15 arm64'
+    runs-on: macos-15
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: '.node-version'
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+
+      - name: Require actual arm64 cold runtime prerequisites
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(uname -s)" = Darwin
+          test "$(uname -m)" = arm64
+          test -x /usr/bin/sandbox-exec
+          xcode-select -p
+          swift --version
+          node --version
+
+      - name: Build independent signed cold application
+        id: cold-app
+        shell: bash
+        env:
+          ERGOPTI_BUILD_COMMIT: ${{ github.sha }}
+          ERGOPTI_VERSION: ${{ inputs.version }}
+          ERGOPTI_CHANNEL: ${{ inputs.channel }}
+          ERGOPTI_RELEASE: 'false'
+          HAMMERSPOON_VERSION: '1.1.1'
+          GH_OWNER: ${{ github.repository_owner }}
+          GH_REPO: ${{ github.event.repository.name }}
+        run: |
+          set -euo pipefail
+          # A real ad-hoc signature suffices for native receiving. The fresh
+          # Sparkle key is used only in this unpublished test application.
+          export SPARKLE_PUBLIC_KEY="$(python3 -c 'import base64,secrets;print(base64.b64encode(secrets.token_bytes(32)).decode())')"
+          bash tools/build/build_macos_app.sh 2>&1 | tee "$RUNNER_TEMP/cold-bootstrap-application-build.log"
+          codesign --verify --deep --strict build/macos/ErgoptiPlus.app 2>&1 | tee -a "$RUNNER_TEMP/cold-bootstrap-application-build.log"
+
+      - name: Receive actual isolated cold native MLX bootstrap
+        shell: bash
+        timeout-minutes: 35
+        run: |
+          set -euo pipefail
+          python3 tools/diagnostics/macos_cold_bootstrap.py \
+            --app "$PWD/build/macos/ErgoptiPlus.app" \
+            --output "$RUNNER_TEMP/native-cold-bootstrap"
+          node tools/test/desktop-ci-evidence.cjs record-cold-macos \
+            "$RUNNER_TEMP/native-cold-bootstrap/receipt.json" \
+            "$RUNNER_TEMP/native-cold-bootstrap/cold-bootstrap-evidence.json"
+
+      # The official runtime boot is separate from the optional rebuilt daemon
+      # model receiver. It still runs if the preceding MLX cold boot refuses.
+      - name: Receive actual official cold Ollama without stock Python
+        if: ${{ !cancelled() && steps.cold-app.outcome == 'success' }}
+        shell: bash
+        timeout-minutes: 35
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          cold_ollama_asset_root="$(mktemp -d "$RUNNER_TEMP/official-cold-ollama-inputs.XXXXXX")"
+          cold_ollama_archive="$cold_ollama_asset_root/ollama-darwin.tgz"
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          release = json.loads(Path('static/ergopti_plus/_shared/modules/llm/ollama_release.json').read_text())
+          assert release['version'] == '0.24.0'
+          assert release['assets']['macos-universal'] == {
+              'filename': 'ollama-darwin.tgz',
+              'sha256': 'e6d5e8b4bc0cb2a35ff7901c58d81ca2170403a819c4726f58798155fa682e38',
+              'bytes': 133395504,
+          }
+          PY
+          curl --proto '=https' --proto-redir '=https' --fail --location --retry 3 --max-time 600 \
+            --output "$cold_ollama_archive" \
+            https://github.com/ollama/ollama/releases/download/v0.24.0/ollama-darwin.tgz
+          python3 - "$cold_ollama_archive" <<'PY'
+          import hashlib
+          import sys
+          from pathlib import Path
+          archive = Path(sys.argv[1])
+          assert archive.stat().st_size == 133395504
+          with archive.open('rb') as stream:
+              actual = hashlib.file_digest(stream, 'sha256').hexdigest()
+          assert actual == 'e6d5e8b4bc0cb2a35ff7901c58d81ca2170403a819c4726f58798155fa682e38'
+          PY
+          python3 tools/diagnostics/macos_cold_ollama_bootstrap.py \
+            --app "$PWD/build/macos/ErgoptiPlus.app" \
+            --official-archive "$cold_ollama_archive" \
+            --repository "$GITHUB_WORKSPACE" \
+            --output "$RUNNER_TEMP/native-cold-ollama-bootstrap"
+          python3 - "$RUNNER_TEMP/native-cold-ollama-bootstrap/receipt.json" <<'PY'
+          import hashlib
+          import json
+          import os
+          import sys
+          from pathlib import Path
+          receipt = json.loads(Path(sys.argv[1]).read_text())
+          for key, expected in {
+              'version': 1, 'status': 'passed', 'client_version': '0.24.0',
+              'helpers_retired': True, 'native_helpers_absent': True, 'cleanup': True,
+              'private_work_retired': True,
+              'official_archive_sha256': 'e6d5e8b4bc0cb2a35ff7901c58d81ca2170403a819c4726f58798155fa682e38',
+              'installed_tree': 'byte-and-link-identical to verified official archive',
+              'selection': 'unmodified production runtime resolvers under inherited kernel sandbox',
+              'daemon_validation': 'not-executed', 'model_validation': 'not-executed',
+          }.items():
+              assert type(receipt[key]) is type(expected) and receipt[key] == expected, key
+          sources = (
+              'macos/modules/llm/network-retry.sh', 'macos/modules/llm/ensure-ollama-deps.sh',
+              'macos/modules/llm/ollama_deps_checker.lua', 'macos/modules/llm/ollama_binary.lua',
+              'macos/modules/llm/ollama-release.sh', 'macos/adapters/native_bootstrap_pty.lua',
+              'macos/adapters/task_lifecycle.lua', 'macos/adapters/python_interpreter.lua',
+              '_shared/lua/core/llm/native_pty_receipt.lua',
+              '_shared/modules/network/proxy_policy.json', '_shared/modules/llm/ollama_release.json',
+          )
+          assert set(receipt['sources']) == set(sources)
+          repository = Path(os.environ['GITHUB_WORKSPACE'])
+          for source in sources:
+              actual = hashlib.sha256((repository / 'static/ergopti_plus' / source).read_bytes()).hexdigest()
+              assert receipt['sources'][source] == actual, source
+          assert receipt['isolation']['kind'] == 'native-scoped-sandbox'
+          assert receipt['caller']['python_resolver'] == 'unmodified production resolver'
+          assert receipt['caller']['ollama_resolver'] == 'unmodified production resolver'
+          assert receipt['caller']['python_state'] == 'python_missing'
+          assert type(receipt['caller']['native_python_candidates_count']) is int
+          assert receipt['caller']['native_python_candidates_count'] == 0
+          print('Official cold Ollama native installation passed; daemon/model validation not executed here.')
+          PY
+
+      - name: Retain official cold Ollama receipt only
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          overwrite: true
+          name: cold-ollama-official-${{ inputs.release && 'release' || 'ci' }}-macos-15
+          retention-days: 7
+          if-no-files-found: error
+          path: ${{ runner.temp }}/native-cold-ollama-bootstrap/receipt.json
+
+      - name: Retain native cold bootstrap evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          overwrite: true
+          name: cold-bootstrap-native-${{ inputs.release && 'release' || 'ci' }}-macos-15
+          retention-days: 7
+          if-no-files-found: error
+          path: |
+            ${{ runner.temp }}/cold-bootstrap-application-build.log
+            ${{ runner.temp }}/native-cold-bootstrap/receipt.json
+            ${{ runner.temp }}/native-cold-bootstrap/result.json
+            ${{ runner.temp }}/native-cold-bootstrap/launch.log
+            ${{ runner.temp }}/native-cold-bootstrap/cold-runtime.sb
+            ${{ runner.temp }}/native-cold-bootstrap/cold-bootstrap-evidence.json
+
   macos-ok:
     name: 'Verdict'
-    needs: [test-hs, e2e-hs, package-macos, launch, tooltip-canvas]
+    needs:
+      - cold-bootstrap-native
+      - test-hs
+      - e2e-hs
+      - package-macos
+      - launch
+      - tooltip-canvas
+      - managed-ollama-native
     if: always()
     runs-on: ubuntu-latest
     steps:
@@ -766,6 +1183,12 @@ jobs:
         with:
           pattern: launch-gate-${{ inputs.release && 'release' || 'ci' }}-*
           path: ${{ runner.temp }}/launch-evidence
+
+      - name: Download native cold bootstrap evidence
+        uses: actions/download-artifact@v4
+        with:
+          name: cold-bootstrap-native-${{ inputs.release && 'release' || 'ci' }}-macos-15
+          path: ${{ runner.temp }}/launch-evidence/cold-bootstrap-native
 
       - name: Verify mandatory jobs and launch scenarios
         env:
