@@ -6922,6 +6922,13 @@ The shared per-model Specifications and Capabilities frames retire four genuine 
   Public Caps Word and OneShot recommendations remain closed pending those
   receipts; this does not complete item93 or qualify physical hardware.
 
+  Source review identifies missing server-side output custody: acknowledged
+  KEY/SYN writes do not acknowledge Xorg modifier state. A fresh native state
+  read can advance the input epoch independently of map/group generation.
+  A future output receipt must join the original Writer edge, device, server
+  event and complete state while retaining original physical admission. Real
+  core/XIM/XI2 application observations remain unexecuted.
+
   Native source25 qualification 37636576661 tests the exact feature tree:
   10,979 units, actual E2E, 132 input-owner controls with all four mandatory
   kernel scenarios and 81 modifier-custody controls pass. Package and all17
@@ -6972,6 +6979,16 @@ The shared per-model Specifications and Capabilities frames retire four genuine 
   are prerequisites, not assignment authority. Active new physical delivery remains
   unavailable on Linux/macOS; fixed accent menus/defaults are not retired.
 
+  The Linux observer now captures an admitted physical position through the
+  original Reader, Hook and source witness before remapping. Shared request
+  ownership and the thin host rejoin the original page, source, callbacks and
+  cancellation acknowledgement after external reads; retired records relinquish
+  their retained callbacks. Controlled components pass 33/0 on LuaJIT and Lua
+  5.4, with all six omission controls failing. The registered browser scenario
+  retains its original 17 assertions and adds 21 exercised Chromium assertions;
+  hosted Chromium/WebKit and real native capture remain to qualify. Public
+  physical delivery stays unavailable until the remaining owners are complete.
+
   Remaining software: complete genuine capture, current effective-source and
   all-owner collision admission, joint input/source/modifier/output custody,
   arbitrary Unicode and real dead-key composition. Reconstruct and review any
@@ -6989,6 +7006,11 @@ The shared per-model Specifications and Capabilities frames retire four genuine 
   existing records. Linux output custody separates original/synthetic holders
   and spent releases, protecting successor holds. This does not enable new
   physical assignments; Linux/macOS delivery remains unavailable.
+
+  The same optional position-capture observer is shared with item 97 and does
+  not infer a physical J position from a saved character. Late cancelled or
+  superseded request callbacks cannot alter the draft. This adds no output or
+  star-migration authority; native capture and the software work below remain.
 
   Remaining software: complete item 97's native capture/source/collision/output
   owners and prove acknowledged star-setting migration while preserving occupied

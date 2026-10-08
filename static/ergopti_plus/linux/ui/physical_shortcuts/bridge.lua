@@ -46,28 +46,95 @@ function M.open(options)
 	if session ~= nil and M.close() ~= true then return false end
 	local Manager = require("ui.webview_manager")
 	local Gestures = require("modules.gestures.manager")
+	local Hook = require("adapters.keyboard_hook")
+	local capture_position, cancel_position, position_available = rawget(Hook, "capture_position"),
+		rawget(Hook, "cancel_position"), rawget(Hook, "position_capture_available")
+	local current_epoch, page_current = rawget(Manager, "current_epoch"), rawget(Manager, "page_current")
+	local eval_js = rawget(Manager, "eval_js")
+	local pause_current = options.is_paused
 	local registry = assert(io.open(assert(Paths.shared("data/keycodes/physical_keys.json")), "r"))
 	local bytes = registry:read("*a"); registry:close()
 	local model = Slots.new(Json.decode(bytes))
 	local positions = {}
 	for _, code in ipairs(model.candidates("evdev")) do positions[#positions + 1] = { code = code, available = true } end
-	local scope, candidate = options.scope, { epoch = nil, constructing = true }
+	local scope, candidate = options.scope, { epoch = nil, constructing = true,
+		manager = Manager, current_epoch = current_epoch, page_current = page_current }
 	session = candidate
-	local function current()
-		return session == candidate and not candidate.cancelled and candidate.epoch ~= nil
-			and Manager.current_epoch(APP) == candidate.epoch
-			and Manager.page_current(APP,candidate.epoch) == true
+	local function page_owner()
+		return rawequal(package.loaded["ui.webview_manager"], Manager)
+			and rawget(Manager, "current_epoch") == current_epoch and rawget(Manager, "page_current") == page_current
+			and type(eval_js) == "function" and rawget(Manager, "eval_js") == eval_js
+			and session == candidate and not candidate.cancelled and candidate.epoch ~= nil
 	end
+	local function current()
+		if not page_owner() then return false end
+		local epoch = candidate.epoch
+		local seen, observed = pcall(current_epoch, APP)
+		if not seen or observed ~= epoch or not page_owner() then return false end
+		local called, acknowledged = pcall(page_current, APP, epoch)
+		if not called or acknowledged ~= true or not page_owner() then return false end
+		local reread, final = pcall(current_epoch, APP)
+		return reread and final == epoch and page_owner() and candidate.epoch == epoch
+	end
+	local function observation_current()
+		if not current() or rawget(options, "is_paused") ~= pause_current then return false end
+		local called, paused = pcall(pause_current)
+		return called and paused == false and current() and rawget(options, "is_paused") == pause_current
+			and rawequal(package.loaded["adapters.keyboard_hook"], Hook)
+			and rawget(Hook, "capture_position") == capture_position
+			and rawget(Hook, "cancel_position") == cancel_position
+			and rawget(Hook, "position_capture_available") == position_available
+	end
+	local function retire_observation()
+		if candidate.position == nil then return true end
+		if candidate.position_retiring then return false end
+		local token = candidate.position
+		candidate.position_retiring = true
+		local called, retired = pcall(cancel_position, token)
+		candidate.position_retiring = false
+		if not called or retired ~= true or not rawequal(candidate.position, token) then return false end
+		candidate.position = nil
+		return true
+	end
+	candidate.retire_observation = retire_observation
 	local function send(name, packet)
 		if not current() then return false end
-		return Manager.eval_js(APP, name .. "(" .. Json.encode(packet) .. ")") == true and current()
+		local script = name .. "(" .. Json.encode(packet) .. ")"
+		-- Serialization and page getters may revoke or replace the original port.
+		if not current() then return false end
+		local called, sent = pcall(eval_js, APP, script)
+		return called and sent == true and current()
 	end
 	candidate.window = Window.new({model=model,catalogue=Gestures,parameter_section="gesture_parameters",
-		positions=positions,translate=I18n.get,label=Gestures.get_action_label,
+		positions=positions,translate=I18n.get,label=Gestures.get_action_label,position_field="evdev",
 		page_current=current,send=send,capture=scope.capture_editor_inventory,current=scope.editor_source_current,
 		commit=function(rows,receipt) return scope.edit(rows,receipt) end,
+		position_available=function()
+			if not observation_current() or type(position_available) ~= "function" then return false end
+			local called, available = pcall(position_available)
+			return called and available == true and observation_current()
+		end,
+		capture_position=function(guard, receive)
+			if not observation_current() or retire_observation() ~= true or type(capture_position) ~= "function" then return nil end
+			local function exact() return observation_current() and guard() == true and observation_current() end
+			local called, token = pcall(capture_position, exact, function(facts)
+				return exact() and receive(facts) == true and exact()
+			end)
+			if not called or type(token) ~= "table" then return nil end
+			candidate.position = token
+			if not exact() then retire_observation(); return nil end
+			return token
+		end,
+		cancel_position=function(token)
+			if candidate.position ~= nil and not rawequal(token, candidate.position) then return false end
+			if candidate.position == nil then
+				local called, retired = pcall(cancel_position, token)
+				return called and retired == true
+			end
+			return retire_observation()
+		end,
 		close=function()
-			if not current() or Manager.hide(APP,candidate.epoch) ~= true then return false end
+			if retire_observation() ~= true or not current() or Manager.hide(APP,candidate.epoch) ~= true then return false end
 			if session == candidate then session = nil end
 			return true
 		end,
@@ -112,8 +179,10 @@ end
 function M.on_message(payload,state,context)
 	local candidate = session
 	if not candidate or candidate.cancelled or type(context) ~= "table" or context.app_name ~= APP then return false end
-	local Manager = require("ui.webview_manager")
-	if context.epoch == nil or context.epoch ~= Manager.current_epoch(APP) then return false end
+	local Manager = package.loaded["ui.webview_manager"]
+	if not rawequal(Manager, candidate.manager) or rawget(Manager, "current_epoch") ~= candidate.current_epoch
+		or rawget(Manager, "page_current") ~= candidate.page_current then return false end
+	if context.epoch == nil or context.epoch ~= candidate.current_epoch(APP) then return false end
 	if candidate.epoch == nil and candidate.constructing then candidate.epoch = context.epoch end
 	if candidate.epoch ~= context.epoch then return false end
 	local message = type(payload) == "string" and Json.decode(payload) or payload
@@ -129,6 +198,7 @@ function M.close()
 	local candidate = session
 	if not candidate then return true end
 	if candidate.constructing or candidate.epoch == nil then return false end
+	if candidate.retire_observation() ~= true then return false end
 	local Manager = require("ui.webview_manager")
 	local called, accepted = pcall(Manager.hide, APP, candidate.epoch)
 	if not called or accepted ~= true then return false end
@@ -155,6 +225,7 @@ function M.on_window_closed(epoch)
 	local candidate = session
 	if not candidate or candidate.epoch ~= epoch then return end
 	candidate.cancelled = true
+	if candidate.retire_observation() ~= true then return end
 	candidate.window.retire()
 	if not candidate.constructing and session == candidate then session = nil end
 end
