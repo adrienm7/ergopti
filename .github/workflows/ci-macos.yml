@@ -177,6 +177,21 @@ jobs:
           if-no-files-found: warn
           retention-days: 7
           path: ${{ env.ERGOPTI_OLLAMA_BUILD_ROOT }}/listener-xctest.log
+      - name: Receive actual independent managed HTTP native clients
+        if: ${{ !cancelled() }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          "$ERGOPTI_NATIVE_HTTP_PYTHON" static/ergopti_plus/macos/tests/support/native_http_receiving_test.py --client-only
+          "$ERGOPTI_NATIVE_HTTP_PYTHON" static/ergopti_plus/macos/tests/support/native_http_wire_client_receiving.py
+        timeout-minutes: 5
+      - name: Qualify actual explicit curl stream ownership
+        if: ${{ !cancelled() }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          "$ERGOPTI_NATIVE_HTTP_PYTHON" tools/test/macos_managed_ollama_explicit_stream_test.py
+        timeout-minutes: 2
       - uses: actions/setup-go@v5
         with:
           go-version: ${{ steps.ollama-toolchain.outputs.version }}
@@ -248,6 +263,26 @@ jobs:
               --launcher "$ERGOPTI_OLLAMA_LAUNCHER" --framework "$ERGOPTI_OLLAMA_FRAMEWORK" \
               --output "$ERGOPTI_OLLAMA_BUILD_ROOT/receiving/$profile" --profile "$profile"
           done
+      - name: Upload qualified native inputs for the application catalogue
+        uses: actions/upload-artifact@v4
+        with:
+          overwrite: true
+          name: managed-ollama-inputs-${{ matrix.architecture }}-${{ github.sha }}-${{ github.run_id }}
+          if-no-files-found: error
+          retention-days: ${{ inputs.release && 7 || 1 }}
+          path: |
+            ${{ env.ERGOPTI_OLLAMA_ASSET }}
+            ${{ env.ERGOPTI_OLLAMA_ASSET }}.provenance.json
+      - name: Upload the actual managed native release asset
+        if: inputs.release
+        uses: actions/upload-artifact@v4
+        with:
+          overwrite: true
+          name: assets-managed-ollama-${{ matrix.architecture }}
+          if-no-files-found: error
+          retention-days: 7
+          path: ${{ env.ERGOPTI_OLLAMA_ASSET }}
+
       - name: Retain actual native producer, catalogue and receiving evidence
         if: always()
         uses: actions/upload-artifact@v4
@@ -417,7 +452,7 @@ jobs:
   # never in a tree restored from an earlier run.
   package-macos:
     name: 'Package'
-    needs: e2e-hs
+    needs: [e2e-hs, managed-ollama-native]
     runs-on: macos-latest
     timeout-minutes: 45
     outputs:
@@ -762,11 +797,89 @@ jobs:
       # grants survive an update; without it the build signs ad hoc and every
       # update costs users each permission. A release still builds without it
       # until the secrets exist, but says so with a warning on the run.
+      - name: Receive both source-qualified native producer inputs
+        uses: actions/download-artifact@v4
+        with:
+          pattern: managed-ollama-inputs-*-${{ github.sha }}-${{ github.run_id }}
+          path: ${{ runner.temp }}/managed-ollama-package/inputs
+          merge-multiple: true
+      - name: Resolve canonical native catalogue build inputs
+        id: managed-catalogue-toolchain
+        env:
+          GOTOOLCHAIN: local
+          ERGOPTI_RELEASE: ${{ inputs.release && 'true' || 'false' }}
+          ERGOPTI_RELEASE_TAG: ${{ inputs.tag }}
+          ERGOPTI_RELEASE_VERSION: ${{ inputs.version }}
+          ERGOPTI_RELEASE_CHANNEL: ${{ inputs.channel }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PYINPUTS'
+          import json
+          import os
+          from pathlib import Path
+          contract = json.loads(Path('static/ergopti_plus/_shared/modules/llm/managed_ollama_runtime.json').read_text())
+          official = json.loads(Path('static/ergopti_plus/_shared/modules/llm/ollama_release.json').read_text())
+          identity = official['assets'][contract['official_asset_key']]
+          root = Path(os.environ['RUNNER_TEMP']) / 'managed-ollama-package'
+          values = {
+              'ERGOPTI_MANAGED_OLLAMA_INPUTS': str(root / 'inputs'),
+              'ERGOPTI_OLLAMA_BUILD_ROOT': str(root),
+              'ERGOPTI_OLLAMA_SOURCE': str(root / 'source'),
+              'ERGOPTI_OLLAMA_SOURCE_COMMIT': contract['source_commit'],
+              'ERGOPTI_OLLAMA_OFFICIAL_ARCHIVE': str(root / identity['filename']),
+              'ERGOPTI_OLLAMA_OFFICIAL_URL': 'https://github.com/ollama/ollama/releases/download/v' + official['version'] + '/' + identity['filename'],
+          }
+          with open(os.environ['GITHUB_OUTPUT'], 'a', encoding='utf-8') as stream:
+              stream.write('version=' + contract['go_version'][2:] + '\n')
+          with open(os.environ['GITHUB_ENV'], 'a', encoding='utf-8') as stream:
+              for key, value in values.items():
+                  assert '\n' not in value and '\r' not in value
+                  stream.write(key + '=' + value + '\n')
+          PYINPUTS
+      - uses: actions/setup-go@v5
+        with:
+          go-version: ${{ steps.managed-catalogue-toolchain.outputs.version }}
+          check-latest: false
+          cache: false
+      - name: Acquire and verify genuine pinned upstream inputs
+        shell: bash
+        run: |
+          set -euo pipefail
+          test ! -e "$ERGOPTI_OLLAMA_SOURCE"
+          test ! -e "$ERGOPTI_OLLAMA_OFFICIAL_ARCHIVE"
+          git init "$ERGOPTI_OLLAMA_SOURCE"
+          git -C "$ERGOPTI_OLLAMA_SOURCE" remote add origin https://github.com/ollama/ollama.git
+          git -C "$ERGOPTI_OLLAMA_SOURCE" fetch --depth=1 --no-tags origin "$ERGOPTI_OLLAMA_SOURCE_COMMIT"
+          git -C "$ERGOPTI_OLLAMA_SOURCE" checkout --detach FETCH_HEAD
+          test "$(git -C "$ERGOPTI_OLLAMA_SOURCE" rev-parse HEAD)" = "$ERGOPTI_OLLAMA_SOURCE_COMMIT"
+          test -z "$(git -C "$ERGOPTI_OLLAMA_SOURCE" status --porcelain --untracked-files=all)"
+          curl --proto '=https' --proto-redir '=https' --fail --location --retry 3 --max-time 600 \
+            --output "$ERGOPTI_OLLAMA_OFFICIAL_ARCHIVE" "$ERGOPTI_OLLAMA_OFFICIAL_URL"
+          python3 - <<'PY'
+          import hashlib
+          import json
+          import os
+          from pathlib import Path
+          contract = json.loads(Path('static/ergopti_plus/_shared/modules/llm/managed_ollama_runtime.json').read_text())
+          identity = json.loads(Path('static/ergopti_plus/_shared/modules/llm/ollama_release.json').read_text())['assets'][contract['official_asset_key']]
+          archive = Path(os.environ['ERGOPTI_OLLAMA_OFFICIAL_ARCHIVE'])
+          assert archive.stat().st_size == identity['bytes']
+          with archive.open('rb') as stream:
+              actual = hashlib.file_digest(stream, 'sha256').hexdigest()
+          assert actual == identity['sha256']
+          receipt = {'filename': archive.name, 'sha256': actual, 'bytes': archive.stat().st_size}
+          with (Path(os.environ['ERGOPTI_OLLAMA_BUILD_ROOT']) / 'official-input-receipt.json').open('x', encoding='utf-8') as stream:
+              json.dump(receipt, stream, sort_keys=True)
+              stream.write('\n')
+          PY
       - name: Build ErgoptiPlus.app
         shell: bash
         env:
           ERGOPTI_BUILD_COMMIT: ${{ github.sha }}
           ERGOPTI_VERSION: ${{ inputs.version }}
+          ERGOPTI_RELEASE_TAG: ${{ inputs.tag }}
+          ERGOPTI_RELEASE_VERSION: ${{ inputs.version }}
           ERGOPTI_BUILD: ${{ inputs.release && github.run_number || '' }}
           ERGOPTI_CHANNEL: ${{ inputs.channel }}
           ERGOPTI_RELEASE: ${{ inputs.release }}
@@ -789,6 +902,7 @@ jobs:
               SPARKLE_PUBLIC_KEY="$(head -c 32 /dev/urandom | base64)"
               export SPARKLE_PUBLIC_KEY
           fi
+          export ERGOPTI_MANAGED_OLLAMA_GO="$(command -v go)"
           bash tools/build/build_macos_app.sh 2>&1 | tee "$RUNNER_TEMP/macos-application-build.log"
 
       - name: Retain application build diagnostics
@@ -880,6 +994,16 @@ jobs:
           bundle_name=$(basename "$latest")
           (cd static/ergopti/macos/bundles && zip -r "../../../../build/macos/Ergopti_macOS.zip" "$bundle_name")
           echo "Packaged keylayout: $bundle_name → Ergopti_macOS.zip"
+
+      - name: Upload the catalogue sealed into the signed application
+        if: inputs.release
+        uses: actions/upload-artifact@v4
+        with:
+          overwrite: true
+          name: assets-managed-ollama-catalogue
+          if-no-files-found: error
+          retention-days: 7
+          path: build/macos/ErgoptiPlus.app/Contents/Resources/static/ergopti_plus/_shared/modules/llm/managed_ollama_release.json
 
       - name: Upload the independent CI archive source
         uses: actions/upload-artifact@v4

@@ -78,6 +78,75 @@ const FROM_REPOSITORY_STATIC = 'linux/static/';
 
 const errors = [];
 
+// A generated catalogue is an output only at the complete owning invocation.
+// No copied reference to the same absent pathname can borrow this admission.
+const MANAGED_BUILDER = 'build_macos_app.sh';
+const MANAGED_OUTPUT = '_shared/modules/llm/managed_ollama_release.json';
+const MANAGED_OWNER = 'tools/build/stage-macos-managed-ollama-inputs.py';
+const CATALOGUE_OWNER = 'tools/build/stage-macos-managed-ollama-catalogue.py';
+function managedCatalogueOutputLine(source) {
+	const lines = source.split(/\r?\n/);
+	const command = 'python3 "$REPO_ROOT/' + MANAGED_OWNER + '" \\';
+	const starts = lines.flatMap((line, index) => (line.trim() === command ? [index] : []));
+	assert.equal(starts.length, 1, 'generated catalogue requires exactly one actual owner call');
+	const start = starts[0];
+	const expected = [
+		command,
+		'--repository "$REPO_ROOT" --inputs "$ERGOPTI_MANAGED_OLLAMA_INPUTS" \\',
+		'--source "${ERGOPTI_OLLAMA_SOURCE:?native source inputs are required}" \\',
+		'--official-archive "${ERGOPTI_OLLAMA_OFFICIAL_ARCHIVE:?official archive is required}" \\',
+		'--go "${ERGOPTI_MANAGED_OLLAMA_GO:?absolute pinned Go is required}" \\',
+		'--release "${ERGOPTI_RELEASE:-false}" --release-tag "${ERGOPTI_RELEASE_TAG:-}" \\',
+		'--release-version "${ERGOPTI_RELEASE_VERSION:-}" --release-channel "$ERGOPTI_CHANNEL" \\',
+		'--output "$static_root/ergopti_plus/' + MANAGED_OUTPUT + '"'
+	];
+	assert.deepEqual(
+		lines.slice(start, start + expected.length).map((line) => line.trim()),
+		expected,
+		'generated catalogue requires the complete source-qualified output invocation'
+	);
+	return start + expected.length - 1;
+}
+const managedBuilderSource = fs.readFileSync(path.join(BUILD_DIR, MANAGED_BUILDER), 'utf8');
+const managedOutputLine = managedCatalogueOutputLine(managedBuilderSource);
+for (const owner of [MANAGED_OWNER, CATALOGUE_OWNER]) {
+	assert.ok(
+		fs.statSync(path.join(ROOT, owner)).isFile(),
+		'the actual generated-output owner exists'
+	);
+}
+for (const [before, after] of [
+	[MANAGED_OWNER, 'tools/build/foreign-catalogue-owner.py'],
+	['--inputs "$ERGOPTI_MANAGED_OLLAMA_INPUTS"', '--inputs "$FOREIGN_INPUTS"'],
+	['--source "${ERGOPTI_OLLAMA_SOURCE:', '--source "${FOREIGN_SOURCE:'],
+	[
+		'--official-archive "${ERGOPTI_OLLAMA_OFFICIAL_ARCHIVE:',
+		'--official-archive "${FOREIGN_ARCHIVE:'
+	],
+	['--go "${ERGOPTI_MANAGED_OLLAMA_GO:', '--go "${FOREIGN_GO:'],
+	['--release-tag "${ERGOPTI_RELEASE_TAG:-}"', '--release-tag "invented-tag"'],
+	[MANAGED_OUTPUT, '_shared/modules/llm/foreign_catalogue.json']
+]) {
+	assert.ok(managedBuilderSource.includes(before), 'mutation hits the actual catalogue recipe');
+	assert.throws(() => managedCatalogueOutputLine(managedBuilderSource.replace(before, after)));
+}
+assert.throws(() => managedCatalogueOutputLine(managedBuilderSource + '\n' + managedBuilderSource));
+const copiedCatalogue =
+	managedBuilderSource +
+	'\ncp "$REPO_ROOT/static/ergopti_plus/' +
+	MANAGED_OUTPUT +
+	'" "$destination"\n';
+assert.equal(
+	managedCatalogueOutputLine(copiedCatalogue),
+	managedOutputLine,
+	'the actual generated-output line is unchanged by a foreign copy'
+);
+assert.notEqual(
+	copiedCatalogue.split('\n').length - 2,
+	managedOutputLine,
+	'an arbitrary copy cannot borrow the admitted output line'
+);
+
 // Generated native files are admitted separately from tracked copied assets.
 // Every negative modifies one real recipe input and must fail source admission.
 const generated = generatedNativeRecipe(ROOT);
@@ -208,6 +277,10 @@ for (const name of scripts) {
 					).length -
 						1
 			) {
+				generatedChecked++;
+				continue;
+			}
+			if (name === MANAGED_BUILDER && rel === MANAGED_OUTPUT && i === managedOutputLine) {
 				generatedChecked++;
 				continue;
 			}
