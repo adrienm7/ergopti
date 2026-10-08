@@ -25,7 +25,8 @@ const ROW_TYPES = new Set([
 	'letter_picker',
 	'choice',
 	'command',
-	'check'
+	'check',
+	'native_content'
 ]);
 
 /** Refuses a declaration the renderers cannot honour. */
@@ -33,6 +34,11 @@ function classifyMenuRow(row, where) {
 	if (!row || typeof row !== 'object' || Array.isArray(row))
 		throw new Error(`${where}: a menu row must be a table`);
 	const labelled = typeof row.i18n === 'string' && row.i18n !== '';
+	const nativeCaption =
+		row.caption_source === 'native' &&
+		row.i18n === undefined &&
+		typeof row.caption_getter === 'string' &&
+		row.caption_getter !== '';
 	if (row.unavailable !== undefined) {
 		if (row.unavailable !== 'hide' && row.unavailable !== 'grey')
 			throw new Error(`${where}: unavailable must be "hide" or "grey"`);
@@ -55,7 +61,7 @@ function classifyMenuRow(row, where) {
 		}
 		if (
 			['command', 'check', 'group'].includes(row.type) &&
-			(typeof row.id !== 'string' || row.id === '' || !labelled)
+			(typeof row.id !== 'string' || row.id === '' || (!labelled && !nativeCaption))
 		)
 			throw new Error(`${where}: unavailable needs a labelled ${row.type} identity`);
 	}
@@ -98,12 +104,113 @@ function hasCaptionPlaceholder(format) {
 	return false;
 }
 
+/** Validates frames which order completed native objects, never provider DATA. */
+function validateNativeCompositions(menu) {
+	for (const [key, rows] of Object.entries(menu)) {
+		if (!Array.isArray(rows) || !rows.some((row) => row?.type === 'native_content')) continue;
+		const identities = new Set();
+		let target;
+		for (const [index, row] of rows.entries()) {
+			const where = `menu.${key} completed-native row ${index}`;
+			if (!row || typeof row !== 'object' || Array.isArray(row))
+				throw new Error(`${where}: a physical declaration must be a table`);
+			if (row.type === 'native_content') {
+				if (
+					Object.keys(row).some(
+						(field) => !['type', 'id', 'kind', 'target', 'platforms', 'unavailable'].includes(field)
+					) ||
+					typeof row.id !== 'string' ||
+					row.id === '' ||
+					identities.has(row.id) ||
+					!['image', 'boundary', 'command', 'rows'].includes(row.kind) ||
+					(row.target !== undefined && (row.target !== true || row.kind !== 'rows')) ||
+					(row.unavailable !== undefined && row.unavailable !== 'hide')
+				)
+					throw new Error(
+						`${where}: completed content needs a unique identity without behavior fields`
+					);
+				if (
+					row.platforms !== undefined &&
+					(!Array.isArray(row.platforms) ||
+						row.platforms.length === 0 ||
+						new Set(row.platforms).size !== row.platforms.length ||
+						!row.platforms.every((platform) => PLATFORMS.includes(platform)))
+				)
+					throw new Error(`${where}: completed content needs native platform tokens`);
+				if (
+					row.unavailable !== undefined &&
+					(row.platforms === undefined || row.platforms.length >= PLATFORMS.length)
+				)
+					throw new Error(`${where}: hide requires a genuinely restricted native owner`);
+				identities.add(row.id);
+				if (row.target === true) {
+					if (target !== undefined || index !== rows.length - 1)
+						throw new Error(`${where}: one final completed slot owns the target`);
+					target = row.id;
+				}
+			} else if (row.type === '---') {
+				if (
+					Object.keys(row).some(
+						(field) => !['type', 'after', 'platforms', 'unavailable'].includes(field)
+					) ||
+					typeof row.after !== 'string' ||
+					!identities.has(row.after)
+				)
+					throw new Error(`${where}: boundary names a preceding completed slot`);
+				if (
+					row.platforms !== undefined &&
+					(!Array.isArray(row.platforms) ||
+						row.platforms.length === 0 ||
+						new Set(row.platforms).size !== row.platforms.length ||
+						!row.platforms.every((platform) => PLATFORMS.includes(platform)))
+				)
+					throw new Error(`${where}: boundary needs native platform tokens`);
+				if (
+					row.unavailable !== undefined &&
+					(row.unavailable !== 'hide' ||
+						row.platforms === undefined ||
+						row.platforms.length >= PLATFORMS.length)
+				)
+					throw new Error(`${where}: boundary hide requires a genuinely restricted owner`);
+			} else
+				throw new Error(
+					`${where}: a completed frame admits only content and conditional boundaries`
+				);
+		}
+		if (target === undefined)
+			throw new Error(`menu.${key}: completed composition needs one final target`);
+	}
+}
+
+// Explicit numbered scalar formats leave every percent byte literal.
+function numberedCaptionFits(title) {
+	return (
+		typeof title === 'string' &&
+		title.includes('{1}') &&
+		!/[{}]/u.test(title.replaceAll('{1}', '')) &&
+		!/[\x00-\x1f\x7f]/u.test(title) &&
+		title.isWellFormed()
+	);
+}
+
 function validateChildTemplates(menu, captionFormat) {
+	validateNativeCompositions(menu);
 	function inertCaptionFits(row) {
-		if (row.caption_getter === undefined) return true;
+		if (row.caption_getter === undefined && row.caption_getters === undefined) return true;
 		if (typeof captionFormat !== 'function') return false;
 		try {
 			const title = captionFormat(row.i18n);
+			if (row.caption_format !== undefined)
+				return row.caption_format === 'numbered' && numberedCaptionFits(title);
+			if (row.caption_getters !== undefined) {
+				const slots = typeof title === 'string' && title.match(/%%|%s|%/g);
+				return (
+					Array.isArray(row.caption_getters) &&
+					slots !== false &&
+					(slots || []).every((slot) => slot !== '%') &&
+					(slots || []).filter((slot) => slot === '%s').length === row.caption_getters.length
+				);
+			}
 			if (row.caption_layout !== undefined)
 				return typeof title === 'string' && title !== '' && !hasCaptionPlaceholder(title);
 			return hasCaptionPlaceholder(title);
@@ -244,6 +351,7 @@ function validateChildTemplates(menu, captionFormat) {
 								'platforms',
 								'unavailable',
 								'caption_getter',
+								'caption_getters',
 								'caption_layout',
 								'caption_joiner'
 							].includes(field)
@@ -277,7 +385,75 @@ function validateChildTemplates(menu, captionFormat) {
 			)
 				throw new Error(`${where}: section header needs a caption without behavior metadata`);
 			if (
+				row.caption_format !== undefined &&
+				(row.caption_format !== 'numbered' ||
+					!['command', 'group'].includes(row.type) ||
+					typeof row.id !== 'string' ||
+					row.id === '' ||
+					typeof row.i18n !== 'string' ||
+					row.i18n === '' ||
+					typeof row.caption_getter !== 'string' ||
+					row.caption_getter === '' ||
+					row.caption_getters !== undefined ||
+					row.caption_source !== undefined ||
+					row.caption_layout !== undefined ||
+					row.caption_joiner !== undefined ||
+					row.label_prefix !== undefined ||
+					row.reason_key !== undefined ||
+					row.disabled_reason_key !== undefined ||
+					!inertCaptionFits(row))
+			)
+				throw new Error(
+					`${where}: numbered caption needs one named scalar getter and an original {1} command or group format`
+				);
+			if (
+				row.caption_source !== undefined &&
+				(row.caption_source !== 'native' ||
+					!['check', 'group'].includes(row.type) ||
+					row.i18n !== undefined ||
+					typeof row.id !== 'string' ||
+					row.id === '' ||
+					typeof row.caption_getter !== 'string' ||
+					row.caption_getter === '' ||
+					row.caption_getters !== undefined ||
+					row.caption_layout !== undefined ||
+					row.caption_joiner !== undefined ||
+					row.label_prefix !== undefined ||
+					row.reason_key !== undefined ||
+					row.disabled_reason_key !== undefined ||
+					row.unavailable !== 'hide')
+			)
+				throw new Error(
+					`${where}: native caption needs a record check or group without translation or decoration metadata`
+				);
+			if (
+				row.caption_getters !== undefined &&
+				(!['command', 'check', 'group', 'label'].includes(row.type) ||
+					typeof row.id !== 'string' ||
+					row.id === '' ||
+					typeof row.i18n !== 'string' ||
+					row.i18n === '' ||
+					row.caption_getter !== undefined ||
+					row.caption_source !== undefined ||
+					row.caption_layout !== undefined ||
+					row.caption_joiner !== undefined ||
+					!Array.isArray(row.caption_getters) ||
+					row.caption_getters.length === 0 ||
+					Object.keys(row.caption_getters).length !== row.caption_getters.length ||
+					!Array.from({ length: row.caption_getters.length }, (_, index) => index).every(
+						(index) =>
+							Object.hasOwn(row.caption_getters, index) &&
+							typeof row.caption_getters[index] === 'string' &&
+							row.caption_getters[index] !== ''
+					) ||
+					!inertCaptionFits(row))
+			)
+				throw new Error(
+					`${where}: caption_getters needs ordered named values and a translated row identity`
+				);
+			if (
 				row.caption_getter !== undefined &&
+				row.caption_source !== 'native' &&
 				(!['command', 'check', 'group', 'label', 'section_header'].includes(row.type) ||
 					typeof row.caption_getter !== 'string' ||
 					row.caption_getter === '' ||
@@ -307,5 +483,6 @@ function validateChildTemplates(menu, captionFormat) {
 module.exports = {
 	classifyMenuRow,
 	validateMenuAvailability,
-	validateChildTemplates
+	validateChildTemplates,
+	validateNativeCompositions
 };

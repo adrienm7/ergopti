@@ -140,6 +140,8 @@ end
 -- transaction preview; engine initialization and native output are not exercised.
 local LIVE_SOURCE_MODULES = {
 	"infra.llm_preferences", "modules.llm.profile_settings", "modules.llm.prediction_engine",
+	-- Settings cache source values, and Agent rows retain that actual module table.
+	"modules.llm.agent_settings", "ui.menu.agent_rows",
 }
 
 local function with_live_source(context, scenario)
@@ -157,6 +159,16 @@ local function with_live_source(context, scenario)
 		assert(status == "ok" and bytes == "")
 		assert(preferences.acquire(owner)); acquired = true
 		assert(preferences.with_configuration(owner, { status = status, content = bytes }, function()
+			-- Independent neutral physical input: both systems are Off, no model or excluded app.
+			local settings = require("modules.llm.agent_settings")
+			for _, system in ipairs({ "system1", "system2" }) do
+				helpers.assert_eq(settings.get_spec(system), "")
+				local model, reason = settings.resolve(system)
+				helpers.assert_nil(model)
+				helpers.assert_eq(reason, "off")
+			end
+			helpers.assert_eq(#settings.get_disabled_apps(), 0)
+			helpers.assert_eq(settings.get_mode(), "off")
 			local engine = require("modules.llm.prediction_engine")
 			assert(engine.get_live() == nil)
 			context.llm.get_live, context.llm.set_live = engine.get_live, engine.set_live
@@ -188,7 +200,8 @@ end
 --- Native editing is not exercised by this menu-shape fixture.
 local function build_fixture_menu(context)
 	local names = {"modules.shortcuts.key_combinations", "infra.key_combinations_scope", "ui.menu.key_combinations",
-		"adapters.storage", "ui.hotstring_editor.bridge"}
+		"adapters.storage", "ui.hotstring_editor.bridge", "ui.gesture_conflicts",
+		"infra.i18n", "infra.manifest_menu"}
 	local magic_path, editor_directory, editor_source, editor_fs
 	local original_getenv, original_i18n_safe = os.getenv, rawget(_G, "i18n_safe")
 	local all_previous = {}; for name, value in pairs(package.loaded) do all_previous[name] = value end
@@ -235,6 +248,10 @@ local function build_fixture_menu(context)
 		package.loaded["infra.key_combinations_scope"] = {retry_restore = function() return true end,
 			edit = function() error("menu-shape fixture cannot publish") end}
 		package.loaded["ui.menu.key_combinations"] = nil
+		-- Native delegates retain module tables. This fixture's new producer must
+		-- share the exact current locale/manifest cohort used by its assertions.
+		package.loaded["infra.i18n"], package.loaded["infra.manifest_menu"] = i18n, ManifestMenu
+		helpers.load_module("ui.gesture_conflicts")
 		local built = with_live_source(context, function()
 			return with_api_source(function(builder) return builder.build(context) end)
 		end)
@@ -323,6 +340,11 @@ local function full_context()
 			get_wrap_pairs      = function() return { ["("] = { left = "(", right = ")" } } end,
 		},
 		gestures = {
+			-- The cached native status producer already consumed these collaborators.
+			-- A neutral reader and genuine defaults describe fixture state only.
+			DEFAULT_GESTURES = require("modules.gestures.manager").DEFAULT_GESTURES,
+			is_reading     = function() return false end,
+			get_action_label = require("modules.gestures.manager").get_action_label,
 			is_enabled     = function() return true end,
 			toggle         = noop,
 			get_action     = function() return nil end,
@@ -412,6 +434,10 @@ helpers.describe("menu certification: the manifest's rows are rendered", functio
 			tap_hold_key_hold_caption = i18n.get("tap_hold.hold.none"),
 			tap_hold_key_delay_caption = "0 ms",
 			personal_default_label = i18n.get("common.none"),
+			-- The genuine source scope above owns these independently chosen neutral values.
+			agent_system_backend_current_caption = i18n.get("menu.agent.off"),
+			agent_system_model_caption = "",
+			agent_disabled_apps_count = "0",
 		}
 		local checked, missing = 0, {}
 		for menu_key in pairs(root) do
@@ -435,7 +461,10 @@ helpers.describe("menu certification: the manifest's rows are rendered", functio
 						if row.caption_getter ~= nil then
 							local caption = fixture_captions[row.caption_getter]
 							helpers.assert_type(caption, "string", "every declared caption needs independent fixture state")
-							if row.caption_layout == "prefix" then
+							if row.caption_format == "numbered" then
+								-- Independently fill the declared old one-value caption; native bytes stay literal.
+								label = label:gsub("{1}", function() return caption end)
+							elseif row.caption_layout == "prefix" then
 								helpers.assert_type(row.caption_joiner, "string")
 								label = label .. row.caption_joiner .. caption
 							elseif row.caption_layout == "suffix" then
@@ -1241,3 +1270,30 @@ helpers.describe("Language completed-child admission (linux)", function()
 end)
 
 require("test.menu_command_literal_prefix_contract").register(helpers, "linux")
+
+helpers.describe("Complete-menu gesture status fixture owns its native cohort", function()
+	helpers.it("rebuilds the native producer against current locale and manifest despite a stale loaded producer", function()
+		local previous = rawget(package.loaded, "ui.gesture_conflicts")
+		local stale = { rows = function() error("a stale gesture producer cannot own this fixture") end }
+		rawset(package.loaded, "ui.gesture_conflicts", stale)
+		local ok, rows = pcall(build_full_menu, full_context())
+		helpers.assert_true(rawequal(rawget(package.loaded, "ui.gesture_conflicts"), stale), "the exact preceding module owner is restored")
+		rawset(package.loaded, "ui.gesture_conflicts", previous)
+		if not ok then error(rows, 0) end
+		helpers.assert_not_nil(find_item(rows, i18n.get("gestures.system.unknown")), "the real native unknown-status parent survives the complete tray")
+	end)
+	helpers.it("provides the original reader ABI and genuine complete native defaults without starting input", function()
+		local context = full_context()
+		helpers.assert_eq(context.gestures.is_reading(), false)
+		helpers.assert_true(rawequal(context.gestures.DEFAULT_GESTURES, require("modules.gestures.manager").DEFAULT_GESTURES),
+			"the fixture uses the actual current native slot inventory")
+		helpers.assert_true(next(context.gestures.DEFAULT_GESTURES) ~= nil, "a fabricated empty inventory cannot satisfy the fixture")
+		local rows = build_full_menu(context)
+		helpers.assert_not_nil(find_item(rows, i18n.get("gestures.system.unknown")))
+		helpers.assert_true(#all_titles(rows) > 40, "the original whole-menu row-count floor remains meaningful")
+	end)
+end)
+
+require("test.menu_layout_caption_values_contract").register(helpers, "linux")
+
+require("test.menu_numbered_caption_contract").register(helpers, "linux")

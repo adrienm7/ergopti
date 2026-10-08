@@ -1836,8 +1836,34 @@ checkPrivacyTriggerControls();
 	assert.deepEqual(
 		manifest.top_level.filter((row) => row.id === 'reload' || row.id === 'quit'),
 		[
-			{ type: 'command', id: 'reload', i18n: 'menu.global.reload' },
-			{ type: 'command', id: 'quit', i18n: 'menu.global.quit' }
+			{
+				type: 'command',
+				id: 'reload',
+				i18n: 'menu.global.reload',
+				platforms: ['ahk', 'linux'],
+				unavailable: 'hide'
+			},
+			{
+				type: 'command',
+				id: 'reload',
+				i18n: 'menu.global.reload_macos',
+				platforms: ['hs'],
+				unavailable: 'hide'
+			},
+			{
+				type: 'command',
+				id: 'quit',
+				i18n: 'menu.global.quit',
+				platforms: ['ahk', 'linux'],
+				unavailable: 'hide'
+			},
+			{
+				type: 'command',
+				id: 'quit',
+				i18n: 'menu.global.quit_macos',
+				platforms: ['hs'],
+				unavailable: 'hide'
+			}
 		],
 		'the existing root owns both lifecycle labels and their order'
 	);
@@ -3541,12 +3567,37 @@ function consumesProfileFrameCommand(source, file, menu, section, id) {
 			sequence.every((value, offset) => tokens[index + offset]?.value === value)
 		);
 	}
-	function assertRefreshWiring(owner, extension) {
+	function assertRefreshWiring(owner, extension, declaration = source) {
+		const { nativeTemplateBinding } = require('../lib/menu-template-binding.cjs');
+		const mac = extension === '.lua';
+		const child = mac ? 'gesture_system_macos_children' : 'gesture_system_windows_children';
+		const parent = mac
+			? 'gesture_system_status_macos_frame'
+			: 'gesture_system_status_windows_frame';
 		const tokens = scriptTokens(owner, extension);
-		if (extension === '.lua') {
-			assert.ok(
-				hasSequence(tokens, ['ManifestMenu', '.', 'template_rows', '(', corpus.section, ',', '{'])
+		assert.deepEqual(
+			declaration[child].filter((row) => row.type === 'include' && row.section === corpus.section),
+			[{ type: 'include', section: corpus.section }],
+			'the genuinely consumed child frame includes the original refresh declaration exactly once'
+		);
+		assert.equal(
+			nativeTemplateBinding(owner, extension, child, 'gesture_system_refresh', 1),
+			true,
+			'the executable refresh owner is bound in the actual typed command port'
+		);
+		const cached = mac ? 'gesture_system_cached_conflicts' : 'gesture_system_cached_slots';
+		assert.equal(
+			nativeTemplateBinding(owner, extension, child, cached, 3),
+			true,
+			'the actual cached native inventory feeds the consumed child frame'
+		);
+		for (const group of ['gesture_system_clear_children', 'gesture_system_conflict_children'])
+			assert.equal(
+				nativeTemplateBinding(owner, extension, parent, group, 3),
+				true,
+				'the genuinely published status frame owns its cached child data'
 			);
+		if (mac) {
 			assert.ok(
 				hasSequence(tokens, ['[', 'gesture_system_refresh', ']', '=', 'function', '(', ')'])
 			);
@@ -3564,27 +3615,36 @@ function consumesProfileFrameCommand(source, file, menu, section, id) {
 				])
 			);
 			assert.ok(
-				hasSequence(tokens, ['for', '_', ',', 'row', 'in', 'ipairs', '(', 'controls', ')'])
+				hasSequence(tokens, ['return', 'status']),
+				'the complete actual status frame is published'
 			);
-			assert.ok(hasSequence(tokens, ['items', '=', 'rows']));
 		} else {
 			assert.ok(
-				hasSequence(tokens, [
-					'MenuRenderer_TemplateRows',
-					'(',
-					corpus.section,
-					',',
-					'Map',
-					'(',
-					'gesture_system_refresh',
-					',',
-					'GestureSystemRequestRefresh',
-					')'
-				])
+				hasSequence(tokens, ['gesture_system_refresh', ',', 'GestureSystemRequestRefresh', ')'])
 			);
-			assert.ok(hasSequence(tokens, ['for', 'Row', 'in', 'Controls']));
-			assert.ok(hasSequence(tokens, ['Children', '.', 'Push', '(', 'Row', ')']));
-			assert.ok(hasSequence(tokens, ['SetTimer', '(', 'GestureSystemRefresh', ',', '-', '1', ')']));
+			assert.ok(
+				hasSequence(tokens, ['SetTimer', '(', 'GestureSystemRefresh', ',', '-', '1', ')']),
+				'Windows retains the original deferred complete-snapshot refresh'
+			);
+			assert.ok(
+				hasSequence(tokens, [
+					'return',
+					'Rows',
+					'is',
+					'Array',
+					'&',
+					'&',
+					'Rows',
+					'.',
+					'Length',
+					'=',
+					'=',
+					'1',
+					'?',
+					'Rows'
+				]),
+				'the complete actual status frame is published'
+			);
 		}
 	}
 	for (const [extension, nativePath] of [
@@ -3593,7 +3653,9 @@ function consumesProfileFrameCommand(source, file, menu, section, id) {
 	]) {
 		const owner = readFileSync(resolve(REPO_ROOT, 'static/ergopti_plus', nativePath), 'utf8');
 		assertRefreshWiring(owner, extension);
-		for (const id of [corpus.section, 'gesture_system_refresh'])
+		const child =
+			extension === '.lua' ? 'gesture_system_macos_children' : 'gesture_system_windows_children';
+		for (const id of [child, 'gesture_system_refresh'])
 			assert.throws(() =>
 				assertRefreshWiring(owner.replaceAll('"' + id + '"', '"unowned_refresh"'), extension)
 			);
@@ -3603,13 +3665,35 @@ function consumesProfileFrameCommand(source, file, menu, section, id) {
 				: owner.replaceAll('GestureSystemRequestRefresh)', 'UnownedRefresh)');
 		assert.throws(() => assertRefreshWiring(changed, extension));
 		const comment = extension === '.lua' ? '-- ' : '; ';
-		const erased = owner.replaceAll('"' + corpus.section + '"', '"unowned_refresh"');
+		const erased = owner.replaceAll('"' + child + '"', '"unowned_refresh"');
 		const call =
 			extension === '.lua'
-				? `ManifestMenu.template_rows("${corpus.section}", {})`
-				: `MenuRenderer_TemplateRows("${corpus.section}", Map(), Map(), Map())`;
+				? `ManifestMenu.template_rows("${child}", {})`
+				: `MenuRenderer_TemplateRows("${child}", Map(), Map(), Map())`;
 		assert.throws(() => assertRefreshWiring(erased + '\n' + comment + call, extension));
 		assert.throws(() => assertRefreshWiring(erased + '\n' + JSON.stringify(call), extension));
+		for (const mutate of [
+			(rows) => rows.filter((row) => row.type !== 'include' || row.section !== corpus.section),
+			(rows) =>
+				rows.map((row) =>
+					row.type === 'include' && row.section === corpus.section
+						? { ...row, section: 'unowned_refresh' }
+						: row
+				),
+			(rows) => [...rows, { type: 'include', section: corpus.section }]
+		]) {
+			const withdrawn = structuredClone(source);
+			withdrawn[child] = mutate(withdrawn[child]);
+			assert.throws(
+				() => assertRefreshWiring(owner, extension, withdrawn),
+				'missing, redirected or duplicate canonical refresh ownership is refused'
+			);
+		}
+		const wrongPort = owner.replaceAll('"gesture_system_refresh"', '"unused_refresh_port"');
+		assert.throws(
+			() => assertRefreshWiring(wrongPort, extension),
+			'a quoted refresh ID outside its actual command port has no authority'
+		);
 	}
 }
 
@@ -4713,6 +4797,8 @@ function consumesProfileFrameCommand(source, file, menu, section, id) {
 				type: 'command',
 				id: 'agent_system_model',
 				i18n: variant.label_key,
+				caption_getter: 'agent_system_model_caption',
+				caption_format: 'numbered',
 				disabled_when: ['agent_system_model_ready']
 			}
 		]);
@@ -4725,7 +4811,7 @@ function consumesProfileFrameCommand(source, file, menu, section, id) {
 	for (const [driver, relative, call] of [
 		['windows', 'ui/menu/menu_llm/menu_agent.ahk', 'MenuRenderer_TemplateRows'],
 		['macos', 'ui/menu/menu_llm/agent_panel.lua', 'ManifestMenu.template_rows'],
-		['linux', 'ui/menu/agent_rows.lua', 'require("infra.manifest_menu").template_rows']
+		['linux', 'ui/menu/agent_rows.lua', 'ManifestMenu.template_rows']
 	]) {
 		const source = readFileSync(
 			resolve(REPO_ROOT, 'static/ergopti_plus', driver, relative),
@@ -9202,3 +9288,1076 @@ console.log(
 		'[OK] complete Magic trigger: exact declared captions/order and executable native binding/refusal owners.'
 	);
 })();
+
+// Complete Tap-Hold action-picker presentation retains both actual native routes.
+{
+	const assert = require('node:assert/strict');
+	const { nativeTemplateBinding } = require('../lib/menu-template-binding.cjs');
+	const section = 'tap_hold_action_picker_frame';
+	const nativePath = 'macos/ui/menu/menu_tap_holds.lua';
+	const declaration = {
+		[section]: [
+			{ type: 'list', id: 'tap_hold_picker_special_rows', platforms: ['hs'], unavailable: 'hide' },
+			{
+				type: 'include',
+				section: 'tap_hold_action_picker_boundary',
+				present_when: 'tap_hold_picker_has_boundary'
+			},
+			{ type: 'list', id: 'tap_hold_picker_grouped_rows', platforms: ['hs'], unavailable: 'hide' }
+		],
+		tap_hold_action_picker_boundary: [{ type: '---', platforms: ['hs'], unavailable: 'hide' }]
+	};
+	const records = parseToml(readFileSync(MANIFEST_PATH, 'utf8')).menu;
+	const generated = JSON.parse(readFileSync(MENU_PATH, 'utf8'));
+	for (const [name, rows] of Object.entries(declaration)) {
+		assert.deepEqual(records[name], rows, 'independently specified complete declaration');
+		assert.deepEqual(generated[name], rows, 'actual generator output');
+	}
+	const source = readFileSync(resolve(REPO_ROOT, 'static/ergopti_plus', nativePath), 'utf8');
+	for (const [key, provider] of [
+		['tap_hold_picker_special_rows', 'special_rows'],
+		['tap_hold_picker_grouped_rows', 'grouped_rows']
+	]) {
+		const binds = (candidate, port = 3) =>
+			nativeTemplateBinding(candidate, '.lua', section, key, port);
+		assert.equal(binds(source), true, 'actual typed list provider is executable and published');
+		assert.equal(binds(source, 1), false, 'list data is not a command callback port');
+		for (const candidate of [
+			source.replaceAll(key + ' = ' + provider, key + ' = nil'),
+			source.replaceAll(key + ' = ' + provider, key + ' = {}'),
+			source.replace(
+				'local function ' +
+					provider +
+					'() return ' +
+					(provider === 'special_rows' ? 'special' : 'grouped') +
+					' end',
+				'local function ' + provider + '() end'
+			),
+			source.replaceAll(
+				'ManifestMenu.template_rows("' + section + '"',
+				'ManifestMenu.template_rows("unrelated_action_picker_frame"'
+			)
+		]) {
+			assert.notEqual(candidate, source, 'counterexample must change the actual owner');
+			assert.equal(
+				binds(candidate),
+				false,
+				'withdrawn/noncallable/empty/wrong-frame evidence is refused'
+			);
+		}
+	}
+	const graphSource = readFileSync(resolve(__dirname, 'test-menu-parity.cjs'), 'utf8');
+	const start = graphSource.indexOf('const OPENS_SUBMENU = {');
+	const finish = graphSource.indexOf('\n};', start);
+	assert(start >= 0 && finish > start, 'actual bounded registry');
+	const graph = require('node:vm').runInNewContext(
+		graphSource.slice(start, finish + 3) + '; OPENS_SUBMENU',
+		{},
+		{ timeout: 1000 }
+	);
+	function assertRoutes(value) {
+		for (const root of ['tap_holds', 'key_combinations']) {
+			assert(Array.isArray(value[root]));
+			assert(
+				value[root].includes(root === 'tap_holds' ? 'tap_holds_menu' : 'key_combinations_group'),
+				'original root mapping remains'
+			);
+			const edge = value[root].find((item) => item?.menu === section);
+			assert(edge, 'each actual native publication root owns its complete picker');
+			assert.equal(edge.kind, 'compose');
+			assert.deepEqual([...edge.platforms], ['hs']);
+			assert.equal(edge.native_sources.hs, nativePath);
+		}
+	}
+	assertRoutes(graph);
+	for (const root of ['tap_holds', 'key_combinations']) {
+		for (const mutate of [
+			(value) => {
+				value[root] = value[root].filter((item) => item?.menu !== section);
+			},
+			(value) => {
+				value[root].find((item) => item?.menu === section).kind = 'submenu';
+			},
+			(value) => {
+				value[root].find((item) => item?.menu === section).platforms = ['linux'];
+			},
+			(value) => {
+				value[root].find((item) => item?.menu === section).native_sources.hs =
+					'macos/ui/menu/menu_utils.lua';
+			},
+			(value) => {
+				value[root] = value[root].filter(
+					(item) => item !== (root === 'tap_holds' ? 'tap_holds_menu' : 'key_combinations_group')
+				);
+			}
+		]) {
+			const wrong = structuredClone(graph);
+			mutate(wrong);
+			assert.throws(() => assertRoutes(wrong));
+		}
+	}
+}
+
+// Cached system status preserves independent prior translations and genuine native capabilities.
+{
+	const assert = require('node:assert/strict');
+	const { nativeTemplateBinding } = require('../lib/menu-template-binding.cjs');
+	const corpus = JSON.parse(
+		readFileSync(resolve(SHARED, 'tests/corpus/menus/gesture_system_status_captions.json'), 'utf8')
+	);
+	const declaration = parseToml(readFileSync(MANIFEST_PATH, 'utf8')).menu;
+	const generated = JSON.parse(readFileSync(MENU_PATH, 'utf8'));
+	const expected = {
+		gesture_system_status_windows_frame: [
+			{
+				type: 'include',
+				section: 'gesture_system_status_unknown',
+				present_when: 'gesture_system_is_unverified'
+			},
+			{
+				type: 'include',
+				section: 'gesture_system_status_clear',
+				present_when: 'gesture_system_is_clear'
+			},
+			{
+				type: 'include',
+				section: 'gesture_system_status_conflicts',
+				present_when: 'gesture_system_has_conflicts'
+			}
+		],
+		gesture_system_status_macos_frame: [
+			{
+				type: 'include',
+				section: 'gesture_system_status_clear',
+				present_when: 'gesture_system_is_clear'
+			},
+			{
+				type: 'include',
+				section: 'gesture_system_status_conflicts',
+				present_when: 'gesture_system_has_conflicts'
+			}
+		],
+		gesture_system_status_linux_frame: [
+			{ type: 'include', section: 'gesture_system_status_unknown' }
+		],
+		gesture_system_status_unknown: [
+			{
+				type: 'group',
+				id: 'gesture_system_unknown_children',
+				i18n: 'gestures.system.unknown',
+				platforms: ['ahk', 'linux'],
+				unavailable: 'hide'
+			}
+		],
+		gesture_system_status_clear: [
+			{
+				type: 'group',
+				id: 'gesture_system_clear_children',
+				i18n: 'gestures.system.clear',
+				platforms: ['ahk', 'hs'],
+				unavailable: 'hide'
+			}
+		],
+		gesture_system_status_conflicts: [
+			{
+				type: 'group',
+				id: 'gesture_system_conflict_children',
+				i18n: 'gestures.system.conflicts_caption',
+				caption_getter: 'gesture_system_conflict_count',
+				platforms: ['ahk', 'hs'],
+				unavailable: 'hide'
+			}
+		],
+		gesture_system_windows_children: [
+			{ type: 'list', id: 'gesture_system_cached_slots', platforms: ['ahk'], unavailable: 'hide' },
+			{ type: 'include', section: 'gesture_system_status_controls' }
+		],
+		gesture_system_macos_children: [
+			{
+				type: 'list',
+				id: 'gesture_system_cached_conflicts',
+				platforms: ['hs'],
+				unavailable: 'hide'
+			},
+			{ type: 'include', section: 'gesture_system_pinch_frame' },
+			{ type: 'include', section: 'gesture_system_status_controls' }
+		],
+		gesture_system_linux_children: [
+			{ type: 'include', section: 'gesture_system_linux_reading_frame' },
+			{
+				type: 'list',
+				id: 'gesture_system_cached_overlap',
+				platforms: ['linux'],
+				unavailable: 'hide'
+			},
+			{
+				type: 'include',
+				section: 'gesture_system_linux_settings_unavailable',
+				present_when: 'gesture_system_settings_unavailable'
+			}
+		]
+	};
+	for (const [key, rows] of Object.entries(expected)) {
+		assert.deepEqual(declaration[key], rows, 'independent fixed native policy: ' + key);
+		assert.deepEqual(generated[key], rows, 'actual owner output: ' + key);
+	}
+	const locales = JSON.parse(readFileSync(resolve(SHARED, 'data/locale_order.json'), 'utf8')).order;
+	assert.equal(locales.length, 21);
+	assert.deepEqual(Object.keys(corpus.captions).sort(), [...locales].sort());
+	for (const locale of locales) {
+		const strings = JSON.parse(readFileSync(resolve(LOCALES_DIR, locale + '.json'), 'utf8'));
+		const prior = corpus.captions[locale];
+		assert.equal(
+			strings['gestures.system.conflicts_caption'].split('%s').join('2'),
+			prior.conflicts_two
+		);
+		for (const state of ['enabled', 'disabled', 'unknown'])
+			assert.equal(strings['gestures.system.pinch_' + state], prior['pinch_' + state]);
+		for (const state of ['unknown', 'configured', 'not_configured'])
+			assert.equal(
+				strings['gestures.system.slot_' + state + '_caption'].split('%s').join('Independent Slot'),
+				prior['slot_' + state]
+			);
+	}
+	for (const [file, extension, section, key, port] of [
+		[
+			'windows/ui/gesture_conflicts.ahk',
+			'.ahk',
+			'gesture_system_slot_windows_frame',
+			'gesture_system_open_unknown_slot',
+			1
+		],
+		[
+			'windows/ui/gesture_conflicts.ahk',
+			'.ahk',
+			'gesture_system_windows_children',
+			'gesture_system_cached_slots',
+			3
+		],
+		[
+			'macos/ui/menu/menu_gestures.lua',
+			'.lua',
+			'gesture_system_macos_children',
+			'gesture_system_open_enabled_pinch',
+			1
+		],
+		[
+			'macos/ui/menu/menu_gestures.lua',
+			'.lua',
+			'gesture_system_macos_children',
+			'gesture_system_cached_conflicts',
+			3
+		],
+		[
+			'linux/ui/gesture_conflicts.lua',
+			'.lua',
+			'gesture_system_slot_linux_frame',
+			'gesture_system_open_unknown_slot',
+			1
+		],
+		[
+			'linux/ui/gesture_conflicts.lua',
+			'.lua',
+			'gesture_system_linux_children',
+			'gesture_system_cached_overlap',
+			3
+		],
+		[
+			'linux/ui/gesture_conflicts.lua',
+			'.lua',
+			'gesture_system_status_linux_frame',
+			'gesture_system_unknown_children',
+			3
+		]
+	]) {
+		const source = readFileSync(resolve(REPO_ROOT, 'static/ergopti_plus', file), 'utf8');
+		assert.equal(nativeTemplateBinding(source, extension, section, key, port), true);
+		assert.equal(
+			nativeTemplateBinding(source, extension, section, key, port === 1 ? 3 : 1),
+			false,
+			'command and cached-data ports stay distinct'
+		);
+		const withdrawn = source.replaceAll('"' + key + '"', '"unused_native_port"');
+		assert.notEqual(withdrawn, source);
+		assert.equal(nativeTemplateBinding(withdrawn, extension, section, key, port), false);
+		const wrong = source.replaceAll('"' + section + '"', '"unrelated_status_frame"');
+		const fake =
+			extension === '.lua'
+				? 'ManifestMenu.template_rows("' + section + '", {})'
+				: 'MenuRenderer_TemplateRows("' + section + '", Map(), Map(), Map())';
+		assert.equal(
+			nativeTemplateBinding(
+				wrong + '\n' + (extension === '.lua' ? '-- ' : '; ') + fake,
+				extension,
+				section,
+				key,
+				port
+			),
+			false
+		);
+		assert.equal(
+			nativeTemplateBinding(wrong + '\n' + JSON.stringify(fake), extension, section, key, port),
+			false
+		);
+	}
+}
+
+// A native root badge consumes actual shared captions and boundary before drawing.
+{
+	const assert = require('node:assert/strict');
+	const { nativeTemplateBinding } = require('../lib/menu-template-binding.cjs');
+	const { scriptTokens } = require('../lib/script-source.cjs');
+	const section = 'macos_canvas_badge_frame';
+	const declaration = {
+		[section]: [
+			{
+				type: 'include',
+				section: 'macos_canvas_badge_paused',
+				present_when: 'macos_badge_is_paused'
+			},
+			{
+				type: 'include',
+				section: 'macos_canvas_badge_active',
+				present_when: 'macos_badge_is_active'
+			},
+			{ type: '---', platforms: ['hs'], unavailable: 'hide' }
+		],
+		macos_canvas_badge_paused: [
+			{
+				type: 'label',
+				id: 'macos_badge_paused_caption',
+				i18n: 'menu.builder.title_paused',
+				platforms: ['hs'],
+				unavailable: 'hide'
+			}
+		],
+		macos_canvas_badge_active: [
+			{
+				type: 'label',
+				id: 'macos_badge_active_caption',
+				i18n: 'menu.builder.title',
+				platforms: ['hs'],
+				unavailable: 'hide'
+			}
+		]
+	};
+	const records = parseToml(readFileSync(MANIFEST_PATH, 'utf8')).menu;
+	const generated = JSON.parse(readFileSync(MENU_PATH, 'utf8'));
+	for (const [name, rows] of Object.entries(declaration)) {
+		assert.deepEqual(records[name], rows, 'independently specified root-badge declaration');
+		assert.deepEqual(generated[name], rows, 'actual owner-generated declaration');
+	}
+	const prior = JSON.parse(
+		readFileSync(resolve(SHARED, 'tests/corpus/menus/macos_canvas_badge_captions.json'), 'utf8')
+	);
+	assert.equal(
+		Object.keys(prior.captions).length,
+		21,
+		'all original caption pairs are independently frozen'
+	);
+	for (const [locale, captions] of Object.entries(prior.captions)) {
+		const strings = JSON.parse(
+			readFileSync(resolve(LOCALES_DIR, locale + '.json'), 'utf8').replace(/^\uFEFF/, '')
+		);
+		assert.equal(strings['menu.builder.title'], captions.active);
+		assert.equal(strings['menu.builder.title_paused'], captions.paused);
+	}
+	const source = readFileSync(
+		resolve(REPO_ROOT, 'static/ergopti_plus/macos/ui/menu/canvas_badge.lua'),
+		'utf8'
+	);
+	for (const [key, expression] of [
+		['macos_badge_is_paused', 'not not paused'],
+		['macos_badge_is_active', 'not paused']
+	]) {
+		const binds = (candidate, port = 2) =>
+			nativeTemplateBinding(candidate, '.lua', section, key, port);
+		assert.equal(binds(source), true, 'actual strict predicate is published at the getter port');
+		assert.equal(binds(source, 1), false, 'state predicate is not a native command');
+		for (const replacement of ['nil', '{}', 'function() end']) {
+			const candidate = source.replace(
+				'[' + JSON.stringify(key) + '] = function() return ' + expression + ' end',
+				'[' + JSON.stringify(key) + '] = ' + replacement
+			);
+			assert.notEqual(candidate, source, 'counterexample changes the actual binding');
+			assert.equal(
+				binds(candidate),
+				false,
+				'withdrawn/noncallable/empty getter evidence is refused'
+			);
+		}
+		const wrongFrame = source.replace(
+			'ManifestMenu.template_rows("' + section + '"',
+			'ManifestMenu.template_rows("unrelated_badge_frame"'
+		);
+		assert.notEqual(wrongFrame, source);
+		assert.equal(
+			binds(wrongFrame),
+			false,
+			'quoted IDs cannot substitute for actual frame consumption'
+		);
+	}
+	function executableSequence(candidate, expected) {
+		const actual = scriptTokens(candidate, '.lua');
+		const tokens = scriptTokens(expected, '.lua');
+		return actual.some((_, at) =>
+			tokens.every(
+				(token, offset) =>
+					actual[at + offset]?.kind === token.kind && actual[at + offset]?.value === token.value
+			)
+		);
+	}
+	const chain = [
+		['macos/ui/menu/init.lua', 'local Builder = require("ui.menu.builder")'],
+		['macos/ui/menu/init.lua', 'pcall(Builder.generate, ctx, menu_mods, actions)'],
+		['macos/ui/menu/builder.lua', 'local CanvasBadge = require("ui.menu.canvas_badge")'],
+		['macos/ui/menu/builder.lua', 'pcall(CanvasBadge.prepend_to, rendered, ctx, function()'],
+		['macos/ui/menu/canvas_badge.lua', 'function M.prepend_to(items, ctx, on_click)'],
+		['macos/ui/menu/canvas_badge.lua', 'local ManifestMenu = require("infra.manifest_menu")']
+	];
+	for (const [path, call] of chain) {
+		const actual = readFileSync(resolve(REPO_ROOT, 'static/ergopti_plus', path), 'utf8');
+		assert.equal(
+			executableSequence(actual, call),
+			true,
+			'the actual root producer reaches the badge consumer'
+		);
+		assert.equal(executableSequence('-- ' + call, call), false, 'comment-only evidence is refused');
+		assert.equal(executableSequence(JSON.stringify(call), call), false, 'quoted source is refused');
+		assert.equal(
+			executableSequence(call.replace(/Builder|CanvasBadge|ManifestMenu|M\./, 'Unrelated.'), call),
+			false,
+			'wrong native owner is refused'
+		);
+	}
+}
+
+// Disjoint caption variants retain one existing lifecycle identity per native OS.
+{
+	const assert = require('node:assert/strict');
+	const menu = JSON.parse(readFileSync(MENU_PATH, 'utf8'));
+	const prior = JSON.parse(
+		readFileSync(
+			resolve(SHARED, 'tests/corpus/menus/macos_lifecycle_command_captions.json'),
+			'utf8'
+		)
+	);
+	assert.equal(
+		Object.keys(prior.captions).length,
+		21,
+		'all prior physical caption pairs are independently frozen'
+	);
+	for (const platform of ['ahk', 'hs', 'linux']) {
+		const projected = menu.top_level.filter(
+			(row) => ['reload', 'quit'].includes(row.id) && row.platforms.includes(platform)
+		);
+		assert.equal(
+			projected.length,
+			2,
+			'exactly one native-visible owner per actual lifecycle identity'
+		);
+		assert.deepEqual(
+			projected.map((row) => row.id),
+			['reload', 'quit'],
+			'the original two native command identities/order remain unchanged'
+		);
+		assert.deepEqual(
+			projected.map((row) => row.i18n),
+			platform === 'hs'
+				? ['menu.global.reload_macos', 'menu.global.quit_macos']
+				: ['menu.global.reload', 'menu.global.quit']
+		);
+	}
+	for (const [locale, commands] of Object.entries(prior.captions)) {
+		const strings = JSON.parse(
+			readFileSync(resolve(LOCALES_DIR, locale + '.json'), 'utf8').replace(/^\uFEFF/, '')
+		);
+		for (const id of ['reload', 'quit']) {
+			assert.equal(
+				strings['menu.global.' + id],
+				commands[id].other,
+				'Windows/Linux keep the exact independently frozen caption'
+			);
+			assert.equal(
+				strings['menu.global.' + id + '_macos'],
+				commands[id].macos,
+				'Mac consumes the exact independently frozen prior display caption'
+			);
+		}
+	}
+	const source = readFileSync(
+		resolve(REPO_ROOT, 'static/ergopti_plus/macos/ui/menu/builder.lua'),
+		'utf8'
+	);
+	const first = source.indexOf('["reload"]          = function()');
+	const last = source.indexOf('["debug"]           = function()', first);
+	assert(
+		first >= 0 && last > first,
+		'both actual lifecycle builders have a bounded physical owner'
+	);
+	const tokens = require('../lib/script-source.cjs').scriptTokens(
+		source.slice(first, last),
+		'.lua'
+	);
+	assert(
+		tokens.length > 20,
+		'a quoted/commented declaration cannot supply the native command builders'
+	);
+	assert(
+		!tokens.some(
+			(token, at) =>
+				token.kind === 'identifier' &&
+				token.value === 'row' &&
+				tokens[at + 1]?.value === '.' &&
+				tokens[at + 2]?.value === 'label' &&
+				tokens[at + 3]?.value === '='
+		),
+		'the actual native lifecycle builder cannot replace its declared caption'
+	);
+}
+
+// Completed native root objects retain actual image/callback owners; the catalogue orders typed roles.
+{
+	const assert = require('node:assert/strict');
+	const declaration = {
+		macos_download_root: [
+			{
+				type: 'native_content',
+				id: 'download',
+				kind: 'command',
+				platforms: ['hs'],
+				unavailable: 'hide'
+			},
+			{ type: '---', after: 'download', platforms: ['hs'], unavailable: 'hide' },
+			{
+				type: 'native_content',
+				id: 'body',
+				kind: 'rows',
+				target: true,
+				platforms: ['hs'],
+				unavailable: 'hide'
+			}
+		],
+		macos_canvas_badge_root: [
+			{
+				type: 'native_content',
+				id: 'badge',
+				kind: 'image',
+				platforms: ['hs'],
+				unavailable: 'hide'
+			},
+			{
+				type: 'native_content',
+				id: 'boundary',
+				kind: 'boundary',
+				platforms: ['hs'],
+				unavailable: 'hide'
+			},
+			{
+				type: 'native_content',
+				id: 'body',
+				kind: 'rows',
+				target: true,
+				platforms: ['hs'],
+				unavailable: 'hide'
+			}
+		]
+	};
+	const canonical = parseToml(readFileSync(MANIFEST_PATH, 'utf8')).menu;
+	const projected = JSON.parse(readFileSync(MENU_PATH, 'utf8'));
+	for (const [key, rows] of Object.entries(declaration)) {
+		assert.deepEqual(canonical[key], rows, 'independent finished kind/role/placement declaration');
+		assert.deepEqual(
+			projected[key],
+			rows,
+			'actual compiler preserves the complete source declaration'
+		);
+	}
+	const { validateNativeCompositions } = require('../lib/menu-row-availability.cjs');
+	assert.doesNotThrow(() => validateNativeCompositions(declaration));
+	const controls = [
+		[
+			'duplicate slot',
+			(m) => {
+				m.macos_canvas_badge_root[1].id = 'badge';
+			}
+		],
+		[
+			'unknown role',
+			(m) => {
+				m.macos_canvas_badge_root[0].kind = 'unowned';
+			}
+		],
+		[
+			'role hides behavior',
+			(m) => {
+				m.macos_canvas_badge_root[0].command = 'unowned';
+			}
+		],
+		[
+			'role hides fake getter',
+			(m) => {
+				m.macos_canvas_badge_root[0].present_when = 'unowned';
+			}
+		],
+		[
+			'no target',
+			(m) => {
+				delete m.macos_canvas_badge_root[2].target;
+			}
+		],
+		[
+			'early target',
+			(m) => {
+				m.macos_canvas_badge_root[0].target = true;
+			}
+		],
+		[
+			'image target',
+			(m) => {
+				m.macos_canvas_badge_root[2].kind = 'image';
+			}
+		],
+		[
+			'invalid native token',
+			(m) => {
+				m.macos_canvas_badge_root[0].platforms = ['HS'];
+			}
+		],
+		[
+			'fake hide',
+			(m) => {
+				m.macos_canvas_badge_root[0].platforms = ['ahk', 'hs', 'linux'];
+			}
+		],
+		[
+			'boundary unknown owner',
+			(m) => {
+				m.macos_download_root[1].after = 'unowned';
+			}
+		],
+		[
+			'boundary future owner',
+			(m) => {
+				m.macos_download_root[1].after = 'body';
+			}
+		],
+		[
+			'boundary hides behavior',
+			(m) => {
+				m.macos_download_root[1].command = 'unowned';
+			}
+		]
+	];
+	for (const [name, corrupt] of controls) {
+		const candidate = JSON.parse(JSON.stringify(declaration));
+		corrupt(candidate);
+		assert.notDeepEqual(candidate, declaration, name + ': genuine physical schema mutation');
+		assert.throws(() => validateNativeCompositions(candidate), undefined, name);
+	}
+	const prior = JSON.parse(
+		readFileSync(resolve(SHARED, 'tests/corpus/menus/macos_native_root_order.json'), 'utf8')
+	);
+	assert.deepEqual(
+		prior.vectors,
+		[
+			{
+				name: 'badge_and_download',
+				badge: true,
+				download: true,
+				expected: ['badge', 'boundary', 'download', 'boundary', 'body']
+			},
+			{
+				name: 'badge_no_download',
+				badge: true,
+				download: false,
+				expected: ['badge', 'boundary', 'body']
+			},
+			{
+				name: 'download_badge_failure',
+				badge: false,
+				download: true,
+				expected: ['download', 'boundary', 'body']
+			},
+			{ name: 'both_absent', badge: false, download: false, expected: ['body'] },
+			{
+				name: 'badge_empty_body',
+				badge: true,
+				download: false,
+				body_empty: true,
+				expected: ['badge', 'boundary']
+			},
+			{
+				name: 'download_empty_body_badge_failure',
+				badge: false,
+				download: true,
+				body_empty: true,
+				expected: ['download', 'boundary']
+			}
+		],
+		'the old physical order oracle is independent and unchanged'
+	);
+}
+
+// Actual macOS layout switching owns the parents and complete automatic/native picker frame.
+{
+	const assert = require('node:assert/strict');
+	const { nativeTemplateBinding } = require('../lib/menu-template-binding.cjs');
+	const declaration = parseToml(readFileSync(MANIFEST_PATH, 'utf8')).menu;
+	const generated = JSON.parse(readFileSync(MENU_PATH, 'utf8'));
+	const expected = {
+		layout_switching_frame: [
+			{
+				type: 'check',
+				id: 'layout_switch_toggle',
+				i18n: 'menu.layout.pause_layout_enabled',
+				checked_when: ['layout_switch_checked'],
+				platforms: ['hs'],
+				unavailable: 'hide'
+			},
+			{
+				type: 'group',
+				id: 'layout_pause_picker',
+				i18n: 'menu.layout.pause_picker_caption',
+				caption_getter: 'layout_pause_caption',
+				disabled_when: ['layout_switch_ready'],
+				platforms: ['hs'],
+				unavailable: 'hide'
+			},
+			{
+				type: 'group',
+				id: 'layout_resume_picker',
+				i18n: 'menu.layout.resume_picker_caption',
+				caption_getter: 'layout_resume_caption',
+				disabled_when: ['layout_switch_ready'],
+				platforms: ['hs'],
+				unavailable: 'hide'
+			}
+		],
+		layout_switch_picker_frame: [
+			{
+				type: 'check',
+				id: 'layout_picker_auto',
+				i18n: 'menu.layout.layout_auto',
+				checked_when: ['layout_picker_auto_checked'],
+				platforms: ['hs'],
+				unavailable: 'hide'
+			},
+			{
+				type: 'include',
+				section: 'layout_switch_picker_choices_frame',
+				present_when: 'layout_picker_has_choices'
+			}
+		],
+		layout_switch_picker_choices_frame: [
+			{ type: '---' },
+			{ type: 'list', id: 'layout_picker_choices', platforms: ['hs'], unavailable: 'hide' }
+		]
+	};
+	for (const [section, rows] of Object.entries(expected)) {
+		assert.deepEqual(declaration[section], rows, 'independent complete switching declaration');
+		assert.deepEqual(generated[section], rows, 'actual generated switching declaration');
+	}
+	const source = readFileSync(
+		resolve(REPO_ROOT, 'static/ergopti_plus/macos/ui/menu/menu_keyboard_layout.lua'),
+		'utf8'
+	);
+	for (const [section, key, port] of [
+		['layout_switching_frame', 'layout_switch_toggle', 1],
+		['layout_switching_frame', 'layout_pause_picker', 3],
+		['layout_switching_frame', 'layout_resume_picker', 3],
+		['layout_switch_picker_frame', 'layout_picker_auto', 1],
+		['layout_switch_picker_frame', 'layout_picker_choices', 3]
+	]) {
+		assert.equal(
+			nativeTemplateBinding(source, '.lua', section, key, port),
+			true,
+			'actual executable typed switching owner'
+		);
+		assert.equal(
+			nativeTemplateBinding(source, '.lua', section, key, port === 1 ? 3 : 1),
+			false,
+			'mutation and data ports remain distinct'
+		);
+		const redirected = source.replaceAll('"' + section + '"', '"unrelated_layout_frame"');
+		assert.notEqual(redirected, source);
+		for (const decoy of [
+			'-- ManifestMenu.template_rows("' + section + '", {})',
+			JSON.stringify('ManifestMenu.template_rows("' + section + '", {})')
+		])
+			assert.equal(
+				nativeTemplateBinding(redirected + '\n' + decoy, '.lua', section, key, port),
+				false,
+				'comment/quoted decoy cannot own a declaration'
+			);
+	}
+	const vectors = JSON.parse(
+		readFileSync(resolve(SHARED, 'tests/corpus/menus/layout_switching_captions.json'), 'utf8')
+	);
+	assert.equal(Object.keys(vectors).length, 21);
+	for (const [locale, prior] of Object.entries(vectors)) {
+		const strings = JSON.parse(readFileSync(resolve(LOCALES_DIR, locale + '.json'), 'utf8'));
+		assert.equal(
+			strings['menu.layout.pause_picker_caption']
+				.split('%s')
+				.join(strings['menu.layout.layout_auto']),
+			prior.pause
+		);
+		assert.equal(
+			strings['menu.layout.resume_picker_caption']
+				.split('%s')
+				.join(strings['menu.layout.layout_auto']),
+			prior.resume
+		);
+		assert.equal(strings['menu.layout.layout_auto'], prior.automatic);
+		assert.equal(strings['menu.layout.pause_layout_enabled'], prior.switch);
+	}
+}
+
+// Ordered original formats and native record captions retain distinct authority.
+{
+	const assert = require('node:assert/strict');
+	const availability = require('../lib/menu-row-availability.cjs');
+	const corpus = JSON.parse(
+		readFileSync(resolve(SHARED, 'tests/corpus/menus/layout_caption_values.json'), 'utf8')
+	);
+	const english = JSON.parse(readFileSync(resolve(LOCALES_DIR, 'en.json'), 'utf8'));
+	const parent = {
+		type: 'group',
+		id: 'genuine_native_parent',
+		caption_source: 'native',
+		caption_getter: 'native',
+		unavailable: 'hide'
+	};
+	availability.validateChildTemplates({ frame: [...corpus.rows, parent] }, (key) => english[key]);
+	for (const [name, alter] of [
+		['empty vector', (row) => (row.caption_getters = [])],
+		['sparse vector', (row) => (row.caption_getters = ['scope', , 'latest'])],
+		['named vector', (row) => (row.caption_getters.extra = 'scope')],
+		['wrong getter', (row) => (row.caption_getters[1] = false)],
+		['wrong arity', (row) => (row.caption_getters = ['scope'])],
+		['mixed scalar', (row) => (row.caption_getter = 'scope')],
+		['mixed joiner', (row) => (row.caption_joiner = '')],
+		['mixed native source', (row) => (row.caption_source = 'native')],
+		[
+			'inert behavior metadata',
+			(row) => {
+				row.type = 'label';
+				row.action = 'foreign';
+			}
+		]
+	]) {
+		const row = structuredClone(corpus.rows[0]);
+		alter(row);
+		assert.throws(
+			() => availability.validateChildTemplates({ frame: [row] }, (key) => english[key]),
+			undefined,
+			name
+		);
+	}
+	for (const original of [corpus.rows[1], parent])
+		for (const [name, change] of [
+			['translation identity', { i18n: 'menu.layout.title' }],
+			['translated vector', { caption_getters: ['native'] }],
+			['empty native getter', { caption_getter: '' }],
+			['wrong native getter', { caption_getter: false }],
+			['foreign native source', { caption_source: 'foreign' }],
+			['native decoration', { caption_joiner: '' }],
+			['foreign row kind', { type: 'command' }]
+		])
+			assert.throws(
+				() =>
+					availability.validateChildTemplates(
+						{ frame: [{ ...original, ...change }] },
+						(key) => english[key]
+					),
+				undefined,
+				name
+			);
+	assert.equal(Object.keys(corpus.expected).length, 21);
+	for (const [locale, expected] of Object.entries(corpus.expected)) {
+		const strings = JSON.parse(readFileSync(resolve(LOCALES_DIR, locale + '.json'), 'utf8'));
+		const parts = strings['menu.layout.update_version'].split('%s');
+		assert.equal(parts.length, 4, 'original locale has three scalar positions');
+		assert.equal(
+			parts[0] +
+				corpus.values.scope +
+				parts[1] +
+				corpus.values.old +
+				parts[2] +
+				corpus.values.latest +
+				parts[3],
+			expected[0]
+		);
+		assert.equal(expected[1], 'Native 100%s && 🦀', 'independent literal native-caption oracle');
+	}
+}
+
+// A forwarded singleton owes the genuine helper, typed callbacks, and finished parent route.
+{
+	const assert = require('node:assert/strict');
+	const { nativeLayoutTemplatePublication } = require('../lib/menu-native-layout-binding.cjs');
+	const declaration = parseToml(readFileSync(MANIFEST_PATH, 'utf8')).menu;
+	const generated = JSON.parse(readFileSync(MENU_PATH, 'utf8'));
+	const native = readFileSync(
+		resolve(REPO_ROOT, 'static/ergopti_plus/macos/ui/menu/menu_keyboard_layout.lua'),
+		'utf8'
+	);
+	const sections = [
+		'layout_native_record_choice',
+		'layout_bundle_installed',
+		'layout_bundle_update',
+		'layout_bundle_install',
+		'layout_bundle_in_list',
+		'layout_bundle_update_install_first',
+		'layout_bundle_upgrade',
+		'layout_bundle_upgrade_to',
+		'layout_bundle_variant_added',
+		'layout_bundle_variant_add',
+		'layout_bundle_variant_parent',
+		'layout_bundle_install_first',
+		'layout_bundle_frame',
+		'layout_native_parent'
+	];
+	for (const section of sections) {
+		assert.deepEqual(
+			generated[section],
+			declaration[section],
+			'owning compiler projects the actual declaration'
+		);
+		const credit = (source) =>
+			nativeLayoutTemplatePublication(source, section, declaration[section]);
+		assert.equal(
+			credit(native),
+			true,
+			section + ' has actual native forwarding and final publication'
+		);
+		for (const [name, candidate] of [
+			['quoted producer', JSON.stringify(native)],
+			[
+				'wrong native receiver',
+				native.replace('renderer.template_rows(section,', 'Foreign.template_rows(section,')
+			],
+			[
+				'redirected declaration',
+				native.replaceAll('"' + section + '"', '"withdrawn_layout_frame"')
+			],
+			[
+				'withdrawn finished subtree',
+				native.replace('"layout_parent_content", submenu, {}', '"layout_parent_content", {}, {}')
+			],
+			['discarded custom rows', native.replace('return custom_rows end', 'return {} end')],
+			['discarded native active rows', native.replace('return active_rows end', 'return {} end')],
+			['discarded bundle rows', native.replace('return declared_bundle_rows end', 'return {} end')],
+			['discarded switching rows', native.replace('return switching_rows end', 'return {} end')]
+		]) {
+			assert.notEqual(candidate, native, name + ' changes a genuine measured producer');
+			assert.equal(credit(candidate), false, name + ' cannot earn native frame credit');
+		}
+		assert.equal(nativeLayoutTemplatePublication(native, section, []), false);
+		assert.equal(credit(native), true, 'exact genuine producer restoration recovers credit');
+	}
+}
+
+// Independent numbered policy vectors; actual canonical generator validation owner.
+{
+	const { validateChildTemplates } = require('../lib/menu-row-availability.cjs');
+	const assert = require('node:assert/strict');
+	const row = {
+		type: 'command',
+		id: 'native_action',
+		i18n: 'contract.numbered',
+		caption_getter: 'native_value',
+		caption_format: 'numbered'
+	};
+	for (const title of ['Caption {1}', '50% %s {1} / {1}', 'Empty ({1})'])
+		assert.doesNotThrow(() => validateChildTemplates({ frame: [row] }, () => title));
+	for (const title of [
+		'Caption',
+		'Caption {2}',
+		'Caption {1} {2}',
+		'Caption {{1}}',
+		'Caption {1',
+		'Caption {1}}'
+	])
+		assert.throws(() => validateChildTemplates({ frame: [row] }, () => title), /numbered caption/);
+	for (const change of [
+		{ caption_format: 'foreign' },
+		{ caption_getter: undefined },
+		{ caption_getter: '' },
+		{ caption_getters: ['native_value'] },
+		{ caption_layout: 'suffix', caption_joiner: ' ' },
+		{ caption_source: 'native' },
+		{ label_prefix: '!' },
+		{ type: 'check' },
+		{ id: '' },
+		{ reason_key: 'reason' },
+		{ disabled_reason_key: 'reason' }
+	])
+		assert.throws(
+			() => validateChildTemplates({ frame: [{ ...row, ...change }] }, () => 'Caption {1}'),
+			/numbered caption/
+		);
+	assert.doesNotThrow(() =>
+		validateChildTemplates({ frame: [{ ...row, type: 'group' }] }, () => 'Parent {1}')
+	);
+}
+
+// Source-only successor controls exercise the actual guarded receiver and nested picker owner.
+{
+	const assert = require('node:assert/strict');
+	const { nativeLayoutTemplatePublication } = require('../lib/menu-native-layout-binding.cjs');
+	const declaration = parseToml(readFileSync(MANIFEST_PATH, 'utf8')).menu;
+	const source = readFileSync(
+		resolve(REPO_ROOT, 'static/ergopti_plus/macos/ui/menu/menu_keyboard_layout.lua'),
+		'utf8'
+	);
+	for (const [name, candidate] of [
+		[
+			'foreign guarded native receiver',
+			source.replace(
+				'pcall(require, "infra.manifest_menu")',
+				'pcall(require, "infra.foreign_menu")'
+			)
+		],
+		[
+			'withdrawn actual renderer refusal',
+			source.replace('if not ok_mm or type(ManifestMenu.build) ~= "function" then', 'if false then')
+		],
+		['shadowed guarded call owner', 'local pcall = ForeignCall\n' + source]
+	]) {
+		assert.notEqual(candidate, source, name + ' mutates the genuine source owner');
+		for (const section of [
+			'layout_native_record_choice',
+			'layout_bundle_frame',
+			'layout_native_parent'
+		])
+			assert.equal(
+				nativeLayoutTemplatePublication(candidate, section, declaration[section]),
+				false,
+				name
+			);
+	}
+	const candidate = source.replace(
+		'local function picker(current_id, on_pick)',
+		'local function foreign_picker(current_id, on_pick)'
+	);
+	assert.notEqual(candidate, source, 'withdraw the actual nested picker declaration');
+	assert.equal(
+		nativeLayoutTemplatePublication(
+			candidate,
+			'layout_native_record_choice',
+			declaration.layout_native_record_choice
+		),
+		false
+	);
+	assert.equal(
+		nativeLayoutTemplatePublication(
+			source,
+			'layout_native_record_choice',
+			declaration.layout_native_record_choice
+		),
+		true,
+		'restore the actual switching builder and nested picker ownership'
+	);
+}

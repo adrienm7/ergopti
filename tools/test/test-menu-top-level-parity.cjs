@@ -408,11 +408,30 @@ const APPROVED_TOP_LEVEL = [
 ];
 
 const declaredTopLevel = (topLevel || []).map((row) => row.id);
-if (declaredTopLevel.join(',') !== APPROVED_TOP_LEVEL.join(',')) {
+// Only Reload/Quit have adjacent, disjoint native caption declarations.
+// Pin their physical multiplicity and the unchanged approved native order.
+const approvedPhysicalOrder = APPROVED_TOP_LEVEL.flatMap((id) =>
+	id === 'reload' || id === 'quit' ? [id, id] : [id]
+);
+if (declaredTopLevel.join(',') !== approvedPhysicalOrder.join(',')) {
 	errors.push(
 		'the manifest top level is not the approved order.\n' +
 			`      approved: ${APPROVED_TOP_LEVEL.join(', ')}\n      declared: ${declaredTopLevel.join(', ')}`
 	);
+}
+
+for (const [driver, ids] of Object.entries(projections)) {
+	const approved = APPROVED_TOP_LEVEL.filter(
+		(id) =>
+			id !== SEPARATOR &&
+			(id !== 'apps' || driver === 'hs') &&
+			(id !== 'suspend' || driver === 'ahk')
+	);
+	if (ids.join(',') !== approved.join(',')) {
+		errors.push(
+			`the ${driver} native top level is not the approved order or has duplicate identities`
+		);
+	}
 }
 
 // Applications lists the applications bundled with the macOS app; the other

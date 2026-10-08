@@ -348,6 +348,22 @@ end
 --- @param slot        string   "tap", "hold", or "combo".
 --- @return table List of hs.menubar menu item tables.
 local function build_action_picker(karabiner, set_fn, current_id, update_menu, slot)
+	local special, grouped = {}, {}
+	local getters = {
+		tap_hold_picker_has_boundary = function() return #special > 0 and #grouped > 0 end,
+	}
+	local function special_rows() return special end
+	local function grouped_rows() return grouped end
+	-- Validate the complete declaration before reading the real action catalogue
+	-- or grouping it. Empty supplied lists have no native selection effects.
+	local admission = ManifestMenu.template_rows("tap_hold_action_picker_frame", {}, getters, {
+		tap_hold_picker_special_rows = special_rows,
+		tap_hold_picker_grouped_rows = grouped_rows,
+	})
+	if type(admission) ~= "table" or #admission ~= 0 then
+		Logger.error(LOG, "Declared Tap-Hold action picker admission refused.")
+		return nil
+	end
 	-- Filter: exclude actions that don't match the slot mode
 	local function slot_filter(action)
 		if slot == "hold" and not action.holdable      then return false end
@@ -361,14 +377,13 @@ local function build_action_picker(karabiner, set_fn, current_id, update_menu, s
 	end
 
 	-- Collect Spécial actions first (ungrouped), then the rest via MenuUtils
-	local items = {}
 	local non_special = {}
 	for _, action in ipairs(karabiner.AVAILABLE_ACTIONS) do
 		if not slot_filter(action) then goto continue end
 		if not special_filter(action) then
 			-- Spécial: show directly without category header
 			local aid = action.id
-			items[#items + 1] = {
+			special[#special + 1] = {
 				label   = action.label,
 				checked = (aid == current_id),
 				action      = function()
@@ -385,18 +400,27 @@ local function build_action_picker(karabiner, set_fn, current_id, update_menu, s
 
 	-- Now use MenuUtils for the grouped, non-Spécial actions
 	if #non_special > 0 then
-		if #items > 0 then items[#items + 1] = { separator = true } end
-		local grouped = MenuUtils.build_action_picker(non_special, current_id, function(aid)
+		grouped = MenuUtils.build_action_picker(non_special, current_id, function(aid)
 			return commit_menu_setting(karabiner, "Grouped action picker", function()
 				return set_fn(aid)
 			end, update_menu)
 		end)
-		for _, it in ipairs(grouped) do
-			items[#items + 1] = it
-		end
+	end
+	if type(grouped) ~= "table" then
+		Logger.error(LOG, "Native grouped Tap-Hold choices are unavailable.")
+		return nil
 	end
 
-	return items
+	local rows = ManifestMenu.template_rows("tap_hold_action_picker_frame", {}, getters, {
+		tap_hold_picker_special_rows = special_rows,
+		tap_hold_picker_grouped_rows = grouped_rows,
+	})
+	local expected = #special + #grouped + (#special > 0 and #grouped > 0 and 1 or 0)
+	if type(rows) ~= "table" or #rows ~= expected then
+		Logger.error(LOG, "Declared Tap-Hold action picker frame refused.")
+		return nil
+	end
+	return rows
 end
 
 
