@@ -3210,7 +3210,18 @@ WP3 prerequisite: the actual macOS physical accounting owner now requires exact 
   admits known expert `[script]`/`[features]` values through their published
   owners, preserves obsolete scalar user-model and section-order rows, and
   checks gesture action-parameter bindings against each driver's complete
-  native gesture inventory. The Lua keyboard owners now publish both logical
+  native gesture inventory. The macOS gesture constructor now also captures its
+  original compatibility accessor, native slot-array identities and ordered
+  scalar image in the genuine shared publication ledger. A copied, withdrawn or
+  replaced owner, accessor or complete slot source remains unjudged without
+  invoking replacement callbacks; exact source repair restores judgment. The
+  independent focused consumer controls pass 188/0 against four predecessor
+  failures, preserving all prior malformed-source assertions and retained
+  parameter bytes. Selected gates pass 382 JS checks, 17,211 portable macOS
+  and 11,693 Linux unit tests, plus both portable E2E suites. Native macOS
+  qualification remains pending;
+  this bounded source-publication correction does not complete item 33.
+  The Lua keyboard owners now publish both logical
   identities and the complete 1,536 physical identities from the actual private
   registry, with current source and owner checks. Cold or partial publication
   remains unjudged; Windows keyboard and other binding owners remain pending.
