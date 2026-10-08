@@ -31,6 +31,18 @@ const FULL = process.argv.includes('--full');
 // Each check mirrors a CI "Validate ·" step. command/args are run from ROOT.
 const CHECKS = [
 	{
+		name: 'source toolchain admission preserves genuine compiler, headers and checkout',
+		cmd: process.execPath,
+		args: ['tools/test/test-linux-source-toolchain.cjs'],
+		repro: 'npm run test:linux-source-toolchain'
+	},
+	{
+		name: 'openSUSE first-install prep and requested-capability diagnostics retain native refusal',
+		cmd: process.execPath,
+		args: ['tools/test/test-opensuse-first-install-tooling.cjs'],
+		repro: 'npm run test:opensuse-first-install-tooling'
+	},
+	{
 		name: 'Nix runtime receipts and hosted registration preserve native admission',
 		cmd: process.execPath,
 		args: ['tools/test/test-linux-nix-native.cjs'],
@@ -2028,6 +2040,12 @@ const CHECKS = [
 		repro: 'npm run test:action-picker-parameter-editor'
 	},
 	{
+		name: 'Apple Shortcuts cold CLI diagnostic preserves ownership and never admits a provider',
+		cmd: 'node',
+		args: ['tools/test/test-apple-shortcuts-cold-cli-probe.cjs'],
+		repro: 'npm run test:apple-shortcuts-cold-cli'
+	},
+	{
 		name: 'file-path headers (convention 3, every source file names itself)',
 		cmd: 'node',
 		args: ['tools/lint/audit-file-headers.cjs'],
@@ -2161,6 +2179,12 @@ const CHECKS = [
 		cmd: 'node',
 		args: ['tools/test/test-managed-network-failure-ui.cjs'],
 		repro: 'npm run test:managed-network-failure-ui'
+	},
+	{
+		name: 'managed fixture late accepted clients retain exact retirement ownership',
+		cmd: 'node',
+		args: ['tools/test/test-managed-remote-retirement.cjs'],
+		repro: 'npm run test:managed-remote-retirement'
 	},
 	{
 		name: 'model browser actions retain their operation session across native reuse',

@@ -105,7 +105,7 @@ assert.deepEqual(catalogue.network_runtime.portable.system_ca_files, [
 ]);
 assert.equal(Object.keys(catalogue.libraries).join(','), 'xkbcommon,xkbcommon_x11,x11,x11_xcb');
 passed++;
-const modules = generator
+const allModules = generator
 	.flatpakModules(catalogue)
 	.split('\n')
 	.filter(Boolean)
@@ -113,6 +113,181 @@ const modules = generator
 		assert.ok(line.startsWith('  - {'));
 		return JSON.parse(line.slice(4));
 	});
+// HTTP content encoding must preserve every declared archive digest.
+const archiveSources = allModules
+	.flatMap((module) => module.sources)
+	.filter((source) => source.type === 'archive');
+assert.ok(archiveSources.length > 0, 'archive preservation needs a genuine declared archive');
+for (const source of archiveSources)
+	assert.equal(
+		source['disable-http-decompression'],
+		true,
+		'HTTP archive must preserve original declared bytes'
+	);
+for (const source of allModules
+	.flatMap((module) => module.sources)
+	.filter((source) => source.type === 'git'))
+	assert.equal(
+		source['disable-http-decompression'],
+		undefined,
+		'Git sources must not borrow archive options'
+	);
+passed++;
+// Replay the real environment admission against the observed SDK lib64 default.
+// Files model installation paths only; no placeholder native component is run.
+const layoutFixture = fs.mkdtempSync(path.join(os.tmpdir(), 'ergopti-meson-layout-'));
+try {
+	const prefix = path.join(layoutFixture, 'installed prefix');
+	const driver = path.join(prefix, 'lib/ergopti');
+	const gio = allModules.find((module) => module.name === 'network-gio-proxy');
+	const option = gio['config-opts'].find((value) => value.startsWith('--libdir='));
+	const observedLibdir = option ? option.slice('--libdir='.length) : 'lib64';
+	for (const file of [
+		'bin/luajit',
+		'bin/curl',
+		'lib/lua/5.1/luv.so',
+		`${observedLibdir}/gio/modules/libgiolibproxy.so`,
+		`${observedLibdir}/gio/modules/libgiognutls.so`,
+		'share/glib-2.0/schemas/gschemas.compiled'
+	]) {
+		fs.mkdirSync(path.dirname(path.join(prefix, file)), { recursive: true });
+		fs.writeFileSync(path.join(prefix, file), 'owned path fixture, never executed');
+	}
+	fs.mkdirSync(driver, { recursive: true });
+	const posix = (value) =>
+		value.replaceAll('\\', '/').replace(/^([A-Za-z]):/, (_, drive) => '/' + drive.toLowerCase());
+	const environmentPath = path.join(layoutFixture, 'environment.sh');
+	fs.writeFileSync(environmentPath, source(environmentTemplate));
+	const observe = () =>
+		spawnSync(
+			bashExecutable(),
+			[
+				'-c',
+				'set -euo pipefail; source "$1" "$2" "$3"; printf "%s\\n" "$GIO_MODULE_DIR"',
+				'owned-meson-layout',
+				posix(environmentPath),
+				posix(prefix),
+				posix(driver)
+			],
+			{
+				encoding: 'utf8',
+				env: { ...process.env, CURL_CA_BUNDLE: 'owned explicit trust, no TLS request' }
+			}
+		);
+	const installed = observe();
+	assert.ifError(installed.error);
+	assert.equal(
+		installed.status,
+		0,
+		'actual generated Meson layout must satisfy installed environment admission'
+	);
+	assert.equal(installed.stdout, posix(path.join(prefix, 'lib/gio/modules')) + '\n');
+	assert.equal(installed.stderr, '');
+	// The original lib64-only layout must still refuse; do not broaden discovery.
+	fs.renameSync(path.join(prefix, 'lib/gio'), path.join(prefix, 'detached-gio'));
+	fs.mkdirSync(path.join(prefix, 'lib64/gio/modules'), { recursive: true });
+	fs.writeFileSync(
+		path.join(prefix, 'lib64/gio/modules/libgiolibproxy.so'),
+		'owned legacy path fixture'
+	);
+	const misplaced = observe();
+	assert.equal(misplaced.status, 1);
+	assert.equal(misplaced.stdout, '');
+	assert.equal(misplaced.stderr, 'Required installed native package component unavailable.\n');
+} finally {
+	fs.rmSync(layoutFixture, { recursive: true, force: true });
+}
+passed++;
+// A required GSS build must carry its own SDK dependency before curl.
+const kerberos = allModules.find((module) => module.name === 'network-krb5');
+assert.ok(kerberos, 'Flatpak GSS requires a pinned Kerberos build before curl');
+assert.equal(allModules.length, 7);
+assert.equal(allModules.filter((module) => module.name === 'network-krb5').length, 1);
+assert.ok(
+	allModules.indexOf(kerberos) < allModules.findIndex((module) => module.name === 'network-curl')
+);
+assert.equal(kerberos.buildsystem, 'simple');
+assert.equal(kerberos.subdir, undefined);
+assert.deepEqual(kerberos.sources, [
+	{
+		type: 'git',
+		url: 'https://github.com/krb5/krb5.git',
+		commit: '8570e77819563e036027e1da789d08ec9333ed4d'
+	}
+]);
+assert.ok(kerberos['build-commands'][1].includes('--prefix=/app'));
+assert.ok(kerberos['post-install'].includes('test -f /app/include/gssapi/gssapi.h'));
+assert.ok(
+	kerberos['post-install'].includes('test "$(pkg-config --variable=prefix mit-krb5-gssapi)" = /app')
+);
+const flatpakCurl = allModules.find((module) => module.name === 'network-curl');
+assert.ok(
+	flatpakCurl['config-opts'].includes('-DCMAKE_INSTALL_LIBDIR=lib'),
+	'Flatpak curl must resolve its own library through /app/lib'
+);
+for (const module of allModules.filter((entry) => entry.buildsystem === 'cmake-ninja')) {
+	assert.deepEqual(
+		module['config-opts'].filter((option) => option.startsWith('-DCMAKE_INSTALL_LIBDIR')),
+		['-DCMAKE_INSTALL_LIBDIR=lib'],
+		`${module.name} must install libraries in the /app/lib runtime search directory`
+	);
+}
+assert.ok(flatpakCurl['config-opts'].includes('-DCURL_USE_GSSAPI=ON'));
+assert.ok(flatpakCurl['config-opts'].includes('-DGSS_ROOT_DIR=/app'));
+assert.ok(flatpakCurl['post-install'].some((command) => command.includes('GSS-API( |$)')));
+assert.ok(flatpakCurl['post-install'].some((command) => command.includes('SPNEGO( |$)')));
+passed++;
+// Execute the generated capability command with an explicit recording curl port.
+// These parser/exit controls do not claim a native Flatpak curl or Kerberos session.
+const featureCommands = flatpakCurl['post-install'].filter((command) =>
+	command.includes('--version')
+);
+assert.equal(featureCommands.length, 1);
+for (const [label, output, status, admitted] of [
+	['complete features', 'curl fixture\nFeatures: GSS-API SPNEGO SSL', 0, true],
+	['missing GSS', 'curl fixture\nFeatures: SPNEGO SSL', 0, false],
+	['missing SPNEGO', 'curl fixture\nFeatures: GSS-API SSL', 0, false],
+	['protocol names are not features', 'Protocols: GSS-API SPNEGO\nFeatures: SSL', 0, false],
+	['foreign GSS suffix', 'Features: GSS-API-foreign SPNEGO', 0, false],
+	['foreign SPNEGO suffix', 'Features: GSS-API SPNEGO-foreign', 0, false],
+	['failed capability process', 'Features: GSS-API SPNEGO SSL', 1, false]
+]) {
+	const command =
+		'curl() { test "$*" = "--disable --version" || return 91; ' +
+		'printf "%s\\n" "$GSS_FIXTURE_OUTPUT"; return "$GSS_FIXTURE_STATUS"; }; ' +
+		featureCommands[0].replaceAll('/app/bin/curl', 'curl');
+	const result = spawnSync(bashExecutable(), ['-c', command], {
+		cwd: root,
+		encoding: 'utf8',
+		env: { ...process.env, GSS_FIXTURE_OUTPUT: output, GSS_FIXTURE_STATUS: String(status) }
+	});
+	assert.ifError(result.error);
+	assert.equal(result.signal, null, label);
+	assert.equal(result.stderr, '', label);
+	assert.equal(result.status === 0, admitted, label);
+	passed++;
+}
+for (const mutation of [
+	(data) => {
+		delete data.network_runtime.portable.flatpak_sources.krb5;
+	},
+	(data) => {
+		data.network_runtime.portable.flatpak_sources.krb5.url = 'https://foreign.invalid/krb5.tar.gz';
+	},
+	(data) => {
+		data.network_runtime.portable.flatpak_sources.krb5.commit = 'unverified';
+	},
+	(data) => {
+		data.network_runtime.portable.flatpak_sources.krb5.url = 'http://github.com/krb5/krb5.git';
+	}
+]) {
+	const invalid = structuredClone(catalogue);
+	mutation(invalid);
+	assert.throws(() => generator.validate(invalid));
+	passed++;
+}
+// Preserve the complete upstream module order, source and option oracles.
+const modules = allModules;
 assert.deepEqual(
 	modules.map((module) => module.name),
 	[
@@ -137,7 +312,67 @@ assert.deepEqual(
 		'https://github.com/GNOME/glib-networking.git'
 	]
 );
+// Duktape 2.7's Makefile omits libm on both shared-library links. Keep it after
+// the C input so the SDK's --as-needed cannot discard its DT_NEEDED dependency.
+const duktapeMathPatch =
+	"test \"$(grep -c '\\$(DUKTAPE_SRCDIR)/duktape\\.c$' Makefile.sharedlibrary)\" -eq 2 && sed -i 's|\\$(DUKTAPE_SRCDIR)/duktape\\.c$|$(DUKTAPE_SRCDIR)/duktape.c -lm|' Makefile.sharedlibrary";
+assert.deepEqual(modules[4]['build-commands'], [
+	duktapeMathPatch,
+	'make -f Makefile.sharedlibrary INSTALL_PREFIX=/app',
+	'make -f Makefile.sharedlibrary INSTALL_PREFIX=/app install'
+]);
+// Replay the actual recipe command against the two pinned link-body shapes,
+// independently preserving flags, SONAMEs and the separate command-line link.
+const sharedLinkFixture =
+	'libduktape.$(SO_REALNAME_SUFFIX):\n' +
+	'\t$(CC) $(CFLAGS) $(CPPFLAGS) $(LDFLAGS) -shared -fPIC -Wall -Wextra -Os -Wl,$(LD_SONAME_ARG),libduktape.$(SO_SONAME_SUFFIX) \\\n' +
+	'\t\t-o $@ $(DUKTAPE_SRCDIR)/duktape.c\n' +
+	'libduktaped.$(SO_REALNAME_SUFFIX):\n' +
+	'\t$(CC) $(CFLAGS) $(CPPFLAGS) $(LDFLAGS) -shared -fPIC -g -Wall -Wextra -Os -Wl,$(LD_SONAME_ARG),libduktaped.$(SO_SONAME_SUFFIX) \\\n' +
+	'\t\t-o $@ $(DUKTAPE_SRCDIR)/duktape.c\n' +
+	'duk:\n\t$(CC) -o duk examples/cmdline/duk_cmdline.c -lduktape -lm\n';
+for (const [label, input, admitted] of [
+	['pinned release and debug links', sharedLinkFixture, true],
+	['one missing link input', sharedLinkFixture.replace('duktape.c\n', 'foreign.c\n'), false],
+	['already patched inputs', sharedLinkFixture.replaceAll('duktape.c\n', 'duktape.c -lm\n'), false]
+]) {
+	const fixture = fs.mkdtempSync(path.join(os.tmpdir(), 'ergopti-duktape-math-'));
+	try {
+		const makefile = path.join(fixture, 'Makefile.sharedlibrary');
+		fs.writeFileSync(makefile, input, 'utf8');
+		const result = spawnSync(bashExecutable(), ['-c', modules[4]['build-commands'][0]], {
+			cwd: fixture,
+			encoding: 'utf8'
+		});
+		assert.ifError(result.error);
+		assert.equal(result.signal, null, label);
+		assert.equal(result.status, admitted ? 0 : 1, label);
+		assert.equal(result.stdout, '', label);
+		assert.equal(result.stderr, '', label);
+		assert.equal(
+			fs.readFileSync(makefile, 'utf8'),
+			admitted ? input.replaceAll('duktape.c\n', 'duktape.c -lm\n') : input,
+			`${label}: both -lm arguments follow source inputs without changing other bytes`
+		);
+	} finally {
+		fs.rmSync(fixture, { recursive: true, force: true });
+	}
+	passed++;
+}
 assert.ok(modules[0]['config-opts'].includes('-DLUA_BUILD_TYPE=System'));
+const mesonModules = allModules.filter((module) => module.buildsystem === 'meson');
+assert.deepEqual(
+	mesonModules.map((module) => module.name),
+	['network-schemas', 'network-libproxy', 'network-gio-proxy']
+);
+for (const module of mesonModules) {
+	assert.deepEqual(
+		module['config-opts'].filter((option) => /^(?:--libdir(?:=|$)|-Dlibdir(?:=|$))/.test(option)),
+		['--libdir=lib'],
+		`${module.name}: one exact library directory without duplicate or conflicting options`
+	);
+}
+assert.deepEqual(modules[1]['config-opts'], ['--libdir=lib', '-Dintrospection=false']);
 assert.equal(modules[2].buildsystem, 'simple');
 assert.equal(modules[2].subdir, undefined);
 assert.deepEqual(modules[2]['build-commands'], [
@@ -151,17 +386,17 @@ assert.ok(modules[2]['build-commands'][1].includes('--disable-static'));
 assert.ok(modules[2]['post-install'].includes('test -f /app/lib/libgssapi_krb5.so'));
 assert.ok(modules[3]['config-opts'].includes('-DCURL_USE_GSSAPI=ON'));
 assert.ok(modules[3]['config-opts'].includes('-DGSS_ROOT_DIR=/app'));
-// Upstream places LDFLAGS before its source and does not consume LDLIBS.
-// Retain libm explicitly there, preserving SDK hardening flags and later as-needed.
+// Preserve SDK flags while retaining libm after each release/debug C input.
 assert.deepEqual(modules[4]['build-commands'], [
-	'make -f Makefile.sharedlibrary INSTALL_PREFIX=/app LDFLAGS="${LDFLAGS:-} -Wl,--no-as-needed -lm -Wl,--as-needed"',
-	'make -f Makefile.sharedlibrary INSTALL_PREFIX=/app LDFLAGS="${LDFLAGS:-} -Wl,--no-as-needed -lm -Wl,--as-needed" install'
+	duktapeMathPatch,
+	'make -f Makefile.sharedlibrary INSTALL_PREFIX=/app',
+	'make -f Makefile.sharedlibrary INSTALL_PREFIX=/app install'
 ]);
 assert.ok(modules[5]['config-opts'].includes('-Dconfig-xdp=true'));
 // The declared package environment resolves native providers from prefix/lib.
 // SDK autodetection must not place either provider in prefix/lib64 instead.
 assert.deepEqual(modules[5]['config-opts'], [
-	'-Dlibdir=lib',
+	'--libdir=lib',
 	'-Ddocs=false',
 	'-Dtests=false',
 	'-Dvapi=false',
@@ -175,7 +410,7 @@ assert.ok(modules[6]['config-opts'].includes('-Dlibproxy=enabled'));
 // The pinned GIO source declares installed_tests, not libproxy's tests option.
 // Preserve both proxy-provider choices and native TLS while refusing unknown flags.
 assert.deepEqual(modules[6]['config-opts'], [
-	'-Dlibdir=lib',
+	'--libdir=lib',
 	'-Dlibproxy=enabled',
 	'-Dgnome_proxy=disabled',
 	'-Dgnutls=enabled',
