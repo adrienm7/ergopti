@@ -276,9 +276,8 @@ def acquire_owned(arguments, native, register, **options):
             old = signal.getsignal(signum)
             signal.signal(signum, deferred)
             previous[signum] = old
-        process = subprocess.Popen(
-            arguments, stdin=subprocess.DEVNULL, start_new_session=True, **options
-        )
+        options.setdefault("stdin", subprocess.DEVNULL)
+        process = subprocess.Popen(arguments, start_new_session=True, **options)
         group = OwnedProcessGroup(process, native)
         try:
             register(group)

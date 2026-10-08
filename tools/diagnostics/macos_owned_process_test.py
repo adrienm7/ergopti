@@ -5,6 +5,7 @@ import ctypes
 import json
 from pathlib import Path
 import subprocess
+import sys
 from tempfile import TemporaryDirectory
 from types import SimpleNamespace
 import unittest
@@ -37,6 +38,62 @@ class OwnedProcessControls(unittest.TestCase):
                 return 0
 
         return Child()
+
+    def test_explicit_owned_stdin_is_preserved_for_private_fixture_input(self):
+        native = Mock()
+        native.observe_exit.return_value = object()
+        native.live_members.return_value = []
+        registered = []
+        group = owner.acquire_owned(
+            [sys.executable, "-c", "import sys; sys.stdout.buffer.write(sys.stdin.buffer.read())"],
+            native,
+            registered.append,
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+        )
+        try:
+            self.assertEqual(registered, [group])
+            group.process.stdin.write(b"actual bounded private pipe bytes")
+            group.process.stdin.close()
+            # This fixture proves real Popen input dispatch, not Darwin WNOWAIT.
+            group.process.wait(timeout=10)
+            self.assertEqual(group.process.stdout.read(), b"actual bounded private pipe bytes")
+        finally:
+            if group.process.poll() is None:
+                group.process.kill()
+                group.process.wait()
+            for stream in (group.process.stdin, group.process.stdout, group.process.stderr):
+                stream.close()
+
+    def test_default_devnull_and_explicit_devnull_are_both_admitted(self):
+        for supplied in ({}, {"stdin": subprocess.DEVNULL}):
+            with self.subTest(supplied=supplied):
+                native = Mock()
+                native.observe_exit.return_value = object()
+                native.live_members.return_value = []
+                registered = []
+                group = owner.acquire_owned(
+                    [sys.executable, "-c", "import sys; print(len(sys.stdin.buffer.read()))"],
+                    native,
+                    registered.append,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
+                    **supplied,
+                )
+                try:
+                    self.assertEqual(registered, [group])
+                    # Real child dispatch/EOF; native group syscall qualification
+                    # remains under the separate original ownership controls.
+                    self.assertEqual(group.process.wait(timeout=10), 0)
+                    self.assertEqual(group.process.stdout.read().strip(), b"0")
+                    self.assertIsNone(group.process.stdin)
+                finally:
+                    if group.process.poll() is None:
+                        group.process.kill()
+                        group.process.wait()
+                    group.process.stdout.close()
+                    group.process.stderr.close()
 
     def test_cancellation_inside_native_observation_preserves_reserved_group_cleanup(self):
         process = Mock(pid=73136, returncode=None)
