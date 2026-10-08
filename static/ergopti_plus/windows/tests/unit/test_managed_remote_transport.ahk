@@ -59,6 +59,76 @@ _ManagedRemoteFixtureEmitDiagnostic(State) {
 	}
 }
 
+; Project the already-closed owner and final receipt before their private removal.
+_ManagedRemoteFixtureCleanupDiagnosticFact(State, Completions) {
+	try {
+		if !(State is Map) || !(Completions is Array) || Completions.Length > 4096
+			return ""
+		Phase := State.Get("state", "unknown")
+		if !(Phase is String) || !RegExMatch(Phase, "\A(?:unknown|starting|ready|failed|stopped)\z")
+			Phase := "unknown"
+		Fact := "state=" . Phase
+		for Name in ["root_removed", "service_stopped", "server_tls_source_unchanged"] {
+			Value := State.Get(Name, -1)
+			if Type(Value) != "Integer" || (Value != 0 && Value != 1)
+				Value := -1
+			Fact .= " " . Name . "=" . Value
+		}
+		for Name in ["ServiceFailures", "server_tls_owned_streams", "server_tls_owned_modules", "server_tls_owned_source_fences"] {
+			Value := State.Get(Name, -1)
+			if Type(Value) != "Integer" || Value < -1 || Value > 4096
+				Value := -1
+			Fact .= " " . Name . "=" . Value
+		}
+		Fact .= " completions=" . Completions.Length
+		ExitCode := "unknown"
+		Marker := "unknown"
+		if Completions.Length == 1 && Completions[1] is Map {
+			Code := Completions[1].Get("exit", "unknown")
+			if Type(Code) == "Integer" && Code >= -2147483648 && Code <= 4294967295
+				ExitCode := Format("{:d}", Code)
+			Out := Completions[1].Get("stdout", "")
+			if Out is String
+				Marker := Trim(Out, "`r`n ") == "OWNED_FIXTURE_STOPPED_ROOT_REMOVED" ? "match" : "mismatch"
+		}
+		return Fact . " exit=" . ExitCode . " marker=" . Marker
+	}
+	return ""
+}
+
+_ManagedRemoteFixtureCleanupDiagnostic(State, Completions) {
+	try {
+		Fact := _ManagedRemoteFixtureCleanupDiagnosticFact(State, Completions)
+		if Fact != ""
+			_TestPrint("::notice title=Windows native cleanup receipt::" . Fact)
+	}
+}
+
+_ManagedRemoteFixtureCleanupDiagnosticControls() {
+	State := Map("state", "stopped", "root_removed", true, "service_stopped", true,
+		"server_tls_source_unchanged", true, "ServiceFailures", 0, "server_tls_owned_streams", 0,
+		"server_tls_owned_modules", 0, "server_tls_owned_source_fences", 0)
+	Completion := Map("exit", 0, "stdout", "OWNED_FIXTURE_STOPPED_ROOT_REMOVED", "stderr", "private")
+	Expected := "state=stopped root_removed=1 service_stopped=1 server_tls_source_unchanged=1"
+		. " ServiceFailures=0 server_tls_owned_streams=0 server_tls_owned_modules=0 server_tls_owned_source_fences=0"
+		. " completions=1 exit=0 marker=match"
+	AssertEqual(Expected, _ManagedRemoteFixtureCleanupDiagnosticFact(State, [Completion]))
+	for Pair in [["state", "stopped`nprivate"], ["root_removed", "private"],
+		["server_tls_owned_streams", 4097], ["ServiceFailures", -2]] {
+		Invalid := State.Clone()
+		Invalid[Pair[1]] := Pair[2]
+		Fact := _ManagedRemoteFixtureCleanupDiagnosticFact(Invalid, [Completion])
+		AssertTrue(Fact != "", "unknown scalar observations must remain explicit")
+		AssertTrue(!InStr(Fact, "private"), "private values cannot enter the diagnostic")
+	}
+	Completion["stdout"] := "private signed URL and credentials"
+	AssertContains(_ManagedRemoteFixtureCleanupDiagnosticFact(State, [Completion]), "marker=mismatch")
+	AssertTrue(!InStr(_ManagedRemoteFixtureCleanupDiagnosticFact(State, [Completion]), "private"))
+	AssertContains(_ManagedRemoteFixtureCleanupDiagnosticFact(State, []), "completions=0 exit=unknown marker=unknown")
+	AssertEqual("", _ManagedRemoteFixtureCleanupDiagnosticFact(0, []))
+}
+Test("managed remote native: closed cleanup projection excludes private captures", _ManagedRemoteFixtureCleanupDiagnosticControls)
+
 _ManagedRemoteFixtureDiagnosticControls() {
 	State := Map("version", 1, "service_failure_stage", "tls_authenticate",
 		"service_failure_kind", "win32", "service_failure_hresult", -2146893042,
@@ -401,8 +471,11 @@ class _ManagedRemoteFixtureOwner {
 			; Reuse the original owned state after native tree quiescence, before its removal.
 			; Diagnostic I/O is bounded and cannot replace the original cleanup assertion.
 			try {
-				if this.Capture is Map && FileGetSize(this.Capture["TmpFile"]) <= 8192
-					_ManagedRemoteFixtureEmitDiagnostic(JsonParse(FileRead(this.Capture["TmpFile"], "UTF-8")))
+				if this.Capture is Map && FileGetSize(this.Capture["TmpFile"]) <= 8192 {
+					FinalObservation := JsonParse(FileRead(this.Capture["TmpFile"], "UTF-8"))
+					_ManagedRemoteFixtureEmitDiagnostic(FinalObservation)
+					_ManagedRemoteFixtureCleanupDiagnostic(FinalObservation, this.Completions)
+				}
 			}
 			if this.Completions.Length == 1 && this.Completions[1]["exit"] == 0
 					&& Trim(this.Completions[1]["stdout"], "`r`n ") == "OWNED_FIXTURE_STOPPED_ROOT_REMOVED"

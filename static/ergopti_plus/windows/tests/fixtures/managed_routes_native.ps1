@@ -137,7 +137,8 @@ public sealed class ErgoptiOrderedPacServer : IDisposable
                         int one=stream.ReadByte(); if(one<0)throw new EndOfStreamException();
                         header.Append((char)one); if(header.ToString().EndsWith("\r\n\r\n"))break;
                     }
-                    if(!header.ToString().StartsWith("GET /order.pac HTTP/1."))throw new InvalidDataException();
+                    bool shape=header.ToString().StartsWith("GET /shape.pac HTTP/1.");
+                    if(!shape && !header.ToString().StartsWith("GET /order.pac HTTP/1."))throw new InvalidDataException();
                     Interlocked.Increment(ref Requests);
                     string first=Revision==0 ? "first.invalid:38101; PROXY second.invalid:38102" : "second.invalid:38102; PROXY first.invalid:38101";
                     string pac="function FindProxyForURL(url,host){"+
@@ -147,6 +148,12 @@ public sealed class ErgoptiOrderedPacServer : IDisposable
                         "return 'PROXY first.invalid:38101; DIRECT; PROXY second.invalid:38102';"+
                         "if(url=='https://ordered-fixture.invalid/unsupported') return 'SOCKS unsupported.invalid:38103; DIRECT';"+
                         "return 'DIRECT';}";
+                    if(shape) pac="function FindProxyForURL(url,host){"+
+                        "if(url=='https://ordered-fixture.invalid:8443/first?marker=private') return 'PROXY full.invalid:38104';"+
+                        "if(url=='https://ordered-fixture.invalid:8443/first') return 'PROXY path.invalid:38105';"+
+                        "if(url=='https://ordered-fixture.invalid:8443/' || url=='https://ordered-fixture.invalid:8443') return 'PROXY origin.invalid:38106';"+
+                        "if(url=='http://ordered-fixture.invalid:8443/first?marker=private') return 'PROXY scheme.invalid:38107';"+
+                        "return 'PROXY other.invalid:38108';}";
                     byte[] body=Encoding.ASCII.GetBytes(pac);
                     byte[] response=Encoding.ASCII.GetBytes("HTTP/1.1 200 OK\r\nConnection: close\r\nCache-Control: no-store\r\nContent-Type: application/x-ns-proxy-autoconfig\r\nContent-Length: "+body.Length+"\r\n\r\n");
                     stream.Write(response,0,response.Length);stream.Write(body,0,body.Length);stream.Flush();
@@ -221,6 +228,25 @@ public sealed class ErgoptiOrderedPacServer : IDisposable
 } catch {
     $Failed=$true
     Write-ManagedRoutesDiagnostic
+    if($ManagedRoutesDiagnosticVector -eq 1 -and $ManagedRoutesDiagnosticStage -eq 'vector_receipt' -and $null -ne $Server) {
+        # A second genuine native lookup identifies only fixed URL-shape branches.
+        # It cannot replace or rescue any of the original full-URL assertions.
+        $Shape='unavailable'
+        try {
+            $Probe=[ErgoptiNativeProxyEx]::Resolve($Vectors[0].Url,
+                ('http://127.0.0.1:'+$Server.Port+'/shape.pac'),$false,9000,128,65536)
+            if($Probe.Ok -and $Probe.CallbacksRetired -and $Probe.Entries.Count -eq 1 -and $Probe.Entries[0].IsProxy) {
+                switch -CaseSensitive ($Probe.Entries[0].ProxyHost) {
+                    'full.invalid' {$Shape='full'}
+                    'path.invalid' {$Shape='path'}
+                    'origin.invalid' {$Shape='origin'}
+                    'scheme.invalid' {$Shape='scheme'}
+                    'other.invalid' {$Shape='other'}
+                }
+            }
+        } catch { }
+        try { [Console]::Error.WriteLine('ROUTE_URL_DIAG shape='+$Shape) } catch { }
+    }
     [Console]::Error.WriteLine('Native complete routing acceptance failed.')
 } finally {
     if($null -ne $Server) {

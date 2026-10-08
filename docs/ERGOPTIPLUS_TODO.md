@@ -5603,6 +5603,14 @@ The fixed Specifications and Capabilities frames of the Windows/macOS per-model 
       open. macOS system trust and explicit proxy relays are integrated, while
       opaque-client full-URL PAC/WPAD/fallback/redirect routing remains CODE.
 
+The maintainer reopened container/hosted-CI continuation after partial
+integration atc417311106a44108d3bfdc7747d2dda937c6229d. Windows native
+receiving now adds only closed URL-shape and final cleanup observations;
+all original route, TLS and retirement assertions remain unchanged.
+The four existing native failures are not yet fixed, artifact NTLM and
+macOS opaque-client routing remain CODE, and genuine device/network
+acceptance remains separate. Item62 stays open.
+
 Linux manual37646124429 atc18f0796b2f708a1650d4a1eb5dc316b7bf263dd
 passes shared checks, Linux units, actual official Ollama installation/model
 pull/inference/shutdown and every other native E2E step. Genuine Nix now passes
