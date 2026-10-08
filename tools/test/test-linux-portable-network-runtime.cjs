@@ -133,6 +133,71 @@ for (const source of allModules
 		'Git sources must not borrow archive options'
 	);
 passed++;
+// Replay the real environment admission against the observed SDK lib64 default.
+// Files model installation paths only; no placeholder native component is run.
+const layoutFixture = fs.mkdtempSync(path.join(os.tmpdir(), 'ergopti-meson-layout-'));
+try {
+	const prefix = path.join(layoutFixture, 'installed prefix');
+	const driver = path.join(prefix, 'lib/ergopti');
+	const gio = allModules.find((module) => module.name === 'network-gio-proxy');
+	const option = gio['config-opts'].find((value) => value.startsWith('--libdir='));
+	const observedLibdir = option ? option.slice('--libdir='.length) : 'lib64';
+	for (const file of [
+		'bin/luajit',
+		'bin/curl',
+		'lib/lua/5.1/luv.so',
+		`${observedLibdir}/gio/modules/libgiolibproxy.so`,
+		`${observedLibdir}/gio/modules/libgiognutls.so`,
+		'share/glib-2.0/schemas/gschemas.compiled'
+	]) {
+		fs.mkdirSync(path.dirname(path.join(prefix, file)), { recursive: true });
+		fs.writeFileSync(path.join(prefix, file), 'owned path fixture, never executed');
+	}
+	fs.mkdirSync(driver, { recursive: true });
+	const posix = (value) =>
+		value.replaceAll('\\', '/').replace(/^([A-Za-z]):/, (_, drive) => '/' + drive.toLowerCase());
+	const environmentPath = path.join(layoutFixture, 'environment.sh');
+	fs.writeFileSync(environmentPath, source(environmentTemplate));
+	const observe = () =>
+		spawnSync(
+			bashExecutable(),
+			[
+				'-c',
+				'set -euo pipefail; source "$1" "$2" "$3"; printf "%s\\n" "$GIO_MODULE_DIR"',
+				'owned-meson-layout',
+				posix(environmentPath),
+				posix(prefix),
+				posix(driver)
+			],
+			{
+				encoding: 'utf8',
+				env: { ...process.env, CURL_CA_BUNDLE: 'owned explicit trust, no TLS request' }
+			}
+		);
+	const installed = observe();
+	assert.ifError(installed.error);
+	assert.equal(
+		installed.status,
+		0,
+		'actual generated Meson layout must satisfy installed environment admission'
+	);
+	assert.equal(installed.stdout, posix(path.join(prefix, 'lib/gio/modules')) + '\n');
+	assert.equal(installed.stderr, '');
+	// The original lib64-only layout must still refuse; do not broaden discovery.
+	fs.renameSync(path.join(prefix, 'lib/gio'), path.join(prefix, 'detached-gio'));
+	fs.mkdirSync(path.join(prefix, 'lib64/gio/modules'), { recursive: true });
+	fs.writeFileSync(
+		path.join(prefix, 'lib64/gio/modules/libgiolibproxy.so'),
+		'owned legacy path fixture'
+	);
+	const misplaced = observe();
+	assert.equal(misplaced.status, 1);
+	assert.equal(misplaced.stdout, '');
+	assert.equal(misplaced.stderr, 'Required installed native package component unavailable.\n');
+} finally {
+	fs.rmSync(layoutFixture, { recursive: true, force: true });
+}
+passed++;
 // A required GSS build must carry its own SDK dependency before curl.
 const kerberos = allModules.find((module) => module.name === 'network-krb5');
 assert.ok(kerberos, 'Flatpak GSS requires a pinned Kerberos build before curl');
@@ -295,6 +360,19 @@ for (const [label, input, admitted] of [
 	passed++;
 }
 assert.ok(modules[0]['config-opts'].includes('-DLUA_BUILD_TYPE=System'));
+const mesonModules = allModules.filter((module) => module.buildsystem === 'meson');
+assert.deepEqual(
+	mesonModules.map((module) => module.name),
+	['network-schemas', 'network-libproxy', 'network-gio-proxy']
+);
+for (const module of mesonModules) {
+	assert.deepEqual(
+		module['config-opts'].filter((option) => /^(?:--libdir(?:=|$)|-Dlibdir(?:=|$))/.test(option)),
+		['--libdir=lib'],
+		`${module.name}: one exact library directory without duplicate or conflicting options`
+	);
+}
+assert.deepEqual(modules[1]['config-opts'], ['--libdir=lib', '-Dintrospection=false']);
 assert.equal(modules[2].buildsystem, 'simple');
 assert.equal(modules[2].subdir, undefined);
 assert.deepEqual(modules[2]['build-commands'], [
@@ -318,7 +396,7 @@ assert.ok(modules[5]['config-opts'].includes('-Dconfig-xdp=true'));
 // The declared package environment resolves native providers from prefix/lib.
 // SDK autodetection must not place either provider in prefix/lib64 instead.
 assert.deepEqual(modules[5]['config-opts'], [
-	'-Dlibdir=lib',
+	'--libdir=lib',
 	'-Ddocs=false',
 	'-Dtests=false',
 	'-Dvapi=false',
@@ -332,7 +410,7 @@ assert.ok(modules[6]['config-opts'].includes('-Dlibproxy=enabled'));
 // The pinned GIO source declares installed_tests, not libproxy's tests option.
 // Preserve both proxy-provider choices and native TLS while refusing unknown flags.
 assert.deepEqual(modules[6]['config-opts'], [
-	'-Dlibdir=lib',
+	'--libdir=lib',
 	'-Dlibproxy=enabled',
 	'-Dgnome_proxy=disabled',
 	'-Dgnutls=enabled',

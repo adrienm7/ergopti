@@ -232,7 +232,6 @@ function flatpakModules(data) {
 			name: 'network-libproxy',
 			buildsystem: 'meson',
 			'config-opts': [
-				'-Dlibdir=lib',
 				'-Ddocs=false',
 				'-Dtests=false',
 				'-Dvapi=false',
@@ -250,7 +249,6 @@ function flatpakModules(data) {
 			name: 'network-gio-proxy',
 			buildsystem: 'meson',
 			'config-opts': [
-				'-Dlibdir=lib',
 				'-Dlibproxy=enabled',
 				'-Dgnome_proxy=disabled',
 				'-Dgnutls=enabled',
@@ -266,6 +264,8 @@ function flatpakModules(data) {
 			// Every CMake module must share the installed runtime search directory.
 			if (recipe.buildsystem === 'cmake-ninja')
 				recipe['config-opts'].unshift('-DCMAKE_INSTALL_LIBDIR=lib');
+			// Meson's SDK default can be lib64; the installed environment admits lib.
+			if (recipe.buildsystem === 'meson') recipe['config-opts'].unshift('--libdir=lib');
 			const input = sources[source];
 			const pinned =
 				source === 'duktape'
