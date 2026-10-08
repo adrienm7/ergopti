@@ -2,6 +2,20 @@
 ; Actual generated staging orchestrator over owned native TLS/PAC/CONNECT.
 ; The only controlled production seams are trusted config/environment readers.
 
+_UpdaterNativeRefusalWebStatus(Receipt) {
+	global _UpdaterManagedFailureContract
+	Value := Receipt.Get("dotnet_web_status", "")
+	if !(Value is String) || !HasProp(_UpdaterManagedFailureContract, "Policy")
+		return "unknown"
+	Definition := _UpdaterManagedFailureContract.Policy["fields"].Get("dotnet_web_status", 0)
+	if !(Definition is Map) || !(Definition.Get("values", 0) is Array)
+		return "unknown"
+	for Allowed in Definition["values"]
+		if StrCompare(Value, Allowed, true) == 0
+			return Value
+	return "unknown"
+}
+
 _UpdaterNativeRefusalDiagnostic(ExpectedStage, Receipt) {
 	Receipt := Receipt is Map ? Receipt : Map()
 	StagePattern := "proxy_resolve|proxy_connect|connect|tls|http|file_read|file_write|file_create|file_rename|file_remove"
@@ -26,6 +40,7 @@ _UpdaterNativeRefusalDiagnostic(ExpectedStage, Receipt) {
 		. " native_errno_domain=" . _ManagedRemoteFixtureDiagnosticEnum(Receipt.Get("native_errno_domain", ""), "posix|win32|winsock")
 		. " native_errno=" . NativeCode . " tls_status=" . _ManagedRemoteFixtureDiagnosticEnum(Receipt.Get("tls_status", ""),
 			"untrusted_certificate|expired_certificate|hostname_mismatch|revoked_certificate|unavailable")
+		. " dotnet_web_status=" . _UpdaterNativeRefusalWebStatus(Receipt)
 }
 
 class _UpdaterNativeTransportOwner extends _ManagedRemoteFixtureOwner {
