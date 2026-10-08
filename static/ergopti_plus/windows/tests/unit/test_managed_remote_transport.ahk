@@ -299,6 +299,29 @@ _ManagedRemoteFixtureCleanupReporterPreservesPrimary() {
 Test("managed remote native: failed printer preserves cleanup result and fence (managed-fixture-cleanup-diagnostic)",
 	_ManagedRemoteFixtureCleanupReporterPreservesPrimary)
 
+; Filtered native tests skip the timing-loader test that a complete suite runs.
+; Use the canonical boot owner for each asynchronous acceptance operation, then
+; restore the caller's exact timing state even when dispatch or assertions fail.
+_ManagedRemoteFixtureWithLlmTimings(Callback) {
+	global LLM_OLLAMA_POLL_MS, LLM_REMOTE_TIMEOUT_MS, LLM_REMOTE_POLL_MS
+	global LLM_INSTALLED_CACHE_TTL_MS, LLM_DEPS_POLL_TIMEOUT_MS
+	Previous := [IsSet(LLM_OLLAMA_POLL_MS) ? LLM_OLLAMA_POLL_MS : unset,
+		IsSet(LLM_REMOTE_TIMEOUT_MS) ? LLM_REMOTE_TIMEOUT_MS : unset,
+		IsSet(LLM_REMOTE_POLL_MS) ? LLM_REMOTE_POLL_MS : unset,
+		IsSet(LLM_INSTALLED_CACHE_TTL_MS) ? LLM_INSTALLED_CACHE_TTL_MS : unset,
+		IsSet(LLM_DEPS_POLL_TIMEOUT_MS) ? LLM_DEPS_POLL_TIMEOUT_MS : unset]
+	try {
+		LLMApiLoadTimings()
+		return Callback.Call()
+	} finally {
+		LLM_OLLAMA_POLL_MS := Previous.Has(1) ? Previous[1] : unset
+		LLM_REMOTE_TIMEOUT_MS := Previous.Has(2) ? Previous[2] : unset
+		LLM_REMOTE_POLL_MS := Previous.Has(3) ? Previous[3] : unset
+		LLM_INSTALLED_CACHE_TTL_MS := Previous.Has(4) ? Previous[4] : unset
+		LLM_DEPS_POLL_TIMEOUT_MS := Previous.Has(5) ? Previous[5] : unset
+	}
+}
+
 class _ManagedRemoteFixtureOwner {
 	__New() {
 		global _DriverDir, _ManagedRemoteFixtureCleanupExitRegistered
@@ -474,6 +497,10 @@ class _ManagedRemoteFixtureOwner {
 	}
 
 	CheckGeneration(ExpectedSuccess) {
+		return _ManagedRemoteFixtureWithLlmTimings(ObjBindMethod(this, "_CheckGeneration", ExpectedSuccess))
+	}
+
+	_CheckGeneration(ExpectedSuccess) {
 		global _LLM_Remote_Async
 		this.GenerationCount += 1
 		ReqId := "managed_network_" . this.Identity . "_" . this.GenerationCount
@@ -515,6 +542,10 @@ class _ManagedRemoteFixtureOwner {
 	}
 
 	CheckReadiness(ExpectedSuccess) {
+		return _ManagedRemoteFixtureWithLlmTimings(ObjBindMethod(this, "_CheckReadiness", ExpectedSuccess))
+	}
+
+	_CheckReadiness(ExpectedSuccess) {
 		global LLM_API_PROVIDERS
 		ProviderId := "managed_network_" . this.Identity
 		AssertFalse(LLM_API_PROVIDERS.Has(ProviderId), "owned acceptance provider identity must be unique")
@@ -790,6 +821,178 @@ _ManagedRemote_ActualSystemTrustAndSelectedTransport(Fixture := unset) {
 }
 Test("managed remote native: actual system CA and static/PAC transport preserve strict TLS and exact cleanup",
 	_ManagedRemote_ActualSystemTrustAndSelectedTransport)
+
+class _ManagedRemoteTimingControlHttp {
+	__New() {
+		this.Polls := 0
+		this.Aborts := 0
+		this.Pending := false
+		this.Status := 0
+		this.ResponseText := ""
+	}
+
+	SetManagedRouting(Args*) {
+	}
+
+	SetDeadline(Args*) {
+	}
+
+	Open(Args*) {
+	}
+
+	SetRequestHeader(Args*) {
+	}
+
+	Send(Args*) {
+		return true
+	}
+
+	WaitForResponse(Args*) {
+		this.Polls += 1
+		return !this.Pending && this.Polls > 1
+	}
+
+	Abort() {
+		this.Aborts += 1
+		return true
+	}
+}
+
+_ManagedRemoteTimingFilteredGeneration() {
+	global LLM_REMOTE_POLL_MS
+	Previous := LLM_REMOTE_POLL_MS
+	Fixture := _ManagedRemoteFixtureOwner()
+	Http := _ManagedRemoteTimingControlHttp()
+	Fixture.BaseUrl := "https://managed-fixture.invalid:443/v1"
+	Fixture.Port := Map("managed_settings", (*) => Map(), "create_http", (*) => Http)
+	try {
+		LLM_REMOTE_POLL_MS := 0
+		Fixture.CheckGeneration(false)
+		AssertTrue(Http.Polls >= 2, "the actual remote poll must rearm after its first pending response")
+		AssertEqual(0, LLM_REMOTE_POLL_MS, "the fixture restores the filtered caller's sentinel")
+	} finally {
+		Fixture.RetireRequests()
+		LLM_REMOTE_POLL_MS := Previous
+	}
+}
+Test("managed remote native: filtered generation owns canonical poll timing (managed-fixture-timing)",
+	_ManagedRemoteTimingFilteredGeneration)
+
+_ManagedRemoteTimingScopeBody(Control) {
+	global LLM_OLLAMA_POLL_MS, LLM_REMOTE_TIMEOUT_MS, LLM_REMOTE_POLL_MS
+	global LLM_INSTALLED_CACHE_TTL_MS, LLM_DEPS_POLL_TIMEOUT_MS
+	Control["calls"] += 1
+	AssertEqual(TimingsGet("llm", "poll_interval_ms"), LLM_OLLAMA_POLL_MS)
+	AssertEqual(TimingsGet("llm", "request_timeout_ms"), LLM_REMOTE_TIMEOUT_MS)
+	AssertEqual(TimingsGet("llm", "poll_interval_ms"), LLM_REMOTE_POLL_MS)
+	AssertEqual(TimingsGet("llm", "installed_cache_ttl_ms"), LLM_INSTALLED_CACHE_TTL_MS)
+	AssertEqual(TimingsGet("llm", "dependency_bootstrap_timeout_ms"), LLM_DEPS_POLL_TIMEOUT_MS)
+	if Control["fail"]
+		throw Control["failure"]
+	return "completed"
+}
+
+_ManagedRemoteTimingScopeRestores() {
+	global LLM_OLLAMA_POLL_MS, LLM_REMOTE_TIMEOUT_MS, LLM_REMOTE_POLL_MS
+	global LLM_INSTALLED_CACHE_TTL_MS, LLM_DEPS_POLL_TIMEOUT_MS, _TimingsCache
+	Previous := [IsSet(LLM_OLLAMA_POLL_MS) ? LLM_OLLAMA_POLL_MS : unset,
+		IsSet(LLM_REMOTE_TIMEOUT_MS) ? LLM_REMOTE_TIMEOUT_MS : unset,
+		IsSet(LLM_REMOTE_POLL_MS) ? LLM_REMOTE_POLL_MS : unset,
+		IsSet(LLM_INSTALLED_CACHE_TTL_MS) ? LLM_INSTALLED_CACHE_TTL_MS : unset,
+		IsSet(LLM_DEPS_POLL_TIMEOUT_MS) ? LLM_DEPS_POLL_TIMEOUT_MS : unset]
+	Cache := _TimingsCache
+	try {
+		for Mode in ["success", "body_failure", "loader_failure", "unset"] {
+			LLM_OLLAMA_POLL_MS := Mode == "unset" ? unset : 101
+			LLM_REMOTE_TIMEOUT_MS := Mode == "unset" ? unset : 103
+			LLM_REMOTE_POLL_MS := Mode == "unset" ? unset : 107
+			LLM_INSTALLED_CACHE_TTL_MS := Mode == "unset" ? unset : 109
+			LLM_DEPS_POLL_TIMEOUT_MS := Mode == "unset" ? unset : 113
+			_TimingsCache := Mode == "loader_failure" ? Map() : Cache
+			Control := Map("calls", 0, "fail", Mode == "body_failure", "failure", ValueError("controlled timing body failure"))
+			Caught := false
+			try {
+				AssertEqual("completed", _ManagedRemoteFixtureWithLlmTimings(_ManagedRemoteTimingScopeBody.Bind(Control)))
+			} catch Any as Failure {
+				Caught := true
+				if Mode == "body_failure"
+					AssertTrue(Failure == Control["failure"], "restoration preserves the exact body exception")
+				else
+					AssertEqual("loader_failure", Mode, "success and unset cases must not throw")
+			}
+			AssertEqual(Mode == "body_failure" || Mode == "loader_failure", Caught)
+			AssertEqual(Mode == "loader_failure" ? 0 : 1, Control["calls"], "failed initialization never admits the operation")
+			if Mode == "unset" {
+				AssertFalse(IsSet(LLM_OLLAMA_POLL_MS) || IsSet(LLM_REMOTE_TIMEOUT_MS) || IsSet(LLM_REMOTE_POLL_MS)
+					|| IsSet(LLM_INSTALLED_CACHE_TTL_MS) || IsSet(LLM_DEPS_POLL_TIMEOUT_MS), "unset ownership is restored exactly")
+			} else {
+				AssertEqual(101, LLM_OLLAMA_POLL_MS)
+				AssertEqual(103, LLM_REMOTE_TIMEOUT_MS)
+				AssertEqual(107, LLM_REMOTE_POLL_MS)
+				AssertEqual(109, LLM_INSTALLED_CACHE_TTL_MS)
+				AssertEqual(113, LLM_DEPS_POLL_TIMEOUT_MS)
+			}
+		}
+	} finally {
+		_TimingsCache := Cache
+		LLM_OLLAMA_POLL_MS := Previous.Has(1) ? Previous[1] : unset
+		LLM_REMOTE_TIMEOUT_MS := Previous.Has(2) ? Previous[2] : unset
+		LLM_REMOTE_POLL_MS := Previous.Has(3) ? Previous[3] : unset
+		LLM_INSTALLED_CACHE_TTL_MS := Previous.Has(4) ? Previous[4] : unset
+		LLM_DEPS_POLL_TIMEOUT_MS := Previous.Has(5) ? Previous[5] : unset
+	}
+}
+Test("managed remote native: canonical timing scope preserves assigned and unset owners (managed-fixture-timing)",
+	_ManagedRemoteTimingScopeRestores)
+
+_ManagedRemoteTimingStagePending(Fixture, Http, Control) {
+	ReqId := "managed_timing_pending_" . Fixture.Identity
+	Resolved := Map("Format", "openai", "Token", "controlled", "Model", "fixture")
+	Callback := (*) => Control["callbacks"] += 1
+	Reservation := _LLMRemote_ReserveRequest(ReqId, Callback, Callback, 15000, A_TickCount, Resolved)
+	Fixture.Requests[ReqId] := Reservation
+	Control["request"] := ReqId
+	AssertTrue(_LLMRemote_DispatchCurl(ReqId, Resolved, "https://managed-fixture.invalid:443/v1",
+		"{}", Callback, Callback, 15000,
+		Map("managed_settings", (*) => Map(), "create_http", (*) => Http), Reservation))
+	AssertEqual(1, Http.Polls, "the actual remote poll owns a pending continuation")
+	throw Control["failure"]
+}
+
+_ManagedRemoteTimingPendingRetirement() {
+	global LLM_REMOTE_POLL_MS, _LLM_Remote_Async
+	Previous := LLM_REMOTE_POLL_MS
+	Fixture := _ManagedRemoteFixtureOwner()
+	Http := _ManagedRemoteTimingControlHttp()
+	Http.Pending := true
+	Control := Map("callbacks", 0, "failure", ValueError("controlled pending body failure"))
+	try {
+		LLM_REMOTE_POLL_MS := 0
+		Caught := false
+		try _ManagedRemoteFixtureWithLlmTimings(_ManagedRemoteTimingStagePending.Bind(Fixture, Http, Control))
+		catch Any as Failure {
+			Caught := true
+			AssertTrue(Failure == Control["failure"], "a pending transport cannot replace the original body failure")
+		}
+		AssertTrue(Caught)
+		AssertEqual(0, LLM_REMOTE_POLL_MS, "the caller's zero period is already restored before retirement")
+		AssertTrue(Fixture.RetireRequests(), "the original fixture retirement path admits no remaining exact request")
+		AssertFalse(_LLM_Remote_Async.Has(Control["request"]), "retirement removes the pending poll's exact registry owner")
+		Started := A_TickCount
+		while Http.Aborts == 0 && !TickExpired64(Started, 1000)
+			Sleep(10)
+		AssertEqual(1, Http.Aborts, "the independent cancellation timer delivers Abort despite a zero remote poll period")
+		Sleep(TimingsGet("llm", "poll_interval_ms") * 2)
+		_LLMRemote_PollRequest(Control["request"])
+		AssertEqual(1, Http.Polls, "the armed continuation and an explicit stale poll cannot touch a retired transport")
+		AssertEqual(0, Control["callbacks"], "a retired pending poll cannot publish either completion callback")
+	} finally {
+		Fixture.RetireRequests()
+		LLM_REMOTE_POLL_MS := Previous
+	}
+}
+Test("managed remote native: pending work retires after timing scope failure (managed-fixture-timing)",
+	_ManagedRemoteTimingPendingRetirement)
 
 class _ManagedRemotePrimaryControlFixture {
 	__New() {
