@@ -8,7 +8,8 @@
 
 local helpers = require("tests.helpers")
 
-return function(callback)
+return function(callback, options)
+	options = options or {}
 	local saved, previous_hs = {}, _G.hs
 	for name, value in pairs(package.loaded) do saved[name] = value end
 	local ok, err = xpcall(function()
@@ -20,7 +21,7 @@ return function(callback)
 		local file = assert(io.open(helpers.shared("modules/llm/defaults.json"), "r"))
 		local raw = file:read("*a"); file:close()
 		local defaults, state = hs.json.decode(raw), hs.json.decode(raw)
-		state.llm_enabled, state.llm_backend, state.llm_model = true, "ollama", ""
+		state.llm_enabled, state.llm_backend, state.llm_model = true, options.backend or "ollama", ""
 		local noop = function() end
 		local accept = function() return true end
 		local calls = {}
@@ -29,20 +30,25 @@ return function(callback)
 		local outcome = true
 		package.loaded["infra.logger"] = helpers.make_logger_stub()
 		package.loaded["infra.notifications"] = { notify = noop }
+		local locale_file = assert(io.open(helpers.shared("data/locales/en.json"), "r"))
+		local real_strings = hs.json.decode(locale_file:read("*a")); locale_file:close()
+		local function real_caption(key)
+			return options.real_model_selector or key:match("^menu%.profiles%.") or key:match("^llm%.profile%.")
+		end
 		package.loaded["infra.i18n"] = { get = function(key)
+			if real_caption(key) then return real_strings[key] or key end
 			if key == "menu.llm.prediction_count_label_one" then return "%d prediction" end
 			if key == "menu.llm.prediction_count_label_other" then return "%d predictions" end
 			return key
-		end, section = function(key) return key end }
+		end, section = function(key) return real_caption(key) and real_strings[key] or key end }
 		package.loaded["modules.llm"] = { DEFAULT_STATE = defaults,
 			get_backend = function() return state.llm_backend end, set_backend = accept,
 			get_current_model = function() return "" end }
 		local models = { get_presets = function() return {} end,
+			get_installed_models = function() return {} end,
 			get_actual_model_name = function(name) return name end,
 			get_model_info = function() return {} end, get_model_ram = function() return 0 end }
 		package.loaded["ui.menu.menu_llm.models_manager"] = { new = function() return models end }
-		package.loaded["ui.menu.menu_llm.profiles_manager"] = {
-			new = function() return { get_menu_item = function() return {} end } end }
 		package.loaded["ui.menu.menu_llm.settings_manager"] = { new = function()
 			return { build_nav_modifier_menu = function() return {} end,
 				build_val_modifier_menu = function() return {} end,
@@ -66,7 +72,8 @@ return function(callback)
 			build = function() return nil, nil end, build_model_picker = function() return {} end }
 		package.loaded["ui.menu.menu_llm.models_selector"] = { build = function() return {} end }
 		package.loaded["ui.menu.menu_llm.model_switcher"] = { new = function()
-			return { get_display_model_name = function(name) return name end,
+			return { switch_model = unobserved_command, disable_model = unobserved_command,
+				get_display_model_name = function(name) return name end,
 				get_model_power_level = function() return 1 end, settle_recovery_debts = accept }
 		end }
 		package.loaded["ui.menu.menu_llm.startup_controller"] = { new = function() return noop end }
@@ -77,6 +84,35 @@ return function(callback)
 		package.loaded["modules.llm.mlx_deps_checker"] = { check_and_install_deps = accept }
 		package.loaded["modules.llm.ollama_deps_checker"] = { check_and_install_deps = accept }
 		package.loaded["infra.manifest_menu"] = nil
+		local core = package.loaded["modules.llm"]
+		core.BUILTIN_PROFILES = require("modules.llm.profiles").BUILTIN_PROFILES
+		calls.profile_constructor_sync = {}
+		core.set_user_profiles = function()
+			calls.profile_constructor_sync[#calls.profile_constructor_sync + 1] = "users"
+			return true
+		end
+		core.set_active_profile = function()
+			calls.profile_constructor_sync[#calls.profile_constructor_sync + 1] = "active"
+			return true
+		end
+		package.loaded["ui.menu.menu_llm.profiles_manager"] = nil
+		local profiles = require("ui.menu.menu_llm.profiles_manager")
+		local genuine_profiles_new = profiles.new
+		profiles.new = function(...)
+			local manager = genuine_profiles_new(...)
+			calls.real_profiles_manager = manager
+			return manager
+		end
+		if options.real_model_selector then
+			package.loaded["ui.menu.menu_llm.models_selector"] = nil
+			local selector = require("ui.menu.menu_llm.models_selector")
+			local genuine_build = selector.build
+			selector.build = function(...)
+				local rows = genuine_build(...)
+				calls.real_model_selector_rows = rows
+				return rows
+			end
+		end
 		local menu = require("ui.menu.menu_llm").create({ state = state,
 			keymap = { set_llm_model = accept }, save_prefs = accept, update_menu = accept, active_tasks = {} })
 		helpers.assert_type(menu.build_item, "function")

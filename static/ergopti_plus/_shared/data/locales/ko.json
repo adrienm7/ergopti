@@ -3242,5 +3242,19 @@
 	"physical_shortcuts.position_unavailable": "이 키 위치는 여기서 사용할 수 없습니다.",
 	"physical_shortcuts.windows_unavailable": "아직 Windows에서 지원되지 않음: 물리 키 단축키 편집기는 아직 Windows에서 사용할 수 없습니다.",
 	"physical_shortcuts.collision": "이 키 조합은 이미 사용 중입니다. 다른 조합을 선택하세요.",
-	"physical_shortcuts.window_unavailable": "이 창을 사용할 수 없습니다: 다시 열어 보세요."
+	"physical_shortcuts.window_unavailable": "이 창을 사용할 수 없습니다: 다시 열어 보세요.",
+	"gestures.system.conflicts_caption": "⚠ 충돌 가능성 %s개",
+	"gestures.system.pinch_enabled": "시스템 핀치 제스처 : 사용",
+	"gestures.system.pinch_disabled": "시스템 핀치 제스처 : 비활성화됨",
+	"gestures.system.pinch_unknown": "시스템 핀치 제스처 : 시스템 제스처: 확인되지 않음",
+	"gestures.system.slot_unknown_caption": "%s — 시스템 제스처: 확인되지 않음",
+	"gestures.system.slot_configured_caption": "%s — ErgoptiPlus용으로 설정됨",
+	"gestures.system.slot_not_configured_caption": "%s — ErgoptiPlus용으로 설정되지 않음",
+	"menu.global.reload_macos": "↺ 다시 로드",
+	"menu.global.quit_macos": "✕ 종료",
+	"menu.layout.pause_picker_caption": "  ↳ 스크립트 일시정지 시 레이아웃 : %s",
+	"menu.layout.resume_picker_caption": "  ↳ 스크립트 활성 시 레이아웃 : %s",
+	"menu.layout.native_variant_caption": "%s v%s",
+	"app_picker.agent_remove_marker": "✗",
+	"app_picker.agent_exclude_current_caption": "%s 제외 (현재)"
 }

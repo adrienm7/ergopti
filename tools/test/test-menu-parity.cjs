@@ -87,6 +87,12 @@ const SEPARATOR = '---';
 // a whole submenu unreachable, which is one of the things being checked.
 
 const OPENS_SUBMENU = {
+	keyboard_slots: {
+		menu: 'keyboard_group_frame',
+		platforms: ['hs'],
+		kind: 'compose',
+		native_sources: { hs: 'macos/ui/menu/menu_keyboard_slots.lua' }
+	},
 	magic_key_source: {
 		menu: 'magic_key_source_menu',
 		platforms: ['ahk', 'hs', 'linux'],
@@ -110,14 +116,88 @@ const OPENS_SUBMENU = {
 		kind: 'compose',
 		native_sources: { hs: 'macos/ui/menu/menu_apps.lua' }
 	},
-	system_gesture_status: {
-		menu: 'gesture_system_status_controls',
-		platforms: ['ahk', 'hs'],
-		kind: 'compose',
-		native_sources: {
-			ahk: 'windows/ui/gesture_conflicts.ahk',
-			hs: 'macos/ui/menu/menu_gestures.lua'
+	system_gesture_status: [
+		{
+			menu: 'gesture_system_status_controls',
+			platforms: ['ahk', 'hs'],
+			kind: 'compose',
+			native_sources: {
+				ahk: 'windows/ui/gesture_conflicts.ahk',
+				hs: 'macos/ui/menu/menu_gestures.lua'
+			}
+		},
+		{
+			menu: 'gesture_system_status_windows_frame',
+			platforms: ['ahk'],
+			kind: 'compose',
+			native_sources: { ahk: 'windows/ui/gesture_conflicts.ahk' }
+		},
+		{
+			menu: 'gesture_system_status_macos_frame',
+			platforms: ['hs'],
+			kind: 'compose',
+			native_sources: { hs: 'macos/ui/menu/menu_gestures.lua' }
+		},
+		{
+			menu: 'gesture_system_status_linux_frame',
+			platforms: ['linux'],
+			kind: 'compose',
+			native_sources: { linux: 'linux/ui/gesture_conflicts.lua' }
 		}
+	],
+	gesture_system_unknown_children: [
+		{
+			menu: 'gesture_system_windows_children',
+			platforms: ['ahk'],
+			kind: 'submenu',
+			native_sources: { ahk: 'windows/ui/gesture_conflicts.ahk' }
+		},
+		{
+			menu: 'gesture_system_linux_children',
+			platforms: ['linux'],
+			kind: 'submenu',
+			native_sources: { linux: 'linux/ui/gesture_conflicts.lua' }
+		}
+	],
+	gesture_system_clear_children: [
+		{
+			menu: 'gesture_system_windows_children',
+			platforms: ['ahk'],
+			kind: 'submenu',
+			native_sources: { ahk: 'windows/ui/gesture_conflicts.ahk' }
+		},
+		{
+			menu: 'gesture_system_macos_children',
+			platforms: ['hs'],
+			kind: 'submenu',
+			native_sources: { hs: 'macos/ui/menu/menu_gestures.lua' }
+		}
+	],
+	gesture_system_conflict_children: [
+		{
+			menu: 'gesture_system_windows_children',
+			platforms: ['ahk'],
+			kind: 'submenu',
+			native_sources: { ahk: 'windows/ui/gesture_conflicts.ahk' }
+		},
+		{
+			menu: 'gesture_system_macos_children',
+			platforms: ['hs'],
+			kind: 'submenu',
+			native_sources: { hs: 'macos/ui/menu/menu_gestures.lua' }
+		}
+	],
+	gesture_system_cached_slots: {
+		menu: 'gesture_system_slot_windows_frame',
+		platforms: ['ahk'],
+		kind: 'compose',
+		native_sources: { ahk: 'windows/ui/gesture_conflicts.ahk' }
+	},
+	gesture_system_cached_overlap: {
+		menu: 'gesture_system_slot_linux_frame',
+		platforms: ['linux'],
+		kind: 'compose',
+		native_sources: { linux: 'linux/ui/gesture_conflicts.lua' }
 	},
 	selection_operations: [
 		'selection_caps_word_control',
@@ -583,13 +663,27 @@ const OPENS_SUBMENU = {
 			platforms: ['hs'],
 			kind: 'compose',
 			native_sources: { hs: 'macos/ui/menu/menu_tap_holds.lua' }
+		},
+		{
+			menu: 'tap_hold_action_picker_frame',
+			platforms: ['hs'],
+			kind: 'compose',
+			native_sources: { hs: 'macos/ui/menu/menu_tap_holds.lua' }
 		}
 	],
 	// Both hand providers render this declared fixed command under every native key.
 	tap_hold_keys_left: 'tap_hold_key_rows',
 	tap_hold_keys_right: 'tap_hold_key_rows',
 	tap_hold_key_delay: 'tap_hold_key_delay_rows',
-	key_combinations: 'key_combinations_group',
+	key_combinations: [
+		'key_combinations_group',
+		{
+			menu: 'tap_hold_action_picker_frame',
+			platforms: ['hs'],
+			kind: 'compose',
+			native_sources: { hs: 'macos/ui/menu/menu_tap_holds.lua' }
+		}
+	],
 	// Both drivers render each pair's declaration: Windows opens it at the
 	// pointer, while macOS hangs it under the cached pair row.
 	key_combination_rows_left: { menu: 'key_combination_pair_menu', platforms: ['ahk', 'hs'] },
@@ -1239,6 +1333,120 @@ OPENS_SUBMENU.llm_display.push({
 	kind: 'compose',
 	native_sources: { ahk: 'windows/ui/menu/menu_llm/menu_settings.ahk' }
 });
+// Actual macOS switching uses genuine canonical parents and native picker data.
+OPENS_SUBMENU.layout_switching = {
+	menu: 'layout_switching_frame',
+	platforms: ['hs'],
+	kind: 'compose',
+	native_sources: { hs: 'macos/ui/menu/menu_keyboard_layout.lua' }
+};
+OPENS_SUBMENU.layout_pause_picker = {
+	menu: 'layout_switch_picker_frame',
+	platforms: ['hs'],
+	kind: 'submenu',
+	native_sources: { hs: 'macos/ui/menu/menu_keyboard_layout.lua' }
+};
+OPENS_SUBMENU.layout_resume_picker = {
+	menu: 'layout_switch_picker_frame',
+	platforms: ['hs'],
+	kind: 'submenu',
+	native_sources: { hs: 'macos/ui/menu/menu_keyboard_layout.lua' }
+};
+
+// Compose before PERSONAL_DEFAULT_GROUP_PROOF; preserve all current genuine edges.
+const layoutOwner = (menu) => ({
+	menu,
+	platforms: ['hs'],
+	kind: 'compose',
+	native_sources: { hs: 'macos/ui/menu/menu_keyboard_layout.lua' },
+	forwarded_template: { hs: 'layout' }
+});
+OPENS_SUBMENU.keyboard_layout = [
+	OPENS_SUBMENU.keyboard_layout,
+	layoutOwner('layout_native_parent')
+];
+OPENS_SUBMENU.layout_parent_content = 'layout_menu';
+OPENS_SUBMENU.custom_layouts = layoutOwner('layout_native_record_choice');
+OPENS_SUBMENU.active_layouts = [
+	OPENS_SUBMENU.active_layouts,
+	layoutOwner('layout_native_record_choice')
+];
+OPENS_SUBMENU.layout_picker_choices = layoutOwner('layout_native_record_choice');
+OPENS_SUBMENU.layout_bundle = [
+	'layout_bundle_installed',
+	'layout_bundle_update',
+	'layout_bundle_install',
+	'layout_bundle_in_list',
+	'layout_bundle_update_install_first',
+	'layout_bundle_upgrade',
+	'layout_bundle_upgrade_to',
+	'layout_bundle_variant_parent',
+	'layout_bundle_install_first',
+	'layout_bundle_frame'
+].map(layoutOwner);
+OPENS_SUBMENU.layout_variant_choices = [
+	'layout_bundle_variant_added',
+	'layout_bundle_variant_add'
+].map(layoutOwner);
+
+// Preserve the existing macOS excluded-applications route and add actual Linux frames.
+OPENS_SUBMENU.agent_disabled_apps = [
+	...(Array.isArray(OPENS_SUBMENU.agent_disabled_apps)
+		? OPENS_SUBMENU.agent_disabled_apps
+		: [OPENS_SUBMENU.agent_disabled_apps]),
+	{
+		menu: 'agent_linux_disabled_apps_frame',
+		platforms: ['linux'],
+		kind: 'compose',
+		native_sources: { linux: 'linux/ui/menu/agent_rows.lua' }
+	},
+	{
+		menu: 'agent_linux_disabled_apps_children',
+		platforms: ['linux'],
+		kind: 'compose',
+		native_sources: { linux: 'linux/ui/menu/agent_rows.lua' }
+	}
+];
+OPENS_SUBMENU.agent_disabled_app_records = {
+	menu: 'agent_linux_disabled_app_remove',
+	platforms: ['linux'],
+	kind: 'compose',
+	native_sources: { linux: 'linux/ui/menu/agent_rows.lua' }
+};
+
+// Preserve every existing platform route and add actual complete Linux frames.
+for (const system of ['system1', 'system2']) {
+	const key = 'agent_' + system;
+	OPENS_SUBMENU[key] = [
+		...(Array.isArray(OPENS_SUBMENU[key]) ? OPENS_SUBMENU[key] : [OPENS_SUBMENU[key]]),
+		{
+			menu: 'agent_linux_' + system + '_frame',
+			platforms: ['linux'],
+			kind: 'compose',
+			native_sources: { linux: 'linux/ui/menu/agent_rows.lua' }
+		},
+		{
+			menu: 'agent_linux_system_children',
+			platforms: ['linux'],
+			kind: 'compose',
+			native_sources: { linux: 'linux/ui/menu/agent_rows.lua' }
+		}
+	];
+}
+OPENS_SUBMENU.agent_system_backend_rows = {
+	menu: 'agent_linux_system_backend_record',
+	platforms: ['linux'],
+	kind: 'compose',
+	native_sources: { linux: 'linux/ui/menu/agent_rows.lua' }
+};
+OPENS_SUBMENU.agent_system_model_rows = {
+	menu: 'agent_system_model_controls',
+	platforms: ['linux'],
+	kind: 'compose',
+	native_sources: { linux: 'linux/ui/menu/agent_rows.lua' }
+};
+OPENS_SUBMENU.agent_system_off_rows = 'agent_system_controls';
+
 const PERSONAL_DEFAULT_GROUP_PROOF = OPENS_SUBMENU.hotstring_personal[0].selected_group.ahk;
 
 /**
@@ -1441,6 +1649,7 @@ function isComposedFragment(rows, kinds) {
 		if (
 			['label', 'section_header'].includes(row.type) &&
 			(Object.hasOwn(row, 'caption_getter') ||
+				Object.hasOwn(row, 'caption_getters') ||
 				Object.hasOwn(row, 'caption_layout') ||
 				Object.hasOwn(row, 'caption_joiner'))
 		) {
@@ -1677,6 +1886,618 @@ for (const [extension, method, comment] of [
 	}
 }
 
+/** Command-only fragments may be published through a genuine typed include closure. */
+function publishesIncludedCommands(source, extension, section, declarations, platform) {
+	const { nativeTemplateBinding } = require('../lib/menu-template-binding.cjs');
+	const rows = declarations[section];
+	if (!Array.isArray(rows) || rows.length === 0) return false;
+	const visible = rows.filter((row) => !row.platforms || row.platforms.includes(platform));
+	return (
+		visible.length > 0 &&
+		visible.every(
+			(row) =>
+				row.type === 'command' &&
+				typeof row.id === 'string' &&
+				row.id !== '' &&
+				nativeTemplateBinding(
+					source,
+					extension,
+					section,
+					row.id,
+					1,
+					[{ src: source }],
+					declarations,
+					platform
+				)
+		)
+	);
+}
+
+// Linux excluded-app frames owe typed genuine command, caption and child providers.
+{
+	const assert = require('node:assert/strict');
+	const { nativeTemplateBinding } = require('../lib/menu-template-binding.cjs');
+	const file = 'linux/ui/menu/agent_rows.lua';
+	const native = fs.readFileSync(path.join(SP, file), 'utf8');
+	const owners = [
+		['agent_linux_disabled_app_remove', 'agent_disabled_app_remove', 1],
+		['agent_linux_disabled_app_remove', 'agent_disabled_app_caption', 2],
+		['agent_linux_disabled_apps_children', 'agent_disabled_app_records', 3],
+		['agent_linux_disabled_app_current', 'agent_disabled_app_current', 1],
+		['agent_linux_disabled_app_current', 'agent_disabled_app_current_caption', 2],
+		['agent_linux_disabled_app_add', 'agent_disabled_app_add', 1],
+		['agent_linux_disabled_apps_frame', 'agent_disabled_apps', 3],
+		['agent_linux_disabled_apps_frame', 'agent_disabled_apps_count', 2]
+	];
+	for (const [section, key, port] of owners) {
+		const credits = (source, declarations = manifest, inputPort = port) =>
+			nativeTemplateBinding(
+				source,
+				'.lua',
+				section,
+				key,
+				inputPort,
+				[{ src: source }],
+				declarations,
+				'linux'
+			);
+		assert.equal(credits(native), true, `${section}/${key}: actual native typed owner`);
+		assert.equal(
+			credits(native.replaceAll(key, 'withdrawn_' + key)),
+			false,
+			'withdrawn actual owner earns no credit'
+		);
+		assert.equal(
+			credits(native.replaceAll('ManifestMenu.template_rows', 'Foreign.template_rows')),
+			false,
+			'foreign receiver cannot publish the canonical frames'
+		);
+		assert.equal(credits(JSON.stringify(native)), false, 'quoted source is inert');
+		assert.equal(
+			credits(native, manifest, port === 1 ? 3 : 1),
+			false,
+			'typed ports cannot exchange their roles'
+		);
+		const withdrawn = { ...manifest };
+		delete withdrawn[section];
+		assert.equal(credits(native, withdrawn), false, 'a missing target invalidates publication');
+		assert.equal(
+			credits(native),
+			true,
+			'exact physical owner restoration recovers the same binding'
+		);
+	}
+	for (const section of ['agent_linux_disabled_app_current', 'agent_linux_disabled_app_add']) {
+		for (const mutation of ['missing', 'redirected', 'cycle', 'wrong_type']) {
+			const changed = structuredClone(manifest);
+			if (mutation === 'missing') delete changed[section];
+			if (mutation === 'redirected')
+				changed.agent_linux_disabled_apps_children = changed.agent_linux_disabled_apps_children.map(
+					(row) => (row.section === section ? { ...row, section: 'unowned_app_frame' } : row)
+				);
+			if (mutation === 'cycle')
+				changed[section].push({ type: 'include', section: 'agent_linux_disabled_apps_children' });
+			if (mutation === 'wrong_type') changed[section][0].type = 'list';
+			assert.equal(
+				publishesIncludedCommands(native, '.lua', section, changed, 'linux'),
+				false,
+				'a broken required include cannot acquire typed command credit'
+			);
+		}
+	}
+}
+
+// Exact native getter/command/list ports remain necessary evidence, never backend authority.
+{
+	const assert = require('node:assert/strict');
+	const { nativeTemplateBinding } = require('../lib/menu-template-binding.cjs');
+	const linux = 'linux/ui/menu/agent_rows.lua';
+	const owners = [
+		[linux, 'linux', '.lua', 'agent_linux_system_backend_record', 'agent_system_backend', 1],
+		[linux, 'linux', '.lua', 'agent_linux_system_backend_record', 'agent_system_backend_label', 2],
+		[
+			linux,
+			'linux',
+			'.lua',
+			'agent_linux_system_backend_record',
+			'agent_system_backend_selected',
+			2
+		],
+		[linux, 'linux', '.lua', 'agent_linux_system_children', 'agent_system_off_rows', 3],
+		[linux, 'linux', '.lua', 'agent_linux_system_children', 'agent_system_backend_rows', 3],
+		[linux, 'linux', '.lua', 'agent_linux_system_children', 'agent_system_model_rows', 3],
+		[linux, 'linux', '.lua', 'agent_linux_system1_frame', 'agent_system1', 3],
+		[linux, 'linux', '.lua', 'agent_linux_system2_frame', 'agent_system2', 3],
+		[
+			linux,
+			'linux',
+			'.lua',
+			'agent_linux_system1_frame',
+			'agent_system_backend_current_caption',
+			2
+		],
+		[
+			linux,
+			'linux',
+			'.lua',
+			'agent_linux_system2_frame',
+			'agent_system_backend_current_caption',
+			2
+		],
+		[linux, 'linux', '.lua', 'agent_system_model_controls', 'agent_system_model_caption', 2],
+		[
+			'windows/ui/menu/menu_llm/menu_agent.ahk',
+			'ahk',
+			'.ahk',
+			'agent_system_model_controls',
+			'agent_system_model_caption',
+			2
+		],
+		...[
+			'agent_system_model_controls',
+			'agent_system_model_installed_controls',
+			'agent_system_model_missing_controls'
+		].map((section) => [
+			'macos/ui/menu/menu_llm/agent_panel.lua',
+			'hs',
+			'.lua',
+			section,
+			'agent_system_model_caption',
+			2
+		])
+	];
+	for (const [file, platform, extension, section, key, port] of owners) {
+		const source = fs.readFileSync(path.join(SP, file), 'utf8');
+		const credit = (native, declarations = manifest, role = port) =>
+			nativeTemplateBinding(
+				native,
+				extension,
+				section,
+				key,
+				role,
+				[{ src: native }],
+				declarations,
+				platform
+			);
+		assert.equal(credit(source), true, `${file}/${section}/${key}: actual native owner`);
+		assert.equal(
+			credit(source.replaceAll(key, 'withdrawn_' + key)),
+			false,
+			'withdrawn port earns no authority'
+		);
+		assert.equal(credit(JSON.stringify(source)), false, 'quoted source is inert');
+		assert.equal(
+			credit(source, manifest, port === 1 ? 3 : 1),
+			false,
+			'command/getter/list roles cannot exchange'
+		);
+		const missing = { ...manifest };
+		delete missing[section];
+		assert.equal(credit(source, missing), false, 'a missing declared target refuses publication');
+		const foreign = source
+			.replaceAll('ManifestMenu.template_rows', 'Foreign.template_rows')
+			.replaceAll('MenuRenderer_TemplateRows', 'Foreign_TemplateRows')
+			.replaceAll('require("infra.manifest_menu").template_rows', 'Foreign.template_rows');
+		assert.equal(
+			credit(foreign),
+			false,
+			'foreign native receiver cannot publish the canonical frame'
+		);
+		assert.equal(credit(source), true, 'exact physical restoration repairs the same owner');
+	}
+}
+
+// Actual system-status routes owe native typed callback/provider owners. This is
+// static necessary evidence, not certification of registry/desktop availability.
+{
+	const assert = require('node:assert/strict');
+	const { nativeTemplateBinding } = require('../lib/menu-template-binding.cjs');
+	assert.deepEqual(
+		OPENS_SUBMENU.system_gesture_status[0],
+		{
+			menu: 'gesture_system_status_controls',
+			platforms: ['ahk', 'hs'],
+			kind: 'compose',
+			native_sources: {
+				ahk: 'windows/ui/gesture_conflicts.ahk',
+				hs: 'macos/ui/menu/menu_gestures.lua'
+			}
+		},
+		'the original independently published controls edge is retained'
+	);
+	const owners = [
+		{
+			file: 'windows/ui/gesture_conflicts.ahk',
+			platform: 'ahk',
+			section: 'gesture_system_status_unknown',
+			key: 'gesture_system_unknown_children',
+			port: 3
+		},
+		{
+			file: 'windows/ui/gesture_conflicts.ahk',
+			platform: 'ahk',
+			section: 'gesture_system_status_clear',
+			key: 'gesture_system_clear_children',
+			port: 3
+		},
+		{
+			file: 'windows/ui/gesture_conflicts.ahk',
+			platform: 'ahk',
+			section: 'gesture_system_status_conflicts',
+			key: 'gesture_system_conflict_children',
+			port: 3
+		},
+		{
+			file: 'windows/ui/gesture_conflicts.ahk',
+			platform: 'ahk',
+			section: 'gesture_system_windows_children',
+			key: 'gesture_system_cached_slots',
+			port: 3
+		},
+		{
+			file: 'windows/ui/gesture_conflicts.ahk',
+			platform: 'ahk',
+			section: 'gesture_system_status_controls',
+			key: 'gesture_system_refresh',
+			port: 1
+		},
+		{
+			file: 'windows/ui/gesture_conflicts.ahk',
+			platform: 'ahk',
+			section: 'gesture_system_slot_unknown',
+			key: 'gesture_system_open_unknown_slot',
+			port: 1
+		},
+		{
+			file: 'windows/ui/gesture_conflicts.ahk',
+			platform: 'ahk',
+			section: 'gesture_system_slot_configured',
+			key: 'gesture_system_open_configured_slot',
+			port: 1
+		},
+		{
+			file: 'windows/ui/gesture_conflicts.ahk',
+			platform: 'ahk',
+			section: 'gesture_system_slot_not_configured',
+			key: 'gesture_system_open_not_configured_slot',
+			port: 1
+		},
+		{
+			file: 'macos/ui/menu/menu_gestures.lua',
+			platform: 'hs',
+			section: 'gesture_system_status_clear',
+			key: 'gesture_system_clear_children',
+			port: 3
+		},
+		{
+			file: 'macos/ui/menu/menu_gestures.lua',
+			platform: 'hs',
+			section: 'gesture_system_status_conflicts',
+			key: 'gesture_system_conflict_children',
+			port: 3
+		},
+		{
+			file: 'macos/ui/menu/menu_gestures.lua',
+			platform: 'hs',
+			section: 'gesture_system_macos_children',
+			key: 'gesture_system_cached_conflicts',
+			port: 3
+		},
+		{
+			file: 'macos/ui/menu/menu_gestures.lua',
+			platform: 'hs',
+			section: 'gesture_system_status_controls',
+			key: 'gesture_system_refresh',
+			port: 1
+		},
+		{
+			file: 'macos/ui/menu/menu_gestures.lua',
+			platform: 'hs',
+			section: 'gesture_system_pinch_enabled',
+			key: 'gesture_system_open_enabled_pinch',
+			port: 1
+		},
+		{
+			file: 'macos/ui/menu/menu_gestures.lua',
+			platform: 'hs',
+			section: 'gesture_system_pinch_disabled',
+			key: 'gesture_system_open_disabled_pinch',
+			port: 1
+		},
+		{
+			file: 'macos/ui/menu/menu_gestures.lua',
+			platform: 'hs',
+			section: 'gesture_system_pinch_unknown',
+			key: 'gesture_system_open_unknown_pinch',
+			port: 1
+		},
+		{
+			file: 'linux/ui/gesture_conflicts.lua',
+			platform: 'linux',
+			section: 'gesture_system_status_unknown',
+			key: 'gesture_system_unknown_children',
+			port: 3
+		},
+		{
+			file: 'linux/ui/gesture_conflicts.lua',
+			platform: 'linux',
+			section: 'gesture_system_linux_children',
+			key: 'gesture_system_cached_overlap',
+			port: 3
+		},
+		{
+			file: 'linux/ui/gesture_conflicts.lua',
+			platform: 'linux',
+			section: 'gesture_system_slot_unknown',
+			key: 'gesture_system_open_unknown_slot',
+			port: 1
+		}
+	];
+	for (const owner of owners) {
+		const native = fs.readFileSync(path.join(SP, owner.file), 'utf8');
+		const extension = path.extname(owner.file);
+		const credits = (candidate, declarations = manifest, port = owner.port) =>
+			nativeTemplateBinding(
+				candidate,
+				extension,
+				owner.section,
+				owner.key,
+				port,
+				[{ src: candidate }],
+				declarations,
+				owner.platform
+			);
+		assert.equal(
+			credits(native),
+			true,
+			`${owner.file}/${owner.section}/${owner.key}: actual native typed owner`
+		);
+		const needle = '"' + owner.key + '"';
+		assert.equal(
+			native.split(needle).length - 1,
+			1,
+			'the independently reviewed native binding is unique'
+		);
+		assert.equal(
+			credits(native.replace(needle, '"withdrawn_' + owner.key + '"')),
+			false,
+			'a withdrawn actual callback/provider earns no typed owner credit'
+		);
+		assert.equal(
+			credits(
+				native.replaceAll(
+					extension === '.ahk' ? 'MenuRenderer_TemplateRows' : 'ManifestMenu.template_rows',
+					extension === '.ahk' ? 'Foreign_TemplateRows' : 'Foreign.template_rows'
+				)
+			),
+			false,
+			'a foreign native receiver cannot publish the shared declarations'
+		);
+		assert.equal(
+			credits(JSON.stringify(native)),
+			false,
+			'quoted native source is data, not a producer'
+		);
+		assert.equal(
+			credits(native, manifest, owner.port === 1 ? 3 : 1),
+			false,
+			'command callbacks and cached child providers cannot exchange typed ports'
+		);
+		const withdrawn = { ...manifest };
+		delete withdrawn[owner.section];
+		assert.equal(
+			credits(native, withdrawn),
+			false,
+			'a removed required target invalidates the real include closure'
+		);
+		assert.equal(credits(native), true, 'exact owner restoration recovers the typed binding');
+	}
+}
+
+// Preserve the original refresh edge through its actual typed included publisher.
+{
+	const assert = require('node:assert/strict');
+	for (const [platform, file, child] of [
+		['ahk', 'windows/ui/gesture_conflicts.ahk', 'gesture_system_windows_children'],
+		['hs', 'macos/ui/menu/menu_gestures.lua', 'gesture_system_macos_children']
+	]) {
+		const native = fs.readFileSync(path.join(SP, file), 'utf8');
+		const extension = path.extname(file);
+		const credits = (candidate, declarations = manifest) =>
+			publishesIncludedCommands(
+				candidate,
+				extension,
+				'gesture_system_status_controls',
+				declarations,
+				platform
+			);
+		assert.equal(credits(native), true, 'the original controls edge has a genuine typed publisher');
+		assert.equal(
+			credits(native.replaceAll('"gesture_system_refresh"', '"withdrawn_refresh"')),
+			false
+		);
+		assert.equal(credits(native.replaceAll('"' + child + '"', '"withdrawn_children"')), false);
+		assert.equal(credits(JSON.stringify(native)), false);
+		for (const mutation of ['missing', 'redirected', 'cycle', 'wrong_type', 'empty']) {
+			const changed = structuredClone(manifest);
+			if (mutation === 'missing') delete changed.gesture_system_status_controls;
+			if (mutation === 'redirected')
+				changed[child] = changed[child].map((row) =>
+					row.section === 'gesture_system_status_controls'
+						? { ...row, section: 'withdrawn_controls' }
+						: row
+				);
+			if (mutation === 'cycle') changed[child].push({ type: 'include', section: child });
+			if (mutation === 'wrong_type') changed.gesture_system_status_controls[0].type = 'list';
+			if (mutation === 'empty') changed.gesture_system_status_controls = [];
+			assert.equal(
+				credits(native, changed),
+				false,
+				mutation + ' ownership earns no included command credit'
+			);
+		}
+	}
+}
+
+// A root presentation is reached by its real native producer, never a synthetic clicked row.
+{
+	const assert = require('node:assert/strict');
+	const { nativeBadgeRootComposition } = require('../lib/menu-native-root-binding.cjs');
+	const controls = require('./fixtures/badge-root-completed-counterexamples.cjs');
+	const target = 'macos_canvas_badge_frame';
+	const sourceFiles = [
+		'macos/ui/menu/init.lua',
+		'macos/ui/menu/builder.lua',
+		'macos/ui/menu/canvas_badge.lua',
+		'macos/ui/menu/menu_llm/init.lua'
+	];
+	const sources = Object.fromEntries(
+		sourceFiles.map((file) => [file, fs.readFileSync(path.join(SP, file), 'utf8')])
+	);
+	const admits = (candidate, declarations = manifest, platform = 'hs') =>
+		nativeBadgeRootComposition(candidate, declarations, platform);
+	// The previous physical source/control corpus is frozen independently, never rebuilt from LIVE.
+	const {
+		nativeBadgeRootComposition: predecessorAdmits
+	} = require('../lib/menu-native-root-binding-predecessor.cjs');
+	const predecessorControls = require('./fixtures/badge-root-counterexamples.cjs');
+	const predecessorPath = path.join(__dirname, 'fixtures/badge-root-predecessor');
+	const predecessorSources = Object.fromEntries(
+		sourceFiles
+			.slice(0, 3)
+			.map((file) => [
+				file,
+				fs.readFileSync(path.join(predecessorPath, file.replaceAll('/', '_') + '.txt'), 'utf8')
+			])
+	);
+	const predecessorManifest = JSON.parse(
+		fs.readFileSync(path.join(predecessorPath, 'menu_manifest.json'), 'utf8')
+	);
+	assert.equal(
+		predecessorControls.length,
+		60,
+		'all historical independent controls remain registered'
+	);
+	assert.equal(
+		predecessorAdmits(predecessorSources, predecessorManifest, 'hs'),
+		true,
+		'the genuine historical physical route was admitted'
+	);
+	for (const control of predecessorControls) {
+		const source = predecessorSources[control.path];
+		assert.equal(
+			source.split(control.before).length - 1,
+			1,
+			control.reason + ': immutable historical physical preimage'
+		);
+		const changed = source.replace(control.before, control.after);
+		assert.notEqual(changed, source, control.reason + ': historical source actually changes');
+		assert.equal(
+			predecessorAdmits(
+				{ ...predecessorSources, [control.path]: changed },
+				predecessorManifest,
+				'hs'
+			),
+			false,
+			control.reason
+		);
+	}
+	assert.equal(
+		controls.length,
+		74,
+		'all 60 LIVE successor obligations and 14 new handoff controls execute'
+	);
+	assert.equal(
+		admits(sources),
+		true,
+		'the actual LIVE completed root must be admitted before negative controls'
+	);
+	for (const control of controls) {
+		const source = sources[control.path];
+		assert.equal(
+			source.split(control.before).length - 1,
+			1,
+			control.reason + ': exact physical counterexample preimage'
+		);
+		const changed = source.replace(control.before, control.after);
+		assert.notEqual(changed, source, control.reason + ': source was actually changed');
+		assert.equal(admits({ ...sources, [control.path]: changed }), false, control.reason);
+	}
+	for (const file of sourceFiles) {
+		assert.equal(admits({ ...sources, [file]: '' }), false, 'missing physical route owner');
+		assert.equal(
+			admits({ ...sources, [file]: JSON.stringify(sources[file]) }),
+			false,
+			'quoted physical source supplies no route'
+		);
+		assert.equal(
+			admits({ ...sources, [file]: '--[=[\n' + sources[file] + '\n]=]' }),
+			false,
+			'comment-only physical source supplies no route'
+		);
+	}
+	for (const platform of ['ahk', 'linux', 'HS', '', undefined]) {
+		assert.equal(
+			nativeBadgeRootComposition(sources, manifest, platform),
+			false,
+			'root edge only exists on its actual native platform'
+		);
+	}
+	for (const section of [
+		target,
+		'macos_canvas_badge_paused',
+		'macos_canvas_badge_active',
+		'macos_canvas_badge_root',
+		'macos_download_root',
+		'llm_download_shortcut_frame',
+		'top_level'
+	]) {
+		const withdrawn = { ...manifest };
+		delete withdrawn[section];
+		assert.equal(admits(sources, withdrawn), false, 'missing actual canonical root or descendant');
+	}
+	const wrongOs = {
+		...manifest,
+		macos_canvas_badge_active: manifest.macos_canvas_badge_active.map((row) => ({
+			...row,
+			platforms: ['linux']
+		}))
+	};
+	assert.equal(
+		admits(sources, wrongOs),
+		false,
+		'wrong-platform caption cannot supply the native root'
+	);
+	const quotedDecoy = {
+		...sources,
+		'macos/ui/menu/builder.lua':
+			sources['macos/ui/menu/builder.lua'] +
+			'\n-- pcall(CanvasBadge.prepend_to, rendered, ctx, function())\nlocal inert_badge_quote = "pcall(CanvasBadge.prepend_to, rendered, ctx, function())"\n'
+	};
+	const admitted = admits(sources);
+	assert.equal(
+		admits(quotedDecoy),
+		admitted,
+		'inert quoted/comment decoys neither create nor withdraw an actual route'
+	);
+	if (admitted) {
+		for (const completedTarget of [target, 'macos_canvas_badge_root', 'macos_download_root']) {
+			reachableOn[completedTarget] = combineMenuVisibility(
+				PLATFORMS,
+				reachableOn[completedTarget],
+				['hs']
+			);
+			openedBy[completedTarget] =
+				'top_level/native Builder.generate → native_composition → CanvasBadge.prepend_to';
+			reachedByKinds[completedTarget] = { hs: new Set(['compose']) };
+		}
+	} else {
+		errors.push(
+			'top_level/native badge: physical root composition refused; declaration remains unreachable'
+		);
+	}
+}
+
 // Iterated to a fixed point rather than walked once: the graph is shallow today
 // but a group nested inside a group would make a single pass depth-dependent,
 // and a check that silently depends on declaration order is a check that breaks
@@ -1713,19 +2534,32 @@ for (let pass = 0; pass < MENU_KEYS.length + 1; pass += 1) {
 					if (
 						typeof file !== 'string' ||
 						!file.startsWith(driver + '/') ||
-						!(opened.selected_group?.[platform]
-							? publishesSelectedMenuGroup(
+						!(opened.forwarded_template?.[platform] === 'layout'
+							? require('../lib/menu-native-layout-binding.cjs').nativeLayoutTemplatePublication(
 									fs.readFileSync(path.join(SP, file), 'utf8'),
-									path.extname(file),
 									target,
-									manifest[target],
-									opened.selected_group[platform]
+									manifest[target]
 								)
-							: publishesTemplate(
-									fs.readFileSync(path.join(SP, file), 'utf8'),
-									path.extname(file),
-									target
-								))
+							: opened.selected_group?.[platform]
+								? publishesSelectedMenuGroup(
+										fs.readFileSync(path.join(SP, file), 'utf8'),
+										path.extname(file),
+										target,
+										manifest[target],
+										opened.selected_group[platform]
+									)
+								: publishesTemplate(
+										fs.readFileSync(path.join(SP, file), 'utf8'),
+										path.extname(file),
+										target
+									) ||
+									publishesIncludedCommands(
+										fs.readFileSync(path.join(SP, file), 'utf8'),
+										path.extname(file),
+										target,
+										manifest,
+										platform
+									))
 					)
 						errors.push(
 							`${menuKey}/${row.id}: ${kind} ${target} has no native template publication on ${platform}`
