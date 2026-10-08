@@ -168,6 +168,12 @@ const PLAN_STEPS = ['Load the Linux release artifact contract', 'Compute tag and
 // skip a gate while its job stays green.
 const STEP_CONDITIONS = [
 	[
+		WINDOWS_BOX,
+		'test-ahk',
+		'Retain native PAC artifact and source identity',
+		"${{ always() && steps.native-pac-build.outcome == 'success' }}"
+	],
+	[
 		LINUX_BOX,
 		'test-linux',
 		'Emit Configuration assertion from failed unit log',

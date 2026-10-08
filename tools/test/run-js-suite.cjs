@@ -1806,6 +1806,12 @@ const CHECKS = [
 		repro: 'node tools/test/test-mlx-download-trust-activation.cjs'
 	},
 	{
+		name: 'native PAC helpers preserve independent standard function vectors',
+		cmd: process.execPath,
+		args: ['tools/test/test-network-pac-helpers.cjs'],
+		repro: 'node tools/test/test-network-pac-helpers.cjs'
+	},
+	{
 		name: 'macOS opaque clients refuse unsupported automatic proxy routing',
 		cmd: process.execPath,
 		args: ['tools/test/test-macos-opaque-network-admission.cjs'],

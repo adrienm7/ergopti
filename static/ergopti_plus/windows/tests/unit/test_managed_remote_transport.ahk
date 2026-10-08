@@ -67,7 +67,10 @@ _ManagedRemoteFixtureCleanupDiagnosticFact(State, Completions) {
 		Phase := State.Get("state", "unknown")
 		if !(Phase is String) || !RegExMatch(Phase, "\A(?:unknown|starting|ready|failed|stopped)\z")
 			Phase := "unknown"
-		Fact := "state=" . Phase
+		Stage := State.Get("root_install_stage", "unknown")
+		if !(Stage is String) || !RegExMatch(Stage, "\A(?:unknown|none|create_store|open_store|verify_absent|export_public|add_root|verify_present|close_store|complete)\z")
+			Stage := "unknown"
+		Fact := "state=" . Phase . " root_install_stage=" . Stage
 		for Name in ["root_removed", "service_stopped", "server_tls_source_unchanged"] {
 			Value := State.Get(Name, -1)
 			if Type(Value) != "Integer" || (Value != 0 && Value != 1)
@@ -104,16 +107,60 @@ _ManagedRemoteFixtureCleanupDiagnostic(State, Completions) {
 	}
 }
 
+; Observe only a dialog class belonging to the still-owned native child, before termination.
+; Window text and certificate identities never leave the private owner.
+_ManagedRemoteFixtureObserveDialog(Handle) {
+	Callback := 0
+	try {
+		Pid := Handle.processId()
+		if !(Pid is Integer) || Pid <= 0 || Pid > 4294967295
+			return
+		Observation := Map("dialog", 0, "visible", 0, "failed", false)
+		Callback := CallbackCreate(_ManagedRemoteFixtureInspectWindow.Bind(Pid, Observation), "", 2)
+		if !DllCall("User32\EnumWindows", "Ptr", Callback, "Ptr", 0, "Int") || Observation["failed"]
+			return
+		_TestPrint("::notice title=Windows native owned dialog::dialog=" . Observation["dialog"] . " visible=" . Observation["visible"])
+	} finally {
+		if Callback
+			CallbackFree(Callback)
+	}
+}
+
+_ManagedRemoteFixtureInspectWindow(Pid, Observation, Window, Parameter) {
+	try {
+		WindowPid := 0
+		if !DllCall("User32\GetWindowThreadProcessId", "Ptr", Window, "UInt*", &WindowPid, "UInt") {
+			Observation["failed"] := true
+			return 1
+		}
+		if WindowPid != Pid
+			return 1
+		ClassName := Buffer(128, 0)
+		if !DllCall("User32\GetClassNameW", "Ptr", Window, "Ptr", ClassName, "Int", 64, "Int") {
+			Observation["failed"] := true
+			return 1
+		}
+		if StrGet(ClassName, "UTF-16") == "#32770" {
+			Observation["dialog"] := 1
+			if DllCall("User32\IsWindowVisible", "Ptr", Window, "Int")
+				Observation["visible"] := 1
+		}
+	} catch {
+		Observation["failed"] := true
+	}
+	return 1
+}
+
 _ManagedRemoteFixtureCleanupDiagnosticControls() {
 	State := Map("state", "stopped", "root_removed", true, "service_stopped", true,
 		"server_tls_source_unchanged", true, "ServiceFailures", 0, "server_tls_owned_streams", 0,
 		"server_tls_owned_modules", 0, "server_tls_owned_source_fences", 0)
 	Completion := Map("exit", 0, "stdout", "OWNED_FIXTURE_STOPPED_ROOT_REMOVED", "stderr", "private")
-	Expected := "state=stopped root_removed=1 service_stopped=1 server_tls_source_unchanged=1"
+	Expected := "state=stopped root_install_stage=unknown root_removed=1 service_stopped=1 server_tls_source_unchanged=1"
 		. " ServiceFailures=0 server_tls_owned_streams=0 server_tls_owned_modules=0 server_tls_owned_source_fences=0"
 		. " completions=1 exit=0 marker=match"
 	AssertEqual(Expected, _ManagedRemoteFixtureCleanupDiagnosticFact(State, [Completion]))
-	for Pair in [["state", "stopped`nprivate"], ["root_removed", "private"],
+	for Pair in [["state", "stopped`nprivate"], ["root_install_stage", "add_root`nprivate"], ["root_removed", "private"],
 		["server_tls_owned_streams", 4097], ["ServiceFailures", -2]] {
 		Invalid := State.Clone()
 		Invalid[Pair[1]] := Pair[2]
@@ -463,6 +510,8 @@ class _ManagedRemoteFixtureOwner {
 						Sleep(10)
 					}
 				}
+				if this.Completions.Length == 0
+					try _ManagedRemoteFixtureObserveDialog(this.Handle)
 				if !this.Handle.terminate()
 					return false
 				if this.NativeState is Map && !this.NativeState.Get("TreeQuiesced", false)
