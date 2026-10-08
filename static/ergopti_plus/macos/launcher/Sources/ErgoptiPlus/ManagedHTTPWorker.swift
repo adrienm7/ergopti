@@ -4,6 +4,7 @@
 
 import CFNetwork
 import CoreFoundation
+import CPOSIXCompatibility
 import Darwin
 import Foundation
 import SystemConfiguration
@@ -198,25 +199,25 @@ enum ManagedProxyLookup {
 		let result = ManagedPACResult()
 		var context = CFStreamClientContext(version: 0,
 			info: Unmanaged.passUnretained(result).toOpaque(), retain: nil, release: nil, copyDescription: nil)
-		let unmanaged: Unmanaged<CFRunLoopSource>?
+		let source: CFRunLoopSource?
 		if let pacURL {
-			unmanaged = CFNetworkExecuteProxyAutoConfigurationURL(pacURL as CFURL, url as CFURL,
+			source = CFNetworkExecuteProxyAutoConfigurationURL(pacURL as CFURL, url as CFURL,
 				managedPACCallback, &context)
 		} else if let script {
-			unmanaged = CFNetworkExecuteProxyAutoConfigurationScript(script as CFString, url as CFURL,
+			source = CFNetworkExecuteProxyAutoConfigurationScript(script as CFString, url as CFURL,
 				managedPACCallback, &context)
 		} else { return nil }
-		guard let source = unmanaged?.takeRetainedValue() else { return nil }
+		guard let source else { return nil }
 		let loop = CFRunLoopGetCurrent()
-		CFRunLoopAddSource(loop, source, kCFRunLoopDefaultMode)
+		CFRunLoopAddSource(loop, source, CFRunLoopMode.defaultMode)
 		defer {
-			CFRunLoopRemoveSource(loop, source, kCFRunLoopDefaultMode)
+			CFRunLoopRemoveSource(loop, source, CFRunLoopMode.defaultMode)
 			CFRunLoopSourceInvalidate(source)
 		}
 		while !result.received {
 			let remaining = deadline - ProcessInfo.processInfo.systemUptime
 			guard remaining > 0 else { return nil }
-			CFRunLoopRunInMode(kCFRunLoopDefaultMode, remaining, true)
+			CFRunLoopRunInMode(CFRunLoopMode.defaultMode, remaining, true)
 		}
 		guard !result.failed, let proxies = result.proxies else { return nil }
 		let object: AnyObject = proxies
