@@ -191,3 +191,23 @@ Requirements:
 - OR udev rule: `KERNEL=="uinput", GROUP="input", MODE="0660"`
 - `ydotool` + `ydotoold` for text injection
 - LuaJIT 2.1+ (available in all target distros)
+
+## Managed HTTP redirect admission
+
+`adapters.http_client.get` and the default `get_owned` preserve the historical
+credential-header no-follow policy. `follow_redirects=true` retains the original
+origin's HTTP response when the shared credential inventory forbids native
+following; empty credential fields also count as present. An observed HTTPS
+downgrade stays refused and returns the original HTTP redirect status/error.
+
+A caller deliberately owning the complete buffered GET hop sequence may pass
+`managed_redirects=true` to `get_owned`, together with `follow_redirects=true`.
+This strictly Boolean option requires that owned buffered GET port and excludes
+path output, ETag and archive output targets. The shared transition then resolves
+each exact hop under the original deadline, waits for actual prior-child
+retirement and strips canonical credentials at an origin boundary. HTTPS
+downgrade, malformed metadata and unsafe destinations remain strict managed
+refusals. The option is captured under the native reservation; changing the
+caller's options later cannot opt another operation in. Other ports refuse this
+opt-in before acquiring a transport. Archive output already owns a separate
+`archive_redirects` contract and never borrows buffered GET permission.

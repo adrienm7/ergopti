@@ -273,7 +273,7 @@ LayoutRegistry_ReadBundled(Id, RegistryDir) {
 _LayoutRegistryDefaultTransport() {
 	return Map(
 		"request", () => CurlAsyncRequest(),
-		"resolve_proxy", SystemProxy_ResolveAsync,
+		"managed", true,
 		"schedule", (Fn, DelayMs) => SetTimer(Fn, -DelayMs)
 	)
 }
@@ -293,35 +293,52 @@ _LayoutRegistryDefaultTransport() {
  * @param {Func} OnSettled
  */
 LayoutRegistry_Request(Url, Partial, Headers, TimeoutMs, Transport, OnSettled) {
+	Started := A_TickCount
 	if !(Transport is Map)
 		Transport := _LayoutRegistryDefaultTransport()
 	Job := { Url: Url, Partial: Partial, Headers: Headers, TimeoutMs: TimeoutMs, Transport: Transport,
-		OnSettled: OnSettled, Settled: false }
+		OnSettled: OnSettled, Settled: false, Started: Started, Request: 0 }
 	LoggerDebug("LayoutRegistry", "Fetching {1}", Url)
-	Transport["resolve_proxy"].Call([Url], (Resolved) => _LayoutRegistrySend(Job, Resolved[Url]))
+	if Transport.Get("managed", false)
+		_LayoutRegistrySend(Job)
+	else
+		Transport["resolve_proxy"].Call([Url], (Resolved) => _LayoutRegistrySend(Job, Resolved[Url]))
+	return Job
 }
 
 _LayoutRegistrySettle(Job, Status, Etag, Err) {
 	if Job.Settled
 		return
 	Job.Settled := true
+	Job.Request := 0
 	Job.OnSettled.Call(Status, Etag, Err)
 }
 
-_LayoutRegistrySend(Job, Proxy) {
+_LayoutRegistrySend(Job, Proxy := unset) {
+	if Job.Settled
+		return
 	try {
 		if !FSDelete(Job.Partial)
 			throw Error("Cannot remove the stale partial download " . Job.Partial)
 		Req := Job.Transport["request"].Call()
+		Job.Request := Req
+		if Job.Transport.Get("managed", false) {
+			Req.SetManagedRouting(0, () => !Job.Settled && Job.Request == Req)
+			Req.SetDeadline(Job.Started, Job.TimeoutMs)
+		}
 		Req.Open("GET", Job.Url, true)
 		for Name, Value in Job.Headers
 			Req.SetRequestHeader(Name, Value)
-		Req.SetProxy(Proxy)
+		if IsSet(Proxy)
+			Req.SetProxy(Proxy)
 		; One budget for the whole transfer, connection included.
 		Req.SetTimeouts(0, Job.TimeoutMs, 0, 0)
 		Req.SetOutputFile(Job.Partial)
-		Req.Send()
+		if !Req.Send()
+			throw Error("The managed registry request refused dispatch.")
 	} catch as Err {
+		if IsObject(Job.Request)
+			Job.Request.Abort()
 		_LayoutRegistrySettle(Job, 0, "", "cannot download " . Job.Url . ": " . Err.Message)
 		return
 	}
@@ -329,6 +346,10 @@ _LayoutRegistrySend(Job, Proxy) {
 }
 
 _LayoutRegistryPoll(Job, Req, Polls) {
+	if Job.Settled {
+		Req.Abort()
+		return
+	}
 	global LAYOUT_REGISTRY_POLL_MS, LAYOUT_REGISTRY_POLL_GRACE
 	try {
 		Ready := Req.WaitForResponse(0)

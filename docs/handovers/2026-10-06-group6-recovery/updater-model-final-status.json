@@ -1,0 +1,85 @@
+{
+	"status": "MODEL QUALIFICATION PASS; physical pipeline and installed package UNEXECUTED",
+	"slot": "CLOSED; no command active",
+	"candidate": {
+		"luajit": {
+			"passed": 96,
+			"failed": 0,
+			"executed": 96,
+			"skipped": 0
+		},
+		"lua54": {
+			"passed": 96,
+			"failed": 0,
+			"executed": 96,
+			"skipped": 0
+		}
+	},
+	"predecessor": {
+		"luajit": {
+			"passed": 76,
+			"failed": 20,
+			"executed": 96,
+			"skipped": 0
+		},
+		"lua54": {
+			"passed": 76,
+			"failed": 20,
+			"executed": 96,
+			"skipped": 0
+		}
+	},
+	"source_inventory": [
+		{
+			"tree": "candidate",
+			"count": 1910,
+			"changed": []
+		},
+		{
+			"tree": "predecessor-production",
+			"count": 1910,
+			"changed": []
+		},
+		{
+			"tree": "predecessor-installer",
+			"count": 1910,
+			"changed": []
+		},
+		{
+			"tree": "predecessor-registry",
+			"count": 1910,
+			"changed": []
+		}
+	],
+	"plan_sha256": "daf97537304d2f24828bf7f8e6a40c4d7bd2f11125a02edc05a06ff8ac50386c",
+	"script_bindings_sha256": "f19243380504f0ebb113f6a345846c7238bc57d8ee42a72ed92e9f9c734103bd",
+	"preserved_first_import_failure": "/workspace/scratch/group6-native-updater-96-qualification1/FINAL-STATUS.json",
+	"legacy": {
+		"passed_per_abi": 5,
+		"skipped": 0,
+		"unexecuted": 0,
+		"initial_environment_failure": "LuaJIT package-managed fixture io.open canonical TMP: EROFS; initial receipt retained; same filter passed with approved escalation",
+		"initial_receipt": "RESULT-legacy.json",
+		"remaining_receipt": "RESULT-legacy-escalated.json",
+		"original_manager8": "PASS in original18 prefix on candidate and predecessor both ABIs; no assertion/source changes",
+		"installer34": "No independent registered34-case floor found; five unchanged original cases replayed per ABI, including original14-stage rollback loop and actual tar install"
+	},
+	"causal": {
+		"production_manager": "10 new receiving/publication cases fail exact predecessor; original8 pass",
+		"transfer": "2 exact predecessor duplicate-publication/acquisition cases fail;2 pass",
+		"pre_reader": "8 exact predecessor owned-refusal constructor/contract negatives; do not claim8 distinct exercised cleanup failures",
+		"unchanged_install_and_registry": "37 previous install/caller controls and29 registry controls pass exact frozen predecessor both ABIs"
+	},
+	"limitations": [
+		"No actual HTTP/output-hop/digest/publication/tar/installer composite proof",
+		"No installed ABI/load/package qualification",
+		"No main/index/Git/CI modifications"
+	],
+	"frozen_launch_scripts_unchanged": true,
+	"receipt_hashes": {
+		"RESULT-candidate.json": "00fce3cc4d8d88d2e626154ade23384a9983449227541261ab035725c100adce",
+		"RESULT-predecessor.json": "8b637737a2d5adba4359a276b263d367368910bdbad0da8e3e3527f96e0b8736",
+		"RESULT-legacy.json": "cc1028e5f57ccf7e333e970c375c5cb253e4d04add2823540f9f16c2c25a24eb",
+		"RESULT-legacy-escalated.json": "e778373f0f85b0a1359599638cb7ac11d36abc446cfc4cad71e8a710e34fa581"
+	}
+}

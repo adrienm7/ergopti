@@ -1,0 +1,277 @@
+# vendor/ergopti_native_proxy_ex.ps1
+# Native ordered automatic lookup; caller owns the physical process deadline.
+if (-not ('ErgoptiNativeProxyEx' -as [type])) {
+Add-Type -TypeDefinition @'
+using System;
+using System.Collections.Generic;
+using System.Diagnostics;
+using System.Runtime.InteropServices;
+using System.Threading;
+using System.Text;
+
+public static class ErgoptiNativeProxyEx
+{
+    [DllImport("kernel32.dll", ExactSpelling=true)]
+    private static extern UInt64 GetTickCount64();
+    public static Int64 CurrentTick() { return checked((Int64)GetTickCount64()); }
+    [StructLayout(LayoutKind.Sequential)]
+    public struct AutoProxyOptions
+    {
+        public UInt32 Flags;
+        public UInt32 AutoDetectFlags;
+        public IntPtr AutoConfigUrl;
+        public IntPtr Reserved;
+        public UInt32 ReservedFlags;
+        public Int32 AutoLogonIfChallenged;
+    }
+    [StructLayout(LayoutKind.Sequential)]
+    public struct NativeEntry
+    {
+        public Int32 IsProxy;
+        public Int32 IsBypass;
+        public Int32 ProxyScheme;
+        public IntPtr ProxyHost;
+        public UInt16 ProxyPort;
+    }
+    [StructLayout(LayoutKind.Sequential)]
+    public struct NativeResult
+    {
+        public UInt32 Count;
+        public IntPtr Entries;
+    }
+    [StructLayout(LayoutKind.Sequential)]
+    public struct AsyncResult
+    {
+        public UIntPtr Api;
+        public UInt32 Error;
+    }
+    public sealed class Entry
+    {
+        public bool IsProxy;
+        public bool IsBypass;
+        public int ProxyScheme;
+        public string ProxyHost;
+        public UInt16 ProxyPort;
+    }
+    public sealed class Result
+    {
+        public bool Ok;
+        public string Kind = "refused";
+        public int NativeError;
+        public string Stage = "lookup";
+        public bool CallbacksRetired;
+        public string CleanupStatus = "pending";
+        public string FailureOrigin = "native";
+        public Entry[] Entries = new Entry[0];
+    }
+    [UnmanagedFunctionPointer(CallingConvention.Winapi)]
+    private delegate void StatusCallback(IntPtr handle, UIntPtr context,
+        UInt32 status, IntPtr information, UInt32 length);
+
+    [DllImport("winhttp.dll", CharSet=CharSet.Unicode, SetLastError=true, ExactSpelling=true)]
+    private static extern IntPtr WinHttpOpen(string agent, UInt32 access,
+        IntPtr proxy, IntPtr bypass, UInt32 flags);
+    [DllImport("winhttp.dll", SetLastError=true, ExactSpelling=true)]
+    private static extern IntPtr WinHttpSetStatusCallback(IntPtr handle,
+        StatusCallback callback, UInt32 flags, UIntPtr reserved);
+    [DllImport("winhttp.dll", SetLastError=true, ExactSpelling=true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool WinHttpSetOption(IntPtr handle, UInt32 option,
+        ref UIntPtr value, UInt32 length);
+    [DllImport("winhttp.dll", ExactSpelling=true)]
+    private static extern UInt32 WinHttpCreateProxyResolver(IntPtr session, out IntPtr resolver);
+    [DllImport("winhttp.dll", CharSet=CharSet.Unicode, ExactSpelling=true)]
+    private static extern UInt32 WinHttpGetProxyForUrlEx(IntPtr resolver, string url,
+        ref AutoProxyOptions options, UIntPtr context);
+    [DllImport("winhttp.dll", ExactSpelling=true)]
+    private static extern UInt32 WinHttpGetProxyResult(IntPtr resolver, ref NativeResult result);
+    [DllImport("winhttp.dll", ExactSpelling=true)]
+    private static extern void WinHttpFreeProxyResult(ref NativeResult result);
+    [DllImport("winhttp.dll", SetLastError=true, ExactSpelling=true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool WinHttpCloseHandle(IntPtr handle);
+
+    private const UInt32 RequestError = 0x00200000;
+    private const UInt32 ProxyComplete = 0x01000000;
+    private const UInt32 HandleClosing = 0x00000800;
+    private const UInt32 HandleFlags = 0x00000c00;
+    private static readonly object retainedGate = new object();
+    private static readonly Dictionary<Guid, Operation> retained = new Dictionary<Guid, Operation>();
+
+    private sealed class Operation
+    {
+        public readonly Guid Identity = Guid.NewGuid();
+        public readonly ManualResetEvent Complete = new ManualResetEvent(false);
+        public readonly ManualResetEvent ResolverClosed = new ManualResetEvent(false);
+        public readonly ManualResetEvent SessionClosed = new ManualResetEvent(false);
+        public readonly ManualResetEvent CallbacksIdle = new ManualResetEvent(true);
+        public readonly object CallbackGate = new object();
+        public int ActiveCallbacks;
+        public readonly StatusCallback Callback;
+        public IntPtr Session;
+        public IntPtr Resolver;
+        public int Error;
+        public int Malformed;
+        public IntPtr Config;
+        public bool CallbackRegistered;
+        public Operation() { Callback = OnStatus; }
+        private void OnStatus(IntPtr handle, UIntPtr context, UInt32 status,
+            IntPtr information, UInt32 length)
+        {
+            // Closing receipts forbid later native callbacks, but an earlier
+            // callback can still be executing concurrently. Account for both.
+            Interlocked.Increment(ref ActiveCallbacks);
+            // Count before any lock/wait: an already-entered callback blocked
+            // on CallbackGate must prevent the parent from releasing its owner.
+            // All event access, including entry/exit, stays inside containment.
+            try {
+            lock(CallbackGate) { CallbacksIdle.Reset(); }
+            // Native callback data is valid only inside this invocation.
+            if (status == HandleClosing) {
+                if (handle == Resolver) ResolverClosed.Set();
+                if (handle == Session) SessionClosed.Set();
+                return;
+            }
+            if (status == RequestError) {
+                if (information == IntPtr.Zero || length != Marshal.SizeOf(typeof(AsyncResult)))
+                    Interlocked.Exchange(ref Malformed, 1);
+                else {
+                    AsyncResult native = (AsyncResult)Marshal.PtrToStructure(information, typeof(AsyncResult));
+                    if (native.Api.ToUInt64()!=6 || native.Error==0) Interlocked.Exchange(ref Malformed,1);
+                    else Interlocked.Exchange(ref Error, unchecked((int)native.Error));
+                }
+                Complete.Set();
+            } else if (status == ProxyComplete) Complete.Set();
+            } catch(Exception) {
+                Interlocked.Exchange(ref Malformed,1);
+                try { Complete.Set(); } catch(ObjectDisposedException) { }
+            } finally {
+                lock(CallbackGate) {
+                    int remaining=Interlocked.Decrement(ref ActiveCallbacks);
+                    try { if(remaining==0) CallbacksIdle.Set(); }
+                    catch(ObjectDisposedException) { Interlocked.Exchange(ref Malformed,1); }
+                }
+            }
+        }
+    }
+
+    private static int Remaining(Stopwatch clock, int budget)
+    {
+        return Math.Max(0, budget - (int)Math.Min(Int32.MaxValue, clock.ElapsedMilliseconds));
+    }
+    private static string ReadBoundedHost(IntPtr address, int maxBytes)
+    {
+        StringBuilder text=new StringBuilder();
+        for(int index=0;index<maxBytes/2;index++) {
+            char value=(char)Marshal.ReadInt16(address,checked(index*2));
+            if(value==0)return text.ToString();
+            text.Append(value);
+        }
+        throw new InvalidOperationException("Native proxy hostname exceeded the admitted bound.");
+    }
+    public static Result Resolve(string url, string pacUrl, bool autoDetect, int budgetMs, int maxEntries, int maxHostBytes)
+    {
+        Result answer = new Result();
+        // The application parent still owns the hard physical process-tree fence.
+        // Reserve one second of the same total budget for native callback retirement.
+        if (budgetMs < 1500 || maxEntries < 1 || maxEntries > 4096 || maxHostBytes < 2 || maxHostBytes > 1048576) { answer.FailureOrigin="invalid_input"; return answer; }
+        Operation operation = new Operation();
+        Stopwatch clock = Stopwatch.StartNew();
+        IntPtr config = IntPtr.Zero;
+        bool sessionClosing = false;
+        bool resolverClosing = false;
+        lock(retainedGate) retained.Add(operation.Identity, operation);
+        try {
+            operation.Session = WinHttpOpen("ErgoptiPlus native ordered-proxy lookup", 1,
+                IntPtr.Zero, IntPtr.Zero, 0x10000000);
+            if(operation.Session==IntPtr.Zero) { answer.NativeError=Marshal.GetLastWin32Error(); return answer; }
+            UIntPtr context = new UIntPtr(1);
+            if(!WinHttpSetOption(operation.Session,45,ref context,(UInt32)UIntPtr.Size)) {
+                answer.NativeError=Marshal.GetLastWin32Error(); return answer;
+            }
+            if(WinHttpSetStatusCallback(operation.Session,operation.Callback,
+                RequestError|ProxyComplete|HandleFlags,UIntPtr.Zero)==new IntPtr(-1)) {
+                answer.NativeError=Marshal.GetLastWin32Error(); return answer;
+            }
+            operation.CallbackRegistered=true;
+            UInt32 created=WinHttpCreateProxyResolver(operation.Session,out operation.Resolver);
+            if(created!=0) { answer.NativeError=unchecked((int)created); return answer; }
+            if(!WinHttpSetOption(operation.Resolver,45,ref context,(UInt32)UIntPtr.Size)) {
+                answer.NativeError=Marshal.GetLastWin32Error(); return answer;
+            }
+            AutoProxyOptions options=new AutoProxyOptions();
+            options.Flags=0x00080000|0x00100000;
+            options.AutoLogonIfChallenged=1;
+            if(!String.IsNullOrEmpty(pacUrl)) {
+                config=Marshal.StringToHGlobalUni(pacUrl); operation.Config=config;
+                options.Flags|=2; options.AutoConfigUrl=config;
+            } else if(autoDetect) { options.Flags|=1; options.AutoDetectFlags=3; }
+            else { answer.FailureOrigin="invalid_input"; return answer; }
+            UInt32 started=WinHttpGetProxyForUrlEx(operation.Resolver,url,ref options,context);
+            if(started!=997) { answer.NativeError=unchecked((int)started); return answer; }
+            if(!operation.Complete.WaitOne(Remaining(clock,budgetMs-1000))) { answer.NativeError=0; answer.FailureOrigin="application_budget"; return answer; }
+            if(operation.Malformed!=0) { answer.FailureOrigin="invalid_native_receipt"; return answer; }
+            if(operation.Error!=0) {
+                answer.NativeError=operation.Error;
+                if(operation.Error==12180 && String.IsNullOrEmpty(pacUrl) && autoDetect) answer.Kind="no_auto_proxy";
+                return answer;
+            }
+            NativeResult nativeResult=new NativeResult();
+            UInt32 obtained=WinHttpGetProxyResult(operation.Resolver,ref nativeResult);
+            if(obtained!=0) { answer.NativeError=unchecked((int)obtained); return answer; }
+            try {
+                if(nativeResult.Count==0 || nativeResult.Count>maxEntries || nativeResult.Entries==IntPtr.Zero) {
+                    answer.FailureOrigin="invalid_native_receipt"; return answer;
+                }
+                int stride=Marshal.SizeOf(typeof(NativeEntry));
+                List<Entry> entries=new List<Entry>();
+                for(int index=0;index<nativeResult.Count;index++) {
+                    NativeEntry raw=(NativeEntry)Marshal.PtrToStructure(
+                        IntPtr.Add(nativeResult.Entries,checked(index*stride)),typeof(NativeEntry));
+                    if((raw.IsProxy!=0 && raw.IsProxy!=1) || (raw.IsBypass!=0 && raw.IsBypass!=1)) {
+                        answer.FailureOrigin="invalid_native_receipt"; return answer;
+                    }
+                    entries.Add(new Entry{ IsProxy=raw.IsProxy!=0, IsBypass=raw.IsBypass!=0,
+                        ProxyScheme=raw.ProxyScheme,
+                        ProxyHost=raw.ProxyHost==IntPtr.Zero ? "" : ReadBoundedHost(raw.ProxyHost,maxHostBytes),
+                        ProxyPort=raw.ProxyPort });
+                }
+                answer.Entries=entries.ToArray(); answer.Kind="routes"; answer.Ok=true;
+            } finally { WinHttpFreeProxyResult(ref nativeResult); }
+        } catch(Exception) {
+            // No URL, PAC location, credentials or managed exception text leaves this boundary.
+            answer.NativeError=0; answer.FailureOrigin="managed_boundary"; answer.Ok=false; answer.Kind="refused";
+        } finally {
+            if(operation.Resolver!=IntPtr.Zero) resolverClosing=WinHttpCloseHandle(operation.Resolver);
+            if(operation.Session!=IntPtr.Zero) sessionClosing=WinHttpCloseHandle(operation.Session);
+            bool resolverRetired=operation.Resolver==IntPtr.Zero ||
+                (resolverClosing && operation.ResolverClosed.WaitOne(Remaining(clock,budgetMs)));
+            bool sessionRetired=operation.Session==IntPtr.Zero ||
+                (sessionClosing && (!operation.CallbackRegistered || operation.SessionClosed.WaitOne(Remaining(clock,budgetMs))));
+            bool callbacksIdle=resolverRetired && sessionRetired &&
+                operation.CallbacksIdle.WaitOne(Remaining(clock,budgetMs));
+            lock(operation.CallbackGate) {
+                answer.CallbacksRetired=resolverRetired && sessionRetired && callbacksIdle && operation.ActiveCallbacks==0;
+            }
+            answer.CleanupStatus=answer.CallbacksRetired ? "retired" : "unacknowledged";
+            if(answer.CallbacksRetired) {
+                // HANDLE_CLOSING is the documented last callback for each native handle.
+                if(config!=IntPtr.Zero) Marshal.FreeHGlobal(config);
+                operation.Complete.Dispose(); operation.ResolverClosed.Dispose(); operation.SessionClosed.Dispose(); operation.CallbacksIdle.Dispose();
+                lock(retainedGate) retained.Remove(operation.Identity);
+            } else {
+                // Do not release callback state after an unacknowledged CloseHandle.
+                // This isolated lookup refuses admission; its parent must retire the Job.
+                answer.Ok=false; answer.Kind="refused";
+                // Preserve an observed primary lookup error independently from
+                // cleanup debt; a missing ACK cannot rewrite native evidence.
+                if(answer.NativeError==0 && answer.FailureOrigin=="native")
+                    answer.FailureOrigin="unacknowledged_cleanup";
+            }
+            GC.KeepAlive(operation.Callback);
+        }
+        return answer;
+    }
+}
+'@
+}

@@ -193,6 +193,18 @@ modules:
         url: https://github.com/LuaJIT/LuaJIT.git
         branch: v2.1
 
+MANIFEST_EOF
+# Additional native modules come from the canonical runtime generator, using
+# exact upstream commits/distribution hashes. Do not maintain a second recipe.
+node - "$PROJECT_ROOT" >> "$MANIFEST_FILE" << 'NETWORK_MODULES_EOF'
+const fs = require('node:fs');
+const path = require('node:path');
+const root = process.argv[2];
+const generator = require(path.join(root, 'tools/codegen/codegen-linux-native-runtime.cjs'));
+const data = JSON.parse(fs.readFileSync(path.join(root, generator.SOURCE), 'utf8'));
+process.stdout.write(generator.flatpakModules(data));
+NETWORK_MODULES_EOF
+cat >> "$MANIFEST_FILE" << 'MANIFEST_EOF'
   # The driver payload, staged by the generating script. `type: dir` copies the
   # CONTENTS of payload/ into the build directory, so these paths are relative
   # to that: lib/, bin/, share/.
@@ -202,8 +214,13 @@ modules:
       - install -d /app/lib/ergopti
       # The shared tree is staged as a CHILD of the driver root (/app/lib/ergopti/_shared),
       # matching what build-linux-deb.sh installs under /usr/lib/ergopti.
+      # The compiler and libc are the declared SDK's target, not the build host.
+      - mkdir -p native-output
+      - bash tools/build/build-linux-native-output.sh --source-directory "$PWD/lib/ergopti/native/archive_output" --output-directory "$PWD/native-output"
       - cp -r lib/ergopti/. /app/lib/ergopti/
+      - install -Dm755 native-output/libergopti_archive_publication.so /app/lib/ergopti/bin/libergopti_archive_publication.so
       - install -Dm755 bin/ergopti /app/bin/ergopti
+      - install -Dm644 lib/ergopti/network-runtime-env.sh /app/lib/ergopti/network-runtime-env.sh
       - install -Dm644 share/applications/org.ergopti.Ergopti.desktop /app/share/applications/org.ergopti.Ergopti.desktop
       - install -Dm644 share/icons/hicolor/scalable/apps/org.ergopti.Ergopti.svg /app/share/icons/hicolor/scalable/apps/org.ergopti.Ergopti.svg
       - install -Dm644 share/metainfo/org.ergopti.Ergopti.metainfo.xml /app/share/metainfo/org.ergopti.Ergopti.metainfo.xml
@@ -211,6 +228,10 @@ modules:
       # payload that staged an empty tree would otherwise produce a bundle that
       # installs cleanly and dies on launch.
       - test -f /app/lib/ergopti/ergopti_hotstrings.lua
+      # Admit the actual /app ABI/backend/schema with the launch environment.
+      # No request or desktop setting is changed by this read-only probe.
+      - bash -c 'set -euo pipefail; source /app/lib/ergopti/network-runtime-env.sh /app /app/lib/ergopti; export XDG_DATA_DIRS=/app/share XDG_DATA_HOME=/app/share; exec /app/bin/luajit /app/lib/ergopti/platform/network/runtime_probe.lua /app/lib/ergopti/_shared'
+      - test -x /app/bin/curl
     sources:
       - type: dir
         path: payload
@@ -233,6 +254,11 @@ echo "  Manifest: $MANIFEST_FILE ($APP_ID)"
 # failure is how a packager ships an empty package and still exits 0.
 echo "Staging driver payload..."
 cp -r "$BUILD_DIR/linux/." "$PAYLOAD_DIR/lib/ergopti/"
+# This SDK module receives sources and the canonical compiler owner only.
+# A host-built ELF must not enter /app before the SDK-built artifact replaces it.
+rm -f -- "$PAYLOAD_DIR/lib/ergopti/bin/libergopti_archive_publication.so"
+mkdir -p "$PAYLOAD_DIR/tools/build"
+install -m 755 "$SCRIPT_DIR/build-linux-native-output.sh" "$PAYLOAD_DIR/tools/build/build-linux-native-output.sh"
 
 # The whole shared tree, not just _shared/lua: the keycode tables, hotstring
 # packs, locales and the defaults the resolver fails fast on live in
@@ -242,6 +268,7 @@ cp -r "$BUILD_DIR/_shared/." "$PAYLOAD_DIR/lib/ergopti/_shared/"
 # The stamp build-linux-driver.sh wrote is how the sandboxed daemon names its
 # commit; a bundle without it would report "unknown".
 bash "$SCRIPT_DIR/write_build_stamp.sh" verify "$PAYLOAD_DIR/lib/ergopti/_shared"
+install -m644 "$SCRIPT_DIR/templates/linux-portable-runtime-env.sh" "$PAYLOAD_DIR/lib/ergopti/network-runtime-env.sh"
 
 echo "  $(find "$PAYLOAD_DIR/lib/ergopti" -type f | wc -l) files staged for /app/lib/ergopti/"
 
@@ -257,7 +284,8 @@ set -euo pipefail
 DRIVER_ROOT="/app/lib/ergopti"
 SHARED_LUA="$DRIVER_ROOT/_shared/lua"
 export LUA_PATH="$DRIVER_ROOT/?.lua;$DRIVER_ROOT/?/init.lua;$SHARED_LUA/?.lua;$SHARED_LUA/?/init.lua;;"
-exec luajit /app/lib/ergopti/ergopti_hotstrings.lua "$@"
+source "$DRIVER_ROOT/network-runtime-env.sh" /app "$DRIVER_ROOT"
+exec /app/bin/luajit /app/lib/ergopti/ergopti_hotstrings.lua "$@"
 WRAPPER_EOF
 chmod 755 "$PAYLOAD_DIR/bin/ergopti"
 echo "  Wrapper: /app/bin/ergopti"

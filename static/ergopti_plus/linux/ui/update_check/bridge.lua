@@ -123,9 +123,10 @@ function M.download_offered(updater, release, ctx)
 		local file = io.open(require("infra.logger_sink").main_log_path(), "rb")
 		return file ~= nil and file:close() == true
 	end
+	local completion_hook = ctx.on_update_finished
 	local function finished(installed, stage)
-		if type(ctx.on_update_finished) ~= "function" then return end
-		local ok = pcall(ctx.on_update_finished, installed, tag, stage)
+		if type(completion_hook) ~= "function" then return end
+		local ok = pcall(completion_hook, installed, tag, stage)
 		if not ok then Logger.error(LOG, "The bound update-completion hook raised.") end
 	end
 	local function dispatch(retry)
@@ -133,14 +134,11 @@ function M.download_offered(updater, release, ctx)
 		owner.attempt = owner.attempt + 1
 		local attempt = owner.attempt
 		owner.active, owner.terminal, owner.failed_download = true, false, false
-		local function done(archive, err, stage, failure_receipt)
-			if serial ~= _offer_serial or attempt ~= owner.attempt or owner.terminal or owner.cancelled then return end
-			owner.active, owner.terminal = false, true
-			if not current() then
-				if session_id and type(DownloadWindow.retire) == "function" then DownloadWindow.retire(session_id) end
-				return
-			end
-			local installed = archive ~= nil and updater.install_update(archive) == true
+		local completed = false
+		local function finish_attempt(installed, archive, err, stage, failure_receipt)
+			if completed or serial ~= _offer_serial or attempt ~= owner.attempt or owner.cancelled then return end
+			completed = true
+			owner.active, owner.terminal, owner.installing = false, true, false
 			owner.succeeded = installed
 			owner.failed_download = archive == nil and stage ~= "verify"
 			if installed then Logger.success(LOG, "Update %s installed.", tag)
@@ -156,6 +154,50 @@ function M.download_offered(updater, release, ctx)
 			end
 			finished(installed, archive and "install" or (stage or "download"))
 		end
+		local function done(archive, err, stage, failure_receipt)
+			if serial ~= _offer_serial or attempt ~= owner.attempt or owner.terminal or owner.cancelled then return end
+			if not current() then
+				owner.active, owner.terminal = false, true
+				if session_id and type(DownloadWindow.retire) == "function" then DownloadWindow.retire(session_id) end
+				return
+			end
+			if archive == nil then finish_attempt(false, archive, err, stage, failure_receipt); return end
+			local native_install = updater.install_update_async
+			if type(native_install) == "function" then
+				owner.installing = true
+				local window_admit = DownloadWindow.install_admission_current
+				local function admit_install()
+					if type(window_admit) ~= "function" or session_id == nil or not current()
+						or serial ~= _offer_serial or attempt ~= owner.attempt or not owner.installing then return false end
+					local checked, admitted = pcall(window_admit, session_id)
+					return checked and admitted == true and current() and serial == _offer_serial
+						and attempt == owner.attempt and owner.installing
+						and package.loaded["ui.download_window.bridge"] == DownloadWindow
+				end
+				local constructing, admitted, seen, early = true, false, false, nil
+				local function install_completed(installed, detail, receipt)
+					if seen then return end
+					seen = true
+					if constructing then early = { installed, detail, receipt }
+					elseif admitted then
+						-- Accepted native completion retains this exact offer attempt.
+						finish_attempt(installed == true, archive, detail, "install", receipt)
+					end
+				end
+				local called, dispatched = pcall(native_install, archive, install_completed, admit_install)
+				admitted = called and dispatched == true
+				constructing = false
+				if not admitted then
+					finish_attempt(false, archive, called and "native install refused" or dispatched, "install")
+				elseif early then
+					finish_attempt(early[1] == true, archive, early[2], "install", early[3])
+				end
+			else
+				-- Existing synchronous port shape; a declared native async refusal
+				-- never falls back to this path.
+				finish_attempt(updater.install_update(archive) == true, archive, err, stage, failure_receipt)
+			end
+		end
 		local started
 		if retry then started = updater.download_release(release, done)
 		else started = updater.download_update(url, done) end
@@ -168,7 +210,7 @@ function M.download_offered(updater, release, ctx)
 		classify_failure = function() return owner.failed_download end,
 		on_retry = function() return dispatch(true) end,
 		on_cancel = function()
-			if not current() or not owner.active or updater.cancel_update() ~= true then return false end
+			if not current() or not owner.active or owner.installing or updater.cancel_update() ~= true then return false end
 			owner.cancelled, owner.active = true, false
 			owner.attempt = owner.attempt + 1
 			return true
