@@ -18,6 +18,7 @@ import re
 import shutil
 import socket
 import socketserver
+import stat
 import ssl
 import subprocess
 import sys
@@ -48,6 +49,47 @@ def load(name, path):
 def digest(path):
     with Path(path).open("rb") as stream:
         return hashlib.file_digest(stream, "sha256").hexdigest()
+
+
+def retained_source(binary, session):
+    """Retain actual executable bytes; never fall back to re-opening its pathname."""
+    descriptor = os.open(binary, os.O_RDONLY | os.O_NOFOLLOW | os.O_CLOEXEC)
+    try:
+        check_retained_source(binary, descriptor, session)
+        return descriptor
+    except BaseException:
+        os.close(descriptor)
+        raise
+
+
+def check_retained_source(binary, descriptor, session):
+    """A changed pathname refuses before the private lease reaches child exec."""
+    before = os.fstat(descriptor)
+    observed = Path(binary).stat(follow_symlinks=False)
+    require(
+        stat.S_ISREG(before.st_mode)
+        and before.st_uid == os.geteuid()
+        and before.st_nlink == 1
+        and before.st_mode & 0o111
+        and (str(before.st_dev), str(before.st_ino)) == (session["device"], session["inode"])
+        and (observed.st_dev, observed.st_ino) == (before.st_dev, before.st_ino),
+        "actual_retained_source_identity",
+    )
+    # pread preserves the retained open-file offset across the actual exec.
+    fingerprint = hashlib.sha256()
+    offset = 0
+    while data := os.pread(descriptor, 65536, offset):
+        fingerprint.update(data)
+        offset += len(data)
+    after = os.fstat(descriptor)
+    current = Path(binary).stat(follow_symlinks=False)
+    require(
+        fingerprint.hexdigest() == session["binary_sha256"]
+        and (before.st_dev, before.st_ino, before.st_size, before.st_mtime_ns, before.st_ctime_ns)
+        == (after.st_dev, after.st_ino, after.st_size, after.st_mtime_ns, after.st_ctime_ns)
+        and (current.st_dev, current.st_ino) == (after.st_dev, after.st_ino),
+        "actual_retained_source_bytes",
+    )
 
 
 class Registry:
@@ -451,15 +493,26 @@ class Receiver:
         if self.options.profile == "explicit-proxy" and not producer:
             environment["https_proxy"] = f"http://127.0.0.1:{self.fixture.ports['first']}"
         self.daemon_log = (self.work / ("producer.log" if producer else "receiver.log")).open("xb")
-        self.fixture.groups.acquire_owned(
-            [str(self.binary), "serve"],
-            self.fixture.native_groups,
-            lambda owner: setattr(self, "daemon", owner),
-            stdin=subprocess.DEVNULL,
-            stdout=self.daemon_log,
-            stderr=self.daemon_log,
-            env=environment,
+        session = self.runtime.POLICY.private_session(
+            self.runtime.POLICY.metadata_bytes(self.session_path.read_bytes())
         )
+        self.binary_descriptor = retained_source(self.binary, session)
+        try:
+            check_retained_source(self.binary, self.binary_descriptor, session)
+            self.fixture.groups.acquire_owned(
+                ["/dev/fd/" + str(self.binary_descriptor), "serve"],
+                self.fixture.native_groups,
+                lambda owner: setattr(self, "daemon", owner),
+                pass_fds=(self.binary_descriptor,),
+                stdin=subprocess.DEVNULL,
+                stdout=self.daemon_log,
+                stderr=self.daemon_log,
+                env=environment,
+            )
+        except OSError as error:
+            self.receipt["source_exec_errno"] = error.errno
+            raise RuntimeError("actual_retained_source_exec") from None
+        self.receipt["source_exec"] = "actual Python Popen retained-FD exec; no pathname fallback"
         opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
         deadline = time.monotonic() + 60
         while time.monotonic() < deadline:
@@ -471,6 +524,7 @@ class Receiver:
                     require(json.load(response)["version"] == "0.24.0", "actual_daemon_version")
                     with patch.dict(os.environ, self.api_environment, clear=True):
                         self.owner()
+                    check_retained_source(self.binary, self.binary_descriptor, session)
                     return
             except (OSError, ValueError):
                 time.sleep(0.1)
@@ -481,6 +535,15 @@ class Receiver:
             require(self.daemon.settle(timeout=15), "actual_daemon_retirement")
             self.daemon = None
             self.daemon_log.close()
+        # Keep source ownership through failed admission or exact group cleanup.
+        # Closing a parent's descriptor does not retire its inherited child FD.
+        descriptor = getattr(self, "binary_descriptor", None)
+        if descriptor is not None:
+            os.close(descriptor)
+            self.binary_descriptor = None
+        log = getattr(self, "daemon_log", None)
+        if log is not None and not log.closed:
+            log.close()
 
     def owner(self):
         session = self.runtime.POLICY.private_session(

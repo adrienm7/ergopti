@@ -14,7 +14,7 @@ const cases = [
 ];
 if (process.platform !== 'win32') {
 	cases.push(['tools/test/macos_native_ollama_api_test.py', 8]);
-	cases.push(['tools/diagnostics/macos_managed_ollama_receiving_test.py', 4]);
+	cases.push(['tools/diagnostics/macos_managed_ollama_receiving_test.py', 7]);
 } else {
 	process.stdout.write(
 		'SKIP actual POSIX process peers on Windows; Apple SDK receiving is separate.\n'

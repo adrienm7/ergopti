@@ -5632,6 +5632,8 @@ The fixed Specifications and Capabilities frames of the Windows/macOS per-model 
       open. macOS system trust and explicit proxy relays are integrated, while
       opaque-client full-URL PAC/WPAD/fallback/redirect routing remains CODE.
 
+Both actual native model receiver daemons now execute only through a retained read-only source descriptor, with no pathname fallback. Private source replacement refuses before lease dispatch; device/inode, byte and timestamp fences hold before execution and after SDK/HMAC admission, through physical retirement. Seven portable controls preserve all four original TLS assertions. Actual Darwin fork/exec, dyld, model exchange and retirement on both CPUs remain required.
+
 Canonical process ownership now preserves supplied stdin and defaults to DEVNULL only when absent. Both new real Linux child regressions fail on the old duplicate-keyword call and pass after the repair; all fifteen original assertion bodies remain. Seventeen controls cover actual PIPE bytes and default/explicit EOF. Darwin process-group and native network receiving still require CI.
 
 Explicit inherited ALL_PROXY aliases retain precedence over native static settings. PAC diagnostics report only the actual native helper capability and never include the configuration URL. Twenty-one actual Bash bootstrap controls pass, with all eighteen original assertion methods and opaque admission preserved. Native macOS routing remains separately required.
