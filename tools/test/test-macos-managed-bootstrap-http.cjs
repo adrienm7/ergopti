@@ -36,8 +36,26 @@ const coldReceipt = spawnSync(
 assert.equal(coldReceipt.error, undefined, 'the independent cold receipt receiver must start');
 assert.equal(coldReceipt.signal, null, 'the independent cold receipt receiver must retire');
 assert.equal(coldReceipt.status, 0, coldReceipt.stderr || coldReceipt.stdout);
-assert.match(coldReceipt.stderr, /Ran 4 tests in/);
+assert.match(coldReceipt.stderr, /Ran 7 tests in/);
 assert.match(coldReceipt.stderr, /\bOK\b/);
 assert.doesNotMatch(coldReceipt.stderr, /skipped=/);
 process.stdout.write(coldReceipt.stdout);
 process.stdout.write(coldReceipt.stderr);
+
+const officialColdReceipt = spawnSync(
+	pythonExecutable(),
+	['tools/diagnostics/macos_cold_ollama_bootstrap_test.py'],
+	{ cwd: path.resolve(__dirname, '../..'), encoding: 'utf8', timeout: 30000 }
+);
+assert.equal(officialColdReceipt.error, undefined, 'the official cold receipt receiver must start');
+assert.equal(officialColdReceipt.signal, null, 'the official cold receipt receiver must retire');
+assert.equal(
+	officialColdReceipt.status,
+	0,
+	officialColdReceipt.stderr || officialColdReceipt.stdout
+);
+assert.match(officialColdReceipt.stderr, /Ran 12 tests in/);
+assert.match(officialColdReceipt.stderr, /\bOK\b/);
+assert.doesNotMatch(officialColdReceipt.stderr, /skipped=/);
+process.stdout.write(officialColdReceipt.stdout);
+process.stdout.write(officialColdReceipt.stderr);

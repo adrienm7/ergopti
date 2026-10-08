@@ -1,4 +1,5 @@
--- Exercise the actual MLX checker and native hs.task on a cold private home.
+-- tools/diagnostics/macos_cold_ollama_bootstrap.lua
+-- Exercise the actual official Ollama checker and native hs.task on a cold private home.
 local config = assert(hs.json.read(assert(os.getenv("ERGOPTI_COLD_BOOTSTRAP_CONFIG"))))
 local driver, shared = config.driver, config.shared
 package.path = driver .. "/?.lua;" .. driver .. "/?/init.lua;"
@@ -19,27 +20,32 @@ local function guarded(callback)
 end
 
 guarded(function()
-	assert(hs.processInfo.arch == "arm64", "Cold MLX acceptance requires native arm64")
+	assert(hs.processInfo.arch == config.architecture)
 	assert(os.getenv("HOME") == config.home)
-	assert(hs.fs.attributes(config.venv) == nil, "Cold venv already exists")
-	assert(hs.fs.attributes(config.uv_root) == nil, "Cold uv cache already exists")
-	-- The inherited kernel sandbox denies stock runtimes. Resolve through the
-	-- actual production adapter; no fake Python edge can qualify native receiving.
-	local python = require("adapters.python_interpreter")
+	assert(hs.fs.attributes(config.install_dir) == nil, "Cold install directory already exists")
+	-- The inherited kernel sandbox denies actual stock runtime reads and
+	-- execution. Production candidates/resolvers and every native port are intact.
 	for _, path in ipairs(config.denied_runtime_paths) do
 		local file = io.open(path, "rb")
 		if file then file:close(); error("Cold sandbox allowed a stock runtime read") end
 	end
+	local python = require("adapters.python_interpreter")
 	local selected, state = python.resolve()
-	assert(selected == nil and state.kind == "python_missing", "Production resolver is not cold")
+	assert(selected == nil and state.kind == "python_missing", "Production Python resolver is not cold")
 	result.native_python_candidates_count = #python.native_candidates()
-	assert(result.native_python_candidates_count == 0, "Production resolver found a stock native Python")
+	assert(result.native_python_candidates_count == 0, "Production resolver found a native Python")
 	result.absent_python_selected = true
 	result.python_state = state.kind
 	result.python_resolver = "unmodified production resolver"
 	result.denied_runtime_paths = config.denied_runtime_paths
-	-- Presentation alone is replaced; tasks, files, hashes, timers, environment,
-	-- runtime resolution and process ownership remain genuine production ports.
+	local binary = require("modules.llm.ollama_binary")
+	assert(binary.resolve() == nil, "Production Ollama resolver is not cold")
+	result.ollama_resolver = "unmodified production resolver"
+	-- Only presentation and installation's service-acquisition result are
+	-- replaced. A separate real daemon/model receiver qualifies those effects.
+	package.loaded["modules.llm.api_ollama"] = {
+		ensure_running = function() result.daemon_validation = "not-executed"; return true end,
+	}
 	local session, visible = 0, false
 	package.loaded["ui.download_window"] = {
 		show = function() session = session + 1; visible = true; return true end,
@@ -56,10 +62,16 @@ guarded(function()
 		local handle, ready = prepare(...)
 		assert(ready == true and handle ~= nil, "Native source admission refused")
 		local request = assert(hs.json.decode(handle.input))
-		assert(request.source_path == driver .. "/modules/llm/ensure-mlx-deps.sh")
+		assert(request.source_path == driver .. "/modules/llm/ensure-ollama-deps.sh")
 		assert(handle.executable == config.helper and handle.arguments[1] == "--managed-pty-worker")
 		result.native_cli = handle.arguments
 		result.source_sha256 = request.source_sha256
+		result.native_environment = {}
+		assert(#request.environment == 6, "Official native source must have exactly six inputs")
+		for _, pair in ipairs(request.environment) do
+			assert(result.native_environment[pair[1]] == nil, "Duplicate official native input")
+			result.native_environment[pair[1]] = pair[2]
+		end
 		result.nonce = request.nonce
 		result.receipt_path = request.receipt_path
 		local settle = handle.settle
@@ -91,11 +103,12 @@ guarded(function()
 		if started then result.worker_pid = task:pid() end
 		return started
 	end
-	owner.checker = require("modules.llm.mlx_deps_checker")
+	owner.checker = require("modules.llm.ollama_deps_checker")
 	assert(owner.checker.install_for_selection(guarded(function(success)
 		result.success = success == true
 		result.state = owner.checker.get_state()
-		result.runtime_installed = owner.checker.runtime_installed()
+		local resolved, _, kind = binary.resolve()
+		result.runtime_installed = resolved == config.install_dir .. "/ollama" and kind == binary.SOURCE_MANAGED
 		publish()
 	end)) == true, "Cold selection refused")
 end)()

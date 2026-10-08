@@ -5632,6 +5632,8 @@ The fixed Specifications and Capabilities frames of the Windows/macOS per-model 
       open. macOS system trust and explicit proxy relays are integrated, while
       opaque-client full-URL PAC/WPAD/fallback/redirect routing remains CODE.
 
+CI now requires the original five macOS jobs plus independent managed-model and cold-client jobs. Native model receiving runs on ARM and Intel, with actual SDK XCTest before source compilation; compiler failures retain their transcripts. Genuine cold MLX and official Ollama keep production resolvers intact and require inherited kernel isolation of stock runtimes, unchanged stock identities and physical closure. Only public receipts upload. Existing graph, launch and receipt assertions remain; precise added condition and native-job bypass mutants reject. These authored jobs remain unqualified until manual CI completes; no release runs on dispatch.
+
 Both actual native model receiver daemons now execute only through a retained read-only source descriptor, with no pathname fallback. Private source replacement refuses before lease dispatch; device/inode, byte and timestamp fences hold before execution and after SDK/HMAC admission, through physical retirement. Seven portable controls preserve all four original TLS assertions. Actual Darwin fork/exec, dyld, model exchange and retirement on both CPUs remain required.
 
 Canonical process ownership now preserves supplied stdin and defaults to DEVNULL only when absent. Both new real Linux child regressions fail on the old duplicate-keyword call and pass after the repair; all fifteen original assertion bodies remain. Seventeen controls cover actual PIPE bytes and default/explicit EOF. Darwin process-group and native network receiving still require CI.

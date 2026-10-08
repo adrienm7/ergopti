@@ -362,6 +362,7 @@ jobs:
     uses: ./.github/workflows/ci-macos.yml
     with:
       release: ${{ needs.validate.outputs.release == 'true' }}
+      tag: ${{ needs.validate.outputs.tag }}
       version: ${{ needs.validate.outputs.version }}
       channel: ${{ needs.validate.outputs.channel }}
     secrets:

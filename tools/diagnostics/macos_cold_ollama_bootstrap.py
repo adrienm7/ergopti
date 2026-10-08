@@ -1,15 +1,18 @@
 #!/usr/bin/env python3
-"""Receive a real Hammerspoon -> native PTY -> pinned MLX cold installation."""
+# tools/diagnostics/macos_cold_ollama_bootstrap.py
+"""Receive a real Hammerspoon -> native PTY -> pinned official Ollama installation without Python."""
 
 import argparse
 import hashlib
 import json
 import os
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 import platform
-import plistlib
-import re
 import signal
+import shutil
+import stat
+import tarfile
+import uuid
 import subprocess
 import sys
 import time
@@ -20,25 +23,21 @@ REPOSITORY = Path(__file__).resolve().parents[2]
 PREFIX = Path("static/ergopti_plus")
 SOURCE_PATHS = (
     "macos/modules/llm/network-retry.sh",
-    "macos/modules/llm/ensure-mlx-deps.sh",
-    "macos/modules/llm/managed_bootstrap_http.py",
-    "macos/modules/llm/mlx_deps_checker.lua",
-    "macos/modules/llm/uv-release.sh",
-    "macos/modules/llm/managed-python-release.sh",
-    "macos/modules/llm/managed-python-downloads.json",
+    "macos/modules/llm/ensure-ollama-deps.sh",
+    "macos/modules/llm/ollama_deps_checker.lua",
+    "macos/modules/llm/ollama_binary.lua",
+    "macos/modules/llm/ollama-release.sh",
     "macos/adapters/native_bootstrap_pty.lua",
+    "macos/adapters/task_lifecycle.lua",
     "macos/adapters/python_interpreter.lua",
-    "macos/platform/network/native_http.py",
-    "_shared/python/network_proxy_policy.py",
     "_shared/lua/core/llm/native_pty_receipt.lua",
     "_shared/modules/network/proxy_policy.json",
-    "_shared/modules/llm/managed_python_release.json",
-    "macos/uv.lock",
-    "macos/pyproject.toml",
+    "_shared/modules/llm/ollama_release.json",
 )
-
-HAMMERSPOON_ARCHIVE_SHA256 = "11bb1c90faf5427f37c7bd4fe7eab9774ae43e1d5cb020c5b3088dac32849efa"
-HAMMERSPOON_ARCHIVE_BYTES = 9704557
+# Independent receiving pins: do not derive these from the new installer.
+OFFICIAL_VERSION = "0.24.0"
+OFFICIAL_SHA256 = "e6d5e8b4bc0cb2a35ff7901c58d81ca2170403a819c4726f58798155fa682e38"
+OFFICIAL_BYTES = 133395504
 
 
 def isolated_runtime_paths(environment):
@@ -61,6 +60,13 @@ def isolated_runtime_paths(environment):
         "/opt/homebrew/bin/uv",
         "/usr/local/bin/uv",
         "/usr/bin/uv",
+        "/Applications/Ollama.app/Contents/Resources/ollama",
+        "/opt/homebrew/bin/ollama",
+        "/usr/local/bin/ollama",
+        "/usr/bin/ollama",
+        "/bin/ollama",
+        "/usr/sbin/ollama",
+        "/sbin/ollama",
     }
     paths.update(str(Path(folder) / "usr/bin/python3") for folder in developers)
     paths.update(str(Path(path).resolve()) for path in tuple(paths))
@@ -98,7 +104,7 @@ def qualify_runtime_isolation(paths, profile):
             raise RuntimeError("Cold isolation did not deny real runtime read")
         native = (
             subprocess.run(
-                ["/usr/bin/lipo", "-verify_arch", "arm64", path],
+                ["/usr/bin/lipo", "-verify_arch", platform.machine(), path],
                 capture_output=True,
                 timeout=15,
             ).returncode
@@ -155,6 +161,7 @@ def validate(result, config):
         or result.get("tasks") != 1
         or result.get("absent_python_selected") is not True
         or result.get("python_resolver") != "unmodified production resolver"
+        or result.get("ollama_resolver") != "unmodified production resolver"
         or result.get("python_state") != "python_missing"
         or type(result.get("native_python_candidates_count")) is not int
         or result.get("native_python_candidates_count") != 0
@@ -202,7 +209,7 @@ def validate(result, config):
     ):
         raise RuntimeError("Native cold physical receipt is incomplete")
     if result.get("source_sha256") != digest(
-        Path(config["driver"]) / "modules/llm/ensure-mlx-deps.sh"
+        Path(config["driver"]) / "modules/llm/ensure-ollama-deps.sh"
     ):
         raise RuntimeError("Native cold executed source differs from admitted source")
     if (
@@ -213,43 +220,96 @@ def validate(result, config):
     ):
         raise RuntimeError("Native cold CLI or private receipt retirement differs")
 
+    expected_environment = {
+        "PROJECT_ROOT": config["driver"],
+        "ERGOPTI_NATIVE_ARCH": config["architecture"],
+        "ERGOPTI_NATIVE_PYTHONS": "",
+        "ERGOPTI_BOOTSTRAP_OLLAMA_RESOLVED_BIN": "",
+        "ERGOPTI_BOOTSTRAP_OLLAMA_INSTALL_DIR": config["install_dir"],
+        "ERGOPTI_BOOTSTRAP_PYTHON": "",
+    }
+    if (
+        result.get("native_environment") != expected_environment
+        or result.get("daemon_validation") != "not-executed"
+    ):
+        raise RuntimeError("Native cold selection or official installer inputs differ")
 
-def receive(app, output):
-    if sys.platform != "darwin" or platform.machine() != "arm64":
-        raise RuntimeError("Native cold MLX receiving requires macOS arm64")
+
+def compare_installed_archive(archive, directory):
+    """Compare actual received upstream members; reject missing/extra runtime code."""
+    directory = directory.resolve(strict=True)
+    members, files = {}, {}
+    with tarfile.open(archive, "r:gz") as package:
+        for member in package.getmembers():
+            name = PurePosixPath(member.name)
+            if name.is_absolute() or ".." in name.parts:
+                raise RuntimeError("Official archive member escapes installation")
+            relative = str(name)
+            if relative == ".":
+                if not member.isdir():
+                    raise RuntimeError("Official archive root is not a directory")
+                continue
+            if relative in members:
+                raise RuntimeError("Official archive has duplicate normalized members")
+            members[relative] = member
+            path = directory / relative
+            if not path.resolve(strict=True).is_relative_to(directory):
+                raise RuntimeError("Installed official member escapes owned directory")
+            observed = path.lstat()
+            if member.issym():
+                if not stat.S_ISLNK(observed.st_mode) or os.readlink(path) != member.linkname:
+                    raise RuntimeError("Installed official symbolic link differs")
+            elif member.islnk():
+                linked = directory / str(PurePosixPath(member.linkname))
+                if (
+                    not linked.resolve(strict=True).is_relative_to(directory)
+                    or not stat.S_ISREG(observed.st_mode)
+                    or not os.path.samefile(path, linked)
+                ):
+                    raise RuntimeError("Installed official hard link differs")
+            elif member.isdir():
+                if not stat.S_ISDIR(observed.st_mode):
+                    raise RuntimeError("Installed official directory differs")
+            elif member.isfile():
+                if not stat.S_ISREG(observed.st_mode):
+                    raise RuntimeError("Installed official file kind differs")
+                stream = package.extractfile(member)
+                if stream is None:
+                    raise RuntimeError("Official regular member has no bytes")
+                expected = hashlib.file_digest(stream, "sha256").hexdigest()
+                if path.stat().st_size != member.size or digest(path) != expected:
+                    raise RuntimeError("Installed official member bytes differ")
+                files[relative] = expected
+            else:
+                raise RuntimeError("Official archive has unsupported member kind")
+            expected_mode = 0o755 if relative == "ollama" else member.mode & 0o7777
+            if not member.issym() and stat.S_IMODE(observed.st_mode) != expected_mode:
+                raise RuntimeError("Installed official member permissions differ")
+    # Explicit directory entries may be absent in a tar. Derive their parents
+    # independently, and never silently allow an extra executable or library.
+    expected_paths = set(members)
+    for name in members:
+        expected_paths.update(
+            str(parent) for parent in PurePosixPath(name).parents if str(parent) != "."
+        )
+    observed_paths = {str(path.relative_to(directory)) for path in directory.rglob("*")}
+    if observed_paths != expected_paths or "ollama" not in files:
+        raise RuntimeError("Installed official runtime inventory differs")
+    return files
+
+
+def receive(app, archive, output, repository):
+    if sys.platform != "darwin" or platform.machine() not in ("arm64", "x86_64"):
+        raise RuntimeError("Native cold Ollama receiving requires supported native macOS")
+    archive = archive.resolve(strict=True)
+    if archive.stat().st_size != OFFICIAL_BYTES or digest(archive) != OFFICIAL_SHA256:
+        raise RuntimeError("Receiving archive differs from independently pinned upstream bytes")
+    repository = repository.resolve(strict=True)
     app, output = app.resolve(strict=True), output.absolute()
-    expected_sha = os.environ.get("GITHUB_SHA", "")
-    if re.fullmatch(r"[a-f0-9]{40}", expected_sha) is None:
-        raise RuntimeError("Cold receiving requires the exact CI source SHA")
     output.mkdir(mode=0o700)
-    owner = output.stat()
-    try:
-        receive_owned(app, output, expected_sha)
-    except Exception as failure:
-        # Only the exact directory created above may retain a typed refusal.
-        current = output.stat()
-        receipt = output / "receipt.json"
-        if (current.st_dev, current.st_ino) == (
-            owner.st_dev,
-            owner.st_ino,
-        ) and not receipt.exists():
-            with receipt.open("x", encoding="utf-8") as stream:
-                json.dump(
-                    {
-                        "version": 1,
-                        "status": "failed",
-                        "refusal": "native_cold_bootstrap_prerequisite_or_receiving_refused",
-                        "exception_type": type(failure).__name__,
-                    },
-                    stream,
-                )
-                stream.write("\n")
-        raise
-
-
-def receive_owned(app, output, expected_sha):
-    """Receive only inside the fresh directory owned by this invocation."""
-    copied = output / "ErgoptiPlus.app"
+    private = output.with_name(output.name + ".private-" + uuid.uuid4().hex)
+    private.mkdir(mode=0o700)
+    copied = private / "ErgoptiPlus.app"
     subprocess.run(["/usr/bin/ditto", str(app), str(copied)], check=True)
     subprocess.run(["/usr/bin/codesign", "--verify", "--strict", "--deep", str(copied)], check=True)
     helper = copied / "Contents/MacOS/ErgoptiPlus"
@@ -257,56 +317,33 @@ def receive_owned(app, output, expected_sha):
     if not helper.is_file() or not hammerspoon.is_file():
         raise RuntimeError("Signed native launcher and embedded Hammerspoon are required")
     resources = copied / "Contents/Resources"
-    stamp = resources / PREFIX / "_shared/build_stamp.txt"
-    if stamp.read_text(encoding="utf-8").splitlines().count("commit=" + expected_sha) != 1:
-        raise RuntimeError("Cold signed application build stamp differs from CI source")
-    archive = app.parent / "cache/Hammerspoon-1.1.1.zip"
-    if (
-        archive.stat().st_size != HAMMERSPOON_ARCHIVE_BYTES
-        or digest(archive) != HAMMERSPOON_ARCHIVE_SHA256
-    ):
-        raise RuntimeError(
-            "Cold application was not built from the pinned official Hammerspoon archive"
-        )
-    info = copied / "Contents/Frameworks/Hammerspoon.app/Contents/Info.plist"
-    if plistlib.loads(info.read_bytes())["CFBundleShortVersionString"] != "1.1.1":
-        raise RuntimeError("Cold native Hammerspoon version differs")
     source_hashes = {}
-    diagnostic_hashes = {
-        str(Path(__file__).relative_to(REPOSITORY)): digest(__file__),
-        str(Path(__file__).with_suffix(".lua").relative_to(REPOSITORY)): digest(
-            Path(__file__).with_suffix(".lua")
-        ),
-    }
     for relative in SOURCE_PATHS:
-        bundled, source = resources / PREFIX / relative, REPOSITORY / PREFIX / relative
+        bundled, source = resources / PREFIX / relative, repository / PREFIX / relative
         if digest(bundled) != digest(source):
             raise RuntimeError("Cold bundle source is stale: " + relative)
         source_hashes[relative] = digest(bundled)
-    # Hosted runners have developer Python and may have uv. A private process
-    # sandbox denies those actual files while leaving the host installation intact.
-    # The real production resolver observes kernel-denied files, not fake candidates.
-    denied_paths = isolated_runtime_paths(os.environ)
-    profile = output / "cold-runtime.sb"
-    profile.write_text(sandbox_profile(denied_paths), encoding="utf-8")
-    isolation = qualify_runtime_isolation(denied_paths, profile)
-    home = output / "home"
+    home = private / "home"
     home.mkdir(mode=0o700)
-    temporary = output / "tmp"
+    temporary = private / "tmp"
     temporary.mkdir(mode=0o700)
     support = home / "Library/Application Support/Ergopti"
     driver = resources / PREFIX / "macos"
+    denied_paths = isolated_runtime_paths(environment=os.environ)
+    profile = private / "isolation.sb"
+    profile.write_text(sandbox_profile(denied_paths), encoding="utf-8")
+    isolation = qualify_runtime_isolation(denied_paths, profile)
     config = {
+        "denied_runtime_paths": denied_paths,
         "home": str(home),
         "driver": str(driver),
         "shared": str(driver.parent / "_shared"),
-        "venv": str(support / "mlx-venv"),
-        "uv_root": str(support / "mlx-uv"),
+        "install_dir": str(support / "ollama"),
+        "architecture": platform.machine(),
         "helper": str(helper),
-        "result": str(output / "result.json"),
-        "denied_runtime_paths": denied_paths,
+        "result": str(private / "result.json"),
     }
-    config_path = output / "config.json"
+    config_path = private / "config.json"
     config_path.write_text(json.dumps(config) + "\n", encoding="utf-8")
     environment = os.environ.copy()
     for name in tuple(environment):
@@ -332,30 +369,22 @@ def receive_owned(app, output, expected_sha):
     native = lifecycle.NativeProcesses()
     report = {
         "version": 1,
-        "sha": expected_sha,
-        "build_commit": expected_sha,
-        "platform": "darwin",
-        "architecture": "arm64",
-        "runtime_environment": "controlled isolated cold environment",
-        "signature_verified": True,
         "status": "failed",
         "sources": source_hashes,
-        "diagnostics": diagnostic_hashes,
         "launcher_sha256": digest(helper),
         "hammerspoon_sha256": digest(hammerspoon),
-        "official_hammerspoon": {
-            "version": "1.1.1",
-            "sha256": HAMMERSPOON_ARCHIVE_SHA256,
-            "bytes": HAMMERSPOON_ARCHIVE_BYTES,
-        },
+        "official_archive_sha256": OFFICIAL_SHA256,
+        "selection": "unmodified production runtime resolvers under inherited kernel sandbox",
         "isolation": {
-            "profile_sha256": digest(profile),
+            "kind": "native-scoped-sandbox",
             "paths": denied_paths,
+            "profile_sha256": digest(profile),
             "observations": isolation,
-            "host_files_preserved": False,
         },
+        "daemon_validation": "not-executed",
+        "model_validation": "not-executed",
     }
-    with (output / "launch.log").open("xb") as log:
+    with (private / "launch.log").open("xb") as log:
         consumer = subprocess.Popen(
             [
                 "/usr/bin/sandbox-exec",
@@ -376,89 +405,66 @@ def receive_owned(app, output, expected_sha):
                     raise RuntimeError("Cold Hammerspoon caller did not publish a terminal receipt")
                 time.sleep(0.2)
             result = json.loads(Path(config["result"]).read_text(encoding="utf-8"))
-            report["caller"] = result
+            report["caller"] = {key: value for key, value in result.items() if key != "error"}
+            if result.get("error"):
+                report["caller"]["error"] = "native-caller"
             validate(result, config)
             if native.matching(helper):
                 raise RuntimeError("Cold native helper processes remain after terminal receipt")
-            python = Path(config["venv"]) / "bin/python"
+            binary = Path(config["install_dir"]) / "ollama"
+            files = compare_installed_archive(archive, Path(config["install_dir"]))
+            subprocess.run(
+                ["/usr/bin/codesign", "--verify", "--strict", str(binary)],
+                capture_output=True,
+                check=True,
+                timeout=60,
+                env=environment,
+            )
             probe = subprocess.run(
-                [
-                    "/usr/bin/sandbox-exec",
-                    "-f",
-                    str(profile),
-                    str(python),
-                    "-I",
-                    "-c",
-                    "import sys,platform,mlx_lm,huggingface_hub,jinja2,safetensors,truststore;"
-                    "assert sys.version_info[:2]==(3,11);assert platform.machine()=='arm64';"
-                    "print(sys.version.split()[0])",
-                ],
+                ["/usr/bin/sandbox-exec", "-f", str(profile), str(binary), "--version"],
                 capture_output=True,
                 text=True,
-                timeout=120,
+                timeout=30,
                 env=environment,
                 check=True,
             )
-            uv = Path(config["uv_root"]) / "bin/uv"
-            version = subprocess.run(
-                ["/usr/bin/sandbox-exec", "-f", str(profile), str(uv), "--version"],
-                capture_output=True,
-                text=True,
-                timeout=10,
-                env=environment,
-                check=True,
-            ).stdout.strip()
-            if version != "uv 0.12.21":
-                raise RuntimeError("Cold uv does not match the independently pinned version")
-            release = json.loads(
-                (resources / PREFIX / "_shared/modules/llm/managed_python_release.json").read_text()
-            )
-            expected_python = release["downloads"]["cpython-3.11.16-darwin-aarch64-none"]
-            if probe.stdout.strip() != ".".join(
-                str(expected_python[k]) for k in ("major", "minor", "patch")
+            # Ollama may report a missing daemon on stderr. Its local client
+            # version must still be the actual pinned executable's version.
+            if "client version is " + OFFICIAL_VERSION not in probe.stdout + probe.stderr:
+                raise RuntimeError("Installed official client does not report the pinned version")
+            if digest(archive) != OFFICIAL_SHA256:
+                raise RuntimeError("Independent receiving archive changed during installation")
+            if any(
+                digest(resources / PREFIX / path) != expected
+                for path, expected in source_hashes.items()
             ):
-                raise RuntimeError("Cold managed Python version differs from pinned download")
-            fingerprint = ":".join(digest(driver / path) for path in ("pyproject.toml", "uv.lock"))
-            if (Path(config["venv"]) / ".last_sync_hash").read_text().strip() != fingerprint:
-                raise RuntimeError("Cold published fingerprint differs from real locked inputs")
+                raise RuntimeError("Native receiving sources changed during installation")
             report.update(
                 status="passed",
-                uv=version,
-                python=probe.stdout.strip(),
-                imports="passed",
-                fingerprint=fingerprint,
+                client_version=OFFICIAL_VERSION,
+                installed_files=files,
                 helpers_retired=True,
-                managed_runtime_isolated_exec=True,
+                installed_tree="byte-and-link-identical to verified official archive",
             )
         finally:
             lifecycle.cleanup(native, hammerspoon, consumer)
-            # On refusal or timeout the actual private helper is signalled by
-            # exact executable identity; retain the whole directory as evidence.
+            # Signal only this copied executable. Disappearance alone cannot
+            # prove its guardian/process-group retirement after a failed caller.
             for pid in native.matching(helper):
                 native.signal(pid, helper, signal.SIGTERM)
             deadline = time.monotonic() + 60
             while native.matching(helper) and time.monotonic() < deadline:
                 time.sleep(0.2)
-            report["cleanup"] = not native.matching(helper)
-            for item in isolation:
-                actual = Path(item["path"]).stat()
-                if (
-                    actual.st_dev,
-                    actual.st_ino,
-                    actual.st_size,
-                    digest(item["path"]),
-                ) != (item["device"], item["inode"], item["bytes"], item["sha256"]):
-                    raise RuntimeError("Stock runtime changed during cold receiving")
-            report["isolation"]["host_files_preserved"] = True
-            for relative, fingerprint in source_hashes.items():
-                if (
-                    digest(REPOSITORY / PREFIX / relative) != fingerprint
-                    or digest(resources / PREFIX / relative) != fingerprint
-                ):
-                    raise RuntimeError("Cold bundled or repository source changed during receiving")
-            for relative, fingerprint in diagnostic_hashes.items():
-                if digest(REPOSITORY / relative) != fingerprint:
-                    raise RuntimeError("Cold diagnostic source changed during receiving")
+            report["native_helpers_absent"] = not native.matching(helper)
+            report["cleanup"] = (
+                report["native_helpers_absent"] is True
+                and report.get("caller", {}).get("receipt_retired") is True
+                and report.get("caller", {}).get("receipt_removed") is True
+            )
+            report["private_work_retired"] = False
+            if report["cleanup"] is True:
+                shutil.rmtree(private)
+                report["private_work_retired"] = not private.exists()
             (output / "receipt.json").write_text(
                 json.dumps(report, indent=2) + "\n", encoding="utf-8"
             )
@@ -469,6 +475,8 @@ def receive_owned(app, output, expected_sha):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--app", type=Path, required=True)
+    parser.add_argument("--official-archive", type=Path, required=True)
+    parser.add_argument("--repository", type=Path, default=REPOSITORY)
     parser.add_argument("--output", type=Path, required=True)
     arguments = parser.parse_args()
-    receive(arguments.app, arguments.output)
+    receive(arguments.app, arguments.official_archive, arguments.output, arguments.repository)
