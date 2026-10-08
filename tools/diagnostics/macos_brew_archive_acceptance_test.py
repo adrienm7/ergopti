@@ -2,6 +2,8 @@
 """Portable refusal/lifecycle controls; these never claim native Brew execution."""
 
 from contextlib import contextmanager
+import ast
+import inspect
 import json
 import hashlib
 from types import SimpleNamespace
@@ -10,6 +12,7 @@ from pathlib import Path, PurePosixPath
 import stat
 import subprocess
 import tempfile
+import textwrap
 from tempfile import TemporaryDirectory
 import unittest
 from unittest.mock import Mock, patch
@@ -834,6 +837,7 @@ class RegistrationFactControls(unittest.TestCase):
     """Real bounded capture admission; native registration remains unqualified."""
 
     def capture(self, root, value):
+        root = Path(root).resolve(strict=True)
         root.chmod(0o700)
         receiver = Mock(pid=73136)
         path = root / "child-1.stderr"
@@ -890,7 +894,7 @@ class RegistrationFactControls(unittest.TestCase):
 
     def test_foreign_symlink_nonregular_and_unclosed_captures_omit_facts(self):
         with TemporaryDirectory() as directory:
-            root = Path(directory)
+            root = Path(directory).resolve(strict=True)
             children, receiver, capture = self.capture(
                 root, self.line("transform-process-type", -50)
             )
@@ -929,7 +933,7 @@ class RegistrationFactControls(unittest.TestCase):
             (22, 65, self.line("transform-process-type", -50)),
         ):
             with self.subTest(code=code, status=status), TemporaryDirectory() as directory:
-                root = Path(directory)
+                root = Path(directory).resolve(strict=True)
                 root.chmod(0o700)
                 (root / "sandbox.sb").write_text(boundary.policy)
                 children = boundary.model(root)
@@ -1969,7 +1973,7 @@ class AppKitRegistrationFactControls(unittest.TestCase):
 
     def test_symlink_hardlink_root_and_partial_read_refusals_do_not_publish_reason(self):
         with TemporaryDirectory() as directory:
-            root = Path(directory)
+            root = Path(directory).resolve(strict=True)
             children, receiver, path = self.capture(root, self.line(2))
             original = root / "original.stderr"
             path.rename(original)
@@ -2002,7 +2006,7 @@ class AppKitRegistrationFactControls(unittest.TestCase):
                 self.subTest(code=code, status=status, number=number),
                 TemporaryDirectory() as directory,
             ):
-                root = Path(directory)
+                root = Path(directory).resolve(strict=True)
                 root.chmod(0o700)
                 (root / "sandbox.sb").write_text(boundary.policy)
                 children = boundary.model(root)
@@ -2115,7 +2119,7 @@ class AppKitPolicyStateControls(unittest.TestCase):
 
     def test_policy_projection_preserves_capture_refusals_and_no_process_observation(self):
         with TemporaryDirectory() as directory:
-            root = Path(directory)
+            root = Path(directory).resolve(strict=True)
             value = self.frame("regular", "prohibited")
             children, receiver, path = self.capture(root, value)
             original = root / "original.stderr"
@@ -2142,7 +2146,7 @@ class AppKitPolicyStateControls(unittest.TestCase):
                 self.subTest(code=code, status=status, reason=reason),
                 TemporaryDirectory() as directory,
             ):
-                root = Path(directory)
+                root = Path(directory).resolve(strict=True)
                 root.chmod(0o700)
                 (root / "sandbox.sb").write_text(boundary.policy)
                 children = boundary.model(root)
@@ -2502,6 +2506,72 @@ class PhysicalFixtureRootControls(unittest.TestCase):
                 self.assertEqual(result.errors, [])
             self.assertFalse(alias.exists())
             self.assertTrue(physical.is_dir())
+
+    def test_registration_fixture_roots_match_exact_boundary_and_capture_parents(self):
+        classes = (
+            RegistrationFactControls,
+            AppKitRegistrationFactControls,
+            AppKitPolicyStateControls,
+        )
+        with TemporaryDirectory() as directory:
+            outer = Path(directory).resolve(strict=True)
+            physical = outer / "physical" / "temp"
+            physical.mkdir(parents=True)
+            aliases = outer / "aliases"
+            aliases.mkdir()
+            alias = aliases / "temp"
+            with owned_directory_link(outer, alias, physical):
+                self.assertNotEqual(alias, alias.resolve(strict=True))
+                boundary = AppleEventBoundaryControls().model(alias)
+                for cls in classes:
+                    with self.subTest(capture_owner=cls.__name__):
+                        capture_owner, receiver, capture = cls().capture(
+                            alias, b"fixed fixture bytes\n"
+                        )
+                        self.assertEqual(capture_owner.root, boundary.root)
+                        self.assertEqual(capture.parent, boundary.root)
+                        self.assertEqual(probe.owned_path(boundary.root, capture), capture)
+                        self.assertEqual(capture.read_bytes(), b"fixed fixture bytes\n")
+                        receiver.poll.assert_not_called()
+                        receiver.wait.assert_not_called()
+        # Scan every root acquisition in the three capture-owning classes, not
+        # only the three current failure sites; negative capture controls need
+        # their physical parent too, or they can refuse for the wrong reason.
+        acquisitions = 0
+        for cls in classes:
+            tree = ast.parse(textwrap.dedent(inspect.getsource(cls)))
+            for node in ast.walk(tree):
+                if not isinstance(node, ast.Assign) or len(node.targets) != 1:
+                    continue
+                if not isinstance(node.targets[0], ast.Name) or node.targets[0].id != "root":
+                    continue
+                value = node.value
+                if (
+                    isinstance(value, ast.Call)
+                    and isinstance(value.func, ast.Attribute)
+                    and value.func.attr == "resolve"
+                    and isinstance(value.func.value, ast.Call)
+                    and isinstance(value.func.value.func, ast.Name)
+                    and value.func.value.func.id == "Path"
+                    and len(value.func.value.args) == 1
+                    and isinstance(value.func.value.args[0], ast.Name)
+                    and value.func.value.args[0].id == "directory"
+                ):
+                    self.assertEqual(
+                        [(kw.arg, ast.dump(kw.value)) for kw in value.keywords],
+                        [("strict", "Constant(value=True)")],
+                    )
+                    acquisitions += 1
+                elif (
+                    isinstance(value, ast.Call)
+                    and isinstance(value.func, ast.Name)
+                    and value.func.id == "Path"
+                    and len(value.args) == 1
+                    and isinstance(value.args[0], ast.Name)
+                    and value.args[0].id == "directory"
+                ):
+                    self.fail("A capture-owner root acquisition still keeps a lexical alias")
+        self.assertEqual(acquisitions, 6, "all six real root acquisitions must be present")
 
 
 if __name__ == "__main__":
