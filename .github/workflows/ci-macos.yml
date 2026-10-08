@@ -276,6 +276,9 @@ jobs:
         id: swift-launcher-tests
         env:
           SWIFT_BACKTRACE: enable=yes
+          # Consent is restricted to the exact disposable signed fixture pair.
+          ERGOPTI_BREW_ALLOW_AUTOMATION_CONSENT: '1'
+          ERGOPTI_BREW_ALLOW_OWNED_CONSENT_UI: '1'
         run: |
           set -euo pipefail
           mkdir -p "$RUNNER_TEMP/swift-launcher-evidence"

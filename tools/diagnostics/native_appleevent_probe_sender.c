@@ -16,6 +16,9 @@ static const AEEventClass probe_class = kCoreEventClass;
 static const AEEventID probe_event = kAEOpenApplication;
 static const AEKeyword nonce_parameter = 0x45674e63; /* EgNc */
 
+int owned_appleevent_permission(const AEAddressDesc *target,
+    AEEventClass event_class, AEEventID event_id, bool ask);
+
 static int valid_nonce(const char *value) {
     if (strlen(value) != 36) return 0;
     for (size_t index = 0; index < 36; index++) {
@@ -84,7 +87,9 @@ finished:
 
 int main(int argc, char **argv) {
     if (argc != 4 || !valid_nonce(argv[2]) ||
-        (strcmp(argv[3], "success") != 0 && strcmp(argv[3], "denied") != 0)) return 64;
+        (strcmp(argv[3], "success") != 0 && strcmp(argv[3], "denied") != 0 &&
+         strcmp(argv[3], "permission-query") != 0 &&
+         strcmp(argv[3], "permission-request") != 0)) return 64;
     errno = 0;
     char *end = NULL;
     const long parsed = strtol(argv[1], &end, 10);
@@ -95,6 +100,18 @@ int main(int argc, char **argv) {
     AppleEvent event = {typeNull, NULL};
     AppleEvent reply = {typeNull, NULL};
     OSStatus status = AECreateDesc(typeKernelProcessID, &recipient, sizeof(recipient), &address);
+    if (strcmp(argv[3], "permission-query") == 0 ||
+        strcmp(argv[3], "permission-request") == 0) {
+        if (status != noErr) {
+            fputs("Owned Automation target construction failed\n", stderr);
+            AEDisposeDesc(&address);
+            return 65;
+        }
+        const int outcome = owned_appleevent_permission(&address, probe_class, probe_event,
+            strcmp(argv[3], "permission-request") == 0);
+        AEDisposeDesc(&address);
+        return outcome;
+    }
     if (status == noErr) {
         status = AECreateAppleEvent(probe_class, probe_event, &address,
             kAutoGenerateReturnID, kAnyTransactionID, &event);
