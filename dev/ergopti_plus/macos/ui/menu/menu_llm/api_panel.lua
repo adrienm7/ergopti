@@ -627,17 +627,22 @@ function M.build(ctx)
 		end
 	end
 
-	table.insert(rows, {
-		label    = "➕ " .. i18n.get("menu.llm.api_add_entry"),
-		disabled = (paused or mutation_busy) or nil,
-		items    = add_rows,
-	})
+	local add_controls = ManifestMenu.template_rows("llm_api_add_provider_group", {}, {
+		llm_api_add_group_ready = function() return not paused and not mutation_busy end,
+	}, { api_add_entry = add_rows })
+	if not add_controls then return nil, nil end
+	for _, row in ipairs(add_controls) do
+		row.label = "➕ " .. row.label
+		table.insert(rows, row)
+	end
 
 	-- Add sits before the separator so creating an entry is one glance
 	-- away; the separator only appears with the management rows below,
 	-- never dangling when no entry exists.
 	if #entries > 0 then
-		table.insert(rows, { separator = true })
+		local separators = ManifestMenu.template_rows("llm_api_add_separator", {}, {}, {})
+		if not separators then return nil, nil end
+		for _, row in ipairs(separators) do table.insert(rows, row) end
 	end
 
 
@@ -662,7 +667,9 @@ function M.build(ctx)
 	-- so no mutation lease is taken; a mid-flight entry change or delete
 	-- discards the verdict instead of relabelling it.
 	if active_entry then
-		table.insert(rows, { separator = true })
+		local boundary_rows = ManifestMenu.template_rows("llm_api_active_boundary", {}, {}, {})
+		if not boundary_rows then return "", {} end
+		for _, row in ipairs(boundary_rows) do rows[#rows + 1] = row end
 	end
 	local test_row = ManifestMenu.command_row("llm_api_active_commands", "api_test_active", {
 		api_test_active = function()
@@ -799,8 +806,11 @@ function M.build(ctx)
 		end
 	end
 	if #system1_rows > 0 then
-		table.insert(rows, { separator = true })
-		for _, row in ipairs(system1_rows) do table.insert(rows, row) end
+		local framed_rows = ManifestMenu.template_rows("llm_api_system1_frame", {}, {}, {
+			["llm_api_system1_rows"] = function() return system1_rows end,
+		})
+		if not framed_rows then return "", {} end
+		for _, row in ipairs(framed_rows) do rows[#rows + 1] = row end
 	end
 
 
@@ -833,11 +843,8 @@ function M.build_model_picker(ctx)
 	local mutation_busy = _mutation_owner ~= nil
 	local names      = entry_names(api_remote, entries)
 
-	table.insert(rows, {
-		label   = i18n.get("menu.llm.no_model"),
-		checked = (active_id == "" or active_id == nil),
-		disabled = (paused or mutation_busy) or nil,
-		action      = (not paused and not mutation_busy) and function()
+	local selection_rows = ManifestMenu.template_rows("llm_api_selection_frame", {
+		["llm_api_no_model"] = function()
 			if _mutation_owner ~= nil then return false end
 			if api_remote and api_remote.set_active_entry_id then
 				if reset_prediction_identity(keymap, "select No Model") ~= true then return false end
@@ -866,11 +873,16 @@ function M.build_model_picker(ctx)
 				return true
 			end
 			return false
-		end or nil,
-	})
-
-	if #entries > 0 then
-		table.insert(rows, { separator = true })
+		end,
+	}, {
+		llm_api_no_model_checked = function() return active_id == "" or active_id == nil end,
+		llm_api_selection_ready = function() return not paused and not mutation_busy end,
+		llm_api_entries_present = function() return #entries > 0 end,
+	}, {})
+	if not selection_rows then return {} end
+	for _, row in ipairs(selection_rows) do
+		if paused or mutation_busy then row.action = nil end
+		rows[#rows + 1] = row
 	end
 
 	for _, e in ipairs(entries) do

@@ -225,10 +225,80 @@ end
 -- =======================================
 -- =======================================
 
+--- Captures the actual plain declaration tables without calling source metamethods.
+--- @param value table Actual parsed source container.
+--- @param records table Accumulated raw field receipts.
+--- @param seen table Previously captured source identities.
+--- @return boolean Whether every captured container is plain.
+local function apps_capture(value, records, seen)
+	if type(value) ~= "table" or getmetatable(value) ~= nil then return false end
+	if seen[value] then return true end
+	seen[value] = true
+	local fields = {}
+	records[#records + 1] = { source = value, fields = fields }
+	for key, field in next, value do
+		if type(key) ~= "string" and type(key) ~= "number" then return false end
+		fields[key] = field
+		if type(field) == "table" and not apps_capture(field, records, seen) then return false end
+	end
+	return true
+end
+
+--- Admits the existing Apps declaration before discovery touches its native providers.
+--- @return table|nil Source receipt, or nil without discovery effects.
+local function apps_source()
+	local get_root, group_row, build = rawget(ManifestMenu, "get_root"),
+		rawget(ManifestMenu, "group_row"), rawget(ManifestMenu, "build")
+	if type(get_root) ~= "function" or type(group_row) ~= "function" or type(build) ~= "function" then return nil end
+	local root = get_root()
+	if type(root) ~= "table" or getmetatable(root) ~= nil then return nil end
+	local top, children, empty = rawget(root, "top_level"), rawget(root, "apps_menu"), rawget(root, "apps_empty_rows")
+	local records, seen = {}, {}
+	if not apps_capture(top, records, seen) or not apps_capture(children, records, seen)
+		or not apps_capture(empty, records, seen) then return nil end
+	local parent, matches = nil, 0
+	for _, row in next, top do
+		if type(row) == "table" and rawget(row, "id") == "apps" then parent, matches = row, matches + 1 end
+	end
+	if matches ~= 1 or rawget(parent, "type") ~= "group" or rawget(parent, "i18n") ~= "menu.apps.title" then return nil end
+	-- The existing pure parent API admits valid empty native trees. This preflight
+	-- supplies no discovered data and does not publish its temporary result.
+	if group_row("top_level", "apps", {}, {}) == nil then return nil end
+	return { root = root, top = top, children = children, empty = empty, records = records,
+		get_root = get_root, group_row = group_row, build = build }
+end
+
+--- Rechecks the exact captured source and API identities before parent publication.
+--- @param receipt table Captured source receipt.
+--- @return boolean Whether the admitted declaration is still current.
+local function apps_source_current(receipt)
+	if not rawequal(rawget(ManifestMenu, "get_root"), receipt.get_root)
+		or not rawequal(rawget(ManifestMenu, "group_row"), receipt.group_row)
+		or not rawequal(rawget(ManifestMenu, "build"), receipt.build) then return false end
+	local root = receipt.get_root()
+	if not rawequal(root, receipt.root) or getmetatable(root) ~= nil
+		or not rawequal(rawget(root, "top_level"), receipt.top)
+		or not rawequal(rawget(root, "apps_menu"), receipt.children)
+		or not rawequal(rawget(root, "apps_empty_rows"), receipt.empty) then return false end
+	for _, record in ipairs(receipt.records) do
+		if getmetatable(record.source) ~= nil then return false end
+		for key, value in next, record.source do
+			if not rawequal(value, rawget(record.fields, key)) then return false end
+		end
+		for key, value in next, record.fields do
+			if not rawequal(value, rawget(record.source, key)) then return false end
+		end
+	end
+	return true
+end
+
+
 --- Builds the Applications submenu for the Hammerspoon menubar.
 --- @param ctx table The global UI context.
 --- @return table The menu item representing the Applications submenu.
 function M.build(ctx)
+	local source = apps_source()
+	if source == nil then return nil end
 	Logger.trace(LOG, "Building applications submenu…")
 	local apps = discover_bundled_apps(ctx)
 	local rows = {}
@@ -296,7 +366,8 @@ function M.build(ctx)
 	end
 
 	if #rows == 0 then
-		table.insert(rows, { label = i18n.get("menu.apps.no_apps"), disabled = true })
+		rows = ManifestMenu.template_rows("apps_empty_rows")
+		if not rows then return nil end
 	end
 
 	-- The list the manifest declares for this driver. Its rows are the bundles
@@ -312,11 +383,12 @@ function M.build(ctx)
 		["apps_installed"] = function() return rows end,
 	})
 
+	if type(rendered) ~= "table" or not apps_source_current(source) then return nil end
+	local parent = source.group_row("top_level", "apps", rendered, {})
+	if parent == nil or not apps_source_current(source) then return nil end
 	Logger.done(LOG, "Applications submenu built (%d item(s)).", #rendered)
-	return {
-		label    = i18n.get("menu.apps.title"),
-		submenu  = rendered,
-	}
+	if not apps_source_current(source) then return nil end
+	return parent
 end
 
 --- Invalidates the discovered-apps cache. Exposed for unit tests.

@@ -268,8 +268,13 @@ global _DefaultLogsDir := _LogsDir
 #Include ../infra/registry.ahk
 #Include ../infra/json.ahk
 #Include ../infra/program_parameter.ahk
+#Include ../adapters/program_providers.ahk
+#Include ../ui/action_picker_webview.ahk
 #Include ../infra/program_actions.ahk
 #Include ../../_shared/modules/network/failure.ahk
+#Include ../adapters/network_failure_host.ahk
+#Include ../ui/download_window/session.ahk
+#Include ../ui/download_window/init.ahk
 ; locale.ahk (string loading + t()) is included here because gestures.ahk calls
 ; t() at the top level when building GESTURE_SLOT_LABELS; without it the process
 ; blocks on an AHK runtime-error MsgBox and the CI job times out. i18n.ahk (locale
@@ -435,6 +440,7 @@ InstallSendNoOps()
 #Include unit/test_menu_languages_and_global_separator.ahk
 #Include unit/test_dynamic_hotstrings_module.ahk
 #Include unit/test_user_hotstrings.ahk
+#Include unit/test_user_hotstrings_pid_publication.ahk
 #Include unit/test_hotstrings_config.ahk
 #Include unit/test_hotstring_delimiter_global_transaction_20260813.ahk
 #Include unit/test_hotstring_override_global_transaction_20260813.ahk
@@ -495,6 +501,7 @@ InstallSendNoOps()
 #Include unit/test_capsword_taphold_unlatch.ahk
 #Include meta/test_tap_hold_suspend_boundary.ahk
 #Include unit/test_updater.ahk
+#Include unit/test_updater_managed_failure.ahk
 #Include unit/test_release_install.ahk
 #Include unit/test_uninstall.ahk
 #Include unit/test_uninstall_source_run.ahk
@@ -569,6 +576,10 @@ _LogBootProgress("loading LLM modules")
 #Include unit/test_llm_api_ollama.ahk
 #Include unit/test_llm_engine_read_guarded_in_timer.ahk
 #Include unit/test_llm_api_remote.ahk
+#Include unit/test_curl_proxy_auth_integration.ahk
+#Include unit/test_managed_curl_owner.ahk
+#Include unit/test_managed_curl_callers.ahk
+#Include unit/test_curl_proxy_auth_policy.ahk
 #Include unit/test_local_server_auth.ahk
 #Include unit/test_local_server_discovery_policy.ahk
 #Include unit/test_local_server_models.ahk
@@ -758,6 +769,7 @@ _LogBootProgress("loading gestures modules")
 #Include unit/test_onboarding_answers.ahk
 #Include unit/test_onboarding_metrics_path.ahk
 #Include unit/test_gestures.ahk
+#Include unit/test_config_keyboard_binding_identity.ahk
 #Include unit/test_virtual_desktops.ahk
 #Include unit/test_text_case_vectors.ahk
 #Include unit/test_wrap_selection_action.ahk
@@ -1073,6 +1085,11 @@ _LogBootProgress("keylogger modules + tests included")
 #Include meta/test_remote_generate_curl_dispatch.ahk
 #Include unit/test_network_dispatch_nonblocking.ahk
 #Include unit/test_managed_network_failure.ahk
+#Include unit/test_managed_network_windows_actions.ahk
+#Include unit/test_managed_terminal_failure.ahk
+#Include unit/test_managed_routes_native.ahk
+#Include unit/test_managed_remote_transport.ahk
+#Include unit/test_updater_managed_transport.ahk
 #Include meta/test_remote_connect_timeout_bounded.ahk
 #Include meta/test_keylogger_json_64bit_decode.ahk
 #Include meta/test_crash_build_offthread.ahk

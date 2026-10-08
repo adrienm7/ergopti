@@ -152,7 +152,7 @@ function M.new(manifest)
 		assert(value ~= nil, "use a neutral value to delete configuration: " .. path)
 		return row(path, value, equal(value, neutral))
 	end
-	local function collect_scope(scope_id)
+	local function collect_scope(scope_id, direct_only)
 		local prefixes, excluded, visiting, dynamic_definitions, presets, parameters = {}, {}, {}, {}, {}, {}
 		local kept = {}
 		local function visit(id)
@@ -171,15 +171,17 @@ function M.new(manifest)
 			for _, path in ipairs(scope.restore_exclude or {}) do excluded[#excluded + 1] = path end
 			for _, path in ipairs(scope.clear_exclude or {}) do kept[#kept + 1] = path end
 			for _, definition in ipairs(scope.dynamic_defaults or {}) do dynamic_definitions[definition] = true end
-			for _, child in ipairs(scope.includes or {}) do visit(child) end
+			if not direct_only then
+				for _, child in ipairs(scope.includes or {}) do visit(child) end
+			end
 			visiting[id] = nil
 		end
 		visit(scope_id)
 		return prefixes, excluded, dynamic_definitions, presets, parameters, kept
 	end
-	function contract.scope_operations(scope_id, mode, owned_paths, owners)
+	local function scope_operations(scope_id, mode, owned_paths, owners, direct_only)
 		assert(mode == "recommended" or mode == "clear", "unknown configuration scope operation")
-		local prefixes, excluded, dynamic_definitions, _, parameters, kept = collect_scope(scope_id)
+		local prefixes, excluded, dynamic_definitions, _, parameters, kept = collect_scope(scope_id, direct_only)
 		-- A restore leaves `restore_exclude` alone and a clear `clear_exclude`:
 		-- no row is planned, so the stored value stays whatever it is.
 		local untouched = mode == "recommended" and excluded or kept
@@ -231,6 +233,13 @@ function M.new(manifest)
 		end
 		return operations
 	end
+	function contract.scope_operations(scope_id, mode, owned_paths, owners)
+		return scope_operations(scope_id, mode, owned_paths, owners, false)
+	end
+	--- Plans only the selected declaration, leaving included scopes to their owners.
+	function contract.direct_scope_operations(scope_id, mode, owned_paths, owners)
+		return scope_operations(scope_id, mode, owned_paths, owners, true)
+	end
 	--- Collects only declared dynamic leaves supplied by explicit runtime owners.
 	--- @param scope_id string Selected scope identifier.
 	--- @param providers table Named callbacks returning dense lists of owned paths.
@@ -269,9 +278,9 @@ function M.new(manifest)
 	--- @param owned_paths table|nil Explicit runtime-owned dynamic paths.
 	--- @param owners table|nil Exact host validators for non-scalar parameter owners.
 	--- @return table plan Detached operations and required preset ownership.
-	function contract.scope_plan(scope_id, mode, owned_paths, owners)
-		local operations = contract.scope_operations(scope_id, mode, owned_paths, owners)
-		local _, _, _, selected = collect_scope(scope_id)
+	local function scope_plan(scope_id, mode, owned_paths, owners, direct_only)
+		local operations = scope_operations(scope_id, mode, owned_paths, owners, direct_only)
+		local _, _, _, selected = collect_scope(scope_id, direct_only)
 		local scopes, presets = {}, {}
 		for scope in pairs(selected) do scopes[#scopes + 1] = scope end
 		table.sort(scopes)
@@ -279,6 +288,14 @@ function M.new(manifest)
 			presets[#presets + 1] = { scope = scope, preset = selected[scope], mode = mode }
 		end
 		return { scope = scope_id, mode = mode, operations = operations, presets = presets }
+	end
+
+	function contract.scope_plan(scope_id, mode, owned_paths, owners)
+		return scope_plan(scope_id, mode, owned_paths, owners, false)
+	end
+	--- Presets and dynamic policies remain owned by this declaration alone.
+	function contract.direct_scope_plan(scope_id, mode, owned_paths, owners)
+		return scope_plan(scope_id, mode, owned_paths, owners, true)
 	end
 
 	return contract

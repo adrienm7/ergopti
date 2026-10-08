@@ -601,3 +601,577 @@ TestGestures_AutoConfigureMarkerPreservesBooleanType() {
 }
 Test("Gestures: onboarding marker preserves TOML boolean type (AHK-102)",
     TestGestures_AutoConfigureMarkerPreservesBooleanType)
+
+
+; The actual cached provider must consume the shared fixed command declaration.
+; Its native registry refresh still runs only from the existing deferred timer.
+TestGestures_SharedSystemRefresh() {
+	global _SharedDir, GESTURE_SLOTS
+	Corpus := JsonParse(FileRead(_SharedDir . "\tests\corpus\menus\gesture_system_refresh.json", "UTF-8"))
+	Root := _MR_GetManifestRoot()
+	Section := Corpus["section"]
+	Definition := Root[Section]
+	AssertEqual(1, Definition.Length, "one independently declared fixed control")
+	for Field, Expected in Corpus["rows"][1] {
+		if Expected is Array {
+			AssertEqual(Expected.Length, Definition[1][Field].Length, "exact platform count")
+			for Index, Platform in Expected
+				AssertEqual(Platform, Definition[1][Field][Index], "exact existing native platform")
+		} else
+			AssertEqual(Expected, Definition[1][Field], "independent field: " . Field)
+	}
+	ExpectedSlots := Corpus["cached_children"]["ahk"]
+	AssertEqual(GESTURE_SLOTS.Length + 1, ExpectedSlots.Length, "handwritten slot sequence includes only one trailing refresh")
+	for Index, Slot in GESTURE_SLOTS
+		AssertEqual(ExpectedSlots[Index], Slot, "cached native slot order")
+	State := GestureSystemState()
+	PreviousReady := State["ready"]
+	PreviousSlots := State["slots"]
+	Rendered := Menu()
+	try {
+		State["ready"] := false
+		Rows := GestureSystemRows()
+		AssertEqual(1, Rows.Length, "one cached system-status submenu")
+		Children := Rows[1]["items"]
+		AssertEqual(ExpectedSlots.Length, Children.Length, "all existing cached children precede the shared command")
+		AssertEqual(t("ui_apps.btn_refresh"), Children[Children.Length]["label"], "existing refresh translation")
+		AssertFalse(State["ready"], "building does not perform a registry read")
+		AssertEqual(Children.Length, _MR_RenderRows(Rendered, Children, "gesture_system_refresh_test", 1),
+			"actual native renderer consumes every cached child and command")
+		AssertEqual(Children.Length, DllCall("GetMenuItemCount", "ptr", Rendered.Handle, "int"),
+			"actual Win32 menu has the same number of children")
+		Flags := DllCall("GetMenuState", "ptr", Rendered.Handle, "uint", Children.Length - 1, "uint", 0x400, "uint")
+		Assert(Flags != 0xFFFFFFFF && !(Flags & 0x3), "existing Refresh remains a clickable native command")
+		Children[Children.Length]["action"].Call()
+		Started := A_TickCount
+		while !State["ready"] && A_TickCount - Started < 2000
+			Sleep(10)
+		AssertTrue(State["ready"], "actual command schedules the original native complete-snapshot refresh")
+		for Slot in GESTURE_SLOTS
+			AssertTrue(State["slots"].Has(Slot), "actual timer publishes the full native snapshot: " . Slot)
+	} finally {
+		SetTimer(GestureSystemRefresh, 0)
+		State["ready"] := PreviousReady
+		State["slots"] := PreviousSlots
+		Rendered.Delete()
+		MenuDispatcher_PruneMenu(Rendered)
+	}
+}
+Test("Gestures: shared system refresh consumes actual cached provider and native timer", TestGestures_SharedSystemRefresh)
+
+; Mutations prove declaration ownership, while restoring the exact original root.
+TestGestures_SharedSystemRefreshDeclaration() {
+	Root := _MR_GetManifestRoot()
+	Section := "gesture_system_status_controls"
+	Original := Root[Section]
+	Rendered := Menu()
+	try {
+		Changed := Original[1].Clone()
+		Changed["i18n"] := "menu.gestures.open_settings"
+		Root[Section] := [Map("type", "---", "platforms", ["ahk"], "unavailable", "hide"), Changed]
+		Rows := GestureSystemRows()
+		Children := Rows[1]["items"]
+		AssertTrue(Children[Children.Length - 1]["separator"], "actual provider follows declared separator order")
+		AssertEqual(t("menu.gestures.open_settings"), Children[Children.Length]["label"], "actual provider follows declared caption")
+		AssertEqual(Children.Length - 1, _MR_RenderRows(Rendered, Children, "gesture_system_order_test", 1),
+			"actual native renderer counts all labelled rows")
+		AssertEqual(Children.Length, DllCall("GetMenuItemCount", "ptr", Rendered.Handle, "int"),
+			"actual native renderer retains the interior separator")
+		Changed["platforms"] := ["hs"]
+		Root[Section] := [Changed]
+		Hidden := GestureSystemRows()[1]["items"]
+		AssertEqual(Children.Length - 2, Hidden.Length, "platform hiding retains every existing cached Settings child")
+		Changed["platforms"] := ["ahk"]
+		Changed["id"] := "unknown_native_refresh_owner"
+		AssertEqual(0, GestureSystemRows().Length, "missing actual command refuses partial status publication")
+	} finally {
+		Root[Section] := Original
+		Rendered.Delete()
+		MenuDispatcher_PruneMenu(Rendered)
+	}
+}
+Test("Gestures: actual system refresh provider follows declaration order caption and platform", TestGestures_SharedSystemRefreshDeclaration)
+
+
+; The independent three-slot vector crosses the original tap_4 boundary once.
+_GTB_WithSlots(Callback) {
+	global GESTURE_SLOTS, GestureAssignments, Features
+	PreviousSlots := GESTURE_SLOTS, PreviousAssignments := GestureAssignments, PreviousFeatures := Features
+	try {
+		GESTURE_SLOTS := ["swipe_3_up", "tap_4", "tap_3"]
+		GestureAssignments := Map("swipe_3_up", "none", "tap_4", "none", "tap_3", "none")
+		Features := Map("gestures", Map("enabled", true))
+		return Callback.Call()
+	} finally {
+		GESTURE_SLOTS := PreviousSlots, GestureAssignments := PreviousAssignments, Features := PreviousFeatures
+	}
+}
+
+_GTB_Owner() {
+	Owner := _MR_FindItemById("gestures_menu", "gesture_slots_ahk")
+	Assert(Owner is Map, "the actual flat Windows provider must be declared")
+	return Owner
+}
+
+_GTB_AssertSlotRows(Rows, ExpectedLength, TapPosition) {
+	Assert(Rows is Array)
+	AssertEqual(ExpectedLength, Rows.Length)
+	for Pair in [[1, "swipe_3_up"], [TapPosition, "tap_4"], [TapPosition + 1, "tap_3"]] {
+		Row := Rows[Pair[1]]
+		AssertTrue(InStr(Row["label"], t("gesture.slots." . Pair[2]) . " : ") == 1)
+		Assert(Row["action"] is Func, "the existing slot action remains its native callback")
+		AssertFalse(Row["disabled"])
+	}
+}
+
+_GTB_DeclaredBoundary() {
+	_GTB_WithSlots(() => _GTB_DeclaredBoundaryInner())
+}
+_GTB_DeclaredBoundaryInner() {
+	Owner := _GTB_Owner()
+	Assert(Owner.Get("status_rows", false) is Map)
+	Boundary := Owner["status_rows"]["tap_group_boundary"]
+	Assert(Boundary is Array)
+	AssertEqual(1, Boundary.Length)
+	AssertEqual(1, Boundary[1].Count)
+	AssertEqual("---", Boundary[1]["type"])
+	Rows := _GES_SlotRows()
+	_GTB_AssertSlotRows(Rows, 4, 3)
+	AssertTrue(Rows[2]["separator"])
+	AssertFalse(Rows[2].Has("action"), "a fixed separator has no click owner")
+	Native := Menu()
+	try {
+		AssertEqual(3, _MR_RenderRows(Native, Rows, "gesture_slots_ahk", 1), "the renderer receipt counts named rows only")
+		AssertEqual(4, DllCall("user32\GetMenuItemCount", "Ptr", Native.Handle, "Int"))
+		Flags := DllCall("user32\GetMenuState", "Ptr", Native.Handle, "UInt", 1, "UInt", 0x400, "UInt")
+		Assert(Flags != 0xFFFFFFFF, "GetMenuState must acknowledge the actual separator position")
+		AssertTrue((Flags & 0x800) != 0, "the actual Win32 item between swipe and tap is a separator")
+		AssertEqual(Rows[3]["label"], _CTC_LabelAt(Native, 2), "tap_4 follows the actual separator")
+	} finally _CTC_ReleaseMenu(Native)
+}
+Test("Gestures menu: the actual flat provider materializes its shared tap boundary", _GTB_DeclaredBoundary)
+
+_GTB_PublishedBoundary() {
+	_GTB_WithSlots(() => _GTB_PublishedBoundaryInner())
+}
+_GTB_PublishedBoundaryInner() {
+	Owner := _GTB_Owner(), HadStatus := Owner.Has("status_rows"), Previous := Owner.Get("status_rows", false)
+	try {
+		Owner["status_rows"] := Map("tap_group_boundary", [
+			Map("type", "label", "i18n", "common.restore_recommended"), Map("type", "---")])
+		Rows := _GES_SlotRows()
+		_GTB_AssertSlotRows(Rows, 5, 4)
+		AssertEqual(t("common.restore_recommended"), Rows[2]["label"])
+		AssertTrue(Rows[2]["disabled"])
+		AssertFalse(Rows[2].Has("action"))
+		AssertTrue(Rows[3]["separator"])
+		AssertFalse(Rows[3].Has("action"))
+		Owner["status_rows"]["tap_group_boundary"][1]["i18n"] := "common.clear_to_system"
+		AssertEqual(t("common.restore_recommended"), Rows[2]["label"], "held materialized data is detached from later source mutation")
+		AssertEqual(t("common.clear_to_system"), _GES_SlotRows()[2]["label"], "a fresh native provider consumes current shared source")
+		Owner.Delete("status_rows")
+		AssertEqual(0, _GES_SlotRows().Length, "a missing required boundary refuses a rebuilt provider")
+		Native := Menu()
+		try {
+			AssertEqual(4, _MR_RenderRows(Native, Rows, "gesture_slots_ahk", 1), "the renderer receipt counts the inert label and slots")
+			AssertEqual(5, DllCall("user32\GetMenuItemCount", "Ptr", Native.Handle, "Int"))
+			AssertEqual(t("common.restore_recommended"), _CTC_LabelAt(Native, 1))
+			Flags := DllCall("user32\GetMenuState", "Ptr", Native.Handle, "UInt", 1, "UInt", 0x400, "UInt")
+			Assert(Flags != 0xFFFFFFFF, "GetMenuState must acknowledge the actual held-label position")
+			AssertTrue((Flags & 3) != 0, "the held inert label remains actually disabled")
+		} finally _CTC_ReleaseMenu(Native)
+	} finally {
+		if HadStatus
+			Owner["status_rows"] := Previous
+		else if Owner.Has("status_rows")
+			Owner.Delete("status_rows")
+	}
+}
+Test("Gestures menu: current declared boundary order is consumed and held inert data is detached", _GTB_PublishedBoundary)
+
+_GTB_RefusedBoundary() {
+	_GTB_WithSlots(() => _GTB_RefusedBoundaryInner())
+}
+_GTB_RefusedBoundaryInner() {
+	global GESTURE_SLOTS, GestureAssignments, Features
+	Owner := _GTB_Owner(), HadStatus := Owner.Has("status_rows"), Previous := Owner.Get("status_rows", false)
+	Assignments := GestureAssignments, FeatureOwner := Features
+	try {
+		for Invalid in [false, Map(), Map("tap_group_boundary", []),
+			Map("tap_group_boundary", [Map("type", "command", "id", "foreign_action")]),
+			Map("tap_group_boundary", [Map("type", "---", "action", (*) => true)]),
+			Map("tap_group_boundary", [Map("type", "label", "i18n", "common.restore_recommended", "checked_when", ["foreign_state"])])] {
+			Owner["status_rows"] := Invalid
+			AssertEqual(0, _GES_SlotRows().Length, "missing, empty or effect-bearing status cannot publish a partial slot list")
+			AssertTrue(GestureAssignments == Assignments)
+			AssertEqual("none", GestureAssignments["tap_4"])
+			AssertTrue(Features == FeatureOwner)
+			AssertTrue(Features["gestures"]["enabled"])
+		}
+		Owner.Delete("status_rows")
+		GESTURE_SLOTS := ["swipe_3_up", "tap_3"]
+		Rows := _GES_SlotRows()
+		AssertEqual(2, Rows.Length, "an absent tap_4 needs no boundary or invented separator")
+		AssertFalse(Rows[1].Get("separator", false))
+		AssertFalse(Rows[2].Get("separator", false))
+	} finally {
+		if HadStatus
+			Owner["status_rows"] := Previous
+		else if Owner.Has("status_rows")
+			Owner.Delete("status_rows")
+	}
+}
+Test("Gestures menu: missing or effect-bearing boundary refuses atomically without changing native assignment owners", _GTB_RefusedBoundary)
+
+
+; The native equivalent replays the exact hand-authored corpus used by Lua.
+; Default case-insensitive Maps deliberately exercise the helper's exact lookup.
+TestGestures_PublishedBindingIdentityCorpus() {
+	global _SharedDir
+	Corpus := JsonParse(FileRead(_SharedDir . "\tests\corpus\config_binding_identity\vectors.json", "UTF-8"))
+	AssertEqual(29, Corpus["vectors"].Length, "frozen independent publication corpus")
+	for Vector in Corpus["vectors"] {
+		if Vector.Get("expects_error", false) {
+			AssertThrows(ConfigBindingIdentityGestureStatus.Bind(Vector["binding"], Vector["catalogue"]), Vector["id"])
+			continue
+		}
+		if Vector.Has("published") && !Vector["published"] {
+			Status := ConfigBindingIdentityGestureStatus(Vector["binding"])
+		} else {
+			Slots := Map()
+			for Slot in Vector["slots"]
+				Slots[Slot] := true
+			Status := ConfigBindingIdentityGestureStatus(Vector["binding"], Map("prefix", Vector["prefix"], "slots", Slots))
+		}
+		AssertEqual(Vector["status"], Status, Vector["id"])
+	}
+}
+Test("Gestures: published binding identity replays shared 29-vector corpus (gesture-binding-identity-corpus)",
+	TestGestures_PublishedBindingIdentityCorpus)
+
+TestGestures_PublishedNativeSlotDomain() {
+	Catalogue := TomlConfigGestureSlotCatalogue()
+	AssertEqual("gesture__", Catalogue["prefix"])
+	AssertEqual(10, Catalogue["slots"].Count, "actual complete Windows catalogue")
+	AssertEqual("On", Catalogue["slots"].CaseSense)
+	for Slot in GestureSlotIds()
+		AssertEqual("current", ConfigBindingIdentityGestureStatus(GestureBindingId("gesture", Slot), Catalogue), Slot)
+	AssertEqual("retired", ConfigBindingIdentityGestureStatus("gesture__removed_gesture_slot", Catalogue))
+	AssertEqual("retired", ConfigBindingIdentityGestureStatus("gesture__TAP_3", Catalogue))
+	AssertEqual("unjudged", ConfigBindingIdentityGestureStatus("Gesture__tap_3", Catalogue))
+	for Binding in ["keyboard__ctrl_k", "tap_key__a", "script__pause", "tap_hold__caps_lock", "combination__caps_lock_then_space"]
+		AssertEqual("unjudged", ConfigBindingIdentityGestureStatus(Binding, Catalogue), Binding)
+}
+Test("Gestures: native owner publishes its exact ten-slot domain (gesture-binding-identity-native-catalogue)",
+	TestGestures_PublishedNativeSlotDomain)
+
+TestGestures_RetiredParameterSettersRefuseBeforePorts() {
+	global GestureActionParameters
+	Previous := GestureActionParameters
+	Calls := []
+	Writer := (*) => (Calls.Push("writer"), false)
+	Notify := (*) => Calls.Push("notify")
+	try {
+		GestureActionParameters := Map()
+		GestureActionParameters.CaseSense := "On"
+		GestureActionParameters["Gesture__tap_3__open_url"] := "https://unjudged.example"
+		AssertFalse(GestureSetActionParameter("gesture__removed_gesture_slot", "open_url", "https://must-not-write.example", Writer, Notify))
+		AssertEqual(0, Calls.Length, "ordinary refusal precedes writer and native notification")
+		AssertEqual(1, GestureActionParameters.Count)
+		AssertEqual("On", GestureActionParameters.CaseSense)
+		Assignments := Map("tap_3", "none")
+		Parameters := GestureActionParameters.Clone()
+		Candidate := Map("has_value", true, "key", "gesture__removed_gesture_slot__open_url", "value", "https://must-not-write.example")
+		AssertFalse(_GestureCommitAssignment(&Assignments, &Parameters, "gestures", "tap_3", "open_url", Candidate, Writer, Notify))
+		AssertEqual(0, Calls.Length, "combined assignment also refuses before persistence")
+		AssertEqual("none", Assignments["tap_3"])
+		AssertEqual(1, Parameters.Count)
+		AssertEqual("On", Parameters.CaseSense)
+	} finally GestureActionParameters := Previous
+}
+Test("Gestures: proven retired parameters refuse both ordinary setter paths before ports (gesture-binding-identity-refusal)",
+	TestGestures_RetiredParameterSettersRefuseBeforePorts)
+
+TestGestures_ParameterSnapshotsKeepCaseTwins() {
+	Known := "gesture__tap_3__open_url"
+	Twin := "Gesture__tap_3__open_url"
+	Source := Map()
+	Source.CaseSense := "On"
+	Source[Known] := "https://known.example"
+	Source[Twin] := "https://unjudged.example"
+	Snapshot := _GestureCloneActionParameters(Source)
+	AssertEqual("On", Snapshot.CaseSense)
+	AssertEqual(2, Snapshot.Count)
+	AssertEqual("https://known.example", Snapshot[Known])
+	AssertEqual("https://unjudged.example", Snapshot[Twin])
+	Revert := Snapshot.Clone()
+	AssertEqual("On", Revert.CaseSense, "native Clone preserves the exact compensation domain")
+	AssertEqual(2, Revert.Count)
+	AssertEqual("https://known.example", Revert[Known])
+	AssertEqual("https://unjudged.example", Revert[Twin])
+	Legacy := Map()
+	Legacy.CaseSense := "Off"
+	Legacy[Known] := "https://legacy.example"
+	AssertEqual("Off", Legacy.CaseSense, "the fixture supplies a populated case-insensitive legacy Map")
+	Upgraded := _GestureCloneActionParameters(Legacy)
+	AssertEqual("On", Upgraded.CaseSense)
+	AssertEqual("https://legacy.example", Upgraded[Known])
+	AssertEqual("Off", Legacy.CaseSense, "populated legacy Map was never switched in place")
+}
+Test("Gestures: detached snapshots and exact native clones retain both case twins (gesture-binding-identity-snapshots)",
+	TestGestures_ParameterSnapshotsKeepCaseTwins)
+
+
+; Keeps compiled publication identity outside runtime assignment fixtures.
+_GSBP_WithPublication(Body) {
+	global SCRIPT_SHORTCUT_SLOTS, _ScriptShortcutBindingPublication
+	PreviousSlots := IsSet(SCRIPT_SHORTCUT_SLOTS) ? SCRIPT_SHORTCUT_SLOTS : unset
+	PreviousPublication := IsSet(_ScriptShortcutBindingPublication) ? _ScriptShortcutBindingPublication : unset
+	try {
+		SCRIPT_SHORTCUT_SLOTS := ["script_altgr_enter", "script_altgr_backspace", "script_altgr_delete", "script_altgr_escape"]
+		_ScriptShortcutBindingPublication := ConfigBindingIdentityScriptPublication(SCRIPT_SHORTCUT_SLOTS)
+		Body.Call()
+	} finally {
+		SCRIPT_SHORTCUT_SLOTS := IsSet(PreviousSlots) ? PreviousSlots : unset
+		_ScriptShortcutBindingPublication := IsSet(PreviousPublication) ? PreviousPublication : unset
+	}
+}
+
+TestGestures_ScriptBindingCorpus() {
+	global _SharedDir
+	Corpus := JsonParse(FileRead(_SharedDir . "\tests\corpus\config_binding_identity\script_vectors.json", "UTF-8"))
+	Catalogue := ConfigBindingIdentityScriptPublication([
+		"script_altgr_enter", "script_altgr_backspace", "script_altgr_delete", "script_altgr_escape"
+	]).Catalogue
+	AssertEqual(14, Corpus.Length, "independent handwritten script identity corpus")
+	for Row in Corpus {
+		Expected := Type(Row["expected"]) == "String" ? Row["expected"] : Row["expected"] ? "current" : "retired"
+		AssertEqual(Expected, ConfigBindingIdentityScriptStatus(Row["binding"], Catalogue), Row["name"])
+		AssertEqual("unjudged", ConfigBindingIdentityScriptStatus(Row["binding"]), Row["name"] . ": unpublished")
+	}
+}
+Test("Gestures: script bindings replay an independent fourteen-vector corpus (script-binding-identity)",
+	TestGestures_ScriptBindingCorpus)
+
+TestGestures_ScriptPublicationIdentity() {
+	_GSBP_WithPublication(_GSBP_PublicationIdentityBody)
+}
+_GSBP_PublicationIdentityBody() {
+	global SCRIPT_SHORTCUT_SLOTS, _ScriptShortcutBindingPublication
+	OriginalSlots := SCRIPT_SHORTCUT_SLOTS
+	OriginalPublication := _ScriptShortcutBindingPublication
+	Received := TomlConfigScriptSlotCatalogue()
+	AssertEqual("script__", Received["prefix"])
+	AssertEqual(4, Received["slots"].Count)
+	AssertEqual("On", Received["slots"].CaseSense)
+	Received["slots"].Delete("script_altgr_enter")
+	Received["slots"]["removed_script_slot"] := true
+	AssertEqual("current", TomlConfigParameterBindingStatus("script__script_altgr_enter"))
+	AssertEqual("retired", TomlConfigParameterBindingStatus("script__removed_script_slot"))
+	SCRIPT_SHORTCUT_SLOTS := OriginalSlots.Clone()
+	AssertEqual("unjudged", TomlConfigParameterBindingStatus("script__removed_script_slot"), "foreign declaration identity withdraws authority")
+	SCRIPT_SHORTCUT_SLOTS := OriginalSlots
+	SCRIPT_SHORTCUT_SLOTS[1] := "foreign_slot"
+	AssertEqual("unjudged", TomlConfigParameterBindingStatus("script__removed_script_slot"), "changed declaration withdraws authority")
+	SCRIPT_SHORTCUT_SLOTS[1] := "script_altgr_enter"
+	_ScriptShortcutBindingPublication := unset
+	AssertEqual("unjudged", TomlConfigParameterBindingStatus("script__removed_script_slot"))
+	_ScriptShortcutBindingPublication := OriginalPublication
+	AssertEqual("retired", TomlConfigParameterBindingStatus("script__removed_script_slot"))
+	for Binding in ["keyboard__removed_key", "tap_key__removed_key", "tap_hold__removed_key", "combination__removed_pair", "Script__removed_script_slot"]
+		AssertEqual("unjudged", TomlConfigParameterBindingStatus(Binding), Binding)
+}
+Test("Gestures: script publication is detached, pure and bound to the compiled declaration (script-binding-identity)",
+	TestGestures_ScriptPublicationIdentity)
+
+TestGestures_ScriptPublicationRefusesMalformed() {
+	for Ids in [[], [""], ["same", "same"], ["nested__id"], [false]]
+		AssertThrows(ConfigBindingIdentityScriptPublication.Bind(Ids), "invalid compiled script declaration refuses")
+	Sparse := Array()
+	Sparse.Length := 2
+	Sparse[1] := "script_altgr_enter"
+	AssertThrows(ConfigBindingIdentityScriptPublication.Bind(Sparse), "a sparse declaration is not complete")
+	for Catalogue in [Map(), Map("prefix", "script__", "slots", Map()), Map("prefix", "keyboard__", "slots", Map("key", true))]
+		AssertThrows(ConfigBindingIdentityScriptStatus.Bind("script__removed", Catalogue), "malformed script publication refuses")
+}
+Test("Gestures: malformed script publication cannot invent retirement (script-binding-identity)",
+	TestGestures_ScriptPublicationRefusesMalformed)
+
+TestGestures_RetiredScriptSettersRefuse() {
+	_GSBP_WithPublication(_GSBP_RetiredSettersBody)
+}
+_GSBP_RetiredSettersBody() {
+	global GestureActionParameters
+	Previous := GestureActionParameters
+	Calls := []
+	Writer := (*) => (Calls.Push("writer"), false)
+	Notify := (*) => Calls.Push("notify")
+	try {
+		GestureActionParameters := Map()
+		GestureActionParameters.CaseSense := "On"
+		GestureActionParameters["Script__removed_script_slot__open_url"] := "https://unjudged.example"
+		AssertFalse(GestureSetActionParameter("script__removed_script_slot", "open_url", "https://must-not-write.example", Writer, Notify))
+		AssertEqual(0, Calls.Length)
+		AssertEqual(1, GestureActionParameters.Count)
+		Assignments := Map("script_altgr_enter", "none")
+		Parameters := _GestureCloneActionParameters(GestureActionParameters)
+		Candidate := Map("has_value", true, "key", "script__removed_script_slot__open_url", "value", "https://must-not-write.example")
+		AssertFalse(_GestureCommitAssignment(&Assignments, &Parameters, "shortcuts.script_control", "script_altgr_enter", "open_url", Candidate, Writer, Notify))
+		AssertEqual(0, Calls.Length)
+		AssertEqual("none", Assignments["script_altgr_enter"])
+		AssertEqual("https://unjudged.example", Parameters["Script__removed_script_slot__open_url"])
+		Snapshot := _GestureCloneActionParameters(Map("script__removed_script_slot__open_url", "https://inverse.example"))
+		AssertEqual("https://inverse.example", Snapshot["script__removed_script_slot__open_url"], "exact inverse is separate from setter admission")
+	} finally GestureActionParameters := Previous
+}
+Test("Gestures: retired script parameter refuses both setter paths before ports (script-binding-identity)",
+	TestGestures_RetiredScriptSettersRefuse)
+
+; Uses the two actual compiled declarations, never a fixture's copied slot list.
+_GTKP_WithPublication(Body) {
+	global TAP_KEY_ORDER, TAP_KEY_SCANCODES, _TapKeyBindingPublication
+	PreviousPublication := IsSet(_TapKeyBindingPublication) ? _TapKeyBindingPublication : unset
+	try {
+		_TapKeyBindingPublication := ConfigBindingIdentityTapPublication(TAP_KEY_ORDER, TAP_KEY_SCANCODES)
+		Body.Call()
+	} finally _TapKeyBindingPublication := IsSet(PreviousPublication) ? PreviousPublication : unset
+}
+
+TestGestures_TapBindingCorpus() {
+	global _SharedDir, TAP_KEY_ORDER, TAP_KEY_SCANCODES
+	Corpus := JsonParse(FileRead(_SharedDir . "\tests\corpus\config_binding_identity\tap_vectors.json", "UTF-8"))
+	Catalogue := ConfigBindingIdentityTapPublication(TAP_KEY_ORDER, TAP_KEY_SCANCODES).Catalogue
+	AssertEqual(13, Corpus.Length, "independent handwritten tap identity corpus")
+	for Row in Corpus {
+		Expected := Type(Row["expected"]) == "String" ? Row["expected"] : Row["expected"] ? "current" : "retired"
+		AssertEqual(Expected, ConfigBindingIdentityTapStatus(Row["binding"], Catalogue), Row["name"])
+		AssertEqual("unjudged", ConfigBindingIdentityTapStatus(Row["binding"]), Row["name"] . ": unpublished")
+	}
+}
+Test("Gestures: tap bindings replay the independent actual-slot corpus (tap-binding-identity)",
+	TestGestures_TapBindingCorpus)
+
+TestGestures_TapPublicationIdentity() {
+	_GTKP_WithPublication(_GTKP_PublicationIdentityBody)
+}
+_GTKP_PublicationIdentityBody() {
+	global TAP_KEY_ORDER, TAP_KEY_SCANCODES, _TapKeyBindingPublication
+	OriginalOrder := TAP_KEY_ORDER
+	OriginalScans := TAP_KEY_SCANCODES
+	OriginalPublication := _TapKeyBindingPublication
+	OriginalScan := TAP_KEY_SCANCODES[TAP_KEY_ORDER[1]]
+	try {
+		Received := TomlConfigTapSlotCatalogue()
+		AssertEqual("tap_key__", Received["prefix"])
+		AssertEqual(TAP_KEY_ORDER.Length, Received["slots"].Count)
+		AssertEqual("On", Received["slots"].CaseSense)
+		Received["slots"].Delete(TAP_KEY_ORDER[1])
+		Received["slots"]["removed_tap_key"] := true
+		AssertEqual("current", TomlConfigParameterBindingStatus("tap_key__" . TAP_KEY_ORDER[1]))
+		AssertEqual("retired", TomlConfigParameterBindingStatus("tap_key__removed_tap_key"))
+		TAP_KEY_ORDER := OriginalOrder.Clone()
+		AssertEqual("unjudged", TomlConfigParameterBindingStatus("tap_key__removed_tap_key"))
+		TAP_KEY_ORDER := OriginalOrder
+		TAP_KEY_SCANCODES := OriginalScans.Clone()
+		AssertEqual("unjudged", TomlConfigParameterBindingStatus("tap_key__removed_tap_key"))
+		TAP_KEY_SCANCODES := OriginalScans
+		TAP_KEY_SCANCODES[TAP_KEY_ORDER[1]] := OriginalScan + 1000
+		AssertEqual("unjudged", TomlConfigParameterBindingStatus("tap_key__removed_tap_key"))
+		TAP_KEY_SCANCODES[TAP_KEY_ORDER[1]] := OriginalScan
+		_TapKeyBindingPublication := unset
+		AssertEqual("unjudged", TomlConfigParameterBindingStatus("tap_key__removed_tap_key"))
+		_TapKeyBindingPublication := OriginalPublication
+		AssertEqual("retired", TomlConfigParameterBindingStatus("tap_key__removed_tap_key"))
+		AssertEqual("unjudged", TomlConfigParameterBindingStatus("Tap_key__" . TAP_KEY_ORDER[1]))
+	} finally {
+		TAP_KEY_ORDER := OriginalOrder
+		TAP_KEY_SCANCODES := OriginalScans
+		TAP_KEY_SCANCODES[TAP_KEY_ORDER[1]] := OriginalScan
+		_TapKeyBindingPublication := OriginalPublication
+	}
+}
+Test("Gestures: tap publication binds both actual compiled source identities and scan values (tap-binding-identity)",
+	TestGestures_TapPublicationIdentity)
+
+TestGestures_TapPublicationRefusesMalformed() {
+	for Ids in [[], [""], ["same", "same"], ["nested__id"], [false]]
+		AssertThrows(ConfigBindingIdentityTapPublication.Bind(Ids, Map()), "invalid compiled tap declaration refuses")
+	Sparse := Array()
+	Sparse.Length := 2
+	Sparse[1] := "first"
+	AssertThrows(ConfigBindingIdentityTapPublication.Bind(Sparse, Map("first", 1)), "a sparse declaration is not complete")
+	for Scans in [Map(), Map("other", 1), Map("first", false), Map("first", "1"), Map("first", -1)]
+		AssertThrows(ConfigBindingIdentityTapPublication.Bind(["first"], Scans), "invalid actual scan owner refuses")
+	AssertThrows(ConfigBindingIdentityTapPublication.Bind(["first", "second"], Map("first", 1, "second", 1)),
+		"two IDs cannot borrow one scan identity")
+}
+Test("Gestures: malformed tap order and scan publications cannot prove retirement (tap-binding-identity)",
+	TestGestures_TapPublicationRefusesMalformed)
+
+TestGestures_TapLatePublicationRead() {
+	_GTKP_WithPublication(_GTKP_LatePublicationReadBody)
+}
+_GTKP_LatePublicationReadBody() {
+	global GestureActionParameters, _TapKeyBindingPublication, TAP_KEY_ORDER
+	PreviousParameters := GestureActionParameters
+	Publication := _TapKeyBindingPublication
+	try {
+		GestureActionParameters := Map()
+		GestureActionParameters.CaseSense := "On"
+		Retired := "tap_key__removed_tap_key__open_url"
+		Current := "tap_key__" . TAP_KEY_ORDER[1] . "__open_url"
+		GestureActionParameters[Retired] := "https://obsolete.example"
+		GestureActionParameters[Current] := "https://current.example"
+		_TapKeyBindingPublication := unset
+		AssertEqual("https://obsolete.example", GestureGetActionParameter("tap_key__removed_tap_key", "open_url"))
+		_TapKeyBindingPublication := Publication
+		AssertEqual("", GestureGetActionParameter("tap_key__removed_tap_key", "open_url"))
+		AssertEqual("https://current.example", GestureGetActionParameter("tap_key__" . TAP_KEY_ORDER[1], "open_url"))
+		AssertEqual("https://obsolete.example", GestureActionParameters[Retired], "a read cannot change the exact inverse snapshot")
+		_TapKeyBindingPublication := unset
+		AssertEqual("https://obsolete.example", GestureGetActionParameter("tap_key__removed_tap_key", "open_url"))
+	} finally {
+		GestureActionParameters := PreviousParameters
+		_TapKeyBindingPublication := Publication
+	}
+}
+Test("Gestures: late tap publication neutralizes reads without destroying exact runtime snapshots (tap-binding-identity)",
+	TestGestures_TapLatePublicationRead)
+
+TestGestures_RetiredTapSettersRefuse() {
+	_GTKP_WithPublication(_GTKP_RetiredSettersBody)
+}
+_GTKP_RetiredSettersBody() {
+	global GestureActionParameters
+	Previous := GestureActionParameters
+	Calls := []
+	Writer := (*) => (Calls.Push("writer"), false)
+	Notify := (*) => Calls.Push("notify")
+	try {
+		GestureActionParameters := Map()
+		GestureActionParameters.CaseSense := "On"
+		GestureActionParameters["Tap_key__removed_tap_key__open_url"] := "https://unjudged.example"
+		AssertFalse(GestureSetActionParameter("tap_key__removed_tap_key", "open_url", "https://must-not-write.example", Writer, Notify))
+		AssertEqual(0, Calls.Length)
+		AssertEqual(1, GestureActionParameters.Count)
+		Assignments := Map("number_row_left", "none")
+		Parameters := _GestureCloneActionParameters(GestureActionParameters)
+		Candidate := Map("has_value", true, "key", "tap_key__removed_tap_key__open_url", "value", "https://must-not-write.example")
+		AssertFalse(_GestureCommitAssignment(&Assignments, &Parameters, "shortcuts.tap_keys", "number_row_left", "open_url", Candidate, Writer, Notify))
+		AssertEqual(0, Calls.Length)
+		AssertEqual("none", Assignments["number_row_left"])
+		AssertEqual("https://unjudged.example", Parameters["Tap_key__removed_tap_key__open_url"])
+		Snapshot := _GestureCloneActionParameters(Map("tap_key__removed_tap_key__open_url", "https://inverse.example"))
+		AssertEqual("https://inverse.example", Snapshot["tap_key__removed_tap_key__open_url"], "exact inverse is separate from setter admission")
+	} finally GestureActionParameters := Previous
+}
+Test("Gestures: retired tap parameter refuses both setter paths before ports (tap-binding-identity)",
+	TestGestures_RetiredTapSettersRefuse)
+
+
+TestGestures_ScriptLatePublicationRead() {
+	AssertEqual(0, _FeatureStateBootRun("script_late_parameter"),
+		"the compiled Script retirement child must complete all native assertions")
+}
+Test("gestures: late script publication neutralizes retained parameters (script-late-publication)",
+	TestGestures_ScriptLatePublicationRead)

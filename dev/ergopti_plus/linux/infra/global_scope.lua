@@ -49,6 +49,12 @@ function M.participants(ctx)
 		return ctx.paused == true or (type(ctx.is_paused) == "function" and ctx.is_paused() == true)
 	end
 	local registry = {}
+	if type(ctx.is_paused) == "function" then
+		registry.global = require("infra.script_scope").participant(function()
+			if ctx.paused == true then return true end
+			return ctx.is_paused()
+		end)
+	end
 	if ctx.tap_holds then registry.tap_holds = require("infra.tap_hold_scope").participant(is_paused) end
 	if ctx.shortcuts then registry.shortcuts = require("infra.shortcuts_scope").participant(is_paused) end
 	-- Without a touchpad the gestures are skipped and reported: their

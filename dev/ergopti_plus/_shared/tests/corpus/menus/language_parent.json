@@ -1,0 +1,36 @@
+{
+	"scope": "original Mac/Linux complete Language parents; native Windows deferred owner unchanged",
+	"parent": {
+		"en": "🌐 Language",
+		"fr": "🌐 Langue",
+		"id": "language",
+		"position": "after configuration before following separator"
+	},
+	"empty_child": "valid only from a successful actual locale collection; parent remains visible",
+	"locales": [
+		{ "code": "da", "mac": "🇩🇰 Dansk", "linux": "Dansk (da)" },
+		{ "code": "de", "mac": "🇩🇪 Deutsch", "linux": "Deutsch (de)" },
+		{ "code": "en", "mac": "🇬🇧 English", "linux": "English (en)" },
+		{ "code": "es", "mac": "🇪🇸 Español", "linux": "Español (es)" },
+		{ "code": "fr", "mac": "🇫🇷 Français", "linux": "Français (fr)" },
+		{ "code": "it", "mac": "🇮🇹 Italiano", "linux": "Italiano (it)" },
+		{ "code": "nl", "mac": "🇳🇱 Nederlands", "linux": "Nederlands (nl)" },
+		{ "code": "no", "mac": "🇳🇴 Norsk", "linux": "Norsk (no)" },
+		{ "code": "pl", "mac": "🇵🇱 Polski", "linux": "Polski (pl)" },
+		{ "code": "pt", "mac": "🇧🇷 Português", "linux": "Português (pt)" },
+		{ "code": "sv", "mac": "🇸🇪 Svenska", "linux": "Svenska (sv)" },
+		{ "code": "tr", "mac": "🇹🇷 Türkçe", "linux": "Türkçe (tr)" },
+		{ "code": "cs", "mac": "🇨🇿 Čeština", "linux": "Čeština (cs)" },
+		{ "code": "ru", "mac": "🇷🇺 Русский", "linux": "Русский (ru)" },
+		{ "code": "uk", "mac": "🇺🇦 Українська", "linux": "Українська (uk)" },
+		{ "code": "he", "mac": "🇮🇱 עברית", "linux": "עברית (he)" },
+		{ "code": "ar", "mac": "🇸🇦 العربية", "linux": "العربية (ar)" },
+		{ "code": "hi", "mac": "🇮🇳 हिन्दी", "linux": "हिन्दी (hi)" },
+		{ "code": "zh", "mac": "🇨🇳 中文", "linux": "中文 (zh)" },
+		{ "code": "ja", "mac": "🇯🇵 日本語", "linux": "日本語 (ja)" },
+		{ "code": "ko", "mac": "🇰🇷 한국어", "linux": "한국어 (ko)" }
+	],
+	"callbacks": "same original per-code action; current choice succeeds without settings publication, Linux requests its existing redraw",
+	"parent_disabled": false,
+	"selection": "only the currently active locale is checked, both active and inactive child states preserved"
+}

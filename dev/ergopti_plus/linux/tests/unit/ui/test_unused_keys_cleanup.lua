@@ -465,3 +465,7 @@ helpers.describe("unused keys (linux): tray wiring", function()
 		helpers.assert_eq(captured.collect, Cleanup.collect)
 	end)
 end)
+
+require("test.config_cleanup_roots_contract").register(helpers, {
+	driver = "linux", collect = Cleanup.collect, find = Cleanup.find,
+})

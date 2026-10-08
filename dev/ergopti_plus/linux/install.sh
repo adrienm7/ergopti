@@ -204,11 +204,58 @@ if $SETUP_PERMS_ONLY; then
 	exit 0
 fi
 
+# shellcheck source=install/native_source_build.sh
+source "${SRC_DRIVER}/install/native_source_build.sh"
+
 # ===========================================
 # ===========================================
 # ======= 4/ Dependency Verification =======
 # ===========================================
 # ===========================================
+
+# APT alternatives are selected from actual local metadata in declared order.
+# A failed/malformed observation never grants repair or falls through to an
+# arbitrary package. Installing a provider still requires the native re-probe.
+_available_apt_runtime_package() {
+	local package_name metadata label value rest candidate count
+	for package_name in "$@"; do
+		if ! metadata="$(LC_ALL=C apt-cache policy -- "$package_name")"; then return 1; fi
+		candidate=""
+		count=0
+		while read -r label value rest; do
+			if [ "$label" = "Candidate:" ]; then
+				count=$((count + 1))
+				[ -z "$rest" ] || return 1
+				candidate="$value"
+			fi
+		done <<< "$metadata"
+		if [ "$count" = 0 ] && [ -z "$metadata" ]; then continue; fi
+		[ "$count" = 1 ] || return 1
+		[ "$candidate" = "(none)" ] && continue
+		[[ "$candidate" =~ ^[0-9][A-Za-z0-9.+:~_-]*$ ]] || return 1
+		printf '%s\n' "$package_name"
+		return 0
+	done
+	return 1
+}
+
+_archive_digest_runtime_available() {
+	luajit "${SRC_DRIVER}/platform/network/digest_probe.lua" "$SRC_DRIVER" >/dev/null 2>&1
+}
+
+_ensure_archive_digest_runtime() {
+	if _archive_digest_runtime_available; then return 0; fi
+	[ -n "${ARCHIVE_DIGEST_SONAME:-}" ] || return 1
+	local manager package_name
+	manager="$(_detect_pkg_manager)"
+	# The generated Lua projection supplies this SONAME to the native probe;
+	# package selection remains in the generator's owned repair table.
+	if ! package_name="$(_required_dependency_package "$manager" "$ARCHIVE_DIGEST_SONAME")"; then
+		return 1
+	fi
+	if ! _install_required_package "$manager" "$package_name"; then return 1; fi
+	_archive_digest_runtime_available
+}
 
 _required_dependency_package() {
 	local pkg_mgr="$1"
@@ -239,6 +286,13 @@ _required_dependency_package() {
 		apk:libxkbcommon-x11.so.0) echo "libxkbcommon-x11" ;;
 		apk:libX11.so.6) echo "libx11" ;;
 		apk:libX11-xcb.so.1) echo "libx11" ;;
+		apt:curl) echo "curl" ;;
+		dnf:curl) echo "curl" ;;
+		zypper:curl) echo "curl" ;;
+		pacman:curl) echo "curl" ;;
+		xbps:curl) echo "curl" ;;
+		apk:curl) echo "curl" ;;
+		apt:libcrypto.so.3) _available_apt_runtime_package libssl3t64 libssl3 ;;
 		# END GENERATED LINUX NATIVE PACKAGES
 		apt:luajit) echo "luajit" ;;
 		dnf:luajit) echo "luajit" ;;
@@ -376,6 +430,114 @@ _check_or_install_library() {
 	echo "  ✔  ${soname} — capacité vérifiée"
 }
 
+_native_output_ordinary_directory() {
+	local directory="$1"
+	if [ -L "$directory" ] || { [ -e "$directory" ] && [ ! -d "$directory" ]; }; then
+		echo "Native archive bin parent unavailable" >&2
+		return 1
+	fi
+}
+
+_native_output_bin_parents() {
+	# This namespace belongs to installed source-build output, never an ad hoc
+	# checkout artifact or an unreviewed release input.
+	if [ -e "${SRC_DRIVER}/native_modules" ] || [ -L "${SRC_DRIVER}/native_modules" ]; then
+		echo "Unreviewed source native module directory" >&2
+		return 1
+	fi
+	_native_output_ordinary_directory "${SRC_DRIVER}/bin" \
+		&& _native_output_ordinary_directory "${LIB_DIR}/linux" \
+		&& _native_output_ordinary_directory "${LIB_DIR}/linux/bin" \
+		&& _native_output_ordinary_directory "${SRC_DRIVER}/native_modules" \
+		&& _native_output_ordinary_directory "${LIB_DIR}/linux/native_modules"
+}
+
+# BEGIN GENERATED LINUX ARCHIVE DIGEST
+ARCHIVE_DIGEST_SONAME="libcrypto.so.3"
+# END GENERATED LINUX ARCHIVE DIGEST
+
+# BEGIN GENERATED LINUX NETWORK PROVIDERS
+_network_runtime_packages() {
+	case "$1" in
+		apt) echo "glib-networking gsettings-desktop-schemas lua-luv" ;;
+		dnf) return 1 ;;
+		zypper) echo "glib-networking gsettings-desktop-schemas luajit-luv" ;;
+		pacman) echo "glib-networking gsettings-desktop-schemas lua51-luv" ;;
+		xbps) return 1 ;;
+		apk) echo "glib-networking gsettings-desktop-schemas lua5.1-luv" ;;
+		*) return 1 ;;
+	esac
+}
+# END GENERATED LINUX NETWORK PROVIDERS
+
+# BEGIN GENERATED LINUX SOURCE NETWORK BUILD
+_network_source_build_packages() {
+	case "$1" in
+		apt) return 1 ;;
+		dnf) echo "git gcc glibc-devel make cmake pkgconf-pkg-config luajit-devel glib-networking gsettings-desktop-schemas dconf" ;;
+		zypper) return 1 ;;
+		pacman) return 1 ;;
+		xbps) return 1 ;;
+		apk) return 1 ;;
+		*) return 1 ;;
+	esac
+}
+NATIVE_LUV_SOURCE_URL="https://github.com/luvit/luv.git"
+NATIVE_LUV_SOURCE_REVISION="26e62e49b0230891ece45a78cc1f63c074e60020"
+NATIVE_LUV_CMAKE_OPTIONS=("-DLUA_BUILD_TYPE=System" "-DWITH_LUA_ENGINE=LuaJIT" "-DBUILD_MODULE=ON" "-DBUILD_SHARED_LIBS=OFF" "-DBUILD_STATIC_LIBS=OFF" "-DWITH_SHARED_LIBUV=OFF")
+# END GENERATED LINUX SOURCE NETWORK BUILD
+
+NATIVE_LUV_STAGE=""
+_prepare_source_network_runtime() {
+	local repository manager packages package_name builder
+	repository="$(cd "${SRC_DRIVER}/../../.." && pwd -P)"
+	if [ "$SRC_DRIVER" != "${repository}/static/ergopti_plus/linux" ]; then return 0; fi
+	if _network_runtime_available; then return 0; fi
+	manager="$(_detect_pkg_manager)"
+	# No bootstrap entry means normal package-based repair still owns admission.
+	if ! packages="$(_network_source_build_packages "$manager")"; then return 0; fi
+	_native_output_bin_parents || return 1
+	builder="${SRC_DRIVER}/install/build_native_luv.sh"
+	[ -f "$builder" ] && [ ! -L "$builder" ] || return 1
+	for package_name in $packages; do
+		_install_required_package "$manager" "$package_name" || return 1
+	done
+	NATIVE_LUV_STAGE="$(mktemp -d)"
+	if ! bash "$builder" "$NATIVE_LUV_STAGE" "$NATIVE_LUV_SOURCE_URL" \
+		"$NATIVE_LUV_SOURCE_REVISION" "${NATIVE_LUV_CMAKE_OPTIONS[@]}"; then
+		echo "Source network build refused; stage retained: $NATIVE_LUV_STAGE" >&2
+		return 1
+	fi
+	[ -f "$NATIVE_LUV_STAGE/luv.so" ] && [ ! -L "$NATIVE_LUV_STAGE/luv.so" ] || return 1
+	export LUA_CPATH="$NATIVE_LUV_STAGE/?.so;${LUA_CPATH:-;;}"
+	_network_runtime_available || return 1
+}
+
+# Read-only native admission shares the lookup child's ABI and resolver factory.
+# A loadable GLib alone cannot replace an installed proxy module or LuaJIT luv.
+_network_runtime_available() {
+	luajit "${SRC_DRIVER}/platform/network/runtime_probe.lua" "${SRC_SHARED}" >/dev/null 2>&1
+}
+
+_ensure_network_runtime() {
+	if _network_runtime_available; then return 0; fi
+	local manager
+	local packages
+	manager="$(_detect_pkg_manager)"
+	if ! packages="$(_network_runtime_packages "${manager}")"; then
+		echo "proxy-backend-unavailable: no verified ${manager} runtime provider; install the documented prerequisites." >&2
+		return 1
+	fi
+	local package_name
+	for package_name in ${packages}; do
+		if ! _install_required_package "${manager}" "${package_name}"; then return 1; fi
+	done
+	if ! _network_runtime_available; then
+		echo "proxy-backend-unavailable: installed packages did not provide the required native runtime." >&2
+		return 1
+	fi
+}
+
 if $SKIP_DEPS; then
 	echo ""
 	echo "=== Dépendances ignorées (--no-deps) ==="
@@ -402,6 +564,7 @@ _check_or_install_library libxkbcommon.so.0
 _check_or_install_library libxkbcommon-x11.so.0
 _check_or_install_library libX11.so.6
 _check_or_install_library libX11-xcb.so.1
+_check_or_install curl
 # END GENERATED LINUX NATIVE CAPABILITIES
 
 # The desktop half: the tray icon and the windows it opens. Best effort rather
@@ -489,9 +652,8 @@ _ensure_gnome_tray_host
 _ensure_desktop_backend tray "icône de la barre système (libayatana-appindicator)" \
 	"local ffi=require('ffi'); for _, n in ipairs({'libayatana-appindicator3.so.1','libappindicator3.so.1'}) do if pcall(ffi.load, n) then os.exit(0) end end; os.exit(1)"
 
-# Optional Lua libraries — the daemon degrades gracefully without them,
-# but the full feature set (async event loop, webview rendering, tray SNI,
-# signal handlers) requires these packages.
+# Networking requires LuaJIT luv and a supported GIO proxy resolver. The other
+# Lua modules below remain optional for webviews, filesystem and signal features.
 echo ""
 echo "=== Dépendances Lua optionnelles (event loop, timers, webviews, signaux) ==="
 
@@ -503,7 +665,8 @@ echo "=== Dépendances Lua optionnelles (event loop, timers, webviews, signaux) 
 # aborted the install before a single driver file was copied.
 #
 # So: a list of candidates per manager, the 5.1/LuaJIT build first; each one is
-# tried until luajit can require the module; a missing package is never fatal.
+# tried until luajit can require the optional module; missing optional packages
+# are not fatal. Networking uses the mandatory canonical provider path instead.
 _lua_module_installed() {
 	luajit -e "require('$1')" >/dev/null 2>&1
 }
@@ -564,7 +727,12 @@ _install_lua_module() {
 	echo "  ⚠  ${mod} (${label}) indisponible pour LuaJIT — fonction dégradée." >&2
 }
 
-_install_lua_module luv   "boucle d'évènements, inotify"
+# Networking owns luv as a required native ABI, after any repair attempt.
+_prepare_source_network_runtime
+_ensure_network_runtime
+if ! _ensure_archive_digest_runtime; then
+	echo "archive-digest-unavailable: retained-FD updates require an actual OpenSSL3 runtime; capability remains unavailable." >&2
+fi
 _install_lua_module lfs   "système de fichiers"
 _install_lua_module posix "signaux SIGTERM/SIGHUP"
 _install_lua_module lgi   "fenêtres WebKit, compteur de vitesse"
@@ -596,6 +764,80 @@ echo "=== Installation des fichiers ==="
 source "${SRC_DRIVER}/install/layout_registry.sh"
 SRC_REGISTRY="$(layout_registry_source "${SRC_DRIVER}" "${DRIVERS_ROOT}")"
 
+# Source installations compile before replacing the current installation.
+# Release bundles carry their target-built helper; absent binaries are refused,
+# never rebuilt from an unrelated checkout or borrowed from a system location.
+# Native helper admission never follows a foreign bin directory. The existing
+# selected source/installation namespace remains the ownership premise; these
+# checks do not claim hostile same-UID race isolation or atomic directory leases.
+# Refuse before compiling, migrating configuration, copying files or replacing
+# the existing generated-helper ownership manifest.
+# BEGIN GENERATED LINUX ARCHIVE BUILD PACKAGES
+_native_output_build_packages() {
+	case "$1" in
+		apt) echo "gcc libc6-dev linux-libc-dev" ;;
+		dnf) echo "gcc glibc-devel kernel-headers" ;;
+		zypper) echo "gcc glibc-devel linux-glibc-devel" ;;
+		pacman) echo "gcc glibc linux-api-headers" ;;
+		xbps) return 1 ;;
+		apk) echo "gcc musl-dev linux-headers" ;;
+		*) return 1 ;;
+	esac
+}
+# END GENERATED LINUX ARCHIVE BUILD PACKAGES
+
+# Only checkout installs compile this backend. Binary release recipients do
+# not acquire a compiler, and --no-deps leaves the complete toolchain to its
+# caller. The canonical builder still verifies compilation and publication.
+_ensure_native_output_toolchain() {
+	if $SKIP_DEPS; then return 0; fi
+	local source="${SRC_DRIVER}/native/archive_output"
+	local source_name manager packages package_name
+	for source_name in archive_publication.c archive_publication.h; do
+		[ -f "${source}/${source_name}" ] && [ ! -L "${source}/${source_name}" ] || return 1
+	done
+	if native_source_compile_probe "$source"; then return 0; fi
+	manager="$(_detect_pkg_manager)"
+	if ! packages="$(_native_output_build_packages "$manager")"; then
+		echo "Native archive build prerequisites unavailable; install a C compiler and libc headers, then use --no-deps" >&2
+		return 1
+	fi
+	for package_name in $packages; do
+		_install_required_package "$manager" "$package_name" || return 1
+	done
+	if ! native_source_compile_probe "$source"; then
+		echo "source-build-toolchain-unavailable" >&2
+		return 1
+	fi
+}
+
+_native_output_bin_parents || exit 1
+command -v tar >/dev/null || { echo "Native payload copy requires tar" >&2; exit 1; }
+NATIVE_OUTPUT_STAGE=""
+NATIVE_OUTPUT_SOURCE="${SRC_DRIVER}/bin/libergopti_archive_publication.so"
+NATIVE_OUTPUT_REPO="$(cd "${SRC_DRIVER}/../../.." && pwd -P)"
+if [ "$SRC_DRIVER" = "${NATIVE_OUTPUT_REPO}/static/ergopti_plus/linux" ]; then
+	NATIVE_OUTPUT_BUILD="${NATIVE_OUTPUT_REPO}/tools/build/build-linux-native-output.sh"
+	[ -f "$NATIVE_OUTPUT_BUILD" ] && [ ! -L "$NATIVE_OUTPUT_BUILD" ] || {
+		echo "Canonical native archive build helper unavailable" >&2
+		exit 1
+	}
+	_ensure_native_output_toolchain || exit 1
+	NATIVE_OUTPUT_STAGE="$(mktemp -d)"
+	# A failed/uncertain compiler leaves its private stage for explicit cleanup;
+	# no recursive trap can erase an unobserved compiler descendant's resources.
+	if ! bash "$NATIVE_OUTPUT_BUILD" --source-directory "${SRC_DRIVER}/native/archive_output" \
+		--output-directory "$NATIVE_OUTPUT_STAGE"; then
+		echo "Native archive build refused; stage retained: $NATIVE_OUTPUT_STAGE" >&2
+		exit 1
+	fi
+	NATIVE_OUTPUT_SOURCE="${NATIVE_OUTPUT_STAGE}/libergopti_archive_publication.so"
+fi
+[ -f "$NATIVE_OUTPUT_SOURCE" ] && [ ! -L "$NATIVE_OUTPUT_SOURCE" ] || {
+	echo "Target native archive backend unavailable" >&2
+	exit 1
+}
+
 # Create destination directories.
 install -d "${LIB_DIR}/linux"
 install -d "${DEST_SHARED}"
@@ -616,7 +858,39 @@ migrate_canonical_packs \
 # Copy driver Lua sources. SRC_DRIVER, not SCRIPT_DIR: from the release tarball
 # this script sits BESIDE the driver rather than inside it, so SCRIPT_DIR would
 # nest linux/, _shared/ and bin/ inside LIB_DIR/linux/.
-cp -r "${SRC_DRIVER}/." "${LIB_DIR}/linux/"
+# Exclude the canonical generated backend from the source copy. Checkout-local
+# fixture .so bytes can never be staged even briefly; only the freshly compiled
+# output (or release-bundle artifact) below supplies this exact destination.
+NATIVE_LUV_RETAINED_DIGEST=""
+if [ -z "$NATIVE_LUV_STAGE" ] && [ -f "${LIB_DIR}/.ergopti-owned-files" ] \
+	&& [ ! -L "${LIB_DIR}/.ergopti-owned-files" ] \
+	&& [ -f "${LIB_DIR}/linux/native_modules/luv.so" ] \
+	&& [ ! -L "${LIB_DIR}/linux/native_modules/luv.so" ]; then
+	NATIVE_LUV_EXISTING_DIGEST="$(sha256sum -- "${LIB_DIR}/linux/native_modules/luv.so")"
+	while IFS=$'\t' read -r prior_digest prior_relative; do
+		if [ "$prior_relative" = "linux/native_modules/luv.so" ] \
+			&& [ "$prior_digest" = "${NATIVE_LUV_EXISTING_DIGEST%% *}" ]; then
+			NATIVE_LUV_RETAINED_DIGEST="$prior_digest"
+		fi
+	done < "${LIB_DIR}/.ergopti-owned-files"
+fi
+tar -C "$SRC_DRIVER" --exclude='./bin/libergopti_archive_publication.so' -cf - . \
+	| tar -C "${LIB_DIR}/linux" -xf -
+# Re-read after the payload/native directory operations; a payload bin alias
+# must not become write authority for the target helper.
+_native_output_bin_parents || exit 1
+install -d "${LIB_DIR}/linux/bin"
+_native_output_bin_parents || exit 1
+[ -d "${LIB_DIR}/linux/bin" ] || exit 1
+install -m 755 "$NATIVE_OUTPUT_SOURCE" "${LIB_DIR}/linux/bin/libergopti_archive_publication.so"
+if [ -n "$NATIVE_LUV_STAGE" ]; then
+	_native_output_bin_parents || exit 1
+	install -d "${LIB_DIR}/linux/native_modules"
+	_native_output_bin_parents || exit 1
+	NATIVE_LUV_PUBLICATION="$(mktemp "${LIB_DIR}/linux/native_modules/.luv.XXXXXX")"
+	install -m 755 "$NATIVE_LUV_STAGE/luv.so" "$NATIVE_LUV_PUBLICATION"
+	mv -T -- "$NATIVE_LUV_PUBLICATION" "${LIB_DIR}/linux/native_modules/luv.so"
+fi
 cp -r "${SRC_SHARED}/." "${DEST_SHARED}/"
 install_layout_registry "${SRC_REGISTRY}" "${LIB_DIR}/linux"
 install -d "${LIB_DIR}/bin"
@@ -628,6 +902,35 @@ if [ -n "${SRC_REGISTRY}" ]; then
 		"${SRC_REGISTRY}" "linux/${LAYOUT_REGISTRY_FOLDER}"
 else
 	bash "${SRC_DRIVER}/install/ownership.sh" "${SRC_DRIVER}" "${SRC_SHARED}" "${LIB_DIR}"
+fi
+
+if [ -n "$NATIVE_OUTPUT_STAGE" ] || [ -n "$NATIVE_LUV_RETAINED_DIGEST" ]; then
+	# This generated checkout artifact is outside the input source tree, so its
+	# actual installed bytes need their own canonical ownership entry.
+	NATIVE_OUTPUT_DIGEST="$(sha256sum -- "${LIB_DIR}/linux/bin/libergopti_archive_publication.so")"
+	NATIVE_OUTPUT_MANIFEST="$(mktemp "${LIB_DIR}/.ergopti-owned-native.XXXXXX")"
+	while IFS=$'\t' read -r native_digest native_relative; do
+		[ "$native_relative" = "linux/bin/libergopti_archive_publication.so" ] && continue
+		[ "$native_relative" = "linux/native_modules/luv.so" ] && continue
+		printf '%s\t%s\n' "$native_digest" "$native_relative" >> "$NATIVE_OUTPUT_MANIFEST"
+	done < "${LIB_DIR}/.ergopti-owned-files"
+	printf '%s\tlinux/bin/libergopti_archive_publication.so\n' "${NATIVE_OUTPUT_DIGEST%% *}" \
+		>> "$NATIVE_OUTPUT_MANIFEST"
+	if [ -n "$NATIVE_LUV_STAGE" ] || [ -n "$NATIVE_LUV_RETAINED_DIGEST" ]; then
+		NATIVE_LUV_DIGEST="$(sha256sum -- "${LIB_DIR}/linux/native_modules/luv.so")"
+		printf '%s\tlinux/native_modules/luv.so\n' "${NATIVE_LUV_DIGEST%% *}" >> "$NATIVE_OUTPUT_MANIFEST"
+	fi
+	mv -- "$NATIVE_OUTPUT_MANIFEST" "${LIB_DIR}/.ergopti-owned-files"
+	if [ -n "$NATIVE_OUTPUT_STAGE" ]; then
+		rm -f -- "${NATIVE_OUTPUT_STAGE}/libergopti_archive_publication.so"
+		rmdir -- "$NATIVE_OUTPUT_STAGE"
+	fi
+fi
+
+if [ -n "$NATIVE_LUV_STAGE" ]; then
+	# Keep the authenticated source/build evidence; no recursive cleanup assumes
+	# retirement of compiler descendants solely from the installer's own exit.
+	echo "Source network build evidence retained: $NATIVE_LUV_STAGE"
 fi
 
 # Create the wrapper script in ~/.local/bin/ that points to the installed libs.

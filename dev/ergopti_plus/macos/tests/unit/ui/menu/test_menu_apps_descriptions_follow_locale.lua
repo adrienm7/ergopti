@@ -41,6 +41,14 @@ helpers.describe("menu_apps: descriptions are resolved when the submenu is built
 					application = { infoForBundlePath = function() return {} end },
 					image = { imageFromPath = function() return nil end },
 				})
+				-- Keep this fixture's direct child view, while the parent uses the
+				-- genuinely initialized shared source and completed-tree API.
+				local provider_view = package.loaded["infra.manifest_menu"]
+				package.loaded["infra.manifest_menu"] = nil
+				local binding = require("infra.manifest_menu")
+				package.loaded["infra.manifest_menu"] = provider_view
+				provider_view.get_root = binding.get_root
+				provider_view.group_row = binding.group_row
 				-- load_with_stubs installs its own i18n table and the module keeps that
 				-- reference, so the language switch is made on that very table.
 				package.loaded["infra.i18n"].get = function(key)

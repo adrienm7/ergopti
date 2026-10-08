@@ -40,6 +40,32 @@
 		"native_errno": {
 			"type": "string"
 		},
+		"dotnet_web_status": {
+			"type": "string",
+			"values": [
+				"Success",
+				"NameResolutionFailure",
+				"ConnectFailure",
+				"ReceiveFailure",
+				"SendFailure",
+				"PipelineFailure",
+				"RequestCanceled",
+				"ProtocolError",
+				"ConnectionClosed",
+				"TrustFailure",
+				"SecureChannelFailure",
+				"ServerProtocolViolation",
+				"KeepAliveFailure",
+				"Pending",
+				"Timeout",
+				"ProxyNameResolutionFailure",
+				"UnknownError",
+				"MessageLengthLimitExceeded",
+				"CacheEntryNotFound",
+				"RequestProhibitedByCachePolicy",
+				"RequestProhibitedByProxy"
+			]
+		},
 		"curl_exit": {
 			"type": "integer"
 		},
@@ -304,7 +330,19 @@
 				"failure_provenance": ["verified"],
 				"network_status": ["disconnected"]
 			}
+		},
+		{
+			"id": "verified_proxy_resolution_unavailable",
+			"cause": "proxy",
+			"when": {
+				"stage": ["proxy_resolve"],
+				"failure_provenance": ["verified"],
+				"proxy_resolution_status": ["unavailable"]
+			}
 		}
 	],
-	"default_cause": "unknown"
+	"default_cause": "unknown",
+	"presentation": {
+		"render_ack_timeout_ms": 5000
+	}
 }

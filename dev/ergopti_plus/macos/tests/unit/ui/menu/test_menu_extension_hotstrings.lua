@@ -11,6 +11,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
+local ExtensionTranslator = require("infra.i18n")
 local shipped = require("toml_codec.codec").decode(require("tests.support.source_file").read(
 	helpers.driver_root() .. "../../layouts/registry/ergopti/manifest.toml")).extension
 
@@ -128,5 +129,110 @@ helpers.describe("Hotstrings menu: extension submenus", function()
 		local by_extension, bound = Builder.bound_groups(ctx)
 		helpers.assert_eq(bound, {})
 		helpers.assert_eq(Builder.extension_menus(ctx, { group_counts = {}, ext_details = {} }, by_extension, {}), {})
+	end)
+end)
+
+
+-- Bind the actual native providers to one fresh genuine declaration catalogue.
+local function with_extension_frame(body, paused)
+	local translator = ExtensionTranslator
+	return helpers.with_stub_scope({ "infra.logger", "infra.manifest_menu", "ui.menu.builder",
+		"ui.menu.menu_hotstrings", "ui.menu.hotstring_counter" }, function()
+		helpers.load_with_stubs("infra.logger")
+		package.loaded["infra.i18n"] = translator
+		local renderer = assert(require("menu.renderer").new({ platform = "hs",
+			manifest_path = function() return require("infra.paths").shared("modules/menu/menu_manifest.json") end,
+			json_decode = require("adapters.json_codec").decode, i18n = translator, logger = require("infra.logger"),
+		}))
+		package.loaded["infra.manifest_menu"] = renderer
+		local Hotstrings = require("ui.menu.menu_hotstrings")
+		local Builder = require("ui.menu.builder")
+		local ctx = context({ "magickey", "rolls", "sfbsreduction" }, { ERGOPTI })
+		ctx.paused = paused == true
+		ctx.config, ctx.base_dir = { log_level = 2 }, helpers.driver_root()
+		ctx.state = { keymap = true, hotstrings = {}, sections_order_overrides = {} }
+		ctx.applyTriggerChar = function(text) return text end
+		local sections = {
+			magickey = { { name = "repeat_corrections", count = 14, description = "Repeat corrections" },
+				{ name = "symbols", count = 3, description = "Symbols" } },
+			rolls = { { name = "hc", count = 7, description = "Roll" } },
+			sfbsreduction = { { name = "comma", count = 5, description = "SFB" } },
+		}
+		ctx.keymap = { get_sections = function(name) return sections[name] or {} end,
+			is_group_enabled = function() return true end, is_section_enabled = function() return true end }
+		local actions = setmetatable({}, { __index = function() return function() end end })
+		local label = string.format(translator.get("menu.extensions.hotstrings_of"), "Ergopti+")
+		local function find(rows)
+			for _, row in ipairs(rows or {}) do
+				if type(row.title) == "string" and row.title:sub(1, #label) == label then return row end
+				local found = find(row.menu); if found then return found end
+			end
+		end
+		return body({ root = renderer.get_root(), translator = translator, context = ctx, owner = Hotstrings,
+			build = function() return find(Builder.generate(ctx, { hotstrings = Hotstrings }, actions)) end })
+	end)
+end
+
+helpers.describe("complete installed extension shared frames (macOS)", function()
+	helpers.it("(shared-extension-frame) retains complete checkbox, category and bound-section order", function()
+		with_extension_frame(function(f)
+			local rows = assert(f.build()).menu
+			helpers.assert_eq(#rows, 6)
+			helpers.assert_eq(rows[1].title, f.translator.get("menu.hotstrings.enable_all_sections"))
+			helpers.assert_eq(rows[1].checked, true)
+			helpers.assert_eq(rows[2].title, "-")
+			helpers.assert_eq(rows[3].title, "sfbsreduction (5)")
+			helpers.assert_eq(rows[4].title, "rolls (7)")
+			helpers.assert_eq(rows[5].title, "-")
+			helpers.assert_eq(rows[6].title, "Repeat corrections (14)")
+			helpers.assert_eq(rows[6].checked, true)
+			f.context.paused = true
+			helpers.assert_eq(rows[1].fn(), false, "a retained canonical checkbox refuses the live native pause")
+		end)
+	end)
+	helpers.it("(shared-extension-frame) preserves the paused checkbox's original absent native action", function()
+		with_extension_frame(function(f)
+			local data = assert(f.owner.build_extension_bulk_actions(f.context, { "rolls" }, {}))
+			helpers.assert_eq(#data, 1); helpers.assert_eq(data[1].checked, true)
+			helpers.assert_eq(data[1].disabled, true); helpers.assert_eq(data[1].action, nil)
+		end, true)
+	end)
+	for _, section in ipairs({ "hotstring_extension_bulk_controls", "hotstring_extension_content_frame", "hotstrings_parameter_boundary" }) do
+		helpers.it("(shared-extension-frame) withdraws only the installed extension for missing " .. section, function()
+			with_extension_frame(function(f)
+				local saved = f.root[section]; f.root[section] = nil
+				helpers.assert_eq(f.build(), nil)
+				f.root[section] = saved
+				helpers.assert_type(f.build(), "table")
+			end)
+		end)
+	end
+	helpers.it("(shared-extension-frame) refuses a foreign bound-provider slot and repairs the whole frame", function()
+		with_extension_frame(function(f)
+			local row = f.root.hotstring_extension_content_frame[5]
+			local saved = row.id; row.id = "foreign_extension_bound_rows"
+			helpers.assert_eq(f.build(), nil)
+			row.id = saved
+			helpers.assert_type(f.build(), "table")
+		end)
+	end)
+	helpers.it("(shared-extension-frame) reads the current declared bulk caption in the native extension provider", function()
+		with_extension_frame(function(f)
+			f.root.hotstring_extension_bulk_controls[1].i18n = "button.ok"
+			helpers.assert_eq(assert(f.build()).menu[1].title, f.translator.get("button.ok"))
+		end)
+	end)
+	helpers.it("(shared-extension-frame) restores genuine owners after a raised native-provider scenario", function()
+		local names = { "infra.i18n", "infra.manifest_menu", "infra.paths", "ui.menu.builder",
+			"ui.menu.menu_hotstrings", "ui.menu.hotstring_counter" }
+		local before = {}; for _, name in ipairs(names) do before[name] = package.loaded[name] end
+		local previous_hs = rawget(_G, "hs")
+		local ok, err = pcall(function()
+			with_extension_frame(function(f) assert(f.build()); error("extension frame scenario sentinel", 0) end)
+		end)
+		helpers.assert_eq(ok, false)
+		helpers.assert_true(tostring(err):find("extension frame scenario sentinel", 1, true) ~= nil)
+		for _, name in ipairs(names) do helpers.assert_true(rawequal(package.loaded[name], before[name]), name) end
+		helpers.assert_true(rawequal(rawget(_G, "hs"), previous_hs))
 	end)
 end)

@@ -14,6 +14,7 @@ helpers.describe("configured gesture menu label", function()
 	helpers.it("replaces the marker on the four-finger menu row", function()
 		helpers.with_fresh_modules({ "ui.menu.menu_gestures", "modules.gestures", "ui.menu.menu_utils",
 			"infra.dialog_util", "infra.i18n", "infra.manifest_menu", "ui.action_picker",
+			"menu.renderer",
 			"ui.menu.shortcut_utils", "infra.logger", "infra.deferred_work" }, function()
 			local file = assert(io.open(helpers.shared("data/locales/fr.json"), "rb"))
 			local strings = json.decode(file:read("*a"))
@@ -33,7 +34,14 @@ helpers.describe("configured gesture menu label", function()
 			package.loaded["ui.menu.menu_utils"] = {}
 			package.loaded["infra.dialog_util"] = {}
 			package.loaded["infra.i18n"] = { get = function(key) return strings[key] or key end, section = function(key) return key end }
+			local renderer = assert(require("menu.renderer").new({
+				platform = "hs",
+				manifest_path = function() return helpers.shared("modules/menu/menu_manifest.json") end,
+				json_decode = json.decode,
+				i18n = package.loaded["infra.i18n"], logger = helpers.make_logger_stub(),
+			}))
 			package.loaded["infra.manifest_menu"] = {
+				template_rows = renderer.template_rows,
 				get_root = function() return { gesture_slots = { ["4"] = { "tap_4" } } } end,
 				build = function(_, _, _, _, _, providers) return providers.gesture_slots_4() end,
 			}

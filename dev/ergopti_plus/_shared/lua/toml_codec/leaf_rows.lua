@@ -23,6 +23,8 @@ local M = {}
 local Codec = require("toml_codec.codec")
 local KeyPath = require("toml_codec.key_path")
 local RecordScanner = require("toml_codec.record_scanner")
+local provenance = setmetatable({}, { __mode = "k" })
+local publications = setmetatable({}, { __mode = "k" })
 
 --- Whether a segment can be written as a bare TOML key.
 --- @param segment string
@@ -31,11 +33,87 @@ local function is_bare(segment)
 	return segment:match("^[A-Za-z0-9_%-]+$") ~= nil
 end
 
-local function clone(value)
+local function clone(value, seen)
 	if type(value) ~= "table" then return value end
+	seen = seen or {}
+	if seen[value] then return seen[value] end
 	local copy = {}
-	for key, child in pairs(value) do copy[key] = clone(child) end
+	seen[value] = copy
+	for key, child in pairs(value) do copy[clone(key, seen)] = clone(child, seen) end
+	provenance[copy] = provenance[value]
 	return copy
+end
+
+--- Decodes one exact source, retaining value-kind evidence under this owner.
+--- Ordinary model tables cannot create array receipts by resembling empty arrays.
+function M.decode_source(content)
+	local document, shapes = Codec.decode_with_shapes(content)
+	if not document then return nil, nil end
+	local function retain(value, path)
+		if type(value) ~= "table" then return end
+		provenance[value] = { source = content, path = path, array = shapes.arrays[value] == true,
+			numbers = clone(shapes.numbers[value]), strings = clone(shapes.strings[value]) }
+		for key, child in pairs(value) do
+			local child_path = {}
+			for index, segment in ipairs(path) do child_path[index] = segment end
+			child_path[#child_path + 1] = key
+			retain(child, child_path)
+		end
+	end
+	retain(document, {})
+	return document, shapes
+end
+
+--- Returns detached descriptive provenance; it grants no publication authority.
+function M.source_origin(value)
+	local origin = provenance[value]
+	if not origin then return nil end
+	return { source = origin.source, path = clone(origin.path), array = origin.array }
+end
+
+local function shape_receipt(value)
+	local shapes = { arrays = {}, numbers = {}, strings = {} }
+	local visiting = {}
+	local function retain(node)
+		if type(node) ~= "table" then return end
+		assert(not visiting[node], "TOML source-shape value contains a cycle")
+		visiting[node] = true
+		local origin = provenance[node]
+		if origin then
+			if origin.array then shapes.arrays[node] = true end
+			shapes.numbers[node], shapes.strings[node] = origin.numbers, origin.strings
+		end
+		for _, child in pairs(node) do retain(child) end
+		visiting[node] = nil
+	end
+	retain(value)
+	return shapes
+end
+
+--- Serializes a model using only kind evidence retained from actual decodes.
+function M.value_literal(value)
+	return Codec.encode_value_with_shapes(value, shape_receipt(value))
+end
+
+--- Validates this owner's exact row, source and still-unchanged desired value.
+--- Copying the exposed opaque token never authenticates a replacement row.
+function M.publication_literal(row, content)
+	local publication = publications[row]
+	if not publication and row.source_shape == nil then return nil end
+	assert(publication and row.source_shape == publication.token, "unowned TOML source-shape capability")
+	assert(content == publication.source, "TOML source-shape capability belongs to another source")
+	assert(row.section == publication.section and row.key == publication.key and row.delete == publication.delete
+		and rawequal(row.value, publication.value), "TOML source-shape row ownership changed")
+	local literal = not row.delete and M.value_literal(row.value) or nil
+	assert(literal == publication.literal, "TOML source-shape desired value changed after preparation")
+	return literal
+end
+
+--- Exposes an opaque receipt only for causal ownership controls and forwarding.
+--- A consumer must retain the actual prepared row as well as this token.
+function M.publication_capability(row)
+	local publication = publications[row]
+	return publication and publication.token or nil
 end
 
 --- Detaches supported decoded TOML values, including nested arrays and maps.
@@ -106,7 +184,7 @@ function M.prepare(content, operations)
 	assert(type(operations) == "table", "leaf rows need an operation array")
 	local scanned, detail = RecordScanner.scan_records(content, { quoted_headers = true })
 	assert(scanned, "TOML source cannot be scanned: " .. tostring(detail))
-	local decoded = Codec.decode(content)
+	local decoded = M.decode_source(content)
 	assert(type(decoded) == "table", "TOML source is malformed")
 	local inline = {}
 	for _, record in ipairs(scanned.records) do
@@ -182,6 +260,12 @@ function M.prepare(content, operations)
 		else
 			rows[#rows + 1] = { section = KeyPath.render(parent), key = name, value = candidate.value }
 		end
+	end
+	for _, row in ipairs(rows) do
+		local token = {}
+		row.source_shape = token
+		publications[row] = { token = token, source = content, section = row.section, key = row.key,
+			delete = row.delete, value = row.value, literal = not row.delete and M.value_literal(row.value) or nil }
 	end
 	return rows
 end

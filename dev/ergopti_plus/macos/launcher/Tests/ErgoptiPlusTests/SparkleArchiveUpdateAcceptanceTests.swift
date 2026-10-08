@@ -37,6 +37,206 @@ final class SparkleArchiveUpdateAcceptanceTests: XCTestCase {
 		}
 	}
 
+	private enum ObservedTermination {
+		case unavailable
+		case exit(Int32)
+		case signal(Int32)
+	}
+
+	private enum StartupPhase: String, CaseIterable {
+		case pythonEntry = "python-entry", importsReady = "imports-ready", cliDispatch = "cli-dispatch"
+		case directoryAdmitted = "directory-admitted", nonceAdmitted = "nonce-admitted", socketBound = "socket-bound"
+		case handlersInstalled = "handlers-installed", startPublishing = "start-publishing"
+		case startPublished = "start-published", loopEntered = "loop-entered"
+		case retirementBegin = "retirement-begin", retiredPublished = "retired-published"
+	}
+
+	private enum StartupCaptureCode: String { case unavailable, empty, malformed, observed }
+
+	private struct StartupFacts {
+		let capture: StartupCaptureCode
+		let phase: StartupPhase?
+		let bytes: Int?
+		static let unavailable = StartupFacts(capture: .unavailable, phase: nil, bytes: nil)
+	}
+
+	/// Complete closed frames only; malformed or missing capture is no progress proof.
+	private static func parseStartupFrames(_ bytes: Data) -> StartupFacts {
+		guard bytes.count <= 512 else { return .unavailable }
+		if bytes.isEmpty { return StartupFacts(capture: .empty, phase: nil, bytes: 0) }
+		guard bytes.allSatisfy({ $0 < 128 }), bytes.last == 10,
+			let text = String(data: bytes, encoding: .utf8) else {
+			return StartupFacts(capture: .malformed, phase: nil, bytes: bytes.count)
+		}
+		let lines = String(text.dropLast()).components(separatedBy: "\n")
+		guard lines.count <= StartupPhase.allCases.count else {
+			return StartupFacts(capture: .malformed, phase: nil, bytes: bytes.count)
+		}
+		var last: StartupPhase?
+		var index = -1
+		for line in lines {
+			let prefix = "SPARKLE_STARTUP/1 "
+			guard line.hasPrefix(prefix), let phase = StartupPhase(rawValue: String(line.dropFirst(prefix.count))),
+				let observed = StartupPhase.allCases.firstIndex(of: phase), observed > index,
+				index != -1 || phase == .pythonEntry else {
+				return StartupFacts(capture: .malformed, phase: nil, bytes: bytes.count)
+			}
+			index = observed; last = phase
+		}
+		return StartupFacts(capture: .observed, phase: last, bytes: bytes.count)
+	}
+
+
+	private enum UpdateProgressEvent: String, CaseIterable {
+		case e0 = "started-1", e1 = "started-2", e2 = "updater-start-attempt"
+		case e3 = "updater-started", e4 = "updater-policy-admitted", e5 = "check-requested-1"
+		case e6 = "check-requested-2", e7 = "user-check-1", e8 = "user-check-2"
+		case e9 = "start-refused", e10 = "unexpected-permission-1", e11 = "unexpected-permission-2"
+		case e12 = "offer-refused-1", e13 = "offer-refused-2", e14 = "offered-1"
+		case e15 = "offered-2", e16 = "not-found-1", e17 = "not-found-2"
+		case e18 = "refused-1", e19 = "refused-2", e20 = "routed-1"
+		case e21 = "routed-2", e22 = "download-1", e23 = "download-2"
+		case e24 = "extracting-1", e25 = "extracting-2", e26 = "ready-1"
+		case e27 = "ready-2", e28 = "installing-1", e29 = "installing-2"
+		case e30 = "relaunch-requested-2", e31 = "cycle-refused-1", e32 = "cycle-refused-2"
+		case e33 = "retry-accepted", e34 = "terminated-1", e35 = "terminated-2"
+		case e36 = "transport-refused-1", e37 = "transport-refused-2", e38 = "control-refused-1"
+		case e39 = "control-refused-2", e40 = "deadline-1", e41 = "deadline-2"
+	}
+	private enum UpdateProgressCapture: String { case unavailable, empty, malformed, observed }
+	private struct UpdateProgressFacts {
+		let capture: UpdateProgressCapture
+		let events: [UpdateProgressEvent]
+		static let unavailable = UpdateProgressFacts(capture: .unavailable, events: [])
+	}
+
+	private enum StartupAdmissionRefusalStage: String { case nativeStart = "native-start", policyValidation = "policy-validation" }
+	private enum StartupAdmissionRefusalDomain: String { case sparkle, cocoa, other }
+	private struct StartupAdmissionRefusalIdentity {
+		let stage: StartupAdmissionRefusalStage
+		let domain: StartupAdmissionRefusalDomain
+		let code: Int64
+	}
+
+	/// Canonical signed native code and a fixed label, tied to this exact child.
+	private static func parseStartupAdmissionRefusalFrame(_ line: String, expectedPID: Int32) -> StartupAdmissionRefusalIdentity? {
+		guard expectedPID > 0 else { return nil }
+		let prefix = "SPARKLE_STARTUP_ADMISSION_REFUSAL/1 pid=" + String(expectedPID) + " stage="
+		guard line.hasPrefix(prefix) else { return nil }
+		let fields = String(line.dropFirst(prefix.count)).components(separatedBy: " domain=")
+		guard fields.count == 2, let stage = StartupAdmissionRefusalStage(rawValue: fields[0]) else { return nil }
+		let codeFields = fields[1].components(separatedBy: " code=")
+		guard codeFields.count == 2, let domain = StartupAdmissionRefusalDomain(rawValue: codeFields[0]),
+			let code = Int64(codeFields[1]), String(code) == codeFields[1] else { return nil }
+		return StartupAdmissionRefusalIdentity(stage: stage, domain: domain, code: code)
+	}
+
+	/// Reuse the complete progress capture. The actual start or immediate policy refusal, noisy frame,
+	/// duplicate identity or foreign PID never substitutes the original catch.
+	private static func parseStartupAdmissionRefusalIdentity(_ text: String, expectedPID: Int32) -> StartupAdmissionRefusalIdentity? {
+		let progress = parseUpdateProgress(text, expectedPID: expectedPID)
+		guard progress.capture == .observed, progress.events.contains(.e9) else { return nil }
+		let frames = text.components(separatedBy: "\n").filter { $0.hasPrefix("SPARKLE_STARTUP_ADMISSION_REFUSAL/1 ") }
+		guard frames.count == 1 else { return nil }
+		return parseStartupAdmissionRefusalFrame(frames[0], expectedPID: expectedPID)
+	}
+
+	/// Project only the original refused-1 callback's bound, typed error identities.
+	private static func refusalErrorChainMessage(_ errors: [[String: Any]], receipt: [String: Any],
+		expectedPID: Int32, nonce: String) -> String {
+		let unavailable = "Native Sparkle wrong-key refusal: capture=unavailable depth=unavailable chain=unavailable"
+		guard expectedPID > 0, receipt["nonce"] as? String == nonce,
+			receipt["event"] as? String == "refused-1", receipt["version"] as? String == "1",
+			let pid = receipt["pid"] as? NSNumber, CFGetTypeID(pid) != CFBooleanGetTypeID(),
+			pid.stringValue == String(expectedPID), !errors.isEmpty, errors.count <= 8 else { return unavailable }
+		var chain: [String] = []
+		for identity in errors {
+			guard Set(identity.keys) == Set(["domain", "code"]),
+				let nativeDomain = identity["domain"] as? String,
+				let value = identity["code"] as? NSNumber, CFGetTypeID(value) != CFBooleanGetTypeID(),
+				String(value.int64Value) == value.stringValue else { return unavailable }
+			let domain: String
+			switch nativeDomain {
+			case SUSparkleErrorDomain: domain = "sparkle"
+			case NSCocoaErrorDomain: domain = "cocoa"
+			default: domain = "other"
+			}
+			chain.append(domain + ":" + String(value.int64Value))
+		}
+		return "Native Sparkle wrong-key refusal: capture=observed depth=" + String(chain.count)
+			+ " chain=" + chain.joined(separator: ",")
+	}
+
+	private func startupAdmissionRefusalMessage(_ identity: StartupAdmissionRefusalIdentity?) -> String {
+		guard let identity else { return "Native Sparkle startup admission refusal: stage=unavailable domain=unavailable code=unavailable" }
+		return "Native Sparkle startup admission refusal: stage=" + identity.stage.rawValue
+			+ " domain=" + identity.domain.rawValue + " code=" + String(identity.code)
+	}
+
+	/// Parse only complete fixed frames from the existing physically retired
+	/// direct child's cached receipt. An inherited/relaunched PID is not borrowed.
+	private static func parseUpdateProgress(_ text: String, expectedPID: Int32) -> UpdateProgressFacts {
+		guard expectedPID > 0, text.utf8.count <= 4096 else { return .unavailable }
+		if text.isEmpty { return UpdateProgressFacts(capture: .empty, events: []) }
+		guard text.utf8.allSatisfy({ $0 < 128 }), text.hasSuffix("\n") else {
+			return UpdateProgressFacts(capture: .malformed, events: [])
+		}
+		let lines = String(text.dropLast()).components(separatedBy: "\n")
+		guard lines.count <= UpdateProgressEvent.allCases.count + 1 else { return .unavailable }
+		let prefix = "SPARKLE_PROGRESS/1 pid=" + String(expectedPID) + " event="
+		var events: [UpdateProgressEvent] = []
+		var startupIdentitySeen = false
+		for line in lines {
+			if line.hasPrefix("SPARKLE_STARTUP_ADMISSION_REFUSAL/1 ") {
+				guard !startupIdentitySeen, events.last == .e9,
+					parseStartupAdmissionRefusalFrame(line, expectedPID: expectedPID) != nil else {
+					return UpdateProgressFacts(capture: .malformed, events: [])
+				}
+				startupIdentitySeen = true
+				continue
+			}
+			guard line.hasPrefix(prefix), let event = UpdateProgressEvent(rawValue: String(line.dropFirst(prefix.count))),
+				!events.contains(event) else {
+				return UpdateProgressFacts(capture: .malformed, events: [])
+			}
+			events.append(event)
+		}
+		guard events.first == .e0 else { return UpdateProgressFacts(capture: .malformed, events: []) }
+		return UpdateProgressFacts(capture: .observed, events: events)
+	}
+
+	private func updateProgressMessage(_ facts: UpdateProgressFacts) -> String {
+		let events = facts.capture == .observed ? facts.events.map { $0.rawValue }.joined(separator: ",") : "unavailable"
+		return "Native Sparkle update progress: capture=" + facts.capture.rawValue + " events=" + events
+	}
+
+	/// This existing counter is incremented after real resource read+close,
+	/// before response writing. It does not acknowledge network delivery.
+	private func resourceReadsMessage(_ value: Any?) -> String {
+		guard let number = value as? NSNumber, CFGetTypeID(number) != CFBooleanGetTypeID(),
+			number.doubleValue.isFinite, (0...64).contains(number.intValue),
+			number.doubleValue == Double(number.intValue) else {
+			return "Native Sparkle network progress: admitted_resource_reads=unavailable"
+		}
+		return "Native Sparkle network progress: admitted_resource_reads=" + String(number.intValue)
+	}
+
+	private enum ChildRefusalCode: String, CaseIterable {
+		case configuration, targetRoot = "target-root", targetBundle = "target-bundle"
+		case receiptPublication = "receipt-publication", control, transport
+	}
+
+	/// Interpret only a single complete fixed frame from the existing private capture.
+	/// Arbitrary native log lines, error descriptions and paths never become facts.
+	private static func parseChildRefusalCode(_ text: String) -> String {
+		guard !text.isEmpty, text.utf8.count <= 16_384, text.hasSuffix("\n") else { return "unavailable" }
+		let prefix = "SPARKLE_CHILD_REFUSAL/1 "
+		let frames = text.components(separatedBy: "\n").filter { $0.hasPrefix(prefix) }
+		guard frames.count == 1, let frame = frames.first,
+			let code = ChildRefusalCode(rawValue: String(frame.dropFirst(prefix.count))) else { return "unavailable" }
+		return code.rawValue
+	}
+
 	private struct Receipt {
 		let status: Int32
 		let stdout: String
@@ -56,20 +256,27 @@ final class SparkleArchiveUpdateAcceptanceTests: XCTestCase {
 		private var observedExit = false
 		private var closedStreams: Set<Int> = []
 		private var cachedReceipt: Receipt?
+		private let startupDiagnostics: Bool
+		private var startupObserved = false
+		private var startupNoticeEmitted = false
+		private var startupFacts = StartupFacts.unavailable
 
 		init(_ executable: String, _ arguments: [String], root: URL,
-			guarded: Bool = false, workerTimeout: Double = 60) throws {
+			guarded: Bool = false, workerTimeout: Double = 60, startupDiagnostics: Bool = false) throws {
+			self.startupDiagnostics = startupDiagnostics
 			let identity = UUID().uuidString
 			originalExecutable = executable
 			stdout = root.appendingPathComponent(identity + ".stdout")
 			stderr = root.appendingPathComponent(identity + ".stderr")
 			guardianReceipt = guarded ? root.appendingPathComponent(identity + ".group.json") : nil
-			func capture(_ url: URL) throws -> FileHandle {
-				let descriptor = open(url.path, O_WRONLY | O_CREAT | O_EXCL | O_NOFOLLOW, 0o600)
+			func capture(_ url: URL, readable: Bool = false) throws -> FileHandle {
+				let descriptor: Int32
+				if readable { descriptor = open(url.path, O_RDWR | O_CREAT | O_EXCL | O_NOFOLLOW, 0o600) }
+				else { descriptor = open(url.path, O_WRONLY | O_CREAT | O_EXCL | O_NOFOLLOW, 0o600) }
 				guard descriptor >= 0 else { throw Failure.evidence("child-capture") }
 				return FileHandle(fileDescriptor: descriptor, closeOnDealloc: true)
 			}
-			let output = try capture(stdout)
+			let output = try capture(stdout, readable: startupDiagnostics)
 			do { streams = [output, try capture(stderr)] }
 			catch { try? output.close(); throw error }
 			if let guardianReceipt {
@@ -84,6 +291,7 @@ final class SparkleArchiveUpdateAcceptanceTests: XCTestCase {
 				process.arguments = arguments
 			}
 			process.environment = NativeFixtureChildEnvironment.make()
+			if startupDiagnostics { process.environment?["ERGOPTI_SPARKLE_STARTUP_DIAGNOSTICS"] = "1" }
 			process.standardOutput = streams[0]
 			process.standardError = streams[1]
 			process.terminationHandler = { [completed] _ in completed.signal() }
@@ -110,7 +318,9 @@ final class SparkleArchiveUpdateAcceptanceTests: XCTestCase {
 			if observedExit { return !process.isRunning }
 			guard completed.wait(timeout: .now() + seconds) == .success else { return false }
 			observedExit = true
-			return !process.isRunning
+			let ended = !process.isRunning
+			if ended { observeStartupCapture() }
+			return ended
 		}
 
 		private func closeCaptures() throws {
@@ -177,6 +387,47 @@ final class SparkleArchiveUpdateAcceptanceTests: XCTestCase {
 			try admitGuardRetirement()
 		}
 
+		/// Reuse the still-owned output descriptor after the existing native exit ACK.
+		/// No path reopen, new FD, wait, signal or closure owner is introduced.
+		private func observeStartupCapture() {
+			guard startupDiagnostics, launched, observedExit, !startupObserved, !closedStreams.contains(0) else { return }
+			startupObserved = true // A refused capture never borrows a later descriptor.
+			var metadata = stat()
+			guard fstat(streams[0].fileDescriptor, &metadata) == 0,
+				metadata.st_mode & mode_t(S_IFMT) == mode_t(S_IFREG), metadata.st_uid == getuid(),
+				metadata.st_mode & 0o777 == 0o600, metadata.st_nlink == 1,
+				metadata.st_size >= 0, metadata.st_size <= 512 else { return }
+			if metadata.st_size == 0 {
+				startupFacts = StartupFacts(capture: .empty, phase: nil, bytes: 0); return
+			}
+			do {
+				try streams[0].seek(toOffset: 0)
+				guard let bytes = try streams[0].read(upToCount: 513), bytes.count == Int(metadata.st_size) else { return }
+				startupFacts = SparkleArchiveUpdateAcceptanceTests.parseStartupFrames(bytes)
+			} catch { startupFacts = .unavailable }
+		}
+
+		private func emitStartupNoticeOnce() {
+			guard startupDiagnostics, !startupNoticeEmitted else { return }
+			startupNoticeEmitted = true
+			let phase = startupFacts.phase?.rawValue ?? "unavailable"
+			let bytes = startupFacts.bytes.map { String($0) } ?? "unavailable"
+			print("::notice title=Native Sparkle startup::phase=" + phase + " capture=" + startupFacts.capture.rawValue + " bytes=" + bytes)
+		}
+
+		/// Report only a native exit already acknowledged by this owner.
+		/// Diagnostics never acquire another wait or alter child retirement.
+		func observedTerminationFacts() -> ObservedTermination {
+			guard launched, observedExit, !process.isRunning else { return .unavailable }
+			emitStartupNoticeOnce()
+			let status = process.terminationStatus
+			switch process.terminationReason {
+			case .exit where (0...255).contains(status): return .exit(status)
+			case .uncaughtSignal where (1...64).contains(status): return .signal(status)
+			default: return .unavailable
+			}
+		}
+
 		/// Repeated observations reuse the physical exit ACK and immutable receipt;
 		/// consuming the semaphore once can never turn an exited child into a timeout.
 		func finish(_ seconds: Double) throws -> Receipt {
@@ -201,11 +452,92 @@ final class SparkleArchiveUpdateAcceptanceTests: XCTestCase {
 			cachedReceipt = receipt
 			return receipt
 		}
+
+		/// The original finish() has already joined exit and closed both captures.
+		/// No path reopen, descriptor, wait, signal or retirement attempt is added.
+
+		/// finish() already acquired the actual exit ACK, closed captures and
+		/// populated this immutable receipt. No new FD/wait/poll/signal is used.
+		func observedUpdateProgress() -> UpdateProgressFacts {
+			guard launched, observedExit, let cachedReceipt else { return .unavailable }
+			return SparkleArchiveUpdateAcceptanceTests.parseUpdateProgress(cachedReceipt.stdout,
+				expectedPID: process.processIdentifier)
+		}
+
+		/// Only the original finish() cached receipt: no path/read/wait or signal.
+		func observedStartupAdmissionRefusalIdentity() -> StartupAdmissionRefusalIdentity? {
+			guard launched, observedExit, let cachedReceipt else { return nil }
+			return SparkleArchiveUpdateAcceptanceTests.parseStartupAdmissionRefusalIdentity(cachedReceipt.stdout,
+				expectedPID: process.processIdentifier)
+		}
+
+		func observedChildRefusalCode() -> String? {
+			guard launched, observedExit, !process.isRunning, let cachedReceipt,
+				cachedReceipt.status == 78 else { return nil }
+			return SparkleArchiveUpdateAcceptanceTests.parseChildRefusalCode(cachedReceipt.stderr)
+		}
+	}
+
+	private enum SignatureProbe: String { case installedKey = "installed-key", foreignKey = "foreign-key" }
+
+	/// Closed cryptographic observations contain no signature, seed or archive bytes.
+	private func signatureProbeMessage(_ probe: SignatureProbe, signature64: Bool, independentValid: Bool,
+		installedValid: Bool, payloadEqual: Bool?, signatureEqual: Bool?) -> String {
+		func fact(_ value: Bool?) -> String { value.map { $0 ? "true" : "false" } ?? "unavailable" }
+		return "Native Sparkle signature facts: probe=" + probe.rawValue
+			+ " signature64=" + fact(signature64) + " independent_valid=" + fact(independentValid)
+			+ " installed_valid=" + fact(installedValid) + " payload_equal=" + fact(payloadEqual)
+			+ " signature_equal=" + fact(signatureEqual)
+	}
+
+	/// Reuse the already bounded exit formatter; application status uses its own fixed label.
+	private func applicationExitRefusalMessage(_ error: Error, termination: ObservedTermination) -> String {
+		let projected: Error
+		if case Failure.evidence(let fact) = error, fact == "application-retirement" {
+			projected = Failure.evidence("server-retirement")
+		} else { projected = error }
+		return serverExitRefusalMessage(projected, termination: termination)
+			.replacingOccurrences(of: "Native Sparkle server retirement refusal:",
+				with: "Native Sparkle application retirement refusal:")
 	}
 
 	private let manager = FileManager.default
 	private var commands: [OwnedProcess] = []
 	private var retirementDebt = false
+
+	/// Only fixed failure classes and bounded already-observed facts cross XCTest.
+	private func serverExitRefusalMessage(_ error: Error, termination: ObservedTermination) -> String {
+		let code: String
+		switch error {
+		case Failure.deadline: code = "deadline"
+		case Failure.evidence(let fact):
+			switch fact {
+			case "server-retirement": code = "exit-status"
+			case "native-child-signal": code = "native-signal"
+			case "native-capture-retirement": code = "capture-retirement"
+			case "native-child-capture": code = "capture-admission"
+			case "unlaunched-native-child": code = "unlaunched"
+			default: code = "unavailable"
+			}
+		default: code = "unavailable"
+		}
+		let reason: String
+		let status: String
+		switch termination {
+		case .exit(let value) where (0...255).contains(value): reason = "exit"; status = String(value)
+		case .signal(let value) where (1...64).contains(value): reason = "signal"; status = String(value)
+		default: reason = "unavailable"; status = "unavailable"
+		}
+		return "Native Sparkle server retirement refusal: code=" + code + " native_reason=" + reason + " native_status=" + status
+	}
+
+	private struct OwnedCensusDirectory {
+		let originalSpelling: String
+		let physicalSpelling: String
+		let device: dev_t
+		let inode: ino_t
+	}
+	private var censusDirectories: [String: OwnedCensusDirectory] = [:]
 
 	private var repository: URL {
 		var result = URL(fileURLWithPath: #filePath)
@@ -230,29 +562,49 @@ final class SparkleArchiveUpdateAcceptanceTests: XCTestCase {
 				XCTFail("Private Sparkle child compilation refused: "
 					+ String(reflecting: String((receipt.stdout + receipt.stderr).prefix(6000))))
 			}
-			if phase == .nativeProcessCensus { annotateCensusRefusal(receipt.stdout) }
+			if phase == .nativeProcessCensus, !annotateCensusRefusal(receipt.stdout) {
+				XCTFail("Native Sparkle census refusal: code=diagnostic-unavailable")
+			}
 			throw Failure.command(phase, receipt.status)
 		}
 		return receipt
 	}
 
 	/// Admit only fixed native facts, never arbitrary child diagnostics or paths.
-	private func annotateCensusRefusal(_ stdout: String) {
+	private func annotateCensusRefusal(_ stdout: String) -> Bool {
 		guard stdout.utf8.count <= 512,
-			let packet = try? JSONSerialization.jsonObject(with: Data(stdout.utf8)) as? [String: Any],
-			packet["code"] as? String == "path-unavailable" else { return }
+			let packet = try? JSONSerialization.jsonObject(with: Data(stdout.utf8)) as? [String: Any] else { return false }
 		func integer(_ key: String, maximum: Int64) -> Int64? {
 			guard let value = packet[key] as? NSNumber, CFGetTypeID(value) != CFBooleanGetTypeID(),
 				value.doubleValue >= 0, value.doubleValue <= Double(maximum),
 				value.doubleValue == Double(value.int64Value) else { return nil }
 			return value.int64Value
 		}
+		if packet["code"] as? String == "directory-refused" {
+			let reasons: Set<String> = ["metadata", "missing", "not-absolute", "not-directory", "mode", "owner", "canonical"]
+			guard integer("schema", maximum: 4) == 4,
+				Set(packet.keys) == Set(["schema", "code", "helper_pid", "reason"]),
+				let helperPID = integer("helper_pid", maximum: Int64(Int32.max)), helperPID > 0,
+				let reason = packet["reason"] as? String, reasons.contains(reason) else { return false }
+			XCTFail("Native Sparkle census refusal: code=directory-refused helper_pid=\(helperPID) reason=\(reason)")
+			return true
+		}
+		if packet["code"] as? String == "stage-refused" {
+			let stages: Set<String> = ["private-root", "library", "inventory", "unexpected"]
+			guard integer("schema", maximum: 3) == 3,
+				Set(packet.keys) == Set(["schema", "code", "helper_pid", "stage"]),
+				let helperPID = integer("helper_pid", maximum: Int64(Int32.max)), helperPID > 0,
+				let stage = packet["stage"] as? String, stages.contains(stage) else { return false }
+			XCTFail("Native Sparkle census refusal: code=stage-refused helper_pid=\(helperPID) stage=\(stage)")
+			return true
+		}
+		guard packet["code"] as? String == "path-unavailable" else { return false }
 		guard let schema = integer("schema", maximum: 2), schema == 1 || schema == 2,
 			let helperPID = integer("helper_pid", maximum: Int64(Int32.max)), helperPID > 0,
-			let pathErrno = integer("path_errno", maximum: 4095) else { return }
+			let pathErrno = integer("path_errno", maximum: 4095) else { return false }
 		var summary = "Native Sparkle census refusal: code=path-unavailable helper_pid=\(helperPID) path_errno=\(pathErrno)"
 		if schema == 1 {
-			guard Set(packet.keys) == Set(["schema", "code", "helper_pid", "path_errno"]) else { return }
+			guard Set(packet.keys) == Set(["schema", "code", "helper_pid", "path_errno"]) else { return false }
 		} else {
 			let states: Set<String> = ["creating", "runnable", "sleeping", "stopped", "zombie",
 				"unavailable", "identity-refused", "state-refused", "abi-refused", "diagnostic-refused"]
@@ -260,21 +612,58 @@ final class SparkleArchiveUpdateAcceptanceTests: XCTestCase {
 				"bsd_bytes", "bsd_errno", "bsd_state"]),
 				let bytes = integer("bsd_bytes", maximum: 4095),
 				let nativeErrno = integer("bsd_errno", maximum: 4095),
-				let state = packet["bsd_state"] as? String, states.contains(state) else { return }
+				let state = packet["bsd_state"] as? String, states.contains(state) else { return false }
 			if ["creating", "runnable", "sleeping", "stopped", "zombie"].contains(state) {
-				guard bytes == 136, nativeErrno == 0 else { return }
+				guard bytes == 136, nativeErrno == 0 else { return false }
 			}
 			summary += " bsd_bytes=\(bytes) bsd_errno=\(nativeErrno) bsd_state=\(state)"
 		}
 		// These are snapshot facts, never an ownership-closure ACK or PID skip.
 		// XCTest evidence must carry them even when raw CI logs are unavailable.
 		XCTFail(summary)
+		return true
 	}
 
 	private func privateDirectory(_ url: URL) throws {
 		guard !manager.fileExists(atPath: url.path) else { throw Failure.prerequisite("private-directory-already-exists") }
+		let spelling = url.path
+		guard censusDirectories[spelling] == nil else { throw Failure.evidence("owned-census-directory-already-acquired") }
 		try manager.createDirectory(at: url, withIntermediateDirectories: false,
 			attributes: [.posixPermissions: 0o700])
+		var original = stat()
+		guard Darwin.lstat(spelling, &original) == 0, original.st_mode & mode_t(S_IFMT) == mode_t(S_IFDIR),
+			let resolved = Darwin.realpath(spelling, nil) else { throw Failure.evidence("owned-census-directory-acquisition") }
+		defer { free(resolved) }
+		// Foundation can return an alias spelling after resolving a file URL.
+		// Keep POSIX bytes as a String, never normalize them through URL.path.
+		let physical = String(cString: resolved)
+		var target = stat()
+		guard Darwin.lstat(physical, &target) == 0, target.st_mode & mode_t(S_IFMT) == mode_t(S_IFDIR),
+			target.st_dev == original.st_dev, target.st_ino == original.st_ino else {
+			throw Failure.evidence("owned-census-directory-acquisition")
+		}
+		censusDirectories[spelling] = OwnedCensusDirectory(originalSpelling: spelling, physicalSpelling: physical,
+			device: original.st_dev, inode: original.st_ino)
+	}
+
+	/// Preserve the acquired directory; a later lookup never adopts a replacement.
+	private func ownedCensusPath(_ url: URL) throws -> String {
+		guard let owned = censusDirectories[url.path] else { throw Failure.evidence("owned-census-directory-unacquired") }
+		for spelling in [owned.originalSpelling, owned.physicalSpelling] {
+			var metadata = stat()
+			guard Darwin.lstat(spelling, &metadata) == 0, metadata.st_mode & mode_t(S_IFMT) == mode_t(S_IFDIR),
+				metadata.st_dev == owned.device, metadata.st_ino == owned.inode else {
+				throw Failure.evidence("owned-census-directory-identity")
+			}
+		}
+		guard let resolved = Darwin.realpath(owned.physicalSpelling, nil) else {
+			throw Failure.evidence("owned-census-directory-canonical")
+		}
+		defer { free(resolved) }
+		guard String(cString: resolved) == owned.physicalSpelling else {
+			throw Failure.evidence("owned-census-directory-canonical")
+		}
+		return owned.physicalSpelling
 	}
 
 	private func waitFor(_ name: String, root: URL, seconds: Double = 45) throws -> [String: Any] {
@@ -392,12 +781,12 @@ final class SparkleArchiveUpdateAcceptanceTests: XCTestCase {
 			"CFBundleName": "ErgoptiPlus", "CFBundleExecutable": "PrivateSparkleChild",
 			"CFBundlePackageType": "APPL", "CFBundleVersion": version,
 			"CFBundleShortVersionString": version + ".0",
-			"FixtureRoot": root.path, "FixtureNonce": nonce,
+			"FixtureRoot": try ownedCensusPath(root), "FixtureNonce": nonce,
 			"FixtureGitHubOwner": identity.owner, "FixtureGitHubRepo": identity.name,
 			"FixtureArchiveOrigin": identity.archiveOrigin,
 			"FixtureArchiveTransport": "http://localhost:" + String(port) + "/archive.tar.xz",
 			"SUFeedURL": "http://localhost:" + String(port) + "/feed.xml",
-			"SUEdPublicKey": publicKey, "SUVerifyUpdateBeforeExtraction": true,
+			"SUPublicEDKey": publicKey, "SUVerifyUpdateBeforeExtraction": true,
 			"SUEnableAutomaticChecks": false, "SUAutomaticallyUpdate": false,
 			"SUAllowsAutomaticUpdates": false, "SUEnableDownloaderService": false,
 			"SUEnableInstallerLauncherService": false,
@@ -494,7 +883,8 @@ final class SparkleArchiveUpdateAcceptanceTests: XCTestCase {
 
 	private func census(_ roots: [URL], root: URL) throws -> [[String: Any]] {
 		let helper = repository.appendingPathComponent("tools/diagnostics/macos_sparkle_archive_fixture.py")
-		let response = try run("/usr/bin/env", ["python3", helper.path, "census"] + roots.map(\.path), root: root, phase: .nativeProcessCensus)
+		let paths = try roots.map { try ownedCensusPath($0) }
+		let response = try run("/usr/bin/env", ["python3", helper.path, "census"] + paths, root: root, phase: .nativeProcessCensus)
 		guard let records = try JSONSerialization.jsonObject(with: Data(response.stdout.utf8)) as? [[String: Any]] else {
 			throw Failure.evidence("native-process-census")
 		}
@@ -521,6 +911,163 @@ final class SparkleArchiveUpdateAcceptanceTests: XCTestCase {
 			}
 		} else if !(receipt.stdout + receipt.stderr).contains("Could not find service") {
 			throw Failure.evidence("installer-job-observation")
+		}
+	}
+
+	func testChildRefusalCaptureProjectsOnlyOneCompleteClosedCategory() {
+		for code in ["configuration", "target-root", "target-bundle", "receipt-publication", "control", "transport"] {
+			XCTAssertEqual(Self.parseChildRefusalCode("Private arbitrary log must stay private\nSPARKLE_CHILD_REFUSAL/1 " + code + "\n"), code)
+		}
+		XCTAssertEqual(Self.parseChildRefusalCode(""), "unavailable")
+		XCTAssertEqual(Self.parseChildRefusalCode("SPARKLE_CHILD_REFUSAL/1 /private/never-exported\n"), "unavailable")
+		XCTAssertEqual(Self.parseChildRefusalCode("SPARKLE_CHILD_REFUSAL/1 configuration"), "unavailable")
+		XCTAssertEqual(Self.parseChildRefusalCode("SPARKLE_CHILD_REFUSAL/1 control\nSPARKLE_CHILD_REFUSAL/1 control\n"), "unavailable")
+		XCTAssertEqual(Self.parseChildRefusalCode("SPARKLE_CHILD_REFUSAL/1 control\nSPARKLE_CHILD_REFUSAL/1 receipt-publication\n"), "unavailable")
+		XCTAssertEqual(Self.parseChildRefusalCode(String(repeating: "x", count: 16_384) + "\n"), "unavailable")
+		XCTAssertEqual(Self.parseChildRefusalCode("SPARKLE_CHILD_REFUSAL/1 transport secret\n"), "unavailable")
+		XCTAssertEqual(Self.parseChildRefusalCode("raw SPARKLE_CHILD_REFUSAL/1 target-root\n"), "unavailable")
+		XCTAssertEqual(Self.parseChildRefusalCode("Private Sparkle child target refused.\n"), "unavailable")
+	}
+
+	func testSignatureAndApplicationFactsContainOnlyClosedObservations() {
+		XCTAssertEqual(signatureProbeMessage(.installedKey, signature64: true, independentValid: true,
+			installedValid: true, payloadEqual: nil, signatureEqual: nil),
+			"Native Sparkle signature facts: probe=installed-key signature64=true independent_valid=true installed_valid=true payload_equal=unavailable signature_equal=unavailable")
+		XCTAssertEqual(signatureProbeMessage(.foreignKey, signature64: true, independentValid: true,
+			installedValid: false, payloadEqual: true, signatureEqual: false),
+			"Native Sparkle signature facts: probe=foreign-key signature64=true independent_valid=true installed_valid=false payload_equal=true signature_equal=false")
+		XCTAssertEqual(applicationExitRefusalMessage(Failure.evidence("application-retirement"), termination: .exit(78)),
+			"Native Sparkle application retirement refusal: code=exit-status native_reason=exit native_status=78")
+		XCTAssertEqual(applicationExitRefusalMessage(Failure.deadline("private-never-exported"), termination: .signal(15)),
+			"Native Sparkle application retirement refusal: code=deadline native_reason=signal native_status=15")
+		XCTAssertEqual(applicationExitRefusalMessage(Failure.evidence("private-never-exported"), termination: .exit(256)),
+			"Native Sparkle application retirement refusal: code=unavailable native_reason=unavailable native_status=unavailable")
+	}
+
+
+	func testUpdateProgressRequiresCompleteClosedFramesAndTheActualChildPID() {
+		let text = "SPARKLE_PROGRESS/1 pid=321 event=started-1\nSPARKLE_PROGRESS/1 pid=321 event=check-requested-1\nSPARKLE_PROGRESS/1 pid=321 event=not-found-1\n"
+		let facts = Self.parseUpdateProgress(text, expectedPID: 321)
+		XCTAssertEqual(facts.capture, .observed)
+		XCTAssertEqual(updateProgressMessage(facts), "Native Sparkle update progress: capture=observed events=started-1,check-requested-1,not-found-1")
+		XCTAssertEqual(Self.parseUpdateProgress("", expectedPID: 321).capture, .empty)
+		for invalid in [text.replacingOccurrences(of: "pid=321", with: "pid=322"),
+			text.replacingOccurrences(of: "pid=321", with: "pid=0321"), String(text.dropLast()),
+			text + "SPARKLE_PROGRESS/1 pid=321 event=not-found-1\n", text + "foreign private text\n",
+			text.replacingOccurrences(of: "not-found-1", with: "invented"),
+			text.replacingOccurrences(of: "not-found-1", with: "not-found-1\0"),
+			"SPARKLE_PROGRESS/1 pid=321 event=check-requested-1\n"] {
+			let rejected = Self.parseUpdateProgress(invalid, expectedPID: 321)
+			XCTAssertNotEqual(rejected.capture, .observed)
+			XCTAssertTrue(rejected.events.isEmpty)
+			XCTAssertFalse(updateProgressMessage(rejected).contains("foreign private text"))
+		}
+		XCTAssertEqual(Self.parseUpdateProgress(String(repeating: "x", count: 4097), expectedPID: 321).capture, .unavailable)
+		XCTAssertEqual(Self.parseUpdateProgress(text, expectedPID: 0).capture, .unavailable)
+	}
+
+	func testStartupAdmissionRefusalIdentityRequiresExactRetiredProgressAndFixedTypedFields() {
+		let before = "SPARKLE_PROGRESS/1 pid=321 event=started-1\nSPARKLE_PROGRESS/1 pid=321 event=updater-start-attempt\nSPARKLE_PROGRESS/1 pid=321 event=start-refused\n"
+		let frame = "SPARKLE_STARTUP_ADMISSION_REFUSAL/1 pid=321 stage=native-start domain=sparkle code=5\n"
+		let after = "SPARKLE_PROGRESS/1 pid=321 event=terminated-1\n"
+		let text = before + frame + after
+		XCTAssertEqual(Self.parseUpdateProgress(text, expectedPID: 321).capture, .observed)
+		XCTAssertEqual(startupAdmissionRefusalMessage(Self.parseStartupAdmissionRefusalIdentity(text, expectedPID: 321)),
+			"Native Sparkle startup admission refusal: stage=native-start domain=sparkle code=5")
+		XCTAssertEqual(Self.parseStartupAdmissionRefusalIdentity(text.replacingOccurrences(of: "code=5", with: "code=-1"), expectedPID: 321)?.code, -1)
+		XCTAssertEqual(Self.parseStartupAdmissionRefusalIdentity(text.replacingOccurrences(of: "domain=sparkle", with: "domain=other"), expectedPID: 321)?.domain, StartupAdmissionRefusalDomain.other)
+		XCTAssertEqual(Self.parseStartupAdmissionRefusalIdentity(text, expectedPID: 321)?.stage, StartupAdmissionRefusalStage.nativeStart)
+		let policy = before.replacingOccurrences(of: "event=start-refused", with: "event=updater-started\nSPARKLE_PROGRESS/1 pid=321 event=start-refused")
+			+ frame.replacingOccurrences(of: "stage=native-start domain=sparkle code=5", with: "stage=policy-validation domain=other code=0") + after
+		XCTAssertEqual(Self.parseUpdateProgress(policy, expectedPID: 321).capture, .observed)
+		XCTAssertEqual(startupAdmissionRefusalMessage(Self.parseStartupAdmissionRefusalIdentity(policy, expectedPID: 321)),
+			"Native Sparkle startup admission refusal: stage=policy-validation domain=other code=0")
+		let invalid = [text.replacingOccurrences(of: "stage=native-start", with: "stage=invented"), before + after, before + frame + frame + after,
+			text.replacingOccurrences(of: "pid=321 stage=", with: "pid=322 stage="),
+			text.replacingOccurrences(of: "pid=321 stage=", with: "pid=0321 stage="),
+			text.replacingOccurrences(of: "domain=sparkle", with: "domain=private-raw-domain"),
+			text.replacingOccurrences(of: "code=5", with: "code=05"),
+			text.replacingOccurrences(of: "code=5", with: "code=+5"),
+			text.replacingOccurrences(of: "code=5", with: "code=9223372036854775808"),
+			text.replacingOccurrences(of: "code=5", with: "code=5 extra=private-text"),
+			String(text.dropLast()), frame + before + after,
+			before.replacingOccurrences(of: "event=start-refused", with: "event=updater-started") + frame + after]
+		for value in invalid {
+			let identity = Self.parseStartupAdmissionRefusalIdentity(value, expectedPID: 321)
+			XCTAssertNil(identity)
+			XCTAssertEqual(startupAdmissionRefusalMessage(identity), "Native Sparkle startup admission refusal: stage=unavailable domain=unavailable code=unavailable")
+		}
+		XCTAssertNil(Self.parseStartupAdmissionRefusalIdentity(text, expectedPID: 0))
+	}
+
+	func testRefusalErrorChainAdmitsOnlyBoundReceiptAndClosedDomainLabels() {
+		let receipt: [String: Any] = ["nonce": "independent-nonce", "pid": 321, "event": "refused-1", "version": "1"]
+		let errors: [[String: Any]] = [["domain": SUSparkleErrorDomain, "code": 4005],
+			["domain": SUSparkleErrorDomain, "code": 3002], ["domain": "untrusted-domain", "code": -7]]
+		XCTAssertEqual(Self.refusalErrorChainMessage(errors, receipt: receipt, expectedPID: 321, nonce: "independent-nonce"),
+			"Native Sparkle wrong-key refusal: capture=observed depth=3 chain=sparkle:4005,sparkle:3002,other:-7")
+		let boundary: [[String: Any]] = [["domain": NSCocoaErrorDomain, "code": NSNumber(value: Int64.min)],
+			["domain": NSCocoaErrorDomain, "code": NSNumber(value: Int64.max)]]
+		XCTAssertEqual(Self.refusalErrorChainMessage(boundary, receipt: receipt, expectedPID: 321, nonce: "independent-nonce"),
+			"Native Sparkle wrong-key refusal: capture=observed depth=2 chain=cocoa:-9223372036854775808,cocoa:9223372036854775807")
+	}
+
+	func testRefusalErrorChainRejectsForeignRecipientEventVersionAndNonce() {
+		let receipt: [String: Any] = ["nonce": "independent-nonce", "pid": 321, "event": "refused-1", "version": "1"]
+		let errors: [[String: Any]] = [["domain": SUSparkleErrorDomain, "code": 3002]]
+		let unavailable = "Native Sparkle wrong-key refusal: capture=unavailable depth=unavailable chain=unavailable"
+		for (field, value) in [("nonce", "foreign-nonce" as Any), ("pid", 322 as Any),
+			("event", "refused-2" as Any), ("version", "2" as Any), ("pid", true as Any), ("pid", 321.5 as Any)] {
+			var foreign = receipt
+			foreign[field] = value
+			XCTAssertEqual(Self.refusalErrorChainMessage(errors, receipt: foreign, expectedPID: 321, nonce: "independent-nonce"), unavailable)
+		}
+		XCTAssertEqual(Self.refusalErrorChainMessage(errors, receipt: receipt, expectedPID: 0, nonce: "independent-nonce"), unavailable)
+	}
+
+	func testRefusalErrorChainRejectsMalformedOrExcessiveIdentityRecords() {
+		let receipt: [String: Any] = ["nonce": "independent-nonce", "pid": 321, "event": "refused-1", "version": "1"]
+		let invalid: [[[String: Any]]] = [[], Array(repeating: ["domain": SUSparkleErrorDomain, "code": 3002], count: 9),
+			[["domain": SUSparkleErrorDomain, "code": true]], [["domain": SUSparkleErrorDomain, "code": 1.5]],
+			[["domain": SUSparkleErrorDomain, "code": "3002"]], [["domain": NSNull(), "code": 3002]],
+			[["domain": SUSparkleErrorDomain, "code": NSNumber(value: UInt64.max)]],
+			[["domain": SUSparkleErrorDomain, "code": NSNumber(value: Double.infinity)]],
+			[["domain": SUSparkleErrorDomain, "code": 3002, "extra": "untrusted-detail"]]]
+		for errors in invalid {
+			XCTAssertEqual(Self.refusalErrorChainMessage(errors, receipt: receipt, expectedPID: 321, nonce: "independent-nonce"),
+				"Native Sparkle wrong-key refusal: capture=unavailable depth=unavailable chain=unavailable")
+		}
+	}
+
+	func testNetworkProgressCounterDoesNotInventSuccessfulDelivery() {
+		XCTAssertEqual(resourceReadsMessage(NSNumber(value: 0)), "Native Sparkle network progress: admitted_resource_reads=0")
+		XCTAssertEqual(resourceReadsMessage(NSNumber(value: 4)), "Native Sparkle network progress: admitted_resource_reads=4")
+		let invalid: [Any?] = [nil, true, false, -1, 65, 1.5, "4", NSNumber(value: Double.infinity)]
+		for value in invalid {
+			XCTAssertEqual(resourceReadsMessage(value), "Native Sparkle network progress: admitted_resource_reads=unavailable")
+		}
+	}
+
+	func testServerExitRefusalMessageProjectsOnlyClosedFacts() {
+		XCTAssertEqual(serverExitRefusalMessage(Failure.deadline("private-input-never-exported"), termination: .unavailable),
+			"Native Sparkle server retirement refusal: code=deadline native_reason=unavailable native_status=unavailable")
+		XCTAssertEqual(serverExitRefusalMessage(Failure.evidence("server-retirement"), termination: .exit(23)),
+			"Native Sparkle server retirement refusal: code=exit-status native_reason=exit native_status=23")
+		XCTAssertEqual(serverExitRefusalMessage(Failure.deadline("private-input-never-exported"), termination: .signal(9)),
+			"Native Sparkle server retirement refusal: code=deadline native_reason=signal native_status=9")
+		XCTAssertEqual(serverExitRefusalMessage(Failure.evidence("private-input-never-exported"), termination: .exit(0)),
+			"Native Sparkle server retirement refusal: code=unavailable native_reason=exit native_status=0")
+		XCTAssertEqual(serverExitRefusalMessage(Failure.evidence("native-child-signal"), termination: .signal(15)),
+			"Native Sparkle server retirement refusal: code=native-signal native_reason=signal native_status=15")
+		XCTAssertEqual(serverExitRefusalMessage(Failure.evidence("native-capture-retirement"), termination: .exit(0)),
+			"Native Sparkle server retirement refusal: code=capture-retirement native_reason=exit native_status=0")
+		XCTAssertEqual(serverExitRefusalMessage(Failure.evidence("native-child-capture"), termination: .exit(0)),
+			"Native Sparkle server retirement refusal: code=capture-admission native_reason=exit native_status=0")
+		XCTAssertEqual(serverExitRefusalMessage(Failure.evidence("unlaunched-native-child"), termination: .unavailable),
+			"Native Sparkle server retirement refusal: code=unlaunched native_reason=unavailable native_status=unavailable")
+		for refused in [ObservedTermination.exit(-1), .exit(256), .signal(0), .signal(65)] {
+			XCTAssertEqual(serverExitRefusalMessage(Failure.deadline("private-input-never-exported"), termination: refused),
+				"Native Sparkle server retirement refusal: code=deadline native_reason=unavailable native_status=unavailable")
 		}
 	}
 
@@ -553,6 +1100,72 @@ final class SparkleArchiveUpdateAcceptanceTests: XCTestCase {
 		passed = testRun?.failureCount == failuresBefore
 	}
 
+	func testOwnedCensusPathAdmitsParentAliasWithoutAdoptingDirectoryReplacement() throws {
+		let root = manager.temporaryDirectory.resolvingSymlinksInPath()
+			.appendingPathComponent("ErgoptiSparkleDirectoryACK-" + UUID().uuidString)
+		try privateDirectory(root)
+		let failuresBefore = try XCTUnwrap(testRun?.failureCount)
+		var passed = false
+		defer {
+			var closed = true
+			for command in commands {
+				do { try command.retire() }
+				catch { closed = false; XCTFail("Owned directory control child retirement refused; inputs retained") }
+			}
+			if closed, passed, testRun?.failureCount == failuresBefore {
+				do {
+					_ = try ownedCensusPath(root)
+					try manager.removeItem(at: root)
+				} catch { XCTFail("Owned directory control input retirement refused; inputs retained") }
+			} else { XCTFail("Owned directory control retained after refusal") }
+		}
+		let physicalParent = root.appendingPathComponent("physical-parent")
+		try privateDirectory(physicalParent)
+		let alias = root.appendingPathComponent("parent-alias")
+		try manager.createSymbolicLink(at: alias, withDestinationURL: physicalParent)
+		let child = alias.appendingPathComponent("child")
+		try privateDirectory(child)
+		let helper = repository.appendingPathComponent("tools/diagnostics/macos_sparkle_archive_fixture.py")
+		let admission = "import importlib.util,sys; s=importlib.util.spec_from_file_location('owned_directory',sys.argv[1]); "
+			+ "m=importlib.util.module_from_spec(s); s.loader.exec_module(m); m.private_directory(sys.argv[2]); print('admitted')"
+		// This independent parent alias reproduces the old real protocol refusal.
+		let refused = try run("/usr/bin/env", ["python3", "-c", admission, helper.path, child.path], root: root, expecting: 1)
+		XCTAssertTrue(refused.stdout.isEmpty)
+		XCTAssertTrue(refused.stderr.contains("Private Sparkle directory refused"))
+		let physical = try ownedCensusPath(child)
+		XCTAssertFalse(physical.contains("/parent-alias/"))
+		let accepted = try run("/usr/bin/env", ["python3", "-c", admission, helper.path, physical], root: root)
+		XCTAssertEqual(accepted.stdout, "admitted\n")
+		XCTAssertTrue(accepted.stderr.isEmpty)
+		try manager.moveItem(at: child, to: physicalParent.appendingPathComponent("retired-child"))
+		try manager.createDirectory(at: child, withIntermediateDirectories: false, attributes: [.posixPermissions: 0o700])
+		XCTAssertThrowsError(try ownedCensusPath(child))
+		try manager.moveItem(at: child, to: physicalParent.appendingPathComponent("replacement-child"))
+		try manager.createSymbolicLink(at: child, withDestinationURL: physicalParent.appendingPathComponent("retired-child"))
+		XCTAssertThrowsError(try ownedCensusPath(child), "A symlink cannot adopt the original inode under another path")
+		passed = testRun?.failureCount == failuresBefore
+	}
+
+	func testStartupFramesDistinguishActualPrefixEmptyAndRefusedCapture() {
+		let valid = Data("SPARKLE_STARTUP/1 python-entry\nSPARKLE_STARTUP/1 imports-ready\nSPARKLE_STARTUP/1 cli-dispatch\n".utf8)
+		let observed = Self.parseStartupFrames(valid)
+		XCTAssertEqual(observed.capture, .observed)
+		XCTAssertEqual(observed.phase, .cliDispatch)
+		XCTAssertEqual(observed.bytes, valid.count)
+		XCTAssertEqual(Self.parseStartupFrames(Data()).capture, .empty)
+		for invalid in [
+			"SPARKLE_STARTUP/1 imports-ready\n", "SPARKLE_STARTUP/1 python-entry",
+			"SPARKLE_STARTUP/1 python-entry\nSPARKLE_STARTUP/1 python-entry\n",
+			"SPARKLE_STARTUP/1 python-entry\nPRIVATE-NOISE\n",
+			"SPARKLE_STARTUP/1 python-entry\nSPARKLE_STARTUP/1 unknown-phase\n",
+		] {
+			let facts = Self.parseStartupFrames(Data(invalid.utf8))
+			XCTAssertEqual(facts.capture, .malformed)
+			XCTAssertNil(facts.phase)
+		}
+		XCTAssertEqual(Self.parseStartupFrames(Data(repeating: 65, count: 513)).capture, .unavailable)
+	}
+
 	func testActualSparkleTarXZUpdateRefusesWrongKeyPreservesOldAppAndRetriesThroughRelaunch() throws {
 		phaseEvidence = try ArchiveAcceptanceEvidence(owner: .sparkle)
 		evidenceRefused = false
@@ -579,6 +1192,12 @@ final class SparkleArchiveUpdateAcceptanceTests: XCTestCase {
 			func attempt(_ label: String, _ action: () throws -> Void) {
 				do { try action() }
 				catch {
+					if label == "application-exit", let application {
+						XCTFail(applicationExitRefusalMessage(error, termination: application.observedTerminationFacts()))
+						if let code = application.observedChildRefusalCode() {
+							XCTFail("Native Sparkle child refusal: category=" + code)
+						}
+					}
 					retirementDebt = true
 					checkpoint("cleanup.debt-" + label, status: "cleanup-debt")
 					XCTFail("Private Sparkle retirement refused (" + label + "); fixture retained at " + root.path)
@@ -590,6 +1209,10 @@ final class SparkleArchiveUpdateAcceptanceTests: XCTestCase {
 				}
 				if let application, application.process.processIdentifier > 0 {
 					attempt("application-exit") {
+						defer {
+							print("::notice title=Native Sparkle update::" + updateProgressMessage(application.observedUpdateProgress()))
+							print("::notice title=Native Sparkle startup admission refusal::" + startupAdmissionRefusalMessage(application.observedStartupAdmissionRefusalIdentity()))
+						}
 						let retired = try application.finish(15)
 						guard retired.status == 0 else { throw Failure.evidence("application-retirement") }
 					}
@@ -597,9 +1220,14 @@ final class SparkleArchiveUpdateAcceptanceTests: XCTestCase {
 			}
 			if let server, server.process.processIdentifier > 0 {
 				attempt("server-exit") {
-					if server.process.isRunning { server.process.terminate() }
-					let retired = try server.finish(10)
-					guard retired.status == 0 else { throw Failure.evidence("server-retirement") }
+					do {
+						if server.process.isRunning { server.process.terminate() }
+						let retired = try server.finish(10)
+						guard retired.status == 0 else { throw Failure.evidence("server-retirement") }
+					} catch {
+						XCTFail(serverExitRefusalMessage(error, termination: server.observedTerminationFacts()))
+						throw error
+					}
 				}
 				attempt("server-terminal") {
 					let terminal = try waitFor("server-retired", root: root.appendingPathComponent("www"), seconds: 2)
@@ -607,6 +1235,7 @@ final class SparkleArchiveUpdateAcceptanceTests: XCTestCase {
 						(terminal["pid"] as? NSNumber)?.int32Value == server.process.processIdentifier else {
 						throw Failure.evidence("server-retirement-receipt")
 					}
+					print("::notice title=Native Sparkle network::" + resourceReadsMessage(terminal["requests"]))
 				}
 			}
 			// Each owner gets an independent retry even when a different owner's
@@ -660,7 +1289,7 @@ final class SparkleArchiveUpdateAcceptanceTests: XCTestCase {
 		let helper = repository.appendingPathComponent("tools/diagnostics/macos_sparkle_archive_fixture.py")
 		let www = root.appendingPathComponent("www")
 		try privateDirectory(www)
-		server = try OwnedProcess("/usr/bin/env", ["python3", helper.path, "serve", www.path, nonce], root: root)
+		server = try OwnedProcess("/usr/bin/env", ["python3", helper.path, "serve", try ownedCensusPath(www), nonce], root: root, startupDiagnostics: true)
 		commands.append(try XCTUnwrap(server))
 		try server?.start()
 		let listening = try waitFor("server-start", root: www, seconds: 10)
@@ -701,7 +1330,16 @@ final class SparkleArchiveUpdateAcceptanceTests: XCTestCase {
 		let signature = String(fragment[try XCTUnwrap(Range(match.range(at: 1), in: fragment))])
 		let signatureBytes = try XCTUnwrap(Data(base64Encoded: signature))
 		XCTAssertEqual(Int(fragment[try XCTUnwrap(Range(match.range(at: 2), in: fragment))]), payload.count)
+		XCTAssertEqual(signatureBytes.count, 64, "The official installed signature has the exact Ed25519 length")
 		XCTAssertTrue(key.publicKey.isValidSignature(signatureBytes, for: payload), "The native signer and independent Ed25519 public key must agree")
+		XCTAssertFalse(foreignKey.publicKey.isValidSignature(signatureBytes, for: payload), "The foreign public key must refuse the actual installed-key signature")
+		let independentInstalledSignature = try? key.signature(for: payload)
+		let installedSignatureEqual = independentInstalledSignature.map { $0 == signatureBytes }
+		print("::notice title=Native Sparkle signature::" + signatureProbeMessage(.installedKey,
+			signature64: signatureBytes.count == 64,
+			independentValid: key.publicKey.isValidSignature(signatureBytes, for: payload),
+			installedValid: key.publicKey.isValidSignature(signatureBytes, for: payload),
+			payloadEqual: nil, signatureEqual: installedSignatureEqual))
 		let wrongSignature = try foreignKey.signature(for: payload)
 		XCTAssertTrue(foreignKey.publicKey.isValidSignature(wrongSignature, for: payload))
 		XCTAssertFalse(key.publicKey.isValidSignature(wrongSignature, for: payload))
@@ -718,7 +1356,27 @@ final class SparkleArchiveUpdateAcceptanceTests: XCTestCase {
 		let foreignFragment = try String(contentsOf: foreignArchives.appendingPathComponent("_ErgoptiPlus.app.tar.xz.sig"), encoding: .utf8)
 		let foreignMatch = try XCTUnwrap(expression.firstMatch(in: foreignFragment, range: NSRange(foreignFragment.startIndex..., in: foreignFragment)))
 		let foreignSignature = String(foreignFragment[try XCTUnwrap(Range(foreignMatch.range(at: 1), in: foreignFragment))])
-		XCTAssertTrue(Data(base64Encoded: foreignSignature) == wrongSignature, "The official signer must agree with the independent foreign Ed25519 key")
+		let officialForeignSignature = try XCTUnwrap(Data(base64Encoded: foreignSignature))
+		let copiedForeignPayload = try Data(contentsOf: foreignArchives.appendingPathComponent("ErgoptiPlus.app.tar.xz"))
+		let officialForeignValid = foreignKey.publicKey.isValidSignature(officialForeignSignature, for: payload)
+		let officialInstalledValid = key.publicKey.isValidSignature(officialForeignSignature, for: payload)
+		let foreignPayloadEqual = copiedForeignPayload == payload
+		print("::notice title=Native Sparkle signature::" + signatureProbeMessage(.foreignKey,
+			signature64: officialForeignSignature.count == 64, independentValid: officialForeignValid,
+			installedValid: officialInstalledValid, payloadEqual: foreignPayloadEqual,
+			signatureEqual: officialForeignSignature == wrongSignature))
+		XCTAssertEqual(officialForeignSignature.count, 64, "The official foreign signature has the exact Ed25519 length")
+		XCTAssertTrue(officialForeignValid, "The independent foreign public key must validate the actual official signature")
+		XCTAssertFalse(officialInstalledValid, "The installed public key must refuse the actual official foreign signature")
+		XCTAssertTrue(foreignPayloadEqual, "The foreign signer must consume the same private archive bytes")
+		// Official and CryptoKit signatures can differ while independently authenticating the same bytes.
+		guard !copiedForeignPayload.isEmpty else { throw Failure.evidence("signature-payload-empty") }
+		var alteredPayload = copiedForeignPayload
+		alteredPayload[alteredPayload.startIndex] ^= 0x01
+		XCTAssertEqual(alteredPayload.count, payload.count, "The counterfactual changes content without changing archive length")
+		XCTAssertTrue(!foreignKey.publicKey.isValidSignature(officialForeignSignature, for: alteredPayload)
+			&& !key.publicKey.isValidSignature(signatureBytes, for: alteredPayload),
+			"Both official signatures must refuse a one-byte change to the independently authenticated archive")
 		XCTAssertEqual(Int(foreignFragment[try XCTUnwrap(Range(foreignMatch.range(at: 2), in: foreignFragment))]), payload.count)
 		try payload.write(to: www.appendingPathComponent("archive.tar.xz"), options: .withoutOverwriting)
 		let refusedFeed = try generatedFeed(foreignArchives, destination: www.appendingPathComponent("feed.xml"), root: root, identity: identity)
@@ -737,8 +1395,10 @@ final class SparkleArchiveUpdateAcceptanceTests: XCTestCase {
 		_ = try waitFor("cycle-refused-1", root: root)
 		let details = try XCTUnwrap(refusal["details"] as? [String: Any])
 		let errors = try XCTUnwrap(details["errors"] as? [[String: Any]])
+		print("::notice title=Native Sparkle wrong-key refusal::" + Self.refusalErrorChainMessage(errors,
+			receipt: refusal, expectedPID: application?.process.processIdentifier ?? 0, nonce: nonce))
 		XCTAssertTrue(errors.contains { $0["domain"] as? String == SUSparkleErrorDomain
-			&& ($0["code"] as? NSNumber)?.intValue == 3001 }, "Wrong-key refusal must reach actual Sparkle signature validation")
+			&& ($0["code"] as? NSNumber)?.intValue == Int(SUError.validationError.rawValue) }, "Wrong-key refusal must reach actual Sparkle signature validation")
 		XCTAssertEqual(try snapshot(installed), oldSnapshot, "A refused archive cannot alter the installed signed source")
 		XCTAssertTrue(try XCTUnwrap(application).process.isRunning)
 		XCTAssertFalse(manager.fileExists(atPath: root.appendingPathComponent("ready-1.json").path))

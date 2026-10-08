@@ -94,3 +94,103 @@ helpers.describe("IA submenu on/off row", function()
 		end
 	end)
 end)
+
+
+helpers.describe("Active download shortcut shared frame", function()
+	helpers.it("retains all three actual task predicates and the held focus callback", function()
+		with_activation("ollama", { true }, nil, function(_, _, calls)
+			local predecessor = package.loaded["ui.download_window"]
+			local focused = 0
+			local owner = { focus = function() focused = focused + 1 end }
+			local ok, detail = xpcall(function()
+				package.loaded["ui.download_window"] = owner
+				helpers.assert_nil(calls.handler.build_download_item())
+				for _, task in ipairs({ "download", "download_tail", "install" }) do
+					calls.root_deps.active_tasks[task] = true
+					local row = calls.handler.build_download_item()
+					helpers.assert_eq(row.title, "menu.llm.show_download_window")
+					helpers.assert_type(row.fn, "function")
+					helpers.assert_nil(row.disabled)
+					helpers.assert_nil(row.menu)
+					row.fn()
+					calls.root_deps.active_tasks[task] = nil
+				end
+				helpers.assert_eq(focused, 3)
+				helpers.assert_eq(calls.saves, 0)
+				helpers.assert_eq(calls.updates, 0)
+			end, debug.traceback)
+			package.loaded["ui.download_window"] = predecessor
+			helpers.assert_eq(rawequal(package.loaded["ui.download_window"], predecessor), true)
+			if not ok then error(detail, 0) end
+		end)
+	end)
+	helpers.it("refuses an unbound declaration without losing the active task or triggering effects", function()
+		with_activation("ollama", { true }, nil, function(_, _, calls)
+			local renderer = package.loaded["infra.manifest_menu"]
+			local rows = renderer.get_array("llm_download_shortcut_frame")
+			local original = rows[1]
+			helpers.assert_not_nil(original)
+			calls.root_deps.active_tasks.download = true
+			local before = calls.handler.build_download_item()
+			helpers.assert_eq(before.title, "menu.llm.show_download_window")
+			local ok, detail = xpcall(function()
+				rows[1] = { type = "command", id = "missing_download_owner", i18n = "menu.llm.show_download_window" }
+				helpers.assert_nil(calls.handler.build_download_item())
+				helpers.assert_eq(calls.root_deps.active_tasks.download, true)
+				helpers.assert_eq(calls.saves, 0)
+				helpers.assert_eq(calls.updates, 0)
+				helpers.assert_eq(calls.notifications, 0)
+			end, debug.traceback)
+			rows[1] = original
+			if not ok then error(detail, 0) end
+			local repaired = calls.handler.build_download_item()
+			helpers.assert_eq(repaired.title, before.title)
+			helpers.assert_type(repaired.fn, "function")
+			calls.root_deps.active_tasks.download = nil
+			helpers.assert_nil(calls.handler.build_download_item())
+		end)
+	end)
+end)
+
+
+helpers.describe("Genuine temperature fixture dependency", function()
+	helpers.it("binds real callbacks and refuses withdrawn declarations before parent publication", function()
+		with_activation("ollama", { true }, nil, function(_, state, calls)
+			local panel = package.loaded["ui.menu.menu_llm.temperature_panel"]
+			helpers.assert_eq(rawequal(panel.build, calls.temperature_builder), true)
+			local sets, resets = 0, 0
+			local set = function() sets = sets + 1; return true end
+			local reset = function() resets = resets + 1; return true end
+			local ctx = { state = state, is_disabled = false,
+				settings_mgr = { set_temperature = set, reset_temperature = reset,
+					apply_setting_transaction = function() error("construction must not apply") end } }
+			local rows = {}
+			helpers.assert_type(panel.build(ctx, rows), "table")
+			helpers.assert_eq(#rows, 1)
+			helpers.assert_type(rows[1].action, "function")
+			helpers.assert_eq(rows[1].action(), true)
+			helpers.assert_eq(sets, 1)
+			helpers.assert_eq(resets, 0)
+			local declaration = package.loaded["infra.manifest_menu"].get_array("llm_generation_temperature_control")
+			local original = declaration[1]
+			local ok, detail = xpcall(function()
+				declaration[1] = { type = "command", id = "missing_temperature_owner", i18n = original.i18n }
+				local refused = {}
+				helpers.assert_nil(panel.build(ctx, refused))
+				helpers.assert_eq(refused, {})
+				helpers.assert_eq(calls.handler.build_item(), {})
+				helpers.assert_eq(sets, 1)
+				helpers.assert_eq(resets, 0)
+				helpers.assert_eq(calls.saves, 0)
+				helpers.assert_eq(calls.updates, 0)
+			end, debug.traceback)
+			declaration[1] = original
+			if not ok then error(detail, 0) end
+			helpers.assert_type(calls.handler.build_item().submenu, "table")
+			local repaired = {}
+			helpers.assert_type(panel.build(ctx, repaired), "table")
+			helpers.assert_eq(repaired[1].action(), true)
+			helpers.assert_eq(sets, 2)
+		end)
+	end)
+end)

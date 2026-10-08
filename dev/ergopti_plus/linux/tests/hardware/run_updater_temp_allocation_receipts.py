@@ -18,11 +18,30 @@ import tempfile
 WORKER = r"""
 local uv = require("luv")
 local Manager = require("modules.updater.manager")
+local ScriptActions = require("modules.shortcuts.script_actions")
+local controller = ScriptActions.new({
+ reset = function() assert(Manager.cancel_update()) end,
+ reload = function() Manager.stop_background_checks(); assert(Manager.cancel_update()) end,
+ quit = function() Manager.stop_background_checks(); assert(Manager.cancel_update()) end,
+})
+Manager.init({ is_paused = controller.is_paused })
+assert(Manager.stop_background_checks() == true, "Actual updater background cancellation refused")
+uv.run()
+assert(not uv.loop_alive(), "Actual updater preparation retained native timer debt")
+-- Prepare actual runtime libraries before the parent applies RLIMIT_NOFILE.
+-- These production factories acquire no archive/reader/EVP context or timer.
+-- Keep them reachable through the original operation and native retirement.
+local prepared_transfer = require("modules.updater.archive_transfer")
+local Output = require("infra.archive_output")
+local prepared_artifact = assert(Output.native_artifact("ergopti-plus-linux.tar.gz"),
+ "Actual native archive runtime preparation unavailable")
+local prepared_output = Output.native()
+local prepared_digest = require("infra.fd_sha256").native()
 local api = assert(os.getenv("ERGOPTI_NATIVE_UPDATER_API"))
 local denied = os.getenv("ERGOPTI_NATIVE_UPDATER_DENIED") == "true"
 local wants_callback = os.getenv("ERGOPTI_NATIVE_UPDATER_CALLBACK") == "true"
-local release = { tag = "v4.0.0", download_url = "http://127.0.0.1:1/archive",
-	checksum_url = "http://127.0.0.1:1/checksum" }
+local release = { tag = "v4.0.0", download_url = "https://127.0.0.1:1/archive",
+	checksum_url = "https://127.0.0.1:1/checksum" }
 Manager._test_set_cached_release(release)
 local callbacks, received_path, received_error = 0, nil, nil
 local callback
@@ -49,6 +68,8 @@ local expected_state = denied and "available" or (api == "update" and "idle" or 
 assert(Manager.get_state() == expected_state, "refusal changed the pre-allocation state")
 assert(Manager.get_cached_release().tag == release.tag)
 assert(Manager.cancel_update() and Manager.get_state() == "idle")
+assert(type(prepared_artifact) == "table" and type(prepared_output) == "table"
+ and type(prepared_digest) == "table" and type(prepared_transfer) == "table", "Actual prepared runtime owners lost")
 """
 
 

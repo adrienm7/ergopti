@@ -42,10 +42,33 @@ local function literal(value)
 	return ok and type(encoded) == "string" and encoded or "null"
 end
 
-local function evaluate(code)
+local function document_current(session)
+	if _session ~= session or session.retired or not session.document_owner then return false end
 	local host = manager()
-	return host and type(host.eval_js) == "function"
-		and host.eval_js(APP_NAME, code) == true
+	if host ~= session.host or type(host.document_owner_current) ~= "function" then return false end
+	local ok, current = pcall(host.document_owner_current, session.document_owner)
+	return ok and current == true and _session == session and not session.retired
+		and manager() == host
+end
+
+--- Observes only the captured current presentation, never operation consent.
+local function presentation_current(session, document_owner)
+	if _session ~= session or session.retired or not document_owner
+		or session.presentation_owner ~= document_owner then return false end
+	local host = manager()
+	if host ~= session.host or type(host.document_owner_current) ~= "function" then return false end
+	local ok, current = pcall(host.document_owner_current, document_owner)
+	return ok and current == true and _session == session and not session.retired
+		and session.presentation_owner == document_owner and manager() == host
+end
+
+local function evaluate(code, session)
+	session = session or _session
+	if not session then return false end
+	local host, document_owner = session.host, session.presentation_owner
+	if not presentation_current(session, document_owner) or type(host.eval_owned_js) ~= "function" then return false end
+	local ok, accepted = pcall(host.eval_owned_js, APP_NAME, document_owner, code)
+	return ok and accepted == true and presentation_current(session, document_owner)
 end
 
 --- Loads the one canonical policy through the driver's native file owner.
@@ -69,8 +92,68 @@ end
 
 local function owner_current(session)
 	if _session ~= session or session.retired or session.cancelled then return false end
+	if not document_current(session) or not session.pause_owner or type(session.pause_owner.is_paused) ~= "function"
+		or session.pause_owner.is_paused ~= session.pause_probe then return false end
+	local ok, paused = pcall(session.pause_probe)
+	if not ok or paused ~= false then return false end
 	local allowed = session.is_current == nil or admits(session.is_current)
-	return allowed and _session == session and not session.retired and not session.cancelled
+	if not allowed or not document_current(session) then return false end
+	ok, paused = pcall(session.pause_probe)
+	return ok and paused == false and _session == session and not session.retired and not session.cancelled
+		and session.pause_owner.is_paused == session.pause_probe
+		and type(session.host.document_owner_retained) == "function"
+		and session.host.document_owner_retained(session.document_owner) == true
+end
+
+--- Admits cleanup of this exact original operation from a fresh live page.
+--- The original operation document and its retry/diagnostic consent stay intact.
+local function cleanup_current(session, document_owner, pause_owner, pause_probe, callback)
+	if _session ~= session or session.retired or session.terminal or session.cancelled
+		or session.on_cancel ~= callback or type(callback) ~= "function"
+		or session.presentation_pause_owner ~= pause_owner or session.presentation_pause_probe ~= pause_probe
+		or type(pause_owner) ~= "table" or type(pause_probe) ~= "function"
+		or pause_owner.is_paused ~= pause_probe then return false end
+	if not presentation_current(session, document_owner) then return false end
+	local ok, paused = pcall(pause_probe)
+	if not ok or paused ~= false or not presentation_current(session, document_owner) then return false end
+	ok, paused = pcall(pause_probe)
+	return ok and paused == false and _session == session and not session.retired
+		and not session.terminal and not session.cancelled and session.on_cancel == callback
+		and session.presentation_owner == document_owner
+		and session.presentation_pause_owner == pause_owner and session.presentation_pause_probe == pause_probe
+		and pause_owner.is_paused == pause_probe
+		and type(session.host.document_owner_retained) == "function"
+		and session.host.document_owner_retained(document_owner) == true
+end
+
+--- Holds one cleanup intent across native document/pause/callback reentry.
+local function cancel_from_presentation(session, document_owner, state)
+	if session.cancelling then return { cancelled = false } end
+	local callback = session.on_cancel
+	local pause_owner, pause_probe = session.presentation_pause_owner, session.presentation_pause_probe
+	session.cancelling = true
+	-- The native message frame must retain the exact admitted pause owner.
+	-- Reject foreign state under the intent before any native or pause probe.
+	if not rawequal(state, pause_owner) then session.cancelling = false; return nil end
+	-- Preserve native-document refusal before pause/cleanup admission, while
+	-- holding the intent across this first external current-document probe.
+	local observed, admitted = pcall(presentation_current, session, document_owner)
+	if not observed or admitted ~= true then session.cancelling = false; return nil end
+	local guarded, allowed = pcall(cleanup_current, session, document_owner, pause_owner, pause_probe, callback)
+	if not guarded or allowed ~= true then session.cancelling = false; return { cancelled = false } end
+	local ok, accepted = pcall(callback)
+	local current, retained = pcall(cleanup_current, session, document_owner, pause_owner, pause_probe, callback)
+	if not ok or accepted ~= true or not current or retained ~= true then
+		session.cancelling = false
+		return { cancelled = false }
+	end
+	local completed, visible = pcall(function()
+		session.cancelled = true
+		M.complete(session.id, false, translated("ollama.download_cancelled"))
+		return presentation_current(session, document_owner)
+	end)
+	session.cancelling = false -- Finally, including presentation/translation refusal.
+	return { cancelled = completed and visible == true }
 end
 
 --- Capabilities come from bound native effects, never the page's retained rows.
@@ -94,7 +177,7 @@ local function invalidate_failure(session)
 	_failure_serial = _failure_serial + 1
 	session.failure_epoch = _failure_serial
 	session.failure_report = nil
-	evaluate("if(window.clearNetworkFailure)window.clearNetworkFailure();")
+	evaluate("if(window.clearNetworkFailure)window.clearNetworkFailure();", session)
 end
 
 local function failure_code(session)
@@ -136,7 +219,7 @@ local function push_initial(session)
 			.. literal(session.final_message) .. ",null);" .. failure_code(session)
 	end
 	statements[#statements + 1] = "}"
-	return evaluate(table.concat(statements))
+	return evaluate(table.concat(statements), session)
 end
 
 --- Opens one owned progress session.
@@ -167,6 +250,7 @@ function M.show(opts)
 	_serial = _serial + 1
 	local session = {
 		id = _serial,
+		host = host,
 		kind = opts.kind,
 		label = opts.label,
 		detail = translated("download_window.starting"),
@@ -218,7 +302,7 @@ function M.update(session_id, percentage, detail, log_line)
 	if type(log_line) == "string" and log_line ~= "" then
 		code = code .. "addLog(" .. literal(log_line) .. ");"
 	end
-	return evaluate(code)
+	return evaluate(code, session)
 end
 
 --- Settles the active session exactly once.
@@ -247,7 +331,7 @@ function M.complete(session_id, succeeded, message, failure_receipt)
 	if _session ~= session or session.retired then return false end
 	if not session.ready then return true end
 	return evaluate("done(" .. tostring(session.succeeded) .. ","
-		.. literal(final_message) .. ",null);" .. failure_code(session))
+		.. literal(final_message) .. ",null);" .. failure_code(session), session)
 end
 
 --- Reopens or focuses the page owned by an existing background session.
@@ -296,23 +380,49 @@ end
 --- Handles only session-bound page controls and epoch-bound failure actions.
 --- @param payload any
 --- @return table|nil
-function M.on_message(payload)
+function M.on_message(payload, state, context)
 	local session = _session
 	if not session or session.retired then return nil end
+	local host = manager()
+	local document_owner = type(context) == "table" and context.document_owner or nil
+	if not document_owner or host ~= session.host or type(host.document_owner_current) ~= "function" then return nil end
+	-- Cleanup intent is claimed before the first external document observation.
+	if type(payload) == "table" and rawget(payload, "action") == "cancel" then
+		if rawget(payload, "session") ~= session.id then return { cancelled = false } end
+		return cancel_from_presentation(session, document_owner, state)
+	end
+	local observed, current = pcall(host.document_owner_current, document_owner)
+	if not observed or current ~= true or _session ~= session or session.retired then return nil end
 	if payload == "ready" then
+		local pause_probe = type(state) == "table" and state.is_paused or nil
+		if type(pause_probe) ~= "function" then return nil end
+		local previous = session.presentation_owner
+		if previous == document_owner and (session.presentation_pause_owner ~= state
+			or session.presentation_pause_probe ~= pause_probe) then return nil end
+		if previous and previous ~= document_owner then
+			local checked, still_current = pcall(host.document_owner_current, previous)
+			if not checked or still_current ~= false then return nil end
+		end
+		-- Bind original consent only once. A reopened document owns display and
+		-- explicit cleanup intent; it cannot revive retry or diagnostic effects.
+		if not session.document_owner then
+			session.document_owner = document_owner
+			session.pause_owner, session.pause_probe = state, pause_probe
+		end
+		session.presentation_owner = document_owner
+		session.presentation_pause_owner, session.presentation_pause_probe = state, pause_probe
+		if not presentation_current(session, document_owner) then return nil end
 		session.ready = true
 		return { pushed = push_initial(session), session_id = session.id,
 			failure_epoch = session.failure_epoch }
 	end
+	if session.presentation_owner ~= document_owner or not presentation_current(session, document_owner) then return nil end
 	if type(payload) ~= "table" or payload.session ~= session.id then
 		return { cancelled = false, retried = false, accepted = false }
 	end
-	if payload.action == "cancel" and not session.terminal and owner_current(session) then
-		local ok, accepted = pcall(session.on_cancel)
-		if not ok or accepted ~= true then return { cancelled = false } end
-		session.cancelled = true
-		M.complete(session.id, false, translated("ollama.download_cancelled"))
-		return { cancelled = true }
+	-- Every effect other than cleanup retains the original operation consent.
+	if session.document_owner ~= document_owner or not document_current(session) then
+		return { cancelled = false, retried = false, accepted = false }
 	end
 	if payload.action == "failure_action" then
 		if payload.epoch ~= session.failure_epoch or not session.terminal
@@ -351,6 +461,17 @@ function M.on_message(payload)
 	if payload.action == "expand" then return { expanded = true } end
 	Logger.debug(LOG, "Unknown download action refused.")
 	return nil
+end
+
+--- Fresh native admission for the same app-update operation document.
+--- No document owner/descriptor is exported; a missing initialization ACK refuses.
+function M.install_admission_current(session_id)
+	local session = _session
+	if not session or session.id ~= session_id or session.kind ~= "app_update"
+		or session.terminal or session.retired or session.cancelled then return false end
+	local observed, admitted = pcall(owner_current, session)
+	return observed and admitted == true and _session == session and session.id == session_id
+		and not session.terminal and not session.retired and not session.cancelled
 end
 
 function M.session_id()

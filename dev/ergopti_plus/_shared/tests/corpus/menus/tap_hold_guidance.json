@@ -1,0 +1,74 @@
+{
+	"platform": "hs",
+	"declarations": {
+		"tap_hold_karabiner_off_rows": [
+			{
+				"type": "label",
+				"id": "tap_hold_karabiner_off",
+				"i18n": "menu.tapholds.karabiner_off_hint",
+				"platforms": ["hs"],
+				"unavailable": "hide"
+			}
+		],
+		"tap_hold_guardian_approval_rows": [
+			{
+				"type": "label",
+				"id": "tap_hold_guardian_approval",
+				"i18n": "menu.tapholds.guardian_requires_approval",
+				"platforms": ["hs"],
+				"unavailable": "hide"
+			},
+			{
+				"type": "command",
+				"id": "tap_hold_login_items_steps",
+				"i18n": "menu.tapholds.show_login_items_steps",
+				"platforms": ["hs"],
+				"unavailable": "hide"
+			}
+		],
+		"tap_hold_guardian_unavailable_rows": [
+			{
+				"type": "label",
+				"id": "tap_hold_guardian_unavailable",
+				"i18n": "menu.tapholds.guardian_unavailable",
+				"platforms": ["hs"],
+				"unavailable": "hide"
+			}
+		],
+		"tap_hold_login_items_open_rows": [
+			{
+				"type": "command",
+				"id": "tap_hold_login_items_open",
+				"i18n": "menu.tapholds.open_login_items",
+				"platforms": ["hs"],
+				"unavailable": "hide"
+			}
+		],
+		"tap_hold_legacy_rules_rows": [
+			{
+				"type": "command",
+				"id": "tap_hold_legacy_rules_cleanup",
+				"i18n": "menu.tapholds.legacy_rules_pending",
+				"platforms": ["hs"],
+				"unavailable": "hide"
+			}
+		]
+	},
+	"states": [
+		{
+			"state": "requires_approval",
+			"expected": [
+				"menu.tapholds.guardian_requires_approval",
+				"menu.tapholds.show_login_items_steps",
+				"menu.tapholds.open_login_items"
+			]
+		},
+		{
+			"state": "unavailable",
+			"expected": ["menu.tapholds.guardian_unavailable", "menu.tapholds.open_login_items"]
+		},
+		{ "state": "ready", "expected": [] },
+		{ "state": "not_used", "expected": [] },
+		{ "state": "unknown", "expected": [] }
+	]
+}

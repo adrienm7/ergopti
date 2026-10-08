@@ -8,6 +8,18 @@
 --- @param Source table The shared keymap.magic_key_source module.
 --- @param fixture table { entry, registry, field, override? } as the driver builds its resolver.
 return function(helpers, Source, fixture)
+	local Json = require("json")
+	local Renderer = require("menu.renderer")
+	local function renderer(t)
+		return assert(Renderer.new({
+			platform = fixture.field == "hs" and "hs" or "linux",
+			manifest_path = function() return helpers.shared and helpers.shared("modules/menu/menu_manifest.json")
+				or helpers.driver_root() .. "/../_shared/modules/menu/menu_manifest.json" end,
+			json_decode = Json.decode,
+			i18n = { get = t, section = t },
+			logger = require("logger.shim"),
+		}))
+	end
 	local resolver = Source.new(fixture)
 
 	helpers.describe("magic key source: shared decisions (" .. fixture.field .. ")", function()
@@ -52,6 +64,7 @@ return function(helpers, Source, fixture)
 			local calls = {}
 			local function t(key) return "<" .. key .. ">" end
 			local rows = Source.menu_rows(resolver, {
+				manifest = renderer(t),
 				t = t,
 				current = "KeyJ",
 				key_text = function(code) return code == "KeyJ" and "j" or nil end,
@@ -79,6 +92,7 @@ return function(helpers, Source, fixture)
 			helpers.assert_eq(calls, { "capture", resolver.automatic, codes[1] })
 
 			local idle = Source.menu_rows(resolver, {
+				manifest = renderer(t),
 				t = t,
 				current = resolver.automatic,
 				key_text = function() error("the layout cannot answer") end,
@@ -118,7 +132,7 @@ return function(helpers, Source, fixture)
 				end
 				local actual = Source.tap_conflict(owned, case.source, keys, fixture.field == "hs" and "hs" or "linux", action)
 				helpers.assert_eq(actual or "", case.expected[fixture.field], case.name)
-				local choices = Source.menu_rows(owned, { t = function(key) return key end,
+				local choices = Source.menu_rows(owned, { manifest = renderer(function(key) return key end), t = function(key) return key end,
 					current = "auto", key_text = function() return nil end, choose = function() end, reason = reason })
 				for index, code in ipairs(owned.candidates()) do
 					if code == case.source then
@@ -150,6 +164,103 @@ return function(helpers, Source, fixture)
 			helpers.assert_true(refused({ entry = { default = "auto", enum_values = { "auto", "KeyA", "KeyB" } },
 				registry = { keys = { KeyA = { [fixture.field] = 1 }, KeyB = { [fixture.field] = 1 } } },
 				field = fixture.field }), "two values naming one key")
+		end)
+
+		helpers.it("(magic-key-source) the declared whole family follows the independent hand hierarchy in English and French", function()
+			local path = helpers.shared and helpers.shared("tests/corpus/menus/magic_key_source_family.json")
+				or helpers.driver_root() .. "/../_shared/tests/corpus/menus/magic_key_source_family.json"
+			local file = assert(io.open(path, "rb")); local corpus = Json.decode(assert(file:read("*a"))); assert(file:close())
+			helpers.assert_eq(resolver.candidates(), corpus.candidates, "hand candidate order is independent of the producer")
+			for _, language in ipairs({ "en", "fr" }) do
+				path = helpers.shared and helpers.shared("data/locales/" .. language .. ".json")
+					or helpers.driver_root() .. "/../_shared/data/locales/" .. language .. ".json"
+				file = assert(io.open(path, "rb")); local locale = Json.decode(assert(file:read("*a"))); assert(file:close())
+				local function translate(key) return assert(locale[key], key) end
+				local manifest = renderer(translate)
+				helpers.assert_eq(manifest.get_array("magic_key_source_menu"), corpus.parent)
+				helpers.assert_eq(manifest.get_array("magic_key_source_children"), corpus.children)
+				for _, state in ipairs(corpus.states) do
+					local calls = {}
+					local rows = Source.menu_rows(resolver, {
+						manifest = manifest, t = translate, current = state.current,
+						key_text = function(code) return code == "KeyJ" and "j" or nil end,
+						reason = function(code) if code == state.blocked then return corpus.reason_key end end,
+						capture = state.capture and function() calls[#calls + 1] = "capture" end or nil,
+						choose = function(code) calls[#calls + 1] = code end,
+					})
+					helpers.assert_eq(#calls, 0, "construction never invokes native actions")
+					helpers.assert_eq(#rows, 1)
+					helpers.assert_eq(rows[1].label, translate(corpus.parent[1].i18n) .. corpus.caption_separator
+						.. (state.shown or translate(state.shown_key)))
+					local items = rows[1].items
+					helpers.assert_eq(#items, #corpus.candidates + 4)
+					helpers.assert_eq(items[1].label, translate(corpus.children[1].i18n))
+					helpers.assert_eq(items[1].disabled == true, not state.capture)
+					helpers.assert_eq(type(items[1].action) == "function", state.capture)
+					helpers.assert_true(items[2].separator)
+					helpers.assert_eq(items[3].label, translate(corpus.children[3].i18n))
+					helpers.assert_eq(items[3].checked, state.current == "auto")
+					helpers.assert_true(items[4].separator)
+					for index, code in ipairs(corpus.candidates) do
+						local row, blocked = items[index + 4], code == state.blocked
+						local label = code == "KeyJ" and "j   (KeyJ)" or code
+						if blocked then label = label .. corpus.conflict_separator .. translate(corpus.reason_key) end
+						helpers.assert_eq(row.label, label, code)
+						helpers.assert_eq(row.checked, code == state.current, code)
+						helpers.assert_eq(row.disabled == true, blocked, code)
+						helpers.assert_eq(type(row.action) == "function", not blocked, code)
+					end
+					if state.capture then items[1].action() end
+					items[3].action()
+					items[6].action()
+					helpers.assert_eq(calls, state.capture and { "capture", "auto", "Digit1" } or { "auto", "Digit1" })
+				end
+			end
+		end)
+
+		helpers.it("(magic-key-source) actual declaration withdrawal removes the family and refuses retained fixed commands", function()
+			local path = helpers.shared and helpers.shared("modules/menu/menu_manifest.json")
+				or helpers.driver_root() .. "/../_shared/modules/menu/menu_manifest.json"
+			local file = assert(io.open(path, "rb")); local original = assert(file:read("*a")); assert(file:close())
+			local temporary = os.tmpname()
+			local calls = 0
+			local function rewrite(document)
+				local out = assert(io.open(temporary, "wb")); assert(out:write(Json.encode(document))); assert(out:close())
+			end
+			local function translate(key) return key end
+			local manifest = assert(Renderer.new({ platform = fixture.field == "hs" and "hs" or "linux",
+				manifest_path = function() return temporary end, json_decode = Json.decode,
+				i18n = { get = translate, section = translate }, logger = require("logger.shim") }))
+			local options = { manifest = manifest, t = translate, current = "auto", key_text = function() return nil end,
+				capture = function() calls = calls + 1 end, choose = function() calls = calls + 1 end }
+			local ok, err = pcall(function()
+				rewrite(Json.decode(original))
+				local retained = assert(Source.menu_rows(resolver, options))[1].items
+				for _, section in ipairs({ "magic_key_source_menu", "magic_key_source_children" }) do
+					local document = Json.decode(original); document[section] = nil; rewrite(document); manifest.invalidate_cache()
+					helpers.assert_nil(Source.menu_rows(resolver, options), section .. " withdrawal cannot reconstruct native fixed rows")
+				end
+				-- The actual command declarations are now absent from the live renderer.
+				helpers.assert_eq(retained[1].action(), false)
+				helpers.assert_eq(retained[3].action(), false)
+				helpers.assert_eq(calls, 0, "withdrawn commands do not enter native callbacks")
+				for _, index in ipairs({ 1, 2, 3, 4, 5 }) do
+					local document = Json.decode(original); table.remove(document.magic_key_source_children, index)
+					rewrite(document); manifest.invalidate_cache()
+					helpers.assert_nil(Source.menu_rows(resolver, options), "a missing genuine child refuses the parent: " .. index)
+				end
+				rewrite(Json.decode(original)); manifest.invalidate_cache()
+				local repaired = assert(Source.menu_rows(resolver, options))[1].items
+				repaired[1].action(); repaired[3].action(); helpers.assert_eq(calls, 2, "fresh repair restores genuine callbacks")
+			end)
+			assert(os.remove(temporary))
+			if not ok then error(err, 0) end
+		end)
+
+		helpers.it("(magic-key-source) no renderer port cannot recreate undeclared rows", function()
+			local ok = pcall(Source.menu_rows, resolver, { t = function(key) return key end,
+				current = "auto", key_text = function() return nil end, choose = function() end })
+			helpers.assert_eq(ok, false, "the intentional renderer contract is mandatory")
 		end)
 	end)
 end

@@ -84,12 +84,19 @@ _FeatureStateDefaultsForSection(Section) {
 ; began between the press and its thread; ``SCAN_CODES`` is the key AltGr
 ; modifies, which names the chord hotkeys and the GetKeyState double-check
 ; guarding against AltGr+Enter pause-bug-style misfires.
+#Include ../../_shared/ahk/config_binding_identity.ahk
+; Bring the compiled data owner forward, without running its later config read.
+#Include %A_LineFile%\..\tap_keys.ahk
+global _TapKeyBindingPublication := ConfigBindingIdentityTapPublication(TAP_KEY_ORDER, TAP_KEY_SCANCODES)
 global SCRIPT_SHORTCUT_SLOTS := [
 		"script_altgr_enter",
 		"script_altgr_backspace",
 		"script_altgr_delete",
 		"script_altgr_escape",
 ]
+; Only this compiled complete declaration publishes the script binding domain.
+; Readers do not infer it from active assignments or reread a catalogue.
+global _ScriptShortcutBindingPublication := ConfigBindingIdentityScriptPublication(SCRIPT_SHORTCUT_SLOTS)
 global SCRIPT_SHORTCUT_LABELS := Map(
 		"script_altgr_enter",     "sg_labels.script_altgr_enter",
 		"script_altgr_backspace", "sg_labels.script_altgr_backspace",

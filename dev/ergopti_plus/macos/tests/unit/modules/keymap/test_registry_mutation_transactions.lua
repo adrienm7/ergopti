@@ -9,6 +9,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
+local CaptionFixture = require("tests.support.personal_menu_caption_fixture")
 
 --- Models the empty boot directory catalogue in registry-only menu fixtures.
 --- The actual registry/persistence owners stay live; importing the boot loader
@@ -545,7 +546,7 @@ helpers.describe("personal menu: the real category persistence owner", function(
 							return publication == "true"
 						end,
 					}
-					local rows = Custom.build_custom(ctx, { group_counts = {} }).submenu
+					local rows = CaptionFixture.build_custom(Custom, ctx, { group_counts = {} }).submenu
 					local committed = rows[enabled and 1 or 2].fn()
 					local accepted, wanted = publication == "true", not enabled
 					if accepted then wanted = enabled end

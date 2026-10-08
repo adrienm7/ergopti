@@ -1,0 +1,183 @@
+{
+	"_comment": "Independent original native child declaration/order expectations, authored before qualification. Shared presentation only; native transaction callbacks remain authoritative. Windows retains its existing profile click/dialog, macOS additionally exposes its actual shortcut prompt.",
+	"section": "llm_custom_profile_controls",
+	"declaration": [
+		{
+			"type": "check",
+			"id": "llm_profile_use",
+			"i18n": "menu.profiles.use_profile",
+			"checked_when": ["llm_custom_profile_active"],
+			"disabled_when": ["llm_custom_profile_ready"],
+			"platforms": ["hs", "linux"],
+			"unavailable": "hide"
+		},
+		{
+			"type": "command",
+			"id": "llm_profile_shortcut",
+			"i18n": "menu.profiles.shortcut_prefix",
+			"disabled_when": ["llm_custom_profile_ready"],
+			"platforms": ["hs"],
+			"unavailable": "hide"
+		},
+		{
+			"type": "---",
+			"platforms": ["hs"],
+			"unavailable": "hide"
+		},
+		{
+			"type": "command",
+			"id": "llm_profile_edit",
+			"i18n": "menu.profiles.edit_profile",
+			"disabled_when": ["llm_custom_profile_ready"],
+			"platforms": ["hs", "linux"],
+			"unavailable": "hide"
+		},
+		{
+			"type": "command",
+			"id": "llm_profile_delete",
+			"i18n": "menu.profiles.delete_profile",
+			"disabled_when": ["llm_custom_profile_ready"],
+			"platforms": ["hs", "linux"],
+			"unavailable": "hide"
+		}
+	],
+	"platform_rows": {
+		"hs": [
+			"llm_profile_use",
+			"llm_profile_shortcut",
+			"---",
+			"llm_profile_edit",
+			"llm_profile_delete"
+		],
+		"linux": ["llm_profile_use", "llm_profile_edit", "llm_profile_delete"],
+		"ahk": []
+	},
+	"caption_snapshots": {
+		"da": {
+			"menu.profiles.use_profile": "Brug dette profil",
+			"menu.profiles.shortcut_prefix": "Genvej: %s",
+			"menu.profiles.edit_profile": "✏️ Rediger…",
+			"menu.profiles.delete_profile": "🗑️ Slet…"
+		},
+		"de": {
+			"menu.profiles.use_profile": "Dieses Profil verwenden",
+			"menu.profiles.shortcut_prefix": "Tastenkombination: %s",
+			"menu.profiles.edit_profile": "✏️ Bearbeiten…",
+			"menu.profiles.delete_profile": "🗑️ Löschen…"
+		},
+		"en": {
+			"menu.profiles.use_profile": "Use this profile",
+			"menu.profiles.shortcut_prefix": "Shortcut: %s",
+			"menu.profiles.edit_profile": "✏️ Edit…",
+			"menu.profiles.delete_profile": "🗑️ Delete…"
+		},
+		"es": {
+			"menu.profiles.use_profile": "Usar este perfil",
+			"menu.profiles.shortcut_prefix": "Atajo: %s",
+			"menu.profiles.edit_profile": "✏️ Editar…",
+			"menu.profiles.delete_profile": "🗑️ Eliminar…"
+		},
+		"fr": {
+			"menu.profiles.use_profile": "Utiliser ce profil",
+			"menu.profiles.shortcut_prefix": "Raccourci : %s",
+			"menu.profiles.edit_profile": "✏️ Modifier…",
+			"menu.profiles.delete_profile": "🗑️ Supprimer…"
+		},
+		"it": {
+			"menu.profiles.use_profile": "Usa questo profilo",
+			"menu.profiles.shortcut_prefix": "Scorciatoia: %s",
+			"menu.profiles.edit_profile": "✏️ Modifica…",
+			"menu.profiles.delete_profile": "🗑️ Elimina…"
+		},
+		"nl": {
+			"menu.profiles.use_profile": "Dit profiel gebruiken",
+			"menu.profiles.shortcut_prefix": "Sneltoets: %s",
+			"menu.profiles.edit_profile": "✏️ Bewerken…",
+			"menu.profiles.delete_profile": "🗑️ Verwijderen…"
+		},
+		"no": {
+			"menu.profiles.use_profile": "Bruk denne profilen",
+			"menu.profiles.shortcut_prefix": "Snarvei: %s",
+			"menu.profiles.edit_profile": "✏️ Rediger…",
+			"menu.profiles.delete_profile": "🗑️ Slett…"
+		},
+		"pl": {
+			"menu.profiles.use_profile": "Użyj tego profilu",
+			"menu.profiles.shortcut_prefix": "Skrót: %s",
+			"menu.profiles.edit_profile": "✏️ Edytuj…",
+			"menu.profiles.delete_profile": "🗑️ Usuń…"
+		},
+		"pt": {
+			"menu.profiles.use_profile": "Usar este perfil",
+			"menu.profiles.shortcut_prefix": "Atalho: %s",
+			"menu.profiles.edit_profile": "✏️ Editar…",
+			"menu.profiles.delete_profile": "🗑️ Excluir…"
+		},
+		"sv": {
+			"menu.profiles.use_profile": "Använd denna profil",
+			"menu.profiles.shortcut_prefix": "Genväg: %s",
+			"menu.profiles.edit_profile": "✏️ Redigera…",
+			"menu.profiles.delete_profile": "🗑️ Radera…"
+		},
+		"tr": {
+			"menu.profiles.use_profile": "Bu profili kullan",
+			"menu.profiles.shortcut_prefix": "Kısayol: %s",
+			"menu.profiles.edit_profile": "✏️ Düzenle…",
+			"menu.profiles.delete_profile": "🗑️ Sil…"
+		},
+		"cs": {
+			"menu.profiles.use_profile": "Použít tento profil",
+			"menu.profiles.shortcut_prefix": "Zkratka: %s",
+			"menu.profiles.edit_profile": "✏️ Upravit…",
+			"menu.profiles.delete_profile": "🗑️ Smazat…"
+		},
+		"ru": {
+			"menu.profiles.use_profile": "Использовать этот профиль",
+			"menu.profiles.shortcut_prefix": "Сочетание клавиш: %s",
+			"menu.profiles.edit_profile": "✏️ Изменить…",
+			"menu.profiles.delete_profile": "🗑️ Удалить…"
+		},
+		"uk": {
+			"menu.profiles.use_profile": "Використати цей профіль",
+			"menu.profiles.shortcut_prefix": "Скорочення: %s",
+			"menu.profiles.edit_profile": "✏️ Змінити…",
+			"menu.profiles.delete_profile": "🗑️ Видалити…"
+		},
+		"he": {
+			"menu.profiles.use_profile": "השתמש בפרופיל זה",
+			"menu.profiles.shortcut_prefix": "קיצור: %s",
+			"menu.profiles.edit_profile": "✏️ ערוך…",
+			"menu.profiles.delete_profile": "🗑️ מחק…"
+		},
+		"ar": {
+			"menu.profiles.use_profile": "استخدام هذا الملف الشخصي",
+			"menu.profiles.shortcut_prefix": "الاختصار: %s",
+			"menu.profiles.edit_profile": "✏️ تعديل…",
+			"menu.profiles.delete_profile": "🗑️ حذف…"
+		},
+		"hi": {
+			"menu.profiles.use_profile": "इस प्रोफ़ाइल का उपयोग करें",
+			"menu.profiles.shortcut_prefix": "शॉर्टकट: %s",
+			"menu.profiles.edit_profile": "✏️ संपादित करें…",
+			"menu.profiles.delete_profile": "🗑️ हटाएँ…"
+		},
+		"zh": {
+			"menu.profiles.use_profile": "使用此配置",
+			"menu.profiles.shortcut_prefix": "快捷键：%s",
+			"menu.profiles.edit_profile": "✏️ 编辑…",
+			"menu.profiles.delete_profile": "🗑️ 删除…"
+		},
+		"ja": {
+			"menu.profiles.use_profile": "このプロファイルを使用",
+			"menu.profiles.shortcut_prefix": "ショートカット: %s",
+			"menu.profiles.edit_profile": "✏️ 編集…",
+			"menu.profiles.delete_profile": "🗑️ 削除…"
+		},
+		"ko": {
+			"menu.profiles.use_profile": "이 프로필 사용",
+			"menu.profiles.shortcut_prefix": "단축키: %s",
+			"menu.profiles.edit_profile": "✏️ 편집…",
+			"menu.profiles.delete_profile": "🗑️ 삭제…"
+		}
+	}
+}

@@ -26,6 +26,19 @@ local function run_fixture(body, source)
 			files[path] = value; controls.writes = controls.writes + 1; return true
 		end,
 	}
+	-- Preserve the controlled native callback before the final logical fence.
+	function file_port.write_if_unchanged_admitted(path, value, expected, _, admission)
+		if type(expected) ~= "table" or getmetatable(expected) ~= nil or type(admission) ~= "function" then return false end
+		local status, content = rawget(expected, "status"), rawget(expected, "content")
+		if not (status == "ok" and type(content) == "string" or status == "absent" and content == nil) then return false end
+		if controls.refuse_write and path == "config" then return false end
+		if status ~= (files[path] and "ok" or "absent") or status == "ok" and files[path] ~= content then return false end
+		if controls.during_write then controls.during_write(path) end
+		local called, admitted = pcall(admission)
+		if not called or admitted ~= true then return false end
+		if status ~= (files[path] and "ok" or "absent") or status == "ok" and files[path] ~= content then return false end
+		files[path] = value; controls.writes = controls.writes + 1; return true
+	end
 	package.loaded["adapters.file_system"] = file_port
 	package.loaded["infra.config_paths"] = { get = function() return "config" end }
 	package.loaded["infra.paths"] = { shared = helpers.shared }

@@ -949,7 +949,9 @@ function _installStatusText() {
 	if (_install.phase === 'restarting')
 		return _fillInstall('changelog_window.install_restarting', tag, path);
 	var reason = _fillInstall(
-		_install.reasonKey || 'changelog_window.install_error_unexpected',
+		(_install.failureReport && _install.failureReport.message_key) ||
+			_install.reasonKey ||
+			'changelog_window.install_error_unexpected',
 		tag,
 		path
 	);
@@ -994,8 +996,10 @@ function _renderInstallControls() {
 	if (text) text.textContent = _install ? _installStatusText() : '';
 	if (retryButton) {
 		retryButton.textContent = _t('changelog_window.retry') || '';
-		retryButton.style.display = _install && _install.phase === 'failed' ? '' : 'none';
+		retryButton.style.display =
+			_install && _install.phase === 'failed' && !_install.managedFailure ? '' : 'none';
 	}
+	_renderInstallFailureActions();
 }
 
 /**
@@ -1011,7 +1015,7 @@ function requestInstall() {
 
 /** Asks the host again for the install that failed. */
 function retryInstall() {
-	if (!_install || _install.phase !== 'failed') return;
+	if (!_install || _install.phase !== 'failed' || _install.managedFailure) return;
 	if (_installBlockedKey !== '') return;
 	_postInstall(_install.tag, _install.channel);
 }
@@ -1043,9 +1047,78 @@ function setInstallProgress(message) {
 		channel: _install && _install.tag === tag ? _install.channel : _currentChannel,
 		phase: message.phase,
 		reasonKey: _hostKey(message.reason_key, INSTALL_REASON_KEY),
-		backupPath: _hostString(message.backup_path) || ''
+		backupPath: _hostString(message.backup_path) || '',
+		operation:
+			Number.isSafeInteger(message.operation) && message.operation > 0 ? message.operation : 0,
+		failureEpoch:
+			Number.isSafeInteger(message.failure_epoch) && message.failure_epoch > 0
+				? message.failure_epoch
+				: 0,
+		managedFailure:
+			message.phase === 'failed' && (message.managed_failure === true || !!message.failure_report),
+		failureReport: message.phase === 'failed' ? _installFailureReport(message) : null
 	};
 	_renderInstallControls();
+}
+
+/** Accepts only the translated public report, never native failure metadata. */
+function _installFailureReport(message) {
+	var report = message.failure_report;
+	if (
+		!report ||
+		typeof report !== 'object' ||
+		!Array.isArray(report.actions) ||
+		!Number.isSafeInteger(message.operation) ||
+		message.operation < 1 ||
+		!Number.isSafeInteger(message.failure_epoch) ||
+		message.failure_epoch < 1 ||
+		typeof report.cause !== 'string' ||
+		!/^[a-z_]+$/.test(report.cause) ||
+		typeof report.message_key !== 'string' ||
+		!/^network\.failure\.[a-z_]+$/.test(report.message_key)
+	)
+		return null;
+	var actions = [];
+	var seen = Object.create(null);
+	report.actions.forEach(function (action) {
+		if (
+			!action ||
+			typeof action.id !== 'string' ||
+			!/^[a-z_]+$/.test(action.id) ||
+			seen[action.id] ||
+			typeof action.label_key !== 'string' ||
+			!/^(network\.action\.[a-z_]+|error_dialog\.open_log|mlx\.use_ollama)$/.test(action.label_key)
+		)
+			return;
+		seen[action.id] = true;
+		actions.push({ id: action.id, label_key: action.label_key });
+	});
+	return { cause: report.cause, message_key: report.message_key, actions: actions };
+}
+
+/** Captures the exact terminal operation; the native host recomputes admission. */
+function _renderInstallFailureActions() {
+	var box = document.getElementById('install-failure-actions');
+	if (!box) return;
+	box.replaceChildren();
+	var current = _install;
+	box.style.display = current && current.failureReport ? 'flex' : 'none';
+	if (!current || current.phase !== 'failed' || !current.failureReport) return;
+	current.failureReport.actions.forEach(function (action) {
+		var button = document.createElement('button');
+		button.type = 'button';
+		button.textContent = _t(action.label_key) || '';
+		button.addEventListener('click', function () {
+			if (_install !== current || current.phase !== 'failed' || _installBlockedKey !== '') return;
+			_postChangelogMessage({
+				action: 'install_failure_action',
+				id: action.id,
+				operation: current.operation,
+				epoch: current.failureEpoch
+			});
+		});
+		box.appendChild(button);
+	});
 }
 
 /**

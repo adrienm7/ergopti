@@ -33,6 +33,7 @@ local Paths          = require("infra.paths")
 local FileSystem     = require("adapters.file_system")
 local JsonCodec      = require("adapters.json_codec")
 local AuthPolicy     = require("llm.local_server_auth")
+local Json           = require("json")
 local Discovery      = require("llm.local_server_discovery")
 local TimerScheduler = require("adapters.timer_scheduler")
 
@@ -73,6 +74,7 @@ M.FAILURE_MODEL_MISSING = "model_missing"
 --- the LLM stack depends on it.
 --- @return table order Server ids in menu order.
 --- @return table servers Server id -> { id, label, base_url }.
+--- @return boolean published Complete same-source local inventory.
 local function load_catalogue()
 	local path = Paths.shared_llm_path("local_servers.json")
 	local raw, status = nil, "error"
@@ -80,21 +82,31 @@ local function load_catalogue()
 	if status ~= "ok" or type(raw) ~= "string" then
 		Logger.error(LOG, "local_servers.json is unreadable at %s (%s): no local server is detected.",
 			tostring(path), tostring(status))
-		return {}, {}
+		return {}, {}, false
 	end
 	local ok, root = pcall(JsonCodec.decode, raw)
 	if not ok or type(root) ~= "table" or type(root.server_order) ~= "table" or type(root.servers) ~= "table" then
 		Logger.error(LOG, "local_servers.json is malformed: no local server is detected.")
-		return {}, {}
+		return {}, {}, false
 	end
+	local source = Json.decode_lossless(raw)
+	local shaped = type(source) == "table" and not Json.is_array(source) and not Json.is_null(source)
+		and Json.is_array(source.server_order) and type(source.servers) == "table"
+		and not Json.is_array(source.servers) and not Json.is_null(source.servers)
 	local order, servers = AuthPolicy.catalogue(root, {})
 	if #order ~= #root.server_order then
 		Logger.error(LOG, "local_servers.json contains unsupported or duplicate optional-auth descriptors.")
 	end
-	return order, servers
+	return order, servers, shaped and #order == #source.server_order
 end
 
-M.ORDER, M.SERVERS = load_catalogue()
+local config_published
+M.ORDER, M.SERVERS, config_published = load_catalogue()
+
+--- Reports admission of the original local catalogue, including a valid empty list.
+--- Runtime mutations and server reachability cannot grant inventory authority.
+--- @return boolean published
+function M.config_catalogue_published() return config_published == true end
 
 --- Tells whether an id names a server of the catalogue.
 --- @param id any

@@ -34,11 +34,38 @@ helpers.describe("Configuration › Restore recommended values (macOS)", functio
 			table.sort(ids)
 			-- Hotstrings take part like every config.toml category: a skipped one
 			-- left its choices, delays and engine switch outside the restore.
-			helpers.assert_eq(ids, { "gestures", "hotstrings", "keyboard_layout", "llm", "metrics", "shortcuts" })
+			helpers.assert_eq(ids, { "gestures", "global", "hotstrings", "keyboard_layout", "llm", "metrics", "shortcuts" })
 			for _, name in ipairs({ "backup_path", "paused", "refresh" }) do
 				helpers.assert_type(requested.options[name], "function")
 			end
 			helpers.assert_nil(requested.options.confirm, "neither Configuration row asks")
+			local previous_script = package.loaded["infra.script_scope"]
+			local native_options, constructed = nil, 0
+			local native_owner = {}
+			package.loaded["infra.script_scope"] = { new = function(options)
+				native_options, constructed = options, constructed + 1
+				return native_owner
+			end }
+			local checked, failure = pcall(function()
+				helpers.assert_eq(requested.options.owners.global(), native_owner)
+				helpers.assert_eq(requested.options.owners.global(), native_owner)
+				helpers.assert_eq(constructed, 1, "the factory retains the exact native cohort")
+				helpers.assert_type(native_options.path, "string")
+				helpers.assert_true(native_options.path ~= "")
+				for _, name in ipairs({ "backup_path", "storage_backup_path", "paused", "capture_preferences", "admission" }) do
+					helpers.assert_type(native_options[name], "function")
+				end
+				for _, name in ipairs({ "capture", "replace", "restore" }) do
+					helpers.assert_type(native_options.checkpoint[name], "function")
+				end
+				local first = native_options.backup_path()
+				helpers.assert_eq(native_options.storage_backup_path(), first .. ".settings")
+				local second = native_options.backup_path()
+				helpers.assert_true(first ~= second)
+				helpers.assert_eq(native_options.storage_backup_path(), second .. ".settings")
+			end)
+			package.loaded["infra.script_scope"] = previous_script
+			if not checked then error(failure) end
 			-- « Tout effacer », beside it since 2026-09-30: the same composition,
 			-- in clear mode, one transaction whose owners each back up first.
 			helpers.assert_eq(actions.clear_to_system(), true)

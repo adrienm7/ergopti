@@ -26,6 +26,7 @@
 --- ==============================================================================
 
 local M = {}
+local BindingPublication = require("config_binding_publication")
 
 local Logger = require("logger.shim")
 local ConfigOutdated = require("config_outdated")
@@ -52,6 +53,8 @@ local BLOCKING_MODIFIERS = { "ctrl", "shift", "alt", "altgr", "meta" }
 
 -- Decoded tap_keys.json entries in menu order; nil until read.
 local _keys = nil
+local _binding_source = nil
+local _binding_catalogue = nil
 
 -- tap key id -> action id, read once from config.toml over the manifest defaults.
 local _assignments = nil
@@ -102,8 +105,11 @@ function M.keys()
 	local path = Paths.shared(KEYS_REL_PATH)
 	local handle = path and io.open(path, "r")
 	if not handle then error("tap_keys: cannot read " .. tostring(path)) end
-	local body = handle:read("*a")
-	handle:close()
+	local read_ok, body = pcall(handle.read, handle, "*a")
+	local close_ok, closed = pcall(handle.close, handle)
+	if not read_ok or type(body) ~= "string" or not close_ok or closed ~= true then
+		error("tap_keys: cannot complete read of " .. tostring(path))
+	end
 	local Json = require("json")
 	local ok, parsed = pcall(Json.decode, body)
 	if not ok or type(parsed) ~= "table" or type(parsed.keys) ~= "table" or #parsed.keys == 0 then
@@ -114,9 +120,27 @@ function M.keys()
 			error("tap_keys: an entry of " .. tostring(path) .. " lacks its id or evdev code")
 		end
 	end
-	_keys = parsed.keys
+	local publication = require("config_binding_identity").tap_binding_catalogue(parsed.keys)
+	_keys, _binding_source, _binding_catalogue = parsed.keys, parsed.keys, publication
 	return _keys
 end
+
+--- Returns only the detached identity of the acknowledged current native source.
+--- A changed source withdraws publication; this accessor performs no IO.
+--- @return table|nil catalogue
+function M.published_binding_catalogue()
+	if not BindingPublication.owner_is_current("tap", "modules.shortcuts.tap_keys", M) then return nil end
+	if _binding_catalogue == nil or not rawequal(_keys, _binding_source) then return nil end
+	local current = require("config_binding_identity").tap_binding_catalogue(_keys)
+	for id in pairs(current.slots) do
+		if _binding_catalogue.slots[id] ~= true then return nil end
+	end
+	for id in pairs(_binding_catalogue.slots) do
+		if current.slots[id] ~= true then return nil end
+	end
+	return current
+end
+
 
 --- The binding id a tap key dispatches under.
 --- @param id string
@@ -346,6 +370,8 @@ end
 
 --- Test seam: forgets what was loaded.
 function M._reset()
+	_binding_source = nil
+	_binding_catalogue = nil
 	_configuration_owner = nil
 	_dispatch_generation = _dispatch_generation + 1
 	_keys = nil
@@ -416,5 +442,7 @@ function M.apply_configuration(owner, state)
 	_dispatch_generation = _dispatch_generation + 1
 	return true
 end
+
+BindingPublication.register("tap", "modules.shortcuts.tap_keys", M, M.published_binding_catalogue)
 
 return M

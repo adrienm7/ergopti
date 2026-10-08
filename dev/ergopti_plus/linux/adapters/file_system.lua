@@ -261,4 +261,28 @@ function M.delete(path)
 	return false
 end
 
+
+-- Preserve the actual constructor's methods, including absent capabilities.
+-- This pure identity receipt neither invokes IO nor grants config readiness.
+local configuration_reader, configuration_writer, configuration_publisher =
+	rawget(M, "read_with_status"), rawget(M, "write_if_unchanged"), rawget(M, "write_if_unchanged_admitted")
+local configuration_remover, configuration_admitted_remover, configuration_exact_remover, configuration_delete =
+	rawget(M, "remove_if_unchanged"), rawget(M, "remove_if_unchanged_admitted"), rawget(M, "remove_exact"), rawget(M, "delete")
+
+--- Returns this initializer's actual native method identities without IO.
+--- Public export replacement cannot change these captured values. Consumers
+--- still own loader-origin, raw live-export and source/publication admission.
+--- @return table owner
+--- @return function reader
+--- @return function writer
+--- @return function publisher
+--- @return function|nil remover
+--- @return function|nil admitted_remover
+--- @return function|nil exact_remover
+--- @return function delete
+function M.configuration_ports()
+	return M, configuration_reader, configuration_writer, configuration_publisher,
+		configuration_remover, configuration_admitted_remover, configuration_exact_remover, configuration_delete
+end
+
 return M

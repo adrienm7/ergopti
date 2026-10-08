@@ -138,9 +138,10 @@ helpers.describe("ShellRunner: argv typing", function()
 	-- here" ships. Ordering matters too -- a check after luv.spawn proves nothing.
 	helpers.it("every luv.spawn site validates its argv before spawning", function()
 		local sites = {
-			{ file = "adapters/http_client.lua", binary = "curl" },
+			{ file = "adapters/curl_http_client.lua", binary = "curl" },
 			{ file = "adapters/file_digest.lua", binary = "sha256sum" },
 			{ file = "adapters/process_runner.lua", binary = "any program (python3 for layouts)" },
+			{ file = "adapters/system_proxy.lua", binary = "the native proxy lookup helper" },
 		}
 		local checked = 0
 		for _, site in ipairs(sites) do
@@ -164,7 +165,7 @@ helpers.describe("ShellRunner: argv typing", function()
 				site.file .. " must validate BEFORE luv.spawn, so a refusal costs no "
 				.. "process (keylogger-worker-timings-must-be-strings)")
 		end
-		helpers.assert_eq(checked, 3, "every spawn site must have been inspected")
+		helpers.assert_eq(checked, 4, "every spawn site must have been inspected")
 	end)
 
 	-- The three drivers must agree on this contract, or the next audit fixes it

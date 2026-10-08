@@ -298,8 +298,18 @@ helpers.describe("release_installer: the replacement script under /bin/sh", func
 	end
 
 	helpers.it("waits for the launcher, keeps the previous app and opens the chosen one", function()
-		local _, sleeper = sh("sleep 0.4 >/dev/null 2>&1 & echo $!")
-		local result = swap({ pid = sleeper:match("(%d+)"), previous = true })
+		-- Keep the shell parent alive to reap its sleeper while the swap waits.
+		local producer = assert(io.popen([[sleep 0.4 >/dev/null 2>&1 & sleeper=$!; printf '%s\n' "$sleeper"; wait "$sleeper"]]))
+		local completed, result = pcall(function()
+			local sleeper = producer:read("*l")
+			assert(sleeper and sleeper:match("^[1-9]%d*$"), "The retained sleeper must publish its exact PID")
+			return swap({ pid = sleeper, previous = true })
+		end)
+		-- Close this exact producer even if PID admission or swap failed. All
+		-- original result assertions run only after the parent has been reaped.
+		local close_completed, closed = pcall(producer.close, producer)
+		if not completed then error(result, 0) end
+		assert(close_completed and closed == true, "The retained sleeper parent must retire successfully")
 		helpers.assert_eq(result.status, 0, result.output)
 		helpers.assert_eq(result.app, "chosen")
 		helpers.assert_eq(result.previous, "installed")

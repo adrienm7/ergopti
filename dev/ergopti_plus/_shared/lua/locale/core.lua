@@ -217,6 +217,12 @@ function M.get(key)
 	return s
 end
 
+--- Returns the locale the translation backend currently owns.
+--- @return string|nil locale Nil before native initialization.
+function M.current_locale()
+	return _state and _state.locale or nil
+end
+
 --- Sets the trigger-character provider used for ★ substitution.
 --- @param fn function A zero-argument function returning the trigger string.
 function M.set_trigger_provider(fn)

@@ -549,3 +549,101 @@ helpers.describe("gestures.actions: a parameterized action honours its binding",
 			.. "to a link they configured somewhere else entirely")
 	end)
 end)
+
+
+helpers.describe("gestures.actions: published parameter binding identity", function()
+	local function with_actions(body)
+		helpers.with_stub_scope({ "modules.gestures", "modules.gestures.actions" }, function()
+			package.loaded["modules.gestures"], package.loaded["modules.gestures.actions"] = nil, nil
+			local gestures = helpers.load_with_stubs("modules.gestures")
+			local actions = require("modules.gestures.actions")
+			actions.init({ action_params = {} })
+			body(actions, gestures)
+		end)
+	end
+
+	helpers.it("refuses a retired bare gesture without changing its runtime snapshot", function()
+		with_actions(function(actions)
+			helpers.assert_eq(actions.set_action_parameter("removed_gesture_slot", "open_url", "https://old.example"), false)
+			helpers.assert_eq(actions.get_all_action_parameters(), {})
+			helpers.assert_eq(actions.action_parameter_binding_fits("removed_gesture_slot"), false)
+		end)
+	end)
+
+	helpers.it("admits every current single and axis slot from the actual owner", function()
+		with_actions(function(actions, gestures)
+			for _, list in ipairs({ gestures.SINGLE_SLOTS, gestures.AXIS_SLOTS }) do
+				for _, slot in ipairs(list) do
+					helpers.assert_eq(actions.action_parameter_binding_fits(slot), true, slot)
+					helpers.assert_eq(actions.set_action_parameter(slot, "open_url", "https://valid.example"), true, slot)
+				end
+			end
+		end)
+	end)
+
+	helpers.it("leaves the other qualified binding owners unjudged", function()
+		with_actions(function(actions)
+			for _, binding in ipairs({ "keyboard__cmd_k", "tap_key__a", "script__reload", "tap_hold__caps_lock", "combination__caps_lock_then_space" }) do
+				local owner = package.loaded["modules.shortcuts.keyboard_shortcuts"]
+				local published = require("config_keyboard_publication").current(owner) ~= nil
+				if binding == "keyboard__cmd_k" and published then
+					helpers.assert_eq(actions.action_parameter_binding_fits(binding), true, "the actual published Mac Cmd+K is current")
+				else
+					helpers.assert_nil(actions.action_parameter_binding_fits(binding), binding)
+				end
+				helpers.assert_eq(actions.set_action_parameter(binding, "open_url", "https://other.example"), true, binding)
+			end
+		end)
+	end)
+
+	helpers.it("does not infer retirement before the gesture owner publishes", function()
+		with_actions(function(actions)
+			package.loaded["modules.gestures"] = nil
+			helpers.assert_nil(actions.action_parameter_binding_fits("removed_gesture_slot"))
+			helpers.assert_eq(actions.set_action_parameter("removed_gesture_slot", "open_url", "https://unjudged.example"), true)
+		end)
+	end)
+
+	helpers.it("keeps exact compensation snapshots independent of ordinary setter admission", function()
+		with_actions(function(actions)
+			local snapshot = { removed_gesture_slot__open_url = "https://prior.example" }
+			helpers.assert_eq(actions.replace_action_parameters(snapshot), true)
+			helpers.assert_eq(actions.get_all_action_parameters(), snapshot)
+			helpers.assert_eq(actions.set_action_parameter("removed_gesture_slot", "open_url", "https://new.example"), false)
+			helpers.assert_eq(actions.get_all_action_parameters(), snapshot)
+		end)
+	end)
+end)
+
+helpers.describe("gestures.actions: malformed native catalogue refusal", function()
+	helpers.it("fails before runtime activation when the actual owner publishes a malformed slot inventory", function()
+		helpers.with_stub_scope({ "modules.gestures", "modules.gestures.actions" }, function()
+			package.loaded["modules.gestures"], package.loaded["modules.gestures.actions"] = nil, nil
+			local gestures = helpers.load_with_stubs("modules.gestures")
+			local actions = require("modules.gestures.actions")
+			gestures.AXIS_SLOTS = nil
+			helpers.assert_throws(function() actions.action_parameter_binding_fits("tap_3") end)
+			gestures.AXIS_SLOTS = {}
+			helpers.assert_throws(function() actions.action_parameter_binding_fits("tap_3") end)
+			gestures.SINGLE_SLOTS = { false }
+			helpers.assert_throws(function() actions.set_action_parameter("tap_3", "open_url", "https://valid.example") end)
+			helpers.assert_eq(actions.get_all_action_parameters(), {})
+		end)
+	end)
+end)
+
+local binding_vectors_path = helpers.shared("tests/corpus/config_binding_identity/vectors.json")
+local binding_vectors_file = assert(io.open(binding_vectors_path, "rb"))
+local binding_vectors_source = assert(binding_vectors_file:read("*a")); assert(binding_vectors_file:close())
+require("test.config_binding_identity_contract").register(helpers, assert(require("json").decode(binding_vectors_source)))
+
+
+require("test.script_binding_publication_contract").register(require("tests.helpers"), "macos")
+
+require("test.tap_binding_publication_contract").register(require("tests.helpers"), "macos")
+
+require("test.binding_publication_authority_contract").register(require("tests.helpers"), "macos")
+
+require("test.keyboard_binding_publication_contract").register(require("tests.helpers"), "macos")
+
+require("test.script_binding_publication_contract").register_late(require("tests.helpers"), "macos")

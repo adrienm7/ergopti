@@ -10,12 +10,35 @@
 
 local uv=require('luv')
 local Http=require('adapters.http_client')
+local Curl=require('adapters.curl_http_client')
 assert(uv.getuid()~=0)
 local BodyPipe=require('infra.http_body_pipe')
 local pipe_backend=type(uv.pipe)=='function' and uv or BodyPipe
 local pipe_field=type(uv.pipe)=='function' and 'pipe' or 'allocate'
 local original_pipe, original_open, original_close, original_handle_close = pipe_backend[pipe_field], uv.pipe_open, uv.fs_close, uv.close
 local server_handles, sockets = {}, {}
+local native_operations = {}
+local original_dispatch = Curl.dispatch_owned
+-- Delegation records the genuine production token; no synthetic timer or
+-- generic handle class can establish cleanup-monitor ownership.
+Curl.dispatch_owned = function(...)
+  local operation = original_dispatch(...)
+  if type(operation)=='table' and type(operation._request)=='table' then
+    native_operations[operation._request.owner]=operation
+  end
+  return operation
+end
+local observation_owner, monitor_observation = nil, false
+local function exact_retained_monitor(handle)
+  if not monitor_observation then return false end
+  local operation=native_operations[observation_owner]
+  local request=operation and operation._request
+  local receipt=request and request.handles and request.handles[handle]
+  return operation and not operation:is_settled() and request.owner==observation_owner
+    and request.timer==handle and request.cleanup_monitor==true
+    and receipt and receipt.state=='open'
+end
+
 local directory=assert(uv.fs_mkdtemp('/tmp/ergopti-body-cleanup-XXXXXX'))
 local sentinel=directory..'/sentinel'
 local f=assert(io.open(sentinel,'wb'));assert(f:write('owned sentinel') and f:close())
@@ -27,7 +50,7 @@ local function wait_for(done)
 end
 local function retired()
   local alive=false
-  uv.walk(function(h) if not server_handles[h] and not uv.is_closing(h) then alive=true end end)
+  uv.walk(function(h) if not server_handles[h] and not exact_retained_monitor(h) then alive=true end end)
   return not alive
 end
 local function count()
@@ -52,6 +75,7 @@ assert(server:listen(8,function(err)
     end
   end))
 end))
+local protected, outcome=xpcall(function()
 local origin='http://127.0.0.1:'..server:getsockname().port
 local warmup
 assert(Http.get(origin,{}, {},function(r)warmup=r end))
@@ -72,6 +96,7 @@ for _,attach in ipairs({false,true})do
 for _,receipt in ipairs({'nil','false','throw'})do
   checks=checks+1
   local owner='native-body-close-debt-'..checks
+  observation_owner,monitor_observation=owner,true
   local raw,allow,retained_handle,pair={},false,nil,nil
   pipe_backend[pipe_field]=function(...)
     local p,a,b=original_pipe(...)
@@ -107,7 +132,8 @@ for _,receipt in ipairs({'nil','false','throw'})do
   end
   local function other_clients_retired()
     local alive=false
-    uv.walk(function(h) if not server_handles[h] and h~=retained_handle and not uv.is_closing(h) then alive=true end end)
+    uv.walk(function(h) if not server_handles[h] and not exact_retained_monitor(h)
+      and not (not allow and h==retained_handle) then alive=true end end)
     return not alive
   end
   local before=count()
@@ -126,6 +152,7 @@ for _,receipt in ipairs({'nil','false','throw'})do
   if successor.started then successor:cancel();wait_for(other_clients_retired)end
   local retained=count()==before+(attach and 2 or 1)
   allow=true
+  monitor_observation=false
   Http.cancel(owner)
   wait_for(other_clients_retired)
   uv.run('nowait')
@@ -147,6 +174,7 @@ for _,reused in ipairs({false,true})do
 for _,receipt in ipairs({'nil','false','throw'})do
   checks=checks+1
   local owner='native-retired-body-fd-'..checks
+  observation_owner,monitor_observation=owner,false
   local pair,sentinel_fd,reported=nil,nil,false
   local attempts=0
   pipe_backend[pipe_field]=function(...) local p,a,b=original_pipe(...);pair=p;return p,a,b end
@@ -172,12 +200,22 @@ for _,receipt in ipairs({'nil','false','throw'})do
   local before=count()
   local callbacks=0
   local dispatched=Http.post(origin,{},'{"text":"literal"}',function()callbacks=callbacks+1 end,{owner=owner})
-  wait_for(retired)
+  -- The descriptor may be positively absent/reused while the exact strong
+  -- handle ledger still owes native close ACKs. Probe that actual boundary;
+  -- full retirement below must not fabricate later predecessor ownership.
+  local predecessor=assert(native_operations[owner], 'exact native predecessor must be captured')
+  local pending_close=false
+  for handle,receipt in pairs(predecessor._request.handles)do
+    if receipt.state=='closing' and uv.is_closing(handle)then pending_close=true end
+  end
+  assert(not predecessor:is_settled() and pending_close, 'native close ACK must still be pending at replacement probe')
   local blocked
   local candidate=Http.get_owned(origin,{}, {owner=owner},function(r)blocked=r end)
   local fenced=candidate.started==false and blocked and blocked.error=='previous request cleanup pending'
-  if candidate.started then candidate:cancel();wait_for(retired)end
-  Http.cancel(owner);uv.run('nowait')
+  if candidate.started then candidate:cancel()end
+  Http.cancel(owner)
+  wait_for(retired)
+  assert(predecessor:is_settled(), 'exact native predecessor must physically settle before sentinel/recovery proof')
   local alive=not reused or (uv.fs_fstat(sentinel_fd) and uv.fs_read(sentinel_fd,100,0)=='owned sentinel')
   local recovered=count()==before+(reused and 1 or 0)
   local success=dispatched==false and callbacks==0 and fenced and alive and attempts==1 and recovered
@@ -207,7 +245,7 @@ do
   allow=true
   wait_for(function()
     local alive=false
-    uv.walk(function(h)if not server_handles[h] and h~=first and not uv.is_closing(h)then alive=true end end)
+    uv.walk(function(h)if not server_handles[h] then alive=true end end)
     return (dispatched or callbacks==1) and not alive
   end)
   local success=not dispatched and fenced and result and result.error=='curl body pipe retirement failed' and count()==before
@@ -230,6 +268,7 @@ do
     return original_stat(fd)
   end
   local callbacks=0
+  observation_owner,monitor_observation='unknown-native-body',true
   local dispatched=Http.post(origin,{},'{}',function()callbacks=callbacks+1 end,{owner='unknown-native-body'})
   wait_for(retired)
   if dispatched then
@@ -248,7 +287,9 @@ do
   local alive=original_stat(replacement) and uv.fs_read(replacement,100,0)=='owned sentinel'
   assert(original_close(replacement))
   if original_stat(pair.write)then assert(original_close(pair.write))end
+  monitor_observation=false
   local recovered=Http.cancel('unknown-native-body') and count()==before
+  wait_for(retired)
   local success=not dispatched and callbacks==0 and fenced and retained and alive and recovered
   print((success and 'PASS 'or'FAIL ')..'SIMULATED initial metadata refusal preserves actual reused descriptor and waits for EBADF')
   if not success then failures=failures+1 end
@@ -256,9 +297,16 @@ do
   uv.fs_fstat=original_stat;pipe_backend[pipe_field]=original_pipe
 end
 
+Curl.dispatch_owned=original_dispatch
 close(server);for _,s in ipairs(sockets)do close(s)end;uv.run()
 assert(not uv.loop_alive())
 assert(uv.fs_unlink(sentinel) and uv.fs_rmdir(directory))
 assert(checks == 14, 'native cleanup regression case inventory changed')
 print('Native resource / simulated refusal body cleanup: '..checks..' checks, '..failures..' failures')
-os.exit(failures==0 and 0 or 1)
+return failures==0 and 0 or 1
+
+end,debug.traceback)
+pipe_backend[pipe_field],uv.pipe_open,uv.fs_close,uv.close=original_pipe,original_open,original_close,original_handle_close
+Curl.dispatch_owned=original_dispatch
+if not protected then error(outcome,0) end
+os.exit(outcome)

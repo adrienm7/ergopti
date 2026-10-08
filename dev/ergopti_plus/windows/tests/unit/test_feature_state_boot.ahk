@@ -114,6 +114,18 @@ TestFeatureStateBootSourceWiring() {
         "feature-state must call the configuration accessor directly")
     AssertTrue(InStr(FeatureStateSource, 'Func("IniCacheGet").Call') = 0,
         "feature-state must not use the boot-fragile Func(...).Call accessor")
+	HarnessSource := FileRead(A_ScriptDir . "\support\feature_state_boot_smoke.ahk", "UTF-8")
+	PolicyInclude := _FeatureStateBootFindOwnerInclude(Source, "TomlConfigParameterBindingStatus")
+	HarnessHelpers := InStr(HarnessSource, _FeatureStateBootNativeInclude(Source, HelpersPos))
+	HarnessLoader := InStr(HarnessSource, PolicyInclude)
+	HarnessState := InStr(HarnessSource, _FeatureStateBootNativeInclude(Source, StatePos))
+	AssertTrue(HarnessHelpers > 0 && HarnessLoader > 0 && HarnessState > 0,
+		"the native child must include the actual configuration-owner parameter policy")
+	AssertTrue(HarnessHelpers < HarnessLoader && HarnessLoader < HarnessState,
+		"the native child preserves the production helper/loader/state dependency order")
+	AssertTrue(InStr(_DriverFuncBody("TomlConfigParameterBindingStatus"),
+		"TomlConfigParameterBindingStatus(BindingId, Catalogue?) {") > 0,
+		"the included native owner declares the actual binding-status callable")
 }
 Test("Feature-state startup: production include order and direct loader dependency stay wired (feature-state-boot-wiring)", TestFeatureStateBootSourceWiring)
 
@@ -124,3 +136,64 @@ TestFeatureStateBootSemanticSources() {
 }
 Test("feature-state startup: semantic root and section sources reach actual readers (config-semantic-snapshot)",
 	TestFeatureStateBootSemanticSources)
+
+
+TestFeatureStateBootScriptBindingPublication() {
+	_FeatureStateBootRun("script_binding_publication")
+}
+Test("feature-state startup: actual compiled script declaration publishes a complete binding receipt (script-binding-identity)",
+	TestFeatureStateBootScriptBindingPublication)
+
+TestFeatureStateBootTapBindingPublication() {
+	_FeatureStateBootRun("tap_binding_publication")
+}
+Test("feature-state startup: actual compiled tap declarations publish before config consumers (tap-binding-identity)",
+	TestFeatureStateBootTapBindingPublication)
+
+TestFeatureStateBootTapBindingSourceWiring() {
+	Source := FileRead(A_ScriptDir . "\..\ErgoptiPlus.ahk", "UTF-8")
+	State := FileRead(A_ScriptDir . "\..\infra\feature_state.ahk", "UTF-8")
+	KeyStatePos := InStr(Source, "#Include adapters/key_state.ahk")
+	StatePos := InStr(Source, "#Include infra/feature_state.ahk")
+	ApplyPos := InStr(Source, "_BootConfigApplied := ApplyBootConfigToml(")
+	GesturePos := InStr(Source, "#Include modules/gestures/init.ahk")
+	LaterTapPos := InStr(Source, "#Include infra/tap_keys.ahk")
+	TapReadPos := InStr(Source, "TapKeysReadConfig(_IniCache)")
+	AssertTrue(KeyStatePos > 0 && StatePos > 0 && ApplyPos > 0 && GesturePos > 0 && LaterTapPos > 0 && TapReadPos > 0,
+		"all actual declaration, reader and native prerequisite source bindings must exist")
+	AssertTrue(KeyStatePos < StatePos && StatePos < ApplyPos && ApplyPos < GesturePos && GesturePos < LaterTapPos && LaterTapPos < TapReadPos,
+		"native declarations precede both config readers while actual tap configuration stays in its original stage")
+	IncludePos := InStr(State, "#Include %A_LineFile%\..\tap_keys.ahk")
+	PublishPos := InStr(State, "global _TapKeyBindingPublication := ConfigBindingIdentityTapPublication(TAP_KEY_ORDER, TAP_KEY_SCANCODES)")
+	AssertTrue(IncludePos > 0 && PublishPos > IncludePos,
+		"the exact existing native source publishes only after its ordinary early include")
+}
+Test("feature-state startup: tap publication source ordering retains the later native read stage (tap-binding-identity)",
+	TestFeatureStateBootTapBindingSourceWiring)
+
+; Follow the real entry-point includes and the canonical definition reader, so
+; moving the policy owner preserves this dependency assertion without a pin.
+_FeatureStateBootFindOwnerInclude(DriverSource, Symbol) {
+	Includes := []
+	for Line in StrSplit(_StripFullLineComments(DriverSource), "`n", "`r") {
+		if !RegExMatch(Line, "^#Include[ `t]+(.+)$", &Directive)
+			continue
+		Operand := Trim(Directive[1])
+		CandidatePath := A_ScriptDir . "\..\" . Operand
+		if !FileExist(CandidatePath)
+			continue
+		CandidateSource := FileRead(CandidatePath, "UTF-8")
+		if !_DriverFindFunctionDefinition(&CandidateSource, Symbol)
+			continue
+		Includes.Push("#Include ..\..\" . StrReplace(Operand, "/", "\"))
+	}
+	if Includes.Length != 1
+		throw Error("The native binding policy must have exactly one real entry-point include owner.")
+	return Includes[1]
+}
+
+_FeatureStateBootNativeInclude(DriverSource, Position) {
+	End := InStr(DriverSource, "`n", false, Position)
+	Line := Trim(SubStr(DriverSource, Position, End ? End - Position : unset), "`r`n `t")
+	return "#Include ..\..\" . StrReplace(SubStr(Line, 10), "/", "\")
+}

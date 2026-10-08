@@ -18,6 +18,7 @@ local MODULES = {
 	"infra.text_utils",
 	"modules.llm.ollama_binary",
 	"modules.llm.ollama_server_command",
+	"modules.llm.network_env",
 	"adapters.task_lifecycle",
 	"adapters.shell_runner",
 	"adapters.timer_scheduler",
@@ -26,6 +27,97 @@ local MODULES = {
 	"ui.menu.menu_llm.requirement_operation_registry",
 	"ui.menu.menu_llm.models_manager_ollama",
 }
+
+--- Receives argv from the actual emitted wrapper through the canonical Bash owner.
+--- The fixture's old args field describes the executed CLI; native_args retains
+--- the exact shell constructor. No shell text is parsed into expected argv.
+--- @param executable string Actual task constructor executable.
+--- @param argv table Actual task constructor arguments.
+--- @return table Executed CLI arguments.
+local retained_receivers = {}
+
+local function receive_pull_argv(executable, argv)
+	helpers.assert_eq(executable, "/bin/bash")
+	helpers.assert_eq(#argv, 2)
+	helpers.assert_eq(argv[1], "-c")
+	helpers.assert_type(argv[2], "string")
+	local packet_path = helpers.temp_dir() .. "/ollama-pull-argv-" .. tostring(os.time())
+		.. "-" .. tostring(math.random(1, 1000000000)) .. ".sh"
+	local owner = { path = packet_path }
+	local function close_source()
+		owner.file_close_attempted = true
+		local ok, closed, err = pcall(function() return owner.file:close() end)
+		if ok and closed == true then owner.file = nil; return true end
+		return nil, tostring(ok and err or closed)
+	end
+	local function close_process()
+		owner.process_close_attempted = true
+		local ok, closed, reason, code = pcall(function() return owner.process:close() end)
+		local terminal = ok and (closed == true or closed == nil)
+			and (reason == "exit" or reason == "signal")
+			and type(code) == "number" and code >= 0 and code % 1 == 0
+		if terminal then
+			owner.process = nil
+			return true, closed, reason, code
+		end
+		return nil, tostring(ok and reason or closed)
+	end
+	local function quote(value)
+		if package.config:sub(1, 1) ~= "/" then
+			helpers.assert_true(not value:find('["%%\r\n]'), "unsafe native fixture command path")
+			return '"' .. value .. '"'
+		end
+		return "'" .. value:gsub("'", "'\\''") .. "'"
+	end
+	local ok, result = xpcall(function()
+		owner.file = assert(io.open(packet_path, "w"))
+		owner.packet_created = true
+		assert(owner.file:write(argv[2]))
+		assert(close_source())
+		local receiver = helpers.driver_root() .. "../../../tools/test/fixtures/macos-opaque-exec-argv.cjs"
+		owner.process = assert(io.popen("node " .. quote(receiver) .. " " .. quote(packet_path), "r"))
+		local output = assert(owner.process:read("*a"))
+		local retired, closed, reason, code = close_process()
+		assert(retired, closed)
+		helpers.assert_eq(closed, true, output)
+		helpers.assert_eq(reason, "exit")
+		helpers.assert_eq(code, 0)
+		local packet = assert(require("json").decode(output))
+		helpers.assert_eq(packet.executable, "/opt/homebrew/bin/ollama")
+		helpers.assert_type(packet.args, "table")
+		return packet.args
+	end, debug.traceback)
+	local cleanup_error
+	-- Close every acquired handle on the same exceptional path. An ambiguous
+	-- attempted close is not retried and cannot admit packet removal.
+	if owner.process and not owner.process_close_attempted then
+		local closed, err = close_process()
+		if not closed then cleanup_error = err end
+	end
+	if owner.file and not owner.file_close_attempted then
+		local closed, err = close_source()
+		if not closed and not cleanup_error then cleanup_error = err end
+	end
+	if owner.file or owner.process then
+		cleanup_error = cleanup_error or "receiver handle closure was not acknowledged"
+	elseif owner.packet_created then
+		local removed_ok, removed, err = pcall(os.remove, packet_path)
+		if removed_ok and removed == true then owner.packet_created = false else
+			cleanup_error = tostring(removed_ok and err or removed)
+		end
+	end
+	if owner.file or owner.process or owner.packet_created then
+		-- Returned module state strongly retains unresolved owners; GC is never
+		-- an acknowledgement, and this fixture adds no reaper or timer.
+		owner.original_error = not ok and result or nil
+		owner.result = ok and result or nil
+		owner.cleanup_error = cleanup_error
+		retained_receivers[#retained_receivers + 1] = owner
+	end
+	if not ok then error(result, 0) end
+	if cleanup_error then error(cleanup_error, 0) end
+	return result
+end
 
 local function with_fixture(spec, body)
 	spec = spec or {}
@@ -223,11 +315,15 @@ local function with_fixture(spec, body)
 				local on_stream = type(on_chunk_or_args) == "function"
 					and on_chunk_or_args or nil
 				local argv = on_stream and (args or {}) or on_chunk_or_args
+				local executed_args = argv
+				if label == "Ollama model pull" then
+					executed_args = receive_pull_argv(executable, argv)
+				end
 				local task = {
 					index = index,
 					label = label,
 					executable = executable,
-					args = argv,
+					args = executed_args, native_args = argv, native_executable = executable,
 					on_done = on_done,
 					on_stream = on_stream,
 					starts = 0,
@@ -281,6 +377,16 @@ local function with_fixture(spec, body)
 			urlevent = {openURL = function() return true end},
 		}
 
+		-- Own the genuine methods with an independently read native policy path.
+		-- The fixture's other cached adapter doubles cannot select a fake policy.
+		local native_root = helpers.driver_root():gsub("\\", "/")
+		package.loaded["modules.llm.network_env"] = nil
+		local network = require("modules.llm.network_env")
+		local native_policy_path = native_root .. "modules/llm/network-retry.sh"
+		local native_policy = assert(io.open(native_policy_path, "r"))
+		assert(native_policy:close())
+		network.policy_path = function() return native_policy_path end
+		package.loaded["modules.llm.network_env"] = network
 		package.loaded["ui.menu.menu_llm.models_manager_ollama"] = nil
 		manager = require("ui.menu.menu_llm.models_manager_ollama").new({
 			active_tasks = {},
@@ -949,4 +1055,79 @@ helpers.describe("A silent Ollama is one reason, told once (llm-enable-unreachab
 	end)
 end)
 
-return true
+helpers.describe("HS035 receiver exceptional closure", function()
+	local vectors = {
+		{ id = "write-throws", write = "throw", error = "writer-sentinel", file_closes = 1, process_closes = 0, removes = 1 },
+		{ id = "write-nil", write = "nil", error = "writer-sentinel", file_closes = 1, process_closes = 0, removes = 1 },
+		{ id = "source-close-throws", file_close = "throw", error = "source-close-sentinel", file_closes = 1, process_closes = 0, removes = 0, retained = true },
+		{ id = "read-throws", read = "throw", error = "reader-sentinel", file_closes = 1, process_closes = 1, removes = 1 },
+		{ id = "read-nil", read = "nil", error = "reader-sentinel", file_closes = 1, process_closes = 1, removes = 1 },
+		{ id = "process-close-throws", process_close = "throw", error = "process-close-sentinel", file_closes = 1, process_closes = 1, removes = 0, retained = true },
+		{ id = "read-and-close-throw", read = "throw", process_close = "throw", error = "reader-sentinel", file_closes = 1, process_closes = 1, removes = 0, retained = true },
+		{ id = "nonzero-exit-is-retired", process_close = "nonzero", error = "expected: true", file_closes = 1, process_closes = 1, removes = 1 },
+		{ id = "packet-remove-refused", remove = "nil", error = "remove-sentinel", file_closes = 1, process_closes = 1, removes = 1, retained = true },
+	}
+	for _, vector in ipairs(vectors) do
+		helpers.it(vector.id, function()
+			local saved_open, saved_popen, saved_remove = io.open, io.popen, os.remove
+			local counts = { file_closes = 0, process_closes = 0, removes = 0 }
+			local events = {}
+			local before = #retained_receivers
+			local file = {
+				write = function()
+					if vector.write == "throw" then error("writer-sentinel", 0) end
+					if vector.write == "nil" then return nil, "writer-sentinel" end
+					return true
+				end,
+				close = function()
+					counts.file_closes = counts.file_closes + 1
+					events[#events + 1] = "file-close"
+					if vector.file_close == "throw" then error("source-close-sentinel", 0) end
+					return true
+				end,
+			}
+			local process = {
+				read = function()
+					if vector.read == "throw" then error("reader-sentinel", 0) end
+					if vector.read == "nil" then return nil, "reader-sentinel" end
+					return '{"executable":"/opt/homebrew/bin/ollama","args":["pull","missing-model"]}'
+				end,
+				close = function()
+					counts.process_closes = counts.process_closes + 1
+					events[#events + 1] = "process-close"
+					if vector.process_close == "throw" then error("process-close-sentinel", 0) end
+					if vector.process_close == "nonzero" then return nil, "exit", 2 end
+					return true, "exit", 0
+				end,
+			}
+			io.open = function() return file end
+			io.popen = function() return process end
+			os.remove = function()
+				counts.removes = counts.removes + 1
+				events[#events + 1] = "remove"
+				if vector.remove == "nil" then return nil, "remove-sentinel" end
+				return true
+			end
+			local ok, err = xpcall(function()
+				return receive_pull_argv("/bin/bash", { "-c", "receiver-owned fault input" })
+			end, debug.traceback)
+			io.open, io.popen, os.remove = saved_open, saved_popen, saved_remove
+			helpers.assert_eq(ok, false)
+			helpers.assert_true(tostring(err):find(vector.error, 1, true) ~= nil, tostring(err))
+			helpers.assert_eq(counts, { file_closes = vector.file_closes, process_closes = vector.process_closes, removes = vector.removes })
+			if vector.removes == 1 then helpers.assert_eq(events[#events], "remove") end
+			helpers.assert_eq(#retained_receivers, before + (vector.retained and 1 or 0))
+			if vector.retained then
+				local owner = retained_receivers[#retained_receivers]
+				helpers.assert_eq(owner.packet_created, true)
+				if vector.file_close == "throw" then helpers.assert_eq(owner.file, file) end
+				if vector.process_close == "throw" then helpers.assert_eq(owner.process, process) end
+				-- These are receiver-owned fake handles, not an unretired native child.
+				-- Drop only this injected record; real unresolved records stay owned.
+				table.remove(retained_receivers)
+			end
+		end)
+	end
+end)
+
+return { retained_receivers = retained_receivers }

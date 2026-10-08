@@ -1,0 +1,322 @@
+# vendor/ergopti_updater_download.ps1
+# Download mechanics for the private tree-owned updater staging process.
+# Route policy is supplied by the canonical network owner, once per exact URL.
+# Defines only a native clock and functions; no input, request or file operation
+# happens on load. It never publishes raw exceptions.
+if (-not ('ErgoptiUpdaterMonotonicClock' -as [type])) {
+    Add-Type -TypeDefinition @'
+using System;
+using System.Runtime.InteropServices;
+public static class ErgoptiUpdaterMonotonicClock
+{
+    [DllImport("kernel32.dll", ExactSpelling = true)]
+    public static extern UInt64 GetTickCount64();
+}
+'@ -ErrorAction Stop
+}
+
+function Get-ErgoptiUpdaterNativeException {
+    param([Exception]$Exception)
+    while ($Exception -is [System.Management.Automation.MethodInvocationException] -and
+        $null -ne $Exception.InnerException) {
+        $Exception = $Exception.InnerException
+    }
+    return $Exception
+}
+
+function Get-ErgoptiUpdaterFailureReceipt {
+    param([Exception]$Exception, [hashtable]$State)
+    if ($State.Receipt -is [hashtable] -and $State.Receipt.Count -ne 0) {
+        return $State.Receipt
+    }
+    $Native = Get-ErgoptiUpdaterNativeException $Exception
+    $Stage = if ($State.Stage -in @('proxy_resolve', 'connect', 'http', 'tls',
+        'file_read', 'file_write', 'file_create', 'file_remove')) { $State.Stage } else { 'connect' }
+    $Receipt = @{ backend = 'dotnet'; stage = $Stage; failure_provenance = 'unknown' }
+    if ($State.Stage -in @('file_read', 'file_write', 'file_create', 'file_remove')) {
+        $Receipt.stage = $State.Stage
+        if ($Native -is [System.IO.IOException] -or
+            $Native -is [UnauthorizedAccessException]) {
+            # HRESULT_FROM_WIN32, not every managed IOException's low word.
+            $Bits = [BitConverter]::ToUInt32([BitConverter]::GetBytes([int]$Native.HResult), 0)
+            if (($Bits -band 4294901760) -eq 2147942400) {
+                $Receipt.failure_provenance = 'verified'
+                $Receipt.native_errno_domain = 'win32'
+                $Receipt.native_errno = [string]($Bits -band 65535)
+            }
+        }
+        return $Receipt
+    }
+    if ($Native -is [System.Net.WebException]) {
+        # Preserve the documented typed status without inventing an OS errno.
+        if ([Enum]::IsDefined([System.Net.WebExceptionStatus], $Native.Status)) {
+            $Receipt.dotnet_web_status = [string]$Native.Status
+        }
+        if ($Native.Status -eq [System.Net.WebExceptionStatus]::TrustFailure) {
+            $Receipt.stage = 'tls'
+            $Receipt.failure_provenance = 'verified'
+            $Receipt.tls_verification = 'enforced'
+            $Receipt.tls_status = 'untrusted_certificate'
+        } elseif ($Native.Status -eq [System.Net.WebExceptionStatus]::SecureChannelFailure) {
+            $Receipt.stage = 'tls'
+            $Receipt.tls_verification = 'enforced'
+        } elseif ($Native.Response -is [System.Net.HttpWebResponse]) {
+            $Receipt.stage = 'http'
+            $Receipt.failure_provenance = 'verified'
+            $Receipt.http_status = [int]$Native.Response.StatusCode
+            $Receipt.http_response_source = 'unavailable'
+        }
+    }
+    return $Receipt
+}
+
+function Get-ErgoptiUpdaterRemainingMilliseconds {
+    param([int64]$StartedTick, [int]$DeadlineMs, [hashtable]$State = $null)
+    $NowTick = [ErgoptiUpdaterMonotonicClock]::GetTickCount64()
+    if ($StartedTick -le 0 -or $NowTick -lt $StartedTick -or $DeadlineMs -le 0) {
+        throw [ArgumentException]::new('Original updater monotonic deadline was refused.')
+    }
+    $Remaining = [int64]$DeadlineMs - ([int64]$NowTick - $StartedTick)
+    if ($Remaining -le 0) {
+        if ($null -ne $State) { $State.Reason = 'deadline' }
+        throw [TimeoutException]::new('Updater download deadline expired.')
+    }
+    return [int][Math]::Min($Remaining, [int]::MaxValue)
+}
+
+function Add-ErgoptiUpdaterCleanupDebt {
+    param([hashtable]$State, [string]$Resource, [string]$Stage, [Exception]$Exception)
+    if (-not $State.ContainsKey('CleanupDebt')) { $State.CleanupDebt = @() }
+    $CleanState = @{ Stage = $Stage; Receipt = @{} }
+    $State.CleanupDebt += @{ resource = $Resource;
+        receipt = (Get-ErgoptiUpdaterFailureReceipt $Exception $CleanState) }
+}
+
+function Close-ErgoptiUpdaterResource {
+    param([IDisposable]$Resource, [string]$Name, [string]$Stage, [hashtable]$State)
+    if ($null -eq $Resource) { return }
+    try { $Resource.Dispose() } catch {
+        # The primary error remains unchanged. The parent's private Job owner
+        # must physically retire this process before publishing any retry.
+        Add-ErgoptiUpdaterCleanupDebt $State $Name $Stage $_.Exception
+    }
+}
+
+function Assert-ErgoptiUpdaterDestination {
+    param([Uri]$Destination)
+    if (-not $Destination.IsAbsoluteUri -or $Destination.Scheme -ne 'https' -or
+        $Destination.UserInfo -ne '' -or $Destination.Fragment -ne '') {
+        throw [ArgumentException]::new('Updater destination was refused.')
+    }
+}
+
+function New-ErgoptiUpdaterProxyCredentials {
+    param([Parameter(Mandatory = $true)][Uri]$ProxyUri)
+    # Automatic .NET authentication cannot prove the guarded curl NTLM boundary.
+    $Credentials = [System.Net.CredentialCache]::new()
+    $Credentials.Add($ProxyUri, 'Negotiate', [System.Net.CredentialCache]::DefaultNetworkCredentials)
+    return ,$Credentials
+}
+
+function Invoke-ErgoptiUpdaterDownload {
+    param(
+        [System.Net.HttpWebRequest]$InitialRequest,
+        [string]$NewExe,
+        [int]$TimeoutMs,
+        [hashtable]$State,
+        [scriptblock]$ResolveRoutes,
+        [int]$DeadlineMs,
+        [int64]$StartedTick
+    )
+    if ($null -eq $ResolveRoutes -or $TimeoutMs -le 0 -or $DeadlineMs -le 0 -or $StartedTick -le 0) {
+        throw [ArgumentException]::new('Canonical updater routing owner is unavailable.')
+    }
+    $Destination = $InitialRequest.RequestUri
+    $MaximumHops = $null
+    $Response = $null
+    $Input = $null
+    $Output = $null
+    try {
+        $null = Get-ErgoptiUpdaterRemainingMilliseconds $StartedTick $DeadlineMs $State
+        $State.Stage = 'file_create'
+        [IO.Directory]::CreateDirectory([IO.Path]::GetDirectoryName($NewExe)) | Out-Null
+        $State.Stage = 'file_remove'
+        [IO.File]::Delete($NewExe)
+        $Hop = 0
+        while ($true) {
+            Assert-ErgoptiUpdaterDestination $Destination
+            $State.Stage = 'proxy_resolve'
+            $Remaining = Get-ErgoptiUpdaterRemainingMilliseconds $StartedTick $DeadlineMs $State
+            $Selection = & $ResolveRoutes $Destination.AbsoluteUri $Remaining
+            if ($null -ne $Selection -and $Selection.CleanupDebt -is [bool] -and
+                $Selection.CleanupDebt) {
+                # This is native resolver retirement debt, not a filesystem or
+                # HTTP receipt resource. The parent's owned Job remains the fence.
+                $State.NativeCleanupDebt = $true
+            }
+            if ($null -eq $Selection -or $Selection.Ok -isnot [bool] -or
+                -not $Selection.Ok -or $Selection.Routes -isnot [array] -or
+                $Selection.Routes.Count -eq 0 -or
+                ($Selection.MaxRoutes -isnot [int] -and $Selection.MaxRoutes -isnot [long]) -or
+                $Selection.MaxRoutes -le 0 -or $Selection.MaxRoutes -gt [int]::MaxValue -or
+                $Selection.Routes.Count -gt $Selection.MaxRoutes -or
+                ($Selection.MaxRedirects -isnot [int] -and $Selection.MaxRedirects -isnot [long]) -or
+                $Selection.MaxRedirects -lt 0 -or $Selection.MaxRedirects -gt [int]::MaxValue) {
+                # Only a canonical, validated receipt can name a resolver cause.
+                if ($null -ne $Selection -and $Selection.Receipt -is [hashtable]) {
+                    $State.Receipt = $Selection.Receipt
+                }
+                throw [InvalidOperationException]::new('Canonical updater route was refused.')
+            }
+            if ($null -eq $MaximumHops) { $MaximumHops = $Selection.MaxRedirects }
+            elseif ($MaximumHops -ne $Selection.MaxRedirects) {
+                throw [InvalidOperationException]::new('Updater route policy changed during the operation.')
+            }
+            # Admit the whole ordered native list before using any entry. The
+            # transport cannot reinterpret SOCKS or HTTPS proxies as direct.
+            foreach ($Route in $Selection.Routes) {
+                if ($Route.Kind -isnot [string] -or $Route.Kind -cnotin @('direct', 'proxy') -or
+                    $Route.Endpoint -isnot [string]) {
+                    throw [ArgumentException]::new('Updater route descriptor was refused.')
+                }
+                if ($Route.Kind -eq 'direct') {
+                    if ($Route.Endpoint -ne '') { throw [ArgumentException]::new('Invalid direct route.') }
+                } else {
+                    if ($Route.Authentication -isnot [string] -or
+                        $Route.Authentication -cne 'current_user_proxy_only') {
+                        throw [NotSupportedException]::new('Updater proxy authentication policy was refused.')
+                    }
+                    [Uri]$Endpoint = $null
+                    if (-not [Uri]::TryCreate($Route.Endpoint, [UriKind]::Absolute, [ref]$Endpoint) -or
+                        $Endpoint.Scheme -ne 'http' -or $Endpoint.UserInfo -ne '' -or
+                        $Endpoint.AbsolutePath -ne '/' -or $Endpoint.Query -ne '' -or
+                        $Endpoint.Fragment -ne '') {
+                        throw [NotSupportedException]::new('Updater proxy protocol was refused.')
+                    }
+                }
+            }
+            for ($RouteIndex = 0; $RouteIndex -lt $Selection.Routes.Count; $RouteIndex++) {
+                $Route = $Selection.Routes[$RouteIndex]
+                $Request = if ($Hop -eq 0 -and $RouteIndex -eq 0) {
+                    $InitialRequest
+                } else {
+                    [System.Net.HttpWebRequest]::Create($Destination)
+                }
+                $Request.Method = 'GET'
+                $Request.UserAgent = 'ErgoptiPlus-Updater/1.0'
+                $Request.AllowAutoRedirect = $false
+                $Request.UseDefaultCredentials = $false
+                $Request.Credentials = $null
+                $Request.PreAuthenticate = $false
+                $Request.KeepAlive = $false
+                $Request.Pipelined = $false
+                $Request.ConnectionGroupName = 'ErgoptiUpdater.' + [Guid]::NewGuid().ToString('N')
+                $Request.Proxy = $null
+                if ($Route.Kind -eq 'proxy') {
+                    $ProxyUri = [Uri]$Route.Endpoint
+                    $Proxy = [System.Net.WebProxy]::new($ProxyUri, $false)
+                    $Credentials = New-ErgoptiUpdaterProxyCredentials $ProxyUri
+                    $Proxy.Credentials = $Credentials
+                    $Request.Proxy = $Proxy
+                }
+                $Remaining = Get-ErgoptiUpdaterRemainingMilliseconds $StartedTick $DeadlineMs $State
+                $Request.Timeout = [Math]::Min($Remaining, $TimeoutMs)
+                $Request.ReadWriteTimeout = [Math]::Min($Remaining, $TimeoutMs)
+                $State.Stage = 'connect'
+                try {
+                    $Response = $Request.GetResponse()
+                    break
+                } catch {
+                    $Failure = $_
+                    $Native = Get-ErgoptiUpdaterNativeException $Failure.Exception
+                    # This GET-only retry does not claim zero previously sent
+                    # bytes or CONNECT provenance under .NET's internal auth.
+                    # HTTP, TLS/authentication and body failures stay terminal.
+                    $RetryableGetConnection = $Native -is [System.Net.WebException] -and
+                        $null -eq $Native.Response -and $Native.Status -in @(
+                            [System.Net.WebExceptionStatus]::NameResolutionFailure,
+                            [System.Net.WebExceptionStatus]::ProxyNameResolutionFailure,
+                            [System.Net.WebExceptionStatus]::ConnectFailure)
+                    $AbortFailed = $false
+                    try { $Request.Abort() } catch {
+                        $State.Receipt = Get-ErgoptiUpdaterFailureReceipt $Native $State
+                        Add-ErgoptiUpdaterCleanupDebt $State 'request' 'connect' $_.Exception
+                        $AbortFailed = $true
+                    }
+                    if ($AbortFailed -or -not $RetryableGetConnection -or $RouteIndex + 1 -eq $Selection.Routes.Count) {
+                        if ($Native -is [System.Net.WebException] -and $null -ne $Native.Response) {
+                            $State.Receipt = Get-ErgoptiUpdaterFailureReceipt $Native $State
+                            Close-ErgoptiUpdaterResource $Native.Response 'response' 'http' $State
+                        }
+                        throw $Failure
+                    }
+                }
+            }
+            if ($null -eq $Response) { throw [InvalidOperationException]::new('No updater response.') }
+            $State.Stage = 'http'
+            $Status = [int]$Response.StatusCode
+            if ($Status -in @(301, 302, 303, 307, 308)) {
+                $Location = $Response.Headers['Location']
+                if ($Hop -eq $MaximumHops -or [string]::IsNullOrEmpty($Location) -or
+                    $Location -match '[\x00-\x1f\x7f]') {
+                    throw [InvalidOperationException]::new('Updater redirect was refused.')
+                }
+                $Next = [Uri]::new($Destination, $Location)
+                Assert-ErgoptiUpdaterDestination $Next
+                $Response.Dispose()
+                $Response = $null
+                $Destination = $Next
+                $Hop++
+                continue
+            }
+            if ($Status -ne 200) {
+                $State.Receipt = @{ backend = 'dotnet'; stage = 'http';
+                    failure_provenance = 'verified'; http_status = $Status;
+                    http_response_source = 'unavailable' }
+                throw [InvalidOperationException]::new('Updater response was refused.')
+            }
+            break
+        }
+        $ExpectedSize = [int64]$Response.ContentLength
+        $State.Stage = 'connect'
+        $Input = $Response.GetResponseStream()
+        $null = Get-ErgoptiUpdaterRemainingMilliseconds $StartedTick $DeadlineMs $State
+        $State.Stage = 'file_create'
+        $Output = [IO.File]::Open($NewExe, [IO.FileMode]::CreateNew,
+            [IO.FileAccess]::Write, [IO.FileShare]::None)
+        $Bytes = New-Object byte[] 65536
+        while ($true) {
+            $State.Stage = 'connect'
+            $Remaining = Get-ErgoptiUpdaterRemainingMilliseconds $StartedTick $DeadlineMs $State
+            $Input.ReadTimeout = [Math]::Min($Remaining, $TimeoutMs)
+            $Count = $Input.Read($Bytes, 0, $Bytes.Length)
+            $null = Get-ErgoptiUpdaterRemainingMilliseconds $StartedTick $DeadlineMs $State
+            if ($Count -eq 0) { break }
+            $State.Stage = 'file_write'
+            $Output.Write($Bytes, 0, $Count)
+        }
+        $State.Stage = 'file_write'
+        $null = Get-ErgoptiUpdaterRemainingMilliseconds $StartedTick $DeadlineMs $State
+        $Output.Flush($true)
+        $null = Get-ErgoptiUpdaterRemainingMilliseconds $StartedTick $DeadlineMs $State
+        $Output.Dispose()
+        $Output = $null
+        $State.Stage = 'connect'
+        $Input.Dispose()
+        $Input = $null
+        $State.Stage = 'http'
+        $Response.Dispose()
+        $Response = $null
+        $null = Get-ErgoptiUpdaterRemainingMilliseconds $StartedTick $DeadlineMs $State
+        return $ExpectedSize
+    } catch {
+        # Freeze actual failing-operation provenance before cleanup can fail.
+        $State.Receipt = Get-ErgoptiUpdaterFailureReceipt $_.Exception $State
+        throw
+    } finally {
+        # Retirement must not turn a network failure into a file-write receipt.
+        Close-ErgoptiUpdaterResource $Output 'output' 'file_write' $State
+        Close-ErgoptiUpdaterResource $Input 'input' 'connect' $State
+        Close-ErgoptiUpdaterResource $Response 'response' 'http' $State
+    }
+}

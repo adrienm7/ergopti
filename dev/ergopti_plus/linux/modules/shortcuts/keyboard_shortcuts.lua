@@ -45,7 +45,11 @@ local Manifest = require("infra.manifest_reader")
 local Codec = require("toml_codec")
 local Writer = require("toml_codec.writer")
 local MagicEditor = require("shortcuts.magic_editor")
+local KeyboardPublication = require("config_keyboard_publication")
+local KeyboardComposition = KeyboardPublication.compose
+local KeyboardOwnerCurrent = KeyboardPublication.owner_is_current
 local PhysicalSlots = require("shortcuts.physical_slots")
+local PhysicalSlotConstructor = PhysicalSlots.new
 local PhysicalAvailability = require("shortcuts.physical_availability")
 
 local LOG = "modules.shortcuts.keyboard_shortcuts"
@@ -115,7 +119,9 @@ local CATALOGUE_REL_PATH = "modules/actions/modifier_chords.json"
 -- Decoded once. `false` after a failed read, so a missing catalogue is reported
 -- once rather than on every menu rebuild.
 local _catalogue = nil
+local _binding_publication = nil
 local _physical_slots = nil
+local _physical_binding_publication = nil
 
 -- slot_id → action_id, for the slots the user has assigned.
 local _assignments = {}
@@ -173,8 +179,13 @@ local function catalogue_keys()
 		Logger.error(LOG, "Cannot read '%s' — no slots are offered.", path)
 		return nil
 	end
-	local body = handle:read("*a")
-	handle:close()
+	local read_ok, body = pcall(handle.read, handle, "*a")
+	local close_ok, closed = pcall(handle.close, handle)
+	if not read_ok or type(body) ~= "string" or not close_ok or closed ~= true then
+		_catalogue = false
+		Logger.error(LOG, "The key catalogue at '%s' was not completely read and closed — no slots are offered.", path)
+		return nil
+	end
 
 	local ok_json, Json = pcall(require, "json")
 	if not ok_json then
@@ -189,6 +200,12 @@ local function catalogue_keys()
 		return nil
 	end
 	_catalogue = parsed.keys
+	local admitted, publication = pcall(KeyboardPublication.publish, _catalogue, SLOT_MODS, MagicEditor.SLOT_ID)
+	if admitted then
+		_binding_publication = publication
+	else
+		Logger.error(LOG, "The complete keyboard source cannot publish its binding catalogue.")
+	end
 	Logger.debug(LOG, "Key catalogue loaded (%d key(s)).", #_catalogue)
 	return _catalogue
 end
@@ -206,11 +223,16 @@ end
 --- @return table owner Shared physical-slot policy.
 local function physical_slots()
 	if _physical_slots then return _physical_slots end
+	assert(rawequal(rawget(package.loaded, "shortcuts.physical_slots"), PhysicalSlots)
+		and getmetatable(PhysicalSlots) == nil and rawequal(rawget(PhysicalSlots, "new"), PhysicalSlotConstructor),
+		"physical-key constructor ownership changed")
 	local path = assert(Paths.shared("data/keycodes/physical_keys.json"), "physical-key registry path unavailable")
 	local file = assert(io.open(path, "rb"))
-	local raw = file:read("*a")
-	file:close()
-	_physical_slots = PhysicalSlots.new(require("json").decode(raw))
+	local read_ok, raw = pcall(file.read, file, "*a")
+	local close_ok, closed = pcall(file.close, file)
+	assert(read_ok and type(raw) == "string" and close_ok and closed == true,
+		"physical-key registry was not completely read and closed")
+	_physical_slots, _physical_binding_publication = PhysicalSlotConstructor(require("json").decode(raw))
 	return _physical_slots
 end
 
@@ -853,7 +875,9 @@ function M._reset()
 	_explicit_assignments = {}
 	_loaded = false
 	_catalogue = nil
+	_binding_publication = nil
 	_physical_slots = nil
+	_physical_binding_publication = nil
 end
 
 
@@ -936,5 +960,22 @@ function M.apply_configuration(owner, state)
 	_dispatch_generation = _dispatch_generation + 1
 	return true
 end
+
+
+--- Returns a detached complete native publication without reading or dispatching input.
+--- @return table|nil catalogue Unavailable or withdrawn sources remain unjudged.
+function M.published_binding_catalogue()
+	if not rawequal(rawget(package.loaded, "config_keyboard_publication"), KeyboardPublication)
+		or getmetatable(KeyboardPublication) ~= nil or type(KeyboardComposition) ~= "function"
+		or type(KeyboardOwnerCurrent) ~= "function"
+		or not rawequal(rawget(KeyboardPublication, "compose"), KeyboardComposition)
+		or not rawequal(rawget(KeyboardPublication, "owner_is_current"), KeyboardOwnerCurrent)
+		or not KeyboardOwnerCurrent(M)
+		or _binding_publication == nil or _physical_binding_publication == nil then return nil end
+	return KeyboardComposition(_binding_publication(_catalogue, SLOT_MODS, MagicEditor.SLOT_ID),
+		_physical_binding_publication(_physical_slots))
+end
+
+KeyboardPublication.register(M, M.published_binding_catalogue)
 
 return M
