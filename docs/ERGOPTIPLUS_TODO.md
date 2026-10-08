@@ -3221,6 +3221,12 @@ WP3 prerequisite: the actual macOS physical accounting owner now requires exact 
   and 11,693 Linux unit tests, plus both portable E2E suites. Native macOS
   qualification remains pending;
   this bounded source-publication correction does not complete item 33.
+  The Windows outdated-load fixture now closes preceding and current genuine
+  logger suppression through the appropriate observer, restoring the exact
+  previous sink even on failure. Every original zero-ERROR and persistence
+  assertion stays intact. Three registered causal controls retain prior ring,
+  queue and native-file evidence and count current ERROR summaries without
+  filtering; actual Windows execution and predecessor replay are pending.
   The Lua keyboard owners now publish both logical
   identities and the complete 1,536 physical identities from the actual private
   registry, with current source and owner checks. Cold or partial publication
