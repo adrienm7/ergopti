@@ -14,7 +14,7 @@
 local M = {}
 local hs     = hs
 local Logger = require("infra.logger")
-local i18n   = require("infra.i18n")
+local ManifestMenu = require("infra.manifest_menu")
 local LOG    = "canvas_badge"
 
 
@@ -32,6 +32,22 @@ local LOG    = "canvas_badge"
 --- @param ctx table Menu context, used for ctx.paused and ctx.script_control.
 --- @param on_click function Callback invoked when the badge is clicked.
 function M.prepend_to(items, ctx, on_click)
+	local paused = ctx and ctx.paused
+	local frame = ManifestMenu.template_rows("macos_canvas_badge_frame", {}, {
+		["macos_badge_is_paused"] = function() return not not paused end,
+		["macos_badge_is_active"] = function() return not paused end,
+	}, {})
+	if type(frame) ~= "table" or #frame ~= 2 or type(frame[1].label) ~= "string"
+		or frame[1].label == "" or frame[2].separator ~= true then
+		Logger.error(LOG, "Declared canvas badge presentation refused.")
+		return false
+	end
+	local compose = ManifestMenu.native_composition("macos_canvas_badge_root")
+	if type(compose) ~= "function" then
+		Logger.error(LOG, "Declared canvas badge root composition refused.")
+		return false
+	end
+	local display_text = frame[1].label
 	-- Calculate the required canvas width based on the longest root menu item
 	local max_text_width = 0
 	for _, item in ipairs(items) do
@@ -49,8 +65,6 @@ function M.prepend_to(items, ctx, on_click)
 	-- Create a transparent canvas that spans the available menu width to force centering
 	local canvas_w = math.ceil(max_text_width)
 
-	local paused = ctx and ctx.paused
-	local display_text = paused and i18n.get("menu.builder.title_paused") or i18n.get("menu.builder.title")
 	local ok, size = pcall(hs.drawing.getTextDrawingSize, display_text, { font = "Helvetica-Bold", size = 14 })
 	local text_w = ok and size and size.w or 80
 
@@ -115,12 +129,17 @@ function M.prepend_to(items, ctx, on_click)
 	local img = canvas_obj:imageFromCanvas()
 	-- Release the NSWindow handle immediately; the image is already captured
 	canvas_obj:delete()
-	table.insert(items, 1, {
+	local badge = {
 		title = "",
 		image = img,
 		fn    = on_click,
-	})
-	table.insert(items, 2, { title = "-" })
+	}
+	local boundary = { title = frame[2].separator and "-" }
+	-- These are completed native objects; the declared frame owns their placement.
+	if compose({ badge = { badge }, boundary = { boundary }, body = items }) ~= true then
+		Logger.error(LOG, "Completed canvas badge root publication refused.")
+		return false
+	end
 end
 
 return M

@@ -9,13 +9,13 @@
 --- ==============================================================================
 
 local M = {}
-local domains = { keyboard = {}, script = {}, tap = {} }
+local domains = { keyboard = {}, script = {}, tap = {}, gesture = {} }
 -- LuaJIT has no ephemeron tables. The live native module retains its accessor;
 -- neither ledger may retain a withdrawn module through its getter closure.
 local initialized = setmetatable({}, { __mode = "k" })
 
 --- Registers an authentic native constructor's accessor exactly once, without IO.
---- @param domain string Fixed binding family: keyboard, script or tap.
+--- @param domain string Fixed binding family: keyboard, script, tap or gesture.
 --- @param module_name string Actual native package namespace.
 --- @param owner table Plain native module being constructed.
 --- @param getter function Its genuine source-bound accessor.

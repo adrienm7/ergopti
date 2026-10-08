@@ -1,6 +1,7 @@
 --- tests/unit/ui/menu/test_layout_scope.lua
 
 local helpers = require("tests.helpers")
+local LayoutFixture = require("tests.support.layout_legacy_caption_fixture")
 local Codec = require("toml_codec")
 local FileSystem = require("adapters.file_system")
 
@@ -160,13 +161,16 @@ end)
 package.loaded["adapters.file_system"] = FileSystem
 package.loaded["infra.preferences"] = nil
 
-helpers.describe("layout scope provider", function()
+helpers.describe("layout scope provider", LayoutFixture.scoped(function()
 	helpers.it("dispatches the common commands through the exact scope owner", function()
-		local renderer = require("infra.manifest_menu")
+		local Layout = helpers.load_with_stubs("ui.menu.menu_keyboard_layout")
+		local renderer = LayoutFixture.install(require("infra.i18n"))
 		local original, captured = renderer.build
-		renderer.build = function(_, _, _, _, ctx) captured = ctx; return {} end
+		renderer.build = function(...)
+			captured = select(5, ...)
+			return original(...)
+		end
 		local ok, err = xpcall(function()
-			local Layout = helpers.load_with_stubs("ui.menu.menu_keyboard_layout")
 			local selected, mode
 			local ctx = { state = {}, base_dir = helpers.driver_root(), updateMenu = function() end,
 				save_prefs = function() error("scope provider must not publish an ordinary save") end,
@@ -185,7 +189,7 @@ helpers.describe("layout scope provider", function()
 		renderer.build = original
 		if not ok then error(err, 0) end
 	end)
-end)
+end))
 
 helpers.describe("macOS scoped preferences under a composition", function()
 	helpers.it("reverts a commit: runtime, staged source, checkpoint and the exact bytes", function()
