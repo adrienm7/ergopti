@@ -149,19 +149,57 @@ _ConfigTomlProjectRecord(Parts, Value, Raw, Namespaces, Cache, Rows) {
 ConfigTomlReadSnapshot(Path) {
 	global _ConfigTomlSnapshots, _ParseTomlCache, _TomlFileCache
 	global _TomlReadFailures, _TomlUnreadableFiles
-	if _ConfigTomlSnapshots.Has(Path) {
-		Previous := _ConfigTomlSnapshots[Path]
-		if _ParseTomlCache.Has(Path) && _ParseTomlCache[Path] == Previous.Cache
+	static Generations := Map()
+	static DecodeOwner := ConfigTomlDecodeSnapshot, JournalOwner := ConfigMigrateBoot
+	static CompareOwner := _ConfigTomlSnapshotEqual
+	Key := _ConfigWriteLeaseKey(Path)
+	if DecodeOwner != ConfigTomlDecodeSnapshot || JournalOwner != ConfigMigrateBoot
+			|| CompareOwner != _ConfigTomlSnapshotEqual
+		throw Error("The native configuration snapshot producer was replaced")
+	if Generations.Has(Key) {
+		Generation := Generations[Key], Previous := Generation.snapshot
+		; Native publication retains one private admitted generation even if the
+		; physical file changes between consumers. Public equivalent Maps alone
+		; cannot issue it. Retirement of an actual cache identity observes anew.
+		if CompareOwner.Call(Previous, Generation.shadow)
+				&& _ConfigTomlSnapshots.Has(Path) && _ConfigTomlSnapshots[Path] == Previous
+				&& _ParseTomlCache.Has(Path) && _ParseTomlCache[Path] == Previous.Cache
 				&& (!IsSet(_TomlFileCache) || (_TomlFileCache.Has(Path)
-					&& StrCompare(_TomlFileCache[Path], Previous.Source, true) == 0))
-			return Previous
+					&& StrCompare(_TomlFileCache[Path], Generation.source, true) == 0)) {
+			try {
+				if Generation.admission.Call(Generation.source, Generation.present)
+						&& CompareOwner.Call(Previous, Generation.shadow)
+					return Previous
+			} catch {
+			}
+		}
+		Generations.Delete(Key)
+	}
+	if _ConfigTomlSnapshots.Has(Path)
 		_ConfigTomlSnapshots.Delete(Path)
+	ReadAdmission := JournalOwner.Call(Path, "capture_read")
+	if !HasMethod(ReadAdmission, "Call") {
+		; Only the same original private journal may attest a real failed native
+		; open/probe. Public refusal maps/errors are never diagnostic authority.
+		ObservedFailure := JournalOwner.Call(Path, "consume_read_failure")
+		if (ObservedFailure is Integer) && (ObservedFailure == 1 || ObservedFailure == 2) {
+			_TomlReadFailures[Path] := true
+			if ObservedFailure == 2
+				_TomlUnreadableFiles[Path] := true
+		}
+		throw Error("The genuine configuration constructor did not admit this source")
 	}
 	if _TomlReadFailures.Has(Path)
 		_TomlReadFailures.Delete(Path)
 	if !FileExist(Path) {
 		Snapshot := ConfigTomlDecodeSnapshot("")
 		Snapshot.Present := false
+		if !ReadAdmission.Call("", 0)
+			throw Error("The configuration absence lost its native source admission")
+		Shadow := DecodeOwner.Call("")
+		Shadow.Present := false
+		Generations[Key] := { snapshot: Snapshot, source: "", present: 0,
+			admission: ReadAdmission, shadow: Shadow }
 		return Snapshot
 	}
 	try Source := FSReadStrict(Path)
@@ -175,6 +213,12 @@ ConfigTomlReadSnapshot(Path) {
 		_TomlUnreadableFiles.Delete(Path)
 	Snapshot := ConfigTomlDecodeSnapshot(Source)
 	Snapshot.Present := true
+	if !ReadAdmission.Call(Source, 1)
+		throw Error("The configuration read lost its native source admission")
+	Shadow := DecodeOwner.Call(Source)
+	Shadow.Present := true
+	Generations[Key] := { snapshot: Snapshot, source: Source, present: 1,
+		admission: ReadAdmission, shadow: Shadow }
 	return Snapshot
 }
 
@@ -238,4 +282,75 @@ TomlConfigStaticForeignOwnershipRegistry() {
 _ConfigTomlDynamicPersonal(Parts) {
 	return Parts is Array && Parts.Length >= 2
 		&& Parts[1] == "hotstrings" && Parts[2] == "personal"
+}
+
+
+; Exact native decoder output is compared to a detached private shadow. This
+; rejects in-place source/cache/row mutation without granting write authority.
+_ConfigTomlSnapshotEqual(Left, Right) {
+	if Type(Left) != Type(Right)
+		return false
+	if Left is Map {
+		if ObjGetBase(Left) != Map.Prototype || ObjGetBase(Right) != Map.Prototype
+			return false
+		for Name in ObjOwnProps(Left)
+			return false
+		for Name in ObjOwnProps(Right)
+			return false
+		if Left.Count != Right.Count || Left.CaseSense != Right.CaseSense
+			return false
+		ExactRight := Map()
+		ExactRight.CaseSense := "On"
+		for Name, Value in Right
+			ExactRight[Name] := Value
+		for Name, Value in Left {
+			if !ExactRight.Has(Name) || !_ConfigTomlSnapshotEqual(Value, ExactRight[Name])
+				return false
+		}
+		return true
+	}
+	if Left is Array {
+		if ObjGetBase(Left) != Array.Prototype || ObjGetBase(Right) != Array.Prototype
+			return false
+		for Name in ObjOwnProps(Left)
+			return false
+		for Name in ObjOwnProps(Right)
+			return false
+		if Left.Length != Right.Length
+			return false
+		loop Left.Length {
+			if !Left.Has(A_Index) || !Right.Has(A_Index)
+					|| !_ConfigTomlSnapshotEqual(Left[A_Index], Right[A_Index])
+				return false
+		}
+		return true
+	}
+	if IsObject(Left) {
+		ExpectedBase := Left is TOML_Bool ? TOML_Bool.Prototype : Object.Prototype
+		if ObjGetBase(Left) != ExpectedBase || ObjGetBase(Right) != ExpectedBase
+			return false
+		LeftFields := Map(), RightFields := Map()
+		LeftFields.CaseSense := "On", RightFields.CaseSense := "On"
+		for Pair in [[Left, LeftFields], [Right, RightFields]] {
+			Owner := Pair[1], Fields := Pair[2]
+			for Name in ObjOwnProps(Owner) {
+				Descriptor := Object.Prototype.GetOwnPropDesc.Call(Owner, Name)
+				if !Descriptor.HasOwnProp("Value")
+					return false
+				Fields[Name] := Descriptor.Value
+			}
+		}
+		if LeftFields.Count != RightFields.Count
+			return false
+		if Left is TOML_Bool {
+			return LeftFields.Count == 1 && LeftFields.Has("Value") && RightFields.Has("Value")
+				&& (LeftFields["Value"] is Integer) && LeftFields["Value"] == RightFields["Value"]
+		}
+		for Name, Value in LeftFields {
+			if !RightFields.Has(Name) || !_ConfigTomlSnapshotEqual(Value, RightFields[Name])
+				return false
+		}
+		return true
+	}
+	return Left is String ? StrCompare(Left, Right, true) == 0 : Left == Right
 }

@@ -5649,8 +5649,12 @@ actual cases pass 83 Linux and 51 portable macOS assertions; the same tests
 with only the exact prior published native producer loaded fail 50/83 and
 44/51 respectively. The native boundary removes a leading separator while
 retaining its declared DATA; the independent control checks both stages and
-every remaining callback/check identity. Final-source hosted qualification of
-22 new Windows subjects and native packaging/install acceptance remains open.
+every remaining callback/check identity. All 22 new Windows subjects pass in
+run 37816803340. Final-source run 37821669361 passes both Lua unit/E2E lanes
+and the complete Linux package/install verdict. Its JS frame consumer assertion
+required the actual captured Linux renderer owner. macOS Brew packaging and two
+Windows network subjects remain failed; dependent Windows E2E/package/install
+and macOS install jobs are skipped. Installed physical acceptance is unexecuted.
 
 - [ ] Execute the existing native per-key command/caption/state/refusal cases and review the still-native Windows menu sites against the actual census (currently 82). Move remaining fixed policy/data to shared declarations without hiding rows or weakening the scanner.
 - [ ] Prepared shared menu packets in docs/handovers/2026-10-04-config-menus are unapplied. Verify their recorded dependencies/preimages, regenerate owner artifacts and qualify all affected drivers after any shared change.
@@ -7187,8 +7191,12 @@ actual cases pass 83 Linux and 51 portable macOS assertions; the same tests
 with only the exact prior published native producer loaded fail 50/83 and
 44/51 respectively. The native boundary removes a leading separator while
 retaining its declared DATA; the independent control checks both stages and
-every remaining callback/check identity. Final-source hosted qualification of
-22 new Windows subjects and native packaging/install acceptance remains open.
+every remaining callback/check identity. All 22 new Windows subjects pass in
+run 37816803340. Final-source run 37821669361 passes both Lua unit/E2E lanes
+and the complete Linux package/install verdict. Its JS frame consumer assertion
+required the actual captured Linux renderer owner. macOS Brew packaging and two
+Windows network subjects remain failed; dependent Windows E2E/package/install
+and macOS install jobs are skipped. Installed physical acceptance is unexecuted.
 
 - [ ] Continue the remaining Windows menu families using shared templates and the item54 census. canonicalHoldOptions is already shared; do not cosmetically reimplement it.
 - [ ] After every Windows push, cancel automatic runs on its exact SHA. Use manual ci.yml with windows for Windows-only changes, or all affected OS lanes for shared changes; let manual runs finish and record native/E2E/package/install outcomes independently.

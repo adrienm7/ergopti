@@ -4811,7 +4811,7 @@ function consumesProfileFrameCommand(source, file, menu, section, id) {
 	for (const [driver, relative, call] of [
 		['windows', 'ui/menu/menu_llm/menu_agent.ahk', 'MenuRenderer_TemplateRows'],
 		['macos', 'ui/menu/menu_llm/agent_panel.lua', 'ManifestMenu.template_rows'],
-		['linux', 'ui/menu/agent_rows.lua', 'require("infra.manifest_menu").template_rows']
+		['linux', 'ui/menu/agent_rows.lua', 'ManifestMenu.template_rows']
 	]) {
 		const source = readFileSync(
 			resolve(REPO_ROOT, 'static/ergopti_plus', driver, relative),
