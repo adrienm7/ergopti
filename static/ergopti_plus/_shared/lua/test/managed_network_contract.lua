@@ -78,6 +78,26 @@ function M.run(policy, corpus, helpers)
 		helpers.assert_eq(pcall(contract.classify, "untyped stderr", {}), false)
 		helpers.assert_eq(pcall(contract.classify, {}, nil), false)
 	end)
+
+	helpers.it("managed network diagnostic preserves closed .NET statuses without new causes", function()
+		local values = assert(policy.fields.dotnet_web_status, "declared .NET status field").values
+		helpers.assert_eq(#values, 21, "documented .NET status enum inventory")
+		for _, value in ipairs(values) do
+			local report = contract.classify({ backend = "dotnet", stage = "connect",
+				failure_provenance = "unknown", dotnet_web_status = value }, {})
+			helpers.assert_eq(report.cause, "unknown")
+			helpers.assert_eq(report.evidence, "insufficient_evidence")
+		end
+		local receipt = { backend = "dotnet", stage = "tls", failure_provenance = "verified",
+			tls_verification = "enforced", tls_status = "untrusted_certificate", dotnet_web_status = "TrustFailure" }
+		helpers.assert_eq(contract.classify(receipt, {}).cause, "certificate", "existing TLS rule remains unchanged")
+		for _, value in ipairs({ "trustfailure", "PRIVATE_STATUS", 1, true, {} }) do
+			receipt.dotnet_web_status = value
+			local report = contract.classify(receipt, {})
+			helpers.assert_eq(report.cause, "unknown", "unknown status cannot borrow a matching TLS rule")
+			helpers.assert_eq(report.evidence, "invalid_receipt", "malformed declared metadata fails closed")
+		end
+	end)
 end
 
 --- Registers the independently authored optional-backend capability corpus.

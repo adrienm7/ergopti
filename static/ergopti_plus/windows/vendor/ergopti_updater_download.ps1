@@ -56,6 +56,10 @@ function Get-ErgoptiUpdaterFailureReceipt {
         return $Receipt
     }
     if ($Native -is [System.Net.WebException]) {
+        # Preserve the documented typed status without inventing an OS errno.
+        if ([Enum]::IsDefined([System.Net.WebExceptionStatus], $Native.Status)) {
+            $Receipt.dotnet_web_status = [string]$Native.Status
+        }
         if ($Native.Status -eq [System.Net.WebExceptionStatus]::TrustFailure) {
             $Receipt.stage = 'tls'
             $Receipt.failure_provenance = 'verified'

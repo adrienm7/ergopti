@@ -5,6 +5,8 @@
  * Tumbleweed metadata and its referenced objects must come from the same
  * origin; otherwise a freshly pulled image can resolve a current index through
  * download.opensuse.org and receive a stale mirror whose payload is incomplete.
+ * The shared first-install fixture must also preserve the canonical checkout
+ * build entry rather than leaving the real installer with an incomplete tree.
  */
 
 'use strict';
@@ -202,7 +204,7 @@ for (const scenario of scenarios) {
 		const output = result.stdout + result.stderr;
 		if (scenario.exit !== 0) {
 			const [solver, download, tls, unknown] = scenario.flags.split(' ');
-			const receipt = `TOOLING: zypper solver=${solver} download=${download} tls=${tls} unknown=${unknown} native_exit=${scenario.exit}`;
+			const receipt = `TOOLING: zypper solver=${solver} download=${download} tls=${tls} unknown=${unknown} missing_requested=unknown native_exit=${scenario.exit}`;
 			assert(
 				output.includes(receipt),
 				`${scenario.name}: exact native exit and closed flags must survive`
@@ -244,3 +246,140 @@ for (const scenario of scenarios) {
 console.log(
 	'[OK] zypper tooling retains eight bounded native receipts without payloads or retries.'
 );
+
+// Execute the actual checkout-copy phase, stopping before chown, sudo or the
+// installer. Only genuine repository files enter this small layout fixture.
+const copyStart = 'rm -rf "${E2E_HOME}/ergopti"';
+const copyEnd = 'chown -R "${E2E_USER}" "${E2E_HOME}/ergopti"';
+for (const boundary of [copyStart, copyEnd]) {
+	assert.strictEqual(toolingHarness.split(boundary).length, 2, 'checkout copy boundary is unique');
+}
+assert(toolingHarness.indexOf(copyEnd) > toolingHarness.indexOf(copyStart));
+const copyPhase = toolingHarness.slice(
+	toolingHarness.indexOf(copyStart),
+	toolingHarness.indexOf(copyEnd)
+);
+const installer = fs.readFileSync(path.join(ROOT, 'static/ergopti_plus/linux/install.sh'), 'utf8');
+const nativeGuardStart =
+	'NATIVE_OUTPUT_SOURCE="${SRC_DRIVER}/bin/libergopti_archive_publication.so"';
+const nativeGuardEnd = '\t_ensure_native_output_toolchain || exit 1';
+for (const boundary of [nativeGuardStart, nativeGuardEnd]) {
+	assert.strictEqual(installer.split(boundary).length, 2, 'real native build guard is unique');
+}
+assert(installer.indexOf(nativeGuardEnd) > installer.indexOf(nativeGuardStart));
+// Close only the guard's open if. The compiler/staging suffix never executes;
+// successful lookup is a source-layout proof, not native backend admission.
+const nativeGuard =
+	installer.slice(installer.indexOf(nativeGuardStart), installer.indexOf(nativeGuardEnd)) +
+	'fi\nprintf "%s\\n" "$NATIVE_OUTPUT_BUILD"\n';
+const helperRelative = 'tools/build/build-linux-native-output.sh';
+const helper = fs.readFileSync(path.join(ROOT, helperRelative), 'utf8');
+assert(
+	helper.includes('for source_name in archive_publication.c archive_publication.h; do'),
+	'the standalone helper declares the real retained-backend sources'
+);
+assert.doesNotMatch(helper, /^\s*(?:source|\.)\s+/m, 'the helper has no shell library dependency');
+assert.doesNotMatch(
+	helper,
+	/^\s*(?:bash|sh|node|python(?:3)?|perl)\s+/m,
+	'the helper does not invoke another repository utility'
+);
+const layoutParent = fs.realpathSync(os.tmpdir());
+const layout = fs.mkdtempSync(path.join(layoutParent, 'ergopti-first-install-source-'));
+assert.strictEqual(
+	path.dirname(layout),
+	layoutParent,
+	'recursive cleanup stays in the owned parent'
+);
+let layoutChildrenTerminal = true;
+try {
+	const sourceRoot = path.join(layout, 'source checkout');
+	const home = path.join(layout, 'ordinary user home');
+	const inputs = [
+		'static/ergopti_plus/linux/install.sh',
+		'static/ergopti_plus/linux/native/archive_output/archive_publication.c',
+		'static/ergopti_plus/linux/native/archive_output/archive_publication.h',
+		'static/ergopti_plus/_shared/data/linux_native_runtime.json',
+		'static/layouts/registry/index.json',
+		'package.json',
+		helperRelative
+	];
+	// Installer libraries belong to the same genuine driver subtree. Source the
+	// guard's declared library below without acquiring dependencies or compiling.
+	const installLibraries = 'static/ergopti_plus/linux/install';
+	for (const file of fs.readdirSync(path.join(ROOT, installLibraries))) {
+		if (fs.statSync(path.join(ROOT, installLibraries, file)).isFile()) {
+			inputs.push(`${installLibraries}/${file}`);
+		}
+	}
+	for (const relative of inputs) {
+		const destination = path.join(sourceRoot, relative);
+		fs.mkdirSync(path.dirname(destination), { recursive: true });
+		fs.copyFileSync(path.join(ROOT, relative), destination);
+	}
+	fs.mkdirSync(home);
+	const copyScript = path.join(layout, 'copy.sh');
+	const guardScript = path.join(layout, 'guard.sh');
+	fs.writeFileSync(copyScript, 'set -euo pipefail\nSRC="$1"\nE2E_HOME="$2"\n' + copyPhase);
+	const sourceBuildImport = 'source "${SRC_DRIVER}/install/native_source_build.sh"';
+	let guardImports = '';
+	if (installer.includes(sourceBuildImport)) {
+		assert.strictEqual(installer.split(sourceBuildImport).length, 2);
+		assert(
+			inputs.includes(`${installLibraries}/native_source_build.sh`),
+			'the actual installer source-build import has a genuine copied library'
+		);
+		guardImports = sourceBuildImport + '\n';
+	}
+	fs.writeFileSync(
+		guardScript,
+		'set -euo pipefail\nSRC_DRIVER="$1"\n' + guardImports + nativeGuard
+	);
+	const runLayout = (script, args) => {
+		const result = spawnSync(bashExecutable(), [bashPath(script), ...args.map(bashPath)], {
+			encoding: 'utf8',
+			timeout: 10000,
+			maxBuffer: 4096
+		});
+		if (result.error || result.status === null || result.signal !== null) {
+			layoutChildrenTerminal = false;
+		}
+		assert.ifError(result.error);
+		assert.notStrictEqual(result.status, null, 'the owned copy/guard child has a terminal status');
+		assert.strictEqual(result.signal, null);
+		return result;
+	};
+	const copied = runLayout(copyScript, [sourceRoot, home]);
+	assert.strictEqual(copied.status, 0, 'the real first-install source copy completes');
+	assert.strictEqual(copied.stderr, '');
+	const checkout = path.join(home, 'ergopti');
+	const driver = path.join(checkout, 'static/ergopti_plus/linux');
+	const admitted = runLayout(guardScript, [driver]);
+	assert.strictEqual(
+		admitted.status,
+		0,
+		'the real first-install copy must satisfy the canonical native helper guard'
+	);
+	assert.strictEqual(admitted.stdout, bashPath(path.join(checkout, helperRelative)) + '\n');
+	assert.strictEqual(admitted.stderr, '');
+	for (const relative of inputs) {
+		assert.deepStrictEqual(
+			fs.readFileSync(path.join(checkout, relative)),
+			fs.readFileSync(path.join(ROOT, relative)),
+			`${relative}: the first-install fixture preserves the genuine source bytes`
+		);
+	}
+	assert(
+		!fs.existsSync(path.join(driver, 'bin/libergopti_archive_publication.so')),
+		'no prebuilt or mock backend bypasses the checkout build prerequisite'
+	);
+	fs.unlinkSync(path.join(checkout, helperRelative));
+	const omitted = runLayout(guardScript, [driver]);
+	assert.strictEqual(omitted.status, 1, 'omitting the genuine helper still refuses installation');
+	assert.strictEqual(omitted.stdout, '');
+	assert.strictEqual(omitted.stderr, 'Canonical native archive build helper unavailable\n');
+} finally {
+	if (layoutChildrenTerminal) fs.rmSync(layout, { recursive: true, force: true });
+	else console.error('Owned source-layout namespace retained: child retirement is unobserved.');
+}
+console.log('[OK] first-install checkout copy preserves genuine native build inputs and refusal.');

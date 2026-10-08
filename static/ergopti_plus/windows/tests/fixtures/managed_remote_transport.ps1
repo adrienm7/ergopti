@@ -4,16 +4,128 @@ param(
     [Parameter(Mandatory = $true)][string]$StatePath,
     [Parameter(Mandatory = $true)][string]$EventPrefix,
     [ValidateSet('Serve', 'ServeUpdater', 'Cleanup')][string]$Mode = 'Serve',
+    [Parameter(Mandatory = $true)][string]$OwnedRootStoreScope,
     [string]$OwnedRootThumbprint = '',
     [string]$OwnedRootSubject = ''
 )
 $ErrorActionPreference = 'Stop'
 $ProgressPreference = 'SilentlyContinue'
-function Remove-OwnedRoot([string]$Thumbprint, [string]$Subject) {
+function Get-OwnedFixtureTokenElevation {
+    if (-not ('ErgoptiOwnedFixtureToken' -as [type])) {
+        Add-Type -TypeDefinition @'
+using System;
+using System.Collections.Generic;
+using System.Runtime.InteropServices;
+using System.Runtime.ExceptionServices;
+public static class ErgoptiOwnedFixtureToken {
+    private static readonly List<Observation> debt = new List<Observation>();
+    [DllImport("kernel32.dll", ExactSpelling = true)]
+    private static extern IntPtr GetCurrentProcess();
+    [DllImport("advapi32.dll", SetLastError = true)]
+    private static extern bool OpenProcessToken(IntPtr process, UInt32 access, out IntPtr token);
+    [DllImport("advapi32.dll", SetLastError = true)]
+    private static extern bool GetTokenInformation(IntPtr token, Int32 kind, out UInt32 value, UInt32 size, out UInt32 returned);
+    [DllImport("kernel32.dll", SetLastError = true)]
+    private static extern bool CloseHandle(IntPtr handle);
+    private static IntPtr OpenNative() {
+        IntPtr token;
+        if (!OpenProcessToken(GetCurrentProcess(), 8, out token)) {
+            throw new InvalidOperationException("Owned fixture token acquisition was refused.");
+        }
+        return token;
+    }
+    private static bool QueryNative(IntPtr token) {
+        UInt32 elevated, returned;
+        if (!GetTokenInformation(token, 20, out elevated, 4, out returned) || returned != 4) {
+            throw new InvalidOperationException("Owned fixture token elevation query was refused.");
+        }
+        return elevated != 0;
+    }
+    public sealed class Observation {
+        private readonly Func<IntPtr> open;
+        private readonly Func<IntPtr, bool> query;
+        private readonly Func<IntPtr, bool> close;
+        private bool attempted;
+        public IntPtr Token { get; private set; }
+        public bool Complete { get; private set; }
+        public Exception QueryFailure { get; private set; }
+        public Exception RetirementFailure { get; private set; }
+        public string RetirementStatus { get; private set; }
+        public Observation(Func<IntPtr> open, Func<IntPtr, bool> query, Func<IntPtr, bool> close) {
+            this.open = open; this.query = query; this.close = close;
+            RetirementStatus = "not_requested";
+        }
+        public bool Observe() {
+            if (attempted || debt.Count != 0) {
+                throw new InvalidOperationException("Unretired token ownership prevents a new permission observation.");
+            }
+            attempted = true;
+            Token = open();
+            if (Token == IntPtr.Zero) { throw new InvalidOperationException("Owned fixture token acquisition was refused."); }
+            bool elevated = false;
+            try { elevated = query(Token); }
+            catch (Exception failure) { QueryFailure = failure; }
+            bool retired = Retire();
+            if (QueryFailure != null) { ExceptionDispatchInfo.Capture(QueryFailure).Throw(); }
+            if (!retired && RetirementFailure != null) { ExceptionDispatchInfo.Capture(RetirementFailure).Throw(); }
+            if (!retired) { throw new InvalidOperationException("Owned fixture token retirement was refused."); }
+            Complete = true;
+            return elevated;
+        }
+        public bool Retire() {
+            if (Token == IntPtr.Zero) { return true; }
+            bool closed = false;
+            try { closed = close(Token); }
+            catch (Exception failure) {
+                RetirementStatus = "unavailable";
+                if (RetirementFailure == null) { RetirementFailure = failure; }
+            }
+            if (!closed) {
+                RetirementStatus = "unavailable";
+                if (!debt.Contains(this)) { debt.Add(this); }
+                return false;
+            }
+            Token = IntPtr.Zero;
+            RetirementStatus = "acknowledged";
+            debt.Remove(this);
+            return true;
+        }
+    }
+    public static int PendingRetirements { get { return debt.Count; } }
+    public static void RetryRetirement() {
+        foreach (Observation owner in debt.ToArray()) { owner.Retire(); }
+    }
+    public static bool ReadElevation() {
+        Observation owner = new Observation(OpenNative, QueryNative, CloseHandle);
+        return owner.Observe();
+    }
+}
+'@ -ErrorAction Stop
+    }
+    return [ErgoptiOwnedFixtureToken]::ReadElevation()
+}
+function Assert-OwnedFixtureRootScope {
+    param([string]$Scope, [scriptblock]$ReadElevation = { Get-OwnedFixtureTokenElevation })
+    if ($Scope -cnotin @('CurrentUser', 'LocalMachine')) {
+        throw [ArgumentException]::new('Owned fixture root-store scope is invalid.')
+    }
+    if ($Scope -ceq 'LocalMachine') {
+        if ($env:GITHUB_ACTIONS -cne 'true' -or $env:RUNNER_ENVIRONMENT -cne 'github-hosted') {
+            throw [InvalidOperationException]::new('Machine scope requires the explicit hosted ephemeral CI context.')
+        }
+        $Elevated = & $ReadElevation
+        if ($Elevated -isnot [bool] -or -not $Elevated) {
+            throw [InvalidOperationException]::new('Machine scope requires verified native token elevation.')
+        }
+    }
+}
+Assert-OwnedFixtureRootScope $OwnedRootStoreScope
+function Remove-OwnedRoot([string]$Thumbprint, [string]$Subject, [string]$Scope) {
+    Assert-OwnedFixtureRootScope $Scope
     if ($Thumbprint -cnotmatch '^[0-9A-F]{40}$' -or $Subject -cnotmatch '^CN=ErgoptiPlus managed-network fixture [0-9a-f]{32}$') {
         throw 'Invalid owned certificate identity.'
     }
-    $Store = [Security.Cryptography.X509Certificates.X509Store]::new('Root', 'CurrentUser')
+    $Store = [Security.Cryptography.X509Certificates.X509Store]::new('Root', $Scope)
     try {
         $Store.Open([Security.Cryptography.X509Certificates.OpenFlags]::ReadWrite)
         $Found = @($Store.Certificates | Where-Object { $_.Thumbprint -ceq $Thumbprint })
@@ -26,13 +138,16 @@ function Remove-OwnedRoot([string]$Thumbprint, [string]$Subject) {
     $Store.Open([Security.Cryptography.X509Certificates.OpenFlags]::ReadOnly)
     try {
         if (@($Store.Certificates | Where-Object { $_.Thumbprint -ceq $Thumbprint }).Count -ne 0) {
-            throw 'Owned current-user root removal was not acknowledged.'
+            throw 'Owned declared-scope root removal was not acknowledged.'
         }
     } finally { $Store.Close(); $Store.Dispose() }
 }
 if ($Mode -ceq 'Cleanup') {
     try {
-        Remove-OwnedRoot $OwnedRootThumbprint $OwnedRootSubject
+        Remove-OwnedRoot $OwnedRootThumbprint $OwnedRootSubject $OwnedRootStoreScope
+        $CleanupReceipt = @{ version = 1; operation = 'root_cleanup'; root_store_scope = $OwnedRootStoreScope;
+            root_thumbprint = $OwnedRootThumbprint; root_subject = $OwnedRootSubject; root_removed = $true }
+        [IO.File]::WriteAllText($StatePath, ($CleanupReceipt | ConvertTo-Json -Compress), [Text.UTF8Encoding]::new($false))
         [Console]::Out.WriteLine('OWNED_ROOT_REMOVED')
         exit 0
     } catch {
@@ -43,8 +158,18 @@ if ($Mode -ceq 'Cleanup') {
 $Fixture = $null
 $Events = @()
 $RootInstalled = $false
-$State = @{ version = 1; state = 'starting'; phase = 'untrusted'; sequence = 0; root_removed = $false; service_stopped = $false; root_install_stage = 'none' }
+$State = @{ version = 1; state = 'starting'; phase = 'untrusted'; sequence = 0;
+    root_store_scope = $OwnedRootStoreScope; root_install_stage = 'none'; root_removed = $false; service_stopped = $false }
 function Publish-State {
+    param([string]$TrustStep = '')
+    if ($TrustStep -ne '') {
+        if ($TrustStep -cnotin @('event_received', 'before_open', 'before_enumeration',
+            'before_export', 'before_add', 'after_add', 'before_postcheck', 'before_close')) {
+            throw [ArgumentException]::new('Invalid owned trust diagnostic step.')
+        }
+        # Trust checkpoints must not wait on native TLS observation getters.
+        $State.trust_step = $TrustStep
+    } else {
     try {
     if ($null -ne $Fixture) {
         $State.server_tls_backend = 'native_openssl3'
@@ -65,6 +190,7 @@ function Publish-State {
         }
     }
     } catch { } # Observation cannot suppress the original state write.
+    }
     $State.sequence++
     [IO.File]::WriteAllText($StatePath, ($State | ConvertTo-Json -Compress), [Text.UTF8Encoding]::new($false))
 }
@@ -770,7 +896,10 @@ public sealed class ErgoptiManagedRemoteFixture : IDisposable
         leafRequest.CertificateExtensions.Add(new X509EnhancedKeyUsageExtension(usages, true));
         // Reserved DNS name reaches only this owned CONNECT relay, without hosts changes.
         leafRequest.CertificateExtensions.Add(new X509Extension("2.5.29.17",
-            Sequence(Tag(0x82, Encoding.ASCII.GetBytes("managed-fixture.invalid"))), false));
+            (updater ? Sequence(Tag(0x82, Encoding.ASCII.GetBytes("managed-fixture.invalid")),
+                Tag(0x82, Encoding.ASCII.GetBytes("updater-redirect.managed-fixture.invalid")),
+                Tag(0x82, Encoding.ASCII.GetBytes("updater-refusal.managed-fixture.invalid"))) :
+                Sequence(Tag(0x82, Encoding.ASCII.GetBytes("managed-fixture.invalid")))), false));
         string crlUrl = "http://127.0.0.1:" + HttpPort + "/fixture.crl";
         byte[] distribution = Sequence(Sequence(Tag(0xa0, Tag(0xa0, Tag(0x86, Encoding.ASCII.GetBytes(crlUrl))))));
         leafRequest.CertificateExtensions.Add(new X509Extension("2.5.29.31", distribution, false));
@@ -812,7 +941,11 @@ public sealed class ErgoptiManagedRemoteFixture : IDisposable
                         finally { client.Close(); lock (gate) clients.Remove(client); }
                     });
                     worker.IsBackground = true;
-                    lock (gate) { clients.Add(client); workers.Add(worker); }
+                    lock (gate) {
+                        // Retirement may have closed its client snapshot after Accept returned.
+                        if (stopping) { client.Close(); continue; }
+                        clients.Add(client); workers.Add(worker);
+                    }
                     worker.Start();
                 } catch (SocketException failure) { if (!stopping) { CaptureServiceFailure("listener_accept", failure); Interlocked.Increment(ref ServiceFailures); } return; }
                 catch (ObjectDisposedException failure) { if (!stopping) { CaptureServiceFailure("listener_accept", failure); Interlocked.Increment(ref ServiceFailures); } return; }
@@ -869,7 +1002,9 @@ public sealed class ErgoptiManagedRemoteFixture : IDisposable
     private void Proxy(TcpClient client)
     {
         NetworkStream source = client.GetStream(); string first = Header(source).Split('\n')[0].Trim();
-        if (first != "CONNECT managed-fixture.invalid:" + TlsPort + " HTTP/1.1") throw new InvalidDataException("Proxy destination escaped fixture.");
+        if (first != "CONNECT managed-fixture.invalid:" + TlsPort + " HTTP/1.1" &&
+            (!updater || first != "CONNECT updater-redirect.managed-fixture.invalid:" + TlsPort + " HTTP/1.1"))
+            throw new InvalidDataException("Proxy destination escaped fixture.");
         using (TcpClient destination = new TcpClient()) {
             lock (gate) clients.Add(destination);
             try {
@@ -908,10 +1043,9 @@ public sealed class ErgoptiManagedRemoteFixture : IDisposable
             Interlocked.Increment(ref DownloadCredentials);
             throw new InvalidDataException("Updater origin received credentials.");
         }
-        string origin = "https://managed-fixture.invalid:" + TlsPort;
         if (first == "GET /updater/start HTTP/1.1") {
             Interlocked.Increment(ref DownloadRedirects);
-            Status(tls, "302 Found", "Location: " + origin + "/updater/good?marker=staging-fixture\r\n", new byte[0], 0);
+            Status(tls, "302 Found", "Location: https://updater-redirect.managed-fixture.invalid:" + TlsPort + "/updater/good?marker=staging-fixture\r\n", new byte[0], 0);
         } else if (first == "GET /updater/good?marker=staging-fixture HTTP/1.1") {
             Interlocked.Increment(ref DownloadGood); byte[] bytes = DownloadBytes();
             Status(tls, "200 OK", "", bytes, bytes.Length);
@@ -952,7 +1086,7 @@ public sealed class ErgoptiManagedRemoteFixture : IDisposable
     private void RefusalProxy(TcpClient client)
     {
         NetworkStream stream = client.GetStream(); string header = Header(stream);
-        if (header.Split('\n')[0].Trim() != "CONNECT managed-fixture.invalid:" + TlsPort + " HTTP/1.1")
+        if (header.Split('\n')[0].Trim() != "CONNECT updater-refusal.managed-fixture.invalid:" + TlsPort + " HTTP/1.1")
             throw new InvalidDataException("Refusal relay destination escaped fixture.");
         Interlocked.Increment(ref ProxyRefusals);
         if (header.IndexOf("\r\nProxy-Authorization:", StringComparison.OrdinalIgnoreCase) >= 0) {
@@ -971,17 +1105,20 @@ public sealed class ErgoptiManagedRemoteFixture : IDisposable
         if (updater && (first == "GET /updater.pac HTTP/1.1" || first == "GET /updater.pac HTTP/1.0")) {
             Interlocked.Increment(ref PacRequests);
             string owned = "https://managed-fixture.invalid:" + TlsPort;
+            // WinHTTP may strip HTTPS paths; fixture route identity uses exact owned authorities.
+            string redirected = "https://updater-redirect.managed-fixture.invalid:" + TlsPort;
+            string refused = "https://updater-refusal.managed-fixture.invalid:" + TlsPort;
             string updaterScript = "function FindProxyForURL(url,host){" +
-                "if(url == '" + owned + "/updater/good?marker=staging-fixture') return 'PROXY 127.0.0.1:" + SecondProxyPort + "';" +
-                "if(url == '" + owned + "/updater/407') return 'PROXY 127.0.0.1:" + RefusalProxyPort + "';" +
-                "if(url == '" + owned + "/updater/slow' || url == '" + owned + "/updater/start' || url == '" + owned + "/updater/401' || url == '" + owned + "/updater/403' || url == '" + owned + "/updater/small' || url == '" + owned + "/updater/wrong-digest' || url == '" + owned + "/updater/truncated') return 'PROXY 127.0.0.1:" + ProxyPort + "';" +
+                "if(host == 'updater-redirect.managed-fixture.invalid' && (url == '" + redirected + "' || url.indexOf('" + redirected + "/') == 0)) return 'PROXY 127.0.0.1:" + SecondProxyPort + "';" +
+                "if(host == 'updater-refusal.managed-fixture.invalid' && (url == '" + refused + "' || url.indexOf('" + refused + "/') == 0)) return 'PROXY 127.0.0.1:" + RefusalProxyPort + "';" +
+                "if(host == 'managed-fixture.invalid' && (url == '" + owned + "' || url.indexOf('" + owned + "/') == 0)) return 'PROXY 127.0.0.1:" + ProxyPort + "';" +
                 "return 'PROXY refused.invalid:9';}";
             Reply(stream, "application/x-ns-proxy-autoconfig", Encoding.UTF8.GetBytes(updaterScript)); return;
         }
         if (first != "GET /proxy.pac HTTP/1.1" && first != "GET /proxy.pac HTTP/1.0") throw new InvalidDataException("HTTP fixture destination mismatch.");
         Interlocked.Increment(ref PacRequests);
         string origin = "https://managed-fixture.invalid:" + TlsPort;
-        string script = "function FindProxyForURL(url,host){if(url == '" + origin + "/v1/models' || url == '" + origin + "/v1/chat/completions?marker=managed-network-fixture') return 'PROXY 127.0.0.1:" + ProxyPort + "'; return 'PROXY refused.invalid:9';}";
+        string script = "function FindProxyForURL(url,host){if(host == 'managed-fixture.invalid' && (url == '" + origin + "' || url.indexOf('" + origin + "/') == 0)) return 'PROXY 127.0.0.1:" + ProxyPort + "'; return 'PROXY refused.invalid:9';}";
         Reply(stream, "application/x-ns-proxy-autoconfig", Encoding.UTF8.GetBytes(script));
     }
     private static byte[] Tag(byte tag, byte[] data)
@@ -1039,37 +1176,42 @@ public sealed class ErgoptiManagedRemoteFixture : IDisposable
     while ([DateTime]::UtcNow -lt $Deadline) {
         $Choice = [Threading.WaitHandle]::WaitAny([Threading.WaitHandle[]]$Events, 1000)
         if ($Choice -eq 0) {
-            # Publish fixed boundaries before calls that may block in the native store provider.
-            # This observes the existing trust transaction without changing its permissions.
-            $State.root_install_stage = 'create_store'; Publish-State
-            $Store = [Security.Cryptography.X509Certificates.X509Store]::new('Root', 'CurrentUser')
+            $State.root_install_stage = 'create_store'
+            Publish-State -TrustStep 'event_received'
+            $Store = [Security.Cryptography.X509Certificates.X509Store]::new('Root', $OwnedRootStoreScope)
             try {
-                $State.root_install_stage = 'open_store'; Publish-State
+                $State.root_install_stage = 'open_store'
+                Publish-State -TrustStep 'before_open'
                 $Store.Open([Security.Cryptography.X509Certificates.OpenFlags]::ReadWrite)
-                $State.root_install_stage = 'verify_absent'; Publish-State
+                $State.root_install_stage = 'verify_absent'
+                Publish-State -TrustStep 'before_enumeration'
                 if (@($Store.Certificates | Where-Object { $_.Thumbprint -ceq $State.root_thumbprint }).Count -ne 0) {
                     throw 'Unique owned root already existed before admission.'
                 }
-                $State.root_install_stage = 'export_public'; Publish-State
+                $State.root_install_stage = 'export_public'
+                Publish-State -TrustStep 'before_export'
                 $PublicRoot = [Security.Cryptography.X509Certificates.X509Certificate2]::new($Fixture.Root.Export([Security.Cryptography.X509Certificates.X509ContentType]::Cert))
                 try {
-                    $State.root_install_stage = 'add_root'; Publish-State
+                    $State.root_install_stage = 'add_root'
+                    Publish-State -TrustStep 'before_add'
                     $Store.Add($PublicRoot)
+                    Publish-State -TrustStep 'after_add'
                 } finally { $PublicRoot.Dispose() }
                 $RootInstalled = $true
-                $State.root_install_stage = 'verify_present'; Publish-State
+                $State.root_install_stage = 'verify_present'
+                Publish-State -TrustStep 'before_postcheck'
                 if (@($Store.Certificates | Where-Object { $_.Thumbprint -ceq $State.root_thumbprint }).Count -ne 1) {
                     throw 'Unique owned root installation was not acknowledged.'
                 }
-            } finally {
-                $State.root_install_stage = 'close_store'; Publish-State
-                $Store.Close(); $Store.Dispose()
-            }
+                # Keep the original finally ownership and exception priority.
+                $State.root_install_stage = 'close_store'
+                Publish-State -TrustStep 'before_close'
+            } finally { $Store.Close(); $Store.Dispose() }
             $Fixture.TrustAdmitted = $true
             $State.root_install_stage = 'complete'
             $State.phase = 'trusted'
         } elseif ($Choice -eq 1) {
-            Remove-OwnedRoot $State.root_thumbprint $State.root_subject
+            Remove-OwnedRoot $State.root_thumbprint $State.root_subject $OwnedRootStoreScope
             $RootInstalled = $false
             $State.root_removed = $true
             $Fixture.TrustAdmitted = $false
@@ -1093,7 +1235,7 @@ public sealed class ErgoptiManagedRemoteFixture : IDisposable
     try {
         if ($null -ne $Fixture) { $Fixture.Dispose(); $State.service_stopped = $true }
         if ($State.ContainsKey('root_thumbprint')) {
-            Remove-OwnedRoot $State.root_thumbprint $State.root_subject
+            Remove-OwnedRoot $State.root_thumbprint $State.root_subject $OwnedRootStoreScope
             $RootInstalled = $false
             $State.root_removed = $true
         }

@@ -2,6 +2,7 @@
 """Constructed independent controls, not native switcher qualification."""
 
 import copy
+import json
 import unittest
 from probe_receipts import qualify
 
@@ -55,6 +56,56 @@ def independent_receipt():
 class ProbeReceipts(unittest.TestCase):
     def test_independent_observed_and_retired_receipt(self):
         self.assertTrue(qualify(independent_receipt(), 101, 202, 303))
+
+    def test_integer_pid_receipt_survives_json_round_trip(self):
+        value = independent_receipt()
+        for key in ("before_pid", "after_pid", "hs_pid"):
+            self.assertIs(type(value[key]), int)
+        decoded = json.loads(json.dumps(value))
+        self.assertTrue(qualify(decoded, 101, 202, 303))
+
+    def test_matching_float_pid_refuses_after_json_round_trip(self):
+        for key in ("before_pid", "after_pid", "hs_pid"):
+            with self.subTest(key=key):
+                value = independent_receipt()
+                value[key] = float(value[key])
+                decoded = json.loads(json.dumps(value))
+                self.assertIs(type(decoded[key]), float)
+                self.assertEqual(decoded[key], independent_receipt()[key])
+                self.assertFalse(qualify(decoded, 101, 202, 303))
+
+    def test_matching_boolean_pid_refuses_after_json_round_trip(self):
+        for index, key in enumerate(("before_pid", "after_pid", "hs_pid")):
+            with self.subTest(key=key):
+                value = independent_receipt()
+                expected = [101, 202, 303]
+                expected[index] = 1
+                value[key] = 1
+                self.assertTrue(qualify(value, *expected))
+                value[key] = True
+                decoded = json.loads(json.dumps(value))
+                self.assertIs(type(decoded[key]), bool)
+                self.assertEqual(decoded[key], expected[index])
+                self.assertFalse(qualify(decoded, *expected))
+
+    def test_other_wrong_pid_types_refuse(self):
+        for key in ("before_pid", "after_pid", "hs_pid"):
+            for replacement in (None, False, "101", [], {}):
+                with self.subTest(key=key, replacement=replacement):
+                    value = independent_receipt()
+                    value[key] = replacement
+                    self.assertFalse(qualify(value, 101, 202, 303))
+
+    def test_expected_pid_wrong_types_remain_refused(self):
+        for index, key in enumerate(("before_pid", "after_pid", "hs_pid")):
+            for replacement in (float((101, 202, 303)[index]), True):
+                with self.subTest(key=key, replacement=replacement):
+                    value = independent_receipt()
+                    expected = [101, 202, 303]
+                    if replacement is True:
+                        value[key] = 1
+                    expected[index] = replacement
+                    self.assertFalse(qualify(value, *expected))
 
     def test_native_post_return_cannot_replace_observation(self):
         value = independent_receipt()

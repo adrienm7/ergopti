@@ -234,6 +234,8 @@ class ArchiveAcceptanceControls(unittest.TestCase):
                 "tools/diagnostics/native_appleevent_permission.c",
                 "tools/diagnostics/native_appleevent_consent.m",
                 "tools/diagnostics/native_appleevent_registration_test.m",
+                "tools/diagnostics/native_appleevent_probe_protocol.h",
+                "tools/diagnostics/native_appleevent_probe_pair.m",
             ):
                 file = repository / name
                 file.parent.mkdir(parents=True, exist_ok=True)
@@ -284,6 +286,8 @@ class ArchiveAcceptanceControls(unittest.TestCase):
                 "tools/diagnostics/native_appleevent_permission.c",
                 "tools/diagnostics/native_appleevent_consent.m",
                 "tools/diagnostics/native_appleevent_registration_test.m",
+                "tools/diagnostics/native_appleevent_probe_protocol.h",
+                "tools/diagnostics/native_appleevent_probe_pair.m",
             ):
                 file = repository / name
                 file.parent.mkdir(parents=True, exist_ok=True)
@@ -595,7 +599,14 @@ class AppleEventBoundaryControls(unittest.TestCase):
     policy = "(version 1)\n(deny file-write*)\n(deny appleevent-send)\n(deny network-outbound)\n"
 
     def model(
-        self, root, *, outcome=-1743, failure=None, unexpected_delivery=False, partial_ready=False
+        self,
+        root,
+        *,
+        outcome=-1743,
+        failure=None,
+        unexpected_delivery=False,
+        partial_ready=False,
+        registration_output=None,
     ):
         judge = self
 
@@ -608,11 +619,25 @@ class AppleEventBoundaryControls(unittest.TestCase):
                 self.deliveries = 0
 
             def start(self, arguments):
+                if getattr(self, "allow_automation_consent", False) is True:
+                    judge.assertEqual(
+                        arguments[0],
+                        str(root / "OwnedAppleEvent-receiver.app/Contents/MacOS/receiver"),
+                    )
+                    judge.assertEqual(len(arguments), 4)
+                    ready_index = 1
+                else:
+                    judge.assertEqual(
+                        arguments[:2],
+                        [str(root / "OwnedAppleEvent.app/Contents/MacOS/owned-probe"), "receiver"],
+                    )
+                    judge.assertEqual(len(arguments), 5)
+                    ready_index = 2
                 child = Mock(pid=73136)
                 self.active.append(child)
                 self.groups[child] = Mock(reaped=False)
                 self.groups[child].observe_exit.return_value = None
-                Path(arguments[1]).write_bytes(
+                Path(arguments[ready_index]).write_bytes(
                     b"" if partial_ready else b"73136\n" + judge.nonce.encode() + b"\n"
                 )
                 return child
@@ -621,7 +646,17 @@ class AppleEventBoundaryControls(unittest.TestCase):
                 if arguments == [str(root / "native-appleevent-registration-test")]:
                     judge.assertTrue(options["confined"])
                     return subprocess.CompletedProcess(
-                        arguments, 0, "native_appkit_registration_controls=6\n", ""
+                        arguments,
+                        0,
+                        (
+                            "native_appkit_registration_controls=6\n"
+                            "native_private_appleevent_controls=1\n"
+                            "native_sender_registration_controls=6\n"
+                            "native_sender_identity_controls=7\n"
+                        )
+                        if registration_output is None
+                        else registration_output,
+                        "",
                     )
                 if arguments[-1] not in ("success", "denied"):
                     return subprocess.CompletedProcess(arguments, 0, "", "")
@@ -669,6 +704,17 @@ class AppleEventBoundaryControls(unittest.TestCase):
         ):
             receipt = probe.admit_appleevent_boundary(children, root)
         return children, receipt
+
+    def test_sdk_private_event_control_is_required_before_any_native_delivery(self):
+        for output in (
+            "native_appkit_registration_controls=6\n",
+            "native_appkit_registration_controls=6\nnative_private_appleevent_controls=0\n",
+        ):
+            with self.subTest(output=output), TemporaryDirectory() as directory:
+                with self.assertRaisesRegex(probe.AppleEventBoundaryError, "registration refusals"):
+                    self.invoke(directory, registration_output=output)
+                self.assertFalse((Path(directory) / "appleevent-ready").exists())
+                self.assertFalse((Path(directory) / "appleevent-delivered.1").exists())
 
     def test_two_independent_positive_routes_precede_each_documented_refusal(self):
         for status in (-1742, -1743):
@@ -2684,6 +2730,264 @@ class OwnedAutomationUIFactControls(unittest.TestCase):
                     self.assertFalse((root / "checkpoint.json").exists())
                 finally:
                     evidence.close()
+
+
+class SharedImageAppleEventRecipeControls(unittest.TestCase):
+    """Real recipe/filesystem over an explicit compiler port, never native delivery."""
+
+    def test_two_roles_share_one_compiled_signed_image_without_privacy_changes(self):
+        with TemporaryDirectory() as directory:
+            root = Path(directory)
+            calls = []
+            children = SimpleNamespace(run=lambda args, **options: calls.append((args, options)))
+            nonce = "54bc7a36-e2f0-43f8-917e-ce3d286d7520"
+            roles = probe._build_appleevent_pair(children, root, root, ["owned-clang"], nonce)
+            self.assertEqual(set(roles), {"receiver", "sender"})
+            self.assertEqual(roles["receiver"][0], roles["sender"][0])
+            self.assertEqual(roles["receiver"][1], "receiver")
+            self.assertEqual(roles["sender"][1], "sender")
+            self.assertEqual(len(calls), 3)
+            self.assertEqual(calls[0][0][0], "owned-clang")
+            self.assertIn(
+                str(root / "tools/diagnostics/native_appleevent_probe_pair.m"), calls[0][0]
+            )
+            self.assertEqual(calls[0][0][-1], roles["receiver"][0])
+            app = root / "OwnedAppleEvent.app"
+            self.assertEqual(calls[1][0], ["/usr/bin/codesign", "--force", "--sign", "-", str(app)])
+            self.assertEqual(
+                calls[2][0], ["/usr/bin/codesign", "--verify", "--deep", "--strict", str(app)]
+            )
+            self.assertTrue(all(options == {"confined": True} for _, options in calls))
+            info = probe.plistlib.loads((app / "Contents/Info.plist").read_bytes())
+            self.assertEqual(info["CFBundleIdentifier"], "com.ergopti.private.appleevent." + nonce)
+            self.assertEqual(info["CFBundleExecutable"], "owned-probe")
+            self.assertNotIn("NSAppleScriptEnabled", info)
+            self.assertNotIn("--entitlements", str(calls))
+
+    def test_compiler_refusal_cannot_sign_or_supply_role_routes(self):
+        with TemporaryDirectory() as directory:
+            run = Mock(side_effect=probe.AdmissionError("actual compiler refusal"))
+            with self.assertRaisesRegex(probe.AdmissionError, "actual compiler refusal"):
+                probe._build_appleevent_pair(
+                    SimpleNamespace(run=run),
+                    Path(directory),
+                    Path(directory),
+                    ["owned-clang"],
+                    "54bc7a36-e2f0-43f8-917e-ce3d286d7520",
+                )
+            self.assertEqual(run.call_count, 1)
+            self.assertEqual(run.call_args.kwargs, {"confined": True})
+
+    def test_an_existing_bundle_is_never_replaced_or_signed(self):
+        with TemporaryDirectory() as directory:
+            root = Path(directory)
+            existing = root / "OwnedAppleEvent.app/Contents/MacOS"
+            existing.mkdir(parents=True)
+            sentinel = existing / "foreign"
+            sentinel.write_bytes(b"independent foreign bytes")
+            run = Mock()
+            with self.assertRaises(FileExistsError):
+                probe._build_appleevent_pair(
+                    SimpleNamespace(run=run),
+                    root,
+                    root,
+                    ["owned-clang"],
+                    "54bc7a36-e2f0-43f8-917e-ce3d286d7520",
+                )
+            run.assert_not_called()
+            self.assertEqual(sentinel.read_bytes(), b"independent foreign bytes")
+
+
+class SenderRegistrationIdentityControls(unittest.TestCase):
+    """Closed scalar transport controls; actual AppKit/Security APIs require macOS."""
+
+    FAILURE = (
+        "Owned AppleEvent outcome admission failed: phase=reply-read, send=0, "
+        "read=-1701, length=unobserved, match=unobserved, error_read=0, "
+        "error_length=4, error_value=-1744, marker2=absent\n"
+    )
+    FRAME = (
+        "OWNED_APPLEEVENT_IDENTITY/1 before=1 after=1 self=1 target=1 "
+        "self_team=0 target_team=0 team=-1 identifier=1 hash=1\n"
+    )
+
+    def test_closed_identity_preserves_original_nonce_and_permission_failure(self):
+        original, facts = probe.appleevent_sender_identity_frame(self.FAILURE + self.FRAME)
+        self.assertEqual(original, self.FAILURE)
+        self.assertEqual(
+            facts,
+            {
+                "appkit_before": 1,
+                "appkit_after": 1,
+                "self_available": True,
+                "target_available": True,
+                "self_team": False,
+                "target_team": False,
+                "team_equal": None,
+                "identifier_equal": True,
+                "hash_equal": True,
+            },
+        )
+        self.assertEqual(probe.appleevent_sender_marker_fact(original)["error_number"], -1744)
+        result = subprocess.CompletedProcess(
+            [], 66, "OWNED_APPLEEVENT_PERMISSION/1 osstatus=-1744\n", self.FAILURE + self.FRAME
+        )
+        with self.assertRaises(probe.AdmissionError) as failed:
+            probe.run_appleevent_sender(
+                SimpleNamespace(run=Mock(return_value=result)), [], "unconfined-positive"
+            )
+        self.assertIn("sender_identity_fact=", str(failed.exception))
+        self.assertIn('"error_number": -1744', str(failed.exception))
+        self.assertIn('"osstatus": -1744', str(failed.exception))
+        self.assertNotIn("OWNED_APPLEEVENT_IDENTITY/", str(failed.exception))
+
+    def test_unavailable_code_identity_remains_unknown_not_equal(self):
+        frame = self.FRAME.replace(
+            "self=1 target=1 self_team=0 target_team=0 team=-1 identifier=1 hash=1",
+            "self=0 target=0 self_team=-1 target_team=-1 team=-1 identifier=-1 hash=-1",
+        )
+        original, facts = probe.appleevent_sender_identity_frame(self.FAILURE + frame)
+        self.assertEqual(original, self.FAILURE)
+        self.assertIs(facts["self_available"], False)
+        for field in ("self_team", "target_team", "team_equal", "identifier_equal", "hash_equal"):
+            self.assertIsNone(facts[field])
+
+    def test_wrong_or_private_fields_cannot_be_exported(self):
+        for frame in (
+            self.FRAME.replace("self=1", "self=0"),
+            self.FRAME.replace("team=-1", "team=1"),
+            self.FRAME.replace("hash=1", "hash=private-digest"),
+            self.FRAME.replace("before=1", "before=01"),
+            self.FRAME + self.FRAME,
+            self.FRAME.rstrip("\n"),
+            self.FRAME + "private-path\n",
+            self.FRAME.replace("target=1", "target=2"),
+        ):
+            with self.subTest(frame=frame):
+                value = self.FAILURE + frame
+                self.assertEqual(probe.appleevent_sender_identity_frame(value), (value, {}))
+
+    def test_sender_precondition_refusal_remains_failed_before_nonce_send(self):
+        failure = "Owned AppleEvent sender AppKit admission refused: 2\n"
+        frame = self.FRAME.replace(
+            "self=1 target=1 self_team=0 target_team=0 team=-1 identifier=1 hash=1",
+            "self=0 target=0 self_team=-1 target_team=-1 team=-1 identifier=-1 hash=-1",
+        )
+        original, facts = probe.appleevent_sender_identity_frame(failure + frame)
+        self.assertEqual(original, failure)
+        self.assertIs(facts["target_available"], False)
+        result = subprocess.CompletedProcess([], 65, "", failure + frame)
+        with self.assertRaisesRegex(probe.AdmissionError, "exit=65"):
+            probe.run_appleevent_sender(
+                SimpleNamespace(run=Mock(return_value=result)), [], "unconfined-positive"
+            )
+
+    def test_success_cannot_adopt_identity_output_instead_of_exact_nonce_receipt(self):
+        result = subprocess.CompletedProcess([], 0, "native_appleevent_status=0\n", self.FRAME)
+        with self.assertRaises(probe.AdmissionError):
+            probe.run_appleevent_sender(
+                SimpleNamespace(run=Mock(return_value=result)), [], "unconfined-positive"
+            )
+
+    def test_security_recipe_and_each_native_control_marker_are_mandatory(self):
+        with TemporaryDirectory() as directory:
+            calls = []
+            root = Path(directory)
+            probe._build_appleevent_pair(
+                SimpleNamespace(run=lambda args, **options: calls.append(args)),
+                root,
+                root,
+                ["owned-clang"],
+                "54bc7a36-e2f0-43f8-917e-ce3d286d7520",
+            )
+            self.assertIn("Security", calls[0])
+        for absent in (
+            "native_sender_registration_controls=6\n",
+            "native_sender_identity_controls=7\n",
+        ):
+            with self.subTest(absent=absent), TemporaryDirectory() as directory:
+                original = (
+                    "native_appkit_registration_controls=6\n"
+                    "native_private_appleevent_controls=1\n"
+                    "native_sender_registration_controls=6\n"
+                    "native_sender_identity_controls=7\n"
+                )
+                with self.assertRaisesRegex(probe.AppleEventBoundaryError, "registration refusals"):
+                    AppleEventBoundaryControls().invoke(
+                        directory, registration_output=original.replace(absent, "")
+                    )
+
+
+class ConsentPairMergeJoinControls(unittest.TestCase):
+    def test_explicit_consent_keeps_two_named_roles_and_default_shared_image(self):
+        import plistlib
+
+        nonce = "54bc7a36-e2f0-43f8-917e-ce3d286d7520"
+        with TemporaryDirectory() as directory:
+            root = Path(directory)
+            calls = []
+            owner = SimpleNamespace(
+                run=lambda args, **options: calls.append((args, options)),
+                allow_automation_consent=True,
+                allow_owned_consent_ui=True,
+            )
+            roles = probe._build_appleevent_consent_pair(owner, root, root, ["owned-clang"], nonce)
+            self.assertEqual(set(roles), {"sender", "receiver"})
+            self.assertNotEqual(roles["sender"][0], roles["receiver"][0])
+            for role in ("sender", "receiver"):
+                app = root / ("OwnedAppleEvent-" + role + ".app")
+                properties = plistlib.loads((app / "Contents/Info.plist").read_bytes())
+                self.assertEqual(
+                    properties["CFBundleIdentifier"],
+                    "com.ergopti.private.appleevent." + role + "." + nonce,
+                )
+                self.assertEqual(
+                    properties["CFBundleName"], "Owned AppleEvent " + role + " " + nonce
+                )
+                self.assertEqual(roles[role], [str(app / "Contents/MacOS" / role)])
+                self.assertTrue(properties["LSUIElement"])
+                self.assertFalse(any("Entitlement" in key for key in properties))
+            self.assertEqual(owner.automation_sender_name, "Owned AppleEvent sender " + nonce)
+            self.assertEqual(owner.automation_receiver_name, "Owned AppleEvent receiver " + nonce)
+            compilations = [args for args, _ in calls if args[0] == "owned-clang"]
+            self.assertEqual(len(compilations), 3)
+            sender = [
+                args
+                for args in compilations
+                if str(root / "tools/diagnostics/native_appleevent_probe_sender.c") in args
+            ]
+            receiver = [
+                args
+                for args in compilations
+                if str(root / "tools/diagnostics/native_appleevent_probe_receiver.c") in args
+            ]
+            self.assertEqual(len(sender), 1)
+            self.assertEqual(len(receiver), 1)
+            for recipe in (sender[0], receiver[0]):
+                self.assertIn("-fobjc-arc", recipe)
+                self.assertEqual(recipe[recipe.index("-x") + 1], "objective-c")
+                for framework in ("ApplicationServices", "Carbon", "AppKit", "Security"):
+                    self.assertIn(framework, recipe)
+            self.assertIn(str(root / "tools/diagnostics/native_appleevent_permission.c"), sender[0])
+            self.assertNotIn(
+                str(root / "tools/diagnostics/native_appleevent_permission.c"), receiver[0]
+            )
+            self.assertTrue(all(options == {"confined": True} for _, options in calls))
+        with TemporaryDirectory() as directory:
+            root = Path(directory)
+            calls = []
+            owner = SimpleNamespace(run=lambda args, **options: calls.append(args))
+            roles = probe._build_appleevent_pair(owner, root, root, ["owned-clang"], nonce)
+            image = str(root / "OwnedAppleEvent.app/Contents/MacOS/owned-probe")
+            self.assertEqual(roles["sender"], [image, "sender"])
+            self.assertEqual(roles["receiver"], [image, "receiver"])
+            shared_compile = [args for args in calls if args[0] == "owned-clang"]
+            self.assertEqual(len(shared_compile), 1)
+            self.assertIn(
+                str(root / "tools/diagnostics/native_appleevent_permission.c"), shared_compile[0]
+            )
+            self.assertFalse(hasattr(owner, "automation_sender_name"))
+            self.assertFalse(hasattr(owner, "automation_receiver_name"))
 
 
 if __name__ == "__main__":

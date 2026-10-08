@@ -635,6 +635,7 @@ end`
 		{ name: 'non-ci', ci: 'false', status: 403 },
 		{ name: 'conditional', ci: 'true', status: 304 }
 	];
+	const managedProxy = 'http://127.0.0.1:9';
 	const managedEnvironment = (evidence, ci, status, cases) => ({
 		...process.env,
 		LUA_PATH: `${path.join(ROOT, 'static/ergopti_plus/_shared/lua/?.lua')};${path.join(ROOT, 'static/ergopti_plus/_shared/lua/?/init.lua')};;`,
@@ -648,15 +649,45 @@ end`
 		UPDATER_AUTH_CASES: JSON.stringify(cases),
 		// Real canonical environment admission, confined to this simulated child.
 		// No OS settings/helper/route receipt override is provided.
-		http_proxy: 'http://127.0.0.1:9',
-		https_proxy: 'http://127.0.0.1:9',
-		HTTP_PROXY: '',
-		HTTPS_PROXY: '',
+		http_proxy: managedProxy,
+		https_proxy: managedProxy,
+		// Windows folds environment names; both spellings must retain the proxy.
+		HTTP_PROXY: process.platform === 'win32' ? managedProxy : '',
+		HTTPS_PROXY: process.platform === 'win32' ? managedProxy : '',
 		all_proxy: '',
 		ALL_PROXY: '',
 		NO_PROXY: '',
 		no_proxy: ''
 	});
+	const managedEnvironmentProbe = spawnSync(
+		nativeLua,
+		[
+			'-e',
+			`
+assert(os.getenv('http_proxy') == 'http://127.0.0.1:9', 'HTTP loopback fixture proxy was lost')
+assert(os.getenv('https_proxy') == 'http://127.0.0.1:9', 'HTTPS loopback fixture proxy was lost')
+local expected_upper = '${process.platform === 'win32' ? 'http://127.0.0.1:9' : ''}'
+assert(os.getenv('HTTP_PROXY') == expected_upper, 'HTTP alias changed the fixture proxy')
+assert(os.getenv('HTTPS_PROXY') == expected_upper, 'HTTPS alias changed the fixture proxy')
+for _, key in ipairs({'all_proxy', 'ALL_PROXY', 'no_proxy', 'NO_PROXY'}) do
+ assert(os.getenv(key) == '', 'fixture inherited another proxy route')
+end
+`
+		],
+		{
+			encoding: 'utf8',
+			env: managedEnvironment(updaterScratch, 'true', 403, managedCases)
+		}
+	);
+	assert.ifError(managedEnvironmentProbe.error);
+	assert.strictEqual(managedEnvironmentProbe.signal, null);
+	assert.strictEqual(
+		managedEnvironmentProbe.status,
+		0,
+		'spawned managed fixture must preserve its explicit loopback proxy environment'
+	);
+	assert.strictEqual(managedEnvironmentProbe.stdout, '');
+	assert.strictEqual(managedEnvironmentProbe.stderr, '');
 	for (const variant of managedVariants) {
 		const evidence = path.join(updaterScratch, `managed-authentication-${variant.name}`);
 		fs.mkdirSync(evidence);
