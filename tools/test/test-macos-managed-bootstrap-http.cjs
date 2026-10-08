@@ -36,7 +36,7 @@ const coldReceipt = spawnSync(
 assert.equal(coldReceipt.error, undefined, 'the independent cold receipt receiver must start');
 assert.equal(coldReceipt.signal, null, 'the independent cold receipt receiver must retire');
 assert.equal(coldReceipt.status, 0, coldReceipt.stderr || coldReceipt.stdout);
-assert.match(coldReceipt.stderr, /Ran 8 tests in/);
+assert.match(coldReceipt.stderr, /Ran 10 tests in/);
 assert.match(coldReceipt.stderr, /\bOK\b/);
 assert.doesNotMatch(coldReceipt.stderr, /skipped=/);
 process.stdout.write(coldReceipt.stdout);
@@ -59,3 +59,17 @@ assert.match(officialColdReceipt.stderr, /\bOK\b/);
 assert.doesNotMatch(officialColdReceipt.stderr, /skipped=/);
 process.stdout.write(officialColdReceipt.stdout);
 process.stdout.write(officialColdReceipt.stderr);
+
+const archiveModes = spawnSync(
+	pythonExecutable(),
+	['tools/test/macos_official_ollama_archive_modes_test.py'],
+	{ cwd: path.resolve(__dirname, '../..'), encoding: 'utf8', timeout: 30000 }
+);
+assert.equal(archiveModes.error, undefined, 'the actual archive mode receiver must start');
+assert.equal(archiveModes.signal, null, 'the actual archive mode receiver must retire');
+assert.equal(archiveModes.status, 0, archiveModes.stderr || archiveModes.stdout);
+assert.match(archiveModes.stderr, /Ran 2 tests in/);
+assert.match(archiveModes.stderr, /\bOK\b/);
+assert.doesNotMatch(archiveModes.stderr, /skipped=/);
+process.stdout.write(archiveModes.stdout);
+process.stdout.write(archiveModes.stderr);

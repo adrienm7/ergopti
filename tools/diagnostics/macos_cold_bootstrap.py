@@ -144,6 +144,17 @@ def digest(path):
     return hashlib.sha256(Path(path).read_bytes()).hexdigest()
 
 
+def validate_uv_version(output):
+    """Qualify the exact pinned native wheel's upstream CLI display format."""
+    # The independently pinned arm64 PyPI wheel eb4f75e8... embeds this release
+    # commit/date. Tagged uv-cli SelfVersionInfo includes the target triple;
+    # requiring the old bare version rejects the genuine published executable.
+    expected = "uv 0.12.21 (7af826859 2026-09-29 aarch64-apple-darwin)"
+    if output != expected:
+        raise RuntimeError("Cold uv does not match the independently pinned version")
+    return "uv 0.12.21"
+
+
 def validate(result, config):
     """Require literal closure fences independently of the production Lua parser."""
     if (
@@ -400,7 +411,7 @@ def receive_owned(app, output, expected_sha):
                 check=True,
             )
             uv = Path(config["uv_root"]) / "bin/uv"
-            version = subprocess.run(
+            version_output = subprocess.run(
                 ["/usr/bin/sandbox-exec", "-f", str(profile), str(uv), "--version"],
                 capture_output=True,
                 text=True,
@@ -408,8 +419,7 @@ def receive_owned(app, output, expected_sha):
                 env=environment,
                 check=True,
             ).stdout.strip()
-            if version != "uv 0.12.21":
-                raise RuntimeError("Cold uv does not match the independently pinned version")
+            version = validate_uv_version(version_output)
             release = json.loads(
                 (resources / PREFIX / "_shared/modules/llm/managed_python_release.json").read_text()
             )
@@ -424,6 +434,7 @@ def receive_owned(app, output, expected_sha):
             report.update(
                 status="passed",
                 uv=version,
+                uv_cli_output=version_output,
                 python=probe.stdout.strip(),
                 imports="passed",
                 fingerprint=fingerprint,

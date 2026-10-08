@@ -274,5 +274,30 @@ class ColdIsolationLipoGrammarTests(unittest.TestCase):
             )
 
 
+class ColdUvVersionTests(unittest.TestCase):
+    """Published wheel metadata and upstream formatting are independent literals."""
+
+    def test_actual_pinned_arm64_format_reports_its_exact_semantic_version(self):
+        self.assertEqual(
+            cold.validate_uv_version("uv 0.12.21 (7af826859 2026-09-29 aarch64-apple-darwin)"),
+            "uv 0.12.21",
+        )
+
+    def test_wrong_release_build_processor_or_extra_output_refuses(self):
+        for output in (
+            "uv 0.12.21",
+            "uv 0.12.21 (aarch64-apple-darwin)",
+            "uv 0.12.20 (7af826859 2026-09-29 aarch64-apple-darwin)",
+            "uv 0.12.21 (7af826859 2026-09-29 x86_64-apple-darwin)",
+            "uv 0.12.21 (7af826858 2026-09-29 aarch64-apple-darwin)",
+            "uv 0.12.21 (7af826859 2026-09-28 aarch64-apple-darwin)",
+            "uv 0.12.21+1 (7af826859 2026-09-29 aarch64-apple-darwin)",
+            "uv 0.12.21 (7af826859 2026-09-29 aarch64-apple-darwin) extra",
+            "uv 0.12.21 (7af826859 2026-09-29 aarch64-apple-darwin)\nforeign",
+        ):
+            with self.subTest(output=output), self.assertRaises(RuntimeError):
+                cold.validate_uv_version(output)
+
+
 if __name__ == "__main__":
     unittest.main()
