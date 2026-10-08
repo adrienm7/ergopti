@@ -2,6 +2,7 @@
 """Independent ownership models; these do not qualify actual macOS syscalls."""
 
 import ctypes
+import errno
 import json
 from pathlib import Path
 import subprocess
@@ -390,6 +391,143 @@ class OwnedProcessControls(unittest.TestCase):
                 [owner.signal.SIG_DFL, owner.signal.SIG_DFL],
             )
             self.assertFalse((root / "receipt.json").exists())
+
+
+class PrivilegedLeaderControls(unittest.TestCase):
+    def setUp(self):
+        self.native = owner.NativeProcessGroups.__new__(owner.NativeProcessGroups)
+        self.leader = 73136
+        self.terminal = SimpleNamespace(
+            si_pid=self.leader, si_code=owner.os.CLD_EXITED, si_status=0
+        )
+        self.waiting = patch.object(owner.os, "waitid", return_value=self.terminal, create=True)
+        self.waiting_mock = self.waiting.start()
+        self.addCleanup(self.waiting.stop)
+        self.records = [(self.leader, 5), (87236, 2)]
+        self.short_changes = {}
+        self.full_received = 0
+        self.full_errno = errno.EPERM
+        self.short_received = 64
+        self.calls = []
+
+        def listed(kind, group, storage, _size):
+            self.assertEqual((kind, group), (2, self.leader))
+            if storage is not None:
+                for index, (pid, _status) in enumerate(self.records):
+                    storage[index] = pid
+            return len(self.records) * ctypes.sizeof(ctypes.c_int)
+
+        def identity(pid, kind, zombies, destination, size):
+            self.calls.append((pid, kind, zombies, size))
+            if kind == 3 and pid == self.leader:
+                ctypes.set_errno(self.full_errno)
+                return self.full_received
+            expected = owner.ProcBSDShortInfo if kind == 13 else owner.ProcBSDInfo
+            self.assertEqual(size, ctypes.sizeof(expected))
+            self.assertEqual(zombies, 1)
+            record = ctypes.cast(destination, ctypes.POINTER(expected)).contents
+            record.pid, record.ppid, record.pgid = pid, owner.os.getpid(), self.leader
+            record.status = dict(self.records)[pid]
+            if kind == 13:
+                for key, value in self.short_changes.items():
+                    setattr(record, key, value)
+                return self.short_received
+            return size
+
+        self.native.library = SimpleNamespace(proc_listpids=listed, proc_pidinfo=identity)
+
+    def test_cross_uid_reserved_zombie_is_positively_identified_and_live_child_preserved(self):
+        self.assertEqual(self.native.live_members(self.leader, self.leader), [87236])
+        self.assertEqual(self.calls, [(73136, 3, 1, 136), (73136, 13, 1, 64), (87236, 3, 1, 136)])
+        self.assertEqual(len(self.waiting_mock.call_args_list), 6)
+        for call in self.waiting_mock.call_args_list:
+            self.assertEqual(
+                call.args,
+                (
+                    owner.os.P_PID,
+                    self.leader,
+                    owner.os.WEXITED | owner.os.WNOHANG | owner.os.WNOWAIT,
+                ),
+            )
+
+    def test_unknown_member_eperm_never_uses_short_identity_or_wait_authority(self):
+        self.records = [(87236, 2)]
+
+        def denied(*_arguments):
+            ctypes.set_errno(errno.EPERM)
+            return 0
+
+        self.native.library.proc_pidinfo = Mock(side_effect=denied)
+        with self.assertRaisesRegex(owner.OwnedProcessError, "member identity"):
+            self.native.live_members(self.leader, self.leader)
+        self.assertEqual(self.native.library.proc_pidinfo.call_args.args[1], 3)
+        self.waiting_mock.assert_not_called()
+
+    def test_partial_full_record_with_eperm_cannot_admit_short_identity(self):
+        self.full_received = 12
+        with self.assertRaisesRegex(owner.OwnedProcessError, "member identity"):
+            self.native.live_members(self.leader, self.leader)
+        self.assertEqual(len(self.calls), 1)
+        self.waiting_mock.assert_not_called()
+
+    def test_other_full_identity_errors_are_never_treated_as_privileged(self):
+        self.full_errno = errno.EIO
+        with self.assertRaisesRegex(owner.OwnedProcessError, "member identity"):
+            self.native.live_members(self.leader, self.leader)
+        self.assertEqual(len(self.calls), 1)
+        self.waiting_mock.assert_not_called()
+
+    def test_every_exact_short_identity_fence_is_required(self):
+        for field, value in (
+            ("pid", 87236),
+            ("ppid", owner.os.getpid() + 1),
+            ("pgid", 87236),
+            ("status", 2),
+        ):
+            with self.subTest(field=field):
+                self.short_changes = {field: value}
+                with self.assertRaisesRegex(
+                    owner.OwnedProcessError, "identity was unavailable or changed"
+                ):
+                    self.native.live_members(self.leader, self.leader)
+
+    def test_missing_or_short_public_record_refuses_retirement(self):
+        for size in (0, 60, 136):
+            with self.subTest(size=size):
+                self.short_received = size
+                with self.assertRaisesRegex(
+                    owner.OwnedProcessError, "identity was unavailable or changed"
+                ):
+                    self.native.live_members(self.leader, self.leader)
+
+    def test_lost_direct_child_reservation_refuses_before_short_query(self):
+        self.waiting_mock.side_effect = ChildProcessError()
+        with self.assertRaisesRegex(owner.OwnedProcessError, "reservation was lost"):
+            self.native.live_members(self.leader, self.leader)
+        self.assertEqual(len(self.calls), 1)
+
+    def test_live_direct_child_does_not_authorize_zombie_identity(self):
+        self.waiting_mock.return_value = None
+        with self.assertRaisesRegex(owner.OwnedProcessError, "not our terminal child"):
+            self.native.live_members(self.leader, self.leader)
+        self.assertEqual(len(self.calls), 1)
+
+    def test_terminal_changed_during_identity_query_refuses_retirement(self):
+        changed = SimpleNamespace(si_pid=self.leader, si_code=owner.os.CLD_EXITED, si_status=7)
+        self.waiting_mock.side_effect = [self.terminal, self.terminal, changed, changed]
+        with self.assertRaisesRegex(owner.OwnedProcessError, "terminal observation changed"):
+            self.native.live_members(self.leader, self.leader)
+
+    def test_terminal_changed_during_remaining_member_census_refuses_retirement(self):
+        changed = SimpleNamespace(si_pid=self.leader, si_code=owner.os.CLD_EXITED, si_status=7)
+        self.waiting_mock.side_effect = [self.terminal] * 4 + [changed, changed]
+        with self.assertRaisesRegex(owner.OwnedProcessError, "lost during group census"):
+            self.native.live_members(self.leader, self.leader)
+
+    def test_privileged_identity_requires_group_equal_exact_reserved_leader(self):
+        with self.assertRaisesRegex(owner.OwnedProcessError, "exact reserved group leader"):
+            self.native.privileged_terminal_identity(self.leader, 87236)
+        self.waiting_mock.assert_not_called()
 
 
 if __name__ == "__main__":
