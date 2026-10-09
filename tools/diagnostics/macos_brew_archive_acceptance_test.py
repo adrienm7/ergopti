@@ -4468,5 +4468,60 @@ class RefusedButtonLabelFactControls(unittest.TestCase):
                 evidence.close()
 
 
+class ForegroundRequestRefusalControls(unittest.TestCase):
+    """A normal activation refusal is not a permission status or a grant."""
+
+    def invoke(self, root, frame, *, code=65, stdout="", mode="request"):
+        executable = root / "owned-sender"
+        executable.write_bytes(b"independent acquired image")
+        policy = root / "owned-policy.sb"
+        policy.write_text("(version 1)\n(deny default)\n")
+        owner = SimpleNamespace(allow_automation_consent=True, allow_owned_consent_ui=False)
+        calls = []
+
+        def run(arguments, **options):
+            self.assertEqual(options, {"check": False, "timeout": 30})
+            calls.append(arguments[-1])
+            if mode == "request" and len(calls) == 1:
+                return subprocess.CompletedProcess(
+                    arguments, 67, "OWNED_APPLEEVENT_PREFLIGHT/1 mode=query osstatus=-1744\n", ""
+                )
+            return subprocess.CompletedProcess(arguments, code, stdout, frame)
+
+        owner.run = run
+        try:
+            probe.admit_appleevent_permission_prerequisite(
+                owner, [str(executable), "73136", "independent-nonce"], policy, lambda phase: None
+            )
+        finally:
+            self.calls = calls
+
+    def test_exact_owned_request_foreground_refusal_never_reaches_fresh_grant_query(self):
+        for state in ("unavailable", "inactive"):
+            with self.subTest(state=state), TemporaryDirectory() as directory:
+                with self.assertRaisesRegex(
+                    probe.AdmissionError, "foreground precondition refused: " + state
+                ):
+                    self.invoke(
+                        Path(directory), "OWNED_APPLEEVENT_FOREGROUND/1 state=" + state + "\n"
+                    )
+                self.assertEqual(self.calls, ["permission-query", "permission-request"])
+
+    def test_foreign_mode_exit_or_dirty_frame_has_no_foreground_or_permission_credit(self):
+        for mode, code, stdout, frame in (
+            ("query", 65, "", "OWNED_APPLEEVENT_FOREGROUND/1 state=inactive\n"),
+            ("request", 0, "", "OWNED_APPLEEVENT_FOREGROUND/1 state=inactive\n"),
+            ("request", 65, "PRIVATE", "OWNED_APPLEEVENT_FOREGROUND/1 state=inactive\n"),
+            ("request", 65, "", "OWNED_APPLEEVENT_FOREGROUND/1 state=private-label\n"),
+            ("request", 65, "", "OWNED_APPLEEVENT_FOREGROUND/1 state=inactive\nPRIVATE\n"),
+        ):
+            with self.subTest(mode=mode, code=code, frame=frame), TemporaryDirectory() as directory:
+                with self.assertRaisesRegex(
+                    probe.AdmissionError, "Malformed owned Automation receipt"
+                ):
+                    self.invoke(Path(directory), frame, mode=mode, code=code, stdout=stdout)
+                self.assertEqual(len(self.calls), 1 if mode == "query" else 2)
+
+
 if __name__ == "__main__":
     unittest.main()

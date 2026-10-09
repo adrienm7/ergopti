@@ -211,8 +211,8 @@ try {
 		['ref', 'refs/heads/main'],
 		['event_name', 'pull_request'],
 		['release', false],
-		['version', '0.0.0-dev.157'],
-		['tag', 'v0.0.0-dev.157']
+		['version', '0.0.0-dev.158'],
+		['tag', 'v0.0.0-dev.158']
 	];
 	for (const [key, value] of badContexts) {
 		const bad = { ...context, [key]: value };
@@ -299,8 +299,8 @@ try {
 		{ GITHUB_ACTIONS: '' },
 		{ GITHUB_REF: 'refs/heads/main' },
 		{ GITHUB_EVENT_NAME: 'pull_request' },
-		{ ERGOPTI_DEV_RELEASE_VERSION: '0.0.0-dev.157' },
-		{ ERGOPTI_DEV_RELEASE_TAG: 'v0.0.0-dev.157' }
+		{ ERGOPTI_DEV_RELEASE_VERSION: '0.0.0-dev.158' },
+		{ ERGOPTI_DEV_RELEASE_TAG: 'v0.0.0-dev.158' }
 	]) {
 		check(() => {
 			const actual = commandModel({ ...environment, ...update }, now);

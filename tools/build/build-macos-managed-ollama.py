@@ -18,6 +18,7 @@ import os
 from pathlib import Path
 import platform
 import shutil
+import shlex
 import signal
 import subprocess
 import tarfile
@@ -388,6 +389,7 @@ def _run_native_go_tests(
                     "-json",
                     "-count=1",
                     "-mod=readonly",
+                    "-modcacherw",
                     "-timeout=" + str(timeout) + "s",
                     "./internal/ergoptinativehttp",
                 ],
@@ -451,6 +453,54 @@ def _run_native_go_tests(
 def extract_archive(archive: Path, destination: Path) -> None:
     with tarfile.open(archive) as stream:
         stream.extractall(destination, filter="data")
+
+
+def native_build_env(contract, asset_contract, architecture: str, work: Path) -> dict:
+    """Bind every cgo compiler/link invocation to the selected native macOS SDK."""
+    sdk_path = Path(run(["xcrun", "--sdk", "macosx", "--show-sdk-path"]))
+    if not sdk_path.is_absolute():
+        raise ValueError("The selected native macOS SDK path is not absolute")
+    sdk = sdk_path.resolve(strict=True)
+    if not sdk.is_dir():
+        raise ValueError("The selected native macOS SDK is not a directory")
+    clang = run(["xcrun", "--sdk", "macosx", "--find", "clang"])
+    clangxx = run(["xcrun", "--sdk", "macosx", "--find", "clang++"])
+    if any(
+        not Path(value).is_absolute() or not Path(value).is_file() for value in (clang, clangxx)
+    ):
+        raise ValueError("The selected native macOS compilers are unavailable")
+    # CC/CXX accept options in Go; keeping the sysroot here also covers linking.
+    # Do not alter the reviewed minimum OS or the authenticated CGO ABI flags.
+    env = dict(os.environ)
+    env.update(
+        GOTOOLCHAIN="local",
+        GOOS=asset_contract["os"],
+        GOARCH=architecture,
+        CGO_ENABLED="1",
+        CGO_CFLAGS=contract["cgo_cflags"],
+        CGO_CXXFLAGS=contract["cgo_cxxflags"],
+        CGO_LDFLAGS=asset_contract["cgo_ldflags"],
+        CGO_CPPFLAGS="",
+        SDKROOT=str(sdk),
+        CC=shlex.join([clang, "-isysroot", str(sdk)]),
+        CXX=shlex.join([clangxx, "-isysroot", str(sdk)]),
+        GOCACHE=str(work / "go-cache"),
+        GOMODCACHE=str(work / "go-mod-cache"),
+        GOTMPDIR=str(work / "go-tmp"),
+    )
+    print(
+        json.dumps(
+            {
+                "native_sdk": str(sdk),
+                "sdk_version": run(["xcrun", "--sdk", "macosx", "--show-sdk-version"]),
+                "cc": clang,
+                "cxx": clangxx,
+            },
+            sort_keys=True,
+        ),
+        flush=True,
+    )
+    return env
 
 
 def build(options) -> Path:
@@ -531,22 +581,7 @@ def build(options) -> Path:
         cli = runtime / contract["binary_path"]
         if not cli.is_file() or cli.is_symlink():
             raise ValueError("The official CLI layout changed")
-        env = dict(os.environ)
-        env.update(
-            GOTOOLCHAIN="local",
-            GOOS=asset_contract["os"],
-            GOARCH=architecture,
-            CGO_ENABLED="1",
-            CGO_CFLAGS=contract["cgo_cflags"],
-            CGO_CXXFLAGS=contract["cgo_cxxflags"],
-            CGO_LDFLAGS=asset_contract["cgo_ldflags"],
-            CGO_CPPFLAGS="",
-            CC=run(["xcrun", "--find", "clang"]),
-            CXX=run(["xcrun", "--find", "clang++"]),
-            GOCACHE=str(work / "go-cache"),
-            GOMODCACHE=str(work / "go-mod-cache"),
-            GOTMPDIR=str(work / "go-tmp"),
-        )
+        env = native_build_env(contract, asset_contract, architecture, work)
         Path(env["GOTMPDIR"]).mkdir()
         # Do not inherit ambient flags that could change the reviewed source or ABI.
         env.pop("GOFLAGS", None)
@@ -562,6 +597,7 @@ def build(options) -> Path:
                 options.go,
                 "build",
                 "-mod=readonly",
+                "-modcacherw",
                 "-trimpath",
                 "-buildvcs=false",
                 "-ldflags",
@@ -637,8 +673,8 @@ def build(options) -> Path:
             cgo_enabled=True,
             deployment_target=contract["deployment_target"],
             cgo_ldflags=env["CGO_LDFLAGS"],
-            sdk_version=run(["xcrun", "--show-sdk-version"]),
-            clang_version=run([env["CC"], "--version"]),
+            sdk_version=run(["xcrun", "--sdk", "macosx", "--show-sdk-version"]),
+            clang_version=run([*shlex.split(env["CC"]), "--version"]),
             official_archive_sha256=official_identity["sha256"],
             official_archive_bytes=official_identity["bytes"],
             runtime_libraries_sha256=library_hashes,

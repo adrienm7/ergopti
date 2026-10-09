@@ -1858,6 +1858,16 @@ def admit_appleevent_permission_prerequisite(children, sender, policy, checkpoin
             "Owned Automation sender or sandbox identity changed",
         )
         checkpoint("after-automation-" + mode)
+        foreground = re.fullmatch(
+            r"OWNED_APPLEEVENT_FOREGROUND/1 state=(unavailable|inactive)\n", result.stderr
+        )
+        require(
+            not (
+                mode == "request" and result.returncode == 65 and not result.stdout and foreground
+            ),
+            "Normal owned Automation sender foreground precondition refused: "
+            + (foreground[1] if foreground is not None else "unadmitted"),
+        )
         prefix = "OWNED_APPLEEVENT_PREFLIGHT/1 mode=" + mode + " osstatus="
         matched = re.fullmatch(re.escape(prefix) + r"(-?[0-9]{1,11})\n", result.stdout)
         require(matched is not None and not result.stderr, "Malformed owned Automation receipt")
