@@ -25,6 +25,31 @@ const shellPath = (value) => {
 	return `/${match[1].toLowerCase()}${match[2]}`;
 };
 const quote = (value) => `'${String(value).replace(/'/g, `'\\''`)}'`;
+const fixtureEnvironmentKeys = new Set([
+	'HTTPS_PROXY',
+	'HTTP_PROXY',
+	'ALL_PROXY',
+	'NO_PROXY',
+	'UV_SYSTEM_CERTS',
+	'SSL_CERT_FILE',
+	'REQUESTS_CA_BUNDLE'
+]);
+function fixtureHostEnvironment(environment = process.env) {
+	return Object.fromEntries(
+		Object.entries(environment).filter(([key]) => !fixtureEnvironmentKeys.has(key.toUpperCase()))
+	);
+}
+function fixturePosixEnvironment(script, environment = {}) {
+	// Node's Windows spawn folds case variants before Bash sees them. Install the
+	// exact receiver inputs inside the POSIX shell, before the policy captures them.
+	const exports = Object.entries(environment).map(([key, value]) => {
+		assert.match(key, /^[A-Za-z_][A-Za-z0-9_]*$/);
+		assert.ok(fixtureEnvironmentKeys.has(key.toUpperCase()), 'receiver environment key');
+		assert.equal(typeof value, 'string', 'receiver environment value');
+		return `export ${key}=${quote(value)}; `;
+	});
+	return exports.join('') + script;
+}
 const vectors = [
 	{
 		id: 'pac-only',
@@ -413,30 +438,51 @@ assert.ifError(prepared.error);
 assert.equal(prepared.status, 0, prepared.stderr || prepared.stdout);
 
 try {
+	const caseInputs = {
+		https_proxy: "lower's literal $HOME ; $(printf must_not_execute)",
+		HTTPS_PROXY: 'upper literal " `printf must_not_execute`',
+		NO_PROXY: 'hostA,hostB',
+		no_proxy: 'hostC,hostD'
+	};
+	const caseHost = fixtureHostEnvironment({
+		...process.env,
+		HtTpS_PrOxY: 'unowned-host-relay',
+		nO_pRoXy: 'unowned-host-bypass'
+	});
+	assert.ok(
+		!Object.keys(caseHost).some((key) => fixtureEnvironmentKeys.has(key.toUpperCase())),
+		'host cleanup rejects every case variant of controlled inputs'
+	);
+	const caseReceived = spawnSync(
+		bash,
+		[
+			'-c',
+			fixturePosixEnvironment(
+				'printf "%s\\n%s\\n%s\\n%s\\n" "$https_proxy" "$HTTPS_PROXY" "$NO_PROXY" "$no_proxy"',
+				caseInputs
+			)
+		],
+		{ env: caseHost, encoding: 'utf8', timeout: 10000 }
+	);
+	assert.ifError(caseReceived.error);
+	assert.equal(caseReceived.signal, null, 'case-sensitive POSIX receiver input');
+	assert.equal(caseReceived.status, 0, 'case-sensitive POSIX receiver input');
+	assert.equal(caseReceived.stdout, Object.values(caseInputs).join('\n') + '\n');
+	assert.equal(caseReceived.stderr, '', 'literal input cannot execute shell substitutions');
+	console.log('ok - case-sensitive POSIX fixture inputs survive the actual host launch');
 	for (const vector of receivingVectors) {
-		const env = { ...process.env };
-		for (const key of [
-			'https_proxy',
-			'HTTPS_PROXY',
-			'http_proxy',
-			'HTTP_PROXY',
-			'all_proxy',
-			'ALL_PROXY',
-			'NO_PROXY',
-			'no_proxy',
-			'UV_SYSTEM_CERTS',
-			'SSL_CERT_FILE',
-			'REQUESTS_CA_BUNDLE'
-		])
-			delete env[key];
-		Object.assign(env, vector.env || {});
+		const env = fixtureHostEnvironment();
 		const script = `log_info() { :; }; log_error() { printf '%s\\n' "$1" >&2; }; . ${quote(shellPath(policy))};
 opaque_system_proxy_snapshot() { printf '%s\\n' ${quote(vector.snapshot)}; return ${vector.getterCode || 0}; }
 apply_system_network ${vector.mode === '' ? '' : 'opaque'}; received=$?;
 printf '__FACT__:%s|%s|%s|%s|%s|%s\\n' "\${OPAQUE_NETWORK_FAILURE_PROVENANCE:-}" "\${OPAQUE_NETWORK_PROXY_RESOLUTION_STATUS:-}" "\${HTTPS_PROXY:-}" "\${https_proxy:-}" "\${UV_SYSTEM_CERTS:-}" "\${NO_PROXY:-}";
 if [ "$received" -eq 0 ]; then printf '__CHILD_STARTED__\\n'; fi;
 exit "$received"`;
-		const result = spawnSync(bash, ['-c', script], { env, encoding: 'utf8', timeout: 10000 });
+		const result = spawnSync(bash, ['-c', fixturePosixEnvironment(script, vector.env)], {
+			env,
+			encoding: 'utf8',
+			timeout: 10000
+		});
 		assert.ifError(result.error);
 		assert.equal(result.signal, null, vector.id);
 		assert.equal(result.status, vector.code, vector.id);
@@ -456,7 +502,10 @@ exit "$received"`;
 				bash,
 				[
 					'-c',
-					`${prelude}printf '__CHILD_STARTED__:%s|%s|%s\\n' "\${HTTPS_PROXY:-}" "\${UV_SYSTEM_CERTS:-}" "\${NO_PROXY:-}"`
+					fixturePosixEnvironment(
+						`${prelude}printf '__CHILD_STARTED__:%s|%s|%s\\n' "\${HTTPS_PROXY:-}" "\${UV_SYSTEM_CERTS:-}" "\${NO_PROXY:-}"`,
+						vector.env
+					)
 				],
 				{ env, encoding: 'utf8', timeout: 10000 }
 			);
@@ -471,11 +520,15 @@ exit "$received"`;
 			assert.equal(packet.ollama.executable, '/bin/bash', `${vector.id}: original Mac pull slot`);
 			assert.equal(packet.ollama.args.length, 2);
 			assert.equal(packet.ollama.args[0], '-c');
-			const actualPull = spawnSync(bash, packet.ollama.args, {
-				env,
-				encoding: 'utf8',
-				timeout: 10000
-			});
+			const actualPull = spawnSync(
+				bash,
+				['-c', fixturePosixEnvironment(packet.ollama.args[1], vector.env)],
+				{
+					env,
+					encoding: 'utf8',
+					timeout: 10000
+				}
+			);
 			assert.ifError(actualPull.error);
 			assert.equal(
 				actualPull.status,
@@ -517,11 +570,15 @@ exit "$received"`;
 
 			if (!vector.child) {
 				assert.equal(typeof packet.mlx.path, 'string');
-				const actualLauncher = spawnSync(bash, ['-c', packet.mlx.source], {
-					env,
-					encoding: 'utf8',
-					timeout: 10000
-				});
+				const actualLauncher = spawnSync(
+					bash,
+					['-c', fixturePosixEnvironment(packet.mlx.source, vector.env)],
+					{
+						env,
+						encoding: 'utf8',
+						timeout: 10000
+					}
+				);
 				assert.ifError(actualLauncher.error);
 				assert.equal(
 					actualLauncher.status,
@@ -549,21 +606,7 @@ exit "$received"`;
 		{ id: 'opaque-opaque', modes: ['opaque', 'opaque'] }
 	];
 	for (const sequence of activationSequences) {
-		const env = { ...process.env };
-		for (const key of [
-			'https_proxy',
-			'HTTPS_PROXY',
-			'http_proxy',
-			'HTTP_PROXY',
-			'all_proxy',
-			'ALL_PROXY',
-			'NO_PROXY',
-			'no_proxy',
-			'UV_SYSTEM_CERTS',
-			'SSL_CERT_FILE',
-			'REQUESTS_CA_BUNDLE'
-		])
-			delete env[key];
+		const env = fixtureHostEnvironment();
 		env.HTTPS_PROXY = 'http://chosen.invalid:3128';
 		env.NO_PROXY = 'intranet.corp,127.0.0.1';
 		const script = `log_info() { :; }; log_error() { :; }; . ${quote(shellPath(policy))};
@@ -685,19 +728,7 @@ opaque_system_proxy_snapshot() { printf '%s\\n' '<dictionary> {' ' ProxyAutoConf
 apply_system_network opaque; received=$?; if [ "$received" -eq 0 ]; then printf '__CHILD_STARTED__\\n'; fi; exit "$received"`
 		],
 		{
-			env: Object.fromEntries(
-				Object.entries(process.env).filter(
-					([key]) =>
-						![
-							'https_proxy',
-							'HTTPS_PROXY',
-							'http_proxy',
-							'HTTP_PROXY',
-							'all_proxy',
-							'ALL_PROXY'
-						].includes(key)
-				)
-			),
+			env: fixtureHostEnvironment(),
 			encoding: 'utf8',
 			timeout: 10000
 		}
