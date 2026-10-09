@@ -337,6 +337,237 @@ Test("config transition runtime: explicit boot override bypasses unused default 
 
 
 
+; =====================================================
+; =====================================================
+; ======= Closed native retained-bundle custody =======
+; =====================================================
+; =====================================================
+
+_CTRT_ClosedRetainPath(Tag) {
+	static Sequence := 0
+	Sequence += 1
+	return A_Temp . "\ergopti-retained-issuer-" . A_ScriptHwnd . "-" . Sequence . "-" . Tag . ".toml"
+}
+
+_CTRT_ClosedRetainCounterfactual(Kind, Name := "") {
+	global _ConfigTransitionRetainedBarrier
+	PreviousRetained := _ConfigTransitionRetainedBarrier
+	AssertFalse(PreviousRetained is Object, "the independent custody case cannot borrow another retained owner")
+	Path := _CTRT_ClosedRetainPath("first")
+	OtherPath := _CTRT_ClosedRetainPath("second")
+	Bundle := _ConfigWriteTerminalTryAcquire([Path, OtherPath])
+	AssertTrue(Bundle is Object)
+	Tokens := Bundle.tokens
+	First := Tokens[1], Second := Tokens[2]
+	FirstKey := First.key
+	State := _ConfigWriteLeaseState()
+	Subject := Bundle
+	Observed := 0, Descriptor := 0
+	Hits := { count: 0 }
+	Released := false, Withdrawn := false
+	Fresh := 0
+	PreviousCritical := Critical("On")
+	try {
+		switch Kind {
+			case "clone":
+				Subject := { kind: Bundle.kind, id: Bundle.id, tokens: Tokens,
+					authorized: Bundle.authorized, shutdown_claimed: Bundle.shutdown_claimed }
+			case "extra":
+				Bundle.UnexpectedRetainedMetadata := true
+			case "getter", "token-getter":
+				Observed := Kind == "getter" ? Bundle : First
+				Descriptor := Object.Prototype.GetOwnPropDesc.Call(Observed, Name)
+				Original := Descriptor.Value
+				Observed.DefineProp(Name, { Get: (*) => (Hits.count += 1, Original) })
+			case "array-observer":
+				Observed := Tokens
+				if Name == "__Enum"
+					Tokens.DefineProp(Name, { Call: (This, Arity) =>
+						(Hits.count += 1, Array.Prototype.__Enum.Call(This, Arity)) })
+				else {
+					OriginalLength := Tokens.Length
+					Tokens.DefineProp(Name, { Get: (*) => (Hits.count += 1, OriginalLength) })
+				}
+			case "reordered":
+				Tokens[1] := Second, Tokens[2] := First
+			case "substituted":
+				Tokens[1] := { key: First.key, id: First.id, kind: First.kind }
+			case "withdrawn":
+				State.owners.Delete(FirstKey)
+				State.terminal := false
+				Withdrawn := true
+			case "retired":
+				AssertTrue(_ConfigWriteTerminalRelease(Bundle))
+				Released := true
+				State.owners[First.key] := First
+				State.owners[Second.key] := Second
+				State.terminal := Bundle
+			default:
+				throw ValueError("Unknown closed retained-bundle counterfactual")
+		}
+		AssertFalse(ConfigTransitionRetainBarrier(Subject),
+			"retention must refuse the exact controlled native custody defect: " . Kind . " " . Name)
+		AssertTrue(_ConfigTransitionRetainedBarrier == PreviousRetained,
+			"refused retention must leave the original borrowed lifecycle holder unchanged")
+		AssertEqual(0, Hits.count, "retention checks native descriptors before public getters or array observers")
+		if Descriptor is Object
+			Observed.DefineProp(Name, Descriptor)
+		else if Kind == "array-observer"
+			Tokens.DeleteProp(Name)
+		if Kind == "extra"
+			Bundle.DeleteProp("UnexpectedRetainedMetadata")
+		Tokens[1] := First, Tokens[2] := Second
+		if Withdrawn {
+			AssertTrue(_ConfigWriteTerminalIsActive(), "public withdrawal did not retire the real private issuer")
+			State.owners[FirstKey] := First
+			State.terminal := Bundle
+			Withdrawn := false
+		}
+		if Released {
+			AssertFalse(_ConfigWriteTerminalIsActive(), "public reinsertion cannot resurrect retired native issuance")
+			State.owners.Delete(First.key)
+			State.owners.Delete(Second.key)
+			State.terminal := false
+			Fresh := _ConfigWriteTerminalTryAcquire([Path, OtherPath])
+			AssertTrue(Fresh is Object)
+			AssertFalse(Fresh == Bundle)
+			AssertTrue(ConfigTransitionRetainBarrier(Fresh), "a real fresh issuer remains retainable after exact cleanup")
+			AssertTrue(ConfigTransitionRetainedBarrier() == Fresh)
+			AssertFalse(ConfigTransitionRetainBarrier(Bundle), "the retired predecessor cannot replace the genuine retained successor")
+			AssertTrue(ConfigTransitionRetainedBarrier() == Fresh)
+		} else {
+			AssertTrue(_ConfigWriteLeaseOwns(First, First.key))
+			AssertTrue(_ConfigWriteLeaseSelectOwner(Bundle, First.key) == First)
+			AssertTrue(ConfigTransitionRetainBarrier(Bundle), "exact repair retains the same still-issued original")
+			AssertTrue(ConfigTransitionRetainedBarrier() == Bundle)
+			AssertTrue(ConfigTransitionRetainBarrier(Bundle), "same live original retention remains idempotent")
+			AssertTrue(_ConfigWriteLeaseOwns(Second, Second.key))
+		}
+		AssertEqual(0, Hits.count)
+	} finally {
+		try {
+			if Descriptor is Object
+				Observed.DefineProp(Name, Descriptor)
+			else if Kind == "array-observer" && Object.Prototype.HasOwnProp.Call(Tokens, Name)
+				Tokens.DeleteProp(Name)
+			if Object.Prototype.HasOwnProp.Call(Bundle, "UnexpectedRetainedMetadata")
+				Bundle.DeleteProp("UnexpectedRetainedMetadata")
+			Tokens[1] := First, Tokens[2] := Second
+			if _ConfigTransitionRetainedBarrier == Subject || _ConfigTransitionRetainedBarrier == Bundle
+					|| ((Fresh is Object) && _ConfigTransitionRetainedBarrier == Fresh)
+				_ConfigTransitionRetainedBarrier := PreviousRetained
+			if !Released {
+				if Withdrawn {
+					State.owners[FirstKey] := First
+					State.terminal := Bundle
+				}
+				AssertTrue(_ConfigWriteTerminalRelease(Bundle))
+			} else {
+				for Token in [First, Second] {
+					if State.owners.Has(Token.key) && State.owners[Token.key] == Token
+						State.owners.Delete(Token.key)
+				}
+				if State.terminal == Bundle
+					State.terminal := false
+			}
+			if Fresh is Object
+				AssertTrue(_ConfigWriteTerminalRelease(Fresh))
+		} finally Critical(PreviousCritical)
+	}
+}
+Test("config transition retention: copied wrapper cannot borrow genuine native tokens", _CTRT_ClosedRetainCounterfactual.Bind("clone"))
+Test("config transition retention: extra native metadata refuses before retention", _CTRT_ClosedRetainCounterfactual.Bind("extra"))
+for Name in ["kind", "id", "tokens", "authorized", "shutdown_claimed"]
+	Test("config transition retention: actual whole bundle getter refuses without invocation " . Name,
+		_CTRT_ClosedRetainCounterfactual.Bind("getter", Name))
+for Name in ["key", "id", "kind"]
+	Test("config transition retention: actual member token getter refuses without invocation " . Name,
+		_CTRT_ClosedRetainCounterfactual.Bind("token-getter", Name))
+for Name in ["__Enum", "Length"]
+	Test("config transition retention: original token array observer refuses without invocation " . Name,
+		_CTRT_ClosedRetainCounterfactual.Bind("array-observer", Name))
+Test("config transition retention: reordered actual tokens refuse before retention", _CTRT_ClosedRetainCounterfactual.Bind("reordered"))
+Test("config transition retention: copied member token refuses before retention", _CTRT_ClosedRetainCounterfactual.Bind("substituted"))
+Test("config transition retention: refused public custody preserves the real native issuer", _CTRT_ClosedRetainCounterfactual.Bind("withdrawn"))
+Test("config transition retention: same retired original cannot replace its retained successor", _CTRT_ClosedRetainCounterfactual.Bind("retired"))
+
+_CTRT_ClosedRetainOrdinaryRefuses() {
+	global _ConfigTransitionRetainedBarrier
+	PreviousRetained := _ConfigTransitionRetainedBarrier
+	AssertFalse(PreviousRetained is Object)
+	Path := _CTRT_ClosedRetainPath("ordinary")
+	Token := _ConfigWriteLeaseTryAcquire(Path, "retention ordinary owner")
+	AssertTrue(Token is Object)
+	Copied := { key: Token.key, id: Token.id, kind: Token.kind }
+	Wrapped := { kind: "terminal_bundle", id: Token.id, tokens: [Token],
+		authorized: false, shutdown_claimed: false }
+	PreviousCritical := Critical("On")
+	try {
+		AssertFalse(ConfigTransitionRetainBarrier(Token))
+		AssertFalse(ConfigTransitionRetainBarrier(Copied))
+		AssertFalse(ConfigTransitionRetainBarrier(Wrapped))
+		AssertTrue(_ConfigTransitionRetainedBarrier == PreviousRetained)
+		AssertTrue(_ConfigWriteLeaseOwns(Token, Path), "refused ordinary copies leave the genuine issuer untouched")
+		AssertTrue(_ConfigWriteLeaseSelectOwner(Token, Path) == Token)
+		AssertFalse(_ConfigWriteLeaseOwns(Copied, Path))
+		AssertFalse(_ConfigWriteTerminalTryAcquire([Path]) is Object)
+	} finally {
+		try {
+			if _ConfigTransitionRetainedBarrier == Token || _ConfigTransitionRetainedBarrier == Copied
+					|| _ConfigTransitionRetainedBarrier == Wrapped
+				_ConfigTransitionRetainedBarrier := PreviousRetained
+			AssertTrue(_ConfigWriteLeaseRelease(Token))
+		} finally Critical(PreviousCritical)
+	}
+}
+Test("config transition retention: ordinary and copied owners never become retained terminal authority", _CTRT_ClosedRetainOrdinaryRefuses)
+
+_CTRT_ClosedRetainRollback(State, Expected, Retain, Bundle) {
+	State.calls += 1
+	AssertTrue(Bundle == Expected, "the raw refusal callback receives the exact originally borrowed native bundle")
+	AssertTrue(_ConfigWriteLeaseSelectOwner(Bundle, State.path) == State.token)
+	return Retain ? ConfigTransitionRetainBarrier(Bundle) : false
+}
+
+_CTRT_ClosedRetainRawRollback(Retain) {
+	global _ConfigTransitionRetainedBarrier
+	PreviousRetained := _ConfigTransitionRetainedBarrier
+	AssertFalse(PreviousRetained is Object)
+	Path := _CTRT_ClosedRetainPath("raw-rollback")
+	Bundle := _ConfigWriteTerminalTryAcquire([Path])
+	AssertTrue(Bundle is Object)
+	State := { calls: 0, path: Path, token: Bundle.tokens[1] }
+	PreviousCritical := Critical("On")
+	try {
+		ConfigTransitionSettleRefusedReload(_CTRT_ClosedRetainRollback.Bind(State, Bundle, Retain), Bundle)
+		AssertEqual(1, State.calls)
+		if Retain {
+			AssertTrue(ConfigTransitionRetainedBarrier() == Bundle)
+			AssertTrue(_ConfigWriteTerminalIsActive(), "the pending rollback keeps its genuinely retained native owner")
+			AssertTrue(_ConfigWriteLeaseOwns(State.token, Path))
+			AssertTrue(ConfigTransitionRetainBarrier(Bundle))
+		} else {
+			AssertTrue(_ConfigTransitionRetainedBarrier == PreviousRetained)
+			AssertFalse(_ConfigWriteTerminalIsActive(), "settled rollback releases through the actual native owner")
+			AssertFalse(_ConfigWriteLeaseOwns(State.token, Path))
+			AssertFalse(_ConfigWriteTerminalRelease(Bundle), "already settled native release is not a synthetic acknowledgment")
+		}
+	} finally {
+		try {
+			if _ConfigTransitionRetainedBarrier == Bundle
+				_ConfigTransitionRetainedBarrier := PreviousRetained
+			if Retain || _ConfigWriteTerminalTryAcquire([], Bundle)
+				AssertTrue(_ConfigWriteTerminalRelease(Bundle))
+		} finally Critical(PreviousCritical)
+	}
+}
+Test("config transition retention: pending raw rollback borrows and retains its original native owner", _CTRT_ClosedRetainRawRollback.Bind(true))
+Test("config transition retention: settled raw rollback releases its original native owner once", _CTRT_ClosedRetainRawRollback.Bind(false))
+
+
+
+
+
 ; ===================================
 ; ===================================
 ; ======= 3/ Direct-run Entry =======
