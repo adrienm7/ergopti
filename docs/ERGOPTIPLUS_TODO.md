@@ -3122,6 +3122,16 @@ Windows PC acceptance, delegated to the maintainer:
   the native permission dialog (once per launch, after the Accessibility dialog,
   closed automatically on approval; not while Tap-Holds are off, where the
   banner stays). Integrated; verify on a Mac.
+
+  A failure-only native lease snapshot now records a closed ten-field schema
+  after the original terminal fence and retirement. The typed decoder refuses
+  unknown fields, arbitrary labels, invalid UTF-8 and alternate encodings;
+  shareable consumers must reconstruct typed data and omit the three outer-only
+  flags for inner records. Local fence completion does not establish receiver
+  acknowledgement or restored input. All112 original Swift tests remain whole;
+  seventeen additive controls require exact-source native execution. The first
+  tap-hold exit73 cause and physical recovery remain unqualified. Item24 stays
+  partial; no permission, fencing or liveness protection is relaxed.
   Native permission UI qualification is now registered in the Swift target:
   ten frozen cases require actual WebKit DOM/bridge callbacks, visible native
   window identities, retirement, deferred log purge and scheduler cleanup.

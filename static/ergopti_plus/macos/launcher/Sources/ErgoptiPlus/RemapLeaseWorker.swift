@@ -1517,6 +1517,132 @@ func transportLeaseFenceUntilRepeatedSuccess(
 // ======================================
 // ======================================
 
+/// Finite diagnostic vocabulary: no generation, pathname, PID or wire payload is retained.
+enum LeaseTerminalBoundary: String, Codable {
+	case outerSilent = "outer-silent", peerClosed = "peer-closed", malformed = "malformed"
+	case cliFailed = "cli-failed", cliPeerClosed = "cli-peer-closed", cliMalformed = "cli-malformed"
+	case acknowledgementSend = "acknowledgement-send", heartbeatReportSend = "heartbeat-report-send"
+	case missingInner = "missing-inner", pollFailed = "poll-failed", boundaryPollFailed = "boundary-poll-failed"
+	case privateDeadline = "private-deadline", guardianParent = "guardian-parent"
+	case innerBoundaryPoll = "inner-boundary-poll", innerReadInvalid = "inner-read-invalid"
+	case terminalReadInvalid = "terminal-read-invalid", innerAckMalformed = "inner-ack-malformed"
+	case terminalAckMalformed = "terminal-ack-malformed", terminalAmbiguous = "terminal-ambiguous"
+	case terminalWithoutProof = "terminal-without-proof"
+	case liveGateRefused = "live-gate-refused", privateSendRefused = "private-send-refused"
+	case publishGateRefused = "publish-gate-refused", guardianPublishLost = "guardian-publish-lost"
+	case innerPublishLost = "inner-publish-lost", stateMachineTerminal = "state-machine-terminal"
+	case unexpectedAcknowledgement = "unexpected-ack", innerReportedFailure = "inner-reported-failure"
+	case detachedFenceExhausted = "detached-fence-exhausted"
+}
+
+enum LeaseTerminalCommand: String, Codable {
+	case none, activate, setMode = "set-mode", heartbeat, stop
+	init(_ command: LeaseInnerCommand?) {
+		switch command {
+		case .none: self = .none
+		case .some(.activate): self = .activate
+		case .some(.setMode): self = .setMode
+		case .some(.heartbeat): self = .heartbeat
+		case .some(.stop): self = .stop
+		}
+	}
+}
+
+enum LeaseTerminalCLI: String, Codable {
+	case none, nonzero, timeout, spawn, output, read, interruption
+	init(_ result: LeaseCLIResult?) {
+		switch result {
+		case .none, .some(.success): self = .none
+		case .some(.failed): self = .nonzero
+		case .some(.timedOut): self = .timeout
+		case .some(.spawnFailed): self = .spawn
+		case .some(.diagnosticOutput): self = .output
+		case .some(.diagnosticReadFailed): self = .read
+		case .some(.interrupted): self = .interruption
+		}
+	}
+}
+
+enum LeaseTerminalRole: String, Codable { case inner, outer }
+enum LeaseTerminalFence: String, Codable { case recovered, exhausted }
+enum LeaseTerminalExit: String, Codable { case success, innerFailed = "inner-failed", other }
+
+/// A closed export schema; no arbitrary strings or native/private identifiers can be represented.
+struct LeaseTerminalExport: Codable, Equatable {
+	let schema: Int
+	let role: LeaseTerminalRole
+	let boundary: LeaseTerminalBoundary
+	let command: LeaseTerminalCommand
+	let cli: LeaseTerminalCLI
+	let stopping: Bool
+	let gateHeld: Bool
+	let deadlineArmed: Bool
+	let fence: LeaseTerminalFence
+	let exit: LeaseTerminalExit
+
+	private static let keys: Set<String> = ["schema", "role", "boundary", "command", "cli", "stopping", "gateHeld", "deadlineArmed", "fence", "exit"]
+
+	func encodedRecord() -> Data? {
+		guard schema == 1 else { return nil }
+		let encoder = JSONEncoder()
+		encoder.outputFormatting = [.sortedKeys]
+		guard let data = try? encoder.encode(self), data.count <= 512 else { return nil }
+		return data
+	}
+
+	/// Strict projection: never returns source bytes, unknown keys, strings or decoder errors.
+	static func decode(_ data: Data) -> LeaseTerminalExport? {
+		guard !data.isEmpty, data.count <= 512, !data.contains(0),
+			String(data: data, encoding: .utf8) != nil,
+			!data.starts(with: Data([0xef, 0xbb, 0xbf])),
+			let object = try? JSONSerialization.jsonObject(with: data),
+			let fields = object as? [String: Any], Set(fields.keys) == keys,
+			let record = try? JSONDecoder().decode(LeaseTerminalExport.self, from: data),
+			record.schema == 1
+		else { return nil }
+		return record
+	}
+}
+
+/// Captures only already-observed state; rendering never performs another native query.
+struct LeaseTerminalSnapshot {
+	let inner: Bool
+	let boundary: LeaseTerminalBoundary
+	let command: LeaseTerminalCommand
+	let cli: LeaseTerminalCLI
+	let stopping: Bool
+	let gateHeld: Bool
+	let deadlineArmed: Bool
+
+	func exportableRecord(fenced: Bool, result: Int32) -> LeaseTerminalExport {
+		return LeaseTerminalExport(schema: 1, role: inner ? .inner : .outer, boundary: boundary,
+			command: command, cli: cli, stopping: stopping, gateHeld: gateHeld, deadlineArmed: deadlineArmed,
+			fence: fenced ? .recovered : .exhausted,
+			exit: result == 0 ? .success : (result == 73 ? .innerFailed : .other))
+	}
+
+	func message(fenced: Bool, result: Int32) -> String {
+		let outcome = result == 0 ? "0" : (result == 73 ? "73" : "other")
+		return "remap lease terminal role=\(inner ? "inner" : "outer")"
+			+ " boundary=\(boundary.rawValue) command=\(command.rawValue) cli=\(cli.rawValue)"
+			+ " stopping=\(stopping ? 1 : 0) gate=\(gateHeld ? 1 : 0) deadline=\(deadlineArmed ? 1 : 0)"
+			+ " fence=\(fenced ? "recovered" : "exhausted") exit=\(outcome)"
+	}
+}
+
+/// Uses the existing best-effort central logger only after the original terminal fence settles.
+private func reportLeaseTerminalSnapshot(_ snapshot: LeaseTerminalSnapshot, fenced: Bool, result: Int32) {
+	#if ERGOPTI_GUARDIAN_TEST_SUPPORT
+	guard ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] == nil else { return }
+	#endif
+	guard let data = snapshot.exportableRecord(fenced: fenced, result: result).encodedRecord(),
+		let json = String(data: data, encoding: .utf8)
+	else { return }
+	let message = "remap lease terminal record=" + json
+	guard message.utf8.count <= 512 else { return }
+	LauncherLog.write(message)
+}
+
 /// Serializes all generation writes and fences after outer liveness loss.
 final class KarabinerLeaseInnerRuntime {
 	private let identity: LeaseIdentity
@@ -1526,6 +1652,8 @@ final class KarabinerLeaseInnerRuntime {
 	private let fenceConfirmationGrace: TimeInterval
 	private let uptime: () -> TimeInterval
 	private let sleep: (useconds_t) -> Void
+	private let diagnosticSink: ((LeaseTerminalSnapshot, Bool, Int32) -> Void)?
+	private var terminalSnapshot: LeaseTerminalSnapshot?
 
 	/// Creates the role that exclusively owns CLI process lifecycle.
 	/// - Parameters:
@@ -1545,7 +1673,8 @@ final class KarabinerLeaseInnerRuntime {
 		uptime: @escaping () -> TimeInterval = {
 			ProcessInfo.processInfo.systemUptime
 		},
-		sleep: @escaping (useconds_t) -> Void = { usleep($0) }
+		sleep: @escaping (useconds_t) -> Void = { usleep($0) },
+		diagnosticSink: ((LeaseTerminalSnapshot, Bool, Int32) -> Void)? = nil
 	) {
 		self.identity = identity
 		self.channel = channel
@@ -1554,6 +1683,7 @@ final class KarabinerLeaseInnerRuntime {
 		self.fenceConfirmationGrace = fenceConfirmationGrace
 		self.uptime = uptime
 		self.sleep = sleep
+		self.diagnosticSink = diagnosticSink
 	}
 
 	/// Runs serialized mode writes until STOP or outer loss initiates a fence.
@@ -1567,9 +1697,14 @@ final class KarabinerLeaseInnerRuntime {
 				timeout: identity.heartbeatSeconds + kPrivateCommandAckTimeoutSeconds
 			)
 			switch event {
-			case .peerClosed, .outerSilent:
+			case .peerClosed:
+				rememberTerminal(.peerClosed)
+				return finishAfterFence(exitCode: LeaseWorkerExit.success.rawValue)
+			case .outerSilent:
+				rememberTerminal(.outerSilent)
 				return finishAfterFence(exitCode: LeaseWorkerExit.success.rawValue)
 			case .malformed:
+				rememberTerminal(.malformed)
 				return finishAfterFence(
 					exitCode: LeaseWorkerExit.malformedProtocol.rawValue,
 					acknowledgement: .failed(LeaseWorkerExit.malformedProtocol.rawValue)
@@ -1620,6 +1755,7 @@ final class KarabinerLeaseInnerRuntime {
 		switch result {
 		case .success:
 			if !channel.send(successAcknowledgement) {
+				rememberTerminal(.acknowledgementSend, command: command)
 				return finishAfterFence(exitCode: LeaseWorkerExit.success.rawValue)
 			}
 			return nil
@@ -1629,8 +1765,10 @@ final class KarabinerLeaseInnerRuntime {
 				acknowledgement: .fenced
 			)
 		case .interrupted(.peerClosed):
+			rememberTerminal(.cliPeerClosed, command: command, result: result)
 			return finishAfterFence(exitCode: LeaseWorkerExit.success.rawValue)
 		case .interrupted(.malformed):
+			rememberTerminal(.cliMalformed, command: command, result: result)
 			return finishAfterFence(
 				exitCode: LeaseWorkerExit.malformedProtocol.rawValue,
 				acknowledgement: .failed(LeaseWorkerExit.malformedProtocol.rawValue)
@@ -1641,10 +1779,12 @@ final class KarabinerLeaseInnerRuntime {
 			.diagnosticOutput, .diagnosticReadFailed(_):
 			if case .heartbeat(_, let sequence) = command {
 				if !channel.send(.heartbeatFailed(sequence)) {
+					rememberTerminal(.heartbeatReportSend, command: command, result: result)
 					return finishAfterFence(exitCode: LeaseWorkerExit.success.rawValue)
 				}
 				return nil
 			}
+			rememberTerminal(.cliFailed, command: command, result: result)
 			return finishAfterFence(
 				exitCode: failureExit,
 				acknowledgement: .failed(failureExit)
@@ -1663,10 +1803,26 @@ final class KarabinerLeaseInnerRuntime {
 	) -> Int32 {
 		guard fenceWithinWorkerBudget() else {
 			_ = channel.send(.failed(LeaseWorkerExit.innerFailed.rawValue))
+			publishTerminal(fenced: false, result: LeaseWorkerExit.innerFailed.rawValue)
 			return LeaseWorkerExit.innerFailed.rawValue
 		}
 		if let acknowledgement { _ = channel.send(acknowledgement) }
+		publishTerminal(fenced: true, result: exitCode)
 		return exitCode
+	}
+
+	/// Snapshot only: this does not add a poll, command, clock or diagnostic write.
+	private func rememberTerminal(_ boundary: LeaseTerminalBoundary, command: LeaseInnerCommand? = nil, result: LeaseCLIResult? = nil) {
+		guard terminalSnapshot == nil else { return }
+		terminalSnapshot = LeaseTerminalSnapshot(inner: true, boundary: boundary,
+			command: LeaseTerminalCommand(command), cli: LeaseTerminalCLI(result),
+			stopping: false, gateHeld: false, deadlineArmed: false)
+	}
+
+	private func publishTerminal(fenced: Bool, result: Int32) {
+		guard let snapshot = terminalSnapshot else { return }
+		if let diagnosticSink { diagnosticSink(snapshot, fenced, result) }
+		else { reportLeaseTerminalSnapshot(snapshot, fenced: fenced, result: result) }
 	}
 
 	/// Retries one tombstone within the inner worker's finite spawn-failure budget.
@@ -2294,6 +2450,8 @@ final class KarabinerLeaseOuterRuntime {
 	private var machine: LeaseOuterStateMachine
 	private var commandDeadline = LeasePrivateCommandDeadline()
 	private var liveTransportGateHeld = false
+	private let diagnosticSink: ((LeaseTerminalSnapshot, Bool, Int32) -> Void)?
+	private var terminalSnapshot: LeaseTerminalSnapshot?
 
 	/// Creates the only role allowed to retain Hammerspoon stdin/stdout.
 	/// - Parameters:
@@ -2326,7 +2484,8 @@ final class KarabinerLeaseOuterRuntime {
 			}
 		},
 		boundaryPoller: @escaping LeaseDescriptorPolling = pollLeaseDescriptor,
-		beforeLiveAcknowledgementPublish: @escaping () -> Void = {}
+		beforeLiveAcknowledgementPublish: @escaping () -> Void = {},
+		diagnosticSink: ((LeaseTerminalSnapshot, Bool, Int32) -> Void)? = nil
 	) {
 		self.identity = identity
 		self.detached = detached
@@ -2339,6 +2498,7 @@ final class KarabinerLeaseOuterRuntime {
 		self.poller = poller
 		self.boundaryPoller = boundaryPoller
 		self.beforeLiveAcknowledgementPublish = beforeLiveAcknowledgementPublish
+		self.diagnosticSink = diagnosticSink
 		machine = LeaseOuterStateMachine(initialMode: identity.initialMode)
 	}
 
@@ -2347,6 +2507,8 @@ final class KarabinerLeaseOuterRuntime {
 	func run() -> Int32 {
 		if detached {
 			guard recoverFenceWithinWorkerBudget() else {
+				rememberTerminal(.detachedFenceExhausted)
+				publishTerminal(fenced: false, result: LeaseWorkerExit.innerFailed.rawValue)
 				return LeaseWorkerExit.innerFailed.rawValue
 			}
 			return LeaseWorkerExit.success.rawValue
@@ -2366,7 +2528,7 @@ final class KarabinerLeaseOuterRuntime {
 
 		while true {
 			guard let current = inner else {
-				return finishAfterRecovery(machine.innerLost())
+				return loseInner(at: .missingInner)
 			}
 			var descriptors = [
 				pollfd(
@@ -2384,7 +2546,7 @@ final class KarabinerLeaseOuterRuntime {
 			let pollResult = poller(&descriptors, timeout)
 			if pollResult == -1 {
 				if errno == EINTR { continue }
-				return finishAfterRecovery(machine.innerLost())
+				return loseInner(at: .pollFailed)
 			}
 			if pollResult > 0 {
 				// Parent STOP/EOF has priority over any stale live-mode ACK in the
@@ -2414,7 +2576,7 @@ final class KarabinerLeaseOuterRuntime {
 			let boundaryPollResult = poller(&descriptors, 0)
 			if boundaryPollResult == -1 {
 				if errno == EINTR { continue }
-				return finishAfterRecovery(machine.innerLost())
+				return loseInner(at: .boundaryPollFailed)
 			}
 			if boundaryPollResult > 0 {
 				if descriptors[0].revents != 0 {
@@ -2435,6 +2597,7 @@ final class KarabinerLeaseOuterRuntime {
 
 			let now = uptime()
 			if commandDeadline.isExpired(at: now) {
+				rememberTerminal(.privateDeadline)
 				commandDeadline.clear()
 				return finishAfterRecovery(machine.innerLost())
 			}
@@ -2483,7 +2646,7 @@ final class KarabinerLeaseOuterRuntime {
 		case .malformed:
 			return perform(machine.receiveParent(line: "MALFORMED"))
 		case .guardianLost:
-			return finishAfterRecovery(machine.innerLost())
+			return loseInner(at: .guardianParent)
 		case .live:
 			break
 		}
@@ -2506,7 +2669,7 @@ final class KarabinerLeaseOuterRuntime {
 			)
 			let boundaryResult = pollLeaseBoundary(&boundary, poller: boundaryPoller)
 			if boundaryResult == -1 {
-				return finishAfterRecovery(machine.innerLost())
+				return loseInner(at: .innerBoundaryPoll)
 			}
 			if boundaryResult > 0 && leasePollReportsTerminal(boundary.revents) {
 				return consumeTerminalInnerLines(lines)
@@ -2515,7 +2678,7 @@ final class KarabinerLeaseOuterRuntime {
 		case .eof(let lines):
 			return consumeTerminalInnerLines(lines)
 		case .invalid:
-			return finishAfterRecovery(machine.innerLost())
+			return loseInner(at: .innerReadInvalid)
 		case .retry:
 			break
 		}
@@ -2534,7 +2697,7 @@ final class KarabinerLeaseOuterRuntime {
 		case .lines(let lines), .eof(let lines):
 			return consumeTerminalInnerLines(lines)
 		case .invalid, .retry:
-			return finishAfterRecovery(machine.innerLost())
+			return loseInner(at: .terminalReadInvalid)
 		}
 	}
 
@@ -2544,10 +2707,10 @@ final class KarabinerLeaseOuterRuntime {
 	private func consumeInnerLines(_ lines: [String]) -> Int32? {
 		for line in lines {
 			guard let acknowledgement = LeaseInnerAcknowledgement.parse(line: line) else {
-				return finishAfterRecovery(machine.innerLost())
+				return loseInner(at: .innerAckMalformed)
 			}
 			let previousCommand = machine.inFlight
-			let actions = machine.receiveInner(acknowledgement)
+			let actions = receiveObservedInner(acknowledgement)
 			if machine.inFlight != previousCommand { commandDeadline.clear() }
 			if let terminal = perform(actions) { return terminal }
 		}
@@ -2563,7 +2726,7 @@ final class KarabinerLeaseOuterRuntime {
 		var failureCount = 0
 		for line in lines {
 			guard let acknowledgement = LeaseInnerAcknowledgement.parse(line: line) else {
-				return finishAfterRecovery(machine.innerLost())
+				return loseInner(at: .terminalAckMalformed)
 			}
 			switch acknowledgement {
 			case .fenced:
@@ -2582,11 +2745,12 @@ final class KarabinerLeaseOuterRuntime {
 		}
 		if !machine.stopping, fenceCount == 0, failureCount == 1,
 			let failureCode {
+			let snapshot = terminalCandidate(.innerReportedFailure)
 			commandDeadline.clear()
-			return perform(machine.receiveInner(.failed(failureCode)))
+			return perform(receiveObservedInner(.failed(failureCode), snapshot: snapshot))
 				?? LeaseWorkerExit.innerFailed.rawValue
 		}
-		return finishAfterRecovery(machine.innerLost())
+		return loseInner(at: fenceCount == 0 && failureCount == 0 ? .terminalWithoutProof : .terminalAmbiguous)
 	}
 
 	/// Performs state-machine actions while converting channel loss into a fence.
@@ -2600,12 +2764,12 @@ final class KarabinerLeaseOuterRuntime {
 					guard !liveTransportGateHeld,
 						guardianRegistration?.beginLiveTransport() == true
 					else {
-						return finishAfterRecovery(machine.innerLost())
+						return loseInner(at: .liveGateRefused)
 					}
 					liveTransportGateHeld = true
 				}
 				guard inner?.send(command) == true else {
-					return finishAfterRecovery(machine.innerLost())
+					return loseInner(at: .privateSendRefused)
 				}
 				commandDeadline.arm(
 					for: command,
@@ -2616,17 +2780,17 @@ final class KarabinerLeaseOuterRuntime {
 					guard !liveTransportGateHeld,
 						guardianRegistration?.beginLiveTransport() == true
 					else {
-						return finishAfterRecovery(machine.innerLost())
+						return loseInner(at: .publishGateRefused)
 					}
 					liveTransportGateHeld = true
 				}
 				if liveTransportGateHeld, isLeaseLiveAcknowledgementLine(line) {
 					guard guardianRegistration?.guardianStillPresent() == true else {
-						return finishAfterRecovery(machine.innerLost())
+						return loseInner(at: .guardianPublishLost)
 					}
 					beforeLiveAcknowledgementPublish()
 					guard liveInnerTransportStillPresent() else {
-						return finishAfterRecovery(machine.innerLost())
+						return loseInner(at: .innerPublishLost)
 					}
 				}
 				if !writeLeaseLine(line, to: parentOutputDescriptor) {
@@ -2635,16 +2799,19 @@ final class KarabinerLeaseOuterRuntime {
 				}
 				endLiveTransportIfNeeded()
 			case .fenceAndFinish(let exitCode, let publishStopped):
+				rememberTerminal(.stateMachineTerminal)
 				commandDeadline.clear()
 				retireCurrentAfterSupervisionLoss()
 				endLiveTransportIfNeeded()
 				guard recoverFenceWithinWorkerBudget() else {
+					publishTerminal(fenced: false, result: LeaseWorkerExit.innerFailed.rawValue)
 					return LeaseWorkerExit.innerFailed.rawValue
 				}
 				if publishStopped {
 					_ = writeLeaseLine("STOPPED", to: parentOutputDescriptor)
 				}
 				guardianRegistration?.retireAfterFence()
+				if exitCode == LeaseWorkerExit.innerFailed.rawValue { publishTerminal(fenced: true, result: exitCode) }
 				return exitCode
 			case .finish(let exitCode):
 				commandDeadline.clear()
@@ -2684,6 +2851,43 @@ final class KarabinerLeaseOuterRuntime {
 		guard liveTransportGateHeld else { return }
 		liveTransportGateHeld = false
 		guardianRegistration?.endLiveTransport()
+	}
+
+	private func terminalCandidate(_ boundary: LeaseTerminalBoundary) -> LeaseTerminalSnapshot {
+		return LeaseTerminalSnapshot(inner: false, boundary: boundary,
+			command: LeaseTerminalCommand(machine.inFlight), cli: .none,
+			stopping: machine.stopping, gateHeld: liveTransportGateHeld,
+			deadlineArmed: commandDeadline.deadline != nil)
+	}
+
+	private func rememberTerminal(_ boundary: LeaseTerminalBoundary) {
+		guard terminalSnapshot == nil else { return }
+		terminalSnapshot = terminalCandidate(boundary)
+	}
+
+	/// Snapshot first; the original state machine alone decides whether this ACK fails.
+	private func receiveObservedInner(_ acknowledgement: LeaseInnerAcknowledgement, snapshot: LeaseTerminalSnapshot? = nil) -> [LeaseOuterAction] {
+		let boundary: LeaseTerminalBoundary
+		if case .failed = acknowledgement { boundary = .innerReportedFailure }
+		else { boundary = .unexpectedAcknowledgement }
+		let candidate = snapshot ?? terminalCandidate(boundary)
+		let actions = machine.receiveInner(acknowledgement)
+		if terminalSnapshot == nil && actions.contains(where: { action in
+			if case .fenceAndFinish(let code, _) = action { return code == LeaseWorkerExit.innerFailed.rawValue }
+			return false
+		}) { terminalSnapshot = candidate }
+		return actions
+	}
+
+	private func loseInner(at boundary: LeaseTerminalBoundary) -> Int32 {
+		rememberTerminal(boundary)
+		return finishAfterRecovery(machine.innerLost())
+	}
+
+	private func publishTerminal(fenced: Bool, result: Int32) {
+		guard let snapshot = terminalSnapshot else { return }
+		if let diagnosticSink { diagnosticSink(snapshot, fenced, result) }
+		else { reportLeaseTerminalSnapshot(snapshot, fenced: fenced, result: result) }
 	}
 
 	/// Completes a recovery action produced outside the normal action executor.
