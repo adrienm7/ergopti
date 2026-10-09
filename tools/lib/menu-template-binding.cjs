@@ -11,7 +11,9 @@ function nativeTemplateBinding(
 	section,
 	key,
 	port,
-	nativeSources = [{ src: source }]
+	nativeSources = [{ src: source }],
+	menuManifest,
+	platform
 ) {
 	const ahk = extension === '.ahk',
 		tokens = scriptTokens(source, extension);
@@ -276,6 +278,36 @@ function nativeTemplateBinding(
 		}
 		return z === a + 1 && id(a) && reference(tokens[a].value, call);
 	}
+	// Only a declared, platform-visible include graph can share the root's ports.
+	// A cyclic or incomplete graph cannot be rendered and supplies no evidence.
+	function includesSection(root) {
+		if (menuManifest === undefined) return root === section;
+		if (!['ahk', 'hs', 'linux'].includes(platform)) return false;
+		const visiting = new Set(),
+			seen = new Set();
+		let valid = true;
+		function visit(name) {
+			if (visiting.has(name) || !Array.isArray(menuManifest?.[name])) {
+				valid = false;
+				return;
+			}
+			if (seen.has(name)) return;
+			visiting.add(name);
+			seen.add(name);
+			for (const row of menuManifest[name]) {
+				if (row?.type !== 'include') continue;
+				if (Array.isArray(row.platforms) && !row.platforms.includes(platform)) continue;
+				if (typeof row.section !== 'string' || row.section === '') {
+					valid = false;
+					continue;
+				}
+				visit(row.section);
+			}
+			visiting.delete(name);
+		}
+		visit(root);
+		return valid && seen.has(section);
+	}
 	for (let i = 0; i < tokens.length; i++) {
 		let open;
 		if (
@@ -296,8 +328,8 @@ function nativeTemplateBinding(
 			!args ||
 			args[0]?.[1] !== args[0]?.[0] + 1 ||
 			!literal(args[0][0]) ||
-			tokens[args[0][0]].value !== section ||
-			!publishesMenuTemplate(source, extension, section)
+			!includesSection(tokens[args[0][0]].value) ||
+			!publishesMenuTemplate(source, extension, tokens[args[0][0]].value)
 		)
 			continue;
 		const arg = args[port];

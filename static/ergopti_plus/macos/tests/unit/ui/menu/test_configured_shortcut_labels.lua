@@ -16,6 +16,7 @@ local names = {
 	"modules.shortcuts", "modules.shortcuts.tap_keys", "modules.shortcuts.bindings",
 	"modules.shortcuts.actions.text", "infra.i18n", "infra.logger", "infra.manifest_menu",
 	"infra.deferred_work", "adapters.input_source_broker", "ui.menu.menu_utils",
+	"infra.paths", "menu.renderer",
 }
 
 helpers.describe("configured shortcut row labels", function()
@@ -23,7 +24,7 @@ helpers.describe("configured shortcut row labels", function()
 		helpers.it("shows the saved parameter in the real " .. surface .. " provider", function()
 			helpers.with_fresh_modules(names, function()
 				local parameters = {
-					[keyboard_binding("ctrl_a")] = "https://keyboard.example/?q=[x]&p=50%",
+					[keyboard_binding("hs_ctrl_a")] = "https://keyboard.example/?q=[x]&p=50%",
 					[tap_binding("number_row_left")] = "https://tap.example",
 					[script_prefix .. "script_altgr_enter"] = "https://script.example",
 				}
@@ -39,8 +40,8 @@ helpers.describe("configured shortcut row labels", function()
 				}
 				local shortcuts = {
 					DEFAULT_STATE = { shortcuts = true },
-					get_keyboard_slot_groups = function() return { { prefix = "ctrl_", group_key = "ctrl", add_key = "add" } } end,
-					assigned_keyboard_slots = function() return { { id = "ctrl_a", action = "open_url" } } end,
+					get_keyboard_slot_groups = function() return { { prefix = "hs_ctrl_", group_key = "menu.shortcuts.ctrl_group", add_key = "menu.shortcuts.ctrl_add" } } end,
+					assigned_keyboard_slots = function() return { { id = "hs_ctrl_a", action = "open_url" } } end,
 					get_keyboard_slot_label = function() return "Ctrl+A" end,
 					keyboard_binding_id = keyboard_binding,
 				}
@@ -54,15 +55,19 @@ helpers.describe("configured shortcut row labels", function()
 				package.loaded["modules.shortcuts.actions.text"] = {}
 				package.loaded["infra.i18n"] = {
 					get = function(key) return key:find("right_opt", 1, true) and "%s" or key end,
+					section = function(key) return key end,
 					decorate_section = function(label) return label end,
 				}
 				package.loaded["infra.logger"] = helpers.make_logger_stub()
 				package.loaded["infra.deferred_work"] = {}
 				package.loaded["adapters.input_source_broker"] = { subscribe = function() return true end }
 				package.loaded["ui.menu.menu_utils"] = {}
+				package.loaded["infra.paths"] = { shared = helpers.shared }
 				-- The Shortcuts submenu opens the script chords' group, whose rows
 				-- are its provider's.
+				local actual_manifest = require("infra.manifest_menu")
 				package.loaded["infra.manifest_menu"] = {
+					template_rows = actual_manifest.template_rows,
 					build = function(key, _, _, groups, _, providers)
 						if key == "shortcuts_menu" then return groups.script_control() end
 						return providers.script_control_shortcuts()
@@ -80,7 +85,7 @@ helpers.describe("configured shortcut row labels", function()
 				local label, expected
 				if surface == "keyboard" then
 					label = require("ui.menu.menu_keyboard_slots").provide_rows(ctx)[1].items[1].label
-					expected = parameters[keyboard_binding("ctrl_a")]
+					expected = parameters[keyboard_binding("hs_ctrl_a")]
 				elseif surface == "tap" then
 					label = require("ui.menu.menu_tap_keys").provide_rows(ctx)[1].label
 					expected = parameters[tap_binding("number_row_left")]

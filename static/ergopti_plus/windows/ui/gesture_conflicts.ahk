@@ -80,30 +80,47 @@ GestureSystemRequestRefresh(*) {
 }
 
 ; Builds shared-renderer data from the last complete registry snapshot.
+; Captures one native slot before creating getters; AHK loop cells are not closure owners.
+_GestureSystemSlotRows(State, Slot, Configured) {
+	return MenuRenderer_TemplateRows("gesture_system_slot_windows_frame", Map(
+		"gesture_system_open_unknown_slot", (*) => GestureOpenTouchpadSettings(),
+		"gesture_system_open_configured_slot", (*) => GestureOpenTouchpadSettings(),
+		"gesture_system_open_not_configured_slot", (*) => GestureOpenTouchpadSettings()), Map(
+		"gesture_system_slot_unverified", () => !State["ready"],
+		"gesture_system_slot_configured", () => State["ready"] && Configured,
+		"gesture_system_slot_not_configured", () => State["ready"] && !Configured,
+		"gesture_system_slot_caption", () => t("gesture.slots." . Slot)), Map())
+}
+
 GestureSystemRows() {
 	global GestureAssignments, GESTURE_SLOTS, Features
 	State := GestureSystemState()
-	Children := []
+	SlotRows := []
 	Conflicts := 0
 	Enabled := Features.Has("gestures") && Features["gestures"].Get("enabled", false)
 	for _, Slot in GESTURE_SLOTS {
 		Configured := State["slots"].Get(Slot, false)
 		if Enabled && GestureAssignments.Get(Slot, "none") != "none" && !Configured
 			Conflicts += 1
-		Children.Push(Map("label", t("gesture.slots." . Slot) . " — "
-			. t(!State["ready"] ? "gestures.system.unknown"
-				: Configured ? "gestures.system.configured" : "gestures.system.not_configured"),
-			"action", (*) => GestureOpenTouchpadSettings()))
+		Rows := _GestureSystemSlotRows(State, Slot, Configured)
+		if !(Rows is Array) || Rows.Length != 1
+			return []
+		SlotRows.Push(Rows[1])
 	}
-	Controls := MenuRenderer_TemplateRows("gesture_system_status_controls",
-		Map("gesture_system_refresh", GestureSystemRequestRefresh), Map(), Map())
-	if !(Controls is Array)
+	Children := MenuRenderer_TemplateRows("gesture_system_windows_children",
+		Map("gesture_system_refresh", GestureSystemRequestRefresh), Map(),
+		Map("gesture_system_cached_slots", () => SlotRows))
+	if !(Children is Array)
 		return []
-	for Row in Controls
-		Children.Push(Row)
-	Label := !State["ready"] ? t("gestures.system.unknown")
-		: Conflicts ? Format(t("gestures.system.conflicts"), Conflicts) : t("gestures.system.clear")
-	return [Map("label", Label, "items", Children)]
+	Rows := MenuRenderer_TemplateRows("gesture_system_status_windows_frame", Map(), Map(
+		"gesture_system_is_unverified", () => !State["ready"],
+		"gesture_system_is_clear", () => State["ready"] && Conflicts == 0,
+		"gesture_system_has_conflicts", () => State["ready"] && Conflicts > 0,
+		"gesture_system_conflict_count", () => String(Conflicts)), Map(
+		"gesture_system_unknown_children", () => Children,
+		"gesture_system_clear_children", () => Children,
+		"gesture_system_conflict_children", () => Children))
+	return Rows is Array && Rows.Length == 1 ? Rows : []
 }
 
 ; Keeps one notice per group alive, with explicit dismissal separate from closing.

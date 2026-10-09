@@ -1175,3 +1175,109 @@ TestGestures_ScriptLatePublicationRead() {
 }
 Test("gestures: late script publication neutralizes retained parameters (script-late-publication)",
 	TestGestures_ScriptLatePublicationRead)
+
+
+; Keeps complete cached-system status assertions on the actual native provider.
+_GSS_WithSnapshot(Callback) {
+	global GESTURE_SLOTS, GestureAssignments, Features, _I18nCache, _I18nCacheLoaded
+	State := GestureSystemState()
+	PreviousSlots := GESTURE_SLOTS, PreviousAssignments := GestureAssignments, PreviousFeatures := Features
+	PreviousReady := State["ready"], PreviousCached := State["slots"]
+	PreviousCache := _I18nCache, PreviousLoaded := _I18nCacheLoaded
+	try {
+		GESTURE_SLOTS := ["swipe_3_up", "tap_4", "tap_3"]
+		GestureAssignments := Map("swipe_3_up", "lookup", "tap_4", "lookup", "tap_3", "lookup")
+		Features := Map("gestures", Map("enabled", true))
+		State["slots"] := Map("swipe_3_up", true, "tap_4", false, "tap_3", false)
+		State["ready"] := false
+		return Callback.Call(State)
+	} finally {
+		GESTURE_SLOTS := PreviousSlots, GestureAssignments := PreviousAssignments, Features := PreviousFeatures
+		State["ready"] := PreviousReady, State["slots"] := PreviousCached
+		_I18nCache := PreviousCache, _I18nCacheLoaded := PreviousLoaded
+	}
+}
+
+_GSS_PriorCaptions() {
+	_GSS_WithSnapshot(_GSS_PriorCaptionsInner)
+}
+_GSS_PriorCaptionsInner(State) {
+	global _SharedDir, GESTURE_SLOTS, GestureAssignments, _I18nCache, _I18nCacheLoaded
+	Corpus := JsonParse(FileRead(_SharedDir . "\tests\corpus\menus\gesture_system_status_captions.json", "UTF-8"))
+	Locales := JsonParse(FileRead(_SharedDir . "\data\locale_order.json", "UTF-8"))["order"]
+	AssertEqual(21, Locales.Length)
+	for Locale in Locales {
+		Prior := Corpus["captions"][Locale]
+		_I18nCache := JsonParse(FileRead(_SharedDir . "\data\locales\" . Locale . ".json", "UTF-8"))
+		_I18nCacheLoaded := true
+		for Slot in GESTURE_SLOTS
+			_I18nCache["gesture.slots." . Slot] := "Independent Slot"
+		State["ready"] := false
+		Rows := GestureSystemRows()
+		AssertEqual(1, Rows.Length)
+		AssertEqual(Prior["unknown"], Rows[1]["label"], Locale . ": cached unknown parent")
+		AssertFalse(State["ready"], "building never starts a registry probe")
+		AssertEqual(4, Rows[1]["items"].Length)
+		for Index in [1, 2, 3] {
+			AssertEqual(Prior["slot_unknown"], Rows[1]["items"][Index]["label"])
+			Assert(Rows[1]["items"][Index]["action"] is Func, "real cached Settings callback retained")
+		}
+		State["ready"] := true
+		Rows := GestureSystemRows()
+		AssertEqual(Prior["conflicts_two"], Rows[1]["label"])
+		AssertEqual(Prior["slot_configured"], Rows[1]["items"][1]["label"])
+		AssertEqual(Prior["slot_not_configured"], Rows[1]["items"][2]["label"])
+		AssertEqual(Prior["slot_not_configured"], Rows[1]["items"][3]["label"])
+		AssertEqual(t("ui_apps.btn_refresh"), Rows[1]["items"][4]["label"])
+		for Slot in GESTURE_SLOTS
+			GestureAssignments[Slot] := "none"
+		AssertEqual(Prior["clear"], GestureSystemRows()[1]["label"])
+		for Slot in GESTURE_SLOTS
+			GestureAssignments[Slot] := "lookup"
+		for Slot in GESTURE_SLOTS
+			_I18nCache["gesture.slots." . Slot] := "Independent " . Slot
+		State["ready"] := false
+		Rows := GestureSystemRows()
+		for Index, Slot in GESTURE_SLOTS
+			AssertEqual(StrReplace(Prior["slot_unknown"], "Independent Slot", "Independent " . Slot),
+				Rows[1]["items"][Index]["label"], "each real native slot retains its own independently chosen caption")
+
+	}
+}
+Test("Gestures status: actual cached slot and parent frames preserve all prior localized captions", _GSS_PriorCaptions)
+
+_GSS_WithdrawnFrames() {
+	_GSS_WithSnapshot(_GSS_WithdrawnFramesInner)
+}
+_GSS_WithdrawnFramesInner(State) {
+	Root := _MR_GetManifestRoot()
+	for Section in ["gesture_system_status_windows_frame", "gesture_system_status_unknown", "gesture_system_windows_children",
+		"gesture_system_slot_windows_frame", "gesture_system_slot_unknown"] {
+		Original := Root[Section]
+		try {
+			Root[Section] := []
+			AssertEqual(0, GestureSystemRows().Length, "withdrawn complete declaration refuses publication: " . Section)
+			AssertFalse(State["ready"], "refusal cannot start a registry probe")
+		} finally Root[Section] := Original
+	}
+}
+Test("Gestures status: actual cached provider refuses every withdrawn active frame", _GSS_WithdrawnFrames)
+
+_GSS_StrictPredicates() {
+	_GSS_WithSnapshot(_GSS_StrictPredicatesInner)
+}
+_GSS_StrictPredicatesInner(State) {
+	Root := _MR_GetManifestRoot()
+	Section := "gesture_system_status_windows_frame"
+	Original := Root[Section]
+	try {
+		for Getter in ["missing_native_status_predicate", "gesture_system_conflict_count"] {
+			Changed := Original[1].Clone()
+			Changed["present_when"] := Getter
+			Root[Section] := [Changed, Original[2], Original[3]]
+			AssertEqual(0, GestureSystemRows().Length, "missing and non-boolean actual source getters refuse status")
+			AssertFalse(State["ready"])
+		}
+	} finally Root[Section] := Original
+}
+Test("Gestures status: actual cached status frame refuses missing and non-boolean predicates", _GSS_StrictPredicates)

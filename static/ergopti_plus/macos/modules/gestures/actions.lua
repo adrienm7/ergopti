@@ -2257,9 +2257,9 @@ function M.action_parameter_binding_fits(binding)
 		local catalogue = BindingPublication.current("script", "infra.script_chord_catalogue", ChordCatalogue)
 		return BindingIdentity.script_binding_fits(binding, catalogue), BindingIdentity.RETIRED_SCRIPT
 	end
-	local gestures = package.loaded["modules.gestures"]
-	if type(gestures) ~= "table" or type(gestures.gesture_slot_catalogue) ~= "function" then return nil end
-	return BindingIdentity.gesture_binding_fits(binding, gestures.gesture_slot_catalogue())
+	local gestures = rawget(package.loaded, "modules.gestures")
+	local catalogue = BindingPublication.current("gesture", "modules.gestures", gestures)
+	return BindingIdentity.gesture_binding_fits(binding, catalogue)
 end
 
 function M.get_action_parameter_spec(action)

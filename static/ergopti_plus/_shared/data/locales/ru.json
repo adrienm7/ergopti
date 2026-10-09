@@ -3244,5 +3244,19 @@
 	"physical_shortcuts.windows_unavailable": "Пока недоступно в Windows: Редактор физических сочетаний клавиш пока недоступен в Windows.",
 	"physical_shortcuts.collision": "Это сочетание клавиш уже используется. Выберите другое.",
 	"physical_shortcuts.window_unavailable": "Это окно недоступно: Попробуйте открыть его снова.",
-	"platform_reason.legacy_helpers_use_windows_scan_code_hotkeys": "Эти прежние вспомогательные функции эмуляции используют горячие клавиши Windows на основе скан-кодов. Другие системы используют сопоставления своих штатных раскладок."
+	"platform_reason.legacy_helpers_use_windows_scan_code_hotkeys": "Эти прежние вспомогательные функции эмуляции используют горячие клавиши Windows на основе скан-кодов. Другие системы используют сопоставления своих штатных раскладок.",
+	"gestures.system.conflicts_caption": "⚠ Возможные конфликты: %s",
+	"gestures.system.pinch_enabled": "Системный жест сведения пальцев : Включено",
+	"gestures.system.pinch_disabled": "Системный жест сведения пальцев : Отключено",
+	"gestures.system.pinch_unknown": "Системный жест сведения пальцев : Системные жесты: не проверены",
+	"gestures.system.slot_unknown_caption": "%s — Системные жесты: не проверены",
+	"gestures.system.slot_configured_caption": "%s — Настроено для ErgoptiPlus",
+	"gestures.system.slot_not_configured_caption": "%s — Не настроено для ErgoptiPlus",
+	"menu.global.reload_macos": "↺ Перезагрузить",
+	"menu.global.quit_macos": "✕ Выйти",
+	"menu.layout.pause_picker_caption": "  ↳ Раскладка когда скрипт на паузе : %s",
+	"menu.layout.resume_picker_caption": "  ↳ Раскладка когда скрипт активен : %s",
+	"menu.layout.native_variant_caption": "%s v%s",
+	"app_picker.agent_remove_marker": "✗",
+	"app_picker.agent_exclude_current_caption": "Исключить %s (текущее)"
 }

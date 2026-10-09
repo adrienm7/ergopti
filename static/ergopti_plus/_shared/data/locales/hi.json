@@ -3244,5 +3244,19 @@
 	"physical_shortcuts.windows_unavailable": "अभी Windows पर उपलब्ध नहीं: भौतिक कुंजी शॉर्टकट संपादक अभी Windows पर उपलब्ध नहीं है।",
 	"physical_shortcuts.collision": "यह कुंजी संयोजन पहले से उपयोग में है। दूसरा चुनें।",
 	"physical_shortcuts.window_unavailable": "यह विंडो उपलब्ध नहीं है: इसे फिर खोलने की कोशिश करें।",
-	"platform_reason.legacy_helpers_use_windows_scan_code_hotkeys": "ये पुरानी एमुलेशन सहायक सुविधाएँ Windows के स्कैन-कोड हॉटकी का उपयोग करती हैं। अन्य सिस्टम अपने मूल कीबोर्ड लेआउट की मैपिंग का उपयोग करते हैं।"
+	"platform_reason.legacy_helpers_use_windows_scan_code_hotkeys": "ये पुरानी एमुलेशन सहायक सुविधाएँ Windows के स्कैन-कोड हॉटकी का उपयोग करती हैं। अन्य सिस्टम अपने मूल कीबोर्ड लेआउट की मैपिंग का उपयोग करते हैं।",
+	"gestures.system.conflicts_caption": "⚠ %s संभावित टकराव",
+	"gestures.system.pinch_enabled": "सिस्टम का पिंच जेस्चर : सक्षम",
+	"gestures.system.pinch_disabled": "सिस्टम का पिंच जेस्चर : अक्षम",
+	"gestures.system.pinch_unknown": "सिस्टम का पिंच जेस्चर : सिस्टम जेस्चर: जाँच नहीं हुई",
+	"gestures.system.slot_unknown_caption": "%s — सिस्टम जेस्चर: जाँच नहीं हुई",
+	"gestures.system.slot_configured_caption": "%s — ErgoptiPlus के लिए कॉन्फ़िगर किया गया",
+	"gestures.system.slot_not_configured_caption": "%s — ErgoptiPlus के लिए कॉन्फ़िगर नहीं किया गया",
+	"menu.global.reload_macos": "↺ पुनः लोड करें",
+	"menu.global.quit_macos": "✕ बंद करें",
+	"menu.layout.pause_picker_caption": "  ↳ स्क्रिप्ट रुकने पर लेआउट : %s",
+	"menu.layout.resume_picker_caption": "  ↳ स्क्रिप्ट सक्रिय होने पर लेआउट : %s",
+	"menu.layout.native_variant_caption": "%s v%s",
+	"app_picker.agent_remove_marker": "✗",
+	"app_picker.agent_exclude_current_caption": "%s को हटाएं (वर्तमान)"
 }

@@ -971,8 +971,8 @@ for (const platform of ['hs', 'linux', 'ahk']) {
 		'Shortcuts parser and owned registration controls complete'
 	);
 	check(
-		/Ran 33 tests in /.test(parser.stderr) && /\nOK\s*$/.test(parser.stderr),
-		'all eighteen original, twelve same-principal and three failure-refinement controls execute without skip'
+		/Ran 35 tests in /.test(parser.stderr) && /\nOK\s*$/.test(parser.stderr),
+		'all eighteen original, twelve same-principal, three failure-refinement and two budget controls execute without skip'
 	);
 	const parserSource = fs.readFileSync(
 		path.join(ROOT, 'tools/diagnostics/apple_shortcuts_probe/test_probe.py'),

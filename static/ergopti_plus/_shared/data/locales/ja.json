@@ -3244,5 +3244,19 @@
 	"physical_shortcuts.windows_unavailable": "Windowsでは未対応: 物理キーのショートカットエディターはWindowsではまだ利用できません。",
 	"physical_shortcuts.collision": "このキーの組み合わせは既に使用されています。別の組み合わせを選んでください。",
 	"physical_shortcuts.window_unavailable": "このウィンドウは利用できません:もう一度開いてみてください。",
-	"platform_reason.legacy_helpers_use_windows_scan_code_hotkeys": "これらの従来のエミュレーション補助機能は、Windows のスキャンコードによるホットキーを使用します。他のシステムでは、ネイティブの配列マッピングを使用します。"
+	"platform_reason.legacy_helpers_use_windows_scan_code_hotkeys": "これらの従来のエミュレーション補助機能は、Windows のスキャンコードによるホットキーを使用します。他のシステムでは、ネイティブの配列マッピングを使用します。",
+	"gestures.system.conflicts_caption": "⚠ 競合の可能性：%s 件",
+	"gestures.system.pinch_enabled": "システムのピンチジェスチャー : 有効",
+	"gestures.system.pinch_disabled": "システムのピンチジェスチャー : 無効",
+	"gestures.system.pinch_unknown": "システムのピンチジェスチャー : システムジェスチャー：未確認",
+	"gestures.system.slot_unknown_caption": "%s — システムジェスチャー：未確認",
+	"gestures.system.slot_configured_caption": "%s — ErgoptiPlus 用に設定済み",
+	"gestures.system.slot_not_configured_caption": "%s — ErgoptiPlus 用に未設定",
+	"menu.global.reload_macos": "↺ リロード",
+	"menu.global.quit_macos": "✕ 終了",
+	"menu.layout.pause_picker_caption": "  ↳ スクリプト停止中のレイアウト : %s",
+	"menu.layout.resume_picker_caption": "  ↳ スクリプト有効時のレイアウト : %s",
+	"menu.layout.native_variant_caption": "%s v%s",
+	"app_picker.agent_remove_marker": "✗",
+	"app_picker.agent_exclude_current_caption": "%s を除外（現在）"
 }
