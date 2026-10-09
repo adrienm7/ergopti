@@ -37,6 +37,18 @@ const CHECKS = [
 		repro: 'npm run test:dev-release-qualification'
 	},
 	{
+		name: 'macOS launch qualification retains strict source and lifecycle evidence',
+		cmd: process.execPath,
+		args: ['tools/test/test-macos-launch-qualification.cjs'],
+		repro: 'node tools/test/test-macos-launch-qualification.cjs'
+	},
+	{
+		name: 'macOS launch qualification models restore environment and owned resources',
+		cmd: process.execPath,
+		args: ['tools/test/test-macos-launch-qualification-lifetime.cjs'],
+		repro: 'node tools/test/test-macos-launch-qualification-lifetime.cjs'
+	},
+	{
 		name: 'source toolchain admission preserves genuine compiler, headers and checkout',
 		cmd: process.execPath,
 		args: ['tools/test/test-linux-source-toolchain.cjs'],
