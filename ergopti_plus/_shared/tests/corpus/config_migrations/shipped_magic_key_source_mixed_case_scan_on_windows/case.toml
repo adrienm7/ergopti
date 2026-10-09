@@ -1,0 +1,8 @@
+# _shared/tests/corpus/config_migrations/shipped_magic_key_source_mixed_case_scan_on_windows/case.toml
+
+[case]
+description = "A scan code the Windows reader accepted in mixed case keeps its key: the v4 to v5 step maps every letter case, not only upper and lower."
+drivers = ["ahk"]
+outcome = "migrated"
+from_version = 4
+to_version = 12

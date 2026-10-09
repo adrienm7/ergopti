@@ -1,0 +1,14 @@
+# _shared/tests/corpus/config_migrations/op_rename/expected.toml
+
+[_meta]
+schema_version = 2
+
+[hotstrings.dynamic]
+date_fr = true
+time = false
+
+[layout]
+new_flag = true
+
+[llm.timing]
+debounce_ms = 200

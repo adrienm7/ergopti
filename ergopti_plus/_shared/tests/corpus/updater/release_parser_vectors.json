@@ -1,0 +1,454 @@
+{
+	"description": "Golden vectors for the shared GitHub release JSON parser (parse_tag, parse_notes, parse_asset_url, parse_prerelease_flag, split_releases_array, parse_html_url, parse_published_at). Consumed by macOS Lua and AHK corpus tests.",
+	"vectors": [
+		{
+			"id": "tag_simple",
+			"category": "parse_tag",
+			"input": { "body": "{\"tag_name\":\"v2.1.0\",\"name\":\"Release 2.1.0\"}" },
+			"expected": "v2.1.0"
+		},
+		{
+			"id": "tag_with_spaces",
+			"category": "parse_tag",
+			"input": { "body": "{\"tag_name\" :  \"v2.1.0-beta.3\" }" },
+			"expected": "v2.1.0-beta.3"
+		},
+		{
+			"id": "tag_missing",
+			"category": "parse_tag",
+			"input": { "body": "{\"name\":\"No tag here\"}" },
+			"expected": ""
+		},
+		{
+			"id": "tag_empty_body",
+			"category": "parse_tag",
+			"input": { "body": "" },
+			"expected": ""
+		},
+		{
+			"id": "tag_nil_body",
+			"category": "parse_tag",
+			"input": { "body": null },
+			"expected": ""
+		},
+		{
+			"id": "notes_simple",
+			"category": "parse_notes",
+			"input": { "body": "{\"body\":\"Bug fixes and improvements\"}" },
+			"expected": "Bug fixes and improvements"
+		},
+		{
+			"id": "notes_with_newlines",
+			"category": "parse_notes",
+			"input": { "body": "{\"body\":\"Line 1\\nLine 2\\nLine 3\"}" },
+			"expected": "Line 1\nLine 2\nLine 3"
+		},
+		{
+			"id": "notes_with_quotes",
+			"category": "parse_notes",
+			"input": { "body": "{\"body\":\"He said \\\"hello\\\" to me\"}" },
+			"expected": "He said \"hello\" to me"
+		},
+		{
+			"id": "notes_null_body",
+			"category": "parse_notes",
+			"input": { "body": "{\"body\":null}" },
+			"expected": ""
+		},
+		{
+			"id": "notes_empty_body",
+			"category": "parse_notes",
+			"input": { "body": "" },
+			"expected": ""
+		},
+		{
+			"id": "notes_empty_string_with_following_metadata",
+			"category": "parse_notes",
+			"input": {
+				"body": "{\"body\":\"\",\"assets\":[]}"
+			},
+			"expected": ""
+		},
+		{
+			"id": "notes_literal_backslash_n",
+			"category": "parse_notes",
+			"input": {
+				"body": "{\"body\":\"Literal \\\\n example\",\"assets\":[]}"
+			},
+			"expected": "Literal \\n example"
+		},
+		{
+			"id": "notes_literal_backslash_r",
+			"category": "parse_notes",
+			"input": {
+				"body": "{\"body\":\"Literal \\\\r example\",\"assets\":[]}"
+			},
+			"expected": "Literal \\r example"
+		},
+		{
+			"id": "notes_literal_backslash_t",
+			"category": "parse_notes",
+			"input": {
+				"body": "{\"body\":\"Literal \\\\t example\",\"assets\":[]}"
+			},
+			"expected": "Literal \\t example"
+		},
+		{
+			"id": "notes_trailing_backslash",
+			"category": "parse_notes",
+			"input": {
+				"body": "{\"body\":\"Trailing \\\\\",\"assets\":[]}"
+			},
+			"expected": "Trailing \\"
+		},
+		{
+			"id": "notes_escaped_delimiter_and_backslash",
+			"category": "parse_notes",
+			"input": {
+				"body": "{\"body\":\"Quoted \\\"} ]\\\" \\\\\",\"assets\":[]}"
+			},
+			"expected": "Quoted \"} ]\" \\"
+		},
+		{
+			"id": "notes_tab",
+			"category": "parse_notes",
+			"input": {
+				"body": "{\"body\":\"Tab\\tseparated\",\"assets\":[]}"
+			},
+			"expected": "Tab\tseparated"
+		},
+		{
+			"id": "notes_control_escapes",
+			"category": "parse_notes",
+			"input": {
+				"body": "{\"body\":\"Back\\bform\\f\",\"assets\":[]}"
+			},
+			"expected": "Back\bform\f"
+		},
+		{
+			"id": "notes_unicode",
+			"category": "parse_notes",
+			"input": {
+				"body": "{\"body\":\"Unicode \\u03b1 \\ud83d\\ude00\",\"assets\":[]}"
+			},
+			"expected": "Unicode α 😀"
+		},
+		{
+			"id": "notes_escaped_slash",
+			"category": "parse_notes",
+			"input": {
+				"body": "{\"body\":\"https:\\/\\/example.invalid\\/notes\",\"assets\":[]}"
+			},
+			"expected": "https://example.invalid/notes"
+		},
+		{
+			"id": "asset_found",
+			"category": "parse_asset_url",
+			"input": {
+				"body": "{\"assets\":[{\"name\":\"ErgoptiPlus.app.zip\",\"browser_download_url\":\"https://github.com/test/repo/releases/download/v1.0/ErgoptiPlus.app.zip\"},{\"name\":\"checksums.txt\",\"browser_download_url\":\"https://github.com/test/repo/releases/download/v1.0/checksums.txt\"}]}",
+				"asset_name": "ErgoptiPlus.app.zip"
+			},
+			"expected": "https://github.com/test/repo/releases/download/v1.0/ErgoptiPlus.app.zip"
+		},
+		{
+			"id": "asset_not_found",
+			"category": "parse_asset_url",
+			"input": {
+				"body": "{\"assets\":[{\"name\":\"other.zip\",\"browser_download_url\":\"https://example.com/other.zip\"}]}",
+				"asset_name": "ErgoptiPlus.app.zip"
+			},
+			"expected": ""
+		},
+		{
+			"id": "asset_empty_body",
+			"category": "parse_asset_url",
+			"input": { "body": "", "asset_name": "ErgoptiPlus.app.zip" },
+			"expected": ""
+		},
+		{
+			"id": "asset_realistic_release_wanted_not_first",
+			"category": "parse_asset_url",
+			"input": {
+				"body": "{\"tag_name\":\"v2.1.0\",\"name\":\"Release 2.1.0\",\"author\":{\"login\":\"adrienm7\",\"name\":\"ci-bot\"},\"assets\":[{\"name\":\"checksums.txt\",\"browser_download_url\":\"https://github.com/x/y/releases/download/v2.1.0/checksums.txt\"},{\"name\":\"ErgoptiPlus.app.zip\",\"browser_download_url\":\"https://github.com/x/y/releases/download/v2.1.0/ErgoptiPlus.app.zip\"}]}",
+				"asset_name": "ErgoptiPlus.app.zip"
+			},
+			"expected": "https://github.com/x/y/releases/download/v2.1.0/ErgoptiPlus.app.zip"
+		},
+		{
+			"id": "asset_label_closing_object",
+			"category": "parse_asset_url",
+			"input": {
+				"body": "{\"assets\":[{\"name\":\"ErgoptiPlus.app.zip\",\"label\":\"} x64\",\"browser_download_url\":\"https://example.invalid/releases/ErgoptiPlus.app.zip\"}]}",
+				"asset_name": "ErgoptiPlus.app.zip"
+			},
+			"expected": "https://example.invalid/releases/ErgoptiPlus.app.zip"
+		},
+		{
+			"id": "asset_preceding_label_closing_array",
+			"category": "parse_asset_url",
+			"input": {
+				"body": "{\"assets\":[{\"name\":\"notes.txt\",\"label\":\"] metadata\"},{\"name\":\"ErgoptiPlus.app.zip\",\"browser_download_url\":\"https://example.invalid/releases/ErgoptiPlus.app.zip\"}]}",
+				"asset_name": "ErgoptiPlus.app.zip"
+			},
+			"expected": "https://example.invalid/releases/ErgoptiPlus.app.zip"
+		},
+		{
+			"id": "asset_label_escaped_delimiters",
+			"category": "parse_asset_url",
+			"input": {
+				"body": "{\"assets\":[{\"name\":\"ErgoptiPlus.app.zip\",\"browser_download_url\":\"https://example.invalid/releases/ErgoptiPlus.app.zip\",\"label\":\"quoted \\\" ] } \\\\ metadata\"}]}",
+				"asset_name": "ErgoptiPlus.app.zip"
+			},
+			"expected": "https://example.invalid/releases/ErgoptiPlus.app.zip"
+		},
+		{
+			"id": "asset_nested_uploader_name_not_asset",
+			"category": "parse_asset_url",
+			"input": {
+				"body": "{\"assets\":[{\"uploader\":{\"name\":\"ErgoptiPlus.app.zip\",\"browser_download_url\":\"https://example.invalid/wrong\"},\"name\":\"other.zip\",\"browser_download_url\":\"https://example.invalid/other\"},{\"name\":\"ErgoptiPlus.app.zip\",\"browser_download_url\":\"https://example.invalid/releases/ErgoptiPlus.app.zip\"}]}",
+				"asset_name": "ErgoptiPlus.app.zip"
+			},
+			"expected": "https://example.invalid/releases/ErgoptiPlus.app.zip"
+		},
+		{
+			"id": "asset_nested_uploader_url_not_asset",
+			"category": "parse_asset_url",
+			"input": {
+				"body": "{\"assets\":[{\"name\":\"ErgoptiPlus.app.zip\",\"uploader\":{\"browser_download_url\":\"https://example.invalid/wrong\"},\"browser_download_url\":\"https://example.invalid/releases/ErgoptiPlus.app.zip\"}]}",
+				"asset_name": "ErgoptiPlus.app.zip"
+			},
+			"expected": "https://example.invalid/releases/ErgoptiPlus.app.zip"
+		},
+		{
+			"id": "asset_escaped_url",
+			"category": "parse_asset_url",
+			"input": {
+				"body": "{\"assets\":[{\"name\":\"ErgoptiPlus.app.zip\",\"browser_download_url\":\"https:\\/\\/example.invalid\\/releases\\/ErgoptiPlus.app.zip\"}]}",
+				"asset_name": "ErgoptiPlus.app.zip"
+			},
+			"expected": "https://example.invalid/releases/ErgoptiPlus.app.zip"
+		},
+		{
+			"id": "asset_escaped_name",
+			"category": "parse_asset_url",
+			"input": {
+				"body": "{\"assets\":[{\"name\":\"ErgoptiPlus.app.\\u007aip\",\"browser_download_url\":\"https://example.invalid/releases/ErgoptiPlus.app.\\u007aip\"}]}",
+				"asset_name": "ErgoptiPlus.app.zip"
+			},
+			"expected": "https://example.invalid/releases/ErgoptiPlus.app.zip"
+		},
+		{
+			"id": "asset_null_release",
+			"category": "parse_asset_url",
+			"input": {
+				"body": "null",
+				"asset_name": "ErgoptiPlus.app.zip"
+			},
+			"expected": ""
+		},
+		{
+			"id": "asset_string_release",
+			"category": "parse_asset_url",
+			"input": {
+				"body": "\"not a release\"",
+				"asset_name": "ErgoptiPlus.app.zip"
+			},
+			"expected": ""
+		},
+		{
+			"id": "asset_array_wrapper",
+			"category": "parse_asset_url",
+			"input": {
+				"body": "[{\"assets\":[{\"name\":\"ErgoptiPlus.app.zip\",\"browser_download_url\":\"https://example.invalid/releases/ErgoptiPlus.app.zip\"}]}]",
+				"asset_name": "ErgoptiPlus.app.zip"
+			},
+			"expected": ""
+		},
+		{
+			"id": "asset_nested_release",
+			"category": "parse_asset_url",
+			"input": {
+				"body": "{\"release\":{\"assets\":[{\"name\":\"ErgoptiPlus.app.zip\",\"browser_download_url\":\"https://example.invalid/releases/ErgoptiPlus.app.zip\"}]}}",
+				"asset_name": "ErgoptiPlus.app.zip"
+			},
+			"expected": ""
+		},
+		{
+			"id": "asset_malformed_json",
+			"category": "parse_asset_url",
+			"input": {
+				"body": "{\"assets\":[{\"name\":\"ErgoptiPlus.app.zip\",\"browser_download_url\":\"https://example.invalid/releases/ErgoptiPlus.app.zip\"}]} trailing",
+				"asset_name": "ErgoptiPlus.app.zip"
+			},
+			"expected": ""
+		},
+		{
+			"id": "asset_null_assets",
+			"category": "parse_asset_url",
+			"input": {
+				"body": "{\"assets\":null}",
+				"asset_name": "ErgoptiPlus.app.zip"
+			},
+			"expected": ""
+		},
+		{
+			"id": "asset_object_assets",
+			"category": "parse_asset_url",
+			"input": {
+				"body": "{\"assets\":{\"asset\":{\"name\":\"ErgoptiPlus.app.zip\",\"browser_download_url\":\"https://example.invalid/releases/ErgoptiPlus.app.zip\"}}}",
+				"asset_name": "ErgoptiPlus.app.zip"
+			},
+			"expected": ""
+		},
+		{
+			"id": "asset_null_url",
+			"category": "parse_asset_url",
+			"input": {
+				"body": "{\"assets\":[{\"name\":\"ErgoptiPlus.app.zip\",\"browser_download_url\":null}]}",
+				"asset_name": "ErgoptiPlus.app.zip"
+			},
+			"expected": ""
+		},
+		{
+			"id": "asset_number_url",
+			"category": "parse_asset_url",
+			"input": {
+				"body": "{\"assets\":[{\"name\":\"ErgoptiPlus.app.zip\",\"browser_download_url\":123}]}",
+				"asset_name": "ErgoptiPlus.app.zip"
+			},
+			"expected": ""
+		},
+		{
+			"id": "asset_nonstring_name",
+			"category": "parse_asset_url",
+			"input": {
+				"body": "{\"assets\":[{\"name\":123,\"browser_download_url\":\"https://example.invalid/releases/ErgoptiPlus.app.zip\"}]}",
+				"asset_name": "ErgoptiPlus.app.zip"
+			},
+			"expected": ""
+		},
+		{
+			"id": "asset_first_matching_missing_url",
+			"category": "parse_asset_url",
+			"input": {
+				"body": "{\"assets\":[{\"name\":\"ErgoptiPlus.app.zip\"},{\"name\":\"ErgoptiPlus.app.zip\",\"browser_download_url\":\"https://example.invalid/releases/ErgoptiPlus.app.zip\"}]}",
+				"asset_name": "ErgoptiPlus.app.zip"
+			},
+			"expected": ""
+		},
+		{
+			"id": "asset_missing_own_url",
+			"category": "parse_asset_url",
+			"input": {
+				"body": "{\"assets\":[{\"name\":\"ErgoptiPlus.app.zip\",\"uploader\":{\"browser_download_url\":\"https://example.invalid/releases/ErgoptiPlus.app.zip\"}}]}",
+				"asset_name": "ErgoptiPlus.app.zip"
+			},
+			"expected": ""
+		},
+		{
+			"id": "asset_first_exact_match_preserved",
+			"category": "parse_asset_url",
+			"input": {
+				"body": "{\"assets\":[{\"name\":\"ErgoptiPlus.app.zip\",\"browser_download_url\":\"https://example.invalid/releases/ErgoptiPlus.app.zip\"},{\"name\":\"ErgoptiPlus.app.zip\",\"browser_download_url\":\"https://example.invalid/second\"}]}",
+				"asset_name": "ErgoptiPlus.app.zip"
+			},
+			"expected": "https://example.invalid/releases/ErgoptiPlus.app.zip"
+		},
+		{
+			"id": "prerelease_true",
+			"category": "parse_prerelease_flag",
+			"input": { "body": "{\"tag_name\":\"v2.0.0-dev.1\",\"prerelease\":true}" },
+			"expected": true
+		},
+		{
+			"id": "prerelease_false",
+			"category": "parse_prerelease_flag",
+			"input": { "body": "{\"tag_name\":\"v2.0.0\",\"prerelease\":false}" },
+			"expected": false
+		},
+		{
+			"id": "prerelease_absent",
+			"category": "parse_prerelease_flag",
+			"input": { "body": "{\"tag_name\":\"v2.0.0\"}" },
+			"expected": false
+		},
+		{
+			"id": "html_url_simple",
+			"category": "parse_html_url",
+			"input": { "body": "{\"html_url\":\"https://github.com/test/repo/releases/tag/v1.0\"}" },
+			"expected": "https://github.com/test/repo/releases/tag/v1.0"
+		},
+		{
+			"id": "html_url_missing",
+			"category": "parse_html_url",
+			"input": { "body": "{\"tag_name\":\"v1.0\"}" },
+			"expected": ""
+		},
+		{
+			"id": "published_at_simple",
+			"category": "parse_published_at",
+			"input": { "body": "{\"published_at\":\"2024-06-01T10:00:00Z\"}" },
+			"expected": "2024-06-01T10:00:00Z"
+		},
+		{
+			"id": "published_at_missing",
+			"category": "parse_published_at",
+			"input": { "body": "{\"tag_name\":\"v1.0\"}" },
+			"expected": ""
+		},
+		{
+			"id": "split_single_object",
+			"category": "split_releases_array",
+			"input": { "json": "[{\"tag_name\":\"v1.0\"}]" },
+			"expected_count": 1
+		},
+		{
+			"id": "split_multiple_objects",
+			"category": "split_releases_array",
+			"input": {
+				"json": "[{\"tag_name\":\"v1.0\"},{\"tag_name\":\"v1.1\"},{\"tag_name\":\"v2.0\"}]"
+			},
+			"expected_count": 3
+		},
+		{
+			"id": "split_empty_array",
+			"category": "split_releases_array",
+			"input": { "json": "[]" },
+			"expected_count": 0
+		},
+		{
+			"id": "split_not_array",
+			"category": "split_releases_array",
+			"input": { "json": "{\"tag_name\":\"v1.0\"}" },
+			"expected_count": 0
+		},
+		{
+			"id": "split_with_brace_in_string",
+			"category": "split_releases_array",
+			"input": {
+				"json": "[{\"tag_name\":\"v1.0\",\"body\":\"contains a } char\"},{\"tag_name\":\"v1.1\"}]"
+			},
+			"expected_count": 2
+		},
+		{
+			"id": "split_with_escaped_quote_in_string",
+			"category": "split_releases_array",
+			"input": {
+				"json": "[{\"tag_name\":\"v1.0\",\"body\":\"has \\\"quote\\\" inside\"},{\"tag_name\":\"v1.1\"}]"
+			},
+			"expected_count": 2
+		},
+		{
+			"id": "split_empty_json",
+			"category": "split_releases_array",
+			"input": { "json": "" },
+			"expected_count": 0
+		},
+		{
+			"id": "split_nil_json",
+			"category": "split_releases_array",
+			"input": { "json": null },
+			"expected_count": 0
+		}
+	]
+}

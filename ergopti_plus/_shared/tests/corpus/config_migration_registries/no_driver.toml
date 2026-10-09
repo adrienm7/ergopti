@@ -1,0 +1,16 @@
+# _shared/tests/corpus/config_migration_registries/no_driver.toml
+#
+# A step names no driver.
+
+[registry]
+current_version = 2
+unstamped_version = 1
+
+[steps.v1_to_v2]
+from = 1
+to = 2
+drivers = []
+reason = "Corpus: one delete."
+ops = [
+	{ op = "delete", section = "gestures", key = "space_wrap" },
+]

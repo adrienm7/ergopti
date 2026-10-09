@@ -1,0 +1,10 @@
+# _shared/tests/corpus/config_migrations/shipped_magic_key_source_scan_becomes_a_key_code_on_windows/input.toml
+
+[_meta]
+schema_version = 4
+
+[hotstrings]
+trigger_char = "★"
+magic_key_source_scan = "SC027"
+magic_key_source_char = ";"
+repeat_key_enabled = true

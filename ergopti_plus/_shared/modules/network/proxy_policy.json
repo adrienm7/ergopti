@@ -1,0 +1,43 @@
+{
+	"schema_version": 1,
+	"environment_precedence": {
+		"http": ["http_proxy", "all_proxy", "ALL_PROXY"],
+		"https": ["https_proxy", "HTTPS_PROXY", "all_proxy", "ALL_PROXY"]
+	},
+	"environment_bypass_precedence": ["no_proxy", "NO_PROXY"],
+	"redirects": { "max_hops": 50 },
+	"system_lookup_environment_exclusions": [
+		"http_proxy",
+		"HTTP_PROXY",
+		"https_proxy",
+		"HTTPS_PROXY",
+		"all_proxy",
+		"ALL_PROXY"
+	],
+	"loopback": {
+		"dns_hosts": ["localhost"],
+		"dns_suffixes": [".localhost"],
+		"ipv4_cidrs": ["127.0.0.0/8"],
+		"ipv6_addresses": ["::1"]
+	},
+	"allowed_proxy_schemes": ["http", "https", "socks4", "socks4a", "socks5", "socks5h"],
+	"max_selections": 128,
+	"native_pac": {
+		"max_script_bytes": 1048576,
+		"max_heap_bytes": 67108864,
+		"max_native_queries": 128
+	},
+	"max_proxy_bytes": 65536,
+	"selected_proxy_bypass": "environment",
+	"missing_native_capability": "environment",
+	"unavailable_native_errors": ["proxy-native-unavailable", "proxy-backend-unavailable"],
+	"failover": {
+		"proxy_name_resolution_exits": [5],
+		"proxy_connect_exits": [7],
+		"requires_zero_http_status": true,
+		"requires_zero_connect_status": true,
+		"requires_no_delivered_bytes": true,
+		"requires_verified_native_receipt": true,
+		"connect_requires_actual_proxy_used": true
+	}
+}

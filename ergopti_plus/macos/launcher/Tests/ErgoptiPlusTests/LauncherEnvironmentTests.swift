@@ -1,0 +1,791 @@
+// Tests/ErgoptiPlusTests/LauncherEnvironmentTests.swift
+
+// ==============================================================================
+// MODULE: Launcher Child-Environment Tests
+// DESCRIPTION:
+// Proves that the Swift launcher exports its exact live process identity to the
+// embedded Hammerspoon child instead of trusting an inherited or fixed marker.
+//
+// FEATURES & RATIONALE:
+// 1. Exact PID replacement: an inherited stale launcher PID is overwritten by
+//    the current process identifier before Process.environment is assigned.
+// 2. Observable bundle identity: the current bundle identifier is exported when
+//    known, while a stale inherited identifier is removed when it is unknown.
+// 3. Environment preservation: unrelated child configuration survives unchanged.
+// 4. Fail-fast identity: a missing device/inode proof reaches the fatal path
+//    before the embedded Hammerspoon child runner can execute.
+// 5. Writable bootstrap: the packaged Lua child receives a stable paths.toml
+//    location outside the signed application resources.
+// 6. Logger authority: stale inherited credentials are removed, and the child
+//    receives only the endpoint that was successfully bound before its launch.
+// 7. Private inheritance: the launcher installs umask 0077 before child spawn.
+// 8. Launch Services isolation: parent GUI identity cannot leak into Hammerspoon.
+// 9. AppKit launch context: the embedded GUI starts through its .app bundle.
+// 10. App Nap: one activity is held from the logger handshake until the child
+//     exits or the launcher terminates, so the native logger stays responsive.
+//
+// NOTE: This target requires the macOS Swift toolchain. Verify with
+// `swift test --package-path static/ergopti_plus/macos/launcher` on macOS.
+// ==============================================================================
+
+import AppKit
+import Dispatch
+import Darwin
+import Foundation
+import XCTest
+@testable import ErgoptiPlus
+
+private final class TestLoggerDatagramServer: LoggerDatagramServing {
+	let endpoint: LoggerDatagramEndpoint
+	private(set) var stopCount = 0
+	private var bootstrapReadyHandler: (() -> Void)?
+	private var configureRefusalHandler: ((LogDirectoryFailure) -> Void)?
+
+	init(port: UInt16 = 31_337, token: String = "test-logger-token") {
+		endpoint = LoggerDatagramEndpoint(port: port, token: token)
+	}
+
+	func setBootstrapReadyHandler(_ handler: @escaping () -> Void) {
+		bootstrapReadyHandler = handler
+	}
+
+	func reportBootstrapReady() { bootstrapReadyHandler?() }
+
+	func setConfigureRefusalHandler(_ handler: @escaping (LogDirectoryFailure) -> Void) {
+		configureRefusalHandler = handler
+	}
+
+	func reportConfigureRefusal(_ failure: LogDirectoryFailure) { configureRefusalHandler?(failure) }
+
+	func stop() { stopCount += 1 }
+}
+
+private final class TestEmbeddedProcessExitMonitor: EmbeddedProcessExitMonitoring {
+	private(set) var cancelCount = 0
+
+	func cancel() { cancelCount += 1 }
+}
+
+private let testEmbeddedHammerspoonBinary =
+	"/tmp/Hammerspoon.app/Contents/MacOS/Hammerspoon"
+
+/// Verifies the pure child-environment boundary used before launching embedded
+/// Hammerspoon.
+final class LauncherEnvironmentTests: XCTestCase {
+
+
+
+
+
+	// ============================================
+	// ============================================
+	// ======= 1/ Exact Child Identity ============
+	// ============================================
+	// ============================================
+
+	/// The child and native helpers must inherit a private file-creation mask.
+	func testLauncherInstallsPrivateInheritedUmask() {
+		var installedMask: mode_t?
+		let priorMask = installPrivateProcessUmask { requestedMask in
+			installedMask = requestedMask
+			return 0o022
+		}
+
+		XCTAssertEqual(installedMask, 0o077)
+		XCTAssertEqual(priorMask, 0o022)
+	}
+
+	/// Verifies current launcher identity replaces stale inherited markers.
+	func testExactLauncherIdentityReplacesInheritedMarkers() {
+		let environment = launcherChildEnvironment(
+			base: [
+				"ERGOPTI_LAUNCHER_PID": "7",
+				"ERGOPTI_LAUNCHER_BUNDLE_ID": "example.stale",
+				"ERGOPTI_LOG_PORT": "9",
+				"ERGOPTI_LOG_TOKEN": "stale-token",
+				"UNRELATED": "preserved",
+			],
+			launcherPid: 4242,
+			launcherBundleId: "com.ergoptiplus.app"
+		)
+
+		XCTAssertEqual(environment["ERGOPTI_LAUNCHER_PID"], "4242")
+		XCTAssertEqual(
+			environment["ERGOPTI_LAUNCHER_BUNDLE_ID"],
+			"com.ergoptiplus.app"
+		)
+		XCTAssertEqual(environment["UNRELATED"], "preserved")
+		XCTAssertNil(environment["ERGOPTI_LOG_PORT"])
+		XCTAssertNil(environment["ERGOPTI_LOG_TOKEN"])
+	}
+
+	/// Verifies an unavailable bundle identifier removes inherited stale state.
+	func testUnknownBundleIdentityCannotLeakAnInheritedMarker() {
+		for bundleId in [nil, ""] as [String?] {
+			let environment = launcherChildEnvironment(
+				base: ["ERGOPTI_LAUNCHER_BUNDLE_ID": "example.stale"],
+				launcherPid: 4242,
+				launcherBundleId: bundleId
+			)
+
+			XCTAssertNil(environment["ERGOPTI_LAUNCHER_BUNDLE_ID"])
+		}
+	}
+
+	/// A GUI child must discover its own bundle and preferences domain instead
+	/// of impersonating the Launch Services parent that spawned it.
+	func testOuterLaunchServicesIdentityCannotLeakIntoEmbeddedGUIChild() {
+		let environment = launcherChildEnvironment(
+			base: [
+				"__CFBundleIdentifier": "com.ergoptiplus.app",
+				"XPC_SERVICE_NAME": "application.com.ergoptiplus.app.123",
+				"UNRELATED": "preserved",
+			],
+			launcherPid: 4242,
+			launcherBundleId: "com.ergoptiplus.app"
+		)
+
+		XCTAssertNil(environment["__CFBundleIdentifier"])
+		XCTAssertNil(environment["XPC_SERVICE_NAME"])
+		XCTAssertEqual(environment["UNRELATED"], "preserved")
+	}
+
+	/// Executing the nested Mach-O directly does not establish an AppKit launch
+	/// context; Launch Services must receive the owning .app and exact environment.
+	func testEmbeddedGUIUsesApplicationBundleLaunchConfiguration() throws {
+		let bundleURL = try XCTUnwrap(embeddedApplicationBundleURL(
+			binaryPath: testEmbeddedHammerspoonBinary
+		))
+		XCTAssertEqual(bundleURL.path, "/tmp/Hammerspoon.app")
+		XCTAssertNil(embeddedApplicationBundleURL(binaryPath: "/tmp/Hammerspoon"))
+
+		let configuration = embeddedApplicationOpenConfiguration(
+			environment: ["ERGOPTI_CONFIG_DIR": "/tmp/config"]
+		)
+		XCTAssertFalse(configuration.activates)
+		XCTAssertFalse(configuration.addsToRecentItems)
+		XCTAssertTrue(configuration.createsNewApplicationInstance)
+		XCTAssertEqual(configuration.environment["ERGOPTI_CONFIG_DIR"], "/tmp/config")
+	}
+
+	/// Proves an unavailable launcher file identity cannot start a partial app.
+	func testMissingLauncherFileIdentityFailsBeforeChildStart() {
+		var childStartCount = 0
+		var fatalMessages: [String] = []
+		let delegate = AppDelegate(
+			launcherIdentityReader: { _ in nil },
+			applicationLauncher: { _, _, _ in childStartCount += 1 },
+			fatalReporter: { fatalMessages.append($0) }
+		)
+
+		delegate.launchHammerspoon(at: testEmbeddedHammerspoonBinary)
+
+		XCTAssertEqual(childStartCount, 0)
+		XCTAssertEqual(
+			fatalMessages,
+			["Running launcher executable identity is unavailable."]
+		)
+	}
+
+	/// The Lua child receives the exact fail-closed reason for localized recovery UI.
+	func testGuardianRegistrationStatusIsExportedToHammerspoon() {
+		var childEnvironment: [String: String] = [:]
+		var launchedApplicationURL: URL?
+		let loggerWorker = TestLoggerDatagramServer()
+		let delegate = AppDelegate(
+			launcherIdentityReader: { _ in (device: "11", inode: "22") },
+			applicationLauncher: { applicationURL, configuration, _ in
+				launchedApplicationURL = applicationURL
+				childEnvironment = configuration.environment
+			},
+			loggerWorkerFactory: { loggerWorker }
+		)
+
+		delegate.launchHammerspoon(
+			at: testEmbeddedHammerspoonBinary,
+			remapGuardianStatus: .requiresApproval
+		)
+
+		XCTAssertEqual(
+			childEnvironment["ERGOPTI_REMAP_GUARDIAN_STATUS"],
+			"requires_approval"
+		)
+		XCTAssertEqual(launchedApplicationURL?.path, "/tmp/Hammerspoon.app")
+	}
+
+	/// paths.toml must survive app replacement and remain writable in /Applications.
+	func testManagedBootstrapPathIsOutsideTheBundleAndExported() {
+		XCTAssertEqual(
+			managedPathsFile(homeDirectory: "/Users/test"),
+			"/Users/test/Library/Application Support/ErgoptiPlus/paths.toml"
+		)
+
+		var childEnvironment: [String: String] = [:]
+		let loggerWorker = TestLoggerDatagramServer()
+		let delegate = AppDelegate(
+			launcherIdentityReader: { _ in (device: "11", inode: "22") },
+			applicationLauncher: { _, configuration, _ in
+				childEnvironment = configuration.environment
+			},
+			loggerWorkerFactory: { loggerWorker }
+		)
+		delegate.launchHammerspoon(at: testEmbeddedHammerspoonBinary)
+
+		let exported = childEnvironment["ERGOPTI_PATHS_FILE"]
+		XCTAssertEqual(exported, managedPathsFile())
+		XCTAssertFalse(exported?.contains(".app/Contents/") ?? true,
+			"the managed bootstrap must never resolve inside signed app resources")
+	}
+
+	/// The GUI launcher starts Hammerspoon at once and never registers the
+	/// guardian: the driver registers it only after reading « Ergopti uses
+	/// Karabiner » = on, so nothing is registered while that switch is off.
+	func testManagedHammerspoonStartsWithoutRegisteringTheGuardian() {
+		var childStartCount = 0
+		var childEnvironment: [String: String] = [:]
+		let loggerWorker = TestLoggerDatagramServer()
+		let delegate = AppDelegate(
+			launcherIdentityReader: { _ in (device: "11", inode: "22") },
+			applicationLauncher: { _, configuration, _ in
+				childStartCount += 1
+				childEnvironment = configuration.environment
+			},
+			loggerWorkerFactory: { loggerWorker }
+		)
+
+		delegate.startManagedHammerspoon(at: testEmbeddedHammerspoonBinary)
+
+		XCTAssertEqual(childStartCount, 1,
+			"no registration result may gate the child any more")
+		XCTAssertEqual(childEnvironment["ERGOPTI_REMAP_GUARDIAN_STATUS"], "not_requested")
+	}
+
+	/// A bound endpoint replaces inherited credentials before the child runner fires.
+	func testNativeLoggerEndpointIsBoundAndExportedBeforeChildStart() {
+		let loggerWorker = TestLoggerDatagramServer(port: 42_424, token: "fresh-token")
+		var factoryCallCount = 0
+		var childEnvironment: [String: String] = [:]
+		let delegate = AppDelegate(
+			launcherIdentityReader: { _ in (device: "11", inode: "22") },
+			applicationLauncher: { _, configuration, _ in
+				XCTAssertEqual(factoryCallCount, 1)
+				childEnvironment = configuration.environment
+			},
+			loggerWorkerFactory: {
+				factoryCallCount += 1
+				return loggerWorker
+			}
+		)
+
+		delegate.launchHammerspoon(at: testEmbeddedHammerspoonBinary)
+
+		XCTAssertEqual(childEnvironment["ERGOPTI_LOG_PORT"], "42424")
+		XCTAssertEqual(childEnvironment["ERGOPTI_LOG_TOKEN"], "fresh-token")
+	}
+
+	/// No input runtime may start when the native sink could not bind its socket.
+	func testMissingNativeLoggerFailsBeforeChildStart() {
+		var childStartCount = 0
+		var fatalMessages: [String] = []
+		let delegate = AppDelegate(
+			launcherIdentityReader: { _ in (device: "11", inode: "22") },
+			applicationLauncher: { _, _, _ in childStartCount += 1 },
+			fatalReporter: { fatalMessages.append($0) },
+			loggerWorkerFactory: { nil }
+		)
+
+		delegate.launchHammerspoon(at: testEmbeddedHammerspoonBinary)
+
+		XCTAssertEqual(childStartCount, 0)
+		XCTAssertEqual(
+			fatalMessages,
+			["Native Hammerspoon logger transport could not be started."]
+		)
+	}
+
+	/// AppKit teardown explicitly cancels the exact pre-bound logger authority.
+	func testApplicationTerminationStopsTheOwnedNativeLogger() {
+		let loggerWorker = TestLoggerDatagramServer()
+		let delegate = AppDelegate(
+			launcherIdentityReader: { _ in (device: "11", inode: "22") },
+			applicationLauncher: { _, _, _ in },
+			loggerWorkerFactory: { loggerWorker }
+		)
+		delegate.launchHammerspoon(at: testEmbeddedHammerspoonBinary)
+
+		delegate.applicationWillTerminate(Notification(name: Notification.Name(
+			"test-termination"
+		)))
+
+		XCTAssertEqual(loggerWorker.stopCount, 1)
+	}
+
+	/// App Nap throttles an accessory launcher; its logger worker then answers
+	/// late and the Lua transport counts a stall. The activity spans the child.
+	func testChildActivityIsHeldWhileTheChildRunsAndReleasedAfterIt() throws {
+		var begun = 0
+		var ended = 0
+		let activity = EmbeddedChildActivity(
+			begin: {
+				begun += 1
+				return NSObject()
+			},
+			end: { _ in ended += 1 }
+		)
+		let store = try temporaryFatalReportStore()
+		let loggerWorker = TestLoggerDatagramServer()
+		let delegate = AppDelegate(
+			launcherIdentityReader: { _ in (device: "11", inode: "22") },
+			applicationLauncher: { _, _, _ in },
+			fatalReporter: { _ in },
+			applicationTerminator: { _ in },
+			loggerWorkerFactory: { loggerWorker },
+			fatalReportStore: store,
+			childActivity: activity
+		)
+
+		delegate.launchHammerspoon(at: testEmbeddedHammerspoonBinary)
+		XCTAssertTrue(activity.isHeld, "the worker must stay responsive from the configure handshake on")
+		XCTAssertEqual(begun, 1)
+		loggerWorker.reportBootstrapReady()
+		delegate.handleEmbeddedHammerspoonExit(.exited(code: 0), guardianStatus: .ready)
+		XCTAssertFalse(activity.isHeld)
+		XCTAssertEqual(ended, 1)
+
+		delegate.launchHammerspoon(at: testEmbeddedHammerspoonBinary)
+		XCTAssertEqual(begun, 2)
+		delegate.applicationWillTerminate(Notification(name: Notification.Name("test-termination")))
+		XCTAssertFalse(activity.isHeld)
+		XCTAssertEqual(ended, 2, "termination must end the activity it holds")
+	}
+
+	func testChildActivityHoldsAndReleasesExactlyOnce() {
+		var begun = 0
+		var ended = 0
+		let activity = EmbeddedChildActivity(
+			begin: {
+				begun += 1
+				return NSObject()
+			},
+			end: { _ in ended += 1 }
+		)
+		activity.release()
+		XCTAssertEqual(ended, 0, "nothing held, nothing to end")
+		activity.hold()
+		activity.hold()
+		XCTAssertEqual(begun, 1, "a second hold must not leak a second activity")
+		activity.release()
+		activity.release()
+		XCTAssertEqual(ended, 1)
+	}
+
+	/// A refused child start rolls back the already-bound logger authority exactly.
+	func testChildLaunchFailureStopsThePreboundNativeLogger() {
+		let loggerWorker = TestLoggerDatagramServer()
+		var fatalMessages: [String] = []
+		let failureReported = expectation(description: "Launch Services failure reported")
+		let delegate = AppDelegate(
+			launcherIdentityReader: { _ in (device: "11", inode: "22") },
+			applicationLauncher: { _, _, completion in
+				completion(nil, NSError(domain: "test-launch", code: 17))
+			},
+			fatalReporter: {
+				fatalMessages.append($0)
+				failureReported.fulfill()
+			},
+			loggerWorkerFactory: { loggerWorker }
+		)
+
+		delegate.launchHammerspoon(at: testEmbeddedHammerspoonBinary)
+		wait(for: [failureReported], timeout: 1)
+
+		XCTAssertEqual(loggerWorker.stopCount, 1)
+		XCTAssertEqual(fatalMessages.count, 1)
+		XCTAssertTrue(fatalMessages[0].hasPrefix("Failed to launch embedded Hammerspoon:"))
+	}
+
+	/// Kernel wait statuses distinguish deliberate exits from signal crashes.
+	func testEmbeddedProcessWaitStatusDecoderPreservesCrashIdentity() {
+		XCTAssertEqual(decodeEmbeddedProcessWaitStatus(0), .exited(code: 0))
+		XCTAssertEqual(decodeEmbeddedProcessWaitStatus(17 << 8), .exited(code: 17))
+		XCTAssertEqual(
+			decodeEmbeddedProcessWaitStatus(SIGSEGV),
+			.signaled(signal: SIGSEGV)
+		)
+	}
+
+	/// The production monitoring transaction must route a crash to fatal UI.
+	func testProductionExitMonitoringRoutesCrashToFatalLauncherUI() {
+		var fatalMessages: [String] = []
+		var cleanTerminationCount = 0
+		var observedProcessIdentifier: pid_t?
+		var observedExit: ((EmbeddedProcessExit) -> Void)?
+		let monitor = TestEmbeddedProcessExitMonitor()
+		let crashReported = expectation(description: "observed crash reaches fatal UI")
+		let delegate = AppDelegate(
+			fatalReporter: {
+				fatalMessages.append($0)
+				crashReported.fulfill()
+			},
+			applicationTerminator: { _ in cleanTerminationCount += 1 },
+			processExitMonitorFactory: { processIdentifier, completion in
+				observedProcessIdentifier = processIdentifier
+				observedExit = completion
+				return monitor
+			}
+		)
+
+		// SwiftPM's XCTest process need not have a live NSRunningApplication
+		// identity, so drive the production monitoring transaction directly.
+		XCTAssertTrue(delegate.beginEmbeddedHammerspoonExitMonitoring(
+			processIdentifier: 42_424,
+			guardianStatus: .unavailable
+		))
+		XCTAssertEqual(observedProcessIdentifier, 42_424)
+		observedExit?(.signaled(signal: SIGSEGV))
+		wait(for: [crashReported], timeout: 1)
+
+		XCTAssertEqual(cleanTerminationCount, 0)
+		XCTAssertEqual(fatalMessages, [
+			"Embedded Hammerspoon stopped unexpectedly after signal 11. "
+				+ "The independent remap guardian is unavailable; ErgoptiPlus rules remain inert.",
+		])
+	}
+
+	/// Fatal text must describe the exact guardian state exported to Hammerspoon.
+	func testUnexpectedExitDiagnosticReflectsActualGuardianStatus() {
+		let cases: [(RemapGuardianRegistrationStatus, String)] = [
+			(.ready, "The independent remap guardian is enforcing ErgoptiPlus remap revocation."),
+			(.requiresApproval,
+				"The independent remap guardian requires user approval; ErgoptiPlus rules remain inert."),
+			(.unavailable,
+				"The independent remap guardian is unavailable; ErgoptiPlus rules remain inert."),
+			(.notRequested,
+				"The remap guardian is registered by the driver only while Ergopti uses Karabiner."),
+		]
+
+		for (guardianStatus, suffix) in cases {
+			var fatalMessages: [String] = []
+			let delegate = AppDelegate(fatalReporter: { fatalMessages.append($0) })
+			delegate.handleEmbeddedHammerspoonExit(
+				.exited(code: 17),
+				guardianStatus: guardianStatus
+			)
+			XCTAssertEqual(fatalMessages, [
+				"Embedded Hammerspoon stopped unexpectedly with exit code 17. " + suffix,
+			])
+		}
+	}
+
+	/// A deliberate clean Hammerspoon quit after bootstrap keeps the fused lifecycle.
+	func testCleanObservedEmbeddedHammerspoonExitTerminatesLauncherNormally() {
+		var fatalMessages: [String] = []
+		var cleanTerminationCount = 0
+		let loggerWorker = TestLoggerDatagramServer()
+		let delegate = AppDelegate(
+			launcherIdentityReader: { _ in (device: "11", inode: "22") },
+			applicationLauncher: { _, _, _ in },
+			fatalReporter: { fatalMessages.append($0) },
+			applicationTerminator: { _ in cleanTerminationCount += 1 },
+			loggerWorkerFactory: { loggerWorker }
+		)
+
+		delegate.launchHammerspoon(at: testEmbeddedHammerspoonBinary)
+		loggerWorker.reportBootstrapReady()
+		delegate.handleEmbeddedHammerspoonExit(.exited(code: 0), guardianStatus: .ready)
+
+		XCTAssertEqual(cleanTerminationCount, 1)
+		XCTAssertEqual(fatalMessages, [])
+	}
+
+	/// A first-launch clean exit before logger readiness receives one bounded retry.
+	func testPrematureCleanExitRetriesBootstrapExactlyOnce() {
+		var childStartCount = 0
+		var cleanTerminationCount = 0
+		var fatalMessages: [String] = []
+		let loggerWorker = TestLoggerDatagramServer()
+		let delegate = AppDelegate(
+			launcherIdentityReader: { _ in (device: "11", inode: "22") },
+			applicationLauncher: { _, _, _ in childStartCount += 1 },
+			fatalReporter: { fatalMessages.append($0) },
+			applicationTerminator: { _ in cleanTerminationCount += 1 },
+			loggerWorkerFactory: { loggerWorker }
+		)
+
+		delegate.launchHammerspoon(at: testEmbeddedHammerspoonBinary)
+		delegate.handleEmbeddedHammerspoonExit(.exited(code: 0), guardianStatus: .ready)
+
+		XCTAssertEqual(childStartCount, 2)
+		XCTAssertEqual(cleanTerminationCount, 0)
+		XCTAssertEqual(fatalMessages, [])
+
+		delegate.handleEmbeddedHammerspoonExit(.exited(code: 0), guardianStatus: .ready)
+
+		XCTAssertEqual(childStartCount, 2)
+		XCTAssertEqual(cleanTerminationCount, 0)
+		XCTAssertEqual(fatalMessages, [
+			"Embedded Hammerspoon stopped unexpectedly with exit code 0. "
+				+ "The independent remap guardian is enforcing ErgoptiPlus remap revocation.",
+		])
+	}
+
+	/// A refused log folder is named instead of a bare exit code, without the
+	/// bootstrap retry that could only fail the same way (symlinked-config-dir).
+	func testRefusedLogFolderIsNamedAndNotRetried() {
+		var childStartCount = 0
+		var fatalMessages: [String] = []
+		let loggerWorker = TestLoggerDatagramServer()
+		let delegate = AppDelegate(
+			launcherIdentityReader: { _ in (device: "11", inode: "22") },
+			applicationLauncher: { _, _, _ in childStartCount += 1 },
+			fatalReporter: { fatalMessages.append($0) },
+			applicationTerminator: { _ in },
+			loggerWorkerFactory: { loggerWorker }
+		)
+		let failure = LogDirectoryFailure(
+			path: "/Users/u/.config/ergopti_plus/hammerspoon/logs",
+			refusal: .danglingSymlink(link: "/Users/u/.config/ergopti_plus/hammerspoon/logs")
+		)
+
+		delegate.launchHammerspoon(at: testEmbeddedHammerspoonBinary)
+		loggerWorker.reportConfigureRefusal(failure)
+		delegate.handleEmbeddedHammerspoonExit(.exited(code: 0), guardianStatus: .unavailable)
+
+		XCTAssertEqual(childStartCount, 1)
+		XCTAssertEqual(fatalMessages, ["Log folder refused: \(failure.diagnostic)."])
+		XCTAssertTrue(fatalMessages[0].contains("symbolic link whose target does not exist"))
+	}
+
+	/// Refusing the kernel status owner cannot silently downgrade to a clean exit.
+	func testExitMonitorSetupFailureIsFatal() {
+		var fatalMessages: [String] = []
+		let delegate = AppDelegate(
+			fatalReporter: { fatalMessages.append($0) },
+			processExitMonitorFactory: { _, _ in nil }
+		)
+
+		XCTAssertFalse(delegate.beginEmbeddedHammerspoonExitMonitoring(
+			processIdentifier: 42_424,
+			guardianStatus: .ready
+		))
+		XCTAssertEqual(fatalMessages, [
+			"Embedded Hammerspoon exit-status monitoring could not attach to process 42424.",
+		])
+	}
+
+	/// AppKit teardown revokes the exact kernel monitor before terminating the child.
+	func testApplicationTerminationCancelsOwnedExitMonitor() {
+		var observedExit: ((EmbeddedProcessExit) -> Void)?
+		let monitor = TestEmbeddedProcessExitMonitor()
+		let staleTerminal = expectation(description: "cancelled monitor stays silent")
+		staleTerminal.isInverted = true
+		let delegate = AppDelegate(
+			fatalReporter: { _ in staleTerminal.fulfill() },
+			applicationTerminator: { _ in staleTerminal.fulfill() },
+			processExitMonitorFactory: { _, completion in
+				observedExit = completion
+				return monitor
+			}
+		)
+		XCTAssertTrue(delegate.beginEmbeddedHammerspoonExitMonitoring(
+			processIdentifier: 42_424,
+			guardianStatus: .ready
+		))
+
+		delegate.applicationWillTerminate(Notification(name: Notification.Name(
+			"test-exit-monitor-termination"
+		)))
+		observedExit?(.signaled(signal: SIGSEGV))
+
+		XCTAssertEqual(monitor.cancelCount, 1)
+		wait(for: [staleTerminal], timeout: 0.05)
+	}
+
+
+
+
+
+	// ============================================
+	// ============================================
+	// ======= 2/ Fatal Lua Aborts ================
+	// ============================================
+	// ============================================
+
+	/// Creates a private report path whose folder is removed after the test.
+	private func temporaryFatalReportStore() throws -> EmbeddedFatalReportStore {
+		let folder = FileManager.default.temporaryDirectory
+			.appendingPathComponent("ergopti-fatal-report-\(UUID().uuidString)")
+		try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+		addTeardownBlock { try? FileManager.default.removeItem(at: folder) }
+		return EmbeddedFatalReportStore(path: folder.appendingPathComponent("hammerspoon-fatal.txt").path)
+	}
+
+	/// Hammerspoon reports status 0 after Lua os.exit(n). Once the logger was
+	/// configured, v0.0.0-dev.128 took that for a Quit and vanished silently
+	/// (silent-boot-abort): a report left by the child must win.
+	func testFatalReportAfterLoggerReadinessIsShownInsteadOfQuitting() throws {
+		let store = try temporaryFatalReportStore()
+		var fatalMessages: [String] = []
+		var cleanTerminationCount = 0
+		let loggerWorker = TestLoggerDatagramServer()
+		let delegate = AppDelegate(
+			launcherIdentityReader: { _ in (device: "11", inode: "22") },
+			applicationLauncher: { _, _, _ in },
+			fatalReporter: { fatalMessages.append($0) },
+			applicationTerminator: { _ in cleanTerminationCount += 1 },
+			loggerWorkerFactory: { loggerWorker },
+			fatalReportStore: store
+		)
+
+		delegate.launchHammerspoon(at: testEmbeddedHammerspoonBinary)
+		loggerWorker.reportBootstrapReady()
+		try "kind=boot\nstage=accessibility\nmessage=Allow it.\ndetail=event tap refused\n"
+			.write(toFile: store.path, atomically: true, encoding: .utf8)
+		delegate.handleEmbeddedHammerspoonExit(.exited(code: 0), guardianStatus: .ready)
+
+		XCTAssertEqual(cleanTerminationCount, 0)
+		XCTAssertEqual(fatalMessages, [
+			"Embedded Hammerspoon stopped at boot stage 'accessibility': event tap refused",
+		])
+	}
+
+	/// A component that stops after boot is a runtime failure, not a failed start.
+	func testRuntimeFatalReportIsNotPresentedAsABootFailure() throws {
+		let store = try temporaryFatalReportStore()
+		var fatalMessages: [String] = []
+		let loggerWorker = TestLoggerDatagramServer()
+		let delegate = AppDelegate(
+			launcherIdentityReader: { _ in (device: "11", inode: "22") },
+			applicationLauncher: { _, _, _ in },
+			fatalReporter: { fatalMessages.append($0) },
+			applicationTerminator: { _ in XCTFail("a runtime fatal report is not a Quit") },
+			loggerWorkerFactory: { loggerWorker },
+			fatalReportStore: store
+		)
+
+		delegate.launchHammerspoon(at: testEmbeddedHammerspoonBinary)
+		loggerWorker.reportBootstrapReady()
+		try ("kind=runtime\nstage=native_logger\nmessage=Stopped.\ndetail=no ACK\n"
+			+ "log=/L/today.log\n")
+			.write(toFile: store.path, atomically: true, encoding: .utf8)
+		delegate.handleEmbeddedHammerspoonExit(.exited(code: 0), guardianStatus: .ready)
+
+		XCTAssertEqual(fatalMessages, [
+			"Embedded Hammerspoon stopped at runtime in component 'native_logger': no ACK",
+		])
+	}
+
+	/// A report from an earlier launch is removed before the child starts, and
+	/// the child learns where to write its own report and launcher.log line.
+	func testLaunchClearsStaleFatalReportAndExportsBothChannels() throws {
+		let store = try temporaryFatalReportStore()
+		try "stage=old\n".write(toFile: store.path, atomically: true, encoding: .utf8)
+		var childEnvironment: [String: String] = [:]
+		let loggerWorker = TestLoggerDatagramServer()
+		let delegate = AppDelegate(
+			launcherIdentityReader: { _ in (device: "11", inode: "22") },
+			applicationLauncher: { _, configuration, _ in
+				childEnvironment = configuration.environment
+			},
+			loggerWorkerFactory: { loggerWorker },
+			fatalReportStore: store
+		)
+
+		delegate.launchHammerspoon(at: testEmbeddedHammerspoonBinary)
+
+		XCTAssertFalse(FileManager.default.fileExists(atPath: store.path))
+		XCTAssertEqual(childEnvironment[kFatalReportEnvironment], store.path)
+		XCTAssertEqual(childEnvironment[kLauncherLogEnvironment], LauncherLog.filePath)
+		XCTAssertTrue(LauncherLog.filePath.hasSuffix("/Library/Logs/ergopti_plus/launcher.log"))
+	}
+
+	/// The app no longer ships Ollama, so the child gets no bundled path to
+	/// trust: the Lua resolver finds an installed Ollama on its own.
+	func testLaunchExportsNoBundledOllamaPath() throws {
+		let store = try temporaryFatalReportStore()
+		var childEnvironment: [String: String] = [:]
+		let loggerWorker = TestLoggerDatagramServer()
+		let delegate = AppDelegate(
+			launcherIdentityReader: { _ in (device: "11", inode: "22") },
+			applicationLauncher: { _, configuration, _ in
+				childEnvironment = configuration.environment
+			},
+			loggerWorkerFactory: { loggerWorker },
+			fatalReportStore: store
+		)
+
+		delegate.launchHammerspoon(at: testEmbeddedHammerspoonBinary)
+
+		XCTAssertNotNil(childEnvironment["ERGOPTI_CONFIG_DIR"])
+		XCTAssertNil(childEnvironment["ERGOPTI_OLLAMA_BIN"])
+		XCTAssertFalse(childEnvironment.values.contains { $0.contains("/Resources/Tools/Ollama") })
+	}
+
+	/// The startup trail names every exported key but never logs the token value.
+	func testStartupTrailListsExportedKeyNamesWithoutValues() {
+		let environment = launcherChildEnvironment(
+			base: ["PATH": "/usr/bin"],
+			launcherPid: 42,
+			launcherBundleId: "com.ergoptiplus.app",
+			loggerEndpoint: LoggerDatagramEndpoint(port: 4242, token: "secret-token-value")
+		)
+		let summary = launcherEnvironmentKeySummary(environment)
+		XCTAssertEqual(summary, [
+			"ERGOPTI_LAUNCHER_BUNDLE_ID", "ERGOPTI_LAUNCHER_PID",
+			kLoggerDatagramPortEnvironment, kLoggerDatagramTokenEnvironment,
+		].sorted().joined(separator: ", "))
+		XCTAssertFalse(summary.contains("secret-token-value"))
+		XCTAssertFalse(summary.contains("PATH"))
+		XCTAssertEqual(launcherEnvironmentKeySummary([:]), "none")
+	}
+
+	/// Exit descriptions stay identical in the trail and in the fatal alert.
+	func testExitDescriptionsNameCodeSignalAndErrno() {
+		XCTAssertEqual(embeddedProcessExitDescription(.exited(code: 0)), "with exit code 0")
+		XCTAssertEqual(embeddedProcessExitDescription(.signaled(signal: 9)), "after signal 9")
+		XCTAssertEqual(
+			embeddedProcessExitDescription(.unavailable(errorCode: 3)),
+			"with unavailable exit status (errno 3)"
+		)
+	}
+
+	/// Without a report, a clean exit after readiness is still the user's Quit.
+	func testCleanExitWithoutFatalReportStillQuits() throws {
+		let store = try temporaryFatalReportStore()
+		var fatalMessages: [String] = []
+		var cleanTerminationCount = 0
+		let loggerWorker = TestLoggerDatagramServer()
+		let delegate = AppDelegate(
+			launcherIdentityReader: { _ in (device: "11", inode: "22") },
+			applicationLauncher: { _, _, _ in },
+			fatalReporter: { fatalMessages.append($0) },
+			applicationTerminator: { _ in cleanTerminationCount += 1 },
+			loggerWorkerFactory: { loggerWorker },
+			fatalReportStore: store
+		)
+
+		delegate.launchHammerspoon(at: testEmbeddedHammerspoonBinary)
+		loggerWorker.reportBootstrapReady()
+		delegate.handleEmbeddedHammerspoonExit(.exited(code: 0), guardianStatus: .ready)
+
+		XCTAssertEqual(cleanTerminationCount, 1)
+		XCTAssertEqual(fatalMessages, [])
+	}
+
+	/// The actual launch owner must pass its freshly captured native map to the child.
+	func testActualLaunchPublishesNativeKeyboardGeometry() throws {
+		let store = try temporaryFatalReportStore()
+		let loggerWorker = TestLoggerDatagramServer()
+		var environment: [String: String] = [:]
+		let delegate = AppDelegate(
+			launcherIdentityReader: { _ in (device: "11", inode: "22") },
+			applicationLauncher: { _, configuration, _ in environment = configuration.environment },
+			loggerWorkerFactory: { loggerWorker },
+			fatalReportStore: store
+		)
+		delegate.launchHammerspoon(at: testEmbeddedHammerspoonBinary)
+		let published = try XCTUnwrap(environment[kKeyboardGeometryEnvironment])
+		let direct = try KeyboardGeometryMap.capture()
+		XCTAssertEqual(published, direct.environmentValue)
+	}
+}

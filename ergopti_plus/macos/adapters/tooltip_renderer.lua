@@ -1,0 +1,148 @@
+--- adapters/tooltip_renderer.lua
+
+--- ==============================================================================
+--- MODULE: TooltipRenderer Adapter (Hammerspoon)
+--- DESCRIPTION:
+--- Hammerspoon implementation of the TooltipRenderer port contract defined in
+--- static/ergopti_plus/_shared/core/ports/TooltipRenderer.spec.js. Wraps the existing
+--- ui/tooltip/ subsystem (renderer.lua + config.lua) behind the four canonical
+--- port methods (show, hide, isVisible, updateElement) so domain modules can
+--- control tooltip display without a direct dependency on hs.canvas.
+---
+--- FEATURES & RATIONALE:
+--- 1. Delegation model: this adapter is a thin facade over the tooltip subsystem
+---    that already exists under ui/tooltip/. No rendering logic lives here —
+---    the adapter only translates the port contract into existing function calls.
+--- 2. show() accepts the draw_calls IR payload and delegates to the appropriate
+---    tooltip display function. Since the full draw_calls IR is not yet consumed
+---    by the existing renderer, show() uses the payload's first text draw call
+---    as the primary content.
+--- 3. updateElement() delegates to renderer.set_element_text() for streaming
+---    partial updates (e.g., LLM token streaming).
+--- ==============================================================================
+
+local M = {}
+
+local Logger = require("infra.logger")
+
+local LOG = "adapters.tooltip_renderer"
+
+-- Tooltip sub-modules loaded lazily so the adapter can be required before the
+-- canvas is ready (e.g., at module definition time in production init.lua).
+local _renderer = nil
+local _tooltip  = nil
+
+
+
+
+
+-- =========================================
+-- =========================================
+-- ======= 1/ Lazy Dependency Loader =======
+-- =========================================
+-- =========================================
+
+local function _ensure_deps()
+	if _renderer and _tooltip then return true end
+	local ok_r, r = pcall(require, "ui.tooltip.renderer")
+	if not ok_r then
+		Logger.error(LOG, "_ensure_deps(): cannot load ui.tooltip.renderer — %s", tostring(r))
+		return false
+	end
+	local ok_t, t = pcall(require, "ui.tooltip")
+	if not ok_t then
+		Logger.error(LOG, "_ensure_deps(): cannot load ui.tooltip — %s", tostring(t))
+		return false
+	end
+	_renderer = r
+	_tooltip  = t
+	return true
+end
+
+
+-- =========================================
+-- =========================================
+-- ======= 2/ Adapter Methods ==============
+-- =========================================
+-- =========================================
+
+--- Renders or updates the tooltip.
+--- @param payload table { draw_calls, position, duration_sec }
+function M.show(payload)
+	if not _ensure_deps() then return end
+	local options = type(payload) == "table" and payload or {}
+	local cleanup
+	local ok, err = pcall(function()
+		cleanup = _tooltip.capture_cleanup()
+		assert(type(cleanup) == "function", "tooltip cleanup capability is unavailable")
+		local content = nil
+		for _, draw_call in ipairs(options.draw_calls or {}) do
+			if type(draw_call) == "table" and draw_call.type == "text" then
+				content = draw_call.styled or draw_call.text
+				if content ~= nil then break end
+			end
+		end
+		if content == nil then
+			error("payload contains no renderable text draw call")
+		end
+		if options.duration_sec ~= nil and type(_tooltip.set_timeout) == "function" then
+			_tooltip.set_timeout(options.duration_sec)
+		end
+		if _tooltip.show(content, false, true) ~= true then
+			error("tooltip subsystem refused the render")
+		end
+	end)
+	if not ok then
+		if type(cleanup) == "function" then pcall(cleanup) end
+		Logger.error(LOG, "show(): rendering failed — %s", tostring(err))
+	end
+end
+
+--- Removes the tooltip from the screen immediately.
+--- @param opts table|nil { forced?: boolean } Bypass queued-row guards when requested.
+function M.hide(...)
+	if not _ensure_deps() then return end
+	local opts = select(1, ...)
+	local forced = type(opts) == "table" and opts.forced == true
+	pcall(function()
+		if forced and type(_tooltip.hide_forced) == "function" then
+			_tooltip.hide_forced()
+		else
+			_tooltip.hide()
+		end
+	end)
+end
+
+--- Returns true if the tooltip is currently visible.
+--- @return boolean
+function M.isVisible()
+	if not _ensure_deps() then return false end
+	local ok, result = pcall(function() return _tooltip.is_visible() end)
+	return ok and result == true
+end
+
+--- Replaces a single draw call by its stable id (streaming partial update).
+--- Falls back to a full show() re-render if the element cannot be targeted.
+--- @param draw_call table The replacement draw call ({ id, type, … }).
+function M.updateElement(draw_call)
+	if not _ensure_deps() then return end
+	if type(draw_call) ~= "table" then return end
+
+	-- Map draw call id to a renderer element index for targeted updates.
+	local DRAW_CALL_TO_ELEM = {
+		preds      = _renderer.ELEM_PREDS,
+		info       = _renderer.ELEM_INFO,
+	}
+	local elem_index = draw_call.id and DRAW_CALL_TO_ELEM[draw_call.id]
+	if elem_index and draw_call.text then
+		pcall(function()
+			local styled = type(draw_call.text) == "string"
+				and hs.styledtext.new(draw_call.text, {})
+				or draw_call.text
+			_renderer.set_element_text(elem_index, styled)
+		end)
+	end
+	-- No full re-render needed — the element update is targeted.
+end
+
+return M

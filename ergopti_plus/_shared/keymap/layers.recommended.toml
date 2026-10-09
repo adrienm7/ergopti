@@ -1,0 +1,134 @@
+# _shared/keymap/layers.recommended.toml
+#
+# Ergopti's recommended navigation layer, as data. It is the preset the
+# first-run wizard and "Restore recommended values" import into the user's
+# layers.toml; it is never applied on its own. An absent or empty layers.toml
+# means no layer remapping at all.
+#
+# Same schema as the user's layers.toml: [_meta].schema_version, then one table
+# per layer and per scope — `all` for every OS, `windows` / `macos` / `linux`
+# for entries that differ, an OS entry replacing the `all` entry for that key.
+# Keys are W3C KeyboardEvent.code identifiers from
+# _shared/data/keycodes/physical_keys.json, written quoted because they are
+# data, not setting names. Values follow the grammar in layer_actions.toml.
+#
+# The `all` table reproduces key for key the Windows layer as it was written by
+# hand before the drivers generated it from layer files, frozen in
+# windows/tests/fixtures/nav_layer_golden.json;
+# tools/test/test-nav-layer-recommended-golden.cjs fails on any difference. The
+# number row, Space and Tab mean different things on each OS, so they live in
+# the OS tables: a repeat count on Windows, F1-F12, Spotlight and window
+# cycling on macOS, nothing on Linux. macOS also keeps Escape on the right
+# Command key, which sits where the right Alt key sits on a PC board. The wheel
+# is volume on Windows and macOS; the Linux layer cannot intercept wheel input
+# ([source_kinds.wheel] in layer_actions.toml), so it is no `all` entry.
+#
+# The layer id is the value a tap-hold key's hold_layer names
+# (_shared/tap_hold/defaults.toml [tap_hold.hold_picker].layers).
+
+
+
+
+
+# =======================
+# =======================
+# ======= 1. Meta =======
+# =======================
+# =======================
+
+[_meta]
+schema_version = 1
+
+
+
+
+
+# ===================================
+# ===================================
+# ======= 2. Navigation layer =======
+# ===================================
+# ===================================
+
+[layers.nav.all]
+# Left hand, top row: document bounds and F2.
+"KeyQ" = "sel_doc_start"
+"KeyW" = "doc_start"
+"KeyE" = "doc_end"
+"KeyR" = "sel_doc_end"
+"KeyT" = "keystroke:F2"
+# Left hand, home row: Backspace, lines and paragraphs, F12.
+"CapsLock" = "backspace"
+"KeyA" = "sel_para_prev"
+"KeyS" = "arrow_up"
+"KeyD" = "arrow_down"
+"KeyF" = "sel_para_next"
+"KeyG" = "keystroke:F12"
+# Left hand, bottom row: line editing.
+"IntlBackslash" = "duplicate_line_up"
+"KeyZ" = "move_line_up"
+"KeyX" = "move_line_down"
+"KeyC" = "duplicate_line_down"
+"KeyV" = "new_line_below"
+# Right hand, top row: selection by character, word and line.
+"KeyY" = "sel_line_start"
+"KeyU" = "sel_word_prev"
+"KeyI" = "sel_left"
+"KeyO" = "sel_right"
+"KeyP" = "sel_word_next"
+"BracketLeft" = "sel_line_end"
+# Right hand, home row: movement by character and word, window to a monitor.
+"KeyH" = "window_to_monitor_left"
+"KeyJ" = "word_prev"
+"KeyK" = "arrow_left"
+"KeyL" = "arrow_right"
+"Semicolon" = "word_next"
+"Quote" = "window_to_monitor_right"
+# Right hand, bottom row: line bounds and window placement.
+"KeyN" = "maximize"
+"KeyM" = "line_start"
+"Comma" = "snap_left"
+"Period" = "snap_right"
+"Slash" = "line_end"
+# Thumb.
+"AltRight" = "escape"
+
+[layers.nav.windows]
+# The wheel: volume instead of scroll.
+"WheelUp" = "vol_up"
+"WheelDown" = "vol_down"
+# The number row: how many times the next repeatable action runs.
+"Digit1" = "repeat_count:1"
+"Digit2" = "repeat_count:2"
+"Digit3" = "repeat_count:3"
+"Digit4" = "repeat_count:4"
+"Digit5" = "repeat_count:5"
+"Digit6" = "repeat_count:6"
+"Digit7" = "repeat_count:7"
+"Digit8" = "repeat_count:8"
+"Digit9" = "repeat_count:9"
+"Digit0" = "repeat_count:10"
+
+# The Karabiner generator (macos/platform/remap/nav_layer.lua) sends every F1-F12
+# keystroke with Fn added while macOS treats the top row as media keys, so the
+# number row reaches the function keys in either mode. The right Command key is
+# Escape on a tap and Option+Shift while held. Hammerspoon, not Karabiner, runs
+# the wheel.
+[layers.nav.macos]
+# The wheel: volume instead of scroll.
+"WheelUp" = "vol_up"
+"WheelDown" = "vol_down"
+"Digit1" = "keystroke:F1"
+"Digit2" = "keystroke:F2"
+"Digit3" = "keystroke:F3"
+"Digit4" = "keystroke:F4"
+"Digit5" = "keystroke:F5"
+"Digit6" = "keystroke:F6"
+"Digit7" = "keystroke:F7"
+"Digit8" = "keystroke:F8"
+"Digit9" = "keystroke:F9"
+"Digit0" = "keystroke:F10"
+"Minus" = "keystroke:F11"
+"Equal" = "keystroke:F12"
+"Space" = "spotlight"
+"Tab" = "keystroke:meta+Backquote"
+"MetaRight" = "escape_or_option_shift"

@@ -1,0 +1,302 @@
+{
+	"_comment": "Cross-driver update-channel vectors, written by hand against channels.json. Every port replays this file: the JavaScript matcher (_shared/ui/update_channels.js, tools/test/test-update-channels-contract.cjs), the Lua port (_shared/lua/updater/channels.lua, one test per Lua driver) and the AHK port (windows/modules/updater/channels.ahk, tests/unit/test_updater_channel_registry.ahk). An empty string means no channel: the shared Lua JSON decoder turns a JSON null into a non-nil sentinel, so the shared data never uses null. tag: channel_for_tag(tag) must return channel. resolve: resolve(value) maps a persisted value or an alias to a channel id (exact and case-sensitive). visible: whether a release tag is listed in the Versions view of a channel (its own tags and those of every more stable channel). offer: should_offer(latest, current, selected, installed); a switch to another channel offers that channel's latest release even when semver orders it lower. pick: the tag pick_latest returns among tags, by semver order within the channel, first occurrence on a tie. newer_elsewhere: newer_elsewhere(releases, selected, installed) lists, in registry order, every channel other than the checked one whose latest release (pick rule) was published strictly after the installed build; the installed build's publish time is that of the first listed release of the same version, and a build that is not listed, or listed without a valid time, predates the whole list. A publish time is valid only as GitHub writes it (YYYY-MM-DDTHH:MM:SSZ, UTC), so text order is time order; a channel whose latest release has no valid time is left out.",
+	"tag": [
+		{ "id": "stable_plain", "tag": "v1.2.3", "channel": "main" },
+		{ "id": "stable_without_v", "tag": "1.2.3", "channel": "main" },
+		{ "id": "stable_upper_v", "tag": "V1.2.3", "channel": "main" },
+		{ "id": "stable_padded", "tag": " v2.10.0 ", "channel": "main" },
+		{ "id": "stable_zero", "tag": "v0.0.0", "channel": "main" },
+		{ "id": "dev_first", "tag": "v0.0.0-dev.1", "channel": "dev" },
+		{ "id": "dev_current", "tag": "v0.0.0-dev.133", "channel": "dev" },
+		{ "id": "dev_without_v", "tag": "0.0.0-dev.42", "channel": "dev" },
+		{ "id": "dev_counter_zero", "tag": "v0.0.0-dev.0", "channel": "" },
+		{ "id": "dev_counter_leading_zero", "tag": "v0.0.0-dev.01", "channel": "" },
+		{ "id": "dev_without_counter", "tag": "v0.0.0-dev", "channel": "" },
+		{ "id": "dev_extra_identifier", "tag": "v0.0.0-dev.5.1", "channel": "" },
+		{ "id": "dev_counter_not_numeric", "tag": "v0.0.0-dev.x", "channel": "" },
+		{ "id": "dev_label_on_stable_core", "tag": "v1.2.3-dev.4", "channel": "" },
+		{ "id": "dev_label_uppercase", "tag": "v0.0.0-DEV.4", "channel": "" },
+		{ "id": "unknown_prerelease_label", "tag": "v1.2.3-beta.1", "channel": "" },
+		{ "id": "empty_prerelease", "tag": "v1.2.3-", "channel": "" },
+		{ "id": "build_metadata", "tag": "v1.2.3+build.5", "channel": "" },
+		{ "id": "leading_zero_core", "tag": "v01.2.3", "channel": "" },
+		{ "id": "two_part_core", "tag": "v1.2", "channel": "" },
+		{ "id": "double_v", "tag": "vv1.2.3", "channel": "" },
+		{ "id": "word", "tag": "latest", "channel": "" },
+		{ "id": "local_build", "tag": "local", "channel": "" },
+		{ "id": "empty", "tag": "", "channel": "" }
+	],
+	"resolve": [
+		{ "id": "main_id", "value": "main", "expect": "main" },
+		{ "id": "dev_id", "value": "dev", "expect": "dev" },
+		{ "id": "stable_alias", "value": "stable", "expect": "main" },
+		{ "id": "case_sensitive", "value": "Main", "expect": "" },
+		{ "id": "not_trimmed", "value": " main", "expect": "" },
+		{ "id": "unknown", "value": "beta", "expect": "" },
+		{ "id": "empty", "value": "", "expect": "" }
+	],
+	"visible": [
+		{ "id": "main_lists_stable", "view": "main", "tag": "v1.2.3", "expect": true },
+		{ "id": "main_hides_dev", "view": "main", "tag": "v0.0.0-dev.5", "expect": false },
+		{ "id": "dev_lists_dev", "view": "dev", "tag": "v0.0.0-dev.5", "expect": true },
+		{ "id": "dev_lists_stable", "view": "dev", "tag": "v1.2.3", "expect": true },
+		{ "id": "dev_hides_foreign_family", "view": "dev", "tag": "v1.2.3-beta.1", "expect": false },
+		{ "id": "main_hides_garbage", "view": "main", "tag": "nightly", "expect": false },
+		{ "id": "unknown_view", "view": "beta", "tag": "v1.2.3", "expect": false }
+	],
+	"offer": [
+		{
+			"id": "same_channel_newer",
+			"latest": "v1.3.0",
+			"current": "1.2.0",
+			"selected": "main",
+			"installed": "main",
+			"expect": true
+		},
+		{
+			"id": "same_channel_equal",
+			"latest": "v1.2.0",
+			"current": "1.2.0",
+			"selected": "main",
+			"installed": "main",
+			"expect": false
+		},
+		{
+			"id": "same_channel_older",
+			"latest": "v1.1.9",
+			"current": "1.2.0",
+			"selected": "main",
+			"installed": "main",
+			"expect": false
+		},
+		{
+			"id": "dev_newer",
+			"latest": "v0.0.0-dev.134",
+			"current": "0.0.0-dev.133",
+			"selected": "dev",
+			"installed": "dev",
+			"expect": true
+		},
+		{
+			"id": "dev_counter_order",
+			"latest": "v0.0.0-dev.10",
+			"current": "0.0.0-dev.9",
+			"selected": "dev",
+			"installed": "dev",
+			"expect": true
+		},
+		{
+			"id": "dev_older",
+			"latest": "v0.0.0-dev.132",
+			"current": "0.0.0-dev.133",
+			"selected": "dev",
+			"installed": "dev",
+			"expect": false
+		},
+		{
+			"id": "switch_main_to_dev",
+			"latest": "v0.0.0-dev.10",
+			"current": "1.2.0",
+			"selected": "dev",
+			"installed": "main",
+			"expect": true
+		},
+		{
+			"id": "switch_dev_to_main",
+			"latest": "v1.0.0",
+			"current": "0.0.0-dev.133",
+			"selected": "main",
+			"installed": "dev",
+			"expect": true
+		},
+		{
+			"id": "candidate_outside_selected",
+			"latest": "v0.0.0-dev.200",
+			"current": "0.0.0-dev.133",
+			"selected": "main",
+			"installed": "dev",
+			"expect": false
+		},
+		{
+			"id": "unknown_installed",
+			"latest": "v1.3.0",
+			"current": "local",
+			"selected": "main",
+			"installed": "",
+			"expect": false
+		},
+		{
+			"id": "unknown_selected",
+			"latest": "v1.3.0",
+			"current": "1.2.0",
+			"selected": "beta",
+			"installed": "main",
+			"expect": false
+		}
+	],
+	"pick": [
+		{
+			"id": "main_highest_semver",
+			"channel": "main",
+			"tags": ["v0.0.0-dev.5", "v1.2.0", "v1.10.0", "v1.9.9"],
+			"expect": "v1.10.0"
+		},
+		{
+			"id": "dev_counter_not_text",
+			"channel": "dev",
+			"tags": ["v1.2.0", "v0.0.0-dev.9", "v0.0.0-dev.10", "v0.0.0-dev.2"],
+			"expect": "v0.0.0-dev.10"
+		},
+		{
+			"id": "main_without_stable",
+			"channel": "main",
+			"tags": ["v0.0.0-dev.5", "v0.0.0-dev.6"],
+			"expect": ""
+		},
+		{ "id": "dev_empty_list", "channel": "dev", "tags": [], "expect": "" },
+		{ "id": "tie_keeps_first", "channel": "main", "tags": ["1.2.0", "v1.2.0"], "expect": "1.2.0" },
+		{ "id": "unknown_channel", "channel": "beta", "tags": ["v1.2.0"], "expect": "" }
+	],
+	"newer_elsewhere": [
+		{
+			"id": "dev_newer_than_installed_main",
+			"selected": "main",
+			"installed": "v1.2.0",
+			"releases": [
+				{ "tag": "v0.0.0-dev.150", "published_at": "2026-09-20T10:00:00Z" },
+				{ "tag": "v1.2.0", "published_at": "2026-09-01T10:00:00Z" }
+			],
+			"expect": [{ "channel": "dev", "tag": "v0.0.0-dev.150" }]
+		},
+		{
+			"id": "dev_older_than_installed_main",
+			"selected": "main",
+			"installed": "v1.2.0",
+			"releases": [
+				{ "tag": "v1.2.0", "published_at": "2026-09-21T10:00:00Z" },
+				{ "tag": "v0.0.0-dev.150", "published_at": "2026-09-20T10:00:00Z" }
+			],
+			"expect": []
+		},
+		{
+			"id": "main_newer_than_installed_dev",
+			"selected": "dev",
+			"installed": "v0.0.0-dev.140",
+			"releases": [
+				{ "tag": "v1.0.0", "published_at": "2026-09-15T08:30:00Z" },
+				{ "tag": "v0.0.0-dev.140", "published_at": "2026-09-10T08:30:00Z" }
+			],
+			"expect": [{ "channel": "main", "tag": "v1.0.0" }]
+		},
+		{
+			"id": "checked_channel_is_never_listed",
+			"selected": "dev",
+			"installed": "v0.0.0-dev.140",
+			"releases": [
+				{ "tag": "v0.0.0-dev.141", "published_at": "2026-09-11T08:30:00Z" },
+				{ "tag": "v0.0.0-dev.140", "published_at": "2026-09-10T08:30:00Z" }
+			],
+			"expect": []
+		},
+		{
+			"id": "channel_latest_is_its_highest_semver",
+			"selected": "main",
+			"installed": "1.2.0",
+			"releases": [
+				{ "tag": "v0.0.0-dev.9", "published_at": "2026-09-25T00:00:00Z" },
+				{ "tag": "v0.0.0-dev.10", "published_at": "2026-09-19T00:00:00Z" },
+				{ "tag": "v1.2.0", "published_at": "2026-09-18T00:00:00Z" }
+			],
+			"expect": [{ "channel": "dev", "tag": "v0.0.0-dev.10" }]
+		},
+		{
+			"id": "channel_latest_older_than_installed_hides_channel",
+			"selected": "main",
+			"installed": "v1.2.0",
+			"releases": [
+				{ "tag": "v0.0.0-dev.9", "published_at": "2026-09-25T00:00:00Z" },
+				{ "tag": "v1.2.0", "published_at": "2026-09-18T00:00:00Z" },
+				{ "tag": "v0.0.0-dev.10", "published_at": "2026-09-17T00:00:00Z" }
+			],
+			"expect": []
+		},
+		{
+			"id": "same_publish_time_is_not_newer",
+			"selected": "main",
+			"installed": "v1.2.0",
+			"releases": [
+				{ "tag": "v0.0.0-dev.150", "published_at": "2026-09-20T10:00:00Z" },
+				{ "tag": "v1.2.0", "published_at": "2026-09-20T10:00:00Z" }
+			],
+			"expect": []
+		},
+		{
+			"id": "installed_not_listed_predates_the_list",
+			"selected": "main",
+			"installed": "v1.0.0",
+			"releases": [
+				{ "tag": "v0.0.0-dev.150", "published_at": "2026-09-20T10:00:00Z" },
+				{ "tag": "v1.2.0", "published_at": "2026-09-01T10:00:00Z" }
+			],
+			"expect": [{ "channel": "dev", "tag": "v0.0.0-dev.150" }]
+		},
+		{
+			"id": "unreleased_build_predates_the_list",
+			"selected": "dev",
+			"installed": "local",
+			"releases": [
+				{ "tag": "v0.0.0-dev.150", "published_at": "2026-09-20T10:00:00Z" },
+				{ "tag": "v1.2.0", "published_at": "2026-09-01T10:00:00Z" }
+			],
+			"expect": [{ "channel": "main", "tag": "v1.2.0" }]
+		},
+		{
+			"id": "latest_without_publish_time_is_skipped",
+			"selected": "main",
+			"installed": "v1.2.0",
+			"releases": [
+				{ "tag": "v0.0.0-dev.150", "published_at": "" },
+				{ "tag": "v1.2.0", "published_at": "2026-09-01T10:00:00Z" }
+			],
+			"expect": []
+		},
+		{
+			"id": "latest_with_offset_time_is_skipped",
+			"selected": "main",
+			"installed": "v1.2.0",
+			"releases": [
+				{ "tag": "v0.0.0-dev.150", "published_at": "2026-09-20T10:00:00+02:00" },
+				{ "tag": "v1.2.0", "published_at": "2026-09-01T10:00:00Z" }
+			],
+			"expect": []
+		},
+		{
+			"id": "installed_without_publish_time_predates_the_list",
+			"selected": "main",
+			"installed": "v1.2.0",
+			"releases": [
+				{ "tag": "v0.0.0-dev.150", "published_at": "2026-08-20T10:00:00Z" },
+				{ "tag": "v1.2.0", "published_at": "" }
+			],
+			"expect": [{ "channel": "dev", "tag": "v0.0.0-dev.150" }]
+		},
+		{
+			"id": "no_other_channel_release",
+			"selected": "main",
+			"installed": "v1.2.0",
+			"releases": [
+				{ "tag": "v1.3.0", "published_at": "2026-09-20T10:00:00Z" },
+				{ "tag": "v1.2.0", "published_at": "2026-09-01T10:00:00Z" }
+			],
+			"expect": []
+		},
+		{
+			"id": "unknown_selected_channel",
+			"selected": "beta",
+			"installed": "v1.2.0",
+			"releases": [{ "tag": "v0.0.0-dev.150", "published_at": "2026-09-20T10:00:00Z" }],
+			"expect": []
+		},
+		{ "id": "empty_list", "selected": "main", "installed": "v1.2.0", "releases": [], "expect": [] }
+	]
+}

@@ -1,0 +1,122 @@
+--- infra/version.lua
+
+--- ==============================================================================
+--- MODULE: Driver Version (Linux)
+--- DESCRIPTION:
+--- Single owner of the Linux driver's version string. Every surface that shows a
+--- version — the tray menu header, the healthcheck, the boot snapshot, the crash
+--- dump, the updater — reads M.VERSION from here.
+---
+--- FEATURES & RATIONALE:
+--- 1. The release build stamps it. The version used to be a "3.0.0" literal that
+---    no build rewrote, while releases are published as 0.0.0-dev.N and N.N.N:
+---    every installed driver showed a version that never existed, and the
+---    updater compared releases against it. tools/build/write_build_stamp.sh now
+---    writes `version=` next to `commit=` in the shared tree's build stamp,
+---    from the version the workflow's release job resolved.
+--- 2. A source run has no stamp and reports M.LOCAL, the token the macOS driver
+---    and the Linux updater already use for "running from a checkout".
+--- 3. A package without a usable version (a CI test build, a broken stamp)
+---    reports M.UNKNOWN with the reason logged, never a guessed number.
+--- 4. Semver build metadata is dropped by the shared parser, so "+<build>" is
+---    never shown.
+--- 5. The About row's build identity (kind, version, commit) is owned here too,
+---    resolved once per daemon; the commit comes from the diagnostics' single
+---    resolver, so the menu and the healthcheck cannot name different commits.
+--- ==============================================================================
+
+local M = {}
+
+local Logger   = require("logger.shim")
+local Snapshot = require("diagnostics.snapshot")
+local Paths    = require("infra.paths")
+local FileSystem = require("adapters.file_system")
+local VersionLabel = require("updater.version_label")
+
+local LOG = "Version"
+
+-- Version reported by a source checkout, which carries no build stamp.
+M.LOCAL = "local"
+
+-- Version reported by a package whose stamp holds no usable version.
+M.UNKNOWN = Snapshot.UNKNOWN
+
+-- Where M.VERSION came from.
+M.SOURCE_BUILD = "build"
+M.SOURCE_LOCAL = "local"
+M.SOURCE_UNKNOWN = "unknown"
+
+--- Resolves the driver version from the shared tree's build stamp.
+--- @param opts table|nil { fs = { read = fn(path) }, shared_root = string } overrides for tests.
+--- @return string version Release version, M.LOCAL or M.UNKNOWN.
+--- @return string source One of the M.SOURCE_* values.
+function M.resolve(opts)
+	opts = opts or {}
+	local shared_root = opts.shared_root
+	if shared_root == nil then shared_root = Paths.shared_root() end
+	-- Release metadata uses the same native regular-file admission and terminal
+	-- receipts as other reads; a FIFO stamp must never block daemon startup.
+	local version, reason, stamped = Snapshot.build_version(opts.fs or FileSystem, shared_root)
+	if version then return version, M.SOURCE_BUILD end
+	if not stamped and reason == nil then return M.LOCAL, M.SOURCE_LOCAL end
+	Logger.warn(LOG, "Driver version unknown: %s.", tostring(reason))
+	return M.UNKNOWN, M.SOURCE_UNKNOWN
+end
+
+-- Resolved once: the stamp cannot change under a running daemon, and the menu
+-- header reads it on every rebuild.
+M.VERSION, M.SOURCE = M.resolve()
+
+-- The About row's build kind for each version source.
+local KIND_BY_SOURCE = {
+	[M.SOURCE_BUILD] = VersionLabel.KIND_RELEASE,
+	[M.SOURCE_LOCAL] = VersionLabel.KIND_LOCAL,
+	[M.SOURCE_UNKNOWN] = VersionLabel.KIND_UNKNOWN,
+}
+
+--- Resolves the build identity the About menu's version row names: the kind of
+--- build, its version and the commit it was built from. The commit comes from
+--- the one resolver behind the diagnostics (infra/diagnostic_snapshot
+--- resolve_commit): the package build stamp, else the checkout's .git read as
+--- files, never a spawned git. When neither tells, that resolver logs a WARNING
+--- with the reason and the commit stays empty; a resolver that raises is logged
+--- as an ERROR and read the same way, so the About submenu is still drawn.
+--- @param opts table|nil { version, source, commit_opts } overrides for tests.
+--- @return table identity { kind, version, commit }: commit is "" when unknown.
+function M.resolve_identity(opts)
+	opts = opts or {}
+	local source = opts.source or M.SOURCE
+	local kind = KIND_BY_SOURCE[source]
+	if not kind then error("unknown version source '" .. tostring(source) .. "'", 2) end
+	local version = opts.version or M.VERSION
+	-- Required here, not at load: infra.diagnostic_snapshot reads M.VERSION.
+	local ok, commit, commit_source = pcall(function()
+		return require("infra.diagnostic_snapshot").resolve_commit(opts.commit_opts)
+	end)
+	if not ok then
+		Logger.error(LOG, "Build commit resolution raised: %s.", tostring(commit))
+		commit, commit_source = "", Snapshot.COMMIT_SOURCE_UNKNOWN
+	end
+	if commit_source == Snapshot.COMMIT_SOURCE_UNKNOWN then commit = "" end
+	Logger.info(LOG, "Build identity: %s build %s, commit %s (source %s).", kind,
+		tostring(version), commit ~= "" and commit or Snapshot.UNKNOWN, tostring(commit_source))
+	return {
+		kind = kind,
+		version = kind == VersionLabel.KIND_RELEASE and version or "",
+		commit = commit,
+	}
+end
+
+-- Resolved on first use (the boot-time tray build): the commit a running
+-- daemon was built from cannot change under it, and the menu reads it on
+-- every rebuild.
+local _identity = nil
+
+--- The build identity, resolved once per daemon.
+--- @return table identity { kind, version, commit }
+function M.identity()
+	if _identity == nil then _identity = M.resolve_identity() end
+	return _identity
+end
+
+return M

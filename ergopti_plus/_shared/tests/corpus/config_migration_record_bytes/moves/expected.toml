@@ -1,0 +1,23 @@
+# Original order of surviving records remains visible.
+[_meta]
+schema_version = 2
+
+# Independent note below a moved row.
+
+
+
+[target] # existing choice wins
+choice = false # explicit stored choice
+extra = "transferred"
+
+# Future explanation survives deleting its former owned table.
+
+[future]
+unknown = "untouched" # keep byte spacing
+
+[new]
+flag = false
+label = "added"
+
+[new.child]
+label = "owned text"

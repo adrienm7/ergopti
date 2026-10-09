@@ -1,0 +1,6 @@
+# _shared/tests/corpus/config_migrations/invalid_version_refused/case.toml
+
+[case]
+description = "A stamp that is not a positive integer is refused rather than guessed."
+drivers = ["ahk", "hs", "linux"]
+outcome = "invalid"

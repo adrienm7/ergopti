@@ -1,0 +1,662 @@
+{
+	"description": "Golden vectors for the diagnostics page's host actions: what a host accepts from the page and what it refuses, with the stable refusal code it logs. `schema` and `templates` are cut-down copies of _shared/modules/diagnostics/schema.json and issue_templates.json with a small max_export_bytes, so the byte bound is exercised by short texts; text lengths are counted in UTF-8 bytes. `expected` is the normalized action, `error` the refusal code. Replayed by _shared/lua/healthcheck/actions.lua in the macOS and Linux suites and by windows/ui/healthcheck/actions.ahk in the AHK suite.",
+	"schema": {
+		"max_export_bytes": 64,
+		"report": {
+			"subdir": "diagnostics",
+			"name_prefix": "ergopti-diagnostics-",
+			"name_suffix": ".md",
+			"name_max_length": 60,
+			"export_sequence_max": 9007199254740991
+		},
+		"permissions": {
+			"macos": {
+				"accessibility": {
+					"settings": "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility"
+				}
+			},
+			"windows": {},
+			"linux": {
+				"input_devices": {
+					"fix": true
+				}
+			}
+		},
+		"sections": [
+			{
+				"id": "summary",
+				"kind": "summary"
+			},
+			{
+				"id": "paths",
+				"fields": [
+					{
+						"id": "logs_dir",
+						"type": "path"
+					},
+					{
+						"id": "errors_today",
+						"type": "path"
+					},
+					{
+						"id": "launcher_log",
+						"type": "path",
+						"platforms": ["macos"]
+					}
+				]
+			},
+			{
+				"id": "system",
+				"fields": [
+					{
+						"id": "os",
+						"type": "text"
+					}
+				]
+			}
+		]
+	},
+	"templates": {
+		"templates": {
+			"bug": {
+				"file": "bug_report.yml",
+				"title_prefix": "[Bug] ",
+				"fields": ["version", "os", "driver", "diagnostics"],
+				"report_field": "diagnostics"
+			}
+		}
+	},
+	"vectors": [
+		{
+			"id": "copy_ok",
+			"driver": "macos",
+			"message": {
+				"action": "copy",
+				"text": "hello"
+			},
+			"expected": {
+				"action": "copy",
+				"text": "hello"
+			}
+		},
+		{
+			"id": "copy_empty_text",
+			"driver": "linux",
+			"message": {
+				"action": "copy",
+				"text": ""
+			},
+			"error": "bad_text"
+		},
+		{
+			"id": "copy_text_not_a_string",
+			"driver": "windows",
+			"message": {
+				"action": "copy",
+				"text": 42
+			},
+			"error": "bad_text"
+		},
+		{
+			"id": "copy_text_at_the_bound",
+			"driver": "windows",
+			"message": {
+				"action": "copy",
+				"text": "0123456789012345678901234567890123456789012345678901234567890123"
+			},
+			"expected": {
+				"action": "copy",
+				"text": "0123456789012345678901234567890123456789012345678901234567890123"
+			}
+		},
+		{
+			"id": "copy_text_over_the_bound",
+			"driver": "windows",
+			"message": {
+				"action": "copy",
+				"text": "01234567890123456789012345678901234567890123456789012345678901234"
+			},
+			"error": "bad_text"
+		},
+		{
+			"id": "copy_bound_counts_utf8_bytes",
+			"driver": "macos",
+			"message": {
+				"action": "copy",
+				"text": "éééééééééééééééééééééééééééééééééé"
+			},
+			"error": "bad_text"
+		},
+		{
+			"id": "copy_multibyte_within_bound",
+			"driver": "macos",
+			"message": {
+				"action": "copy",
+				"text": "éééééééééééééééééééééééééééééééé"
+			},
+			"expected": {
+				"action": "copy",
+				"text": "éééééééééééééééééééééééééééééééé"
+			}
+		},
+		{
+			"id": "save_ok",
+			"driver": "linux",
+			"message": {
+				"action": "save",
+				"text": "# report",
+				"name": "ergopti-diagnostics-linux-2.1.0-20260924T100000Z.md"
+			},
+			"expected": {
+				"action": "save",
+				"text": "# report",
+				"name": "ergopti-diagnostics-linux-2.1.0-20260924T100000Z.md"
+			}
+		},
+		{
+			"id": "save_name_with_a_slash",
+			"driver": "linux",
+			"message": {
+				"action": "save",
+				"text": "x",
+				"name": "ergopti-diagnostics-../../evil.md"
+			},
+			"error": "bad_name"
+		},
+		{
+			"id": "save_name_with_a_backslash",
+			"driver": "windows",
+			"message": {
+				"action": "save",
+				"text": "x",
+				"name": "ergopti-diagnostics-..\\evil.md"
+			},
+			"error": "bad_name"
+		},
+		{
+			"id": "save_name_with_a_colon",
+			"driver": "windows",
+			"message": {
+				"action": "save",
+				"text": "x",
+				"name": "ergopti-diagnostics-C:evil.md"
+			},
+			"error": "bad_name"
+		},
+		{
+			"id": "save_name_wrong_prefix",
+			"driver": "macos",
+			"message": {
+				"action": "save",
+				"text": "x",
+				"name": "evil-diagnostics-x.md"
+			},
+			"error": "bad_name"
+		},
+		{
+			"id": "save_name_wrong_suffix",
+			"driver": "macos",
+			"message": {
+				"action": "save",
+				"text": "x",
+				"name": "ergopti-diagnostics-x.command"
+			},
+			"error": "bad_name"
+		},
+		{
+			"id": "save_name_without_a_body",
+			"driver": "macos",
+			"message": {
+				"action": "save",
+				"text": "x",
+				"name": "ergopti-diagnostics-.md"
+			},
+			"error": "bad_name"
+		},
+		{
+			"id": "save_name_too_long",
+			"driver": "macos",
+			"message": {
+				"action": "save",
+				"text": "x",
+				"name": "ergopti-diagnostics-0123456789012345678901234567890123456789.md"
+			},
+			"error": "bad_name"
+		},
+		{
+			"id": "save_without_a_name",
+			"driver": "macos",
+			"message": {
+				"action": "save",
+				"text": "x"
+			},
+			"error": "bad_name"
+		},
+		{
+			"id": "report_ok",
+			"driver": "windows",
+			"message": {
+				"action": "report",
+				"text": "# report",
+				"fields": {
+					"version": "2.1.0",
+					"os": "Windows 11",
+					"driver": "windows"
+				}
+			},
+			"expected": {
+				"action": "report",
+				"text": "# report",
+				"fields": {
+					"version": "2.1.0",
+					"os": "Windows 11",
+					"driver": "windows"
+				}
+			}
+		},
+		{
+			"id": "report_ignores_a_file_name",
+			"driver": "macos",
+			"message": {
+				"action": "report",
+				"text": "# report",
+				"name": "report.md",
+				"fields": {
+					"driver": "macos"
+				}
+			},
+			"expected": {
+				"action": "report",
+				"text": "# report",
+				"fields": {
+					"driver": "macos"
+				}
+			}
+		},
+		{
+			"id": "report_field_filled_by_the_host",
+			"driver": "linux",
+			"message": {
+				"action": "report",
+				"text": "# report",
+				"fields": {
+					"diagnostics": "Version: 2.1.0"
+				}
+			},
+			"error": "unknown_field"
+		},
+		{
+			"id": "report_unknown_field",
+			"driver": "windows",
+			"message": {
+				"action": "report",
+				"text": "x",
+				"fields": {
+					"url": "https://example.com"
+				}
+			},
+			"error": "unknown_field"
+		},
+		{
+			"id": "report_fields_not_an_object",
+			"driver": "linux",
+			"message": {
+				"action": "report",
+				"text": "x",
+				"fields": "version"
+			},
+			"error": "bad_fields"
+		},
+		{
+			"id": "report_empty_field",
+			"driver": "linux",
+			"message": {
+				"action": "report",
+				"text": "x",
+				"fields": {
+					"os": ""
+				}
+			},
+			"error": "bad_fields"
+		},
+		{
+			"id": "report_empty_text",
+			"driver": "windows",
+			"message": {
+				"action": "report",
+				"text": "",
+				"fields": {}
+			},
+			"error": "bad_text"
+		},
+		{
+			"id": "open_path_ok",
+			"driver": "windows",
+			"message": {
+				"action": "open_path",
+				"id": "logs_dir"
+			},
+			"expected": {
+				"action": "open_path",
+				"id": "logs_dir"
+			}
+		},
+		{
+			"id": "open_path_platform_field",
+			"driver": "macos",
+			"message": {
+				"action": "open_path",
+				"id": "launcher_log"
+			},
+			"expected": {
+				"action": "open_path",
+				"id": "launcher_log"
+			}
+		},
+		{
+			"id": "open_path_field_of_another_platform",
+			"driver": "windows",
+			"message": {
+				"action": "open_path",
+				"id": "launcher_log"
+			},
+			"error": "unknown_path"
+		},
+		{
+			"id": "open_path_raw_path",
+			"driver": "linux",
+			"message": {
+				"action": "open_path",
+				"id": "/etc/passwd"
+			},
+			"error": "unknown_path"
+		},
+		{
+			"id": "open_path_not_a_path_field",
+			"driver": "linux",
+			"message": {
+				"action": "open_path",
+				"id": "os"
+			},
+			"error": "unknown_path"
+		},
+		{
+			"id": "open_settings_ok",
+			"driver": "macos",
+			"message": {
+				"action": "open_settings",
+				"id": "accessibility"
+			},
+			"expected": {
+				"action": "open_settings",
+				"id": "accessibility",
+				"url": "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility"
+			}
+		},
+		{
+			"id": "open_settings_without_a_page",
+			"driver": "linux",
+			"message": {
+				"action": "open_settings",
+				"id": "input_devices"
+			},
+			"error": "unknown_settings"
+		},
+		{
+			"id": "open_settings_raw_url",
+			"driver": "macos",
+			"message": {
+				"action": "open_settings",
+				"id": "https://example.com"
+			},
+			"error": "unknown_settings"
+		},
+		{
+			"id": "open_settings_on_windows",
+			"driver": "windows",
+			"message": {
+				"action": "open_settings",
+				"id": "accessibility"
+			},
+			"error": "unknown_settings"
+		},
+		{
+			"id": "refresh_default",
+			"driver": "linux",
+			"message": {
+				"action": "refresh"
+			},
+			"expected": {
+				"action": "refresh",
+				"detailed": false,
+				"extensive": false
+			}
+		},
+		{
+			"id": "refresh_detailed",
+			"driver": "windows",
+			"message": {
+				"action": "refresh",
+				"detailed": true
+			},
+			"expected": {
+				"action": "refresh",
+				"detailed": true,
+				"extensive": false
+			}
+		},
+		{
+			"id": "refresh_detailed_not_a_boolean",
+			"driver": "macos",
+			"message": {
+				"action": "refresh",
+				"detailed": "yes"
+			},
+			"error": "bad_detailed"
+		},
+		{
+			"id": "close_ok",
+			"driver": "macos",
+			"message": {
+				"action": "close"
+			},
+			"expected": {
+				"action": "close"
+			}
+		},
+		{
+			"id": "unknown_action",
+			"driver": "linux",
+			"message": {
+				"action": "run",
+				"command": "rm -rf ~"
+			},
+			"error": "unknown_action"
+		},
+		{
+			"id": "missing_action",
+			"driver": "windows",
+			"message": {
+				"text": "x"
+			},
+			"error": "unknown_action"
+		},
+		{
+			"id": "not_a_message",
+			"driver": "macos",
+			"message": "copy",
+			"error": "not_a_message"
+		},
+		{
+			"id": "extensive_true_windows",
+			"driver": "windows",
+			"message": {
+				"action": "refresh",
+				"detailed": false,
+				"extensive": true
+			},
+			"expected": {
+				"action": "refresh",
+				"detailed": false,
+				"extensive": true
+			}
+		},
+		{
+			"id": "extensive_string_refused_windows",
+			"driver": "windows",
+			"message": {
+				"action": "refresh",
+				"extensive": "true"
+			},
+			"error": "bad_extensive"
+		},
+		{
+			"id": "cancel_windows",
+			"driver": "windows",
+			"message": {
+				"action": "cancel"
+			},
+			"expected": {
+				"action": "cancel"
+			}
+		},
+		{
+			"id": "extensive_true_macos",
+			"driver": "macos",
+			"message": {
+				"action": "refresh",
+				"detailed": false,
+				"extensive": true
+			},
+			"expected": {
+				"action": "refresh",
+				"detailed": false,
+				"extensive": true
+			}
+		},
+		{
+			"id": "extensive_string_refused_macos",
+			"driver": "macos",
+			"message": {
+				"action": "refresh",
+				"extensive": "true"
+			},
+			"error": "bad_extensive"
+		},
+		{
+			"id": "cancel_macos",
+			"driver": "macos",
+			"message": {
+				"action": "cancel"
+			},
+			"expected": {
+				"action": "cancel"
+			}
+		},
+		{
+			"id": "extensive_true_linux",
+			"driver": "linux",
+			"message": {
+				"action": "refresh",
+				"detailed": false,
+				"extensive": true
+			},
+			"expected": {
+				"action": "refresh",
+				"detailed": false,
+				"extensive": true
+			}
+		},
+		{
+			"id": "extensive_string_refused_linux",
+			"driver": "linux",
+			"message": {
+				"action": "refresh",
+				"extensive": "true"
+			},
+			"error": "bad_extensive"
+		},
+		{
+			"id": "cancel_linux",
+			"driver": "linux",
+			"message": {
+				"action": "cancel"
+			},
+			"expected": {
+				"action": "cancel"
+			}
+		},
+		{
+			"id": "export_snapshot_windows",
+			"driver": "windows",
+			"message": {
+				"action": "export_snapshot",
+				"export_sequence": 3
+			},
+			"expected": {
+				"action": "export_snapshot",
+				"export_sequence": 3
+			}
+		},
+		{
+			"id": "export_snapshot_string_windows",
+			"driver": "windows",
+			"message": {
+				"action": "export_snapshot",
+				"export_sequence": "3"
+			},
+			"error": "bad_export_sequence"
+		},
+		{
+			"id": "export_snapshot_macos",
+			"driver": "macos",
+			"message": {
+				"action": "export_snapshot",
+				"export_sequence": 3
+			},
+			"expected": {
+				"action": "export_snapshot",
+				"export_sequence": 3
+			}
+		},
+		{
+			"id": "export_snapshot_string_macos",
+			"driver": "macos",
+			"message": {
+				"action": "export_snapshot",
+				"export_sequence": "3"
+			},
+			"error": "bad_export_sequence"
+		},
+		{
+			"id": "export_snapshot_linux",
+			"driver": "linux",
+			"message": {
+				"action": "export_snapshot",
+				"export_sequence": 3
+			},
+			"expected": {
+				"action": "export_snapshot",
+				"export_sequence": 3
+			}
+		},
+		{
+			"id": "export_snapshot_string_linux",
+			"driver": "linux",
+			"message": {
+				"action": "export_snapshot",
+				"export_sequence": "3"
+			},
+			"error": "bad_export_sequence"
+		},
+		{
+			"id": "export_sequence_above_shared_max",
+			"driver": "windows",
+			"message": {
+				"action": "export_snapshot",
+				"export_sequence": 9007199254740992
+			},
+			"error": "bad_export_sequence"
+		}
+	]
+}

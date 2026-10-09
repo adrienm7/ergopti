@@ -1,0 +1,39 @@
+{
+	"description": "The four script-management chords every driver offers under « Raccourcis de gestion du script »: AltGr (Windows, Linux) or the right Option key (macOS) with Enter, Backspace, Delete (fn+Delete on a Mac keyboard without the key) or Escape. Each slot is the features manifest entry shortcuts.script_control.<id>, which holds its preset and its default. `ahk` is the AutoHotkey scan code (windows/infra/feature_state.ahk SCRIPT_SHORTCUT_SCAN_CODES), `hs` the macOS keycode of the key and `karabiner` the Karabiner key the sentinel rule reads, `linux` the evdev keycode. `paused_actions` are the only actions a chord runs while the driver is paused. Pinned on the three drivers by tools/test/test-script-chords-three-os.cjs.",
+	"slots": [
+		{
+			"id": "script_altgr_enter",
+			"ahk": "SC01C",
+			"hs": 36,
+			"karabiner": "return_or_enter",
+			"linux": 28
+		},
+		{
+			"id": "script_altgr_backspace",
+			"ahk": "SC00E",
+			"hs": 51,
+			"karabiner": "delete_or_backspace",
+			"linux": 14
+		},
+		{
+			"id": "script_altgr_delete",
+			"ahk": "SC153",
+			"hs": 117,
+			"karabiner": "delete_forward",
+			"linux": 111
+		},
+		{
+			"id": "script_altgr_escape",
+			"ahk": "SC001",
+			"hs": 53,
+			"karabiner": "escape",
+			"linux": 1
+		}
+	],
+	"paused_actions": [
+		"script_pause_toggle",
+		"script_reload",
+		"script_quit",
+		"open_personal_shortcuts"
+	]
+}

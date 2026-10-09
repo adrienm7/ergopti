@@ -1,0 +1,5 @@
+# Independent inline ancestor occupancy.
+[hotstrings.editor]
+shortcut = { mods = ["ctrl"], key = "d" } # preserve source
+[shortcuts]
+keyboard = { magic_editor = "none", future = false } # preserve owner

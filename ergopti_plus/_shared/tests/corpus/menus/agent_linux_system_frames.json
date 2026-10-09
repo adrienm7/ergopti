@@ -1,0 +1,526 @@
+{
+	"provenance": "Independently frozen from prior physical locale values and original scalar substitution before writing any candidate source or generator output. Native model/provider inputs are literal values, not expectation data rendered by the candidate.",
+	"model": "Native% & {1}",
+	"spec": "cerebras|Native% & {1}",
+	"provider_literal": "Provider% & {1}",
+	"sections": {
+		"backend": "agent_linux_system_backend_record",
+		"children": "agent_linux_system_children",
+		"system1": "agent_linux_system1_frame",
+		"system2": "agent_linux_system2_frame"
+	},
+	"locales": {
+		"ar": {
+			"off": "معطّل",
+			"local": "محلي (Ollama)",
+			"model": "النموذج… (Native% & {1})",
+			"model_empty": "النموذج… ()",
+			"installed": "النموذج… (Native% & {1}، مثبّت)",
+			"missing": "النموذج… (Native% & {1}، غير مثبّت)",
+			"systems": {
+				"system1": {
+					"off": "⚡ النظام 1 (سريع): معطّل",
+					"local": "⚡ النظام 1 (سريع): محلي (Ollama)",
+					"remote": "⚡ النظام 1 (سريع): Cerebras",
+					"native_literal": "⚡ النظام 1 (سريع): Provider% & {1}"
+				},
+				"system2": {
+					"off": "🧠 النظام 2 (متأنٍّ): معطّل",
+					"local": "🧠 النظام 2 (متأنٍّ): محلي (Ollama)",
+					"remote": "🧠 النظام 2 (متأنٍّ): Cerebras",
+					"native_literal": "🧠 النظام 2 (متأنٍّ): Provider% & {1}"
+				}
+			},
+			"windows_native_model": "النموذج… (Native% && {1})"
+		},
+		"cs": {
+			"off": "Vypnuto",
+			"local": "Místní (Ollama)",
+			"model": "Model… (Native% & {1})",
+			"model_empty": "Model… ()",
+			"installed": "Model… (Native% & {1}, nainstalován)",
+			"missing": "Model… (Native% & {1}, není nainstalován)",
+			"systems": {
+				"system1": {
+					"off": "⚡ Systém 1 (rychlý): Vypnuto",
+					"local": "⚡ Systém 1 (rychlý): Místní (Ollama)",
+					"remote": "⚡ Systém 1 (rychlý): Cerebras",
+					"native_literal": "⚡ Systém 1 (rychlý): Provider% & {1}"
+				},
+				"system2": {
+					"off": "🧠 Systém 2 (důkladný): Vypnuto",
+					"local": "🧠 Systém 2 (důkladný): Místní (Ollama)",
+					"remote": "🧠 Systém 2 (důkladný): Cerebras",
+					"native_literal": "🧠 Systém 2 (důkladný): Provider% & {1}"
+				}
+			},
+			"windows_native_model": "Model… (Native% && {1})"
+		},
+		"da": {
+			"off": "Slået fra",
+			"local": "Lokal (Ollama)",
+			"model": "Model… (Native% & {1})",
+			"model_empty": "Model… ()",
+			"installed": "Model… (Native% & {1}, installeret)",
+			"missing": "Model… (Native% & {1}, ikke installeret)",
+			"systems": {
+				"system1": {
+					"off": "⚡ System 1 (hurtigt): Slået fra",
+					"local": "⚡ System 1 (hurtigt): Lokal (Ollama)",
+					"remote": "⚡ System 1 (hurtigt): Cerebras",
+					"native_literal": "⚡ System 1 (hurtigt): Provider% & {1}"
+				},
+				"system2": {
+					"off": "🧠 System 2 (grundigt): Slået fra",
+					"local": "🧠 System 2 (grundigt): Lokal (Ollama)",
+					"remote": "🧠 System 2 (grundigt): Cerebras",
+					"native_literal": "🧠 System 2 (grundigt): Provider% & {1}"
+				}
+			},
+			"windows_native_model": "Model… (Native% && {1})"
+		},
+		"de": {
+			"off": "Aus",
+			"local": "Lokal (Ollama)",
+			"model": "Modell… (Native% & {1})",
+			"model_empty": "Modell… ()",
+			"installed": "Modell… (Native% & {1}, installiert)",
+			"missing": "Modell… (Native% & {1}, nicht installiert)",
+			"systems": {
+				"system1": {
+					"off": "⚡ System 1 (schnell): Aus",
+					"local": "⚡ System 1 (schnell): Lokal (Ollama)",
+					"remote": "⚡ System 1 (schnell): Cerebras",
+					"native_literal": "⚡ System 1 (schnell): Provider% & {1}"
+				},
+				"system2": {
+					"off": "🧠 System 2 (gründlich): Aus",
+					"local": "🧠 System 2 (gründlich): Lokal (Ollama)",
+					"remote": "🧠 System 2 (gründlich): Cerebras",
+					"native_literal": "🧠 System 2 (gründlich): Provider% & {1}"
+				}
+			},
+			"windows_native_model": "Modell… (Native% && {1})"
+		},
+		"en": {
+			"off": "Off",
+			"local": "Local (Ollama)",
+			"model": "Model… (Native% & {1})",
+			"model_empty": "Model… ()",
+			"installed": "Model… (Native% & {1}, installed)",
+			"missing": "Model… (Native% & {1}, not installed)",
+			"systems": {
+				"system1": {
+					"off": "⚡ System 1 (fast): Off",
+					"local": "⚡ System 1 (fast): Local (Ollama)",
+					"remote": "⚡ System 1 (fast): Cerebras",
+					"native_literal": "⚡ System 1 (fast): Provider% & {1}"
+				},
+				"system2": {
+					"off": "🧠 System 2 (thorough): Off",
+					"local": "🧠 System 2 (thorough): Local (Ollama)",
+					"remote": "🧠 System 2 (thorough): Cerebras",
+					"native_literal": "🧠 System 2 (thorough): Provider% & {1}"
+				}
+			},
+			"windows_native_model": "Model… (Native% && {1})"
+		},
+		"es": {
+			"off": "Desactivado",
+			"local": "Local (Ollama)",
+			"model": "Modelo… (Native% & {1})",
+			"model_empty": "Modelo… ()",
+			"installed": "Modelo… (Native% & {1}, instalado)",
+			"missing": "Modelo… (Native% & {1}, no instalado)",
+			"systems": {
+				"system1": {
+					"off": "⚡ Sistema 1 (rápido): Desactivado",
+					"local": "⚡ Sistema 1 (rápido): Local (Ollama)",
+					"remote": "⚡ Sistema 1 (rápido): Cerebras",
+					"native_literal": "⚡ Sistema 1 (rápido): Provider% & {1}"
+				},
+				"system2": {
+					"off": "🧠 Sistema 2 (reflexivo): Desactivado",
+					"local": "🧠 Sistema 2 (reflexivo): Local (Ollama)",
+					"remote": "🧠 Sistema 2 (reflexivo): Cerebras",
+					"native_literal": "🧠 Sistema 2 (reflexivo): Provider% & {1}"
+				}
+			},
+			"windows_native_model": "Modelo… (Native% && {1})"
+		},
+		"fr": {
+			"off": "Désactivé",
+			"local": "Local (Ollama)",
+			"model": "Modèle… (Native% & {1})",
+			"model_empty": "Modèle… ()",
+			"installed": "Modèle… (Native% & {1}, installé)",
+			"missing": "Modèle… (Native% & {1}, non installé)",
+			"systems": {
+				"system1": {
+					"off": "⚡ Système 1 (rapide) : Désactivé",
+					"local": "⚡ Système 1 (rapide) : Local (Ollama)",
+					"remote": "⚡ Système 1 (rapide) : Cerebras",
+					"native_literal": "⚡ Système 1 (rapide) : Provider% & {1}"
+				},
+				"system2": {
+					"off": "🧠 Système 2 (réfléchi) : Désactivé",
+					"local": "🧠 Système 2 (réfléchi) : Local (Ollama)",
+					"remote": "🧠 Système 2 (réfléchi) : Cerebras",
+					"native_literal": "🧠 Système 2 (réfléchi) : Provider% & {1}"
+				}
+			},
+			"windows_native_model": "Modèle… (Native% && {1})"
+		},
+		"he": {
+			"off": "כבוי",
+			"local": "מקומי (Ollama)",
+			"model": "מודל… (Native% & {1})",
+			"model_empty": "מודל… ()",
+			"installed": "מודל… (Native% & {1}, מותקן)",
+			"missing": "מודל… (Native% & {1}, לא מותקן)",
+			"systems": {
+				"system1": {
+					"off": "⚡ מערכת 1 (מהירה): כבוי",
+					"local": "⚡ מערכת 1 (מהירה): מקומי (Ollama)",
+					"remote": "⚡ מערכת 1 (מהירה): Cerebras",
+					"native_literal": "⚡ מערכת 1 (מהירה): Provider% & {1}"
+				},
+				"system2": {
+					"off": "🧠 מערכת 2 (מעמיקה): כבוי",
+					"local": "🧠 מערכת 2 (מעמיקה): מקומי (Ollama)",
+					"remote": "🧠 מערכת 2 (מעמיקה): Cerebras",
+					"native_literal": "🧠 מערכת 2 (מעמיקה): Provider% & {1}"
+				}
+			},
+			"windows_native_model": "מודל… (Native% && {1})"
+		},
+		"hi": {
+			"off": "बंद",
+			"local": "स्थानीय (Ollama)",
+			"model": "मॉडल… (Native% & {1})",
+			"model_empty": "मॉडल… ()",
+			"installed": "मॉडल… (Native% & {1}, इंस्टॉल है)",
+			"missing": "मॉडल… (Native% & {1}, इंस्टॉल नहीं है)",
+			"systems": {
+				"system1": {
+					"off": "⚡ सिस्टम 1 (तेज़): बंद",
+					"local": "⚡ सिस्टम 1 (तेज़): स्थानीय (Ollama)",
+					"remote": "⚡ सिस्टम 1 (तेज़): Cerebras",
+					"native_literal": "⚡ सिस्टम 1 (तेज़): Provider% & {1}"
+				},
+				"system2": {
+					"off": "🧠 सिस्टम 2 (विचारशील): बंद",
+					"local": "🧠 सिस्टम 2 (विचारशील): स्थानीय (Ollama)",
+					"remote": "🧠 सिस्टम 2 (विचारशील): Cerebras",
+					"native_literal": "🧠 सिस्टम 2 (विचारशील): Provider% & {1}"
+				}
+			},
+			"windows_native_model": "मॉडल… (Native% && {1})"
+		},
+		"it": {
+			"off": "Disattivato",
+			"local": "Locale (Ollama)",
+			"model": "Modello… (Native% & {1})",
+			"model_empty": "Modello… ()",
+			"installed": "Modello… (Native% & {1}, installato)",
+			"missing": "Modello… (Native% & {1}, non installato)",
+			"systems": {
+				"system1": {
+					"off": "⚡ Sistema 1 (veloce): Disattivato",
+					"local": "⚡ Sistema 1 (veloce): Locale (Ollama)",
+					"remote": "⚡ Sistema 1 (veloce): Cerebras",
+					"native_literal": "⚡ Sistema 1 (veloce): Provider% & {1}"
+				},
+				"system2": {
+					"off": "🧠 Sistema 2 (ponderato): Disattivato",
+					"local": "🧠 Sistema 2 (ponderato): Locale (Ollama)",
+					"remote": "🧠 Sistema 2 (ponderato): Cerebras",
+					"native_literal": "🧠 Sistema 2 (ponderato): Provider% & {1}"
+				}
+			},
+			"windows_native_model": "Modello… (Native% && {1})"
+		},
+		"ja": {
+			"off": "オフ",
+			"local": "ローカル (Ollama)",
+			"model": "モデル…（Native% & {1}）",
+			"model_empty": "モデル…（）",
+			"installed": "モデル…（Native% & {1}、インストール済み）",
+			"missing": "モデル…（Native% & {1}、未インストール）",
+			"systems": {
+				"system1": {
+					"off": "⚡ システム1（高速）：オフ",
+					"local": "⚡ システム1（高速）：ローカル (Ollama)",
+					"remote": "⚡ システム1（高速）：Cerebras",
+					"native_literal": "⚡ システム1（高速）：Provider% & {1}"
+				},
+				"system2": {
+					"off": "🧠 システム2（熟考）：オフ",
+					"local": "🧠 システム2（熟考）：ローカル (Ollama)",
+					"remote": "🧠 システム2（熟考）：Cerebras",
+					"native_literal": "🧠 システム2（熟考）：Provider% & {1}"
+				}
+			},
+			"windows_native_model": "モデル…（Native% && {1}）"
+		},
+		"ko": {
+			"off": "꺼짐",
+			"local": "로컬 (Ollama)",
+			"model": "모델… (Native% & {1})",
+			"model_empty": "모델… ()",
+			"installed": "모델… (Native% & {1}, 설치됨)",
+			"missing": "모델… (Native% & {1}, 설치되지 않음)",
+			"systems": {
+				"system1": {
+					"off": "⚡ 시스템 1 (빠름): 꺼짐",
+					"local": "⚡ 시스템 1 (빠름): 로컬 (Ollama)",
+					"remote": "⚡ 시스템 1 (빠름): Cerebras",
+					"native_literal": "⚡ 시스템 1 (빠름): Provider% & {1}"
+				},
+				"system2": {
+					"off": "🧠 시스템 2 (신중함): 꺼짐",
+					"local": "🧠 시스템 2 (신중함): 로컬 (Ollama)",
+					"remote": "🧠 시스템 2 (신중함): Cerebras",
+					"native_literal": "🧠 시스템 2 (신중함): Provider% & {1}"
+				}
+			},
+			"windows_native_model": "모델… (Native% && {1})"
+		},
+		"nl": {
+			"off": "Uit",
+			"local": "Lokaal (Ollama)",
+			"model": "Model… (Native% & {1})",
+			"model_empty": "Model… ()",
+			"installed": "Model… (Native% & {1}, geïnstalleerd)",
+			"missing": "Model… (Native% & {1}, niet geïnstalleerd)",
+			"systems": {
+				"system1": {
+					"off": "⚡ Systeem 1 (snel): Uit",
+					"local": "⚡ Systeem 1 (snel): Lokaal (Ollama)",
+					"remote": "⚡ Systeem 1 (snel): Cerebras",
+					"native_literal": "⚡ Systeem 1 (snel): Provider% & {1}"
+				},
+				"system2": {
+					"off": "🧠 Systeem 2 (grondig): Uit",
+					"local": "🧠 Systeem 2 (grondig): Lokaal (Ollama)",
+					"remote": "🧠 Systeem 2 (grondig): Cerebras",
+					"native_literal": "🧠 Systeem 2 (grondig): Provider% & {1}"
+				}
+			},
+			"windows_native_model": "Model… (Native% && {1})"
+		},
+		"no": {
+			"off": "Av",
+			"local": "Lokal (Ollama)",
+			"model": "Modell… (Native% & {1})",
+			"model_empty": "Modell… ()",
+			"installed": "Modell… (Native% & {1}, installert)",
+			"missing": "Modell… (Native% & {1}, ikke installert)",
+			"systems": {
+				"system1": {
+					"off": "⚡ System 1 (raskt): Av",
+					"local": "⚡ System 1 (raskt): Lokal (Ollama)",
+					"remote": "⚡ System 1 (raskt): Cerebras",
+					"native_literal": "⚡ System 1 (raskt): Provider% & {1}"
+				},
+				"system2": {
+					"off": "🧠 System 2 (grundig): Av",
+					"local": "🧠 System 2 (grundig): Lokal (Ollama)",
+					"remote": "🧠 System 2 (grundig): Cerebras",
+					"native_literal": "🧠 System 2 (grundig): Provider% & {1}"
+				}
+			},
+			"windows_native_model": "Modell… (Native% && {1})"
+		},
+		"pl": {
+			"off": "Wyłączony",
+			"local": "Lokalny (Ollama)",
+			"model": "Model… (Native% & {1})",
+			"model_empty": "Model… ()",
+			"installed": "Model… (Native% & {1}, zainstalowany)",
+			"missing": "Model… (Native% & {1}, niezainstalowany)",
+			"systems": {
+				"system1": {
+					"off": "⚡ System 1 (szybki): Wyłączony",
+					"local": "⚡ System 1 (szybki): Lokalny (Ollama)",
+					"remote": "⚡ System 1 (szybki): Cerebras",
+					"native_literal": "⚡ System 1 (szybki): Provider% & {1}"
+				},
+				"system2": {
+					"off": "🧠 System 2 (dokładny): Wyłączony",
+					"local": "🧠 System 2 (dokładny): Lokalny (Ollama)",
+					"remote": "🧠 System 2 (dokładny): Cerebras",
+					"native_literal": "🧠 System 2 (dokładny): Provider% & {1}"
+				}
+			},
+			"windows_native_model": "Model… (Native% && {1})"
+		},
+		"pt": {
+			"off": "Desativado",
+			"local": "Local (Ollama)",
+			"model": "Modelo… (Native% & {1})",
+			"model_empty": "Modelo… ()",
+			"installed": "Modelo… (Native% & {1}, instalado)",
+			"missing": "Modelo… (Native% & {1}, não instalado)",
+			"systems": {
+				"system1": {
+					"off": "⚡ Sistema 1 (rápido): Desativado",
+					"local": "⚡ Sistema 1 (rápido): Local (Ollama)",
+					"remote": "⚡ Sistema 1 (rápido): Cerebras",
+					"native_literal": "⚡ Sistema 1 (rápido): Provider% & {1}"
+				},
+				"system2": {
+					"off": "🧠 Sistema 2 (ponderado): Desativado",
+					"local": "🧠 Sistema 2 (ponderado): Local (Ollama)",
+					"remote": "🧠 Sistema 2 (ponderado): Cerebras",
+					"native_literal": "🧠 Sistema 2 (ponderado): Provider% & {1}"
+				}
+			},
+			"windows_native_model": "Modelo… (Native% && {1})"
+		},
+		"ru": {
+			"off": "Выключено",
+			"local": "Локально (Ollama)",
+			"model": "Модель… (Native% & {1})",
+			"model_empty": "Модель… ()",
+			"installed": "Модель… (Native% & {1}, установлена)",
+			"missing": "Модель… (Native% & {1}, не установлена)",
+			"systems": {
+				"system1": {
+					"off": "⚡ Система 1 (быстрая): Выключено",
+					"local": "⚡ Система 1 (быстрая): Локально (Ollama)",
+					"remote": "⚡ Система 1 (быстрая): Cerebras",
+					"native_literal": "⚡ Система 1 (быстрая): Provider% & {1}"
+				},
+				"system2": {
+					"off": "🧠 Система 2 (вдумчивая): Выключено",
+					"local": "🧠 Система 2 (вдумчивая): Локально (Ollama)",
+					"remote": "🧠 Система 2 (вдумчивая): Cerebras",
+					"native_literal": "🧠 Система 2 (вдумчивая): Provider% & {1}"
+				}
+			},
+			"windows_native_model": "Модель… (Native% && {1})"
+		},
+		"sv": {
+			"off": "Av",
+			"local": "Lokal (Ollama)",
+			"model": "Modell… (Native% & {1})",
+			"model_empty": "Modell… ()",
+			"installed": "Modell… (Native% & {1}, installerad)",
+			"missing": "Modell… (Native% & {1}, inte installerad)",
+			"systems": {
+				"system1": {
+					"off": "⚡ System 1 (snabbt): Av",
+					"local": "⚡ System 1 (snabbt): Lokal (Ollama)",
+					"remote": "⚡ System 1 (snabbt): Cerebras",
+					"native_literal": "⚡ System 1 (snabbt): Provider% & {1}"
+				},
+				"system2": {
+					"off": "🧠 System 2 (eftertänksamt): Av",
+					"local": "🧠 System 2 (eftertänksamt): Lokal (Ollama)",
+					"remote": "🧠 System 2 (eftertänksamt): Cerebras",
+					"native_literal": "🧠 System 2 (eftertänksamt): Provider% & {1}"
+				}
+			},
+			"windows_native_model": "Modell… (Native% && {1})"
+		},
+		"tr": {
+			"off": "Kapalı",
+			"local": "Yerel (Ollama)",
+			"model": "Model… (Native% & {1})",
+			"model_empty": "Model… ()",
+			"installed": "Model… (Native% & {1}, yüklü)",
+			"missing": "Model… (Native% & {1}, yüklü değil)",
+			"systems": {
+				"system1": {
+					"off": "⚡ Sistem 1 (hızlı): Kapalı",
+					"local": "⚡ Sistem 1 (hızlı): Yerel (Ollama)",
+					"remote": "⚡ Sistem 1 (hızlı): Cerebras",
+					"native_literal": "⚡ Sistem 1 (hızlı): Provider% & {1}"
+				},
+				"system2": {
+					"off": "🧠 Sistem 2 (düşünceli): Kapalı",
+					"local": "🧠 Sistem 2 (düşünceli): Yerel (Ollama)",
+					"remote": "🧠 Sistem 2 (düşünceli): Cerebras",
+					"native_literal": "🧠 Sistem 2 (düşünceli): Provider% & {1}"
+				}
+			},
+			"windows_native_model": "Model… (Native% && {1})"
+		},
+		"uk": {
+			"off": "Вимкнено",
+			"local": "Локально (Ollama)",
+			"model": "Модель… (Native% & {1})",
+			"model_empty": "Модель… ()",
+			"installed": "Модель… (Native% & {1}, встановлено)",
+			"missing": "Модель… (Native% & {1}, не встановлено)",
+			"systems": {
+				"system1": {
+					"off": "⚡ Система 1 (швидка): Вимкнено",
+					"local": "⚡ Система 1 (швидка): Локально (Ollama)",
+					"remote": "⚡ Система 1 (швидка): Cerebras",
+					"native_literal": "⚡ Система 1 (швидка): Provider% & {1}"
+				},
+				"system2": {
+					"off": "🧠 Система 2 (вдумлива): Вимкнено",
+					"local": "🧠 Система 2 (вдумлива): Локально (Ollama)",
+					"remote": "🧠 Система 2 (вдумлива): Cerebras",
+					"native_literal": "🧠 Система 2 (вдумлива): Provider% & {1}"
+				}
+			},
+			"windows_native_model": "Модель… (Native% && {1})"
+		},
+		"zh": {
+			"off": "关闭",
+			"local": "本地 (Ollama)",
+			"model": "模型…（Native% & {1}）",
+			"model_empty": "模型…（）",
+			"installed": "模型…（Native% & {1}，已安装）",
+			"missing": "模型…（Native% & {1}，未安装）",
+			"systems": {
+				"system1": {
+					"off": "⚡ 系统 1（快速）：关闭",
+					"local": "⚡ 系统 1（快速）：本地 (Ollama)",
+					"remote": "⚡ 系统 1（快速）：Cerebras",
+					"native_literal": "⚡ 系统 1（快速）：Provider% & {1}"
+				},
+				"system2": {
+					"off": "🧠 系统 2（深思）：关闭",
+					"local": "🧠 系统 2（深思）：本地 (Ollama)",
+					"remote": "🧠 系统 2（深思）：Cerebras",
+					"native_literal": "🧠 系统 2（深思）：Provider% & {1}"
+				}
+			},
+			"windows_native_model": "模型…（Native% && {1}）"
+		}
+	},
+	"prior_locale_sha256": {
+		"ar": "a1669afbc1ebd21db88bf90aeca7f2cc455b4072d879ef6d5b18cfe809b88630",
+		"cs": "f2255d91da513ae4a077ecbb8ab296d3168113e8743c3945136a29f27b923aca",
+		"da": "298d4ca0d827b27a92cf3a9f3b0760d2e8885a4a31de41d58b56bdec21aaeaa3",
+		"de": "4cef2f0c83a6a3a9b1a8377cde721309b1ca77be029aa8a9720236d10bc57488",
+		"en": "e740ee35d6c879394821fd658dfa1e0f67be97a41b0bb0cf06adc072fc604417",
+		"es": "b4299d76b88935e3642426776001ae415454bd68c65539fec7f0ca96db202aba",
+		"fr": "c8e94e0d67d63da9729dcc33c282a2ce6b34884e0833dc0ec882b24982cfb01b",
+		"he": "32bd44775bd88fbbabf4851c81943deb1b92b26edda8c1393bb4989bb11e527d",
+		"hi": "a61c1272d272046ad53fffe55fb8a51a728a90f9499108971613209c5a5cf598",
+		"it": "e2a0951cd6e2d6100c2bb72b6e5347b999c58ec2b9267edb029fe77f1fb778ce",
+		"ja": "84efcfe2ebe6110005b01b21b112b0186e9d35a7184cafb93f8b177e53cb3743",
+		"ko": "f9487c83b8ee324754880e8024ed65b3323aea78009057fe256b853efb68f312",
+		"nl": "a5b0baccf7fa7d1d70f245ec2f7d778eef4cfe34d90edeff7a8450382540d293",
+		"no": "07b975b5e03e60a4777d4cce54ebd91d46fd71cc229b9c448caad5c2b9f13dd2",
+		"pl": "7eaae4c9d3782e6d779be52f57b48e939883159a0a28de19c13b186455d90581",
+		"pt": "7a3baaa9fef12992a672390cc2def512122892481ff537f445db3ba2d7c72d02",
+		"ru": "524e86c95a8b8a608a722d607667e9ed01b0c38c282ba475aebc13b7a2a12468",
+		"sv": "023ff9b10340d5280801809d31e90aef7f7281af24283a939664bdf1f80580e3",
+		"tr": "c27b62792acf8f15694704d7a57cf638a52e01ff0ba770c225dc0b1a29d862f9",
+		"uk": "d98d37b6693e8288236179b556db8fbf3b28e722c87bac58276db0fedfc19f74",
+		"zh": "71fabbdeb68f12c2aa0119b96ba29601b1e1c9bfd39907bc3123caff935e12cc"
+	},
+	"windows_encoding_provenance": {
+		"owner": "windows/infra/manifest_menu.ahk",
+		"preexisting_literal_rule": "Label := StrReplace(Label, \"&\", \"&&\")",
+		"owner_sha256": "309382c1f94664704b49ca265ae99dfb0d3e2f6d7a4aad57c52d0724dd1c35ae",
+		"source": "Original frozen physical-caption corpus, encoded by the unchanged preexisting native menu metasyntax rule; no candidate formatter used."
+	}
+}

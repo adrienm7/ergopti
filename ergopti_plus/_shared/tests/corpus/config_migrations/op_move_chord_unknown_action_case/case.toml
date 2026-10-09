@@ -1,0 +1,7 @@
+[case]
+description = "Known action spelling is exact and preserves unknown case variants."
+drivers = ["ahk", "hs", "linux"]
+outcome = "migrated"
+from_version = 1
+to_version = 2
+preserve_source = true

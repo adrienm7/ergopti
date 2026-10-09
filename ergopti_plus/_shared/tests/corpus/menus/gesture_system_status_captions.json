@@ -1,0 +1,236 @@
+{
+	"source_head": "33a5227ea0546aaf1333c7e4819860b516477d3b",
+	"captions": {
+		"da": {
+			"unknown": "Systembevægelser: ikke kontrolleret",
+			"clear": "✓ Systembevægelser: ingen konflikter",
+			"conflicts_two": "⚠ 2 mulige konflikter",
+			"pinch_enabled": "Systemets knibebevægelse : Aktiveret",
+			"pinch_disabled": "Systemets knibebevægelse : Deaktiveret",
+			"pinch_unknown": "Systemets knibebevægelse : Systembevægelser: ikke kontrolleret",
+			"slot_unknown": "Independent Slot — Systembevægelser: ikke kontrolleret",
+			"slot_configured": "Independent Slot — Konfigureret til ErgoptiPlus",
+			"slot_not_configured": "Independent Slot — Ikke konfigureret til ErgoptiPlus"
+		},
+		"de": {
+			"unknown": "Systemgesten: nicht überprüft",
+			"clear": "✓ Systemgesten: keine Konflikte",
+			"conflicts_two": "⚠ 2 mögliche Konflikte",
+			"pinch_enabled": "Systemgeste zum Zusammenziehen : Aktiviert",
+			"pinch_disabled": "Systemgeste zum Zusammenziehen : Deaktiviert",
+			"pinch_unknown": "Systemgeste zum Zusammenziehen : Systemgesten: nicht überprüft",
+			"slot_unknown": "Independent Slot — Systemgesten: nicht überprüft",
+			"slot_configured": "Independent Slot — Für ErgoptiPlus konfiguriert",
+			"slot_not_configured": "Independent Slot — Nicht für ErgoptiPlus konfiguriert"
+		},
+		"en": {
+			"unknown": "System gestures: unverified",
+			"clear": "✓ System gestures: no conflicts",
+			"conflicts_two": "⚠ 2 potential conflict(s)",
+			"pinch_enabled": "System pinch gesture : Enabled",
+			"pinch_disabled": "System pinch gesture : Disabled",
+			"pinch_unknown": "System pinch gesture : System gestures: unverified",
+			"slot_unknown": "Independent Slot — System gestures: unverified",
+			"slot_configured": "Independent Slot — Configured for ErgoptiPlus",
+			"slot_not_configured": "Independent Slot — Not configured for ErgoptiPlus"
+		},
+		"es": {
+			"unknown": "Gestos del sistema: sin verificar",
+			"clear": "✓ Gestos del sistema: sin conflictos",
+			"conflicts_two": "⚠ 2 posibles conflictos",
+			"pinch_enabled": "Gesto de pellizco del sistema : Activado",
+			"pinch_disabled": "Gesto de pellizco del sistema : Desactivado",
+			"pinch_unknown": "Gesto de pellizco del sistema : Gestos del sistema: sin verificar",
+			"slot_unknown": "Independent Slot — Gestos del sistema: sin verificar",
+			"slot_configured": "Independent Slot — Configurado para ErgoptiPlus",
+			"slot_not_configured": "Independent Slot — No configurado para ErgoptiPlus"
+		},
+		"fr": {
+			"unknown": "Gestes système : non vérifiés",
+			"clear": "✓ Gestes système : aucun conflit",
+			"conflicts_two": "⚠ 2 conflit(s) potentiel(s)",
+			"pinch_enabled": "Pincement système : Activé",
+			"pinch_disabled": "Pincement système : Désactivé",
+			"pinch_unknown": "Pincement système : Gestes système : non vérifiés",
+			"slot_unknown": "Independent Slot — Gestes système : non vérifiés",
+			"slot_configured": "Independent Slot — Configuré pour ErgoptiPlus",
+			"slot_not_configured": "Independent Slot — Non configuré pour ErgoptiPlus"
+		},
+		"it": {
+			"unknown": "Gesti di sistema: non verificati",
+			"clear": "✓ Gesti di sistema: nessun conflitto",
+			"conflicts_two": "⚠ 2 possibili conflitti",
+			"pinch_enabled": "Gesto di pizzicamento del sistema : Attivo",
+			"pinch_disabled": "Gesto di pizzicamento del sistema : Disabilitato",
+			"pinch_unknown": "Gesto di pizzicamento del sistema : Gesti di sistema: non verificati",
+			"slot_unknown": "Independent Slot — Gesti di sistema: non verificati",
+			"slot_configured": "Independent Slot — Configurato per ErgoptiPlus",
+			"slot_not_configured": "Independent Slot — Non configurato per ErgoptiPlus"
+		},
+		"nl": {
+			"unknown": "Systeemgebaren: niet gecontroleerd",
+			"clear": "✓ Systeemgebaren: geen conflicten",
+			"conflicts_two": "⚠ 2 mogelijke conflicten",
+			"pinch_enabled": "Knijpgebaar van het systeem : Ingeschakeld",
+			"pinch_disabled": "Knijpgebaar van het systeem : Uitgeschakeld",
+			"pinch_unknown": "Knijpgebaar van het systeem : Systeemgebaren: niet gecontroleerd",
+			"slot_unknown": "Independent Slot — Systeemgebaren: niet gecontroleerd",
+			"slot_configured": "Independent Slot — Geconfigureerd voor ErgoptiPlus",
+			"slot_not_configured": "Independent Slot — Niet geconfigureerd voor ErgoptiPlus"
+		},
+		"no": {
+			"unknown": "Systembevegelser: ikke kontrollert",
+			"clear": "✓ Systembevegelser: ingen konflikter",
+			"conflicts_two": "⚠ 2 mulige konflikter",
+			"pinch_enabled": "Systemets klypebevegelse : Aktivert",
+			"pinch_disabled": "Systemets klypebevegelse : Deaktivert",
+			"pinch_unknown": "Systemets klypebevegelse : Systembevegelser: ikke kontrollert",
+			"slot_unknown": "Independent Slot — Systembevegelser: ikke kontrollert",
+			"slot_configured": "Independent Slot — Konfigurert for ErgoptiPlus",
+			"slot_not_configured": "Independent Slot — Ikke konfigurert for ErgoptiPlus"
+		},
+		"pl": {
+			"unknown": "Gesty systemowe: niezweryfikowane",
+			"clear": "✓ Gesty systemowe: brak konfliktów",
+			"conflicts_two": "⚠ Możliwe konflikty: 2",
+			"pinch_enabled": "Systemowy gest szczypania : Włączone",
+			"pinch_disabled": "Systemowy gest szczypania : Wyłączony",
+			"pinch_unknown": "Systemowy gest szczypania : Gesty systemowe: niezweryfikowane",
+			"slot_unknown": "Independent Slot — Gesty systemowe: niezweryfikowane",
+			"slot_configured": "Independent Slot — Skonfigurowano dla ErgoptiPlus",
+			"slot_not_configured": "Independent Slot — Nie skonfigurowano dla ErgoptiPlus"
+		},
+		"pt": {
+			"unknown": "Gestos do sistema: não verificados",
+			"clear": "✓ Gestos do sistema: sem conflitos",
+			"conflicts_two": "⚠ 2 possíveis conflitos",
+			"pinch_enabled": "Gesto de pinça do sistema : Ativado",
+			"pinch_disabled": "Gesto de pinça do sistema : Desativado",
+			"pinch_unknown": "Gesto de pinça do sistema : Gestos do sistema: não verificados",
+			"slot_unknown": "Independent Slot — Gestos do sistema: não verificados",
+			"slot_configured": "Independent Slot — Configurado para ErgoptiPlus",
+			"slot_not_configured": "Independent Slot — Não configurado para ErgoptiPlus"
+		},
+		"sv": {
+			"unknown": "Systemgester: inte kontrollerade",
+			"clear": "✓ Systemgester: inga konflikter",
+			"conflicts_two": "⚠ 2 möjliga konflikter",
+			"pinch_enabled": "Systemets nypgest : Aktiverad",
+			"pinch_disabled": "Systemets nypgest : Inaktiverad",
+			"pinch_unknown": "Systemets nypgest : Systemgester: inte kontrollerade",
+			"slot_unknown": "Independent Slot — Systemgester: inte kontrollerade",
+			"slot_configured": "Independent Slot — Konfigurerat för ErgoptiPlus",
+			"slot_not_configured": "Independent Slot — Inte konfigurerat för ErgoptiPlus"
+		},
+		"tr": {
+			"unknown": "Sistem hareketleri: doğrulanmadı",
+			"clear": "✓ Sistem hareketleri: çakışma yok",
+			"conflicts_two": "⚠ 2 olası çakışma",
+			"pinch_enabled": "Sistemin kıstırma hareketi : Etkin",
+			"pinch_disabled": "Sistemin kıstırma hareketi : Devre dışı",
+			"pinch_unknown": "Sistemin kıstırma hareketi : Sistem hareketleri: doğrulanmadı",
+			"slot_unknown": "Independent Slot — Sistem hareketleri: doğrulanmadı",
+			"slot_configured": "Independent Slot — ErgoptiPlus için yapılandırıldı",
+			"slot_not_configured": "Independent Slot — ErgoptiPlus için yapılandırılmadı"
+		},
+		"cs": {
+			"unknown": "Systémová gesta: neověřena",
+			"clear": "✓ Systémová gesta: bez konfliktů",
+			"conflicts_two": "⚠ Možné konflikty: 2",
+			"pinch_enabled": "Systémové gesto sevření : Zapnuto",
+			"pinch_disabled": "Systémové gesto sevření : Zakázáno",
+			"pinch_unknown": "Systémové gesto sevření : Systémová gesta: neověřena",
+			"slot_unknown": "Independent Slot — Systémová gesta: neověřena",
+			"slot_configured": "Independent Slot — Nastaveno pro ErgoptiPlus",
+			"slot_not_configured": "Independent Slot — Nenastaveno pro ErgoptiPlus"
+		},
+		"ru": {
+			"unknown": "Системные жесты: не проверены",
+			"clear": "✓ Системные жесты: конфликтов нет",
+			"conflicts_two": "⚠ Возможные конфликты: 2",
+			"pinch_enabled": "Системный жест сведения пальцев : Включено",
+			"pinch_disabled": "Системный жест сведения пальцев : Отключено",
+			"pinch_unknown": "Системный жест сведения пальцев : Системные жесты: не проверены",
+			"slot_unknown": "Independent Slot — Системные жесты: не проверены",
+			"slot_configured": "Independent Slot — Настроено для ErgoptiPlus",
+			"slot_not_configured": "Independent Slot — Не настроено для ErgoptiPlus"
+		},
+		"uk": {
+			"unknown": "Системні жести: не перевірені",
+			"clear": "✓ Системні жести: конфліктів немає",
+			"conflicts_two": "⚠ Можливі конфлікти: 2",
+			"pinch_enabled": "Системний жест зведення пальців : Увімкнено",
+			"pinch_disabled": "Системний жест зведення пальців : Вимкнено",
+			"pinch_unknown": "Системний жест зведення пальців : Системні жести: не перевірені",
+			"slot_unknown": "Independent Slot — Системні жести: не перевірені",
+			"slot_configured": "Independent Slot — Налаштовано для ErgoptiPlus",
+			"slot_not_configured": "Independent Slot — Не налаштовано для ErgoptiPlus"
+		},
+		"he": {
+			"unknown": "מחוות מערכת: לא נבדקו",
+			"clear": "✓ מחוות מערכת: אין התנגשויות",
+			"conflicts_two": "⚠ 2 התנגשויות אפשריות",
+			"pinch_enabled": "מחוות הצביטה של המערכת : מופעל",
+			"pinch_disabled": "מחוות הצביטה של המערכת : מושבת",
+			"pinch_unknown": "מחוות הצביטה של המערכת : מחוות מערכת: לא נבדקו",
+			"slot_unknown": "Independent Slot — מחוות מערכת: לא נבדקו",
+			"slot_configured": "Independent Slot — מוגדר עבור ErgoptiPlus",
+			"slot_not_configured": "Independent Slot — לא מוגדר עבור ErgoptiPlus"
+		},
+		"ar": {
+			"unknown": "إيماءات النظام: لم يتم التحقق منها",
+			"clear": "✓ إيماءات النظام: لا تعارضات",
+			"conflicts_two": "⚠ 2 تعارضات محتملة",
+			"pinch_enabled": "إيماءة القرص في النظام : مُفعّل",
+			"pinch_disabled": "إيماءة القرص في النظام : مُعطَّل",
+			"pinch_unknown": "إيماءة القرص في النظام : إيماءات النظام: لم يتم التحقق منها",
+			"slot_unknown": "Independent Slot — إيماءات النظام: لم يتم التحقق منها",
+			"slot_configured": "Independent Slot — تم الإعداد لاستخدام ErgoptiPlus",
+			"slot_not_configured": "Independent Slot — لم يتم الإعداد لاستخدام ErgoptiPlus"
+		},
+		"hi": {
+			"unknown": "सिस्टम जेस्चर: जाँच नहीं हुई",
+			"clear": "✓ सिस्टम जेस्चर: कोई टकराव नहीं",
+			"conflicts_two": "⚠ 2 संभावित टकराव",
+			"pinch_enabled": "सिस्टम का पिंच जेस्चर : सक्षम",
+			"pinch_disabled": "सिस्टम का पिंच जेस्चर : अक्षम",
+			"pinch_unknown": "सिस्टम का पिंच जेस्चर : सिस्टम जेस्चर: जाँच नहीं हुई",
+			"slot_unknown": "Independent Slot — सिस्टम जेस्चर: जाँच नहीं हुई",
+			"slot_configured": "Independent Slot — ErgoptiPlus के लिए कॉन्फ़िगर किया गया",
+			"slot_not_configured": "Independent Slot — ErgoptiPlus के लिए कॉन्फ़िगर नहीं किया गया"
+		},
+		"zh": {
+			"unknown": "系统手势：尚未验证",
+			"clear": "✓ 系统手势：无冲突",
+			"conflicts_two": "⚠ 2 个潜在冲突",
+			"pinch_enabled": "系统捏合手势 : 已启用",
+			"pinch_disabled": "系统捏合手势 : 已禁用",
+			"pinch_unknown": "系统捏合手势 : 系统手势：尚未验证",
+			"slot_unknown": "Independent Slot — 系统手势：尚未验证",
+			"slot_configured": "Independent Slot — 已为 ErgoptiPlus 配置",
+			"slot_not_configured": "Independent Slot — 未为 ErgoptiPlus 配置"
+		},
+		"ja": {
+			"unknown": "システムジェスチャー：未確認",
+			"clear": "✓ システムジェスチャー：競合なし",
+			"conflicts_two": "⚠ 競合の可能性：2 件",
+			"pinch_enabled": "システムのピンチジェスチャー : 有効",
+			"pinch_disabled": "システムのピンチジェスチャー : 無効",
+			"pinch_unknown": "システムのピンチジェスチャー : システムジェスチャー：未確認",
+			"slot_unknown": "Independent Slot — システムジェスチャー：未確認",
+			"slot_configured": "Independent Slot — ErgoptiPlus 用に設定済み",
+			"slot_not_configured": "Independent Slot — ErgoptiPlus 用に未設定"
+		},
+		"ko": {
+			"unknown": "시스템 제스처: 확인되지 않음",
+			"clear": "✓ 시스템 제스처: 충돌 없음",
+			"conflicts_two": "⚠ 충돌 가능성 2개",
+			"pinch_enabled": "시스템 핀치 제스처 : 사용",
+			"pinch_disabled": "시스템 핀치 제스처 : 비활성화됨",
+			"pinch_unknown": "시스템 핀치 제스처 : 시스템 제스처: 확인되지 않음",
+			"slot_unknown": "Independent Slot — 시스템 제스처: 확인되지 않음",
+			"slot_configured": "Independent Slot — ErgoptiPlus용으로 설정됨",
+			"slot_not_configured": "Independent Slot — ErgoptiPlus용으로 설정되지 않음"
+		}
+	}
+}

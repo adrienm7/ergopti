@@ -1,0 +1,15 @@
+# _shared/tests/corpus/config_migrations/op_move_section/migrations.toml
+
+[registry]
+current_version = 2
+unstamped_version = 1
+
+[steps.v1_to_v2]
+from = 1
+to = 2
+drivers = ["ahk", "hs", "linux"]
+reason = "Corpus: section moves with descendants and conflicts."
+ops = [
+	{ op = "move_section", section = "linux.gestures", to_section = "gestures" },
+	{ op = "move_section", section = "old", to_section = "new" },
+]

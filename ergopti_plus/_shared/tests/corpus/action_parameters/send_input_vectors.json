@@ -1,0 +1,163 @@
+{
+	"description": "Golden vectors for the parameters of send_text (kind text), send_key (kind key) and send_shortcut (kind shortcut): what a stored value types or presses. Replayed by the macOS, Linux and Windows suites against the vocabulary _shared/modules/actions/send_keys.json. A vector with `repeat` stands for its value repeated that many times.",
+	"rule": {
+		"text": "Valid when it holds between 1 and text_max_code_points code points and no control character (U+0000 to U+001F, U+007F to U+009F). It is typed exactly as stored: nothing is trimmed.",
+		"key": "The value is trimmed of ASCII whitespace. It names a key when, with A to Z lowered, it equals the id or an alias of a send_keys.json key; the canonical form is that id. Otherwise it is valid when it is exactly one code point that is not a control character, which is pressed as that character, case kept. Anything else, including an empty value, is invalid.",
+		"shortcut": "The value is trimmed of ASCII whitespace. When it ends with ++ the key is + and the modifiers are what precedes the last two characters; otherwise it is split on +, the last part is the key and the others are modifiers. Each modifier, trimmed and with A to Z lowered, must be the id or an alias of a send_keys.json modifier, at least one is required, and two may not name the same id. The key follows the key rule, except that a single A to Z letter is lowered: in a shortcut it names the key, not the capital. The canonical form lists the modifier ids in send_keys.json order, then the key, joined by +."
+	},
+	"vectors": [
+		{
+			"id": "text_sentence",
+			"kind": "text",
+			"value": "bonjour cela va bien?",
+			"canonical": "bonjour cela va bien?"
+		},
+		{
+			"id": "text_keeps_its_spaces",
+			"kind": "text",
+			"value": "  Cordialement, ",
+			"canonical": "  Cordialement, "
+		},
+		{
+			"id": "text_accents_and_emoji",
+			"kind": "text",
+			"value": "À bientôt 👋",
+			"canonical": "À bientôt 👋"
+		},
+		{ "id": "text_a_single_space", "kind": "text", "value": " ", "canonical": " " },
+		{
+			"id": "text_at_the_limit",
+			"kind": "text",
+			"value": "a",
+			"repeat": 500,
+			"canonical": "a",
+			"canonical_repeat": 500
+		},
+		{
+			"id": "text_emoji_count_as_one",
+			"kind": "text",
+			"value": "👋",
+			"repeat": 500,
+			"canonical": "👋",
+			"canonical_repeat": 500
+		},
+		{ "id": "text_over_the_limit", "kind": "text", "value": "a", "repeat": 501, "valid": false },
+		{ "id": "text_empty", "kind": "text", "value": "", "valid": false },
+		{ "id": "text_line_break", "kind": "text", "value": "bonjour\nau revoir", "valid": false },
+		{ "id": "text_tab", "kind": "text", "value": "a\tb", "valid": false },
+		{ "id": "text_c1_control", "kind": "text", "value": "a\u0085b", "valid": false },
+		{ "id": "key_enter", "kind": "key", "value": "enter", "named": "enter", "canonical": "enter" },
+		{
+			"id": "key_named_any_case",
+			"kind": "key",
+			"value": "Enter",
+			"named": "enter",
+			"canonical": "enter"
+		},
+		{ "id": "key_alias", "kind": "key", "value": "Esc", "named": "escape", "canonical": "escape" },
+		{ "id": "key_trimmed", "kind": "key", "value": "  tab ", "named": "tab", "canonical": "tab" },
+		{ "id": "key_function", "kind": "key", "value": "F13", "named": "f13", "canonical": "f13" },
+		{
+			"id": "key_page_down_alias",
+			"kind": "key",
+			"value": "PgDn",
+			"named": "page_down",
+			"canonical": "page_down"
+		},
+		{ "id": "key_letter_keeps_case", "kind": "key", "value": "A", "char": "A", "canonical": "A" },
+		{ "id": "key_accented_letter", "kind": "key", "value": "é", "char": "é", "canonical": "é" },
+		{ "id": "key_symbol", "kind": "key", "value": "{", "char": "{", "canonical": "{" },
+		{ "id": "key_emoji", "kind": "key", "value": "👋", "char": "👋", "canonical": "👋" },
+		{ "id": "key_empty", "kind": "key", "value": "", "valid": false },
+		{ "id": "key_blank", "kind": "key", "value": "   ", "valid": false },
+		{ "id": "key_unknown_name", "kind": "key", "value": "f21", "valid": false },
+		{ "id": "key_two_characters", "kind": "key", "value": "ab", "valid": false },
+		{ "id": "key_combining_sequence", "kind": "key", "value": "é", "valid": false },
+		{ "id": "key_control_character", "kind": "key", "value": "\u0007", "valid": false },
+		{
+			"id": "shortcut_ctrl_a",
+			"kind": "shortcut",
+			"value": "ctrl+a",
+			"mods": ["ctrl"],
+			"char": "a",
+			"canonical": "ctrl+a"
+		},
+		{
+			"id": "shortcut_letter_is_lowered",
+			"kind": "shortcut",
+			"value": "Ctrl + A",
+			"mods": ["ctrl"],
+			"char": "a",
+			"canonical": "ctrl+a"
+		},
+		{
+			"id": "shortcut_primary",
+			"kind": "shortcut",
+			"value": "primary+s",
+			"mods": ["primary"],
+			"char": "s",
+			"canonical": "primary+s"
+		},
+		{
+			"id": "shortcut_modifiers_in_order",
+			"kind": "shortcut",
+			"value": "shift+cmd+z",
+			"mods": ["shift", "super"],
+			"char": "z",
+			"canonical": "shift+super+z"
+		},
+		{
+			"id": "shortcut_alias_option",
+			"kind": "shortcut",
+			"value": "option+esc",
+			"mods": ["alt"],
+			"named": "escape",
+			"canonical": "alt+escape"
+		},
+		{
+			"id": "shortcut_named_key",
+			"kind": "shortcut",
+			"value": "alt+F4",
+			"mods": ["alt"],
+			"named": "f4",
+			"canonical": "alt+f4"
+		},
+		{
+			"id": "shortcut_three_modifiers",
+			"kind": "shortcut",
+			"value": "ctrl+alt+shift+Delete",
+			"mods": ["ctrl", "alt", "shift"],
+			"named": "delete",
+			"canonical": "ctrl+alt+shift+delete"
+		},
+		{
+			"id": "shortcut_plus_key",
+			"kind": "shortcut",
+			"value": "ctrl++",
+			"mods": ["ctrl"],
+			"char": "+",
+			"canonical": "ctrl++"
+		},
+		{
+			"id": "shortcut_accented_key_keeps_case",
+			"kind": "shortcut",
+			"value": "alt+É",
+			"mods": ["alt"],
+			"char": "É",
+			"canonical": "alt+É"
+		},
+		{ "id": "shortcut_without_modifier", "kind": "shortcut", "value": "a", "valid": false },
+		{ "id": "shortcut_without_key", "kind": "shortcut", "value": "ctrl+", "valid": false },
+		{ "id": "shortcut_modifiers_only", "kind": "shortcut", "value": "ctrl+shift", "valid": false },
+		{ "id": "shortcut_unknown_modifier", "kind": "shortcut", "value": "hyper+a", "valid": false },
+		{
+			"id": "shortcut_repeated_modifier",
+			"kind": "shortcut",
+			"value": "ctrl+control+a",
+			"valid": false
+		},
+		{ "id": "shortcut_empty_modifier", "kind": "shortcut", "value": "ctrl++a", "valid": false },
+		{ "id": "shortcut_two_character_key", "kind": "shortcut", "value": "ctrl+ab", "valid": false },
+		{ "id": "shortcut_empty", "kind": "shortcut", "value": "", "valid": false }
+	]
+}

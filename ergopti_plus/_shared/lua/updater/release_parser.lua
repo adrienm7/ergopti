@@ -1,0 +1,163 @@
+--- _shared/lua/updater/release_parser.lua
+
+--- ==============================================================================
+--- MODULE: GitHub Release JSON Parser (Shared)
+--- DESCRIPTION:
+--- Pure functions for parsing GitHub Releases API JSON payloads. Tags, assets,
+--- notes, publication times and flags decode JSON at their metadata boundaries.
+--- Extracted from macos/infra/updater.lua (parse_tag,
+--- parse_notes, parse_asset_url, split_releases_array, parse_prerelease_flag)
+--- and windows/infra/updater/core.ahk (Updater_ParseTagName, Updater_ParseBody,
+--- _Updater_SplitReleasesArray, _Updater_ParsePrerelease) so both drivers
+--- share a single implementation.
+---
+--- The AHK driver cannot require Lua modules, so its copy in
+--- infra/updater/core.ahk is hand-maintained and pinned by the shared corpus
+--- test (see _shared/tests/corpus/updater/).
+---
+--- This module is PURE Lua — no driver imports, no io/network, no OS calls.
+--- ==============================================================================
+
+local Json = require("json")
+local M = {}
+
+
+
+
+
+-- ==========================================
+-- ==========================================
+-- ======= 1/ Tag & Notes Parsers ===========
+-- ==========================================
+-- ==========================================
+
+--- Extracts the selected release's own "tag_name" without reading nested fields.
+--- An array wrapper selects its first release, preserving publication order.
+--- @param body string Raw JSON (single object or array wrapper).
+--- @return string tag or ""
+function M.parse_tag(body)
+	if type(body) ~= "string" or body == "" then return "" end
+	local release = Json.decode(body)
+	if type(release) ~= "table" then return "" end
+	if type(release[1]) == "table" then release = release[1] end
+	return type(release.tag_name) == "string" and release.tag_name or ""
+end
+
+
+--- Extracts the "body" field (release notes markdown) from a GitHub release
+--- object. JSON escapes decode once; the established carriage-return removal
+--- applies to decoded notes, preserving literal backslash examples.
+--- @param body string Raw single-release JSON object.
+--- @return string notes or ""
+function M.parse_notes(body)
+	if type(body) ~= "string" or body == "" then return "" end
+	local release = Json.decode(body)
+	if type(release) ~= "table" or type(release.body) ~= "string" then return "" end
+	return (release.body:gsub("\r", ""))
+end
+
+
+--- Extracts the browser_download_url for a named asset from a GitHub release
+--- JSON object. Decoding keeps delimiters and nested metadata inside their
+--- own fields; a label cannot terminate an asset or supply its name or URL.
+--- @param body string Raw single-release JSON object.
+--- @param asset_name string The asset filename to find (e.g. "ErgoptiPlus.app.zip")
+--- @return string url or ""
+function M.parse_asset_url(body, asset_name)
+	if type(body) ~= "string" or body == "" then return "" end
+	if type(asset_name) ~= "string" or asset_name == "" then return "" end
+	local release = Json.decode(body)
+	if type(release) ~= "table" or type(release.assets) ~= "table" then return "" end
+	for _, asset in ipairs(release.assets) do
+		if type(asset) == "table" and asset.name == asset_name then
+			return type(asset.browser_download_url) == "string" and asset.browser_download_url or ""
+		end
+	end
+	return ""
+end
+
+
+--- Extracts the "html_url" field from a single-release JSON object.
+--- @param body string Raw JSON
+--- @return string url or ""
+function M.parse_html_url(body)
+	if not body or body == "" then return "" end
+	return body:match('"html_url"%s*:%s*"([^"]+)"') or ""
+end
+
+
+--- Extracts the selected release object's own "published_at" string.
+--- JSON escapes decode once; timestamp validation remains with its consumers.
+--- @param body string Raw single-release JSON object.
+--- @return string timestamp or ""
+function M.parse_published_at(body)
+	if type(body) ~= "string" or body == "" then return "" end
+	local release = Json.decode(body)
+	if type(release) ~= "table" then return "" end
+	return type(release.published_at) == "string" and release.published_at or ""
+end
+
+
+--- Extracts the selected release object's own boolean "prerelease" flag.
+--- Channel membership stays with the tag registry, independently of this flag.
+--- @param body string Raw single-release JSON object.
+--- @return boolean true if prerelease flag is true, false otherwise
+function M.parse_prerelease_flag(body)
+	if type(body) ~= "string" or body == "" then return false end
+	local release = Json.decode(body)
+	return type(release) == "table" and release.prerelease == true
+end
+
+
+
+
+-- ================================================
+-- ================================================
+-- ======= 2/ Releases Array Splitter ==============
+-- ================================================
+-- ================================================
+
+--- Splits a complete top-level array of release objects into exact raw spans.
+--- The JSON owner validates syntax; span fencing preserves bytes and order,
+--- refusing non-object root elements rather than offering their nested objects.
+--- @param json string Raw JSON array string
+--- @return table Array of object-JSON strings
+function M.split_releases_array(json)
+	local out = {}
+	if type(json) ~= "string" or json == "" then return out end
+	local trimmed = json:match("^%s*(.*)$") or json
+	if trimmed:sub(1, 1) ~= "[" then return out end
+	local decoded = Json.decode(json)
+	if type(decoded) ~= "table" then return out end
+	local pos, depth, start = 2, 0, 0
+	local array_depth = 1
+	local in_str, esc = false, false
+	while pos <= #trimmed do
+		local c = trimmed:sub(pos, pos)
+		if in_str then
+			if esc then esc = false
+			elseif c == "\\" then esc = true
+			elseif c == '"' then in_str = false end
+		elseif c == '"' then in_str = true
+		elseif c == "[" then array_depth = array_depth + 1
+		elseif c == "]" then
+			array_depth = array_depth - 1
+			if array_depth == 0 then break end
+		elseif c == "{" then
+			if depth == 0 and array_depth == 1 then start = pos end
+			depth = depth + 1
+		elseif c == "}" then
+			depth = depth - 1
+			if depth == 0 and start > 0 then
+				out[#out + 1] = trimmed:sub(start, pos)
+				start = 0
+			end
+		end
+		pos = pos + 1
+	end
+	if #out ~= #decoded then return {} end
+	return out
+end
+
+
+return M

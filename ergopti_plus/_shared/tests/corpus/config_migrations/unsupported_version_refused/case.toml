@@ -1,0 +1,6 @@
+# _shared/tests/corpus/config_migrations/unsupported_version_refused/case.toml
+
+[case]
+description = "A stamp older than the first registered step has no migration path and is refused."
+drivers = ["ahk", "hs", "linux"]
+outcome = "unsupported"

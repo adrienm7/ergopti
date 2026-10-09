@@ -1,0 +1,8 @@
+# _shared/tests/corpus/config_migrations/shipped_script_chords_renamed_on_macos/case.toml
+
+[case]
+description = "The shipped v6 to v7 step gives macOS's script-control switch and its three right-Option slots the names every driver uses; the values, a slot left off included, are kept."
+drivers = ["hs"]
+outcome = "migrated"
+from_version = 6
+to_version = 12

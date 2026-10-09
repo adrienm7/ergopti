@@ -1,0 +1,294 @@
+--- modules/llm/pty_process_group.lua
+
+--- ==============================================================================
+--- MODULE: PTY Process-Group Wrapper
+--- DESCRIPTION:
+--- Publishes a temporary Python wrapper that gives an hs.task one exact native
+--- parent for a whole shell process group. SIGTERM/SIGINT/SIGHUP are forwarded
+--- to every descendant and the wrapper waits for the group leader before its
+--- own terminal callback can prove settlement.
+--- ==============================================================================
+
+local M = {}
+
+local Logger = require("infra.logger")
+
+local LOG = "llm.pty_process_group"
+
+-- A failed close/remove is ambiguous: the native operation may have mutated
+-- before refusing. Keep the exact handle/path reachable until a later explicit
+-- retry proves both capabilities settled.
+local _file_cleanup_debt = {}
+local _path_cleanup_debt = {}
+
+local WRAPPER_SOURCE = [[import os, sys, select, subprocess, signal, time
+TERM_GRACE_SECONDS = 1.0
+KILL_DRAIN_SECONDS = 1.0
+proc = None
+pending_signals = []
+termination_deadline = None
+kill_deadline = None
+kill_sent = False
+
+def forward_group_signal(signum):
+    global termination_deadline
+    try: os.killpg(proc.pid, signum)
+    except ProcessLookupError: return
+    if termination_deadline is None:
+        termination_deadline = time.monotonic() + TERM_GRACE_SECONDS
+
+def forward_signal(signum, _frame):
+    if proc is None:
+        pending_signals.append(signum)
+        return
+    forward_group_signal(signum)
+
+for forwarded in (signal.SIGTERM, signal.SIGINT, signal.SIGHUP):
+    signal.signal(forwarded, forward_signal)
+master_fd, slave_fd = os.openpty()
+proc = subprocess.Popen(sys.argv[1:], stdin=slave_fd, stdout=slave_fd, stderr=slave_fd, close_fds=True, start_new_session=True)
+os.close(slave_fd)
+for pending in pending_signals:
+    forward_group_signal(pending)
+pending_signals = []
+
+def group_is_alive():
+    try: os.killpg(proc.pid, 0)
+    except ProcessLookupError: return False
+    except PermissionError:
+        # Darwin can report EPERM for a group containing only the unreaped
+        # zombie leader. Reap that exact child, then require a fresh ESRCH.
+        # After KILL, orphan zombies may await their own parent's reaping;
+        # unconfirmed retirement consumes only the existing drain budget.
+        if proc.poll() is None: raise
+        try: os.killpg(proc.pid, 0)
+        except ProcessLookupError: return False
+        except PermissionError:
+            if not kill_sent: raise
+    return True
+
+def escalate_if_due(now):
+    global kill_sent, kill_deadline
+    if termination_deadline is None or kill_sent or now < termination_deadline:
+        return
+    if group_is_alive():
+        try: os.killpg(proc.pid, signal.SIGKILL)
+        except ProcessLookupError: pass
+        sys.stderr.write("PTY process group ignored termination; escalating to SIGKILL.\n")
+        sys.stderr.flush()
+    kill_sent = True
+    kill_deadline = now + KILL_DRAIN_SECONDS
+
+master_open = True
+drain_timed_out = False
+while True:
+    now = time.monotonic()
+    escalate_if_due(now)
+    group_alive = group_is_alive()
+    if proc.poll() is not None and not group_alive:
+        break
+    if kill_sent and kill_deadline is not None and now >= kill_deadline:
+        drain_timed_out = True
+        sys.stderr.write("PTY process group retirement was unconfirmed after SIGKILL drain deadline.\n")
+        sys.stderr.flush()
+        break
+
+    timeout = 0.05
+    next_deadline = kill_deadline if kill_sent else termination_deadline
+    if next_deadline is not None:
+        timeout = min(timeout, max(0.0, next_deadline - now))
+    if master_open:
+        try:
+            ready, _, _ = select.select([master_fd], [], [], timeout)
+        except (OSError, ValueError):
+            master_open = False
+            continue
+        if ready:
+            try:
+                data = os.read(master_fd, 4096)
+            except OSError:
+                master_open = False
+                continue
+            if not data:
+                master_open = False
+                continue
+            sys.stdout.buffer.write(data)
+            sys.stdout.buffer.flush()
+    else:
+        time.sleep(timeout)
+
+if drain_timed_out:
+    returncode = 124
+else:
+    proc.wait()
+    returncode = proc.returncode
+os.close(master_fd)
+sys.exit(returncode)
+]]
+
+--- Removes one exact path only on a literal native success.
+--- @param path string Exact wrapper path.
+--- @param label string Stable diagnostic label.
+--- @return boolean removed
+local function remove_exact(path, label)
+	local ok, removed_or_error, detail = xpcall(function()
+		return os.remove(path)
+	end, debug.traceback)
+	if ok ~= true or removed_or_error ~= true then
+		_path_cleanup_debt[path] = true
+		Logger.error(LOG, "%s removal failed for %s: %s.",
+			tostring(label), tostring(path),
+			tostring(ok == true and (detail or removed_or_error) or removed_or_error))
+		return false
+	end
+	_path_cleanup_debt[path] = nil
+	return true
+end
+
+--- Closes one exact file handle only on a literal native success.
+--- @param file file* Exact wrapper file handle.
+--- @param path string Exact wrapper path.
+--- @param label string Stable diagnostic label.
+--- @param remove_after_close boolean Whether settlement must also unlink path.
+--- @return boolean closed
+local function close_exact(file, path, label, remove_after_close)
+	local ok, closed_or_error, detail = xpcall(function()
+		return file:close()
+	end, debug.traceback)
+	if ok ~= true or closed_or_error ~= true then
+		_file_cleanup_debt[file] = {
+			path = path,
+			label = label,
+			remove_after_close = remove_after_close == true,
+		}
+		Logger.error(LOG, "%s close failed for %s: %s.",
+			tostring(label), tostring(path),
+			tostring(ok == true and (detail or closed_or_error) or closed_or_error))
+		return false
+	end
+	_file_cleanup_debt[file] = nil
+	return true
+end
+
+--- Retries retained close debt for one path before an unlink attempt.
+--- @param path string Exact wrapper path.
+--- @return boolean settled
+--- @return boolean had_debt
+local function retry_file_debt_for_path(path)
+	local entries = {}
+	for file, entry in pairs(_file_cleanup_debt) do
+		if entry.path == path then
+			entries[#entries + 1] = { file = file, entry = entry }
+		end
+	end
+	local settled = true
+	local had_debt = #entries > 0
+	for _, item in ipairs(entries) do
+		local entry = item.entry
+		if _file_cleanup_debt[item.file] == entry then
+			if close_exact(item.file, entry.path, entry.label,
+				entry.remove_after_close) ~= true then
+				settled = false
+			elseif entry.remove_after_close
+				and remove_exact(entry.path, entry.label) ~= true then
+				settled = false
+			end
+		end
+	end
+	return settled, had_debt
+end
+
+--- Writes one unpublished wrapper file.
+--- @param label string Stable filename/log label.
+--- @return string|nil path
+--- @return string|nil error_detail
+function M.create(label)
+	-- A successor is also the retry opportunity for every exact cleanup
+	-- capability retained by an earlier wrapper transaction. Do not accumulate
+	-- unpublished files while one of those identities is still ambiguous.
+	if M.retry_cleanup() ~= true then
+		Logger.error(LOG, "%s wrapper creation blocked by prior cleanup debt.",
+			tostring(label))
+		return nil, "prior wrapper cleanup unsettled"
+	end
+	local tmp_ok, path_or_error = xpcall(os.tmpname, debug.traceback)
+	if not tmp_ok or type(path_or_error) ~= "string" or path_or_error == "" then
+		Logger.error(LOG, "%s wrapper path allocation failed: %s.",
+			tostring(label), tostring(path_or_error))
+		return nil, tostring(path_or_error)
+	end
+	local path = path_or_error
+	local open_ok, file_or_error, open_detail = xpcall(function()
+		return io.open(path, "w")
+	end, debug.traceback)
+	if open_ok ~= true or file_or_error == nil or file_or_error == false then
+		remove_exact(path, tostring(label) .. " wrapper rollback")
+		local detail = open_ok == true and (open_detail or file_or_error) or file_or_error
+		Logger.error(LOG, "%s wrapper open failed: %s.",
+			tostring(label), tostring(detail))
+		return nil, tostring(detail)
+	end
+	local file = file_or_error
+	local write_ok, written_or_error, write_detail = xpcall(function()
+		return file:write(WRAPPER_SOURCE)
+	end, debug.traceback)
+	if write_ok ~= true or written_or_error == nil or written_or_error == false then
+		local detail = write_ok == true and (write_detail or written_or_error)
+			or written_or_error
+		if close_exact(file, path, tostring(label) .. " wrapper rollback", true) then
+			remove_exact(path, tostring(label) .. " wrapper rollback")
+		end
+		Logger.error(LOG, "%s wrapper write failed: %s.",
+			tostring(label), tostring(detail))
+		return nil, tostring(detail)
+	end
+	if close_exact(file, path, tostring(label) .. " wrapper publication", true) ~= true then
+		Logger.error(LOG, "%s wrapper publication close did not commit.", tostring(label))
+		return nil, "wrapper close refused"
+	end
+	return path, nil
+end
+
+--- Removes one exact settled wrapper path.
+--- @param path string|nil Wrapper path returned by create().
+--- @return boolean removed
+function M.remove(path)
+	if type(path) ~= "string" or path == "" then return true end
+	local settled, had_debt = retry_file_debt_for_path(path)
+	if settled ~= true then return false end
+	if had_debt == true then return _path_cleanup_debt[path] ~= true end
+	return remove_exact(path, "Wrapper")
+end
+
+--- Retries every exact wrapper cleanup capability retained after refusal.
+--- @return boolean settled
+function M.retry_cleanup()
+	local paths = {}
+	for path in pairs(_path_cleanup_debt) do paths[#paths + 1] = path end
+	local files = {}
+	for file, entry in pairs(_file_cleanup_debt) do
+		files[#files + 1] = { file = file, entry = entry }
+	end
+	local settled = true
+	for _, item in ipairs(files) do
+		local entry = item.entry
+		if _file_cleanup_debt[item.file] == entry then
+			if close_exact(item.file, entry.path, entry.label,
+				entry.remove_after_close) ~= true then
+				settled = false
+			elseif entry.remove_after_close
+				and remove_exact(entry.path, entry.label) ~= true then
+				settled = false
+			end
+		end
+	end
+	for _, path in ipairs(paths) do
+		if _path_cleanup_debt[path] == true
+			and remove_exact(path, "Wrapper cleanup retry") ~= true then
+			settled = false
+		end
+	end
+	return settled
+end
+
+return M

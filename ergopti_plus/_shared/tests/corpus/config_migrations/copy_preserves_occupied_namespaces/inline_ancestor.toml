@@ -1,0 +1,6 @@
+# Every explicitly stored inline choice must remain byte-for-byte intact.
+[source]
+choice = true
+
+[settings]
+inline = { color = "future", visible = false, palette = [{ Key = "upper", key = "lower" }] }

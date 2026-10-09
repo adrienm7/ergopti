@@ -1,0 +1,8 @@
+# _shared/tests/corpus/config_migrations/shipped_script_chords_kept_on_windows_and_linux/case.toml
+
+[case]
+description = "The v6 to v7 step renames macOS keys only: Windows and Linux already name the script chords script_altgr_*, and a stray return_key is left for the configuration cleanup."
+drivers = ["ahk", "linux"]
+outcome = "migrated"
+from_version = 6
+to_version = 12

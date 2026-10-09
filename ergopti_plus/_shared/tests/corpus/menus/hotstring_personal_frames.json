@@ -1,0 +1,233 @@
+{
+	"native_section_inventory": [
+		{
+			"name": "alpha",
+			"description": "Repeated",
+			"count": 2
+		},
+		{
+			"name": "-",
+			"description": "",
+			"count": 0
+		},
+		{
+			"name": "module",
+			"description": "Placeholder",
+			"count": 0,
+			"is_module_placeholder": true
+		},
+		{
+			"name": "beta",
+			"description": "Repeated",
+			"count": 3
+		}
+	],
+	"none_captions": {
+		"ahk": {
+			"en": "None",
+			"fr": "Aucune"
+		},
+		"hs": {
+			"en": "None",
+			"fr": "Aucune"
+		},
+		"linux": {
+			"en": "None",
+			"fr": "Aucun"
+		}
+	},
+	"controls": {
+		"ahk": ["editor", "open_file", "separator", "default_parent", "close_on_add"],
+		"hs_editor_legacy": [
+			"editor",
+			"open_file",
+			"separator",
+			"legacy_shortcut",
+			"default_parent",
+			"close_on_add"
+		],
+		"hs_editor": ["editor", "open_file", "separator", "default_parent", "close_on_add"],
+		"hs_no_editor_legacy": [
+			"open_file",
+			"separator",
+			"default_parent",
+			"legacy_shortcut",
+			"close_on_add"
+		],
+		"hs_no_editor": ["open_file", "separator", "default_parent", "close_on_add"],
+		"linux_editor_bridge": ["editor", "default_parent", "close_on_add", "separator"],
+		"linux_no_editor_bridge": ["default_parent", "close_on_add", "separator"],
+		"linux_editor_no_bridge": ["editor", "separator"],
+		"linux_no_editor_no_bridge": ["separator"]
+	},
+	"default_choices": {
+		"ahk_empty": ["none", "separator"],
+		"ahk_duplicates": ["none", "separator", "Repeated", "Placeholder", "Repeated #2"],
+		"hs_empty": ["none"],
+		"hs_duplicate_and_placeholder": ["none", "separator", "Repeated", "Repeated"],
+		"linux_empty": ["none"],
+		"linux_native_order": ["none", "alpha", "-", "module", "beta"]
+	},
+	"default_selected": "beta",
+	"default_checks": {
+		"ahk": [false, false, false, false, true],
+		"hs": [false, false, false, true],
+		"linux": [false, false, false, false, true]
+	},
+	"default_parent_labels": {
+		"ahk": {
+			"en": "Default category: Repeated #2",
+			"fr": "Catégorie par défaut : Repeated #2"
+		},
+		"hs": {
+			"en": "Default category: Repeated",
+			"fr": "Catégorie par défaut : Repeated"
+		},
+		"linux": {
+			"en": "Default category: beta",
+			"fr": "Catégorie par défaut : beta"
+		}
+	},
+	"legacy_shortcut": {
+		"en": "Shortcut: Win + ctrl + J",
+		"fr": "Raccourci : Win + ctrl + J"
+	},
+	"close_caption": {
+		"en": "Close UI after adding a hotstring via shortcut",
+		"fr": "Fermer l'UI après ajout d'un hotstring par le raccourci"
+	},
+	"open_file_caption": {
+		"en": "Open file…",
+		"fr": "Ouvrir le fichier…"
+	},
+	"content_order": {
+		"ahk": [
+			"controls",
+			"main_source_boundary_if_order_nonempty",
+			"main_source_sections",
+			"sorted_folders",
+			"sorted_root_files"
+		],
+		"hs": [
+			"controls",
+			"personal_boundary_if_real_rows",
+			"personal_sections",
+			"unavailable_directories",
+			"extension_boundary_if_tree_nonempty",
+			"recursive_folders_then_files",
+			"custom_boundary_if_real_rows",
+			"custom_sections"
+		],
+		"linux": [
+			"controls",
+			"unclassified_nonextension_groups",
+			"unrepresented_personal_sources",
+			"unavailable_directories",
+			"no_group_loaded_if_added_zero"
+		]
+	},
+	"directory_cases": [
+		{
+			"name": "folders_and_files",
+			"folders": ["a", "z"],
+			"files": ["alpha", "omega"],
+			"expected": ["a", "z", "separator", "alpha", "omega"]
+		},
+		{
+			"name": "folders_only",
+			"folders": ["a", "z"],
+			"files": [],
+			"expected": ["a", "z"]
+		},
+		{
+			"name": "files_only",
+			"folders": [],
+			"files": ["alpha", "omega"],
+			"expected": ["alpha", "omega"]
+		},
+		{
+			"name": "empty",
+			"folders": [],
+			"files": [],
+			"expected": []
+		},
+		{
+			"name": "mac_top_level_no_file_boundary",
+			"folders": ["a"],
+			"files": ["alpha"],
+			"separate_files": false,
+			"expected": ["a", "alpha"]
+		}
+	],
+	"file_order": {
+		"ahk_admitted": ["open_file", "separator", "personal_file_controls", "native_section_controls"],
+		"ahk_unavailable": ["open_file", "personal_file_unavailable", "native_inert_sections"],
+		"hs_admitted": [
+			"personal_file_controls",
+			"category_enable",
+			"category_disable",
+			"open_file_if_path",
+			"separator_when_sections",
+			"native_sections"
+		],
+		"hs_unavailable": [
+			"personal_file_controls",
+			"personal_file_unavailable",
+			"category_enable",
+			"category_disable",
+			"open_file_if_path",
+			"separator_when_sections",
+			"native_inert_sections"
+		]
+	},
+	"empty_linux": {
+		"en": "(no group loaded)",
+		"fr": "(aucun groupe chargé)",
+		"disabled": true,
+		"has_action": true
+	},
+	"postures": {
+		"ahk": {
+			"none_action_while_paused": true,
+			"open_file_action_while_paused": true,
+			"close_action_while_paused": true
+		},
+		"hs": {
+			"none_action_while_paused": true,
+			"open_file_action_while_paused": false,
+			"close_action_while_paused": false,
+			"legacy_action_while_paused": false
+		},
+		"linux": {
+			"none_action_while_paused": true,
+			"close_action_while_paused": true
+		}
+	},
+	"native_lifecycle": {
+		"retained_menus": ["PersonalMenu", "DefaultSectionMenu"],
+		"held_default_repaint": true,
+		"held_close_repaint": true,
+		"no_presentation_source_write": true,
+		"returned_children_disposed_on_new_refusal": true,
+		"borrowed_menus_not_disposed": true,
+		"default_caption_both_pre_admitted_before_setter": true,
+		"default_caption_refusal_effects": {
+			"setter": 0,
+			"write": 0,
+			"check": 0,
+			"uncheck": 0,
+			"rename": 0
+		}
+	},
+	"refusals": [
+		"missing_declaration",
+		"malformed_declaration",
+		"foreign_child",
+		"duplicate_frame_identity",
+		"unknown_caption_getter",
+		"missing_caption_getter",
+		"missing_default_children",
+		"missing_native_list_provider"
+	],
+	"source_boundary": "Native personal catalogue, controls, G2 scope admission and transaction callback bodies unchanged; captions and source data remain exact."
+}

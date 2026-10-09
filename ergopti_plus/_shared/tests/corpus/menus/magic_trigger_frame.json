@@ -1,0 +1,54 @@
+{
+	"source": "independent expected images for the actual three native Magic trigger providers",
+	"section": "hotstrings_magic_trigger_frame",
+	"keys": {
+		"native_main": "menu.hotstrings.magic_key_prefix",
+		"linux_main": "menu.hotstrings.magic_key",
+		"linux_reset": "menu.hotstrings.magic_key_reset"
+	},
+	"cases": [
+		{
+			"language": "en",
+			"value": "★",
+			"customised": false,
+			"windows": ["Magic key: ★"],
+			"macos": ["Magic key: ★"],
+			"linux": ["Magic key : ★"]
+		},
+		{
+			"language": "fr",
+			"value": "★",
+			"customised": false,
+			"windows": ["Touche magique : ★"],
+			"macos": ["Touche magique : ★"],
+			"linux": ["Touche magique : ★"]
+		},
+		{
+			"language": "en",
+			"value": "§",
+			"customised": true,
+			"windows": ["Magic key: §"],
+			"macos": ["Magic key: §"],
+			"linux": ["Magic key : §", "    Restore the default key"]
+		},
+		{
+			"language": "fr",
+			"value": "§",
+			"customised": true,
+			"windows": ["Touche magique : §"],
+			"macos": ["Touche magique : §"],
+			"linux": ["Touche magique : §", "    Rétablir la touche par défaut"]
+		}
+	],
+	"macos_paused": { "disabled": true, "action_present": false, "row_present": true },
+	"initial_refusal": {
+		"row_count": 0,
+		"prompt": 0,
+		"set": 0,
+		"reset": 0,
+		"save": 0,
+		"reload": 0
+	},
+	"literal_reset_prefix": "    ",
+	"native_counted_sites": { "windows": 0, "macos": 1, "linux": 2 }
+}

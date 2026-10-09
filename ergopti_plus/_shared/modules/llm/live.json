@@ -1,0 +1,5 @@
+{
+	"_comment": "Live mode (llm_live_prompt_toggle): while on, every keystroke asks for predictions with the binding's prompt. debounce_ms coalesces a burst of keystrokes into one request; min_words is the typed-word floor, 0 so the first word already shows. Read by the three prediction engines.",
+	"debounce_ms": 80,
+	"min_words": 0
+}

@@ -1,0 +1,25 @@
+{
+	"schema": 1,
+	"rows": [
+		{
+			"id": "llm_instant_on_word_end",
+			"i18n": "menu.llm.instant_on_word_end",
+			"native": "instant_on_word_end",
+			"state": "llm_instant_on_word_end"
+		},
+		{
+			"id": "llm_after_hotstring",
+			"i18n": "menu.llm.after_hotstring",
+			"native": "after_hotstring",
+			"state": "llm_after_hotstring"
+		}
+	],
+	"states": [
+		[false, false],
+		[false, true],
+		[true, false],
+		[true, true]
+	],
+	"prediction_counts": [1, 2],
+	"alternate_i18n": "menu.llm.trigger_menu_title"
+}

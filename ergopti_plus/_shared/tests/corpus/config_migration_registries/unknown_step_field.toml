@@ -1,0 +1,17 @@
+# _shared/tests/corpus/config_migration_registries/unknown_step_field.toml
+#
+# A step holds a field outside from, to, drivers, reason and ops.
+
+[registry]
+current_version = 2
+unstamped_version = 1
+
+[steps.v1_to_v2]
+from = 1
+to = 2
+drivers = ["ahk", "hs", "linux"]
+reason = "Corpus: one delete."
+note = "not a step field"
+ops = [
+	{ op = "delete", section = "gestures", key = "space_wrap" },
+]

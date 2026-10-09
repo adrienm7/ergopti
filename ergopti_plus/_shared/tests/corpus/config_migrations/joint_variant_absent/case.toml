@@ -1,0 +1,6 @@
+[case]
+description = "joint variant absent preserves exact typed joint ownership."
+drivers = ["ahk", "hs", "linux"]
+outcome = "migrated"
+from_version = 1
+to_version = 2

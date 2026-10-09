@@ -1,0 +1,168 @@
+﻿; tests/meta/test_ingest_failure_requeues.ahk
+
+; ==============================================================================
+; MODULE: Keylogger Ingest Failure Re-queue Meta Test
+; DESCRIPTION:
+; Regression guard for HIGH-04 plus the durable-JSONL duplicate retry case.
+;
+; KL_IngestOnce atomically snapshots and clears _pending_entries under Critical
+; (lines 1349-1352 of keylogger.ahk) before the heavy SQL conversion and
+; durable data.sql append. If that append fails, the catch block used to log and
+; return without re-queuing pending_snapshot onto _pending_entries.
+;
+; The original recovery put the ENTIRE pending snapshot back in RAM. But the
+; snapshot had already been appended to today.log before data.sql failed; the
+; unchanged offset then read those JSONL lines AND the re-queued copy, doubling
+; the next aggregate batch. The fix tracks the number of completed JSONL lines
+; and re-queues only the unwritten tail. Today_log_offset remains unchanged so
+; completed lines are retried exactly once from disk.
+;
+; This test asserts:
+;   (a) The durable-append catch delegates to the shared recovery helper.
+;   (b) It starts after pending_logged_count, not at the already logged head.
+;   (c) The re-queue is wrapped in Critical("On") / Critical("Off").
+;   (d) today_log_offset is NOT advanced inside the catch block.
+;
+; SCOPE: source introspection of modules/keylogger/keylogger.ahk.
+; ==============================================================================
+
+#Requires AutoHotkey v2.0
+
+
+
+
+; =====================================================
+; =====================================================
+; ======= 1/ Source scan helpers ======================
+; =====================================================
+; =====================================================
+
+; Extracts the body of the durable data.sql append catch inside KL_IngestOnce.
+; Returns the substring from the catch opening brace to the matching close.
+_IFR_ExtractCatchBody(Src) {
+	AppendPos := InStr(Src,
+		"KL_AppendDataSqlDurable(Keylogger.data_sql_path, body)")
+	if (!AppendPos)
+		return ""
+	; Find the catch keyword after the durable append call.
+	CatchPos := InStr(Src, "catch as err {", , AppendPos)
+	if (!CatchPos)
+		return ""
+	; Walk forward to find the matching closing brace.
+	depth := 0
+	i := CatchPos
+	Len := StrLen(Src)
+	while (i <= Len) {
+		ch := SubStr(Src, i, 1)
+		if (ch == "{")
+			depth++
+		else if (ch == "}") {
+			depth--
+			if (depth <= 0)
+				return SubStr(Src, CatchPos, i - CatchPos + 1)
+		}
+		i++
+	}
+	return SubStr(Src, CatchPos)
+}
+
+
+; ===================================================
+; ===================================================
+; ======= 2/ Test implementations ===================
+; ===================================================
+; ===================================================
+
+_IFR_CheckRequeueOnFailure() {
+	Src := _DriverDirConcat("modules/keylogger")
+
+	CatchBody := _IFR_ExtractCatchBody(Src)
+	Assert(CatchBody != "",
+		"durable data.sql append catch must be present in KL_IngestOnce")
+
+	; Conversion and append failures share the same exact-tail recovery.
+	Assert(InStr(CatchBody, "_KL_IngestRequeueUnwritten(pending_snapshot, pending_logged_count)"),
+		"durable append catch must delegate its exact snapshot and journal ownership count")
+	RequeueBody := _DriverFuncBody("_KL_IngestRequeueUnwritten")
+	Assert(RequeueBody != "", "the shared recovery helper must exist")
+	Assert(InStr(RequeueBody, "InsertAt"), "recovery must restore pending entries")
+
+	; The re-queue must reference pending_snapshot entries.
+	Assert(InStr(CatchBody, "pending_snapshot"),
+		"durable append catch must reference pending_snapshot to re-queue the consumed entries")
+	Assert(InStr(CatchBody, "pending_logged_count"),
+		"durable append catch must distinguish JSONL-backed entries from the unwritten pending tail")
+	Assert(InStr(RequeueBody, "Snapshot[LoggedCount + A_Index]"),
+		"FileAppend catch must re-queue only entries that never reached today.log")
+
+	; (b) The re-queue must be wrapped in Critical to prevent a concurrent Push
+	;     from the keystroke hook from interleaving with the InsertAt.
+	Assert(InStr(RequeueBody, 'Critical("On")'),
+		'durable append catch must wrap the re-queue in Critical("On")')
+	Assert(InStr(RequeueBody, "Critical(PreviousCritical)") > 0,
+		"durable append catch must restore the caller Critical state after re-queueing")
+
+	; (c) today_log_offset must NOT be advanced in the catch block
+	;     (the next tick must retry the same chunk).
+	Assert(!InStr(CatchBody, "today_log_offset :="),
+		"durable append catch must NOT advance today_log_offset — next tick must retry the same chunk")
+}
+
+
+Test("meta fix-ingest-failure-requeues-pending: durable append catch re-queues only the pending tail not already durable in today.log",
+	_IFR_CheckRequeueOnFailure)
+
+
+; The same HIGH-04 transaction must cover the OTHER destructive-after-clear
+; call: opening today.log. FileOpen throws OSError in AHK v2 — it never returns
+; a falsy handle — so a bare `fh := KL_OpenTodayFh()` aborted the timer thread
+; after _pending_entries had already been snapshot-and-cleared, discarding the
+; local snapshot with no requeue and no offset rollback. Unlike the data.sql
+; path there is no disk copy to fall back on: KL_AppendLog pushes to
+; _pending_entries only, so the snapshot is the sole copy of those keystrokes.
+;
+; Scans the concatenated module source, matching the helper this file already
+; uses, rather than resolving one function body.
+_IFR_TodayLogOpenRequeues() {
+	Src := _DriverDirConcat("modules/keylogger")
+
+	OpenPos := InStr(Src, "fh := KL_OpenTodayFh(Scope.Token)")
+	Assert(OpenPos > 0, "KL_IngestOnce must still open today.log via KL_OpenTodayFh()")
+
+	; Bounded windows on both sides: only the statements immediately around the
+	; call can establish that it is inside a try with a recovering catch.
+	HeadStart := (OpenPos > 120) ? OpenPos - 120 : 1
+	Head := SubStr(Src, HeadStart, OpenPos - HeadStart)
+	Assert(InStr(Head, "try {") > 0,
+		"KL_IngestOnce must open today.log inside a try - FileOpen throws OSError in v2 and would otherwise abort the tick after _pending_entries was already cleared")
+
+	CatchWindow := SubStr(Src, OpenPos, 1000)
+	Assert(InStr(CatchWindow, "catch as err") > 0,
+		"the today.log open must have an explicit catch")
+	Assert(InStr(CatchWindow, "InsertAt") > 0,
+		"the today.log open failure must re-queue the pending snapshot onto _pending_entries")
+	Assert(InStr(CatchWindow, "pending_snapshot") > 0,
+		"the re-queue must restore pending_snapshot, the only copy of those entries")
+	Assert(InStr(CatchWindow, "today_log_open_failed") > 0,
+		"the failure must return a distinct reason so the caller can tell it from a data.sql failure")
+}
+Test("meta ingest: a failed today.log open re-queues the whole pending snapshot",
+	_IFR_TodayLogOpenRequeues)
+
+
+_IFR_TodayLogWriteAndFlushReceiptsAreMandatory() {
+	Ingest := _DriverFuncBody("KL_IngestOnce")
+	Assert(Ingest != "", "KL_IngestOnce must remain discoverable")
+	Assert(InStr(Ingest, "_KL_JournalAppendDefault(fh, line)") > 0,
+		"regular ingest must use the complete-or-absent JSONL writer instead of discarding File.Write's count")
+	FlushPos := InStr(Ingest, "KL_FlushTodayFh(fh)")
+	Assert(FlushPos > 0,
+		"regular ingest must still cross the stable-storage boundary")
+	FailureReturn := "return Map(" . Chr(34) . "ok" . Chr(34) . ", false"
+	Assert(InStr(SubStr(Ingest, FlushPos, 500), FailureReturn) > 0,
+		"a failed today.log flush must abort the ingest transaction instead of advancing new_offset")
+	Assert(InStr(SubStr(Ingest, FlushPos, 700), "_KL_JournalRestoreSnapshot") > 0,
+		"the unproved pending snapshot must return to RAM when its flush fails")
+}
+Test("keylogger ingest: JSONL write and flush receipts gate offset publication (AHK-076)",
+	_IFR_TodayLogWriteAndFlushReceiptsAreMandatory)

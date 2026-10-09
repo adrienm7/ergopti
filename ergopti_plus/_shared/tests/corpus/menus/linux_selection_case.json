@@ -1,0 +1,40 @@
+{
+	"section": "selection_case_commands",
+	"commands": [
+		{
+			"id": "uppercase_selection",
+			"label_key": "menu.shortcuts.to_uppercase",
+			"method": "transform_uppercase",
+			"selected": "été Straße Москва",
+			"expected": "ÉTÉ STRASSE МОСКВА"
+		},
+		{
+			"id": "selection_lowercase",
+			"label_key": "menu.shortcuts.to_lowercase",
+			"method": "transform_lowercase",
+			"selected": "ÉTÉ STRAẞE",
+			"expected": "été straße"
+		},
+		{
+			"id": "titlecase_selection",
+			"label_key": "menu.shortcuts.to_titlecase",
+			"method": "transform_titlecase",
+			"selected": "«ÉTÉ» STRAẞE МОСКВА",
+			"expected": "«Été» Straße Москва"
+		}
+	],
+	"platforms": [
+		{
+			"platform": "linux",
+			"rows": 3
+		},
+		{
+			"platform": "ahk",
+			"rows": 0
+		},
+		{
+			"platform": "hs",
+			"rows": 0
+		}
+	]
+}

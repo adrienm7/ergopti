@@ -1,0 +1,6 @@
+[case]
+description = "Native alt and period aliases resolve through the shared catalogue."
+drivers = ["ahk", "hs", "linux"]
+outcome = "migrated"
+from_version = 1
+to_version = 2

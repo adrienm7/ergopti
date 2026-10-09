@@ -1,0 +1,90 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-256 -256 512 512">
+
+<style>
+    :root {
+		color-scheme: light dark;
+		--background: #343048 !important;
+		--border: #edebf0 !important;
+    }
+
+	/* It looks better even in dark mode */
+	/*
+    @media (prefers-color-scheme: dark) {
+		:root {
+			--background: #edebf0 !important;
+			--border: #343048 !important;
+		}
+    }
+	*/
+
+		.segment {
+		stroke: #edebf0 !important;
+		}
+
+		.star {
+		fill: #343048 !important;
+		}
+
+		.letter {
+		fill: #343048 !important;
+		}
+</style>
+
+
+<g transform="scale(1.85)">
+    <path id="oif-segment-green" fill="#14b830"
+        stroke="#edebf0" stroke-width="0"
+		class="segment"
+        d="M 0 0 L 0 -141 L 141 -141 L 141 -44.97 Z"
+    />
+    <path id="oif-segment-purple" fill="#9b36e2"
+        stroke="#edebf0" stroke-width="0"
+		class="segment"
+        d="M 0 0 L 141 -44.97 L 141 141 L 100.55 141 Z"
+    />
+    <path id="oif-segment-red" fill="#e83030"
+        stroke="#edebf0" stroke-width="0"
+		class="segment"
+        d="M 0 0 L 100.55 141 L -100.55 141 Z"
+    />
+    <path id="oif-segment-blue" fill="#0088cc"
+        stroke="#edebf0" stroke-width="0"
+		class="segment"
+        d="M 0 0 L -100.55 141 L -141 141 L -141 -44.97 Z"
+    />
+    <path id="oif-segment-yellow" fill="#f4c025"
+        stroke="#edebf0" stroke-width="0"
+		class="segment"
+        d="M 0 0 L -141 -44.97 L -141 -141 L 0 -141 Z"
+    />
+</g>
+
+
+
+<!-- Star overlay for simulated border -->
+<g transform="rotate(36) translate(3 3)">
+	<!-- White star for border -->
+	<path
+		transform="scale(17.5) rotate(180) translate(-0.025 -0.3)"
+		style="
+			fill: #fff;
+		"
+		d="M0-16 3.652-4.76h11.817l-9.56 6.944 3.65 11.24L0 6.474l-9.561 6.947
+			3.652-11.24-9.56-6.943h11.817L0-16z"
+    />
+	<!-- Main star (no stroke) -->
+    <path
+		transform="scale(13) rotate(180) translate(-0.025 -0.3)"
+		style="
+			fill: #343048;
+		"
+		class="star"
+		d="M0-16 3.652-4.76h11.817l-9.56 6.944 3.65 11.24L0 6.474l-9.561 6.947
+			3.652-11.24-9.56-6.943h11.817L0-16z"
+    />
+</g>
+
+
+
+</svg>

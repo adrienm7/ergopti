@@ -505,7 +505,7 @@ data = {
         {
             "key": "LAlt",
             "hand": "left",
-            "finger": 'thumb',
+            "finger": "thumb",
             "row": "5",
             "column": "2",
             "size": "1.25",
@@ -514,7 +514,7 @@ data = {
             "key": "Space",
             "code": "Space",
             "hand": "left",
-            "finger": 'thumb',
+            "finger": "thumb",
             "row": "5",
             "column": "4",
             "size": "7",
@@ -523,7 +523,7 @@ data = {
             "key": "RAlt",
             "code": "AltRight",
             "hand": "right",
-            "finger": 'thumb',
+            "finger": "thumb",
             "row": "5",
             "column": "10",
             "size": "1.25",
@@ -548,7 +548,7 @@ data = {
 }
 
 
-# Fonction de tri pour trier d'abord par row, puis par column
+# Fonction de tri pour trier d’abord par row, puis par column
 def custom_sort(item):
     return (int(item["row"]), int(item["column"]))
 

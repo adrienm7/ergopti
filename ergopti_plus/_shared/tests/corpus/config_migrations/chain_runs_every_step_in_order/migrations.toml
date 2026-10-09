@@ -1,0 +1,32 @@
+# _shared/tests/corpus/config_migrations/chain_runs_every_step_in_order/migrations.toml
+
+[registry]
+current_version = 4
+unstamped_version = 1
+
+[steps.v1_to_v2]
+from = 1
+to = 2
+drivers = ["ahk", "hs", "linux"]
+reason = "Corpus: first step renames."
+ops = [
+	{ op = "rename", section = "s", key = "a", to_key = "b" },
+]
+
+[steps.v2_to_v3]
+from = 2
+to = 3
+drivers = ["ahk", "hs", "linux"]
+reason = "Corpus: second step maps the renamed value."
+ops = [
+	{ op = "map_value", section = "s", key = "b", map = [{ from = "x", to = "y" }] },
+]
+
+[steps.v3_to_v4]
+from = 3
+to = 4
+drivers = ["ahk", "hs", "linux"]
+reason = "Corpus: third step moves the section."
+ops = [
+	{ op = "move_section", section = "s", to_section = "t" },
+]

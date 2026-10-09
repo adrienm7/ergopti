@@ -1,0 +1,162 @@
+{
+	"_comment": "Pins _shared/lua/llm/translate.lua and windows/modules/llm/translate.ahk (llm_translate_selection) against _shared/modules/llm/translate.json and _shared/data/locale_names.json. An extract vector without `text` expects no translation.",
+	"parse_vectors": [
+		{
+			"id": "interface_language",
+			"value": "ui",
+			"valid": true
+		},
+		{
+			"id": "shipped_locale",
+			"value": "ja",
+			"valid": true
+		},
+		{
+			"id": "another_locale",
+			"value": "fr",
+			"valid": true
+		},
+		{
+			"id": "upper_case",
+			"value": "FR",
+			"valid": true
+		},
+		{
+			"id": "empty",
+			"value": "",
+			"valid": false
+		},
+		{
+			"id": "unknown_locale",
+			"value": "xx",
+			"valid": true
+		},
+		{
+			"id": "region_suffix",
+			"value": "en-US",
+			"valid": true
+		},
+		{
+			"id": "trailing_space",
+			"value": "ui ",
+			"valid": false
+		},
+		{
+			"id": "free_unicode_name",
+			"value": "Gaeilge",
+			"valid": true
+		},
+		{
+			"id": "free_non_latin",
+			"value": "ქართული",
+			"valid": true
+		},
+		{
+			"id": "action_separator",
+			"value": "English|2",
+			"valid": false
+		},
+		{
+			"id": "line_break",
+			"value": "English\nJapanese",
+			"valid": false
+		},
+		{
+			"id": "c1_control",
+			"value": "English",
+			"valid": false
+		},
+		{
+			"id": "leading_space",
+			"value": " Esperanto",
+			"valid": false
+		},
+		{
+			"id": "maximum_utf8_bytes",
+			"value": "éééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééé",
+			"valid": true
+		},
+		{
+			"id": "over_maximum_utf8_bytes",
+			"value": "ééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééa",
+			"valid": false
+		},
+		{
+			"id": "template_placeholder",
+			"value": "English{language}",
+			"valid": false
+		}
+	],
+	"target_vectors": [
+		{
+			"id": "interface_follows_ui",
+			"value": "ui",
+			"ui_locale": "fr",
+			"locale": "fr",
+			"language": "Français"
+		},
+		{
+			"id": "fixed_locale_ignores_ui",
+			"value": "ja",
+			"ui_locale": "fr",
+			"locale": "ja",
+			"language": "日本語"
+		},
+		{
+			"id": "interface_other_ui",
+			"value": "ui",
+			"ui_locale": "de",
+			"locale": "de",
+			"language": "Deutsch"
+		}
+	],
+	"prompt_vectors": [
+		{
+			"id": "native_name",
+			"language": "Deutsch",
+			"prompt": "You translate for a keyboard assistant. TEXT is what the user selected.\nTranslate TEXT into Deutsch. Keep its meaning, tone, formatting and line breaks; keep names, code and URLs unchanged. If TEXT is already in Deutsch, return it unchanged.\nReply with one block — nothing else:\nTRANSLATION: <translation>"
+		},
+		{
+			"id": "non_latin",
+			"language": "日本語",
+			"prompt": "You translate for a keyboard assistant. TEXT is what the user selected.\nTranslate TEXT into 日本語. Keep its meaning, tone, formatting and line breaks; keep names, code and URLs unchanged. If TEXT is already in 日本語, return it unchanged.\nReply with one block — nothing else:\nTRANSLATION: <translation>"
+		},
+		{
+			"id": "replacement_is_literal",
+			"language": "%1 $&",
+			"prompt": "You translate for a keyboard assistant. TEXT is what the user selected.\nTranslate TEXT into %1 $&. Keep its meaning, tone, formatting and line breaks; keep names, code and URLs unchanged. If TEXT is already in %1 $&, return it unchanged.\nReply with one block — nothing else:\nTRANSLATION: <translation>"
+		}
+	],
+	"user_text_vectors": [
+		{
+			"id": "multi_line",
+			"text": "Salut,\non se voit demain ?",
+			"user_text": "TEXT:\nSalut,\non se voit demain ?"
+		}
+	],
+	"extract_vectors": [
+		{
+			"id": "plain",
+			"block": "TRANSLATION: See you tomorrow",
+			"text": "See you tomorrow"
+		},
+		{
+			"id": "bold_mixed_case",
+			"block": "**Translation:** Hola,\n¿qué tal?",
+			"text": "Hola,\n¿qué tal?"
+		},
+		{
+			"id": "preamble",
+			"block": "Sure.\nTRANSLATION:\n  明日会いましょう  ",
+			"text": "明日会いましょう"
+		},
+		{
+			"id": "missing_tag",
+			"block": "See you tomorrow"
+		},
+		{
+			"id": "empty_after_tag",
+			"block": "TRANSLATION:   "
+		}
+	]
+}

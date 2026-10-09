@@ -1,0 +1,17 @@
+# _shared/tests/corpus/config_migrations/op_delete/migrations.toml
+
+[registry]
+current_version = 2
+unstamped_version = 1
+
+[steps.v1_to_v2]
+from = 1
+to = 2
+drivers = ["ahk", "hs", "linux"]
+reason = "Corpus: key and section removal."
+ops = [
+	{ op = "delete", section = "gestures", key = "space_wrap" },
+	{ op = "delete", section = "ahk" },
+	{ op = "delete", section = "layout", key = "only_key" },
+	{ op = "delete", section = "nowhere", key = "ghost" },
+]

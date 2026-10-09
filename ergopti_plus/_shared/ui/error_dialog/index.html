@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="UTF-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1" />
+		<title data-i18n="common.error_title"></title>
+		<link rel="stylesheet" href="style.css" />
+		<script src="../host_bridge.js"></script>
+		<script src="../i18n.js"></script>
+	</head>
+	<body>
+		<main>
+			<h1 id="heading"></h1>
+			<p id="intro" class="intro"></p>
+			<p id="module" class="module"></p>
+			<pre id="message" class="message"></pre>
+			<p class="logged">
+				<span id="logged"></span>
+				<button type="button" id="btn-open-log" disabled></button>
+			</p>
+			<p id="more" class="more" hidden></p>
+			<details id="details">
+				<summary data-i18n="error_dialog.details"></summary>
+				<p class="hint" data-i18n="healthcheck.preview.hint"></p>
+				<pre id="details-text"></pre>
+			</details>
+			<p id="status" class="status info" role="status" aria-live="polite"></p>
+			<p id="disable-hint" class="hint"></p>
+		</main>
+		<footer class="buttons">
+			<button type="button" id="btn-close" data-i18n="common.close"></button>
+			<button type="button" id="btn-copy" disabled data-i18n="error_dialog.copy"></button>
+			<button
+				type="button"
+				id="btn-report"
+				class="primary"
+				disabled
+				data-i18n="healthcheck.toolbar.report"
+			></button>
+		</footer>
+		<script src="script.js"></script>
+	</body>
+</html>

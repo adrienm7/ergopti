@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="fr">
+	<head>
+		<meta charset="utf-8" />
+		<title data-i18n="numeric_prompt.window_title"></title>
+		<link rel="stylesheet" href="style.css" />
+		<script src="../i18n.js"></script>
+		<script src="../host_bridge.js"></script>
+	</head>
+	<body>
+		<div id="container">
+			<h2 id="prompt-title"></h2>
+
+			<div id="prompt-hint"></div>
+
+			<div id="input-wrapper">
+				<input type="number" id="value-input" step="any" />
+				<div id="range-hint"></div>
+			</div>
+
+			<div id="error" hidden></div>
+
+			<div id="buttons">
+				<button
+					type="button"
+					id="cancel-button"
+					data-i18n="numeric_prompt.cancel"
+					onclick="doCancel()"
+				></button>
+				<button
+					type="button"
+					id="save-button"
+					data-i18n="numeric_prompt.save"
+					onclick="doSave()"
+				></button>
+			</div>
+		</div>
+
+		<script src="script.js"></script>
+	</body>
+</html>

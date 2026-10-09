@@ -1,0 +1,155 @@
+# _shared/modules/personal_info/preview_vectors.toml
+#
+# What the preview bubble must show for a personal_info value, on every driver.
+#
+# WHY THIS FILE EXISTS
+# fields.toml says WHICH fields are secret and mask.lua says HOW MUCH of one is
+# hidden, but neither pins the ANSWER. Three drivers each render the bubble in
+# their own language — Lua on macOS and Linux, AutoHotkey on Windows — so
+# "identical on all three" is a claim that has to be measured rather than
+# intended. These are the vectors that measure it: every driver's test suite
+# runs the same inputs through its own masking path and must produce the same
+# `preview` string, byte for byte.
+#
+# A value that reads differently on two machines is not a cosmetic difference.
+# The bubble exists so a user can confirm WHICH of their values is about to be
+# typed; if Windows reveals four digits where macOS reveals none, the check the
+# bubble offers is not the same check.
+#
+# HOW THE EXPECTED VALUES WERE OBTAINED
+# By running the shared implementation, then hand-checking each one against the
+# policy fields.toml states in prose — head 2, tail 4, nothing revealed below
+# twelve characters, separators preserved and never counted. Both halves matter:
+# generated alone, the corpus would only say the drivers agree with whichever
+# behaviour shipped; hand-written alone, it would drift from the code that has
+# to satisfy it.
+#
+# ADDING A VECTOR
+# Add the case, run the drivers' suites, and only then write the expected value
+# in — after checking it against the prose above. A vector whose expectation was
+# copied from a failing run is a bug with a test around it.
+
+
+
+
+# ==============================================================================
+# 1/ Masked fields — the four that hide a financial or identity secret
+# ==============================================================================
+
+[[vectors]]
+field = "iban"
+input = "FR7630006000011234567890189"
+preview = "FR•••••••••••••••••••••0189"
+why = "the headline case: 27 characters, so 2 + 21 + 4"
+
+[[vectors]]
+field = "iban"
+input = "FR76 3000 6000 0112 3456 7890 189"
+preview = "FR•• •••• •••• •••• •••• •••0 189"
+why = "the same IBAN as a user types it — spaces are kept and are not counted toward the head or the tail"
+
+[[vectors]]
+field = "bic"
+input = "BNPAFRPP"
+preview = "••••••••"
+why = "eight characters is below min_length_to_reveal, so a partial reveal would be most of the value"
+
+[[vectors]]
+field = "bic"
+input = "BNPAFRPPXXX"
+preview = "•••••••••••"
+why = "the eleven-character form is still below the bound"
+
+[[vectors]]
+field = "credit_card"
+input = "4111111111111111"
+preview = "41••••••••••1111"
+why = "the last four digits are how a card issuer asks you to identify the card"
+
+[[vectors]]
+field = "credit_card"
+input = "4111 1111 1111 1111"
+preview = "41•• •••• •••• 1111"
+why = "as printed on the card, in groups of four"
+
+[[vectors]]
+field = "social_security_number"
+input = "1 85 05 78 006 084 36"
+preview = "1 8• •• •• ••• •84 36"
+why = "a French SSN keeps its conventional spacing; the tail counts four digits, not four positions"
+
+
+
+
+# ==============================================================================
+# 2/ The boundary — where a reveal starts being a reveal
+# ==============================================================================
+
+[[vectors]]
+field = "iban"
+input = "FR7630006000"
+preview = "FR••••••6000"
+why = "exactly twelve characters: the first length at which anything is shown"
+
+[[vectors]]
+field = "iban"
+input = "FR763000600"
+preview = "•••••••••••"
+why = "eleven characters — one below the bound, and nothing is revealed"
+
+
+
+
+# ==============================================================================
+# 3/ Public fields — shown exactly as they will be typed
+# ==============================================================================
+
+[[vectors]]
+field = "phone_number"
+input = "+33 6 12 34 56 78"
+preview = "+33 6 12 34 56 78"
+why = "declared masked = false: a phone number is how people reach you, and hiding it helps nobody"
+
+[[vectors]]
+field = "phone_number_clean"
+input = "+33612345678"
+preview = "+33612345678"
+why = "the unspaced variant is the same decision"
+
+[[vectors]]
+field = "email_address"
+input = "adrien@example.org"
+preview = "adrien@example.org"
+
+[[vectors]]
+field = "first_name"
+input = "Adrien"
+preview = "Adrien"
+
+[[vectors]]
+field = "postal_code"
+input = "75011"
+preview = "75011"
+
+
+
+
+# ==============================================================================
+# 4/ Provenance — what happens when the field name is missing or unknown
+# ==============================================================================
+#
+# Both of these must MASK. A field that is absent from fields.toml and a field
+# whose name one driver misspells look identical from here, and treating either
+# as public reveals the value. Absence is never permission.
+
+[[vectors]]
+# No `field` key at all: the value reached the bubble without its provenance.
+input = "FR7630006000011234567890189"
+preview = "FR•••••••••••••••••••••0189"
+why = "provenance lost on the way to the bubble is exactly when a value must not be assumed public"
+
+[[vectors]]
+field = "not_a_declared_field"
+input = "FR7630006000011234567890189"
+preview = "FR•••••••••••••••••••••0189"
+why = "an undeclared field is masked — a name one driver spells differently must not become a reveal"

@@ -1,0 +1,56 @@
+﻿; tests/meta/test_lalt_rctrl_accept_suspend_guard.ahk
+
+; ==============================================================================
+; MODULE: LAlt / RCtrl Accept Suspend Guard Meta Test
+; DESCRIPTION:
+; Static source guard for the T-W04 finding: the LLM-accept path in
+; lalt.ahk and rctrl.ahk must route through TapHoldDispatchTap, whose central
+; gate checks A_IsSuspended before invoking any delayed tap callback.
+;
+; Both tap-hold blocks reach LLM_Tooltip_FireTabOrAccept, through
+; TapHoldEmitKeyTap, on a tap release that follows a KeyWait. Because the key-wait is non-blocking the AHK
+; hotkey thread stays alive across a Suspend toggle, so the caller could
+; fire the LLM accept callback while the driver is paused if no guard is
+; present. The callback is bound and handed to the shared dispatch gate, so
+; suspend and intervening-activity policy cannot drift between special paths.
+; ==============================================================================
+
+#Requires AutoHotkey v2.0
+
+
+
+
+; =====================================================
+; =====================================================
+; ======= 1/ Source scan helpers ======================
+; =====================================================
+; =====================================================
+
+; Scans the whole platform/remap/ directory instead of one hardcoded file.
+; Every assertion below is a PRESENCE check, so widening the scope cannot weaken
+; one — and _DriverDirConcat throws when the directory moves, instead of dying
+; with an unreadable-path error that says nothing about the invariant at stake.
+_LARSG_ReadSource() {
+	return _DriverDirConcat("platform/remap")
+}
+
+; =====================================================
+; =====================================================
+; ======= 2/ Assertions ================================
+; =====================================================
+; =====================================================
+
+_LARSG_LaltAcceptHasSuspendGuard() {
+	Src := _LARSG_ReadSource()
+	Assert(InStr(Src, 'TapHoldDispatchTap("left_alt", TapHoldEmitKeyTap.Bind("Tab"))') > 0,
+		"lalt.ahk: delayed LLM accept must run through the central suspend/activity gate")
+}
+Test("lalt: LLM accept path has A_IsSuspended guard", _LARSG_LaltAcceptHasSuspendGuard)
+
+
+_LARSG_RctrlAcceptHasSuspendGuard() {
+	Src := _LARSG_ReadSource()
+	Assert(InStr(Src, 'TapHoldDispatchTap("right_ctrl", TapHoldEmitKeyTap.Bind("Tab"))') > 0,
+		"rctrl.ahk: delayed LLM accept must run through the central suspend/activity gate")
+}
+Test("rctrl: LLM accept path has A_IsSuspended guard", _LARSG_RctrlAcceptHasSuspendGuard)

@@ -1,0 +1,10 @@
+[_meta]
+schema_version = 2
+
+# Independent handoff input.
+[hotstrings.editor]
+keep = "neighbor" # unchanged
+
+[shortcuts.keyboard]
+hs_option_period = "open_hotstrings_editor"
+magic_editor = "none"

@@ -1,0 +1,272 @@
+--- modules/keymap/state.lua
+
+--- ==============================================================================
+--- MODULE: Keymap CoreState factory
+--- DESCRIPTION:
+--- Owns the shared-state table passed by reference to every keymap submodule
+--- (Registry, Expander, LLMBridge, utils). Previously defined inline in
+--- keymap/init.lua; extracting it here makes the set of invariants that the
+--- submodules rely on explicit and easier to reason about in isolation.
+---
+--- FEATURES & RATIONALE:
+--- 1. Single Source of Truth for initial values: a factory function seeds
+---    every field from the canonical DEFAULT_STATE / DELAYS_DEFAULT tables
+---    supplied by keymap/init.lua. Submodules never re-declare defaults.
+--- 2. Closure-bound methods: suppress_rescan and suppress_rescan_keep_buffer
+---    are bound to the new state table at creation time so callers never have
+---    to thread the state handle through.
+--- 3. Declared Invariants: comments on the index fields document which pairs
+---    must stay consistent (e.g. mappings / mappings_by_tail_char) — the
+---    Registry is responsible for maintaining these after any structural
+---    change, but the invariant lives here with the state definition.
+--- ==============================================================================
+
+local hs = hs
+local M  = {}
+
+
+
+
+
+--- ===============================================
+--- ===============================================
+--- ======= 1/ Default Initialisation Seeds =======
+--- ===============================================
+--- ===============================================
+
+-- Default seconds the rescan window uses when callers do not pass an explicit
+-- duration to suppress_rescan(). Picked empirically to bridge the gap between
+-- an expansion firing and the next user keystroke without swallowing more
+-- than one human-speed key.
+local DEFAULT_SUPPRESS_SEC      = 0.5
+
+-- Suppression window applied after a FINAL-RESULT expansion, which must also
+-- outlast the replacement landing on screen. Named here, beside the default it
+-- doubles, because a bare literal at the call site is a magic number whose
+-- relationship to that default is invisible (project convention 5.1).
+M.FINAL_RESULT_SUPPRESS_SEC = DEFAULT_SUPPRESS_SEC * 2
+local DEFAULT_SUPPRESS_KEEP_SEC = 0.3
+
+
+
+
+-- =====================================
+-- =====================================
+-- ======= 2/ State Factory ============
+-- =====================================
+-- =====================================
+
+--- Builds a fresh CoreState table seeded from the canonical defaults.
+---
+--- The returned table carries:
+---   - the rolling keystroke buffer,
+---   - the mapping database (flat list + O(1) lookup + tail-char buckets),
+---   - the terminator/delay configuration pulled from the supplied defaults,
+---   - bound closures (suppress_rescan / suppress_rescan_keep_buffer) that
+---     mutate the same table rather than any module-level state.
+---
+--- Invariants the Registry must maintain after any structural change:
+---   * mappings_lookup[trigger .. "\0" .. is_word .. "\0" .. auto] points to
+---     the same entry that appears in mappings (flat list).
+---   * For every entry e in mappings, e.tail_char indexes it inside
+---     mappings_by_tail_char; if e.has_magic then e.star_base_tail_char
+---     indexes it inside mappings_by_star_tail_char.
+---   * mappings stays sorted by (tlen desc, is_word first, group_order asc,
+---     seq asc) at all times.
+---
+--- @param defaults table The DEFAULT_STATE table from keymap/init.lua.
+--- @param delays_default table The DELAYS_DEFAULT table from keymap/init.lua.
+--- @return table The freshly-seeded CoreState.
+function M.new(defaults, delays_default)
+	if type(defaults) ~= "table" then
+		error("state.new(): defaults must be a table (got " .. type(defaults) .. ").")
+	end
+	if type(delays_default) ~= "table" then
+		error("state.new(): delays_default must be a table (got " .. type(delays_default) .. ").")
+	end
+
+	local s = {
+		buffer                     = "",
+		-- LLM prompt context is intentionally distinct from the cursor-relative
+		-- hotstring buffer. Navigation always invalidates hotstring eligibility,
+		-- while the user-facing llm_reset_on_nav preference may retain this text.
+		llm_buffer                 = "",
+		-- True when the character immediately to the LEFT of `buffer` is
+		-- known to be a word terminator (or there is no character at all
+		-- — start of input). Flipped to false whenever the cursor moves
+		-- into an unobservable context (Backspace past the buffer's start,
+		-- arrow / nav keys, mouse click, Ctrl/Cmd combos other than
+		-- select-all, paste, undo, etc.). The expander consults this flag
+		-- when an `is_word` mapping matches at byte index 1 of the buffer
+		-- — without it we cannot distinguish « fresh document » from
+		-- « cursor moved mid-word and buffer was wiped ».
+		start_is_word_boundary     = true,
+		magic_key                  = defaults.trigger_char,
+		-- Flat list of mapping entries, sorted longest-first. See the
+		-- invariants comment above for how the adjacent indexes must stay
+		-- consistent with this list.
+		mappings                   = {},
+		mappings_lookup            = {},
+		mappings_by_tail_char      = {},
+		mappings_by_star_tail_char = {},
+		-- Ordinary auto mappings that happened to end with a newly selected
+		-- magic key are deliberately not reclassified as star mappings. Keep a
+		-- narrow index for that rare collision so prospective magic resolution
+		-- does not rescan the full (usually thousands-entry) magic tail bucket.
+		mappings_by_literal_magic_tail = {},
+		groups                     = {},
+		seq_counter                = 0,
+		-- Monotonic counter assigned on first registration of a group name;
+		-- stable across disable/enable cycles so the sort tiebreaker
+		-- (group_order asc) cannot flip priority of same-length triggers.
+		group_order_counter        = 0,
+		interceptors               = {},
+		preview_providers          = {},
+		shift_side                 = nil,
+		processing_paused          = false,
+		last_key_time              = 0,
+		last_key_was_complex       = false,
+		no_rescan_until            = 0,
+		lifecycle_generation       = 0,
+		WORD_TIMEOUT_SEC           = 5.0,
+		BASE_DELAY_SEC             = defaults.expansion_delay,
+		DELAYS                     = {},
+		-- Per-section delay overrides (seconds), keyed first by owning group and
+		-- then by section name. Section names are not globally unique across TOML
+		-- files, so flattening this table lets one category change another's policy.
+		SECTION_DELAYS             = {},
+		DELAYS_DEFAULT             = delays_default,
+		current_group              = nil,
+		group_post_load_hooks      = {},
+		ignored_window_titles      = {},
+		ignored_window_patterns    = {},
+	}
+
+	-- Closure-bound so callers hold a single s reference and never have to
+	-- thread the state handle through. suppress_rescan always wipes the
+	-- buffer (used after an expansion) while suppress_rescan_keep_buffer
+	-- leaves it intact (used for sequential hotstring chains).
+	s.prepare_suppress_rescan = function(duration)
+		local epoch_fn = hs and hs.timer and hs.timer.secondsSinceEpoch or os.time
+		return epoch_fn() + (tonumber(duration) or DEFAULT_SUPPRESS_SEC)
+	end
+
+	-- Memory-only commit half used after replacement buffer mutation. Keeping the
+	-- native clock read in prepare_suppress_rescan() prevents a second clock fault
+	-- from rolling Quartz back after the engine already describes new text.
+	s.commit_suppress_rescan = function(deadline)
+		s.no_rescan_until = deadline
+		s.buffer = ""
+		s.llm_buffer = ""
+		-- Post-expansion: the replacement just landed on screen. Treat the
+		-- new cursor position as abutting a word boundary so the next typed
+		-- char can fire word-boundary-required triggers — that mirrors the
+		-- AHK HSEv2 contract (HSE_ApplyExpansion semantics).
+		s.start_is_word_boundary = true
+	end
+
+	s.suppress_rescan = function(duration)
+		s.commit_suppress_rescan(s.prepare_suppress_rescan(duration))
+	end
+
+	--- Resolves the expansion delay (seconds) that applies to one mapping.
+	---
+	--- Canonical projections already resolve user section > user group > corpus
+	--- through the shared cascade. Standalone registries retain their local chain:
+	---   user-overridden group delay > TOML per-section delay > group delay > base.
+	--- A group delay differing from its hardcoded default counts as a user
+	--- override and wins over a per-section TOML value.
+	---
+	--- Lives on CoreState because TWO consumers need the same answer: the tap,
+	--- which decides whether a trigger may still fire, and the preview, which
+	--- decides how long to show the row offering it. The preview used to derive
+	--- its lifetime from a coarse three-way key instead, so the tooltip could
+	--- vanish while the trigger was still live, or linger after it had expired —
+	--- promising an expansion the engine would refuse.
+	--- @param m table A registry mapping (reads has_magic, group and section).
+	--- @return number Delay in seconds; 0 means "always active".
+	s.resolve_mapping_delay = function(m)
+		if type(m) ~= "table" then return s.BASE_DELAY_SEC end
+		local group = m.group and s.groups[m.group]
+		local resolved = m.group and s.SECTION_DELAYS[m.group]
+		if group and group.delay_resolved and resolved and resolved[m.section] ~= nil then
+			return resolved[m.section]
+		end
+		if m.has_magic then return s.DELAYS.STAR_TRIGGER or s.BASE_DELAY_SEC end
+		if m.group and s.DELAYS[m.group] ~= nil
+			and s.DELAYS_DEFAULT[m.group] ~= nil
+			and s.DELAYS[m.group] ~= s.DELAYS_DEFAULT[m.group] then
+			return s.DELAYS[m.group]
+		end
+		local group_sections = m.group and s.SECTION_DELAYS[m.group] or nil
+		if type(group_sections) == "table" and m.section
+			and group_sections[m.section] ~= nil then
+			return group_sections[m.section]
+		end
+		if m.group and s.DELAYS[m.group] then return s.DELAYS[m.group] end
+		return s.BASE_DELAY_SEC
+	end
+
+	--- Returns whether an ordinary auto mapping is live and, when finite, how
+	--- many seconds remain. Both the eventtap and prospective tooltip use this
+	--- comparison; the caller supplies elapsed time so no consumer reads another
+	--- consumer's transient clock state.
+	--- @param m table Registry mapping.
+	--- @param elapsed number Seconds since the preceding physical key.
+	--- @param complex_mult number|nil Modifier timing multiplier (defaults to 1).
+	--- @return boolean allowed
+	--- @return number|nil remaining Nil means the mapping has no deadline.
+	s.mapping_delay_remaining = function(m, elapsed, complex_mult)
+		local specific_delay = s.resolve_mapping_delay(m)
+		local multiplier = tonumber(complex_mult) or 1
+		-- Autocorrections are never stretched for complex keystrokes (they fire
+		-- on letter combos, not modifier+letter sequences).
+		local allowed_delay = m and m.group == "autocorrection"
+			and specific_delay or (specific_delay * multiplier)
+		if allowed_delay == 0 then return true, nil end
+		local remaining = allowed_delay - math.max(0, tonumber(elapsed) or 0)
+		-- Deadlines are half-open. Tooltip dequeue expires a row when now >=
+		-- expire_at; accepting the mapping at equality would let callback order
+		-- decide whether the same timestamp still owns a visible promise.
+		return remaining > 0, math.max(0, remaining)
+	end
+
+	s.suppress_rescan_keep_buffer = function(duration)
+		local epoch_fn = hs and hs.timer and hs.timer.secondsSinceEpoch or os.time
+		s.no_rescan_until = epoch_fn() + (tonumber(duration) or DEFAULT_SUPPRESS_KEEP_SEC)
+	end
+
+	-- Seed the initial per-group delays from defaults.
+	for k, v in pairs(delays_default) do
+		s.DELAYS[k] = v
+	end
+
+	-- Recompute the word-inactivity timeout from the LARGEST active delay,
+	-- considering BOTH group delays and per-section overrides. A delay of 0
+	-- means "always-active" → the timeout must be infinite (0) so the buffer is
+	-- never auto-wiped before such a trigger can fire. Section delays MUST be
+	-- included: a long per-section window (e.g. comma_j = 5 s) would otherwise
+	-- be cut short by a timeout sized only to the group delays. Call again
+	-- whenever DELAYS or SECTION_DELAYS change (set_delay, load_toml).
+	s.recompute_word_timeout = function()
+		local has_infinite = false
+		local max_delay    = 0
+		local function consider(value)
+			if type(value) ~= "number" then return end
+			if value == 0        then has_infinite = true end
+			if value > max_delay then max_delay = value end
+		end
+		for _, delay in pairs(s.DELAYS) do consider(delay) end
+		for _, group_sections in pairs(s.SECTION_DELAYS) do
+			if type(group_sections) == "table" then
+				for _, delay in pairs(group_sections) do consider(delay) end
+			end
+		end
+		s.WORD_TIMEOUT_SEC = has_infinite and 0 or (max_delay + 0.5)
+	end
+	s.recompute_word_timeout()
+
+	return s
+end
+
+return M

@@ -1,0 +1,84 @@
+{
+	"_comment": "Shared no-op persistence vectors. An existing byte-identical image is acknowledged without publication; changed values and types still publish. Windows adds its canonical UTF-8 BOM to the common TOML image.",
+	"cases": [
+		{
+			"id": "same_boolean",
+			"input": "[demo]\nvalue = true\n",
+			"section": "demo",
+			"key": "value",
+			"kind": "boolean",
+			"value": true,
+			"writes": 0
+		},
+		{
+			"id": "same_integer",
+			"input": "[demo]\nvalue = 7\n",
+			"section": "demo",
+			"key": "value",
+			"kind": "integer",
+			"value": 7,
+			"writes": 0
+		},
+		{
+			"id": "same_string",
+			"input": "[demo]\nvalue = \"Keep\"\n",
+			"section": "demo",
+			"key": "value",
+			"kind": "string",
+			"value": "Keep",
+			"writes": 0
+		},
+		{
+			"id": "same_array",
+			"input": "[demo]\nvalue = [\"a\", \"b\"]\n",
+			"section": "demo",
+			"key": "value",
+			"kind": "array",
+			"value": ["a", "b"],
+			"writes": 0
+		},
+		{
+			"id": "delete_missing_key",
+			"input": "[demo]\nvalue = 7\n",
+			"section": "demo",
+			"key": "absent",
+			"delete": true,
+			"writes": 0
+		},
+		{
+			"id": "delete_missing_section",
+			"input": "[demo]\nvalue = 7\n",
+			"section": "missing",
+			"key": "absent",
+			"delete": true,
+			"writes": 0
+		},
+		{
+			"id": "changed_integer",
+			"input": "[demo]\nvalue = 7\n",
+			"section": "demo",
+			"key": "value",
+			"kind": "integer",
+			"value": 8,
+			"writes": 1
+		},
+		{
+			"id": "case_sensitive_string",
+			"input": "[demo]\nvalue = \"Keep\"\n",
+			"section": "demo",
+			"key": "value",
+			"kind": "string",
+			"value": "keep",
+			"writes": 1
+		},
+		{
+			"id": "integer_to_boolean",
+			"input": "[demo]\nvalue = 1\n",
+			"section": "demo",
+			"key": "value",
+			"kind": "boolean",
+			"value": true,
+			"writes": 1
+		}
+	]
+}

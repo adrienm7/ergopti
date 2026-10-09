@@ -1,0 +1,10 @@
+[registry]
+current_version = 2
+unstamped_version = 1
+
+[steps.v1_to_v2]
+from = 1
+to = 2
+drivers = ["ahk", "hs", "linux"]
+reason = "Independent closed chord operation shape rejection."
+ops = [{ op = "move_chord_action", section = "hotstrings.editor", key = "shortcut", to_section = "shortcuts.keyboard", action = "open_hotstrings_editor", conditional_key = "magic_editor", disabled_action = "none", platform = "windows" }]

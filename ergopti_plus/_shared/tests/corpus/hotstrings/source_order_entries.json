@@ -1,0 +1,25 @@
+{
+	"description": "Independent interleaved source-order fixture; not a replacement for the historical 140-rule corpus.",
+	"source": "[_meta]\nsections_order = [\"abbreviations\", \"caps\", \"terms\", \"unknown\"]\ndelay = 0.5\n[_meta.section_delays]\ncaps = 0.2\nterms = 0.3\nabbreviations = 0.4\n[[caps]]\n\"firstx\" = { output = \"First\", is_word = true, is_case_sensitive = true, auto_expand = true, final_result = true }\n[[terms]]\n\"secondx\" = { output = \"Second\", is_word = false, auto_expand = true, is_case_sensitive = true, is_case_sensitive_strict = true, priority = 44 }\n[[caps]]\n\"thirdx\" = { output = \"Third\", is_word = true, is_case_sensitive = true, auto_expand = false }\n[[abbreviations]]\n\"fourthx\" = { output = \"Fourth\", is_word = true, is_case_sensitive = true, auto_expand = true }\n[[unknown]]\n\"unknownx\" = { output = \"Unknown\", is_word = true, is_case_sensitive = true, auto_expand = true }\n[[caps]]\n\"sixthx\" = { output = \"Sixth\", is_word = false, is_case_sensitive = true, auto_expand = true }\n",
+	"source_order": ["firstx", "secondx", "thirdx", "fourthx", "unknownx", "sixthx"],
+	"admitted_source_order": ["firstx", "secondx", "thirdx", "fourthx", "sixthx"],
+	"declared_order": ["fourthx", "firstx", "thirdx", "sixthx", "secondx"],
+	"caps_order": ["firstx", "thirdx", "sixthx"],
+	"sections": ["abbreviations", "caps", "terms", "unknown"],
+	"counts": {
+		"caps": 3,
+		"terms": 1,
+		"abbreviations": 1,
+		"unknown": 1
+	},
+	"bound_source": "[_meta]\nsections_order = [\"caps\"]\n[[caps]]\n\"boundfirst\" = { output = \"First bound\", is_word = true, is_case_sensitive = true }\n[[caps]]\n\"boundsecond\" = { output = \"Second bound\", is_word = true, is_case_sensitive = true }\n[[caps]]\n\"boundthird\" = { output = \"Third bound\", is_word = true, is_case_sensitive = true }\n[[caps]]\n\"boundfourth\" = { output = \"Fourth bound\", is_word = true, is_case_sensitive = true }\n",
+	"bound_caps_order": ["boundfirst", "boundsecond", "boundthird", "boundfourth"],
+	"bound_declared_order": [
+		"fourthx",
+		"boundfirst",
+		"boundsecond",
+		"boundthird",
+		"boundfourth",
+		"secondx"
+	]
+}

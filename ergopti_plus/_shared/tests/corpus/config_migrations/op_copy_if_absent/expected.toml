@@ -1,0 +1,28 @@
+[_meta]
+schema_version = 2
+
+[source]
+on = true
+off = false
+text = "legacy"
+numeric_text = "001"
+numeric_text_copy = "001"
+empty = []
+rows = [[1, 2], [3]]
+records = [{ delay = 1.25, visible = false, palette = [{ Key = "upper", key = "lower" }] }]
+
+[destination]
+on = false
+off = true
+text = 42
+unrelated = "keep"
+new_on = true
+new_off = false
+new_text = "legacy"
+empty = []
+rows = [[1, 2], [3]]
+records = [{ delay = 1.25, visible = false, palette = [{ Key = "upper", key = "lower" }] }]
+second_on = true
+
+[sibling]
+records = [{ delay = 1.25, visible = false, palette = [{ Key = "upper", key = "lower" }] }]

@@ -1,0 +1,393 @@
+{
+	"description": "Golden vectors for screen reading (llm_screen_region / llm_screen_full): the binding parameter, the vision model it resolves to with _shared/modules/llm/vision.json, the request body each API dialect receives, and how a tagged answer is read. Generated from _shared/lua/llm/vision.lua, replayed by it and by windows/modules/llm/vision.ahk.",
+	"rule": "parse: \"<backend>\" or \"<backend>|<model>\"; backend matches ^[a-z][a-z0-9_]*$; model is 1-200 characters, no control character or |, no leading or trailing spacing. A parse vector with valid false is refused; one without model has none. model_vectors: the binding's model, else vision.json default_models[backend], else none (a vector without model). request_vectors compare the decoded JSON body. extract: the text after the first case-insensitive tag, ** removed, trimmed, over every following line; none when absent or empty (a vector without text).",
+	"extract_vectors": [
+		{
+			"block": "SCREEN: Hi Marc,\nsee you at 3.\n",
+			"id": "screen_multiline",
+			"tag": "SCREEN:",
+			"text": "Hi Marc,\nsee you at 3."
+		},
+		{
+			"block": "**ANSWER:** Merci !",
+			"id": "answer_bold",
+			"tag": "ANSWER:",
+			"text": "Merci !"
+		},
+		{
+			"block": "answer: ok then",
+			"id": "lowercase_tag",
+			"tag": "ANSWER:",
+			"text": "ok then"
+		},
+		{
+			"block": "Sure.\nANSWER:\nLine 1\nLine 2",
+			"id": "preamble",
+			"tag": "ANSWER:",
+			"text": "Line 1\nLine 2"
+		},
+		{
+			"block": "Just text",
+			"id": "no_tag",
+			"tag": "ANSWER:"
+		},
+		{
+			"block": "ANSWER:   \n",
+			"id": "empty_after_tag",
+			"tag": "ANSWER:"
+		}
+	],
+	"model_vectors": [
+		{
+			"id": "local_default",
+			"model": "qwen2.5vl:3b",
+			"value": "local"
+		},
+		{
+			"id": "provider_default",
+			"model": "claude-haiku-4-5",
+			"value": "anthropic"
+		},
+		{
+			"id": "explicit_wins",
+			"model": "gpt-4.1",
+			"value": "openai|gpt-4.1"
+		},
+		{
+			"id": "no_default",
+			"value": "cerebras"
+		},
+		{
+			"id": "no_default_explicit",
+			"model": "llama-4-scout-17b",
+			"value": "cerebras|llama-4-scout-17b"
+		}
+	],
+	"parse_vectors": [
+		{
+			"backend": "local",
+			"id": "local_default",
+			"value": "local"
+		},
+		{
+			"backend": "openai",
+			"id": "provider_with_model",
+			"model": "gpt-4.1-mini",
+			"value": "openai|gpt-4.1-mini"
+		},
+		{
+			"backend": "local",
+			"id": "ollama_tag_model",
+			"model": "qwen2.5vl:7b",
+			"value": "local|qwen2.5vl:7b"
+		},
+		{
+			"backend": "openai_compat",
+			"id": "compat_model_with_slash",
+			"model": "meta-llama/Llama-4-Scout",
+			"value": "openai_compat|meta-llama/Llama-4-Scout"
+		},
+		{
+			"id": "empty",
+			"valid": false,
+			"value": ""
+		},
+		{
+			"id": "uppercase_backend",
+			"valid": false,
+			"value": "OpenAI"
+		},
+		{
+			"id": "empty_model",
+			"valid": false,
+			"value": "openai|"
+		},
+		{
+			"id": "two_separators",
+			"valid": false,
+			"value": "openai|a|b"
+		},
+		{
+			"id": "padded_model",
+			"valid": false,
+			"value": "openai| gpt"
+		},
+		{
+			"id": "space_in_backend",
+			"valid": false,
+			"value": "open ai"
+		},
+		{
+			"id": "newline_in_model",
+			"valid": false,
+			"value": "openai|gpt\n4"
+		},
+		{
+			"id": "too_long_model",
+			"valid": false,
+			"value": "openai|mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm"
+		},
+		{
+			"backend": "openai",
+			"id": "longest_model",
+			"model": "mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm",
+			"value": "openai|mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm"
+		}
+	],
+	"request_vectors": [
+		{
+			"body": {
+				"max_tokens": 1200,
+				"messages": [
+					{
+						"content": "SYS",
+						"role": "system"
+					},
+					{
+						"content": [
+							{
+								"text": "Transcribe this screenshot.",
+								"type": "text"
+							},
+							{
+								"image_url": {
+									"url": "data:image/png;base64,QUJD"
+								},
+								"type": "image_url"
+							}
+						],
+						"role": "user"
+					}
+				],
+				"model": "m",
+				"stream": false
+			},
+			"format": "openai",
+			"id": "openai_image",
+			"spec": {
+				"image": "QUJD",
+				"max_tokens": 1200,
+				"mime": "image/png",
+				"model": "m",
+				"system": "SYS",
+				"text": "Transcribe this screenshot."
+			}
+		},
+		{
+			"body": {
+				"max_tokens": 600,
+				"messages": [
+					{
+						"content": "SYS",
+						"role": "system"
+					},
+					{
+						"content": "SCREEN:\nhello",
+						"role": "user"
+					}
+				],
+				"model": "m",
+				"stream": false
+			},
+			"format": "openai",
+			"id": "openai_text",
+			"spec": {
+				"max_tokens": 600,
+				"model": "m",
+				"system": "SYS",
+				"text": "SCREEN:\nhello"
+			}
+		},
+		{
+			"body": {
+				"max_tokens": 1200,
+				"messages": [
+					{
+						"content": [
+							{
+								"source": {
+									"data": "QUJD",
+									"media_type": "image/png",
+									"type": "base64"
+								},
+								"type": "image"
+							},
+							{
+								"text": "Transcribe this screenshot.",
+								"type": "text"
+							}
+						],
+						"role": "user"
+					}
+				],
+				"model": "m",
+				"system": "SYS"
+			},
+			"format": "anthropic",
+			"id": "anthropic_image",
+			"spec": {
+				"image": "QUJD",
+				"max_tokens": 1200,
+				"mime": "image/png",
+				"model": "m",
+				"system": "SYS",
+				"text": "Transcribe this screenshot."
+			}
+		},
+		{
+			"body": {
+				"max_tokens": 600,
+				"messages": [
+					{
+						"content": [
+							{
+								"text": "SCREEN:\nhello",
+								"type": "text"
+							}
+						],
+						"role": "user"
+					}
+				],
+				"model": "m",
+				"system": "SYS"
+			},
+			"format": "anthropic",
+			"id": "anthropic_text",
+			"spec": {
+				"max_tokens": 600,
+				"model": "m",
+				"system": "SYS",
+				"text": "SCREEN:\nhello"
+			}
+		},
+		{
+			"body": {
+				"contents": [
+					{
+						"parts": [
+							{
+								"inline_data": {
+									"data": "QUJD",
+									"mime_type": "image/png"
+								}
+							},
+							{
+								"text": "Transcribe this screenshot."
+							}
+						],
+						"role": "user"
+					}
+				],
+				"generationConfig": {
+					"maxOutputTokens": 1200
+				},
+				"system_instruction": {
+					"parts": [
+						{
+							"text": "SYS"
+						}
+					]
+				}
+			},
+			"format": "gemini",
+			"id": "gemini_image",
+			"spec": {
+				"image": "QUJD",
+				"max_tokens": 1200,
+				"mime": "image/png",
+				"model": "m",
+				"system": "SYS",
+				"text": "Transcribe this screenshot."
+			}
+		},
+		{
+			"body": {
+				"contents": [
+					{
+						"parts": [
+							{
+								"text": "SCREEN:\nhello"
+							}
+						],
+						"role": "user"
+					}
+				],
+				"generationConfig": {
+					"maxOutputTokens": 600
+				},
+				"system_instruction": {
+					"parts": [
+						{
+							"text": "SYS"
+						}
+					]
+				}
+			},
+			"format": "gemini",
+			"id": "gemini_text",
+			"spec": {
+				"max_tokens": 600,
+				"model": "m",
+				"system": "SYS",
+				"text": "SCREEN:\nhello"
+			}
+		},
+		{
+			"body": {
+				"messages": [
+					{
+						"content": "SYS",
+						"role": "system"
+					},
+					{
+						"content": "Transcribe this screenshot.",
+						"images": ["QUJD"],
+						"role": "user"
+					}
+				],
+				"model": "m",
+				"options": {
+					"num_predict": 1200
+				},
+				"stream": false
+			},
+			"format": "ollama",
+			"id": "ollama_image",
+			"spec": {
+				"image": "QUJD",
+				"max_tokens": 1200,
+				"mime": "image/png",
+				"model": "m",
+				"system": "SYS",
+				"text": "Transcribe this screenshot."
+			}
+		},
+		{
+			"body": {
+				"messages": [
+					{
+						"content": "SYS",
+						"role": "system"
+					},
+					{
+						"content": "SCREEN:\nhello",
+						"role": "user"
+					}
+				],
+				"model": "m",
+				"options": {
+					"num_predict": 600
+				},
+				"stream": false
+			},
+			"format": "ollama",
+			"id": "ollama_text",
+			"spec": {
+				"max_tokens": 600,
+				"model": "m",
+				"system": "SYS",
+				"text": "SCREEN:\nhello"
+			}
+		}
+	]
+}

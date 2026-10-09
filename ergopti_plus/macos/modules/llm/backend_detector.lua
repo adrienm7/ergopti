@@ -1,0 +1,192 @@
+--- modules/llm/backend_detector.lua
+
+--- ==============================================================================
+--- MODULE: LLM Backend Detector
+--- DESCRIPTION:
+--- Decides which LLM backend ("mlx" or "ollama") should be the default on
+--- the current host. The rule is straightforward and deterministic:
+---   - macOS on Apple Silicon (arm64) ≥ 14.0  → "mlx"  (native MLX runtime)
+---   - everything else                         → "ollama" (portable fallback)
+---
+--- A user-saved preference (hs.settings: "llm_backend") always wins over the
+--- auto-detected default — switching backends in the menu must persist.
+---
+--- FEATURES & RATIONALE:
+--- 1. Single source of truth: every caller asking "which backend?" goes
+---    through this module so the policy is consistent across boot, menu
+---    opening, and backend-switch flows.
+--- 2. Defensive detection: each underlying probe (uname, sw_vers, hs.host)
+---    is wrapped in pcall and falls back to a sane default — a probe
+---    failure must never leave the user with no usable backend.
+--- 3. Pure read-only: this module never installs, downloads, or spawns
+---    anything; it only reports a decision. Bootstrapping is the
+---    responsibility of *_deps_checker modules which consult this one.
+--- ==============================================================================
+
+local M = {}
+local hs     = hs
+local Logger = require("infra.logger")
+local Storage = require("adapters.storage")
+
+local LOG = "backend_detector"
+
+
+
+
+-- =====================================
+-- =====================================
+-- ======= 1/ Constants ================
+-- =====================================
+-- =====================================
+
+-- Backend identifiers. Kept here as constants so a typo in any caller is
+-- immediately visible at lint time rather than at runtime.
+M.BACKEND_MLX    = "mlx"
+M.BACKEND_OLLAMA = "ollama"
+M.BACKEND_API    = "api"  -- remote provider (OpenAI / Anthropic / Gemini / …)
+
+-- Oldest macOS the MLX runtime installs on: the mlx and mlx-metal wheels the
+-- committed uv.lock pins start at macosx_14_0_arm64. The former floor of 13
+-- picked MLX on macOS 13, where uv sync then failed with no wheel "for the
+-- current platform", reported as a network error. A test reads uv.lock to
+-- keep this floor equal to the oldest locked wheel.
+local MLX_MIN_MACOS_MAJOR = 14
+M.MLX_MIN_MACOS_MAJOR = MLX_MIN_MACOS_MAJOR
+
+-- Hammerspoon-settings key under which the user's explicit choice is
+-- persisted. Picking the same key as menu_llm.DEFAULT_STATE keeps the two
+-- in sync.
+local SETTING_KEY = "llm_backend"
+
+
+
+
+-- ==============================
+-- ==============================
+-- ======= 2/ Probes ============
+-- ==============================
+-- ==============================
+
+--- Returns true on Apple Silicon (arm64). Falls back to a heuristic on the
+--- /opt/homebrew prefix when uname is unavailable for any reason.
+--- @return boolean True when the host CPU is arm64.
+local _is_arm_cached = nil
+local _macos_major_cached = nil
+-- The architecture uname named ("arm64" or "x86_64"), or false when it named
+-- neither, so a fallback guess is never reported as a probed fact.
+local _probed_arch = nil
+
+local function is_apple_silicon()
+	-- Memoised: the CPU architecture cannot change while the process runs, and
+	-- this used to spawn a subprocess on every call — including twice during
+	-- boot, on the critical path before the keymap starts.
+	if _is_arm_cached ~= nil then return _is_arm_cached end
+	local ok, out = pcall(hs.execute, "/usr/bin/uname -m")
+	_probed_arch = false
+	if ok and type(out) == "string" then
+		if out:match("arm64") then _probed_arch = "arm64"; _is_arm_cached = true; return true end
+		if out:match("x86_64") then _probed_arch = "x86_64"; _is_arm_cached = false; return false end
+	end
+	-- Heuristic fallback: Homebrew on Apple Silicon installs to /opt/homebrew,
+	-- on Intel to /usr/local. Not 100 % bullet-proof, but catches every
+	-- realistic case on a Mac shipped after late-2020.
+	_is_arm_cached = hs.fs.attributes("/opt/homebrew", "mode") == "directory"
+	return _is_arm_cached
+end
+
+--- Returns the macOS major version as an integer (13, 14, 15, …) or nil
+--- when the probe fails. We treat "unknown" as "too old to be safe" → MLX
+--- not selected.
+--- @return integer|nil major Major macOS version, or nil if unknown.
+local function macos_major_version()
+	-- Memoised for the same reason as the architecture probe: the OS version is
+	-- fixed for the life of the process, and a failed probe is cached as false
+	-- so a broken sw_vers is not re-spawned on every call either.
+	if _macos_major_cached ~= nil then
+		return _macos_major_cached or nil
+	end
+	local ok, out = pcall(hs.execute, "/usr/bin/sw_vers -productVersion")
+	if not ok or type(out) ~= "string" then
+		_macos_major_cached = false
+		return nil
+	end
+	local major = out:match("^(%d+)")
+	_macos_major_cached = (major and tonumber(major)) or false
+	return _macos_major_cached or nil
+end
+
+
+
+
+
+-- =======================================
+-- =======================================
+-- ======= 3/ Public Detection API =======
+-- =======================================
+-- =======================================
+
+--- Computes the auto-detected default backend ignoring any user preference.
+--- Useful for diagnostics and for the menu's "reset to default" action.
+--- @return string One of M.BACKEND_MLX / M.BACKEND_OLLAMA.
+function M.auto_default()
+	local arm = is_apple_silicon()
+	local major = macos_major_version()
+	local ok_macos = (major ~= nil) and (major >= MLX_MIN_MACOS_MAJOR)
+
+	if arm and ok_macos then
+		Logger.debug(LOG, "Auto-default = mlx (arm64, macOS major=%s).", tostring(major))
+		return M.BACKEND_MLX
+	end
+	Logger.debug(LOG, "Auto-default = ollama (arm=%s, macOS major=%s).",
+		tostring(arm), tostring(major))
+	return M.BACKEND_OLLAMA
+end
+
+--- Tells whether this Mac can run the MLX runtime: Apple Silicon running
+--- natively (Ergopti under Rosetta reads x86_64 and gets x86_64 wheels) and
+--- macOS MLX_MIN_MACOS_MAJOR or later. Only a probed fact refuses: an
+--- architecture or a version that cannot be read lets the installation try
+--- and name its own failure.
+--- @return boolean supported False only when a probe proved MLX cannot run.
+--- @return table platform { arch = "arm64"|"x86_64"|nil, macos_major = integer|nil }
+function M.mlx_support()
+	is_apple_silicon()
+	local arch = _probed_arch or nil
+	local major = macos_major_version()
+	local platform = { arch = arch, macos_major = major }
+	if arch == "x86_64" then return false, platform end
+	if major ~= nil and major < MLX_MIN_MACOS_MAJOR then return false, platform end
+	return true, platform
+end
+
+--- Returns the effective backend the rest of the stack should use. Honours
+--- a user-saved preference when present; otherwise falls back to
+--- M.auto_default().
+--- @return string One of M.BACKEND_MLX / M.BACKEND_OLLAMA / M.BACKEND_API.
+function M.effective_backend()
+	local saved = Storage.get(SETTING_KEY)
+	if saved == M.BACKEND_MLX or saved == M.BACKEND_OLLAMA or saved == M.BACKEND_API then
+		Logger.debug(LOG, "Effective backend = %s (user-saved).", saved)
+		return saved
+	end
+	return M.auto_default()
+end
+
+--- Persists an explicit backend choice. Validates the value to keep callers
+--- honest — a typo would otherwise silently corrupt hs.settings.
+--- @param backend string Must equal M.BACKEND_MLX / M.BACKEND_OLLAMA / M.BACKEND_API.
+--- @return boolean committed
+function M.set_backend(backend)
+	if backend ~= M.BACKEND_MLX and backend ~= M.BACKEND_OLLAMA and backend ~= M.BACKEND_API then
+		Logger.error(LOG, "set_backend: invalid backend '%s' — refusing to persist.", tostring(backend))
+		return false
+	end
+	if Storage.set(SETTING_KEY, backend) ~= true then
+		Logger.error(LOG, "Backend preference '%s' could not be persisted.", backend)
+		return false
+	end
+	Logger.debug(LOG, "Backend preference saved: %s.", backend)
+	return true
+end
+
+return M

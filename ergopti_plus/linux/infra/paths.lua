@@ -1,0 +1,259 @@
+--- infra/paths.lua
+
+--- ==============================================================================
+--- MODULE: Linux Path Resolver
+--- DESCRIPTION:
+--- Single source of truth for where the shared tree lives, mirroring the macOS
+--- infra/paths.lua and windows/infra/boot.ahk.
+---
+--- WHY THIS EXISTS — TWO SHIPPED BUGS, SAME CAUSE:
+--- Every Linux module used to derive `_shared` itself, from its own file's
+--- location, with its own number of `..` steps. Twelve such expressions existed,
+--- at four different depths, and two of them were wrong:
+---
+---   * infra/i18n.lua walked `../../` from the driver root to reach
+---     `_shared/data/locales`. One level too high. `ls` on the missing directory
+---     printed nothing, the scan collected zero codes, and the fallback list
+---     `{"en", "fr"}` took over — so the language menu offered 2 locales out of
+---     the 21 that ship. Nothing failed; the menu just quietly had two rows.
+---
+---   * modules/keylogger/sqlite_writer.lua walked `../../../` for
+---     `_shared/data/db/schema.sql`. Two levels too high, with a bare relative
+---     path as the fallback — which made schema loading depend on the process's
+---     CURRENT DIRECTORY rather than on where the driver is installed.
+---
+--- Both are the same failure: a path derived per-file cannot be verified, and a
+--- wrong one degrades silently instead of failing. This module derives the root
+--- once, from its own location, and every caller asks it.
+---
+--- FEATURES & RATIONALE:
+--- 1. Self-locating: the root comes from debug.getinfo on THIS file, so it is
+---    correct wherever the driver is installed and independent of the CWD.
+--- 2. Fails loudly: shared_root() returns nil when the tree is not found, and
+---    shared() logs which path it looked for — a missing shared tree is a broken
+---    install, not something to paper over with a fallback that half-works.
+--- 3. Layout-tolerant, not layout-guessing: the two layouts that actually ship
+---    are both probed, in a fixed order, and nothing else is. See shared_root().
+--- ==============================================================================
+
+local M = {}
+
+local Logger = require("logger.shim")
+local LOG = "paths"
+
+-- The file a candidate directory must carry to BE the shared tree. Probing a
+-- file rather than the directory keeps a stale empty `_shared/` left by a
+-- partial install from resolving and then failing at every subsequent read.
+local SHARED_PROBE_FILE = "data/locales/en.json"
+
+-- Refusals of the installed-layouts record already logged: the roots are read
+-- at every hotstring reload, and one ERROR per reason is enough to name it.
+local _installed_refusals_reported = {}
+
+
+
+
+-- =========================================
+-- =========================================
+-- ======= 1/ Root resolution ==============
+-- =========================================
+-- =========================================
+
+--- Reads the actual process working directory rather than inherited PWD.
+--- Native cwd queries also preserve legal newline bytes in directory names.
+--- @return string|nil
+function M.current_directory()
+	local ok_uv, uv = pcall(require, "luv")
+	if ok_uv and type(uv.cwd) == "function" then
+		local ok, cwd = pcall(uv.cwd)
+		if ok and type(cwd) == "string" and cwd ~= "" then return cwd end
+	end
+	local ok_ffi, ffi = pcall(require, "ffi")
+	if ok_ffi and ffi.os ~= "Windows" then
+		pcall(ffi.cdef, "char *getcwd(char *buf, size_t size);")
+		local buf = ffi.new("char[?]", 4096)
+		local ok, res = pcall(function() return ffi.C.getcwd(buf, 4096) end)
+		if ok and res ~= nil then return ffi.string(buf) end
+	end
+	local ok, pipe = pcall(io.popen, "pwd 2>/dev/null")
+	if not ok or not pipe then return nil end
+	local out = (pipe:read("*a") or "")
+	local first, kind, code = pipe:close()
+	if not (first == 0 or (first == true and (kind == nil or kind == "exit")
+		and (code == nil or code == 0))) then return nil end
+	-- Remove only pwd's record terminator, never whitespace belonging to the cwd.
+	out = out:gsub("\n$", "")
+	return out ~= "" and out or nil
+end
+
+--- Normalises native separators without rewriting POSIX filename bytes.
+--- The bootstrap and updater share this boundary; backslash is data on Linux.
+--- @param path string
+--- @return string
+function M.normalize_native_separators(path)
+	assert(type(path) == "string", "native path must be a string")
+	if package.config:sub(1, 1) == "\\" then return (path:gsub("\\", "/")) end
+	return path
+end
+
+--- Anchors a path to the working directory when it is relative.
+---
+--- A relative root is not a local inconvenience: every path built from it is
+--- handed to OTHER processes — the tray icon to the panel, pages to WebKit —
+--- and each of those resolves it against its own working directory. Launched from a checkout (`luajit ergopti_hotstrings.lua`, a
+--- relative package.path), the tray announced "./../_shared/assets/…" and the
+--- panel, running elsewhere, drew nothing.
+--- @param path string
+--- @return string
+local function absolute(path)
+	if path:sub(1, 1) == "/" or path:match("^%a:/") then return path end
+	local cwd = M.current_directory()
+	if not cwd then return path end
+	cwd = M.normalize_native_separators(cwd):gsub("/+$", "")
+	if path == "." then return cwd end
+	local relative = path:gsub("^%./", "")
+	return cwd .. "/" .. relative
+end
+
+--- The driver root (…/static/ergopti_plus/linux), derived from this file.
+--- @return string Absolute native path with no trailing slash.
+local function driver_root()
+	local src = debug.getinfo(1, "S").source
+	if src:sub(1, 1) == "@" then src = src:sub(2) end
+	src = M.normalize_native_separators(src)
+	-- src is <driver root>/infra/paths.lua
+	return absolute(src:match("^(.*)/infra/paths%.lua$") or ".")
+end
+
+local _driver_root = driver_root()
+local _shared_root = nil
+
+local function shared_probe(path)
+	local handle = io.open(path, "r")
+	if not handle then return false end
+	handle:close()
+	return true
+end
+
+--- Resolves the shared tree beside or inside an explicit driver root.
+--- This is the non-memoised seam used to validate a staged update before it
+--- replaces the running tree; it deliberately applies the same probe and
+--- precedence as shared_root().
+--- @param root string Absolute driver root.
+--- @param probe function|nil Predicate receiving the complete probe-file path.
+--- @return string|nil Absolute shared root with no trailing slash.
+function M.shared_root_from(root, probe)
+	if type(root) ~= "string" or root == "" then return nil end
+	local exists = type(probe) == "function" and probe or shared_probe
+	local sibling = root .. "/../_shared"
+	local child = root .. "/_shared"
+	for _, candidate in ipairs({ sibling, child }) do
+		if exists(candidate .. "/" .. SHARED_PROBE_FILE) then return candidate end
+	end
+	return nil
+end
+
+--- Absolute path to the _shared tree, or nil when it cannot be found.
+---
+--- TWO LAYOUTS SHIP, AND BOTH ARE REAL:
+---
+---   * SIBLING — `<driver root>/../_shared`. The checkout
+---     (static/ergopti_plus/{linux,_shared}) and the release tarball, which
+---     unpacks `linux/` and `_shared/` next to each other.
+---
+---   * CHILD — `<driver root>/_shared`. The system packages. build-linux-deb.sh,
+---     build-linux-rpm.sh and PKGBUILD all stage the driver flat into
+---     /usr/lib/ergopti and nest the shared tree inside it, because a sibling
+---     would put it at /usr/lib/_shared — a directory no package may own.
+---
+--- Resolving the sibling ONLY is the defect this ordering replaced. On an
+--- installed .deb the probe addressed /usr/lib/_shared/data/locales/en.json and
+--- shared_root() returned nil — taking with it every locale, keycode table,
+--- hotstring pack, tooltip config and defaults file the driver reads. The
+--- wrapper's LUA_PATH hides how broad that is: it rescues `require`, so the
+--- daemon starts and only the DATA reads fail.
+---
+--- The sibling is probed first because it is the layout every developer, test
+--- and CI run uses, so the common case still costs a single io.open.
+--- @return string|nil Absolute path with no trailing slash.
+function M.shared_root()
+	if _shared_root ~= nil then return _shared_root end
+	local sibling = _driver_root .. "/../_shared"
+	local child   = _driver_root .. "/_shared"
+	_shared_root = M.shared_root_from(_driver_root)
+	if _shared_root then return _shared_root end
+	-- Both candidates are named because the next reader's first question is which
+	-- layout was assumed, and a message carrying one path answers half of it.
+	Logger.error(LOG, "Shared tree not found: neither %s nor %s carries %s — the install is incomplete.",
+		sibling, child, SHARED_PROBE_FILE)
+	return nil
+end
+
+--- Absolute path to a file or directory inside the shared tree.
+--- @param rel string Path relative to _shared, e.g. "data/db/schema.sql".
+--- @return string|nil Absolute path, or nil when the shared tree is missing.
+function M.shared(rel)
+	local root = M.shared_root()
+	if not root then return nil end
+	if type(rel) ~= "string" or rel == "" then return root end
+	return (root .. "/" .. (rel:gsub("^/", "")))
+end
+
+--- Test seam: the anchoring rule driver_root() applies to its own location.
+--- The runner loads this file through an absolute path, so the relative case a
+--- checkout launch produces is only reachable through here.
+--- @param path string
+--- @return string
+function M._absolute_for_test(path)
+	return absolute(path)
+end
+
+--- The driver root, for callers that need a driver-relative path.
+--- @return string Absolute path with no trailing slash.
+function M.driver_root()
+	return _driver_root
+end
+
+--- The directories extension packs are installed into, in precedence order.
+---
+--- The bundled root is a SIBLING of _shared and of this driver, not a child of
+--- either: extensions are shipped to all three drivers from one place, which is
+--- why the Windows driver's `_ExtensionsDir` points at the same directory. The
+--- committed layout generations come next. The user root comes last, preserving
+--- its precedence over bundled and layout-installed packs with the same id. It is
+--- the `extensions` folder of the effective configuration directory, as on macOS
+--- and Windows, so an XDG_CONFIG_HOME or a relocated configuration folder moves it
+--- with the layouts the manager installs there.
+--- @return table Array of absolute paths.
+function M.extension_roots()
+	local roots = {}
+	local shared = M.shared_root()
+	if shared then
+		-- _shared/../extensions — resolved from the shared root because that is the
+		-- one anchor already probed for existence above.
+		roots[#roots + 1] = shared .. "/../extensions"
+	end
+	-- Resolve lazily: the layout registry itself imports Paths at module load.
+	local LayoutRegistry = require("modules.keymap.layout_registry")
+	-- The installed-layouts record may have been written by another build or
+	-- cut short by a crash or a sync tool. Its layouts' packs are then missing
+	-- from this load, reported, while the bundled and the user's packs still
+	-- load, as on macOS: the daemon's startup never depends on that record.
+	local ok_installed, installed = pcall(LayoutRegistry.extension_roots)
+	if ok_installed then
+		for _, root in ipairs(installed) do roots[#roots + 1] = root end
+	else
+		local reason = tostring(installed)
+		if not _installed_refusals_reported[reason] then
+			_installed_refusals_reported[reason] = true
+			Logger.error(LOG, "The installed layouts' extensions are skipped: %s.", reason)
+		end
+	end
+	-- The Ergopti extension the driver ships is installed by shipping
+	-- (layouts/extension.shipped_root), after the installed generations.
+	roots[#roots + 1] = LayoutRegistry.shipped_extension_root()
+	roots[#roots + 1] = require("infra.config_paths").get_config_dir() .. "/extensions"
+	return roots
+end
+
+return M

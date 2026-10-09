@@ -1,0 +1,511 @@
+--- tests/unit/meta/test_timer_scheduler_adapter.lua
+---
+--- Integration tests for the timer_scheduler adapter (luv stub).
+--- Tests the full API surface (after/every/cancel/cancelAll) without requiring
+--- the luv library. On CI without luv, the stub path returns handles without
+--- actually scheduling timers — these tests verify the stub is safe.
+---
+--- Real luv timers require:
+---   sudo apt install lua-luv  (or luarocks install luv)
+
+local helpers = require("tests.helpers")
+local ts      = helpers.load_module("adapters.timer_scheduler")
+
+-- Native API double: the backend retains callbacks, not returned Lua tokens.
+local function timer_fixture()
+	local state = { timers = {} }
+	local backend = {}
+	function backend.update_time() end -- native void-style clock refresh
+	function backend.new_timer()
+		local timer = { closed = false, stopped = false }
+		state.timers[#state.timers + 1] = timer
+		return timer
+	end
+	function backend.timer_start(timer, timeout, interval, callback)
+		timer.timeout, timer.interval, timer.callback = timeout, interval, callback
+		return 0
+	end
+	function backend.timer_stop(timer) timer.stopped = true; return 0 end
+	function backend.close(timer) timer.closed = true; timer.callback = nil end
+	function state.fire(index)
+		local timer = state.timers[index]
+		if not timer.closed and not timer.stopped then timer.callback() end
+	end
+	local previous_backend, previous_scheduler = package.loaded.luv, package.loaded["adapters.timer_scheduler"]
+	package.loaded.luv, package.loaded["adapters.timer_scheduler"] = backend, nil
+	local scheduler = require("adapters.timer_scheduler")
+	package.loaded.luv, package.loaded["adapters.timer_scheduler"] = previous_backend, previous_scheduler
+	return scheduler, state
+end
+
+helpers.describe("linux-timer-gc-ownership", function()
+	for _, count in ipairs({ 1, 3, 12 }) do
+		helpers.it("linux-timer-gc-ownership: cancelAll owns " .. count .. " unretained repeaters", function()
+			local scheduler, state = timer_fixture()
+			local callbacks = 0
+			for _ = 1, count do scheduler.every(1, function() callbacks = callbacks + 1 end) end
+			collectgarbage("collect")
+			collectgarbage("collect")
+			helpers.assert_eq(scheduler.activeCount(), count, "GC cannot erase native timer ownership")
+			helpers.assert_eq(scheduler.cancelAll(), true)
+			for index, timer in ipairs(state.timers) do
+				helpers.assert_true(timer.stopped and timer.closed, "every issued timer must be retired")
+				state.fire(index)
+			end
+			helpers.assert_eq(callbacks, 0, "retired backend timers publish no callbacks")
+			helpers.assert_eq(scheduler.activeCount(), 0)
+			helpers.assert_eq(scheduler.cancelAll(), true, "bulk cancellation remains idempotent")
+		end)
+	end
+
+	helpers.it("linux-timer-gc-ownership: cancellation preserves mixed unretained ownership", function()
+		local scheduler, state = timer_fixture()
+		scheduler.after(1, function() end)
+		scheduler.every(1, function() end)
+		scheduler.after(1, function() end)
+		scheduler.every(1, function() end)
+		collectgarbage("collect")
+		helpers.assert_eq(scheduler.activeCount(), 4)
+		helpers.assert_eq(scheduler.cancelAll(), true)
+		for _, timer in ipairs(state.timers) do helpers.assert_true(timer.closed and timer.stopped) end
+		helpers.assert_eq(scheduler.activeCount(), 0)
+	end)
+
+	helpers.it("linux-timer-gc-ownership: one-shot firing releases its token", function()
+		local scheduler, state = timer_fixture()
+		local tokens = setmetatable({}, { __mode = "v" })
+		local callbacks = 0
+		tokens[1] = scheduler.after(1, function() callbacks = callbacks + 1 end)
+		collectgarbage("collect")
+		helpers.assert_eq(scheduler.activeCount(), 1)
+		state.fire(1)
+		state.fire(1)
+		collectgarbage("collect")
+		helpers.assert_eq(callbacks, 1, "one-shot completion occurs once")
+		helpers.assert_eq(scheduler.activeCount(), 0)
+		helpers.assert_eq(tokens[1], nil, "settled one-shots do not accumulate in the registry")
+	end)
+
+	helpers.it("linux-timer-gc-ownership: individual cancellation releases a repeating token", function()
+		local scheduler, state = timer_fixture()
+		local tokens = setmetatable({}, { __mode = "v" })
+		tokens[1] = scheduler.every(1, function() end)
+		helpers.assert_eq(scheduler.cancel(tokens[1]), true)
+		helpers.assert_eq(scheduler.cancel(tokens[1]), true)
+		collectgarbage("collect")
+		helpers.assert_eq(tokens[1], nil)
+		helpers.assert_true(state.timers[1].closed and state.timers[1].stopped)
+		helpers.assert_eq(scheduler.activeCount(), 0)
+	end)
+end)
+
+helpers.describe("timer_scheduler adapter", function()
+
+  -- ==========================================================================
+  -- 1. Module structure
+  -- ==========================================================================
+
+  helpers.describe("module structure", function()
+    helpers.it("exports after", function()
+      helpers.assert_true(type(ts.after) == "function", "after is a function")
+    end)
+    helpers.it("exports every", function()
+      helpers.assert_true(type(ts.every) == "function", "every is a function")
+    end)
+    helpers.it("exports cancel", function()
+      helpers.assert_true(type(ts.cancel) == "function", "cancel is a function")
+    end)
+    helpers.it("exports cancelAll", function()
+      helpers.assert_true(type(ts.cancelAll) == "function", "cancelAll is a function")
+    end)
+    helpers.it("exports capability and active-count diagnostics", function()
+      helpers.assert_true(type(ts.HAS_ASYNC) == "boolean", "HAS_ASYNC is a boolean")
+      helpers.assert_true(type(ts.activeCount) == "function", "activeCount is a function")
+    end)
+  end)
+
+  -- ==========================================================================
+  -- 2. after() — one-shot timer
+  -- ==========================================================================
+
+  helpers.describe("after()", function()
+    helpers.it("returns an opaque handle", function()
+      local handle = ts.after(1.0, function() end)
+      helpers.assert_true(type(handle) == "table", "after returns a table")
+      helpers.assert_true(handle.fired ~= nil, "handle has fired field")
+      helpers.assert_true(handle.id ~= nil, "handle has id field")
+      helpers.assert_true(type(handle.armed) == "boolean", "handle exposes real scheduling state")
+    end)
+
+    helpers.it("never claims an unavailable timer was armed", function()
+      local handle = ts.after(1.0, function() end)
+      if ts.HAS_ASYNC then
+        helpers.assert_true(handle.armed, "an available backend must arm the timer")
+      else
+        helpers.assert_eq(handle.armed, false,
+          "without luv the adapter must not return a false-success handle")
+        helpers.assert_eq(handle.fired, true, "an unarmed handle is already terminal")
+        helpers.assert_eq(ts.activeCount(), 0, "unarmed timers are never counted as live")
+      end
+    end)
+
+    helpers.it("returns unique IDs across calls", function()
+      local h1 = ts.after(1.0, function() end)
+      local h2 = ts.after(2.0, function() end)
+      helpers.assert_true(h1.id ~= h2.id, "handle IDs are unique")
+    end)
+
+    -- Every case here returns a HANDLE, and the handle is the contract: the caller
+    -- keeps it to cancel later. "Does not crash" says nothing about whether one
+    -- came back, and a nil handle means the caller can never cancel that timer —
+    -- it fires into a torn-down driver.
+    helpers.it("a zero delay still yields a cancellable handle", function()
+      local h = ts.after(0, function() end)
+      helpers.assert_eq(type(h), "table", "after(0) must return a handle, not nil")
+      helpers.assert_true(h.id ~= nil, "and it must carry an id, or cancel cannot find it")
+      ts.cancel(h)
+    end)
+
+    helpers.it("a negative delay is clamped rather than rejected", function()
+      local h = ts.after(-1, function() end)
+      helpers.assert_eq(type(h), "table",
+        "a negative delay must clamp to immediate — dropping the timer would lose "
+          .. "the work the caller scheduled")
+      ts.cancel(h)
+    end)
+
+    helpers.it("a nil callback still yields a handle the caller can cancel", function()
+      local h = ts.after(1.0, nil)
+      helpers.assert_eq(type(h), "table",
+        "the handle is returned before the callback is ever used, so a bad callback "
+          .. "must not cost the caller its cancellation token")
+      ts.cancel(h)
+    end)
+
+    helpers.it("a non-function callback still yields a handle", function()
+      local h = ts.after(1.0, "hello")
+      helpers.assert_eq(type(h), "table", "same for a string callback")
+      ts.cancel(h)
+    end)
+  end)
+
+  -- ==========================================================================
+  -- 3. every() — repeating timer
+  -- ==========================================================================
+
+  helpers.describe("every()", function()
+    helpers.it("returns an opaque handle", function()
+      local handle = ts.every(5.0, function() end)
+      helpers.assert_true(type(handle) == "table", "every returns a table")
+    end)
+
+    helpers.it("a zero interval yields a handle and does not spin the loop", function()
+      local h = ts.every(0, function() end)
+      helpers.assert_eq(type(h), "table", "every(0) must return a handle")
+      -- The adapter floors the interval at 1 ms. A literal 0 would re-arm the
+      -- timer with no delay and peg a core.
+      ts.cancel(h)
+    end)
+
+    helpers.it("a day-long interval yields a handle", function()
+      local h = ts.every(86400, function() end)
+      helpers.assert_eq(type(h), "table", "a long interval must not overflow into a dropped timer")
+      ts.cancel(h)
+    end)
+  end)
+
+  -- ==========================================================================
+  -- 4. cancel() — cancel a single timer
+  -- ==========================================================================
+
+  -- cancel() marks the handle fired. That flag is the observable, and no case
+  -- looked at it: a cancel that silently did nothing left a timer live, and the
+  -- callback then runs against state the caller has already torn down.
+  helpers.describe("cancel()", function()
+    -- The adapter degrades when luv is absent: after() returns a handle with NO
+    -- timer field and the scheduler is a no-op. That degradation has to be
+    -- OBSERVABLE, or a caller cannot tell scheduled work from work that will
+    -- never run — so the assertion is split on the same condition the adapter
+    -- branches on, rather than asserting a contract only one host satisfies.
+    helpers.it("cancelling a live handle marks it spent", function()
+      local h = ts.after(10.0, function() end)
+      ts.cancel(h)
+      if h.timer then
+        helpers.assert_eq(h.fired, true,
+          "a real timer must be marked spent, or a later cancelAll walks a handle "
+            .. "whose libuv timer is already closed")
+      else
+        helpers.assert_eq(h.timer, nil,
+          "with no luv the handle must carry no timer at all — that absence is how a "
+            .. "caller can tell nothing was ever scheduled")
+      end
+    end)
+
+    helpers.it("cancel(nil) is a no-op", function()
+      ts.cancel(nil)
+      -- Nothing to assert on the argument; what must hold is that the scheduler
+      -- still works afterwards.
+      local h = ts.after(1.0, function() end)
+      helpers.assert_eq(type(h), "table", "the scheduler must still issue handles")
+      ts.cancel(h)
+    end)
+
+    helpers.it("cancel on a non-table leaves the scheduler usable", function()
+      ts.cancel("not a handle")
+      local h = ts.after(1.0, function() end)
+      helpers.assert_eq(type(h), "table", "a bogus cancel must not poison the scheduler")
+      ts.cancel(h)
+    end)
+
+    helpers.it("cancel on a table with no timer is a no-op", function()
+      ts.cancel({})
+      local h = ts.after(1.0, function() end)
+      helpers.assert_eq(type(h), "table", "an empty handle must be ignored, not dereferenced")
+      ts.cancel(h)
+    end)
+
+    helpers.it("cancelling twice is idempotent", function()
+      local h = ts.after(10.0, function() end)
+      ts.cancel(h)
+      local after_first = h.fired
+      ts.cancel(h)
+      helpers.assert_eq(h.fired, after_first,
+        "a second cancel must not change the handle's state — whatever the first "
+          .. "left, it stays")
+    end)
+  end)
+
+  -- ==========================================================================
+  -- 5. cancelAll() — cancel everything
+  -- ==========================================================================
+
+  helpers.describe("cancelAll()", function()
+    helpers.it("cancelAll on an empty scheduler leaves it usable", function()
+      ts.cancelAll()
+      local h = ts.after(1.0, function() end)
+      helpers.assert_eq(type(h), "table", "the scheduler must still issue handles afterwards")
+      ts.cancelAll()
+    end)
+
+    helpers.it("cancelAll marks every live handle fired", function()
+      local a = ts.after(1.0, function() end)
+      local b = ts.after(2.0, function() end)
+      local c = ts.every(3.0, function() end)
+      ts.cancelAll()
+      for name, h in pairs({ ["first one-shot"] = a, ["second one-shot"] = b, ["repeater"] = c }) do
+        if h.timer then
+          helpers.assert_eq(h.fired, true,
+            "the " .. name .. " must be marked spent — a surviving repeater fires "
+              .. "forever into a driver that has already shut down")
+        else
+          helpers.assert_eq(h.timer, nil,
+            "with no luv the " .. name .. " was never scheduled, and says so")
+        end
+      end
+    end)
+  end)
+
+  -- ==========================================================================
+  -- 6. Edge cases
+  -- ==========================================================================
+
+  helpers.describe("edge cases", function()
+    helpers.it("multiple concurrent after calls", function()
+      local handles = {}
+      for i = 1, 20 do
+        handles[i] = ts.after(i * 0.1, function() end)
+      end
+      helpers.assert_eq(#handles, 20, "20 handles created")
+      ts.cancelAll()
+    end)
+
+    helpers.it("cancelAll clears a mixed set of one-shots and repeaters", function()
+      local handles = {
+        ts.after(1.0, function() end),
+        ts.every(2.0, function() end),
+        ts.after(3.0, function() end),
+        ts.every(4.0, function() end),
+      }
+      ts.cancelAll()
+      for i, h in ipairs(handles) do
+        if h.timer then
+          helpers.assert_eq(h.fired, true,
+            "handle " .. i .. " must be marked spent — cancelAll walking only the "
+              .. "one-shots is how a repeater outlives the driver")
+        else
+          helpers.assert_eq(h.timer, nil, "handle " .. i .. " was never scheduled")
+        end
+      end
+    end)
+  end)
+
+end)
+
+local function with_luv(fake_luv, body)
+  local previous_luv = package.loaded["luv"]
+  local previous_scheduler = package.loaded["adapters.timer_scheduler"]
+  package.loaded["luv"] = fake_luv
+  package.loaded["adapters.timer_scheduler"] = nil
+  local ok, err = pcall(function() body(require("adapters.timer_scheduler")) end)
+  package.loaded["luv"] = previous_luv
+  package.loaded["adapters.timer_scheduler"] = previous_scheduler
+  helpers.assert_true(ok, "luv timer probe must not throw: " .. tostring(err))
+end
+
+helpers.describe("timer_scheduler armed ownership", function()
+  helpers.it("linux-relative-clock: simulated refresh exception closes unarmed timers", function()
+    local closed, starts = 0, 0
+    with_luv({
+      update_time = function() error("simulated clock refresh failure") end,
+      new_timer = function() return {} end,
+      timer_start = function() starts = starts + 1; return 0 end,
+      close = function() closed = closed + 1 end,
+    }, function(scheduler)
+      for _, method in ipairs({ "after", "every" }) do
+        local handle = scheduler[method](1, function() end)
+        helpers.assert_true(handle.fired and not handle.armed)
+      end
+      helpers.assert_eq(starts, 0, "refresh failure must refuse native arming")
+      helpers.assert_eq(closed, 2, "allocated native timers must be released")
+      helpers.assert_eq(scheduler.activeCount(), 0)
+    end)
+  end)
+
+  helpers.it("counts and releases a successfully armed timer", function()
+    local callback = nil
+    with_luv({
+      update_time = function() end,
+      new_timer = function() return {} end,
+      timer_start = function(_, _, _, fn) callback = fn; return true end,
+      timer_stop = function() return true end,
+      close = function() return true end,
+    }, function(scheduler)
+      local handle = scheduler.after(1, function() end)
+      helpers.assert_true(handle.armed)
+      helpers.assert_eq(scheduler.activeCount(), 1)
+      callback()
+      helpers.assert_eq(handle.armed, false)
+      helpers.assert_eq(handle.fired, true)
+      helpers.assert_eq(scheduler.activeCount(), 0)
+    end)
+  end)
+
+  helpers.it("closes and rejects a timer the backend did not start", function()
+    local closed = 0
+    with_luv({
+      update_time = function() end,
+      new_timer = function() return {} end,
+      timer_start = function() return false end,
+      timer_stop = function() return true end,
+      close = function() closed = closed + 1; return true end,
+    }, function(scheduler)
+      for _, method in ipairs({ "after", "every" }) do
+        local handle = scheduler[method](1, function() end)
+        helpers.assert_eq(handle.armed, false, method .. " must report the rejection")
+        helpers.assert_eq(handle.fired, true, method .. " rejection is terminal")
+        helpers.assert_eq(scheduler.activeCount(), 0)
+      end
+      helpers.assert_eq(closed, 2, "every rejected libuv handle must be closed")
+    end)
+  end)
+
+  helpers.it("retains ownership when cancellation is uncertain", function()
+    local close_fails = true
+    with_luv({
+      update_time = function() end,
+      new_timer = function() return {} end,
+      timer_start = function() return true end,
+      timer_stop = function() return true end,
+      close = function()
+        if close_fails then error("close failed") end
+        return true
+      end,
+    }, function(scheduler)
+      local handle = scheduler.after(1, function() end)
+      helpers.assert_eq(scheduler.cancel(handle), false)
+      helpers.assert_true(handle.armed,
+        "an uncertain close must retain the handle instead of publishing cancellation")
+      helpers.assert_eq(scheduler.activeCount(), 1)
+      close_fails = false
+      helpers.assert_true(scheduler.cancel(handle), "a later cleanup may retry ownership release")
+      helpers.assert_eq(scheduler.activeCount(), 0)
+    end)
+  end)
+
+  helpers.it("still invokes a fired callback when handle cleanup fails", function()
+    local callback = nil
+    local close_fails = true
+    local fired = 0
+    with_luv({
+      update_time = function() end,
+      new_timer = function() return {} end,
+      timer_start = function(_, _, _, fn) callback = fn; return true end,
+      timer_stop = function() return true end,
+      close = function()
+        if close_fails then error("close failed") end
+        return true
+      end,
+    }, function(scheduler)
+      local handle = scheduler.after(1, function() fired = fired + 1 end)
+      callback()
+      helpers.assert_eq(fired, 1, "resource cleanup failure must not swallow scheduled work")
+      helpers.assert_eq(handle.fired, true)
+      helpers.assert_eq(handle.armed, false)
+      close_fails = false
+      helpers.assert_true(scheduler.cancel(handle), "retained resource ownership must be retryable")
+    end)
+  end)
+end)
+
+helpers.describe("linux-timer-finite-admission", function()
+	local invalid = {
+		{ name = "NaN", value = 0 / 0 },
+		{ name = "positive infinity", value = math.huge },
+		{ name = "negative infinity", value = -math.huge },
+		{ name = "positive conversion overflow", value = 1e308 },
+		{ name = "negative conversion overflow", value = -1e308 },
+		{ name = "numeric string", value = "0.1" },
+		{ name = "boolean", value = false },
+		{ name = "nil" },
+		{ name = "table", value = {} },
+	}
+	for _, method in ipairs({ "after", "every" }) do
+		for _, case in ipairs(invalid) do
+			helpers.it("linux-timer-finite-admission: " .. method .. " rejects " .. case.name .. " before allocation", function()
+				local scheduler, state = timer_fixture()
+				local calls = 0
+				local handle = scheduler[method](case.value, function() calls = calls + 1 end)
+				helpers.assert_eq(handle.armed, false)
+				helpers.assert_eq(handle.fired, true)
+				helpers.assert_eq(handle.timer, nil)
+				helpers.assert_eq(#state.timers, 0, "invalid arithmetic must not acquire native resources")
+				helpers.assert_eq(scheduler.activeCount(), 0)
+				helpers.assert_eq(calls, 0)
+			end)
+		end
+	end
+end)
+
+helpers.describe("linux-timer-finite-admission", function()
+	helpers.it("linux-timer-finite-admission: shared policy preserves finite magnitude and signed values", function()
+		local policy = require("number_policy")
+		for _, value in ipairs({ 0, -1, 0.125, 1e308 }) do
+			helpers.assert_eq(policy.is_finite(value), true)
+		end
+		for _, case in ipairs({ { value = 0 / 0 }, { value = math.huge }, { value = -math.huge },
+			{ value = "1" }, { value = false }, {}, { value = {} } }) do
+			helpers.assert_eq(policy.is_finite(case.value), false)
+		end
+	end)
+
+	local native_ok = pcall(require, "luv")
+	if native_ok and package.config:sub(1, 1) == "/" then
+		helpers.it("linux-timer-finite-admission: native admission and delivery preserve healthy successors", function()
+			local executable = assert(arg and arg[-1], "running Lua interpreter must be identifiable")
+			local fixture = helpers.driver_root() .. "/tests/fixtures/native_timer_finite_admission.lua"
+			local function quote(value) return "'" .. value:gsub("'", "'\\''") .. "'" end
+			local result = os.execute(quote(executable) .. " " .. quote(fixture))
+			helpers.assert_true(result == true or result == 0, "native numeric admission fixture must succeed")
+		end)
+	end
+end)

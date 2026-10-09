@@ -1,0 +1,52 @@
+# static/extensions/ergopti-demo/hotstrings/demo-phrases.toml
+
+# ====================
+# ====================
+# ======= Meta =======
+# ====================
+# ====================
+
+[_meta]
+color = "#1e88e5"
+delay = 1.5
+description = { fr = "Phrases et formules de politesse de démonstration", en = "Demo greeting and polite phrases", de = "Demo-Phrasen und Höflichkeitsformeln", es = "Frases de cortesía y demostración" }
+sections_order = ["greetings", "farewells"]
+
+
+
+# =========================
+# ===== Meta.Sections =====
+# =========================
+
+[_meta.sections]
+greetings = { fr = "Formules d'introduction", en = "Greeting phrases", de = "Begrüßungsphrasen", es = "Frases de saludo" }
+farewells  = { fr = "Formules de congé",      en = "Farewell phrases",  de = "Abschiedsphrasen",    es = "Frases de despedida" }
+
+
+
+
+# ========================
+# ========================
+# ======= Greetings =======
+# ========================
+# ========================
+
+[[greetings]]
+"helo★"   = { output = "Hello, world!",              is_word = false, auto_expand = false, is_case_sensitive = false, final_result = true }
+"bonjr★"  = { output = "Bonjour à tous !",           is_word = false, auto_expand = false, is_case_sensitive = false, final_result = true }
+"hiall★"  = { output = "Hi everyone, hope you're well!", is_word = false, auto_expand = false, is_case_sensitive = false, final_result = true }
+"hola★"   = { output = "¡Hola a todos!",             is_word = false, auto_expand = false, is_case_sensitive = false, final_result = true }
+
+
+
+
+# =======================
+# =======================
+# ======= Farewells =======
+# =======================
+# =======================
+
+[[farewells]]
+"bye★"    = { output = "Goodbye, see you soon!",   is_word = false, auto_expand = false, is_case_sensitive = false, final_result = true }
+"ciao★"   = { output = "Ciao, à bientôt !",        is_word = false, auto_expand = false, is_case_sensitive = false, final_result = true }
+"tschüs★" = { output = "Tschüss, bis bald!",       is_word = false, auto_expand = false, is_case_sensitive = false, final_result = true }

@@ -1,0 +1,86 @@
+{
+	"_comment": "Cross-driver contract of the About submenu's version row, written by hand. The row names the running build and the commit it was built from: a release shows its version, a build that is not a stamped release says it is local, a package whose stamp holds no usable version says its version is unknown, and a commit that cannot be determined is spelled by its own key, never guessed. keys maps each build kind (and the unknown commit) to the locale key every driver reads; each key's value carries the placeholders listed in placeholders (named, substituted once, left to right, so a value is never re-read as a placeholder or as a pattern). The vectors use the fake templates below, never a locale's wording, so they pin the formatter and not a translation. Every port replays this file: the shared Lua module _shared/lua/updater/version_label.lua (one test per Lua driver) and the AHK port Updater_VersionRowLabel in windows/modules/updater/core.ahk (tests/unit/test_version_label_vectors.ahk). An empty commit means the commit is unknown; the file uses no JSON null.",
+	"keys": {
+		"release": "menu.about.version_release",
+		"local": "menu.about.version_local",
+		"unknown": "menu.about.version_unknown",
+		"unknown_commit": "menu.about.commit_unknown"
+	},
+	"placeholders": {
+		"menu.about.version_release": ["{version}", "{commit}"],
+		"menu.about.version_local": ["{commit}"],
+		"menu.about.version_unknown": ["{commit}"],
+		"menu.about.commit_unknown": []
+	},
+	"templates": {
+		"menu.about.version_release": "R {version} <{commit}>",
+		"menu.about.version_local": "L <{commit}>",
+		"menu.about.version_unknown": "U <{commit}>",
+		"menu.about.commit_unknown": "?"
+	},
+	"vectors": [
+		{
+			"id": "release_dev",
+			"kind": "release",
+			"version": "0.0.0-dev.144",
+			"commit": "c3005e0b9",
+			"expected": "R 0.0.0-dev.144 <c3005e0b9>"
+		},
+		{
+			"id": "release_stable",
+			"kind": "release",
+			"version": "1.2.3",
+			"commit": "0123456789",
+			"expected": "R 1.2.3 <0123456789>"
+		},
+		{
+			"id": "release_unknown_commit",
+			"kind": "release",
+			"version": "1.2.3",
+			"commit": "",
+			"expected": "R 1.2.3 <?>"
+		},
+		{
+			"id": "local",
+			"kind": "local",
+			"version": "",
+			"commit": "c3005e0b9",
+			"expected": "L <c3005e0b9>"
+		},
+		{
+			"id": "local_ignores_version",
+			"kind": "local",
+			"version": "0.0.0-dev.144",
+			"commit": "c3005e0b9",
+			"expected": "L <c3005e0b9>"
+		},
+		{
+			"id": "local_unknown_commit",
+			"kind": "local",
+			"version": "",
+			"commit": "",
+			"expected": "L <?>"
+		},
+		{
+			"id": "unknown_version",
+			"kind": "unknown",
+			"version": "",
+			"commit": "abcdef012",
+			"expected": "U <abcdef012>"
+		},
+		{
+			"id": "unknown_version_unknown_commit",
+			"kind": "unknown",
+			"version": "",
+			"commit": "",
+			"expected": "U <?>"
+		},
+		{
+			"id": "values_are_literal",
+			"kind": "release",
+			"version": "9.9.9-a%1{commit}",
+			"commit": "{version}%0",
+			"expected": "R 9.9.9-a%1{commit} <{version}%0>"
+		}
+	]
+}

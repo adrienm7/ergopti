@@ -1,0 +1,89 @@
+{
+	"description": "Native display name and flag emoji for every shipped locale, keyed by code. Single source for the three drivers' language menus and the site. Display ORDER lives in locale_order.json; this file carries only presentation of an individual entry. The Windows menu derives its [XX] tag from the code because flag emoji do not render in Win32 menus.",
+	"locales": {
+		"da": {
+			"name": "Dansk",
+			"flag": "🇩🇰"
+		},
+		"de": {
+			"name": "Deutsch",
+			"flag": "🇩🇪"
+		},
+		"en": {
+			"name": "English",
+			"flag": "🇬🇧"
+		},
+		"es": {
+			"name": "Español",
+			"flag": "🇪🇸"
+		},
+		"fr": {
+			"name": "Français",
+			"flag": "🇫🇷"
+		},
+		"it": {
+			"name": "Italiano",
+			"flag": "🇮🇹"
+		},
+		"nl": {
+			"name": "Nederlands",
+			"flag": "🇳🇱"
+		},
+		"no": {
+			"name": "Norsk",
+			"flag": "🇳🇴"
+		},
+		"pl": {
+			"name": "Polski",
+			"flag": "🇵🇱"
+		},
+		"pt": {
+			"name": "Português",
+			"flag": "🇧🇷"
+		},
+		"sv": {
+			"name": "Svenska",
+			"flag": "🇸🇪"
+		},
+		"tr": {
+			"name": "Türkçe",
+			"flag": "🇹🇷"
+		},
+		"cs": {
+			"name": "Čeština",
+			"flag": "🇨🇿"
+		},
+		"ru": {
+			"name": "Русский",
+			"flag": "🇷🇺"
+		},
+		"uk": {
+			"name": "Українська",
+			"flag": "🇺🇦"
+		},
+		"he": {
+			"name": "עברית",
+			"flag": "🇮🇱"
+		},
+		"ar": {
+			"name": "العربية",
+			"flag": "🇸🇦"
+		},
+		"hi": {
+			"name": "हिन्दी",
+			"flag": "🇮🇳"
+		},
+		"zh": {
+			"name": "中文",
+			"flag": "🇨🇳"
+		},
+		"ja": {
+			"name": "日本語",
+			"flag": "🇯🇵"
+		},
+		"ko": {
+			"name": "한국어",
+			"flag": "🇰🇷"
+		}
+	}
+}

@@ -1,0 +1,432 @@
+{
+	"description": "Golden vectors for the error window policy of _shared/modules/diagnostics/error_policy.json. signature_vectors: an error's signature is its module, the separator, then the unformatted message template, verbatim. scenarios: each one starts from a fresh session and feeds its events in order; every event is { module, template, at (seconds on the session's clock), enabled (the Debug menu's 'Show a window for every error'), open (the window is open or about to open) } and expects one verdict: disabled (unticked; nothing is recorded), duplicate (this signature already opened or joined a window this session), folded (joins the open window: recorded, spends no budget), rate_limited (max_dialogs windows already opened within the last window_sec seconds; nothing is recorded, so the error may open a window when it recurs later), show (opens the window: recorded and spends the budget). A window opened at time s counts against the budget while now - s < window_sec. The checks run in that order: disabled, duplicate, folded, rate_limited, show. invalid_policies must be refused by validate. Each scenario carries its own policy so the vectors do not move with the production thresholds. Replayed by the macOS and Linux Lua suites (_shared/lua/diagnostics/error_policy.lua) and the AHK suite (windows/infra/error_policy.ahk).",
+	"signature_vectors": [
+		{
+			"id": "module_and_template",
+			"separator": "|",
+			"module": "keylogger",
+			"template": "Flush failed: %s",
+			"expected": "keylogger|Flush failed: %s"
+		},
+		{
+			"id": "ahk_placeholders_stay",
+			"separator": "|",
+			"module": "Menu",
+			"template": "Log level {1} was refused",
+			"expected": "Menu|Log level {1} was refused"
+		},
+		{
+			"id": "separator_inside_template",
+			"separator": "|",
+			"module": "a",
+			"template": "x|y",
+			"expected": "a|x|y"
+		},
+		{
+			"id": "empty_template",
+			"separator": "|",
+			"module": "mod",
+			"template": "",
+			"expected": "mod|"
+		},
+		{
+			"id": "non_ascii_template",
+			"separator": "|",
+			"module": "hotstrings",
+			"template": "Échec du fichier « %s » ✗",
+			"expected": "hotstrings|Échec du fichier « %s » ✗"
+		},
+		{
+			"id": "other_separator",
+			"separator": " :: ",
+			"module": "a",
+			"template": "b",
+			"expected": "a :: b"
+		}
+	],
+	"scenarios": [
+		{
+			"id": "once_per_session",
+			"policy": {
+				"signature_separator": "|",
+				"max_dialogs": 3,
+				"window_sec": 3600,
+				"present_delay_ms": 250
+			},
+			"events": [
+				{
+					"module": "keylogger",
+					"template": "Flush failed: %s",
+					"at": 0,
+					"enabled": true,
+					"open": false,
+					"expected": "show"
+				},
+				{
+					"module": "keylogger",
+					"template": "Flush failed: %s",
+					"at": 10,
+					"enabled": true,
+					"open": false,
+					"expected": "duplicate"
+				},
+				{
+					"module": "keylogger",
+					"template": "Flush failed: %s",
+					"at": 100000,
+					"enabled": true,
+					"open": false,
+					"expected": "duplicate"
+				},
+				{
+					"module": "gestures",
+					"template": "Flush failed: %s",
+					"at": 100010,
+					"enabled": true,
+					"open": false,
+					"expected": "show"
+				},
+				{
+					"module": "keylogger",
+					"template": "Flush failed after %d tries: %s",
+					"at": 100020,
+					"enabled": true,
+					"open": false,
+					"expected": "show"
+				}
+			]
+		},
+		{
+			"id": "budget_per_window",
+			"policy": {
+				"signature_separator": "|",
+				"max_dialogs": 3,
+				"window_sec": 3600,
+				"present_delay_ms": 250
+			},
+			"events": [
+				{
+					"module": "a",
+					"template": "t1",
+					"at": 0,
+					"enabled": true,
+					"open": false,
+					"expected": "show"
+				},
+				{
+					"module": "a",
+					"template": "t2",
+					"at": 60,
+					"enabled": true,
+					"open": false,
+					"expected": "show"
+				},
+				{
+					"module": "a",
+					"template": "t3",
+					"at": 120,
+					"enabled": true,
+					"open": false,
+					"expected": "show"
+				},
+				{
+					"module": "a",
+					"template": "t4",
+					"at": 180,
+					"enabled": true,
+					"open": false,
+					"expected": "rate_limited"
+				},
+				{
+					"module": "a",
+					"template": "t4",
+					"at": 3599,
+					"enabled": true,
+					"open": false,
+					"expected": "rate_limited"
+				},
+				{
+					"module": "a",
+					"template": "t4",
+					"at": 3600,
+					"enabled": true,
+					"open": false,
+					"expected": "show"
+				},
+				{
+					"module": "a",
+					"template": "t5",
+					"at": 3650,
+					"enabled": true,
+					"open": false,
+					"expected": "rate_limited"
+				},
+				{
+					"module": "a",
+					"template": "t5",
+					"at": 3720,
+					"enabled": true,
+					"open": false,
+					"expected": "show"
+				}
+			]
+		},
+		{
+			"id": "folded_while_open",
+			"policy": {
+				"signature_separator": "|",
+				"max_dialogs": 3,
+				"window_sec": 3600,
+				"present_delay_ms": 250
+			},
+			"events": [
+				{
+					"module": "ui",
+					"template": "boom",
+					"at": 0,
+					"enabled": true,
+					"open": false,
+					"expected": "show"
+				},
+				{
+					"module": "ui",
+					"template": "other",
+					"at": 1,
+					"enabled": true,
+					"open": true,
+					"expected": "folded"
+				},
+				{
+					"module": "ui",
+					"template": "other",
+					"at": 50,
+					"enabled": true,
+					"open": false,
+					"expected": "duplicate"
+				},
+				{
+					"module": "ui",
+					"template": "boom",
+					"at": 51,
+					"enabled": true,
+					"open": true,
+					"expected": "duplicate"
+				},
+				{
+					"module": "ui",
+					"template": "third",
+					"at": 52,
+					"enabled": true,
+					"open": true,
+					"expected": "folded"
+				}
+			]
+		},
+		{
+			"id": "folded_spends_no_budget",
+			"policy": {
+				"signature_separator": "|",
+				"max_dialogs": 2,
+				"window_sec": 3600,
+				"present_delay_ms": 250
+			},
+			"events": [
+				{
+					"module": "x",
+					"template": "a",
+					"at": 0,
+					"enabled": true,
+					"open": false,
+					"expected": "show"
+				},
+				{
+					"module": "x",
+					"template": "b",
+					"at": 1,
+					"enabled": true,
+					"open": true,
+					"expected": "folded"
+				},
+				{
+					"module": "x",
+					"template": "c",
+					"at": 2,
+					"enabled": true,
+					"open": false,
+					"expected": "show"
+				},
+				{
+					"module": "x",
+					"template": "d",
+					"at": 3,
+					"enabled": true,
+					"open": false,
+					"expected": "rate_limited"
+				}
+			]
+		},
+		{
+			"id": "disabled_records_nothing",
+			"policy": {
+				"signature_separator": "|",
+				"max_dialogs": 3,
+				"window_sec": 3600,
+				"present_delay_ms": 250
+			},
+			"events": [
+				{
+					"module": "m",
+					"template": "t",
+					"at": 0,
+					"enabled": false,
+					"open": false,
+					"expected": "disabled"
+				},
+				{
+					"module": "m",
+					"template": "t",
+					"at": 5,
+					"enabled": true,
+					"open": false,
+					"expected": "show"
+				},
+				{
+					"module": "m",
+					"template": "u",
+					"at": 6,
+					"enabled": false,
+					"open": true,
+					"expected": "disabled"
+				},
+				{
+					"module": "m",
+					"template": "u",
+					"at": 7,
+					"enabled": true,
+					"open": false,
+					"expected": "show"
+				},
+				{
+					"module": "m",
+					"template": "t",
+					"at": 8,
+					"enabled": false,
+					"open": false,
+					"expected": "disabled"
+				}
+			]
+		},
+		{
+			"id": "rate_limited_is_not_recorded",
+			"policy": {
+				"signature_separator": "|",
+				"max_dialogs": 1,
+				"window_sec": 10,
+				"present_delay_ms": 0
+			},
+			"events": [
+				{
+					"module": "s",
+					"template": "a",
+					"at": 0,
+					"enabled": true,
+					"open": false,
+					"expected": "show"
+				},
+				{
+					"module": "s",
+					"template": "b",
+					"at": 1,
+					"enabled": true,
+					"open": false,
+					"expected": "rate_limited"
+				},
+				{
+					"module": "s",
+					"template": "b",
+					"at": 10,
+					"enabled": true,
+					"open": false,
+					"expected": "show"
+				},
+				{
+					"module": "s",
+					"template": "b",
+					"at": 30,
+					"enabled": true,
+					"open": false,
+					"expected": "duplicate"
+				}
+			]
+		}
+	],
+	"invalid_policies": [
+		{
+			"id": "no_budget",
+			"policy": {
+				"signature_separator": "|",
+				"max_dialogs": 0,
+				"window_sec": 3600,
+				"present_delay_ms": 250
+			}
+		},
+		{
+			"id": "fractional_budget",
+			"policy": {
+				"signature_separator": "|",
+				"max_dialogs": 1.5,
+				"window_sec": 3600,
+				"present_delay_ms": 250
+			}
+		},
+		{
+			"id": "missing_budget",
+			"policy": { "signature_separator": "|", "window_sec": 3600, "present_delay_ms": 250 }
+		},
+		{
+			"id": "empty_window",
+			"policy": {
+				"signature_separator": "|",
+				"max_dialogs": 3,
+				"window_sec": 0,
+				"present_delay_ms": 250
+			}
+		},
+		{
+			"id": "negative_window",
+			"policy": {
+				"signature_separator": "|",
+				"max_dialogs": 3,
+				"window_sec": -5,
+				"present_delay_ms": 250
+			}
+		},
+		{
+			"id": "negative_delay",
+			"policy": {
+				"signature_separator": "|",
+				"max_dialogs": 3,
+				"window_sec": 3600,
+				"present_delay_ms": -1
+			}
+		},
+		{
+			"id": "text_delay",
+			"policy": {
+				"signature_separator": "|",
+				"max_dialogs": 3,
+				"window_sec": 3600,
+				"present_delay_ms": "soon"
+			}
+		},
+		{
+			"id": "empty_separator",
+			"policy": {
+				"signature_separator": "",
+				"max_dialogs": 3,
+				"window_sec": 3600,
+				"present_delay_ms": 250
+			}
+		}
+	]
+}

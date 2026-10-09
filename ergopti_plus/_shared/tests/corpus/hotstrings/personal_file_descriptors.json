@@ -1,0 +1,109 @@
+{
+	"version": 1,
+	"vectors": [
+		{
+			"name": "flat separator",
+			"components": ["a__b.toml"],
+			"id": "personal-file:615f5f622e746f6d6c",
+			"label": "a__b"
+		},
+		{
+			"name": "nested separator",
+			"components": ["a", "b.toml"],
+			"id": "personal-file:61:622e746f6d6c",
+			"label": "a / b"
+		},
+		{
+			"name": "dotted stem",
+			"components": ["words.old.toml"],
+			"id": "personal-file:776f7264732e6f6c642e746f6d6c",
+			"label": "words.old"
+		},
+		{
+			"name": "work sibling",
+			"components": ["work", "team.toml"],
+			"id": "personal-file:776f726b:7465616d2e746f6d6c",
+			"label": "work / team"
+		},
+		{
+			"name": "home sibling",
+			"components": ["home", "team.toml"],
+			"id": "personal-file:686f6d65:7465616d2e746f6d6c",
+			"label": "home / team"
+		},
+		{
+			"name": "Unicode",
+			"components": ["Équipe", "mémoire.toml"],
+			"id": "personal-file:c3897175697065:6dc3a96d6f6972652e746f6d6c",
+			"label": "Équipe / mémoire"
+		},
+		{
+			"name": "NFC",
+			"components": ["é.toml"],
+			"id": "personal-file:c3a92e746f6d6c",
+			"label": "é"
+		},
+		{
+			"name": "NFD",
+			"components": ["é.toml"],
+			"id": "personal-file:65cc812e746f6d6c",
+			"label": "é"
+		},
+		{
+			"name": "case preserved",
+			"components": ["Rolls.TOML"],
+			"id": "personal-file:526f6c6c732e544f4d4c",
+			"label": "Rolls"
+		},
+		{
+			"name": "bundled collision",
+			"components": ["rolls.toml"],
+			"id": "personal-file:726f6c6c732e746f6d6c",
+			"label": "rolls"
+		},
+		{
+			"name": "nested bundled collision",
+			"components": ["work", "rolls.toml"],
+			"id": "personal-file:776f726b:726f6c6c732e746f6d6c",
+			"label": "work / rolls"
+		},
+		{
+			"name": "literal backslash",
+			"components": ["a\\b.toml"],
+			"id": "personal-file:615c622e746f6d6c",
+			"label": "a\\b"
+		},
+		{
+			"name": "empty historical stem",
+			"components": [".toml"],
+			"id": "personal-file:2e746f6d6c",
+			"label": ""
+		}
+	],
+	"invalid_components": [
+		[],
+		[""],
+		[".", "a.toml"],
+		["..", "a.toml"],
+		["a/b.toml"],
+		["a.txt"],
+		["a\u0000.toml"]
+	],
+	"invalid_ids": [
+		"rolls",
+		"ext:demo:rolls",
+		"personal-file:",
+		"personal-file:61:",
+		"personal-file::61",
+		"personal-file:61::622e746f6d6c",
+		"personal-file:615F5F622e746f6d6c",
+		"personal-file:0",
+		"personal-file:zz",
+		"personal-file:2e2e:622e746f6d6c",
+		"personal-file:c0802e746f6d6c",
+		"personal-file:eda0802e746f6d6c",
+		"personal-file:f49080802e746f6d6c",
+		"personal-file:612f622e746f6d6c",
+		"personal-file:61002e746f6d6c"
+	]
+}

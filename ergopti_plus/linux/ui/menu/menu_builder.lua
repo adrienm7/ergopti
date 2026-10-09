@@ -1,0 +1,5054 @@
+--- ui/menu/menu_builder.lua
+
+--- ==============================================================================
+--- MODULE: Menu Builder (Linux)
+--- DESCRIPTION:
+--- Builds the tray menu item list from the daemon's runtime state. Called by
+--- ergopti_hotstrings.lua to populate the tray_menu adapter with dynamic items
+--- reflecting the current hotstring groups, layouts, LLM models, and metrics.
+---
+--- The menu tree mirrors the macOS menubar (§9 of the parity plan): its rows,
+--- their order and the separators between them are the manifest's `top_level`,
+--- which M.build dispatches through its builder table.
+---
+--- Items that depend on features not yet implemented on Linux
+--- are present as labelled stubs that log the action — they don't crash and
+--- they show the intended final shape.
+---
+--- FEATURES & RATIONALE:
+--- 1. Hierarchical items: items with a `menu` sub-table are rendered as
+---    submenus, which the tray backend renders as real nested GtkMenus.
+--- 2. All callbacks are closures over the daemon's state — zero global coupling.
+--- 3. New sections (shortcuts, tap-holds, gestures, configuration, language,
+---    debug) are added as documented stubs so the menu shape is correct.
+--- ==============================================================================
+
+local M = {}
+local WindowTitles = require("window_titles")
+local NumberRowPolicy = require("layout.number_row_policy")
+local ParameterLabel = require("action_parameter_label")
+local RowDialect = require("menu.row_dialect")
+
+local Logger = require("logger.shim")
+local Extensions = require("hotstrings.extensions")
+local PersonalFiles = require("hotstrings.personal_files")
+local PersonalFileMenu = require("menu.personal_files")
+local Languages = require("hotstrings.languages")
+local LocaleTable = require("_generated.locale_table")
+local MagicKey = require("modules.hotstrings.magic_key")
+local MagicKeySourceRows = require("keymap.magic_key_source")
+local PreviewSettings = require("modules.hotstrings.preview_settings")
+local RepeatKey = require("modules.hotstrings.repeat_key")
+local Modal = require("ui.modal")
+local TextPrompt = require("ui.text_prompt")
+local PrivacyPolicy = require("llm.trigger_policy")
+local LlmBackendRows = require("ui.menu.llm_backend_rows")
+local ProgrammableHotstrings = require("ui.menu.programmatic_hotstrings")
+local ProgrammableMenuPolicy = require("menu.programmable_hotstrings")
+local LOG = "ui.menu.menu_builder"
+
+--- Keeps private executable/argv data out of persistent menu presentation.
+local function binding_label(label, registry, binding, action)
+	if type(registry.get_action_parameter_spec) == "function" and registry.get_action_parameter_spec(action) == "program" then return label end
+	return ParameterLabel.for_binding(label, registry, binding, action)
+end
+
+-- Delays are stored in seconds and typed in milliseconds: seconds is what the
+-- cascade and the TOMLs speak, milliseconds is what a person means by "wait a
+-- bit longer". The conversion happens only at this boundary.
+local MS_PER_SEC = 1000
+
+-- The category id of the user's own hotstrings — the stem of personal.toml, and
+-- the same name the editor bridge writes under. Named here so the default-section
+-- picker reads the sections of that pack rather than guessing at a spelling.
+local PERSONAL_CATEGORY = "personal"
+
+-- Single source of the driver version and of the build identity.
+local Version = require("infra.version")
+
+-- The one answer to "installed build or source run".
+local Installation = require("infra.installation")
+
+-- The shared wording of the About version row.
+local VersionLabel = require("updater.version_label")
+
+-- The shared automatic-check schedule (frequency presets and their snap).
+local Schedule = require("updater.schedule")
+
+--- Flag and native name of a locale code, from the generated locale table.
+--- @param code string
+--- @return string
+local function language_label(code)
+	return Languages.label(code, LocaleTable)
+end
+
+-- The shared manifest menu renderer, bound for this driver (infra/manifest_menu).
+-- pcall for the same reason i18n_safe exists: the tray menu must still build when
+-- the shared tree is not reachable, which is a real boot-order case on a partial
+-- install rather than a hypothetical.
+local ok_mm, ManifestMenu = pcall(require, "infra.manifest_menu")
+if not ok_mm or type(ManifestMenu) ~= "table" then ManifestMenu = nil end
+
+--- Substitutes a single placeholder in a translated template.
+---
+--- Plain indices rather than gsub: a release tag or an interval code is data,
+--- and a "%" in it would be read as a capture reference in gsub's REPLACEMENT
+--- string and raise "invalid use of '%'".
+--- @param template string The translated string, containing `placeholder`.
+--- @param placeholder string The literal token to replace, e.g. "{tag}".
+--- @param value any The value to substitute.
+--- @return string The filled template.
+local function _fill(template, placeholder, value)
+	local at = template:find(placeholder, 1, true)
+	if not at then return template .. " " .. tostring(value) end
+	return template:sub(1, at - 1) .. tostring(value) .. template:sub(at + #placeholder)
+end
+
+local function shell_quote(value)
+	return "'" .. tostring(value or ""):gsub("'", "'\\''") .. "'"
+end
+
+--- Normalises a child-process exit status across interpreters.
+---
+--- Production runs LuaJIT (Lua 5.1 semantics): os.execute and pipe:close
+--- return a NUMBER, 0 for success. From Lua 5.2 the same success reads as
+--- `true`. A bare `if not status` is therefore never true on LuaJIT — not
+--- even for a failure — so Cancel and "binary absent" both read as success.
+--- Every zenity site below goes through this helper.
+--- @param status any
+--- @return boolean
+local function succeeded(status)
+	return status == true or status == 0
+end
+
+--- Asks the user for a line of text (ui/text_prompt.lua, shared with the AI
+--- agent's command dialog).
+---
+--- Declared here, above every closure that calls it: a `local` declared after a
+--- closure that uses it is captured as a nil GLOBAL, and the call fails at click
+--- time rather than at load time — which is the shape of three bugs already fixed
+--- in this driver.
+--- @param title string Window title.
+--- @param prompt string The question.
+--- @param initial string|nil Pre-filled value.
+--- @param hidden boolean|nil Mask the typed text (an API key).
+--- @return string|nil The entered text, or nil when the dialog was cancelled.
+local function prompt_text(title, prompt, initial, hidden)
+	return TextPrompt.ask(title, prompt, initial, hidden)
+end
+
+--- Shows a message the user must acknowledge.
+--- @param message string Already-localised text.
+--- @param title string|nil Already-localised window title.
+local function show_error(message, title)
+	local command = "zenity --error"
+		.. " --title=" .. shell_quote(WindowTitles.compose(title == nil and i18n_safe("common.error_title") or title))
+		.. " --text=" .. shell_quote(message) .. " 2>/dev/null"
+	if not succeeded(Modal.run(function() return os.execute(command) end)) then
+		-- Zenity absent: the refusal still has to reach someone, and a silent
+		-- rejection reads as a menu row that does nothing when clicked.
+		Logger.error(LOG, "%s", tostring(message))
+	end
+end
+
+--- Shows an informational message the user must acknowledge.
+--- @param title string Already-localised window title.
+--- @param message string Already-localised text.
+local function show_info(title, message)
+	local command = "zenity --info --title=" .. shell_quote(WindowTitles.compose(title))
+		.. " --text=" .. shell_quote(message) .. " 2>/dev/null"
+	if not succeeded(Modal.run(function() return os.execute(command) end)) then
+		-- Zenity absent: the outcome is still recorded where a user can find it.
+		Logger.info(LOG, "%s", tostring(message))
+	end
+end
+
+--- Escapes text for zenity's --text, which is Pango markup: a config value
+--- holding "<" or "&" would otherwise blank the dialog.
+--- @param text string
+--- @return string
+local function zenity_plain(text)
+	return (tostring(text):gsub("&", "&amp;"):gsub("<", "&lt;"):gsub(">", "&gt;"))
+end
+
+--- Prompts and persists the parameter required by one action before binding it.
+--- @param ctx table Menu context with an optional prompt test boundary.
+--- @param gestures table Shared action catalogue and parameter store.
+--- @param binding string Exact binding identity used during dispatch.
+--- @param action string Action identifier.
+--- @param assign function Publishes the binding only after its parameter is durable.
+--- @param picked string|nil A value the action picker's own editor collected: it
+---   is validated and stored without a prompt.
+--- @return boolean assigned True only when the whole user-visible assignment succeeded.
+local function assign_parameterized_action(ctx, gestures, binding, action, assign, picked)
+	local spec = type(gestures.get_action_parameter_spec) == "function"
+		and gestures.get_action_parameter_spec(action) or nil
+	local bindings = package.loaded["infra.program_binding_transaction"]
+	if spec ~= "program" and type(bindings) == "table" and bindings.pending() then
+		Logger.error(LOG, "Binding edit refused while private user program compensation remains pending.")
+		return false
+	end
+	if not spec then return assign() == true end
+
+	local prior = type(gestures.get_action_parameter) == "function"
+		and gestures.get_action_parameter(binding, action) or ""
+	local value
+	if type(picked) == "string" then
+		value = picked
+	elseif type(ctx.prompt_action_parameter) == "function" then
+		value = ctx.prompt_action_parameter(binding, action, spec, prior)
+	elseif spec == "app" then
+		-- An application is picked among the desktop entries, never typed.
+		local chosen, why = require("ui.app_chooser").pick(require("adapters.shell_runner"),
+			gestures.get_action_parameter_prompt(action))
+		if not chosen then Logger.info(LOG, "No application chosen for '%s': %s.", tostring(binding), tostring(why)) end
+		value = chosen
+	else
+		local label = type(gestures.get_action_label) == "function"
+			and gestures.get_action_label(action) or action
+		local title = _fill(i18n_safe("dialog.gestures.param_title"), "{1}", label)
+		-- The prompt belongs to the parameter kind (the gestures manager owns it).
+		-- Escaped: a wrap-pair sample such as <…> would be read as Pango markup.
+		value = prompt_text(title, zenity_plain(gestures.get_action_parameter_prompt(action)), prior)
+	end
+	if value == nil or (spec == "llm_language" and value == "") then return false end
+	if type(gestures.validate_action_parameter) ~= "function"
+		or not gestures.validate_action_parameter(action, value)
+	then
+		Logger.warn(LOG, "Invalid parameter for binding '%s' action '%s'.",
+			tostring(binding), tostring(action))
+		show_error(zenity_plain(gestures.get_action_parameter_error(action)))
+		return false
+	end
+	if spec == "program" then
+		return require("infra.program_binding_transaction").apply(binding, value, ctx.is_paused)
+	end
+	if type(gestures.set_action_parameter) ~= "function"
+		or not gestures.set_action_parameter(binding, action, value)
+	then
+		Logger.error(LOG, "Action parameter for binding '%s' was not persisted.",
+			tostring(binding))
+		return false
+	end
+	return assign() == true
+end
+
+--- Opens the shared searchable action catalogue for one current assignment.
+--- @param title string Already-localised target label.
+--- @param current string Current action id.
+--- @param binding string The binding the pick is for: the picker's own editor
+---   starts from the value it holds for a send_* action.
+--- @param on_confirm function Transactional assignment callback, given the action
+---   id and the value the picker's editor collected, if any.
+--- @return boolean opened
+local function open_action_picker(title, current, binding, on_confirm, selected_items)
+	local ok_picker, Picker = pcall(require, "ui.action_picker.bridge")
+	local ok_gestures, Gestures = pcall(require, "modules.gestures.manager")
+	if not ok_picker or type(Picker.open) ~= "function" or not ok_gestures then
+		Logger.error(LOG, "Action picker is unavailable for '%s'.", tostring(title))
+		return false
+	end
+	local items = type(selected_items) == "table" and selected_items or Gestures.get_picker_items()
+	local editor = Gestures.get_picker_parameter_fields(items, binding)
+	return Picker.open({
+		title = title,
+		label = i18n_safe("dialog.action_picker.label"),
+		current = current or "none",
+		items = items,
+		send_vocabulary = editor.send_vocabulary,
+		parameter_strings = editor.parameter_strings,
+		prompt_choices = editor.prompt_choices,
+		vision_choices = editor.vision_choices,
+		language_choices = editor.language_choices,
+		default_count = editor.default_count,
+		edit_current_label = editor.edit_current_label,
+	}, function(option, _state, picked) return on_confirm(option, picked) end)
+end
+
+--- The rows under one bindable slot: the searchable picker and, when the slot
+--- is bound, a row that clears it.
+---
+--- The whole catalogue used to be inlined here, about 640 rows per slot — for
+--- each of the 39 gesture slots and every keyboard slot — which no tray menu
+--- can present usably and which the picker, with its headings and search,
+--- already offers.
+--- @param slot_label string Already-localised target label.
+--- @param bound string The action currently bound ("none" when unbound).
+--- @param binding string The binding the slot dispatches its action under.
+--- @param assign function(option, picked) Transactional assignment; true on commit.
+--- @return table Provider rows.
+local function slot_binding_rows(slot_label, bound, binding, assign)
+	if not ManifestMenu then return {} end
+	local function pick() open_action_picker(slot_label, bound, binding, assign) end
+	local function clear() assign("none") end
+	local rows = ManifestMenu.template_rows("slot_binding_frame", {
+		["slot_binding_pick"] = pick,
+		["slot_binding_clear"] = clear,
+	}, {
+		["slot_binding_has_action"] = function() return bound ~= "none" end,
+	}, {})
+	-- A missing late declaration must withdraw the entire slot submenu. The
+	-- renderer may already have translated earlier rows; no picker or write runs.
+	if type(rows) ~= "table" or #rows ~= (bound ~= "none" and 2 or 1) then return {} end
+	return rows
+end
+
+--- Asks a yes/no question.
+---
+--- Returns nil rather than false when the dialog could not be shown at all, so a
+--- caller can tell "the user said no" from "there was nobody to ask" — the second
+--- must not be recorded as a choice.
+--- @param title string Already-translated.
+--- @param text string Already-translated.
+--- @param ok_label string Already-translated.
+--- @param cancel_label string Already-translated.
+--- @return boolean|nil
+local function ask_yes_no(title, text, ok_label, cancel_label, default_cancel)
+	-- os.execute returns a number on LuaJIT (5.1) and true on 5.2+: the
+	-- module-level succeeded() above normalises both spellings.
+	local command = "zenity --question --title=" .. shell_quote(WindowTitles.compose(title))
+		.. " --text=" .. shell_quote(text)
+		.. " --ok-label=" .. shell_quote(ok_label)
+		.. " --cancel-label=" .. shell_quote(cancel_label)
+		.. (default_cancel and " --default-cancel" or "")
+		.. " 2>/dev/null"
+
+	-- Probed rather than assumed, because the exit code alone cannot distinguish
+	-- "the user pressed Cancel" from "no such binary" — both are non-zero, and
+	-- treating the second as a No would silently record a choice nobody made.
+	if not succeeded(os.execute("command -v zenity >/dev/null 2>&1")) then
+		Logger.error(LOG, "Zenity is unavailable: cannot ask '%s'.", tostring(title))
+		return nil
+	end
+	-- zenity exits 0 for the OK button and 1 for cancel.
+	return succeeded(Modal.run(function() return os.execute(command) end))
+end
+
+local function gesture_slot_label(slot)
+	local fingers, direction = tostring(slot):match("^swipe_(%d+)_(.+)$")
+	if fingers and direction then
+		local directions = {
+			left = "gauche", right = "droite", up = "haut", down = "bas",
+			up_left = "haut-gauche", up_right = "haut-droite",
+			down_left = "bas-gauche", down_right = "bas-droite",
+		}
+		return "Balayage " .. fingers .. " doigts vers " .. (directions[direction] or direction)
+	end
+	local tap_fingers = tostring(slot):match("^tap_(%d+)$")
+	if tap_fingers then return "Tap " .. tap_fingers .. " doigts" end
+	return tostring(slot)
+end
+
+
+-- =========================================
+-- =========================================
+-- ======= 1/ Section Builders =============
+-- =========================================
+-- =========================================
+
+--- The version as the header shows it: "v0.0.0-dev.12" for a release, the bare
+--- token for a source run or an unknown build ("local", "unknown").
+--- @param version string
+--- @return string
+local function _version_text(version)
+	local v = tostring(version)
+	if v:match("^%d") then return "v" .. v end
+	return v
+end
+
+--- Builds the top-level header with version.
+--- Returns a single item (not an array) — callers insert it directly.
+---
+--- While the script is paused the header is the way back, as on macOS, where the
+--- title row resumes: it used to stay a disabled label, so a paused script could
+--- only be resumed by a gesture or a shortcut the user had to remember.
+local function _build_header(ctx)
+	local version = _version_text(ctx._version or Version.VERSION)
+	if ctx.paused == true then
+		return {
+			label = i18n_safe("menu.builder.title_paused") .. " — " .. version,
+			action = function()
+				if type(ctx.on_toggle_pause) ~= "function" then
+					Logger.error(LOG, "Paused title row: ctx.on_toggle_pause is absent — the script stays paused.")
+					return
+				end
+				ctx.on_toggle_pause()
+			end,
+		}
+	end
+	return { label = "Ergopti — " .. version, disabled = true }
+end
+
+--- Greys one feature row for a pause, and strips what would let it act.
+---
+--- Stripped, not merely greyed: a disabled row whose submenu or handler survives
+--- still acts the moment a tray backend renders the greying differently.
+--- @param row table Row data from a section builder.
+--- @return table The same row, greyed.
+local function _grey_for_pause(row)
+	if type(row) ~= "table" or row.separator then return row end
+	row.disabled = true
+	row.submenu = nil
+	row.items = nil
+	row.action = nil
+	return row
+end
+
+--- Whether a manifest row is visible on this driver. A row with no ``platforms``
+--- restriction is visible everywhere.
+--- @param row table Manifest row.
+--- @return boolean
+local function _row_is_for_linux(row)
+	if type(row.platforms) ~= "table" then return true end
+	for _, p in ipairs(row.platforms) do
+		if p == "linux" then return true end
+	end
+	return false
+end
+
+--- Builds the layout selection submenu.
+---
+--- The rows were two names written out here — "qwerty" and "azerty" — while the
+--- decoder already owned the list. `input_reader.get_layouts()` is the very table
+--- it resolves keycodes through, so a menu that enumerates it by hand goes stale
+--- the day a third one is added, and says nothing about which the driver can
+--- actually decode.
+local function _build_layouts(ctx)
+	local current = ctx.layout or "qwerty"
+	local on_change = ctx.on_layout_change
+
+	-- Layout selection controls character interpretation here; the manifest
+	-- restricts the layout emulation switch to Windows with its reason.
+	local render_ctx = {}
+	for key, value in pairs(ctx) do render_ctx[key] = value end
+	-- The "Manage layouts…" row opens the shared layout manager window.
+	render_ctx.commands = {}
+	for key, value in pairs(ctx.commands or {}) do render_ctx.commands[key] = value end
+	render_ctx.commands["layout_manager"] = function()
+		if type(ctx.webview) ~= "table" or type(ctx.webview.show) ~= "function" then
+			Logger.error(LOG, "No webview manager in the menu context — the layout manager cannot open.")
+			return false
+		end
+		return ctx.webview.show("layout_manager")
+	end
+
+
+	local providers = {
+		-- The custom layout picker: the registry layouts the layout manager
+		-- installed, the one this session activated checked; choosing one makes
+		-- it the first input source of the desktop session.
+		["custom_layouts"] = function()
+			local ok_registry, LayoutRegistry = pcall(require, "modules.keymap.layout_registry")
+			if not ok_registry then
+				Logger.error(LOG, "The layout registry client is unavailable: %s.", tostring(LayoutRegistry))
+				return {}
+			end
+			local snapshot = LayoutRegistry.snapshot()
+			local entries = {}
+			for _, entry in pairs(snapshot.installed or {}) do entries[#entries + 1] = entry end
+			table.sort(entries, function(a, b) return tostring(a.name) < tostring(b.name) end)
+			local rows = {}
+			for _, entry in ipairs(entries) do
+				local id = entry.id
+				rows[#rows + 1] = {
+					label   = type(entry.name) == "string" and entry.name or id,
+					checked = snapshot.active == id,
+					action  = function()
+						LayoutRegistry.select(id, function(selected, _, detail)
+							if not selected then
+								Logger.error(LOG, "The '%s' layout could not be activated: %s.", id, tostring(detail))
+							end
+						end)
+					end,
+				}
+			end
+			if #rows == 0 then
+				if type(ManifestMenu) ~= "table" or type(ManifestMenu.status_rows) ~= "function" then return {} end
+				local status = ManifestMenu.status_rows("layout_menu", "custom_layouts", "none_installed")
+				return type(status) == "table" and status or {}
+			end
+			return rows
+		end,
+		["base_layouts"] = function()
+			local ok_reader, reader = pcall(require, "modules.hotstrings.input_reader")
+			if not ok_reader or type(reader.get_layouts) ~= "function" then
+				Logger.error(LOG, "The input reader exposes no layout table — no layout can be offered.")
+				return {}
+			end
+			local known = reader.get_layouts()
+			if type(known) ~= "table" then
+				Logger.error(LOG, "The layout table is not a table — no layout can be offered.")
+				return {}
+			end
+
+			-- Ordered: `pairs` would reshuffle the list on every menu build.
+			local names = {}
+			for name in pairs(known) do names[#names + 1] = name end
+			table.sort(names)
+
+			local rows = {}
+			for _, name in ipairs(names) do
+				local chosen = name
+				rows[#rows + 1] = {
+					label   = name,
+					-- The tray draws its own mark. The glued "✓" this used to carry
+					-- puts one platform's convention inside a string, and the row was
+					-- not even a check item.
+					checked = current == name,
+					action  = function()
+						if type(on_change) ~= "function" then
+							Logger.error(LOG, "ctx.on_layout_change is absent — '%s' cannot be selected.", chosen)
+							return
+						end
+						on_change(chosen)
+					end,
+				}
+			end
+			return rows
+		end,
+	}
+
+	-- The physical magic key: the key typing the magic key, chosen by pressing it
+	-- or from the candidates (modules/hotstrings/magic_key_source.lua); the rows
+	-- are the shared ones macOS draws too.
+	providers["magic_key_source"] = function()
+		local Source = ctx.magic_key_source
+		if type(Source) ~= "table" then
+			Logger.error(LOG, "No physical magic-key owner in the menu context — its row cannot be built.")
+			return {}
+		end
+		local function notify(key, level)
+			local ok_notifier, Notifier = pcall(require, "adapters.application_notifier")
+			if ok_notifier then
+				Notifier.send(i18n_safe(key), { title = i18n_safe("dialog.magic_key_source.title"), level = level })
+			else
+				Logger.error(LOG, "No notifier: %s.", i18n_safe(key))
+			end
+		end
+		local function changed()
+			if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
+		end
+		return MagicKeySourceRows.menu_rows(Source.resolver(), {
+			manifest = ManifestMenu,
+			t = i18n_safe,
+			current = Source.get(),
+			key_text = Source.key_text,
+			reason = Source.choice_reason,
+			choose = function(value)
+				local ok, reason = Source.set(value)
+				if not ok then
+					show_error(i18n_safe(reason))
+					return
+				end
+				changed()
+			end,
+			capture = Source.can_capture() and function()
+				local started = Source.capture({
+					on_chosen = changed,
+					on_refused = function(reason) notify(reason, "warning") end,
+				})
+				if started then notify("dialog.magic_key_source.prompt", "info") end
+			end or nil,
+		})
+	end
+
+	-- Native-only status never acquires a preference or forced-input writer.
+	render_ctx.commands["number_row_mode"] = function() return false end
+	providers["number_row_policy"] = function() return NumberRowPolicy.native_rows(ManifestMenu, render_ctx.commands) end
+	local rows = ManifestMenu
+		and ManifestMenu.build("layout_menu", "Layout", nil, nil, render_ctx, providers)
+		or {}
+	return { label = i18n_safe("menu.layout.title"), submenu = rows }
+end
+
+--- Whether any hotstring can expand: a category gate open, or the dynamic
+--- hotstrings (dates, @-tags) on. The state the Hotstrings switch and its
+--- parent row show on this driver, where the master is that set of gates
+--- rather than a flag of its own. It used to be « every category on », so the
+--- wizard's recommendation, which opens one category, showed the switch
+--- unticked while ★ expanded, and a click switched every category on.
+--- @param ctx table Menu context: config, dyn_hotstrings.
+--- @return boolean
+local function _hotstrings_on(ctx)
+	local config = ctx.config
+	if type(config.any_enabled) == "function" and config.any_enabled() then return true end
+	local dyn = ctx.dyn_hotstrings
+	return type(dyn) == "table" and type(dyn.is_enabled) == "function" and dyn.is_enabled() == true
+end
+
+--- Restores or clears the Hotstrings scope at once. Neither asks: the scope
+--- owner's verified backups are the way back (the maintainer retired the
+--- clear's question on 2026-09-30).
+---
+--- The one transaction that writes the manifest's recommended values after
+--- verified backups. Deleting the explicit choices instead yields the neutral
+--- state, where every catalogue is off: the opposite of the restore's label.
+--- @param ctx table Menu context: paused, is_paused, dyn_hotstrings, tooltip_preview, on_menu_changed.
+--- @param mode string "recommended" or "clear".
+--- @return boolean committed
+local function _apply_hotstrings_scope(ctx, mode)
+	if ctx.paused == true or type(ctx.is_paused) ~= "function" or ctx.is_paused() then return false end
+	local committed = require("infra.hotstrings_scope").apply(mode, ctx.is_paused,
+		{ dynamic = ctx.dyn_hotstrings, preview = ctx.tooltip_preview })
+	if committed == true and type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
+	return committed
+end
+
+--- Renders the rows of the hotstrings submenu that the manifest describes.
+---
+--- Defined BEFORE its caller: a `local function` is not hoisted
+--- (project-lua-closure-before-local-nil-global).
+---
+--- THE GROUP CLASSIFICATION COMES FROM THE MANIFEST, and it spells the group ids
+--- with underscores (`distances_reduction`) while the shared hotstring index
+--- spells them without (`distancesreduction`). macOS reconciles the two by
+--- comparing both forms; this does the same rather than inventing a third
+--- answer. One vocabulary would be better and neither driver owns that decision.
+--- @param ctx table Menu context; ctx.webview opens the settings window.
+--- @param config table The hotstrings config module.
+--- @return table Menu rows, empty when the renderer could not be bound.
+--- Admits the whole canonical quick-delay caption map without native fallback.
+--- @param root table The current published menu manifest.
+--- @return table|nil Captions; unknown fields or malformed data refuse the frame.
+local function parameter_delay_captions(root)
+	local captions = type(root) == "table" and rawget(root, "hotstrings_delay_captions") or nil
+	local keys = { default = true, magic_key = true, autocorrection = true,
+		ai_acceptance = true, autocompletion = true }
+	if type(captions) ~= "table" or getmetatable(captions) ~= nil then return nil end
+	local count = 0
+	for key, value in next, captions do
+		if keys[key] ~= true or type(value) ~= "string" or value == "" then return nil end
+		count = count + 1
+	end
+	if count ~= 5 then return nil end
+	return captions
+end
+
+
+-- Captures the actual declared frame before native value readers can reenter it.
+local function magic_frame_snapshot(renderer, key, expected)
+	key, expected = key or "hotstrings_magic_trigger_frame", expected or 3
+	local root = renderer.get_root()
+	local frame = type(root) == "table" and rawget(root, key)
+	if type(frame) ~= "table" or getmetatable(frame) ~= nil or #frame ~= expected then return nil end
+	local slots = 0
+	for index in next, frame do
+		if type(index) ~= "number" or index % 1 ~= 0 or index < 1 or index > expected then return nil end
+		slots = slots + 1
+	end
+	if slots ~= expected then return nil end
+	local snapshot = {}
+	for index, row in ipairs(frame) do
+		if type(row) ~= "table" or getmetatable(row) ~= nil then return nil end
+		local fields = {}
+		for key, value in next, row do
+			if type(value) == "table" then
+				if getmetatable(value) ~= nil then return nil end
+				local entries = {}
+				for field, item in next, value do
+					if type(item) == "table" or type(item) == "function" then return nil end
+					entries[field] = item
+				end
+				fields[key] = { identity = value, entries = entries }
+			elseif type(value) == "function" then return nil
+			else fields[key] = value end
+		end
+		snapshot[index] = { identity = row, fields = fields }
+	end
+	return { root = root, frame = frame, rows = snapshot, key = key }
+end
+
+-- Publication is withheld when any captured declaration identity or field changed.
+local function magic_frame_current(renderer, snapshot)
+	if not snapshot or not rawequal(renderer.get_root(), snapshot.root)
+		or not rawequal(rawget(snapshot.root, snapshot.key), snapshot.frame)
+		or getmetatable(snapshot.frame) ~= nil or #snapshot.frame ~= #snapshot.rows then return false end
+	local slots = 0
+	for index in next, snapshot.frame do
+		if type(index) ~= "number" or index % 1 ~= 0 or index < 1 or index > #snapshot.rows then return false end
+		slots = slots + 1
+	end
+	if slots ~= #snapshot.rows then return false end
+	for index, saved in ipairs(snapshot.rows) do
+		local row = rawget(snapshot.frame, index)
+		if not rawequal(row, saved.identity) or getmetatable(row) ~= nil then return false end
+		local count, expected = 0, 0
+		for key, value in next, row do
+			count = count + 1
+			local prior = saved.fields[key]
+			if type(prior) == "table" then
+				if not rawequal(value, prior.identity) or getmetatable(value) ~= nil then return false end
+				local entries, wanted = 0, 0
+				for field, item in next, value do
+					entries = entries + 1
+					if not rawequal(item, prior.entries[field]) then return false end
+				end
+				for _ in next, prior.entries do wanted = wanted + 1 end
+				if entries ~= wanted then return false end
+			elseif not rawequal(value, prior) then return false end
+		end
+		for _ in next, saved.fields do expected = expected + 1 end
+		if count ~= expected then return false end
+	end
+	return true
+end
+
+local function _manifest_hotstring_rows(ctx, config)
+	if not ManifestMenu then
+		Logger.warn(LOG, "Manifest renderer unavailable — the hotstrings submenu loses its declared rows.")
+		return {}
+	end
+
+	local root    = ManifestMenu.get_root() or {}
+	local captions = parameter_delay_captions(root)
+	local boundaries = ManifestMenu.template_rows("hotstrings_parameter_boundary", {}, {}, {})
+	local classes = type(root.hotstring_groups) == "table" and root.hotstring_groups or {}
+	local groups  = type(config.get_groups) == "function" and (config.get_groups() or {}) or {}
+
+	--- The group ids of one manifest class, in both spellings.
+	--- @param class string "standard", "dynamic" or "ergopti".
+	--- @return table Set of accepted ids.
+	local function members_of(class)
+		local set = {}
+		for _, id in ipairs(classes[class] or {}) do
+			set[id] = true
+			local flattened = id:gsub("_", "")
+			if flattened ~= id then set[flattened] = true end
+		end
+		return set
+	end
+
+	--- The name to show for a category, in the user's language.
+	---
+	--- The packs carry a description in 21 locales and the menu used to print the
+	--- file stem, in every language: "distancesreduction" rather than "Réduction
+	--- des distances". English is the fallback because it is the reference locale
+	--- the others are checked against, and the stem is the last resort.
+	--- @param id string Category id.
+	--- @param category table|nil Category metadata from the loader.
+	--- @return string
+	local function category_label(id, category)
+		if PersonalFiles.components(id) and category and PersonalFiles.is_descriptor(category.personal_source) then
+			local descriptor = category.personal_source
+			return descriptor.label ~= "" and descriptor.label or descriptor.components[#descriptor.components]
+		end
+		local description = category and category.description or nil
+		-- A pack whose [_meta] description is a plain string, not a locale table —
+		-- which is what the editor writes for personal.toml — used to fall straight
+		-- through to the file stem, so the user's own hotstrings appeared as
+		-- "personal (12)" while the other two drivers show "Hotstrings personnels".
+		-- The category.* keys exist in all 21 locales for exactly this.
+		if type(description) ~= "table" then
+			local translated = i18n_safe("category." .. id)
+			if translated ~= "category." .. id then return translated end
+			return id
+		end
+		local locale = "en"
+		local ok_i18n, i18n_mod = pcall(require, "infra.i18n")
+		if ok_i18n and type(i18n_mod.get_locale) == "function" then
+			local current = i18n_mod.get_locale()
+			if type(current) == "string" and current ~= "" then locale = current end
+		end
+		return description[locale] or description.en or id
+	end
+
+	--- The display name of an installed extension.
+	---
+	--- The loader stapled the extension's manifest name onto every category it
+	--- produced, so the name is read back from any one of its packs rather than by
+	--- rescanning the disk from the menu — a menu build must not do file I/O, and
+	--- the tray rebuilds this on every toggle.
+	--- @param extension_id string The id parsed out of a namespaced category key.
+	--- @return string
+	local function extension_label(extension_id)
+		for _, name in ipairs(groups) do
+			local id = Extensions.parse_category_key(name)
+			if id == extension_id then
+				local category = type(config.get_category) == "function" and config.get_category(name) or nil
+				local extension = category and category.extension or nil
+				if type(extension) == "table" and type(extension.name) == "string" and extension.name ~= "" then
+					return extension.name
+				end
+			end
+		end
+		return extension_id
+	end
+
+	--- How many hotstrings a category is firing right now.
+	---
+	--- Asked of the config module, which owns the gate and section state; the
+	--- fallback is only for a harness that supplies a partial config table, and it
+	--- is the honest one — the total the file holds, which is what this row showed
+	--- unconditionally before.
+	--- @param id string
+	--- @param category table|nil
+	--- @return integer
+	local function active_count(id, category)
+		if type(config.active_count) == "function" then return config.active_count(id) end
+		return (category and category.count) or 0
+	end
+
+	--- Whether every listed category's gate is open and every one of its sections
+	--- is ticked: the state an « all sections » checkbox shows. A list with no
+	--- category is not « all on », since there is nothing the checkbox could have
+	--- switched on.
+	--- @param ids table Array of category ids.
+	--- @return boolean
+	local function sections_all_on(ids)
+		-- The same per-section question the section rows below ask: what the user
+		-- ticked, not what the closed gate makes effective.
+		local section_on = config.is_section_checked or config.is_section_enabled
+		if #ids == 0 or type(config.is_group_enabled) ~= "function" or type(section_on) ~= "function" then
+			return false
+		end
+		for _, id in ipairs(ids) do
+			if not config.is_group_enabled(id) then return false end
+			local category = type(config.get_category) == "function" and config.get_category(id) or nil
+			for name in pairs(category and category.sections or {}) do
+				if not section_on(id, name) then return false end
+			end
+		end
+		return true
+	end
+
+	--- One checkbox for every section of `ids`, where a « tout activer » / « tout
+	--- désactiver » pair used to be: two rows and two keys for one control, whose
+	--- state the user could only guess. Ticked when all of them are on; a click
+	--- switches them all to the other side in one write, and enabling lifts each
+	--- gate (config.set_categories_sections does it).
+	--- @param ids table Array of category ids.
+	--- @return table Provider row.
+	local function all_sections_row(ids)
+		local all_on = sections_all_on(ids)
+		local action = function()
+			local called, committed = false, false
+			if type(config.set_categories_sections) == "function" then
+				called, committed = pcall(config.set_categories_sections, ids, not all_on)
+			end
+			if called and committed == true then return true end
+			Logger.error(LOG, "The aggregate hotstrings switch did not acknowledge durable publication.")
+			show_error(i18n_safe("dialog.bulk_toggle.save_failed"), i18n_safe("common.error_title"))
+			return false
+		end
+		return ManifestMenu.check_row("hotstring_scope_checkbox", "hotstring_scope_all_sections",
+			{ hotstring_scope_all_sections = action },
+			{ hotstring_scope_all_on = function() return all_on end })
+	end
+
+	--- One category, as a submenu rather than a single toggle.
+	---
+	--- This is where roughly four fifths of the rows the other two drivers show
+	--- come from, and Linux had none of them: a category was one line reading its
+	--- own file stem with a tick, and its sections, its counts and its file were
+	--- unreachable. Everything below comes from the loader's catalogue, which is
+	--- the same parse the engine already did.
+	--- @param id string Category id.
+	--- @return table
+	local function category_submenu(id)
+		local category = (type(config.get_category) == "function") and config.get_category(id) or nil
+		local on = config.is_group_enabled and config.is_group_enabled(id)
+		local count = category and category.count or 0
+		local personal = PersonalFiles.components(id) ~= nil
+		local binding = personal and type(config.personal_file_scope_binding) == "function"
+			and config.personal_file_scope_binding(id) or nil
+		local function current_source()
+			return not personal or type(binding) == "table" and type(binding.current) == "function"
+				and binding.current() == true
+		end
+
+		local sub = {}
+
+		local sections = category and category.sections_order or {}
+		if #sections > 0 then
+
+			for _, name in ipairs(sections) do
+				local section = (category.sections or {})[name]
+				-- A section an extension binds is drawn in that extension's submenu.
+				if section and section.extension then goto continue_section end
+				-- CHECKED, not ENABLED. The two are different questions and answering
+				-- both with the effective state made a switched-off category untick
+				-- every section it holds — so the information "here is what comes back
+				-- when you switch it on" disappeared, and it looked as though the
+				-- per-section choices had been reset. They never were; only the screen
+				-- said so.
+				local section_checked = config.is_section_checked
+					and config.is_section_checked(id, name)
+					or (config.is_section_enabled and config.is_section_enabled(id, name))
+				sub[#sub + 1] = {
+					-- The count is the point of the row: a section with three entries
+					-- and one with nine hundred are the same line without it.
+					label    = string.format("%s (%d)", name, section and section.count or 0),
+					checked  = section_checked and true or false,
+					-- Greyed rather than hidden while the category is off: a row that
+					-- disappears reads as a bug, and the user still needs to see what
+					-- they will get back when they switch the category on.
+					disabled = not on,
+					action = function()
+						local called, committed = pcall(function()
+							if not current_source() then return false end
+							if type(config.toggle_section) ~= "function" then return false end
+							return config.toggle_section(id, name)
+						end)
+						if called and committed == true then return true end
+						Logger.error(LOG, "Hotstring section toggle refused for '%s.%s' (%s).", id, name,
+							called and "owner-not-committed" or "owner-error")
+						show_error(i18n_safe("dialog.bulk_toggle.save_failed"), i18n_safe("common.error_title"))
+						return false
+					end,
+				}
+				::continue_section::
+			end
+		end
+
+		local function commit_scope(enabled)
+			local called, committed = pcall(function()
+				if not current_source() then return false end
+				return config.set_category_scope_enabled({ id }, enabled)
+			end)
+			if called and committed == true then return true end
+			Logger.error(LOG, "Hotstring category scope refused for '%s' (%s).", id,
+				called and "owner-not-committed" or "owner-error")
+			show_error(i18n_safe("dialog.bulk_toggle.save_failed"), i18n_safe("common.error_title"))
+			return false
+		end
+		local render_ctx = { commands = {
+			["hotstring_category_enable_all"] = function()
+				return commit_scope(true)
+			end,
+			["hotstring_category_disable_all"] = function()
+				return commit_scope(false)
+			end,
+		} }
+		local rendered = ManifestMenu.build("hotstring_category_menu", "Hotstrings", nil, nil,
+			render_ctx, {
+				["hotstring_category_file"] = function()
+					if not category or not category.path then return {} end
+					local source = category.path
+					local row = ManifestMenu.command_row("hotstring_file_commands", "hotstring_file_open",
+						{ hotstring_file_open = function() return ctx.on_open_file(source) end },
+						{ hotstring_file_ready = function() return type(ctx.on_open_file) == "function" end })
+					return row and { row } or {}
+				end,
+				["hotstring_category_sections"] = function() return sub end,
+			})
+		if personal then
+			local controls = type(config.personal_metadata_controls) == "function" and config.personal_metadata_controls(id) or nil
+			local rows = PersonalFileMenu.build({ manifest = ManifestMenu, current = current_source,
+				enabled = function() return type(config.is_group_enabled) == "function" and config.is_group_enabled(id) == true end,
+				available = function(field) return controls ~= nil and controls.file[field] ~= true end,
+				enable = function(enabled)
+					return (enabled and config.enable_group or config.disable_group)(id) == true
+				end,
+				tooltip_enabled = function() return type(config.resolve) == "function" and config.resolve(id, nil).show_tooltip == true end,
+				tooltip = function(value) return config.set_personal_metadata(id, nil, "show_tooltip", value) == true end,
+				edit = function() return ctx.webview ~= nil and type(ctx.webview.show) == "function"
+					and ctx.webview.show("hotstrings_config_window") == true end,
+				metadata_reason = function() return i18n_safe("menu.hotstrings.personal_metadata_unavailable") end,
+				changed = function() if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end end,
+			})
+			for index = #rows, 1, -1 do table.insert(rendered, 1, rows[index]) end
+		end
+		if personal then
+			PersonalFileMenu.apply_category_admission(rendered, {
+				manifest = ManifestMenu, translate = i18n_safe, current = current_source,
+			})
+		end
+
+		return {
+			-- The ACTIVE count, not the file's total. A user reads this figure as
+			-- "what is firing right now" and checks a disable by watching it fall;
+			-- it never moved, so a fully disabled Autocorrection went on advertising
+			-- every entry it would have had.
+			label   = string.format("%s (%d)", category_label(id, category), active_count(id, category))
+				.. (personal and not current_source() and (" — " .. i18n_safe("menu.hotstrings.personal_source_unavailable")) or ""),
+			checked = on and true or false,
+			submenu = rendered,
+		}
+	end
+
+	--- Kept as the name the callers below already use.
+	--- @param name string Category id.
+	--- @return table
+	local function group_row(name)
+		return category_submenu(name)
+	end
+
+	--- Appends every loaded group belonging to `class`.
+	--- @param items table
+	--- @param class string
+	local function append_class(items, class)
+		local want  = members_of(class)
+		local added = 0
+		for _, name in ipairs(groups) do
+			if want[name] then
+				items[#items + 1] = group_row(name)
+				added = added + 1
+			end
+		end
+		if added == 0 then
+			if type(ManifestMenu.status_rows) ~= "function" then return end
+			local status = ManifestMenu.status_rows("hotstrings_menu", "hotstring_categories_standard", "no_groups")
+			for _, row in ipairs(type(status) == "table" and status or {}) do
+				items[#items + 1] = row
+			end
+		end
+	end
+
+	-- "Personal" is defined by exclusion: whatever the user loaded that the
+	-- manifest does not classify. Listing it any other way would need a second
+	-- classification to keep in step with the first.
+	local classified = {}
+	for _, class in ipairs({ "standard", "dynamic", "ergopti" }) do
+		for id in pairs(members_of(class)) do classified[id] = true end
+	end
+	-- Language-pack groups are classified by the shared index, not the manifest's
+	-- group classes: they render under their language's own submenu.
+	local language_packs = type(config.language_packs) == "function" and config.language_packs() or {}
+	for id in pairs(Languages.groups(language_packs)) do classified[id] = true end
+
+	--- One row per language: its native name, one « all sections » checkbox for
+	--- all of its categories, then each category's submenu.
+	--- @return table
+	local function language_rows()
+		local rows = {}
+		for _, pack in ipairs(language_packs) do
+			local ids = {}
+			for _, stem in ipairs(pack.categories) do ids[#ids + 1] = Languages.group_id(pack.id, stem) end
+			local switch, categories = all_sections_row(ids), {}
+			local total = 0
+			for _, id in ipairs(ids) do
+				local category = type(config.get_category) == "function" and config.get_category(id) or nil
+				if category then
+					categories[#categories + 1] = group_row(id)
+					total = total + active_count(id, category)
+				end
+			end
+			local items = switch and ManifestMenu.template_rows("hotstring_language_frame", {}, {}, {
+				hotstring_language_switch = function() return { switch } end,
+				hotstring_language_categories = function() return categories end,
+			})
+			if items then
+				local parents = ManifestMenu.template_rows("hotstring_language_parent_lua", {}, {
+					hotstring_language_name = function() return language_label(pack.locale) end,
+					hotstring_language_count = function() return string.format("%d", total) end,
+				}, { hotstring_language_children = items })
+				for _, row in ipairs(parents or {}) do rows[#rows + 1] = row end
+			end
+		end
+		return rows
+	end
+
+	--- Every known category id, sorted: the scope of the whole-tree « all
+	--- sections » checkbox, switched in ONE write. The row it replaced looped
+	--- `toggle_group` until 2026-08-05, which never touched the section keys and
+	--- ended each category in a full `load_all()` — magickey.toml alone is 305 KB —
+	--- inside a menu callback.
+	--- @return table Array of category ids.
+	local function all_category_ids()
+		local ids = {}
+		local categories = type(config.get_categories) == "function" and config.get_categories() or nil
+		for id in pairs(categories or {}) do ids[#ids + 1] = id end
+		table.sort(ids)
+		return ids
+	end
+
+	--- Renders a delay for a menu label: "750 ms", or the infinity sign for 0.
+	---
+	--- Zero does not mean "fire instantly" — it means the trigger never expires,
+	--- so the category stays armed however long the user pauses. Printing "0 ms"
+	--- would read as the exact opposite of what it does.
+	--- @param seconds number
+	--- @return string
+	local function delay_display(seconds)
+		local ms = math.floor(seconds * MS_PER_SEC + 0.5)
+		if ms == 0 then return i18n_safe("menu.hotstrings.infinite") end
+		return ms .. " ms"
+	end
+
+	--- Asks for a delay in milliseconds and returns it in seconds.
+	--- @param title string Already-translated dialog title.
+	--- @param current_sec number
+	--- @return number|nil Seconds, or nil when cancelled or refused.
+	local function prompt_delay(title, current_sec)
+		local raw = prompt_text(
+			title,
+			i18n_safe("menu.hotstrings.delay_prompt"),
+			tostring(math.floor(current_sec * MS_PER_SEC + 0.5)))
+		if raw == nil then return nil end
+
+		local value = tonumber((raw:gsub("%s", "")))
+		-- Refused rather than clamped: a negative or fractional millisecond is a
+		-- typo, and silently rounding it would store a number the user never chose
+		-- and cannot see is different from what they typed.
+		if not value or value < 0 or value ~= math.floor(value) then
+			show_error(i18n_safe("menu.hotstrings.delay_invalid_body"))
+			return nil
+		end
+		return value / MS_PER_SEC
+	end
+
+	--- Contains the existing durable delay owner's receipt before repainting.
+	--- @param setter function|nil
+	--- @return boolean committed
+	local function commit_delay(setter, ...)
+		local ok, committed = false, false
+		if type(setter) == "function" then ok, committed = pcall(setter, ...) end
+		if not ok or committed ~= true then
+			Logger.error(LOG, "The hotstring delay owner refused publication.")
+			show_error(i18n_safe("dialog.bulk_toggle.save_failed"), i18n_safe("common.error_title"))
+			return false
+		end
+		if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
+		return true
+	end
+
+	--- The row for the global default delay — the one every category inherits
+	--- when neither it nor its sections declare one.
+	--- @return table
+	local function global_delay_row()
+		local current = config.get_global_delay and config.get_global_delay() or nil
+		if type(current) ~= "number" then
+			Logger.error(LOG, "hotstrings_config exposes no global delay — the row cannot show a value.")
+			return {
+				label    = i18n_safe(captions.default) .. " : " .. i18n_safe("menu.hotstrings.missing_value"),
+				disabled = true,
+			}
+		end
+
+		local overridden = config.has_global_delay_override and config.has_global_delay_override() or false
+		local title = i18n_safe(captions.default)
+		return {
+			-- menu.settings.default_indicator carries its own leading space.
+			label = title .. " : " .. delay_display(current)
+				.. (overridden and "" or i18n_safe("menu.settings.default_indicator")),
+			action = function()
+				local chosen = prompt_delay(title, current)
+				if chosen == nil then return end
+				return commit_delay(config.set_global_delay, chosen)
+			end,
+		}
+	end
+
+	--- The row for one category's default delay.
+	---
+	--- Reads the EFFECTIVE value through resolve() so the number matches what the
+	--- settings window shows and what the engine actually applies, and writes
+	--- through set_override() so both UIs share one store.
+	--- @param category string
+	--- @param label_key string
+	--- @return table
+	local function category_delay_row(category, label_key)
+		local title = i18n_safe(label_key)
+		local ok, resolved = pcall(config.resolve, category, nil)
+		local current = ok and type(resolved) == "table" and tonumber(resolved.delay) or nil
+		if type(current) ~= "number" then
+			Logger.error(LOG, "No resolvable delay for category '%s' — its row shows no value.", tostring(category))
+			return {
+				label    = title .. " : " .. i18n_safe("menu.hotstrings.missing_value"),
+				disabled = true,
+			}
+		end
+
+		local overridden = resolved.has_override == true
+		return {
+			label = title .. " : " .. delay_display(current)
+				.. (overridden and "" or i18n_safe("menu.settings.default_indicator")),
+			action = function()
+				local chosen = prompt_delay(title, current)
+				if chosen == nil then return end
+				return commit_delay(config.set_override, category, nil, "delay", chosen)
+			end,
+		}
+	end
+
+	local ok_term, Terminators = pcall(require, "keymap.terminators")
+	if not ok_term then Terminators = nil end
+
+	local params_handlers = {
+		["word_expanders"] = function()
+			if not boundaries then return {} end
+			if not Terminators then
+				Logger.error(LOG, "keymap.terminators unavailable — the word-delimiter submenu is skipped.")
+				return {}
+			end
+
+			local function word_expanders_ready()
+				return ctx.paused ~= true and not (type(ctx.is_paused) == "function" and ctx.is_paused())
+			end
+
+			--- Captures enough catalogue state to undo a persistence failure.
+			--- @return table
+			local function snapshot()
+				local saved = { enabled = {}, custom = {} }
+				for _, def in ipairs(Terminators.get_terminator_defs() or {}) do
+					if def.key then
+						saved.enabled[def.key] = Terminators.is_terminator_enabled(def.key)
+						if def.custom then
+							saved.custom[#saved.custom + 1] = {
+								key = def.key,
+								char = type(def.chars) == "table" and def.chars[1] or nil,
+								label = def.label,
+								consume = def.consume == true,
+							}
+						end
+					end
+				end
+				return saved
+			end
+
+			--- Restores a snapshot after the durable write was refused.
+			--- @param saved table
+			local function restore(saved)
+				local custom_keys = {}
+				for _, def in ipairs(Terminators.get_terminator_defs() or {}) do
+					if def.key and def.custom then custom_keys[#custom_keys + 1] = def.key end
+				end
+				for _, key in ipairs(custom_keys) do Terminators.remove_custom_terminator(key) end
+				for _, def in ipairs(saved.custom) do
+					Terminators.add_custom_terminator(def.key, def.char, def.label, def.consume)
+				end
+				Terminators.set_terminators_enabled(saved.enabled)
+			end
+
+			--- Persists a mutation, rebuilding the menu only after durable success.
+			--- @param saved table State from before the mutation.
+			--- @return boolean
+			local function commit(saved)
+				local persisted = false
+				if type(ctx.on_persist_terminators) == "function" then
+					local called, result = pcall(ctx.on_persist_terminators)
+					persisted = called and result == true
+				end
+				if not persisted then
+					restore(saved)
+					Logger.error(LOG, "Word-delimiter change was rolled back because persistence failed.")
+					return false
+				end
+				if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
+				return true
+			end
+
+			--- The CATALOGUE delimiter keys — the user's own are excluded.
+			---
+			--- This used to include custom ones, and its comment said so as if it
+			--- were a decision. Both reference drivers skip them deliberately: a
+			--- delimiter the user added by hand must not be wiped by a bulk action
+			--- aimed at the shipped set.
+			--- @return table Array of key strings.
+			local function all_keys()
+				local keys = {}
+				for _, def in ipairs(Terminators.get_terminator_defs() or {}) do
+					if def.key and not def.custom then keys[#keys + 1] = def.key end
+				end
+				return keys
+			end
+
+			--- Sets every catalogue delimiter at once.
+			--- @param on boolean
+			--- @return function
+			local function set_all(on)
+				return function()
+					if not word_expanders_ready() then return false end
+					local saved = snapshot()
+					local changes = {}
+					for _, key in ipairs(all_keys()) do
+						changes[key] = on
+					end
+					if Terminators.set_terminators_enabled(changes) ~= true then return false end
+					return commit(saved)
+				end
+			end
+
+			local sub = {}
+
+			local function reset_terminators()
+				if not word_expanders_ready() then return false end
+				local saved = snapshot()
+				local changes = {}
+				for _, def in ipairs(Terminators.get_terminator_defs() or {}) do
+					if def.key and not def.custom then
+						changes[def.key] = def.default_enabled ~= false
+					end
+				end
+				if Terminators.set_terminators_enabled(changes) ~= true then return false end
+				return commit(saved)
+			end
+
+			for _, def in ipairs(Terminators.get_terminator_defs() or {}) do
+				if def.type == "separator" then
+					for _, boundary in ipairs(boundaries) do sub[#sub + 1] = boundary end
+				elseif def.key then
+					local key = def.key
+					-- The live magic key, not the ★ the catalogue was written with.
+					-- The label is shipped as a literal star; a user who changed the
+					-- key saw the delimiter list still naming a character that is no
+					-- longer their trigger, in every language.
+					local label = (def.label or key):gsub("★", MagicKey.get())
+					-- A consumed delimiter is swallowed by the expansion; an unconsumed
+					-- one is typed after it. The difference is visible only in the
+					-- output, so the row has to say which it is — a space that vanishes
+					-- and a space that stays look like a bug either way round.
+					local first_char = type(def.chars) == "table" and def.chars[1] or nil
+					if first_char and Terminators.terminator_is_consumed
+						and Terminators.terminator_is_consumed(first_char) then
+						label = label .. " " .. i18n_safe("menu.hotstrings.consumed_suffix")
+					end
+					sub[#sub + 1] = {
+						label   = label,
+						checked = Terminators.is_terminator_enabled(key) and true or false,
+						action      = function()
+							local saved = snapshot()
+							if Terminators.set_terminator_enabled(key,
+								not Terminators.is_terminator_enabled(key)) then commit(saved) end
+						end,
+					}
+					if def.custom then
+						local delete_row = ManifestMenu.command_row("word_expander_custom_menu", "word_expander_delete", {
+							["word_expander_delete"] = function()
+								local saved = snapshot()
+								if Terminators.remove_custom_terminator(key) ~= true then return false end
+								return commit(saved) == true
+							end,
+						}, { ["word_expanders_ready"] = word_expanders_ready })
+						if delete_row then sub[#sub + 1] = delete_row end
+					end
+				end
+			end
+
+			local catalogue_rows = sub
+			sub = {}
+			local add_row = ManifestMenu.command_row("word_expander_custom_menu", "word_expander_add", {
+				["word_expander_add"] = function()
+					local char = prompt_text(
+						i18n_safe("dialog.hotstrings.new_delimiter_title"),
+						i18n_safe("dialog.hotstrings.new_delimiter_prompt"),
+						"")
+					if not word_expanders_ready() then return false end
+					if char == nil then return false end
+
+					-- Codepoints, not bytes: "…" is three bytes and one character, so
+					-- a byte-length check would refuse most of what a user would pick.
+					local codepoints = 0
+					for _ in char:gmatch("[%z\1-\127\194-\244][\128-\191]*") do
+						codepoints = codepoints + 1
+					end
+					if codepoints ~= 1 then
+						show_error(i18n_safe("dialog.magic_key.error_length"))
+						return false
+					end
+
+					local consume = ask_yes_no(
+						i18n_safe("dialog.hotstrings.consume_title"),
+						i18n_safe("dialog.hotstrings.consume_body"),
+						i18n_safe("dialog.hotstrings.consume_yes"),
+						i18n_safe("dialog.hotstrings.consume_no"))
+					-- nil is "nobody could be asked", which must not be stored as a No.
+					if not word_expanders_ready() then return false end
+					if consume == nil then return false end
+
+					local saved = snapshot()
+					if Terminators.add_custom_terminator("custom_" .. char, char, char, consume) ~= true then return false end
+					return commit(saved) == true
+				end,
+			}, { ["word_expanders_ready"] = word_expanders_ready })
+			if add_row then sub[#sub + 1] = add_row end
+
+			local exp_ctx = {
+				commands = {
+					["word_expanders_enable_all"] = set_all(true),
+					["word_expanders_disable_all"] = set_all(false),
+					["word_expanders_restore"] = reset_terminators,
+				},
+				state_getters = { ["word_expanders_ready"] = word_expanders_ready },
+			}
+			local entries = ManifestMenu.template_rows("hotstrings_word_expander_frame", {}, {}, {
+				["parameter_catalogue_entries"] = function() return catalogue_rows end,
+				["parameter_custom_entries"] = function() return sub end,
+			})
+			if not entries then return {} end
+			local rendered_expanders = ManifestMenu.build("word_expanders_menu", "HotstringsParams", nil, nil,
+				exp_ctx, { ["word_expander_entries"] = function() return entries end })
+			local children = ManifestMenu.native_child_rows(rendered_expanders)
+			if not children then return {} end
+			return ManifestMenu.template_rows("hotstrings_word_expander_parent", {},
+				{ ["parameter_parent_ready"] = function() return true end },
+				{ ["parameter_word_expander_children"] = children }) or {}
+		end,
+		["magic_key_config"] = function()
+			local source = magic_frame_snapshot(ManifestMenu)
+			if not source then return {} end
+			local current = MagicKey.get()
+			local customised = MagicKey.is_customised()
+			local change = function()
+					local chosen = prompt_text(
+						i18n_safe("dialog.magic_key.title"),
+						i18n_safe("dialog.magic_key.prompt"),
+						current)
+					-- nil is a cancelled dialog, which must change nothing. An empty
+					-- string is a user who cleared the box and pressed OK, and that is
+					-- refused by validate() with its own message rather than silently
+					-- treated as a cancel.
+					if chosen == nil then return end
+					local ok, reason = MagicKey.set(chosen)
+					if not ok then
+						show_error(i18n_safe(reason or "dialog.magic_key.error_empty"))
+						return
+					end
+					if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
+				end
+			local reset = function()
+						MagicKey.reset()
+						if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
+					end
+			local rows = ManifestMenu.template_rows("hotstrings_magic_trigger_frame", { magic_key_change = change, magic_key_reset = reset },
+				{ magic_key_value = function() return current end }, { magic_key_reset_if_custom = function()
+					if not customised then return {} end
+					local reset_source = magic_frame_snapshot(ManifestMenu, "hotstrings_magic_trigger_reset", 1)
+					if not reset_source then return nil end
+					local reset_rows = ManifestMenu.template_rows("hotstrings_magic_trigger_reset", { magic_key_reset = reset }, {}, {})
+					if not reset_rows or not magic_frame_current(ManifestMenu, reset_source) then return nil end
+					return reset_rows
+				end })
+			if not rows or not magic_frame_current(ManifestMenu, source) then return {} end
+			return rows
+		end,
+		["delays_colors"] = function()
+			-- A submenu, not the single row this used to be. The old row opened the
+			-- settings window and stopped there, justified by a comment saying "this
+			-- driver has no per-category delays to prompt for" — which was false when
+			-- it was written: hotstrings_config.resolve() walks the same five-rung
+			-- cascade as macOS, set_override() persists to the same file, and
+			-- ergopti_hotstrings.lua consumes the resolved delay on every keystroke.
+			-- The values were all there; only the prompts were missing.
+			if not captions then return {} end
+
+			local settings_row = ManifestMenu.command_row("hotstrings_delays_menu", "hotstrings_config_window", {
+				hotstrings_config_window = function()
+					if type(ctx.webview) ~= "table" or type(ctx.webview.show) ~= "function" then
+						Logger.error(LOG, "No webview manager in the menu context — cannot open the hotstrings settings.")
+						return
+					end
+					-- The directory name under _shared/ui/. "hotstrings_config" has a
+					-- bridge but no page, so this row opened a window reading
+					-- "Error: app 'hotstrings_config' not found" — the settings window
+					-- this whole submenu points at had never once opened on Linux.
+					ctx.webview.show("hotstrings_config_window")
+				end,
+			}, { hotstrings_config_ready = function() return true end })
+			local sub = ManifestMenu.template_rows("hotstrings_delays_frame", {}, {}, {
+				["parameter_delay_config"] = function() return settings_row and { settings_row } or {} end,
+				["parameter_delay_default"] = function() return { global_delay_row() } end,
+				["parameter_delay_magic_key"] = function() return { category_delay_row("magickey", captions.magic_key) } end,
+				["parameter_delay_autocorrection"] = function() return { category_delay_row("autocorrection", captions.autocorrection) } end,
+			})
+			if not sub then return {} end
+			return ManifestMenu.template_rows("hotstrings_delays_parent", {},
+				{ ["parameter_parent_ready"] = function() return true end }, { ["parameter_delays_children"] = sub }) or {}
+		end,
+	}
+
+	local providers = {
+		["hotstring_categories_standard"] = function()
+			local rows = {}
+			append_class(rows, "standard")
+			return rows
+		end,
+		["hotstring_categories_dynamic"] = function()
+			local rows = {}
+			-- Its own handler, not append_class. This driver's group list comes from
+			-- TOML file stems and there is no dynamic-hotstrings TOML — the rules are
+			-- registered in code — so append_class matched nothing and the row
+			-- resolved to a greyed "(aucun groupe chargé)" while the engine was
+			-- running and expanding dates and @-tags. A user could not see the
+			-- category, count it, or switch it off.
+			local dyn = ctx.dyn_hotstrings
+			if type(dyn) ~= "table" or type(dyn.is_enabled) ~= "function" then
+				Logger.error(LOG, "No dynamic-hotstrings manager in the menu context — its category is not shown.")
+				return rows
+			end
+
+			local on = dyn.is_enabled()
+			-- active_count, not get_rules_count: the latter counts the RULES the
+			-- dynamic engine registered and knows nothing about the prefix
+			-- expansions, which are mappings held by the ordinary matcher. The
+			-- category would have advertised 3 while offering 13, and would not have
+			-- moved when a family was switched off.
+			local count = type(dyn.active_count) == "function" and dyn.active_count() or 0
+			if on and type(dyn.user_code_is_enabled) == "function" and dyn.user_code_is_enabled() then
+				count = count + dyn.user_code_count()
+			end
+
+			local sub = {
+				{
+					label = i18n_safe("menu.shortcuts.edit_personal_info"),
+					action = function()
+						if type(ctx.webview) ~= "table" or type(ctx.webview.show) ~= "function" then
+							Logger.error(LOG, "Personal-info editor cannot open: webview manager is unavailable.")
+							return
+						end
+						ctx.webview.show("personal_info_editor")
+					end,
+				},
+			}
+
+			-- One row per rule family, as Windows and macOS offer. The plan recorded
+			-- this as blocked by the shared engine "registering the date rules as a
+			-- batch with no identifier". That was wrong: add_rule has always carried
+			-- a section, and match_buffer has always taken a predicate to filter on
+			-- it. This driver simply passed nil for it.
+			local families = type(dyn.rule_families) == "function" and dyn.rule_families() or {}
+			if #families > 0 then
+				sub[#sub + 1] = { separator = true }
+
+				for _, family in ipairs(families) do
+					if family.separator then
+						sub[#sub + 1] = { separator = true }
+					else
+						local section, enabled, family_id = family.section, family.enabled, family.id
+						-- The count, on the families that have one. A prefix family with
+						-- 0 behind it is a switch that can do nothing until the user
+						-- fills in that field of personal_info.toml, and the count is
+						-- the only thing on the row that says so.
+						local family_label = family.count
+							and string.format("%s (%d)", family.label, family.count)
+							or family.label
+						sub[#sub + 1] = {
+							-- Resolved by the manager, which owns both the locale key
+							-- and the engine that answers what "{date}" is today.
+							label    = family_label,
+							checked  = enabled,
+							-- Greyed while the category itself is off, like a section
+							-- row: the tick still says what comes back when it is
+							-- switched on.
+							disabled = not on,
+							action       = function()
+								local current_family
+								local called, committed = pcall(function()
+									local current = ctx.dyn_hotstrings
+									if current ~= dyn or type(current.is_enabled) ~= "function"
+										or type(current.rule_families) ~= "function"
+										or type(current.is_rule_enabled) ~= "function"
+										or type(current.set_rule_enabled) ~= "function" then return false end
+									local declared = 0
+									for _, entry in ipairs(ManifestMenu.get_dynamic_hotstring_families()) do
+										if entry.id == family_id and (entry.linux_section or entry.section) == section then
+											declared = declared + 1
+										end
+									end
+									if declared ~= 1 then return false end
+									for _, entry in ipairs(current.rule_families()) do
+										if entry.id == family_id and entry.section == section then
+											if current_family ~= nil then return false end
+											current_family = entry
+										end
+									end
+									if type(current_family) ~= "table" or type(current_family.enabled) ~= "boolean"
+										or current.is_enabled() ~= true then return false end
+									local live_enabled = current.is_rule_enabled(nil, section)
+									if type(live_enabled) ~= "boolean" or live_enabled ~= current_family.enabled
+										or ctx.dyn_hotstrings ~= current then return false end
+									return current.set_rule_enabled(section, not live_enabled)
+								end)
+								if not called or committed ~= true then
+									Logger.error(LOG, "Dynamic hotstring family refused (%s).", called and "owner-not-committed" or "owner-error")
+									show_error(i18n_safe("dialog.bulk_toggle.save_failed"), i18n_safe("common.error_title"))
+									return false
+								end
+								-- A prefix family is matched by the ORDINARY engine, which
+								-- knows nothing about dynamic families — so its switch has
+								-- to add or remove mappings rather than filter them, and
+								-- that means a reload. The date families need none of this;
+								-- their guard is read at match time.
+								-- The preference receipt above does not acknowledge this
+								-- separate catalogue reload or invent its compensation.
+								if current_family.count and config and type(config.reload) == "function" then
+									config.reload()
+								end
+								if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
+								return true
+							end,
+						}
+					end
+				end
+			end
+
+			local programmable = ProgrammableMenuPolicy.build_entry_rows(ManifestMenu,
+				function() return ProgrammableHotstrings.build(ctx) end)
+			for _, row in ipairs(programmable) do sub[#sub + 1] = row end
+
+			local function commit_scope(enabled)
+				local called, committed = pcall(function() return dyn.set_scope_enabled(enabled, config) end)
+				if not called or committed ~= true then
+					Logger.error(LOG, "Dynamic hotstring scope refused (%s).", called and "owner-not-committed" or "owner-error")
+					show_error(i18n_safe("dialog.bulk_toggle.save_failed"), i18n_safe("common.error_title"))
+					return false
+				end
+				if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
+				return true
+			end
+			local rendered = ManifestMenu.build("hotstring_category_menu", "Hotstrings", nil, nil,
+				{ commands = {
+					hotstring_category_enable_all = function() return commit_scope(true) end,
+					hotstring_category_disable_all = function() return commit_scope(false) end,
+				} }, {
+					hotstring_category_file = function() return {} end,
+					hotstring_category_sections = function() return sub end,
+				})
+
+			rows[#rows + 1] = {
+				-- category.dynamic_hotstrings, which is the key the CATEGORY carries in
+				-- all 21 locales. menu.hotstrings.dynamic is the manifest's SECTION
+				-- description key and has no translation of its own, so it would have
+				-- rendered as the raw string.
+				label   = string.format("%s (%d)", i18n_safe("category.dynamic_hotstrings"), count),
+				checked = on,
+				submenu = rendered,
+			}
+			return rows
+		end,
+		["hotstring_languages"] = language_rows,
+		["hotstring_personal"] = function()
+			local default_parent, group_rows, unavailable_rows = {}, {}, {}
+			local preferences_present, close_on_add, close_action = false, false, nil
+			local function editor_ready()
+				if ctx.paused == true or type(ctx.is_paused) ~= "function"
+					or type(ctx.webview) ~= "table" or type(ctx.webview.show) ~= "function" then return false end
+				local ok, current = pcall(ctx.is_paused)
+				return ok and current == false
+			end
+			local editor_row = ManifestMenu.command_row("personal_hotstring_commands", "personal_hotstring_open_editor",
+				{ personal_hotstring_open_editor = function() return ctx.webview.show("hotstring_editor") end },
+				{ personal_hotstring_editor_ready = editor_ready })
+
+			local ok_editor, Editor = pcall(require, "ui.hotstring_editor.bridge")
+			if ok_editor and type(Editor.get_pref) == "function" then
+				-- Which section a new entry lands in. Built from the personal pack's
+				-- own section order so the list is what the user actually has, and
+				-- "none" is offered because leaving it unset is a real choice.
+				local current = Editor.get_pref("default_section")
+				local personal = type(config.get_category) == "function"
+					and config.get_category(PERSONAL_CATEGORY) or nil
+				local none_action = function()
+						Editor.set_pref("default_section", "")
+						if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
+					end
+				local choices = {}
+
+				for _, name in ipairs(personal and personal.sections_order or {}) do
+					choices[#choices + 1] = {
+						label   = name,
+						checked = (current == name),
+						action      = function()
+							Editor.set_pref("default_section", name)
+							if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
+						end,
+					}
+				end
+				local sub = ManifestMenu.template_rows("hotstring_personal_default_frame", {
+					["personal_default_none"] = none_action,
+				}, {
+					["personal_default_unset"] = function() return current == nil or current == "" end,
+					["personal_default_boundary"] = function() return false end,
+				}, { ["personal_default_choices"] = function() return choices end })
+				if type(sub) ~= "table" then return {} end
+				local projected_default = ManifestMenu.template_rows("hotstring_personal_default_parent", {},
+					{ personal_default_label = function()
+						return (current ~= nil and current ~= "") and current or i18n_safe("common.none")
+					end }, { personal_default_caption = function() return sub end })
+				if type(projected_default) ~= "table" then return {} end
+				default_parent = projected_default
+
+				preferences_present = true
+				close_on_add = Editor.get_pref("auto_close") == true
+				close_action = function()
+						Editor.set_pref("auto_close", not close_on_add)
+						if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
+					end
+
+			else
+				Logger.error(LOG, "The hotstring editor bridge is unavailable — its preferences cannot be shown.")
+			end
+
+
+			local added, represented = 0, {}
+			for _, name in ipairs(groups) do
+				-- Extension packs are unclassified too, but they are not personal
+				-- files: they belong to the extension that shipped them and get their
+				-- own section below. Without this test they appeared here, under a
+				-- heading that told the user they had written them.
+				if not classified[name] and not Extensions.parse_category_key(name) then
+					group_rows[#group_rows + 1] = group_row(name)
+					represented[name] = true
+					added = added + 1
+				end
+			end
+			-- Empty or unavailable sources still own a file row; mappings are not
+			-- a discovery inventory and must not hide their source controls.
+			if type(config.personal_file_sources) == "function" then
+				for _, source in ipairs(config.personal_file_sources()) do
+					local descriptor = source.descriptor
+					if PersonalFiles.is_descriptor(descriptor) and not represented[descriptor.id] then
+						local row = group_row(descriptor.id)
+						row.label = descriptor.label .. " (0)"
+						if type(config.personal_file_scope_binding) ~= "function"
+							or config.personal_file_scope_binding(descriptor.id) == nil then
+							row.label = row.label .. " — " .. i18n_safe("menu.hotstrings.personal_source_unavailable")
+						end
+						group_rows[#group_rows + 1], represented[descriptor.id] = row, true
+						added = added + 1
+					end
+				end
+			end
+			if type(config.personal_unavailable_directories) == "function" then
+				for _, blocked in ipairs(config.personal_unavailable_directories()) do
+					unavailable_rows[#unavailable_rows + 1] = { label = blocked.label,
+						submenu = PersonalFileMenu.directory_unavailable(ManifestMenu) }
+					added = added + 1
+				end
+			end
+			local controls = ManifestMenu.template_rows("hotstring_personal_controls_frame", {
+				["personal_close_on_add"] = close_action,
+			}, {
+				["personal_open_present"] = function() return false end,
+				["personal_controls_head_boundary"] = function() return false end,
+				["personal_controls_tail_boundary"] = function() return true end,
+				["personal_preferences_present"] = function() return preferences_present end,
+				["personal_controls_ready"] = function() return true end,
+				["personal_close_on_add"] = function() return close_on_add end,
+			}, {
+				["personal_editor"] = function() return editor_row and { editor_row } or {} end,
+				["personal_default_parent"] = function() return default_parent end,
+				["personal_legacy_before"] = function() return {} end,
+				["personal_legacy_after"] = function() return {} end,
+			})
+			if type(controls) ~= "table" then return {} end
+			local rows = ManifestMenu.template_rows("hotstring_personal_content_frame", {}, {
+				["personal_main_boundary"] = function() return false end,
+				["personal_tree_boundary"] = function() return false end,
+				["personal_custom_boundary"] = function() return false end,
+				["personal_empty"] = function() return added == 0 end,
+			}, {
+				["personal_controls"] = function() return controls end,
+				["personal_main_sections"] = function() return group_rows end,
+				["personal_unavailable_directories"] = function() return unavailable_rows end,
+				["personal_tree"] = function() return {} end,
+				["personal_custom_sections"] = function() return {} end,
+			})
+			if type(rows) ~= "table" then return {} end
+			if added == 0 then rows[#rows].action = function() end end
+
+			return rows
+		end,
+		["hotstring_extensions"] = function()
+			local rows = {}
+			-- One « Hotstrings <extension> » submenu per installed extension, holding
+			-- its packs and the bundled categories it binds whole (Ergopti's SFB
+			-- reduction and rolls, which keep their historical ids). Grouped by
+			-- extension rather than listed flat because an extension is the unit the
+			-- user installed and the unit they will want to turn off; its individual
+			-- packs are an implementation detail of how its author organised them.
+			local by_extension, order, names = {}, {}, {}
+			for _, name in ipairs(groups) do
+				local extension_id = Extensions.parse_category_key(name)
+				local label = nil
+				if not extension_id then
+					local category = type(config.get_category) == "function" and config.get_category(name) or nil
+					local extension = category and category.extension or nil
+					if type(extension) == "table" and type(extension.id) == "string" then
+						extension_id = extension.id
+						label = extension.name
+					end
+				end
+				if extension_id then
+					if not by_extension[extension_id] then
+						by_extension[extension_id] = {}
+						order[#order + 1] = extension_id
+					end
+					local list = by_extension[extension_id]
+					list[#list + 1] = name
+					names[extension_id] = names[extension_id] or label
+				end
+			end
+
+			-- The sections an extension binds inside a bundled category (Ergopti's
+			-- repeat corrections in the magic key): a row each in its submenu.
+			local bound_sections = {}
+			for _, name in ipairs(groups) do
+				local category = type(config.get_category) == "function" and config.get_category(name) or nil
+				for _, section in ipairs(category and category.sections_order or {}) do
+					local record = (category.sections or {})[section]
+					local extension = record and record.extension or nil
+					if type(extension) == "table" and type(extension.id) == "string" then
+						if not by_extension[extension.id] then
+							by_extension[extension.id] = {}
+							order[#order + 1] = extension.id
+						end
+						names[extension.id] = names[extension.id] or extension.name
+						local list = bound_sections[extension.id] or {}
+						bound_sections[extension.id] = list
+						list[#list + 1] = { category = name, section = section, count = record.count or 0,
+							description = record.description }
+					end
+				end
+			end
+
+			-- The bound categories in the menu manifest's order, the one Windows
+			-- walks too, rather than in load order; the packs follow as loaded.
+			for extension_id, list in pairs(by_extension) do
+				by_extension[extension_id] = Extensions.menu_order(list, classes)
+			end
+
+			if #order == 0 then
+				rows[#rows + 1] = {
+					label    = i18n_safe("menu.extensions.none_installed"),
+					action       = function() end,
+					disabled = true,
+				}
+				return
+			end
+
+			for _, extension_id in ipairs(order) do
+				local packs = by_extension[extension_id]
+				local pack_rows, bound_rows = {}, {}
+				local function commit_gates(enabled)
+					if ctx.paused == true or (type(ctx.is_paused) == "function" and ctx.is_paused()) then return false end
+					local bindings = {}
+					for _, leaf in ipairs(bound_sections[extension_id] or {}) do
+						bindings[#bindings + 1] = { group = leaf.category, section = leaf.section }
+					end
+					local called, committed = pcall(function()
+						if type(config.set_extension_sections_enabled) ~= "function" then return false end
+						return config.set_extension_sections_enabled(packs, bindings, enabled)
+					end)
+					if called and committed == true then
+						if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
+						return true
+					end
+					Logger.error(LOG, "Extension hotstring gate selection refused (%s).",
+						called and "owner-not-committed" or "owner-error")
+					show_error(i18n_safe("dialog.bulk_toggle.save_failed"), i18n_safe("common.error_title"))
+					return false
+				end
+
+				-- Turning the extension off means turning off every pack it brought.
+				-- Offered first because it is the action the extension as a unit
+				-- affords; the per-pack rows below are for the user who wants half.
+				local bulk = ManifestMenu.template_rows("hotstring_extension_bulk_controls", {
+					["extension_enable_all"] = function() return commit_gates(true) end,
+					["extension_disable_all"] = function() return commit_gates(false) end,
+				}, {}, {})
+
+				for _, name in ipairs(packs) do
+					pack_rows[#pack_rows + 1] = group_row(name)
+				end
+				for _, bound in ipairs(bound_sections[extension_id] or {}) do
+					local category_on = config.is_group_enabled and config.is_group_enabled(bound.category)
+					local checked = config.is_section_checked
+						and config.is_section_checked(bound.category, bound.section)
+						or (config.is_section_enabled and config.is_section_enabled(bound.category, bound.section))
+					local description = bound.description
+					if type(description) == "table" then
+						local locale = require("infra.i18n").get_locale()
+						description = description[locale] or description.en
+					end
+					if type(description) ~= "string" or description == "" then description = bound.section end
+					bound_rows[#bound_rows + 1] = {
+						label    = string.format("%s (%d)", description, bound.count),
+						checked  = checked and true or false,
+						-- Greyed while its category is off, like a section row there.
+						disabled = not category_on or ctx.paused == true,
+						action   = (category_on and ctx.paused ~= true) and function()
+							if ctx.paused == true or (type(ctx.is_paused) == "function" and ctx.is_paused())
+								or config.is_group_enabled(bound.category) ~= true then return false end
+							local called, committed = pcall(function()
+								if type(config.toggle_section) ~= "function" then return false end
+								return config.toggle_section(bound.category, bound.section)
+							end)
+							if called and committed == true then return true end
+							Logger.error(LOG, "Extension hotstring section toggle refused for '%s.%s' (%s).", bound.category, bound.section,
+								called and "owner-not-committed" or "owner-error")
+							show_error(i18n_safe("dialog.bulk_toggle.save_failed"), i18n_safe("common.error_title"))
+							return false
+						end or nil,
+					}
+				end
+
+				local sub = type(bulk) == "table" and ManifestMenu.template_rows("hotstring_extension_content_frame", {}, {}, {
+					["extension_bulk_head"] = function() return bulk end,
+					["extension_pack_rows"] = function() return pack_rows end,
+					["extension_bound_boundary"] = function()
+						if bound_sections[extension_id] and #packs > 0 then
+							return ManifestMenu.template_rows("hotstrings_parameter_boundary", {}, {}, {})
+						end
+						return {}
+					end,
+					["extension_bound_tail"] = function() return bound_rows end,
+				}) or nil
+				local name = names[extension_id] or extension_label(extension_id)
+				if sub then rows[#rows + 1] = {
+					label = string.format(i18n_safe("menu.extensions.hotstrings_of"), name),
+					items = sub,
+				} end
+			end
+			return rows
+		end,
+	}
+
+	-- word_expanders left params_handlers: its manifest row is `type = "list"`
+	-- now, so the shared renderer materialises every row of the submenu from the
+	-- data the provider returns rather than this driver assembling the menu.
+	local params_providers = {
+		["word_expanders"] = params_handlers["word_expanders"],
+		["magic_key_config"] = params_handlers["magic_key_config"],
+		["delays_colors"] = params_handlers["delays_colors"],
+		-- The four toggles the manifest has declared for this driver all along and
+		-- that nothing could reach: ui/tooltip/preview.lua honoured them on the hot
+		-- path while its set_enabled() had no caller, so they were fixed at their
+		-- load-time value. PreviewSettings owns them now; this menu is the way in.
+		--
+		-- Provider DATA since 2026-08-07: `{label, checked, action}` rows the
+		-- renderer materialises, rather than a menu tree this driver assembled.
+		["preview_bubbles"] = function()
+			local choices = {}
+			local row = ManifestMenu.check_row("preview_magic_control", "preview_star_enabled", {
+				["preview_star_enabled"] = function()
+					if PreviewSettings.toggle("star") ~= true then return false end
+					if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
+					return true
+				end,
+			}, {
+				["hotstrings.preview_star_enabled"] = function() return PreviewSettings.get("star") == true end,
+				-- Preserve configuration access while the Linux engine is paused.
+				["preview_magic_ready"] = function() return true end,
+			})
+			if row then choices[#choices + 1] = row end
+			local magic_rows = choices
+			choices = {}
+			local presence_commands, presence_getters = {}, { preview_presence_ready = function() return true end }
+			for key, name in pairs({ preview_autocorrect_enabled = "autocorrect", preview_ai_enabled = "ai" }) do
+				presence_commands[key] = function()
+					if PreviewSettings.toggle(name) ~= true then return false end
+					if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
+					return true
+				end
+				presence_getters["hotstrings." .. key] = function() return PreviewSettings.get(name) == true end
+			end
+			for _, declaration in ipairs(ManifestMenu.get_array("preview_presence_controls")) do
+				local row = ManifestMenu.check_row("preview_presence_controls", declaration.id, presence_commands, presence_getters)
+				if row then choices[#choices + 1] = row end
+			end
+			local presence_rows = choices
+			choices = {}
+			local row = ManifestMenu.check_row("preview_colored_control", "preview_colored_tooltips", {
+				["preview_colored_tooltips"] = function()
+					if PreviewSettings.toggle("colored") ~= true then return false end
+					if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
+					return true
+				end,
+			}, {
+				["hotstrings.preview_colored_tooltips"] = function() return PreviewSettings.get("colored") == true end,
+				-- Configuring a preview remains allowed while the Linux engine is paused.
+				["preview_colored_ready"] = function() return true end,
+			})
+			if row then choices[#choices + 1] = row end
+
+			local children = ManifestMenu.template_rows("hotstrings_preview_frame", {}, {}, {
+				["parameter_preview_magic"] = function() return magic_rows end,
+				["parameter_preview_presence"] = function() return presence_rows end,
+				["parameter_preview_colored"] = function() return choices end,
+			})
+			if not children then return {} end
+			return ManifestMenu.template_rows("hotstrings_preview_parent", {},
+				{ ["parameter_parent_ready"] = function() return true end }, { ["parameter_preview_children"] = children }) or {}
+		end,
+	}
+	params_handlers["word_expanders"] = nil
+	params_handlers["magic_key_config"] = nil
+	params_handlers["delays_colors"] = nil
+
+	local group_builders = {
+		["hotstrings_params"] = function(c)
+			-- `repeat_key` is a `check` row: the renderer draws it from the
+			-- declaration and this driver supplies only the toggle and the state
+			-- behind the tick. Registered on the context the group is rendered
+			-- with, because that is where the check branch looks.
+			local params_ctx = {}
+			for key, value in pairs(c) do params_ctx[key] = value end
+			params_ctx.commands = {}
+			for key, value in pairs(c.commands or {}) do params_ctx.commands[key] = value end
+			params_ctx.commands["repeat_key"] = function()
+				RepeatKey.toggle()
+				if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
+			end
+			params_ctx.state_getters = {}
+			for key, value in pairs(c.state_getters or {}) do params_ctx.state_getters[key] = value end
+			params_ctx.state_getters["hotstrings_repeat_enabled"] = function()
+				return RepeatKey.is_enabled()
+			end
+			return ManifestMenu.build("hotstrings_params_group", "HotstringsParams",
+				params_handlers, nil, params_ctx, params_providers)
+		end,
+	}
+
+	-- The « all sections » checkbox is a `check` declaration, built by the shared
+	-- renderer, so this driver supplies only its behaviour and its tick.
+	local hs_ctx = {}
+	for key, value in pairs(ctx) do hs_ctx[key] = value end
+	local function hotstrings_on() return _hotstrings_on(ctx) end
+	local whole_tree = all_sections_row(all_category_ids())
+
+	--- Restores or clears the Hotstrings scope at once.
+	--- @param mode string "recommended" or "clear".
+	--- @return boolean committed
+	local function apply_hotstrings_scope(mode)
+		return _apply_hotstrings_scope(ctx, mode)
+	end
+
+	hs_ctx.commands = {
+		["scope_restore"] = function() return apply_hotstrings_scope("recommended") end,
+		["scope_clear"] = function() return apply_hotstrings_scope("clear") end,
+		["hotstrings_all_sections"] = whole_tree and whole_tree.action or nil,
+		-- The category switch, the submenu's first row. Every driver registers it:
+		-- no tray can switch a category from the row that opens its submenu.
+		["hotstrings_toggle"]      = function()
+			-- The batched writers, not a loop of toggle_group: each toggle_group
+			-- ends in a full load_all(), which re-parses every pack — magickey.toml
+			-- alone is 305 KB — once per category, inside a menu callback.
+			local changed
+			if hotstrings_on() then
+				-- Off stops every expansion: each gate closes, keeping its section
+				-- choices, and the dynamic hotstrings stop with them.
+				changed = config.disable_all()
+				local dyn = ctx.dyn_hotstrings
+				if changed ~= false and type(dyn) == "table" and type(dyn.is_enabled) == "function"
+					and dyn.is_enabled() and dyn.set_enabled(false) ~= true then
+					changed = false
+				end
+			else
+				changed = config.enable_all()
+			end
+			if changed ~= false and type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
+		end,
+		-- Reloading the catalogue from disk: this driver's own affordance, because
+		-- it is the only one whose hotstrings can change under it without a
+		-- restart. Declared with that reason rather than appended unannounced.
+		["hotstrings_reload"]      = function()
+			if config.reload then config.reload() end
+		end,
+	}
+	hs_ctx.state_getters = {}
+	for key, value in pairs(ctx.state_getters or {}) do hs_ctx.state_getters[key] = value end
+	hs_ctx.state_getters["hotstrings_enabled"] = hotstrings_on
+	hs_ctx.state_getters["hotstrings_all_sections_enabled"] = function() return whole_tree ~= nil and whole_tree.checked end
+
+	return ManifestMenu.build("hotstrings_menu", "Hotstrings", nil, group_builders, hs_ctx, providers)
+end
+
+--- Builds the hotstrings submenu: the manifest's rows, then this driver's own.
+--- @param ctx table Menu context.
+--- @return table One menu entry with its submenu.
+local function _build_hotstrings(ctx)
+	local config = ctx.config
+
+	if type(config) ~= "table" then
+		local status_rows = ManifestMenu and ManifestMenu.template_rows("linux_hotstrings_absent_rows", {}, {}, {})
+		if not status_rows then return {} end
+		return { label = i18n_safe("menu.hotstrings.title"), items = status_rows }
+	end
+
+	local items = _manifest_hotstring_rows(ctx, config)
+
+	-- The gate row and the reload row are BOTH the manifest's now, and both are
+	-- built by the shared renderer from their declaration — see the `commands`
+	-- and `state_getters` registered in _manifest_hotstring_rows.
+	--
+	-- The gate sits inside the submenu, as on every driver: appindicator binds
+	-- item.fn only when the row has NO submenu (`if item.menu … elseif item.fn …`),
+	-- and AppKit and Win32 never send a click for such a row either.
+
+	-- The grand total, which macOS and Windows both put on this entry and Linux
+	-- did not. On a driver that re-scans its catalogue from disk it is the fastest
+	-- confirmation that a reload found the packs at all.
+	--
+	-- Summed from the ACTIVE counts, not the files' totals: a grand total computed
+	-- the naive way would contradict the per-category numbers directly beneath it
+	-- the moment anything was switched off.
+	local grand_total = 0
+	if type(config.get_groups) == "function" and type(config.active_count) == "function" then
+		for _, name in ipairs(config.get_groups() or {}) do
+			grand_total = grand_total + (config.active_count(name) or 0)
+		end
+	end
+
+	local title = i18n_safe("menu.hotstrings.title")
+	if grand_total > 0 then title = string.format("%s (%d)", title, grand_total) end
+
+	-- The parent carries the same tick as the switch that opens the submenu, for
+	-- a user scanning the top level. It cannot be clicked: no tray binds a click
+	-- on a row that opens a submenu, which is why the switch is a row inside.
+	return { label = title, checked = _hotstrings_on(ctx), submenu = items }
+end
+
+--- Builds the AI / LLM submenu.
+local function _build_llm(ctx)
+	local NativeParent = require("ui.menu.ai_parent")
+	local parent = NativeParent.begin(ManifestMenu, "llm", ctx)
+	if not parent then return nil end
+	local llm = ctx.llm
+	if not llm then
+		local status_rows = ManifestMenu and ManifestMenu.template_rows("linux_llm_absent_rows", {}, {}, {})
+		if not status_rows then return {} end
+		return NativeParent.finish(parent, ManifestMenu.render_rows(status_rows, "linux_llm_absent_rows"))
+	end
+
+	local items = {}
+	local enabled = parent.enabled
+
+	-- The master gate is the manifest's first row and the shared renderer draws
+	-- it, from the command and the getter registered below. It also gets its OWN
+	-- two labels back — « Activer / Désactiver les suggestions IA », translated in
+	-- twenty-one locales and read by nobody — instead of a generic « Activé » with
+	-- a " ✓" glued on, a mark that belongs to the tray rather than to the string.
+
+	local providers = {}
+	local dynamic_handlers = {}
+	local group_builders = {}
+
+	--- Appends computed row data after the shared renderer materialises it.
+	---
+	--- LLM parent labels include live values, so they remain dynamic manifest
+	--- entries. They are still provider DATA, though: keeping `title` / `menu`
+	--- here would make this driver own the native row shape and bypass the one
+	--- renderer that is supposed to own it.
+	--- @param target table Native menu array supplied by the manifest renderer.
+	--- @param row table Provider row data ({label, items, disabled}).
+	--- @param id string Stable diagnostic id.
+	local function append_rendered_row(target, row, id)
+		for _, rendered in ipairs(ManifestMenu.render_rows({ row }, id)) do
+			target[#target + 1] = rendered
+		end
+	end
+
+	-- Inactivity and privacy controls. Unlike the model and generation lists,
+	-- this is one labelled submenu, so the manifest keeps its cross-driver
+	-- declared group and this driver supplies only the runtime child contents.
+	group_builders["llm_trigger"] = function()
+		local ok_settings, TriggerSettings = pcall(require, "modules.llm.trigger_settings")
+		if not ok_settings then
+			Logger.error(LOG, "LLM trigger settings unavailable; trigger menu omitted.")
+			return
+		end
+		local rows = {}
+		local current_delay = TriggerSettings.get("debounce_ms")
+		local delay_choices = {}
+		for _, value in ipairs(TriggerSettings.presets("debounce_ms")) do
+			delay_choices[#delay_choices + 1] = {
+				label = tostring(value) .. " ms",
+				checked = current_delay == value,
+				action = function()
+					TriggerSettings.set("debounce_ms", value)
+					if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
+				end,
+			}
+		end
+		local bounds = TriggerSettings.bounds("debounce_ms")
+		local custom_rows = ManifestMenu.template_rows("llm_numeric_custom_rows", {
+			["llm_numeric_custom_value"] = function()
+				local ok_prompt, Prompt = pcall(require, "ui.numeric_prompt.bridge")
+				if not ok_prompt then
+					Logger.error(LOG, "No numeric prompt; debounce can only take a preset.")
+					return
+				end
+				Prompt.ask({
+					title = i18n_safe("menu.llm.trigger_menu_title"),
+					hint = string.format("%d – %d ms", bounds.min, bounds.max),
+					value = current_delay,
+					min = bounds.min,
+					max = bounds.max,
+					on_save = function(value)
+						local saved = TriggerSettings.set("debounce_ms", math.floor(value))
+						if saved and type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
+						return saved
+					end,
+				}, ctx.webview)
+			end,
+		})
+		for _, row in ipairs(custom_rows or {}) do delay_choices[#delay_choices + 1] = row end
+		rows[#rows + 1] = {
+			label = string.format(i18n_safe("menu.llm.debounce_label"), tostring(current_delay) .. " ms"),
+			items = delay_choices,
+		}
+		local boundary_rows = ManifestMenu.template_rows("llm_trigger_provider_boundary", {}, {}, {})
+		if not boundary_rows then return end
+		for _, row in ipairs(boundary_rows) do rows[#rows + 1] = row end
+		local leading_rows = rows
+		rows = {}
+		local Preferences = require("infra.llm_preferences")
+		local function privacy_snapshot(name)
+			local snapshot = {owner = TriggerSettings, generation = 0,
+				value = TriggerSettings.get(name), enabled = llm.is_enabled(),
+				paused = true, blocked = true}
+			local ok, detail = xpcall(function()
+				local path = "llm.trigger." .. name
+				local values, source = Preferences.get_many({"llm.enabled", "llm.models.selected", path})
+				snapshot.source = source
+				snapshot.preferences_generation = Preferences.generation()
+				if type(llm.streaming_revision) ~= "function" then error("Native admission revision is unavailable") end
+				snapshot.generation = llm.streaming_revision()
+				local revision = snapshot.preferences_generation
+				if type(revision) ~= "number" or revision ~= revision or revision == math.huge
+					or revision < 0 or revision % 1 ~= 0 then error("Invalid preference revision") end
+				snapshot.backend = llm.get_backend()
+				snapshot.paused = ctx.paused == true or ctx.is_paused()
+				snapshot.blocked = Preferences.admit() ~= true
+					or values["llm.enabled"] ~= snapshot.enabled
+					or values["llm.models.selected"] ~= snapshot.backend or values[path] ~= snapshot.value
+			end, debug.traceback)
+			if not ok then
+				Logger.warn(LOG, "Privacy row source is unavailable: %s.", tostring(detail))
+				snapshot.blocked = true
+			end
+			return snapshot
+		end
+		local url_source = privacy_snapshot("url_bar_filter_enabled")
+		local secure_source = privacy_snapshot("secure_filter_enabled")
+		local function privacy_command(expected, name)
+			local current = privacy_snapshot(name)
+			local decision = PrivacyPolicy.intent(expected, current)
+			if expected.preferences_generation ~= current.preferences_generation
+				or decision.admitted ~= true or type(expected.source) ~= "table" or type(current.source) ~= "table"
+				or expected.source.status ~= current.source.status
+				or expected.source.content ~= current.source.content then return false end
+			if TriggerSettings.set(name, decision.value, expected.source) ~= true then return false end
+			if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
+			return true
+		end
+		local function ready()
+			return llm.is_enabled() == true and ctx.paused ~= true
+				and not (type(ctx.is_paused) == "function" and ctx.is_paused() == true)
+		end
+		local function toggle(name)
+			if not ready() then return false end
+			if TriggerSettings.toggle(name) ~= true then return false end
+			if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
+			return true
+		end
+		local trigger_ctx = {
+			commands = {
+				["llm_url_bar_filter"] = function() return privacy_command(url_source, "url_bar_filter_enabled") end,
+				["llm_secure_field_filter"] = function() return privacy_command(secure_source, "secure_filter_enabled") end,
+				["llm_instant_on_word_end"] = function() return toggle("instant_on_word_end") end,
+				["llm_after_hotstring"] = function() return toggle("after_hotstring") end,
+			},
+			state_getters = {
+				["llm_url_bar_filter_enabled"] = function() return TriggerSettings.get("url_bar_filter_enabled") end,
+				["llm_secure_field_filter_enabled"] = function() return TriggerSettings.get("secure_filter_enabled") end,
+				["llm_url_bar_filter_ready"] = function() return PrivacyPolicy.ready(url_source) end,
+				["llm_secure_field_filter_ready"] = function() return PrivacyPolicy.ready(secure_source) end,
+				["llm_instant_on_word_end_enabled"] = function() return TriggerSettings.get("instant_on_word_end") end,
+				["llm_after_hotstring_enabled"] = function() return TriggerSettings.get("after_hotstring") end,
+				["llm_trigger_ready"] = ready,
+			},
+		}
+		rows = ManifestMenu.build("llm_trigger_menu", "LLM", nil, nil, trigger_ctx, {
+			["llm_trigger_leading"] = function() return leading_rows end,
+			["llm_trigger_remaining"] = function() return rows end,
+		})
+		local child_rows = ManifestMenu.native_child_rows(rows)
+		if child_rows == nil then return nil end
+		return { items = child_rows, disabled = not enabled or nil }
+	end
+
+	dynamic_handlers["llm_profile"] = function(target)
+		local ok_profiles, ProfileSettings = pcall(require, "modules.llm.profile_settings")
+		if not ok_profiles then return end
+		-- The model predictions actually use: an API entry's when the API answers.
+		local current_model = llm.get_prediction_model and llm.get_prediction_model() or nil
+		local effective = ProfileSettings.effective_profile(current_model)
+		local count = ProfileSettings.get("num_predictions") or 1
+		local function refresh()
+			if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
+		end
+		local function select_profile(profile_id)
+			if type(profile_id) ~= "string" or profile_id == "" then return false end
+			if type(llm.get_live) ~= "function" or type(llm.set_live) ~= "function" then
+				Logger.error(LOG, "Manual profile selection refused: its live override owner is unavailable.")
+				return false
+			end
+			local observed, live = xpcall(llm.get_live, debug.traceback)
+			if not observed then return false end
+			if live ~= nil then
+				local stopped, accepted = xpcall(llm.set_live, debug.traceback, nil)
+				local checked, current = xpcall(llm.get_live, debug.traceback)
+				if stopped ~= true or accepted ~= true or checked ~= true or current ~= nil then
+					Logger.error(LOG, "Manual profile selection refused: its temporary override did not retire.")
+					return false
+				end
+			end
+			local saved = ProfileSettings.set("active", profile_id, current_model)
+			if saved then refresh() end
+			return saved
+		end
+		local function save_profile(profile, activate, expected_existing)
+			local saved = ProfileSettings.save_user_profile(
+				profile, activate, expected_existing)
+			if saved then refresh() end
+			return saved
+		end
+		local function create_ready()
+			if ctx.paused == true or type(ctx.is_paused) ~= "function" then return false end
+			local ok, current = pcall(ctx.is_paused)
+			return ok and current == false
+		end
+		local function open_editor(existing, activate, opts, create)
+			if create and not create_ready() then return false end
+			local ok_editor, Editor = pcall(require, "ui.prompt_editor.bridge")
+			if not ok_editor or type(Editor.open) ~= "function" then
+				Logger.error(LOG, "Prompt editor is unavailable.")
+				return false
+			end
+			local expected_existing = type(existing) == "table"
+				and not (type(opts) == "table" and opts.as_new == true)
+			if not expected_existing then
+				local editor_opts = {}
+				for key, value in pairs(type(opts) == "table" and opts or {}) do
+					editor_opts[key] = value
+				end
+				editor_opts.profile_id = ProfileSettings.next_user_profile_id()
+				opts = editor_opts
+			end
+			if create and not create_ready() then return false end
+			return Editor.open(existing, function(profile)
+				if create and not create_ready() then return false end
+				return save_profile(profile, activate, expected_existing)
+			end, opts)
+		end
+		local effective_label = effective
+		local active_builtin, user_profiles, seed
+		local function auto_profile()
+			if not create_ready() then return false end
+			local current = ProfileSettings.get("auto_profile_for_model")
+			if type(current) ~= "boolean" or not create_ready() then return false end
+			local saved = ProfileSettings.set("auto_profile_for_model", not current, current_model)
+			if saved ~= true then return false end
+			refresh()
+			return true
+		end
+		local function builtin_rows()
+			local rows = {}
+			for _, profile in ipairs(ProfileSettings.list_built_in()) do
+				local profile_id = profile.id
+				-- The same label the action picker lists the profile under. _fill
+				-- appended the count to every label without {n}: "Basic — … 3 s".
+				local label = ProfileSettings.menu_label(profile, count)
+				if effective == profile_id then
+					effective_label = label
+					active_builtin = profile
+				end
+				rows[#rows + 1] = {
+					label = label,
+					checked = effective == profile_id,
+					action = function()
+						select_profile(profile_id)
+					end,
+				}
+			end
+			return rows
+		end
+		local function custom_present()
+			user_profiles = ProfileSettings.list_user()
+			return #user_profiles > 0
+		end
+		local function custom_rows()
+			local rows = {}
+			for _, profile in ipairs(user_profiles) do
+				local owned_profile = profile
+				local profile_id = profile.id
+				local label = profile.label
+				if effective == profile_id then effective_label = label end
+				local function child_ready()
+					if type(ProfileSettings.list_user) ~= "function" then return false end
+					local ok, current = pcall(ProfileSettings.list_user)
+					if not ok or type(current) ~= "table" then return false end
+					local matches = 0
+					for _, entry in ipairs(current) do
+						if entry.id == profile_id then matches = matches + 1 end
+					end
+					return matches == 1
+				end
+				rows[#rows + 1] = {
+					label = label,
+					items = ManifestMenu.template_rows("llm_custom_profile_controls", {
+						["llm_profile_use"] = function() return select_profile(profile_id) end,
+						["llm_profile_edit"] = function() return open_editor(owned_profile, false) end,
+						["llm_profile_delete"] = function()
+								local title = string.format(
+									i18n_safe("menu.profiles.delete_confirm_title"), label)
+								local confirmed
+								if type(ctx.confirm_profile_delete) == "function" then
+									confirmed = ctx.confirm_profile_delete(profile_id, label)
+								else
+									confirmed = ask_yes_no(
+										title,
+										i18n_safe("menu.profiles.delete_confirm_body"),
+										i18n_safe("button.delete"),
+										i18n_safe("button.cancel"))
+								end
+								if confirmed ~= true then return false end
+								local deleted = ProfileSettings.delete_user_profile(profile_id)
+								if deleted then refresh() end
+								return deleted
+							end,
+					}, {
+						["llm_custom_profile_active"] = function()
+							return ProfileSettings.effective_profile(current_model) == profile_id
+						end,
+						["llm_custom_profile_ready"] = child_ready,
+					}, {}) or {},
+				}
+			end
+			return rows
+		end
+		local function clone_present()
+			if not active_builtin then return false end
+			seed = {
+				label = effective_label .. " " .. i18n_safe("menu.profiles.copy_suffix"),
+				system_single = active_builtin.system_single,
+				system_multi_template = active_builtin.system_multi_template,
+				batch = active_builtin.batch == true,
+			}
+			return true
+		end
+		local rows = ManifestMenu.template_rows("llm_profile_lua_frame", {
+			["llm_profile_auto_detect"] = auto_profile,
+			["llm_profile_clone"] = function() return open_editor(seed, true, { as_new = true }, true) end,
+			["llm_profile_create"] = function() return open_editor(nil, true, nil, true) end,
+		}, {
+			["llm_profile_recommendation_present"] = function() return false end,
+			["llm_profile_recommendation_paused"] = function() return false end,
+			["llm_profile_auto_detect_checked"] = function() return ProfileSettings.get("auto_profile_for_model") == true end,
+			["llm_profile_custom_present"] = custom_present,
+			["llm_profile_clone_present"] = clone_present,
+			["llm_profile_create_ready"] = create_ready,
+			["llm_profile_clone_ready"] = create_ready,
+		}, {
+			["llm_profile_builtin_rows"] = builtin_rows,
+			["llm_profile_custom_rows"] = custom_rows,
+		})
+		if not rows then return end
+		append_rendered_row(target, {
+			label = string.format(i18n_safe("menu.profiles.profile_label_prefix"), effective_label),
+			items = rows,
+			disabled = not enabled or nil,
+		}, "llm_profile")
+	end
+
+	group_builders["llm_display"] = function()
+		local ok_display, DisplaySettings = pcall(require, "modules.llm.display_settings")
+		if not ok_display then return end
+		local DisplayPolicy = require("llm.display_policy")
+		local ProfileSettings = require("modules.llm.profile_settings")
+		local function show_all_ready()
+			return DisplayPolicy.ready(ProfileSettings.get("num_predictions"),
+				ctx.paused == true or (type(ctx.is_paused) == "function" and ctx.is_paused() == true)
+				or type(llm.is_enabled) ~= "function" or llm.is_enabled() ~= true)
+		end
+		local Preferences = require("infra.llm_preferences")
+		local function streaming_snapshot()
+			local paused
+			if type(ctx.is_paused) == "function" then paused = ctx.is_paused() end
+			local values, source = Preferences.get_many({ "llm.enabled", "llm.display.streaming", "llm.display.streaming_multi" })
+			local revision = type(llm.streaming_revision) == "function" and llm.streaming_revision() or nil
+			local enabled = type(llm.is_enabled) == "function" and llm.is_enabled() or nil
+			local streaming, progressive = DisplaySettings.get("streaming"), DisplaySettings.get("streaming_multi")
+			return {
+				owner = Preferences, source = source,
+				generation = type(revision) == "number" and Preferences.generation() + revision or nil,
+				platform = "linux",
+				backend = type(llm.get_backend) == "function" and llm.get_backend() or nil,
+				enabled = enabled, paused = paused,
+				blocked = Preferences.admit() ~= true or enabled ~= values["llm.enabled"]
+					or streaming ~= values["llm.display.streaming"] or progressive ~= values["llm.display.streaming_multi"],
+				progressive = progressive, streaming = streaming,
+			}
+		end
+		local streaming_source = streaming_snapshot()
+		local rows = {}
+		local function indentation_snapshot()
+			local snapshot = streaming_snapshot()
+			local values, source = Preferences.get_many({ "llm.profiles.num_predictions", "llm.display.pred_indent" })
+			snapshot.count = ProfileSettings.get("num_predictions")
+			snapshot.indentation = DisplaySettings.get("pred_indent")
+			snapshot.blocked = snapshot.blocked or snapshot.count ~= values["llm.profiles.num_predictions"]
+				or snapshot.indentation ~= values["llm.display.pred_indent"]
+			-- Re-reading the canonical owner advances its revision for every source
+			-- change, including unrelated fields and away/back transitions.
+			snapshot.source = source
+			local revision = type(llm.streaming_revision) == "function" and llm.streaming_revision() or nil
+			local generation = type(revision) == "number" and Preferences.generation() + revision or nil
+			snapshot.blocked = snapshot.blocked or snapshot.generation ~= generation
+			snapshot.generation = generation
+			return snapshot
+		end
+		local indentation_source = indentation_snapshot()
+		local function info_bar_snapshot()
+			local values, source = Preferences.get_many({ "llm.enabled", "llm.display.show_info_bar" })
+			local revision = type(llm.streaming_revision) == "function" and llm.streaming_revision() or nil
+			local enabled = type(llm.is_enabled) == "function" and llm.is_enabled() or nil
+			local selected = DisplaySettings.get("show_info_bar")
+			local paused
+			if type(ctx.is_paused) == "function" then paused = ctx.is_paused() end
+			return {
+				owner = Preferences, source = source,
+				generation = type(revision) == "number" and Preferences.generation() + revision or nil,
+				backend = type(llm.get_backend) == "function" and llm.get_backend() or nil,
+				info_bar = selected, enabled = enabled, paused = paused,
+				blocked = Preferences.admit() ~= true or enabled ~= values["llm.enabled"]
+					or selected ~= values["llm.display.show_info_bar"],
+			}
+		end
+		local info_bar_source = info_bar_snapshot()
+		local display_ctx = {
+			commands = {
+				["llm_indentation"] = function(value)
+					local current = indentation_snapshot()
+					local decision = DisplayPolicy.indentation_intent(indentation_source, current, value, DisplaySettings.indent_values())
+					if decision.admitted ~= true then return false end
+					if DisplaySettings.set("pred_indent", decision.value, current.source) ~= true then return false end
+					if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
+					return true
+				end,
+				["llm_show_all"] = function()
+					if not show_all_ready() then return false end
+					if DisplaySettings.set("streaming_multi", not DisplaySettings.get("streaming_multi")) ~= true then return false end
+					if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
+					return true
+				end,
+				["llm_token_streaming"] = function()
+					local current = streaming_snapshot()
+					local decision = DisplayPolicy.streaming_intent(streaming_source, current)
+					if decision.admitted ~= true then return false end
+					if DisplaySettings.set("streaming", decision.value, current.source) ~= true then return false end
+					if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
+					return true
+				end,
+				["llm_info_bar"] = function()
+					local current = info_bar_snapshot()
+					local decision = DisplayPolicy.info_bar_intent(info_bar_source, current)
+					if decision.admitted ~= true then return false end
+					if DisplaySettings.set("show_info_bar", decision.value, current.source) ~= true then return false end
+					if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
+					return true
+				end,
+			},
+			state_getters = {
+				["llm.display.pred_indent"] = function() return indentation_source.indentation end,
+				["llm_indentation_ready"] = function() return DisplayPolicy.indentation_ready(indentation_source) end,
+				["llm_show_all_enabled"] = function() return DisplayPolicy.show_all(DisplaySettings.get("streaming_multi")) end,
+				["llm_show_all_ready"] = show_all_ready,
+				["llm_token_streaming_enabled"] = function()
+					return DisplayPolicy.streaming_capable(streaming_source.platform, streaming_source.backend)
+						and streaming_source.streaming == true
+				end,
+				["llm_token_streaming_ready"] = function() return DisplayPolicy.streaming_ready(streaming_source) end,
+				["llm_info_bar_enabled"] = function() return info_bar_source.info_bar end,
+				["llm_info_bar_ready"] = function() return DisplayPolicy.info_bar_ready(info_bar_source) end,
+			},
+		}
+		local display_rows = ManifestMenu.build("llm_display_menu", "LLM", nil, nil, display_ctx, {
+			["llm_display_leading"] = function() return {} end,
+			["llm_display_remaining"] = function() return {} end,
+			["llm_display_trailing"] = function() return rows end,
+		})
+		local child_rows = ManifestMenu.native_child_rows(display_rows)
+		if child_rows == nil then return nil end
+		return { items = child_rows, disabled = not enabled or nil }
+	end
+
+	group_builders["llm_navigation"] = function()
+		local ok_navigation, NavigationSettings = pcall(require, "modules.llm.navigation_settings")
+		if not ok_navigation then return end
+		-- One choice list per chord: the navigation modifiers held with Up and
+		-- Down, and the validation modifiers held with a digit.
+		local function chord_rows(current, bare_label, set)
+			local rows = {}
+			for _, option in ipairs(NavigationSettings.options()) do
+				local label = #option > 0 and table.concat(option, "+") or bare_label
+				local checked = #option == #current
+				for index, modifier in ipairs(option) do checked = checked and current[index] == modifier end
+				rows[#rows + 1] = {
+					label = label,
+					checked = checked,
+					action = function()
+						local called, committed = pcall(set, option)
+						if not called or committed ~= true then
+							Logger.error(LOG, "Prediction modifier choice was not durably acknowledged.")
+							show_error(i18n_safe("dialog.bulk_toggle.save_failed"))
+							return false
+						end
+						if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
+						return true
+					end,
+				}
+			end
+			return rows
+		end
+		local arrows_only = i18n_safe("menu.llm.arrows_only")
+		local no_modifier = i18n_safe("menu.settings.no_modifier")
+		local navigation = NavigationSettings.get_navigation()
+		local validation = NavigationSettings.get()
+		local definitions = {}
+		for _, definition in ipairs(ManifestMenu.get_array("llm_navigation_rows")) do
+			if type(definition) == "table" and definition.type == "list"
+				and type(definition.i18n) == "string" and definition.i18n ~= ""
+				and (definition.id == "llm_nav_modifiers" or definition.id == "llm_val_modifiers") then
+				definitions[definition.id] = definition
+			end
+		end
+		local navigation_providers = {
+			["llm_nav_modifiers"] = function()
+				local definition = definitions.llm_nav_modifiers
+				if not definition then return {} end
+				return { {
+					label = i18n_safe(definition.i18n) .. " — "
+						.. (#navigation > 0 and table.concat(navigation, "+") or arrows_only),
+					items = chord_rows(navigation, arrows_only, NavigationSettings.set_navigation),
+				} }
+			end,
+			["llm_val_modifiers"] = function()
+				local definition = definitions.llm_val_modifiers
+				if not definition then return {} end
+				return { {
+					label = string.format(i18n_safe(definition.i18n),
+						#validation > 0 and table.concat(validation, "+") or no_modifier),
+					items = chord_rows(validation, no_modifier, NavigationSettings.set),
+				} }
+			end,
+		}
+		local rows = ManifestMenu.build("llm_navigation_rows", "LLM navigation", nil, nil, ctx, navigation_providers)
+		local child_rows = ManifestMenu.native_child_rows(rows)
+		if child_rows == nil then return nil end
+		return { items = child_rows, disabled = not enabled or nil }
+	end
+
+	-- The models this machine actually has. A `list`, because the rows are
+	-- whatever Ollama reports and no static entry can enumerate them.
+	local function ollama_model_rows()
+		if type(llm.get_models) ~= "function" then return {} end
+		local models = llm.get_models()
+		if type(models) ~= "table" then return {} end
+		local current = llm.get_current_model and llm.get_current_model() or nil
+		local rows = {}
+		for _, model in ipairs(models) do
+			rows[#rows + 1] = {
+				label = model,
+				-- `checked`, not a "✓" glued to the label: the tray draws its own
+				-- mark, and the glued form puts one platform's convention inside a
+				-- string twenty other languages also read.
+				checked = model == current,
+				action = function()
+					if llm.set_model then llm.set_model(model) end
+					if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
+				end,
+			}
+		end
+		if #rows > 0 then
+			for _, row in ipairs(ManifestMenu.status_rows("llm_menu", "llm_models", "model_picker_tail") or {}) do
+				rows[#rows + 1] = row
+			end
+		end
+		local browser_row = ManifestMenu.command_row("llm_model_commands", "llm_browse_models", {
+			["llm_browse_models"] = function()
+				return ctx.webview.show("model_browser") == true
+			end,
+		}, {
+			["llm_model_browser_ready"] = function()
+				return type(ctx.webview) == "table" and type(ctx.webview.show) == "function"
+			end,
+		})
+		if browser_row then rows[#rows + 1] = browser_row end
+		return rows
+	end
+
+	-- Who answers: Ollama's models above, or the API entries (Cerebras, …).
+	providers["llm_models"] = function()
+		return LlmBackendRows.rows(llm, {
+			prompt = prompt_text,
+			error = show_error,
+			info = show_info,
+			confirm = function(title, text)
+				return ask_yes_no(title, zenity_plain(text), i18n_safe("button.delete"), i18n_safe("button.cancel"))
+			end,
+		}, ctx.on_menu_changed, ollama_model_rows, { paused = ctx.paused, is_paused = ctx.is_paused })
+	end
+
+	--- The suggestion count row: a generation parameter, the first one on every
+	--- driver, with one choice per count from 1 to 10.
+	--- @return table|nil row Nil, with the failure logged, when the profile settings cannot load.
+	local function suggestion_count_row()
+		local ok_profiles, ProfileSettings = pcall(require, "modules.llm.profile_settings")
+		if not ok_profiles then
+			Logger.error(LOG, "LLM profile settings unavailable — the suggestion count row cannot be built: %s.",
+				tostring(ProfileSettings))
+			return nil
+		end
+		local current = ProfileSettings.get("num_predictions")
+		local choices = {}
+		for value = 1, 10 do
+			-- One key per plural form, the rows macOS and Windows draw.
+			local count_key = value == 1 and "menu.llm.prediction_count_label_one"
+				or "menu.llm.prediction_count_label_other"
+			choices[#choices + 1] = {
+				label = string.format(i18n_safe(count_key), value),
+				checked = current == value,
+				action = function()
+					ProfileSettings.set("num_predictions", value)
+					if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
+				end,
+			}
+		end
+		return {
+			label = string.format(i18n_safe("menu.llm.num_predictions_label"), tostring(current)),
+			items = choices,
+			disabled = not enabled or nil,
+		}
+	end
+
+	-- The suggestion count, temperature and context length. The manifest has
+	-- declared the last two as features for as long as it has existed and this
+	-- driver read them from the canonical defaults with no way to change either —
+	-- constants wearing the shape of settings.
+	dynamic_handlers["llm_generation"] = function(target)
+		local ok_profiles, ProfileSettings = pcall(require, "modules.llm.profile_settings")
+		if not ok_profiles then
+			Logger.error(LOG, "LLM profile settings unavailable — generation controls cannot read their current count: %s.",
+				tostring(ProfileSettings))
+			return
+		end
+		local ok_settings, Settings = pcall(require, "modules.llm.settings")
+		if not ok_settings then
+			Logger.error(LOG, "LLM settings unavailable — the generation rows cannot be built.")
+			return {}
+		end
+		local rows = {}
+		rows[#rows + 1] = suggestion_count_row()
+		for _, setting in ipairs({
+			{ name = "temperature", key = "menu.llm.generation.temperature" },
+			{ name = "context_length", key = "menu.llm.generation.context_length" },
+			{ name = "min_words", key = "menu.llm.min_words_label", formatted = true },
+			{ name = "max_words", key = "menu.llm.max_words_label", formatted = true },
+		}) do
+			local current = Settings.get(setting.name)
+			local choices = {}
+			for _, value in ipairs(Settings.presets(setting.name)) do
+				choices[#choices + 1] = {
+					label = tostring(value),
+					checked = current == value,
+					action = function()
+						Settings.set(setting.name, value)
+						if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
+					end,
+				}
+			end
+			-- Free entry beside the presets, so this driver can express any value
+			-- macOS's numeric dialog can. Closing the gap the other way — taking
+			-- the dialog off macOS and leaving only presets — would have removed a
+			-- capability, which is convergence downwards.
+			local bounds = Settings.bounds(setting.name)
+			if bounds then
+				local custom_rows = ManifestMenu.template_rows("llm_numeric_custom_rows", {
+					["llm_numeric_custom_value"] = function()
+						local ok_prompt, Prompt = pcall(require, "ui.numeric_prompt.bridge")
+						if not ok_prompt then
+							Logger.error(LOG, "No numeric prompt — '%s' can only take a preset.", setting.name)
+							return
+						end
+						Prompt.ask({
+							title = i18n_safe(setting.key),
+							hint = string.format("%s – %s", tostring(bounds.min), tostring(bounds.max)),
+							value = Settings.get(setting.name),
+							min = bounds.min,
+							max = bounds.max,
+							on_save = function(value)
+								local saved = Settings.set(setting.name, value)
+								if saved and type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
+								return saved
+							end,
+						}, ctx.webview)
+					end,
+				})
+				for _, row in ipairs(custom_rows or {}) do choices[#choices + 1] = row end
+			end
+
+			rows[#rows + 1] = {
+				label = setting.formatted and string.format(i18n_safe(setting.key), current)
+					or (i18n_safe(setting.key) .. " — " .. tostring(current)),
+				items = choices,
+			}
+		end
+		--- Reads current group, pause and prediction-count facts before delivery.
+		--- @return boolean ready
+		local function ready()
+			local count = ProfileSettings.get("num_predictions")
+			return ctx.paused ~= true and type(llm.is_enabled) == "function" and llm.is_enabled() == true
+				and type(count) == "number" and count >= 2
+		end
+		local generation_ctx = {
+			commands = {
+				["llm_auto_raise_temperature"] = function()
+					if not ready() then return false end
+					if Settings.set("auto_raise_temp", not Settings.get("auto_raise_temp")) ~= true then return false end
+					if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
+					return true
+				end,
+			},
+			state_getters = {
+				["llm_auto_raise_enabled"] = function() return Settings.get("auto_raise_temp") end,
+				["llm_auto_raise_ready"] = ready,
+			},
+		}
+		local generation_rows = ManifestMenu.build("llm_generation_menu", "LLM", nil, nil, generation_ctx, {
+			["llm_generation_values"] = function() return rows end,
+		})
+		for _, row in ipairs(generation_rows) do target[#target + 1] = row end
+	end
+
+	-- The category switch, the submenu's first row: appindicator binds item.fn
+	-- only on a row with no submenu, so the parent cannot carry it.
+	local llm_ctx = {}
+	for key, value in pairs(ctx) do llm_ctx[key] = value end
+	llm_ctx.commands = {}
+	for key, value in pairs(ctx.commands or {}) do llm_ctx.commands[key] = value end
+	-- The restore alone: the AI menu's clear row was retired.
+	llm_ctx.commands["scope_restore"] = function()
+		if ctx.paused == true then return false end
+		local committed = require("infra.llm_scope").apply("recommended", ctx.paused)
+		if committed and type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
+		return committed
+	end
+	llm_ctx.commands["llm_toggle"] = function()
+		if type(llm.toggle) ~= "function" then return false end
+		if llm.toggle then llm.toggle(ctx.on_menu_changed) end
+		if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
+	end
+	llm_ctx.state_getters = {}
+	for key, value in pairs(ctx.state_getters or {}) do llm_ctx.state_getters[key] = value end
+	llm_ctx.state_getters["llm_enabled"] = function() return enabled end
+	-- The switch has no precondition here beyond the pause, which greys the whole
+	-- IA row from the top level anyway.
+	llm_ctx.state_getters["llm_toggle_ready"] = function() return type(llm.toggle) == "function" and ctx.paused ~= true end
+
+	local rendered = ManifestMenu
+		and ManifestMenu.build("llm_menu", "LLM", dynamic_handlers, group_builders, llm_ctx, providers)
+		or {}
+	for _, row in ipairs(rendered) do items[#items + 1] = row end
+
+	-- The parent carries the same tick as the switch inside, for a user scanning
+	-- the top level; it cannot be clicked, which is why the switch is a row.
+	return NativeParent.finish(parent, items)
+end
+
+--- Builds the AI agent submenu (ui/menu/agent_rows.lua).
+--- @param ctx table Menu context.
+--- @return table Row data { label, submenu }.
+local function _build_agent(ctx)
+	if not ManifestMenu then
+		Logger.error(LOG, "Manifest renderer unavailable — the AI agent submenu cannot be built.")
+		return nil
+	end
+	return require("ui.menu.agent_rows").build(ctx, {
+		prompt = function(title, text, initial, hidden, choices)
+			return TextPrompt.ask(title, zenity_plain(text), initial, hidden, choices)
+		end,
+		error = function(text) show_error(zenity_plain(text)) end,
+	})
+end
+
+--- Builds the metrics/keylogger submenu.
+--- Reports the at-rest migration and offers to stop it.
+--- Converting a year of stored rows takes minutes, and without this entry the
+--- user ticks menu.metrics.encrypt_at_rest and sees nothing happen at all.
+---
+--- PROVIDER data — the `metrics_migration` list declares the slot and the shared
+--- renderer draws the row. A `list` and not a `command`, because the label IS the
+--- progress: "n / total", which no static declaration can spell.
+--- @param k table The keylogger module.
+--- @return table One provider row.
+local function _migration_row(k)
+	if type(k.get_migration_progress) ~= "function" then
+		local rows = ManifestMenu.template_rows("metrics_migration_unavailable_rows")
+		return rows and rows[1] or nil
+	end
+	local progress = k.get_migration_progress()
+	if not progress.running then
+		local rows = ManifestMenu.template_rows("metrics_migration_idle_rows")
+		return rows and rows[1] or nil
+	end
+	return {
+		label = string.format(i18n_safe("menu.metrics.migration_progress"),
+			progress.scanned, progress.total),
+		action = function()
+			if type(k.cancel_migration) == "function" then k.cancel_migration() end
+		end,
+	}
+end
+
+--- Renders the rows of the metrics submenu that the manifest describes.
+---
+--- Defined BEFORE its caller: a `local function` is not hoisted, so calling it
+--- above its definition would bind the nil global
+--- (project-lua-closure-before-local-nil-global).
+--- @param ctx table Menu context; ctx.webview opens the two metrics windows.
+--- @param k table The keylogger module.
+--- @return table Menu rows, empty when the renderer could not be bound.
+local function _manifest_metrics_rows(ctx, k)
+	if not ManifestMenu then
+		Logger.warn(LOG, "Manifest renderer unavailable — the metrics submenu loses its declared rows.")
+		return {}
+	end
+
+	--- Reads one flag out of the keylogger's privacy state.
+	--- @param key string
+	--- @return function
+	local function privacy(key)
+		return function()
+			if type(k.get_privacy_state) ~= "function" then return false end
+			return k.get_privacy_state()[key] == true
+		end
+	end
+
+	--- The floating WPM pill, loaded lazily so a driver whose GTK surface is
+	--- missing still builds its menu — the row then reports the widget as off,
+	--- which is what it is.
+	--- @return table|nil
+	local function wpm_widget()
+		local ok, widget = pcall(require, "ui.wpm.widget")
+		return ok and widget or nil
+	end
+
+
+	-- The canonical state keys the manifest's disabled_when / checked_when arrays
+	-- name. A key declared there with no getter here is an ERROR in the renderer,
+	-- not a silent always-enabled row — which is the whole point of resolving them
+	-- declaratively instead of re-deriving the condition at each call site.
+	local getters = {
+		keylogger_enabled      = function() return type(k.is_enabled) == "function" and k.is_enabled() end,
+		metrics_filter_private = privacy("private_filter_enabled"),
+		metrics_filter_secure  = privacy("secure_filter_enabled"),
+		metrics_filter_sysauth = privacy("system_auth_filter_enabled"),
+		-- The manifest gates the colour row on the widget being visible: choosing
+		-- how to colour something that is not on screen is a control with no
+		-- subject. Without this getter the resolver logs an error and falls back to
+		-- the safe answer, so the row would be permanently greyed — right by
+		-- accident, and wrong the moment the widget is shown.
+		metrics_suppressed     = function()
+			return type(k.is_suppressed) == "function" and k.is_suppressed() or false
+		end,
+		wpm_widget_visible     = function()
+			local widget = wpm_widget()
+			return widget ~= nil and widget.is_running()
+		end,
+		metrics_widget_colors  = function()
+			local widget = wpm_widget()
+			return widget ~= nil and widget.uses_source_colors()
+		end,
+		metrics_widget_graph   = function()
+			local widget = wpm_widget()
+			return widget ~= nil and widget.uses_graph()
+		end,
+		-- The tray readout: the Linux counterpart of the macOS menu bar one.
+		metrics_menubar_wpm    = function()
+			local ok, readout = pcall(require, "ui.wpm.tray_readout")
+			return ok and readout.is_running() or false
+		end,
+		metrics_menubar_colors = function()
+			local ok, readout = pcall(require, "ui.wpm.tray_readout")
+			return ok and readout.uses_source_colors() or false
+		end,
+		wpm_menubar_visible    = function()
+			local ok, readout = pcall(require, "ui.wpm.tray_readout")
+			return ok and readout.is_running() or false
+		end,
+	}
+
+	--- Opens one of the two metrics windows through the webview manager.
+	--- @param app string Window id, e.g. "metrics_typing".
+	--- @return function
+	local function open_window(app)
+		return function()
+			if type(ctx.webview) ~= "table" or type(ctx.webview.show) ~= "function" then
+				Logger.error(LOG, "No webview manager in the menu context — cannot open '%s'.", app)
+				return
+			end
+			ctx.webview.show(app)
+		end
+	end
+
+	--- Flips one privacy flag.
+	--- @param key string Privacy-state key.
+	--- @param setter function|nil
+	--- @return function
+	local function toggle(key, setter)
+		return function()
+			if type(setter) ~= "function" then
+				Logger.error(LOG, "No setter for privacy flag '%s' — the row does nothing.", key)
+				return
+			end
+			setter(not privacy(key)())
+		end
+	end
+
+
+	local function cmd_wpm_widget()
+		local widget = wpm_widget()
+		if not widget then
+			Logger.error(LOG, "No WPM widget module — the row cannot toggle anything.")
+			return false
+		end
+		local changed
+		if widget.is_running() then
+			changed = widget.stop()
+		else
+			changed = widget.start()
+		end
+		if changed == true and type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
+		return changed == true
+	end
+
+	local function cmd_widget_colors()
+		local widget = wpm_widget()
+		if not widget then
+			Logger.error(LOG, "No WPM widget module — colors cannot change.")
+			return false
+		end
+		local changed = widget.set_use_source_colors(not widget.uses_source_colors())
+		if changed == true and type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
+		return changed == true
+	end
+
+	local function cmd_include_realtime()
+		local widget = wpm_widget()
+		if not widget then
+			Logger.error(LOG, "No WPM widget module — graph cannot change.")
+			return false
+		end
+		local changed = widget.set_graph(not widget.uses_graph())
+		if changed == true and type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
+		return changed == true
+	end
+
+	local handlers = {}
+
+	-- The declarative rows read their state and their behaviour off the context:
+	-- `state_getters` answers the manifest's checked_when / disabled_when keys,
+	-- `commands` answers its `command` (defaulting to the row id). Passing them
+	-- on a COPY of ctx keeps the caller's table untouched — the same ctx is
+	-- handed to every other submenu builder in this file.
+	local render_ctx = {}
+	for key, value in pairs(ctx) do render_ctx[key] = value end
+	-- The restore alone: the maintainer retired the Metrics clear on 2026-09-30.
+	-- The Configuration clear still composes the metrics scope owner.
+	local function restore_metrics_scope()
+		if ctx.paused == true or type(ctx.is_paused) ~= "function" or ctx.is_paused() then return false end
+		local committed = require("infra.metrics_scope").apply("recommended", ctx.is_paused)
+		if committed == true and type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
+		return committed
+	end
+	getters["metrics_encrypt_enabled"] = privacy("encrypt")
+	render_ctx.state_getters = getters
+	-- Bracketed keys on purpose: the bijection gate resolves "does this driver
+	-- handle the row" by looking for the quoted id, and a bare key is invisible
+	-- to it — which would report three declared rows as unhandled while they work.
+	render_ctx.commands = {
+		["wpm_widget"] = cmd_wpm_widget,
+		["widget_colors"] = cmd_widget_colors,
+		["include_realtime"] = cmd_include_realtime,
+		-- The category switch, the submenu's first row: appindicator binds
+		-- item.fn only on a row with no submenu, so the parent cannot carry it.
+		["scope_restore"] = restore_metrics_scope,
+		["metrics_toggle"] = function()
+			if type(k.set_enabled) ~= "function" then
+				Logger.error(LOG, "The keylogger exposes no set_enabled — the gate does nothing.")
+				return
+			end
+			k.set_enabled(not (type(k.is_enabled) == "function" and k.is_enabled()))
+			if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
+		end,
+		-- `command` rows since 2026-08-07: the label and the greying are the
+		-- manifest's, so this driver supplies only the window each one opens.
+		-- `check` since 2026-08-07: the label and the tick are the manifest's, so
+		-- this supplies only the toggle. The row used to carry a DIFFERENT label
+		-- here than on the other two drivers — one switch, two names.
+		["encryption"]     = toggle("encrypt", k.set_encrypt_enabled),
+		["show_typing"]    = open_window("metrics_typing"),
+		["show_apps"]      = open_window("metrics_apps"),
+
+		["filter_private"] = toggle("private_filter_enabled", k.set_private_filter_enabled),
+		["filter_secure"]  = toggle("secure_filter_enabled", k.set_secure_filter_enabled),
+		["filter_sysauth"] = toggle("system_auth_filter_enabled", k.set_system_auth_filter_enabled),
+
+		-- This driver answers these five in its log rather than in a window; the
+		-- other two open a metrics WINDOW for the same figures. Declared rows
+		-- since 2026-08-06, so the manifest can describe a driver-specific row
+		-- rather than the driver keeping it to itself.
+		["metrics_suspend"] = function()
+			if type(k.is_suppressed) ~= "function" then
+				Logger.error(LOG, "Keylogger exposes no is_suppressed — the row cannot toggle anything.")
+				return
+			end
+			if k.is_suppressed() then k.unsuppress() else k.suppress() end
+			if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
+		end,
+		["reset_wpm_position"] = function()
+			local widget = wpm_widget()
+			if not widget then
+				Logger.error(LOG, "No WPM widget module — its place cannot be reset.")
+				return
+			end
+			widget.reset_position()
+		end,
+		["wpm_menubar"] = function()
+			local ok, readout = pcall(require, "ui.wpm.tray_readout")
+			if not ok then
+				Logger.error(LOG, "No WPM tray readout module — the row cannot toggle anything.")
+				return
+			end
+			local changed = readout.is_running() and readout.stop() or readout.start()
+			if changed and type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
+		end,
+		["menubar_colors"] = function()
+			local ok, readout = pcall(require, "ui.wpm.tray_readout")
+			if not ok then return end
+			local changed = readout.set_use_source_colors(not readout.uses_source_colors())
+			if changed and type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
+		end,
+		["metrics_reset_session"] = function()
+			if type(k.reset_session) ~= "function" then
+				Logger.error(LOG, "Keylogger exposes no reset_session — the row does nothing.")
+				return
+			end
+			k.reset_session()
+			Logger.info(LOG, "Metrics session reset.")
+		end,
+	}
+
+	-- The migration readout, as the one row a `list` provider returns: its label
+	-- is the progress itself.
+	local providers = {
+		["metrics_migration"] = function() return { _migration_row(k) } end,
+	}
+
+	return ManifestMenu.build("metrics_menu", "Metrics", handlers, nil, render_ctx, providers)
+end
+
+--- Builds the metrics submenu, with the rows the manifest describes rendered by
+--- the shared renderer and the rest appended after.
+---
+--- THE FIRST SUBMENU ON THIS DRIVER TO READ THE MANIFEST. Until 2026-08-04 Linux
+--- opened `menu_manifest.json` nowhere at all — the top-level parity gate had to
+--- parse this file's `_build_*` calls to compare the two, which is how `kanata`,
+--- `updates` and `apps` were found built here and undescribed there.
+---
+--- Six rows now come from the manifest, with their `disabled_when` and
+--- `checked_when` predicates resolved declaratively rather than re-derived here.
+--- Seven others were removed from this driver's projection in the same pass,
+--- because they configure features the FEATURE manifest already declares
+--- elsewhere: the WPM widget (it has since come back, see ui/wpm),
+--- the two metrics-window shortcuts, and the app-exclusion list, for which this
+--- driver's keylogger exposes no setter. A row that cannot be rendered is a
+--- promise the manifest makes on this driver's behalf and the driver breaks.
+---
+--- What stays hand-built below is what the manifest does not describe on any
+--- driver: this driver's own session-stats, WPM and per-app readouts, the
+--- encryption-migration status, and suspend/reset.
+--- @param ctx table Menu context.
+--- @return table One menu entry with its submenu.
+--- Checks raw dense arrays without triggering source metamethods.
+--- @param value table Source array.
+--- @param records boolean Whether its values must be plain records.
+--- @return boolean
+local function metrics_dense(value, records)
+	if type(value) ~= "table" or getmetatable(value) ~= nil then return false end
+	local count, maximum = 0, 0
+	for index, row in next, value do
+		if type(index) ~= "number" or index % 1 ~= 0 or index < 1 then return false end
+		if records and (type(row) ~= "table" or getmetatable(row) ~= nil) then return false end
+		count, maximum = count + 1, math.max(maximum, index)
+	end
+	return count == maximum
+end
+
+--- Admits the actual Metrics source structure without interpreting command grammar.
+--- @param renderer table|nil Actual manifest renderer.
+--- @param platform string Native platform token.
+--- @return table|nil root, table|nil top, table|nil children, table|nil parent, table|nil fields
+local function metrics_source(renderer, platform)
+	if type(renderer) ~= "table" or type(rawget(renderer, "get_root")) ~= "function"
+		or type(rawget(renderer, "build")) ~= "function" or type(rawget(renderer, "group_row")) ~= "function" then return nil end
+
+	local ok, root = pcall(renderer.get_root)
+	if not ok then return nil end
+	if type(root) ~= "table" or getmetatable(root) ~= nil then return nil end
+	local top, children = rawget(root, "top_level"), rawget(root, "metrics_menu")
+	if not metrics_dense(top, true) or not metrics_dense(children, true) then return nil end
+	local parent
+	for _, row in next, top do
+		if rawget(row, "id") == "metrics" then
+			if parent then return nil end
+			parent = row
+		end
+	end
+	if parent == nil or rawget(parent, "type") ~= "group" or type(rawget(parent, "i18n")) ~= "string"
+		or rawget(parent, "i18n") == "" or not metrics_dense(rawget(parent, "rows"), true) then return nil end
+	local platforms = rawget(parent, "platforms")
+	if platforms ~= nil then
+		if not metrics_dense(platforms, false) then return nil end
+		local visible = false
+		for _, token in next, platforms do
+			if type(token) ~= "string" then return nil end
+			if token == platform then visible = true end
+		end
+		if not visible then return nil end
+	end
+	local fields = {}
+	for key, value in next, parent do fields[key] = value end
+	return root, top, children, parent, fields
+end
+
+--- Rechecks the captured direct parent fields without source metamethods.
+--- @param parent table Actual direct source row.
+--- @param fields table Captured raw field references and scalar values.
+--- @return boolean
+local function metrics_parent_unchanged(parent, fields)
+	for key, value in next, parent do
+		if not rawequal(value, rawget(fields, key)) then return false end
+	end
+	for key, value in next, fields do
+		if not rawequal(value, rawget(parent, key)) then return false end
+	end
+	return true
+end
+
+
+local function _build_metrics(ctx)
+	local root, top, section, parent, fields = metrics_source(ManifestMenu, "linux")
+	if root == nil then return nil end
+	local k = ctx.keylogger
+	if type(k) ~= "table" then
+		local status_rows = ManifestMenu and ManifestMenu.template_rows("linux_metrics_absent_rows", {}, {}, {})
+		if not status_rows then return nil end
+		local items = ManifestMenu.render_rows(status_rows, "linux_metrics_absent_rows")
+		if not metrics_dense(items, true) then return nil end
+		local current_root, current_top, current_section, current_parent = metrics_source(ManifestMenu, "linux")
+		if not rawequal(root, current_root) or not rawequal(top, current_top)
+			or not rawequal(section, current_section) or not rawequal(parent, current_parent)
+			or not metrics_parent_unchanged(parent, fields) then return nil end
+		local projected = ManifestMenu.group_row("top_level", "metrics", items, { keylogger_enabled = function() return nil end })
+		current_root, current_top, current_section, current_parent = metrics_source(ManifestMenu, "linux")
+		if not rawequal(root, current_root) or not rawequal(top, current_top)
+			or not rawequal(section, current_section) or not rawequal(parent, current_parent)
+			or not metrics_parent_unchanged(parent, fields) then return nil end
+		return projected
+	end
+
+	local items = _manifest_metrics_rows(ctx, k)
+
+	-- The collection gate and the migration readout are both the manifest's now —
+	-- the gate as the `toggle` row every driver's metrics menu declares, the
+	-- readout as a `list`, because its label IS the progress and no static
+	-- declaration can spell "n / total".
+	local on = type(k.is_enabled) == "function" and k.is_enabled() == true
+	if not metrics_dense(items, true) then return nil end
+	local current_root, current_top, current_section, current_parent = metrics_source(ManifestMenu, "linux")
+	if not rawequal(root, current_root) or not rawequal(top, current_top)
+		or not rawequal(section, current_section) or not rawequal(parent, current_parent)
+		or not metrics_parent_unchanged(parent, fields) then return nil end
+	local projected = ManifestMenu.group_row("top_level", "metrics", items, { keylogger_enabled = function() return on end })
+	current_root, current_top, current_section, current_parent = metrics_source(ManifestMenu, "linux")
+	if not rawequal(root, current_root) or not rawequal(top, current_top)
+		or not rawequal(section, current_section) or not rawequal(parent, current_parent)
+		or not metrics_parent_unchanged(parent, fields) then return nil end
+	return projected
+end
+
+--- Builds the shortcuts submenu.
+--- One menu row per installed extension that ships `shortcuts/menu.lua`.
+---
+--- The file is executed in a sandbox exposing exactly what the macOS host
+--- exposes — `add_item`, `t` and `ext_name` — with the standard library reachable
+--- through __index so an author can use `string` and `table` without either host
+--- listing them. Anything the extension collects becomes a submenu under its own
+--- name.
+---
+--- setfenv rather than a _ENV upvalue: this driver runs LuaJIT, which is 5.1, and
+--- setfenv is the 5.1 spelling. The macOS host uses the same call.
+--- @return table Array of menu rows, empty when nothing is installed.
+--- Converts a row written in this driver's dialect into the provider data a
+--- `list` row takes, recursively.
+--- Converts a LIST of driver-dialect rows, for a caller that emits its own row
+--- as provider data and only adapts what an extension handed it.
+--- @param list table Array of rows in the driver dialect.
+--- @return table Array of provider rows.
+local function _as_provider_row_list(list)
+	return RowDialect.rows(list)
+end
+
+
+local function _extension_shortcut_rows()
+	local rows = {}
+
+	local ok_paths, Paths = pcall(require, "infra.paths")
+	local ok_loader, Loader = pcall(require, "modules.hotstrings.loader")
+	if not ok_paths or not ok_loader or type(Paths.extension_roots) ~= "function" then return rows end
+
+	-- The same io functions hotstrings_config.extension_packs() injects. The
+	-- scanner takes them rather than reaching for the filesystem itself, which is
+	-- what lets it be shared and tested; passing nil returns an empty list, so
+	-- this is not optional.
+	local ok_scan, packs = pcall(Extensions.scan, Paths.extension_roots(), {
+		list_dirs  = Loader.list_subdirs,
+		list_files = Loader.find_toml_files,
+		read_file  = Loader.read_file,
+	})
+	if not ok_scan or type(packs) ~= "table" then return rows end
+
+	-- One entry per extension: the scanner already collapses an id that appears
+	-- under more than one root (bundled and user-installed).
+	for _, pack in ipairs(packs) do
+		local id, dir = pack.id, pack.dir
+		if id and dir then
+			local menu_path = dir .. "/shortcuts/menu.lua"
+			local chunk = loadfile(menu_path)
+			if chunk then
+				local collected = {}
+				local sandbox = {
+					add_item = function(item)
+						if type(item) == "table" then collected[#collected + 1] = item end
+					end,
+					t        = i18n_safe,
+					ext_name = pack.name or id,
+				}
+				setmetatable(sandbox, { __index = _G })
+				sandbox._G = sandbox
+
+				if setfenv then setfenv(chunk, sandbox) end
+				local ok_run, err = pcall(chunk)
+				if not ok_run then
+					-- Surfaced as a row, not only logged: an extension whose menu
+					-- throws would otherwise be indistinguishable from one that
+					-- declares nothing, and its author would have no way to tell.
+					Logger.warn(LOG, "Extension '%s' shortcuts/menu.lua failed: %s", id, tostring(err))
+					local marker_rows = ManifestMenu.template_rows("shortcut_extension_error_frame", {}, {
+						shortcut_extension_name = function() return pack.name or id end,
+					}, {})
+					if not marker_rows or #marker_rows == 0 then return {} end
+					for _, row in ipairs(marker_rows) do rows[#rows + 1] = row end
+				elseif #collected > 0 then
+					-- The extension's OWN rows are still adapted: an author writes
+					-- them in the host dialect both Lua drivers expose (`add_item`
+					-- with `title`/`fn`), and that is a published surface. This row —
+					-- the pack's own entry — is ours, so it is provider data.
+					local external_rows = _as_provider_row_list(collected)
+					if external_rows then rows[#rows + 1] = { label = pack.name or id, items = external_rows } end
+				end
+			end
+		end
+	end
+
+	return rows
+end
+
+--- Builds the shortcuts submenu: this driver's own rows, then the manifest's.
+---
+--- Hand-rolled until 2026-08-05, which is what kept `extensions_shortcuts`
+--- restricted to Windows in the manifest even after both Lua drivers had
+--- implemented it: a menu that dispatches nothing by id cannot be promised a row
+--- by id, and the handler-bijection ratchet says so. It dispatches now, and the
+--- restriction is gone.
+---
+--- The rows above the manifest section are this driver's own — CapsWord, the
+--- selection transforms, the wrap pairs — and no manifest entry describes them
+--- yet. macOS is in the same position with `at_hash`, and prepends it the
+--- same way.
+--- @param ctx table Menu context.
+--- @return table One menu entry with its submenu.
+local function _build_shortcuts(ctx)
+	local sc = ctx.shortcuts
+	if not sc then
+		local status_rows = ManifestMenu and ManifestMenu.template_rows("linux_shortcuts_absent_rows", {}, {}, {})
+		if not status_rows then return {} end
+		return { label = i18n_safe("menu.shortcuts.title"), items = status_rows }
+	end
+
+	local enabled = sc.is_enabled()
+	local items = {}
+
+	-- The gate row is the manifest's first row and the shared renderer builds it,
+	-- from the command and the state getter registered below.
+
+	-- The seven operations this driver performs on the current selection. Held
+	-- for the `selection_operations` provider below rather than appended here:
+	-- they were seven rows of a SHARED menu that no manifest described, so no
+	-- gate could compare them with what the other two drivers offer, and the
+	-- renderer had nothing to place.
+	local function caps_word_ready()
+		return type(sc.configuration_admitted) == "function" and sc.configuration_admitted() == true
+			and type(sc.toggle_caps_word) == "function" and type(sc.is_caps_word_active) == "function"
+			and type(sc.is_caps_word_active()) == "boolean"
+	end
+	local selection_rows = {}
+	local caps_row = ManifestMenu.check_row("selection_caps_word_control", "selection_caps_word", {
+		["selection_caps_word"] = function()
+			if not caps_word_ready() or sc.toggle_caps_word() ~= true then return false end
+			Logger.info(LOG, "CapsWord toggled: %s", tostring(sc.is_caps_word_active()))
+			if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
+			return true
+		end,
+	}, {
+		["selection_caps_word_active"] = function()
+			return type(sc.is_caps_word_active) == "function" and sc.is_caps_word_active() == true
+		end,
+		["selection_caps_word_ready"] = caps_word_ready,
+	})
+	if caps_row then selection_rows[#selection_rows + 1] = caps_row end
+	local case_boundary = ManifestMenu.template_rows("selection_case_boundary", {}, {}, {})
+	if not case_boundary then return {} end
+	for _, row in ipairs(case_boundary) do selection_rows[#selection_rows + 1] = row end
+	local case_methods = {
+		uppercase_selection = "transform_uppercase",
+		selection_lowercase = "transform_lowercase",
+		titlecase_selection = "transform_titlecase",
+	}
+	local function case_ready(method)
+		return type(sc.configuration_admitted) == "function" and sc.configuration_admitted() == true
+			and type(sc[method]) == "function"
+	end
+	local case_getters = {
+		uppercase_selection_ready = function() return case_ready(case_methods.uppercase_selection) end,
+		selection_lowercase_ready = function() return case_ready(case_methods.selection_lowercase) end,
+		titlecase_selection_ready = function() return case_ready(case_methods.titlecase_selection) end,
+	}
+	for _, command in ipairs(ManifestMenu.get_array("selection_case_commands")) do
+		local id, method = command.id, case_methods[command.id]
+		local ready = assert(case_getters[id .. "_ready"], "Selection case command has no native owner")
+		local row = ManifestMenu.command_row("selection_case_commands", id, {
+			[id] = function()
+				if not ready() or sc[method]() ~= true then return false end
+				return true
+			end,
+		}, case_getters)
+		if row then selection_rows[#selection_rows + 1] = row end
+	end
+	local helper_boundary = ManifestMenu.template_rows("selection_helper_boundary", {}, {}, {})
+	if not helper_boundary then return {} end
+	for _, row in ipairs(helper_boundary) do selection_rows[#selection_rows + 1] = row end
+	local helper_methods = {
+		["selection_select_word"] = "select_word",
+		["selection_select_line"] = "select_line",
+		["selection_paste_plain"] = "paste_plain",
+	}
+	local helper_getters = {
+		selection_select_word_ready = function() return case_ready(helper_methods.selection_select_word) end,
+		selection_select_line_ready = function() return case_ready(helper_methods.selection_select_line) end,
+		selection_paste_plain_ready = function() return case_ready(helper_methods.selection_paste_plain) end,
+	}
+	for _, command in ipairs(ManifestMenu.get_array("selection_helper_commands")) do
+		local id, method = command.id, helper_methods[command.id]
+		local ready = assert(helper_getters[id .. "_ready"], "Selection helper command has no native owner")
+		local row = ManifestMenu.command_row("selection_helper_commands", id, {
+			[id] = function()
+				if not ready() or sc[method]() ~= true then return false end
+				return true
+			end,
+		}, helper_getters)
+		if row then selection_rows[#selection_rows + 1] = row end
+	end
+
+	-- Wrap symbols submenu. Ordered, because `get_wrap_pairs` returns a map and
+	-- `pairs` would give the user a different order on every rebuild.
+	local wrap_items = {}
+	local opening = {}
+	for ch, pair in pairs(sc.get_wrap_pairs()) do
+		-- Only the opening character: each pair is stored under both of its ends.
+		if ch == pair.left then opening[#opening + 1] = { ch = ch, pair = pair } end
+	end
+	table.sort(opening, function(a, b) return a.ch < b.ch end)
+	for _, entry in ipairs(opening) do
+		local pair = entry.pair
+		-- The pair around an ellipsis, and nothing else. This used to append a
+		-- second illustration, "(«texte»)", whose only content was a French word —
+		-- so the row was a translated label followed by an untranslated one, and
+		-- the ellipsis had already said the same thing in every language.
+		wrap_items[#wrap_items + 1] = {
+			label  = string.format("%s … %s", entry.ch, pair.right),
+			action = function() sc.wrap_selection(pair.left, pair.right) end,
+		}
+	end
+
+	local handlers = {}
+
+	-- The manifest's `keyboard_slots` row, which this driver could not answer
+	-- until it had a chord capture and somewhere to store an assignment. One
+	-- submenu per modifier group, each listing every key in the shared catalogue
+	-- with whatever the user has bound to it — the same shape the gesture slots
+	-- use, for the same reason: the slot space is fixed and the assignment is the
+	-- user's, so a static entry cannot enumerate the rows.
+	local providers = {}
+	providers["keyboard_slots"] = function()
+		local ok_kbd, Keyboard = pcall(require, "modules.shortcuts.keyboard_shortcuts")
+		local ok_gestures, Gestures = pcall(require, "modules.gestures.manager")
+		if not ok_kbd or not ok_gestures then
+			Logger.error(LOG, "Keyboard slots unavailable — the shortcuts submenu loses its bindings.")
+			return {}
+		end
+
+		-- The action catalogue is the gestures manager's, and the labels with it:
+		-- the picker opened below lists it with its headings.
+		local out = {}
+		local skipped = {}
+		local function assign_slot(slot, option, picked)
+			local assigned = assign_parameterized_action(
+				ctx,
+				Gestures,
+				Keyboard.binding_id(slot),
+				option,
+				function() return Keyboard.set_action(slot, option) end,
+				picked
+			)
+			if assigned and type(ctx.on_menu_changed) == "function" then
+				ctx.on_menu_changed()
+			end
+			return assigned
+		end
+		for _, group in ipairs(Keyboard.SLOT_GROUPS) do
+			local rows = {}
+			for _, slot in ipairs(Keyboard.available_slots(group.prefix)) do
+				local bound = Keyboard.get_action(slot) or "none"
+				local reason
+				if slot == require("shortcuts.magic_editor").SLOT_ID then
+					local gate = ctx.input_capture_gate
+					reason = Keyboard.magic_editor_decision({ master = enabled == true,
+						paused = ctx.paused == true or (type(ctx.is_paused) == "function" and ctx.is_paused() == true),
+						inhibited = type(gate) == "table" and type(gate.blocks_text) == "function" and gate.blocks_text() == true }).reason
+				end
+				local slot_label = Keyboard.get_slot_label(slot, reason)
+				local choices = slot_binding_rows(slot_label, bound, Keyboard.binding_id(slot),
+					function(option, picked) return assign_slot(slot, option, picked) end)
+				rows[#rows + 1] = {
+					label = slot_label
+						.. " → " .. binding_label(Gestures.get_action_label(bound),
+							Gestures, Keyboard.binding_id(slot), bound),
+					items = choices,
+				}
+			end
+			-- A group with no slot is the key catalogue failing to load: drawing it
+			-- anyway put three submenus that open onto nothing in the tray.
+			if #rows > 0 then
+				out[#out + 1] = { label = i18n_safe(group.group_key), items = rows }
+			else
+				skipped[#skipped + 1] = group.prefix
+			end
+		end
+		if #skipped > 0 then
+			Logger.error(LOG, "Keyboard slot group(s) %s not drawn: the key catalogue offered no slot.",
+				table.concat(skipped, ", "))
+		end
+		return out
+	end
+
+	-- The number-row tap keys: one row per key, named by what a tap on it types
+	-- under the loaded XKB keymap, then its action; the submenu opens the picker.
+	providers["tap_keys"] = function()
+		local ok_tap, TapKeys = pcall(require, "modules.shortcuts.tap_keys")
+		local ok_gestures, Gestures = pcall(require, "modules.gestures.manager")
+		if not ok_tap or not ok_gestures then
+			Logger.error(LOG, "Tap keys unavailable — the shortcuts submenu loses them.")
+			return {}
+		end
+		local ok_layout, Layout = pcall(require, "adapters.keyboard_layout")
+		local labels = { get = i18n_safe }
+		local rows = {}
+		for _, key in ipairs(TapKeys.keys()) do
+			local bound = TapKeys.get_action(key.id)
+			local name = TapKeys.display_name(key.id, ok_layout and Layout or nil, labels)
+			local function assign(option, picked)
+				local assigned = assign_parameterized_action(ctx, Gestures, TapKeys.binding_id(key.id),
+					option, function() return TapKeys.set_action(key.id, option) end, picked)
+				if assigned and type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
+				return assigned
+			end
+			rows[#rows + 1] = {
+				label = name .. " → " .. (bound ~= "none" and binding_label(
+					Gestures.get_action_label(bound), Gestures, TapKeys.binding_id(key.id), bound)
+					or i18n_safe("menu.shortcuts.tap_keys.unassigned")),
+				items = slot_binding_rows(name, bound, TapKeys.binding_id(key.id), assign),
+			}
+		end
+		return rows
+	end
+
+	-- « Raccourcis de gestion du script », declared by script_control_group as
+	-- on every driver: the chords' switch, the restore of their preset, the
+	-- clear to the system's behaviour, then one row per slot. The restore and
+	-- the clear apply at once, without a question, through the Shortcuts scope
+	-- narrowed to the chords; the clear writes "none" in every slot, since an
+	-- absent slot starts with its preset. The title is ticked from the switch.
+	local group_builders = {}
+	group_builders["key_combinations"] = function()
+		return require("ui.menu.key_combinations").build(ctx, {
+			manifest = ManifestMenu, get = i18n_safe, key_label = function(entry)
+				local label = i18n_safe(entry.label_key); return label == entry.label_key and entry.id or label
+			end,
+			action_label = function(action, gestures) return gestures.get_action_label(action) end,
+			open_picker = open_action_picker, error = show_error,
+			prompt_delay = function(current, declared)
+				return TextPrompt.ask(i18n_safe("menu.tapholds.simultaneous_dialog_title"),
+					zenity_plain(string.format(i18n_safe("menu.tapholds.simultaneous_dialog_prompt"), declared)), tostring(current))
+			end,
+			prompt_hold = function(label, current, choices)
+				return TextPrompt.ask(label, zenity_plain(string.format(i18n_safe("menu.shortcuts.key_combinations_hold_hold"), current)), current, false, choices)
+			end,
+			parameter = function(context, gestures, binding, action, spec)
+				local prior = gestures.get_action_parameter(binding, action)
+				if type(context.prompt_action_parameter) == "function" then
+					return context.prompt_action_parameter(binding, action, spec, prior)
+				end
+				if spec == "program" then return nil end
+				if spec == "app" then
+					return require("ui.app_chooser").pick(require("adapters.shell_runner"), gestures.get_action_parameter_prompt(action))
+				end
+				local title = _fill(i18n_safe("dialog.gestures.param_title"), "{1}", gestures.get_action_label(action))
+				return prompt_text(title, zenity_plain(gestures.get_action_parameter_prompt(action)), prior)
+			end,
+		})
+	end
+	group_builders["script_control"] = function()
+		local ok_chords, Chords = pcall(require, "modules.shortcuts.script_chords")
+		local ok_gestures, Gestures = pcall(require, "modules.gestures.manager")
+		if not ok_chords or not ok_gestures then
+			Logger.error(LOG, "Script chords unavailable — the shortcuts submenu loses them.")
+			return nil
+		end
+		local chords_on = Chords.chords_enabled()
+		local chord_providers = {}
+		chord_providers["script_control_shortcuts"] = function()
+			local rows = {}
+			for _, slot in ipairs(Chords.slots()) do
+				local bound = Chords.get_action(slot.id)
+				local name = i18n_safe("sg_labels." .. slot.id)
+				local function assign(option, picked)
+					local assigned = assign_parameterized_action(ctx, Gestures, Chords.binding_id(slot.id),
+						option, function() return Chords.set_action(slot.id, option) end, picked)
+					if assigned and type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
+					return assigned
+				end
+				rows[#rows + 1] = {
+					label = name .. " → " .. binding_label(Gestures.get_action_label(bound),
+						Gestures, Chords.binding_id(slot.id), bound),
+					items = slot_binding_rows(name, bound, Chords.binding_id(slot.id), assign),
+				}
+			end
+			return rows
+		end
+		local function apply_chords_scope(mode)
+			if ctx.paused == true or type(ctx.is_paused) ~= "function" or ctx.is_paused() then return false end
+			local committed = require("infra.shortcuts_scope").apply(mode, ctx.is_paused, "script_chords")
+			if committed == true and type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
+			return committed
+		end
+		local chords_ctx = {}
+		for key, value in pairs(ctx) do chords_ctx[key] = value end
+		chords_ctx.commands = {}
+		for key, value in pairs(ctx.commands or {}) do chords_ctx.commands[key] = value end
+		chords_ctx.commands["script_control_toggle"] = function()
+			local read, current = false, nil
+			if type(Chords.chords_enabled) == "function" then read, current = pcall(Chords.chords_enabled) end
+			local called, committed = false, false
+			if read and type(current) == "boolean" and type(Chords.set_chords_enabled) == "function" then
+				called, committed = pcall(Chords.set_chords_enabled, not current)
+			end
+			if not called or committed ~= true then
+				Logger.error(LOG, "The script chord switch did not acknowledge durable publication.")
+				show_error(i18n_safe("dialog.bulk_toggle.save_failed"), i18n_safe("common.error_title"))
+				return false
+			end
+			if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
+			return true
+		end
+		chords_ctx.commands["scope_restore"] = function() return apply_chords_scope("recommended") end
+		chords_ctx.commands["scope_clear"] = function() return apply_chords_scope("clear") end
+		chords_ctx.state_getters = {}
+		for key, value in pairs(ctx.state_getters or {}) do chords_ctx.state_getters[key] = value end
+		chords_ctx.state_getters["script_control_enabled"] = function() return chords_on end
+		-- Already rendered: the group row takes the rows as its finished submenu.
+		return ManifestMenu.build("script_control_group", "Shortcuts", nil, nil, chords_ctx, chord_providers)
+	end
+
+	-- The wrap-symbol picker. The manifest called it Windows-only until
+	-- 2026-08-06 while this driver had been drawing it all along; it is a shared
+	-- `list` row now, in the same position on all three drivers.
+	providers["wrap_symbols_menu"] = function()
+		return ManifestMenu.template_rows("shortcut_wrap_frame", {}, {}, {
+			shortcut_wrap_symbols_linux = function() return wrap_items end,
+		})
+	end
+
+	providers["selection_operations"] = function()
+		return selection_rows
+	end
+
+	-- One row per installed extension that ships shortcuts/menu.lua.
+	--
+	-- An extension author writes that file and it appears under Raccourcis on
+	-- macOS and, as menu.ahk, on Windows. On Linux nothing appeared, so every
+	-- action an extension declared was unreachable — and the bundled demo
+	-- extension carries the file, so this reproduced out of the box.
+	--
+	-- Provider data since 2026-08-07: the rows are the renderer's to build, and
+	-- only the submenu each extension declares for itself stays this driver's.
+	providers["extensions_shortcuts"] = function()
+		return _extension_shortcut_rows()
+	end
+
+	-- `shortcuts_toggle` is the submenu's first row: appindicator binds item.fn
+	-- only on a row with no submenu, so the parent cannot carry the switch.
+	local sc_ctx = {}
+	for key, value in pairs(ctx) do sc_ctx[key] = value end
+	sc_ctx.commands = {}
+	for key, value in pairs(ctx.commands or {}) do sc_ctx.commands[key] = value end
+	local function apply_shortcuts_scope(mode)
+		if ctx.paused == true or type(ctx.is_paused) ~= "function" or ctx.is_paused() then return false end
+		local committed = require("infra.shortcuts_scope").apply(mode, ctx.is_paused)
+		if committed == true and type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
+		return committed
+	end
+	sc_ctx.commands["scope_restore"] = function() return apply_shortcuts_scope("recommended") end
+	sc_ctx.commands["scope_clear"] = function() return apply_shortcuts_scope("clear") end
+	sc_ctx.commands["shortcuts_toggle"] = function()
+		local read, current = false, nil
+		if type(sc.is_enabled) == "function" then read, current = pcall(sc.is_enabled) end
+		local called, committed = false, false
+		if read and type(current) == "boolean" and type(sc.set_enabled) == "function" then
+			called, committed = pcall(sc.set_enabled, not current)
+		end
+		if not called or committed ~= true then
+			Logger.error(LOG, "The shortcuts master did not acknowledge durable publication.")
+			show_error(i18n_safe("dialog.bulk_toggle.save_failed"), i18n_safe("common.error_title"))
+			return false
+		end
+		if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
+		return true
+	end
+	sc_ctx.commands["edit_chatgpt_url"] = function()
+		local ok_chatgpt, ChatGPT = pcall(require, "modules.shortcuts.chatgpt")
+		if not ok_chatgpt or type(ChatGPT.get_url) ~= "function"
+			or type(ChatGPT.set_url) ~= "function" then
+			Logger.error(LOG, "ChatGPT URL settings are unavailable — the value cannot be edited.")
+			return
+		end
+		local value = prompt_text(
+			i18n_safe("dialog.shortcuts.chatgpt_title"),
+			i18n_safe("dialog.shortcuts.chatgpt_prompt"),
+			ChatGPT.get_url())
+		if value == nil then return end
+		if type(ChatGPT.is_valid) ~= "function" or not ChatGPT.is_valid(value) then
+			show_error(i18n_safe("dialog.gestures.param_err_url"))
+			return
+		end
+		if ChatGPT.set_url(value) and type(ctx.on_menu_changed) == "function" then
+			ctx.on_menu_changed()
+		end
+	end
+	sc_ctx.state_getters = {}
+	for key, value in pairs(ctx.state_getters or {}) do sc_ctx.state_getters[key] = value end
+	local physical_editor = require("shortcuts.physical_editor_menu").new({
+		paused = function()
+			if ctx.paused == true or type(ctx.is_paused) ~= "function" then return nil end
+			return ctx.is_paused()
+		end,
+		scope = function() return require("infra.shortcuts_scope").editor_owner(ctx.is_paused) end,
+		host = function() return require("ui.physical_shortcuts.bridge") end,
+		refused = function() show_error(i18n_safe("physical_shortcuts.window_unavailable")) end,
+	})
+	sc_ctx.commands["physical_shortcuts_editor"] = physical_editor.open
+	sc_ctx.state_getters["physical_shortcuts_editor_ready"] = physical_editor.ready
+	sc_ctx.state_getters["shortcuts_enabled"] = function() return enabled end
+	sc_ctx.state_getters["key_combinations_enabled"] = function()
+		return require("modules.shortcuts.key_combinations").is_enabled() == true
+	end
+	-- Ticks « Raccourcis de gestion du script » while its switch is on.
+	sc_ctx.state_getters["script_control_enabled"] = function()
+		local ok_chords, Chords = pcall(require, "modules.shortcuts.script_chords")
+		return ok_chords and Chords.chords_enabled() == true
+	end
+	-- The manifest's `feature` row for wrap-on-type, drawn where the manifest
+	-- hangs it (just above the wrap-symbol picker). Its label is the feature's
+	-- own description key, as on Windows.
+	sc_ctx.feature_rows = {}
+	for key, value in pairs(ctx.feature_rows or {}) do sc_ctx.feature_rows[key] = value end
+	local function wrap_on_type_ready()
+		return type(sc.is_enabled) == "function" and sc.is_enabled() == true
+			and type(sc.configuration_admitted) == "function" and sc.configuration_admitted() == true
+			and type(sc.is_wrap_on_type_enabled) == "function" and type(sc.set_wrap_on_type_enabled) == "function"
+	end
+	if type(sc.is_wrap_on_type_enabled) == "function" then
+		sc_ctx.feature_rows["shortcuts.wrap_text_if_selected"] = function()
+			local on = sc.is_wrap_on_type_enabled()
+			local rows = ManifestMenu.template_rows("shortcut_wrap_live_control", {
+				["shortcut_wrap_on_type"] = function()
+					if not wrap_on_type_ready() then return false end
+					local current = sc.is_wrap_on_type_enabled()
+					if type(current) ~= "boolean" or not wrap_on_type_ready() then return false end
+					if sc.set_wrap_on_type_enabled(not current) ~= true then return false end
+					if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
+					return true
+				end,
+			}, {
+				shortcut_wrap_on_type_checked = function() return on == true end,
+				shortcut_wrap_on_type_ready = function() return wrap_on_type_ready() and type(on) == "boolean" end,
+			}, {})
+			if not rows or #rows ~= 1 then return nil end
+			return rows[1]
+		end
+	end
+
+	local manifest_rows = ManifestMenu
+		and ManifestMenu.build("shortcuts_menu", "Shortcuts", handlers, group_builders, sc_ctx, providers)
+		or {}
+	if #manifest_rows > 0 then
+		for _, row in ipairs(manifest_rows) do items[#items + 1] = row end
+	end
+
+	return { label = i18n_safe("menu.shortcuts.title"), checked = enabled, submenu = items }
+end
+
+--- Display name of a tap-hold key: the label key the shared key catalogue
+--- gives it, the one the Windows and macOS menus show.
+--- @param entry table One entry of the manager's key_catalog().
+--- @return string
+local function _tap_hold_key_label(entry)
+	local label = i18n_safe(entry.label_key)
+	if label == entry.label_key then return entry.id end
+	return label
+end
+
+--- Display name of a tap action: the key itself for "", else the catalogue's.
+--- @param action string|nil
+--- @param gestures table|nil The gestures manager, for the actions it labels.
+--- @return string
+local function _tap_hold_action_label(action, gestures)
+	if type(action) ~= "string" or action == "" then return i18n_safe("tap_hold.tap.none") end
+	local label = i18n_safe("sg_actions." .. action)
+	if label ~= "sg_actions." .. action then return label end
+	if gestures and type(gestures.get_action_label) == "function" then
+		local ok, named = pcall(gestures.get_action_label, action)
+		if ok and type(named) == "string" and named ~= "" then return named end
+	end
+	return action
+end
+
+--- The hold option a key's entry matches.
+--- @param options table From the manager's hold_options().
+--- @param entry table The key's configuration.
+--- @return table|nil
+local function _tap_hold_current_hold(options, entry)
+	local modifier = type(entry.hold_modifier) == "string" and entry.hold_modifier or ""
+	local layer = type(entry.hold_layer) == "string" and entry.hold_layer or ""
+	for _, option in ipairs(options) do
+		if (option.kind == "none" and modifier == "" and layer == "")
+			or (option.kind == "modifier" and option.id == modifier and layer == "")
+			or (option.kind == "layer" and option.id == layer) then
+			return option
+		end
+	end
+	return nil
+end
+
+--- Builds the Tap-Holds submenu: the feature switch, reset and disable-all,
+--- then one row per key with its tap picker, hold picker and delay — the
+--- Windows menu, on the engine this daemon runs. Every change writes the
+--- user's tap_hold.toml and reloads the engine, so it is in force at once.
+--- @param ctx table Menu context (ctx.tap_holds is the tap-hold manager).
+--- @return table One menu entry with its submenu.
+local function _build_tap_holds(ctx)
+	local th = ctx.tap_holds
+	if not th then
+		return { label = i18n_safe("menu.tapholds.title"), disabled = true }
+	end
+	local Writer = require("platform.remap.tap_hold_writer")
+	local HoldOptions = require("tap_hold.hold_options")
+	local KeyCatalog = require("tap_hold.key_catalog")
+
+	local function changed(ok)
+		if not ok then show_error(i18n_safe("dialog.bulk_toggle.save_failed"), i18n_safe("common.error_title")) end
+		if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
+	end
+
+	local keys = th.keys()
+	local options = th.hold_options()
+	local feature_on = th.file_enabled() and th.is_enabled()
+
+	--- Opens the searchable action picker for a key's tap.
+	--- @param catalog_entry table The key's entry of the manager's key_catalog().
+	--- @param current string The key's tap now.
+	local function pick_tap(catalog_entry, current)
+		local key_id = catalog_entry.id
+		local ok_picker, Picker = pcall(require, "ui.action_picker.bridge")
+		if not ok_picker or type(Picker.open) ~= "function" then
+			Logger.error(LOG, "Action picker is unavailable for the tap of '%s'.", key_id)
+			return
+		end
+		local items = {}
+		for _, id in ipairs(th.tap_actions()) do
+			items[#items + 1] = { type = "action", id = id, label = _tap_hold_action_label(id, ctx.gestures) }
+		end
+		table.sort(items, function(left, right) return left.label < right.label end)
+		Picker.open({
+			title = i18n_safe("tap_hold.picker.title_prefix") .. _tap_hold_key_label(catalog_entry),
+			label = i18n_safe("dialog.action_picker.label"),
+			current = current == "" and "__native__" or current,
+			allow_native = true,
+			native_label = i18n_safe("tap_hold.tap.none"),
+			items = items,
+		}, function(option)
+			local ok = Writer.set_tap(key_id, option == "__native__" and "" or option)
+			changed(ok)
+			return ok
+		end)
+	end
+
+	--- Asks for a key's own delay, in milliseconds.
+	local function ask_delay(key_id, current_ms)
+		local value = prompt_text(i18n_safe("menu.tapholds.key_tap_delay_dialog_title"),
+			string.format(i18n_safe("menu.tapholds.key_tap_delay_dialog_prompt"), current_ms),
+			tostring(current_ms))
+		if value == nil then return false end
+		local ms = tonumber(value)
+		if not ms or ms ~= ms or ms == math.huge or ms <= 0 or math.floor(ms + 0.5) <= 0 then
+			Logger.warn(LOG, "Invalid tap-hold delay '%s' — ignored.", tostring(value))
+			show_error(tostring(value), i18n_safe("dialog.gestures.param_error_title"))
+			return false
+		end
+		local call_ok, persisted = pcall(Writer.set_threshold, key_id, math.floor(ms + 0.5) / 1000)
+		if not call_ok or persisted ~= true then
+			changed(false)
+			return false
+		end
+		changed(true)
+		return true
+	end
+
+	--- The rows of one hand: its keys in the shared catalogue's order, each
+	--- with its disable, tap, hold and delay rows. The manifest draws the two
+	--- hand headers and the separator between the hands around them.
+	--- @param hand string "left" or "right".
+	--- @return table
+	local function hand_rows(hand)
+		local rows = {}
+		for _, catalog_entry in ipairs(KeyCatalog.of_hand(th.key_catalog(), hand)) do
+			local key_id = catalog_entry.id
+			local entry = keys[key_id] or {}
+			local active = keys[key_id] ~= nil and entry.enabled ~= false
+			local tap = active and type(entry.tap_action) == "string" and entry.tap_action or ""
+			local hold = active and _tap_hold_current_hold(options, entry) or options[1]
+			local tap_label = _tap_hold_action_label(tap, ctx.gestures)
+			local hold_label = hold and HoldOptions.label(hold, i18n_safe) or i18n_safe("tap_hold.hold.none")
+			local configured = tap ~= "" or (hold ~= nil and hold.kind ~= "none")
+			local ms = math.floor((tonumber(entry.time_activation_seconds) or 0) * 1000 + 0.5)
+
+			local hold_rows = {}
+			for _, option in ipairs(options) do
+				hold_rows[#hold_rows + 1] = {
+					label = HoldOptions.label(option, i18n_safe),
+					checked = (hold == option) or nil,
+					action = function() changed(Writer.set_hold(key_id, option.kind, option.id)) end,
+				}
+			end
+
+			local delay_rows = ManifestMenu.template_rows("tap_hold_key_delay_rows", {
+				["tap_hold_key_delay_set"] = function() return ask_delay(key_id, ms) end,
+			})
+			if not delay_rows then return nil end
+
+			local key_rows = ManifestMenu.template_rows("tap_hold_key_rows", {
+				["tap_hold_key_native"] = function() changed(Writer.set_native(key_id)) end,
+				["tap_hold_key_tap"] = function() pick_tap(catalog_entry, tap) end,
+			}, {
+				["tap_hold_key_configured"] = function() return configured end,
+				["tap_hold_key_tap_caption"] = function() return tap_label end,
+				["tap_hold_key_hold_caption"] = function() return hold_label end,
+				["tap_hold_key_delay_caption"] = function() return ms .. " ms" end,
+			}, { ["tap_hold_key_hold"] = hold_rows, ["tap_hold_key_delay"] = delay_rows })
+			if key_rows then
+
+				rows[#rows + 1] = {
+					label = _tap_hold_key_label(catalog_entry) .. "  :  "
+						.. (configured and (tap_label .. "  /  " .. hold_label) or "—"),
+					checked = configured or nil,
+					items = key_rows,
+				}
+			end
+		end
+		return rows
+	end
+
+	local providers = {
+		["tap_hold_keys_left"] = function() return hand_rows("left") end,
+		["tap_hold_keys_right"] = function() return hand_rows("right") end,
+	}
+
+	local render_ctx = {}
+	for key, value in pairs(ctx) do render_ctx[key] = value end
+	render_ctx.commands = {}
+	for key, value in pairs(ctx.commands or {}) do render_ctx.commands[key] = value end
+	-- The feature switch is persisted in the file ([tap_hold] enabled), as the
+	-- Windows toggle is in its config; turning it on also lifts a runtime
+	-- « Disable all ».
+	render_ctx.commands["tapholds_toggle"] = function()
+		local want = not feature_on
+		local ok = Writer.set_enabled(want)
+		if ok and want then ok = th.set_enabled(true) end
+		changed(ok)
+	end
+	-- The scope's restore and clear, the first group after the switch, run the
+	-- shared scope transaction at once: both files backed up, the engine
+	-- acknowledging the candidate before it is published.
+	local function apply_scope(mode)
+		if ctx.paused == true then return false end
+		local committed = require("infra.tap_hold_scope").apply(mode, function() return ctx.paused == true end)
+		changed(committed)
+		return committed
+	end
+	render_ctx.commands["scope_restore"] = function() return apply_scope("recommended") end
+	render_ctx.commands["scope_clear"] = function() return apply_scope("clear") end
+	render_ctx.state_getters = {}
+	for key, value in pairs(ctx.state_getters or {}) do render_ctx.state_getters[key] = value end
+	render_ctx.state_getters["tapholds_enabled"] = function() return feature_on end
+
+	-- The navigation layer editor: the shared page, saved and applied by
+	-- ui/layer_editor/bridge.lua.
+	render_ctx.commands["edit_nav_layer"] = function()
+		if type(ctx.webview) ~= "table" or type(ctx.webview.show) ~= "function" then
+			Logger.error(LOG, "No webview manager in the menu context — the layer editor cannot open.")
+			return
+		end
+		ctx.webview.show("layer_editor")
+	end
+
+	local rows = ManifestMenu
+		and ManifestMenu.build("tap_holds_menu", "TapHolds", nil, nil, render_ctx, providers)
+		or {}
+	return { label = i18n_safe("menu.tapholds.title"), submenu = rows }
+end
+
+--- Builds the gestures submenu.
+local function _build_gestures(ctx)
+	local ge = ctx.gestures
+	if not ge then
+		local status_rows = ManifestMenu and ManifestMenu.template_rows("linux_gestures_absent_rows", {}, {}, {})
+		if not status_rows then return {} end
+		return { label = i18n_safe("menu.gestures.title"), items = status_rows }
+	end
+
+	local enabled = ge.is_enabled()
+
+	-- Keyed by the manifest's own row ids. Each handler appends to the table the
+	-- renderer HANDS IT, never to one closed over from here: the renderer builds
+	-- its own result and passes it in, so a handler writing to an outer table
+	-- would emit its rows into a menu the renderer never returns — every gesture
+	-- row silently missing, with nothing failing.
+	local gesture_rows = {}
+	local function apply_scope(mode)
+		if ctx.paused == true then return false end
+		local committed = ge.apply_scope(mode)
+		if committed == true and type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
+		return committed
+	end
+
+	-- The scope's restore and clear are `command` rows of the first group: the
+	-- renderer builds each row and its label from the declaration, right after
+	-- the switch, and this driver registers only what the click does.
+	local gesture_commands = {
+		["scope_restore"] = function() return apply_scope("recommended") end,
+		["scope_clear"] = function() return apply_scope("clear") end,
+	}
+
+	-- The master toggle's BEHAVIOUR. Its label, its position and the two i18n keys
+	-- that distinguish on from off are the manifest's, and the shared renderer
+	-- draws it — which also retires the " ✓" this driver glued to a translated
+	-- label, a mark that belonged to the tray rather than to the string.
+	local gestures_on = enabled
+	local function master_toggle_action()
+		ge.toggle()
+		if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
+	end
+
+	local function assign_action(slot, action, picked)
+		local committed = assign_parameterized_action(
+			ctx,
+			ge,
+			slot,
+			action,
+			function() return ge.set_action(slot, action) end,
+			picked
+		)
+		if committed and action ~= "none" then
+			local group = slot:match("^(%a+_%d+)")
+			if group then require("ui.gesture_conflicts").show({ key = group, slot = slot }) end
+		end
+		return committed
+	end
+
+	-- The manifest's `gesture_slots_linux` row. One flat list rather than the
+	-- per-finger-count groups macOS splits into (gesture_slots_2 … _5): the slots
+	-- come from ge.DEFAULT_GESTURES, which is keyed by slot name and not by finger
+	-- count, so grouping would mean parsing the names apart only to regroup them.
+	local providers = {}
+	providers["system_gesture_status"] = function() return require("ui.gesture_conflicts").rows(ge) end
+	gesture_commands["system_gesture_settings"] = function() return require("ui.gesture_conflicts").open_settings() end
+	providers["gesture_slots_linux"] = function()
+		local out = {}
+		-- Every known slot is configurable here. A partial quick list made
+		-- parameterized actions unreachable for the omitted gesture bindings.
+		local slots = {}
+		for slot in pairs(ge.DEFAULT_GESTURES or {}) do slots[#slots + 1] = slot end
+		table.sort(slots)
+
+		-- What this machine's touchpad can physically express. The kernel only
+		-- advertises BTN_TOOL_QUADTAP at four slots and QUINTTAP at five, so a pad
+		-- that stops at three — which the Precision Touchpad spec permits — can
+		-- never fire twenty of these rows. Offering them anyway is the dead-line
+		-- delivery the manifest's reason mechanism exists to avoid.
+		--
+		-- nil when no touchpad was found or its capability could not be read, and
+		-- slot_is_reachable answers TRUE for everything in that case: a probe that
+		-- could not read the hardware must never take a working gesture away.
+		local touchpad = type(ge.touchpad) == "function" and ge.touchpad() or nil
+		local max_fingers = touchpad and touchpad.max_fingers or nil
+		local ok_finder, Finder = pcall(require, "modules.gestures.touchpad_finder")
+
+		for _, slot in ipairs(slots) do
+			local reachable = true
+			if ok_finder and type(Finder.slot_is_reachable) == "function" then
+				reachable = Finder.slot_is_reachable(slot, max_fingers)
+			end
+			if not reachable then
+				-- Greyed with its reason rather than hidden: a row that vanishes
+				-- reads as a bug, and the user cannot tell "this hardware cannot"
+				-- from "this driver forgot".
+				out[#out + 1] = {
+					label    = gesture_slot_label(slot) .. " — "
+						.. i18n_safe("platform_reason.touchpad_cannot_count_that_many"),
+					disabled = true,
+				}
+				goto continue
+			end
+
+			local action = ge.get_action(slot) or "none"
+			local label = ge.get_action_display_label and ge.get_action_display_label(slot)
+				or ge.get_action_label(action)
+			local slot_label = gesture_slot_label(slot)
+			local choices = slot_binding_rows(slot_label, action, slot, function(option, picked)
+				local assigned = assign_action(slot, option, picked)
+				if assigned and type(ctx.on_menu_changed) == "function" then
+					ctx.on_menu_changed()
+				end
+				return assigned
+			end)
+			out[#out + 1] = {
+				label = slot_label .. " → " .. label,
+				items = choices,
+			}
+			::continue::
+		end
+		return out
+	end
+
+	-- Declared in the manifest since 2026-08-04. Linux reads gestures from
+	-- libinput, which macOS gets from the OS and Windows does not have at all, so
+	-- the reader is startable here and has no counterpart elsewhere. Its label was
+	-- a hardcoded French string, which every non-French user read in French — and
+	-- being in no manifest, no gate could see either that or the row itself.
+	providers["gesture_reading_linux"] = function()
+		return {
+			{
+				label  = i18n_safe(ge.is_reading() and "menu.gestures.reading_on" or "menu.gestures.reading_off"),
+				action = function()
+					if ge.is_reading() then ge.stop_reading() else ge.start_reading() end
+					if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
+				end,
+			},
+		}
+	end
+
+	-- The master toggle is the manifest's first row and the renderer builds it,
+	-- from the command registered here — the same mechanism as the two whole-tree
+	-- actions below it, which have been `command` rows since 2026-08-06.
+	local gesture_ctx = {}
+	for key, value in pairs(ctx) do gesture_ctx[key] = value end
+	gesture_ctx.commands = {}
+	for key, value in pairs(gesture_commands or {}) do gesture_ctx.commands[key] = value end
+	gesture_ctx.commands["gestures_toggle"] = master_toggle_action
+	gesture_ctx.state_getters = {}
+	for key, value in pairs(ctx.state_getters or {}) do gesture_ctx.state_getters[key] = value end
+	gesture_ctx.state_getters["gestures_enabled"] = function() return gestures_on end
+
+	local rendered = ManifestMenu.build("gestures_menu", "Gestures", gesture_rows, nil, gesture_ctx, providers)
+	local menu = {}
+	for _, row in ipairs(rendered or {}) do menu[#menu + 1] = row end
+
+	return { label = i18n_safe("menu.gestures.title"), checked = gestures_on, submenu = menu }
+end
+
+--- Checks raw dense arrays without triggering source metamethods.
+--- @param value table Source array.
+--- @param records boolean Whether its values must be plain records.
+--- @return boolean
+local function configuration_dense(value, records)
+	if type(value) ~= "table" or getmetatable(value) ~= nil then return false end
+	local count, maximum = 0, 0
+	for index, row in next, value do
+		if type(index) ~= "number" or index % 1 ~= 0 or index < 1 then return false end
+		if records and (type(row) ~= "table" or getmetatable(row) ~= nil) then return false end
+		count, maximum = count + 1, math.max(maximum, index)
+	end
+	return count == maximum
+end
+
+--- Admits the actual Configuration source structure without interpreting command grammar.
+--- @param renderer table|nil Actual manifest renderer.
+--- @param platform string Native platform token.
+--- @return table|nil root, table|nil top, table|nil children, table|nil parent, table|nil fields
+local function configuration_source(renderer, platform)
+	if type(renderer) ~= "table" or type(rawget(renderer, "get_root")) ~= "function"
+		or type(rawget(renderer, "build")) ~= "function" or type(rawget(renderer, "group_row")) ~= "function" then return nil end
+
+	local root = renderer.get_root()
+	if type(root) ~= "table" or getmetatable(root) ~= nil then return nil end
+	local top, children = rawget(root, "top_level"), rawget(root, "configuration_menu")
+	if not configuration_dense(top, true) or not configuration_dense(children, true) then return nil end
+	local parent
+	for _, row in next, top do
+		if rawget(row, "id") == "configuration" then
+			if parent then return nil end
+			parent = row
+		end
+	end
+	if parent == nil or rawget(parent, "type") ~= "group" or type(rawget(parent, "i18n")) ~= "string"
+		or rawget(parent, "i18n") == "" or not configuration_dense(rawget(parent, "rows"), true) then return nil end
+	local platforms = rawget(parent, "platforms")
+	if platforms ~= nil then
+		if not configuration_dense(platforms, false) then return nil end
+		local visible = false
+		for _, token in next, platforms do
+			if type(token) ~= "string" then return nil end
+			if token == platform then visible = true end
+		end
+		if not visible then return nil end
+	end
+	local fields = {}
+	for key, value in next, parent do fields[key] = value end
+	return root, top, children, parent, fields
+end
+
+--- Rechecks the captured direct parent fields without source metamethods.
+--- @param parent table Actual direct source row.
+--- @param fields table Captured raw field references and scalar values.
+--- @return boolean
+local function configuration_parent_unchanged(parent, fields)
+	for key, value in next, parent do
+		if not rawequal(value, rawget(fields, key)) then return false end
+	end
+	for key, value in next, fields do
+		if not rawequal(value, rawget(parent, key)) then return false end
+	end
+	return true
+end
+
+--- Builds the Configuration submenu.
+---
+--- Everything about the configuration itself, never one feature: the
+--- recommended values, the file, the folders editor and the setup wizard. It
+--- replaced « Actions globales » and the two top-level rows that opened the
+--- folder and the wizard, and the Applications submenu whose only row was
+--- that same folder.
+local function _build_configuration(ctx)
+	local root, top, section, parent, fields = configuration_source(ManifestMenu, "linux")
+	if root == nil then return nil end
+
+	--- Calls one of the context's optional callbacks, saying so when it is absent.
+	--- @param name string
+	--- @return function
+	local function call_ctx(name)
+		return function()
+			if type(ctx[name]) ~= "function" then
+				Logger.error(LOG, "Configuration: ctx.%s is absent — the row does nothing.", name)
+				return
+			end
+			ctx[name]()
+		end
+	end
+
+	-- The global restore and clear compose every category's own scope owner,
+	-- all of them or none of them, at once: each owner backs up first, so
+	-- neither asks (the maintainer retired the clear's question on 2026-09-30).
+	local function apply_global_scope(mode)
+		if ctx.paused == true or (type(ctx.is_paused) == "function" and ctx.is_paused()) then return false end
+		local GlobalScope = require("infra.global_scope")
+		local committed, report = GlobalScope.apply(mode, GlobalScope.participants(ctx))
+		-- « Reverted » is only said when it is true; a pending rollback is an
+		-- ERROR the composition logs, which the error window already reports.
+		if not committed and report.reverted ~= false then
+			show_error(i18n_safe("dialog.bulk_toggle.save_failed"), i18n_safe("common.error_title"))
+		end
+		if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
+		return committed
+	end
+
+	-- Every row is `type = "command"` in the manifest, and so is the separator
+	-- between them: labels, order and spacing declared once, with this driver
+	-- supplying only what each row does.
+	local render_ctx = {}
+	for key, value in pairs(ctx) do render_ctx[key] = value end
+	render_ctx.commands = {
+		-- Every category through its own scope owner, hotstrings included: the
+		-- recommended hotstrings, never the neutral state where every catalogue is
+		-- off, and that neutral state for the clear.
+		["scope_restore"] = function() return apply_global_scope("recommended") end,
+		["scope_clear"] = function() return apply_global_scope("clear") end,
+		-- The cleanup needs no daemon state: it reads config.toml itself and
+		-- opens the shared review page through the driver's WebView owner.
+		["clean_unused_keys"] = function()
+			local ok_cleanup, Cleanup = pcall(require, "ui.menu.unused_keys_cleanup")
+			if not ok_cleanup or type(Cleanup) ~= "table" then
+				Logger.error(LOG, "Unused-settings cleanup is unavailable: %s.", tostring(Cleanup))
+				show_error(_fill(i18n_safe("dialog.unused_keys.failed"), "{1}",
+					i18n_safe("dialog.unused_keys.reason.unreadable")),
+					i18n_safe("dialog.unused_keys.title"))
+				return
+			end
+			return Cleanup.run_from_menu()
+		end,
+		-- The folders editor, as on the other two drivers. This row used to open
+		-- the hotstrings folder in the file manager, a second meaning for one
+		-- label.
+		["config_folder"] = function()
+			if type(ctx.webview) ~= "table" or type(ctx.webview.show) ~= "function" then
+				Logger.error(LOG, "No webview manager — the folders editor cannot open.")
+				return
+			end
+			ctx.webview.show("paths_editor")
+		end,
+		["setup_wizard"] = call_ctx("on_show_setup_wizard"),
+	}
+
+	render_ctx.state_getters = {}
+	for key, value in pairs(ctx.state_getters or {}) do render_ctx.state_getters[key] = value end
+	local rows = ManifestMenu.build("configuration_menu", "Configuration", nil, nil, render_ctx)
+	if not configuration_dense(rows, true) then return nil end
+	local current_root, current_top, current_section, current_parent = configuration_source(ManifestMenu, "linux")
+	if not rawequal(root, current_root) or not rawequal(top, current_top)
+		or not rawequal(section, current_section) or not rawequal(parent, current_parent)
+		or not configuration_parent_unchanged(parent, fields) then return nil end
+	return ManifestMenu.group_row("top_level", "configuration", rows, render_ctx.state_getters)
+end
+
+--- Builds the language selector submenu.
+--- Lists all available locales, marks the active one with a checkmark.
+--- Switching persists via i18n.set_locale() → storage adapter.
+local function _build_language(ctx)
+	local items = {}
+
+	-- Try to load i18n for real locale list + switching.
+	local i18n = nil
+	local ok_i18n, i18n_mod = pcall(require, "infra.i18n")
+	if ok_i18n then i18n = i18n_mod end
+
+	if i18n then
+		local active = i18n.get_locale()
+		local locales = i18n.list_locales()
+		if type(locales) ~= "table" or getmetatable(locales) ~= nil then return nil end
+		local count, maximum = 0, 0
+		for index, code in next, locales do
+			if type(index) ~= "number" or index % 1 ~= 0 or index < 1
+				or type(code) ~= "string" or code == "" then return nil end
+			count, maximum = count + 1, math.max(maximum, index)
+		end
+		if count ~= maximum then return nil end
+		for _, code in ipairs(locales) do
+			local cap = code  -- capture for closure
+			items[#items + 1] = {
+				-- Provider data, and the tick is the tray's own check item rather
+				-- than a "✓" glued to the label — that glued form put one platform's
+				-- convention inside a string twenty other languages also read.
+				label   = i18n.display_name(code) .. " (" .. code .. ")",
+				checked = code == active,
+				action  = function()
+					if i18n.set_locale(cap) and type(ctx.on_menu_changed) == "function" then
+						ctx.on_menu_changed()
+					end
+				end,
+			}
+		end
+	else
+		-- No i18n module: two hardcoded names is a hand-written enumeration of a
+		-- list the shared catalogue owns, and it logged instead of switching. A
+		-- driver that cannot read its locales says so.
+		Logger.error(LOG, "i18n unavailable — the language menu has no locale to offer.")
+		return nil
+	end
+
+	local admitted = ManifestMenu
+		and ManifestMenu.template_rows("language_menu", {}, {}, {
+			["locales"] = function() return items end,
+		})
+	if not admitted then return nil end
+	local rows = ManifestMenu.render_rows(admitted, "language_menu")
+	return ManifestMenu.group_row("top_level", "language", rows, {})
+end
+
+--- The channel picker of the About submenu: one submenu titled with the
+--- subscribed channel's registry name, one row per registry channel in registry
+--- order, ticked on the subscribed one. A click subscribes through the updater,
+--- which persists the choice; the redraw it asks for retitles the picker.
+--- @param ctx table Menu context.
+--- @param up table The updater module.
+--- @return table row A provider row with its items.
+local function _channel_picker(ctx, up)
+	return ManifestMenu.choice_row("about_update_channel_menu", "update_channel", {
+		update_channel = function(id)
+			local ok, committed = pcall(up.set_channel, id)
+			if not ok or committed ~= true then return false end
+			if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
+			-- An open Versions page follows only an acknowledged subscription.
+			local ok_bridge, Changelog = pcall(require, "ui.changelog.bridge")
+			if ok_bridge then
+				Changelog.push_subscribed_channel(id)
+			else
+				Logger.error(LOG, "The Versions page bridge is unavailable: %s.", tostring(Changelog))
+			end
+			return true
+		end,
+	}, { ["updater.channel"] = function() return up.get_channel() end })
+end
+
+--- Supplies the registered cadence choice to the existing updater owner.
+--- @param ctx table Menu context.
+--- @param up table Native updater owner.
+--- @return table row Shared choice provider data.
+local function _frequency_picker(ctx, up)
+	return ManifestMenu.choice_row("about_update_frequency_menu", "update_check_interval", {
+		update_check_interval = function(seconds)
+			if up.set_check_interval(seconds) ~= true then return false end
+			up.stop_background_checks()
+			up.start_background_checks()
+			if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
+			return true
+		end,
+	}, {
+		["updater.check_interval_seconds"] = function()
+			return Schedule.snap_interval(up.get_check_interval(), up.TIMING)
+		end,
+	})
+end
+
+--- The updater block of the About submenu, as provider DATA: the version, the
+--- channel picker right before the check row, then the check-frequency picker.
+--- It used to be a Linux-only top-level "Updates" submenu with its own
+--- 'stable'/'dev' rows.
+--- @param ctx table Menu context.
+--- @return table rows
+local function _about_update_rows(ctx)
+	local up = ctx.updater
+	-- The build and the commit it was built from, in the shared wording:
+	-- « Version 0.0.0-dev.144 (c3005e0b9) » for a release, « Version locale
+	-- (c3005e0b9) » for a source run. The identity is resolved once per daemon
+	-- by infra/version.lua, so a rebuild reads no file.
+	local identity = Version.identity()
+	local out = {
+		{
+			label = VersionLabel.format(identity.kind, identity.version, identity.commit, i18n_safe),
+			disabled = true,
+		},
+	}
+	local separator_rows = ManifestMenu.template_rows("about_version_separator")
+	if not separator_rows then return {} end
+	for _, row in ipairs(separator_rows) do out[#out + 1] = row end
+	if not up then
+		Logger.error(LOG, "No updater module — the About menu shows no channel or check row.")
+		return out
+	end
+
+	out[#out + 1] = _channel_picker(ctx, up)
+
+	-- A local version has no installation to update, so it checks for nothing
+	-- (the updater starts no background check for it). Its check row and its
+	-- frequency row are still drawn, greyed with the reason: left out, nobody
+	-- could tell whether the automatic update exists.
+	local source_run = Installation.is_source_run()
+	local frequency_row = _frequency_picker(ctx, up)
+
+	-- A check discovers releases; installation needs the separately named row.
+	if source_run then
+		local source_row = ManifestMenu.command_row("about_source_menu", "about_source_check", {
+			["about_source_check"] = function() return false end,
+		}, { ["about_source_release_ready"] = function() return not source_run end })
+		if source_row then out[#out + 1] = source_row end
+	else
+		out[#out + 1] = {
+		label = up.get_menu_label(),
+		disabled = up.get_state() == "checking" or up.get_state() == "downloading"
+			or up.get_state() == "installing",
+		action = function()
+			-- The answer is shown in the shared update-check window, with Update
+			-- and the other channels' newer releases
+			local opened = require("ui.update_check.bridge").open({
+				updater            = up,
+				on_menu_changed    = ctx.on_menu_changed,
+				on_update_finished = ctx.on_update_finished,
+				on_open_today_log  = ctx.on_open_today_log,
+			})
+			if opened then return end
+			-- Without a window (no WebKitGTK, no display) the answer is announced
+			-- by a notification instead
+			Logger.warn(LOG, "The update-check window could not open; the answer is notified instead.")
+			up.check_for_updates(nil, function(available, release, err)
+				if available and release then
+					Logger.info(LOG, "Update available: %s.", release.tag)
+				elseif err then
+					Logger.warn(LOG, "Update check failed: %s.", tostring(err))
+				else
+					Logger.info(LOG, "No update available (current: %s).", up.current_version())
+				end
+				if type(ctx.on_update_checked) == "function" then
+					ctx.on_update_checked(available, release, err)
+				end
+				if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
+			end)
+		end,
+	}
+	end
+
+	-- Only once there is something to install: a permanently visible
+	-- "download" row that does nothing is indistinguishable from a broken one.
+	if up.get_state() == "available" then
+		local rel = up.get_cached_release()
+		if rel and source_run then
+			-- A source run offers the latest release to look at, but has no
+			-- installation to replace: the row stays, greyed, and the renderer
+			-- names why as on every greyed row with a reason, with no action a
+			-- click could start.
+			out[#out + 1] = {
+				label = _fill(i18n_safe("menu.about.update_now"), "{tag}", rel.tag),
+				disabled = true,
+				disabled_reason_key = "menu.about.source_run_reason",
+			}
+		elseif rel then
+			out[#out + 1] = {
+				label = _fill(i18n_safe("menu.about.update_now"), "{tag}", rel.tag),
+				action = function()
+					-- Consent names the release this row shows: the manager refuses
+					-- it if a background check replaced the cached release since.
+					require("ui.update_check.bridge").download_offered(up, rel, ctx)
+				end,
+			}
+		end
+	end
+
+
+	if source_run then
+		frequency_row.items = nil
+		frequency_row.disabled = true
+		frequency_row.disabled_reason_key = "menu.about.source_run_reason"
+		out[#out + 1] = frequency_row
+		return out
+	end
+
+	out[#out + 1] = frequency_row
+	return out
+end
+
+M._about_update_rows = _about_update_rows
+
+--- The action of the Uninstall row: the confirmed removal transaction of
+--- ui/menu/uninstall.lua, which quits the daemon through ctx.on_quit once the
+--- removal worker owns the files.
+--- @param ctx table Menu context.
+--- @return function
+local function _uninstall_command(ctx)
+	return function()
+		require("ui.menu.uninstall").run({
+			title = i18n_safe("menu.global.uninstall"),
+			confirmation = i18n_safe("dialog.uninstall.confirm"),
+			failure = i18n_safe("dialog.uninstall.failed"),
+			confirm = function(title, text)
+				return ask_yes_no(title, zenity_plain(text),
+					i18n_safe("button.remove"), i18n_safe("button.cancel"))
+			end,
+			fail = function(text) show_error(zenity_plain(text), i18n_safe("menu.global.uninstall")) end,
+			quit = function()
+				if type(ctx.on_quit) ~= "function" then
+					Logger.error(LOG, "Uninstall: ctx.on_quit is absent — the daemon cannot quit.")
+					return
+				end
+				ctx.on_quit()
+			end,
+		})
+	end
+end
+
+--- Checks raw dense arrays without triggering source metamethods.
+--- @param value table Source array.
+--- @param records boolean Whether its values must be plain records.
+--- @return boolean
+local function about_dense(value, records)
+	if type(value) ~= "table" or getmetatable(value) ~= nil then return false end
+	local count, maximum = 0, 0
+	for index, row in next, value do
+		if type(index) ~= "number" or index % 1 ~= 0 or index < 1 then return false end
+		if records and (type(row) ~= "table" or getmetatable(row) ~= nil) then return false end
+		count, maximum = count + 1, math.max(maximum, index)
+	end
+	return count == maximum
+end
+
+--- Admits the actual About source structure without interpreting choice grammar.
+--- @param renderer table|nil Actual manifest renderer.
+--- @param platform string Native platform token.
+--- @return table|nil root, table|nil top, table|nil children, table|nil parent, table|nil fields
+local function about_source(renderer, platform)
+	if type(renderer) ~= "table" or type(rawget(renderer, "get_root")) ~= "function"
+		or type(rawget(renderer, "build")) ~= "function" or type(rawget(renderer, "group_row")) ~= "function" then return nil end
+
+	local root = renderer.get_root()
+	if type(root) ~= "table" or getmetatable(root) ~= nil then return nil end
+	local top, children = rawget(root, "top_level"), rawget(root, "about_menu")
+	if not about_dense(top, true) or not about_dense(children, true) or #children == 0 then return nil end
+	local parent
+	for _, row in next, top do
+		if rawget(row, "id") == "about" then
+			if parent then return nil end
+			parent = row
+		end
+	end
+	if parent == nil or rawget(parent, "type") ~= "group" or rawget(parent, "label_prefix") ~= nil
+		or type(rawget(parent, "i18n")) ~= "string" or rawget(parent, "i18n") == ""
+		or not about_dense(rawget(parent, "rows"), true) then return nil end
+	local platforms = rawget(parent, "platforms")
+	if platforms ~= nil then
+		if not about_dense(platforms, false) then return nil end
+		local visible = false
+		for _, token in next, platforms do
+			if type(token) ~= "string" then return nil end
+			if token == platform then visible = true end
+		end
+		if not visible then return nil end
+	end
+	local fields = {}
+	for key, value in next, parent do fields[key] = value end
+	return root, top, children, parent, fields
+end
+
+--- Rechecks the captured direct parent fields without source metamethods.
+--- @param parent table Actual direct source row.
+--- @param fields table Captured raw field references and scalar values.
+--- @return boolean
+local function about_parent_unchanged(parent, fields)
+	for key, value in next, parent do
+		if not rawequal(value, rawget(fields, key)) then return false end
+	end
+	for key, value in next, fields do
+		if not rawequal(value, rawget(parent, key)) then return false end
+	end
+	return true
+end
+
+--- Builds the about item: the updater block, Versions and its GitHub page, then
+--- startup and Uninstall after a separator. Uninstall sat at the bottom of
+--- Configuration until 2026-09, where it read as one more setting.
+local function _build_about(ctx)
+	local root, top, section, parent, fields = about_source(ManifestMenu, "linux")
+	if root == nil then return nil end
+	local render_ctx = {}
+	for key, value in pairs(ctx) do render_ctx[key] = value end
+	render_ctx.commands = {
+		["start_at_login"] = function()
+			if not require("ui.menu.start_at_login").toggle() then
+				show_error(i18n_safe("dialog.start_at_login.failed"), i18n_safe("menu.global.start_at_login"))
+			end
+			if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
+		end,
+		["uninstall"] = _uninstall_command(ctx),
+		-- Opens the release notes. It used to log one line to a file the user
+		-- never sees and call that an About box — while ui/changelog/ was written,
+		-- registered in webview_manager's bridge table and given a window title,
+		-- with no caller anywhere. The page existed and nothing could reach it.
+		["about_changelog"] = function()
+			if type(ctx.webview) ~= "table" or type(ctx.webview.show) ~= "function" then
+				Logger.error(LOG, "No webview manager — the release notes cannot open.")
+				return
+			end
+			ctx.webview.show("changelog")
+		end,
+		["about_releases_page"] = function()
+			if type(ctx.updater) ~= "table" then
+				Logger.error(LOG, "No updater module — the releases page URL is unknown.")
+				return
+			end
+			local url = ctx.updater.releases_page_url()
+			Logger.info(LOG, "Opening releases page: %s", url)
+			pcall(function() os.execute("xdg-open " .. shell_quote(url) .. " 2>/dev/null &") end)
+		end,
+	}
+
+	-- A local version run from source has nothing to uninstall: the row stays,
+	-- greyed, and says why (the manifest's disabled_reason_key).
+	local getters = {}
+	for key, getter in pairs(type(render_ctx.state_getters) == "table" and render_ctx.state_getters or {}) do
+		getters[key] = getter
+	end
+	getters["installed_build"] = function() return not Installation.is_source_run() end
+	getters["startup_command_available"] = function()
+		return require("ui.menu.start_at_login").command_available() ~= false
+	end
+	getters["start_at_login_enabled"] = function()
+		return require("ui.menu.start_at_login").enabled() == true
+	end
+	render_ctx.state_getters = getters
+
+	local rows = ManifestMenu
+		and ManifestMenu.build("about_menu", "About", nil, nil, render_ctx, {
+			["about_updates"] = function() return _about_update_rows(ctx) end,
+		})
+		or {}
+	if not about_dense(rows, true) then return nil end
+	local current_root, current_top, current_section, current_parent = about_source(ManifestMenu, "linux")
+	if not rawequal(root, current_root) or not rawequal(top, current_top)
+		or not rawequal(section, current_section) or not rawequal(parent, current_parent)
+		or not about_parent_unchanged(parent, fields) then return nil end
+	return ManifestMenu.group_row("top_level", "about", rows, render_ctx.state_getters)
+end
+
+--- Builds the reload item.
+---
+--- This used to run `kill -HUP $$` through os.execute. Two things were wrong
+--- with that, and together they made the item a no-op that logged success:
+--- `os.getpid` does not exist in Lua, so the expression always fell through to
+--- the literal `"$$"`; and os.execute runs its string in a NEW /bin/sh, where
+--- `$$` is that shell's own PID. The daemon therefore told a throwaway shell to
+--- reload, and the shell obligingly killed itself.
+---
+--- The daemon owns the reload; the menu asks it to, exactly as the quit item
+--- asks via on_quit. No signal, no subprocess, no PID to get wrong.
+local function _build_reload(ctx)
+	return ManifestMenu.command_row("top_level", "reload", {
+		reload = function()
+			if type(ctx.on_reload) ~= "function" then
+				-- Loudly, not silently: a Reload item that cannot reload is the
+				-- exact failure this replaced.
+				Logger.error(LOG, "Reload requested but ctx.on_reload is absent — the menu cannot reload the daemon.")
+				return
+			end
+			Logger.info(LOG, "Reload requested from the tray menu…")
+			local ok, err = pcall(ctx.on_reload)
+			if not ok then
+				Logger.error(LOG, "Reload callback raised: %s.", tostring(err))
+			end
+		end,
+	})
+end
+
+--- Builds the quit item.
+local function _build_quit(ctx)
+	return ManifestMenu.command_row("top_level", "quit", {
+		quit = function()
+			Logger.info(LOG, "Quit requested via tray menu.")
+			if ctx.on_quit then ctx.on_quit() end
+		end,
+	})
+end
+
+--- Checks raw dense arrays without triggering source metamethods.
+--- @param value table Source array.
+--- @param records boolean Whether its values must be plain records.
+--- @return boolean
+local function debug_dense(value, records)
+	if type(value) ~= "table" or getmetatable(value) ~= nil then return false end
+	local count, maximum = 0, 0
+	for index, row in next, value do
+		if type(index) ~= "number" or index % 1 ~= 0 or index < 1 then return false end
+		if records and (type(row) ~= "table" or getmetatable(row) ~= nil) then return false end
+		count, maximum = count + 1, math.max(maximum, index)
+	end
+	return count == maximum
+end
+
+--- Admits the actual Debug source structure without interpreting choice grammar.
+--- @param renderer table|nil Actual manifest renderer.
+--- @param platform string Native platform token.
+--- @return table|nil root, table|nil top, table|nil children, table|nil parent, table|nil fields
+local function debug_source(renderer, platform)
+	if type(renderer) ~= "table" or type(rawget(renderer, "get_root")) ~= "function"
+		or type(rawget(renderer, "build")) ~= "function" or type(rawget(renderer, "group_row")) ~= "function" then return nil end
+
+	local root = renderer.get_root()
+	if type(root) ~= "table" or getmetatable(root) ~= nil then return nil end
+	local top, children = rawget(root, "top_level"), rawget(root, "debug_menu")
+	if not debug_dense(top, true) or not debug_dense(children, true) then return nil end
+	local parent
+	for _, row in next, top do
+		if rawget(row, "id") == "debug" then
+			if parent then return nil end
+			parent = row
+		end
+	end
+	if parent == nil or rawget(parent, "type") ~= "group" or type(rawget(parent, "i18n")) ~= "string"
+		or rawget(parent, "i18n") == "" or not debug_dense(rawget(parent, "rows"), true) then return nil end
+	local platforms = rawget(parent, "platforms")
+	if platforms ~= nil then
+		if not debug_dense(platforms, false) then return nil end
+		local visible = false
+		for _, token in next, platforms do
+			if type(token) ~= "string" then return nil end
+			if token == platform then visible = true end
+		end
+		if not visible then return nil end
+	end
+	local fields = {}
+	for key, value in next, parent do fields[key] = value end
+	return root, top, children, parent, fields
+end
+
+--- Rechecks the captured direct parent fields without source metamethods.
+--- @param parent table Actual direct source row.
+--- @param fields table Captured raw field references and scalar values.
+--- @return boolean
+local function debug_parent_unchanged(parent, fields)
+	for key, value in next, parent do
+		if not rawequal(value, rawget(fields, key)) then return false end
+	end
+	for key, value in next, fields do
+		if not rawequal(value, rawget(parent, key)) then return false end
+	end
+	return true
+end
+
+--- Builds the debug submenu from the shared manifest.
+---
+--- WHAT THIS REPLACED. Three rows written out by hand, while the manifest
+--- declared five for this platform: `open_today_log` and `open_error_log` were
+--- described in `debug_menu`, translated in all 21 locales, offered on Windows
+--- and macOS, and simply absent here. Nothing reported it, because a driver that
+--- does not read a manifest section cannot notice a row it does not build.
+---
+--- Windows and macOS each have their OWN reader for this same section
+--- (`infra/menu_manifest.ahk`, `ui/menu/builder.lua`) and key on `id` alone, so
+--- typing the rows costs them nothing and buys this driver the shared renderer.
+--- @param ctx table Menu context.
+--- @return table One menu entry with its submenu.
+local function _build_debug(ctx)
+	local root, top, section, parent, fields = debug_source(ManifestMenu, "linux")
+	if root == nil then return nil end
+
+	--- Calls one of the context's optional callbacks, saying so when it is absent.
+	--- @param name string The ctx field to invoke.
+	--- @return function
+	local function call_ctx(name)
+		return function()
+			if type(ctx[name]) ~= "function" then
+				Logger.error(LOG, "Debug menu: ctx.%s is absent — the row does nothing.", name)
+				return
+			end
+			ctx[name]()
+		end
+	end
+
+	local render_ctx = {}
+	for key, value in pairs(ctx) do render_ctx[key] = value end
+	render_ctx.commands = {
+		["log_level"]      = ctx.on_set_log_level,
+		["open_logs"]      = call_ctx("on_open_logs"),
+		["open_today_log"] = call_ctx("on_open_today_log"),
+		["open_error_log"] = call_ctx("on_open_error_log"),
+		["healthcheck"]    = call_ctx("on_healthcheck"),
+		-- Self-contained: the report reads the daemon state the webview manager
+		-- already holds, so the daemon supplies no callback for them
+		["report_bug"]      = function() require("ui.healthcheck.report").report_bug() end,
+		["suggest_feature"] = function() require("ui.healthcheck.report").suggest_feature() end,
+		["show_error_dialog"] = call_ctx("on_toggle_error_dialog"),
+	}
+	render_ctx.state_getters = {}
+	for key, value in pairs(ctx.state_getters or {}) do render_ctx.state_getters[key] = value end
+	render_ctx.state_getters["script.log_level"] = function() return ctx.log_level end
+	render_ctx.state_getters["error_dialog_enabled"] = function()
+		return require("ui.error_dialog.bridge").is_enabled()
+	end
+
+	local rows = ManifestMenu.build("debug_menu", "Debug", nil, nil, render_ctx, {})
+	if not debug_dense(rows, true) then return nil end
+	local current_root, current_top, current_section, current_parent = debug_source(ManifestMenu, "linux")
+	if not rawequal(root, current_root) or not rawequal(top, current_top)
+		or not rawequal(section, current_section) or not rawequal(parent, current_parent)
+		or not debug_parent_unchanged(parent, fields) then return nil end
+	return ManifestMenu.group_row("top_level", "debug", rows, render_ctx.state_getters)
+end
+
+
+-- =========================================
+-- =========================================
+-- ======= 2/ i18n Safe Fallback ===========
+-- =========================================
+-- =========================================
+
+--- Returns the translated string, or the KEY when the i18n module cannot be
+--- loaded at all. Separated so the menu builder works before the i18n wiring is
+--- done — the pcall guards a real boot-order case, not a missing translation.
+---
+--- It used to take a French `fallback` second argument, supplied at all 30 call
+--- sites. Every one of those keys exists in en.json and the locale-parity gate
+--- keeps all 21 locales in step with it, so the fallback was unreachable — and
+--- had it ever been reached, it would have shown French to a user of any of the
+--- other 20 languages. A raw key on screen is ugly and diagnosable; a silently
+--- wrong language is neither.
+--- @param key string i18n key.
+--- @return string The translation, or the key itself.
+function i18n_safe(key)
+	local ok, i18n = pcall(require, "infra.i18n")
+	if ok and i18n and type(i18n.get) == "function" then
+		local val = i18n.get(key)
+		if val and val ~= key then return val end
+	end
+	return key
+end
+
+
+-- =========================================
+-- =========================================
+-- ======= 3/ Public API ===================
+-- =========================================
+-- =========================================
+
+--- Builds the full tray menu item list from the daemon's current state.
+--- @param ctx table {
+---   _version       string   Driver version string.
+---   paused         boolean  Whether the script is paused (greys the feature rows).
+---   is_paused      function Live pause getter for deferred configuration actions.
+---   on_toggle_pause function Resumes from the paused title row.
+---   config         table    Hotstrings_config module.
+---   layout         string   Current keyboard layout.
+---   on_layout_change function Called with new layout name.
+---   keylogger      table    Keylogger module.
+---   llm            table|nil LLM prediction engine state.
+---   dry_run        boolean  Dry-run mode flag.
+---   verbose        boolean  Verbose flag.
+---   on_quit        function Called when Quit is selected.
+---   webview        table    Webview manager; opens the folders editor.
+---   on_set_log_level function (optional) Log level change.
+---   on_open_logs   function (optional) Open logs dir.
+---   on_healthcheck function (optional) Launch healthcheck.
+---   on_show_setup_wizard function (optional) Launch setup wizard.
+--- }
+--- @return table Array of { title, menu?, fn?, checked?, disabled? } items.
+function M.build(ctx)
+	local ctx = type(ctx) == "table" and ctx or {}
+	-- Row DATA since 2026-08-07, rendered at the end of this function. Every
+	-- builder used to return the finished tray row that hangs its submenu — the
+	-- same three fields written by hand, once per submenu, twenty times over.
+	-- They return `{ label, submenu }` now and the shared renderer draws the
+	-- whole tray root.
+	--
+	-- `submenu` and not `items` for the trees that are already built: the
+	-- renderer caps nested ROW data at three levels to stop a self-referential
+	-- provider from recursing, and re-describing the hotstrings tree — which is
+	-- already deeper than that — would truncate it silently.
+	local rows = {}
+
+	-- Header (non-interactive). Not a manifest row: it is this driver's version
+	-- string, which no declaration can carry.
+	rows[#rows + 1] = _build_header(ctx)
+
+	-- Every entry below, and the separators between them, in the order the
+	-- manifest declares — read rather than repeated here.
+	--
+	-- The order used to be written out in this function, and it had already
+	-- drifted: this driver put the debug submenu between "reload" and "quit"
+	-- while `top_level` declares it last, and nothing could see the difference
+	-- because the sequence existed only as a list of calls. Windows has read this
+	-- same array through its own loader all along.
+	local builders = {
+		["keyboard_layout"] = _build_layouts,
+		["hotstrings"]      = _build_hotstrings,
+		["llm"]             = _build_llm,
+		["agent"]           = _build_agent,
+		["metrics"]         = _build_metrics,
+		["shortcuts"]       = _build_shortcuts,
+		["tap_holds"]       = _build_tap_holds,
+		["gestures"]        = _build_gestures,
+		["configuration"]   = _build_configuration,
+		["language"]        = _build_language,
+		["about"]           = _build_about,
+		["reload"]          = _build_reload,
+		["quit"]            = _build_quit,
+		["debug"]           = _build_debug,
+	}
+
+	local declared = ManifestMenu and ManifestMenu.get_array("top_level") or {}
+	if #declared == 0 then
+		Logger.error(LOG, "The manifest declares no top-level row — the tray would be empty.")
+		return {}
+	end
+
+	-- Quit is held back and appended last, which is the ONE place this driver
+	-- departs from the declared order. Every other tray application on this
+	-- desktop puts it at the bottom (SNI/dbusmenu convention), and a user
+	-- reaching for the last entry expects Quit. The manifest still decides that
+	-- the row exists and what precedes it; only this one position is the
+	-- platform's, and tools/test/test-menu-top-level-parity.cjs records it as a
+	-- deliberate divergence rather than letting it pass unnoticed.
+	local quit_row = nil
+
+	for _, row in ipairs(declared) do
+		if type(row) == "table" then
+			local id = row.id
+			if id == "---" then
+				rows[#rows + 1] = { separator = true }
+			elseif _row_is_for_linux(row) then
+				local build = builders[id]
+				if not build then
+					-- A declared row this driver has no builder for is a row the user
+					-- was promised and will not see. The bijection gate cannot catch it
+					-- here, because top_level rows carry no behaviour type.
+					Logger.error(LOG, "No builder for top-level row '%s' — the entry is missing.", tostring(id))
+				elseif row.disabled == true then
+					rows[#rows + 1] = { label = i18n_safe(row.i18n), disabled = true,
+						disabled_reason_key = row.reason_key }
+				elseif id == "quit" then
+					quit_row = build(ctx)
+				elseif ctx.paused == true and row.greyed_when_paused == true then
+					-- The rows the manifest marks as features, the same ones on the
+					-- three trays. The tail (updates, configuration, language, about,
+					-- reload, quit, debug) stays live: it is how the user inspects,
+					-- resumes or leaves a paused script.
+					rows[#rows + 1] = _grey_for_pause(build(ctx))
+				else
+					rows[#rows + 1] = build(ctx)
+				end
+			end
+		end
+	end
+
+	if quit_row then
+		rows[#rows + 1] = { separator = true }
+		rows[#rows + 1] = quit_row
+	else
+		Logger.error(LOG, "The manifest declares no quit row for this driver — the tray cannot be closed.")
+	end
+
+	if not (ManifestMenu and type(ManifestMenu.render_rows) == "function") then
+		Logger.error(LOG, "The shared renderer is unavailable — the tray cannot be drawn.")
+		return {}
+	end
+	return ManifestMenu.render_rows(rows, "top_level")
+end
+
+return M

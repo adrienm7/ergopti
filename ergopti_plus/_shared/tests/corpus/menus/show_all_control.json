@@ -1,0 +1,31 @@
+{
+	"schema": 1,
+	"row": {
+		"id": "llm_show_all",
+		"i18n": "menu.llm.show_all_at_once"
+	},
+	"alternate_i18n": "menu.llm.display_menu_title",
+	"states": [
+		{
+			"progressive": false,
+			"show_all": true
+		},
+		{
+			"progressive": true,
+			"show_all": false
+		}
+	],
+	"prediction_counts": [1, 2],
+	"sequential_events": [
+		{
+			"progressive": false,
+			"intermediate_frames": 0,
+			"final_frames": 1
+		},
+		{
+			"progressive": true,
+			"intermediate_frames": 1,
+			"final_frames": 1
+		}
+	]
+}

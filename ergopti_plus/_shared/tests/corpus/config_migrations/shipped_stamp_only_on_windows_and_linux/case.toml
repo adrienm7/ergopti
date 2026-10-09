@@ -1,0 +1,8 @@
+# _shared/tests/corpus/config_migrations/shipped_stamp_only_on_windows_and_linux/case.toml
+
+[case]
+description = "A step that does not name a driver only moves its stamp: Windows and Linux keep space_wrap, which only macOS retired."
+drivers = ["ahk", "linux"]
+outcome = "migrated"
+from_version = 2
+to_version = 12

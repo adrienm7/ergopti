@@ -1,0 +1,229 @@
+# _shared/modules/hotstrings/autocorrection.toml
+# format_toml: preserve-rule-order
+# ====================
+# ====================
+# ======= Meta =======
+# ====================
+# ====================
+
+[_meta]
+color = "#2e7d32"
+delay = 1.0
+show_tooltip = true
+description = { fr = "Autocorrection", en = "Autocorrection", de = "Autokorrektur", es = "Autocorrección", zh = "自动纠错", ar = "تصحيح تلقائي", cs = "Automatická oprava", da = "Autokorrektur", he = "תיקון אוטומטי", hi = "स्वत: सुधार", it = "Correzione automatica", ja = "自動修正", ko = "자동 수정", nl = "Autocorrectie", no = "Autokorrektur", pl = "Autokorekta", pt = "Autocorreção", ru = "Автокоррекция", sv = "Autokorrigering", tr = "Otomatik düzeltme", uk = "Автовиправлення" }
+sections_order = ["names", "abbreviations", "technical_terms"]
+
+
+
+# =========================
+# ===== Meta.Sections =====
+# =========================
+
+[_meta.sections]
+names = { ar = "الأسماء والمنتجات", cs = "Jména a produkty", da = "Navne og produkter", de = "Namen und Produkte", en = "Names and products", es = "Nombres y productos", fr = "Noms et produits", he = "שמות ומוצרים", hi = "नाम और उत्पाद", it = "Nomi e prodotti", ja = "名前と製品", ko = "이름과 제품", nl = "Namen en producten", no = "Navn og produkter", pl = "Nazwy i produkty", pt = "Nomes e produtos", ru = "Имена и продукты", sv = "Namn och produkter", tr = "Adlar ve ürünler", uk = "Назви та продукти", zh = "名称和产品" }
+abbreviations = { ar = "الاختصارات", cs = "Zkratky", da = "Forkortelser", de = "Abkürzungen", en = "Abbreviations", es = "Abreviaturas", fr = "Abréviations", he = "קיצורים", hi = "संक्षिप्त रूप", it = "Abbreviazioni", ja = "略語", ko = "약어", nl = "Afkortingen", no = "Forkortelser", pl = "Skróty", pt = "Abreviações", ru = "Сокращения", sv = "Förkortningar", tr = "Kısaltmalar", uk = "Скорочення", zh = "缩写" }
+technical_terms = { ar = "المصطلحات التقنية", cs = "Technické termíny", da = "Tekniske termer", de = "Technische Begriffe", en = "Technical terms", es = "Términos técnicos", fr = "Termes techniques", he = "מונחים טכניים", hi = "तकनीकी शब्द", it = "Termini tecnici", ja = "技術用語", ko = "기술 용어", nl = "Technische termen", no = "Tekniske termer", pl = "Terminy techniczne", pt = "Termos técnicos", ru = "Технические термины", sv = "Tekniska termer", tr = "Teknik terimler", uk = "Технічні терміни", zh = "技术术语" }
+
+
+
+
+
+# ===============================
+# ===============================
+# ======= Common families =======
+# ===============================
+# ===============================
+
+[[technical_terms]]
+"adaboost" = { output = "AdaBoost", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
+[[abbreviations]]
+"adn" = { output = "ADN", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
+"ag" = { output = "AG", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
+"api" = { output = "API", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
+[[names]]
+"autohotkey" = { output = "AutoHotkey", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
+[[abbreviations]]
+"aws" = { output = "AWS", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
+"axa" = { output = "AXA", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
+[[names]]
+"azure devops" = { output = "Azure DevOps", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
+[[abbreviations]]
+"bbc" = { output = "BBC", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
+"bbq" = { output = "BBQ", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
+"bdd" = { output = "BDD", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
+"bdds" = { output = "BDDs", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
+"bic" = { output = "BIC", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
+"bpce" = { output = "BPCE", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
+"bspce" = { output = "BSPCE", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
+"caas" = { output = "CaaS", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
+"captcha" = { output = "CAPTCHA", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
+[[technical_terms]]
+"catboost" = { output = "CatBoost", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
+[[abbreviations]]
+"cdd" = { output = "CDD", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
+"cdi" = { output = "CDI", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
+[[names]]
+"chatgpt" = { output = "ChatGPT", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
+[[abbreviations]]
+"cli" = { output = "CLI", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
+"comex" = { output = "COMEX", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
+"cpu" = { output = "CPU", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
+"csp" = { output = "CSP", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
+"css" = { output = "CSS", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
+"cv" = { output = "CV", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
+[[technical_terms]]
+"data science" = { output = "Data Science", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
+"data scientist" = { output = "Data Scientist", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
+[[names]]
+"databricks" = { output = "Databricks", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
+[[abbreviations]]
+"dbaas" = { output = "DBaaS", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
+"dna" = { output = "DNA", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
+[[names]]
+"docker" = { output = "Docker", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
+[[abbreviations]]
+"ds" = { output = "DS", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
+[[names]]
+"dynatrace" = { output = "Dynatrace", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
+"ergopti" = { output = "Ergopti", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
+[[abbreviations]]
+"esg" = { output = "ESG", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
+"faas" = { output = "FaaS", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
+[[names]]
+"facebook" = { output = "Facebook", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
+"firefox" = { output = "Firefox", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
+[[abbreviations]]
+"fmi" = { output = "FMI", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
+"gcp" = { output = "GCP", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
+"gdpr" = { output = "GDPR", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
+[[names]]
+"github" = { output = "GitHub", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
+"google" = { output = "Google", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
+[[abbreviations]]
+"gps" = { output = "GPS", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
+"gpu" = { output = "GPU", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
+[[names]]
+"hammerspoon" = { output = "Hammerspoon", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
+[[abbreviations]]
+"hd" = { output = "HD", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
+"ht" = { output = "HT", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
+"ia" = { output = "IA", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
+"iaas" = { output = "IaaS", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
+"iban" = { output = "IBAN", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
+"imf" = { output = "IMF", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
+[[names]]
+"insee" = { output = "Insee", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
+"instagram" = { output = "Instagram", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
+"intellij" = { output = "IntelliJ", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
+[[abbreviations]]
+"ip" = { output = "IP", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
+"iptv" = { output = "IPTV", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
+"json" = { output = "JSON", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
+"ko" = { output = "KO", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
+"kpi" = { output = "KPI", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
+"kpis" = { output = "KPIs", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
+[[technical_terms]]
+"latex" = { output = "LaTeX", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
+"lightgbm" = { output = "LightGBM", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
+[[names]]
+"linux" = { output = "Linux", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
+[[abbreviations]]
+"llm" = { output = "LLM", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
+"llms" = { output = "LLMs", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
+[[technical_terms]]
+"lora" = { output = "LoRA", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
+"lualatex" = { output = "LuaLaTeX", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
+[[names]]
+"macos" = { output = "macOS", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
+[[abbreviations]]
+"maj" = { output = "MAJ", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
+"majs" = { output = "MAJs", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
+"mbti" = { output = "MBTI", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
+"mcp" = { output = "MCP", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
+"ml" = { output = "ML", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
+"mle" = { output = "MLE", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
+[[names]]
+"mlflow" = { output = "MLflow", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
+[[technical_terms]]
+"mlops" = { output = "MLOps", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
+[[abbreviations]]
+"nasa" = { output = "NASA", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
+"nato" = { output = "NATO", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
+"nfc" = { output = "NFC", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
+"nft" = { output = "NFT", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
+"nlp" = { output = "NLP", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
+"ny" = { output = "NY", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
+"ok" = { output = "OK", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
+[[names]]
+"onedrive" = { output = "OneDrive", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
+"onenote" = { output = "OneNote", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
+[[abbreviations]]
+"onu" = { output = "ONU", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
+[[names]]
+"openshift" = { output = "OpenShift", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
+"opentelemetry" = { output = "OpenTelemetry", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
+"optimot" = { output = "Optimot", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
+[[abbreviations]]
+"otan" = { output = "OTAN", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
+[[names]]
+"outlook" = { output = "Outlook", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
+[[abbreviations]]
+"ovni" = { output = "OVNI", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
+"ovnis" = { output = "OVNIS", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
+"paas" = { output = "PaaS", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
+"pnl" = { output = "PNL", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
+"poc" = { output = "POC", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
+[[names]]
+"powerbi" = { output = "PowerBI", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
+"powerpoint" = { output = "PowerPoint", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
+[[abbreviations]]
+"pr" = { output = "PR", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
+[[technical_terms]]
+"qlora" = { output = "QLoRA", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
+[[abbreviations]]
+"r" = { output = "R", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
+"raid" = { output = "RAID", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
+"ram" = { output = "RAM", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
+"rdc" = { output = "RDC", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
+"rgpd" = { output = "RGPD", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
+"rh" = { output = "RH", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
+"rib" = { output = "RIB", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
+"saas" = { output = "SaaS", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
+"sas" = { output = "SAS", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
+[[names]]
+"sharepoint" = { output = "SharePoint", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
+[[abbreviations]]
+"siret" = { output = "SIRET", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
+"slm" = { output = "SLM", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
+"sncf" = { output = "SNCF", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
+"sql" = { output = "SQL", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
+"ssd" = { output = "SSD", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
+"ssh" = { output = "SSH", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
+"ssl" = { output = "SSL", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
+"swift" = { output = "SWIFT", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
+[[names]]
+"tiktok" = { output = "TikTok", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
+[[abbreviations]]
+"tldr" = { output = "TL;DR", is_word = true, auto_expand = true, is_case_sensitive = true, final_result = false }
+"tls" = { output = "TLS", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
+"ttc" = { output = "TTC", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
+"ttm" = { output = "TTM", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
+"ui" = { output = "UI", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
+"uno" = { output = "UNO", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
+"url" = { output = "URL", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
+"urss" = { output = "URSS", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
+"ux" = { output = "UX", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
+[[names]]
+"vendome" = { output = "Vendôme", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
+[[abbreviations]]
+"vpn" = { output = "VPN", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
+"vps" = { output = "VPS", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
+[[names]]
+"vscode" = { output = "VSCode", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
+"wikipedia" = { output = "Wikipedia", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
+"wikipédia" = { output = "Wikipédia", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
+"windows" = { output = "Windows", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
+[[technical_terms]]
+"xgboost" = { output = "XGBoost", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }
+[[names]]
+"youtube" = { output = "YouTube", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }

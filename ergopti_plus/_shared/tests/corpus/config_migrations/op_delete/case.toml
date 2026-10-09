@@ -1,0 +1,8 @@
+# _shared/tests/corpus/config_migrations/op_delete/case.toml
+
+[case]
+description = "delete removes one key, or a whole section and every section below it; a section left empty disappears."
+drivers = ["ahk", "hs", "linux"]
+outcome = "migrated"
+from_version = 1
+to_version = 2

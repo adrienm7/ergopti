@@ -1,0 +1,375 @@
+--- tests/unit/ui/menu/test_hotstring_bulk_checkboxes.lua
+
+--- ==============================================================================
+--- MODULE: Regression — explicit categories and independent bulk selection
+--- DESCRIPTION:
+--- Category commands set their requested posture through one atomic owner, keep
+--- the root engine stopped, and withhold UI publication after refused saves.
+--- Language and whole-tree section controls retain their existing
+--- independent checkbox contracts until their own scoped migration.
+--- ==============================================================================
+
+local helpers = require("tests.helpers")
+local CaptionFixture = require("tests.support.personal_menu_caption_fixture")
+
+local RETIRED = {
+	"menu.hotstrings.category_on", "menu.hotstrings.category_off",
+	"menu.hotstrings.enable_all", "menu.hotstrings.disable_all",
+}
+
+--- A context whose groups each carry two real sections, a separator and a
+--- module placeholder.
+--- @param sections_on boolean Whether every section is on.
+--- @param group_on boolean Whether every group gate is on.
+--- @param files table|nil Hotstring files, default { "alpha.toml" }.
+--- @return table ctx, table batches
+local function context(sections_on, group_on, files)
+	local batches = {}
+	local function sections_of()
+		return {
+			{ name = "one" },
+			{ name = "-" },
+			{ name = "module", is_module_placeholder = true },
+			{ name = "two" },
+		}
+	end
+	local ctx = {
+		paused = false,
+		hotfiles = files or { "alpha.toml" },
+		get_group_name = function(path) return (path:gsub("%.toml$", "")) end,
+		state = { hotstrings = {}, keymap = true, sections_order_overrides = {} },
+		applyTriggerChar = function(value) return value end,
+		keymap = {
+			is_group_enabled = function() return group_on end,
+			get_sections = function() return sections_of() end,
+			is_section_enabled = function() return sections_on end,
+			set_category_scope_enabled = function(names, enabled, publish)
+				batches[#batches + 1] = { names = names, enabled = enabled }
+				return publish()
+			end,
+			set_groups_sections_enabled = function(changes, enabled)
+				batches[#batches + 1] = { changes = changes, enabled = enabled }
+				return true
+			end,
+			start = function() return true end,
+			is_started = function() return true end,
+		},
+		save_prefs = function() return true end,
+		updateMenu = function() end,
+		notify_feature = function() end,
+	}
+	return ctx, batches
+end
+
+--- Asserts that no row of `rows`, at any depth, still draws a retired label.
+--- @param rows table
+--- @param where string
+local function assert_no_retired(rows, where)
+	local seen = 0
+	local function walk(list)
+		for _, row in ipairs(list or {}) do
+			local label = row.label or row.title
+			if type(label) == "string" then
+				seen = seen + 1
+				for _, retired in ipairs(RETIRED) do
+					helpers.assert_true(label ~= retired, where .. " still draws the retired '" .. retired .. "' row")
+				end
+			end
+			walk(row.items or row.menu)
+		end
+	end
+	walk(rows)
+	helpers.assert_true(seen > 0, where .. " drew no labelled row, so the absence proves nothing")
+end
+
+helpers.describe("hotstring scope commands and independent bulk checkboxes", function()
+	for _, posture in ipairs({ true, false }) do
+		for _, enabled in ipairs({ true, false }) do
+			helpers.it("a category offers the explicit scope command " .. tostring(enabled)
+				.. " behind group gate " .. tostring(posture), function()
+				local hotstrings = helpers.load_with_stubs("ui.menu.menu_hotstrings")
+				local ctx, batches = context(not posture, posture)
+				ctx.state.keymap = false
+				local starts, saves, updates = 0, 0, 0
+				ctx.keymap.start = function() starts = starts + 1; return true end
+				ctx.save_prefs = function() saves = saves + 1; return true end
+				ctx.updateMenu = function() updates = updates + 1 end
+				local rows = hotstrings.build_groups(ctx, nil, { group_counts = {} })
+				local sub = rows[1] and rows[1].submenu
+				helpers.assert_true(type(sub) == "table", "the rendered category child must survive intact")
+				helpers.assert_eq(sub[1].title, "menu.hotstrings.scope_enable_all")
+				helpers.assert_eq(sub[2].title, "menu.hotstrings.scope_disable_all")
+				helpers.assert_nil(sub[1].checked, "an explicit command is not a state switch")
+				helpers.assert_nil(sub[2].checked, "both commands remain available in either posture")
+				sub[enabled and 1 or 2].fn()
+				helpers.assert_eq(#batches, 1, "one click is one category-owner transaction")
+				helpers.assert_eq(batches[1], { names = { "alpha" }, enabled = enabled })
+				helpers.assert_eq(ctx.state.hotstrings.alpha, enabled, "persist the selected category gate")
+				helpers.assert_eq({ saves, updates, starts }, { 1, 1, 0 })
+				helpers.assert_eq(ctx.state.keymap, false, "editing a category never starts the root engine")
+			end)
+		end
+
+		helpers.it("a language submenu opens with one checkbox, ticked " .. tostring(posture), function()
+			local hotstrings = helpers.load_with_stubs("ui.menu.menu_hotstrings")
+			local ctx, batches = context(posture, posture)
+			local rows = hotstrings.build_language_bulk_actions(ctx, { "alpha" })
+			helpers.assert_eq(#rows, 1, "the pair is one row")
+			helpers.assert_eq(rows[1].label, "menu.hotstrings.enable_all_sections")
+			helpers.assert_eq(rows[1].checked, posture, "ticked exactly when every category and section is on")
+			rows[1].action()
+			helpers.assert_eq(#batches, 1, "one click is one batch")
+			helpers.assert_eq(batches[1].enabled, not posture, "the click switches the whole language")
+		end)
+
+		helpers.it("the top of the menu has one switch for every section, ticked " .. tostring(posture), function()
+			local hotstrings = helpers.load_with_stubs("ui.menu.menu_hotstrings")
+			local ctx, batches = context(posture, posture, { "alpha.toml", "beta.toml" })
+			local switch = hotstrings.all_sections_switch(ctx)
+			helpers.assert_eq(switch.checked, posture, "ticked exactly when every group and section is on")
+			helpers.assert_eq(type(switch.action), "function", "the switch must act")
+			switch.action()
+			helpers.assert_eq(#batches, 1, "one click is one batch")
+			helpers.assert_eq(batches[1].enabled, not posture, "the click switches the whole tree")
+			helpers.assert_eq(#batches[1].changes, 2, "every group is in the batch")
+		end)
+	end
+
+	helpers.it("one group with a section off leaves every « all » checkbox unticked", function()
+		local hotstrings = helpers.load_with_stubs("ui.menu.menu_hotstrings")
+		local ctx = context(true, true, { "alpha.toml", "beta.toml" })
+		ctx.keymap.is_section_enabled = function(group, section)
+			return not (group == "beta" and section == "two")
+		end
+		helpers.assert_eq(hotstrings.all_sections_switch(ctx).checked, false,
+			"« all on » means all of them: one section off is not all")
+		local rows = hotstrings.build_language_bulk_actions(ctx, { "alpha", "beta" })
+		helpers.assert_eq(rows[1].checked, false, "the language checkbox reads every one of its groups")
+		helpers.assert_eq(hotstrings.build_language_bulk_actions(ctx, { "alpha" })[1].checked, true,
+			"and only its own groups")
+	end)
+
+	helpers.it("a paused script can choose its next category without starting capture", function()
+		local hotstrings = helpers.load_with_stubs("ui.menu.menu_hotstrings")
+		local ctx, batches = context(true, true)
+		ctx.paused = true
+		ctx.state.keymap = false
+		local starts = 0
+		ctx.keymap.start = function() starts = starts + 1; return true end
+		local sub = hotstrings.build_groups(ctx, nil, { group_counts = {} })[1].submenu
+		helpers.assert_eq(type(sub[2].fn), "function", "selection is separate from input capture")
+		sub[2].fn()
+		helpers.assert_eq(batches[1].enabled, false)
+		helpers.assert_eq(starts, 0)
+		helpers.assert_eq(ctx.paused, true)
+		helpers.assert_eq(ctx.state.keymap, false)
+	end)
+
+	for _, enabled in ipairs({ true, false }) do
+		for _, refusal in ipairs({ "false", "nil", "throw" }) do
+			helpers.it("a refused category save " .. refusal .. " restores posture " .. tostring(enabled), function()
+				local hotstrings = helpers.load_with_stubs("ui.menu.menu_hotstrings")
+				local ctx, batches = context(not enabled, not enabled)
+				ctx.state.hotstrings.alpha = not enabled
+				ctx.state.hotstrings.beta = true
+				ctx.state.keymap = false
+				local saves, updates = 0, 0
+				ctx.save_prefs = function()
+					saves = saves + 1
+					if refusal == "throw" then error("category save fixture refused") end
+					if refusal == "false" then return false end
+					return nil
+				end
+				ctx.updateMenu = function() updates = updates + 1 end
+				local sub = hotstrings.build_groups(ctx, nil, { group_counts = {} })[1].submenu
+				sub[enabled and 1 or 2].fn()
+				helpers.assert_eq(#batches, 1, "the category owner received one requested mutation")
+				helpers.assert_eq(saves, 1)
+				helpers.assert_eq(updates, 0, "a refused save is never acknowledged by rebuilding the tray")
+				helpers.assert_eq(ctx.state.hotstrings, { alpha = not enabled, beta = true })
+				helpers.assert_eq(ctx.state.keymap, false)
+			end)
+		end
+	end
+
+	helpers.it("a refused tray refresh cannot undo an acknowledged category save", function()
+		local hotstrings = helpers.load_with_stubs("ui.menu.menu_hotstrings")
+		local ctx, batches = context(false, false)
+		ctx.state.hotstrings.alpha = false
+		local saved_choice, refreshes
+		ctx.save_prefs = function() saved_choice = ctx.state.hotstrings.alpha; return true end
+		ctx.updateMenu = function() refreshes = (refreshes or 0) + 1; error("tray refresh fixture refused") end
+		local sub = hotstrings.build_groups(ctx, nil, { group_counts = {} })[1].submenu
+		sub[1].fn()
+		helpers.assert_eq(#batches, 1)
+		helpers.assert_eq(saved_choice, true)
+		helpers.assert_eq(refreshes, 1)
+		helpers.assert_eq(ctx.state.hotstrings.alpha, true,
+			"a UI failure cannot make the public choice disagree with the committed file and registry")
+	end)
+
+	for _, enabled in ipairs({ true, false }) do
+		for _, posture in ipairs({ true, false }) do
+			helpers.it("personal scope command " .. tostring(enabled) .. " behind gate " .. tostring(posture), function()
+				local custom = helpers.load_with_stubs("ui.menu.menu_hotstrings_custom")
+				local ctx, batches = context(not posture, posture, { "personal.toml" })
+				ctx.state.trigger_char = "★"
+				ctx.state.keymap = false
+				ctx.paused = true
+				ctx.hotstring_editor = { open = function() end }
+				local starts, saves, updates = 0, 0, 0
+				ctx.keymap.start = function() starts = starts + 1; return true end
+				ctx.save_prefs = function() saves = saves + 1; return true end
+				ctx.updateMenu = function() updates = updates + 1 end
+				local built = CaptionFixture.build_custom(custom, ctx, { group_counts = {} })
+				local rows = built.submenu
+				helpers.assert_true(type(rows) == "table", "the personal menu must use the shared declaration")
+				helpers.assert_eq(rows[1].title, "menu.hotstrings.scope_enable_all")
+				helpers.assert_eq(rows[2].title, "menu.hotstrings.scope_disable_all")
+				helpers.assert_nil(rows[enabled and 1 or 2].checked)
+				assert_no_retired(rows, "the personal submenu")
+				helpers.assert_true(rows[enabled and 1 or 2].fn())
+				helpers.assert_eq(batches, { { names = { "personal", "custom" }, enabled = enabled } })
+				helpers.assert_eq({ saves, updates, starts }, { 1, 1, 0 })
+				helpers.assert_eq(ctx.state.hotstrings, { personal = enabled, custom = enabled })
+				helpers.assert_eq(ctx.state.keymap, false)
+				helpers.assert_eq(ctx.paused, true)
+			end)
+		end
+		for _, refusal in ipairs({ "false", "nil", "throw" }) do
+			helpers.it("personal scope restores every prior gate after " .. refusal .. " save for " .. tostring(enabled), function()
+				local custom = helpers.load_with_stubs("ui.menu.menu_hotstrings_custom")
+				local ctx, batches = context(not enabled, not enabled, { "personal.toml", "personal_ext_work.toml" })
+				ctx.state.trigger_char = "★"
+				ctx.state.hotstrings = { personal = not enabled, custom = not enabled, unrelated = true }
+				ctx.hotstring_editor = { open = function() end }
+				local updates, saved = 0, nil
+				ctx.save_prefs = function()
+					saved = { ctx.state.hotstrings.personal, ctx.state.hotstrings.personal_ext_work, ctx.state.hotstrings.custom }
+					if refusal == "throw" then error("personal save fixture refused") end
+					if refusal == "false" then return false end
+				end
+				ctx.updateMenu = function() updates = updates + 1 end
+				local rows = CaptionFixture.build_custom(custom, ctx, { group_counts = {} }).submenu
+				helpers.assert_true(type(rows) == "table", "personal scope commands must render")
+				helpers.assert_eq(rows[enabled and 1 or 2].fn(), false)
+				helpers.assert_eq(batches, { { names = { "personal", "personal_ext_work", "custom" }, enabled = enabled } })
+				helpers.assert_eq(saved, { enabled, enabled, enabled }, "one candidate reaches the canonical save")
+				helpers.assert_eq(updates, 0)
+				helpers.assert_eq(ctx.state.hotstrings, { personal = not enabled, custom = not enabled, unrelated = true },
+					"restore existing and absent gates after refusal")
+			end)
+		end
+	end
+	helpers.it("a personal file submenu owns only its group and keeps shared command order", function()
+		helpers.with_stub_scope({ "infra.personal_file_scope", "ui.menu.menu_hotstrings_custom" }, function()
+			-- This projection fixture owns a synthetic acknowledged group. Actual
+			-- provenance, native route and refusal behavior have their own owner test.
+			local bindings = 0
+			package.loaded["infra.personal_file_scope"] = { bind = function()
+				bindings = bindings + 1
+				return function() return true end
+			end }
+			local custom = helpers.load_with_stubs("ui.menu.menu_hotstrings_custom")
+			local ctx, batches = context(false, false, { "personal.toml", "personal_ext_work.toml" })
+			ctx.state.trigger_char = "★"
+			ctx.hotfile_paths = { personal_ext_work = "/user/work.toml" }
+			ctx.hotstring_editor = { open = function() end }
+			local rows = CaptionFixture.build_custom(custom, ctx, { group_counts = {} }).submenu
+			local file
+			for _, row in ipairs(rows) do if row.title == "work" then file = row end end
+			helpers.assert_true(file ~= nil, "the personal file must survive native subtree rendering")
+			helpers.assert_eq(file.menu[1].title, "menu.hotstrings.scope_enable_all")
+			helpers.assert_eq(file.menu[2].title, "menu.hotstrings.scope_disable_all")
+			helpers.assert_eq(file.menu[3].title, "menu.hotstrings.open_file")
+			helpers.assert_eq(file.menu[4].title, "-")
+			helpers.assert_eq(file.menu[5].title, "one")
+			helpers.assert_eq(file.menu[1].fn(), true)
+			helpers.assert_eq(batches, { { names = { "personal_ext_work" }, enabled = true } })
+			helpers.assert_eq(ctx.state.hotstrings, { personal_ext_work = true }, "sibling choices remain absent")
+			helpers.assert_eq(bindings, 1, "one native admission binding per rendered file")
+		end)
+	end)
+
+end)
+
+
+--- Exercises real command rendering and DeferredWork; only the native timer is injected.
+--- @param committed boolean Native scheduling acknowledgement.
+--- @param body function Real category callback observations.
+local function with_category_file(committed, body, change_label)
+	helpers.with_stub_scope({ "infra.manifest_menu", "infra.deferred_work",
+		"adapters.timer_scheduler", "modules.keymap", "modules.dynamic_hotstrings",
+		"ui.menu.menu_hotstrings" }, function()
+		-- Category file opening neither starts nor inspects these unrelated engines.
+		package.loaded["modules.keymap"] = { DEFAULT_STATE = {} }
+		package.loaded["modules.dynamic_hotstrings"] = { DEFAULT_STATE = {} }
+		local callbacks, launches = {}, {}
+		package.loaded["adapters.timer_scheduler"] = { after = function(_, callback)
+			callbacks[#callbacks + 1] = callback
+			return {}, committed
+		end }
+		local hotstrings = helpers.load_with_stubs("ui.menu.menu_hotstrings")
+		hs.execute = function(command) launches[#launches + 1] = command; return "", true end
+		package.loaded["infra.manifest_menu"] = assert(require("menu.renderer").new({
+			platform = "hs", manifest_path = function() return helpers.shared("modules/menu/menu_manifest.json") end,
+			json_decode = function(bytes)
+				local document = hs.json.decode(bytes)
+				if change_label then document.hotstring_file_commands[1].i18n = "fixture.category.file.command" end
+				return document
+			end,
+			i18n = { get = function(key) return key end, section = function(key) return key end },
+			logger = require("infra.logger"),
+		}))
+		package.loaded["ui.menu.menu_hotstrings"] = nil
+		hotstrings = require("ui.menu.menu_hotstrings")
+		body(hotstrings, callbacks, launches)
+	end)
+end
+
+helpers.describe("shared category file command", function()
+	helpers.it("shared category file: consumes the actual declared label", function()
+		with_category_file(true, function(hotstrings)
+			local ctx = context(true, true)
+			ctx.hotfile_paths = { alpha = "/user/a.toml" }
+			helpers.assert_eq(hotstrings.build_groups(ctx, nil, { group_counts = {} })[1].submenu[3].title,
+				"fixture.category.file.command")
+		end, true)
+	end)
+	for _, committed in ipairs({ true, false }) do
+		helpers.it("shared category file: returns the native deferred scheduling acknowledgement " .. tostring(committed), function()
+			with_category_file(committed, function(hotstrings, callbacks, launches)
+				local ctx = context(false, false)
+				ctx.paused = true
+				ctx.hotfile_paths = { alpha = "/user/category file.toml" }
+				local saves = 0
+				ctx.save_prefs = function() saves = saves + 1; return true end
+				local command = hotstrings.build_groups(ctx, nil, { group_counts = {} })[1].submenu[3]
+				helpers.assert_eq(command.title, "menu.hotstrings.open_file")
+				helpers.assert_true(command.disabled ~= true, "configuration remains available under pause")
+				ctx.hotfile_paths.alpha = "/foreign/replaced.toml"
+				helpers.assert_eq(command.fn(), committed)
+				helpers.assert_eq(#callbacks, 1)
+				helpers.assert_eq(#launches, 0, "the deferred native owner has not delivered yet")
+				if committed then callbacks[1]() end
+				helpers.assert_eq(#launches, committed and 1 or 0)
+				if committed then
+					helpers.assert_eq(launches[1], "open " .. require("infra.text_utils").shell_quote("/user/category file.toml"))
+				end
+				helpers.assert_eq(saves, 0)
+			end)
+		end)
+	end
+	helpers.it("shared category file: refuses a held callback after the native execute port is withdrawn", function()
+		with_category_file(true, function(hotstrings, callbacks, launches)
+			local ctx = context(true, true)
+			ctx.hotfile_paths = { alpha = "/user/a.toml" }
+			local command = hotstrings.build_groups(ctx, nil, { group_counts = {} })[1].submenu[3]
+			hs.execute = nil
+			helpers.assert_eq(command.fn(), false)
+			helpers.assert_eq(#callbacks, 0)
+			helpers.assert_eq(#launches, 0)
+			helpers.assert_eq(hotstrings.build_groups(ctx, nil, { group_counts = {} })[1].submenu[3].disabled, true)
+		end)
+	end)
+end)

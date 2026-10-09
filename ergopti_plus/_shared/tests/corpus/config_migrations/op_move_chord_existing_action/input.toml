@@ -1,0 +1,8 @@
+# Independent handoff input.
+[hotstrings.editor]
+shortcut = { mods = ["ctrl"], key = "d" }
+keep = "neighbor" # unchanged
+
+[shortcuts.keyboard]
+hs_ctrl_d = "open_config"
+magic_editor = "ctrl_a"

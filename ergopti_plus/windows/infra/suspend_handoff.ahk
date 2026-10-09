@@ -1,0 +1,256 @@
+﻿; infra/suspend_handoff.ahk
+
+; ==============================================================================
+; MODULE: Suspend Reload Hand-off
+; DESCRIPTION:
+; Owns the small, dependency-injected state transition that carries Suspend
+; across Reload. Preparation creates only inert pending state. The live marker
+; is published at the terminal OnExit commit, after every refusal gate accepts;
+; consumption atomically claims it and toggles only after the claim is deleted.
+; Keeping the transition free of OS calls makes every failure boundary
+; behavioural-testable without loading the live lifecycle.
+; ==============================================================================
+
+#Requires AutoHotkey v2.0
+
+; File name of the one-shot marker that carries a pause across a Reload. This
+; module is included before boot so the marker path contract is available early.
+; The consuming watchdog is deliberately armed only by lifecycle.ahk, after all
+; state used by ToggleSuspend has initialized.
+global SUSPEND_MARKER_FILENAME := "suspend_restore.marker"
+
+
+
+
+
+; ==============================================
+; ==============================================
+; ======= 1/ Preparation and publication =======
+; ==============================================
+; ==============================================
+
+SuspendHandoffMarkerPath(PathsFile, Filename := "suspend_restore.marker") {
+	if !(PathsFile is String) or PathsFile == ""
+		return ""
+	SplitPath(PathsFile, , &Dir)
+	return Dir . "\" . Filename
+}
+
+; @param Content {String} The intent written, "1" unless the publisher needs
+;        to recognise its own marker later (see SuspendHandoffRetract).
+SuspendHandoffPrepare(Path, WriteFn, ReadFn, MoveFn, DeleteFn, Content := "1") {
+	if !(HasMethod(WriteFn, "Call") and HasMethod(ReadFn, "Call")
+			and HasMethod(MoveFn, "Call") and HasMethod(DeleteFn, "Call"))
+		throw TypeError("Suspend hand-off preparation requires filesystem callbacks.")
+	_SuspendHandoffRequireContent(Content)
+	if !(Path is String) or Path == ""
+		return false
+	PendingPath := Path . ".pending"
+	StagePath := PendingPath . ".stage"
+	Prepared := false
+	try {
+		if !WriteFn.Call(StagePath, Content)
+			return false
+		Staged := ReadFn.Call(StagePath)
+		if !(Staged is String) or Staged != Content
+			return false
+		if !MoveFn.Call(StagePath, PendingPath)
+			return false
+		Prepared := true
+		return true
+	} finally {
+		if !Prepared
+			try DeleteFn.Call(StagePath)
+	}
+}
+
+; Publishes the prepared intent, which must still hold Content.
+SuspendHandoffCommit(Path, ReadFn, MoveFn, Content := "1") {
+	if !HasMethod(ReadFn, "Call") or !HasMethod(MoveFn, "Call")
+		throw TypeError("Suspend hand-off commit requires read and move callbacks.")
+	_SuspendHandoffRequireContent(Content)
+	if !(Path is String) or Path == ""
+		return false
+	PendingPath := Path . ".pending"
+	Pending := ReadFn.Call(PendingPath)
+	if !(Pending is String) or Pending != Content
+		return false
+	return MoveFn.Call(PendingPath, Path) ? true : false
+}
+
+; Withdraws the live marker a transition published, when that transition is
+; refused after its commit (a Reload vetoed by a later OnExit gate). Only a
+; marker still holding Content is deleted: another transition's intent is not
+; this refusal's to revoke. The one consumer, the successor's boot, is stopped
+; before a refused Reload retracts, so nothing claims the marker in between.
+; @return {Boolean} True when no marker holding Content remains.
+SuspendHandoffRetract(Path, Content, ExistsFn, ReadFn, DeleteFn) {
+	if !(HasMethod(ExistsFn, "Call") and HasMethod(ReadFn, "Call")
+			and HasMethod(DeleteFn, "Call"))
+		throw TypeError("Suspend hand-off retraction requires filesystem callbacks.")
+	_SuspendHandoffRequireContent(Content)
+	if !(Path is String) or Path == ""
+		return true
+	if !ExistsFn.Call(Path)
+		return true
+	Live := ReadFn.Call(Path)
+	if !(Live is String)
+		return false
+	if (Live != Content)
+		return true
+	return DeleteFn.Call(Path) ? true : false
+}
+
+_SuspendHandoffRequireContent(Content) {
+	if !(Content is String) or Content == ""
+		throw ValueError("Suspend hand-off intent must be a non-empty string.")
+}
+
+; Idempotently removes only inert preparation artifacts. It never deletes the
+; live marker, so even failed cleanup after a refused Reload cannot invent a
+; future suspend transition.
+SuspendHandoffAbort(Path, ExistsFn, DeleteFn) {
+	if !HasMethod(ExistsFn, "Call") or !HasMethod(DeleteFn, "Call")
+		throw TypeError("Suspend hand-off abort requires filesystem callbacks.")
+	if !(Path is String) or Path == ""
+		return true
+	Ok := true
+	for Candidate in [Path . ".pending.stage", Path . ".pending"] {
+		try Exists := ExistsFn.Call(Candidate)
+		catch {
+			Ok := false
+			continue
+		}
+		if Exists {
+			try Deleted := DeleteFn.Call(Candidate)
+			catch {
+				Ok := false
+				continue
+			}
+			if !Deleted
+				Ok := false
+		}
+		try StillExists := ExistsFn.Call(Candidate)
+		catch {
+			Ok := false
+			continue
+		}
+		if StillExists
+			Ok := false
+	}
+	return Ok
+}
+
+; Prepares inert intent before invoking ReloadFn. ReloadTerminalInvoke owns the
+; terminal commit callback and returns 1 once the successor is launched and the
+; reload is pending. Any other result means no successor was launched; both
+; layers may then abort, so AbortFn is deliberately required to be idempotent.
+SuspendHandoffReload(IsSuspended, Path, PrepareFn, ReloadFn, BeforeReloadFn := 0,
+		FailureFn := 0, CancelFn := 0) {
+	if !HasMethod(PrepareFn, "Call") or !HasMethod(ReloadFn, "Call")
+		throw TypeError("Suspend hand-off requires prepare and reload callbacks.")
+	if IsSuspended {
+		if (Path == "" or !PrepareFn.Call(Path)) {
+			if HasMethod(FailureFn, "Call")
+				try FailureFn.Call("prepare", Path)
+			return false
+		}
+	}
+	if HasMethod(BeforeReloadFn, "Call")
+		BeforeReloadFn.Call()
+	Reloaded := ReloadFn.Call()
+	if (Reloaded is Integer) && Reloaded == 1
+		return true
+	; No successor was launched. Clean only inert pending state; the terminal
+	; layer may already have made the same idempotent call while canceling its
+	; record.
+	if IsSuspended {
+		Canceled := false
+		if HasMethod(CancelFn, "Call") {
+			try CancelResult := CancelFn.Call(Path)
+			catch
+				CancelResult := false
+			Canceled := (CancelResult is Integer) && CancelResult == 1
+		}
+		if !Canceled && HasMethod(FailureFn, "Call")
+			try FailureFn.Call("cancel", Path)
+	}
+	return false
+}
+
+; Pending/stage files have never crossed terminal authority and must never be
+; interpreted as pause intent. Boot best-effort removes them before looking for
+; a live marker.
+SuspendHandoffDiscardPending(Path, ExistsFn, DeleteFn, FailureFn := 0) {
+	Ok := SuspendHandoffAbort(Path, ExistsFn, DeleteFn)
+	if !Ok and HasMethod(FailureFn, "Call")
+		try FailureFn.Call("discard-pending", Path)
+	return Ok
+}
+
+
+
+
+
+; ============================================
+; ============================================
+; ======= 2/ Atomic marker consumption =======
+; ============================================
+; ============================================
+
+; Claims a marker with one same-volume rename, consumes the claim, then toggles
+; once. The claim name is derived here, not supplied by a lifecycle caller, so
+; it is necessarily stable across process restarts: when deletion fails, the
+; next boot resumes from the retained claim instead of losing ownership with
+; the old process identity. A failed claim/delete reports once and leaves
+; ToggleFn untouched.
+_SuspendHandoffConsumeFailure(FailureFn, Stage, Path) {
+	if HasMethod(FailureFn, "Call")
+		try FailureFn.Call(Stage, Path)
+	return false
+}
+
+SuspendHandoffConsume(Path, IsSuspended, ExistsFn, MoveFn, DeleteFn, ToggleFn, BeforeToggleFn := 0, FailureFn := 0) {
+	if !(HasMethod(ExistsFn, "Call") and HasMethod(MoveFn, "Call")
+			and HasMethod(DeleteFn, "Call") and HasMethod(ToggleFn, "Call"))
+		throw TypeError("Suspend hand-off requires filesystem and toggle callbacks.")
+	if (Path == "")
+		return true
+	ClaimPath := Path . ".claim"
+	try {
+		Claimed := ExistsFn.Call(ClaimPath)
+		SourceExists := ExistsFn.Call(Path)
+	} catch {
+		return _SuspendHandoffConsumeFailure(FailureFn, "probe", Path)
+	}
+	if !Claimed {
+		if !SourceExists
+			return true
+		try Moved := MoveFn.Call(Path, ClaimPath, false)
+		catch
+			return _SuspendHandoffConsumeFailure(FailureFn, "claim", Path)
+		if !Moved
+			return _SuspendHandoffConsumeFailure(FailureFn, "claim", Path)
+	} else if SourceExists {
+		; Both files express the same desired state: the replacement process must
+		; be suspended. Coalesce them before toggling so the source cannot replay
+		; on a later boot. Source goes first; a later claim-delete failure still
+		; leaves the stable claim carrying the unconsumed intent.
+		try Deleted := DeleteFn.Call(Path)
+		catch
+			return _SuspendHandoffConsumeFailure(FailureFn, "coalesce", Path)
+		if !Deleted
+			return _SuspendHandoffConsumeFailure(FailureFn, "coalesce", Path)
+	}
+	try Consumed := DeleteFn.Call(ClaimPath)
+	catch
+		return _SuspendHandoffConsumeFailure(FailureFn, "consume", ClaimPath)
+	if !Consumed
+		return _SuspendHandoffConsumeFailure(FailureFn, "consume", ClaimPath)
+	if IsSuspended
+		return true
+	if HasMethod(BeforeToggleFn, "Call")
+		BeforeToggleFn.Call()
+	ToggleFn.Call()
+	return true
+}

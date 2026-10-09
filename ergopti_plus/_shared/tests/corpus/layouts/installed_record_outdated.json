@@ -1,0 +1,50 @@
+{
+	"_comment": "Handwritten installed-record preservation controls. Outdated membership stays excluded from usable layouts; original JSON source belongs to its persisted record, including Boolean/null/number identities and future members. Native Windows consumes these vectors without regenerating expectations.",
+	"schema_version": 1,
+	"top_member": "\"future_record\" : {\"enabled\":false,\"nothing\":null,\"threshold\":1.25e+2,\"empty\":[]}",
+	"valid_id": "sample",
+	"valid_member": "\"sample\" : {\"id\":\"sample\",\"sha256\":\"x\",\"version\":\"1\",\"size\":1,\"future_value\" : {\"enabled\":false,\"nothing\":null,\"threshold\":1.25e+2,\"empty\":[]}}",
+	"valid_future_member": "\"future_value\" : {\"enabled\":false,\"nothing\":null,\"threshold\":1.25e+2,\"empty\":[]}",
+	"outdated": [
+		{
+			"id": "renamed",
+			"member": "\"renamed\" : {\"id\":\"other\",\"sha256\":\"x\",\"version\":\"1\",\"size\":1}",
+			"detail": "its id field does not name this entry"
+		},
+		{
+			"id": "../evil",
+			"member": "\"../evil\" : {\"id\":\"../evil\",\"sha256\":\"x\",\"version\":\"1\",\"size\":1}",
+			"detail": "the key is not a layout id"
+		},
+		{
+			"id": "ergopti_v1",
+			"member": "\"ergopti_v1\" : {\"id\":\"ergopti_v1\",\"version\":\"1.0\"}",
+			"detail": "it has no verified checksum, version or size"
+		},
+		{
+			"id": "retired_scalar",
+			"member": "\"retired_scalar\" : false",
+			"detail": "the entry is not an object"
+		},
+		{
+			"id": "retired_null",
+			"member": "\"retired_null\" : null",
+			"detail": "the entry is not an object"
+		},
+		{
+			"id": "retired_number",
+			"member": "\"retired_number\" : 1.25e+2",
+			"detail": "the entry is not an object"
+		},
+		{
+			"id": "_LayoutCatalogueRecordSource",
+			"member": "\"_LayoutCatalogueRecordSource\" : {\"id\":\"_LayoutCatalogueRecordSource\",\"sha256\":\"x\",\"version\":\"1\",\"size\":1}",
+			"detail": "the key is not a layout id"
+		},
+		{
+			"id": "retired_unicode",
+			"member": "\"retired_unicode\" : \"é\\uD83D\\uDE00\"",
+			"detail": "the entry is not an object"
+		}
+	]
+}

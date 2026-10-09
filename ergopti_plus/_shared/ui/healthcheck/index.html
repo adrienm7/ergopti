@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="UTF-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1" />
+		<title data-i18n="menu.debug.healthcheck"></title>
+		<link rel="stylesheet" href="style.css" />
+		<script src="../dom_utils.js"></script>
+		<script src="../host_bridge.js"></script>
+		<script src="../i18n.js"></script>
+		<script src="../redact.js"></script>
+		<script src="model.js"></script>
+		<script src="checks.js"></script>
+	</head>
+	<body>
+		<header class="toolbar">
+			<div class="buttons">
+				<div class="toolbar-left">
+					<button
+						type="button"
+						id="btn-open-logs"
+						disabled
+						data-i18n="healthcheck.toolbar.open_logs"
+					></button>
+				</div>
+				<div class="toolbar-center">
+					<button
+						type="button"
+						id="btn-copy"
+						disabled
+						data-i18n="healthcheck.toolbar.copy"
+					></button>
+					<button
+						type="button"
+						id="btn-save"
+						disabled
+						data-i18n="healthcheck.toolbar.save"
+					></button>
+					<button
+						type="button"
+						id="btn-report"
+						class="primary"
+						disabled
+						data-i18n="healthcheck.toolbar.report"
+					></button>
+				</div>
+				<div class="toolbar-right">
+					<button type="button" id="btn-cancel" disabled data-i18n="common.cancel"></button>
+					<button
+						type="button"
+						id="btn-refresh"
+						disabled
+						data-i18n="healthcheck.toolbar.refresh"
+					></button>
+				</div>
+			</div>
+			<label class="details">
+				<input type="checkbox" id="chk-details" disabled />
+				<span data-i18n="healthcheck.details_checkbox"></span>
+			</label>
+			<label class="details">
+				<input type="checkbox" id="chk-extensive" disabled />
+				<span data-i18n="healthcheck.deep_tests_checkbox"></span>
+			</label>
+			<p id="deep-progress" role="status" aria-live="polite"></p>
+			<pre id="deep-results"></pre>
+			<p id="status" class="status info" role="status" aria-live="polite"></p>
+		</header>
+		<main id="content"></main>
+		<details id="preview">
+			<summary data-i18n="healthcheck.preview.title"></summary>
+			<p class="hint" data-i18n="healthcheck.preview.hint"></p>
+			<pre id="preview-text"></pre>
+		</details>
+		<script src="script.js"></script>
+	</body>
+</html>

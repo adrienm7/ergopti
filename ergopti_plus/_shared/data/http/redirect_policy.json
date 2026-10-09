@@ -1,0 +1,19 @@
+{
+	"sensitive_headers": [
+		"api-key",
+		"authorization",
+		"cookie",
+		"cookie2",
+		"proxy-authorization",
+		"x-api-key",
+		"x-goog-api-key"
+	],
+	"buffered_get": {
+		"format": "curl-single-hop-v1",
+		"status_min": 300,
+		"status_max": 399,
+		"max_hops": 50,
+		"max_url_bytes": 8192,
+		"max_native_receipt_bytes": 32768
+	}
+}

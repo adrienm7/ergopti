@@ -1,0 +1,881 @@
+--- tests/unit/meta/test_sqlite_reader_projection.lua
+
+--- ==============================================================================
+--- MODULE: The Reader Asks For Everything The Walk Writes
+--- DESCRIPTION:
+--- That the dashboard projection queries every n-gram table and every per-app-day
+--- aggregate the schema declares, carries the delay and error columns out of
+--- each, and lands the rows under the keys the dashboard reads.
+---
+--- THE DEFECT THIS PINS:
+--- The reader named exactly one n-gram table and no aggregate table at all. It built an envelope with thirteen codes
+--- in it and filled one, handing back permanently empty maps for the other
+--- eight — so the word lists, the pair lists and every panel keyed on a sequence
+--- longer than a single character rendered blank no matter what the database
+--- held. Writing the tables (which the walker now does) fixes nothing on its own
+--- if nobody reads them, and the two halves fail in exactly the same way from
+--- the outside: a blank panel.
+---
+--- AND THE TWO COLUMNS IT DROPPED:
+--- `td` and `e` were selected by neither query and discarded by the merge. They
+--- are what separates a frequency list from a cost ranking — "which sequences
+--- slow you down" is td/cd, and with td absent the panel sorted a column of
+--- zeroes while looking entirely functional.
+---
+--- WHY IT STUBS THE COMMAND BUILDER AND io.popen:
+--- sqlite3 is not guaranteed on the maintainer's machine or in CI, and a test
+--- that skips when it is missing would report green having asserted nothing on
+--- the platform that gates the merge. Stubbing both ends runs the reader's real
+--- code — its SQL, its filters, its merge arithmetic — with nothing left to the
+--- environment.
+--- ==============================================================================
+
+local helpers = require("tests.helpers")
+local NativeCommand = require("modules.keylogger.sqlite_command")
+local Json = require("json")
+
+-- Every table the schema declares for character sequences, and the code the
+-- dashboard envelope uses for each.
+local EXPECTED = {
+	{ code = "c", table_name = "ngram_chars" },
+	{ code = "bg", table_name = "ngram_bigrams" },
+	{ code = "tg", table_name = "ngram_trigrams" },
+	{ code = "qg", table_name = "ngram_quadgrams" },
+	{ code = "pg", table_name = "ngram_pentagrams" },
+	{ code = "hx", table_name = "ngram_hexagrams" },
+	{ code = "hp", table_name = "ngram_heptagrams" },
+	{ code = "w", table_name = "ngram_words" },
+	{ code = "w_bg", table_name = "ngram_word_bigrams" },
+}
+
+--- Runs the reader with both ends of its sqlite3 shell-out replaced.
+---
+--- @param responder function Given the SQL, returns the JSON body sqlite3 would
+---        have printed (or "" for no rows).
+--- @param body function Receives the freshly loaded reader module.
+--- @return table Every SQL statement the reader issued, in order.
+local function with_stubbed_sqlite(responder, body)
+	local command_name = "modules.keylogger.sqlite_command"
+	local reader_name = "modules.keylogger.sqlite_reader"
+	local previous_command = package.loaded[command_name]
+	local previous_reader = package.loaded[reader_name]
+	local previous_popen = io.popen
+
+	local statements, commands = {}, {}
+	local next_body = ""
+
+	package.loaded[command_name] = {
+		build = function(_path, sql, opts)
+			statements[#statements + 1] = sql
+			local response = responder(sql) or ""
+			local body = type(response) == "table" and response.body or response
+			local status = type(response) == "table" and response.status or 0
+			next_body = body
+			if opts and opts.capture_exit then
+				next_body = body .. "\nERGOPTI_SQL_EXIT_STATUS=" .. status .. "\n"
+			end
+			-- Preserve the real builder/parser ABI; only the CLI response is fake.
+			local command, reason = NativeCommand.build(_path, sql, opts)
+			commands[#commands + 1] = command
+			return command, reason
+		end,
+		read_exit_receipt = NativeCommand.read_exit_receipt,
+		sanitise_error = NativeCommand.sanitise_error,
+		escape_literal = NativeCommand.escape_literal,
+	}
+	io.popen = function()
+		local sent = next_body
+		return {
+			read = function() return sent end,
+			close = function() return true end,
+		}
+	end
+
+	package.loaded[reader_name] = nil
+	local ok, err = pcall(function()
+		body(require(reader_name))
+	end)
+
+	io.popen = previous_popen
+	package.loaded[command_name] = previous_command
+	package.loaded[reader_name] = previous_reader
+	helpers.assert_true(ok, "the projection must complete: " .. tostring(err))
+	return statements, commands
+end
+
+helpers.describe("linux-sqlite-readonly", function()
+	for _, method in ipairs({ "read_system_days", "read_manifest", "read_ngrams", "read_range_split_today" }) do
+		helpers.it("linux-sqlite-readonly: " .. method .. " opens every source through native readonly JSON", function()
+			local statements, commands = with_stubbed_sqlite(function() return "[]" end, function(reader)
+				local result = reader[method]("/db/metrics.sqlite", "2026-10-03", "2026-10-03", {})
+				helpers.assert_type(result, "table")
+			end)
+			helpers.assert_true(#commands > 0 and #commands == #statements, "the selected public API must actually dispatch every query")
+			for _, command in ipairs(commands) do
+				helpers.assert_contains(command, "'-readonly'", "projection must refuse creation at SQLite open, before SQL executes")
+				helpers.assert_contains(command, "'-json'", "readonly open must retain the real output ABI")
+				helpers.assert_contains(command, "'/db/metrics.sqlite'")
+			end
+		end)
+	end
+end)
+
+helpers.describe("linux-sqlite-calendar-split", function()
+	local fixtures = {
+		{ name = "ordinary", day = { year = 2026, month = 5, day = 14, hour = 12 }, previous = "2026-05-13" },
+		{ name = "midnight", day = { year = 2026, month = 5, day = 14, hour = 0, min = 1 }, previous = "2026-05-13" },
+		{ name = "leap", day = { year = 2024, month = 3, day = 1, hour = 12 }, previous = "2024-02-29" },
+		{ name = "year", day = { year = 2027, month = 1, day = 1, hour = 12 }, previous = "2026-12-31" },
+		{ name = "month", day = { year = 2026, month = 5, day = 1, hour = 12 }, previous = "2026-04-30" },
+		{ name = "clock crosses midnight after captured today", day = { year = 2026, month = 12, day = 31, hour = 23, min = 59, sec = 59 }, advance = 2, previous = "2026-12-30" },
+	}
+	for _, fixture in ipairs(fixtures) do
+		helpers.it("linux-sqlite-calendar-split: " .. fixture.name .. " uses the preceding captured calendar day", function()
+			local native_date, native_time = os.date, os.time
+			local captured = native_time(fixture.day)
+			os.date = function(format, timestamp) return native_date(format, timestamp or captured) end
+			os.time = function(date) return date and native_time(date) or (captured + (fixture.advance or 0)) end
+			local ok, err = xpcall(function()
+				local statements = with_stubbed_sqlite(function() return "[]" end, function(reader)
+					reader.read_range_split_today("/db/metrics.sqlite")
+				end)
+				-- The CLI is a declared test double; date normalization delegates
+				-- to the runtime's native calendar functions rather than a fake.
+				helpers.assert_contains(statements[1], "date <= '" .. fixture.previous .. "'")
+			end, debug.traceback)
+			os.date, os.time = native_date, native_time
+			if not ok then error(err, 0) end
+		end)
+	end
+end)
+
+helpers.describe("linux-sqlite-read-receipts", function()
+	for _, status in ipairs({ 1, 7, 127, 137, 255 }) do
+		helpers.it("linux-sqlite-read-receipts: dashboard rejects valid JSON with status " .. status, function()
+			with_stubbed_sqlite(function()
+				return { body = '[{"date":"2026-10-03","wifi_changes":42}]', status = status }
+			end, function(reader)
+				helpers.assert_nil(next(reader.read_system_days("/db/metrics.sqlite", nil, nil)),
+					"valid rows cannot hide a failed query receipt")
+			end)
+		end)
+	end
+
+	helpers.it("linux-sqlite-read-receipts: successful dashboard JSON retains real values", function()
+		with_stubbed_sqlite(function()
+			return { body = '[{"date":"2026-10-03","wifi_changes":42}]', status = 0 }
+		end, function(reader)
+			local days = reader.read_system_days("/db/metrics.sqlite", nil, nil)
+			helpers.assert_eq(days["2026-10-03"].wifi_changes, 42)
+		end)
+	end)
+end)
+
+helpers.describe("sqlite-ngram-text-receipts", function()
+	helpers.it("sqlite-ngram-text-receipts: escaped native token bytes remain distinct", function()
+		with_stubbed_sqlite(function(sql)
+			if not sql:find("FROM ngram_chars", 1, true) then return "[]" end
+			local rows = {}
+			for index, token in ipairs({ "a", "a\0b", "\0", "été" }) do
+				rows[index] = { token_json = Json.encode(token), c = index, td = index * 10,
+					e = index, esrc_json = '{}', source_rows = 1 }
+			end
+			return Json.encode(rows)
+		end, function(reader)
+			local chars = reader.read_ngrams("/owned/metrics.sqlite").c
+			for index, token in ipairs({ "a", "a\0b", "\0", "été" }) do
+				helpers.assert_not_nil(chars[token], "native JSON token must retain all original bytes")
+				helpers.assert_eq(chars[token].c, index, "distinct tokens cannot merge counters")
+				helpers.assert_eq(chars[token].t, index * 10)
+			end
+		end)
+	end)
+end)
+
+--- Whether any statement selects from the given table.
+--- @param statements table
+--- @param table_name string
+--- @return boolean
+local function queried(statements, table_name)
+	for _, sql in ipairs(statements) do
+		-- Anchored on the word boundary so ngram_chars does not answer for
+		-- ngram_chars_class, and ngram_words does not answer for
+		-- ngram_word_bigrams.
+		if sql:find("FROM " .. table_name .. "[^%w_]") or sql:find("FROM " .. table_name .. "$") then
+			return true
+		end
+	end
+	return false
+end
+
+
+
+
+-- =================================================================
+-- =================================================================
+-- ======= 1/ Coverage =============================================
+-- =================================================================
+-- =================================================================
+
+helpers.describe("sqlite reader: which tables it asks for", function()
+
+	helpers.it("queries every character-sequence family, not just single characters", function()
+		local statements = with_stubbed_sqlite(function() return "" end, function(reader)
+			reader.read_ngrams("/tmp/probe.sqlite", "2026-08-01", "2026-08-06", nil)
+		end)
+
+		for _, entry in ipairs(EXPECTED) do
+			helpers.assert_true(queried(statements, entry.table_name),
+				"'" .. entry.table_name .. "' was never queried — the dashboard would "
+					.. "hand back an empty map for code '" .. entry.code .. "' whatever "
+					.. "the database holds, and a blank panel looks identical whether "
+					.. "the rows were never written or never read")
+		end
+	end)
+
+	helpers.it("asks for the delay and error columns", function()
+		local statements = with_stubbed_sqlite(function() return "" end, function(reader)
+			reader.read_ngrams("/tmp/probe.sqlite", nil, nil, nil)
+		end)
+
+		local checked = 0
+		for _, sql in ipairs(statements) do
+			if sql:find("FROM ngram_", 1, true) and not sql:find("ngram_scancodes", 1, true) then
+				checked = checked + 1
+				helpers.assert_true(sql:find("td", 1, true) ~= nil,
+					"without td the cost ranking sorts a column of zeroes while looking "
+						.. "entirely functional: " .. sql)
+				helpers.assert_true(sql:find("e,", 1, true) ~= nil,
+					"and without e the error analysis has no errors: " .. sql)
+			end
+		end
+		helpers.assert_true(checked >= #EXPECTED,
+			"every family must be checked, or this passes by not looking")
+	end)
+
+	helpers.it("carries the app filter into each family, not only the first", function()
+		local statements = with_stubbed_sqlite(function() return "" end, function(reader)
+			reader.read_ngrams("/tmp/probe.sqlite", nil, nil, { "firefox" })
+		end)
+
+		for _, entry in ipairs(EXPECTED) do
+			local found = false
+			for _, sql in ipairs(statements) do
+				if sql:find("FROM " .. entry.table_name .. "[^%w_]") and sql:find("firefox", 1, true) then
+					found = true
+				end
+			end
+			helpers.assert_true(found,
+				"'" .. entry.table_name .. "' ignored the selected application — a "
+					.. "per-app view that silently widens to every app is worse than "
+					.. "an empty one, because the number looks plausible")
+		end
+	end)
+
+end)
+
+
+
+
+-- =================================================================
+-- =================================================================
+-- ======= 2/ What comes back ======================================
+-- =================================================================
+-- =================================================================
+
+helpers.describe("sqlite reader: what the envelope carries", function()
+
+	helpers.it("lands each family's rows under its own code", function()
+		local result
+		with_stubbed_sqlite(function(sql)
+			if sql:find("FROM ngram_bigrams", 1, true) then
+				return '[{"token_json":"\\\"ab\\\"","c":7,"td":840,"e":1,"esrc_json":"{}"}]'
+			end
+			return ""
+		end, function(reader)
+			result = reader.read_ngrams("/tmp/probe.sqlite", nil, nil, nil)
+		end)
+
+		helpers.assert_not_nil(result.bg.ab, "a bigram row must reach the bigram code")
+		helpers.assert_eq(result.bg.ab.c, 7)
+		helpers.assert_true(next(result.c) == nil,
+			"and must not be folded into the single-character map, which is where "
+				.. "every sequence would have landed if the codes were mixed up")
+	end)
+
+	helpers.it("keeps the delay total and the error count", function()
+		local result
+		with_stubbed_sqlite(function(sql)
+			if sql:find("FROM ngram_trigrams", 1, true) then
+				return '[{"token_json":"\\\"abc\\\"","c":4,"td":1200,"e":2,"esrc_json":"{}"}]'
+			end
+			return ""
+		end, function(reader)
+			result = reader.read_ngrams("/tmp/probe.sqlite", nil, nil, nil)
+		end)
+
+		helpers.assert_eq(result.tg.abc.t, 1200,
+			"the writer stores it and the merge dropped it, so 'which sequences cost "
+				.. "you the most' ranked by zero")
+		helpers.assert_eq(result.tg.abc.e, 2,
+			"and the error analysis had no errors to analyse")
+	end)
+
+	helpers.it("adds rows from several devices rather than replacing them", function()
+		local result
+		with_stubbed_sqlite(function(sql)
+			if sql:find("FROM ngram_words", 1, true) then
+				return '[{"token_json":"\\\"bonjour\\\"","c":3,"td":900,"e":0,"esrc_json":"{}"},'
+					.. '{"token_json":"\\\"bonjour\\\"","c":5,"td":1500,"e":1,"esrc_json":"{}"}]'
+			end
+			return ""
+		end, function(reader)
+			result = reader.read_ngrams("/tmp/probe.sqlite", nil, nil, nil)
+		end)
+
+		helpers.assert_eq(result.w.bonjour.c, 8,
+			"one row per device is the normal case for a synced database; taking the "
+				.. "last would report one machine's typing as the whole total")
+		helpers.assert_eq(result.w.bonjour.t, 2400)
+	end)
+
+	helpers.it("splits today by application across every family", function()
+		local result
+		with_stubbed_sqlite(function(sql)
+			if sql:find("FROM ngram_bigrams", 1, true) and sql:find("app,", 1, true) then
+				return '[{"app":"firefox","token_json":"\\\"ab\\\"","c":2,"td":200,"e":0,"esrc_json":"{}"}]'
+			end
+			return ""
+		end, function(reader)
+			result = reader.read_range_split_today("/tmp/probe.sqlite", nil, nil, nil)
+		end)
+
+		helpers.assert_not_nil(result.today.firefox, "today's per-app split must exist")
+		helpers.assert_eq(result.today.firefox.bg.ab.c, 2,
+			"the split-today path had its own hardcoded ngram_chars, so the live view "
+				.. "stayed blank even once the historical one was fixed")
+	end)
+
+end)
+
+
+
+
+-- =================================================================
+-- =================================================================
+-- ======= 3/ The per-app-day aggregates ===========================
+-- =================================================================
+-- =================================================================
+
+helpers.describe("sqlite reader: the daily aggregate tables", function()
+
+	helpers.it("queries all four, not only the totals row", function()
+		local statements = with_stubbed_sqlite(function() return "" end, function(reader)
+			reader.read_manifest("/tmp/probe.sqlite", "2026-08-01", "2026-08-06", nil)
+		end)
+
+		for _, table_name in ipairs({
+			"agg_app_day", "agg_app_day_chars_class", "agg_app_day_errors",
+			"agg_app_day_hourly", "agg_app_day_hourly_min5",
+			"agg_app_day_buckets", "agg_app_day_burst", "agg_app_day_session",
+			"agg_app_day_ergo", "agg_app_day_titles", "agg_app_day_layouts",
+			"agg_app_day_kc_hold",
+		}) do
+			helpers.assert_true(queried(statements, table_name),
+				"'" .. table_name .. "' was never queried — the walk now fills it and "
+					.. "nobody reads it, which from the outside is the same blank panel "
+					.. "as never having filled it")
+		end
+	end)
+
+	helpers.it("projects the character breakdown onto the manifest entry", function()
+		local manifest
+		with_stubbed_sqlite(function(sql)
+			if sql:find("FROM agg_app_day_chars_class", 1, true) then
+				return '[{"date":"2026-08-06","app":"firefox","letter":120,"digit":8,'
+					.. '"punct":15,"space":30,"other":2,'
+					.. '"first_min":"09:12","last_min":"18:40"}]'
+			end
+			return ""
+		end, function(reader)
+			manifest = reader.read_manifest("/tmp/probe.sqlite", nil, nil, nil)
+		end)
+
+		local entry = manifest["2026-08-06"] and manifest["2026-08-06"].firefox
+		helpers.assert_not_nil(entry, "the entry must exist even with no totals row")
+		helpers.assert_eq(entry.char_letter, 120)
+		helpers.assert_eq(entry.first_typed_min, "09:12",
+			"the earliest keystroke of the day is what the heatmap labels its axis "
+				.. "with, and it was never read on this driver")
+	end)
+
+	helpers.it("projects the error analysis under the names the dashboard expects", function()
+		local manifest
+		with_stubbed_sqlite(function(sql)
+			if sql:find("FROM agg_app_day_errors", 1, true) then
+				return '[{"date":"2026-08-06","app":"code","bs_total":42,'
+					.. '"cascade_count":5,"cascade_max_len":11,'
+					.. '"recovery_sum":3200,"recovery_count":16}]'
+			end
+			return ""
+		end, function(reader)
+			manifest = reader.read_manifest("/tmp/probe.sqlite", nil, nil, nil)
+		end)
+
+		local entry = manifest["2026-08-06"].code
+		helpers.assert_eq(entry.bs_total, 42)
+		helpers.assert_eq(entry.cascade_count_total, 5,
+			"the dashboard reads cascade_count_total, not cascade_count — the same "
+				.. "number under the wrong key renders as zero, which is worse than "
+				.. "missing because it looks like an answer")
+		helpers.assert_eq(entry.recovery_time_sum_ms, 3200)
+	end)
+
+	helpers.it("keys the activity histogram by hour and by slot", function()
+		local manifest
+		with_stubbed_sqlite(function(sql)
+			if sql:find("FROM agg_app_day_hourly_min5", 1, true) then
+				return '[{"date":"2026-08-06","app":"code","slot":"10:05","c":40,"e":1,"es":0}]'
+			end
+			if sql:find("FROM agg_app_day_hourly", 1, true) then
+				return '[{"date":"2026-08-06","app":"code","hour":"10","c":180,"e":4,"em":2,"es":1}]'
+			end
+			return ""
+		end, function(reader)
+			manifest = reader.read_manifest("/tmp/probe.sqlite", nil, nil, nil)
+		end)
+
+		local entry = manifest["2026-08-06"].code
+		helpers.assert_eq(entry.hourly["10"].c, 180)
+		helpers.assert_eq(entry.hourly_min5["10:05"].c, 40,
+			"the two histograms are separate panels keyed differently, and reading "
+				.. "the fine one into the coarse map would silently halve the timeline")
+	end)
+
+end)
+
+
+
+
+-- =================================================================
+-- =================================================================
+-- ======= 4/ Runs and thresholds ==================================
+-- =================================================================
+-- =================================================================
+
+helpers.describe("sqlite reader: bursts, sessions and pause buckets", function()
+
+	helpers.it("keys the pause buckets by threshold", function()
+		local manifest
+		with_stubbed_sqlite(function(sql)
+			if sql:find("FROM agg_app_day_buckets", 1, true) then
+				return '[{"date":"2026-08-06","app":"code","bucket_ms":2000,'
+					.. '"time_sum":45000,"credited":300,"hs_in_t":0,"hs_in_c":0,'
+					.. '"llm_in_t":0,"llm_in_c":0}]'
+			end
+			return ""
+		end, function(reader)
+			manifest = reader.read_manifest("/tmp/probe.sqlite", nil, nil, nil)
+		end)
+
+		local entry = manifest["2026-08-06"].code
+		helpers.assert_eq(entry.time_buckets["2000"], 45000,
+			"the dropdown reads one threshold; keyed by anything else it finds "
+				.. "nothing and shows the unfiltered total instead, which is the one "
+				.. "number the control exists to avoid")
+		helpers.assert_eq(entry.credited_buckets["2000"], 300)
+	end)
+
+	helpers.it("merges two devices' burst histograms instead of picking one", function()
+		local manifest
+		with_stubbed_sqlite(function(sql)
+			if sql:find("FROM agg_app_day_burst", 1, true) then
+				return '[{"source_rows":1,"date":"2026-08-06","app":"code","count_total":10,"max_cpm":420.5,'
+					.. '"max_chars":88,"inter_count":9,"inter_sum":900,"inter_sumsq":90000,'
+					.. '"length_buckets_json":"{\\"20\\":3}"},'
+					.. '{"source_rows":1,"date":"2026-08-06","app":"code","count_total":4,"max_cpm":380,'
+					.. '"max_chars":40,"inter_count":3,"inter_sum":300,"inter_sumsq":30000,'
+					.. '"length_buckets_json":"{\\"20\\":2,\\"50\\":1}"}]'
+			end
+			return ""
+		end, function(reader)
+			manifest = reader.read_manifest("/tmp/probe.sqlite", nil, nil, nil)
+		end)
+
+		local entry = manifest["2026-08-06"].code
+		helpers.assert_eq(entry.burst_count_total, 14)
+		helpers.assert_eq(entry.burst_max_chars, 88,
+			"the longest burst of the day is a record, not a sum: adding two "
+				.. "machines' records would invent one nobody typed")
+		helpers.assert_eq(entry.burst_length_buckets["20"], 5,
+			"the histograms are merged key by key. Taking one row's blob would "
+				.. "silently discard the other machine's bursts while the totals "
+				.. "beside it stayed right, which is the hardest kind of wrong to spot.")
+	end)
+
+	helpers.it("preserves identical burst blob multiplicity (histogram-source-rows)", function()
+		with_stubbed_sqlite(function(sql)
+			if sql:find("FROM agg_app_day_burst", 1, true) then
+				return '[{"date":"2026-08-06","app":"code","count_total":28,'
+					.. '"source_rows":2,"length_buckets_json":"{\\"20\\":3}"}]'
+			end
+			return ""
+		end, function(reader)
+			local entry = reader.read_manifest("/tmp/probe.sqlite")["2026-08-06"].code
+			helpers.assert_eq(entry.burst_count_total, 28)
+			helpers.assert_eq(entry.burst_length_buckets["20"], 6,
+				"SQL group multiplicity is independent of the already-summed event count")
+		end)
+	end)
+
+	helpers.it("accumulates session durations across rows", function()
+		local manifest
+		with_stubbed_sqlite(function(sql)
+			if sql:find("FROM agg_app_day_session", 1, true) then
+				return '[{"date":"2026-08-06","app":"code","count_total":2,"longest_ms":600000,'
+					.. '"longest_chars":2000,"total_active_ms":900000,'
+					.. '"durations_json":"[600000,300000]"}]'
+			end
+			return ""
+		end, function(reader)
+			manifest = reader.read_manifest("/tmp/probe.sqlite", nil, nil, nil)
+		end)
+
+		local entry = manifest["2026-08-06"].code
+		helpers.assert_eq(entry.session_count_total, 2)
+		helpers.assert_eq(entry.session_longest_ms, 600000)
+		helpers.assert_eq(#entry.session_durations, 2,
+			"the durations are what the distribution plot is drawn from; an empty "
+				.. "array renders an axis and no bars")
+	end)
+
+end)
+
+
+
+
+helpers.describe("sqlite reader: the ergonomics record", function()
+
+	helpers.it("takes the longest streak rather than the sum", function()
+		local manifest
+		with_stubbed_sqlite(function(sql)
+			if sql:find("FROM agg_app_day_ergo", 1, true) then
+				return '[{"date":"2026-08-06","app":"code","f_max":4,"h_max":9,'
+					.. '"ar_count":0,"focus_sum":0,"focus_count":0}]'
+			end
+			return ""
+		end, function(reader)
+			manifest = reader.read_manifest("/tmp/probe.sqlite", nil, nil, nil)
+		end)
+
+		local entry = manifest["2026-08-06"].code
+		helpers.assert_eq(entry.same_finger_streak_max, 4,
+			"the longest same-finger run of the day is a record; adding two "
+				.. "machines' records would invent a streak nobody typed")
+		helpers.assert_eq(entry.same_hand_streak_max, 9)
+	end)
+
+end)
+
+helpers.describe("linux-sqlite-null-boundary", function()
+
+	helpers.it("linux-sqlite-null-boundary: only the tagged null scalar is removed", function()
+		local Json = require("json")
+		with_stubbed_sqlite(function()
+			-- Controlled JSON shape checks are units, not native SQLite output.
+			return '[{"date":"2026-10-03","battery_min":[],"battery_max":{},"battery_sum":{"keep":null},"battery_count":0}]'
+		end, function(reader)
+			local day = reader.read_system_days("/db/metrics.sqlite", nil, nil)["2026-10-03"]
+			helpers.assert_true(Json.is_array(day.battery_min), "typed empty array identity was removed")
+			helpers.assert_type(day.battery_max, "table", "ordinary empty objects must survive")
+			helpers.assert_true(not Json.is_array(day.battery_max))
+			helpers.assert_true(Json.is_null(day.battery_sum.keep), "the scalar boundary must not recursively normalize")
+			helpers.assert_eq(day.battery_count, 0)
+		end)
+	end)
+
+	helpers.it("linux-sqlite-null-boundary: nullable system scalars retain absent extrema and zero totals", function()
+		with_stubbed_sqlite(function()
+			return '[{"date":"2026-10-03","wifi_changes":3,"battery_sum":null,"battery_count":null,"battery_min":null,"battery_max":null}]'
+		end, function(reader)
+			local day = reader.read_system_days("/db/metrics.sqlite", nil, nil)["2026-10-03"]
+			helpers.assert_eq(day.wifi_changes, 3)
+			helpers.assert_eq(day.battery_sum, 0)
+			helpers.assert_eq(day.battery_count, 0)
+			helpers.assert_nil(day.battery_min)
+			helpers.assert_nil(day.battery_max)
+		end)
+	end)
+
+	helpers.it("linux-sqlite-null-boundary: optional manifest minutes stay absent without changing nested JSON text", function()
+		local Json = require("json")
+		with_stubbed_sqlite(function(sql)
+			if sql:find("FROM agg_app_day_chars_class", 1, true) then
+				return '[{"date":"2026-10-03","app":"café","letter":3,"first_min":null,"last_min":null}]'
+			elseif sql:find("FROM agg_app_day_burst", 1, true) then
+				return Json.encode({ { date = "2026-10-03", app = "café", source_rows = 1,
+					length_buckets_json = Json.encode({ ["nul\0é"] = 2 }) } })
+			end
+			return "[]"
+		end, function(reader)
+			local entry = reader.read_manifest("/db/metrics.sqlite", nil, nil)["2026-10-03"]["café"]
+			helpers.assert_eq(entry.char_letter, 3)
+			helpers.assert_nil(entry.first_typed_min)
+			helpers.assert_nil(entry.last_typed_min)
+			helpers.assert_eq(entry.burst_length_buckets["nul\0é"], 2)
+			-- The legacy decoder contract belongs to its existing callers.
+			helpers.assert_type(Json.decode('{"legacy":null}').legacy, "table")
+			helpers.assert_true(Json.is_null(Json.decode_lossless('{"tagged":null}').tagged))
+		end)
+	end)
+
+end)
+
+helpers.describe("linux-manifest-completion", function()
+	for _, body in ipairs({ "", "[]", '[{"date":"2026-10-03","app":"owned","llm_chars":3}]' }) do
+		helpers.it("linux-manifest-completion: successful CLI body " .. body .. " acknowledges every projection pass", function()
+			with_stubbed_sqlite(function(sql)
+				if sql:find("FROM agg_app_day ", 1, true) then return body end
+				return "[]"
+			end, function(reader)
+				local manifest, complete = reader.read_manifest("/db/metrics.sqlite")
+				helpers.assert_type(manifest, "table")
+				helpers.assert_eq(complete, true)
+			end)
+		end)
+	end
+	for _, table_name in ipairs({ "agg_app_day", "agg_app_day_errors", "agg_app_day_session" }) do
+		helpers.it("linux-manifest-completion: refusal in " .. table_name .. " cannot acknowledge a partial projection", function()
+			with_stubbed_sqlite(function(sql)
+				if sql:find("FROM " .. table_name .. "[%s;]") then return { body = "[]", status = 1 } end
+				if sql:find("FROM agg_app_day ", 1, true) then return '[{"date":"2026-10-03","app":"owned","llm_chars":3}]' end
+				return "[]"
+			end, function(reader)
+				local manifest, complete = reader.read_manifest("/db/metrics.sqlite")
+				helpers.assert_eq(complete, false)
+				if table_name ~= "agg_app_day" then helpers.assert_eq(manifest["2026-10-03"].owned.llm_chars, 3) end
+			end)
+		end)
+	end
+	helpers.it("linux-manifest-completion: malformed native JSON refuses completion", function()
+		with_stubbed_sqlite(function() return "[invalid JSON" end, function(reader)
+			local manifest, complete = reader.read_manifest("/db/metrics.sqlite")
+			helpers.assert_nil(next(manifest))
+			helpers.assert_eq(complete, false)
+		end)
+	end)
+	helpers.it("linux-manifest-completion: invalid path keeps the empty first return and refuses completion", function()
+		with_stubbed_sqlite(function() error("invalid path must not spawn") end, function(reader)
+			local manifest, complete = reader.read_manifest("")
+			helpers.assert_nil(next(manifest))
+			helpers.assert_eq(complete, false)
+		end)
+	end)
+end)
+
+helpers.describe("linux-sqlite-layouts-seen", function()
+	helpers.it("linux-sqlite-layouts-seen: grouped counts use the canonical shared field without a dead alias", function()
+		with_stubbed_sqlite(function(sql)
+			if sql:find("FROM agg_app_day_layouts", 1, true) then
+				helpers.assert_contains(sql, "SUM(count) AS count")
+				helpers.assert_contains(sql, "GROUP BY date, app, layout")
+				return Json.encode({
+					{ date = "2000-01-01", app = "owned", layout = "qwerty", count = 5 },
+					{ date = "2000-01-01", app = "owned", layout = "café'owned", count = 2 },
+				})
+			end
+			return "[]"
+		end, function(reader)
+			local manifest, complete = reader.read_manifest("/db/metrics.sqlite")
+			local entry = manifest["2000-01-01"].owned
+			helpers.assert_eq(entry.layouts_seen.qwerty, 5)
+			helpers.assert_eq(entry.layouts_seen["café'owned"], 2)
+			helpers.assert_nil(entry.layouts)
+			helpers.assert_eq(entry.chars, 0)
+			helpers.assert_eq(complete, true)
+		end)
+	end)
+	helpers.it("linux-sqlite-layouts-seen: existing date and app filters remain on the grouped metadata query", function()
+		local apps = { "owned' app" }
+		local statements = with_stubbed_sqlite(function() return "[]" end, function(reader)
+			reader.read_manifest("/db/metrics.sqlite", "1999-12-31", "2000-01-01", apps)
+		end)
+		local matches = 0
+		for _, sql in ipairs(statements) do
+			if sql:find("FROM agg_app_day_layouts", 1, true) then
+				matches = matches + 1
+				helpers.assert_contains(sql, "date >= '1999-12-31'")
+				helpers.assert_contains(sql, "date <= '2000-01-01'")
+				helpers.assert_contains(sql, "app IN ('owned'' app')")
+			end
+		end
+		helpers.assert_eq(matches, 1)
+		helpers.assert_eq(apps[1], "owned' app")
+	end)
+	helpers.it("linux-sqlite-layouts-seen: control apps without layout rows retain absent optional maps", function()
+		with_stubbed_sqlite(function(sql)
+			if sql:find("FROM agg_app_day ", 1, true) then return '[{"date":"2000-01-01","app":"owned","chars":3}]' end
+			return "[]"
+		end, function(reader)
+			local manifest, complete = reader.read_manifest("/db/metrics.sqlite")
+			helpers.assert_eq(manifest["2000-01-01"].owned.chars, 3)
+			helpers.assert_nil(manifest["2000-01-01"].owned.layouts_seen)
+			helpers.assert_nil(manifest["2000-01-01"].owned.layouts)
+			helpers.assert_eq(complete, true)
+		end)
+	end)
+	helpers.it("linux-sqlite-layouts-seen: refused receipt preserves the partial first return", function()
+		with_stubbed_sqlite(function(sql)
+			if sql:find("FROM agg_app_day_layouts", 1, true) then return { body = "[]", status = 1 } end
+			if sql:find("FROM agg_app_day ", 1, true) then return '[{"date":"2000-01-01","app":"owned","chars":3}]' end
+			return "[]"
+		end, function(reader)
+			local manifest, complete = reader.read_manifest("/db/metrics.sqlite")
+			helpers.assert_eq(manifest["2000-01-01"].owned.chars, 3)
+			helpers.assert_nil(manifest["2000-01-01"].owned.layouts_seen)
+			helpers.assert_eq(complete, false)
+		end)
+	end)
+end)
+
+helpers.describe("linux-sqlite-switch-projection", function()
+	helpers.it("linux-sqlite-switch-projection: grouped destinations reach the shared map without inventing other totals", function()
+		with_stubbed_sqlite(function(sql)
+			if sql:find("FROM agg_app_day_switches_to", 1, true) then
+				helpers.assert_contains(sql, "SUM(count) AS count")
+				helpers.assert_contains(sql, "GROUP BY date, app, app_to")
+				return Json.encode({
+					{ date = "2026-10-05", app = "owned-source", app_to = "owned-destination", count = 7 },
+					{ date = "2026-10-05", app = "owned-source", app_to = "café'owned", count = 2 },
+				})
+			end
+			return "[]"
+		end, function(reader)
+			local manifest, complete = reader.read_manifest("/db/metrics.sqlite")
+			local source = manifest["2026-10-05"]["owned-source"]
+			helpers.assert_eq(source.switches_to["owned-destination"], 7)
+			helpers.assert_eq(source.switches_to["café'owned"], 2)
+			helpers.assert_eq(source.chars, 0)
+			helpers.assert_nil(manifest["2026-10-05"]["owned-destination"])
+			helpers.assert_eq(complete, true)
+		end)
+	end)
+	helpers.it("linux-sqlite-switch-projection: existing date and source app filters cover the alternate schema keys", function()
+		local apps = { "owned' source", "café" }
+		local statements = with_stubbed_sqlite(function() return "[]" end, function(reader)
+			reader.read_manifest("/db/metrics.sqlite", "2026-10-01", "2026-10-05", apps)
+		end)
+		local matches = 0
+		for _, sql in ipairs(statements) do
+			if sql:find("FROM agg_app_day_switches_to", 1, true) then
+				matches = matches + 1
+				helpers.assert_contains(sql, "app_from AS app")
+				helpers.assert_contains(sql, "date >= '2026-10-01'")
+				helpers.assert_contains(sql, "date <= '2026-10-05'")
+				helpers.assert_contains(sql, "app IN ('owned'' source','café')")
+			end
+		end
+		helpers.assert_eq(matches, 1)
+		helpers.assert_eq(#apps, 2)
+		helpers.assert_eq(apps[1], "owned' source")
+	end)
+	helpers.it("linux-sqlite-switch-projection: absent transitions retain optional maps and healthy completion", function()
+		with_stubbed_sqlite(function(sql)
+			if sql:find("FROM agg_app_day ", 1, true) then
+				return '[{"date":"2026-10-05","app":"owned-control","chars":3}]'
+			end
+			return "[]"
+		end, function(reader)
+			local manifest, complete = reader.read_manifest("/db/metrics.sqlite")
+			helpers.assert_eq(manifest["2026-10-05"]["owned-control"].chars, 3)
+			helpers.assert_nil(manifest["2026-10-05"]["owned-control"].switches_to)
+			helpers.assert_eq(complete, true)
+		end)
+	end)
+	helpers.it("linux-sqlite-switch-projection: failed destination read refuses complete cache admission", function()
+		with_stubbed_sqlite(function(sql)
+			if sql:find("FROM agg_app_day_switches_to", 1, true) then return { body = "[]", status = 1 } end
+			if sql:find("FROM agg_app_day ", 1, true) then
+				return '[{"date":"2026-10-05","app":"owned-control","chars":3}]'
+			end
+			return "[]"
+		end, function(reader)
+			local manifest, complete = reader.read_manifest("/db/metrics.sqlite")
+			helpers.assert_eq(manifest["2026-10-05"]["owned-control"].chars, 3)
+			helpers.assert_nil(manifest["2026-10-05"]["owned-control"].switches_to)
+			helpers.assert_eq(complete, false)
+		end)
+	end)
+end)
+
+helpers.describe("linux-ngram-extra-sources", function()
+	local cases = {
+		{ "extra labels across identical source blobs", '{"hotstring":1,"llm":3,"other":2,"none":9,"case-transform":4,"owned-extension":1}', 2, 2, 6, 14 },
+		{ "known sources and manual none exclusion", '{"hotstring":1,"llm":2,"other":3,"none":4}', 1, 1, 2, 3 },
+		{ "safe recognized scalar admission", '{"hotstring":"3","llm":"4","other":"2","none":100,"string":"owned","table":{},"bool":true,"nil":null,"array":[9]}', 1, 3, 4, 2 },
+		{ "extra scalar admission", '{"hotstring":1.5,"llm":2.5,"other":"3","case-transform":4.5,"owned-extension":"5","none":100}', 1, 1.5, 2.5, 12.5 },
+		{ "array keys are not labels", '[1,2,3]', 1, 0, 0, 0 },
+		{ "JSON null blob", 'null', 1, 0, 0, 0 },
+		{ "JSON null values", '{"hotstring":null,"llm":null,"other":null,"owned":null}', 1, 0, 0, 0 },
+		{ "JSON scalar blob", 'false', 1, 0, 0, 0 },
+		{ "malformed legacy literal fallback", '{"hotstring":3,"llm":4,"other":5,owned', 1, 3, 4, 5 },
+	}
+	for _, case in ipairs(cases) do
+		helpers.it("linux-ngram-extra-sources: " .. case[1], function()
+			with_stubbed_sqlite(function(sql)
+				if sql:find("FROM ngram_chars", 1, true) then
+					return Json.encode({ { token_json = Json.encode("owned"), c = 40, td = 90, e = 6,
+						esrc_json = case[2], source_rows = case[3] } })
+				end
+				return "[]"
+			end, function(reader)
+				local item = reader.read_ngrams("/db/owned.sqlite").c.owned
+				helpers.assert_eq(item.c, 40)
+				helpers.assert_eq(item.t, 90)
+				helpers.assert_eq(item.e, 6)
+				helpers.assert_eq(item.hs, case[4])
+				helpers.assert_eq(item.llm, case[5])
+				helpers.assert_eq(item.o, case[6])
+			end)
+		end)
+	end
+	helpers.it("linux-ngram-extra-sources: split-today uses the same source taxonomy", function()
+		with_stubbed_sqlite(function(sql)
+			if sql:find("FROM ngram_chars", 1, true) and sql:find("app,", 1, true) then
+				return Json.encode({ { app = "owned", token_json = Json.encode("x"), c = 8, td = 20, e = 1,
+					esrc_json = '{"hotstring":1,"llm":2,"none":99,"case-transform":5}', source_rows = 1 } })
+			end
+			return "[]"
+		end, function(reader)
+			local split = reader.read_range_split_today("/db/owned.sqlite")
+			local item = split.today.owned.c.x
+			helpers.assert_eq(item.c, 8)
+			helpers.assert_eq(item.hs, 1)
+			helpers.assert_eq(item.llm, 2)
+			helpers.assert_eq(item.o, 5)
+		end)
+	end)
+end)
+
+helpers.describe("linux-ngram-source-policy", function()
+	helpers.it("linux-ngram-source-policy: shared other-source membership excludes dedicated and nonlabel keys", function()
+		local Utils = require("keylogger.utils")
+		local cases = {
+			{ label = "other", expected = true },
+			{ label = "case-transform", expected = true },
+			{ label = "owned-extension", expected = true },
+			{ label = "", expected = true },
+			{ label = "hotstring", expected = false },
+			{ label = "llm", expected = false },
+			{ label = "none", expected = false },
+			{ label = 1, expected = false },
+			{ label = true, expected = false },
+			{ label = false, expected = false },
+			{ label = {}, expected = false },
+			{ expected = false },
+		}
+		for _, case in ipairs(cases) do
+			helpers.assert_eq(Utils.is_other_synthetic_source(case.label), case.expected)
+		end
+	end)
+end)

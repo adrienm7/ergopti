@@ -1,0 +1,15 @@
+{
+	"_comment": "Keyboard-layout registry location, the single source for every driver and tool. The registry is a folder of this repository: one <id>/<id>.keylayout (the only source of a layout) plus <id>/meta.toml per layout, and index.json generated from them by tools/build/build-layouts-index.cjs. Drivers download index.json and the chosen .keylayout straight from that folder through raw_url_template; owner and repo come from ../updater/defaults.json. branch is the standalone default; each packaged driver resolves its installed build channel through the updater owner. Local source refresh reads the bundled registry without HTTP. max_file_bytes bounds every download (index or layout). local_folder is the folder, inside the configuration folder, where a driver keeps the layouts it downloaded (<id>.keylayout) with installed_file, the record of each installed layout and the index entry its copy was verified against, and the last catalogue index.json with the ETag the registry served it with (etag_file). ergopti_family identifies the Ergopti layouts in catalogue metadata. Geometry hotstrings remain opt-in on every layout; the active layout never changes their enabled state.",
+	"registry": {
+		"folder": "static/layouts/registry",
+		"index_file": "index.json",
+		"branch": "main",
+		"raw_url_template": "https://raw.githubusercontent.com/{owner}/{repo}/{branch}/{folder}/{path}",
+		"download_timeout_sec": 30,
+		"max_file_bytes": 2097152,
+		"local_folder": "layouts",
+		"installed_file": "installed.json",
+		"etag_file": "index.etag",
+		"ergopti_family": "ergopti"
+	}
+}

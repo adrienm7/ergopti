@@ -1,0 +1,118 @@
+{
+	"description": "Independent TODO96 characterization: historical Windows plus descriptors and manually read selected Ergopti+ neutral outputs; no option retirement or physical-keyboard equivalence claim.",
+	"rows": [
+		{
+			"scan": "SC012",
+			"shift": false,
+			"legacy_level": "altgr_plus",
+			"descriptor": {
+				"wrap": "%",
+				"left": "%",
+				"right": "%"
+			},
+			"selected": "%"
+		},
+		{
+			"scan": "SC013",
+			"shift": false,
+			"legacy_level": "altgr_plus",
+			"descriptor": {
+				"word": "o\u00f9"
+			},
+			"selected": "o\u00f9"
+		},
+		{
+			"scan": "SC018",
+			"shift": false,
+			"legacy_level": "altgr_plus",
+			"descriptor": {
+				"wrap": "!",
+				"left": "!",
+				"right": "!"
+			},
+			"selected": "!"
+		},
+		{
+			"scan": "SC012",
+			"shift": true,
+			"legacy_level": "altgr_plus_shift",
+			"descriptor": {
+				"text": "\u0152"
+			},
+			"selected": "\u202f%"
+		},
+		{
+			"scan": "SC013",
+			"shift": true,
+			"legacy_level": "altgr_plus_shift",
+			"descriptor": {
+				"word": "O\u00f9"
+			},
+			"selected": "O\u00f9"
+		},
+		{
+			"scan": "SC018",
+			"shift": true,
+			"legacy_level": "altgr_plus_shift",
+			"descriptor": {
+				"text": " !"
+			},
+			"selected": "\u202f!"
+		}
+	],
+	"roll_rows": [
+		{
+			"plus": false,
+			"shift": "none",
+			"kind": "text",
+			"output": "\u0153"
+		},
+		{
+			"plus": true,
+			"shift": "none",
+			"kind": "wrap",
+			"output": "%"
+		},
+		{
+			"plus": false,
+			"shift": "physical",
+			"kind": "text",
+			"output": "\u0152"
+		},
+		{
+			"plus": true,
+			"shift": "physical",
+			"kind": "text",
+			"output": " %"
+		},
+		{
+			"plus": false,
+			"shift": "left_hold",
+			"kind": "text",
+			"output": "\u0152"
+		},
+		{
+			"plus": true,
+			"shift": "left_hold",
+			"kind": "text",
+			"output": " %"
+		},
+		{
+			"plus": false,
+			"shift": "right_hold",
+			"kind": "text",
+			"output": "\u0152"
+		},
+		{
+			"plus": true,
+			"shift": "right_hold",
+			"kind": "text",
+			"output": " %"
+		}
+	],
+	"limits": [
+		"Roll rows have no preceding chevron; existing source registration and timing guards remain separate.",
+		"Wrap receipts prove the actual production invocation, not OS clipboard selection behavior.",
+		"Native interpreter/callback output is not real physical AltGr/Kana hotkey precedence."
+	]
+}

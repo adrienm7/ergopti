@@ -1,0 +1,4 @@
+# Independent handoff input.
+[hotstrings.editor]
+shortcut = { mods = ["ctrl"], key = "escape" } # keep unsupported
+keep = "neighbor" # unchanged

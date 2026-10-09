@@ -1,0 +1,7 @@
+# _shared/tests/corpus/config_migrations/op_delete/expected.toml
+
+[_meta]
+schema_version = 2
+
+[gestures]
+enabled = false

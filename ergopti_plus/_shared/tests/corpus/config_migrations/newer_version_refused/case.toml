@@ -1,0 +1,6 @@
+# _shared/tests/corpus/config_migrations/newer_version_refused/case.toml
+
+[case]
+description = "A file written by a newer build is never written: the session becomes read-only."
+drivers = ["ahk", "hs", "linux"]
+outcome = "newer"

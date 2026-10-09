@@ -1,0 +1,24 @@
+<!-- _shared/ui/personal_info_editor/index.html -->
+<!doctype html>
+<html lang="fr">
+	<head>
+		<meta charset="utf-8" />
+		<title data-i18n="editor.personal_info.window_title"></title>
+		<link rel="stylesheet" href="style.css" />
+		<script src="../host_bridge.js"></script>
+	</head>
+	<body>
+		<h1 data-i18n="editor.personal_info.window_title"></h1>
+
+		<form id="info-form" onsubmit="return false;">
+			<div id="rows"></div>
+
+			<div class="btns">
+				<button type="button" class="save" id="btn-save" data-i18n="common.save"></button>
+				<button type="button" class="cancel" id="btn-cancel" data-i18n="common.cancel"></button>
+			</div>
+		</form>
+
+		<script src="script.js"></script>
+	</body>
+</html>

@@ -1,0 +1,155 @@
+{
+	"description": "Golden vectors for the selection case actions (selection_uppercase, selection_lowercase, selection_titlecase and the uppercase_selection / titlecase_selection toggles). Replayed by the macOS, Linux and Windows suites so the three drivers agree on accented letters, apostrophes and hyphens.",
+	"title_rule": "Title case lowercases the text, then gives the first character of each word its Unicode title-case form. A word starts at the beginning of the text and after whitespace or a dash (Unicode Pd, e.g. the hyphen of jean-pierre). Other punctuation placed before a word (quotes, brackets, guillemets) is kept and does not consume the capital. An apostrophe inside a word does not start a new word, so l'ete stays L'ete and don't stays Don't. A digit or symbol that starts a word is kept and ends the word start, so 3e stays 3e.",
+	"toggle_rule": "toggle_upper returns the uppercase text when the text contains a character with an uppercase mapping, the lowercase text otherwise. toggle_title returns the lowercase text when the text is already in title case, the title-case text otherwise.",
+	"drivers_rule": "A vector without a drivers list applies to hs, linux and ahk. The Windows driver uses the operating system's simple case mappings (StrUpper / StrLower), which do not expand ß to SS, do not apply the Greek final sigma and have no title-case digraphs, so those vectors are limited to the two Lua drivers, which read the complete generated Unicode table.",
+	"vectors": [
+		{
+			"id": "french_accents_lowercase_input",
+			"input": "élève à ça",
+			"upper": "ÉLÈVE À ÇA",
+			"lower": "élève à ça",
+			"title": "Élève À Ça",
+			"toggle_upper": "ÉLÈVE À ÇA",
+			"toggle_title": "Élève À Ça"
+		},
+		{
+			"id": "french_accents_uppercase_input",
+			"input": "ÉLÈVE À ÇA",
+			"upper": "ÉLÈVE À ÇA",
+			"lower": "élève à ça",
+			"title": "Élève À Ça",
+			"toggle_upper": "élève à ça",
+			"toggle_title": "Élève À Ça"
+		},
+		{
+			"id": "french_title_toggles_back_to_lowercase",
+			"input": "Élève À Ça",
+			"upper": "ÉLÈVE À ÇA",
+			"lower": "élève à ça",
+			"title": "Élève À Ça",
+			"toggle_upper": "ÉLÈVE À ÇA",
+			"toggle_title": "élève à ça"
+		},
+		{
+			"id": "ligatures_and_cedilla",
+			"input": "cœur œuvre garçon",
+			"upper": "CŒUR ŒUVRE GARÇON",
+			"lower": "cœur œuvre garçon",
+			"title": "Cœur Œuvre Garçon",
+			"toggle_upper": "CŒUR ŒUVRE GARÇON",
+			"toggle_title": "Cœur Œuvre Garçon"
+		},
+		{
+			"id": "apostrophe_elision_stays_inside_the_word",
+			"input": "l'été d'un ami",
+			"upper": "L'ÉTÉ D'UN AMI",
+			"lower": "l'été d'un ami",
+			"title": "L'été D'un Ami",
+			"toggle_upper": "L'ÉTÉ D'UN AMI",
+			"toggle_title": "L'été D'un Ami"
+		},
+		{
+			"id": "typographic_apostrophe",
+			"input": "l’hiver qu’il fait",
+			"upper": "L’HIVER QU’IL FAIT",
+			"lower": "l’hiver qu’il fait",
+			"title": "L’hiver Qu’il Fait",
+			"toggle_upper": "L’HIVER QU’IL FAIT",
+			"toggle_title": "L’hiver Qu’il Fait"
+		},
+		{
+			"id": "english_contraction",
+			"input": "DON'T STOP",
+			"upper": "DON'T STOP",
+			"lower": "don't stop",
+			"title": "Don't Stop",
+			"toggle_upper": "don't stop",
+			"toggle_title": "Don't Stop"
+		},
+		{
+			"id": "hyphenated_compounds",
+			"input": "jean-pierre à saint-étienne",
+			"upper": "JEAN-PIERRE À SAINT-ÉTIENNE",
+			"lower": "jean-pierre à saint-étienne",
+			"title": "Jean-Pierre À Saint-Étienne",
+			"toggle_upper": "JEAN-PIERRE À SAINT-ÉTIENNE",
+			"toggle_title": "Jean-Pierre À Saint-Étienne"
+		},
+		{
+			"id": "opening_punctuation_keeps_the_capital",
+			"input": "«été» (ça) \"oui\"",
+			"upper": "«ÉTÉ» (ÇA) \"OUI\"",
+			"lower": "«été» (ça) \"oui\"",
+			"title": "«Été» (Ça) \"Oui\"",
+			"toggle_upper": "«ÉTÉ» (ÇA) \"OUI\"",
+			"toggle_title": "«Été» (Ça) \"Oui\""
+		},
+		{
+			"id": "digit_starts_a_word",
+			"input": "le 3e étage",
+			"upper": "LE 3E ÉTAGE",
+			"lower": "le 3e étage",
+			"title": "Le 3e Étage",
+			"toggle_upper": "LE 3E ÉTAGE",
+			"toggle_title": "Le 3e Étage"
+		},
+		{
+			"id": "whitespace_is_preserved",
+			"input": "  deux\tmots\n",
+			"upper": "  DEUX\tMOTS\n",
+			"lower": "  deux\tmots\n",
+			"title": "  Deux\tMots\n",
+			"toggle_upper": "  DEUX\tMOTS\n",
+			"toggle_title": "  Deux\tMots\n"
+		},
+		{
+			"id": "cyrillic",
+			"input": "привет мир",
+			"upper": "ПРИВЕТ МИР",
+			"lower": "привет мир",
+			"title": "Привет Мир",
+			"toggle_upper": "ПРИВЕТ МИР",
+			"toggle_title": "Привет Мир"
+		},
+		{
+			"id": "no_cased_character",
+			"input": "123 + 456",
+			"upper": "123 + 456",
+			"lower": "123 + 456",
+			"title": "123 + 456",
+			"toggle_upper": "123 + 456",
+			"toggle_title": "123 + 456"
+		},
+		{
+			"id": "german_sharp_s_expands",
+			"drivers": ["hs", "linux"],
+			"input": "straße",
+			"upper": "STRASSE",
+			"lower": "straße",
+			"title": "Straße",
+			"toggle_upper": "STRASSE",
+			"toggle_title": "Straße"
+		},
+		{
+			"id": "greek_final_sigma",
+			"drivers": ["hs", "linux"],
+			"input": "ΟΔΟΣ ΚΑΙ ΟΣΑ",
+			"upper": "ΟΔΟΣ ΚΑΙ ΟΣΑ",
+			"lower": "οδος και οσα",
+			"title": "Οδος Και Οσα",
+			"toggle_upper": "οδος και οσα",
+			"toggle_title": "Οδος Και Οσα"
+		},
+		{
+			"id": "title_case_digraph",
+			"drivers": ["hs", "linux"],
+			"input": "ǆungla",
+			"upper": "ǄUNGLA",
+			"lower": "ǆungla",
+			"title": "ǅungla",
+			"toggle_upper": "ǄUNGLA",
+			"toggle_title": "ǅungla"
+		}
+	]
+}

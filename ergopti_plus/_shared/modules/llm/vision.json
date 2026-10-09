@@ -1,0 +1,41 @@
+{
+	"_comment": "Screen reading for the llm_screen_region / llm_screen_full actions (_shared/lua/llm/vision.lua, windows/modules/llm/vision.ahk). A vision model first transcribes the captured screen (read_prompt, answer tagged SCREEN:); the AI menu's text backend then drafts one answer per entry of answers, in order, each tagged ANSWER:, shown as the tooltip's candidates. default_models name the vision model used when a binding names none; a backend absent from it needs a model in the binding. {language} is the user's interface language. error_answers are the answers of llm_screen_error, in tooltip order: the explanation of the error on SCREEN in the interface language, then the fix the user can type.",
+	"screen_tag": "SCREEN:",
+	"answer_tag": "ANSWER:",
+	"image_mime": "image/png",
+	"max_image_edge": 1568,
+	"read_max_tokens": 1200,
+	"answer_max_tokens": 600,
+	"default_models": {
+		"local": "qwen2.5vl:3b",
+		"openai": "gpt-4o-mini",
+		"anthropic": "claude-haiku-4-5",
+		"gemini": "gemini-2.0-flash",
+		"mistral": "pixtral-12b-latest"
+	},
+	"read_prompt": "You read screenshots for a keyboard assistant.\nTranscribe what the screenshot shows so that someone who cannot see it can act on it: the exact text of messages, emails, errors, code, tables and their numbers, who wrote what, and what the user seems to be doing. Keep the original language of the text. Skip menus, toolbars and decoration.\nReply with one block — nothing else:\nSCREEN: <transcription>",
+	"answers": [
+		{
+			"id": "reply",
+			"prompt": "You write for a keyboard assistant. SCREEN is what the user sees.\nDraft the reply the user would send to the message or email on SCREEN: answer its questions, match its language, tone and form of address, and keep it short. If there is nothing to reply to, write the most useful next message.\nReply with one block — nothing else:\nANSWER: <reply>"
+		},
+		{
+			"id": "translate",
+			"prompt": "You write for a keyboard assistant. SCREEN is what the user sees.\nTranslate the main text on SCREEN into {language}; if it is already in {language}, translate it into English. Keep names, numbers and formatting.\nReply with one block — nothing else:\nANSWER: <translation>"
+		},
+		{
+			"id": "explain",
+			"prompt": "You write for a keyboard assistant. SCREEN is what the user sees.\nIn {language}, explain the error, code, table or message on SCREEN in a few sentences and, when something is wrong, say how to fix it (give the corrected command or code).\nReply with one block — nothing else:\nANSWER: <explanation>"
+		}
+	],
+	"error_answers": [
+		{
+			"id": "cause",
+			"prompt": "You help a user understand an error. SCREEN is what the user sees: a terminal, a log, a dialog or code showing an error.\nExplain in {language}, in at most three short sentences, what went wrong and its most likely cause. Quote the decisive part of the error message.\nReply with one block — nothing else:\nANSWER: <explanation>"
+		},
+		{
+			"id": "fix",
+			"prompt": "You help a user fix an error. SCREEN is what the user sees: a terminal, a log, a dialog or code showing an error.\nWrite the single most likely fix the user can type: the exact command to run, or the corrected line of code. No explanation, no markdown fence.\nReply with one block — nothing else:\nANSWER: <fix>"
+		}
+	]
+}

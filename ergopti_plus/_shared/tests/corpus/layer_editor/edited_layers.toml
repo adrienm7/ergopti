@@ -1,0 +1,84 @@
+# layers.toml — written by the ErgoptiPlus layer editor.
+#
+# Each [layers.<layer>.<section>] table binds physical keys, named by their
+# W3C KeyboardEvent.code, while the layer is held. `all` applies on every
+# system; a `windows`, `macos` or `linux` entry replaces it on that system.
+# The values are the actions of _shared/keymap/layer_actions.toml.
+
+[_meta]
+schema_version = 1
+
+[layers.nav.all]
+"KeyQ" = "sel_doc_start"
+"KeyW" = "doc_start"
+"KeyE" = "doc_end"
+"KeyR" = "sel_doc_end"
+"KeyT" = "keystroke:F2"
+"KeyY" = "sel_line_start"
+"KeyU" = "sel_word_prev"
+"KeyI" = "sel_left"
+"KeyO" = "sel_right"
+"KeyP" = "sel_word_next"
+"BracketLeft" = "sel_line_end"
+"CapsLock" = "backspace"
+"KeyA" = "sel_para_prev"
+"KeyS" = "arrow_up"
+"KeyD" = "arrow_down"
+"KeyF" = "sel_para_next"
+"KeyH" = "window_to_monitor_left"
+"KeyJ" = "word_prev"
+"KeyK" = "arrow_left"
+"KeyL" = "arrow_right"
+"Semicolon" = "word_next"
+"Quote" = "window_to_monitor_right"
+"IntlBackslash" = "duplicate_line_up"
+"KeyZ" = "move_line_up"
+"KeyX" = "move_line_down"
+"KeyC" = "duplicate_line_down"
+"KeyV" = "new_line_below"
+"KeyN" = "maximize"
+"KeyM" = "line_start"
+"Comma" = "snap_left"
+"Period" = "snap_right"
+"Slash" = "line_end"
+"AltRight" = "escape"
+
+[layers.nav.windows]
+"Digit1" = "repeat_count:1"
+"Digit2" = "repeat_count:2"
+"Digit3" = "repeat_count:3"
+"Digit4" = "repeat_count:4"
+"Digit5" = "repeat_count:5"
+"Digit6" = "repeat_count:6"
+"Digit7" = "repeat_count:7"
+"Digit8" = "repeat_count:8"
+"Digit9" = "repeat_count:9"
+"Digit0" = "repeat_count:10"
+"KeyT" = "arrow_up"
+"WheelUp" = "vol_up"
+"WheelDown" = "vol_down"
+
+[layers.nav.macos]
+"Digit1" = "keystroke:F1"
+"Digit2" = "keystroke:F2"
+"Digit3" = "keystroke:F3"
+"Digit4" = "keystroke:F4"
+"Digit5" = "keystroke:F5"
+"Digit6" = "keystroke:F6"
+"Digit7" = "keystroke:F7"
+"Digit8" = "keystroke:F8"
+"Digit9" = "keystroke:F9"
+"Digit0" = "keystroke:F10"
+"Minus" = "keystroke:F11"
+"Equal" = "keystroke:F12"
+"Tab" = "keystroke:meta+Backquote"
+"KeyT" = "keystroke:primary+shift+KeyZ"
+"KeyG" = "keystroke:F12"
+"Space" = "spotlight"
+"MetaRight" = "escape_or_option_shift"
+"WheelUp" = "vol_up"
+"WheelDown" = "vol_down"
+
+[layers.nav.linux]
+"KeyT" = "mute"
+"KeyG" = "keystroke:F12"

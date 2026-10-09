@@ -1,0 +1,49 @@
+{
+	"rows": [
+		{
+			"type": "command",
+			"id": "upgrade",
+			"i18n": "menu.layout.update_version",
+			"caption_getters": ["scope", "old", "latest"]
+		},
+		{
+			"type": "check",
+			"id": "native",
+			"caption_source": "native",
+			"caption_getter": "native",
+			"checked_when": ["selected"],
+			"disabled_when": ["ready"],
+			"platforms": ["hs"],
+			"unavailable": "hide"
+		}
+	],
+	"values": {
+		"scope": "Scope 12% & 🦀",
+		"old": "2.2.1",
+		"latest": "2.2.2",
+		"native": "Native 100%s && 🦀"
+	},
+	"expected": {
+		"da": ["Opdatér Ergopti (Scope 12% & 🦀) v2.2.1 → v2.2.2", "Native 100%s && 🦀"],
+		"de": ["Ergopti (Scope 12% & 🦀) v2.2.1 → v2.2.2 aktualisieren", "Native 100%s && 🦀"],
+		"en": ["Update Ergopti (Scope 12% & 🦀) v2.2.1 → v2.2.2", "Native 100%s && 🦀"],
+		"es": ["Actualizar Ergopti (Scope 12% & 🦀) v2.2.1 → v2.2.2", "Native 100%s && 🦀"],
+		"fr": ["Mettre à jour Ergopti (Scope 12% & 🦀) v2.2.1 → v2.2.2", "Native 100%s && 🦀"],
+		"it": ["Aggiorna Ergopti (Scope 12% & 🦀) v2.2.1 → v2.2.2", "Native 100%s && 🦀"],
+		"nl": ["Ergopti (Scope 12% & 🦀) v2.2.1 → v2.2.2 bijwerken", "Native 100%s && 🦀"],
+		"no": ["Oppgrader Ergopti (Scope 12% & 🦀) v2.2.1 → v2.2.2", "Native 100%s && 🦀"],
+		"pl": ["Zaktualizuj Ergopti (Scope 12% & 🦀) v2.2.1 → v2.2.2", "Native 100%s && 🦀"],
+		"pt": ["Atualizar Ergopti (Scope 12% & 🦀) v2.2.1 → v2.2.2", "Native 100%s && 🦀"],
+		"sv": ["Uppdatera Ergopti (Scope 12% & 🦀) v2.2.1 → v2.2.2", "Native 100%s && 🦀"],
+		"tr": ["Ergopti (Scope 12% & 🦀) v2.2.1 → v2.2.2 güncelle", "Native 100%s && 🦀"],
+		"cs": ["Aktualizovat Ergopti (Scope 12% & 🦀) v2.2.1 → v2.2.2", "Native 100%s && 🦀"],
+		"ru": ["Обновить Ergopti (Scope 12% & 🦀) v2.2.1 → v2.2.2", "Native 100%s && 🦀"],
+		"uk": ["Оновити Ergopti (Scope 12% & 🦀) v2.2.1 → v2.2.2", "Native 100%s && 🦀"],
+		"he": ["עדכן Ergopti (Scope 12% & 🦀) v2.2.1 → v2.2.2", "Native 100%s && 🦀"],
+		"ar": ["تحديث Ergopti (Scope 12% & 🦀) v2.2.1 → v2.2.2", "Native 100%s && 🦀"],
+		"hi": ["Ergopti (Scope 12% & 🦀) v2.2.1 → v2.2.2 अपडेट करें", "Native 100%s && 🦀"],
+		"zh": ["更新 Ergopti (Scope 12% & 🦀) v2.2.1 → v2.2.2", "Native 100%s && 🦀"],
+		"ja": ["Ergopti (Scope 12% & 🦀) v2.2.1 → v2.2.2 に更新", "Native 100%s && 🦀"],
+		"ko": ["Ergopti (Scope 12% & 🦀) v2.2.1 → v2.2.2 업데이트", "Native 100%s && 🦀"]
+	}
+}

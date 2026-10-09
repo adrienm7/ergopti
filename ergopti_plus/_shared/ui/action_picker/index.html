@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="fr">
+	<head>
+		<meta charset="UTF-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1" />
+		<link rel="stylesheet" href="style.css" />
+		<script src="../i18n.js"></script>
+		<script src="../host_bridge.js"></script>
+	</head>
+	<body>
+		<header id="hdr">
+			<div class="hdr-text">
+				<h1 id="title"></h1>
+				<p id="subtitle"></p>
+			</div>
+			<button
+				id="toc-btn"
+				type="button"
+				title=""
+				onclick="toggleToc()"
+				aria-label="Table of contents"
+			>
+				☰
+			</button>
+		</header>
+
+		<div id="search-bar">
+			<span class="search-ico" aria-hidden="true">⌕</span>
+			<input id="search" type="text" autocomplete="off" autocorrect="off" spellcheck="false" />
+		</div>
+
+		<main id="list" tabindex="-1"></main>
+
+		<!-- The editor of a send_text / send_key / send_shortcut value, or of the
+		     prompt and count of an llm_prompt_prediction, the vision backend of a
+		     screen action or the target language of a translation, shown in place of the
+		     list once such an action is picked. -->
+		<section id="param" hidden>
+			<h2 id="param-title"></h2>
+			<p id="param-prompt"></p>
+			<p id="param-hint"></p>
+			<input id="param-input" type="text" autocomplete="off" autocorrect="off" spellcheck="false" />
+			<div id="param-choice" hidden>
+				<label id="param-profile-label" for="param-profile"></label>
+				<select id="param-profile"></select>
+				<label id="param-count-label" for="param-count"></label>
+				<select id="param-count"></select>
+			</div>
+			<div id="param-vision" hidden>
+				<label id="param-vision-provider-label" for="param-vision-provider"></label>
+				<select id="param-vision-provider"></select>
+				<label id="param-vision-model-label" for="param-vision-model"></label>
+				<input
+					id="param-vision-model"
+					type="text"
+					autocomplete="off"
+					autocorrect="off"
+					spellcheck="false"
+				/>
+			</div>
+			<div id="param-language" hidden>
+				<label id="param-language-label" for="param-language-select"></label>
+				<select id="param-language-select"></select>
+			</div>
+			<div id="param-program" hidden>
+				<div id="param-program-automation" hidden>
+					<p id="param-program-automation-title"></p>
+					<p id="param-program-automation-reason"></p>
+					<ul id="param-program-automation-list"></ul>
+				</div>
+				<div id="param-program-provider" hidden>
+					<label id="param-program-provider-label" for="param-program-provider-select"></label>
+					<select id="param-program-provider-select"></select>
+					<p id="param-program-provider-hint"></p>
+					<p id="param-program-provider-status" role="status"></p>
+				</div>
+				<label id="param-program-executable-label" for="param-program-executable"></label>
+				<input id="param-program-executable" type="text" autocomplete="off" spellcheck="false" />
+				<p id="param-program-arguments-label"></p>
+				<div id="param-program-arguments"></div>
+				<button id="param-program-add" type="button"></button>
+			</div>
+			<p id="param-error" hidden></p>
+			<div class="param-buttons">
+				<button id="param-back" type="button"></button>
+				<button id="param-save" type="button"></button>
+			</div>
+		</section>
+
+		<div id="empty" hidden></div>
+
+		<!-- Table-of-contents drawer: lists every heading (indented by level). -->
+		<div id="toc" hidden>
+			<div id="toc-inner"></div>
+		</div>
+
+		<footer id="ftr">
+			<span id="count"></span>
+			<button id="btn-edit-current" type="button" hidden></button>
+			<button id="btn-cancel" type="button" onclick="doCancel()"></button>
+		</footer>
+
+		<script src="../program_parameter.js"></script>
+		<script src="script.js"></script>
+	</body>
+</html>

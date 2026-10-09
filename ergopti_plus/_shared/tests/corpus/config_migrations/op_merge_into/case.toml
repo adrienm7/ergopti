@@ -1,0 +1,8 @@
+# _shared/tests/corpus/config_migrations/op_merge_into/case.toml
+
+[case]
+description = "merge_into moves the keys of one section, not its sub-sections; an existing target key wins."
+drivers = ["ahk", "hs", "linux"]
+outcome = "migrated"
+from_version = 1
+to_version = 2

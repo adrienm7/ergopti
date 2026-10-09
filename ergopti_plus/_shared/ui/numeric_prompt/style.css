@@ -1,0 +1,107 @@
+/* _shared/ui/numeric_prompt/style.css */
+
+/* Deliberately the same palette and metrics as token_prompt: the two windows
+   ask the same kind of question and a user who has seen one should recognise
+   the other rather than wonder whether it belongs to the same application. */
+
+* {
+	box-sizing: border-box;
+	margin: 0;
+	padding: 0;
+}
+
+body {
+	align-items: center;
+	background: #242426;
+	color: #e8e8ea;
+	display: flex;
+	font-family: -apple-system, 'SF Pro Text', 'Helvetica Neue', sans-serif;
+	justify-content: center;
+	min-height: 100vh;
+}
+
+#container {
+	display: flex;
+	flex-direction: column;
+	gap: 14px;
+	max-width: 100%;
+	padding: 24px;
+	width: 380px;
+}
+
+h2 {
+	font-size: 15px;
+	font-weight: 600;
+}
+
+#prompt-hint {
+	color: #a0a0a6;
+	font-size: 12px;
+	line-height: 1.45;
+}
+
+#input-wrapper {
+	display: flex;
+	flex-direction: column;
+	gap: 6px;
+}
+
+#value-input {
+	background: #1b1b1d;
+	border: 1px solid #3a3a3d;
+	border-radius: 6px;
+	color: #e8e8ea;
+	font-family: 'SF Mono', ui-monospace, monospace;
+	font-size: 14px;
+	padding: 9px 11px;
+	width: 100%;
+}
+
+#value-input:focus {
+	border-color: #5a8dee;
+	outline: none;
+}
+
+#range-hint {
+	color: #7a7a80;
+	font-size: 11px;
+}
+
+/* Not colour alone: a red border on a dark field is easy to miss and invisible
+   to a reader who cannot distinguish it, so the message carries the meaning. */
+#error {
+	background: #3a1f1f;
+	border-radius: 6px;
+	color: #ff9d9d;
+	font-size: 12px;
+	padding: 8px 10px;
+}
+
+#buttons {
+	display: flex;
+	gap: 8px;
+	justify-content: flex-end;
+}
+
+button {
+	background: #333336;
+	border: 1px solid #46464a;
+	border-radius: 6px;
+	color: #e8e8ea;
+	cursor: pointer;
+	font-size: 13px;
+	padding: 7px 15px;
+}
+
+button:hover {
+	background: #3d3d41;
+}
+
+#save-button {
+	background: #3a6bd0;
+	border-color: #3a6bd0;
+}
+
+#save-button:hover {
+	background: #4478e0;
+}

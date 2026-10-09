@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+  "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>CFBundleIdentifier</key>
+    <string>com.apple.keyboardlayout.ergopti</string>
+    <key>CFBundleName</key>
+    <string>Ergopti</string>
+    <key>CFBundleShortVersionString</key>
+    <string>2.2.2</string>
+    <key>CFBundleVersion</key>
+    <string>2.2.2</string>
+    <key>KLInfo_Ergopti_v2_2_2</key>
+        <dict>
+            <key>TICapsLockLanguageSwitchCapable</key>
+            <true/>
+            <key>TISIconIsTemplate</key>
+            <false/>
+            <key>ICNS</key>
+            <string>Ergopti_v2_2_2.icns</string>
+            <key>TISInputSourceID</key>
+            <string>com.apple.keyboardlayout.ergopti</string>
+            <key>TISIntendedLanguage</key>
+            <string>fr</string>
+        </dict>
+	<key>KLInfo_Ergopti_v2_2_2_ansi</key>
+        <dict>
+            <key>TICapsLockLanguageSwitchCapable</key>
+            <true/>
+            <key>TISIconIsTemplate</key>
+            <false/>
+            <key>ICNS</key>
+            <string>Ergopti_v2_2_2_ansi.icns</string>
+            <key>TISInputSourceID</key>
+            <string>com.apple.keyboardlayout.ergopti.ansi</string>
+            <key>TISIntendedLanguage</key>
+            <string>fr</string>
+        </dict>
+	<key>KLInfo_Ergopti_v2_2_2_plus</key>
+        <dict>
+            <key>TICapsLockLanguageSwitchCapable</key>
+            <true/>
+            <key>TISIconIsTemplate</key>
+            <false/>
+            <key>ICNS</key>
+            <string>Ergopti_v2_2_2_plus.icns</string>
+            <key>TISInputSourceID</key>
+            <string>com.apple.keyboardlayout.ergopti.plus</string>
+            <key>TISIntendedLanguage</key>
+            <string>fr</string>
+        </dict>
+	<key>KLInfo_Ergopti_v2_2_2_plus_ansi</key>
+        <dict>
+            <key>TICapsLockLanguageSwitchCapable</key>
+            <true/>
+            <key>TISIconIsTemplate</key>
+            <false/>
+            <key>ICNS</key>
+            <string>Ergopti_v2_2_2_plus_ansi.icns</string>
+            <key>TISInputSourceID</key>
+            <string>com.apple.keyboardlayout.ergopti.plus.ansi</string>
+            <key>TISIntendedLanguage</key>
+            <string>fr</string>
+        </dict>
+</dict>
+</plist>

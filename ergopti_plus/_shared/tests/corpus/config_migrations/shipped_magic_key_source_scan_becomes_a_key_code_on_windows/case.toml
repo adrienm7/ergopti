@@ -1,0 +1,8 @@
+# _shared/tests/corpus/config_migrations/shipped_magic_key_source_scan_becomes_a_key_code_on_windows/case.toml
+
+[case]
+description = "The shipped v4 to v5 step turns the Windows magic-key scan code into the KeyboardEvent.code of the shared magic_key_source, and keeps the detection character beside it."
+drivers = ["ahk"]
+outcome = "migrated"
+from_version = 4
+to_version = 12

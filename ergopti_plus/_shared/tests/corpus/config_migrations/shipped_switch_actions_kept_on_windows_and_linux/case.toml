@@ -1,0 +1,8 @@
+# _shared/tests/corpus/config_migrations/shipped_switch_actions_kept_on_windows_and_linux/case.toml
+
+[case]
+description = "The v5 to v6 step names macOS alone: Windows and Linux keep app_switcher, win_prev and win_next, which they still offer, and only move their stamp."
+drivers = ["ahk", "linux"]
+outcome = "migrated"
+from_version = 5
+to_version = 12

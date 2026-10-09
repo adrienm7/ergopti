@@ -1,0 +1,821 @@
+﻿; ui/wpm/wpm_display.ahk
+
+; ==============================================================================
+; MODULE: WPM Widget — Display Engine
+; DESCRIPTION:
+; Constants, module state, ring-buffer helpers, color-resolution utilities,
+; default-position helpers, and the show/hide/tick rendering loop for the
+; real-time WPM widget. This file owns everything that drives what the user
+; sees on screen; configuration persistence lives in wpm_config.ahk.
+;
+; Split from ui/wpm/init.ahk; see that file for the full module overview.
+; ==============================================================================
+
+#Requires Autohotkey v2.0+
+
+
+
+
+
+; ============================
+; ============================
+; ======= 1/ Constants =======
+; ============================
+; ============================
+
+class WPMWidgetConst {
+    ; ── Loaded at runtime by WPMWidget_LoadSharedConst() ─────────────────────────
+    ; From _shared/modules/wpm_widget/constants.toml (the canon every driver
+    ; reads) and _shared/modules/timings/constants.toml. Zero here, never a
+    ; copied default: a key missing from the canon keeps the widget off.
+    ; [compact]
+    static W                  := 0
+    static H                  := 0
+    static H_NUMBER           := 0
+    static H_GAP              := 0
+    static H_UNIT             := 0
+    static NUMBER_FONT_SIZE   := 0
+    static UNIT_FONT_SIZE     := 0
+    static UNIT_DARKEN        := 0.0
+    static CORNER_R           := 0
+    static EDGE_MARGIN        := 0
+    ; [graph]
+    static GRAPH_W            := 0
+    static GRAPH_H            := 0
+    static GRAPH_CORNER_R     := 0
+    static GRAPH_PAD          := 0
+    static GRAPH_HISTORY      := 0
+    static GRAPH_SCALE_MAX    := 0
+    static GRAPH_LABEL_PX     := 0
+    static GRAPH_BG           := ""
+    static GRAPH_BG_ALPHA     := 0.0
+    static GRAPH_BORDER       := ""
+    static GRAPH_BORDER_ALPHA := 0.0
+    static GRAPH_BORDER_W     := 0
+    static GRAPH_LINE_W       := 0
+    static GRAPH_LINE_ALPHA   := 0.0
+    static GRAPH_FILL_ALPHA   := 0.0
+    static GRAPH_TEXT         := ""
+    ; [colors]  (hex strings without leading '#')
+    static COLOR_BG_MANUAL    := ""
+    static COLOR_BG_AI        := ""
+    static COLOR_BG_IDLE      := ""
+    static COLOR_TXT_ACTIVE   := ""
+    static COLOR_TXT_IDLE     := ""
+    static COLOR_FALLBACK     := ""
+    ; [neutral_sources] — categories that never colour the widget.
+    static NEUTRAL            := Map()
+    ; [transparency]
+    static ALPHA_ACTIVE       := 0
+    static ALPHA_IDLE         := 0
+    ; Timings: [ui] and [keylogger].
+    static IDLE_HIDE_MS       := 0
+    static COLOR_HOLD_MS      := 0
+    static TICK_MS            := 0
+    static WINDOW_MS          := 0
+    static WPM_MIN_DURATION_MS := 0
+
+    ; ── Windows-only: no counterpart on the other drivers ────────────────────────
+    ; Fast cursor-movement poll (ms). The display tick is too coarse to get the
+    ; widget out of the way: this dedicated poll hides the surface within
+    ; MOUSE_WATCH_MS of the slightest cursor movement. Polling MouseGetPos keeps
+    ; it hook-free (no global WH_MOUSE_LL install).
+    static MOUSE_WATCH_MS     := 50
+    ; Delay (ms) after "ready" before the widget first appears, so it arrives a
+    ; beat after boot rather than mid-startup.
+    static BOOT_SHOW_DELAY_MS := 2500
+    ; Delay (ms) after "ready" before the graph window is PRE-WARMED (created +
+    ; first hidden render + GDI+ startup) off the typing path, so the one-time DWM
+    ; window-allocation cost is not absorbed by a tooltip render when the widget
+    ; first appears (it showed up as a ~110 ms Tooltip.Present blip).
+    static PREWARM_DELAY_MS := 900
+    ; Config key names written to config.toml under [metrics].
+    static CFG_VISIBLE        := "wpm_widget_visible"
+    static CFG_X              := "wpm_widget_x"
+    static CFG_Y              := "wpm_widget_y"
+    static CFG_COLORS         := "wpm_widget_colors"
+    static CFG_GRAPH          := "wpm_widget_graph"
+    ; Ring buffer capacity for recent keystrokes.
+    static RING_CAP           := 2000
+}
+
+
+
+
+; Wrap-safe 32-bit TickCount delta: handles the ~49.7-day counter rollover
+; that makes a naive (now - last) subtraction return a huge negative number.
+_WPMWidget_TickDelta(now, last) => ((now - last + 0x100000000) & 0xFFFFFFFF)
+
+
+
+
+
+; ===============================
+; ===============================
+; ======= 2/ Module state =======
+; ===============================
+; ===============================
+
+class WPMWidget {
+    ; Compact mode GUI handles.
+    static _gui           := false
+    static _lbl_wpm       := false
+    static _lbl_unit      := false
+    static _lbl_strip     := false   ; Darker background strip behind the unit label
+
+    ; Graph mode GUI (a layered window painted with GDI+ — no WebView2).
+    static _graph_gui        := false
+
+    ; GDI+ handles, created once and reused for every graph render. The token is
+    ; held for the process lifetime (the graph re-renders every tick, so per-call
+    ; startup/shutdown would be pure waste). The font is in logical pixels; the
+    ; per-render world transform scales it to the correct physical size per DPI.
+    static _gdip_started     := false
+    static _gdip_initializing := false
+    static _gdip_cleanup_debt := 0
+    static _gdip_module      := 0
+    static _gdip_token       := 0
+    static _gdip_family      := 0
+    static _gdip_font        := 0
+    static _gdip_fmt         := 0
+    static _gdip_frame_rendering := false
+    static _gdip_frame_cleanup_debt := 0
+
+    ; Visibility + position.
+    static visible        := false
+    static pos_x          := -1         ; -1 = auto-position on first show
+    static pos_y          := -1
+
+    ; Ring buffer of recent keystrokes.
+    static _ring          := []
+    static _ring_head     := 0
+
+    ; WPM history array for graph (newest last).
+    static _graph_hist    := []
+
+    ; Derived state refreshed by the tick.
+    static _last_wpm      := 0
+    static _last_tick     := 0
+    static _last_hs       := false
+    static _last_ai       := false
+    static _last_ac       := false
+    ; Timestamps of the last HS/AI/AC keystroke (for source_color_duration logic).
+    static _last_hs_tick      := 0
+    static _last_ai_tick      := 0
+    static _last_ac_tick      := 0
+    ; TOML category of the last HS expansion (e.g. "magickey", "autocorrection").
+    ; Used to resolve the widget color from the same pipeline as the tooltip.
+    static _last_hs_category  := "magickey"
+    ; Section hint for the last HS expansion. When the category is "personal" the
+    ; section name mirrors a standard category (e.g. "autocorrectionJ") and is
+    ; used as a color fallback so personal hotstrings match their group color.
+    static _last_hs_section   := ""
+
+    ; Display options.
+    static use_colors     := false
+    static show_graph     := false
+
+    ; Drag state.
+    static _drag_start_x  := 0
+    static _drag_start_y  := 0
+    static _drag_win_x    := 0
+    static _drag_win_y    := 0
+    static _dragging      := false
+
+    ; Idle-hide state: wall clock of the last keyboard event seen by the widget.
+    static _last_input_ms := 0
+
+    ; Last observed cursor position for the fast mouse-watch hide. Seeded in
+    ; WPMWidget_Show so the very first poll never fires a spurious hide.
+    static _last_mouse_x  := 0
+    static _last_mouse_y  := 0
+}
+
+
+
+
+
+; ======================================
+; ======================================
+; ======= 3/ Ring buffer helpers =======
+; ======================================
+; ======================================
+
+; Categories whose expansions must not color the widget (no visible tooltip,
+; or ergonomic substitutions that should stay at the default blue color).
+_WPMWidget_NeutralCategory(category) {
+    return WPMWidgetConst.NEUTRAL.Has(category)
+}
+
+; Called by the keylogger hook after each accepted keystroke.
+; category: TOML group name of the hotstring ("magickey", "rolls", …).
+;   Pass "" for manual keystrokes or when the category is unknown.
+;   "rolls" and "repeat_key" are treated as neutral and do not color the widget.
+WPMWidget_Push(is_hs := false, is_ai := false, is_ac := false, category := "", section := "") {
+	; WPM pushes can originate from the deferred fire-log timer, which native
+	; Suspend does not disarm. Guard before the ring/timestamp mutations so a
+	; stale callback cannot repaint pre-pause activity after resume.
+	if A_IsSuspended
+		return
+	if !WPMWidget.visible
+		return
+	; Neutral categories count as keystrokes but must not trigger HS color.
+	if (is_hs and _WPMWidget_NeutralCategory(category))
+		is_hs := false
+	cap := WPMWidgetConst.RING_CAP
+	now_t := A_TickCount
+	entry := Map("t", now_t, "hs", is_hs, "ai", is_ai, "ac", is_ac)
+	; Pair the second pause check with every ring/timestamp mutation. Helpers above
+	; may yield, while this region contains no Send/Sleep/I/O/logger call and stays
+	; bounded regardless of replacement length.
+	RingCritical := Critical("On")
+	try {
+		if A_IsSuspended or !WPMWidget.visible
+			return
+		head := WPMWidget._ring_head
+		if (WPMWidget._ring.Length < cap)
+			WPMWidget._ring.Push(entry)
+		else
+			WPMWidget._ring[head + 1] := entry
+		WPMWidget._ring_head := Mod(head + 1, cap)
+		WPMWidget._last_tick := now_t
+		WPMWidget._last_input_ms := now_t
+		WPMWidget._last_hs := is_hs
+		WPMWidget._last_ai := is_ai
+		WPMWidget._last_ac := is_ac
+		if is_hs {
+			WPMWidget._last_hs_tick := now_t
+			WPMWidget._last_hs_category := (category != "") ? category : "magickey"
+			WPMWidget._last_hs_section := section
+			StoredCategory := WPMWidget._last_hs_category
+		}
+		if is_ai
+			WPMWidget._last_ai_tick := now_t
+		if is_ac
+			WPMWidget._last_ac_tick := now_t
+	} finally {
+		; Preserve an outer injection transaction. Unconditionally switching
+		; Critical off here would let the next hook callback interleave with it.
+		Critical(RingCritical)
+	}
+	; Per-keystroke hot path — gate the arg-array build behind the cached flag so
+	; nothing is interpolated when DEBUG is off (logger.ahk convention).
+	if is_hs and LoggerIsDebugEnabled()
+		LoggerDebug("WPMWidget", "Push hs: category='{1}' section='{2}' stored='{3}'", category, section, StoredCategory)
+}
+
+
+; Compute current WPM from the ring buffer.
+WPMWidget_Calc() {
+    now      := A_TickCount
+    count    := 0
+    has_hs   := false
+    has_ai   := false
+    has_ac   := false
+    earliest := now
+    latest   := 0
+    ; Walk the ring under Critical so a concurrent WPMWidget_Push (keyboard thread)
+    ; cannot grow the array or overwrite a slot mid-enumeration — the loop sees a
+    ; consistent snapshot. No Send/Sleep/blocking call here, so the hook is safe.
+    RingCritical := Critical("On")
+    try {
+        for _, ev in WPMWidget._ring {
+            t := ev["t"]
+            ; Wrap-safe age check: skip events older than the rolling window
+            if (_WPMWidget_TickDelta(now, t) > WPMWidgetConst.WINDOW_MS)
+                continue
+            count++
+            if ev["hs"]
+                has_hs := true
+            if ev["ai"]
+                has_ai := true
+            if ev["ac"]
+                has_ac := true
+            if (t < earliest)
+                earliest := t
+            if (t > latest)
+                latest := t
+        }
+    } finally {
+        Critical(RingCritical)
+    }
+    if (count < 2)
+        return Map("wpm", 0, "has_hs", has_hs, "has_ai", has_ai, "has_ac", has_ac)
+    ; Use now as the right edge (mirrors Hammerspoon): as time passes after the
+    ; last keystroke the window grows and WPM decays naturally to 0.
+    ; latest - earliest would freeze the WPM at the last typed value.
+    elapsed_ms := Max(_WPMWidget_TickDelta(now, earliest), WPMWidgetConst.WPM_MIN_DURATION_MS)
+    wpm := (count / 5) / (elapsed_ms / 60000)
+    return Map("wpm", Round(wpm), "has_hs", has_hs, "has_ai", has_ai, "has_ac", has_ac)
+}
+
+
+; Resolve the color for a hotstring category.
+;
+; The USER OVERRIDE comes first. Reading the TOML file directly — which is all
+; this used to do — sees only what is on disk, so a color changed in the config
+; window sat in _HotstringsOverrides and never reached the widget until the next
+; reload: the tooltip repainted immediately and the widget did not, from the same
+; edit. HotstringsResolve owns the full cascade (user section > user category >
+; TOML section > TOML category > default) and is the single place that knows
+; about overrides at all.
+;
+; The direct TOML read remains as the FALLBACK, which is the case the bypass was
+; written for: during early init _SharedDir may not be resolved yet and the
+; resolver would hand back a stale empty entry.
+; Returns "" when neither source has a color.
+; Only the FALLBACK file read is memoized, in a static Map keyed by
+; CategoryName. The resolver is asked on every call and is never memoized here.
+_WPMWidget_ReadTomlColor(CategoryName) {
+    static _color_cache := Map()
+
+    ; Ask the override-aware resolver FIRST, before any cache lookup. The
+    ; cache-hit early return used to sit above this block, so the first call
+    ; that fell through to the fallback (resolver not yet available during early
+    ; init — the exact window the fallback exists for) cached its answer, often
+    ; the empty string, and every later call short-circuited on it. The resolver
+    ; was then skipped permanently for that category: a colour changed in the
+    ; config window repainted the tooltip and left the widget on the manual blue
+    ; until restart, which is the very staleness the resolver was added to fix.
+    ; Its result is deliberately NOT memoized — HotstringsResolve owns a
+    ; generation-invalidated cache of its own (_HSResolveCache /
+    ; HotstringsResolveBumpGen), and a second copy here could only desynchronise
+    ; from it.
+    if (CategoryName != "" and IsSet(HotstringsResolve)) {
+        try {
+            Resolved := HotstringsResolve(CategoryName, "")
+            if (IsObject(Resolved) and Resolved.HasOwnProp("Color") and Resolved.Color != "")
+                return Resolved.Color
+        }
+    }
+
+    ; Resolver unavailable or empty — serve the memoized file read. The WPM tick
+    ; fires every ~100 ms and would otherwise re-read the category TOML dozens of
+    ; times per second.
+    if _color_cache.Has(CategoryName)
+        return _color_cache[CategoryName]
+
+    global _SharedDir, GLOBAL_DEFAULT_COLOR
+    FilePath := HotstringsBundledTomlPath(CategoryName)
+    if !FileExist(FilePath) {
+        LoggerDebug("WPMWidget", "ReadTomlColor: file not found for '{1}': {2}", CategoryName, FilePath)
+        _color_cache[CategoryName] := ""
+        return ""
+    }
+    FileContent := FileRead(FilePath, "UTF-8")
+    InMeta := false
+    loop parse, FileContent, "`n", "`r" {
+        Line := Trim(A_LoopField, " `t")
+        if (Line == "" or SubStr(Line, 1, 1) == "#")
+            continue
+        if (SubStr(Line, 1, 2) == "[[")
+            break
+        if (Line == "[_meta]") {
+            InMeta := true
+            continue
+        }
+        if (SubStr(Line, 1, 1) == "[") {
+            InMeta := false
+            continue
+        }
+        if InMeta and RegExMatch(Line, '^color\s*=\s*"([^"]+)"', &M) {
+            c := M[1]
+            LoggerDebug("WPMWidget", "ReadTomlColor: '{1}' → raw='{2}' default='{3}'", CategoryName, c, GLOBAL_DEFAULT_COLOR)
+            ; Skip the global blue fallback — it means "no category color set"
+            result := (c != GLOBAL_DEFAULT_COLOR) ? c : ""
+            _color_cache[CategoryName] := result
+            return result
+        }
+    }
+    LoggerDebug("WPMWidget", "ReadTomlColor: no color key found for '{1}'", CategoryName)
+    _color_cache[CategoryName] := ""
+    return ""
+}
+
+; Returns the raw compact-mode background hex for a hotstring category
+; (without leading '#'). Reads the color directly from the TOML group file
+; via ParseTomlGroupConfig — the same path the tooltip uses — so the widget
+; always shows the exact color configured in the hotstring TOML.
+; Falls back to FallbackHex if the TOML is absent or has no color.
+WPMWidget_CategoryBgColor(CategoryName, FallbackHex, SectionHint := "") {
+    try {
+        raw := _WPMWidget_ReadTomlColor(CategoryName)
+        if (raw != "") {
+            result := (SubStr(raw, 1, 1) == "#") ? SubStr(raw, 2) : raw
+            LoggerDebug("WPMWidget", "CategoryBgColor '{1}' → '{2}'", CategoryName, result)
+            if RegExMatch(result, "^[0-9A-Fa-f]{6}$")
+                return result
+            ; Falls through to fallback if format is invalid
+        }
+        if (SectionHint != "") {
+            Basecat := _WPMWidget_SectionBaseCategory(SectionHint)
+            if (Basecat != "") {
+                raw2 := _WPMWidget_ReadTomlColor(Basecat)
+                if (raw2 != "") {
+                    result2 := (SubStr(raw2, 1, 1) == "#") ? SubStr(raw2, 2) : raw2
+                    LoggerDebug("WPMWidget", "CategoryBgColor '{1}' via section '{2}' → '{3}'", CategoryName, Basecat, result2)
+                    if RegExMatch(result2, "^[0-9A-Fa-f]{6}$")
+                        return result2
+                    ; Falls through to fallback if format is invalid
+                }
+            }
+        }
+    } catch as e {
+        LoggerError("WPMWidget", "CategoryBgColor failed for '{1}': {2}", CategoryName, e.Message)
+    }
+    LoggerDebug("WPMWidget", "CategoryBgColor '{1}' → fallback '{2}'", CategoryName, FallbackHex)
+    return FallbackHex
+}
+
+; Derive the standard category name from a section name by stripping the
+; trailing PascalCase qualifier (e.g. "autocorrectionJ" → "autocorrection",
+; "magickey" → "magickey", "distancesreductionQU" → "distancesreduction").
+; Returns "" when no known base category can be derived.
+_WPMWidget_SectionBaseCategory(SectionName) {
+    static KnownCats := ["autocorrection", "magickey", "distancesreduction",
+                         "sfbsreduction", "rolls", "personal"]
+    Lower := StrLower(SectionName)
+    for _, Cat in KnownCats {
+        if (SubStr(Lower, 1, StrLen(Cat)) == Cat)
+            return Cat
+    }
+    return ""
+}
+
+; Resolve the compact-mode background color for the current source state.
+; HS and AC colors are read live from the TOML/override pipeline so user
+; customizations in the hotstrings config window are reflected immediately.
+WPMWidget_ResolveBgColor(idle, has_hs, has_ai, has_ac, use_colors) {
+    if idle
+        return WPMWidgetConst.COLOR_BG_IDLE
+    if use_colors {
+        if has_ai
+            return WPMWidgetConst.COLOR_BG_AI
+        if has_hs {
+            LoggerDebug("WPMWidget", "ResolveBgColor: has_hs cat='{1}'", WPMWidget._last_hs_category)
+            ; A group with no usable colour takes the canon's fallback accent,
+            ; as it does on macOS and Linux.
+            return WPMWidget_CategoryBgColor(WPMWidget._last_hs_category, WPMWidgetConst.COLOR_FALLBACK, WPMWidget._last_hs_section)
+        }
+        if has_ac
+            return WPMWidget_CategoryBgColor("autocorrection", WPMWidgetConst.COLOR_FALLBACK)
+    }
+    LoggerDebug("WPMWidget", "ResolveBgColor: no color — use_colors={1} has_hs={2} has_ai={3} has_ac={4}", use_colors, has_hs, has_ai, has_ac)
+    return WPMWidgetConst.COLOR_BG_MANUAL
+}
+
+
+; Resolve the graph accent color hex string.
+; HS and AC colors are sourced from the same TOML pipeline as tooltips.
+WPMWidget_ResolveGraphColor(has_hs, has_ai, has_ac, use_colors) {
+    ; The curve takes the pill's own colour, as on macOS and Linux.
+    return WPMWidget_ResolveBgColor(false, has_hs, has_ai, has_ac, use_colors)
+}
+
+
+
+
+
+; ==================================================
+; ==================================================
+; ======= 4/ Default position (bottom-right) =======
+; ==================================================
+; ==================================================
+
+; Returns the default top-left position for the compact widget.
+; Bottom-right corner lands at (wr - EDGE_MARGIN, wb - EDGE_MARGIN) so the widget
+; sits just above the taskbar with the same margin on both sides.
+; pos_x/pos_y always store the compact top-left; WPMWidget_ShowPos() derives the
+; actual top-left for the current mode from that anchor via the shared bottom-right corner.
+WPMWidget_DefaultPos(&out_x, &out_y) {
+    MonitorGetWorkArea(, &wl, &wt, &wr, &wb)
+    out_x := wr - WPMWidgetConst.W  - WPMWidgetConst.EDGE_MARGIN
+    out_y := wb - WPMWidgetConst.H  - WPMWidgetConst.EDGE_MARGIN
+}
+
+; Derives the top-left corner for the current display mode from the saved compact
+; top-left (pos_x/pos_y). The bottom-right corner is kept constant across modes.
+WPMWidget_ShowPos(&out_x, &out_y) {
+    if WPMWidget.show_graph {
+        ; bottom-right of compact = pos_x + W, pos_y + H
+        ; top-left of graph       = bottom-right - GRAPH_W, bottom-right - GRAPH_H
+        out_x := WPMWidget.pos_x + WPMWidgetConst.W - WPMWidgetConst.GRAPH_W
+        out_y := WPMWidget.pos_y + WPMWidgetConst.H - WPMWidgetConst.GRAPH_H
+    } else {
+        out_x := WPMWidget.pos_x
+        out_y := WPMWidget.pos_y
+    }
+}
+
+
+
+
+
+; ==============================
+; ==============================
+; ======= 6/ Show / Hide =======
+; ==============================
+; ==============================
+
+; Applies the widget's geometry to a surface Gui: seeds the saved anchor on first
+; use, derives the current mode's top-left from it and sizes + positions the
+; window WHILE HIDDEN (the tick is the only thing allowed to reveal it).
+;
+; THE single owner of that Show call. A Gui that was constructed but never Shown
+; has a 0x0 client rect, and GR_DrawBitmap early-returns on `W <= 0 or H <= 0` —
+; so a rebuilt-but-unsized graph surface never receives another
+; UpdateLayeredWindow and the widget silently paints nothing for the rest of the
+; session. The builders construct; this positions; every path that produces a
+; usable surface must go through both.
+_WPMWidget_ApplySurfaceGeometry(gui_ref) {
+    if !gui_ref
+        return
+    if (WPMWidget.pos_x = -1 || WPMWidget.pos_y = -1) {
+        WPMWidget_DefaultPos(&def_x, &def_y)
+        WPMWidget.pos_x := def_x
+        WPMWidget.pos_y := def_y
+    }
+    w := WPMWidget.show_graph ? WPMWidgetConst.GRAPH_W : WPMWidgetConst.W
+    h := WPMWidget.show_graph ? WPMWidgetConst.GRAPH_H : WPMWidgetConst.H
+    WPMWidget_ShowPos(&show_x, &show_y)
+    ; Hide alone sizes without revealing; adding NoActivate selects a visible show mode.
+    gui_ref.Show("Hide x" . show_x . " y" . show_y . " w" . w . " h" . h)
+}
+
+; No-op draw callback for GR_DrawBitmap: leaves the freshly created DIB untouched.
+; CreateDIBSection zero-fills its pixels, so the uploaded layered surface is FULLY
+; TRANSPARENT (every ARGB = 0). This is the key to warming the graph window without
+; ever flashing: see WPMWidget_PrewarmGraph.
+_WPMWidget_WarmDrawTransparent(MemDC, W, H) {
+    ; Intentionally draws nothing: the zero-filled DIB uploads as a fully
+    ; transparent layered surface, so prewarming never leaves opaque stale content.
+}
+
+; Pre-create the graph window + warm GDI+ and the layered/DWM upload path during a
+; quiet boot slot (armed earlier than WPMWidget_Show), so the one-time DWM
+; window-allocation and GdiplusStartup cost is paid OFF the typing path. Previously
+; that cost was absorbed by the first render after the widget appeared, surfacing as
+; a ~110 ms blip (message-pump reentrancy while DWM composited the brand-new window).
+;
+; The warm uploads a TRANSPARENT surface, not a real "0" graph. The former geometry
+; call combined Hide with NoActivate, selecting a visible show mode and revealing
+; any opaque prewarmed content. Geometry now uses Hide alone. Keep the transparent
+; warm frame so only the typing tick owns the first opaque upload and reveal.
+WPMWidget_PrewarmGraph() {
+    if (!WPMWidget.visible or !WPMWidget.show_graph or A_IsSuspended)
+        return
+    if !WPMWidget._graph_gui
+        WPMWidget_BuildGraph()
+    g := WPMWidget._graph_gui
+    if !g
+        return
+    try {
+        ; Size the layered window, start GDI+, then upload one TRANSPARENT frame to
+        ; warm the CreateDIBSection -> UpdateLayeredWindow -> DWM path without opaque
+        ; content. GR_Hide leaves it in the clean SW_HIDE resting state.
+        _WPMWidget_ApplySurfaceGeometry(g)
+        WPMWidget_EnsureGdip()
+        GR_DrawBitmap(g.Hwnd, _WPMWidget_WarmDrawTransparent)
+        GR_Hide(g.Hwnd)
+        LoggerDone("WPMWidget", "Graph window pre-warmed (transparent surface), off the typing path.")
+    } catch as e {
+        LoggerError("WPMWidget", "Graph pre-warm failed: {1}", e.Message)
+    }
+}
+
+
+; Clears the rolling WPM state (keystroke ring, history, input/category
+; timestamps). Called by WPMWidget_Show so keystrokes typed during boot/reload --
+; before the widget surface is armed -- cannot trigger an immediate reveal: the
+; widget must stay hidden until the user actually types after it is shown.
+_WPMWidget_ResetRolling() {
+    RingCritical := Critical("On")
+    try {
+        WPMWidget._ring := []
+        WPMWidget._ring_head := 0
+    } finally {
+        Critical(RingCritical)
+    }
+    WPMWidget._graph_hist    := []
+    WPMWidget._last_input_ms := 0
+    WPMWidget._last_hs_tick  := 0
+    WPMWidget._last_ai_tick  := 0
+    WPMWidget._last_ac_tick  := 0
+    WPMWidget._last_wpm      := 0
+}
+
+
+WPMWidget_Show() {
+    LoggerStart("WPMWidget", "Showing widget (graph={1}, pos_x={2}, pos_y={3})…",
+        WPMWidget.show_graph, WPMWidget.pos_x, WPMWidget.pos_y)
+    if WPMWidget.show_graph {
+        if !WPMWidget._graph_gui
+            WPMWidget_BuildGraph()
+    } else {
+        if !WPMWidget._gui
+            WPMWidget_BuildCompact()
+    }
+
+    WPMWidget.visible := true
+
+    ; Start from a clean slate -- discard any keystrokes counted during boot or
+    ; reload so the surface stays hidden until the user types AFTER it is shown.
+    _WPMWidget_ResetRolling()
+
+    gui_ref := WPMWidget.show_graph ? WPMWidget._graph_gui : WPMWidget._gui
+
+    ; Both modes start invisible; the tick reveals the surface once the user types.
+    ; Graph mode is a layered GDI+ window: position + size it WHILE HIDDEN, then the
+    ; tick paints it via UpdateLayeredWindow and reveals it (per-pixel alpha rules
+    ; out WinSetTransparent here — the two layering modes are mutually exclusive).
+    ; Compact mode uses the same "Hide" approach — no flash on startup.
+    _WPMWidget_ApplySurfaceGeometry(gui_ref)
+
+    SetTimer(WPMWidget_Tick, WPMWidgetConst.TICK_MS)
+
+    ; Seed the cursor position and arm the fast mouse-watch so the widget hides the
+    ; instant the cursor moves — it must never cover text the user wants to read.
+    MouseGetPos(&_seed_mx, &_seed_my)
+    WPMWidget._last_mouse_x := _seed_mx
+    WPMWidget._last_mouse_y := _seed_my
+    SetTimer(WPMWidget_MouseWatch, WPMWidgetConst.MOUSE_WATCH_MS)
+
+    LoggerSuccess("WPMWidget", "Widget shown at ({1}, {2}) mode={3}.",
+        WPMWidget.pos_x, WPMWidget.pos_y, WPMWidget.show_graph ? "graph" : "compact")
+}
+
+WPMWidget_Hide() {
+    WPMWidget.visible := false
+    SetTimer(WPMWidget_Tick, 0)
+    SetTimer(WPMWidget_MouseWatch, 0)
+    if WPMWidget._gui
+        try WPMWidget._gui.Hide()
+    if WPMWidget._graph_gui
+        try WPMWidget._graph_gui.Hide()
+    try LoggerDone("WPMWidget", "Widget hidden.")
+}
+
+
+
+
+
+; =========================================
+; =========================================
+; ======= 7/ Tick — refresh display =======
+; =========================================
+; =========================================
+
+WPMWidget_Tick() {
+    if !WPMWidget.visible
+        return
+
+    ; While the script is paused the widget must show nothing. Hide the surface
+    ; directly (not via WPMWidget_Hide, which would clear .visible and stop this
+    ; timer) so it reappears on resume with no restore bookkeeping.
+    if A_IsSuspended {
+        gui_ref := WPMWidget.show_graph ? WPMWidget._graph_gui : WPMWidget._gui
+        if gui_ref
+            try gui_ref.Hide()
+        return
+    }
+
+    now    := A_TickCount
+    result := WPMWidget_Calc()
+    wpm    := result["wpm"]
+    ; Source color active for COLOR_HOLD_MS after the last event — long enough
+    ; for the 500 ms tick to always catch even very short burst expansions.
+    has_hs := _WPMWidget_TickDelta(now, WPMWidget._last_hs_tick) < WPMWidgetConst.COLOR_HOLD_MS
+    has_ai := _WPMWidget_TickDelta(now, WPMWidget._last_ai_tick) < WPMWidgetConst.COLOR_HOLD_MS
+    has_ac := _WPMWidget_TickDelta(now, WPMWidget._last_ac_tick) < WPMWidgetConst.COLOR_HOLD_MS
+
+    ; Update graph history.
+    WPMWidget._graph_hist.Push(wpm)
+    while (WPMWidget._graph_hist.Length > WPMWidgetConst.GRAPH_HISTORY)
+        WPMWidget._graph_hist.RemoveAt(1)
+
+    ; Hide after IDLE_HIDE_MS of keyboard inactivity.
+    keyboard_idle := WPMWidget._last_input_ms > 0
+        && _WPMWidget_TickDelta(now, WPMWidget._last_input_ms) > WPMWidgetConst.IDLE_HIDE_MS
+    ; Hide immediately if the mouse/touchpad was used more recently than the last keystroke —
+    ; A_TimeIdleMouse is built into AHK and requires no hook install.
+    mouse_active  := A_TimeIdleMouse < A_TimeIdleKeyboard
+    should_show   := _WPMWidget_TooltipUp()
+        || (!keyboard_idle && !mouse_active && ((wpm > 0) || has_hs || has_ai || has_ac))
+    gui_ref := WPMWidget.show_graph ? WPMWidget._graph_gui : WPMWidget._gui
+    if !gui_ref
+        return
+
+    if !should_show {
+        try _WPMWidget_HideSurface(gui_ref)
+        return
+    }
+
+    is_idle := false
+    wpm_str := String(wpm)
+    txt_col := WPMWidgetConst.COLOR_TXT_ACTIVE
+
+    if WPMWidget.show_graph {
+        ; Paint the layered window via GDI+ WHILE still hidden, then reveal it — no
+        ; flash and no browser cold-start. The catch clears a stale handle (e.g. the
+        ; user closed the window) so the next tick rebuilds cleanly.
+        try {
+            accent := WPMWidget_ResolveGraphColor(has_hs, has_ai, has_ac, WPMWidget.use_colors)
+            label  := wpm_str . " " . t("menu.metrics.wpm_unit")
+            if !WPMWidget_RenderGraph(label, accent)
+                return
+            GR_Show(WPMWidget._graph_gui.Hwnd)
+        } catch as _e {
+            ; Mirrors the compact-mode sibling below: LOG the failure and rebuild.
+            ; A bare catch that only dropped the handle left the widget dead until
+            ; the user happened to toggle the mode by hand, with nothing anywhere
+            ; to say a render had thrown — the two branches of the same tick
+            ; behaved differently for no reason anyone chose.
+            try LoggerError("WPMWidget", "Graph mode tick threw — rebuilding widget: {1}.", _e.Message)
+            WPMWidget._graph_gui := false
+            try WPMWidget_BuildGraph()
+            ; The builder only constructs. Without the geometry the rebuilt Gui
+            ; keeps a 0x0 client rect, GR_DrawBitmap early-returns on every later
+            ; tick and the "recovery" leaves the widget exactly as dead as the bare
+            ; catch it replaced — just with one ERROR line to show for it.
+            try _WPMWidget_ApplySurfaceGeometry(WPMWidget._graph_gui)
+        }
+    } else {
+        bg_color := WPMWidget_ResolveBgColor(is_idle, has_hs, has_ai, has_ac, WPMWidget.use_colors)
+        alpha    := WPMWidgetConst.ALPHA_ACTIVE
+        try {
+            WPMWidget._gui.Show("NoActivate")
+            WPMWidget._gui.BackColor := bg_color
+            WinSetTransparent(alpha, WPMWidget._gui)
+            WinRedraw(WPMWidget._gui)
+            dark_bg := _WPMWidget_DarkenHex(bg_color)
+            if WPMWidget._lbl_strip
+                WPMWidget._lbl_strip.Opt("Background" . dark_bg)
+            if WPMWidget._lbl_wpm && (wpm_str != WPMWidget._lbl_wpm.Value)
+                WPMWidget._lbl_wpm.Value := wpm_str
+            if WPMWidget._lbl_wpm
+                WPMWidget._lbl_wpm.SetFont("c" . txt_col)
+            if WPMWidget._lbl_unit
+                WPMWidget._lbl_unit.SetFont("c" . txt_col)
+        } catch as _e {
+            try LoggerError("WPMWidget", "Compact mode tick threw — rebuilding widget: {1}.", _e.Message)
+            WPMWidget._gui       := false
+            WPMWidget._lbl_wpm   := false
+            WPMWidget._lbl_unit  := false
+            WPMWidget._lbl_strip := false
+            try WPMWidget_BuildCompact()
+            ; Same reason as the graph sibling above: the next tick reveals this
+            ; window with a bare Show("NoActivate"), which would put the rebuilt
+            ; widget at the OS default position instead of the user's corner.
+            try _WPMWidget_ApplySurfaceGeometry(WPMWidget._gui)
+        }
+    }
+    WPMWidget._last_wpm := wpm
+}
+
+
+; Hide the widget surface. Both modes hide outright now — the graph is a native
+; GDI+ layered window with no WebView2 renderer to keep alive. Shared by the
+; display tick and the fast mouse-watch so both hide identically.
+_WPMWidget_HideSurface(gui_ref) {
+    gui_ref.Hide()
+}
+
+
+; Fast cursor-movement watch — armed only while the widget is visible. Costs a
+; MouseGetPos plus an integer compare every MOUSE_WATCH_MS; the moment the cursor
+; moves, the surface is hidden so it never sits over text the user is reading.
+; This only ever drives the HIDE transition: the 500 ms display tick's own
+; mouse_active gate keeps it hidden afterwards and re-shows it once the user types
+; again, so no re-show bookkeeping is needed here.
+; Whether a hotstring preview or an AI suggestion is on screen. It keeps the
+; widget up, as on macOS and Linux: the user is mid-typing, choosing what to
+; insert.
+_WPMWidget_TooltipUp() {
+    try return (IsSet(TooltipIsVisible) && TooltipIsVisible())
+        || (IsSet(LLM_TooltipIsVisible) && LLM_TooltipIsVisible())
+    catch
+        return false
+}
+
+WPMWidget_MouseWatch() {
+    if !WPMWidget.visible
+        return
+
+    ; SetTimer callbacks keep firing under native Suspend() (only Hotkeys/Hotstrings
+    ; are disarmed), so this fast watch needs its own guard — mirrors WPMWidget_Tick.
+    if A_IsSuspended
+        return
+
+    MouseGetPos(&mx, &my)
+    if (mx == WPMWidget._last_mouse_x and my == WPMWidget._last_mouse_y)
+        return
+    WPMWidget._last_mouse_x := mx
+    WPMWidget._last_mouse_y := my
+    ; The tick keeps the widget up while a preview is on screen; hiding it here
+    ; would only make it flicker back.
+    if _WPMWidget_TooltipUp()
+        return
+    gui_ref := WPMWidget.show_graph ? WPMWidget._graph_gui : WPMWidget._gui
+    if gui_ref
+        try _WPMWidget_HideSurface(gui_ref)
+}

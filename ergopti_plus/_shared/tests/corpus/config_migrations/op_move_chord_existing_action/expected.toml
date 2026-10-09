@@ -1,0 +1,10 @@
+[_meta]
+schema_version = 2
+
+# Independent handoff input.
+[hotstrings.editor]
+keep = "neighbor" # unchanged
+
+[shortcuts.keyboard]
+hs_ctrl_d = "open_config"
+magic_editor = "ctrl_a"

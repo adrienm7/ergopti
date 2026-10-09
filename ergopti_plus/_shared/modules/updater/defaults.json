@@ -1,0 +1,112 @@
+{
+	"_comment": "Cross-driver updater scalars and release artifact names. Single source replacing per-file literals in the Windows, macOS and Linux updaters and release CI. macOS and Linux read this file at require-time via Paths.shared; the Windows driver has no JSON reader at include time and reads the generated windows/_generated/update_schedule.ahk (npm run codegen:update-schedule) plus inline scalars pinned by tools/test/test-updater-constants-single-source.cjs. timing: the automatic-check schedule every driver applies through _shared/modules/updater/schedule.js and its ports (vectors in schedule_vectors.json). check_interval_presets are the menu's frequency choices in display order (label: menu.about.frequency.<code>; 'never' is 0 and disables automatic checks); a saved value outside them snaps to the nearest preset by ratio. boot_check_delay_sec also applies after a wake. jitter_percent of the interval, capped at jitter_max_sec, spreads checks deterministically per install; failure_backoff_sec is the retry delay after 1, 2 and 3+ consecutive failures, never longer than the interval; reevaluate_sec bounds every timer so a suspended machine or a monotonic timer never delays a due check by more than that. check_state.storage_key names the runtime record (last_check_at, last_success_at, failures, seed, last_notified_tag) each driver keeps in its Storage port. release_sources: URL templates ({owner}/{repo}) and budgets of the changelog window, which tries the REST API first and the public Atom feed when the API is blocked or slow; ui_watchdog_sec must exceed proxy_resolve_timeout_sec + 2 * source_timeout_sec. update_check: the release list every update channel reads; each driver keeps its channel's latest release through the shared registry (channels.json), since /releases/latest ignores prereleases and answers 404 while a channel has no release. config_backup: the backup a release install from the Versions window makes before anything is downloaded, and the one a restore makes of the configuration it replaces. It copies every file of the configuration folder whose extension is listed, except under the top-level exclude_dirs (the backups themselves and the metrics data), into <configuration folder>/<folder>/<kind prefix>-<YYYYMMDD-HHMMSS>[-<tag>]/, and writes <manifest> last, so a folder without one is an incomplete backup nobody restores. macOS and Linux run _shared/lua/updater/config_backup.lua; Windows windows/modules/updater/config_backup.ahk reads this block at run time. release_install.macos_archives: ordered manual Versions installer bindings to release_assets keys and native archive formats. A present preferred archive must pass its exact repository URL and GitHub SHA-256; only its absence permits the declared historical ZIP. macos_bundle remains the ZIP asset of existing producers until the release packaging transition is qualified. release_install.install_timeout_ms: local native installation cap captured once at fresh install admission; reader, tar and cleanup phases share this deadline. Existing synchronous installations previously had no finite cap. release_install.listing_max_output_bytes: finite tar names/verbose output ceiling captured once at local install admission; extraction and the general native-process output limit retain their existing bounds. archive_transfer: checksum, archive and hash phase ceilings captured once by the shared pure transfer_budget policy; the total deadline is derived by summing those captured ceilings. Redirects, PAC retries and child retirement never restart a phase.",
+	"github": {
+		"owner": "adrienm7",
+		"repo": "ergopti"
+	},
+	"timing": {
+		"default_check_interval_sec": 86400,
+		"boot_check_delay_sec": 30,
+		"check_interval_presets": [
+			{
+				"code": "5m",
+				"seconds": 300
+			},
+			{
+				"code": "30m",
+				"seconds": 1800
+			},
+			{
+				"code": "1h",
+				"seconds": 3600
+			},
+			{
+				"code": "6h",
+				"seconds": 21600
+			},
+			{
+				"code": "12h",
+				"seconds": 43200
+			},
+			{
+				"code": "1d",
+				"seconds": 86400
+			},
+			{
+				"code": "3d",
+				"seconds": 259200
+			},
+			{
+				"code": "1w",
+				"seconds": 604800
+			},
+			{
+				"code": "1mo",
+				"seconds": 2592000
+			},
+			{
+				"code": "never",
+				"seconds": 0
+			}
+		],
+		"jitter_percent": 10,
+		"jitter_max_sec": 3600,
+		"failure_backoff_sec": [300, 900, 3600],
+		"reevaluate_sec": 300
+	},
+	"check_state": {
+		"storage_key": "updater.check_state"
+	},
+	"release_assets": {
+		"linux_bundle": "ergopti-plus-linux.tar.gz",
+		"macos_bundle": "ErgoptiPlus.app.zip",
+		"macos_bundle_tar_xz": "ErgoptiPlus.app.tar.xz"
+	},
+	"update_check": {
+		"releases_url": "https://api.github.com/repos/{owner}/{repo}/releases?per_page=100"
+	},
+	"config_backup": {
+		"folder": "backups",
+		"manifest": "backup.json",
+		"kinds": {
+			"pre_install": "pre-install",
+			"pre_restore": "pre-restore"
+		},
+		"include_extensions": [".toml", ".json"],
+		"exclude_dirs": ["backups", "metrics"]
+	},
+	"release_sources": {
+		"api_releases_url": "https://api.github.com/repos/{owner}/{repo}/releases?per_page=20",
+		"atom_feed_url": "https://github.com/{owner}/{repo}/releases.atom",
+		"releases_page_url": "https://github.com/{owner}/{repo}/releases",
+		"source_timeout_sec": 15,
+		"proxy_resolve_timeout_sec": 10,
+		"ui_watchdog_sec": 45
+	},
+	"release_install": {
+		"install_timeout_ms": 180000,
+		"listing_max_output_bytes": 8388608,
+		"macos_archives": [
+			{
+				"asset_key": "macos_bundle_tar_xz",
+				"format": "tar.xz"
+			},
+			{
+				"asset_key": "macos_bundle",
+				"format": "zip"
+			}
+		]
+	},
+	"archive_transfer": {
+		"schema_version": 1,
+		"phase_timeout_ms": {
+			"checksum": 15000,
+			"archive": 300000,
+			"hash": 15000
+		},
+		"transport": {
+			"max_header_bytes": 262144,
+			"revocation_best_effort": false
+		}
+	}
+}

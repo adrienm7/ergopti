@@ -1,0 +1,201 @@
+{
+	"description": "Golden vectors for the tone ladder behind the more formal / more familiar actions: the next register, which text a step rewrites, and how the answer is read. Replayed by the shared Lua module (_shared/lua/llm/tone.lua, macOS and Linux) and its AutoHotkey port.",
+	"rule": "Ladder: 1 tone_familiar, 2 tone_neutral, 3 tone_formal, 4 tone_very_formal. A step moves by +1 (more formal) or -1 (more familiar); past an end it stops (nil) unless cycling, which wraps to the opposite end. A selection equal to the remembered output resumes from the remembered source and level; any other non-blank selection starts from itself at level 2. extract reads the first line after a case-insensitive REWRITE:, drops ** and a quote pair wrapping the whole answer, and trims; nothing left is nil. A step vector without expected stops; an extract vector without expected reads nothing.",
+	"step_vectors": [
+		{
+			"id": "neutral_to_formal",
+			"level": 2,
+			"direction": 1,
+			"cycle": false,
+			"expected": 3
+		},
+		{
+			"id": "neutral_to_familiar",
+			"level": 2,
+			"direction": -1,
+			"cycle": false,
+			"expected": 1
+		},
+		{
+			"id": "top_stops",
+			"level": 4,
+			"direction": 1,
+			"cycle": false
+		},
+		{
+			"id": "bottom_stops",
+			"level": 1,
+			"direction": -1,
+			"cycle": false
+		},
+		{
+			"id": "top_wraps",
+			"level": 4,
+			"direction": 1,
+			"cycle": true,
+			"expected": 1
+		},
+		{
+			"id": "bottom_wraps",
+			"level": 1,
+			"direction": -1,
+			"cycle": true,
+			"expected": 4
+		},
+		{
+			"id": "middle_ignores_cycle",
+			"level": 3,
+			"direction": 1,
+			"cycle": true,
+			"expected": 4
+		}
+	],
+	"plan_vectors": [
+		{
+			"id": "fresh_selection_more_formal",
+			"selection": "merci pour ton aide",
+			"direction": 1,
+			"cycle": false,
+			"expected": {
+				"source": "merci pour ton aide",
+				"level": 3,
+				"profile_id": "tone_formal"
+			}
+		},
+		{
+			"id": "fresh_selection_more_familiar",
+			"selection": "Merci pour votre aide.",
+			"direction": -1,
+			"cycle": false,
+			"expected": {
+				"source": "Merci pour votre aide.",
+				"level": 1,
+				"profile_id": "tone_familiar"
+			}
+		},
+		{
+			"id": "resumes_from_memory",
+			"selection": "Merci pour votre aide.",
+			"memory": {
+				"source": "merci pour ton aide",
+				"output": "Merci pour votre aide.",
+				"level": 3
+			},
+			"direction": 1,
+			"cycle": false,
+			"expected": {
+				"source": "merci pour ton aide",
+				"level": 4,
+				"profile_id": "tone_very_formal"
+			}
+		},
+		{
+			"id": "memory_of_other_text_ignored",
+			"selection": "autre texte",
+			"memory": {
+				"source": "merci",
+				"output": "Merci.",
+				"level": 3
+			},
+			"direction": 1,
+			"cycle": false,
+			"expected": {
+				"source": "autre texte",
+				"level": 3,
+				"profile_id": "tone_formal"
+			}
+		},
+		{
+			"id": "end_of_ladder",
+			"selection": "Très formel.",
+			"memory": {
+				"source": "salut",
+				"output": "Très formel.",
+				"level": 4
+			},
+			"direction": 1,
+			"cycle": false,
+			"reason": "end_of_ladder"
+		},
+		{
+			"id": "end_of_ladder_cycles",
+			"selection": "Très formel.",
+			"memory": {
+				"source": "salut",
+				"output": "Très formel.",
+				"level": 4
+			},
+			"direction": 1,
+			"cycle": true,
+			"expected": {
+				"source": "salut",
+				"level": 1,
+				"profile_id": "tone_familiar"
+			}
+		},
+		{
+			"id": "blank_selection",
+			"selection": "  \n",
+			"direction": 1,
+			"cycle": true,
+			"reason": "empty_selection"
+		},
+		{
+			"id": "empty_selection",
+			"selection": "",
+			"direction": -1,
+			"cycle": false,
+			"reason": "empty_selection"
+		}
+	],
+	"extract_vectors": [
+		{
+			"id": "plain",
+			"block": "REWRITE: Merci pour votre aide.",
+			"expected": "Merci pour votre aide."
+		},
+		{
+			"id": "lowercase_tag_and_spaces",
+			"block": "  rewrite :   Thanks a lot!  ",
+			"expected": "Thanks a lot!"
+		},
+		{
+			"id": "first_line_only",
+			"block": "REWRITE: Bonjour.\nNote: I changed tu to vous.",
+			"expected": "Bonjour."
+		},
+		{
+			"id": "bold_removed",
+			"block": "**REWRITE:** Merci !",
+			"expected": "Merci !"
+		},
+		{
+			"id": "wrapping_quotes_removed",
+			"block": "REWRITE: \"Merci pour tout.\"",
+			"expected": "Merci pour tout."
+		},
+		{
+			"id": "wrapping_guillemets_removed",
+			"block": "REWRITE: « Merci pour tout. »",
+			"expected": "Merci pour tout."
+		},
+		{
+			"id": "inner_quotes_kept",
+			"block": "REWRITE: Il a dit « oui » hier.",
+			"expected": "Il a dit « oui » hier."
+		},
+		{
+			"id": "preamble_before_tag",
+			"block": "Sure! REWRITE: Hi there.",
+			"expected": "Hi there."
+		},
+		{
+			"id": "no_tag",
+			"block": "Merci pour votre aide."
+		},
+		{
+			"id": "empty_answer",
+			"block": "REWRITE:   "
+		}
+	]
+}

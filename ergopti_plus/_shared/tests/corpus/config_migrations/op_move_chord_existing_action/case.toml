@@ -1,0 +1,6 @@
+[case]
+description = "Existing recognized ordinary and contextual actions win without being overwritten."
+drivers = ["ahk", "hs", "linux"]
+outcome = "migrated"
+from_version = 1
+to_version = 2
