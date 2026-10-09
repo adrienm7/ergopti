@@ -3668,6 +3668,188 @@ for (const [what, from, to] of [
 	mustCatch(what, LINUX_BOX, from, to, linuxAudioPrerequisiteProblems);
 }
 
+// Saved simultaneous actions must follow both unchanged kernel prerequisites.
+const LINUX_SIMULTANEOUS_HARNESS = 'static/ergopti_plus/linux/tests/hardware/run_daemon_live.sh';
+const LINUX_SIMULTANEOUS_COMMAND =
+	'python3 tests/hardware/run_native_subreaper.py luajit tests/hardware/run_simultaneous_configuration_real.lua';
+const LINUX_SIMULTANEOUS_ENVELOPE = [
+	'luajit tests/hardware/run_modifier_custody.lua',
+	'CUSTODY=$?',
+	'if [ "${CUSTODY}" = "0" ]; then',
+	'python3 tests/hardware/run_native_subreaper.py luajit tests/hardware/run_input_owner_real.lua',
+	'CUSTODY=$?',
+	'fi',
+	'if [ "${CUSTODY}" = "0" ]; then',
+	LINUX_SIMULTANEOUS_COMMAND,
+	'CUSTODY=$?',
+	'fi',
+	'if [ "${CUSTODY}" != "0" ]; then',
+	'kill ${PIDS} 2>/dev/null',
+	'exit "${CUSTODY}"',
+	'fi'
+];
+
+const LINUX_SIMULTANEOUS_STEP = 'The whole daemon, live — a trigger typed, a tray shown';
+const LINUX_SIMULTANEOUS_ENTRY = `sudo bash ${LINUX_SIMULTANEOUS_HARNESS}`;
+
+/** Binds the inspected harness to its mandatory existing native workflow call. */
+function linuxSimultaneousWorkflowProblems(files) {
+	const steps = files
+		.filter((entry) => entry.rel === LINUX_BOX)
+		.flatMap((entry) => pipeline.jobsOfText(entry.text, entry.rel))
+		.filter((job) => job.id === 'e2e-linux')
+		.flatMap((job) => pipeline.steps(job.body))
+		.filter((step) => step.name === LINUX_SIMULTANEOUS_STEP);
+	if (steps.length !== 1) return ['Linux needs exactly one whole-daemon native step'];
+	const step = steps[0];
+	const commands = logicalLines(step.body).filter((line) => line !== '');
+	const aptPrefix =
+		'sudo python3 "$GITHUB_WORKSPACE/tools/ci/ubuntu_apt.py" -y --no-install-recommends ';
+	if (
+		pipeline.stepField(step.body, 'if') !== NOT_CANCELLED ||
+		pipeline.stepField(step.body, 'timeout-minutes') !== '6' ||
+		pipeline.stepField(step.body, 'continue-on-error') !== null ||
+		commands.length !== 3 ||
+		commands[0] !== 'sudo modprobe uinput' ||
+		!commands[1].startsWith(aptPrefix) ||
+		!/^[a-z0-9.+-]+(?:\s+[a-z0-9.+-]+)*$/.test(commands[1].slice(aptPrefix.length)) ||
+		commands[2] !== LINUX_SIMULTANEOUS_ENTRY
+	) {
+		return [
+			'Linux whole-daemon enrollment must retain its prerequisites, exact call and failure budget'
+		];
+	}
+	return [];
+}
+
+errors.push(...linuxSimultaneousWorkflowProblems(pipeline.files()));
+const linuxSimultaneousStepBody = pipeline.step(pipeline.job('e2e-linux'), LINUX_SIMULTANEOUS_STEP);
+for (const [what, from, to] of [
+	['omitted live harness', LINUX_SIMULTANEOUS_ENTRY, 'true'],
+	['redirected live harness', LINUX_SIMULTANEOUS_ENTRY, `${LINUX_SIMULTANEOUS_ENTRY} --skip`],
+	['forgiven live harness', LINUX_SIMULTANEOUS_ENTRY, `${LINUX_SIMULTANEOUS_ENTRY} || true`],
+	['disabled live step', NOT_CANCELLED, '${{ false }}'],
+	['changed live budget', 'timeout-minutes: 6', 'timeout-minutes: 12'],
+	[
+		'forgiven live step',
+		'timeout-minutes: 6',
+		'timeout-minutes: 6\n        continue-on-error: true'
+	]
+]) {
+	assert.ok(linuxSimultaneousStepBody.includes(from), `${what}: causal preimage must exist`);
+	const changed = pipeline.files().map((entry) => ({
+		...entry,
+		text:
+			entry.rel === LINUX_BOX
+				? entry.text.replace(linuxSimultaneousStepBody, linuxSimultaneousStepBody.replace(from, to))
+				: entry.text
+	}));
+	assert.ok(
+		linuxSimultaneousWorkflowProblems(changed).length > 0,
+		`${what} must refuse enrollment`
+	);
+}
+
+/** Retains exact ordered native calls, status admission and failing teardown. */
+function linuxSimultaneousEnrollmentProblems(source) {
+	const body = `        run: |\n${source
+		.split('\n')
+		.map((line) => `          ${line}`)
+		.join('\n')}`;
+	const lines = logicalLines(body).filter((line) => line !== '');
+	const first = LINUX_SIMULTANEOUS_ENVELOPE[0];
+	const phase = 'LLM_READY="$(mktemp -u)"';
+	const at = lines.indexOf(first);
+	const end = lines.indexOf(phase);
+	if (
+		at < 0 ||
+		end <= at ||
+		lines.filter((line) => line === phase).length !== 1 ||
+		JSON.stringify(lines.slice(at, end)) !== JSON.stringify(LINUX_SIMULTANEOUS_ENVELOPE)
+	) {
+		return ['Linux simultaneous configuration needs the complete ordered native custody envelope'];
+	}
+	for (const command of [first, LINUX_SIMULTANEOUS_ENVELOPE[3], LINUX_SIMULTANEOUS_COMMAND]) {
+		if (lines.filter((line) => line === command).length !== 1) {
+			return ['each mandatory Linux native command must execute exactly once in its envelope'];
+		}
+	}
+	// A closed prefix prevents an enclosing function, false branch or quote from
+	// turning the otherwise exact sequence into unexecuted source text.
+	const raw = source.split('\n');
+	const start = raw.findIndex((line) => line.trim() === first);
+	for (const input of [source, `${raw.slice(0, start).join('\n')}\n`]) {
+		const syntax = spawnSync(bashExecutable(), ['-n'], { input, encoding: 'utf8' });
+		if (syntax.error || syntax.signal || syntax.status !== 0) {
+			return ['Linux native envelope needs valid shell syntax and a closed top-level prefix'];
+		}
+	}
+	return [];
+}
+
+const linuxSimultaneousHarness = fs.readFileSync(
+	path.resolve(__dirname, '../..', LINUX_SIMULTANEOUS_HARNESS),
+	'utf8'
+);
+errors.push(...linuxSimultaneousEnrollmentProblems(linuxSimultaneousHarness));
+const linuxSimultaneousBlock = LINUX_SIMULTANEOUS_ENVELOPE.slice(6, 10).join('\n');
+const linuxSimultaneousNormalized = linuxSimultaneousHarness
+	.split('\n')
+	.map((line) => line.trim())
+	.join('\n');
+assert.equal(
+	linuxSimultaneousEnrollmentProblems(
+		linuxSimultaneousHarness + '\n# A separate owner may add post-native setup here.\n'
+	).length,
+	0,
+	'additive owner work outside the executable native envelope must remain permitted'
+);
+for (const [what, from, to] of [
+	['old harness omits the supplement', linuxSimultaneousBlock, ''],
+	[
+		'duplicate supplement',
+		linuxSimultaneousBlock,
+		`${linuxSimultaneousBlock}\n${linuxSimultaneousBlock}`
+	],
+	['disabled supplement', linuxSimultaneousBlock, linuxSimultaneousBlock.replace('= "0"', '= "1"')],
+	[
+		'wrong native helper',
+		LINUX_SIMULTANEOUS_COMMAND,
+		LINUX_SIMULTANEOUS_COMMAND.replace('run_simultaneous_configuration_real', 'run_daemon_live')
+	],
+	['broadened native command', LINUX_SIMULTANEOUS_COMMAND, `${LINUX_SIMULTANEOUS_COMMAND} --skip`],
+	['forgiven native failure', LINUX_SIMULTANEOUS_COMMAND, `${LINUX_SIMULTANEOUS_COMMAND} || true`],
+	[
+		'uncaptured supplement status',
+		linuxSimultaneousBlock,
+		linuxSimultaneousBlock.replace('CUSTODY=$?', 'CUSTODY=0')
+	],
+	['missing old input owner', LINUX_SIMULTANEOUS_ENVELOPE[3], 'true'],
+	[
+		'changed native deadline wrapper',
+		LINUX_SIMULTANEOUS_COMMAND,
+		LINUX_SIMULTANEOUS_COMMAND.replace(
+			'run_native_subreaper.py',
+			'run_native_subreaper.py --timeout 80'
+		)
+	],
+	['supplement before old input owner', LINUX_SIMULTANEOUS_ENVELOPE[3], LINUX_SIMULTANEOUS_COMMAND],
+	['forgiven final failure', 'exit "${CUSTODY}"', 'exit 0'],
+	['missing failure cleanup', 'kill ${PIDS} 2>/dev/null', 'true'],
+	[
+		'hidden in a false branch',
+		LINUX_SIMULTANEOUS_ENVELOPE[0],
+		`if false; then\n${LINUX_SIMULTANEOUS_ENVELOPE[0]}`
+	],
+	['only a commented supplement', LINUX_SIMULTANEOUS_COMMAND, `# ${LINUX_SIMULTANEOUS_COMMAND}`]
+]) {
+	assert.ok(linuxSimultaneousNormalized.includes(from), `${what}: causal preimage must exist`);
+	assert.ok(
+		linuxSimultaneousEnrollmentProblems(linuxSimultaneousNormalized.replace(from, to)).length > 0,
+		`${what} must refuse native qualification`
+	);
+}
+
 // The temporary Mac exception still requires closed context and retained gates.
 require('./test-macos-dev-qualification-deferral.cjs');
 
