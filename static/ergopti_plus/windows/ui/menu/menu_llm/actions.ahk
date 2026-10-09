@@ -429,7 +429,7 @@ _LLM_Menu_FireInstalledTagsProbe(NowTick := unset, DispatchFn := unset) {
 LLM_Menu_SetProfile(id) {
 	return LLM_Menu_CommitMutation("the LLM profile selection",
 		(Candidate) => _LLM_Menu_SetProfileCandidate(Candidate, id),
-		_LLM_Menu_ApplyStandardCommitted)
+		_LLM_Menu_ApplyProfileCommitted)
 }
 
 _LLM_Menu_SetProfileCandidate(Candidate, Id) {

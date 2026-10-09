@@ -3,7 +3,7 @@
 ; ==============================================================================
 ; MODULE: AI Live Mode (Windows)
 ; DESCRIPTION:
-; Drives llm_live_prompt_toggle and the AI menu's live mode submenu through the
+; Drives the retained llm_live_prompt_toggle and prompt-provider APIs through the
 ; real code path, with the network (the engine's remote transport) and the
 ; keyboard (the SendInput primitive) faked as in test_llm_prompt_prediction.ahk,
 ; whose fixture this file reuses. Toggle -> typing -> live request (prompt,
@@ -552,11 +552,11 @@ _LLV_MenuListsRewritePrompts() {
 		AssertEqual("advanced", _LLM_Menu["profile_id"], "the active profile never changed")
 	}
 	Emit := _DriverFuncBody("_LLM_Menu_EmitRow")
-	AssertContains(Emit, 'case "llm_live_mode":', "the AI menu draws the live mode row")
-	AssertContains(Emit, 'Map("llm_live_mode", LLM_Menu_BuildLiveModeMenu)', "as the live mode submenu")
-	Assert(_LMNM_LiveRoute(Emit), "the native live group consumes the same callable and handle through its typed renderer")
+	Assert(!InStr(Emit, 'case "llm_live_mode":', true), "the AI menu has no second live profile selector")
+	Assert(!InStr(Emit, 'Map("llm_live_mode", LLM_Menu_BuildLiveModeMenu)', true), "the retired live selector is not bound")
+	Assert(_LMNM_GenerationRoute(Emit), "the retained native generation group consumes the same callable and handle through its typed renderer")
 }
-Test("LLM live mode: the AI menu lists Off and the rewrite prompts, sharing the action's state",
+Test("LLM live mode: retained shortcut provider preserves state without a visible live selector",
 	_LLV_MenuListsRewritePrompts)
 
 ; The live translations stay out of the Ctrl+<n> profile hotkeys.
@@ -921,3 +921,20 @@ _LLV_DeclaredOffLabelOwnsUniqueness() {
 }
 Test("LLM live mode: shared Off label edits preserve actual native prompt uniqueness",
 	_LLV_DeclaredOffLabelOwnsUniqueness)
+
+; A durable menu profile choice retires its temporary shortcut override.
+_LLV_ManualProfileRetiresOverride() {
+	_LLV_Run(LLV_SENTENCE, (Calls, Lines, Builds) => _Check())
+	_Check() {
+		global _LLM_Menu, _LLM_Engine
+		LLM_Engine_LiveStart("translate_ja", 0)
+		AssertTrue(LLM_Engine_LiveIsActive(), "precondition: the shortcut override is active")
+		_LLM_Menu["profile_id"] := "advanced"
+		AssertTrue(_LLM_Menu_ApplyProfileCommitted(), "the actual post-commit owner applies the chosen profile")
+		AssertFalse(LLM_Engine_LiveIsActive(), "manual selection cannot retain the temporary override")
+		AssertEqual("advanced", _LLM_Engine["profile_id"], "the chosen normal profile reaches the real engine")
+		Setter := _DriverFuncBody("LLM_Menu_SetProfile")
+		AssertContains(Setter, "_LLM_Menu_ApplyProfileCommitted", "the genuine manual transaction consumes this owner")
+	}
+}
+Test("LLM live mode: manual profile publication retires the temporary shortcut override", _LLV_ManualProfileRetiresOverride)
