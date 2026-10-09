@@ -1,10 +1,5 @@
 {
-	"description": "Independent fixed Off-choice contract; a cancellation command, not a persistent setting. Native prompt rows and lifecycle remain owned by their engines.",
-	"manifest": "llm_live_controls",
-	"id": "llm_live_mode_off",
-	"label_key": "menu.llm.live_mode_off",
-	"checked_getter": "llm_live_is_off",
-	"ready_getter": "llm_live_off_ready",
+	"description": "Retained shortcut stop/admission contract; the retired Live menu owns no declaration or native presentation.",
 	"states": [
 		{
 			"live": false,
@@ -38,5 +33,7 @@
 		"tr",
 		"uk",
 		"zh"
-	]
+	],
+	"retired_menu_sections": ["llm_live_controls", "llm_live_off_boundary"],
+	"stop_notice_key": "llm.live.off"
 }

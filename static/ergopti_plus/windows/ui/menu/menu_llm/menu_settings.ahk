@@ -216,53 +216,6 @@ _LLM_Menu_TriggerRows(Position := "all") {
 	return LeadingRows
 }
 
-/**
- * Builds the live mode submenu (manifest row llm_live_mode).
- * @returns {Menu} Populated live mode submenu.
- */
-LLM_Menu_BuildLiveModeMenu() {
-	return MenuRenderer_NewFromList("llm_menu", "llm_live_mode", (*) => _LLM_Menu_LiveModeRows())
-}
-
-/**
- * Row data for the live mode submenu: "Off", then every prompt that rewrites
- * the current sentence (the built-ins in menu order, then the user's custom
- * prompts), labelled as the prompt list labels them. The row of the current
- * state is checked; a prompt row turns live mode on with it and the menu's
- * count, the same engine state the llm_live_prompt_toggle action drives.
- * @returns {Array} The Off row, then one row per rewrite prompt.
- */
-_LLM_Menu_LiveModeRows() {
-	global _LLM_Menu
-	Live := LLM_Engine_LiveOverride()
-	Active := Live is Map
-	Off := MenuRenderer_CheckRow("llm_live_controls", "llm_live_mode_off",
-		Map("llm_live_mode_off", (*) => LLM_Menu_StopLiveMode()),
-		Map("llm_live_is_off", (*) => !(LLM_Engine_LiveOverride() is Map),
-			"llm_live_off_ready", (*) => true))
-	if !(Off is Map)
-		return []
-	Rows := [Off]
-	; AHK addresses rows by their actual rendered label, including shared edits.
-	Seen := Map(Off["label"], 1)
-	for Choice in LLM_Menu_PromptChoices() {
-		Id := Choice["value"]
-		if !LLM_Rewrite_IsRewriteProfile(LLM_FindProfile(Id, _LLM_Menu["user_profiles"]))
-			continue
-		Rows.Push(Map(
-			"label",   _LLM_Menu_UniqueMenuLabel(Seen, Choice["label"]),
-			"checked", Active && Live["profile_id"] == Id,
-			"action",  _LLM_Menu_MakeLiveModeHandler(Id)))
-	}
-	return Rows
-}
-
-; A closure per row: built in a helper so each keeps its own profile id.
-; @param {String} ProfileId The prompt the row turns live mode on with.
-_LLM_Menu_MakeLiveModeHandler(ProfileId) {
-	return (*) => LLM_Menu_StartLiveMode(ProfileId, 0)
-}
-
 
 
 
