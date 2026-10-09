@@ -27,6 +27,7 @@
 local M = {}
 
 local Logger = require("logger.shim")
+local TextUtils = require("text_utils")
 local utf8_lib = (type(utf8) == "table" and utf8.len)
 	and utf8 or require("compat.utf8")
 
@@ -118,9 +119,11 @@ end
 --- @param suffix string The string sequence that must immediately precede the trigger character.
 --- @param section string The UI section name linking this rule to a toggleable menu item.
 --- @param resolver function A callback function that returns the string to insert.
+--- @param require_word_boundary boolean|nil Builtin word-start policy; absent preserves custom-rule semantics.
 --- @return boolean committed
-function M.add_rule(suffix, section, resolver)
-	if type(suffix) ~= "string" or type(section) ~= "string" or type(resolver) ~= "function" then
+function M.add_rule(suffix, section, resolver, require_word_boundary)
+	if type(suffix) ~= "string" or type(section) ~= "string" or type(resolver) ~= "function"
+		or (require_word_boundary ~= nil and type(require_word_boundary) ~= "boolean") then
 		Logger.warn(LOG, "add_rule: invalid arguments — skipped.")
 		return false
 	end
@@ -129,7 +132,8 @@ function M.add_rule(suffix, section, resolver)
 		Logger.warn(LOG, "add_rule: suffix must be non-empty valid UTF-8 — skipped.")
 		return false
 	end
-	table.insert(_rules, { suffix = suffix, section = section, resolver = resolver })
+	table.insert(_rules, { suffix = suffix, section = section, resolver = resolver,
+		require_word_boundary = require_word_boundary })
 	Logger.debug(LOG, "Rule registered: suffix='%s' section='%s'.", suffix, section)
 	return true
 end
@@ -200,6 +204,24 @@ end
 -- =======================================================
 -- =======================================================
 
+--- Admits the beginning of a bare builtin trigger under the ordinary word policy.
+--- Explicit @ tags retain their back-to-back command contract.
+--- @param buffer string Exact text preceding the magic key.
+--- @param suffix string Registered builtin trigger.
+--- @param start_is_boundary boolean|nil The input owner's buffer-start state.
+--- @return boolean admitted
+function M.word_boundary_allows(buffer, suffix, start_is_boundary)
+	if type(buffer) ~= "string" or type(suffix) ~= "string" or suffix == ""
+		or buffer:sub(-#suffix) ~= suffix then return false end
+	if suffix:sub(1, 1) == "@" then return true end
+	local before = buffer:sub(1, #buffer - #suffix)
+	if before == "" then return start_is_boundary == true end
+	local valid, offset = pcall(utf8_lib.offset, before, -1)
+	if not valid or type(offset) ~= "number" then return false end
+	return not TextUtils.is_hotstring_word_char(before:sub(offset))
+end
+
+
 --- Checks whether any registered rule matches the tail of the given buffer,
 --- subject to the optional section-guard predicate.
 --- Returns a match descriptor or nil — does NOT perform any text injection.
@@ -207,14 +229,17 @@ end
 --- @param group_name string The keymap group name passed to is_section_enabled.
 --- @param is_section_enabled_fn function|nil Predicate: (group, section) → boolean.
 --- @return table|nil Match descriptor {rule, result} or nil if no match.
-function M.match_buffer(buffer, group_name, is_section_enabled_fn)
+--- @param start_is_boundary boolean|nil The exact input owner's rolling-buffer start state.
+function M.match_buffer(buffer, group_name, is_section_enabled_fn, start_is_boundary)
 	if type(buffer) ~= "string" then return nil end
 	for _, rule in ipairs(_rules) do
 		-- Apply section guard when provided; skip disabled sections
 		if is_section_enabled_fn == nil
 				or is_section_enabled_fn(group_name, rule.section) then
 			local suf = rule.suffix
-			if #suf > 0 and buffer:sub(-(#suf)) == suf then
+			if #suf > 0 and buffer:sub(-#suf) == suf
+				and (rule.require_word_boundary ~= true
+					or M.word_boundary_allows(buffer, suf, start_is_boundary)) then
 				local ok, result = pcall(rule.resolver)
 				if not ok then report_resolver_failure(rule, result) end
 				if ok and type(result) == "string" and result ~= "" then
@@ -246,9 +271,10 @@ end
 --- @param group_name string The keymap group name passed to is_section_enabled.
 --- @param is_section_enabled_fn function|nil Predicate: (group, section) → boolean.
 --- @return string|nil The preview string, or nil if no rule matches.
-function M.preview(buffer, group_name, is_section_enabled_fn)
+--- @param start_is_boundary boolean|nil The exact input owner's rolling-buffer start state.
+function M.preview(buffer, group_name, is_section_enabled_fn, start_is_boundary)
 	if type(buffer) ~= "string" then return nil end
-	local match = M.match_buffer(buffer, group_name, is_section_enabled_fn)
+	local match = M.match_buffer(buffer, group_name, is_section_enabled_fn, start_is_boundary)
 	if match then return match.result end
 	return nil
 end
@@ -269,8 +295,8 @@ end
 function M.register_date_rules(trigger)
 	local t = trigger or "★"
 
-	M.add_rule("td", "date", function() return os.date("%Y_%m_%d") end)
-	M.add_rule("dt", "datefr", function() return os.date("%d/%m/%Y") end)
+	M.add_rule("td", "date", function() return os.date("%Y_%m_%d") end, true)
+	M.add_rule("dt", "datefr", function() return os.date("%d/%m/%Y") end, true)
 	M.add_rule("date", "datelongfr", function()
 		local days   = { "dimanche", "lundi", "mardi", "mercredi", "jeudi", "vendredi", "samedi" }
 		local months = { "janvier", "février", "mars", "avril", "mai", "juin",
@@ -280,7 +306,7 @@ function M.register_date_rules(trigger)
 		local mon  = tonumber(os.date("%m"))
 		local year = os.date("%Y")
 		return days[wday] .. " " .. mday .. " " .. months[mon] .. " " .. year
-	end)
+	end, true)
 
 	Logger.info(LOG, "Date rules registered (trigger='%s').", t)
 end

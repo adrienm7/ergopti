@@ -794,7 +794,7 @@ local function main()
 		-- which the engine never sees: its buffer no longer describes the line.
 		on_text_injected = function()
 			_undoable = nil
-			engine:reset()
+			engine:reset(false)
 		end,
 		defaults_path = require("infra.paths").shared("tap_hold/defaults.toml"),
 		user_path = require("infra.config_paths").config(require("platform.remap.tap_hold_writer").FILE_NAME),
@@ -858,7 +858,7 @@ local function main()
 			_last_offered = nil
 			if tooltip_preview then tooltip_preview.hide() end
 			if llm_overlay then llm_overlay.hide() end
-			engine:reset()
+			engine:reset(false)
 		end,
 	})
 	-- Close the input path before the hook starts, then publish a conclusive
@@ -869,7 +869,7 @@ local function main()
 		on_block = function()
 			_undoable = nil
 			_last_offered = nil
-			engine:reset()
+			engine:reset(false)
 			secure_focus_guard.invalidate()
 			if tooltip_preview then tooltip_preview.hide() end
 			if llm_overlay then llm_overlay.hide() end
@@ -1132,7 +1132,8 @@ local function main()
 				-- actually deliver (the static matcher has nothing for "@…"), and the
 				-- bubble renders the first row undimmed.
 				if dyn_hotstrings and type(dyn_hotstrings.preview_candidates) == "function" then
-					local extra = dyn_hotstrings.preview_candidates(engine:current_buffer())
+					local extra = dyn_hotstrings.preview_candidates(engine:current_buffer(),
+						engine:buffer_starts_at_word_boundary())
 					for index = #extra, 1, -1 do
 						table.insert(candidates, 1, extra[index])
 					end
@@ -1176,6 +1177,7 @@ local function main()
 		-- heap allocation, and the buffer does not change between the two calls.
 		if prediction_engine or (dyn_hotstrings and dyn_hotstrings.is_enabled()) then
 			local buf = engine:current_buffer()
+			local start_is_boundary = engine:buffer_starts_at_word_boundary()
 			if prediction_engine then
 				pcall(function()
 					prediction_engine.on_char(ch, buf, {
@@ -1191,7 +1193,7 @@ local function main()
 			-- take precedence over dynamic expansions.
 			if dyn_hotstrings and dyn_hotstrings.is_enabled() and not result then
 				local ok_dh2, expanded, dynamic_event = pcall(function()
-					return dyn_hotstrings.on_trigger(buf, ch)
+					return dyn_hotstrings.on_trigger(buf, ch, start_is_boundary)
 				end)
 				if ok_dh2 and expanded then
 					if dynamic_event and not dynamic_event.pending_user then
@@ -2255,7 +2257,7 @@ local function main()
 			_undoable = nil
 			if tooltip_preview then tooltip_preview.hide() end
 			if llm_overlay then llm_overlay.hide() end
-			engine:reset()
+			engine:reset(false)
 			_cached_app_id = (type(appName) == "string" and appName ~= "" and appName) or nil
 			-- The private-browsing verdict is computed HERE, off the input path.
 			-- The title was previously received and discarded, which is why the
