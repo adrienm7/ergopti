@@ -1,7 +1,7 @@
 {
 	"schema": 1,
 	"id": "stable-v1-20261009-macos-native-deferred",
-	"expires_at": "2026-10-09T22:00:00Z",
+	"expires_at": "2026-10-10T00:00:00Z",
 	"repository": "adrienm7/ergopti",
 	"event_name": "push",
 	"ref": "refs/heads/main",
@@ -10,7 +10,7 @@
 	"channel": "main",
 	"tag": "v1.0.0",
 	"version": "1.0.0",
-	"authorization_note": "Explicit human approval received on 2026-10-09: \"Oui, publier avec ces trois limites explicites\". Only stable v1.0.0 before 2026-10-09T22:00:00Z is admitted. Native macOS Brew archive, Shortcuts discovery and external AppleEvent qualification are DEFERRED and qualified:false. All other tests, builds, macOS signing, source and asset integrity, installation and launch lifecycle checks remain mandatory. A separate explicit maintainer authorization admits an unsigned Windows v1.0.0 artifact with source/artifact-bound public disclosure; main AHK, compiler and compiled startup checks remain full; only the separately approved native desktop wrapper is deferred. No TCC grant, database mutation or sender substitution is authorized. Other tags and later runs retain full default qualification. Explicit additional human approval received on 2026-10-09 extends this same v1.0.0/22UTC window to the six exact PAC/network, macOS stubbed harness, Windows desktop wrapper and Linux simultaneous supplement scopes listed below. Compilation, packaging, signing as separately authorized, installation and every other check remain mandatory. No all-job bypass or permission workaround is authorized.",
+	"authorization_note": "Explicit human approvals received on 2026-10-09: \"Oui, publier avec ces trois limites explicites\", followed by approval of the additional blocking test suites. Only main push, stable v1.0.0 before 2026-10-10T00:00:00Z is admitted. All thirteen exact listed native/harness scopes are DEFERRED and qualified:false: the original three macOS scopes, six additional PAC/HTTP/stubbed harness/Windows desktop/Linux simultaneous scopes, and Linux unit/meta, Linux E2E/live fixture chain, Core JavaScript and native macOS model receiving. Compilation, native producer catalogue checks, packaging, source and asset integrity, installation, all unlisted tests and launch lifecycle checks remain mandatory. Windows unsigned v1.0.0 is separately authorized with source/artifact-bound public disclosure; macOS signing remains mandatory. No TCC grant, database mutation, sender substitution or permission workaround is authorized. After midnight Paris on October 10, the maintainer renewed the instruction to publish a minimum stable release immediately to restore the website download buttons, followed by ten hours of v1.0.1 fixes with full tests if possible. This renewal keeps the same thirteen scopes and unsigned Windows permission, with a new bounded expiry of 02:00 Paris (00:00 UTC). Other tags/events and later runs retain full default qualification; no additional scope is granted.",
 	"scopes": {
 		"macos-brew-archive": {
 			"kind": "swift_test_file",
@@ -70,7 +70,34 @@
 				"luajit",
 				"tests/hardware/run_simultaneous_configuration_real.lua"
 			],
-			"reason": "Only the saved simultaneous-configuration native supplement remains unqualified. Input-owner custody and the rest of the live daemon chain remain mandatory."
+			"reason": "The simultaneous-configuration native supplement remains unqualified. The separately authorized Linux E2E suite deferral also covers its surrounding live fixture chain in this bounded window."
+		},
+		"linux-unit-suite": {
+			"kind": "command",
+			"path": ".github/workflows/ci-linux.yml",
+			"args": ["test-linux", "Run the driver unit test suite"],
+			"reason": "Explicitly approved temporary suite deferral: hosted failures remain unresolved; no executed assertion count or native acceptance is claimed. Compile, package, integrity and installed-package checks remain mandatory."
+		},
+		"linux-e2e-suite": {
+			"kind": "command",
+			"path": ".github/workflows/ci-linux.yml",
+			"args": ["e2e-linux", "Linux E2E test suite bodies including live fixture chain"],
+			"reason": "Explicitly approved temporary suite deferral: hosted failures remain unresolved; no executed assertion count or native acceptance is claimed. Compile, package, integrity and installed-package checks remain mandatory."
+		},
+		"core-js-suite": {
+			"kind": "command",
+			"path": ".github/workflows/ci.yml",
+			"args": ["core", "npm run test:js"],
+			"reason": "Six hosted JavaScript guards fail on the approved wrapper shapes; the JS suite is explicitly unqualified, not inferred passed. Properties, mutation, build/package/integrity and install remain mandatory."
+		},
+		"macos-native-model-receiving": {
+			"kind": "command",
+			"path": ".github/workflows/ci-macos.yml",
+			"args": [
+				"managed-ollama-native",
+				"Receive actual native model create, pull, inference and retirement"
+			],
+			"reason": "Hosted native model receiving timed out restoring trust after actual producer build and catalogue checks passed. Model receiving remains unqualified; no TLS, trust or permission workaround is authorized."
 		}
 	}
 }

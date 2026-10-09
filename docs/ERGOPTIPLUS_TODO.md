@@ -11,20 +11,21 @@ facts go to docs/memory), and the numbers of the others never change.
 
 ## Delivery checkpoint
 
-The maintainer authorized integrating both published histories and releasing
-stable v1.0.0 before October 9 at 22:00 UTC. The assembled branch contains both
-`origin/dev` and `origin/main` histories, without force-push or squashing. The
-complete site build passes after migrating Vite asset URL queries. Promo item
-113 implementations remain local and are excluded from the release assembly.
+The original October 9 publication deadline was missed. After midnight Paris,
+the maintainer renewed the immediate v1.0.0 publication request because the
+website needs an actual latest stable release for its download buttons. The
+same thirteen already approved qualification reports and unsigned Windows
+permission are now bounded to October 10 at 00:00 UTC (02:00 Paris), only for
+v1.0.0. No additional test scope is excluded. Compilation, packaging, source
+and asset integrity, installation and all unlisted checks remain mandatory.
+Public receipts must state DEFERRED and qualified:false; this is not full
+native qualification. Actual tag, source and assets still require verification.
 
-The maintainer separately approved exactly three macOS native qualification
-deferrals for v1.0.0 only, expiring at 22:00 UTC: native Homebrew archive
-acceptance, Apple Shortcuts discovery, and external AppleEvent qualification.
-Public release notes and source-bound receipts must state DEFERRED and
-qualified:false. Windows, Linux, other tests, builds, signatures, source and
-asset checks, installation and launch lifecycle assertions remain mandatory.
-This authorization is not a release receipt or proof that any deferred feature
-works; publication and the remaining full checks are still pending.
+Both published histories and the local video commits are retained without
+force-push or squashing. Promo item 113 implementations remain local and are
+excluded from the release assembly. After v1.0.0 publication, spend up to ten
+hours on v1.0.1 with the maximum verified fixes and restoration of the deferred
+tests. That follow-up version has no qualification or unsigned exception.
 
 [CI 37955301676](https://github.com/adrienm7/ergopti/actions/runs/37955301676)
 completed successfully under the maintainer-authorized fast prerelease profile.
@@ -6028,6 +6029,8 @@ cancellation owners are unchanged. Items 54 and 81 remain partial.
       open. macOS system trust and explicit proxy relays are integrated, while
       opaque-client full-URL PAC/WPAD/fallback/redirect routing remains CODE.
 
+2026-10-09 final upstream refresh. Explicit refspec receiving now includes actualDev20f66968 (including the approved thirteen-scope publication policy and renewed window), without changing that policy or the other groups' code. Raw full-default124, Mac source/typed78, item36 constructed65, PAC portable82, approved-policy controls and normal formatting pass on this composed source. Native corrected Windows44 and final cross-platform acceptance remain pending; inherited whole-gate failures remain reported above.
+
 2026-10-09 upstream receiving. The latest actual Dev253fe1ab is preserved. The Source10 CI step retains its strict original command, source/run/attempt receipt and ten-minute budget while adopting the mandatory non-cancellation condition after upstream retired the fast input. The raw full-default guard preserves124 controls; the Mac source/typed-receipt guard preserves all58 upstream and12 Source10 bodies, plus eight negative controls for the approved explicit PAC qualification wrapper (78/0). Item36 constructed65 and PAC selected-cohort portable82 controls pass; this is not native Mac qualification. Windows manual37995346703 ataa6d73f3 has10657 passes and one original Source44 failure: the genuine ErrorRecord identifies DecoderFallbackException atFetch.Invoke line241, outside the original TargetInvocationException catch. Its new closed diagnostic case passes; E2E/package/install are skipped, and the corrected catch now requires the path-specific decoder/oversize class or an actual HTTP503 WebException; unrelated failures and owner debt are not admitted. Seven actual PS7 controls pass, including two real HTTP503 exchanges and physical peer retirement; corrected Windows44 execution remains pending. Release is skipped. No TODO identifier is removed. Normal formatting passes; the full local JS run has401 passes/five failures. The unchanged source-toolchain test is requalified successfully with scoped TMPDIR=/tmp after the retained ENOSPC failure, and the Homebrew guard passes after exact qualification-wrapper binding. Source10 raw-condition5 and constructed source-receipt22 controls pass. The same whole pipeline test then reaches an incoming Linux live-harness causal-preimage failure; it is not a whole-gate pass. The incoming Linux evidence and Windows desktop guards also remain red and are byte-identical toDev253fe1ab. Their owners have been notified; no assertion or original native command is removed.
 
 2026-10-09 current-source network receiving. The full native Windows suite37936720478 passed10617 cases with0 failures, including queued TLS, current-user SSPI and finite proxy authentication; its later desktop collector refused warning text, so E2E/package/install were skipped. Current Dev Go SDK/cache fixes, fresh native CLI publication and physical catalogue roots are preserved with all37 evidence controls. The controlled signal-result fixture now publishes its complete closed JSON by an exclusive same-directory pending file and atomic replacement. All37 original methods, their assertions and five-second clocks remain exact; seven enrolled receiving controls bring the normal cohort to44. The actual original empty/partial publication counterexamples fail, while all44 corrected controls pass under a physically closed owner with no retained debt. The historical Source43 failure cause remains unknown; this test-only correction provides no native Go or Darwin acceptance. Retained authentic curl binaries were separately re-admitted against current unchanged artifact commitments: seven real version/loader/signature commands and17 receiver controls passed under the physically closed original owner; this does not qualify the current driver cohort. The real retained-output18/public30 Linux gate subsequently passed48/48 with0 skips on clean integratede896 under the original physically closed owners; this qualifies that cohort only. New source changes still require fresh native qualification with scoped tool/SDK inputs. This kernel lacks the required proc-children interface; canonical Nix/store prerequisites are also absent, so compatible hosted CI is required for those targets. The reviewed shared PAC source24 contract and its exact Source10 CI enrollment are now adopted: initial-authority-only native credentials, direct fresh bounded PAC retrieval, physically owned redirect sessions, strict UTF/BOM decoding and original full-URL argument binding remain guarded. All51 portable HTTP receiving methods,61 source controls and14 real HTTP/TLS peer cases pass; Source10 enrollment preserves the raw bounded fast policy and full/manual obligations. The incoming37 Go evidence controls, FullDefault44 alias/registry and original source assertions are preserved. Exact manual37968407062 on479d6f68 is terminal failure with Release skipped: both macOS SDK41, Source10 and original HTTPWorker12 cohorts pass, while the two real PAC/WPAD wire methods retain trust-removal refusal and restoration debt. Windows executes10639 passes/four failures out of10643 unique timed rows; the new Source44 child exits1 early, while the original27 selected network controls pass. The source fixture now groups its URL expression before the five-element reflection argument array at both real Fetch call sites. Actual PowerShell7 reproduces14 original arity errors and14 corrected typed invocations;66 normal portable checks and14 real peer cases pass. Executable-only guards reject comments, strings and valid spaced here-string lookalikes. Original44 native assertions, clocks, credential policy and physical retirement remain unchanged. Fresh exact Windows manual37975640734 on13e981637 executes10640 passes/three failures: the unchanged held-response heartbeat passes in2898.396ms, while Source44 still exits1 after885.107ms before observing its complete marker. Its cause remains unknown. The reviewed first-failure diagnostic appends only closed error category, unique bounded script line and fixed compiler-code scalars from the existing settled capture; it never exports raw stderr, paths, URLs, credentials or environment. Three registered native literal/ambiguity/privacy controls are added without changing the original exit assertion, all44 PS bodies, capture8192, caller55seconds, Fetch5seconds or physical finalizer. All three literal diagnostic controls actually pass in exact manual37984497921 on5d839b13 (10655PASS/1FAIL/10656 unique timed rows). Source44 alone still exits1 in682.195ms with unknown/line0 because the original tree owner publishes settled combined stdout and fixed empty stderr. The reviewed correction uses that actual capture through one shared selector and adds one genuine owned PowerShell5 failure child; the new runtime control remains unexecuted until the next Windows manual. Original44 bodies, exit assertion,8192 cap,55s caller,5s Fetch,+1s retirement and physical finalizers remain unchanged. No underlying exception cause is inferred. The existing private byte-exact portable fixture also genuinely passes36 pre-Fetch URI/PowerShell controls on Linux PS7 under a closed owner; this is not Windows/Fetch44 acceptance. Actual Windows PowerShell5/Fetch44 receiving with this diagnostic, independent held-response failure diagnosis, final all-three-OS E2E/package/install and genuine managed-network acceptance remain required; no historical native cause, activation or restoration success is inferred. The reviewed Windows updater now stores its retention and release receipt outside the exact five-field native ConfigBundle, retains only one exact bundle graph, expires a predecessor acknowledgment on genuine successor admission, and refuses copied identity or foreign operation case. All existing native assertions remain; all eight additive registered AHK cases pass in the genuine10643-row Windows manifest on479d6f68. This cohort result does not qualify the whole lane. Portable source-derived controls pass; the separate closed-issuer schema composition and actual Windows E2E/package/install acceptance remain unrun. Item62 and transversal16/38 remain open.
@@ -9435,6 +9438,35 @@ test precondition failure, not a Lua defect or a successful permission grant.
   The Linux diagnostic filename premise is corrected without changing its
   seven native save assertions. Receive those assertions on Linux. Restore
   every deferred execution for other tags, pull requests and expired runs.
+
+  A later explicit approval also covered the remaining blocking test suites:
+  Linux unit/meta, the Linux E2E/live fixture chain, Core JavaScript, and native
+  macOS model receiving. The resulting thirteen-scope profile was published
+  in `d9e747660c`; all scopes remain unqualified. The original 22:00 UTC expiry
+  was retained. The requested 23:59 Paris publication deadline was missed;
+  the later immediate-release instruction renews only the existing limits
+  until October 10 at 00:00 UTC as stated in the delivery checkpoint. Do not
+  renew this policy or the unsigned Windows permission beyond that window.
+
+  First stable attempt 37994227917 exposed 61 Linux unit failures, six Core
+  workflow-guard failures, and a native macOS model trust-restoration timeout.
+  The actual macOS producer build and 27 catalogue controls passed before
+  model receiving failed. Local About/startup fixture receiving now passes
+  51 controls with original and inverse failures preserved; native Linux and
+  the complete suite remain unqualified. Other fixture corrections are still
+  in progress. No stable publication is established by these bounded results.
+
+- [x] **134.** Preserve the website custom domain during Pages deployments.
+
+  The main deployment removed the prior gh-pages CNAME while the source had
+  no replacement, which removed the ergopti.fr Pages association and served
+  GitHub's 404 page. The association was restored and the maintainer confirmed
+  recovery. Commit `f5e2ab2ca8` adds static/CNAME, watches its changes, and
+  verifies the built copy before the deployment replaces any published files.
+  The registered guard reproduces the missing-file failure and rejects removal
+  of either the trigger or pre-deployment check. Actual successor deployment
+  37996719619 completed successfully, retained the root CNAME, and served
+  HTTP 200 after publication. This closes that specific domain-loss defect.
 
 ## Time estimate
 
