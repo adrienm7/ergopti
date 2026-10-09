@@ -3279,5 +3279,6 @@
 	"healthcheck.summary.incomplete": "Nogle ønskede kontroller afventer, er annulleret eller har ubekræftet oprydning.",
 	"healthcheck.summary.observed": "Ingen problemer fundet i de fuldførte kontroller.",
 	"healthcheck.summary.scope": "Resultaterne dækker kun de registrerede kontroller. Isolerede testsuiter blev ikke kørt.",
-	"healthcheck.problem.diagnostic_check": "Diagnostisk kontrol mislykkedes: %s."
+	"healthcheck.problem.diagnostic_check": "Diagnostisk kontrol mislykkedes: %s.",
+	"healthcheck.export.privacy_notice": "Denne rapport deler kun tilladte tekniske oplysninger. Logfiler, fri tekst, stier og identificerende oplysninger udelades, også med detaljer aktiveret. Lokale sidetest medtages ikke."
 }

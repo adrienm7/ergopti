@@ -720,6 +720,7 @@ for (const vector of vectors.file_name_vectors || []) {
 // =========================
 // =========================
 
+require('./fixtures/healthcheck-sharing-controls.cjs').run(ROOT);
 require('./fixtures/diagnostic-checks-controls.cjs').run(ROOT);
 require('./fixtures/diagnostic-summary-controls.cjs').run(ROOT);
 

@@ -3279,5 +3279,6 @@
 	"healthcheck.summary.incomplete": "Vissa begärda kontroller väntar, har avbrutits eller har obekräftad resursrensning.",
 	"healthcheck.summary.observed": "Inga problem upptäcktes i de slutförda kontrollerna.",
 	"healthcheck.summary.scope": "Resultaten gäller endast de registrerade kontrollerna. Isolerade testsviter kördes inte.",
-	"healthcheck.problem.diagnostic_check": "Diagnostisk kontroll misslyckades: %s."
+	"healthcheck.problem.diagnostic_check": "Diagnostisk kontroll misslyckades: %s.",
+	"healthcheck.export.privacy_notice": "Den här rapporten delar bara tillåtna tekniska uppgifter. Loggar, fritext, sökvägar och identifierande uppgifter utesluts även när detaljer är aktiverade. Lokala sidtester ingår inte."
 }

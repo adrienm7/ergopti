@@ -3279,5 +3279,6 @@
 	"healthcheck.summary.incomplete": "Některé požadované kontroly čekají, byly zrušeny nebo nemají potvrzené uvolnění prostředků.",
 	"healthcheck.summary.observed": "V dokončených kontrolách nebyl zjištěn žádný problém.",
 	"healthcheck.summary.scope": "Výsledky se týkají pouze zaznamenaných kontrol. Izolované testovací sady nebyly spuštěny.",
-	"healthcheck.problem.diagnostic_check": "Diagnostická kontrola selhala: %s."
+	"healthcheck.problem.diagnostic_check": "Diagnostická kontrola selhala: %s.",
+	"healthcheck.export.privacy_notice": "Tato zpráva sdílí pouze povolené technické údaje. Protokoly, volný text, cesty a identifikační údaje jsou vynechány i při zapnutých podrobnostech. Místní testy stránky nejsou zahrnuty."
 }

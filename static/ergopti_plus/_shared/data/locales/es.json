@@ -3279,5 +3279,6 @@
 	"healthcheck.summary.incomplete": "Algunas comprobaciones solicitadas están pendientes, se cancelaron o su limpieza no está confirmada.",
 	"healthcheck.summary.observed": "No se detectaron problemas en las comprobaciones completadas.",
 	"healthcheck.summary.scope": "Los resultados solo abarcan las comprobaciones registradas. No se ejecutaron las pruebas aisladas.",
-	"healthcheck.problem.diagnostic_check": "Falló la comprobación de diagnóstico: %s."
+	"healthcheck.problem.diagnostic_check": "Falló la comprobación de diagnóstico: %s.",
+	"healthcheck.export.privacy_notice": "Este informe comparte solo datos técnicos permitidos. Se excluyen registros, texto libre, rutas y datos identificativos, incluso con los detalles activados. No incluye las pruebas locales de la página."
 }

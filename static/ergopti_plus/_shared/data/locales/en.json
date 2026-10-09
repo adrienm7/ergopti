@@ -3279,5 +3279,6 @@
 	"healthcheck.summary.incomplete": "Some requested checks are pending, cancelled, or have unconfirmed cleanup.",
 	"healthcheck.summary.observed": "No problem detected in the completed checks.",
 	"healthcheck.summary.scope": "Results cover the recorded checks only. Isolated suites were not run.",
-	"healthcheck.problem.diagnostic_check": "Diagnostic check failed: %s."
+	"healthcheck.problem.diagnostic_check": "Diagnostic check failed: %s.",
+	"healthcheck.export.privacy_notice": "This report shares only allowed technical facts. Logs, free text, paths and identifying details are excluded even when details are enabled. Local page tests are not included."
 }

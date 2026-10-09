@@ -3279,5 +3279,6 @@
 	"healthcheck.summary.incomplete": "İstenen bazı denetimler bekliyor, iptal edildi veya kaynak temizliği doğrulanmadı.",
 	"healthcheck.summary.observed": "Tamamlanan denetimlerde sorun bulunmadı.",
 	"healthcheck.summary.scope": "Sonuçlar yalnızca kaydedilen denetimleri kapsar. Yalıtılmış test grupları çalıştırılmadı.",
-	"healthcheck.problem.diagnostic_check": "Tanılama denetimi başarısız oldu: %s."
+	"healthcheck.problem.diagnostic_check": "Tanılama denetimi başarısız oldu: %s.",
+	"healthcheck.export.privacy_notice": "Bu rapor yalnızca izin verilen teknik bilgileri paylaşır. Ayrıntılar açık olsa bile günlükler, serbest metin, yollar ve kimlik belirten bilgiler dışarıda tutulur. Yerel sayfa testleri dahil değildir."
 }

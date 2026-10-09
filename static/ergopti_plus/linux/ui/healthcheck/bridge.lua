@@ -645,7 +645,9 @@ local function perform(session, action, state, context)
 	local documents = M.config()
 	if action.action == "export_snapshot" then
 		return { type = "action", action = "export_snapshot", ok = true,
-			export_sequence = action.export_sequence, snapshot = session.snapshot }
+			export_sequence = action.export_sequence, snapshot = session.snapshot,
+			share_text = require("healthcheck.share").document(session.snapshot, documents.schema,
+				require("infra.i18n").get(documents.schema.share_policy.notice_key)).text }
 	end
 	if action.action == "cancel" then
 		cancel_probes(session)
@@ -668,7 +670,7 @@ local function perform(session, action, state, context)
 		if context and type(context.close_owned_window) == "function" then context.close_owned_window() end
 		return nil
 	end
-	local result = Report.perform(action, session.snapshot.sections.paths, documents, Report.redaction_context())
+	local result = Report.perform(action, session.snapshot.sections.paths, documents, Report.redaction_context(), nil, session.snapshot)
 	result.type = "action"
 	result.action = action.action
 	return result

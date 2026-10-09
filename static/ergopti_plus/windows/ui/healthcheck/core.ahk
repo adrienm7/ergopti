@@ -692,8 +692,7 @@ _HC_ShowNativeSnapshot(G, Snapshot) {
 
 /** Formats the quick native report with an explicit unexecuted-test status. */
 _HC_NativeSnapshotText(Snapshot) {
-	Status := StrReplace(t("healthcheck.probe.not_run"), "%s", t("healthcheck.deep_tests.reason.not_embedded"))
-	return HealthCheck_FormatPlain(Snapshot) . "`n" . t("healthcheck.deep_tests.title") . ": " . Status
+	return HealthCheck_ShareDocument(Snapshot, HealthCheck_Config()["schema"])["text"]
 }
 
 /** Exports the captured quick fallback without browser-dependent checks. */
@@ -706,7 +705,7 @@ _HC_NativeSaveSnapshot(Snapshot, *) {
 		Map("schema", Config["schema"], "templates", Config["templates"], "driver", "windows"))
 	if !Validated.Has("action")
 		throw Error("The native diagnostic export was refused.")
-	return HealthCheck_PerformAction(Validated["action"], Snapshot["sections"]["paths"], Config)
+	return HealthCheck_PerformAction(Validated["action"], Snapshot["sections"]["paths"], Config, 0, Snapshot)
 }
 
 ; Keeps arrays and records expandable, including each recent log entry.
@@ -873,7 +872,8 @@ _HC_PerformPageAction(WindowEpoch, Action, Config) {
 			_HealthCheck_CloseGui(_HC_Gui)
 		case "export_snapshot":
 			_HC_Send(WindowEpoch, _HC_ValueToJson(Map("type", "action", "action", "export_snapshot",
-				"ok", true, "export_sequence", Action["export_sequence"], "snapshot", _HC_Session["snapshot"])))
+				"ok", true, "export_sequence", Action["export_sequence"], "snapshot", _HC_Session["snapshot"],
+				"share_text", HealthCheck_ShareDocument(_HC_Session["snapshot"], Config["schema"])["text"])))
 		case "cancel":
 			HealthCheck_CancelProbes()
 			for CancelledProbe in _HC_Session["snapshot"]["probes"] {
@@ -892,7 +892,7 @@ _HC_PerformPageAction(WindowEpoch, Action, Config) {
 			_HC_Send(WindowEpoch, '{"type":"snapshot","snapshot":' . _HC_ValueToJson(_HC_Session["snapshot"]) . '}')
 			_HC_RestartProbes(WindowEpoch)
 		default:
-			Outcome := HealthCheck_PerformAction(Action, _HC_Session["snapshot"]["sections"]["paths"], Config)
+			Outcome := HealthCheck_PerformAction(Action, _HC_Session["snapshot"]["sections"]["paths"], Config, 0, _HC_Session["snapshot"])
 			Json := '{"type":"action","action":' . _HC_JsStr(Action["action"])
 				. ',"ok":' . (Outcome["ok"] ? "true" : "false")
 			if Outcome.Has("path")

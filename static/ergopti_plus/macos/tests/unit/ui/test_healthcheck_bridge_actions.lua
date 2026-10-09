@@ -156,6 +156,17 @@ local function as_jdoe(body)
 	if not ok then error(err, 0) end
 end
 
+local function share_action(context, action)
+	context.page({ body = { action = "export_snapshot", export_sequence = 1 } })
+	local messages = page_messages(context)
+	local fresh = messages[#messages]
+	helpers.assert_eq(fresh.action, "export_snapshot")
+	helpers.assert_type(fresh.share_text, "string")
+	action.text = fresh.share_text
+	context.page({ body = action })
+	return fresh.share_text
+end
+
 helpers.describe("diagnostics window: the page's bridge (macOS)", function()
 	helpers.it("registers the handler host_bridge.js posts to, and polls nothing", function()
 		local core, context = load_window()
@@ -208,8 +219,9 @@ helpers.describe("diagnostics window: the page's bridge (macOS)", function()
 		as_jdoe(function()
 			local core, context = load_window()
 			core.show_window()
-			context.page({ body = { action = "copy", text = "log at /Users/jdoe/Library/Logs by jdoe" } })
-			helpers.assert_eq(context.copied, { "log at ~/Library/Logs by <user>" })
+			local approved = share_action(context, { action = "copy", text = "log at /Users/jdoe/Library/Logs by jdoe" })
+			helpers.assert_eq(context.copied, { approved })
+			helpers.assert_true(not approved:find("/Users/", 1, true), "Shared output contains no local path")
 			local messages = page_messages(context)
 			helpers.assert_eq(messages[#messages].type, "action")
 			helpers.assert_eq(messages[#messages].action, "copy")
@@ -233,12 +245,13 @@ helpers.describe("diagnostics window: the page's bridge (macOS)", function()
 					return { start = function() return true end }
 				end,
 			}
-			local ok, err = pcall(context.page, { body = { action = "report",
+			local ok, approved = pcall(share_action, context, { action = "report",
 				text = "log at /Users/jdoe/Library/Logs by jdoe",
-				fields = { version = "2.4.0", os = "macOS 15.1", driver = "macos" } } })
+				fields = { version = "2.4.0", os = "macOS 15.1", driver = "macos" } })
 			package.loaded["adapters.shell_runner"] = nil
-			helpers.assert_true(ok, tostring(err))
-			helpers.assert_eq(context.copied, { "log at ~/Library/Logs by <user>" })
+			helpers.assert_true(ok, tostring(approved))
+			helpers.assert_eq(context.copied, { approved })
+			helpers.assert_true(not approved:find("/Users/", 1, true), "Shared output contains no local path")
 			helpers.assert_eq(#context.opened_urls, 1, "the bug form opens once")
 			local encoded = context.opened_urls[1]:match("[?&]diagnostics=([^&]*)")
 			local diagnostics = encoded and encoded:gsub("%%(%x%x)", function(hex) return string.char(tonumber(hex, 16)) end)
@@ -256,7 +269,7 @@ helpers.describe("diagnostics window: the page's bridge (macOS)", function()
 		as_jdoe(function()
 			local core, context = load_window({ clipboard = false })
 			core.show_window()
-			context.page({ body = { action = "copy", text = "report" } })
+			share_action(context, { action = "copy", text = "report" })
 			helpers.assert_eq(context.deleted, 0, "a refused copy must not close the only copy source")
 			local messages = page_messages(context)
 			helpers.assert_eq(messages[#messages].ok, false)

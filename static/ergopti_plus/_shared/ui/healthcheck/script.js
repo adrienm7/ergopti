@@ -40,6 +40,7 @@
 	var checkRun = null;
 	var exportSequence = 0;
 	var pendingExport = null;
+	var sharedText = null;
 
 	function requestExport(action) {
 		if (pendingExport) return;
@@ -56,6 +57,7 @@
 		if (
 			!isTrue(message.ok) ||
 			!message.snapshot ||
+			typeof message.share_text !== 'string' ||
 			state.snapshot !== request.snapshot ||
 			message.snapshot.driver !== request.snapshot.driver ||
 			message.snapshot.generated_at !== request.snapshot.generated_at
@@ -63,6 +65,7 @@
 			return;
 		message.snapshot.diagnostic_checks = state.snapshot.diagnostic_checks;
 		state.snapshot = message.snapshot;
+		sharedText = message.share_text;
 		render();
 		if (request.action === 'copy') post({ action: 'copy', text: exportText() });
 		else if (request.action === 'save')
@@ -86,6 +89,7 @@
 			function (id, result) {
 				if (state.snapshot !== captured) return;
 				captured.diagnostic_checks[id] = result;
+				sharedText = null;
 				render();
 			},
 			function (fn) {
@@ -189,8 +193,9 @@
 	 * @returns {string}
 	 */
 	function exportText() {
-		var markdown = Model.formatMarkdown(state.snapshot, state.config.schema, t);
-		return Redact.apply(markdown, state.config.redaction, state.config.context);
+		return sharedText !== null
+			? sharedText
+			: Model.formatShareable(state.snapshot, state.config.schema, t);
 	}
 
 	/**
@@ -309,6 +314,7 @@
 	 */
 	window.receiveDiagnostics = function (message) {
 		if (!message || typeof message !== 'object') return;
+		if (message.type !== 'action' || message.action === 'cancel') sharedText = null;
 		switch (message.type) {
 			case 'init':
 				state.config = message.config;
@@ -355,7 +361,9 @@
 	 * @returns {string}
 	 */
 	function reportName() {
-		return Model.fileName(Model.reportInfo(state.snapshot));
+		return Model.fileName(
+			Model.reportInfo(Model.shareSnapshot(state.snapshot, state.config.schema))
+		);
 	}
 
 	/**
@@ -364,7 +372,9 @@
 	 * @returns {object}
 	 */
 	function issueFields() {
-		var fields = Model.issueFields(Model.reportInfo(state.snapshot));
+		var fields = Model.issueFields(
+			Model.reportInfo(Model.shareSnapshot(state.snapshot, state.config.schema))
+		);
 		Object.keys(fields).forEach(function (id) {
 			fields[id] = Redact.apply(String(fields[id]), state.config.redaction, state.config.context);
 		});

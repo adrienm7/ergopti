@@ -3279,5 +3279,6 @@
 	"healthcheck.summary.incomplete": "Certains contrôles demandés sont en attente, annulés ou leur nettoyage reste à confirmer.",
 	"healthcheck.summary.observed": "Aucun problème détecté dans les contrôles terminés.",
 	"healthcheck.summary.scope": "Les résultats portent uniquement sur les contrôles consignés. Les suites isolées n’ont pas été exécutées.",
-	"healthcheck.problem.diagnostic_check": "Échec du contrôle de diagnostic : %s."
+	"healthcheck.problem.diagnostic_check": "Échec du contrôle de diagnostic : %s.",
+	"healthcheck.export.privacy_notice": "Ce rapport partage uniquement les faits techniques autorisés. Les logs, textes libres, chemins et informations identifiantes sont exclus, même lorsque les détails sont activés. Les tests locaux de la page ne sont pas inclus."
 }

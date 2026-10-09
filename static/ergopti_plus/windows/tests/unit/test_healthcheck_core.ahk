@@ -367,11 +367,16 @@ _TestHC_NativeSnapshotText() {
 	try {
 		_I18nCache := Map("healthcheck.deep_tests.title", "In-depth checks",
 			"healthcheck.probe.not_run", "Not run: %s",
-			"healthcheck.deep_tests.reason.not_embedded", "The suite is not embedded")
+			"healthcheck.deep_tests.reason.not_embedded", "The suite is not embedded",
+			"healthcheck.export.privacy_notice", "Only approved technical facts are shared")
 		_I18nCacheLoaded := true
 		Snapshot := Map("driver", "windows", "generated_at", "2026-10-09T09:10:36Z", "sections", Map())
 		Text := _HC_NativeSnapshotText(Snapshot)
-		AssertEqual("ErgoptiPlus — windows — 2026-10-09T09:10:36Z`nIn-depth checks: Not run: The suite is not embedded", Text)
+		AssertContains(Text, "Only approved technical facts are shared")
+		AssertContains(Text, "driver-suites: not_run")
+		AssertContains(Text, "page-model-checks: not_collected")
+		AssertContains(Text, '"driver":"windows"')
+		AssertContains(Text, '"generated_at":"2026-10-09T09:10:36Z"')
 		AssertEqual(0, InStr(Text, "%s"), "the native fallback must interpolate the locale placeholder")
 	} finally {
 		_I18nCache := SavedCache, _I18nCacheLoaded := SavedLoaded

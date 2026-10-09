@@ -254,8 +254,8 @@ function init(page, detailed, mode) {
 	if (!preview.includes('# ErgoptiPlus')) fail('the preview is not the Markdown report');
 	if (preview.includes('/home/jdoe') || preview.includes('abcdef123456'))
 		fail('the preview is not redacted');
-	if (!preview.includes('~/.local/state/ergopti_plus/logs'))
-		fail('the preview lost the redacted home path');
+	if (preview.includes('~/.local/state/ergopti_plus/logs'))
+		fail('the share preview leaked even a redacted path');
 	if (!page.elements.content.innerHTML.includes('<h2>')) fail('the page rendered no section');
 
 	page.elements['btn-copy'].dispatch('click');
@@ -268,7 +268,12 @@ function init(page, detailed, mode) {
 			action: 'export_snapshot',
 			ok: true,
 			export_sequence: request.export_sequence,
-			snapshot: snapshot(true)
+			snapshot: snapshot(true),
+			share_text: page.sandbox.ErgoptiDiagnostics.formatShareable(
+				snapshot(true),
+				schema,
+				(key) => page.sandbox._i18n_strings[key] || key
+			)
 		});
 	}
 	const copy = page.posted[page.posted.length - 1];
@@ -285,7 +290,12 @@ function init(page, detailed, mode) {
 			action: 'export_snapshot',
 			ok: true,
 			export_sequence: request.export_sequence,
-			snapshot: snapshot(true)
+			snapshot: snapshot(true),
+			share_text: page.sandbox.ErgoptiDiagnostics.formatShareable(
+				snapshot(true),
+				schema,
+				(key) => page.sandbox._i18n_strings[key] || key
+			)
 		});
 	}
 	const report = page.posted[page.posted.length - 1];
@@ -316,7 +326,12 @@ function init(page, detailed, mode) {
 			action: 'export_snapshot',
 			ok: true,
 			export_sequence: request.export_sequence,
-			snapshot: snapshot(true)
+			snapshot: snapshot(true),
+			share_text: page.sandbox.ErgoptiDiagnostics.formatShareable(
+				snapshot(true),
+				schema,
+				(key) => page.sandbox._i18n_strings[key] || key
+			)
 		});
 	}
 	const save = page.posted[page.posted.length - 1];
@@ -341,7 +356,10 @@ function init(page, detailed, mode) {
 		fail('a row button did not post its action');
 
 	// Details: unticking drops the opt-in values at once, then asks the host
-	if (!preview.includes('Secret Keyboard')) fail('the detailed preview misses the device name');
+	if (preview.includes('Secret Keyboard'))
+		fail('the detailed share preview leaked the device name');
+	if (!page.elements.content.innerHTML.includes('Secret Keyboard'))
+		fail('the local detailed view lost its independently collected device name');
 	page.elements['chk-details'].checked = false;
 	page.elements['chk-details'].dispatch('change', { target: page.elements['chk-details'] });
 	if (page.elements['preview-text'].textContent.includes('Secret Keyboard'))
@@ -502,7 +520,7 @@ function init(page, detailed, mode) {
 	if (page.posted.at(-1).action !== 'cancel' || page.scheduled.size !== 0)
 		fail('Cancel did not stop the model queue and request actual host cancellation');
 	const text = page.elements['preview-text'].textContent;
-	if (!text.includes('CANCELLED') || !text.includes('NOT_RUN'))
+	if (!text.includes('cancelled') || !text.includes('not_collected'))
 		fail('cancelled partial exports lose their precise outcomes');
 }
 
@@ -539,7 +557,12 @@ function init(page, detailed, mode) {
 		action: 'export_snapshot',
 		ok: true,
 		export_sequence: request.export_sequence + 1,
-		snapshot: fresh
+		snapshot: fresh,
+		share_text: page.sandbox.ErgoptiDiagnostics.formatShareable(
+			fresh,
+			schema,
+			(key) => page.sandbox._i18n_strings[key] || key
+		)
 	});
 	if (page.posted.some((row) => row && row.action === 'copy'))
 		fail('a foreign export sequence was accepted');
@@ -548,16 +571,21 @@ function init(page, detailed, mode) {
 		action: 'export_snapshot',
 		ok: true,
 		export_sequence: request.export_sequence,
-		snapshot: fresh
+		snapshot: fresh,
+		share_text: page.sandbox.ErgoptiDiagnostics.formatShareable(
+			fresh,
+			schema,
+			(key) => page.sandbox._i18n_strings[key] || key
+		)
 	});
 	const copy = page.posted.at(-1);
 	if (
 		copy.action !== 'copy' ||
-		!copy.text.includes('TIMEOUT') ||
-		!copy.text.includes('native_status=-1712') ||
-		!copy.text.includes('runtime_pid=4321') ||
-		!copy.text.includes('detail=native_timeout') ||
-		!copy.text.includes('qualification_scope=local_runtime_nonce')
+		!copy.text.includes('"state":"timeout"') ||
+		!copy.text.includes('"native_status":-1712') ||
+		!copy.text.includes('"runtime_pid":4321') ||
+		!copy.text.includes('"cleanup":"settled"') ||
+		!copy.text.includes('"qualification_scope":"local_runtime_nonce"')
 	)
 		fail('the fresh precise owner receipt was not exported');
 	if (copy.text.includes('Resource cleanup is pending'))
@@ -571,7 +599,12 @@ function init(page, detailed, mode) {
 		action: 'export_snapshot',
 		ok: true,
 		export_sequence: stale.export_sequence,
-		snapshot: fresh
+		snapshot: fresh,
+		share_text: page.sandbox.ErgoptiDiagnostics.formatShareable(
+			fresh,
+			schema,
+			(key) => page.sandbox._i18n_strings[key] || key
+		)
 	});
 	if (page.posted.length !== before) fail('an obsolete export survived a new snapshot request');
 }
