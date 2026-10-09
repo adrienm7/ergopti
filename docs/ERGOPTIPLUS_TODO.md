@@ -8852,7 +8852,7 @@ test precondition failure, not a Lua defect or a successful permission grant.
   controls include four failing inverses. Physical Mac foreground behavior
   still requires acceptance with the new package.
 
-- [ ] **123.** Make the shared diagnostic export safe for a workplace Mac.
+- [~] **123.** Make the shared diagnostic export safe for a workplace Mac.
 
   The maintainer explicitly requires no personal or company data in the
   report attached to GitHub. Restrict every shared export to allowed typed
@@ -8874,7 +8874,14 @@ test precondition failure, not a Lua defect or a successful permission grant.
   hosted consent. Restore deferred tests based on actual evidence, not by
   treating missing or locally successful checks as hosted passes.
 
-- [ ] **124.** Remove the redundant Live mode submenu on every OS.
+  The closed shared schema and retained-host export authority are committed
+  locally on all three drivers. Current-source model/page checks pass, as do
+  210 Lua sink controls, 26 Mac and 19 Linux registered controls, and 21 AHK
+  source-body cases with a complete execution manifest. Synthetic private
+  values and forged previews are refused. These inert tests do not qualify
+  the installed native application or restore any deferred hosted assertion.
+
+- [~] **124.** Remove the redundant Live mode submenu on every OS.
 
   The maintainer clarified that the AI menu already configures suggestions
   while typing. Retain one profile selector and configurable shortcuts that
@@ -8885,7 +8892,13 @@ test precondition failure, not a Lua defect or a successful permission grant.
   Cover the new menu contract and actual profile/prompt behavior on all three
   drivers without broad changes to the prediction engine.
 
-- [ ] **125.** Configure an arbitrary translation target through an input box.
+  Shared declaration and all three menu owners are committed locally. The
+  complete menu-manifest test passes after integration with incoming native
+  menu frames. Three older Linux tests still expect the retired submenu;
+  migrate their action, refusal and locale coverage to the retained owners
+  before considering the complete composed suite qualified.
+
+- [~] **125.** Configure an arbitrary translation target through an input box.
 
   The maintainer requested one Translate action with a freely entered target
   language, saved in its binding. Reuse the existing input dialog instead of
@@ -8897,6 +8910,26 @@ test precondition failure, not a Lua defect or a successful permission grant.
   bindings, current selection guards, prediction admission and response limits.
   Use one shared parameter contract and matching Windows/Lua ports, with
   invalid-input and non-interface-language regression cases on all three OSes.
+
+  The three drivers, generated action catalogues and all 21 locales are
+  committed locally. Eight actual inert AHK controls, the full picker test,
+  Mac request/context and both Lua parameter corpora pass. Actual request
+  tests preserve selection authority and legacy custom profiles. The
+  installed dialog, real inference and complete release suites remain open.
+
+- [ ] **126.** Reconcile restored macOS trackpad gestures with their executed actions.
+
+  On the built-in Apple Silicon Mac trackpad, the maintainer cleared all
+  gestures and restored recommended values. The UI then assigned the
+  two-finger left swipe to Up Arrow, but performing it pasted text instead.
+  Verify the complete clear/restore/read/display/dispatch sequence, including
+  direction and finger-count identities, cached bindings, inherited defaults
+  and the actual key output. Establish the cause before changing defaults.
+  Add a regression that compares the displayed binding with the executed
+  action and repeat after reload; check equivalent shared restoration and
+  dispatch paths on Windows and Linux. Preserve personal configuration during
+  investigation. The exact installed source and native reproduction remain
+  to be confirmed.
 
 ## Time estimate
 
