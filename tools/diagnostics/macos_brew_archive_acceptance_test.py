@@ -3006,11 +3006,11 @@ class AutomationPrerequisiteControls(unittest.TestCase):
         for value in (False, None, 1, "true"):
             with self.subTest(value=value), TemporaryDirectory() as directory:
                 with self.assertRaisesRegex(probe.AdmissionError, "not explicitly authorized"):
-                    self.invoke(Path(directory), (), allow=value)
+                    self.invoke(Path(directory).resolve(strict=True), (), allow=value)
 
     def test_existing_permission_requires_two_fresh_exact_context_queries(self):
         with TemporaryDirectory() as directory:
-            owner, observed, receipt = self.invoke(Path(directory), (0, 0))
+            owner, observed, receipt = self.invoke(Path(directory).resolve(strict=True), (0, 0))
             self.assertEqual(owner.run.call_count, 2)
             self.assertEqual(
                 observed,
@@ -3030,7 +3030,9 @@ class AutomationPrerequisiteControls(unittest.TestCase):
                 probe, "approve_owned_automation_prompt", return_value="pressed"
             ) as approval,
         ):
-            owner, observed, receipt = self.invoke(Path(directory), (-1744, 0, 0), ui=True)
+            owner, observed, receipt = self.invoke(
+                Path(directory).resolve(strict=True), (-1744, 0, 0), ui=True
+            )
         approval.assert_called_once_with(
             owner, "exact-owned-requester", 30, "Owned sender identity", "Owned receiver identity"
         )
@@ -3046,7 +3048,7 @@ class AutomationPrerequisiteControls(unittest.TestCase):
 
     def test_consent_required_request_and_fresh_query_keep_original_sender_and_policy(self):
         with TemporaryDirectory() as directory:
-            root = Path(directory)
+            root = Path(directory).resolve(strict=True)
             owner, observed, receipt = self.invoke(root, (-1744, 0, 0))
             self.assertEqual(owner.run.call_count, 3)
             self.assertEqual(
@@ -3075,26 +3077,26 @@ class AutomationPrerequisiteControls(unittest.TestCase):
         for statuses in ((-1743,), (-600,), (-1744, -1743), (-1744, -600), (-1744, -1744)):
             with self.subTest(statuses=statuses), TemporaryDirectory() as directory:
                 with self.assertRaisesRegex(probe.AdmissionError, "was not granted"):
-                    self.invoke(Path(directory), statuses)
+                    self.invoke(Path(directory).resolve(strict=True), statuses)
 
     def test_initial_or_requested_grant_requires_fresh_nonprompt_confirmation(self):
         for statuses in ((0, -1744), (-1744, 0, -1743)):
             with self.subTest(statuses=statuses), TemporaryDirectory() as directory:
                 with self.assertRaisesRegex(probe.AdmissionError, "Fresh nonprompt"):
-                    self.invoke(Path(directory), statuses)
+                    self.invoke(Path(directory).resolve(strict=True), statuses)
 
     def test_prompt_timeout_preserves_the_native_owner_failure(self):
         failure = probe.AdmissionError("Owned native command exceeded deadline")
         with TemporaryDirectory() as directory:
             with self.assertRaises(probe.AdmissionError) as caught:
-                self.invoke(Path(directory), (), error=failure)
+                self.invoke(Path(directory).resolve(strict=True), (), error=failure)
             self.assertIs(caught.exception, failure)
 
     def test_changed_executable_or_policy_cannot_borrow_permission_receipt(self):
         for target in ("sender", "policy"):
             with self.subTest(target=target), TemporaryDirectory() as directory:
                 with self.assertRaisesRegex(probe.AdmissionError, "identity changed"):
-                    self.invoke(Path(directory), (0,), mutate=target)
+                    self.invoke(Path(directory).resolve(strict=True), (0,), mutate=target)
 
     def test_dirty_mismatched_or_noncanonical_receipts_cannot_grant_permission(self):
         for raw in (
@@ -3109,11 +3111,11 @@ class AutomationPrerequisiteControls(unittest.TestCase):
         ):
             with self.subTest(raw=raw), TemporaryDirectory() as directory:
                 with self.assertRaises(probe.AdmissionError):
-                    self.invoke(Path(directory), (0,), raw=raw)
+                    self.invoke(Path(directory).resolve(strict=True), (0,), raw=raw)
 
     def test_consented_prerequisite_never_replaces_original_positive_or_denial_receipts(self):
         with TemporaryDirectory() as directory:
-            root = Path(directory)
+            root = Path(directory).resolve(strict=True)
             (root / "sandbox.sb").write_text(AppleEventBoundaryControls.policy)
             judge = AppleEventBoundaryControls()
             owner = judge.model(root)
@@ -4139,7 +4141,9 @@ class FirstPositiveAutomationPrerequisiteControls(unittest.TestCase):
 
     def test_fresh_owned_permission_precedes_first_positive_and_keeps_all_three_routes(self):
         with TemporaryDirectory() as directory:
-            owner, observations, receipt = self.invoke(Path(directory), (-1744, 0, 0))
+            owner, observations, receipt = self.invoke(
+                Path(directory).resolve(strict=True), (-1744, 0, 0)
+            )
             self.assertEqual(
                 observations,
                 [
@@ -4168,7 +4172,7 @@ class FirstPositiveAutomationPrerequisiteControls(unittest.TestCase):
         for statuses in ((-1743,), (-1744, -1743), (-1744, -1744), (0, -1744)):
             with self.subTest(statuses=statuses), TemporaryDirectory() as directory:
                 with self.assertRaises(probe.AppleEventBoundaryError) as refusal:
-                    self.invoke(Path(directory), statuses)
+                    self.invoke(Path(directory).resolve(strict=True), statuses)
                 self.assertIsInstance(refusal.exception.__cause__, probe.AdmissionError)
                 self.assertEqual(self.last_owner.sender_calls, [])
                 self.assertEqual(self.last_owner.deliveries, 0)
@@ -4177,7 +4181,9 @@ class FirstPositiveAutomationPrerequisiteControls(unittest.TestCase):
 
     def test_default_shared_image_never_requests_consent_and_keeps_original_routes(self):
         with TemporaryDirectory() as directory:
-            owner, observations, receipt = self.invoke(Path(directory), (), allow=False)
+            owner, observations, receipt = self.invoke(
+                Path(directory).resolve(strict=True), (), allow=False
+            )
             self.assertEqual(observations, [("success", None), ("success", None), ("denied", None)])
             self.assertEqual(len(owner.sender_calls), 3)
             self.assertTrue(receipt["receiver_retired"])
@@ -4521,6 +4527,42 @@ class ForegroundRequestRefusalControls(unittest.TestCase):
                 ):
                     self.invoke(Path(directory), frame, mode=mode, code=code, stdout=stdout)
                 self.assertEqual(len(self.calls), 1 if mode == "query" else 2)
+
+
+class CanonicalPermissionFixtureRootControls(unittest.TestCase):
+    """Keep modeled permission expectations on the same physical fixture root."""
+
+    def test_all_permission_fixture_root_acquisitions_are_physical(self):
+        acquisitions = 0
+        for cls in (AutomationPrerequisiteControls, FirstPositiveAutomationPrerequisiteControls):
+            tree = ast.parse(textwrap.dedent(inspect.getsource(cls)))
+            parents = {
+                child: node for node in ast.walk(tree) for child in ast.iter_child_nodes(node)
+            }
+            for node in ast.walk(tree):
+                if not (
+                    isinstance(node, ast.Call)
+                    and isinstance(node.func, ast.Name)
+                    and node.func.id == "Path"
+                    and len(node.args) == 1
+                    and isinstance(node.args[0], ast.Name)
+                    and node.args[0].id == "directory"
+                ):
+                    continue
+                resolver = parents.get(node)
+                self.assertIsInstance(resolver, ast.Attribute)
+                self.assertEqual(resolver.attr, "resolve")
+                call = parents.get(resolver)
+                self.assertIsInstance(call, ast.Call)
+                self.assertEqual(call.args, [])
+                self.assertEqual(
+                    [(kw.arg, ast.dump(kw.value)) for kw in call.keywords],
+                    [("strict", "Constant(value=True)")],
+                )
+                acquisitions += 1
+        self.assertEqual(
+            acquisitions, 13, "every original permission fixture acquisition must remain"
+        )
 
 
 if __name__ == "__main__":
