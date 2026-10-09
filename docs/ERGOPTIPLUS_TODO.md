@@ -7143,6 +7143,17 @@ assertions have passed review; actual Windows SSPI, capture, staging and WinHTTP
 execution still require the next non-release hosted run. The earlier eleven
 native failures and skipped E2E/package/install remain unqualified meanwhile.
 
+Hosted manual run 37886569318 at 859915743 reveals that the portable managed
+serve receiving fixture ignored its actual Python argument until after its
+first emitted command. Its container-specific interpreter path fails with
+exit 127 on the runner. The fixture now carries the supplied interpreter from
+initialization, and both existing real foreground controls additionally require
+that exact interpreter and isolated no-bytecode flags before execution. Original
+refusal, empty output, untouched HOME and cache assertions remain intact. This
+corrects a fixture prerequisite; native custom-anchor TLS, managed HTTP startup,
+Windows qualification and archive/install acceptance remain pending. Item 62
+remains open.
+
 - [~] **63.** Layer actions: screen brightness up/down are now shared, labelled
   through the existing 21-locale action catalogue, and implemented for keyboard
   layers on all three drivers. Windows and macOS also support their existing
