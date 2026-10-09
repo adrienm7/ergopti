@@ -38,16 +38,48 @@ Extract into a new owned temporary directory, never over a checkout.
 
 ## Receiving the CI proposal
 
-The prepared preimages are the genuine `c80ff645` source, not current `dev`.
-Group 6 exclusively owns the overlapping fast-policy guard repair. Coordination
-[6084620712](https://github.com/adrienm7/ergopti/issues/86#issuecomment-6084620712)
-pins direct patch `0342670082a010cf40755e94dce263fba6b59210cdd6c265ecfeba880d2c7f81`
-and helper `7ffd4f9914e871629730f8237d40b9dfcb6e8d20417a01bf3834d9b9615d36ad`,
-but supplies no transferable source bytes or published commit yet. Request
-[6084670887](https://github.com/adrienm7/ergopti/issues/86#issuecomment-6084670887)
-asks for that source. Canonical/CI adoption remains on hold until its authentic
-published successor is received, composed, independently checked and verified.
-Do not replace Group 6's guard with this older complete file.
+The first archive's preimages are genuine `c80ff645` source. Its focused
+proposal is superseded: independent receiving found that it could accept an
+exit-zero run with no tests, and its unconditional step would violate the
+authorized temporary fast-prerelease test deferral. Keep that evidence and the
+failed cadence proposal; neither is an adopted workflow.
+
+Group 6 subsequently published its authentic full-default helper in
+`b454b3d971fa8e032f8bb9cc6c1e951380af8691`, now in `dev` at `e896bd3e`, and
+released private/own-branch composition in
+[6084921090](https://github.com/adrienm7/ergopti/issues/86#issuecomment-6084921090).
+[reviewed-native-receiving.tar.gz](reviewed-native-receiving.tar.gz) contains the
+authenticated eight-path successor, independent source and portable receiving
+reviews, frozen pre-implementation corpora, and the 23-path current-Dev source
+merge preparation. Its separate metadata is in `manifest.json`.
+
+The successor preserves the original 44 Group 6 controls, 52 deferral controls,
+24 focused outcomes and the full Swift suite. Eight explicit fast wrappers
+retain the existing default predicates. A scoped receiver requires all 146
+independently frozen lease method identities, complete matching XCTest frames,
+no skipped/failed/foreign/duplicate cases, and both process statuses zero. The
+independent 44 controls pass (two accepted, 42 refused); two frozen malformed
+summary controls fail on the predecessor and pass on the successor. The
+registered 51 controls also cover real bounded-file growth and leading frames.
+Three exact removals produce assertion failures; each restoration passes.
+These are portable receiving controls, not execution of the native methods.
+
+The source patch preimages are the explicit two-parent CI composition in its
+`BASE.json`, not a bare current-Dev workflow. Both strict patch inverses and
+the full/default body union pass. The original 25-minute full-suite and
+45-minute job limits, ACL/raw-observer/upload/full-suite adjacency and consent
+environment remain whole. Native completion within these budgets is unknown.
+
+Canonical adoption still needs the forthcoming Group 3 SDK enrollment and
+its closed helper tuple, granted in
+[6085138182](https://github.com/adrienm7/ergopti/issues/86#issuecomment-6085138182),
+plus Group 1 generator coordination requested in
+[6084988660](https://github.com/adrienm7/ergopti/issues/86#issuecomment-6084988660).
+The current-Dev merge has 25 conflicting paths: 23 reviewed source postimages
+and two CI paths. Regenerate with the genuine `build:manifest` and `build:menu`
+owners after composition; the locale-table generator does not consume these
+translated values. Do not overwrite another group's workflow or output with
+an older complete file.
 
 After ownership is released, use the owned `codex/ci-macos-input` branch, cancel
 only automatic runs of each exact pushed SHA, then dispatch `ci.yml` with
@@ -64,7 +96,7 @@ callback repair). The 3ad release build passed, but its test build failed; fresh
 corrected native execution remains unrun. The source census is 146 total methods,
 not 146 plus 17. The exact passive contract is in
 [6084503817](https://github.com/adrienm7/ergopti/issues/86#issuecomment-6084503817).
-Fetched `dev` at `9652afc3` lacks this diagnostic chain. Its presence must be
+Fetched `dev` at `e896bd3e` lacks this diagnostic chain. Its presence must be
 verified before claiming a shared export contains the native snapshot. Historical
 records carry no currentness, readiness or receiver-fence authority.
 

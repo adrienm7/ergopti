@@ -26,7 +26,71 @@
 			"subjects": 28
 		}
 	],
-	"adoption": "HOLD_G6_SOURCE_SUCCESSOR",
+	"adoption": "SUPERSEDED_BY_REVIEWED_RECEIVING_PREPARATION",
 	"native_execution": "UNEXECUTED",
-	"incident_exit73_cause": "UNKNOWN"
+	"incident_exit73_cause": "UNKNOWN",
+	"reviewed_receiving": {
+		"source_dev": "e896bd3ee047eb4795b0bd13c2ac715d626042ea",
+		"g6_source": "b454b3d971fa8e032f8bb9cc6c1e951380af8691",
+		"archive": {
+			"path": "reviewed-native-receiving.tar.gz",
+			"bytes": 6759558,
+			"sha256": "a8ca9ea10a347160baed4986c8f86bcf55071bb5549ca8749d9f1bd294b2c02a",
+			"members": 229
+		},
+		"packets": [
+			{
+				"prefix": "focused-final",
+				"manifest_sha256": "46a5364a5613e8d6272ab4c7f7ce70685439adb75fae896ca3119e611e34f915",
+				"census_sha256": "aba5c809579a713377022d1c6c8856c3a69cb93a8d3262882d081b5f595c5715",
+				"subjects": 29
+			},
+			{
+				"prefix": "focused-final-independent",
+				"manifest_sha256": "b30b22717dba30c44ba5064ef310f07ddf60c6fc92f741a41c964ad075942a8d",
+				"census_sha256": "be90150d54e478f8842887c429cdd3e2bbb55172f114c00bca96efeecabf60d8",
+				"subjects": 17
+			},
+			{
+				"prefix": "receiver-independent",
+				"manifest_sha256": "30aed055bf9e64a732d87e2e590743471ac6a3778c89abcf14fcfc21353a01a0",
+				"census_sha256": "0725368222e8550fa668706e6e2237139ded07b39f0181a995a8b2a706b46716",
+				"subjects": 36
+			},
+			{
+				"prefix": "receiver-frozen",
+				"manifest_sha256": "7aa2104ed4321658dda9a16ddd53f85542861d03ca3d47130e4102c9434fd9a0",
+				"census_sha256": "369bc69474c8eda26429e41fa8e4c0ed89c417ee699583dbcc395776dca03c14",
+				"subjects": 4
+			},
+			{
+				"prefix": "receiver-driver",
+				"manifest_sha256": "ac6ade303fb03bfbdcbf655914aa4ba5be1d0cba8fd0d4526e2338ae41c14299",
+				"census_sha256": "8a2200d1f557cf5efcbe6cdadf5dbe39f86421a2c2504de4b42c2f3d01779026",
+				"subjects": 2
+			},
+			{
+				"prefix": "summary-frozen",
+				"manifest_sha256": "c0c36c7d62d53813f945d679c1fb6a6cdc3164cda150197a64fabd8e41bed4c6",
+				"census_sha256": "6a1fb30225a39cf743bbbce72a173f8dad9b78e916922f4ff9a0c9af37dbd6ba",
+				"subjects": 3
+			},
+			{
+				"prefix": "dev23-source",
+				"manifest_sha256": "e9638a38ebe3ea838646ce8728be1fe42b723daf677f04c9069f103e1178d22d",
+				"census_sha256": "5dba3b2a938925d23e5240066f44d6092fb0a3a67b1e834a6da7e8ca0aacdc5f",
+				"subjects": 120
+			},
+			{
+				"prefix": "dev-e896-revalidation",
+				"manifest_sha256": "b8d58363d48688cfe9f79d657778c79e8adeb1148add81351ed5a6afedb5290f",
+				"census_sha256": "76872780dc79ac09e3e857c23f149e021288b23938472b0a3a29025e21835564",
+				"subjects": 2
+			}
+		],
+		"verdict": "CLEAR_SOURCE_AND_PORTABLE_RECEIVING",
+		"adoption": "PENDING_G3_SOURCE_AND_G1_GENERATOR_COORDINATION",
+		"native_execution": "UNEXECUTED",
+		"full_package_qualified": false
+	}
 }

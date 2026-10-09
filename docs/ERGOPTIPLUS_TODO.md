@@ -3245,8 +3245,14 @@ heartbeat cadence proposal remains on hold, and fallback policy is unchanged.
 
 The independently reviewed native cohort preparation and the failed cadence
 proposal are preserved in docs/handovers/2026-10-09-group5-native-qualification.
-CI adoption waits for the Group 6 guard successor; native execution is unrun,
-all original assertions remain mandatory, and item 24 stays partial.
+The superseding eight-path CI preparation now receives the genuine published
+Group 6 helper and preserves every original control and full-suite budget.
+Its independently frozen 146-case receiver refuses empty/partial runs; 44
+independent controls, two causal malformed-summary controls and the registered
+51 portable controls pass. Strict fast wrappers preserve the authorized
+temporary deferral and default route. Actual native execution is still unrun;
+Group 3 enrollment composition and Group 1 generator coordination are pending.
+No first-tap exit 73 cause is established, and item 24 stays partial.
 
 - [~] **30.** Physical magic-key setting on all three OSes: one
   `hotstrings.magic_key_source` (a KeyboardEvent.code, `auto` by default),
