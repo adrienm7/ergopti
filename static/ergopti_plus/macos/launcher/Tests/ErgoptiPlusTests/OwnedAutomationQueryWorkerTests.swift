@@ -365,6 +365,47 @@ final class OwnedAutomationQueryWorkerTests: XCTestCase {
 		XCTAssertNotEqual(OwnedAutomationQueryWorker.SourceGeneration.path(current.path), original)
 	}
 
+	func testActualNoPromptPermissionAPIOnlyPublishesRetiredMetadata() throws {
+		// This runs the real API under the native test product, not the signed app.
+		let session = try AutomationQueryTestSession(
+			executable: executable(), operation: OwnedAutomationQueryWorker.permissionObservationOperation)
+		defer { session.cleanup() }
+		try session.wait { session.markers.contains("Q1 HELD") }
+		XCTAssertEqual(session.markers, ["Q1 HELD"])
+		try session.activate()
+		try session.wait { session.markers.contains("Q1 RETIRED 0") }
+		try session.finish()
+		XCTAssertEqual(session.markers.count, 3)
+		let data = try XCTUnwrap(session.markers.first(where: { $0.hasPrefix("Q1 DATA ") }))
+		let raw = try XCTUnwrap(Data(base64Encoded: String(data.dropFirst(8))))
+		let arguments = ["owned", "--automation-query-worker", "permission-observation", "19"]
+		guard OwnedAutomationQueryWorker.bridgePacketMatches(raw, arguments: arguments),
+			session.markers == ["Q1 HELD", data, "Q1 RETIRED 0"],
+			session.process.terminationReason == .exit, session.process.terminationStatus == 0,
+			session.stderr.isEmpty, session.decoder.buffered.isEmpty else {
+			XCTFail("The actual permission worker must publish only after exact native retirement.")
+			return
+		}
+		let packet = try XCTUnwrap(JSONSerialization.jsonObject(with: raw) as? [String: Any])
+		XCTAssertEqual(packet["observation"] as? String, "native-returned")
+		XCTAssertEqual(packet["target"] as? String, "shortcuts-events")
+		XCTAssertEqual(packet["event_class"] as? String, "core")
+		XCTAssertEqual(packet["event_id"] as? String, "getd")
+		XCTAssertEqual(packet["ask_user"] as? Bool, false)
+		XCTAssertNil(packet["rows"])
+		XCTAssertNil(packet["status"])
+		// Every native OSStatus is diagnostic metadata; zero grants no catalogue.
+		let status = try XCTUnwrap(packet["osstatus"] as? NSNumber)
+		let code = try XCTUnwrap(Int32(exactly: status.int64Value))
+		guard packet["observation"] as? String == "native-returned" else {
+			XCTFail("Address failure does not observe the permission API.")
+			return
+		}
+		// A closed log retains the actual OSStatus without claiming another caller's consent.
+		print("SDK_PERMISSION_OBSERVATION caller=native-test-product target=shortcuts-events"
+			+ " event_class=core event_id=getd ask_user=0 nonce=19 osstatus=\(code)")
+	}
+
 	func testPermissionObservationIsFixedAndSeparateFromBusinessRoles() throws {
 		let args = ["owned", "--automation-query-worker", "permission-observation", "19"]
 		XCTAssertTrue(OwnedAutomationQueryWorker.validRequest(arguments: args))
