@@ -47,6 +47,7 @@ local OWNERS = {
 	"llm.profile_selector",
 	"llm.prompt_action",
 	"llm.tone",
+	"llm.translate",
 	"llm.vision",
 	"modules.gestures",
 	"modules.gestures.actions",
