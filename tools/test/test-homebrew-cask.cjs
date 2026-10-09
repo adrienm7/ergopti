@@ -832,6 +832,36 @@ check('archive owners publish bounded typed phase evidence before native work', 
 	assert.match(writer, /testRefusedPublicationNeverReplacesAnUnclosedCheckpoint/);
 });
 
+// Bind the approved wrapper before checking the original mandatory native body.
+function nativeHttpFullBody(script) {
+	const prefix = [
+		'set -euo pipefail',
+		'receipt="$RUNNER_TEMP/stable-macos-native-http-${{ matrix.architecture }}.json"',
+		'mkdir -p "$(dirname "$receipt")"',
+		'node tools/ci/dev-release-qualification.cjs --scope macos-native-http --receipt "$receipt"',
+		'mode="$(node tools/ci/dev-release-qualification.cjs --scope macos-native-http --validate-scope-receipt "$receipt")"',
+		'if [ "$mode" = deferred ]; then',
+		'    echo "[DEFERRED] macos-native-http: qualified=false; original command not executed."',
+		'elif [ "$mode" = full ]; then',
+		''
+	].join('\n');
+	const suffix = 'else\n    echo "Invalid command qualification disposition" >&2\n    exit 1\nfi\n';
+	assert.ok(script.startsWith(prefix), 'native HTTP requires the exact approved receipt prefix');
+	assert.ok(script.endsWith(suffix), 'unknown native HTTP dispositions remain fatal');
+	assert.strictEqual(script.split(prefix).length, 2);
+	assert.strictEqual(script.split(suffix).length, 2);
+	const body = script.slice(prefix.length, -suffix.length);
+	assert.ok(body.length > 100, 'the full native command body is nonempty');
+	return body
+		.split('\n')
+		.map((line) => {
+			if (line === '') return line;
+			assert.ok(line.startsWith('    '), 'native HTTP command stays inside the full branch');
+			return line.slice(4);
+		})
+		.join('\n');
+}
+
 check('shared native process ownership controls remain registered and mandatory', () => {
 	const result = spawnSync(
 		process.platform === 'win32' ? 'python' : 'python3',
@@ -860,7 +890,18 @@ check('shared native process ownership controls remain registered and mandatory'
 	]) {
 		const steps = workflow.jobs[job].steps.filter((step) => step.name === name);
 		assert.strictEqual(steps.length, 1, `${job} needs one actual native receiving owner`);
-		const script = steps[0].run;
+		const rawScript = steps[0].run;
+		const script = job === 'managed-ollama-native' ? nativeHttpFullBody(rawScript) : rawScript;
+		if (job === 'managed-ollama-native') {
+			for (const [before, after] of [
+				['--validate-scope-receipt "$receipt"', '--validate-scope-receipt "foreign"'],
+				['qualified=false; original command not executed.', 'qualified=true; command passed.'],
+				['    exit 1\nfi\n', '    exit 0\nfi\n']
+			]) {
+				assert.ok(rawScript.includes(before));
+				assert.throws(() => nativeHttpFullBody(rawScript.replace(before, after)));
+			}
+		}
 		assert.ok(script.startsWith('set -euo pipefail\nstatus=0\n'));
 		assert.strictEqual(script.split(command).length - 1, 1);
 		assert.ok(script.includes(`${command} || status=1\n`));

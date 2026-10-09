@@ -3281,5 +3281,6 @@
 	"healthcheck.summary.scope": "Die Ergebnisse gelten nur für die protokollierten Prüfungen. Isolierte Testsuiten wurden nicht ausgeführt.",
 	"healthcheck.problem.diagnostic_check": "Diagnoseprüfung fehlgeschlagen: %s.",
 	"healthcheck.export.privacy_notice": "Dieser Bericht teilt nur freigegebene technische Angaben. Protokolle, Freitext, Pfade und identifizierende Angaben bleiben auch bei aktivierten Details ausgeschlossen. Lokale Seitentests sind nicht enthalten.",
-	"sg_actions.llm_translate_context": "🌐 Aktuellen Satz übersetzen [konfigurierbar]"
+	"sg_actions.llm_translate_context": "🌐 Aktuellen Satz übersetzen [konfigurierbar]",
+	"menu.about.startup_other_command_reason": "Anderer Startbefehl: Der Autostart ist für einen anderen Befehl oder eine andere Installation eingerichtet. Die Einstellung bleibt erhalten."
 }

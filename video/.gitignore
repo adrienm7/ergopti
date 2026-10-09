@@ -1,0 +1,7 @@
+# Links into ../static and generated audio, recreated by scripts/prepare.mjs
+public/
+# Measured from the driver sources at every run
+src/_generated/
+# Renders
+out/
+node_modules/

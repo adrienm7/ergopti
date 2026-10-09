@@ -30,6 +30,7 @@ const crypto = require('crypto');
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
+const tomlOwnData = require('./fixtures/toml-own-data.cjs');
 
 const {
 	REGISTRY_DIR,
@@ -460,7 +461,7 @@ check(
 			'the bundled hotstrings extension includes the plus'
 		);
 		assert.deepStrictEqual(
-			ergopti.magic_key,
+			tomlOwnData(ergopti.magic_key),
 			{ key: 'KeyC' },
 			'Ergopti declares the key its layout places the magic key on'
 		);
@@ -492,7 +493,7 @@ check(
 		const extension = parse(
 			fs.readFileSync(path.join(REGISTRY_DIR, 'ergopti/manifest.toml'), 'utf8')
 		).extension;
-		assert.deepStrictEqual(extension.hotstring_bindings.distancesreduction, {
+		assert.deepStrictEqual(tomlOwnData(extension.hotstring_bindings.distancesreduction), {
 			category: reference.category,
 			feature_section: reference.feature_section,
 			source: reference.source
@@ -501,7 +502,7 @@ check(
 		const document = parse(
 			fs.readFileSync(path.join(REGISTRY_DIR, 'ergopti/hotstrings/distancesreduction.toml'), 'utf8')
 		);
-		assert.deepStrictEqual(document._meta, reference.meta);
+		assert.deepStrictEqual(tomlOwnData(document._meta), reference.meta);
 		const entries = Object.entries(document)
 			.filter(([section]) => section !== '_meta')
 			.flatMap(([section, blocks]) =>
@@ -554,12 +555,12 @@ check('Ergopti owns suffixes and magic-key replacement with exact historical dat
 	const extension = parse(
 		fs.readFileSync(path.join(REGISTRY_DIR, 'ergopti/manifest.toml'), 'utf8')
 	).extension;
-	assert.deepStrictEqual(extension.hotstring_bindings.suffixes_a, {
+	assert.deepStrictEqual(tomlOwnData(extension.hotstring_bindings.suffixes_a), {
 		category: 'french_distancesreduction',
 		feature_section: 'hotstrings.french_distancesreduction',
 		source: 'common'
 	});
-	assert.deepStrictEqual(extension.hotstring_bindings.magickeyreplace, {
+	assert.deepStrictEqual(tomlOwnData(extension.hotstring_bindings.magickeyreplace), {
 		category: 'magickey',
 		feature_section: 'hotstrings.magic_key',
 		sections: ['replace'],

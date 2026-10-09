@@ -89,6 +89,7 @@ local function snapshot_shared_rules()
 			suffix = rule.suffix,
 			section = rule.section,
 			resolver = rule.resolver,
+			require_word_boundary = rule.require_word_boundary,
 		}
 	end
 	return snapshot
@@ -99,7 +100,7 @@ end
 local function restore_shared_rules(snapshot)
 	SharedEngine.reset_rules()
 	for _, rule in ipairs(snapshot) do
-		SharedEngine.add_rule(rule.suffix, rule.section, rule.resolver)
+		SharedEngine.add_rule(rule.suffix, rule.section, rule.resolver, rule.require_word_boundary)
 	end
 end
 
@@ -233,7 +234,10 @@ local function interceptor(event, km_buffer, ctx)
 	local snapshot = _preview_snapshot
 	_preview_snapshot = nil -- every action identity is single-use
 	local match = nil
-	if snapshot and snapshot.buffer == buffer and snapshot.trigger == _trigger then
+	if snapshot and snapshot.buffer == buffer and snapshot.trigger == _trigger
+		and (snapshot.match.rule.require_word_boundary ~= true
+			or SharedEngine.word_boundary_allows(buffer, snapshot.match.rule.suffix,
+				ctx and ctx.start_is_word_boundary)) then
 		local section_live = not guard or guard(GROUP_NAME, snapshot.match.rule.section)
 		local lease_ok = false
 		if section_live and type(_km.owns_visible_magic_action) == "function" then
@@ -246,7 +250,8 @@ local function interceptor(event, km_buffer, ctx)
 		end
 		if lease_ok then match = snapshot.match end
 	end
-	if not match then match = SharedEngine.match_buffer(buffer, GROUP_NAME, guard) end
+	if not match then match = SharedEngine.match_buffer(buffer, GROUP_NAME, guard,
+		ctx and ctx.start_is_word_boundary) end
 	if not match then
 		return require("modules.dynamic_hotstrings.user_code").request(buffer) and "consume" or nil
 	end
@@ -345,9 +350,10 @@ end
 
 --- Resolves the exact dynamic action advertised by the keymap tooltip.
 --- @param buf string Current keymap buffer.
+--- @param start_is_boundary boolean|nil Current keymap-owned buffer-start state.
 --- @return string|nil result
 --- @return table|nil token
-local function preview_provider(buf)
+local function preview_provider(buf, start_is_boundary)
 	_preview_snapshot = nil
 	if type(_km.is_group_enabled) == "function" and not _km.is_group_enabled(GROUP_NAME) then
 		return nil
@@ -356,7 +362,7 @@ local function preview_provider(buf)
 	local guard = is_sec_enabled
 		and function(grp, sec) return is_sec_enabled(grp, sec) end
 		or nil
-	local match = SharedEngine.match_buffer(buf, GROUP_NAME, guard)
+	local match = SharedEngine.match_buffer(buf, GROUP_NAME, guard, start_is_boundary)
 	if not match then return require("modules.dynamic_hotstrings.user_code").preview(buf) end
 	local token = {}
 	_preview_snapshot = {
@@ -453,7 +459,7 @@ local function register_prefix_entries()
 	-- out: the trigger prefix is itself a fragment of the secret (the first 5
 	-- digits of the SSN, the first 6 chars of the IBAN), so redacting only the
 	-- replacement would still leak
-	local base_opts = { is_word = false, auto_expand = true, is_case_sensitive = true, is_private = true }
+	local base_opts = { is_word = true, auto_expand = true, is_case_sensitive = true, is_private = true }
 
 	--- Copies the shared flags and names the personal_info.toml field the value
 	--- came from.
@@ -744,9 +750,9 @@ function M.start(keymap_module)
 
 	local provider_ok = run_start_step("preview-provider registration", function()
 		return require_void_commit("preview-provider registration", _km.register_preview_provider,
-			function(buf)
+			function(buf, start_is_boundary)
 				if not owns_active_start(token, keymap_module) then return nil end
-				return preview_provider(buf)
+				return preview_provider(buf, start_is_boundary)
 			end)
 	end)
 	if not provider_ok then

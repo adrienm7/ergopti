@@ -34,4 +34,21 @@ helpers.describe("login startup", function()
 		end), false)
 		helpers.assert_eq(Startup.toggle(function() return true, "disabled\n" end), false)
 	end)
+	helpers.it("another startup command disables mutation without a false owned state (login-startup)", function()
+		local commands = {}
+		local function run(command)
+			commands[#commands + 1] = command
+			return true, "other\n"
+		end
+		helpers.assert_eq(Startup.command_available(run), false)
+		helpers.assert_eq(Startup.enabled(run), nil)
+		helpers.assert_eq(Startup.toggle(run), false)
+		helpers.assert_eq(#commands, 3)
+		for _, command in ipairs(commands) do
+			helpers.assert_true(command:match(" status$") ~= nil, "no mutation crosses the existing helper")
+		end
+		helpers.assert_eq(Startup.command_available(function() return false, "" end), nil)
+		helpers.assert_eq(Startup.command_available(function() return true, "enabled\n" end), true)
+		helpers.assert_eq(Startup.command_available(function() return true, "disabled\n" end), true)
+	end)
 end)

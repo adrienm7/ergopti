@@ -467,102 +467,392 @@ async function simulate(context, status = 0, entries = fixtures, afterFamilySign
 	process.exitCode = 1;
 });
 
-// Fast publication is intentionally unqualified, and never a default test pass.
+// Full execution replaces the retired one-release all-suite bypass.
 {
+	const pipeline = require('./ci-pipeline.cjs');
+	const workflows = {
+		'ci.yml': ['validate', 'core', 'macos', 'windows', 'linux', 'manual-verdict', 'release'],
+		'ci-windows.yml': ['test-ahk', 'e2e-ahk', 'package-windows', 'launch-windows', 'windows-ok'],
+		'ci-macos.yml': [
+			'item36-native',
+			'managed-ollama-native',
+			'test-hs',
+			'e2e-hs',
+			'tooltip-canvas',
+			'package-macos',
+			'launch',
+			'cold-bootstrap-native',
+			'macos-ok'
+		],
+		'ci-linux.yml': ['test-linux', 'e2e-linux', 'package-linux', 'install-linux', 'linux-ok']
+	};
+	const ordinaryConditions = {
+		macos: "needs.validate.outputs.lane_macos == 'true'",
+		windows: "needs.validate.outputs.lane_windows == 'true'",
+		linux: "needs.validate.outputs.lane_linux == 'true'",
+		'manual-verdict': "always() && github.event_name == 'workflow_dispatch'",
+		release: "github.event_name == 'push' && needs.validate.outputs.release == 'true'",
+		'windows-ok': 'always()',
+		'item36-native': "${{ github.event_name == 'workflow_dispatch' && !inputs.release }}",
+		'macos-ok': 'always()',
+		'package-linux':
+			"${{ !cancelled() && (needs.e2e-linux.result == 'success' || (github.event_name == 'workflow_dispatch' && needs.e2e-linux.result == 'failure')) }}",
+		'linux-ok': 'always()'
+	};
+	let jobs = 0,
+		steps = 0;
+	for (const [file, required] of Object.entries(workflows)) {
+		const relative = '.github/workflows/' + file;
+		const source = fs.readFileSync(path.join(ROOT, relative), 'utf8');
+		assert.doesNotMatch(
+			source,
+			/fast_prerelease|ERGOPTI_FAST_PRERELEASE|--fast-action/,
+			file + ': retired input, command and receipt wiring cannot authorize skips'
+		);
+		const actual = pipeline.jobsOfText(source, relative);
+		assert.deepEqual(
+			actual.map((job) => job.id),
+			required,
+			file + ': every job class is retained'
+		);
+		for (const job of actual) {
+			jobs++;
+			assert.notEqual(job.body.trim(), '', job.id + ': job evidence cannot be empty');
+			assert.equal(
+				pipeline.field(job.body, 'if'),
+				ordinaryConditions[job.id] ?? null,
+				job.id + ': only the original ordinary admission may select this full job'
+			);
+			assert.equal(
+				pipeline.field(job.body, 'continue-on-error'),
+				null,
+				job.id + ': a failure cannot be converted into success'
+			);
+			for (const step of pipeline.steps(job.body)) {
+				steps++;
+				assert.doesNotMatch(
+					step.body,
+					/fast_prerelease|ERGOPTI_FAST_PRERELEASE|--fast-action/,
+					job.id + ': every retained step uses its ordinary admission'
+				);
+			}
+		}
+	}
+	assert.equal(jobs, 26);
+	assert(steps > 150, 'full step inventory cannot be vacuous');
+	const rootSource = fs.readFileSync(path.join(ROOT, '.github/workflows/ci.yml'), 'utf8');
+	const rootJobs = pipeline.jobsOfText(rootSource, '.github/workflows/ci.yml');
+	const release = rootJobs.find((job) => job.id === 'release');
+	assert(release, 'the real release owner is retained');
+	assert.equal(
+		pipeline.field(release.body, 'if'),
+		"github.event_name == 'push' && needs.validate.outputs.release == 'true'"
+	);
+	assert.deepEqual(pipeline.needsOf(release.body), [
+		'validate',
+		'core',
+		'macos',
+		'windows',
+		'linux'
+	]);
+	const owner = fs.mkdtempSync(path.join(os.tmpdir(), 'ergopti-retired-fast-cli-'));
+	try {
+		for (const event of ['push', 'pull_request', 'workflow_dispatch']) {
+			for (const args of [
+				['--fast-action', 'select'],
+				['--fast-action', 'admit'],
+				['--fast-action', 'receipt', '--lane', 'windows'],
+				['--fast-action', 'receipt', '--lane', 'macos'],
+				['--fast-action', 'receipt', '--lane', 'linux']
+			]) {
+				const result = spawnSync(
+					process.execPath,
+					[path.join(ROOT, 'tools/ci/dev-release-qualification.cjs'), ...args],
+					{
+						cwd: owner,
+						encoding: 'utf8',
+						env: {
+							...process.env,
+							GITHUB_ACTIONS: 'true',
+							GITHUB_REPOSITORY: policy.repository,
+							GITHUB_EVENT_NAME: event,
+							GITHUB_REF: policy.ref,
+							GITHUB_SHA: sha,
+							ERGOPTI_DEV_RELEASE_RELEASE: 'true',
+							ERGOPTI_DEV_RELEASE_PRERELEASE: 'true',
+							ERGOPTI_DEV_RELEASE_CHANNEL: policy.channel,
+							ERGOPTI_DEV_RELEASE_TAG: policy.tag,
+							ERGOPTI_DEV_RELEASE_VERSION: policy.version,
+							ERGOPTI_FAST_PRERELEASE: 'true',
+							GITHUB_OUTPUT: path.join(owner, 'output.txt'),
+							GITHUB_STEP_SUMMARY: path.join(owner, 'summary.txt')
+						}
+					}
+				);
+				assert.equal(result.error, undefined, 'the actual closed CLI executes');
+				assert.equal(result.status, 1, event + ': the retired request is refused');
+				assert.match(result.stderr, /^Invalid qualification command arguments\.\r?\n$/);
+				assert.equal(result.stdout, '', 'no historical receipt is minted as present authority');
+				assert.deepEqual(
+					fs.readdirSync(owner),
+					[],
+					'refusal creates no output, receipt or summary'
+				);
+			}
+		}
+	} finally {
+		fs.rmSync(owner, { recursive: true, force: true });
+	}
+	for (const name of ['fastPrerelease', 'validateFastPrerelease', 'fastPrereleaseReceipt'])
+		assert.equal(
+			Object.hasOwn(q, name),
+			false,
+			name + ': retired API cannot grant execution authority'
+		);
+	console.log(
+		'Retired fast157: all26 job classes and retained steps use full defaults; actual obsolete CLI refuses without side effects.'
+	);
+}
+
+// The proposed stable option is isolated from the original five-scope dev policy.
+{
+	const stable = q.parseClosedJson(fs.readFileSync(q.STABLE_POLICY_PATH, 'utf8'));
+	const exact = {
+		github_actions: 'true',
+		repository: 'adrienm7/ergopti',
+		event_name: 'push',
+		ref: 'refs/heads/main',
+		release: true,
+		prerelease: 'false',
+		channel: 'main',
+		tag: 'v1.0.0',
+		version: '1.0.0'
+	};
+	const before = new Date('2026-10-09T21:00:00Z');
+	const accepted = q.authorizeQualificationProfile(stable.id, exact, before);
+	assert.deepEqual(q.deferredScopes(accepted), [
+		'macos-brew-archive',
+		'macos-shortcuts-discovery',
+		'macos-launch-appleevents',
+		'macos-native-pac',
+		'macos-native-http',
+		'macos-stubbed-unit',
+		'macos-stubbed-e2e',
+		'windows-native-desktop',
+		'linux-simultaneous-native'
+	]);
+	assert.equal(
+		q.resolveQualificationProfile(exact, before),
+		null,
+		'unscoped Windows/Linux callers stay full'
+	);
+	for (const scope of ['windows-pac-full-url', 'linux-window-receipts']) {
+		assert.equal(q.resolveQualificationProfile(exact, before, scope), null);
+		assert.throws(
+			() => q.qualificationReceipt(accepted, scope, { source_sha: sha }),
+			/Unknown qualification receipt scope/
+		);
+	}
+	for (const scope of q.deferredScopes(accepted)) {
+		assert.equal(q.resolveQualificationProfile(exact, before, scope), accepted);
+		const receipt = q.qualificationReceipt(accepted, scope, { source_sha: sha });
+		assert.equal(receipt.qualified, false);
+		assert.equal(receipt.status, 'deferred');
+		assert.equal(receipt.source_sha, sha);
+		assert.equal(receipt.tag, 'v1.0.0');
+		assert.equal(receipt.expires_at, '2026-10-09T22:00:00Z');
+		q.validateQualificationReceipt(receipt, scope, sha, exact, before);
+		assert.throws(() =>
+			q.validateQualificationReceipt({ ...receipt, qualified: true }, scope, sha, exact, before)
+		);
+		assert.throws(() =>
+			q.validateQualificationReceipt(receipt, scope, 'b'.repeat(40), exact, before)
+		);
+	}
+	for (const runner of ['macos-15', 'macos-15-intel']) {
+		for (const scenario of ['clean', 'karabiner_config']) {
+			const row = q.launchQualificationReceipt(accepted, scenario, runner, { source_sha: sha });
+			assert.equal(row.status, 'deferred');
+			assert.equal(row.qualified, false);
+			q.validateLaunchQualificationReceipt(row, scenario, runner, sha, exact, before);
+		}
+		assert.equal(
+			q.launchQualificationReceipt(accepted, 'configured_symlink', runner, { source_sha: sha })
+				.status,
+			'full',
+			'unrelated launch scenarios remain mandatory'
+		);
+	}
+	for (const [field, value] of [
+		['github_actions', 'false'],
+		['repository', 'foreign/repo'],
+		['event_name', 'workflow_dispatch'],
+		['event_name', 'pull_request'],
+		['ref', 'refs/heads/dev'],
+		['release', false],
+		['release', 'true'],
+		['prerelease', 'true'],
+		['channel', 'dev'],
+		['tag', 'v1.0.1'],
+		['version', '1.0.1']
+	]) {
+		assert.equal(q.stablePublicationProfile({ ...exact, [field]: value }, before), null);
+		assert.throws(() =>
+			q.authorizeQualificationProfile(stable.id, { ...exact, [field]: value }, before)
+		);
+	}
+	assert.equal(q.stablePublicationProfile(exact, new Date(stable.expires_at)), null);
+	assert.throws(() =>
+		q.stablePublicationNotice(stable.id, exact, sha, new Date(stable.expires_at))
+	);
+	assert.throws(() => q.stablePublicationNotice(stable.id, exact, '', before));
+	assert.throws(() => q.stablePublicationNotice('foreign', exact, sha, before));
+	const notice = q.stablePublicationNotice(stable.id, exact, sha, before);
+	assert.match(notice, /NATIVE AND HARNESS QUALIFICATION DEFERRED \/ qualified:false/);
+	assert.ok(notice.includes(sha));
+	assert.ok(
+		notice.includes(
+			'Known macOS reports remain under investigation: Karabiner lease failures (including watchdog exit 73 and PONG/READY timeouts), and an active Homebrew upgrade leaving Hammerspoon running without ErgoptiPlus. This release does not claim those reports repaired.'
+		)
+	);
+	assert.equal(
+		q.deferredScopes(accepted).length,
+		9,
+		'only the six explicitly approved added scopes extend the original three'
+	);
+	assert.ok(
+		notice.includes(
+			'Compilation, packaging, macOS signing, source and asset integrity, installation and all other tests remain required'
+		)
+	);
+	assert.equal(
+		q.stablePublicationNotice('', { ...exact, event_name: 'pull_request' }, '', before),
+		''
+	);
+	for (const [field, value] of [
+		['tag', 'v1.0.1'],
+		['version', '1.0.1'],
+		['expires_at', '2026-10-10T22:00:00Z'],
+		['repository', 'foreign/repo']
+	]) {
+		assert.throws(
+			() => q.validatePolicy({ ...stable, [field]: value }),
+			/Invalid one-candidate stable boundary/
+		);
+	}
+	const broadened = JSON.parse(JSON.stringify(stable));
+	broadened.scopes['windows-pac-full-url'] = policy.scopes['windows-pac-full-url'];
+	assert.throws(() => q.validatePolicy(broadened), /Invalid closed qualification fields/);
+	console.log(
+		'Draft stable v1.0.0: exact nine approved scopes, all unlisted work full, strict expiry and source-bound public limits PASS.'
+	);
+}
+
+// Both fresh clock and artifact guards must immediately precede each external channel push.
+{
+	const workflow = fs.readFileSync(path.join(ROOT, '.github/workflows/ci.yml'), 'utf8');
+	const guard = 'node tools/ci/dev-release-qualification.cjs --publication-admit >/dev/null';
+	const signatureGuard = 'node tools/ci/windows-stable-signing.cjs --publication-admit >/dev/null';
+	function requirePublicationGuard(source, push) {
+		assert.equal(source.split(push).length, 2, 'the actual publication push must be unique');
+		const prefix = source.slice(0, source.indexOf(push)).trimEnd();
+		assert.equal(
+			prefix
+				.split(/\r?\n/)
+				.slice(-2)
+				.map((line) => line.trim())
+				.join('\n'),
+			guard + '\n' + signatureGuard,
+			'fresh qualification admission must precede publication'
+		);
+	}
+	for (const push of [
+		'git -C "$worktree" push origin "HEAD:refs/heads/${branch}"',
+		'git -C "$tap" push origin HEAD'
+	]) {
+		requirePublicationGuard(workflow, push);
+		const actual = guard + '\n              ' + signatureGuard + '\n              ' + push;
+		assert.ok(workflow.includes(actual), 'the inverse must withdraw the exact executed guard');
+		assert.throws(
+			() => requirePublicationGuard(workflow.replace(actual, push), push),
+			/fresh qualification admission/
+		);
+		for (const replacement of [
+			guard + '\n              ' + push,
+			signatureGuard + '\n              ' + push,
+			signatureGuard + '\n              ' + guard + '\n              ' + push
+		]) {
+			assert.throws(
+				() => requirePublicationGuard(workflow.replace(actual, replacement), push),
+				/fresh qualification admission/
+			);
+		}
+	}
+	console.log(
+		'Stable publication: both actual external channel pushes retain fresh admission; guard omission refuses.'
+	);
+}
+
+// Windows signature permission is distinct from the three native test deferrals.
+{
+	const Signing = require('../ci/windows-stable-signing.cjs');
 	const context = {
 		github_actions: 'true',
 		repository: 'adrienm7/ergopti',
 		event_name: 'push',
-		ref: 'refs/heads/dev',
+		ref: 'refs/heads/main',
 		release: true,
-		prerelease: 'true',
-		channel: 'dev',
-		tag: 'v0.0.0-dev.157',
-		version: '0.0.0-dev.157'
+		prerelease: 'false',
+		channel: 'main',
+		tag: 'v1.0.0',
+		version: '1.0.0'
 	};
-	const now = new Date('2026-10-09T14:00:00Z');
-	assert.equal(q.fastPrerelease(context, now), true);
-	assert.equal(q.validateFastPrerelease(false, context, now), false);
-	for (const change of [
-		{ github_actions: '' },
-		{ repository: 'other/ergopti' },
-		{ event_name: 'pull_request' },
+	const source = 'a'.repeat(40),
+		hash = 'b'.repeat(64),
+		clock = new Date('2026-10-09T21:59:59Z');
+	Signing.admit(context, source, source, clock);
+	Signing.requireFreshUnsigned('true');
+	for (const value of ['false', undefined, '', true]) {
+		assert.throws(() => Signing.requireFreshUnsigned(value));
+	}
+	for (const patch of [
+		{ github_actions: 'false' },
 		{ event_name: 'workflow_dispatch' },
-		{ ref: 'refs/heads/main' },
+		{ event_name: 'pull_request' },
+		{ ref: 'refs/heads/dev' },
 		{ release: false },
-		{ prerelease: 'false' },
-		{ channel: 'main' },
-		{ tag: 'v0.0.0-dev.158', version: '0.0.0-dev.158' },
-		{ tag: 'v0.0.0-dev.156', version: '0.0.0-dev.156' }
+		{ prerelease: 'true' },
+		{ channel: 'dev' },
+		{ tag: 'v1.0.1' },
+		{ version: '1.0.1' },
+		{ repository: 'foreign/repository' }
 	]) {
-		assert.equal(q.fastPrerelease({ ...context, ...change }, now), false);
-		assert.throws(
-			() => q.validateFastPrerelease(true, { ...context, ...change }, now),
-			/not authorized/
+		assert.throws(() => Signing.admit({ ...context, ...patch }, source, source, clock));
+	}
+	assert.throws(() => Signing.admit(context, source, 'c'.repeat(40), clock));
+	assert.throws(() => Signing.admit(context, 'A'.repeat(40), 'A'.repeat(40), clock));
+	assert.throws(() => Signing.admit(context, source, source, new Date('2026-10-09T22:00:00Z')));
+	assert.throws(() => Signing.admit(context, source, source, new Date('invalid')));
+	assert.throws(() =>
+		Signing.admit(context, source, source, clock, { ...Signing.POLICY, authorized: false })
+	);
+	const value = Signing.receipt(context, source, source, hash, clock);
+	Signing.validateReceipt(value, context, source, source, hash, clock);
+	for (const patch of [
+		{ signature: 'Valid' },
+		{ qualified: true },
+		{ tests: 'deferred' },
+		{ source_sha: 'c'.repeat(40) },
+		{ sha256: 'd'.repeat(64) },
+		{ tag: 'v1.0.1' },
+		{ artifact: 'foreign.exe' },
+		{ extra: true }
+	]) {
+		assert.throws(() =>
+			Signing.validateReceipt({ ...value, ...patch }, context, source, source, hash, clock)
 		);
 	}
-	assert.equal(q.fastPrerelease(context, new Date('2026-10-10T07:00:00Z')), false);
-	assert.throws(
-		() => q.validateFastPrerelease(true, context, new Date('2026-10-10T07:00:00Z')),
-		/not authorized/
-	);
-	assert.throws(() => q.validateFastPrerelease('true', context, now), /Boolean/);
-	assert.throws(() => q.fastPrerelease({ ...context, extra: true }, now), /closed/);
-	const outcomes = {
-		windows: {
-			'test-ahk': 'skipped',
-			'e2e-ahk': 'skipped',
-			'package-windows': 'success',
-			'launch-windows': 'skipped'
-		},
-		macos: {
-			'cold-bootstrap-native': 'skipped',
-			'test-hs': 'skipped',
-			'e2e-hs': 'skipped',
-			'package-macos': 'success',
-			launch: 'skipped',
-			'tooltip-canvas': 'skipped',
-			'managed-ollama-native': 'success'
-		},
-		linux: {
-			'test-linux': 'skipped',
-			'e2e-linux': 'skipped',
-			'package-linux': 'success',
-			'install-linux': 'skipped'
-		}
-	};
-	for (const [lane, expected] of Object.entries(outcomes)) {
-		const needs = Object.fromEntries(
-			Object.entries(expected).map(([name, result]) => [name, { result }])
-		);
-		const receipt = q.fastPrereleaseReceipt(lane, needs, 'a'.repeat(40), context, now);
-		assert.equal(receipt.qualified, false);
-		assert.equal(receipt.status, 'UNQUALIFIED');
-		assert.equal(receipt.tests, 'DEFERRED');
-		assert.equal(receipt.source_sha, 'a'.repeat(40));
-		for (const name of Object.keys(needs)) {
-			assert.throws(
-				() =>
-					q.fastPrereleaseReceipt(
-						lane,
-						{ ...needs, [name]: { result: 'failure' } },
-						'a'.repeat(40),
-						context,
-						now
-					),
-				/mandatory jobs/
-			);
-		}
-		const missing = { ...needs };
-		delete missing[Object.keys(needs)[0]];
-		assert.throws(
-			() => q.fastPrereleaseReceipt(lane, missing, 'a'.repeat(40), context, now),
-			/closed/
-		);
-		assert.throws(() => q.fastPrereleaseReceipt(lane, needs, '', context, now), /SHA/);
-	}
-	assert.throws(
-		() => q.fastPrereleaseReceipt('other', {}, 'a'.repeat(40), context, now),
-		/Unknown/
-	);
+	assert(Signing.notice(source).includes('UNSIGNED / qualified:false'));
+	assert(Signing.notice(source).includes('SignPath Foundation'));
+	console.log('[OK] one-candidate unsigned signature permission and source-bound receipt guards.');
 }

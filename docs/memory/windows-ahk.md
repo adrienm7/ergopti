@@ -399,6 +399,20 @@ while the same tap is still dispatched, bare and in the rendered control.
 Action: give a new user-key Tab producer that provenance; never pass one from a
 gesture, macro, timer or text send (`test_llm_menu_tab_source_hwnd.ahk`).
 
+### project-llm-automation-accepts
+
+A Tab injected by another process (SendInput) reaches the Tab hotkeys and the
+I1 prefix watcher, because AutoHotkey ranks unmarked input at the highest
+level, but it is never `GetKeyState("Tab", "P")`; the driver cannot tell it
+from its own level-2+ Tabs (remap output, roll replay), so the physical gate
+must stay. External tools (the `video/` real capture) accept through the
+registered message `Ergopti.LLM.AcceptPrediction.v1` instead, honoured by
+`LLM_Tooltip_TryAcceptAutomation` only while the bridge is active, with the
+chord's focus and held-modifier gates. Injected Ctrl combinations are not
+usable either: the LCtrl tap-hold turns them into a tap (Paste). Action: add
+any new external trigger as a caller of that primitive, never by relaxing the
+Tab policy (`test_llm_tab_accept_policy.ahk`).
+
 ### project-llm-validation-digit-is-the-digit-row-key
 
 The validation chord's native route was resolved by `VkKeyScanExW` of the digit

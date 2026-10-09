@@ -1051,13 +1051,85 @@
 		return projectShare(snapshot, schema.share_policy.projection);
 	}
 
+	/** Renders only detached, policy-approved leaves; local free text never enters these rows. */
+	function shareRows(value, rule, prefix, rows) {
+		if (rule.kind === 'object') {
+			Object.keys(value)
+				.sort()
+				.forEach(function (key) {
+					shareRows(value[key], rule.fields[key], prefix ? prefix + '.' + key : key, rows);
+				});
+		} else if (rule.kind === 'array') {
+			value.forEach(function (item, index) {
+				shareRows(item, rule.item, prefix + '.' + (index + 1), rows);
+			});
+		} else
+			rows.push(
+				'| ' + cell(prefix) + ' | ' + cell(rule.kind === 'boolean' ? !!value : value) + ' |'
+			);
+	}
+
+	/** Schema sections supply labels; the sharing policy remains the sole data authority. */
+	function shareReadable(safe, schema, t) {
+		var lines = [],
+			policy = schema.share_policy.projection.fields;
+		var rows = [];
+		Object.keys(safe)
+			.sort()
+			.forEach(function (key) {
+				if (key !== 'sections' && key !== 'probes' && key !== 'retired_probes')
+					shareRows(safe[key], policy[key], key, rows);
+			});
+		lines.push('| | |', '| --- | --- |', ...rows, '');
+		schema.sections.forEach(function (section) {
+			var data = safe.sections && safe.sections[section.id];
+			if (!data) return;
+			rows = [];
+			Object.keys(data)
+				.sort()
+				.forEach(function (key) {
+					var label = (section.fields || []).some(function (field) {
+						return field.id === key;
+					})
+						? t('healthcheck.field.' + key)
+						: key;
+					shareRows(data[key], policy.sections.fields[section.id].fields[key], label, rows);
+				});
+			if (rows.length)
+				lines.push(
+					'## ' + t('healthcheck.section.' + section.id),
+					'',
+					'| | |',
+					'| --- | --- |',
+					...rows,
+					''
+				);
+		});
+		rows = [];
+		for (var key of ['probes', 'retired_probes'])
+			if (safe[key]) shareRows(safe[key], policy[key], key, rows);
+		if (rows.length)
+			lines.push(
+				'## ' + t('healthcheck.deep_tests.probe_inventory'),
+				'',
+				'| | |',
+				'| --- | --- |',
+				...rows,
+				''
+			);
+		return lines.join('\n');
+	}
+
 	/** The local preview uses the same closed projection as the host's output. */
 	function formatShareable(snapshot, schema, t) {
+		var safe = shareSnapshot(snapshot, schema);
 		return (
 			'# ErgoptiPlus diagnostics\n\n' +
 			t(schema.share_policy.notice_key) +
-			'\n\ndriver-suites: not_run\npage-model-checks: not_collected\n\n```json\n' +
-			JSON.stringify(shareSnapshot(snapshot, schema)) +
+			'\n\ndriver-suites: not_run\npage-model-checks: not_collected\n\n' +
+			shareReadable(safe, schema, t) +
+			'\n```json\n' +
+			JSON.stringify(safe) +
 			'\n```\n'
 		);
 	}

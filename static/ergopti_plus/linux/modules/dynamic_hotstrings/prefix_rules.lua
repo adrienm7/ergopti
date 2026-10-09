@@ -58,7 +58,7 @@ local IBAN_PREFIX_CHARS     = 6
 -- Every mapping this module builds carries the same flags. auto_expand because
 -- there is no terminator to wait for; is_private because both halves are secret.
 local BASE_OPTS = {
-	is_word           = false,
+	is_word           = true,
 	auto_expand       = true,
 	is_case_sensitive = true,
 	is_private        = true,

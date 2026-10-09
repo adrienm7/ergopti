@@ -4198,6 +4198,8 @@ type = "check"
 id = "start_at_login"
 i18n = "menu.global.start_at_login"
 checked_when = ["start_at_login_enabled"]
+disabled_when = ["startup_command_available"]
+disabled_reason_key = "menu.about.startup_other_command_reason"
 
 # A local version run from source has nothing to remove: the row stays in place,
 # greyed by `disabled_when`, and says why. A row greyed with a reason is drawn

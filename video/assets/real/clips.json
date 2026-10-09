@@ -1,0 +1,20 @@
+{
+	"_comment": "Written by scripts/record-screen.ps1: unedited recordings of the installed driver shown by the Real scene.",
+	"system": "Windows 11",
+	"aspect": 1.7778,
+	"clips": [
+		{
+			"file": "hotstrings.mp4",
+			"caption": "Autocorrection and ★ abbreviations, typed live",
+			"segments": [[0.3, 16.3]]
+		},
+		{
+			"file": "ai.mp4",
+			"caption": "A real AI prediction: the typo fixed in one key",
+			"segments": [
+				[0.3, 7.0],
+				[13.3, 17.67]
+			]
+		}
+	]
+}

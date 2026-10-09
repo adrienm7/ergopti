@@ -1,0 +1,19 @@
+{
+	"_comment": "Hotstring triggers the scenes type. Only triggers live here: scripts/prepare.mjs looks their outputs up in the driver's hotstring files and fails if one disappears.",
+	"hotstrings": [
+		"github",
+		"macos",
+		"youtube",
+		"chatgpt",
+		"alexei",
+		"pex★",
+		"ct★",
+		"pcq★",
+		"eef★",
+		"(c)★",
+		"(for all)★",
+		"< = >★",
+		"ecq★",
+		"ia★"
+	]
+}

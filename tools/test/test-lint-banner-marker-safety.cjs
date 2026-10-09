@@ -91,6 +91,74 @@ function runLint(extraArgs) {
 	});
 }
 
+/** Verifies commit admission against both published release histories. */
+function checkPublishedCommitBoundaries() {
+	const assert = require('node:assert/strict');
+	const os = require('node:os');
+	const vm = require('node:vm');
+	const { execFileSync, execSync } = require('node:child_process');
+	const fixture = fs.mkdtempSync(path.join(os.tmpdir(), 'ergopti-commit-scope-'));
+	const owner = fs
+		.readFileSync(LINT_SCRIPT, 'utf8')
+		.match(/function checkNoCoAuthor\(\) \{[\s\S]*?\n\}/);
+	assert(owner, 'the actual commit-admission owner must exist');
+	const options = { cwd: fixture, encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'] };
+	const git = (...args) => execFileSync('git', args, options).trim();
+	const commit = (subject, forbidden = false) => {
+		const message = path.join(fixture, 'message.txt');
+		fs.writeFileSync(
+			message,
+			subject + (forbidden ? '\n\nCo-Authored-By: Fixture <fixture@example.invalid>\n' : '\n')
+		);
+		git('commit', '--allow-empty', '-F', message);
+	};
+	const check = (name, expected) => {
+		const scope = { execSync, REPO_ROOT: fixture, totalViolations: 0, console: { warn() {} } };
+		vm.runInNewContext(owner[0] + '\ncheckNoCoAuthor();', scope);
+		test(
+			name,
+			scope.totalViolations === expected,
+			`expected ${expected}, got ${scope.totalViolations}`
+		);
+	};
+	try {
+		git('init', '--initial-branch=main');
+		git('config', 'user.name', 'Commit fixture');
+		git('config', 'user.email', 'fixture@example.invalid');
+		git('config', 'commit.gpgSign', 'false');
+		git('config', 'core.hooksPath', path.join(fixture, 'empty-hooks'));
+		commit('chore: establish published dev');
+		git('update-ref', 'refs/remotes/origin/dev', 'HEAD');
+		commit('chore: retain published main history', true);
+		git('update-ref', 'refs/remotes/origin/main', 'HEAD');
+		git('switch', '-c', 'topic');
+		commit('fix: integrate both accepted histories');
+		check('published main trailers do not require rewriting accepted history', 0);
+		commit('fix: reject a new forbidden trailer', true);
+		check('new topic trailers remain forbidden after release-branch integration', 1);
+		git('update-ref', '-d', 'refs/remotes/origin/main');
+		check('an unavailable main boundary does not exempt its commits', 2);
+		git('update-ref', 'refs/remotes/origin/main', 'HEAD~2');
+		git('update-ref', '-d', 'refs/remotes/origin/dev');
+		check('a main-only checkout still checks unpublished topic commits', 1);
+		git('update-ref', '-d', 'refs/remotes/origin/main');
+		check('a checkout without release refs preserves the recent-history check', 2);
+		git('update-ref', 'refs/remotes/origin/main', 'HEAD~2');
+		git('update-ref', 'refs/remotes/origin/dev', 'HEAD~3');
+		git('switch', '-c', 'unpublished-side', 'refs/remotes/origin/dev');
+		commit('fix: reject an unpublished second-parent trailer', true);
+		git('switch', 'topic');
+		git('merge', '--no-ff', '--no-edit', 'unpublished-side');
+		check('unpublished second-parent trailers are checked as well', 2);
+	} finally {
+		assert.equal(path.dirname(fixture), path.resolve(os.tmpdir()));
+		assert(path.basename(fixture).startsWith('ergopti-commit-scope-'));
+		fs.rmSync(fixture, { recursive: true, force: true });
+	}
+}
+
+checkPublishedCommitBoundaries();
+
 try {
 	fs.writeFileSync(FIXTURE_PATH, FIXTURE_CONTENT, 'utf8');
 

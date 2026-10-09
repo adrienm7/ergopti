@@ -3281,5 +3281,6 @@
 	"healthcheck.summary.scope": "Results cover the recorded checks only. Isolated suites were not run.",
 	"healthcheck.problem.diagnostic_check": "Diagnostic check failed: %s.",
 	"healthcheck.export.privacy_notice": "This report shares only allowed technical facts. Logs, free text, paths and identifying details are excluded even when details are enabled. Local page tests are not included.",
-	"sg_actions.llm_translate_context": "🌐 Translate the current sentence [configurable]"
+	"sg_actions.llm_translate_context": "🌐 Translate the current sentence [configurable]",
+	"menu.about.startup_other_command_reason": "Another startup command: Startup is configured for another command or installation. Keep its existing setting."
 }

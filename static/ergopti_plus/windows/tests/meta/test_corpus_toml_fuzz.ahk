@@ -89,9 +89,24 @@ _TomlFuzz_RunAll() {
 	; ===== 1.1) Per-vector run ====
 	; ==============================
 
+	Skipped := _TomlFuzz_RegisterVectors(Data, Test)
+
+	; Summary test
+	_TomlFuzz_Summary() {
+		AssertTrue(Data.Length > 0, "At least one vector must exist in the corpus")
+	}
+	Test("TOML fuzz corpus: all " . Data.Length . " entries processed (" . Skipped . " null-byte skip(s))", _TomlFuzz_Summary)
+}
+
+
+; Registers the exact admitted vectors without executing their file/parser callbacks.
+; @param Data {Array} Canonical decoded corpus or independently authored recording vectors.
+; @param RegisterTest {Func} The actual test registry owner or a recording sink.
+; @return {Integer} Count of vectors explicitly excluded for an actual UTF-16 NUL.
+_TomlFuzz_RegisterVectors(Data, RegisterTest) {
+	if !(Data is Array) || !(RegisterTest is Func)
+		throw TypeError("TOML fuzz registration requires its corpus and registry owner.")
 	Skipped := 0
-	Passed  := 0
-	Failed  := 0
 
 	for Vec in Data {
 		VecId   := Vec.Has("id")          ? Vec["id"]          : "UNKNOWN"
@@ -101,19 +116,36 @@ _TomlFuzz_RunAll() {
 
 		; Skip inputs containing null bytes — FileAppend on Windows will silently
 		; truncate or corrupt the file, making the test meaningless.
-		if InStr(Input, Chr(0)) {
+		if RegExMatch(Input, "\x00") {
 			Skipped++
 			continue
 		}
 
-		Test("[corpus:TOML-" . VecId . "] " . Descr, _TomlFuzz_RunVector.Bind(VecId, Input))
+		RegisterTest.Call("[corpus:TOML-" . VecId . "] " . Descr, _TomlFuzz_RunVector.Bind(VecId, Input))
 	}
 
-	; Summary test
-	_TomlFuzz_Summary() {
-		AssertTrue(Data.Length > 0, "At least one vector must exist in the corpus")
-	}
-	Test("TOML fuzz corpus: all " . Data.Length . " entries processed (" . Skipped . " null-byte skip(s))", _TomlFuzz_Summary)
+	return Skipped
 }
 
 _TomlFuzz_RunAll()
+
+_TomlFuzz_NulRegistrationControls() {
+	Data := [
+		Map("id", "safe-first", "input", "a=1", "description", "first"),
+		Map("id", "nul-head", "input", Chr(0) . "a=1"),
+		Map("id", "safe-empty", "input", "", "description", "empty"),
+		Map("id", "nul-middle", "input", "a=" . Chr(0) . "1"),
+		Map("id", "safe-unicode", "input", "a='é'", "description", "unicode"),
+		Map("id", "nul-tail", "input", "a=1" . Chr(0)),
+		Map("id", "safe-last", "input", "a=2", "description", "last")]
+	Recorded := []
+	Register := (Name, Callback) => Recorded.Push(Map("name", Name, "callback", Callback))
+	AssertEqual(3, _TomlFuzz_RegisterVectors(Data, Register), "only the three actual NUL vectors are excluded")
+	AssertEqual(4, Recorded.Length, "all ordinary vectors are registered, including empty and Unicode")
+	for Index, Expected in ["[corpus:TOML-safe-first] first", "[corpus:TOML-safe-empty] empty",
+		"[corpus:TOML-safe-unicode] unicode", "[corpus:TOML-safe-last] last"] {
+		AssertEqual(Expected, Recorded[Index]["name"], "the actual registration preserves each independent id and order")
+		AssertTrue(Recorded[Index]["callback"] is Func, "the actual bound vector callback is retained")
+	}
+}
+Test("TOML fuzz corpus: actual UTF-16 registration excludes only NUL vectors", _TomlFuzz_NulRegistrationControls)

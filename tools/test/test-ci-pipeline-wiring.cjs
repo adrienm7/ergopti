@@ -3705,28 +3705,35 @@ function nativePacSourceProblems(files) {
 	return problems;
 }
 errors.push(...nativePacSourceProblems(pipeline.files()));
-// The fifth-path projection grants only this exact raw bound condition.
+// The actual raw Source10 condition remains mandatory after the retired fast route.
 const rawSourceFiles = require('./ci-pipeline.cjs').files();
-const rawSourceStep = PAC_SOURCE_STEP.replace(
-	'if: ${{ !cancelled() }}',
-	'if: ${{ !inputs.fast_prerelease && (!cancelled()) }}'
-);
-assert.equal(pipeline.validateRaw(rawSourceFiles), true);
-for (const replacement of [
-	'',
-	rawSourceStep + rawSourceStep,
-	rawSourceStep.replace('if: ${{ !inputs.fast_prerelease && (!cancelled()) }}', 'if: false'),
-	rawSourceStep.replace(
-		'if: ${{ !inputs.fast_prerelease && (!cancelled()) }}',
-		'if: ${{ !cancelled() }}'
-	)
+const rawSourceStep = PAC_SOURCE_STEP;
+assert.doesNotThrow(() => pipeline.validateRaw(rawSourceFiles));
+for (const [replacement, error] of [
+	[
+		'',
+		/\[ci-pipeline\] no step named 'Qualify actual native PAC source ownership XCTest controls'/
+	],
+	[
+		rawSourceStep + rawSourceStep,
+		/\[ci-pipeline\] step 'Qualify actual native PAC source ownership XCTest controls' appears 2 times in one job/
+	],
+	[
+		rawSourceStep.replace('if: ${{ !cancelled() }}', 'if: false'),
+		/\[ci-full-default\].*full step condition/
+	],
+	[
+		rawSourceStep.replace('if: ${{ !cancelled() }}', 'if: ${{ success() }}'),
+		/\[ci-full-default\].*full step condition/
+	]
 ]) {
 	const changed = rawSourceFiles.map((file) =>
 		file.rel === MACOS_BOX ? { ...file, text: file.text.replace(rawSourceStep, replacement) } : file
 	);
-	assert.throws(() => pipeline.fromFiles(changed), /full-default/);
+	assert.notDeepEqual(changed, rawSourceFiles);
+	assert.throws(() => pipeline.fromFiles(changed), error);
 }
-console.log('PASS: exact Source10 raw projection controls=5; native execution unqualified.');
+console.log('PASS: exact Source10 raw condition controls=5; native execution unqualified.');
 for (const [name, changed] of [
 	['missing source step', ''],
 	['duplicate source step', PAC_SOURCE_STEP + PAC_SOURCE_STEP],

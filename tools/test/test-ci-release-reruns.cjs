@@ -219,11 +219,14 @@ function repository(name, branch) {
 	// The extracted workflow calls the real channel resolver and its registry.
 	for (const relative of [
 		'tools/build/release-channel.cjs',
+		'tools/ci/dev-release-qualification.cjs',
+		'tools/ci/windows-stable-signing.cjs',
+		'.github/ci/stable_windows_signing_exception.json',
+		'.github/ci/dev_release_qualification_exceptions.json',
+		'.github/ci/stable_release_qualification_exception.json',
 		'tools/build/publish-verified-release.cjs',
 		'tools/build/macos-release-publication.cjs',
 		'tools/build/macos-release-archives.cjs',
-		'tools/ci/dev-release-qualification.cjs',
-		'.github/ci/dev_release_qualification_exceptions.json',
 		'tools/lib/paths.cjs',
 		'static/ergopti_plus/_shared/modules/updater/defaults.json',
 		'static/ergopti_plus/_shared/modules/updater/channels.json',
@@ -333,6 +336,19 @@ fs.writeFileSync(
 );
 fs.chmodSync(path.join(stubs, 'gh'), 0o755);
 fs.chmodSync(path.join(stubs, 'curl'), 0o755);
+// Git Bash must execute the same observed CPython as fixture generation; a
+// Windows Store python3 alias is not the workflow's real Python prerequisite.
+// Forward argv unchanged to the real interpreter, never simulate verification.
+if (process.platform === 'win32') {
+	const nativePython = bashPath(pythonExecutable());
+	const quotedPython = "'" + nativePython.replaceAll("'", "'\\''") + "'";
+	fs.writeFileSync(
+		path.join(stubs, 'python3'),
+		'#!/usr/bin/env bash\nexec ' + quotedPython + ' "$@"\n'
+	);
+	fs.chmodSync(path.join(stubs, 'python3'), 0o755);
+}
+
 const STUB_PATH = `export PATH="${bashPath(stubs)}:$PATH"\n`;
 
 // A Node child must cross the same fake gh boundary on Windows: Node cannot
@@ -786,6 +802,11 @@ function preflight(
 	copyManagedPublicationSources(cwd);
 	for (const relative of [
 		'tools/build/release-channel.cjs',
+		'tools/ci/dev-release-qualification.cjs',
+		'tools/ci/windows-stable-signing.cjs',
+		'.github/ci/stable_windows_signing_exception.json',
+		'.github/ci/dev_release_qualification_exceptions.json',
+		'.github/ci/stable_release_qualification_exception.json',
 		'static/ergopti_plus/_shared/ui/update_channels.js',
 		'static/ergopti_plus/_shared/modules/updater/defaults.json',
 		'static/ergopti_plus/_shared/modules/updater/channels.json'
@@ -1183,31 +1204,53 @@ check(
 	}
 );
 
+// The temporary fast route is retired. Legacy flags are inert data, not an
+// alternative admission capability; mandatory asset verification still gates
+// every publication, including hostile or malformed former fast requests.
 check(
-	'an unbound fast release request refuses before publication (release-fast-unbound-refusal)',
+	'retired fast request cannot change full release admission (release-fast-retired-full)',
 	() => {
 		const result = createRelease('true', { fastPrerelease: 'true' });
-		assert.notEqual(result.status, 0);
-		assert.match(result.stderr, /Temporary fast prerelease is not authorized for this context\./);
-		assert.deepEqual(
-			result.calls,
-			[],
-			'An unauthorized fast request cannot call the publication port.'
+		assert.equal(result.status, 0, result.stdout + result.stderr);
+		assert.ok(
+			!result.args.includes('--notes'),
+			'Retired fast flags cannot add unqualified bypass notes.'
+		);
+		assert.equal(
+			result.state.isDraft,
+			false,
+			'Only the fully verified ordinary release publishes.'
 		);
 	}
 );
-
 check(
-	'missing and malformed fast release input refuse before publication (release-fast-input-refusal)',
+	'retired missing or malformed fast flags cannot bypass assets (release-fast-retired-input)',
 	() => {
-		for (const fastPrerelease of ['', 'TRUE', '1']) {
-			const result = createRelease('true', { fastPrerelease });
-			assert.notEqual(result.status, 0);
-			assert.match(result.stderr, /Missing Boolean fast prerelease input\./);
-			assert.deepEqual(
-				result.calls,
-				[],
-				'Malformed policy input cannot call the publication port.'
+		for (const fastPrerelease of ['', 'TRUE', '1', 'true']) {
+			const valid = createRelease('true', { fastPrerelease });
+			assert.equal(valid.status, 0, valid.stdout + valid.stderr);
+			assert.ok(
+				!valid.args.includes('--notes'),
+				'Every legacy flag retains full release semantics.'
+			);
+			const refused = createRelease('true', {
+				fastPrerelease,
+				mode: 'permanent-loss',
+				missing: 'ErgoptiPlus.exe'
+			});
+			assert.notEqual(
+				refused.status,
+				0,
+				'Missing mandatory assets must refuse even with a retired fast flag.'
+			);
+			assert.equal(
+				refused.state.isDraft,
+				true,
+				'Refusal retains the draft instead of publishing incomplete assets.'
+			);
+			assert.ok(
+				!refused.calls.some((call) => call.includes('--draft=false')),
+				'No retired flag can reach the public publication port after failed asset verification.'
 			);
 		}
 	}
@@ -1605,6 +1648,86 @@ check("each script's env carries the plan output or preflight decision it reads"
 		'the release job must give the preflight and the notes the bundle name plan resolved'
 	);
 });
+
+check(
+	'real qualification helper closes publication on foreign context and preserves full defaults',
+	() => {
+		const work = repository('qualification-publication', 'main');
+		const marker = path.join(work, 'publication-marker');
+		const script =
+			'set -euo pipefail\nnode tools/ci/dev-release-qualification.cjs --publication-admit >/dev/null\nprintf published > publication-marker';
+		const foreign = {
+			ERGOPTI_NATIVE_QUALIFICATION_PROFILE: 'stable-v1-20261009-macos-native-deferred',
+			GITHUB_ACTIONS: 'true',
+			GITHUB_REPOSITORY: 'adrienm7/ergopti',
+			GITHUB_EVENT_NAME: 'push',
+			GITHUB_REF: 'refs/heads/main',
+			GITHUB_SHA: 'a'.repeat(40),
+			ERGOPTI_DEV_RELEASE_RELEASE: 'true',
+			ERGOPTI_DEV_RELEASE_PRERELEASE: 'false',
+			ERGOPTI_DEV_RELEASE_CHANNEL: 'main',
+			ERGOPTI_DEV_RELEASE_TAG: 'v1.0.1',
+			ERGOPTI_DEV_RELEASE_VERSION: '1.0.1'
+		};
+		const refused = runScript(script, work, foreign);
+		assert.notEqual(refused.status, 0);
+		assert.match(refused.stderr, /not authorized/);
+		assert.equal(
+			fs.existsSync(marker),
+			false,
+			'refused admission cannot reach the publication port'
+		);
+		const ordinary = runScript(script, work, {
+			...foreign,
+			ERGOPTI_NATIVE_QUALIFICATION_PROFILE: ''
+		});
+		assert.equal(ordinary.status, 0, ordinary.stdout + ordinary.stderr);
+		assert.equal(
+			fs.readFileSync(marker, 'utf8'),
+			'published',
+			'full default must execute the real copied helper'
+		);
+	}
+);
+
+check(
+	'real unsigned publication helper refuses a missing receipt before its publication port',
+	() => {
+		const work = repository('unsigned-publication', 'main');
+		const sha = commit(work, 'independent unsigned boundary fixture');
+		const marker = path.join(work, 'unsigned-marker');
+		const script =
+			'set -euo pipefail\nnode tools/ci/windows-stable-signing.cjs --publication-admit >/dev/null\nprintf published > unsigned-marker';
+		const env = {
+			GITHUB_ACTIONS: 'true',
+			GITHUB_REPOSITORY: REPOSITORY,
+			GITHUB_EVENT_NAME: 'push',
+			GITHUB_REF: 'refs/heads/main',
+			GITHUB_SHA: sha,
+			ERGOPTI_DEV_RELEASE_RELEASE: 'true',
+			ERGOPTI_DEV_RELEASE_PRERELEASE: 'false',
+			ERGOPTI_DEV_RELEASE_CHANNEL: 'main',
+			ERGOPTI_DEV_RELEASE_TAG: 'v1.0.0',
+			ERGOPTI_DEV_RELEASE_VERSION: '1.0.0',
+			ERGOPTI_WINDOWS_SIGNING_CONFIGURED: 'false'
+		};
+		const refused = runScript(script, work, env);
+		assert.notEqual(refused.status, 0);
+		assert.match(refused.stderr, /not admitted/);
+		assert.equal(
+			fs.existsSync(marker),
+			false,
+			'missing evidence must not reach the publication port'
+		);
+		const full = runScript(script, work, { ...env, ERGOPTI_WINDOWS_SIGNING_CONFIGURED: 'true' });
+		assert.equal(full.status, 0, full.stdout + full.stderr);
+		assert.equal(
+			fs.readFileSync(marker, 'utf8'),
+			'published',
+			'complete signed configuration retains full defaults'
+		);
+	}
+);
 
 if (failures.length > 0) {
 	console.error('[FAIL] a release re-run can republish old code or cannot finish a release:');

@@ -1385,3 +1385,33 @@ helpers.describe("MLX trusted bootstrap network admission", function()
 		end
 	end))
 end)
+
+helpers.describe("MLX native bootstrap admission", function()
+	helpers.it("mlx-native-bootstrap-admission: the actual Python launcher admits the native receiver before installer dispatch", scoped(function()
+		local world = new_world()
+		local checker = load_world(world)
+		speak("en")
+		helpers.assert_true(checker.install_for_selection())
+		local command = world.tasks[1].command()
+		local receiver = assert(command:find("s.loader.exec_module(m); m._resolve_worker()", 1, true),
+			"native wheel staging must not be rejected by the opaque-only gate")
+		local execution = assert(command:find("exec ", 1, true))
+		helpers.assert_true(receiver < execution, "identity admission precedes the actual Python PTY")
+		helpers.assert_true(command:find("${https_proxy:-${HTTPS_PROXY:-${all_proxy:-${ALL_PROXY:-}}}}", 1, true) ~= nil,
+			"the original explicit route keeps its lower-case-first precedence")
+		helpers.assert_true(command:find("managed_bootstrap_http.py", 1, true) ~= nil,
+			"the native branch requires the actual installed staging helper")
+		local Network = package.loaded["modules.llm.network_env"]
+		local FileSystem = package.loaded["adapters.file_system"]
+		local exists = FileSystem.exists
+		FileSystem.exists = function(path)
+			if path:sub(-#"/platform/network/native_http.py") == "/platform/network/native_http.py" then return false end
+			return exists(path)
+		end
+		local prelude = Network.bootstrap_prelude("TEST", "/owned/python")
+		local managed = Network.managed_http_prelude("TEST")
+		FileSystem.exists = exists
+		helpers.assert_type(prelude, "string", "manual/explicit branches must not require the unused native receiver")
+		helpers.assert_nil(managed, "the public native-only owner still requires its receiver")
+	end))
+end)

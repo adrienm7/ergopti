@@ -1,0 +1,148 @@
+{
+	"_comment": "Scene order (the tray menu’s order after the overview) and lengths in seconds, read by the Remotion compositions and by scripts/make-audio.mjs so the soundtrack lands its accents on the cuts. gif=true scenes also render as README GIFs; gifFps and gifColors lower the encoding of a busy scene that would exceed the GIF budget. film=false keeps a scene out of the film (its component and GIF stay) for the under-two-minutes cut.",
+	"fps": 30,
+	"transitionFrames": 15,
+	"scenes": [
+		{
+			"id": "hook",
+			"seconds": 5,
+			"gif": false
+		},
+		{
+			"id": "three-os",
+			"seconds": 16,
+			"gif": true
+		},
+		{
+			"id": "menu",
+			"seconds": 20,
+			"gif": true,
+			"gifFps": 8,
+			"gifColors": 96,
+			"film": false
+		},
+		{
+			"id": "tap-holds",
+			"seconds": 13,
+			"gif": true,
+			"film": false
+		},
+		{
+			"id": "nav-layer",
+			"seconds": 9,
+			"gif": true,
+			"film": false
+		},
+		{
+			"id": "shortcuts",
+			"seconds": 6,
+			"gif": true,
+			"film": false
+		},
+		{
+			"id": "shortcut-teleport",
+			"seconds": 7,
+			"gif": false
+		},
+		{
+			"id": "shortcut-any",
+			"seconds": 5,
+			"gif": false
+		},
+		{
+			"id": "shortcut-select-line",
+			"seconds": 4,
+			"gif": false,
+			"film": false
+		},
+		{
+			"id": "shortcut-case",
+			"seconds": 4,
+			"gif": false,
+			"film": false
+		},
+		{
+			"id": "shortcut-color",
+			"seconds": 4,
+			"gif": false,
+			"film": false
+		},
+		{
+			"id": "shortcut-search",
+			"seconds": 9,
+			"gif": false
+		},
+		{
+			"id": "shortcut-wrap",
+			"seconds": 7,
+			"gif": true
+		},
+		{
+			"id": "gestures",
+			"seconds": 6,
+			"gif": true,
+			"film": false
+		},
+		{
+			"id": "personal-hotstrings",
+			"seconds": 13,
+			"gif": true
+		},
+		{
+			"id": "extreme-hotstrings",
+			"seconds": 12,
+			"gif": true
+		},
+		{
+			"id": "metrics",
+			"seconds": 13,
+			"gif": true,
+			"gifFps": 10,
+			"gifColors": 128
+		},
+		{
+			"id": "screen-time",
+			"seconds": 9,
+			"gif": true,
+			"film": false
+		},
+		{
+			"id": "ai-predictions",
+			"seconds": 12,
+			"gif": true
+		},
+		{
+			"id": "ai-everywhere",
+			"seconds": 16,
+			"gif": true
+		},
+		{
+			"id": "ai-local",
+			"seconds": 7,
+			"gif": true
+		},
+		{
+			"id": "ai-actions",
+			"seconds": 7,
+			"gif": true,
+			"film": false
+		},
+		{
+			"id": "private",
+			"seconds": 6,
+			"gif": false,
+			"film": false
+		},
+		{
+			"id": "real",
+			"seconds": 29,
+			"gif": false,
+			"film": false
+		},
+		{
+			"id": "outro",
+			"seconds": 4,
+			"gif": false
+		}
+	]
+}

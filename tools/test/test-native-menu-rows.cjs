@@ -272,8 +272,18 @@ function inventory(driver) {
 			sites.push(...sitesOf(rel, text, ext));
 		}
 	}
-	const retirements = admittedSourceRetirements(driver, traversed);
-	const required = LEGACY.drivers[driver].sourceFiles.filter((rel) => !retirements.has(rel));
+	const retired = CURRENT_SOURCE_RETIREMENTS[driver] || [];
+	for (const rel of retired) {
+		assert.ok(
+			LEGACY.drivers[driver].sourceFiles.includes(rel),
+			'retirement must name an exact historical source'
+		);
+		assert.ok(
+			!fs.existsSync(path.join(SP, rel)),
+			`${driver}: retired production source must remain absent: ${rel}`
+		);
+	}
+	const required = LEGACY.drivers[driver].sourceFiles.filter((rel) => !retired.includes(rel));
 	assert.ok(
 		traversed.size >= required.length,
 		`${driver}: source coverage ${traversed.size}/${required.length} is incomplete`
@@ -283,6 +293,10 @@ function inventory(driver) {
 			traversed.has(rel),
 			`${driver}: mandatory production source was not traversed: ${rel}`
 		);
+	// Read declaration retirement only after exact remaining path coverage passed.
+	const admitted = admittedSourceRetirements(driver, traversed);
+	for (const rel of retired)
+		assert.ok(admitted.has(rel), `${driver}: current source retirement was not admitted: ${rel}`);
 	SOURCE_COUNTS[driver] = traversed.size;
 	return sites;
 }
@@ -336,6 +350,13 @@ assert.equal(
 	'the independent b06 legacy oracle must remain unchanged'
 );
 const LEGACY = JSON.parse(legacyBytes.toString('utf8'));
+
+// Explicit current retirement keeps every historical excerpt and floor intact.
+// Any other absent source, or resurrection of this removed provider, refuses.
+const CURRENT_SOURCE_RETIREMENTS = Object.freeze({
+	macos: Object.freeze(['macos/ui/menu/menu_llm/live_mode_panel.lua'])
+});
+
 const SOURCE_COUNTS = {};
 const errors = [];
 for (const driver of DRIVERS) {
@@ -359,6 +380,14 @@ for (const driver of DRIVERS) {
 }
 
 const current = {};
+// Cross-driver retirement inspection cannot replace a missing original root's refusal.
+for (const driver of DRIVERS) {
+	const sourceRoot = path.join(SP, driver === 'windows' ? 'windows' : `${driver}/ui/menu`);
+	assert.ok(
+		fs.existsSync(sourceRoot) && fs.statSync(sourceRoot).isDirectory(),
+		`${driver}: mandatory source root must exist: ${sourceRoot}`
+	);
+}
 for (const driver of DRIVERS) current[driver] = inventory(driver);
 
 // Read and validate the debt ledger in both modes, before any write. Updating

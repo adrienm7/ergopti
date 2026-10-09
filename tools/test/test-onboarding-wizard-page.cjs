@@ -1628,6 +1628,34 @@ function assertSeparated(row, where) {
 // ======= 5/ Re-run from the menu ======
 // ======================================
 
+(function twoFingerRecommendationsStayWithTheOperatingSystem() {
+	for (const platform of ['windows', 'macos', 'linux']) {
+		const page = openWizard({ platform });
+		page.platform = platform;
+		goToPage(page, 'gestures');
+		answer(page, true);
+		const assigned = finish(page).answers.operations.filter(
+			(op) => /^gestures\.(tap_2|swipe_2_)/.test(op.path) && op.value !== 'none'
+		);
+		assert.deepEqual(
+			assigned,
+			[],
+			platform + ': recommendations must not take over two-finger OS gestures'
+		);
+	}
+	const page = openWizard({
+		platform: 'macos',
+		current: { 'gestures.enabled': true, 'gestures.swipe_2_left': 'tab_close' }
+	});
+	goToPage(page, 'gestures');
+	answer(page, true);
+	assert.deepEqual(
+		finish(page).answers.operations.filter((op) => op.path === 'gestures.swipe_2_left'),
+		[],
+		'an explicitly configured two-finger action remains owned by the user'
+	);
+})();
+
 (function aRerunShowsAndKeepsTheValuesInForce() {
 	const described = CATALOGUE.platforms.macos.pages.find((page) => page.id === 'gestures');
 	const items = described.groups[0].items;

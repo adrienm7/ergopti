@@ -1485,7 +1485,8 @@ local function onKeyDownRaw(e, provenance, provenance_status)
 	-- it without using it are those an interceptor suppresses, which are rare
 	-- next to the ones that fall through to step 8 and read it anyway.
 	local chars = e:getCharacters(false)
-	local _interceptor_ctx = { keyCode = keyCode, flags = flags, chars = chars }
+	local _interceptor_ctx = { keyCode = keyCode, flags = flags, chars = chars,
+		start_is_word_boundary = CoreState.start_is_word_boundary }
 	local suppress_triggers = false
 	for idx, interceptor in ipairs(CoreState.interceptors) do
 		-- The already-fetched event fields are handed over as a third argument.

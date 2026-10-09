@@ -7,7 +7,9 @@ const paths = require('../lib/paths.cjs');
 
 /** Verify explicit neutral and recommended projections before driver boot. */
 async function main() {
-	const { parse } = await import('smol-toml');
+	const { parse: parseSource } = await import('smol-toml');
+	const tomlOwnData = require('./fixtures/toml-own-data.cjs');
+	const parse = (source) => tomlOwnData(parseSource(source));
 	const source = fs.readFileSync(paths.shared('modules/features/manifest.toml'), 'utf8');
 	const manifest = parse(
 		source.replace(
