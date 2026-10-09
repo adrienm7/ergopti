@@ -109,7 +109,13 @@ codesign_native_runtime
 }
 const result = spawnSync(
 	process.platform === 'win32' ? 'python' : 'python3',
-	['-B', 'tools/test/test_automation_query_ci_publisher.py'],
+	[
+		'-B',
+		'-m',
+		'unittest',
+		'tools.test.test_automation_query_ci_publisher.PublisherTests',
+		'tools.test.test_automation_query_ci_publisher.CompilerCustodyTests'
+	],
 	{
 		cwd: ROOT,
 		encoding: 'utf8',
@@ -127,4 +133,77 @@ assert(
 );
 console.log(
 	'[OK] query CI publisher keeps complete compiler provenance and immutable nested signature; native CI unrun'
+);
+
+// SDK diagnostic metadata executes only the existing admitted signed observer.
+for (const relative of [
+	'tools/diagnostics/program_actions/permission_observation.py',
+	'tools/diagnostics/program_actions/test_permission_observation.py'
+]) {
+	assert(observer.includes('"' + relative + '"'), 'source receipt must enroll ' + relative);
+}
+const diagnostic = spawnSync(
+	process.platform === 'win32' ? 'python' : 'python3',
+	['-B', '-m', 'unittest', 'test_permission_observation.PermissionObservationControls', '-v'],
+	{
+		cwd: path.join(ROOT, 'tools/diagnostics/program_actions'),
+		encoding: 'utf8',
+		timeout: 30000,
+		env: { ...process.env, PYTHONDONTWRITEBYTECODE: '1' }
+	}
+);
+assert(
+	!diagnostic.error && diagnostic.signal === null && diagnostic.status === 0,
+	diagnostic.stderr
+);
+assert(
+	/Ran 10 tests in /.test(diagnostic.stderr) && /\nOK\s*$/.test(diagnostic.stderr),
+	'all ten independent SDK metadata controls execute'
+);
+const enrollment = spawnSync(
+	process.platform === 'win32' ? 'python' : 'python3',
+	[
+		'-B',
+		'-m',
+		'unittest',
+		'tools.test.test_automation_query_ci_publisher.PermissionPublisherEnrollmentTests',
+		'-v'
+	],
+	{
+		cwd: ROOT,
+		encoding: 'utf8',
+		timeout: 30000,
+		env: { ...process.env, PYTHONDONTWRITEBYTECODE: '1' }
+	}
+);
+assert(
+	!enrollment.error && enrollment.signal === null && enrollment.status === 0,
+	enrollment.stderr
+);
+assert(
+	/Ran 3 tests in /.test(enrollment.stderr) && /\nOK\s*$/.test(enrollment.stderr),
+	'all three additional publisher enrollment controls execute'
+);
+
+const admission = spawnSync(
+	process.platform === 'win32' ? 'python' : 'python3',
+	[
+		'-B',
+		'-m',
+		'unittest',
+		'test_permission_observation.PermissionAdmissionControls',
+		'test_permission_observation.PermissionMainAdmissionControls',
+		'-v'
+	],
+	{
+		cwd: path.join(ROOT, 'tools/diagnostics/program_actions'),
+		encoding: 'utf8',
+		timeout: 30000,
+		env: { ...process.env, PYTHONDONTWRITEBYTECODE: '1' }
+	}
+);
+assert(!admission.error && admission.signal === null && admission.status === 0, admission.stderr);
+assert(
+	/Ran 12 tests in /.test(admission.stderr) && /\nOK\s*$/.test(admission.stderr),
+	'all twelve additional decoder and main authentication controls execute'
 );

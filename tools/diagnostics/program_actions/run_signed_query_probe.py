@@ -16,6 +16,7 @@ import stat
 import subprocess
 import sys
 import time
+import types
 
 
 class Refused(RuntimeError):
@@ -207,10 +208,14 @@ class SignedQuery:
             self.group.process.stdin.close()
             self.control_closed = True
 
+    def _make_protocol(self):
+        """Default to the unchanged business-envelope decoder."""
+        return QueryProtocol()
+
     def query(self, operation, nonce, identifier=None, cancel_held=False):
         require(self.group is None, "cleanup_pending")
         self.control_closed = False
-        self.protocol = QueryProtocol()
+        self.protocol = self._make_protocol()
         arguments = [self.helper, "--automation-query-worker", operation, str(nonce)]
         if identifier is not None:
             arguments.append(identifier)
@@ -362,12 +367,52 @@ def source_paths(root, source_sha):
     selected.update(
         {
             "tools/diagnostics/program_actions/run_signed_query_probe.py",
+            "tools/diagnostics/program_actions/permission_observation.py",
+            "tools/diagnostics/program_actions/test_permission_observation.py",
             "tools/diagnostics/macos_owned_process.py",
             "static/ergopti_plus/macos/adapters/apple_shortcuts_native.lua",
             "static/ergopti_plus/macos/adapters/apple_shortcuts.lua",
         }
     )
     return sorted(selected)
+
+
+def load_permission_query(root, source_sha, hashes):
+    """Execute only decoder bytes authenticated by the signed build receipt."""
+    relative = "tools/diagnostics/program_actions/permission_observation.py"
+    path = root / relative
+    raw = path.read_bytes()
+    require(
+        not path.is_symlink()
+        and hashlib.sha256(raw).hexdigest() == hashes.get(relative)
+        and subprocess.check_output(["git", "show", source_sha + ":" + relative], cwd=root) == raw,
+        "source_refused",
+    )
+    # Bind the decoder's dependency to this already admitted observer, including
+    # its exact Refused class. Never search sys.path for another copy of the owner.
+    dependency = types.ModuleType("run_signed_query_probe")
+    for name, value in {
+        "QueryProtocol": QueryProtocol,
+        "Refused": Refused,
+        "SignedQuery": SignedQuery,
+        "require": require,
+        "unique": unique,
+    }.items():
+        setattr(dependency, name, value)
+    was_present = "run_signed_query_probe" in sys.modules
+    previous = sys.modules.get("run_signed_query_probe")
+    module = types.ModuleType("signed_query_permission_observation")
+    module.__file__ = str(path)
+    try:
+        sys.modules["run_signed_query_probe"] = dependency
+        exec(compile(raw, str(path), "exec"), module.__dict__)
+    finally:
+        if not was_present:
+            del sys.modules["run_signed_query_probe"]
+        else:
+            sys.modules["run_signed_query_probe"] = previous
+    require(issubclass(module.PermissionQuery, SignedQuery), "source_refused")
+    return module.PermissionQuery
 
 
 def main():
@@ -475,6 +520,26 @@ def main():
         ownership = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(ownership)
         require(not interrupted, "interrupted")
+        if not args.cancel_held:
+            permission_query = load_permission_query(root, args.source_sha, hashes)
+            backend = permission_query(helper, ownership, ownership.NativeProcessGroups())
+            metadata = backend.observe(3)
+            require(
+                not interrupted and identity(helper) == captured and backend.group is None,
+                "interrupted" if interrupted else "identity_refused",
+            )
+            require(
+                all(
+                    hashlib.sha256((root / relative).read_bytes()).hexdigest() == digest
+                    for relative, digest in hashes.items()
+                ),
+                "source_refused",
+            )
+            result["sdk_permission_observation"] = {
+                "metadata": metadata,
+                "local_retired": True,
+                "operations": backend.receipts,
+            }
         backend = SignedQuery(helper, ownership, ownership.NativeProcessGroups())
         observed = backend.query("discover", 1, cancel_held=args.cancel_held)
         require(

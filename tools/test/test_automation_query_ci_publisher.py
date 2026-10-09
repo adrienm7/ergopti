@@ -40,6 +40,8 @@ class PublisherTests(unittest.TestCase):
         self.inputs = [P.LAUNCHER + path for path in native]
         self.inputs += [
             "tools/diagnostics/program_actions/run_signed_query_probe.py",
+            "tools/diagnostics/program_actions/permission_observation.py",
+            "tools/diagnostics/program_actions/test_permission_observation.py",
             "tools/diagnostics/macos_owned_process.py",
             "static/ergopti_plus/macos/adapters/apple_shortcuts.lua",
             "static/ergopti_plus/macos/adapters/apple_shortcuts_native.lua",
@@ -50,7 +52,13 @@ class PublisherTests(unittest.TestCase):
         for relative in self.inputs:
             target = self.root / relative
             target.parent.mkdir(parents=True, exist_ok=True)
-            if relative.endswith("run_signed_query_probe.py"):
+            if relative.endswith(
+                (
+                    "run_signed_query_probe.py",
+                    "permission_observation.py",
+                    "test_permission_observation.py",
+                )
+            ):
                 shutil.copyfile(ROOT / relative, target)
             else:
                 target.write_bytes(("literal input " + relative).encode())
@@ -354,6 +362,54 @@ class CompilerCustodyTests(unittest.TestCase):
                 P.native_run(Path("controlled"), ["fixed-compiler"], None, 1)
         self.assertEqual(self.group.calls, 1)
         self.assertIs(P._RETAINED_COMPILERS[id(self.group)], self.group)
+
+
+class PermissionPublisherEnrollmentTests(unittest.TestCase):
+    setUp = PublisherTests.setUp
+    command_output = PublisherTests.command_output
+    compiler_run = PublisherTests.compiler_run
+    built = PublisherTests.built
+
+    def test_decoder_and_controls_are_sealed_in_original_receipt(self):
+        self.built()
+        P.seal(self.root, self.directory, self.app)
+        receipt = json.loads(
+            (self.app / "Contents/Resources/automation-query-build.json").read_bytes()
+        )
+        for relative in (
+            "tools/diagnostics/program_actions/permission_observation.py",
+            "tools/diagnostics/program_actions/test_permission_observation.py",
+        ):
+            self.assertEqual(
+                receipt["source_hashes"][relative],
+                hashlib.sha256(self.tracked[relative]).hexdigest(),
+            )
+        self.assertEqual(
+            set(receipt),
+            {
+                "schema",
+                "contract",
+                "source_sha",
+                "source_hashes",
+                "helper_sha256",
+                "ci_run_id",
+                "ci_run_attempt",
+            },
+        )
+
+    def test_decoder_counterfeit_refused_before_compiler(self):
+        relative = "tools/diagnostics/program_actions/permission_observation.py"
+        (self.root / relative).write_bytes(b'raise RuntimeError("must not execute")')
+        with self.assertRaisesRegex(P.Refused, "tracked_input_mismatch"):
+            P.compile_product(self.root, self.directory, self.compiler_run)
+        self.assertEqual(self.commands, [])
+
+    def test_decoder_omission_refused_before_compiler(self):
+        relative = "tools/diagnostics/program_actions/permission_observation.py"
+        del self.tracked[relative]
+        with self.assertRaises(KeyError):
+            P.compile_product(self.root, self.directory, self.compiler_run)
+        self.assertEqual(self.commands, [])
 
 
 if __name__ == "__main__":

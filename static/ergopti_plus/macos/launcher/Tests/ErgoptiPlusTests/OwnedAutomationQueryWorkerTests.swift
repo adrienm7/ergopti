@@ -364,4 +364,51 @@ final class OwnedAutomationQueryWorkerTests: XCTestCase {
 		XCTAssertNotEqual(OwnedAutomationQueryWorker.SourceGeneration.descriptor(descriptor), original)
 		XCTAssertNotEqual(OwnedAutomationQueryWorker.SourceGeneration.path(current.path), original)
 	}
+
+	func testPermissionObservationIsFixedAndSeparateFromBusinessRoles() throws {
+		let args = ["owned", "--automation-query-worker", "permission-observation", "19"]
+		XCTAssertTrue(OwnedAutomationQueryWorker.validRequest(arguments: args))
+		XCTAssertFalse(OwnedAutomationQueryWorker.validRequest(arguments: args + ["arbitrary-target"]))
+		let statuses: [Int32] = [0, -600, -1743, -1744, Int32.min, Int32.max]
+		for status in statuses {
+			let packet = try XCTUnwrap(OwnedAutomationQueryWorker.permissionObservationPacket(nonce: 19, addressStatus: 0, permissionStatus: status))
+			let bytes = try JSONSerialization.data(withJSONObject: packet)
+			XCTAssertTrue(OwnedAutomationQueryWorker.bridgePacketMatches(bytes, arguments: args))
+			XCTAssertFalse(OwnedAutomationQueryWorker.bridgePacketMatches(bytes, arguments: bridgeArguments()))
+			XCTAssertNil(packet["status"])
+			XCTAssertNil(packet["rows"])
+		}
+		XCTAssertNil(OwnedAutomationQueryWorker.permissionObservationPacket(nonce: 19, addressStatus: 0, permissionStatus: nil))
+		XCTAssertNil(OwnedAutomationQueryWorker.permissionObservationPacket(nonce: 19, addressStatus: -50, permissionStatus: 0))
+		XCTAssertNil(OwnedAutomationQueryWorker.permissionObservationPacket(nonce: 0, addressStatus: 0, permissionStatus: 0))
+	}
+
+	func testPermissionObservationRejectsPromptAndOpenDiagnosticGrammar() throws {
+		let args = ["owned", "--automation-query-worker", "permission-observation", "19"]
+		let original = try XCTUnwrap(OwnedAutomationQueryWorker.permissionObservationPacket(nonce: 19, addressStatus: 0, permissionStatus: 0))
+		let changes: [(String, Any)] = [("ask_user", true), ("ask_user", 0), ("osstatus", true),
+			("osstatus", 0.5), ("osstatus", Int64(Int32.max) + 1), ("observation", "granted"),
+			("observation", "address-refused"), ("target", "arbitrary"), ("event_class", "****"),
+			("event_id", "****"), ("nonce", 20), ("status", "observed"), ("rows", [] as [String])]
+		for (key, value) in changes {
+			var packet = original; packet[key] = value
+			XCTAssertFalse(OwnedAutomationQueryWorker.bridgePacketMatches(try JSONSerialization.data(withJSONObject: packet), arguments: args), key)
+		}
+		var missing = original; missing.removeValue(forKey: "osstatus")
+		XCTAssertFalse(OwnedAutomationQueryWorker.bridgePacketMatches(try JSONSerialization.data(withJSONObject: missing), arguments: args))
+	}
+
+	func testPermissionObservationStillRequiresExactNativeRetirement() throws {
+		let args = ["owned", "--automation-query-worker", "permission-observation", "19"]
+		let packet = try XCTUnwrap(OwnedAutomationQueryWorker.permissionObservationPacket(nonce: 19, addressStatus: 0, permissionStatus: -1744))
+		let bytes = try JSONSerialization.data(withJSONObject: packet)
+		var transcript = OwnedAutomationQueryWorker.BridgeTranscript()
+		XCTAssertTrue(transcript.accept("Q1 HELD", arguments: args))
+		XCTAssertTrue(transcript.accept("Q1 DATA " + bytes.base64EncodedString(), arguments: args))
+		XCTAssertNil(transcript.publishablePayload(guardianStatus: 0, cancelled: false, beforeDeadline: true))
+		XCTAssertTrue(transcript.accept("Q1 RETIRED 0", arguments: args))
+		XCTAssertEqual(transcript.publishablePayload(guardianStatus: 0, cancelled: false, beforeDeadline: true), bytes)
+		XCTAssertNil(transcript.publishablePayload(guardianStatus: 0, cancelled: true, beforeDeadline: true))
+		XCTAssertNil(transcript.publishablePayload(guardianStatus: 0, cancelled: false, beforeDeadline: false))
+	}
 }
