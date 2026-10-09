@@ -211,7 +211,7 @@ local function assign_parameterized_action(ctx, gestures, binding, action, assig
 		-- Escaped: a wrap-pair sample such as <…> would be read as Pango markup.
 		value = prompt_text(title, zenity_plain(gestures.get_action_parameter_prompt(action)), prior)
 	end
-	if value == nil then return false end
+	if value == nil or (spec == "llm_language" and value == "") then return false end
 	if type(gestures.validate_action_parameter) ~= "function"
 		or not gestures.validate_action_parameter(action, value)
 	then

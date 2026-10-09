@@ -248,9 +248,9 @@
 	"dialog.gestures.param_text": "Einzugebender Text (eine Zeile, höchstens {1} Zeichen):",
 	"dialog.gestures.param_key": "Zu drückende Taste: ein Zeichen oder einer dieser Namen:\n{1}",
 	"dialog.gestures.param_shortcut": "Zu drückendes Tastenkürzel: Modifikatoren und eine Taste, mit + verbunden, zum Beispiel primary+a oder ctrl+shift+t. Modifikatoren: primary (Strg, unter macOS ⌘), ctrl, alt, shift, super. Taste: ein Zeichen oder einer dieser Namen:\n{1}",
-	"dialog.gestures.param_llm_prompt": "Zu verwendender Prompt, als Kennung, optional gefolgt von | und einer Anzahl Vorhersagen (1 bis 10; ohne sie gilt die Anzahl aus dem KI-Menü). Verfügbare Prompts:\n{1}",
+	"dialog.gestures.param_llm_prompt": "Zu verwendender Prompt, als Kennung, optional gefolgt von | und einer Anzahl Vorhersagen (1 bis 10; ohne sie gilt die Anzahl aus dem KI-Menü). Verfügbare Prompts:\n{1}\nZum Übersetzen: translate|count|language, zum Beispiel translate|1|Esperanto (count: 1–10).",
 	"dialog.gestures.param_llm_vision": "Anbieter des Bildmodells: local oder ein API-Anbieter, optional gefolgt von | und einem Modellnamen. Verfügbare Anbieter:\n{1}",
-	"dialog.gestures.param_llm_language": "Zielsprache: ui für die Menüsprache oder ein Sprachcode. Verfügbare Sprachen:\n{1}",
+	"dialog.gestures.param_llm_language": "Zielsprache (zum Beispiel Esperanto). Mit ui wird die Sprache der Oberfläche verwendet. Höchstens {1} UTF-8-Bytes.",
 	"dialog.gestures.param_error_title": "Ungültiger Wert",
 	"dialog.gestures.param_err_url": "Geben Sie eine gültige http:// oder https://-Adresse ein.",
 	"dialog.gestures.param_err_app": "Wählen Sie eine App: Name oder Pfad dürfen nicht leer sein, nicht mit einem Leerzeichen beginnen oder enden und keinen Zeilenumbruch enthalten.",
@@ -262,7 +262,7 @@
 	"dialog.gestures.param_err_shortcut": "Geben Sie mindestens einen Modifikator und eine Taste ein, mit + verbunden, zum Beispiel primary+a.",
 	"dialog.gestures.param_err_llm_prompt": "Geben Sie eine Prompt-Kennung aus der Liste ein, optional gefolgt von | und einer Zahl von 1 bis 10.",
 	"dialog.gestures.param_err_llm_vision": "Geben Sie einen Anbieter aus der Liste ein, optional gefolgt von | und einem Modellnamen ohne Leerzeichen am Rand.",
-	"dialog.gestures.param_err_llm_language": "Geben Sie ui oder einen Sprachcode aus der Liste ein.",
+	"dialog.gestures.param_err_llm_language": "Geben Sie einen nicht leeren Sprachnamen ohne umgebende Leerzeichen oder reservierte Zeichen innerhalb der angezeigten Grenze ein.",
 	"dialog.gestures.warning_msg": "⚠️ Achtung: Das Aktivieren von Trackpad-Gesten kann zu Konflikten mit System-Gesten führen.\n\nUm Konflikte zu vermeiden, deaktivieren Sie folgende macOS-Optionen:\n\n• 2-Finger-Trackpad-Gesten: Scrollen und Wischen deaktivieren, falls Sie diese in Hammerspoon verwenden möchten.\n• 3-Finger-Gesten zum Verschieben von Fenstern und Auswählen\n• 3-Finger-Tap zum Nachschlagen im Wörterbuch\n• 3-Finger-Wischen horizontal/vertikal zum Wechseln von Spaces, App Exposé oder Mission Control\n• 4-Finger-Wischen horizontal/vertikal zum Wechseln von Spaces, App Exposé oder Mission Control\n\nEs ist wichtig, System-Gesten mit 4 Fingern zu deaktivieren, um 5-Finger-Gesten definieren zu können. Andernfalls würde macOS nicht zwischen ihnen unterscheiden und 5-Finger-Gesten blockieren.",
 	"dialog.gestures.warning_title": "Gesten-Warnung",
 	"dialog.gpt_link.title": "Von Win + G geöffneten Link bearbeiten",
@@ -3280,5 +3280,6 @@
 	"healthcheck.summary.observed": "In den abgeschlossenen Prüfungen wurde kein Problem erkannt.",
 	"healthcheck.summary.scope": "Die Ergebnisse gelten nur für die protokollierten Prüfungen. Isolierte Testsuiten wurden nicht ausgeführt.",
 	"healthcheck.problem.diagnostic_check": "Diagnoseprüfung fehlgeschlagen: %s.",
-	"healthcheck.export.privacy_notice": "Dieser Bericht teilt nur freigegebene technische Angaben. Protokolle, Freitext, Pfade und identifizierende Angaben bleiben auch bei aktivierten Details ausgeschlossen. Lokale Seitentests sind nicht enthalten."
+	"healthcheck.export.privacy_notice": "Dieser Bericht teilt nur freigegebene technische Angaben. Protokolle, Freitext, Pfade und identifizierende Angaben bleiben auch bei aktivierten Details ausgeschlossen. Lokale Seitentests sind nicht enthalten.",
+	"sg_actions.llm_translate_context": "🌐 Aktuellen Satz übersetzen [konfigurierbar]"
 }

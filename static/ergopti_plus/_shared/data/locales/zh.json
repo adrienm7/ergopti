@@ -248,9 +248,9 @@
 	"dialog.gestures.param_text": "要输入的文字（一行，最多 {1} 个字符）：",
 	"dialog.gestures.param_key": "要按下的键：一个字符，或以下名称之一：\n{1}",
 	"dialog.gestures.param_shortcut": "要按下的快捷键：用 + 连接修饰键和一个键，例如 primary+a 或 ctrl+shift+t。修饰键：primary（Ctrl，在 macOS 上为 ⌘）、ctrl、alt、shift、super。键：一个字符，或以下名称之一：\n{1}",
-	"dialog.gestures.param_llm_prompt": "要使用的提示词标识符，可选地后接 | 和预测数量（1 到 10；省略时使用 AI 菜单中的数量）。可用提示词：\n{1}",
+	"dialog.gestures.param_llm_prompt": "要使用的提示词标识符，可选地后接 | 和预测数量（1 到 10；省略时使用 AI 菜单中的数量）。可用提示词：\n{1}\n翻译格式：translate|count|language，例如 translate|1|Esperanto（count：1–10）。",
 	"dialog.gestures.param_llm_vision": "视觉模型提供方：local 或某个 API 提供方，可选地后接 | 和模型名称。可用提供方：\n{1}",
-	"dialog.gestures.param_llm_language": "翻译语言：ui 表示菜单语言，或填写语言代码。可用语言：\n{1}",
+	"dialog.gestures.param_llm_language": "目标语言（例如世界语）。输入 ui 可使用界面语言。最多 {1} 个 UTF-8 字节。",
 	"dialog.gestures.param_error_title": "值无效",
 	"dialog.gestures.param_err_url": "请输入有效的 http:// 或 https:// 网址。",
 	"dialog.gestures.param_err_app": "请选择一个应用程序：其名称或路径不能为空，不能以空格开头或结尾，也不能包含换行符。",
@@ -262,7 +262,7 @@
 	"dialog.gestures.param_err_shortcut": "请输入至少一个修饰键和一个键，用 + 连接，例如 primary+a。",
 	"dialog.gestures.param_err_llm_prompt": "请输入列表中的提示词标识符，可选地后接 | 和 1 到 10 之间的数字。",
 	"dialog.gestures.param_err_llm_vision": "请输入列表中的提供方，可选地后接 | 和首尾无空格的模型名称。",
-	"dialog.gestures.param_err_llm_language": "请输入 ui 或列表中的语言代码。",
+	"dialog.gestures.param_err_llm_language": "请输入非空的语言名称，不得包含首尾空格或保留字符，且不得超过显示的长度限制。",
 	"dialog.gestures.warning_msg": "⚠️ 注意：启用触控板手势可能与系统手势产生冲突。\n\n为避免冲突，请禁用以下 macOS 选项：\n\n• 2指触控板手势：如需在 Hammerspoon 中使用，请禁用滚动和滑动。\n• 3指触控板手势用于移动窗口和选择文本\n• 3指轻点查词\n• 3指水平/垂直滑动切换 Space、启用 App Exposé 或 Mission Control\n• 4指水平/垂直滑动切换 Space、启用 App Exposé 或 Mission Control\n\n必须禁用4指系统手势才能定义5指手势。否则 macOS 将无法区分两者，导致5指手势无法工作。",
 	"dialog.gestures.warning_title": "手势警告",
 	"dialog.gpt_link.title": "编辑 Win + G 打开的链接",
@@ -3280,5 +3280,6 @@
 	"healthcheck.summary.observed": "已完成的检查中未发现问题。",
 	"healthcheck.summary.scope": "结果仅涵盖已记录的检查。未运行隔离环境中的测试套件。",
 	"healthcheck.problem.diagnostic_check": "诊断检查失败：%s。",
-	"healthcheck.export.privacy_notice": "此报告仅分享允许的技术信息。即使启用详细信息，也不包含日志、自由文本、路径或身份识别信息。本地页面测试不包含在内。"
+	"healthcheck.export.privacy_notice": "此报告仅分享允许的技术信息。即使启用详细信息，也不包含日志、自由文本、路径或身份识别信息。本地页面测试不包含在内。",
+	"sg_actions.llm_translate_context": "🌐 翻译当前句子 [可配置]"
 }

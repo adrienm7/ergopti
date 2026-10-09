@@ -248,9 +248,9 @@
 	"dialog.gestures.param_text": "Text k napsání (jeden řádek, nejvýše {1} znaků):",
 	"dialog.gestures.param_key": "Klávesa ke stisknutí: jeden znak, nebo jeden z těchto názvů:\n{1}",
 	"dialog.gestures.param_shortcut": "Zkratka ke stisknutí: modifikátory a klávesa spojené znakem +, například primary+a nebo ctrl+shift+t. Modifikátory: primary (Ctrl, v macOS ⌘), ctrl, alt, shift, super. Klávesa: jeden znak, nebo jeden z těchto názvů:\n{1}",
-	"dialog.gestures.param_llm_prompt": "Prompt, který se použije, zadaný jeho identifikátorem, volitelně následovaný | a počtem předpovědí (1 až 10; bez něj se použije počet z nabídky AI). Dostupné prompty:\n{1}",
+	"dialog.gestures.param_llm_prompt": "Prompt, který se použije, zadaný jeho identifikátorem, volitelně následovaný | a počtem předpovědí (1 až 10; bez něj se použije počet z nabídky AI). Dostupné prompty:\n{1}\nPro překlad: translate|count|language, například translate|1|Esperanto (count: 1–10).",
 	"dialog.gestures.param_llm_vision": "Poskytovatel modelu pro vidění: local nebo poskytovatel API, volitelně následovaný | a názvem modelu. Dostupní poskytovatelé:\n{1}",
-	"dialog.gestures.param_llm_language": "Jazyk překladu: ui pro jazyk nabídky, nebo kód jazyka. Dostupné jazyky:\n{1}",
+	"dialog.gestures.param_llm_language": "Cílový jazyk (například esperanto). Pro jazyk rozhraní zadejte ui. Nejvýše {1} bajtů UTF-8.",
 	"dialog.gestures.param_error_title": "Neplatná hodnota",
 	"dialog.gestures.param_err_url": "Zadejte platnou adresu http:// nebo https://.",
 	"dialog.gestures.param_err_app": "Vyberte aplikaci: její název ani cesta nesmí být prázdné, začínat ani končit mezerou ani obsahovat zalomení řádku.",
@@ -262,7 +262,7 @@
 	"dialog.gestures.param_err_shortcut": "Zadejte alespoň jeden modifikátor a klávesu spojené znakem +, například primary+a.",
 	"dialog.gestures.param_err_llm_prompt": "Zadejte identifikátor promptu ze seznamu, volitelně následovaný | a číslem od 1 do 10.",
 	"dialog.gestures.param_err_llm_vision": "Zadejte poskytovatele ze seznamu, volitelně následovaného | a názvem modelu bez mezer na okrajích.",
-	"dialog.gestures.param_err_llm_language": "Zadejte ui nebo kód jazyka ze seznamu.",
+	"dialog.gestures.param_err_llm_language": "Zadejte neprázdný název jazyka bez okolních mezer nebo vyhrazených znaků, v zobrazeném limitu.",
 	"dialog.gestures.warning_msg": "⚠️ Upozornění: Povolení gest touchpadu může narušit systémová gesta.\n\nAby nedocházelo ke konfliktům, deaktivujte v macOS tyto možnosti:\n\n• Gesta touchpadu 2 prsty: zakažte posouvání a přejíždění, pokud je chcete používat v Hammerspoon.\n• Gesta touchpadu 3 prsty pro přesouvání oken a výběr textu\n• Klepnutí 3 prsty pro vyhledání slov ve slovníku\n• Horizontální/vertikální přejetí 3 prsty pro přepínání ploch, aktivaci App Exposé nebo Mission Control\n• Horizontální/vertikální přejetí 4 prsty pro přepínání ploch, aktivaci App Exposé nebo Mission Control\n\nJe důležité zakázat systémová gesta 4 prsty, abyste mohli definovat gesta 5 prsty. Jinak by macOS nerozlišovalo mezi nimi a zabránilo by gestům 5 prsty fungovat. Proto jsou výchozí gesta 4 prsty přetvořena v modulu Gesta, aby obnovila systémové funkce bez konfliktu s gesty 5 prsty.",
 	"dialog.gestures.warning_title": "Upozornění gesta",
 	"dialog.gpt_link.title": "Upravit odkaz otevřený pomocí Win + G",
@@ -3280,5 +3280,6 @@
 	"healthcheck.summary.observed": "V dokončených kontrolách nebyl zjištěn žádný problém.",
 	"healthcheck.summary.scope": "Výsledky se týkají pouze zaznamenaných kontrol. Izolované testovací sady nebyly spuštěny.",
 	"healthcheck.problem.diagnostic_check": "Diagnostická kontrola selhala: %s.",
-	"healthcheck.export.privacy_notice": "Tato zpráva sdílí pouze povolené technické údaje. Protokoly, volný text, cesty a identifikační údaje jsou vynechány i při zapnutých podrobnostech. Místní testy stránky nejsou zahrnuty."
+	"healthcheck.export.privacy_notice": "Tato zpráva sdílí pouze povolené technické údaje. Protokoly, volný text, cesty a identifikační údaje jsou vynechány i při zapnutých podrobnostech. Místní testy stránky nejsou zahrnuty.",
+	"sg_actions.llm_translate_context": "🌐 Přeložit aktuální větu [nastavitelné]"
 }

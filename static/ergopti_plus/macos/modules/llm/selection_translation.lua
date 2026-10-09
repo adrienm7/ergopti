@@ -81,7 +81,7 @@ end
 function M.config()
 	if _config then return _config end
 	local config = read_shared_json(Paths.shared_llm_path("translate.json"), "modules/llm/translate.json")
-	for _, key in ipairs({ "ui_value", "tag", "user_prefix", "prompt" }) do
+	for _, key in ipairs({ "ui_value", "tag", "user_prefix", "prompt", "prediction_prompt" }) do
 		if type(config[key]) ~= "string" or config[key] == "" then
 			error("selection_translation: translate.json field '" .. key .. "' must be a non-empty string")
 		end
@@ -89,6 +89,8 @@ function M.config()
 	if type(config.max_tokens) ~= "number" or config.max_tokens <= 0 then
 		error("selection_translation: translate.json field 'max_tokens' must be a positive number")
 	end
+	if type(config.max_language_bytes) ~= "number" or config.max_language_bytes < 1
+		or config.max_language_bytes % 1 ~= 0 then error("translate.json has no language byte limit") end
 	_config = config
 	return _config
 end
@@ -299,7 +301,7 @@ function M.run(value, parent)
 		return false
 	end
 	local code = Translate.target_locale(target, config, interface_locale())
-	local language = Translate.language_name(code, names)
+	local language = Translate.resolve_language(target, config, names, interface_locale())
 	if not language then
 		Logger.error(LOG, "Translation refused: locale '%s' has no native name.", tostring(code))
 		return false

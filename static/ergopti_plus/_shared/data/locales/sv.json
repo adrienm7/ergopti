@@ -248,9 +248,9 @@
 	"dialog.gestures.param_text": "Text att skriva (en rad, högst {1} tecken):",
 	"dialog.gestures.param_key": "Tangent att trycka på: ett tecken eller ett av dessa namn:\n{1}",
 	"dialog.gestures.param_shortcut": "Kortkommando att trycka på: modifierare och en tangent förenade med +, till exempel primary+a eller ctrl+shift+t. Modifierare: primary (Ctrl, eller ⌘ på macOS), ctrl, alt, shift, super. Tangent: ett tecken eller ett av dessa namn:\n{1}",
-	"dialog.gestures.param_llm_prompt": "Prompt att använda, angiven med sitt id, eventuellt följt av | och ett antal förutsägelser (1 till 10; utan det används antalet i AI-menyn). Tillgängliga prompter:\n{1}",
+	"dialog.gestures.param_llm_prompt": "Prompt att använda, angiven med sitt id, eventuellt följt av | och ett antal förutsägelser (1 till 10; utan det används antalet i AI-menyn). Tillgängliga prompter:\n{1}\nFör översättning: translate|count|language, till exempel translate|1|Esperanto (count: 1–10).",
 	"dialog.gestures.param_llm_vision": "Leverantör av bildmodellen: local eller en API-leverantör, eventuellt följt av | och ett modellnamn. Tillgängliga leverantörer:\n{1}",
-	"dialog.gestures.param_llm_language": "Översättningsspråk: ui för menyspråket, eller en språkkod. Tillgängliga språk:\n{1}",
+	"dialog.gestures.param_llm_language": "Målspråk (till exempel esperanto). Använd ui för gränssnittets språk. Högst {1} UTF-8-byte.",
 	"dialog.gestures.param_error_title": "Ogiltigt värde",
 	"dialog.gestures.param_err_url": "Ange en giltig http:// eller https://-adress.",
 	"dialog.gestures.param_err_app": "Välj en app: namnet eller sökvägen får inte vara tom, börja eller sluta med ett mellanslag eller innehålla en radbrytning.",
@@ -262,7 +262,7 @@
 	"dialog.gestures.param_err_shortcut": "Ange minst en modifierare och en tangent förenade med +, till exempel primary+a.",
 	"dialog.gestures.param_err_llm_prompt": "Ange ett prompt-id från listan, eventuellt följt av | och ett tal från 1 till 10.",
 	"dialog.gestures.param_err_llm_vision": "Ange en leverantör från listan, eventuellt följd av | och ett modellnamn utan mellanslag i ändarna.",
-	"dialog.gestures.param_err_llm_language": "Ange ui eller en språkkod från listan.",
+	"dialog.gestures.param_err_llm_language": "Ange ett språknamn som inte är tomt, utan inledande eller avslutande blanksteg eller reserverade tecken, inom den visade gränsen.",
 	"dialog.gestures.warning_msg": "⚠️ Varning: Aktivering av trackpad-gester kan störa systemgester.\n\nFör att undvika konflikter inaktiverar du följande macOS-alternativ:\n\n• 2-fingers trackpad-gester: inaktivera skrollning och svepning om du vill använda dem i Hammerspoon.\n• 3-fingers trackpad-gester för att flytta fönster och markera text\n• 3-fingers tryck för att slå upp ord i ordlistan\n• 3-fingers horisontell/vertikal svepning för att växla utrymmen, aktivera App Exposé eller Mission Control\n• 4-fingers horisontell/vertikal svepning för att växla utrymmen, aktivera App Exposé eller Mission Control\n\nDet är viktigt att inaktivera 4-fingers systemgester för att definiera 5-fingers gester. Annars skulle macOS inte kunna särskilja dem och skulle förhindra 5-fingers gester från att fungera. Därför omkonfigureras de standard 4-fingers gesterorna i modulen Gester för att återställa systemfunktioner utan konflikt med 5-fingers gester.",
 	"dialog.gestures.warning_title": "Varningstecken för gester",
 	"dialog.gpt_link.title": "Redigera länk öppnad av Win + G",
@@ -3280,5 +3280,6 @@
 	"healthcheck.summary.observed": "Inga problem upptäcktes i de slutförda kontrollerna.",
 	"healthcheck.summary.scope": "Resultaten gäller endast de registrerade kontrollerna. Isolerade testsviter kördes inte.",
 	"healthcheck.problem.diagnostic_check": "Diagnostisk kontroll misslyckades: %s.",
-	"healthcheck.export.privacy_notice": "Den här rapporten delar bara tillåtna tekniska uppgifter. Loggar, fritext, sökvägar och identifierande uppgifter utesluts även när detaljer är aktiverade. Lokala sidtester ingår inte."
+	"healthcheck.export.privacy_notice": "Den här rapporten delar bara tillåtna tekniska uppgifter. Loggar, fritext, sökvägar och identifierande uppgifter utesluts även när detaljer är aktiverade. Lokala sidtester ingår inte.",
+	"sg_actions.llm_translate_context": "🌐 Översätt den aktuella meningen [konfigurerbar]"
 }

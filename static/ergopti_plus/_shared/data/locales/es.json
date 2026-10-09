@@ -248,9 +248,9 @@
 	"dialog.gestures.param_text": "Texto que se escribirá (una línea, {1} caracteres como máximo):",
 	"dialog.gestures.param_key": "Tecla que se pulsará: un carácter o uno de estos nombres:\n{1}",
 	"dialog.gestures.param_shortcut": "Atajo que se pulsará: modificadores y una tecla unidos por +, por ejemplo primary+a o ctrl+shift+t. Modificadores: primary (Ctrl, o ⌘ en macOS), ctrl, alt, shift, super. Tecla: un carácter o uno de estos nombres:\n{1}",
-	"dialog.gestures.param_llm_prompt": "Prompt que se usará, por su identificador, seguido opcionalmente de | y un número de predicciones (de 1 a 10; si no, se usa el número del menú de IA). Prompts disponibles:\n{1}",
+	"dialog.gestures.param_llm_prompt": "Prompt que se usará, por su identificador, seguido opcionalmente de | y un número de predicciones (de 1 a 10; si no, se usa el número del menú de IA). Prompts disponibles:\n{1}\nPara traducir: translate|count|language, por ejemplo translate|1|Esperanto (count: 1–10).",
 	"dialog.gestures.param_llm_vision": "Proveedor del modelo de visión: local o un proveedor de API, seguido opcionalmente de | y un nombre de modelo. Proveedores disponibles:\n{1}",
-	"dialog.gestures.param_llm_language": "Idioma de traducción: ui para el idioma del menú, o un código de idioma. Idiomas disponibles:\n{1}",
+	"dialog.gestures.param_llm_language": "Idioma de destino (por ejemplo, esperanto). Usa ui para el idioma de la interfaz. Máximo {1} bytes UTF-8.",
 	"dialog.gestures.param_error_title": "Valor no válido",
 	"dialog.gestures.param_err_url": "Introduzca una URL http:// o https:// válida.",
 	"dialog.gestures.param_err_app": "Elija una aplicación: su nombre o ruta no puede estar vacío, empezar o terminar con un espacio ni contener un salto de línea.",
@@ -262,7 +262,7 @@
 	"dialog.gestures.param_err_shortcut": "Introduzca al menos un modificador y una tecla unidos por +, por ejemplo primary+a.",
 	"dialog.gestures.param_err_llm_prompt": "Introduzca un identificador de prompt de la lista, seguido opcionalmente de | y un número del 1 al 10.",
 	"dialog.gestures.param_err_llm_vision": "Introduzca un proveedor de la lista, seguido opcionalmente de | y un nombre de modelo sin espacios en los extremos.",
-	"dialog.gestures.param_err_llm_language": "Escriba ui o un código de idioma de la lista.",
+	"dialog.gestures.param_err_llm_language": "Introduce un nombre de idioma no vacío, sin espacios al principio o al final ni caracteres reservados, dentro del límite indicado.",
 	"dialog.gestures.warning_msg": "⚠️ Atención: Activar los gestos del trackpad puede interferir con los gestos del sistema.\n\nPara evitar conflictos, desactive las siguientes opciones de macOS:\n\n• Gestos de trackpad con 2 dedos: desactivar desplazamiento y deslizamientos si desea usarlos en Hammerspoon.\n• Gestos de trackpad con 3 dedos para mover ventanas y seleccionar texto\n• Toque con 3 dedos para buscar palabras en el diccionario\n• Deslizamiento horizontal/vertical con 3 dedos para cambiar de espacio, activar App Exposé o Mission Control\n• Deslizamiento horizontal/vertical con 4 dedos para cambiar de espacio, activar App Exposé o Mission Control\n\nEs importante desactivar los gestos del sistema de 4 dedos para poder definir gestos de 5 dedos. De lo contrario, macOS no distinguiría entre ellos e impediría que los gestos de 5 dedos funcionen.",
 	"dialog.gestures.warning_title": "Advertencia de gestos",
 	"dialog.gpt_link.title": "Editar enlace abierto por Win + G",
@@ -3280,5 +3280,6 @@
 	"healthcheck.summary.observed": "No se detectaron problemas en las comprobaciones completadas.",
 	"healthcheck.summary.scope": "Los resultados solo abarcan las comprobaciones registradas. No se ejecutaron las pruebas aisladas.",
 	"healthcheck.problem.diagnostic_check": "Falló la comprobación de diagnóstico: %s.",
-	"healthcheck.export.privacy_notice": "Este informe comparte solo datos técnicos permitidos. Se excluyen registros, texto libre, rutas y datos identificativos, incluso con los detalles activados. No incluye las pruebas locales de la página."
+	"healthcheck.export.privacy_notice": "Este informe comparte solo datos técnicos permitidos. Se excluyen registros, texto libre, rutas y datos identificativos, incluso con los detalles activados. No incluye las pruebas locales de la página.",
+	"sg_actions.llm_translate_context": "🌐 Traducir la frase actual [configurable]"
 }

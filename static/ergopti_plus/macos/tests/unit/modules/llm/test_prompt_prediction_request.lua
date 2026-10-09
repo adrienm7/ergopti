@@ -218,3 +218,29 @@ helpers.describe("rewrite requests (llm-prompt-prediction)", function()
 		helpers.assert_eq(fixture.engine.get_predictions()[1].deletes, 12)
 	end)
 end)
+
+helpers.it("runs a per-binding free language through the current sentence pipeline", function()
+	local fixture = load_fixture({ buffer = "Bonjour Marc. On se voit demain ?" })
+	local Json = require("json")
+	local config_file = assert(io.open(helpers.shared("modules/llm/translate.json"), "r"))
+	local names_file = assert(io.open(helpers.shared("data/locale_names.json"), "r"))
+	local config = assert(Json.decode(config_file:read("*a"))); config_file:close()
+	local names = assert(Json.decode(names_file:read("*a"))); names_file:close()
+	local previous = package.loaded["modules.llm.selection_translation"]
+	package.loaded["modules.llm.selection_translation"] = {
+		config = function() return config end, locale_names = function() return names end,
+	}
+	local ok, detail = pcall(function()
+		helpers.assert_eq(fixture.engine.request_prompt_prediction("translate|1|Esperanto"), true)
+		helpers.assert_eq(fixture.fetches, 1)
+		helpers.assert_eq(fixture.last_fetch.tail, "On se voit demain ?")
+		helpers.assert_true(fixture.last_fetch.profile_override.system_single:find("Translate TAIL into Esperanto", 1, true) ~= nil)
+		helpers.assert_eq(package.loaded["modules.llm"].get_active_profile().id, "basic")
+		helpers.assert_eq(fixture.engine.start_live_prompt("translate|2|ქართული"), true)
+		helpers.assert_eq(fixture.engine.get_live_prompt().translation_target, "ქართული")
+		helpers.assert_eq(fixture.engine.get_live_prompt().num_predictions, 2)
+		helpers.assert_eq(fixture.engine.toggle_live_prompt("invalid|0"), true, "turning off never needs a valid receipt")
+	end)
+	package.loaded["modules.llm.selection_translation"] = previous
+	if not ok then error(detail, 0) end
+end)

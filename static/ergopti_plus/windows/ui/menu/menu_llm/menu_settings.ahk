@@ -1033,9 +1033,11 @@ _LLM_Menu_MarkExplicitPrediction() {
  *     when omitted.
  * @returns {Boolean} True when a prediction was requested.
  */
-LLM_Menu_TriggerPredictionWith(ProfileId, NumPredictions := 0, FireFn := 0) {
+LLM_Menu_TriggerPredictionWith(ProfileId, NumPredictions := 0, FireFn := 0, TranslationTarget := "") {
 	global _LLM_Menu, _LLM_Bridge_Buffer
-	Profile := LLM_FindProfile(ProfileId, _LLM_Menu["user_profiles"])
+	Profile := (TranslationTarget != "") ? ((ProfileId == "translate")
+		? LLM_Translate_PredictionProfile(TranslationTarget) : 0)
+		: LLM_FindProfile(ProfileId, _LLM_Menu["user_profiles"])
 	; A rewrite rewrites the current sentence, whatever its length: the engine
 	; receives the whole buffer and extends its capped context to the sentence.
 	; Its "nothing typed" is an empty sentence, not an empty buffer.
@@ -1058,6 +1060,8 @@ LLM_Menu_TriggerPredictionWith(ProfileId, NumPredictions := 0, FireFn := 0) {
 	LoggerInfo("LLM", "Prompt prediction requested with '{1}' ({2} prediction(s), {3} context character(s)).",
 		ProfileId, (NumPredictions > 0) ? NumPredictions : _LLM_Menu["n_predictions"], StrLen(Context))
 	Override := Map("profile_id", ProfileId, "num_predictions", NumPredictions)
+	if (TranslationTarget != "")
+		Override["translation_target"] := TranslationTarget
 	if HasMethod(FireFn, "Call") {
 		FireFn(Context, Override)
 		_LLM_Menu_MarkExplicitPrediction()
@@ -1079,10 +1083,10 @@ LLM_Menu_TriggerPredictionWith(ProfileId, NumPredictions := 0, FireFn := 0) {
  * @param {Integer} NumPredictions The binding's own count, 0 for the menu's.
  * @returns {Boolean} True when live mode changed state.
  */
-LLM_Menu_ToggleLiveMode(ProfileId, NumPredictions := 0) {
+LLM_Menu_ToggleLiveMode(ProfileId, NumPredictions := 0, TranslationTarget := "") {
 	if LLM_Engine_LiveIsActive()
 		return LLM_Menu_StopLiveMode()
-	return LLM_Menu_StartLiveMode(ProfileId, NumPredictions)
+	return LLM_Menu_StartLiveMode(ProfileId, NumPredictions, TranslationTarget)
 }
 
 /**
@@ -1095,7 +1099,7 @@ LLM_Menu_ToggleLiveMode(ProfileId, NumPredictions := 0) {
  * @param {Integer} NumPredictions The binding's own count, 0 for the menu's.
  * @returns {Boolean} True when live mode is on with that prompt.
  */
-LLM_Menu_StartLiveMode(ProfileId, NumPredictions := 0) {
+LLM_Menu_StartLiveMode(ProfileId, NumPredictions := 0, TranslationTarget := "") {
 	global _LLM_Menu, _LLM_Bridge_Buffer
 	Enabled := _LLM_Menu.Get("enabled", false)
 	Reason := LLM_Menu_ManualPredictionRefusal(A_IsSuspended, Enabled,
@@ -1104,13 +1108,16 @@ LLM_Menu_StartLiveMode(ProfileId, NumPredictions := 0) {
 		_LLM_Menu_ShowManualPredictionRefusal(Reason, StrLen(_LLM_Bridge_Buffer))
 		return false
 	}
-	if !(LLM_FindProfile(ProfileId, _LLM_Menu["user_profiles"]) is Map) {
+	Profile := (TranslationTarget != "") ? ((ProfileId == "translate")
+		? LLM_Translate_PredictionProfile(TranslationTarget) : 0)
+		: LLM_FindProfile(ProfileId, _LLM_Menu["user_profiles"])
+	if !(Profile is Map) {
 		LoggerWarn("LLM", "Live mode refused: the prompt '{1}' no longer exists.", ProfileId)
 		_LLM_Menu_ShowManualPredictionNotice("llm.prompt_prediction.unknown_prompt")
 		return false
 	}
-	LLM_Engine_LiveStart(ProfileId, NumPredictions)
-	_LLM_Menu_ShowNotice(StrReplace(t("llm.live.on"), "{1}", LLM_Menu_GetProfileLabel(ProfileId)))
+	LLM_Engine_LiveStart(ProfileId, NumPredictions, TranslationTarget)
+	_LLM_Menu_ShowNotice(StrReplace(t("llm.live.on"), "{1}", (TranslationTarget != "") ? Profile["label"] : LLM_Menu_GetProfileLabel(ProfileId)))
 	LLM_Menu_RequestBuild("live_mode")
 	return true
 }
