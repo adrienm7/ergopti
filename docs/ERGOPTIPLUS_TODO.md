@@ -3262,6 +3262,17 @@ temporary deferral and default route. Actual native execution is still unrun;
 Group 3 enrollment composition and Group 1 generator coordination are pending.
 No first-tap exit 73 cause is established, and item 24 stays partial.
 
+A standalone four-Swift diagnostic patch against genuine published Dev
+`e896bd3ee` is now preserved in the native qualification handover. It needs
+only existing Dev dependencies and no other feature runtime owner. Strict
+application and inverse restore the complete sparse Dev launcher source;
+this is source receiving, not a causal fix or native execution. Manual macOS
+run 37979226215 has a successful production launcher build on the exact
+published feature tree; Swift completion, minimal Dev-context qualification,
+Intel, installation and real-Mac acceptance remain pending. The conditional
+OFF workaround loses remapping/tap-holds and must not hide cleanup debt.
+Item 24 stays partial and incident 117 remains open.
+
 - [~] **30.** Physical magic-key setting on all three OSes: one
   `hotstrings.magic_key_source` (a KeyboardEvent.code, `auto` by default),
   config schema v5 migrating every spelling of the Windows

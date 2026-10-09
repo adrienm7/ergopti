@@ -1,0 +1,2598 @@
+diff --git a/static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/RemapLeaseWorker.swift b/static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/RemapLeaseWorker.swift
+--- a/static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/RemapLeaseWorker.swift
++++ b/static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/RemapLeaseWorker.swift
+@@ -1517,6 +1517,133 @@
+ // ======================================
+ // ======================================
+ 
++/// Finite diagnostic vocabulary: no generation, pathname, PID or wire payload is retained.
++enum LeaseTerminalBoundary: String, Codable {
++	case outerSilent = "outer-silent", peerClosed = "peer-closed", malformed = "malformed"
++	case cliFailed = "cli-failed", cliPeerClosed = "cli-peer-closed", cliMalformed = "cli-malformed"
++	case acknowledgementSend = "acknowledgement-send", heartbeatReportSend = "heartbeat-report-send"
++	case missingInner = "missing-inner", pollFailed = "poll-failed", boundaryPollFailed = "boundary-poll-failed"
++	case privateDeadline = "private-deadline", guardianParent = "guardian-parent"
++	case innerBoundaryPoll = "inner-boundary-poll", innerReadInvalid = "inner-read-invalid"
++	case terminalReadInvalid = "terminal-read-invalid", innerAckMalformed = "inner-ack-malformed"
++	case terminalAckMalformed = "terminal-ack-malformed", terminalAmbiguous = "terminal-ambiguous"
++	case terminalWithoutProof = "terminal-without-proof"
++	case liveGateRefused = "live-gate-refused", privateSendRefused = "private-send-refused"
++	case publishGateRefused = "publish-gate-refused", guardianPublishLost = "guardian-publish-lost"
++	case innerPublishLost = "inner-publish-lost", stateMachineTerminal = "state-machine-terminal"
++	case unexpectedAcknowledgement = "unexpected-ack", innerReportedFailure = "inner-reported-failure"
++	case detachedFenceExhausted = "detached-fence-exhausted"
++}
++
++enum LeaseTerminalCommand: String, Codable {
++	case none, activate, setMode = "set-mode", heartbeat, stop
++	init(_ command: LeaseInnerCommand?) {
++		switch command {
++		case .none: self = .none
++		case .some(.activate): self = .activate
++		case .some(.setMode): self = .setMode
++		case .some(.heartbeat): self = .heartbeat
++		case .some(.stop): self = .stop
++		}
++	}
++}
++
++enum LeaseTerminalCLI: String, Codable {
++	case none, nonzero, timeout, spawn, output, read, interruption
++	init(_ result: LeaseCLIResult?) {
++		switch result {
++		case .none, .some(.success): self = .none
++		case .some(.failed): self = .nonzero
++		case .some(.timedOut): self = .timeout
++		case .some(.spawnFailed): self = .spawn
++		case .some(.diagnosticOutput): self = .output
++		case .some(.diagnosticReadFailed): self = .read
++		case .some(.interrupted): self = .interruption
++		}
++	}
++}
++
++enum LeaseTerminalRole: String, Codable { case inner, outer }
++enum LeaseTerminalFence: String, Codable { case recovered, exhausted }
++enum LeaseTerminalExit: String, Codable { case success, innerFailed = "inner-failed", other }
++
++/// A closed export schema; no arbitrary strings or native/private identifiers can be represented.
++struct LeaseTerminalExport: Codable, Equatable {
++	let schema: Int
++	let role: LeaseTerminalRole
++	let boundary: LeaseTerminalBoundary
++	let command: LeaseTerminalCommand
++	let cli: LeaseTerminalCLI
++	let stopping: Bool
++	let gateHeld: Bool
++	let deadlineArmed: Bool
++	let fence: LeaseTerminalFence
++	let exit: LeaseTerminalExit
++
++	private static let keys: Set<String> = ["schema", "role", "boundary", "command", "cli", "stopping", "gateHeld", "deadlineArmed", "fence", "exit"]
++
++	func encodedRecord() -> Data? {
++		guard schema == 1 else { return nil }
++		let encoder = JSONEncoder()
++		encoder.outputFormatting = [.sortedKeys]
++		guard let data = try? encoder.encode(self), data.count <= 512 else { return nil }
++		return data
++	}
++
++	/// Strict projection: never returns source bytes, unknown keys, strings or decoder errors.
++	static func decode(_ data: Data) -> LeaseTerminalExport? {
++		guard !data.isEmpty, data.count <= 512, !data.contains(0),
++			String(data: data, encoding: .utf8) != nil,
++			!data.starts(with: Data([0xef, 0xbb, 0xbf])),
++			let object = try? JSONSerialization.jsonObject(with: data),
++			let fields = object as? [String: Any], Set(fields.keys) == keys,
++			let record = try? JSONDecoder().decode(LeaseTerminalExport.self, from: data),
++			record.schema == 1
++		else { return nil }
++		return record
++	}
++}
++
++/// Captures only already-observed state; rendering never performs another native query.
++struct LeaseTerminalSnapshot {
++	let inner: Bool
++	let boundary: LeaseTerminalBoundary
++	let command: LeaseTerminalCommand
++	let cli: LeaseTerminalCLI
++	let stopping: Bool
++	let gateHeld: Bool
++	let deadlineArmed: Bool
++
++	func exportableRecord(fenced: Bool, result: Int32) -> LeaseTerminalExport {
++		return LeaseTerminalExport(schema: 1, role: inner ? .inner : .outer, boundary: boundary,
++			command: command, cli: cli, stopping: stopping, gateHeld: gateHeld, deadlineArmed: deadlineArmed,
++			fence: fenced ? .recovered : .exhausted,
++			exit: result == 0 ? .success : (result == 73 ? .innerFailed : .other))
++	}
++
++	func message(fenced: Bool, result: Int32) -> String {
++		let outcome = result == 0 ? "0" : (result == 73 ? "73" : "other")
++		return "remap lease terminal role=\(inner ? "inner" : "outer")"
++			+ " boundary=\(boundary.rawValue) command=\(command.rawValue) cli=\(cli.rawValue)"
++			+ " stopping=\(stopping ? 1 : 0) gate=\(gateHeld ? 1 : 0) deadline=\(deadlineArmed ? 1 : 0)"
++			+ " fence=\(fenced ? "recovered" : "exhausted") exit=\(outcome)"
++	}
++}
++
++/// Uses the existing best-effort central logger only after the original terminal fence settles.
++private func reportLeaseTerminalSnapshot(_ snapshot: LeaseTerminalSnapshot, fenced: Bool, result: Int32) {
++	#if ERGOPTI_GUARDIAN_TEST_SUPPORT
++	guard ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] == nil else { return }
++	#endif
++	guard let data = snapshot.exportableRecord(fenced: fenced, result: result).encodedRecord(),
++		let json = String(data: data, encoding: .utf8)
++	else { return }
++	_ = RemapLeaseDiagnosticStore().retain(snapshot.exportableRecord(fenced: fenced, result: result))
++	let message = "remap lease terminal record=" + json
++	guard message.utf8.count <= 512 else { return }
++	LauncherLog.write(message)
++}
++
+ /// Serializes all generation writes and fences after outer liveness loss.
+ final class KarabinerLeaseInnerRuntime {
+ 	private let identity: LeaseIdentity
+@@ -1526,6 +1653,8 @@
+ 	private let fenceConfirmationGrace: TimeInterval
+ 	private let uptime: () -> TimeInterval
+ 	private let sleep: (useconds_t) -> Void
++	private let diagnosticSink: ((LeaseTerminalSnapshot, Bool, Int32) -> Void)?
++	private var terminalSnapshot: LeaseTerminalSnapshot?
+ 
+ 	/// Creates the role that exclusively owns CLI process lifecycle.
+ 	/// - Parameters:
+@@ -1545,7 +1674,8 @@
+ 		uptime: @escaping () -> TimeInterval = {
+ 			ProcessInfo.processInfo.systemUptime
+ 		},
+-		sleep: @escaping (useconds_t) -> Void = { usleep($0) }
++		sleep: @escaping (useconds_t) -> Void = { usleep($0) },
++		diagnosticSink: ((LeaseTerminalSnapshot, Bool, Int32) -> Void)? = nil
+ 	) {
+ 		self.identity = identity
+ 		self.channel = channel
+@@ -1554,6 +1684,7 @@
+ 		self.fenceConfirmationGrace = fenceConfirmationGrace
+ 		self.uptime = uptime
+ 		self.sleep = sleep
++		self.diagnosticSink = diagnosticSink
+ 	}
+ 
+ 	/// Runs serialized mode writes until STOP or outer loss initiates a fence.
+@@ -1567,9 +1698,14 @@
+ 				timeout: identity.heartbeatSeconds + kPrivateCommandAckTimeoutSeconds
+ 			)
+ 			switch event {
+-			case .peerClosed, .outerSilent:
++			case .peerClosed:
++				rememberTerminal(.peerClosed)
++				return finishAfterFence(exitCode: LeaseWorkerExit.success.rawValue)
++			case .outerSilent:
++				rememberTerminal(.outerSilent)
+ 				return finishAfterFence(exitCode: LeaseWorkerExit.success.rawValue)
+ 			case .malformed:
++				rememberTerminal(.malformed)
+ 				return finishAfterFence(
+ 					exitCode: LeaseWorkerExit.malformedProtocol.rawValue,
+ 					acknowledgement: .failed(LeaseWorkerExit.malformedProtocol.rawValue)
+@@ -1620,6 +1756,7 @@
+ 		switch result {
+ 		case .success:
+ 			if !channel.send(successAcknowledgement) {
++				rememberTerminal(.acknowledgementSend, command: command)
+ 				return finishAfterFence(exitCode: LeaseWorkerExit.success.rawValue)
+ 			}
+ 			return nil
+@@ -1629,8 +1766,10 @@
+ 				acknowledgement: .fenced
+ 			)
+ 		case .interrupted(.peerClosed):
++			rememberTerminal(.cliPeerClosed, command: command, result: result)
+ 			return finishAfterFence(exitCode: LeaseWorkerExit.success.rawValue)
+ 		case .interrupted(.malformed):
++			rememberTerminal(.cliMalformed, command: command, result: result)
+ 			return finishAfterFence(
+ 				exitCode: LeaseWorkerExit.malformedProtocol.rawValue,
+ 				acknowledgement: .failed(LeaseWorkerExit.malformedProtocol.rawValue)
+@@ -1641,10 +1780,12 @@
+ 			.diagnosticOutput, .diagnosticReadFailed(_):
+ 			if case .heartbeat(_, let sequence) = command {
+ 				if !channel.send(.heartbeatFailed(sequence)) {
++					rememberTerminal(.heartbeatReportSend, command: command, result: result)
+ 					return finishAfterFence(exitCode: LeaseWorkerExit.success.rawValue)
+ 				}
+ 				return nil
+ 			}
++			rememberTerminal(.cliFailed, command: command, result: result)
+ 			return finishAfterFence(
+ 				exitCode: failureExit,
+ 				acknowledgement: .failed(failureExit)
+@@ -1663,10 +1804,26 @@
+ 	) -> Int32 {
+ 		guard fenceWithinWorkerBudget() else {
+ 			_ = channel.send(.failed(LeaseWorkerExit.innerFailed.rawValue))
++			publishTerminal(fenced: false, result: LeaseWorkerExit.innerFailed.rawValue)
+ 			return LeaseWorkerExit.innerFailed.rawValue
+ 		}
+ 		if let acknowledgement { _ = channel.send(acknowledgement) }
++		publishTerminal(fenced: true, result: exitCode)
+ 		return exitCode
++	}
++
++	/// Snapshot only: this does not add a poll, command, clock or diagnostic write.
++	private func rememberTerminal(_ boundary: LeaseTerminalBoundary, command: LeaseInnerCommand? = nil, result: LeaseCLIResult? = nil) {
++		guard terminalSnapshot == nil else { return }
++		terminalSnapshot = LeaseTerminalSnapshot(inner: true, boundary: boundary,
++			command: LeaseTerminalCommand(command), cli: LeaseTerminalCLI(result),
++			stopping: false, gateHeld: false, deadlineArmed: false)
++	}
++
++	private func publishTerminal(fenced: Bool, result: Int32) {
++		guard let snapshot = terminalSnapshot else { return }
++		if let diagnosticSink { diagnosticSink(snapshot, fenced, result) }
++		else { reportLeaseTerminalSnapshot(snapshot, fenced: fenced, result: result) }
+ 	}
+ 
+ 	/// Retries one tombstone within the inner worker's finite spawn-failure budget.
+@@ -2294,6 +2451,8 @@
+ 	private var machine: LeaseOuterStateMachine
+ 	private var commandDeadline = LeasePrivateCommandDeadline()
+ 	private var liveTransportGateHeld = false
++	private let diagnosticSink: ((LeaseTerminalSnapshot, Bool, Int32) -> Void)?
++	private var terminalSnapshot: LeaseTerminalSnapshot?
+ 
+ 	/// Creates the only role allowed to retain Hammerspoon stdin/stdout.
+ 	/// - Parameters:
+@@ -2326,7 +2485,8 @@
+ 			}
+ 		},
+ 		boundaryPoller: @escaping LeaseDescriptorPolling = pollLeaseDescriptor,
+-		beforeLiveAcknowledgementPublish: @escaping () -> Void = {}
++		beforeLiveAcknowledgementPublish: @escaping () -> Void = {},
++		diagnosticSink: ((LeaseTerminalSnapshot, Bool, Int32) -> Void)? = nil
+ 	) {
+ 		self.identity = identity
+ 		self.detached = detached
+@@ -2339,6 +2499,7 @@
+ 		self.poller = poller
+ 		self.boundaryPoller = boundaryPoller
+ 		self.beforeLiveAcknowledgementPublish = beforeLiveAcknowledgementPublish
++		self.diagnosticSink = diagnosticSink
+ 		machine = LeaseOuterStateMachine(initialMode: identity.initialMode)
+ 	}
+ 
+@@ -2347,6 +2508,8 @@
+ 	func run() -> Int32 {
+ 		if detached {
+ 			guard recoverFenceWithinWorkerBudget() else {
++				rememberTerminal(.detachedFenceExhausted)
++				publishTerminal(fenced: false, result: LeaseWorkerExit.innerFailed.rawValue)
+ 				return LeaseWorkerExit.innerFailed.rawValue
+ 			}
+ 			return LeaseWorkerExit.success.rawValue
+@@ -2366,7 +2529,7 @@
+ 
+ 		while true {
+ 			guard let current = inner else {
+-				return finishAfterRecovery(machine.innerLost())
++				return loseInner(at: .missingInner)
+ 			}
+ 			var descriptors = [
+ 				pollfd(
+@@ -2384,7 +2547,7 @@
+ 			let pollResult = poller(&descriptors, timeout)
+ 			if pollResult == -1 {
+ 				if errno == EINTR { continue }
+-				return finishAfterRecovery(machine.innerLost())
++				return loseInner(at: .pollFailed)
+ 			}
+ 			if pollResult > 0 {
+ 				// Parent STOP/EOF has priority over any stale live-mode ACK in the
+@@ -2414,7 +2577,7 @@
+ 			let boundaryPollResult = poller(&descriptors, 0)
+ 			if boundaryPollResult == -1 {
+ 				if errno == EINTR { continue }
+-				return finishAfterRecovery(machine.innerLost())
++				return loseInner(at: .boundaryPollFailed)
+ 			}
+ 			if boundaryPollResult > 0 {
+ 				if descriptors[0].revents != 0 {
+@@ -2435,6 +2598,7 @@
+ 
+ 			let now = uptime()
+ 			if commandDeadline.isExpired(at: now) {
++				rememberTerminal(.privateDeadline)
+ 				commandDeadline.clear()
+ 				return finishAfterRecovery(machine.innerLost())
+ 			}
+@@ -2483,7 +2647,7 @@
+ 		case .malformed:
+ 			return perform(machine.receiveParent(line: "MALFORMED"))
+ 		case .guardianLost:
+-			return finishAfterRecovery(machine.innerLost())
++			return loseInner(at: .guardianParent)
+ 		case .live:
+ 			break
+ 		}
+@@ -2506,7 +2670,7 @@
+ 			)
+ 			let boundaryResult = pollLeaseBoundary(&boundary, poller: boundaryPoller)
+ 			if boundaryResult == -1 {
+-				return finishAfterRecovery(machine.innerLost())
++				return loseInner(at: .innerBoundaryPoll)
+ 			}
+ 			if boundaryResult > 0 && leasePollReportsTerminal(boundary.revents) {
+ 				return consumeTerminalInnerLines(lines)
+@@ -2515,7 +2679,7 @@
+ 		case .eof(let lines):
+ 			return consumeTerminalInnerLines(lines)
+ 		case .invalid:
+-			return finishAfterRecovery(machine.innerLost())
++			return loseInner(at: .innerReadInvalid)
+ 		case .retry:
+ 			break
+ 		}
+@@ -2534,7 +2698,7 @@
+ 		case .lines(let lines), .eof(let lines):
+ 			return consumeTerminalInnerLines(lines)
+ 		case .invalid, .retry:
+-			return finishAfterRecovery(machine.innerLost())
++			return loseInner(at: .terminalReadInvalid)
+ 		}
+ 	}
+ 
+@@ -2544,10 +2708,10 @@
+ 	private func consumeInnerLines(_ lines: [String]) -> Int32? {
+ 		for line in lines {
+ 			guard let acknowledgement = LeaseInnerAcknowledgement.parse(line: line) else {
+-				return finishAfterRecovery(machine.innerLost())
++				return loseInner(at: .innerAckMalformed)
+ 			}
+ 			let previousCommand = machine.inFlight
+-			let actions = machine.receiveInner(acknowledgement)
++			let actions = receiveObservedInner(acknowledgement)
+ 			if machine.inFlight != previousCommand { commandDeadline.clear() }
+ 			if let terminal = perform(actions) { return terminal }
+ 		}
+@@ -2563,7 +2727,7 @@
+ 		var failureCount = 0
+ 		for line in lines {
+ 			guard let acknowledgement = LeaseInnerAcknowledgement.parse(line: line) else {
+-				return finishAfterRecovery(machine.innerLost())
++				return loseInner(at: .terminalAckMalformed)
+ 			}
+ 			switch acknowledgement {
+ 			case .fenced:
+@@ -2582,11 +2746,12 @@
+ 		}
+ 		if !machine.stopping, fenceCount == 0, failureCount == 1,
+ 			let failureCode {
++			let snapshot = terminalCandidate(.innerReportedFailure)
+ 			commandDeadline.clear()
+-			return perform(machine.receiveInner(.failed(failureCode)))
++			return perform(receiveObservedInner(.failed(failureCode), snapshot: snapshot))
+ 				?? LeaseWorkerExit.innerFailed.rawValue
+ 		}
+-		return finishAfterRecovery(machine.innerLost())
++		return loseInner(at: fenceCount == 0 && failureCount == 0 ? .terminalWithoutProof : .terminalAmbiguous)
+ 	}
+ 
+ 	/// Performs state-machine actions while converting channel loss into a fence.
+@@ -2600,12 +2765,12 @@
+ 					guard !liveTransportGateHeld,
+ 						guardianRegistration?.beginLiveTransport() == true
+ 					else {
+-						return finishAfterRecovery(machine.innerLost())
++						return loseInner(at: .liveGateRefused)
+ 					}
+ 					liveTransportGateHeld = true
+ 				}
+ 				guard inner?.send(command) == true else {
+-					return finishAfterRecovery(machine.innerLost())
++					return loseInner(at: .privateSendRefused)
+ 				}
+ 				commandDeadline.arm(
+ 					for: command,
+@@ -2616,17 +2781,17 @@
+ 					guard !liveTransportGateHeld,
+ 						guardianRegistration?.beginLiveTransport() == true
+ 					else {
+-						return finishAfterRecovery(machine.innerLost())
++						return loseInner(at: .publishGateRefused)
+ 					}
+ 					liveTransportGateHeld = true
+ 				}
+ 				if liveTransportGateHeld, isLeaseLiveAcknowledgementLine(line) {
+ 					guard guardianRegistration?.guardianStillPresent() == true else {
+-						return finishAfterRecovery(machine.innerLost())
++						return loseInner(at: .guardianPublishLost)
+ 					}
+ 					beforeLiveAcknowledgementPublish()
+ 					guard liveInnerTransportStillPresent() else {
+-						return finishAfterRecovery(machine.innerLost())
++						return loseInner(at: .innerPublishLost)
+ 					}
+ 				}
+ 				if !writeLeaseLine(line, to: parentOutputDescriptor) {
+@@ -2635,16 +2800,19 @@
+ 				}
+ 				endLiveTransportIfNeeded()
+ 			case .fenceAndFinish(let exitCode, let publishStopped):
++				rememberTerminal(.stateMachineTerminal)
+ 				commandDeadline.clear()
+ 				retireCurrentAfterSupervisionLoss()
+ 				endLiveTransportIfNeeded()
+ 				guard recoverFenceWithinWorkerBudget() else {
++					publishTerminal(fenced: false, result: LeaseWorkerExit.innerFailed.rawValue)
+ 					return LeaseWorkerExit.innerFailed.rawValue
+ 				}
+ 				if publishStopped {
+ 					_ = writeLeaseLine("STOPPED", to: parentOutputDescriptor)
+ 				}
+ 				guardianRegistration?.retireAfterFence()
++				if exitCode == LeaseWorkerExit.innerFailed.rawValue { publishTerminal(fenced: true, result: exitCode) }
+ 				return exitCode
+ 			case .finish(let exitCode):
+ 				commandDeadline.clear()
+@@ -2684,6 +2852,43 @@
+ 		guard liveTransportGateHeld else { return }
+ 		liveTransportGateHeld = false
+ 		guardianRegistration?.endLiveTransport()
++	}
++
++	private func terminalCandidate(_ boundary: LeaseTerminalBoundary) -> LeaseTerminalSnapshot {
++		return LeaseTerminalSnapshot(inner: false, boundary: boundary,
++			command: LeaseTerminalCommand(machine.inFlight), cli: .none,
++			stopping: machine.stopping, gateHeld: liveTransportGateHeld,
++			deadlineArmed: commandDeadline.deadline != nil)
++	}
++
++	private func rememberTerminal(_ boundary: LeaseTerminalBoundary) {
++		guard terminalSnapshot == nil else { return }
++		terminalSnapshot = terminalCandidate(boundary)
++	}
++
++	/// Snapshot first; the original state machine alone decides whether this ACK fails.
++	private func receiveObservedInner(_ acknowledgement: LeaseInnerAcknowledgement, snapshot: LeaseTerminalSnapshot? = nil) -> [LeaseOuterAction] {
++		let boundary: LeaseTerminalBoundary
++		if case .failed = acknowledgement { boundary = .innerReportedFailure }
++		else { boundary = .unexpectedAcknowledgement }
++		let candidate = snapshot ?? terminalCandidate(boundary)
++		let actions = machine.receiveInner(acknowledgement)
++		if terminalSnapshot == nil && actions.contains(where: { action in
++			if case .fenceAndFinish(let code, _) = action { return code == LeaseWorkerExit.innerFailed.rawValue }
++			return false
++		}) { terminalSnapshot = candidate }
++		return actions
++	}
++
++	private func loseInner(at boundary: LeaseTerminalBoundary) -> Int32 {
++		rememberTerminal(boundary)
++		return finishAfterRecovery(machine.innerLost())
++	}
++
++	private func publishTerminal(fenced: Bool, result: Int32) {
++		guard let snapshot = terminalSnapshot else { return }
++		if let diagnosticSink { diagnosticSink(snapshot, fenced, result) }
++		else { reportLeaseTerminalSnapshot(snapshot, fenced: fenced, result: result) }
+ 	}
+ 
+ 	/// Completes a recovery action produced outside the normal action executor.
+@@ -2880,6 +3085,9 @@
+ #endif
+ 
+ /// Dispatches validated headless roles from the signed launcher executable.
++private let kRemapLeaseDiagnosticSnapshotFlag = "--remap-lease-diagnostic-snapshot"
++private let kRemapLeaseDiagnosticNextFlag = "--observe-next-remap-lease-diagnostics"
++
+ enum KarabinerLeaseWorker {
+ 	/// Detects every headless role before any NSApplication side effect.
+ 	/// - Parameter arguments: Complete process argv.
+@@ -2893,7 +3101,9 @@
+ 			return true
+ 		}
+ 		#endif
+-		return arguments[1] == kKarabinerLeaseWorkerFlag
++		return arguments[1] == kRemapLeaseDiagnosticSnapshotFlag
++			|| arguments[1] == kRemapLeaseDiagnosticNextFlag
++			|| arguments[1] == kKarabinerLeaseWorkerFlag
+ 			|| arguments[1] == kKarabinerLeaseRevokeFlag
+ 			|| arguments[1] == kKarabinerLeaseInnerFlag
+ 			|| arguments[1] == kKarabinerLeaseGuardianFlag
+@@ -2908,6 +3118,25 @@
+ 	/// - Returns: Stable process exit status.
+ 	static func run(arguments: [String]) -> Int32 {
+ 		guard arguments.count > 1 else { return LeaseWorkerExit.invalidArguments.rawValue }
++		// Passive retained history is read before lease reaping, signal policy, or bootstrap.
++		if arguments[1] == kRemapLeaseDiagnosticSnapshotFlag {
++			guard arguments.count == 2 else { return LeaseWorkerExit.invalidArguments.rawValue }
++			guard let data = RemapLeaseDiagnosticStore().observe().encodedEnvelope() else {
++				return LeaseWorkerExit.innerFailed.rawValue
++			}
++			let written = data.withUnsafeBytes { Darwin.write(STDOUT_FILENO, $0.baseAddress!, $0.count) }
++			return written == data.count ? LeaseWorkerExit.success.rawValue : LeaseWorkerExit.innerFailed.rawValue
++		}
++		if arguments[1] == kRemapLeaseDiagnosticNextFlag {
++			guard arguments.count == 2 else { return LeaseWorkerExit.invalidArguments.rawValue }
++			let delivered = RemapLeaseDiagnosticStore().observeNext { frame in
++				guard var data = frame.encodedFrame() else { return false }
++				data.append(0x0a)
++				let written = data.withUnsafeBytes { Darwin.write(STDOUT_FILENO, $0.baseAddress!, $0.count) }
++				return written == data.count
++			}
++			return delivered ? LeaseWorkerExit.success.rawValue : LeaseWorkerExit.innerFailed.rawValue
++		}
+ 		// Ignored SIGCHLD and SA_NOCLDWAIT survive exec and would auto-reap the
+ 		// exact child whose unreaped PID proves private-group ownership
+ 		prepareLeaseChildReaping()
+diff --git a/static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/RemapLeaseDiagnosticStore.swift b/static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/RemapLeaseDiagnosticStore.swift
+new file mode 100644
+--- /dev/null
++++ b/static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/RemapLeaseDiagnosticStore.swift
+@@ -0,0 +1,314 @@
++// Private retained technical records; no lease or input authority is established by this store.
++import Darwin
++import Foundation
++
++enum LeaseDiagnosticObservationState: String, Codable { case observed, unobserved }
++
++struct LeaseDiagnosticEnvelope: Encodable {
++	let schema = 1
++	let state: LeaseDiagnosticObservationState
++	let retention = "historical"
++	let currentness = "unknown"
++	let records: [LeaseTerminalExport]
++
++	func encodedEnvelope() -> Data? {
++		guard records.count <= 2,
++			Set(records.map { $0.role.rawValue }).count == records.count,
++			records.map { $0.role } == [LeaseTerminalRole.inner, .outer].filter { role in records.contains { $0.role == role } },
++			records.allSatisfy({ $0.encodedRecord() != nil }),
++			(state == .observed) == !records.isEmpty
++		else { return nil }
++		let encoder = JSONEncoder()
++		encoder.outputFormatting = [.sortedKeys]
++		guard let data = try? encoder.encode(self), data.count <= 2048 else { return nil }
++		return data
++	}
++}
++
++/// Reader never invokes the creating/chmod-capable writer directory resolver.
++struct RemapLeaseDiagnosticStore {
++	private let directoryPath: String
++	private let afterSingleRead: ((LeaseTerminalRole) -> Void)?
++
++	init() {
++		directoryPath = NSHomeDirectory() + "/" + kMacOSLogsHomeRelativePath
++		afterSingleRead = nil
++	}
++
++	#if ERGOPTI_GUARDIAN_TEST_SUPPORT
++	/// Private filesystem fixture injection; the release CLI has no path argument.
++	init(testingDirectory: URL, afterSingleRead: ((LeaseTerminalRole) -> Void)? = nil) {
++		directoryPath = testingDirectory.path
++		self.afterSingleRead = afterSingleRead
++	}
++	#endif
++
++	private func filename(_ role: LeaseTerminalRole) -> String {
++		return role == .inner ? "remap-lease-diagnostic-inner.json" : "remap-lease-diagnostic-outer.json"
++	}
++
++	private func ownedDirectory(_ value: stat) -> Bool {
++		return (value.st_mode & S_IFMT) == S_IFDIR && value.st_uid == geteuid()
++			&& (value.st_mode & 0o7777) == 0o700
++	}
++
++	private func ownedRecord(_ value: stat) -> Bool {
++		return (value.st_mode & S_IFMT) == S_IFREG && value.st_uid == geteuid()
++			&& (value.st_mode & 0o7777) == 0o600 && value.st_nlink == 1
++			&& value.st_size > 0 && value.st_size <= 512
++	}
++
++	private func sameIdentity(_ left: stat, _ right: stat, includeContentMetadata: Bool) -> Bool {
++		guard left.st_dev == right.st_dev, left.st_ino == right.st_ino,
++			left.st_mode == right.st_mode, left.st_uid == right.st_uid,
++			left.st_gid == right.st_gid, left.st_nlink == right.st_nlink
++		else { return false }
++		if !includeContentMetadata { return true }
++		return left.st_size == right.st_size
++			&& left.st_mtimespec.tv_sec == right.st_mtimespec.tv_sec
++			&& left.st_mtimespec.tv_nsec == right.st_mtimespec.tv_nsec
++			&& left.st_ctimespec.tv_sec == right.st_ctimespec.tv_sec
++			&& left.st_ctimespec.tv_nsec == right.st_ctimespec.tv_nsec
++	}
++
++	/// A metadata-only namespace cut; O_NOFOLLOW_ANY also refuses changed ancestor aliases.
++	private func directoryCurrent(_ path: String, descriptor: Int32, expected: stat, strict: Bool) -> Bool {
++		var held = stat(), named = stat(), reopened = stat()
++		guard Darwin.fstat(descriptor, &held) == 0, ownedDirectory(held),
++			Darwin.lstat(path, &named) == 0, ownedDirectory(named),
++			sameIdentity(expected, held, includeContentMetadata: strict),
++			sameIdentity(held, named, includeContentMetadata: strict)
++		else { return false }
++		let cut = Darwin.open(path, O_RDONLY | O_DIRECTORY | O_CLOEXEC | O_NOFOLLOW_ANY)
++		guard cut >= 0 else { return false }
++		defer { _ = Darwin.close(cut) }
++		return Darwin.fstat(cut, &reopened) == 0 && ownedDirectory(reopened)
++			&& sameIdentity(held, reopened, includeContentMetadata: strict)
++	}
++
++	/// Single bounded read from one retained private regular FD, followed by file/name/namespace cuts.
++	private func read(_ role: LeaseTerminalRole, directory: Int32, identity: stat) -> LeaseTerminalExport? {
++		let name = filename(role)
++		var before = stat(), opened = stat()
++		guard Darwin.fstatat(directory, name, &before, AT_SYMLINK_NOFOLLOW) == 0, ownedRecord(before)
++		else { return nil }
++		let descriptor = Darwin.openat(directory, name, O_RDONLY | O_CLOEXEC | O_NOFOLLOW | O_NONBLOCK)
++		guard descriptor >= 0 else { return nil }
++		defer { _ = Darwin.close(descriptor) }
++		guard Darwin.fstat(descriptor, &opened) == 0, ownedRecord(opened),
++			sameIdentity(before, opened, includeContentMetadata: true)
++		else { return nil }
++		var bytes = [UInt8](repeating: 0, count: 513)
++		let count = bytes.withUnsafeMutableBytes { Darwin.read(descriptor, $0.baseAddress!, $0.count) }
++		afterSingleRead?(role)
++		var held = stat(), named = stat()
++		guard count == Int(opened.st_size), count > 0, count <= 512,
++			Darwin.fstat(descriptor, &held) == 0, ownedRecord(held),
++			Darwin.fstatat(directory, name, &named, AT_SYMLINK_NOFOLLOW) == 0, ownedRecord(named),
++			sameIdentity(opened, held, includeContentMetadata: true),
++			sameIdentity(held, named, includeContentMetadata: true),
++			directoryCurrent(directoryPath, descriptor: directory, expected: identity, strict: true),
++			let record = LeaseTerminalExport.decode(Data(bytes.prefix(count))), record.role == role
++		else { return nil }
++		return record
++	}
++
++	/// Missing/refused records yield unobserved; this method performs no mutation or lease bootstrap.
++	func observe() -> LeaseDiagnosticEnvelope {
++		let absent = LeaseDiagnosticEnvelope(state: .unobserved, records: [])
++		let directory = Darwin.open(directoryPath, O_RDONLY | O_DIRECTORY | O_CLOEXEC | O_NOFOLLOW_ANY)
++		guard directory >= 0 else { return absent }
++		defer { _ = Darwin.close(directory) }
++		var identity = stat()
++		guard Darwin.fstat(directory, &identity) == 0, ownedDirectory(identity),
++			directoryCurrent(directoryPath, descriptor: directory, expected: identity, strict: true)
++		else { return absent }
++		let records = [LeaseTerminalRole.inner, .outer].compactMap { read($0, directory: directory, identity: identity) }
++		guard directoryCurrent(directoryPath, descriptor: directory, expected: identity, strict: true)
++		else { return absent }
++		return LeaseDiagnosticEnvelope(state: records.isEmpty ? .unobserved : .observed, records: records)
++	}
++
++	/// Best-effort fixed-role atomic publication, called only after original terminal fence settlement.
++	@discardableResult func retain(_ record: LeaseTerminalExport) -> Bool {
++		guard let data = record.encodedRecord(),
++			case .success(let opened) = OwnedLogDirectoryResolver.open(directoryPath)
++		else { return false }
++		let directory = opened.descriptor
++		defer { _ = Darwin.close(directory) }
++		var identity = stat()
++		guard Darwin.fstat(directory, &identity) == 0, ownedDirectory(identity),
++			directoryCurrent(opened.resolvedPath, descriptor: directory, expected: identity, strict: false)
++		else { return false }
++		let name = filename(record.role), temporary = name + ".tmp"
++		var existing = stat()
++		let namedStatus = Darwin.fstatat(directory, name, &existing, AT_SYMLINK_NOFOLLOW)
++		guard (namedStatus == 0 ? ownedRecord(existing) : errno == ENOENT) else { return false }
++		let descriptor = Darwin.openat(directory, temporary,
++			O_WRONLY | O_CREAT | O_EXCL | O_CLOEXEC | O_NOFOLLOW | O_NONBLOCK, S_IRUSR | S_IWUSR)
++		guard descriptor >= 0 else { return false }
++		var published = false
++		defer {
++			if !published {
++				var held = stat(), named = stat()
++				if Darwin.fstat(descriptor, &held) == 0,
++					Darwin.fstatat(directory, temporary, &named, AT_SYMLINK_NOFOLLOW) == 0,
++					sameIdentity(held, named, includeContentMetadata: false) {
++					_ = Darwin.unlinkat(directory, temporary, 0)
++				}
++			}
++			_ = Darwin.close(descriptor)
++		}
++		guard Darwin.fchmod(descriptor, S_IRUSR | S_IWUSR) == 0 else { return false }
++		let written = data.withUnsafeBytes { Darwin.write(descriptor, $0.baseAddress!, $0.count) }
++		var held = stat(), named = stat()
++		guard written == data.count, Darwin.fsync(descriptor) == 0,
++			Darwin.fstat(descriptor, &held) == 0, ownedRecord(held), held.st_size == off_t(data.count),
++			Darwin.fstatat(directory, temporary, &named, AT_SYMLINK_NOFOLLOW) == 0,
++			sameIdentity(held, named, includeContentMetadata: true),
++			directoryCurrent(opened.resolvedPath, descriptor: directory, expected: identity, strict: false),
++			Darwin.renameat(directory, temporary, directory, name) == 0
++		else { return false }
++		published = true
++		return Darwin.fsync(directory) == 0
++			&& directoryCurrent(opened.resolvedPath, descriptor: directory, expected: identity, strict: false)
++	}
++
++	/// Holding the original vnode prevents inode reuse from impersonating the baseline.
++	private final class NextRecordWitness {
++		let descriptor: Int32
++		let identity: stat
++		let record: LeaseTerminalExport
++
++		init(descriptor: Int32, identity: stat, record: LeaseTerminalExport) {
++			self.descriptor = descriptor
++			self.identity = identity
++			self.record = record
++		}
++
++		deinit { _ = Darwin.close(descriptor) }
++	}
++
++	/// Reads and pins the same private vnode whose closed bytes are returned.
++	private func nextRecord(_ role: LeaseTerminalRole, directory: Int32, identity: stat) -> NextRecordWitness? {
++		let name = filename(role)
++		var before = stat(), opened = stat()
++		guard Darwin.fstatat(directory, name, &before, AT_SYMLINK_NOFOLLOW) == 0, ownedRecord(before)
++		else { return nil }
++		let descriptor = Darwin.openat(directory, name, O_RDONLY | O_CLOEXEC | O_NOFOLLOW | O_NONBLOCK)
++		guard descriptor >= 0 else { return nil }
++		var retained = false
++		defer { if !retained { _ = Darwin.close(descriptor) } }
++		guard Darwin.fstat(descriptor, &opened) == 0, ownedRecord(opened),
++			sameIdentity(before, opened, includeContentMetadata: true)
++		else { return nil }
++		var bytes = [UInt8](repeating: 0, count: 513)
++		let count = bytes.withUnsafeMutableBytes { Darwin.read(descriptor, $0.baseAddress!, $0.count) }
++		afterSingleRead?(role)
++		var held = stat(), named = stat()
++		guard count == Int(opened.st_size), count > 0, count <= 512,
++			Darwin.fstat(descriptor, &held) == 0, ownedRecord(held),
++			Darwin.fstatat(directory, name, &named, AT_SYMLINK_NOFOLLOW) == 0, ownedRecord(named),
++			sameIdentity(opened, held, includeContentMetadata: true),
++			sameIdentity(held, named, includeContentMetadata: true),
++			directoryCurrent(directoryPath, descriptor: directory, expected: identity, strict: true),
++			let record = LeaseTerminalExport.decode(Data(bytes.prefix(count))), record.role == role
++		else { return nil }
++		retained = true
++		return NextRecordWitness(descriptor: descriptor, identity: held, record: record)
++	}
++
++	/// Arms only a stable private namespace, then latches its first qualified new vnode.
++	/// The fixed wait is bounded; synchronous filesystem/stdout latency is not a hard process deadline.
++	func observeNext(
++		emit: (LeaseDiagnosticNextFrame) -> Bool,
++		uptime: () -> TimeInterval = { ProcessInfo.processInfo.systemUptime },
++		sleep: (useconds_t) -> Void = { _ = Darwin.usleep($0) }
++	) -> Bool {
++		let absent = LeaseDiagnosticNextFrame(phase: .unobserved, records: [])
++		let directory = Darwin.open(directoryPath, O_RDONLY | O_DIRECTORY | O_CLOEXEC | O_NOFOLLOW_ANY)
++		guard directory >= 0 else { return emit(absent) }
++		defer { _ = Darwin.close(directory) }
++		var identity = stat()
++		guard Darwin.fstat(directory, &identity) == 0, ownedDirectory(identity),
++			directoryCurrent(directoryPath, descriptor: directory, expected: identity, strict: true)
++		else { return emit(absent) }
++		let roles = [LeaseTerminalRole.inner, .outer]
++		var baseline: [String: NextRecordWitness] = [:]
++		defer { withExtendedLifetime(baseline) {} }
++		for role in roles {
++			var named = stat()
++			if Darwin.fstatat(directory, filename(role), &named, AT_SYMLINK_NOFOLLOW) == 0 {
++				guard let witness = nextRecord(role, directory: directory, identity: identity)
++				else { return emit(absent) }
++				baseline[role.rawValue] = witness
++			} else if errno != ENOENT { return emit(absent) }
++		}
++		// All baseline cuts precede the armed callback; callbacks never grant native authority.
++		for role in roles {
++			var named = stat()
++			let status = Darwin.fstatat(directory, filename(role), &named, AT_SYMLINK_NOFOLLOW)
++			if let witness = baseline[role.rawValue] {
++				var held = stat()
++				guard status == 0, Darwin.fstat(witness.descriptor, &held) == 0,
++					ownedRecord(held), ownedRecord(named),
++					sameIdentity(witness.identity, held, includeContentMetadata: true),
++					sameIdentity(held, named, includeContentMetadata: true)
++				else { return emit(absent) }
++			} else if status == 0 || errno != ENOENT { return emit(absent) }
++		}
++		guard directoryCurrent(directoryPath, descriptor: directory, expected: identity, strict: true)
++		else { return emit(absent) }
++		let start = uptime(), deadline = start + 30
++		guard start.isFinite, start >= 0, deadline.isFinite, deadline > start else { return emit(absent) }
++		guard emit(LeaseDiagnosticNextFrame(phase: .armed, records: [])) else { return false }
++		var last = start
++		for turn in 0..<600 {
++			let now = uptime()
++			guard now.isFinite, now >= last, now < deadline else { break }
++			last = now
++			guard directoryCurrent(directoryPath, descriptor: directory, expected: identity, strict: false)
++			else { break }
++			var cut = stat()
++			guard Darwin.fstat(directory, &cut) == 0, ownedDirectory(cut) else { break }
++			for role in roles {
++				guard let candidate = nextRecord(role, directory: directory, identity: cut) else { continue }
++				if let previous = baseline[role.rawValue],
++					previous.identity.st_dev == candidate.identity.st_dev,
++					previous.identity.st_ino == candidate.identity.st_ino { continue }
++				let admitted = uptime()
++				guard admitted.isFinite, admitted >= last, admitted < deadline else { return emit(absent) }
++				// A later publication cannot overwrite this already captured typed value.
++				return emit(LeaseDiagnosticNextFrame(phase: .observed, records: [candidate.record]))
++			}
++			let after = uptime()
++			guard after.isFinite, after >= last, after < deadline, turn < 599 else { break }
++			last = after
++			let microseconds = useconds_t((min(0.05, deadline - after) * 1_000_000).rounded(.down))
++			guard microseconds > 0 else { break }
++			sleep(microseconds)
++		}
++		return emit(absent)
++	}
++}
++
++/// Closed passive observations never identify an input generation or a writer.
++enum LeaseDiagnosticNextPhase: String, Codable { case armed, observed, unobserved }
++
++struct LeaseDiagnosticNextFrame: Encodable {
++	let schema = 1
++	let scope = "first-observed-new-record"
++	let currentness = "unknown"
++	let phase: LeaseDiagnosticNextPhase
++	let records: [LeaseTerminalExport]
++
++	func encodedFrame() -> Data? {
++		guard records.count <= 1, (phase == .observed) == !records.isEmpty,
++			records.allSatisfy({ $0.encodedRecord() != nil })
++		else { return nil }
++		let encoder = JSONEncoder()
++		encoder.outputFormatting = [.sortedKeys]
++		guard let data = try? encoder.encode(self), data.count <= 2048 else { return nil }
++		return data
++	}
++}
+diff --git a/static/ergopti_plus/macos/launcher/Tests/ErgoptiPlusTests/RemapLeaseWorkerTests.swift b/static/ergopti_plus/macos/launcher/Tests/ErgoptiPlusTests/RemapLeaseWorkerTests.swift
+--- a/static/ergopti_plus/macos/launcher/Tests/ErgoptiPlusTests/RemapLeaseWorkerTests.swift
++++ b/static/ergopti_plus/macos/launcher/Tests/ErgoptiPlusTests/RemapLeaseWorkerTests.swift
+@@ -6064,3 +6064,1310 @@
+ 		return revoked == 0 && (mode == kLeaseModeActive || mode == kLeaseModePaused)
+ 	}
+ }
++
++// Additive terminal-diagnostic controls; all historical controls above remain whole.
++extension KarabinerLeaseWorkerTests {
++	private func terminalDiagnosticInner(
++		events: [LeaseInnerChannelEvent], results: [LeaseCLIResult],
++		onDiagnostic: @escaping (LeaseTerminalSnapshot, Bool, Int32, Int) -> Void
++	) -> Int32 {
++		let executor = ScriptedLeaseCLIExecutor(results: results, probeCalls: [])
++		let runtime = KarabinerLeaseInnerRuntime(
++			identity: makeIdentity(), channel: ScriptedLeaseInnerChannel(events: events),
++			executor: executor, fenceConfirmationGrace: 0, uptime: { 0 }, sleep: { _ in },
++			diagnosticSink: { snapshot, fenced, result in
++				onDiagnostic(snapshot, fenced, result, executor.payloads.count)
++			}
++		)
++		return runtime.run()
++	}
++
++	func testTerminalDiagnosticOuterSilenceFollowsBothOriginalFenceTransports() {
++		var delivered = 0
++		let status = terminalDiagnosticInner(events: [.outerSilent], results: [.success, .success]) {
++			snapshot, fenced, result, calls in
++			delivered += 1
++			XCTAssertEqual(snapshot.boundary, .outerSilent)
++			XCTAssertEqual(snapshot.command, .none)
++			XCTAssertTrue(fenced)
++			XCTAssertEqual(result, 0)
++			XCTAssertEqual(calls, 2, "diagnostic must follow both original fence transports")
++		}
++		XCTAssertEqual(status, 0)
++		XCTAssertEqual(delivered, 1)
++	}
++
++	func testTerminalDiagnosticPeerClosureRemainsDistinctAndFollowsFence() {
++		var delivered = 0
++		let status = terminalDiagnosticInner(events: [.peerClosed], results: [.success, .success]) {
++			snapshot, fenced, result, calls in
++			delivered += 1
++			XCTAssertEqual(snapshot.boundary, .peerClosed)
++			XCTAssertTrue(fenced)
++			XCTAssertEqual(result, 0)
++			XCTAssertEqual(calls, 2)
++		}
++		XCTAssertEqual(status, 0)
++		XCTAssertEqual(delivered, 1)
++	}
++
++	func testTerminalDiagnosticTypedCLIFailurePreservesActivationResultAfterFence() {
++		var delivered = 0
++		let status = terminalDiagnosticInner(events: [.command(.activate(1))],
++			results: [.spawnFailed(42), .success, .success]) { snapshot, fenced, result, calls in
++			delivered += 1
++			XCTAssertEqual(snapshot.boundary, .cliFailed)
++			XCTAssertEqual(snapshot.command, .activate)
++			XCTAssertEqual(snapshot.cli, .spawn)
++			XCTAssertTrue(fenced)
++			XCTAssertEqual(result, LeaseWorkerExit.activationFailed.rawValue)
++			XCTAssertEqual(calls, 3)
++		}
++		XCTAssertEqual(status, LeaseWorkerExit.activationFailed.rawValue)
++		XCTAssertEqual(delivered, 1)
++	}
++
++	func testTerminalDiagnosticExhaustedFenceDoesNotClaimRecovery() {
++		var delivered = 0
++		let status = terminalDiagnosticInner(events: [.outerSilent],
++			results: [.spawnFailed(42), .spawnFailed(42), .spawnFailed(42)]) {
++			snapshot, fenced, result, calls in
++			delivered += 1
++			XCTAssertEqual(snapshot.boundary, .outerSilent)
++			XCTAssertFalse(fenced)
++			XCTAssertEqual(result, 73)
++			XCTAssertEqual(calls, 3, "no extra fence retry may be added for logging")
++		}
++		XCTAssertEqual(status, 73)
++		XCTAssertEqual(delivered, 1)
++	}
++
++	func testTerminalDiagnosticAcceptedStopRemainsQuiet() {
++		var delivered = 0
++		let status = terminalDiagnosticInner(events: [.command(.stop)], results: [.success, .success]) {
++			_, _, _, _ in delivered += 1
++		}
++		XCTAssertEqual(status, 0)
++		XCTAssertEqual(delivered, 0)
++	}
++
++	func testTerminalDiagnosticOuterFormattingOmitsHeartbeatSequenceAndRawFailure() {
++		let snapshot = LeaseTerminalSnapshot(inner: false, boundary: .privateDeadline,
++			command: LeaseTerminalCommand(.heartbeat(2, UInt32.max)), cli: .none,
++			stopping: false, gateHeld: true, deadlineArmed: true)
++		XCTAssertEqual(snapshot.message(fenced: true, result: 73),
++			"remap lease terminal role=outer boundary=private-deadline command=heartbeat cli=none stopping=0 gate=1 deadline=1 fence=recovered exit=73")
++		XCTAssertEqual(LeaseTerminalCLI(.spawnFailed(42)), .spawn)
++		XCTAssertEqual(LeaseTerminalCLI(.failed(42)), .nonzero)
++	}
++
++	func testTerminalDiagnosticInnerFormattingMatchesIndependentFrozenGrammar() {
++		let snapshot = LeaseTerminalSnapshot(inner: true, boundary: .outerSilent, command: .none,
++			cli: .none, stopping: false, gateHeld: false, deadlineArmed: false)
++		XCTAssertEqual(snapshot.message(fenced: true, result: 0),
++			"remap lease terminal role=inner boundary=outer-silent command=none cli=none stopping=0 gate=0 deadline=0 fence=recovered exit=0")
++		XCTAssertEqual(snapshot.message(fenced: false, result: 999).components(separatedBy: " ").last, "exit=other")
++	}
++}
++
++// Independent copies of historical native fault cases; original112 remain whole.
++extension KarabinerLeaseWorkerTests {
++	func testTerminalDiagnosticNativeDeadlineRetainsFirstSnapshotAfterGuardianRetirement() throws {
++		let fixture = try makeExecutableFixture(
++			body: "if [ -f \"$3\" ]; then\n"
++				+ "  IFS= read -r command <&3 || exit 40\n"
++				+ "  [ \"$command\" = STOP ] || exit 41\n"
++				+ "  if kill -0 \"$(cat \"$3\")\" 2>/dev/null; then\n"
++				+ "    : > \"${4}.order-violation\"\n  fi\n"
++				+ "  : > \"$4\"\n  printf 'FENCED\\n' >&3\n  exit 0\nfi\n"
++				+ "/bin/sh -c 'trap \"\" HUP TERM; : > \"$1\"; "
++				+ "while :; do /bin/sleep 1; done' lease-child \"${4}.ready\" 3>&- &\n"
++				+ "echo \"$!\" > \"${3}.child\"\necho \"$$\" > \"$3\"\nwait\n"
++		)
++		defer { try? FileManager.default.removeItem(at: fixture.deletingLastPathComponent()) }
++		let childPIDFile = fixture.deletingLastPathComponent()
++			.appendingPathComponent("stopped-inner.pid")
++		let descendantPIDFile = URL(fileURLWithPath: childPIDFile.path + ".child")
++		let replacementFenceFile = fixture.deletingLastPathComponent()
++			.appendingPathComponent("replacement-fenced")
++		let childReadyFile = URL(fileURLWithPath: replacementFenceFile.path + ".ready")
++		let orderViolationFile = URL(
++			fileURLWithPath: replacementFenceFile.path + ".order-violation"
++		)
++		let identity = LeaseIdentity(
++			cliPath: "/unused/karabiner_cli",
++			token: token,
++			modeName: childPIDFile.path,
++			revokedName: replacementFenceFile.path,
++			initialMode: kLeaseModeActive,
++			heartbeatSeconds: 5
++		)
++		var parentPipe = [Int32](repeating: -1, count: 2)
++		let pipeStatus = parentPipe.withUnsafeMutableBufferPointer { buffer in
++			Darwin.pipe(buffer.baseAddress!)
++		}
++		XCTAssertEqual(pipeStatus, 0)
++		guard pipeStatus == 0 else { return }
++		let nullDescriptor = Darwin.open("/dev/null", O_WRONLY)
++		XCTAssertGreaterThanOrEqual(nullDescriptor, 0)
++		guard nullDescriptor >= 0 else { return }
++		let sibling = try startUnrelatedSibling()
++		defer {
++			_ = Darwin.close(parentPipe[0])
++			_ = Darwin.close(parentPipe[1])
++			_ = Darwin.close(nullDescriptor)
++			stopTestOwnedSibling(sibling)
++		}
++		var clockReads = 0
++		var stagedChildPID: pid_t?
++		var groupStopStatus: Int32?
++		let diagnosticGuardian = ScriptedLeaseGuardianRegistration(armResult: true)
++		var diagnosticDeliveries = 0
++		let runtime = KarabinerLeaseOuterRuntime(
++			identity: identity,
++			detached: false,
++			spawner: PosixLeaseInnerSpawner(executablePath: fixture.path),
++			guardianRegistration: diagnosticGuardian,
++			recoveryExecutor: ScriptedLeaseCLIExecutor(results: [], probeCalls: []),
++			parentInputDescriptor: parentPipe[0],
++			parentOutputDescriptor: nullDescriptor,
++			uptime: {
++				clockReads += 1
++				if clockReads <= 2 { return 0 }
++				if stagedChildPID == nil {
++					stagedChildPID = self.waitForPID(
++						in: descendantPIDFile,
++						timeout: 2
++					)
++					_ = self.waitForFile(at: childReadyFile, timeout: 2)
++					if let stagedChildPID {
++						let groupID = Darwin.getpgid(stagedChildPID)
++						groupStopStatus = Darwin.killpg(groupID, SIGSTOP)
++					}
++				}
++				return 2
++			},
++			diagnosticSink: { snapshot, fenced, status in
++				diagnosticDeliveries += 1
++				XCTAssertEqual(snapshot.boundary, .privateDeadline)
++				XCTAssertEqual(snapshot.command, .activate)
++				XCTAssertFalse(snapshot.stopping)
++				XCTAssertTrue(snapshot.gateHeld)
++				XCTAssertTrue(snapshot.deadlineArmed)
++				XCTAssertTrue(fenced)
++				XCTAssertEqual(status, 73)
++				XCTAssertEqual(diagnosticGuardian.retireCalls, 1)
++				XCTAssertTrue(FileManager.default.fileExists(atPath: replacementFenceFile.path))
++			}
++		)
++
++		let result = runtime.run()
++		let childPID = try XCTUnwrap(stagedChildPID)
++
++		XCTAssertEqual(result, LeaseWorkerExit.innerFailed.rawValue)
++		XCTAssertEqual(groupStopStatus, 0)
++		XCTAssertTrue(waitUntilGone(childPID, timeout: 2))
++		XCTAssertTrue(FileManager.default.fileExists(atPath: replacementFenceFile.path))
++		XCTAssertFalse(
++			FileManager.default.fileExists(atPath: orderViolationFile.path),
++			"replacement fencing must observe the old direct inner already reaped"
++		)
++		assertSiblingStillExecuting(
++			sibling,
++			"the unrelated sibling must execute after stopped-group recovery"
++		)
++		XCTAssertEqual(diagnosticDeliveries, 1)
++	}
++
++	func testTerminalDiagnosticNativePrivateEOFWaitsForBothFencesAndRetirement() throws {
++		let fixture = try makeExecutableFixture(
++			body: "IFS= read -r activate <&3 || exit 40\n"
++				+ "[ \"$activate\" = 'ACTIVATE 1' ] || exit 41\n"
++				+ "printf 'READY 1\\n' >&3\n"
++				+ "IFS= read -r heartbeat <&3 || exit 42\n"
++				+ "[ \"$heartbeat\" = 'HEARTBEAT 1 1' ] || exit 43\n"
++				+ "exit 73\n"
++		)
++		defer { try? FileManager.default.removeItem(at: fixture.deletingLastPathComponent()) }
++		var parentPipe = [Int32](repeating: -1, count: 2)
++		let parentPipeStatus = parentPipe.withUnsafeMutableBufferPointer { buffer in
++			Darwin.pipe(buffer.baseAddress!)
++		}
++		XCTAssertEqual(parentPipeStatus, 0)
++		guard parentPipeStatus == 0 else { return }
++		var outputPipe = [Int32](repeating: -1, count: 2)
++		let outputPipeStatus = outputPipe.withUnsafeMutableBufferPointer { buffer in
++			Darwin.pipe(buffer.baseAddress!)
++		}
++		XCTAssertEqual(outputPipeStatus, 0)
++		guard outputPipeStatus == 0 else {
++			_ = Darwin.close(parentPipe[0])
++			_ = Darwin.close(parentPipe[1])
++			return
++		}
++		defer {
++			_ = Darwin.close(parentPipe[0])
++			_ = Darwin.close(parentPipe[1])
++			_ = Darwin.close(outputPipe[0])
++			_ = Darwin.close(outputPipe[1])
++		}
++		let identity = LeaseIdentity(
++			cliPath: kCanonicalKarabinerCLIPath,
++			token: token,
++			modeName: "ergopti_mode_\(token)",
++			revokedName: "ergopti_revoked_\(token)",
++			initialMode: kLeaseModeActive,
++			heartbeatSeconds: 5
++		)
++		let unavailableSpawner = InitialThenUnavailableLeaseInnerSpawner(
++			initialSpawner: PosixLeaseInnerSpawner(executablePath: fixture.path)
++		)
++		let recoveryExecutor = ScriptedLeaseCLIExecutor(results: [], probeCalls: [])
++		let sibling = try startUnrelatedSibling()
++		defer { stopTestOwnedSibling(sibling) }
++		let diagnosticGuardian = ScriptedLeaseGuardianRegistration(armResult: true)
++		var diagnosticDeliveries = 0
++		let runtime = KarabinerLeaseOuterRuntime(
++			identity: identity,
++			detached: false,
++			spawner: unavailableSpawner,
++			guardianRegistration: diagnosticGuardian,
++			recoveryExecutor: recoveryExecutor,
++			parentInputDescriptor: parentPipe[0],
++			parentOutputDescriptor: outputPipe[1],
++			diagnosticSink: { snapshot, fenced, status in
++				diagnosticDeliveries += 1
++				XCTAssertEqual(snapshot.boundary, .terminalWithoutProof)
++				XCTAssertEqual(snapshot.command, .heartbeat)
++				XCTAssertFalse(snapshot.stopping)
++				XCTAssertTrue(fenced)
++				XCTAssertEqual(status, 73)
++				let exactFence = LeasePayloads.fence(identity: identity)
++				XCTAssertEqual(recoveryExecutor.payloads, [exactFence, exactFence])
++				XCTAssertEqual(diagnosticGuardian.retireCalls, 1)
++			}
++		)
++		let finished = DispatchSemaphore(value: 0)
++		var exitCode: Int32?
++		DispatchQueue.global(qos: .userInitiated).async {
++			exitCode = runtime.run()
++			finished.signal()
++		}
++
++		var readyPoll = pollfd(
++			fd: outputPipe[0],
++			events: Int16(POLLIN | POLLHUP | POLLERR),
++			revents: 0
++		)
++		let readyPollResult = Darwin.poll(&readyPoll, 1, 2_000)
++		XCTAssertGreaterThan(
++			readyPollResult,
++			0,
++			"the initial authenticated inner must publish READY"
++		)
++		guard readyPollResult > 0 else {
++			_ = Darwin.close(parentPipe[1])
++			parentPipe[1] = -1
++			_ = finished.wait(timeout: .now() + 5)
++			return
++		}
++		var outputDecoder = BoundedLeaseLineDecoder()
++		switch readLeaseLines(from: outputPipe[0], decoder: &outputDecoder) {
++		case .lines(let lines), .eof(let lines):
++			XCTAssertEqual(lines, ["READY"])
++		case .invalid, .retry:
++			XCTFail("the initial authenticated inner must publish canonical READY")
++		}
++		XCTAssertTrue(writeLeaseLine("PING 1", to: parentPipe[1]))
++		let finishResult = finished.wait(timeout: .now() + 5)
++		XCTAssertEqual(
++			finishResult,
++			.success,
++			"an unavailable replacement launcher must fall back instead of looping"
++		)
++		guard finishResult == .success else { return }
++
++		let exactFence = LeasePayloads.fence(identity: identity)
++		XCTAssertEqual(exitCode, LeaseWorkerExit.innerFailed.rawValue)
++		XCTAssertEqual(
++			unavailableSpawner.spawnAttempts,
++			2,
++			"one initial inner plus one unavailable replacement must be sufficient"
++		)
++		XCTAssertEqual(recoveryExecutor.payloads, [exactFence, exactFence])
++		XCTAssertEqual(
++			recoveryExecutor.cliPaths,
++			[kCanonicalKarabinerCLIPath, kCanonicalKarabinerCLIPath],
++			"outer recovery may execute only the canonical karabiner_cli"
++		)
++		assertSiblingStillExecuting(
++			sibling,
++			"the simulated stock Karabiner sibling must never be signalled"
++		)
++		XCTAssertEqual(diagnosticDeliveries, 1)
++	}
++
++	func testTerminalDiagnosticNativeGuardianLossIsDistinctBeforeBothFences() throws {
++		let fixture = try makeExecutableFixture(
++			body: "IFS= read -r activate <&3 || exit 40\n"
++				+ "[ \"$activate\" = 'ACTIVATE 1' ] || exit 41\n"
++				+ "printf 'READY 1\\n' >&3\n"
++				+ "IFS= read -r heartbeat <&3 || exit 42\n"
++				+ "[ \"$heartbeat\" = 'HEARTBEAT 1 1' ] || exit 43\n"
++				+ "exit 73\n"
++		)
++		defer { try? FileManager.default.removeItem(at: fixture.deletingLastPathComponent()) }
++		var parentPipe = [Int32](repeating: -1, count: 2)
++		let parentPipeStatus = parentPipe.withUnsafeMutableBufferPointer { buffer in
++			Darwin.pipe(buffer.baseAddress!)
++		}
++		XCTAssertEqual(parentPipeStatus, 0)
++		guard parentPipeStatus == 0 else { return }
++		var outputPipe = [Int32](repeating: -1, count: 2)
++		let outputPipeStatus = outputPipe.withUnsafeMutableBufferPointer { buffer in
++			Darwin.pipe(buffer.baseAddress!)
++		}
++		XCTAssertEqual(outputPipeStatus, 0)
++		guard outputPipeStatus == 0 else {
++			_ = Darwin.close(parentPipe[0])
++			_ = Darwin.close(parentPipe[1])
++			return
++		}
++		defer {
++			_ = Darwin.close(parentPipe[0])
++			_ = Darwin.close(parentPipe[1])
++			_ = Darwin.close(outputPipe[0])
++			_ = Darwin.close(outputPipe[1])
++		}
++		let identity = LeaseIdentity(
++			cliPath: kCanonicalKarabinerCLIPath,
++			token: token,
++			modeName: "ergopti_mode_\(token)",
++			revokedName: "ergopti_revoked_\(token)",
++			initialMode: kLeaseModeActive,
++			heartbeatSeconds: 5
++		)
++		let unavailableSpawner = InitialThenUnavailableLeaseInnerSpawner(
++			initialSpawner: PosixLeaseInnerSpawner(executablePath: fixture.path)
++		)
++		let recoveryExecutor = ScriptedLeaseCLIExecutor(results: [], probeCalls: [])
++		let sibling = try startUnrelatedSibling()
++		defer { stopTestOwnedSibling(sibling) }
++		let diagnosticGuardian = ScriptedLeaseGuardianRegistration(armResult: true)
++		var diagnosticDeliveries = 0
++		let runtime = KarabinerLeaseOuterRuntime(
++			identity: identity,
++			detached: false,
++			spawner: unavailableSpawner,
++			guardianRegistration: diagnosticGuardian,
++			recoveryExecutor: recoveryExecutor,
++			parentInputDescriptor: parentPipe[0],
++			parentOutputDescriptor: outputPipe[1],
++			diagnosticSink: { snapshot, fenced, status in
++				diagnosticDeliveries += 1
++				XCTAssertEqual(snapshot.boundary, .guardianParent)
++				XCTAssertEqual(snapshot.command, .none)
++				XCTAssertFalse(snapshot.stopping)
++				XCTAssertTrue(fenced)
++				XCTAssertEqual(status, 73)
++				let exactFence = LeasePayloads.fence(identity: identity)
++				XCTAssertEqual(recoveryExecutor.payloads, [exactFence, exactFence])
++				XCTAssertEqual(diagnosticGuardian.retireCalls, 1)
++			}
++		)
++		let finished = DispatchSemaphore(value: 0)
++		var exitCode: Int32?
++		DispatchQueue.global(qos: .userInitiated).async {
++			exitCode = runtime.run()
++			finished.signal()
++		}
++
++		var readyPoll = pollfd(
++			fd: outputPipe[0],
++			events: Int16(POLLIN | POLLHUP | POLLERR),
++			revents: 0
++		)
++		let readyPollResult = Darwin.poll(&readyPoll, 1, 2_000)
++		XCTAssertGreaterThan(
++			readyPollResult,
++			0,
++			"the initial authenticated inner must publish READY"
++		)
++		guard readyPollResult > 0 else {
++			_ = Darwin.close(parentPipe[1])
++			parentPipe[1] = -1
++			_ = finished.wait(timeout: .now() + 5)
++			return
++		}
++		var outputDecoder = BoundedLeaseLineDecoder()
++		switch readLeaseLines(from: outputPipe[0], decoder: &outputDecoder) {
++		case .lines(let lines), .eof(let lines):
++			XCTAssertEqual(lines, ["READY"])
++		case .invalid, .retry:
++			XCTFail("the initial authenticated inner must publish canonical READY")
++		}
++		diagnosticGuardian.present = false
++		XCTAssertTrue(writeLeaseLine("PING 1", to: parentPipe[1]))
++		let finishResult = finished.wait(timeout: .now() + 5)
++		XCTAssertEqual(
++			finishResult,
++			.success,
++			"an unavailable replacement launcher must fall back instead of looping"
++		)
++		guard finishResult == .success else { return }
++
++		let exactFence = LeasePayloads.fence(identity: identity)
++		XCTAssertEqual(exitCode, LeaseWorkerExit.innerFailed.rawValue)
++		XCTAssertEqual(
++			unavailableSpawner.spawnAttempts,
++			2,
++			"one initial inner plus one unavailable replacement must be sufficient"
++		)
++		XCTAssertEqual(recoveryExecutor.payloads, [exactFence, exactFence])
++		XCTAssertEqual(
++			recoveryExecutor.cliPaths,
++			[kCanonicalKarabinerCLIPath, kCanonicalKarabinerCLIPath],
++			"outer recovery may execute only the canonical karabiner_cli"
++		)
++		assertSiblingStillExecuting(
++			sibling,
++			"the simulated stock Karabiner sibling must never be signalled"
++		)
++		XCTAssertEqual(diagnosticDeliveries, 1)
++	}
++
++	func testTerminalDiagnosticNativeAcceptedStopOrEOFRemainsQuiet() throws {
++		var diagnosticDeliveries = 0
++		for closesAfterPause in [false, true] {
++			let fixture = try makeExecutableFixture(
++				body: "IFS= read -r command <&3 || exit 40\n"
++					+ "printf '%s\\n' \"$command\" > \"$3\"\n"
++					+ "[ \"$command\" = 'ACTIVATE 1' ] || exit 41\n"
++					+ "printf 'READY 1\\n' >&3\n"
++					+ "IFS= read -r command <&3 || exit 42\n"
++					+ "printf '%s\\n' \"$command\" >> \"$3\"\n"
++					+ "if [ \"$command\" != STOP ]; then\n"
++					+ "  : > \"$4\"\n"
++					+ "  IFS= read -r command <&3 || exit 43\n"
++					+ "  printf '%s\\n' \"$command\" >> \"$3\"\n"
++					+ "fi\n"
++					+ "[ \"$command\" = STOP ] || exit 44\n"
++					+ "printf 'FENCED\\n' >&3\nexit 0\n"
++			)
++			defer { try? FileManager.default.removeItem(at: fixture.deletingLastPathComponent()) }
++			let traceFile = fixture.deletingLastPathComponent()
++				.appendingPathComponent(closesAfterPause ? "hup.trace" : "stop.trace")
++			let violationFile = fixture.deletingLastPathComponent()
++				.appendingPathComponent(closesAfterPause ? "hup.violation" : "stop.violation")
++			var parentPipe = [Int32](repeating: -1, count: 2)
++			let pipeStatus = parentPipe.withUnsafeMutableBufferPointer { buffer in
++				Darwin.pipe(buffer.baseAddress!)
++			}
++			XCTAssertEqual(pipeStatus, 0)
++			guard pipeStatus == 0 else { continue }
++			let nullDescriptor = Darwin.open("/dev/null", O_WRONLY)
++			XCTAssertGreaterThanOrEqual(nullDescriptor, 0)
++			guard nullDescriptor >= 0 else {
++				_ = Darwin.close(parentPipe[0])
++				_ = Darwin.close(parentPipe[1])
++				continue
++			}
++			defer {
++				_ = Darwin.close(parentPipe[0])
++				if parentPipe[1] >= 0 { _ = Darwin.close(parentPipe[1]) }
++				_ = Darwin.close(nullDescriptor)
++			}
++			let identity = LeaseIdentity(
++				cliPath: "/unused/karabiner_cli",
++				token: token,
++				modeName: traceFile.path,
++				revokedName: violationFile.path,
++				initialMode: kLeaseModeActive,
++				heartbeatSeconds: 5
++			)
++			let guardianRegistration = ScriptedLeaseGuardianRegistration(armResult: true)
++			guardianRegistration.childCloseDescriptors = [parentPipe[1]]
++			var clockReads = 0
++			let runtime = KarabinerLeaseOuterRuntime(
++				identity: identity,
++				detached: false,
++				spawner: PosixLeaseInnerSpawner(executablePath: fixture.path),
++				guardianRegistration: guardianRegistration,
++				recoveryExecutor: ScriptedLeaseCLIExecutor(results: [], probeCalls: []),
++				parentInputDescriptor: parentPipe[0],
++				parentOutputDescriptor: nullDescriptor,
++				uptime: {
++					clockReads += 1
++					if clockReads == 3 {
++						XCTAssertTrue(writeLeaseLine("PAUSE", to: parentPipe[1]))
++						if closesAfterPause {
++							_ = Darwin.close(parentPipe[1])
++							parentPipe[1] = -1
++						} else {
++							XCTAssertTrue(writeLeaseLine("STOP", to: parentPipe[1]))
++						}
++					}
++					return 0
++				},
++				diagnosticSink: { _, _, _ in diagnosticDeliveries += 1 }
++			)
++
++			XCTAssertEqual(runtime.run(), LeaseWorkerExit.success.rawValue)
++			let trace = try String(contentsOf: traceFile, encoding: .utf8)
++			XCTAssertTrue(trace.contains("ACTIVATE 1\n"))
++			XCTAssertTrue(trace.contains("STOP\n"))
++			XCTAssertFalse(trace.contains("SET "))
++			XCTAssertFalse(trace.contains("HEARTBEAT "))
++			XCTAssertFalse(
++				FileManager.default.fileExists(atPath: violationFile.path),
++				"terminal public ownership loss must be the next private command"
++			)
++		}
++		XCTAssertEqual(diagnosticDeliveries, 0)
++	}
++}
++
++extension KarabinerLeaseWorkerTests {
++	func testTerminalDiagnosticNativeDeadlineWaitsForBothFencesAndRetirement() throws {
++		let fixture = try makeExecutableFixture(
++			body: "IFS= read -r activate <&3 || exit 40\n"
++				+ "[ \"$activate\" = 'ACTIVATE 1' ] || exit 41\n"
++				+ "printf 'READY 1\\n' >&3\n"
++				+ "IFS= read -r heartbeat <&3 || exit 42\n"
++				+ "[ \"$heartbeat\" = 'HEARTBEAT 1 1' ] || exit 43\n"
++				+ "IFS= read -r pending <&3 || exit 44\n"
++		)
++		defer { try? FileManager.default.removeItem(at: fixture.deletingLastPathComponent()) }
++		var parentPipe = [Int32](repeating: -1, count: 2)
++		let parentPipeStatus = parentPipe.withUnsafeMutableBufferPointer { buffer in
++			Darwin.pipe(buffer.baseAddress!)
++		}
++		XCTAssertEqual(parentPipeStatus, 0)
++		guard parentPipeStatus == 0 else { return }
++		var outputPipe = [Int32](repeating: -1, count: 2)
++		let outputPipeStatus = outputPipe.withUnsafeMutableBufferPointer { buffer in
++			Darwin.pipe(buffer.baseAddress!)
++		}
++		XCTAssertEqual(outputPipeStatus, 0)
++		guard outputPipeStatus == 0 else {
++			_ = Darwin.close(parentPipe[0])
++			_ = Darwin.close(parentPipe[1])
++			return
++		}
++		defer {
++			_ = Darwin.close(parentPipe[0])
++			_ = Darwin.close(parentPipe[1])
++			_ = Darwin.close(outputPipe[0])
++			_ = Darwin.close(outputPipe[1])
++		}
++		let identity = LeaseIdentity(
++			cliPath: kCanonicalKarabinerCLIPath,
++			token: token,
++			modeName: "ergopti_mode_\(token)",
++			revokedName: "ergopti_revoked_\(token)",
++			initialMode: kLeaseModeActive,
++			heartbeatSeconds: 5
++		)
++		let unavailableSpawner = InitialThenUnavailableLeaseInnerSpawner(
++			initialSpawner: PosixLeaseInnerSpawner(executablePath: fixture.path)
++		)
++		let recoveryExecutor = ScriptedLeaseCLIExecutor(results: [], probeCalls: [])
++		let sibling = try startUnrelatedSibling()
++		defer { stopTestOwnedSibling(sibling) }
++		let diagnosticGuardian = ScriptedLeaseGuardianRegistration(armResult: true)
++		var diagnosticDeliveries = 0
++		let runtime = KarabinerLeaseOuterRuntime(
++			identity: identity,
++			detached: false,
++			spawner: unavailableSpawner,
++			guardianRegistration: diagnosticGuardian,
++			recoveryExecutor: recoveryExecutor,
++			parentInputDescriptor: parentPipe[0],
++			parentOutputDescriptor: outputPipe[1],
++			diagnosticSink: { snapshot, fenced, status in
++				diagnosticDeliveries += 1
++				XCTAssertEqual(snapshot.boundary, .privateDeadline)
++				XCTAssertTrue(snapshot.gateHeld)
++				XCTAssertTrue(snapshot.deadlineArmed)
++				XCTAssertEqual(snapshot.command, .heartbeat)
++				XCTAssertFalse(snapshot.stopping)
++				XCTAssertTrue(fenced)
++				XCTAssertEqual(status, 73)
++				let exactFence = LeasePayloads.fence(identity: identity)
++				XCTAssertEqual(recoveryExecutor.payloads, [exactFence, exactFence])
++				XCTAssertEqual(diagnosticGuardian.retireCalls, 1)
++			}
++		)
++		let finished = DispatchSemaphore(value: 0)
++		var exitCode: Int32?
++		DispatchQueue.global(qos: .userInitiated).async {
++			exitCode = runtime.run()
++			finished.signal()
++		}
++
++		var readyPoll = pollfd(
++			fd: outputPipe[0],
++			events: Int16(POLLIN | POLLHUP | POLLERR),
++			revents: 0
++		)
++		let readyPollResult = Darwin.poll(&readyPoll, 1, 2_000)
++		XCTAssertGreaterThan(
++			readyPollResult,
++			0,
++			"the initial authenticated inner must publish READY"
++		)
++		guard readyPollResult > 0 else {
++			_ = Darwin.close(parentPipe[1])
++			parentPipe[1] = -1
++			_ = finished.wait(timeout: .now() + 5)
++			return
++		}
++		var outputDecoder = BoundedLeaseLineDecoder()
++		switch readLeaseLines(from: outputPipe[0], decoder: &outputDecoder) {
++		case .lines(let lines), .eof(let lines):
++			XCTAssertEqual(lines, ["READY"])
++		case .invalid, .retry:
++			XCTFail("the initial authenticated inner must publish canonical READY")
++		}
++		XCTAssertTrue(writeLeaseLine("PING 1", to: parentPipe[1]))
++		let finishResult = finished.wait(timeout: .now() + 5)
++		XCTAssertEqual(
++			finishResult,
++			.success,
++			"an unavailable replacement launcher must fall back instead of looping"
++		)
++		guard finishResult == .success else { return }
++
++		let exactFence = LeasePayloads.fence(identity: identity)
++		XCTAssertEqual(exitCode, LeaseWorkerExit.innerFailed.rawValue)
++		XCTAssertEqual(
++			unavailableSpawner.spawnAttempts,
++			2,
++			"one initial inner plus one unavailable replacement must be sufficient"
++		)
++		XCTAssertEqual(recoveryExecutor.payloads, [exactFence, exactFence])
++		XCTAssertEqual(
++			recoveryExecutor.cliPaths,
++			[kCanonicalKarabinerCLIPath, kCanonicalKarabinerCLIPath],
++			"outer recovery may execute only the canonical karabiner_cli"
++		)
++		assertSiblingStillExecuting(
++			sibling,
++			"the simulated stock Karabiner sibling must never be signalled"
++		)
++		XCTAssertEqual(diagnosticDeliveries, 1)
++	}
++}
++
++extension KarabinerLeaseWorkerTests {
++	func testTerminalDiagnosticNativeUnexpectedAckSnapshotsBeforeStateMutation() throws {
++		let fixture = try makeExecutableFixture(
++			body: "IFS= read -r activate <&3 || exit 40\n"
++				+ "[ \"$activate\" = 'ACTIVATE 1' ] || exit 41\n"
++				+ "printf 'READY 1\\n' >&3\n"
++				+ "IFS= read -r heartbeat <&3 || exit 42\n"
++				+ "[ \"$heartbeat\" = 'HEARTBEAT 1 1' ] || exit 43\n"
++				+ "printf 'TRANSPORTED 2\\n' >&3\nIFS= read -r pending <&3 || exit 44\n"
++		)
++		defer { try? FileManager.default.removeItem(at: fixture.deletingLastPathComponent()) }
++		var parentPipe = [Int32](repeating: -1, count: 2)
++		let parentPipeStatus = parentPipe.withUnsafeMutableBufferPointer { buffer in
++			Darwin.pipe(buffer.baseAddress!)
++		}
++		XCTAssertEqual(parentPipeStatus, 0)
++		guard parentPipeStatus == 0 else { return }
++		var outputPipe = [Int32](repeating: -1, count: 2)
++		let outputPipeStatus = outputPipe.withUnsafeMutableBufferPointer { buffer in
++			Darwin.pipe(buffer.baseAddress!)
++		}
++		XCTAssertEqual(outputPipeStatus, 0)
++		guard outputPipeStatus == 0 else {
++			_ = Darwin.close(parentPipe[0])
++			_ = Darwin.close(parentPipe[1])
++			return
++		}
++		defer {
++			_ = Darwin.close(parentPipe[0])
++			_ = Darwin.close(parentPipe[1])
++			_ = Darwin.close(outputPipe[0])
++			_ = Darwin.close(outputPipe[1])
++		}
++		let identity = LeaseIdentity(
++			cliPath: kCanonicalKarabinerCLIPath,
++			token: token,
++			modeName: "ergopti_mode_\(token)",
++			revokedName: "ergopti_revoked_\(token)",
++			initialMode: kLeaseModeActive,
++			heartbeatSeconds: 5
++		)
++		let unavailableSpawner = InitialThenUnavailableLeaseInnerSpawner(
++			initialSpawner: PosixLeaseInnerSpawner(executablePath: fixture.path)
++		)
++		let recoveryExecutor = ScriptedLeaseCLIExecutor(results: [], probeCalls: [])
++		let sibling = try startUnrelatedSibling()
++		defer { stopTestOwnedSibling(sibling) }
++		let diagnosticGuardian = ScriptedLeaseGuardianRegistration(armResult: true)
++		var diagnosticDeliveries = 0
++		let runtime = KarabinerLeaseOuterRuntime(
++			identity: identity,
++			detached: false,
++			spawner: unavailableSpawner,
++			guardianRegistration: diagnosticGuardian,
++			recoveryExecutor: recoveryExecutor,
++			parentInputDescriptor: parentPipe[0],
++			parentOutputDescriptor: outputPipe[1],
++			diagnosticSink: { snapshot, fenced, status in
++				diagnosticDeliveries += 1
++				XCTAssertEqual(snapshot.boundary, .unexpectedAcknowledgement)
++				XCTAssertTrue(snapshot.gateHeld)
++				XCTAssertTrue(snapshot.deadlineArmed)
++				XCTAssertEqual(snapshot.command, .heartbeat)
++				XCTAssertFalse(snapshot.stopping)
++				XCTAssertTrue(fenced)
++				XCTAssertEqual(status, 73)
++				let exactFence = LeasePayloads.fence(identity: identity)
++				XCTAssertEqual(recoveryExecutor.payloads, [exactFence, exactFence])
++				XCTAssertEqual(diagnosticGuardian.retireCalls, 1)
++			}
++		)
++		let finished = DispatchSemaphore(value: 0)
++		var exitCode: Int32?
++		DispatchQueue.global(qos: .userInitiated).async {
++			exitCode = runtime.run()
++			finished.signal()
++		}
++
++		var readyPoll = pollfd(
++			fd: outputPipe[0],
++			events: Int16(POLLIN | POLLHUP | POLLERR),
++			revents: 0
++		)
++		let readyPollResult = Darwin.poll(&readyPoll, 1, 2_000)
++		XCTAssertGreaterThan(
++			readyPollResult,
++			0,
++			"the initial authenticated inner must publish READY"
++		)
++		guard readyPollResult > 0 else {
++			_ = Darwin.close(parentPipe[1])
++			parentPipe[1] = -1
++			_ = finished.wait(timeout: .now() + 5)
++			return
++		}
++		var outputDecoder = BoundedLeaseLineDecoder()
++		switch readLeaseLines(from: outputPipe[0], decoder: &outputDecoder) {
++		case .lines(let lines), .eof(let lines):
++			XCTAssertEqual(lines, ["READY"])
++		case .invalid, .retry:
++			XCTFail("the initial authenticated inner must publish canonical READY")
++		}
++		XCTAssertTrue(writeLeaseLine("PING 1", to: parentPipe[1]))
++		let finishResult = finished.wait(timeout: .now() + 5)
++		XCTAssertEqual(
++			finishResult,
++			.success,
++			"an unavailable replacement launcher must fall back instead of looping"
++		)
++		guard finishResult == .success else { return }
++
++		let exactFence = LeasePayloads.fence(identity: identity)
++		XCTAssertEqual(exitCode, LeaseWorkerExit.innerFailed.rawValue)
++		XCTAssertEqual(
++			unavailableSpawner.spawnAttempts,
++			2,
++			"one initial inner plus one unavailable replacement must be sufficient"
++		)
++		XCTAssertEqual(recoveryExecutor.payloads, [exactFence, exactFence])
++		XCTAssertEqual(
++			recoveryExecutor.cliPaths,
++			[kCanonicalKarabinerCLIPath, kCanonicalKarabinerCLIPath],
++			"outer recovery may execute only the canonical karabiner_cli"
++		)
++		assertSiblingStillExecuting(
++			sibling,
++			"the simulated stock Karabiner sibling must never be signalled"
++		)
++		XCTAssertEqual(diagnosticDeliveries, 1)
++	}
++
++	func testTerminalDiagnosticNativeFailed73SnapshotsBeforeTerminalMutation() throws {
++		let fixture = try makeExecutableFixture(
++			body: "IFS= read -r activate <&3 || exit 40\n"
++				+ "[ \"$activate\" = 'ACTIVATE 1' ] || exit 41\n"
++				+ "printf 'READY 1\\n' >&3\n"
++				+ "IFS= read -r heartbeat <&3 || exit 42\n"
++				+ "[ \"$heartbeat\" = 'HEARTBEAT 1 1' ] || exit 43\n"
++				+ "printf 'FAILED 73\\n' >&3\nexit 73\n"
++		)
++		defer { try? FileManager.default.removeItem(at: fixture.deletingLastPathComponent()) }
++		var parentPipe = [Int32](repeating: -1, count: 2)
++		let parentPipeStatus = parentPipe.withUnsafeMutableBufferPointer { buffer in
++			Darwin.pipe(buffer.baseAddress!)
++		}
++		XCTAssertEqual(parentPipeStatus, 0)
++		guard parentPipeStatus == 0 else { return }
++		var outputPipe = [Int32](repeating: -1, count: 2)
++		let outputPipeStatus = outputPipe.withUnsafeMutableBufferPointer { buffer in
++			Darwin.pipe(buffer.baseAddress!)
++		}
++		XCTAssertEqual(outputPipeStatus, 0)
++		guard outputPipeStatus == 0 else {
++			_ = Darwin.close(parentPipe[0])
++			_ = Darwin.close(parentPipe[1])
++			return
++		}
++		defer {
++			_ = Darwin.close(parentPipe[0])
++			_ = Darwin.close(parentPipe[1])
++			_ = Darwin.close(outputPipe[0])
++			_ = Darwin.close(outputPipe[1])
++		}
++		let identity = LeaseIdentity(
++			cliPath: kCanonicalKarabinerCLIPath,
++			token: token,
++			modeName: "ergopti_mode_\(token)",
++			revokedName: "ergopti_revoked_\(token)",
++			initialMode: kLeaseModeActive,
++			heartbeatSeconds: 5
++		)
++		let unavailableSpawner = InitialThenUnavailableLeaseInnerSpawner(
++			initialSpawner: PosixLeaseInnerSpawner(executablePath: fixture.path)
++		)
++		let recoveryExecutor = ScriptedLeaseCLIExecutor(results: [], probeCalls: [])
++		let sibling = try startUnrelatedSibling()
++		defer { stopTestOwnedSibling(sibling) }
++		let diagnosticGuardian = ScriptedLeaseGuardianRegistration(armResult: true)
++		var diagnosticDeliveries = 0
++		let runtime = KarabinerLeaseOuterRuntime(
++			identity: identity,
++			detached: false,
++			spawner: unavailableSpawner,
++			guardianRegistration: diagnosticGuardian,
++			recoveryExecutor: recoveryExecutor,
++			parentInputDescriptor: parentPipe[0],
++			parentOutputDescriptor: outputPipe[1],
++			diagnosticSink: { snapshot, fenced, status in
++				diagnosticDeliveries += 1
++				XCTAssertEqual(snapshot.boundary, .innerReportedFailure)
++				XCTAssertTrue(snapshot.gateHeld)
++				XCTAssertTrue(snapshot.deadlineArmed)
++				XCTAssertEqual(snapshot.command, .heartbeat)
++				XCTAssertFalse(snapshot.stopping)
++				XCTAssertTrue(fenced)
++				XCTAssertEqual(status, 73)
++				let exactFence = LeasePayloads.fence(identity: identity)
++				XCTAssertEqual(recoveryExecutor.payloads, [exactFence, exactFence])
++				XCTAssertEqual(diagnosticGuardian.retireCalls, 1)
++			}
++		)
++		let finished = DispatchSemaphore(value: 0)
++		var exitCode: Int32?
++		DispatchQueue.global(qos: .userInitiated).async {
++			exitCode = runtime.run()
++			finished.signal()
++		}
++
++		var readyPoll = pollfd(
++			fd: outputPipe[0],
++			events: Int16(POLLIN | POLLHUP | POLLERR),
++			revents: 0
++		)
++		let readyPollResult = Darwin.poll(&readyPoll, 1, 2_000)
++		XCTAssertGreaterThan(
++			readyPollResult,
++			0,
++			"the initial authenticated inner must publish READY"
++		)
++		guard readyPollResult > 0 else {
++			_ = Darwin.close(parentPipe[1])
++			parentPipe[1] = -1
++			_ = finished.wait(timeout: .now() + 5)
++			return
++		}
++		var outputDecoder = BoundedLeaseLineDecoder()
++		switch readLeaseLines(from: outputPipe[0], decoder: &outputDecoder) {
++		case .lines(let lines), .eof(let lines):
++			XCTAssertEqual(lines, ["READY"])
++		case .invalid, .retry:
++			XCTFail("the initial authenticated inner must publish canonical READY")
++		}
++		XCTAssertTrue(writeLeaseLine("PING 1", to: parentPipe[1]))
++		let finishResult = finished.wait(timeout: .now() + 5)
++		XCTAssertEqual(
++			finishResult,
++			.success,
++			"an unavailable replacement launcher must fall back instead of looping"
++		)
++		guard finishResult == .success else { return }
++
++		let exactFence = LeasePayloads.fence(identity: identity)
++		XCTAssertEqual(exitCode, LeaseWorkerExit.innerFailed.rawValue)
++		XCTAssertEqual(
++			unavailableSpawner.spawnAttempts,
++			2,
++			"one initial inner plus one unavailable replacement must be sufficient"
++		)
++		XCTAssertEqual(recoveryExecutor.payloads, [exactFence, exactFence])
++		XCTAssertEqual(
++			recoveryExecutor.cliPaths,
++			[kCanonicalKarabinerCLIPath, kCanonicalKarabinerCLIPath],
++			"outer recovery may execute only the canonical karabiner_cli"
++		)
++		assertSiblingStillExecuting(
++			sibling,
++			"the simulated stock Karabiner sibling must never be signalled"
++		)
++		XCTAssertEqual(diagnosticDeliveries, 1)
++	}
++}
++
++extension KarabinerLeaseWorkerTests {
++	func testTerminalExportPositiveIndependentLiteralAndTypedSnapshotRoundTrip() throws {
++		let literal = #"{"schema":1,"role":"outer","boundary":"private-deadline","command":"heartbeat","cli":"none","stopping":false,"gateHeld":true,"deadlineArmed":true,"fence":"recovered","exit":"inner-failed"}"#
++		let observed = try XCTUnwrap(LeaseTerminalExport.decode(Data(literal.utf8)))
++		let snapshot = LeaseTerminalSnapshot(inner: false, boundary: .privateDeadline, command: .heartbeat,
++			cli: .none, stopping: false, gateHeld: true, deadlineArmed: true)
++		XCTAssertEqual(observed, snapshot.exportableRecord(fenced: true, result: 73))
++		let encoded = try XCTUnwrap(observed.encodedRecord())
++		XCTAssertLessThanOrEqual(encoded.count, 512)
++		XCTAssertEqual(LeaseTerminalExport.decode(encoded), observed)
++	}
++
++	func testTerminalExportRejectsIndependentPIIUnknownTypeMissingAndSizeVectors() {
++		let vectors = [
++			#"{"schema":1,"role":"employee@example.invalid","boundary":"private-deadline","command":"heartbeat","cli":"none","stopping":false,"gateHeld":true,"deadlineArmed":true,"fence":"recovered","exit":"inner-failed"}"#,
++			#"{"schema":1,"role":"outer","boundary":"/Users/employee/private","command":"heartbeat","cli":"none","stopping":false,"gateHeld":true,"deadlineArmed":true,"fence":"recovered","exit":"inner-failed"}"#,
++			#"{"schema":1,"role":"outer","boundary":"private-deadline","command":"ergopti_mode_personal-token","cli":"none","stopping":false,"gateHeld":true,"deadlineArmed":true,"fence":"recovered","exit":"inner-failed"}"#,
++			#"{"schema":1,"role":"outer","boundary":"private-deadline","command":"heartbeat","cli":"https://proxy.invalid/private","stopping":false,"gateHeld":true,"deadlineArmed":true,"fence":"recovered","exit":"inner-failed"}"#,
++			#"{"schema":1,"role":"outer","boundary":"private-deadline","command":"heartbeat","cli":"none","stopping":false,"gateHeld":true,"deadlineArmed":true,"fence":"--private-argv","exit":"inner-failed"}"#,
++			#"{"schema":1,"role":"outer","boundary":"private-deadline","command":"heartbeat","cli":"none","stopping":false,"gateHeld":true,"deadlineArmed":true,"fence":"recovered","exit":"employee-id-123"}"#,
++			#"{"schema":1,"role":"outer","boundary":"private-deadline","command":"heartbeat","cli":"none","stopping":"private-string","gateHeld":true,"deadlineArmed":true,"fence":"recovered","exit":"inner-failed"}"#,
++			#"{"schema":1,"role":"outer","boundary":"private-deadline","command":"heartbeat","cli":"none","stopping":false,"gateHeld":1,"deadlineArmed":true,"fence":"recovered","exit":"inner-failed"}"#,
++			#"{"schema":1,"role":"outer","boundary":"private-deadline","command":"heartbeat","cli":"none","stopping":false,"gateHeld":true,"deadlineArmed":null,"fence":"recovered","exit":"inner-failed"}"#,
++			#"{"schema":"1","role":"outer","boundary":"private-deadline","command":"heartbeat","cli":"none","stopping":false,"gateHeld":true,"deadlineArmed":true,"fence":"recovered","exit":"inner-failed"}"#,
++			#"{"schema":true,"role":"outer","boundary":"private-deadline","command":"heartbeat","cli":"none","stopping":false,"gateHeld":true,"deadlineArmed":true,"fence":"recovered","exit":"inner-failed"}"#,
++			#"{"schema":2,"role":"outer","boundary":"private-deadline","command":"heartbeat","cli":"none","stopping":false,"gateHeld":true,"deadlineArmed":true,"fence":"recovered","exit":"inner-failed"}"#,
++			#"{"schema":1,"role":"outer","boundary":"private-deadline","command":"heartbeat","cli":"none","stopping":false,"gateHeld":true,"deadlineArmed":true,"fence":"recovered","exit":"inner-failed","proxy_url":"employee@example.invalid"}"#,
++			#"{"schema":1,"role":"outer","boundary":"private-deadline","command":"heartbeat","cli":"none","stopping":false,"gateHeld":true,"deadlineArmed":true,"fence":"recovered","exit":"inner-failed","token":"employee@example.invalid"}"#,
++			#"{"schema":1,"role":"outer","boundary":"private-deadline","command":"heartbeat","cli":"none","stopping":false,"gateHeld":true,"deadlineArmed":true,"fence":"recovered","exit":"inner-failed","argv":"employee@example.invalid"}"#,
++			#"{"schema":1,"role":"outer","boundary":"private-deadline","command":"heartbeat","cli":"none","stopping":false,"gateHeld":true,"deadlineArmed":true,"fence":"recovered","exit":"inner-failed","source_path":"employee@example.invalid"}"#,
++			#"{"schema":1,"role":"outer","boundary":"private-deadline","command":"heartbeat","cli":"none","stopping":false,"gateHeld":true,"deadlineArmed":true,"fence":"recovered","exit":"inner-failed","status":"employee@example.invalid"}"#,
++			#"{"schema":1,"role":"outer","boundary":"private-deadline","command":"heartbeat","stopping":false,"gateHeld":true,"deadlineArmed":true,"fence":"recovered","exit":"inner-failed"}"#,
++			#"                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 "#,
++		]
++		for literal in vectors {
++			XCTAssertNil(LeaseTerminalExport.decode(Data(literal.utf8)), "closed export must reject input")
++		}
++	}
++}
++
++extension KarabinerLeaseWorkerTests {
++	func testTerminalExportRejectsIndependentEncodingEmptyAndSuffixVectors() {
++		let vectors: [Data] = [
++			Data([]), // empty
++			Data([0xff]), // invalid-utf8
++			Data([0x7b, 0x00, 0x22, 0x00, 0x73, 0x00, 0x63, 0x00, 0x68, 0x00, 0x65, 0x00, 0x6d, 0x00, 0x61, 0x00, 0x22, 0x00, 0x3a, 0x00, 0x31, 0x00, 0x2c, 0x00, 0x22, 0x00, 0x72, 0x00, 0x6f, 0x00, 0x6c, 0x00, 0x65, 0x00, 0x22, 0x00, 0x3a, 0x00, 0x22, 0x00, 0x6f, 0x00, 0x75, 0x00, 0x74, 0x00, 0x65, 0x00, 0x72, 0x00, 0x22, 0x00, 0x2c, 0x00, 0x22, 0x00, 0x62, 0x00, 0x6f, 0x00, 0x75, 0x00, 0x6e, 0x00, 0x64, 0x00, 0x61, 0x00, 0x72, 0x00, 0x79, 0x00, 0x22, 0x00, 0x3a, 0x00, 0x22, 0x00, 0x70, 0x00, 0x72, 0x00, 0x69, 0x00, 0x76, 0x00, 0x61, 0x00, 0x74, 0x00, 0x65, 0x00, 0x2d, 0x00, 0x64, 0x00, 0x65, 0x00, 0x61, 0x00, 0x64, 0x00, 0x6c, 0x00, 0x69, 0x00, 0x6e, 0x00, 0x65, 0x00, 0x22, 0x00, 0x2c, 0x00, 0x22, 0x00, 0x63, 0x00, 0x6f, 0x00, 0x6d, 0x00, 0x6d, 0x00, 0x61, 0x00, 0x6e, 0x00, 0x64, 0x00, 0x22, 0x00, 0x3a, 0x00, 0x22, 0x00, 0x68, 0x00, 0x65, 0x00, 0x61, 0x00, 0x72, 0x00, 0x74, 0x00, 0x62, 0x00, 0x65, 0x00, 0x61, 0x00, 0x74, 0x00, 0x22, 0x00, 0x2c, 0x00, 0x22, 0x00, 0x63, 0x00, 0x6c, 0x00, 0x69, 0x00, 0x22, 0x00, 0x3a, 0x00, 0x22, 0x00, 0x6e, 0x00, 0x6f, 0x00, 0x6e, 0x00, 0x65, 0x00, 0x22, 0x00, 0x2c, 0x00, 0x22, 0x00, 0x73, 0x00, 0x74, 0x00, 0x6f, 0x00, 0x70, 0x00, 0x70, 0x00, 0x69, 0x00, 0x6e, 0x00, 0x67, 0x00, 0x22, 0x00, 0x3a, 0x00, 0x66, 0x00, 0x61, 0x00, 0x6c, 0x00, 0x73, 0x00, 0x65, 0x00, 0x2c, 0x00, 0x22, 0x00, 0x67, 0x00, 0x61, 0x00, 0x74, 0x00, 0x65, 0x00, 0x48, 0x00, 0x65, 0x00, 0x6c, 0x00, 0x64, 0x00, 0x22, 0x00, 0x3a, 0x00, 0x74, 0x00, 0x72, 0x00, 0x75, 0x00, 0x65, 0x00, 0x2c, 0x00, 0x22, 0x00, 0x64, 0x00, 0x65, 0x00, 0x61, 0x00, 0x64, 0x00, 0x6c, 0x00, 0x69, 0x00, 0x6e, 0x00, 0x65, 0x00, 0x41, 0x00, 0x72, 0x00, 0x6d, 0x00, 0x65, 0x00, 0x64, 0x00, 0x22, 0x00, 0x3a, 0x00, 0x74, 0x00, 0x72, 0x00, 0x75, 0x00, 0x65, 0x00, 0x2c, 0x00, 0x22, 0x00, 0x66, 0x00, 0x65, 0x00, 0x6e, 0x00, 0x63, 0x00, 0x65, 0x00, 0x22, 0x00, 0x3a, 0x00, 0x22, 0x00, 0x72, 0x00, 0x65, 0x00, 0x63, 0x00, 0x6f, 0x00, 0x76, 0x00, 0x65, 0x00, 0x72, 0x00, 0x65, 0x00, 0x64, 0x00, 0x22, 0x00, 0x2c, 0x00, 0x22, 0x00, 0x65, 0x00, 0x78, 0x00, 0x69, 0x00, 0x74, 0x00, 0x22, 0x00, 0x3a, 0x00, 0x22, 0x00, 0x69, 0x00, 0x6e, 0x00, 0x6e, 0x00, 0x65, 0x00, 0x72, 0x00, 0x2d, 0x00, 0x66, 0x00, 0x61, 0x00, 0x69, 0x00, 0x6c, 0x00, 0x65, 0x00, 0x64, 0x00, 0x22, 0x00, 0x7d, 0x00]), // utf16le-no-bom
++			Data([0x00, 0x7b, 0x00, 0x22, 0x00, 0x73, 0x00, 0x63, 0x00, 0x68, 0x00, 0x65, 0x00, 0x6d, 0x00, 0x61, 0x00, 0x22, 0x00, 0x3a, 0x00, 0x31, 0x00, 0x2c, 0x00, 0x22, 0x00, 0x72, 0x00, 0x6f, 0x00, 0x6c, 0x00, 0x65, 0x00, 0x22, 0x00, 0x3a, 0x00, 0x22, 0x00, 0x6f, 0x00, 0x75, 0x00, 0x74, 0x00, 0x65, 0x00, 0x72, 0x00, 0x22, 0x00, 0x2c, 0x00, 0x22, 0x00, 0x62, 0x00, 0x6f, 0x00, 0x75, 0x00, 0x6e, 0x00, 0x64, 0x00, 0x61, 0x00, 0x72, 0x00, 0x79, 0x00, 0x22, 0x00, 0x3a, 0x00, 0x22, 0x00, 0x70, 0x00, 0x72, 0x00, 0x69, 0x00, 0x76, 0x00, 0x61, 0x00, 0x74, 0x00, 0x65, 0x00, 0x2d, 0x00, 0x64, 0x00, 0x65, 0x00, 0x61, 0x00, 0x64, 0x00, 0x6c, 0x00, 0x69, 0x00, 0x6e, 0x00, 0x65, 0x00, 0x22, 0x00, 0x2c, 0x00, 0x22, 0x00, 0x63, 0x00, 0x6f, 0x00, 0x6d, 0x00, 0x6d, 0x00, 0x61, 0x00, 0x6e, 0x00, 0x64, 0x00, 0x22, 0x00, 0x3a, 0x00, 0x22, 0x00, 0x68, 0x00, 0x65, 0x00, 0x61, 0x00, 0x72, 0x00, 0x74, 0x00, 0x62, 0x00, 0x65, 0x00, 0x61, 0x00, 0x74, 0x00, 0x22, 0x00, 0x2c, 0x00, 0x22, 0x00, 0x63, 0x00, 0x6c, 0x00, 0x69, 0x00, 0x22, 0x00, 0x3a, 0x00, 0x22, 0x00, 0x6e, 0x00, 0x6f, 0x00, 0x6e, 0x00, 0x65, 0x00, 0x22, 0x00, 0x2c, 0x00, 0x22, 0x00, 0x73, 0x00, 0x74, 0x00, 0x6f, 0x00, 0x70, 0x00, 0x70, 0x00, 0x69, 0x00, 0x6e, 0x00, 0x67, 0x00, 0x22, 0x00, 0x3a, 0x00, 0x66, 0x00, 0x61, 0x00, 0x6c, 0x00, 0x73, 0x00, 0x65, 0x00, 0x2c, 0x00, 0x22, 0x00, 0x67, 0x00, 0x61, 0x00, 0x74, 0x00, 0x65, 0x00, 0x48, 0x00, 0x65, 0x00, 0x6c, 0x00, 0x64, 0x00, 0x22, 0x00, 0x3a, 0x00, 0x74, 0x00, 0x72, 0x00, 0x75, 0x00, 0x65, 0x00, 0x2c, 0x00, 0x22, 0x00, 0x64, 0x00, 0x65, 0x00, 0x61, 0x00, 0x64, 0x00, 0x6c, 0x00, 0x69, 0x00, 0x6e, 0x00, 0x65, 0x00, 0x41, 0x00, 0x72, 0x00, 0x6d, 0x00, 0x65, 0x00, 0x64, 0x00, 0x22, 0x00, 0x3a, 0x00, 0x74, 0x00, 0x72, 0x00, 0x75, 0x00, 0x65, 0x00, 0x2c, 0x00, 0x22, 0x00, 0x66, 0x00, 0x65, 0x00, 0x6e, 0x00, 0x63, 0x00, 0x65, 0x00, 0x22, 0x00, 0x3a, 0x00, 0x22, 0x00, 0x72, 0x00, 0x65, 0x00, 0x63, 0x00, 0x6f, 0x00, 0x76, 0x00, 0x65, 0x00, 0x72, 0x00, 0x65, 0x00, 0x64, 0x00, 0x22, 0x00, 0x2c, 0x00, 0x22, 0x00, 0x65, 0x00, 0x78, 0x00, 0x69, 0x00, 0x74, 0x00, 0x22, 0x00, 0x3a, 0x00, 0x22, 0x00, 0x69, 0x00, 0x6e, 0x00, 0x6e, 0x00, 0x65, 0x00, 0x72, 0x00, 0x2d, 0x00, 0x66, 0x00, 0x61, 0x00, 0x69, 0x00, 0x6c, 0x00, 0x65, 0x00, 0x64, 0x00, 0x22, 0x00, 0x7d]), // utf16be-no-bom
++			Data([0xff, 0xfe, 0x7b, 0x00, 0x22, 0x00, 0x73, 0x00, 0x63, 0x00, 0x68, 0x00, 0x65, 0x00, 0x6d, 0x00, 0x61, 0x00, 0x22, 0x00, 0x3a, 0x00, 0x31, 0x00, 0x2c, 0x00, 0x22, 0x00, 0x72, 0x00, 0x6f, 0x00, 0x6c, 0x00, 0x65, 0x00, 0x22, 0x00, 0x3a, 0x00, 0x22, 0x00, 0x6f, 0x00, 0x75, 0x00, 0x74, 0x00, 0x65, 0x00, 0x72, 0x00, 0x22, 0x00, 0x2c, 0x00, 0x22, 0x00, 0x62, 0x00, 0x6f, 0x00, 0x75, 0x00, 0x6e, 0x00, 0x64, 0x00, 0x61, 0x00, 0x72, 0x00, 0x79, 0x00, 0x22, 0x00, 0x3a, 0x00, 0x22, 0x00, 0x70, 0x00, 0x72, 0x00, 0x69, 0x00, 0x76, 0x00, 0x61, 0x00, 0x74, 0x00, 0x65, 0x00, 0x2d, 0x00, 0x64, 0x00, 0x65, 0x00, 0x61, 0x00, 0x64, 0x00, 0x6c, 0x00, 0x69, 0x00, 0x6e, 0x00, 0x65, 0x00, 0x22, 0x00, 0x2c, 0x00, 0x22, 0x00, 0x63, 0x00, 0x6f, 0x00, 0x6d, 0x00, 0x6d, 0x00, 0x61, 0x00, 0x6e, 0x00, 0x64, 0x00, 0x22, 0x00, 0x3a, 0x00, 0x22, 0x00, 0x68, 0x00, 0x65, 0x00, 0x61, 0x00, 0x72, 0x00, 0x74, 0x00, 0x62, 0x00, 0x65, 0x00, 0x61, 0x00, 0x74, 0x00, 0x22, 0x00, 0x2c, 0x00, 0x22, 0x00, 0x63, 0x00, 0x6c, 0x00, 0x69, 0x00, 0x22, 0x00, 0x3a, 0x00, 0x22, 0x00, 0x6e, 0x00, 0x6f, 0x00, 0x6e, 0x00, 0x65, 0x00, 0x22, 0x00, 0x2c, 0x00, 0x22, 0x00, 0x73, 0x00, 0x74, 0x00, 0x6f, 0x00, 0x70, 0x00, 0x70, 0x00, 0x69, 0x00, 0x6e, 0x00, 0x67, 0x00, 0x22, 0x00, 0x3a, 0x00, 0x66, 0x00, 0x61, 0x00, 0x6c, 0x00, 0x73, 0x00, 0x65, 0x00, 0x2c, 0x00, 0x22, 0x00, 0x67, 0x00, 0x61, 0x00, 0x74, 0x00, 0x65, 0x00, 0x48, 0x00, 0x65, 0x00, 0x6c, 0x00, 0x64, 0x00, 0x22, 0x00, 0x3a, 0x00, 0x74, 0x00, 0x72, 0x00, 0x75, 0x00, 0x65, 0x00, 0x2c, 0x00, 0x22, 0x00, 0x64, 0x00, 0x65, 0x00, 0x61, 0x00, 0x64, 0x00, 0x6c, 0x00, 0x69, 0x00, 0x6e, 0x00, 0x65, 0x00, 0x41, 0x00, 0x72, 0x00, 0x6d, 0x00, 0x65, 0x00, 0x64, 0x00, 0x22, 0x00, 0x3a, 0x00, 0x74, 0x00, 0x72, 0x00, 0x75, 0x00, 0x65, 0x00, 0x2c, 0x00, 0x22, 0x00, 0x66, 0x00, 0x65, 0x00, 0x6e, 0x00, 0x63, 0x00, 0x65, 0x00, 0x22, 0x00, 0x3a, 0x00, 0x22, 0x00, 0x72, 0x00, 0x65, 0x00, 0x63, 0x00, 0x6f, 0x00, 0x76, 0x00, 0x65, 0x00, 0x72, 0x00, 0x65, 0x00, 0x64, 0x00, 0x22, 0x00, 0x2c, 0x00, 0x22, 0x00, 0x65, 0x00, 0x78, 0x00, 0x69, 0x00, 0x74, 0x00, 0x22, 0x00, 0x3a, 0x00, 0x22, 0x00, 0x69, 0x00, 0x6e, 0x00, 0x6e, 0x00, 0x65, 0x00, 0x72, 0x00, 0x2d, 0x00, 0x66, 0x00, 0x61, 0x00, 0x69, 0x00, 0x6c, 0x00, 0x65, 0x00, 0x64, 0x00, 0x22, 0x00, 0x7d, 0x00]), // utf16le-bom
++			Data([0xfe, 0xff, 0x00, 0x7b, 0x00, 0x22, 0x00, 0x73, 0x00, 0x63, 0x00, 0x68, 0x00, 0x65, 0x00, 0x6d, 0x00, 0x61, 0x00, 0x22, 0x00, 0x3a, 0x00, 0x31, 0x00, 0x2c, 0x00, 0x22, 0x00, 0x72, 0x00, 0x6f, 0x00, 0x6c, 0x00, 0x65, 0x00, 0x22, 0x00, 0x3a, 0x00, 0x22, 0x00, 0x6f, 0x00, 0x75, 0x00, 0x74, 0x00, 0x65, 0x00, 0x72, 0x00, 0x22, 0x00, 0x2c, 0x00, 0x22, 0x00, 0x62, 0x00, 0x6f, 0x00, 0x75, 0x00, 0x6e, 0x00, 0x64, 0x00, 0x61, 0x00, 0x72, 0x00, 0x79, 0x00, 0x22, 0x00, 0x3a, 0x00, 0x22, 0x00, 0x70, 0x00, 0x72, 0x00, 0x69, 0x00, 0x76, 0x00, 0x61, 0x00, 0x74, 0x00, 0x65, 0x00, 0x2d, 0x00, 0x64, 0x00, 0x65, 0x00, 0x61, 0x00, 0x64, 0x00, 0x6c, 0x00, 0x69, 0x00, 0x6e, 0x00, 0x65, 0x00, 0x22, 0x00, 0x2c, 0x00, 0x22, 0x00, 0x63, 0x00, 0x6f, 0x00, 0x6d, 0x00, 0x6d, 0x00, 0x61, 0x00, 0x6e, 0x00, 0x64, 0x00, 0x22, 0x00, 0x3a, 0x00, 0x22, 0x00, 0x68, 0x00, 0x65, 0x00, 0x61, 0x00, 0x72, 0x00, 0x74, 0x00, 0x62, 0x00, 0x65, 0x00, 0x61, 0x00, 0x74, 0x00, 0x22, 0x00, 0x2c, 0x00, 0x22, 0x00, 0x63, 0x00, 0x6c, 0x00, 0x69, 0x00, 0x22, 0x00, 0x3a, 0x00, 0x22, 0x00, 0x6e, 0x00, 0x6f, 0x00, 0x6e, 0x00, 0x65, 0x00, 0x22, 0x00, 0x2c, 0x00, 0x22, 0x00, 0x73, 0x00, 0x74, 0x00, 0x6f, 0x00, 0x70, 0x00, 0x70, 0x00, 0x69, 0x00, 0x6e, 0x00, 0x67, 0x00, 0x22, 0x00, 0x3a, 0x00, 0x66, 0x00, 0x61, 0x00, 0x6c, 0x00, 0x73, 0x00, 0x65, 0x00, 0x2c, 0x00, 0x22, 0x00, 0x67, 0x00, 0x61, 0x00, 0x74, 0x00, 0x65, 0x00, 0x48, 0x00, 0x65, 0x00, 0x6c, 0x00, 0x64, 0x00, 0x22, 0x00, 0x3a, 0x00, 0x74, 0x00, 0x72, 0x00, 0x75, 0x00, 0x65, 0x00, 0x2c, 0x00, 0x22, 0x00, 0x64, 0x00, 0x65, 0x00, 0x61, 0x00, 0x64, 0x00, 0x6c, 0x00, 0x69, 0x00, 0x6e, 0x00, 0x65, 0x00, 0x41, 0x00, 0x72, 0x00, 0x6d, 0x00, 0x65, 0x00, 0x64, 0x00, 0x22, 0x00, 0x3a, 0x00, 0x74, 0x00, 0x72, 0x00, 0x75, 0x00, 0x65, 0x00, 0x2c, 0x00, 0x22, 0x00, 0x66, 0x00, 0x65, 0x00, 0x6e, 0x00, 0x63, 0x00, 0x65, 0x00, 0x22, 0x00, 0x3a, 0x00, 0x22, 0x00, 0x72, 0x00, 0x65, 0x00, 0x63, 0x00, 0x6f, 0x00, 0x76, 0x00, 0x65, 0x00, 0x72, 0x00, 0x65, 0x00, 0x64, 0x00, 0x22, 0x00, 0x2c, 0x00, 0x22, 0x00, 0x65, 0x00, 0x78, 0x00, 0x69, 0x00, 0x74, 0x00, 0x22, 0x00, 0x3a, 0x00, 0x22, 0x00, 0x69, 0x00, 0x6e, 0x00, 0x6e, 0x00, 0x65, 0x00, 0x72, 0x00, 0x2d, 0x00, 0x66, 0x00, 0x61, 0x00, 0x69, 0x00, 0x6c, 0x00, 0x65, 0x00, 0x64, 0x00, 0x22, 0x00, 0x7d]), // utf16be-bom
++			Data([0xef, 0xbb, 0xbf, 0x7b, 0x22, 0x73, 0x63, 0x68, 0x65, 0x6d, 0x61, 0x22, 0x3a, 0x31, 0x2c, 0x22, 0x72, 0x6f, 0x6c, 0x65, 0x22, 0x3a, 0x22, 0x6f, 0x75, 0x74, 0x65, 0x72, 0x22, 0x2c, 0x22, 0x62, 0x6f, 0x75, 0x6e, 0x64, 0x61, 0x72, 0x79, 0x22, 0x3a, 0x22, 0x70, 0x72, 0x69, 0x76, 0x61, 0x74, 0x65, 0x2d, 0x64, 0x65, 0x61, 0x64, 0x6c, 0x69, 0x6e, 0x65, 0x22, 0x2c, 0x22, 0x63, 0x6f, 0x6d, 0x6d, 0x61, 0x6e, 0x64, 0x22, 0x3a, 0x22, 0x68, 0x65, 0x61, 0x72, 0x74, 0x62, 0x65, 0x61, 0x74, 0x22, 0x2c, 0x22, 0x63, 0x6c, 0x69, 0x22, 0x3a, 0x22, 0x6e, 0x6f, 0x6e, 0x65, 0x22, 0x2c, 0x22, 0x73, 0x74, 0x6f, 0x70, 0x70, 0x69, 0x6e, 0x67, 0x22, 0x3a, 0x66, 0x61, 0x6c, 0x73, 0x65, 0x2c, 0x22, 0x67, 0x61, 0x74, 0x65, 0x48, 0x65, 0x6c, 0x64, 0x22, 0x3a, 0x74, 0x72, 0x75, 0x65, 0x2c, 0x22, 0x64, 0x65, 0x61, 0x64, 0x6c, 0x69, 0x6e, 0x65, 0x41, 0x72, 0x6d, 0x65, 0x64, 0x22, 0x3a, 0x74, 0x72, 0x75, 0x65, 0x2c, 0x22, 0x66, 0x65, 0x6e, 0x63, 0x65, 0x22, 0x3a, 0x22, 0x72, 0x65, 0x63, 0x6f, 0x76, 0x65, 0x72, 0x65, 0x64, 0x22, 0x2c, 0x22, 0x65, 0x78, 0x69, 0x74, 0x22, 0x3a, 0x22, 0x69, 0x6e, 0x6e, 0x65, 0x72, 0x2d, 0x66, 0x61, 0x69, 0x6c, 0x65, 0x64, 0x22, 0x7d]), // utf8-bom
++			Data([0x7b, 0x22, 0x73, 0x63, 0x68, 0x65, 0x6d, 0x61, 0x22, 0x3a, 0x31, 0x2c, 0x22, 0x72, 0x6f, 0x6c, 0x65, 0x22, 0x3a, 0x22, 0x6f, 0x75, 0x74, 0x65, 0x72, 0x22, 0x2c, 0x22, 0x62, 0x6f, 0x75, 0x6e, 0x64, 0x61, 0x72, 0x79, 0x22, 0x3a, 0x22, 0x70, 0x72, 0x69, 0x76, 0x61, 0x74, 0x65, 0x2d, 0x64, 0x65, 0x61, 0x64, 0x6c, 0x69, 0x6e, 0x65, 0x22, 0x2c, 0x22, 0x63, 0x6f, 0x6d, 0x6d, 0x61, 0x6e, 0x64, 0x22, 0x3a, 0x22, 0x68, 0x65, 0x61, 0x72, 0x74, 0x62, 0x65, 0x61, 0x74, 0x22, 0x2c, 0x22, 0x63, 0x6c, 0x69, 0x22, 0x3a, 0x22, 0x6e, 0x6f, 0x6e, 0x65, 0x22, 0x2c, 0x22, 0x73, 0x74, 0x6f, 0x70, 0x70, 0x69, 0x6e, 0x67, 0x22, 0x3a, 0x66, 0x61, 0x6c, 0x73, 0x65, 0x2c, 0x22, 0x67, 0x61, 0x74, 0x65, 0x48, 0x65, 0x6c, 0x64, 0x22, 0x3a, 0x74, 0x72, 0x75, 0x65, 0x2c, 0x22, 0x64, 0x65, 0x61, 0x64, 0x6c, 0x69, 0x6e, 0x65, 0x41, 0x72, 0x6d, 0x65, 0x64, 0x22, 0x3a, 0x74, 0x72, 0x75, 0x65, 0x2c, 0x22, 0x66, 0x65, 0x6e, 0x63, 0x65, 0x22, 0x3a, 0x22, 0x72, 0x65, 0x63, 0x6f, 0x76, 0x65, 0x72, 0x65, 0x64, 0x22, 0x2c, 0x22, 0x65, 0x78, 0x69, 0x74, 0x22, 0x3a, 0x22, 0x69, 0x6e, 0x6e, 0x65, 0x72, 0x2d, 0x66, 0x61, 0x69, 0x6c, 0x65, 0x64, 0x22, 0x7d, 0x70, 0x72, 0x69, 0x76, 0x61, 0x74, 0x65, 0x2d, 0x73, 0x75, 0x66, 0x66, 0x69, 0x78]), // suffix
++		]
++		for data in vectors {
++			XCTAssertNil(LeaseTerminalExport.decode(data), "closed UTF8 export must reject input")
++		}
++	}
++}
++
++#if ERGOPTI_GUARDIAN_TEST_SUPPORT
++extension KarabinerLeaseWorkerTests {
++	private func withDiagnosticDirectory(_ body: (URL, URL) throws -> Void) throws {
++		let parent = FileManager.default.temporaryDirectory.resolvingSymlinksInPath()
++			.appendingPathComponent("lease-store-test-" + UUID().uuidString, isDirectory: true)
++		try FileManager.default.createDirectory(at: parent, withIntermediateDirectories: false,
++			attributes: [.posixPermissions: 0o700])
++		defer { try? FileManager.default.removeItem(at: parent) }
++		try body(parent, parent.appendingPathComponent("ergopti_plus", isDirectory: true))
++	}
++
++	private func diagnosticLiteral(_ role: LeaseTerminalRole = .outer) -> Data {
++		if role == .inner {
++			return Data(#"{"schema":1,"role":"inner","boundary":"outer-silent","command":"none","cli":"none","stopping":false,"gateHeld":false,"deadlineArmed":false,"fence":"exhausted","exit":"inner-failed"}"#.utf8)
++		}
++		return Data(#"{"schema":1,"role":"outer","boundary":"private-deadline","command":"heartbeat","cli":"none","stopping":false,"gateHeld":true,"deadlineArmed":true,"fence":"recovered","exit":"inner-failed"}"#.utf8)
++	}
++
++	private func createDiagnosticDirectory(_ directory: URL) throws {
++		try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: false,
++			attributes: [.posixPermissions: 0o700])
++	}
++
++	@discardableResult private func putDiagnostic(_ directory: URL, data: Data, role: String = "outer") throws -> URL {
++		let file = directory.appendingPathComponent("remap-lease-diagnostic-" + role + ".json")
++		try data.write(to: file)
++		XCTAssertEqual(Darwin.chmod(file.path, 0o600), 0)
++		return file
++	}
++
++	func testRetainedDiagnosticMissingDirectoryDoesNotCreate() throws {
++		try withDiagnosticDirectory { _, directory in
++			let observation = RemapLeaseDiagnosticStore(testingDirectory: directory).observe()
++			XCTAssertEqual(observation.state, .unobserved)
++			XCTAssertTrue(observation.records.isEmpty)
++			XCTAssertFalse(FileManager.default.fileExists(atPath: directory.path))
++		}
++	}
++
++	func testRetainedDiagnosticPrivateRecordsAndAtomicReplacement() throws {
++		try withDiagnosticDirectory { _, directory in
++			let store = RemapLeaseDiagnosticStore(testingDirectory: directory)
++			let inner = try XCTUnwrap(LeaseTerminalExport.decode(diagnosticLiteral(.inner)))
++			let outer = try XCTUnwrap(LeaseTerminalExport.decode(diagnosticLiteral()))
++			XCTAssertTrue(store.retain(outer))
++			XCTAssertTrue(store.retain(inner))
++			XCTAssertTrue(store.retain(outer))
++			let observation = store.observe()
++			XCTAssertEqual(observation.state, .observed)
++			XCTAssertEqual(observation.records, [inner, outer])
++			XCTAssertEqual(observation.retention, "historical")
++			XCTAssertEqual(observation.currentness, "unknown")
++			XCTAssertEqual(Set(try FileManager.default.contentsOfDirectory(atPath: directory.path)),
++				Set(["remap-lease-diagnostic-inner.json", "remap-lease-diagnostic-outer.json"]))
++			var metadata = stat()
++			XCTAssertEqual(Darwin.lstat(directory.appendingPathComponent("remap-lease-diagnostic-outer.json").path, &metadata), 0)
++			XCTAssertEqual(metadata.st_uid, geteuid())
++			XCTAssertEqual(metadata.st_mode & 0o7777, 0o600)
++			XCTAssertEqual(metadata.st_nlink, 1)
++		}
++	}
++
++	func testRetainedDiagnosticUnknownPIIFieldsNeverExport() throws {
++		try withDiagnosticDirectory { _, directory in
++			try createDiagnosticDirectory(directory)
++			let literal = #"{"schema":1,"role":"outer","boundary":"private-deadline","command":"heartbeat","cli":"none","stopping":false,"gateHeld":true,"deadlineArmed":true,"fence":"recovered","exit":"inner-failed","private":"/Users/synthetic/token=secret https://proxy.invalid"}"#
++			try putDiagnostic(directory, data: Data(literal.utf8))
++			let observation = RemapLeaseDiagnosticStore(testingDirectory: directory).observe()
++			XCTAssertEqual(observation.state, .unobserved)
++			XCTAssertTrue(observation.records.isEmpty)
++			let output = try XCTUnwrap(observation.encodedEnvelope())
++			XCTAssertFalse(String(decoding: output, as: UTF8.self).contains("synthetic"))
++			XCTAssertFalse(String(decoding: output, as: UTF8.self).contains("secret"))
++		}
++	}
++
++	func testRetainedDiagnosticWrongRoleFilenameRefused() throws {
++		try withDiagnosticDirectory { _, directory in
++			try createDiagnosticDirectory(directory)
++			try putDiagnostic(directory, data: diagnosticLiteral(.inner))
++			XCTAssertEqual(RemapLeaseDiagnosticStore(testingDirectory: directory).observe().state, .unobserved)
++		}
++	}
++
++	func testRetainedDiagnosticPublicRecordRefusedWithoutChmod() throws {
++		try withDiagnosticDirectory { _, directory in
++			try createDiagnosticDirectory(directory)
++			let file = try putDiagnostic(directory, data: diagnosticLiteral())
++			XCTAssertEqual(Darwin.chmod(file.path, 0o644), 0)
++			XCTAssertEqual(RemapLeaseDiagnosticStore(testingDirectory: directory).observe().state, .unobserved)
++			var metadata = stat()
++			XCTAssertEqual(Darwin.lstat(file.path, &metadata), 0)
++			XCTAssertEqual(metadata.st_mode & 0o7777, 0o644)
++		}
++	}
++
++	func testRetainedDiagnosticSymlinkRecordRefusedWithoutTargetMutation() throws {
++		try withDiagnosticDirectory { parent, directory in
++			try createDiagnosticDirectory(directory)
++			let target = parent.appendingPathComponent("target")
++			try diagnosticLiteral().write(to: target)
++			let file = directory.appendingPathComponent("remap-lease-diagnostic-outer.json")
++			XCTAssertEqual(Darwin.symlink(target.path, file.path), 0)
++			XCTAssertEqual(RemapLeaseDiagnosticStore(testingDirectory: directory).observe().state, .unobserved)
++			XCTAssertEqual(try Data(contentsOf: target), diagnosticLiteral())
++		}
++	}
++
++	func testRetainedDiagnosticHardlinkRecordRefusedWithoutMutation() throws {
++		try withDiagnosticDirectory { parent, directory in
++			try createDiagnosticDirectory(directory)
++			let file = try putDiagnostic(directory, data: diagnosticLiteral())
++			let alias = parent.appendingPathComponent("hardlink")
++			XCTAssertEqual(Darwin.link(file.path, alias.path), 0)
++			XCTAssertEqual(RemapLeaseDiagnosticStore(testingDirectory: directory).observe().state, .unobserved)
++			var metadata = stat()
++			XCTAssertEqual(Darwin.lstat(file.path, &metadata), 0)
++			XCTAssertEqual(metadata.st_nlink, 2)
++			XCTAssertEqual(try Data(contentsOf: alias), diagnosticLiteral())
++		}
++	}
++
++	func testRetainedDiagnosticFIFORefusedBeforeContentRead() throws {
++		try withDiagnosticDirectory { _, directory in
++			try createDiagnosticDirectory(directory)
++			let file = directory.appendingPathComponent("remap-lease-diagnostic-outer.json")
++			XCTAssertEqual(Darwin.mkfifo(file.path, 0o600), 0)
++			var reads = 0
++			let store = RemapLeaseDiagnosticStore(testingDirectory: directory, afterSingleRead: { _ in reads += 1 })
++			XCTAssertEqual(store.observe().state, .unobserved)
++			XCTAssertEqual(reads, 0)
++		}
++	}
++
++	func testRetainedDiagnosticOversizeRefusedBeforeContentRead() throws {
++		try withDiagnosticDirectory { _, directory in
++			try createDiagnosticDirectory(directory)
++			try putDiagnostic(directory, data: Data(repeating: 0x20, count: 513))
++			var reads = 0
++			let store = RemapLeaseDiagnosticStore(testingDirectory: directory, afterSingleRead: { _ in reads += 1 })
++			XCTAssertEqual(store.observe().state, .unobserved)
++			XCTAssertEqual(reads, 0)
++		}
++	}
++
++	func testRetainedDiagnosticFileReplacementAfterCapturedReadRefused() throws {
++		try withDiagnosticDirectory { parent, directory in
++			try createDiagnosticDirectory(directory)
++			let file = try putDiagnostic(directory, data: diagnosticLiteral())
++			var reads = 0
++			let store = RemapLeaseDiagnosticStore(testingDirectory: directory, afterSingleRead: { _ in
++				reads += 1
++				XCTAssertEqual(Darwin.rename(file.path, parent.appendingPathComponent("old-record").path), 0)
++				do {
++					try self.putDiagnostic(directory, data: self.diagnosticLiteral())
++				} catch {
++					XCTFail("Owned diagnostic record replacement fixture failed.")
++				}
++			})
++			XCTAssertEqual(store.observe().state, .unobserved)
++			XCTAssertEqual(reads, 1)
++		}
++	}
++
++	func testRetainedDiagnosticDirectoryReplacementAfterCapturedReadRefused() throws {
++		try withDiagnosticDirectory { parent, directory in
++			try createDiagnosticDirectory(directory)
++			try putDiagnostic(directory, data: diagnosticLiteral())
++			var reads = 0
++			let store = RemapLeaseDiagnosticStore(testingDirectory: directory, afterSingleRead: { _ in
++				reads += 1
++				XCTAssertEqual(Darwin.rename(directory.path, parent.appendingPathComponent("old-directory").path), 0)
++				do {
++					try self.createDiagnosticDirectory(directory)
++				} catch {
++					XCTFail("Owned diagnostic directory replacement fixture failed.")
++				}
++				do {
++					try self.putDiagnostic(directory, data: self.diagnosticLiteral())
++				} catch {
++					XCTFail("Owned diagnostic record replacement fixture failed.")
++				}
++			})
++			XCTAssertEqual(store.observe().state, .unobserved)
++			XCTAssertEqual(reads, 1)
++		}
++	}
++
++	func testRetainedDiagnosticLateAncestorAliasRefused() throws {
++		try withDiagnosticDirectory { parent, directory in
++			try createDiagnosticDirectory(directory)
++			try putDiagnostic(directory, data: diagnosticLiteral())
++			let parked = parent.appendingPathComponent("old-directory")
++			var reads = 0
++			let store = RemapLeaseDiagnosticStore(testingDirectory: directory, afterSingleRead: { _ in
++				reads += 1
++				XCTAssertEqual(Darwin.rename(directory.path, parked.path), 0)
++				XCTAssertEqual(Darwin.symlink(parked.path, directory.path), 0)
++			})
++			XCTAssertEqual(store.observe().state, .unobserved)
++			XCTAssertEqual(reads, 1)
++		}
++	}
++
++	func testRetainedDiagnosticInitialDirectoryAliasRefused() throws {
++		try withDiagnosticDirectory { parent, directory in
++			let target = parent.appendingPathComponent("private-target")
++			try createDiagnosticDirectory(target)
++			try putDiagnostic(target, data: diagnosticLiteral())
++			XCTAssertEqual(Darwin.symlink(target.path, directory.path), 0)
++			XCTAssertEqual(RemapLeaseDiagnosticStore(testingDirectory: directory).observe().state, .unobserved)
++			XCTAssertEqual(try Data(contentsOf: target.appendingPathComponent("remap-lease-diagnostic-outer.json")), diagnosticLiteral())
++		}
++	}
++
++	func testRetainedDiagnosticWriterRefusesUnownedShapeWithoutMutation() throws {
++		try withDiagnosticDirectory { _, directory in
++			try createDiagnosticDirectory(directory)
++			let file = try putDiagnostic(directory, data: diagnosticLiteral())
++			XCTAssertEqual(Darwin.chmod(file.path, 0o644), 0)
++			let record = try XCTUnwrap(LeaseTerminalExport.decode(diagnosticLiteral(.inner)))
++			let outer = try XCTUnwrap(LeaseTerminalExport.decode(diagnosticLiteral()))
++			XCTAssertFalse(RemapLeaseDiagnosticStore(testingDirectory: directory).retain(outer))
++			XCTAssertEqual(try Data(contentsOf: file), diagnosticLiteral())
++			XCTAssertTrue(RemapLeaseDiagnosticStore(testingDirectory: directory).retain(record))
++		}
++	}
++
++	func testRetainedDiagnosticDispatcherRejectsPathOverrideBeforeBootstrap() {
++		XCTAssertTrue(KarabinerLeaseWorker.handles(arguments: ["launcher", "--remap-lease-diagnostic-snapshot"]))
++		XCTAssertEqual(KarabinerLeaseWorker.run(arguments: ["launcher", "--remap-lease-diagnostic-snapshot", "/Users/synthetic/private"]), LeaseWorkerExit.invalidArguments.rawValue)
++	}
++
++	func testRetainedDiagnosticEnvelopeClosedMetadataAndBound() throws {
++		let empty = LeaseDiagnosticEnvelope(state: .unobserved, records: [])
++		let data = try XCTUnwrap(empty.encodedEnvelope())
++		let object = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])
++		XCTAssertEqual(Set(object.keys), Set(["schema", "state", "retention", "currentness", "records"]))
++		XCTAssertEqual(object["state"] as? String, "unobserved")
++		XCTAssertEqual(object["retention"] as? String, "historical")
++		XCTAssertEqual(object["currentness"] as? String, "unknown")
++		XCTAssertLessThanOrEqual(data.count, 2048)
++		let outer = try XCTUnwrap(LeaseTerminalExport.decode(diagnosticLiteral()))
++		let inner = try XCTUnwrap(LeaseTerminalExport.decode(diagnosticLiteral(.inner)))
++		XCTAssertNil(LeaseDiagnosticEnvelope(state: .observed, records: []).encodedEnvelope())
++		XCTAssertNil(LeaseDiagnosticEnvelope(state: .unobserved, records: [outer]).encodedEnvelope())
++		XCTAssertNil(LeaseDiagnosticEnvelope(state: .observed, records: [outer, outer]).encodedEnvelope())
++		XCTAssertNil(LeaseDiagnosticEnvelope(state: .observed, records: [outer, inner]).encodedEnvelope())
++		XCTAssertNotNil(LeaseDiagnosticEnvelope(state: .observed, records: [inner, outer]).encodedEnvelope())
++	}
++}
++#endif
++
++#if ERGOPTI_GUARDIAN_TEST_SUPPORT
++extension KarabinerLeaseWorkerTests {
++	func testRetainedDiagnosticTrueParentAliasPreservingLeafInodesRefused() throws {
++		try withDiagnosticDirectory { parent, directory in
++			try createDiagnosticDirectory(directory)
++			let file = try putDiagnostic(directory, data: diagnosticLiteral())
++			let parked = parent.deletingLastPathComponent()
++				.appendingPathComponent(parent.lastPathComponent + "-parked", isDirectory: true)
++			defer { try? FileManager.default.removeItem(at: parked) }
++			var originalDirectory = stat(), originalRecord = stat()
++			XCTAssertEqual(Darwin.lstat(directory.path, &originalDirectory), 0)
++			XCTAssertEqual(Darwin.lstat(file.path, &originalRecord), 0)
++			var reads = 0
++			let store = RemapLeaseDiagnosticStore(testingDirectory: directory, afterSingleRead: { role in
++				XCTAssertEqual(role, .outer)
++				reads += 1
++				XCTAssertEqual(Darwin.rename(parent.path, parked.path), 0)
++				XCTAssertEqual(Darwin.symlink(parked.path, parent.path), 0)
++				var aliasedDirectory = stat(), aliasedRecord = stat(), alias = stat()
++				XCTAssertEqual(Darwin.lstat(parent.path, &alias), 0)
++				XCTAssertEqual(alias.st_mode & S_IFMT, S_IFLNK)
++				XCTAssertEqual(Darwin.lstat(directory.path, &aliasedDirectory), 0)
++				XCTAssertEqual(Darwin.lstat(file.path, &aliasedRecord), 0)
++				XCTAssertEqual(aliasedDirectory.st_dev, originalDirectory.st_dev)
++				XCTAssertEqual(aliasedDirectory.st_ino, originalDirectory.st_ino)
++				XCTAssertEqual(aliasedDirectory.st_mode, originalDirectory.st_mode)
++				XCTAssertEqual(aliasedRecord.st_dev, originalRecord.st_dev)
++				XCTAssertEqual(aliasedRecord.st_ino, originalRecord.st_ino)
++				XCTAssertEqual(aliasedRecord.st_mode, originalRecord.st_mode)
++				XCTAssertEqual(aliasedRecord.st_size, originalRecord.st_size)
++			})
++			let observation = store.observe()
++			XCTAssertEqual(reads, 1)
++			XCTAssertEqual(observation.state, .unobserved)
++			XCTAssertTrue(observation.records.isEmpty)
++		}
++	}
++}
++#endif
+diff --git a/static/ergopti_plus/macos/launcher/Tests/ErgoptiPlusTests/LeaseDiagnosticNextObservationTests.swift b/static/ergopti_plus/macos/launcher/Tests/ErgoptiPlusTests/LeaseDiagnosticNextObservationTests.swift
+new file mode 100644
+--- /dev/null
++++ b/static/ergopti_plus/macos/launcher/Tests/ErgoptiPlusTests/LeaseDiagnosticNextObservationTests.swift
+@@ -0,0 +1,430 @@
++import Darwin
++import Foundation
++import XCTest
++@testable import ErgoptiPlus
++
++/// Actual private filesystem controls with an injected scheduling clock; native execution is required.
++final class LeaseDiagnosticNextObservationTests: XCTestCase {
++	private let inner = #"{"schema":1,"role":"inner","boundary":"outer-silent","command":"none","cli":"none","stopping":false,"gateHeld":false,"deadlineArmed":false,"fence":"exhausted","exit":"inner-failed"}"#
++	private let outer_failure = #"{"schema":1,"role":"outer","boundary":"private-deadline","command":"heartbeat","cli":"none","stopping":false,"gateHeld":true,"deadlineArmed":true,"fence":"recovered","exit":"inner-failed"}"#
++	private let outer_recovery = #"{"schema":1,"role":"outer","boundary":"private-deadline","command":"heartbeat","cli":"none","stopping":true,"gateHeld":false,"deadlineArmed":false,"fence":"recovered","exit":"success"}"#
++
++	private func record(_ text: String) throws -> LeaseTerminalExport {
++		try XCTUnwrap(LeaseTerminalExport.decode(Data(text.utf8)))
++	}
++
++	private func fixture(_ body: (URL) throws -> Void) throws {
++		let directory = FileManager.default.temporaryDirectory.resolvingSymlinksInPath()
++			.appendingPathComponent("lease-next-" + UUID().uuidString, isDirectory: true)
++		try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: false,
++			attributes: [.posixPermissions: NSNumber(value: 0o700)])
++		defer { try? FileManager.default.removeItem(at: directory) }
++		try body(directory)
++	}
++
++	private func file(_ directory: URL, _ role: String = "outer") -> URL {
++		directory.appendingPathComponent("remap-lease-diagnostic-" + role + ".json")
++	}
++
++	private func put(_ data: Data, at url: URL, mode: mode_t = 0o600) throws {
++		let descriptor = Darwin.open(url.path, O_WRONLY | O_CREAT | O_TRUNC | O_NOFOLLOW | O_NONBLOCK, mode)
++		XCTAssertGreaterThanOrEqual(descriptor, 0)
++		guard descriptor >= 0 else { return }
++		defer { XCTAssertEqual(Darwin.close(descriptor), 0) }
++		XCTAssertEqual(Darwin.fchmod(descriptor, mode), 0)
++		XCTAssertEqual(data.withUnsafeBytes { Darwin.write(descriptor, $0.baseAddress!, $0.count) }, data.count)
++		XCTAssertEqual(Darwin.fsync(descriptor), 0)
++	}
++
++	private func identity(_ url: URL) throws -> stat {
++		var value = stat()
++		XCTAssertEqual(Darwin.lstat(url.path, &value), 0)
++		return value
++	}
++
++	private func timeoutFrames(_ store: RemapLeaseDiagnosticStore,
++		armed: (() -> Void)? = nil, sleepAction: (() -> Void)? = nil) -> [LeaseDiagnosticNextFrame] {
++		var now: TimeInterval = 0
++		var frames: [LeaseDiagnosticNextFrame] = []
++		XCTAssertTrue(store.observeNext(emit: { frame in
++			frames.append(frame)
++			if frame.phase == .armed { armed?() }
++			return true
++		}, uptime: { now }, sleep: { _ in sleepAction?(); now = 30 }))
++		return frames
++	}
++
++	func testUnchangedOneAndTwoRolesNeverBecomeNew() throws {
++		for both in [false, true] {
++			try fixture { directory in
++				try put(Data(outer_failure.utf8), at: file(directory))
++				if both { try put(Data(inner.utf8), at: file(directory, "inner")) }
++				let frames = timeoutFrames(RemapLeaseDiagnosticStore(testingDirectory: directory))
++				XCTAssertEqual(frames.map { $0.phase }, [.armed, .unobserved])
++				XCTAssertTrue(frames.allSatisfy { $0.records.isEmpty })
++			}
++		}
++	}
++
++	func testChangedFieldsOnSameVnodeNeverBecomeNew() throws {
++		try fixture { directory in
++			try put(Data(outer_failure.utf8), at: file(directory))
++			let before = try identity(file(directory))
++			let frames = timeoutFrames(RemapLeaseDiagnosticStore(testingDirectory: directory), armed: {
++				do { try self.put(Data(self.outer_recovery.utf8), at: self.file(directory)) }
++				catch { XCTFail("Controlled in-place write failed") }
++			})
++			let after = try identity(file(directory))
++			XCTAssertEqual(before.st_ino, after.st_ino)
++			XCTAssertEqual(frames.map { $0.phase }, [.armed, .unobserved])
++		}
++	}
++
++	func testAtomicIdenticalPublicationChangesVnodeAndIsObserved() throws {
++		try fixture { directory in
++			try put(Data(outer_failure.utf8), at: file(directory))
++			let before = try identity(file(directory)), directoryBefore = try identity(directory)
++			let value = try record(outer_failure)
++			let store = RemapLeaseDiagnosticStore(testingDirectory: directory)
++			let frames = timeoutFrames(store, armed: {
++				XCTAssertTrue(store.retain(value))
++				do { try FileManager.default.setAttributes(
++					[.modificationDate: Date(timeIntervalSince1970: TimeInterval(directoryBefore.st_mtimespec.tv_sec) + 2)],
++					ofItemAtPath: directory.path) }
++				catch { XCTFail("Controlled directory metadata change failed") }
++			})
++			let after = try identity(file(directory)), directoryAfter = try identity(directory)
++			XCTAssertNotEqual(before.st_ino, after.st_ino)
++			XCTAssertTrue(directoryBefore.st_mtimespec.tv_nsec != directoryAfter.st_mtimespec.tv_nsec
++				|| directoryBefore.st_mtimespec.tv_sec != directoryAfter.st_mtimespec.tv_sec
++				|| directoryBefore.st_ctimespec.tv_nsec != directoryAfter.st_ctimespec.tv_nsec
++				|| directoryBefore.st_ctimespec.tv_sec != directoryAfter.st_ctimespec.tv_sec)
++			XCTAssertEqual(frames.map { $0.phase }, [.armed, .observed])
++			XCTAssertEqual(frames.last?.records.first?.encodedRecord(), value.encodedRecord())
++		}
++	}
++
++	func testAbsentRoleAndEmptyBaselinePermitOneNewRecord() throws {
++		for role in [LeaseTerminalRole.inner, .outer] {
++			try fixture { directory in
++				if role == .inner { try put(Data(outer_failure.utf8), at: file(directory)) }
++				let store = RemapLeaseDiagnosticStore(testingDirectory: directory)
++				let value = try record(role == .inner ? inner : outer_failure)
++				let frames = timeoutFrames(store, armed: { XCTAssertTrue(store.retain(value)) })
++				XCTAssertEqual(frames.map { $0.phase }, [.armed, .observed])
++				XCTAssertEqual(frames.last?.records.count, 1)
++				XCTAssertEqual(frames.last?.records.first?.role, role)
++			}
++		}
++	}
++
++	func testFirstTypedFailureIsNotReplacedDuringFinalEmission() throws {
++		try fixture { directory in
++			try put(Data(outer_recovery.utf8), at: file(directory))
++			let store = RemapLeaseDiagnosticStore(testingDirectory: directory)
++			let failure = try record(outer_failure), recovery = try record(outer_recovery), later = try record(inner)
++			var frames: [LeaseDiagnosticNextFrame] = []
++			var sleeps = 0
++			XCTAssertTrue(store.observeNext(emit: { frame in
++				frames.append(frame)
++				if frame.phase == .armed { XCTAssertTrue(store.retain(failure)) }
++				if frame.phase == .observed {
++					XCTAssertTrue(store.retain(recovery)); XCTAssertTrue(store.retain(later))
++				}
++				return true
++			}, uptime: { 0 }, sleep: { _ in sleeps += 1 }))
++			XCTAssertEqual(sleeps, 0)
++			XCTAssertEqual(frames.last?.records.first?.encodedRecord(), failure.encodedRecord())
++			XCTAssertEqual(frames.last?.records.count, 1)
++		}
++	}
++
++	func testBothNewRolesStillExportExactlyOneObservedRole() throws {
++		try fixture { directory in
++			let store = RemapLeaseDiagnosticStore(testingDirectory: directory)
++			let first = try record(inner), second = try record(outer_failure)
++			let frames = timeoutFrames(store, armed: {
++				XCTAssertTrue(store.retain(first)); XCTAssertTrue(store.retain(second))
++			})
++			XCTAssertEqual(frames.last?.phase, .observed)
++			XCTAssertEqual(frames.last?.records.count, 1)
++			XCTAssertEqual(frames.last?.scope, "first-observed-new-record")
++			XCTAssertEqual(frames.last?.currentness, "unknown")
++		}
++	}
++
++	func testInvalidBaselineRefusesArmingWithoutRepair() throws {
++		let inputs = [Data("{".utf8), Data((String(outer_failure.dropLast()) + ",\"token\":\"synthetic\"}").utf8),
++			Data(inner.utf8)]
++		for bytes in inputs {
++			try fixture { directory in
++				try put(bytes, at: file(directory))
++				let frames = timeoutFrames(RemapLeaseDiagnosticStore(testingDirectory: directory))
++				XCTAssertEqual(frames.map { $0.phase }, [.unobserved])
++				XCTAssertEqual(try Data(contentsOf: file(directory)), bytes)
++			}
++		}
++		for mode in [mode_t(0o644), mode_t(0o1600)] {
++			try fixture { directory in
++				try put(Data(outer_failure.utf8), at: file(directory), mode: mode)
++				let frames = timeoutFrames(RemapLeaseDiagnosticStore(testingDirectory: directory))
++				XCTAssertEqual(frames.map { $0.phase }, [.unobserved])
++				XCTAssertEqual(try identity(file(directory)).st_mode & 0o7777, mode)
++			}
++		}
++	}
++
++	func testInvalidNewRecordsNeverLatchAndLaterValidCanRecover() throws {
++		let inputs = [Data("{".utf8), Data([0xff]), Data((outer_failure + "suffix").utf8),
++			Data((String(outer_failure.dropLast()) + ",\"path\":\"synthetic\"}").utf8), Data(inner.utf8)]
++		for bytes in inputs {
++			try fixture { directory in
++				let store = RemapLeaseDiagnosticStore(testingDirectory: directory)
++				let frames = timeoutFrames(store, armed: {
++					do { try self.put(bytes, at: self.file(directory)) }
++					catch { XCTFail("Controlled invalid fixture write failed") }
++				})
++				XCTAssertEqual(frames.map { $0.phase }, [.armed, .unobserved])
++				XCTAssertEqual(try Data(contentsOf: file(directory)), bytes)
++			}
++		}
++		try fixture { directory in
++			let store = RemapLeaseDiagnosticStore(testingDirectory: directory)
++			let valid = try record(outer_failure)
++			var frames: [LeaseDiagnosticNextFrame] = [], now: TimeInterval = 0
++			XCTAssertTrue(store.observeNext(emit: { frame in
++				frames.append(frame)
++				if frame.phase == .armed {
++					do { try self.put(Data("{".utf8), at: self.file(directory)) }
++					catch { XCTFail("Controlled partial write failed") }
++				}
++				return true
++			}, uptime: { now }, sleep: { _ in XCTAssertTrue(store.retain(valid)); now = 0.05 }))
++			XCTAssertEqual(frames.map { $0.phase }, [.armed, .observed])
++		}
++	}
++
++	func testAliasedAndUnsupportedCandidatesAreNotReadOrRepaired() throws {
++		for kind in ["symlink", "hardlink", "fifo", "oversize", "mode"] {
++			try fixture { directory in
++				let target = directory.appendingPathComponent("fixture-target")
++				try put(Data(outer_failure.utf8), at: target)
++				var reads = 0
++				let store = RemapLeaseDiagnosticStore(testingDirectory: directory, afterSingleRead: { _ in reads += 1 })
++				let frames = timeoutFrames(store, armed: {
++					let name = self.file(directory).path
++					switch kind {
++					case "symlink": XCTAssertEqual(Darwin.symlink(target.path, name), 0)
++					case "hardlink": XCTAssertEqual(Darwin.link(target.path, name), 0)
++					case "fifo": XCTAssertEqual(Darwin.mkfifo(name, 0o600), 0)
++					default:
++						do { try self.put(kind == "oversize" ? Data(repeating: 65, count: 513) : Data(self.outer_failure.utf8),
++							at: self.file(directory), mode: kind == "mode" ? 0o644 : 0o600) }
++						catch { XCTFail("Controlled unsupported fixture write failed") }
++					}
++				})
++				XCTAssertEqual(frames.map { $0.phase }, [.armed, .unobserved])
++				XCTAssertEqual(reads, 0)
++				XCTAssertEqual(try Data(contentsOf: target), Data(outer_failure.utf8))
++			}
++		}
++	}
++
++	func testFileReplacementAfterReadRejectsThatCut() throws {
++		try fixture { directory in
++			let publisher = RemapLeaseDiagnosticStore(testingDirectory: directory)
++			let value = try record(outer_failure)
++			var armed = false, reads = 0
++			let store = RemapLeaseDiagnosticStore(testingDirectory: directory, afterSingleRead: { _ in
++				if armed { reads += 1; XCTAssertTrue(publisher.retain(value)) }
++			})
++			let frames = timeoutFrames(store, armed: { armed = true; XCTAssertTrue(publisher.retain(value)) })
++			XCTAssertEqual(reads, 1)
++			XCTAssertEqual(frames.map { $0.phase }, [.armed, .unobserved])
++		}
++	}
++
++	func testNamespaceReplacementAndAncestorAliasRefuseReadCut() throws {
++		for alias in [false, true] {
++			try fixture { parent in
++				let directory = parent.appendingPathComponent("records", isDirectory: true)
++				try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: false,
++					attributes: [.posixPermissions: NSNumber(value: 0o700)])
++				let parked = parent.appendingPathComponent("parked", isDirectory: true)
++				let publisher = RemapLeaseDiagnosticStore(testingDirectory: directory)
++				let value = try record(outer_failure)
++				var armed = false, reads = 0
++				let store = RemapLeaseDiagnosticStore(testingDirectory: directory, afterSingleRead: { _ in
++					guard armed else { return }; reads += 1
++					do {
++						try FileManager.default.moveItem(at: directory, to: parked)
++						if alias { try FileManager.default.createSymbolicLink(atPath: directory.path, withDestinationPath: parked.path) }
++						else { try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: false,
++							attributes: [.posixPermissions: NSNumber(value: 0o700)]) }
++					} catch { XCTFail("Controlled namespace replacement failed") }
++				})
++				let frames = timeoutFrames(store, armed: { armed = true; XCTAssertTrue(publisher.retain(value)) })
++				XCTAssertEqual(reads, 1)
++				XCTAssertEqual(frames.map { $0.phase }, [.armed, .unobserved])
++			}
++		}
++	}
++
++	func testArmedAndObservedOutputFailuresDoNotRetryOrResample() throws {
++		for phase in [LeaseDiagnosticNextPhase.armed, .observed] {
++			try fixture { directory in
++				try put(Data(outer_failure.utf8), at: file(directory))
++				let publisher = RemapLeaseDiagnosticStore(testingDirectory: directory)
++				let value = try record(outer_recovery)
++				var emissions = 0, reads = 0, sleeps = 0
++				let store = RemapLeaseDiagnosticStore(testingDirectory: directory, afterSingleRead: { _ in reads += 1 })
++				XCTAssertFalse(store.observeNext(emit: { frame in
++					emissions += 1
++					if frame.phase == .armed && phase == .observed { XCTAssertTrue(publisher.retain(value)) }
++					return frame.phase != phase
++				}, uptime: { 0 }, sleep: { _ in sleeps += 1 }))
++				XCTAssertEqual(emissions, phase == .armed ? 1 : 2)
++				XCTAssertEqual(reads, phase == .armed ? 1 : 2)
++				XCTAssertEqual(sleeps, 0)
++			}
++		}
++	}
++
++	func testArmedCallbackAndReadTimeConsumeDeadline() throws {
++		for duringRead in [false, true] {
++			try fixture { directory in
++				let publisher = RemapLeaseDiagnosticStore(testingDirectory: directory)
++				let value = try record(outer_failure)
++				var now: TimeInterval = 0, armed = false
++				let store = RemapLeaseDiagnosticStore(testingDirectory: directory, afterSingleRead: { _ in
++					if armed && duringRead { now = 30 }
++				})
++				var phases: [LeaseDiagnosticNextPhase] = []
++				XCTAssertTrue(store.observeNext(emit: { frame in
++					phases.append(frame.phase)
++					if frame.phase == .armed {
++						armed = true; XCTAssertTrue(publisher.retain(value))
++						if !duringRead { now = 30 }
++					}
++					return true
++				}, uptime: { now }, sleep: { _ in XCTFail("No deadline sleep permitted") }))
++				XCTAssertEqual(phases, [.armed, .unobserved])
++			}
++		}
++	}
++
++	func testStalledBackwardsAndNonfiniteClocksAreFinite() throws {
++		for kind in ["stalled", "backward", "nan", "infinite", "initial"] {
++			try fixture { directory in
++				var now: TimeInterval = kind == "initial" ? .nan : 1
++				try put(Data(outer_failure.utf8), at: file(directory))
++				var reads = 0, sleeps = 0, phases: [LeaseDiagnosticNextPhase] = []
++				let store = RemapLeaseDiagnosticStore(testingDirectory: directory, afterSingleRead: { _ in reads += 1 })
++				XCTAssertTrue(store.observeNext(emit: { frame in
++					phases.append(frame.phase)
++					if frame.phase == .armed {
++						if kind == "backward" { now = 0 }
++						if kind == "nan" { now = .nan }
++						if kind == "infinite" { now = .infinity }
++					}
++					return true
++				}, uptime: { now }, sleep: { duration in sleeps += 1; XCTAssertLessThanOrEqual(duration, 50_000) }))
++				XCTAssertEqual(phases.last, .unobserved)
++				XCTAssertEqual(sleeps, kind == "stalled" ? 599 : 0)
++				XCTAssertEqual(reads, kind == "stalled" ? 601 : 1)
++				XCTAssertLessThanOrEqual(reads - 1, 600)
++			}
++		}
++	}
++
++	func testSleepIsCappedToRemainingDeadline() throws {
++		try fixture { directory in
++			var now: TimeInterval = 0, durations: [useconds_t] = []
++			XCTAssertTrue(RemapLeaseDiagnosticStore(testingDirectory: directory).observeNext(emit: { _ in true },
++				uptime: { now }, sleep: { duration in
++					durations.append(duration)
++					now = durations.count == 1 ? 29.99 : 30
++				}))
++			XCTAssertEqual(durations.count, 2)
++			XCTAssertEqual(durations.first, 50_000)
++			XCTAssertLessThanOrEqual(try XCTUnwrap(durations.last), 10_000)
++			XCTAssertGreaterThan(try XCTUnwrap(durations.last), 0)
++		}
++	}
++
++	func testFramesAreClosedAndInvalidArgvRefusesBeforeEffects() throws {
++		let value = try record(outer_failure)
++		for phase in [LeaseDiagnosticNextPhase.armed, .observed, .unobserved] {
++			let frame = LeaseDiagnosticNextFrame(phase: phase, records: phase == .observed ? [value] : [])
++			let data = try XCTUnwrap(frame.encodedFrame())
++			XCTAssertLessThanOrEqual(data.count, 2048)
++			let object = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])
++			XCTAssertEqual(Set(object.keys), Set(["schema", "scope", "phase", "currentness", "records"]))
++			XCTAssertEqual(object["schema"] as? Int, 1)
++			XCTAssertEqual(object["scope"] as? String, "first-observed-new-record")
++			XCTAssertEqual(object["currentness"] as? String, "unknown")
++		}
++		XCTAssertNil(LeaseDiagnosticNextFrame(phase: .armed, records: [value]).encodedFrame())
++		XCTAssertNil(LeaseDiagnosticNextFrame(phase: .observed, records: []).encodedFrame())
++		XCTAssertNil(LeaseDiagnosticNextFrame(phase: .observed, records: [value, value]).encodedFrame())
++		for extra in ["synthetic-path", "--observe-next-remap-lease-diagnostics"] {
++			let argv = ["launcher", "--observe-next-remap-lease-diagnostics", extra]
++			XCTAssertTrue(KarabinerLeaseWorker.handles(arguments: argv))
++			XCTAssertEqual(KarabinerLeaseWorker.run(arguments: argv), LeaseWorkerExit.invalidArguments.rawValue)
++		}
++		XCTAssertFalse(KarabinerLeaseWorker.handles(arguments: ["launcher", "--observe-next-remap-lease-unknown"]))
++	}
++
++	func testTrueAncestorAliasPreservesLeafIdentitiesButRefusesPublication() throws {
++		try fixture { top in
++			let parent = top.appendingPathComponent("parent", isDirectory: true)
++			let parked = top.appendingPathComponent("parked", isDirectory: true)
++			let directory = parent.appendingPathComponent("records", isDirectory: true)
++			try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true,
++				attributes: [.posixPermissions: NSNumber(value: 0o700)])
++			let publisher = RemapLeaseDiagnosticStore(testingDirectory: directory)
++			let value = try record(outer_failure)
++			var armed = false, reads = 0
++			let store = RemapLeaseDiagnosticStore(testingDirectory: directory, afterSingleRead: { _ in
++				guard armed else { return }; reads += 1
++				do {
++					let beforeDirectory = try self.identity(directory), beforeFile = try self.identity(self.file(directory))
++					try FileManager.default.moveItem(at: parent, to: parked)
++					try FileManager.default.createSymbolicLink(atPath: parent.path, withDestinationPath: parked.path)
++					XCTAssertEqual(beforeDirectory.st_ino, try self.identity(directory).st_ino)
++					XCTAssertEqual(beforeFile.st_ino, try self.identity(self.file(directory)).st_ino)
++				} catch { XCTFail("Controlled ancestor alias failed") }
++			})
++			let frames = timeoutFrames(store, armed: { armed = true; XCTAssertTrue(publisher.retain(value)) })
++			XCTAssertEqual(reads, 1)
++			XCTAssertEqual(frames.map { $0.phase }, [.armed, .unobserved])
++		}
++	}
++
++	func testMissingAndNonprivateBaselineAreNotCreatedOrRepaired() throws {
++		try fixture { directory in
++			let missing = directory.appendingPathComponent("absent", isDirectory: true)
++			let frames = timeoutFrames(RemapLeaseDiagnosticStore(testingDirectory: missing))
++			XCTAssertEqual(frames.map { $0.phase }, [.unobserved])
++			XCTAssertFalse(FileManager.default.fileExists(atPath: missing.path))
++			XCTAssertEqual(Darwin.chmod(directory.path, 0o755), 0)
++			let refused = timeoutFrames(RemapLeaseDiagnosticStore(testingDirectory: directory))
++			XCTAssertEqual(refused.map { $0.phase }, [.unobserved])
++			XCTAssertEqual(try identity(directory).st_mode & 0o7777, mode_t(0o755))
++		}
++	}
++
++	func testBaselineReadCompletesBeforeArmingAndDoesNotPollOnEmissionFailure() throws {
++		try fixture { directory in
++			try put(Data(outer_failure.utf8), at: file(directory))
++			var reads = 0
++			let store = RemapLeaseDiagnosticStore(testingDirectory: directory, afterSingleRead: { _ in reads += 1 })
++			XCTAssertFalse(store.observeNext(emit: { frame in
++				XCTAssertEqual(frame.phase, .armed)
++				XCTAssertEqual(reads, 1)
++				return false
++			}, uptime: { 0 }, sleep: { _ in XCTFail("Failed handshake must not wait") }))
++			XCTAssertEqual(reads, 1)
++		}
++	}
++}

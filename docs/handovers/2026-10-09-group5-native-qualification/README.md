@@ -153,3 +153,55 @@ the original 146-method worker cohort and its 17 filesystem methods; that older 
 receiver does not qualify the new class. Native compilation, native method
 execution, real-Mac reproduction, packaging and installation remain separate
 requirements. No first-tap cause or recovery is claimed by this source addition.
+
+## Standalone diagnostic packet
+
+[standalone-e896.patch](standalone-e896.patch) is an autonomous diagnostic-only
+patch based on published Dev `e896bd3ee047eb4795b0bd13c2ac715d626042ea`.
+Its SHA256 is `c9bc69a370cf446b4fb8a7d8e350c63d815cfda28a989aebf0b096b15079f90f`.
+Receive it with `git apply --check` against the actual integration checkout
+before applying; refuse changed preimages instead of overwriting newer work.
+Do not import the complete feature branch for this packet.
+
+Exactly four paths change under `static/ergopti_plus/macos/launcher/`:
+
+- `Sources/ErgoptiPlus/RemapLeaseWorker.swift`;
+- `Sources/ErgoptiPlus/RemapLeaseDiagnosticStore.swift` (new);
+- `Tests/ErgoptiPlusTests/RemapLeaseWorkerTests.swift`;
+- `Tests/ErgoptiPlusTests/LeaseDiagnosticNextObservationTests.swift` (new).
+
+The deltas come from `a9d951677`, `3adffa730`, `c80ff645` and `5844c9b34`.
+The original Dev worker and worker tests match the first delta's actual parent.
+Strict sequential application and combined forward/inverse checks restore the
+complete genuine sparse Dev launcher project. All other original source files
+remain unchanged. No Lua, native producer, configuration, generator, locale,
+schema, manifest, workflow or other feature owner is required. The existing Dev
+main dispatcher already enters `KarabinerLeaseWorker.handles/run` before normal
+bootstrap. Existing production dependencies are `kMacOSLogsHomeRelativePath`,
+`OwnedLogDirectoryResolver.open` and `LauncherLog.write`; no extra main or helper
+source change is needed by source inspection.
+
+Both flags documented above are passive. The historical snapshot and first new
+record have unknown currentness; they do not prove a live generation, receiver
+revocation or successful retirement. The patch contains no private user logs.
+It adds diagnostics, not a correction of the first tap-hold watchdog exit 73.
+Retain incident 117 and partial item 24.
+
+Manual macOS run [37979226215](https://github.com/adrienm7/ergopti/actions/runs/37979226215)
+is testing `a9e8b1722164347d56989a483675ec660063bffb`, whose tree equals published
+feature `5844c9b34`. The production release launcher build passed; the full Swift
+suite is still running at this checkpoint. The four postimages match that
+source, but the surrounding feature project differs from this standalone Dev
+project. This does not qualify compilation or execution in the minimal Dev
+context, Intel, installation or the real user's incident. Count actual native
+method outcomes separately: 146 worker methods (including 17 filesystem cases)
+and the separate 19 observer methods. Source inventory is not execution.
+
+The explicit Karabiner OFF workaround must await its final successful callback;
+request admission is not completion. It removes owned rules only and disables
+remapping and tap-holds. Unsafe pending fencing cannot report success. A
+`rules-not-removed` failure can leave persisted OFF with cleanup debt. Local
+STOPPED or fallback tombstones are not receiver acknowledgements; guardian
+unregistration is not universal proof of process exit during a permanent drain
+error. Physical release and exact owner retirement remain unqualified on the
+user's Mac. This workaround does not resolve the cause.
