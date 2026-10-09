@@ -207,8 +207,9 @@ local function load_world(world)
 		end,
 	}
 	-- Load the unchanged producer with its canonical path spelling on every host.
-	package.loaded["modules.llm.network_env"] = assert(loadfile(
-		helpers.driver_root() .. "modules/llm/network_env.lua"))()
+	local network_path = assert(package.searchpath("modules.llm.network_env", package.path))
+	network_path = network_path:gsub("\\", "/")
+	package.loaded["modules.llm.network_env"] = assert(loadfile(network_path))()
 	package.loaded["ui.download_window"] = {
 		is_active = function() return world.window_sessions > 0 end,
 		session_id = function() return world.window_sessions end,
