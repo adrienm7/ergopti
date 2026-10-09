@@ -370,9 +370,20 @@ const Opened: React.FC<{ c: (typeof SMART_CASES)[number] }> = ({ c }) => {
 						<div style={{ fontSize: 30, fontWeight: 800 }}>Q3 review</div>
 						{bar('90%')}
 						{bar('75%')}
-						<div style={{ display: 'flex', alignItems: 'flex-end', gap: 18, height: 150, marginTop: 26 }}>
+						<div
+							style={{
+								display: 'flex',
+								alignItems: 'flex-end',
+								gap: 18,
+								height: 150,
+								marginTop: 26
+							}}
+						>
 							{[50, 80, 65, 120, 140].map((h, i) => (
-								<div key={i} style={{ width: 50, height: h, borderRadius: 4, background: '#3088ed' }} />
+								<div
+									key={i}
+									style={{ width: 50, height: h, borderRadius: 4, background: '#3088ed' }}
+								/>
 							))}
 						</div>
 						{bar('60%')}
@@ -430,9 +441,17 @@ const SmartDemo: React.FC = () => {
 	const open = progress(frame, current.at + 6, 14);
 	return (
 		<div style={{ width: DEMO_W }}>
-			<OsWindow os="windows" title="Notes" width={DEMO_W} height={150} bodyStyle={{ padding: '30px 34px' }}>
+			<OsWindow
+				os="windows"
+				title="Notes"
+				width={DEMO_W}
+				height={150}
+				bodyStyle={{ padding: '30px 34px' }}
+			>
 				<span style={{ fontFamily: MONO, fontSize: 32, color: '#eee' }}>
-					<span style={{ background: `rgba(49,190,255,${0.45 * selected})` }}>{current.selection}</span>
+					<span style={{ background: `rgba(49,190,255,${0.45 * selected})` }}>
+						{current.selection}
+					</span>
 				</span>
 			</OsWindow>
 			<div
