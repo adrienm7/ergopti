@@ -659,7 +659,8 @@ _ArtifactQueuedTlsShutdownControls() {
 				Fact := _ArtifactQueuedTlsFailureFact(Observed[1]["stdout"])
 				if Fact is Map
 					FileAppend("# " . Fact["frame"] . "`n", "*", "UTF-8")
-			} catch { }
+			} catch {
+			}
 		}
 		AssertEqual(0, Observed[1]["exit"])
 		AssertEqual("OWNED_QUEUED_TLS_SHUTDOWN_CONTROLLED_PORTS:7", Trim(Observed[1]["stdout"], "`r`n "))
