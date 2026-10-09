@@ -9288,8 +9288,8 @@ test precondition failure, not a Lua defect or a successful permission grant.
 
   Do not turn skipped Core, unit, E2E, installation, launch or native checks
   into passes. Default, pull requests and dev.158 retain full execution.
-  Main has only the separately authorized, expiring three-scope v1.0.0
-  exception documented in the delivery checkpoint; later stable tags are full.
+  Main has only the separately authorized, expiring v1.0.0 exception
+  documented below; later stable tags are full.
   Collect private-safe real-Mac evidence, correct actual failures and qualify
   the complete source/package before claiming a fully green tested release.
 
@@ -9387,8 +9387,8 @@ test precondition failure, not a Lua defect or a successful permission grant.
   hash and unsigned status; this is not a Windows test deferral. Future stable
   releases require actual signing or a separate explicit maintainer decision.
 
-  The stable assembly retains the three separately approved macOS native
-  qualification limits and the unresolved Karabiner/live-upgrade reports.
+  The stable assembly retains the separately approved qualification limits
+  below and the unresolved Karabiner/live-upgrade reports.
   Full local formatting and encoding passed. The composed JavaScript run
   reported 380/405 passing checks, with actual failures retained for review;
   follow-up fixes address TOML reference prototypes, startup menu metadata,
@@ -9399,6 +9399,37 @@ test precondition failure, not a Lua defect or a successful permission grant.
   manifests passed validation. The composed website production build passed.
   These bounded receipts do not certify the unfinished groups or native
   macOS qualification, and publication still requires the hosted verdicts.
+
+- [ ] **133.** Restore qualification after the bounded v1.0.0 reports.
+
+  On October 9, the maintainer explicitly extended the existing three macOS
+  reports to six exact failing test scopes: native macOS PAC/WPAD, independent
+  native HTTP clients, stubbed macOS unit/meta and virtual-keyboard harnesses,
+  the Windows native desktop wrapper, and the Linux saved simultaneous-input
+  supplement. The approval applies only to v1.0.0 before 22:00 UTC that day.
+  Public notes and source-bound receipts must identify every scope as
+  DEFERRED and qualified:false. Compilation, packaging, installation, source
+  and artifact integrity and every other test remain mandatory. Windows
+  unsigned publication has its separate approval in item 132. Never extend
+  either deadline or infer full qualification from the resulting CI verdict.
+
+  Retain the exact causes and evidence for the follow-up:
+  - Native macOS PAC callbacks receive the origin and slash instead of the
+    complete path/query on both hosted architectures. The independent HTTP
+    trust fixture also times out; its cause remains unproved.
+  - Windows completed five desktop cases, but 5,485 global-shadow warnings
+    violate the wrapper's exact stdout receipt. The second six-case cohort
+    did not execute. Preserve warning rejection while isolating the runner.
+  - Four of 54 Linux saved simultaneous-input checks fail. The remaining
+    live-daemon checks and input ownership custody remain mandatory; add
+    precise numeric event differences before attributing a production cause.
+  - Mac shutdown fixture isolation and obsolete VS Code startup premises
+    are corrected with 24 passing inert controls. Other stubbed harness
+    failures remain open; these corrections do not qualify a native Mac.
+
+  The Linux diagnostic filename premise is corrected without changing its
+  seven native save assertions. Receive those assertions on Linux. Restore
+  every deferred execution for other tags, pull requests and expired runs.
 
 ## Time estimate
 
