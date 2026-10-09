@@ -633,7 +633,13 @@ async function simulate(context, status = 0, entries = fixtures, afterFamilySign
 	assert.deepEqual(q.deferredScopes(accepted), [
 		'macos-brew-archive',
 		'macos-shortcuts-discovery',
-		'macos-launch-appleevents'
+		'macos-launch-appleevents',
+		'macos-native-pac',
+		'macos-native-http',
+		'macos-stubbed-unit',
+		'macos-stubbed-e2e',
+		'windows-native-desktop',
+		'linux-simultaneous-native'
 	]);
 	assert.equal(
 		q.resolveQualificationProfile(exact, before),
@@ -702,17 +708,21 @@ async function simulate(context, status = 0, entries = fixtures, afterFamilySign
 	assert.throws(() => q.stablePublicationNotice(stable.id, exact, '', before));
 	assert.throws(() => q.stablePublicationNotice('foreign', exact, sha, before));
 	const notice = q.stablePublicationNotice(stable.id, exact, sha, before);
-	assert.match(notice, /MACOS NATIVE QUALIFICATION DEFERRED \/ qualified:false/);
+	assert.match(notice, /NATIVE AND HARNESS QUALIFICATION DEFERRED \/ qualified:false/);
 	assert.ok(notice.includes(sha));
 	assert.ok(
 		notice.includes(
 			'Known macOS reports remain under investigation: Karabiner lease failures (including watchdog exit 73 and PONG/READY timeouts), and an active Homebrew upgrade leaving Hammerspoon running without ErgoptiPlus. This release does not claim those reports repaired.'
 		)
 	);
-	assert.equal(q.deferredScopes(accepted).length, 3, 'known reports do not add deferral scopes');
+	assert.equal(
+		q.deferredScopes(accepted).length,
+		9,
+		'only the six explicitly approved added scopes extend the original three'
+	);
 	assert.ok(
 		notice.includes(
-			'All other tests, macOS signing, source and asset integrity, installation and launch lifecycle checks remain required'
+			'Compilation, packaging, macOS signing, source and asset integrity, installation and all other tests remain required'
 		)
 	);
 	assert.equal(
@@ -734,7 +744,7 @@ async function simulate(context, status = 0, entries = fixtures, afterFamilySign
 	broadened.scopes['windows-pac-full-url'] = policy.scopes['windows-pac-full-url'];
 	assert.throws(() => q.validatePolicy(broadened), /Invalid closed qualification fields/);
 	console.log(
-		'Draft stable v1.0.0: exact three Mac scopes, full Windows/Linux, strict expiry and source-bound public limits PASS.'
+		'Draft stable v1.0.0: exact nine approved scopes, all unlisted work full, strict expiry and source-bound public limits PASS.'
 	);
 }
 

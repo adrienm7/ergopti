@@ -19,6 +19,41 @@ const SCOPE_IDS = Object.freeze([
 	'macos-shortcuts-discovery',
 	'macos-launch-appleevents'
 ]);
+const STABLE_EXTRA_SCOPES = Object.freeze({
+	'macos-native-pac': {
+		path: '.github/workflows/ci-macos.yml',
+		args: ['managed-ollama-native', 'Qualify actual native PAC and WPAD XCTest controls']
+	},
+	'macos-native-http': {
+		path: '.github/workflows/ci-macos.yml',
+		args: ['managed-ollama-native', 'Receive actual independent managed HTTP native clients']
+	},
+	'macos-stubbed-unit': {
+		path: '.github/workflows/ci-macos.yml',
+		args: ['test-hs', 'Run unit + meta tests']
+	},
+	'macos-stubbed-e2e': {
+		path: '.github/workflows/ci-macos.yml',
+		args: ['e2e-hs', 'Run virtual-keyboard harness (stubbed hs.* — no real Hammerspoon)']
+	},
+	'windows-native-desktop': {
+		path: '.github/workflows/ci-windows.yml',
+		args: ['test-ahk', 'Run native desktop AHK cohorts']
+	},
+	'linux-simultaneous-native': {
+		path: 'static/ergopti_plus/linux/tests/hardware/run_daemon_live.sh',
+		args: [
+			'python3',
+			'tests/hardware/run_native_subreaper.py',
+			'luajit',
+			'tests/hardware/run_simultaneous_configuration_real.lua'
+		]
+	}
+});
+const STABLE_SCOPE_IDS = Object.freeze([
+	...SCOPE_IDS.slice(2),
+	...Object.keys(STABLE_EXTRA_SCOPES)
+]);
 const CONTEXT_KEYS = [
 	'github_actions',
 	'repository',
@@ -115,13 +150,13 @@ function validatePolicy(value) {
 		value.tag !== 'v' + value.version
 	)
 		refuse('Invalid qualification release boundary.');
-	const policyScopes = stable ? SCOPE_IDS.slice(2) : SCOPE_IDS;
+	const policyScopes = stable ? STABLE_SCOPE_IDS : SCOPE_IDS;
 	keys(value.scopes, policyScopes);
 	const kinds = ['ahk_test', 'linux_fixture', 'swift_test_file', 'command', 'macos_launch'];
 	const names = new Set();
 	for (const scope of policyScopes) {
 		const i = SCOPE_IDS.indexOf(scope);
-		const row = value.scopes[SCOPE_IDS[i]];
+		const row = value.scopes[scope];
 		const expected =
 			i === 0
 				? ['kind', 'name', 'reason']
@@ -132,13 +167,19 @@ function validatePolicy(value) {
 						: ['kind', 'path', 'args', 'reason'];
 		keys(row, expected);
 		if (
+			i < 0 &&
+			(row.path !== STABLE_EXTRA_SCOPES[scope].path ||
+				JSON.stringify(row.args) !== JSON.stringify(STABLE_EXTRA_SCOPES[scope].args))
+		)
+			refuse('Invalid closed stable command scope.');
+		if (
 			i === 4 &&
 			(JSON.stringify(row.scenarios) !== '["clean","karabiner_config"]' ||
 				JSON.stringify(row.runners) !== '["macos-15","macos-15-intel"]')
 		)
 			refuse('Invalid closed Mac launch qualification matrix.');
 		if (
-			row.kind !== kinds[i] ||
+			row.kind !== (i < 0 ? 'command' : kinds[i]) ||
 			typeof row.reason !== 'string' ||
 			!row.reason ||
 			/[\r\n]/.test(row.reason)
@@ -193,8 +234,8 @@ function eligible(context, now, policy = POLICY) {
 }
 /** Automatic mismatch, expiry and later tags retain full default execution. */
 function resolveQualificationProfile(context, now = new Date(), scope = null) {
-	if (eligible(context, now)) return POLICY;
-	return SCOPE_IDS.slice(2).includes(scope) && eligible(context, now, STABLE_POLICY)
+	if ((scope === null || SCOPE_IDS.includes(scope)) && eligible(context, now)) return POLICY;
+	return STABLE_SCOPE_IDS.includes(scope) && eligible(context, now, STABLE_POLICY)
 		? STABLE_POLICY
 		: null;
 }
@@ -370,13 +411,57 @@ function stablePublicationNotice(id, context, sha, now = new Date()) {
 	if (id !== STABLE_POLICY.id) refuse('Unknown stable publication selection.');
 	const profile = authorizeQualificationProfile(id, context, now);
 	return (
-		'MACOS NATIVE QUALIFICATION DEFERRED / qualified:false (source ' +
+		'NATIVE AND HARNESS QUALIFICATION DEFERRED / qualified:false (source ' +
 		sourceSha(sha) +
-		'): native Brew archive, Shortcuts discovery and external AppleEvent qualification remain missing. ' +
-		'All other tests, macOS signing, source and asset integrity, installation and launch lifecycle checks remain required. Windows signature evidence is disclosed separately. ' +
-		'Packaging does not prove native feature acceptance. This exception applies only to v1.0.0 before 2026-10-09T22:00:00Z.' +
+		'): ' +
+		deferredScopes(profile)
+			.map((scope) => scope + ': ' + profile.scopes[scope].reason)
+			.join(' ') +
+		' ' +
+		'Compilation, packaging, macOS signing, source and asset integrity, installation and all other tests remain required. Windows signature evidence is disclosed separately. ' +
+		'[Qualification records](https://github.com/adrienm7/ergopti/releases/tag/v1.0.0) retain the exact source-bound deferred scopes. Packaging does not prove native feature acceptance. This exception applies only to v1.0.0 before 2026-10-09T22:00:00Z.' +
 		' Known macOS reports remain under investigation: Karabiner lease failures (including watchdog exit 73 and PONG/READY timeouts), and an active Homebrew upgrade leaving Hammerspoon running without ErgoptiPlus. This release does not claim those reports repaired.'
 	);
+}
+/** Validates existing source-bound scope receipts before a command can be deferred. */
+function scopeDisposition(receipt, scope, sha, context, now = new Date()) {
+	if (receipt && receipt.status === 'deferred') {
+		validateQualificationReceipt(receipt, scope, sha, context, now);
+		return 'deferred';
+	}
+	const expected = {
+		schema: 1,
+		profile_id: null,
+		scope,
+		status: 'full',
+		qualified: false,
+		source_sha: sourceSha(sha)
+	};
+	if (
+		JSON.stringify(receipt) !== JSON.stringify(expected) ||
+		resolveQualificationProfile(context, now, scope) !== null
+	)
+		refuse('Invalid full command qualification receipt.');
+	return 'full';
+}
+/** Requires every actually emitted command scope receipt before public disclosure. */
+function admitCommandReceipts(directory, context, sha, now = new Date()) {
+	const expected = {
+		'macos-native-pac': ['arm64', 'amd64'],
+		'macos-native-http': ['arm64', 'amd64'],
+		'macos-stubbed-unit': [''],
+		'macos-stubbed-e2e': [''],
+		'windows-native-desktop': [''],
+		'linux-simultaneous-native': ['']
+	};
+	for (const [scope, suffixes] of Object.entries(expected)) {
+		for (const suffix of suffixes) {
+			const file = path.join(directory, 'stable-' + scope + (suffix ? '-' + suffix : '') + '.json');
+			const record = parseClosedJson(fs.readFileSync(file, 'utf8'));
+			if (scopeDisposition(record, scope, sha, context, now) !== 'deferred')
+				refuse('Missing approved deferred command receipt.');
+		}
+	}
 }
 function main(argv) {
 	if (argv.length === 1 && argv[0] === '--publication-select') {
@@ -390,6 +475,12 @@ function main(argv) {
 			environmentContext(),
 			process.env.GITHUB_SHA
 		);
+		if (notice)
+			admitCommandReceipts(
+				path.resolve(__dirname, '../../release-assets'),
+				environmentContext(),
+				process.env.GITHUB_SHA
+			);
 		console.log('ERGOPTI_NATIVE_QUALIFICATION_NOTE=' + notice);
 		return;
 	}
@@ -404,6 +495,7 @@ function main(argv) {
 				'--execution-manifest',
 				'--scenario',
 				'--runner',
+				'--validate-scope-receipt',
 				'--validate-launch-receipt'
 			].includes(argv[i]) ||
 			!argv[i + 1] ||
@@ -413,9 +505,21 @@ function main(argv) {
 		options[argv[i]] = argv[i + 1];
 	}
 	const scope = options['--scope'];
-	if (!SCOPE_IDS.includes(scope)) refuse('Unknown qualification scope.');
+	if (![...SCOPE_IDS, ...STABLE_SCOPE_IDS].includes(scope)) refuse('Unknown qualification scope.');
 	const context = environmentContext(),
 		profile = resolveQualificationProfile(context, new Date(), scope);
+	if (options['--validate-scope-receipt']) {
+		if (!Object.hasOwn(STABLE_EXTRA_SCOPES, scope)) refuse('Unknown command qualification scope.');
+		console.log(
+			scopeDisposition(
+				parseClosedJson(fs.readFileSync(options['--validate-scope-receipt'], 'utf8')),
+				scope,
+				process.env.GITHUB_SHA,
+				context
+			)
+		);
+		return;
+	}
 	if (scope === 'macos-launch-appleevents') {
 		const receipt = options['--validate-launch-receipt']
 			? parseClosedJson(fs.readFileSync(options['--validate-launch-receipt'], 'utf8'))
@@ -500,6 +604,8 @@ function main(argv) {
 	}
 }
 module.exports = {
+	admitCommandReceipts,
+	scopeDisposition,
 	stablePublicationProfile,
 	stablePublicationNotice,
 	POLICY_PATH,
