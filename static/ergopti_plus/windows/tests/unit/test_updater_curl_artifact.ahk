@@ -86,6 +86,7 @@ class _ArtifactNtlmProxyOwner {
 		return false
 	}
 	Close() {
+		try this.Tls.Signal("Observe")
 		if this.Event
 			DllCall("Kernel32\SetEvent", "Ptr", this.Event, "Int")
 		Started := A_TickCount
@@ -133,6 +134,20 @@ class _ArtifactNtlmProxyOwner {
 					_TestPrint("::notice title=Windows native SSPI first failure::" . FirstFact)
 			} catch Any {
 				; Passive provenance cannot change service/refusal/physical-close assertions.
+			}
+			try {
+				Progress := _ArtifactNtlmProgressDiagnostic(this.State)
+				try {
+					if this.Tls.ReadState() {
+						TlsClose := _ArtifactTlsCloseDiagnostic(this.Tls.State)
+						if TlsClose != ""
+							Progress .= (Progress == "" ? "" : " ") . TlsClose
+					}
+				}
+				if Progress != ""
+					_TestPrint("::notice title=Windows native SSPI closed stream observation::" . Progress)
+			} catch Any {
+				; Optional owned-stream receipt cannot replace original closure assertions.
 			}
 			AssertTrue(this.NativeState is Map && this.NativeState.Get("TreeQuiesced", false), "SSPI service process and Job handles close")
 			AssertEqual(1, this.Results.Length)
@@ -525,3 +540,95 @@ _ArtifactNtlmFullDuplexRetirementControls() {
 	}
 }
 Test("artifact curl: full-duplex response survives request EOF and bounded retirement still refuses unfinished or foreign work", _ArtifactNtlmFullDuplexRetirementControls)
+
+; Closed scalar observations do not qualify transport, TLS or physical source identity.
+_ArtifactNtlmProgressDiagnostic(State) {
+	if _ArtifactNtlmTunnelFailureDiagnostic(State) == ""
+		return ""
+	Fact := ""
+	for Name in ["first_failure_response_read", "first_failure_response_written"] {
+		Value := State.Get(Name, "")
+		if Type(Value) != "Integer" || Value < 0 || Value > 2147483647
+			return ""
+		Fact .= (Fact == "" ? "" : " ") . Name . "=" . Format("{:d}", Value)
+	}
+	if State["first_failure_response_written"] > State["first_failure_response_read"]
+		return ""
+	return Fact
+}
+
+_ArtifactTlsCloseDiagnostic(State) {
+	if !(State is Map)
+		return ""
+	Fact := ""
+	for Row in [["sequence", 1, 65535], ["called", 0, 1], ["result", -1, 1], ["error", 0, 12],
+		["received", 0, 2147483647], ["written", 0, 2147483647], ["close_written", -1, 1048576],
+		["pending", -1, 1], ["network_closed", 1, 1]] {
+		Name := "tls_close_" . Row[1]
+		Value := State.Get(Name, "")
+		if Type(Value) != "Integer" || Value < Row[2] || Value > Row[3]
+			return ""
+		Fact .= (Fact == "" ? "" : " ") . Name . "=" . Format("{:d}", Value)
+	}
+	if State["tls_close_close_written"] > State["tls_close_written"]
+		|| (State["tls_close_called"] == 0 && (State["tls_close_result"] != 0 || State["tls_close_error"] != 0))
+		|| (State["tls_close_result"] >= 0 && State["tls_close_error"] != 0)
+		return ""
+	return Fact
+}
+
+_ArtifactTlsCloseProjectionControls() {
+	State := Map("tls_close_sequence", 1, "tls_close_called", 1, "tls_close_result", 0,
+		"tls_close_error", 0, "tls_close_received", 203, "tls_close_written", 524901,
+		"tls_close_close_written", 31, "tls_close_pending", -1, "tls_close_network_closed", 1,
+		"private", "PRIVATE_HEADER_BODY_AUTH_URL")
+	AssertEqual("tls_close_sequence=1 tls_close_called=1 tls_close_result=0 tls_close_error=0 tls_close_received=203 tls_close_written=524901 tls_close_close_written=31 tls_close_pending=-1 tls_close_network_closed=1", _ArtifactTlsCloseDiagnostic(State))
+	for Pair in [["sequence", 0], ["called", 2], ["result", 2], ["error", 13], ["received", -1],
+		["written", 2147483648], ["close_written", 1048577], ["close_written", -2], ["pending", 2], ["network_closed", 0],
+		["sequence", "1"], ["received", "PRIVATE"], ["result", 0.5], ["error", 1]] {
+		Foreign := State.Clone()
+		Foreign["tls_close_" . Pair[1]] := Pair[2]
+		AssertEqual("", _ArtifactTlsCloseDiagnostic(Foreign))
+	}
+	AssertEqual("", _ArtifactTlsCloseDiagnostic(Map()))
+	AssertEqual("", _ArtifactTlsCloseDiagnostic(0))
+	Relay := Map("first_failure_site", "forward_response", "first_failure_family", "winsock", "first_failure_code", 10054,
+		"first_failure_operation", "read", "first_failure_stop_requested", 0, "first_failure_target_close_state", 0,
+		"first_failure_response_read", 529601, "first_failure_response_written", 529601)
+	AssertEqual("first_failure_response_read=529601 first_failure_response_written=529601", _ArtifactNtlmProgressDiagnostic(Relay))
+	for Pair in [["first_failure_response_read", -1], ["first_failure_response_written", 529602],
+		["first_failure_response_read", "PRIVATE"], ["first_failure_response_written", 2147483648]] {
+		Foreign := Relay.Clone()
+		Foreign[Pair[1]] := Pair[2]
+		AssertEqual("", _ArtifactNtlmProgressDiagnostic(Foreign))
+	}
+}
+Test("artifact curl: closed stream scalar receipt refuses private text and unacknowledged disposal", _ArtifactTlsCloseProjectionControls)
+
+_ArtifactOwnedCloseProgressControls() {
+	global _DriverDir
+	Observed := []
+	Handle := 0
+	try {
+		Handle := ShellRunner_SpawnTreeOwned(_Updater_PowerShellPath(),
+			["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-File",
+				_DriverDir . "\tests\fixtures\owned_close_progress_controls.ps1", "-FixturePath",
+				_DriverDir . "\tests\fixtures\managed_remote_transport.ps1", "-ProxyPath",
+				_DriverDir . "\tests\fixtures\artifact_ntlm_proxy.ps1"],
+			(Code, Out, Err) => Observed.Push(Map("exit", Code, "stdout", Out, "stderr", Err)))
+		AssertTrue(Handle.start(), "actual owned close methods component process starts")
+		Started := A_TickCount
+		while Observed.Length == 0 && !TickExpired64(Started, 15000) {
+			_SR_TreePoll()
+			Sleep(10)
+		}
+		AssertEqual(1, Observed.Length)
+		AssertEqual(0, Observed[1]["exit"])
+		AssertEqual("OWNED_CLOSE_PROGRESS_CONTROLLED_PORTS:11", Trim(Observed[1]["stdout"], "`r`n "))
+		AssertEqual("", Observed[1]["stderr"])
+	} finally {
+		if IsObject(Handle)
+			AssertTrue(Handle.terminate(), "owned close source component Job retires")
+	}
+}
+Test("artifact curl: actual owned TLS-close/copy methods preserve failures with controlled native ports", _ArtifactOwnedCloseProgressControls)

@@ -28,6 +28,24 @@ function Get-ErgoptiLegacyRawContractFlags {
     $ProxyText=$Values.proxy -is [string]
     $BypassText=$Values.bypass -is [string]
     $NativeInteger=($Values.native_error -is [int] -or $Values.native_error -is [long])
+    $Ipv6Bracket=$false;$Ipv6Authority=$false;$Ipv6Port=$false;$Ipv6Literal=$false
+    if ($ProxyText -and $Values.proxy.Length -le 256 -and
+        $Values.proxy -cmatch '^\[([0-9A-Fa-f:]+)\]:([0-9]{1,5})$') {
+        $Ipv6Bracket=$true
+        $ObservedAddress=$null;$ExpectedAddress=$null
+        $ObservedPort=0;$ExpectedPort=0
+        if ([Net.IPAddress]::TryParse($Matches[1],[ref]$ObservedAddress) -and
+            $ObservedAddress.AddressFamily -eq [Net.Sockets.AddressFamily]::InterNetworkV6 -and
+            [int]::TryParse($Matches[2],[ref]$ObservedPort) -and $ObservedPort -ge 1 -and $ObservedPort -le 65535) {
+            $Ipv6Authority=$true
+            if ($ExpectedRaw -cmatch '^\[([0-9A-Fa-f:]+)\]:([0-9]{1,5})$' -and
+                [Net.IPAddress]::TryParse($Matches[1],[ref]$ExpectedAddress) -and
+                [int]::TryParse($Matches[2],[ref]$ExpectedPort)) {
+                $Ipv6Port=$ObservedPort -eq $ExpectedPort
+                $Ipv6Literal=$Ipv6Port -and $ObservedAddress.Equals($ExpectedAddress)
+            }
+        }
+    }
     # Emit fixed booleans only. Never project a relay, URI, token or source value.
     return @{
         ok_bool=[int]$OkBool;ok_true=[int]($OkBool -and $Values.ok -eq $true)
@@ -37,6 +55,8 @@ function Get-ErgoptiLegacyRawContractFlags {
         proxy_legacy_ipv6_literal=[int]($ProxyText -and $Values.proxy -ceq '[2001:0DB8:0000:0000:0000:0000:0000:0001]:3129')
         bypass_text=[int]$BypassText;bypass_empty=[int]($BypassText -and $Values.bypass -ceq '')
         native_integer=[int]$NativeInteger;native_zero=[int]($NativeInteger -and $Values.native_error -eq 0)
+        proxy_ipv6_bracket=[int]$Ipv6Bracket;proxy_ipv6_authority=[int]$Ipv6Authority
+        proxy_ipv6_port=[int]$Ipv6Port;proxy_ipv6_normalized_literal=[int]$Ipv6Literal
     }
 }
 function Get-ErgoptiRetirementSourceHash {
@@ -148,6 +168,17 @@ function ConvertFrom-ErgoptiPacRoutes {
             $Frame.results[0].kind -cne 'named_proxy' -or $Frame.results[0].access_type -ne 3 -or
             $Frame.results[0].proxy -cne $Control.Raw -or
             $Frame.results[0].bypass -cne '' -or $Frame.results[0].native_error -ne 0)) {
+            if ($DiagnosticControl -eq 5 -and $null -ne $DiagnosticRawFlags) {
+                try {
+                    $Flags='RETIREMENT_RAW_FLAGS control='+$DiagnosticControl+' schema=1'
+                    foreach($Name in @('ok_bool','ok_true','kind_text','kind_named','access_integer','access_three',
+                        'proxy_text','proxy_literal','proxy_legacy_ipv6_literal','bypass_text','bypass_empty',
+                        'native_integer','native_zero','proxy_ipv6_bracket','proxy_ipv6_authority','proxy_ipv6_port','proxy_ipv6_normalized_literal')) {
+                        $Flags+=' '+$Name+'='+[string]$DiagnosticRawFlags[$Name]
+                    }
+                    [Console]::Error.WriteLine($Flags)
+                } catch { }
+            }
             throw 'Legacy raw proxy receipt contract changed.'
         }
         $Child.Dispose();$Child=$null
@@ -169,17 +200,6 @@ function ConvertFrom-ErgoptiPacRoutes {
     try {[Console]::Out.WriteLine('::notice title=Windows legacy PAC closed cause::control='+$DiagnosticControl+
         ' stage='+$DiagnosticStage+' cause='+$Cause+' line='+$CauseLine)} catch { }
     try {[Console]::Error.WriteLine('RETIREMENT_DIAG control='+$DiagnosticControl+' stage='+$DiagnosticStage+' child_exit='+$DiagnosticExit+' stdout_units='+$DiagnosticOut+' stderr_units='+$DiagnosticErr)} catch { }
-    if($null -ne $DiagnosticRawFlags) {
-        try {
-            $Flags='RETIREMENT_RAW_FLAGS control='+$DiagnosticControl+' schema=1'
-            foreach($Name in @('ok_bool','ok_true','kind_text','kind_named','access_integer','access_three',
-                'proxy_text','proxy_literal','proxy_legacy_ipv6_literal','bypass_text','bypass_empty',
-                'native_integer','native_zero')) {
-                $Flags+=' '+$Name+'='+[string]$DiagnosticRawFlags[$Name]
-            }
-            [Console]::Error.WriteLine($Flags)
-        } catch { }
-    }
     [Console]::Error.WriteLine('Legacy proxy retirement protocol failed.')
 } finally {
     if($null -ne $Child) {

@@ -124,10 +124,10 @@ _UpdaterNativeStagingDiagnosticFact(Diagnostic) {
 }
 
 _UpdaterNativeStagingSetupDiagnosticFact(Fact) {
-	if !(Fact is Map) || Fact.Count != 6
+	if !(Fact is Map) || (Fact.Count != 6 && Fact.Count != 10)
 		return ""
 	for Key in Fact
-		if !(Key is String) || !RegExMatch(Key, "\A(?:schema_version|site|line|exception|error|hresult)\z")
+		if !(Key is String) || !RegExMatch(Key, "\A(?:schema_version|site|line|exception|error|hresult|command|category|language|compiler)\z")
 			return ""
 	if !(Fact.Get("schema_version", "") is Integer) || Fact["schema_version"] != 1
 		|| !(Fact.Get("line", "") is Integer) || Fact["line"] < 0 || Fact["line"] > 8192
@@ -135,11 +135,24 @@ _UpdaterNativeStagingSetupDiagnosticFact(Fact) {
 		return ""
 	for Pair in [["site", "download_module_load|download_module_reconstruct|native_routes_load|route_call|unknown"],
 		["exception", "invalid_operation|runtime|argument|io|other"],
-		["error", "compiler|type_exists|type_missing|method_missing|command_missing|property_missing|method_invocation|variable_refused|route_refused|observation_seam|other"]]
+		["error", "compiler|type_exists|type_missing|method_missing|command_missing|property_missing|method_invocation|variable_refused|route_refused|observation_seam|language_refused|json_invalid|other"]]
 		if !(Fact.Get(Pair[1], "") is String) || !RegExMatch(Fact[Pair[1]], "\A(?:" . Pair[2] . ")\z")
 			return ""
+	Details := ""
+	if Fact.Count == 10 {
+		for Pair in [["command", "add_type|get_content|convert_json|other"],
+			["category", "unknown|0|[1-9]|[12][0-9]|3[01]"],
+			["language", "FullLanguage|ConstrainedLanguage|RestrictedLanguage|NoLanguage|unknown"],
+			["compiler", "none|CS[0-9]{4}"]]
+			if !(Fact.Get(Pair[1], "") is String) || !RegExMatch(Fact[Pair[1]], "\A(?:" . Pair[2] . ")\z")
+				return ""
+		if Fact["compiler"] != "none" && (Fact["command"] != "add_type" || Fact["error"] != "compiler")
+			return ""
+		Details := " command=" . Fact["command"] . " category=" . Fact["category"]
+			. " language=" . Fact["language"] . " compiler=" . Fact["compiler"]
+	}
 	return "site=" . Fact["site"] . " line=" . Fact["line"] . " exception=" . Fact["exception"]
-		. " error=" . Fact["error"] . " hresult=" . Format("{:d}", Fact["hresult"])
+		. " error=" . Fact["error"] . " hresult=" . Format("{:d}", Fact["hresult"]) . Details
 }
 
 _UpdaterNativeEmitSetupDiagnostic(Run) {
@@ -152,9 +165,14 @@ _UpdaterNativeEmitSetupDiagnostic(Run) {
 		Text := FSReadUtf8Exact(Path)
 		if !(Text is String) || StrLen(Text) > 2048 || RegExMatch(Text, '"(?:schema_version|line|hresult)"\s*:\s*(?:true|false|null)\b')
 			return
-		for Key in ["schema_version", "site", "line", "exception", "error", "hresult"] {
+		for Key in ["schema_version", "site", "line", "exception", "error", "hresult", "command", "category", "language", "compiler"] {
 			Pattern := '"' . Key . '"\s*:'
-			if !RegExMatch(Text, Pattern, &Seen) || RegExMatch(Text, Pattern, , Seen.Pos + Seen.Len)
+			if !RegExMatch(Text, Pattern, &Seen) {
+				if Key == "command" || Key == "category" || Key == "language" || Key == "compiler"
+					continue
+				return
+			}
+			if RegExMatch(Text, Pattern, , Seen.Pos + Seen.Len)
 				return
 		}
 		Fact := _UpdaterNativeStagingSetupDiagnosticFact(JsonParse(Text))
@@ -1023,3 +1041,20 @@ _UpdaterNativeRouteShapeControls() {
 	}
 }
 Test("updater staging: closed route-shape observation preserves typed policy and private bounds", _UpdaterNativeRouteShapeControls)
+
+
+_UpdaterNativeSetupDetailControls() {
+	Fact := Map("schema_version", 1, "site", "download_module_load", "line", 7,
+		"exception", "invalid_operation", "error", "compiler", "hresult", -2146233079,
+		"command", "add_type", "category", "6", "language", "FullLanguage", "compiler", "CS1519")
+	AssertContains(_UpdaterNativeStagingSetupDiagnosticFact(Fact), "command=add_type category=6 language=FullLanguage compiler=CS1519")
+	for Pair in [["command", "PRIVATE_COMMAND"], ["category", "32"], ["category", 6],
+		["language", "PRIVATE_LANGUAGE"], ["compiler", "CS15190"], ["command", "get_content"], ["error", "other"]] {
+		Changed := Fact.Clone()
+		Changed[Pair[1]] := Pair[2]
+		AssertEqual("", _UpdaterNativeStagingSetupDiagnosticFact(Changed), "compiler details require exact direct provenance")
+	}
+	Fact.Delete("compiler")
+	AssertEqual("", _UpdaterNativeStagingSetupDiagnosticFact(Fact), "partial detail sets are refused")
+}
+Test("updater fixture: setup details require direct closed compiler provenance", _UpdaterNativeSetupDetailControls)

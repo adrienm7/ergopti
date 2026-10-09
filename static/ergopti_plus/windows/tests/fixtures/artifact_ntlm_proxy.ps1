@@ -75,19 +75,20 @@ public sealed class ErgoptiArtifactNtlmProxy : IDisposable {
     public sealed class FailureObservation {
         public readonly string Site, Family, Operation;
         public readonly int Code, TargetCloseState;
+        public readonly int ResponseRead, ResponseWritten;
         public readonly bool StopRequested;
-        public FailureObservation(string site, string family, int code, string operation, int targetCloseState, bool stopRequested) {
+        public FailureObservation(string site, string family, int code, string operation, int targetCloseState, bool stopRequested, int responseRead=0, int responseWritten=0) {
             Site=site; Family=family; Code=code; Operation=operation;
-            TargetCloseState=targetCloseState; StopRequested=stopRequested;
+            TargetCloseState=targetCloseState; StopRequested=stopRequested; ResponseRead=responseRead; ResponseWritten=responseWritten;
         }
     }
     FailureObservation firstFailure;
     public FailureObservation FirstFailure { get { return Interlocked.CompareExchange(ref firstFailure,null,null); } }
-    void ObserveCode(string site, string family, int code, string operation="none", int targetCloseState=0, bool stopRequested=false) {
-        try { Interlocked.CompareExchange(ref firstFailure,new FailureObservation(site,family,code,operation,targetCloseState,stopRequested),null); }
+    void ObserveCode(string site, string family, int code, string operation="none", int targetCloseState=0, bool stopRequested=false, int responseRead=0, int responseWritten=0) {
+        try { Interlocked.CompareExchange(ref firstFailure,new FailureObservation(site,family,code,operation,targetCloseState,stopRequested,responseRead,responseWritten),null); }
         catch { /* Optional observation cannot affect the original failure counter. */ }
     }
-    void ObserveException(string site, Exception failure, string operation="none", int targetCloseState=0, bool stopRequested=false) {
+    void ObserveException(string site, Exception failure, string operation="none", int targetCloseState=0, bool stopRequested=false, int responseRead=0, int responseWritten=0) {
         try {
             SocketException socket=failure as SocketException;
             if(socket==null && failure is IOException) socket=failure.InnerException as SocketException;
@@ -95,7 +96,7 @@ public sealed class ErgoptiArtifactNtlmProxy : IDisposable {
                 failure is InvalidOperationException ? "invalid_operation" :
                 failure is ArgumentException ? "argument" : "other";
             int code=socket!=null ? socket.NativeErrorCode : failure.HResult;
-            ObserveCode(site,family,code,operation,targetCloseState,stopRequested);
+            ObserveCode(site,family,code,operation,targetCloseState,stopRequested,responseRead,responseWritten);
         } catch { /* No raw exception, provider data or retry authority is published. */ }
     }
     public ErgoptiArtifactNtlmProxy(int port, bool negotiate) : this(port,negotiate,false) { }
@@ -244,15 +245,20 @@ public sealed class ErgoptiArtifactNtlmProxy : IDisposable {
     // CopyTo merges reader and writer failures. Keep the same bounded chunk,
     // EOF and failure behavior while recording which actual operation refused.
     static void CopyResponse(Stream remote, Stream client, Action<string,Exception> failed) {
-        string operation="read";
+        CopyResponseObserved(remote,client,delegate(string operation,Exception failure,int read,int written) { failed(operation,failure); });
+    }
+    static void CopyResponseObserved(Stream remote, Stream client, Action<string,Exception,int,int> failed) {
+        string operation="read"; int received=0, written=0;
         try {
             byte[] buffer=new byte[81920];
             while(true) {
                 operation="read"; int count=remote.Read(buffer,0,buffer.Length);
                 if(count==0) return;
+                received=count>Int32.MaxValue-received ? Int32.MaxValue : received+count;
                 operation="write"; client.Write(buffer,0,count);
+                written=count>Int32.MaxValue-written ? Int32.MaxValue : written+count;
             }
-        } catch(Exception failure) { failed(operation,failure); }
+        } catch(Exception failure) { failed(operation,failure,received,written); }
     }
     // Request EOF finishes only the send direction. Closing the receive
     // direction here interrupts our own still-active response reader.
@@ -344,11 +350,11 @@ public sealed class ErgoptiArtifactNtlmProxy : IDisposable {
                 site="write_tunnel"; Write(stream,"HTTP/1.1 200 Connection Established\r\n\r\n");
                 site="get_target_stream"; NetworkStream remote=upstream.GetStream();
                 site="start_receiver"; Thread reverse=new Thread(delegate() {
-                    try { CopyResponse(remote,stream,delegate(string operation, Exception failure) {
+                    try { CopyResponseObserved(remote,stream,delegate(string operation, Exception failure, int responseRead, int responseWritten) {
                         bool stopRequested=stopping;
                         int closeState=Interlocked.CompareExchange(ref targetCloseState,0,0);
                         if(!stopRequested) {
-                            ObserveException("forward_response",failure,operation,closeState,stopRequested);
+                            ObserveException("forward_response",failure,operation,closeState,stopRequested,responseRead,responseWritten);
                             Interlocked.Increment(ref Failures);
                         }
                     }); }
@@ -412,10 +418,12 @@ function Publish {
         if ($null -eq $Observation) {
             $State.first_failure_site='none'; $State.first_failure_family='none'; $State.first_failure_code=0
             $State.first_failure_operation='none'; $State.first_failure_stop_requested=0; $State.first_failure_target_close_state=0
+            $State.first_failure_response_read=0; $State.first_failure_response_written=0
         } else {
             $State.first_failure_site=$Observation.Site; $State.first_failure_family=$Observation.Family; $State.first_failure_code=$Observation.Code
             $State.first_failure_operation=$Observation.Operation; $State.first_failure_stop_requested=[int]$Observation.StopRequested
             $State.first_failure_target_close_state=$Observation.TargetCloseState
+            $State.first_failure_response_read=$Observation.ResponseRead; $State.first_failure_response_written=$Observation.ResponseWritten
         }
     }
     $Pending=$StatePath+'.pending'

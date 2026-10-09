@@ -42,6 +42,9 @@ function Write-ProxyEntryFailure([System.Management.Automation.ErrorRecord]$Fail
         switch -CaseSensitive (($ErrorId -split ',')[0]) {
             'Canonical native entrypoint deadline was refused.' {$Error='budget_refused'}
             'COMPILER_ERRORS' {$Error='compiler'}
+            'SOURCE_CODE_ERROR' {$Error='compiler'}
+            'CannotDefineNewType' {$Error='language_refused'}
+            'System.ArgumentException' {if ($Failure.InvocationInfo.MyCommand.Name -ceq 'ConvertFrom-Json') {$Error='json_invalid'}}
             'TYPE_ALREADY_EXISTS' {$Error='type_exists'}
             'TypeNotFound' {$Error='type_missing'}
             'MethodNotFound' {$Error='method_missing'}
@@ -49,6 +52,34 @@ function Write-ProxyEntryFailure([System.Management.Automation.ErrorRecord]$Fail
             'PropertyNotFoundStrict' {$Error='property_missing'}
             'CommandNotFoundException' {$Error='command_missing'}
             'MethodInvocationException' {$Error='method_invocation'}
+        }
+    }
+    $Command='other'
+    if ($null -ne $Failure.InvocationInfo -and $null -ne $Failure.InvocationInfo.MyCommand) {
+        switch -CaseSensitive ($Failure.InvocationInfo.MyCommand.Name) {
+            'Add-Type' {$Command='add_type'}
+            'Get-Content' {$Command='get_content'}
+            'ConvertFrom-Json' {$Command='convert_json'}
+        }
+    }
+    $Category='unknown'
+    if ($null -ne $Failure.CategoryInfo -and [Enum]::IsDefined([Management.Automation.ErrorCategory],$Failure.CategoryInfo.Category)) {
+        $Category=([int]$Failure.CategoryInfo.Category).ToString([Globalization.CultureInfo]::InvariantCulture)
+    }
+    $Language='unknown'
+    if ($ExecutionContext.SessionState.LanguageMode -cin @('FullLanguage','ConstrainedLanguage','RestrictedLanguage','NoLanguage')) {
+        $Language=[string]$ExecutionContext.SessionState.LanguageMode
+    }
+    $Compiler='none'
+    $ErrorIdToken=''
+    if ($Error -ceq 'compiler' -and $Command -ceq 'add_type' -and $ErrorId.Length -le 256) {
+        $ErrorIdToken=($ErrorId -split ',')[0]
+    }
+    if ($ErrorIdToken -cin @('SOURCE_CODE_ERROR','COMPILER_ERRORS')) {
+        $CompilerText=[string]$Failure.Exception.Message
+        if ($CompilerText.Length -le 8192) {
+            $Codes=[regex]::Matches($CompilerText,'(?m)^[^\r\n]{0,512}\berror (CS[0-9]{4}):')
+            if ($Codes.Count -eq 1) {$Compiler=$Codes[0].Groups[1].Value}
         }
     }
     $Budget=if ($script:LookupSeconds -is [int]) {'int32'} elseif ($script:LookupSeconds -is [long]) {'int64'}
@@ -60,7 +91,7 @@ function Write-ProxyEntryFailure([System.Management.Automation.ErrorRecord]$Fail
         $Method=$Type.GetMethod('CurrentTick',[Reflection.BindingFlags]::Public -bor [Reflection.BindingFlags]::Static)
         if ($null -ne $Method -and $Method.GetParameters().Length -eq 0 -and $Method.ReturnType -eq [long]) {$Tick=1}
     }
-    [Console]::Out.WriteLine('PROXY_ENTRY_DIAG site='+$Site+' line='+$Line+' error='+$Error+' budget='+$Budget+' helper='+$Helper+' tick='+$Tick)
+    [Console]::Out.WriteLine('PROXY_ENTRY_DIAG site='+$Site+' line='+$Line+' error='+$Error+' budget='+$Budget+' helper='+$Helper+' tick='+$Tick+' command='+$Command+' category='+$Category+' language='+$Language+' compiler='+$Compiler)
     [Console]::Out.Flush()
 }
 $ProxyEntrySite='unknown'
@@ -241,7 +272,7 @@ try {
     # entire Job-owned tree has acknowledged retirement.
     $ProxyNativeDiagnosticStage='entrypoint_input'
     $ProxyEntrySite='paths'
-    $VendorRoot=Split-Path -Parent $WorkerPath
+    $VendorRoot=Split-Path -Parent ([IO.Path]::GetFullPath($WorkerPath))
     $SharedRoot=Join-Path (Split-Path -Parent (Split-Path -Parent $VendorRoot)) '_shared'
     $PolicyPath=Join-Path $SharedRoot 'modules/network/proxy_policy.json'
     $DefaultsPath=Join-Path $SharedRoot 'modules/updater/defaults.json'

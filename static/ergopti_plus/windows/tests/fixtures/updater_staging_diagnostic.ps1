@@ -180,6 +180,9 @@ function Write-ErgoptiStagingSetupDiagnostic {
         if ($Id.Length -le 256) {
             switch -CaseSensitive (($Id -split ',')[0]) {
                 'COMPILER_ERRORS' {$Error='compiler'}
+                'SOURCE_CODE_ERROR' {$Error='compiler'}
+                'CannotDefineNewType' {$Error='language_refused'}
+                'System.ArgumentException' {if ($Failure.InvocationInfo.MyCommand.Name -ceq 'ConvertFrom-Json') {$Error='json_invalid'}}
                 'TYPE_ALREADY_EXISTS' {$Error='type_exists'}
                 'TypeNotFound' {$Error='type_missing'}
                 'MethodNotFound' {$Error='method_missing'}
@@ -191,7 +194,35 @@ function Write-ErgoptiStagingSetupDiagnostic {
                 'Legacy route observation seam drifted.' {$Error='observation_seam'}
             }
         }
-        $Fact=@{schema_version=1;site=$Site;line=[int]$Line;exception=$Family;error=$Error;hresult=[int]$Exception.HResult}
+        $Command='other'
+        if ($null -ne $Failure.InvocationInfo -and $null -ne $Failure.InvocationInfo.MyCommand) {
+            switch -CaseSensitive ($Failure.InvocationInfo.MyCommand.Name) {
+                'Add-Type' {$Command='add_type'}
+                'Get-Content' {$Command='get_content'}
+                'ConvertFrom-Json' {$Command='convert_json'}
+            }
+        }
+        $Category='unknown'
+        if ($null -ne $Failure.CategoryInfo -and [Enum]::IsDefined([Management.Automation.ErrorCategory],$Failure.CategoryInfo.Category)) {
+            $Category=([int]$Failure.CategoryInfo.Category).ToString([Globalization.CultureInfo]::InvariantCulture)
+        }
+        $Language='unknown'
+        if ($ExecutionContext.SessionState.LanguageMode -cin @('FullLanguage','ConstrainedLanguage','RestrictedLanguage','NoLanguage')) {
+            $Language=[string]$ExecutionContext.SessionState.LanguageMode
+        }
+        $Compiler='none'
+        $ErrorIdToken=''
+        if ($Error -ceq 'compiler' -and $Command -ceq 'add_type' -and $Id.Length -le 256) {
+            $ErrorIdToken=($Id -split ',')[0]
+        }
+        if ($ErrorIdToken -cin @('SOURCE_CODE_ERROR','COMPILER_ERRORS')) {
+            $CompilerText=[string]$Failure.Exception.Message
+            if ($CompilerText.Length -le 8192) {
+                $Codes=[regex]::Matches($CompilerText,'(?m)^[^\r\n]{0,512}\berror (CS[0-9]{4}):')
+                if ($Codes.Count -eq 1) {$Compiler=$Codes[0].Groups[1].Value}
+            }
+        }
+        $Fact=@{schema_version=1;site=$Site;line=[int]$Line;exception=$Family;error=$Error;hresult=[int]$Exception.HResult;command=$Command;category=$Category;language=$Language;compiler=$Compiler}
         $Bytes=[Text.UTF8Encoding]::new($false).GetBytes(($Fact|ConvertTo-Json -Compress))
         if ($Bytes.Length -gt 2048) {return}
         $Stream=[IO.File]::Open($Path,[IO.FileMode]::CreateNew,[IO.FileAccess]::Write,[IO.FileShare]::None)

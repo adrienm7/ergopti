@@ -209,6 +209,16 @@ function Publish-State {
         $State.server_tls_owned_modules = $Fixture.NativeTls.OwnedModuleReferences
         $State.server_tls_owned_source_fences = $Fixture.NativeTls.OwnedSourceFences
         $State.server_tls_owned_streams = $Fixture.NativeTls.OwnedStreams
+        try {
+        $Closed = $Fixture.NativeTls.ReadClosedStream()
+        if ($null -ne $Closed) {
+            $State.tls_close_sequence=$Closed.Sequence; $State.tls_close_called=$Closed.ShutdownCalled
+            $State.tls_close_result=$Closed.ShutdownResult; $State.tls_close_error=$Closed.ShutdownError
+            $State.tls_close_received=$Closed.Received; $State.tls_close_written=$Closed.Written
+            $State.tls_close_close_written=$Closed.CloseWritten; $State.tls_close_pending=$Closed.Pending
+            $State.tls_close_network_closed=$Closed.NetworkClosed
+        }
+        } catch { } # New observation cannot suppress prior service failure facts.
         $Fact = $Fixture.ReadServiceFailure()
         if ($Fact.Stage -cne 'none') {
             $State.service_failure_stage = $Fact.Stage
@@ -363,6 +373,29 @@ public sealed class ErgoptiFixtureOpenSsl : IDisposable
     public int OwnedModuleReferences { get { return (sslModule != IntPtr.Zero ? 1 : 0) + (cryptoModule != IntPtr.Zero ? 1 : 0); } }
     public int OwnedSourceFences { get { return images.Count; } }
     public int OwnedStreams { get { lock (gate) return streams; } }
+    public sealed class ClosedStreamFact {
+        public readonly int Sequence, ShutdownCalled, ShutdownResult, ShutdownError;
+        public readonly int Received, Written, CloseWritten, Pending, NetworkClosed;
+        public ClosedStreamFact(int sequence, int called, int result, int error, int received,
+            int written, int closeWritten, int pending, int networkClosed) {
+            Sequence=sequence; ShutdownCalled=called; ShutdownResult=result; ShutdownError=error;
+            Received=received; Written=written; CloseWritten=closeWritten; Pending=pending; NetworkClosed=networkClosed;
+        }
+    }
+    private ClosedStreamFact closedStream;
+    public ClosedStreamFact ReadClosedStream() { lock (gate) return closedStream; }
+    private void ObserveClosedStream(int called, int result, int error, int received,
+        int written, int closeWritten, int pending, bool networkClosed) {
+        // A failed close is unavailable, never a fabricated physical acknowledgement.
+        if (!networkClosed) return;
+        try { lock (gate) {
+            int sequence=closedStream==null ? 1 : Math.Min(closedStream.Sequence, 65534)+1;
+            closedStream=new ClosedStreamFact(sequence,called,result,error,received,written,closeWritten,pending,1);
+        } } catch { /* Optional observation cannot replace original retirement or failure. */ }
+    }
+    private static int AddObservedBytes(int total, int count) {
+        return count > Int32.MaxValue-total ? Int32.MaxValue : total+count;
+    }
 
     private static string Hex(byte[] bytes)
     {
@@ -660,6 +693,7 @@ public sealed class ErgoptiFixtureOpenSsl : IDisposable
         private readonly byte[] encrypted = new byte[16384];
         private bool disposed;
         private bool authenticated;
+        private int receivedEncrypted, writtenEncrypted;
         public NativeStream(ErgoptiFixtureOpenSsl owner, NetworkStream network, Func<bool> trustAdmitted)
         {
             if (network == null || trustAdmitted == null) throw new ArgumentNullException();
@@ -694,6 +728,7 @@ public sealed class ErgoptiFixtureOpenSsl : IDisposable
                     if (count > encrypted.Length || total > 1048576 - count)
                         throw new InvalidDataException("Native TLS encrypted output ceiling refused.");
                     network.Write(encrypted, 0, count);
+                    writtenEncrypted=AddObservedBytes(writtenEncrypted,count);
                     total += count;
                 }
             } finally { pin.Free(); Array.Clear(encrypted, 0, encrypted.Length); }
@@ -702,6 +737,7 @@ public sealed class ErgoptiFixtureOpenSsl : IDisposable
         {
             int count = network.Read(encrypted, 0, encrypted.Length);
             if (count <= 0) throw new EndOfStreamException("Owned TLS peer closed before protocol completion.");
+            receivedEncrypted=AddObservedBytes(receivedEncrypted,count);
             System.Runtime.InteropServices.GCHandle pin = System.Runtime.InteropServices.GCHandle.Alloc(encrypted, System.Runtime.InteropServices.GCHandleType.Pinned);
             try {
                 if (Owner.bioWrite(input, pin.AddrOfPinnedObject(), count) != count)
@@ -784,23 +820,34 @@ public sealed class ErgoptiFixtureOpenSsl : IDisposable
         {
             if (disposed) return;
             if (disposing) {
+                int shutdownCalled=0, shutdownResult=0, shutdownError=0, closeWritten=0, pending=-1;
+                bool networkClosed=false;
                 try {
                     if (authenticated && ssl != IntPtr.Zero) {
                         Owner.clearError();
                         int result = Owner.shutdown(ssl);
                         int error = result < 0 ? Owner.sslError(ssl, result) : 0;
+                        shutdownCalled=1; shutdownResult=result; shutdownError=error;
                         if (result < 0 && error != 2 && error != 3 && error != 6)
                             throw new InvalidOperationException("Native TLS close notification refused.");
                         // Send close_notify once; never wait for a peer during retirement.
-                        Drain();
+                        int priorWritten=writtenEncrypted;
+                        try { Drain(); }
+                        finally {
+                            closeWritten=writtenEncrypted==Int32.MaxValue ? -1 : writtenEncrypted-priorWritten;
+                        }
                     }
                 } finally {
                     if (ssl != IntPtr.Zero) { Owner.sslFree(ssl); ssl = input = output = IntPtr.Zero; }
-                    try { network.Dispose(); }
+                    // Read only this existing stream; refusal remains explicitly unavailable.
+                    try { pending=network.DataAvailable ? 1 : 0; } catch { }
+                    try { network.Dispose(); networkClosed=true; }
                     finally {
                         Array.Clear(encrypted, 0, encrypted.Length);
                         lock (Owner.gate) Owner.streams--;
                         disposed = true;
+                        Owner.ObserveClosedStream(shutdownCalled,shutdownResult,shutdownError,
+                            receivedEncrypted,writtenEncrypted,closeWritten,pending,networkClosed);
                     }
                 }
             }
