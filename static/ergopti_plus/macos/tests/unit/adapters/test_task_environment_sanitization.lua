@@ -21,6 +21,7 @@ local helpers = require("tests.helpers")
 -- ===========================================================
 
 local MANAGED_KEYS = {
+	"ERGOPTI_KEYBOARD_GEOMETRY_V1",
 	"ERGOPTI_LAUNCHER_PID",
 	"ERGOPTI_LAUNCHER_BUNDLE_ID",
 	"ERGOPTI_LOG_PORT",
@@ -46,6 +47,7 @@ local function make_task_factory(set_result)
 		ERGOPTI_LAUNCHER_BUNDLE_ID = "com.ergopti.launcher",
 		ERGOPTI_LOG_PORT = "42424",
 		ERGOPTI_LOG_TOKEN = "secret-transport-token",
+		ERGOPTI_KEYBOARD_GEOMETRY_V1 = "owned native geometry",
 	}
 	local task = {}
 

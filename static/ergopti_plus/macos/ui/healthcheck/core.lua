@@ -340,6 +340,11 @@ local ADAPTER_SPECS = {
 		wired    = true,
 	},
 	{
+		id       = "adapters.keyboard_geometry",
+		contract = { "initialize", "event_type", "form", "native_code", "physical_code" },
+		wired    = true,
+	},
+	{
 		id       = "adapters.file_system",
 		contract = { "read", "write", "exists", "prepare_parent_for_create" },
 		wired    = true,
