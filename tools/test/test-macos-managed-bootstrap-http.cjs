@@ -68,7 +68,7 @@ const archiveModes = spawnSync(
 assert.equal(archiveModes.error, undefined, 'the actual archive mode receiver must start');
 assert.equal(archiveModes.signal, null, 'the actual archive mode receiver must retire');
 assert.equal(archiveModes.status, 0, archiveModes.stderr || archiveModes.stdout);
-assert.match(archiveModes.stderr, /Ran 3 tests in/);
+assert.match(archiveModes.stderr, /Ran 4 tests in/);
 assert.match(archiveModes.stderr, /\bOK\b/);
 assert.doesNotMatch(archiveModes.stderr, /skipped=/);
 process.stdout.write(archiveModes.stdout);
