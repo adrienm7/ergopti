@@ -36,6 +36,50 @@ WIRE = load("receiving_fact_wire", SUPPORT / "native_http_wire_fixture.py")
 CLIENT = load("receiving_fact_client", SUPPORT / "native_http_wire_client_receiving.py")
 
 
+# Finite approved source-acquisition hunks compose before the independent
+# ownership repair. These spans never replace the historical whole-source pin.
+PAC_SOURCE_ACQUISITION_INVERSE = (
+    (
+        "\tstatic func routes(url: URL, budget: TimeInterval, maximumSelections: Int,\n\t\tsettingsProvider: () -> CFDictionary? = { CFNetworkCopySystemProxySettings()?.takeRetainedValue() },\n\t\tcertificates: [SecCertificate] = [],\n\t\tdiscoveryMetadataProvider: () -> ManagedWPADMetadata = { ManagedProxyLookup.discoveryMetadata() }) -> [[String: Any]]? {\n\t\tguard budget.isFinite, budget > 0 else { return nil }\n\t\tlet deadline = ProcessInfo.processInfo.systemUptime + budget\n\t\tguard !ManagedPACSource.hasDebt, let settings = settingsProvider(),\n\t\t\tProcessInfo.processInfo.systemUptime < deadline else { return nil }\n\t\tlet dictionary = (settings as AnyObject) as? [String: Any]\n\t\tlet discoveryEnabled = (dictionary?[kCFNetworkProxiesProxyAutoDiscoveryEnable as String] as? NSNumber)?.boolValue == true\n",
+        "\tstatic func routes(url: URL, budget: TimeInterval, maximumSelections: Int,\n\t\tsettingsProvider: () -> CFDictionary? = { CFNetworkCopySystemProxySettings()?.takeRetainedValue() },\n\t\tdiscoveryMetadataProvider: () -> ManagedWPADMetadata = { ManagedProxyLookup.discoveryMetadata() }) -> [[String: Any]]? {\n\t\tguard let settings = settingsProvider() else { return nil }\n\t\tlet dictionary = (settings as AnyObject) as? [String: Any]\n\t\tlet discoveryEnabled = (dictionary?[kCFNetworkProxiesProxyAutoDiscoveryEnable as String] as? NSNumber)?.boolValue == true\n",
+    ),
+    (
+        "\t\t})\n\t\tvar routes: [[String: Any]] = []\n\t\tfor candidate in candidates {\n\t\t\tguard let kind = candidate[kCFProxyTypeKey as String] as? String else { return nil }\n\t\t\tif kind == kCFProxyTypeAutoConfigurationURL as String {\n\t\t\t\tguard let pacURL = candidate[kCFProxyAutoConfigurationURLKey as String] as? URL,\n\t\t\t\t\tlet expanded = evaluate(url: url, pacURL: pacURL, script: nil, deadline: deadline, certificates: certificates),\n\t\t\t\t\t!expanded.isEmpty else { return nil }\n\t\t\t\troutes.append(contentsOf: expanded)\n\t\t\t} else if kind == kCFProxyTypeAutoConfigurationJavaScript as String {\n\t\t\t\tguard let script = candidate[kCFProxyAutoConfigurationJavaScriptKey as String] as? String,\n\t\t\t\t\tlet expanded = evaluate(url: url, pacURL: nil, script: script, deadline: deadline, certificates: certificates),\n\t\t\t\t\t!expanded.isEmpty else { return nil }\n\t\t\t\troutes.append(contentsOf: expanded)\n",
+        "\t\t})\n\t\tvar routes: [[String: Any]] = []\n\t\tlet deadline = ProcessInfo.processInfo.systemUptime + budget\n\t\tfor candidate in candidates {\n\t\t\tguard let kind = candidate[kCFProxyTypeKey as String] as? String else { return nil }\n\t\t\tif kind == kCFProxyTypeAutoConfigurationURL as String {\n\t\t\t\tguard let pacURL = candidate[kCFProxyAutoConfigurationURLKey as String] as? URL,\n\t\t\t\t\tlet expanded = evaluate(url: url, pacURL: pacURL, script: nil, deadline: deadline),\n\t\t\t\t\t!expanded.isEmpty else { return nil }\n\t\t\t\troutes.append(contentsOf: expanded)\n\t\t\t} else if kind == kCFProxyTypeAutoConfigurationJavaScript as String {\n\t\t\t\tguard let script = candidate[kCFProxyAutoConfigurationJavaScriptKey as String] as? String,\n\t\t\t\t\tlet expanded = evaluate(url: url, pacURL: nil, script: script, deadline: deadline),\n\t\t\t\t\t!expanded.isEmpty else { return nil }\n\t\t\t\troutes.append(contentsOf: expanded)\n",
+    ),
+    (
+        "\t\t\t!hasNativePAC {\n\t\t\tguard let discovered = discover(url: url, deadline: deadline,\n\t\t\t\tmaximumSelections: maximumSelections, certificates: certificates, metadataProvider: discoveryMetadataProvider) else { return nil }\n\t\t\troutes = discovered\n\t\t}\n",
+        "\t\t\t!hasNativePAC {\n\t\t\tguard let discovered = discover(url: url, deadline: deadline,\n\t\t\t\tmaximumSelections: maximumSelections, metadataProvider: discoveryMetadataProvider) else { return nil }\n\t\t\troutes = discovered\n\t\t}\n",
+    ),
+    (
+        "\n\tstatic func discover(url: URL, deadline: TimeInterval, maximumSelections: Int,\n\t\tcertificates: [SecCertificate] = [],\n\t\tmetadataProvider: () -> ManagedWPADMetadata = { ManagedProxyLookup.discoveryMetadata() }) -> [[String: Any]]? {\n\t\tguard !ManagedPACSource.hasDebt, ProcessInfo.processInfo.systemUptime < deadline else { return nil }\n\t\tlet metadata = metadataProvider()\n\t\tguard let endpoints = discoveryURLs(dhcpOption: metadata.dhcpOption, searchDomains: metadata.searchDomains),\n\t\t\t!endpoints.isEmpty, endpoints.count <= maximumSelections else { return nil }\n\t\tfor endpoint in endpoints {\n\t\t\tguard !ManagedPACSource.hasDebt, ProcessInfo.processInfo.systemUptime < deadline else { return nil }\n\t\t\tif let result = evaluate(url: url, pacURL: endpoint, script: nil, deadline: deadline, certificates: certificates),\n\t\t\t\t!result.isEmpty, result.count <= maximumSelections { return result }\n\t\t}\n",
+        "\n\tstatic func discover(url: URL, deadline: TimeInterval, maximumSelections: Int,\n\t\tmetadataProvider: () -> ManagedWPADMetadata = { ManagedProxyLookup.discoveryMetadata() }) -> [[String: Any]]? {\n\t\tlet metadata = metadataProvider()\n\t\tguard let endpoints = discoveryURLs(dhcpOption: metadata.dhcpOption, searchDomains: metadata.searchDomains),\n\t\t\t!endpoints.isEmpty, endpoints.count <= maximumSelections else { return nil }\n\t\tfor endpoint in endpoints {\n\t\t\tguard ProcessInfo.processInfo.systemUptime < deadline else { return nil }\n\t\t\tif let result = evaluate(url: url, pacURL: endpoint, script: nil, deadline: deadline),\n\t\t\t\t!result.isEmpty, result.count <= maximumSelections { return result }\n\t\t}\n",
+    ),
+    (
+        "\t}\n\n\tstatic func evaluate(url: URL, pacURL: URL?, script: String?, deadline: TimeInterval,\n\t\tcertificates: [SecCertificate] = []) -> [[String: Any]]? {\n\t\tguard !ManagedPACSource.hasDebt, ProcessInfo.processInfo.systemUptime < deadline else { return nil }\n\t\tlet source: String\n\t\tif let pacURL, script == nil {\n\t\t\tguard let acquired = ManagedPACSource.load(pacURL, deadline: deadline, certificates: certificates) else { return nil }\n\t\t\tsource = acquired\n\t\t} else if pacURL == nil, let script { source = script }\n\t\telse { return nil }\n\t\tguard ProcessInfo.processInfo.systemUptime < deadline,\n\t\t\tlet bound = try? ManagedPACSource.bind(source, url: url) else { return nil }\n\t\treturn evaluateNative(url: url, pacURL: nil, script: bound, deadline: deadline)\n\t}\n\n\t/// Keep the raw public framework boundary observable independently of the\n\t/// production binding. This does not acquire a PAC through an owned session.\n\tstatic func evaluateNative(url: URL, pacURL: URL?, script: String?, deadline: TimeInterval) -> [[String: Any]]? {\n\t\tguard ProcessInfo.processInfo.systemUptime < deadline else { return nil }\n\t\tlet result = ManagedPACResult()\n\t\tvar context = CFStreamClientContext(version: 0,\n",
+        "\t}\n\n\tstatic func evaluate(url: URL, pacURL: URL?, script: String?, deadline: TimeInterval) -> [[String: Any]]? {\n\t\tlet result = ManagedPACResult()\n\t\tvar context = CFStreamClientContext(version: 0,\n",
+    ),
+    (
+        '\t\t\tguard let selected = ManagedProxyLookup.routes(url: request.url,\n\t\t\t\tbudget: min(lookupRemaining ?? request.idleTimeout, request.idleTimeout),\n\t\t\t\tmaximumSelections: maximumSelections, settingsProvider: settingsProvider, certificates: certificates,\n\t\t\t\tdiscoveryMetadataProvider: discoveryMetadataProvider)\n\t\t\telse { return refuse(reason: "unavailable", status: 78, output: output) }\n',
+        '\t\t\tguard let selected = ManagedProxyLookup.routes(url: request.url,\n\t\t\t\tbudget: min(lookupRemaining ?? request.idleTimeout, request.idleTimeout),\n\t\t\t\tmaximumSelections: maximumSelections, settingsProvider: settingsProvider,\n\t\t\t\tdiscoveryMetadataProvider: discoveryMetadataProvider)\n\t\t\telse { return refuse(reason: "unavailable", status: 78, output: output) }\n',
+    ),
+)
+
+
+def pac_source_acquisition_projection(source):
+    """Invert only one complete enrolled request-owned PAC source repair."""
+    if "ManagedPACSource." not in source:
+        return source
+    if any(source.count(new) != 1 for new, old in PAC_SOURCE_ACQUISITION_INVERSE):
+        raise ValueError("PAC source acquisition enrollment refused")
+    projected = source
+    for new, old in PAC_SOURCE_ACQUISITION_INVERSE:
+        projected = projected.replace(new, old, 1)
+    if "ManagedPACSource." in projected:
+        raise ValueError("PAC source acquisition projection refused")
+    return projected
+
+
 # Preserve the diagnostic-only release pin across the separately reviewed PAC
 # ownership repair afb1f15d. Each complete, unique span must be enrolled before
 # any inversion; the whole historical hash still protects every unrelated byte.
@@ -66,6 +110,7 @@ HISTORICAL_HTTP_RELEASE_SHA256 = "68659ddec98c9a427244b315b69c17750b743eab2cdd36
 
 def historical_pac_ownership_projection(source):
     """Accept the exact legacy source or the complete approved ownership repair."""
+    source = pac_source_acquisition_projection(source)
     if hashlib.sha256(source.encode("utf-8")).hexdigest() == HISTORICAL_HTTP_RELEASE_SHA256:
         return source
     if any(source.count(new) != 1 or (old and old in source) for new, old in PAC_OWNERSHIP_INVERSE):
@@ -1701,11 +1746,13 @@ class HistoricalPACOwnershipProjectionTests(unittest.TestCase):
         source = (
             SUPPORT.parents[1] / "launcher/Sources/ErgoptiPlus/ManagedHTTPWorker.swift"
         ).read_text(encoding="utf-8")
-        return re.sub(
-            r"^[ \t]*#if ERGOPTI_MANAGED_HTTP_FIXTURE_DIAGNOSTICS\n.*?^[ \t]*#endif\n",
-            "",
-            source,
-            flags=re.MULTILINE | re.DOTALL,
+        return pac_source_acquisition_projection(
+            re.sub(
+                r"^[ \t]*#if ERGOPTI_MANAGED_HTTP_FIXTURE_DIAGNOSTICS\n.*?^[ \t]*#endif\n",
+                "",
+                source,
+                flags=re.MULTILINE | re.DOTALL,
+            )
         )
 
     def test41CompleteApprovedRepairAndExactLegacyKeepOriginalWholePin(self):
@@ -1768,6 +1815,348 @@ class HistoricalPACOwnershipProjectionTests(unittest.TestCase):
                     self.assertIn(before, candidate)
                     with self.assertRaises(ValueError):
                         historical_pac_ownership_projection(candidate.replace(before, after, 1))
+
+
+class PACSourceAcquisitionProjectionTests(unittest.TestCase):
+    @staticmethod
+    def raw_source():
+        source = (
+            SUPPORT.parents[1] / "launcher/Sources/ErgoptiPlus/ManagedHTTPWorker.swift"
+        ).read_text()
+        return re.sub(
+            r"^[ \t]*#if ERGOPTI_MANAGED_HTTP_FIXTURE_DIAGNOSTICS\n.*?^[ \t]*#endif\n",
+            "",
+            source,
+            flags=re.MULTILINE | re.DOTALL,
+        )
+
+    def test45CompleteSourceOwnerKeepsImmutableHistoricalPin(self):
+        source = self.raw_source()
+        legacy = historical_pac_ownership_projection(source)
+        self.assertEqual(
+            hashlib.sha256(legacy.encode()).hexdigest(), HISTORICAL_HTTP_RELEASE_SHA256
+        )
+        self.assertNotIn("ManagedPACSource.", legacy)
+
+    def test46EveryPartialSourceOwnerSpanRefuses(self):
+        source = self.raw_source()
+        for new, old in PAC_SOURCE_ACQUISITION_INVERSE:
+            with self.subTest(span=new):
+                self.assertEqual(source.count(new), 1)
+                with self.assertRaises(ValueError):
+                    historical_pac_ownership_projection(source.replace(new, old, 1))
+
+    def test47DuplicateAndAlteredSourceOwnerSpansRefuse(self):
+        source = self.raw_source()
+        for new, old in PAC_SOURCE_ACQUISITION_INVERSE:
+            with self.subTest(span=new):
+                with self.assertRaises(ValueError):
+                    historical_pac_ownership_projection(source.replace(new, new + new, 1))
+                with self.assertRaises(ValueError):
+                    historical_pac_ownership_projection(
+                        source.replace(new, new + "// unapproved\n", 1)
+                    )
+
+    def test48NativeTrustAndOriginalDeadlineCannotDriftUnderEnrollment(self):
+        source = self.raw_source()
+        for before, after in (
+            (
+                "let deadline = ProcessInfo.processInfo.systemUptime + budget",
+                "let deadline = ProcessInfo.processInfo.systemUptime + budget + 1",
+            ),
+            ("certificates: certificates", "certificates: []"),
+            ("CFNetworkExecuteProxyAutoConfigurationScript", "UnapprovedScriptRuntime"),
+        ):
+            self.assertIn(before, source)
+            with self.assertRaises(ValueError):
+                historical_pac_ownership_projection(source.replace(before, after, 1))
+
+
+class NativeTrustRemovalDiagnosticTests(unittest.TestCase):
+    def setUp(self):
+        self.fixture = WIRE.WireFixture(native=False)
+        self.addCleanup(self.cleanup_fixture)
+
+    def cleanup_fixture(self):
+        # No native trust mutation occurs through these explicit POSIX ports.
+        self.fixture.native = False
+        self.fixture.trust_attempted = False
+        self.fixture.close()
+
+    def test45CanonicalPublicCalleeProjectionCannotExportMessageOrGuessOSStatus(self):
+        raw = b"SecTrustSettingsRemoveTrustSettings: private-certificate https://private.invalid/key\n"
+        fact = WIRE.WireFixture._security_failure_fact(raw)
+        self.assertEqual(fact, {"version": 1, "observed": 1, "category": "trust_settings_remove"})
+        self.assertNotIn("private", json.dumps(fact))
+        self.assertNotIn("https", json.dumps(fact))
+        self.assertNotIn("status", fact)
+        for unknown in (
+            b"",
+            b"SecTrustSettingsRemoveTrustSettings: \n",
+            b"security: SecTrustSettingsRemoveTrustSettings: refusal\n",
+            b"SecTrustSettingsSetTrustSettings: refusal\n",
+            b"Error reading file /private/certificate.pem\n",
+            raw + raw,
+            raw[:-1],
+            raw.replace(b"private", b"\x00"),
+            b"SecTrustSettingsRemoveTrustSettings: " + b"x" * 1024 + b"\n",
+            "SecTrustSettingsRemoveTrustSettings: refusal\n",
+        ):
+            with self.subTest(length=len(unknown)):
+                self.assertEqual(
+                    WIRE.WireFixture._security_failure_fact(unknown),
+                    {"version": 1, "observed": 0, "category": None},
+                )
+
+    def test46RealFailingChildProjectsOnlyAfterExactFilesAndChildAreRetired(self):
+        children = []
+        acquire = subprocess.Popen
+
+        def owned_child(*args, **options):
+            child = acquire(*args, **options)
+            child.output_owner, child.error_owner = options["stdout"], options["stderr"]
+            children.append(child)
+            return child
+
+        output = io.StringIO()
+        command = [
+            sys.executable,
+            "-B",
+            "-c",
+            "import sys; sys.stderr.write('SecTrustSettingsRemoveTrustSettings: private-certificate-url\\n'); sys.exit(1)",
+        ]
+        with mock.patch.object(WIRE.subprocess, "Popen", side_effect=owned_child):
+            with contextlib.redirect_stdout(output):
+                with self.assertRaises(WIRE.FixtureFailure):
+                    self.fixture._command(command, security_failure_observation=True)
+        self.assertEqual(self.fixture.command_fact, {"phase": "exit", "status": 1})
+        self.assertEqual(len(children), 1)
+        child = children[0]
+        self.assertEqual(child.returncode, 1)
+        self.assertTrue(
+            child.stdin.closed and child.output_owner.closed and child.error_owner.closed
+        )
+        receipt = json.loads(output.getvalue().split(" ", 2)[2])
+        self.assertEqual(
+            receipt,
+            {
+                "version": 1,
+                "observed": 1,
+                "category": "trust_settings_remove",
+                "phase": "exit",
+                "status": 1,
+            },
+        )
+        self.assertNotIn("private-certificate", output.getvalue())
+        create_file = tempfile.TemporaryFile
+        reads, files = [], []
+
+        class ObservedFile:
+            def __init__(self, owner):
+                self.owner = owner
+
+            def __getattr__(self, name):
+                return getattr(self.owner, name)
+
+            def read(self, size=-1):
+                raw = self.owner.read(size)
+                reads.append((size, len(raw)))
+                return raw
+
+        def bounded_file(*args, **options):
+            value = ObservedFile(create_file(*args, **options))
+            files.append(value)
+            return value
+
+        actual_print = print
+
+        def publication(*args, **options):
+            self.assertTrue(all(value.closed for value in files))
+            self.assertIsNotNone(children[-1].returncode)
+            self.assertTrue(children[-1].stdin.closed)
+            actual_print(*args, **options)
+
+        large_command = [
+            sys.executable,
+            "-B",
+            "-c",
+            "import sys; sys.stderr.buffer.write(b'x' * (2 * 1024 * 1024)); sys.exit(1)",
+        ]
+        bounded_output = io.StringIO()
+        with mock.patch.object(WIRE.subprocess, "Popen", side_effect=owned_child):
+            with mock.patch.object(WIRE.tempfile, "TemporaryFile", side_effect=bounded_file):
+                with mock.patch("builtins.print", side_effect=publication):
+                    with contextlib.redirect_stdout(bounded_output):
+                        with self.assertRaises(WIRE.FixtureFailure):
+                            self.fixture._command(large_command, security_failure_observation=True)
+        self.assertEqual(reads, [(1025, 1025)])
+        self.assertEqual(
+            json.loads(bounded_output.getvalue().split(" ", 2)[2]),
+            {"version": 1, "observed": 0, "category": None, "phase": "exit", "status": 1},
+        )
+        for refusal in (OSError("closed diagnostic output"), KeyboardInterrupt()):
+            with mock.patch("builtins.print", side_effect=refusal):
+                with self.assertRaises(WIRE.FixtureFailure) as primary:
+                    self.fixture._command(command, security_failure_observation=True)
+            self.assertEqual(self.fixture.command_fact, {"phase": "exit", "status": 1})
+            self.assertIs(primary.exception.__cause__, refusal)
+
+    def test47FreshAfterQueryConsumesOriginalClockAndPreservesRemovalAndClosureDebt(self):
+        import sys as system
+
+        native_monotonic = time.monotonic
+        real_command = self.fixture._command
+        ca_der = ssl.PEM_cert_to_DER_cert(self.fixture.ca.read_text())
+        query_receipt = {
+            "version": 1,
+            "export_status": 0,
+            "entry_count": 1,
+            "owned_status": -25300,
+            "owned_present": 0,
+        }
+        query_body = (
+            "import sys; sys.stdin.buffer.read(); sys.stdout.buffer.write("
+            + repr(json.dumps(query_receipt).encode())
+            + ")"
+        )
+        remove_body = "import sys; sys.stderr.write('SecTrustSettingsRemoveTrustSettings: private-message\\n'); sys.exit(1)"
+        for expire, close_uncertain in ((False, False), (True, False), (False, True)):
+            with self.subTest(expire=expire, close_uncertain=close_uncertain):
+                self.fixture.native = True
+                self.fixture.trust_attempted = True
+                self.fixture.trust_query_executable = "portable-owned-query"
+                self.fixture.command_fact = None
+                offset = [0.0]
+                calls, observations, children, close_debt = [], [], [], []
+                primary_remove = []
+                acquire, create_file = subprocess.Popen, tempfile.TemporaryFile
+                original_observe = self.fixture._observe_admin_trust
+
+                def observe(deadline, *, after=False):
+                    observations.append((deadline, after))
+                    return original_observe(deadline, after=after)
+
+                def child(*args, **options):
+                    value = acquire(*args, **options)
+                    value.output_owner, value.error_owner = options["stdout"], options["stderr"]
+                    children.append(value)
+                    return value
+
+                class UncertainClosedFile:
+                    def __init__(self, owner):
+                        self.owner = owner
+
+                    def __getattr__(self, name):
+                        return getattr(self.owner, name)
+
+                    def close(self):
+                        self.owner.close()
+                        raise OSError("controlled after-query physical close uncertainty")
+
+                files = []
+
+                def temporary(*args, **options):
+                    value = create_file(*args, **options)
+                    if close_uncertain and len(calls) == 3 and len(files) % 2 == 1:
+                        value = UncertainClosedFile(value)
+                        close_debt.append(value)
+                    files.append(value)
+                    return value
+
+                def command(arguments, input_bytes=b"", **options):
+                    calls.append((arguments, options))
+                    if arguments[0] == "portable-owned-query":
+                        self.assertEqual(input_bytes, ca_der)
+                        return real_command(
+                            [system.executable, "-B", "-c", query_body], input_bytes, **options
+                        )
+                    self.assertEqual(
+                        arguments,
+                        [
+                            "/usr/bin/sudo",
+                            "-n",
+                            "/usr/bin/security",
+                            "remove-trusted-cert",
+                            "-d",
+                            str(self.fixture.ca),
+                        ],
+                    )
+                    self.assertTrue(options["security_failure_observation"])
+                    try:
+                        return real_command([system.executable, "-B", "-c", remove_body], **options)
+                    except WIRE.FixtureFailure as refusal:
+                        primary_remove.append(refusal)
+                        if expire:
+                            offset[0] = 16.0
+                        raise
+
+                output = io.StringIO()
+                try:
+                    with mock.patch.object(
+                        WIRE.time, "monotonic", side_effect=lambda: native_monotonic() + offset[0]
+                    ):
+                        with mock.patch.object(self.fixture, "_command", side_effect=command):
+                            with mock.patch.object(
+                                self.fixture, "_observe_admin_trust", side_effect=observe
+                            ):
+                                with mock.patch.object(WIRE.subprocess, "Popen", side_effect=child):
+                                    with mock.patch.object(
+                                        WIRE.tempfile, "TemporaryFile", side_effect=temporary
+                                    ):
+                                        with contextlib.redirect_stdout(output):
+                                            with self.assertRaises(WIRE.FixtureFailure) as refusal:
+                                                self.fixture.trust(False)
+                    self.assertIs(refusal.exception, primary_remove[0])
+                    self.assertTrue(self.fixture.trust_attempted)
+                    self.assertEqual(self.fixture.command_fact, {"phase": "exit", "status": 1})
+                    self.assertEqual([after for _, after in observations], [False, True])
+                    self.assertEqual(observations[0][0], observations[1][0])
+                    self.assertEqual(calls[1][1]["deadline"], observations[0][0])
+                    self.assertEqual(len(children), 2 if expire else 3)
+                    self.assertTrue(
+                        all(
+                            child.returncode is not None
+                            and child.stdin.closed
+                            and child.output_owner.closed
+                            and child.error_owner.closed
+                            for child in children
+                        )
+                    )
+                    if close_uncertain:
+                        self.assertIsInstance(refusal.exception.__cause__, OSError)
+                        self.assertEqual(len(close_debt), 1)
+                        self.assertTrue(close_debt[0].closed)
+                        self.assertTrue(
+                            any(
+                                debt["stream"] is close_debt[0] and debt["uncertain"]
+                                for debt in self.fixture.command_file_debt
+                            )
+                        )
+                        self.assertFalse(self.fixture._retire_command_files())
+                    else:
+                        after_line = next(
+                            line
+                            for line in output.getvalue().splitlines()
+                            if line.startswith("# native_http_admin_trust_after ")
+                        )
+                        after = json.loads(after_line.split(" ", 2)[2])
+                        self.assertEqual(after["observed"], 0 if expire else 1)
+                        if not expire:
+                            self.assertEqual(after["owned_status"], -25300)
+                    self.assertNotIn("private-message", output.getvalue())
+                finally:
+                    # Retire only this test's exact already-closed injected debt;
+                    # the production owner never promotes uncertainty to success.
+                    self.fixture.command_file_debt[:] = [
+                        debt
+                        for debt in self.fixture.command_file_debt
+                        if debt["stream"] not in close_debt
+                    ]
+                    for value in files:
+                        if not value.closed:
+                            value.close()
+                    self.fixture.native = False
+                    self.fixture.trust_attempted = False
 
 
 if __name__ == "__main__":
