@@ -596,13 +596,15 @@ function M.build(ctx)
 				-- Selecting the current backend again is how a missing runtime
 				-- is installed; an installed one is reused without any work.
 				claim_runtime_selection()
+				if state.llm_enabled == false then return true end
 				if runtime_install_offer.is_installed("mlx") then return true end
 				return check_backend_deps("mlx")
 			end
 			local function activate_mlx(runtime_settled)
 				Logger.info(LOG, "Activating MLX backend…")
 				local committed = publish_backend("mlx", function(debt)
-					if runtime_settled ~= true and check_backend_deps("mlx") ~= true then
+					if state.llm_enabled ~= false and runtime_settled ~= true
+						and check_backend_deps("mlx") ~= true then
 						return false
 					end
 					if not publish_backend_label(debt, "mlx") then return false end
@@ -620,12 +622,12 @@ function M.build(ctx)
 					end
 					return true
 				end)
-				if committed then
+				if committed and state.llm_enabled ~= false then
 					pcall(os.execute, "pkill -f '[o]llama serve' 2>/dev/null || true")
 				end
 				return committed
 			end
-			if not runtime_install_offer.is_installed("mlx") then
+			if state.llm_enabled ~= false and not runtime_install_offer.is_installed("mlx") then
 				return switch_after_install("mlx", runtime_install_offer.select_mlx, activate_mlx)
 			end
 			claim_runtime_selection()
@@ -645,13 +647,15 @@ function M.build(ctx)
 		action       = not paused and function()
 			if state.llm_backend == "ollama" then
 				claim_runtime_selection()
+				if state.llm_enabled == false then return true end
 				if runtime_install_offer.is_installed("ollama") then return true end
 				return check_backend_deps("ollama")
 			end
 			local function activate_ollama(runtime_settled)
 				Logger.info(LOG, "Deactivating MLX backend (switching to Ollama)…")
 				local function finish_ollama_switch(debt)
-					if runtime_settled ~= true and check_backend_deps("ollama") ~= true then
+					if state.llm_enabled ~= false and runtime_settled ~= true
+						and check_backend_deps("ollama") ~= true then
 						return false
 					end
 					if not publish_backend_label(debt, "ollama") then return false end
@@ -677,7 +681,7 @@ function M.build(ctx)
 			-- A missing Ollama is offered before any backend state changes: a
 			-- decline leaves the current backend untouched, and an accepted
 			-- download switches only once the executable exists.
-			if not runtime_install_offer.is_installed("ollama") then
+			if state.llm_enabled ~= false and not runtime_install_offer.is_installed("ollama") then
 				return switch_after_install("ollama", function(on_installed)
 					return runtime_install_offer.select_ollama(on_installed,
 						{ keeps_current_backend = true })
@@ -721,7 +725,9 @@ function M.build(ctx)
 				end
 				-- The old local server is expendable only after every exact target
 				-- successor has committed.
-				pcall(os.execute, "pkill -f '[o]llama serve' 2>/dev/null || true")
+				if state.llm_enabled ~= false then
+					pcall(os.execute, "pkill -f '[o]llama serve' 2>/dev/null || true")
+				end
 				return true
 			end
 			if state.llm_backend == "mlx" then
