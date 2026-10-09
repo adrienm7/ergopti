@@ -4749,6 +4749,14 @@ copied wrappers, observer refusal, actual rollback retention and cleanup. Their
 34-case Windows native qualification remains unexecuted; portable source review
 alone does not prove the complete transactional writer or migrations.
 
+The exact Windows diagnostic CI37970058040 passes 10,642 unit cases and fails
+one later discovery assertion because an older boot-refusal fixture leaves its
+accepted explicit save pending. That fixture now uses its own coordinator and
+restores the original caller object, every field and runtime definedness through
+normal and throwing exits. All original user-file protection assertions remain;
+the independent joined-discovery assertion is unchanged. Native qualification
+of this isolation correction is still pending.
+
 - [~] **43.** A Mac upgraded from a pre-lease release could not deploy (dev.149:
   « Merge aborted: 25 ambiguous legacy ErgoptiPlus rules … matches the
   historical CapsWord anchor »): its karabiner.json keeps an untagged historical
