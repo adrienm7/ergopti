@@ -10,7 +10,7 @@
 	"channel": "dev",
 	"tag": "v0.0.0-dev.157",
 	"version": "0.0.0-dev.157",
-	"authorization_note": "The maintainer requested a prompt diagnostic prerelease with the temporarily deferred tests, to exercise the urgent fixes on a real Mac and return the private-safe report. The same five scopes apply only to dev.157, with the unchanged October 10 07:00 UTC expiry. Every deferred scope remains unqualified. Default, Main, pull requests, dev.158 and other releases execute all assertions; no native pass or feature completion is claimed.",
+	"authorization_note": "The maintainer explicitly authorized deferring all test suites to publish a prompt diagnostic dev.157 prerelease. The fast route supersedes the narrower five-scope deferral only for this tag and before the unchanged October 10 07:00 UTC expiry. Build, signing, source and asset integrity remain required. Core, unit, E2E, installation, launch and native qualification are DEFERRED and qualified:false, not passed. Default, Main, pull requests, dev.158 and other releases execute all assertions. No native acceptance or feature completion is claimed.",
 	"scopes": {
 		"windows-pac-full-url": {
 			"kind": "ahk_test",
