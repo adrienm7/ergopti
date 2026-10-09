@@ -176,6 +176,7 @@ def read_contract(repository: Path, inputs: Inputs):
             "upstream_preimages",
             "request_hook_paths",
             "source_fingerprint_paths",
+            "native_http_go_test_policy",
             "assets",
         ],
     )
@@ -218,6 +219,24 @@ def read_contract(repository: Path, inputs: Inputs):
         or contract["allowed_signing_modes"] != ["ad-hoc", "configured-certificate"]
     ):
         raise ValueError("The native producer policy was refused")
+    policy = contract["native_http_go_test_policy"]
+    exact_keys(policy, ["timeout_seconds", "maximum_log_bytes", "required_passes"])
+    for key in ("timeout_seconds", "maximum_log_bytes"):
+        if type(policy[key]) is not int or policy[key] <= 0:
+            raise ValueError("A native Go receiving bound was refused")
+    identities = policy["required_passes"]
+    if (
+        not isinstance(identities, list)
+        or not identities
+        or any(
+            not isinstance(name, str)
+            or not name.startswith("Test")
+            or any(ord(character) < 32 for character in name)
+            for name in identities
+        )
+        or len(set(identities)) != len(identities)
+    ):
+        raise ValueError("The frozen native Go receiving identities were refused")
     exact_keys(contract["assets"], ["macos-arm64", "macos-amd64"])
     for key, asset in contract["assets"].items():
         exact_keys(asset, ["os", "architecture", "filename", "cgo_ldflags"])

@@ -39,6 +39,12 @@
  */
 const GENERATORS = [
 	{
+		script: 'codegen/codegen-managed-bootstrap.cjs',
+		outputs: [
+			'static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/ManagedBootstrapPolicy.generated.swift'
+		]
+	},
+	{
 		script: 'codegen/codegen-ollama-release.cjs',
 		outputs: ['static/ergopti_plus/macos/modules/llm/ollama-release.sh']
 	},

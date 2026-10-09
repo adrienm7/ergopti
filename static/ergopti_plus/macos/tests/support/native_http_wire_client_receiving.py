@@ -40,58 +40,73 @@ class RealNativeClientReceiving(unittest.TestCase):
         # This owner supplies native WNOWAIT/group retirement for compilation,
         # signing and the fixture security commands too.
         cls.fixture = wire.WireFixture()
-        cls.root = Path(tempfile.mkdtemp(prefix="ergopti-native-client-app-"))
-        os.chmod(cls.root, 0o700)
-        cls.app = cls.root / "OwnedNativeHTTPFixture.app"
-        contents = cls.app / "Contents"
-        executable = contents / "MacOS/ErgoptiPlus"
-        executable.parent.mkdir(parents=True)
-        cls.resources = contents / "Resources"
-        payload = cls.resources / "static/ergopti_plus"
-        native = payload / "macos/platform/network"
-        native.mkdir(parents=True)
-        shared = payload / "_shared/python"
-        shared.mkdir(parents=True)
-        contract = payload / "_shared/modules/network/proxy_policy.json"
-        contract.parent.mkdir(parents=True)
-        shutil.copy2(
-            ROOT / "static/ergopti_plus/_shared/modules/network/proxy_policy.json", contract
-        )
-        shutil.copy2(ROOT / "static/ergopti_plus/_shared/python/network_proxy_policy.py", shared)
-        for name in ("native_http.py", "managed_http.py"):
-            shutil.copy2(MAC / "platform/network" / name, native)
-        source = MAC / "launcher/Sources/ErgoptiPlus/ManagedHTTPWorker.swift"
-        fixture_source = Path(__file__).with_name("native_http_fixture_main.swift")
-        compatibility_headers = MAC / "launcher/Sources/CPOSIXCompatibility/include"
-        compatibility_sources = tuple(
-            compatibility_headers / name
-            for name in (
-                "CPOSIXCompatibility.h",
-                "OwnedProgramCompatibility.h",
-                "LoopbackListenerCompatibility.h",
-                "OwnedImageAliasCompatibility.h",
-                "OwnedSuspendedImageCompatibility.h",
-            )
-        )
-        # Retain exact compiler inputs in the private packet. A concurrent edit
-        # refuses qualification, even if swiftc itself returned success.
-        observed = {
-            str(path.relative_to(ROOT)): hashlib.sha256(path.read_bytes()).hexdigest()
-            for path in (
-                source,
-                fixture_source,
-                *compatibility_sources,
-                MAC / "platform/network/native_http.py",
-                MAC / "platform/network/managed_http.py",
-                ROOT / "static/ergopti_plus/_shared/python/network_proxy_policy.py",
-                ROOT / "static/ergopti_plus/_shared/modules/network/proxy_policy.json",
-            )
-        }
-        worker_copy = cls.root / source.name
-        main_copy = cls.root / fixture_source.name
-        shutil.copy2(source, worker_copy)
-        shutil.copy2(fixture_source, main_copy)
+        cls.root = None
         try:
+            cls.root = Path(tempfile.mkdtemp(prefix="ergopti-native-client-app-"))
+            os.chmod(cls.root, 0o700)
+            cls.app = cls.root / "OwnedNativeHTTPFixture.app"
+            contents = cls.app / "Contents"
+            executable = contents / "MacOS/ErgoptiPlus"
+            executable.parent.mkdir(parents=True)
+            cls.resources = contents / "Resources"
+            payload = cls.resources / "static/ergopti_plus"
+            native = payload / "macos/platform/network"
+            native.mkdir(parents=True)
+            shared = payload / "_shared/python"
+            shared.mkdir(parents=True)
+            contract = payload / "_shared/modules/network/proxy_policy.json"
+            contract.parent.mkdir(parents=True)
+            shutil.copy2(
+                ROOT / "static/ergopti_plus/_shared/modules/network/proxy_policy.json", contract
+            )
+            shutil.copy2(
+                ROOT / "static/ergopti_plus/_shared/python/network_proxy_policy.py", shared
+            )
+            for name in ("native_http.py", "managed_http.py"):
+                shutil.copy2(MAC / "platform/network" / name, native)
+            source = MAC / "launcher/Sources/ErgoptiPlus/ManagedHTTPWorker.swift"
+            certificate_source = source.with_name("ManagedCertificateAuthorities.swift")
+            bootstrap_source = source.with_name("ManagedBootstrapPolicy.generated.swift")
+            fixture_source = Path(__file__).with_name("native_http_fixture_main.swift")
+            compatibility_headers = MAC / "launcher/Sources/CPOSIXCompatibility/include"
+            compatibility_sources = tuple(
+                compatibility_headers / name
+                for name in (
+                    "CPOSIXCompatibility.h",
+                    "OwnedProgramCompatibility.h",
+                    "LoopbackListenerCompatibility.h",
+                    "OwnedImageAliasCompatibility.h",
+                    "OwnedSuspendedImageCompatibility.h",
+                )
+            )
+            # Retain exact compiler inputs in the private packet. A concurrent edit
+            # refuses qualification, even if swiftc itself returned success.
+            observed = {
+                str(path.relative_to(ROOT)): hashlib.sha256(path.read_bytes()).hexdigest()
+                for path in (
+                    source,
+                    certificate_source,
+                    bootstrap_source,
+                    fixture_source,
+                    *compatibility_sources,
+                    MAC / "platform/network/native_http.py",
+                    MAC / "platform/network/managed_http.py",
+                    ROOT / "static/ergopti_plus/_shared/python/network_proxy_policy.py",
+                    ROOT / "static/ergopti_plus/_shared/modules/network/proxy_policy.json",
+                )
+            }
+            worker_copy = cls.root / source.name
+            certificate_copy = cls.root / certificate_source.name
+            bootstrap_copy = cls.root / bootstrap_source.name
+            main_copy = cls.root / fixture_source.name
+            swift_inputs = (
+                (source, worker_copy),
+                (certificate_source, certificate_copy),
+                (bootstrap_source, bootstrap_copy),
+                (fixture_source, main_copy),
+            )
+            for original, copied in swift_inputs:
+                shutil.copy2(original, copied)
             # SwiftPM supplies this real Clang module to the release launcher.
             # Standalone receiving must import the identical public C headers,
             # including the explicit public macOS DHCP declarations.
@@ -110,6 +125,12 @@ class RealNativeClientReceiving(unittest.TestCase):
                 "}\n",
                 encoding="utf-8",
             )
+            for original, copied in swift_inputs:
+                if (
+                    hashlib.sha256(copied.read_bytes()).hexdigest()
+                    != observed[str(original.relative_to(ROOT))]
+                ):
+                    raise RuntimeError("Native Swift source changed before compilation")
             cls.fixture._command(
                 [
                     "/usr/bin/xcrun",
@@ -120,12 +141,20 @@ class RealNativeClientReceiving(unittest.TestCase):
                     "-framework",
                     "SystemConfiguration",
                     str(worker_copy),
+                    str(certificate_copy),
+                    str(bootstrap_copy),
                     str(main_copy),
                     "-o",
                     str(executable),
                 ],
                 timeout=60,
             )
+            for original, copied in swift_inputs:
+                if (
+                    hashlib.sha256(copied.read_bytes()).hexdigest()
+                    != observed[str(original.relative_to(ROOT))]
+                ):
+                    raise RuntimeError("Native Swift source changed during compilation")
             for relative, digest in observed.items():
                 if hashlib.sha256((ROOT / relative).read_bytes()).hexdigest() != digest:
                     raise RuntimeError("Native receiving source changed during compilation")
@@ -157,7 +186,8 @@ class RealNativeClientReceiving(unittest.TestCase):
             cls.httpx = httpx
         except BaseException:
             cls.fixture.close()
-            shutil.rmtree(cls.root)
+            if cls.root is not None:
+                shutil.rmtree(cls.root)
             raise
 
     @classmethod

@@ -9,6 +9,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"sync"
 	"syscall"
 )
 
@@ -72,4 +73,41 @@ func loadNativeSession(path string) *Session {
 		return nil
 	}
 	return session
+}
+
+var admittedNetworkBootstrap struct {
+	sync.Once
+	snapshot *networkSnapshot
+	err      error
+}
+
+func loadNetworkBootstrap() (*networkSnapshot, error) {
+	admittedNetworkBootstrap.Do(func() {
+		// The original public startup choice is immutable, including a refusal
+		// or legacy absence. Late environment changes cannot select another mode.
+		path := os.Getenv("ERGOPTI_OLLAMA_NETWORK_BOOTSTRAP")
+		if path == "" {
+			return
+		}
+		admittedNetworkBootstrap.snapshot, admittedNetworkBootstrap.err = readNetworkBootstrap(path)
+	})
+	return admittedNetworkBootstrap.snapshot, admittedNetworkBootstrap.err
+}
+
+func readNetworkBootstrap(path string) (*networkSnapshot, error) {
+	sessionPath := os.Getenv("ERGOPTI_OLLAMA_NATIVE_SESSION")
+	session := loadNativeSession(sessionPath)
+	if session == nil {
+		return nil, fail("protocol")
+	}
+	cwd, err := os.Getwd()
+	if err != nil {
+		return nil, fail("protocol")
+	}
+	mode := "default"
+	value, present := os.LookupEnv("OLLAMA_MODELS")
+	if present {
+		mode = "environment"
+	}
+	return readBootstrapFiles(path, os.Getenv("ERGOPTI_OLLAMA_NETWORK_BOOTSTRAP_DEVICE"), os.Getenv("ERGOPTI_OLLAMA_NETWORK_BOOTSTRAP_INODE"), sessionPath, session, bootstrapStore{Mode: mode, Value: value, CWD: cwd})
 }

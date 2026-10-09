@@ -1,6 +1,7 @@
 # platform/suspended_image_owner.py
 """Own the native suspended guardian and release session bytes after image proof."""
 
+import importlib.util
 import json
 import os
 from pathlib import Path
@@ -76,6 +77,49 @@ class EmptySession:
             value._created = True
             value._file_identity = os.fstat(value._file_fd)
             value.validate()
+            return value
+        except BaseException as primary:
+            try:
+                value.retire()
+            except BaseException as cleanup:
+                raise ImageRefusal("operation", primary=primary, cleanup=cleanup) from primary
+            raise
+
+    @classmethod
+    def acquire_sibling(cls, session, purpose, *, register):
+        """Acquire an exclusive same-nonce private file under the held directory."""
+        if (
+            purpose not in ("network", "source")
+            or re.fullmatch(r"daemon-[0-9a-f]{32}\.json", session.name) is None
+        ):
+            raise ImageRefusal("session")
+        value = cls()
+        value.directory = session.directory
+        value.name = purpose + "-" + session.name[len("daemon-") :]
+        value.path = value.directory / value.name
+        value.session = session
+        value._directory_fd = None
+        value._file_fd = None
+        value._created = False
+        value._close_debt = None
+        value._operation = None
+        value._written = b""
+        register(value)
+        try:
+            session.validate()
+            value._directory_fd = os.dup(session._directory_fd)
+            os.set_inheritable(value._directory_fd, False)
+            value._directory_identity = os.fstat(value._directory_fd)
+            value._file_fd = os.open(
+                value.name,
+                os.O_RDWR | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW | os.O_CLOEXEC,
+                0o600,
+                dir_fd=value._directory_fd,
+            )
+            value._created = True
+            value._file_identity = os.fstat(value._file_fd)
+            value.validate()
+            session.validate()
             return value
         except BaseException as primary:
             try:
@@ -164,10 +208,13 @@ class SuspendedImageOwner:
     observation substitutes for its explicit native retirement protocol.
     """
 
-    def __init__(self, launcher, request, session, source_check, outgoing, *, register):
+    def __init__(
+        self, launcher, request, session, source_check, outgoing, *, register, bootstrap=None
+    ):
         self.launcher = Path(launcher)
         self.request = dict(request)
         self.session = session
+        self.bootstrap = bootstrap
         self.source_check = source_check
         self.outgoing = outgoing
         self.process = None
@@ -176,8 +223,10 @@ class SuspendedImageOwner:
         self.physically_retired = False
         self.listener = None
         self._retired = None
+        self._retirement_started = False
         self._refused = None
         self._outgoing_closed = None
+        self._bootstrap_closed = None
         self._failure = None
         self._protocol_debt = False
         self._close_debt = None
@@ -186,22 +235,52 @@ class SuspendedImageOwner:
         self._selector = selectors.DefaultSelector()
         self._startup_deadline = time.monotonic() + request["remaining_ms"] / 1000
         self._spawn_attempted = False
+        self._guardian_retirement_proven = False
+        self._default_guardian = None
         register(self)
         session.bind_operation(self)
-        outgoing.bind_operation(self)
+        if outgoing is None:
+            if set(request).intersection(
+                ("outgoing_worker", "outgoing_device", "outgoing_inode", "outgoing_sha256")
+            ):
+                raise ImageRefusal("source")
+            path = Path(__file__).with_name("trusted_native_guardian.py")
+            specification = importlib.util.spec_from_file_location(
+                "ergopti_image_trusted_guardian", path
+            )
+            guardian = importlib.util.module_from_spec(specification)
+            specification.loader.exec_module(guardian)
+            self._default_guardian = guardian.TrustedNativeGuardian.acquire(
+                launcher,
+                progress=self.progress,
+                register=lambda value: setattr(self, "_default_guardian", value),
+            )
+            self._default_guardian.bind_operation(self)
+        else:
+            outgoing.bind_operation(self)
+        if bootstrap is not None:
+            bootstrap.bind_operation(self)
 
     def progress(self):
         if time.monotonic() >= self._startup_deadline:
             raise ImageRefusal("deadline")
 
     def recheck_source(self):
+        if self._retirement_started or self._failure is not None or self._protocol_debt:
+            raise ImageRefusal("state")
         self.progress()
         self.source_check()
-        if self.outgoing.fields(progress=self.progress) != {
+        if self.outgoing is None:
+            self._default_guardian.validate(progress=self.progress)
+        elif self.outgoing.fields(progress=self.progress) != {
             name: self.request[name]
             for name in ("outgoing_worker", "outgoing_device", "outgoing_inode", "outgoing_sha256")
         }:
             raise ImageRefusal("source")
+        if self.bootstrap is not None:
+            fields = self.bootstrap.fields()
+            if fields != {name: self.request.get(name) for name in fields}:
+                raise ImageRefusal("source")
         self.progress()
 
     def start(self):
@@ -235,6 +314,8 @@ class SuspendedImageOwner:
         self._wait(lambda: self.image_ready, self._startup_deadline)
         self.recheck_source()
         self.session.release_key(self)
+        if self.bootstrap is not None:
+            self.bootstrap.release_key(self)
         self._send(b"ACTIVATE\n", self._startup_deadline)
         self._wait(lambda: self.active, self._startup_deadline)
 
@@ -261,7 +342,7 @@ class SuspendedImageOwner:
                 raise ImageRefusal("protocol")
             role = fields[1]
             if role == "IMAGE_READY" and len(fields) == 8:
-                if self.image_ready or self.active or self._retired is not None:
+                if self.image_ready or self.active or self._retirement_started:
                     raise ImageRefusal("protocol")
                 pid = decimal(fields[2], 2**31 - 1, positive=True)
                 uid = decimal(fields[3], 2**32 - 1)
@@ -285,28 +366,39 @@ class SuspendedImageOwner:
                 }
                 self.image_ready = True
             elif role == "ACTIVE" and len(fields) == 2:
-                if not self.image_ready or self.active or self._retired is not None:
+                if not self.image_ready or self.active or self._retirement_started:
                     raise ImageRefusal("protocol")
                 self.active = True
             elif role == "PENDING" and len(fields) == 3:
                 decimal(fields[2], 2**31 - 1)
+                self._retirement_started = True
             elif role == "REFUSED" and len(fields) == 3:
                 if self.image_ready or self._refused is not None or self._retired is not None:
                     raise ImageRefusal("protocol")
+                self._retirement_started = True
                 self._refused = decimal(fields[2], 2**31 - 1)
                 self._failure = ImageRefusal("admission")
             elif role == "OUTGOING_CLOSED" and len(fields) == 3:
                 if self._outgoing_closed is not None or self._retired is not None:
                     raise ImageRefusal("protocol")
                 self._outgoing_closed = decimal(fields[2], 2**31 - 1)
+                self._retirement_started = True
+            elif role == "BOOTSTRAP_CLOSED" and len(fields) == 3:
+                if self.bootstrap is None or self._bootstrap_closed is not None:
+                    raise ImageRefusal("protocol")
+                self._bootstrap_closed = decimal(fields[2], 2**31 - 1)
+                self._retirement_started = True
             elif role == "RETIRED" and len(fields) == 9:
                 if self._retired is not None or self._refused is not None:
                     raise ImageRefusal("protocol")
                 status = decimal(fields[2], 255)
                 if fields[3:6] != ["1", "1", "0"] or self._outgoing_closed is None:
                     raise ImageRefusal("protocol")
+                if self.bootstrap is not None and self._bootstrap_closed is None:
+                    raise ImageRefusal("protocol")
                 closes = tuple(decimal(value, 2**31 - 1) for value in fields[6:])
                 self._retired = (status, closes)
+                self._retirement_started = True
             else:
                 raise ImageRefusal("protocol")
         except (ValueError, IndexError, UnicodeError, ImageRefusal) as error:
@@ -371,9 +463,17 @@ class SuspendedImageOwner:
                 if self._close_debt is None:
                     self._close_debt = error
 
+    def _close_default_guardian(self):
+        if self._default_guardian is not None:
+            try:
+                self._default_guardian.close()
+            except BaseException as error:
+                if self._close_debt is None:
+                    self._close_debt = error
+
     def public_receipt(self):
         """Project bounded lifecycle scalars without keys, names or native logs."""
-        return {
+        receipt = {
             "image_ready": self.image_ready,
             "active": self.active,
             "physically_retired": self.physically_retired,
@@ -384,12 +484,17 @@ class SuspendedImageOwner:
             "guardian_status": getattr(self.process, "returncode", None),
             "protocol_debt": self._protocol_debt,
         }
+        if self.bootstrap is not None:
+            receipt["bootstrap_close_errno"] = self._bootstrap_closed
+        return receipt
 
     def settle(self, timeout=15):
         """A timeout retains live owner debt; no hard-kill shortcut exists."""
         if self.physically_retired:
             return self._close_debt is None and self._failure is None
         if not self._spawn_attempted:
+            self._guardian_retirement_proven = True
+            self._close_default_guardian()
             self._close_selector()
             if self._close_debt is not None:
                 return False
@@ -425,7 +530,16 @@ class SuspendedImageOwner:
         self._close_selector()
         if self._close_debt is not None or not proven:
             return False
+        self._guardian_retirement_proven = True
+        self._close_default_guardian()
+        if self._close_debt is not None:
+            return False
         self.physically_retired = True
-        if retired and (status != 0 or self._outgoing_closed != 0 or any(self._retired[1])):
+        if retired and (
+            status != 0
+            or self._outgoing_closed != 0
+            or any(self._retired[1])
+            or (self.bootstrap is not None and self._bootstrap_closed != 0)
+        ):
             self._failure = ImageRefusal("cleanup")
         return self._failure is None

@@ -9,6 +9,8 @@ This producer never edits the input checkout or creates/publishes a release.
 from __future__ import annotations
 
 import argparse
+import contextlib
+import importlib.util
 import gzip
 import hashlib
 import json
@@ -16,9 +18,11 @@ import os
 from pathlib import Path
 import platform
 import shutil
+import signal
 import subprocess
 import tarfile
 import tempfile
+import time
 
 RUNTIME_CONTRACT = "static/ergopti_plus/_shared/modules/llm/managed_ollama_runtime.json"
 IMPORT = '\tnativehttp "github.com/ollama/ollama/internal/ergoptinativehttp"\n'
@@ -165,8 +169,14 @@ def apply_hooks(source: Path, repository: Path) -> dict[str, str]:
     package = source / "internal/ergoptinativehttp"
     package.mkdir(parents=True, exist_ok=False)
     bridge = repository / "static/ergopti_plus/_shared/go/native_http"
-    for name in ("transport.go", "worker_darwin.go", "worker_other.go", "admission.go"):
-        shutil.copyfile(bridge / name, package / name)
+    for relative in contract["source_fingerprint_paths"]:
+        origin = repository / relative
+        if origin.suffix == ".go":
+            if origin.parent != bridge:
+                raise ValueError("The canonical native Go source inventory escaped its owner")
+            shutil.copyfile(origin, package / origin.name)
+        elif origin.suffix == ".json":
+            shutil.copyfile(origin, package / origin.name)
     # This flag is a build capability probe, never an admission receipt by itself.
     (source / "ergopti_native_http_capability.go").write_text(
         'package main\n\nimport (\n"fmt"\n"os"\n'
@@ -185,6 +195,257 @@ def run(argv: list[str], *, cwd: Path | None = None, env=None) -> str:
     return subprocess.run(
         argv, cwd=cwd, env=env, check=True, text=True, stdout=subprocess.PIPE
     ).stdout.strip()
+
+
+class NativeGoRetirementDebt(RuntimeError):
+    """The source-qualified test owner's capabilities still require retirement."""
+
+
+@contextlib.contextmanager
+def native_build_directory(output: Path):
+    """Preserve sources when native test retirement cannot be acknowledged."""
+    work = Path(tempfile.mkdtemp(prefix="managed-ollama-", dir=output))
+    preserve = False
+    try:
+        yield work
+    except NativeGoRetirementDebt:
+        preserve = True
+        raise
+    finally:
+        if not preserve:
+            shutil.rmtree(work)
+
+
+def unique_json_fields(pairs):
+    """Refuse duplicate event fields rather than accepting the final occurrence."""
+    result = {}
+    for key, value in pairs:
+        if key in result:
+            raise ValueError("A native Go event contains duplicate fields")
+        result[key] = value
+    return result
+
+
+def admit_go_test_log(path: Path, package: str, required: list[str], maximum_bytes: int) -> dict:
+    """Require the frozen test identities and a complete successful package."""
+    if (
+        not required
+        or len(required) != len(set(required))
+        or any(not isinstance(name, str) or not name.startswith("Test") for name in required)
+        or type(maximum_bytes) is not int
+        or maximum_bytes <= 0
+        or path.stat().st_size > maximum_bytes
+    ):
+        raise ValueError("The native Go receiving policy or log size was refused")
+    expected = set(required)
+    running = set()
+    passed = set()
+    started = False
+    completed = False
+    with path.open("r", encoding="utf-8", newline="") as stream:
+        for line in stream:
+            if not line.endswith("\n") or not line.strip():
+                raise ValueError("The native Go transcript is incomplete")
+            event = json.loads(line, object_pairs_hook=unique_json_fields)
+            if not isinstance(event, dict) or event.get("Package") != package or completed:
+                raise ValueError("The native Go event package or terminal order was refused")
+            action = event.get("Action")
+            test = event.get("Test")
+            if action in ("fail", "skip"):
+                raise ValueError("A native Go subject failed or was skipped")
+            if action == "start":
+                if started or test is not None:
+                    raise ValueError("A native Go package started more than once")
+                started = True
+            elif not started:
+                raise ValueError("A native Go event precedes package ownership")
+            elif action == "run":
+                if test not in expected or test in running:
+                    raise ValueError("A native Go subject is foreign or duplicated")
+                running.add(test)
+            elif action == "pass":
+                if test is None:
+                    if running != expected or passed != expected:
+                        raise ValueError("The native Go receiving census is incomplete")
+                    completed = True
+                else:
+                    if test not in running or test in passed:
+                        raise ValueError("A native Go subject passed without a unique run")
+                    passed.add(test)
+            elif action == "output":
+                if not isinstance(event.get("Output"), str) or (
+                    test is not None and test not in running
+                ):
+                    raise ValueError("A native Go output has no admitted subject")
+            elif action in ("pause", "cont"):
+                if test not in running or test in passed:
+                    raise ValueError("A native Go continuation has no live subject")
+            else:
+                raise ValueError("A native Go event action is unsupported")
+    if not completed:
+        raise ValueError("The native Go package never completed")
+    return {
+        "passed": len(passed),
+        "top_level_passed": sum("/" not in name for name in passed),
+        "subtests_passed": sum("/" in name for name in passed),
+        "failed": 0,
+        "skipped": 0,
+        "package_completed": True,
+        "transcript_sha256": sha256(path),
+        "transcript_bytes": path.stat().st_size,
+    }
+
+
+class NativeGoCancelled(InterruptedError):
+    """Owned test cancellation cannot publish a successful receiving result."""
+
+
+class NativeGoCancellation:
+    """Scope signal authority to one test call and defer it during physical cleanup."""
+
+    def __init__(self):
+        self.previous = {}
+        self.pending = False
+        self.retiring = False
+
+    def interrupt(self, _signum, _frame):
+        self.pending = True
+        if not self.retiring:
+            raise NativeGoCancelled("Owned native Go receiving was cancelled")
+
+    def check(self):
+        if self.pending:
+            raise NativeGoCancelled("Owned native Go receiving was cancelled")
+
+    def restore(self):
+        for signum, handler in self.previous.items():
+            signal.signal(signum, handler)
+
+    def __enter__(self):
+        try:
+            for signum in (signal.SIGTERM, signal.SIGINT):
+                self.previous[signum] = signal.getsignal(signum)
+                signal.signal(signum, self.interrupt)
+        except BaseException:
+            self.retiring = True
+            self.restore()
+            raise
+        return self
+
+    def __exit__(self, kind, _value, _traceback):
+        self.retiring = True
+        self.restore()
+        if kind is None:
+            self.check()
+        return False
+
+
+def run_native_go_tests(options, candidate, env, contract, fingerprint, architecture) -> None:
+    """Cancel only this native receiving call and restore exact prior handlers."""
+    with NativeGoCancellation() as cancellation:
+        _run_native_go_tests(
+            options, candidate, env, contract, fingerprint, architecture, cancellation
+        )
+
+
+def _run_native_go_tests(
+    options, candidate, env, contract, fingerprint, architecture, cancellation
+) -> None:
+    """Hold the actual Darwin test PGID until native retirement precedes build."""
+    owner_path = options.repository.resolve() / "tools/diagnostics/macos_owned_process.py"
+    if sha256(owner_path) != fingerprint["tools/diagnostics/macos_owned_process.py"]:
+        raise ValueError("The native Go process owner source changed")
+    spec = importlib.util.spec_from_file_location("ergopti_go_test_owner", owner_path)
+    owner = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(owner)
+    native = owner.NativeProcessGroups()
+    policy = contract["native_http_go_test_policy"]
+    timeout = policy["timeout_seconds"]
+    maximum = policy["maximum_log_bytes"]
+    if type(timeout) is not int or timeout <= 0 or type(maximum) is not int or maximum <= 0:
+        raise ValueError("The native Go receiving bounds are invalid")
+    asset = contract["assets"]["macos-" + architecture]["filename"]
+    output = options.output.resolve()
+    transcript = output / (asset + ".go-tests.jsonl")
+    errors = output / (asset + ".go-tests.stderr.txt")
+    evidence = output / (asset + ".go-tests.receipt.json")
+    for path in (transcript, errors, evidence):
+        if path.exists() or path.is_symlink():
+            raise ValueError("The native Go receiving output is already owned")
+    group = None
+
+    def register(acquired):
+        nonlocal group
+        group = acquired
+
+    with transcript.open("xb") as stdout, errors.open("xb") as stderr:
+        try:
+            cancellation.check()
+            owner.acquire_owned(
+                [
+                    options.go,
+                    "test",
+                    "-json",
+                    "-count=1",
+                    "-mod=readonly",
+                    "-timeout=" + str(timeout) + "s",
+                    "./internal/ergoptinativehttp",
+                ],
+                native,
+                register,
+                cwd=candidate,
+                env=env,
+                stdout=stdout,
+                stderr=stderr,
+            )
+            cancellation.check()
+            deadline = time.monotonic() + timeout
+            while group.observe_exit() is None:
+                if (
+                    transcript.stat().st_size + errors.stat().st_size > maximum
+                    or time.monotonic() >= deadline
+                ):
+                    raise ValueError("The native Go receiving bound expired")
+                time.sleep(0.02)
+        finally:
+            cancellation.retiring = True
+            if group is not None:
+                try:
+                    closed = group.settle()
+                except BaseException as error:
+                    raise NativeGoRetirementDebt(
+                        "Native Go retirement observation failed"
+                    ) from error
+                if not closed:
+                    raise NativeGoRetirementDebt("Native Go retirement remains unacknowledged")
+        cancellation.check()
+        if group is None or group.process.returncode != 0:
+            raise ValueError("The genuine native Go receiving process failed")
+    if transcript.stat().st_size + errors.stat().st_size > maximum:
+        raise ValueError("The native Go receiving byte bound was exceeded")
+    cancellation.check()
+    fact = admit_go_test_log(
+        transcript,
+        "github.com/ollama/ollama/internal/ergoptinativehttp",
+        policy["required_passes"],
+        maximum,
+    )
+    fact.update(
+        schema_version=1,
+        repository_commit=run(["git", "rev-parse", "HEAD"], cwd=options.repository),
+        repository_source_sha256=fingerprint,
+        runtime_contract_sha256=sha256(options.repository / RUNTIME_CONTRACT),
+        source_commit=contract["source_commit"],
+        go_version=contract["go_version"],
+        platform="darwin",
+        architecture=architecture,
+        native_execution=True,
+        worker_owner=group.receipt(),
+    )
+    cancellation.check()
+    with evidence.open("x", encoding="utf-8", newline="\n") as stream:
+        json.dump(fact, stream, sort_keys=True, indent=2)
+        stream.write("\n")
 
 
 def extract_archive(archive: Path, destination: Path) -> None:
@@ -236,8 +497,7 @@ def build(options) -> Path:
     receipt = output / (asset.name + ".provenance.json")
     if asset.exists() or receipt.exists():
         raise ValueError("The output asset or provenance is already owned")
-    with tempfile.TemporaryDirectory(prefix="managed-ollama-", dir=output) as temporary:
-        work = Path(temporary)
+    with native_build_directory(output) as work:
         archive = work / "source.tar"
         with archive.open("xb") as stream:
             subprocess.run(
@@ -291,6 +551,12 @@ def build(options) -> Path:
         # Do not inherit ambient flags that could change the reviewed source or ABI.
         env.pop("GOFLAGS", None)
         env.pop("GOEXPERIMENT", None)
+        run_native_go_tests(options, candidate, env, contract, repository_sources, architecture)
+        package = candidate / "internal/ergoptinativehttp"
+        for relative, expected in repository_sources.items():
+            origin = Path(relative)
+            if origin.suffix in (".go", ".json") and sha256(package / origin.name) != expected:
+                raise ValueError("The received native Go source changed before compilation")
         run(
             [
                 options.go,

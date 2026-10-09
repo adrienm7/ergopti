@@ -1842,6 +1842,18 @@ const CHECKS = [
 		repro: 'node tools/test/test-managed-python-release.cjs'
 	},
 	{
+		name: 'managed bootstrap shared policy and generated Swift remain source-qualified',
+		cmd: process.execPath,
+		args: ['tools/test/test-managed-bootstrap-policy.cjs'],
+		repro: 'node tools/test/test-managed-bootstrap-policy.cjs'
+	},
+	{
+		name: 'macOS guardian preserves public strict and offline signature flags',
+		cmd: process.execPath,
+		args: ['tools/test/test-macos-guardian-signature-flags.cjs'],
+		repro: 'node tools/test/test-macos-guardian-signature-flags.cjs'
+	},
+	{
 		name: 'managed Ollama portable admission and operation retirement',
 		cmd: process.execPath,
 		args: ['tools/test/test-managed-ollama-protocol.cjs'],

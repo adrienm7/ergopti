@@ -7014,6 +7014,32 @@ unchanged candidate without relaxing any assertion or clock. Local formatting,
 Item62 remains open for the existing Windows/Mac CODE and native/device work;
 items16/38 retain their complete independent requirements.
 
+Manual37867543036 at e2edb24a4 reaches 393 shared JavaScript passes, but all
+three macOS native builds refuse an unqualified Swift signing-flag name.
+The public SDK declares that flag as a typed OptionSet member. Its correction
+preserves strict, all-architecture and offline signature validation; seven
+independent source/mutant controls pass. Actual postimage compilation remains
+required. The downstream model/curl receivers and cold receipt did not execute
+after that build failure and do not establish transport or archive regressions.
+
+The macOS production-network preparation now retains an empty bootstrap until
+the original suspended image is admitted, seals its source authority to the
+same daemon session, and preserves raw model-store paths and the captured
+proxy/certificate policy. Cancellation, terminal prepare refusal and missing
+Swift-input cleanup have independent causal controls. The shared envelope and
+native Go cache retain one admission decision; removing its environment hint
+cannot restore ambient routing. Production activation remains guarded while
+the canonical serve/selector caller and actual model receiving are completed.
+
+Normal validation now enrolls the reviewed bootstrap, guardian, source reader,
+serve, Go producer and Swift-copy controls. The required native SDK cohort is
+41 cases: all previous 35 plus six network/bootstrap cases. The native Go
+producer requires 48 exact Darwin observations before compilation and retains
+its JSONL, stderr and physical-retirement receipt as CI diagnostics, never
+release assets. Linux's 44 Go observations and portable controls do not qualify
+those Darwin cases. Final-source qualification, genuine model exchange and
+complete native packaging/install remain required; items 62, 16 and 38 stay open.
+
 - [~] **63.** Layer actions: screen brightness up/down are now shared, labelled
   through the existing 21-locale action catalogue, and implemented for keyboard
   layers on all three drivers. Windows and macOS also support their existing

@@ -158,7 +158,7 @@ jobs:
           set +e
           swift test --package-path static/ergopti_plus/macos/launcher \
             --scratch-path "$ERGOPTI_OLLAMA_BUILD_ROOT/swift" \
-            --filter 'ManagedOllamaAPIWorkerTests|ManagedPTYWorkerTests|ManagedImageAliasTests|OwnedSuspendedImageTests|ManagedListenerPathIdentityTests' 2>&1 | tee "$transcript"
+            --filter 'ManagedOllamaAPIWorkerTests|ManagedPTYWorkerTests|ManagedImageAliasTests|OwnedSuspendedImageTests|ManagedListenerPathIdentityTests|ManagedNetworkBootstrapTests' 2>&1 | tee "$transcript"
           statuses=("${PIPESTATUS[@]}")
           set -e
           test "${statuses[0]}" -eq 0
@@ -177,7 +177,9 @@ jobs:
           grep -Fq 'Executed 6 tests, with 0 failures' "$transcript"
           grep -Fq "Test Suite 'ManagedListenerPathIdentityTests' passed" "$transcript"
           grep -Fq 'Executed 2 tests, with 0 failures' "$transcript"
-          grep -Fq 'Executed 35 tests, with 0 failures' "$transcript"
+          grep -Fq "Test Suite 'ManagedNetworkBootstrapTests' passed" "$transcript"
+          test "$(grep -Fc 'Executed 6 tests, with 0 failures' "$transcript")" -eq 2
+          grep -Fq 'Executed 41 tests, with 0 failures' "$transcript"
         timeout-minutes: 10
       - name: Retain independent native SDK XCTest diagnostics
         if: always()

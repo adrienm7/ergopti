@@ -8,6 +8,14 @@ import Security
 import Darwin
 import Foundation
 
+struct ManagedNetworkBootstrapBinding {
+	let path: String
+	let device: UInt64
+	let inode: UInt64
+	let storeMode: String
+	let cwd: String
+}
+
 struct OwnedSuspendedImageRequest {
 	let executable: String
 	let arguments: [String]
@@ -18,6 +26,7 @@ struct OwnedSuspendedImageRequest {
 	let environment: [String: String]
 	let outgoingWorker: String
 	let outgoingSHA256: String?
+	let bootstrap: ManagedNetworkBootstrapBinding?
 
 	private static func unsigned(_ value: Any?) -> UInt64? {
 		guard let number = value as? NSNumber, CFGetTypeID(number) != CFBooleanGetTypeID(),
@@ -35,9 +44,11 @@ struct OwnedSuspendedImageRequest {
 	static func parse(_ data: Data, launcher: String) -> OwnedSuspendedImageRequest? {
 		let keys: Set<String> = ["version", "executable", "arguments", "device", "inode", "session_path",
 			"remaining_ms", "home", "models_path", "network_policy", "host", "proxy_url"]
+		let outgoingKeys: Set<String> = ["outgoing_worker", "outgoing_device", "outgoing_inode", "outgoing_sha256"]
+		let bootstrapKeys: Set<String> = ["bootstrap_path", "bootstrap_device", "bootstrap_inode", "store_mode", "store_cwd"]
 		guard data.count <= 65_536,
 			let fields = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any],
-			Set(fields.keys) == keys || Set(fields.keys) == keys.union(["outgoing_worker", "outgoing_device", "outgoing_inode", "outgoing_sha256"]),
+			[keys, keys.union(outgoingKeys), keys.union(bootstrapKeys), keys.union(outgoingKeys).union(bootstrapKeys)].contains(Set(fields.keys)),
 			unsigned(fields["version"]) == 1,
 			let device = decimal(fields["device"]), device <= UInt64(UInt32.max),
 			let inode = decimal(fields["inode"]), inode > 0,
@@ -45,7 +56,8 @@ struct OwnedSuspendedImageRequest {
 			let executable = fields["executable"] as? String, validPath(executable),
 			let session = fields["session_path"] as? String, validPath(session),
 			let home = fields["home"] as? String, validPath(home),
-			let models = fields["models_path"] as? String, models.isEmpty || validPath(models),
+			let models = fields["models_path"] as? String, !models.utf8.contains(0), models.utf8.count <= ManagedBootstrapPolicy.maximumProxyBytes,
+				fields["bootstrap_path"] != nil || models.isEmpty || validPath(models),
 			let policy = fields["network_policy"] as? String, validPath(policy),
 			let host = fields["host"] as? String, validLoopback(host, prefix: "127.0.0.1:"),
 			let proxy = fields["proxy_url"] as? String,
@@ -56,7 +68,7 @@ struct OwnedSuspendedImageRequest {
 		let runtime = home + "/Library/Application Support/Ergopti/ollama-native-http/"
 		let sessions = home + "/Library/Application Support/Ergopti/ollama-native-sessions/"
 		guard executable.hasPrefix(runtime), session.hasPrefix(sessions),
-			models.isEmpty || models.hasPrefix(home + "/") else { return nil }
+			fields["bootstrap_path"] != nil || models.isEmpty || models.hasPrefix(home + "/") else { return nil }
 		let sessionName = String(session.dropFirst(sessions.count))
 		guard sessionName.hasPrefix("daemon-"), sessionName.hasSuffix(".json"), sessionName.utf8.count == 44,
 			sessionName.dropFirst(7).dropLast(5).utf8.allSatisfy({ (48...57).contains($0) || (97...102).contains($0) }) else { return nil }
@@ -64,6 +76,18 @@ struct OwnedSuspendedImageRequest {
 		let prefix = ".ergopti-image-"
 		guard basename.hasPrefix(prefix), basename.utf8.count == prefix.utf8.count + 32,
 			basename.dropFirst(prefix.count).utf8.allSatisfy({ (48...57).contains($0) || (97...102).contains($0) }) else { return nil }
+		let bootstrap: ManagedNetworkBootstrapBinding?
+		if fields["bootstrap_path"] != nil {
+			guard proxy.isEmpty, let path = fields["bootstrap_path"] as? String, validPath(path),
+				path == sessions + "network-" + String(sessionName.dropFirst(7)),
+				let device = decimal(fields["bootstrap_device"]), device <= UInt64(UInt32.max),
+				let inode = decimal(fields["bootstrap_inode"]), inode > 0,
+				let mode = fields["store_mode"] as? String, ["default", "environment"].contains(mode),
+				(mode == "default" && models.isEmpty) || (mode == "environment" && !models.isEmpty),
+				let cwd = fields["store_cwd"] as? String, validPath(cwd),
+				cwd == FileManager.default.currentDirectoryPath else { return nil }
+			bootstrap = ManagedNetworkBootstrapBinding(path: path, device: device, inode: inode, storeMode: mode, cwd: cwd)
+		} else { bootstrap = nil }
 		let outgoing: String
 		let outgoingDevice: UInt64
 		let outgoingInode: UInt64
@@ -95,11 +119,16 @@ struct OwnedSuspendedImageRequest {
 			"ERGOPTI_LAUNCHER_DEVICE": String(outgoingDevice),
 			"ERGOPTI_LAUNCHER_INODE": String(outgoingInode),
 		]
+		if let bootstrap {
+			environment["ERGOPTI_OLLAMA_NETWORK_BOOTSTRAP"] = bootstrap.path
+			environment["ERGOPTI_OLLAMA_NETWORK_BOOTSTRAP_DEVICE"] = String(bootstrap.device)
+			environment["ERGOPTI_OLLAMA_NETWORK_BOOTSTRAP_INODE"] = String(bootstrap.inode)
+		}
 		if !models.isEmpty { environment["OLLAMA_MODELS"] = models }
 		if !proxy.isEmpty { environment["https_proxy"] = proxy }
 		return OwnedSuspendedImageRequest(executable: executable, arguments: arguments, device: device,
 			inode: inode, sessionPath: session, remainingMilliseconds: UInt32(remaining), environment: environment,
-			outgoingWorker: outgoing, outgoingSHA256: outgoingSHA256)
+			outgoingWorker: outgoing, outgoingSHA256: outgoingSHA256, bootstrap: bootstrap)
 	}
 
 	private static func validPath(_ value: String) -> Bool {
@@ -234,7 +263,7 @@ enum OwnedSuspendedImageGuardian {
 			var code: SecStaticCode?
 			guard SecStaticCodeCreateWithPath(URL(fileURLWithPath: request.outgoingWorker) as CFURL, [], &code) == errSecSuccess,
 				let code,
-				SecStaticCodeCheckValidity(code, SecCSFlags(rawValue: kSecCSStrictValidate | kSecCSCheckAllArchitectures | kSecCSNoNetworkAccess), nil) == errSecSuccess,
+				SecStaticCodeCheckValidity(code, SecCSFlags(rawValue: kSecCSStrictValidate | kSecCSCheckAllArchitectures).union(.noNetworkAccess), nil) == errSecSuccess,
 				outgoingBound(), admissionRemaining() else { return false }
 			return true
 		}
@@ -272,6 +301,33 @@ enum OwnedSuspendedImageGuardian {
 		guard fstat(sessionDirectory, &initialDirectory) == 0, fstat(session, &initialSession) == 0, sessionAdmitted(empty: true) else {
 			_ = send("V1 REFUSED \(ESTALE)"); return 0
 		}
+		// The caller owns this exclusive empty file before image admission. Only
+		// its public pathname and vnode identity enter the suspended environment.
+		var bootstrapDescriptor: Int32 = -1
+		var initialBootstrap = stat()
+		if let bootstrap = request.bootstrap {
+			bootstrapDescriptor = openat(sessionDirectory, URL(fileURLWithPath: bootstrap.path).lastPathComponent,
+				O_RDONLY | O_CLOEXEC | O_NOFOLLOW | O_NONBLOCK)
+			guard bootstrapDescriptor >= 0, fstat(bootstrapDescriptor, &initialBootstrap) == 0 else {
+				if bootstrapDescriptor >= 0 { Darwin.close(bootstrapDescriptor) }
+				_ = send("V1 REFUSED \(EIO)"); return 0
+			}
+		}
+		defer { if bootstrapDescriptor >= 0 { Darwin.close(bootstrapDescriptor) } }
+		func bootstrapAdmitted(empty: Bool) -> Bool {
+			guard let bootstrap = request.bootstrap else { return true }
+			var held = stat(); var named = stat()
+			return bootstrap.cwd == FileManager.default.currentDirectoryPath
+				&& fstat(bootstrapDescriptor, &held) == 0
+				&& fstatat(sessionDirectory, URL(fileURLWithPath: bootstrap.path).lastPathComponent, &named, AT_SYMLINK_NOFOLLOW) == 0
+				&& (held.st_mode & S_IFMT) == S_IFREG && (named.st_mode & S_IFMT) == S_IFREG
+				&& held.st_uid == geteuid() && held.st_nlink == 1 && (held.st_mode & 0o7777) == 0o600
+				&& UInt64(UInt32(bitPattern: held.st_dev)) == bootstrap.device && UInt64(held.st_ino) == bootstrap.inode
+				&& held.st_dev == initialBootstrap.st_dev && held.st_ino == initialBootstrap.st_ino
+				&& held.st_dev == named.st_dev && held.st_ino == named.st_ino
+				&& (empty ? held.st_size == 0 : held.st_size > 0 && held.st_size <= ManagedBootstrapPolicy.maximumMetadataBytes)
+		}
+		guard bootstrapAdmitted(empty: true) else { _ = send("V1 REFUSED \(ESTALE)"); return 0 }
 		guard let argv = duplicateCStringVector([request.executable] + request.arguments) else {
 			_ = send("V1 REFUSED \(ENOMEM)"); return 0
 		}
@@ -303,7 +359,7 @@ enum OwnedSuspendedImageGuardian {
 			return identity
 		}
 		var ready = false; var active = false; var pendingSent = false
-		if prepareError == 0, sessionAdmitted(empty: true), let identity = imageAdmitted() {
+		if prepareError == 0, sessionAdmitted(empty: true), bootstrapAdmitted(empty: true), let identity = imageAdmitted() {
 			ready = send("V1 IMAGE_READY \(identity.pid) \(identity.uid) \(identity.start_seconds) \(identity.start_microseconds) \(identity.device) \(identity.inode)")
 			if !ready { cancelled = true }
 		} else { cancelled = true }
@@ -311,7 +367,7 @@ enum OwnedSuspendedImageGuardian {
 			for line in readLines() {
 				if line == Data("CANCEL".utf8) { cancelled = true; continue }
 				if line == Data("ACTIVATE".utf8), ready, !active, !cancelled,
-					sessionAdmitted(empty: false), outgoingAdmitted(), imageAdmitted() != nil {
+					sessionAdmitted(empty: false), bootstrapAdmitted(empty: false), outgoingAdmitted(), imageAdmitted() != nil {
 					let receipt = ergopti_owned_program_activate(retained)
 					active = receipt.active && !receipt.cancelled && receipt.error_code == 0
 					if !active || !send("V1 ACTIVE") { cancelled = true }
@@ -322,6 +378,12 @@ enum OwnedSuspendedImageGuardian {
 			let receipt = ergopti_owned_program_poll(retained)
 			if receipt.retired && receipt.leader_exited && receipt.status_valid && receipt.error_code == 0 {
 				if ergopti_owned_program_destroy(&owner) {
+					var bootstrapClose: Int32 = 0
+					if bootstrapDescriptor >= 0 {
+						bootstrapClose = Darwin.close(bootstrapDescriptor) == 0 ? 0 : (errno == 0 ? EIO : errno)
+						bootstrapDescriptor = -1
+						_ = send("V1 BOOTSTRAP_CLOSED \(bootstrapClose)")
+					}
 					let outgoingClose = Darwin.close(outgoingDescriptor) == 0 ? 0 : (errno == 0 ? EIO : errno)
 					outgoingDescriptor = -1
 					_ = send("V1 OUTGOING_CLOSED \(outgoingClose)")
@@ -335,7 +397,7 @@ enum OwnedSuspendedImageGuardian {
 					// handles_closed=0 remains incomplete until the receiver proves exact
 					// guardian reap plus EOF and closure of every retained control pipe.
 					_ = send("V1 RETIRED \(receipt.exit_status) 1 1 0 \(aliasClose) \(sessionClose) \(directoryClose)")
-					return outputOpen && outgoingClose == 0 && aliasClose == 0 && sessionClose == 0 && directoryClose == 0 ? 0 : 74
+					return outputOpen && bootstrapClose == 0 && outgoingClose == 0 && aliasClose == 0 && sessionClose == 0 && directoryClose == 0 ? 0 : 74
 				}
 				// A refused destruction keeps the owner and native cleanup capability.
 				cancelled = true
