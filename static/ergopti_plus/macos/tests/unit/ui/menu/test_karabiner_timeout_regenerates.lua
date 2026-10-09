@@ -18,6 +18,8 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
+local runtime_inputs
+helpers, runtime_inputs = require("tests.support.remap_menu_runtime_inputs").bind(helpers)
 
 package.loaded["platform.remap.lease_controller"] = {
 	status = function() return "active", { phase = "active" } end,
@@ -50,6 +52,9 @@ local TYPED_DELAY_MS = "350"
 local function make_karabiner()
 	local calls = { regenerate = 0, set_tap_hold = 0, set_sticky = 0 }
 	return {
+		get_runtime = runtime_inputs.get_runtime,
+		shared_runtime_selected = runtime_inputs.shared_runtime_selected,
+		runtime_unavailable_reason = runtime_inputs.runtime_unavailable_reason,
 		_calls = calls,
 		DEFAULT_TAP_HOLD_TIMEOUT_MS       = 200,
 		DEFAULT_STICKY_TIMEOUT_MS         = 1000,

@@ -1094,6 +1094,42 @@
 			"i18n": "menu.global.setup_wizard"
 		},
 		{
+			"type": "list",
+			"id": "karabiner_runtime_status",
+			"platforms": [
+				"hs"
+			],
+			"unavailable": "hide",
+			"status_rows": {
+				"shared": [
+					{
+						"type": "label",
+						"i18n": "menu.global.karabiner_runtime.shared"
+					}
+				],
+				"owned": [
+					{
+						"type": "label",
+						"i18n": "menu.global.karabiner_runtime.owned"
+					},
+					{
+						"type": "label",
+						"i18n": "menu.global.karabiner_runtime_unavailable"
+					}
+				],
+				"unavailable": [
+					{
+						"type": "label",
+						"i18n": "menu.global.karabiner_runtime"
+					},
+					{
+						"type": "label",
+						"i18n": "healthcheck.state.unavailable"
+					}
+				]
+			}
+		},
+		{
 			"type": "check",
 			"id": "karabiner_integration",
 			"i18n": "menu.global.karabiner_integration",
@@ -1103,7 +1139,10 @@
 			"platforms": [
 				"hs"
 			],
-			"reason_key": "platform_reason.remap_engine_is_per_driver"
+			"reason_key": "platform_reason.remap_engine_is_per_driver",
+			"disabled_when": [
+				"karabiner_shared_runtime_selected"
+			]
 		},
 		{
 			"type": "command",
@@ -1112,7 +1151,11 @@
 			"platforms": [
 				"hs"
 			],
-			"reason_key": "platform_reason.remap_engine_is_per_driver"
+			"reason_key": "platform_reason.remap_engine_is_per_driver",
+			"disabled_when": [
+				"karabiner_shared_runtime_selected"
+			],
+			"disabled_reason_key": "healthcheck.state.unavailable"
 		}
 	],
 	"debug_menu": [

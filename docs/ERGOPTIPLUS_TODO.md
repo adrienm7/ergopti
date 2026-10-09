@@ -3197,23 +3197,17 @@ Earlier Python control drafts remain private evidence, not SDK registration.
 Native execution of this new diagnostic remains UNEXECUTED; it grants no UI,
 permission, retirement or ready authority. Item 24 remains partial.
 
-The native stage-four UI probe now records only a closed, bounded tuple of
-already observed timer, view and window state before reporting its unchanged
-refusal. Twenty-eight portable Lua controls pass; six before/after endpoint
-traces preserve the original calls and return values. The original ten native
-cases and all deadlines remain unchanged. A required source-path comment was
-added without changing the test body. Exact-source macOS execution and physical
-guardian/Login Items/tap-hold acceptance remain pending; item24 stays partial.
-
-The latest genuine macOS run37880447936 reaches stage4 but refuses the
-unchanged stage8.5 native-window predicate. A failure-only observation now
-records bounded already-read view/window facts at stages8.5 and9.5. It preserves
-original probe order, return values, deadlines and refusal. All32 modeled Lua
-controls pass; removing the observation fails eight of20 additive controls.
-The original12 controls remain whole. LuaJIT execution fails on existing
-Lua5.4-only table.pack/utf8 dependencies and is not qualified. Actual late-window
-cause, all10 native UI cases and physical guardian acceptance remain open.
-This diagnostic does not complete item24.
+Private continuation after actual macOS run37880447936 at7c88374f12ab6682fd7460cf10b69efcf41e05e6:
+the permission probe reaches stage4 but refuses the unchanged stage8.5 window
+predicate. A prepared failure-only observation retains bounded already-read
+view/window facts at stages8.5 and9.5. Independent Lua5.4 replay passes all32
+modeled controls, conserving the original12; removing the observation fails
+eight of20 additive controls without load errors. The original31-pass/one-fail
+oracle draft and LuaJIT dependency/ABI failures remain retained and unqualified.
+The original ten native cases, probe order, refusal and deadlines remain whole.
+Exact-source native execution of this successor, the actual late-window cause
+and physical guardian/Login Items/tap-hold acceptance remain open. This is
+prepared source, not feature adoption or completion of item24.
 
 - [~] **30.** Physical magic-key setting on all three OSes: one
   `hotstrings.magic_key_source` (a KeyboardEvent.code, `auto` by default),
@@ -3398,39 +3392,6 @@ and restoration/debt assertions remain mandatory.
   assumption and fn/globe), WP10 enable and retire. Media metrics identities
   now exist for play/pause, track skips and brightness; production capture and
   native UI/physical acceptance remain unfinished.
-  Protected VHD qualification now runs the actual checked `pkgutil --expand-full`
-  command without requiring its option to appear in help output. The command's
-  status, output, deadline, package identity, payload, signatures and ownership
-  fences remain mandatory. Thirty portable controls pass and retain all21
-  original cases; a new ordinary XCTest method registers the full30 under the
-  unchanged30/35/10 budgets. Actual Darwin expansion and protected native
-  qualification remain pending.
-  Compiler-owner refusal now preserves the UID from the same original lstat
-  read in a closed role/route diagnostic, while retaining the original UID-zero
-  guard, refusal and status. All19 original and four new portable controls pass
-  normally and with inherited optimization; the new controls reject the actual
-  predecessor. This identifies no native owner until exact-source macOS runs,
-  grants no root or runtime authority, and does not complete item31.
-  Native input queue creation now refuses a null queue before opening the
-  device or publishing started. The original retry owner, stop behavior and
-  queue-free path remain intact. Six frozen acquisition scenarios and the
-  unknown-case refusal pass using the actual vendor class with modeled native
-  ports; the genuine predecessor passes two and fails four, and restoring the
-  correction passes all six. Ordinary XCTest registration retains30/35/10.
-  The owning generator now produces64 leaves while preserving all63 previous
-  products. Only current source pins/counts change; independent historical
-  oracles, native inputs34, dependencies36 and builder size134324 remain fixed.
-  Portable consumer controls pass. The original nine-case worker first timed
-  out at30.012 seconds, then passed once in a fresh owner at26.623 under the
-  same30-second limit; both results are retained. Actual Darwin queue delivery,
-  drain, retirement, kernel cutover and physical capture remain unqualified.
-  This prerequisite does not complete WP4, item31 or transverse items16/38.
-  Selector regressions now pass the actual absolute shared source directory
-  to each Lua child. This preserves canonical constructor identity without
-  requiring an optional native cwd provider. All three migration vectors,
-  eight restore/clear vectors and six selector cases pass on Lua 5.4 and
-  LuaJIT with LuaFileSystem absent; the hosted correction remains pending.
-  No source-identity policy or runtime authority is changed.
   The fixed-source reader now uses public `Path.parents` and path equality
   for lexical containment while preserving every original physical source,
   byte-read, Git, namespace and currentness check. The independent 48-case
@@ -5097,77 +5058,206 @@ inputs restore all 233 unchanged controls; independent replay also passes the
 34 existing missing/owned refusal controls. Final composed verification remains
 pending. No assertion, native requirement or item is waived.
 
-Private T2 expected-inventory candidate (not integrated): the current source
-retains33 original inputs,36 dependencies and63 generated outputs, with the
-historical diagnostic sources and original producer bodies preserved. The
-normally discoverable XCTest registration retains seven producer and two
-inventory methods, covering37 inventory scenarios and unknown refusal. Exact
-current41 composition passes formatting,389 JS checks and18,686 portable macOS
-cases. All nine registered methods pass with actual Linux Clang19/BlocksRuntime
-in25.722 seconds under the original30-second bound. Native Darwin/XCTest,
-queue acquisition/cutover, complete coverage, packaging, installation and
-physical input remain unqualified; runtime stays disabled and fixture_only.
-The predecessor41be manual run37862638268 is terminal FAILURE: its original
-25-minute Swift limit leaves84 passes,8 failures and one unfinished case.
-This candidate does not fix or qualify those separate native failures, nor
-complete item31 or transverse16/38.
+The private macOS Configuration menu preparation presents the admitted runtime
+through one shared read-only row. Its unsupported owned or unavailable intent
+preserves consent and disables shared integration callbacks, stale tap-hold
+mutations and rule removal through fresh admission checks. Existing translations, supported
+shared behavior and every original ordered menu assertion remain mandatory.
+The original nine-row caption oracle gains the independently declared status
+row; eleven upstream action-picker cases receive actual scoped runtime inputs
+without changing their bodies, counters, faults or cleanup. Independent replay
+passes 98 focused controls. Full composed local and native qualification is
+recorded separately; owned installation/start and physical acceptance remain
+unfinished. Item31 and transverse16/38 stay open.
 
-A failure-only owned-configuration observation now preserves the original
-native admission and exception while reporting only fixed operation, cleanup
-and retirement enums. All16 original controls and8 new refusal observations
-pass in the actual24-method portable suite. Independent bounded source and
-privacy review is CLEAR; the default XCTest method remains native unexecuted.
-Exact41 native configuration still refuses despite a complete eight-variant
-private packet; its controller cause is not yet observed. The diagnostic grants
-no permission, installation, remapping or runtime authority. Item31 and
-transverse16/38 remain open.
+The physical-source selector's two Lua child fixtures now receive the actual
+absolute shared source directory as an argument. Relative constructor coordinates
+failed when the runner lacked a native current-directory provider; the production
+constructor authority remains unchanged. Both actual Lua54 and LuaJIT preserve
+all three migration and eight restore/clear assertions with and without LFS,
+and reject a foreign constructor. The complete six-case selector passes after
+the correction versus four passes and two failures without LFS before it.
+Exact-source manual run37862638268 at41be2e93 passes all389 Core JS checks,
+including the six-case selector, and18,686 stubbed macOS units. Native runtime
+acceptance remains pending; this fixture repair does not complete item31 or
+transverse16/38.
 
-The full-source admission count is corrected from4527 to4528 regular
-files plus four links, preserving the independently fixed4532 paths, exact
-hashes, modes and link targets. Four physical filesystem controls pass in
-normal and optimized Python; genuine prior admission fails all four. Test
-contents and original-source admission are explicitly modeled; a complete
-compilable native materialization remains unqualified. The actual generator
-preserves all63 other products and the exact inverse recovers genuine vendor
-source. An active vendor queue error now forwards its original nonzero
-IOReturn through the existing owner failure route. Six fixed scenarios and
-unknown refusal pass using actual C++ with modeled IOKit/scheduler ports;
-genuine prior source fails active, pending-value and restart assertions.
-The new restart fixture retires its old peer before acquiring again; the
-initial incorrect fixture failure is retained. All31 passing bounded commands
-execute510 test methods, with five expected predecessor failures and zero
-skips/timeouts. Darwin delivery, retirement, drain, cutover and physical capture
-remain unqualified. Item31 and transverse16/38 remain incomplete.
+The independently reviewed T2 expected-inventory preparation is published only
+on the dedicated test CI branch at4f34f9aa, followed by the genuine current-dev
+merge87bbe0b6. It is not integrated into the feature branch or dev. The source
+retains33 original inputs,36 dependencies and63 generated outputs. Its normal
+XCTest registration preserves all seven original producer methods and two
+inventory methods, including37 scenarios and unknown refusal. The composed
+source passes formatting,389 JS checks and18,686 portable macOS cases; the
+actual Linux Clang19/Blocks replay passes nine methods in25.722 seconds under 30. Fresh current-dev Windows-only corrections remain whole; their BOM/LF gate
+passes1876 sources, with Windows native execution deferred. Darwin execution of
+this new registration, native queue acquisition/cutover and complete coverage
+remain unexecuted. Owned runtime stays disabled and fixture_only.
 
-Protected VHD inventory refusal now emits one bounded, closed ordinal
-observation from the original inventory read. All38 controls pass without
-changing the original30 controls or three independent42-member corpora.
-Missing AppleDouble entries remain a hypothesis until actual Darwin expansion
-is captured. Twelve mutation commands fail specific unchanged assertions;
-278 successful portable method invocations grant no native authority. The
-pkgutil caller advances only its two literal reference pins; the original11
-controls pass normally and optimized. A separate read-only CLT metadata probe
-has20 passing controls in each Python mode and after exact restoration; the
-predecessor and four mutations each fail a specific assertion in both modes.
-It observes fixed compiler/SDK metadata without invoking tools, selecting a
-toolchain or relaxing mandatory UID-zero admission. Actual CLT presence,
-ownership and SDK access remain unobserved until macOS CI. Signing, root,
-protected expansion, packaging and installation remain unqualified.
+Manual macOS run37862638268 at41be2e93 is terminal FAILURE. The Swift step reaches
+its original25-minute limit with93 started cases:84 pass,8 fail and one remains
+unfinished. Both owned whole-compilation attempts refuse at their original
+300-second boundary, although their Core builds pass117.525s and92.790s. The
+first Console build and the second CLI build remain without completion receipts;
+retained object files do not establish completed target qualification. Separate
+CoreService/CLI calibration passes185.911s. Apple keychain settings performs a
+normal atomic file replacement, which the current fixed-inode custody refuses;
+simply recapturing an inode would violate the original foreign-replacement
+controls. Owned configuration has a complete eight-variant private packet but
+its outer admission refuses. A reviewed fixed-field failure observation passes
+all24 portable controls; its new native XCTest remains unexecuted. Permission
+UI and protected VHD remain failed or unqualified. The exact root-process
+observation names preflight_compiler_owner: the selected compiler fails its
+required owner predicate before privileged bootstrap; no ownership guard is
+relaxed. Keyboard/TIS cases are not reached; installation and Release are
+skipped. These results do not qualify item31 or transverse16/38.
 
-Latest manual macOS qualification, run37880447936 at7c88374f12ab6682fd7460cf10b69efcf41e05e6,
-completed all467 Swift cases:442 passed,10 failed and15 skipped. Packaging and
+Windows PC follow-up for the final integrated Group5 source: retain the exact
+dev SHA and run the normal Windows unit/meta, E2E, packaging and installation
+qualification after the managed-network owner resolves its native PAC refusal.
+Manual run37857293152 at944b1425fdb7d9a09e79714b67cec25d3b3d6740 reports
+10,436 unit passes and one failure, case6687 in test_managed_routes_native.ahk:
+the first independent PAC vector expects three routes but observes one direct
+native bypass. Its cause remains unqualified; no Group5 source is attributed.
+Windows E2E, package and installation are skipped, and the native-port step is
+not executed. Preserve that assertion and its independent vector; the maintainer
+will resume Windows-only qualification on their PC. Mac acceptance and item31
+remain incomplete.
+
+Actual manual macOS run37880447936 tests exact7c88374f12ab6682fd7460cf10b69efcf41e05e6
+and completes all467 Swift cases:442 passed,10 failed,15 skipped. Packaging and
 native verdicts fail; installation and Release are skipped. All37 keyboard
-source cases, eight private configuration variants and the vendor queue-creation
-refusal pass. Six Carbon evidence records close with no omitted events; this
-qualifies actual US/French selection and restoration, not physical keyboards.
-Owned compilation refuses inventory before the build DAG; pkgutil's prerequisite
-refuses a stale reference pin before native marker operations. Permission UI
-reaches stage8.5 but its ten-case acceptance remains incomplete. The protected
-root prerequisite refuses the selected Xcode compiler's observed UID501 under
-its unchanged UID-0 guard. One initializer control refuses after complete
-unittest discovery; its precise case is unknown because captures were outside
-the archived parent. Original assertions, budgets and all native requirements
-remain active. Item31 and transverse16/38 remain incomplete.
+source cases, eight private configuration variants and the vendor null-queue
+acquisition refusal pass. Six Carbon evidence records close without omitted
+events and prove actual US/French source selection/restoration, not physical
+keyboards or capture. Owned compilation refuses inventory before the build DAG;
+pkgutil refuses stale reference pins before native marker operations. Permission
+UI reaches stage8.5 without completing its ten-case acceptance. The root
+prerequisite refuses the selected Xcode compiler's observed UID501 under its
+unchanged UID-zero guard. An initializer case refuses after completed unittest
+discovery; its detailed case remains unknown because captures were outside the
+archived parent. These results are retained separately from earlier41be failures.
+
+The current private continuation is bound to a reviewed67-path native transfer
+inventory. The36-path continuation is now published only on the owned test CI
+branch in queue commit8d2a49db and diagnostic commitd2b93289; it remains outside
+the feature and dev. Source adoption is conditional on postimage conservation and
+fresh gates on a clean composition starting from the actual feature. The held
+C33 callback/model/manifest work, canonical checkpoint, original Windows PC
+follow-up and every earlier native requirement remain unchanged. No workflow
+or toolchain-selection authority follows from this preparation.
+
+The prepared full-source guard counts4528 regular files plus four links,
+conserving all4532 independently fixed paths, hashes, modes and link targets.
+Four physical-filesystem controls pass in normal and optimized Python; their
+small file contents and original-source admission are explicitly modeled, so
+they do not prove a compilable full native materialization. The queue successor
+forwards the actual vendor callback's original nonzero IOReturn through its
+existing failure route. Six scenarios plus unknown refusal use actual C++ with
+modeled IOKit/scheduler ports. Thirty-one passing bounded commands execute510
+methods with zero skips/timeouts; five expected predecessor assertion failures
+and one genuine initial restart-fixture failure are retained separately. The
+real generator preserves the other63 products and the exact original vendor
+inverse. Darwin delivery, drain, retirement, cutover and physical capture remain
+unexecuted for these sources.
+
+The prepared protected-VHD diagnostic passes all38 portable controls while
+preserving the original30 and all three independent42-member corpora. It emits
+only a bounded ordinal from the original inventory read. Twelve expected
+assertion-red commands and278 positive method invocations are retained; actual
+Darwin expansion and any missing AppleDouble cause remain unobserved. Two
+pkgutil reference pins follow the corrected image; the final composition must
+retain and execute all eleven original controls and the actual native marker
+qualification. No package, signature, ownership or expansion guard is relaxed.
+
+The read-only CLT successor passes all20 portable controls in normal and
+optimized Python, both before and after exact restoration, plus the independent
+late-alias control. Ten expected assertion-red replays reject the predecessor
+and four mutations with zero errors. Ordinary Linux metadata proves only its
+private filesystem observations; actual runner CLT/compiler/SDK presence and
+ownership remain unobserved. The helper executes no tools, selects no toolchain,
+grants no authority and never relaxes mandatory UID-zero admission.
+
+Prepared initializer capture retention uses the existing uploaded evidence
+parent while preserving all44 invocations, assertions and native budgets; the
+actual refusal cause and successor native execution remain unqualified. The
+separately prepared build coordinator passes682 primary portable invocations
+and22 causal replays, preserving historical consumers and source policies.
+Those results do not prove actual full-source admission, native parallel-build
+budget fit or signed products. Root reports the private36-path gate passed in
+969 seconds with389 JS and18,718 Hammerspoon cases; Swift is explicitly deferred
+on Linux. This is not qualification of the distinct clean feature composition.
+Manual macOS run37891123181 atd2b93289 is in progress with no release; no native
+result is inferred before its final outcome. Signing, root prerequisites, protected expansion,
+packaging, installation, physical acceptance, item31 and transverse16/38 remain
+incomplete. Windows-only follow-up stays delegated to the maintainer as recorded
+above; no item is removed and no untested source is called integrated.
+
+Exact macOS-only manual run [37891123181](https://github.com/adrienm7/ergopti/actions/runs/37891123181)
+at d2b93289 is terminal CANCELLED by the platform's 45-minute package limit,
+not by this task. Its 67 native source images match feature commit4639de64;
+the private CI metadata environment, TODO and preserved checkpoint differ.
+Swift reaches its unchanged25-minute step limit with54 passed, six failed and
+one unfinished method; there is no complete suite summary. The fresh baseline
+reaches the separate owned compilation, but that compilation and the separate
+Core constructor return124 within their original300-second calibrations.
+Their combined method takes849.990seconds; this is not one compiler deadline.
+Source controls also return124 after300.855seconds. Root/SDK/signing, permission
+UI, VHD package ordinals and later keyboard/TIS cohorts are not reached.
+Installation and Release are skipped; the all-page exact-SHA census has no
+automatic runs. The task never cancelled the manual validation.
+
+The successful actual CLT metadata method takes0.252seconds, but its diagnostic
+marker is absent from the complete log. Its existing bounded, admitted receipt
+is now written directly to Foundation stderr with the same prefix and newline,
+without another read, changed fields, authority, assertion or budget. Independent
+source review and exact inverse recovery pass; native Foundation transport and
+actual log retention still require a matching-source run. No buffering cause,
+root-owned SDK presence, compiler selection or completed TODO31 is inferred.
+
+The full Swift evidence upload fails after enumerating47,769files and uploading
+1,023,410,176bytes: a previously enumerated temporary Console object in the
+failed owned-build fixture is absent at the ZIP read. No Swift archive is
+published. Runner teardown later terminates12 orphan clang processes; their
+fixture/parent/group attribution and the temporary-file mutation actor remain
+unknown. The closed inherited process group does not prove closure of escaped
+compiler sessions. Preserve original compilation, retirement and corpus
+assertions while qualifying this boundary; do not treat a larger CI budget as
+a correction of the native compilation refusals. Item31 remains partial.
+
+The reviewed C33 source composition now preserves the shared runtime captions
+and the eight historical menu models while adding a narrow Clear All refusal
+route for the genuine uninitialized parser owner. The same failed read, actual
+invoked reader, current configuration/manager identities and one-use epoch proof
+are required; a newer init or any stop invalidates the route. It grants no
+readiness or successful write, and the original apply_scope still refuses before
+mutating corrupt bytes. The six registered regressions retain all53 original
+admission bodies plus independent reader, clock, query and lifecycle controls.
+The corrected reader locator adapts the real-source fixture without changing its
+original future-backend assertions. Independent source/control reviews are
+qualified; complete final-source gates and native UI, E2E, packaging, installation
+and physical acceptance remain separate requirements. Item31 remains partial.
+
+Closed native failure observations now retain bounded public context from the
+existing compiler journal and retired VirtualHID reference receipt. The journal
+projection preserves lexical integers, live-parent lineage, independent frozen
+vectors and the original Guardian result; the reference projection exposes only
+42 fixed ordinals and typed comparison flags. Original compile deadlines,
+source/currentness checks, 38 reference controls and the independent 42-record
+package corpus are unchanged. Thirty-three journal controls and eight reference
+projection controls are registered; Foundation, console transport and matching
+macOS execution remain unqualified here. These diagnostics do not prove a
+compiler timeout cause, authorize a driver or complete item31 and items16/38.
+
+The separate Core constructor build now uses the same explicit-module policy as
+the actual baseline and owned compiler commands. All original architecture,
+custody, currentness, budget and calibration assertions remain mandatory.
+Independent portable execution retains224 passing test cases and eight causal
+negative assertion failures for the original omission and a narrow policy
+mutation. An additive ordinary Swift caller runs the39 Core controls in normal
+and optimized Python modes; its exact frozen inverse guard preserves the old
+historical caller oracle. Actual Swift discovery, native compilation and timeout
+causality remain unqualified until a matching macOS run. Item31 remains partial.
 
 - [~] **33.** Config policy for the files other than config.toml (the former
   item 25): Published in the second 2026-09-30 release for the files the review
@@ -6637,6 +6727,14 @@ process retirement and elapsed-time acceptance remain distinct requirements.
 This does not recover the unavailable 25-rule backup, diagnose that exact report,
 qualify confirmation UI or complete TODO43.
 
+Exact41be manual run37862638268 now supplies closed native Hammerspoon artifact
+receipts: all six original cleanup cases and the four owner, four refusal and
+four source cases pass over actual private files. Each receipt reports its
+source/owner closure and retained elapsed time. The whole Swift/CI run fails
+separately; installation, remap lease initialization, physical input and actual
+confirmation UI remain unexecuted. The unavailable25-rule user backup is not
+reconstructed, so TODO43 remains partial.
+
 The actual native method in [37411747843](https://github.com/adrienm7/ergopti/actions/runs/37411747843)
 passed its six cleanup cases, but printing its full JSON as one huge console line
 interleaved with the XCTest completion marker. The unchanged strict evidence
@@ -6726,6 +6824,15 @@ artifact remains blocked by the cloud network policy. The whole Swift step
 times out, with packaging and installation skipped; these passing methods do
 not qualify final-source confirmation UI, physical input or the unavailable
 historical25-rule configuration. Item43 remains partial.
+
+The authentic d2b93289 transcript in manual run37891123181 records failures of
+the original six-case cleanup method and the three four-case consent cohorts
+at official-runtime acquisition (`stage_refused`), before their cleanup
+operations. These do not replace the earlier passing private-file receipts or
+establish a regression in the remover. The new run ends at the platform limit;
+its full Swift capture upload fails, so the exact acquisition cause is unknown.
+Confirmation UI, final-source installation, physical acceptance and the
+unavailable historical25-rule backup remain unqualified. Item43 stays partial.
 
 - [~] **44.** CapsWord is no longer cancelled by the pointer when Karabiner
   activated it (AltGr + CapsLock): the watcher probed the variable with
@@ -11187,12 +11294,51 @@ Current Group 3 source checkpoint (item 111, 2026-10-06): [Group 3 current check
   Six controlled real-Notepad caller cases passing do not qualify the
   physical/default InputHook trigger or close this incident.
 
+- [ ] **115.** Qualify the portable JavaScript suite on its Windows host.
+
+  At `b06aefcb6386aa4b875c1c86c29e27c07ab8f951`, the local suite passes
+  378 of 387 controls; hosted Core passes all 387. Preserve every assertion
+  and native target qualification while correcting the host-bound fixtures:
+  - Domain build and Linux installer sandbox: native archive construction
+    refuses Windows; the sandbox's subsequent missing-service read hides the
+    original installer failure. Keep genuine Linux compiler/ELF admission.
+  - Installed Linux layout discovery: the Windows Lua fixture supplies a
+    drive-qualified source coordinate to a POSIX constructor, which refuses
+    before extension discovery. The downstream missing-layout counts do not
+    demonstrate missing packaged TOML files.
+  - Managed HTTP phase model: the retained wrapper hides its child error;
+    positive closure still depends on POSIX ownership/mode facts. Capture the
+    actual refusal before proposing a correction.
+  - Linux updater provider model: host `path.join` emits backslashes for the
+    POSIX `LUA_CPATH_5_4` vector. Preserve versioned native ABI/ELF controls.
+  - Sparkle portable controls: Windows cannot supply the expected POSIX mode;
+    two socket refusals still hide their underlying exceptions. Account for
+    the two existing POSIX signal exclusions without adding test skips.
+  - Brew and provider receipt controls: existing symlink cases fail with
+    Windows privilege error 1314. Preserve wrong-kind, hardlink and ownership
+    refusals when providing explicit portable filesystem ports.
+  - Opaque macOS proxy fixture: local commit `05cb477fd` supplies exact POSIX
+    vectors inside all four Bash entry paths before policy capture. All 57
+    original assertions remain; nine new assertions cover actual case-sensitive
+    receiving and literal shell values. Pinned Windows Node 22.22.2 passes all
+    49 controls; the original and export-removal inverse both fail.
+
+  The complete local suite now passes 379 of 387 controls. The sole changed
+  result is the corrected proxy fixture; the other eight failures match the
+  pre-fix full run. This does not qualify native macOS execution.
+
+  These are local-host findings, not additional release deferrals or proof
+  of a driver failure on its native OS. Linux implementation changes remain
+  with their Linux owner. Production proxy precedence is unchanged.
+
 ## Temporary dev release qualification deferrals
 
 The maintainer requested a release before 2026-10-09 09:00 Europe/Paris and
 explicitly authorized temporary test-execution deferrals when necessary.
 The closed policy in `.github/ci/dev_release_qualification_exceptions.json`
-applies only to the dev push prerelease `v0.0.0-dev.156` before 07:00 UTC.
+now applies only to the dev push prerelease `v0.0.0-dev.156` before
+2026-10-10 07:00 UTC, following the renewed publication request after the
+hosted consent diagnosis. The original October 9 deadline was missed.
 Main, pull requests, local runs and the next dev tag retain full execution.
 Every deferred qualification remains open and must never count as a pass:
 
@@ -11209,10 +11355,12 @@ Every deferred qualification remains open and must never count as a pass:
 - [ ] Qualify native macOS Shortcuts catalogue discovery. The first
       `app.shortcuts()` call exceeded twenty seconds; preserve the portable
       parser/JXA controls and do not infer permission or successful discovery.
-- [ ] Verify the corrected Windows SHA-256 staging operation on hosted
-      Windows. Local actual PowerShell controls, AHK generated-script contract,
-      whole-graph compilation and 70 E2E cases pass; cancelled CI receiving
-      does not prove the complete native download/trust chain.
+- [x] Verify the corrected Windows SHA-256 staging operation on hosted
+      Windows. CI run `37868449649` at
+      `b06aefcb6386aa4b875c1c86c29e27c07ab8f951` passes 10,454 unit cases,
+      including trusted native CA/static/PAC readiness and exact cleanup,
+      followed by E2E, packaging and installation/launch. The separate
+      full-URL PAC qualification above remains deferred.
 - [ ] Publish exact DEFERRED/source-bound receipts and these limitations in
       the prerelease notes, then complete and re-enable every missing native
       qualification. The temporary profile expires automatically and cannot
@@ -11221,6 +11369,44 @@ Every deferred qualification remains open and must never count as a pass:
 These deferrals do not close groups 2, 4 or 7, the Notepad/default-trigger
 qualification, recurring input incident 114 or promo follow-up 113. Their
 existing requirements and retained evidence remain authoritative.
+
+CI run `37868449649` passes Core and every Windows/Linux job under the
+documented four-scope profile. Diagnostic run `37898352401` reuses its exact
+archive on ARM and Intel and shows an unanswered Automation consent dialog:
+hosted-compute-agent requests control of ErgoptiPlus. Onboarding, continued
+application lifetime and normal Quit succeed. This establishes the external
+test precondition failure, not a Lua defect or a successful permission grant.
+
+- [ ] Qualify external macOS AppleEvents and the dependent native timer,
+      Karabiner and ScriptScope assertions on both architectures. The renewed
+      single-release profile records the four clean/Karabiner launch legs as
+      DEFERRED with `qualified:false`; lifecycle, other scenarios, packaging,
+      signing and installation remain required. Default, Main, PR and dev.157
+      runs must execute the complete assertions.
+
+- [ ] **116.** Provide a guided third-party prerelease validation report.
+      The maintainer requested a Debugging menu button that runs the needed
+      checks and returns one local file to share. Reuse asynchronous diagnostic
+      ownership, progress, cancellation and redacted export. Package the small
+      native probe graph through the canonical bundle owner. Keep quick export
+      as the default on all three OSes. Offer an unchecked "Include in-depth
+      tests (may take a long time)" checkbox, with progress, cancellation and
+      partial results. Reuse CI assertions that are safe in a personal session;
+      keep install, reload and profile-replacement suites in an explicitly
+      isolated mode and explain every unavailable prerequisite.
+      Bind results to
+      the actual version, source, package identity, OS and architecture; report
+      PASS, FAIL or NOT_RUN and observed permission/cleanup failures separately.
+      Run timers and Karabiner generation in private fixtures, external
+      AppleEvents only through normal user consent, and read-only Shortcuts
+      discovery. Run complete isolated Brew acceptance only when its declared
+      prerequisites exist. Never call CI profile seeding on a personal Mac,
+      change TCC, execute a personal shortcut or stop the resident driver.
+      Keep private text, configuration, shortcut names and credentials out of
+      the archive. Do not upload automatically. Match the menu/report contract
+      on all three drivers, with translated reasons for OS-specific checks.
+      An ARM report does not qualify Intel, future sources or hosted consent.
+      This follow-up does not delay the immediate dev.156 publication.
 
 ## Time estimate
 

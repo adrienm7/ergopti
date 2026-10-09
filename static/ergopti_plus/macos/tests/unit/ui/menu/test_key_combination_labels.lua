@@ -9,6 +9,8 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
+local runtime_inputs
+helpers, runtime_inputs = require("tests.support.remap_menu_runtime_inputs").bind(helpers)
 
 --- Reads source bytes without involving the menu's label resolver.
 --- @param path string Absolute source path.
@@ -43,6 +45,9 @@ end
 --- @return table
 local function remap(definitions, observed)
 	local out = {
+		get_runtime = runtime_inputs.get_runtime,
+		shared_runtime_selected = runtime_inputs.shared_runtime_selected,
+		runtime_unavailable_reason = runtime_inputs.runtime_unavailable_reason,
 		MOD_COMBOS = definitions, TAP_HOLD_KEYS = {}, NON_CANONICAL_COMBOS = {},
 		DEFAULT_TAP_HOLD_TIMEOUT_MS = 200, DEFAULT_STICKY_TIMEOUT_MS = 1000,
 		DEFAULT_SIMULTANEOUS_THRESHOLD_MS = 50,

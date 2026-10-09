@@ -9,6 +9,8 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
+local runtime_inputs
+helpers, runtime_inputs = require("tests.support.remap_menu_runtime_inputs").bind(helpers)
 local Json = require("json")
 
 local LOCALES = {
@@ -57,6 +59,9 @@ local function remap_owner(world)
 		return true
 	end
 	return {
+		get_runtime = runtime_inputs.get_runtime,
+		shared_runtime_selected = runtime_inputs.shared_runtime_selected,
+		runtime_unavailable_reason = runtime_inputs.runtime_unavailable_reason,
 		DEFAULT_TAP_HOLD_TIMEOUT_MS = 200,
 		DEFAULT_STICKY_TIMEOUT_MS = 1000,
 		DEFAULT_SIMULTANEOUS_THRESHOLD_MS = 50,

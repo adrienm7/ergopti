@@ -16,7 +16,7 @@
 --- right key.
 --- ==============================================================================
 
-local helpers = require("tests.helpers")
+local helpers, runtime_inputs = require("tests.support.remap_menu_runtime_inputs").bind(require("tests.helpers"))
 local Json    = require("json")
 
 
@@ -51,6 +51,9 @@ local function remap_double()
 		MOD_COMBOS = {},
 		NON_CANONICAL_COMBOS = {},
 		get_enabled = function() return true end,
+		get_runtime = runtime_inputs.get_runtime,
+		shared_runtime_selected = runtime_inputs.shared_runtime_selected,
+		runtime_unavailable_reason = runtime_inputs.runtime_unavailable_reason,
 		get_tap_holds_enabled = function() return true end,
 		get_combo_symmetric = function() return false end,
 		get_tap_action = function() return "none" end,
@@ -535,6 +538,9 @@ local function with_action_picker_frame(body)
 		local effects = { catalogue_reads = 0, grouped_reads = 0, setters = {}, regenerations = 0,
 			refreshes = 0, receipt = true, actions = {} }
 		local native = setmetatable({
+			get_runtime = runtime_inputs.get_runtime,
+			shared_runtime_selected = runtime_inputs.shared_runtime_selected,
+			runtime_unavailable_reason = runtime_inputs.runtime_unavailable_reason,
 			regenerate = function() effects.regenerations = effects.regenerations + 1; return true end,
 		}, {
 			__index = function(_, key)

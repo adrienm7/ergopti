@@ -3,6 +3,7 @@
 
 import importlib.util
 import contextlib
+import gzip
 import io
 import json
 import os
@@ -425,6 +426,154 @@ class VerdictTests(unittest.TestCase):
 
     def test_healthy_launch_passes(self):
         self.assertEqual(gate.evaluate("clean", observe()), [])
+
+    def test_appleevent_diagnostics_retain_system_logs_and_collection_failures(self):
+        for outcome in ("success", "refused", "timeout"):
+            with self.subTest(outcome=outcome), tempfile.TemporaryDirectory() as folder:
+                output = Path(folder) / "output"
+                output.mkdir()
+                home = Path(folder) / "home"
+                home.mkdir()
+                log_calls = []
+
+                def native_run(arguments, **options):
+                    if arguments[0] == "log":
+                        log_calls.append(arguments)
+                        if outcome == "timeout":
+                            raise subprocess.TimeoutExpired(arguments, options["timeout"])
+                        return subprocess.CompletedProcess(
+                            arguments,
+                            64 if outcome == "refused" else 0,
+                            "native log evidence",
+                            "log collection refused" if outcome == "refused" else "",
+                        )
+                    return subprocess.CompletedProcess(arguments, 0, "", "")
+
+                with (
+                    mock.patch.object(gate.subprocess, "run", side_effect=native_run),
+                    mock.patch.object(gate, "processes", return_value=[]),
+                ):
+                    collected = gate.collect(
+                        output,
+                        {"logs_dir": home / "missing"},
+                        home,
+                        (Path("/private/owned/Hammerspoon"),),
+                    )
+                self.assertEqual(len(log_calls), 2)
+                system_call = log_calls[1]
+                predicate = system_call[system_call.index("--predicate") + 1]
+                self.assertIn('process == "tccd"', predicate)
+                self.assertIn('subsystem == "com.apple.appleevents"', predicate)
+                self.assertIn("--info", system_call)
+                self.assertIn("--debug", system_call)
+                self.assertEqual(system_call[system_call.index("--last") + 1], "4m")
+                diagnostics = collected["unified_logs"]
+                self.assertEqual(len(diagnostics), 2)
+                for receipt in diagnostics:
+                    self.assertEqual(
+                        receipt["status"], "captured" if outcome == "success" else "unavailable"
+                    )
+                    if outcome == "refused":
+                        self.assertEqual(receipt["exit_status"], 64)
+                        self.assertIn("log collection refused", receipt["stderr"])
+                    if outcome == "timeout":
+                        self.assertIn("TimeoutExpired", receipt["cause"])
+                self.assertEqual(
+                    json.loads((output / "unified-log-collection.json").read_text()), diagnostics
+                )
+                self.assertTrue((output / "appleevents-system.log").exists())
+
+    def test_unified_log_capture_requires_completed_archive_and_preview_writes(self):
+        for failure in ("open", "close", "preview"):
+            with self.subTest(failure=failure), tempfile.TemporaryDirectory() as folder:
+                output = Path(folder) / "output"
+                output.mkdir()
+                home = Path(folder) / "home"
+                home.mkdir()
+                original_write = Path.write_text
+
+                @contextlib.contextmanager
+                def refused_close(*arguments, **options):
+                    yield io.StringIO()
+                    raise OSError("Archive close refused")
+
+                def refused_preview(path, text, **options):
+                    if path.name in ("unified.log", "appleevents-system.log"):
+                        raise OSError("Preview write refused")
+                    return original_write(path, text, **options)
+
+                with contextlib.ExitStack() as stack:
+                    stack.enter_context(mock.patch.object(gate, "processes", return_value=[]))
+                    stack.enter_context(
+                        mock.patch.object(
+                            gate.subprocess,
+                            "run",
+                            return_value=subprocess.CompletedProcess([], 0, "evidence", ""),
+                        )
+                    )
+                    if failure == "open":
+                        stack.enter_context(
+                            mock.patch.object(
+                                gate.gzip, "open", side_effect=OSError("Archive open refused")
+                            )
+                        )
+                    elif failure == "close":
+                        stack.enter_context(mock.patch.object(gate.gzip, "open", refused_close))
+                    else:
+                        stack.enter_context(mock.patch.object(Path, "write_text", refused_preview))
+                    collected = gate.collect(
+                        output,
+                        {"logs_dir": home / "missing"},
+                        home,
+                        (Path("/private/owned/Hammerspoon"),),
+                    )
+                for receipt in collected["unified_logs"]:
+                    self.assertEqual(receipt["status"], "unavailable")
+                    self.assertIn("refused", receipt["cause"])
+                    if failure != "preview":
+                        self.assertNotIn("archive_file", receipt)
+                    else:
+                        self.assertIn("Preview write refused", receipt["preview_error"])
+                        self.assertEqual(receipt["archive_file"], receipt["file"] + ".gz")
+                        with gzip.open(
+                            output / receipt["archive_file"], "rt", encoding="utf-8"
+                        ) as handle:
+                            self.assertEqual(handle.read(), "evidence")
+
+    def test_unified_log_archive_preserves_initial_authorization_after_preview_limit(self):
+        with tempfile.TemporaryDirectory() as folder:
+            output = Path(folder) / "output"
+            output.mkdir()
+            home = Path(folder) / "home"
+            home.mkdir()
+            trace = "initial consent request\n" + "x" * 400000 + "\nfinal observation\n"
+
+            def native_run(arguments, **options):
+                return subprocess.CompletedProcess(
+                    arguments, 0, trace if arguments[0] == "log" else "", ""
+                )
+
+            with (
+                mock.patch.object(gate.subprocess, "run", side_effect=native_run),
+                mock.patch.object(gate, "processes", return_value=[]),
+            ):
+                collected = gate.collect(
+                    output,
+                    {"logs_dir": home / "missing"},
+                    home,
+                    (Path("/private/owned/Hammerspoon"),),
+                )
+            for receipt in collected["unified_logs"]:
+                with gzip.open(
+                    output / (receipt["file"] + ".gz"), "rt", encoding="utf-8"
+                ) as handle:
+                    self.assertEqual(handle.read(), trace)
+                self.assertEqual(receipt["archive_file"], receipt["file"] + ".gz")
+                self.assertEqual(receipt["characters"], len(trace))
+                self.assertTrue(receipt["preview_truncated"])
+                preview = (output / receipt["file"]).read_text(encoding="utf-8")
+                self.assertEqual(len(preview), 400000)
+                self.assertTrue(preview.endswith("final observation\n"))
 
     def test_window_timeout_does_not_discard_other_native_evidence(self):
         with tempfile.TemporaryDirectory() as folder:

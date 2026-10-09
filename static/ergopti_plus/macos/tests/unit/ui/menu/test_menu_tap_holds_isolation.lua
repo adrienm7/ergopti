@@ -9,7 +9,7 @@
 --- that starts, stops, opens or reports on that engine.
 --- ==============================================================================
 
-local helpers = require("tests.helpers")
+local helpers, runtime_inputs = require("tests.support.remap_menu_runtime_inputs").bind(require("tests.helpers"))
 
 --- Minimal platform.remap double consumed by the menu builders. Every method
 --- that would reach the engine raises, so a build that calls one fails loudly.
@@ -28,6 +28,9 @@ local function remap_double(enabled)
 			from = { simultaneous = { { key_code = "left_shift" }, { key_code = "right_shift" } } } } },
 		NON_CANONICAL_COMBOS = {},
 		get_enabled = function() return enabled end,
+		get_runtime = runtime_inputs.get_runtime,
+		shared_runtime_selected = runtime_inputs.shared_runtime_selected,
+		runtime_unavailable_reason = runtime_inputs.runtime_unavailable_reason,
 		set_enabled = function() error("the tap-holds menu has no enable toggle") end,
 		get_combo_symmetric = function() return false end,
 		get_tap_action = function() return "none" end,

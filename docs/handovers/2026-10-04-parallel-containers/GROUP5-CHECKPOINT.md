@@ -2742,3 +2742,357 @@ inputs. Independent replay passes these and 34 existing missing/owned refusal
 controls. Every original assertion, callback fault and cleanup remains whole.
 Final composed verification remains pending. Native macOS and Windows execution
 remain unexecuted; these partial results close no TODO item.
+
+## Current dev and read-only runtime menu admission
+
+Published runtime configuration/controller commit ef15b50c4 passes its complete
+selected portable gate: 388 JavaScript checks, 18,339 macOS cases across 1,588
+modules, 101 stub E2E scenarios with one host skip, formatting and BOM/LF.
+Native macOS and Windows qualification remains unexecuted for this successor.
+
+The feature preserves current dev f2680c158 through no-squash merge 1f20912eb.
+All 21 locale compositions preserve both parents' exact leaf values. The real
+menu owner regenerates the product; no independent corpus is regenerated.
+Its synchronization gate reports 388/389 JavaScript checks, 18,684 macOS cases,
+11,883 Linux units, 101 stub macOS and 189 Linux E2E scenarios passing.
+The release-body interpreter refuses a new upstream Node heredoc; its bounded
+reviewed correction awaits the release/workflow owner's shared seam grant.
+Seven Linux native gates also fail or refuse admission. Read-only diagnosis
+preserves their missing source/tool/kernel prerequisites and staging failure.
+Correcting only the cloud Lua wrapper's explicit-path handling subsequently
+passes all four actual native network-runtime controls; this focused result
+does not qualify the other six gates. Native packaging/install remains open.
+
+The adopted C14 source adds the declared read-only Configuration runtime row,
+retains native intent and guards shared integration/removal and tap-hold changes
+with current admitted runtime inputs. It offers no owned runtime activation.
+Original menu bodies, assertions, callback faults and independent ordered
+caption expectations stay whole. Actual owner generation produces menu image
+158e22e3c08e9beea0a2e5bef7e75ef94ad6f153cafd74130bd406e7a49422cd.
+The fourteen source images match the reviewed C13 plus one-line call chronology
+successor. Independent replay passes 98 controls; full Root selected gates are
+recorded separately. Native Hammerspoon, packaging and installation remain
+unexecuted for these sources; no hardware acceptance is inferred.
+
+Group 1 grants the exact shared/test seams in issue86 comments6068227266 and 6069458581. Source publication and explicit release of this bounded shared phase
+follow the Root gate receipt. No dev integration lock, codex/ci-validation write,
+release, item removal or foreign branch update occurs here. Items24/30/31/40/43/44
+and transverse16/38 remain partial.
+
+The first C14 Root gate is retained failed at index tree
+23522770d4a7247d0320daa852e59655e0115299: formatting differs in this checkpoint;
+JavaScript passes 385/389, with three genuine menu regressions and the unchanged
+upstream release-body refusal; macOS passes 18,637 with 59 failures across nine
+modules, while stub E2E passes 101 with one host skip. The complete log is
+79c5b90fdcedbe1df7c3ed971b32174e700ccc255115c95421488f04f370a2fc.
+
+Native parent reuse corrects the two actual row-count regressions without
+changing their baselines. A precise sixth-argument Configuration chronology
+expectation corrects the full parity guard privately; Group 1's additional seam
+grant remains pending. All three original guards and 98 original/frozen focused
+controls pass in that private successor. Eight other old menu models need real
+scoped runtime inputs, conserving the caller's original dependency environment.
+The ninth case is genuine malformed TOML: its real owner remains uninitialized,
+so borrowing another owner's valid intent is forbidden. Its original Clear All
+row/callback, unchanged-byte, false-result and visible-refusal obligations remain
+mandatory; a bounded existing-command refusal route is still under preparation.
+No failed check is waived and no new native qualification is claimed.
+
+The additional input-only successor has independent clearance for its genuine
+scoped owner and seven old fixture bodies: 73 passes versus the same preimages'
+17 passes and 56 failures. Eleven lifetime controls and five independent
+cleanup-failure controls pass. All original assertions, errors, counters and
+order remain whole; no mutable module/native-debt state is restored. These
+private images are not yet adopted. Tray's input-only two caption failures and
+the unchanged real malformed-config failure remain retained.
+
+A private clear-only exception initially passes the original malformed case,
+but genuine future-runtime controls prove the same nil/false/nil query tuple
+also follows invalid enum rejection. That proposed route remains blocked;
+its 27 passes and two genuine failures are not a qualified correction.
+A narrower source-only proposal adds a fourth parser-error classification,
+conserving the config reader's first three results and same-read receipt, and
+an opaque latest-attempt parser-refusal identity. Current owner/reader/operation
+and token checks, repeated initialization and stop invalidation are required
+before the original refusal-only command can be offered. This proof grants no
+state, write, native readiness or activation. No prospective source is adopted.
+Issue86 comment6070487223 records the bounded shared/test ownership request.
+
+Actual origin/dev advances to f43e06ec10aef8b5554ae30c7f3439cde4985c76;
+Root has fetched it but has not yet merged it into the dirty feature checkout.
+A separate genuine private CI ancestry merge preserves its release-body,
+Homebrew-root and Windows fixture corrections alongside published Root1f209.
+Reviewed permission-progress44, pkgutil-capability11 and production-producer7
+portable checks pass on that candidate. Formatting and all389 JavaScript checks
+pass after an unchanged rerun with the canonical temporary-directory permission;
+the initial319 passes and70 environment refusals remain retained separately.
+The genuine candidate944b1425fdb7d9a09e79714b67cec25d3b3d6740 is pushed only
+to codex/ci-macos-input. Exact-SHA automatic cancellation finds no automatic
+runs. Manual ci.yml run37857293152 selects all three OS lanes, with Release
+push-only and disabled for this event. This source cohort remains private
+preparation; canonical feature adoption and native qualification are separate.
+
+The real Core/js job reports388 passes and one failing selector check: two
+Lua child fixtures refuse relative canonical-constructor coordinates. Causal
+replay preserves all original assertions: the old six-case check passes four
+and fails two without LFS on both actual Lua54 and LuaJIT, while supplying the
+actual absolute shared directory via child argv passes all six with and without
+LFS. A foreign constructor remains refused in all four combinations. The exact
+four-input correction is adopted only in the canonical working tree; its full
+selected gate and successor publication remain pending. Completed Linux units
+report11,883 passes; other native jobs remain in progress. The manual run is
+allowed to reach its final result. No TODO item, native budget or failed result
+is waived.
+
+The Root staged/unstaged C14 recovery patch and source identities are retained
+outside the checkout in the C14-live-resume-20261008 publication directory.
+
+## Exact native result and selector CI correction
+
+Manual run37857293152 finishes with failure on exact944b1425: all37 jobs reach
+terminal status, with26 successes, six failures and five skipped jobs. Release
+is skipped; the manual validation was never cancelled. Real Linux units pass
+11,883, E2E and all four package formats pass, all17 installation/launch scenarios
+pass, and the Linux verdict succeeds. macOS stub units pass18,686, stub E2E and
+12 actual tooltip painted captures pass. Windows units pass10,436 and fail the
+one managed-network PAC case6687; E2E/package/install are skipped.
+
+macOS packaging refuses its portable Brew preflight:83 methods contain five
+failing subcases across three methods. The actual model resolves its temporary
+root but those three capture inputs retain an alias spelling. A real contained
+Linux directory alias reproduces exactly those five failures. Resolving only
+the three fixture root acquisitions passes all83 controls under both ordinary
+and alias roots, without changing production or any original assertion. Native
+macOS replay remains unexecuted. The precise Group6 seam request and Group3
+Shortcuts failure are published in issue86 comment6071123145; neither owner's
+source is adopted. Actual Shortcuts discovery refuses after20.115750 seconds,
+with genuine group retirement; permission remains not_determined and cause
+unqualified. No TCC cause or native catalogue success is inferred.
+
+Release-launcher compilation, the main Swift suite, permission-progress44,
+pkgutil11, production-producer7, Source6 signing diagnosis and Source16's
+explicit-modules experiment are all unexecuted because Brew preflight failed
+first. The tooltip result does not qualify these methods or physical input.
+The149-subject terminal receipt is authenticated outside the checkout under
+group5-native-run-37857293152, census
+db23c1cf7fd64f60174766d3f2379a0c15a9539158dcef8b9d97e14bcdf616b6.
+
+The exact two-path selector fixture/TODO31 repair is published only on owned
+codex/ci-macos-input as b23ceb92e95546ca561d2e464183573a0e78a61a, sole
+parent944b1425, tree1bbc532aafb7048f7cdf13a485e34abf67746ca9. Selected format
+and all389 JavaScript checks pass; all28 prior preparation source images and
+all133 prior sealed subjects remain exact. Three paginated exact-SHA automatic
+censuses find no automatic run, and no new manual run is dispatched. The45-subject
+publication receipt is authenticated. Canonical feat/macos-input remains at
+1f20912eb with its existing index preserved; this CI-only publication does not
+integrate C14, complete a TODO item or qualify the repaired SHA natively.
+
+Independent C14 review reproduces a genuine extra refusal-proof flaw: the actual
+Config public reader can return a forged parse_error classification and mint a
+real manager token. A well-formed unsupported future source then gains Clear All
+and enters actual apply_scope once; the operation still refuses and source bytes
+remain whole. Original53 controls, ABI12, persisted3 and tray10 pass, while the
+three reader-substitution controls and independent future-input control fail.
+The124-subject author packet and16-subject independent BLOCKED review remain
+immutable; no source from them is adopted. A narrower executed private successor
+preserves the first four Config results and adds a same-invocation decoder proof,
+but full fixture ownership, independent review and canonical gates remain pending.
+
+## Private refusal lineage and refreshed upstream qualification
+
+The executed private C14 reader-lineage successor preserves all first four
+Config returns and binds an opaque refusal proof to the actual canonical decoder
+invocation. The original53 controls now pass53/0 after explicit real-codec fixture
+ownership and three actual superseded-init guards. Independent reader substitution
+controls pass. A subsequent focused32-module replay passes432 and fails one setup
+that still looks for the removed facade's RealConfig upvalue; the reviewed one-line
+setup successor binds the actually published Config module, retaining the six
+original test bodies and all fixed future-input bytes.
+
+A separate genuine public-query substitution still admits Clear All for a
+well-formed unsupported future file. Independent review reproduces that refusal
+bug, while borrowing an unchanged second genuine manager's query refuses through
+its existing closed-owner cache check. The candidate remains blocked pending
+exact query provenance, regression replay and independent clearance. No source
+from this preparation is adopted or described as a passing canonical gate.
+
+The private T2 expected-interface producer passes37 scenarios compiled from the
+actual pinned vendor classes with controlled IOKit/CF/dispatcher ports and genuine
+portable GSL/pqrs types. Independent review identified and reproduced stale native
+entry callbacks, late duplicate notifications and a genuine not-null pointer type
+compile failure; their bounded private corrections preserve the original native
+callback/deadline ownership. Native Darwin enumeration remains unexecuted. Current
+consumer signing tests initially pass37 and fail eight because their current
+schema2 input still declares the previous60 replacements/4527 files. The closed
+production validator refuses that stale declaration. Only the two current input count literals are recut to measured63/4528;
+all45 signing cases then pass. The ten targeted consumer suites pass250 cases,
+including five builder-image controls, with no reported skips. Every custody
+assertion and historical oracle remains unchanged. Final sealing and independent
+review are pending. The37 inventory scenarios currently require an explicit
+Python/Clang invocation with genuine upstream/vendor inputs; they are not yet
+registered in default JS or XCTest discovery. A separate source-only native
+registration follow-up is being prepared, preserving the original method bodies
+and native budgets. Default CI success does not prove these37 controls executed.
+
+An actual fresh fetch advances origin/dev from f43e06ec1 to
+35cdc109d715a980fbd52383817975bb23ceaad7. Its already integrated4f290c1fd
+fixes the Brew capture-root alias inputs and retains all refusal assertions,
+adding the84th portable regression. Its35cdc109d retains Windows native
+acknowledgement publication ownership with an atomic fixture publication. The
+owned private CI candidate is preparing a genuine upstream merge and fresh
+selected gates before another macOS-only manual validation; no result is claimed
+before execution. The canonical feature index and working tree remain preserved.
+
+## Exact41be native dispatch and reviewed private successors
+
+The owned CI candidate genuinely merges freshdev35cdc109d as
+41be2e931add714073dbdc067a1b900ad4db42d2, parentsb23ceb92/35cdc109d,
+tree2bb2118ac5b1c7055864c9a3357a27ca2b6e397c. All28 prior native preparation
+sources and the selector/TODO correction remain byte-whole. Format passes and
+all389 JS checks pass. Three exact-SHA automatic censuses are empty; the99-subject
+publication packet is authenticated. Manual ci.yml/macOS run37862638268 tests
+this exact SHA, with no release and Windows/Linux unselected. Hosted Core JS
+passes389 and macOS stub units pass18,686/0. Stubbed E2E and all12 native
+painted tooltip captures also pass. Portable Brew preflight, the release launcher
+build and installed-VHD ancestry prerequisite succeed; the original main Swift
+XCTest step starts at00:16:10Z and times out at its original25-minute limit.
+The manual run is terminal FAILURE:13 jobs,6 successful,3 failed and4 skipped;
+Release is skipped, Windows/Linux are unselected and installation is skipped.
+The exact transcript records93 starts,84 passes,8 failures and one unfinished
+initializer-delivery case, with no complete whole-suite summary. Both owned
+whole-compilation attempts return124 at their original300-second limit;
+CoreService/CLI calibration independently passes185.911s. Signing credential
+setup/cleanup, owned configuration, native permission UI, protected VHD and
+root-process prerequisites remain failed or unqualified. Keyboard/TIS cases
+are not reached. Pkg11's actual method passes0.942s; portableUI44 is not reached.
+C14 and T2 are absent from this candidate; its result cannot qualify them.
+
+The final private C14 production/fixture successor has239 authenticated subjects,
+439 targeted Lua passes, zero failures, three original JS guard passes and six
+actual source parses. Its15-path delta preserves all original assertion bodies
+and exact canonical preimages. Independent review reproduces the corrected
+reader/query chronology and their causal inverses. A packaging discrepancy in
+the offered53-test top-level copy is explicitly retained: the correct executed
+source isde280b39, provided by the separately authenticated five-subject
+c14-durable53-input addendum; oldb0e16c3 must not be adopted. Five newly discovered
+regression modules pass21 cases. The same ten fixture-lifetime cases pass five
+and fail five on the older fixture, then pass with the corrected fixture. One
+first-clock inverse survives because a separate guard already refuses; it is
+not claimed as a killed mutation. The additive user-read clock case now passes:
+its exact invoked-reader guard inverse yields one pass and one genuine failure,
+then restored sources pass both cases. All six relative native regression
+modules are discovered once by the unchanged runner. Their separate independent
+review is CLEAR for this bounded source scope. Root authenticates all16 author
+and10 review subjects. The private strict-lint receipt still has ten unrelated
+review-only header failures and is not presented as a full green gate. Full
+canonical gates, native qualification and Group1 callback/model ownership
+acknowledgement remain pending; the old failed Root gate is not overwritten.
+
+The393-subject T2 source packet and797-subject independent review authenticate.
+Independent regeneration reproduces all63 outputs:57 old T1 outputs stay whole,
+three change and three are added. The source declaration has34 base dependencies
+plus two VHD dependencies, totaling36; T1 had33 plus two, totaling35. Independent
+native-entry/alias controls and their inverse mutants confirm the corrections.
+Root separately executes the unchanged inventory harness: both unittest methods
+pass, covering37 scenarios and the unknown-scenario refusal. These use actual
+vendor C++/GSL with modeled IOKit/CF/dispatcher ports and establish no Darwin
+hardware behavior.
+
+A separate five-new-file XCTest registration proposal reuses the unchanged
+producer7 and inventory2 methods in one nine-method suite. It preserves the
+historical1019-file archive/manifest and adds21 original pinned source inputs,
+for1040 distinct inputs. Root independently verifies all135664 original bytes,
+SHA256s, Git blob IDs and modes against genuine upstream9312593 andtree8f16414.
+The input exporter reproduces resources, never behavior expectations. Actual
+fresh export, exact check and fresh repeat each pass. The original nine methods
+pass under genuine Linux Clang19 and BlocksRuntime in24.043 seconds, within the
+original30-second process bound, with no timeout, skip or remaining group. Root
+authenticates all34 executed-seal subjects and all171 independent review
+subjects. The separate registration review is CLEAR for source adoption and
+targeted native validation: nine bounded controls pass and removal of the fixed
+authenticated import binding actually executes a foreign helper and refuses.
+All74 T2 sources and four historical assets remain whole; the five-path patch
+applies and reverses exactly. Actual Swift/XCTest execution remains unexecuted.
+The original
+30/35 native SDK budgets remain mandatory. A prospective T2 composition onto
+41be now has an independent CLEAR source review and Root's fresh selected
+gate: formatting,389 JS checks and18,686 Lua tests pass in957.972s; Swift is
+explicitly deferred on Linux. All29 source postimages remain byte-whole after
+those gates, index treecd06347c9a4a93f7d209674b3f26f1d7ce01fb67. The actual
+registered-nine replay also passes25.722s under30, preserving the Source16
+experiment and existing signer outcomes. A separate ownedTODO31 status update
+is being qualified before publication. Native dispatch remains held while the
+actual prior failures are diagnosed; no unchanged failing rerun is claimed. No runtime
+activation, full coverage, native queue cutover, packaging, installation or TODO
+completion is inferred.
+
+## Upstream Windows fixture retirement checkpoint
+
+An explicit fresh fetch advances origin/dev to
+b188785e3, whose Windows-only fixture correction retains native readiness
+observations before genuine owner retirement. Canonical Group5 source/index
+changes remain preserved; this fetch does not merge the dirty feature checkout
+or change the exact41be source tested by the running macOS dispatch. Windows
+PC qualification remains separately delegated to the maintainer.
+
+## Native legacy cleanup and keyboard failure cascade
+
+Exact41be native Hammerspoon artifact receipts pass the original six cleanup
+cases and three four-case owner/refusal/source cohorts. Each closes its genuine
+owner and preserves measured elapsed time. They authorize only production
+operations on private files: no installation, remap lease, physical input, UI
+confirmation or reconstructed user backup is claimed. Whole Swift/CI remains
+failed, so TODO43 is partial.
+
+The read-only diagnosis of prior70a86 unfiltered459 cases authenticates14
+subjects and the exact tested source. One French-selection completion failure
+leaves cleanup debt; four later cases refuse before acquisition. The fresh
+current source remains US despite French selected/enabled and native noErr.
+Observed restoration is at least44.5ms beyond the original deadline, so failure
+and debt retention are required. No supported removable work or query-order
+correction exists yet. All four corresponding41be Swift files are byte-identical
+to70a86, but current41 never reaches them. This comparison is not a new native
+pass or failure.
+
+## Current-dev test publication and complete C gate
+
+The dedicated Group5 test CI branch publishes4f34f9aa for the reviewed T2
+inventory/registration preparation and87bbe0b6 for its genuine merge of current
+origin/dev b06aefcb6. All30 owned publication blobs remain whole after the
+merge; six upstream Windows correction paths are retained. The1876-source
+AHK BOM/LF check passes; Windows execution is skipped on this Linux host.
+Exact-SHA automatic workflow censuses are empty after both pushes. No new native
+dispatch, final lock acquisition, validation-branch movement or dev write occurs.
+
+Root's complete private32-path C composition exits1 after1158.871s. Formatting
+passes, JS reports388 passes/1 pinned-source-read refusal (77 vs frozen75),
+portable E2E reports101 passes/1 driver-specific skip, and Lua reports18772
+passes/1 genuine future-backend reader-locator failure. All32 postimages remain
+whole. The actual ratchet and original lifecycle assertions remain mandatory;
+three narrow fixture locator corrections are proposed separately. The full
+composition is restored exactly to clean87 using its authenticated inverse
+patch with --index after refreshing stale index metadata; no source reset,
+assertion removal or result reseeding occurs. Group1 canonical ownership ACK
+still blocks adoption of the shared/callback menu preparation.
+
+A separate three-path owned-configuration refusal observation preserves the
+complete original production AST, native admission arguments, original16 test
+controls and deadlines. Independent bounded review passes16 controls, verifies
+all ten imported/controller subjects equal exact41,87 and canonical, and
+accepts a source-identical new-file patch-envelope correction. Root's actual
+full24 portable suite passes with unchanged postimages and clean inverse
+restoration. New default Swift execution is unexecuted; selected gates are now
+running on87 plus only this preparation and its owned31 status note. The
+observation reports fixed enums only and does not repair or qualify the native
+controller failure. The original inadmissible patch envelope and its failure
+receipt are retained, rather than overwritten.
+
+The root prerequisite archive now narrows its exact41 refusal to
+preflight_compiler_owner, with unchanged UNAVAILABLE/status69, empty stdout and
+closed native group. Actual owner UID/path is not projected; no trust, SDK or
+ABI acceptance follows. The protected-VHD expand_prerequisite separately checks
+only presence of --expand-full in native help before any package acquisition.
+The earlier eight actual pkgutil streams already establish help omits that flag;
+option execution remains untested. A source-only proposal will replace this
+display assumption with genuine fixed expansion and pinned payload verification,
+preserving native custody, assertions and deadlines. Neither refusal is waived.

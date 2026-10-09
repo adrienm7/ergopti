@@ -309,6 +309,8 @@ final class HS274NativePolicyQualificationTests: XCTestCase {
 		if receipt.status != 0 {
 			print("Retired owned compilation refusal code: "
 				+ HS274RetiredBuildRefusal.code(receipt.stderr, producer: .owned))
+			HS274OwnedBoundaryConsole.observe(arguments: arguments, root: root, repository: Self.repository,
+				workerStatus: receipt.status, guardianClosed: true)
 		}
 		return receipt
 	}

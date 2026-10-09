@@ -33,8 +33,8 @@ local function with_source(source, body, declaration)
 			local declaration_paths, original_shared
 			calls.declaration_resolves = 0
 			if declaration_path then
-				-- The fixture captured the real reader before replacing its public
-				-- facade. Bind that reader's actual path port, not a later stub.
+				-- The real-source fixture publishes the genuine configuration owner.
+				-- Bind that reader's actual path port before initializing the manager.
 				local function captured(fn, expected)
 					for index = 1, 20 do
 						local name, value = debug.getupvalue(fn, index)
@@ -42,7 +42,7 @@ local function with_source(source, body, declaration)
 					end
 					error("the genuine reader port was not found: " .. expected, 0)
 				end
-				local reader = captured(require("platform.remap.config").load_user_config, "RealConfig")
+				local reader = require("platform.remap.config")
 				declaration_paths = captured(captured(reader.load_user_config, "runtime_setting"), "Paths")
 				original_shared = declaration_paths.shared
 				declaration_paths.shared = function(relative)

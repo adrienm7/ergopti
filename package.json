@@ -465,7 +465,9 @@
 		"test:menu-shared-delegation": "node ./tools/test/test-menu-shared-delegation.cjs",
 		"test:linux:fd-sha256-native": "node ./tools/test/run-linux-fd-sha256-native.cjs",
 		"test:linux-fd-sha256-native-gate": "node ./tools/test/test-linux-fd-sha256-native-gate.cjs",
-		"test:dev-release-qualification": "node ./tools/test/test-dev-release-qualification.cjs"
+		"test:dev-release-qualification": "node ./tools/test/test-dev-release-qualification.cjs",
+		"test:macos-launch-qualification": "node ./tools/test/test-macos-launch-qualification.cjs",
+		"test:macos-launch-qualification-lifetime": "node ./tools/test/test-macos-launch-qualification-lifetime.cjs"
 	},
 	"type": "module",
 	"dependencies": {

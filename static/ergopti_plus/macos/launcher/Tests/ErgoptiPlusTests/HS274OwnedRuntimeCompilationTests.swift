@@ -10,6 +10,21 @@ import XCTest
 
 extension HS274NativePolicyQualificationTests {
 
+	func testPortableCoreConstructorCommandsKeepExistingCompilerPolicy() throws {
+		let modes: [[String]] = [[], ["-O"]]
+		try fixture { root in
+			let controls = source("owned_runtime_service_reference_core_fixture_build_test.py")
+			for mode in modes {
+				let receipt = try run(URL(fileURLWithPath: "/usr/bin/env"),
+					["python3"] + mode + [controls.path], root: root)
+				XCTAssertEqual(receipt.status, 0)
+				XCTAssertTrue(receipt.stdout.isEmpty)
+				XCTAssertTrue(receipt.stderr.contains("Ran 39 tests in "))
+				XCTAssertTrue(receipt.stderr.hasSuffix("\nOK\n"))
+			}
+		}
+	}
+
 	func testPortableFourTargetPreparationUsesActualFilesystemAndClosedControls() throws {
 		try fixture { root in
 			let script = source("hs274_native_build.py").deletingLastPathComponent()
@@ -192,7 +207,7 @@ extension HS274NativePolicyQualificationTests {
 				XCTAssertEqual(partial?["qualification"] as? String,
 					"unsigned_actual_core_constructor_compilation_only")
 				XCTAssertEqual(partial?["producer_sha256"] as? String,
-					"729c33710cab92d63af6c27c16c6705c3e629edb5867766873c5f8089fcaa42b")
+					"7307dfdbceb05874e570cd74b76ad4daca1d87d4f2838716b3435a1adee3a621")
 				XCTAssertEqual(partial?["source_factory_sha256"] as? String,
 					"71237241a3a43fa3dbc5c5b8db488432b9051ed66322cbdf497959b3724b10a1")
 				XCTAssertEqual(partial?["architectures"] as? [String], ["arm64", "x86_64"])

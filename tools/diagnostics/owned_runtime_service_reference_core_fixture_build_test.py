@@ -213,6 +213,7 @@ class CoreFixtureContracts(unittest.TestCase):
                 "CODE_SIGNING_ALLOWED=NO",
                 "CODE_SIGNING_REQUIRED=NO",
                 "GCC_GENERATE_DEBUGGING_SYMBOLS=NO",
+                "SWIFT_ENABLE_EXPLICIT_MODULES=NO",
             ],
         )
 
@@ -310,6 +311,7 @@ class CoreFixtureContracts(unittest.TestCase):
                     "CODE_SIGNING_ALLOWED=NO",
                     "CODE_SIGNING_REQUIRED=NO",
                     "GCC_GENERATE_DEBUGGING_SYMBOLS=NO",
+                    "SWIFT_ENABLE_EXPLICIT_MODULES=NO",
                 ]
                 if label == "core":
                     expected.append("ASSETCATALOG_COMPILER_GENERATE_ASSET_SYMBOLS=NO")
@@ -544,6 +546,81 @@ class CoreFixtureContracts(unittest.TestCase):
             self.assertFalse(owner.observation()["ready"])
         finally:
             self.assertTrue(owner.close_retained())
+
+    def test_actual_core_command_matches_owned_explicit_module_policy(self):
+        # Execute only the actual shared pure argv function, never a native build.
+        import ast
+
+        source = SOURCE.parents[1] / "build/remap_runtime_build.py"
+        parsed = ast.parse(source.read_text())
+        function = next(
+            node
+            for node in parsed.body
+            if isinstance(node, ast.FunctionDef) and node.name == "build_command"
+        )
+        namespace = {"Path": Path}
+        exec(compile(ast.Module(body=[function], type_ignores=[]), str(source), "exec"), namespace)
+        expected = [
+            "/actual/xcodebuild",
+            "-configuration",
+            "Release",
+            "-alltargets",
+            "SYMROOT=" + str(self.root / "build"),
+            "ARCHS=arm64 x86_64",
+            "ONLY_ACTIVE_ARCH=NO",
+            "CODE_SIGNING_ALLOWED=NO",
+            "CODE_SIGNING_REQUIRED=NO",
+            "GCC_GENERATE_DEBUGGING_SYMBOLS=NO",
+            "SWIFT_ENABLE_EXPLICIT_MODULES=NO",
+        ]
+        self.assertEqual(namespace["build_command"]("/actual/xcodebuild", self.root), expected)
+        self.assertEqual(self.api._release_command("/actual/xcodebuild", self.root), expected)
+
+    def test_actual_core_command_keeps_baseline_explicit_module_policy(self):
+        # Evaluate the original baseline's actual argv expression with pure ports.
+        import ast
+
+        source = SOURCE.with_name("hs274_native_build.py")
+        parsed = ast.parse(source.read_text())
+        function = next(
+            node
+            for node in parsed.body
+            if isinstance(node, ast.FunctionDef) and node.name == "compile_native"
+        )
+        expressions = [
+            node.args[1]
+            for node in ast.walk(function)
+            if isinstance(node, ast.Call)
+            and isinstance(node.func, ast.Name)
+            and node.func.id == "phase"
+            and len(node.args) == 3
+            and isinstance(node.args[1], ast.List)
+            and any(
+                isinstance(value, ast.Constant)
+                and value.value == "SWIFT_ENABLE_EXPLICIT_MODULES=NO"
+                for value in node.args[1].elts
+            )
+        ]
+        self.assertEqual(len(expressions), 1)
+        namespace = {"tools": {"xcodebuild": "/actual/xcodebuild"}, "project": self.root}
+        baseline = eval(compile(ast.Expression(expressions[0]), str(source), "eval"), namespace)
+        expected = [
+            "/actual/xcodebuild",
+            "-configuration",
+            "Release",
+            "-alltargets",
+            "SYMROOT=" + str(self.root / "build"),
+            "CODE_SIGNING_ALLOWED=NO",
+            "CODE_SIGNING_REQUIRED=NO",
+            "GCC_GENERATE_DEBUGGING_SYMBOLS=NO",
+            "SWIFT_ENABLE_EXPLICIT_MODULES=NO",
+        ]
+        self.assertEqual(baseline, expected)
+        actual = self.api._release_command("/actual/xcodebuild", self.root)
+        self.assertEqual(
+            [value for value in actual if value.startswith("SWIFT_ENABLE_EXPLICIT_MODULES=")],
+            ["SWIFT_ENABLE_EXPLICIT_MODULES=NO"],
+        )
 
 
 if __name__ == "__main__":
