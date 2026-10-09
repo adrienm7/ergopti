@@ -137,7 +137,21 @@ function VALIDATORS.refresh(message)
 	local detailed = message.detailed
 	if detailed == nil then detailed = false end
 	if type(detailed) ~= "boolean" then return nil, "bad_detailed" end
-	return { action = "refresh", detailed = detailed }
+	local extensive = message.extensive
+	if extensive == nil then extensive = false end
+	if type(extensive) ~= "boolean" then return nil, "bad_extensive" end
+	return { action = "refresh", detailed = detailed, extensive = extensive }
+end
+
+function VALIDATORS.export_snapshot(message, context)
+	local sequence = message.export_sequence
+	if type(sequence) ~= "number" or sequence ~= math.floor(sequence) or sequence <= 0
+		or sequence > context.schema.report.export_sequence_max then return nil, "bad_export_sequence" end
+	return { action = "export_snapshot", export_sequence = sequence }
+end
+
+function VALIDATORS.cancel()
+	return { action = "cancel" }
 end
 
 function VALIDATORS.close()

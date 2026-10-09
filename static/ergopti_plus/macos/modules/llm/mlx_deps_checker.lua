@@ -56,6 +56,8 @@ local BootstrapPauseOwner = require("modules.llm.dependency_bootstrap_pause_owne
 local PtyProcessGroup = require("modules.llm.pty_process_group")
 local Diagnosis = require("modules.llm.mlx_bootstrap_diagnosis")
 local PythonInterpreter = require("adapters.python_interpreter")
+local NetworkEnv = require("modules.llm.network_env")
+local NetworkAdmission = require("modules.llm.opaque_network_admission")
 
 local LOG = "mlx_deps"
 
@@ -1245,6 +1247,15 @@ function M.check_and_install_deps(on_complete, replay_token)
 	else
 		bash_cmd = "ERGOPTI_BOOTSTRAP_PYTHON=" .. shell_quote(python_bin) .. " " .. bash_cmd
 	end
+	local network_prelude
+	if native_pty == nil then
+		local network_error
+		network_prelude, network_error = NetworkEnv.opaque_prelude("MLX-DEPS")
+		if type(network_prelude) ~= "string" or network_prelude == "" then
+			Logger.error(LOG, "MLX network admission could not be prepared: %s.", tostring(network_error))
+			return settle_preflight_failure(i18n.get("mlx.deps_failed"))
+		end
+	end
 	local pty_wrapper_path, wrapper_error
 	if native_pty == nil then pty_wrapper_path, wrapper_error = PtyProcessGroup.create("MLX dependency") end
 	if native_pty == nil and not pty_wrapper_path then
@@ -1289,6 +1300,7 @@ function M.check_and_install_deps(on_complete, replay_token)
 		-- Every meaningful line the script printed, kept as it streams: the
 		-- completion only receives what the streaming callback did not take.
 		output_tail = Diagnosis.new_tail({ markers = KNOWN_MARKERS }),
+		network_admission = NetworkAdmission.new(),
 	}
 	local task
 	local function owner_is_current()
@@ -1296,6 +1308,7 @@ function M.check_and_install_deps(on_complete, replay_token)
 			and _pause_controller.is_current(owner.token, owner.authorization)
 	end
 	local function record_output(stdout_chunk, stderr_chunk)
+		if native_pty == nil and type(stderr_chunk) == "string" then owner.network_admission.push(stderr_chunk) end
 		owner.output_tail.push(stdout_chunk, "stdout")
 		owner.output_tail.push(stderr_chunk, "stderr")
 	end
@@ -1376,7 +1389,13 @@ function M.check_and_install_deps(on_complete, replay_token)
 			-- The cause is searched for in every retained line: the closing
 			-- lines of the script blame the network whatever failed.
 			local lines = owner.output_tail.lines()
-			local cause = Diagnosis.classify(lines, exit_code, platform_context())
+			local context = platform_context()
+			local network_receipt = native_pty == nil and owner.network_admission.finish(exit_code) or nil
+			if network_receipt ~= nil then
+				context.network_receipt = network_receipt
+				context.network_contract = { classify = NetworkAdmission.report }
+			end
+			local cause = Diagnosis.classify(lines, exit_code, context)
 			local tail = Diagnosis.summary(cause)
 			Logger.error(LOG, "MLX bootstrap failed (exit=%s, cause=%s, path=%s). Last output: %s",
 				tostring(exit_code), tostring(cause.kind), tostring(cause.path), joined_tail(lines))
@@ -1476,12 +1495,19 @@ function M.check_and_install_deps(on_complete, replay_token)
 		return consume_stream(table.unpack(args, 1, args.n))
 	end
 
-	-- Construct the full Python invocation: python3 executes the PTY wrapper,
-	-- passing bash_cmd so the child process receives the exact shell command.
-	local task_executable = python_bin
-	local task_arguments = { "-u", pty_wrapper_path, "/bin/bash", "-c", bash_cmd }
+	local task_executable, task_arguments
 	if native_pty ~= nil then
 		task_executable, task_arguments = native_pty.executable, native_pty.arguments
+	else
+		-- Receive the trusted pre-child phase outside the Python PTY so stderr
+		-- keeps exact framing. The separate native transport retains its own
+		-- source admission and cannot acquire this prelude's diagnostic authority.
+		local launch_command = "( " .. network_prelude .. ": ); "
+			.. "_ergopti_bootstrap_network_status=$?; "
+			.. "[ \"$_ergopti_bootstrap_network_status\" -eq 0 ] || exit \"$_ergopti_bootstrap_network_status\"; "
+			.. "exec " .. shell_quote(python_bin) .. " -u " .. shell_quote(pty_wrapper_path)
+			.. " /bin/bash -c " .. shell_quote(bash_cmd)
+		task_executable, task_arguments = "/bin/bash", { "-c", launch_command }
 	end
 	-- Both transports join the same task construction, GC root and conditional
 	-- start transaction. Selecting a transport cannot bypass launch rollback.

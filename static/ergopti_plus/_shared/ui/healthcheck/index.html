@@ -10,6 +10,7 @@
 		<script src="../i18n.js"></script>
 		<script src="../redact.js"></script>
 		<script src="model.js"></script>
+		<script src="checks.js"></script>
 	</head>
 	<body>
 		<header class="toolbar">
@@ -44,6 +45,7 @@
 					></button>
 				</div>
 				<div class="toolbar-right">
+					<button type="button" id="btn-cancel" disabled data-i18n="common.cancel"></button>
 					<button
 						type="button"
 						id="btn-refresh"
@@ -56,6 +58,12 @@
 				<input type="checkbox" id="chk-details" disabled />
 				<span data-i18n="healthcheck.details_checkbox"></span>
 			</label>
+			<label class="details">
+				<input type="checkbox" id="chk-extensive" disabled />
+				<span data-i18n="healthcheck.deep_tests_checkbox"></span>
+			</label>
+			<p id="deep-progress" role="status" aria-live="polite"></p>
+			<pre id="deep-results"></pre>
 			<p id="status" class="status info" role="status" aria-live="polite"></p>
 		</header>
 		<main id="content"></main>

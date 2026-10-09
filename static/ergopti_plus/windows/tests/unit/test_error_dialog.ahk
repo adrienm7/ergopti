@@ -190,10 +190,13 @@ _TED_ActionsUseTheHostsReport() {
 	_TED_Reset()
 	try {
 		Performed := []
-		Perform := (Action, Paths, Config) => (Performed.Push(Map("action", Action, "paths", Paths)), Map("ok", true))
+		Perform := (Action, Paths, Config, Unused, Snapshot) => (Performed.Push(Map("action", Action, "paths", Paths, "snapshot", Snapshot)), Map("ok", true))
 		Report := Map("text", "# ErgoptiPlus diagnostics`n", "fields", Map("title", "Mod: boom"))
+		Snapshot := _TED_SharingSnapshot()
+		Config := HealthCheck_Config()
+		Shared := HealthCheck_ShareDocument(Snapshot, Config["schema"])
 		_ED_Session := Map("epoch", _ED_WindowEpoch, "report", Report, "open_id", "errors_today",
-			"paths", Map("errors_today", "C:\x\errors.log"), "config", Map())
+			"paths", Map("errors_today", "C:\x\errors.log"), "config", Config, "snapshot", Snapshot)
 		_ED_ResetDone := false
 		_ErrorDialog_HandleMessage(_ED_WindowEpoch, '{"action":"copy","text":"forged"}', Perform)
 		_ErrorDialog_HandleMessage(_ED_WindowEpoch, '{"action":"report"}', Perform)
@@ -201,11 +204,11 @@ _TED_ActionsUseTheHostsReport() {
 		_ErrorDialog_HandleMessage(_ED_WindowEpoch, '{"action":"open_path","id":"config_dir"}', Perform)
 		AssertEqual(3, Performed.Length, "copy, report and open run; the unknown action does not")
 		AssertEqual("copy", Performed[1]["action"]["action"])
-		AssertEqual(Report["text"], Performed[1]["action"]["text"], "the page cannot choose what is copied")
+		AssertEqual(Shared["text"], Performed[1]["action"]["text"], "the page cannot choose what is copied")
 		AssertEqual("report", Performed[2]["action"]["action"])
-		AssertEqual("Mod: boom", Performed[2]["action"]["fields"]["title"])
+		AssertFalse(Performed[2]["action"]["fields"].Has("title"), "sharing omits the free error title")
 		; The host prefills the report itself and saves no file (report-focus)
-		AssertEqual(Report["text"], Performed[2]["action"]["text"], "report sends the report copy sends")
+		AssertEqual(Shared["text"], Performed[2]["action"]["text"], "report sends the report copy sends")
 		AssertFalse(Performed[2]["action"].Has("name"), "a report names no file to save")
 		AssertEqual("open_path", Performed[3]["action"]["action"])
 		AssertEqual("errors_today", Performed[3]["action"]["id"], "open_log opens today's errors file, by id")
@@ -238,3 +241,47 @@ _TED_GlobalHandlerSurfacesThroughTheWindow() {
 }
 Test("error window: uncaught errors reach it by their site, without a toast (error-dialog-windows)",
 	_TED_GlobalHandlerSurfacesThroughTheWindow)
+
+
+; Supplies only synthetic host data; no collector, window or clipboard runs.
+_TED_SharingSnapshot() {
+	return Map("driver", "windows", "schema_version", 2, "detailed", false,
+		"generated_at", "2026-09-24T08:15:02Z", "sections", Map(
+			"versions", Map("ergopti_version", "2.1.0", "commit", "abcdef123456"),
+			"system", Map("os", "Windows 11", "arch", "x64"),
+			"issues", Map("warn_count", 1, "err_count", 2, "recent", ["CANARY-private.invalid/notes"]),
+			"paths", Map("errors_today", "C:\synthetic-owner\errors.log")),
+		"probes", Map("appleevent_transport", Map("state", "error", "native_status", -1744, "ms", 12, "cleanup", "settled")))
+}
+
+_TED_RealSharingSink() {
+	global _ED_Session, _ED_ResetDone, _ED_WindowEpoch
+	SavedSession := _ED_Session, SavedReset := _ED_ResetDone, SavedEpoch := _ED_WindowEpoch
+	try {
+		Snapshot := _TED_SharingSnapshot()
+		Fields := _ErrorDialog_BuildReport(Map("kind", "error", "module", "synthetic",
+			"message", "CANARY-private.invalid/notes", "time", "local"), (*) => Snapshot)
+		Assert(Fields["snapshot"] == Snapshot, "the builder retains the exact captured host snapshot")
+		AssertContains(Fields["report"]["text"], "CANARY", "local detailed report remains available")
+		Copied := [], Opened := []
+		Overrides := Map("identity", (*) => Map("home", "C:\synthetic-owner", "user", "synthetic"),
+			"copy", (Text) => (Copied.Push(Text), true), "open_url", (Url) => (Opened.Push(Url), true))
+		Perform := (Action, Paths, Config, Unused := 0, Retained := 0) => HealthCheck_PerformAction(Action, Paths, Config, Overrides, Retained)
+		_ED_Session := Fields
+		_ED_ResetDone := true ; The response port refuses before any WebView use.
+		_ErrorDialog_Perform(_ED_WindowEpoch, "copy", Perform)
+		_ErrorDialog_Perform(_ED_WindowEpoch, "report", Perform)
+		AssertEqual(2, Copied.Length, "both callers reach the actual approved copy sink")
+		AssertEqual(1, Opened.Length, "the actual issue builder opens after copying")
+		AssertEqual(Copied[1], Copied[2], "both actions use the same retained projection")
+		AssertFalse(InStr(Copied[1], "CANARY"), "private error details never leave")
+		AssertContains(Copied[1], "-1744", "admitted technical status remains useful")
+		AssertFalse(InStr(Opened[1], "CANARY"), "the issue URL cannot leak the error")
+		Overrides["copy"] := (*) => false
+		_ErrorDialog_Perform(_ED_WindowEpoch, "report", Perform)
+		AssertEqual(1, Opened.Length, "copy refusal prevents another browser action")
+	} finally {
+		_ED_Session := SavedSession, _ED_ResetDone := SavedReset, _ED_WindowEpoch := SavedEpoch
+	}
+}
+Test("error window: actual sharing caller retains snapshot and excludes private details", _TED_RealSharingSink)

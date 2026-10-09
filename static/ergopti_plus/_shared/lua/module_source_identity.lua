@@ -12,12 +12,17 @@ local function normalize(source, directory)
 	if type(source) ~= "string" or source:sub(1, 1) ~= "@" then return nil end
 	local path = source:sub(2):gsub("\\", "/")
 	if path == "" or path:find("%z") then return nil end
-	local absolute = path:sub(1, 1) == "/"
+	-- The ordinary Windows Lua loader emits drive-qualified @file sources.
+	-- Preserve that root exactly; drive-relative sources still need an anchor.
+	local drive = path:match("^%a:/")
+	local absolute = drive ~= nil or path:sub(1, 1) == "/"
 	if not absolute then
 		if type(directory) ~= "string" or directory:sub(1, 1) ~= "/" or directory:find("%z") then return nil end
 		path = directory .. "/" .. path
 		absolute = true
 	end
+	local root = drive or "/"
+	if drive then path = path:sub(#drive + 1) end
 	local parts = {}
 	for part in path:gmatch("[^/]+") do
 		if part == "." then
@@ -31,7 +36,7 @@ local function normalize(source, directory)
 		end
 	end
 	if #parts == 0 then return nil end
-	return "@" .. (absolute and "/" or "") .. table.concat(parts, "/")
+	return "@" .. (absolute and root or "") .. table.concat(parts, "/")
 end
 
 --- Derives an exact relative sibling from a known native module's file suffix.

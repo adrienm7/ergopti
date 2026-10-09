@@ -282,9 +282,10 @@ end
 --- action through the gesture registry, under the key's own binding, or nil when
 --- the keycode is no assigned tap key. Memory only: asked inside the eventtap.
 --- @param keycode integer
+--- @param keyboard_type integer|nil Originating keyboard model.
 --- @return function|nil
-local function decide_tap_key(keycode)
-	local action, binding = TapKeys.decide(keycode)
+local function decide_tap_key(keycode, keyboard_type)
+	local action, binding = TapKeys.decide(keycode, keyboard_type)
 	if not action then return nil end
 	return function()
 		local GestActions = require("modules.gestures.actions")

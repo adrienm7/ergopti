@@ -89,6 +89,7 @@ end)
 helpers.describe("llm_language parameter: what the binding editors show", function()
 	local names = read_json("data/locale_names.json")
 	local order = read_json("data/locale_order.json")
+	local config = read_json("modules/llm/translate.json")
 	local i18n = require("infra.i18n")
 
 	--- The label of the interface-language choice for the current locale.
@@ -100,16 +101,13 @@ helpers.describe("llm_language parameter: what the binding editors show", functi
 		return template:sub(1, at - 1) .. name .. template:sub(at + 3)
 	end
 
-	helpers.it("the zenity prompt lists the interface language first, then every locale", function()
+	helpers.it("the native input prompt states the shared free-language byte limit", function()
 		local prompt = Gestures.get_action_parameter_prompt(ACTION)
 		helpers.assert_true(prompt:find("{1}", 1, true) == nil, "the placeholder is filled")
-		local expected = { "ui \226\128\148 " .. ui_label() }
-		for _, code in ipairs(order.order) do
-			local entry = names.locales[code]
-			expected[#expected + 1] = code .. " \226\128\148 " .. entry.flag .. " " .. entry.name
-		end
-		local listing = table.concat(expected, "\n")
-		helpers.assert_true(prompt:find(listing, 1, true) ~= nil, "the languages, one per line: " .. prompt)
+		local template = i18n.get("dialog.gestures.param_llm_language")
+		local at = assert(template:find("{1}", 1, true))
+		local expected = template:sub(1, at - 1) .. tostring(config.max_language_bytes) .. template:sub(at + 3)
+		helpers.assert_eq(prompt, expected, "the native InputBox displays the shared byte limit")
 	end)
 
 	helpers.it("the refusal is the kind's own", function()
@@ -135,8 +133,13 @@ helpers.describe("llm_language parameter: what the binding editors show", functi
 		helpers.assert_eq(strings.languageLabel, i18n.get("dialog.action_picker.language_label"))
 		helpers.assert_eq(strings.prompts.llm_language, Gestures.get_action_parameter_prompt(ACTION))
 		helpers.assert_eq(strings.errors.llm_language, Gestures.get_action_parameter_error(ACTION))
-		helpers.assert_true(Gestures.set_action_parameter("tap_3", ACTION, "FR") == false,
+		helpers.assert_true(Gestures.set_action_parameter("tap_3", ACTION, "FR|invalid") == false,
 			"an invalid value is refused")
+		helpers.assert_eq(Gestures.get_action_parameter("tap_3", ACTION), "ja",
+			"refusal preserves the existing binding")
+		helpers.assert_true(Gestures.set_action_parameter("tap_3", ACTION, "Esperanto"),
+			"a free language name is accepted through the actual binding owner")
+		helpers.assert_eq(Gestures.get_action_parameter("tap_3", ACTION), "Esperanto")
 	end)
 
 	helpers.it("the bridge hands the page the language choices", function()

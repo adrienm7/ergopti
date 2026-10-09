@@ -20,7 +20,7 @@ const result = spawnSync(
 assert.equal(result.error, undefined, 'the catalogue receiver must start');
 assert.equal(result.signal, null, 'the catalogue receiver must close within its bound');
 assert.equal(result.status, 0, result.stderr || result.stdout);
-assert.match(result.stderr, /Ran 18 tests in/);
+assert.match(result.stderr, /Ran 24 tests in/);
 assert.match(result.stderr, /\bOK\b/);
 assert.doesNotMatch(result.stderr, /skipped=/);
 assert.match(result.stdout, /actual native producer receiving was not requested/);

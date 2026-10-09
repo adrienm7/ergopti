@@ -1,0 +1,113 @@
+name: Native keyboard geometry
+
+on:
+  push:
+    branches: [codex/macos-keyboard-geometry-20261009]
+  workflow_dispatch:
+    inputs:
+      source_sha:
+        description: Exact committed source to qualify
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: keyboard-geometry-${{ github.run_id }}
+  cancel-in-progress: false
+
+jobs:
+  geometry:
+    strategy:
+      fail-fast: false
+      matrix:
+        runner: [macos-15, macos-15-intel]
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.source_sha || github.sha }}
+      - name: Verify immutable source and record SDK identity
+        id: source
+        env:
+          EXPECTED_SOURCE: ${{ inputs.source_sha || github.sha }}
+        run: |
+          set -euo pipefail
+          [[ "$EXPECTED_SOURCE" =~ ^[0-9a-f]{40}$ ]]
+          test "$(git rev-parse HEAD)" = "$EXPECTED_SOURCE"
+          owner="$RUNNER_TEMP/keyboard-geometry-evidence"
+          test ! -e "$owner"
+          mkdir -m 700 "$owner"
+          git rev-parse HEAD > "$owner/source-sha.txt"
+          uname -m > "$owner/architecture.txt"
+          swift --version > "$owner/swift-version.txt"
+          xcodebuild -version > "$owner/xcode-version.txt"
+          xcrun --show-sdk-version > "$owner/sdk-version.txt"
+          shasum -a 256 static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/KeyboardGeometry.swift static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/main.swift static/ergopti_plus/macos/launcher/Tests/ErgoptiPlusTests/KeyboardGeometryTests.swift static/ergopti_plus/macos/launcher/Tests/ErgoptiPlusTests/LauncherEnvironmentTests.swift > "$owner/source-pins.txt"
+      - name: Verify selected XCTest receipt controls
+        id: portable
+        run: python3 -B tools/test/test_keyboard_geometry_xctest_receipt.py
+      - name: Receive native keyboard geometry
+        run: |
+          set -euo pipefail
+          unset ERGOPTI_DEV_QUALIFICATION_PROFILE
+          owner="$RUNNER_TEMP/keyboard-geometry-evidence"
+          set +e
+          swift test --package-path static/ergopti_plus/macos/launcher --scratch-path "$RUNNER_TEMP/keyboard-geometry-swift" --filter KeyboardGeometryTests 2>&1 | tee "$owner/KeyboardGeometryTests.log"
+          status=("${PIPESTATUS[@]}")
+          set -e
+          python3 tools/diagnostics/keyboard_geometry_xctest_receipt.py --class KeyboardGeometryTests --source static/ergopti_plus/macos/launcher/Tests/ErgoptiPlusTests/KeyboardGeometryTests.swift --log "$owner/KeyboardGeometryTests.log" --test-exit "${status[0]}" --capture-exit "${status[1]}" --receipt "$owner/KeyboardGeometryTests.receipt.json"
+      - name: Receive actual launcher environment
+        if: ${{ !cancelled() && steps.source.outcome == 'success' && steps.portable.outcome == 'success' }}
+        run: |
+          set -euo pipefail
+          unset ERGOPTI_DEV_QUALIFICATION_PROFILE
+          owner="$RUNNER_TEMP/keyboard-geometry-evidence"
+          test -d "$owner"
+          set +e
+          swift test --package-path static/ergopti_plus/macos/launcher --scratch-path "$RUNNER_TEMP/keyboard-geometry-swift" --filter LauncherEnvironmentTests 2>&1 | tee "$owner/LauncherEnvironmentTests.log"
+          status=("${PIPESTATUS[@]}")
+          set -e
+          python3 tools/diagnostics/keyboard_geometry_xctest_receipt.py --class LauncherEnvironmentTests --source static/ergopti_plus/macos/launcher/Tests/ErgoptiPlusTests/LauncherEnvironmentTests.swift --log "$owner/LauncherEnvironmentTests.log" --test-exit "${status[0]}" --capture-exit "${status[1]}" --receipt "$owner/LauncherEnvironmentTests.receipt.json"
+      - uses: actions/setup-python@v5
+        if: ${{ !cancelled() && steps.source.outcome == 'success' }}
+        with:
+          python-version: '3.13'
+      - uses: actions/setup-node@v4
+        if: ${{ !cancelled() && steps.source.outcome == 'success' }}
+        with:
+          node-version-file: '.node-version'
+      - name: Receive native owned PTY zombie and descendant retirement
+        if: ${{ !cancelled() && steps.source.outcome == 'success' }}
+        run: |
+          set -euo pipefail
+          owner="$RUNNER_TEMP/keyboard-geometry-evidence"
+          python3 --version > "$owner/pty-python-version.txt"
+          shasum -a 256 static/ergopti_plus/macos/modules/llm/pty_process_group.lua tools/diagnostics/macos_pty_process_group_native.py tools/diagnostics/macos_owned_process.py tools/test/test-pty-process-group-escalation.cjs > "$owner/pty-source-pins.txt"
+          set +e
+          python3 -B tools/diagnostics/macos_pty_process_group_native.py --source static/ergopti_plus/macos/modules/llm/pty_process_group.lua --output-dir "$owner" > "$owner/pty-native.stdout.txt" 2> "$owner/pty-native.stderr.txt"
+          status=$?
+          set -e
+          printf '%s\n' "$status" > "$owner/pty-native.exit.txt"
+          exit "$status"
+      - name: Receive deterministic PTY permission-refusal and escalation controls
+        if: ${{ !cancelled() && steps.source.outcome == 'success' }}
+        run: |
+          set -euo pipefail
+          owner="$RUNNER_TEMP/keyboard-geometry-evidence"
+          set +e
+          node tools/test/test-pty-process-group-escalation.cjs > "$owner/pty-model.stdout.txt" 2> "$owner/pty-model.stderr.txt"
+          status=$?
+          set -e
+          printf '%s\n' "$status" > "$owner/pty-model.exit.txt"
+          exit "$status"
+      - name: Preserve native results and failures
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: keyboard-geometry-${{ matrix.runner }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/keyboard-geometry-evidence/
+          if-no-files-found: error
+          retention-days: 7

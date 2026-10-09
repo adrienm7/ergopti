@@ -53,6 +53,30 @@ function classifyMenuRow(row, where) {
 		row.i18n === undefined &&
 		typeof row.caption_getter === 'string' &&
 		row.caption_getter !== '';
+	if (row.disabled !== undefined) {
+		if (typeof row.disabled !== 'boolean' || !where.startsWith('menu.top_level ')) {
+			// Inert rows own their closed presentation vocabulary before the top-level gate.
+			const reason =
+				row.type === 'section_header'
+					? 'section header needs a caption without behavior metadata'
+					: row.type === 'label'
+						? 'inert label needs an identity and caption without behavior metadata'
+						: 'disabled is a boolean top-level presentation gate';
+			throw new Error(`${where}: ${reason}`);
+		}
+		if (
+			row.disabled &&
+			(!labelled ||
+				typeof row.reason_key !== 'string' ||
+				row.reason_key === '' ||
+				typeof row.id !== 'string' ||
+				row.id === '' ||
+				row.id === '---' ||
+				row.unavailable !== undefined ||
+				row.disabled_when !== undefined)
+		)
+			throw new Error(`${where}: a disabled top-level row needs its exact label and reason`);
+	}
 	if (row.unavailable !== undefined) {
 		if (row.unavailable !== 'hide' && row.unavailable !== 'grey')
 			throw new Error(`${where}: unavailable must be "hide" or "grey"`);

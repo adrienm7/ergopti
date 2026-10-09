@@ -582,7 +582,8 @@ check('actual-helper-rejects-main-pr-version-clock', () => {
 	for (const changed of [
 		{ ...context, ref: 'refs/heads/main' },
 		{ ...context, event_name: 'pull_request' },
-		{ ...context, version: '0.0.0-dev.157' }
+		{ ...context, version: '0.0.0-dev.156' },
+		{ ...context, version: '0.0.0-dev.158' }
 	])
 		assert.equal(policy.resolveQualificationProfile(changed, clock), null);
 	assert.equal(

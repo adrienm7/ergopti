@@ -771,4 +771,21 @@ final class LauncherEnvironmentTests: XCTestCase {
 		XCTAssertEqual(cleanTerminationCount, 1)
 		XCTAssertEqual(fatalMessages, [])
 	}
+
+	/// The actual launch owner must pass its freshly captured native map to the child.
+	func testActualLaunchPublishesNativeKeyboardGeometry() throws {
+		let store = try temporaryFatalReportStore()
+		let loggerWorker = TestLoggerDatagramServer()
+		var environment: [String: String] = [:]
+		let delegate = AppDelegate(
+			launcherIdentityReader: { _ in (device: "11", inode: "22") },
+			applicationLauncher: { _, configuration, _ in environment = configuration.environment },
+			loggerWorkerFactory: { loggerWorker },
+			fatalReportStore: store
+		)
+		delegate.launchHammerspoon(at: testEmbeddedHammerspoonBinary)
+		let published = try XCTUnwrap(environment[kKeyboardGeometryEnvironment])
+		let direct = try KeyboardGeometryMap.capture()
+		XCTAssertEqual(published, direct.environmentValue)
+	}
 }

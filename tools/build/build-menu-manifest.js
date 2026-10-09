@@ -67,7 +67,8 @@ const HEADER = {
 		"unavailable (rows restricted by platforms only): 'hide' = not applicable where the row " +
 		"is not declared, never drawn there and carrying no reason_key; 'grey' = not yet ported " +
 		'there, drawn disabled with its label and its translated reason_key. A restricted row ' +
-		'without the field is hidden, as before the field existed. disabled_reason_key (command ' +
+		'without the field is hidden, as before the field existed. A top-level disabled = true ' +
+		'presentation uses its i18n label and reason_key without constructing the component. disabled_reason_key (command ' +
 		'rows or identified labelled groups with disabled_when): why disabled_when greys the row where it is drawn, rendered ' +
 		"like a 'grey' row: « label — head of the reason », with nothing to run."
 };

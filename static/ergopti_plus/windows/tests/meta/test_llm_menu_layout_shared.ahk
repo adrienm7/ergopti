@@ -49,7 +49,6 @@ _LMLS_Canonical() {
 		Map("id", "llm_model",               "off", false, "dot", true),
 		Map("id", "llm_profile",             "off", true,  "dot", false),
 		Map("id", "llm_trigger",             "off", true,  "dot", false),
-		Map("id", "llm_live_mode",           "off", true,  "dot", false),
 		Map("id", "llm_generation_settings", "off", true,  "dot", false),
 		Map("id", "llm_display",             "off", true,  "dot", false),
 		Map("id", "llm_navigation",          "off", true,  "dot", false)
@@ -216,17 +215,17 @@ _LMLS_CurrentGroupSourceAndDataControls() {
 	_LMLS_CurrentRowTypesPolicy(_LMLS_ManifestRows())
 }
 
-; The five fixed parents are declared groups; backend/model/profile remain native.
+; The four fixed parents are declared groups; backend/model/profile remain native.
 _LMLS_CurrentRowTypesPolicy(Rows) {
 	Groups := 0
 	for Row in Rows {
 		if Row["id"] == "llm_trigger" || Row["id"] == "llm_display" || Row["id"] == "llm_navigation"
-			|| Row["id"] == "llm_live_mode" || Row["id"] == "llm_generation_settings" {
+			|| Row["id"] == "llm_generation_settings" {
 			AssertEqual("group", Row["type"], "fixed LLM parents require shared group ownership")
 			Groups += 1
 		} else AssertEqual("dynamic", Row["type"], "other native dynamic domains retain their existing API")
 	}
-	AssertEqual(5, Groups, "exactly the selected genuine fixed parents have shared group ownership")
+	AssertEqual(4, Groups, "exactly the selected genuine fixed parents have shared group ownership")
 }
 Test("llm-menu-layout-shared: true canonical groups require executable native source owners", _LMLS_CurrentGroupSourceAndDataControls)
 

@@ -38,8 +38,10 @@ for (const [key, value] of [
 	['release', 'true'],
 	['prerelease', 'false'],
 	['channel', 'main'],
-	['version', '0.0.0-dev.157'],
-	['tag', 'v0.0.0-dev.157']
+	['version', '0.0.0-dev.156'],
+	['tag', 'v0.0.0-dev.156'],
+	['version', '0.0.0-dev.158'],
+	['tag', 'v0.0.0-dev.158']
 ]) {
 	const bad = { ...ctx, [key]: value };
 	assert.equal(q.resolveQualificationProfile(bad, now), null);
@@ -358,7 +360,7 @@ async function simulate(context, status = 0, entries = fixtures, afterFamilySign
 	const prior = process.env.GITHUB_SHA;
 	process.env.GITHUB_SHA = sha;
 	try {
-		const full = await simulate({ ...ctx, tag: 'v0.0.0-dev.157', version: '0.0.0-dev.157' });
+		const full = await simulate({ ...ctx, tag: 'v0.0.0-dev.158', version: '0.0.0-dev.158' });
 		assert.equal(full.result, 0);
 		assert.equal(full.spawned.length, 2);
 		assert.equal(full.receipts.length, 0);
@@ -385,7 +387,7 @@ async function simulate(context, status = 0, entries = fixtures, afterFamilySign
 				{},
 				{ GITHUB_REF: 'refs/heads/main' },
 				{ GITHUB_EVENT_NAME: 'pull_request' },
-				{ ERGOPTI_DEV_RELEASE_TAG: 'v0.0.0-dev.157', ERGOPTI_DEV_RELEASE_VERSION: '0.0.0-dev.157' }
+				{ ERGOPTI_DEV_RELEASE_TAG: 'v0.0.0-dev.158', ERGOPTI_DEV_RELEASE_VERSION: '0.0.0-dev.158' }
 			]) {
 				Object.assign(process.env, releaseEnvironment, override);
 				const embedded = await simulate(undefined, 0, embeddedFixtures);
@@ -464,3 +466,103 @@ async function simulate(context, status = 0, entries = fixtures, afterFamilySign
 	console.error(error);
 	process.exitCode = 1;
 });
+
+// Fast publication is intentionally unqualified, and never a default test pass.
+{
+	const context = {
+		github_actions: 'true',
+		repository: 'adrienm7/ergopti',
+		event_name: 'push',
+		ref: 'refs/heads/dev',
+		release: true,
+		prerelease: 'true',
+		channel: 'dev',
+		tag: 'v0.0.0-dev.157',
+		version: '0.0.0-dev.157'
+	};
+	const now = new Date('2026-10-09T14:00:00Z');
+	assert.equal(q.fastPrerelease(context, now), true);
+	assert.equal(q.validateFastPrerelease(false, context, now), false);
+	for (const change of [
+		{ github_actions: '' },
+		{ repository: 'other/ergopti' },
+		{ event_name: 'pull_request' },
+		{ event_name: 'workflow_dispatch' },
+		{ ref: 'refs/heads/main' },
+		{ release: false },
+		{ prerelease: 'false' },
+		{ channel: 'main' },
+		{ tag: 'v0.0.0-dev.158', version: '0.0.0-dev.158' },
+		{ tag: 'v0.0.0-dev.156', version: '0.0.0-dev.156' }
+	]) {
+		assert.equal(q.fastPrerelease({ ...context, ...change }, now), false);
+		assert.throws(
+			() => q.validateFastPrerelease(true, { ...context, ...change }, now),
+			/not authorized/
+		);
+	}
+	assert.equal(q.fastPrerelease(context, new Date('2026-10-10T07:00:00Z')), false);
+	assert.throws(
+		() => q.validateFastPrerelease(true, context, new Date('2026-10-10T07:00:00Z')),
+		/not authorized/
+	);
+	assert.throws(() => q.validateFastPrerelease('true', context, now), /Boolean/);
+	assert.throws(() => q.fastPrerelease({ ...context, extra: true }, now), /closed/);
+	const outcomes = {
+		windows: {
+			'test-ahk': 'skipped',
+			'e2e-ahk': 'skipped',
+			'package-windows': 'success',
+			'launch-windows': 'skipped'
+		},
+		macos: {
+			'cold-bootstrap-native': 'skipped',
+			'test-hs': 'skipped',
+			'e2e-hs': 'skipped',
+			'package-macos': 'success',
+			launch: 'skipped',
+			'tooltip-canvas': 'skipped',
+			'managed-ollama-native': 'success'
+		},
+		linux: {
+			'test-linux': 'skipped',
+			'e2e-linux': 'skipped',
+			'package-linux': 'success',
+			'install-linux': 'skipped'
+		}
+	};
+	for (const [lane, expected] of Object.entries(outcomes)) {
+		const needs = Object.fromEntries(
+			Object.entries(expected).map(([name, result]) => [name, { result }])
+		);
+		const receipt = q.fastPrereleaseReceipt(lane, needs, 'a'.repeat(40), context, now);
+		assert.equal(receipt.qualified, false);
+		assert.equal(receipt.status, 'UNQUALIFIED');
+		assert.equal(receipt.tests, 'DEFERRED');
+		assert.equal(receipt.source_sha, 'a'.repeat(40));
+		for (const name of Object.keys(needs)) {
+			assert.throws(
+				() =>
+					q.fastPrereleaseReceipt(
+						lane,
+						{ ...needs, [name]: { result: 'failure' } },
+						'a'.repeat(40),
+						context,
+						now
+					),
+				/mandatory jobs/
+			);
+		}
+		const missing = { ...needs };
+		delete missing[Object.keys(needs)[0]];
+		assert.throws(
+			() => q.fastPrereleaseReceipt(lane, missing, 'a'.repeat(40), context, now),
+			/closed/
+		);
+		assert.throws(() => q.fastPrereleaseReceipt(lane, needs, '', context, now), /SHA/);
+	}
+	assert.throws(
+		() => q.fastPrereleaseReceipt('other', {}, 'a'.repeat(40), context, now),
+		/Unknown/
+	);
+}

@@ -21,6 +21,8 @@ import tarfile
 import tempfile
 from types import SimpleNamespace
 import unittest
+from unittest import mock
+import shlex
 
 REPOSITORY = Path(__file__).resolve().parents[2]
 SPEC = importlib.util.spec_from_file_location(
@@ -437,6 +439,124 @@ class PortableCatalogue(unittest.TestCase):
                 )
 
 
+class NativeBuildEnvironment(unittest.TestCase):
+    """Closed command ports qualify SDK propagation, not an actual Darwin build."""
+
+    def setUp(self):
+        spec = importlib.util.spec_from_file_location(
+            "native_builder", REPOSITORY / "tools/build/build-macos-managed-ollama.py"
+        )
+        self.builder = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(self.builder)
+        self.owner = tempfile.TemporaryDirectory(prefix="managed-sdk-env-")
+        self.addCleanup(self.owner.cleanup)
+        self.root = Path(self.owner.name)
+        self.sdk = self.root / "macOS SDK with spaces"
+        self.sdk.mkdir()
+        self.cc = self.root / "clang tool"
+        self.cxx = self.root / "clang++ tool"
+        self.cc.write_bytes(b"Independent inert compiler path control\n")
+        self.cxx.write_bytes(b"Independent inert C++ compiler path control\n")
+        self.contract = {
+            "cgo_cflags": "-O3 -mmacosx-version-min=14.0",
+            "cgo_cxxflags": "-O3 -mmacosx-version-min=14.0",
+        }
+        self.asset = {
+            "os": "darwin",
+            "cgo_ldflags": "-framework Foundation -framework SystemConfiguration",
+        }
+        self.calls = []
+
+    def command(self, argv):
+        self.calls.append(argv)
+        responses = {
+            ("xcrun", "--sdk", "macosx", "--show-sdk-path"): str(self.sdk),
+            ("xcrun", "--sdk", "macosx", "--find", "clang"): str(self.cc),
+            ("xcrun", "--sdk", "macosx", "--find", "clang++"): str(self.cxx),
+            ("xcrun", "--sdk", "macosx", "--show-sdk-version"): "26.0",
+        }
+        if tuple(argv) not in responses:
+            raise AssertionError("Unknown native build command")
+        return responses[tuple(argv)]
+
+    def environment(self):
+        with mock.patch.object(self.builder, "run", self.command):
+            return self.builder.native_build_env(self.contract, self.asset, "arm64", self.root)
+
+    def test_compilers_and_linker_carry_the_exact_selected_sdk(self):
+        env = self.environment()
+        self.assertEqual(
+            [str(self.cc), "-isysroot", str(self.sdk.resolve())], shlex.split(env["CC"])
+        )
+        self.assertEqual(
+            [str(self.cxx), "-isysroot", str(self.sdk.resolve())], shlex.split(env["CXX"])
+        )
+        self.assertEqual(str(self.sdk.resolve()), env["SDKROOT"])
+        self.assertEqual(
+            [
+                ["xcrun", "--sdk", "macosx", "--show-sdk-path"],
+                ["xcrun", "--sdk", "macosx", "--find", "clang"],
+                ["xcrun", "--sdk", "macosx", "--find", "clang++"],
+                ["xcrun", "--sdk", "macosx", "--show-sdk-version"],
+            ],
+            self.calls,
+        )
+
+    def test_ambient_sdk_compilers_and_flags_cannot_replace_reviewed_abi(self):
+        ambient = {
+            "SDKROOT": "foreign-ios-sdk",
+            "CC": "foreign-cc",
+            "CXX": "foreign-cxx",
+            "CGO_CFLAGS": "-DUNREVIEWED",
+            "CGO_LDFLAGS": "-Lforeign",
+        }
+        with mock.patch.dict(self.builder.os.environ, ambient):
+            env = self.environment()
+        self.assertEqual(str(self.sdk.resolve()), env["SDKROOT"])
+        self.assertEqual(self.contract["cgo_cflags"], env["CGO_CFLAGS"])
+        self.assertEqual(self.contract["cgo_cxxflags"], env["CGO_CXXFLAGS"])
+        self.assertEqual(self.asset["cgo_ldflags"], env["CGO_LDFLAGS"])
+        self.assertEqual("", env["CGO_CPPFLAGS"])
+        self.assertEqual("1", env["CGO_ENABLED"])
+        self.assertEqual("darwin", env["GOOS"])
+        self.assertEqual("arm64", env["GOARCH"])
+        self.assertEqual("local", env["GOTOOLCHAIN"])
+
+    def test_missing_sdk_refuses_before_compiler_selection(self):
+        self.sdk.rmdir()
+        with self.assertRaises(FileNotFoundError):
+            self.environment()
+        self.assertEqual([["xcrun", "--sdk", "macosx", "--show-sdk-path"]], self.calls)
+
+    def test_missing_compiler_refuses_without_substituting_path(self):
+        self.cc.unlink()
+        with self.assertRaisesRegex(ValueError, "compilers are unavailable"):
+            self.environment()
+        self.assertEqual(3, len(self.calls))
+
+    def test_empty_relative_and_regular_file_sdk_paths_refuse_before_compilers(self):
+        for raw in ("", ".", str(self.cc)):
+            with self.subTest(raw=raw):
+                self.calls.clear()
+
+                def query(argv):
+                    if argv == ["xcrun", "--sdk", "macosx", "--show-sdk-path"]:
+                        return raw
+                    return self.command(argv)
+
+                with mock.patch.object(self.builder, "run", query):
+                    with self.assertRaisesRegex(ValueError, "selected native macOS SDK"):
+                        self.builder.native_build_env(self.contract, self.asset, "arm64", self.root)
+                self.assertEqual([], self.calls)
+
+    def test_native_query_refusal_preserves_exact_error(self):
+        refusal = subprocess.CalledProcessError(73, ["xcrun", "--sdk", "macosx", "--show-sdk-path"])
+        with mock.patch.object(self.builder, "run", side_effect=refusal):
+            with self.assertRaises(subprocess.CalledProcessError) as raised:
+                self.builder.native_build_env(self.contract, self.asset, "arm64", self.root)
+        self.assertIs(refusal, raised.exception)
+
+
 class NativeCatalogue(unittest.TestCase):
     """This profile requires actual native producer output, not portable fixtures."""
 
@@ -526,6 +646,7 @@ if __name__ == "__main__":
         parser.error("The native receiving profile requires every actual producer/source input")
     NATIVE = options
     suite = unittest.defaultTestLoader.loadTestsFromTestCase(PortableCatalogue)
+    suite.addTests(unittest.defaultTestLoader.loadTestsFromTestCase(NativeBuildEnvironment))
     if options.native:
         suite.addTests(unittest.defaultTestLoader.loadTestsFromTestCase(NativeCatalogue))
     else:
