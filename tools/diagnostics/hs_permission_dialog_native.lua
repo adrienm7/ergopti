@@ -162,6 +162,44 @@ return function(config)
 		end)
 	end
 
+	-- Reopened-window facts retain only original stage-8.5/9.5 operand reads.
+	local window_pending, window_seen, window_sequence = nil, {}, 0
+	local function window_value(name, value)
+		if window_pending ~= nil then window_pending[name] = value end
+		return value
+	end
+	local function window_handle(value)
+		if window_pending ~= nil then window_pending.native_window = value == nil and "nil" or "non_nil" end
+		return value
+	end
+	local function window_observation()
+		local saved = window_pending
+		window_pending = nil
+		if not progress_enabled or saved == nil then return end
+		local saved_stage, saved_view = saved.stage, saved.view
+		local visible, native_window = saved.visible, saved.native_window
+		if (saved_stage ~= 8.5 or saved_view ~= 3) and (saved_stage ~= 9.5 or saved_view ~= 4) then return end
+		if (visible ~= "not_read" and type(visible) ~= "boolean")
+			or (native_window ~= "not_read" and native_window ~= "nil" and native_window ~= "non_nil") then return end
+		if math.type(progress_pid) ~= "integer" or progress_pid <= 0 or progress_pid > 2147483647
+			or type(progress_nonce) ~= "string" or #progress_nonce ~= 32 or not progress_nonce:match("^[a-f0-9]+$")
+			or type(progress_version) ~= "string" or #progress_version > 32
+			or not progress_version:match("^[A-Za-z0-9][A-Za-z0-9._+%-]*$") then return end
+		local visible_json = visible == "not_read" and '"not_read"' or tostring(visible)
+		local key = table.concat({ tostring(saved_stage), tostring(saved_view), visible_json, native_window }, "/")
+		if window_seen[key] or window_sequence >= 32 then return end
+		window_seen[key] = true
+		window_sequence = window_sequence + 1
+		local saved_sequence = window_sequence
+		pcall(function()
+			local encoded = string.format(
+				'ERGOPTI_PERMISSION_UI_WINDOW_BRANCH {"schema":1,"kind":"permission_ui_window_branch_observation","authority":false,"native_verdict":"unchanged","pid":%d,"nonce":"%s","version":"%s","sequence":%d,"stage":%s,"view":%d,"visible":%s,"native_window":"%s"}\n',
+				progress_pid, progress_nonce, progress_version, saved_sequence, tostring(saved_stage), saved_view,
+				visible_json, native_window)
+			if #encoded <= 512 then io.stderr:write(encoded) end
+		end)
+	end
+
 	local function stage_failure(boundary, saved_stage, saved_checkpoint, saved_count, saved_busy)
 		if not stage_failure_enabled then return end
 		-- Plain saved state is diagnostic only; captured stderr is best effort.
@@ -227,8 +265,12 @@ return function(config)
 	UI.show_webview = forwarder
 	local function remember_window(view)
 		check(type(view) == "userdata", "Actual native view missing")
-		if stage4_value("visible", view:isVisible()) ~= true then return nil end
-		local window = stage4_window(view:hswindow())
+		if progress_enabled and (stage == 8.5 or stage == 9.5) then
+			window_pending = { stage = stage, view = stage == 8.5 and 3 or 4,
+				visible = "not_read", native_window = "not_read" }
+		end
+		if window_value("visible", stage4_value("visible", view:isVisible())) ~= true then return nil end
+		local window = window_handle(stage4_window(view:hswindow()))
 		if window == nil then return nil end -- Bounded readiness only; no substituted AX handle.
 		local id = window:id()
 		check(math.type(id) == "integer" and id > 0, "Actual native window ID unavailable")
@@ -425,6 +467,7 @@ return function(config)
 			if not finished then Logger.error("permission_fixture", "%s", tostring(err)) end
 		end
 		stage4_observation()
+		window_observation()
 	end)
 	assert(observer:start())
 end

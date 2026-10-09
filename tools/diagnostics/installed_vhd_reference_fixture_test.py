@@ -342,5 +342,250 @@ class ExpansionRouteTests(unittest.TestCase):
         self.assertEqual(len(payload_checks), 1)
 
 
+class PayloadInventoryDiagnosticTests(unittest.TestCase):
+    """Fixed original ordinal witnesses; modeled inventory never qualifies Darwin."""
+
+    app_metadata = (
+        "Applications/.Karabiner-VirtualHIDDevice-Manager.app/Contents/._embedded.provisionprofile"
+    )
+    prefix = b"ERGOPTI_VHD_PAYLOAD_INVENTORY_DIAGNOSTIC "
+
+    def captured(self, actual):
+        import json
+        from unittest.mock import patch
+
+        writes = []
+        reader, writer = os.pipe()
+        saved_stderr = os.dup(2)
+        real_write = os.write
+        try:
+            os.dup2(writer, 2)
+            os.close(writer)
+            writer = -1
+
+            def observed_write(fd, body):
+                writes.append((fd, body))
+                return real_write(fd, body)
+
+            with patch.object(SUBJECT.os, "write", side_effect=observed_write):
+                SUBJECT.observe_payload_inventory_refusal("8.4.0", actual)
+        finally:
+            os.dup2(saved_stderr, 2)
+            os.close(saved_stderr)
+            if writer >= 0:
+                os.close(writer)
+        try:
+            received = os.read(reader, 8193)
+            self.assertEqual(os.read(reader, 1), b"")
+        finally:
+            os.close(reader)
+        self.assertEqual(len(writes), 1)
+        fd, body = writes[0]
+        self.assertEqual(received, body)
+        self.assertEqual(fd, 2)
+        self.assertLessEqual(len(body), 8192)
+        self.assertTrue(body.startswith(self.prefix))
+        self.assertTrue(body.endswith(b"\n"))
+        packet = json.loads(body[len(self.prefix) :])
+        self.assertEqual(packet["expected_count"], 42)
+        self.assertEqual(packet["reason"], "payload_inventory")
+        self.assertIs(packet["authority"], False)
+        self.assertIs(packet["installation_qualified"], False)
+        self.assertIs(packet["reference_qualified"], False)
+        return packet, body
+
+    def test_missing_known_indices_extra_count_and_private_names_are_bounded(self):
+        actual = {
+            "Library": {"identity": {"mode": 16877}},
+            "/private/SECRET/foreign-payload": {"bytes": 99, "sha256": "SECRET"},
+        }
+        packet, body = self.captured(actual)
+        self.assertEqual(packet["missing_expected_indices"], list(range(22)) + list(range(23, 42)))
+        self.assertIn(3, packet["missing_expected_indices"])
+        self.assertIn(8, packet["missing_expected_indices"])
+        self.assertEqual(packet["extra_count"], 1)
+        for private in (b"SECRET", b"private", b"foreign-payload", b"Applications", b"Library"):
+            self.assertNotIn(private, body)
+
+    def test_fixed_original_file_and_directory_scalar_matches_are_nullable(self):
+        actual = {
+            self.app_metadata: {
+                "identity": {"mode": 33188},
+                "bytes": 579,
+                "sha256": "31187b1fd98223fdbf4bdc8d46fb86da52ec03591de2e4f71275a7cec5aea14e",
+            },
+            "Library": {"identity": {"mode": 16877}},
+        }
+        packet, _ = self.captured(actual)
+        self.assertEqual(
+            packet["rows"][3],
+            {
+                "index": 3,
+                "present": True,
+                "type_matches": True,
+                "mode_matches": True,
+                "bytes_matches": True,
+                "sha256_matches": True,
+            },
+        )
+        self.assertEqual(
+            packet["rows"][22],
+            {
+                "index": 22,
+                "present": True,
+                "type_matches": True,
+                "mode_matches": True,
+                "bytes_matches": None,
+                "sha256_matches": None,
+            },
+        )
+        self.assertEqual(
+            packet["missing_expected_indices"], [0, 1, 2] + list(range(4, 22)) + list(range(23, 42))
+        )
+
+    def test_fixed_original_file_type_mode_size_and_digest_mismatches_are_false(self):
+        packet, _ = self.captured(
+            {self.app_metadata: {"identity": {"mode": 16877}, "bytes": 580, "sha256": "0" * 64}}
+        )
+        self.assertEqual(
+            packet["rows"][3],
+            {
+                "index": 3,
+                "present": True,
+                "type_matches": False,
+                "mode_matches": False,
+                "bytes_matches": False,
+                "sha256_matches": False,
+            },
+        )
+
+    def test_all_missing_rows_have_only_fixed_indices_and_nullable_booleans(self):
+        packet, _ = self.captured({})
+        self.assertEqual(
+            set(packet),
+            {
+                "schema",
+                "kind",
+                "authority",
+                "version",
+                "reason",
+                "expected_count",
+                "rows",
+                "missing_expected_indices",
+                "extra_count",
+                "installation_qualified",
+                "reference_qualified",
+            },
+        )
+        self.assertEqual(packet["schema"], 1)
+        self.assertEqual(packet["version"], "8.4.0")
+        self.assertEqual(packet["kind"], "installed_vhd_payload_inventory_refusal_observation")
+        self.assertEqual(packet["missing_expected_indices"], list(range(42)))
+        self.assertEqual(packet["extra_count"], 0)
+        self.assertEqual(
+            packet["rows"],
+            [
+                {
+                    "index": i,
+                    "present": False,
+                    "type_matches": None,
+                    "mode_matches": None,
+                    "bytes_matches": None,
+                    "sha256_matches": None,
+                }
+                for i in range(42)
+            ],
+        )
+
+    def test_failure_only_observer_uses_the_single_already_read_inventory(self):
+        import copy
+        from unittest.mock import patch
+
+        actual = {"Library": {"identity": {"mode": 16877}}}
+        before = copy.deepcopy(actual)
+        with (
+            patch.object(SUBJECT, "inventory", return_value=actual) as capture,
+            patch.object(SUBJECT, "observe_payload_inventory_refusal") as observe,
+            patch.object(SUBJECT, "__name__", "__main__"),
+        ):
+            with self.assertRaisesRegex(SUBJECT.Refusal, "^payload_inventory$"):
+                SUBJECT.verify_payload("8.4.0", Path("/private/SECRET"))
+            capture.assert_called_once_with(Path("/private/SECRET"))
+            observe.assert_called_once_with("8.4.0", actual)
+            self.assertIs(observe.call_args.args[1], actual)
+        self.assertEqual(actual, before)
+        # A captured single-entry predicate port checks routing only; the real
+        # frozen42 corpus is restored by patch exit and is never regenerated.
+        with (
+            patch.object(SUBJECT, "PAYLOADS", {"8.4.0": {"Library": [16877, 0, "fixed"]}}),
+            patch.object(SUBJECT, "inventory", return_value=actual) as capture,
+            patch.object(SUBJECT, "observe_payload_inventory_refusal") as observe,
+            patch.object(SUBJECT, "__name__", "__main__"),
+        ):
+            SUBJECT.verify_payload("8.4.0", Path("/private/SECRET"))
+            capture.assert_called_once()
+            observe.assert_not_called()
+
+    def test_write_fault_or_partial_write_cannot_redeem_the_original_refusal(self):
+        from unittest.mock import patch
+
+        for result in (OSError("SECRET stderr unavailable"), 1):
+            with (
+                self.subTest(result=type(result).__name__),
+                patch.object(SUBJECT, "__name__", "__main__"),
+                patch.object(SUBJECT, "inventory", return_value={}),
+                patch.object(
+                    SUBJECT.os,
+                    "write",
+                    side_effect=result if isinstance(result, OSError) else None,
+                    return_value=result if isinstance(result, int) else None,
+                ) as write,
+            ):
+                with self.assertRaisesRegex(SUBJECT.Refusal, "^payload_inventory$"):
+                    SUBJECT.verify_payload("8.4.0", Path("/private/SECRET"))
+                self.assertEqual(write.call_count, 1)
+
+    def test_oversized_optional_serialization_is_not_written_and_refusal_survives(self):
+        from unittest.mock import patch
+
+        with (
+            patch.object(SUBJECT, "__name__", "__main__"),
+            patch.object(SUBJECT, "inventory", return_value={}),
+            patch.object(SUBJECT.json, "dumps", return_value="x" * 8192),
+            patch.object(SUBJECT.os, "write") as write,
+        ):
+            with self.assertRaisesRegex(SUBJECT.Refusal, "^payload_inventory$"):
+                SUBJECT.verify_payload("8.4.0", Path("/private/SECRET"))
+            write.assert_not_called()
+
+    def test_malformed_optional_values_and_unsupported_versions_never_disclose_values(self):
+        from unittest.mock import patch
+
+        packet, body = self.captured(
+            {
+                self.app_metadata: {
+                    "identity": {"mode": "SECRET"},
+                    "bytes": "/private/SECRET",
+                    "sha256": "SECRET" * 10000,
+                }
+            }
+        )
+        self.assertEqual(
+            packet["rows"][3],
+            {
+                "index": 3,
+                "present": True,
+                "type_matches": None,
+                "mode_matches": None,
+                "bytes_matches": None,
+                "sha256_matches": None,
+            },
+        )
+        self.assertNotIn(b"SECRET", body)
+        with patch.object(SUBJECT.os, "write") as write:
+            SUBJECT.observe_payload_inventory_refusal("SECRET version", {})
+            write.assert_not_called()
+
+
 if __name__ == "__main__":
     unittest.main()

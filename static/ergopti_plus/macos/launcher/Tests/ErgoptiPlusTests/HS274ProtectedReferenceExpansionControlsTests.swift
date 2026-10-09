@@ -13,10 +13,10 @@ extension HS274NativePolicyQualificationTests {
 				["python3", "-B", controls.path], root: root)
 			XCTAssertEqual(receipt.status, 0)
 			XCTAssertTrue(receipt.stdout.isEmpty)
-			let complete = #"\A[.]{30}\n[-]{70}\nRan 30 tests in [0-9]+\.[0-9]{3}s\n\nOK\n\z"#
+			let complete = #"\A[.]{38}\n[-]{70}\nRan 38 tests in [0-9]+\.[0-9]{3}s\n\nOK\n\z"#
 			XCTAssertLessThanOrEqual(receipt.stderr.utf8.count, 4096)
 			XCTAssertNotNil(receipt.stderr.range(of: complete, options: .regularExpression),
-				"All twenty-one original custody controls and nine modeled routing controls must execute; native expansion remains unqualified.")
+				"All twenty-one original custody controls, nine modeled routing controls and eight refusal diagnostic controls must execute; native expansion remains unqualified.")
 		}
 	}
 }

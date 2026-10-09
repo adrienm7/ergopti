@@ -3205,6 +3205,16 @@ cases and all deadlines remain unchanged. A required source-path comment was
 added without changing the test body. Exact-source macOS execution and physical
 guardian/Login Items/tap-hold acceptance remain pending; item24 stays partial.
 
+The latest genuine macOS run37880447936 reaches stage4 but refuses the
+unchanged stage8.5 native-window predicate. A failure-only observation now
+records bounded already-read view/window facts at stages8.5 and9.5. It preserves
+original probe order, return values, deadlines and refusal. All32 modeled Lua
+controls pass; removing the observation fails eight of20 additive controls.
+The original12 controls remain whole. LuaJIT execution fails on existing
+Lua5.4-only table.pack/utf8 dependencies and is not qualified. Actual late-window
+cause, all10 native UI cases and physical guardian acceptance remain open.
+This diagnostic does not complete item24.
+
 - [~] **30.** Physical magic-key setting on all three OSes: one
   `hotstrings.magic_key_source` (a KeyboardEvent.code, `auto` by default),
   config schema v5 migrating every spelling of the Windows
@@ -5128,6 +5138,21 @@ initial incorrect fixture failure is retained. All31 passing bounded commands
 execute510 test methods, with five expected predecessor failures and zero
 skips/timeouts. Darwin delivery, retirement, drain, cutover and physical capture
 remain unqualified. Item31 and transverse16/38 remain incomplete.
+
+Protected VHD inventory refusal now emits one bounded, closed ordinal
+observation from the original inventory read. All38 controls pass without
+changing the original30 controls or three independent42-member corpora.
+Missing AppleDouble entries remain a hypothesis until actual Darwin expansion
+is captured. Twelve mutation commands fail specific unchanged assertions;
+278 successful portable method invocations grant no native authority. The
+pkgutil caller advances only its two literal reference pins; the original11
+controls pass normally and optimized. A separate read-only CLT metadata probe
+has20 passing controls in each Python mode and after exact restoration; the
+predecessor and four mutations each fail a specific assertion in both modes.
+It observes fixed compiler/SDK metadata without invoking tools, selecting a
+toolchain or relaxing mandatory UID-zero admission. Actual CLT presence,
+ownership and SDK access remain unobserved until macOS CI. Signing, root,
+protected expansion, packaging and installation remain unqualified.
 
 Latest manual macOS qualification, run37880447936 at7c88374f12ab6682fd7460cf10b69efcf41e05e6,
 completed all467 Swift cases:442 passed,10 failed and15 skipped. Packaging and

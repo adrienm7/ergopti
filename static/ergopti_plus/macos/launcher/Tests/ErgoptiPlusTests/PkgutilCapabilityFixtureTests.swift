@@ -98,7 +98,7 @@ extension HS274NativePolicyQualificationTests {
 			XCTAssertEqual(negative, Data("BAD!".utf8) + positive.dropFirst(4))
 			let sources = try XCTUnwrap(packet["source_sha256"] as? [String: String])
 			XCTAssertEqual(Set(sources.keys), Set(["generator_probe", "original_reference"]))
-			XCTAssertEqual(sources["original_reference"], "5c8e6d89177c23697e6910fa5a2ca7245617cfc066b3b85f04c5b422fe06bc4a")
+			XCTAssertEqual(sources["original_reference"], "06fe3c4d824d14b854c126c51bf392fcda826353532c918e4309c508e37390d3")
 			XCTAssertEqual(sources["generator_probe"],
 				SHA256.hash(data: try Data(contentsOf: helper)).map { String(format: "%02x", $0) }.joined())
 			let tools = try XCTUnwrap(packet["tool_sha256"] as? [String: String])

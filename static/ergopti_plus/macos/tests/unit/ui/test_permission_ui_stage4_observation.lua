@@ -440,4 +440,229 @@ helpers.describe("Stage-4 observations preserve existing software branches", fun
 	end)
 end)
 
+
+-- New late-window controls reuse the unchanged frozen native-port model.
+local WINDOW_PREFIX = "ERGOPTI_PERMISSION_UI_WINDOW_BRANCH "
+local function modeled_window(mode, flag, target_stage)
+	return helpers.with_fresh_modules(MODULES, function()
+		local old = { hs = _G.hs, open = io.open, stderr = io.stderr, stdout = io.stdout, rename = os.rename }
+		local old_hook, old_mask, old_count = debug.gethook()
+		local preloads = {}
+		for _, name in ipairs(MODULES) do preloads[name] = package.preload[name] end
+		local files, lines, stdout, trace, first_guard = {}, {}, {}, {}, {}
+		local ids, next_id, wrapped, originals, configured = {}, 0, {}, {}, false
+		local callback, frame_active, first_frame, changed = nil, false, false, false
+		local window_publisher, writer_reentered = nil, false
+		local function scalar(value)
+			if type(value) == "string" or type(value) == "number" or type(value) == "boolean" or value == nil then
+				return value == nil and "<nil>" or value
+			end
+			if not ids[value] then next_id = next_id + 1; ids[value] = next_id end
+			return type(value) .. ":" .. ids[value]
+		end
+		local function slots(values)
+			local result = { n = values.n }
+			for i = 1, values.n do result[i] = scalar(values[i]) end
+			return result
+		end
+		local wrap
+		local function wrap_view(view)
+			if type(view) ~= "userdata" then return end
+			local index = getmetatable(view).__index
+			for _, name in ipairs({ "isVisible", "hswindow", "frame", "delete", "evaluateJavaScript" }) do
+				wrap(index, name, "view." .. name)
+			end
+		end
+		wrap = function(object, key, name)
+			local original = object[key]
+			if type(original) ~= "function" or wrapped[original] then return end
+			local forwarding = function(...)
+				local args = slots(table.pack(...))
+				local values = table.pack(original(...))
+				trace[#trace + 1] = { name = name, args = args, returns = slots(values) }
+				if frame_active then first_guard[#first_guard + 1] = { name = name, args = args } end
+				if name == "UI.show_webview" then wrap_view(values[1]) end
+				if name == "view.hswindow" and type(values[1]) == "table" then wrap(values[1], "id", "window.id") end
+				return table.unpack(values, 1, values.n)
+			end
+			wrapped[forwarding] = true; originals[forwarding] = original
+			object[key] = forwarding
+		end
+		local function configure()
+			if configured then return end
+			configured = true
+			for _, pair in ipairs({ { "ui.ui_builder", "UI" }, { "ui.permission_dialog", "Dialog" },
+				{ "ui.permission_dialog.login_items_guide", "Guide" }, { "adapters.timer_scheduler", "Scheduler" } }) do
+				local _, _, provider = upvalue(package.preload[pair[1]], "value")
+				assert(type(provider) == "table")
+				for name, value in pairs(provider) do
+					if type(value) == "function" then wrap(provider, name, pair[2] .. "." .. name) end
+				end
+			end
+			for name in pairs(hs.window) do wrap(hs.window, name, "hs.window." .. name) end
+			for name in pairs(hs.timer) do wrap(hs.timer, name, "hs.timer." .. name) end
+			wrap(hs.fs, "mkdir", "hs.fs.mkdir"); wrap(hs.fs, "attributes", "hs.fs.attributes")
+		end
+		local function change_state(fn)
+			local _, _, stage = upvalue(fn, "stage")
+			if stage ~= target_stage then return false end
+			local _, _, busy = upvalue(fn, "busy")
+			if busy ~= false or changed then return false end
+			changed = true
+			local _, _, observations = upvalue(fn, "observations")
+			local view = observations[target_stage == 8.5 and 3 or 4]
+			assert(type(view) == "userdata")
+			local index = getmetatable(view).__index
+			if mode == "window_nil" then
+				index.hswindow = function() return nil end; wrap(index, "hswindow", "view.hswindow")
+			elseif mode == "invisible" or mode == "invalid_visible" then
+				index.isVisible = function() return mode == "invalid_visible" and "UNKNOWN/path" or false end
+				wrap(index, "isVisible", "view.isVisible")
+			end
+			return true
+		end
+		io.open = function(path, access)
+			if access == "rb" then
+				if files[path] == nil then return nil end
+				return { read = function() return files[path] end, close = function() return true end }
+			end
+			assert(access == "wb")
+			return { write = function(_, bytes) files[path] = (files[path] or "") .. bytes; return true end, close = function() return true end }
+		end
+		os.rename = function(a, b) files[b], files[a] = files[a], nil; return true end
+		io.stderr = { write = function(_, bytes)
+			if bytes:sub(1, #WINDOW_PREFIX) == WINDOW_PREFIX then
+				if mode == "writer_throw" then error("PRIVATE_DIAGNOSTIC_WRITER", 0) end
+				if mode == "writer_reentry" and not writer_reentered
+					and bytes:find('"stage":' .. tostring(target_stage) .. ",", 1, true) then
+					writer_reentered = true
+					local owner, slot = upvalue(window_publisher, "window_pending")
+					assert(owner)
+					debug.setupvalue(owner, slot, { stage = target_stage, view = target_stage == 8.5 and 3 or 4, visible = true, native_window = "non_nil" })
+					window_publisher()
+				end
+			end
+			lines[#lines + 1] = bytes; return true
+		end }
+		io.stdout = { write = function(_, bytes) stdout[#stdout + 1] = bytes; return true end }
+		local result = table.pack(xpcall(function()
+			debug.sethook(function(event)
+				local info = debug.getinfo(2, "fS")
+				if not info or info.source ~= "@" .. PROBE then return end
+				if event == "call" then
+					if mode == "invalid_snapshot" or mode == "invalid_stage" or mode == "invalid_identity" then
+						local owner, slot, pending = upvalue(info.func, "window_pending")
+						if owner and type(pending) == "table" then
+							if mode == "invalid_snapshot" then pending.view = -1
+							elseif mode == "invalid_stage" then pending.stage = "PRIVATE/path"
+							else
+								local nonce_owner, nonce_slot = upvalue(info.func, "progress_nonce")
+								if nonce_owner then debug.setupvalue(nonce_owner, nonce_slot, "PRIVATE/path") end
+							end
+						end
+					end
+					configure()
+					local _, _, tick = upvalue(info.func, "tick")
+					if type(tick) == "function" then
+						callback = info.func
+						local _, _, actual_publisher = upvalue(info.func, "window_observation")
+						window_publisher = actual_publisher
+						if not first_frame and change_state(info.func) then first_frame = true; frame_active = true end
+					end
+				elseif event == "return" and info.func == callback then frame_active = false end
+			end, "cr")
+			local run = assert(load("return function(mode, source, root, flag)\n" .. HARNESS .. "\nend", "@frozen-progress-model"))()
+			run("healthy", PROBE, "/modeled/private/permission-progress", flag)
+			debug.sethook()
+			local summary = assert(Json.decode(table.concat(stdout)))
+			if summary.packet then summary.packet = assert(Json.decode(summary.packet)) end
+			local rows = {}
+			for _, bytes in ipairs(lines) do
+				if bytes:sub(1, #WINDOW_PREFIX) == WINDOW_PREFIX then
+					helpers.assert_true(#bytes <= 512 and bytes:sub(-1) == "\n")
+					rows[#rows + 1] = assert(Json.decode(bytes:sub(#WINDOW_PREFIX + 1)))
+				end
+			end
+			return summary, rows, trace, first_guard, lines
+		end, debug.traceback))
+		debug.sethook(old_hook, old_mask, old_count)
+		_G.hs, io.open, io.stderr, io.stdout, os.rename = old.hs, old.open, old.stderr, old.stdout, old.rename
+		for _, name in ipairs(MODULES) do package.preload[name] = preloads[name] end
+		if not result[1] then error(result[2], 0) end
+		return table.unpack(result, 2, result.n)
+	end)
+end
+
+local function window_payload(rows, target_stage, expected)
+	helpers.assert_true(#rows > 0 and #rows <= 32)
+	local seen, selected = {}, nil
+	for index, row in ipairs(rows) do
+		local fields = 0; for _ in pairs(row) do fields = fields + 1 end
+		helpers.assert_eq(fields, 12)
+		helpers.assert_eq(row.schema, 1); helpers.assert_eq(row.kind, "permission_ui_window_branch_observation")
+		helpers.assert_eq(row.authority, false); helpers.assert_eq(row.native_verdict, "unchanged")
+		helpers.assert_eq(row.pid, 123); helpers.assert_eq(row.nonce, string.rep("1", 32)); helpers.assert_eq(row.version, "1.1.1")
+		helpers.assert_eq(row.sequence, index)
+		helpers.assert_true(row.stage == 8.5 and row.view == 3 or row.stage == 9.5 and row.view == 4)
+		local key = table.concat({ tostring(row.stage), tostring(row.view), tostring(row.visible), row.native_window }, "/")
+		helpers.assert_eq(seen[key], nil); seen[key] = true
+		if row.stage == target_stage then selected = row end
+	end
+	helpers.assert_true(selected ~= nil, "Exact late-stage observation absent")
+	for key, value in pairs(expected) do helpers.assert_eq(selected[key], value, "Independent late operand " .. key) end
+end
+
+helpers.describe("Reopened-window observations preserve existing native branches", function()
+	for _, target_stage in ipairs({ 8.5, 9.5 }) do
+		local expected_view = target_stage == 8.5 and 3 or 4
+		for _, case in ipairs({
+			{ "healthy", true, "non_nil", "hs.timer.absoluteTime,view.isVisible,view.hswindow,window.id"
+				.. (target_stage == 8.5 and ",view.delete" or "") },
+			{ "invisible", false, "not_read", "hs.timer.absoluteTime,view.isVisible" },
+			{ "window_nil", true, "nil", "hs.timer.absoluteTime,view.isVisible,view.hswindow" },
+		}) do
+			helpers.it("records original operands at " .. target_stage .. " for " .. case[1], function()
+				local result, rows, _, guard = modeled_window(case[1], true, target_stage)
+				window_payload(rows, target_stage, { view = expected_view, visible = case[2], native_window = case[3] })
+				helpers.assert_eq(guard_names(guard), case[4])
+				if case[1] == "healthy" then
+					helpers.assert_eq(result.packet.status, "ok"); helpers.assert_eq(#result.packet.case_results, 10)
+				end
+			end)
+		end
+		helpers.it("suppresses unknown original visibility at " .. target_stage, function()
+			local result, rows, _, guard = modeled_window("invalid_visible", true, target_stage)
+			for _, row in ipairs(rows) do helpers.assert_true(row.stage ~= target_stage) end
+			helpers.assert_eq(result.packet, nil); helpers.assert_eq(result.observer_live, true)
+			helpers.assert_eq(guard_names(guard), "hs.timer.absoluteTime,view.isVisible")
+		end)
+		helpers.it("preserves results and endpoints when new writer throws at " .. target_stage, function()
+			local result, rows, trace = modeled_window("writer_throw", true, target_stage)
+			local healthy, _, healthy_trace = modeled_window("healthy", true, target_stage)
+			helpers.assert_eq(#rows, 0); helpers.assert_eq(Json.encode(result), Json.encode(healthy))
+			helpers.assert_eq(Json.encode(trace), Json.encode(healthy_trace))
+		end)
+		helpers.it("latches before writer reentry at " .. target_stage, function()
+			local result, rows, trace = modeled_window("writer_reentry", true, target_stage)
+			local healthy, healthy_rows, healthy_trace = modeled_window("healthy", true, target_stage)
+			helpers.assert_eq(Json.encode(rows), Json.encode(healthy_rows)); helpers.assert_eq(Json.encode(result), Json.encode(healthy))
+			helpers.assert_eq(Json.encode(trace), Json.encode(healthy_trace))
+		end)
+		for _, mode in ipairs({ "invalid_snapshot", "invalid_stage", "invalid_identity" }) do
+			helpers.it("suppresses " .. mode .. " without native action changes at " .. target_stage, function()
+				local result, rows, trace = modeled_window(mode, true, target_stage)
+				local healthy, _, healthy_trace = modeled_window("healthy", true, target_stage)
+				helpers.assert_eq(#rows, 0); helpers.assert_eq(Json.encode(result), Json.encode(healthy))
+				helpers.assert_eq(Json.encode(trace), Json.encode(healthy_trace))
+			end)
+		end
+		helpers.it("keeps optout silent and all endpoint slots whole at " .. target_stage, function()
+			local off, off_rows, off_trace, _, off_lines = modeled_window("healthy", false, target_stage)
+			local on, on_rows, on_trace = modeled_window("healthy", true, target_stage)
+			helpers.assert_eq(#off_rows, 0); helpers.assert_eq(#off_lines, 0); helpers.assert_true(#on_rows > 0)
+			helpers.assert_eq(Json.encode(off), Json.encode(on)); helpers.assert_eq(Json.encode(off_trace), Json.encode(on_trace))
+		end)
+	end
+end)
+
 return { modeled = modeled, HARNESS = HARNESS }

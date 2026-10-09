@@ -228,7 +228,8 @@ extension HS274NativePolicyQualificationTests {
 
 	/// Runs all eleven protected-reference controls inside one explicit SDK-owned fixture.
 	func testActualOwnedProtectedVirtualHIDReferenceCases() throws {
-		try fixture { root in
+		let parent = try compilationEvidenceParent()
+		try fixture(parent: parent) { root in
 			let diagnostics = source("hs274_native_build.py").deletingLastPathComponent()
 			let script = diagnostics.appendingPathComponent("installed_vhd_reference_fixture.py")
 			let stage = root.appendingPathComponent("reference-payload")
