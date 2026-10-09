@@ -68,7 +68,7 @@ const HEADER = {
 		"is not declared, never drawn there and carrying no reason_key; 'grey' = not yet ported " +
 		'there, drawn disabled with its label and its translated reason_key. A restricted row ' +
 		'without the field is hidden, as before the field existed. A top-level disabled = true ' +
-		'presentation uses its i18n label and reason_key without constructing the component. disabled_reason_key (command ' +
+		'presentation uses its i18n label and reason_key without constructing the component. disabled_reason_key (command/check ' +
 		'rows or identified labelled groups with disabled_when): why disabled_when greys the row where it is drawn, rendered ' +
 		"like a 'grey' row: « label — head of the reason », with nothing to run."
 };
@@ -86,7 +86,7 @@ const PLATFORMS = ['ahk', 'hs', 'linux'];
  *     nothing is drawn and no reason is owed) or NOT YET PORTED there
  *     (`unavailable = "grey"`: greyed with its `reason_key`);
  *   - its `disabled_when` greys it where it is drawn: greyed with its
- *     `disabled_reason_key`, read on `command` rows and identified labelled groups. `reason_key` cannot carry
+ *     `disabled_reason_key`, read on `command`/`check` rows and identified labelled groups. `reason_key` cannot carry
  *     that reason too, since a restricted row keeps it for the platforms it
  *     leaves out (the health check reads it there).
  * @param {object} menu The parsed [menu] tables.

@@ -102,6 +102,11 @@ try {
 	);
 	assert.equal(run('status').stdout.trim(), 'enabled');
 	fs.writeFileSync(desktop, '[Desktop Entry]\nExec=/other/program\n');
+	assert.equal(
+		run('status').stdout.trim(),
+		'other',
+		'the actual foreign command is read-only conflict evidence'
+	);
 	assert.notEqual(run('disable').status, 0, 'foreign startup commands are never replaced');
 	assert.equal(fs.readFileSync(desktop, 'utf8'), '[Desktop Entry]\nExec=/other/program\n');
 	console.log(
