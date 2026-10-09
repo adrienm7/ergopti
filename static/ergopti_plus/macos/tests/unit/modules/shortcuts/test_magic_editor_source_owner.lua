@@ -331,4 +331,117 @@ helpers.describe("conditional editor shortcut: native source and ordinary owners
 			end)
 		end
 	end)
+
+
+	helpers.it("fences delivery when the final context callback retires its exact owner", function()
+		with_fixture(function(subject, registrar, native, state, spec, respond)
+			helpers.assert_eq(subject.start(spec), true)
+			respond()
+			local native_handle = native.hotkey._bound[1]
+			local callback = native_handle.pressed_fn
+			local stopped, reads, errors = nil, 0, 0
+			local logger = package.loaded["infra.logger"]
+			local error_log = logger.error
+			logger.error = function(...) errors = errors + 1; return error_log(...) end
+			spec.context.replace_active = function()
+				reads = reads + 1
+				stopped = subject.stop()
+				return state.replace_active
+			end
+			callback()
+			helpers.assert_eq(stopped, true, "exact native and probe owners must actually retire")
+			helpers.assert_eq(reads, 1, "the terminal context callback must execute")
+			helpers.assert_eq(registrar.live_count(), 0, "retired native owner must remain absent")
+			helpers.assert_eq(#state.actions, 0, "retired owner may execute no action")
+			helpers.assert_eq(subject.stop(), true)
+			helpers.assert_eq({ enabled = native_handle.enabled, deleted = native_handle.deleted },
+				{ enabled = false, deleted = true }, "the same original native handle must be disabled and deleted")
+			helpers.assert_eq(errors, 0, "the real registrar must not swallow a callback exception after retirement")
+		end)
+	end)
+
+	helpers.it("rechecks parent admission after the final context callback", function()
+		with_fixture(function(subject, registrar, native, state, spec, respond)
+			helpers.assert_eq(subject.start(spec), true)
+			respond()
+			local reads = 0
+			spec.context.replace_active = function()
+				reads = reads + 1
+				state.current = false
+				return state.replace_active
+			end
+			native.hotkey._bound[1].pressed_fn()
+			local actions = #state.actions
+			helpers.assert_eq(subject.stop(), true)
+			helpers.assert_eq(registrar.live_count(), 0)
+			helpers.assert_eq(reads, 1, "the late parent revocation premise must occur")
+			helpers.assert_eq(actions, 0, "a revoked parent must not execute the captured action")
+		end)
+	end)
+
+	helpers.it("rechecks native source after the final context callback", function()
+		with_fixture(function(subject, registrar, native, state, spec, respond)
+			helpers.assert_eq(subject.start(spec), true)
+			respond()
+			local reads = 0
+			spec.context.replace_active = function()
+				reads = reads + 1
+				state.source_id = "source.second"
+				return state.replace_active
+			end
+			native.hotkey._bound[1].pressed_fn()
+			local actions = #state.actions
+			helpers.assert_eq(subject.stop(), true)
+			helpers.assert_eq(registrar.live_count(), 0)
+			helpers.assert_eq(reads, 1, "the actual probe port must change source during the terminal callback")
+			helpers.assert_eq(actions, 0, "a changed native source must not execute the captured action")
+		end)
+	end)
+
+
+	for _, boundary in ipairs({ "retired", "parent", "source" }) do
+		helpers.it("refuses native acquisition after project callbacks revoke " .. boundary, function()
+			with_fixture(function(subject, registrar, native, state, spec, respond)
+				local native_bind, binds, reads, stopped = native.hotkey.bind, 0, 0, nil
+				native.hotkey.bind = function(...)
+					binds = binds + 1
+					return native_bind(...)
+				end
+				spec.context.paused = function()
+					reads = reads + 1
+					if boundary == "retired" then stopped = subject.stop()
+					elseif boundary == "parent" then state.current = false
+					else state.source_id = "source.second" end
+					return false
+				end
+				helpers.assert_eq(subject.start(spec), true)
+				respond()
+				local captured_binds = binds
+				helpers.assert_eq(subject.stop(), true)
+				helpers.assert_eq(registrar.live_count(), 0, "the actual native owner must settle before assertion")
+				helpers.assert_eq(reads, 1, "the actual project admission callback must run")
+				if boundary == "retired" then helpers.assert_eq(stopped, true) end
+				helpers.assert_eq(#state.actions, 0)
+				helpers.assert_eq(captured_binds, 0, "revoked projected receipt must never start a native acquisition")
+			end)
+		end)
+	end
+
+
+	helpers.it("allocates no source query after construction context retires its owner", function()
+		with_fixture(function(subject, registrar, _, state, spec)
+			local stopped = nil
+			spec.context.trigger = function()
+				stopped = subject.stop()
+				return state.trigger
+			end
+			local started = subject.start(spec)
+			local requests = #state.requests
+			helpers.assert_eq(subject.stop(), true)
+			helpers.assert_eq(registrar.live_count(), 0)
+			helpers.assert_eq(stopped, true, "the constructor read must actually settle its old owner")
+			helpers.assert_eq(started, false, "a retired constructor must not acknowledge startup")
+			helpers.assert_eq(requests, 0, "no new query owner may be allocated after retirement")
+		end)
+	end)
 end)

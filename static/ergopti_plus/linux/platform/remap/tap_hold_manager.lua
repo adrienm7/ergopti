@@ -46,6 +46,7 @@ local MS_PER_SECOND = 1000
 
 local _initialized = false
 local _hook = nil            -- The keyboard hook the engine is installed in.
+local _native_hook = nil     -- Request receiver only; no native authority snapshot.
 local _execute_action = nil  -- Runs a catalogue action by name.
 local _action_names = nil    -- The action catalogue's ids.
 local _on_text_injected = nil -- Told of text the injector typed for a one-shot.
@@ -75,6 +76,9 @@ local _generation = 0       -- Revokes queued actions across every runtime insta
 --- @param action string|table A catalogue action id, or { type_text }.
 --- @param binding string|nil Exact key identity returned with a catalogue tap.
 local function _run_tap(action, binding)
+	-- This is intent, not an ACK: only Hook's original live-frame controller
+	-- can mint and publish the input arm. Late public exports grant no authority.
+	if action == "one_shot_shift" or action == "caps_word" then return action end
 	if type(action) == "table" then
 		local ok, result = pcall(function()
 			return require("modules.hotstrings.injector").inject(0, action.type_text)
@@ -238,6 +242,7 @@ local function _build(loaded, boot)
 		one_shot_timeout_ms = Timings.ms("tap_hold", "one_shot_shift_timeout_ms"),
 		key_text = function(code) return _hook.key_text(code) end,
 		plan_text = function(text) return (require("adapters.keyboard_layout").plan(text)) end,
+		caps_word_plan = function(text) return _hook.plan_caps_word(text) end,
 		one_shot_result = _one_shot_result,
 		held_modifiers = function() return _hook.held_modifiers() end,
 		held_text_modifier_codes = function() return _hook.held_text_modifier_codes() end,
@@ -245,7 +250,12 @@ local function _build(loaded, boot)
 	})
 	local combinations = Combinations.new({ keys = loaded.catalog, hold_picker = loaded.hold_picker,
 		is_paused = function() return _paused end, changed = _apply,
-		actions = { is_assignable = function(action) return action ~= "one_shot_shift" and action ~= "caps_word" and _tap_action_set()[action] == true end } })
+		actions = { is_assignable = function(action)
+			-- Native adapter identity selects the request route; frame/source/output
+			-- admission still belongs exclusively to its original controller.
+			return action ~= "caps_word" and (action ~= "one_shot_shift" or _hook == _native_hook)
+				and _tap_action_set()[action] == true
+		end } })
 	if combinations.has_bindings() then
 		engine = CombinationEngine.new(engine, combinations.engine_options(_pair_thresholds(loaded)))
 	end
@@ -293,6 +303,9 @@ function M.init(opts)
 			error("tap-hold manager requires " .. name, 2)
 		end
 	end
+	-- Keylogger imports Manager before Hook. Select the loaded receiver at init,
+	-- before callbacks; its private frame controller alone proves native rights.
+	_native_hook = package.loaded["adapters.keyboard_hook"]
 	Logger.start(LOG, "Initialising tap-holds…")
 	_hook = opts.keyboard_hook
 	_execute_action = opts.execute_action

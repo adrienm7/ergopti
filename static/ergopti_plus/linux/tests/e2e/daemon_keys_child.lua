@@ -89,11 +89,14 @@ local function chars(text)
 	return out
 end
 
-local screen, code_of, char_of, next_code = {}, {}, {}, 1000
+-- Controlled character codes stay inside the actual Writer's evdev range.
+-- Control keys used by this fixture are below 256; these slots are disjoint.
+local screen, code_of, char_of, next_code = {}, {}, {}, 256
 local repeat_state = { reads = 0, attempts = 0, dispatched = 0, origins = 0, decisions = 0,
 	raw = 0, group = 0, origin_name = "fixture keyboard", compose_failed = false }
 local function code_for(c)
 	if not code_of[c] then
+		assert(next_code <= 767, "controlled character fixture exhausted its evdev slots")
 		code_of[c] = next_code
 		char_of[next_code] = c
 		next_code = next_code + 1
@@ -102,29 +105,14 @@ local function code_for(c)
 end
 
 package.preload["adapters.keyboard_layout"] = function()
-	return {
-		refresh = function() return true end,
-		is_ready = function() return true end,
-		source = function() return "scripted" end,
-		resolve = function(c) return { keycode = code_for(c), level = 1, mods = {} } end,
-		plan = function(text)
-			local plan = {}
-			for _, c in ipairs(chars(text)) do plan[#plan + 1] = { keycode = code_for(c), level = 1, mods = {} } end
-			return plan
-		end,
-		shortcut_keycode = function(_, us_code) return us_code end,
-		_set_table_for_test = function() end,
-	}
+	-- The layout is controlled; opaque plan custody is actual KeyboardLayout logic.
+	return require("tests.support.layout_cohort_fixture").layout(code_for)
 end
 
 package.preload["adapters.uinput_writer"] = function()
-	return {
-		is_available = function() return true end,
-		open = function() return true end,
-		close = function() return true end,
-		is_open = function() return true end,
-		sync = function() return true end,
-		emit = function(code, value)
+	-- Actual Writer transactions over controlled byte ports, never native input.
+	return require("tests.fakes").uinput_writer({
+		on_emit = function(code, value)
 			if MAGIC_REPEAT ~= "none" and value == 1 and char_of[code] == "★" then
 				repeat_state.attempts = repeat_state.attempts + 1
 				if MAGIC_REPEAT == "injection" and repeat_state.attempts == 2 then return false end
@@ -139,7 +127,7 @@ package.preload["adapters.uinput_writer"] = function()
 			end
 			return true
 		end,
-	}
+	})
 end
 
 local callbacks = {}

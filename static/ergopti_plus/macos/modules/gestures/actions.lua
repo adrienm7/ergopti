@@ -833,6 +833,57 @@ end)
 -- One action per target and scope. app_switcher, alt_tab_apps (Alt+F17),
 -- app_window_previous, win_prev and win_next did the same thing as one of
 -- these on macOS; config migration step v5_to_v6 maps a stored one to its twin.
+--- Captures native assignment and canonical configuration before asynchronous input.
+--- @param binding string Actual gesture or keyboard binding that dispatched it.
+--- @return table|nil publication Full IO check and callback-free terminal seal.
+local function native_switcher_publication(binding)
+	if type(binding) ~= "string" or binding == "" then return nil end
+	local parent, lifecycle = current_action_parent(), action_scope_lifecycle(current_action_parent())
+	local epoch, state = lifecycle.epoch, _state
+	local Preferences = require("infra.preferences")
+	local path = require("infra.config_paths").get("ConfigTomlPath")
+	local source = Preferences.source_snapshot(path)
+	if type(source) ~= "table" or source.status ~= "ok" or type(source.content) ~= "string" then return nil end
+	local source_guard = Preferences.capture_source_delivery_guard(path)
+	local assignment, assignment_owner, assignment_method, assignment_name
+	if binding:sub(1, 10) == "keyboard__" or binding:sub(1, 9) == "tap_key__" or binding:sub(1, 8) == "script__" then
+		local name = binding:sub(1, 10) == "keyboard__"
+			and "modules.shortcuts.keyboard_shortcuts"
+			or (binding:sub(1, 9) == "tap_key__" and "modules.shortcuts.tap_keys" or "modules.shortcuts.script_control")
+		assignment_name = name
+		assignment_owner = rawget(package.loaded, name)
+		assignment_method = assignment_owner and assignment_owner.capture_action_delivery_guard
+		if type(assignment_method) ~= "function" then return nil end
+		assignment = assignment_method(binding, "system_app_switcher")
+	elseif state and state.ga and state.ga[binding] == "system_app_switcher" then
+		local actions = state.ga
+		assignment = function() return _state == state and state.ga == actions and actions[binding] == "system_app_switcher" end
+	end
+	if type(assignment) ~= "function" then return nil end
+	local function cached()
+		return lifecycle.epoch == epoch and lifecycle.admission_open == true and lifecycle.transition == nil
+			and source_guard() == true and assignment() == true
+			and rawequal(rawget(package.loaded, "modules.gestures.actions"), M)
+			and (not assignment_owner or (rawequal(rawget(package.loaded, assignment_name), assignment_owner)
+				and assignment_owner.capture_action_delivery_guard == assignment_method))
+	end
+	local function current()
+		if not cached() or not aux_admission_open(parent) then return false end
+		local content, status = FileSystem.read_with_status(path)
+		return status == "ok" and content == source.content and cached()
+	end
+	if not current() then return nil end
+	return { current = current, cached = cached }
+end
+
+sg("system_app_switcher", function(binding)
+	local publication = native_switcher_publication(binding)
+	if not publication then
+		Logger.error(LOG, "Native switcher refused an unavailable or retired binding source.")
+		return false
+	end
+	return require("modules.gestures.native_app_switcher_action").request(current_action_parent(), publication)
+end)
 sg("app_previous",      function() return switch_to_previous_application("all_screens") end)
 sg("app_previous_screen", function() return switch_to_previous_application("this_screen") end)
 sg("cmd_shift_tab",     switch_to_least_recent_application)
@@ -1885,6 +1936,8 @@ local function scoped_action_children()
 		return nil
 	end
 	return {
+		{id = "native_switcher", subject = require("modules.gestures.native_app_switcher_action"),
+			pause = "pause", resume = "resume", query = "is_paused", pending = "has_pending"},
 		{id = "auxiliary", subject = AuxOwner,
 			pause = "pause", resume = "resume", query = "is_paused",
 			pending = "has_pending"},
@@ -2542,6 +2595,13 @@ function M.run_program(binding)
 		end)
 		if type(digest) ~= "string" or #digest ~= 64 or not digest:match("^[0-9a-f]+$") then return false end
 		_program_parameters_owned = true
+		local NativeAutomation = require("adapters.apple_shortcuts_native")
+		if NativeAutomation.is_chosen_program(parsed.executable, parsed.arguments) then
+			AuxOwner.revalidate_automation(parsed.executable, parsed.arguments, admitted, parent)
+			-- Query acceptance is not automation invocation. A persisted chosen ID
+			-- cannot bypass the same unavailable service-retirement gate as the picker.
+			return false
+		end
 		return AuxOwner.run_program(parsed.executable, parsed.arguments, admitted, parent,
 			{ source_path = path, source_sha256 = digest })
 	end)

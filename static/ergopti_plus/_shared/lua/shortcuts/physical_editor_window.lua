@@ -40,13 +40,18 @@ function M.new(options)
 		if current() then return options.send("selected", packet) == true end
 		return false
 	end
+	ports.emit_position = function(packet)
+		if not current() then return false end
+		return options.send("captured", packet) == true and current()
+	end
 	editor = Editor.new(ports)
 	--- Routes closed shared-page operations to their exact native session.
-	--- @param message table Ready, choose, save, remove or close request.
+	--- @param message table Closed editor, position observation or retirement request.
 	--- @return boolean handled
 	function window.receive(message)
 		if busy or not current() or type(message) ~= "table" then return false end
 		local fields = { ready = { action = true }, choose = { action = true, request = true },
+			capture_position = { action = true, request = true }, cancel_position = { action = true },
 			save = { action = true, token = true }, remove = { action = true, slot = true }, close = { action = true } }
 		local allowed = fields[message.action]
 		if not allowed then return false end
@@ -70,6 +75,12 @@ function M.new(options)
 			return ready
 		end
 		if not ready then return false end
+		if message.action == "cancel_position" then return editor.cancel_position() end
+		if message.action == "capture_position" then
+			local called, enrolled = pcall(editor.capture_position, message.request)
+			if not called or enrolled ~= true then options.send("refused", "unavailable") end
+			return called and enrolled == true
+		end
 		if message.action == "choose" then
 			local called, opened = pcall(editor.choose, message.request)
 			if not called or opened ~= true then options.send("refused", "save_failed") end

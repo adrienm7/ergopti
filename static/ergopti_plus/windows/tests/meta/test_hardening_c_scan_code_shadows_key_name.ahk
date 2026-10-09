@@ -429,6 +429,11 @@ _HCSC_NoHookHotkeyNamesACharacter() {
 	Assert(RegExMatch(Code, "m)^RegisterAltGrLayer\(\)\s*$") > 0,
 		"the layout must still register the AltGr layer unconditionally")
 	StrReplace(Code, 'Hotkey("SC138 & " . SC,', , , &AltGrRegistrations)
+	if RegExMatch(Code, "m)^RegisterAltGrLayer\(HotkeyFn := Hotkey, HotIfFn := HotIf, DispatchFn := AltGrShiftDispatch, RealAltGrFn := IsRealAltGrPress\) \{([\s\S]*?)^\}", &NativeProducer)
+		&& !RegExMatch(NativeProducer[1], "m)^\s*HotkeyFn\s*:=") {
+		RegExReplace(NativeProducer[1], 'm)^\s*HotkeyFn\.Call\("SC138 & " \. SC,', , &NativePortRegistrations)
+		AltGrRegistrations += NativePortRegistrations
+	}
 	Assert(AltGrRegistrations >= 3, "the AltGr layer must still register its keys as SC138 & SCnnn hotkeys")
 	Golden := JsonParse(FileRead(A_ScriptDir . "\fixtures\ergopti_emulation_golden.json", "UTF-8"))
 	AltGr := Map()

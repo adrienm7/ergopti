@@ -12,6 +12,7 @@ let token = null;
 let selection = 0;
 let pending = false;
 let writable = true;
+let captureAvailable = false;
 const modifierNames = ['ctrl', 'alt', 'shift', 'super'];
 const node = (id) => document.getElementById(id);
 
@@ -21,6 +22,7 @@ function status(key) {
 
 function busy(value) {
 	pending = value;
+	node('capture').disabled = value || !writable || !captureAvailable;
 	for (const id of ['add', 'choose', 'cancel', 'position']) node(id).disabled = value || !writable;
 	for (const input of node('modifiers').querySelectorAll('input'))
 		input.disabled = value || !writable;
@@ -30,6 +32,7 @@ function busy(value) {
 }
 
 function changed() {
+	post({ action: 'cancel_position' });
 	selection += 1;
 	token = null;
 	node('selected-action').textContent = '';
@@ -123,6 +126,9 @@ function init(data) {
 		node('modifiers').appendChild(label);
 	}
 	writable = data.readonly !== true;
+	captureAvailable = data.capture === true;
+	node('capture').disabled = !captureAvailable || !writable;
+	node('capture-reason').hidden = data.capture === true;
 	render();
 	busy(false);
 	status(data.reason || '');
@@ -133,6 +139,16 @@ function selected(data) {
 	if (data.request_id !== selection || node('editor').hidden || !writable) return;
 	token = data.token;
 	node('selected-action').textContent = data.label;
+	busy(false);
+}
+
+// Only the still-owned native request fills the manual draft; page keys cannot mint it.
+function captured(data) {
+	if (data.request_id !== selection || node('editor').hidden || !writable) return;
+	node('position').value = data.code;
+	for (const name of modifierNames) node('mod-' + name).checked = data.mods[name] === true;
+	token = null;
+	node('selected-action').textContent = '';
 	busy(false);
 }
 
@@ -164,6 +180,12 @@ function refused(reason) {
 
 document.addEventListener('DOMContentLoaded', () => {
 	node('add').addEventListener('click', () => edit(null));
+	node('capture').addEventListener('click', () => {
+		if (pending || !writable) return;
+		if (node('editor').hidden) edit(null);
+		else changed();
+		post({ action: 'capture_position', request: { request_id: selection } });
+	});
 	node('position').addEventListener('change', changed);
 	node('cancel').addEventListener('click', () => {
 		changed();

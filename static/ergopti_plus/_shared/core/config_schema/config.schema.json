@@ -348,7 +348,7 @@
 				"ergopti_base": { "type": "boolean" },
 				"direct_access_digits": { "type": "string", "enum": ["native", "digits", "symbols"] },
 				"ergopti_alt_gr": { "type": "boolean" },
-				"ergopti_plus": { "type": "boolean" },
+				"ergopti_variant": { "type": "string", "enum": ["none", "ergopti", "ergopti_plus"] },
 				"ctrl_magic_save": { "type": "boolean" },
 				"emulated_layout": { "type": "string", "pattern": "^([a-z][a-z0-9_]*)?$" }
 			}

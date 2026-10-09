@@ -8,11 +8,87 @@ function checkpoint(number) {
 	);
 	$.NSFileHandle.fileHandleWithStandardError.writeData(data);
 }
-function run() {
+// The native import owns the C signature: no fabricated AEDesc layout or ABI cast.
+// This asks about the same osascript principal, never starts the target or prompts.
+function permissionPreflight() {
+	checkpoint('P:BEGIN');
+	try {
+		ObjC.import('CoreServices');
+		var eventClass = $.kAECoreSuite,
+			eventID = $.kAEGetData,
+			targetType = $.typeApplicationBundleID;
+		// Fixed failure-only annotations identify the original unavailable guard;
+		// they never change bridge admission or disclose exception/native values.
+		if (typeof $.AEDeterminePermissionToAutomateTarget !== 'function') {
+			checkpoint('B:API');
+			checkpoint('P:UNAVAILABLE');
+			return;
+		}
+		if (
+			!$.NSAppleEventDescriptor ||
+			typeof $.NSAppleEventDescriptor.descriptorWithBundleIdentifier !== 'function'
+		) {
+			checkpoint('B:METADATA');
+			checkpoint('P:UNAVAILABLE');
+			return;
+		}
+		if (
+			[eventClass, eventID, targetType].some(function (value) {
+				return (
+					typeof value !== 'number' ||
+					!isFinite(value) ||
+					Math.floor(value) !== value ||
+					value < 0 ||
+					value > 4294967295
+				);
+			})
+		) {
+			checkpoint('B:CONSTANTS');
+			checkpoint('P:UNAVAILABLE');
+			return;
+		}
+		var descriptor = $.NSAppleEventDescriptor.descriptorWithBundleIdentifier(
+			'com.apple.shortcuts.events'
+		);
+		if (!descriptor || descriptor.descriptorType !== targetType) {
+			checkpoint('B:DESCRIPTOR');
+			checkpoint('P:UNAVAILABLE');
+			return;
+		}
+		// aeDesc is the SDK's NS_RETURNS_INNER_POINTER. Keep its native owner live
+		// through the call and the post-call read; never copy or reinterpret it.
+		var pointer = descriptor.aeDesc;
+		if (!pointer) {
+			checkpoint('B:POINTER');
+			checkpoint('P:UNAVAILABLE');
+			return;
+		}
+		checkpoint('P:CALL_ATTEMPT');
+		var code = $.AEDeterminePermissionToAutomateTarget(pointer, eventClass, eventID, false);
+		if (
+			descriptor.descriptorType !== targetType ||
+			typeof code !== 'number' ||
+			!isFinite(code) ||
+			Math.floor(code) !== code ||
+			code < -2147483648 ||
+			code > 2147483647
+		) {
+			checkpoint('P:INVALID');
+			return;
+		}
+		checkpoint('P:RETURN:' + code);
+	} catch (error) {
+		// No exception detail, permission inference or fallback leaves this boundary.
+		checkpoint('P:REFUSED');
+	}
+}
+function run(args) {
 	var stage = 1;
 	try {
 		var app = Application('com.apple.shortcuts.events');
 		checkpoint(1);
+		if (Array.isArray(args) && args.length === 1 && args[0] === '--permission-preflight')
+			permissionPreflight();
 		var catalogue = app.shortcuts();
 		checkpoint(2);
 		if (!Array.isArray(catalogue))
