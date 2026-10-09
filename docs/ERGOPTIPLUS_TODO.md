@@ -8655,6 +8655,15 @@ Final joined-source gates and remote Shortcut retirement remain required.
   unit/E2E/package/startup. Device work: real layout changes and editor-key
   delivery on supported keyboards/seats; controlled probes cannot prove it.
 
+  The retired macOS editor-startup fixture retains all13 lifecycle assertions
+  and additionally checks the genuine nil result and exact noncommit reason.
+  Actual Lua5.4 source replay passes2/0; two wrong-domain mutations pass the
+  former fixture but fail one case each in the strengthened fixture. The
+  unchanged pcall classifier admits the new result checks without a baseline
+  waiver. Raw LuaJIT remains unqualified because its existing command-lines
+  dependency requires table.pack; native Hammerspoon is unrun. This does not
+  finish live retargeting, collision or installed acceptance.
+
 - [~] **109.** Use one shared ErgoptiPlus — Title prefix/separator policy
   for application windows, with empty prefix removing branding. Implemented:
   generated AHK/Lua/Swift composers, translated bare captions and live retitles
@@ -8684,6 +8693,14 @@ Final joined-source gates and remote Shortcut retirement remain required.
   panel/filter/notification delivery through three-OS package/install gates.
   Device work: actual key history, notification clicks and desktop focus only
   where hosted automation cannot observe the user's session.
+
+  The Linux HealthCheck copy fixture now uses the genuine exported snapshot
+  document before entering the clipboard port. All14 original cases remain;
+  free-text and stale-preview refusals are additive, and the original literal
+  redaction oracle still exercises the real Redact owner. Controlled old13/1
+  becomes16/0 on both Lua ABIs; restoring the obsolete false-port input fails
+  the actual-effect assertion. This fixture repair does not qualify native
+  clipboard/GUI delivery or Windows invisible capture. Item109 stays partial.
 
 - [~] **111.** Offer two distinct shared actions on all drivers: the OS
   normal app switcher and windows only on the display containing the current
