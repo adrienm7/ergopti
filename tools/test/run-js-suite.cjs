@@ -1926,6 +1926,12 @@ const CHECKS = [
 		repro: 'node tools/test/test-macos-managed-ollama-catalogue.cjs'
 	},
 	{
+		name: 'native PAC source contract preserves ownership and exact full-URL binding',
+		cmd: process.execPath,
+		args: ['tools/test/test-native-pac-source-contract.cjs'],
+		repro: 'node tools/test/test-native-pac-source-contract.cjs'
+	},
+	{
 		name: 'native PAC helpers preserve independent standard function vectors',
 		cmd: process.execPath,
 		args: ['tools/test/test-network-pac-helpers.cjs'],

@@ -396,6 +396,7 @@ class Receiver:
         http_binary = self.http_app / "Contents/MacOS/ErgoptiPlus"
         http_binary.parent.mkdir(parents=True)
         worker = self.work / "ManagedHTTPWorker.swift"
+        pac_source = self.work / "ManagedPACSource.swift"
         certificates = self.work / "ManagedCertificateAuthorities.swift"
         bootstrap_policy = self.work / "ManagedBootstrapPolicy.generated.swift"
         main = self.work / "native_http_fixture_main.swift"
@@ -403,6 +404,7 @@ class Receiver:
             "static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/ManagedHTTPWorker.swift", worker
         )
         for name, destination in (
+            ("ManagedPACSource.swift", pac_source),
             ("ManagedCertificateAuthorities.swift", certificates),
             ("ManagedBootstrapPolicy.generated.swift", bootstrap_policy),
         ):
@@ -452,6 +454,10 @@ class Receiver:
                 worker,
             ),
             (
+                "static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/ManagedPACSource.swift",
+                pac_source,
+            ),
+            (
                 "static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/ManagedCertificateAuthorities.swift",
                 certificates,
             ),
@@ -476,6 +482,7 @@ class Receiver:
                 "-framework",
                 "SystemConfiguration",
                 str(worker),
+                str(pac_source),
                 str(certificates),
                 str(bootstrap_policy),
                 str(main),

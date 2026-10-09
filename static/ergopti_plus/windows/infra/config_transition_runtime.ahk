@@ -218,17 +218,21 @@ _ConfigTransitionRuntimeOwns(Bundle, Path) {
 ; borrows it instead of deadlocking on a second acquisition.
 ConfigTransitionRetainBarrier(Bundle) {
 	global _ConfigTransitionRetainedBarrier
-	if !(Bundle is Object) || !Bundle.HasOwnProp("kind")
-			|| Bundle.kind != "terminal_bundle"
-			|| !Bundle.HasOwnProp("tokens") || !(Bundle.tokens is Array)
-			|| !_ConfigWriteTerminalIsActive()
-		return false
-	for Token in Bundle.tokens {
-		if !_ConfigWriteLeaseOwns(Token)
-			return false
-	}
 	PreviousCritical := Critical("On")
 	try {
+		; Shape is intrinsic; only the actual closed issuer grants custody.
+		if !_ConfigWriteLeaseDataObject(Bundle, ["kind", "id", "tokens", "authorized", "shutdown_claimed"])
+				|| !_ConfigWriteTerminalTryAcquire([], Bundle)
+			return false
+		if !(Bundle is Object) || !Bundle.HasOwnProp("kind")
+				|| Bundle.kind != "terminal_bundle"
+				|| !Bundle.HasOwnProp("tokens") || !(Bundle.tokens is Array)
+				|| !_ConfigWriteTerminalIsActive()
+			return false
+		for Token in Bundle.tokens {
+			if !_ConfigWriteLeaseOwns(Token)
+				return false
+		}
 		if (_ConfigTransitionRetainedBarrier is Object)
 			return _ConfigTransitionRetainedBarrier == Bundle
 		_ConfigTransitionRetainedBarrier := Bundle

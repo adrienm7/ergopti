@@ -181,6 +181,12 @@ const MACOS_NATIVE_STEP_CONDITIONS = [
 	[
 		MACOS_BOX,
 		'managed-ollama-native',
+		'Qualify actual native PAC source ownership XCTest controls',
+		NOT_CANCELLED
+	],
+	[
+		MACOS_BOX,
+		'managed-ollama-native',
 		'Qualify actual native PAC and WPAD XCTest controls',
 		NOT_CANCELLED
 	],
@@ -3573,6 +3579,238 @@ for (const [what, from, to] of [
 ]) {
 	mustCatch(what, LINUX_BOX, from, to, linuxAudioPrerequisiteProblems);
 }
+
+// A disjoint mandatory cohort; literal ownership is narrower than a generic Swift filter.
+const PAC_SOURCE_STEP =
+	'      - name: Qualify actual native PAC source ownership XCTest controls\n        if: ${{ !cancelled() }}\n        shell: bash\n        run: |\n          set -euo pipefail\n          test -n "$ERGOPTI_NATIVE_HTTP_PYTHON"\n          test -x "$ERGOPTI_NATIVE_HTTP_PYTHON"\n          test -z "${ERGOPTI_DEV_QUALIFICATION_PROFILE:-}"\n          transcript="$ERGOPTI_OLLAMA_BUILD_ROOT/native-pac-source-xctest.log"\n          source_receipt="$ERGOPTI_OLLAMA_BUILD_ROOT/native-pac-source-inputs.json"\n          node tools/diagnostics/native_pac_source_evidence.cjs begin "$GITHUB_SHA" "$GITHUB_RUN_ID" "$GITHUB_RUN_ATTEMPT" "$ERGOPTI_OLLAMA_EXPECTED_ARCHITECTURE" "$source_receipt"\n          set +e\n          swift test --package-path static/ergopti_plus/macos/launcher \\\n            --scratch-path "$ERGOPTI_OLLAMA_BUILD_ROOT/swift" \\\n            --filter \'(^|[.])ManagedPACSourceTests([/.]|$)\' 2>&1 | tee "$transcript"\n          source_statuses=("${PIPESTATUS[@]}")\n          set -e\n          test "${#source_statuses[@]}" -eq 2\n          node tools/diagnostics/native_pac_source_evidence.cjs judge "$transcript" "${source_statuses[0]}" "${source_statuses[1]}" "$GITHUB_SHA" "$GITHUB_RUN_ID" "$GITHUB_RUN_ATTEMPT" "$ERGOPTI_OLLAMA_EXPECTED_ARCHITECTURE" "$source_receipt" "$ERGOPTI_OLLAMA_BUILD_ROOT/native-pac-source-verdict.json"\n        timeout-minutes: 10\n';
+function nativePacSourceProblems(files) {
+	const mac = files.find((file) => file.rel === MACOS_BOX)?.text ?? '';
+	const jobs = [
+		...mac.matchAll(/^  managed-ollama-native:\n[\s\S]*?(?=^  [A-Za-z][\w-]*:|(?![\s\S]))/gm)
+	];
+	const problems = [];
+	if (jobs.length !== 1) return ['native-source-job'];
+	const job = jobs[0][0];
+	if (mac.split(PAC_SOURCE_STEP).length !== 2 || job.split(PAC_SOURCE_STEP).length !== 2)
+		problems.push('native-source-exact-step');
+	const sdk = job.indexOf(
+		'      - name: Qualify actual SDK accepted-owner and deadline XCTest controls\n'
+	);
+	const source = job.indexOf(PAC_SOURCE_STEP);
+	const pac = job.indexOf('      - name: Qualify actual native PAC and WPAD XCTest controls\n');
+	if (sdk < 0 || source <= sdk || pac <= source) problems.push('native-source-order');
+	for (const name of [
+		'native-pac-source-xctest.log',
+		'native-pac-source-inputs.json',
+		'native-pac-source-verdict.json'
+	]) {
+		const line = `            \${{ env.ERGOPTI_OLLAMA_BUILD_ROOT }}/${name}`;
+		if (job.split('\n').filter((actual) => actual === line).length !== 1)
+			problems.push('native-source-retained-' + name);
+	}
+	return problems;
+}
+errors.push(...nativePacSourceProblems(pipeline.files()));
+// The fifth-path projection grants only this exact raw bound condition.
+const rawSourceFiles = require('./ci-pipeline.cjs').files();
+const rawSourceStep = PAC_SOURCE_STEP.replace(
+	'if: ${{ !cancelled() }}',
+	'if: ${{ !inputs.fast_prerelease && (!cancelled()) }}'
+);
+assert.equal(pipeline.validateRaw(rawSourceFiles), true);
+for (const replacement of [
+	'',
+	rawSourceStep + rawSourceStep,
+	rawSourceStep.replace('if: ${{ !inputs.fast_prerelease && (!cancelled()) }}', 'if: false'),
+	rawSourceStep.replace(
+		'if: ${{ !inputs.fast_prerelease && (!cancelled()) }}',
+		'if: ${{ !cancelled() }}'
+	)
+]) {
+	const changed = rawSourceFiles.map((file) =>
+		file.rel === MACOS_BOX ? { ...file, text: file.text.replace(rawSourceStep, replacement) } : file
+	);
+	assert.throws(() => pipeline.fromFiles(changed), /full-default/);
+}
+console.log('PASS: exact Source10 raw projection controls=5; native execution unqualified.');
+for (const [name, changed] of [
+	['missing source step', ''],
+	['duplicate source step', PAC_SOURCE_STEP + PAC_SOURCE_STEP],
+	['skipped source step', PAC_SOURCE_STEP.replace('if: ${{ !cancelled() }}', 'if: false')],
+	['ignored source child status', PAC_SOURCE_STEP.replace('"${source_statuses[0]}"', '"0"')],
+	['ignored source capture status', PAC_SOURCE_STEP.replace('"${source_statuses[1]}"', '"0"')],
+	['foreign source run', PAC_SOURCE_STEP.replace('"$GITHUB_RUN_ID"', '"foreign"')],
+	['foreign source attempt', PAC_SOURCE_STEP.replace('"$GITHUB_RUN_ATTEMPT"', '"1"')],
+	[
+		'source verdict before capture closure',
+		PAC_SOURCE_STEP.replace('source_statuses=("${PIPESTATUS[@]}")', 'source_statuses=(0 0)')
+	]
+])
+	mustCatch(name, MACOS_BOX, PAC_SOURCE_STEP, changed, nativePacSourceProblems);
+for (const name of [
+	'native-pac-source-xctest.log',
+	'native-pac-source-inputs.json',
+	'native-pac-source-verdict.json'
+]) {
+	const line = `            \${{ env.ERGOPTI_OLLAMA_BUILD_ROOT }}/${name}\n`;
+	mustCatch('missing retained ' + name, MACOS_BOX, line, '', nativePacSourceProblems);
+}
+
+// Actual begin/judge over a private tracked checkout. These are constructed
+// XCTest frames, not an execution or a qualification of native Swift controls.
+function checkNativePacSourceReceipts() {
+	const os = require('node:os');
+	const reader = require('../diagnostics/native_pac_source_evidence.cjs');
+	const repository = fs.mkdtempSync(path.join(os.tmpdir(), 'ergopti-source-receipt-'));
+	const root = path.resolve(__dirname, '../..');
+	const git = (args) => {
+		const result = spawnSync('git', args, { cwd: repository, encoding: 'utf8' });
+		assert.equal(result.status, 0, result.stderr);
+		return result.stdout.trim();
+	};
+	const write = (relative, bytes) => {
+		const file = path.join(repository, relative);
+		fs.mkdirSync(path.dirname(file), { recursive: true });
+		fs.writeFileSync(file, bytes);
+	};
+	const methods = [
+		'testStrictUTF8AndBOMAdmission',
+		'testStrictUTF16RejectsMalformedSurrogatesAndNUL',
+		'testAuthorityScopeIncludesCanonicalSchemeHostEffectivePort',
+		'testBindingEscapesRequestDataAndRefusesInvalidSource',
+		'testRealPACSourceDecodersRetireEverySession',
+		'testRealPACSourceStatusSizeAndEncodingRefusalsRetire',
+		'testRealPACSourceRedirectsHaveFreshCredentialFreeOwners',
+		'testRealPACSourceTrustAnchorsPreserveHostnameAndDowngradeRefusal',
+		'testRealPACSourceDeadlineRefusesAndRetiresBeforeReplacement',
+		'testOriginalLookupBudgetIncludesSettingsPreparation'
+	];
+	let count = 0;
+	try {
+		const tests = 'static/ergopti_plus/macos/launcher/Tests/ErgoptiPlusTests/';
+		for (const suite of [
+			'ManagedPACSourceTests',
+			'ReleaseArchiveStagingTests',
+			'SparkleArchiveUpdateAcceptanceTests',
+			'HomebrewArchiveAcceptanceTests',
+			'HomebrewAutomationConsentTests'
+		]) {
+			const relative = tests + suite + '.swift';
+			write(relative, fs.readFileSync(path.join(root, relative)));
+		}
+		for (const relative of [
+			'static/ergopti_plus/_shared/modules/network/proxy_policy.json',
+			'static/ergopti_plus/macos/tests/support/native_pac_source_fixture.py',
+			'tools/diagnostics/native_pac_source_evidence.cjs',
+			'tools/diagnostics/swift_xctest_evidence.cjs'
+		])
+			write(relative, fs.readFileSync(path.join(root, relative)));
+		git(['init', '-q']);
+		git(['add', '--', '.']);
+		git([
+			'-c',
+			'user.name=Source receipt control',
+			'-c',
+			'user.email=source-control@example.invalid',
+			'commit',
+			'-qm',
+			'Private source-receipt control'
+		]);
+		const candidate = git(['rev-parse', 'HEAD']);
+		const epoch = [candidate, '123', '2', 'arm64'];
+		const before = path.join(repository, 'before.json'),
+			capture = path.join(repository, 'capture.log');
+		assert.equal(reader.main(['begin', ...epoch, before], repository), 0);
+		count++;
+		const lines = [
+			"Test Suite 'Selected tests' started at 2026-10-09",
+			"Test Suite 'ErgoptiPlusPackageTests.xctest' started at 2026-10-09",
+			"Test Suite 'ManagedPACSourceTests' started at 2026-10-09"
+		];
+		for (const method of methods) {
+			lines.push(
+				`Test Case '-[ErgoptiPlusTests.ManagedPACSourceTests ${method}]' started.`,
+				`Test Case '-[ErgoptiPlusTests.ManagedPACSourceTests ${method}]' passed (0.1 seconds).`
+			);
+		}
+		for (const suite of [
+			'ManagedPACSourceTests',
+			'ErgoptiPlusPackageTests.xctest',
+			'Selected tests'
+		])
+			lines.push(
+				`Test Suite '${suite}' passed at 2026-10-09`,
+				'Executed 10 tests, with 0 failures (0 unexpected) in 1 seconds'
+			);
+		const transcript = lines.join('\n') + '\n';
+		write('capture.log', transcript);
+		let serial = 0;
+		const judge = (fields = epoch, statuses = ['0', '0']) =>
+			reader.main(
+				[
+					'judge',
+					capture,
+					...statuses,
+					...fields,
+					before,
+					path.join(repository, `verdict-${serial++}.json`)
+				],
+				repository
+			);
+		assert.equal(judge(), 0);
+		count++;
+		for (const [index, value] of [
+			[0, '0'.repeat(40)],
+			[1, '124'],
+			[2, '3'],
+			[3, 'amd64']
+		]) {
+			const changed = [...epoch];
+			changed[index] = value;
+			assert.notEqual(judge(changed), 0);
+			count++;
+		}
+		for (const statuses of [
+			['1', '0'],
+			['0', '1']
+		]) {
+			assert.notEqual(judge(epoch, statuses), 0);
+			count++;
+		}
+		for (const method of methods) {
+			write('capture.log', transcript.replace(` ${method}]' passed`, ` ${method}]' skipped`));
+			assert.notEqual(judge(), 0);
+			count++;
+		}
+		write('capture.log', transcript);
+		const policy = 'static/ergopti_plus/_shared/modules/network/proxy_policy.json';
+		const original = fs.readFileSync(path.join(repository, policy));
+		write(policy, Buffer.concat([original, Buffer.from('\n')]));
+		assert.notEqual(judge(), 0);
+		count++;
+		write(policy, original);
+		const unbound = 'static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/Unbound.swift';
+		write(unbound, '// unbound\n');
+		assert.notEqual(judge(), 0);
+		count++;
+		fs.unlinkSync(path.join(repository, unbound));
+		fs.unlinkSync(capture);
+		fs.symlinkSync(before, capture);
+		assert.notEqual(judge(), 0);
+		count++;
+		fs.unlinkSync(capture);
+		write('capture.log', Buffer.from([0xff]));
+		assert.notEqual(judge(), 0);
+		count++;
+		assert.equal(count, 22);
+		console.log(
+			'PASS: native PAC source receipt controls=22; constructed transcripts/native execution unqualified.'
+		);
+	} finally {
+		fs.rmSync(repository, { recursive: true, force: true });
+	}
+}
+checkNativePacSourceReceipts();
 
 // The temporary Mac exception still requires closed context and retained gates.
 require('./test-macos-dev-qualification-deferral.cjs');
