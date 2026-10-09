@@ -285,6 +285,12 @@ _THPA_SharingVectors() {
 		Document := HealthCheck_ShareDocument(Snapshot, Config["schema"])
 		for Canary in Vector["canaries"]
 			AssertFalse(InStr(Document["text"], Canary), "sharing corpus leaked " . Vector["name"])
+		Readable := StrSplit(Document["text"], Chr(96) . Chr(96) . Chr(96) . "json")[1]
+		for Id in ["versions", "hardware", "system", "input", "ai", "permissions", "issues"]
+			AssertContains(Readable, "## " . t("healthcheck.section." . Id))
+		AssertContains(Readable, "| probes.appleevent_transport.native_status | -1744 |")
+		AssertContains(Readable, "| probes.appleevent_transport.cleanup | pending |")
+		AssertContains(Readable, "| retired_probes.1.probes.appleevent_transport.cleanup | unknown |")
 		AssertEqual("timeout", Document["snapshot"]["probes"]["appleevent_transport"]["state"])
 		AssertEqual("pending", Document["snapshot"]["probes"]["appleevent_transport"]["cleanup"])
 		AssertEqual(-1744, Document["snapshot"]["probes"]["appleevent_transport"]["native_status"])
