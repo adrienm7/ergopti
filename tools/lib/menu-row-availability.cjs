@@ -54,8 +54,16 @@ function classifyMenuRow(row, where) {
 		typeof row.caption_getter === 'string' &&
 		row.caption_getter !== '';
 	if (row.disabled !== undefined) {
-		if (typeof row.disabled !== 'boolean' || !where.startsWith('menu.top_level '))
-			throw new Error(`${where}: disabled is a boolean top-level presentation gate`);
+		if (typeof row.disabled !== 'boolean' || !where.startsWith('menu.top_level ')) {
+			// Inert rows own their closed presentation vocabulary before the top-level gate.
+			const reason =
+				row.type === 'section_header'
+					? 'section header needs a caption without behavior metadata'
+					: row.type === 'label'
+						? 'inert label needs an identity and caption without behavior metadata'
+						: 'disabled is a boolean top-level presentation gate';
+			throw new Error(`${where}: ${reason}`);
+		}
 		if (
 			row.disabled &&
 			(!labelled ||

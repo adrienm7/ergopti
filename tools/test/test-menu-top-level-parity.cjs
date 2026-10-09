@@ -579,3 +579,37 @@ console.log(
 for (const [driver, why] of Object.entries(KNOWN_ORDER_DIVERGENCES)) {
 	console.log(`     · ${driver} order: ${why}`);
 }
+
+// Disabled metadata remains rejected by the same inert owner on every compiler path.
+{
+	const assert = require('node:assert/strict');
+	const { classifyMenuRow } = require('../lib/menu-row-availability.cjs');
+	for (const [type, reason] of [
+		['section_header', /section header needs a caption without behavior metadata/],
+		['label', /inert label needs an identity and caption without behavior metadata/]
+	]) {
+		for (const disabled of [true, false, 'unowned', 1])
+			assert.throws(
+				() =>
+					classifyMenuRow(
+						{ type, id: 'inert', i18n: 'caption', disabled },
+						'menu.fixture row "inert"'
+					),
+				reason
+			);
+	}
+	assert.throws(
+		() =>
+			classifyMenuRow(
+				{ type: 'group', id: 'agent', i18n: 'caption', disabled: 'true' },
+				'menu.top_level row "agent"'
+			),
+		/disabled is a boolean top-level presentation gate/
+	);
+	assert.doesNotThrow(() =>
+		classifyMenuRow(
+			{ type: 'group', id: 'agent', i18n: 'caption', disabled: true, reason_key: 'reason' },
+			'menu.top_level row "agent"'
+		)
+	);
+}
