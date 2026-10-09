@@ -576,27 +576,48 @@ def collect(output, state, home, executables):
         ["screencapture", "-x", str(output / "desktop.png")], capture_output=True, timeout=30
     )
     windows = collect_owned_windows(output, executables)
-    # Unified log and crash reports explain a child that dies or a launcher that
-    # stops logging, which the file logs alone cannot distinguish.
-    try:
-        unified = subprocess.run(
-            [
-                "log",
-                "show",
-                "--style",
-                "syslog",
-                "--last",
-                "4m",
-                "--predicate",
-                'process == "ErgoptiPlus" OR process == "Hammerspoon"',
-            ],
-            capture_output=True,
-            text=True,
-            timeout=120,
-        )
-        (output / "unified.log").write_text(unified.stdout[-400000:], encoding="utf-8")
-    except (OSError, subprocess.TimeoutExpired) as error:
-        (output / "unified.log").write_text(f"{type(error).__name__}: {error}\n", encoding="utf-8")
+    # Application-only logs omit the system service handling an AppleEvent
+    # authorization request. Keep its evidence separate on this disposable CI
+    # host, with the system's default privacy redaction and the same time bound.
+    unified_logs = []
+    for filename, predicate in (
+        ("unified.log", 'process == "ErgoptiPlus" OR process == "Hammerspoon"'),
+        (
+            "appleevents-system.log",
+            'process == "tccd" OR process == "appleeventsd" '
+            'OR subsystem == "com.apple.TCC" OR subsystem == "com.apple.appleevents"',
+        ),
+    ):
+        receipt = {"file": filename, "status": "unavailable"}
+        unified_logs.append(receipt)
+        try:
+            unified = subprocess.run(
+                [
+                    "log",
+                    "show",
+                    "--style",
+                    "syslog",
+                    "--info",
+                    "--debug",
+                    "--last",
+                    "4m",
+                    "--predicate",
+                    predicate,
+                ],
+                capture_output=True,
+                text=True,
+                timeout=120,
+            )
+            receipt.update(exit_status=unified.returncode, stderr=unified.stderr[-4000:])
+            if unified.returncode == 0:
+                receipt["status"] = "captured"
+            (output / filename).write_text(unified.stdout[-400000:], encoding="utf-8")
+        except (OSError, subprocess.TimeoutExpired) as error:
+            receipt["cause"] = f"{type(error).__name__}: {error}"
+            (output / filename).write_text(receipt["cause"] + "\n", encoding="utf-8")
+    (output / "unified-log-collection.json").write_text(
+        json.dumps(unified_logs, indent=2) + "\n", encoding="utf-8"
+    )
     for folder in (
         home / "Library/Logs/DiagnosticReports",
         Path("/Library/Logs/DiagnosticReports"),
@@ -608,7 +629,7 @@ def collect(output, state, home, executables):
                 ):
                     (output / "crash-reports").mkdir(exist_ok=True)
                     shutil.copyfile(report, output / "crash-reports" / report.name)
-    return {"errors": errors, "windows": windows}
+    return {"errors": errors, "windows": windows, "unified_logs": unified_logs}
 
 
 def print_native_probe_diagnostics(report):
