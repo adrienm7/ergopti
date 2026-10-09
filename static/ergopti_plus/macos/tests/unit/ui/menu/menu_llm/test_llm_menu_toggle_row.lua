@@ -270,3 +270,185 @@ helpers.describe("actual transient download producer reaches completed root comp
 		end)
 	end
 end)
+
+
+-- The oracle contains original catalogue captions and raw native checked-field
+-- presence, frozen before the parent starts consuming its canonical group.
+local function outer_parent_corpus()
+	local file = assert(io.open(helpers.shared("tests/corpus/menus/macos_llm_outer_parent.json"), "rb"))
+	local raw = file:read("*a"); file:close()
+	return assert(require("adapters.json_codec").decode(raw))
+end
+
+local function with_genuine_outer_parent(calls, callback)
+	-- The actual API backend has no local health probe; no refresh port is suppressed.
+	helpers.assert_eq(calls.root_deps.state.llm_backend, "api")
+	local port = package.loaded["infra.manifest_menu"]
+	local before_build, before_group = port.build, port.group_row
+	local activation_logger = package.loaded["infra.logger"]
+	local owned = { "infra.manifest_menu", "menu.renderer", "infra.i18n", "infra.locale", "locale.core", "infra.logger" }
+	local previous = {}
+	for index, name in ipairs(owned) do previous[index] = package.loaded[name] end
+	local ok, detail = xpcall(function()
+		helpers.with_fresh_modules(owned, function()
+			local closed_logger = {}
+			for name, value in pairs(activation_logger) do closed_logger[name] = value end
+			closed_logger.LEVELS = require("logger").LEVELS
+			closed_logger.current_level = closed_logger.LEVELS.WARNING
+			package.loaded["infra.logger"] = closed_logger
+			local native_i18n, native_locale = require("infra.i18n"), require("infra.locale")
+			native_i18n.set_locale_injector(native_locale.set_locale)
+			native_i18n.set_locale_no_reload("en")
+			local native = require("infra.manifest_menu")
+			local capture = {}
+			-- The producer requires this genuine table at call time. Observe that
+			-- owner, rather than the older port captured by its outer constructor.
+			local actual_build = native.build
+			helpers.assert_type(actual_build, "function")
+			native.build = function(...)
+				local args = { ... }
+				local child = actual_build(...)
+				if args[1] == "llm_menu" then
+					capture.render_ctx, capture.child = args[5], child
+				end
+				return child
+			end
+			port.group_row = native.group_row
+			local observed_ok, observed_detail = xpcall(function()
+				callback(native, native_i18n, capture)
+			end, debug.traceback)
+			native.build = actual_build
+			helpers.assert_true(rawequal(native.build, actual_build))
+			if not observed_ok then error(observed_detail, 0) end
+		end)
+	end, debug.traceback)
+	port.build, port.group_row = before_build, before_group
+	for index, name in ipairs(owned) do
+		helpers.assert_true(rawequal(package.loaded[name], previous[index]), "outer parent scope restores " .. name)
+	end
+	helpers.assert_true(rawequal(port.build, before_build))
+	helpers.assert_true(rawequal(port.group_row, before_group))
+	if not ok then error(detail, 0) end
+end
+
+helpers.describe("genuine shared outer IA parent", function()
+	local corpus = outer_parent_corpus()
+	helpers.assert_eq(#corpus.captions, 21)
+	helpers.assert_eq(#corpus.states, 3)
+	for _, expected in ipairs(corpus.captions) do
+		helpers.it("retains original title, optional checked field and native subtree: " .. expected.locale, function()
+			with_activation("api", { true }, nil, function(_, state, calls)
+				with_genuine_outer_parent(calls, function(_, native_i18n, capture)
+					native_i18n.set_locale_no_reload(expected.locale)
+					for _, vector in ipairs(corpus.states) do
+						if vector.value == "nil" then state.llm_enabled = nil
+						else state.llm_enabled = vector.value == "true" end
+						local item = calls.handler.build_item()
+						helpers.assert_type(item, "table")
+						helpers.assert_eq(item.label, expected.title)
+						helpers.assert_eq(rawget(item, "checked") ~= nil, vector.checked_present)
+						helpers.assert_eq(item.checked, vector.checked)
+						helpers.assert_nil(item.action)
+						helpers.assert_nil(item.disabled)
+						helpers.assert_true(rawequal(item.submenu, capture.child), "actual completed native child remains identical")
+						helpers.assert_true(#item.submenu >= 2, "real llm_menu supplies its switch and restore rows")
+						helpers.assert_true(rawequal(item.submenu[1].fn, capture.render_ctx.commands.llm_toggle))
+						helpers.assert_eq(calls.saves, corpus.construction_saves)
+						helpers.assert_eq(calls.updates, corpus.construction_updates)
+						helpers.assert_eq(calls.notifications, corpus.construction_notifications)
+					end
+				end)
+			end)
+		end)
+	end
+	for _, scenario in ipairs({ "withdrawn", "duplicate", "command", "wrong-platform" }) do
+		helpers.it("refuses actual canonical parent " .. scenario .. " and repairs without side effects", function()
+			with_activation("api", { true }, nil, function(_, state, calls)
+				with_genuine_outer_parent(calls, function(native)
+					state.llm_enabled = true
+					local root = native.get_root()
+					local original = root.llm_native_parent
+					helpers.assert_eq(#original, 1)
+					local row = original[1]
+					local before = calls.handler.build_item()
+					helpers.assert_not_nil(before)
+					local changed = {}
+					for key, value in pairs(row) do changed[key] = value end
+					if scenario == "withdrawn" then root.llm_native_parent = {}
+					elseif scenario == "duplicate" then root.llm_native_parent = { row, row }
+					elseif scenario == "command" then changed.type = "command"; root.llm_native_parent = { changed }
+					else changed.platforms = { "linux" }; root.llm_native_parent = { changed } end
+					local ok, detail = xpcall(function()
+						helpers.assert_nil(calls.handler.build_item(), "unadmitted parent is never published")
+						helpers.assert_eq(state.llm_enabled, true)
+						helpers.assert_eq(calls.saves, 0)
+						helpers.assert_eq(calls.updates, 0)
+						helpers.assert_eq(calls.notifications, 0)
+					end, debug.traceback)
+					root.llm_native_parent = original
+					if not ok then error(detail, 0) end
+					local repaired = calls.handler.build_item()
+					helpers.assert_eq(repaired.label, before.label)
+					helpers.assert_eq(repaired.checked, true)
+				end)
+			end)
+		end)
+	end
+	helpers.it("uses actual canonical caption policy rather than the former hardcoded parent key", function()
+		with_activation("api", { true }, nil, function(_, _, calls)
+			with_genuine_outer_parent(calls, function(native, native_i18n)
+				local row = native.get_array("llm_native_parent")[1]
+				local predecessor = row.i18n
+				local ok, detail = xpcall(function()
+					row.i18n = "common.restore_recommended"
+					local item = calls.handler.build_item()
+					helpers.assert_eq(item.label, native_i18n.get("common.restore_recommended"))
+					helpers.assert_true(item.label ~= native_i18n.get("menu.llm.title"))
+					helpers.assert_eq(calls.saves, 0)
+					helpers.assert_eq(calls.updates, 0)
+				end, debug.traceback)
+				row.i18n = predecessor
+				if not ok then error(detail, 0) end
+			end)
+		end)
+	end)
+end)
+
+helpers.describe("actual outer IA parent reaches real tray transport", function()
+	helpers.it("hands the genuine completed child and toggle into the actual Builder", function()
+		with_activation("api", { true }, nil, function(_, state, calls)
+			state.llm_enabled = true
+			local original_build = calls.handler.build_item
+			local observed
+			local ok, detail = xpcall(function()
+				with_genuine_outer_parent(calls, function(_, native_i18n, capture)
+					calls.handler.build_item = function(...)
+						observed = original_build(...)
+						return observed
+					end
+					helpers.with_fresh_modules({ "ui.menu.builder", "ui.menu.canvas_badge" }, function()
+						local actual = require("ui.menu.builder").generate({ config = { log_level = 2 },
+							llm_handler = calls.handler, script_control = { toggle = function() error("draw never resumes") end } },
+							{}, { reload = function() error("draw never reloads") end, quit = function() error("draw never quits") end })
+						helpers.assert_type(observed, "table")
+						local published, matches = nil, 0
+						for _, row in ipairs(actual) do
+							if row.title == native_i18n.get("menu.llm.title") then published, matches = row, matches + 1 end
+						end
+						helpers.assert_eq(matches, 1)
+						helpers.assert_true(rawequal(observed.submenu, capture.child))
+						helpers.assert_true(rawequal(published.menu, observed.submenu))
+						helpers.assert_true(rawequal(published.menu[1].fn, capture.render_ctx.commands.llm_toggle))
+						helpers.assert_nil(published.fn)
+						helpers.assert_eq(published.checked, true)
+						helpers.assert_eq(calls.saves, 0)
+						helpers.assert_eq(calls.updates, 0)
+						helpers.assert_eq(calls.notifications, 0)
+					end)
+				end)
+			end, debug.traceback)
+			calls.handler.build_item = original_build
+			if not ok then error(detail, 0) end
+		end)
+	end)
+end)

@@ -197,6 +197,7 @@
 	"config_cleanup.intro": "Zkontrolujte nastavení, která ErgoptiPlus již nepoužívá.",
 	"dialog.action_picker.disabled": "∅ Nic",
 	"dialog.action_picker.label": "Akce:",
+	"dialog.action_picker.menu_label": "Akce:…",
 	"dialog.action_picker.back": "← Zpět",
 	"dialog.action_picker.capture_key": "Stiskněte klávesu, kterou chcete odeslat, nebo napište její název.",
 	"dialog.action_picker.capture_shortcut": "Stiskněte zkratku, kterou chcete odeslat, nebo ji napište.",

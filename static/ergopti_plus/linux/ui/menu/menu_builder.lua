@@ -278,18 +278,18 @@ end
 --- @param assign function(option, picked) Transactional assignment; true on commit.
 --- @return table Provider rows.
 local function slot_binding_rows(slot_label, bound, binding, assign)
-	local rows = {
-		{
-			label = i18n_safe("dialog.action_picker.label") .. "…",
-			action = function() open_action_picker(slot_label, bound, binding, assign) end,
-		},
-	}
-	if bound ~= "none" then
-		rows[#rows + 1] = {
-			label = i18n_safe("dialog.action_picker.disabled"),
-			action = function() assign("none") end,
-		}
-	end
+	if not ManifestMenu then return {} end
+	local function pick() open_action_picker(slot_label, bound, binding, assign) end
+	local function clear() assign("none") end
+	local rows = ManifestMenu.template_rows("slot_binding_frame", {
+		["slot_binding_pick"] = pick,
+		["slot_binding_clear"] = clear,
+	}, {
+		["slot_binding_has_action"] = function() return bound ~= "none" end,
+	}, {})
+	-- A missing late declaration must withdraw the entire slot submenu. The
+	-- renderer may already have translated earlier rows; no picker or write runs.
+	if type(rows) ~= "table" or #rows ~= (bound ~= "none" and 2 or 1) then return {} end
 	return rows
 end
 
@@ -4604,10 +4604,78 @@ local function _uninstall_command(ctx)
 	end
 end
 
+--- Checks raw dense arrays without triggering source metamethods.
+--- @param value table Source array.
+--- @param records boolean Whether its values must be plain records.
+--- @return boolean
+local function about_dense(value, records)
+	if type(value) ~= "table" or getmetatable(value) ~= nil then return false end
+	local count, maximum = 0, 0
+	for index, row in next, value do
+		if type(index) ~= "number" or index % 1 ~= 0 or index < 1 then return false end
+		if records and (type(row) ~= "table" or getmetatable(row) ~= nil) then return false end
+		count, maximum = count + 1, math.max(maximum, index)
+	end
+	return count == maximum
+end
+
+--- Admits the actual About source structure without interpreting choice grammar.
+--- @param renderer table|nil Actual manifest renderer.
+--- @param platform string Native platform token.
+--- @return table|nil root, table|nil top, table|nil children, table|nil parent, table|nil fields
+local function about_source(renderer, platform)
+	if type(renderer) ~= "table" or type(rawget(renderer, "get_root")) ~= "function"
+		or type(rawget(renderer, "build")) ~= "function" or type(rawget(renderer, "group_row")) ~= "function" then return nil end
+
+	local root = renderer.get_root()
+	if type(root) ~= "table" or getmetatable(root) ~= nil then return nil end
+	local top, children = rawget(root, "top_level"), rawget(root, "about_menu")
+	if not about_dense(top, true) or not about_dense(children, true) or #children == 0 then return nil end
+	local parent
+	for _, row in next, top do
+		if rawget(row, "id") == "about" then
+			if parent then return nil end
+			parent = row
+		end
+	end
+	if parent == nil or rawget(parent, "type") ~= "group" or rawget(parent, "label_prefix") ~= nil
+		or type(rawget(parent, "i18n")) ~= "string" or rawget(parent, "i18n") == ""
+		or not about_dense(rawget(parent, "rows"), true) then return nil end
+	local platforms = rawget(parent, "platforms")
+	if platforms ~= nil then
+		if not about_dense(platforms, false) then return nil end
+		local visible = false
+		for _, token in next, platforms do
+			if type(token) ~= "string" then return nil end
+			if token == platform then visible = true end
+		end
+		if not visible then return nil end
+	end
+	local fields = {}
+	for key, value in next, parent do fields[key] = value end
+	return root, top, children, parent, fields
+end
+
+--- Rechecks the captured direct parent fields without source metamethods.
+--- @param parent table Actual direct source row.
+--- @param fields table Captured raw field references and scalar values.
+--- @return boolean
+local function about_parent_unchanged(parent, fields)
+	for key, value in next, parent do
+		if not rawequal(value, rawget(fields, key)) then return false end
+	end
+	for key, value in next, fields do
+		if not rawequal(value, rawget(parent, key)) then return false end
+	end
+	return true
+end
+
 --- Builds the about item: the updater block, Versions and its GitHub page, then
 --- startup and Uninstall after a separator. Uninstall sat at the bottom of
 --- Configuration until 2026-09, where it read as one more setting.
 local function _build_about(ctx)
+	local root, top, section, parent, fields = about_source(ManifestMenu, "linux")
+	if root == nil then return nil end
 	local render_ctx = {}
 	for key, value in pairs(ctx) do render_ctx[key] = value end
 	render_ctx.commands = {
@@ -4657,7 +4725,12 @@ local function _build_about(ctx)
 			["about_updates"] = function() return _about_update_rows(ctx) end,
 		})
 		or {}
-	return { label = i18n_safe("menu.about.title"), submenu = rows }
+	if not about_dense(rows, true) then return nil end
+	local current_root, current_top, current_section, current_parent = about_source(ManifestMenu, "linux")
+	if not rawequal(root, current_root) or not rawequal(top, current_top)
+		or not rawequal(section, current_section) or not rawequal(parent, current_parent)
+		or not about_parent_unchanged(parent, fields) then return nil end
+	return ManifestMenu.group_row("top_level", "about", rows, render_ctx.state_getters)
 end
 
 --- Builds the reload item.
