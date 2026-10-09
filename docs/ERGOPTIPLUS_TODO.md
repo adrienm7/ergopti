@@ -3728,6 +3728,29 @@ the complete three-OS checkpoint remain pending.
 - [ ] **36.** Packaging remainder (the former item 21): macOS release archive as
       `.tar.xz` (verify Sparkle, the Homebrew cask and CI install first).
 
+Manual macOS qualification now has an independent archive cohort: the existing
+eight archive, fifteen Sparkle, one six-scenario Homebrew and one consent
+XCTest methods run without waiting for the managed HTTP job. Its closed selected
+case census refuses missing, duplicate, foreign, failed or skipped results;
+source receipts reject untracked or ignored implicit compiler inputs. Original
+full Package, installation and transversal16/38 gates remain unchanged. Portable
+source and receiving controls pass; the exact25 native tests, six Homebrew
+scenarios and final packaging/install qualification remain unexecuted until
+the new manual runner completes. Item36 stays open.
+
+The native ownership helper positively identifies only its exact held privileged terminal leader through public SHORTBSDINFO after an actual fullBSD EPERM refusal, bracketed by repeated real nonreaping child observations. Every foreign or live member retains the existing strict fullBSD census. All eighteen original portable methods remain unchanged and twenty-nine controls pass. Both macOS native receiving entries now require two actual SDK and sudo/security tests alongside the original independent HTTP receivers; any failed receiver keeps the step red. Actual Darwin qualification remains pending.
+
+The latest upstream prerelease qualification policy is composed with the Group 6 producer without duplicate YAML inputs or callers. Its single native Brew-file exclusion keeps the original consent controls in a separate always-included Swift file; both original test method bodies remain byte-identical. The actual release limitations publisher stays inside the footer section markers, with unchanged ordinary-release sections and independent exception-body receiving. Portable selector/consent guards pass; full native Swift and archive receiving remain required, and manual validation never activates the expiring release-only exception.
+
+Native archive receiving retains a qualified consent requester while its exact nil-window/AXCannotComplete observation is pending, within the original deadline. A vanished Sparkle spectator is ignored only after exact BSD ESRCH plus a fresh process-absence observation. All105 Brew and46 Sparkle original methods remain exact;109 Brew and47 Sparkle controls pass and both preimage receiving regressions are red. Actual AX, Sparkle and archive installation remain required.
+
+Homebrew native run 37788799471 on c6e716a85 completes the retained
+owned process cases but refuses the real Brew consent observation. The
+bounded native AX diagnostic now retains only closed agent/attribute/error
+enums and scalar identities. All 90 existing portable assertions remain;
+four new receiving controls require 94 total. The exact native refusal is
+not waived; supported consent qualification and packaging remain pending.
+
 Manual macOS run37604627108 at35ef2db8fb6d6b920d51ce6ec692e7f124ffe9e7
 passes the real Sparkle cohort with exact XCTest completion: admitted resource
 reads, independently valid foreign-key refusal, installed-key retry,
@@ -3878,7 +3901,7 @@ Native macOS requirement-display qualification remains blocked: the actual owned
 
 The actual macOS codesign display packet in run37165861602 exits zero and emits one commented "# designated => " record containing its native cdhash alternatives. The extraction owner now recognizes exactly that observed prefix alongside the existing bare prefix, counts both before stripping or trimming, and still refuses missing, empty, mixed/duplicate and nonzero displays. The unchanged deep/strict requirement verifier owns signature admission. All earlier XCTest assertions and archive-byte/mode/symlink/metadata, source, environment and physical-retirement checks remain intact; the native test additionally requires the parsed requirement to match its actual signed source. 54 actual Linux-shell profiles/cases with typed native-tool ports pass; three causal mutations fail. Native macOS signature/extraction and Swift execution remain required before consumer qualification or producer delivery. TODO36 remains partial.
 
-TODO 36 remains partial. The pending dual-archive producer accepts only the observed native bare or fixed commented designated-requirement prefix, rejects duplicate/empty requirements before any archive writer, and verifies both restored bundles against the exact extracted requirement. The maximum exposed native XZ preset is 9; the existing ZIP and helper ZIP remain unchanged. Native macOS consumer PASS is required before producer delivery, then actual native producer signing/extraction/readback tests, Sparkle feed and Homebrew migration remain pending.
+TODO36 remains partial. The dual ZIP/tar.xz producer is implemented and invoked by the actual application builder after signed-bundle verification. It requires one native bare or fixed commented designated requirement and verifies restored signatures, bytes, modes and symlinks before publication; native XZ uses preset 9 and the separate helper ZIP is unchanged. Shared archive bindings also drive release signing, the preferred Sparkle feed, Homebrew cask selection and CI installation. Native tests invoke the real producer and retain independent signing, extraction, metadata and refusal assertions. Current-source Darwin archive receiving, real Sparkle wrong-key refusal/retry/installation/relaunch, Brew consent/containment/install/upgrade/refusal/recovery, and complete packaging/install qualification remain required. Portable tests and historical native passes do not qualify the final sources; items 16/38 remain open.
 
 The stable-signing replay admits only the actual archive producer path with its signed app and build directory, and checks both signature verifications precede that call. Native-helper ZIP behavior and all existing identity/keychain cleanup assertions remain intact. The original replay fails; the corrected replay passes, while the original identity defect, permissive producer port and missing archive-order guard each fail. This fixture-only evidence does not qualify physical native archive/signing; final composed and hosted native validation remain pending.
 
@@ -4276,6 +4299,38 @@ real responsible identity/prompt/grant and its effect unmeasured. A public
 permission call can block arbitrarily; the hosted runner cannot supply human
 consent. The original positives, full denial, six Brew cases, clocks and physical
 closure remain mandatory. This source audit does not close36 or16/38.
+
+The 2026-10-08 continuation implements the previously unimplemented bounded
+Automation prerequisite. The same final signed sender requests public OS consent
+on a worker thread inside the exact deny-removal sandbox, followed by a fresh
+nonprompt permission query and both original nonce deliveries. A separate explicit
+opt-in enables normal OS prompt approval using existing Accessibility permission;
+it verifies the reserved sender's signed UUID identity and the Apple-signed
+consent agent, designated requirement and unique window naming both private
+fixtures. Pressing Allow is an observation, never evidence of a permission grant.
+The requester retains its original 30-second deadline, each UI child has at most
+three seconds, and physical retirement remains mandatory after every refusal.
+The existing full-policy denial, all six Brew archive cases, Sparkle refusals and
+transversal16/38 requirements remain unchanged. Private portable controls pass
+90/90, including 18 additions, and all 412 original assertion expressions remain
+unchanged and ordered. Native compilation, actual responsible identity and secure
+prompt admission, the complete macOS Package job and all eleven installation legs
+remain unexecuted on this source. Explicit XCTest/CI fixture opt-ins are prepared;
+quiet invocations never request or approve consent. Item36 stays open until actual
+native receiving succeeds; source preparation and portable controls do not qualify
+the release archive lifecycle.
+
+The native receiving source now retains one private alias of the original
+executable vnode and verifies the actual physical spelling without losing its
+device/inode, current-UID or TCP-listener admissions. A suspended-image guardian
+checks the original acquired process before accepting the private session key;
+retirement requires its exact reap, stream EOF and checked handle closure before
+alias removal. Portable controls are registered with exact case counts. The
+native selected SDK census retains the original API12 and PTY11 and adds alias4,
+suspended-image6 and physical-spelling2, requiring all35 rather than allowing an
+arbitrary filter. Native compilation, the complete model receiver, package and
+all eleven installation legs must still succeed on the same final source.
+These source repairs do not complete item36 or transversal16/38.
 
 - [~] **37.** Always show the shipped Ergopti hotstring pack, including when
   its keyboard layout is not installed. Move French `suffixes_a` and magic-key
@@ -4883,7 +4938,7 @@ integrated, then publish one grouped release.
 
 - [~] **54.** Every menu is declared in the shared menu manifest, never in
   driver code. The ratchet `npm run test:native-menu-rows` counts the rows
-  drivers still build (current baseline: Windows 27, macOS 22, Linux 30, each
+  drivers still build (current baseline: Windows 27, macOS 21, Linux 27, each
   site listed in tools/test/native-menu-rows-baseline.json); migrate them to
   zero. Each OS-limited row declares `unavailable = "hide"` (not
   applicable) or `"grey"` (not yet ported, with its reason); classify the
@@ -5736,6 +5791,8 @@ and zero remaining sites and failed writes. This validation correction changes
 no native menu behavior or generated artifact. The remaining menu families and
 item 38 device acceptance stay open, and items 54/81 remain partial.
 
+The separately reviewed combined LLM/About menu-parent tranche preserves native callbacks, dynamic children and all21 caption catalogues. Its historical exact-source run37896215435 passes the six selected menu/encoding/format targets, 11,951 Linux units, Linux E2E/package and17 installation scenarios, plus17,503 portable macOS units and the native tooltip captures. Windows executes10,489 passing checks with its sole remaining failure in canonical WinHTTP PAC routing; Windows E2E/package/install are skipped. macOS Brew packaging fails its native AppleEvent receiver case and installation is skipped. These receipts qualify the owned menu tranche at its recorded source tree; they are not blanket native, packaging or device success. Current upstream translations and keyboard policy remain preserved by the new three-way source composition. Remaining native menu families and items54/81 stay partial.
+
 - [ ] **62.** Downloads on managed company networks: system trust and
       system proxy for every download child (Ollama installation/server/pull,
       updater/rollback and remote AI), with translated certificate/proxy/blocked/
@@ -5746,6 +5803,320 @@ item 38 device acceptance stay open, and items 54/81 remain partial.
       Complete native, package, installation and enterprise acceptance remains
       open. macOS system trust and explicit proxy relays are integrated, while
       opaque-client full-URL PAC/WPAD/fallback/redirect routing remains CODE.
+
+Current composed receiving qualification adds an independent exact twelve-case native PAC/WPAD XCTest cohort on both macOS architectures, including the existing real CFNetwork HTTPS path/query control. Its strict reader refuses missing, skipped, duplicated, foreign or failed cases; it does not qualify the full package or installation. The final composite preserves the published Group1 menu delivery and Group3 documentation. The dedicated XcodeGen metadata token remains absent until the Group5 scoped consumer and child-environment removal are integrated together. Native execution of this current candidate is pending the final integrated all-OS manual CI; previous failures and the remaining software/device tasks below remain open.
+
+The next reviewed receiving tranche (2026-10-09) preserves the original native
+bounds. Portable HTTP retirement now starts the six public server shutdowns
+concurrently, retains every exact worker before start and refuses namespace
+removal until all workers settle; forty controls keep the original60-second
+registration. Route observations are closed three-byte facts and do not prove
+HTTPS URL sanitization. The public admin authorization probe consumes the
+original removal budget; it can cache an existing right and never grants
+restoration authority.
+
+Windows clears only exact admitted SCRIPT/SWAP environment fragments after
+source decoding and before the compiler. The retained inherited-environment
+high-water assertion, decoded bytes, arguments, foreign variables, routing and
+original clocks remain. The native fixtures also correct AHKv2 UTF16 byte
+measurements, explicitly admit the existing artifact failure contract, and hold
+the exact queued diagnostics callback before its final acknowledgement. Queued
+TLS failure frames remain observational; unknown native codes are-1 and cannot
+become a successful transport or retirement claim. Independent causal and
+source-conservation reviews pass. Actual new Windows/macOS qualification is
+pending; previous manual37903142972 still has10,510 passes/seven failures.
+
+Remaining hosted/software steps, distinct from personal-device acceptance:
+
+- [ ] Windows: qualify the real Framework compiler and staging TLS/file-denial/live-body cases after consumed-fragment retirement, genuine junction/rename receiving, queued callback revocation, artifact receiving and all seven queued TLS modes. Diagnose any remaining failures through exact native receipts; preserve all original assertions and deadlines.
+- [ ] Windows: reach and qualify both authenticated current-user proxy scenarios and the strict NTLM-only bare challenge. Negotiate success does not qualify bare NTLM; implement any missing bounded scheme discovery only after native receiving and shared capability review, without silent downgrade.
+- [ ] macOS: qualify the independent25 archive/Sparkle/Brew/consent XCTest cases and all six Homebrew scenarios, the full native suite, final package and actual installed upgrade/relaunch. Preserve both Brew positives and policy denial; no supported consent-grant path is established yet.
+- [ ] macOS: qualify actual CFNetwork full-URL PAC/WPAD/fallback/redirect routing and owned trust restoration. The41 SDK cases passed on both architectures atfa330029, but final-source HTTP/model receiving and production activation remain unqualified. Keep the existing activation guard until these receipts pass.
+- [ ] All three drivers: complete final-source unit/E2E/package/install/launch and managed-network acceptance, including system trust, proxy authentication and distinct safe translated failure recovery. Official cold runtime/version probes do not qualify an unexecuted daemon/model installation.
+
+Personal-device steps remain separately required for genuine enterprise network
+configurations and installed-application behavior on Windows/macOS, alongside
+the unchanged physical obligations in item38. They do not replace feasible
+software repairs or hosted qualification. Items36/62 and transversal16/38 stay
+open; this receiving tranche does not qualify a stable release.
+
+The Windows updater capture ledger's native implementation now lives in its
+native adapter, included through the original updater owner. The complete class
+bytes and all transaction/retirement policies are unchanged. This restores the
+shared module OS-call census from260 to250 under the unchanged252 baseline.
+Portable source, include-graph and encoding checks pass; genuine AHK parsing,
+E2E and package/install receiving remain required. This structural correction
+does not qualify the outstanding capture namespace or network failures.
+
+Native Windows receiving checkpoint (2026-10-09): manual37867543036 at
+`e2edb24a4044b828ffb642528e428da8edaaf3e7` completes10,473 controls:
+10,460 pass and13 fail. Linux unit/E2E/package and17 installations pass;
+Windows E2E/package/install are skipped and Release is skipped. The legacy
+fixture now reaches the unchanged fifth raw-proxy assertion; staging refuses
+at proxy resolution before the file-denial or live-body controls. SSPI has
+real current-user identities but still fails physical closure. Three existing
+capture attacks fail before their attack at the initial directory move; no
+immediate errno was previously retained, so their cause remains unknown.
+
+Additive receiving now preserves the exact first SSPI operation and same-call
+signed status; closed legacy IPv6 formatting flags; pre-Require WinHTTP
+stage/family/status; and the actual resolver selection shape without pipeline
+output or routing authority. One new five-phase capture probe records immediate
+native move errno and held identity. Its exact strong owner survives refused
+restoration/closure; a successful restoration is acknowledged before later
+retirement debt and is not repeated on retry. All original assertions, clocks,
+refusals and eight capture-case bytes remain unchanged. Independent portable
+producer/ownership reviews pass; native receiving of these observations and
+the remaining causal fixes still require the next Windows dispatch. These are
+observations, not proof that the13 failures are fixed. Items62/16/38 stay open.
+
+Native macOS checkpoint (2026-10-09): manual37873740234 at
+`a81dd0d2c834dbaa751a273d3cd96822ffd59119` completes with failure.
+Core JavaScript/properties, macOS stubbed unit/E2E and the native tooltip
+captures pass; both managed-runtime architectures and cold bootstrap fail at
+a duplicate Swift type declaration before SDK/model receiving. Package and
+installation are skipped, and Release is skipped. The canonical generator now
+names the new network enum ManagedNetworkBootstrapPolicy; its six consumers
+follow that name. The existing download policy/parser and both JSON policies
+remain exact. Forty portable controls, including the actual36-source Swift
+inventory and causal declaration/consumer mutants, pass. Actual native
+compilation, SDK41/Go48, model exchange, package and installation after this
+namespace correction still require a new dispatch; the production guard
+remains closed and items36/62/16/38 are not qualified by source checks.
+
+The early native updater sidecar now retains its exact closed stage,
+exception family and signed HRESULT before file-read admission; v1 remains
+exactly five fields and v2 requires all eight. No message, stack or destination
+is projected. The actual current36-fragment producer feeds the original
+PowerShell digest and observation controls, with three additive observation
+cases. The captured legacy PAC cause is now projected by the original settled
+AHK owner, with exact control/stage matching and bounded closed enums; malformed
+or duplicate notices refuse. Original assertions and clocks remain intact.
+Portable PowerShell controls pass; genuine Windows receiving remains required
+before choosing a fix for the early native failure or closing item62.
+
+Native Windows follow-up (2026-10-09): manual37859445983 at
+`30dc44176959ccdf3571db2191e1155e5d1bd3a9` completes all10,454 registered
+controls:10,446 pass and8 fail, with no watchdog. Core JavaScript/properties
+pass; E2E, package and installation are skipped, and no release runs. The
+captured legacy source cause is the unavailable Get-FileHash command; its
+isolated fixture now hashes held source streams through the runtime SHA256
+API and guards absent optional control keys under StrictMode. Five controlled
+protocol cases and independent exact-byte/closure controls pass portably;
+corrected Windows receiving is unrun. The existing early sidecar is now exposed
+on file-remove refusal, and bounded SSPI counters preserve the original primary
+assertions. WinHTTP's closed diagnostic uses the stdout channel its original
+receiver reads. Remaining actual PAC, staging and SSPI physical-retirement
+causes require the corrected native run; diagnostic changes do not claim fixes
+or waive assertions. Item62 and transversal16/38 remain open.
+
+Native Windows receiving follow-up (2026-10-08): manual37850871117 at
+`dea3ec72fb11df9780424dcb735c99d7bca8a70c` terminates with failure after the
+unchanged native watchdog:8,135 passed and9 failed results,8,144 of10,438
+registered controls completed; the live partial-source-reader control and all
+later controls remain unqualified. The canonical live PAC/401 control passes,
+and all three SSPI accepts now report status0; their physical cleanup still
+fails. Core JavaScript/properties pass; E2E, packaging, installation and
+Release are skipped. The canonical upstream parser-owner correction at
+`9447c35f439552d6450c829f6c0a050dfe74e583` replaces the duplicate local
+preparation and must be retained when updating this branch. The bounded
+partial-stage diagnostic control now receives the existing canonical
+failure-contract wrapper. The
+legacy retirement fixture adds an enumerated, bounded source-cause notice:
+controlled PowerShell missing-property and missing-hash-command failures are
+now distinguishable, but neither proves the actual Windows cause. Every
+original assertion, authorization guard and watchdog is retained. BOM/LF and
+source-preservation checks pass; candidate Windows replay remains required.
+These corrections do not close item62 or transversal items16/38.
+
+The Windows updater's authenticated curl child now receives only the four
+private paths allocated by its parent-owned capture ledger. Hard Job cancellation
+cannot bypass that parent's namespace retirement. Observation and deletion hold
+the verified original directory lease throughout each file operation; foreign
+replacements, junctions, transplanted originals and refused handle closure retain
+debt and block a successor. Only actual Job retirement permits file/directory
+disposition, and the original publication still requires the complete authenticated
+body. The five prepared native cases retain their exact assertion prefix; three
+additional namespace/partial-retry cases make eight. Source controls, PowerShell
+parsing and C# compilation pass portably; all eight genuine Windows cases remain
+unexecuted until targeted native CI. The original legacy slow receiving vector,
+authorization, publication and retirement clocks remain unchanged.
+
+The actual cold receiver now transports device/inode identities as canonical uint64 decimal strings, preserving the observed APFS inode1152921500312523020 without JavaScript rounding. The first official-installer correction set COPYFILE_DISABLE for its exact tar child; native37853243814 showed that this alone did not disable the separate BSD archive reader's AppleDouble consumption. The successor also sets the documented child-only TAR_READER_OPTIONS=tar:!mac-ext, preserving the literal pinned members without changing GNU tar arguments or the archive oracle. Genuine libarchive receiving passes four cases, including retained AppleDouble bytes/modes and inherited-parent override; the original enabled reader fails the causal control. Original physical sandbox, mode, whole-archive and retirement assertions remain. Successor Darwin cold receiving remains required.
+
+The source-bound macOS pull/retirement prerequisites now preserve the original
+session, immutable operation authority and acknowledgement through explicit
+cleanup retries. A failed local deletion resumes only the remaining owned files;
+it cannot issue another pull, reset the clock or release an unresolved slot.
+Unknown/expired retirement remains conservative. The original manager's managed
+dispatch remains dormant pending source-qualified native receiving. The real
+model fixture joins the retained alias and suspended-image owner and refuses
+duplicate prepare/start before acquiring new resources. Actual production serve,
+session handoff, approved proxy/certificate environment and custom OLLAMA_MODELS
+paths remain CODE, followed by genuine native create/pull/infer/cancel receiving.
+Portable receipts do not qualify those pending paths or close item62.
+
+The native listener worker now records bounded debug-only lexical/physical path and inode-match scalars for its known fixture PID, from the same native snapshot. This evidence does not authorize listener admission, and all twelve original API methods remain byte-identical. Sixteen portable C controls and independent privacy/refusal controls pass; actual ARM and Intel SDK observation must establish the remaining listener refusal before changing any production path predicate.
+
+The actual Windows successor run37845671532 starts the real SSPI listener, but all three authenticated relay cases refuse AcceptSecurityContext with native status0x80090302. Both receiving servers now acquire the independently verified WinSDK inbound credential direction instead of outbound credentials; actual source-bound compilation and credential-role controls reject the preimage. Bounded scalar diagnostics expose the unchanged legacy PAC, canonical PAC authentication, readiness and early partial-stage failures without extending deadlines or replacing assertions. The 10426 passing and eight failing native checks are prior evidence; corrected native authentication, E2E, packaging and installation remain pending.
+
+The actual SSPI fixture caller passed its TLS port as an Integer in argv slot12. The unchanged native spawn owner refuses every non-String argument before process creation, so the later missing-state cleanup assertion masked that startup refusal. The real caller now uses one argument builder with explicit decimal port serialization; six independent port/PAC controls run that same builder through the production spawn validator and require the exact old integer to fail. All sixty-two existing assertions remain unchanged. Native Windows replay remains required before qualifying authentication.
+
+The explicit macOS model bootstrap relay now uses bounded header/body pipes instead of buffering the complete download before the canonical pinned-size check. It closes and reaps the actual curl child before redirects, rejects oversized metadata and incomplete successful bodies, and disables curl startup configuration before every other option. Six actual Linux curl relay cases pass, including a causal HOME/CURL_HOME configuration poisoning case; the preimage fails that routing control and three stream controls. Native macOS curl and TLS qualification remains required, and optional model activation stays gated by native source admission.
+
+The actual Windows PAC executable from run37828508949 is now joined to the runtime helper, full-URL route owner and system WPAD worker. Its actual source-bound producer passes seventeen Duktape and six Windows platform cases; an independent fresh owner reconstruction matches all twelve source inputs, the actual MSVC function extent, binary, license, imports and PE mitigations. The runtime identity receipt and all four required assets are shipped through the canonical bundle manifest. Registered native regressions retain full-URL ordering/freshness, HTTP 401, progressing-body deadline and five physical worker-retirement cases. Portable parsing, embedded compilation and five persistent-protocol controls pass; complete native runtime receiving, SSPI and package/install qualification remains pending.
+
+Windows PowerShell 5.1 reads BOM-less fixture sources through the system code page. The independent Unicode bounded-reader vector now constructs the same four literal UTF-16 units using ASCII source. All twenty-nine original controls remain unchanged; the old Windows-1252 decoding is red while the candidate passes those controls. Actual Windows PowerShell 5.1 replay remains required.
+
+The native company-network fixture now disposes every acquired X509Store certificate snapshot wrapper, including unrelated certificates, on success and refusal. The exact owned thumbprint/subject, scope guards, removal and reopened absence checks remain mandatory. Eight additive wrapper-ownership controls reject duplicate identities, mismatched subjects and removal/retirement failures while preserving the primary refusal and typed debt. These portable controls do not prove the cause of the remaining actual TLS readiness or staging failures.
+
+Actual cold macOS installation reaches a physically retired ready worker after the lipo fix. The MLX receiver now requires the exact independently pinned uv wheel build and published version format, retaining the canonical semantic version and refusing nine spoofed outputs. The official Ollama installer preserves the verified archive member modes inside its private 0700 staging directory under restrictive inherited umasks; two real ordinary-user tar controls fail on the old extraction and pass after correction. Original full archive, runtime-isolation and native retirement assertions remain unchanged. Successor native receiving and package/install acceptance remains required.
+
+Actual ARM and Intel run37831859442 compiles the SDK tests and passes all eleven PTY cases, but the twelve API tests still fail listener discovery and retained-image startup. A test-only bounded scalar witness carrier now identifies the refused BSD identity, mapped executable or accepted socket stage; retained-image fixtures disclose only native spawn/exit scalars. All twenty-three original native tests, witness order, admission results, source-descriptor identity and deadlines remain unchanged. Native diagnostic receiving and the actual Go producer/model exchange are still required.
+
+The native Windows SSPI fixture now preserves an exclusively created closed startup-state receipt when identity, Add-Type or handle controls fail before the normal service state exists. The AHK owner publishes only fixed startup-stage and optional compiler-code scalars before retaining every existing shutdown assertion. An actual injected compiler failure remains exit one and now reports compile/CS0246; identity/sentinel refusal and pre-existing foreign-file controls also pass. This exposes the previously masked native startup cause and does not qualify successful SSPI authentication.
+
+The actual managed macOS producer inputs now flow into package assembly through the existing combined catalogue generator, with both architecture receipts and archives bound to the same SHA/run. The signed application contains that generated catalogue, and release-only native archives plus exact catalogue bytes enter the existing assets pipeline. Before new publication, the release preflight validates current source identities, exact hashes/sizes/URLs and identical catalogue bytes in both signed application archive formats. Twenty-four independent portable input/archive/publication controls preserve all previous pipeline bypass controls. Native producer, package and installation receiving remain required; manual CI still publishes no release. Both native producer hosts also execute the six actual explicit curl stream regressions after independent SDK and HTTP observation, even when a previous case fails.
+
+The actual native macOS wire receiver still fails its process-group identity observation in run37831859442. That unchanged refusal now records only received bytes, errno, reserved-member and native PID/PGID match/status scalars. The original seventeen controlled cases remain identical and one additive diagnostic case passes. Public XNU confirms the current ABI and zombie lookup, so no speculative layout or leader-exclusion repair is applied. Both native producer entries also run the original independent HTTP clients after SDK observation even when a prior case fails, allowing the next actual kernel receipt to expose the cause while the existing package cases remain registered. A receiving failure still fails its native job.
+
+Actual Windows run37828508949 passes the native PAC producer but fails eight AHK cases. Its existing quiet-success cleanup regression catches an unconditional Group 6 scalar notice. The observation remains bounded and is retained before private removal; publication now follows the original failed-cleanup condition. Successful graceful cleanup and every original receipt assertion remain unchanged. Native replay and the seven other failures remain pending.
+
+Actual ARM and Intel run37821833578 builds the release launcher successfully but stops before SDK tests at a newline-leading optional-chain expression. The test syntax now keeps that expression together, retaining every non-whitespace token and assertion. Native test compilation and the twenty-three SDK cases remain required.
+
+Standalone HTTP and model receivers now compile against exact copied production CPOSIX public headers and the SystemConfiguration framework, with original source hashes and physical cleanup retained. Nine portable model controls preserve the original seven; both new compiler-boundary refusal cases fail on the preimage. These controls intercept the compiler and do not claim Apple SDK, model transfer or source execution qualification.
+
+Actual cold macOS receiving refuses before application launch because its lipo invocation puts the input after the greedy -verify_arch option. Both diagnostics now follow the published Apple file-first grammar, retaining native denial, unchanged stock-runtime identities and unmodified production resolver requirements. Two causal preimage regressions fail; eight MLX and seventeen official cold controls pass. Real cold installation remains required.
+
+Actual Windows run37821833578 returns a mapped IPv4 value polluted by bytes written during a rejected IPv6 parse. The fallback now reconstructs its complete IN6_ADDR before adding the mapped prefix. Two independently injected partial-write preimages fail; ten causal postimage cases, ten retained typed-format cases and seventeen genuine Duktape controls pass. All six original native receiving assertions and sorter ownership/bounds remain unchanged. The proposed repair still requires actual Windows receiving; no PE producer or AHK acceptance is claimed from the failed run.
+
+Windows native SSPI receiving now registers buffered remote POST and exact full-URL ordered PAC cases using the common owned curl transport. The fixture retains SDK invalid-handle semantics, current-user identity, strict Schannel revocation, exclusive refused-route ownership and physical process/context retirement. Five literal handle controls and the existing twenty-nine common-engine controls pass in Linux PowerShell; these are models, not a native authentication qualification. Actual Windows SSPI, PAC, Root-store trust, packaging and installation remain required.
+
+The official CLI version probe now uses a child-only owned non-listening loopback port through complete subprocess retirement. It cannot consume an existing daemon reply and requires both exact pinned upstream warning lines. All twelve original cold controls remain; four new reservation, routing and spoof-refusal controls pass for sixteen total. User environment and external daemons remain unchanged; actual signed macOS CLI receiving is still required.
+
+CI now requires the original five macOS jobs plus independent managed-model and cold-client jobs. Native model receiving runs on ARM and Intel, with actual SDK XCTest before source compilation; compiler failures retain their transcripts. Genuine cold MLX and official Ollama keep production resolvers intact and require inherited kernel isolation of stock runtimes, unchanged stock identities and physical closure. Only public receipts upload. Existing graph, launch and receipt assertions remain; precise added condition and native-job bypass mutants reject. These authored jobs remain unqualified until manual CI completes; no release runs on dispatch.
+
+Both actual native model receiver daemons now execute only through a retained read-only source descriptor, with no pathname fallback. Private source replacement refuses before lease dispatch; device/inode, byte and timestamp fences hold before execution and after SDK/HMAC admission, through physical retirement. Seven portable controls preserve all four original TLS assertions. Actual Darwin fork/exec, dyld, model exchange and retirement on both CPUs remain required.
+
+Canonical process ownership now preserves supplied stdin and defaults to DEVNULL only when absent. Both new real Linux child regressions fail on the old duplicate-keyword call and pass after the repair; all fifteen original assertion bodies remain. Seventeen controls cover actual PIPE bytes and default/explicit EOF. Darwin process-group and native network receiving still require CI.
+
+Explicit inherited ALL_PROXY aliases retain precedence over native static settings. PAC diagnostics report only the actual native helper capability and never include the configuration URL. Twenty-one actual Bash bootstrap controls pass, with all eighteen original assertion methods and opaque admission preserved. Native macOS routing remains separately required.
+
+Native Ollama API admission now uses the actual SDK mapped source and accepted TCP listener identity before private payload delivery. Eleven PTY and twelve listener XCTest cases preserve the sixteen original test bodies. The original official Ollama installer also has a no-Python PTY caller that joins its exact physical receipt before releasing its task owner. All seventy-two focused Lua cases pass; actual native compilation, retained Mach-O execution and cold installation remain required.
+
+Actual macOS run37807104214 exposed public DHCP import, audited CFNetwork source type and run-loop mode compiler errors. The native worker now imports the explicit public DHCP header and matches the SDK return type and mode. DHCP/DNS discovery and every existing native assertion remain. Native compilation must requalify the repair; no Swift success is claimed from Linux.
+
+Windows PAC sorting now formats mapped IPv4 through an explicit family and typed address pointer. The optimized C preimage is red and ten guarded postimage cases pass; seventeen Duktape controls also pass. Native sorter bounds and all six original receiving assertions remain. Actual MSVC and native Windows receiving remain required.
+
+Linux CONNECT receiving now distinguishes the admitted certificate-refusal
+client reset from unknown client or backend failures. All five original model
+assertion bodies remain intact; nine causal controls and the actual 30 public
+transport plus 18 retained-output controls pass. Full-suite retries remain
+pending after local disk exhaustion; no native or packaging gate is waived.
+
+The managed Python reader now selects the requested native archive from the
+two-row catalogue and sends uv only that reviewed row, with the original
+deadline and checksum fence. All18 bootstrap controls pass, including the
+original ARM cache/offline assertions and independent Intel literal inputs.
+The previous reader fails those retained controls on the two-row catalogue.
+Native archive extraction and execution still require real macOS receiving.
+
+Managed Python metadata now includes independently verified official arm64
+and Intel macOS archives. Both generated records retain literal upstream
+checksums; all 16 refusal vectors and exact architecture selection pass.
+Native extraction, interpreter execution and the Intel bootstrap helper
+join remain pending; metadata preparation does not qualify installation.
+
+The private macOS wire reader now shares bounded owner startup, frame reading
+and terminal retirement with closed native roles. The existing HTTP role
+still refuses extra terminal fields and unsupported admission errors; its
+ten protocol cases and two real locked Python-client exchanges pass. Five
+additional role controls pass on actual subprocess peers. This portable
+protocol receiving does not prove the Darwin listener or Ollama operation.
+
+macOS WPAD source now delegates DNS search to the native resolver instead of
+constructing domain suffixes, while validated DHCP252 still owns discovery.
+Missing/invalid discovery refuses before any origin request. Existing
+component coverage retains its refusal predicates with the intended native
+DNS endpoint; three additive controls and an actual CFNetwork DHCP/PAC wire
+receiver are authored. Swift compilation and these Apple-native assertions
+remain unexecuted until hosted CI; real company DHCP/DNS is a device check.
+
+Optional managed macOS Ollama source now pins actual upstream bytes and a
+native Go producer, preserves the official runtime library tree, and stages
+only source-qualified catalogues from real produced artifacts. Portable
+catalogue18, runtime7, operation8, native-API peer8 and TLS fixture4 controls
+pass; the Go race suite passes36, retaining every original27 case. New installer sources also join
+the independently verified Intel uv and Python records. Compiler inputs stay
+outside app payloads. Native build/signing, actual model create/pull/inference
+and production daemon/source admission remain pending; no unpublished asset
+URL is invented and this preparation does not activate an opaque daemon.
+
+The optional native Go redirect path also strips credentials and cookie-jar
+secrets on changed ports, subdomains and foreign-return chains, vetoes HTTPS
+downgrades, and retains the original redirect callback and rejection policy.
+All36 race-tested controls pass; real macOS model receiving remains pending.
+
+The macOS native-network tranche adds NSURLSession/CFNetwork route receiving,
+a bounded private HTTP protocol, an owned PTY bootstrap and verified offline
+Python inputs. The frozen local candidate passes all 17,158 Hammerspoon
+assertions and 386 JavaScript checks in sequence. The final source-reader
+repair also passes all 15 bootstrap and four cold-bootstrap controls.
+Native Swift compilation, real Apple transport, cold installation and
+opaque-client activation still require hosted receiving. Physical company
+network acceptance remains open; these portable results do not close item62.
+
+The first address-sort ABI diagnostic confirms valid input-owned pointers
+and an exact two-record returned table, disproving the output-relocation
+hypothesis. No speculative sorter fix was applied. Additional fixed scalar
+receiving/conversion facts now use test-only GitHub notices, retaining all
+six original assertions and the production worker unchanged. Native
+artifact receiving remains pending until those facts establish the cause.
+
+Hosted Windows now passes strict compilation, all17 real VM cases and the
+original IPv4/extended DNS and adapter checks after the overlapped repair.
+The next original address-sort check fails. Its test build now retains only
+bounded ABI shape facts from independent literal loopback inputs; production
+sorter policy and every original native assertion remain unchanged. The
+artifact and production route join remain pending, rather than qualified.
+
+Windows full-URL PAC source preparation adds a bounded, fresh-script native
+Duktape evaluator with the canonical script, heap, query and deadline limits.
+The real Windows producer will qualify DNS/interface helpers, source identity,
+PE mitigations and system-only imports before publishing its executable.
+All86 independent helper vectors and17 actual pinned VM controls pass locally;
+Windows compilation, production joins and native route receiving remain pending.
+The first hosted build exposed redundant error-macro return values under MSVC
+strict warnings. The six call sites now use the identical nonreturning public
+Duktape error API; actual GCC strict-warning compilation and all17 VM controls
+pass. The corrected MSVC build still requires its own hosted receiving.
+The second hosted attempt compiled that C source, then exposed a global /TC
+flag treating linked object files as C. The producer now infers language from
+the authored .c files and sends .obj inputs to the linker; strict warning and
+PE mitigation flags remain unchanged. Complete native artifact receiving is pending.
+The third hosted build passes the 17 real VM controls, then refuses localhost
+DNS with actual Winsock 10022. DNS now uses the supported Unicode overlapped
+event API under the same absolute deadline, with cancellation and completion
+acknowledgment before releasing its native references. Ten controlled lifecycle
+cases and all 17 VM cases pass; all six native platform assertions remain intact.
+The corrected Windows API and complete artifact receiving remain unqualified
+until the next hosted run.
+
+Windows release asset staging now joins the same bounded curl attempt
+engine as real requests, using the exact selected asset integer token
+and byte bound. New receiving requires genuine SSPI NTLM CONNECT, no
+authentication downgrade, exclusive destination creation, preserved
+preexisting files and original deadline/child/pipe retirement. Legacy
+.NET assertions remain intact. Portable parsing and component controls
+pass; Windows native and final-source qualification remain pending.
+
+The maintainer reopened container/hosted-CI continuation after partial
+integration atc417311106a44108d3bfdc7747d2dda937c6229d. Windows native
+receiving now adds only closed URL-shape and final cleanup observations;
+all original route, TLS and retirement assertions remain unchanged.
+The four existing native failures are not yet fixed, artifact NTLM and
+macOS opaque-client routing remain CODE, and genuine device/network
+acceptance remains separate. Item62 stays open.
 
 Linux manual37646124429 atc18f0796b2f708a1650d4a1eb5dc316b7bf263dd
 passes shared checks, Linux units, actual official Ollama installation/model
@@ -6745,6 +7116,219 @@ unchanged candidate without relaxing any assertion or clock. Local formatting,
 382 JS checks,26 runtime controls and1,875 AHK BOM/LF checks also pass.
 Item62 remains open for the existing Windows/Mac CODE and native/device work;
 items16/38 retain their complete independent requirements.
+
+Manual37867543036 at e2edb24a4 reaches 393 shared JavaScript passes, but all
+three macOS native builds refuse an unqualified Swift signing-flag name.
+The public SDK declares that flag as a typed OptionSet member. Its correction
+preserves strict, all-architecture and offline signature validation; seven
+independent source/mutant controls pass. Actual postimage compilation remains
+required. The downstream model/curl receivers and cold receipt did not execute
+after that build failure and do not establish transport or archive regressions.
+
+The macOS production-network preparation now retains an empty bootstrap until
+the original suspended image is admitted, seals its source authority to the
+same daemon session, and preserves raw model-store paths and the captured
+proxy/certificate policy. Cancellation, terminal prepare refusal and missing
+Swift-input cleanup have independent causal controls. The shared envelope and
+native Go cache retain one admission decision; removing its environment hint
+cannot restore ambient routing. Production activation remains guarded while
+the canonical serve/selector caller and actual model receiving are completed.
+
+Normal validation now enrolls the reviewed bootstrap, guardian, source reader,
+serve, Go producer and Swift-copy controls. The required native SDK cohort is
+41 cases: all previous 35 plus six network/bootstrap cases. The native Go
+producer requires 48 exact Darwin observations before compilation and retains
+its JSONL, stderr and physical-retirement receipt as CI diagnostics, never
+release assets. Linux's 44 Go observations and portable controls do not qualify
+those Darwin cases. Final-source qualification, genuine model exchange and
+complete native packaging/install remain required; items 62, 16 and 38 stay open.
+
+The canonical macOS serve/restart and model-pull callers now forward the explicit
+managed-source kind and retain the reviewed daemon session and cleanup owner.
+Public receipt hints use one bounded native task instead of reading complete
+metadata on the GUI thread; private Python selection uses the generated pinned
+locator and one exact native header probe. Preparation, asynchronous continuation
+and physical retirement consume the original caller deadline, including initial
+filesystem and system-interpreter lookup time. Missing clocks, terminal refusal
+and unsettled cleanup cannot admit a successor or refresh the budget. Portable
+receiving passes the original eight interpreter controls, 45 exact preflight
+cases/331 assertions, 29 hint cases/361 assertions, the composed caller controls
+and three genuine Linux descriptor/header controls. These component observations
+do not establish actual Darwin task/image or installed-application behavior.
+
+Hosted macOS manual37877137440 atfc1d16e83 compiles both native architectures,
+but the mandatory SDK cohort fails bootstrap/held-image retirement and chunked
+API receiving. Actual independent HTTP receiving reaches its deadline; the cold
+Ollama version probe reaches its unchanged 30-second bound. Native source/model
+receiving and package/install are unqualified. Production source activation
+remains guarded; these native failures still require feasible code corrections
+and another hosted run before any device-only remainder is claimed. Hosted
+Windows manual37875482474 at1ad9514c passes10,475 of10,486 controls and fails11;
+its E2E/package/install are skipped. Both items36/62 and transverse16/38 remain
+open with their existing acceptance requirements.
+
+The next candidate corrects advanced Data indices in chunked API line limits,
+creates a verified private session when Foundation starts its guardian as a
+process-group leader, and removes DNS discovery from the numeric TLS test peer.
+The canonical pull dispatcher shares one task-start owner across both routes;
+constructor/start refusals retain partially acquired tasks until their exact
+physical settlement receipt. Optional runtime absence and unavailable native
+clock ports refuse without logging a directory-enumeration error or renewing
+the original deadline. Existing assertions and native activation guards remain.
+HTTP deadline observations now distinguish actual CONNECT 407 refusal from a
+delivered tunnel response and retain bounded cleanup facts. The cold version
+probe records bounded timeout evidence without extending its 30-second limit.
+Managed Python hint and serve commands explicitly retain isolation while
+disabling bytecode writes in the immutable payload; real copied-command controls
+refuse on Linux as before and prove that their module imports leave no caches.
+Final selected Linux-hosted gates pass formatting, BOM/LF, all 396 JS checks,
+17,527 Hammerspoon-port unit controls, 101 E2E scenarios with one explicit skip,
+11,878 Linux unit controls and 189 Linux E2E scenarios. Actual AHK and Darwin
+Swift validation remain explicitly deferred. The terminal supervisor was lost
+before producing its native closure receipt, so passing completed tests do not
+qualify that supervisor's physical cleanup. Hosted native SDK, HTTP, source/model,
+packaging and installation qualification still remain required. These results
+do not establish a device-only remainder or finish item 62.
+
+The Windows receiving candidate reads the legacy raw-contract flags from their
+actual strict stderr frame and half-closes only the proxy request direction at
+EOF, preserving the response direction until its existing retirement bound.
+Startup failures retain bounded setup observations in an explicitly owned
+sidecar included in the original nonrecursive cleanup inventory. Directory
+capture observations use bounded absolute source and restoration paths without
+changing process CWD, waiving the original attacks or claiming Windows rename
+success. The composed portable PowerShell/C#/TCP controls and preserved AHK
+assertions have passed review; actual Windows SSPI, capture, staging and WinHTTP
+execution still require the next non-release hosted run. The earlier eleven
+native failures and skipped E2E/package/install remain unqualified meanwhile.
+
+Hosted manual run 37886569318 at 859915743 reveals that the portable managed
+serve receiving fixture ignored its actual Python argument until after its
+first emitted command. Its container-specific interpreter path fails with
+exit 127 on the runner. The fixture now carries the supplied interpreter from
+initialization, and both existing real foreground controls additionally require
+that exact interpreter and isolated no-bytecode flags before execution. Original
+refusal, empty output, untouched HOME and cache assertions remain intact. This
+corrects a fixture prerequisite; native custom-anchor TLS, managed HTTP startup,
+Windows qualification and archive/install acceptance remain pending. Item 62
+remains open.
+
+The next macOS receiving tranche replaces the nonportable bound-but-unlistened
+TCP version witness with one exclusively owned loopback HTTP 503 peer returning
+an empty body. It preserves the pinned real client, original 30-second clock,
+child-only route override and mandatory physical socket/thread retirement.
+Thirty-four portable controls pass, including a genuine socket-close race that
+requires a known request refusal to survive concurrent retirement; the exact
+preimage fails this control. Four causal mutations refuse. Native Darwin
+client/version acceptance remains unexecuted. The bootstrap TLS positive
+case additionally observes only its closed terminal reason and a separate real
+SSL hostname/custom-anchor evaluation; all six tests and assertions remain.
+Managed HTTP fixture startup records bounded lexical stages in a private owned
+receipt, observes them only after exact worker/pipe settlement, and retains
+uncertain closure debt without retrying a possibly reused descriptor. Fifteen
+portable controls pass with the original eight intact and five causal mutations
+refused. Trust restoration exposes only closed command/phase/status facts and
+still refuses incomplete restoration. Independent reviews approve all three
+packets; these diagnostics do not establish the remaining native TLS, worker
+startup or trust-restoration causes. Final selected gates and exact-source
+non-release macOS CI remain required; items 36/62 and transversal 16/38 stay open.
+
+The Windows receiving successor repairs one proven fixture setup failure: the
+unresolved vendor path produced the wrong shared defaults directory and the
+same PathNotFound HRESULT observed in native run37886569318. Normalize that
+existing path before deriving its parents. The exact old source fails the
+physical source-linked regression; all three corrected path controls pass.
+The legacy raw-proxy observer now reads the actual physically settled merged
+stdout instead of its empty stderr field. Original IPv6 assertions remain.
+Setup failures retain only closed command/category/language/compile-ID facts.
+SSPI observations retain acknowledged TLS-close byte counts and first relay
+progress without joining a possibly stale disposed stream to that failure;
+original SSL calls, security predicates, errors and deadlines remain intact.
+The three retained-directory attacks now stage their original children through
+an owned holding directory before moving the empty root, preserving all native
+identity handles. Refused staging/restoration/closure retains its exact actor;
+no production Running state or cleanup debt is fabricated. Independent reviews
+approve these source changes. Portable setup15, source receivers32, path3 and
+SSPI11/TCP4+6 controls pass; the new14 AHK graph cases, original physical attacks,
+TLS/SSPI failures, all native Windows code and E2E/package/install still require
+exact-source hosted qualification. Items36/62 and transversal16/38 remain open.
+
+Hosted macOS manual37893618153 at8bedc59d4 passes the actual cold MLX/Ollama
+job, including the official cold Ollama installer. Its daemon/model exchange
+is explicitly not executed by that installer control. Both SDK architectures
+still fail one of41 cases (two assertions): the custom-anchor TLS peer refuses
+its certificate. The independent HTTP worker reaches settings_provider but
+never emits its first response frame; its original deadline and mandatory
+physical settlement remain. Admin trust removal also reaches its unchanged
+15-second deadline. Package/install are skipped; these observations do not
+establish a device-only remainder or complete items36/62.
+
+The app-supplied TLS anchor fixture now declares serverAuth explicitly, as
+required by the Apple SSL server policy for its newly issued certificate.
+The original six assertions remain unchanged; eight independent source/DER
+controls retain wrong-purpose and absent-purpose refusals. Test-only HTTP
+observations distinguish proxy-copy, PAC callback/run-loop and session stages
+within the original private256-byte bound. A contended observation lock refuses
+immediately; the release source is byte-identical after removing the fixture
+compilation guards. The original15 portable controls and both native test
+methods remain intact; the receiving successor adds three meaningful controls.
+Missing optional stages remain unknown. Native compilation and the positive
+Apple Security verdict still require exact-source macOS qualification.
+
+Hosted Windows manual37895077474 atc415887e9 finishes10,501 successful and10
+failed unit controls. Core JS/properties pass; E2E/package/install are skipped
+and Release/Publish is skipped. The native PAC unresolved-root regression now
+passes. Remaining failures expose the staging observer's encoded-source size,
+three successful graph finalizers accessing already-retired entries, an
+unobserved junction child-open error, a legacy raw IPv6 spelling mismatch and
+three SSPI physical-close refusals. None of these failures is waived or
+qualified by Linux portable controls. Their feasible corrections and another
+non-release native run remain required; items36/62 and transversal16/38 stay open.
+
+The optional admin-trust observer uses the same already compiled signed fixture
+and reads only the exact owned certificate's trust presence and a strictly
+validated admin entry count. It cannot mutate trust or grant permission. Input,
+child/pipe settlement and the query consume the original removal deadline;
+refusal cannot clear restoration debt. Exact parent file/pipe objects retain
+closure debt, including actual FileIO errors that retire Python's closed marker
+before the OS descriptor closes. The stdin close observer preserves timed
+communicate and records errors even when its BrokenPipe handling suppresses
+them. Uncertain retired owners cannot be retried, authorize a successor or
+permit private fixture deletion. Twenty-eight portable controls pass; original
+assertions remain, with only explicit standalone-owner initialization and a
+controlled live-child flush prerequisite added. Actual Security reads, admin
+entry counts, runtime authorization and restoration still need hosted macOS
+observations. The source mechanism for removing the last admin entry remains
+conditional; no external/device-only cause is established.
+
+The next Windows receiving tranche preserves its actual bounded staging
+transport instead of enlarging it: an exact PowerShell source literal removes
+redundant encoding, reducing nine chunks to eight under the unchanged7000x8
+limit. The explicit CR/LF delimiter guard rejects a real parser escape; three
+actual PowerShell literal/parser/budget controls and independent causal mutations
+pass. Original15 observation controls remain, with three additional receivers
+and four actual-constructor AHK controls awaiting Windows execution. The legacy
+raw IPv6 fixture pins the independently documented and observed Windows
+System.Uri host spelling; its strict guard and original five cases remain.
+Thirteen guard and seven literal controls pass. Current product updater/remote
+paths use the canonical resolver; no legacy IPv6 product success is inferred.
+
+Three graph finalizers now check the exact remaining owner before removing an
+entry already retired by successful cleanup. The original218 assertions and16
+registrations remain prefixes. The junction child-open predicate remains strict;
+only bounded failure facts are added. Its reparse matcher requires exact UTF16
+lengths and fixed-length reads, with a genuine Buffer/embedded-NUL regression.
+The actual Windows junction cause and the added225-assertion/17-case fixture
+remain unqualified. Native TLS stream retirement now consumes at most one
+already readable encrypted buffer through the original TLS engine, without a
+peer wait or new clock. Real Linux OpenSSL/TLS receiving reproduces the original
+queued-close failure and passes the candidate; unexpected application data is
+still refused. The original11 component controls plus seven new controls pass,
+as do four causal mutations and scope/parser checks. This protocol proof does
+not qualify Windows socket lifetime, SSPI/Schannel or the observed10054 reset.
+Independent reviews approve these sources; exact-source Windows qualification
+and E2E/package/install remain required. No item or transversal requirement is
+removed.
 
 - [~] **63.** Provide shared screen-brightness up/down actions on all three
   drivers, including supported keyboard and wheel layers. Implemented: the

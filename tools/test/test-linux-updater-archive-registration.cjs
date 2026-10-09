@@ -343,10 +343,10 @@ console.log('Archive mandatory registration: 60 controls passed; 0 skipped.');
 // Separate follow-up controls leave the entire original sixty-case prefix exact.
 const followup =
 	'[OK] Linux archive snapshot: 5 controls passed; 0 skipped; actual private Git snapshots only.\n' +
-	'[OK] Linux CONNECT terminal protocol: 5 controls passed; 0 skipped; modeled socket/select only.\n';
+	'[OK] Linux CONNECT terminal protocol: 9 controls passed; 0 skipped; modeled socket/select only.\n';
 function validateFollowup(catalogue, planner, text) {
 	assert.equal(catalogue.jobs['e2e-linux'].subjects['archive-private-snapshot'], 5);
-	assert.equal(catalogue.jobs['e2e-linux'].subjects['connect-terminal-protocol-model'], 5);
+	assert.equal(catalogue.jobs['e2e-linux'].subjects['connect-terminal-protocol-model'], 9);
 	for (const source of [
 		'tools/test/test-linux-updater-archive-snapshot.py',
 		'tools/test/prepare-linux-updater-archive-snapshot.py',
@@ -413,7 +413,7 @@ for (const [needle, replacement] of [
 control('whole follow-up frame scopes four actual Git and five protocol models', () =>
 	assert.deepEqual(Evidence.readFollowupCounts(sourceReceipt + followup), {
 		snapshot: 5,
-		connect: 5
+		connect: 9
 	})
 );
 for (const bad of [
@@ -431,7 +431,7 @@ for (const [kind, line] of [
 	['snapshot', 'Archive snapshot controls: 5 passed; 0 skipped.\n'],
 	[
 		'connect',
-		'CONNECT terminal protocol controls: 5 passed; 0 skipped; modeled socket/select only.\n'
+		'CONNECT terminal protocol controls: 9 passed; 0 skipped; modeled socket/select only.\n'
 	]
 ]) {
 	const good = { status: 0, signal: null, error: null, stdout: line, stderr: '' };

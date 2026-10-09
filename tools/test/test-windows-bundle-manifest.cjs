@@ -74,6 +74,20 @@ const LICENSE_NOTICES = new Set([`${SHARED_REL}/ui/vendor/LICENSES.md`]);
 // not by what the manifest says. A reference into one of them is itself a failure.
 const NEVER_RUNTIME = [
 	['shared test corpora', (arc) => arc.startsWith(`${SHARED_REL}/tests/`)],
+	['Python driver runtime', (arc) => arc.startsWith(`${SHARED_REL}/python/`)],
+	['native compile sources', (arc) => arc.startsWith(`${SHARED_REL}/native/`)],
+	['Go compile sources', (arc) => arc.startsWith(`${SHARED_REL}/go/`)],
+	[
+		'macOS native Ollama catalogue',
+		(arc) =>
+			/^managed_ollama_(?:runtime|release)\.json$/.test(
+				arc.slice(`${SHARED_REL}/modules/llm/`.length)
+			) && arc.startsWith(`${SHARED_REL}/modules/llm/`)
+	],
+	[
+		'macOS Python bootstrap catalogue',
+		(arc) => arc === `${SHARED_REL}/modules/llm/managed_python_release.json`
+	],
 	['Lua sources', (arc) => arc.startsWith(`${SHARED_REL}/lua/`) || arc.endsWith('.lua')],
 	['documentation', (arc) => arc.endsWith('.md') && !LICENSE_NOTICES.has(arc)],
 	['developer scripts', (arc) => /\.(?:py|sh)$/.test(arc)],
@@ -406,6 +420,29 @@ function skipGroup(tokens, i) {
 }
 
 /**
+ * Decodes the actual values of AHK string spans for filesystem classification.
+ * The shared scanner preserves literal boundaries but strips the backtick from
+ * escape pairs; treating a newline reuse-key separator as "n" invents a path.
+ * @param {string} source - AutoHotkey source.
+ * @returns {object[]} Code tokens with a decoded pathValue on string spans.
+ */
+function ahkPathTokens(source) {
+	const controls = { a: '\x07', b: '\b', f: '\f', n: '\n', r: '\r', t: '\t', v: '\v' };
+	return scriptTokens(source, '.ahk').map((token) => {
+		if (token.kind !== 'string') return token;
+		const raw = source.slice(token.start + 1, token.end - 1);
+		let value = '';
+		for (let at = 0; at < raw.length; at++) {
+			if (raw[at] === '`' && at + 1 < raw.length) {
+				const escaped = raw[++at];
+				value += Object.hasOwn(controls, escaped) ? controls[escaped] : escaped;
+			} else value += raw[at];
+		}
+		return { ...token, pathValue: value };
+	});
+}
+
+/**
  * Extracts the AutoHotkey references.
  * @returns {{literals: object[], chains: object[]}} Path tokens found in string
  *   literals, and concatenations anchored on a runtime root global.
@@ -416,7 +453,7 @@ function ahkReferences() {
 	const tokenised = sources.map(({ rel, text }) => ({
 		rel,
 		text,
-		tokens: scriptTokens(text, '.ahk')
+		tokens: ahkPathTokens(text)
 	}));
 
 	// Globals bound to one string literal resolve like the literal.
@@ -430,7 +467,7 @@ function ahkReferences() {
 				tokens[i + 3].kind === 'string' &&
 				!(tokens[i + 4] && tokens[i + 4].value === '.')
 			) {
-				constants.set(tokens[i + 1].value, tokens[i + 3].value);
+				constants.set(tokens[i + 1].value, tokens[i + 3].pathValue);
 			}
 		}
 	}
@@ -459,7 +496,8 @@ function ahkReferences() {
 				) {
 					const next = tokens[i + 6];
 					if (next && next.value === '.') continue;
-					const joined = normalise(`${roots.get(root.value)}/${lit.value.replace(/\\/g, '/')}`);
+					if (/[\x00-\x1f]/.test(lit.pathValue)) continue;
+					const joined = normalise(`${roots.get(root.value)}/${lit.pathValue.replace(/\\/g, '/')}`);
 					if (joined !== null) {
 						roots.set(name.value, joined);
 						grew = true;
@@ -525,7 +563,7 @@ function ahkReferences() {
 				const op = tokens[j + 1];
 				let end;
 				if (op.kind === 'string') {
-					parts.push({ lit: op.value });
+					parts.push({ lit: op.pathValue });
 					j += 2;
 					continue;
 				}
@@ -638,6 +676,9 @@ function dataReferences(shipped) {
 	const wholePath = new RegExp(`^${PATH_TOKEN.source}$`);
 	for (const arc of shipped) {
 		if (!/\.(?:json|toml)$/.test(arc)) continue;
+		// The audit rejects every foreign/compile-only payload independently.
+		// Such mutation inputs are not Windows data and may have no source file.
+		if (neverRuntime(arc)) continue;
 		const text = read(universe.get(arc));
 		for (const quoted of text.matchAll(/"((?:[^"\\\n]|\\.)*)"|'([^'\n]*)'/g)) {
 			const value = (quoted[1] !== undefined ? quoted[1] : quoted[2]).trim();
@@ -663,11 +704,45 @@ function dataReferences(shipped) {
  *   text (NUL marks a runtime part), or null when ".." climbs out of the bundle.
  */
 function chainPattern(chain) {
+	// Win32 filenames cannot contain literal control characters. A root joined
+	// with a newline or tab is a reuse key or message, not an asset path.
+	if (chain.parts.some((part) => 'lit' in part && /[\x00-\x1f]/.test(part.lit))) return null;
 	const raw = chain.parts.map((p) => ('lit' in p ? p.lit : '\0')).join('');
 	const joined = `${chain.base}/${raw.replace(/\\/g, '/')}`;
 	const text = normalise(joined);
 	if (text === null || text === '') return null;
 	return { text, dynamic: text.includes('\0'), directory: joined.endsWith('/') };
+}
+
+// Independent AHK spelling controls keep non-path reuse keys separate from
+// real native source references; no production filename is allowlisted.
+for (const [raw, expected, nonPath] of [
+	['`a', '\x07', true],
+	['`b', '\b', true],
+	['`f', '\f', true],
+	['`n', '\n', true],
+	['`r', '\r', true],
+	['`t', '\t', true],
+	['`v', '\v', true],
+	['``n', '`n', false],
+	['\\native\\network\\pac_runtime.c', '\\native\\network\\pac_runtime.c', false],
+	['\\native\\network\\pac_runtime.h', '\\native\\network\\pac_runtime.h', false],
+	['\\data\\locales\\fr.json', '\\data\\locales\\fr.json', false]
+]) {
+	const source = '_SharedDir . "' + raw + '" . Locale';
+	const literal = ahkPathTokens(source).find((token) => token.kind === 'string');
+	assert.equal(literal.pathValue, expected, 'AHK literal spelling retains its actual path value');
+	const pattern = chainPattern({
+		base: SHARED_REL,
+		parts: [{ lit: literal.pathValue }, { dyn: 'Locale' }]
+	});
+	assert.equal(
+		pattern === null,
+		nonPath,
+		'only actual control-valued literals refuse filesystem classification'
+	);
+	if (!nonPath)
+		assert.equal(pattern.dynamic, true, 'real root-anchored dynamic path coverage remains active');
 }
 
 /**
@@ -851,6 +926,31 @@ if (selection && refs) {
 		],
 		['drop', `${registryFolder}/ergol/ergol.keylayout`, 'a file the registry index names'],
 		['add', sharedTest, 'a shared test corpus'],
+		['add', `${SHARED_REL}/python/network_proxy_policy.py`, 'a Python driver source'],
+		[
+			'add',
+			`${SHARED_REL}/python/__pycache__/network_proxy_policy.cpython-313.pyc`,
+			'a generated Python driver runtime cache'
+		],
+		['add', `${SHARED_REL}/python/runtime.bin`, 'an arbitrary Python driver runtime asset'],
+		['add', `${SHARED_REL}/native/network/pac_runtime.c`, 'a native compile source'],
+		['add', `${SHARED_REL}/native/network/pac_runtime.h`, 'a native compile header'],
+		['add', `${SHARED_REL}/go/native_http/transport.go`, 'a Go compile source'],
+		[
+			'add',
+			`${SHARED_REL}/modules/llm/managed_ollama_runtime.json`,
+			'the macOS native Ollama source catalogue'
+		],
+		[
+			'add',
+			`${SHARED_REL}/modules/llm/managed_ollama_release.json`,
+			'the macOS native Ollama produced catalogue'
+		],
+		[
+			'add',
+			`${SHARED_REL}/modules/llm/managed_python_release.json`,
+			'the macOS Python bootstrap catalogue'
+		],
 		['add', 'vendor/UIA.ahk', 'a compile-time library'],
 		...REQUIRED_RUNTIME_ASSETS.map((asset) => [
 			'drop',

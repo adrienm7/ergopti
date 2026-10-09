@@ -5,15 +5,16 @@
 --- DESCRIPTION:
 --- Resolves the one Ollama executable used by every API, menu, and bootstrap
 --- path. The app no longer bundles Ollama, so the resolver looks for an
---- existing installation in a fixed order: the official Ollama.app (system
+--- source-bound optional install hint, then the official Ollama.app (system
 --- then user Applications), Homebrew, the copy Ergopti downloads on demand
 --- into its own Application Support folder, then PATH.
 ---
 --- FEATURES & RATIONALE:
---- 1. Stat-only probes: every candidate is checked with one filesystem
----    attribute read, never with a subprocess, so building the AI menu or
----    selecting a backend cannot stall the main run loop.
---- 2. No cache: a removal or a fresh install is observed on the next call.
+--- 1. Stock candidates use one filesystem attribute
+---    read. Optional runtime metadata is a provisional hint; the native server
+---    owner independently verifies its actual catalogue, bytes and signature.
+--- 2. Optional metadata is received asynchronously; cheap attributes invalidate
+---    its provisional cache. Source admission always runs again in Python.
 --- 3. Single owner: the on-demand installer receives its target folder from
 ---    managed_install_dir(), so the download lands exactly where this resolver
 ---    looks for it.
@@ -48,6 +49,7 @@ M.SOURCE_USER_APP = "user_app"
 M.SOURCE_HOMEBREW = "homebrew"
 M.SOURCE_MANAGED = "managed"
 M.SOURCE_PATH = "path"
+M.SOURCE_NATIVE_MANAGED = "native_managed"
 
 
 
@@ -139,11 +141,37 @@ end
 -- ===================================
 -- ===================================
 
---- Resolves Ollama without a cache so removal/replacement is observed promptly.
+--- Returns the optional source-qualified runtime's native install directory.
+--- @return string|nil directory Native owned location, not a trust statement.
+function M.native_managed_install_dir()
+	local home = home_directory()
+	return home and home .. "/Library/Application Support/Ergopti/ollama-native-http" or nil
+end
+
+--- Receives only a provisional installed-receipt hint for the native runtime.
+--- The real server owner repeats byte, catalogue, signature and image admission.
+--- @return string|nil executable Candidate with matched current metadata.
+--- @return table|nil budgets Existing retry owner values.
+--- @return string|nil state Exact pending task state.
+function M.native_candidate()
+	local directory = M.native_managed_install_dir()
+	if not directory then return nil end
+	local source = debug.getinfo(1, "S").source:sub(2)
+	local driver = source:match("^(.*)/modules/llm/ollama_binary%.lua$")
+	if not driver then return nil end
+	local hint, state = require("adapters.managed_ollama_hint").get(directory, driver)
+	if not hint then return nil, nil, state end
+	return is_executable_file(hint.candidate) and hint.candidate or nil, hint.budgets
+end
+
+--- Resolve stock candidates live, or receive an asynchronously invalidated hint.
 --- @return string|nil executable_path
 --- @return string|nil error_message
 --- @return string|nil source One of the SOURCE_* identifiers.
 function M.resolve()
+	local native, _, state = M.native_candidate()
+	if native then return native, nil, M.SOURCE_NATIVE_MANAGED end
+	if state == "pending" then return nil, "managed runtime metadata is pending", nil end
 	local seen = {}
 	for _, candidate in ipairs(M.candidates()) do
 		if not seen[candidate.path] then

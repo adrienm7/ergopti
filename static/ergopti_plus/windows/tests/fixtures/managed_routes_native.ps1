@@ -1,4 +1,4 @@
-# Scratch-only production routing-helper acceptance: actual WinHTTP Ex/PAC.
+# Scratch-only production routing-helper acceptance: full-URL native PAC and WinHTTP ABI.
 # Configuration/environment readers are the only injection boundaries.
 param([Parameter(Mandatory=$true)][string]$RoutesPath,
       [Parameter(Mandatory=$true)][string]$PolicyPath,
@@ -6,6 +6,8 @@ param([Parameter(Mandatory=$true)][string]$RoutesPath,
 $ErrorActionPreference='Stop'
 $ProgressPreference='SilentlyContinue'
 $Server=$null
+$AuthenticationServer=$null
+$SlowServer=$null
 $Failed=$false
 $ManagedRoutesDiagnosticStage='load_routes'
 $ManagedRoutesDiagnosticVector=0
@@ -116,12 +118,15 @@ public sealed class ErgoptiOrderedPacServer : IDisposable
     private readonly TcpListener listener;
     private readonly Thread thread;
     private volatile bool stopped;
+    private readonly bool drip;
     public readonly int Port;
     public int Requests;
     public int Errors;
     public int Revision;
-    public ErgoptiOrderedPacServer()
+    public ErgoptiOrderedPacServer() : this(false) { }
+    public ErgoptiOrderedPacServer(bool drip)
     {
+        this.drip=drip;
         listener=new TcpListener(IPAddress.Loopback,0); listener.Start();
         Port=((IPEndPoint)listener.LocalEndpoint).Port;
         thread=new Thread(Serve); thread.IsBackground=true; thread.Start();
@@ -137,21 +142,39 @@ public sealed class ErgoptiOrderedPacServer : IDisposable
                         int one=stream.ReadByte(); if(one<0)throw new EndOfStreamException();
                         header.Append((char)one); if(header.ToString().EndsWith("\r\n\r\n"))break;
                     }
-                    if(!header.ToString().StartsWith("GET /order.pac HTTP/1."))throw new InvalidDataException();
+                    bool shape=header.ToString().StartsWith("GET /shape.pac HTTP/1.");
+                    if(!shape && !header.ToString().StartsWith("GET /order.pac HTTP/1."))throw new InvalidDataException();
                     Interlocked.Increment(ref Requests);
                     string first=Revision==0 ? "first.invalid:38101; PROXY second.invalid:38102" : "second.invalid:38102; PROXY first.invalid:38101";
                     string pac="function FindProxyForURL(url,host){"+
+                        // Native WinHTTP strips the HTTPS path. That evaluation must not
+                        // gate a valid full-URL script whose stripped branch deliberately fails.
+                        "if(url=='https://ordered-fixture.invalid:8443/' || url=='https://ordered-fixture.invalid:8443') throw new Error('owned origin-only refusal');"+
                         "if(url=='https://ordered-fixture.invalid:8443/first?marker=private') "+
                         "return 'PROXY "+first+"; DIRECT';"+
                         "if(url=='http://ordered-fixture.invalid:8080/direct-middle') "+
                         "return 'PROXY first.invalid:38101; DIRECT; PROXY second.invalid:38102';"+
                         "if(url=='https://ordered-fixture.invalid/unsupported') return 'SOCKS unsupported.invalid:38103; DIRECT';"+
                         "return 'DIRECT';}";
+                    if(shape) pac="function FindProxyForURL(url,host){"+
+                        "if(url=='https://ordered-fixture.invalid:8443/first?marker=private') return 'PROXY full.invalid:38104';"+
+                        "if(url=='https://ordered-fixture.invalid:8443/first') return 'PROXY path.invalid:38105';"+
+                        "if(url=='https://ordered-fixture.invalid:8443/' || url=='https://ordered-fixture.invalid:8443') return 'PROXY origin.invalid:38106';"+
+                        "if(url=='http://ordered-fixture.invalid:8443/first?marker=private') return 'PROXY scheme.invalid:38107';"+
+                        "return 'PROXY other.invalid:38108';}";
                     byte[] body=Encoding.ASCII.GetBytes(pac);
                     byte[] response=Encoding.ASCII.GetBytes("HTTP/1.1 200 OK\r\nConnection: close\r\nCache-Control: no-store\r\nContent-Type: application/x-ns-proxy-autoconfig\r\nContent-Length: "+body.Length+"\r\n\r\n");
-                    stream.Write(response,0,response.Length);stream.Write(body,0,body.Length);stream.Flush();
+                    stream.Write(response,0,response.Length);
+                    if(drip) {
+                        // Every native read makes progress before its per-read timeout,
+                        // but this body deliberately exceeds the original total lookup budget.
+                        for(int index=0;index<body.Length&&!stopped;index++) {
+                            stream.Write(body,index,1);stream.Flush();Thread.Sleep(150);
+                        }
+                    } else {stream.Write(body,0,body.Length);stream.Flush();}
                 }
-            } catch(SocketException) { if(!stopped)Interlocked.Increment(ref Errors); }
+            } catch(SocketException) { if(!stopped&&!drip)Interlocked.Increment(ref Errors); }
+            catch(IOException) { if(!stopped&&!drip)Interlocked.Increment(ref Errors); }
             catch(ObjectDisposedException) { if(!stopped)Interlocked.Increment(ref Errors); }
             catch(Exception) { Interlocked.Increment(ref Errors); }
         }
@@ -208,8 +231,56 @@ public sealed class ErgoptiOrderedPacServer : IDisposable
     Set-ManagedRoutesDiagnosticResult $Refused
     $ManagedRoutesDiagnosticStage='unsupported_receipt'
     if($Refused.Ok -or $Refused.Routes.Count -ne 0 -or $Refused.Receipt.stage -cne 'proxy_resolve'){throw 'Unsupported full-list entry silently fell back to DIRECT.'}
+    $ManagedRoutesDiagnosticStage='slow_lookup'
+    $SlowServer=[ErgoptiOrderedPacServer]::new($true)
+    $SlowPac='http://127.0.0.1:'+$SlowServer.Port+'/order.pac'
+    $SlowReader={param($MaxBytes) @{Ok=$true;Absent=$false;AutoDetect=$false;PacUrl=$SlowPac;Proxy='';Bypass='';NativeError=0;FailureOrigin=''}}.GetNewClosure()
+    $SlowClock=[Diagnostics.Stopwatch]::StartNew()
+    $SlowAnswer=Resolve-ErgoptiNativeNetworkRoutes -DestinationUrl $Vectors[0].Url -BudgetMs 3000 `
+        -ReadConfig $SlowReader -ReadEnvironment $EmptyEnvironment -PolicyPath $PolicyPath -UpdaterDefaultsPath $UpdaterDefaultsPath
+    $SlowClock.Stop()
+    Set-ManagedRoutesDiagnosticResult $SlowAnswer
+    $ManagedRoutesDiagnosticStage='slow_receipt'
+    if($SlowAnswer.Ok -or $SlowAnswer.Routes.Count -ne 0 -or $SlowAnswer.CleanupDebt -or
+        $SlowClock.ElapsedMilliseconds -gt 3000 -or $SlowServer.Requests -ne 1) {
+        throw 'Progressing PAC body escaped its original lookup deadline or owner retirement.'
+    }
+    $ManagedRoutesDiagnosticStage='slow_owner'
+    $SlowServer.Dispose()
+    if($SlowServer.Errors -ne 0){throw 'Owned slow PAC receiving service failed.'}
+    $SlowServer=$null
+    $AfterSlow=Resolve-ErgoptiNativeNetworkRoutes -DestinationUrl $Vectors[0].Url @Common
+    if(-not $AfterSlow.Ok -or $AfterSlow.Routes.Count -ne 3 -or
+        $AfterSlow.Routes[0].Endpoint -cne 'http://second.invalid:38102/') {
+        throw 'A retired PAC deadline owner contaminated the next actual native request.'
+    }
     # Actual settings discovery is independently observed without mutating it;
     # an unavailable native reader is a failed qualification, not a synthetic pass.
+    $ManagedRoutesDiagnosticStage='pac_auth_lookup'
+    . (Join-Path $PSScriptRoot 'pac_ntlm_origin.ps1')
+    $AuthenticationServer=[ErgoptiPacNtlmOrigin]::new()
+    $AuthenticatedPac='http://127.0.0.1:'+$AuthenticationServer.Port+'/authenticated.pac'
+    $AuthenticationReader={param($MaxBytes) @{Ok=$true;Absent=$false;AutoDetect=$false;PacUrl=$AuthenticatedPac;Proxy='';Bypass='';NativeError=0;FailureOrigin=''}}.GetNewClosure()
+    $Authenticated=Resolve-ErgoptiNativeNetworkRoutes -DestinationUrl 'https://pac-auth-fixture.invalid:8443/authenticated?marker=private' `
+        -BudgetMs 9000 -ReadConfig $AuthenticationReader -ReadEnvironment $EmptyEnvironment -PolicyPath $PolicyPath -UpdaterDefaultsPath $UpdaterDefaultsPath
+    Set-ManagedRoutesDiagnosticResult $Authenticated
+    $ManagedRoutesDiagnosticStage='pac_auth_receipt'
+    if(-not $Authenticated.Ok -or $Authenticated.Routes.Count -ne 2 -or
+        $Authenticated.Routes[0].Kind -cne 'proxy' -or $Authenticated.Routes[0].Endpoint -cne 'http://auth-fixture.invalid:38109/' -or
+        $Authenticated.Routes[1].Kind -cne 'direct' -or $Authenticated.Routes[1].Endpoint -cne '') {
+        throw 'Native current-user PAC authentication/full-URL order was refused.'
+    }
+    $ManagedRoutesDiagnosticStage='pac_auth_owner'
+    $AuthenticationServer.Dispose()
+    if(-not $AuthenticationServer.IdentityMatched -or $AuthenticationServer.Bare -lt 1 -or
+        $AuthenticationServer.TypeOne -ne 1 -or $AuthenticationServer.TypeThree -ne 1 -or
+        $AuthenticationServer.Authenticated -ne 1 -or $AuthenticationServer.Responses -ne 1 -or
+        $AuthenticationServer.Active -ne 0 -or $AuthenticationServer.Failures -ne 0 -or
+        $AuthenticationServer.OwnedCredentials -ne 0 -or $AuthenticationServer.OwnedContexts -ne 0 -or
+        $AuthenticationServer.OwnedTokens -ne 0 -or $AuthenticationServer.OwnedBuffers -ne 0) {
+        throw 'Native PAC SSPI identity or physical owner retirement was refused.'
+    }
+    $AuthenticationServer=$null
     $ManagedRoutesDiagnosticStage='settings_read'
     Set-ManagedRoutesDiagnosticResult $null
     $Actual=[ErgoptiWindowsProxyConfig]::Read(65536)
@@ -221,8 +292,47 @@ public sealed class ErgoptiOrderedPacServer : IDisposable
 } catch {
     $Failed=$true
     Write-ManagedRoutesDiagnostic
+    try {
+        if($null -ne $AuthenticationServer) {
+            $AuthStage=$AuthenticationServer.FailureStage
+            if($AuthStage -cnotin @('none','acquire_credentials','accept_context','context_token','identity_match')){$AuthStage='other'}
+            $AuthValues=@($AuthenticationServer.Bare,$AuthenticationServer.TypeOne,$AuthenticationServer.TypeThree,
+                $AuthenticationServer.Authenticated,$AuthenticationServer.Responses,$AuthenticationServer.Failures,
+                $AuthenticationServer.Active,$AuthenticationServer.OwnedCredentials,$AuthenticationServer.OwnedContexts,
+                $AuthenticationServer.OwnedTokens,$AuthenticationServer.OwnedBuffers)
+            $AuthValid=$AuthenticationServer.SecurityStatus -is [int] -and $AuthenticationServer.IdentityMatched -is [bool]
+            foreach($Value in $AuthValues){if($Value -isnot [int] -or $Value -lt 0 -or $Value -gt 256){$AuthValid=$false}}
+            if($AuthValid) {
+                [Console]::Error.WriteLine(('PAC_AUTH_DIAG stage={0} security_status={1} identity={2} bare={3} type_one={4} type_three={5} authenticated={6} responses={7} failures={8} active={9} credentials={10} contexts={11} tokens={12} buffers={13}' -f
+                    $AuthStage,$AuthenticationServer.SecurityStatus,[int]$AuthenticationServer.IdentityMatched,
+                    $AuthValues[0],$AuthValues[1],$AuthValues[2],$AuthValues[3],$AuthValues[4],$AuthValues[5],
+                    $AuthValues[6],$AuthValues[7],$AuthValues[8],$AuthValues[9],$AuthValues[10]))
+            }
+        }
+    } catch { }
+    if($ManagedRoutesDiagnosticVector -eq 1 -and $ManagedRoutesDiagnosticStage -eq 'vector_receipt' -and $null -ne $Server) {
+        # A second genuine native lookup identifies only fixed URL-shape branches.
+        # It cannot replace or rescue any of the original full-URL assertions.
+        $Shape='unavailable'
+        try {
+            $Probe=[ErgoptiNativeProxyEx]::Resolve($Vectors[0].Url,
+                ('http://127.0.0.1:'+$Server.Port+'/shape.pac'),$false,9000,128,65536)
+            if($Probe.Ok -and $Probe.CallbacksRetired -and $Probe.Entries.Count -eq 1 -and $Probe.Entries[0].IsProxy) {
+                switch -CaseSensitive ($Probe.Entries[0].ProxyHost) {
+                    'full.invalid' {$Shape='full'}
+                    'path.invalid' {$Shape='path'}
+                    'origin.invalid' {$Shape='origin'}
+                    'scheme.invalid' {$Shape='scheme'}
+                    'other.invalid' {$Shape='other'}
+                }
+            }
+        } catch { }
+        try { [Console]::Error.WriteLine('ROUTE_URL_DIAG shape='+$Shape) } catch { }
+    }
     [Console]::Error.WriteLine('Native complete routing acceptance failed.')
 } finally {
+    if($null -ne $SlowServer){try{$SlowServer.Dispose()}catch{$Failed=$true;[Console]::Error.WriteLine('Owned slow PAC cleanup refused.')}}
+    if($null -ne $AuthenticationServer){try{$AuthenticationServer.Dispose()}catch{$Failed=$true;[Console]::Error.WriteLine('Owned native PAC authentication cleanup refused.')}}
     if($null -ne $Server) {
         try{$Server.Dispose()}catch{
             if(-not $Failed){

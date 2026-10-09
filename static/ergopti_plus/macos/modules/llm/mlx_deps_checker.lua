@@ -153,6 +153,8 @@ local _active_tasks = {}
 -- until its one native terminal callback proves process settlement.
 local _owned_timers = { initial = nil, hide = nil, deadline = nil }
 local _task_owner = nil
+-- A failed receipt rollback remains owned even before a native task exists.
+local _native_pty_preflight_owner = nil
 local _resume_intent = nil
 local _terminal_outcome = nil
 
@@ -816,6 +818,10 @@ end
 local function terminate_task_owner(owner, label)
 	if type(owner) ~= "table" or owner.settled == true then return true end
 	owner.authorized = false
+	if type(owner.native_terminal_retry) == "function" then
+		owner.native_terminal_retry()
+		if owner.settled == true then return true end
+	end
 	if owner.termination_accepted == true then return false end
 	local accepted = TaskLifecycle.terminate(owner.task, label)
 	if owner.settled == true then return true end
@@ -830,8 +836,13 @@ quiesce_owned_work = function()
 	local hide_settled = cancel_owned_timer("hide", "MLX bootstrap auto-hide")
 	local deadline_settled = cancel_owned_timer("deadline", "MLX dependency bootstrap deadline")
 	local task_settled = terminate_task_owner(_task_owner, "MLX dependency bootstrap")
+	local preflight_settled = true
+	if _native_pty_preflight_owner ~= nil then
+		preflight_settled = _native_pty_preflight_owner.rollback() == true
+		if preflight_settled then _native_pty_preflight_owner = nil end
+	end
 	return initial_settled == true and hide_settled == true
-		and deadline_settled == true and task_settled == true
+		and deadline_settled == true and task_settled == true and preflight_settled == true
 end
 
 schedule_initial_for_token = function(token)
@@ -1206,18 +1217,44 @@ function M.check_and_install_deps(on_complete, replay_token)
 	-- one the failure is named and its offer carries the install
 	-- (hardening-h-no-rosetta).
 	local python_bin, python_state = PythonInterpreter.resolve()
+	local native_pty
 	if not python_bin then
-		return settle_preflight_failure(nil,
-			{ kind = "no_native_python", state = python_state, repairable = false })
+		local NativePty = require("adapters.native_bootstrap_pty")
+		local native_environment = {
+			{ "PROJECT_ROOT", hs_root },
+			{ "ERGOPTI_NATIVE_ARCH", PythonInterpreter.native_arch() or "" },
+			{ "ERGOPTI_NATIVE_PYTHONS", table.concat(PythonInterpreter.native_candidates(), ":") },
+		}
+		if repair then native_environment[#native_environment + 1] = { "ERGOPTI_MLX_REPAIR", "1" } end
+		if _native_pty_preflight_owner ~= nil then
+			if _native_pty_preflight_owner.rollback() ~= true then
+				return settle_preflight_failure(nil,
+					{ kind = "no_native_python", state = python_state, repairable = false })
+			end
+			_native_pty_preflight_owner = nil
+		end
+		local prepared
+		native_pty, prepared = NativePty.prepare(script_path, native_environment, BOOTSTRAP_TIMEOUT_SEC * 1000)
+		if prepared ~= true then
+			if native_pty ~= nil and native_pty.rollback() ~= true then
+				_native_pty_preflight_owner = native_pty
+			end
+			return settle_preflight_failure(nil,
+				{ kind = "no_native_python", state = python_state, repairable = false })
+		end
+	else
+		bash_cmd = "ERGOPTI_BOOTSTRAP_PYTHON=" .. shell_quote(python_bin) .. " " .. bash_cmd
 	end
-	local pty_wrapper_path, wrapper_error = PtyProcessGroup.create("MLX dependency")
-	if not pty_wrapper_path then
+	local pty_wrapper_path, wrapper_error
+	if native_pty == nil then pty_wrapper_path, wrapper_error = PtyProcessGroup.create("MLX dependency") end
+	if native_pty == nil and not pty_wrapper_path then
 		Logger.error(LOG, "Failed to publish the MLX process-group wrapper: %s.",
 			tostring(wrapper_error))
 		return settle_preflight_failure(i18n.get("mlx.deps_pty_write_failed"))
 	end
 	if not _pause_controller.is_current(token, authorization) then
 		PtyProcessGroup.remove(pty_wrapper_path)
+		if native_pty ~= nil and native_pty.rollback() ~= true then _native_pty_preflight_owner = native_pty end
 		return settle_stale_intent()
 	end
 	Logger.debug(LOG, "PTY wrapper created successfully at %s", pty_wrapper_path)
@@ -1382,6 +1419,17 @@ function M.check_and_install_deps(on_complete, replay_token)
 
 	local function process_settled_terminal(args)
 		if owner.terminal_processed == true then return false end
+		if native_pty ~= nil and native_pty.settle(args[1]) ~= true then
+			owner.native_terminal_retry = function() return process_settled_terminal(args) end
+			Logger.error(LOG, "Native bootstrap completion retained: physical receipt or cleanup is unsettled.")
+			if owner_is_current() then
+				_bootstrap_state = "failed"
+				_last_failure_message = i18n.get("mlx.deps_failed")
+				if owns_window() then pcall(llm_progress.set_error, _last_failure_message) end
+			end
+			return false
+		end
+		owner.native_terminal_retry = nil
 		owner.terminal_processed = true
 		release_task_owner(owner)
 		PtyProcessGroup.remove(pty_wrapper_path)
@@ -1430,13 +1478,21 @@ function M.check_and_install_deps(on_complete, replay_token)
 
 	-- Construct the full Python invocation: python3 executes the PTY wrapper,
 	-- passing bash_cmd so the child process receives the exact shell command.
-	task = TaskLifecycle.native("MLX dependency bootstrap", python_bin,
-		completion_callback, streaming_callback,
-		{ "-u", pty_wrapper_path, "/bin/bash", "-c", bash_cmd })
+	local task_executable = python_bin
+	local task_arguments = { "-u", pty_wrapper_path, "/bin/bash", "-c", bash_cmd }
+	if native_pty ~= nil then
+		task_executable, task_arguments = native_pty.executable, native_pty.arguments
+	end
+	-- Both transports join the same task construction, GC root and conditional
+	-- start transaction. Selecting a transport cannot bypass launch rollback.
+	task = TaskLifecycle.native("MLX dependency bootstrap", task_executable,
+		completion_callback, streaming_callback, task_arguments)
+	if task ~= nil and native_pty ~= nil and native_pty.bind_input(task) ~= true then task = nil end
 
 	if not task then
 		owner.authorized = false
 		PtyProcessGroup.remove(pty_wrapper_path)
+		if native_pty ~= nil and native_pty.rollback() ~= true then _native_pty_preflight_owner = native_pty end
 		return settle_preflight_failure(i18n.get("mlx.deps_task_create_failed"))
 	end
 	owner.task = task
@@ -1479,10 +1535,19 @@ function M.check_and_install_deps(on_complete, replay_token)
 		owner.authorized = false
 		release_task_owner(owner)
 		PtyProcessGroup.remove(pty_wrapper_path)
+		if native_pty ~= nil and native_pty.rollback() ~= true then _native_pty_preflight_owner = native_pty end
 		return settle_preflight_failure(i18n.get("mlx.deps_failed"))
 	end
 
 	Logger.debug(LOG, "Starting hs.task…")
+	if native_pty ~= nil and native_pty.mark_start_attempted() ~= true then
+		owner.dispatching = false
+		owner.authorized = false
+		cancel_owned_timer("deadline", "MLX dependency bootstrap deadline")
+		release_task_owner(owner)
+		if native_pty.rollback() ~= true then _native_pty_preflight_owner = native_pty end
+		return settle_preflight_failure(i18n.get("mlx.deps_task_start_failed"))
+	end
 	local started = TaskLifecycle.start(task, "MLX dependency bootstrap")
 	if started ~= true then
 		owner.dispatching = false

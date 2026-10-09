@@ -1,0 +1,231 @@
+{
+	"source": "Independent current native parent caption and complete prior About catalogue order, frozen before candidate authoring. No suite or actual native build executed for this freeze.",
+	"native_parent_caption_key": "menu.about.title",
+	"true_parent_id": "about",
+	"prior_top_level_record": {
+		"id": "about"
+	},
+	"about_child_declarations": [
+		{
+			"type": "list",
+			"id": "about_updates"
+		},
+		{
+			"type": "---"
+		},
+		{
+			"type": "command",
+			"id": "about_changelog",
+			"i18n": "menu.about.changelog"
+		},
+		{
+			"type": "command",
+			"id": "about_releases_page",
+			"i18n": "menu.about.open_releases_page"
+		},
+		{
+			"type": "---"
+		},
+		{
+			"type": "check",
+			"id": "start_at_login",
+			"i18n": "menu.global.start_at_login",
+			"checked_when": ["start_at_login_enabled"]
+		},
+		{
+			"type": "command",
+			"id": "uninstall",
+			"i18n": "menu.global.uninstall",
+			"disabled_when": ["installed_build"],
+			"disabled_reason_key": "menu.about.source_run_reason"
+		}
+	],
+	"order_without_updater": [
+		"version",
+		"separator",
+		"changelog",
+		"releases_page",
+		"separator",
+		"startup",
+		"uninstall"
+	],
+	"native_callback_contract": {
+		"startup": ["toggle with no arguments", "on_menu_changed with no arguments after toggle"],
+		"changelog": ["webview.show", "changelog"],
+		"uninstall": ["ui.menu.uninstall.run", "original options callbacks retained"],
+		"releases_page": [
+			"updater.releases_page_url with no arguments",
+			"unchanged native xdg-open callback"
+		]
+	},
+	"locales": {
+		"ar": {
+			"about_parent": "الإصدار / التحديثات",
+			"paused_header": "Ergopti+ ⏸",
+			"changelog": "الإصدارات",
+			"releases_page": "الإصدارات — GitHub",
+			"startup": "التشغيل عند تسجيل الدخول",
+			"uninstall": "إلغاء تثبيت Ergopti…"
+		},
+		"cs": {
+			"about_parent": "Verze / Aktualizace",
+			"paused_header": "Ergopti+ ⏸",
+			"changelog": "Verze",
+			"releases_page": "Verze — GitHub",
+			"startup": "Spustit při přihlášení",
+			"uninstall": "Odinstalovat Ergopti…"
+		},
+		"da": {
+			"about_parent": "Version / Opdateringer",
+			"paused_header": "Ergopti+ ⏸",
+			"changelog": "Versioner",
+			"releases_page": "Versioner — GitHub",
+			"startup": "Start ved login",
+			"uninstall": "Afinstaller Ergopti…"
+		},
+		"de": {
+			"about_parent": "Version / Aktualisierungen",
+			"paused_header": "Ergopti+ ⏸",
+			"changelog": "Versionen",
+			"releases_page": "Versionen — GitHub",
+			"startup": "Bei der Anmeldung starten",
+			"uninstall": "Ergopti deinstallieren…"
+		},
+		"en": {
+			"about_parent": "Version / Updates",
+			"paused_header": "Ergopti+ ⏸",
+			"changelog": "Releases",
+			"releases_page": "Releases — GitHub",
+			"startup": "Start at login",
+			"uninstall": "Uninstall Ergopti…"
+		},
+		"es": {
+			"about_parent": "Versión / Actualizaciones",
+			"paused_header": "Ergopti+ ⏸",
+			"changelog": "Versiones",
+			"releases_page": "Versiones — GitHub",
+			"startup": "Iniciar al abrir sesión",
+			"uninstall": "Desinstalar Ergopti…"
+		},
+		"fr": {
+			"about_parent": "Version / Mises à jour",
+			"paused_header": "Ergopti+ ⏸",
+			"changelog": "Versions",
+			"releases_page": "Versions — GitHub",
+			"startup": "Démarrer à l’ouverture de session",
+			"uninstall": "Désinstaller Ergopti…"
+		},
+		"he": {
+			"about_parent": "גרסה / עדכונים",
+			"paused_header": "Ergopti+ ⏸",
+			"changelog": "גרסאות",
+			"releases_page": "גרסאות — GitHub",
+			"startup": "הפעלה בעת הכניסה למערכת",
+			"uninstall": "הסרת Ergopti…"
+		},
+		"hi": {
+			"about_parent": "संस्करण / अपडेट",
+			"paused_header": "Ergopti+ ⏸",
+			"changelog": "रिलीज़",
+			"releases_page": "रिलीज़ — GitHub",
+			"startup": "लॉगिन पर शुरू करें",
+			"uninstall": "Ergopti अनइंस्टॉल करें…"
+		},
+		"it": {
+			"about_parent": "Versione / Aggiornamenti",
+			"paused_header": "Ergopti+ ⏸",
+			"changelog": "Versioni",
+			"releases_page": "Versioni — GitHub",
+			"startup": "Avvia all’accesso",
+			"uninstall": "Disinstalla Ergopti…"
+		},
+		"ja": {
+			"about_parent": "バージョン / アップデート",
+			"paused_header": "Ergopti+ ⏸",
+			"changelog": "リリース",
+			"releases_page": "リリース — GitHub",
+			"startup": "ログイン時に起動",
+			"uninstall": "Ergopti をアンインストール…"
+		},
+		"ko": {
+			"about_parent": "버전 / 업데이트",
+			"paused_header": "Ergopti+ ⏸",
+			"changelog": "릴리스",
+			"releases_page": "릴리스 — GitHub",
+			"startup": "로그인 시 시작",
+			"uninstall": "Ergopti 제거…"
+		},
+		"nl": {
+			"about_parent": "Versie / Updates",
+			"paused_header": "Ergopti+ ⏸",
+			"changelog": "Versies",
+			"releases_page": "Versies — GitHub",
+			"startup": "Starten bij aanmelden",
+			"uninstall": "Ergopti verwijderen…"
+		},
+		"no": {
+			"about_parent": "Versjon / Oppdateringer",
+			"paused_header": "Ergopti+ ⏸",
+			"changelog": "Versjoner",
+			"releases_page": "Versjoner — GitHub",
+			"startup": "Start ved innlogging",
+			"uninstall": "Avinstaller Ergopti…"
+		},
+		"pl": {
+			"about_parent": "Wersja / Aktualizacje",
+			"paused_header": "Ergopti+ ⏸",
+			"changelog": "Wersje",
+			"releases_page": "Wersje — GitHub",
+			"startup": "Uruchamiaj po zalogowaniu",
+			"uninstall": "Odinstaluj Ergopti…"
+		},
+		"pt": {
+			"about_parent": "Versão / Atualizações",
+			"paused_header": "Ergopti+ ⏸",
+			"changelog": "Versões",
+			"releases_page": "Versões — GitHub",
+			"startup": "Iniciar ao entrar na sessão",
+			"uninstall": "Desinstalar Ergopti…"
+		},
+		"ru": {
+			"about_parent": "Версия / Обновления",
+			"paused_header": "Ergopti+ ⏸",
+			"changelog": "Версии",
+			"releases_page": "Версии — GitHub",
+			"startup": "Запускать при входе в систему",
+			"uninstall": "Удалить Ergopti…"
+		},
+		"sv": {
+			"about_parent": "Version / Uppdateringar",
+			"paused_header": "Ergopti+ ⏸",
+			"changelog": "Versioner",
+			"releases_page": "Versioner — GitHub",
+			"startup": "Starta vid inloggning",
+			"uninstall": "Avinstallera Ergopti…"
+		},
+		"tr": {
+			"about_parent": "Sürüm / Güncellemeler",
+			"paused_header": "Ergopti+ ⏸",
+			"changelog": "Sürümler",
+			"releases_page": "Sürümler — GitHub",
+			"startup": "Oturum açıldığında başlat",
+			"uninstall": "Ergopti’yi kaldır…"
+		},
+		"uk": {
+			"about_parent": "Версія / Оновлення",
+			"paused_header": "Ergopti+ ⏸",
+			"changelog": "Версії",
+			"releases_page": "Версії — GitHub",
+			"startup": "Запускати під час входу в систему",
+			"uninstall": "Видалити Ergopti…"
+		},
+		"zh": {
+			"about_parent": "版本 / 更新",
+			"paused_header": "Ergopti+ ⏸",
+			"changelog": "版本",
+			"releases_page": "版本 — GitHub",
+			"startup": "登录时启动",
+			"uninstall": "卸载 Ergopti…"
+		}
+	}
+}

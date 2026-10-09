@@ -37,7 +37,7 @@ const END = {
 	crypto: '8 PASS, 0 FAIL, 0 SKIP; controlled metadata only',
 	parents: '4 PASS, 0 FAIL, 0 SKIP; filesystem guard only',
 	snapshot: 'Archive snapshot controls: 5 passed; 0 skipped.',
-	connect: 'CONNECT terminal protocol controls: 5 passed; 0 skipped; modeled socket/select only.'
+	connect: 'CONNECT terminal protocol controls: 9 passed; 0 skipped; modeled socket/select only.'
 };
 function receipt(kind, result) {
 	if (
@@ -165,7 +165,7 @@ async function run({
 			if (kind === 'connect') {
 				if (
 					identities.get(source) !==
-					'452ba937f6ac7d995f23c4cb3b49d7d96939dc0ac3c23460bf6c83df42e8db77'
+					'e65edc6b1c2252e5e2fd4894321f55ce570fb02618d6bd46923dcacc83c98862'
 				)
 					throw new Error('CONNECT fixture identity refused');
 				args = [
@@ -219,7 +219,7 @@ async function run({
 			'[OK] Linux archive snapshot: 5 controls passed; 0 skipped; actual private Git snapshots only.'
 		);
 		log(
-			'[OK] Linux CONNECT terminal protocol: 5 controls passed; 0 skipped; modeled socket/select only.'
+			'[OK] Linux CONNECT terminal protocol: 9 controls passed; 0 skipped; modeled socket/select only.'
 		);
 		return 0;
 	} catch {
