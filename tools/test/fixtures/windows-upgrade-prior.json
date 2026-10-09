@@ -1,0 +1,23 @@
+{
+	"schema_version": 1,
+	"release": "v0.0.0-dev.155",
+	"version": "0.0.0-dev.155",
+	"commit": "c9e4c64abb6448243252201dffec0c248e2c24ac",
+	"asset_id": 601771276,
+	"url": "https://github.com/adrienm7/ergopti/releases/download/v0.0.0-dev.155/ErgoptiPlus.exe",
+	"bytes": 8983040,
+	"sha256": "210d737ab9ebb9a65d54d98aafe05cba78fe961de00e75cce660ce0067b09caf",
+	"config_schema_version": 6,
+	"extracted_assets": [
+		{
+			"path": "static/ergopti_plus/_shared/core/config_schema/migrations.toml",
+			"bytes": 33897,
+			"sha256": "39b35d65f2c3e2dc01a2c32f762b56ec8b16aaff55495d86d12529ab298b4bf4"
+		},
+		{
+			"path": "static/ergopti_plus/_shared/data/locales/en.json",
+			"bytes": 209494,
+			"sha256": "eaff8ce0e2bb4d7ec539ad92dc77067b5c740e9eedf4c5e698d7ddad51659e43"
+		}
+	]
+}

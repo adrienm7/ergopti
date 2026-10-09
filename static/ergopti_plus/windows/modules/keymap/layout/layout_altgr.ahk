@@ -349,7 +349,9 @@ CtrlAltDispatch(Combo, *) {
 ; exact same order as the original ``SC138 & SCxxx::`` blocks so AHK’s
 ; "most-recently-registered variant wins" rule produces identical
 ; behaviour when several Layout sub-features are simultaneously enabled.
-RegisterAltGrLayer() {
+RegisterAltGrLayer(HotkeyFn := Hotkey, HotIfFn := HotIf, DispatchFn := AltGrShiftDispatch, RealAltGrFn := IsRealAltGrPress) {
+    if !HasMethod(HotkeyFn, "Call") || !HasMethod(HotIfFn, "Call") || !HasMethod(DispatchFn, "Call") || !HasMethod(RealAltGrFn, "Call")
+        throw TypeError("AltGr registration requires callable native registration and dispatch ports.")
     _BuildAltGrTables()
     try LoggerStart("LayoutAltGr", "Registering AltGr layer hotkeys…")
 
@@ -363,35 +365,35 @@ RegisterAltGrLayer() {
     ; gating unrelated layers behind this condition.
     try {
         ; --- ErgoptiPlus overrides (registered first, lowest precedence) ---
-        HotIf((*) => Features["layout"]["ergopti_plus"] and IsRealAltGrPress())
+        HotIfFn.Call((*) => ErgoptiLayout_PlusIsActive() and RealAltGrFn.Call())
         for SC in ALTGR_PLUS_OVERRIDES {
-            Hotkey("SC138 & " . SC, AltGrShiftDispatch.Bind(SC, ALTGR_PLUS_OVERRIDES), "I2")
+            HotkeyFn.Call("SC138 & " . SC, DispatchFn.Bind(SC, ALTGR_PLUS_OVERRIDES), "I2")
         }
 
         ; --- ErgoptiAltGr Number row + Ctrl+Alt Numpad mappings ---
         ; Note: ergopti_base is intentionally NOT required here — superscripts,
         ; subscripts and the € sign are layout-independent and must work even when
         ; the Ergopti keyboard emulation is off.
-        HotIf((*) => Features["layout"]["ergopti_alt_gr"] and IsRealAltGrPress())
+        HotIfFn.Call((*) => Features["layout"]["ergopti_alt_gr"] and RealAltGrFn.Call())
         for SC in ALTGR_NUMBER_ROW {
-            Hotkey("SC138 & " . SC, AltGrShiftDispatch.Bind(SC, ALTGR_NUMBER_ROW), "I2")
+            HotkeyFn.Call("SC138 & " . SC, DispatchFn.Bind(SC, ALTGR_NUMBER_ROW), "I2")
         }
         ; A real Ctrl+Alt chord, never the AltGr key: under the AltGr gate above
         ; these needed the physical AltGr, which a Ctrl+Alt chord never holds,
         ; so they were dead on standard layouts and QWERTY.
-        HotIf((*) => Features["layout"]["ergopti_alt_gr"] and IsCtrlAltNotAltGr())
+        HotIfFn.Call((*) => Features["layout"]["ergopti_alt_gr"] and IsCtrlAltNotAltGr())
         for SC, Combo in CTRL_ALT_NUMPAD {
-            Hotkey("^!" . SC, CtrlAltDispatch.Bind(Combo), "I2")
+            HotkeyFn.Call("^!" . SC, CtrlAltDispatch.Bind(Combo), "I2")
         }
 
         ; --- ErgoptiAltGr base rows (registered last, highest precedence) ---
-        HotIf((*) => Features["layout"]["ergopti_alt_gr"] and IsRealAltGrPress())
+        HotIfFn.Call((*) => Features["layout"]["ergopti_alt_gr"] and RealAltGrFn.Call())
         for SC in ALTGR_BASE_ROWS {
-            Hotkey("SC138 & " . SC, AltGrShiftDispatch.Bind(SC, ALTGR_BASE_ROWS), "I2")
+            HotkeyFn.Call("SC138 & " . SC, DispatchFn.Bind(SC, ALTGR_BASE_ROWS), "I2")
         }
 
     } finally {
-        HotIf() ; Reset to no condition
+        HotIfFn.Call() ; Reset to no condition
     }
     try LoggerSuccess("LayoutAltGr", "AltGr layer registered ({1} entries).",
         ALTGR_PLUS_OVERRIDES.Count + ALTGR_NUMBER_ROW.Count + CTRL_ALT_NUMPAD.Count

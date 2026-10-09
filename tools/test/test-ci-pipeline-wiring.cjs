@@ -349,6 +349,7 @@ const STEP_CONDITIONS = [
 	[WINDOWS_BOX, 'package-windows', 'Sign and verify ErgoptiPlus.exe', 'inputs.release'],
 	[WINDOWS_BOX, 'test-ahk', 'Annotate AHK results', 'always()'],
 	[WINDOWS_BOX, 'test-ahk', 'Publish AHK execution manifest', 'always()'],
+	[WINDOWS_BOX, 'test-ahk', 'Publish native desktop AHK evidence', 'always()'],
 	[
 		WINDOWS_BOX,
 		'launch-windows',
@@ -362,6 +363,8 @@ const STEP_CONDITIONS = [
 		'always()'
 	],
 	[WINDOWS_BOX, 'launch-windows', 'Upload mandatory launch evidence', 'always()'],
+	// Failed upgrade setup/launch must retain its negative receipt before the verdict.
+	[WINDOWS_BOX, 'launch-windows', 'Upload mandatory compiled upgrade failure evidence', 'always()'],
 	[LINUX_BOX, 'install-linux', 'Prepare the container', "matrix.kind == 'install'"],
 	[LINUX_BOX, 'install-linux', 'Verify source compiler and checkout', "matrix.kind == 'install'"],
 	[LINUX_BOX, 'install-linux', 'Create the installation user', "matrix.kind == 'install'"],

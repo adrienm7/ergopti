@@ -1,5 +1,5 @@
 # Missing old choices must not opt in any new section.
 [_meta]
-schema_version = 11
+schema_version = 12
 [foreign]
 caps = false
