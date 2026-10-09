@@ -373,6 +373,12 @@ const CHECKS = [
 		repro: 'npm run test:native-menu-rows'
 	},
 	{
+		name: 'native-menu census admits migration to zero only with intact legacy detection and complete source coverage',
+		cmd: 'node',
+		args: ['tools/test/test-native-menu-census-admission.cjs'],
+		repro: 'node tools/test/test-native-menu-census-admission.cjs'
+	},
+	{
 		name: 'no restore or clear row asks a question on any driver (restore-recommended-no-confirm)',
 		cmd: 'node',
 		args: ['tools/test/test-restore-recommended-no-confirm.cjs'],
