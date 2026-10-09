@@ -1,0 +1,81 @@
+name: Native keyboard geometry
+
+on:
+  push:
+    branches: [codex/macos-keyboard-geometry-20261009]
+  workflow_dispatch:
+    inputs:
+      source_sha:
+        description: Exact committed source to qualify
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: keyboard-geometry-${{ github.run_id }}
+  cancel-in-progress: false
+
+jobs:
+  geometry:
+    strategy:
+      fail-fast: false
+      matrix:
+        runner: [macos-15, macos-15-intel]
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.source_sha || github.sha }}
+      - name: Verify immutable source and record SDK identity
+        id: source
+        env:
+          EXPECTED_SOURCE: ${{ inputs.source_sha || github.sha }}
+        run: |
+          set -euo pipefail
+          [[ "$EXPECTED_SOURCE" =~ ^[0-9a-f]{40}$ ]]
+          test "$(git rev-parse HEAD)" = "$EXPECTED_SOURCE"
+          owner="$RUNNER_TEMP/keyboard-geometry-evidence"
+          test ! -e "$owner"
+          mkdir -m 700 "$owner"
+          git rev-parse HEAD > "$owner/source-sha.txt"
+          uname -m > "$owner/architecture.txt"
+          swift --version > "$owner/swift-version.txt"
+          xcodebuild -version > "$owner/xcode-version.txt"
+          xcrun --show-sdk-version > "$owner/sdk-version.txt"
+          shasum -a 256 static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/KeyboardGeometry.swift static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/main.swift static/ergopti_plus/macos/launcher/Tests/ErgoptiPlusTests/KeyboardGeometryTests.swift static/ergopti_plus/macos/launcher/Tests/ErgoptiPlusTests/LauncherEnvironmentTests.swift > "$owner/source-pins.txt"
+      - name: Verify selected XCTest receipt controls
+        id: portable
+        run: python3 -B tools/test/test_keyboard_geometry_xctest_receipt.py
+      - name: Receive native keyboard geometry
+        run: |
+          set -euo pipefail
+          unset ERGOPTI_DEV_QUALIFICATION_PROFILE
+          owner="$RUNNER_TEMP/keyboard-geometry-evidence"
+          set +e
+          swift test --package-path static/ergopti_plus/macos/launcher --scratch-path "$RUNNER_TEMP/keyboard-geometry-swift" --filter KeyboardGeometryTests 2>&1 | tee "$owner/KeyboardGeometryTests.log"
+          status=("${PIPESTATUS[@]}")
+          set -e
+          python3 tools/diagnostics/keyboard_geometry_xctest_receipt.py --class KeyboardGeometryTests --source static/ergopti_plus/macos/launcher/Tests/ErgoptiPlusTests/KeyboardGeometryTests.swift --log "$owner/KeyboardGeometryTests.log" --test-exit "${status[0]}" --capture-exit "${status[1]}" --receipt "$owner/KeyboardGeometryTests.receipt.json"
+      - name: Receive actual launcher environment
+        if: ${{ !cancelled() && steps.source.outcome == 'success' && steps.portable.outcome == 'success' }}
+        run: |
+          set -euo pipefail
+          unset ERGOPTI_DEV_QUALIFICATION_PROFILE
+          owner="$RUNNER_TEMP/keyboard-geometry-evidence"
+          test -d "$owner"
+          set +e
+          swift test --package-path static/ergopti_plus/macos/launcher --scratch-path "$RUNNER_TEMP/keyboard-geometry-swift" --filter LauncherEnvironmentTests 2>&1 | tee "$owner/LauncherEnvironmentTests.log"
+          status=("${PIPESTATUS[@]}")
+          set -e
+          python3 tools/diagnostics/keyboard_geometry_xctest_receipt.py --class LauncherEnvironmentTests --source static/ergopti_plus/macos/launcher/Tests/ErgoptiPlusTests/LauncherEnvironmentTests.swift --log "$owner/LauncherEnvironmentTests.log" --test-exit "${status[0]}" --capture-exit "${status[1]}" --receipt "$owner/LauncherEnvironmentTests.receipt.json"
+      - name: Preserve native results and failures
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: keyboard-geometry-${{ matrix.runner }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/keyboard-geometry-evidence/
+          if-no-files-found: error
+          retention-days: 7

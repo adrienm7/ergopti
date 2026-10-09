@@ -910,6 +910,9 @@ do
 end
 
 -- Now safe to load modules that depend on config_dir
+-- The native map is immutable for this VM; every key event supplies its own
+-- model identifier, including events from Karabiner's virtual keyboard.
+require("adapters.keyboard_geometry").initialize()
 local file_system        = require("adapters.file_system")
 -- Guarded: platform.remap reaches platform/remap/defaults.lua, whose
 -- top-level body calls load_sections() and require_section() and raises from both.
