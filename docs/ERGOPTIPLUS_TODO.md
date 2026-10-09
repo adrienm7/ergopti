@@ -4946,7 +4946,7 @@ integrated, then publish one grouped release.
 
 - [~] **54.** Every menu is declared in the shared menu manifest, never in
   driver code. The ratchet `npm run test:native-menu-rows` counts the rows
-  drivers still build (current baseline: Windows 27, macOS 21, Linux 27, each
+  drivers still build (current baseline: Windows 26, macOS 19, Linux 22, each
   site listed in tools/test/native-menu-rows-baseline.json); migrate them to
   zero. Each OS-limited row declares `unavailable = "hide"` (not
   applicable) or `"grey"` (not yet ported, with its reason); classify the
@@ -5799,7 +5799,59 @@ and zero remaining sites and failed writes. This validation correction changes
 no native menu behavior or generated artifact. The remaining menu families and
 item 38 device acceptance stay open, and items 54/81 remain partial.
 
-The separately reviewed combined LLM/About menu-parent tranche preserves native callbacks, dynamic children and all21 caption catalogues. Its historical exact-source run37896215435 passes the six selected menu/encoding/format targets, 11,951 Linux units, Linux E2E/package and17 installation scenarios, plus17,503 portable macOS units and the native tooltip captures. Windows executes10,489 passing checks with its sole remaining failure in canonical WinHTTP PAC routing; Windows E2E/package/install are skipped. macOS Brew packaging fails its native AppleEvent receiver case and installation is skipped. These receipts qualify the owned menu tranche at its recorded source tree; they are not blanket native, packaging or device success. Current upstream translations and keyboard policy remain preserved by the new three-way source composition. Remaining native menu families and items54/81 stay partial.
+The shared LLM/About parent tranche is integrated through the no-squash merge
+`cbb0efd431752da5ec8ccf38029463a76bb4ee55`, retaining original menu commit
+`a6ab7eff322595809f5260e480b3b876ff953853` and census commit
+`b299016568bea7aec5b2e9282401700290fce190`. All 44 reviewed source postimages and
+both genuine outputs remain unchanged in that merge. Native callbacks, dynamic
+children, the 21 caption catalogues and upstream keyboard metadata retain their
+existing owners. Its selected local gates pass formatting, AHK BOM/LF, 393 JS
+checks, 17,714 portable macOS unit checks, 12,474 Linux unit checks, 101 portable
+macOS E2E checks with one platform skip, and 189 Linux E2E checks.
+
+Exact integrated manual run 37917921507 is terminal failure: 404 shared JS checks,
+12,474 Linux units, Linux native E2E, packaging and all 17 installation scenarios
+pass; portable macOS units pass 17,765 checks and native tooltip captures pass.
+Windows stops before the main suite on an updater-fixture parse error. The
+corrective integrated run 37922366585 at `81f365c0` passes 10,612 Windows checks
+with three failures, while native macOS cold MLX and both SDK architectures pass.
+Managed-network and native Brew archive acceptance still fail; dependent Windows
+and macOS packaging and installation are skipped. Both manuals skip Release and
+are preserved without cancellation. These outcomes do not qualify every native
+consumer or installed-device behavior.
+
+The next shared menu tranche declares the Hotstrings language and scope parents,
+retains literal captions and per-entry native callbacks, and declares Linux AI
+outer parents around their existing child providers. Shared generic groups carry
+the existing localized unavailable reason and retain strict native ownership and
+acknowledgement checks. Its two separate current-source qualifications pass seven
+Hotstrings Node targets, six AI/menu Node targets, Linux LuaJIT language/provider
+coverage (116 cases), the completed unchanged-input Lua 5.4 language/provider
+coverage (122 cases), shared owner contracts (40 cases per driver and ABI), Linux
+AI parents (20 cases per ABI), and Agent settings (96 cases per ABI). Original
+negative controls and independent corpora remain intact. Supplemental Lua 5.4
+physical-writer failures reproduce the exact two unchanged-baseline failures;
+the actual Linux LuaJIT physical-writer suite passes 50/0. Supplemental macOS
+LuaJIT cannot parse the unchanged native bit-shift syntax; required macOS Lua 5.4
+coverage passes. These private receipts remain distinct from the combined final
+selected gates and native packaging/installation qualification.
+
+Installed-device acceptance still requires opening LLM backend/profile parents,
+Hotstrings language/scope parents and About, checking captions and unavailable
+reasons, invoking retained child commands, and checking the same state after
+restart. Record the build and observed result on Windows and, when available,
+macOS; logs are not required for the initial observation. This does not replace
+unfinished configuration software, remaining native menu families or item 38's
+broader acceptance requirements. Items 54 and 81 remain partial.
+
+The final parent correction keeps the original macOS LLM singleton and
+gives Linux its own declaration. Present AI engines retain navigable settings
+when a native action capability is missing; unavailable actions refuse without
+changing state or refreshing the menu. Complete local selected Lua gates pass
+17,782 portable macOS and 12,545 Linux tests, plus 101 macOS and 189 Linux
+E2E scenarios. One existing macOS host scenario is skipped. Native Windows
+execution, final integrated native CI and installed-device acceptance remain
+required; these results do not close this item.
 
 - [ ] **62.** Downloads on managed company networks: system trust and
       system proxy for every download child (Ollama installation/server/pull,
@@ -7421,9 +7473,9 @@ is committed; one request is one commit with its regression test.
 
 - [~] **81.** The maintainer asks to treat item 54 now (every menu row is
   declared in the shared manifest, none built in a driver's folder):
-  Windows 27, macOS 22 and Linux 30 rows are still built by the
-  drivers (`tools/test/native-menu-rows-baseline.json`). Read on
-  2026-10-01, the sites are of four kinds, and three of them need the
+  Windows 26, macOS 19 and Linux 22 rows are still built by the
+  drivers (`tools/test/native-menu-rows-baseline.json`). The current census
+  was regenerated on 2026-10-09. The sites are of four kinds, and three need the
   manifest to say more than it can today:
   (a) rows a `dynamic` entry leaves to the driver (Windows `register`,
   `append` and `add`: the WPM widget rows of Metrics, the AI menus):

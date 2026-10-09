@@ -255,12 +255,14 @@ end
 --- @return table Provider row.
 function M.all_sections_row(ctx, group_names, set_fn)
 	local all_on = M.all_sections_on(ctx, group_names)
-	return {
-		label    = i18n.get("menu.hotstrings.enable_all_sections"),
-		checked  = all_on,
-		disabled = ctx.paused or nil,
-		action   = not ctx.paused and set_fn(not all_on) or nil,
-	}
+	local row = ManifestMenu.check_row("hotstring_scope_checkbox", "hotstring_scope_all_sections",
+		{ hotstring_scope_all_sections = function() return false end },
+		{ hotstring_scope_all_on = function() return all_on end })
+	if not row then return nil end
+	-- Acquire the original native callback only after declaration admission.
+	row.disabled = ctx.paused or nil
+	row.action = not ctx.paused and set_fn(not all_on) or nil
+	return row
 end
 
 local function open_toml_path(path)

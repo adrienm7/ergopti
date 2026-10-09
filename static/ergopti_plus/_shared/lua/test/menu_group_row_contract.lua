@@ -225,4 +225,149 @@ function M.register(helpers, driver)
 	end)
 end
 
+
+
+local register_finished_groups = M.register
+
+--- Exercises the genuine generic build route in both already registered Lua consumers.
+function M.register(helpers, driver)
+	register_finished_groups(helpers, driver)
+	helpers.describe("generic declared group disabled reason", function()
+		for _, code in ipairs({ "en", "fr" }) do
+			local language = code
+			for _, ready in ipairs({ false, true }) do
+				local state = ready
+				helpers.it("generic group preserves native child and translated readiness " .. tostring(state) .. " in " .. language, function()
+					with_parent(driver, language, function(menu, child, _, count)
+						local root = menu.get_root()
+						root.generic_reason = { { type = "group", id = "parent", i18n = "menu.llm.title",
+							disabled_when = { "ready" }, disabled_reason_key = "menu.llm.unavailable" } }
+						local reads, builds = 0, 0
+						local rows = menu.build("generic_reason", "", {}, { parent = function()
+							builds = builds + 1; return { menu = child }
+						end }, { state_getters = { ready = function() reads = reads + 1; return state end } })
+						helpers.assert_eq(#rows, 1)
+						local caption = ({ en = "✨ Artificial Intelligence", fr = "✨ Intelligence Artificielle" })[language]
+						local reason = ({ en = "AI unavailable", fr = "IA indisponible" })[language]
+						helpers.assert_eq(rows[1].title, state and caption or (caption .. " — " .. reason))
+						if state then helpers.assert_nil(rows[1].disabled) else helpers.assert_eq(rows[1].disabled, true) end
+						helpers.assert_true(rawequal(rows[1].menu, child))
+						helpers.assert_true(rawequal(rows[1].menu[1].fn, child[1].fn))
+						helpers.assert_eq(reads, 1); helpers.assert_eq(builds, 1); helpers.assert_eq(count(), 0)
+					end)
+				end)
+			end
+		end
+		helpers.it("generic reasoned group preserves the original builder disabled state", function()
+			with_parent(driver, "en", function(menu, child)
+				menu.get_root().generic_reason = { { type = "group", id = "parent", i18n = "menu.llm.title",
+					disabled_when = { "ready" }, disabled_reason_key = "menu.llm.unavailable" } }
+				local rows = menu.build("generic_reason", "", {}, { parent = function()
+					return { menu = child, disabled = true }
+				end }, { state_getters = { ready = function() return true end } })
+				helpers.assert_eq(#rows, 1); helpers.assert_eq(rows[1].disabled, true)
+				helpers.assert_eq(rows[1].title, "✨ Artificial Intelligence")
+				helpers.assert_true(rawequal(rows[1].menu, child))
+			end)
+		end)
+		for _, change in ipairs({ "source", "getter", "builder", "context", "child" }) do
+			local mutation = change
+			helpers.it("generic group final getter refuses " .. mutation .. " withdrawal", function()
+				with_parent(driver, "en", function(menu, child, _, count)
+					local root = menu.get_root()
+					root.generic_reason = { { type = "group", id = "parent", i18n = "menu.llm.title",
+						disabled_when = { "ready" }, disabled_reason_key = "menu.llm.unavailable" } }
+					local calls = 0
+					local builders = { parent = function() return { menu = child } end }
+					local getters = {}
+					local ctx = { state_getters = getters, on_menu_changed = function() end }
+					getters.ready = function()
+						calls = calls + 1
+						if mutation == "source" then root.generic_reason = nil
+						elseif mutation == "getter" then getters.ready = function() return false end
+						elseif mutation == "builder" then builders.parent = function() return {} end
+						elseif mutation == "context" then ctx.on_menu_changed = nil
+						else child[1].fn = function() error("replaced native action") end end
+						return false
+					end
+					local rows = menu.build("generic_reason", "", {}, builders, ctx)
+					helpers.assert_eq(calls, 1, "the real declared getter must execute")
+					helpers.assert_eq(#rows, 0, "the withdrawn cohort must not publish a parent")
+					helpers.assert_eq(count(), 0)
+				end)
+			end)
+		end
+	end)
+end
+
+
+local register_generic_groups = M.register
+
+--- Retains the old physical choice route and closes final API metamethod ownership.
+function M.register(helpers, driver)
+	register_generic_groups(helpers, driver)
+	helpers.describe("generic group corrective owner fences", function()
+		helpers.it("retains the existing physical updater choice with a nonempty genuine context", function()
+			with_physical_parent(driver, "en", function(menu)
+				local calls, selected = 0, nil
+				local ctx = { commands = { update_channel = function(value)
+					calls = calls + 1; selected = value; return true
+				end }, state_getters = { ["updater.channel"] = function() return "main" end } }
+				local rows = menu.build("about_update_channel_menu", "", {}, {}, ctx)
+				helpers.assert_eq(#rows, 1)
+				helpers.assert_eq(rows[1].title, "Update channel: Stable")
+				helpers.assert_eq(#rows[1].menu, 2)
+				helpers.assert_eq(rows[1].menu[1].checked, true)
+				helpers.assert_eq(rows[1].menu[2].checked, false)
+				helpers.assert_eq(calls, 0)
+				helpers.assert_eq(rows[1].menu[2].fn(), true)
+				helpers.assert_eq(selected, "dev"); helpers.assert_eq(calls, 1)
+			end)
+		end)
+		helpers.it("refuses API ownership withdrawn through a final getter installed metatable", function()
+			with_parent(driver, "en", function(menu, child, _, count)
+				local root = menu.get_root()
+				root.generic_reason = { { type = "group", id = "parent", i18n = "menu.llm.title",
+					disabled_when = { "ready" }, disabled_reason_key = "menu.llm.unavailable" } }
+				local original_group = rawget(menu, "group_row")
+				local original_disabled = rawget(menu, "resolve_disabled_when")
+				local previous_meta = getmetatable(menu)
+				local reads, projected, meta_reads = 0, false, 0
+				rawset(menu, "group_row", function(key, id, completed, getters)
+					local row = original_group(key, id, completed, getters)
+					helpers.assert_type(row, "table", "the genuine completed group result is the positive premise")
+					helpers.assert_true(rawequal(row.submenu, child))
+					projected = true
+					return row
+				end)
+				local ok, detail = xpcall(function()
+					local rows = menu.build("generic_reason", "", {}, { parent = function()
+						return { menu = child }
+					end }, { state_getters = { ready = function()
+						reads = reads + 1
+						rawset(menu, "resolve_disabled_when", nil)
+						setmetatable(menu, { __index = function(_, key)
+							meta_reads = meta_reads + 1
+							if key == "resolve_disabled_when" then
+								rawset(menu, "group_row", nil)
+								return original_disabled
+							end
+						end })
+						return false
+					end } })
+					helpers.assert_eq(reads, 1, "the actual native final readiness getter must execute")
+					helpers.assert_eq(projected, true, "the genuine parent was constructed before final validation")
+					helpers.assert_eq(#rows, 0, "the withdrawn API cohort must not publish")
+					helpers.assert_eq(meta_reads, 0, "final validation uses only raw API identity reads")
+					helpers.assert_eq(count(), 0)
+				end, debug.traceback)
+				setmetatable(menu, previous_meta)
+				rawset(menu, "group_row", original_group)
+				rawset(menu, "resolve_disabled_when", original_disabled)
+				if not ok then error(detail, 0) end
+			end)
+		end)
+	end)
+end
+
 return M

@@ -1,0 +1,132 @@
+{
+	"candidate": "f2336a7dfa9b6ee57a4fe5561ee21fbbbadc9b92",
+	"integrated_sha": "2ebdb643ef8d8e1f9352eaca8c9490510a3c1fda",
+	"parents": [
+		"81f365c09976f8e38821f1d9216e422508ca9167",
+		"f2336a7dfa9b6ee57a4fe5561ee21fbbbadc9b92"
+	],
+	"tree": "0ccafe4cc617eae3052fcef8872ad83d3c0bcc18",
+	"feature_commits": [
+		"02ae39716b714f062a21e1b2a32ae2ea7c4c7e3f",
+		"990c017f282338d600d37464ed3b5d279249790a"
+	],
+	"local_selected": {
+		"status": "PASS",
+		"format": "PASS",
+		"js": 404,
+		"hs_pass": 17783,
+		"hs_fail": 0,
+		"hs_modules": 1554,
+		"virtual_e2e_pass": 101,
+		"host_e2e_skip": 1,
+		"source_unchanged": true
+	},
+	"manual": {
+		"id": 37933681841,
+		"url": "https://github.com/adrienm7/ergopti/actions/runs/37933681841",
+		"event": "workflow_dispatch",
+		"branch": "codex/ci-validation",
+		"sha": "2ebdb643ef8d8e1f9352eaca8c9490510a3c1fda",
+		"conclusion": "failure",
+		"os_lanes": "macos",
+		"jobs": [
+			{
+				"id": 113830350268,
+				"name": "Validate / Checks and plan",
+				"conclusion": "success"
+			},
+			{
+				"id": 113830671093,
+				"name": "Core / properties",
+				"conclusion": "success"
+			},
+			{
+				"id": 113830671220,
+				"name": "Core / js",
+				"conclusion": "success"
+			},
+			{
+				"id": 113830671243,
+				"name": "macOS / Unit tests (stubbed)",
+				"conclusion": "success"
+			},
+			{
+				"id": 113830671380,
+				"name": "macOS / Native cold MLX bootstrap \u00b7 macos-15 arm64",
+				"conclusion": "success"
+			},
+			{
+				"id": 113830671388,
+				"name": "macOS / Managed Ollama native \u00b7 arm64",
+				"conclusion": "failure"
+			},
+			{
+				"id": 113830671465,
+				"name": "macOS / Item 36 native archive qualification",
+				"conclusion": "failure"
+			},
+			{
+				"id": 113830672114,
+				"name": "macOS / Managed Ollama native \u00b7 amd64",
+				"conclusion": "failure"
+			},
+			{
+				"id": 113830672999,
+				"name": "Windows",
+				"conclusion": "skipped"
+			},
+			{
+				"id": 113830673354,
+				"name": "Linux",
+				"conclusion": "skipped"
+			},
+			{
+				"id": 113834673896,
+				"name": "macOS / E2E tests (stubbed)",
+				"conclusion": "success"
+			},
+			{
+				"id": 113835631814,
+				"name": "macOS / Native tooltip canvas \u00b7 12 captures",
+				"conclusion": "success"
+			},
+			{
+				"id": 113835633298,
+				"name": "macOS / Package",
+				"conclusion": "skipped"
+			},
+			{
+				"id": 113835633990,
+				"name": "macOS / Install and launch \u00b7 ${{ matrix.scenario }} \u00b7 ${{ matrix.runner }}",
+				"conclusion": "skipped"
+			},
+			{
+				"id": 113835972705,
+				"name": "macOS / Verdict",
+				"conclusion": "failure"
+			},
+			{
+				"id": 113836121912,
+				"name": "Validate / Selected OS verdict",
+				"conclusion": "failure"
+			},
+			{
+				"id": 113836124333,
+				"name": "Release / Publish",
+				"conclusion": "skipped"
+			}
+		],
+		"query_worker_new_api_test": "COMPILED; NOT SELECTED/EXECUTED",
+		"original_native_sdk41": "PASS BOTH ARCHITECTURES; DISTINCT COHORT",
+		"package_install": "SKIPPED",
+		"release": "SKIPPED"
+	},
+	"automatic_cancelled": [37933618835],
+	"lock": {
+		"sha": "7d8e9d3d42e9c3ca989fe94b6d788477dd1bb45c",
+		"owner": 3,
+		"deleted_after_terminal": true
+	},
+	"todo_removed": [],
+	"feature_retained": true
+}

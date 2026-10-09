@@ -8332,6 +8332,27 @@ checked_when = ["llm_parent_enabled"]
 platforms = ["hs"]
 unavailable = "hide"
 
+# Linux completes the existing native children before declaring either parent.
+[[menu.llm_native_parent_linux]]
+type = "group"
+id = "llm_parent_linux"
+i18n = "menu.llm.title"
+checked_when = ["llm_parent_enabled"]
+disabled_when = ["llm_parent_ready"]
+disabled_reason_key = "menu.llm.unavailable"
+platforms = ["linux"]
+unavailable = "hide"
+
+[[menu.agent_native_parent]]
+type = "group"
+id = "agent_parent_linux"
+i18n = "menu.agent.title"
+checked_when = ["agent_parent_enabled"]
+disabled_when = ["agent_parent_ready"]
+disabled_reason_key = "menu.llm.unavailable"
+platforms = ["linux"]
+unavailable = "hide"
+
 [[menu.llm_download_shortcut_frame]]
 type = "command"
 id = "llm_download_shortcut"
@@ -9398,4 +9419,44 @@ type = "command"
 id = "slot_binding_clear"
 i18n = "dialog.action_picker.disabled"
 platforms = ["linux"]
+unavailable = "hide"
+
+# Language presentation consumes actual native categories. This frame does not
+# claim aggregate catalogue or scope transaction ownership.
+[[menu.hotstring_scope_checkbox]]
+type = "check"
+id = "hotstring_scope_all_sections"
+i18n = "menu.hotstrings.enable_all_sections"
+checked_when = ["hotstring_scope_all_on"]
+
+[[menu.hotstring_language_frame]]
+type = "list"
+id = "hotstring_language_switch"
+
+[[menu.hotstring_language_frame]]
+type = "---"
+
+[[menu.hotstring_language_frame]]
+type = "list"
+id = "hotstring_language_categories"
+
+[[menu.hotstring_language_parent_windows]]
+type = "group"
+id = "hotstring_language_children"
+caption_source = "native"
+caption_getter = "hotstring_language_name"
+caption_count_getter = "hotstring_language_count"
+caption_count_format = "%s (%s)"
+icon_getter = "hotstring_language_icon"
+platforms = ["ahk"]
+unavailable = "hide"
+
+[[menu.hotstring_language_parent_lua]]
+type = "group"
+id = "hotstring_language_children"
+caption_source = "native"
+caption_getter = "hotstring_language_name"
+caption_count_getter = "hotstring_language_count"
+caption_count_format = "%s (%s)"
+platforms = ["hs", "linux"]
 unavailable = "hide"
