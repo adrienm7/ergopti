@@ -2981,6 +2981,25 @@ const { nativeLinuxAiParentPublication } = require('../lib/menu-native-llm-paren
 			['linux/ui/menu/ai_parent.lua', 'api_method(renderer, method)', 'renderer[method]'],
 			['linux/ui/menu/ai_parent.lua', 'return row\nend', 'return { label = "synthetic" }\nend']
 		];
+		const disabledRow =
+			'elseif row.disabled == true then\n\t\t\t\t\trows[#rows + 1] = { label = i18n_safe(row.i18n), disabled = true,\n\t\t\t\t\t\tdisabled_reason_key = row.reason_key }';
+		for (const [before, after] of [
+			['elseif row.disabled == true then', 'elseif false then'],
+			['disabled = true,', 'disabled = false,'],
+			['disabled_reason_key = row.reason_key', 'disabled_reason_key = "foreign"'],
+			['label = i18n_safe(row.i18n)', 'label = "synthetic"']
+		]) {
+			assert.equal(
+				disabledRow.split(before).length - 1,
+				1,
+				'closed disabled branch mutation exists'
+			);
+			replacements.push([
+				'linux/ui/menu/menu_builder.lua',
+				disabledRow,
+				disabledRow.replace(before, after)
+			]);
+		}
 		if (kind === 'agent')
 			replacements.push(
 				[producerFile, 'llm.set_agent_mode(id)', 'true'],
