@@ -5780,6 +5780,21 @@ or duplicate notices refuse. Original assertions and clocks remain intact.
 Portable PowerShell controls pass; genuine Windows receiving remains required
 before choosing a fix for the early native failure or closing item62.
 
+Native Windows follow-up (2026-10-09): manual37859445983 at
+`30dc44176959ccdf3571db2191e1155e5d1bd3a9` completes all10,454 registered
+controls:10,446 pass and8 fail, with no watchdog. Core JavaScript/properties
+pass; E2E, package and installation are skipped, and no release runs. The
+captured legacy source cause is the unavailable Get-FileHash command; its
+isolated fixture now hashes held source streams through the runtime SHA256
+API and guards absent optional control keys under StrictMode. Five controlled
+protocol cases and independent exact-byte/closure controls pass portably;
+corrected Windows receiving is unrun. The existing early sidecar is now exposed
+on file-remove refusal, and bounded SSPI counters preserve the original primary
+assertions. WinHTTP's closed diagnostic uses the stdout channel its original
+receiver reads. Remaining actual PAC, staging and SSPI physical-retirement
+causes require the corrected native run; diagnostic changes do not claim fixes
+or waive assertions. Item62 and transversal16/38 remain open.
+
 Native Windows receiving follow-up (2026-10-08): manual37850871117 at
 `dea3ec72fb11df9780424dcb735c99d7bca8a70c` terminates with failure after the
 unchanged native watchdog:8,135 passed and9 failed results,8,144 of10,438

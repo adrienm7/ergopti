@@ -14,6 +14,21 @@ $DiagnosticStage='prepare'
 $DiagnosticExit=-999
 $DiagnosticOut=-1
 $DiagnosticErr=-1
+function Get-ErgoptiRetirementSourceHash {
+    param([string]$Path)
+    # The isolated native caller disables module auto-loading. Hash the held
+    # source stream with the runtime API rather than an optional shell command.
+    $Stream=$null
+    $Algorithm=$null
+    try {
+        $Stream=[IO.File]::OpenRead($Path)
+        $Algorithm=[Security.Cryptography.SHA256]::Create()
+        return [BitConverter]::ToString($Algorithm.ComputeHash($Stream)).Replace('-','')
+    } finally {
+        if($null -ne $Algorithm){$Algorithm.Dispose()}
+        if($null -ne $Stream){$Stream.Dispose()}
+    }
+}
 try {
     $null=[IO.Directory]::CreateDirectory($Root)
     $Source=[IO.File]::ReadAllBytes($WorkerPath)
@@ -52,8 +67,8 @@ function ConvertFrom-ErgoptiPacRoutes {
         $null=[IO.Directory]::CreateDirectory($Case)
         $Worker=Join-Path $Case 'worker.ps1'
         [IO.File]::WriteAllBytes($Worker,$Source)
-        if((Get-FileHash -LiteralPath $Worker -Algorithm SHA256).Hash -cne
-            (Get-FileHash -LiteralPath $WorkerPath -Algorithm SHA256).Hash) {
+        if((Get-ErgoptiRetirementSourceHash -Path $Worker) -cne
+            (Get-ErgoptiRetirementSourceHash -Path $WorkerPath)) {
             throw 'Production worker source identity was not preserved.'
         }
         [IO.File]::WriteAllText((Join-Path $Case 'ergopti_network_routes.ps1'),$ControlledPorts,$Utf8)
@@ -61,7 +76,7 @@ function ConvertFrom-ErgoptiPacRoutes {
         $Defaults=Join-Path $Case 'defaults.json'
         [IO.File]::WriteAllText($Defaults,'{"release_sources":{"proxy_resolve_timeout_sec":10}}',$Utf8)
         $Input=Join-Path $Case 'input.json'
-        $Urls=if($Control.Ipv6){@('https://legacy-fixture.invalid/ipv6')}elseif($Control.Proxy){@('https://legacy-fixture.invalid/proxy')}else{
+        $Urls=if($Control.ContainsKey('Ipv6') -and $Control.Ipv6){@('https://legacy-fixture.invalid/ipv6')}elseif($Control.ContainsKey('Proxy') -and $Control.Proxy){@('https://legacy-fixture.invalid/proxy')}else{
             @('https://legacy-fixture.invalid/a','https://legacy-fixture.invalid/b','https://legacy-fixture.invalid/c')}
         $Record=@{version=1;auto_detect=$false;pac_url='http://pac-fixture.invalid/order.pac';
             urls=@($Urls);
@@ -101,7 +116,7 @@ function ConvertFrom-ErgoptiPacRoutes {
             throw 'Legacy worker started after native debt or published a partial completed receipt.'
         }
         $DiagnosticStage='raw_proxy_contract'
-        if($Control.Proxy -and ($Frame.results[0].ok -ne $true -or
+        if($Control.ContainsKey('Proxy') -and $Control.Proxy -and ($Frame.results[0].ok -ne $true -or
             $Frame.results[0].kind -cne 'named_proxy' -or $Frame.results[0].access_type -ne 3 -or
             $Frame.results[0].proxy -cne $Control.Raw -or
             $Frame.results[0].bypass -cne '' -or $Frame.results[0].native_error -ne 0)) {
