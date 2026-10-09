@@ -5067,6 +5067,16 @@ The predecessor41be manual run37862638268 is terminal FAILURE: its original
 This candidate does not fix or qualify those separate native failures, nor
 complete item31 or transverse16/38.
 
+A failure-only owned-configuration observation now preserves the original
+native admission and exception while reporting only fixed operation, cleanup
+and retirement enums. All16 original controls and8 new refusal observations
+pass in the actual24-method portable suite. Independent bounded source and
+privacy review is CLEAR; the default XCTest method remains native unexecuted.
+Exact41 native configuration still refuses despite a complete eight-variant
+private packet; its controller cause is not yet observed. The diagnostic grants
+no permission, installation, remapping or runtime authority. Item31 and
+transverse16/38 remain open.
+
 - [~] **33.** Config policy for the files other than config.toml (the former
   item 25): Published in the second 2026-09-30 release for the files the review
   listed; see `docs/memory/text-input-and-config.md`. Current source already

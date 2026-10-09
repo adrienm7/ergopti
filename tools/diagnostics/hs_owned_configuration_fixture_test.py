@@ -2,6 +2,7 @@
 """Handwritten owner-file and native receipt refusals, frozen before fixture code."""
 
 import hashlib
+import io
 import json
 import os
 from pathlib import Path
@@ -162,6 +163,127 @@ class OwnedConfigurationNativeControls(unittest.TestCase):
             self.assertEqual(source.stat().st_mtime_ns, original.st_mtime_ns)
             with self.assertRaisesRegex(ValueError, "Source identity changed"):
                 fixture.verify_identity(source, identity)
+
+
+class OwnedConfigurationFailureObservationControls(unittest.TestCase):
+    """Closed diagnostics cannot change genuine admission or expose failure text."""
+
+    def invoke(self, packet, report):
+        operation = getattr(fixture, "admit_with_failure_observation", fixture.admit)
+        return operation(packet, report, NONCE, 42, EXECUTABLE, DOMAIN)
+
+    def capture_refusal(self, report, packet=None):
+        sink = io.StringIO()
+        with mock.patch.object(fixture.sys, "stderr", sink):
+            with self.assertRaises(ValueError):
+                self.invoke(owned_receipt() if packet is None else packet, report)
+        raw = sink.getvalue()
+        self.assertLessEqual(len(raw.encode()), 512)
+        self.assertTrue(raw.startswith("ERGOPTI_OWNED_CONFIGURATION_FAILURE "))
+        self.assertEqual(raw.count("\n"), 1)
+        return json.loads(raw.removeprefix("ERGOPTI_OWNED_CONFIGURATION_FAILURE "))
+
+    def expected(self, operation="none", cleanup="none", retirement="acknowledged"):
+        return {
+            "schema": 1,
+            "kind": "owned_configuration_controller_failure_observation",
+            "authority": False,
+            "native_verdict": "unchanged",
+            "operation": operation,
+            "cleanup": cleanup,
+            "retirement": retirement,
+        }
+
+    def test_original_controller_refusals_project_only_their_fixed_operation(self):
+        cases = (
+            ("Native private publication observation deadline", "observation_deadline"),
+            ("Native private publication receipt deadline", "receipt_deadline"),
+            ("Exact native publication child exited before receipt", "child_exited_before_receipt"),
+            ("Exact native publication child exited during receipt", "child_exited_during_receipt"),
+            ("Source identity changed", "source_identity_changed"),
+            ("Native private publication controller deadline", "controller_deadline"),
+        )
+        for reason, operation in cases:
+            with self.subTest(operation=operation):
+                report = OwnedConfigurationNativeControls().report()
+                report["operation_error"] = reason
+                self.assertEqual(self.capture_refusal(report), self.expected(operation=operation))
+
+    def test_cleanup_failure_cannot_be_hidden_by_a_complete_native_packet(self):
+        report = OwnedConfigurationNativeControls().report()
+        report["cleanup_errors"] = ["Retirement: private details must never be projected"]
+        self.assertEqual(self.capture_refusal(report), self.expected(cleanup="refused"))
+
+    def test_unconfirmed_retirement_remains_a_refusal(self):
+        report = OwnedConfigurationNativeControls().report()
+        report["application_cleanup"] = "unconfirmed; inputs retained"
+        self.assertEqual(self.capture_refusal(report), self.expected(retirement="unconfirmed"))
+
+    def test_original_packet_validation_remains_required_after_clean_retirement(self):
+        packet = owned_receipt()
+        packet["complete"] = False
+        self.assertEqual(
+            self.capture_refusal(OwnedConfigurationNativeControls().report(), packet),
+            self.expected(),
+        )
+
+    def test_unknown_failure_text_never_enters_the_diagnostic(self):
+        report = OwnedConfigurationNativeControls().report()
+        report["operation_error"] = "/private/customer/path\n" + "sensitive" * 5000
+        self.assertEqual(
+            self.capture_refusal(report), self.expected(operation="unclassified_refusal")
+        )
+
+    def test_nonplain_reports_receive_no_additional_foreign_getter_call(self):
+        calls = []
+        original = ValueError("primary owner refusal")
+
+        class ForeignReport(dict):
+            def get(self, *args):
+                calls.append(args)
+                raise original
+
+        sink = io.StringIO()
+        with mock.patch.object(fixture.sys, "stderr", sink):
+            with self.assertRaises(ValueError) as error:
+                self.invoke(owned_receipt(), ForeignReport())
+        self.assertIs(error.exception, original)
+        self.assertEqual(len(calls), 1)
+        self.assertEqual(
+            json.loads(sink.getvalue().removeprefix("ERGOPTI_OWNED_CONFIGURATION_FAILURE ")),
+            self.expected(operation="unavailable", cleanup="unavailable", retirement="unavailable"),
+        )
+
+    def test_failed_diagnostic_sink_preserves_the_original_exception_identity(self):
+        original = ValueError("primary owner refusal")
+        report = OwnedConfigurationNativeControls().report()
+        with mock.patch.object(fixture, "admit", side_effect=original):
+            with mock.patch.object(
+                fixture.sys.stderr, "write", side_effect=OSError("sink unavailable")
+            ):
+                with self.assertRaises(ValueError) as error:
+                    self.invoke(owned_receipt(), report)
+        self.assertIs(error.exception, original)
+
+    def test_healthy_genuine_admission_emits_nothing_and_keeps_its_result_identity(self):
+        actual_admit = fixture.admit
+        returned = []
+
+        def observed(*args):
+            result = actual_admit(*args)
+            returned.append(result)
+            return result
+
+        sink = io.StringIO()
+        with mock.patch.object(fixture, "admit", side_effect=observed):
+            with mock.patch.object(fixture.sys, "stderr", sink):
+                result = self.invoke(owned_receipt(), OwnedConfigurationNativeControls().report())
+        self.assertEqual(sink.getvalue(), "")
+        self.assertEqual(len(returned), 1)
+        self.assertIs(result, returned[0])
+        self.assertEqual(result["variant_count"], 8)
+        self.assertIs(result["installation"], False)
+        self.assertIs(result["remapping"], False)
 
 
 class OwnedConfigurationProviderControls(unittest.TestCase):
