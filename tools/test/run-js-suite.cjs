@@ -31,6 +31,12 @@ const FULL = process.argv.includes('--full');
 // Each check mirrors a CI "Validate ·" step. command/args are run from ROOT.
 const CHECKS = [
 	{
+		name: 'macOS native PAC and WPAD qualification requires all twelve original cases',
+		cmd: process.execPath,
+		args: ['tools/test/test-macos-native-pac-qualification.cjs'],
+		repro: 'npm run test:macos-native-pac-qualification'
+	},
+	{
 		name: 'macOS archive qualification requires exact native cases and compiler inputs',
 		cmd: process.execPath,
 		args: ['tools/test/test-item36-native-qualification.cjs'],

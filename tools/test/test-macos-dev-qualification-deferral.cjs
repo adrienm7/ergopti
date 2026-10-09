@@ -108,7 +108,35 @@ function admitNativeSdkSelector(mac) {
 		'            exit 1\n          fi\n';
 	if (step.split(skippedRefusal).length !== 2) return null;
 	const position = jobs[0].index + steps[0].index + step.indexOf(SDK_FILTER);
-	return admitItem36Selector(mac.slice(0, position) + mac.slice(position + SDK_FILTER.length));
+	return admitNativePacSelector(mac.slice(0, position) + mac.slice(position + SDK_FILTER.length));
+}
+// Only the exact existing PAC/WPAD receiving cohort may use this selector.
+const PAC_STEP_NAME = 'Qualify actual native PAC and WPAD XCTest controls';
+const PAC_FILTER =
+	"--filter 'ManagedHTTPWorkerTests|ManagedHTTPWireTests|ManagedHTTPWPADWireTests'";
+const PAC_STEP_SOURCE =
+	'      - name: Qualify actual native PAC and WPAD XCTest controls\n        if: ${{ !cancelled() }}\n        shell: bash\n        run: |\n          set -euo pipefail\n          test -n "$ERGOPTI_NATIVE_HTTP_PYTHON"\n          test -x "$ERGOPTI_NATIVE_HTTP_PYTHON"\n          transcript="$ERGOPTI_OLLAMA_BUILD_ROOT/native-pac-xctest.log"\n          set +e\n          swift test --package-path static/ergopti_plus/macos/launcher \\\n            --scratch-path "$ERGOPTI_OLLAMA_BUILD_ROOT/swift" \\\n            --filter \'ManagedHTTPWorkerTests|ManagedHTTPWireTests|ManagedHTTPWPADWireTests\' 2>&1 | tee "$transcript"\n          pac_statuses=("${PIPESTATUS[@]}")\n          set -e\n          node tools/diagnostics/managed_http_pac_xctest_evidence.cjs "$transcript" "${pac_statuses[0]}" "${pac_statuses[1]}" "$ERGOPTI_OLLAMA_BUILD_ROOT/native-pac-verdict.json"\n        timeout-minutes: 10\n';
+function admitNativePacSelector(mac) {
+	if (mac.split(PAC_FILTER).length !== 2) return null;
+	const jobs = [
+		...mac.matchAll(/^  managed-ollama-native:\n[\s\S]*?(?=^  [A-Za-z][\w-]*:|(?![\s\S]))/gm)
+	];
+	if (jobs.length !== 1) return null;
+	const job = jobs[0][0];
+	const steps = [
+		...job.matchAll(
+			/^      - name: Qualify actual native PAC and WPAD XCTest controls\n[\s\S]*?(?=^      - |(?![\s\S]))/gm
+		)
+	];
+	if (steps.length !== 1 || steps[0][0] !== PAC_STEP_SOURCE || job.split(PAC_FILTER).length !== 2)
+		return null;
+	const before = job.indexOf(`      - name: ${SDK_STEP_NAME}\n`);
+	const after = job.indexOf(
+		'      - name: Receive actual independent managed HTTP native clients\n'
+	);
+	if (before < 0 || before >= steps[0].index || after <= steps[0].index) return null;
+	const position = jobs[0].index + steps[0].index + steps[0][0].indexOf(PAC_FILTER);
+	return admitItem36Selector(mac.slice(0, position) + mac.slice(position + PAC_FILTER.length));
 }
 // Admit only the additional manual diagnostic selector and its exact source owner.
 const ITEM36_FILTER =
@@ -777,4 +805,14 @@ console.log(
 	'PASS: Mac qualification deferral source/typed-receipt controls=52; Swift/native execution unqualified.'
 );
 
-require('./test-item36-native-qualification.cjs')({ workflow, admitItem36Selector, ITEM36_FILTER });
+require('./test-item36-native-qualification.cjs')({
+	workflow,
+	admitItem36Selector,
+	ITEM36_FILTER
+});
+
+require('./test-macos-native-pac-qualification.cjs')({
+	workflow,
+	admitNativePacSelector,
+	PAC_FILTER
+});
