@@ -1,0 +1,32 @@
+{
+	"feature_source": "edaafae64db1d0ff748ae87c96af055b3f03c617",
+	"archive": {
+		"path": "prepared-evidence.tar.gz",
+		"bytes": 416615,
+		"sha256": "a990c9b7a2a3d3d3832d8285628aa908483684ff33e8c16b10bc38e41856ab72",
+		"members": 75
+	},
+	"packets": [
+		{
+			"prefix": "focused-ci",
+			"census": "CENSUS.json",
+			"sha256": "15a94b92d34284b6e659028e44a3c54b5523f7b1f3103c47f210870287220732",
+			"subjects": 37
+		},
+		{
+			"prefix": "focused-ci-independent",
+			"census": "CENSUS.json",
+			"sha256": "832aa331135a384f9e3e330ef17996b081420987e2439436fabdd26eae52570d",
+			"subjects": 5
+		},
+		{
+			"prefix": "cadence-HOLD",
+			"census": "MANIFEST.json",
+			"sha256": "3c269532e6448943e532158b956682e72952a75887eb533b5dfd7bf6a48f8dc9",
+			"subjects": 28
+		}
+	],
+	"adoption": "HOLD_G6_SOURCE_SUCCESSOR",
+	"native_execution": "UNEXECUTED",
+	"incident_exit73_cause": "UNKNOWN"
+}

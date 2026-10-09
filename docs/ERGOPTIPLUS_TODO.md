@@ -3243,6 +3243,11 @@ ports. Exact-source macOS execution remains required. The first tap-hold exit
 73 cause remains unknown; this ownership correction does not qualify incident recovery or complete item 24. The separate
 heartbeat cadence proposal remains on hold, and fallback policy is unchanged.
 
+The independently reviewed native cohort preparation and the failed cadence
+proposal are preserved in docs/handovers/2026-10-09-group5-native-qualification.
+CI adoption waits for the Group 6 guard successor; native execution is unrun,
+all original assertions remain mandatory, and item 24 stays partial.
+
 - [~] **30.** Physical magic-key setting on all three OSes: one
   `hotstrings.magic_key_source` (a KeyboardEvent.code, `auto` by default),
   config schema v5 migrating every spelling of the Windows
