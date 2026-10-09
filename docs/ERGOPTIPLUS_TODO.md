@@ -9135,7 +9135,9 @@ Current Group 3 source checkpoint (item 111, 2026-10-06): [Group 3 current check
 The maintainer requested a release before 2026-10-09 09:00 Europe/Paris and
 explicitly authorized temporary test-execution deferrals when necessary.
 The closed policy in `.github/ci/dev_release_qualification_exceptions.json`
-applies only to the dev push prerelease `v0.0.0-dev.156` before 07:00 UTC.
+now applies only to the dev push prerelease `v0.0.0-dev.156` before
+2026-10-10 07:00 UTC, following the renewed publication request after the
+hosted consent diagnosis. The original October 9 deadline was missed.
 Main, pull requests, local runs and the next dev tag retain full execution.
 Every deferred qualification remains open and must never count as a pass:
 
@@ -9167,13 +9169,43 @@ These deferrals do not close groups 2, 4 or 7, the Notepad/default-trigger
 qualification, recurring input incident 114 or promo follow-up 113. Their
 existing requirements and retained evidence remain authoritative.
 
-CI run `37868449649` passes Core and every Windows/Linux job. Release remains
-blocked by the clean and Karabiner macOS launch scenarios on ARM and Intel:
-external AppleEvent control and dependent native probes time out. Their
-cause is unproved. A separately reviewed exception proposal has portable
-test evidence, but explicit authorization of that additional scope is still
-pending. It has not changed the current four-scope policy or qualified a
-native feature.
+CI run `37868449649` passes Core and every Windows/Linux job under the
+documented four-scope profile. Diagnostic run `37898352401` reuses its exact
+archive on ARM and Intel and shows an unanswered Automation consent dialog:
+hosted-compute-agent requests control of ErgoptiPlus. Onboarding, continued
+application lifetime and normal Quit succeed. This establishes the external
+test precondition failure, not a Lua defect or a successful permission grant.
+
+- [ ] Qualify external macOS AppleEvents and the dependent native timer,
+      Karabiner and ScriptScope assertions on both architectures. The renewed
+      single-release profile records the four clean/Karabiner launch legs as
+      DEFERRED with `qualified:false`; lifecycle, other scenarios, packaging,
+      signing and installation remain required. Default, Main, PR and dev.157
+      runs must execute the complete assertions.
+
+- [ ] **116.** Provide a guided third-party prerelease validation report.
+      The maintainer requested a Debugging menu button that runs the needed
+      checks and returns one local file to share. Reuse asynchronous diagnostic
+      ownership, progress, cancellation and redacted export. Package the small
+      native probe graph through the canonical bundle owner. Keep quick export
+      as the default on all three OSes. Offer an unchecked "Include in-depth
+      tests (may take a long time)" checkbox, with progress, cancellation and
+      partial results. Reuse CI assertions that are safe in a personal session;
+      keep install, reload and profile-replacement suites in an explicitly
+      isolated mode and explain every unavailable prerequisite.
+      Bind results to
+      the actual version, source, package identity, OS and architecture; report
+      PASS, FAIL or NOT_RUN and observed permission/cleanup failures separately.
+      Run timers and Karabiner generation in private fixtures, external
+      AppleEvents only through normal user consent, and read-only Shortcuts
+      discovery. Run complete isolated Brew acceptance only when its declared
+      prerequisites exist. Never call CI profile seeding on a personal Mac,
+      change TCC, execute a personal shortcut or stop the resident driver.
+      Keep private text, configuration, shortcut names and credentials out of
+      the archive. Do not upload automatically. Match the menu/report contract
+      on all three drivers, with translated reasons for OS-specific checks.
+      An ARM report does not qualify Intel, future sources or hosted consent.
+      This follow-up does not delay the immediate dev.156 publication.
 
 ## Time estimate
 
