@@ -237,6 +237,12 @@ platforms = ["ahk", "hs"]
 description_key = "menu.ui"
 platforms = ["hs"]
 
+# Linux native simultaneous timing and symmetry. Third slots remain neutral.
+[sections.mod_combos]
+description_key = "menu.shortcuts.key_combinations"
+platforms = ["linux"]
+reason_key = "platform_reason.remap_engine_is_per_driver"
+
 [sections.shortcuts.key_combination_taps]
 description_key = "menu.shortcuts.key_combinations"
 platforms = ["ahk", "linux"]
@@ -1961,6 +1967,27 @@ description_key = "menu.shortcuts.key_combinations"
 
 
 
+# Linux declares its own values; no runtime fallback to Mac hs_timeouts.
+[[features.mod_combos]]
+id = "simultaneous_threshold_ms"
+platforms = ["linux"]
+default = 100
+recommended = 100
+input_altering = false
+type = "number"
+description_key = "menu.tapholds.simultaneous_dialog_title"
+reason_key = "platform_reason.remap_engine_is_per_driver"
+
+[[features.mod_combos]]
+id = "symmetric"
+platforms = ["linux"]
+default = false
+recommended = false
+input_altering = false
+type = "boolean"
+description_key = "menu.tapholds.symmetric"
+reason_key = "platform_reason.remap_engine_is_per_driver"
+
 # ====================================
 # ===== 3.5.6 shortcuts.personal =====
 # ====================================
@@ -2436,7 +2463,7 @@ description_key = "menu.gestures.tap_4"
 id = "swipe_2_left"
 platforms = ["hs", "linux"]
 default = "none"
-recommended_per_platform = { hs = "arrow_up", linux = "none" }
+recommended = "none"
 input_altering = true
 type = "action"
 description_key = "menu.gestures.swipe_2_left"
@@ -3465,12 +3492,14 @@ description_key = "menu.layout.ergopti_alt_gr"
 superseded_reason_key = "menu.layout.superseded_ergopti_only"
 
 [[features.layout]]
-id = "ergopti_plus"
+id = "ergopti_variant"
 platforms = ["ahk"]
-default = false
-recommended = true
+reason_key = "platform_reason.legacy_helpers_use_windows_scan_code_hotkeys"
+default = "none"
+recommended = "ergopti_plus"
 input_altering = true
-type = "boolean"
+type = "enum"
+enum_values = ["none", "ergopti", "ergopti_plus"]
 description_key = "menu.layout.ergopti_plus"
 superseded_reason_key = "menu.layout.superseded_ergopti_only"
 
@@ -3837,6 +3866,9 @@ greyed_when_paused = true
 [[menu.top_level]]
 id = "agent"
 greyed_when_paused = true
+disabled = true
+i18n = "menu.agent.title"
+reason_key = "menu.agent.not_ready"
 
 [[menu.top_level]]
 id = "---"
@@ -3863,7 +3895,10 @@ reason_key = "platform_reason.tray_top_level_rows_are_each_drivers"
 # Versions, Configuration, then Language (the maintainer's order of
 # 2026-10-02): what runs, how it is set up, how it speaks.
 [[menu.top_level]]
+type = "group"
 id = "about"
+i18n = "menu.about.title"
+rows = []
 
 # « Configuration » replaced « Actions globales » and the two top-level rows
 # that opened configuration windows: its submenu is configuration_menu.
@@ -4071,21 +4106,6 @@ disabled_when_off = true
 health_dot = false
 platforms = ["ahk", "hs", "linux"]
 
-[[menu.llm_menu]]
-type = "group"
-id = "llm_live_mode"
-i18n = "menu.llm.live_mode_title"
-disabled_when_off = true
-health_dot = false
-platforms = ["ahk", "hs", "linux"]
-
-# Fixed Off choice; prompts remain the native live-mode provider's data.
-[[menu.llm_live_controls]]
-type = "check"
-id = "llm_live_mode_off"
-i18n = "menu.llm.live_mode_off"
-checked_when = ["llm_live_is_off"]
-disabled_when = ["llm_live_off_ready"]
 
 [[menu.llm_menu]]
 type = "group"
@@ -4178,6 +4198,8 @@ type = "check"
 id = "start_at_login"
 i18n = "menu.global.start_at_login"
 checked_when = ["start_at_login_enabled"]
+disabled_when = ["startup_command_available"]
+disabled_reason_key = "menu.about.startup_other_command_reason"
 
 # A local version run from source has nothing to remove: the row stays in place,
 # greyed by `disabled_when`, and says why. A row greyed with a reason is drawn
@@ -4214,10 +4236,6 @@ type = "---"
 platforms = ["ahk"]
 unavailable = "hide"
 
-[[menu.llm_live_off_boundary]]
-type = "---"
-platforms = ["hs"]
-unavailable = "hide"
 
 [[menu.llm_trigger_menu]]
 type = "list"
@@ -4750,8 +4768,8 @@ platforms = ["ahk", "hs", "linux"]
 
 # « Combinaisons de touches »: every combination of two tap-hold keys, in one
 # group with a first-row switch of its own. Its rows are
-# key_combinations_group. Linux owns ordered tap/hold slots; simultaneous
-# first-press chord buffering remains unavailable there.
+# key_combinations_group. Linux owns ordered tap/hold and same-device
+# simultaneous slots through its native first-press receipt owner.
 # A separator sets it apart from the submenus above, which each create
 # shortcuts under one modifier.
 [[menu.shortcuts_menu]]
@@ -4988,41 +5006,41 @@ reason_key = "platform_reason.remap_engine_is_per_driver"
 type = "command"
 id = "scope_restore"
 i18n = "common.restore_recommended"
-platforms = ["ahk", "hs"]
+platforms = ["ahk", "hs", "linux"]
 reason_key = "platform_reason.remap_engine_is_per_driver"
 
 [[menu.key_combinations_group]]
 type = "command"
 id = "scope_clear"
 i18n = "common.clear_to_system"
-platforms = ["ahk", "hs"]
+platforms = ["ahk", "hs", "linux"]
 reason_key = "platform_reason.remap_engine_is_per_driver"
 
 [[menu.key_combinations_group]]
 type = "---"
-platforms = ["ahk", "hs"]
+platforms = ["ahk", "hs", "linux"]
 
-# macOS: the Karabiner chords' symmetry, their activation delay, and the
+# macOS and Linux: owned chords' symmetry, their activation delay, and the
 # bulk copy of every pair's tap slot into its chord slot.
 [[menu.key_combinations_group]]
 type = "check"
 id = "combo_symmetric"
 i18n = "menu.tapholds.symmetric"
 checked_when = ["combo_symmetric"]
-platforms = ["hs"]
+platforms = ["hs", "linux"]
 reason_key = "platform_reason.remap_engine_is_per_driver"
 
 [[menu.key_combinations_group]]
 type = "list"
 id = "combo_timings"
-platforms = ["hs"]
+platforms = ["hs", "linux"]
 reason_key = "platform_reason.remap_engine_is_per_driver"
 
 [[menu.key_combinations_group]]
 type = "command"
 id = "copy_tap_to_combo"
 i18n = "menu.tapholds.copy_tap_to_combo"
-platforms = ["hs"]
+platforms = ["hs", "linux"]
 reason_key = "platform_reason.remap_engine_is_per_driver"
 
 [[menu.key_combinations_group]]
@@ -5031,7 +5049,7 @@ type = "---"
 # One row per ordered pair of tap-hold keys: the key held first, then the key
 # struck under it, so LAlt then CapsLock is not CapsLock then LAlt. Each pair
 # has its slots: « Maintenir 1 + taper 2 → » and « Maintenir 1 + maintenir
-# 2 → » on both, and on macOS « Accord (simultané) → », which Windows does
+# 2 → » on both, and on macOS/Linux « Accord (simultané) → », which Windows does
 # not have yet (it needs the first key of a chord to wait for the second).
 #
 # Two lists, by the hand of the key held first as [tap_hold.catalog] assigns it
@@ -5605,6 +5623,9 @@ i18n = "menu.hotstrings.header_common"
 [[menu.hotstrings_menu]]
 type = "list"
 id = "hotstring_categories_standard"
+# Linux retains its inert empty-category marker; other drivers keep their
+# existing empty-list posture and never request this named provider status.
+status_rows.no_groups = [{ type = "label", i18n = "menu.hotstrings.no_group_loaded" }]
 
 [[menu.hotstrings_menu]]
 type = "list"
@@ -6460,7 +6481,7 @@ action_parameters = { domains = ["combination"], restore = "remove" }
 prefixes = ["shortcuts.key_combination_taps", "shortcuts.key_combination_holds", "mod_combos", "category_enabled.key_combinations"]
 restore_exclude = []
 clear_exclude = ["mod_combos.enabled", "category_enabled.key_combinations"]
-dynamic_defaults = [{ prefix = "shortcuts.key_combination_taps", depth = 1, default = "none", recommended = "none" }, { prefix = "shortcuts.key_combination_holds", depth = 1, default = "none", recommended = "none" }]
+dynamic_defaults = [{ prefix = "shortcuts.key_combination_taps", depth = 1, default = "none", recommended = "none" }, { prefix = "shortcuts.key_combination_holds", depth = 1, default = "none", recommended = "none" }, { prefix = "mod_combos.config", depth = 2, suffix = "combo", default = "none", recommended = "none" }]
 
 # The Gestures clear removes the assignments and keeps the switch, like the
 # Tap-Holds one: the user assigns the next gesture from there.
@@ -8317,6 +8338,37 @@ i18n = "menu.llm.warning_install_ollama"
 platforms = ["ahk"]
 unavailable = "hide"
 
+# The macOS native handler completes its genuine llm_menu subtree before this
+# parent is declared. The top-level provider still owns cross-driver placement.
+[[menu.llm_native_parent]]
+type = "group"
+id = "llm_parent_content"
+i18n = "menu.llm.title"
+checked_when = ["llm_parent_enabled"]
+platforms = ["hs"]
+unavailable = "hide"
+
+# Linux completes the existing native children before declaring either parent.
+[[menu.llm_native_parent_linux]]
+type = "group"
+id = "llm_parent_linux"
+i18n = "menu.llm.title"
+checked_when = ["llm_parent_enabled"]
+disabled_when = ["llm_parent_ready"]
+disabled_reason_key = "menu.llm.unavailable"
+platforms = ["linux"]
+unavailable = "hide"
+
+[[menu.agent_native_parent]]
+type = "group"
+id = "agent_parent_linux"
+i18n = "menu.agent.title"
+checked_when = ["agent_parent_enabled"]
+disabled_when = ["agent_parent_ready"]
+disabled_reason_key = "menu.llm.unavailable"
+platforms = ["linux"]
+unavailable = "hide"
+
 [[menu.llm_download_shortcut_frame]]
 type = "command"
 id = "llm_download_shortcut"
@@ -9230,4 +9282,197 @@ i18n = "menu.agent.system2"
 caption_getter = "agent_system_backend_current_caption"
 caption_format = "numbered"
 platforms = ["linux"]
+unavailable = "hide"
+
+# The actual Windows dynamic profile row retains its finished native Menu child.
+[[menu.llm_profile_parent_ahk]]
+type = "group"
+id = "llm_profile_parent"
+i18n = "menu.profiles.profile_label_prefix"
+caption_getter = "llm_profile_parent_caption"
+disabled_when = ["llm_profile_parent_ready"]
+platforms = ["ahk"]
+unavailable = "hide"
+
+# Ordered parent and existing boundary are one consumed native publication frame.
+[[menu.llm_profile_parent_frame_ahk]]
+type = "list"
+id = "llm_profile_parent_rows"
+platforms = ["ahk"]
+unavailable = "hide"
+
+[[menu.llm_profile_parent_frame_ahk]]
+type = "include"
+section = "llm_after_profile_boundary"
+
+# The actual native catalogue owns brands; translated suffix placement is shared.
+[[menu.llm_backend_option_caption_frame_ahk]]
+type = "include"
+section = "llm_backend_ollama_option_caption_ahk"
+present_when = "llm_backend_option_is_ollama"
+
+[[menu.llm_backend_option_caption_frame_ahk]]
+type = "include"
+section = "llm_backend_api_option_caption_ahk"
+present_when = "llm_backend_option_is_api"
+
+[[menu.llm_backend_ollama_option_caption_ahk]]
+type = "label"
+id = "llm_backend_ollama_option_caption"
+i18n = "menu.llm.backend_ollama_suffix"
+caption_getter = "llm_backend_option_brand"
+caption_layout = "suffix"
+caption_joiner = " — "
+platforms = ["ahk"]
+unavailable = "hide"
+
+[[menu.llm_backend_api_option_caption_ahk]]
+type = "label"
+id = "llm_backend_api_option_caption"
+i18n = "menu.llm.backend_api_suffix"
+caption_getter = "llm_backend_option_brand"
+caption_layout = "suffix"
+caption_joiner = " — "
+platforms = ["ahk"]
+unavailable = "hide"
+
+# The native numeric/default data and original callback owners feed one port frame.
+[[menu.llm_backend_ollama_port_control_ahk]]
+type = "command"
+id = "llm_backend_ollama_port"
+i18n = "menu.llm.ollama_port_label"
+caption_getter = "llm_backend_ollama_port_caption"
+platforms = ["ahk"]
+unavailable = "hide"
+
+[[menu.llm_backend_ollama_port_frame_ahk]]
+type = "include"
+section = "llm_backend_ollama_port_control_ahk"
+
+[[menu.llm_backend_ollama_port_frame_ahk]]
+type = "include"
+section = "llm_native_numeric_reset"
+present_when = "llm_backend_ollama_port_customized"
+
+# Real native catalogue order stays inside its typed list; canonical joins are shared.
+[[menu.llm_backend_child_frame_ahk]]
+type = "include"
+section = "llm_backend_child_choices_ahk"
+
+[[menu.llm_backend_child_frame_ahk]]
+type = "include"
+section = "llm_backend_choice_boundary"
+
+[[menu.llm_backend_child_frame_ahk]]
+type = "include"
+section = "llm_backend_child_port_rows_ahk"
+
+[[menu.llm_backend_child_frame_ahk]]
+type = "include"
+section = "llm_backend_child_local_rows_ahk"
+
+[[menu.llm_backend_child_choices_ahk]]
+type = "list"
+id = "llm_backend_child_choices"
+platforms = ["ahk"]
+unavailable = "hide"
+
+[[menu.llm_backend_child_port_rows_ahk]]
+type = "list"
+id = "llm_backend_child_port_rows"
+platforms = ["ahk"]
+unavailable = "hide"
+
+[[menu.llm_backend_child_local_rows_ahk]]
+type = "list"
+id = "llm_backend_child_local_rows"
+platforms = ["ahk"]
+unavailable = "hide"
+
+# Native selected provider datum is not a translated affix or a new catalogue.
+[[menu.llm_backend_parent_ahk]]
+type = "group"
+id = "llm_backend_parent"
+caption_source = "native"
+caption_getter = "llm_backend_parent_caption"
+disabled_when = ["llm_backend_parent_ready"]
+platforms = ["ahk"]
+unavailable = "hide"
+
+# Actual captured installation warning precedes the same finished native child.
+[[menu.llm_backend_parent_frame_ahk]]
+type = "include"
+section = "llm_backend_warning_rows_ahk"
+
+[[menu.llm_backend_parent_frame_ahk]]
+type = "list"
+id = "llm_backend_parent_rows"
+platforms = ["ahk"]
+unavailable = "hide"
+
+[[menu.llm_backend_warning_rows_ahk]]
+type = "list"
+id = "llm_backend_warning_rows"
+platforms = ["ahk"]
+unavailable = "hide"
+
+# Shared picker/clear frame for Linux keyboard, tap-key, chord and gesture slots.
+
+[[menu.slot_binding_frame]]
+type = "command"
+id = "slot_binding_pick"
+i18n = "dialog.action_picker.menu_label"
+platforms = ["linux"]
+unavailable = "hide"
+
+[[menu.slot_binding_frame]]
+type = "include"
+section = "slot_binding_clear_frame"
+present_when = "slot_binding_has_action"
+
+[[menu.slot_binding_clear_frame]]
+type = "command"
+id = "slot_binding_clear"
+i18n = "dialog.action_picker.disabled"
+platforms = ["linux"]
+unavailable = "hide"
+
+# Language presentation consumes actual native categories. This frame does not
+# claim aggregate catalogue or scope transaction ownership.
+[[menu.hotstring_scope_checkbox]]
+type = "check"
+id = "hotstring_scope_all_sections"
+i18n = "menu.hotstrings.enable_all_sections"
+checked_when = ["hotstring_scope_all_on"]
+
+[[menu.hotstring_language_frame]]
+type = "list"
+id = "hotstring_language_switch"
+
+[[menu.hotstring_language_frame]]
+type = "---"
+
+[[menu.hotstring_language_frame]]
+type = "list"
+id = "hotstring_language_categories"
+
+[[menu.hotstring_language_parent_windows]]
+type = "group"
+id = "hotstring_language_children"
+caption_source = "native"
+caption_getter = "hotstring_language_name"
+caption_count_getter = "hotstring_language_count"
+caption_count_format = "%s (%s)"
+icon_getter = "hotstring_language_icon"
+platforms = ["ahk"]
+unavailable = "hide"
+
+[[menu.hotstring_language_parent_lua]]
+type = "group"
+id = "hotstring_language_children"
+caption_source = "native"
+caption_getter = "hotstring_language_name"
+caption_count_getter = "hotstring_language_count"
+caption_count_format = "%s (%s)"
+platforms = ["hs", "linux"]
 unavailable = "hide"

@@ -21,6 +21,7 @@ local KEYCODE_ESCAPE = 53
 local MODULES = {
 	"ui.menu.magic_key_source_menu", "adapters.timer_scheduler", "infra.notifications",
 	"modules.keymap.magic_key_source", "modules.shortcuts.tap_keys", "infra.manifest_menu",
+	"adapters.keyboard_geometry",
 }
 
 --- Runs body against the real menu module, its timers, notifications and
@@ -53,6 +54,7 @@ local function with_menu(body)
 			world.taps[#world.taps + 1] = tap
 			return tap
 		end
+		package.loaded["adapters.keyboard_geometry"] = require("tests.support.keyboard_geometry_ports").new(eventtap.event.properties)
 		world.keycodes = { map = { [KEYCODE_J] = "j", [KEYCODE_SPACE] = "space" } }
 		local Menu = helpers.load_with_stubs("ui.menu.magic_key_source_menu",
 			{ eventtap = eventtap, keycodes = world.keycodes })
@@ -75,9 +77,12 @@ local function context(save_ok)
 end
 
 --- A physical keyDown for the capture tap.
-local function key_down(keycode)
+local function key_down(keycode, model)
 	return {
-		getProperty = function() return 0 end,
+		getProperty = function(_, property)
+			if property == require("tests.stubs.hs").eventtap.event.properties.keyboardEventKeyboardType then return model end
+			return 0
+		end,
 		getKeyCode = function() return keycode end,
 	}
 end
@@ -191,7 +196,7 @@ helpers.describe("magic key source menu: configured tap ownership", function()
 			local actions = require("modules.gestures.actions")
 			helpers.assert_true(Tap.apply_configuration({ shortcuts = { tap_keys = { number_row_left = "send_text" } } }, actions.is_assignable))
 			local ctx = context(true)
-			for _, code in ipairs({ "Backquote", "IntlBackslash" }) do
+			for _, code in ipairs({ "Backquote" }) do
 				helpers.assert_eq(Menu.choose(ctx, code), false)
 			end
 			helpers.assert_eq(ctx.saves, 0)
@@ -206,10 +211,12 @@ helpers.describe("magic key source menu: configured tap ownership", function()
 			helpers.assert_true(row and row.disabled)
 			helpers.assert_nil(row.action)
 			helpers.assert_true(Menu.capture(ctx))
-			helpers.assert_true(world.taps[1].callback(key_down(50)))
+			helpers.assert_true(world.taps[1].callback(key_down(50, 7001)))
 			run_deferred(world)
 			helpers.assert_eq(ctx.saves, 0, "captured conflicts use the same pre-write refusal")
 			helpers.assert_eq(Tap.get_action("number_row_left"), "send_text")
+			helpers.assert_true(Menu.choose(ctx, "IntlBackslash"), "the ISO neighbor is a distinct physical assignment")
+			helpers.assert_eq(ctx.applied, { "IntlBackslash" })
 			helpers.assert_true(Menu.choose(ctx, "auto"), "automatic never takes a configured tap")
 		end)
 	end)
@@ -259,6 +266,68 @@ helpers.describe("magic key source: the actual declared native menu", function()
 				world.taps[1].callback(key_down(KEYCODE_ESCAPE)); run_deferred(world)
 				helpers.assert_eq(Menu.capturing(), false)
 			end)
+		end)
+	end)
+end)
+
+
+helpers.describe("magic key source menu: event-bound keyboard geometry", function()
+	for _, row in ipairs({
+		{ name = "ANSI Backquote", code = 50, model = 7001, expected = "Backquote" },
+		{ name = "ANSI neighbor", code = 10, model = 7001, expected = "IntlBackslash" },
+		{ name = "ISO Backquote", code = 10, model = 7002, expected = "Backquote" },
+		{ name = "ISO neighbor", code = 50, model = 7002, expected = "IntlBackslash" },
+	}) do
+		helpers.it("captures " .. row.name .. " from the same event before deferred persistence", function()
+			with_menu(function(Menu, world)
+				local ctx = context(true)
+				helpers.assert_true(Menu.capture(ctx))
+				local event = key_down(row.code, row.model)
+				helpers.assert_true(world.taps[1].callback(event))
+				helpers.assert_eq(ctx.saves, 0)
+				event.getProperty = function() error("The original event must not be reread after deferral") end
+				run_deferred(world)
+				helpers.assert_eq(ctx.state.magic_key_source, row.expected)
+				helpers.assert_eq(ctx.applied, { row.expected })
+				helpers.assert_eq(ctx.saves, 1)
+				helpers.assert_eq(Menu.capturing(), false)
+				helpers.assert_eq(world.taps[1].running, false)
+			end)
+		end)
+	end
+	helpers.it("leaves an unproved or JIS swapped position native without persisting a neighbor", function()
+		for _, model in ipairs({ 7003, 7004, "7002", -1, 7002.5, 32768 }) do
+			with_menu(function(Menu, world)
+				local ctx = context(true)
+				helpers.assert_true(Menu.capture(ctx))
+				helpers.assert_eq(world.taps[1].callback(key_down(10, model)), false)
+				run_deferred(world)
+				helpers.assert_eq(ctx.saves, 0)
+				helpers.assert_eq(ctx.applied, {})
+				helpers.assert_eq(ctx.state.magic_key_source, "auto")
+				helpers.assert_eq(Menu.capturing(), false)
+			end)
+		end
+	end)
+end)
+
+helpers.describe("magic key source menu: physical labels without an event", function()
+	helpers.it("does not label a swapped candidate using the opposite ANSI glyph", function()
+		with_menu(function(Menu, world)
+			world.keycodes.map[50], world.keycodes.map[10] = "@", "<"
+			require("modules.keymap.magic_key_source").set("Backquote")
+			local rows = Menu.rows(context(true))
+			helpers.assert_eq(rows[1].label:sub(-#"Backquote"), "Backquote")
+			local labels = {}
+			for _, item in ipairs(rows[1].items) do
+				if item.label then labels[item.label] = true end
+			end
+			helpers.assert_true(labels.Backquote)
+			helpers.assert_true(labels.IntlBackslash)
+			helpers.assert_nil(labels["@   (Backquote)"])
+			helpers.assert_nil(labels["<   (IntlBackslash)"])
+			helpers.assert_eq(#world.taps, 0)
+			helpers.assert_eq(labels["j   (KeyJ)"], true, "a stable physical key retains its real input-source glyph")
 		end)
 	end)
 end)

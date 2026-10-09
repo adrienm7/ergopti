@@ -95,11 +95,12 @@ _DG_StageStub(Id) {
 }
 
 ; Records the staged tree instead of publishing it to the tray.
-_DG_CaptureStage(Captured, Stage) {
+_DG_CaptureStage(Captured, DisabledTitles, Stage) {
 	for _, Entry in Stage {
 		if (Entry["kind"] == "check" || Entry["kind"] == "disable")
 			continue
-		Captured.Push(Entry["label"] == "" ? "---" : Entry["label"])
+		Label := Entry["label"]
+		Captured.Push(Label == "" ? "---" : (DisabledTitles.Has(Label) ? DisabledTitles[Label] : Label))
 	}
 	return 1
 }
@@ -114,11 +115,18 @@ _DG_StageWithStubs(TopLevel) {
 	SavedStage := _TrayMenuStage
 	SavedLabels := _TrayFeatureHeadLabels
 	Captured := []
+	DisabledTitles := Map()
+	for _, Entry in TopLevel {
+		if Entry.Get("disabled", false) {
+			Label := t(Entry["i18n"]) . " — " . _MR_ReasonHead(t(Entry["reason_key"]))
+			DisabledTitles[Label] := Entry["id"]
+		}
+	}
 	try {
 		_TrayMenuStage := false
 		TrayMenuStage_Begin()
 		_MI_StageTopLevel(TopLevel, Stubs)
-		AssertTrue(TrayMenuStage_Publish(0, _DG_CaptureStage.Bind(Captured)))
+		AssertTrue(TrayMenuStage_Publish(0, _DG_CaptureStage.Bind(Captured, DisabledTitles)))
 	} finally {
 		_TrayMenuStage := SavedStage
 		_TrayFeatureHeadLabels := SavedLabels
@@ -237,3 +245,54 @@ Test("menu drift gate (AHK): initMenu stages its whole root through the dispatch
 	_DG_InitMenuDispatchesTheWholeRoot)
 Test("menu drift gate (AHK): every root builder stages the row its id names",
 	_DG_EveryBuilderStagesItsOwnRow)
+
+; The real dispatcher must skip the unfinished builder and stage an inert,
+; localized header. It is not a feature head that resume may re-enable.
+_DG_RecordNeighbor(Calls, Id) {
+	Calls.Push(Id)
+	TrayMenuStage_AddFeature(Id, 0)
+}
+
+_DG_AgentUnreadyDoesNotDisableNeighbors() {
+	global _TrayMenuStage, _TrayFeatureHeadLabels
+	Agent := false
+	for _, Entry in _DG_ManifestTopLevel() {
+		if Entry["id"] == "agent"
+			Agent := Entry
+	}
+	Assert(Agent is Map, "the canonical Agent declaration must exist")
+	AssertEqual(true, Agent.Get("disabled", false))
+	SavedStage := _TrayMenuStage
+	SavedLabels := _TrayFeatureHeadLabels
+	Calls := []
+	try {
+		_TrayMenuStage := false
+		TrayMenuStage_Begin()
+		_MI_StageTopLevel([Map("id", "llm"), Agent], Map(
+			"llm", _DG_RecordNeighbor.Bind(Calls, "llm"),
+			"agent", _DG_RecordNeighbor.Bind(Calls, "agent")))
+		AssertEqual("llm", _DG_Join(Calls), "disabled Agent must not execute its builder")
+		Label := t("menu.agent.title") . " — " . _MR_ReasonHead(t("menu.agent.not_ready"))
+		FoundAction := false
+		FoundDisable := false
+		for _, Row in _TrayMenuStage {
+			if Row["label"] != Label
+				continue
+			if Row["kind"] == "action" {
+				FoundAction := true
+				AssertEqual(false, Row["target"].Call(), "the disabled header has no executable Agent action")
+			}
+			if Row["kind"] == "disable"
+				FoundDisable := true
+		}
+		Assert(FoundAction && FoundDisable, "Agent must retain its exact localized disabled header")
+		AssertEqual("llm", _DG_Join(_TrayStageFeatureLabels(_TrayMenuStage)),
+			"pause/resume may only re-enable the neighboring AI feature header")
+	} finally {
+		_TrayMenuStage := SavedStage
+		_TrayFeatureHeadLabels := SavedLabels
+	}
+}
+
+Test("Agent IA unready: real root stages an inert localized header while neighboring AI stays available",
+	_DG_AgentUnreadyDoesNotDisableNeighbors)

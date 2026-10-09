@@ -793,6 +793,7 @@ class HopRelay(OwnedAcceptedConnections, http.server.ThreadingHTTPServer):
         super().__init__(("127.0.0.1", 0), HopHandler)
         self.routes, self.requests = {}, []
         self.before_initial, self.tls_origin = None, None
+        self.expected_certificate_reset = False
 
 
 class HopHandler(http.server.BaseHTTPRequestHandler):
@@ -809,6 +810,7 @@ class HopHandler(http.server.BaseHTTPRequestHandler):
             self.end_headers()
             self.close_connection = True
             return
+        expected_client_reset = self.server.expected_certificate_reset is True
         # CONNECT changes this exact HTTP connection into a terminal tunnel.
         # Once the peer closes/aborts TLS, never parse another HTTP request line.
         self.close_connection = True
@@ -823,7 +825,14 @@ class HopHandler(http.server.BaseHTTPRequestHandler):
                 if not readable:
                     return
                 for source in readable:
-                    data = source.recv(65536)
+                    try:
+                        data = source.recv(65536)
+                    except ConnectionResetError:
+                        # Only the explicit failed-trust control permits its
+                        # client to reset TLS. Unknown/other-peer resets propagate.
+                        if source is self.connection and expected_client_reset:
+                            return
+                        raise
                     if not data:
                         return
                     (backend if source is self.connection else self.connection).sendall(data)
@@ -1349,7 +1358,13 @@ class PerHopControls(unittest.TestCase):
             + str(self.relay_a.server_port)
             + "';}"
         ).encode()
-        receipt = self.invoke_hop(initial, [initial], body="")
+        # Each admitted tunnel captures this case's marker before TLS begins.
+        # Resetting the server marker cannot reclassify that retained tunnel.
+        self.relay_a.expected_certificate_reset = True
+        try:
+            receipt = self.invoke_hop(initial, [initial], body="")
+        finally:
+            self.relay_a.expected_certificate_reset = False
         self.assertFalse(receipt["ok"])
         self.assertEqual(receipt["failure_receipt"]["curl_exit"], 60)
         self.assertEqual(receipt["hop_probe"]["lookups"], 1)

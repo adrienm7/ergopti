@@ -67,7 +67,14 @@ _LLM_Engine_NormalizePromptOverride(Override) {
 	Live := Override.Get("live", false)
 	if !(Live is Integer) || (Live != 0 && Live != 1)
 		throw TypeError("A prompt override's live flag must be a Boolean.")
-	return Map("profile_id", ProfileId, "num_predictions", Count, "live", Live ? true : false)
+	Checked := Map("profile_id", ProfileId, "num_predictions", Count, "live", Live ? true : false)
+	if Override.Has("translation_target") {
+		Target := Override["translation_target"]
+		if (!(ProfileId == "translate") || !LLM_Translate_IsValid(Target))
+			throw ValueError("A translation override must carry an admitted language target.")
+		Checked["translation_target"] := Target
+	}
+	return Checked
 }
 
 /**
@@ -303,6 +310,8 @@ LLM_Engine_FirePrediction(buffer, AcceptSource := unset, Override := 0) {
 	_LLM_Engine["request_prompt_override"] := (Override is Map)
 		? Map("request_id", this_request_id, "profile_id", Override["profile_id"],
 			"live", IsLive) : ""
+	if (Override is Map && Override.Has("translation_target"))
+		_LLM_Engine["request_prompt_override"]["translation_target"] := Override["translation_target"]
 
 	; Honour the disabled_apps user preference: skip prediction entirely when the focused
 	; app is on the user's exclusion list, so typed context never leaves an app the user
@@ -370,8 +379,10 @@ LLM_Engine_FirePrediction(buffer, AcceptSource := unset, Override := 0) {
 	; than the one the user bound would be a silent substitution.
 	if (Override is Map) {
 		effective_profile_id := Override["profile_id"]
-		profile := LLM_FindProfile(effective_profile_id,
-			_LLM_Engine.Has("user_profiles") ? _LLM_Engine["user_profiles"] : [])
+		profile := Override.Has("translation_target")
+			? LLM_Translate_PredictionProfile(Override["translation_target"])
+			: LLM_FindProfile(effective_profile_id,
+				_LLM_Engine.Has("user_profiles") ? _LLM_Engine["user_profiles"] : [])
 		if !(profile is Map) {
 			try LoggerWarn("LLM", "Prompt prediction dropped: the prompt '{1}' no longer exists.",
 				effective_profile_id)
@@ -675,8 +686,10 @@ _LLM_Engine_ApplyTooltipDisplayOpts(slotCount := 1) {
 		Override := _LLM_Engine.Get("request_prompt_override", "")
 		if (Override is Map
 				&& Override["request_id"] == _LLM_Engine.Get("request_id", -1)) {
-			prof := LLM_FindProfile(Override["profile_id"],
-				_LLM_Engine.Has("user_profiles") ? _LLM_Engine["user_profiles"] : [])
+			prof := Override.Has("translation_target")
+				? LLM_Translate_PredictionProfile(Override["translation_target"])
+				: LLM_FindProfile(Override["profile_id"],
+					_LLM_Engine.Has("user_profiles") ? _LLM_Engine["user_profiles"] : [])
 			; A built-in record carries no label of its own; the menu's names it,
 			; so the user sees which of their prompts answered.
 			if (prof is Map and prof.Has("label"))

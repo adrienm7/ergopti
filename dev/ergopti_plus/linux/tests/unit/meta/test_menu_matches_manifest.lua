@@ -85,6 +85,19 @@ end
 local function find_item(items, title)
 	for _, item in ipairs(items or {}) do
 		if item.title == title then return item end
+		-- Absent native owners retain the declared inert child and its exact reason.
+		local reasoned = nil
+		for _, key in ipairs({ "llm_native_parent_linux", "agent_native_parent" }) do
+			for _, declaration in ipairs(ManifestMenu.get_array(key) or {}) do
+				if declaration.type == "group" and i18n.get(declaration.i18n) == title
+					and type(declaration.disabled_reason_key) == "string" then
+					local projected = ManifestMenu.render_rows({ { label = title, disabled = true,
+						disabled_reason_key = declaration.disabled_reason_key } }, "absent-parent-selection")
+					if #projected == 1 then reasoned = projected[1].title end
+				end
+			end
+		end
+		if item.disabled == true and reasoned ~= nil and item.title == reasoned then return item end
 		local nested = type(item.menu) == "table" and find_item(item.menu, title) or nil
 		if nested then return nested end
 	end
@@ -404,14 +417,117 @@ end
 -- =================================================================
 -- =================================================================
 
-helpers.describe("menu certification: the manifest's rows are rendered", function()
+--- Decorates a cache-restoration case with an absent genuine native owner.
+--- The inner component journal must retire its actual inserted module entry;
+--- this outer finally restores the pre-test identity, including false/absence.
+--- @param body function Original complete restoration test body.
+--- @return function Protected registered test body.
+local function with_uncached_ai_parent(body)
+	return function()
+		local previous = rawget(package.loaded, "ui.menu.ai_parent")
+		local ok, result = xpcall(function()
+			package.loaded["ui.menu.ai_parent"] = nil
+			body()
+			helpers.assert_nil(rawget(package.loaded, "ui.menu.ai_parent"),
+				"the inner component journal removes the genuine newly inserted owner")
+		end, debug.traceback)
+		package.loaded["ui.menu.ai_parent"] = previous
+		if not ok then error(result, 0) end
+		helpers.assert_true(rawequal(rawget(package.loaded, "ui.menu.ai_parent"), previous),
+			"the outer finally restores the exact original native owner cache state")
+	end
+end
+
+--- Observes the actual inserted owner at its registered Agent construction seam.
+--- The original fresh builder must consume this table; a disconnected cached
+--- upvalue gives zero calls. Every observation forwards the genuine owner.
+--- @param body function Builds with the existing real native builder fixture.
+--- @return table rows
+local function with_actual_ai_parent_probe(body)
+	local owner = require("ui.menu.ai_parent")
+	local begin, agent_calls = owner.begin, 0
+	owner.begin = function(renderer, kind, ...)
+		if kind == "agent" then agent_calls = agent_calls + 1 end
+		return begin(renderer, kind, ...)
+	end
+	local ok, rows = xpcall(body, debug.traceback)
+	owner.begin = begin
+	if not ok then error(rows, 0) end
+	helpers.assert_eq(agent_calls, 1, "the fresh actual builder consumes the inserted native Agent owner exactly once")
+	helpers.assert_true(rawequal(rawget(package.loaded, "ui.menu.ai_parent"), owner),
+		"the native construction uses the actual newly inserted cache entry")
+	return rows
+end
+
+--- Runs a component scenario under the independently published Agent declaration.
+--- Public-policy scenarios keep the actual current declaration unchanged.
+--- Every setup step and the body are protected; cache/global/source identities
+--- are restored even if setup, fixture decoding or a completed scenario throws.
+--- @param component boolean Use the recorded available declaration for coverage.
+--- @param body function Scenario accepting the actual renderer and declaration.
+--- @return any result
+local function with_agent_declaration(component, body)
+	local previous = {}; for name, value in pairs(package.loaded) do previous[name] = value end
+	local original_getenv, original_i18n_safe = os.getenv, rawget(_G, "i18n_safe")
+	local renderer, build, group_row, root, top, agent_index, public_agent, file
+	local ok, result = xpcall(function()
+		-- Use the same genuine locale/manifest cohort as all original assertions.
+		package.loaded["infra.i18n"], package.loaded["infra.manifest_menu"] = i18n, ManifestMenu
+		renderer = require("infra.manifest_menu")
+		build, group_row = renderer.build, renderer.group_row
+		root = renderer.get_root(); top = root and root.top_level
+		helpers.assert_type(top, "table", "the actual top-level declaration must exist")
+		for index, row in ipairs(top) do
+			if row.id == "agent" then
+				helpers.assert_nil(agent_index, "the actual Agent declaration must be unique")
+				agent_index, public_agent = index, row
+			end
+		end
+		helpers.assert_type(public_agent, "table", "the actual Agent declaration must exist")
+		if component then
+			-- Existing shared source fixture, published at 1028f6bd: not output
+			-- expectations, current availability or a synthetic owner/engine.
+			file = assert(io.open(helpers.driver_root()
+				.. "/tests/support/fixtures/agent_available_top_level_published_1028.json", "rb"))
+			local contents = assert(file:read("*a")); assert(file:close()); file = nil
+			local available = require("json").decode(contents)
+			helpers.assert_type(available, "table", "the published declaration must decode")
+			helpers.assert_eq(available.id, "agent", "the historical source owns only Agent")
+			helpers.assert_eq(available.greyed_when_paused, true, "the published pause policy is retained")
+			local fields = 0
+			for key in pairs(available) do
+				helpers.assert_true(key == "id" or key == "greyed_when_paused",
+					"the fixture cannot introduce readiness or owner fields")
+				fields = fields + 1
+			end
+			helpers.assert_eq(fields, 2, "the independently published declaration has exactly two fields")
+			top[agent_index] = available
+		end
+		return body(renderer, top[agent_index], public_agent)
+	end, debug.traceback)
+	local closed, close_error = true, nil
+	if file then closed, close_error = pcall(function() assert(file:close()) end) end
+	if root and top then root.top_level = top end
+	if top and agent_index and public_agent then top[agent_index] = public_agent end
+	if renderer then renderer.build, renderer.group_row = build, group_row end
+	os.getenv = original_getenv; rawset(_G, "i18n_safe", original_i18n_safe)
+	for name in pairs(package.loaded) do if previous[name] == nil then rawset(package.loaded, name, nil) end end
+	for name, value in pairs(previous) do rawset(package.loaded, name, value) end
+	if not ok then error(result, 0) end
+	if not closed then error(close_error, 0) end
+	return result
+end
+
+helpers.describe("menu certification: published available component rows are rendered", function()
 
 	local built = nil
 	local titles = nil
 
 	helpers.before_each(function()
 		if built then return end
-		built = build_full_menu(full_context())
+		built = with_agent_declaration(true, function()
+			return build_full_menu(full_context())
+		end)
 		titles = {}
 		for _, title in ipairs(all_titles(built)) do titles[title] = true end
 	end)
@@ -1297,3 +1413,95 @@ end)
 require("test.menu_layout_caption_values_contract").register(helpers, "linux")
 
 require("test.menu_numbered_caption_contract").register(helpers, "linux")
+
+-- Component coverage above uses the recorded declaration only during its build.
+-- Current public policy is checked separately with the genuine prediction owner.
+helpers.describe("menu certification: current disabled public Agent policy", function()
+	for _, state in ipairs({ "present", "paused", "absent" }) do
+		helpers.it("keeps current Agent unavailable with " .. state .. " engine state", function()
+			with_agent_declaration(false, function(renderer, declaration)
+				helpers.assert_eq(declaration.disabled, true, "the current public source explicitly disables Agent")
+				helpers.assert_eq(declaration.i18n, "menu.agent.title")
+				helpers.assert_eq(declaration.reason_key, "menu.agent.not_ready")
+				for _, name in ipairs({ "modules.llm.prediction_engine", "modules.llm.agent_settings",
+					"ui.menu.menu_builder", "ui.menu.agent_rows", "ui.menu.ai_parent" }) do
+					package.loaded[name] = nil
+				end
+				require("tests.support.llm_preferences_fixture").with(function()
+					local engine = require("modules.llm.prediction_engine")
+					local context = { llm = engine, paused = state == "paused",
+						on_quit = function() end, on_menu_changed = function() end }
+					context.is_paused = function() return context.paused end
+					engine.init({ is_paused = context.is_paused })
+					if state == "absent" then context.llm = nil end
+					local native_build, native_group = renderer.build, renderer.group_row
+					local child_calls, available_groups = 0, 0
+					renderer.build = function(key, ...)
+						if key == "agent_menu" then child_calls = child_calls + 1 end
+						return native_build(key, ...)
+					end
+					renderer.group_row = function(frame, id, ...)
+						if id == "agent_parent_linux" then available_groups = available_groups + 1 end
+						return native_group(frame, id, ...)
+					end
+					local caption = i18n.get("menu.agent.title")
+					local found
+					for _, row in ipairs(require("ui.menu.menu_builder").build(context)) do
+						if type(row.title) == "string" and row.title:sub(1, #caption) == caption then
+							helpers.assert_nil(found, "the actual public Agent row must be unique")
+							found = row
+						end
+					end
+					helpers.assert_type(found, "table", "the current unavailable Agent remains visible")
+					helpers.assert_eq(found.title, caption .. " — " .. i18n.get("menu.agent.not_ready"),
+						"the exact current translated reason survives rendering")
+					helpers.assert_eq(found.disabled, true)
+					helpers.assert_nil(found.menu, "the disabled public row cannot publish a component submenu")
+					helpers.assert_nil(found.fn, "the disabled public row cannot expose a command")
+					helpers.assert_eq(child_calls, 0, "current policy never builds the available Agent child")
+					helpers.assert_eq(available_groups, 0, "current policy never projects an available Agent group")
+					local retained
+					for _, row in ipairs(renderer.get_root().top_level) do if row.id == "agent" then retained = row end end
+					helpers.assert_true(rawequal(retained, declaration), "public tests cannot substitute historical availability")
+				end)
+			end)
+		end)
+	end
+
+	helpers.it("restores exact public source, owners and cache after a throwing component scenario", with_uncached_ai_parent(function()
+		local root, top = ManifestMenu.get_root(), ManifestMenu.get_root().top_level
+		local public_agent; for _, row in ipairs(top) do if row.id == "agent" then public_agent = row end end
+		local previous = {}; for name, value in pairs(package.loaded) do previous[name] = value end
+		local build, group_row = ManifestMenu.build, ManifestMenu.group_row
+		local original_getenv, original_i18n_safe = os.getenv, rawget(_G, "i18n_safe")
+		local replaced = false
+		local ok, err = pcall(function()
+			with_agent_declaration(true, function(renderer, historical, actual)
+				replaced = not rawequal(historical, actual)
+				helpers.assert_true(replaced, "the recorded declaration really replaced the public row before refusal")
+				helpers.assert_eq(historical.disabled, nil, "the component scenario really entered the historical scope")
+				with_actual_ai_parent_probe(function() return build_full_menu(full_context()) end)
+				package.loaded["infra.manifest_menu"] = {}
+				renderer.build = function() error("component renderer must not survive") end
+				os.getenv = function() return nil end; rawset(_G, "i18n_safe", function() return "temporary" end)
+				error("deliberate published component refusal")
+			end)
+		end)
+		helpers.assert_eq(ok, false, "the component refusal must propagate")
+		helpers.assert_true(tostring(err):find("deliberate published component refusal", 1, true) ~= nil)
+		helpers.assert_true(replaced, "the failure occurred after the genuine historical substitution")
+		helpers.assert_true(rawequal(root.top_level, top), "the original top-level array identity is restored")
+		local restored; for _, row in ipairs(top) do if row.id == "agent" then restored = row end end
+		helpers.assert_true(rawequal(restored, public_agent), "the exact current declaration identity is restored")
+		helpers.assert_true(rawequal(ManifestMenu.build, build))
+		helpers.assert_true(rawequal(ManifestMenu.group_row, group_row))
+		helpers.assert_true(rawequal(os.getenv, original_getenv))
+		helpers.assert_true(rawequal(rawget(_G, "i18n_safe"), original_i18n_safe))
+		for name, value in pairs(previous) do
+			helpers.assert_true(rawequal(rawget(package.loaded, name), value), "the exact previous cache entry is restored: " .. name)
+		end
+		for name in pairs(package.loaded) do
+			helpers.assert_true(previous[name] ~= nil, "no component-only cache entry survives: " .. name)
+		end
+	end))
+end)

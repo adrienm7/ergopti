@@ -164,7 +164,7 @@ helpers.describe("dynamic_hotstrings.start: RulesEngine listens to keymap's trig
 
 			-- The "★" default must NOT fire the interceptor's trigger-char gate anymore —
 			-- proving RulesEngine is no longer listening to personal_info.toml's value.
-			local star_result = interceptor(make_key_event("★"), "td")
+			local star_result = interceptor(make_key_event("★"), "td", { start_is_word_boundary = true })
 			helpers.assert_true(star_result == nil,
 				"interceptor must NOT fire on the personal_info.toml default '★' once the keymap trigger differs")
 			helpers.assert_eq(fake_km.get_injected_count(), 0,
@@ -173,7 +173,7 @@ helpers.describe("dynamic_hotstrings.start: RulesEngine listens to keymap's trig
 			-- The keymap's custom trigger char DOES fire the gate (reaches match_buffer;
 			-- returning "consume" for the registered "td" date rule proves the trigger
 			-- comparison at rules_engine.lua's interceptor passed).
-			local custom_result = interceptor(make_key_event(CUSTOM_TRIGGER), "td")
+			local custom_result = interceptor(make_key_event(CUSTOM_TRIGGER), "td", { start_is_word_boundary = true })
 			helpers.assert_eq(custom_result, "consume",
 				"interceptor must fire and consume on the keymap's custom trigger char")
 			helpers.assert_eq(fake_km.get_injected_count(), 1,
@@ -195,7 +195,7 @@ helpers.describe("dynamic_hotstrings.start: RulesEngine listens to keymap's trig
 			helpers.assert_eq(started, true,
 				"the composite fixture must commit both engines before invoking the interceptor")
 
-			local result = fake_km.get_interceptor()(make_key_event(NBSP .. ":"), "td")
+			local result = fake_km.get_interceptor()(make_key_event(NBSP .. ":"), "td", { start_is_word_boundary = true })
 			helpers.assert_eq(result, "consume",
 				"the date engine must accept the layout's single NBSP+colon keyDown payload")
 			helpers.assert_eq(fake_km.get_injected_count(), 1)

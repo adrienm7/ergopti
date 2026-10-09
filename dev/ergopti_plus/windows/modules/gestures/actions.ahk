@@ -255,6 +255,7 @@ global GESTURE_ACTIONS := Map(
 				Fn: (BindingId := "") => GestureLivePromptToggle(BindingId),
 		},
 		; The selection translated into the language the binding names.
+		"llm_translate_context", { Fn: GestureTranslateContext },
 		"llm_translate_selection", {
 				Fn: (BindingId := "") => GestureTranslateSelection(BindingId),
 		},
@@ -441,7 +442,7 @@ GesturePromptPrediction(BindingId := "", FireFn := 0) {
 				return false
 		}
 		return LLM_Menu_TriggerPredictionWith(Parsed["profile_id"],
-				Parsed.Get("num_predictions", 0), FireFn)
+				Parsed.Get("num_predictions", 0), FireFn, Parsed.Get("translation_target", ""))
 }
 
 ; Runs the llm_live_prompt_toggle action of one binding. While live mode is on,
@@ -459,7 +460,8 @@ GestureLivePromptToggle(BindingId := "") {
 				LoggerWarn("gestures", "llm_live_prompt_toggle ignored for binding '{1}': {2}.", BindingId, Reason)
 				return false
 		}
-		return LLM_Menu_ToggleLiveMode(Parsed["profile_id"], Parsed.Get("num_predictions", 0))
+		return LLM_Menu_ToggleLiveMode(Parsed["profile_id"], Parsed.Get("num_predictions", 0),
+				Parsed.Get("translation_target", ""))
 }
 
 ; Runs a screen action of one binding: its stored value names the vision
@@ -477,6 +479,13 @@ GestureScreenVision(ActionId, BindingId := "") {
 ; shares with llm_generate_prediction.
 ; @param {String} BindingId The binding whose parameter to read.
 ; @returns {Boolean} True when the selection capture started.
+GestureTranslateContext(BindingId := "", FireFn := 0) {
+	Value := GestureGetActionParameter(BindingId, "llm_translate_context")
+	if !LLM_Translate_IsValid(Value)
+		return false
+	return LLM_Menu_TriggerPredictionWith("translate", 1, FireFn, Value)
+}
+
 GestureTranslateSelection(BindingId := "") {
 		return LLM_Translate_Trigger(GestureGetActionParameter(BindingId, "llm_translate_selection"))
 }

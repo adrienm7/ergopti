@@ -419,7 +419,7 @@ tap_4 = "none"
 ergopti_base = false
 direct_access_digits = "native"
 ergopti_alt_gr = false
-ergopti_plus = false
+ergopti_variant = "none"
 ctrl_magic_save = false
 emulated_layout = ""
 

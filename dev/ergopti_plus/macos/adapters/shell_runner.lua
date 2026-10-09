@@ -170,9 +170,14 @@ end
 ---        consumer delivery. Potentially unbounded producers must use streaming.
 --- @param environment table|nil Explicit child values, copied and verified without
 ---   modifying the Hammerspoon environment or admitting launcher-only authority.
+--- @param private boolean|nil Uses payload-free native task logging.
+--- @param owned_protocol boolean|nil Retains cancellation/retirement receipt delivery.
+--- @param protocol_limit number|nil Bounded start-frame bytes; old callers keep 512.
 --- @return table Handle with start() (returns boolean) and terminate() methods.
-function M.spawn(executable, args, on_done, on_chunk, environment, private, owned_protocol)
+function M.spawn(executable, args, on_done, on_chunk, environment, private, owned_protocol, protocol_limit)
 	local Logger = process_logger(private)
+	if protocol_limit ~= nil and (owned_protocol ~= true or type(protocol_limit) ~= "number"
+		or protocol_limit % 1 ~= 0 or protocol_limit < 512 or protocol_limit > 90000) then return refused_handle(private) end
 	local refusal = M.validate_spawn_args(executable, args)
 	if refusal ~= "" then
 		Logger.error(LOG, "spawn(): refused for '%s' — %s.",
@@ -519,7 +524,7 @@ function M.spawn(executable, args, on_done, on_chunk, environment, private, owne
 					_pending_protocol_bytes = _pending_protocol_bytes
 						+ (type(stdout_chunk) == "string" and #stdout_chunk or 0)
 						+ (type(stderr_chunk) == "string" and #stderr_chunk or 0)
-					if _pending_protocol_bytes > require("adapters.owned_program_runner").MAX_PROTOCOL_BYTES
+					if _pending_protocol_bytes > (protocol_limit or require("adapters.owned_program_runner").MAX_PROTOCOL_BYTES)
 						or #_pending_chunks >= require("adapters.owned_program_runner").MAX_PROTOCOL_BYTES then
 						_pending_protocol_overflow = true
 						_pending_chunks = { table.pack(task, "V1 INVALID\n", "") }

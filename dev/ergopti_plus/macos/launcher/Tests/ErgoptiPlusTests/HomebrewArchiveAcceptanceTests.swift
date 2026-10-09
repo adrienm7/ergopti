@@ -13,6 +13,11 @@ final class HomebrewArchiveAcceptanceTests: XCTestCase {
 		case refused(Int32, String)
 	}
 
+	/// Keep normal OS permission requests explicit for each native fixture invocation.
+	private static func consentArguments(_ environment: [String: String]) throws -> [String] {
+		return try HomebrewAutomationConsent.arguments(environment)
+	}
+
 	private static var repositoryURL: URL {
 		var url = URL(fileURLWithPath: #filePath)
 		for _ in 0..<7 { url.deleteLastPathComponent() }
@@ -58,6 +63,8 @@ final class HomebrewArchiveAcceptanceTests: XCTestCase {
 		process.arguments = ["python3", Self.repositoryURL.appendingPathComponent(
 			"tools/diagnostics/macos_brew_archive_acceptance.py").path,
 			Self.repositoryURL.path, receiptURL.path, "--fixture-parent", root.path, "--evidence-directory", evidenceDirectory.path]
+		let ordinaryArguments = try XCTUnwrap(process.arguments)
+		process.arguments = ordinaryArguments + (try Self.consentArguments(ProcessInfo.processInfo.environment))
 		process.environment = NativeFixtureChildEnvironment.make()
 		process.currentDirectoryURL = root
 		process.standardOutput = output

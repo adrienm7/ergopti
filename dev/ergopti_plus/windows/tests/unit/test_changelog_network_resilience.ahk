@@ -793,6 +793,8 @@ _CNR_ControlledNativePacFixture() {
 			Sleep(10)
 		}
 		AssertEqual(1, Observed.Length, "owned native fixture must settle within its bounded test budget")
+		if Observed[1]["exit"] != 0
+			try _CNR_NativePacDiagnostic(Observed[1])
 		AssertEqual(0, Observed[1]["exit"], "real WinHTTP PAC ABI and destination policy must agree")
 		AssertEqual("", Observed[1]["stderr"], "native fixture must expose no hidden failure")
 		AssertContains(Observed[1]["stdout"], "[OK] 11 controlled native WinHTTP PAC fixtures")
@@ -818,3 +820,112 @@ _CNR_NativeEndpointPolicy() {
 	AssertFalse(_SystemProxy_NativeBypassIsUsable("internal.invalid:8443"), "unsupported bypass ports must be refused")
 }
 Test("system proxy native: one usable relay or supported scheme map is selected without truncating failover", _CNR_NativeEndpointPolicy)
+
+; Project only enumerated stages and bounded scalars from the settled owner capture.
+_CNR_NativePacDiagnostic(Observation) {
+	Fact := _CNR_NativePacDiagnosticFact(Observation.Get("stdout", ""))
+	if Fact != ""
+		_TestPrint("::notice title=Windows canonical PAC entrypoint::" . Fact)
+	Entry := _CNR_NativePacEntryDiagnosticFact(Observation.Get("stdout", ""))
+	if Entry != ""
+		_TestPrint("::notice title=Windows canonical PAC entrypoint input::" . Entry)
+}
+
+_CNR_NativePacEntryDiagnosticFact(Out) {
+	if !(Out is String) || StrLen(Out) > 8192
+		return ""
+	Pattern := "m)^PROXY_ENTRY_DIAG site=(paths|defaults_read|budget_guard|native_ex_load|private_input|input_write|launch_setup|unknown) line=(0|[1-9][0-9]{0,3}) error=(budget_refused|compiler|type_exists|type_missing|method_missing|method_overload|property_missing|command_missing|method_invocation|language_refused|json_invalid|other) budget=(int32|int64|double|absent|other) helper=([01]) tick=([01])(?: command=(add_type|get_content|convert_json|other) category=(unknown|0|[1-9]|[12][0-9]|3[01]) language=(FullLanguage|ConstrainedLanguage|RestrictedLanguage|NoLanguage|unknown) compiler=(none|CS[0-9]{4}))?`r?$"
+	if !RegExMatch(Out, Pattern, &Fact) || Integer(Fact[2]) > 8192 || (Fact[5] == "0" && Fact[6] != "0")
+		return ""
+	if Fact[10] != "" && Fact[10] != "none" && (Fact[7] != "add_type" || Fact[3] != "compiler")
+		return ""
+	Prefix := "m)^PROXY_ENTRY_DIAG "
+	if !RegExMatch(Out, Prefix, &First) || First.Pos != Fact.Pos || RegExMatch(Out, Prefix, , Fact.Pos + Fact.Len)
+		return ""
+	return SubStr(RTrim(Fact[0], "`r"), StrLen("PROXY_ENTRY_DIAG ")+1)
+}
+
+_CNR_NativePacDiagnosticFact(Out) {
+	if !(Out is String) || StrLen(Out) > 8192
+		return ""
+	Pattern := "m)^PROXY_NATIVE_DIAG stage=(source_load|source_parse|native_compile|fixture_compile|abi|server_setup|native_call|native_cases|https_scope|direct|bad_script|missing_script|failover|entrypoint_input|entrypoint_start|entrypoint_wait|entrypoint_read|entrypoint_process|entrypoint_privacy|entrypoint_parse|entrypoint_frame|server_receipt|cleanup) passed=([0-9]|10|11) family=(win32|command_missing|io|argument|invalid_operation|timeout|runtime|other) code=(-?(?:0|[1-9][0-9]{0,9}))`r?$"
+	if !RegExMatch(Out, Pattern, &Fact)
+		return ""
+	Prefix := "m)^PROXY_NATIVE_DIAG "
+	if !RegExMatch(Out, Prefix, &First) || First.Pos != Fact.Pos
+		return ""
+	if RegExMatch(Out, Prefix, , Fact.Pos + Fact.Len)
+		return ""
+	if Fact[4] == "-0" || Integer(Fact[4]) < -2147483648 || Integer(Fact[4]) > 2147483647
+		return ""
+	return SubStr(RTrim(Fact[0], "`r"), StrLen("PROXY_NATIVE_DIAG ")+1)
+}
+
+_CNR_NativePacDiagnosticProtocol() {
+	Early := "PROXY_NATIVE_DIAG stage=native_compile passed=0 family=runtime code=-2146233087"
+	AssertEqual("stage=native_compile passed=0 family=runtime code=-2146233087", _CNR_NativePacDiagnosticFact(Early))
+	AssertEqual("stage=native_call passed=5 family=win32 code=12180", _CNR_NativePacDiagnosticFact("PROXY_NATIVE_DIAG stage=native_call passed=5 family=win32 code=12180`r`n"))
+	AssertEqual("stage=cleanup passed=11 family=io code=-2147483648", _CNR_NativePacDiagnosticFact("PROXY_NATIVE_DIAG stage=cleanup passed=11 family=io code=-2147483648"))
+	for Refused in [StrReplace(Early, "native_compile", "private_url"), StrReplace(Early, "family=runtime", "family=secret"),
+		StrReplace(Early, "passed=0", "passed=12"), StrReplace(Early, "code=-2146233087", "code=2147483648"),
+		StrReplace(Early, "code=-2146233087", "code=-2147483649"), StrReplace(Early, "code=-2146233087", "code=01"),
+		StrReplace(Early, "code=-2146233087", "code=-0"), Early . "`n" . Early,
+		"PROXY_NATIVE_DIAG unadmitted=private`n" . Early, Early . "`nPROXY_NATIVE_DIAG unadmitted=private",
+		Early . " secret=fixture-secret", Early . StrReplace(Format("{:8192}", ""), " ", "x")] {
+		AssertEqual("", _CNR_NativePacDiagnosticFact(Refused), "unadmitted diagnostic data must remain private")
+	}
+	Entry := "PROXY_ENTRY_DIAG site=native_ex_load line=213 error=compiler budget=int64 helper=0 tick=0"
+	AssertEqual("site=native_ex_load line=213 error=compiler budget=int64 helper=0 tick=0", _CNR_NativePacEntryDiagnosticFact(Entry))
+	for Refused in [StrReplace(Entry, "native_ex_load", "PRIVATE_URL"), StrReplace(Entry, "line=213", "line=8193"),
+		StrReplace(Entry, "line=213", "line=0213"), StrReplace(Entry, "error=compiler", "error=PRIVATE_TEXT"),
+		StrReplace(Entry, "budget=int64", "budget=PRIVATE"), StrReplace(Entry, "helper=0", "helper=2"),
+		StrReplace(Entry, "tick=0", "tick=1"), Entry . "`n" . Entry, "PROXY_ENTRY_DIAG private=1`n" . Entry,
+		Entry . " private=token"]
+		AssertEqual("", _CNR_NativePacEntryDiagnosticFact(Refused), "entrypoint observations refuse private or inconsistent fields")
+}
+Test("system proxy native: early failure diagnostic admits only one closed scalar frame", _CNR_NativePacDiagnosticProtocol)
+
+
+_CNR_NativePacEntryDetailControls() {
+	Base := "PROXY_ENTRY_DIAG site=defaults_read line=249 error=json_invalid budget=absent helper=0 tick=0"
+	Details := " command=convert_json category=0 language=FullLanguage compiler=none"
+	AssertContains(_CNR_NativePacEntryDiagnosticFact(Base . Details), "command=convert_json category=0 language=FullLanguage compiler=none")
+	Compiler := StrReplace(Base, "error=json_invalid", "error=compiler")
+	AssertContains(_CNR_NativePacEntryDiagnosticFact(Compiler . " command=add_type category=6 language=FullLanguage compiler=CS1519"), "compiler=CS1519")
+	for Value in [Base . StrReplace(Details, "convert_json", "PRIVATE_COMMAND"),
+		Base . StrReplace(Details, "category=0", "category=32"),
+		Base . StrReplace(Details, "category=0", "category=00"),
+		Base . StrReplace(Details, "FullLanguage", "PRIVATE_LANGUAGE"),
+		Base . StrReplace(Details, "compiler=none", "compiler=CS1519"),
+		Compiler . StrReplace(Details, "compiler=none", "compiler=CS1519"),
+		Base . StrReplace(Details, " compiler=none", ""), Base . Details . " raw=PRIVATE"]
+		AssertEqual("", _CNR_NativePacEntryDiagnosticFact(Value), "only complete typed command observations can reach notices")
+}
+Test("system proxy native: entrypoint failure details reject unrelated commands and private compiler data", _CNR_NativePacEntryDetailControls)
+
+
+_CNR_ControlledNativePacPaths() {
+	global _DriverDir
+	Observed := []
+	Handle := 0
+	try {
+		Handle := ShellRunner_SpawnTreeOwned(A_WinDir . "\System32\WindowsPowerShell\v1.0\powershell.exe",
+			["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-File",
+				_DriverDir . "\tests\fixtures\system_proxy_native_paths.ps1", "-NativeFixturePath",
+				_DriverDir . "\tests\fixtures\system_proxy_native.ps1"],
+			(Code, Out, Err) => Observed.Push(Map("exit", Code, "stdout", Out, "stderr", Err)), , , 8192)
+		AssertTrue(Handle.start(), "the source-bound native path fixture must actually start")
+		Started := A_TickCount
+		while Observed.Length == 0 && !TickExpired64(Started, 30000) {
+			_SR_TreePoll()
+			Sleep(10)
+		}
+		AssertEqual(1, Observed.Length, "the exact path fixture must settle once")
+		AssertEqual(0, Observed[1]["exit"], "unresolved input components must resolve to the independent shared defaults")
+		AssertEqual("", Observed[1]["stderr"], "the settled path fixture exposes no hidden error")
+		AssertEqual("[OK] native PAC path derivation controls=3 network=0 compiler=0", Observed[1]["stdout"])
+	} finally {
+		AssertTrue(IsObject(Handle) ? Handle.terminate() : true, "the exact path fixture process must physically retire")
+	}
+}
+Test("system proxy native: actual unresolved fixture paths retain shared defaults (native-pac-unresolved-root)", _CNR_ControlledNativePacPaths)

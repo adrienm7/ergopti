@@ -32,6 +32,7 @@ local function with_focus(boundary, scenario)
 			focus = function() records.app_focuses = records.app_focuses + 1 end,
 		}
 		local window = {
+			unminimize = function(self) return self end,
 			moveToScreen = function() records.moves = records.moves + 1 end,
 			raise = function() records.raises = records.raises + 1 end,
 			focus = function() records.focuses = records.focuses + 1 end,

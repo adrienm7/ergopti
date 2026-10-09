@@ -1912,9 +1912,9 @@
 										]
 									},
 									{
-										"path": "layout.ergopti_plus",
-										"value": true,
-										"default": false,
+										"path": "layout.ergopti_variant",
+										"value": "ergopti_plus",
+										"default": "none",
 										"recommended": true,
 										"label": [
 											{
@@ -3484,22 +3484,6 @@
 										"value_label": [
 											{
 												"key": "sg_actions.win_app_next"
-											}
-										]
-									},
-									{
-										"path": "gestures.swipe_2_left",
-										"value": "arrow_up",
-										"default": "none",
-										"recommended": true,
-										"label": [
-											{
-												"key": "menu.gestures.swipe_2_left"
-											}
-										],
-										"value_label": [
-											{
-												"key": "sg_actions.arrow_up"
 											}
 										]
 									},

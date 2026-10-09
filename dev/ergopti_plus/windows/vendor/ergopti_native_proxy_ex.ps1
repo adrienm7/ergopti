@@ -11,6 +11,7 @@ using System.Text;
 
 public static class ErgoptiNativeProxyEx
 {
+    public const int CleanupReserveMilliseconds=1000;
     [DllImport("kernel32.dll", ExactSpelling=true)]
     private static extern UInt64 GetTickCount64();
     public static Int64 CurrentTick() { return checked((Int64)GetTickCount64()); }
@@ -209,7 +210,7 @@ public static class ErgoptiNativeProxyEx
             else { answer.FailureOrigin="invalid_input"; return answer; }
             UInt32 started=WinHttpGetProxyForUrlEx(operation.Resolver,url,ref options,context);
             if(started!=997) { answer.NativeError=unchecked((int)started); return answer; }
-            if(!operation.Complete.WaitOne(Remaining(clock,budgetMs-1000))) { answer.NativeError=0; answer.FailureOrigin="application_budget"; return answer; }
+            if(!operation.Complete.WaitOne(Remaining(clock,budgetMs-CleanupReserveMilliseconds))) { answer.NativeError=0; answer.FailureOrigin="application_budget"; return answer; }
             if(operation.Malformed!=0) { answer.FailureOrigin="invalid_native_receipt"; return answer; }
             if(operation.Error!=0) {
                 answer.NativeError=operation.Error;

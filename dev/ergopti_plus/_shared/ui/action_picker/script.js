@@ -105,6 +105,7 @@ function init(data) {
 	hostPlatform = data.platform || '';
 	paramStrings = data.parameterStrings || null;
 	programProviders = data.programProviders || null;
+	automationProviders = data.automationProviders || null;
 	programProviderStrings = data.programProviderStrings || {};
 	promptChoices = Array.isArray(data.promptChoices) ? data.promptChoices : null;
 	defaultCount = typeof data.defaultCount === 'number' ? data.defaultCount : null;
@@ -482,6 +483,7 @@ let sendVocabulary = null;
 let hostPlatform = '';
 let paramStrings = null;
 let programProviders = null;
+let automationProviders = null;
 let programProviderStrings = {};
 
 // Host-supplied for llm_prompt: the prompt profiles a binding may run
@@ -573,7 +575,15 @@ const LLM_PROMPT_MAX_PREDICTIONS = 10;
 // {profileId, numPredictions (null = the menu's count)}, or null when invalid.
 function parseLlmPrompt(value) {
 	const parts = value.split('|');
-	if (parts.length > 2) return null;
+	if (parts.length > 3) return null;
+	if (
+		parts.length === 3 &&
+		(parts[0] !== 'translate' ||
+			parts[2] === '' ||
+			parts[2] !== parts[2].replace(TRIM, '') ||
+			/[{}\x00-\x1f\x7f-\x9f]/.test(parts[2]))
+	)
+		return null;
 	const profileId = parts[0];
 	if (profileId === '' || profileId.length > LLM_PROMPT_MAX_ID_LENGTH) return null;
 	if (!/^[A-Za-z0-9_-]+$/.test(profileId)) return null;
@@ -581,7 +591,9 @@ function parseLlmPrompt(value) {
 	if (!/^[0-9]+$/.test(parts[1])) return null;
 	const count = Number(parts[1]);
 	if (count < LLM_PROMPT_MIN_PREDICTIONS || count > LLM_PROMPT_MAX_PREDICTIONS) return null;
-	return { profileId: profileId, numPredictions: count };
+	const parsed = { profileId: profileId, numPredictions: count };
+	if (parts.length === 3) parsed.translationTarget = parts[2];
+	return parsed;
 }
 
 // The rules pinned by _shared/tests/corpus/llm/vision_vectors.json:
@@ -677,8 +689,7 @@ function canEdit(entry) {
 	if (entry.parameter === 'llm_prompt')
 		return promptChoices !== null && promptChoices.length > 0 && defaultCount !== null;
 	if (entry.parameter === 'llm_vision') return visionChoices !== null && visionChoices.length > 0;
-	if (entry.parameter === 'llm_language')
-		return languageChoices !== null && languageChoices.length > 0;
+	if (entry.parameter === 'llm_language') return false;
 	return SEND_INPUT_KINDS.has(entry.parameter) && sendVocabulary !== null;
 }
 
@@ -801,6 +812,7 @@ function openParamEditor(entry) {
 		for (const argument of current === null ? [] : current.arguments)
 			appendProgramArgument(argument);
 		fillProgramProviders();
+		fillAutomationInventory();
 		el('param-program-executable').focus();
 		return;
 	}
@@ -870,6 +882,38 @@ function programProviderRefused() {
 	if (!editing || editing.parameter !== 'program') return;
 	el('param-error').textContent = programProviderStrings.changed || '';
 	el('param-error').hidden = false;
+}
+
+// Readonly automation names never enter the ordinary script selector.
+function fillAutomationInventory() {
+	if (automationProviders === null) return;
+	el('param-program-automation').hidden = false;
+	el('param-program-automation-title').textContent = automationProviders.title || '';
+	el('param-program-automation-reason').textContent =
+		programProviderStrings.unavailableBinding || '';
+	const list = el('param-program-automation-list');
+	list.replaceChildren();
+	for (const choice of Array.isArray(automationProviders.choices)
+		? automationProviders.choices
+		: []) {
+		if (typeof choice.label !== 'string') continue;
+		const item = document.createElement('li');
+		item.textContent = choice.label;
+		list.appendChild(item);
+	}
+	if (automationProviders.truncated === true) {
+		const more = document.createElement('li');
+		more.textContent = '…';
+		list.appendChild(more);
+	}
+}
+
+// Readonly asynchronous inventory updates preserve the current action/editor.
+function updateAutomationProviders(packet) {
+	if (!packet || typeof packet !== 'object') return;
+	automationProviders = packet;
+	if (!editing || editing.parameter !== 'program') return;
+	fillAutomationInventory();
 }
 
 function appendProgramArgument(value) {

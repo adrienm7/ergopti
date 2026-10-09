@@ -536,16 +536,21 @@ function M.force_focus(wv, is_new, lifecycle)
 			end)
 			if not current() then return false end
 			if not moved then return fail("screen move") end
+			local activated = pcall(function() hs.focus(true) end)
+			if not current() then return false end
+			if not activated then return fail("application focus") end
+			local restored, restore_result = pcall(function() return win:unminimize() end)
+			if not current() then return false end
+			if not restored or restore_result == nil or restore_result == false then
+				return fail("window restore")
+			end
 			local raised = pcall(function() win:raise() end)
 			if not current() then return false end
 			if not raised then return fail("window raise") end
 			local focused = pcall(function() win:focus() end)
 			if not current() then return false end
 			if not focused then return fail("window focus") end
-			local activated = pcall(function() hs.focus(true) end)
-			if not current() then return false end
-			if not activated then return fail("application focus") end
-			Logger.info(LOG, "Window focus applied successfully (attempt %d).", attempts + 1)
+			Logger.info(LOG, "Window presentation requested (attempt %d).", attempts + 1)
 			return current()
 		elseif attempts < max_attempts then
 			-- Handle not ready yet: retry shortly.
@@ -556,13 +561,13 @@ function M.force_focus(wv, is_new, lifecycle)
 			-- webview front again (show() makes it key) and activate Hammerspoon.
 			-- Never bringToFront(): it sets a floating or screen-saver LEVEL instead
 			-- of raising the window, which then stays above every other app.
-			local shown = pcall(function() wv:show() end)
-			if not current() then return false end
-			if not shown then return fail("fallback window focus") end
 			local activated = pcall(function() hs.focus(true) end)
 			if not current() then return false end
 			if not activated then return fail("fallback application focus") end
-			Logger.warn(LOG, "Window focus applied via show fallback after %d attempts.", max_attempts)
+			local shown = pcall(function() wv:show() end)
+			if not current() then return false end
+			if not shown then return fail("fallback window focus") end
+			Logger.warn(LOG, "Window presentation requested via show fallback after %d attempts.", max_attempts)
 			return current()
 		end
 	end

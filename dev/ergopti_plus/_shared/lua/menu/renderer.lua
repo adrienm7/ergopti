@@ -41,6 +41,42 @@
 --- ==============================================================================
 
 local M = {}
+
+--- Captures plain source records and callback maps before a reasoned group calls native owners.
+local function reasoned_group_snapshot(value, seen)
+	if type(value) ~= "table" then return { value = value } end
+	if getmetatable(value) ~= nil then return nil end
+	seen = seen or {}
+	if seen[value] then return seen[value] end
+	local receipt = { value = value, fields = {} }
+	seen[value] = receipt
+	for key, field in next, value do
+		local captured = reasoned_group_snapshot(field, seen)
+		if not captured then return nil end
+		receipt.fields[key] = captured
+	end
+	return receipt
+end
+
+--- Pure final validation; no native getter follows this comparison.
+local function reasoned_group_current(receipt, seen)
+	if not receipt then return false end
+	if receipt.fields == nil then return true end
+	local value = receipt.value
+	if getmetatable(value) ~= nil then return false end
+	seen = seen or {}
+	if seen[receipt] then return true end
+	seen[receipt] = true
+	for key, field in next, value do
+		local captured = rawget(receipt.fields, key)
+		if not captured or not rawequal(field, captured.value) then return false end
+	end
+	for key, captured in next, receipt.fields do
+		if not rawequal(rawget(value, key), captured.value) or not reasoned_group_current(captured, seen) then return false end
+	end
+	return true
+end
+
 local utf8_length = require("compat.utf8").len
 
 -- Literal command decoration does not interpret percent bytes or native data.
@@ -122,6 +158,15 @@ local function read_native_caption(item, getters)
 		or type(getters) ~= "table" or type(getters[item.caption_getter]) ~= "function" then return nil end
 	local ok, title = pcall(getters[item.caption_getter])
 	if not ok or type(title) ~= "string" or title == "" or title:find("[%z\1-\31\127]") or utf8_length(title) == nil then return nil end
+	if item.caption_count_getter ~= nil or item.caption_count_format ~= nil then
+		if item.type ~= "group" or type(item.caption_count_getter) ~= "string" or item.caption_count_getter == ""
+			or type(item.caption_count_format) ~= "string" or item.caption_count_format:find("[%z\1-\31\127]")
+			or type(getters[item.caption_count_getter]) ~= "function" then return nil end
+		local count_ok, count = pcall(getters[item.caption_count_getter])
+		if not count_ok or type(count) ~= "string" or count == "" or count:find("[%z\1-\31\127]")
+			or utf8_length(count) == nil then return nil end
+		return caption_values(item.caption_count_format, { title, count })
+	end
 	return title
 end
 
@@ -1538,6 +1583,66 @@ function M.new(deps)
 				local i18n_key  = type(item.i18n) == "string" and item.i18n or ""
 				if group_id == "" or (i18n_key == "" and item.caption_source ~= "native") then
 					Logger.warn(LOG, "group item missing id or i18n in '%s' — skipped.", manifest_key)
+					goto continue
+				end
+				if item.disabled_reason_key ~= nil then
+					local root = get_manifest_root()
+					local source = reasoned_group_snapshot(menu_def)
+					local state = reasoned_group_snapshot(getters)
+					local builders = reasoned_group_snapshot(group_builders)
+					if getmetatable(R) ~= nil then goto continue end
+					local group_owner, render_owner = rawget(R, "group_row"), rawget(R, "render_rows")
+					local builtin_owner, disabled_owner = rawget(R, "build_builtin_group"), rawget(R, "resolve_disabled_when")
+					if type(group_owner) ~= "function" or type(render_owner) ~= "function"
+						or type(builtin_owner) ~= "function" or type(disabled_owner) ~= "function" then goto continue end
+					local context_getters = type(ctx) == "table" and rawget(ctx, "state_getters") or nil
+					local context_fields = {}
+					if type(ctx) == "table" then
+						if getmetatable(ctx) ~= nil then goto continue end
+						for key, value in next, ctx do context_fields[key] = value end
+					end
+					if not source or not state or not builders then goto continue end
+					local built
+					if type(group_builders[group_id]) == "function" then
+						local ok
+						ok, built = call_isolated(manifest_key, group_id, group_builders[group_id], ctx)
+					else built = builtin_owner(group_id, ctx) end
+					if type(built) ~= "table" then goto continue end
+					local child = type(built.items) == "table" and render_rows(built.items, group_id, 1)
+						or (type(built.menu) == "table" and built.menu or built)
+					local child_source = reasoned_group_snapshot(child)
+					local built_source = reasoned_group_snapshot(built)
+					local inherited_disabled = built.disabled
+					local projected = group_owner(manifest_key, group_id, child, getters)
+					if not projected or not rawequal(projected.submenu, child) then goto continue end
+					if inherited_disabled then projected.disabled = true end
+					local rendered = render_owner({ projected }, group_id)
+					-- Complete all foreign reads before the final pure source/owner checks.
+					local current_root = get_manifest_root()
+					if not rawequal(current_root, root) or not rawequal(rawget(root, manifest_key), menu_def)
+						or getmetatable(R) ~= nil
+						or not rawequal(rawget(R, "group_row"), group_owner) or not rawequal(rawget(R, "render_rows"), render_owner)
+						or not rawequal(rawget(R, "build_builtin_group"), builtin_owner)
+						or not rawequal(rawget(R, "resolve_disabled_when"), disabled_owner)
+						or (type(ctx) == "table" and not rawequal(rawget(ctx, "state_getters"), context_getters))
+						or not reasoned_group_current(source) or not reasoned_group_current(state)
+						or not reasoned_group_current(builders) or not reasoned_group_current(child_source)
+						or not reasoned_group_current(built_source)
+						or #rendered ~= 1 or not rawequal(rendered[1].menu, child) then goto continue end
+					if type(ctx) == "table" then
+						if getmetatable(ctx) ~= nil then goto continue end
+						local changed = false
+						for key, value in next, ctx do
+							if not rawequal(value, rawget(context_fields, key)) then changed = true; break end
+						end
+						for key, value in next, context_fields do
+							if not rawequal(value, rawget(ctx, key)) then changed = true; break end
+						end
+						if changed then goto continue end
+					end
+					flush_sep()
+					table.insert(result, rendered[1])
+					item_count = item_count + 1
 					goto continue
 				end
 				local label = i18n.get(i18n_key)

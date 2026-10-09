@@ -540,3 +540,165 @@ helpers.describe("private run_program actual scoped pause", function()
 		end)
 	end)
 end)
+
+local CHOSEN = '{"version":1,"executable":"/usr/bin/shortcuts","arguments":["run","11111111-1111-1111-1111-111111111111"]}'
+
+local function native_query_fixture(native)
+	package.loaded["adapters.apple_shortcuts_native"] = nil
+	local attributes = { mode = "file", permissions = "rwxr-xr-x", dev = 42, ino = 73,
+		uid = 0, gid = 0, size = 100, modification = 1, change = 1 }
+	local stat, lstat, absolute = native.fs.attributes, native.fs.symlinkAttributes, native.fs.pathToAbsolute
+	native.fs.attributes = function(path) if (path == "/usr/bin/shortcuts" or path == HELPER:gsub("ErgoptiPlus$", "ErgoptiAutomationQuery")) then return attributes end; return stat(path) end
+	native.fs.symlinkAttributes = function(path) if (path == "/usr/bin/shortcuts" or path == HELPER:gsub("ErgoptiPlus$", "ErgoptiAutomationQuery")) then return attributes end; return lstat(path) end
+	native.fs.pathToAbsolute = function(path) if (path == "/usr/bin/shortcuts" or path == HELPER:gsub("ErgoptiPlus$", "ErgoptiAutomationQuery")) then return path end; return absolute(path) end
+	native.base64 = { decode = function(value)
+		helpers.assert_eq(value, "FIXED_QUERY_BYTES")
+		return '{"version":1,"nonce":1,"operation":"revalidate","status":"observed","rows":[{"id":"11111111-1111-1111-1111-111111111111","name":"日本 é","accepts_input":false}],"truncated":false}'
+	end }
+	local create = native.task.new
+	native.task.new = function(...)
+		local task = create(...)
+		if task.arguments[1] == "--automation-query-worker" then
+			function task:setInput(value)
+				self.inputs[#self.inputs + 1] = value
+				if value == "ACTIVATE\n" then self.activations = self.activations + 1 end
+				return self
+			end
+			function task:complete(code)
+				self:emit("Q1 RETIRED " .. tostring(code or 0) .. "\n")
+				return self:helper_exit(0)
+			end
+		end
+		return task
+	end
+end
+
+local function persist_chosen(actions, preferences, path, gesture_port, binding)
+	helpers.assert_eq(actions.set_action_parameter(binding or "tap_3", "run_program", CHOSEN), true)
+	helpers.assert_eq(preferences.save(path, {}, {}, { gestures = gesture_port }), true)
+end
+
+helpers.describe("private persisted chosen-ID native action chain", function()
+	helpers.it("revalidates the literal UUID and never starts a service invocation", function()
+		with_program(function(actions, auxiliary, preferences, native, tasks, path, _, _, gesture_port)
+			native_query_fixture(native)
+			persist_chosen(actions, preferences, path, gesture_port)
+			helpers.assert_eq(actions.execute_single("run_program", "tap_3"), true, "dispatcher acknowledges the event, not service invocation")
+			helpers.assert_eq(#tasks, 1)
+			helpers.assert_eq(tasks[1].arguments, { "--automation-query-worker", "revalidate", "1", "11111111-1111-1111-1111-111111111111" })
+			helpers.assert_eq(tasks[1].executable, HELPER:gsub("ErgoptiPlus$", "ErgoptiAutomationQuery"))
+			tasks[1]:emit("Q1 HELD\n")
+			helpers.assert_eq(tasks[1].inputs, { "ACTIVATE\n" })
+			tasks[1]:emit("Q1 DATA FIXED_QUERY_BYTES\n")
+			tasks[1]:complete()
+			helpers.assert_eq(auxiliary.has_pending("gestures"), false)
+			helpers.assert_eq(#tasks, 1, "observed ID never lowers to shortcuts run")
+		end)
+	end)
+	helpers.it("uses the actual keyboard callback with the same native UUID query", function()
+		with_program(function(actions, auxiliary, preferences, native, tasks, path, _, _, gesture_port)
+			native_query_fixture(native)
+			persist_chosen(actions, preferences, path, gesture_port, "keyboard__cmd_1")
+			local keyboard = require("modules.shortcuts.keyboard_shortcuts")
+			helpers.assert_eq(keyboard.set_action("cmd_1", "run_program"), true)
+			helpers.assert_eq(keyboard.start(), true)
+			local registered
+			for _, item in ipairs(native.hotkey._bound) do
+				if item.key == "1" and #item.mods == 1 and item.mods[1] == "cmd" then registered = item end
+			end
+			helpers.assert_true(registered ~= nil)
+			helpers.assert_eq(registered.pressed_fn(), true, "keyboard acknowledges the event, not service invocation")
+			helpers.assert_eq(#tasks, 1)
+			helpers.assert_eq(tasks[1].arguments[1], "--automation-query-worker")
+			tasks[1]:emit("Q1 HELD\n")
+			helpers.assert_eq(keyboard.stop(), true, "keyboard native bindings release separately")
+			helpers.assert_eq(actions.force_cleanup("shortcut_bindings"), false, "aggregate action owner retains query debt")
+			helpers.assert_eq(tasks[1].closed, true)
+			tasks[1]:complete(15)
+			helpers.assert_eq(auxiliary.has_pending("shortcut_bindings"), false)
+			helpers.assert_eq(keyboard.stop(), true)
+		end)
+	end)
+	helpers.it("holds exact query debt across replacement and gesture pause", function()
+		with_program(function(actions, auxiliary, preferences, native, tasks, path, _, _, gesture_port)
+			native_query_fixture(native)
+			persist_chosen(actions, preferences, path, gesture_port)
+			helpers.assert_eq(actions.run_program("tap_3"), false)
+			tasks[1]:emit("Q1 HELD\n")
+			helpers.assert_eq(actions.set_action_parameter("tap_3", "run_program", CHOSEN), false)
+			helpers.assert_eq(auxiliary.has_pending("gestures"), true)
+			helpers.assert_eq(actions.force_cleanup("gestures"), false)
+			helpers.assert_eq(actions.run_program("tap_3"), false)
+			helpers.assert_eq(#tasks, 1)
+			helpers.assert_eq(tasks[1].closed, true)
+			tasks[1]:complete(15)
+			helpers.assert_eq(auxiliary.has_pending("gestures"), false)
+			helpers.assert_eq(actions.run_program("tap_3"), false, "paused consumer cannot query again")
+			helpers.assert_eq(#tasks, 1)
+		end)
+	end)
+	helpers.it("rechecks acknowledged source before activating a held native query", function()
+		with_program(function(actions, auxiliary, preferences, native, tasks, path, _, _, gesture_port)
+			native_query_fixture(native)
+			persist_chosen(actions, preferences, path, gesture_port)
+			local source = preferences.source_snapshot(path)
+			helpers.assert_eq(actions.run_program("tap_3"), false)
+			local file = assert(io.open(path, "wb")); file:write(source.content .. "\n# changed before query activation\n"); file:close()
+			tasks[1]:emit("Q1 HELD\n")
+			helpers.assert_eq(tasks[1].activations, 0)
+			helpers.assert_eq(tasks[1].closed, true)
+			helpers.assert_eq(auxiliary.has_pending("gestures"), true)
+			tasks[1]:complete(15)
+			helpers.assert_eq(auxiliary.has_pending("gestures"), false)
+		end)
+	end)
+	helpers.it("refuses a name selector before allocating any query or service process", function()
+		with_program(function(actions, _, preferences, native, tasks, path, _, _, gesture_port)
+			native_query_fixture(native)
+			local named = '{"version":1,"executable":"/usr/bin/shortcuts","arguments":["run","Visible duplicate name"]}'
+			helpers.assert_eq(actions.set_action_parameter("tap_3", "run_program", named), true)
+			helpers.assert_eq(preferences.save(path, {}, {}, { gestures = gesture_port }), true)
+			helpers.assert_eq(actions.run_program("tap_3"), false)
+			helpers.assert_eq(#tasks, 0)
+		end)
+	end)
+end)
+
+helpers.describe("private chosen-ID remaining native consumer assignments", function()
+	helpers.it("uses the actual tap-key assignment and decision through the same UUID guard", function()
+		with_program(function(actions, _, preferences, native, tasks, path, _, _, gesture_port)
+			native_query_fixture(native)
+			package.loaded["modules.shortcuts.tap_keys"] = nil
+			package.loaded["adapters.keyboard_geometry"] = nil
+			local geometry = require("adapters.keyboard_geometry")
+			require("tests.support.keyboard_geometry").initialize(geometry)
+			local tap = require("modules.shortcuts.tap_keys")
+			helpers.assert_eq(tap.set_action("number_row_left", "run_program", function() return true end), true)
+			persist_chosen(actions, preferences, path, gesture_port, "tap_key__number_row_left")
+			helpers.assert_eq(tap.decide(50), nil, "A model-free event cannot claim the ambiguous physical key")
+			helpers.assert_eq(tap.decide(50, 43), nil, "An unknown keyboard form leaves the key native")
+			helpers.assert_eq(tap.decide(10, 40), nil, "The ISO extra key cannot claim the ANSI left-edge assignment")
+			helpers.assert_eq(tap.decide(50, 41), nil, "The ANSI extra key cannot claim the ISO left-edge assignment")
+			local action, binding = tap.decide(50, 40)
+			helpers.assert_eq(action, "run_program"); helpers.assert_eq(binding, "tap_key__number_row_left")
+			helpers.assert_eq(actions.execute_single(action, binding), true)
+			helpers.assert_eq(#tasks, 1)
+			helpers.assert_eq(tasks[1].arguments, { "--automation-query-worker", "revalidate", "1", "11111111-1111-1111-1111-111111111111" })
+			tasks[1]:emit("Q1 HELD\n"); tasks[1]:complete()
+		end)
+	end)
+	helpers.it("uses the actual script-control assignment through the same UUID guard", function()
+		with_program(function(actions, _, preferences, native, tasks, path, _, _, gesture_port)
+			native_query_fixture(native)
+			package.loaded["modules.shortcuts.script_control"] = nil
+			local control = require("modules.shortcuts.script_control")
+			helpers.assert_eq(control.set_shortcut_action("script_altgr_enter", "run_program"), true)
+			helpers.assert_eq(actions.set_action_parameter("script__script_altgr_enter", "run_program", CHOSEN), true)
+			helpers.assert_eq(preferences.save(path, { script_control_shortcuts = control.get_shortcut_actions() }, {}, { gestures = gesture_port }), true)
+			helpers.assert_eq(actions.execute_single(control.get_shortcut_actions().script_altgr_enter, "script__script_altgr_enter"), true)
+			helpers.assert_eq(#tasks, 1)
+			helpers.assert_eq(tasks[1].arguments, { "--automation-query-worker", "revalidate", "1", "11111111-1111-1111-1111-111111111111" })
+			tasks[1]:emit("Q1 HELD\n"); tasks[1]:complete()
+		end)
+	end)
+end)

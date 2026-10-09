@@ -15,10 +15,11 @@
 
 local helpers = require("tests.helpers")
 local Json = require("json")
+local Share = require("healthcheck.share")
 
 local HOME = "/home/jdoe"
 local LOGS_DIR = "/var/tmp/ergopti_report_logs"
-local NAME = "ergopti-diagnostics-linux-2.4.0-20260924T100000Z.md"
+local NAME = "ergopti-diagnostics-linux-2026-09-24T10_00_00Z.md"
 local REPORT = "# ErgoptiPlus diagnostics\n\nconfig_dir: /home/jdoe/.config/ergopti_plus (jdoe)\n"
 
 --- Reads a shared JSON document.
@@ -88,6 +89,25 @@ local function query_value(url, key)
 	return (raw:gsub("%%(%x%x)", function(hex) return string.char(tonumber(hex, 16)) end))
 end
 
+local function host_snapshot(long)
+	local snapshot = { schema_version = 2, driver = "linux", generated_at = "2026-09-24T10:00:00Z",
+		sections = { versions = { ergopti_version = "2.4.0" }, issues = { recent = REPORT } },
+		probes = { github_api = { state = "error", cleanup = "pending", ms = 1 } } }
+	if long then
+		snapshot.retired_probes = {}
+		for index = 1, 300 do
+			snapshot.retired_probes[index] = { probes = { github_api = { state = "timeout", cleanup = "unknown", ms = index } } }
+		end
+	end
+	return snapshot
+end
+
+local function approved_text(long)
+	local config = documents()
+	return Share.document(host_snapshot(long), config.schema,
+		require("infra.i18n").get(config.schema.share_policy.notice_key)).text
+end
+
 --- Performs one action as the bridge does.
 --- @param action table
 --- @param adjust function|nil Changes the recorded side effects.
@@ -99,7 +119,14 @@ local function perform(action, adjust)
 	ordered(calls, overrides)
 	if adjust then adjust(overrides) end
 	local paths = { logs_dir = LOGS_DIR, diagnostics_dir = LOGS_DIR .. "/diagnostics" }
-	return Report.perform(action, paths, documents(), Report.redaction_context(overrides), overrides), calls
+	local snapshot = host_snapshot(type(action.text) == "string" and #action.text > documents().templates.max_url_bytes)
+	if action.action == "copy" or action.action == "save" or action.action == "report" then
+		local request = {}
+		for key, value in pairs(action) do request[key] = value end
+		request.text = approved_text(type(action.text) == "string" and #action.text > documents().templates.max_url_bytes)
+		action = request
+	end
+	return Report.perform(action, paths, documents(), Report.redaction_context(overrides), overrides, snapshot), calls
 end
 
 helpers.describe("healthcheck page actions (linux)", function()
@@ -108,11 +135,11 @@ helpers.describe("healthcheck page actions (linux)", function()
 			version = "2.4.0", os = "Fedora Linux 41 (/home/jdoe)", driver = "linux",
 		} })
 		helpers.assert_eq(result.ok, true)
-		helpers.assert_eq(calls.copy, { "# ErgoptiPlus diagnostics\n\nconfig_dir: ~/.config/ergopti_plus (<user>)\n" })
+		helpers.assert_eq(calls.copy, { approved_text(false) })
 		helpers.assert_eq(result.path, nil, "a report names no file")
 		helpers.assert_eq(query_value(calls.open_url[1], "diagnostics"), calls.copy[1],
 			"the form's diagnostics field is the report the clipboard holds")
-		helpers.assert_eq(query_value(calls.open_url[1], "os"), "Fedora Linux 41 (~)")
+		helpers.assert_eq(query_value(calls.open_url[1], "os"), "linux")
 		local repo = documents().repository
 		local prefix = "https://github.com/" .. repo.owner .. "/" .. repo.repo .. "/issues/new?template=bug_report.yml&"
 		helpers.assert_eq(calls.open_url[1]:sub(1, #prefix), prefix)
@@ -223,7 +250,16 @@ helpers.describe("healthcheck debug menu reports (linux)", function()
 	helpers.it("Suggest a feature opens the feature form with the version and the system", function()
 		local Report = helpers.load_module("ui.healthcheck.report")
 		local calls = {}
-		helpers.assert_eq(Report.suggest_feature(recording(calls)), true)
+		local previous_bridge = package.loaded["ui.healthcheck.bridge"]
+		local previous_manager = package.loaded["ui.webview_manager"]
+		package.loaded["ui.healthcheck.bridge"] = { DRIVER = "linux", config = documents,
+			build_snapshot = function() return host_snapshot(false) end }
+		package.loaded["ui.webview_manager"] = { get_daemon_state = function() return {} end }
+		local ok, result = pcall(Report.suggest_feature, recording(calls))
+		package.loaded["ui.healthcheck.bridge"] = previous_bridge
+		package.loaded["ui.webview_manager"] = previous_manager
+		helpers.assert_true(ok, tostring(result))
+		helpers.assert_eq(result, true)
 		local repo = documents().repository
 		local prefix = "https://github.com/" .. repo.owner .. "/" .. repo.repo
 			.. "/issues/new?template=feature_request.yml&"
@@ -265,7 +301,7 @@ helpers.describe("healthcheck checked save receipts (linux)", function()
 		local result, calls, writes, directories = default_save(function() return true end)
 		helpers.assert_eq(result.ok, true)
 		helpers.assert_eq(writes, { { path = LOGS_DIR .. "/diagnostics/" .. NAME,
-			text = "# ErgoptiPlus diagnostics\n\nconfig_dir: ~/.config/ergopti_plus (<user>)\n" } })
+			text = approved_text(false) } })
 		helpers.assert_eq(#directories, 1)
 		helpers.assert_eq(calls.reveal, { result.path })
 	end)
@@ -298,5 +334,30 @@ helpers.describe("healthcheck checked save receipts (linux)", function()
 		helpers.assert_eq(result.ok, true)
 		helpers.assert_eq(result.path, LOGS_DIR .. "/diagnostics/" .. NAME)
 		helpers.assert_eq(#writes, 1)
+	end)
+end)
+
+
+helpers.describe("closed diagnostic sharing corpus", function()
+	helpers.it("excludes synthetic private fields on all driver snapshots", function()
+		local corpus = shared_json("tests/corpus/healthcheck/share_vectors.json")
+		local config = documents()
+		for _, vector in ipairs(corpus.vectors) do
+			local document = Share.document(vector.snapshot, config.schema,
+				require("infra.i18n").get(config.schema.share_policy.notice_key))
+			for _, canary in ipairs(vector.canaries) do
+				helpers.assert_true(not document.text:find(canary, 1, true), vector.name)
+			end
+			local readable = document.text:match("^(.-)```json")
+			for _, id in ipairs({ "versions", "hardware", "system", "input", "ai", "permissions", "issues" }) do
+				assert(readable:find("## " .. require("infra.i18n").get("healthcheck.section." .. id), 1, true), "readable section omitted")
+			end
+			assert(readable:find("| probes.appleevent_transport.native_status | -1744 |", 1, true))
+			assert(readable:find("| probes.appleevent_transport.cleanup | pending |", 1, true))
+			assert(readable:find("| retired_probes.1.probes.appleevent_transport.cleanup | unknown |", 1, true))
+			helpers.assert_eq(document.snapshot.probes.appleevent_transport.state, "timeout")
+			helpers.assert_eq(document.snapshot.probes.appleevent_transport.cleanup, "pending")
+			helpers.assert_eq(document.snapshot.probes.appleevent_transport.native_status, -1744)
+		end
 	end)
 end)

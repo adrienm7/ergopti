@@ -92,7 +92,7 @@ LayoutManager_ActiveId(FeaturesSource := unset) {
 	Layout := FeaturesSource.Has("layout") ? FeaturesSource["layout"] : Map()
 	if !(Layout.Get("ergopti_base", false) = true)
 		return ""
-	return (Layout.Get("ergopti_plus", false) = true) ? ERGOPTI_PLUS_LAYOUT_ID : ERGOPTI_LAYOUT_ID
+	return ErgoptiLayout_BuiltinVariant(FeaturesSource)
 }
 
 ; JSON of the page state. JSON_NULL stands for none.
@@ -308,27 +308,60 @@ _LayMgrWeb_PushState(Deps, *) {
 }
 
 /**
- * Makes ``Id`` the layout typing uses: an Ergopti layout selects the built-in
- * emulation (with or without Ergopti+), any other installed layout becomes the
- * emulated layout. Persists, then reloads so the emulation registers.
- * @param {string} Id
- * @returns {boolean} Whether the reload was started.
+ * Selects a layout through the acknowledged configuration handoff.
+ * @param {String} Id Registry layout identifier.
+ * @param {Map} Options Configuration lifecycle ports for owner tests.
+ * @returns {Boolean} Whether the successor launch was accepted.
  */
-LayoutManager_Select(Id) {
-	global Features, ERGOPTI_PLUS_LAYOUT_ID
-	Builtin := LayoutManager_BuiltinIds()
-	if Builtin.Has(Id)
-		Entries := [
-			Map("path", "layout.emulated_layout", "value", ""),
-			Map("path", "layout.ergopti_base", "value", true),
-			Map("path", "layout.ergopti_plus", "value", Id == ERGOPTI_PLUS_LAYOUT_ID),
+LayoutManager_Select(Id, Options := unset) {
+	Receipt := IsSet(Options) ? LayoutManager_SelectTransition(Id, Options) : LayoutManager_SelectTransition(Id)
+	return Receipt["status"] == "pending" || Receipt["status"] == "committed"
+}
+
+/**
+ * Retains the selected configuration until successor completion or rollback.
+ * The resident input owner keeps its admitted layout while the reload is pending.
+ * @param {String} Id Registry layout identifier.
+ * @param {Map} Options Configuration lifecycle ports for owner tests.
+ * @returns {Map} Pending or terminal configuration receipt.
+ */
+LayoutManager_SelectTransition(Id, Options := unset) {
+	if !LayoutRegistry_IsValidId(Id)
+		throw ValueError("The layout selection requires a valid registry identifier.")
+	if !IsSet(Options)
+		Options := Map()
+	if !(Options is Map)
+		throw TypeError("The layout selection requires explicit lifecycle options.")
+	global ConfigurationFile
+	Path := Options.Has("path") ? Options["path"] : ConfigurationFile
+	SnapshotFn := Options.Get("snapshot_fn", _LayMgrWeb_BuiltinVariantSnapshot)
+	if !HasMethod(SnapshotFn, "Call")
+		throw TypeError("The selected helper source requires a callable intent witness.")
+	Expected := Options.Has("expected") ? Options["expected"] : SnapshotFn.Call(Path)
+	LoggerInfo("LayoutManager", "Selecting the '{1}' layout through the owned reload handoff.", Id)
+	return ConfigScopeCommitOperations("keyboard_layout", "select",
+		_LayMgrWeb_SelectionOperations.Bind(Id, Path, Expected, SnapshotFn), Options)
+}
+
+; Built-in selections keep the existing empty-emulation contract and overlays.
+; A registry selection changes only its source identifier; it owns no layer gate.
+_LayMgrWeb_SelectionOperations(Id, Path, Expected, SnapshotFn) {
+	global ERGOPTI_PLUS_LAYOUT_ID
+	Current := SnapshotFn.Call(Path)
+	if !(Expected is Map) || !(Current is Map)
+			|| !Expected.Get("valid", false) || !Current.Get("valid", false)
+			|| Expected.Get("path", "") != Path || Current.Get("path", "") != Path
+			|| Expected["presence"] != Current["presence"]
+			|| StrCompare(Expected["content"], Current["content"], true) != 0
+			|| !ManifestValuesEqual(Expected["values"], Current["values"])
+		throw Error("The selected helper source intent changed or could not be admitted.")
+	if LayoutManager_BuiltinIds().Has(Id)
+		return [
+			ManifestSparseOperation("layout.emulated_layout", ""),
+			ManifestSparseOperation("layout.ergopti_base", true),
+			ManifestSparseOperation("layout.ergopti_variant", Id),
 		]
-	else
-		Entries := [Map("path", "layout.emulated_layout", "value", Id)]
-	LoggerInfo("LayoutManager", "Selecting the '{1}' layout and reloading.", Id)
-	if (WriteFeatureBatchV2(Features, Entries) != Entries.Length)
-		return ConfigReportPersistenceFailure("the layout selection")
-	return ReloadPreservingSuspend()
+	return [ManifestSparseOperation("layout.emulated_layout", Id)]
 }
 
 ; The successor discovers committed extension roots even for nonselected layouts.
@@ -557,4 +590,41 @@ _LayMgrWeb_Reset() {
 	}
 	_LayMgrWeb_Controller := unset
 	_LayMgrWeb_WebView := unset
+}
+
+; Snapshot both typed variant and independent source/layer intent without mutating them.
+_LayMgrWeb_BuiltinVariantSnapshot(Path) {
+	Snapshot := Map("path", Path, "valid", false, "presence", false, "content", "", "values", Map())
+	try {
+		Snapshot["presence"] := FSStrictExists(Path)
+		Snapshot["content"] := Snapshot["presence"] ? FSReadUtf8Exact(Path) : ""
+		if !(Snapshot["content"] is String)
+			return Snapshot
+		Document := TOML_ParseDocument(Snapshot["content"])
+		Legacy := _TOML_DocumentLookup(Document, ["layout", "ergopti_plus"])
+		if Legacy["found"] || Legacy["blocked"]
+			return Snapshot
+		for Field in ["layout.ergopti_variant", "layout.emulated_layout", "layout.ergopti_base",
+			"layout.ergopti_alt_gr", "category_enabled.layout"] {
+			Read := _TOML_DocumentLookup(Document, StrSplit(Field, "."))
+			if Read["blocked"]
+				return Snapshot
+			Value := Read["found"] ? Read["value"] : ManifestDefaultFor(Field)
+			if Field == "layout.ergopti_base" || Field == "layout.ergopti_alt_gr" || Field == "category_enabled.layout" {
+				if Read["found"] && !(Value is TOML_Bool)
+					return Snapshot
+				if Value is TOML_Bool
+					Value := Value.Value
+			} else if Field == "layout.ergopti_variant" {
+				if !(Value is String) || (StrCompare(Value, "none", true) != 0 && StrCompare(Value, "ergopti", true) != 0 && StrCompare(Value, "ergopti_plus", true) != 0)
+					return Snapshot
+			} else if !(Value is String) || (Value != "" && !LayoutRegistry_IsValidId(Value))
+				return Snapshot
+			Snapshot["values"][Field] := Value
+		}
+		Snapshot["valid"] := _TOML_WriteSourceMatches(Path, Snapshot["presence"], Snapshot["content"])
+	} catch {
+		Snapshot["valid"] := false
+	}
+	return Snapshot
 }

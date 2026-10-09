@@ -50,9 +50,12 @@ _UpdaterNativeObservedStagingScript(OriginalScript) {
 	HeaderEnd := InStr(OriginalScript, "`n")
 	if !HeaderEnd
 		throw Error("The actual staging parameter declaration is unavailable.")
+	; A literal here-string avoids redundant Base64 expansion of trusted source.
+	; A closing delimiter cannot escape into the surrounding fixture worker.
+	if RegExMatch(OriginalScript, "(?:\A|[\r\n])'@")
+		throw Error("The staging fixture source contains a literal delimiter.")
 	return SubStr(OriginalScript, 1, HeaderEnd) . Helper . "`n"
-		. '$StagingSource=[Text.Encoding]::UTF8.GetString([Convert]::FromBase64String("'
-		. _Updater_EncodeUtf8Payload(OriginalScript) . '"))' . "`n"
+		. "$StagingSource=@'`n" . OriginalScript . "`n'@`n"
 		. '$StagingObserved=New-ErgoptiObservedStagingScript $StagingSource ""' . "`n"
 		. '& ([scriptblock]::Create($StagingObserved.Source)) @PSBoundParameters'
 }
@@ -86,26 +89,101 @@ _UpdaterNativeStagingScalarFact(Scalar) {
 }
 
 _UpdaterNativeStagingDiagnosticFact(Diagnostic) {
-	if !(Diagnostic is Map) || Diagnostic.Count != 5
+	if !(Diagnostic is Map) || (Diagnostic.Count != 5 && Diagnostic.Count != 8)
 		return ""
 	for DiagnosticKey in Diagnostic
-		if !(DiagnosticKey is String) || !RegExMatch(DiagnosticKey, "\A(?:schema_version|operation|exception|expected|actual)\z")
+		if !(DiagnosticKey is String) || !RegExMatch(DiagnosticKey, "\A(?:schema_version|operation|exception|expected|actual|observed_stage|exception_family|hresult)\z")
 			return ""
 	DiagnosticOperation := Diagnostic.Get("operation", "")
 	DiagnosticException := Diagnostic.Get("exception", "")
-	if Type(Diagnostic.Get("schema_version", "")) != "Integer" || Diagnostic["schema_version"] != 1
+	if Type(Diagnostic.Get("schema_version", "")) != "Integer"
+		|| !((Diagnostic.Count == 5 && Diagnostic["schema_version"] == 1)
+			|| (Diagnostic.Count == 8 && Diagnostic["schema_version"] == 2))
 		|| !(DiagnosticOperation is String) || !RegExMatch(DiagnosticOperation,
 			"\A(?:metadata|content_length|minimum|digest_format|digest_read|budget|digest_compare|not_file_read)\z")
 		|| !(DiagnosticException is String) || !RegExMatch(DiagnosticException,
 			"\A(?:command_not_found|item_not_found|property_not_found|method_invocation|io|unauthorized|timeout|runtime|other)\z")
 		return ""
+	Extended := ""
+	if Diagnostic["schema_version"] == 2 {
+		ObservedStage := Diagnostic.Get("observed_stage", "")
+		Family := Diagnostic.Get("exception_family", "")
+		Code := Diagnostic.Get("hresult", "")
+		if !(ObservedStage is String) || !RegExMatch(ObservedStage,
+			"\A(?:proxy_resolve|proxy_connect|connect|tls|http|file_create|file_read|file_write|file_remove|file_rename|unknown)\z")
+			|| !(Family is String) || !RegExMatch(Family,
+				"\A(?:win32|web|argument|invalid_operation|security|type_initialization|command_not_found|item_not_found|property_not_found|method_invocation|io|unauthorized|timeout|runtime|other)\z")
+			|| !(Code is Integer) || Code < -2147483648 || Code > 2147483647
+			return ""
+		Extended := " observed_stage=" . ObservedStage . " exception_family=" . Family . " hresult=" . Format("{:d}", Code)
+	}
 	DiagnosticExpected := _UpdaterNativeStagingScalarFact(Diagnostic.Get("expected", 0))
 	DiagnosticActual := _UpdaterNativeStagingScalarFact(Diagnostic.Get("actual", 0))
 	if DiagnosticExpected == "" || DiagnosticActual == ""
 		return ""
-	return "suboperation=" . DiagnosticOperation . " exception=" . DiagnosticException
+	return "suboperation=" . DiagnosticOperation . " exception=" . DiagnosticException . Extended
 		. " expected_" . StrReplace(DiagnosticExpected, " ", " expected_")
 		. " actual_" . StrReplace(DiagnosticActual, " ", " actual_")
+}
+
+_UpdaterNativeStagingSetupDiagnosticFact(Fact) {
+	if !(Fact is Map) || (Fact.Count != 6 && Fact.Count != 10)
+		return ""
+	for Key in Fact
+		if !(Key is String) || !RegExMatch(Key, "\A(?:schema_version|site|line|exception|error|hresult|command|category|language|compiler)\z")
+			return ""
+	if !(Fact.Get("schema_version", "") is Integer) || Fact["schema_version"] != 1
+		|| !(Fact.Get("line", "") is Integer) || Fact["line"] < 0 || Fact["line"] > 8192
+		|| !(Fact.Get("hresult", "") is Integer) || Fact["hresult"] < -2147483648 || Fact["hresult"] > 2147483647
+		return ""
+	for Pair in [["site", "download_module_load|download_module_reconstruct|native_routes_load|route_call|unknown"],
+		["exception", "invalid_operation|runtime|argument|io|other"],
+		["error", "compiler|type_exists|type_missing|method_missing|command_missing|property_missing|method_invocation|variable_refused|route_refused|observation_seam|language_refused|json_invalid|other"]]
+		if !(Fact.Get(Pair[1], "") is String) || !RegExMatch(Fact[Pair[1]], "\A(?:" . Pair[2] . ")\z")
+			return ""
+	Details := ""
+	if Fact.Count == 10 {
+		for Pair in [["command", "add_type|get_content|convert_json|other"],
+			["category", "unknown|0|[1-9]|[12][0-9]|3[01]"],
+			["language", "FullLanguage|ConstrainedLanguage|RestrictedLanguage|NoLanguage|unknown"],
+			["compiler", "none|CS[0-9]{4}"]]
+			if !(Fact.Get(Pair[1], "") is String) || !RegExMatch(Fact[Pair[1]], "\A(?:" . Pair[2] . ")\z")
+				return ""
+		if Fact["compiler"] != "none" && (Fact["command"] != "add_type" || Fact["error"] != "compiler")
+			return ""
+		Details := " command=" . Fact["command"] . " category=" . Fact["category"]
+			. " language=" . Fact["language"] . " compiler=" . Fact["compiler"]
+	}
+	return "site=" . Fact["site"] . " line=" . Fact["line"] . " exception=" . Fact["exception"]
+		. " error=" . Fact["error"] . " hresult=" . Format("{:d}", Fact["hresult"]) . Details
+}
+
+_UpdaterNativeEmitSetupDiagnostic(Run) {
+	try {
+		if !Run.HasOwnProp("StagingSetupDiagnosticPath")
+			return
+		Path := Run.StagingSetupDiagnosticPath
+		if FSSize(Path) > 2048
+			return
+		Text := FSReadUtf8Exact(Path)
+		if !(Text is String) || StrLen(Text) > 2048 || RegExMatch(Text, '"(?:schema_version|line|hresult)"\s*:\s*(?:true|false|null)\b')
+			return
+		for Key in ["schema_version", "site", "line", "exception", "error", "hresult", "command", "category", "language", "compiler"] {
+			Pattern := '"' . Key . '"\s*:'
+			if !RegExMatch(Text, Pattern, &Seen) {
+				if Key == "command" || Key == "category" || Key == "language" || Key == "compiler"
+					continue
+				return
+			}
+			if RegExMatch(Text, Pattern, , Seen.Pos + Seen.Len)
+				return
+		}
+		Fact := _UpdaterNativeStagingSetupDiagnosticFact(JsonParse(Text))
+		if Fact != ""
+			Run.RefusalDiagnosticPrinter.Call("::notice title=Windows staging setup::" . Fact)
+	} catch Any {
+		; Optional fixture observation never changes admission or refusal.
+	}
 }
 
 _UpdaterNativeReadStagingDiagnostic(Path) {
@@ -114,9 +192,70 @@ _UpdaterNativeReadStagingDiagnostic(Path) {
 	DiagnosticText := FSReadUtf8Exact(Path)
 	if !(DiagnosticText is String) || StrLen(DiagnosticText) > 2048
 		return ""
-	if RegExMatch(DiagnosticText, '"(?:schema_version|arity|size)"\s*:\s*(?:true|false|null)\b')
+	if RegExMatch(DiagnosticText, '"(?:schema_version|arity|size|hresult)"\s*:\s*(?:true|false|null)\b')
 		return ""
 	return _UpdaterNativeStagingDiagnosticFact(JsonParse(DiagnosticText))
+}
+
+_UpdaterNativeRouteShapeFact(Fact) {
+	if !(Fact is Map) || Fact.Count != 15 || !(Fact.Get("schema_version", "") is Integer) || Fact.Get("schema_version", 0) != 1
+		return ""
+	ExpectedKeys := "schema_version|selection_kind|selection_arity|ok_kind|ok_value|routes_kind|routes_count|max_routes_kind|max_routes_value|max_redirects_kind|max_redirects_value|receipt_kind|receipt_count|receipt_backend_kind|receipt_stage_kind"
+	for Key in Fact
+		if !(Key is String) || !RegExMatch(Key, "\A(?:" . ExpectedKeys . ")\z")
+			return ""
+	Kinds := "absent|bool|int32|int64|array|hashtable|string|other|unobserved"
+	for Key in ["selection_kind", "ok_kind", "routes_kind", "max_routes_kind", "max_redirects_kind", "receipt_kind", "receipt_backend_kind", "receipt_stage_kind"]
+		if !(Fact[Key] is String) || !RegExMatch(Fact[Key], "\A(?:" . Kinds . ")\z")
+			return ""
+	for Key in ["schema_version", "selection_arity", "routes_count", "max_routes_value", "max_redirects_value", "receipt_count"]
+		if !(Fact[Key] is Integer) || Fact[Key] < -1 || Fact[Key] > 2147483647
+			return ""
+	if Fact["selection_kind"] == "unobserved" || Fact["selection_arity"] > 4096
+		|| (Fact["selection_kind"] == "absent" && Fact["selection_arity"] != 0)
+		|| (Fact["selection_kind"] != "absent" && Fact["selection_kind"] != "array" && Fact["selection_arity"] != 1)
+		|| !(Fact["ok_value"] is String) || !RegExMatch(Fact["ok_value"], "\A(?:true|false|unavailable)\z")
+		|| (Fact["ok_kind"] == "bool" ? Fact["ok_value"] == "unavailable" : Fact["ok_value"] != "unavailable")
+		|| Fact["routes_count"] > 4096 || Fact["receipt_count"] > 64
+		return ""
+	if Fact["selection_kind"] != "hashtable" {
+		for Key in ["ok_kind", "routes_kind", "max_routes_kind", "max_redirects_kind", "receipt_kind", "receipt_backend_kind", "receipt_stage_kind"]
+			if Fact[Key] != "unobserved"
+				return ""
+	}
+	for Pair in [["routes_kind", "routes_count", "array"], ["receipt_kind", "receipt_count", "hashtable"]]
+		if Fact[Pair[1]] != Pair[3] && Fact[Pair[2]] != -1
+			return ""
+	for Prefix in ["max_routes", "max_redirects"]
+		if Fact[Prefix . "_kind"] != "int32" && Fact[Prefix . "_kind"] != "int64" && Fact[Prefix . "_value"] != -1
+			return ""
+	Text := ""
+	for Key in ["selection_kind", "selection_arity", "ok_kind", "ok_value", "routes_kind", "routes_count", "max_routes_kind", "max_routes_value", "max_redirects_kind", "max_redirects_value", "receipt_kind", "receipt_count", "receipt_backend_kind", "receipt_stage_kind"]
+		Text .= (Text == "" ? "" : " ") . Key . "=" . Fact[Key]
+	return Text
+}
+
+_UpdaterNativeReadRouteShape(Path) {
+	if !(Path is String) || Path == "" || FSSize(Path) > 2048
+		return ""
+	Text := FSReadUtf8Exact(Path)
+	if !(Text is String) || StrLen(Text) > 2048
+		|| RegExMatch(Text, '"(?:schema_version|selection_arity|routes_count|max_routes_value|max_redirects_value|receipt_count)"\s*:\s*(?:true|false|null)\b')
+		return ""
+	return _UpdaterNativeRouteShapeFact(JsonParse(Text))
+}
+
+_UpdaterNativeEmitRouteShape(Run) {
+	_UpdaterNativeEmitSetupDiagnostic(Run)
+	try {
+		if Run.HasOwnProp("RouteShapeDiagnosticPath") {
+			Fact := _UpdaterNativeReadRouteShape(Run.RouteShapeDiagnosticPath)
+			if Fact != ""
+				Run.RefusalDiagnosticPrinter.Call("::notice title=Windows staging route shape diagnostic::" . Fact)
+		}
+	} catch Any {
+		; Optional shape observation cannot replace the real route/refusal assertions.
+	}
 }
 
 class _UpdaterNativeTransportOwner extends _ManagedRemoteFixtureOwner {
@@ -172,6 +311,8 @@ class _UpdaterNativeDownloadRun {
 		this.NewExe := this.Directory . "staged.exe"
 		this.SwapPath := this.Directory . "swap.ps1"
 		this.StagingDiagnosticPath := this.Directory . "staging-diagnostic.json"
+		this.StagingSetupDiagnosticPath := this.StagingDiagnosticPath . ".setup"
+		this.RouteShapeDiagnosticPath := this.Directory . "route-shape.json"
 		FileAppend(this.OldBytes, this.CurrentExe, "UTF-8-RAW")
 		if this.DenyFile
 			DirCreate(this.NewExe)
@@ -194,11 +335,14 @@ class _UpdaterNativeDownloadRun {
 			this.Transport.Environment.Push(Pair)
 			DiagnosticPair := {Name: Prefix . "_TEST_STAGING_DIAGNOSTIC", Value: this.StagingDiagnosticPath}
 			this.Transport.Environment.Push(DiagnosticPair)
+			RouteShapePair := {Name: Prefix . "_TEST_ROUTE_SHAPE", Value: this.RouteShapeDiagnosticPath}
+			this.Transport.Environment.Push(RouteShapePair)
+			EnvSet(RouteShapePair.Name, RouteShapePair.Value)
 			EnvSet(DiagnosticPair.Name, DiagnosticPair.Value)
 			EnvSet(Pair.Name, Pair.Value)
 			; Add declared trusted callbacks to the real transport invocation only.
 			; Passive observation chunks preserve every original worker operation and guard.
-			Admission := '$env:ERGOPTI_FIXTURE_STAGING_DIAGNOSTIC=$env:' . DiagnosticPair.Name . ';$ownedPac=$env:' . Pair.Name . ';'
+			Admission := '$env:ERGOPTI_FIXTURE_STAGING_ROUTE_SHAPE=$env:' . RouteShapePair.Name . ';$env:ERGOPTI_FIXTURE_STAGING_DIAGNOSTIC=$env:' . DiagnosticPair.Name . ';$ownedPac=$env:' . Pair.Name . ';'
 				. '$reader={param($MaxBytes)[pscustomobject]@{Ok=$true;AutoDetect=$false;Absent=$false;PacUrl=$ownedPac;Proxy="";Bypass="";NativeError=0;FailureOrigin=""}}.GetNewClosure();'
 				. '$environment={param($Name)return ""};'
 			Bootstrap := Admission . this.Transport.Bootstrap . ' -ReadConfig $reader -ReadEnvironment $environment'
@@ -228,6 +372,7 @@ class _UpdaterNativeDownloadRun {
 	Accepted() {
 		Result := this.Wait()
 		if Result["exit"] != 0 {
+			_UpdaterNativeEmitRouteShape(this)
 			this.RefusalDiagnosticStatus := "unavailable"
 			this.StagingDiagnosticStatus := "unavailable"
 			try {
@@ -276,6 +421,20 @@ class _UpdaterNativeDownloadRun {
 			; Reporting refusal cannot replace the original native acceptance assertions.
 			this.RefusalDiagnosticStatus := "unavailable"
 		}
+		this.StagingDiagnosticStatus := "unavailable"
+		try {
+			if this.HasOwnProp("StagingDiagnosticPath") {
+				StagingFact := _UpdaterNativeReadStagingDiagnostic(this.StagingDiagnosticPath)
+				if StagingFact != "" {
+					this.RefusalDiagnosticPrinter.Call("::notice title=Windows staging suboperation diagnostic::" . StagingFact)
+					this.StagingDiagnosticStatus := "reported"
+				}
+			}
+		} catch Any {
+			; Optional observation cannot replace the original refusal assertion.
+			this.StagingDiagnosticStatus := "unavailable"
+		}
+		_UpdaterNativeEmitRouteShape(this)
 		AssertEqual(Reason, Failure["reason"])
 		if Stage != ""
 			AssertEqual(Stage, Failure["receipt"].Get("stage", ""))
@@ -319,7 +478,7 @@ class _UpdaterNativeDownloadRun {
 				return false
 		}
 		if this.Directory != "" {
-			for Name in ["CurrentExe", "NewExe", "SwapPath", "StagingDiagnosticPath"] {
+			for Name in ["CurrentExe", "NewExe", "SwapPath", "StagingDiagnosticPath", "StagingSetupDiagnosticPath", "RouteShapeDiagnosticPath"] {
 				if !this.HasOwnProp(Name)
 					continue
 				Path := this.%Name%
@@ -630,6 +789,8 @@ _UpdaterNative_ActualDeadlineAndCancellation(Contract, Fixture := unset) {
 				_SR_TreePoll()
 				Sleep(10)
 			}
+			if !FileExist(Run.NewExe) || Run.Results.Length != 0
+				_UpdaterNativeEmitPartialStageDiagnostic(Run, Kind)
 			AssertTrue(FileExist(Run.NewExe) && Run.Results.Length == 0,
 				"actual child must own a live partial stage before cancellation/deadline admission")
 			Fixture.Observe()
@@ -731,3 +892,210 @@ _UpdaterNativeStagingFactControls() {
 }
 Test("updater fixture: staging diagnostics keep closed scalar shapes and privacy",
 	_UpdaterNativeStagingFactControls)
+
+; Observe the captured terminal before the original live-stage assertion fires.
+_UpdaterNativePartialStageDiagnostic(Kind, Completions, State, Elapsed) {
+	Fact := "kind=" . _ManagedRemoteFixtureDiagnosticEnum(Kind, "cancel|deadline")
+		. " elapsed_ms=" . _ManagedRemoteFixtureGenerationInteger(Elapsed, 0, 2147483647)
+		. " callbacks=" . (Completions is Array ? _ManagedRemoteFixtureGenerationInteger(Completions.Length, 0, 65535) : "unknown")
+		. " tree_quiesced=" . (State is Map ? _ManagedRemoteFixtureDiagnosticBoolean(State.Get("TreeQuiesced", "")) : "unknown")
+	if !(Completions is Array) || Completions.Length != 1 || !(Completions[1] is Map)
+		return Fact . " exit=unknown failure=unavailable"
+	Completion := Completions[1]
+	Fact .= " exit=" . _ManagedRemoteFixtureGenerationInteger(Completion.Get("exit", ""), -2147483648, 4294967295)
+	Output := Completion.Get("stdout", 0)
+	if !(Output is String)
+		return Fact . " failure=invalid"
+	Failure := _Updater_ParseStagingFailure(Output)
+	if !Failure["valid"]
+		return Fact . " failure=invalid"
+	return Fact . " failure=admitted reason=" . _ManagedRemoteFixtureDiagnosticEnum(Failure["reason"], "download|verify|deadline")
+		. " " . _UpdaterNativeRefusalDiagnostic("", Failure["receipt"])
+}
+
+_UpdaterNativeEmitPartialStageDiagnostic(Run, Kind) {
+	_UpdaterNativeEmitRouteShape(Run)
+	try {
+		Elapsed := TickElapsed64(Run.StartedTick)
+		Fact := _UpdaterNativePartialStageDiagnostic(Kind, Run.Results, Run.NativeState, Elapsed)
+		Run.RefusalDiagnosticPrinter.Call("::notice title=Windows native partial stage diagnostic::" . Fact)
+		if Run.HasOwnProp("StagingDiagnosticPath") {
+			StagingFact := _UpdaterNativeReadStagingDiagnostic(Run.StagingDiagnosticPath)
+			if StagingFact != ""
+				Run.RefusalDiagnosticPrinter.Call("::notice title=Windows staging suboperation diagnostic::" . StagingFact)
+		}
+	} catch Any {
+		; Observation refusal cannot replace or satisfy the live-stage assertion.
+	}
+}
+
+_UpdaterNativePartialStageDiagnosticControls(Contract) {
+	Output := '{"schema_version":1,"state":"failed","operation":"download","reason":"download","receipt":{"backend":"dotnet","stage":"tls","failure_provenance":"verified","tls_status":"untrusted_certificate"},"cleanup_debt":[],"native_cleanup_debt":false}'
+	Fact := _UpdaterNativePartialStageDiagnostic("cancel", [Map("exit", 1, "stdout", Output)], Map("TreeQuiesced", true), 1500)
+	AssertContains(Fact, "kind=cancel elapsed_ms=1500 callbacks=1 tree_quiesced=true exit=1 failure=admitted reason=download")
+	AssertContains(Fact, "observed_stage=tls backend=dotnet")
+	AssertContains(Fact, "tls_status=untrusted_certificate")
+	Fact := _UpdaterNativePartialStageDiagnostic("deadline", [], Map("TreeQuiesced", "true"), "1500")
+	AssertContains(Fact, "elapsed_ms=unknown callbacks=0 tree_quiesced=unknown exit=unknown failure=unavailable")
+	Fact := _UpdaterNativePartialStageDiagnostic("PRIVATE_KIND", [Map("exit", "1", "stdout", "PRIVATE_URL_TOKEN")], Map(), 0)
+	AssertContains(Fact, "kind=unknown")
+	AssertContains(Fact, "exit=unknown failure=invalid")
+	AssertFalse(InStr(Fact, "PRIVATE"), "private stdout never enters the bounded scalar projection")
+}
+Test("updater native: missing partial stage exposes captured cause without weakening its assertion",
+	(*) => _UpdaterNative_WithContract(_UpdaterNativePartialStageDiagnosticControls))
+
+_UpdaterNativeEarlyStagingFactControls() {
+	Empty := Map("type", "absent", "arity", 0, "size_available", "unavailable")
+	Fact := Map("schema_version", 2, "operation", "not_file_read", "exception", "other",
+		"expected", Empty, "actual", Empty, "observed_stage", "proxy_resolve",
+		"exception_family", "invalid_operation", "hresult", -2146233079)
+	AssertContains(_UpdaterNativeStagingDiagnosticFact(Fact),
+		"observed_stage=proxy_resolve exception_family=invalid_operation hresult=-2146233079",
+		"actual pre-read exception family and stage remain bounded scalars")
+	Fact["hresult"] := "-2146233079"
+	AssertEqual("", _UpdaterNativeStagingDiagnosticFact(Fact), "string native codes are refused")
+	Fact["hresult"] := -2146233079
+	Fact["exception_family"] := "PRIVATE_MESSAGE"
+	AssertEqual("", _UpdaterNativeStagingDiagnosticFact(Fact), "unlisted exception text is refused")
+	Fact["exception_family"] := "invalid_operation"
+	Fact["observed_stage"] := "PRIVATE_URL"
+	AssertEqual("", _UpdaterNativeStagingDiagnosticFact(Fact), "private stage values are refused")
+	Fact["observed_stage"] := "proxy_resolve"
+	Fact.Delete("hresult")
+	AssertEqual("", _UpdaterNativeStagingDiagnosticFact(Fact), "partial extended facts are refused")
+	Setup := Map("schema_version", 1, "site", "native_routes_load", "line", 30,
+		"exception", "invalid_operation", "error", "compiler", "hresult", -2146233079)
+	AssertEqual("site=native_routes_load line=30 exception=invalid_operation error=compiler hresult=-2146233079", _UpdaterNativeStagingSetupDiagnosticFact(Setup))
+	for Pair in [["site", "PRIVATE_URL"], ["line", 8193], ["line", "30"], ["exception", "PRIVATE_ERROR"],
+		["error", "PRIVATE_TOKEN"], ["hresult", 2147483648], ["schema_version", 2]] {
+		Changed := Setup.Clone()
+		Changed[Pair[1]] := Pair[2]
+		AssertEqual("", _UpdaterNativeStagingSetupDiagnosticFact(Changed), "setup observations reject malformed private fields")
+	}
+	Setup["private"] := "PRIVATE"
+	AssertEqual("", _UpdaterNativeStagingSetupDiagnosticFact(Setup))
+}
+Test("updater fixture: early staging diagnostics retain actual bounded operation provenance",
+	_UpdaterNativeEarlyStagingFactControls)
+
+_UpdaterNativeRefusedSidecarControls(Contract) {
+	Directory := _SR_AcquireCaptureDirectory()
+	Path := Directory . "sidecar.json"
+	try {
+		for Mode in ["valid", "invalid", "sink_refused"] {
+			if FileExist(Path)
+				FileDelete(Path)
+			Text := Mode == "invalid" ? "PRIVATE_CONTENT" : '{"schema_version":2,"operation":"not_file_read","exception":"unauthorized","observed_stage":"file_remove","exception_family":"unauthorized","hresult":-2147024891,"expected":{"type":"absent","arity":0,"size_available":"unavailable"},"actual":{"type":"absent","arity":0,"size_available":"unavailable"}}'
+			FileAppend(Text, Path, "UTF-8-RAW")
+			Observed := []
+			Printer := Mode == "sink_refused" ? _ManagedRemoteStateWaitPrinterRefused.Bind(Map("calls", 0)) : (Fact) => Observed.Push(Fact)
+			Run := _UpdaterNativeRefusalDiagnosticControl(Printer)
+			Run.StagingDiagnosticPath := Path
+			Run.FixtureResult := Map("exit", 1, "stdout", '{"schema_version":1,"state":"failed","operation":"download","reason":"download","receipt":{}}')
+			Caught := false
+			try Run.Refused("download", "file_remove")
+			catch as Failure {
+				Caught := true
+				AssertContains(Failure.Message, "expected: <file_remove>", "observation preserves the exact primary stage assertion")
+			}
+			AssertTrue(Caught)
+			AssertEqual(Mode == "valid" ? "reported" : "unavailable", Run.StagingDiagnosticStatus)
+			AssertEqual(Mode == "valid" ? 2 : Mode == "invalid" ? 1 : 0, Observed.Length)
+			if Mode == "valid" {
+				AssertContains(Observed[2], "observed_stage=file_remove exception_family=unauthorized hresult=-2147024891")
+				AssertFalse(InStr(Observed[2], "PRIVATE"))
+			}
+		}
+	} finally {
+		if FileExist(Path)
+			FileDelete(Path)
+		DirDelete(Directory, false)
+	}
+}
+Test("updater native: refusal sidecar observation preserves the original stage assertion", _UpdaterNative_WithContract.Bind(_UpdaterNativeRefusedSidecarControls))
+
+_UpdaterNativeRouteShapeControls() {
+	; Independent literal receipt: no route, endpoint, URL or credential is copied.
+	Text := '{"schema_version":1,"selection_kind":"hashtable","selection_arity":1,"ok_kind":"bool","ok_value":"false","routes_kind":"array","routes_count":0,"max_routes_kind":"absent","max_routes_value":-1,"max_redirects_kind":"absent","max_redirects_value":-1,"receipt_kind":"hashtable","receipt_count":4,"receipt_backend_kind":"string","receipt_stage_kind":"string"}'
+	Fact := JsonParse(Text)
+	AssertContains(_UpdaterNativeRouteShapeFact(Fact), "selection_kind=hashtable selection_arity=1 ok_kind=bool ok_value=false")
+	AssertContains(_UpdaterNativeRouteShapeFact(Fact), "receipt_kind=hashtable receipt_count=4 receipt_backend_kind=string receipt_stage_kind=string")
+	Fact["private"] := "PRIVATE_URL_TOKEN"
+	AssertEqual("", _UpdaterNativeRouteShapeFact(Fact), "unknown/private shape fields are refused")
+	Fact.Delete("private")
+	Fact["selection_kind"] := "PRIVATE_URL_TOKEN"
+	AssertEqual("", _UpdaterNativeRouteShapeFact(Fact), "unlisted kinds never reach scalar notices")
+	Fact["selection_kind"] := "hashtable"
+	Fact["max_routes_value"] := "8"
+	AssertEqual("", _UpdaterNativeRouteShapeFact(Fact), "string policy values remain unavailable")
+	Directory := _SR_AcquireCaptureDirectory()
+	Path := Directory . "route-shape.json"
+	try {
+		FileAppend(Text, Path, "UTF-8-RAW")
+		AssertContains(_UpdaterNativeReadRouteShape(Path), "routes_kind=array routes_count=0", "actual bounded sidecar joins the receiving validator")
+		FileDelete(Path)
+		FileAppend(StrReplace(Text, '"routes_count":0', '"routes_count":false'), Path, "UTF-8-RAW")
+		AssertEqual("", _UpdaterNativeReadRouteShape(Path), "JSON booleans cannot masquerade as policy integer observations")
+	} finally {
+		if FileExist(Path)
+			FileDelete(Path)
+		DirDelete(Directory, false)
+	}
+}
+Test("updater staging: closed route-shape observation preserves typed policy and private bounds", _UpdaterNativeRouteShapeControls)
+
+
+_UpdaterNativeSetupDetailControls() {
+	Fact := Map("schema_version", 1, "site", "download_module_load", "line", 7,
+		"exception", "invalid_operation", "error", "compiler", "hresult", -2146233079,
+		"command", "add_type", "category", "6", "language", "FullLanguage", "compiler", "CS1519")
+	AssertContains(_UpdaterNativeStagingSetupDiagnosticFact(Fact), "command=add_type category=6 language=FullLanguage compiler=CS1519")
+	for Pair in [["command", "PRIVATE_COMMAND"], ["category", "32"], ["category", 6],
+		["language", "PRIVATE_LANGUAGE"], ["compiler", "CS15190"], ["command", "get_content"], ["error", "other"]] {
+		Changed := Fact.Clone()
+		Changed[Pair[1]] := Pair[2]
+		AssertEqual("", _UpdaterNativeStagingSetupDiagnosticFact(Changed), "compiler details require exact direct provenance")
+	}
+	Fact.Delete("compiler")
+	AssertEqual("", _UpdaterNativeStagingSetupDiagnosticFact(Fact), "partial detail sets are refused")
+}
+Test("updater fixture: setup details require direct closed compiler provenance", _UpdaterNativeSetupDetailControls)
+
+
+_UpdaterNativeObservedSourceBudget() {
+	global UPDATER_STAGING_ENV_MAX_CHARS, UPDATER_STAGING_MAX_SCRIPT_CHUNKS
+	Original := _Updater_BuildStagingWorkerScript()
+	Observed := _UpdaterNativeObservedStagingScript(Original)
+	Payload := _Updater_EncodePowerShellCommand(Observed)
+	AssertTrue(Ceil(StrLen(Payload) / UPDATER_STAGING_ENV_MAX_CHARS) <= UPDATER_STAGING_MAX_SCRIPT_CHUNKS,
+		"the exact observed native worker fits the unchanged production transport bound")
+	Transport := _Updater_BuildStagingTransport(Observed, _Updater_BuildSwapWorkerScript(),
+		"https://fixture.invalid/staging", "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+		"C:\fixture\new.exe", "C:\fixture\swap.ps1", "C:\fixture\current.exe", 524288, 5000)
+	try AssertEqual(Observed, _UST_DecodeUtf16Base64(Transport.ScriptPayload),
+		"the actual bounded environment transport preserves the full observed worker")
+	finally _Updater_ClearStagingTransport(Transport)
+}
+Test("updater native: exact observed source fits unchanged encoded chunk transport", _UpdaterNativeObservedSourceBudget)
+
+_UpdaterNativeObservedSourceLiteral() {
+	Original := _Updater_BuildStagingWorkerScript()
+	Observed := _UpdaterNativeObservedStagingScript(Original)
+	Start := InStr(Observed, "$StagingSource=@'`n")
+	AssertTrue(Start > 0, "the real constructor contains its quoted literal boundary")
+	Start += StrLen("$StagingSource=@'`n")
+	End := InStr(Observed, "`n'@`n", true, Start)
+	AssertTrue(End > Start, "the real constructor has one complete literal")
+	AssertEqual(Original, SubStr(Observed, Start, End - Start),
+		"all production statements reach the observation transform without encoding duplication")
+}
+Test("updater native: literal fixture transport conserves every original source byte", _UpdaterNativeObservedSourceLiteral)
+
+Test("updater native: a here-string closing delimiter cannot escape the source fixture", (*) =>
+	AssertThrows(() => _UpdaterNativeObservedStagingScript("param()`n'@"),
+		"a source delimiter must refuse before it can become surrounding PowerShell"))
+
+Test("updater native: CR-only source delimiters cannot escape the literal fixture", (*) =>
+	AssertThrows(() => _UpdaterNativeObservedStagingScript("param()`n# source`r'@`r$script:escaped=1"),
+		"PowerShell CR boundaries refuse before any injected statement can execute"))

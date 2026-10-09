@@ -113,7 +113,7 @@ helpers.describe("dynamic hotstrings manager", function()
       -- Buffer "td\" should match the "td" → YYYY_MM_DD date rule.
       -- The backslash is the trigger character.
       dh.set_enabled(true)
-      local ok = dh.on_trigger("td\\", "\\")
+      local ok = dh.on_trigger("td\\", "\\", true)
       -- This will try to inject via ydotool, which fails on test machines.
       -- We only verify it doesn't crash.
       helpers.assert_true(type(ok) == "boolean", "on_trigger returns boolean")
@@ -121,7 +121,7 @@ helpers.describe("dynamic hotstrings manager", function()
 
     helpers.it("on_trigger when disabled returns false", function()
       dh.set_enabled(false)
-      local ok = dh.on_trigger("td\\", "\\")
+      local ok = dh.on_trigger("td\\", "\\", true)
       helpers.assert_true(ok == false, "disabled module → no match")
       dh.set_enabled(true)
     end)
@@ -142,13 +142,13 @@ helpers.describe("dynamic hotstrings manager", function()
   helpers.describe("preview contract", function()
 
     helpers.it("preview with empty buffer returns nil", function()
-      local p = dh.preview("")
+      local p = dh.preview("", true)
       helpers.assert_true(p == nil, "empty buffer → nil preview")
     end)
 
     helpers.it("preview when disabled returns nil", function()
       dh.set_enabled(false)
-      local p = dh.preview("td\\")
+      local p = dh.preview("td\\", true)
       helpers.assert_true(p == nil, "disabled → nil preview")
       dh.set_enabled(true)
     end)
@@ -176,7 +176,7 @@ helpers.describe("dynamic hotstrings manager", function()
       local Engine = require("dynamic_hotstrings")
       Engine.reset_rules()
       Engine.register_date_rules("\\")
-      local match = Engine.match_buffer("td", nil, nil)
+      local match = Engine.match_buffer("td", nil, nil, true)
       helpers.assert_true(match ~= nil, "'td' matches a date rule")
       if match then
         helpers.assert_true(type(match.result) == "string" and #match.result > 0,
@@ -269,7 +269,7 @@ helpers.describe("dynamic hotstrings manager", function()
       dh.init({ trigger_char = "\\", personal_info_path = path })
       dh.set_enabled(true)
       -- Buffer ends with the trigger; preview strips it and previews "@p".
-      local p = dh.preview("@p\\")
+      local p = dh.preview("@p\\", true)
       helpers.assert_eq(p, "Adrien", "preview of '@p' must expand to first_name, not a placeholder")
       os.remove(path)
     end)
@@ -337,7 +337,7 @@ helpers.describe("dynamic hotstrings manager", function()
         end,
       }
 
-      local single_preview = dh.preview("@é\\")
+      local single_preview = dh.preview("@é\\", true)
       local single_fired, single_event = dh.on_trigger("@é\\", "\\")
       local fields = dh.resolve_combo("né")
       local rows = dh.preview_candidates("@né")
@@ -471,7 +471,7 @@ helpers.describe("dynamic hotstrings manager", function()
       local init_ok, init_error = pcall(function()
         dh.init({ trigger_char = "\\", personal_info_path = path })
       end)
-      local preview = dh.preview("@" .. decomposed_e_acute .. "\\")
+      local preview = dh.preview("@" .. decomposed_e_acute .. "\\", true)
 
       logger.error = original_error
       os.remove(path)

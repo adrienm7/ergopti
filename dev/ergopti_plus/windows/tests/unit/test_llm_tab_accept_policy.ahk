@@ -355,6 +355,69 @@ _LTAP_SlotAcceptPolicyTable() {
 Test("LLM accept: released validation chord inserts only its exact slot (llm-val-chord-inserts)",
 	_LTAP_SlotAcceptPolicyTable)
 
+; An external program's request (the registered accept message) is not a key:
+; it needs no physical Tab, yet keeps the focus and modifier gates, and the
+; bridge ignores it while inactive.
+_LTAP_AutomationAcceptPolicyTable() {
+	global _Stub_LlmTooltipVisible, _Stub_LlmPresentedRecord
+	global _LTAP_AcceptCount, _LTAP_LastAcceptedText
+	Vectors := [
+		Map("label", "request in the originating control, no key down", "accept", true),
+		Map("label", "Ctrl still held", "accept", false,
+			"input", _LTAP_Input(false, true)),
+		Map("label", "Win still held", "accept", false,
+			"input", _LTAP_Input(false, false, false, false, true)),
+		Map("label", "focus moved to another window", "accept", false,
+			"input", _LTAP_Input(false, false, false, false, false, 200, 1001)),
+		Map("label", "focus moved to another control", "accept", false,
+			"input", _LTAP_Input(false, false, false, false, false, 100, 1002)),
+		Map("label", "unverifiable focus", "accept", false,
+			"input", _LTAP_Input(false, false, false, false, false, 0, 0, false)),
+		Map("label", "no prediction shown", "accept", false, "hidden", true)
+	]
+	for TestVector in Vectors {
+		_LTAP_Setup()
+		try {
+			if TestVector.Get("hidden", false) {
+				_Stub_LlmTooltipVisible := false
+				_Stub_LlmPresentedRecord := 0
+			}
+			Accepted := LLM_Tooltip_TryAcceptAutomation(
+				TestVector.Get("input", _LTAP_Input(false)), _LTAP_RecordAccept)
+			AssertEqual(TestVector["accept"], Accepted,
+				TestVector["label"] . ": automation acceptance must follow its canonical policy")
+			AssertEqual(TestVector["accept"] ? 1 : 0, _LTAP_AcceptCount,
+				TestVector["label"] . ": injection count")
+			if TestVector["accept"]
+				AssertEqual("predicted text", _LTAP_LastAcceptedText,
+					"the active slot text must be injected exactly once")
+		} finally {
+			_LTAP_Teardown()
+		}
+	}
+}
+
+Test("LLM accept: an automation request inserts only in the owning control (llm-automation-accepts)",
+	_LTAP_AutomationAcceptPolicyTable)
+
+_LTAP_AutomationRequestIgnoredWhileBridgeInactive() {
+	global _LLM_Bridge_Active
+	Previous := _LLM_Bridge_Active
+	_LLM_Bridge_Active := false
+	try {
+		AssertEqual(0, _LLM_Automation_OnAcceptMessage(0, 0,
+				LLM_Automation_AcceptMessage(), 0),
+			"an inactive bridge must refuse, not acknowledge, the request")
+	} finally {
+		_LLM_Bridge_Active := Previous
+	}
+	Assert(LLM_Automation_AcceptMessage() >= 0xC000,
+		"the request must use a registered message, never a fixed WM_APP number another program could reuse")
+}
+
+Test("LLM accept: an inactive bridge refuses automation requests (llm-automation-accepts)",
+	_LTAP_AutomationRequestIgnoredWhileBridgeInactive)
+
 
 
 
@@ -492,3 +555,188 @@ _LTAP_RealAltGrTapReachesThePolicyAsTheUsersTab() {
 
 Test("LLM accept: the real AltGr Tab tap reaches the policy as the user's Tab (llm-accept-inserts)",
 	_LTAP_RealAltGrTapReachesThePolicyAsTheUsersTab)
+
+
+; Deferred external requests retain one render and one bridge lifecycle.
+_LTAP_WithAutomationOwner(Fn) {
+	global _LLM_Bridge_Active, _LLM_Automation_Generation
+	global _LLM_Automation_Pending, _LLM_Automation_Listening
+	global _LLM_Engine, _LLM_AcceptInProgress, _Stub_LlmPresentedRecord
+	global _Stub_LlmTooltipVisible, _Stub_LlmTooltipText
+	global _LTAP_AcceptCount, _LTAP_LastAcceptedText, _LTAP_ReentryResult
+	global _LTAP_ReentryRemapResult, _LTAP_ReentryCtrlResult
+	Saved := {
+		Active: _LLM_Bridge_Active, Generation: _LLM_Automation_Generation,
+		Pending: _LLM_Automation_Pending, Listening: _LLM_Automation_Listening,
+		Request: _LLM_Engine["request_id"], Source: _LLM_Engine["request_accept_source"],
+		Progress: _LLM_AcceptInProgress, Record: _Stub_LlmPresentedRecord,
+		Visible: _Stub_LlmTooltipVisible, Text: _Stub_LlmTooltipText,
+		Count: _LTAP_AcceptCount, Accepted: _LTAP_LastAcceptedText,
+		Reentry: _LTAP_ReentryResult, Remap: _LTAP_ReentryRemapResult,
+		Ctrl: _LTAP_ReentryCtrlResult
+	}
+	_LLM_Bridge_Active := true
+	_LLM_Automation_Pending := 0
+	_LLM_Automation_Listening := false
+	_LTAP_Setup()
+	try Fn.Call()
+	finally {
+		; The timer port never starts a native timer. Break any retained test cycle.
+		if IsObject(_LLM_Automation_Pending)
+			_LLM_Automation_Pending.Callback := 0
+		_LLM_Bridge_Active := Saved.Active
+		_LLM_Automation_Generation := Saved.Generation
+		_LLM_Automation_Pending := Saved.Pending
+		_LLM_Automation_Listening := Saved.Listening
+		_LLM_Engine["request_id"] := Saved.Request
+		_LLM_Engine["request_accept_source"] := Saved.Source
+		_LLM_AcceptInProgress := Saved.Progress
+		_Stub_LlmPresentedRecord := Saved.Record
+		_Stub_LlmTooltipVisible := Saved.Visible
+		_Stub_LlmTooltipText := Saved.Text
+		_LTAP_AcceptCount := Saved.Count
+		_LTAP_LastAcceptedText := Saved.Accepted
+		_LTAP_ReentryResult := Saved.Reentry
+		_LTAP_ReentryRemapResult := Saved.Remap
+		_LTAP_ReentryCtrlResult := Saved.Ctrl
+	}
+}
+
+_LTAP_AutomationTimer(Owner, Callback, Period) {
+	Owner.Periods.Push(Period)
+	Owner.Callback := Callback
+	if Period == 0 && Owner.FailDisarm
+		throw Owner.Error
+}
+
+_LTAP_AutomationOwnerCase(Kind) {
+	global _LLM_Bridge_Active, _LLM_Automation_Generation
+	global _LLM_Automation_Pending, _Stub_LlmPresentedRecord, _LTAP_AcceptCount
+	Timer := {Periods: [], Callback: 0, FailDisarm: false, Error: Error("owned disarm failed")}
+	State := _LLM_Automation_Queue(LLM_Tooltip_GetAcceptSnapshot(),
+		_LTAP_AutomationTimer.Bind(Timer))
+	Callback := Timer.Callback
+	if Kind == "replacement"
+		_LTAP_Setup()
+	else if Kind == "slot"
+		_Stub_LlmPresentedRecord.Slots[1] := "new slot text"
+	else if Kind == "generation"
+		_LLM_Automation_Generation += 1
+	else if Kind == "supersede" {
+		Timer.FailDisarm := true
+		Caught := 0
+		try _LLM_Automation_Queue(LLM_Tooltip_GetAcceptSnapshot(),
+			_LTAP_AutomationTimer.Bind(Timer))
+		catch as Err
+			Caught := Err
+		AssertEqual(ObjPtr(Timer.Error), ObjPtr(Caught), "failed replacement must remain explicit")
+	}
+	else if Kind == "restart" {
+		Timer.FailDisarm := true
+		_LLM_Bridge_Active := false
+		Caught := 0
+		try _LLM_Automation_Listen(false)
+		catch as Err
+			Caught := Err
+		AssertEqual(ObjPtr(Timer.Error), ObjPtr(Caught), "disarm failure must remain explicit")
+		AssertEqual(ObjPtr(State), ObjPtr(_LLM_Automation_Pending),
+			"failed disarm must retain its exact callback owner")
+		_LLM_Bridge_Active := true
+	} else if Kind == "stop" {
+		_LLM_Bridge_Active := false
+		_LLM_Automation_Listen(false)
+		_LLM_Bridge_Active := true
+		AssertEqual(0, _LLM_Automation_Pending, "stop must retire the queued owner")
+	}
+	Accepted := Callback.Call(_LTAP_Input(false), _LTAP_RecordAccept)
+	AssertEqual(Kind == "same", Accepted, Kind . ": deferred request admission")
+	AssertEqual(Kind == "same" ? 1 : 0, _LTAP_AcceptCount,
+		Kind . ": only the admitted original render may inject")
+	AssertFalse(Callback.Call(_LTAP_Input(false), _LTAP_RecordAccept),
+		"a completed callback must never replay")
+	if Kind != "same"
+		AssertEqual("", _Stub_LlmPresentedRecord.Lifecycle.Outcome,
+			"a refused stale request must not claim the live render")
+}
+
+_LTAP_AutomationOwnsRenderAndLifecycle() {
+	for Kind in ["same", "replacement", "slot", "generation", "supersede", "stop", "restart"]
+		_LTAP_WithAutomationOwner(_LTAP_AutomationOwnerCase.Bind(Kind))
+}
+
+Test("LLM automation owner: deferred requests cannot accept a replacement or restarted bridge",
+	_LTAP_AutomationOwnsRenderAndLifecycle)
+
+_LTAP_AutomationListenerPort(Owner, Message, Callback, Threads) {
+	Owner.Calls.Push(Threads)
+	if Threads == 1 || Owner.FailClose
+		throw Threads == 1 ? Owner.Primary : Owner.Secondary
+}
+
+_LTAP_AutomationStopPort(Owner, Port) {
+	global _LLM_Bridge_Active
+	Owner.Stops += 1
+	_LLM_Bridge_Active := false
+	_LLM_Automation_Listen(false, Port)
+}
+
+_LTAP_AutomationListenerFailureCase(FailClose) {
+	global _LLM_Bridge_Active, _LLM_Automation_Listening
+	Owner := {Calls: [], Stops: 0, FailClose: FailClose,
+		Primary: Error("registration failed"), Secondary: Error("retirement failed")}
+	Port := Map("message", () => 0xC123, "listen", _LTAP_AutomationListenerPort.Bind(Owner))
+	Caught := 0
+	try _LLM_Automation_StartListener(Port, _LTAP_AutomationStopPort.Bind(Owner, Port))
+	catch as Err
+		Caught := Err
+	AssertEqual(ObjPtr(Owner.Primary), ObjPtr(Caught), "cleanup must preserve the first failure")
+	AssertFalse(_LLM_Bridge_Active, "registration failure must fence the bridge")
+	AssertEqual(1, Owner.Stops, "started bridge cleanup must be attempted exactly once")
+	AssertEqual(2, Owner.Calls.Length, "registration and exact listener retirement must both be attempted")
+	AssertEqual(FailClose, _LLM_Automation_Listening,
+		"failed retirement remains owned; successful retirement is acknowledged")
+	Owner.FailClose := false
+	_LLM_Automation_Listen(false, Port)
+	AssertFalse(_LLM_Automation_Listening, "late retirement may close only the retained listener")
+}
+
+_LTAP_AutomationListenerFailure() {
+	for FailClose in [false, true]
+		_LTAP_WithAutomationOwner(_LTAP_AutomationListenerFailureCase.Bind(FailClose))
+}
+
+Test("LLM automation owner: listener failures fence the bridge and preserve the first exception",
+	_LTAP_AutomationListenerFailure)
+
+_LTAP_AutomationSchedulingPort(Owner, Callback, Period) {
+	if Period == -1
+		throw Owner.Primary
+	if Owner.FailClose
+		throw Owner.Secondary
+}
+
+_LTAP_AutomationSchedulingFailureCase() {
+	global _LLM_Automation_Pending
+	Owner := {Primary: Error("scheduling failed"), Secondary: Error("disarm failed"), FailClose: true}
+	Caught := 0
+	try _LLM_Automation_Queue(LLM_Tooltip_GetAcceptSnapshot(),
+		_LTAP_AutomationSchedulingPort.Bind(Owner))
+	catch as Err
+		Caught := Err
+	AssertEqual(ObjPtr(Owner.Primary), ObjPtr(Caught), "failed scheduling keeps its original exception")
+	AssertTrue(IsObject(_LLM_Automation_Pending), "failed disarm retains the exact callback")
+	State := _LLM_Automation_Pending
+	Callback := State.Callback
+	Owner.FailClose := false
+	_LLM_Automation_CancelPending()
+	AssertEqual(0, _LLM_Automation_Pending, "a late disarm acknowledgement retires the owner")
+	AssertFalse(Callback.Call(_LTAP_Input(false), _LTAP_RecordAccept),
+		"a failed scheduling transaction must never accept if its callback later arrives")
+}
+
+_LTAP_AutomationSchedulingFailure() {
+	_LTAP_WithAutomationOwner(_LTAP_AutomationSchedulingFailureCase)
+}
+
+Test("LLM automation owner: timer failures retain debt without masking the first exception",
+	_LTAP_AutomationSchedulingFailure)

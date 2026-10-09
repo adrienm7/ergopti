@@ -99,8 +99,8 @@ helpers.describe("macOS number-row tap keys (tap-keys)", function()
 	helpers.it("the labels follow the current input source", function()
 		local ok, err = true, nil
 		for _, case in ipairs({
-			{ name = "French", chars = { [50] = "@", [10] = "<", [27] = ")", [24] = "-" }, expected = "@ ) -" },
-			{ name = "US", chars = { [50] = "`", [10] = "§", [27] = "-", [24] = "=" }, expected = "` - =" },
+			{ name = "French", chars = { [50] = "@", [10] = "<", [27] = ")", [24] = "-" }, expected = "<menu.shortcuts.tap_keys.number_row_left> ) -" },
+			{ name = "US", chars = { [50] = "`", [10] = "§", [27] = "-", [24] = "=" }, expected = "<menu.shortcuts.tap_keys.number_row_left> - =" },
 		}) do
 			local TapKeys, restore = fresh(nil, case.chars)
 			ok, err = pcall(function()

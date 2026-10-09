@@ -14,11 +14,14 @@ local Policy = require("shortcuts.magic_editor")
 local Registrar = require("adapters.hotkey_registrar")
 local Broker = require("adapters.input_source_broker")
 local Probe = require("adapters.keyboard_source_probe")
+local original_source_id = rawget(Probe, "current_source_id")
+local original_request = rawget(Probe, "request")
 local FileSystem = require("adapters.file_system")
 local JsonCodec = require("adapters.json_codec")
 local Paths = require("infra.paths")
 local Manifest = require("infra.manifest_reader")
 local MagicKeySource = require("modules.keymap.magic_key_source")
+local Geometry = require("adapters.keyboard_geometry")
 local Logger = require("infra.logger")
 
 local LOG = "shortcuts.magic_editor"
@@ -33,6 +36,16 @@ local _registry = nil
 local _subscribed = false
 local _acquisition_depth = 0
 local _cancel_depth = 0
+
+--- Retains the exact source issuer loaded before any external constructor read.
+--- Replacement values cannot publish signed-source proof through this owner.
+local function probe_current()
+	return rawequal(package.loaded["adapters.keyboard_source_probe"], Probe)
+		and getmetatable(Probe) == nil and type(original_source_id) == "function"
+		and type(original_request) == "function"
+		and rawequal(rawget(Probe, "current_source_id"), original_source_id)
+		and rawequal(rawget(Probe, "request"), original_request)
+end
 
 local function registry()
 	if _registry then return _registry end
@@ -73,22 +86,53 @@ local function cancel_attempt()
 	return true
 end
 
+--- Rejoins only the spec/ports from this attempt's construction frame.
+--- Parent configuration and context callbacks are trusted constructor-owned
+--- inputs; a true callback result never authenticates a replacement frame.
+local function attempt_matches(attempt)
+	local spec, context, ports = attempt.spec, attempt.context, attempt.ports
+	if not probe_current() or not _started or _spec ~= spec or attempt.generation ~= _generation
+		or spec.context ~= context or spec.action ~= attempt.action
+		or spec.configuration_generation ~= attempt.configuration
+		or spec.is_current ~= ports.is_current or spec.is_action ~= ports.is_action
+		or context.legacy_present ~= attempt.legacy_present
+		or context.assignment_unavailable ~= attempt.assignment_unavailable
+		or Probe.current_source_id ~= ports.source_id then return false end
+	for _, name in ipairs({ "trigger", "magic_source", "replace_active", "paused", "inhibited" }) do
+		if context[name] ~= ports[name] then return false end
+	end
+	return true
+end
+
+--- Validates callback observations before a final private attempt check.
 local function current(attempt)
-	return _started and _attempt == attempt and attempt.fenced ~= true
-		and attempt.generation == _generation and _spec.is_current() == true
-		and Probe.current_source_id() == attempt.source_id
-		and _spec.context.trigger() == attempt.trigger
-		and _spec.context.magic_source() == attempt.magic_source
-		and _spec.context.replace_active() == attempt.replace_active
+	local function owned()
+		return _attempt == attempt and attempt.fenced ~= true and attempt_matches(attempt)
+	end
+	local function observe(callback)
+		if not owned() then return nil end
+		local value = callback()
+		if not owned() then return nil end
+		return value
+	end
+	local ports = attempt.ports
+	return observe(ports.trigger) == attempt.trigger
+		and observe(ports.magic_source) == attempt.magic_source
+		and observe(ports.replace_active) == attempt.replace_active
+		and observe(ports.source_id) == attempt.source_id
+		and observe(ports.is_current) == true and owned()
 end
 
 local function project(receipt, attempt)
+	local context = attempt.context
 	local candidates, remapped_candidates, known = {}, {}, {}
 	local by_native = {}
+	local keyboard_type = receipt and receipt.keyboard_type or nil
 	for code, entry in pairs(registry()) do
 		if entry.kind == "key" and type(entry.hs) == "number" then
 			known[code] = true
-			by_native[entry.hs] = code
+			local native = Geometry.physical_code(entry, keyboard_type)
+			if native ~= nil then by_native[native] = code end
 		end
 	end
 	for _, level in ipairs(receipt and receipt.levels or {}) do
@@ -96,7 +140,7 @@ local function project(receipt, attempt)
 		if code then
 			local remapped = MagicKeySource.remaps(level.code, {}, function()
 				return attempt.replace_active
-			end)
+			end, keyboard_type)
 			local candidate = {
 				code = code,
 				native_code = level.code,
@@ -114,8 +158,8 @@ local function project(receipt, attempt)
 	if #remapped_candidates > 0 then candidates = remapped_candidates end
 	return Policy.resolve({
 		default_action = Manifest.default_for(Policy.PATH),
-		stored_action = _spec.action,
-		is_action = _spec.is_action,
+		stored_action = attempt.action,
+		is_action = attempt.ports.is_action,
 		trigger = attempt.trigger,
 		source = {
 			generation = attempt.generation,
@@ -124,29 +168,63 @@ local function project(receipt, attempt)
 		},
 		known_codes = known,
 		explicit_claims = Registrar.physical_claims(),
-		configuration_generation = _spec.configuration_generation,
-		admission = gates(),
+		configuration_generation = attempt.configuration,
+		admission = {
+			master = _started and attempt.ports.is_current() == true,
+			paused = context.paused() ~= false,
+			inhibited = context.inhibited() ~= false,
+		},
 	})
 end
 
+--- Joins callback observations to the same retained conditional owner.
+--- Context/native reads may retire or replace this owner synchronously. Never
+--- reread cleared globals or execute a successor through the captured callback.
+--- @return boolean accepted
 local function deliver()
-	local decision = _decision
-	if _acquisition_depth ~= 0 or not decision or not _spec or (_spec.context.legacy_present or _spec.context.assignment_unavailable) then return false end
-	local admission = gates()
-	if not Policy.can_deliver(decision, {
-		source_generation = _generation,
-		configuration_generation = _spec.configuration_generation,
-		action = _spec.action or Manifest.default_for(Policy.PATH),
-		master = admission.master,
-		paused = admission.paused,
-		inhibited = admission.inhibited,
-	}) then return false end
-	if Probe.current_source_id() ~= _decision.source_id
-		or _spec.context.trigger() ~= _decision.trigger
-		or _spec.context.magic_source() ~= _decision.magic_source
-		or _spec.context.replace_active() ~= _decision.replace_active
-		or Registrar.physical_claims()[decision.source.identity] ~= nil then return false end
-	return _spec.execute(decision.action, Policy.BINDING_ID)
+	local decision, spec, handle, epoch = _decision, _spec, _handle, _generation
+	if _acquisition_depth ~= 0 or not decision or not spec or handle == nil
+		or spec.context.legacy_present or spec.context.assignment_unavailable then return false end
+	local context, action, configuration = spec.context, spec.action, spec.configuration_generation
+	local ports = {
+		is_current = spec.is_current, execute = spec.execute,
+		paused = context.paused, inhibited = context.inhibited, trigger = context.trigger,
+		magic_source = context.magic_source, replace_active = context.replace_active,
+	}
+	local source_id = original_source_id
+	local function owner_current()
+		if not probe_current() or not _started or _spec ~= spec or _decision ~= decision or _handle ~= handle
+			or _generation ~= epoch or _acquisition_depth ~= 0 or _cancel_depth ~= 0
+			or spec.context ~= context or spec.action ~= action or spec.configuration_generation ~= configuration
+			or context.legacy_present or context.assignment_unavailable
+			or spec.is_current ~= ports.is_current or spec.execute ~= ports.execute
+			or Probe.current_source_id ~= source_id then return false end
+		for _, name in ipairs({ "paused", "inhibited", "trigger", "magic_source", "replace_active" }) do
+			if context[name] ~= ports[name] then return false end
+		end
+		return true
+	end
+	local function observe(callback)
+		if not owner_current() then return nil end
+		local value = callback()
+		if not owner_current() then return nil end
+		return value
+	end
+	local effective_action = action or Manifest.default_for(Policy.PATH)
+	local paused, inhibited = observe(ports.paused), observe(ports.inhibited)
+	if paused ~= false or inhibited ~= false
+		or observe(ports.trigger) ~= decision.trigger
+		or observe(ports.magic_source) ~= decision.magic_source
+		or observe(ports.replace_active) ~= decision.replace_active then return false end
+	-- Join source and parent after the final context callback, then leave only
+	-- exact private identity checks after those external observations.
+	if observe(source_id) ~= decision.source_id or observe(ports.is_current) ~= true
+		or not Policy.can_deliver(decision, {
+			source_generation = epoch, configuration_generation = configuration,
+			action = effective_action, master = true, paused = paused, inhibited = inhibited,
+		}) or Registrar.physical_claims()[decision.source.identity] ~= nil
+		or not owner_current() then return false end
+	return ports.execute(decision.action, Policy.BINDING_ID)
 end
 
 --- Replaces the source proof only after exact prior owners have settled.
@@ -157,9 +235,23 @@ function M.refresh()
 	local cancelled = cancel_attempt()
 	local released = release_native()
 	if not cancelled or not released then return false end
+	if not probe_current() then return false end
 	if not _started or _spec.action == "none" or _spec.context.legacy_present
 		or _spec.context.assignment_unavailable then return true end
-	local source_id = Probe.current_source_id()
+	local spec, context = _spec, _spec.context
+	local attempt = {
+		generation = _generation, spec = spec, context = context,
+		action = spec.action, configuration = spec.configuration_generation,
+		legacy_present = context.legacy_present, assignment_unavailable = context.assignment_unavailable,
+		ports = {
+			source_id = original_source_id, is_current = spec.is_current, is_action = spec.is_action,
+			trigger = context.trigger, magic_source = context.magic_source, replace_active = context.replace_active,
+			paused = context.paused, inhibited = context.inhibited,
+		},
+		installing = true,
+	}
+	local source_id = attempt.ports.source_id()
+	if not attempt_matches(attempt) or _attempt ~= nil then return false end
 	if source_id == nil then return true end
 	local codes, seen = {}, {}
 	for _, entry in pairs(registry()) do
@@ -169,18 +261,17 @@ function M.refresh()
 		end
 	end
 	table.sort(codes)
-	local attempt = {
-		generation = _generation,
-		source_id = source_id,
-		trigger = _spec.context.trigger(),
-		magic_source = _spec.context.magic_source(),
-		replace_active = _spec.context.replace_active(),
-		installing = true,
-	}
+	if not attempt_matches(attempt) or _attempt ~= nil then return false end
+	attempt.source_id = source_id
+	for _, name in ipairs({ "trigger", "magic_source", "replace_active" }) do
+		attempt[name] = attempt.ports[name]()
+		if not attempt_matches(attempt) or _attempt ~= nil then return false end
+	end
 	_attempt = attempt
-	local operation = Probe.request({ source_id = source_id, codes = codes }, function(receipt, reason)
+	local operation = original_request({ source_id = source_id, codes = codes }, function(receipt, reason)
 		if not current(attempt) then return end
 		local decision = project(receipt, attempt)
+		if not current(attempt) then return end
 		decision.source_id, decision.trigger = attempt.source_id, attempt.trigger
 		decision.magic_source, decision.replace_active = attempt.magic_source, attempt.replace_active
 		_decision = decision
@@ -211,6 +302,11 @@ function M.refresh()
 			Logger.error(LOG, "Settled input-source proof retains native cleanup debt.")
 		end
 	end)
+	if not probe_current() then
+		attempt.fenced = true
+		cancel_attempt()
+		return false
+	end
 	if attempt.fenced then return cancel_attempt() end
 	return true
 end
@@ -219,6 +315,7 @@ end
 --- @param spec table Canonical assignment, live context and parent admission.
 --- @return boolean accepted
 function M.start(spec)
+	if not probe_current() then return false end
 	_spec = spec
 	_started = true
 	_subscribed = true

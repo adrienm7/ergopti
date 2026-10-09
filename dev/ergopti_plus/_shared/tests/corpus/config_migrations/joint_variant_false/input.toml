@@ -1,0 +1,7 @@
+[_meta]
+schema_version = 1
+[layout]
+ergopti_plus = false
+ergopti_base = true
+ergopti_alt_gr = false
+emulated_layout = ""

@@ -128,6 +128,39 @@ _JsonObjectMemberSpansAt(&text, position) {
 }
 
 /**
+ * Returns exact source spans for ordered elements of a complete JSON array.
+ * Validates the whole document with the canonical parser before reusing its
+ * token progress. Native numeric/Boolean aliases therefore retain provenance.
+ * Offsets are one-based UTF-16 positions for SubStr, not byte offsets.
+ * @param {string} text Complete JSON array source.
+ * @returns {Array} Element start, length and original validated source text.
+ * @throws {Error} Invalid JSON or a root that is not an array.
+ */
+JsonArrayElementSpans(text) {
+	parsed := JsonParse(text)
+	if !(parsed is Array)
+		throw TypeError("Selected JSON source is not an array.")
+	position := 1
+	_JsonSkipWs(&text, &position)
+	position++
+	spans := []
+	_JsonSkipWs(&text, &position)
+	if SubStr(text, position, 1) == "]"
+		return spans
+	loop {
+		_JsonSkipWs(&text, &position)
+		start := position
+		_JsonParseValue(&text, &position, 1)
+		spans.Push(Map("start", start, "length", position - start,
+			"text", SubStr(text, start, position - start)))
+		_JsonSkipWs(&text, &position)
+		if SubStr(text, position, 1) == "]"
+			return spans
+		position++
+	}
+}
+
+/**
  * Encodes one value as a complete JSON string literal.
  * @param value Value converted to String before encoding.
  * @param {boolean} escapeHtml Also neutralise HTML parser delimiters when the
