@@ -1339,6 +1339,7 @@ function closedPublicationCalls(unit, role) {
 					error: 4,
 					ipairs: 1,
 					_row_is_for_linux: 1,
+					i18n_safe: 1,
 					tostring: 1,
 					build: 3,
 					_grey_for_pause: 1,
@@ -1430,17 +1431,22 @@ function closedNativeControl(unit, role) {
 			'if id == "---" then',
 			'if not build then',
 			'elseif _row_is_for_linux(row) then',
+			'elseif row.disabled == true then',
 			'elseif id == "quit" then',
 			'elseif ctx.paused == true and row.greyed_when_paused == true then'
 		];
 		if (
 			positions(unit, 'if').length !== 6 ||
-			positions(unit, 'elseif').length !== 3 ||
+			positions(unit, 'elseif').length !== 4 ||
 			positions(unit, 'return').length !== 3 ||
 			conditions.some((text) => positions(unit, text).length !== 1) ||
-			positions(unit, 'rows [').length !== 6 ||
-			positions(unit, 'rows [ # rows + 1 ] =').length !== 6 ||
+			positions(unit, 'rows [').length !== 7 ||
+			positions(unit, 'rows [ # rows + 1 ] =').length !== 7 ||
 			positions(unit, 'build ( ctx )').length !== 3 ||
+			positions(
+				unit,
+				'elseif row.disabled == true then rows[#rows + 1] = { label = i18n_safe(row.i18n), disabled = true, disabled_reason_key = row.reason_key } elseif id == "quit" then'
+			).length !== 1 ||
 			positions(unit, 'ManifestMenu =').length
 		)
 			return false;
