@@ -1,13 +1,54 @@
 {
 	"_comment": "The diagnostics window's snapshot, version 2, produced by the three drivers and rendered and exported by the shared page (_shared/ui/healthcheck/model.js). A snapshot is { schema_version, driver, generated_at (UTC, ISO 8601), detailed, sections: { <section id>: { <field id>: value } or { items: [ ... ] } }, probes: { <probe id>: { state, ms, detail } } }. Sections render in this order; a section or a field whose `platforms` omits the driver is neither collected nor shown there. Labels come from the locales: healthcheck.section.<id>, healthcheck.field.<id>, healthcheck.column.<section>.<column>. Field types: text, path (the page offers Open; the host opens it by field id only, never by a path the page sends), count, bytes, seconds, ms, percent (0 to 100, of the whole machine's processor capacity), bool (true, or 1 from the AHK writer), list, log (an H3 and a block), enum (translated through enum_key + value). A field with `probe` is filled by that asynchronous probe and reads as pending until the probe answers; `probe` is a probe id, or a map from driver to probe id when only some drivers need one; show_ms appends the probe's duration. The cpu_load probe takes two samples sample_ms apart, on a timer. An items section with `probe` lists what phase A read and says its list is incomplete until that probe answers with the whole list (macOS reads its Bluetooth devices with system_profiler). A field marked opt_in, and an items column in opt_in_columns, is collected and shown only when the user ticks 'Include details'. Phase A, the synchronous collection, must stay under phase_a_budget_ms and may only read memory, cached values and small files: every subprocess, network request or slow system query is a probe bounded by its timeout_ms. `permissions` lists, per driver, the permission ids the host reports, the system settings page it opens for one (by id) and whether a fix hint (healthcheck.permission_fix.<id>) exists. `report` bounds the Markdown file the page asks the host to save under the logs folder.",
 	"schema_version": 2,
+	"diagnostic_checks": {
+		"items": [
+			{
+				"id": "schema_fields",
+				"label": "healthcheck.deep_tests.schema",
+				"scope": "diagnostics-model"
+			},
+			{
+				"id": "probe_inventory",
+				"label": "healthcheck.deep_tests.probe_inventory",
+				"scope": "diagnostics-model"
+			},
+			{
+				"id": "redaction",
+				"label": "healthcheck.deep_tests.redaction",
+				"scope": "synthetic-export"
+			},
+			{
+				"id": "driver_suites",
+				"label": "healthcheck.deep_tests.ci_suites",
+				"scope": "isolated-suite",
+				"reason": "not_embedded"
+			},
+			{
+				"id": "install_reload_profile",
+				"label": "healthcheck.deep_tests.ci_suites",
+				"scope": "isolated-suite",
+				"reason": "isolated_environment_required"
+			}
+		],
+		"redaction_vector": {
+			"context": {
+				"home": "/diagnostics-user",
+				"user": "diagnostics-user",
+				"case_insensitive": false
+			},
+			"input": "location /diagnostics-user/config; account diagnostics-user; api_key=diagnostic_key_123456789",
+			"expected": "location ~/config; account <user>; api_key=<secret>"
+		}
+	},
 	"phase_a_budget_ms": 5,
 	"max_export_bytes": 2097152,
 	"report": {
 		"subdir": "diagnostics",
 		"name_prefix": "ergopti-diagnostics-",
 		"name_suffix": ".md",
-		"name_max_length": 160
+		"name_max_length": 160,
+		"export_sequence_max": 9007199254740991
 	},
 	"probes": {
 		"github_api": {
@@ -32,6 +73,11 @@
 		"bluetooth": {
 			"timeout_ms": 10000,
 			"platforms": ["macos"]
+		},
+		"appleevent_transport": {
+			"label": "healthcheck.deep_tests.appleevents",
+			"platforms": ["macos"],
+			"timeout_ms": 10000
 		}
 	},
 	"permissions": {
@@ -51,8 +97,12 @@
 		},
 		"windows": {},
 		"linux": {
-			"input_devices": { "fix": true },
-			"uinput": { "fix": true }
+			"input_devices": {
+				"fix": true
+			},
+			"uinput": {
+				"fix": true
+			}
 		}
 	},
 	"feature_labels": {
@@ -67,82 +117,251 @@
 	"peripheral_buses": ["usb", "bluetooth", "internal", "other"],
 	"peripheral_kinds": ["keyboard", "mouse", "touchpad", "other"],
 	"sections": [
-		{ "id": "summary", "kind": "summary" },
+		{
+			"id": "summary",
+			"kind": "summary"
+		},
 		{
 			"id": "paths",
 			"fields": [
-				{ "id": "config_dir", "type": "path" },
-				{ "id": "logs_dir", "type": "path" },
-				{ "id": "log_today", "type": "path" },
-				{ "id": "errors_today", "type": "path" },
-				{ "id": "crash_dir", "type": "path" },
-				{ "id": "diagnostics_dir", "type": "path" },
-				{ "id": "app_dir", "type": "path" },
-				{ "id": "launcher_log", "type": "path", "platforms": ["macos"] }
+				{
+					"id": "config_dir",
+					"type": "path"
+				},
+				{
+					"id": "logs_dir",
+					"type": "path"
+				},
+				{
+					"id": "log_today",
+					"type": "path"
+				},
+				{
+					"id": "errors_today",
+					"type": "path"
+				},
+				{
+					"id": "crash_dir",
+					"type": "path"
+				},
+				{
+					"id": "diagnostics_dir",
+					"type": "path"
+				},
+				{
+					"id": "app_dir",
+					"type": "path"
+				},
+				{
+					"id": "launcher_log",
+					"type": "path",
+					"platforms": ["macos"]
+				}
 			]
 		},
 		{
 			"id": "versions",
 			"fields": [
-				{ "id": "ergopti_version", "type": "text" },
-				{ "id": "commit", "type": "text" },
-				{ "id": "channel", "type": "text" },
-				{ "id": "runtime", "type": "text" },
-				{ "id": "karabiner", "type": "text", "platforms": ["macos"] },
-				{ "id": "webview", "type": "text", "platforms": ["windows", "linux"] },
-				{ "id": "kanata", "type": "text", "platforms": ["linux"], "probe": "system_details" }
+				{
+					"id": "ergopti_version",
+					"type": "text"
+				},
+				{
+					"id": "commit",
+					"type": "text"
+				},
+				{
+					"id": "channel",
+					"type": "text"
+				},
+				{
+					"id": "runtime",
+					"type": "text"
+				},
+				{
+					"id": "karabiner",
+					"type": "text",
+					"platforms": ["macos"]
+				},
+				{
+					"id": "webview",
+					"type": "text",
+					"platforms": ["windows", "linux"]
+				},
+				{
+					"id": "kanata",
+					"type": "text",
+					"platforms": ["linux"],
+					"probe": "system_details"
+				}
 			]
 		},
 		{
 			"id": "hardware",
 			"fields": [
-				{ "id": "model", "type": "text", "probe": { "macos": "system_details" } },
-				{ "id": "cpu", "type": "text", "probe": { "macos": "system_details" } },
-				{ "id": "cpu_cores", "type": "count", "probe": { "macos": "system_details" } },
-				{ "id": "arch", "type": "text" },
-				{ "id": "ram_total", "type": "bytes" },
-				{ "id": "displays", "type": "list" }
+				{
+					"id": "model",
+					"type": "text",
+					"probe": {
+						"macos": "system_details"
+					}
+				},
+				{
+					"id": "cpu",
+					"type": "text",
+					"probe": {
+						"macos": "system_details"
+					}
+				},
+				{
+					"id": "cpu_cores",
+					"type": "count",
+					"probe": {
+						"macos": "system_details"
+					}
+				},
+				{
+					"id": "arch",
+					"type": "text"
+				},
+				{
+					"id": "ram_total",
+					"type": "bytes"
+				},
+				{
+					"id": "displays",
+					"type": "list"
+				}
 			]
 		},
 		{
 			"id": "system",
 			"fields": [
-				{ "id": "os", "type": "text" },
-				{ "id": "kernel", "type": "text", "platforms": ["linux"] },
-				{ "id": "display_server", "type": "text", "platforms": ["linux"] },
-				{ "id": "desktop", "type": "text", "platforms": ["linux"] },
-				{ "id": "locale", "type": "text" },
-				{ "id": "keyboard_layout", "type": "text" },
-				{ "id": "ram_free", "type": "bytes" },
+				{
+					"id": "os",
+					"type": "text"
+				},
+				{
+					"id": "kernel",
+					"type": "text",
+					"platforms": ["linux"]
+				},
+				{
+					"id": "display_server",
+					"type": "text",
+					"platforms": ["linux"]
+				},
+				{
+					"id": "desktop",
+					"type": "text",
+					"platforms": ["linux"]
+				},
+				{
+					"id": "locale",
+					"type": "text"
+				},
+				{
+					"id": "keyboard_layout",
+					"type": "text"
+				},
+				{
+					"id": "ram_free",
+					"type": "bytes"
+				},
 				{
 					"id": "disk_free",
 					"type": "bytes",
-					"probe": { "macos": "system_details", "linux": "system_details" }
+					"probe": {
+						"macos": "system_details",
+						"linux": "system_details"
+					}
 				},
-				{ "id": "cpu_usage", "type": "percent", "probe": "cpu_load" },
-				{ "id": "process_cpu", "type": "percent", "probe": "cpu_load" },
-				{ "id": "process_memory", "type": "bytes", "probe": { "macos": "cpu_load" } },
-				{ "id": "uptime", "type": "seconds" },
-				{ "id": "elevated", "type": "bool" },
-				{ "id": "running_apps", "type": "list", "opt_in": true, "platforms": ["windows", "macos"] }
+				{
+					"id": "cpu_usage",
+					"type": "percent",
+					"probe": "cpu_load"
+				},
+				{
+					"id": "process_cpu",
+					"type": "percent",
+					"probe": "cpu_load"
+				},
+				{
+					"id": "process_memory",
+					"type": "bytes",
+					"probe": {
+						"macos": "cpu_load"
+					}
+				},
+				{
+					"id": "uptime",
+					"type": "seconds"
+				},
+				{
+					"id": "elevated",
+					"type": "bool"
+				},
+				{
+					"id": "running_apps",
+					"type": "list",
+					"opt_in": true,
+					"platforms": ["windows", "macos"]
+				}
 			]
 		},
 		{
 			"id": "input",
 			"fields": [
-				{ "id": "paused", "type": "bool" },
-				{ "id": "shift", "type": "bool" },
-				{ "id": "ctrl", "type": "bool" },
-				{ "id": "alt", "type": "bool" },
-				{ "id": "altgr", "type": "bool" },
-				{ "id": "meta", "type": "bool" },
-				{ "id": "caps_lock", "type": "bool" },
-				{ "id": "remap_phase", "type": "text", "platforms": ["macos"] },
-				{ "id": "kanata_running", "type": "bool", "platforms": ["linux"] },
-				{ "id": "keymap_resolved", "type": "bool", "platforms": ["linux"] }
+				{
+					"id": "paused",
+					"type": "bool"
+				},
+				{
+					"id": "shift",
+					"type": "bool"
+				},
+				{
+					"id": "ctrl",
+					"type": "bool"
+				},
+				{
+					"id": "alt",
+					"type": "bool"
+				},
+				{
+					"id": "altgr",
+					"type": "bool"
+				},
+				{
+					"id": "meta",
+					"type": "bool"
+				},
+				{
+					"id": "caps_lock",
+					"type": "bool"
+				},
+				{
+					"id": "remap_phase",
+					"type": "text",
+					"platforms": ["macos"]
+				},
+				{
+					"id": "kanata_running",
+					"type": "bool",
+					"platforms": ["linux"]
+				},
+				{
+					"id": "keymap_resolved",
+					"type": "bool",
+					"platforms": ["linux"]
+				}
 			]
 		},
-		{ "id": "features", "kind": "items", "columns": ["id", "enabled"] },
+		{
+			"id": "features",
+			"kind": "items",
+			"columns": ["id", "enabled"]
+		},
 		{
 			"id": "unavailable",
 			"kind": "items",
@@ -153,18 +372,44 @@
 		{
 			"id": "ai",
 			"fields": [
-				{ "id": "ai_enabled", "type": "bool" },
-				{ "id": "ai_backend", "type": "text" },
-				{ "id": "ai_model", "type": "text" },
-				{ "id": "ai_profile", "type": "text" },
-				{ "id": "ai_health", "type": "text", "probe": "ai_health", "show_ms": true }
+				{
+					"id": "ai_enabled",
+					"type": "bool"
+				},
+				{
+					"id": "ai_backend",
+					"type": "text"
+				},
+				{
+					"id": "ai_model",
+					"type": "text"
+				},
+				{
+					"id": "ai_profile",
+					"type": "text"
+				},
+				{
+					"id": "ai_health",
+					"type": "text",
+					"probe": "ai_health",
+					"show_ms": true
+				}
 			]
 		},
 		{
 			"id": "network",
 			"fields": [
-				{ "id": "github_api", "type": "text", "probe": "github_api", "show_ms": true },
-				{ "id": "wifi_signal", "type": "text", "platforms": ["macos"] }
+				{
+					"id": "github_api",
+					"type": "text",
+					"probe": "github_api",
+					"show_ms": true
+				},
+				{
+					"id": "wifi_signal",
+					"type": "text",
+					"platforms": ["macos"]
+				}
 			]
 		},
 		{
@@ -178,34 +423,70 @@
 			"kind": "items",
 			"columns": ["bus", "kind", "vendor_id", "product_id", "name"],
 			"opt_in_columns": ["name"],
-			"probe": { "macos": "bluetooth" }
+			"probe": {
+				"macos": "bluetooth"
+			}
 		},
 		{
 			"id": "issues",
 			"fields": [
-				{ "id": "warn_count", "type": "count" },
-				{ "id": "err_count", "type": "count" },
-				{ "id": "last_error", "type": "log" },
+				{
+					"id": "warn_count",
+					"type": "count"
+				},
+				{
+					"id": "err_count",
+					"type": "count"
+				},
+				{
+					"id": "last_error",
+					"type": "log"
+				},
 				{
 					"id": "recent_source",
 					"type": "enum",
 					"enum_key": "healthcheck.recent_source.",
 					"values": ["errors_file", "ring", "unavailable"]
 				},
-				{ "id": "recent", "type": "log" }
+				{
+					"id": "recent",
+					"type": "log"
+				}
 			]
 		},
 		{
 			"id": "developer",
 			"collapsed": true,
 			"fields": [
-				{ "id": "modules_failed", "type": "list" },
-				{ "id": "modules_disabled", "type": "list" },
-				{ "id": "modules_ok", "type": "list" },
-				{ "id": "log_level", "type": "text" },
-				{ "id": "ring_lines", "type": "count" },
-				{ "id": "event_tap_telemetry", "type": "text", "platforms": ["macos"] },
-				{ "id": "phase_a_ms", "type": "ms" }
+				{
+					"id": "modules_failed",
+					"type": "list"
+				},
+				{
+					"id": "modules_disabled",
+					"type": "list"
+				},
+				{
+					"id": "modules_ok",
+					"type": "list"
+				},
+				{
+					"id": "log_level",
+					"type": "text"
+				},
+				{
+					"id": "ring_lines",
+					"type": "count"
+				},
+				{
+					"id": "event_tap_telemetry",
+					"type": "text",
+					"platforms": ["macos"]
+				},
+				{
+					"id": "phase_a_ms",
+					"type": "ms"
+				}
 			]
 		}
 	]

@@ -227,11 +227,11 @@ _HealthCheck_Developer() {
 ; The pending state of every probe this driver runs.
 ; @param Schema {Map}
 ; @returns {Map}
-_HealthCheck_PendingProbes(Schema) {
+_HealthCheck_PendingProbes(Schema, Selected := true) {
 	Probes := Map()
 	for Id, Probe in Schema["probes"]
 		if _HealthCheck_Applies(Probe)
-			Probes[Id] := Map("state", "pending")
+			Probes[Id] := Selected ? Map("state", "pending") : Map("state", "not_run", "reason", "opt_in_required")
 	return Probes
 }
 
@@ -251,7 +251,10 @@ _HealthCheck_NowMs() {
 ; in-process reads only, the probes fill the rest.
 ; @param Detailed {Boolean} Whether the user ticked "Include details".
 ; @returns {Map} { schema_version, driver, generated_at, detailed, sections, probes }
-HealthCheck_Run(Detailed := false) {
+; @param Extensive {Boolean} Admits asynchronous checks independently of privacy.
+HealthCheck_Run(Detailed := false, Extensive := false) {
+	if !(Extensive is Integer) || (Extensive != 0 && Extensive != 1)
+		throw TypeError("Extensive diagnostics require a Boolean selection.")
 	global _HealthCheckStartMs
 	try LoggerStart("Healthcheck", "Collecting the diagnostics…")
 	; The budget is the collection's: the shared documents are parsed once per
@@ -275,7 +278,7 @@ HealthCheck_Run(Detailed := false) {
 	Peripherals := _HealthCheck_Collect("peripherals", () => _HealthCheck_Peripherals(Detailed), Map("items", []))
 	Issues      := _HealthCheck_Collect("issues", _HealthCheck_Issues, Map())
 	Developer   := _HealthCheck_Collect("developer", _HealthCheck_Developer, Map())
-	Probes      := _HealthCheck_PendingProbes(Schema)
+	Probes      := _HealthCheck_PendingProbes(Schema, Extensive)
 
 	Sections := Map(
 		"paths",       Paths,
@@ -294,6 +297,7 @@ HealthCheck_Run(Detailed := false) {
 		"driver",         "windows",
 		"generated_at",   FormatTime(A_NowUTC, "yyyy-MM-dd'T'HH:mm:ss'Z'"),
 		"detailed",       Detailed ? true : false,
+		"extensive",      Extensive ? true : false,
 		"sections",       Sections,
 		"probes",         Probes)
 
@@ -438,6 +442,10 @@ _HealthCheck_SortedLines(Text) {
 ; Wide enough for a path to stay on one line (test-healthcheck-page).
 global HC_WIDTH  := 1060
 global HC_HEIGHT := 720
+
+; The fallback export row is reserved below the structured tree.
+global HC_NATIVE_EXPORT_ROW := 38
+global HC_NATIVE_EXPORT_MARGIN := 6
 
 ; Virtual host for the shared page — maps _SharedDir so relative assets
 ; (style.css, script.js, ../dom_utils.js) and the locale files resolve over https.
@@ -596,7 +604,7 @@ HealthCheck_ShowWindow(Mode := "") {
 				_HC_WindowEpoch += 1
 				WindowEpoch := _HC_WindowEpoch
 				PageUrl := "https://" . HC_VHOST . "/ui/healthcheck/index.html?cb=" . A_TickCount . "&epoch=" . WindowEpoch
-				_HC_Session := Map("epoch", WindowEpoch, "snapshot", Snapshot, "detailed", false, "mode", Mode,
+				_HC_Session := Map("epoch", WindowEpoch, "snapshot", Snapshot, "detailed", false, "extensive", false, "mode", Mode,
 					"page_url", PageUrl)
 
 				try {
@@ -653,9 +661,12 @@ HealthCheck_ShowWindow(Mode := "") {
 ; @param G {Gui} The diagnostics host window.
 ; @param Snapshot {Map} The same snapshot supplied to the shared page.
 _HC_ShowNativeSnapshot(G, Snapshot) {
-	global HC_WIDTH, HC_HEIGHT
-	Tree := G.Add("TreeView", "x0 y0 w" . HC_WIDTH . " h" . HC_HEIGHT . " +HScroll")
+	global HC_WIDTH, HC_HEIGHT, HC_NATIVE_EXPORT_ROW, HC_NATIVE_EXPORT_MARGIN
+	Tree := G.Add("TreeView", "x0 y0 w" . HC_WIDTH . " h" . (HC_HEIGHT - HC_NATIVE_EXPORT_ROW) . " +HScroll")
 	G.NativeDiagnostics := Tree
+	NativeSave := G.Add("Button", "x8 y" . (HC_HEIGHT - HC_NATIVE_EXPORT_ROW + HC_NATIVE_EXPORT_MARGIN)
+		. " w160", t("healthcheck.toolbar.save"))
+	NativeSave.OnEvent("Click", _HC_NativeSaveSnapshot.Bind(Snapshot))
 	Summary := Tree.Add(t("healthcheck.section.summary"), 0, "Bold Expand")
 	_HC_NativeAddValue(Tree, t("healthcheck.export.driver"), Snapshot["driver"], Summary)
 	_HC_NativeAddValue(Tree, t("healthcheck.export.generated"), Snapshot["generated_at"], Summary)
@@ -677,6 +688,25 @@ _HC_ShowNativeSnapshot(G, Snapshot) {
 		}
 	}
 	return Tree
+}
+
+/** Formats the quick native report with an explicit unexecuted-test status. */
+_HC_NativeSnapshotText(Snapshot) {
+	Status := StrReplace(t("healthcheck.probe.not_run"), "%s", t("healthcheck.deep_tests.reason.not_embedded"))
+	return HealthCheck_FormatPlain(Snapshot) . "`n" . t("healthcheck.deep_tests.title") . ": " . Status
+}
+
+/** Exports the captured quick fallback without browser-dependent checks. */
+_HC_NativeSaveSnapshot(Snapshot, *) {
+	Config := HealthCheck_Config()
+	Name := Config["schema"]["report"]["name_prefix"] . "windows-" . FormatTime(A_NowUTC, "yyyyMMdd-HHmmss")
+		. Config["schema"]["report"]["name_suffix"]
+	Text := _HC_NativeSnapshotText(Snapshot)
+	Validated := HealthCheck_ValidateAction(Map("action", "save", "text", Text, "name", Name),
+		Map("schema", Config["schema"], "templates", Config["templates"], "driver", "windows"))
+	if !Validated.Has("action")
+		throw Error("The native diagnostic export was refused.")
+	return HealthCheck_PerformAction(Validated["action"], Snapshot["sections"]["paths"], Config)
 }
 
 ; Keeps arrays and records expandable, including each recent log entry.
@@ -812,6 +842,25 @@ _HC_HandleMessage(WindowEpoch, Raw) {
 	}
 }
 
+; Retains diagnostic metadata only; lower HTTP owners retain actual capabilities.
+; @param Session {Map} The exact window session being refreshed.
+_HC_ArchiveCleanupMetadata(Session) {
+	Rows := Map()
+	for Id, Result in Session["snapshot"]["probes"] {
+		if Result.Get("state", "") == "pending" {
+			Result := Result.Clone()
+			Result["state"] := "cancelled"
+			Result["cleanup"] := "pending"
+		}
+		if Result.Has("cleanup") && Result["cleanup"] != "settled"
+			Rows[Id] := Result.Clone()
+	}
+	History := Session.Get("cleanup_history", [])
+	if Rows.Count
+		History.Push(Map("probes", Rows))
+	Session["cleanup_history"] := History
+}
+
 ; Performs one validated action of the page and answers it.
 ; @param WindowEpoch {Integer}
 ; @param Action {Map} From HealthCheck_ValidateAction.
@@ -822,9 +871,24 @@ _HC_PerformPageAction(WindowEpoch, Action, Config) {
 		case "close":
 			global _HC_Gui
 			_HealthCheck_CloseGui(_HC_Gui)
+		case "export_snapshot":
+			_HC_Send(WindowEpoch, _HC_ValueToJson(Map("type", "action", "action", "export_snapshot",
+				"ok", true, "export_sequence", Action["export_sequence"], "snapshot", _HC_Session["snapshot"])))
+		case "cancel":
+			HealthCheck_CancelProbes()
+			for CancelledProbe in _HC_Session["snapshot"]["probes"] {
+				ProbeResult := _HC_Session["snapshot"]["probes"][CancelledProbe]
+				if ProbeResult.Get("state", "") == "pending"
+					_HC_Session["snapshot"]["probes"][CancelledProbe] := Map("state", "cancelled", "cleanup", "pending")
+			}
+			_HC_Send(WindowEpoch, '{"type":"action","action":"cancel","ok":true,"snapshot":' . _HC_ValueToJson(_HC_Session["snapshot"]) . '}')
 		case "refresh":
+			HealthCheck_CancelProbes()
+			_HC_ArchiveCleanupMetadata(_HC_Session)
+			_HC_Session["extensive"] := Action["extensive"]
 			_HC_Session["detailed"] := Action["detailed"]
-			_HC_Session["snapshot"] := HealthCheck_Run(Action["detailed"])
+			_HC_Session["snapshot"] := HealthCheck_Run(Action["detailed"], Action["extensive"])
+			_HC_Session["snapshot"]["retired_probes"] := _HC_Session.Get("cleanup_history", [])
 			_HC_Send(WindowEpoch, '{"type":"snapshot","snapshot":' . _HC_ValueToJson(_HC_Session["snapshot"]) . '}')
 			_HC_RestartProbes(WindowEpoch)
 		default:
@@ -870,9 +934,21 @@ _HC_Send(WindowEpoch, Json) {
 ; Restarts the probes of the window's snapshot; each answer is kept in the
 ; snapshot and pushed into the same window only.
 ; @param WindowEpoch {Integer}
-_HC_RestartProbes(WindowEpoch) {
+_HC_RestartProbes(WindowEpoch, StartFn := unset) {
 	global _HC_Session
+	HealthCheck_CancelProbes()
+	Selected := _HC_Session.Get("extensive", false)
+	if !(Selected is Integer) || (Selected != 0 && Selected != 1)
+		throw TypeError("The diagnostics session has an invalid extensive selection.")
+	if !Selected
+		return false
+	if IsSet(StartFn) {
+		if !HasMethod(StartFn, "Call")
+			throw TypeError("The diagnostics starter must be callable.")
+		return StartFn.Call(WindowEpoch, HealthCheck_Config()["schema"], _HC_PublishProbe)
+	}
 	HealthCheck_StartProbes(WindowEpoch, HealthCheck_Config()["schema"], _HC_PublishProbe)
+	return true
 }
 
 ; Publishes one probe's answer into its window.

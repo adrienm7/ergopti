@@ -87,11 +87,35 @@ _TestHC_RunIsVersion2() {
 	Assert(RegExMatch(Result["generated_at"], "^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$"),
 		"generated_at must be UTC ISO 8601: " . Result["generated_at"])
 	for Id in ["github_api", "ai_health"]
-		AssertEqual("pending", Result["probes"][Id]["state"], Id . " must start pending")
+		AssertEqual("not_run", Result["probes"][Id]["state"], Id . " must not start without extensive opt-in")
 }
 
-Test("HealthCheck: Run returns a version 2 snapshot with its probes pending",
-	_TestHC_RunIsVersion2)
+Test("HealthCheck: Run returns a version 2 quick snapshot with probes explicitly not run", _TestHC_RunIsVersion2)
+
+/** Proves the actual starter admits only the independent extensive selection. */
+_TestHC_ExtensiveAdmission(Selected, ExpectedStarts) {
+	global _HC_Session, _HC_ProbeRun
+	if _HC_ProbeRun
+		throw Error("A foreign diagnostic probe run is active.")
+	SavedSession := _HC_Session
+	Calls := []
+	Start(Epoch, Schema, Publish) {
+		Calls.Push(Epoch)
+		AssertTrue(Schema is Map)
+		AssertTrue(HasMethod(Publish, "Call"))
+		return true
+	}
+	try {
+		_HC_Session := Map("extensive", Selected, "detailed", true)
+		_HC_RestartProbes(71, Start)
+		AssertEqual(ExpectedStarts, Calls.Length)
+		if ExpectedStarts
+			AssertEqual(71, Calls[1])
+	} finally _HC_Session := SavedSession
+}
+Test("HealthCheck extensive: quick privacy opt-in creates no probe", _TestHC_ExtensiveAdmission.Bind(false, 0))
+Test("HealthCheck extensive: explicit opt-in reaches actual starter once", _TestHC_ExtensiveAdmission.Bind(true, 1))
+
 
 
 ; Every section the schema declares for Windows is produced, and nothing the
@@ -337,6 +361,24 @@ _TestHC_FunctionsExist() {
 Test("HealthCheck: core functions are defined (core.ahk included in run_all)",
 	_TestHC_FunctionsExist)
 
+_TestHC_NativeSnapshotText() {
+	global _I18nCache, _I18nCacheLoaded
+	SavedCache := _I18nCache, SavedLoaded := _I18nCacheLoaded
+	try {
+		_I18nCache := Map("healthcheck.deep_tests.title", "In-depth checks",
+			"healthcheck.probe.not_run", "Not run: %s",
+			"healthcheck.deep_tests.reason.not_embedded", "The suite is not embedded")
+		_I18nCacheLoaded := true
+		Snapshot := Map("driver", "windows", "generated_at", "2026-10-09T09:10:36Z", "sections", Map())
+		Text := _HC_NativeSnapshotText(Snapshot)
+		AssertEqual("ErgoptiPlus — windows — 2026-10-09T09:10:36Z`nIn-depth checks: Not run: The suite is not embedded", Text)
+		AssertEqual(0, InStr(Text, "%s"), "the native fallback must interpolate the locale placeholder")
+	} finally {
+		_I18nCache := SavedCache, _I18nCacheLoaded := SavedLoaded
+	}
+}
+Test("HealthCheck: native quick export formats the unexecuted-test reason", _TestHC_NativeSnapshotText)
+
 _TestHC_StructuredNativeFallback() {
 	Snapshot := Map("driver", "windows", "generated_at", "2026-10-01T21:35:37Z",
 		"sections", Map(
@@ -493,3 +535,40 @@ for _HCClockOrigin in [100, 0x100000064] {
 	Test("HealthCheck probe-clock-native64: long shared finish origin=" . _HCClockOrigin,
 		_TestHC_ProbeFinishRollover.Bind(_HCClockOrigin, 0x100000050))
 }
+
+
+/** Exercises the actual cancel/refresh/export owner without a live WebView or probe run. */
+_TestHC_CancelRefreshExportHistory(Refresh := true) {
+	global _HC_Session, _HC_ResetDone, _HC_ProbeRun
+	if _HC_ProbeRun
+		throw Error("A foreign diagnostic probe run is active.")
+	SavedSession := _HC_Session, SavedReset := _HC_ResetDone
+	try {
+		_HC_ResetDone := true
+		_HC_Session := Map("snapshot", Map("probes", Map(
+			"github_api", Map("state", "timeout", "cleanup", "unknown", "ms", 23),
+			"ai_health", Map("state", "pending"))), "extensive", false, "detailed", false)
+		Config := HealthCheck_Config()
+		_HC_PerformPageAction(0, Map("action", "cancel"), Config)
+		if Refresh {
+			_HC_PerformPageAction(0, Map("action", "refresh", "detailed", false, "extensive", false), Config)
+			AssertTrue(_HC_Session["snapshot"].Has("retired_probes"), "refresh must retain unconfirmed prior cleanup")
+			AssertEqual(1, _HC_Session["snapshot"]["retired_probes"].Length)
+			_HC_PerformPageAction(0, Map("action", "refresh", "detailed", false, "extensive", false), Config)
+			AssertEqual(1, _HC_Session["snapshot"]["retired_probes"].Length, "idle refresh must not duplicate the cohort")
+		}
+		_HC_PerformPageAction(0, Map("action", "export_snapshot", "export_sequence", 3), Config)
+		Encoded := JsonParse(_HC_ValueToJson(_HC_Session["snapshot"]))
+		Rows := Refresh ? Encoded["retired_probes"][1]["probes"] : Encoded["probes"]
+		AssertEqual("timeout", Rows["github_api"]["state"], "cleanup metadata must not change a terminal business result")
+		AssertEqual("unknown", Rows["github_api"]["cleanup"], "export must not invent a cleanup ACK")
+		AssertEqual(23, Rows["github_api"]["ms"])
+		AssertEqual("cancelled", Rows["ai_health"]["state"])
+		AssertEqual("pending", Rows["ai_health"]["cleanup"])
+	} finally {
+		_HC_Session := SavedSession
+		_HC_ResetDone := SavedReset
+	}
+}
+Test("HealthCheck cleanup-history: cancel then refresh then export preserves unknown cleanup", _TestHC_CancelRefreshExportHistory)
+Test("HealthCheck cleanup-history: immediate cancel export retains existing truthful metadata", _TestHC_CancelRefreshExportHistory.Bind(false))

@@ -18,7 +18,7 @@ local helpers = require("tests.helpers")
 -- The modules each case replaces, restored after it
 local FIXTURE_MODULES = {
 	"infra.logger", "ui.healthcheck.probes", "adapters.timer_scheduler", "adapters.http_client",
-	"adapters.shell_runner", "adapters.json_codec", "modules.llm",
+	"adapters.shell_runner", "adapters.json_codec", "modules.llm", "ui.healthcheck.appleevents",
 }
 
 --- Runs body with the real probes over recorded adapters.
@@ -67,7 +67,27 @@ local function with_probes(body)
 				world.timers[#world.timers + 1] = handle
 				return handle, true
 			end,
-			cancel = function(handle) handle.cancelled = true; return true end,
+			cancel = function(handle)
+				handle.cancelled = true
+				if handle.on_settled then handle.on_settled() end
+				return true
+			end,
+			onSettled = function(handle, callback) handle.on_settled = callback; return true end,
+		}
+		-- The five existing probes use their original controlled adapters. The
+		-- sixth collaborator is deliberately NOT_RUN; its real body has a
+		-- separate behavioral suite and must not spawn under these old ports.
+		package.loaded["ui.healthcheck.appleevents"] = {
+			body = function(config)
+				return function(done, register_cancel, started_ms)
+					world.appleevent_started = started_ms
+					world.appleevent_timeout = config.timeout_ms
+					local actor = { snapshot = function() return { cleanup = "settled" } end }
+					register_cancel(function() world.appleevent_cancelled = true end)
+					done({ state = "not_run", detail = "separate_inert_owner_suite", cleanup = "settled" })
+					return actor
+				end
+			end,
 		}
 		package.loaded["adapters.http_client"] = {
 			new = function(options)
@@ -116,6 +136,7 @@ local function start(Probes, paths, options)
 	local answers = {}
 	local snapshot = {
 		detailed = options.detailed == true,
+		extensive = true,
 		sections = { paths = paths or {}, peripherals = { items = options.usb or {} } },
 	}
 	local run = Probes.start(schema, snapshot, function(id, result, sections)
@@ -164,6 +185,39 @@ end
 local function task_of(world, executable)
 	for _, task in ipairs(world.tasks) do if task.executable == executable then return task end end
 	return nil
+end
+
+--- Runs the actual registry with one retained actor and exact refused watchdog.
+--- @param body function(run, answers, controls) Drives cleanup acknowledgements.
+local function with_retained_actor(body)
+	with_probes(function(Probes, world)
+		local controls = { actor_ack = false, watchdog_ack = false, actor_calls = 0, watchdog_calls = 0 }
+		local actor = {
+			snapshot = function() return { cleanup = controls.actor_ack and "settled" or "pending" } end,
+			cancel = function() controls.actor_calls = controls.actor_calls + 1 end,
+		}
+		package.loaded["ui.healthcheck.appleevents"] = {
+			body = function()
+				return function(done, register_cancel)
+					controls.complete = done
+					register_cancel(actor.cancel)
+					return actor
+				end
+			end,
+		}
+		local run, answers = start(Probes)
+		controls.watchdog = assert(run.watchdogs.appleevent_transport)
+		local scheduler = package.loaded["adapters.timer_scheduler"]
+		local original_cancel = scheduler.cancel
+		scheduler.cancel = function(handle)
+			if handle == controls.watchdog then
+				controls.watchdog_calls = controls.watchdog_calls + 1
+				if not controls.watchdog_ack then return false end
+			end
+			return original_cancel(handle)
+		end
+		body(run, answers, controls)
+	end)
 end
 
 helpers.describe("diagnostics probes (macOS)", function()
@@ -315,4 +369,65 @@ helpers.describe("diagnostics probes (macOS)", function()
 			helpers.assert_eq(world.stopped_samplers, 1, "the processor sampler is stopped")
 		end)
 	end)
+	helpers.it("passes the original start clock to the separately controlled AppleEvent collaborator", function()
+		with_probes(function(Probes, world)
+			local run, answers = start(Probes)
+			helpers.assert_eq(world.appleevent_started, hs.timer.absoluteTime() / 1e6)
+			helpers.assert_true(type(world.appleevent_timeout) == "number" and world.appleevent_timeout > 0)
+			helpers.assert_eq(answer_of(answers, "appleevent_transport").result.state, "not_run")
+			helpers.assert_eq(run.has_pending_cleanup(), false, "the closed collaborator and watchdog both acknowledge cleanup")
+		end)
+	end)
+
+	helpers.it("repeated Cancel retries exact retained actor and watchdog without reviving business results", function()
+		for _, prior in ipairs({ "error", "cancelled" }) do
+			with_retained_actor(function(run, answers, controls)
+				if prior == "error" then
+					controls.complete({ state = "error", detail = "permission_refused", cleanup = "pending" })
+				end
+				run.cancel()
+				local original = run.results.appleevent_transport
+				helpers.assert_eq(original.state, prior)
+				helpers.assert_eq(original.cleanup, "pending")
+				helpers.assert_eq(run.has_pending_cleanup(), true)
+				helpers.assert_true(run.actors.appleevent_transport ~= nil)
+				helpers.assert_true(run.watchdogs.appleevent_transport == controls.watchdog)
+				local actor_calls, watchdog_calls, published = controls.actor_calls, controls.watchdog_calls, #answers
+				controls.actor_ack, controls.watchdog_ack = true, true
+				run.cancel()
+				helpers.assert_eq(controls.actor_calls, actor_calls + 1)
+				helpers.assert_eq(controls.watchdog_calls, watchdog_calls + 1)
+				helpers.assert_eq(run.has_pending_cleanup(), false)
+				helpers.assert_true(run.results.appleevent_transport == original)
+				helpers.assert_eq(original.state, prior)
+				helpers.assert_eq(original.detail, prior == "error" and "permission_refused" or nil)
+				helpers.assert_eq(original.cleanup, "settled")
+				helpers.assert_eq(#answers, published, "cleanup acknowledgement must not republish business completion")
+			end)
+		end
+	end)
+
+	helpers.it("Cancel retries archived cohort capabilities before releasing their cleanup owner", function()
+		with_retained_actor(function(run, answers, controls)
+			local Cleanup = require("healthcheck.cleanup")
+			local session = { probes = run, snapshot = { probes = run.results } }
+			Cleanup.archive(session)
+			helpers.assert_true(session.probes == nil)
+			helpers.assert_true(session.probe_history[1].run == run)
+			local original = run.results.appleevent_transport
+			helpers.assert_eq(original.state, "cancelled")
+			helpers.assert_eq(original.cleanup, "pending")
+			local actor_calls, watchdog_calls, published = controls.actor_calls, controls.watchdog_calls, #answers
+			controls.actor_ack, controls.watchdog_ack = true, true
+			Cleanup.cancel(session)
+			helpers.assert_eq(controls.actor_calls, actor_calls + 1)
+			helpers.assert_eq(controls.watchdog_calls, watchdog_calls + 1)
+			helpers.assert_true(session.probe_history[1].run == nil, "release only after exact capability ACKs")
+			helpers.assert_true(session.snapshot.retired_probes[1].probes.appleevent_transport == original)
+			helpers.assert_eq(original.state, "cancelled")
+			helpers.assert_eq(original.cleanup, "settled")
+			helpers.assert_eq(#answers, published)
+		end)
+	end)
+
 end)
