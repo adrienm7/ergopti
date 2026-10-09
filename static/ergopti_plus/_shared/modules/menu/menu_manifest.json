@@ -511,18 +511,6 @@
 		},
 		{
 			"type": "group",
-			"id": "llm_live_mode",
-			"i18n": "menu.llm.live_mode_title",
-			"disabled_when_off": true,
-			"health_dot": false,
-			"platforms": [
-				"ahk",
-				"hs",
-				"linux"
-			]
-		},
-		{
-			"type": "group",
 			"id": "llm_generation_settings",
 			"i18n": "menu.llm.generation_menu_title",
 			"disabled_when_off": true,
