@@ -241,6 +241,7 @@ def _release_command(executable, project):
         "CODE_SIGNING_ALLOWED=NO",
         "CODE_SIGNING_REQUIRED=NO",
         "GCC_GENERATE_DEBUGGING_SYMBOLS=NO",
+        "SWIFT_ENABLE_EXPLICIT_MODULES=NO",
     ]
 
 

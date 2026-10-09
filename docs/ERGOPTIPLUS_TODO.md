@@ -5249,6 +5249,16 @@ projection controls are registered; Foundation, console transport and matching
 macOS execution remain unqualified here. These diagnostics do not prove a
 compiler timeout cause, authorize a driver or complete item31 and items16/38.
 
+The separate Core constructor build now uses the same explicit-module policy as
+the actual baseline and owned compiler commands. All original architecture,
+custody, currentness, budget and calibration assertions remain mandatory.
+Independent portable execution retains224 passing test cases and eight causal
+negative assertion failures for the original omission and a narrow policy
+mutation. An additive ordinary Swift caller runs the39 Core controls in normal
+and optimized Python modes; its exact frozen inverse guard preserves the old
+historical caller oracle. Actual Swift discovery, native compilation and timeout
+causality remain unqualified until a matching macOS run. Item31 remains partial.
+
 - [~] **33.** Config policy for the files other than config.toml (the former
   item 25): Published in the second 2026-09-30 release for the files the review
   listed; see `docs/memory/text-input-and-config.md`. Current source already
