@@ -16,9 +16,10 @@ import zlib
 
 ROOT = Path(__file__).resolve().parents[2]
 FIXED_PROVIDER = "c29ceb96e73655cadea7763805b9468c32744033c2f177bae492e4ce9fe4100a"
-FIXED_FACTORY = "26cbd216dcbd4c03619c43a1823bd00757ad0043865575a783936f50dfdec9a8"
-FIXED_PRODUCER = "9916f622d1c7a89e782fdd9c2621fdd25ae1646fcef35acb46b5ff5299019ea0"
-FIXED_BUILDER = "d34f55714ce094d7a43d0c4ea36cc8bf4070c92c8009e0677939146d394030b8"
+FIXED_FACTORY = "5c20758ef6c377eafbb7724e1b6d561645e1d72a786b4470e18f7e5313ba5eda"
+FIXED_PRODUCER = "bd3387c2823dbedb2262411a500749426e078fd7d7cc185c26aaf6fc30dc0d9b"
+FIXED_INVENTORY = "5a033ca40c506b654f62fd3e1a0b9eee7a74396c8fd68f2319aba38173e92515"
+FIXED_BUILDER = "724f8dbcba1b749442bd87728c0736f6836fb1e32e99b0f2dd94cac1b62927e7"
 OLD_PROVIDER_SHA256 = "a4ef0f4b7bd2c9cdabb4b8eb9e0a7249eab4f9e06f9991bcdb2f59a230220b4f"
 OLD_FACTORY_SHA256 = "70d90ede3bdfbf44e146ba4a26f101ebfec2a1745bc05a8260db001d5a236537"
 # Exact historical producer source bytes, frozen before the closure edit.
@@ -661,10 +662,16 @@ class LexicalSourceClosureControls(unittest.TestCase):
                 for target in node.targets
             ):
                 dependencies.extend(ast.literal_eval(node.value))
-        self.assertEqual(len(dependencies), 35)
+        self.assertEqual(len(dependencies), 36)
         self.assertEqual(
             tuple(row for row in dependencies if row[0] == "tools/build/remap_runtime_producer.py"),
             (("tools/build/remap_runtime_producer.py", FIXED_PRODUCER),),
+        )
+        self.assertEqual(
+            tuple(
+                row for row in dependencies if row[0] == "tools/build/remap_runtime_inventory.hpp"
+            ),
+            (("tools/build/remap_runtime_inventory.hpp", FIXED_INVENTORY),),
         )
         paths = {path for path, _ in dependencies} | {
             "tools/build/remap_runtime_source.py",
@@ -690,7 +697,7 @@ class LexicalSourceClosureControls(unittest.TestCase):
         factory = self.builder._source_factory()
         deadline = time.monotonic() + 60
         captured = factory.capture_dependencies(self.root, deadline)
-        self.assertEqual(len(captured), 33)
+        self.assertEqual(len(captured), 34)
         self.assertEqual(
             tuple(
                 (row.path, digest(row.data))

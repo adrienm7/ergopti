@@ -117,10 +117,10 @@ class ObservationControls(unittest.TestCase):
         self.record.update(
             schema=2,
             source_profile="owned_vhd_broker_source_v1",
-            source_factory_sha256="26cbd216dcbd4c03619c43a1823bd00757ad0043865575a783936f50dfdec9a8",
+            source_factory_sha256="5c20758ef6c377eafbb7724e1b6d561645e1d72a786b4470e18f7e5313ba5eda",
             source_inventory_entries=4505,
-            owned_replacements=60,
-            staged_files=4527,
+            owned_replacements=63,
+            staged_files=4528,
             staged_links=4,
         )
         for row, (_, relative) in zip(self.record["products"], PRODUCTS, strict=True):

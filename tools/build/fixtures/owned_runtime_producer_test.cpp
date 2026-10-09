@@ -51,6 +51,10 @@ json open(runtime& owner) {
 void route() {
   fixture input;
   runtime owner;
+#ifndef TEST_DIAGNOSTIC_PROFILE
+  auto inventory = runtime::watch_inventory();
+  inventory.publish({input.device.identity}, input.device.enumerated, false);
+#endif
   auto ordinary = monitor(input);
   unsigned original_started = 0, original_stopped = 0;
   std::size_t original_delivered = 0;
@@ -121,6 +125,10 @@ void route() {
 void acquisition(const std::string& scenario) {
   fixture input;
   runtime owner;
+#ifndef TEST_DIAGNOSTIC_PROFILE
+  auto inventory = runtime::watch_inventory();
+  inventory.publish({input.device.identity}, input.device.enumerated, false);
+#endif
   auto ordinary = monitor(input);
   if (scenario == "changed-identity") input.device.identity = 42;
   if (scenario == "allocation") producer_ports::allocation_refused = true;

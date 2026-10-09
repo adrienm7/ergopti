@@ -5052,6 +5052,21 @@ inputs restore all 233 unchanged controls; independent replay also passes the
 34 existing missing/owned refusal controls. Final composed verification remains
 pending. No assertion, native requirement or item is waived.
 
+Private T2 expected-inventory candidate (not integrated): the current source
+retains33 original inputs,36 dependencies and63 generated outputs, with the
+historical diagnostic sources and original producer bodies preserved. The
+normally discoverable XCTest registration retains seven producer and two
+inventory methods, covering37 inventory scenarios and unknown refusal. Exact
+current41 composition passes formatting,389 JS checks and18,686 portable macOS
+cases. All nine registered methods pass with actual Linux Clang19/BlocksRuntime
+in25.722 seconds under the original30-second bound. Native Darwin/XCTest,
+queue acquisition/cutover, complete coverage, packaging, installation and
+physical input remain unqualified; runtime stays disabled and fixture_only.
+The predecessor41be manual run37862638268 is terminal FAILURE: its original
+25-minute Swift limit leaves84 passes,8 failures and one unfinished case.
+This candidate does not fix or qualify those separate native failures, nor
+complete item31 or transverse16/38.
+
 - [~] **33.** Config policy for the files other than config.toml (the former
   item 25): Published in the second 2026-09-30 release for the files the review
   listed; see `docs/memory/text-input-and-config.md`. Current source already

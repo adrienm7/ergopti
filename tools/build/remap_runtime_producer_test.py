@@ -47,6 +47,7 @@ def outputs():
     expected[provider.PARENT_LIFECYCLE_PREIMAGE[0]] = provider.PARENT_LIFECYCLE_PREIMAGE[1]
     expected.update(factory.AUTH_VENDOR_ORIGINAL_PREIMAGES)
     expected.update(factory.STREAM_INPUTS)
+    expected.update(factory.OWNED_INVENTORY_INPUTS)
     expected.update(factory.VHD_ORIGINAL_INPUTS)
     originals = {path: (UPSTREAM / path).read_bytes() for path in expected}
     end = time.monotonic() + 60

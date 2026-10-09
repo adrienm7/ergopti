@@ -1,0 +1,172 @@
+{
+	"schema": 1,
+	"classification": "Fixed genuine upstream source inputs; not generated behavior expectations or native readiness evidence.",
+	"generator": "tools/build/generate_remap_runtime_inventory_fixture.py",
+	"upstream": "9312593e1a3bf72b94c63c524ebabe2637442e8a",
+	"original_fixture": {
+		"files": 1019,
+		"manifest_sha256": "b7ac1a92ca736a957116d032774a3182e32303bcef055e37863a366195026869",
+		"archive_sha256": "6389c53e3adb6cdfd13a80e0580758ac6cff4c985a26ff18dcec204be2aa5877"
+	},
+	"supplement_files": 21,
+	"supplement_source_bytes": 135664,
+	"combined_files": 1040,
+	"resource_bytes": 141900,
+	"resource_sha256": "3c3d988bd24ac6c2157bd8062c9f9149525ce71d3cf57c0f2c75f4ecd85a7e87",
+	"files": [
+		{
+			"path": "src/apps/ConsoleUserServer/include/console_user_server/components_manager.hpp",
+			"bytes": 14537,
+			"sha256": "9e7d856e7b5efbfefb855926cd48830c660d2255ac86ed2d837774a6dcf6774d",
+			"git_blob_oid": "c31de04a33cac22b048eb508708abfc8d4ee027a",
+			"git_mode": "100644"
+		},
+		{
+			"path": "src/apps/ConsoleUserServer/include/console_user_server/runtime.h",
+			"bytes": 350,
+			"sha256": "aed536dc7a58e9e1091ae047591aa38917ceef27a87dfdfb96113a34e19c9d49",
+			"git_blob_oid": "c3b3b5d33871b2d3b12abf000efb98e2c97d74c7",
+			"git_mode": "100644"
+		},
+		{
+			"path": "src/apps/ConsoleUserServer/include/console_user_server/ui_bridge.h",
+			"bytes": 712,
+			"sha256": "e1c6f3d5855dff09b30877eea4938b1c03c1f50dccfc233b10284d56a3e9ebc1",
+			"git_blob_oid": "e6185d347ceae077d6f11bc43d79cbfc44535148",
+			"git_mode": "100644"
+		},
+		{
+			"path": "src/apps/ConsoleUserServer/project.yml",
+			"bytes": 1842,
+			"sha256": "16d44a6b79415b91a095d533d247b7a1898b672e3b02b086d0af0c11bc68947e",
+			"git_blob_oid": "70bbe1861deb78bc2b2f7e99409be72d440d2a8c",
+			"git_mode": "100644"
+		},
+		{
+			"path": "src/apps/ConsoleUserServer/src/runtime.cpp",
+			"bytes": 6483,
+			"sha256": "e6db5905ff0231a8c7bec7f581f922b137fa7f79b25c6114265d6e08beca85c1",
+			"git_blob_oid": "d78aa5cb4cb7ead99a15618512556ecd78818e59",
+			"git_mode": "100644"
+		},
+		{
+			"path": "src/apps/ConsoleUserServer/swift/KarabinerConsoleUserServerApp.swift",
+			"bytes": 4797,
+			"sha256": "f807712854907b9db4c9079a6d406c937e12eb6af202f08cdfc1a717d623a5fe",
+			"git_blob_oid": "5833bce3f64d6c403bff2221b473b70c29238dc5",
+			"git_mode": "100644"
+		},
+		{
+			"path": "src/apps/CoreService/include/core_service/agent/permission_checker.hpp",
+			"bytes": 5989,
+			"sha256": "560f204958e808637b40cdfd57c05f7be67ea468ea1735e53c4dc4914b4b0d23",
+			"git_blob_oid": "9bd733d0d9d150a22847dafc91efb3e8d704b33b",
+			"git_mode": "100644"
+		},
+		{
+			"path": "src/apps/CoreService/include/core_service/daemon/device_grabber_details/entry.hpp",
+			"bytes": 13253,
+			"sha256": "ebbdaecb186f668a1da143791cb2c86a405bb244ebb014205d73a8b9a691f512",
+			"git_blob_oid": "183b4f939405194e1014a2f0159f3bd61ccd04e8",
+			"git_mode": "100644"
+		},
+		{
+			"path": "src/apps/CoreService/include/core_service/main/agent.hpp",
+			"bytes": 5113,
+			"sha256": "d9dacbc698493858eae85bc02dcb09e947e48e4fb3bb9f6e6757faa8eb7f72a1",
+			"git_blob_oid": "4b62c46e0b728a2ec4ab7cadc3186e3e79f65365",
+			"git_mode": "100644"
+		},
+		{
+			"path": "src/apps/CoreService/include/core_service/main/daemon.hpp",
+			"bytes": 4372,
+			"sha256": "192288ef32b69095f128cbc3f42c6d508b4639c0ef90eec960e650c42a32bd70",
+			"git_blob_oid": "11fde983eeeba070a0476092c57b331266ad2043",
+			"git_mode": "100644"
+		},
+		{
+			"path": "src/apps/CoreService/project.yml",
+			"bytes": 1695,
+			"sha256": "5ddca1a9a891665789d9d38d8265faa5582d43b04f6ebdcebe2149726c38c8e7",
+			"git_blob_oid": "b6bf6a644a1b7d8d43db01aaabbd6d1a214f3d96",
+			"git_mode": "100644"
+		},
+		{
+			"path": "src/bin/cli/project.yml",
+			"bytes": 1035,
+			"sha256": "03182afff7f5d48c6c7d813a482e12c9e00d089c9cad0e8bc3e07107122d8c6b",
+			"git_blob_oid": "857840c0b583086861bfac4acff9157de2ee5c10",
+			"git_mode": "100644"
+		},
+		{
+			"path": "src/bin/cli/src/main.cpp",
+			"bytes": 22126,
+			"sha256": "b4e2ed11067107c6097ea2ca37bbdd50ec146954eef95dc8340cd5a082be8a53",
+			"git_blob_oid": "2aa0aa40e8c3b8d3e01bcb370a2895068d3910cc",
+			"git_mode": "100644"
+		},
+		{
+			"path": "src/share/constants.hpp",
+			"bytes": 9057,
+			"sha256": "78396544ae00d2cf8d66bb8b959bc54cf6bca506d0985ad1499c5e844a187aa9",
+			"git_blob_oid": "e91c3de5b120c7741ac37901fc4580fd82ad7471",
+			"git_mode": "100644"
+		},
+		{
+			"path": "src/share/device_properties.hpp",
+			"bytes": 15135,
+			"sha256": "8930bdf0067f3d97de760ccb5d7cabaf1b6eb4ebb247c283fb72d7ce1277c933",
+			"git_blob_oid": "f25a19dd0497cd9db07b392700ad6a8bca0a6da1",
+			"git_mode": "100644"
+		},
+		{
+			"path": "src/share/hid_device_events_monitor.hpp",
+			"bytes": 7253,
+			"sha256": "3ae0e95865894b55016dd58ef8a61e5fc40875c2a39bc3a6e0bf8ea1d5460873",
+			"git_blob_oid": "b6a671e38bf7062a69854465611205f2ef0f3735",
+			"git_mode": "100644"
+		},
+		{
+			"path": "src/share/iokit_utility.hpp",
+			"bytes": 1916,
+			"sha256": "4942c42c58eb5c49f90d712575d3aaa1c4921efa2978ac6566e547a1d96e97b2",
+			"git_blob_oid": "626be1f0388e24e22bfd6f068593de85fecbf996",
+			"git_mode": "100644"
+		},
+		{
+			"path": "src/share/process_lifecycle_manager.hpp",
+			"bytes": 7298,
+			"sha256": "3a7f800def33c311e6029887fe18b0874b2d4f89b7e389349038fb6683e474a0",
+			"git_blob_oid": "4de176328d8bd1cec5cfbfba70aa1b4150026dcd",
+			"git_mode": "100644"
+		},
+		{
+			"path": "src/share/types/device_id.hpp",
+			"bytes": 318,
+			"sha256": "9365d29445baf320ddb14769244d5029fc742b932d19bb598bf3dbb79a3fa52e",
+			"git_blob_oid": "66ab1bdf981e2541ca0ee68123365d01185af892",
+			"git_mode": "100644"
+		},
+		{
+			"path": "src/share/types/device_identifiers.hpp",
+			"bytes": 7502,
+			"sha256": "0bf2ce65a4c05fc01a92486494bf94777b8cc8692b2756efa518a3281704198d",
+			"git_blob_oid": "f27e9cb3857809900620a9a2b87947d74f5eedb8",
+			"git_mode": "100644"
+		},
+		{
+			"path": "src/share/types/operation_type.hpp",
+			"bytes": 4881,
+			"sha256": "5fa6f28a5abee73f97f7dffad9f459543c6d93ad8ead70f2bdea0462569e766b",
+			"git_blob_oid": "3edb9dae86cc9357dd187976f12f05659963438e",
+			"git_mode": "100644"
+		}
+	],
+	"source_provenance": {
+		"repository": "https://github.com/pqrs-org/Karabiner-Elements",
+		"tree_oid": "8f16414df74e03968c1c89e22e1fb7992c6a06eb",
+		"acquisition": "Read original held-FD bytes from already authenticated pristine Git checkout; every source SHA256 and Git blob OID is independently retained. No network during tests.",
+		"license": "Original LICENSE.md remains byte-whole in unchanged1019 fixture; supplement contains only original main-repository sources.",
+		"registry": "Fixed source-input export outside ordinary product generation traversal; no implementation-derived expectation generation."
+	}
+}

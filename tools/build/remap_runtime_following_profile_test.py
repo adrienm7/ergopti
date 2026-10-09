@@ -13,8 +13,9 @@ import unittest
 
 BUILD = Path(__file__).resolve().parent
 REPOSITORY = BUILD.parent.parent
-FIXED = "26cbd216dcbd4c03619c43a1823bd00757ad0043865575a783936f50dfdec9a8"
-FIXED_PRODUCER = "9916f622d1c7a89e782fdd9c2621fdd25ae1646fcef35acb46b5ff5299019ea0"
+FIXED = "5c20758ef6c377eafbb7724e1b6d561645e1d72a786b4470e18f7e5313ba5eda"
+FIXED_PRODUCER = "bd3387c2823dbedb2262411a500749426e078fd7d7cc185c26aaf6fc30dc0d9b"
+FIXED_INVENTORY = "5a033ca40c506b654f62fd3e1a0b9eee7a74396c8fd68f2319aba38173e92515"
 
 
 def retained_module(name, path):
@@ -74,8 +75,8 @@ class FollowingProfileControls(PrivateCurrentSourceCase):
             schema=2,
             source_profile="owned_vhd_broker_source_v1",
             source_factory_sha256=FIXED,
-            owned_replacements=60,
-            staged_files=4527,
+            owned_replacements=63,
+            staged_files=4528,
         )
         return record
 
@@ -280,13 +281,13 @@ class FollowingDependencyControls(PrivateCurrentSourceCase):
             self.subject.compile_owned(self.candidate, self.owner(), 300)
         self.assertEqual(caught.exception.code, "dependency_changed")
 
-    def test_observer_initial_cut_holds_all35_real_inputs(self):
+    def test_observer_initial_cut_holds_all36_real_inputs(self):
         actual = dict(self.scope)
         exec(
             compile(ast.Module(body=[self.initial], type_ignores=[]), str(self.observer), "exec"),
             actual,
         )
-        self.assertEqual(len(actual["dependencies"]), 35)
+        self.assertEqual(len(actual["dependencies"]), 36)
         self.assertEqual(
             tuple(
                 (row.path, hashlib.sha256(row.data).hexdigest())
@@ -294,6 +295,14 @@ class FollowingDependencyControls(PrivateCurrentSourceCase):
                 if row.path == "tools/build/remap_runtime_producer.py"
             ),
             (("tools/build/remap_runtime_producer.py", FIXED_PRODUCER),),
+        )
+        self.assertEqual(
+            tuple(
+                (row.path, hashlib.sha256(row.data).hexdigest())
+                for row in actual["dependencies"]
+                if row.path == "tools/build/remap_runtime_inventory.hpp"
+            ),
+            (("tools/build/remap_runtime_inventory.hpp", FIXED_INVENTORY),),
         )
         self.assertEqual(
             tuple(row.path for row in actual["dependencies"][-2:]),
