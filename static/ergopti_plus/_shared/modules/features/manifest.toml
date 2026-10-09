@@ -3865,7 +3865,10 @@ reason_key = "platform_reason.tray_top_level_rows_are_each_drivers"
 # Versions, Configuration, then Language (the maintainer's order of
 # 2026-10-02): what runs, how it is set up, how it speaks.
 [[menu.top_level]]
+type = "group"
 id = "about"
+i18n = "menu.about.title"
+rows = []
 
 # « Configuration » replaced « Actions globales » and the two top-level rows
 # that opened configuration windows: its submenu is configuration_menu.
@@ -8319,6 +8322,16 @@ i18n = "menu.llm.warning_install_ollama"
 platforms = ["ahk"]
 unavailable = "hide"
 
+# The macOS native handler completes its genuine llm_menu subtree before this
+# parent is declared. The top-level provider still owns cross-driver placement.
+[[menu.llm_native_parent]]
+type = "group"
+id = "llm_parent_content"
+i18n = "menu.llm.title"
+checked_when = ["llm_parent_enabled"]
+platforms = ["hs"]
+unavailable = "hide"
+
 [[menu.llm_download_shortcut_frame]]
 type = "command"
 id = "llm_download_shortcut"
@@ -9231,5 +9244,158 @@ id = "agent_system2"
 i18n = "menu.agent.system2"
 caption_getter = "agent_system_backend_current_caption"
 caption_format = "numbered"
+platforms = ["linux"]
+unavailable = "hide"
+
+# The actual Windows dynamic profile row retains its finished native Menu child.
+[[menu.llm_profile_parent_ahk]]
+type = "group"
+id = "llm_profile_parent"
+i18n = "menu.profiles.profile_label_prefix"
+caption_getter = "llm_profile_parent_caption"
+disabled_when = ["llm_profile_parent_ready"]
+platforms = ["ahk"]
+unavailable = "hide"
+
+# Ordered parent and existing boundary are one consumed native publication frame.
+[[menu.llm_profile_parent_frame_ahk]]
+type = "list"
+id = "llm_profile_parent_rows"
+platforms = ["ahk"]
+unavailable = "hide"
+
+[[menu.llm_profile_parent_frame_ahk]]
+type = "include"
+section = "llm_after_profile_boundary"
+
+# The actual native catalogue owns brands; translated suffix placement is shared.
+[[menu.llm_backend_option_caption_frame_ahk]]
+type = "include"
+section = "llm_backend_ollama_option_caption_ahk"
+present_when = "llm_backend_option_is_ollama"
+
+[[menu.llm_backend_option_caption_frame_ahk]]
+type = "include"
+section = "llm_backend_api_option_caption_ahk"
+present_when = "llm_backend_option_is_api"
+
+[[menu.llm_backend_ollama_option_caption_ahk]]
+type = "label"
+id = "llm_backend_ollama_option_caption"
+i18n = "menu.llm.backend_ollama_suffix"
+caption_getter = "llm_backend_option_brand"
+caption_layout = "suffix"
+caption_joiner = " — "
+platforms = ["ahk"]
+unavailable = "hide"
+
+[[menu.llm_backend_api_option_caption_ahk]]
+type = "label"
+id = "llm_backend_api_option_caption"
+i18n = "menu.llm.backend_api_suffix"
+caption_getter = "llm_backend_option_brand"
+caption_layout = "suffix"
+caption_joiner = " — "
+platforms = ["ahk"]
+unavailable = "hide"
+
+# The native numeric/default data and original callback owners feed one port frame.
+[[menu.llm_backend_ollama_port_control_ahk]]
+type = "command"
+id = "llm_backend_ollama_port"
+i18n = "menu.llm.ollama_port_label"
+caption_getter = "llm_backend_ollama_port_caption"
+platforms = ["ahk"]
+unavailable = "hide"
+
+[[menu.llm_backend_ollama_port_frame_ahk]]
+type = "include"
+section = "llm_backend_ollama_port_control_ahk"
+
+[[menu.llm_backend_ollama_port_frame_ahk]]
+type = "include"
+section = "llm_native_numeric_reset"
+present_when = "llm_backend_ollama_port_customized"
+
+# Real native catalogue order stays inside its typed list; canonical joins are shared.
+[[menu.llm_backend_child_frame_ahk]]
+type = "include"
+section = "llm_backend_child_choices_ahk"
+
+[[menu.llm_backend_child_frame_ahk]]
+type = "include"
+section = "llm_backend_choice_boundary"
+
+[[menu.llm_backend_child_frame_ahk]]
+type = "include"
+section = "llm_backend_child_port_rows_ahk"
+
+[[menu.llm_backend_child_frame_ahk]]
+type = "include"
+section = "llm_backend_child_local_rows_ahk"
+
+[[menu.llm_backend_child_choices_ahk]]
+type = "list"
+id = "llm_backend_child_choices"
+platforms = ["ahk"]
+unavailable = "hide"
+
+[[menu.llm_backend_child_port_rows_ahk]]
+type = "list"
+id = "llm_backend_child_port_rows"
+platforms = ["ahk"]
+unavailable = "hide"
+
+[[menu.llm_backend_child_local_rows_ahk]]
+type = "list"
+id = "llm_backend_child_local_rows"
+platforms = ["ahk"]
+unavailable = "hide"
+
+# Native selected provider datum is not a translated affix or a new catalogue.
+[[menu.llm_backend_parent_ahk]]
+type = "group"
+id = "llm_backend_parent"
+caption_source = "native"
+caption_getter = "llm_backend_parent_caption"
+disabled_when = ["llm_backend_parent_ready"]
+platforms = ["ahk"]
+unavailable = "hide"
+
+# Actual captured installation warning precedes the same finished native child.
+[[menu.llm_backend_parent_frame_ahk]]
+type = "include"
+section = "llm_backend_warning_rows_ahk"
+
+[[menu.llm_backend_parent_frame_ahk]]
+type = "list"
+id = "llm_backend_parent_rows"
+platforms = ["ahk"]
+unavailable = "hide"
+
+[[menu.llm_backend_warning_rows_ahk]]
+type = "list"
+id = "llm_backend_warning_rows"
+platforms = ["ahk"]
+unavailable = "hide"
+
+# Shared picker/clear frame for Linux keyboard, tap-key, chord and gesture slots.
+
+[[menu.slot_binding_frame]]
+type = "command"
+id = "slot_binding_pick"
+i18n = "dialog.action_picker.menu_label"
+platforms = ["linux"]
+unavailable = "hide"
+
+[[menu.slot_binding_frame]]
+type = "include"
+section = "slot_binding_clear_frame"
+present_when = "slot_binding_has_action"
+
+[[menu.slot_binding_clear_frame]]
+type = "command"
+id = "slot_binding_clear"
+i18n = "dialog.action_picker.disabled"
 platforms = ["linux"]
 unavailable = "hide"

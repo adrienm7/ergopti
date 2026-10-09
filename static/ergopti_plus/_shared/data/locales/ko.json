@@ -197,6 +197,7 @@
 	"config_cleanup.intro": "ErgoptiPlus에서 더 이상 사용하지 않는 설정을 확인하세요.",
 	"dialog.action_picker.disabled": "∅ 없음",
 	"dialog.action_picker.label": "동작:",
+	"dialog.action_picker.menu_label": "동작:…",
 	"dialog.action_picker.back": "← 뒤로",
 	"dialog.action_picker.capture_key": "보낼 키를 누르거나 키 이름을 입력하세요.",
 	"dialog.action_picker.capture_shortcut": "보낼 단축키를 누르거나 입력하세요.",

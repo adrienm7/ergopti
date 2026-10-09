@@ -395,6 +395,19 @@ assemble_app() {
 	# tools/test/test-macos-bundle-payload.cjs proves every runtime reference
 	# still resolves in this set.
 	node "$REPO_ROOT/tools/build/macos-bundle-payload.cjs" stage "$REPO_ROOT" "$static_root"
+	# Generated metadata has actual native archive identities; no catalogue is
+	# committed or inferred from a version. A local build may omit this optional
+	# runtime, but a supplied producer-input directory must qualify both hosts.
+	if [ -n "${ERGOPTI_MANAGED_OLLAMA_INPUTS:-}" ]; then
+		python3 "$REPO_ROOT/tools/build/stage-macos-managed-ollama-inputs.py" \
+			--repository "$REPO_ROOT" --inputs "$ERGOPTI_MANAGED_OLLAMA_INPUTS" \
+			--source "${ERGOPTI_OLLAMA_SOURCE:?native source inputs are required}" \
+			--official-archive "${ERGOPTI_OLLAMA_OFFICIAL_ARCHIVE:?official archive is required}" \
+			--go "${ERGOPTI_MANAGED_OLLAMA_GO:?absolute pinned Go is required}" \
+			--release "${ERGOPTI_RELEASE:-false}" --release-tag "${ERGOPTI_RELEASE_TAG:-}" \
+			--release-version "${ERGOPTI_RELEASE_VERSION:-}" --release-channel "$ERGOPTI_CHANNEL" \
+			--output "$static_root/ergopti_plus/_shared/modules/llm/managed_ollama_release.json"
+	fi
 	# The bundle has no .git: the stamp is how the driver's diagnostics name the
 	# commit this app was built from. Written before codesign seals the resources.
 	bash "$REPO_ROOT/tools/build/write_build_stamp.sh" write "$static_root/ergopti_plus/_shared"

@@ -66,7 +66,7 @@ function corpusFiles() {
 	for (const d of DRIVERS) out.push(...walk(path.join(ROOT, 'static/ergopti_plus', d)));
 	out.push(...walk(path.join(ROOT, 'tools')));
 	out.push(...walk(path.join(ROOT, 'static/ergopti_plus/_shared/core')));
-	return out.filter((f) => /\.(js|cjs|mjs|lua|ahk)$/.test(f));
+	return out.filter((f) => /\.(js|cjs|mjs|lua|ahk|c|h)$/.test(f));
 }
 
 const modules = walk(SHARED).filter((f) => f.endsWith('.js'));

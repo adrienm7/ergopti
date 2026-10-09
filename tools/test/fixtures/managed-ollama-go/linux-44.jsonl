@@ -1,0 +1,183 @@
+{"Time":"2026-10-08T23:54:31.011420861Z","Action":"start","Package":"ergopti/nativehttp"}
+{"Time":"2026-10-08T23:54:31.015666312Z","Action":"run","Package":"ergopti/nativehttp","Test":"TestPrivateHMACFrozenIndependentVectorBindsAuthorityPathAndBody"}
+{"Time":"2026-10-08T23:54:31.015687834Z","Action":"output","Package":"ergopti/nativehttp","Test":"TestPrivateHMACFrozenIndependentVectorBindsAuthorityPathAndBody","Output":"=== RUN   TestPrivateHMACFrozenIndependentVectorBindsAuthorityPathAndBody\n"}
+{"Time":"2026-10-08T23:54:31.015713602Z","Action":"output","Package":"ergopti/nativehttp","Test":"TestPrivateHMACFrozenIndependentVectorBindsAuthorityPathAndBody","Output":"--- PASS: TestPrivateHMACFrozenIndependentVectorBindsAuthorityPathAndBody (0.00s)\n"}
+{"Time":"2026-10-08T23:54:31.015716817Z","Action":"pass","Package":"ergopti/nativehttp","Test":"TestPrivateHMACFrozenIndependentVectorBindsAuthorityPathAndBody","Elapsed":0}
+{"Time":"2026-10-08T23:54:31.015721194Z","Action":"run","Package":"ergopti/nativehttp","Test":"TestPrivateAdmissionRequiresExactSecretAndLoopback"}
+{"Time":"2026-10-08T23:54:31.015722986Z","Action":"output","Package":"ergopti/nativehttp","Test":"TestPrivateAdmissionRequiresExactSecretAndLoopback","Output":"=== RUN   TestPrivateAdmissionRequiresExactSecretAndLoopback\n"}
+{"Time":"2026-10-08T23:54:31.015986717Z","Action":"output","Package":"ergopti/nativehttp","Test":"TestPrivateAdmissionRequiresExactSecretAndLoopback","Output":"--- PASS: TestPrivateAdmissionRequiresExactSecretAndLoopback (0.00s)\n"}
+{"Time":"2026-10-08T23:54:31.015999426Z","Action":"pass","Package":"ergopti/nativehttp","Test":"TestPrivateAdmissionRequiresExactSecretAndLoopback","Elapsed":0}
+{"Time":"2026-10-08T23:54:31.016004693Z","Action":"run","Package":"ergopti/nativehttp","Test":"TestPrivateAdmissionDoesNotDiscloseUnqualifiedDaemon"}
+{"Time":"2026-10-08T23:54:31.016006426Z","Action":"output","Package":"ergopti/nativehttp","Test":"TestPrivateAdmissionDoesNotDiscloseUnqualifiedDaemon","Output":"=== RUN   TestPrivateAdmissionDoesNotDiscloseUnqualifiedDaemon\n"}
+{"Time":"2026-10-08T23:54:31.016011554Z","Action":"output","Package":"ergopti/nativehttp","Test":"TestPrivateAdmissionDoesNotDiscloseUnqualifiedDaemon","Output":"--- PASS: TestPrivateAdmissionDoesNotDiscloseUnqualifiedDaemon (0.00s)\n"}
+{"Time":"2026-10-08T23:54:31.016013657Z","Action":"pass","Package":"ergopti/nativehttp","Test":"TestPrivateAdmissionDoesNotDiscloseUnqualifiedDaemon","Elapsed":0}
+{"Time":"2026-10-08T23:54:31.01601608Z","Action":"run","Package":"ergopti/nativehttp","Test":"TestPrivateSessionRejectsDuplicateNullAndMalformedIdentity"}
+{"Time":"2026-10-08T23:54:31.016018103Z","Action":"output","Package":"ergopti/nativehttp","Test":"TestPrivateSessionRejectsDuplicateNullAndMalformedIdentity","Output":"=== RUN   TestPrivateSessionRejectsDuplicateNullAndMalformedIdentity\n"}
+{"Time":"2026-10-08T23:54:31.017328494Z","Action":"output","Package":"ergopti/nativehttp","Test":"TestPrivateSessionRejectsDuplicateNullAndMalformedIdentity","Output":"--- PASS: TestPrivateSessionRejectsDuplicateNullAndMalformedIdentity (0.00s)\n"}
+{"Time":"2026-10-08T23:54:31.017340081Z","Action":"pass","Package":"ergopti/nativehttp","Test":"TestPrivateSessionRejectsDuplicateNullAndMalformedIdentity","Elapsed":0}
+{"Time":"2026-10-08T23:54:31.017343125Z","Action":"run","Package":"ergopti/nativehttp","Test":"TestOwnedPullRetirementWaitsForPhysicalNativeAndBackgroundOwners"}
+{"Time":"2026-10-08T23:54:31.017345459Z","Action":"output","Package":"ergopti/nativehttp","Test":"TestOwnedPullRetirementWaitsForPhysicalNativeAndBackgroundOwners","Output":"=== RUN   TestOwnedPullRetirementWaitsForPhysicalNativeAndBackgroundOwners\n"}
+{"Time":"2026-10-08T23:54:31.017456864Z","Action":"output","Package":"ergopti/nativehttp","Test":"TestOwnedPullRetirementWaitsForPhysicalNativeAndBackgroundOwners","Output":"--- PASS: TestOwnedPullRetirementWaitsForPhysicalNativeAndBackgroundOwners (0.00s)\n"}
+{"Time":"2026-10-08T23:54:31.017461851Z","Action":"pass","Package":"ergopti/nativehttp","Test":"TestOwnedPullRetirementWaitsForPhysicalNativeAndBackgroundOwners","Elapsed":0}
+{"Time":"2026-10-08T23:54:31.017471135Z","Action":"run","Package":"ergopti/nativehttp","Test":"TestOrdinaryPullAndPrivateForeignSessionStaySeparate"}
+{"Time":"2026-10-08T23:54:31.017473228Z","Action":"output","Package":"ergopti/nativehttp","Test":"TestOrdinaryPullAndPrivateForeignSessionStaySeparate","Output":"=== RUN   TestOrdinaryPullAndPrivateForeignSessionStaySeparate\n"}
+{"Time":"2026-10-08T23:54:31.017475972Z","Action":"output","Package":"ergopti/nativehttp","Test":"TestOrdinaryPullAndPrivateForeignSessionStaySeparate","Output":"--- PASS: TestOrdinaryPullAndPrivateForeignSessionStaySeparate (0.00s)\n"}
+{"Time":"2026-10-08T23:54:31.017477875Z","Action":"pass","Package":"ergopti/nativehttp","Test":"TestOrdinaryPullAndPrivateForeignSessionStaySeparate","Elapsed":0}
+{"Time":"2026-10-08T23:54:31.017479577Z","Action":"run","Package":"ergopti/nativehttp","Test":"TestBootstrapIndependentHMACVectorAndImmutableSnapshot"}
+{"Time":"2026-10-08T23:54:31.01748118Z","Action":"output","Package":"ergopti/nativehttp","Test":"TestBootstrapIndependentHMACVectorAndImmutableSnapshot","Output":"=== RUN   TestBootstrapIndependentHMACVectorAndImmutableSnapshot\n"}
+{"Time":"2026-10-08T23:54:31.018033558Z","Action":"output","Package":"ergopti/nativehttp","Test":"TestBootstrapIndependentHMACVectorAndImmutableSnapshot","Output":"--- PASS: TestBootstrapIndependentHMACVectorAndImmutableSnapshot (0.00s)\n"}
+{"Time":"2026-10-08T23:54:31.01804215Z","Action":"pass","Package":"ergopti/nativehttp","Test":"TestBootstrapIndependentHMACVectorAndImmutableSnapshot","Elapsed":0}
+{"Time":"2026-10-08T23:54:31.018050062Z","Action":"run","Package":"ergopti/nativehttp","Test":"TestBootstrapSignedProtocolRefusals"}
+{"Time":"2026-10-08T23:54:31.018052055Z","Action":"output","Package":"ergopti/nativehttp","Test":"TestBootstrapSignedProtocolRefusals","Output":"=== RUN   TestBootstrapSignedProtocolRefusals\n"}
+{"Time":"2026-10-08T23:54:31.037019943Z","Action":"output","Package":"ergopti/nativehttp","Test":"TestBootstrapSignedProtocolRefusals","Output":"--- PASS: TestBootstrapSignedProtocolRefusals (0.02s)\n"}
+{"Time":"2026-10-08T23:54:31.037056978Z","Action":"pass","Package":"ergopti/nativehttp","Test":"TestBootstrapSignedProtocolRefusals","Elapsed":0.02}
+{"Time":"2026-10-08T23:54:31.037081113Z","Action":"run","Package":"ergopti/nativehttp","Test":"TestBootstrapPreservesCustomStoreWithoutMigration"}
+{"Time":"2026-10-08T23:54:31.037083236Z","Action":"output","Package":"ergopti/nativehttp","Test":"TestBootstrapPreservesCustomStoreWithoutMigration","Output":"=== RUN   TestBootstrapPreservesCustomStoreWithoutMigration\n"}
+{"Time":"2026-10-08T23:54:31.037601023Z","Action":"output","Package":"ergopti/nativehttp","Test":"TestBootstrapPreservesCustomStoreWithoutMigration","Output":"--- PASS: TestBootstrapPreservesCustomStoreWithoutMigration (0.00s)\n"}
+{"Time":"2026-10-08T23:54:31.037611058Z","Action":"pass","Package":"ergopti/nativehttp","Test":"TestBootstrapPreservesCustomStoreWithoutMigration","Elapsed":0}
+{"Time":"2026-10-08T23:54:31.037613762Z","Action":"run","Package":"ergopti/nativehttp","Test":"TestBootstrapRealPrivateFDAndNamespaceRefusals"}
+{"Time":"2026-10-08T23:54:31.037616206Z","Action":"output","Package":"ergopti/nativehttp","Test":"TestBootstrapRealPrivateFDAndNamespaceRefusals","Output":"=== RUN   TestBootstrapRealPrivateFDAndNamespaceRefusals\n"}
+{"Time":"2026-10-08T23:54:31.03949662Z","Action":"output","Package":"ergopti/nativehttp","Test":"TestBootstrapRealPrivateFDAndNamespaceRefusals","Output":"--- PASS: TestBootstrapRealPrivateFDAndNamespaceRefusals (0.00s)\n"}
+{"Time":"2026-10-08T23:54:31.039509009Z","Action":"pass","Package":"ergopti/nativehttp","Test":"TestBootstrapRealPrivateFDAndNamespaceRefusals","Elapsed":0}
+{"Time":"2026-10-08T23:54:31.039512263Z","Action":"run","Package":"ergopti/nativehttp","Test":"TestBootstrapNativeWorkerGetsOnlyPrivateCertificates"}
+{"Time":"2026-10-08T23:54:31.039514326Z","Action":"output","Package":"ergopti/nativehttp","Test":"TestBootstrapNativeWorkerGetsOnlyPrivateCertificates","Output":"=== RUN   TestBootstrapNativeWorkerGetsOnlyPrivateCertificates\n"}
+{"Time":"2026-10-08T23:54:31.039592983Z","Action":"output","Package":"ergopti/nativehttp","Test":"TestBootstrapNativeWorkerGetsOnlyPrivateCertificates","Output":"--- PASS: TestBootstrapNativeWorkerGetsOnlyPrivateCertificates (0.00s)\n"}
+{"Time":"2026-10-08T23:54:31.03959751Z","Action":"pass","Package":"ergopti/nativehttp","Test":"TestBootstrapNativeWorkerGetsOnlyPrivateCertificates","Elapsed":0}
+{"Time":"2026-10-08T23:54:31.039600033Z","Action":"run","Package":"ergopti/nativehttp","Test":"TestBootstrapCertificateTrustIsScopedAndPreservesOriginal"}
+{"Time":"2026-10-08T23:54:31.039601756Z","Action":"output","Package":"ergopti/nativehttp","Test":"TestBootstrapCertificateTrustIsScopedAndPreservesOriginal","Output":"=== RUN   TestBootstrapCertificateTrustIsScopedAndPreservesOriginal\n"}
+{"Time":"2026-10-08T23:54:31.051888229Z","Action":"output","Package":"ergopti/nativehttp","Test":"TestBootstrapCertificateTrustIsScopedAndPreservesOriginal","Output":"2026/10/08 23:54:31 http: TLS handshake error from 127.0.0.1:46128: remote error: tls: bad certificate\n"}
+{"Time":"2026-10-08T23:54:31.052907308Z","Action":"output","Package":"ergopti/nativehttp","Test":"TestBootstrapCertificateTrustIsScopedAndPreservesOriginal","Output":"2026/10/08 23:54:31 http: TLS handshake error from 127.0.0.1:46132: remote error: tls: bad certificate\n"}
+{"Time":"2026-10-08T23:54:31.055838579Z","Action":"output","Package":"ergopti/nativehttp","Test":"TestBootstrapCertificateTrustIsScopedAndPreservesOriginal","Output":"--- PASS: TestBootstrapCertificateTrustIsScopedAndPreservesOriginal (0.01s)\n"}
+{"Time":"2026-10-08T23:54:31.055852981Z","Action":"pass","Package":"ergopti/nativehttp","Test":"TestBootstrapCertificateTrustIsScopedAndPreservesOriginal","Elapsed":0.01}
+{"Time":"2026-10-08T23:54:31.055857978Z","Action":"run","Package":"ergopti/nativehttp","Test":"TestBootstrapCertificateDirectoryAndMalformedRefusals"}
+{"Time":"2026-10-08T23:54:31.055860191Z","Action":"output","Package":"ergopti/nativehttp","Test":"TestBootstrapCertificateDirectoryAndMalformedRefusals","Output":"=== RUN   TestBootstrapCertificateDirectoryAndMalformedRefusals\n"}
+{"Time":"2026-10-08T23:54:31.064406347Z","Action":"output","Package":"ergopti/nativehttp","Test":"TestBootstrapCertificateDirectoryAndMalformedRefusals","Output":"--- PASS: TestBootstrapCertificateDirectoryAndMalformedRefusals (0.01s)\n"}
+{"Time":"2026-10-08T23:54:31.064459575Z","Action":"pass","Package":"ergopti/nativehttp","Test":"TestBootstrapCertificateDirectoryAndMalformedRefusals","Elapsed":0.01}
+{"Time":"2026-10-08T23:54:31.064478634Z","Action":"run","Package":"ergopti/nativehttp","Test":"TestBootstrapExplicitProxyUsesActualScopedTLSAnchor"}
+{"Time":"2026-10-08T23:54:31.064480997Z","Action":"output","Package":"ergopti/nativehttp","Test":"TestBootstrapExplicitProxyUsesActualScopedTLSAnchor","Output":"=== RUN   TestBootstrapExplicitProxyUsesActualScopedTLSAnchor\n"}
+{"Time":"2026-10-08T23:54:31.071314536Z","Action":"output","Package":"ergopti/nativehttp","Test":"TestBootstrapExplicitProxyUsesActualScopedTLSAnchor","Output":"2026/10/08 23:54:31 http: TLS handshake error from 127.0.0.1:46564: remote error: tls: bad certificate\n"}
+{"Time":"2026-10-08T23:54:31.071506811Z","Action":"output","Package":"ergopti/nativehttp","Test":"TestBootstrapExplicitProxyUsesActualScopedTLSAnchor","Output":"--- PASS: TestBootstrapExplicitProxyUsesActualScopedTLSAnchor (0.01s)\n"}
+{"Time":"2026-10-08T23:54:31.071544106Z","Action":"pass","Package":"ergopti/nativehttp","Test":"TestBootstrapExplicitProxyUsesActualScopedTLSAnchor","Elapsed":0.01}
+{"Time":"2026-10-08T23:54:31.071564026Z","Action":"run","Package":"ergopti/nativehttp","Test":"TestFullURLPrivateHeadersAndPhysicalCompletion"}
+{"Time":"2026-10-08T23:54:31.07156677Z","Action":"output","Package":"ergopti/nativehttp","Test":"TestFullURLPrivateHeadersAndPhysicalCompletion","Output":"=== RUN   TestFullURLPrivateHeadersAndPhysicalCompletion\n"}
+{"Time":"2026-10-08T23:54:31.076523149Z","Action":"output","Package":"ergopti/nativehttp","Test":"TestFullURLPrivateHeadersAndPhysicalCompletion","Output":"--- PASS: TestFullURLPrivateHeadersAndPhysicalCompletion (0.00s)\n"}
+{"Time":"2026-10-08T23:54:31.076579162Z","Action":"pass","Package":"ergopti/nativehttp","Test":"TestFullURLPrivateHeadersAndPhysicalCompletion","Elapsed":0}
+{"Time":"2026-10-08T23:54:31.076594024Z","Action":"run","Package":"ergopti/nativehttp","Test":"TestWireFailuresCannotPublishFinalBytes"}
+{"Time":"2026-10-08T23:54:31.076596608Z","Action":"output","Package":"ergopti/nativehttp","Test":"TestWireFailuresCannotPublishFinalBytes","Output":"=== RUN   TestWireFailuresCannotPublishFinalBytes\n"}
+{"Time":"2026-10-08T23:54:31.076643767Z","Action":"run","Package":"ergopti/nativehttp","Test":"TestWireFailuresCannotPublishFinalBytes/truncated"}
+{"Time":"2026-10-08T23:54:31.076646151Z","Action":"output","Package":"ergopti/nativehttp","Test":"TestWireFailuresCannotPublishFinalBytes/truncated","Output":"=== RUN   TestWireFailuresCannotPublishFinalBytes/truncated\n"}
+{"Time":"2026-10-08T23:54:31.080532937Z","Action":"output","Package":"ergopti/nativehttp","Test":"TestWireFailuresCannotPublishFinalBytes/truncated","Output":"--- PASS: TestWireFailuresCannotPublishFinalBytes/truncated (0.00s)\n"}
+{"Time":"2026-10-08T23:54:31.080546957Z","Action":"pass","Package":"ergopti/nativehttp","Test":"TestWireFailuresCannotPublishFinalBytes/truncated","Elapsed":0}
+{"Time":"2026-10-08T23:54:31.080550252Z","Action":"run","Package":"ergopti/nativehttp","Test":"TestWireFailuresCannotPublishFinalBytes/false-terminal"}
+{"Time":"2026-10-08T23:54:31.080551975Z","Action":"output","Package":"ergopti/nativehttp","Test":"TestWireFailuresCannotPublishFinalBytes/false-terminal","Output":"=== RUN   TestWireFailuresCannotPublishFinalBytes/false-terminal\n"}
+{"Time":"2026-10-08T23:54:31.084500702Z","Action":"output","Package":"ergopti/nativehttp","Test":"TestWireFailuresCannotPublishFinalBytes/false-terminal","Output":"--- PASS: TestWireFailuresCannotPublishFinalBytes/false-terminal (0.00s)\n"}
+{"Time":"2026-10-08T23:54:31.084549004Z","Action":"pass","Package":"ergopti/nativehttp","Test":"TestWireFailuresCannotPublishFinalBytes/false-terminal","Elapsed":0}
+{"Time":"2026-10-08T23:54:31.084562564Z","Action":"run","Package":"ergopti/nativehttp","Test":"TestWireFailuresCannotPublishFinalBytes/wrong-exit"}
+{"Time":"2026-10-08T23:54:31.084564827Z","Action":"output","Package":"ergopti/nativehttp","Test":"TestWireFailuresCannotPublishFinalBytes/wrong-exit","Output":"=== RUN   TestWireFailuresCannotPublishFinalBytes/wrong-exit\n"}
+{"Time":"2026-10-08T23:54:31.088215453Z","Action":"output","Package":"ergopti/nativehttp","Test":"TestWireFailuresCannotPublishFinalBytes/wrong-exit","Output":"--- PASS: TestWireFailuresCannotPublishFinalBytes/wrong-exit (0.00s)\n"}
+{"Time":"2026-10-08T23:54:31.088266399Z","Action":"pass","Package":"ergopti/nativehttp","Test":"TestWireFailuresCannotPublishFinalBytes/wrong-exit","Elapsed":0}
+{"Time":"2026-10-08T23:54:31.088291466Z","Action":"run","Package":"ergopti/nativehttp","Test":"TestWireFailuresCannotPublishFinalBytes/late-bytes"}
+{"Time":"2026-10-08T23:54:31.088294019Z","Action":"output","Package":"ergopti/nativehttp","Test":"TestWireFailuresCannotPublishFinalBytes/late-bytes","Output":"=== RUN   TestWireFailuresCannotPublishFinalBytes/late-bytes\n"}
+{"Time":"2026-10-08T23:54:31.091897285Z","Action":"output","Package":"ergopti/nativehttp","Test":"TestWireFailuresCannotPublishFinalBytes/late-bytes","Output":"--- PASS: TestWireFailuresCannotPublishFinalBytes/late-bytes (0.00s)\n"}
+{"Time":"2026-10-08T23:54:31.091911867Z","Action":"pass","Package":"ergopti/nativehttp","Test":"TestWireFailuresCannotPublishFinalBytes/late-bytes","Elapsed":0}
+{"Time":"2026-10-08T23:54:31.091915973Z","Action":"run","Package":"ergopti/nativehttp","Test":"TestWireFailuresCannotPublishFinalBytes/null-terminal"}
+{"Time":"2026-10-08T23:54:31.091918006Z","Action":"output","Package":"ergopti/nativehttp","Test":"TestWireFailuresCannotPublishFinalBytes/null-terminal","Output":"=== RUN   TestWireFailuresCannotPublishFinalBytes/null-terminal\n"}
+{"Time":"2026-10-08T23:54:31.095225854Z","Action":"output","Package":"ergopti/nativehttp","Test":"TestWireFailuresCannotPublishFinalBytes/null-terminal","Output":"--- PASS: TestWireFailuresCannotPublishFinalBytes/null-terminal (0.00s)\n"}
+{"Time":"2026-10-08T23:54:31.095269229Z","Action":"pass","Package":"ergopti/nativehttp","Test":"TestWireFailuresCannotPublishFinalBytes/null-terminal","Elapsed":0}
+{"Time":"2026-10-08T23:54:31.095288647Z","Action":"run","Package":"ergopti/nativehttp","Test":"TestWireFailuresCannotPublishFinalBytes/duplicate"}
+{"Time":"2026-10-08T23:54:31.095291021Z","Action":"output","Package":"ergopti/nativehttp","Test":"TestWireFailuresCannotPublishFinalBytes/duplicate","Output":"=== RUN   TestWireFailuresCannotPublishFinalBytes/duplicate\n"}
+{"Time":"2026-10-08T23:54:31.101550259Z","Action":"output","Package":"ergopti/nativehttp","Test":"TestWireFailuresCannotPublishFinalBytes/duplicate","Output":"--- PASS: TestWireFailuresCannotPublishFinalBytes/duplicate (0.01s)\n"}
+{"Time":"2026-10-08T23:54:31.101569257Z","Action":"pass","Package":"ergopti/nativehttp","Test":"TestWireFailuresCannotPublishFinalBytes/duplicate","Elapsed":0.01}
+{"Time":"2026-10-08T23:54:31.101573654Z","Action":"run","Package":"ergopti/nativehttp","Test":"TestWireFailuresCannotPublishFinalBytes/invalid-header"}
+{"Time":"2026-10-08T23:54:31.101575957Z","Action":"output","Package":"ergopti/nativehttp","Test":"TestWireFailuresCannotPublishFinalBytes/invalid-header","Output":"=== RUN   TestWireFailuresCannotPublishFinalBytes/invalid-header\n"}
+{"Time":"2026-10-08T23:54:31.106420211Z","Action":"output","Package":"ergopti/nativehttp","Test":"TestWireFailuresCannotPublishFinalBytes/invalid-header","Output":"--- PASS: TestWireFailuresCannotPublishFinalBytes/invalid-header (0.01s)\n"}
+{"Time":"2026-10-08T23:54:31.106605535Z","Action":"pass","Package":"ergopti/nativehttp","Test":"TestWireFailuresCannotPublishFinalBytes/invalid-header","Elapsed":0.01}
+{"Time":"2026-10-08T23:54:31.106627798Z","Action":"output","Package":"ergopti/nativehttp","Test":"TestWireFailuresCannotPublishFinalBytes","Output":"--- PASS: TestWireFailuresCannotPublishFinalBytes (0.03s)\n"}
+{"Time":"2026-10-08T23:54:31.106670501Z","Action":"pass","Package":"ergopti/nativehttp","Test":"TestWireFailuresCannotPublishFinalBytes","Elapsed":0.03}
+{"Time":"2026-10-08T23:54:31.107185083Z","Action":"run","Package":"ergopti/nativehttp","Test":"TestHeadVerifiesTerminalBeforeHeaders"}
+{"Time":"2026-10-08T23:54:31.107195399Z","Action":"output","Package":"ergopti/nativehttp","Test":"TestHeadVerifiesTerminalBeforeHeaders","Output":"=== RUN   TestHeadVerifiesTerminalBeforeHeaders\n"}
+{"Time":"2026-10-08T23:54:31.107199725Z","Action":"run","Package":"ergopti/nativehttp","Test":"TestHeadVerifiesTerminalBeforeHeaders/complete"}
+{"Time":"2026-10-08T23:54:31.10720295Z","Action":"output","Package":"ergopti/nativehttp","Test":"TestHeadVerifiesTerminalBeforeHeaders/complete","Output":"=== RUN   TestHeadVerifiesTerminalBeforeHeaders/complete\n"}
+{"Time":"2026-10-08T23:54:31.111420225Z","Action":"output","Package":"ergopti/nativehttp","Test":"TestHeadVerifiesTerminalBeforeHeaders/complete","Output":"--- PASS: TestHeadVerifiesTerminalBeforeHeaders/complete (0.00s)\n"}
+{"Time":"2026-10-08T23:54:31.111438011Z","Action":"pass","Package":"ergopti/nativehttp","Test":"TestHeadVerifiesTerminalBeforeHeaders/complete","Elapsed":0}
+{"Time":"2026-10-08T23:54:31.111442067Z","Action":"run","Package":"ergopti/nativehttp","Test":"TestHeadVerifiesTerminalBeforeHeaders/wrong-exit"}
+{"Time":"2026-10-08T23:54:31.111444691Z","Action":"output","Package":"ergopti/nativehttp","Test":"TestHeadVerifiesTerminalBeforeHeaders/wrong-exit","Output":"=== RUN   TestHeadVerifiesTerminalBeforeHeaders/wrong-exit\n"}
+{"Time":"2026-10-08T23:54:31.116266922Z","Action":"output","Package":"ergopti/nativehttp","Test":"TestHeadVerifiesTerminalBeforeHeaders/wrong-exit","Output":"--- PASS: TestHeadVerifiesTerminalBeforeHeaders/wrong-exit (0.01s)\n"}
+{"Time":"2026-10-08T23:54:31.116282525Z","Action":"pass","Package":"ergopti/nativehttp","Test":"TestHeadVerifiesTerminalBeforeHeaders/wrong-exit","Elapsed":0.01}
+{"Time":"2026-10-08T23:54:31.116318198Z","Action":"output","Package":"ergopti/nativehttp","Test":"TestHeadVerifiesTerminalBeforeHeaders","Output":"--- PASS: TestHeadVerifiesTerminalBeforeHeaders (0.01s)\n"}
+{"Time":"2026-10-08T23:54:31.116321212Z","Action":"pass","Package":"ergopti/nativehttp","Test":"TestHeadVerifiesTerminalBeforeHeaders","Elapsed":0.01}
+{"Time":"2026-10-08T23:54:31.116324297Z","Action":"run","Package":"ergopti/nativehttp","Test":"TestGoRedirectPolicyRetainsFullURLAndStripsForeignAuth"}
+{"Time":"2026-10-08T23:54:31.116325929Z","Action":"output","Package":"ergopti/nativehttp","Test":"TestGoRedirectPolicyRetainsFullURLAndStripsForeignAuth","Output":"=== RUN   TestGoRedirectPolicyRetainsFullURLAndStripsForeignAuth\n"}
+{"Time":"2026-10-08T23:54:31.123028334Z","Action":"output","Package":"ergopti/nativehttp","Test":"TestGoRedirectPolicyRetainsFullURLAndStripsForeignAuth","Output":"--- PASS: TestGoRedirectPolicyRetainsFullURLAndStripsForeignAuth (0.01s)\n"}
+{"Time":"2026-10-08T23:54:31.123045429Z","Action":"pass","Package":"ergopti/nativehttp","Test":"TestGoRedirectPolicyRetainsFullURLAndStripsForeignAuth","Elapsed":0.01}
+{"Time":"2026-10-08T23:54:31.123049175Z","Action":"run","Package":"ergopti/nativehttp","Test":"TestCancellationAndConcurrentClosePhysicallyRetirePeer"}
+{"Time":"2026-10-08T23:54:31.123051418Z","Action":"output","Package":"ergopti/nativehttp","Test":"TestCancellationAndConcurrentClosePhysicallyRetirePeer","Output":"=== RUN   TestCancellationAndConcurrentClosePhysicallyRetirePeer\n"}
+{"Time":"2026-10-08T23:54:31.123054783Z","Action":"run","Package":"ergopti/nativehttp","Test":"TestCancellationAndConcurrentClosePhysicallyRetirePeer/stall-header"}
+{"Time":"2026-10-08T23:54:31.123056596Z","Action":"output","Package":"ergopti/nativehttp","Test":"TestCancellationAndConcurrentClosePhysicallyRetirePeer/stall-header","Output":"=== RUN   TestCancellationAndConcurrentClosePhysicallyRetirePeer/stall-header\n"}
+{"Time":"2026-10-08T23:54:31.245335116Z","Action":"output","Package":"ergopti/nativehttp","Test":"TestCancellationAndConcurrentClosePhysicallyRetirePeer/stall-header","Output":"--- PASS: TestCancellationAndConcurrentClosePhysicallyRetirePeer/stall-header (0.12s)\n"}
+{"Time":"2026-10-08T23:54:31.245370449Z","Action":"pass","Package":"ergopti/nativehttp","Test":"TestCancellationAndConcurrentClosePhysicallyRetirePeer/stall-header","Elapsed":0.12}
+{"Time":"2026-10-08T23:54:31.245376918Z","Action":"run","Package":"ergopti/nativehttp","Test":"TestCancellationAndConcurrentClosePhysicallyRetirePeer/cancel-body"}
+{"Time":"2026-10-08T23:54:31.245382797Z","Action":"output","Package":"ergopti/nativehttp","Test":"TestCancellationAndConcurrentClosePhysicallyRetirePeer/cancel-body","Output":"=== RUN   TestCancellationAndConcurrentClosePhysicallyRetirePeer/cancel-body\n"}
+{"Time":"2026-10-08T23:54:31.249170505Z","Action":"output","Package":"ergopti/nativehttp","Test":"TestCancellationAndConcurrentClosePhysicallyRetirePeer/cancel-body","Output":"--- PASS: TestCancellationAndConcurrentClosePhysicallyRetirePeer/cancel-body (0.00s)\n"}
+{"Time":"2026-10-08T23:54:31.24922093Z","Action":"pass","Package":"ergopti/nativehttp","Test":"TestCancellationAndConcurrentClosePhysicallyRetirePeer/cancel-body","Elapsed":0}
+{"Time":"2026-10-08T23:54:31.249245276Z","Action":"run","Package":"ergopti/nativehttp","Test":"TestCancellationAndConcurrentClosePhysicallyRetirePeer/stall-body"}
+{"Time":"2026-10-08T23:54:31.24924787Z","Action":"output","Package":"ergopti/nativehttp","Test":"TestCancellationAndConcurrentClosePhysicallyRetirePeer/stall-body","Output":"=== RUN   TestCancellationAndConcurrentClosePhysicallyRetirePeer/stall-body\n"}
+{"Time":"2026-10-08T23:54:31.37060761Z","Action":"output","Package":"ergopti/nativehttp","Test":"TestCancellationAndConcurrentClosePhysicallyRetirePeer/stall-body","Output":"--- PASS: TestCancellationAndConcurrentClosePhysicallyRetirePeer/stall-body (0.12s)\n"}
+{"Time":"2026-10-08T23:54:31.370636402Z","Action":"pass","Package":"ergopti/nativehttp","Test":"TestCancellationAndConcurrentClosePhysicallyRetirePeer/stall-body","Elapsed":0.12}
+{"Time":"2026-10-08T23:54:31.370649402Z","Action":"output","Package":"ergopti/nativehttp","Test":"TestCancellationAndConcurrentClosePhysicallyRetirePeer","Output":"--- PASS: TestCancellationAndConcurrentClosePhysicallyRetirePeer (0.25s)\n"}
+{"Time":"2026-10-08T23:54:31.370653137Z","Action":"pass","Package":"ergopti/nativehttp","Test":"TestCancellationAndConcurrentClosePhysicallyRetirePeer","Elapsed":0.25}
+{"Time":"2026-10-08T23:54:31.370656883Z","Action":"run","Package":"ergopti/nativehttp","Test":"TestBypassIndependentVectors"}
+{"Time":"2026-10-08T23:54:31.370659086Z","Action":"output","Package":"ergopti/nativehttp","Test":"TestBypassIndependentVectors","Output":"=== RUN   TestBypassIndependentVectors\n"}
+{"Time":"2026-10-08T23:54:31.370810981Z","Action":"output","Package":"ergopti/nativehttp","Test":"TestBypassIndependentVectors","Output":"--- PASS: TestBypassIndependentVectors (0.00s)\n"}
+{"Time":"2026-10-08T23:54:31.370815297Z","Action":"pass","Package":"ergopti/nativehttp","Test":"TestBypassIndependentVectors","Elapsed":0}
+{"Time":"2026-10-08T23:54:31.370817821Z","Action":"run","Package":"ergopti/nativehttp","Test":"TestIdleDeadlinePhysicallyRetiresPeer"}
+{"Time":"2026-10-08T23:54:31.370819383Z","Action":"output","Package":"ergopti/nativehttp","Test":"TestIdleDeadlinePhysicallyRetiresPeer","Output":"=== RUN   TestIdleDeadlinePhysicallyRetiresPeer\n"}
+{"Time":"2026-10-08T23:54:31.475099391Z","Action":"output","Package":"ergopti/nativehttp","Test":"TestIdleDeadlinePhysicallyRetiresPeer","Output":"--- PASS: TestIdleDeadlinePhysicallyRetiresPeer (0.10s)\n"}
+{"Time":"2026-10-08T23:54:31.475134093Z","Action":"pass","Package":"ergopti/nativehttp","Test":"TestIdleDeadlinePhysicallyRetiresPeer","Elapsed":0.1}
+{"Time":"2026-10-08T23:54:31.47513927Z","Action":"run","Package":"ergopti/nativehttp","Test":"TestUnknownLengthRequiresTerminalAndExactEOF"}
+{"Time":"2026-10-08T23:54:31.475141954Z","Action":"output","Package":"ergopti/nativehttp","Test":"TestUnknownLengthRequiresTerminalAndExactEOF","Output":"=== RUN   TestUnknownLengthRequiresTerminalAndExactEOF\n"}
+{"Time":"2026-10-08T23:54:31.479137992Z","Action":"output","Package":"ergopti/nativehttp","Test":"TestUnknownLengthRequiresTerminalAndExactEOF","Output":"--- PASS: TestUnknownLengthRequiresTerminalAndExactEOF (0.00s)\n"}
+{"Time":"2026-10-08T23:54:31.479155528Z","Action":"pass","Package":"ergopti/nativehttp","Test":"TestUnknownLengthRequiresTerminalAndExactEOF","Elapsed":0}
+{"Time":"2026-10-08T23:54:31.479158823Z","Action":"run","Package":"ergopti/nativehttp","Test":"TestClientErrorPrivacyRetainsContextCause"}
+{"Time":"2026-10-08T23:54:31.479181466Z","Action":"output","Package":"ergopti/nativehttp","Test":"TestClientErrorPrivacyRetainsContextCause","Output":"=== RUN   TestClientErrorPrivacyRetainsContextCause\n"}
+{"Time":"2026-10-08T23:54:31.584597035Z","Action":"output","Package":"ergopti/nativehttp","Test":"TestClientErrorPrivacyRetainsContextCause","Output":"--- PASS: TestClientErrorPrivacyRetainsContextCause (0.11s)\n"}
+{"Time":"2026-10-08T23:54:31.584631827Z","Action":"pass","Package":"ergopti/nativehttp","Test":"TestClientErrorPrivacyRetainsContextCause","Elapsed":0.11}
+{"Time":"2026-10-08T23:54:31.584636975Z","Action":"run","Package":"ergopti/nativehttp","Test":"TestManagedRedirectStrictAuthorityAndDowngrade"}
+{"Time":"2026-10-08T23:54:31.584639649Z","Action":"output","Package":"ergopti/nativehttp","Test":"TestManagedRedirectStrictAuthorityAndDowngrade","Output":"=== RUN   TestManagedRedirectStrictAuthorityAndDowngrade\n"}
+{"Time":"2026-10-08T23:54:31.584644476Z","Action":"run","Package":"ergopti/nativehttp","Test":"TestManagedRedirectStrictAuthorityAndDowngrade/https://origin.example/blob?q=two"}
+{"Time":"2026-10-08T23:54:31.584647049Z","Action":"output","Package":"ergopti/nativehttp","Test":"TestManagedRedirectStrictAuthorityAndDowngrade/https://origin.example/blob?q=two","Output":"=== RUN   TestManagedRedirectStrictAuthorityAndDowngrade/https://origin.example/blob?q=two\n"}
+{"Time":"2026-10-08T23:54:31.597424411Z","Action":"output","Package":"ergopti/nativehttp","Test":"TestManagedRedirectStrictAuthorityAndDowngrade/https://origin.example/blob?q=two","Output":"--- PASS: TestManagedRedirectStrictAuthorityAndDowngrade/https://origin.example/blob?q=two (0.01s)\n"}
+{"Time":"2026-10-08T23:54:31.597455236Z","Action":"pass","Package":"ergopti/nativehttp","Test":"TestManagedRedirectStrictAuthorityAndDowngrade/https://origin.example/blob?q=two","Elapsed":0.01}
+{"Time":"2026-10-08T23:54:31.597459813Z","Action":"run","Package":"ergopti/nativehttp","Test":"TestManagedRedirectStrictAuthorityAndDowngrade/https://origin.example:443/blob?q=two"}
+{"Time":"2026-10-08T23:54:31.597462367Z","Action":"output","Package":"ergopti/nativehttp","Test":"TestManagedRedirectStrictAuthorityAndDowngrade/https://origin.example:443/blob?q=two","Output":"=== RUN   TestManagedRedirectStrictAuthorityAndDowngrade/https://origin.example:443/blob?q=two\n"}
+{"Time":"2026-10-08T23:54:31.604233954Z","Action":"output","Package":"ergopti/nativehttp","Test":"TestManagedRedirectStrictAuthorityAndDowngrade/https://origin.example:443/blob?q=two","Output":"--- PASS: TestManagedRedirectStrictAuthorityAndDowngrade/https://origin.example:443/blob?q=two (0.01s)\n"}
+{"Time":"2026-10-08T23:54:31.604288755Z","Action":"pass","Package":"ergopti/nativehttp","Test":"TestManagedRedirectStrictAuthorityAndDowngrade/https://origin.example:443/blob?q=two","Elapsed":0.01}
+{"Time":"2026-10-08T23:54:31.604311479Z","Action":"run","Package":"ergopti/nativehttp","Test":"TestManagedRedirectStrictAuthorityAndDowngrade/https://origin.example:444/blob?q=two"}
+{"Time":"2026-10-08T23:54:31.604314253Z","Action":"output","Package":"ergopti/nativehttp","Test":"TestManagedRedirectStrictAuthorityAndDowngrade/https://origin.example:444/blob?q=two","Output":"=== RUN   TestManagedRedirectStrictAuthorityAndDowngrade/https://origin.example:444/blob?q=two\n"}
+{"Time":"2026-10-08T23:54:31.611084098Z","Action":"output","Package":"ergopti/nativehttp","Test":"TestManagedRedirectStrictAuthorityAndDowngrade/https://origin.example:444/blob?q=two","Output":"--- PASS: TestManagedRedirectStrictAuthorityAndDowngrade/https://origin.example:444/blob?q=two (0.01s)\n"}
+{"Time":"2026-10-08T23:54:31.611105439Z","Action":"pass","Package":"ergopti/nativehttp","Test":"TestManagedRedirectStrictAuthorityAndDowngrade/https://origin.example:444/blob?q=two","Elapsed":0.01}
+{"Time":"2026-10-08T23:54:31.611109816Z","Action":"run","Package":"ergopti/nativehttp","Test":"TestManagedRedirectStrictAuthorityAndDowngrade/https://asset.origin.example/blob?q=two"}
+{"Time":"2026-10-08T23:54:31.61111255Z","Action":"output","Package":"ergopti/nativehttp","Test":"TestManagedRedirectStrictAuthorityAndDowngrade/https://asset.origin.example/blob?q=two","Output":"=== RUN   TestManagedRedirectStrictAuthorityAndDowngrade/https://asset.origin.example/blob?q=two\n"}
+{"Time":"2026-10-08T23:54:31.61651515Z","Action":"output","Package":"ergopti/nativehttp","Test":"TestManagedRedirectStrictAuthorityAndDowngrade/https://asset.origin.example/blob?q=two","Output":"--- PASS: TestManagedRedirectStrictAuthorityAndDowngrade/https://asset.origin.example/blob?q=two (0.00s)\n"}
+{"Time":"2026-10-08T23:54:31.6165488Z","Action":"pass","Package":"ergopti/nativehttp","Test":"TestManagedRedirectStrictAuthorityAndDowngrade/https://asset.origin.example/blob?q=two","Elapsed":0}
+{"Time":"2026-10-08T23:54:31.616553727Z","Action":"run","Package":"ergopti/nativehttp","Test":"TestManagedRedirectStrictAuthorityAndDowngrade/https://foreign.example/blob?q=two"}
+{"Time":"2026-10-08T23:54:31.616556561Z","Action":"output","Package":"ergopti/nativehttp","Test":"TestManagedRedirectStrictAuthorityAndDowngrade/https://foreign.example/blob?q=two","Output":"=== RUN   TestManagedRedirectStrictAuthorityAndDowngrade/https://foreign.example/blob?q=two\n"}
+{"Time":"2026-10-08T23:54:31.622003237Z","Action":"output","Package":"ergopti/nativehttp","Test":"TestManagedRedirectStrictAuthorityAndDowngrade/https://foreign.example/blob?q=two","Output":"--- PASS: TestManagedRedirectStrictAuthorityAndDowngrade/https://foreign.example/blob?q=two (0.01s)\n"}
+{"Time":"2026-10-08T23:54:31.622050447Z","Action":"pass","Package":"ergopti/nativehttp","Test":"TestManagedRedirectStrictAuthorityAndDowngrade/https://foreign.example/blob?q=two","Elapsed":0.01}
+{"Time":"2026-10-08T23:54:31.622084688Z","Action":"run","Package":"ergopti/nativehttp","Test":"TestManagedRedirectStrictAuthorityAndDowngrade/http://origin.example/blob?q=two"}
+{"Time":"2026-10-08T23:54:31.622112529Z","Action":"output","Package":"ergopti/nativehttp","Test":"TestManagedRedirectStrictAuthorityAndDowngrade/http://origin.example/blob?q=two","Output":"=== RUN   TestManagedRedirectStrictAuthorityAndDowngrade/http://origin.example/blob?q=two\n"}
+{"Time":"2026-10-08T23:54:31.624883632Z","Action":"output","Package":"ergopti/nativehttp","Test":"TestManagedRedirectStrictAuthorityAndDowngrade/http://origin.example/blob?q=two","Output":"--- PASS: TestManagedRedirectStrictAuthorityAndDowngrade/http://origin.example/blob?q=two (0.00s)\n"}
+{"Time":"2026-10-08T23:54:31.624928759Z","Action":"pass","Package":"ergopti/nativehttp","Test":"TestManagedRedirectStrictAuthorityAndDowngrade/http://origin.example/blob?q=two","Elapsed":0}
+{"Time":"2026-10-08T23:54:31.624942419Z","Action":"output","Package":"ergopti/nativehttp","Test":"TestManagedRedirectStrictAuthorityAndDowngrade","Output":"--- PASS: TestManagedRedirectStrictAuthorityAndDowngrade (0.04s)\n"}
+{"Time":"2026-10-08T23:54:31.624959394Z","Action":"pass","Package":"ergopti/nativehttp","Test":"TestManagedRedirectStrictAuthorityAndDowngrade","Elapsed":0.04}
+{"Time":"2026-10-08T23:54:31.624999534Z","Action":"run","Package":"ergopti/nativehttp","Test":"TestManagedRedirectKeepsOriginalVeto"}
+{"Time":"2026-10-08T23:54:31.625002629Z","Action":"output","Package":"ergopti/nativehttp","Test":"TestManagedRedirectKeepsOriginalVeto","Output":"=== RUN   TestManagedRedirectKeepsOriginalVeto\n"}
+{"Time":"2026-10-08T23:54:31.627508029Z","Action":"output","Package":"ergopti/nativehttp","Test":"TestManagedRedirectKeepsOriginalVeto","Output":"--- PASS: TestManagedRedirectKeepsOriginalVeto (0.00s)\n"}
+{"Time":"2026-10-08T23:54:31.628058794Z","Action":"pass","Package":"ergopti/nativehttp","Test":"TestManagedRedirectKeepsOriginalVeto","Elapsed":0}
+{"Time":"2026-10-08T23:54:31.62809633Z","Action":"run","Package":"ergopti/nativehttp","Test":"TestManagedRedirectReturnToOriginDoesNotRestoreHeaderOrJarSecrets"}
+{"Time":"2026-10-08T23:54:31.628099504Z","Action":"output","Package":"ergopti/nativehttp","Test":"TestManagedRedirectReturnToOriginDoesNotRestoreHeaderOrJarSecrets","Output":"=== RUN   TestManagedRedirectReturnToOriginDoesNotRestoreHeaderOrJarSecrets\n"}
+{"Time":"2026-10-08T23:54:31.636087563Z","Action":"output","Package":"ergopti/nativehttp","Test":"TestManagedRedirectReturnToOriginDoesNotRestoreHeaderOrJarSecrets","Output":"--- PASS: TestManagedRedirectReturnToOriginDoesNotRestoreHeaderOrJarSecrets (0.01s)\n"}
+{"Time":"2026-10-08T23:54:31.636113531Z","Action":"pass","Package":"ergopti/nativehttp","Test":"TestManagedRedirectReturnToOriginDoesNotRestoreHeaderOrJarSecrets","Elapsed":0.01}
+{"Time":"2026-10-08T23:54:31.636119871Z","Action":"output","Package":"ergopti/nativehttp","Output":"PASS\n"}
+{"Time":"2026-10-08T23:54:31.636675328Z","Action":"output","Package":"ergopti/nativehttp","Output":"ok  \tergopti/nativehttp\t0.625s\n"}
+{"Time":"2026-10-08T23:54:31.645916302Z","Action":"pass","Package":"ergopti/nativehttp","Elapsed":0.635}

@@ -252,6 +252,22 @@ local ADAPTER_SPECS = {
 		wired    = true,
 	},
 	{
+		id       = "adapters.managed_ollama_hint",
+		contract = { "get", "cancel" },
+		-- Structural dispatch wiring; source and image admission stay independent.
+		wired    = true,
+	},
+	{
+		id       = "adapters.native_python_probe",
+		contract = { "get", "cancel", "onSettled" },
+		wired    = true,
+	},
+	{
+		id       = "adapters.native_bootstrap_pty",
+		contract = { "prepare" },
+		wired    = true,
+	},
+	{
 		id       = "adapters.physical_shortcut_hook",
 		contract = { "new" },
 		-- Structural require reachability; runtime native delivery stays unavailable.
@@ -435,6 +451,14 @@ local ADAPTER_SPECS = {
 			"begin", "emit_key_stroke", "claim_tag", "claim_physical_fence",
 			"current_action_epoch", "register_action_listener", "enter_callback",
 			"leave_callback", "keyboard_characters",
+		},
+		wired    = true,
+	},
+	{
+		id       = "adapters.managed_ollama_pull",
+		contract = {
+			"handles", "prepare", "prepare_owned", "mark_start_attempted",
+			"rollback", "retire", "prepare_cleanup", "finish_cleanup",
 		},
 		wired    = true,
 	},

@@ -197,6 +197,7 @@
 	"config_cleanup.intro": "Gennemgå indstillinger, som ErgoptiPlus ikke længere bruger.",
 	"dialog.action_picker.disabled": "∅ Intet",
 	"dialog.action_picker.label": "Handling:",
+	"dialog.action_picker.menu_label": "Handling:…",
 	"dialog.action_picker.back": "← Tilbage",
 	"dialog.action_picker.capture_key": "Tryk på den tast, der skal sendes, eller skriv dens navn.",
 	"dialog.action_picker.capture_shortcut": "Tryk på den genvej, der skal sendes, eller skriv den.",

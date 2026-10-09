@@ -11,19 +11,25 @@
 # owned by ApiOllama.
 #
 # Usage: ensure-ollama-deps.sh <resolved-executable-or-empty> <install-dir>
+#                            [resolved-native-python]
 # ============================================================================
 
 set -eu
 set -o pipefail 2>/dev/null || true
 
-SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+if [ "$0" = "/dev/fd/3" ] && [ -n "${ERGOPTI_BOOTSTRAP_SCRIPT_DIR:-}" ]; then
+	SCRIPT_DIR="$ERGOPTI_BOOTSTRAP_SCRIPT_DIR"
+else
+	SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+fi
 NETWORK_RETRY_LIB="$SCRIPT_DIR/network-retry.sh"
 OLLAMA_RELEASE_FILE="$SCRIPT_DIR/ollama-release.sh"
 # System tools stay reachable when the caller hands over a minimal PATH.
 export PATH="$PATH:/usr/bin:/bin:/usr/sbin:/sbin"
 
-OLLAMA_RESOLVED_BIN="${1:-}"
-OLLAMA_INSTALL_DIR="${2:-}"
+OLLAMA_RESOLVED_BIN="${1:-${ERGOPTI_BOOTSTRAP_OLLAMA_RESOLVED_BIN:-}}"
+OLLAMA_INSTALL_DIR="${2:-${ERGOPTI_BOOTSTRAP_OLLAMA_INSTALL_DIR:-}}"
+export ERGOPTI_BOOTSTRAP_PYTHON="${3:-${ERGOPTI_BOOTSTRAP_PYTHON:-}}"
 INSTALL_TEMP=""
 INSTALL_STAGE=""
 INSTALL_ROLLBACK=""
@@ -45,6 +51,7 @@ log_error() {
 cleanup_install() {
 	if [ -n "$DOWNLOAD_PID" ]; then
 		kill "$DOWNLOAD_PID" 2>/dev/null || true
+		wait "$DOWNLOAD_PID" 2>/dev/null || true
 	fi
 	if [ -n "$INSTALL_ROLLBACK" ] && [ -e "$INSTALL_ROLLBACK" ]; then
 		if [ ! -e "$OLLAMA_INSTALL_DIR" ]; then
@@ -134,7 +141,7 @@ download_archive() {
 	elif [ "$size" -eq "$OLLAMA_DARWIN_TGZ_BYTES" ]; then
 		return 0
 	fi
-	curl_resumable -o "$archive_path" "$archive_url" &
+	managed_bootstrap_download "$archive_url" "$archive_path" "$OLLAMA_DARWIN_TGZ_SHA256" "$OLLAMA_DARWIN_TGZ_BYTES" resumable --replace-owner &
 	DOWNLOAD_PID=$!
 	while kill -0 "$DOWNLOAD_PID" 2>/dev/null; do
 		report_download_progress
@@ -170,7 +177,11 @@ emit_marker "OLLAMA_VERIFIED"
 parent_dir="$(dirname "$OLLAMA_INSTALL_DIR")"
 mkdir -p "$parent_dir"
 INSTALL_STAGE="$(mktemp -d "$parent_dir/.ollama.ergopti.XXXXXX")"
-if ! tar -xzf "$archive_path" -C "$INSTALL_STAGE"; then
+# Preserve pinned member modes even under the native private-process umask.
+# Preserve literal AppleDouble archive members and their published modes.
+# BSD tar's reader consumes these before copyfile extraction options apply;
+# its reader option is scoped to this child and is ignored by GNU tar.
+if ! COPYFILE_DISABLE=1 TAR_READER_OPTIONS='tar:!mac-ext' tar -xzpf "$archive_path" -C "$INSTALL_STAGE"; then
 	log_error "The verified Ollama archive could not be extracted."
 	exit 1
 fi

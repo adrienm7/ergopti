@@ -197,6 +197,7 @@
 	"config_cleanup.intro": "Review the settings no longer used by ErgoptiPlus.",
 	"dialog.action_picker.disabled": "∅ Nothing",
 	"dialog.action_picker.label": "Action:",
+	"dialog.action_picker.menu_label": "Action:…",
 	"dialog.action_picker.back": "← Back",
 	"dialog.action_picker.capture_key": "Press the key to send, or type its name.",
 	"dialog.action_picker.capture_shortcut": "Press the shortcut to send, or type it.",

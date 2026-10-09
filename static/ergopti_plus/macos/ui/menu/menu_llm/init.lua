@@ -1951,11 +1951,9 @@ local function create_menu(deps)
 
 				-- The tick mirrors the switch; the parent has no action, since a row
 				-- that opens a submenu is never clicked.
-				return {
-						label   = i18n.get("menu.llm.title"),
-						checked = state.llm_enabled or nil,
-						submenu = main_menu
-				}
+				return ManifestMenu.group_row("llm_native_parent", "llm_parent_content", main_menu, {
+					llm_parent_enabled = function() return state.llm_enabled or nil end,
+				})
 		end
 
 		check_startup, startup_scope_idle = StartupCtrl.new({

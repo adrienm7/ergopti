@@ -197,6 +197,7 @@
 	"config_cleanup.intro": "Reveja as definições que o ErgoptiPlus já não utiliza.",
 	"dialog.action_picker.disabled": "∅ Nada",
 	"dialog.action_picker.label": "Ação:",
+	"dialog.action_picker.menu_label": "Ação:…",
 	"dialog.action_picker.back": "← Voltar",
 	"dialog.action_picker.capture_key": "Prima a tecla a enviar ou escreva o seu nome.",
 	"dialog.action_picker.capture_shortcut": "Prima o atalho a enviar ou escreva-o.",

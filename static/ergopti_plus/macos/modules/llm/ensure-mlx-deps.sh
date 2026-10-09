@@ -76,8 +76,16 @@ set -o pipefail 2>/dev/null || true
 
 export HF_HUB_DISABLE_XET=1
 
-# Resolve the driver root independently of the caller's current directory.
-SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+# The native no-Python PTY retains the admitted source as descriptor 3. Its
+# trusted source directory is derived by that native owner before executing
+# the descriptor; ordinary pathname invocations never use the override.
+case "$0" in
+	/dev/fd/3)
+		case "${ERGOPTI_BOOTSTRAP_SCRIPT_DIR:-}" in /*) ;; *) exit 78 ;; esac
+		SCRIPT_DIR="$(cd "$ERGOPTI_BOOTSTRAP_SCRIPT_DIR" && pwd)"
+		;;
+	*) SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)" ;;
+esac
 NETWORK_RETRY_LIB="$SCRIPT_DIR/network-retry.sh"
 UV_RELEASE_FILE="$SCRIPT_DIR/uv-release.sh"
 for dependency_file in "$NETWORK_RETRY_LIB" "$UV_RELEASE_FILE"; do
@@ -289,7 +297,7 @@ install_pinned_uv() {
 	local work wheel digest
 	work="$(mktemp -d "${TMPDIR:-/tmp}/ergopti-uv.XXXXXX")" || return 1
 	wheel="$work/uv.whl"
-	if ! curl_resilient -o "$wheel" "$UV_WHEEL_ARM64_URL" >&2; then
+	if ! managed_bootstrap_download "$UV_WHEEL_ARM64_URL" "$wheel" "$UV_WHEEL_ARM64_SHA256" "" resilient >&2; then
 		rm -rf "$work"
 		return 1
 	fi
@@ -379,6 +387,43 @@ if [ -n "${ERGOPTI_NATIVE_PYTHONS:-}" ]; then
 	IFS="$saved_ifs"
 fi
 
+# Native request staging removes uv's outgoing network dependency. Cached
+# imports still return without staging; explicit environment routes retain the
+# original uv client. The resolved PTY interpreter is also the input helper,
+# never an uninspected PATH Python or the xcode-select shim.
+native_offline_bootstrap() {
+	[ -n "${ERGOPTI_LAUNCHER_EXECUTABLE:-}" ] \
+		&& [ -z "$OPAQUE_NETWORK_INHERITED_HTTPS_ROUTE" ] \
+		&& [ -f "$SCRIPT_DIR/managed_bootstrap_http.py" ] \
+		&& { [ -x "${ERGOPTI_BOOTSTRAP_PYTHON:-}" ] || managed_bootstrap_launcher_available; }
+}
+
+# A fresh Mac needs no preinstalled interpreter to stage the pinned uv runtime.
+# Generated metadata comes from the shared release contract; genuine uv owns
+# the offline hash check, extraction and publication of its Python directory.
+native_install_managed_python_without_python() {
+	local work rc python_path
+	[ -f "$SCRIPT_DIR/managed-python-release.sh" ] || return 78
+	# shellcheck source=/dev/null
+	source "$SCRIPT_DIR/managed-python-release.sh"
+	[ "$MANAGED_PYTHON_UV_RELEASE" = "$UV_RELEASE_VERSION" ] || return 78
+	case "$MANAGED_PYTHON_REQUEST" in cpython-"$PYTHON_VERSION".*-macos-aarch64-none) ;; *) return 78 ;; esac
+	[ -f "$SCRIPT_DIR/$MANAGED_PYTHON_DOWNLOADS_BASENAME" ] || return 78
+	work="$(mktemp -d "${TMPDIR:-/tmp}/ergopti-native-python.XXXXXX")" || return 1
+	if ! managed_bootstrap_download "$MANAGED_PYTHON_URL" "$work/$MANAGED_PYTHON_CACHE_BASENAME" "$MANAGED_PYTHON_SHA256" "" resilient >&2; then
+		rm -rf "$work"
+		return 1
+	fi
+	UV_PYTHON_CACHE_DIR="$work" UV_PYTHON_DOWNLOADS=manual "$UV_BIN" python install "$MANAGED_PYTHON_REQUEST" \
+		--offline --no-config --python-downloads-json-url "$SCRIPT_DIR/$MANAGED_PYTHON_DOWNLOADS_BASENAME" >&2
+	rc=$?
+	rm -rf "$work"
+	[ "$rc" -eq 0 ] || return "$rc"
+	python_path="$("$UV_BIN" python find "$MANAGED_PYTHON_REQUEST" --offline)" || return 1
+	[ -x "$python_path" ] && ! lacks_native_slice "$python_path" || return 1
+	export ERGOPTI_BOOTSTRAP_PYTHON="$python_path"
+}
+
 if [ -n "$SYSTEM_PYTHON" ]; then
 	PYTHON_FOR_VENV="$SYSTEM_PYTHON"
 	export UV_PYTHON_PREFERENCE=only-system
@@ -390,14 +435,26 @@ else
 	# 'uv python find' returns non-zero when no managed interpreter matching
 	# the request is available. In that case we ask uv to download one.
 	if ! "$UV_BIN" python find "$PYTHON_REQUEST" >/dev/null 2>&1; then
-		apply_system_network opaque || exit $?
+		if ! native_offline_bootstrap; then apply_system_network opaque || exit $?; fi
 		emit_marker "PYTHON_INSTALLING"
 		log_info "Téléchargement de Python $PYTHON_VERSION via uv (interpréteur managé)…"
 		# uv prints "Downloading cpython-3.11.x (45 MB)…" on stderr — we forward
 		# it verbatim so the live log shows real download progress. Wrapped in
 		# retry_network so a tethered / throttled connection doesn't fail the
 		# whole bootstrap on a single TCP reset.
-		uv_python_install() { "$UV_BIN" python install "$PYTHON_REQUEST" >&2; }
+		uv_python_install() {
+			if native_offline_bootstrap; then
+				if [ ! -x "${ERGOPTI_BOOTSTRAP_PYTHON:-}" ]; then
+					native_install_managed_python_without_python
+					return $?
+				fi
+				"$ERGOPTI_BOOTSTRAP_PYTHON" "$SCRIPT_DIR/managed_bootstrap_http.py" \
+					--timeout "$CURL_MAX_TIME_SEC" --idle-timeout "$CURL_STALL_SEC" \
+					python-install --uv "$UV_BIN" --request "$PYTHON_REQUEST" >&2
+			else
+				"$UV_BIN" python install "$PYTHON_REQUEST" >&2
+			fi
+		}
 		if ! retry_network uv_python_install; then
 			log_error "Échec du téléchargement de Python $PYTHON_VERSION via uv. Vérifiez votre connexion réseau."
 			exit 1
@@ -462,7 +519,7 @@ if [ "$REPAIR_MODE" = "1" ]; then
 	if ! venv_is_removable; then
 		exit 5
 	fi
-	apply_system_network opaque || exit $?
+	if ! native_offline_bootstrap; then apply_system_network opaque || exit $?; fi
 	for leftover in "$VENV_DIR" "$VENV_DIR".bootstrap.* "$VENV_DIR".rollback.*; do
 		if [ ! -e "$leftover" ] && [ ! -L "$leftover" ]; then
 			continue
@@ -522,7 +579,7 @@ fi
 
 # Admission precedes uv venv (which may fetch Python) and uv sync. A verified
 # cached environment returned above requires no opaque network capability.
-apply_system_network opaque || exit $?
+if ! native_offline_bootstrap; then apply_system_network opaque || exit $?; fi
 
 # Slow path: real work is about to happen. Emit VENV_SYNC_RAN FIRST so the
 # Hammerspoon caller surfaces a "patientez" notification immediately, then
@@ -564,7 +621,9 @@ trap 'exit 143' TERM
 trap 'exit 129' HUP
 
 log_info "Création du virtualenv candidat : $STAGING_VENV"
-if ! "$UV_BIN" venv "$STAGING_VENV" --python "$PYTHON_FOR_VENV" >&2; then
+UV_VENV_COMMAND=("$UV_BIN" venv "$STAGING_VENV" --python "$PYTHON_FOR_VENV")
+if native_offline_bootstrap; then UV_VENV_COMMAND+=(--offline --no-python-downloads); fi
+if ! "${UV_VENV_COMMAND[@]}" >&2; then
 	log_error "Impossible de créer le virtualenv candidat via 'uv venv'."
 	exit 1
 fi
@@ -589,6 +648,15 @@ if [ "$REPAIR_MODE" = "1" ]; then
 	UV_SYNC_REPAIR_FLAG="--refresh"
 fi
 uv_deps_sync() {
+	if native_offline_bootstrap; then
+		# The actual candidate interpreter supplies its PEP 425/508 platform
+		# tags. All selected locked wheels cross the native request owner, then
+		# uv consumes their hashes offline; the original imports judge them.
+		"$STAGING_VENV/bin/python" "$SCRIPT_DIR/managed_bootstrap_http.py" \
+			--timeout "$CURL_MAX_TIME_SEC" --idle-timeout "$CURL_STALL_SEC" \
+			sync --uv "$UV_BIN" --project "$HS_ROOT" --python "$STAGING_VENV/bin/python" >&2
+		return $?
+	fi
 	# $UV_SYNC_FROZEN_FLAG is "--frozen" in bundle mode (read-only .app) so uv
 	# reads the committed lock file without attempting to rewrite it.
 	# shellcheck disable=SC2086

@@ -318,6 +318,29 @@ function checkCiBody(modules) {
 		`CI must emit every section the splitter knows, in order (got ${markers.join(', ')})`
 	);
 
+	// Replay the actual policy publisher, retaining explicit unqualified labels.
+	const qualification = require('../../.github/ci/dev_release_qualification_exceptions.json');
+	const qualifiedBody = buildCiBody(
+		{ ...env, TAG: qualification.tag, VERSION: qualification.version },
+		CHANGELOG_MD
+	);
+	const qualifiedParts = modules.splitReleaseBody(qualifiedBody);
+	expect(qualifiedParts.format === 'marked', 'the exception body must retain every section marker');
+	expect(
+		qualifiedParts.footer.includes('Deferred checks are not passes'),
+		'the real publisher must disclose unqualified native checks'
+	);
+	for (const [scope, record] of Object.entries(qualification.scopes)) {
+		expect(
+			qualifiedParts.footer.includes(scope + ':** ' + record.reason),
+			'the actual body must retain each deferred scope and reason'
+		);
+	}
+	expect(
+		!body.includes('Native validation limitations'),
+		'ordinary release tags must not inherit a foreign qualification exception'
+	);
+
 	// Without a changelog file the step still writes a marked, valid body.
 	const bare = modules.splitReleaseBody(buildCiBody(env, ''));
 	expect(

@@ -120,6 +120,38 @@ function Assert-OwnedFixtureRootScope {
     }
 }
 Assert-OwnedFixtureRootScope $OwnedRootStoreScope
+function Invoke-OwnedRootSnapshot {
+    param($Store, [string]$Thumbprint, [string]$Subject, [bool]$Remove = $false)
+    # Store.Close retires the store handle, not independently acquired wrappers.
+    $Snapshot = $Store.Certificates
+    $PrimaryFailure = $null
+    try {
+        $Found = @($Snapshot | Where-Object { $_.Thumbprint -ceq $Thumbprint })
+        if ($Found.Count -gt 1) { throw 'Ambiguous owned certificate identity.' }
+        foreach ($Certificate in $Found) {
+            if ($Certificate.Subject -cne $Subject) { throw 'Owned certificate subject changed.' }
+            if ($Remove) { $Store.Remove($Certificate) }
+        }
+        return $Found.Count
+    } catch {
+        $PrimaryFailure = $_
+        throw
+    } finally {
+        $ReleaseFailed = $false
+        foreach ($Certificate in $Snapshot) {
+            try { $Certificate.Dispose() }
+            catch { $ReleaseFailed = $true }
+        }
+        if ($ReleaseFailed) {
+            if ($null -eq $PrimaryFailure) {
+                throw [InvalidOperationException]::new('Owned certificate snapshot retirement was refused.')
+            }
+            # Retain the original admission failure and disclose its cleanup debt
+            # only as a typed fact, without serializing any certificate bytes.
+            $PrimaryFailure.Exception.Data['OwnedRootSnapshotRetirementDebt'] = $true
+        }
+    }
+}
 function Remove-OwnedRoot([string]$Thumbprint, [string]$Subject, [string]$Scope) {
     Assert-OwnedFixtureRootScope $Scope
     if ($Thumbprint -cnotmatch '^[0-9A-F]{40}$' -or $Subject -cnotmatch '^CN=ErgoptiPlus managed-network fixture [0-9a-f]{32}$') {
@@ -128,16 +160,11 @@ function Remove-OwnedRoot([string]$Thumbprint, [string]$Subject, [string]$Scope)
     $Store = [Security.Cryptography.X509Certificates.X509Store]::new('Root', $Scope)
     try {
         $Store.Open([Security.Cryptography.X509Certificates.OpenFlags]::ReadWrite)
-        $Found = @($Store.Certificates | Where-Object { $_.Thumbprint -ceq $Thumbprint })
-        if ($Found.Count -gt 1) { throw 'Ambiguous owned certificate identity.' }
-        foreach ($Certificate in $Found) {
-            if ($Certificate.Subject -cne $Subject) { throw 'Owned certificate subject changed.' }
-            $Store.Remove($Certificate)
-        }
+        $null = Invoke-OwnedRootSnapshot $Store $Thumbprint $Subject $true
     } finally { $Store.Close() }
     $Store.Open([Security.Cryptography.X509Certificates.OpenFlags]::ReadOnly)
     try {
-        if (@($Store.Certificates | Where-Object { $_.Thumbprint -ceq $Thumbprint }).Count -ne 0) {
+        if ((Invoke-OwnedRootSnapshot $Store $Thumbprint $Subject) -ne 0) {
             throw 'Owned declared-scope root removal was not acknowledged.'
         }
     } finally { $Store.Close(); $Store.Dispose() }
@@ -159,7 +186,7 @@ $Fixture = $null
 $Events = @()
 $RootInstalled = $false
 $State = @{ version = 1; state = 'starting'; phase = 'untrusted'; sequence = 0;
-    root_store_scope = $OwnedRootStoreScope; root_removed = $false; service_stopped = $false }
+    root_store_scope = $OwnedRootStoreScope; root_install_stage = 'none'; root_removed = $false; service_stopped = $false }
 function Publish-State {
     param([string]$TrustStep = '')
     if ($TrustStep -ne '') {
@@ -182,6 +209,16 @@ function Publish-State {
         $State.server_tls_owned_modules = $Fixture.NativeTls.OwnedModuleReferences
         $State.server_tls_owned_source_fences = $Fixture.NativeTls.OwnedSourceFences
         $State.server_tls_owned_streams = $Fixture.NativeTls.OwnedStreams
+        try {
+        $Closed = $Fixture.NativeTls.ReadClosedStream()
+        if ($null -ne $Closed) {
+            $State.tls_close_sequence=$Closed.Sequence; $State.tls_close_called=$Closed.ShutdownCalled
+            $State.tls_close_result=$Closed.ShutdownResult; $State.tls_close_error=$Closed.ShutdownError
+            $State.tls_close_received=$Closed.Received; $State.tls_close_written=$Closed.Written
+            $State.tls_close_close_written=$Closed.CloseWritten; $State.tls_close_pending=$Closed.Pending
+            $State.tls_close_network_closed=$Closed.NetworkClosed
+        }
+        } catch { } # New observation cannot suppress prior service failure facts.
         $Fact = $Fixture.ReadServiceFailure()
         if ($Fact.Stage -cne 'none') {
             $State.service_failure_stage = $Fact.Stage
@@ -336,6 +373,29 @@ public sealed class ErgoptiFixtureOpenSsl : IDisposable
     public int OwnedModuleReferences { get { return (sslModule != IntPtr.Zero ? 1 : 0) + (cryptoModule != IntPtr.Zero ? 1 : 0); } }
     public int OwnedSourceFences { get { return images.Count; } }
     public int OwnedStreams { get { lock (gate) return streams; } }
+    public sealed class ClosedStreamFact {
+        public readonly int Sequence, ShutdownCalled, ShutdownResult, ShutdownError;
+        public readonly int Received, Written, CloseWritten, Pending, NetworkClosed;
+        public ClosedStreamFact(int sequence, int called, int result, int error, int received,
+            int written, int closeWritten, int pending, int networkClosed) {
+            Sequence=sequence; ShutdownCalled=called; ShutdownResult=result; ShutdownError=error;
+            Received=received; Written=written; CloseWritten=closeWritten; Pending=pending; NetworkClosed=networkClosed;
+        }
+    }
+    private ClosedStreamFact closedStream;
+    public ClosedStreamFact ReadClosedStream() { lock (gate) return closedStream; }
+    private void ObserveClosedStream(int called, int result, int error, int received,
+        int written, int closeWritten, int pending, bool networkClosed) {
+        // A failed close is unavailable, never a fabricated physical acknowledgement.
+        if (!networkClosed) return;
+        try { lock (gate) {
+            int sequence=closedStream==null ? 1 : Math.Min(closedStream.Sequence, 65534)+1;
+            closedStream=new ClosedStreamFact(sequence,called,result,error,received,written,closeWritten,pending,1);
+        } } catch { /* Optional observation cannot replace original retirement or failure. */ }
+    }
+    private static int AddObservedBytes(int total, int count) {
+        return count > Int32.MaxValue-total ? Int32.MaxValue : total+count;
+    }
 
     private static string Hex(byte[] bytes)
     {
@@ -633,6 +693,7 @@ public sealed class ErgoptiFixtureOpenSsl : IDisposable
         private readonly byte[] encrypted = new byte[16384];
         private bool disposed;
         private bool authenticated;
+        private int receivedEncrypted, writtenEncrypted;
         public NativeStream(ErgoptiFixtureOpenSsl owner, NetworkStream network, Func<bool> trustAdmitted)
         {
             if (network == null || trustAdmitted == null) throw new ArgumentNullException();
@@ -667,6 +728,7 @@ public sealed class ErgoptiFixtureOpenSsl : IDisposable
                     if (count > encrypted.Length || total > 1048576 - count)
                         throw new InvalidDataException("Native TLS encrypted output ceiling refused.");
                     network.Write(encrypted, 0, count);
+                    writtenEncrypted=AddObservedBytes(writtenEncrypted,count);
                     total += count;
                 }
             } finally { pin.Free(); Array.Clear(encrypted, 0, encrypted.Length); }
@@ -675,6 +737,7 @@ public sealed class ErgoptiFixtureOpenSsl : IDisposable
         {
             int count = network.Read(encrypted, 0, encrypted.Length);
             if (count <= 0) throw new EndOfStreamException("Owned TLS peer closed before protocol completion.");
+            receivedEncrypted=AddObservedBytes(receivedEncrypted,count);
             System.Runtime.InteropServices.GCHandle pin = System.Runtime.InteropServices.GCHandle.Alloc(encrypted, System.Runtime.InteropServices.GCHandleType.Pinned);
             try {
                 if (Owner.bioWrite(input, pin.AddrOfPinnedObject(), count) != count)
@@ -757,23 +820,47 @@ public sealed class ErgoptiFixtureOpenSsl : IDisposable
         {
             if (disposed) return;
             if (disposing) {
+                int shutdownCalled=0, shutdownResult=0, shutdownError=0, closeWritten=0, pending=-1;
+                bool networkClosed=false;
                 try {
                     if (authenticated && ssl != IntPtr.Zero) {
-                        Owner.clearError();
-                        int result = Owner.shutdown(ssl);
-                        int error = result < 0 ? Owner.sslError(ssl, result) : 0;
-                        if (result < 0 && error != 2 && error != 3 && error != 6)
-                            throw new InvalidOperationException("Native TLS close notification refused.");
-                        // Send close_notify once; never wait for a peer during retirement.
-                        Drain();
+                        int priorWritten=writtenEncrypted;
+                        try {
+                            bool settled=false, receivedInput=false;
+                            for (int attempts=0; attempts<512; attempts++) {
+                                Owner.clearError();
+                                int result=Owner.shutdown(ssl);
+                                int error=result<0 ? Owner.sslError(ssl,result) : 0;
+                                shutdownCalled=1; shutdownResult=result; shutdownError=error;
+                                if (result<0 && error!=2 && error!=3 && error!=6)
+                                    throw new InvalidOperationException("Native TLS close notification refused.");
+                                int written=Drain();
+                                if (result==1 || error==6) { settled=true; break; }
+                                // The first zero sends our alert. Let TLS inspect its existing BIO before closing.
+                                if (result==0 && attempts==0) continue;
+                                // Admit at most one existing encrypted buffer; readable peer data cannot renew retirement.
+                                if ((result==0 || error==2) && !receivedInput && network.DataAvailable) {
+                                    Receive(); receivedInput=true; continue;
+                                }
+                                if (error==3 && written>0) continue;
+                                settled=true; break;
+                            }
+                            if (!settled) throw new InvalidDataException("Native TLS shutdown progress ceiling exceeded.");
+                        } finally {
+                            closeWritten=writtenEncrypted==Int32.MaxValue ? -1 : writtenEncrypted-priorWritten;
+                        }
                     }
                 } finally {
                     if (ssl != IntPtr.Zero) { Owner.sslFree(ssl); ssl = input = output = IntPtr.Zero; }
-                    try { network.Dispose(); }
+                    // Read only this existing stream; refusal remains explicitly unavailable.
+                    try { pending=network.DataAvailable ? 1 : 0; } catch { }
+                    try { network.Dispose(); networkClosed=true; }
                     finally {
                         Array.Clear(encrypted, 0, encrypted.Length);
                         lock (Owner.gate) Owner.streams--;
                         disposed = true;
+                        Owner.ObserveClosedStream(shutdownCalled,shutdownResult,shutdownError,
+                            receivedEncrypted,writtenEncrypted,closeWritten,pending,networkClosed);
                     }
                 }
             }
@@ -860,6 +947,7 @@ public sealed class ErgoptiManagedRemoteFixture : IDisposable
     public int DownloadWrongDigest;
     public int DownloadTruncated;
     public int DownloadSlow;
+    public int DownloadCurlSlow;
     public int DownloadCredentials;
     public int SecondProxyConnects;
     public int ProxyRefusals;
@@ -1064,6 +1152,14 @@ public sealed class ErgoptiManagedRemoteFixture : IDisposable
         } else if (first == "GET /updater/truncated HTTP/1.1") {
             Interlocked.Increment(ref DownloadTruncated);
             Status(tls, "200 OK", "", new byte[32], 524288);
+        } else if (first == "GET /updater/curl-slow HTTP/1.1") {
+            Interlocked.Increment(ref DownloadCurlSlow);
+            byte[] headerBytes = Encoding.ASCII.GetBytes("HTTP/1.1 200 OK\r\nConnection: close\r\nContent-Length: 524288\r\n\r\n");
+            tls.Write(headerBytes, 0, headerBytes.Length); tls.Flush();
+            byte[] part = new byte[1024];
+            for (int index = 0; index < 512 && !stopping; index++) {
+                tls.Write(part, 0, part.Length); tls.Flush(); Thread.Sleep(100);
+            }
         } else if (first == "GET /updater/slow HTTP/1.1") {
             Interlocked.Increment(ref DownloadSlow);
             byte[] headerBytes = Encoding.ASCII.GetBytes("HTTP/1.1 200 OK\r\nConnection: close\r\nContent-Length: 524288\r\n\r\n");
@@ -1176,31 +1272,39 @@ public sealed class ErgoptiManagedRemoteFixture : IDisposable
     while ([DateTime]::UtcNow -lt $Deadline) {
         $Choice = [Threading.WaitHandle]::WaitAny([Threading.WaitHandle[]]$Events, 1000)
         if ($Choice -eq 0) {
+            $State.root_install_stage = 'create_store'
             Publish-State -TrustStep 'event_received'
             $Store = [Security.Cryptography.X509Certificates.X509Store]::new('Root', $OwnedRootStoreScope)
             try {
+                $State.root_install_stage = 'open_store'
                 Publish-State -TrustStep 'before_open'
                 $Store.Open([Security.Cryptography.X509Certificates.OpenFlags]::ReadWrite)
+                $State.root_install_stage = 'verify_absent'
                 Publish-State -TrustStep 'before_enumeration'
-                if (@($Store.Certificates | Where-Object { $_.Thumbprint -ceq $State.root_thumbprint }).Count -ne 0) {
+                if ((Invoke-OwnedRootSnapshot $Store $State.root_thumbprint $State.root_subject) -ne 0) {
                     throw 'Unique owned root already existed before admission.'
                 }
+                $State.root_install_stage = 'export_public'
                 Publish-State -TrustStep 'before_export'
                 $PublicRoot = [Security.Cryptography.X509Certificates.X509Certificate2]::new($Fixture.Root.Export([Security.Cryptography.X509Certificates.X509ContentType]::Cert))
                 try {
+                    $State.root_install_stage = 'add_root'
                     Publish-State -TrustStep 'before_add'
                     $Store.Add($PublicRoot)
                     Publish-State -TrustStep 'after_add'
                 } finally { $PublicRoot.Dispose() }
                 $RootInstalled = $true
+                $State.root_install_stage = 'verify_present'
                 Publish-State -TrustStep 'before_postcheck'
-                if (@($Store.Certificates | Where-Object { $_.Thumbprint -ceq $State.root_thumbprint }).Count -ne 1) {
+                if ((Invoke-OwnedRootSnapshot $Store $State.root_thumbprint $State.root_subject) -ne 1) {
                     throw 'Unique owned root installation was not acknowledged.'
                 }
                 # Keep the original finally ownership and exception priority.
+                $State.root_install_stage = 'close_store'
                 Publish-State -TrustStep 'before_close'
             } finally { $Store.Close(); $Store.Dispose() }
             $Fixture.TrustAdmitted = $true
+            $State.root_install_stage = 'complete'
             $State.phase = 'trusted'
         } elseif ($Choice -eq 1) {
             Remove-OwnedRoot $State.root_thumbprint $State.root_subject $OwnedRootStoreScope
@@ -1210,7 +1314,7 @@ public sealed class ErgoptiManagedRemoteFixture : IDisposable
             $State.phase = 'removed'
         } elseif ($Choice -eq 3) { break }
         if ($Choice -ne [Threading.WaitHandle]::WaitTimeout) {
-            foreach ($Counter in @('Requests','Generations','ReadyRequests','ProxyConnects','PacRequests','CrlRequests','FailedTls','ServiceFailures','ClosedConnections','DownloadRequests','DownloadRedirects','DownloadGood','DownloadOrigin401','DownloadOrigin403','DownloadSmall','DownloadWrongDigest','DownloadTruncated','DownloadSlow','DownloadCredentials','SecondProxyConnects','ProxyRefusals','BasicCredentials')) {
+            foreach ($Counter in @('Requests','Generations','ReadyRequests','ProxyConnects','PacRequests','CrlRequests','FailedTls','ServiceFailures','ClosedConnections','DownloadRequests','DownloadRedirects','DownloadGood','DownloadOrigin401','DownloadOrigin403','DownloadSmall','DownloadWrongDigest','DownloadTruncated','DownloadSlow','DownloadCurlSlow','DownloadCredentials','SecondProxyConnects','ProxyRefusals','BasicCredentials')) {
                 $State[$Counter] = $Fixture.$Counter
             }
             Publish-State

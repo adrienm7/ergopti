@@ -54,8 +54,9 @@
  * 4. One root, one lane per OS: ci.yml has exactly one job without needs, the
  *    root; each lane caller needs the root alone; release needs the root and
  *    core and the three lanes, nothing else. Each OS exposes the same five
- *    phases with exactly one entry and one final verdict. macOS also observes
- *    its native tooltip canvas independently after E2E and before the verdict.
+ *    phases and one final verdict. Windows/Linux keep one entry; macOS has
+ *    exactly three entries for unit tests and independent mandatory managed
+ *    Ollama/cold bootstrap jobs, and observes its native tooltip canvas after E2E.
  * 5. Only the steps in STEP_CONDITIONS set an `if`, each exactly its own, and
  *    e2e-linux's harnesses run under !cancelled(). No script swallows a test
  *    runner's failure with `|| true`, and every `| tee` runs under pipefail.
@@ -86,6 +87,16 @@ const MACOS_BOX = '.github/workflows/ci-macos.yml';
 const WINDOWS_BOX = '.github/workflows/ci-windows.yml';
 const LINUX_BOX = '.github/workflows/ci-linux.yml';
 const BOXES = [MACOS_BOX, WINDOWS_BOX, LINUX_BOX];
+const MACOS_NATIVE_ENTRIES = ['managed-ollama-native', 'cold-bootstrap-native'];
+const MACOS_VERDICT_NEEDS = [
+	'cold-bootstrap-native',
+	'test-hs',
+	'e2e-hs',
+	'package-macos',
+	'launch',
+	'tooltip-canvas',
+	'managed-ollama-native'
+];
 // The run graph's single root: the repository-wide checks, then the release
 // plan every lane and release read.
 const ROOT = 'validate';
@@ -166,7 +177,87 @@ const PLAN_STEPS = ['Load the Linux release artifact contract', 'Compute tag and
 // The only steps of the pipeline that may set an `if`, each with its only
 // accepted value. Every other step runs whenever its job runs, so no edit can
 // skip a gate while its job stays green.
+const MACOS_NATIVE_STEP_CONDITIONS = [
+	[
+		MACOS_BOX,
+		'managed-ollama-native',
+		'Qualify actual native PAC and WPAD XCTest controls',
+		NOT_CANCELLED
+	],
+	[
+		MACOS_BOX,
+		'managed-ollama-native',
+		'Retain independent native PAC XCTest diagnostics',
+		'always()'
+	],
+	[MACOS_BOX, 'item36-native', 'Retain scoped item 36 native diagnostics', 'always()'],
+	[
+		MACOS_BOX,
+		'managed-ollama-native',
+		'Qualify actual explicit curl stream ownership',
+		'${{ !cancelled() }}'
+	],
+	[
+		MACOS_BOX,
+		'managed-ollama-native',
+		'Receive actual independent managed HTTP native clients',
+		'${{ !cancelled() }}'
+	],
+	[
+		MACOS_BOX,
+		'managed-ollama-native',
+		'Upload the actual managed native release asset',
+		'inputs.release'
+	],
+	[
+		MACOS_BOX,
+		'package-macos',
+		'Upload the catalogue sealed into the signed application',
+		'inputs.release'
+	],
+	[
+		MACOS_BOX,
+		'managed-ollama-native',
+		'Retain independent native launcher compiler diagnostics',
+		'always()'
+	],
+	[
+		MACOS_BOX,
+		'managed-ollama-native',
+		'Retain independent native SDK XCTest diagnostics',
+		'always()'
+	],
+	[
+		MACOS_BOX,
+		'managed-ollama-native',
+		'Retain actual private-session and numeric TLS peer diagnostics',
+		'always()'
+	],
+	[
+		MACOS_BOX,
+		'managed-ollama-native',
+		'Retain actual native producer, catalogue and receiving evidence',
+		'always()'
+	],
+	[MACOS_BOX, 'package-macos', 'Retain launcher build diagnostics', 'always()'],
+	[MACOS_BOX, 'package-macos', 'Retain application build diagnostics', 'always()'],
+	[
+		MACOS_BOX,
+		'cold-bootstrap-native',
+		'Receive actual official cold Ollama without stock Python',
+		"${{ !cancelled() && steps.cold-app.outcome == 'success' }}"
+	],
+	[MACOS_BOX, 'cold-bootstrap-native', 'Retain official cold Ollama receipt only', 'always()'],
+	[MACOS_BOX, 'cold-bootstrap-native', 'Retain native cold bootstrap evidence', 'always()']
+];
 const STEP_CONDITIONS = [
+	...MACOS_NATIVE_STEP_CONDITIONS,
+	[
+		WINDOWS_BOX,
+		'test-ahk',
+		'Retain native PAC artifact and source identity',
+		"${{ always() && steps.native-pac-build.outcome == 'success' }}"
+	],
 	[
 		LINUX_BOX,
 		'test-linux',
@@ -930,10 +1021,18 @@ function graphProblems(files) {
 			[WINDOWS_BOX]: ['test-ahk', 'e2e-ahk', 'package-windows', 'launch-windows', 'windows-ok'],
 			[LINUX_BOX]: ['test-linux', 'e2e-linux', 'package-linux', 'install-linux', 'linux-ok']
 		}[rel];
-		// Preserve the five original phases and add exactly one independent native observation.
+		// Preserve the five original phases and require each independent native job.
 		const exposed =
 			rel === MACOS_BOX
-				? [...sequence.slice(0, 2), 'tooltip-canvas', ...sequence.slice(2)]
+				? [
+						'item36-native',
+						'managed-ollama-native',
+						...sequence.slice(0, 2),
+						'tooltip-canvas',
+						...sequence.slice(2, 4),
+						'cold-bootstrap-native',
+						sequence[4]
+					]
 				: sequence;
 		if (JSON.stringify(jobs.map((job) => job.id)) !== JSON.stringify(exposed)) {
 			problems.push(
@@ -946,8 +1045,12 @@ function graphProblems(files) {
 				index === 0
 					? []
 					: index === 4
-						? [...sequence.slice(0, 4), ...(rel === MACOS_BOX ? ['tooltip-canvas'] : [])]
-						: [sequence[index - 1]];
+						? rel === MACOS_BOX
+							? MACOS_VERDICT_NEEDS
+							: sequence.slice(0, 4)
+						: rel === MACOS_BOX && id === 'package-macos'
+							? ['e2e-hs', 'managed-ollama-native']
+							: [sequence[index - 1]];
 			if (!job || JSON.stringify(pipeline.needsOf(job.body)) !== JSON.stringify(expected)) {
 				problems.push(`${rel} ${id} must need exactly ${expected.join(', ')}`);
 			}
@@ -964,6 +1067,30 @@ function graphProblems(files) {
 			}
 		}
 		if (rel === MACOS_BOX) {
+			const scoped = jobs.find((candidate) => candidate.id === 'item36-native');
+			if (
+				!scoped ||
+				pipeline.needsOf(scoped.body).length !== 0 ||
+				pipeline.field(scoped.body, 'if') !==
+					"${{ github.event_name == 'workflow_dispatch' && !inputs.release }}" ||
+				pipeline.field(scoped.body, 'continue-on-error') !== null ||
+				pipeline.field(scoped.body, 'outputs') !== null ||
+				pipeline.field(scoped.body, 'secrets') !== null
+			)
+				problems.push(
+					'item36-native must retain its independent manual nonrelease diagnosis boundary'
+				);
+			for (const id of MACOS_NATIVE_ENTRIES) {
+				const native = jobs.find((candidate) => candidate.id === id);
+				if (!native || pipeline.needsOf(native.body).length !== 0) {
+					problems.push(`${rel} ${id} must remain an independent entry`);
+				}
+				for (const key of ['if', 'continue-on-error']) {
+					if (native && pipeline.field(native.body, key) !== null) {
+						problems.push(`${rel} ${id} must set no ${key}; native qualification is mandatory`);
+					}
+				}
+			}
 			const canvas = jobs.find((candidate) => candidate.id === 'tooltip-canvas');
 			if (!canvas || JSON.stringify(pipeline.needsOf(canvas.body)) !== JSON.stringify(['e2e-hs'])) {
 				problems.push(`${rel} tooltip-canvas must need exactly e2e-hs`);
@@ -982,14 +1109,31 @@ function graphProblems(files) {
 		const exits = jobs
 			.filter((candidate) => !needed.has(candidate.id))
 			.map((candidate) => candidate.id);
-		if (entries.length !== 1) {
+		if (rel === MACOS_BOX) {
+			const expectedEntries = [
+				'item36-native',
+				'managed-ollama-native',
+				'test-hs',
+				'cold-bootstrap-native'
+			];
+			if (JSON.stringify(entries) !== JSON.stringify(expectedEntries)) {
+				problems.push(
+					`${rel} must have exactly the four declared entries [${expectedEntries.join(', ')}]; got [${entries.join(', ')}]`
+				);
+			}
+		} else if (entries.length !== 1) {
 			problems.push(
 				`${rel} must have exactly one entry job, which needs no job of its file; got [${entries.join(', ')}]`
 			);
 		}
-		if (exits.length !== 1) {
+		const expectedExits = rel === MACOS_BOX ? ['item36-native', 'macos-ok'] : [sequence[4]];
+		if (
+			rel === MACOS_BOX
+				? JSON.stringify(exits) !== JSON.stringify(expectedExits)
+				: exits.length !== 1
+		) {
 			problems.push(
-				`${rel} must have exactly one exit job, which no job of its file needs; got [${exits.join(', ')}]`
+				`${rel} must preserve exactly its declared verdict and scoped diagnostic exits; got [${exits.join(', ')}]`
 			);
 		}
 		for (const [id, needs] of needsOfJob) {
@@ -1004,11 +1148,7 @@ function graphProblems(files) {
 
 for (const [what, from, to] of [
 	['missing mandatory canvas graph node', '  tooltip-canvas:\n', '  omitted-tooltip-canvas:\n'],
-	[
-		'canvas bypassed by the macOS verdict',
-		'    needs: [test-hs, e2e-hs, package-macos, launch, tooltip-canvas]\n',
-		'    needs: [test-hs, e2e-hs, package-macos, launch]\n'
-	],
+	['canvas bypassed by the macOS verdict', '      - tooltip-canvas\n', ''],
 	[
 		'canvas depends on packaging instead of native E2E',
 		"  tooltip-canvas:\n    name: 'Native tooltip canvas · 12 captures'\n    needs: e2e-hs\n",
@@ -1019,6 +1159,50 @@ for (const [what, from, to] of [
 	mustCatch(what, MACOS_BOX, from, to, graphProblems);
 }
 
+mustCatch(
+	'native producer omitted from application packaging',
+	MACOS_BOX,
+	'    needs: [e2e-hs, managed-ollama-native]\n',
+	'    needs: e2e-hs\n',
+	graphProblems
+);
+
+// Both independent native entries must feed the verdict and must never become optional.
+for (const id of MACOS_NATIVE_ENTRIES) {
+	for (const [what, from, to] of [
+		['missing native graph node', `  ${id}:\n`, `  omitted-${id}:\n`],
+		['native job bypassed by verdict', `      - ${id}\n`, ''],
+		['conditional native job', `  ${id}:\n`, `  ${id}:\n    if: false\n`],
+		['forgiven native job', `  ${id}:\n`, `  ${id}:\n    continue-on-error: true\n`],
+		['native job coupled to packaging', `  ${id}:\n`, `  ${id}:\n    needs: package-macos\n`]
+	]) {
+		mustCatch(`${id}: ${what}`, MACOS_BOX, from, to, graphProblems);
+	}
+}
+for (const [what, from, to] of [
+	['missing scoped item36 node', '  item36-native:\n', '  omitted-item36-native:\n'],
+	[
+		'coupled scoped item36 entry',
+		'  item36-native:\n',
+		'  item36-native:\n    needs: package-macos\n'
+	],
+	[
+		'forgiven scoped item36 failure',
+		'  item36-native:\n',
+		'  item36-native:\n    continue-on-error: true\n'
+	],
+	[
+		'broad scoped item36 admission',
+		"    if: ${{ github.event_name == 'workflow_dispatch' && !inputs.release }}\n",
+		'    if: always()\n'
+	],
+	[
+		'unqualified scoped item36 release output',
+		'  item36-native:\n',
+		'  item36-native:\n    outputs:\n      assets: fake\n'
+	]
+])
+	mustCatch(what, MACOS_BOX, from, to, graphProblems);
 errors.push(...graphProblems(pipeline.files()));
 for (const [what, rel, from, to] of [
 	[
@@ -1438,6 +1622,41 @@ mustCatch(
 	'      - name: Omitted Configuration assertion diagnostic\n',
 	stepProblems
 );
+// Each new native evidence condition is exact, scoped to its job and source-owned step.
+for (const [rel, job, name, condition] of MACOS_NATIVE_STEP_CONDITIONS) {
+	const head = `      - name: ${name}\n`;
+	const from = head + `        if: ${condition}\n`;
+	for (const changed of ['', 'false', 'success()']) {
+		mustCatch(
+			`${job} ${name}: replaced native evidence condition ${changed || '(none)'}`,
+			rel,
+			from,
+			head + (changed ? `        if: ${changed}\n` : ''),
+			stepProblems
+		);
+	}
+	mustCatch(
+		`${job} ${name}: missing native evidence step`,
+		rel,
+		head,
+		`      - name: Omitted ${name}\n`,
+		stepProblems
+	);
+}
+const officialColdHead = '      - name: Receive actual official cold Ollama without stock Python\n';
+for (const condition of [
+	'always()',
+	'${{ !cancelled() }}',
+	"${{ !cancelled() && steps.cold-app.outcome != 'failure' }}"
+]) {
+	mustCatch(
+		'official cold runtime receiver broadened admission ' + condition,
+		MACOS_BOX,
+		officialColdHead + "        if: ${{ !cancelled() && steps.cold-app.outcome == 'success' }}\n",
+		officialColdHead + `        if: ${condition}\n`,
+		stepProblems
+	);
+}
 // Upload only closed receipts: the owned script corpus contains newline names,
 // and recursively uploading its private fixture tree also exposes unnecessary data.
 const NATIVE_INVENTORY_ARTIFACT = 'Retain native Hammerspoon provider inventory';
@@ -2888,13 +3107,14 @@ const directDistroUnitStep =
 	'        shell: bash\n        run: |\n          ' +
 	DISTRO_UNIT_COMMAND +
 	'\n';
-const directDistroFiles = pipeline
-	.files()
-	.map((entry) =>
-		entry.rel === LINUX_BOX
-			? { ...entry, text: entry.text.replace(distroUnitBody, directDistroUnitStep) }
-			: entry
-	);
+const directDistroFiles = pipeline.files().map((entry) =>
+	entry.rel === LINUX_BOX
+		? {
+				...entry,
+				text: entry.text.replace(distroUnitBody, directDistroUnitStep)
+			}
+		: entry
+);
 assert.deepEqual(
 	distroUnitProblems(directDistroFiles),
 	[],
@@ -3232,7 +3452,10 @@ assert.ok(
 	'physical renderer before layer renderer must refuse'
 );
 for (const changed of [undefined, 'node ./tools/test/browser/layer-editor.playwright.cjs']) {
-	const scripts = { ...PHYSICAL_BROWSER_SCRIPTS, [PHYSICAL_BROWSER_ALIAS]: changed };
+	const scripts = {
+		...PHYSICAL_BROWSER_SCRIPTS,
+		[PHYSICAL_BROWSER_ALIAS]: changed
+	};
 	assert.ok(
 		physicalBrowserProblems(pipeline.files(), scripts).length > 0,
 		'missing or redirected physical browser alias must refuse'
@@ -3363,7 +3586,7 @@ if (errors.length > 0) {
 }
 
 console.log(
-	`[OK] one root (${ROOT}) with ${planOutputs.size} plan outputs, ${callers.length} lane callers with one ` +
-		`entry and one exit job each, and ${gatedSecrets} release-only secrets are wired as designed, ` +
+	`[OK] one root (${ROOT}) with ${planOutputs.size} plan outputs, ${callers.length} lane callers with ` +
+		`three mandatory macOS entries plus one manual diagnostic, one Windows/Linux entry and the declared exits, and ${gatedSecrets} release-only secrets are wired as designed, ` +
 		`${CONDITIONS.size} conditional steps are the only ones, and the release preflight runs before any side effect.`
 );

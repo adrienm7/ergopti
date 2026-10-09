@@ -16,7 +16,7 @@ function readArchiveCount(text) {
 }
 const FOLLOWUP =
 	'[OK] Linux archive snapshot: 5 controls passed; 0 skipped; actual private Git snapshots only.\n' +
-	'[OK] Linux CONNECT terminal protocol: 5 controls passed; 0 skipped; modeled socket/select only.\n';
+	'[OK] Linux CONNECT terminal protocol: 9 controls passed; 0 skipped; modeled socket/select only.\n';
 function readSourceCounts(text) {
 	// Preserve the exact old twelve-control receipt, and admit only the explicit
 	// whole extension. Separate mandatory readers below require the extension.
@@ -34,7 +34,7 @@ function readFollowupCounts(text) {
 		'[OK] Linux archive source crypto: 8 controls passed; 0 skipped; controlled metadata only.\n' +
 		'[OK] Linux archive source bin parents: 4 controls passed; 0 skipped; filesystem guards only.\n';
 	if (text !== original + FOLLOWUP) refuse();
-	return { snapshot: 5, connect: 5 };
+	return { snapshot: 5, connect: 9 };
 }
 function readRegular(filename) {
 	const before = fs.lstatSync(filename, { bigint: true });

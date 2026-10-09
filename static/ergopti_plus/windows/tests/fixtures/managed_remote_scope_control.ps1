@@ -6,13 +6,14 @@ $Tokens = $null
 $Errors = $null
 $Ast = [Management.Automation.Language.Parser]::ParseFile($SourcePath, [ref]$Tokens, [ref]$Errors)
 if ($Errors.Count -ne 0) { throw 'The root-scope producer source did not parse.' }
-foreach ($Name in @('Get-OwnedFixtureTokenElevation', 'Assert-OwnedFixtureRootScope', 'Remove-OwnedRoot')) {
+foreach ($Name in @('Get-OwnedFixtureTokenElevation', 'Assert-OwnedFixtureRootScope', 'Invoke-OwnedRootSnapshot', 'Remove-OwnedRoot')) {
     $Functions = @($Ast.FindAll({ param($Node)
         $Node -is [Management.Automation.Language.FunctionDefinitionAst] -and $Node.Name -ceq $Name
     }, $true))
     if ($Functions.Count -ne 1) { throw 'The actual root-scope guard was not uniquely found.' }
     . ([scriptblock]::Create($Functions[0].Extent.Text))
 }
+& (Join-Path $PSScriptRoot 'managed_remote_snapshot_control.ps1') -SourcePath $SourcePath
 $SavedActions = $env:GITHUB_ACTIONS
 $SavedRunner = $env:RUNNER_ENVIRONMENT
 $script:Reads = 0
