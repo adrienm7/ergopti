@@ -1616,7 +1616,10 @@ function assertUpdaterEvidence(step) {
 	assert.strictEqual(pipeline.stepField(step, 'uses'), 'actions/upload-artifact@v4');
 	assert.strictEqual(pipeline.stepField(step, 'continue-on-error'), null);
 	assert.match(step, /^          name: linux-updater-live-diagnostics$/m);
-	assert.match(step, /^          path: \$\{\{ runner\.temp \}\}\/linux-updater-live$/m);
+	assert.match(
+		step,
+		/^          path: \|\n            \$\{\{ runner\.temp \}\}\/linux-updater-live\n            \$\{\{ runner\.temp \}\}\/stable-linux-e2e-suite\.json$/m
+	);
 	assert.match(step, /^          if-no-files-found: error$/m);
 }
 assertUpdaterEvidence(updaterEvidence);
@@ -1650,7 +1653,35 @@ assert.strictEqual(
 	'Run virtual-keyboard E2E harness (stubbed)',
 	'the stubbed E2E harness must run right after the unit suite'
 );
+// Receipt uploaders retain failed/deferred facts; they never execute a harness.
+const retainedQualifications = new Map([
+	[
+		'Retain the source-bound linux-unit-suite qualification',
+		['assets-qualification-linux-unit-suite', 'stable-linux-unit-suite.json']
+	],
+	[
+		'Retain the source-bound linux-e2e-suite qualification',
+		['assets-qualification-linux-e2e-suite', 'stable-linux-e2e-suite.json']
+	],
+	[
+		'Retain the contained simultaneous qualification',
+		['assets-qualification-simultaneous-contained', 'stable-linux-simultaneous-native.json']
+	]
+]);
+function assertRetainedQualification(step) {
+	const expected = retainedQualifications.get(step.name);
+	if (!expected) return false;
+	assert.equal(pipeline.stepField(step.body, 'if'), 'always()');
+	assert.equal(pipeline.stepField(step.body, 'uses'), 'actions/upload-artifact@v4');
+	assert.equal(pipeline.stepField(step.body, 'run'), null);
+	assert.equal(pipeline.stepField(step.body, 'continue-on-error'), null);
+	assert.ok(step.body.includes('          name: ' + expected[0] + '\n'));
+	assert.ok(step.body.includes('          path: ${{ runner.temp }}/' + expected[1] + '\n'));
+	assert.match(step.body, /^          if-no-files-found: warn$/m);
+	return true;
+}
 for (const harness of testLinuxSteps.slice(unitAt + 1, recordAt)) {
+	if (assertRetainedQualification(harness)) continue;
 	assert.strictEqual(
 		pipeline.stepField(harness.body, 'if'),
 		'${{ !cancelled() }}',
@@ -1658,6 +1689,7 @@ for (const harness of testLinuxSteps.slice(unitAt + 1, recordAt)) {
 	);
 }
 for (const tail of testLinuxSteps.slice(recordAt)) {
+	if (assertRetainedQualification(tail)) continue;
 	assert.strictEqual(
 		pipeline.stepField(tail.body, 'if'),
 		null,
@@ -1666,6 +1698,7 @@ for (const tail of testLinuxSteps.slice(recordAt)) {
 }
 for (const boxJob of pipeline.jobs(LINUX_BOX)) {
 	for (const boxStep of pipeline.steps(boxJob.body)) {
+		if (assertRetainedQualification(boxStep)) continue;
 		assert.doesNotMatch(
 			pipeline.stepField(boxStep.body, 'if') ?? '',
 			/\balways\(\)/,

@@ -6,6 +6,7 @@ const fs = require('node:fs');
 const Full = require('./ci-full-default.cjs');
 const Raw = require('./ci-pipeline.cjs');
 const Policy = require('../ci/dev-release-qualification.cjs');
+const Scoped = require('./fixtures/ci-scoped-full-branches.cjs');
 const source = Raw.files();
 const MAC = '.github/workflows/ci-macos.yml';
 const ENTRY = '.github/workflows/ci.yml';
@@ -23,32 +24,135 @@ function changed(rel, before, after) {
 }
 check('raw loader and full view retain every exact source byte', () => {
 	const view = Full.fromFiles(source);
-	assert.deepEqual(view.files(), source);
+	assert.deepEqual(view.rawFiles(), source);
 	for (const entry of source) {
 		assert.equal(entry.text, fs.readFileSync(`${Raw.ROOT}/${entry.rel}`, 'utf8'));
-		assert.equal(view.file(entry.rel), entry.text);
+		assert.equal(view.file(entry.rel), Scoped.projectScopedSteps(entry.text, entry.rel));
 	}
-	assert.equal(view.text(), Raw.text());
+	assert.equal(
+		view.text(),
+		view
+			.files()
+			.map((entry) => entry.text)
+			.join('\n')
+	);
 	assert.deepEqual(view.calls(), Raw.calls());
 	assert.equal(Raw.field(Raw.job('core'), 'if'), null);
 	assert.equal(Raw.field(Raw.job('tooltip-canvas'), 'if'), null);
 });
-check('all product scripts remain exact, without a projection', () => {
+check('every scoped full body remains owned; all other product scripts remain exact', () => {
 	let jobs = 0,
 		steps = 0;
 	for (const entry of source)
 		for (const job of Raw.jobsOfText(entry.text, entry.rel)) {
 			jobs++;
-			assert.equal(Full.job(job.id), job.body);
+			assert.equal(Full.field(Full.job(job.id), 'if'), Raw.field(job.body, 'if'));
 			for (const step of Raw.steps(job.body)) {
 				if (!step.name) continue;
 				steps++;
-				assert.equal(Full.step(Full.job(job.id), step.name), step.body);
+				const retained = Full.step(Full.job(job.id), step.name);
+				const slot = Scoped.contract.slots.find(
+					(slot) => slot.file === entry.rel && slot.job === job.id && slot.step === step.name
+				);
+				if (slot) {
+					assert.equal(Full.stepField(retained, 'if'), Raw.stepField(step.body, 'if'));
+					assert.equal(
+						Full.stepField(retained, 'continue-on-error'),
+						Raw.stepField(step.body, 'continue-on-error')
+					);
+					assert.equal(
+						Full.stepField(retained, 'timeout-minutes'),
+						Raw.stepField(step.body, 'timeout-minutes')
+					);
+					assert.equal(
+						Full.runOf(retained).join('\n'),
+						Scoped.unwrap(Raw.runOf(step.body).join('\n'), Scoped.contract.protocols[slot.protocol])
+					);
+				} else assert.equal(retained, step.body);
 				assert.equal(Full.stepField(step.body, 'run'), Raw.stepField(step.body, 'run'));
 			}
 		}
 	assert.equal(jobs, 26);
 	assert.ok(steps > 150, 'the full retained script inventory is nonvacuous');
+});
+const testedProtocols = new Set();
+for (const slot of Scoped.contract.slots) {
+	if (testedProtocols.has(slot.protocol)) continue;
+	testedProtocols.add(slot.protocol);
+	const original = source.find((file) => file.rel === slot.file);
+	const job = Raw.jobsOfText(original.text, slot.file).find((job) => job.id === slot.job);
+	const step = Raw.step(job.body, slot.step);
+	check(`${slot.job}/${slot.step} refuses same-length unknown validation command`, () => {
+		const mutated = step.replace('--validate-scope-receipt', '--validate-scope-receipx');
+		assert.notEqual(mutated, step);
+		assert.equal(mutated.length, step.length);
+		assert.throws(() => Full.fromFiles(changed(slot.file, step, mutated)), /admission/);
+	});
+	check(`${slot.job}/${slot.step} refuses weakened scope validation`, () => {
+		const mutated = step.replace('--validate-scope-receipt', '--receipt');
+		assert.notEqual(mutated, step);
+		assert.throws(() => Full.fromFiles(changed(slot.file, step, mutated)), /admission/);
+	});
+	check(`${slot.job}/${slot.step} refuses alternate full-mode admission`, () => {
+		const protocol = Scoped.contract.protocols[slot.protocol];
+		const before = protocol.format === 'bash' ? '[ "$mode" = full ]' : "$mode -ceq 'full'";
+		const mutated = step.replace(
+			before,
+			protocol.format === 'bash' ? '[ "$mode" != deferred ]' : "$mode -cne 'deferred'"
+		);
+		assert.notEqual(mutated, step);
+		assert.throws(() => Full.fromFiles(changed(slot.file, step, mutated)), /admission/);
+	});
+	check(`${slot.job}/${slot.step} refuses swallowed selector failure`, () => {
+		const mutated = step.replace('--validate-scope-receipt', '--validate-scope-receipt-unknown');
+		assert.notEqual(mutated, step);
+		assert.throws(() => Full.fromFiles(changed(slot.file, step, mutated)), /admission/);
+	});
+}
+for (const mode of ['delete-step', 'missing-run']) {
+	check(`every reviewed owner refuses ${mode}`, () => {
+		let cases = 0;
+		for (const slot of Scoped.contract.slots) {
+			const file = source.find((file) => file.rel === slot.file);
+			const job = Raw.jobsOfText(file.text, file.rel).find((job) => job.id === slot.job);
+			const step = Raw.step(job.body, slot.step);
+			let replacement = '';
+			if (mode === 'missing-run') {
+				const block = /^        run: \|\n(?: {10}[^\n]*(?:\n|$)|\n)*/m.exec(step);
+				assert.ok(block, 'the genuine reviewed run body exists');
+				replacement = step.replace(block[0], '');
+			}
+			assert.notEqual(replacement, step);
+			assert.throws(
+				() => Full.fromFiles(changed(slot.file, step, replacement)),
+				`${slot.job}/${slot.step} must retain its actual ${mode === 'delete-step' ? 'registration' : 'run body'}`
+			);
+			cases++;
+		}
+		assert.equal(cases, Scoped.contract.slots.length);
+		assert.ok(cases > 150, 'all reviewed scoped owners are exercised nonvacuously');
+	});
+}
+check('native custody scope preserves the complete original full block', () => {
+	const script = fs.readFileSync(
+		Raw.ROOT + '/static/ergopti_plus/linux/tests/hardware/run_daemon_live.sh',
+		'utf8'
+	);
+	const retained = Scoped.projectLinuxHarness(script);
+	assert.ok(
+		retained.includes(
+			'\tpython3 tests/hardware/run_native_subreaper.py luajit tests/hardware/run_simultaneous_configuration_real.lua\n\tCUSTODY=$?\nfi\nif [ "${CUSTODY}" != "0" ]; then'
+		)
+	);
+	for (const [before, after] of [
+		['--validate-scope-receipt', '--receipt'],
+		['elif [ "$mode" = full ]', 'elif [ "$mode" != deferred ]'],
+		['CUSTODY=2\n\tfi', 'CUSTODY=0\n\tfi']
+	]) {
+		const altered = script.replace(before, after);
+		assert.notEqual(altered, script);
+		assert.throws(() => Scoped.projectLinuxHarness(altered));
+	}
 });
 check('mandatory default predicates are the actual workflow predicates', () => {
 	assert.equal(Full.field(Full.job('core'), 'if'), null);
