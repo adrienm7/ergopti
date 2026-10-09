@@ -9,7 +9,7 @@ _ManagedCallerFactory(State) {
 	return State["request"]
 }
 
-_ManagedCallerChangelog(Mode := "live") {
+_ManagedCallerChangelog(Mode := "live", YieldAfterAck := false) {
 	global _CLW_RequestEpoch, _CLW_Queue, CHANGELOG_SOURCE_TIMEOUT_MS
 	Previous := _CNR_InstallChangelog()
 	State := _ManagedCurlControlState()
@@ -25,7 +25,23 @@ _ManagedCallerChangelog(Mode := "live") {
 		AssertTrue(State["factory_returned"] - State["input"]["started_tick"] >= 15, "request acquisition cannot reset the original source clock")
 		AssertEqual(CHANGELOG_SOURCE_TIMEOUT_MS, State["input"]["deadline_ms"], "discovery and transfer share the source's original duration")
 		AssertFalse(FileExist(State["directory"] . "transport.json"), "actual caller headers stay unpublished before route/capability admission")
+		; This control delivers the poll only after exact source revocation. Hold
+		; its real callback before the complete ACK can make admission due.
+		AssertTrue(IsObject(Request.ManagedAdmissionFn), "manual Versions revocation must own the actual admission callback")
+		if YieldAfterAck {
+			AssertEqual(0, A_IsCritical, "the Versions interleave must allow actual timer dispatch")
+			SetTimer(Request.ManagedAdmissionFn, -1)
+		}
+		SetTimer(Request.ManagedAdmissionFn, 0)
 		_ManagedCurlControlAck(State)
+		if YieldAfterAck {
+			Sleep(30)
+			AssertTrue(IsObject(Request.ManagedAdmissionFn), "holding admission retains the exact callback until source replacement")
+			AssertFalse(Request.ManagedPayloadPublished, "a yielded complete ACK cannot preempt controlled Versions replacement")
+			AssertFalse(Request.Aborted, "holding admission preserves the original live Versions request until replacement")
+			AssertEqual(State["input"]["started_tick"], Request.DeadlineStart, "the Versions interleave cannot restart the source clock")
+			AssertEqual(CHANGELOG_SOURCE_TIMEOUT_MS, Request.DeadlineTimeout, "the Versions interleave cannot extend its original duration")
+		}
 		if Mode == "replaced"
 			_CLW_RequestEpoch += 1
 		else if Mode == "expired" {
@@ -54,6 +70,7 @@ _ManagedCallerChangelog(Mode := "live") {
 Test("managed caller: Versions owns proxy admission before transport under its original source clock", _ManagedCallerChangelog)
 Test("managed caller: Versions replacement revokes a queued native admission", _ManagedCallerChangelog.Bind("replaced"))
 Test("managed caller: Versions source expiry revokes a queued native admission", _ManagedCallerChangelog.Bind("expired"))
+Test("managed caller: queued Versions admission cannot preempt replacement after a yielded ACK (versions-queued-admission-owner)", _ManagedCallerChangelog.Bind("replaced", true))
 
 _ManagedCallerHealthcheck(YieldAfterAck := false) {
 	global _HC_ProbeRun
