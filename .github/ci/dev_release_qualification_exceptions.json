@@ -1,16 +1,16 @@
 {
 	"schema": 1,
-	"id": "dev-release-20261009",
-	"expires_at": "2026-10-09T07:00:00Z",
+	"id": "dev-release-20261009-diagnostic-prerelease",
+	"expires_at": "2026-10-10T07:00:00Z",
 	"repository": "adrienm7/ergopti",
 	"event_name": "push",
 	"ref": "refs/heads/dev",
 	"release": true,
 	"prerelease": "true",
 	"channel": "dev",
-	"tag": "v0.0.0-dev.156",
-	"version": "0.0.0-dev.156",
-	"authorization_note": "The maintainer explicitly authorized temporary qualification deferrals for this single dev prerelease before 09:00 Europe/Paris. These exceptions do not establish feature or native qualification.",
+	"tag": "v0.0.0-dev.157",
+	"version": "0.0.0-dev.157",
+	"authorization_note": "The maintainer explicitly authorized deferring all test suites to publish a prompt diagnostic dev.157 prerelease. The fast route supersedes the narrower five-scope deferral only for this tag and before the unchanged October 10 07:00 UTC expiry. Build, signing, source and asset integrity remain required. Core, unit, E2E, installation, launch and native qualification are DEFERRED and qualified:false, not passed. Default, Main, pull requests, dev.158 and other releases execute all assertions. No native acceptance or feature completion is claimed.",
 	"scopes": {
 		"windows-pac-full-url": {
 			"kind": "ahk_test",
@@ -34,6 +34,13 @@
 			"path": "tools/diagnostics/apple_shortcuts_probe/run_probe.py",
 			"args": [],
 			"reason": "First app.shortcuts() native catalogue fetch exceeded twenty seconds; native discovery remains missing."
+		},
+		"macos-launch-appleevents": {
+			"kind": "macos_launch",
+			"path": "tools/diagnostics/macos_launch_gate.py",
+			"scenarios": ["clean", "karabiner_config"],
+			"runners": ["macos-15", "macos-15-intel"],
+			"reason": "Both hosted architectures show an unanswered Automation consent dialog for hosted-compute-agent to control ErgoptiPlus. External AppleEvent transport and its dependent timer, Karabiner and ScriptScope feature proofs are DEFERRED and qualified:false. All launch lifecycle checks remain mandatory."
 		}
 	}
 }

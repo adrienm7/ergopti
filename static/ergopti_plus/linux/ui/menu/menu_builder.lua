@@ -211,7 +211,7 @@ local function assign_parameterized_action(ctx, gestures, binding, action, assig
 		-- Escaped: a wrap-pair sample such as <…> would be read as Pango markup.
 		value = prompt_text(title, zenity_plain(gestures.get_action_parameter_prompt(action)), prior)
 	end
-	if value == nil then return false end
+	if value == nil or (spec == "llm_language" and value == "") then return false end
 	if type(gestures.validate_action_parameter) ~= "function"
 		or not gestures.validate_action_parameter(action, value)
 	then
@@ -986,9 +986,11 @@ local function _manifest_hotstring_rows(ctx, config)
 			end
 		end
 		if added == 0 then
-			items[#items + 1] = {
-				label = i18n_safe("menu.hotstrings.no_group_loaded"), disabled = true,
-			}
+			if type(ManifestMenu.status_rows) ~= "function" then return end
+			local status = ManifestMenu.status_rows("hotstrings_menu", "hotstring_categories_standard", "no_groups")
+			for _, row in ipairs(type(status) == "table" and status or {}) do
+				items[#items + 1] = row
+			end
 		end
 	end
 
@@ -2089,15 +2091,18 @@ end
 
 --- Builds the AI / LLM submenu.
 local function _build_llm(ctx)
+	local NativeParent = require("ui.menu.ai_parent")
+	local parent = NativeParent.begin(ManifestMenu, "llm", ctx)
+	if not parent then return nil end
 	local llm = ctx.llm
 	if not llm then
 		local status_rows = ManifestMenu and ManifestMenu.template_rows("linux_llm_absent_rows", {}, {}, {})
 		if not status_rows then return {} end
-		return { label = i18n_safe("menu.llm.title"), items = status_rows }
+		return NativeParent.finish(parent, ManifestMenu.render_rows(status_rows, "linux_llm_absent_rows"))
 	end
 
 	local items = {}
-	local enabled = llm.is_enabled and llm.is_enabled() or false
+	local enabled = parent.enabled
 
 	-- The master gate is the manifest's first row and the shared renderer draws
 	-- it, from the command and the getter registered below. It also gets its OWN
@@ -2254,44 +2259,6 @@ local function _build_llm(ctx)
 		return { items = child_rows, disabled = not enabled or nil }
 	end
 
-	-- Live mode: Off, then every rewrite-format prompt (the built-ins in menu
-	-- order, then the user's own), labelled as in the prompt list. The engine
-	-- owns the state the llm_live_prompt_toggle action shares; a prompt chosen
-	-- here runs with the menu's count.
-	group_builders["llm_live_mode"] = function()
-		local ok_profiles, ProfileSettings = pcall(require, "modules.llm.profile_settings")
-		if not ok_profiles or type(llm.get_live) ~= "function" then
-			Logger.error(LOG, "LLM live mode unavailable; live submenu omitted.")
-			return
-		end
-		local Rewrite = require("llm.rewrite")
-		local live = llm.get_live()
-		local count = ProfileSettings.get("num_predictions") or 1
-		local function choose(profile_id)
-			local committed = llm.set_live(profile_id) == true
-			if committed and type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
-			return committed
-		end
-		local rows = { ManifestMenu.check_row("llm_live_controls", "llm_live_mode_off",
-			{ llm_live_mode_off = function() return choose(nil) end },
-			{ llm_live_is_off = function() return llm.get_live() == nil end,
-				llm_live_off_ready = function() return true end }) }
-		local prompts = {}
-		for _, profile in ipairs(ProfileSettings.list_built_in()) do prompts[#prompts + 1] = profile end
-		for _, profile in ipairs(ProfileSettings.list_user()) do prompts[#prompts + 1] = profile end
-		for _, profile in ipairs(prompts) do
-			if Rewrite.is_rewrite_profile(profile) then
-				local profile_id = profile.id
-				rows[#rows + 1] = {
-					label = ProfileSettings.menu_label(profile, count),
-					checked = live ~= nil and live.profile_id == profile_id,
-					action = function() choose(profile_id) end,
-				}
-			end
-		end
-		return { items = rows, disabled = not enabled or nil }
-	end
-
 	dynamic_handlers["llm_profile"] = function(target)
 		local ok_profiles, ProfileSettings = pcall(require, "modules.llm.profile_settings")
 		if not ok_profiles then return end
@@ -2303,6 +2270,21 @@ local function _build_llm(ctx)
 			if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
 		end
 		local function select_profile(profile_id)
+			if type(profile_id) ~= "string" or profile_id == "" then return false end
+			if type(llm.get_live) ~= "function" or type(llm.set_live) ~= "function" then
+				Logger.error(LOG, "Manual profile selection refused: its live override owner is unavailable.")
+				return false
+			end
+			local observed, live = xpcall(llm.get_live, debug.traceback)
+			if not observed then return false end
+			if live ~= nil then
+				local stopped, accepted = xpcall(llm.set_live, debug.traceback, nil)
+				local checked, current = xpcall(llm.get_live, debug.traceback)
+				if stopped ~= true or accepted ~= true or checked ~= true or current ~= nil then
+					Logger.error(LOG, "Manual profile selection refused: its temporary override did not retire.")
+					return false
+				end
+			end
 			local saved = ProfileSettings.set("active", profile_id, current_model)
 			if saved then refresh() end
 			return saved
@@ -2845,6 +2827,7 @@ local function _build_llm(ctx)
 		return committed
 	end
 	llm_ctx.commands["llm_toggle"] = function()
+		if type(llm.toggle) ~= "function" then return false end
 		if llm.toggle then llm.toggle(ctx.on_menu_changed) end
 		if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
 	end
@@ -2853,7 +2836,7 @@ local function _build_llm(ctx)
 	llm_ctx.state_getters["llm_enabled"] = function() return enabled end
 	-- The switch has no precondition here beyond the pause, which greys the whole
 	-- IA row from the top level anyway.
-	llm_ctx.state_getters["llm_toggle_ready"] = function() return ctx.paused ~= true end
+	llm_ctx.state_getters["llm_toggle_ready"] = function() return type(llm.toggle) == "function" and ctx.paused ~= true end
 
 	local rendered = ManifestMenu
 		and ManifestMenu.build("llm_menu", "LLM", dynamic_handlers, group_builders, llm_ctx, providers)
@@ -2862,7 +2845,7 @@ local function _build_llm(ctx)
 
 	-- The parent carries the same tick as the switch inside, for a user scanning
 	-- the top level; it cannot be clicked, which is why the switch is a row.
-	return { label = i18n_safe("menu.llm.title"), checked = enabled, submenu = items }
+	return NativeParent.finish(parent, items)
 end
 
 --- Builds the AI agent submenu (ui/menu/agent_rows.lua).
@@ -2871,7 +2854,7 @@ end
 local function _build_agent(ctx)
 	if not ManifestMenu then
 		Logger.error(LOG, "Manifest renderer unavailable — the AI agent submenu cannot be built.")
-		return { label = i18n_safe("menu.agent.title"), disabled = true }
+		return nil
 	end
 	return require("ui.menu.agent_rows").build(ctx, {
 		prompt = function(title, text, initial, hidden, choices)
@@ -5029,6 +5012,9 @@ function M.build(ctx)
 					-- was promised and will not see. The bijection gate cannot catch it
 					-- here, because top_level rows carry no behaviour type.
 					Logger.error(LOG, "No builder for top-level row '%s' — the entry is missing.", tostring(id))
+				elseif row.disabled == true then
+					rows[#rows + 1] = { label = i18n_safe(row.i18n), disabled = true,
+						disabled_reason_key = row.reason_key }
 				elseif id == "quit" then
 					quit_row = build(ctx)
 				elseif ctx.paused == true and row.greyed_when_paused == true then

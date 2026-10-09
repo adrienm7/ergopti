@@ -64,6 +64,10 @@ HANDLERS = {}
 ALIVE = True
 CLOCK = 0.0
 SELECT_CALLS = 0
+REAPED = False
+KILL_AT = None
+POST_KILL_MODES = {"post-kill-transient", "post-kill-persistent"}
+ZOMBIE_MODES = {"zombie-only", "zombie-descendant", "exited-permission", "live-permission"} | POST_KILL_MODES
 REAL_PRINT = builtins.print
 
 if not hasattr(signal, "SIGHUP"):
@@ -95,11 +99,16 @@ class FakeProcess:
     def __init__(self, args, stdin=None, stdout=None, stderr=None,
                  close_fds=False, start_new_session=False):
         self.pid = 4242
-        self.returncode = None
+        self.returncode = 78 if MODE in ZOMBIE_MODES and MODE != "live-permission" else None
         FakeProcess.active = self
         EVENTS.append(["spawn", list(args), bool(start_new_session)])
 
     def poll(self):
+        global REAPED
+        if MODE in ZOMBIE_MODES:
+            EVENTS.append(["poll", self.pid, self.returncode])
+            if self.returncode is not None:
+                REAPED = True
         return self.returncode
 
     def wait(self, timeout=None):
@@ -109,19 +118,37 @@ class FakeProcess:
 subprocess.Popen = FakeProcess
 
 def fake_killpg(pid, sig):
-    global ALIVE
+    global ALIVE, KILL_AT
     if sig == 0:
+        if MODE in ZOMBIE_MODES:
+            EVENTS.append(["probe", pid, bool(REAPED)])
+            if pid != 4242:
+                raise RuntimeError("signal probe targeted an unrelated group")
+            if MODE in POST_KILL_MODES and KILL_AT is not None:
+                if MODE == "post-kill-persistent" or CLOCK < KILL_AT + 0.15:
+                    EVENTS.append(["unconfirmed", CLOCK])
+                    raise PermissionError(1, "Operation not permitted")
+                ALIVE = False
+            if MODE in {"live-permission", "exited-permission"} or not REAPED:
+                raise PermissionError(1, "Operation not permitted")
+            if MODE == "zombie-only":
+                ALIVE = False
         if ALIVE:
             return None
         raise ProcessLookupError()
     EVENTS.append(["killpg", pid, sig])
     if sig == signal.SIGTERM:
-        FakeProcess.active.returncode = -signal.SIGTERM
+        if MODE not in ZOMBIE_MODES:
+            FakeProcess.active.returncode = -signal.SIGTERM
         return None
     if sig == signal.SIGKILL:
+        if MODE in POST_KILL_MODES:
+            KILL_AT = CLOCK
+            return None
         if MODE != "stubborn-after-kill":
             ALIVE = False
-            FakeProcess.active.returncode = -signal.SIGKILL
+            if MODE not in ZOMBIE_MODES:
+                FakeProcess.active.returncode = -signal.SIGKILL
         return None
 
 os.killpg = fake_killpg
@@ -274,6 +301,134 @@ const noWait = replaceExactly(
 test(
 	'mutation guard rejects a missing exact-leader wait',
 	!escalationContract(runWrapper(python, noWait))
+);
+
+function zombieGoneContract(run) {
+	const events = run.payload.events;
+	const probes = eventsOf(run, 'probe');
+	return (
+		run.payload.exit === 78 &&
+		run.payload.alive === false &&
+		probes.length === 2 &&
+		probes[0][2] === false &&
+		probes[1][2] === true &&
+		events.findIndex((event) => event[0] === 'probe') <
+			events.findIndex((event) => event[0] === 'poll') &&
+		eventsOf(run, 'poll')[0][2] === 78 &&
+		eventsOf(run, 'killpg').length === 0 &&
+		eventsOf(run, 'wait').length === 1 &&
+		eventsOf(run, 'close').some((event) => event[1] === 10)
+	);
+}
+
+function permissionRefusalContract(run, expectedProbes, leaderExit) {
+	const exception = eventsOf(run, 'exception');
+	return (
+		run.payload.exit === 250 &&
+		run.payload.alive === true &&
+		exception.length === 1 &&
+		exception[0][1] === 'PermissionError' &&
+		exception[0][2].includes('Operation not permitted') &&
+		eventsOf(run, 'probe').length === expectedProbes &&
+		eventsOf(run, 'poll').length === 1 &&
+		eventsOf(run, 'poll')[0][2] === leaderExit &&
+		eventsOf(run, 'wait').length === 0 &&
+		!eventsOf(run, 'close').some((event) => event[1] === 10)
+	);
+}
+
+const zombie = runWrapper(python, wrapper, 'zombie-only');
+test(
+	'zombie-only EPERM reaps the exact leader and preserves the child refusal exit78',
+	zombieGoneContract(zombie),
+	JSON.stringify(zombie)
+);
+
+const descendant = runWrapper(python, wrapper, 'zombie-descendant');
+test(
+	'reaped leader with a live descendant still requires TERM KILL and complete drain',
+	escalationContract(descendant) &&
+		descendant.payload.exit === 78 &&
+		eventsOf(descendant, 'probe').length >= 3 &&
+		eventsOf(descendant, 'probe')[1][2] === true,
+	JSON.stringify(descendant)
+);
+
+const livePermission = runWrapper(python, wrapper, 'live-permission');
+test(
+	'EPERM with a live exact leader remains a permission refusal',
+	permissionRefusalContract(livePermission, 1, null),
+	JSON.stringify(livePermission)
+);
+
+const exitedPermission = runWrapper(python, wrapper, 'exited-permission');
+test(
+	'persistent EPERM after exact leader reaping never proves group disappearance',
+	permissionRefusalContract(exitedPermission, 2, 78),
+	JSON.stringify(exitedPermission)
+);
+
+const noReap = wrapper.includes('except PermissionError:')
+	? replaceExactly(
+			wrapper,
+			'        if proc.poll() is None: raise',
+			'        raise  # mutation: zombie leader never reaped'
+		)
+	: wrapper;
+test(
+	'mutation guard detects missing exact leader reaping',
+	!zombieGoneContract(runWrapper(python, noReap, 'zombie-only'))
+);
+
+const postKillGuard = '        except PermissionError:\n            if not kill_sent: raise';
+const reprobeBlock =
+	'        try: os.killpg(proc.pid, 0)\n        except ProcessLookupError: return False' +
+	(wrapper.includes(postKillGuard) ? '\n' + postKillGuard : '');
+const noReprobe = wrapper.includes('except PermissionError:')
+	? replaceExactly(
+			wrapper,
+			reprobeBlock,
+			'        return False  # mutation: group disappearance inferred from leader exit'
+		)
+	: wrapper;
+test(
+	'mutation guard detects disappearance inferred without a second native group probe',
+	!escalationContract(runWrapper(python, noReprobe, 'zombie-descendant'))
+);
+
+const swallowPermission = wrapper.includes('except PermissionError:')
+	? replaceExactly(
+			wrapper,
+			reprobeBlock,
+			'        try: os.killpg(proc.pid, 0)\n        except (ProcessLookupError, PermissionError): return False'
+		)
+	: wrapper;
+test(
+	'mutation guard detects persistent permission refusal hidden as gone',
+	!permissionRefusalContract(runWrapper(python, swallowPermission, 'exited-permission'), 2, 78)
+);
+
+const retiring = runWrapper(python, wrapper, 'post-kill-transient');
+test(
+	'post-KILL uncertainty waits for observed disappearance within the existing drain budget',
+	escalationContract(retiring) &&
+		retiring.payload.exit === 78 &&
+		eventsOf(retiring, 'unconfirmed').length >= 2,
+	JSON.stringify(retiring)
+);
+const unconfirmed = runWrapper(python, wrapper, 'post-kill-persistent');
+test(
+	'persistent post-KILL uncertainty times out without reporting retirement',
+	boundedDrainContract(unconfirmed) && eventsOf(unconfirmed, 'unconfirmed').length >= 2,
+	JSON.stringify(unconfirmed)
+);
+test(
+	'mutation guard rejects inferring post-KILL retirement from permission refusal',
+	!escalationContract(runWrapper(python, swallowPermission, 'post-kill-transient'))
+);
+test(
+	'mutation guard keeps the existing deadline for unconfirmed post-KILL retirement',
+	!boundedDrainContract(runWrapper(python, noHardDeadline, 'post-kill-persistent'))
 );
 
 report();

@@ -11,6 +11,8 @@ public static class ErgoptiUpdaterMonotonicClock
 {
     [DllImport("kernel32.dll", ExactSpelling = true)]
     public static extern UInt64 GetTickCount64();
+    [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+    public static extern bool CreateDirectoryW(string path, IntPtr security);
 }
 '@ -ErrorAction Stop
 }
@@ -35,6 +37,12 @@ function Get-ErgoptiUpdaterFailureReceipt {
     $Receipt = @{ backend = 'dotnet'; stage = $Stage; failure_provenance = 'unknown' }
     if ($State.Stage -in @('file_read', 'file_write', 'file_create', 'file_remove')) {
         $Receipt.stage = $State.Stage
+        if ($Native -is [ComponentModel.Win32Exception] -and $Native.NativeErrorCode -gt 0) {
+            $Receipt.failure_provenance = 'verified'
+            $Receipt.native_errno_domain = 'win32'
+            $Receipt.native_errno = [string]$Native.NativeErrorCode
+            return $Receipt
+        }
         if ($Native -is [System.IO.IOException] -or
             $Native -is [UnauthorizedAccessException]) {
             # HRESULT_FROM_WIN32, not every managed IOException's low word.
@@ -318,5 +326,240 @@ function Invoke-ErgoptiUpdaterDownload {
         Close-ErgoptiUpdaterResource $Output 'output' 'file_write' $State
         Close-ErgoptiUpdaterResource $Input 'input' 'connect' $State
         Close-ErgoptiUpdaterResource $Response 'response' 'http' $State
+    }
+}
+
+# Release assets use the same owned curl attempt and causal authentication fence
+# as HTTP requests. The legacy .NET function remains an explicitly selected path.
+function Invoke-ErgoptiUpdaterCurlDownload {
+    param(
+        [Uri]$Destination, [string]$NewExe, [int]$TimeoutMs, [hashtable]$State,
+        [scriptblock]$ResolveRoutes, [int]$DeadlineMs, [int64]$StartedTick,
+        [int64]$AuthenticatedSize, [string]$PolicyPath, [string]$DefaultsPath,
+        [scriptblock]$ReadEnvironment = $null
+    )
+    if ($AuthenticatedSize -le 0 -or $AuthenticatedSize -gt [int]::MaxValue -or
+        $null -eq $ResolveRoutes -or $TimeoutMs -le 0) {
+        throw [ArgumentException]::new('Authenticated artifact transport admission was refused.')
+    }
+    Assert-ErgoptiUpdaterDestination $Destination
+    $Policy = Get-ErgoptiNetworkPolicy $PolicyPath
+    $Defaults = Get-Content -LiteralPath $DefaultsPath -Raw -Encoding UTF8 | ConvertFrom-Json
+    $Limits = $Defaults.archive_transfer.transport
+    if (-not (Test-ErgoptiNetworkInt32 $Limits.max_header_bytes) -or
+        $Limits.max_header_bytes -lt 1 -or $Limits.max_header_bytes -gt [int]::MaxValue -or $Limits.revocation_best_effort -isnot [bool]) {
+        throw [ArgumentException]::new('Canonical artifact transport limits were refused.')
+    }
+    if ($Policy.selected_proxy_bypass -cne 'environment') {
+        throw [ArgumentException]::new('Canonical selected-proxy bypass policy was refused.')
+    }
+    if ($null -eq $ReadEnvironment) {
+        $ReadEnvironment = { param($Name) [Environment]::GetEnvironmentVariable($Name, 'Process') }
+    }
+    $Directory = $null
+    $ParentOwnedCapture = $false
+    $Engine = $null
+    $Input = $null
+    $Output = $null
+    $Answer = @{ child_quiesced = $false }
+    try {
+        $null = Get-ErgoptiUpdaterRemainingMilliseconds $StartedTick $DeadlineMs $State
+        $State.Stage = 'file_create'
+        $Parent = [IO.Path]::GetDirectoryName($NewExe)
+        [IO.Directory]::CreateDirectory($Parent) | Out-Null
+        if ($State.ContainsKey('OwnedCaptureDirectory')) {
+            $CaptureCandidate = $State.OwnedCaptureDirectory
+            if ($CaptureCandidate -isnot [string] -or $CaptureCandidate -eq '' -or
+                [IO.Path]::GetDirectoryName($CaptureCandidate) -cne $Parent -or
+                [IO.Path]::GetFileName($CaptureCandidate) -cnotmatch '^curl\.[0-9a-f]{32}$' -or
+                -not [IO.Directory]::Exists($CaptureCandidate)) {
+                throw [ArgumentException]::new('Parent-owned artifact capture was refused.')
+            }
+            foreach ($Name in @('artifact.bin', 'headers.bin', 'capability.json', 'transport.conf')) {
+                if (-not [IO.File]::Exists((Join-Path $CaptureCandidate $Name))) {
+                    throw [ArgumentException]::new('Parent-owned artifact capture file was absent.')
+                }
+            }
+            $ParentOwnedCapture = $true
+        } else {
+            $CaptureCandidate = Join-Path $Parent ('curl.' + [Guid]::NewGuid().ToString('N'))
+            if (-not [ErgoptiUpdaterMonotonicClock]::CreateDirectoryW($CaptureCandidate, [IntPtr]::Zero)) {
+                throw [ComponentModel.Win32Exception]::new([Runtime.InteropServices.Marshal]::GetLastWin32Error())
+            }
+        }
+        $Directory = $CaptureCandidate
+        $Parameters = [pscustomobject]@{
+            started_tick = $StartedTick; deadline_ms = $DeadlineMs;
+            max_response_bytes = $AuthenticatedSize; max_header_bytes = $Limits.max_header_bytes;
+            connect_timeout_ms = $TimeoutMs; revocation_best_effort = $Limits.revocation_best_effort;
+            response_path = (Join-Path $Directory 'artifact.bin'); header_path = (Join-Path $Directory 'headers.bin');
+            capability_path = (Join-Path $PSScriptRoot 'ergopti_curl_capabilities_worker.ps1');
+            headers = @(); body = ''; user_agent = 'ErgoptiPlus-Updater/1.0'
+        }
+        . (Join-Path $PSScriptRoot 'ergopti_curl_attempt.ps1')
+        $Engine = New-ErgoptiCurlAttemptEngine $Parameters $Answer (Join-Path $Directory 'capability.json') `
+            (Join-Path $Directory 'payload.bin') (Join-Path $Directory 'transport.conf')
+        $Capability = $null
+        function Resolve-ErgoptiArtifactFreshSelection {
+            param([Uri]$Destination)
+            $Selection = & $ResolveRoutes $Destination.AbsoluteUri $Engine.GetRemainingBudget()
+            if ($null -ne $Selection -and $Selection.CleanupDebt -is [bool] -and $Selection.CleanupDebt) {
+                $State.NativeCleanupDebt = $true
+                throw [InvalidOperationException]::new('Native routing has retained retirement debt.')
+            }
+            if ($null -eq $Selection -or $Selection.Ok -isnot [bool] -or -not $Selection.Ok -or
+                $Selection.Routes -isnot [array] -or $Selection.Routes.Count -lt 1 -or
+                -not (Test-ErgoptiNetworkInt32 $Selection.MaxRoutes) -or $Selection.MaxRoutes -lt 1 -or
+                $Selection.Routes.Count -gt $Selection.MaxRoutes -or
+                -not (Test-ErgoptiNetworkInt32 $Selection.MaxRedirects) -or $Selection.MaxRedirects -lt 0) {
+                if ($null -ne $Selection -and $Selection.Receipt -is [hashtable]) { $State.Receipt = $Selection.Receipt }
+                throw [InvalidOperationException]::new('Canonical artifact routing was refused.')
+            }
+            # Admit the whole list before preparing credentials for any route.
+            foreach ($Route in $Selection.Routes) {
+                if ($Route.Kind -cnotin @('direct', 'proxy') -or $Route.Endpoint -isnot [string]) {
+                    throw [ArgumentException]::new('Artifact route descriptor was refused.')
+                }
+                if ($Route.Kind -ceq 'direct') {
+                    if ($Route.Endpoint -cne '') { throw 'Invalid artifact direct route.' }
+                } elseif ($Route.Authentication -cne 'current_user_proxy_only' -or
+                    (Get-ErgoptiHttpRelay $Route.Endpoint $Policy) -cne $Route.Endpoint) {
+                    throw [ArgumentException]::new('Artifact proxy route was refused.')
+                }
+            }
+            $Bypass = ''
+            foreach ($Name in $Policy.environment_bypass_precedence) {
+                $Value = & $ReadEnvironment $Name
+                if ($null -ne $Value -and $Value -ne '') { $Bypass = $Value; break }
+            }
+            if (Test-ErgoptiEnvironmentBypass $Destination $Bypass $Policy) {
+                $Selection.Routes = @(@{ Kind = 'direct'; Endpoint = ''; Authentication = 'none' })
+            }
+            return $Selection
+        }
+        $MaximumHops = $null
+        $Hop = 0
+        while ($true) {
+            Assert-ErgoptiUpdaterDestination $Destination
+            $State.Stage = 'proxy_resolve'
+            $State.Receipt = @{}
+            $Selection = Resolve-ErgoptiArtifactFreshSelection $Destination
+            if ($null -eq $MaximumHops) { $MaximumHops = $Selection.MaxRedirects }
+            elseif ($MaximumHops -ne $Selection.MaxRedirects) { throw 'Artifact routing policy changed.' }
+            if ($null -eq $Capability) {
+                $State.Stage = 'connect'
+                $Capability = $Engine.ObserveCapability()
+                if ([version]$Capability.version -lt [version]'8.7.0') { throw 'Native proxy-use evidence is unavailable.' }
+                # Capability observation may outlast a settings revision. Resolve
+                # the complete URL afresh before the first credential-bearing child.
+                continue
+            }
+            $Metrics = $null
+            for ($DiscoveryOrdinal = 0; $DiscoveryOrdinal -lt $Selection.Routes.Count; $DiscoveryOrdinal++) {
+                $Route = $Selection.Routes[$DiscoveryOrdinal]
+                if ($Route.Kind -ceq 'proxy' -and (-not $Capability.sspi -or -not $Capability.spnego)) {
+                    throw 'The actual native proxy authentication features are unavailable.'
+                }
+                $State.Stage = 'connect'
+                $State.Receipt = @{ backend = 'curl'; stage = 'connect'; failure_provenance = 'unknown'; tls_verification = 'enforced' }
+                if ($Route.Kind -ceq 'proxy' -and $Destination.Scheme -ceq 'https') {
+                    $Discovery = $Engine.DiscoverProxy($Destination, $Route, $Capability, $Selection, $DiscoveryOrdinal)
+                    if ($Discovery.ready) {
+                        $FreshSelection = Resolve-ErgoptiArtifactFreshSelection $Destination
+                        $Metrics = $Engine.InvokeDiscoveredRoute($Destination, $Route, 'GET', $false, $false, $FreshSelection)
+                    } else { $Metrics = $Discovery.metrics }
+                } else {
+                    $Metrics = $Engine.InvokeRoute($Destination, $Route, 'negotiate', 'GET', $false, $false)
+                    if ($Engine.TestNtlmChallenge($Destination, $Route, $Metrics, $Capability)) {
+                        $Metrics = $Engine.InvokeRoute($Destination, $Route, 'ntlm', 'GET', $false, $false)
+                    }
+                }
+                $State.Receipt.failure_provenance = 'verified'
+                if ($Metrics.exit -eq 0) { break }
+                $State.Receipt.curl_exit = [int]$Metrics.exit
+                $State.Receipt.http_status = $Metrics.status
+                $State.Receipt.proxy_connect_status = $Metrics.connect
+                $State.Receipt.proxy_mode = $(if ($Metrics.proxy_used) { 'selected' } else { 'direct' })
+                $State.Receipt.http_response_source = $(if ($Metrics.connect -eq 407 -and $Metrics.status -eq 0) { 'proxy' } else { 'unavailable' })
+                if ($Metrics.connect -ge 400 -and $Metrics.connect -le 599 -and $Metrics.status -eq 0 -and $Metrics.proxy_used) {
+                    $State.Receipt.stage = 'proxy_connect'
+                }
+                if ($Metrics.exit -eq 5) { $State.Receipt.stage = 'proxy_resolve' }
+                if ($Metrics.exit -in @(35, 60, 77, 83)) { $State.Receipt.stage = 'tls' }
+                $Retry = $Route.Kind -ceq 'proxy' -and $Metrics.proxy_used -and $Metrics.child_quiesced -and
+                    $Metrics.status -eq 0 -and $Metrics.connect -eq 0 -and $Metrics.delivered -eq 0 -and
+                    ($Policy.failover.proxy_name_resolution_exits -contains $Metrics.exit -or $Policy.failover.proxy_connect_exits -contains $Metrics.exit)
+                if (-not $Retry) { throw [InvalidOperationException]::new('Artifact transport was refused.') }
+            }
+            if ($null -eq $Metrics -or $Metrics.exit -ne 0 -or -not $Engine.ChildQuiesced()) {
+                throw [InvalidOperationException]::new('All artifact routes were refused.')
+            }
+            if ($Metrics.status -in @(301, 302, 303, 307, 308)) {
+                if ($Hop -ge $MaximumHops -or -not $Metrics.headers.headers.ContainsKey('location')) { throw 'Artifact redirect was refused.' }
+                $Destination = [Uri]::new($Destination, $Metrics.headers.headers.location)
+                Assert-ErgoptiUpdaterDestination $Destination
+                $Hop++
+                continue
+            }
+            if ($Metrics.status -ne 200) {
+                $State.Receipt = @{ backend = 'curl'; stage = 'http'; failure_provenance = 'verified';
+                    http_status = $Metrics.status; http_response_source = 'unavailable' }
+                throw [InvalidOperationException]::new('Artifact HTTP response was refused.')
+            }
+            if ($Metrics.delivered -ne $AuthenticatedSize) {
+                $State.Reason = 'verify'
+                throw [InvalidOperationException]::new('Authenticated artifact size mismatch.')
+            }
+            break
+        }
+        $State.Receipt = @{}
+        $State.Stage = 'file_read'
+        $Input = [IO.File]::Open($Parameters.response_path, [IO.FileMode]::Open, [IO.FileAccess]::Read, [IO.FileShare]::None)
+        if ($Input.Length -ne $AuthenticatedSize) { $State.Reason = 'verify'; throw 'Captured artifact size changed.' }
+        $State.Stage = 'file_create'
+        $Output = [IO.File]::Open($NewExe, [IO.FileMode]::CreateNew, [IO.FileAccess]::Write, [IO.FileShare]::None)
+        $State.StagedExecutableOwned = $true
+        $Bytes = New-Object byte[] 65536
+        $Copied = [int64]0
+        while ($true) {
+            $null = $Engine.GetRemainingBudget()
+            $State.Stage = 'file_read'
+            $Count = $Input.Read($Bytes, 0, $Bytes.Length)
+            $null = $Engine.GetRemainingBudget()
+            if ($Count -eq 0) { break }
+            $State.Stage = 'file_write'
+            $Output.Write($Bytes, 0, $Count)
+            $Copied += $Count
+        }
+        if ($Copied -ne $AuthenticatedSize) { $State.Reason = 'verify'; throw 'Artifact copy size mismatch.' }
+        $State.Stage = 'file_write'
+        $Output.Flush($true)
+        $null = $Engine.GetRemainingBudget()
+        $Output.Dispose(); $Output = $null
+        $State.Stage = 'file_read'
+        $Input.Dispose(); $Input = $null
+        $null = $Engine.GetRemainingBudget()
+        return $AuthenticatedSize
+    } catch {
+        if ($null -ne $Engine -and -not $Engine.ChildQuiesced()) { $State.NativeCleanupDebt = $true }
+        if ($null -ne $Engine -and $Engine.GetNativeRemainingBudget() -le 0) { $State.Reason = 'deadline' }
+        $State.Receipt = Get-ErgoptiUpdaterFailureReceipt $_.Exception $State
+        throw
+    } finally {
+        Close-ErgoptiUpdaterResource $Output 'output' 'file_write' $State
+        Close-ErgoptiUpdaterResource $Input 'input' 'file_read' $State
+        if ($null -ne $Directory -and -not $ParentOwnedCapture) {
+            if ($null -ne $Engine -and -not $Engine.ChildQuiesced()) {
+                $State.NativeCleanupDebt = $true
+            } else {
+                try { [IO.Directory]::Delete($Directory, $true) }
+                catch { Add-ErgoptiUpdaterCleanupDebt $State 'artifact_capture' 'file_remove' $_.Exception }
+            }
+        }
+        if ($State.NativeCleanupDebt -or $State.CleanupDebt.Count -ne 0) {
+            # A finally failure supersedes a pending successful return; the
+            # parent's Job must close before it publishes a retry or successor.
+            throw [InvalidOperationException]::new('Artifact resources have unacknowledged retirement.')
+        }
     }
 }

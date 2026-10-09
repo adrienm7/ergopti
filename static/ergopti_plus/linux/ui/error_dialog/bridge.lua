@@ -173,7 +173,7 @@ end
 
 --- The report of one error, from the diagnostics snapshot.
 --- @param record table { kind, module, message, time, log_path? }
---- @return table { report, paths, documents, context, log_path, open_id }
+--- @return table { report, snapshot, paths, documents, context, log_path, open_id }
 local function build_report(record)
 	local Health = require("ui.healthcheck.bridge")
 	local HealthReport = require("ui.healthcheck.report")
@@ -211,6 +211,7 @@ local function build_report(record)
 	end
 	return {
 		report    = report,
+		snapshot  = snapshot,
 		paths     = paths,
 		documents = documents,
 		context   = HealthReport.redaction_context(),
@@ -232,9 +233,11 @@ function M.report(record)
 			tostring(fields))
 		return false
 	end
+	local shared = require("healthcheck.share").document(fields.snapshot, fields.documents.schema,
+		require("infra.i18n").get(fields.documents.schema.share_policy.notice_key))
 	local result = require("ui.healthcheck.report").perform(
-		{ action = "report", text = fields.report.text, fields = fields.report.fields },
-		fields.paths, fields.documents, fields.context)
+		{ action = "report", text = shared.text, fields = shared.fields },
+		fields.paths, fields.documents, fields.context, nil, fields.snapshot)
 	return result.ok == true
 end
 
@@ -347,14 +350,19 @@ local function perform(name, context)
 	end
 	local session = _session
 	local action
+	local shared
+	if name == "copy" or name == "report" then
+		shared = require("healthcheck.share").document(session.snapshot, session.documents.schema,
+			require("infra.i18n").get(session.documents.schema.share_policy.notice_key))
+	end
 	if name == "copy" then
-		action = { action = "copy", text = session.report.text }
+		action = { action = "copy", text = shared.text }
 	elseif name == "report" then
-		action = { action = "report", text = session.report.text, fields = session.report.fields }
+		action = { action = "report", text = shared.text, fields = shared.fields }
 	else
 		action = { action = "open_path", id = session.open_id }
 	end
-	local result = require("ui.healthcheck.report").perform(action, session.paths, session.documents, session.context)
+	local result = require("ui.healthcheck.report").perform(action, session.paths, session.documents, session.context, nil, session.snapshot)
 	return { type = "action", action = name, ok = result.ok == true, missing = result.missing == true }
 end
 

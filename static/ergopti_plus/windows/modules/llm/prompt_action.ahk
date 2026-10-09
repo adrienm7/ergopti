@@ -86,6 +86,16 @@ LLM_PromptAction_Parse(Value, &Reason := "") {
 	if !SeparatorAt
 		return Map("profile_id", ProfileId)
 	Count := SubStr(Value, SeparatorAt + 1)
+	TranslationTarget := ""
+	TargetAt := InStr(Count, LLM_PROMPT_ACTION_SEPARATOR, true)
+	if TargetAt {
+		TranslationTarget := SubStr(Count, TargetAt + 1)
+		Count := SubStr(Count, 1, TargetAt - 1)
+		if (!(ProfileId == "translate") || !LLM_Translate_IsLanguageText(TranslationTarget)) {
+			Reason := "invalid translation target"
+			return false
+		}
+	}
 	if !RegExMatch(Count, "^[0-9]+\z") {
 		Reason := "invalid prediction count"
 		return false
@@ -104,7 +114,10 @@ LLM_PromptAction_Parse(Value, &Reason := "") {
 		Reason := "prediction count out of range"
 		return false
 	}
-	return Map("profile_id", ProfileId, "num_predictions", Predictions)
+	Parsed := Map("profile_id", ProfileId, "num_predictions", Predictions)
+	if TargetAt
+		Parsed["translation_target"] := TranslationTarget
+	return Parsed
 }
 
 /**
@@ -122,10 +135,12 @@ LLM_PromptAction_IsValid(Value) {
  * @param {Integer} NumPredictions A count of its own, or 0 for the menu setting.
  * @returns {String} The encoded parameter.
  */
-LLM_PromptAction_Format(ProfileId, NumPredictions := 0) {
+LLM_PromptAction_Format(ProfileId, NumPredictions := 0, TranslationTarget := "") {
 	global LLM_PROMPT_ACTION_SEPARATOR
 	Value := (NumPredictions == 0) ? ProfileId
 		: ProfileId . LLM_PROMPT_ACTION_SEPARATOR . NumPredictions
+	if (TranslationTarget != "")
+		Value .= LLM_PROMPT_ACTION_SEPARATOR . TranslationTarget
 	if !(LLM_PromptAction_Parse(Value, &Reason) is Map)
 		throw ValueError("LLM_PromptAction_Format: " . Reason . ".")
 	return Value

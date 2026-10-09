@@ -49,6 +49,13 @@ _APAP_AnchorArmsThePrefixOnEveryPress() {
 		Registered += 1
 		Pos := At + 1
 	}
+	Producer := _LT_NativeAltGrRegistrationBody()
+	Pos := 1
+	while (At := RegExMatch(Producer, 'm)^[ `t]*HotkeyFn\.Call\("SC138 & " \. SC,', &Call, Pos)) {
+		Assert(_LT_NativeDelegateIsCode(Producer, Call, "HotkeyFn.Call("), "only executable native-default AltGr registrations count")
+		Registered += 1
+		Pos := At + Max(1, Call.Len)
+	}
 	AssertTrue(Registered >= 4, "the AltGr combinations the anchor arms for must still be registered (found " . Registered . ")")
 }
 Test("altgr prefix: an always-eligible pass-through combination arms SC138 on its press (qwerty-altgr-prefix-2026-09-26)",

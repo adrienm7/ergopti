@@ -13,6 +13,11 @@ name: Windows
 on:
   workflow_call:
     inputs:
+      fast_prerelease:
+        description: Temporary unqualified dev157 test deferral; defaults remain full
+        required: false
+        default: false
+        type: boolean
       release:
         description: True when ci.yml's plan resolved a free release tag
         required: true
@@ -47,11 +52,20 @@ on:
 permissions:
   contents: read
 
+env:
+  ERGOPTI_DEV_RELEASE_RELEASE: ${{ inputs.release }}
+  ERGOPTI_DEV_RELEASE_PRERELEASE: ${{ inputs.prerelease }}
+  ERGOPTI_DEV_RELEASE_CHANNEL: ${{ inputs.channel }}
+  ERGOPTI_DEV_RELEASE_TAG: ${{ inputs.tag }}
+  ERGOPTI_DEV_RELEASE_VERSION: ${{ inputs.version }}
+  ERGOPTI_FAST_PRERELEASE: ${{ inputs.fast_prerelease }}
+
 jobs:
   # ─────────────────────────────────────────────────
   # 1) AHK unit, native and contract tests
   # ─────────────────────────────────────────────────
   test-ahk:
+    if: ${{ !inputs.fast_prerelease }}
     name: 'Unit tests'
     runs-on: windows-latest
 
@@ -61,6 +75,28 @@ jobs:
       - name: Build and test native navigation event owner
         shell: pwsh
         run: ./tools/build/build_windows_nav_owner.ps1
+
+      - name: Prepare native PAC source generator
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+
+      - name: Build and test native full-URL PAC evaluator
+        id: native-pac-build
+        shell: pwsh
+        run: ./tools/build/build_windows_network_pac.ps1 -Publish
+
+      - name: Retain native PAC artifact and source identity
+        if: ${{ always() && steps.native-pac-build.outcome == 'success' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-native-pac-${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}
+          if-no-files-found: error
+          path: |
+            static/ergopti_plus/windows/vendor/ergopti_network_pac.exe
+            static/ergopti_plus/windows/vendor/ergopti_network_pac.json
+            static/ergopti_plus/windows/vendor/ergopti_network_pac.LICENSE.txt
+            static/ergopti_plus/windows/build/native/network_pac/artifact_receipt.json
 
       # The suites run on the interpreter the release exe ships with: its
       # version, archive and digest come from the one release contract, so a
@@ -240,6 +276,20 @@ jobs:
               Write-Error "Test suite failed (exit $exit)."; exit $exit
           }
 
+      - name: Run native desktop AHK cohorts
+        shell: pwsh
+        timeout-minutes: 25
+        run: ./tools/test/run-windows-native-desktop.ps1
+
+      - name: Publish native desktop AHK evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          overwrite: true
+          name: windows-ahk-native-desktop
+          path: ${{ runner.temp }}/windows-ahk-native-desktop/
+          if-no-files-found: error
+
       # The isolated LLM suites. They cannot join run_all.ahk: each installs
       # its own global stubs (a WebView2 stand-in, a fake model index) that would
       # collide with the shared harness, which is why they were written as
@@ -361,6 +411,7 @@ jobs:
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
   e2e-ahk:
+    if: ${{ !inputs.fast_prerelease }}
     name: 'E2E tests (engine)'
     needs: [test-ahk]
     runs-on: windows-latest
@@ -468,12 +519,21 @@ jobs:
   # alters; nothing here disables or restores Defender.
   package-windows:
     name: 'Package'
+    if: ${{ !cancelled() && ((inputs.fast_prerelease && needs.e2e-ahk.result == 'skipped') || (!inputs.fast_prerelease && needs.e2e-ahk.result == 'success')) }}
     needs: [e2e-ahk]
     runs-on: windows-latest
 
     steps:
       # A shallow clone: no step of this job reads git history.
       - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: '.node-version'
+
+      - name: Recheck temporary fast prerelease authorization
+        shell: bash
+        run: node tools/ci/dev-release-qualification.cjs --fast-action admit
 
       - name: Build and test native navigation event owner
         shell: pwsh
@@ -483,6 +543,10 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: '3.12'
+
+      - name: Build and test native full-URL PAC evaluator
+        shell: pwsh
+        run: ./tools/build/build_windows_network_pac.ps1 -Publish
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
@@ -685,6 +749,7 @@ jobs:
             static/ergopti/windows/Ergopti_windows.exe
 
   launch-windows:
+    if: ${{ !inputs.fast_prerelease }}
     name: 'Install and launch'
     needs: [package-windows]
     runs-on: windows-latest
@@ -706,6 +771,10 @@ jobs:
         with:
           name: assets-windows
           path: ${{ runner.temp }}/package
+
+      - name: Install locked native acceptance dependencies
+        shell: pwsh
+        run: npm ci --ignore-scripts
 
       - name: Test native compiled startup admission
         shell: pwsh
@@ -1135,6 +1204,26 @@ jobs:
               Stop-LaunchedApp $proc
           }
 
+      - name: Qualify compiled prior-release upgrade and installed full save
+        shell: pwsh
+        timeout-minutes: 10
+        run: |
+          ./tools/test/run-compiled-save-upgrade.ps1 `
+            -Executable "$env:RUNNER_TEMP/package/ergopti_plus/windows/ErgoptiPlus.exe" `
+            -Checkout "$env:GITHUB_WORKSPACE" `
+            -StartupEvidence "$env:RUNNER_TEMP/evidence.json" `
+            -EvidenceDirectory "$env:RUNNER_TEMP/windows-compiled-upgrade-evidence"
+
+      - name: Upload mandatory compiled upgrade failure evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-compiled-upgrade-evidence
+          overwrite: true
+          path: ${{ runner.temp }}/windows-compiled-upgrade-evidence
+          retention-days: 7
+          if-no-files-found: error
+
       - name: Qualify programmable hotstrings in the actual compiled package
         if: ${{ !cancelled() }}
         shell: pwsh
@@ -1184,13 +1273,32 @@ jobs:
           node-version-file: '.node-version'
 
       - name: Download launch evidence
+        if: ${{ !inputs.fast_prerelease }}
         uses: actions/download-artifact@v4
         with:
           pattern: windows-launch-evidence
           path: ${{ runner.temp }}/launch-evidence
 
+      - name: Install locked evidence validation dependencies
+        if: ${{ !inputs.fast_prerelease }}
+        run: npm ci --ignore-scripts
+
       - name: Verify mandatory jobs and launch scenarios
+        if: ${{ !inputs.fast_prerelease }}
         env:
           NEEDS: ${{ toJSON(needs) }}
           RELEASE: ${{ inputs.release }}
         run: node tools/test/desktop-ci-evidence.cjs verify windows "$RUNNER_TEMP/launch-evidence"
+      - name: Record UNQUALIFIED temporary test deferral
+        if: ${{ inputs.fast_prerelease }}
+        env:
+          NEEDS: ${{ toJSON(needs) }}
+        run: node tools/ci/dev-release-qualification.cjs --fast-action receipt --lane windows
+
+      - name: Retain the explicit unqualified test receipt
+        if: ${{ inputs.fast_prerelease }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: fast-prerelease-unqualified-windows
+          path: fast-prerelease-windows.json
+          if-no-files-found: error

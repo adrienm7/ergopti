@@ -53,6 +53,30 @@ function classifyMenuRow(row, where) {
 		row.i18n === undefined &&
 		typeof row.caption_getter === 'string' &&
 		row.caption_getter !== '';
+	if (row.disabled !== undefined) {
+		if (typeof row.disabled !== 'boolean' || !where.startsWith('menu.top_level ')) {
+			// Inert rows own their closed presentation vocabulary before the top-level gate.
+			const reason =
+				row.type === 'section_header'
+					? 'section header needs a caption without behavior metadata'
+					: row.type === 'label'
+						? 'inert label needs an identity and caption without behavior metadata'
+						: 'disabled is a boolean top-level presentation gate';
+			throw new Error(`${where}: ${reason}`);
+		}
+		if (
+			row.disabled &&
+			(!labelled ||
+				typeof row.reason_key !== 'string' ||
+				row.reason_key === '' ||
+				typeof row.id !== 'string' ||
+				row.id === '' ||
+				row.id === '---' ||
+				row.unavailable !== undefined ||
+				row.disabled_when !== undefined)
+		)
+			throw new Error(`${where}: a disabled top-level row needs its exact label and reason`);
+	}
 	if (row.unavailable !== undefined) {
 		if (row.unavailable !== 'hide' && row.unavailable !== 'grey')
 			throw new Error(`${where}: unavailable must be "hide" or "grey"`);
@@ -82,8 +106,23 @@ function classifyMenuRow(row, where) {
 	if (row.disabled_reason_key !== undefined) {
 		if (typeof row.disabled_reason_key !== 'string' || row.disabled_reason_key === '')
 			throw new Error(`${where}: disabled_reason_key must name a locale key`);
-		if (row.type !== 'command')
-			throw new Error(`${where}: disabled_reason_key is read on command rows only`);
+		if (row.type !== 'command' && row.type !== 'group')
+			throw new Error(
+				`${where}: disabled_reason_key is read on command rows only, or identified labelled groups`
+			);
+		if (
+			row.type === 'group' &&
+			(typeof row.id !== 'string' ||
+				row.id === '' ||
+				!labelled ||
+				!Array.isArray(row.disabled_when) ||
+				row.disabled_when.length === 0 ||
+				Object.keys(row.disabled_when).length !== row.disabled_when.length ||
+				Array.from(row.disabled_when).some((key) => typeof key !== 'string' || key === ''))
+		)
+			throw new Error(
+				`${where}: a reasoned group needs its identity, i18n label and nonempty disabled_when keys`
+			);
 		if (!Array.isArray(row.disabled_when) || row.disabled_when.length === 0)
 			throw new Error(`${where}: disabled_reason_key needs the disabled_when that greys the row`);
 		if (!labelled) throw new Error(`${where}: a greyed row needs an i18n label`);

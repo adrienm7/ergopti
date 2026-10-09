@@ -176,7 +176,11 @@ const IDS = [
 	'param-program-provider-label',
 	'param-program-provider-select',
 	'param-program-provider-hint',
-	'param-program-provider-status'
+	'param-program-provider-status',
+	'param-program-automation',
+	'param-program-automation-title',
+	'param-program-automation-reason',
+	'param-program-automation-list'
 ];
 for (const id of IDS) check(html.includes(`id="${id}"`), `index.html must declare #${id}`);
 
@@ -484,7 +488,8 @@ function loadPage(platform, current) {
 			check(
 				parsed !== null &&
 					parsed.profileId === vector.profile_id &&
-					parsed.numPredictions === expected,
+					parsed.numPredictions === expected &&
+					parsed.translationTarget === vector.translation_target,
 				`${vector.id}: the page reads ${JSON.stringify(parsed)}`
 			);
 		}
@@ -657,37 +662,38 @@ function loadPage(platform, current) {
 	);
 }
 
-// 10. The llm_language editor offers the host's languages, the interface
-//     language first, starts from the binding and saves the chosen value.
-{
-	const page = loadPage('ahk');
+// 10. Free language entry belongs to the host's existing InputBox, on all drivers.
+// The page must not synthesize a locale or overwrite the stored binding value.
+for (const platform of ['ahk', 'hs', 'linux']) {
+	const page = loadPage(platform);
 	vm.runInContext("doConfirm('llm_translate_selection')", page.context);
+	check(page.posted.length === 1, 'language choice is handed off once');
+	const handoff = page.posted[0];
 	check(
-		page.byId['param-language'].hidden === false &&
-			page.byId['param-input'].hidden === true &&
-			page.byId['param-vision'].hidden === true,
-		'the language editor replaces the text field'
+		handoff && handoff.action === 'confirm' && handoff.id === 'llm_translate_selection',
+		'exact language action is handed to its native parameter owner'
 	);
 	check(
-		page.byId['param-language-label'].textContent === 'Translate into',
-		'the language label is shown'
-	);
-	check(page.byId['param-language-select'].value === 'ja', 'the editor starts from the binding');
-	check(
-		page.byId['param-language-select'].children[0].value === 'ui',
-		'the interface language comes first'
-	);
-	page.byId['param-language-select'].value = 'ui';
-	page.keydown({ key: 'Enter', code: 'Enter' });
-	check(
-		page.posted.length === 1 &&
-			page.posted[0].id === 'llm_translate_selection' &&
-			page.posted[0].parameter === 'ui',
-		'Enter saves the chosen language'
+		handoff && !Object.hasOwn(handoff, 'parameter'),
+		'the page cannot invent a target-language receipt'
 	);
 	check(
-		vm.runInContext("parseParameter('llm_language', 'xx')", page.context) === null,
-		'a language the host does not offer is refused'
+		vm.runInContext('editing === null', page.context),
+		'the closed locale catalogue never opens'
+	);
+	page.context.__value = 'translate|2|Esperanto';
+	const receipt = vm.runInContext('parseLlmPrompt(__value)', page.context);
+	check(
+		receipt &&
+			receipt.profileId === 'translate' &&
+			receipt.numPredictions === 2 &&
+			receipt.translationTarget === 'Esperanto',
+		'the typed per-binding target stays literal'
+	);
+	page.context.__value = 'rewrite|2|Esperanto';
+	check(
+		vm.runInContext('parseLlmPrompt(__value)', page.context) === null,
+		'a target cannot silently change an unrelated prompt'
 	);
 }
 
@@ -844,6 +850,57 @@ for (const platform of ['hs', 'linux', 'ahk']) {
 	);
 }
 
+// 14. Native readonly automation inventory remains separate from script assignment.
+{
+	const page = loadPage('hs');
+	vm.runInContext(
+		`programProviders={choices:[{key:'8:1',label:'Owned script.py'}]};
+		programProviderStrings={manual:'Manual',unavailableBinding:'Translated native unavailable'};
+		doConfirm('run_program'); appendProgramArgument('literal before native query')`,
+		page.context
+	);
+	page.byId['param-program-executable'].value = '/private/literal tool';
+	vm.runInContext(
+		`updateAutomationProviders({title:'Apple Shortcuts',choices:[
+		{key:'automation:9:1',label:'日本 e\\u0301\\n<script>private name</script>',available:false}],truncated:false})`,
+		page.context
+	);
+	check(page.byId['param-program-automation'].hidden === false, 'actual native inventory appears');
+	check(
+		page.byId['param-program-automation-title'].textContent === 'Apple Shortcuts',
+		'separate provider identity'
+	);
+	check(
+		page.byId['param-program-automation-reason'].textContent === 'Translated native unavailable',
+		'existing translated unavailable reason'
+	);
+	check(
+		page.byId['param-program-automation-list'].children[0].textContent ===
+			'日本 e\u0301\n<script>private name</script>',
+		'native names remain literal Unicode text'
+	);
+	check(
+		page.byId['param-program-provider-select'].children.length === 2,
+		'readonly workflows never enter script select'
+	);
+	check(
+		page.byId['param-program-executable'].value === '/private/literal tool',
+		'asynchronous native update preserves manual executable'
+	);
+	check(
+		page.byId['param-program-arguments'].querySelectorAll('textarea')[0].value ===
+			'literal before native query',
+		'asynchronous native update preserves literal arguments'
+	);
+	check(page.posted.length === 0, 'inventory update cannot confirm an automation');
+	page.byId['param-save'].dispatch('click');
+	check(
+		page.posted.length === 1 &&
+			JSON.parse(page.posted[0].parameter).executable === '/private/literal tool',
+		'manual literal assignment remains available'
+	);
+}
+
 // Parser controls qualify receipt admission only; native Hammerspoon runs in CI.
 {
 	const controls = spawnSync(
@@ -916,8 +973,42 @@ for (const platform of ['hs', 'linux', 'ahk']) {
 		'Shortcuts parser and owned registration controls complete'
 	);
 	check(
-		/Ran 20 tests in /.test(parser.stderr) && /\nOK\s*$/.test(parser.stderr),
-		'all twenty Shortcuts parser and diagnostic controls execute without skip'
+		/Ran 35 tests in /.test(parser.stderr) && /\nOK\s*$/.test(parser.stderr),
+		'all eighteen original, twelve same-principal, three failure-refinement and two budget controls execute without skip'
+	);
+	const parserSource = fs.readFileSync(
+		path.join(ROOT, 'tools/diagnostics/apple_shortcuts_probe/test_probe.py'),
+		'utf8'
+	);
+	const originalControls =
+		parserSource.split('class PermissionPreflightControls(')[0].trimEnd() + '\n';
+	check(
+		require('node:crypto').createHash('sha256').update(originalControls).digest('hex') ===
+			'df1903edc2398f0a5385f2bdc9c8217850ce4a0b9d346977070013c589e81074',
+		'all eighteen original Shortcuts control bodies remain byte-exact'
+	);
+}
+
+// Portable signed-query protocol/provenance references run on every host.
+// Actual nonreaping pipe controls and native Swift/SB execution are Darwin CI-owned.
+{
+	const reference = spawnSync(
+		process.platform === 'win32' ? 'python' : 'python3',
+		['-m', 'unittest', 'test_signed_query_probe.ProtocolControls'],
+		{
+			cwd: path.join(ROOT, 'tools', 'diagnostics', 'program_actions'),
+			encoding: 'utf8',
+			timeout: 30000,
+			env: { ...process.env, PYTHONDONTWRITEBYTECODE: '1' }
+		}
+	);
+	check(
+		!reference.error && reference.signal === null && reference.status === 0,
+		'signed-query protocol/provenance controls complete'
+	);
+	check(
+		/Ran 9 tests in /.test(reference.stderr) && /\nOK\s*$/.test(reference.stderr),
+		'all nine independent signed-query references execute without skip'
 	);
 }
 

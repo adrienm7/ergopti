@@ -2436,7 +2436,7 @@ description_key = "menu.gestures.tap_4"
 id = "swipe_2_left"
 platforms = ["hs", "linux"]
 default = "none"
-recommended_per_platform = { hs = "arrow_up", linux = "none" }
+recommended = "none"
 input_altering = true
 type = "action"
 description_key = "menu.gestures.swipe_2_left"
@@ -3465,12 +3465,14 @@ description_key = "menu.layout.ergopti_alt_gr"
 superseded_reason_key = "menu.layout.superseded_ergopti_only"
 
 [[features.layout]]
-id = "ergopti_plus"
+id = "ergopti_variant"
 platforms = ["ahk"]
-default = false
-recommended = true
+reason_key = "platform_reason.legacy_helpers_use_windows_scan_code_hotkeys"
+default = "none"
+recommended = "ergopti_plus"
 input_altering = true
-type = "boolean"
+type = "enum"
+enum_values = ["none", "ergopti", "ergopti_plus"]
 description_key = "menu.layout.ergopti_plus"
 superseded_reason_key = "menu.layout.superseded_ergopti_only"
 
@@ -3837,6 +3839,9 @@ greyed_when_paused = true
 [[menu.top_level]]
 id = "agent"
 greyed_when_paused = true
+disabled = true
+i18n = "menu.agent.title"
+reason_key = "menu.agent.not_ready"
 
 [[menu.top_level]]
 id = "---"
@@ -4074,21 +4079,6 @@ disabled_when_off = true
 health_dot = false
 platforms = ["ahk", "hs", "linux"]
 
-[[menu.llm_menu]]
-type = "group"
-id = "llm_live_mode"
-i18n = "menu.llm.live_mode_title"
-disabled_when_off = true
-health_dot = false
-platforms = ["ahk", "hs", "linux"]
-
-# Fixed Off choice; prompts remain the native live-mode provider's data.
-[[menu.llm_live_controls]]
-type = "check"
-id = "llm_live_mode_off"
-i18n = "menu.llm.live_mode_off"
-checked_when = ["llm_live_is_off"]
-disabled_when = ["llm_live_off_ready"]
 
 [[menu.llm_menu]]
 type = "group"
@@ -4217,10 +4207,6 @@ type = "---"
 platforms = ["ahk"]
 unavailable = "hide"
 
-[[menu.llm_live_off_boundary]]
-type = "---"
-platforms = ["hs"]
-unavailable = "hide"
 
 [[menu.llm_trigger_menu]]
 type = "list"
@@ -5608,6 +5594,9 @@ i18n = "menu.hotstrings.header_common"
 [[menu.hotstrings_menu]]
 type = "list"
 id = "hotstring_categories_standard"
+# Linux retains its inert empty-category marker; other drivers keep their
+# existing empty-list posture and never request this named provider status.
+status_rows.no_groups = [{ type = "label", i18n = "menu.hotstrings.no_group_loaded" }]
 
 [[menu.hotstrings_menu]]
 type = "list"
@@ -8328,6 +8317,27 @@ id = "llm_parent_content"
 i18n = "menu.llm.title"
 checked_when = ["llm_parent_enabled"]
 platforms = ["hs"]
+unavailable = "hide"
+
+# Linux completes the existing native children before declaring either parent.
+[[menu.llm_native_parent_linux]]
+type = "group"
+id = "llm_parent_linux"
+i18n = "menu.llm.title"
+checked_when = ["llm_parent_enabled"]
+disabled_when = ["llm_parent_ready"]
+disabled_reason_key = "menu.llm.unavailable"
+platforms = ["linux"]
+unavailable = "hide"
+
+[[menu.agent_native_parent]]
+type = "group"
+id = "agent_parent_linux"
+i18n = "menu.agent.title"
+checked_when = ["agent_parent_enabled"]
+disabled_when = ["agent_parent_ready"]
+disabled_reason_key = "menu.llm.unavailable"
+platforms = ["linux"]
 unavailable = "hide"
 
 [[menu.llm_download_shortcut_frame]]

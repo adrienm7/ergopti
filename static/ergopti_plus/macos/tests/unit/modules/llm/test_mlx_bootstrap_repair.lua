@@ -41,7 +41,8 @@ local OWNED = {
 	"modules.llm.mlx_bootstrap_diagnosis", "modules.llm.mlx_deps_checker",
 	"ui.menu.menu_llm.runtime_install_offer", "ui.menu.menu_llm.mlx_repair_offer",
 	"adapters.python_interpreter", "ui.python_runtime_offer",
-	"adapters.file_system",
+	"adapters.file_system", "modules.llm.network_env", "modules.llm.opaque_network_admission",
+	"adapters.native_bootstrap_pty",
 }
 
 -- The closing lines ensure-mlx-deps.sh prints after any failed uv sync: they
@@ -134,8 +135,17 @@ local function task_api(world)
 		new = function(executable, completion, stream, args)
 			if type(stream) == "table" then args, stream = stream, nil end
 			local task = { executable = executable, args = args or {}, completion = completion, stream = stream }
-			function task:start() return self end
-			function task:terminate() return self end
+			function task:start()
+				if type(world.on_start) == "function" then world.on_start(self) end
+				if world.start_mode == "false" then return false end
+				if world.start_mode == "nil" then return nil end
+				if world.start_mode == "throw" then error("Independent native start refusal") end
+				return self
+			end
+			function task:terminate()
+				self.terminate_calls = (self.terminate_calls or 0) + 1
+				return self
+			end
 			function task:isRunning() return false end
 			function task.emit(stdout, stderr) return task.stream(task, stdout or "", stderr or "") end
 			function task.finish(code, stdout, stderr) return task.completion(code, stdout or "", stderr or "") end
@@ -183,6 +193,7 @@ local function load_world(world)
 	package.loaded["infra.logger"] = logger
 	-- Only native boundaries are doubled: the policy bytes and parser remain real.
 	package.loaded["adapters.file_system"] = {
+		exists = function(path) return fake_fs(world).attributes(path, "mode") ~= nil end,
 		read = function(path)
 			helpers.assert_true(path:find("/_shared/", 1, true) ~= nil, "native fixture reads actual shared source data")
 			local file = assert(io.open(path, "rb"))
@@ -195,6 +206,10 @@ local function load_world(world)
 			return attributes and "present" or "absent", attributes
 		end,
 	}
+	-- Load the unchanged producer with its canonical path spelling on every host.
+	local network_path = assert(package.searchpath("modules.llm.network_env", package.path))
+	network_path = network_path:gsub("\\", "/")
+	package.loaded["modules.llm.network_env"] = assert(loadfile(network_path))()
 	package.loaded["ui.download_window"] = {
 		is_active = function() return world.window_sessions > 0 end,
 		session_id = function() return world.window_sessions end,
@@ -428,6 +443,62 @@ helpers.describe("A failed MLX bootstrap names its cause (mlx-bootstrap-exit-std
 			message)
 		helpers.assert_true(message:find("No module named 'mlx'", 1, true) ~= nil, message)
 	end))
+end)
+
+helpers.describe("Native PTY caller joins the original MLX task transaction", function()
+	for _, start_mode in ipairs({ "false", "nil", "throw" }) do
+		helpers.it("retains native " .. start_mode .. " start until its exact retirement receipt", scoped(function()
+			local world = new_world()
+			world.start_mode = start_mode
+			local checker = load_world(world)
+			package.loaded["adapters.python_interpreter"]._set_deps({
+				read_head = function() return nil end,
+				realpath = function(path) return path end,
+				getenv = function() return nil end,
+				select_link_target = function() return nil end,
+				process_arch = function() return "arm64" end,
+			})
+			local retired, start_attempted, bound, pause_owner = false, false, false, nil
+			helpers.assert_true(checker.configure_pause_owner({
+				is_paused = function() return false end,
+				is_pause_transition_pending = function() return false end,
+				get_pause_epoch = function() return 0 end,
+				register_pause_owner = function(_, owner) pause_owner = owner; return true end,
+			}))
+			package.loaded["adapters.native_bootstrap_pty"] = {
+				prepare = function(source, environment, budget)
+					helpers.assert_true(source:match("/modules/llm/ensure%-mlx%-deps%.sh$") ~= nil)
+					helpers.assert_eq(budget, 1800000, "original bootstrap budget is preserved")
+					helpers.assert_eq(#environment, 3, "original bootstrap environment joins native source")
+					return {
+						executable = "/Applications/ErgoptiPlus.app/Contents/MacOS/ErgoptiPlus",
+						arguments = { "--managed-pty-worker", tostring(budget) },
+						bind_input = function(task) bound = task; return true end,
+						mark_start_attempted = function() start_attempted = true; return true end,
+						rollback = function() return true end,
+						settle = function(status) helpers.assert_eq(status, 64); return retired end,
+					}, true
+				end,
+			}
+			world.on_start = function(task)
+				helpers.assert_eq(bound, task, "private input joins the same native handle before start")
+				helpers.assert_true(start_attempted)
+				helpers.assert_true(checker.is_task_running(), "original task slot is published before start")
+			end
+			helpers.assert_eq(checker.install_for_selection(nil), false)
+			helpers.assert_eq(#world.tasks, 1, "no Python or alternate native task may be created")
+			local task = world.tasks[1]
+			helpers.assert_eq(task.executable, "/Applications/ErgoptiPlus.app/Contents/MacOS/ErgoptiPlus")
+			helpers.assert_eq(task.terminate_calls, 1, "start refusal joins the exact original rollback")
+			helpers.assert_true(checker.is_task_running(), "signal acceptance is not native settlement")
+			task.finish(64, "", "")
+			helpers.assert_true(checker.is_task_running(), "callback without receipt retains native cleanup debt")
+			helpers.assert_eq(checker.reset_bootstrap_state(), false)
+			retired = true
+			helpers.assert_true(pause_owner.pause(), "pause retries the same retained physical receipt")
+			helpers.assert_eq(checker.is_task_running(), false)
+		end))
+	end
 end)
 
 
@@ -932,10 +1003,13 @@ helpers.describe("A missing MLX runtime is announced with its install button (ml
 		-- Selecting MLX repairs it, on the native interpreter, telling the script the processor.
 		helpers.assert_true(router.select_mlx(function() end))
 		helpers.assert_eq(#world.tasks, 1)
-		helpers.assert_eq(world.tasks[1].executable, helpers.HEALTHY_PYTHON)
+		helpers.assert_eq(world.tasks[1].executable, "/bin/bash")
+		helpers.assert_true(world.tasks[1].command():find(
+			"exec '" .. helpers.HEALTHY_PYTHON .. "' -u '/tmp/fixture-pty.py'", 1, true) ~= nil,
+			"the acknowledged shell must exec only the independently admitted native Python")
 		local command = world.tasks[1].command()
 		helpers.assert_true(command:find("ERGOPTI_MLX_REPAIR=1", 1, true) ~= nil, command)
-		helpers.assert_true(command:find("ERGOPTI_NATIVE_ARCH='arm64'", 1, true) ~= nil, command)
+		helpers.assert_true(command:find("ERGOPTI_NATIVE_ARCH='\\''arm64'\\''", 1, true) ~= nil, command)
 	end))
 end)
 
@@ -1221,5 +1295,93 @@ helpers.describe("Managed network failure actions retain their native revision",
 		helpers.assert_eq(#world.dialogs[1].choices, 1)
 		helpers.assert_eq(world.dialogs[1].choices[1], package.loaded["infra.i18n"].get("network.action.retry"))
 		helpers.assert_eq(#world.spawns, 0)
+	end))
+end)
+
+helpers.describe("MLX trusted bootstrap network admission", function()
+	helpers.it("native PTY output cannot borrow the Python prelude admission", scoped(function()
+		local world = new_world()
+		local checker = load_world(world)
+		package.loaded["adapters.python_interpreter"]._set_deps({
+			read_head = function() return nil end,
+			realpath = function(path) return path end,
+			getenv = function() return nil end,
+			select_link_target = function() return nil end,
+			process_arch = function() return "arm64" end,
+		})
+		local settled = false
+		package.loaded["adapters.native_bootstrap_pty"] = {
+			prepare = function(_, _, budget)
+				return {
+					executable = "/Applications/ErgoptiPlus.app/Contents/MacOS/ErgoptiPlus",
+					arguments = { "--managed-pty-worker", tostring(budget) },
+					bind_input = function() return true end,
+					mark_start_attempted = function() return true end,
+					rollback = function() return true end,
+					settle = function(status)
+						helpers.assert_eq(status, 78)
+						settled = true
+						return true
+					end,
+				}, true
+			end,
+		}
+		speak("en")
+		helpers.assert_true(checker.install_for_selection())
+		local task = world.tasks[1]
+		helpers.assert_eq(task.executable, "/Applications/ErgoptiPlus.app/Contents/MacOS/ErgoptiPlus")
+		task.emit("", "__ERGOPTI_OPAQUE_ADMISSION_V1__:refused:verified:unavailable\n")
+		task.finish(78)
+		helpers.assert_true(settled, "the native receipt owner retains terminal settlement")
+		local cause = checker.get_failure_cause()
+		helpers.assert_true(cause.kind ~= "proxy")
+		helpers.assert_nil(cause.network_report)
+	end))
+	helpers.it("reports the pre-child automatic-route refusal using central proxy policy", scoped(function()
+		local world = new_world()
+		local checker = load_world(world)
+		speak("en")
+		helpers.assert_true(checker.install_for_selection())
+		local task = world.tasks[1]
+
+		task.emit("", "__ERGOPTI_OPAQUE_")
+		task.emit("", "ADMISSION_V1__:refused:verified:unavailable\n")
+		task.finish(78)
+		local cause = checker.get_failure_cause()
+		helpers.assert_eq(cause.kind, "proxy")
+		helpers.assert_eq(cause.network_report.message_key, "network.failure.proxy")
+		helpers.assert_eq(cause.network_report.evidence, "verified_proxy_resolution_unavailable")
+		helpers.assert_true(checker.has_failed())
+		helpers.assert_eq(task.executable, "/bin/bash")
+		local command = task.command()
+		local accepted = assert(command:find("__ERGOPTI_OPAQUE_ADMISSION_V1__:accepted", 1, true))
+		local execution = assert(command:find("exec ", 1, true))
+		helpers.assert_true(accepted < execution, "trusted admission precedes the interpreter and installer")
+		helpers.assert_true(command:sub(1, 2) == "( ", "the route exports stay in the admission subshell")
+	end))
+	helpers.it("accepted admission makes later child refusal frames non-authoritative", scoped(function()
+		local world = new_world()
+		local checker = load_world(world)
+		speak("en")
+		helpers.assert_true(checker.install_for_selection())
+		world.tasks[1].emit("", "__ERGOPTI_OPAQUE_ADMISSION_V1__:accepted\n")
+		world.tasks[1].emit("", "__ERGOPTI_OPAQUE_ADMISSION_V1__:refused:verified:unavailable\n")
+		world.tasks[1].finish(78)
+		local cause = checker.get_failure_cause()
+		helpers.assert_true(cause.kind ~= "proxy")
+		helpers.assert_nil(cause.network_report)
+	end))
+	helpers.it("bare exit78 and wrong terminal never mint proxy authority", scoped(function()
+		for _, row in ipairs({ { code = 78, stderr = "ordinary failure\n" },
+			{ code = 1, stderr = "__ERGOPTI_OPAQUE_ADMISSION_V1__:refused:verified:unavailable\n" } }) do
+			local world = new_world()
+			local checker = load_world(world)
+			speak("en")
+			helpers.assert_true(checker.install_for_selection())
+			world.tasks[1].finish(row.code, "", row.stderr)
+			local cause = checker.get_failure_cause()
+			helpers.assert_true(cause.kind ~= "proxy")
+			helpers.assert_nil(cause.network_report)
+		end
 	end))
 end)

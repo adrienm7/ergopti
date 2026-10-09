@@ -42,7 +42,7 @@ local function with_focus(mode, scenario)
 			end,
 		}
 		local window = {}
-		for _, method in ipairs({ "moveToScreen", "raise", "focus" }) do
+		for _, method in ipairs({ "moveToScreen", "unminimize", "raise", "focus" }) do
 			window[method] = function(self)
 				if mode == method then error("private native error") end
 				if method == "raise" then records.raises = records.raises + 1 end
@@ -95,7 +95,7 @@ local function with_focus(mode, scenario)
 end
 
 helpers.describe("webview focus failure outcomes", function()
-	for _, mode in ipairs({ "lookup", "screen", "moveToScreen", "raise", "focus", "app",
+	for _, mode in ipairs({ "lookup", "screen", "moveToScreen", "unminimize", "raise", "focus", "app",
 		"schedule throw", "schedule refusal", "custom schedule throw", "custom schedule refusal",
 		"owner validation", "space lookup", "space move", "space lookup refusal" }) do
 		helpers.it("rejects " .. mode .. " without false success (webview-focus-failure)", function()
@@ -104,7 +104,8 @@ helpers.describe("webview focus failure outcomes", function()
 				helpers.assert_eq(records.successes, 0)
 				helpers.assert_eq(#records.errors, 1)
 				helpers.assert_eq(records.errors[1]:find("private native error", 1, true), nil)
-				helpers.assert_eq(records.app_focuses, 0)
+				local activated_before_refusal = mode == "unminimize" or mode == "raise" or mode == "focus"
+				helpers.assert_eq(records.app_focuses, activated_before_refusal and 1 or 0)
 			end)
 		end)
 	end
@@ -115,7 +116,7 @@ helpers.describe("webview focus failure outcomes", function()
 			for _, callback in ipairs(records.deferred) do callback() end
 			helpers.assert_eq(#records.errors, 1)
 			helpers.assert_eq(records.successes, 0)
-			helpers.assert_eq(records.app_focuses, 0)
+			helpers.assert_eq(records.app_focuses, 1, "fallback failure retains the actual prior activation")
 			records.deferred[#records.deferred]()
 			helpers.assert_eq(#records.errors, 1)
 		end)

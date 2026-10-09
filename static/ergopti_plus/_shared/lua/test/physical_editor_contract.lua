@@ -38,4 +38,158 @@ return function(helpers, Editor, Window, Model)
 			s=fixture();s.options.capture=function()return nil,'unavailable' end;w=Window.new(s.options);eq(w.receive({action='ready'}),true,'Native unavailable reason renders readonly');eq(s.sent.data.reason,'window_unavailable','Unavailable owner never reports a false configuration change')
 		end)
 	end)
+	helpers.describe("Shared physical position observation request", function()
+		helpers.it("retains the native page/source guard without granting publication or browser authority", function()
+			local page, canonical, callbacks, messages, writes = true, {}, {}, {}, 0
+			local active, cancel_refused = nil, false
+			local actions = { is_assignable = function(action) return action == "none" end,
+				get_action_parameter_spec = function() end, validate_action_parameter = function() return false end,
+				split_action_parameter_key = function() end }
+			local options = { model = Model, catalogue = actions, parameter_section = "gesture_parameters",
+				positions = {}, label = function(action) return action end,
+				capture = function() return { assignments = {}, parameters = {} }, canonical end,
+				current = function(receipt) return page and rawequal(receipt, canonical) end,
+				commit = function() writes = writes + 1; return false end, picker = function() return false end,
+				emit = function() return true end, page_current = function() return page end,
+				send = function(name, packet) messages[#messages + 1] = { name, packet }; return true end,
+				translate = function(key) return key end, close = function() return true end,
+				position_available = function() return true end, position_field = "evdev" }
+			options.capture_position = function(current, receive)
+				active = {}; callbacks[#callbacks + 1] = { current = current, receive = receive, token = active }
+				return active
+			end
+			options.cancel_position = function(token)
+				if cancel_refused then return false end
+				return rawequal(token, active)
+			end
+			local window = Window.new(options)
+			eq(window.receive({ action = "ready" }), true, "actual shared session opens from native inventory")
+			eq(messages[1][2].capture, true, "controlled original position port is distinct from inventory capture")
+			eq(window.receive({ action = "capture_position", request = { request_id = 1, code = "KeyJ" } }), false,
+				"browser code cannot supply native position facts")
+			eq(#callbacks, 0, "forged request cannot enroll capture")
+			eq(window.receive({ action = "capture_position", request = { request_id = 2 } }), true, "exact page enrolls one observation")
+			eq(callbacks[1].receive({ native_code = 36, mods = { shift = true } }), true, "native code translates through the actual shared registry")
+			eq(messages[#messages][1], "captured", "position result uses its own protocol message")
+			eq(messages[#messages][2].code, "KeyJ", "registry resolves genuine evdev identity")
+			eq(messages[#messages][2].request_id, 2, "result retains the exact page request")
+			eq(writes, 0, "position observation creates no action, parameter or file write")
+			eq(callbacks[1].receive({ native_code = 37, mods = {} }), false, "duplicate native callback cannot replace the observed position")
+			eq(window.receive({ action = "save", token = 2 }), true, "unissued draft receives an explicit refusal result")
+			eq(writes, 0, "request identity is never a publication token")
+			canonical = {}
+			eq(callbacks[1].current(), false, "changed canonical source withdraws capture")
+			eq(callbacks[1].receive({ native_code = 36, mods = {} }), false, "stale source callback cannot fill a draft")
+			page = false
+			eq(window.receive({ action = "capture_position", request = { request_id = 3 } }), false, "foreign page cannot enroll")
+			eq(callbacks[1].receive({ native_code = 36, mods = {} }), false, "retired page cannot accept a late native result")
+			page, canonical = true, {}
+			local retry
+			local previous_cancel = options.cancel_position
+			local recursions = 0
+			local recurse = false
+			options.cancel_position = function(token)
+				if recurse then
+					recursions = recursions + 1
+					eq(retry.receive({ action = "cancel_position" }), false, "exact cancellation callback cannot recursively retire the same request")
+				end
+				return previous_cancel(token)
+			end
+			retry = Window.new(options)
+			eq(retry.receive({ action = "ready" }), true, "fresh page captures a separate exact inventory")
+			eq(retry.receive({ action = "capture_position", request = { request_id = 4 } }), true)
+			cancel_refused = true
+			eq(retry.receive({ action = "capture_position", request = { request_id = 5 } }), false, "refused cancellation retains the exact observation")
+			eq(#callbacks, 2, "cancellation debt forbids a successor observation")
+			eq(callbacks[2].receive({ native_code = 36, mods = {} }), false, "cancelled pending request cannot fill a draft")
+			cancel_refused = false
+			recurse = true
+			eq(retry.receive({ action = "cancel_position" }), true, "exact cancellation retries after refusal")
+			eq(recursions, 1, "native cancellation is called once, without recursive release")
+			eq(retry.receive({ action = "capture_position", request = { request_id = 6 } }), true, "settled debt permits a separate request")
+			eq(writes, 0, "capture lifecycle never creates a publication or action draft")
+
+		end)
+	end)
+
+	helpers.describe("Independent getter enrollment boundary", function()
+		helpers.it("refuses recursive enrollment during original source getter", function()
+			local canonical, window, armed, recursive, callbacks, cancels = {}, nil, false, nil, {}, 0
+			local active
+			local actions = { is_assignable = function(a) return a == "none" end,
+				get_action_parameter_spec = function() end, validate_action_parameter = function() return false end,
+				split_action_parameter_key = function() end }
+			local options = { model = Model, catalogue = actions, parameter_section = "gesture_parameters", positions = {},
+				label = function(a) return a end, capture = function() return { assignments = {}, parameters = {} }, canonical end,
+				current = function(receipt)
+					if armed then
+						armed = false
+						recursive = window.receive({ action = "capture_position", request = { request_id = 202 } })
+					end
+					return rawequal(receipt, canonical)
+				end,
+				commit = function() error("no writer authorized") end, picker = function() return false end,
+				emit = function() return true end, page_current = function() return true end,
+				send = function() return true end, translate = function(k) return k end, close = function() return true end,
+				position_available = function() return true end, position_field = "evdev",
+				capture_position = function(current, receive)
+					active = {}; callbacks[#callbacks + 1] = { current = current, receive = receive, token = active }
+					return active
+				end,
+				cancel_position = function(token) cancels = cancels + 1; return rawequal(token, active) end }
+			window = Window.new(options)
+			eq(window.receive({ action = "ready" }), true, "original normal page bootstrap")
+			armed = true
+			local accepted = window.receive({ action = "capture_position", request = { request_id = 101 } })
+			print("INDEPENDENT_GETTER_REENTRY", tostring(recursive), "OUTER", tostring(accepted), "ENROLLMENTS", #callbacks, "CANCELS", cancels)
+			eq(recursive, false, "source getter may not recursively enroll another observation")
+			eq(#callbacks, 1, "only outer request reaches the original native observation port")
+			armed = true
+			local delivered = callbacks[1].receive({ native_code = 36, mods = {} })
+			eq(recursive, false, "delivery getter cannot recursively enroll a successor request")
+			eq(#callbacks, 1, "delivery validation reserves the same original observation")
+			eq(delivered, true, "refused nested enrollment preserves the valid outer delivery")
+			window.close()
+		end)
+	end)
+
+	helpers.describe("Independent terminal getter cancellation", function()
+		helpers.it("refuses terminal emit after source getter cancels original request", function()
+			local canonical, window, armed, recursive, callbacks, cancels = {}, nil, false, nil, {}, 0
+			local active, calls, captured = nil, 0, 0
+			local actions = { is_assignable = function(a) return a == "none" end,
+				get_action_parameter_spec = function() end, validate_action_parameter = function() return false end,
+				split_action_parameter_key = function() end }
+			local options = { model = Model, catalogue = actions, parameter_section = "gesture_parameters", positions = {},
+				label = function(a) return a end, capture = function() return { assignments = {}, parameters = {} }, canonical end,
+				current = function(receipt)
+					if armed then
+						calls = calls + 1
+						if calls == 2 then
+							armed = false
+							recursive = window.receive({ action = "cancel_position" })
+						end
+					end
+					return rawequal(receipt, canonical)
+				end,
+				commit = function() error("no writer authorized") end, picker = function() return false end,
+				emit = function() return true end, page_current = function() return true end,
+				send = function(name) if name == "captured" then captured = captured + 1 end; return true end, translate = function(k) return k end, close = function() return true end,
+				position_available = function() return true end, position_field = "evdev",
+				capture_position = function(current, receive)
+					active = {}; callbacks[#callbacks + 1] = { current = current, receive = receive, token = active }
+					return active
+				end,
+				cancel_position = function(token) cancels = cancels + 1; return rawequal(token, active) end }
+			window = Window.new(options)
+			eq(window.receive({ action = "ready" }), true, "original normal page bootstrap")
+			eq(window.receive({ action = "capture_position", request = { request_id = 101 } }), true)
+			armed = true
+			local accepted = callbacks[1].receive({ native_code = 36, mods = {} })
+			print("INDEPENDENT_TERMINAL_CANCEL", tostring(recursive), "ACK", tostring(accepted), "CAPTURED", captured, "CANCELS", cancels)
+			window.close()
+			eq(recursive, true, "getter cancellation has original native retirement acknowledgement")
+			eq(captured, 0, "cancelled request must not cross terminal position emit")
+		end)
+	end)
 end

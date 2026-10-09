@@ -1,0 +1,4 @@
+[case]
+description = "Independent neutral internal variant ownership."
+drivers = ["ahk", "hs", "linux"]
+outcome = "invalid"

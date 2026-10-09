@@ -57,6 +57,7 @@ const { spawnSync } = require('node:child_process');
 const pipeline = require('./ci-pipeline.cjs');
 // Throws without bash: this test must fail, never skip, without it.
 const { bashExecutable } = require('../lib/git-bash.cjs');
+const { pythonExecutable } = require('../lib/python.cjs');
 
 const ROOT = path.resolve(__dirname, '..', '..');
 const PREFLIGHT = 'Refuse to publish an incomplete or already-taken release';
@@ -70,6 +71,43 @@ const LINUX_BUNDLE = JSON.parse(
 		'utf8'
 	)
 ).release_assets.linux_bundle;
+
+const MANAGED_PUBLICATION_ASSETS = [
+	'ollama-ergopti-native-http-darwin-arm64.tgz',
+	'ollama-ergopti-native-http-darwin-amd64.tgz',
+	'managed_ollama_release.json'
+];
+// Source dependencies are real copied files. The fixture creator never imports
+// production admission or generation code to choose its expected metadata.
+const MANAGED_PUBLICATION_SOURCES = [
+	'tools/build/verify-macos-managed-ollama-publication.py',
+	'tools/build/stage-macos-managed-ollama-catalogue.py',
+	'tools/build/build-macos-managed-ollama.py',
+	'static/ergopti_plus/_shared/modules/llm/managed_ollama_runtime.json',
+	'static/ergopti_plus/_shared/modules/llm/ollama_release.json',
+	'static/ergopti_plus/_shared/python/managed_ollama_runtime.py',
+	'static/ergopti_plus/_shared/go/native_http/transport.go',
+	'static/ergopti_plus/_shared/go/native_http/worker_darwin.go',
+	'static/ergopti_plus/_shared/go/native_http/worker_other.go',
+	'static/ergopti_plus/_shared/go/native_http/admission.go',
+	'static/ergopti_plus/_shared/go/native_http/network_bootstrap.go',
+	'static/ergopti_plus/_shared/go/native_http/network_bootstrap_posix.go',
+	'static/ergopti_plus/_shared/go/native_http/network_bootstrap_unsupported.go',
+	'static/ergopti_plus/_shared/go/native_http/transport_test.go',
+	'static/ergopti_plus/_shared/go/native_http/admission_test.go',
+	'static/ergopti_plus/_shared/go/native_http/network_bootstrap_test.go',
+	'static/ergopti_plus/_shared/go/native_http/network_bootstrap_darwin_test.go',
+	'static/ergopti_plus/_shared/modules/llm/managed_ollama_bootstrap.json',
+	'static/ergopti_plus/_shared/modules/network/proxy_policy.json',
+	'tools/diagnostics/macos_owned_process.py'
+];
+function copyManagedPublicationSources(work) {
+	for (const relative of MANAGED_PUBLICATION_SOURCES) {
+		const target = path.join(work, relative);
+		fs.mkdirSync(path.dirname(target), { recursive: true });
+		fs.copyFileSync(path.join(ROOT, relative), target);
+	}
+}
 
 const failures = [];
 const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'ergopti-release-reruns-'));
@@ -184,6 +222,8 @@ function repository(name, branch) {
 		'tools/build/publish-verified-release.cjs',
 		'tools/build/macos-release-publication.cjs',
 		'tools/build/macos-release-archives.cjs',
+		'tools/ci/dev-release-qualification.cjs',
+		'.github/ci/dev_release_qualification_exceptions.json',
 		'tools/lib/paths.cjs',
 		'static/ergopti_plus/_shared/modules/updater/defaults.json',
 		'static/ergopti_plus/_shared/modules/updater/channels.json',
@@ -193,6 +233,7 @@ function repository(name, branch) {
 		fs.mkdirSync(path.dirname(target), { recursive: true });
 		fs.copyFileSync(path.join(ROOT, relative), target);
 	}
+	copyManagedPublicationSources(work);
 	return work;
 }
 
@@ -662,7 +703,18 @@ function uploadedLayout(channel) {
 			for (const candidate of pipeline.steps(job.body)) {
 				if (!/uses:\s*actions\/upload-artifact/.test(candidate.body)) continue;
 				if (!/^ {10}name:\s*assets-/m.test(candidate.body)) continue;
-				const listed = uploadPaths(candidate.body);
+				const listed = uploadPaths(candidate.body).flatMap((listedPath) => {
+					if (listedPath !== '${{ env.ERGOPTI_OLLAMA_ASSET }}') return [listedPath];
+					assert.equal(
+						job.id,
+						'managed-ollama-native',
+						'the runtime asset has one native producer owner'
+					);
+					assert.equal(candidate.name, 'Upload the actual managed native release asset');
+					// The real matrix uploads each archive alone: both artifact roots are
+					// its filename. Independent filenames model these two actual legs.
+					return MANAGED_PUBLICATION_ASSETS.slice(0, 2);
+				});
 				const dirs = listed.map((listedPath) => listedPath.split('/').slice(0, -1));
 				const common = [];
 				for (
@@ -688,7 +740,7 @@ function uploadedLayout(channel) {
 					const pattern = new RegExp(
 						`^${leaf.replace(/[.+?^$(){}|[\]\\]/g, '\\$&').replace(/\*/g, '[^/]*')}$`
 					);
-					for (const name of requiredAssets(channel)) {
+					for (const name of [...requiredAssets(channel), ...MANAGED_PUBLICATION_ASSETS]) {
 						if (!pattern.test(name)) continue;
 						if (layout.has(name)) throw new Error(`two assets-* upload paths match ${name}`);
 						layout.set(name, [...below.slice(0, -1), name].join('/'));
@@ -714,7 +766,8 @@ function preflight(
 		cwd = runner,
 		channel = 'dev',
 		sha = head,
-		uploaded = false
+		uploaded = false,
+		managedMutation = null
 	} = {}
 ) {
 	const assets = path.join(cwd, 'release-assets');
@@ -727,6 +780,38 @@ function preflight(
 		fs.mkdirSync(path.dirname(target), { recursive: true });
 		fs.writeFileSync(target, `${name}\n`);
 	}
+	// Execute the real new preflight owner against independent, physically
+	// bound synthetic publication assets and actual valid ZIP/TAR files.
+	// These bytes deliberately cannot qualify native production or signing.
+	copyManagedPublicationSources(cwd);
+	for (const relative of [
+		'tools/build/release-channel.cjs',
+		'static/ergopti_plus/_shared/ui/update_channels.js',
+		'static/ergopti_plus/_shared/modules/updater/defaults.json',
+		'static/ergopti_plus/_shared/modules/updater/channels.json'
+	]) {
+		const target = path.join(cwd, relative);
+		fs.mkdirSync(path.dirname(target), { recursive: true });
+		fs.copyFileSync(path.join(ROOT, relative), target);
+	}
+	const managed = spawnSync(
+		pythonExecutable(),
+		[
+			path.join(ROOT, 'tools/test/fixtures/managed_native_publication.py'),
+			'--repository',
+			cwd,
+			'--assets',
+			assets,
+			'--tag',
+			tag,
+			'--channel',
+			channel
+		],
+		{ cwd, env: GIT_ENV, encoding: 'utf8', timeout: 60000 }
+	);
+	assert.equal(managed.error, undefined, 'independent publication fixture must start');
+	assert.equal(managed.signal, null, 'independent publication fixture must close');
+	assert.equal(managed.status, 0, managed.stderr || managed.stdout);
 	if (uploaded) {
 		const flattened = runScript(flattenScript, cwd, {});
 		if (flattened.status !== 0) return { ...flattened, ghCalls: [] };
@@ -749,6 +834,7 @@ function preflight(
 			stderr: ''
 		})
 	});
+	if (managedMutation) managedMutation(assets);
 	if (missingAsset && fs.existsSync(path.join(assets, missingAsset)))
 		fs.unlinkSync(path.join(assets, missingAsset));
 	const ghLog = stubLog('gh');
@@ -948,6 +1034,8 @@ check('a failed release lookup fails the preflight instead of being read as "no 
 check('an unreachable origin fails the preflight instead of reading as "tag free"', () => {
 	const offline = path.join(scratch, 'offline-work');
 	git(scratch, 'clone', '--quiet', path.join(scratch, 'runner-origin.git'), offline);
+	// A real candidate checkout is required before its source-bound catalogue.
+	git(offline, 'checkout', '--quiet', '--detach', head);
 	git(offline, 'remote', 'set-url', 'origin', path.join(scratch, 'no-such-origin.git'));
 	const result = preflight('v0.0.0-dev.10', { cwd: offline });
 	assert.notEqual(result.status, 0);
@@ -1028,7 +1116,10 @@ check('the stable channel compares stable tags only', () => {
 const createScript = scriptOf(pipeline.step(releaseJob, CREATE_RELEASE), CREATE_RELEASE);
 
 /** Runs the release creation with `prerelease`; returns the result and gh's arguments. */
-function createRelease(prerelease, { mode = '', missing = '', incomplete = '' } = {}) {
+function createRelease(
+	prerelease,
+	{ mode = '', missing = '', incomplete = '', fastPrerelease = 'false' } = {}
+) {
 	const assets = path.join(runner, 'release-assets');
 	fs.rmSync(assets, { recursive: true, force: true });
 	fs.mkdirSync(assets);
@@ -1055,6 +1146,7 @@ function createRelease(prerelease, { mode = '', missing = '', incomplete = '' } 
 		{
 			TAG: 'v0.0.0-dev.30',
 			PRERELEASE: prerelease,
+			ERGOPTI_FAST_PRERELEASE: fastPrerelease,
 			TITLE: 'Ergopti v0.0.0-dev.30',
 			GITHUB_SHA: head,
 			GITHUB_REPOSITORY: REPOSITORY,
@@ -1078,6 +1170,48 @@ function createRelease(prerelease, { mode = '', missing = '', incomplete = '' } 
 		state: JSON.parse(fs.readFileSync(stateFile, 'utf8'))
 	};
 }
+
+check(
+	'full release fixtures admit the real policy with explicit false (release-full-default-policy)',
+	() => {
+		const result = createRelease('true');
+		assert.equal(result.status, 0, result.stdout + result.stderr);
+		assert.ok(
+			!result.args.includes('--notes'),
+			'Full execution cannot borrow fast prerelease notes.'
+		);
+	}
+);
+
+check(
+	'an unbound fast release request refuses before publication (release-fast-unbound-refusal)',
+	() => {
+		const result = createRelease('true', { fastPrerelease: 'true' });
+		assert.notEqual(result.status, 0);
+		assert.match(result.stderr, /Temporary fast prerelease is not authorized for this context\./);
+		assert.deepEqual(
+			result.calls,
+			[],
+			'An unauthorized fast request cannot call the publication port.'
+		);
+	}
+);
+
+check(
+	'missing and malformed fast release input refuse before publication (release-fast-input-refusal)',
+	() => {
+		for (const fastPrerelease of ['', 'TRUE', '1']) {
+			const result = createRelease('true', { fastPrerelease });
+			assert.notEqual(result.status, 0);
+			assert.match(result.stderr, /Missing Boolean fast prerelease input\./);
+			assert.deepEqual(
+				result.calls,
+				[],
+				'Malformed policy input cannot call the publication port.'
+			);
+		}
+	}
+);
 
 /** Splits `gh release create` arguments into the tag, its options and its files. */
 function parseCreate(args) {
@@ -1352,6 +1486,44 @@ check('published historical resume does not require rebuilt preferred archive', 
 	});
 	assert.equal(result.status, 0, result.stdout + result.stderr);
 	assert.equal(result.outputs.create_release, 'false');
+});
+
+// Actual preflight source remains unchanged: these corrupt only private bytes.
+for (const name of MANAGED_PUBLICATION_ASSETS) {
+	check('fresh publication refuses missing managed asset ' + name, () => {
+		const result = preflight('v0.0.0-dev.51', { missingAsset: name });
+		assert.notEqual(result.status, 0);
+		assert.deepEqual(result.outputs, {});
+		assert.deepEqual(result.ghCalls, [], 'refused bytes cause no publication lookup');
+	});
+}
+check('both actual native matrix uploads resolve to their exact archive filenames', () => {
+	const layout = uploadedLayout('dev');
+	for (const name of MANAGED_PUBLICATION_ASSETS) {
+		assert.equal(layout.get(name), name, 'single-file native/catalogue artifacts are flat');
+	}
+});
+check('fresh publication refuses changed managed asset bytes', () => {
+	const result = preflight('v0.0.0-dev.52', {
+		managedMutation: (assets) =>
+			fs.appendFileSync(path.join(assets, MANAGED_PUBLICATION_ASSETS[0]), 'foreign')
+	});
+	assert.notEqual(result.status, 0);
+	assert.deepEqual(result.outputs, {});
+	assert.deepEqual(result.ghCalls, []);
+});
+check('fresh publication refuses stale managed catalogue source', () => {
+	const result = preflight('v0.0.0-dev.53', {
+		managedMutation: (assets) => {
+			const file = path.join(assets, MANAGED_PUBLICATION_ASSETS[2]);
+			const catalogue = JSON.parse(fs.readFileSync(file, 'utf8'));
+			catalogue.repository_commit = '0'.repeat(40);
+			fs.writeFileSync(file, JSON.stringify(catalogue) + '\n');
+		}
+	});
+	assert.notEqual(result.status, 0);
+	assert.deepEqual(result.outputs, {});
+	assert.deepEqual(result.ghCalls, []);
 });
 
 // ==========================================

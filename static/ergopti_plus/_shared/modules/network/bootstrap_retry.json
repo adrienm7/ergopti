@@ -1,0 +1,6 @@
+{
+	"schema_version": 1,
+	"admission_seconds": 30,
+	"idle_seconds": 60,
+	"retirement_seconds": 600
+}

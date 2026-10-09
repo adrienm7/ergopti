@@ -22,6 +22,7 @@
 --- ==============================================================================
 
 local M = {}
+local Translate = require("llm.translate")
 
 
 
@@ -58,6 +59,14 @@ M.MAX_ID_LENGTH = 128
 function M.parse(value)
 	if type(value) ~= "string" then return nil, "not a string" end
 	local profile_id, count = value:match("^([^|]*)|(.*)$")
+	local target
+	if count then
+		local count_field, target_field = count:match("^([^|]*)|(.*)$")
+		if count_field then
+			if profile_id ~= "translate" or not Translate.is_language_text(target_field) then return nil, "invalid translation target" end
+			count, target = count_field, target_field
+		end
+	end
 	if not profile_id then profile_id, count = value, nil end
 	if profile_id == "" then return nil, "empty profile id" end
 	if #profile_id > M.MAX_ID_LENGTH then return nil, "profile id too long" end
@@ -68,7 +77,7 @@ function M.parse(value)
 	if n < M.MIN_PREDICTIONS or n > M.MAX_PREDICTIONS then
 		return nil, "prediction count out of range"
 	end
-	return { profile_id = profile_id, num_predictions = n }, nil
+	return { profile_id = profile_id, num_predictions = n, translation_target = target }, nil
 end
 
 --- Tells whether a binding value is syntactically valid.
@@ -82,9 +91,10 @@ end
 --- @param profile_id string A valid profile id.
 --- @param num_predictions number|nil A count of its own, or nil for the menu setting.
 --- @return string value The encoded parameter.
-function M.format(profile_id, num_predictions)
+function M.format(profile_id, num_predictions, translation_target)
 	local value = num_predictions == nil and profile_id
 		or (profile_id .. M.SEPARATOR .. tostring(num_predictions))
+	if translation_target ~= nil then value = value .. M.SEPARATOR .. translation_target end
 	local parsed, err = M.parse(value)
 	if not parsed then error("prompt_action.format: " .. tostring(err)) end
 	return value

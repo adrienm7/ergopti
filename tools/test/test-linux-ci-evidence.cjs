@@ -27,7 +27,7 @@ const { spawnSync } = require('child_process');
 const { bashExecutable } = require('../lib/git-bash.cjs');
 const { findRuntime, run: runLinux } = require('./run-linux-lua.cjs');
 const { verifyAggregate } = require('./linux-ci-evidence.cjs');
-const pipeline = require('./ci-pipeline.cjs');
+const pipeline = require('./ci-full-default.cjs');
 
 const ROOT = path.resolve(__dirname, '..', '..');
 const MANIFEST = JSON.parse(

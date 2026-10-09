@@ -100,4 +100,31 @@ function M.opaque_prelude(tag)
 	return build_prelude(tag, true)
 end
 
+--- Admits the bundled managed HTTP receiver without materializing system aliases.
+--- The caller sets PYTHON_BIN to its pinned runtime before this prelude. The
+--- native transport subsequently resolves each exact request and redirect URL.
+--- @param tag string Child log prefix.
+--- @return string|nil prelude
+--- @return string|nil err
+function M.managed_http_prelude(tag)
+	local root = driver_root()
+	if not root or not M.policy_path() then return nil, "the bundled managed network policy is missing" end
+	local directory = root .. "/platform/network"
+	if not FileSystem.exists(directory .. "/native_http.py") then
+		return nil, "the bundled managed network receiver is missing"
+	end
+	-- The canonical receiver validates the exact bundle path and executable
+	-- device/inode. This probe performs no network lookup or request and keeps
+	-- inherited environment selectors intact, including no_proxy precedence.
+	local probe = "import importlib.util,sys; s=importlib.util.spec_from_file_location('ergopti_native_admission',sys.argv[1]); "
+		.. "m=importlib.util.module_from_spec(s); s.loader.exec_module(m); m._resolve_worker()"
+	local prefix = text_utils.shell_quote("[" .. tostring(tag) .. "] %s\n")
+	local accepted = text_utils.shell_quote(Admission.accepted_line)
+	local refused = text_utils.shell_quote(Admission.refusal_prefix .. "unavailable:unavailable")
+	return "if \"$PYTHON_BIN\" -c " .. text_utils.shell_quote(probe) .. " " .. text_utils.shell_quote(directory .. "/native_http.py")
+		.. " >/dev/null 2>&1; then printf '%s\\n' " .. accepted .. " >&2; else printf " .. prefix
+		.. " 'The bundled native network receiver is unavailable. No download was started.' >&2; "
+		.. "printf '%s\\n' " .. refused .. " >&2; exit " .. tostring(Admission.refusal_exit_code) .. "; fi; ", nil
+end
+
 return M

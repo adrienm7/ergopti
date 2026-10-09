@@ -82,13 +82,14 @@ local function with_rows(opts, scenario)
 		local record = {
 			runtime_backend = opts.backend,
 			switches = {},
-			dialogs = 0,
+			dialogs = 0, process_commands = 0,
 			notices = {},
 			mlx = new_checker(opts.mlx_installed ~= false),
 			ollama = new_checker(opts.ollama_installed ~= false, true),
 		}
 		local state = {
 			llm_backend = opts.backend,
+			llm_enabled = opts.enabled ~= false,
 			llm_model = "current-model",
 			llm_model_mlx = "mlx-model",
 			llm_model_ollama = "ollama-model",
@@ -125,7 +126,10 @@ local function with_rows(opts, scenario)
 
 		local previous_execute = os.execute
 		local previous_hs_execute = hs.execute
-		os.execute = function() return true end
+		os.execute = function()
+			record.process_commands = record.process_commands + 1
+			return true
+		end
 		hs.execute = function() return opts.arch or "arm64" end
 		local ok, err = xpcall(function()
 			local BackendPanel = require("ui.menu.menu_llm.backend_panel")
@@ -133,7 +137,10 @@ local function with_rows(opts, scenario)
 				state = state,
 				keymap = { set_llm_backend_name = function() return true end },
 				paused = false,
-				models_mgr = {},
+				models_mgr = { stop_mlx_server_if_needed = function(done)
+					record.stops = (record.stops or 0) + 1
+					return done()
+				end },
 				get_display_model_name = function(name) return name end,
 				switch_model = function(model)
 					record.switches[#record.switches + 1] = {
@@ -300,6 +307,63 @@ helpers.describe("The MLX row explains an unsupported Mac and offers Ollama (mlx
 			helpers.assert_eq(#record.switches, 1, "« Use Ollama » runs the Ollama row's own selection")
 			helpers.assert_eq(record.switches[1].model, "ollama-model")
 			helpers.assert_eq(state.llm_backend, "ollama")
+		end)
+	end)
+end)
+
+helpers.describe("backend-before-enable configuration", function()
+	helpers.it("selects absent Ollama from failed MLX while AI stays off", function()
+		with_rows({ backend = "mlx", enabled = false, mlx_installed = false,
+			ollama_installed = false }, function(rows, record, state)
+			helpers.assert_eq(rows[ROW.ollama].action(), true)
+			helpers.assert_eq(state.llm_backend, "ollama")
+			helpers.assert_eq(record.runtime_backend, "ollama")
+			helpers.assert_eq(state.llm_enabled, false)
+			helpers.assert_eq(record.stops, 1, "the actual old-backend stop boundary remains required")
+			helpers.assert_eq(record.dialogs, 0)
+			helpers.assert_eq(record.ollama.installs, 0)
+			helpers.assert_eq(record.mlx.installs, 0)
+			helpers.assert_eq(#record.switches, 1)
+			helpers.assert_eq(record.switches[1].model, "ollama-model")
+			helpers.assert_eq(record.process_commands, 0, "configuration cannot stop a personal process")
+		end)
+	end)
+	helpers.it("selects absent MLX preference without installing while AI is off", function()
+		with_rows({ backend = "api", enabled = false, mlx_installed = false }, function(rows, record, state)
+			helpers.assert_eq(rows[ROW.mlx].action(), true)
+			helpers.assert_eq(state.llm_backend, "mlx")
+			helpers.assert_eq(record.runtime_backend, "mlx")
+			helpers.assert_eq(state.llm_enabled, false)
+			helpers.assert_eq(record.mlx.installs, 0)
+			helpers.assert_eq(record.dialogs, 0)
+			helpers.assert_eq(#record.switches, 1)
+			helpers.assert_eq(record.switches[1].model, "mlx-model")
+			helpers.assert_eq(record.process_commands, 0, "configuration cannot stop a personal process")
+		end)
+	end)
+	helpers.it("selects API while MLX is absent without repairing it", function()
+		with_rows({ backend = "mlx", enabled = false, mlx_installed = false }, function(rows, record, state)
+			helpers.assert_eq(rows[ROW.api].action(), true)
+			helpers.assert_eq(state.llm_backend, "api")
+			helpers.assert_eq(record.runtime_backend, "api")
+			helpers.assert_eq(record.stops, 1)
+			helpers.assert_eq(record.mlx.installs, 0)
+			helpers.assert_eq(record.dialogs, 0)
+			helpers.assert_eq(state.llm_enabled, false)
+			helpers.assert_eq(record.process_commands, 0, "configuration cannot stop a personal process")
+		end)
+	end)
+end)
+
+helpers.describe("off-state current backend reselect", function()
+	helpers.it("does not install an absent current runtime or stop processes", function()
+		with_rows({ backend = "mlx", enabled = false, mlx_installed = false }, function(rows, record, state)
+			helpers.assert_eq(rows[ROW.mlx].action(), true)
+			helpers.assert_eq(state.llm_backend, "mlx")
+			helpers.assert_eq(state.llm_enabled, false)
+			helpers.assert_eq(record.mlx.installs, 0)
+			helpers.assert_eq(record.process_commands, 0)
+			helpers.assert_eq(#record.switches, 0)
 		end)
 	end)
 end)

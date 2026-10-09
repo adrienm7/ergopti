@@ -49,7 +49,6 @@ _LMLS_Canonical() {
 		Map("id", "llm_model",               "off", false, "dot", true),
 		Map("id", "llm_profile",             "off", true,  "dot", false),
 		Map("id", "llm_trigger",             "off", true,  "dot", false),
-		Map("id", "llm_live_mode",           "off", true,  "dot", false),
 		Map("id", "llm_generation_settings", "off", true,  "dot", false),
 		Map("id", "llm_display",             "off", true,  "dot", false),
 		Map("id", "llm_navigation",          "off", true,  "dot", false)
@@ -65,10 +64,11 @@ _LMLS_SharedDir() {
 ; llm_menu that are visible on "ahk". Linux's two inline `list` rows and the
 ; separator between them are not settings rows and are filtered out here exactly
 ; as _LLM_MenuLayout_Rows() filters them at runtime.
-_LMLS_ManifestRows() {
+_LMLS_ManifestRows(Source := unset) {
 	path := _LMLS_SharedDir() . "\modules\menu\menu_manifest.json"
-	content := ""
-	try content := FileRead(path, "UTF-8")
+	content := IsSet(Source) ? Source : ""
+	if !IsSet(Source)
+		try content := FileRead(path, "UTF-8")
 	Assert(content != "", "_shared/modules/menu/menu_manifest.json must be readable")
 	parsed := JsonParse(content)
 	Assert(parsed is Map && parsed.Has("llm_menu"), "menu_manifest.json must have an 'llm_menu' array")
@@ -216,17 +216,17 @@ _LMLS_CurrentGroupSourceAndDataControls() {
 	_LMLS_CurrentRowTypesPolicy(_LMLS_ManifestRows())
 }
 
-; The five fixed parents are declared groups; backend/model/profile remain native.
+; The four fixed parents are declared groups; backend/model/profile remain native.
 _LMLS_CurrentRowTypesPolicy(Rows) {
 	Groups := 0
 	for Row in Rows {
 		if Row["id"] == "llm_trigger" || Row["id"] == "llm_display" || Row["id"] == "llm_navigation"
-			|| Row["id"] == "llm_live_mode" || Row["id"] == "llm_generation_settings" {
+			|| Row["id"] == "llm_generation_settings" {
 			AssertEqual("group", Row["type"], "fixed LLM parents require shared group ownership")
 			Groups += 1
 		} else AssertEqual("dynamic", Row["type"], "other native dynamic domains retain their existing API")
 	}
-	AssertEqual(5, Groups, "exactly the selected genuine fixed parents have shared group ownership")
+	AssertEqual(4, Groups, "exactly the selected genuine fixed parents have shared group ownership")
 }
 Test("llm-menu-layout-shared: true canonical groups require executable native source owners", _LMLS_CurrentGroupSourceAndDataControls)
 
@@ -234,7 +234,8 @@ Test("llm-menu-layout-shared: true canonical groups require executable native so
 ; Withdraw each current row's declared route without deriving expected types.
 _LMLS_CurrentRowTypeWithdrawalControls() {
 	Rows := _LMLS_ManifestRows()
-	AssertEqual(8, Rows.Length, "all current Windows settings rows enter the route controls")
+	_LMLS_CurrentInventoryPolicy(Rows)
+	AssertEqual(_LMLS_Canonical().Length, Rows.Length, "all current Windows settings rows enter the route controls")
 	_LMLS_CurrentRowTypesPolicy(Rows)
 	for Index, Original in Rows {
 		Mutant := []
@@ -255,3 +256,93 @@ _LMLS_CurrentRowTypeWithdrawalControls() {
 	}
 }
 Test("llm-menu-layout-shared: every current declared native route rejects its type withdrawal", _LMLS_CurrentRowTypeWithdrawalControls)
+
+; The published removal left seven handwritten canonical rows, not eight.
+; Pin their complete inventory before withdrawing any genuine current route.
+_LMLS_CurrentInventoryPolicy(Rows) {
+	Canonical := _LMLS_Canonical()
+	Types := ["dynamic", "dynamic", "dynamic", "group", "group", "group", "group"]
+	AssertEqual(7, Canonical.Length, "the independently handwritten canonical inventory remains seven")
+	AssertEqual(Canonical.Length, Rows.Length, "current LLM inventory row count")
+	for Index, Expected in Canonical {
+		AssertEqual(Expected["id"], Rows[Index]["id"], "current LLM inventory IDs and order")
+		AssertEqual(Types[Index], Rows[Index]["type"], "current LLM inventory exact route type")
+		AssertEqual(Expected["off"], Rows[Index]["disabled_when_off"], "current LLM inventory exact off policy")
+		AssertEqual(Expected["dot"], Rows[Index]["health_dot"], "current LLM inventory exact health-dot policy")
+	}
+}
+
+; Locate mutation targets in real captured JSON; expected IDs never come from it.
+_LMLS_SourceRowIndex(Parts, Id) {
+	for Index, Part in Parts {
+		Entry := JsonParse(Part["text"])
+		if Entry is Map && Entry.Has("id") && Entry["id"] == Id
+			return Index
+	}
+	throw Error("The genuine source lacks the independently selected fixture target: " . Id)
+}
+
+_LMLS_InventorySourceControl(Kind) {
+	Path := _LMLS_SharedDir() . "\modules\menu\menu_manifest.json"
+	Source := FileRead(Path, "UTF-8")
+	_LMLS_CurrentInventoryPolicy(_LMLS_ManifestRows(Source))
+	if Kind == "current"
+		return
+	Member := JsonObjectMemberSpans(Source)["llm_menu"]
+	Parts := JsonArrayElementSpans(Member["text"])
+	Profile := _LMLS_SourceRowIndex(Parts, "llm_profile")
+	Backend := _LMLS_SourceRowIndex(Parts, "llm_backend")
+	Model := _LMLS_SourceRowIndex(Parts, "llm_model")
+	Trigger := _LMLS_SourceRowIndex(Parts, "llm_trigger")
+	Values := []
+	for Part in Parts
+		Values.Push(Part["text"])
+	switch Kind {
+		case "revived":
+			; Independently retained row removed by published dd8bd7554.
+			Retired := '{"type":"group","id":"llm_live_mode","i18n":"menu.llm.live_mode_title",'
+				. '"disabled_when_off":true,"health_dot":false,"platforms":["ahk","hs","linux"]}'
+			Values.InsertAt(Trigger + 1, Retired)
+			ExpectedMessage := "current LLM inventory row count - expected: <7>, actual: <8>"
+		case "missing":
+			Values.RemoveAt(Profile)
+			ExpectedMessage := "current LLM inventory row count - expected: <7>, actual: <6>"
+		case "duplicate":
+			; Retain seven rows and four groups: cardinality alone must not admit this.
+			Values[Model] := Values[Profile]
+			ExpectedMessage := "current LLM inventory IDs and order - expected: <llm_model>, actual: <llm_profile>"
+		case "reordered":
+			OldBackend := Values[Backend]
+			Values[Backend] := Values[Model], Values[Model] := OldBackend
+			ExpectedMessage := "current LLM inventory IDs and order - expected: <llm_backend>, actual: <llm_model>"
+		default:
+			throw ValueError("Unknown inventory source control")
+	}
+	ArraySource := "["
+	for Index, Value in Values
+		ArraySource .= (Index == 1 ? "" : ",") . Value
+	ArraySource .= "]"
+	MutantSource := SubStr(Source, 1, Member["start"] - 1) . ArraySource
+		. SubStr(Source, Member["start"] + Member["length"])
+	Rows := _LMLS_ManifestRows(MutantSource)
+	Refused := false
+	try _LMLS_CurrentInventoryPolicy(Rows)
+	catch as InventoryFailure {
+		if Type(InventoryFailure) != "Error" || InventoryFailure.Message != ExpectedMessage
+			throw InventoryFailure
+		Refused := true
+	}
+	AssertTrue(Refused, "a real-source inventory mutation must refuse for its independent contract reason: " . Kind)
+	AssertEqual(Source, FileRead(Path, "UTF-8"), "source controls never modify the canonical manifest")
+}
+
+Test("llm-menu-layout-shared: genuine current source retains the complete seven-row inventory",
+	_LMLS_InventorySourceControl.Bind("current"))
+Test("llm-menu-layout-shared: revived retired live row cannot join the current source inventory",
+	_LMLS_InventorySourceControl.Bind("revived"))
+Test("llm-menu-layout-shared: missing real-source row refuses before route withdrawal",
+	_LMLS_InventorySourceControl.Bind("missing"))
+Test("llm-menu-layout-shared: duplicate real-source ID cannot borrow seven-row cardinality",
+	_LMLS_InventorySourceControl.Bind("duplicate"))
+Test("llm-menu-layout-shared: reordered real-source IDs cannot borrow current route types",
+	_LMLS_InventorySourceControl.Bind("reordered"))

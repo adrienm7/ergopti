@@ -1547,7 +1547,87 @@ MenuRenderer_AppendGroup(TargetMenu, ManifestKey, GroupId, GroupBuilders, Disabl
 ; Render a named group submenu. A group declaring ``checked_when`` ticks its
 ; title from those getters, as a category's parent row shows its switch: the
 ; key-combinations group is checked while its own first-row switch is on.
+
+; Plain source/container receipts retain nested identities and callback owners.
+_MR_ReasonedGroupSnapshot(Value, Seen := unset) {
+	if !(Value is Map) && !(Value is Array)
+		return Map("value", Value)
+	if ObjGetBase(Value) != (Value is Map ? Map.Prototype : Array.Prototype)
+		return false
+	for Name in ObjOwnProps(Value)
+		return false
+	Seen := IsSet(Seen) ? Seen : Map()
+	Identity := ObjPtr(Value)
+	if Seen.Has(Identity)
+		return Seen[Identity]
+	Receipt := Map("value", Value, "fields", Map(), "size", Value is Map ? Value.Count : Value.Length)
+	Seen[Identity] := Receipt
+	if Value is Array {
+		loop Value.Length
+			if !Value.Has(A_Index)
+				return false
+	}
+	for Key, Field in Value {
+		Captured := _MR_ReasonedGroupSnapshot(Field, Seen)
+		if !Captured
+			return false
+		Receipt["fields"][Key] := Captured
+	}
+	return Receipt
+}
+
+; No native getter runs after this pure final receipt comparison.
+_MR_ReasonedGroupCurrent(Receipt, Seen := unset) {
+	if !(Receipt is Map)
+		return false
+	if !Receipt.Has("fields")
+		return true
+	Value := Receipt["value"]
+	if ObjGetBase(Value) != (Value is Map ? Map.Prototype : Array.Prototype)
+		return false
+	for Name in ObjOwnProps(Value)
+		return false
+	if (Value is Map ? Value.Count : Value.Length) != Receipt["size"]
+		return false
+	Seen := IsSet(Seen) ? Seen : Map()
+	Identity := ObjPtr(Receipt)
+	if Seen.Has(Identity)
+		return true
+	Seen[Identity] := true
+	for Key, Captured in Receipt["fields"] {
+		if !Value.Has(Key) || Type(Value[Key]) != Type(Captured["value"])
+			|| !(Value[Key] == Captured["value"]) || !_MR_ReasonedGroupCurrent(Captured, Seen)
+			return false
+	}
+	return true
+}
+
 _MR_RenderGroup(ResultMenu, Item, CategoryName, GroupBuilders, ManifestKey := "", StateGetters := "", Disabled := unset) {
+	if Item.Has("disabled_reason_key") {
+		Root := _MR_GetManifestRoot(), SourceRows := _MR_GetMenuDef(ManifestKey)
+		Source := _MR_ReasonedGroupSnapshot(SourceRows)
+		States := _MR_ReasonedGroupSnapshot(StateGetters)
+		Builders := _MR_ReasonedGroupSnapshot(GroupBuilders)
+		if !Source || !States || !Builders
+			return false
+		Id := _MR_Get(Item, "id")
+		Sub := GroupBuilders is Map && GroupBuilders.Has(Id)
+			? GroupBuilders[Id]() : _MR_BuildBuiltinGroup(Id, CategoryName)
+		if !(Sub is Menu)
+			return false
+		Row := MenuRenderer_GroupRow(ManifestKey, Id, Sub, StateGetters)
+		if !(Row is Map) || Row["submenu"] != Sub
+			return false
+		if IsSet(Disabled) && Disabled
+			Row["disabled"] := true
+		CurrentRoot := _MR_GetManifestRoot()
+		if CurrentRoot != Root || !Root.Has(ManifestKey) || Root[ManifestKey] != SourceRows
+			|| !_MR_ReasonedGroupCurrent(Source) || !_MR_ReasonedGroupCurrent(States)
+			|| !_MR_ReasonedGroupCurrent(Builders)
+			return false
+		return _MR_RenderRows(ResultMenu, [Row], ManifestKey, 1) == 1
+	}
+
 	Id    := _MR_Get(Item, "id")
 	I18nKey := _MR_Get(Item, "i18n")
 	if (Id == "" or (I18nKey == "" && _MR_Get(Item, "caption_source") != "native")) {
@@ -1782,6 +1862,21 @@ MenuRenderer_NewFromList(MenuKey, ListId, Provider) {
 	Target := Menu()
 	MenuRenderer_FillFromList(Target, MenuKey, ListId, Provider)
 	return Target
+}
+
+/**
+ * Stages one permanently disabled root presentation without building its feature.
+ * The row is not a paused feature head, so resume cannot enable it later.
+ * @param {Map} Entry Exact shared top-level declaration.
+ */
+MenuRenderer_StageDisabledTopLevel(Entry) {
+	if !(Entry is Map) || Entry.Get("disabled", false) != true
+		|| Type(Entry.Get("i18n", "")) != "String" || Entry.Get("i18n", "") == ""
+		|| Type(Entry.Get("reason_key", "")) != "String" || Entry.Get("reason_key", "") == ""
+		throw ValueError("Disabled root presentation requires its declared label and reason")
+	Label := t(Entry["i18n"]) . " — " . _MR_ReasonHead(t(Entry["reason_key"]))
+	TrayMenuStage_AddAction(Label, (*) => false)
+	TrayMenuStage_Disable(Label)
 }
 
 ; Appends row DATA to an EXISTING menu, at its current end.

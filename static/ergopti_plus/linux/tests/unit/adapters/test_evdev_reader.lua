@@ -538,3 +538,738 @@ helpers.describe("evdev_reader: is_available", function()
 	end)
 
 end)
+
+--- Exercises the actual FFI boundary with controlled symbol providers, never a kernel device.
+--- @param rows table Encoded input_event bytes.
+--- @param options table|nil Controlled provider callbacks and failures.
+--- @param body function Actual reader assertions.
+local function controlled_native_reader(rows, options, body)
+	options = options or {}
+	local old_ffi, old_preload = package.loaded.ffi, package.preload.ffi
+	local codec = require("infra.input_event")
+	local log = { reads = 0, closes = 0, opens = 0, grabs = 0 }
+	local reader
+	local symbols = {
+		open = function()
+			log.opens = log.opens + 1
+			if options.before_open then options.before_open(reader) end
+			return options.fds and options.fds[log.opens] or options.fd or 7
+		end,
+		ioctl = function(_, request)
+			log.grabs = log.grabs + 1
+			if options.before_ioctl then options.before_ioctl(reader) end
+			if options.grab_fails and request == 0x40044590 then return -1 end
+			return 0
+		end,
+		read = function(_, buffer)
+			if options.before_read then options.before_read(reader) end
+			log.reads = log.reads + 1
+			local bytes = rows[log.reads]
+			if not bytes then return -1 end
+			buffer.bytes = bytes
+			return #bytes
+		end,
+		poll = function() return 1 end,
+		close = function(fd)
+			log.closes = log.closes + 1
+			if options.before_close then options.before_close(reader, fd) end
+			return options.close_fails and -1 or 0
+		end,
+	}
+	package.loaded.ffi = nil
+	package.preload.ffi = function()
+		if options.before_load then options.before_load(reader) end
+		return {
+			cdef = function() if options.before_cdef then options.before_cdef(reader) end end,
+			sizeof = function() return 24 end,
+			new = function(kind) return kind == "struct pollfd[1]" and { [0] = {} } or { bytes = "" } end,
+			cast = function(_, value) return value end,
+			string = function(buffer, count)
+				if options.before_string then options.before_string(reader) end
+				return buffer.bytes:sub(1, count)
+			end,
+			errno = function() return 11 end,
+			C = symbols,
+		}
+	end
+	codec._reset_measurement()
+	local called, err = pcall(function()
+		reader = helpers.load_module("adapters.evdev_reader")
+		body(reader, log, symbols)
+	end)
+	package.loaded.ffi, package.preload.ffi = old_ffi, old_preload
+	codec._reset_measurement()
+	if not called then error(err, 0) end
+end
+
+helpers.describe("evdev_reader: controlled native-origin receipts", function()
+
+	helpers.it("never grants native authority to an explicit custom backend or decoded copy", function()
+		local reader = helpers.load_module("adapters.evdev_reader")
+		local backend = recorder({ encoded(1, 30, 1) })
+		backend.native = true
+		reader._set_backend(backend)
+		helpers.assert_eq(reader.open("/dev/input/event3"), true)
+		helpers.assert_eq(reader.grab(), true)
+		local event = assert(reader.read_event())
+		helpers.assert_eq(reader.capture_event(event), nil)
+		helpers.assert_eq(reader.capture_event({ type = 1, code = 30, value = 1 }), nil)
+		helpers.assert_eq(reader.close(), true)
+	end)
+
+	helpers.it("binds an opaque current receipt to actual controlled native KEY bytes", function()
+		controlled_native_reader({ encoded(1, 30, 1) }, nil, function(reader)
+			helpers.assert_eq(reader.open("/dev/input/event3", "owned"), true)
+			helpers.assert_eq(reader.grab("owned"), true)
+			local event = assert(reader.read_event("owned"))
+			local cap = reader.capture_event(event, "owned")
+			helpers.assert_eq(type(cap), "table")
+			helpers.assert_eq(next(cap), nil)
+			helpers.assert_eq(reader.capture_event(event, "foreign"), nil)
+			helpers.assert_eq(reader.capture_event(event, "owned"), cap)
+			helpers.assert_eq(reader.event_current(cap), true)
+			helpers.assert_eq(reader.source_current(cap), true)
+			local view = reader.event_view(cap)
+			helpers.assert_eq(view.code, 30)
+			helpers.assert_eq(view.value, 1)
+			helpers.assert_eq(view.source, "/dev/input/event3")
+			helpers.assert_eq(view.slot, "owned")
+			helpers.assert_eq(view.origin, "native-evdev")
+			helpers.assert_eq(view.fd, nil)
+			helpers.assert_eq(view.backend, nil)
+			view.code = 42
+			helpers.assert_eq(reader.event_view(cap).code, 30)
+			helpers.assert_eq(reader.close("owned"), true)
+		end)
+	end)
+
+	helpers.it("does not mistake equal-shaped or metamethod-equal objects for issued authority", function()
+		controlled_native_reader({ encoded(1, 30, 1) }, nil, function(reader)
+			reader.open("/dev/input/event3"); reader.grab()
+			local event = assert(reader.read_event())
+			local copy = {}; for field, value in pairs(event) do copy[field] = value end
+			helpers.assert_eq(reader.capture_event(copy), nil)
+			local cap = assert(reader.capture_event(event))
+			local alias = setmetatable({}, { __eq = function() return true end })
+			setmetatable(cap, getmetatable(alias))
+			helpers.assert_eq(reader.event_current(alias), false)
+			helpers.assert_eq(reader.event_view(alias), nil)
+			helpers.assert_eq(reader.source_current(alias), false)
+			reader.close()
+		end)
+	end)
+
+	helpers.it("refuses remapped, mutated or metatable-backed decoded event objects", function()
+		controlled_native_reader({ encoded(1, 30, 1) }, nil, function(reader)
+			reader.open("/dev/input/event3"); reader.grab()
+			local event = assert(reader.read_event())
+			local cap = assert(reader.capture_event(event))
+			event.code = 42
+			helpers.assert_eq(reader.capture_event(event), nil)
+			helpers.assert_eq(reader.event_view(cap), nil)
+			helpers.assert_eq(reader.source_current(cap), false)
+			event.code, event.remapped = 30, true
+			helpers.assert_eq(reader.capture_event(event), nil)
+			event.remapped = nil
+			setmetatable(event, { __pairs = function() error("not a native row") end })
+			helpers.assert_eq(reader.event_current(cap), false)
+			reader.close()
+		end)
+	end)
+
+	helpers.it("separates current event admission from held-origin session currency", function()
+		controlled_native_reader({ encoded(1, 42, 1), encoded(1, 30, 1) }, nil, function(reader)
+			reader.open("/dev/input/event3"); reader.grab()
+			local first = assert(reader.read_event())
+			local cap = assert(reader.capture_event(first))
+			local second = assert(reader.read_event())
+			helpers.assert_eq(reader.capture_event(first), nil)
+			helpers.assert_eq(reader.event_current(cap), false)
+			helpers.assert_eq(reader.event_view(cap), nil)
+			helpers.assert_eq(reader.source_current(cap), true)
+			local next_cap = assert(reader.capture_event(second))
+			helpers.assert_eq(reader.event_view(next_cap).read_epoch, 2)
+			reader.close()
+		end)
+	end)
+
+	helpers.it("requires an acknowledged grab before issuing any native event receipt", function()
+		controlled_native_reader({ encoded(1, 30, 1) }, nil, function(reader)
+			reader.open("/dev/input/event3")
+			local event = assert(reader.read_event())
+			helpers.assert_eq(reader.capture_event(event), nil)
+			reader.close()
+		end)
+		controlled_native_reader({ encoded(1, 30, 1) }, { grab_fails = true }, function(reader)
+			reader.open("/dev/input/event3")
+			helpers.assert_eq(reader.grab(), false)
+			helpers.assert_eq(reader.capture_event((assert(reader.read_event()))), nil)
+			reader.close()
+		end)
+	end)
+
+	helpers.it("revokes old receipts on ungrab even after the same descriptor is grabbed again", function()
+		controlled_native_reader({ encoded(1, 42, 1), encoded(1, 30, 1) }, nil, function(reader)
+			reader.open("/dev/input/event3"); reader.grab()
+			local cap = assert(reader.capture_event((assert(reader.read_event()))))
+			helpers.assert_eq(reader.ungrab(), true)
+			helpers.assert_eq(reader.source_current(cap), false)
+			helpers.assert_eq(reader.grab(), true)
+			helpers.assert_eq(reader.source_current(cap), false)
+			helpers.assert_eq(type(reader.capture_event((assert(reader.read_event())))), "table")
+			reader.close()
+		end)
+	end)
+
+	helpers.it("rejects a recycled numeric fd after native close and fresh open", function()
+		controlled_native_reader({ encoded(1, 30, 1), encoded(1, 31, 1) }, nil, function(reader, log)
+			reader.open("/dev/input/event3"); reader.grab()
+			local cap = assert(reader.capture_event((assert(reader.read_event()))))
+			helpers.assert_eq(reader.close(), true)
+			helpers.assert_eq(reader.open("/dev/input/event3"), true)
+			reader.grab()
+			helpers.assert_eq(reader.source_current(cap), false)
+			helpers.assert_eq(reader.event_current(cap), false)
+			helpers.assert_eq(type(reader.capture_event((assert(reader.read_event())))), "table")
+			helpers.assert_eq(log.opens, 2)
+			reader.close()
+		end)
+	end)
+
+	helpers.it("fences the native session on queue loss until real close and reopen", function()
+		controlled_native_reader({ encoded(1, 42, 1), encoded(0, 3, 0), encoded(0, 0, 0),
+			encoded(1, 30, 1), encoded(1, 31, 1) }, nil, function(reader)
+			reader.open("/dev/input/event3"); reader.grab()
+			local cap = assert(reader.capture_event((assert(reader.read_event()))))
+			reader.read_event()
+			helpers.assert_eq(reader.source_current(cap), false)
+			reader.read_event()
+			helpers.assert_eq(reader.capture_event((assert(reader.read_event()))), nil)
+			helpers.assert_eq(reader.close(), true)
+			reader.open("/dev/input/event3"); reader.grab()
+			helpers.assert_eq(type(reader.capture_event((assert(reader.read_event())))), "table")
+			reader.close()
+		end)
+	end)
+
+	helpers.it("refuses native rebinding while a descriptor is live and rejects prior-session receipts", function()
+		controlled_native_reader({ encoded(1, 30, 1), encoded(1, 31, 1) }, nil, function(reader)
+			reader.open("/dev/input/event3"); reader.grab()
+			local cap = assert(reader.capture_event((assert(reader.read_event()))))
+			helpers.assert_eq(reader.use_ffi_backend(), false)
+			helpers.assert_eq(reader._set_backend((recorder())), false)
+			helpers.assert_eq(reader.source_current(cap), true)
+			helpers.assert_eq(reader.close(), true)
+			helpers.assert_eq(reader.use_ffi_backend(), true)
+			reader.open("/dev/input/event3"); reader.grab()
+			helpers.assert_eq(reader.source_current(cap), false)
+			helpers.assert_eq(type(reader.capture_event((assert(reader.read_event())))), "table")
+			reader.close()
+		end)
+	end)
+
+	helpers.it("reserves read and native closure against reentrant lifecycle operations", function()
+		local options = {}
+		controlled_native_reader({ encoded(1, 42, 1), encoded(1, 30, 1) }, options, function(reader, log)
+			reader.open("/dev/input/event3"); reader.grab()
+			local cap = assert(reader.capture_event((assert(reader.read_event()))))
+			local function probe(current)
+				helpers.assert_eq(current.source_current(cap), false)
+				helpers.assert_eq(current.close(), false)
+				helpers.assert_eq(current.open("/dev/input/foreign"), false)
+				helpers.assert_eq(current._reset_backend(), false)
+				helpers.assert_eq(current._set_backend((recorder())), false)
+			end
+			options.before_read = probe
+			helpers.assert_eq(type(reader.capture_event((assert(reader.read_event())))), "table")
+			options.before_close = probe
+			helpers.assert_eq(reader.close(), true)
+			helpers.assert_eq(log.closes, 1)
+		end)
+	end)
+
+	helpers.it("holds binding reservation before lazy FFI and cdef callbacks", function()
+		local options = {}
+		local function probe(reader)
+			helpers.assert_eq(reader.open("/dev/input/foreign"), false)
+			helpers.assert_eq(reader.use_ffi_backend(), false)
+			helpers.assert_eq(reader._set_backend((recorder())), false)
+		end
+		options.before_load, options.before_cdef = probe, probe
+		controlled_native_reader({}, options, function(reader, log)
+			helpers.assert_eq(reader.open("/dev/input/event3"), true)
+			helpers.assert_eq(log.opens, 1)
+			helpers.assert_eq(reader.close(), true)
+		end)
+	end)
+
+	helpers.it("pins native symbols so later public ffi.C replacement cannot substitute a descriptor operation", function()
+		controlled_native_reader({ encoded(1, 30, 1) }, nil, function(reader, log, symbols)
+			reader.open("/dev/input/event3"); reader.grab()
+			symbols.read = function() error("foreign read") end
+			symbols.close = function() error("foreign close") end
+			symbols.ioctl = function() error("foreign ioctl") end
+			helpers.assert_eq(type(reader.capture_event((assert(reader.read_event())))), "table")
+			helpers.assert_eq(reader.close(), true)
+			helpers.assert_eq(log.reads, 1)
+			helpers.assert_eq(log.closes, 1)
+		end)
+	end)
+
+	helpers.it("checks actual bytes even if a callback temporarily substitutes the decoder primitives", function()
+		local codec = require("infra.input_event")
+		local original = codec.unpack_u16_le
+		local options = { before_string = function()
+			codec.unpack_u16_le = function(data, offset)
+				codec.unpack_u16_le = original
+				return 1 + original(data, offset)
+			end
+		end }
+		controlled_native_reader({ encoded(1, 30, 1) }, options, function(reader)
+			reader.open("/dev/input/event3"); reader.grab()
+			local event = assert(reader.read_event())
+			helpers.assert_eq(codec.unpack_u16_le, original)
+			helpers.assert_eq(reader.capture_event(event), nil)
+			reader.close()
+		end)
+	end)
+
+	helpers.it("retains native close debt without reset or numeric-fd retry", function()
+		controlled_native_reader({ encoded(1, 30, 1) }, { close_fails = true }, function(reader, log)
+			reader.open("/dev/input/event3"); reader.grab()
+			local cap = assert(reader.capture_event((assert(reader.read_event()))))
+			helpers.assert_eq(reader.close(), false)
+			helpers.assert_eq(reader.has_native_origin_debt(), true)
+			helpers.assert_eq(reader.source_current(cap), false)
+			helpers.assert_eq(reader.close(), false)
+			helpers.assert_eq(reader._reset_backend(), false)
+			helpers.assert_eq(reader._set_backend((recorder())), false)
+			helpers.assert_eq(reader.use_ffi_backend(), false)
+			helpers.assert_eq(reader.open("/dev/input/event3"), false)
+			helpers.assert_eq(log.closes, 1)
+		end)
+	end)
+
+	helpers.it("does not trust a replaceable public event-current callback for receipt views", function()
+		controlled_native_reader({ encoded(1, 30, 1) }, nil, function(reader)
+			reader.open("/dev/input/event3"); reader.grab()
+			local cap = assert(reader.capture_event((assert(reader.read_event()))))
+			reader.event_current = function() return true end
+			reader.close()
+			helpers.assert_eq(reader.event_view(cap), nil)
+			helpers.assert_eq(reader.source_current(cap), false)
+		end)
+	end)
+
+end)
+
+helpers.describe("evdev_reader: bounded native receipt lifetime", function()
+
+	helpers.it("keeps held-origin authority without requiring the caller to retain the event table", function()
+		controlled_native_reader({ encoded(1, 42, 1), encoded(1, 30, 1) }, nil, function(reader)
+			reader.open("/dev/input/event3"); reader.grab()
+			local cap = assert(reader.capture_event((assert(reader.read_event()))))
+			reader.read_event()
+			collectgarbage("collect")
+			helpers.assert_eq(reader.source_current(cap), true)
+			reader.close()
+		end)
+	end)
+
+	helpers.it("does not retain abandoned opaque receipts or prior decoded rows through weak-key value cycles", function()
+		controlled_native_reader({ encoded(1, 30, 1), encoded(1, 31, 1) }, nil, function(reader)
+			reader.open("/dev/input/event3"); reader.grab()
+			local event = assert(reader.read_event())
+			local cap = assert(reader.capture_event(event))
+			local weak = setmetatable({ event, cap }, { __mode = "v" })
+			event, cap = nil, nil
+			reader.read_event()
+			collectgarbage("collect")
+			collectgarbage("collect")
+			helpers.assert_eq(weak[1], nil)
+			helpers.assert_eq(weak[2], nil)
+			reader.close()
+		end)
+	end)
+
+end)
+
+helpers.describe("evdev_reader: exact slot cleanup after native peer debt", function()
+
+	helpers.it("keeps known peer input readable and retireable without minting authority after another slot's unknown close", function()
+		local options = { fds = { 7, 8 } }
+		controlled_native_reader({ encoded(1, 30, 1), encoded(1, 31, 1) }, options, function(reader, log)
+			reader.open("/dev/input/event3", "keyboard"); reader.grab("keyboard")
+			reader.open("/dev/input/event4", "peer"); reader.grab("peer")
+			local first = assert(reader.read_event("keyboard"))
+			local cap = assert(reader.capture_event(first, "keyboard"))
+			options.before_close = function(_, fd) options.close_fails = fd == 8 end
+			helpers.assert_eq(reader.close("peer"), false)
+			helpers.assert_eq(reader.source_current(cap), false)
+			helpers.assert_eq(reader.wait_readable(0, "keyboard"), true)
+			local next_event, status = reader.read_event("keyboard")
+			helpers.assert_eq(status, "event")
+			helpers.assert_eq(next_event.code, 31)
+			helpers.assert_eq(reader.capture_event(next_event, "keyboard"), nil)
+			helpers.assert_eq(reader.ungrab("keyboard"), true)
+			helpers.assert_eq(reader.close("keyboard"), true)
+			helpers.assert_eq(reader.close("peer"), false)
+			helpers.assert_eq(log.closes, 2)
+			helpers.assert_eq(reader.has_native_origin_debt(), true)
+		end)
+	end)
+
+end)
+
+helpers.describe("evdev_reader: origin is separate from current held-state authority", function()
+
+	helpers.it("reports a later native release without turning an original-session receipt into a held-key oracle", function()
+		controlled_native_reader({ encoded(1, 42, 1), encoded(1, 42, 0) }, nil, function(reader)
+			reader.open("/dev/input/event3"); reader.grab()
+			local down = assert(reader.capture_event((assert(reader.read_event()))))
+			local release = assert(reader.read_event())
+			local up = assert(reader.capture_event(release))
+			helpers.assert_eq(reader.event_current(down), false)
+			helpers.assert_eq(reader.event_view(up).code, 42)
+			helpers.assert_eq(reader.event_view(up).value, 0)
+			helpers.assert_eq(reader.source_current(down), true)
+			reader.close()
+		end)
+	end)
+
+end)
+
+helpers.describe("independent exact native slot identity", function()
+	helpers.it("refuses metamethod-equal foreign slot aliases", function()
+		local mt = { __eq = function() return true end }
+		local owned, foreign = setmetatable({}, mt), setmetatable({}, mt)
+		controlled_native_reader({ encoded(1, 30, 1) }, nil, function(reader)
+			helpers.assert_eq(reader.open("/dev/input/event3", owned), true)
+			helpers.assert_eq(reader.grab(owned), true)
+			local event = assert(reader.read_event(owned))
+			local alias = reader.capture_event(event, foreign)
+			helpers.assert_eq(reader.close(owned), true)
+			helpers.assert_eq(alias, nil, "only the exact issuing slot may capture its native row")
+		end)
+	end)
+end)
+
+--- Runs exact-slot observer controls against explicitly controlled FFI providers.
+--- @param single_sided boolean Lua54 permits an equality callback on only one operand.
+local function independent_slot_observer_case(single_sided)
+	controlled_native_reader({ encoded(1, 30, 1) }, nil, function(reader, log)
+		local callbacks, owned = 0, {}
+		local mt = { __eq = function()
+			callbacks = callbacks + 1
+			assert(reader.close(owned))
+			return true
+		end }
+		if not single_sided then setmetatable(owned, mt) end
+		local foreign = setmetatable({}, mt)
+		assert(reader.open("/dev/input/event3", owned))
+		assert(reader.grab(owned))
+		local event = assert(reader.read_event(owned))
+		local cap = reader.capture_event(event, foreign)
+		local unexpected_close_attempts = log.closes
+		helpers.assert_eq(reader.close(owned), true)
+		helpers.assert_eq(callbacks, 0, "native receipt observation must not invoke a supplied slot metamethod")
+		helpers.assert_eq(unexpected_close_attempts, 0, "an alias comparison cannot trigger native session cleanup")
+		helpers.assert_eq(cap, nil)
+	end)
+end
+helpers.describe("independent opaque slot observer purity", function()
+	helpers.it("never invokes matching two-sided alias callbacks during source observation", function()
+		independent_slot_observer_case(false)
+	end)
+	helpers.it("never invokes Lua54 single-sided alias callbacks during source observation", function()
+		independent_slot_observer_case(true)
+	end)
+end)
+
+helpers.describe("evdev_reader: legitimate opaque slot receipt", function()
+
+	helpers.it("preserves exact owned table slots without invoking their equality handlers", function()
+		local owned = setmetatable({}, { __eq = function() error("opaque slot equality must stay private") end })
+		controlled_native_reader({ encoded(1, 30, 1) }, nil, function(reader, log)
+			helpers.assert_eq(reader.open("/dev/input/event3", owned), true)
+			helpers.assert_eq(reader.grab(owned), true)
+			local event = assert(reader.read_event(owned))
+			local cap = assert(reader.capture_event(event, owned))
+			helpers.assert_eq(reader.event_current(cap), true)
+			helpers.assert_eq(rawequal(reader.event_view(cap).slot, owned), true)
+			helpers.assert_eq(reader.source_current(cap), true)
+			helpers.assert_eq(reader.close(owned), true)
+			helpers.assert_eq(log.closes, 1)
+			helpers.assert_eq(reader.source_current(cap), false)
+		end)
+	end)
+
+end)
+
+--- Provides controlled native syscall symbols for held-key receipt tests.
+--- No kernel descriptor or physical device is acquired by this fixture.
+local function controlled_held_reader(options, body)
+	options = options or {}
+	local saved_ffi, saved_preload = package.loaded.ffi, package.preload.ffi
+	local codec = require("infra.input_event")
+	local reader
+	local log = { queries = 0, opens = 0, closes = 0 }
+	local function bitmap(count)
+		local values = {}
+		for index = 1, count do values[index] = 0 end
+		for _, code in ipairs(options.down or { 29, 42 }) do
+			local index = math.floor(code / 8) + 1
+			if index <= count then values[index] = values[index] + 2 ^ (code % 8) end
+		end
+		local bytes = {}
+		for index, value in ipairs(values) do bytes[index] = string.char(value) end
+		return table.concat(bytes)
+	end
+	local symbols = {
+		open = function() log.opens = log.opens + 1; return log.opens + 6 end,
+		close = function() log.closes = log.closes + 1; return options.close_fails and -1 or 0 end,
+		ioctl = function(_, request, buffer)
+			if request % 256 == 0x18 then
+				log.queries = log.queries + 1
+				local count = math.floor(request / 0x10000) % 0x4000
+				if options.before_query then options.before_query(reader) end
+				buffer.bytes = options.bytes or bitmap(count)
+				return options.copied == nil and count or options.copied
+			end
+			return options.grab_fails and -1 or 0
+		end,
+		read = function(_, buffer)
+			local bytes = table.remove(options.rows or {}, 1)
+			if not bytes then return -1 end
+			buffer.bytes = bytes; return #bytes
+		end,
+		poll = function() return 1 end,
+	}
+	package.loaded.ffi = nil
+	package.preload.ffi = function()
+		return {
+			cdef = function() end, sizeof = function() return 24 end,
+			new = function(kind) return kind == "struct pollfd[1]" and { [0] = {} } or { bytes = "" } end,
+			cast = function(_, value) return value end,
+			string = function(buffer, count)
+				if options.before_string then options.before_string(reader) end
+				return buffer.bytes:sub(1, count)
+			end,
+			errno = function() return 11 end, C = symbols,
+		}
+	end
+	codec._reset_measurement()
+	local called, reason = pcall(function()
+		reader = helpers.load_module("adapters.evdev_reader")
+		body(reader, options, log, symbols)
+	end)
+	package.loaded.ffi, package.preload.ffi = saved_ffi, saved_preload
+	codec._reset_measurement()
+	if not called then error(reason, 0) end
+end
+
+helpers.describe("evdev_reader: controlled fresh native held-state receipts", function()
+
+	helpers.it("issues detached opaque full-key state including nonzero Ctrl and Shift", function()
+		controlled_held_reader(nil, function(reader)
+			assert(reader.open("/controlled/native-a", "a")); assert(reader.grab("a"))
+			local cap = assert(reader.capture_pressed_keys("a"))
+			helpers.assert_eq(next(cap), nil)
+			helpers.assert_eq(reader.pressed_keys_current(cap), true)
+			local view = assert(reader.pressed_keys_view(cap))
+			helpers.assert_eq(view.down, { 29, 42 })
+			helpers.assert_eq(view.max_code, 0x2ff)
+			helpers.assert_eq(view.source, "/controlled/native-a")
+			helpers.assert_eq(view.slot, "a")
+			helpers.assert_eq(view.fd, nil); helpers.assert_eq(view.backend, nil)
+			view.down[1], view.slot = 1, "foreign"
+			helpers.assert_eq(reader.pressed_keys_view(cap).down, { 29, 42 })
+			helpers.assert_eq(reader.close("a"), true)
+		end)
+	end)
+
+	helpers.it("does not mint native held authority from a custom bitset provider", function()
+		local reader = helpers.load_module("adapters.evdev_reader")
+		local backend = recorder()
+		local queries = 0
+		backend.native = true
+		backend.read_bits = function() queries = queries + 1; return string.rep("\0", 96) end
+		reader._set_backend(backend); assert(reader.open("/controlled/custom")); assert(reader.grab())
+		local cap = reader.capture_pressed_keys()
+		reader.close(); reader._reset_backend()
+		helpers.assert_eq(cap, nil); helpers.assert_eq(queries, 0)
+	end)
+
+	helpers.it("requires literal native grab acknowledgement before the held ioctl", function()
+		controlled_held_reader(nil, function(reader, _, log)
+			assert(reader.open("/controlled/native-a"))
+			helpers.assert_eq(reader.capture_pressed_keys(), nil)
+			helpers.assert_eq(log.queries, 0)
+			reader.close()
+		end)
+		controlled_held_reader({ grab_fails = true }, function(reader, _, log)
+			assert(reader.open("/controlled/native-a")); helpers.assert_eq(reader.grab(), false)
+			helpers.assert_eq(reader.capture_pressed_keys(), nil); helpers.assert_eq(log.queries, 0)
+			reader.close()
+		end)
+	end)
+
+	helpers.it("rejects short, failed and unknown native ioctl copy acknowledgements", function()
+		for _, copied in ipairs({ 0, 95, -1, 97, 1.5, false }) do
+			controlled_held_reader({ copied = copied }, function(reader)
+				assert(reader.open("/controlled/native-a")); assert(reader.grab())
+				helpers.assert_eq(reader.capture_pressed_keys(), nil)
+				reader.close()
+			end)
+		end
+	end)
+
+	helpers.it("refuses invalid native buffers and provider exceptions", function()
+		for _, options in ipairs({ { bytes = "\0" }, { before_query = function() error("controlled") end },
+			{ before_string = function() error("controlled") end } }) do
+			controlled_held_reader(options, function(reader)
+				assert(reader.open("/controlled/native-a")); assert(reader.grab())
+				helpers.assert_eq(reader.capture_pressed_keys(), nil)
+				reader.close()
+			end)
+		end
+	end)
+
+	helpers.it("seals query callbacks against lifecycle reentry and old-current observations", function()
+		controlled_held_reader(nil, function(reader, options, log)
+			assert(reader.open("/controlled/native-a")); assert(reader.grab())
+			local old = assert(reader.capture_pressed_keys())
+			options.before_query = function(current)
+				helpers.assert_eq(current.pressed_keys_current(old), false)
+				helpers.assert_eq(current.capture_pressed_keys(), nil)
+				helpers.assert_eq(current.close(), false)
+				helpers.assert_eq(current.ungrab(), false)
+				helpers.assert_eq(current.use_ffi_backend(), false)
+				helpers.assert_eq(current._reset_backend(), false)
+			end
+			local cap = assert(reader.capture_pressed_keys())
+			helpers.assert_eq(reader.pressed_keys_current(old), false)
+			helpers.assert_eq(reader.pressed_keys_current(cap), true)
+			helpers.assert_eq(log.closes, 0)
+			options.before_query = nil
+			options.copied = 0
+			helpers.assert_eq(reader.capture_pressed_keys(), nil)
+			helpers.assert_eq(reader.pressed_keys_current(cap), false, "even a refused native query revokes its older observation")
+			options.copied = nil
+			options.down = { 42 }
+			local fresh = assert(reader.capture_pressed_keys())
+			helpers.assert_eq(reader.pressed_keys_view(fresh).down, { 42 })
+			reader.close()
+		end)
+	end)
+
+	helpers.it("rechecks decoder/provider currency after the last external buffer callback", function()
+		controlled_held_reader(nil, function(reader, options)
+			assert(reader.open("/controlled/native-a")); assert(reader.grab())
+			local codec = require("infra.input_event")
+			local original = codec.decode
+			options.before_string = function() codec.decode = function() return {} end end
+			local cap = reader.capture_pressed_keys()
+			codec.decode = original; options.before_string = nil; reader.close()
+			helpers.assert_eq(cap, nil)
+		end)
+	end)
+
+	helpers.it("revokes held observations on the next read even if event session provenance survives", function()
+		controlled_held_reader({ rows = { encoded(1, 42, 1), encoded(1, 30, 1) } }, function(reader)
+			assert(reader.open("/controlled/native-a")); assert(reader.grab())
+			local event = assert(reader.read_event())
+			local origin = assert(reader.capture_event(event))
+			local held = assert(reader.capture_pressed_keys())
+			reader.read_event()
+			helpers.assert_eq(reader.source_current(origin), true)
+			helpers.assert_eq(reader.pressed_keys_current(held), false)
+			local fresh = assert(reader.capture_pressed_keys())
+			reader.read_event()
+			helpers.assert_eq(reader.pressed_keys_current(fresh), false, "an empty queue read still ends the observation")
+			reader.close()
+		end)
+	end)
+
+	helpers.it("revokes observations after ordinary held queries and preserves independent source epochs", function()
+		controlled_held_reader(nil, function(reader)
+			for _, slot in ipairs({ "a", "b" }) do assert(reader.open("/controlled/native-" .. slot, slot)); assert(reader.grab(slot)) end
+			local a = assert(reader.capture_pressed_keys("a"))
+			local b = assert(reader.capture_pressed_keys("b"))
+			reader.read_event("b")
+			helpers.assert_eq(reader.pressed_keys_current(a), true)
+			helpers.assert_eq(reader.pressed_keys_current(b), false)
+			reader.pressed_keys("a", 0x2ff)
+			helpers.assert_eq(reader.pressed_keys_current(a), false)
+			reader.close("a"); reader.close("b")
+		end)
+	end)
+
+	helpers.it("revokes held receipts on ungrab, reused fd/session and native close debt", function()
+		controlled_held_reader(nil, function(reader, options)
+			assert(reader.open("/controlled/native-a")); assert(reader.grab())
+			local cap = assert(reader.capture_pressed_keys())
+			assert(reader.ungrab()); assert(reader.grab())
+			helpers.assert_eq(reader.pressed_keys_current(cap), false)
+			local next_cap = assert(reader.capture_pressed_keys())
+			options.close_fails = true; helpers.assert_eq(reader.close(), false)
+			helpers.assert_eq(reader.pressed_keys_current(next_cap), false)
+			helpers.assert_eq(reader.has_native_origin_debt(), true)
+			helpers.assert_eq(reader.capture_pressed_keys(), nil)
+		end)
+	end)
+
+	helpers.it("refuses query-loss authority until acknowledged native retirement and reopen", function()
+		controlled_held_reader({ rows = { encoded(0, 3, 0) } }, function(reader)
+			assert(reader.open("/controlled/native-a")); assert(reader.grab())
+			local cap = assert(reader.capture_pressed_keys())
+			reader.read_event()
+			helpers.assert_eq(reader.pressed_keys_current(cap), false)
+			helpers.assert_eq(reader.capture_pressed_keys(), nil)
+			assert(reader.close()); assert(reader.open("/controlled/native-a")); assert(reader.grab())
+			helpers.assert_eq(type(reader.capture_pressed_keys()), "table")
+			reader.close()
+		end)
+	end)
+
+	helpers.it("does not invoke capability or slot equality metamethods for forged observations", function()
+		controlled_held_reader(nil, function(reader)
+			local calls = 0
+			local meta = { __eq = function() calls = calls + 1; return true end }
+			local slot, alias = setmetatable({}, meta), setmetatable({}, meta)
+			assert(reader.open("/controlled/native-a", slot)); assert(reader.grab(slot))
+			local cap = assert(reader.capture_pressed_keys(slot))
+			setmetatable(cap, meta)
+			helpers.assert_eq(reader.capture_pressed_keys(alias), nil)
+			helpers.assert_eq(reader.pressed_keys_current(setmetatable({}, meta)), false)
+			helpers.assert_eq(reader.pressed_keys_view(setmetatable({}, meta)), nil)
+			helpers.assert_eq(calls, 0)
+			reader.close(slot)
+		end)
+	end)
+
+	helpers.it("records bounded partial coverage and rejects invalid query ranges before native calls", function()
+		controlled_held_reader(nil, function(reader, _, log)
+			assert(reader.open("/controlled/native-a")); assert(reader.grab())
+			for _, last in ipairs({ -1, 768, 1.5, false, "767", math.huge }) do
+				helpers.assert_eq(reader.capture_pressed_keys(nil, last), nil)
+			end
+			helpers.assert_eq(log.queries, 0)
+			local cap = assert(reader.capture_pressed_keys(nil, 31))
+			local view = reader.pressed_keys_view(cap)
+			helpers.assert_eq(view.max_code, 31); helpers.assert_eq(view.down, { 29 })
+			reader.close()
+		end)
+	end)
+
+	helpers.it("retains private view validation even if a public current method is replaced", function()
+		controlled_held_reader(nil, function(reader)
+			assert(reader.open("/controlled/native-a")); assert(reader.grab())
+			local cap = assert(reader.capture_pressed_keys())
+			reader.close()
+			reader.pressed_keys_current = function() return true end
+			helpers.assert_eq(reader.pressed_keys_view(cap), nil)
+		end)
+	end)
+
+end)

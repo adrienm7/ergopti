@@ -206,3 +206,203 @@ helpers.describe("complete installed extension shared frames (Linux)", function(
 		for _, name in ipairs(names) do helpers.assert_true(rawequal(package.loaded[name], before[name]), name) end
 	end)
 end)
+
+
+-- The standard-category empty marker is inert presentation owned by its live list.
+local function read_standard_empty_json(path)
+	local file = assert(io.open(path, "rb"))
+	local value = assert(require("json").decode(file:read("*a")))
+	file:close()
+	return value
+end
+
+local StandardEmptyCorpus = read_standard_empty_json(require("infra.paths").shared("tests/corpus/menus/linux_standard_category_empty_status.json"))
+
+--- Observes the real registered provider while forwarding the full public build.
+--- @param callback function Receives native build, captured data and genuine binding.
+local function with_standard_empty(callback, locale)
+	local old_builder = package.loaded["ui.menu.menu_builder"]
+	local binding = require("infra.manifest_menu")
+	local i18n = require("infra.i18n")
+	local old_build, old_status, old_get, old_locale = binding.build, binding.status_rows, i18n.get, i18n.get_locale
+	local owner
+	for _, row in ipairs(binding.get_array(StandardEmptyCorpus.section)) do
+		if row.id == StandardEmptyCorpus.provider then
+			helpers.assert_nil(owner, "the standard provider must have one actual declaration")
+			owner = row
+		end
+	end
+	assert(owner, "the real standard-category list declaration is required")
+	local old_statuses = owner.status_rows
+	local state = { loaded = false, data = nil, delivered = nil, writes = {} }
+	local categories = {
+		magickey = { id = "magickey", description = { en = "Native magic" }, count = 3, sections_order = {}, sections = {} },
+		autocorrection = { id = "autocorrection", description = { en = "Native corrections" }, count = 2, sections_order = {}, sections = {} },
+	}
+	local config = {
+		get_groups = function() return state.loaded and { "magickey", "autocorrection" } or {} end,
+		get_categories = function() return state.loaded and categories or {} end,
+		get_category = function(id) return state.loaded and categories[id] or nil end,
+		active_count = function(id) return categories[id] and categories[id].count or 0 end,
+		is_group_enabled = function() return true end,
+		is_section_enabled = function() return true end,
+		any_enabled = function() return state.loaded end,
+		language_packs = function() return {} end,
+		resolve = function() return { delay = 0.75, color = "#1e88e5", has_override = false } end,
+		get_global_delay = function() return 0.75 end,
+		has_global_delay_override = function() return false end,
+		set_category_scope_enabled = function(ids, enabled)
+			state.writes[#state.writes + 1] = { ids = ids, enabled = enabled }
+			return true
+		end,
+	}
+	local ok, detail = xpcall(function()
+		local catalogue = read_standard_empty_json(require("infra.paths").shared("data/locales/" .. (locale or "en") .. ".json"))
+		i18n.get = function(key) return catalogue[key] or key end
+		i18n.get_locale = function() return locale or "en" end
+		binding.build = function(key, category, dynamic, builders, ctx, providers)
+			if key == StandardEmptyCorpus.section then
+				local provider = assert(providers[StandardEmptyCorpus.provider], "actual standard provider registered")
+				providers[StandardEmptyCorpus.provider] = function(...)
+					state.data = provider(...)
+					return state.data
+				end
+			end
+			local rows = old_build(key, category, dynamic, builders, ctx, providers)
+			if key == StandardEmptyCorpus.section then state.delivered = rows end
+			return rows
+		end
+		local module = helpers.load_module("ui.menu.menu_builder")
+		local function build()
+			state.data, state.delivered = nil, nil
+			local items = module.build({ config = config, _version = "9.9.9" })
+			local title = i18n.get("menu.hotstrings.title")
+			for _, row in ipairs(items or {}) do
+				if type(row.title) == "string" and row.title:sub(1, #title) == title then
+					helpers.assert_true(rawequal(row.menu, state.delivered), "real full tray publishes the completed Hotstrings menu")
+					helpers.assert_type(state.data, "table", "actual list provider was consumed")
+					local first, last
+					for index, child in ipairs(row.menu) do
+						if child.title == i18n.section("menu.hotstrings.header_common") then
+							helpers.assert_nil(first, "one actual common-category header")
+							first = index
+						elseif child.title == i18n.section("menu.hotstrings.header_languages") then
+							helpers.assert_nil(last, "one actual language header")
+							last = index
+						end
+					end
+					helpers.assert_not_nil(first); helpers.assert_not_nil(last)
+					helpers.assert_true(first < last, "actual provider publication stays in its declared block")
+					local standard = {}
+					for index = first + 1, last - 1 do
+						if row.menu[index].title ~= "-" then standard[#standard + 1] = row.menu[index] end
+					end
+					return standard
+				end
+			end
+			error("the actual public builder must publish Hotstrings")
+		end
+		callback(build, state, binding, owner, catalogue)
+	end, debug.traceback)
+	owner.status_rows = old_statuses
+	binding.build, binding.status_rows, i18n.get, i18n.get_locale = old_build, old_status, old_get, old_locale
+	package.loaded["ui.menu.menu_builder"] = old_builder
+	if not ok then error(detail, 0) end
+end
+
+local function count_standard_empty(rows, caption)
+	local count = 0
+	for _, row in ipairs(rows or {}) do
+		if row.title == caption then
+			count = count + 1
+			helpers.assert_eq(row.disabled, true)
+			helpers.assert_nil(row.fn)
+			helpers.assert_nil(row.menu)
+		end
+	end
+	return count
+end
+
+helpers.describe("shared Linux standard-category empty status", function()
+	for locale, expected in pairs(StandardEmptyCorpus.captions) do
+		helpers.it("(standard-category-empty-status) retains the native inert caption in " .. locale, function()
+			with_standard_empty(function(build, state, _, owner, catalogue)
+				helpers.assert_eq(catalogue[StandardEmptyCorpus.row.i18n], expected)
+				helpers.assert_eq(owner.status_rows[StandardEmptyCorpus.status], { StandardEmptyCorpus.row })
+				local rows = build()
+				helpers.assert_eq(state.data, { { label = expected, disabled = true } })
+				helpers.assert_eq(count_standard_empty(rows, expected), 1)
+				helpers.assert_eq(#state.writes, 0)
+			end, locale)
+		end)
+	end
+
+	helpers.it("(standard-category-empty-status) consumes a changed shared caption through the actual provider", function()
+		with_standard_empty(function(build, state, _, owner, catalogue)
+			local replacement = "menu.layout.none_installed"
+			owner.status_rows = { [StandardEmptyCorpus.status] = { { type = "label", i18n = replacement } } }
+			local rows = build()
+			helpers.assert_eq(state.data, { { label = catalogue[replacement], disabled = true } })
+			helpers.assert_eq(count_standard_empty(rows, catalogue[replacement]), 1)
+			helpers.assert_eq(count_standard_empty(rows, StandardEmptyCorpus.captions.en), 0)
+			helpers.assert_eq(#state.writes, 0)
+		end)
+	end)
+
+	for _, invalid in ipairs({ "missing_status", "missing_statuses", "empty", "command", "effectful_label" }) do
+		helpers.it("(standard-category-empty-status) refuses inert publication after " .. invalid, function()
+			with_standard_empty(function(build, state, _, owner)
+				helpers.assert_eq(count_standard_empty(build(), StandardEmptyCorpus.captions.en), 1)
+				local bad = {
+					empty = {}, command = { { type = "command", id = "foreign", i18n = StandardEmptyCorpus.row.i18n } },
+					effectful_label = { { type = "label", i18n = StandardEmptyCorpus.row.i18n, action = function() state.writes[#state.writes + 1] = "forbidden" end } },
+				}
+				if invalid == "missing_statuses" then owner.status_rows = nil
+				else owner.status_rows = { [StandardEmptyCorpus.status] = bad[invalid] } end
+				local rows = build()
+				helpers.assert_eq(state.data, {})
+				helpers.assert_eq(count_standard_empty(rows, StandardEmptyCorpus.captions.en), 0)
+				helpers.assert_eq(#state.writes, 0)
+			end)
+		end)
+	end
+
+	helpers.it("(standard-category-empty-status) refuses an unavailable status port without native fallback", function()
+		with_standard_empty(function(build, state, binding)
+			helpers.assert_eq(count_standard_empty(build(), StandardEmptyCorpus.captions.en), 1)
+			binding.status_rows = nil
+			helpers.assert_eq(count_standard_empty(build(), StandardEmptyCorpus.captions.en), 0)
+			helpers.assert_eq(state.data, {})
+			helpers.assert_eq(#state.writes, 0)
+		end)
+	end)
+
+	helpers.it("(standard-category-empty-status) preserves loaded order, ticks and genuine category callbacks", function()
+		with_standard_empty(function(build, state, _, owner)
+			state.loaded = true
+			owner.status_rows = nil
+			local rows = build()
+			helpers.assert_eq(#state.data, 2)
+			helpers.assert_eq(state.data[1].label, "Native magic (3)")
+			helpers.assert_eq(state.data[2].label, "Native corrections (2)")
+			local first, second
+			for index, row in ipairs(rows) do
+				if row.title == "Native magic (3)" then first = index end
+				if row.title == "Native corrections (2)" then second = index end
+			end
+			helpers.assert_not_nil(first); helpers.assert_eq(second, first + 1)
+			for index, position in ipairs({ first, second }) do
+				local native, data = rows[position], state.data[index]
+				helpers.assert_eq(native.checked, true)
+				helpers.assert_true(rawequal(native.menu, data.submenu))
+				helpers.assert_eq(native.menu[1].fn(), true)
+				helpers.assert_eq(native.menu[2].fn(), true)
+			end
+			helpers.assert_eq(state.writes, {
+				{ ids = { "magickey" }, enabled = true }, { ids = { "magickey" }, enabled = false },
+				{ ids = { "autocorrection" }, enabled = true }, { ids = { "autocorrection" }, enabled = false },
+			})
+			helpers.assert_eq(count_standard_empty(rows, StandardEmptyCorpus.captions.en), 0)
+		end)
+	end)
+end)

@@ -488,7 +488,7 @@ M.features = {
 		path = "gestures.tap_4", id = "tap_4", section = "gestures", default = "none", type = "action", description_key = "menu.gestures.tap_4", platforms = { "ahk", "hs", "linux" }, recommended = "win_app_next", input_altering = true,
 	},
 	{
-		path = "gestures.swipe_2_left", id = "swipe_2_left", section = "gestures", default = "none", type = "action", description_key = "menu.gestures.swipe_2_left", platforms = { "hs", "linux" }, recommended = "arrow_up", input_altering = true,
+		path = "gestures.swipe_2_left", id = "swipe_2_left", section = "gestures", default = "none", type = "action", description_key = "menu.gestures.swipe_2_left", platforms = { "hs", "linux" }, recommended = "none", input_altering = true,
 	},
 	{
 		path = "gestures.swipe_5_up", id = "swipe_5_up", section = "gestures", default = "none", type = "action", description_key = "menu.gestures.swipe_5_up", platforms = { "hs", "linux" }, recommended = "none", input_altering = true,
@@ -1109,7 +1109,7 @@ M.unavailable = {
 		path = "layout.ergopti_alt_gr", section = "layout", reason_key = "", platforms = { "ahk" },
 	},
 	{
-		path = "layout.ergopti_plus", section = "layout", reason_key = "", platforms = { "ahk" },
+		path = "layout.ergopti_variant", section = "layout", reason_key = "platform_reason.legacy_helpers_use_windows_scan_code_hotkeys", platforms = { "ahk" },
 	},
 	{
 		path = "layout.ctrl_magic_save", section = "layout", reason_key = "", platforms = { "ahk" },

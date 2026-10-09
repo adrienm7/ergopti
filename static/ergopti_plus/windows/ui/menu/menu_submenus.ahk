@@ -165,7 +165,7 @@ _HS_LanguageRows() {
 	Rows := []
 	IsGated := IsCategoryGated("Hotstrings")
 	for _, Pack in HotstringsLanguageCategories() {
-		Switch := _HS_LanguageSwitchRow(Pack)
+		LanguageSwitch := _HS_LanguageSwitchRow(Pack)
 		Categories := []
 		LanguageTotal := 0
 		for _, Cat in Pack["categories"] {
@@ -182,9 +182,9 @@ _HS_LanguageRows() {
 		; The flag is an icon here, as in the language selector: Win32 menus
 		; cannot render the flag emoji the Lua drivers put in the label.
 		Items := MenuRenderer_TemplateRows("hotstring_language_frame", Map(), Map(), Map(
-			"hotstring_language_switch", (*) => Switch is Map ? [Switch] : [],
+			"hotstring_language_switch", (*) => LanguageSwitch is Map ? [LanguageSwitch] : [],
 			"hotstring_language_categories", (*) => Categories))
-		if !(Items is Array) || !(Switch is Map)
+		if !(Items is Array) || !(LanguageSwitch is Map)
 			continue
 		Parents := MenuRenderer_TemplateRows("hotstring_language_parent_windows", Map(), Map(
 			"hotstring_language_name", HotstringsLanguageName.Bind(Pack["locale"]),

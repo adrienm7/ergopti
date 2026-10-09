@@ -37,7 +37,7 @@
 
 const fs = require('node:fs');
 const path = require('node:path');
-const pipeline = require('./ci-pipeline.cjs');
+const pipeline = require('./ci-full-default.cjs');
 
 const root = path.resolve(__dirname, '..', '..');
 const WINDOWS_BOX = '.github/workflows/ci-windows.yml';
@@ -1513,6 +1513,89 @@ if (windowsSmokeStep !== null && windowsLaunchUpload !== null) {
 			}
 		}
 	};
+	// Independent authored observations, including the authenticated historical
+	// release and two current-process full saves. Never ask the producer to make
+	// its own positive expectation or borrow ready as a save acknowledgment.
+	positive.compiled_upgrade = {
+		schema_version: 1,
+		prior_install: {
+			package_sha256: '210d737ab9ebb9a65d54d98aafe05cba78fe961de00e75cce660ce0067b09caf',
+			asset_id: 601771276,
+			version: '0.0.0-dev.155',
+			commit: 'c9e4c64abb6448243252201dffec0c248e2c24ac',
+			bundle_identity: '0.0.0-dev.155',
+			pid: 20,
+			executable: 'C:\\private\\prior\\ErgoptiPlus.exe',
+			created_utc: '2026-10-07T12:00:00.0000000Z',
+			exit_code: 0,
+			tree_closed: true,
+			native_profile_before_edit: {
+				sha256: '4'.repeat(64),
+				schema_version: 6,
+				metrics_enabled: false,
+				metrics_shortcut_typing: 'Ctrl+Alt+M',
+				metrics_shortcut_apps: 'Ctrl+Alt+A',
+				future_dashboard: { keep: 9, enabled: false },
+				source_records_observed: 1
+			},
+			installed_user_edit: {
+				schema_version: 1,
+				contract: 'offline-installed-user-edit',
+				before_sha256: '4'.repeat(64),
+				after_sha256: '9'.repeat(64),
+				untouched_before_sha256: '6'.repeat(64),
+				untouched_after_sha256: '6'.repeat(64),
+				profile_schema_version: 6,
+				preserved_records: 5,
+				changed: true
+			},
+			saved_profile: { sha256: '9'.repeat(64), preserved_records: 5, schema_version: 6 },
+			extracted_assets: [
+				{
+					path: 'static/ergopti_plus/_shared/core/config_schema/migrations.toml',
+					bytes: 33897,
+					sha256: '39b35d65f2c3e2dc01a2c32f762b56ec8b16aaff55495d86d12529ab298b4bf4'
+				},
+				{
+					path: 'static/ergopti_plus/_shared/data/locales/en.json',
+					bytes: 209494,
+					sha256: 'eaff8ce0e2bb4d7ec539ad92dc77067b5c740e9eedf4c5e698d7ddad51659e43'
+				}
+			]
+		},
+		launches: [0, 1].map((index) => {
+			const nonce = (index === 0 ? 'd' : 'e').repeat(32);
+			const pid = 43 + index;
+			const native_startup = structuredClone(positive.native_startup);
+			native_startup.nonce = native_startup.receipt.nonce = nonce;
+			native_startup.pid = native_startup.receipt.pid = pid;
+			return {
+				native_startup,
+				created_utc: `2026-10-07T12:00:0${index + 1}.0000000Z`,
+				full_save: {
+					schema_version: 1,
+					nonce,
+					pid,
+					executable: 'C:\\private\\ErgoptiPlus.exe',
+					compiled: true,
+					build_commit: sha,
+					bundle_identity: '0.0.0-dev\n' + sha,
+					requested: 3,
+					committed: 3,
+					settled: 3,
+					pending: false
+				},
+				tree_closed: true,
+				wal_absent: true,
+				bundle_workspace_absent: true,
+				saved_profile: {
+					sha256: (index === 0 ? 'f' : '8').repeat(64),
+					preserved_records: 5,
+					schema_version: 12
+				}
+			};
+		})
+	};
 	const verify = (record, jobs = needs) =>
 		desktop.verify({
 			platform: 'windows',
@@ -1523,7 +1606,43 @@ if (windowsSmokeStep !== null && windowsLaunchUpload !== null) {
 			release: false
 		});
 	assert.doesNotThrow(() => verify(positive), 'the complete successful receipt still passes');
+	const missingUpgrade = structuredClone(positive);
+	delete missingUpgrade.compiled_upgrade;
+	assert.throws(
+		() => verify(missingUpgrade),
+		/Missing compiled upgrade evidence/,
+		'green jobs and fresh readiness cannot replace mandatory installed-upgrade evidence'
+	);
+	const uncommittedUpgrade = structuredClone(positive);
+	uncommittedUpgrade.compiled_upgrade.launches[1].full_save.committed = 2;
+	assert.throws(
+		() => verify(uncommittedUpgrade),
+		/Full save is uncommitted/,
+		'a settled warm launch cannot replace its committed full-save generation'
+	);
+	const foreignPriorUpgrade = structuredClone(positive);
+	foreignPriorUpgrade.compiled_upgrade.prior_install.package_sha256 = '7'.repeat(64);
+	assert.throws(
+		() => verify(foreignPriorUpgrade),
+		/Prior package is not the trusted release/,
+		'complete startup and save observations cannot authenticate a foreign prior package'
+	);
 	const missingReadiness = structuredClone(positive);
+	const missingEditBoundary = structuredClone(positive);
+	delete missingEditBoundary.compiled_upgrade.prior_install.installed_user_edit;
+	assert.throws(
+		() => verify(missingEditBoundary),
+		/Missing offline installed-user edit boundary/,
+		'old ready and current saves cannot replace an admitted installed-user boundary'
+	);
+	const damagedUnrelatedSource = structuredClone(positive);
+	damagedUnrelatedSource.compiled_upgrade.prior_install.installed_user_edit.untouched_after_sha256 =
+		'5'.repeat(64);
+	assert.throws(
+		() => verify(damagedUnrelatedSource),
+		/Offline edit lost unrelated native bytes/,
+		'the setup cannot repair comment loss by replacing the observed installed profile'
+	);
 	delete missingReadiness.native_startup;
 	assert.throws(
 		() => verify(missingReadiness),
@@ -1576,7 +1695,7 @@ if (windowsSmokeStep !== null && windowsLaunchUpload !== null) {
 // CI_ARCHIVE_WORKFLOW_TESTS_BEGIN
 {
 	const assert = require('node:assert/strict');
-	const ownerPipeline = require('./ci-pipeline.cjs');
+	const ownerPipeline = require('./ci-full-default.cjs');
 	/** Require the consumed CI policy, separate source authority and installed evidence. */
 	function ciArchiveWorkflowProblems(text) {
 		const problems = [];
