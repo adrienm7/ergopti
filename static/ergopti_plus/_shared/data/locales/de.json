@@ -1483,6 +1483,7 @@
 	"menu.llm.trigger_menu_title": "KI-Auslösung",
 	"menu.llm.live_mode_title": "⚡ Live-Modus",
 	"menu.agent.title": "🤖 KI-Agent",
+	"menu.agent.not_ready": "Noch nicht bereit",
 	"menu.agent.system1": "⚡ System 1 (schnell): {1}",
 	"menu.agent.system2": "🧠 System 2 (gründlich): {1}",
 	"menu.agent.off": "Aus",

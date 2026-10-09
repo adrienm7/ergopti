@@ -5033,6 +5033,9 @@ function M.build(ctx)
 					-- was promised and will not see. The bijection gate cannot catch it
 					-- here, because top_level rows carry no behaviour type.
 					Logger.error(LOG, "No builder for top-level row '%s' — the entry is missing.", tostring(id))
+				elseif row.disabled == true then
+					rows[#rows + 1] = { label = i18n_safe(row.i18n), disabled = true,
+						disabled_reason_key = row.reason_key }
 				elseif id == "quit" then
 					quit_row = build(ctx)
 				elseif ctx.paused == true and row.greyed_when_paused == true then

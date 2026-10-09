@@ -53,6 +53,22 @@ function classifyMenuRow(row, where) {
 		row.i18n === undefined &&
 		typeof row.caption_getter === 'string' &&
 		row.caption_getter !== '';
+	if (row.disabled !== undefined) {
+		if (typeof row.disabled !== 'boolean' || !where.startsWith('menu.top_level '))
+			throw new Error(`${where}: disabled is a boolean top-level presentation gate`);
+		if (
+			row.disabled &&
+			(!labelled ||
+				typeof row.reason_key !== 'string' ||
+				row.reason_key === '' ||
+				typeof row.id !== 'string' ||
+				row.id === '' ||
+				row.id === '---' ||
+				row.unavailable !== undefined ||
+				row.disabled_when !== undefined)
+		)
+			throw new Error(`${where}: a disabled top-level row needs its exact label and reason`);
+	}
 	if (row.unavailable !== undefined) {
 		if (row.unavailable !== 'hide' && row.unavailable !== 'grey')
 			throw new Error(`${where}: unavailable must be "hide" or "grey"`);

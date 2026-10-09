@@ -1483,6 +1483,7 @@
 	"menu.llm.trigger_menu_title": "تشغيل الذكاء الاصطناعي",
 	"menu.llm.live_mode_title": "⚡ الوضع المباشر",
 	"menu.agent.title": "🤖 وكيل الذكاء الاصطناعي",
+	"menu.agent.not_ready": "غير جاهز بعد",
 	"menu.agent.system1": "⚡ النظام 1 (سريع): {1}",
 	"menu.agent.system2": "🧠 النظام 2 (متأنٍّ): {1}",
 	"menu.agent.off": "معطّل",

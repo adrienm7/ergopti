@@ -1483,6 +1483,7 @@
 	"menu.llm.trigger_menu_title": "Wyzwalanie SI",
 	"menu.llm.live_mode_title": "⚡ Tryb na żywo",
 	"menu.agent.title": "🤖 Agent AI",
+	"menu.agent.not_ready": "Jeszcze niegotowy",
 	"menu.agent.system1": "⚡ System 1 (szybki): {1}",
 	"menu.agent.system2": "🧠 System 2 (dokładny): {1}",
 	"menu.agent.off": "Wyłączony",

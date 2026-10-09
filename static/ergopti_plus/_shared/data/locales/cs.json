@@ -1483,6 +1483,7 @@
 	"menu.llm.trigger_menu_title": "Spouštění AI",
 	"menu.llm.live_mode_title": "⚡ Živý režim",
 	"menu.agent.title": "🤖 Agent AI",
+	"menu.agent.not_ready": "Zatím není připraven",
 	"menu.agent.system1": "⚡ Systém 1 (rychlý): {1}",
 	"menu.agent.system2": "🧠 Systém 2 (důkladný): {1}",
 	"menu.agent.off": "Vypnuto",

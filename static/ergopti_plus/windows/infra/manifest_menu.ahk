@@ -1864,6 +1864,21 @@ MenuRenderer_NewFromList(MenuKey, ListId, Provider) {
 	return Target
 }
 
+/**
+ * Stages one permanently disabled root presentation without building its feature.
+ * The row is not a paused feature head, so resume cannot enable it later.
+ * @param {Map} Entry Exact shared top-level declaration.
+ */
+MenuRenderer_StageDisabledTopLevel(Entry) {
+	if !(Entry is Map) || Entry.Get("disabled", false) != true
+		|| Type(Entry.Get("i18n", "")) != "String" || Entry.Get("i18n", "") == ""
+		|| Type(Entry.Get("reason_key", "")) != "String" || Entry.Get("reason_key", "") == ""
+		throw ValueError("Disabled root presentation requires its declared label and reason")
+	Label := t(Entry["i18n"]) . " — " . _MR_ReasonHead(t(Entry["reason_key"]))
+	TrayMenuStage_AddAction(Label, (*) => false)
+	TrayMenuStage_Disable(Label)
+}
+
 ; Appends row DATA to an EXISTING menu, at its current end.
 ;
 ; The third entry point, and the narrowest: unlike MenuRenderer_FillFromList it

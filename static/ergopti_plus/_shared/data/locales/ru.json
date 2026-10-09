@@ -1483,6 +1483,7 @@
 	"menu.llm.trigger_menu_title": "Запуск ИИ",
 	"menu.llm.live_mode_title": "⚡ Живой режим",
 	"menu.agent.title": "🤖 ИИ-агент",
+	"menu.agent.not_ready": "Пока не готов",
 	"menu.agent.system1": "⚡ Система 1 (быстрая): {1}",
 	"menu.agent.system2": "🧠 Система 2 (вдумчивая): {1}",
 	"menu.agent.off": "Выключено",
