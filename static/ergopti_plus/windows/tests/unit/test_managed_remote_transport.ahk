@@ -311,12 +311,13 @@ Test("managed remote native: failed printer preserves cleanup result and fence (
 ; restore the caller's exact timing state even when dispatch or assertions fail.
 _ManagedRemoteFixtureWithLlmTimings(Callback) {
 	global LLM_OLLAMA_POLL_MS, LLM_REMOTE_TIMEOUT_MS, LLM_REMOTE_POLL_MS
-	global LLM_INSTALLED_CACHE_TTL_MS, LLM_DEPS_POLL_TIMEOUT_MS
+	global LLM_INSTALLED_CACHE_TTL_MS, LLM_DEPS_POLL_TIMEOUT_MS, LLM_REMOTE_READY_PING_DEADLINE_MS
 	Previous := [IsSet(LLM_OLLAMA_POLL_MS) ? LLM_OLLAMA_POLL_MS : unset,
 		IsSet(LLM_REMOTE_TIMEOUT_MS) ? LLM_REMOTE_TIMEOUT_MS : unset,
 		IsSet(LLM_REMOTE_POLL_MS) ? LLM_REMOTE_POLL_MS : unset,
 		IsSet(LLM_INSTALLED_CACHE_TTL_MS) ? LLM_INSTALLED_CACHE_TTL_MS : unset,
-		IsSet(LLM_DEPS_POLL_TIMEOUT_MS) ? LLM_DEPS_POLL_TIMEOUT_MS : unset]
+		IsSet(LLM_DEPS_POLL_TIMEOUT_MS) ? LLM_DEPS_POLL_TIMEOUT_MS : unset,
+		IsSet(LLM_REMOTE_READY_PING_DEADLINE_MS) ? LLM_REMOTE_READY_PING_DEADLINE_MS : unset]
 	try {
 		LLMApiLoadTimings()
 		return Callback.Call()
@@ -326,6 +327,7 @@ _ManagedRemoteFixtureWithLlmTimings(Callback) {
 		LLM_REMOTE_POLL_MS := Previous.Has(3) ? Previous[3] : unset
 		LLM_INSTALLED_CACHE_TTL_MS := Previous.Has(4) ? Previous[4] : unset
 		LLM_DEPS_POLL_TIMEOUT_MS := Previous.Has(5) ? Previous[5] : unset
+		LLM_REMOTE_READY_PING_DEADLINE_MS := Previous.Has(6) ? Previous[6] : unset
 	}
 }
 
@@ -1127,10 +1129,11 @@ Test("managed remote native: filtered generation owns canonical poll timing (man
 
 _ManagedRemoteTimingScopeBody(Control) {
 	global LLM_OLLAMA_POLL_MS, LLM_REMOTE_TIMEOUT_MS, LLM_REMOTE_POLL_MS
-	global LLM_INSTALLED_CACHE_TTL_MS, LLM_DEPS_POLL_TIMEOUT_MS
+	global LLM_INSTALLED_CACHE_TTL_MS, LLM_DEPS_POLL_TIMEOUT_MS, LLM_REMOTE_READY_PING_DEADLINE_MS
 	Control["calls"] += 1
 	AssertEqual(TimingsGet("llm", "poll_interval_ms"), LLM_OLLAMA_POLL_MS)
 	AssertEqual(TimingsGet("llm", "request_timeout_ms"), LLM_REMOTE_TIMEOUT_MS)
+	AssertEqual(TimingsGet("llm", "request_timeout_ms"), LLM_REMOTE_READY_PING_DEADLINE_MS)
 	AssertEqual(TimingsGet("llm", "poll_interval_ms"), LLM_REMOTE_POLL_MS)
 	AssertEqual(TimingsGet("llm", "installed_cache_ttl_ms"), LLM_INSTALLED_CACHE_TTL_MS)
 	AssertEqual(TimingsGet("llm", "dependency_bootstrap_timeout_ms"), LLM_DEPS_POLL_TIMEOUT_MS)
@@ -1141,12 +1144,13 @@ _ManagedRemoteTimingScopeBody(Control) {
 
 _ManagedRemoteTimingScopeRestores() {
 	global LLM_OLLAMA_POLL_MS, LLM_REMOTE_TIMEOUT_MS, LLM_REMOTE_POLL_MS
-	global LLM_INSTALLED_CACHE_TTL_MS, LLM_DEPS_POLL_TIMEOUT_MS, _TimingsCache
+	global LLM_INSTALLED_CACHE_TTL_MS, LLM_DEPS_POLL_TIMEOUT_MS, LLM_REMOTE_READY_PING_DEADLINE_MS, _TimingsCache
 	Previous := [IsSet(LLM_OLLAMA_POLL_MS) ? LLM_OLLAMA_POLL_MS : unset,
 		IsSet(LLM_REMOTE_TIMEOUT_MS) ? LLM_REMOTE_TIMEOUT_MS : unset,
 		IsSet(LLM_REMOTE_POLL_MS) ? LLM_REMOTE_POLL_MS : unset,
 		IsSet(LLM_INSTALLED_CACHE_TTL_MS) ? LLM_INSTALLED_CACHE_TTL_MS : unset,
-		IsSet(LLM_DEPS_POLL_TIMEOUT_MS) ? LLM_DEPS_POLL_TIMEOUT_MS : unset]
+		IsSet(LLM_DEPS_POLL_TIMEOUT_MS) ? LLM_DEPS_POLL_TIMEOUT_MS : unset,
+		IsSet(LLM_REMOTE_READY_PING_DEADLINE_MS) ? LLM_REMOTE_READY_PING_DEADLINE_MS : unset]
 	Cache := _TimingsCache
 	try {
 		for Mode in ["success", "body_failure", "loader_failure", "unset"] {
@@ -1155,6 +1159,7 @@ _ManagedRemoteTimingScopeRestores() {
 			LLM_REMOTE_POLL_MS := Mode == "unset" ? unset : 107
 			LLM_INSTALLED_CACHE_TTL_MS := Mode == "unset" ? unset : 109
 			LLM_DEPS_POLL_TIMEOUT_MS := Mode == "unset" ? unset : 113
+			LLM_REMOTE_READY_PING_DEADLINE_MS := Mode == "unset" ? unset : 127
 			_TimingsCache := Mode == "loader_failure" ? Map() : Cache
 			Control := Map("calls", 0, "fail", Mode == "body_failure", "failure", ValueError("controlled timing body failure"))
 			Caught := false
@@ -1171,13 +1176,15 @@ _ManagedRemoteTimingScopeRestores() {
 			AssertEqual(Mode == "loader_failure" ? 0 : 1, Control["calls"], "failed initialization never admits the operation")
 			if Mode == "unset" {
 				AssertFalse(IsSet(LLM_OLLAMA_POLL_MS) || IsSet(LLM_REMOTE_TIMEOUT_MS) || IsSet(LLM_REMOTE_POLL_MS)
-					|| IsSet(LLM_INSTALLED_CACHE_TTL_MS) || IsSet(LLM_DEPS_POLL_TIMEOUT_MS), "unset ownership is restored exactly")
+					|| IsSet(LLM_INSTALLED_CACHE_TTL_MS) || IsSet(LLM_DEPS_POLL_TIMEOUT_MS)
+					|| IsSet(LLM_REMOTE_READY_PING_DEADLINE_MS), "unset ownership is restored exactly")
 			} else {
 				AssertEqual(101, LLM_OLLAMA_POLL_MS)
 				AssertEqual(103, LLM_REMOTE_TIMEOUT_MS)
 				AssertEqual(107, LLM_REMOTE_POLL_MS)
 				AssertEqual(109, LLM_INSTALLED_CACHE_TTL_MS)
 				AssertEqual(113, LLM_DEPS_POLL_TIMEOUT_MS)
+				AssertEqual(127, LLM_REMOTE_READY_PING_DEADLINE_MS)
 			}
 		}
 	} finally {
@@ -1187,6 +1194,7 @@ _ManagedRemoteTimingScopeRestores() {
 		LLM_REMOTE_POLL_MS := Previous.Has(3) ? Previous[3] : unset
 		LLM_INSTALLED_CACHE_TTL_MS := Previous.Has(4) ? Previous[4] : unset
 		LLM_DEPS_POLL_TIMEOUT_MS := Previous.Has(5) ? Previous[5] : unset
+		LLM_REMOTE_READY_PING_DEADLINE_MS := Previous.Has(6) ? Previous[6] : unset
 	}
 }
 Test("managed remote native: canonical timing scope preserves assigned and unset owners (managed-fixture-timing)",
@@ -2292,3 +2300,22 @@ _ManagedRemoteReadinessFactoryPrimary() {
 	AssertEqual(0, Run["http"].Length)
 }
 Test("managed remote native: readiness capture preserves factory failure (managed-fixture-readiness-diagnostic)", _ManagedRemoteReadinessFactoryPrimary)
+
+_ManagedRemoteTimingChangedRegistryBudget(Expected, *) {
+	global LLM_REMOTE_READY_PING_DEADLINE_MS
+	AssertEqual(Expected, LLM_REMOTE_READY_PING_DEADLINE_MS, "the genuine timing loader consumes the changed canonical value")
+}
+
+_ManagedRemoteTimingReadinessRegistryChange() {
+	global _TimingsCache
+	Previous := _TimingsCache
+	Changed := Previous.Clone()
+	Changed["llm"] := Previous["llm"].Clone()
+	Changed["llm"]["request_timeout_ms"] := 7000
+	try {
+		_TimingsCache := Changed
+		_ManagedRemoteFixtureWithLlmTimings(_ManagedRemoteTimingChangedRegistryBudget.Bind(7000))
+	} finally _TimingsCache := Previous
+}
+Test("managed remote native: readiness loader consumes changed canonical request timing (ready-canonical-budget)",
+	_ManagedRemoteTimingReadinessRegistryChange)

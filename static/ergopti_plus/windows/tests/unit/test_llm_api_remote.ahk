@@ -1559,6 +1559,10 @@ class _RemoteProxy_ReadyHttp {
 	}
 	SetTimeouts(*) {
 	}
+	SetDeadline(Start, Budget) {
+		this.State["start"] := Start
+		this.State["budget"] := Budget
+	}
 	SetRequestHeader(*) {
 	}
 	SetProxy(Proxy) {
@@ -1579,7 +1583,11 @@ _RemoteProxy_ReadyCreate(State) {
 }
 
 _RemoteProxy_ReadyAdmission(ProbeCase := "success") {
-	global LLM_API_PROVIDERS
+	return _ManagedRemoteFixtureWithLlmTimings(_RemoteProxy_ReadyAdmissionBody.Bind(ProbeCase))
+}
+
+_RemoteProxy_ReadyAdmissionBody(ProbeCase) {
+	global LLM_API_PROVIDERS, LLM_REMOTE_READY_PING_DEADLINE_MS
 	SavedProviders := LLM_API_PROVIDERS
 	LLM_API_PROVIDERS := Map("group6_fixture", Map("Format", "openai", "BaseUrl", "https://ready.invalid:8443/v1"))
 	State := Map("creates", 0, "sends", 0, "aborts", 0, "results", [])
@@ -1591,6 +1599,8 @@ _RemoteProxy_ReadyAdmission(ProbeCase := "success") {
 		AssertTrue(State.Has("continue"), "readiness must use the system admission resolver")
 		AssertEqual("https://ready.invalid:8443/v1/models", State["url"])
 		AssertEqual(0, State["creates"], "no readiness child before the first PAC answer")
+		if ProbeCase == "budget_change"
+			LLM_REMOTE_READY_PING_DEADLINE_MS := 0
 		if ProbeCase == "replace"
 			Successor := LLM_AuxBegin("group6_ready", Map("backend", "api", "endpoint", "next", "identity", "successor"))
 		State["continue"].Call(Map("ok", ProbeCase != "reject", "inherit", false, "proxy", "http://managed.corp:3128"))
@@ -1606,6 +1616,8 @@ _RemoteProxy_ReadyAdmission(ProbeCase := "success") {
 			AssertEqual(1, State["creates"], "duplicate completion must create exactly one transport")
 			AssertEqual(1, State["sends"], "readiness must send exactly once")
 			AssertEqual("http://managed.corp:3128", State["proxy"], "readiness and generation must share relay admission")
+			AssertEqual(Owner["network_start_tick"], State["start"], "deferred admission retains the original request origin")
+			AssertEqual(Owner["network_timeout_ms"], State["budget"], "deferred admission retains the originally admitted canonical budget")
 		}
 	} finally {
 		_LLM_AuxRetireOwner(Owner)
@@ -1618,3 +1630,33 @@ Test("remote proxy: readiness waits for and applies the same relay", _RemoteProx
 Test("remote proxy: superseded readiness cannot launch a child", _RemoteProxy_ReadyAdmission.Bind("replace"))
 
 Test("remote proxy: unresolved receipt refuses readiness once", _RemoteProxy_ReadyAdmission.Bind("reject"))
+
+Test("remote proxy: a later timing change cannot renew or erase readiness's original deadline (ready-canonical-budget)",
+	_RemoteProxy_ReadyAdmission.Bind("budget_change"))
+
+_RemoteProxy_ReadyInvalidBudget(Budget) {
+	global LLM_REMOTE_READY_PING_DEADLINE_MS
+	Previous := IsSet(LLM_REMOTE_READY_PING_DEADLINE_MS) ? LLM_REMOTE_READY_PING_DEADLINE_MS : unset
+	Owner := LLM_AuxBegin("ready_invalid_budget", Map("backend", "api", "endpoint", "controlled", "identity", "fixture"))
+	State := Map("creates", 0)
+	try {
+		LLM_REMOTE_READY_PING_DEADLINE_MS := Budget == "unset" ? unset : Budget
+		Rejected := false
+		try LLM_RemoteIsReady_Async(Map(), (*) => 0, Owner,
+			Map("create_http", _RemoteProxy_ReadyCreate.Bind(State), "resolve_proxy", (*) => false))
+		catch Error as Failure {
+			Rejected := true
+			AssertContains(Failure.Message, "initialized canonical request budget")
+		}
+		AssertTrue(Rejected, "invalid timing cannot borrow Send's fallback duration")
+		AssertEqual(0, State["creates"], "invalid initialization creates no transport")
+		AssertFalse(Owner.Has("network_start_tick"), "invalid initialization cannot acquire a readiness deadline")
+		AssertTrue(LLM_AuxIsCurrent(Owner), "invalid timing preserves the caller's exact owner")
+	} finally {
+		LLM_REMOTE_READY_PING_DEADLINE_MS := IsSet(Previous) ? Previous : unset
+		_LLM_AuxRetireOwner(Owner)
+	}
+}
+for Index, Budget in [0, -1, "30000", 0x80000000, "unset"]
+	Test("remote proxy: invalid canonical readiness budget refuses before transport " . Index . " (ready-canonical-budget)",
+		_RemoteProxy_ReadyInvalidBudget.Bind(Budget))
