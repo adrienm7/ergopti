@@ -973,9 +973,15 @@ function M.show_window(opts)
 
 	-- Raised and focused once, like every window: never given a level that
 	-- keeps it above the windows the user opens afterwards.
-	ui_builder.force_focus(wv, true, { is_current = function()
-		return _focus_owner == focus_owner and _window == wv and _window_generation == generation
-	end })
+	local focus_ok, focused = xpcall(function()
+		return ui_builder.force_focus(wv, true, { is_current = function()
+			return _focus_owner == focus_owner and _window == wv and _window_generation == generation
+		end })
+	end, debug.traceback)
+	if not focus_ok or focused ~= true then
+		Logger.error(LOG, "Diagnostics window presentation was refused; the current report remains open.")
+		return false
+	end
 
 	Logger.success(LOG, "Diagnostics window opened.")
 	return true

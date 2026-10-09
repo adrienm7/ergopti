@@ -63,7 +63,8 @@ local function load_window(controls)
 		end,
 	}
 	package.loaded["ui.healthcheck.probes"] = {
-		start = function(_, snapshot)
+		start = function(_, snapshot, on_result)
+			context.probe_result = on_result
 			context.started_probes = context.started_probes + 1
 			context.probe_snapshot = snapshot
 			return { cancel = function() context.cancelled_probes = context.cancelled_probes + 1 end }
@@ -309,6 +310,44 @@ helpers.describe("diagnostics window: the page's bridge (macOS)", function()
 			helpers.assert_eq(messages[#messages].snapshot.detailed, true)
 			helpers.assert_eq(context.started_probes, 2)
 			helpers.assert_eq(context.cancelled_probes, 1)
+		end)
+	end)
+end)
+
+
+helpers.describe("diagnostics user presentation admission", function()
+	for _, mode in ipairs({ "false", "throw" }) do
+		helpers.it("diagnostics foreground refuses focus " .. mode, function()
+			as_jdoe(function()
+			local core, context = load_window()
+			package.loaded["ui.ui_builder"].force_focus = function()
+				if mode == "throw" then error("owned presentation failure") end
+				return false
+			end
+			helpers.assert_eq(core.show_window(), false)
+			helpers.assert_eq(context.deleted, 0, "Presentation refusal must preserve the shown report")
+			helpers.assert_eq(context.released, 0, "The current page handler remains owned")
+			context.page({ body = "ready" })
+			local messages = page_messages(context)
+			helpers.assert_eq(messages[#messages].type, "init", "The retained report remains usable")
+			helpers.assert_true(#context.errors > 0)
+			end)
+		end)
+	end
+
+	helpers.it("diagnostics background probe completion never steals window focus", function()
+		as_jdoe(function()
+			local core, context = load_window()
+			helpers.assert_true(core.show_window())
+			context.page({ body = "ready" })
+			context.page({ body = { action = "refresh", extensive = true } })
+			helpers.assert_eq(context.started_probes, 1)
+			helpers.assert_type(context.probe_result, "function")
+			context.probe_result("github_api", { state = "ok", ms = 1 }, {})
+			helpers.assert_eq(context.focused, 1, "Only the user's original open may request focus")
+			context.page({ body = { action = "close" } })
+			context.probe_result("github_api", { state = "ok", ms = 2 }, {})
+			helpers.assert_eq(context.focused, 1, "Late retired completion must stay inert")
 		end)
 	end)
 end)
