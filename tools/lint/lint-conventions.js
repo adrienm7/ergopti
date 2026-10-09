@@ -115,20 +115,23 @@ function checkFileHeader(file) {
 function checkNoCoAuthor() {
 	let log = '';
 	try {
-		// Try from origin/dev, fall back to last 20 commits
-		try {
-			log = execSync('git log origin/dev..HEAD --format=%B', {
-				cwd: REPO_ROOT,
-				encoding: 'utf8',
-				stdio: ['pipe', 'pipe', 'pipe']
-			});
-		} catch {
-			log = execSync('git log -20 --format=%B', {
-				cwd: REPO_ROOT,
-				encoding: 'utf8',
-				stdio: ['pipe', 'pipe', 'pipe']
-			});
-		}
+		// Integrating either published release history must not require rewriting it.
+		// New commits, including unpublished second parents, remain in the checked set.
+		const options = {
+			cwd: REPO_ROOT,
+			encoding: 'utf8',
+			stdio: ['pipe', 'pipe', 'pipe']
+		};
+		const published = ['refs/remotes/origin/dev', 'refs/remotes/origin/main'].filter((ref) => {
+			try {
+				execSync(`git rev-parse --verify ${ref}`, options);
+				return true;
+			} catch {
+				return false;
+			}
+		});
+		const range = published.length ? `HEAD --not ${published.join(' ')}` : '-20';
+		log = execSync(`git log ${range} --format=%B`, options);
 	} catch {
 		return; // git not available
 	}
