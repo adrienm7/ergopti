@@ -1,4 +1,4 @@
---- test/manual_profile_selection.lua
+--- _shared/lua/test/manual_profile_selection.lua
 
 --- ==============================================================================
 --- MODULE: Manual Profile Selection Override Contract
