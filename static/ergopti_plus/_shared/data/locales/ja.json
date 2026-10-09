@@ -248,9 +248,9 @@
 	"dialog.gestures.param_text": "入力するテキスト（1 行、最大 {1} 文字）：",
 	"dialog.gestures.param_key": "押すキー：1 文字、または次のいずれかの名前：\n{1}",
 	"dialog.gestures.param_shortcut": "押すショートカット：修飾キーとキーを + でつなげて入力します（例：primary+a、ctrl+shift+t）。修飾キー：primary（Ctrl、macOS では ⌘）、ctrl、alt、shift、super。キー：1 文字、または次のいずれかの名前：\n{1}",
-	"dialog.gestures.param_llm_prompt": "使用するプロンプトの識別子。必要に応じて | と予測数（1〜10、省略時は AI メニューの数）を続けます。利用できるプロンプト:\n{1}",
+	"dialog.gestures.param_llm_prompt": "使用するプロンプトの識別子。必要に応じて | と予測数（1〜10、省略時は AI メニューの数）を続けます。利用できるプロンプト:\n{1}\n翻訳する場合：translate|count|language。例：translate|1|Esperanto（count：1～10）。",
 	"dialog.gestures.param_llm_vision": "画像認識モデルの提供元：local または API 提供元。必要に応じて | とモデル名を続けます。利用できる提供元:\n{1}",
-	"dialog.gestures.param_llm_language": "翻訳先の言語：メニューの言語なら ui、または言語コード。利用できる言語：\n{1}",
+	"dialog.gestures.param_llm_language": "翻訳先の言語（例：エスペラント）。インターフェースの言語を使う場合は ui を入力してください。UTF-8 で最大 {1} バイト。",
 	"dialog.gestures.param_error_title": "無効な値",
 	"dialog.gestures.param_err_url": "有効な http:// または https:// の URL を入力してください。",
 	"dialog.gestures.param_err_app": "アプリケーションを選択してください。名前やパスは空にできず、先頭や末尾に空白を置いたり、改行を含めたりすることはできません。",
@@ -262,7 +262,7 @@
 	"dialog.gestures.param_err_shortcut": "修飾キーを 1 つ以上とキーを + でつなげて入力してください（例：primary+a）。",
 	"dialog.gestures.param_err_llm_prompt": "一覧のプロンプト識別子を入力してください。必要に応じて | と 1〜10 の数を続けます。",
 	"dialog.gestures.param_err_llm_vision": "一覧の提供元を入力してください。必要に応じて | と前後に空白のないモデル名を続けます。",
-	"dialog.gestures.param_err_llm_language": "ui または一覧の言語コードを入力してください。",
+	"dialog.gestures.param_err_llm_language": "表示された上限内で、空でない言語名を入力してください。前後の空白や予約文字は使用できません。",
 	"dialog.gestures.warning_msg": "⚠️ 警告: タッチパッドジェスチャーを有効にすると、システムジェスチャーと干渉する可能性があります。\n\n競合を避けるため、以下のmacOSオプションを無効にしてください:\n\n• 2本指タッチパッドジェスチャー: Hammerspoonで使用する場合はスクロールとスワイプを無効にする\n• ウィンドウの移動とテキスト選択の3本指タッチパッドジェスチャー\n• 辞書で単語を調べる3本指タップ\n• スペースの切り替え、App ExposéまたはMission Controlの起動に使う3本指の水平/垂直スワイプ\n• スペースの切り替え、App ExposéまたはMission Controlの起動に使う4本指の水平/垂直スワイプ\n\n5本指ジェスチャーを定義するには、4本指のシステムジェスチャーを無効にすることが重要です。そうしないと、macOSはそれらを区別できず、5本指ジェスチャーの動作を妨げます。そのため、ジェスチャーモジュールではデフォルトの4本指ジェスチャーを再定義して、5本指ジェスチャーとの競合なしにシステム機能を復元しています。",
 	"dialog.gestures.warning_title": "ジェスチャーの警告",
 	"dialog.gpt_link.title": "Win + Gで開くリンクを編集",
@@ -3280,5 +3280,6 @@
 	"healthcheck.summary.observed": "完了したチェックでは問題は検出されませんでした。",
 	"healthcheck.summary.scope": "結果は記録されたチェックのみを対象とします。隔離環境でのテストスイートは実行されていません。",
 	"healthcheck.problem.diagnostic_check": "診断チェックに失敗しました: %s。",
-	"healthcheck.export.privacy_notice": "このレポートは許可された技術情報のみを共有します。詳細を有効にしても、ログ、自由記述、パス、個人を特定する情報は含まれません。ページのローカルテストは含まれません。"
+	"healthcheck.export.privacy_notice": "このレポートは許可された技術情報のみを共有します。詳細を有効にしても、ログ、自由記述、パス、個人を特定する情報は含まれません。ページのローカルテストは含まれません。",
+	"sg_actions.llm_translate_context": "🌐 現在の文を翻訳 [設定可能]"
 }

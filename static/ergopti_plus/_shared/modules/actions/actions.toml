@@ -1192,12 +1192,18 @@ parameter = "llm_vision"
 platform = "all"
 parameter = "llm_vision"
 
+[sg_actions.llm_translate_context]
+# Translates the current sentence through the existing rewrite prediction owner.
+# The target is stored per binding; selecting this action changes no active profile.
+platform = "all"
+parameter = "llm_language"
+
 [sg_actions.llm_translate_selection]
 # Translates the SELECTION with the AI menu's current text backend
 # (_shared/modules/llm/translate.json) and shows the translation in the
 # prediction tooltip; accepting it replaces the selection, Escape leaves the
 # text untouched. The parameter is "ui" (the interface language, the default)
-# or a locale code. Nothing selected: a notice. It refuses like
+# or a free language name. Nothing selected: a notice. It refuses like
 # llm_generate_prediction (paused, AI off, backend not ready).
 platform = "all"
 parameter = "llm_language"
@@ -1651,6 +1657,7 @@ items = [
     "llm_screen_region",
     "llm_screen_full",
     "llm_screen_error",
+    "llm_translate_context",
     "llm_translate_selection",
     "llm_agent_selection",
     "llm_agent_command",

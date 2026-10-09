@@ -248,9 +248,9 @@
 	"dialog.gestures.param_text": "Te typen tekst (één regel, hoogstens {1} tekens):",
 	"dialog.gestures.param_key": "Toets om in te drukken: één teken, of een van deze namen:\n{1}",
 	"dialog.gestures.param_shortcut": "Sneltoets om in te drukken: modificatietoetsen en een toets verbonden met +, bijvoorbeeld primary+a of ctrl+shift+t. Modificatietoetsen: primary (Ctrl, of ⌘ op macOS), ctrl, alt, shift, super. Toets: één teken, of een van deze namen:\n{1}",
-	"dialog.gestures.param_llm_prompt": "Te gebruiken prompt, via de id, eventueel gevolgd door | en een aantal voorspellingen (1 tot 10; zonder wordt het aantal uit het AI-menu gebruikt). Beschikbare prompts:\n{1}",
+	"dialog.gestures.param_llm_prompt": "Te gebruiken prompt, via de id, eventueel gevolgd door | en een aantal voorspellingen (1 tot 10; zonder wordt het aantal uit het AI-menu gebruikt). Beschikbare prompts:\n{1}\nVoor vertaling: translate|count|language, bijvoorbeeld translate|1|Esperanto (count: 1–10).",
 	"dialog.gestures.param_llm_vision": "Aanbieder van het beeldmodel: local of een API-aanbieder, eventueel gevolgd door | en een modelnaam. Beschikbare aanbieders:\n{1}",
-	"dialog.gestures.param_llm_language": "Doeltaal: ui voor de menutaal, of een taalcode. Beschikbare talen:\n{1}",
+	"dialog.gestures.param_llm_language": "Doeltaal (bijvoorbeeld Esperanto). Gebruik ui voor de interfacetaal. Maximaal {1} UTF-8-bytes.",
 	"dialog.gestures.param_error_title": "Ongeldige waarde",
 	"dialog.gestures.param_err_url": "Voer een geldige http:// of https://-URL in.",
 	"dialog.gestures.param_err_app": "Kies een app: de naam of het pad mag niet leeg zijn, niet met een spatie beginnen of eindigen en geen regeleinde bevatten.",
@@ -262,7 +262,7 @@
 	"dialog.gestures.param_err_shortcut": "Voer minstens één modificatietoets en een toets in, verbonden met +, bijvoorbeeld primary+a.",
 	"dialog.gestures.param_err_llm_prompt": "Voer een prompt-id uit de lijst in, eventueel gevolgd door | en een getal van 1 tot 10.",
 	"dialog.gestures.param_err_llm_vision": "Voer een aanbieder uit de lijst in, eventueel gevolgd door | en een modelnaam zonder spaties aan de randen.",
-	"dialog.gestures.param_err_llm_language": "Voer ui of een taalcode uit de lijst in.",
+	"dialog.gestures.param_err_llm_language": "Voer binnen de aangegeven limiet een niet-lege taalnaam in zonder spaties aan het begin of einde of gereserveerde tekens.",
 	"dialog.gestures.warning_msg": "⚠️ Waarschuwing: Touchpadgebaren inschakelen kan conflicteren met systeemgebaren.\n\nOm conflicten te vermijden, schakelt u de volgende macOS-opties uit:\n\n• 2-vinger touchpadgebaren: schakel scrollen en vegen uit als u ze in Hammerspoon wilt gebruiken.\n• 3-vinger touchpadgebaren om vensters te verplaatsen en tekst te selecteren\n• 3-vinger tik om woorden in het woordenboek op te zoeken\n• 3-vinger horizontaal/verticaal vegen om ruimten te wisselen, App Exposé of Mission Control te activeren\n• 4-vinger horizontaal/verticaal vegen om ruimten te wisselen, App Exposé of Mission Control te activeren\n\nHet is belangrijk om 4-vinger systeemgebaren uit te schakelen om 5-vinger gebaren te definiëren. Anders zou macOS ze niet onderscheiden en 5-vinger gebaren verhinderen. Daarom worden de standaard 4-vinger gebaren opnieuw gedefinieerd in de Gebaren-module om systeemfuncties te herstellen zonder conflicten met 5-vinger gebaren.",
 	"dialog.gestures.warning_title": "Gebaarwaarschuwing",
 	"dialog.gpt_link.title": "Link bewerken geopend door Win + G",
@@ -3280,5 +3280,6 @@
 	"healthcheck.summary.observed": "Geen probleem gevonden in de voltooide controles.",
 	"healthcheck.summary.scope": "De resultaten gelden alleen voor de vastgelegde controles. Geïsoleerde testsuites zijn niet uitgevoerd.",
 	"healthcheck.problem.diagnostic_check": "Diagnostische controle mislukt: %s.",
-	"healthcheck.export.privacy_notice": "Dit rapport deelt alleen toegestane technische gegevens. Logboeken, vrije tekst, paden en identificerende gegevens blijven uitgesloten, ook als details zijn ingeschakeld. Lokale paginatests zijn niet opgenomen."
+	"healthcheck.export.privacy_notice": "Dit rapport deelt alleen toegestane technische gegevens. Logboeken, vrije tekst, paden en identificerende gegevens blijven uitgesloten, ook als details zijn ingeschakeld. Lokale paginatests zijn niet opgenomen.",
+	"sg_actions.llm_translate_context": "🌐 Huidige zin vertalen [instelbaar]"
 }
