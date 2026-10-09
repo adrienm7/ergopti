@@ -6712,5 +6712,58 @@
 			],
 			"unavailable": "hide"
 		}
+	],
+	"hotstring_scope_checkbox": [
+		{
+			"type": "check",
+			"id": "hotstring_scope_all_sections",
+			"i18n": "menu.hotstrings.enable_all_sections",
+			"checked_when": [
+				"hotstring_scope_all_on"
+			]
+		}
+	],
+	"hotstring_language_frame": [
+		{
+			"type": "list",
+			"id": "hotstring_language_switch"
+		},
+		{
+			"type": "---"
+		},
+		{
+			"type": "list",
+			"id": "hotstring_language_categories"
+		}
+	],
+	"hotstring_language_parent_windows": [
+		{
+			"type": "group",
+			"id": "hotstring_language_children",
+			"caption_source": "native",
+			"caption_getter": "hotstring_language_name",
+			"caption_count_getter": "hotstring_language_count",
+			"caption_count_format": "%s (%s)",
+			"icon_getter": "hotstring_language_icon",
+			"platforms": [
+				"ahk"
+			],
+			"unavailable": "hide"
+		}
+	],
+	"hotstring_language_parent_lua": [
+		{
+			"type": "group",
+			"id": "hotstring_language_children",
+			"caption_source": "native",
+			"caption_getter": "hotstring_language_name",
+			"caption_count_getter": "hotstring_language_count",
+			"caption_count_format": "%s (%s)",
+			"platforms": [
+				"hs",
+				"linux"
+			],
+			"unavailable": "hide"
+		}
 	]
 }

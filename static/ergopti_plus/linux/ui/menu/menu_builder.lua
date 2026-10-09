@@ -820,20 +820,19 @@ local function _manifest_hotstring_rows(ctx, config)
 	--- @return table Provider row.
 	local function all_sections_row(ids)
 		local all_on = sections_all_on(ids)
-		return {
-			label   = i18n_safe("menu.hotstrings.enable_all_sections"),
-			checked = all_on,
-			action  = function()
-				local called, committed = false, false
-				if type(config.set_categories_sections) == "function" then
-					called, committed = pcall(config.set_categories_sections, ids, not all_on)
-				end
-				if called and committed == true then return true end
-				Logger.error(LOG, "The aggregate hotstrings switch did not acknowledge durable publication.")
-				show_error(i18n_safe("dialog.bulk_toggle.save_failed"), i18n_safe("common.error_title"))
-				return false
-			end,
-		}
+		local action = function()
+			local called, committed = false, false
+			if type(config.set_categories_sections) == "function" then
+				called, committed = pcall(config.set_categories_sections, ids, not all_on)
+			end
+			if called and committed == true then return true end
+			Logger.error(LOG, "The aggregate hotstrings switch did not acknowledge durable publication.")
+			show_error(i18n_safe("dialog.bulk_toggle.save_failed"), i18n_safe("common.error_title"))
+			return false
+		end
+		return ManifestMenu.check_row("hotstring_scope_checkbox", "hotstring_scope_all_sections",
+			{ hotstring_scope_all_sections = action },
+			{ hotstring_scope_all_on = function() return all_on end })
 	end
 
 	--- One category, as a submenu rather than a single toggle.
@@ -1013,19 +1012,26 @@ local function _manifest_hotstring_rows(ctx, config)
 		for _, pack in ipairs(language_packs) do
 			local ids = {}
 			for _, stem in ipairs(pack.categories) do ids[#ids + 1] = Languages.group_id(pack.id, stem) end
-			local items = { all_sections_row(ids), { separator = true } }
+			local switch, categories = all_sections_row(ids), {}
 			local total = 0
 			for _, id in ipairs(ids) do
 				local category = type(config.get_category) == "function" and config.get_category(id) or nil
 				if category then
-					items[#items + 1] = group_row(id)
+					categories[#categories + 1] = group_row(id)
 					total = total + active_count(id, category)
 				end
 			end
-			rows[#rows + 1] = {
-				label = string.format("%s (%d)", language_label(pack.locale), total),
-				items = items,
-			}
+			local items = switch and ManifestMenu.template_rows("hotstring_language_frame", {}, {}, {
+				hotstring_language_switch = function() return { switch } end,
+				hotstring_language_categories = function() return categories end,
+			})
+			if items then
+				local parents = ManifestMenu.template_rows("hotstring_language_parent_lua", {}, {
+					hotstring_language_name = function() return language_label(pack.locale) end,
+					hotstring_language_count = function() return string.format("%d", total) end,
+				}, { hotstring_language_children = items })
+				for _, row in ipairs(parents or {}) do rows[#rows + 1] = row end
+			end
 		end
 		return rows
 	end
@@ -1999,7 +2005,7 @@ local function _manifest_hotstring_rows(ctx, config)
 	hs_ctx.commands = {
 		["scope_restore"] = function() return apply_hotstrings_scope("recommended") end,
 		["scope_clear"] = function() return apply_hotstrings_scope("clear") end,
-		["hotstrings_all_sections"] = whole_tree.action,
+		["hotstrings_all_sections"] = whole_tree and whole_tree.action or nil,
 		-- The category switch, the submenu's first row. Every driver registers it:
 		-- no tray can switch a category from the row that opens its submenu.
 		["hotstrings_toggle"]      = function()
@@ -2031,7 +2037,7 @@ local function _manifest_hotstring_rows(ctx, config)
 	hs_ctx.state_getters = {}
 	for key, value in pairs(ctx.state_getters or {}) do hs_ctx.state_getters[key] = value end
 	hs_ctx.state_getters["hotstrings_enabled"] = hotstrings_on
-	hs_ctx.state_getters["hotstrings_all_sections_enabled"] = function() return whole_tree.checked end
+	hs_ctx.state_getters["hotstrings_all_sections_enabled"] = function() return whole_tree ~= nil and whole_tree.checked end
 
 	return ManifestMenu.build("hotstrings_menu", "Hotstrings", nil, group_builders, hs_ctx, providers)
 end

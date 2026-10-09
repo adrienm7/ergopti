@@ -481,6 +481,7 @@ return {
 	"tests.unit.ui.test_gesture_conflicts",
 	"tests.unit.ui.test_healthcheck_linux_rows",
 	"tests.unit.ui.test_hotstring_bulk_checkboxes",
+	"tests.unit.ui.test_hotstrings_language_scope_frame",
 	"tests.unit.ui.test_hotstrings_master_tick",
 	"tests.unit.ui.test_healthcheck_bridge_actions",
 	"tests.unit.ui.test_healthcheck_probes",

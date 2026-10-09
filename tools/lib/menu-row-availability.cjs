@@ -29,6 +29,20 @@ const ROW_TYPES = new Set([
 	'native_content'
 ]);
 
+/** Counts ordered scalar slots with the native renderers' percent-token rules. */
+function nativeCountSlots(format) {
+	if (typeof format !== 'string') return -1;
+	let slots = 0;
+	for (let index = 0; index < format.length; index += 1) {
+		if (format[index] !== '%') continue;
+		const following = format[index + 1];
+		if (following === 's') slots += 1;
+		else if (following !== '%') return -1;
+		index += 1;
+	}
+	return slots;
+}
+
 /** Refuses a declaration the renderers cannot honour. */
 function classifyMenuRow(row, where) {
 	if (!row || typeof row !== 'object' || Array.isArray(row))
@@ -426,6 +440,29 @@ function validateChildTemplates(menu, captionFormat) {
 				throw new Error(
 					`${where}: native caption needs a record check or group without translation or decoration metadata`
 				);
+			if (
+				(row.caption_count_getter !== undefined || row.caption_count_format !== undefined) &&
+				(row.type !== 'group' ||
+					row.caption_source !== 'native' ||
+					typeof row.caption_count_getter !== 'string' ||
+					row.caption_count_getter === '' ||
+					typeof row.caption_count_format !== 'string' ||
+					/[\x00-\x1f\x7f]/.test(row.caption_count_format) ||
+					nativeCountSlots(row.caption_count_format) !== 2)
+			)
+				throw new Error(
+					`${where}: native count captions need a group and two ordered scalar slots`
+				);
+			if (
+				row.icon_getter !== undefined &&
+				(row.type !== 'group' ||
+					typeof row.icon_getter !== 'string' ||
+					row.icon_getter === '' ||
+					!Array.isArray(row.platforms) ||
+					row.platforms.length !== 1 ||
+					row.platforms[0] !== 'ahk')
+			)
+				throw new Error(`${where}: native group icons need an explicit Windows getter`);
 			if (
 				row.caption_getters !== undefined &&
 				(!['command', 'check', 'group', 'label'].includes(row.type) ||

@@ -122,6 +122,15 @@ local function read_native_caption(item, getters)
 		or type(getters) ~= "table" or type(getters[item.caption_getter]) ~= "function" then return nil end
 	local ok, title = pcall(getters[item.caption_getter])
 	if not ok or type(title) ~= "string" or title == "" or title:find("[%z\1-\31\127]") or utf8_length(title) == nil then return nil end
+	if item.caption_count_getter ~= nil or item.caption_count_format ~= nil then
+		if item.type ~= "group" or type(item.caption_count_getter) ~= "string" or item.caption_count_getter == ""
+			or type(item.caption_count_format) ~= "string" or item.caption_count_format:find("[%z\1-\31\127]")
+			or type(getters[item.caption_count_getter]) ~= "function" then return nil end
+		local count_ok, count = pcall(getters[item.caption_count_getter])
+		if not count_ok or type(count) ~= "string" or count == "" or count:find("[%z\1-\31\127]")
+			or utf8_length(count) == nil then return nil end
+		return caption_values(item.caption_count_format, { title, count })
+	end
 	return title
 end
 

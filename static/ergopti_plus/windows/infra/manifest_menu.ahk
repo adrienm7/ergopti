@@ -1011,6 +1011,18 @@ _MR_TemplateRows(ManifestKey, Commands, StateGetters, Children, Visiting, Status
 			if !(Items is Array)
 				return false
 			Row := Map("label", IsSet(Label) ? Label : t(_MR_Get(Item, "i18n")), "items", Items)
+			if Item.Has("icon_getter") {
+				IconGetter := Item["icon_getter"]
+				if Type(IconGetter) != "String" || IconGetter == "" || !(StateGetters is Map)
+					|| !StateGetters.Has(IconGetter) || !HasMethod(StateGetters[IconGetter], "Call")
+					return false
+				try Icon := StateGetters[IconGetter].Call()
+				catch
+					return false
+				if Type(Icon) != "String"
+					return false
+				Row["icon"] := Icon
+			}
 			if Item.Has("disabled_when") && MenuRenderer_ResolveDisabledWhen(ManifestKey, Id, StateGetters) {
 				Row["disabled"] := true
 				if Item.Has("disabled_reason_key")
@@ -1108,7 +1120,23 @@ _MR_ReadNativeCaption(Item, Getters, &Caption) {
 	try Caption := Getters[Getter].Call()
 	catch
 		return false
-	return Type(Caption) == "String" && Caption != "" && _MR_PlainUnicodeCaption(Caption)
+	if Type(Caption) != "String" || Caption == "" || !_MR_PlainUnicodeCaption(Caption)
+		return false
+	if Item.Has("caption_count_getter") || Item.Has("caption_count_format") {
+		CountGetter := _MR_Get(Item, "caption_count_getter")
+		Format := _MR_Get(Item, "caption_count_format")
+		if _MR_Get(Item, "type") != "group" || Type(CountGetter) != "String" || CountGetter == ""
+			|| Type(Format) != "String" || !_MR_PlainUnicodeCaption(Format)
+			|| !Getters.Has(CountGetter) || !HasMethod(Getters[CountGetter], "Call")
+			return false
+		try Count := Getters[CountGetter].Call()
+		catch
+			return false
+		if Type(Count) != "String" || Count == "" || !_MR_PlainUnicodeCaption(Count)
+			return false
+		return _MR_CaptionValues(Format, [Caption, Count], &Caption)
+	}
+	return true
 }
 
 ; Ordered getter vectors retain original translated formats and reject malformed native data.

@@ -165,9 +165,8 @@ _HS_LanguageRows() {
 	Rows := []
 	IsGated := IsCategoryGated("Hotstrings")
 	for _, Pack in HotstringsLanguageCategories() {
-		Items := []
-		Items.Push(_HS_LanguageSwitchRow(Pack))
-		Items.Push(Map("separator", true))
+		Switch := _HS_LanguageSwitchRow(Pack)
+		Categories := []
 		LanguageTotal := 0
 		for _, Cat in Pack["categories"] {
 			V1Cat := Cat["v1"]
@@ -175,17 +174,26 @@ _HS_LanguageRows() {
 				continue
 			Total := _HS_GatedCount(IsGated and IsCategoryGated(V1Cat), _CountEnabledForCategory(V1Cat))
 			LanguageTotal += Total
-			Items.Push(Map(
+			Categories.Push(Map(
 				"label",   GetCategoryTitle(V1Cat) . " (" . FmtCount(Total) . ")",
 				"checked", IsCategoryGated(V1Cat) ? true : false,
 				"submenu", SubMenus[V1Cat]))
 		}
 		; The flag is an icon here, as in the language selector: Win32 menus
 		; cannot render the flag emoji the Lua drivers put in the label.
-		Rows.Push(Map(
-			"label", HotstringsLanguageName(Pack["locale"]) . " (" . FmtCount(LanguageTotal) . ")",
-			"icon",  I18nFlagIconPath(Pack["locale"]),
-			"items", Items))
+		Items := MenuRenderer_TemplateRows("hotstring_language_frame", Map(), Map(), Map(
+			"hotstring_language_switch", (*) => Switch is Map ? [Switch] : [],
+			"hotstring_language_categories", (*) => Categories))
+		if !(Items is Array) || !(Switch is Map)
+			continue
+		Parents := MenuRenderer_TemplateRows("hotstring_language_parent_windows", Map(), Map(
+			"hotstring_language_name", HotstringsLanguageName.Bind(Pack["locale"]),
+			"hotstring_language_count", (*) => FmtCount(LanguageTotal),
+			"hotstring_language_icon", I18nFlagIconPath.Bind(Pack["locale"])),
+			Map("hotstring_language_children", Items))
+		if Parents is Array
+			for Parent in Parents
+				Rows.Push(Parent)
 	}
 	return Rows
 }
