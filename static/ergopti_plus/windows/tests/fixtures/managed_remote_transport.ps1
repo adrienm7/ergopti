@@ -887,6 +887,7 @@ public sealed class ErgoptiManagedRemoteFixture : IDisposable
     public int DownloadWrongDigest;
     public int DownloadTruncated;
     public int DownloadSlow;
+    public int DownloadCurlSlow;
     public int DownloadCredentials;
     public int SecondProxyConnects;
     public int ProxyRefusals;
@@ -1091,6 +1092,14 @@ public sealed class ErgoptiManagedRemoteFixture : IDisposable
         } else if (first == "GET /updater/truncated HTTP/1.1") {
             Interlocked.Increment(ref DownloadTruncated);
             Status(tls, "200 OK", "", new byte[32], 524288);
+        } else if (first == "GET /updater/curl-slow HTTP/1.1") {
+            Interlocked.Increment(ref DownloadCurlSlow);
+            byte[] headerBytes = Encoding.ASCII.GetBytes("HTTP/1.1 200 OK\r\nConnection: close\r\nContent-Length: 524288\r\n\r\n");
+            tls.Write(headerBytes, 0, headerBytes.Length); tls.Flush();
+            byte[] part = new byte[1024];
+            for (int index = 0; index < 512 && !stopping; index++) {
+                tls.Write(part, 0, part.Length); tls.Flush(); Thread.Sleep(100);
+            }
         } else if (first == "GET /updater/slow HTTP/1.1") {
             Interlocked.Increment(ref DownloadSlow);
             byte[] headerBytes = Encoding.ASCII.GetBytes("HTTP/1.1 200 OK\r\nConnection: close\r\nContent-Length: 524288\r\n\r\n");
@@ -1245,7 +1254,7 @@ public sealed class ErgoptiManagedRemoteFixture : IDisposable
             $State.phase = 'removed'
         } elseif ($Choice -eq 3) { break }
         if ($Choice -ne [Threading.WaitHandle]::WaitTimeout) {
-            foreach ($Counter in @('Requests','Generations','ReadyRequests','ProxyConnects','PacRequests','CrlRequests','FailedTls','ServiceFailures','ClosedConnections','DownloadRequests','DownloadRedirects','DownloadGood','DownloadOrigin401','DownloadOrigin403','DownloadSmall','DownloadWrongDigest','DownloadTruncated','DownloadSlow','DownloadCredentials','SecondProxyConnects','ProxyRefusals','BasicCredentials')) {
+            foreach ($Counter in @('Requests','Generations','ReadyRequests','ProxyConnects','PacRequests','CrlRequests','FailedTls','ServiceFailures','ClosedConnections','DownloadRequests','DownloadRedirects','DownloadGood','DownloadOrigin401','DownloadOrigin403','DownloadSmall','DownloadWrongDigest','DownloadTruncated','DownloadSlow','DownloadCurlSlow','DownloadCredentials','SecondProxyConnects','ProxyRefusals','BasicCredentials')) {
                 $State[$Counter] = $Fixture.$Counter
             }
             Publish-State

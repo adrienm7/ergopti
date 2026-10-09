@@ -1103,6 +1103,7 @@ _LogBootProgress("keylogger modules + tests included")
 #Include unit/test_managed_remote_transport.ahk
 #Include unit/test_updater_managed_transport.ahk
 #Include unit/test_updater_curl_artifact.ahk
+#Include unit/test_updater_curl_capture.ahk
 #Include unit/test_managed_remote_sspi.ahk
 #Include meta/test_remote_connect_timeout_bounded.ahk
 #Include meta/test_keylogger_json_64bit_decode.ahk
