@@ -8,7 +8,7 @@
 --- an error (which the shared error UI surfaces), never a confirmation.
 --- ==============================================================================
 
-local helpers = require("tests.helpers")
+local helpers, runtime_inputs = require("tests.support.remap_menu_runtime_inputs").bind(require("tests.helpers"))
 
 local OWNED_MODULES = {
 	"infra.logger",
@@ -48,6 +48,9 @@ local function owner(enabled, ok)
 	local requests = {}
 	return {
 		get_enabled = function() return enabled end,
+		get_runtime = runtime_inputs.get_runtime,
+		shared_runtime_selected = runtime_inputs.shared_runtime_selected,
+		runtime_unavailable_reason = runtime_inputs.runtime_unavailable_reason,
 		set_enabled = function(value, on_done)
 			requests[#requests + 1] = value
 			on_done(ok, ok and "stopped" or "rules-not-removed: unprovable")

@@ -131,6 +131,26 @@ end
 --- @return table|nil Decoded table, or nil.
 local TomlCodec = require("infra.toml.codec")
 
+-- New refusal proofs belong only to this reader and the canonical shared parser.
+-- Modeled public seams retain their original first four return values.
+local parser_refusal = { decoder = rawget(TomlCodec, "decode_with_shapes") }
+do
+	local identity = require("module_source_identity")
+	local directory = require("module_source_directory").capture()
+	local expected = identity.sibling(debug.getinfo(1, "S").source,
+		"macos/platform/remap/config.lua", "_shared/lua/toml_codec/codec.lua", directory)
+	parser_refusal.decoder_canonical = type(parser_refusal.decoder) == "function"
+		and identity.same(debug.getinfo(parser_refusal.decoder, "S").source, expected, directory)
+end
+local function parser_refusal_current()
+	return parser_refusal.decoder_canonical and rawget(package.loaded, "platform.remap.config") == M
+		and rawget(package.loaded, "infra.toml.codec") == TomlCodec
+		and rawget(M, "load_user_config") == parser_refusal.reader
+		and rawget(M, "_load_toml_file") == parser_refusal.loader
+		and rawget(TomlCodec, "decode_with_shapes") == parser_refusal.decoder
+		and rawget(M, "parser_refusal_factory") == parser_refusal.factory
+end
+
 --- Load a TOML user-config file.
 --- Returns the decoded table on success, nil when the file is genuinely absent,
 --- and a classified error when an existing path is unsafe or cannot be decoded
@@ -142,6 +162,7 @@ local TomlCodec = require("infra.toml.codec")
 --- @return table|nil source Exact same-read path/status/raw receipt when admitted.
 --- @return table|nil shapes Canonical parser identities for array dictionary admission.
 function M._load_toml_file(path)
+	local attempt = parser_refusal.attempt
 	local raw, read_status = FileSystem.read_with_status(path)
 	if read_status ~= "ok" then
 		if read_status == "absent" then return nil, "absent", { path = path, status = "absent" } end
@@ -149,9 +170,12 @@ function M._load_toml_file(path)
 			.. "(failure content withheld).")
 		return nil, "read_error"
 	end
+	local decoder_current = parser_refusal_current()
 	local ok, data, shapes = pcall(TomlCodec.decode_with_shapes, raw)
 	if not ok or type(data) ~= "table" then
 		Logger.error(LOG, "Cannot parse '%s' as TOML — refusing to silently reset user config.", path)
+		if decoder_current and parser_refusal_current() and attempt ~= nil
+			and parser_refusal.attempt == attempt then attempt.proof = {} end
 		return nil, "parse_error"
 	end
 	return data, nil, { path = path, status = "ok", content = raw }, shapes
@@ -581,13 +605,21 @@ end
 --- @return table|nil state Full state, or nil when the persisted source is unsafe.
 --- @return string status One of "ok", "absent", or "error".
 --- @return table|nil source Optional exact same-read path/status/raw admission receipt.
+--- @return string|nil failure "parse_error" only for the actual TOML decoder refusal.
+--- @return table|nil proof Opaque same-read proof only for a genuine parser refusal.
 function M.load_user_config(tap_hold_keys, mod_combos, user_config_path)
+	local attempt = {}
+	parser_refusal.attempt = attempt
 	local setting = runtime_setting()
 	if not setting then return nil, "error" end
 	local data, err, source, shapes = M._load_toml_file(user_config_path)
 
 	if not data then
 		if err == "parse_error" or err == "read_error" then
+			if err == "parse_error" then
+				return nil, "error", nil, "parse_error",
+					parser_refusal_current() and parser_refusal.attempt == attempt and attempt.proof or nil
+			end
 			-- File exists but is corrupt: _load_toml_file already logged the
 			-- error with the full path. Fall back to defaults so the driver can
 			-- run, but do NOT overwrite the corrupt file.
@@ -1039,5 +1071,31 @@ function M.save_runtime(value, user_config_path, expected_source)
 	end
 	return publish_config_candidate(user_config_path, payload, expected_content, expected_status)
 end
+
+
+-- Bind the original declarations only after both public functions exist.
+parser_refusal.reader, parser_refusal.loader = M.load_user_config, M._load_toml_file
+local function qualify_parser_refusal(proof)
+	local attempt = parser_refusal.attempt
+	if not parser_refusal_current() or type(proof) ~= "table" or attempt == nil
+		or attempt.proof ~= proof or attempt.consumed then return nil end
+	attempt.consumed = true
+	return function()
+		return parser_refusal_current() and parser_refusal.attempt == attempt and attempt.proof == proof
+	end
+end
+--- Returns the closed reader origin and inert parser-refusal qualification ports.
+--- No modeled public seam, stale receipt or foreign owner issues a proof.
+--- @return table origin
+--- @return function reader
+--- @return function loader
+--- @return function decoder
+--- @return function current
+--- @return function qualify
+parser_refusal.factory = function()
+	return M, parser_refusal.reader, parser_refusal.loader, parser_refusal.decoder,
+		parser_refusal_current, qualify_parser_refusal
+end
+M.parser_refusal_factory = parser_refusal.factory
 
 return M

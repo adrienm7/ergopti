@@ -8,7 +8,7 @@
 --- redeploys, without touching a single per-key assignment.
 --- ==============================================================================
 
-local helpers = require("tests.helpers")
+local helpers, runtime_inputs = require("tests.support.remap_menu_runtime_inputs").bind(require("tests.helpers"))
 
 --- Remap double recording the switch and every assignment write.
 --- @param observed table Mutable observation table.
@@ -25,6 +25,9 @@ local function remap_double(observed)
 		MOD_COMBOS = {},
 		NON_CANONICAL_COMBOS = {},
 		get_enabled = function() return true end,
+		get_runtime = runtime_inputs.get_runtime,
+		shared_runtime_selected = runtime_inputs.shared_runtime_selected,
+		runtime_unavailable_reason = runtime_inputs.runtime_unavailable_reason,
 		get_tap_holds_enabled = function() return observed.enabled end,
 		set_tap_holds_enabled = function(value)
 			observed.switch_writes[#observed.switch_writes + 1] = value

@@ -62,6 +62,29 @@ return function(run)
 	return helpers.with_stub_scope(OWNED_MODULES, function()
 		local RealConfig = helpers.load_with_stubs("platform.remap.config")
 
+		local original_loader = helpers.load_with_stubs
+		local real_source = false
+		helpers.load_with_stubs = function(module_name, ...)
+			if not real_source then return original_loader(module_name, ...) end
+			-- Preserve the caller's exact aliases before the named source executes.
+			-- A caller's explicit replacement remains a replacement, never authority.
+			local aliases = { "infra.toml.codec", "toml_codec", "toml_codec.codec" }
+			local bindings = {}
+			for _, name in ipairs(aliases) do bindings[name] = rawget(package.loaded, name) end
+			local original_require, handed_off = require, false
+			_G.require = function(name, ...)
+				if name == module_name and not handed_off then
+					handed_off = true
+					for _, alias in ipairs(aliases) do package.loaded[alias] = bindings[alias] end
+				end
+				return original_require(name, ...)
+			end
+			local result = table.pack(pcall(original_loader, module_name, ...))
+			_G.require = original_require
+			if not result[1] then error(result[2], 0) end
+			return table.unpack(result, 2, result.n)
+		end
+
 		local REAL_ONBOARDING_CACHE_PATH = "/__ergopti_hs011_integration__/Karabiner-Elements.dmg"
 
 		--- Clones a persisted payload so later live publication cannot rewrite evidence.
@@ -79,6 +102,7 @@ return function(run)
 		--- @return table calls
 		local function load_enabled_remap(options)
 			options = options or {}
+			real_source = type(options.real_user_config_path) == "string"
 			local onboarding_stop_succeeds = options.onboarding_stop_succeeds
 			if onboarding_stop_succeeds == nil then onboarding_stop_succeeds = true end
 			local calls = {
@@ -199,6 +223,9 @@ return function(run)
 				end,
 				resolve_layout_actions = function() return 0 end,
 			}
+			if type(options.real_user_config_path) == "string" then
+				package.loaded["platform.remap.config"] = RealConfig
+			end
 			package.loaded["platform.remap.generator"] = {
 				-- The facade only delegates to this rule; the real one is pinned
 				-- by test_generator_combo_gate_split.lua.
@@ -419,7 +446,12 @@ return function(run)
 			package.loaded["adapters.timer_scheduler"] = timer_scheduler
 			-- layers.toml, read at every regeneration, lives in get_config_dir(); none here.
 			package.loaded["infra.config_paths"] = {
-				get = function() return "missing-config.toml" end,
+				get = function(key)
+					if key == "KarabinerConfigPath" and type(options.real_user_config_path) == "string" then
+						return options.real_user_config_path
+					end
+					return "missing-config.toml"
+				end,
 				get_config_dir = function() return "tests/unit/platform/remap/no-layers-toml" end,
 			}
 			package.loaded["modules.keylogger.kc_bridge"] = {
@@ -796,12 +828,15 @@ return function(run)
 			return count
 		end
 
-		return run({
+		local results = table.pack(pcall(run, {
 			load_enabled_remap = load_enabled_remap,
 			load_remap_with_real_onboarding = load_remap_with_real_onboarding,
 			load_resume_script_control = load_resume_script_control,
 			clone_payload = clone_payload,
 			count_notifications = count_notifications,
-		})
+		}))
+		helpers.load_with_stubs = original_loader
+		if not results[1] then error(results[2], 0) end
+		return table.unpack(results, 2, results.n)
 	end)
 end

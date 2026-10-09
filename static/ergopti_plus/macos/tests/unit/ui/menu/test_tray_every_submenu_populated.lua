@@ -18,6 +18,8 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
+local runtime_inputs
+helpers, runtime_inputs = require("tests.support.remap_menu_runtime_inputs").bind(helpers)
 local LayoutFixture = require("tests.support.layout_legacy_caption_fixture")
 
 -- The menu modules ui/menu/init.lua loads, under the keys Builder.generate reads.
@@ -58,6 +60,9 @@ local LOSS_MARKERS = {
 --- @return table
 local function remap_double()
 	return {
+		get_runtime = runtime_inputs.get_runtime,
+		shared_runtime_selected = runtime_inputs.shared_runtime_selected,
+		runtime_unavailable_reason = runtime_inputs.runtime_unavailable_reason,
 		DEFAULT_TAP_HOLD_TIMEOUT_MS = 200,
 		DEFAULT_STICKY_TIMEOUT_MS = 1000,
 		DEFAULT_SIMULTANEOUS_THRESHOLD_MS = 50,
@@ -187,7 +192,7 @@ local function walk(rows, visit, path, depth)
 	end
 end
 
-helpers.describe("the real macOS tray: every submenu reaches the menu bar populated", LayoutFixture.scoped(function()
+helpers.describe("the real macOS tray: every submenu reaches the menu bar populated", LayoutFixture.scoped(helpers.scoped_runtime_inputs(function()
 	local MENU, LINES, BUILD_ERROR = build_tray()
 	helpers.it("builds without raising", function()
 		helpers.assert_nil(BUILD_ERROR, "Builder.generate raised over the real menu modules")
@@ -240,11 +245,18 @@ helpers.describe("the real macOS tray: every submenu reaches the menu bar popula
 		}
 		local named = {}
 		local allowed_seen = 0
+		local runtime_caption = i18n.get("menu.global.karabiner_runtime.shared")
+		local runtime_seen = 0
 		walk(MENU, function(row, where, depth)
 			if type(row.title) == "string" and row.title:lower():find("karabiner", 1, true) then
 				local in_configuration = depth == 2
 					and where:find(i18n.get("menu.configuration.title"), 1, true) ~= nil
-				if allowed[row.title] and in_configuration then
+				if row.title == runtime_caption and in_configuration then
+					runtime_seen = runtime_seen + 1
+					helpers.assert_eq(row.disabled, true, "shared runtime status is informational")
+					helpers.assert_nil(row.fn, "shared runtime status has no callback")
+					helpers.assert_nil(row.checked, "shared runtime status has no tick")
+				elseif allowed[row.title] and in_configuration then
 					allowed_seen = allowed_seen + 1
 				else
 					named[#named + 1] = where .. " '" .. row.title .. "'"
@@ -253,6 +265,7 @@ helpers.describe("the real macOS tray: every submenu reaches the menu bar popula
 		end)
 		helpers.assert_eq(#named, 0, "the remap engine must stay invisible: " .. table.concat(named, ", "))
 		helpers.assert_eq(allowed_seen, 2, "the switch and its removal command must be drawn")
+		helpers.assert_eq(runtime_seen, 1, "the exact shared runtime status appears once in Configuration")
 	end)
 
 	helpers.it("draws the config folder row once, in the Configuration submenu", function()
@@ -339,6 +352,7 @@ helpers.describe("the real macOS tray: every submenu reaches the menu bar popula
 			"-",
 			CONFIG_FOLDER,
 			i18n.get("menu.global.setup_wizard"),
+			i18n.get("menu.global.karabiner_runtime.shared"),
 			i18n.get("menu.global.karabiner_integration"),
 			i18n.get("menu.global.remove_from_karabiner"),
 		}, " | "))
@@ -369,4 +383,4 @@ helpers.describe("the real macOS tray: every submenu reaches the menu bar popula
 			"startup immediately precedes Uninstall")
 		helpers.assert_eq(rows[#rows - 2].title, "-", "a separator sets the installation group apart")
 	end)
-end))
+end)))

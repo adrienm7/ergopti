@@ -754,11 +754,13 @@ function M.generate(ctx, menu_mods, actions)
 			for key, value in pairs(ctx.state_getters or {}) do cfg_ctx.state_getters[key] = value end
 			-- « Ergopti uses Karabiner » and « Remove Ergopti from Karabiner »
 			-- need the remap owner; without it the renderer skips both rows.
+			local switch_providers = {}
 			if type(ctx.karabiner) == "table" then
-				local switch_commands, switch_getters = require("ui.menu.remap_switch")
+				local switch_commands, switch_getters, providers = require("ui.menu.remap_switch")
 					.rows(ctx.karabiner, ctx.updateMenu)
 				for id, fn in pairs(switch_commands) do cfg_ctx.commands[id] = fn end
 				for id, fn in pairs(switch_getters) do cfg_ctx.state_getters[id] = fn end
+				switch_providers = providers
 			end
 			-- Pause owns the bindings axis for the whole pause window: pause_all()
 			-- snapshots what was running and resume_all() restores that snapshot.
@@ -774,8 +776,11 @@ function M.generate(ctx, menu_mods, actions)
 				-- An unregistered command draws no row, so it has nothing to gate.
 				if type(fn) == "function" then pause_gated[fn] = true end
 			end
-			local rows = ManifestMenu.build("configuration_menu", "Configuration", nil, nil, cfg_ctx)
+			local rows = ManifestMenu.build("configuration_menu", "Configuration", nil, nil, cfg_ctx, switch_providers)
 			if not configuration_dense(rows, true) then return {} end
+			for _, row in ipairs(rows) do
+				if row.disabled == true then row.fn = nil end
+			end
 			if ctx.paused then
 				for _, row in ipairs(rows) do
 					if row.fn ~= nil and pause_gated[row.fn] then

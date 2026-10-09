@@ -5225,6 +5225,19 @@ compiler sessions. Preserve original compilation, retirement and corpus
 assertions while qualifying this boundary; do not treat a larger CI budget as
 a correction of the native compilation refusals. Item31 remains partial.
 
+The reviewed C33 source composition now preserves the shared runtime captions
+and the eight historical menu models while adding a narrow Clear All refusal
+route for the genuine uninitialized parser owner. The same failed read, actual
+invoked reader, current configuration/manager identities and one-use epoch proof
+are required; a newer init or any stop invalidates the route. It grants no
+readiness or successful write, and the original apply_scope still refuses before
+mutating corrupt bytes. The six registered regressions retain all53 original
+admission bodies plus independent reader, clock, query and lifecycle controls.
+The corrected reader locator adapts the real-source fixture without changing its
+original future-backend assertions. Independent source/control reviews are
+qualified; complete final-source gates and native UI, E2E, packaging, installation
+and physical acceptance remain separate requirements. Item31 remains partial.
+
 - [~] **33.** Config policy for the files other than config.toml (the former
   item 25): Published in the second 2026-09-30 release for the files the review
   listed; see `docs/memory/text-input-and-config.md`. Current source already

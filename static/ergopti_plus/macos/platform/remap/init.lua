@@ -191,7 +191,31 @@ local _approval_presenter       = nil   -- Login Items steps the boot registered
 local _script_chords_source     = nil   -- The script chords' plan the boot registered, or nil
 local _legacy_cleanup_presenter = nil   -- Legacy-rule cleanup dialog the boot registered, or nil
 local _legacy_conflicts         = nil   -- Untagged legacy rules the last deploy refused, while pending
-local _legacy_cleanup_offered   = { confirmations = setmetatable({}, { __mode = "k" }), confirmation_generation = 0 } -- Offers and UI receipts
+local _legacy_cleanup_offered   = { confirmations = setmetatable({}, { __mode = "k" }), confirmation_generation = 0 } -- Legacy offers and inert menu refusal receipts
+do
+	local owner, factory = Config, rawget(Config, "parser_refusal_factory")
+	local identity = require("module_source_identity")
+	local directory = require("module_source_directory").capture()
+	local expected = identity.sibling(debug.getinfo(1, "S").source,
+		"macos/platform/remap/init.lua", "macos/platform/remap/config.lua", directory)
+	if rawget(package.loaded, "platform.remap.config") == owner and type(factory) == "function"
+		and identity.same(debug.getinfo(factory, "S").source, expected, directory) then
+		local called, origin, reader, loader, decoder, current, qualify = pcall(factory)
+		if called and origin == owner and type(reader) == "function" and type(loader) == "function"
+			and type(decoder) == "function" and type(current) == "function" and type(qualify) == "function" then
+			_legacy_cleanup_offered.parser_refusal_binding = {
+				reader = reader,
+				current = function()
+					return rawget(package.loaded, "platform.remap.config") == owner
+						and rawget(owner, "parser_refusal_factory") == factory
+						and rawget(owner, "load_user_config") == reader
+						and rawget(owner, "_load_toml_file") == loader and current() == true
+				end,
+				qualify = qualify,
+			}
+		end
+	end
+end
 local _legacy_offer_token       = nil   -- The one deferred cleanup offer { epoch }, inert once replaced
 local _guardian_regeneration_wait = nil -- Bundled rebuilds retained behind exact native readiness
 local _lease_less_resume_waiters = {} -- Resume terminals released by a non-ready guardian status
@@ -3613,6 +3637,17 @@ function M.runtime_unavailable_reason()
 	return _state and _state.runtime_unavailable_reason or nil
 end
 
+--- Returns only the latest uninitialized parser refusal's opaque identity.
+--- A repeated init or requested stop invalidates the prior identity immediately.
+--- @return table|nil token No runtime intent, readiness or successful command authority.
+function M.parser_refusal_token()
+	local attempt = _legacy_cleanup_offered.parser_refusal_attempt
+	if rawget(package.loaded, "platform.remap") ~= M
+		or _state ~= nil or attempt == nil or attempt.epoch ~= _lifecycle_epoch then return nil end
+	if type(attempt.proof_current) ~= "function" or attempt.proof_current() ~= true then return nil end
+	return attempt.token
+end
+
 --- Proves the inert settings lifecycle never acquired a controller generation.
 --- An initialized or unreadable controller must retain its existing exact fence.
 --- @return boolean absent True only for actual uninitialized, token-free custody.
@@ -6175,6 +6210,7 @@ end
 --- @param on_done function|nil Callback fn(ok, reason) after the exact fence.
 --- @return boolean True when the stop transaction was accepted or completed.
 function M.stop_lease(on_done)
+	_legacy_cleanup_offered.parser_refusal_attempt = nil
 	if M.runtime_unavailable_reason() ~= nil
 		and (settle_bulk_settings_before_lifecycle("Inert lease stop", "explicit-lease-stop-requested") ~= true or M.has_pending_settings_save()) then
 		invoke_public_callback("stop lease", on_done, false, "settings-recovery-pending")
@@ -6454,6 +6490,9 @@ end
 ---   module never hard-codes OS path logic outside the port boundary.
 --- @return boolean initialized True after settings commit; native readiness is separate.
 function M.init(file_system)
+	_legacy_cleanup_offered.parser_refusal_attempt = nil
+	local attempt = { epoch = _lifecycle_epoch }
+	_legacy_cleanup_offered.parser_refusal_attempt = attempt
 	-- Retain native custody before any config, logger or injected port callback.
 	-- These capabilities belong only to inert settings and never to persistence.
 	local initialized_port = rawget(LeaseController, "is_initialized")
@@ -6510,12 +6549,28 @@ function M.init(file_system)
 		return false
 	end
 
-	local user_cfg, user_config_status = timed("load_user_config", function()
-		return Config.load_user_config(M.TAP_HOLD_KEYS, M.MOD_COMBOS, resolve_user_config())
+	if _legacy_cleanup_offered.parser_refusal_attempt ~= attempt or attempt.epoch ~= _lifecycle_epoch then return false end
+	local binding = _legacy_cleanup_offered.parser_refusal_binding
+	local reader_current = binding ~= nil and binding.current() == true
+	local user_cfg, user_config_status, _, user_config_failure, user_config_proof = timed("load_user_config", function()
+		if _legacy_cleanup_offered.parser_refusal_attempt ~= attempt or attempt.epoch ~= _lifecycle_epoch then return end
+		local invoked_reader = Config.load_user_config
+		attempt.reader_invoked = reader_current and invoked_reader == binding.reader and binding.current() == true
+		return invoked_reader(M.TAP_HOLD_KEYS, M.MOD_COMBOS, resolve_user_config())
 	end)
+	if _legacy_cleanup_offered.parser_refusal_attempt ~= attempt or attempt.epoch ~= _lifecycle_epoch then return false end
+	if reader_current and attempt.reader_invoked == true and binding.current() == true then
+		attempt.proof_current = binding.qualify(user_config_proof)
+	end
 	if user_config_status == "error" or type(user_cfg) ~= "table"
 		or type(user_cfg.runtime) ~= "string" or user_cfg.runtime == "" then
 		Logger.error(LOG, "Karabiner bridge initialization refused because its user config is unsafe.")
+		if user_config_failure == "parse_error" and type(attempt.proof_current) == "function"
+			and attempt.proof_current() == true
+			and binding.current() == true and user_cfg == nil and user_config_status == "error"
+			and _state == nil and _legacy_cleanup_offered.parser_refusal_attempt == attempt and attempt.epoch == _lifecycle_epoch then
+			attempt.token = {}
+		end
 		return false
 	end
 	if user_cfg.runtime ~= "shared" then
@@ -6876,6 +6931,7 @@ end
 --- disabled hotkey with an unfenced Karabiner generation.
 --- @return boolean stopped True only when every local resource was released.
 function M.teardown_local()
+	_legacy_cleanup_offered.parser_refusal_attempt = nil
 	local custody = _state and _state.runtime_custody
 	if custody and not custody.current() then return false end
 	local initialized_before
@@ -6941,6 +6997,7 @@ end
 --- @param on_done function|nil Callback fn(fenced, reason).
 --- @return boolean True when exact revocation was accepted.
 function M.revoke(reason, on_done)
+	_legacy_cleanup_offered.parser_refusal_attempt = nil
 	local custody = _state and _state.runtime_custody
 	if _enabled_transition ~= nil and _enabled_transition.file ~= nil then
 		local transaction = _enabled_transition
@@ -7066,6 +7123,7 @@ end
 --- @param on_done function|nil Callback fn(ok, reason) after both phases.
 --- @return boolean True when the transaction was accepted or completed.
 function M.shutdown(reason, on_done)
+	_legacy_cleanup_offered.parser_refusal_attempt = nil
 	local callback_fired = false
 	local callback_succeeded = false
 	local function settle_shutdown(ok, detail)
@@ -7097,6 +7155,7 @@ end
 --- controller proves STOPPED or its exact fallback transports complete.
 --- @return boolean True when the stop transaction was accepted.
 function M.stop()
+	_legacy_cleanup_offered.parser_refusal_attempt = nil
 	_legacy_cleanup_offered.confirmation_generation = _legacy_cleanup_offered.confirmation_generation + 1
 	return M.shutdown("hammerspoon_stop")
 end

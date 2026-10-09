@@ -4494,6 +4494,22 @@ i18n = "menu.global.setup_wizard"
 # rule removed from karabiner.json; Karabiner itself is never quit or
 # reconfigured. The command below turns it off, or only cleans the file when
 # it already is.
+# Native settings intent is read-only until installed runtime ownership is proved.
+[[menu.configuration_menu]]
+type = "list"
+id = "karabiner_runtime_status"
+platforms = ["hs"]
+unavailable = "hide"
+status_rows.shared = [{ type = "label", i18n = "menu.global.karabiner_runtime.shared" }]
+status_rows.owned = [
+    { type = "label", i18n = "menu.global.karabiner_runtime.owned" },
+    { type = "label", i18n = "menu.global.karabiner_runtime_unavailable" },
+]
+status_rows.unavailable = [
+    { type = "label", i18n = "menu.global.karabiner_runtime" },
+    { type = "label", i18n = "healthcheck.state.unavailable" },
+]
+
 [[menu.configuration_menu]]
 type = "check"
 id = "karabiner_integration"
@@ -4501,6 +4517,8 @@ i18n = "menu.global.karabiner_integration"
 checked_when = ["karabiner_integration_enabled"]
 platforms = ["hs"]
 reason_key = "platform_reason.remap_engine_is_per_driver"
+
+disabled_when = ["karabiner_shared_runtime_selected"]
 
 [[menu.configuration_menu]]
 type = "command"
@@ -4514,6 +4532,9 @@ reason_key = "platform_reason.remap_engine_is_per_driver"
 # They are `command` now, like the four rows below them, and the label is the
 # manifest's. macOS reads only the id from this array, so the added type changes
 # nothing there.
+disabled_when = ["karabiner_shared_runtime_selected"]
+disabled_reason_key = "healthcheck.state.unavailable"
+
 [[menu.debug_menu]]
 type = "command"
 id = "window_spy"

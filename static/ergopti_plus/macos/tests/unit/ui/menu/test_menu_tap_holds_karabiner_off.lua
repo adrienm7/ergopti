@@ -10,7 +10,7 @@
 --- back on.
 --- ==============================================================================
 
-local helpers = require("tests.helpers")
+local helpers, runtime_inputs = require("tests.support.remap_menu_runtime_inputs").bind(require("tests.helpers"))
 
 local HINT = "menu.tapholds.karabiner_off_hint"
 
@@ -37,6 +37,9 @@ local function menu_over_double(integration_enabled)
 			from = { simultaneous = { { key_code = "left_shift" }, { key_code = "right_shift" } } } } },
 		NON_CANONICAL_COMBOS = {},
 		get_enabled = function() return integration_enabled end,
+		get_runtime = runtime_inputs.get_runtime,
+		shared_runtime_selected = runtime_inputs.shared_runtime_selected,
+		runtime_unavailable_reason = runtime_inputs.runtime_unavailable_reason,
 		get_tap_holds_enabled = function() return true end,
 		get_mod_combos_enabled = function() return true end,
 		get_combo_symmetric = function() return false end,

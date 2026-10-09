@@ -21,7 +21,7 @@
 --- Driven through Builder.generate, so the assertion is on what the menu offers.
 --- ==============================================================================
 
-local helpers = require("tests.helpers")
+local helpers, runtime_inputs = require("tests.support.remap_menu_runtime_inputs").bind(require("tests.helpers"))
 
 -- The rows in the order the menu must draw them, by the key of their label.
 local EXPECTED = {
@@ -162,6 +162,9 @@ local function rows_with_karabiner(enabled, calls)
 	i18n.build_language_menu_items = function() return {} end
 	local karabiner = {
 		get_enabled = function() return enabled end,
+		get_runtime = runtime_inputs.get_runtime,
+		shared_runtime_selected = runtime_inputs.shared_runtime_selected,
+		runtime_unavailable_reason = runtime_inputs.runtime_unavailable_reason,
 		set_enabled = function(value, on_done)
 			calls[#calls + 1] = "set_enabled:" .. tostring(value)
 			on_done(true, "stopped")
@@ -207,6 +210,7 @@ helpers.describe("configuration submenu (macOS): « Ergopti uses Karabiner »", 
 				"-",
 				"menu.global.config_folder",
 				"menu.global.setup_wizard",
+				"menu.global.karabiner_runtime.shared",
 				"menu.global.karabiner_integration",
 				"menu.global.remove_from_karabiner",
 			}, ", "))

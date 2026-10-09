@@ -14,6 +14,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
+local tap_helpers, runtime_inputs = require("tests.support.remap_menu_runtime_inputs").bind(helpers)
 local Codec = require("toml_codec")
 local Manifest = require("infra.manifest_reader")
 local FileSystem = require("adapters.file_system")
@@ -145,6 +146,9 @@ package.loaded["infra.preferences"] = nil
 --- @return table remap
 local function remap_double(requests)
 	return {
+		get_runtime = runtime_inputs.get_runtime,
+		shared_runtime_selected = runtime_inputs.shared_runtime_selected,
+		runtime_unavailable_reason = runtime_inputs.runtime_unavailable_reason,
 		get_enabled = function() return true end,
 		get_tap_holds_enabled = function() return true end,
 		apply_scope = function(request, on_done)
@@ -182,7 +186,7 @@ local function run_tap_hold_row(id)
 end
 
 helpers.describe("restore-recommended-no-confirm: Tap-Holds (macOS)", function()
-	helpers.it("the restore row sends the recommended scope without a question", function()
+	tap_helpers.it("the restore row sends the recommended scope without a question", function()
 		local accepted, requests, asked, refreshes = run_tap_hold_row("scope_restore")
 		helpers.assert_eq(accepted, true)
 		helpers.assert_eq(#asked, 0, "restoring the recommended values asks nothing")
@@ -194,7 +198,7 @@ helpers.describe("restore-recommended-no-confirm: Tap-Holds (macOS)", function()
 		helpers.assert_eq(refreshes, 1, "the menu refreshes once the terminal commits")
 	end)
 
-	helpers.it("the clear row sends the clear scope without a question", function()
+	tap_helpers.it("the clear row sends the clear scope without a question", function()
 		local accepted, requests, asked, refreshes = run_tap_hold_row("scope_clear")
 		helpers.assert_eq(accepted, true)
 		helpers.assert_eq(#asked, 0, "clearing asks nothing either")

@@ -29,6 +29,7 @@ local M = {}
 local Logger      = require("infra.logger")
 local MenuUtils   = require("ui.menu.menu_utils")
 local ManifestMenu = require("infra.manifest_menu")
+local RemapSwitch = require("ui.menu.remap_switch")
 local Paths       = require("infra.paths")
 local KeyCatalog  = require("tap_hold.key_catalog")
 local CombinationLabels = require("tap_hold.combination_labels")
@@ -101,6 +102,7 @@ end
 --- @param update_menu function|nil Menu refresh callback.
 --- @return boolean accepted
 local function commit_menu_setting(karabiner, source, mutate, update_menu)
+	if not RemapSwitch.is_shared_runtime(karabiner) then return false end
 	local call_ok, committed_or_err = xpcall(mutate, debug.traceback)
 	if not call_ok or committed_or_err ~= true then
 		Logger.error(LOG, "%s setting mutation failed: %s.",
@@ -182,6 +184,7 @@ end
 --- @param success_uses_count boolean Whether the format consumes change_count.
 --- @param update_menu function|nil Menu refresh callback.
 --- @param operation_arg string|nil Optional identifier passed before callback.
+--- @param refusal_guard function|nil Exact uninitialized clear-only owner admission.
 --- @return boolean accepted
 local function run_bulk_menu_command(
 	karabiner,
@@ -190,10 +193,21 @@ local function run_bulk_menu_command(
 	success_message,
 	success_uses_count,
 	update_menu,
-	operation_arg
+	operation_arg,
+	refusal_guard
 )
+	if refusal_guard then
+		if not refusal_guard() then
+			Logger.error(LOG, "Uninitialized Clear All owner changed before bulk admission.")
+			return false
+		end
+	elseif not RemapSwitch.is_shared_runtime(karabiner) then return false end
 	local operation = karabiner and karabiner[method_name]
 	Logger.start(LOG, start_message)
+	if refusal_guard and (not refusal_guard() or rawget(karabiner, method_name) ~= operation) then
+		Logger.error(LOG, "Uninitialized Clear All owner changed before dispatch.")
+		return false
+	end
 	if type(operation) ~= "function" then
 		Logger.error(LOG, "Karabiner bulk command '%s' is unavailable.", method_name)
 		return false
@@ -205,6 +219,9 @@ local function run_bulk_menu_command(
 	local pending_reason = nil
 	local pending_count = 0
 	local function finish(ok, reason, change_count)
+		if refusal_guard and ok == true then
+			ok, reason, change_count = false, "unexpected-uninitialized-success", 0
+		end
 		if callback_seen then
 			Logger.warn(LOG, "Duplicate Karabiner bulk command '%s' callback ignored.", method_name)
 			return
@@ -239,12 +256,18 @@ local function run_bulk_menu_command(
 	end
 
 	local call_ok, accepted_or_err = xpcall(function()
+		if refusal_guard and not refusal_guard() then return false end
 		if operation_arg ~= nil then
 			return operation(operation_arg, finish)
 		end
 		return operation(finish)
 	end, debug.traceback)
 	dispatching = false
+	if refusal_guard and call_ok and accepted_or_err == true then
+		callback_seen = false
+		finish(false, "unexpected-uninitialized-acceptance", 0)
+		return false
+	end
 	if not call_ok or accepted_or_err ~= true then
 		-- A refusal names its cause (bulk-settings-busy, script-paused...)
 		-- through the terminal it already fired; only a request that fired
@@ -273,12 +296,35 @@ local _scope_generation = 0
 --- @param mode string "recommended" or "clear".
 --- @param update_menu function|nil Menu refresh callback.
 --- @param scope string|nil "tap_holds" by default, or "key_combinations".
+--- @param refusal_guard function|nil Exact published uninitialized clear-only owner.
 --- @return boolean accepted
-local function run_scope(karabiner, mode, update_menu, scope)
+local function run_scope(karabiner, mode, update_menu, scope, refusal_guard)
+	if refusal_guard then
+		if mode ~= "clear" or (scope ~= nil and scope ~= "tap_holds") or not refusal_guard() then
+			Logger.error(LOG, "Uninitialized Clear All scope owner changed before admission.")
+			return false
+		end
+	elseif not RemapSwitch.is_shared_runtime(karabiner) then return false end
 	scope = scope or "tap_holds"
 	_scope_generation = _scope_generation + 1
-	local backup_path = require("infra.config_paths").get("KarabinerConfigPath") .. "." .. scope .. "-"
-		.. tostring(hs.timer.absoluteTime()) .. "-" .. _scope_generation .. ".bak"
+	local function scope_backup_path()
+		local path = require("infra.config_paths").get("KarabinerConfigPath")
+		if refusal_guard and not refusal_guard() then error("uninitialized scope owner changed after path resolution", 0) end
+		local timestamp = hs.timer.absoluteTime()
+		if refusal_guard and not refusal_guard() then error("uninitialized scope owner changed after clock read", 0) end
+		return path .. "." .. scope .. "-" .. tostring(timestamp) .. "-" .. _scope_generation .. ".bak"
+	end
+	local backup_path
+	if refusal_guard then
+		local ok, detail = pcall(scope_backup_path)
+		if not ok then
+			Logger.error(LOG, "Uninitialized Clear All scope preparation refused: %s.", tostring(detail))
+			return false
+		end
+		backup_path = detail
+	else
+		backup_path = scope_backup_path()
+	end
 	return run_bulk_menu_command(
 		karabiner,
 		"apply_scope",
@@ -286,7 +332,8 @@ local function run_scope(karabiner, mode, update_menu, scope)
 		scope .. " scope " .. mode .. " applied.",
 		false,
 		update_menu,
-		{ scope = scope, mode = mode, backup_path = backup_path }
+		{ scope = scope, mode = mode, backup_path = backup_path },
+		refusal_guard
 	)
 end
 
@@ -986,6 +1033,7 @@ end
 --- @return function command
 local function login_items_steps_command(karabiner)
 	return function()
+		if not RemapSwitch.is_shared_runtime(karabiner) then return false end
 		Logger.info(LOG, "Showing the Login Items steps again from the Tap-Holds menu.")
 		local ok, shown = xpcall(function()
 			return require("ui.permission_dialog.login_items_guide").reopen(karabiner)
@@ -1034,6 +1082,7 @@ local function guardian_status_rows(karabiner, tap_holds_on)
 	if type(opener) == "function" then
 		local open_rows = ManifestMenu.template_rows("tap_hold_login_items_open_rows", {
 			["tap_hold_login_items_open"] = function()
+				if not RemapSwitch.is_shared_runtime(karabiner) then return false end
 				Logger.info(LOG, "Opening Login Items for the remap guardian (%s).", state)
 				return opener(report_login_items_opened) == true
 			end,
@@ -1059,6 +1108,7 @@ local function legacy_rules_rows(karabiner)
 	if type(conflicts) ~= "table" then return {} end
 	return ManifestMenu.template_rows("tap_hold_legacy_rules_rows", {
 		["tap_hold_legacy_rules_cleanup"] = function()
+			if not RemapSwitch.is_shared_runtime(karabiner) then return false end
 			Logger.info(LOG, "Showing the legacy Karabiner rules cleanup from the Tap-Holds menu.")
 			local shown_ok, shown = xpcall(function()
 				return require("ui.legacy_rules_cleanup").open(karabiner)
@@ -1070,6 +1120,12 @@ local function legacy_rules_rows(karabiner)
 			return shown == true
 		end,
 	})
+end
+
+--- Constructs the existing Tap-Holds provider parent for either runtime intent.
+--- @return table parent Existing provider row, completed by its native caller.
+local function tap_holds_parent()
+	return { label = i18n.get("menu.tapholds.title") }
 end
 
 --- Builds the Tap-holds row and its submenu.
@@ -1092,6 +1148,21 @@ function M.build(ctx)
 	if not karabiner then
 		Logger.warn(LOG, "Remap module absent from context — tap-holds submenu skipped.")
 		return nil
+	end
+
+	if not RemapSwitch.is_shared_runtime(karabiner) then
+		local rows = RemapSwitch.runtime_rows(karabiner)
+		if not rows then return nil end
+		local refusal_guard = RemapSwitch.uninitialized_clear_guard(karabiner)
+		if refusal_guard then
+			local clear = ManifestMenu.command_row("tap_holds_menu", "scope_clear", {
+				scope_clear = function() return run_scope(karabiner, "clear", update_menu, nil, refusal_guard) end,
+			}, {})
+			if clear then rows[#rows + 1] = clear end
+		end
+		local parent = tap_holds_parent()
+		parent.submenu = ManifestMenu.render_rows(rows, "karabiner_runtime_status")
+		return parent
 	end
 
 	local enabled = karabiner.get_enabled()
@@ -1151,11 +1222,10 @@ function M.build(ctx)
 	-- `submenu`, not `items`: ManifestMenu.build returns rows it has ALREADY
 	-- materialised. Handed over as `items`, the tray render dropped every one of
 	-- them and the submenu opened empty on the real menu bar.
-	return {
-		label   = i18n.get("menu.tapholds.title"),
-		checked = tap_holds_on or nil,
-		submenu = ManifestMenu.build("tap_holds_menu", "TapHolds", nil, nil, render_ctx, providers),
-	}
+	local parent = tap_holds_parent()
+	parent.checked = tap_holds_on or nil
+	parent.submenu = ManifestMenu.build("tap_holds_menu", "TapHolds", nil, nil, render_ctx, providers)
+	return parent
 end
 
 --- Switches the Tap-Holds feature, persists it, then redeploys the rules.
@@ -1167,6 +1237,7 @@ end
 --- @param update_menu function|nil Menu refresh callback.
 --- @return boolean committed
 function M.set_feature_enabled(karabiner, enabled, update_menu)
+	if not RemapSwitch.is_shared_runtime(karabiner) then return false end
 	if type(karabiner) ~= "table" or type(karabiner.set_tap_holds_enabled) ~= "function" then
 		Logger.error(LOG, "Tap-Holds switch is unavailable.")
 		return false
@@ -1207,6 +1278,11 @@ function M.build_key_combinations(ctx)
 	if not karabiner then
 		Logger.warn(LOG, "Remap module absent from context — key-combinations group skipped.")
 		return nil
+	end
+
+	if not RemapSwitch.is_shared_runtime(karabiner) then
+		local rows = RemapSwitch.runtime_rows(karabiner)
+		return rows and ManifestMenu.render_rows(rows, "karabiner_runtime_status") or nil
 	end
 
 	local enabled = karabiner.get_enabled()
@@ -1273,6 +1349,7 @@ end
 --- @param update_menu function|nil Menu refresh callback.
 --- @return boolean committed
 function M.set_key_combinations_enabled(karabiner, enabled, update_menu)
+	if not RemapSwitch.is_shared_runtime(karabiner) then return false end
 	if type(karabiner) ~= "table" or type(karabiner.set_mod_combos_enabled) ~= "function" then
 		Logger.error(LOG, "Key-combinations switch is unavailable.")
 		return false
@@ -1301,6 +1378,7 @@ end
 --- once boot settles. Safe to call repeatedly.
 --- @param ctx table Menu context (provides karabiner + updateMenu).
 function M.prime(ctx)
+	if not RemapSwitch.is_shared_runtime(ctx and ctx.karabiner) then return end
 	local karabiner = ctx and ctx.karabiner
 	if not karabiner or type(karabiner.get_enabled) ~= "function" then return end
 	local ok, enabled = pcall(karabiner.get_enabled)
