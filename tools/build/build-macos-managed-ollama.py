@@ -503,6 +503,42 @@ def native_build_env(contract, asset_contract, architecture: str, work: Path) ->
     return env
 
 
+def compile_native_cli(
+    options, candidate: Path, work: Path, cli: Path, env, contract, architecture
+):
+    """Replace the extracted CLI only with a successful, verified fresh build."""
+    compiled_cli = work / "compiled-ollama"
+    if compiled_cli.exists() or compiled_cli.is_symlink():
+        raise ValueError("The native compiler output is already owned")
+    run(
+        [
+            options.go,
+            "build",
+            "-mod=readonly",
+            "-modcacherw",
+            "-trimpath",
+            "-buildvcs=false",
+            "-ldflags",
+            "-w -s -X=github.com/ollama/ollama/version.Version="
+            + contract["version"]
+            + " -X=github.com/ollama/ollama/internal/ergoptinativehttp.BuiltSourceCommit="
+            + contract["source_commit"]
+            + " -X=github.com/ollama/ollama/server.mode=release",
+            "-o",
+            str(compiled_cli),
+            ".",
+        ],
+        cwd=candidate,
+        env=env,
+    )
+    if not compiled_cli.is_file() or compiled_cli.is_symlink() or compiled_cli.stat().st_size == 0:
+        raise ValueError("The native compiler output is not a regular file")
+    expected = "arm64" if architecture == "arm64" else "x86_64"
+    if run(["lipo", "-archs", str(compiled_cli)]) != expected:
+        raise ValueError("The fresh native binary architecture changed")
+    os.replace(compiled_cli, cli)
+
+
 def build(options) -> Path:
     if platform.system() != "Darwin":
         raise ValueError("A genuine macOS SDK and CGO compiler are required")
@@ -592,27 +628,7 @@ def build(options) -> Path:
             origin = Path(relative)
             if origin.suffix in (".go", ".json") and sha256(package / origin.name) != expected:
                 raise ValueError("The received native Go source changed before compilation")
-        run(
-            [
-                options.go,
-                "build",
-                "-mod=readonly",
-                "-modcacherw",
-                "-trimpath",
-                "-buildvcs=false",
-                "-ldflags",
-                "-w -s -X=github.com/ollama/ollama/version.Version="
-                + contract["version"]
-                + " -X=github.com/ollama/ollama/internal/ergoptinativehttp.BuiltSourceCommit="
-                + contract["source_commit"]
-                + " -X=github.com/ollama/ollama/server.mode=release",
-                "-o",
-                str(cli),
-                ".",
-            ],
-            cwd=candidate,
-            env=env,
-        )
+        compile_native_cli(options, candidate, work, cli, env, contract, architecture)
         signing = [
             "codesign",
             "--force",

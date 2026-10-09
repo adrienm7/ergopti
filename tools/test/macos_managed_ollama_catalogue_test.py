@@ -78,7 +78,7 @@ class PortableCatalogue(unittest.TestCase):
     def setUp(self):
         self.owner = tempfile.TemporaryDirectory(prefix="managed-ollama-catalogue-unit-")
         self.addCleanup(self.owner.cleanup)
-        self.root = Path(self.owner.name)
+        self.root = Path(self.owner.name).resolve(strict=True)
         self.contract, _ = CATALOGUE.read_contract(REPOSITORY, CATALOGUE.Inputs())
         self.official = self.root / "official.tgz"
         self.asset = self.root / "ollama-ergopti-native-http-darwin-arm64.tgz"
