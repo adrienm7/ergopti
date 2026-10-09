@@ -222,8 +222,6 @@ function repository(name, branch) {
 		'tools/build/publish-verified-release.cjs',
 		'tools/build/macos-release-publication.cjs',
 		'tools/build/macos-release-archives.cjs',
-		'tools/ci/dev-release-qualification.cjs',
-		'.github/ci/dev_release_qualification_exceptions.json',
 		'tools/lib/paths.cjs',
 		'static/ergopti_plus/_shared/modules/updater/defaults.json',
 		'static/ergopti_plus/_shared/modules/updater/channels.json',
@@ -333,6 +331,19 @@ fs.writeFileSync(
 );
 fs.chmodSync(path.join(stubs, 'gh'), 0o755);
 fs.chmodSync(path.join(stubs, 'curl'), 0o755);
+// Git Bash must execute the same observed CPython as fixture generation; a
+// Windows Store python3 alias is not the workflow's real Python prerequisite.
+// Forward argv unchanged to the real interpreter, never simulate verification.
+if (process.platform === 'win32') {
+	const nativePython = bashPath(pythonExecutable());
+	const quotedPython = "'" + nativePython.replaceAll("'", "'\\''") + "'";
+	fs.writeFileSync(
+		path.join(stubs, 'python3'),
+		'#!/usr/bin/env bash\nexec ' + quotedPython + ' "$@"\n'
+	);
+	fs.chmodSync(path.join(stubs, 'python3'), 0o755);
+}
+
 const STUB_PATH = `export PATH="${bashPath(stubs)}:$PATH"\n`;
 
 // A Node child must cross the same fake gh boundary on Windows: Node cannot
@@ -1183,31 +1194,53 @@ check(
 	}
 );
 
+// The temporary fast route is retired. Legacy flags are inert data, not an
+// alternative admission capability; mandatory asset verification still gates
+// every publication, including hostile or malformed former fast requests.
 check(
-	'an unbound fast release request refuses before publication (release-fast-unbound-refusal)',
+	'retired fast request cannot change full release admission (release-fast-retired-full)',
 	() => {
 		const result = createRelease('true', { fastPrerelease: 'true' });
-		assert.notEqual(result.status, 0);
-		assert.match(result.stderr, /Temporary fast prerelease is not authorized for this context\./);
-		assert.deepEqual(
-			result.calls,
-			[],
-			'An unauthorized fast request cannot call the publication port.'
+		assert.equal(result.status, 0, result.stdout + result.stderr);
+		assert.ok(
+			!result.args.includes('--notes'),
+			'Retired fast flags cannot add unqualified bypass notes.'
+		);
+		assert.equal(
+			result.state.isDraft,
+			false,
+			'Only the fully verified ordinary release publishes.'
 		);
 	}
 );
-
 check(
-	'missing and malformed fast release input refuse before publication (release-fast-input-refusal)',
+	'retired missing or malformed fast flags cannot bypass assets (release-fast-retired-input)',
 	() => {
-		for (const fastPrerelease of ['', 'TRUE', '1']) {
-			const result = createRelease('true', { fastPrerelease });
-			assert.notEqual(result.status, 0);
-			assert.match(result.stderr, /Missing Boolean fast prerelease input\./);
-			assert.deepEqual(
-				result.calls,
-				[],
-				'Malformed policy input cannot call the publication port.'
+		for (const fastPrerelease of ['', 'TRUE', '1', 'true']) {
+			const valid = createRelease('true', { fastPrerelease });
+			assert.equal(valid.status, 0, valid.stdout + valid.stderr);
+			assert.ok(
+				!valid.args.includes('--notes'),
+				'Every legacy flag retains full release semantics.'
+			);
+			const refused = createRelease('true', {
+				fastPrerelease,
+				mode: 'permanent-loss',
+				missing: 'ErgoptiPlus.exe'
+			});
+			assert.notEqual(
+				refused.status,
+				0,
+				'Missing mandatory assets must refuse even with a retired fast flag.'
+			);
+			assert.equal(
+				refused.state.isDraft,
+				true,
+				'Refusal retains the draft instead of publishing incomplete assets.'
+			);
+			assert.ok(
+				!refused.calls.some((call) => call.includes('--draft=false')),
+				'No retired flag can reach the public publication port after failed asset verification.'
 			);
 		}
 	}
