@@ -9431,6 +9431,34 @@ test precondition failure, not a Lua defect or a successful permission grant.
   seven native save assertions. Receive those assertions on Linux. Restore
   every deferred execution for other tags, pull requests and expired runs.
 
+  A later explicit approval also covered the remaining blocking test suites:
+  Linux unit/meta, the Linux E2E/live fixture chain, Core JavaScript, and native
+  macOS model receiving. The resulting thirteen-scope profile was published
+  in `d9e747660c`; all scopes remain unqualified. The original 22:00 UTC expiry
+  was retained. The requested 23:59 Paris publication deadline was missed;
+  a separate extension question remains unanswered. Do not silently renew
+  this policy or the unsigned Windows permission.
+
+  First stable attempt 37994227917 exposed 61 Linux unit failures, six Core
+  workflow-guard failures, and a native macOS model trust-restoration timeout.
+  The actual macOS producer build and 27 catalogue controls passed before
+  model receiving failed. Local About/startup fixture receiving now passes
+  51 controls with original and inverse failures preserved; native Linux and
+  the complete suite remain unqualified. Other fixture corrections are still
+  in progress. No stable publication is established by these bounded results.
+
+- [x] **134.** Preserve the website custom domain during Pages deployments.
+
+  The main deployment removed the prior gh-pages CNAME while the source had
+  no replacement, which removed the ergopti.fr Pages association and served
+  GitHub's 404 page. The association was restored and the maintainer confirmed
+  recovery. Commit `f5e2ab2ca8` adds static/CNAME, watches its changes, and
+  verifies the built copy before the deployment replaces any published files.
+  The registered guard reproduces the missing-file failure and rejects removal
+  of either the trigger or pre-deployment check. Actual successor deployment
+  37996719619 completed successfully, retained the root CNAME, and served
+  HTTP 200 after publication. This closes that specific domain-loss defect.
+
 ## Time estimate
 
 Order-of-magnitude estimate: 40–70 agent-days for the current remaining
