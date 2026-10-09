@@ -4501,6 +4501,14 @@ The packaged macOS launch matrix now contains a Karabiner configuration scenario
 The signed native checkpoint 37116923472 reached the actual independent JSON codec and production build/merge owners, then refused its first variant because the canonical French action registry gives distinct Cmd+Tab and Option+F17 outputs the same localized label. Legacy reconstruction now keeps validated action-label candidates: unused descriptive ambiguity cannot block foreign profiles, while a complete historical block referencing distinct candidates remains unowned and refuses publication. The eight real-catalogue default/recommended switch vectors prove merge, exact-source publication and unchanged confirmation locally. Signed native qualification of all eight variants remains pending; the original AppleEvent controls and deadlines remain mandatory.
 
 - [~] **42.** config.toml batch writer follow-ups (`toml-batch-existing-key`):
+  Windows direct full-save intent is now recorded before the unchanged unsafe
+  serializer refusal. The existing safe path resolver refuses absent or empty
+  paths without creating a generation; implicit drains remain separate.
+  Four additive registered controls cover retained mandatory intent, zero native
+  write/collection during refusal, terminal veto, exact repair retry and native
+  owner restoration. Original assertions are retained. Source review and
+  portable guards pass; actual Windows unit/E2E/package/install and startup
+  qualification are pending, so this slice does not close the item.
   macOS conditional writes, unchanged acknowledgements and removals now
   support a captured strict final logical admission. The new APIs detach
   classified source scalars before native callbacks; refused operations
