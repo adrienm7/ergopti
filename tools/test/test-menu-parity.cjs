@@ -2049,7 +2049,26 @@ const {
 		['for _, row in ipairs(builders[id]() or {}) do', 'for _, row in ipairs({}) do'],
 		['local rendered = ManifestMenu.render_rows(items, "top_level")', 'local rendered = {}']
 	];
-	assert.equal(callerControls.length, 8, 'all actual tray transport withdrawals remain registered');
+	callerControls.push(
+		[
+			'local projected = { id = entry.id, greyed_when_paused = entry.greyed_when_paused == true }',
+			'local projected = { id = "foreign", greyed_when_paused = entry.greyed_when_paused == true }'
+		],
+		['table.insert(result, projected)', 'table.insert(result, {})'],
+		[
+			'local projected = { id = entry.id, greyed_when_paused = entry.greyed_when_paused == true }\n\t\tif entry.disabled == true then',
+			'local projected = { id = entry.id, greyed_when_paused = entry.greyed_when_paused == true }\n\t\tif false then'
+		],
+		[
+			'projected.disabled, projected.i18n, projected.reason_key = true, entry.i18n, entry.reason_key',
+			'projected.disabled, projected.i18n, projected.reason_key = true, entry.i18n, "foreign"'
+		]
+	);
+	assert.equal(
+		callerControls.length,
+		12,
+		'all original eight and four current projection withdrawals remain registered'
+	);
 	for (const [before, after] of callerControls) {
 		assert.equal(builder.split(before).length - 1, 1, 'exact current caller preimage');
 		assert.equal(
@@ -2771,8 +2790,8 @@ function publishesIncludedCommands(source, extension, section, declarations, pla
 	}
 	assert.equal(
 		controls.length,
-		74,
-		'all 60 LIVE successor obligations and 14 new handoff controls execute'
+		78,
+		'all original 74 completed-root obligations and four current projection controls execute'
 	);
 	assert.equal(
 		admits(sources),
