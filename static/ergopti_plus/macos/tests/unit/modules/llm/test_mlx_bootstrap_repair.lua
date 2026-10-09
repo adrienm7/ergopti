@@ -41,7 +41,7 @@ local OWNED = {
 	"modules.llm.mlx_bootstrap_diagnosis", "modules.llm.mlx_deps_checker",
 	"ui.menu.menu_llm.runtime_install_offer", "ui.menu.menu_llm.mlx_repair_offer",
 	"adapters.python_interpreter", "ui.python_runtime_offer",
-	"adapters.file_system",
+	"adapters.file_system", "modules.llm.network_env", "modules.llm.opaque_network_admission",
 }
 
 -- The closing lines ensure-mlx-deps.sh prints after any failed uv sync: they
@@ -183,6 +183,7 @@ local function load_world(world)
 	package.loaded["infra.logger"] = logger
 	-- Only native boundaries are doubled: the policy bytes and parser remain real.
 	package.loaded["adapters.file_system"] = {
+		exists = function(path) return fake_fs(world).attributes(path, "mode") ~= nil end,
 		read = function(path)
 			helpers.assert_true(path:find("/_shared/", 1, true) ~= nil, "native fixture reads actual shared source data")
 			local file = assert(io.open(path, "rb"))
@@ -195,6 +196,9 @@ local function load_world(world)
 			return attributes and "present" or "absent", attributes
 		end,
 	}
+	-- Load the unchanged producer with its canonical path spelling on every host.
+	package.loaded["modules.llm.network_env"] = assert(loadfile(
+		helpers.driver_root() .. "modules/llm/network_env.lua"))()
 	package.loaded["ui.download_window"] = {
 		is_active = function() return world.window_sessions > 0 end,
 		session_id = function() return world.window_sessions end,
@@ -932,10 +936,13 @@ helpers.describe("A missing MLX runtime is announced with its install button (ml
 		-- Selecting MLX repairs it, on the native interpreter, telling the script the processor.
 		helpers.assert_true(router.select_mlx(function() end))
 		helpers.assert_eq(#world.tasks, 1)
-		helpers.assert_eq(world.tasks[1].executable, helpers.HEALTHY_PYTHON)
+		helpers.assert_eq(world.tasks[1].executable, "/bin/bash")
+		helpers.assert_true(world.tasks[1].command():find(
+			"exec '" .. helpers.HEALTHY_PYTHON .. "' -u '/tmp/fixture-pty.py'", 1, true) ~= nil,
+			"the acknowledged shell must exec only the independently admitted native Python")
 		local command = world.tasks[1].command()
 		helpers.assert_true(command:find("ERGOPTI_MLX_REPAIR=1", 1, true) ~= nil, command)
-		helpers.assert_true(command:find("ERGOPTI_NATIVE_ARCH='arm64'", 1, true) ~= nil, command)
+		helpers.assert_true(command:find("ERGOPTI_NATIVE_ARCH='\\''arm64'\\''", 1, true) ~= nil, command)
 	end))
 end)
 
@@ -1221,5 +1228,55 @@ helpers.describe("Managed network failure actions retain their native revision",
 		helpers.assert_eq(#world.dialogs[1].choices, 1)
 		helpers.assert_eq(world.dialogs[1].choices[1], package.loaded["infra.i18n"].get("network.action.retry"))
 		helpers.assert_eq(#world.spawns, 0)
+	end))
+end)
+
+helpers.describe("MLX trusted bootstrap network admission", function()
+	helpers.it("reports the pre-child automatic-route refusal using central proxy policy", scoped(function()
+		local world = new_world()
+		local checker = load_world(world)
+		speak("en")
+		helpers.assert_true(checker.install_for_selection())
+		local task = world.tasks[1]
+
+		task.emit("", "__ERGOPTI_OPAQUE_")
+		task.emit("", "ADMISSION_V1__:refused:verified:unavailable\n")
+		task.finish(78)
+		local cause = checker.get_failure_cause()
+		helpers.assert_eq(cause.kind, "proxy")
+		helpers.assert_eq(cause.network_report.message_key, "network.failure.proxy")
+		helpers.assert_eq(cause.network_report.evidence, "verified_proxy_resolution_unavailable")
+		helpers.assert_true(checker.has_failed())
+		helpers.assert_eq(task.executable, "/bin/bash")
+		local command = task.command()
+		local accepted = assert(command:find("__ERGOPTI_OPAQUE_ADMISSION_V1__:accepted", 1, true))
+		local execution = assert(command:find("exec ", 1, true))
+		helpers.assert_true(accepted < execution, "trusted admission precedes the interpreter and installer")
+		helpers.assert_true(command:sub(1, 2) == "( ", "the route exports stay in the admission subshell")
+	end))
+	helpers.it("accepted admission makes later child refusal frames non-authoritative", scoped(function()
+		local world = new_world()
+		local checker = load_world(world)
+		speak("en")
+		helpers.assert_true(checker.install_for_selection())
+		world.tasks[1].emit("", "__ERGOPTI_OPAQUE_ADMISSION_V1__:accepted\n")
+		world.tasks[1].emit("", "__ERGOPTI_OPAQUE_ADMISSION_V1__:refused:verified:unavailable\n")
+		world.tasks[1].finish(78)
+		local cause = checker.get_failure_cause()
+		helpers.assert_true(cause.kind ~= "proxy")
+		helpers.assert_nil(cause.network_report)
+	end))
+	helpers.it("bare exit78 and wrong terminal never mint proxy authority", scoped(function()
+		for _, row in ipairs({ { code = 78, stderr = "ordinary failure\n" },
+			{ code = 1, stderr = "__ERGOPTI_OPAQUE_ADMISSION_V1__:refused:verified:unavailable\n" } }) do
+			local world = new_world()
+			local checker = load_world(world)
+			speak("en")
+			helpers.assert_true(checker.install_for_selection())
+			world.tasks[1].finish(row.code, "", row.stderr)
+			local cause = checker.get_failure_cause()
+			helpers.assert_true(cause.kind ~= "proxy")
+			helpers.assert_nil(cause.network_report)
+		end
 	end))
 end)
