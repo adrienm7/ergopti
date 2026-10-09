@@ -630,6 +630,11 @@ async function simulate(context, status = 0, entries = fixtures, afterFamilySign
 	};
 	const before = new Date('2026-10-09T21:00:00Z');
 	const accepted = q.authorizeQualificationProfile(stable.id, exact, before);
+	assert.equal(
+		q.authorizeQualificationProfile(stable.id, exact, new Date('2026-10-09T22:30:00Z')),
+		accepted,
+		'the renewed human v1 publication window admits the same thirteen scopes after midnight Paris'
+	);
 	assert.deepEqual(q.deferredScopes(accepted), [
 		'macos-brew-archive',
 		'macos-shortcuts-discovery',
@@ -664,7 +669,7 @@ async function simulate(context, status = 0, entries = fixtures, afterFamilySign
 		assert.equal(receipt.status, 'deferred');
 		assert.equal(receipt.source_sha, sha);
 		assert.equal(receipt.tag, 'v1.0.0');
-		assert.equal(receipt.expires_at, '2026-10-09T22:00:00Z');
+		assert.equal(receipt.expires_at, '2026-10-10T00:00:00Z');
 		q.validateQualificationReceipt(receipt, scope, sha, exact, before);
 		assert.throws(() =>
 			q.validateQualificationReceipt({ ...receipt, qualified: true }, scope, sha, exact, before)
@@ -813,7 +818,7 @@ async function simulate(context, status = 0, entries = fixtures, afterFamilySign
 	};
 	const source = 'a'.repeat(40),
 		hash = 'b'.repeat(64),
-		clock = new Date('2026-10-09T21:59:59Z');
+		clock = new Date('2026-10-09T23:59:59Z');
 	Signing.admit(context, source, source, clock);
 	Signing.requireFreshUnsigned('true');
 	for (const value of ['false', undefined, '', true]) {
@@ -835,7 +840,7 @@ async function simulate(context, status = 0, entries = fixtures, afterFamilySign
 	}
 	assert.throws(() => Signing.admit(context, source, 'c'.repeat(40), clock));
 	assert.throws(() => Signing.admit(context, 'A'.repeat(40), 'A'.repeat(40), clock));
-	assert.throws(() => Signing.admit(context, source, source, new Date('2026-10-09T22:00:00Z')));
+	assert.throws(() => Signing.admit(context, source, source, new Date('2026-10-10T00:00:00Z')));
 	assert.throws(() => Signing.admit(context, source, source, new Date('invalid')));
 	assert.throws(() =>
 		Signing.admit(context, source, source, clock, { ...Signing.POLICY, authorized: false })
