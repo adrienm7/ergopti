@@ -1486,7 +1486,10 @@ def _validate_owned_automation_ui_fact(packet):
         "first_type",
         "first_error",
     }
-    require(type(packet) is dict and set(packet) == keys, "Unadmitted Automation UI fact fields")
+    require(
+        type(packet) is dict and set(packet) in (keys, keys | {"first_button"}),
+        "Unadmitted Automation UI fact fields",
+    )
     require(
         type(packet["schema"]) is int and packet["schema"] == 1,
         "Unadmitted Automation UI fact schema",
@@ -1560,6 +1563,157 @@ def _validate_owned_automation_ui_fact(packet):
             packet["first_agent"] >= 0 and packet["first_type"] != "none",
             "Automation UI refusal lacks an agent/type",
         )
+    if "first_button" in packet:
+        button = packet["first_button"]
+        require(
+            packet["first_attribute"] == "button-title"
+            and packet["first_type"] != "string"
+            and type(button) is dict
+            and set(button)
+            in (
+                {"schema", "subrole", "type", "error"},
+                {"schema", "subrole", "type", "error", "window"},
+                {"schema", "subrole", "type", "error", "labels"},
+                {"schema", "subrole", "type", "error", "window", "labels"},
+            ),
+            "Unadmitted refused button fact fields",
+        )
+        require(
+            type(button["schema"]) is int
+            and button["schema"] == 1
+            and type(button["error"]) is int
+            and -(2**31) <= button["error"] < 2**31,
+            "Unadmitted refused button schema or AXError",
+        )
+        require(
+            type(button["type"]) is str
+            and button["type"] in {"absent", "ax-element", "string", "array", "number", "other"}
+            and type(button["subrole"]) is str
+            and button["subrole"]
+            in {"absent", "wrong-type", "unknown", "close", "minimize", "zoom"},
+            "Unadmitted refused button enum",
+        )
+        require(
+            (button["type"] == "absent" and button["subrole"] == "absent")
+            or (
+                button["type"] == "string"
+                and button["error"] == 0
+                and button["subrole"] in {"unknown", "close", "minimize", "zoom"}
+            )
+            or (
+                button["type"] not in {"absent", "string"}
+                and button["error"] == 0
+                and button["subrole"] == "wrong-type"
+            ),
+            "Refused button type and enum disagree",
+        )
+        if "window" in button:
+            window = button["window"]
+            require(
+                type(window) is dict
+                and set(window) == {"schema", "role", "type", "error", "controls"}
+                and type(window["schema"]) is int
+                and window["schema"] == 1
+                and type(window["error"]) is int
+                and -(2**31) <= window["error"] < 2**31,
+                "Unadmitted refused button window fact fields",
+            )
+            kinds = {"absent", "ax-element", "string", "array", "number", "other"}
+            require(
+                type(window["type"]) is str
+                and window["type"] in kinds
+                and type(window["role"]) is str
+                and window["role"] in {"absent", "wrong-type", "window", "sheet", "other"},
+                "Unadmitted refused button window enum",
+            )
+            require(
+                (window["type"] == "absent" and window["role"] == "absent")
+                or (
+                    window["type"] == "string"
+                    and window["error"] == 0
+                    and window["role"] in {"window", "sheet", "other"}
+                )
+                or (
+                    window["type"] not in {"absent", "string"}
+                    and window["error"] == 0
+                    and window["role"] == "wrong-type"
+                ),
+                "Refused button window type and role disagree",
+            )
+            controls = window["controls"]
+            require(
+                type(controls) is dict and set(controls) == {"close", "minimize", "zoom"},
+                "Unadmitted fixed window control fields",
+            )
+            for control in controls.values():
+                require(
+                    type(control) is dict
+                    and set(control) == {"type", "error", "relation"}
+                    and type(control["error"]) is int
+                    and -(2**31) <= control["error"] < 2**31
+                    and type(control["type"]) is str
+                    and control["type"] in kinds
+                    and type(control["relation"]) is str
+                    and control["relation"] in {"same", "different", "unobserved"},
+                    "Unadmitted fixed window control observation",
+                )
+                require(
+                    (
+                        control["error"] == 0
+                        and control["type"] == "ax-element"
+                        and control["relation"] in {"same", "different"}
+                    )
+                    or (
+                        control["type"] != "ax-element"
+                        and control["relation"] == "unobserved"
+                        and (control["error"] == 0 or control["type"] == "absent")
+                    ),
+                    "Window control identity lacks a successful exact AX element observation",
+                )
+        if "labels" in button:
+            labels = button["labels"]
+            require(
+                type(labels) is dict and set(labels) == {"description", "value"},
+                "Unadmitted exact refused button label fields",
+            )
+            for label in labels.values():
+                require(
+                    type(label) is dict
+                    and set(label) == {"type", "error", "family"}
+                    and type(label["error"]) is int
+                    and -(2**31) <= label["error"] < 2**31
+                    and type(label["type"]) is str
+                    and label["type"]
+                    in {"absent", "ax-element", "string", "array", "number", "other"}
+                    and type(label["family"]) is str
+                    and label["family"]
+                    in {
+                        "allow",
+                        "deny",
+                        "close",
+                        "minimize",
+                        "zoom",
+                        "other",
+                        "absent",
+                        "wrong-type",
+                    },
+                    "Unadmitted exact refused button label observation",
+                )
+                require(
+                    (label["type"] == "absent" and label["family"] == "absent")
+                    or (
+                        label["error"] == 0
+                        and label["type"] == "string"
+                        and label["family"]
+                        in {"allow", "deny", "close", "minimize", "zoom", "other"}
+                    )
+                    or (
+                        label["error"] == 0
+                        and label["type"] not in {"absent", "string"}
+                        and label["family"] == "wrong-type"
+                    ),
+                    "Refused button label type and family disagree",
+                )
     return dict(packet)
 
 
@@ -1704,6 +1858,16 @@ def admit_appleevent_permission_prerequisite(children, sender, policy, checkpoin
             "Owned Automation sender or sandbox identity changed",
         )
         checkpoint("after-automation-" + mode)
+        foreground = re.fullmatch(
+            r"OWNED_APPLEEVENT_FOREGROUND/1 state=(unavailable|inactive)\n", result.stderr
+        )
+        require(
+            not (
+                mode == "request" and result.returncode == 65 and not result.stdout and foreground
+            ),
+            "Normal owned Automation sender foreground precondition refused: "
+            + (foreground[1] if foreground is not None else "unadmitted"),
+        )
         prefix = "OWNED_APPLEEVENT_PREFLIGHT/1 mode=" + mode + " osstatus="
         matched = re.fullmatch(re.escape(prefix) + r"(-?[0-9]{1,11})\n", result.stdout)
         require(matched is not None and not result.stderr, "Malformed owned Automation receipt")

@@ -37,7 +37,7 @@
 
 const fs = require('node:fs');
 const path = require('node:path');
-const pipeline = require('./ci-pipeline.cjs');
+const pipeline = require('./ci-full-default.cjs');
 
 const root = path.resolve(__dirname, '..', '..');
 const WINDOWS_BOX = '.github/workflows/ci-windows.yml';
@@ -1695,7 +1695,7 @@ if (windowsSmokeStep !== null && windowsLaunchUpload !== null) {
 // CI_ARCHIVE_WORKFLOW_TESTS_BEGIN
 {
 	const assert = require('node:assert/strict');
-	const ownerPipeline = require('./ci-pipeline.cjs');
+	const ownerPipeline = require('./ci-full-default.cjs');
 	/** Require the consumed CI policy, separate source authority and installed evidence. */
 	function ciArchiveWorkflowProblems(text) {
 		const problems = [];

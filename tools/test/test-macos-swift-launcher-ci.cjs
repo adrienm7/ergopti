@@ -56,7 +56,7 @@
 
 const fs = require('fs');
 const path = require('path');
-const pipeline = require('./ci-pipeline.cjs');
+const pipeline = require('./ci-full-default.cjs');
 
 const ROOT = path.resolve(__dirname, '..', '..');
 const MACOS_BOX = '.github/workflows/ci-macos.yml';

@@ -3488,22 +3488,6 @@
 										]
 									},
 									{
-										"path": "gestures.swipe_2_left",
-										"value": "arrow_up",
-										"default": "none",
-										"recommended": true,
-										"label": [
-											{
-												"key": "menu.gestures.swipe_2_left"
-											}
-										],
-										"value_label": [
-											{
-												"key": "sg_actions.arrow_up"
-											}
-										]
-									},
-									{
 										"path": "gestures.swipe_3_horiz",
 										"value": "words",
 										"default": "none",
