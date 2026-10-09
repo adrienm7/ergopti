@@ -3661,7 +3661,13 @@ original barrier tests and 37 assertion/registration calls remain; eight frozen
 issuer cases and 21 additive controls are registered. Three portable source
 guards pass; genuine AHK, E2E, packaging and installation for these 33 cases
 remain unexecuted pending Windows CI. This bounded issuer change does not close
-the full migration/writer composition or the external retained-wrapper follow-up.
+the full migration/writer composition. The retained transition wrapper now
+requires that same privately issued bundle before reading fields or publishing
+retention, inside its unchanged critical section. All 15 original transition
+cases and 66 assertion/registration calls remain; 19 additive native cases cover
+copied wrappers, observer refusal, actual rollback retention and cleanup. Their
+34-case Windows native qualification remains unexecuted; portable source review
+alone does not prove the complete transactional writer or migrations.
 
 - [~] **34.** Match the Windows recommended hotstring delays to the shared
   manifest, and make hand-written `[[hotstrings.terminators]]` lists editable.
@@ -4735,7 +4741,13 @@ original barrier tests and 37 assertion/registration calls remain; eight frozen
 issuer cases and 21 additive controls are registered. Three portable source
 guards pass; genuine AHK, E2E, packaging and installation for these 33 cases
 remain unexecuted pending Windows CI. This bounded issuer change does not close
-the full migration/writer composition or the external retained-wrapper follow-up.
+the full migration/writer composition. The retained transition wrapper now
+requires that same privately issued bundle before reading fields or publishing
+retention, inside its unchanged critical section. All 15 original transition
+cases and 66 assertion/registration calls remain; 19 additive native cases cover
+copied wrappers, observer refusal, actual rollback retention and cleanup. Their
+34-case Windows native qualification remains unexecuted; portable source review
+alone does not prove the complete transactional writer or migrations.
 
 - [~] **43.** A Mac upgraded from a pre-lease release could not deploy (dev.149:
   « Merge aborted: 25 ambiguous legacy ErgoptiPlus rules … matches the
