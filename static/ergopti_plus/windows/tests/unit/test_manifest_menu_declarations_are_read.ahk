@@ -1743,3 +1743,115 @@ _WPF_CheckCurrentCapturedParentRefusal(Root) {
 }
 
 Test("Windows profile parent: current captured dispatch refuses missing parent before native profile data", _WPF_CurrentCapturedParentRefusal)
+
+
+Test("generic group: declared reason/readiness retains the actual native child", _GDR_NativeProjection)
+Test("generic group: caller disabled state remains effective", _GDR_CallerDisabled)
+Test("generic group: final getter source withdrawal refuses publication", _GDR_SourceWithdrawal)
+Test("generic group: final getter callback replacement refuses publication", _GDR_GetterWithdrawal)
+Test("generic group: final getter builder replacement refuses publication", _GDR_BuilderWithdrawal)
+
+_GDR_WithReasonedGroup(Body) {
+	Root := _MR_GetManifestRoot(), Key := "_test_generic_group_reason"
+	Present := Root.Has(Key), Previous := Present ? Root[Key] : false
+	Child := Menu(), Calls := Map("count", 0)
+	try {
+		Child.Add("Native action", (*) => Calls["count"] += 1)
+		Root[Key] := [Map("type", "group", "id", "parent", "i18n", "menu.llm.title",
+			"disabled_when", ["ready"], "disabled_reason_key", "menu.llm.unavailable")]
+		Body.Call(Key, Root, Child, Calls)
+	} finally {
+		if Present
+			Root[Key] := Previous
+		else if Root.Has(Key)
+			Root.Delete(Key)
+		Child.Delete()
+	}
+}
+
+_GDR_NativeProjection() {
+	_GDR_WithReasonedGroup(_GDR_CheckProjection)
+}
+
+_GDR_CheckProjection(Key, Root, Child, Calls) {
+	for Ready in [true, false] {
+		Parent := Menu(), Reads := Map("count", 0)
+		try {
+			AssertTrue(_MR_RenderGroup(Parent, Root[Key][1], "", Map("parent", () => Child), Key,
+				Map("ready", _GDR_ReadReady.Bind(Reads, Ready))))
+			AssertEqual(1, TrayMenuItemCount(Parent))
+			AssertEqual(1, Reads["count"], "the genuine readiness getter runs once")
+			Label := t("menu.llm.title") . (Ready ? "" : " — " . _MR_ReasonHead(t("menu.llm.unavailable")))
+			AssertEqual(Label, _MUR_LabelAt(Parent, 0))
+			AssertEqual(Child.Handle, DllCall("GetSubMenu", "ptr", Parent.Handle, "int", 0, "ptr"))
+			State := DllCall("GetMenuState", "ptr", Parent.Handle, "uint", 0, "uint", 0x400, "uint")
+			if Ready
+				AssertEqual(0, State & 3)
+			else
+				AssertTrue((State & 3) != 0)
+			AssertEqual(0, Calls["count"], "projection retains and never runs the native child action")
+		} finally {
+			Parent.Delete()
+			MenuDispatcher_PruneMenu(Parent)
+		}
+	}
+}
+
+_GDR_ReadReady(Reads, Ready) {
+	Reads["count"] += 1
+	return Ready
+}
+
+_GDR_CallerDisabled() {
+	_GDR_WithReasonedGroup(_GDR_CheckCallerDisabled)
+}
+
+_GDR_CheckCallerDisabled(Key, Root, Child, Calls) {
+	Parent := Menu()
+	try {
+		AssertTrue(_MR_RenderGroup(Parent, Root[Key][1], "", Map("parent", () => Child), Key,
+			Map("ready", () => true), true))
+		AssertEqual(t("menu.llm.title"), _MUR_LabelAt(Parent, 0))
+		State := DllCall("GetMenuState", "ptr", Parent.Handle, "uint", 0, "uint", 0x400, "uint")
+		AssertTrue((State & 3) != 0)
+		AssertEqual(Child.Handle, DllCall("GetSubMenu", "ptr", Parent.Handle, "int", 0, "ptr"))
+	} finally {
+		Parent.Delete()
+		MenuDispatcher_PruneMenu(Parent)
+	}
+}
+
+_GDR_SourceWithdrawal() {
+	_GDR_WithReasonedGroup(_GDR_CheckWithdrawal.Bind("source"))
+}
+_GDR_GetterWithdrawal() {
+	_GDR_WithReasonedGroup(_GDR_CheckWithdrawal.Bind("getter"))
+}
+_GDR_BuilderWithdrawal() {
+	_GDR_WithReasonedGroup(_GDR_CheckWithdrawal.Bind("builder"))
+}
+
+_GDR_CheckWithdrawal(Mutation, Key, Root, Child, Calls) {
+	Parent := Menu(), Reads := Map("count", 0), Getters := Map(), Builders := Map("parent", () => Child)
+	Getters["ready"] := _GDR_Withdraw.Bind(Mutation, Key, Root, Getters, Builders, Reads)
+	try {
+		AssertFalse(_MR_RenderGroup(Parent, Root[Key][1], "", Builders, Key, Getters))
+		AssertEqual(1, Reads["count"], "the actual last native getter must execute")
+		AssertEqual(0, TrayMenuItemCount(Parent), "a withdrawn source/callback cohort cannot publish")
+		AssertEqual(0, Calls["count"])
+	} finally {
+		Parent.Delete()
+		MenuDispatcher_PruneMenu(Parent)
+	}
+}
+
+_GDR_Withdraw(Mutation, Key, Root, Getters, Builders, Reads) {
+	Reads["count"] += 1
+	if Mutation == "source"
+		Root.Delete(Key)
+	else if Mutation == "getter"
+		Getters["ready"] := () => true
+	else
+		Builders["parent"] := () => Menu()
+	return false
+}

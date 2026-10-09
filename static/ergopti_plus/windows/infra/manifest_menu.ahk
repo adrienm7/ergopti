@@ -1011,6 +1011,18 @@ _MR_TemplateRows(ManifestKey, Commands, StateGetters, Children, Visiting, Status
 			if !(Items is Array)
 				return false
 			Row := Map("label", IsSet(Label) ? Label : t(_MR_Get(Item, "i18n")), "items", Items)
+			if Item.Has("icon_getter") {
+				IconGetter := Item["icon_getter"]
+				if Type(IconGetter) != "String" || IconGetter == "" || !(StateGetters is Map)
+					|| !StateGetters.Has(IconGetter) || !HasMethod(StateGetters[IconGetter], "Call")
+					return false
+				try Icon := StateGetters[IconGetter].Call()
+				catch
+					return false
+				if Type(Icon) != "String"
+					return false
+				Row["icon"] := Icon
+			}
 			if Item.Has("disabled_when") && MenuRenderer_ResolveDisabledWhen(ManifestKey, Id, StateGetters) {
 				Row["disabled"] := true
 				if Item.Has("disabled_reason_key")
@@ -1108,7 +1120,23 @@ _MR_ReadNativeCaption(Item, Getters, &Caption) {
 	try Caption := Getters[Getter].Call()
 	catch
 		return false
-	return Type(Caption) == "String" && Caption != "" && _MR_PlainUnicodeCaption(Caption)
+	if Type(Caption) != "String" || Caption == "" || !_MR_PlainUnicodeCaption(Caption)
+		return false
+	if Item.Has("caption_count_getter") || Item.Has("caption_count_format") {
+		CountGetter := _MR_Get(Item, "caption_count_getter")
+		Format := _MR_Get(Item, "caption_count_format")
+		if _MR_Get(Item, "type") != "group" || Type(CountGetter) != "String" || CountGetter == ""
+			|| Type(Format) != "String" || !_MR_PlainUnicodeCaption(Format)
+			|| !Getters.Has(CountGetter) || !HasMethod(Getters[CountGetter], "Call")
+			return false
+		try Count := Getters[CountGetter].Call()
+		catch
+			return false
+		if Type(Count) != "String" || Count == "" || !_MR_PlainUnicodeCaption(Count)
+			return false
+		return _MR_CaptionValues(Format, [Caption, Count], &Caption)
+	}
+	return true
 }
 
 ; Ordered getter vectors retain original translated formats and reject malformed native data.
@@ -1519,7 +1547,87 @@ MenuRenderer_AppendGroup(TargetMenu, ManifestKey, GroupId, GroupBuilders, Disabl
 ; Render a named group submenu. A group declaring ``checked_when`` ticks its
 ; title from those getters, as a category's parent row shows its switch: the
 ; key-combinations group is checked while its own first-row switch is on.
+
+; Plain source/container receipts retain nested identities and callback owners.
+_MR_ReasonedGroupSnapshot(Value, Seen := unset) {
+	if !(Value is Map) && !(Value is Array)
+		return Map("value", Value)
+	if ObjGetBase(Value) != (Value is Map ? Map.Prototype : Array.Prototype)
+		return false
+	for Name in ObjOwnProps(Value)
+		return false
+	Seen := IsSet(Seen) ? Seen : Map()
+	Identity := ObjPtr(Value)
+	if Seen.Has(Identity)
+		return Seen[Identity]
+	Receipt := Map("value", Value, "fields", Map(), "size", Value is Map ? Value.Count : Value.Length)
+	Seen[Identity] := Receipt
+	if Value is Array {
+		loop Value.Length
+			if !Value.Has(A_Index)
+				return false
+	}
+	for Key, Field in Value {
+		Captured := _MR_ReasonedGroupSnapshot(Field, Seen)
+		if !Captured
+			return false
+		Receipt["fields"][Key] := Captured
+	}
+	return Receipt
+}
+
+; No native getter runs after this pure final receipt comparison.
+_MR_ReasonedGroupCurrent(Receipt, Seen := unset) {
+	if !(Receipt is Map)
+		return false
+	if !Receipt.Has("fields")
+		return true
+	Value := Receipt["value"]
+	if ObjGetBase(Value) != (Value is Map ? Map.Prototype : Array.Prototype)
+		return false
+	for Name in ObjOwnProps(Value)
+		return false
+	if (Value is Map ? Value.Count : Value.Length) != Receipt["size"]
+		return false
+	Seen := IsSet(Seen) ? Seen : Map()
+	Identity := ObjPtr(Receipt)
+	if Seen.Has(Identity)
+		return true
+	Seen[Identity] := true
+	for Key, Captured in Receipt["fields"] {
+		if !Value.Has(Key) || Type(Value[Key]) != Type(Captured["value"])
+			|| !(Value[Key] == Captured["value"]) || !_MR_ReasonedGroupCurrent(Captured, Seen)
+			return false
+	}
+	return true
+}
+
 _MR_RenderGroup(ResultMenu, Item, CategoryName, GroupBuilders, ManifestKey := "", StateGetters := "", Disabled := unset) {
+	if Item.Has("disabled_reason_key") {
+		Root := _MR_GetManifestRoot(), SourceRows := _MR_GetMenuDef(ManifestKey)
+		Source := _MR_ReasonedGroupSnapshot(SourceRows)
+		States := _MR_ReasonedGroupSnapshot(StateGetters)
+		Builders := _MR_ReasonedGroupSnapshot(GroupBuilders)
+		if !Source || !States || !Builders
+			return false
+		Id := _MR_Get(Item, "id")
+		Sub := GroupBuilders is Map && GroupBuilders.Has(Id)
+			? GroupBuilders[Id]() : _MR_BuildBuiltinGroup(Id, CategoryName)
+		if !(Sub is Menu)
+			return false
+		Row := MenuRenderer_GroupRow(ManifestKey, Id, Sub, StateGetters)
+		if !(Row is Map) || Row["submenu"] != Sub
+			return false
+		if IsSet(Disabled) && Disabled
+			Row["disabled"] := true
+		CurrentRoot := _MR_GetManifestRoot()
+		if CurrentRoot != Root || !Root.Has(ManifestKey) || Root[ManifestKey] != SourceRows
+			|| !_MR_ReasonedGroupCurrent(Source) || !_MR_ReasonedGroupCurrent(States)
+			|| !_MR_ReasonedGroupCurrent(Builders)
+			return false
+		return _MR_RenderRows(ResultMenu, [Row], ManifestKey, 1) == 1
+	}
+
 	Id    := _MR_Get(Item, "id")
 	I18nKey := _MR_Get(Item, "i18n")
 	if (Id == "" or (I18nKey == "" && _MR_Get(Item, "caption_source") != "native")) {

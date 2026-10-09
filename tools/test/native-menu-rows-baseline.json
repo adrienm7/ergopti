@@ -1,7 +1,7 @@
 {
 	"_comment": "Native menu rows still built in driver code (tools/test/test-native-menu-rows.cjs). Lower with --update-baseline as rows move to the shared manifest; never raise.",
 	"windows": {
-		"count": 27,
+		"count": 26,
 		"sites": [
 			"windows/infra/tray_bootstrap.ahk:54 add",
 			"windows/ui/menu/menu_hotstrings.ahk:913 append",
@@ -28,20 +28,17 @@
 			"windows/ui/menu/menu_shortcuts.ahk:195 append",
 			"windows/ui/menu/menu_shortcuts.ahk:200 append",
 			"windows/ui/menu/menu_submenus.ahk:62 separator",
-			"windows/ui/menu/menu_submenus.ahk:170 separator",
-			"windows/ui/menu/menu_submenus.ahk:209 separator"
+			"windows/ui/menu/menu_submenus.ahk:217 separator"
 		]
 	},
 	"macos": {
-		"count": 21,
+		"count": 19,
 		"sites": [
-			"macos/ui/menu/builder.lua:452 separator",
-			"macos/ui/menu/builder.lua:876 separator",
+			"macos/ui/menu/builder.lua:880 separator",
 			"macos/ui/menu/menu_gestures.lua:205 static",
 			"macos/ui/menu/menu_gestures.lua:257 static",
 			"macos/ui/menu/menu_hotstrings.lua:297 static",
 			"macos/ui/menu/menu_hotstrings.lua:518 separator",
-			"macos/ui/menu/menu_hotstrings_custom.lua:259 static",
 			"macos/ui/menu/menu_hotstrings_management.lua:713 static",
 			"macos/ui/menu/menu_keyboard_slots.lua:152 static",
 			"macos/ui/menu/menu_keyboard_slots.lua:153 static",
@@ -59,35 +56,30 @@
 		]
 	},
 	"linux": {
-		"count": 27,
+		"count": 22,
 		"sites": [
 			"linux/ui/menu/menu_builder.lua:255 static",
 			"linux/ui/menu/menu_builder.lua:369 static",
 			"linux/ui/menu/menu_builder.lua:523 static",
 			"linux/ui/menu/menu_builder.lua:561 static",
-			"linux/ui/menu/menu_builder.lua:824 static",
-			"linux/ui/menu/menu_builder.lua:991 static",
-			"linux/ui/menu/menu_builder.lua:1016 separator",
-			"linux/ui/menu/menu_builder.lua:1475 static",
-			"linux/ui/menu/menu_builder.lua:1493 separator",
-			"linux/ui/menu/menu_builder.lua:1497 separator",
-			"linux/ui/menu/menu_builder.lua:1795 static",
-			"linux/ui/menu/menu_builder.lua:2048 static",
-			"linux/ui/menu/menu_builder.lua:2090 static",
-			"linux/ui/menu/menu_builder.lua:2152 static",
-			"linux/ui/menu/menu_builder.lua:2859 static",
-			"linux/ui/menu/menu_builder.lua:2868 static",
-			"linux/ui/menu/menu_builder.lua:3391 static",
-			"linux/ui/menu/menu_builder.lua:3829 static",
-			"linux/ui/menu/menu_builder.lua:3883 static",
-			"linux/ui/menu/menu_builder.lua:3914 static",
-			"linux/ui/menu/menu_builder.lua:3915 static",
-			"linux/ui/menu/menu_builder.lua:4048 static",
-			"linux/ui/menu/menu_builder.lua:4057 static",
-			"linux/ui/menu/menu_builder.lua:4207 static",
-			"linux/ui/menu/menu_builder.lua:4588 static",
-			"linux/ui/menu/menu_builder.lua:5018 separator",
-			"linux/ui/menu/menu_builder.lua:5042 separator"
+			"linux/ui/menu/menu_builder.lua:990 static",
+			"linux/ui/menu/menu_builder.lua:1481 static",
+			"linux/ui/menu/menu_builder.lua:1499 separator",
+			"linux/ui/menu/menu_builder.lua:1503 separator",
+			"linux/ui/menu/menu_builder.lua:1801 static",
+			"linux/ui/menu/menu_builder.lua:2054 static",
+			"linux/ui/menu/menu_builder.lua:2161 static",
+			"linux/ui/menu/menu_builder.lua:3401 static",
+			"linux/ui/menu/menu_builder.lua:3839 static",
+			"linux/ui/menu/menu_builder.lua:3893 static",
+			"linux/ui/menu/menu_builder.lua:3924 static",
+			"linux/ui/menu/menu_builder.lua:3925 static",
+			"linux/ui/menu/menu_builder.lua:4058 static",
+			"linux/ui/menu/menu_builder.lua:4067 static",
+			"linux/ui/menu/menu_builder.lua:4217 static",
+			"linux/ui/menu/menu_builder.lua:4598 static",
+			"linux/ui/menu/menu_builder.lua:5028 separator",
+			"linux/ui/menu/menu_builder.lua:5052 separator"
 		]
 	}
 }
