@@ -73,9 +73,11 @@ final class ManagedHTTPWorkerTests: XCTestCase {
 			url: URL(string: "https://same.example/b?case=two")!, pacURL: nil, script: script,
 			deadline: ProcessInfo.processInfo.systemUptime + 20))
 		XCTAssertEqual(first.count, 2)
+		guard first.count == 2 else { return }
 		XCTAssertEqual(first[0][kCFProxyHostNameKey as String] as? String, "first.example")
 		XCTAssertEqual(first[1][kCFProxyTypeKey as String] as? String, kCFProxyTypeNone as String)
 		XCTAssertEqual(second.count, 2)
+		guard second.count == 2 else { return }
 		XCTAssertEqual(second[0][kCFProxyHostNameKey as String] as? String, "second.example")
 		XCTAssertEqual(second[1][kCFProxyHostNameKey as String] as? String, "third.example")
 	}
@@ -91,6 +93,7 @@ final class ManagedHTTPWorkerTests: XCTestCase {
 			url: URL(string: "http://same.example/a?case=three")!, pacURL: nil, script: script,
 			deadline: ProcessInfo.processInfo.systemUptime + 20))
 		XCTAssertEqual(result.count, 3)
+		guard result.count == 3 else { return }
 		XCTAssertEqual(result[0][kCFProxyHostNameKey as String] as? String, "first.example")
 		XCTAssertEqual(result[1][kCFProxyHostNameKey as String] as? String, "second.example")
 		XCTAssertEqual(result[2][kCFProxyTypeKey as String] as? String, kCFProxyTypeNone as String)
