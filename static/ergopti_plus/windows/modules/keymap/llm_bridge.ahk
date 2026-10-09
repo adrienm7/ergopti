@@ -613,13 +613,17 @@ LLM_Tooltip_TryAcceptTab(TabProvenance := false, Modifiers := [], InputSnapshot 
  * diverge between them. The caller has already applied its own policy.
  * @param {Object} Presented - Snapshot from LLM_Tooltip_GetAcceptSnapshot.
  * @param {Func} AcceptFn - Optional deterministic injection callback.
+ * @param {Integer} AutomationGeneration - Optional external-request bridge epoch.
  * @returns {boolean} True when this call claimed and dispatched the prediction.
  */
-_LLM_Accept_ClaimAndDispatch(Presented, AcceptFn := unset) {
+_LLM_Accept_ClaimAndDispatch(Presented, AcceptFn := unset, AutomationGeneration := unset) {
 	global _LLM_AcceptInProgress
 	PreviousCritical := Critical("On")
 	try {
 		if _LLM_AcceptInProgress || !IsObject(Presented)
+			return false
+		if IsSet(AutomationGeneration) && (A_IsSuspended || !_LLM_Bridge_Active
+				|| AutomationGeneration != _LLM_Automation_Generation)
 			return false
 		if !IsSet(AcceptFn) {
 			AdmissionSeed := _LLM_Bridge_CaptureAdmissionSeed(
@@ -808,14 +812,21 @@ _LLM_SlotAccept_Insert(State) {
  * the control that owns the render.
  * @param {Map} InputSnapshot - Optional current physical/focus snapshot.
  * @param {Func} AcceptFn - Optional injection callback.
+ * @param {Object} Expected - Optional exact render retained by the external request.
+ * @param {Integer} AutomationGeneration - Optional admitted bridge epoch.
  * @returns {boolean} True when the prediction was claimed and dispatched.
  */
-LLM_Tooltip_TryAcceptAutomation(InputSnapshot := unset, AcceptFn := unset) {
+LLM_Tooltip_TryAcceptAutomation(InputSnapshot := unset, AcceptFn := unset, Expected := unset, AutomationGeneration := unset) {
 	Presented := LLM_Tooltip_GetAcceptSnapshot()
 	if !IsSet(InputSnapshot)
 		InputSnapshot := _LLM_Accept_ReadInputSnapshot()
 	Gate := _LLM_Accept_AutomationRefusal(Presented, InputSnapshot)
-	if Gate == "" && _LLM_Accept_ClaimAndDispatch(Presented, AcceptFn?)
+	if IsSet(Expected) && (!IsObject(Presented) || !IsObject(Expected)
+			|| ObjPtr(Presented.Record) != ObjPtr(Expected.Record)
+			|| ObjPtr(Presented.Surface) != ObjPtr(Expected.Surface)
+			|| Presented.ActiveIdx != Expected.ActiveIdx || Presented.Text != Expected.Text)
+		Gate := "another prediction replaced the automation request's render"
+	if Gate == "" && _LLM_Accept_ClaimAndDispatch(Presented, AcceptFn?, AutomationGeneration?)
 		return true
 	; The requester sees nothing typed, so the refusal must be named.
 	try LoggerWarn("LLM", "Automation request did not insert the prediction: {1}.",
@@ -843,11 +854,24 @@ _LLM_Accept_AutomationRefusal(Presented, InputSnapshot) {
 
 ; Runs one automation request off the message thread
 ; (adapters/llm_automation.ahk); the bridge may have stopped since it arrived.
-_LLM_Automation_Accept() {
-	if A_IsSuspended || !_LLM_Bridge_Active
-		return
-	if LLM_Tooltip_TryAcceptAutomation()
+_LLM_Automation_Accept(State, InputSnapshot := unset, AcceptFn := unset) {
+	global _LLM_Automation_Pending
+	PreviousCritical := Critical("On")
+	try {
+		if !IsObject(State) || !IsObject(_LLM_Automation_Pending)
+				|| ObjPtr(State) != ObjPtr(_LLM_Automation_Pending)
+			return false
+		_LLM_Automation_Pending := 0
+		State.Callback := 0
+		if State.Cancelled || A_IsSuspended || !_LLM_Bridge_Active || State.Generation != _LLM_Automation_Generation
+			return false
+	} finally {
+		Critical(PreviousCritical)
+	}
+	Accepted := LLM_Tooltip_TryAcceptAutomation(InputSnapshot?, AcceptFn?, State.Presented, State.Generation)
+	if Accepted && State.Generation == _LLM_Automation_Generation && _LLM_Bridge_Active && !IsSet(AcceptFn)
 		LLM_Engine_CancelTimer()
+	return Accepted
 }
 
 ; Emit Tab normally whenever canonical acceptance rejects it. A tap-hold's Tab
@@ -900,7 +924,7 @@ LLM_Bridge_Start(opts) {
 		throw Err
 	}
 	_LLM_Bridge_Active := true
-	_LLM_Automation_Listen(true)
+	_LLM_Automation_StartListener()
 	try LoggerInfo("LLM", "Bridge engine ready — keystrokes via HookDispatcher until PrefixWatcher starts.")
 }
 
@@ -915,7 +939,7 @@ _LLM_Bridge_Activate(source) {
 	_LLM_PointerWatch_Start()
 	_LLM_Bridge_UnregisterDispatcherFallback()
 	_LLM_Bridge_Active := true
-	_LLM_Automation_Listen(true)
+	_LLM_Automation_StartListener()
 	try LoggerInfo("LLM", "Bridge active — keystrokes via {1}.", source)
 }
 
@@ -992,22 +1016,37 @@ _LLM_Bridge_OnDispatcherKey(ih, vk, sc) {
  */
 LLM_Bridge_Stop() {
 	global _LLM_Bridge_Active
-	LLM_Bridge_CancelPrefixObserver()
-	_LLM_Bridge_UnregisterDispatcherFallback()
-	_LLM_PointerWatch_Stop()
-	_LLM_Automation_Listen(false)
-	if !_LLM_Bridge_Active
-		return
+	WasActive := _LLM_Bridge_Active
 	_LLM_Bridge_Active := false
-	_LLM_Bridge_ClearBuffer()
-	; The agent-only feed takes over from here on a fresh context: whatever it
-	; held before the bridge started predates everything typed since
-	LLM_Bridge_ResetAgentFeed("the prediction bridge stopped")
-	try LLM_Engine_StopGeneration()   ; Cancel in-flight HTTP before disabling the engine
-	LLM_Engine_SetEnabled(false)
-	try LLM_OllamaCancelWarmupRetry()
-	LLM_Tooltip_Hide()
-	try LoggerInfo("LLM", "Bridge stopped.")
+	FirstError := 0
+	try {
+		LLM_Bridge_CancelPrefixObserver()
+		_LLM_Bridge_UnregisterDispatcherFallback()
+		_LLM_PointerWatch_Stop()
+		if !WasActive
+			return
+		_LLM_Bridge_ClearBuffer()
+		; The agent-only feed takes over from here on a fresh context: whatever it
+		; held before the bridge started predates everything typed since
+		LLM_Bridge_ResetAgentFeed("the prediction bridge stopped")
+		try LLM_Engine_StopGeneration()   ; Cancel in-flight HTTP before disabling the engine
+		LLM_Engine_SetEnabled(false)
+		try LLM_OllamaCancelWarmupRetry()
+		LLM_Tooltip_Hide()
+		try LoggerInfo("LLM", "Bridge stopped.")
+	} catch as Err {
+		FirstError := Err
+	} finally {
+		try _LLM_Automation_Listen(false)
+		catch as Err {
+			if !IsObject(FirstError)
+				FirstError := Err
+			else
+				try LoggerError("LLM", "Automation listener retirement also failed: {1}.", Err.Message)
+		}
+		if IsObject(FirstError)
+			throw FirstError
+	}
 }
 
 /**
