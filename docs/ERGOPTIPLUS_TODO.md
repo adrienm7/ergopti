@@ -8780,6 +8780,15 @@ test precondition failure, not a Lua defect or a successful permission grant.
   alone does not restore a failed lease. Verify the actual Apple Silicon
   package with the reported failure before calling the incident resolved.
 
+  The supported temporary mode is Configuration > Ergopti uses Karabiner >
+  Off. Its current owner confirms Off only after the owned lease stop barrier,
+  guardian release and setting persistence succeed. It then stops the
+  lease-dependent input owners and removes only Ergopti-owned rules. This
+  temporarily disables Ergopti remapping, tap-hold and generated chords;
+  personal Karabiner rules are preserved. Eleven inert lifecycle/menu
+  controls pass, including refusal paths. Actual retirement on the affected
+  Mac remains unqualified: an unsuccessful Off operation is not completion.
+
 - [~] **118.** Keep macOS ANSI/ISO physical positions distinct.
 
   The maintainer reports that the shortcut for the key left of 1 instead
@@ -8883,6 +8892,12 @@ test precondition failure, not a Lua defect or a successful permission grant.
   values and forged previews are refused. These inert tests do not qualify
   the installed native application or restore any deferred hosted assertion.
 
+  Error-dialog callers now retain the captured snapshot and pass its typed
+  share document to the actual report owner on every driver. Root receiving
+  passes 13 Mac, two Linux and one registered AHK control; the AHK execution
+  manifest is complete. Native Linux write/close refusal checks remain for
+  CI. Local detailed error previews are not included in shared exports.
+
 - [~] **124.** Remove the redundant Live mode submenu on every OS.
 
   The maintainer clarified that the AI menu already configures suggestions
@@ -8896,9 +8911,14 @@ test precondition failure, not a Lua defect or a successful permission grant.
 
   Shared declaration and all three menu owners are committed locally. The
   complete menu-manifest test passes after integration with incoming native
-  menu frames. Three older Linux tests still expect the retired submenu;
-  migrate their action, refusal and locale coverage to the retained owners
-  before considering the complete composed suite qualified.
+  menu frames. The older Linux tests now exercise the retained shortcut and
+  manual profile owners: all 25 controls pass, with stop-before-save inverse
+  failures. Orphan declarations and dormant native providers are now removed;
+  current-source receiving passes 15 Mac controls, five actual registered AHK
+  controls with a complete manifest, 163 Windows wiring checks and the menu
+  bijection/category gates. Some older source-scanning guards still expect
+  the retired inline native projection and need migration without losing
+  their semantic coverage. The complete composed suite remains unqualified.
 
 - [~] **125.** Configure an arbitrary translation target through an input box.
 
@@ -8919,19 +8939,20 @@ test precondition failure, not a Lua defect or a successful permission grant.
   tests preserve selection authority and legacy custom profiles. The
   installed dialog, real inference and complete release suites remain open.
 
-- [ ] **126.** Reconcile restored macOS trackpad gestures with their executed actions.
+- [~] **126.** Leave all recommended two-finger gestures unassigned.
 
   On the built-in Apple Silicon Mac trackpad, the maintainer cleared all
   gestures and restored recommended values. The UI then assigned the
-  two-finger left swipe to Up Arrow, but performing it pasted text instead.
-  Verify the complete clear/restore/read/display/dispatch sequence, including
-  direction and finger-count identities, cached bindings, inherited defaults
-  and the actual key output. Establish the cause before changing defaults.
-  Add a regression that compares the displayed binding with the executed
-  action and repeat after reload; check equivalent shared restoration and
-  dispatch paths on Windows and Linux. Preserve personal configuration during
-  investigation. The exact installed source and native reproduction remain
-  to be confirmed.
+  two-finger left swipe to Up Arrow. The maintainer corrected the report:
+  Up recalled the previous terminal command; no Paste action occurred.
+  The actual clear/restore/dispatch chain agrees with that observation.
+
+  At the maintainer's request, every shared recommended two-finger slot is
+  now unassigned to avoid OS gesture conflicts. The canonical manifest and
+  regenerated Mac defaults agree; custom bindings are preserved. Ten actual
+  inert Mac scope/dispatch controls and shared slot/default parity pass.
+  Restoring recommendations and checking unconsumed gestures on the physical
+  built-in trackpad remain acceptance work for the next prerelease.
 
 ## Time estimate
 
