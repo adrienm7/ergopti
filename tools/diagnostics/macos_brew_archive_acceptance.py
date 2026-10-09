@@ -1486,7 +1486,10 @@ def _validate_owned_automation_ui_fact(packet):
         "first_type",
         "first_error",
     }
-    require(type(packet) is dict and set(packet) == keys, "Unadmitted Automation UI fact fields")
+    require(
+        type(packet) is dict and set(packet) in (keys, keys | {"first_button"}),
+        "Unadmitted Automation UI fact fields",
+    )
     require(
         type(packet["schema"]) is int and packet["schema"] == 1,
         "Unadmitted Automation UI fact schema",
@@ -1559,6 +1562,44 @@ def _validate_owned_automation_ui_fact(packet):
         require(
             packet["first_agent"] >= 0 and packet["first_type"] != "none",
             "Automation UI refusal lacks an agent/type",
+        )
+    if "first_button" in packet:
+        button = packet["first_button"]
+        require(
+            packet["first_attribute"] == "button-title"
+            and packet["first_type"] != "string"
+            and type(button) is dict
+            and set(button) == {"schema", "subrole", "type", "error"},
+            "Unadmitted refused button fact fields",
+        )
+        require(
+            type(button["schema"]) is int
+            and button["schema"] == 1
+            and type(button["error"]) is int
+            and -(2**31) <= button["error"] < 2**31,
+            "Unadmitted refused button schema or AXError",
+        )
+        require(
+            type(button["type"]) is str
+            and button["type"] in {"absent", "ax-element", "string", "array", "number", "other"}
+            and type(button["subrole"]) is str
+            and button["subrole"]
+            in {"absent", "wrong-type", "unknown", "close", "minimize", "zoom"},
+            "Unadmitted refused button enum",
+        )
+        require(
+            (button["type"] == "absent" and button["subrole"] == "absent")
+            or (
+                button["type"] == "string"
+                and button["error"] == 0
+                and button["subrole"] in {"unknown", "close", "minimize", "zoom"}
+            )
+            or (
+                button["type"] not in {"absent", "string"}
+                and button["error"] == 0
+                and button["subrole"] == "wrong-type"
+            ),
+            "Refused button type and enum disagree",
         )
     return dict(packet)
 

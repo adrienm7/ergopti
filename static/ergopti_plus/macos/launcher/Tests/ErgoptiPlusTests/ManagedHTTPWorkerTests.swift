@@ -156,6 +156,98 @@ final class ManagedHTTPWorkerTests: XCTestCase {
 		XCTAssertEqual(selected.count, 2)
 		XCTAssertEqual(selected[0][kCFProxyHostNameKey as String] as? String, "selected.example")
 		XCTAssertEqual(selected[1][kCFProxyTypeKey as String] as? String, kCFProxyTypeNone as String)
+
+		// Only an explicit DIRECT in the PAC result may admit a direct route.
+		var withoutDirect = settings
+		withoutDirect[kCFNetworkProxiesProxyAutoConfigJavaScript as String] =
+			"function FindProxyForURL(url, host) { return 'PROXY selected.example:3111'; }"
+		let proxyOnly = try XCTUnwrap(ManagedProxyLookup.routes(url: URL(string: "https://origin.example/private?case=three")!,
+			budget: 20, maximumSelections: 16, settingsProvider: { withoutDirect as CFDictionary },
+			discoveryMetadataProvider: { metadataReads += 1; return ManagedWPADMetadata(dhcpOption: nil, searchDomains: []) }))
+		XCTAssertEqual(metadataReads, 0)
+		XCTAssertEqual(proxyOnly.count, 1)
+		guard proxyOnly.count == 1 else { return }
+		XCTAssertEqual(proxyOnly[0][kCFProxyHostNameKey as String] as? String, "selected.example")
+		XCTAssertFalse(proxyOnly.contains { $0[kCFProxyTypeKey as String] as? String == kCFProxyTypeNone as String })
+
+		// Preserve repeated native PAC choices; removing duplicates is not ownership.
+		var repeatedChoices = settings
+		repeatedChoices[kCFNetworkProxiesProxyAutoConfigJavaScript as String] =
+			"function FindProxyForURL(url, host) { return 'PROXY selected.example:3111; PROXY selected.example:3111; DIRECT'; }"
+		let repeated = try XCTUnwrap(ManagedProxyLookup.routes(url: URL(string: "https://origin.example/private?case=four")!,
+			budget: 20, maximumSelections: 16, settingsProvider: { repeatedChoices as CFDictionary },
+			discoveryMetadataProvider: { metadataReads += 1; return ManagedWPADMetadata(dhcpOption: nil, searchDomains: []) }))
+		XCTAssertEqual(metadataReads, 0)
+		XCTAssertEqual(repeated.count, 3)
+		guard repeated.count == 3 else { return }
+		XCTAssertEqual(repeated[0][kCFProxyHostNameKey as String] as? String, "selected.example")
+		XCTAssertEqual(repeated[1][kCFProxyHostNameKey as String] as? String, "selected.example")
+		XCTAssertEqual(repeated[2][kCFProxyTypeKey as String] as? String, kCFProxyTypeNone as String)
 	}
 
+
+	func testActualCFNetworkHTTPPACArgumentShapeObservation() throws {
+		try observePACArgumentShape(scheme: "http")
+	}
+
+	func testActualCFNetworkHTTPSPACArgumentShapeObservation() throws {
+		try observePACArgumentShape(scheme: "https")
+	}
+
+	// Fixed authored values only. The returned proxy is never dispatched.
+	// This observation cannot replace the original full-URL assertions above.
+	private func observePACArgumentShape(scheme: String) throws {
+		let deadline = ProcessInfo.processInfo.systemUptime + 20
+		XCTAssertTrue(scheme == "http" || scheme == "https")
+		guard scheme == "http" || scheme == "https" else { return }
+		let origin = "\(scheme)://same.example:4455"
+		let full = origin + "/a?case=shape"
+		let url = try XCTUnwrap(URL(string: full))
+		let forms = try JSONSerialization.data(withJSONObject: [full, origin + "/", origin])
+		let literals = try XCTUnwrap(String(data: forms, encoding: .utf8))
+		let script = """
+		function FindProxyForURL(url, host) {
+			var forms = \(literals);
+			var u = 7;
+			if (typeof url === "undefined") u = 5;
+			else if (typeof url !== "string") u = 6;
+			else if (url === forms[0]) u = 0;
+			else if (url === forms[1]) u = 1;
+			else if (url === forms[2]) u = 2;
+			else if (url === "same.example") u = 3;
+			else if (url === "/a?case=shape") u = 4;
+			var h = 5;
+			if (typeof host === "undefined") h = 3;
+			else if (typeof host !== "string") h = 4;
+			else if (host === "same.example") h = 0;
+			else if (host === forms[0]) h = 1;
+			else if (host === "same.example:4455") h = 2;
+			return "PROXY pac-shape.invalid:" + (20000 + 10 * u + h);
+		}
+		"""
+		let routes = try XCTUnwrap(ManagedProxyLookup.evaluate(url: url,
+			pacURL: nil, script: script, deadline: deadline))
+		XCTAssertEqual(routes.count, 1)
+		guard routes.count == 1 else { return }
+		let route = routes[0]
+		XCTAssertTrue(route[kCFProxyTypeKey as String] as? String == kCFProxyTypeHTTP as String)
+		XCTAssertTrue(route[kCFProxyHostNameKey as String] as? String == "pac-shape.invalid")
+		guard route[kCFProxyTypeKey as String] as? String == kCFProxyTypeHTTP as String,
+			route[kCFProxyHostNameKey as String] as? String == "pac-shape.invalid" else { return }
+		let number = try XCTUnwrap(route[kCFProxyPortNumberKey as String] as? NSNumber)
+		let integral = CFGetTypeID(number) != CFBooleanGetTypeID()
+			&& number.doubleValue == Double(number.intValue)
+		XCTAssertTrue(integral)
+		guard integral else { return }
+		let code = number.intValue
+		let inRange = (20000...20075).contains(code)
+		XCTAssertTrue(inRange)
+		guard inRange else { return }
+		let urlShape = (code - 20000) / 10
+		let hostShape = (code - 20000) % 10
+		let recognized = (0...7).contains(urlShape) && (0...5).contains(hostShape)
+		XCTAssertTrue(recognized)
+		guard recognized else { return }
+		print("PAC_ARGUMENT_SHAPE purpose=\(scheme) port=\(code)")
+	}
 }

@@ -4184,5 +4184,89 @@ class FirstPositiveAutomationPrerequisiteControls(unittest.TestCase):
             self.assertNotIn("permission_prerequisite", receipt)
 
 
+class RefusedButtonSubroleFactControls(unittest.TestCase):
+    """Receive fixed diagnostic enums on real private files, never native AX/TCC credit."""
+
+    def packet(self, subrole="close", kind="string", error=0):
+        packet = OwnedAutomationUIFactControls.packet()
+        packet.update(first_attribute="button-title", first_error=-25205)
+        packet["first_button"] = {"schema": 1, "subrole": subrole, "type": kind, "error": error}
+        return packet
+
+    def test_closed_subrole_evidence_preserves_original_unsupported_title_refusal(self):
+        for subrole, kind, error in (
+            ("close", "string", 0),
+            ("minimize", "string", 0),
+            ("zoom", "string", 0),
+            ("unknown", "string", 0),
+            ("absent", "absent", -25205),
+            ("wrong-type", "number", 0),
+        ):
+            with self.subTest(subrole=subrole):
+                packet = self.packet(subrole, kind, error)
+                self.assertEqual(probe._validate_owned_automation_ui_fact(packet), packet)
+                self.assertEqual(packet["first_attribute"], "button-title")
+                self.assertEqual(packet["first_error"], -25205)
+
+    def test_foreign_private_malformed_or_unbound_button_facts_are_refused(self):
+        for replacement in (
+            None,
+            {"schema": True, "subrole": "close", "type": "string", "error": 0},
+            {"schema": 1, "subrole": "private-description", "type": "string", "error": 0},
+            {"schema": 1, "subrole": "close", "type": "string", "error": -25205},
+            {"schema": 1, "subrole": "close", "type": "absent", "error": 0},
+            {"schema": 1, "subrole": "close", "type": "string", "error": True},
+            {"schema": 1, "subrole": "close", "type": "string", "error": 2**31},
+            {"schema": 1, "subrole": "unknown", "type": "other", "error": 0},
+            {"schema": 1, "subrole": "close", "type": "string", "error": 0, "accepted": True},
+        ):
+            with self.subTest(replacement=replacement), self.assertRaises(probe.AdmissionError):
+                packet = self.packet()
+                packet["first_button"] = replacement
+                probe._validate_owned_automation_ui_fact(packet)
+        for attribute in ("none", "windows", "button-enabled"):
+            with self.subTest(attribute=attribute), self.assertRaises(probe.AdmissionError):
+                packet = self.packet()
+                packet["first_attribute"] = attribute
+                probe._validate_owned_automation_ui_fact(packet)
+
+    def test_real_owned_capture_exports_subrole_without_grant_or_retirement_credit(self):
+        with TemporaryDirectory() as directory, patch.object(probe, "NativeProcessGroups"):
+            root = Path(directory)
+            evidence_dir = root / "evidence"
+            evidence_dir.mkdir(mode=0o700)
+            evidence = probe.PhaseEvidence(evidence_dir)
+            owner = probe.Children(root, evidence=evidence)
+            packet = self.packet()
+            primary = subprocess.CompletedProcess(
+                [], 67, "OWNED_AUTOMATION_UI/1 state=observation-refused\n", ""
+            )
+
+            def producer(arguments, **options):
+                self.assertEqual(arguments[:-1], ["/owned/helper", "sender", "receiver", "73"])
+                self.assertEqual(options, {"check": False, "timeout": 2})
+                path = Path(arguments[-1])
+                self.assertEqual(path.parent, root)
+                self.assertEqual(stat.S_IMODE(path.stat().st_mode), 0o600)
+                path.write_text(json.dumps(packet))
+                return primary
+
+            owner.run = Mock(side_effect=producer)
+            try:
+                result = probe._owned_automation_ui_run(
+                    owner, ["/owned/helper", "sender", "receiver", "73"], 2
+                )
+                self.assertIs(result, primary)
+                self.assertEqual(result.returncode, 67)
+                self.assertEqual(result.stdout, "OWNED_AUTOMATION_UI/1 state=observation-refused\n")
+                receipt = json.loads((evidence_dir / "checkpoint.json").read_text())
+                self.assertEqual(receipt["native_ui"], packet)
+                self.assertEqual(receipt["status"], "refused")
+                self.assertFalse(receipt["ownership_closed"])
+                self.assertEqual(list(root.glob("automation-ui-fact-*")), [])
+            finally:
+                evidence.close()
+
+
 if __name__ == "__main__":
     unittest.main()

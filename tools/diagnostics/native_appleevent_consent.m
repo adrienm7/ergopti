@@ -23,6 +23,9 @@ static int factAgent = -1, factScanned = 0, factWindows = 0, factNodes = 0;
 static int factCandidates = 0, factMatches = 0, factError = 0;
 static const char *factAttribute = "none", *factType = "none";
 static AXError attributeError = kAXErrorSuccess;
+static BOOL factButtonObserved = NO;
+static int factButtonError = 0;
+static const char *factButtonSubrole = "absent", *factButtonType = "absent";
 
 static const char *kind(id value) {
     if (value == nil) return "absent";
@@ -46,15 +49,23 @@ static void publish_facts(void) {
     struct stat named;
     if (lstat(factPath, &named) == 0 && named.st_dev == factIdentity.st_dev &&
         named.st_ino == factIdentity.st_ino) {
+        char buttonPacket[256] = "";
+        if (factButtonObserved) {
+            int buttonLength = snprintf(buttonPacket, sizeof(buttonPacket),
+                ",\"first_button\":{\"schema\":1,\"subrole\":\"%s\","
+                "\"type\":\"%s\",\"error\":%d}",
+                factButtonSubrole, factButtonType, factButtonError);
+            if (buttonLength <= 0 || buttonLength >= (int)sizeof(buttonPacket)) buttonPacket[0] = '\0';
+        }
         char packet[1024];
         int length = snprintf(packet, sizeof(packet),
             "{\"schema\":1,\"ax_trusted\":%s,\"requester_qualified\":%s,"
             "\"scanned_agents\":%d,\"windows\":%d,\"nodes\":%d,\"candidates\":%d,"
             "\"matches\":%d,\"first_agent\":%d,\"first_attribute\":\"%s\","
-            "\"first_type\":\"%s\",\"first_error\":%d}\n",
+            "\"first_type\":\"%s\",\"first_error\":%d%s}\n",
             factTrusted ? "true" : "false", factRequester ? "true" : "false",
             factScanned, factWindows, factNodes, factCandidates, factMatches,
-            factAgent, factAttribute, factType, factError);
+            factAgent, factAttribute, factType, factError, buttonPacket);
         if (length > 0 && length < (int)sizeof(packet)) {
             size_t offset = 0;
             while (offset < (size_t)length) {
@@ -152,6 +163,21 @@ static id attribute(AXUIElementRef element, CFStringRef key) {
     return CFBridgingRelease(value);
 }
 
+// Observe only the same first refused button. These fixed facts never
+// authorize a button, alter the original refusal or disclose a UI string.
+static void observe_refused_button(AXUIElementRef element) {
+    id value = attribute(element, kAXSubroleAttribute);
+    factButtonError = (int)attributeError;
+    factButtonType = kind(value);
+    if (value == nil) factButtonSubrole = "absent";
+    else if (![value isKindOfClass:[NSString class]]) factButtonSubrole = "wrong-type";
+    else if ([value isEqualToString:(__bridge NSString *)kAXCloseButtonSubrole]) factButtonSubrole = "close";
+    else if ([value isEqualToString:(__bridge NSString *)kAXMinimizeButtonSubrole]) factButtonSubrole = "minimize";
+    else if ([value isEqualToString:(__bridge NSString *)kAXZoomButtonSubrole]) factButtonSubrole = "zoom";
+    else factButtonSubrole = "unknown";
+    factButtonObserved = YES;
+}
+
 static BOOL inspect_window(AXUIElementRef window, NSString *sender, NSString *receiver,
     NSMutableArray *allowButtons, BOOL *targetSeen, BOOL *senderSeen, BOOL *denySeen, int agent) {
     NSMutableArray *pending = [NSMutableArray arrayWithObject:(__bridge id)window];
@@ -175,7 +201,12 @@ static BOOL inspect_window(AXUIElementRef window, NSString *sender, NSString *re
             NSString *title = attribute(element, kAXTitleAttribute);
             AXError titleError = attributeError;
             NSNumber *enabled = attribute(element, kAXEnabledAttribute);
-            if (![title isKindOfClass:[NSString class]]) { refused_fact(agent, "button-title", title, titleError); return NO; }
+            if (![title isKindOfClass:[NSString class]]) {
+                BOOL firstButton = strcmp(factAttribute, "none") == 0 && factDescriptor >= 0;
+                refused_fact(agent, "button-title", title, titleError);
+                if (firstButton) observe_refused_button(element);
+                return NO;
+            }
             if (![enabled isKindOfClass:[NSNumber class]]) { refused_fact(agent, "button-enabled", enabled, attributeError); return NO; }
             if ([title isEqualToString:@"Allow"] && enabled.boolValue) [allowButtons addObject:item];
             if ([title isEqualToString:@"Don't Allow"] || [title isEqualToString:@"Don’t Allow"])
