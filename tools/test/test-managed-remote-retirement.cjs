@@ -80,7 +80,9 @@ for (const [name, rows] of [
 			context.requestUrl = url;
 			context.requestHost = host;
 			assert.equal(
-				vm.runInContext('FindProxyForURL(requestUrl, requestHost)', context, { timeout: 100 }),
+				vm.runInContext('FindProxyForURL(requestUrl, requestHost)', context, {
+					timeout: 100
+				}),
 				`PROXY 127.0.0.1:${port}`,
 				`${name}: exact owned HTTPS authority must select its relay without a path`
 			);
@@ -96,7 +98,9 @@ for (const [name, rows] of [
 			context.requestUrl = url;
 			context.requestHost = requestHost;
 			assert.equal(
-				vm.runInContext('FindProxyForURL(requestUrl, requestHost)', context, { timeout: 100 }),
+				vm.runInContext('FindProxyForURL(requestUrl, requestHost)', context, {
+					timeout: 100
+				}),
 				'PROXY refused.invalid:9',
 				`${name}: foreign authority cannot acquire an owned relay`
 			);
@@ -133,6 +137,8 @@ console.log(
 	'PASS: real fixture PAC assemblies retain bounded HTTPS authorities and foreign refusal.'
 );
 
+stagingCleanupControls();
+
 if (process.platform !== 'win32') {
 	console.log('SKIP: managed fixture retirement requires Windows PowerShell and owned loopback.');
 	process.exit(0);
@@ -147,7 +153,7 @@ assert.ok(fs.existsSync(powershell), 'The real Windows PowerShell runtime is req
 // observation functions only; this does not qualify HTTP, TLS or certificate stores.
 const os = require('node:os');
 /** Retire only the exact fixture namespace after a known synchronous terminal. */
-function retireStagingObservation(directory, terminal, files = fs) {
+function retireStagingObservation(directory, terminal, files = fs, routeShapes = false) {
 	if (
 		!terminal ||
 		terminal.error ||
@@ -161,15 +167,21 @@ function retireStagingObservation(directory, terminal, files = fs) {
 		if (!directoryStat.isDirectory() || directoryStat.isSymbolicLink())
 			return 'retained_unexpected_type';
 		const entries = files.readdirSync(directory);
-		if (entries.length > 1 || (entries.length === 1 && entries[0] !== 'pure-fact.json')) {
+		if (typeof routeShapes !== 'boolean') return 'retained_unexpected_entries';
+		const owned = ['pure-fact.json'];
+		if (routeShapes) {
+			// The six closed route-shape controls publish only these exclusive names.
+			for (let ordinal = 1; ordinal <= 6; ordinal++) owned.push(`route-shape-${ordinal}.json`);
+		}
+		if (entries.length > owned.length || entries.some((name) => !owned.includes(name))) {
 			return 'retained_unexpected_entries';
 		}
-		const fact = path.join(directory, 'pure-fact.json');
-		if (entries.length === 1) {
-			const factStat = files.lstatSync(fact);
+		// Check the complete cohort before unlinking its first exact owned member.
+		for (const name of entries) {
+			const factStat = files.lstatSync(path.join(directory, name));
 			if (!factStat.isFile() || factStat.isSymbolicLink()) return 'retained_unexpected_type';
-			files.unlinkSync(fact);
 		}
+		for (const name of entries) files.unlinkSync(path.join(directory, name));
 		files.rmdirSync(directory);
 		return 'closed';
 	} catch {
@@ -183,7 +195,8 @@ function finishStagingObservation(
 	terminal,
 	assertions,
 	report = console.error,
-	files = fs
+	files = fs,
+	routeShapes = false
 ) {
 	let failed = false;
 	let primary;
@@ -193,7 +206,7 @@ function finishStagingObservation(
 		failed = true;
 		primary = error;
 	}
-	const cleanup = retireStagingObservation(directory, terminal, files);
+	const cleanup = retireStagingObservation(directory, terminal, files, routeShapes);
 	finishStagingObservation.lastCleanupStatus = cleanup;
 	finishStagingObservation.lastReportStatus = 'not_required';
 	if (cleanup !== 'closed') {
@@ -231,15 +244,22 @@ const stagingResult = spawnSync(
 	],
 	{ encoding: 'utf8', windowsHide: true, maxBuffer: 65536 }
 );
-finishStagingObservation(stagingOwned, stagingResult, () => {
-	assert.ifError(stagingResult.error);
-	assert.equal(stagingResult.status, 0, stagingResult.stdout + stagingResult.stderr);
-	assert.equal(stagingResult.stderr, '');
-	assert.equal(
-		stagingResult.stdout.trim(),
-		'PASS: staging observation checks=18 native_watch=0 network=0 certificate=0'
-	);
-});
+finishStagingObservation(
+	stagingOwned,
+	stagingResult,
+	() => {
+		assert.ifError(stagingResult.error);
+		assert.equal(stagingResult.status, 0, stagingResult.stdout + stagingResult.stderr);
+		assert.equal(stagingResult.stderr, '');
+		assert.equal(
+			stagingResult.stdout.trim(),
+			'PASS: staging observation checks=18 native_watch=0 network=0 certificate=0'
+		);
+	},
+	console.error,
+	fs,
+	true
+);
 
 // Exercise only the actual generated digest/integrity region with module
 // autoload disabled: no download, TLS, certificate store or resident driver.
@@ -286,3 +306,73 @@ assert.deepEqual(result.stdout.trim().split(/\r?\n/), [
 console.log(
 	'PASS: actual fixture bodies retire admitted clients and reject late accepted clients.'
 );
+
+/** Exercise the actual cleanup owner without a process or filesystem mutation. */
+function stagingCleanupControls() {
+	const directory = '/owned-staging-control';
+	const terminal = { status: 0, signal: null, error: null };
+	const cohort = [
+		'pure-fact.json',
+		...Array.from({ length: 6 }, (_, i) => `route-shape-${i + 1}.json`)
+	];
+	function files(entries, wrongType) {
+		const removed = [];
+		return {
+			removed,
+			lstatSync(filename) {
+				return {
+					isDirectory: () => filename === directory,
+					isFile: () => filename !== directory && filename !== wrongType,
+					isSymbolicLink: () => false
+				};
+			},
+			readdirSync: () => entries,
+			unlinkSync: (filename) => removed.push(filename),
+			rmdirSync: (filename) => removed.push(filename)
+		};
+	}
+	let port = files(cohort);
+	assert.equal(retireStagingObservation(directory, terminal, port, true), 'closed');
+	assert.deepEqual(port.removed, [...cohort.map((name) => path.join(directory, name)), directory]);
+	port = files(cohort);
+	assert.equal(retireStagingObservation(directory, terminal, port), 'retained_unexpected_entries');
+	assert.equal(
+		port.removed.length,
+		0,
+		'the digest owner cannot acquire route-shape deletion authority'
+	);
+	port = files([...cohort, 'foreign.json']);
+	assert.equal(
+		retireStagingObservation(directory, terminal, port, true),
+		'retained_unexpected_entries'
+	);
+	assert.equal(port.removed.length, 0, 'unexpected entries preserve the complete namespace');
+	port = files(cohort, path.join(directory, cohort[6]));
+	assert.equal(
+		retireStagingObservation(directory, terminal, port, true),
+		'retained_unexpected_type'
+	);
+	assert.equal(port.removed.length, 0, 'late wrong type refuses before the first unlink');
+	port = files(cohort);
+	assert.equal(
+		retireStagingObservation(directory, { status: null }, port, true),
+		'retained_unknown_terminal'
+	);
+	assert.equal(port.removed.length, 0, 'unknown terminal cannot authorize cleanup');
+	const primary = new Error('controlled primary');
+	assert.throws(
+		() =>
+			finishStagingObservation(
+				directory,
+				terminal,
+				() => {
+					throw primary;
+				},
+				() => {},
+				files(cohort),
+				true
+			),
+		(error) => error === primary,
+		'physical cleanup cannot replace the primary assertion'
+	);
+}
