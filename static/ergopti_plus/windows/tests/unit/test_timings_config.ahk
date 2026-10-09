@@ -84,11 +84,12 @@ Test("Timings: tap-hold constants sourced from the registry", TestTimings_TapHol
 
 TestTimings_LlmApiSourced() {
     global LLM_OLLAMA_POLL_MS, LLM_REMOTE_TIMEOUT_MS, LLM_REMOTE_POLL_MS, LLM_INSTALLED_CACHE_TTL_MS
-    global LLM_DEPS_POLL_TIMEOUT_MS
+    global LLM_DEPS_POLL_TIMEOUT_MS, LLM_REMOTE_READY_PING_DEADLINE_MS
     ; Reassign-at-boot loader; the registry was loaded at this file's top level.
     LLMApiLoadTimings()
     AssertEqual(50, LLM_OLLAMA_POLL_MS, "LLM_OLLAMA_POLL_MS")
     AssertEqual(30000, LLM_REMOTE_TIMEOUT_MS, "LLM_REMOTE_TIMEOUT_MS")
+    AssertEqual(TimingsGet("llm", "request_timeout_ms"), LLM_REMOTE_READY_PING_DEADLINE_MS, "readiness retains the canonical whole-request budget")
     AssertEqual(50, LLM_REMOTE_POLL_MS, "LLM_REMOTE_POLL_MS")
     AssertEqual(2000, LLM_INSTALLED_CACHE_TTL_MS, "LLM_INSTALLED_CACHE_TTL_MS")
     AssertEqual(1800000, LLM_DEPS_POLL_TIMEOUT_MS, "LLM_DEPS_POLL_TIMEOUT_MS")
