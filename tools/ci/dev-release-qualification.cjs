@@ -122,7 +122,7 @@ function validatePolicy(value) {
 	if (
 		stable &&
 		(value.repository !== 'adrienm7/ergopti' ||
-			value.expires_at !== '2026-10-09T22:00:00Z' ||
+			value.expires_at !== '2026-10-10T00:00:00Z' ||
 			value.tag !== 'v1.0.0' ||
 			value.version !== '1.0.0')
 	)
@@ -435,7 +435,7 @@ function stablePublicationNotice(id, context, sha, now = new Date()) {
 			.join(' ') +
 		' ' +
 		'Compilation, packaging, macOS signing, source and asset integrity, installation and all other tests remain required. Windows signature evidence is disclosed separately. ' +
-		'[Qualification records](https://github.com/adrienm7/ergopti/releases/tag/v1.0.0) retain the exact source-bound deferred scopes. Packaging does not prove native feature acceptance. This exception applies only to v1.0.0 before 2026-10-09T22:00:00Z.' +
+		'[Qualification records](https://github.com/adrienm7/ergopti/releases/tag/v1.0.0) retain the exact source-bound deferred scopes. Packaging does not prove native feature acceptance. This exception applies only to v1.0.0 before 2026-10-10T00:00:00Z.' +
 		' Known macOS reports remain under investigation: Karabiner lease failures (including watchdog exit 73 and PONG/READY timeouts), and an active Homebrew upgrade leaving Hammerspoon running without ErgoptiPlus. This release does not claim those reports repaired.'
 	);
 }

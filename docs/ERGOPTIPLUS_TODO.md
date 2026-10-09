@@ -11,20 +11,21 @@ facts go to docs/memory), and the numbers of the others never change.
 
 ## Delivery checkpoint
 
-The maintainer authorized integrating both published histories and releasing
-stable v1.0.0 before October 9 at 22:00 UTC. The assembled branch contains both
-`origin/dev` and `origin/main` histories, without force-push or squashing. The
-complete site build passes after migrating Vite asset URL queries. Promo item
-113 implementations remain local and are excluded from the release assembly.
+The original October 9 publication deadline was missed. After midnight Paris,
+the maintainer renewed the immediate v1.0.0 publication request because the
+website needs an actual latest stable release for its download buttons. The
+same thirteen already approved qualification reports and unsigned Windows
+permission are now bounded to October 10 at 00:00 UTC (02:00 Paris), only for
+v1.0.0. No additional test scope is excluded. Compilation, packaging, source
+and asset integrity, installation and all unlisted checks remain mandatory.
+Public receipts must state DEFERRED and qualified:false; this is not full
+native qualification. Actual tag, source and assets still require verification.
 
-The maintainer separately approved exactly three macOS native qualification
-deferrals for v1.0.0 only, expiring at 22:00 UTC: native Homebrew archive
-acceptance, Apple Shortcuts discovery, and external AppleEvent qualification.
-Public release notes and source-bound receipts must state DEFERRED and
-qualified:false. Windows, Linux, other tests, builds, signatures, source and
-asset checks, installation and launch lifecycle assertions remain mandatory.
-This authorization is not a release receipt or proof that any deferred feature
-works; publication and the remaining full checks are still pending.
+Both published histories and the local video commits are retained without
+force-push or squashing. Promo item 113 implementations remain local and are
+excluded from the release assembly. After v1.0.0 publication, spend up to ten
+hours on v1.0.1 with the maximum verified fixes and restoration of the deferred
+tests. That follow-up version has no qualification or unsigned exception.
 
 [CI 37955301676](https://github.com/adrienm7/ergopti/actions/runs/37955301676)
 completed successfully under the maintainer-authorized fast prerelease profile.
@@ -9436,8 +9437,9 @@ test precondition failure, not a Lua defect or a successful permission grant.
   macOS model receiving. The resulting thirteen-scope profile was published
   in `d9e747660c`; all scopes remain unqualified. The original 22:00 UTC expiry
   was retained. The requested 23:59 Paris publication deadline was missed;
-  a separate extension question remains unanswered. Do not silently renew
-  this policy or the unsigned Windows permission.
+  the later immediate-release instruction renews only the existing limits
+  until October 10 at 00:00 UTC as stated in the delivery checkpoint. Do not
+  renew this policy or the unsigned Windows permission beyond that window.
 
   First stable attempt 37994227917 exposed 61 Linux unit failures, six Core
   workflow-guard failures, and a native macOS model trust-restoration timeout.

@@ -4,7 +4,7 @@
 	"authorized": true,
 	"authorization_date": "2026-10-09",
 	"authorization_quote": "ok pour release pour le moment pas de signature. et mets en todo de faire avec signpath foundation",
-	"expires_at": "2026-10-09T22:00:00Z",
+	"expires_at": "2026-10-10T00:00:00Z",
 	"repository": "adrienm7/ergopti",
 	"event_name": "push",
 	"ref": "refs/heads/main",
