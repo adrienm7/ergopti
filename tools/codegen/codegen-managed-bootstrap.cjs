@@ -48,6 +48,39 @@ function strictJSON(bytes) {
 function render(bootstrapBytes, proxyBytes) {
 	const policy = strictJSON(bootstrapBytes);
 	const proxy = strictJSON(proxyBytes);
+	const source = proxy.native_pac?.source_acquisition;
+	const sourceFields = [
+		'route',
+		'credentials',
+		'credential_scope',
+		'allowed_schemes',
+		'required_status',
+		'encodings',
+		'strict_decoding',
+		'forbid_https_downgrade'
+	];
+	if (
+		!source ||
+		typeof source !== 'object' ||
+		Array.isArray(source) ||
+		Object.keys(source).sort().join() !== sourceFields.sort().join() ||
+		source.route !== 'direct' ||
+		source.credentials !== 'native-default' ||
+		source.credential_scope !== 'initial_authority' ||
+		source.required_status !== 200 ||
+		source.strict_decoding !== true ||
+		source.forbid_https_downgrade !== true ||
+		JSON.stringify(source.allowed_schemes) !== JSON.stringify(['http', 'https']) ||
+		JSON.stringify(source.encodings) !==
+			JSON.stringify(['utf-8', 'utf-8-bom', 'utf-16le-bom', 'utf-16be-bom']) ||
+		!Number.isSafeInteger(proxy.native_pac.max_script_bytes) ||
+		proxy.native_pac.max_script_bytes < 1 ||
+		proxy.native_pac.max_script_bytes > 2147483647 ||
+		!Number.isSafeInteger(proxy.redirects?.max_hops) ||
+		proxy.redirects.max_hops < 1 ||
+		proxy.redirects.max_hops > 2147483647
+	)
+		throw new Error('Invalid native PAC source policy.');
 	const fields = [
 		'schema_version',
 		'maximum_metadata_bytes',
@@ -109,6 +142,16 @@ function render(bootstrapBytes, proxyBytes) {
 		`\tstatic let maximumProxyBytes = ${proxy.max_proxy_bytes}\n` +
 		`\tstatic let maximumCertificateBytes = ${policy.maximum_certificate_bytes}\n` +
 		`\tstatic let maximumCertificateFiles = ${policy.maximum_certificate_files}\n` +
+		`\tstatic let maximumPACSourceBytes = ${proxy.native_pac.max_script_bytes}\n` +
+		`\tstatic let maximumPACRedirects = ${proxy.redirects.max_hops}\n` +
+		`\tstatic let pacSourceRoute = ${literal(source.route)}\n` +
+		`\tstatic let pacSourceCredentials = ${literal(source.credentials)}\n` +
+		`\tstatic let pacSourceCredentialScope = ${literal(source.credential_scope)}\n` +
+		`\tstatic let pacSourceSchemes = ${literal(source.allowed_schemes)}\n` +
+		`\tstatic let pacSourceStatus = ${source.required_status}\n` +
+		`\tstatic let pacSourceEncodings = ${literal(source.encodings)}\n` +
+		`\tstatic let pacSourceStrictDecoding = ${source.strict_decoding}\n` +
+		`\tstatic let pacSourceForbidsDowngrade = ${source.forbid_https_downgrade}\n` +
 		'}\n'
 	);
 }

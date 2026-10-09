@@ -14,7 +14,7 @@ const cases = [
 ];
 if (process.platform !== 'win32') {
 	cases.push(['tools/test/macos_native_ollama_api_test.py', 8]);
-	cases.push(['tools/test/macos_native_http_receiving_facts_test.py', 44]);
+	cases.push(['tools/test/macos_native_http_receiving_facts_test.py', 51]);
 	cases.push(['tools/test/macos_managed_ollama_explicit_stream_test.py', 6]);
 	cases.push(['tools/diagnostics/macos_managed_ollama_receiving_test.py', 16]);
 	cases.push(['tools/test/managed_ollama_sessions_test.py', 11]);
@@ -39,7 +39,7 @@ if (process.platform !== 'win32') {
 	cases.push(['tools/diagnostics/macos_ollama_daemon_authority_test.py', 14]);
 	cases.push(['tools/diagnostics/macos_managed_ollama_serve_test.py', 14]);
 	cases.push(['tools/diagnostics/macos_ollama_daemon_authority_reader_test.py', 13]);
-	cases.push(['tools/diagnostics/macos_native_wire_swift_dependencies_test.py', 7]);
+	cases.push(['tools/diagnostics/macos_native_wire_swift_dependencies_test.py', 10]);
 	cases.push(['tools/test/managed_ollama_go_evidence_test.py', 37]);
 } else {
 	process.stdout.write(

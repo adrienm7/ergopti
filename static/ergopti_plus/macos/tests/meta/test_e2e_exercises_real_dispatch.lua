@@ -98,6 +98,13 @@ local function locate_harness(src)
 	end
 	helpers.assert_true(job_at ~= nil, "the harness step must belong to a job")
 	local job_name = src:match("^\n  [%w_%-]+:[ \t]*\n    name:([^\n]*)", job_at)
+	-- The bound temporary prerelease condition is the only admitted prelude.
+	-- The raw central CI policy separately validates its authorization and full defaults.
+	local fast_header = "\n  e2e-hs:\n    if: ${{ !inputs.fast_prerelease }}\n"
+	if job_name == nil and job_id == "e2e-hs"
+		and src:sub(job_at, job_at + #fast_header - 1) == fast_header then
+		job_name = src:match("^    name:([^\n]*)", job_at + #fast_header)
+	end
 	helpers.assert_true(job_name ~= nil, "the harness job must open with its name: field")
 
 	return {
@@ -161,5 +168,48 @@ helpers.describe("F-HIGH-30: the macOS virtual-keyboard CI job no longer overcla
 			"so a reviewer can find the deferred real-coverage plan (F-HIGH-30)")
 		helpers.assert_true(preceding:find("ubuntu%-latest") ~= nil or preceding:find("WindowServer", 1, true) ~= nil,
 			"the comment above the harness step must explain the ubuntu-latest / no-WindowServer constraint")
+	end)
+end)
+
+--- Closed workflow-source fixtures; these do not execute GitHub or Hammerspoon.
+helpers.describe("F-HIGH-30: exact temporary fast-header composition", function()
+	local function fixture(header, job_name, step_name)
+		return "jobs:\n" .. header .. "    name: " .. (job_name or "'E2E tests (stubbed)'")
+			.. "\n    steps:\n      - name: " .. (step_name or "Run virtual-keyboard harness (stubbed)")
+			.. "\n        run: lua5.4 " .. HARNESS .. "\n"
+	end
+	helpers.it("both ordinary and exact fast headers preserve stub coverage labels", function()
+		for _, header in ipairs({ "  e2e-hs:\n", "  e2e-hs:\n    if: ${{ !inputs.fast_prerelease }}\n" }) do
+			local harness = locate_harness(fixture(header))
+			helpers.assert_eq(harness.job_id, "e2e-hs")
+			helpers.assert_true(flags_stub(harness.job_name))
+			helpers.assert_true(flags_stub(harness.step_name))
+		end
+	end)
+	helpers.it("arbitrary disabling or overbroad conditions are refused", function()
+		for _, condition in ipairs({ "false", "true", "always()", "${{ !inputs.fast_prerelease || true }}", "${{ !inputs.fast_prerelease && false }}" }) do
+			local ok = pcall(locate_harness, fixture("  e2e-hs:\n    if: " .. condition .. "\n"))
+			helpers.assert_eq(ok, false, "an unadmitted job condition must not hide the mandatory name")
+		end
+	end)
+	helpers.it("a duplicated condition or foreign job cannot acquire this prelude", function()
+		for _, header in ipairs({
+			"  e2e-hs:\n    if: ${{ !inputs.fast_prerelease }}\n    if: ${{ !inputs.fast_prerelease }}\n",
+			"  other-hs:\n    if: ${{ !inputs.fast_prerelease }}\n",
+		}) do
+			helpers.assert_eq(pcall(locate_harness, fixture(header)), false)
+		end
+	end)
+	helpers.it("the exact prelude never substitutes for a job name", function()
+		local src = fixture("  e2e-hs:\n    if: ${{ !inputs.fast_prerelease }}\n")
+		src = src:gsub("    name: 'E2E tests %(stubbed%)'\n", "")
+		helpers.assert_eq(pcall(locate_harness, src), false)
+	end)
+	helpers.it("the same label predicates reject overclaimed fast-header coverage", function()
+		local header = "  e2e-hs:\n    if: ${{ !inputs.fast_prerelease }}\n"
+		local job = locate_harness(fixture(header, "'E2E'"))
+		local step = locate_harness(fixture(header, nil, "Run real Hammerspoon E2E"))
+		helpers.assert_eq(flags_stub(job.job_name), false)
+		helpers.assert_eq(flags_stub(step.step_name), false)
 	end)
 end)
