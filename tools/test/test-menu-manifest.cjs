@@ -27,7 +27,9 @@
 
 const { readFileSync, readdirSync } = require('fs');
 const { resolve, dirname } = require('path');
-const { parse: parseToml } = require('smol-toml');
+const { parse: parseTomlSource } = require('smol-toml');
+const tomlOwnData = require('./fixtures/toml-own-data.cjs');
+const parseToml = (source) => tomlOwnData(parseTomlSource(source));
 
 const REPO_ROOT = resolve(__dirname, '..', '..');
 const SHARED = resolve(REPO_ROOT, 'static/ergopti_plus/_shared');
