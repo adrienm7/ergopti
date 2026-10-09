@@ -2463,7 +2463,7 @@ description_key = "menu.gestures.tap_4"
 id = "swipe_2_left"
 platforms = ["hs", "linux"]
 default = "none"
-recommended_per_platform = { hs = "arrow_up", linux = "none" }
+recommended = "none"
 input_altering = true
 type = "action"
 description_key = "menu.gestures.swipe_2_left"
@@ -3866,6 +3866,9 @@ greyed_when_paused = true
 [[menu.top_level]]
 id = "agent"
 greyed_when_paused = true
+disabled = true
+i18n = "menu.agent.title"
+reason_key = "menu.agent.not_ready"
 
 [[menu.top_level]]
 id = "---"
@@ -4103,21 +4106,6 @@ disabled_when_off = true
 health_dot = false
 platforms = ["ahk", "hs", "linux"]
 
-[[menu.llm_menu]]
-type = "group"
-id = "llm_live_mode"
-i18n = "menu.llm.live_mode_title"
-disabled_when_off = true
-health_dot = false
-platforms = ["ahk", "hs", "linux"]
-
-# Fixed Off choice; prompts remain the native live-mode provider's data.
-[[menu.llm_live_controls]]
-type = "check"
-id = "llm_live_mode_off"
-i18n = "menu.llm.live_mode_off"
-checked_when = ["llm_live_is_off"]
-disabled_when = ["llm_live_off_ready"]
 
 [[menu.llm_menu]]
 type = "group"
@@ -4246,10 +4234,6 @@ type = "---"
 platforms = ["ahk"]
 unavailable = "hide"
 
-[[menu.llm_live_off_boundary]]
-type = "---"
-platforms = ["hs"]
-unavailable = "hide"
 
 [[menu.llm_trigger_menu]]
 type = "list"

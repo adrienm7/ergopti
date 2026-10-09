@@ -69,7 +69,7 @@ local function load_healthcheck(scheduler, title_label)
 		window_chrome_steps = function() return {} end,
 		get_app_geometry = function() return { width = 860, height = 720 } end,
 		window_title = compose_title,
-		force_focus = function() end,
+		force_focus = function() return true end,
 	}
 
 	hs_stub.webview.new = function() return webview end

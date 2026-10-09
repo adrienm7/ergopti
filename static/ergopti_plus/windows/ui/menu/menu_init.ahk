@@ -174,7 +174,10 @@ _MI_StageTopLevel(TopLevel, Builders, IncludeFn := 0, StatusLabel := "") {
 		}
 		BootProfile_StageBegin("menu row " . Id)
 		try {
-			Builders[Id].Call()
+			if Entry.Get("disabled", false)
+				MenuRenderer_StageDisabledTopLevel(Entry)
+			else
+				Builders[Id].Call()
 			BootProfile_StageEnd("menu row " . Id)
 		} catch as Err {
 			BootProfile_StageAbort("menu row " . Id, Err.Message)

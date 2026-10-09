@@ -3,7 +3,7 @@
 ; ==============================================================================
 ; MODULE: AI Live Mode (Windows)
 ; DESCRIPTION:
-; Drives llm_live_prompt_toggle and the AI menu's live mode submenu through the
+; Drives the retained llm_live_prompt_toggle and prompt-provider APIs through the
 ; real code path, with the network (the engine's remote transport) and the
 ; keyboard (the SendInput primitive) faked as in test_llm_prompt_prediction.ahk,
 ; whose fixture this file reuses. Toggle -> typing -> live request (prompt,
@@ -508,55 +508,38 @@ _LLV_MenuListsRewritePrompts() {
 			"batch", false)
 		_LLM_Menu["user_profiles"] := [Custom, Plain]
 		_LLM_Engine["user_profiles"] := [Custom, Plain]
-		Rows := _LLM_Menu_LiveModeRows()
-		AssertEqual(t("menu.llm.live_mode_off"), Rows[1]["label"], "Off comes first")
-		AssertTrue(Rows[1]["checked"], "and is checked while live mode is off")
-		Expected := []
-		for Id in LLM_PROFILE_BUILTIN_ORDER
-			if LLM_Rewrite_IsRewriteProfile(LLM_FindProfile(Id))
-				Expected.Push(LLM_Menu_GetProfileLabel(Id))
-		Expected.Push("Traduire en allemand")
-		AssertEqual(Expected.Length + 1, Rows.Length, "then every rewrite prompt, and only those")
-		for Index, Label in Expected
-			AssertEqual(Label, Rows[Index + 1]["label"], "built-ins in menu order, then custom prompts")
-		Labels := ""
-		for Row in Rows
-			Labels .= Row["label"] . "|"
-		AssertContains(Labels, LLM_Menu_GetProfileLabel("translate_en"), "the translations are listed")
-		AssertFalse(InStr(Labels, LLM_Menu_GetProfileLabel("basic")) > 0, "continuation prompts are not")
-		AssertFalse(InStr(Labels, "Suite|") > 0, "nor a custom continuation prompt")
-
-		; Choosing a prompt turns live mode on with it and the menu's count
-		for Row in Rows {
-			if (Row["label"] == LLM_Menu_GetProfileLabel("translate_ja")) {
-				AssertTrue(_LLV_InvokeAndRetireNotice(Row["action"], &Notice),
-					"the actual menu callback returns its live-mode admission")
-				AssertEqual(StrReplace(t("llm.live.on"), "{1}", LLM_Menu_GetProfileLabel("translate_ja")), Notice,
-					"the protected menu callback retains its actual localized notice")
-			}
+		Choices := LLM_Menu_PromptChoices()
+		AssertEqual(LLM_PROFILE_BUILTIN_ORDER.Length + 2, Choices.Length,
+			"the retained prompt chooser offers every built-in and custom profile")
+		for Index, Id in LLM_PROFILE_BUILTIN_ORDER {
+			AssertEqual(Id, Choices[Index]["value"], "built-ins retain their canonical order")
+			AssertEqual(LLM_Menu_GetProfileLabel(Id), Choices[Index]["label"])
 		}
-		AssertTrue(LLM_Engine_LiveIsActive(), "the row turns live mode on")
+		AssertEqual("user_trad_1", Choices[Choices.Length - 1]["value"])
+		AssertEqual("Traduire en allemand", Choices[Choices.Length - 1]["label"])
+		AssertEqual("user_plain_1", Choices[Choices.Length]["value"])
+		AssertEqual("Suite", Choices[Choices.Length]["label"])
+		AssertTrue(LLM_Rewrite_IsRewriteProfile(Custom), "the custom translation keeps its rewrite classification")
+		AssertFalse(LLM_Rewrite_IsRewriteProfile(Plain), "the custom continuation keeps its own classification")
+		AssertTrue(_LLV_InvokeAndRetireNotice(LLM_Menu_StartLiveMode.Bind("translate_ja", 0), &Notice),
+			"the retained shortcut owner admits the actual prompt")
+		AssertEqual(StrReplace(t("llm.live.on"), "{1}", LLM_Menu_GetProfileLabel("translate_ja")), Notice,
+			"the actual start retains its localized notice")
 		Override := LLM_Engine_LiveOverride()
-		AssertEqual("translate_ja", Override["profile_id"], "with its prompt")
-		AssertEqual(0, Override["num_predictions"], "and the menu's count")
-		Rows := _LLM_Menu_LiveModeRows()
-		AssertFalse(Rows[1]["checked"], "Off is no longer checked")
-		for Row in Rows
-			AssertEqual(Row["label"] == LLM_Menu_GetProfileLabel("translate_ja"), Row["checked"] ? true : false,
-				"only the live prompt is checked: " . Row["label"])
-		; The action and the menu share one state: the menu's Off ends the action's live mode
-		AssertTrue(_LLV_InvokeAndRetireNotice(Rows[1]["action"], &Notice),
-			"the actual Off callback retains its successful result")
-		AssertEqual(t("llm.live.off"), Notice, "Off retains its actual localized notice")
-		AssertFalse(LLM_Engine_LiveIsActive(), "Off turns live mode off")
-		AssertEqual("advanced", _LLM_Menu["profile_id"], "the active profile never changed")
+		AssertEqual("translate_ja", Override["profile_id"])
+		AssertEqual(0, Override["num_predictions"], "the default count still belongs to the ordinary menu")
+		AssertTrue(_LLV_InvokeAndRetireNotice(LLM_Menu_StopLiveMode, &Notice),
+			"the actual retained stop owner returns its successful result")
+		AssertEqual(t("llm.live.off"), Notice)
+		AssertFalse(LLM_Engine_LiveIsActive())
+		AssertEqual("advanced", _LLM_Menu["profile_id"], "a temporary shortcut never changes the manual profile")
 	}
 	Emit := _DriverFuncBody("_LLM_Menu_EmitRow")
-	AssertContains(Emit, 'case "llm_live_mode":', "the AI menu draws the live mode row")
-	AssertContains(Emit, 'Map("llm_live_mode", LLM_Menu_BuildLiveModeMenu)', "as the live mode submenu")
-	Assert(_LMNM_LiveRoute(Emit), "the native live group consumes the same callable and handle through its typed renderer")
+	Assert(!InStr(Emit, 'case "llm_live_mode":', true), "the AI menu has no second live profile selector")
+	Assert(!InStr(Emit, 'Map("llm_live_mode", LLM_Menu_BuildLiveModeMenu)', true), "the retired live selector is not bound")
+	Assert(_LMNM_GenerationRoute(Emit), "the native generation group keeps the same typed renderer")
 }
-Test("LLM live mode: the AI menu lists Off and the rewrite prompts, sharing the action's state",
+Test("LLM live mode: retained prompt chooser and shortcut owners preserve state (retired-live-menu)",
 	_LLV_MenuListsRewritePrompts)
 
 ; The live translations stay out of the Ctrl+<n> profile hotkeys.
@@ -761,10 +744,9 @@ _LLV_MenuNoticeRetiresBeforeYield() {
 		global _TooltipPendingRequest
 		State := { Rendered: false }
 		Renderer := (*) => State.Rendered := true
-		Rows := _LLM_Menu_LiveModeRows()
-		AssertTrue(Rows.Length > 1, "the real menu must have a live prompt to invoke")
+		Start := LLM_Menu_StartLiveMode.Bind("translate_ja", 0)
 		Action() {
-			Rows[2]["action"].Call()
+			AssertTrue(Start.Call(), "the actual retained start owner admits the prompt")
 			Request := _TooltipPendingRequest
 			AssertTrue(IsObject(Request), "the real menu action must publish its notice")
 			; Substitute only the renderer boundary; a failure cannot touch native UI.
@@ -789,7 +771,7 @@ _LLV_MenuNoticeRetiresBeforeYield() {
 		}
 	}
 }
-Test("LLM live mode: menu fixture retires due rendering before yielding (live-menu-fixture)",
+Test("LLM live mode: menu fixture retires due rendering before yielding (live-menu-fixture) (retired-live-menu)",
 	_LLV_MenuNoticeRetiresBeforeYield)
 
 
@@ -800,11 +782,10 @@ _LLV_FailedMenuNoticeRetiresBeforeYield() {
 		global _TooltipPendingRequest
 		State := { Rendered: false }
 		Renderer := (*) => State.Rendered := true
-		Rows := _LLM_Menu_LiveModeRows()
-		AssertTrue(Rows.Length > 1, "the real menu must provide an action")
+		Start := LLM_Menu_StartLiveMode.Bind("translate_ja", 0)
 		Failure := Error("expected live menu action failure")
 		Action() {
-			Rows[2]["action"].Call()
+			AssertTrue(Start.Call(), "the actual retained start owner admits the prompt")
 			Request := _TooltipPendingRequest
 			AssertTrue(IsObject(Request), "the failing action first publishes its actual notice")
 			SetTimer(Request.TimerFn, 0)
@@ -830,94 +811,113 @@ _LLV_FailedMenuNoticeRetiresBeforeYield() {
 		}
 	}
 }
-Test("LLM live mode: failed menu fixture retires due rendering (live-menu-failure-fixture)",
+Test("LLM live mode: failed menu fixture retires due rendering (live-menu-failure-fixture) (retired-live-menu)",
 	_LLV_FailedMenuNoticeRetiresBeforeYield)
 
 
-; The fixed Off command is declared once; dynamic prompt rows keep their owners.
+; The duplicate submenu is retired; its shortcut stop owner remains available.
 _LLV_DeclaredOffPolicy() {
 	global _SharedDir
 	Spec := JsonParse(FileRead(_SharedDir . "\tests\corpus\menus\llm_live_off.json", "UTF-8"))
-	Declarations := _MR_GetMenuDef(Spec["manifest"])
-	AssertEqual(1, Declarations.Length, "only the fixed Off choice belongs to the shared head")
-	Entry := Declarations[1]
-	AssertEqual("check", Entry["type"])
-	AssertEqual(Spec["id"], Entry["id"])
-	AssertEqual(Spec["label_key"], Entry["i18n"])
-	AssertEqual(Spec["checked_getter"], Entry["checked_when"][1])
-	AssertEqual(Spec["ready_getter"], Entry["disabled_when"][1])
-	Observed := Map("ready", true, "off", false, "calls", 0)
-	Row := MenuRenderer_CheckRow(Spec["manifest"], Spec["id"],
-		Map(Spec["id"], _Run), Map(Spec["ready_getter"], (*) => Observed["ready"],
-			Spec["checked_getter"], (*) => Observed["off"]))
-	_Run(*) {
-		Observed["calls"] += 1
-		return false
+	Root := _MM_GetManifestRoot()
+	for Section in Spec["retired_menu_sections"]
+		AssertFalse(Root.Has(Section), "retired sections must not masquerade as callable menu providers")
+	_LLV_Run("hello", _Body)
+	_Body(Calls, Lines, Builds) {
+		for Expected in Spec["states"] {
+			if Expected["live"]
+				AssertTrue(_LLV_InvokeAndRetireNotice(LLM_Menu_StartLiveMode.Bind("translate_en", 0)))
+			AssertEqual(Expected["checked"], !(LLM_Engine_LiveOverride() is Map),
+				"the retained shortcut state keeps the independent former Off-state oracle")
+			BeforeBuilds := Builds.Length
+			Changed := _LLV_InvokeAndRetireNotice(LLM_Menu_StopLiveMode, &Notice)
+			AssertEqual(Expected["live"], Changed, "stop returns the real state-change receipt")
+			AssertFalse(LLM_Engine_LiveIsActive(), "the real stop leaves no temporary override")
+			AssertEqual(BeforeBuilds + (Expected["live"] ? 1 : 0), Builds.Length,
+				"a refused inactive stop publishes no menu update")
+			if Expected["live"]
+				AssertEqual(t(Spec["stop_notice_key"]), Notice)
+		}
 	}
-	AssertFalse(Row["checked"])
-	for State in Spec["states"] {
-		Observed["off"] := !State["live"]
-		Projected := MenuRenderer_CheckRow(Spec["manifest"], Spec["id"],
-			Map(Spec["id"], _Run), Map(Spec["ready_getter"], (*) => Observed["ready"],
-				Spec["checked_getter"], (*) => Observed["off"]))
-		AssertEqual(State["checked"], Projected["checked"], "the declared state keeps the actual native tick")
-	}
-	Observed["ready"] := false
-	AssertFalse(Row["action"].Call(), "retained command checks current policy before delivery")
-	AssertEqual(0, Observed["calls"])
-	Observed["ready"] := true
-	AssertFalse(Row["action"].Call(), "native refusal remains the callback result")
-	AssertEqual(1, Observed["calls"])
 }
-Test("LLM live mode: fixed Off command retains shared policy and native receipt", _LLV_DeclaredOffPolicy)
+Test("LLM live mode: retired declaration leaves actual shortcut stop receipts intact (retired-live-menu)", _LLV_DeclaredOffPolicy)
 
 
-; Drive the actual provider under a shared label edit that collides with a prompt.
+; Every locale feeds the actual manual profile providers, not a hidden Off row.
 _LLV_DeclaredOffLabelOwnsUniqueness() {
 	_LLV_Run("hello", _Body)
 	_Body(Calls, Lines, Builds) {
-		global _MM_MANIFEST_ROOT_CACHE, _LLM_Menu, _LLM_Engine
-		SavedCache := _MM_MANIFEST_ROOT_CACHE
-		SavedMenuProfiles := _LLM_Menu["user_profiles"]
-		SavedEngineProfiles := _LLM_Engine["user_profiles"]
-		Observed := Map()
+		global _SharedDir, _LLM_Menu, _LLM_Engine
+		global _I18nLocale, _I18nCache, _I18nCacheLoaded, LLM_PROFILE_HOTKEY_LIMIT
+		Spec := JsonParse(FileRead(_SharedDir . "\tests\corpus\menus\llm_live_off.json", "UTF-8"))
+		Saved := { Locale: _I18nLocale, Cache: _I18nCache, Loaded: _I18nCacheLoaded,
+			MenuProfiles: _LLM_Menu["user_profiles"], EngineProfiles: _LLM_Engine["user_profiles"],
+			HadLimit: IsSet(LLM_PROFILE_HOTKEY_LIMIT) }
+		if Saved.HadLimit
+			Saved.Limit := LLM_PROFILE_HOTKEY_LIMIT
 		try {
-			Root := _MM_GetManifestRoot().Clone()
-			Entry := Root["llm_live_controls"][1].Clone()
-			Entry["i18n"] := "button.ok"
-			Root["llm_live_controls"] := [Entry]
-			_MM_MANIFEST_ROOT_CACHE := Root
-			Label := t("button.ok")
-			Custom := Map("id", "user_off_collision", "label", Label,
-				"system_single", "Rewrite TAIL. Reply REWRITE: <text>", "system_multi", "", "batch", false)
-			_LLM_Menu["user_profiles"] := [Custom]
-			_LLM_Engine["user_profiles"] := [Custom]
-			Rows := _LLM_Menu_LiveModeRows()
-			Observed["off_label"] := Rows[1]["label"]
-			Seen := Map()
-			Duplicates := 0
-			for Row in Rows {
-				if Seen.Has(Row["label"])
-					Duplicates++
-				Seen[Row["label"]] := true
+			LLM_PROFILE_HOTKEY_LIMIT := 0
+			AssertEqual(21, Spec["locales"].Length, "the real locale corpus remains complete")
+			for Code in Spec["locales"] {
+				_I18nLocale := Code
+				_I18nCache := JsonParse(FileRead(_SharedDir . "\data\locales\" . Code . ".json", "UTF-8"))
+				_I18nCacheLoaded := true
+				Label := t(Spec["stop_notice_key"])
+				Assert(Label != "" && Label != Spec["stop_notice_key"], "the stop notice is translated: " . Code)
+				First := Map("id", "user_off_collision_1", "label", Label,
+					"system_single", "Rewrite TAIL. Reply REWRITE: <text>", "system_multi", "", "batch", false)
+				Second := First.Clone()
+				Second["id"] := "user_off_collision_2"
+				_LLM_Menu["user_profiles"] := [First, Second]
+				_LLM_Engine["user_profiles"] := _LLM_Menu["user_profiles"]
+				Seen := Map()
+				Rows := _LLM_Menu_ProfileBuiltinRows(Seen)
+				for Row in _LLM_Menu_ProfileCustomRows(Seen, Map("user_profiles", _LLM_Menu["user_profiles"]))
+					Rows.Push(Row)
+				Labels := Map()
+				for Row in Rows {
+					AssertFalse(Labels.Has(Row["label"]), "the real manual chooser owns unique labels: " . Code)
+					Labels[Row["label"]] := true
+				}
+				AssertTrue(Labels.Has(Label), "the first real custom row remains reachable: " . Code)
+				AssertTrue(Labels.Has(Label . " #2"), "the second real custom row retains its identity: " . Code)
+				AssertEqual(2, _LLM_Menu["user_profiles"].Length, "rendering must not mutate profile ownership")
 			}
-			Observed["duplicates"] := Duplicates
-			Observed["renamed_prompt"] := Seen.Has(Label . " #2")
-			Entry["type"] := "command"
-			Observed["refused_rows"] := _LLM_Menu_LiveModeRows().Length
 		} finally {
-			_MM_MANIFEST_ROOT_CACHE := SavedCache
-			_LLM_Menu["user_profiles"] := SavedMenuProfiles
-			_LLM_Engine["user_profiles"] := SavedEngineProfiles
+			_I18nLocale := Saved.Locale
+			_I18nCache := Saved.Cache
+			_I18nCacheLoaded := Saved.Loaded
+			_LLM_Menu["user_profiles"] := Saved.MenuProfiles
+			_LLM_Engine["user_profiles"] := Saved.EngineProfiles
+			LLM_PROFILE_HOTKEY_LIMIT := Saved.HadLimit ? Saved.Limit : unset
 		}
-		AssertEqual(t("button.ok"), Observed["off_label"], "the actual shared label is admitted")
-		AssertEqual(0, Observed["duplicates"], "the provider owns uniqueness for the admitted label")
-		AssertTrue(Observed["renamed_prompt"], "the existing prompt suffix owner resolves the collision")
-		AssertEqual(0, Observed["refused_rows"], "a refused shared Off row never serves a guessed fallback")
-		AssertTrue(_MM_MANIFEST_ROOT_CACHE == SavedCache, "the exact prior manifest owner is restored")
-		AssertTrue(_LLM_Menu["user_profiles"] == SavedMenuProfiles, "the exact prior menu profiles are restored")
-		AssertTrue(_LLM_Engine["user_profiles"] == SavedEngineProfiles, "the exact prior engine profiles are restored")
+		AssertTrue(_I18nCache == Saved.Cache, "the exact prior locale cache is restored")
+		AssertTrue(_LLM_Menu["user_profiles"] == Saved.MenuProfiles, "the exact prior menu profiles are restored")
+		AssertTrue(_LLM_Engine["user_profiles"] == Saved.EngineProfiles, "the exact prior engine profiles are restored")
 	}
 }
-Test("LLM live mode: shared Off label edits preserve actual native prompt uniqueness",
+Test("LLM live mode: all locales keep actual manual profile label uniqueness (retired-live-menu)",
 	_LLV_DeclaredOffLabelOwnsUniqueness)
+
+; A durable menu profile choice retires its temporary shortcut override.
+_LLV_ManualProfileRetiresOverride() {
+	global _LLM_Menu
+	; The post-commit owner projects the complete menu, unlike prediction-only cases.
+	Menu := LLM_Menu_DeepClone(_LLM_Menu)
+	for Key, Value in _LPP_Menu()
+		Menu[Key] := Value
+	Menu["app_profile_overrides"] := Map()
+	_LLV_Run(LLV_SENTENCE, (Calls, Lines, Builds) => _Check(), Menu)
+	_Check() {
+		global _LLM_Menu, _LLM_Engine
+		LLM_Engine_LiveStart("translate_ja", 0)
+		AssertTrue(LLM_Engine_LiveIsActive(), "precondition: the shortcut override is active")
+		_LLM_Menu["profile_id"] := "advanced"
+		AssertTrue(_LLM_Menu_ApplyManualProfileCommitted(), "the actual post-commit owner applies the chosen profile")
+		AssertFalse(LLM_Engine_LiveIsActive(), "manual selection cannot retain the temporary override")
+		AssertEqual("advanced", _LLM_Engine["profile_id"], "the chosen normal profile reaches the real engine")
+		Setter := _DriverFuncBody("LLM_Menu_SetProfile")
+		AssertContains(Setter, "_LLM_Menu_ApplyManualProfileCommitted", "the genuine manual transaction consumes this owner")
+	}
+}
+Test("LLM live mode: manual profile publication retires the temporary shortcut override", _LLV_ManualProfileRetiresOverride)

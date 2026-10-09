@@ -193,6 +193,16 @@
 				};
 			case 'error':
 				return { text: t('healthcheck.probe.error', String(result.detail || '')), state: 'fail' };
+			case 'not_run':
+				return {
+					text: t(
+						'healthcheck.probe.not_run',
+						t('healthcheck.deep_tests.reason.' + (result.reason || 'opt_in_required'))
+					),
+					state: 'muted'
+				};
+			case 'cancelled':
+				return { text: t('healthcheck.probe.cancelled'), state: 'muted' };
 			case 'disabled':
 				return { text: t('healthcheck.probe.disabled'), state: 'muted' };
 			case 'unsupported':
@@ -277,6 +287,79 @@
 		return data && typeof data === 'object' ? data : {};
 	}
 
+	/** Classifies recorded coverage independently of completion counts. */
+	function diagnosticCoverage(snapshot, schema) {
+		if (!schema.diagnostic_checks) return null;
+		if (!isTrue(snapshot.extensive)) return 'healthcheck.summary.quick';
+		function unconfirmed(result) {
+			return result.cleanup !== undefined && result.cleanup !== 'settled';
+		}
+		var complete = schema.diagnostic_checks.items
+			.filter(function (spec) {
+				return !spec.reason;
+			})
+			.every(function (spec) {
+				var result = (snapshot.diagnostic_checks || {})[spec.id];
+				return result && result.state === 'ok' && !unconfirmed(result);
+			});
+		Object.keys(schema.probes || {}).forEach(function (id) {
+			if (!appliesTo(schema.probes[id], snapshot.driver)) return;
+			var result = (snapshot.probes || {})[id];
+			if (!result || (result.state !== 'ok' && result.state !== 'disabled') || unconfirmed(result))
+				complete = false;
+		});
+		(snapshot.retired_probes || []).forEach(function (cohort) {
+			Object.keys(cohort.probes || {}).forEach(function (id) {
+				var result = cohort.probes[id];
+				if (
+					!result ||
+					unconfirmed(result) ||
+					(result.state !== 'ok' && result.state !== 'disabled')
+				)
+					complete = false;
+			});
+		});
+		return complete ? 'healthcheck.summary.observed' : 'healthcheck.summary.incomplete';
+	}
+
+	/** Adds failed recorded diagnostics; cancellation and NOT_RUN remain neutral. */
+	function diagnosticProblems(snapshot, schema) {
+		var list = [];
+		function failed(result) {
+			return result && (result.state === 'error' || result.state === 'timeout');
+		}
+		(schema.diagnostic_checks ? schema.diagnostic_checks.items : []).forEach(function (spec) {
+			if (failed((snapshot.diagnostic_checks || {})[spec.id]))
+				list.push({
+					key: 'healthcheck.problem.diagnostic_check',
+					args: [{ key: spec.label }],
+					action: null
+				});
+		});
+		function probes(results, retired) {
+			Object.keys(schema.probes || {}).forEach(function (id) {
+				if (!appliesTo(schema.probes[id], snapshot.driver) || !failed((results || {})[id])) return;
+				// The original summary already names these two current network failures.
+				if (
+					!retired &&
+					(id === 'github_api' ||
+						(id === 'ai_health' && isTrue(sectionData(snapshot, 'ai').ai_enabled)))
+				)
+					return;
+				list.push({
+					key: 'healthcheck.problem.diagnostic_check',
+					args: [schema.probes[id].label ? { key: schema.probes[id].label } : id],
+					action: null
+				});
+			});
+		}
+		probes(snapshot.probes, false);
+		(snapshot.retired_probes || []).forEach(function (cohort) {
+			probes(cohort.probes, true);
+		});
+		return list;
+	}
+
 	/**
 	 * The problems the summary lists, each with the action that fixes it when
 	 * one exists. A problem is a locale key and its arguments; an argument
@@ -334,7 +417,7 @@
 		) {
 			list.push({ key: 'healthcheck.problem.keymap', args: [], action: null });
 		}
-		return list;
+		return list.concat(diagnosticProblems(snapshot, schema));
 	}
 
 	/**
@@ -571,8 +654,19 @@
 	 */
 	function renderSummary(snapshot, schema, t) {
 		var list = problems(snapshot, schema);
+		var coverage = diagnosticCoverage(snapshot, schema);
+		var scope = coverage
+			? '<p class="muted">' + escapeHtml(t('healthcheck.summary.scope')) + '</p>'
+			: '';
 		if (list.length === 0)
-			return '<p class="ok">' + escapeHtml(t('healthcheck.problem.none')) + '</p>';
+			return (
+				'<p class="' +
+				(!coverage || coverage === 'healthcheck.summary.observed' ? 'ok' : 'muted') +
+				'">' +
+				escapeHtml(t(coverage || 'healthcheck.problem.none')) +
+				'</p>' +
+				scope
+			);
 		var html = '<ul class="problems">';
 		list.forEach(function (problem) {
 			html += '<li><span class="fail">' + escapeHtml(problemText(problem, t)) + '</span>';
@@ -585,7 +679,7 @@
 			}
 			html += '</li>';
 		});
-		return html + '</ul>';
+		return html + '</ul>' + scope;
 	}
 
 	/**
@@ -672,7 +766,9 @@
 		var data = sectionData(snapshot, section.id);
 		if (section.kind === 'summary') {
 			var list = problems(snapshot, schema);
-			if (list.length === 0) lines.push(t('healthcheck.problem.none'));
+			var coverage = diagnosticCoverage(snapshot, schema);
+			if (coverage) lines.push(t('healthcheck.summary.scope'));
+			if (list.length === 0) lines.push(t(coverage || 'healthcheck.problem.none'));
 			list.forEach(function (problem) {
 				lines.push('- ' + problemText(problem, t));
 			});
@@ -866,7 +962,109 @@
 		return { version: info.version, os: info.os, driver: info.driver };
 	}
 
+	/** Projects only typed fields declared by the canonical sharing policy. */
+	function projectShare(value, rule) {
+		if (
+			[
+				'object',
+				'array',
+				'enum',
+				'boolean',
+				'number',
+				'integer',
+				'version',
+				'hash',
+				'utc',
+				'commit',
+				'runtime'
+			].indexOf(rule.kind) < 0
+		)
+			throw new Error('Unknown diagnostic sharing rule');
+		if (rule.kind === 'object') {
+			if (!value || typeof value !== 'object' || Array.isArray(value)) return {};
+			var result = {};
+			Object.keys(rule.fields).forEach(function (key) {
+				if (
+					!Object.prototype.hasOwnProperty.call(value, key) &&
+					rule.fields[key].default === undefined
+				)
+					return;
+				var item = projectShare(value[key], rule.fields[key]);
+				if (item !== undefined) result[key] = item;
+			});
+			return result;
+		}
+		if (rule.kind === 'array') {
+			if (!Array.isArray(value)) return [];
+			return value.map(function (item) {
+				return projectShare(item, rule.item);
+			});
+		}
+		if (rule.kind === 'enum')
+			return typeof value === 'string' && rule.values.indexOf(value) >= 0 ? value : rule.default;
+		if (rule.kind === 'boolean') {
+			if (value === true || value === 1) return true;
+			if (value === false || value === 0) return false;
+			return undefined;
+		}
+		if (rule.kind === 'number' || rule.kind === 'integer')
+			return typeof value === 'number' &&
+				Number.isFinite(value) &&
+				Math.abs(value) <= Number.MAX_SAFE_INTEGER &&
+				(rule.minimum === undefined || value >= rule.minimum) &&
+				(rule.maximum === undefined || value <= rule.maximum) &&
+				(rule.kind !== 'integer' || Number.isSafeInteger(value))
+				? value
+				: undefined;
+		if (typeof value !== 'string') return undefined;
+		if (rule.kind === 'commit') {
+			var binding = /^([a-fA-F0-9]{7,64})(?: \((?:build|git)\))?$/.exec(value);
+			return binding ? binding[1] : undefined;
+		}
+		if (rule.kind === 'runtime') {
+			for (var prefix of rule.prefixes)
+				for (var suffix of rule.suffixes) {
+					if (!value.startsWith(prefix) || !value.endsWith(suffix)) continue;
+					var end = suffix ? value.length - suffix.length : value.length;
+					var version = projectShare(value.slice(prefix.length, end), { kind: 'version' });
+					if (version !== undefined) return version;
+				}
+			return undefined;
+		}
+		if (rule.kind === 'version')
+			return /^\d+(?:\.\d+){1,3}(?:-dev\.\d+|-beta\d+)?$/.test(value) ? value : undefined;
+		if (rule.kind === 'hash') return /^[a-fA-F0-9]{7,64}$/.test(value) ? value : undefined;
+		if (rule.kind === 'utc')
+			return /^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d(?:\.\d{1,9})?Z$/.test(value) ? value : undefined;
+		throw new Error('Unknown diagnostic sharing rule');
+	}
+
+	/** Technical sharing never exports free text, local details or page-only model verdicts. */
+	function shareSnapshot(snapshot, schema) {
+		if (
+			!schema.share_policy ||
+			schema.share_policy.version !== 1 ||
+			!snapshot ||
+			['windows', 'macos', 'linux'].indexOf(snapshot.driver) < 0
+		)
+			throw new Error('Diagnostic sharing policy or identity unavailable');
+		return projectShare(snapshot, schema.share_policy.projection);
+	}
+
+	/** The local preview uses the same closed projection as the host's output. */
+	function formatShareable(snapshot, schema, t) {
+		return (
+			'# ErgoptiPlus diagnostics\n\n' +
+			t(schema.share_policy.notice_key) +
+			'\n\ndriver-suites: not_run\npage-model-checks: not_collected\n\n```json\n' +
+			JSON.stringify(shareSnapshot(snapshot, schema)) +
+			'\n```\n'
+		);
+	}
+
 	global.ErgoptiDiagnostics = {
+		shareSnapshot: shareSnapshot,
+		formatShareable: formatShareable,
 		sectionsFor: sectionsFor,
 		probeFor: probeFor,
 		formatValue: formatValue,

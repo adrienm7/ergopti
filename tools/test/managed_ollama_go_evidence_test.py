@@ -1,6 +1,7 @@
 # tools/test/managed_ollama_go_evidence_test.py
 """Receive frozen genuine Go output; no macOS SDK or Darwin execution credit."""
 
+import ast
 import importlib.util
 import json
 import os
@@ -11,6 +12,8 @@ import time
 from pathlib import Path
 import tempfile
 import unittest
+import unittest.mock
+from types import SimpleNamespace
 
 ROOT = Path(__file__).resolve().parents[2]
 SPEC = importlib.util.spec_from_file_location(
@@ -144,10 +147,151 @@ class NativeGoEvidenceTests(unittest.TestCase):
                 raise PRODUCER.NativeGoRetirementDebt("independent closure refusal")
         self.assertEqual((owned / "source").read_text(encoding="utf-8"), "retained\n")
 
+    def native_go_argv(self, operation):
+        tree = ast.parse(Path(PRODUCER.__file__).read_text(encoding="utf-8"))
+        function = next(
+            node
+            for node in tree.body
+            if isinstance(node, ast.FunctionDef)
+            and node.name
+            == ("compile_native_cli" if operation == "build" else "_run_native_go_tests")
+        )
+        commands = [
+            node
+            for node in ast.walk(function)
+            if isinstance(node, ast.List)
+            and len(node.elts) >= 2
+            and isinstance(node.elts[1], ast.Constant)
+            and node.elts[1].value == operation
+        ]
+        self.assertEqual(len(commands), 1, "the actual native command must be unique")
+        expression = ast.Expression(body=commands[0])
+        return eval(
+            compile(expression, "actual-native-go-argv", "eval"),
+            {
+                "options": SimpleNamespace(go="owned-go"),
+                "contract": CONTRACT,
+                "timeout": POLICY["timeout_seconds"],
+                "cli": self.root / "owned-ollama",
+                "compiled_cli": self.root / "compiled-ollama",
+            },
+        )
+
+    def testActualGoTestCreatesWritableOwnedModuleCache(self):
+        argv = self.native_go_argv("test")
+        self.assertEqual(argv.count("-modcacherw"), 1)
+        self.assertEqual(argv.count("-mod=readonly"), 1)
+        self.assertEqual(argv[0:2], ["owned-go", "test"])
+        self.assertIn("-json", argv)
+        self.assertIn("-count=1", argv)
+        self.assertIn("-timeout=" + str(POLICY["timeout_seconds"]) + "s", argv)
+        self.assertEqual(argv[-1], "./internal/ergoptinativehttp")
+
+    def testActualGoBuildCreatesWritableOwnedModuleCache(self):
+        argv = self.native_go_argv("build")
+        self.assertEqual(argv.count("-modcacherw"), 1)
+        self.assertEqual(argv.count("-mod=readonly"), 1)
+        self.assertEqual(argv[0:2], ["owned-go", "build"])
+        self.assertIn("-trimpath", argv)
+        self.assertIn("-buildvcs=false", argv)
+        self.assertEqual(argv[-1], ".")
+        self.assertEqual(argv[argv.index("-o") + 1], str(self.root / "compiled-ollama"))
+        self.assertNotEqual(argv[argv.index("-o") + 1], str(self.root / "owned-ollama"))
+
     def testNormalBuildDirectoryIsRetired(self):
         with PRODUCER.native_build_directory(self.root) as owned:
             (owned / "source").write_text("owned\n", encoding="utf-8")
         self.assertFalse(owned.exists())
+
+
+class NativeCliPublicationTests(unittest.TestCase):
+    """Real owned file replacement with recording Go/lipo, never native compilation."""
+
+    def setUp(self):
+        self.temporary = tempfile.TemporaryDirectory(prefix="managed-fresh-cli-")
+        self.addCleanup(self.temporary.cleanup)
+        self.root = Path(self.temporary.name)
+        self.candidate = self.root / "source"
+        self.candidate.mkdir()
+        self.cli = self.root / "ollama"
+        self.original = b"Independent authenticated upstream CLI bytes\n"
+        self.compiled = b"Independent recorded fresh native CLI bytes\n"
+        self.cli.write_bytes(self.original)
+        self.options = SimpleNamespace(go="owned-go")
+        self.env = {"CGO_ENABLED": "1", "CC": "owned-clang -isysroot owned-sdk"}
+        self.calls = []
+        self.mode = "healthy"
+        self.refusal = subprocess.CalledProcessError(78, ["owned-go", "build"])
+
+    def command(self, argv, *, cwd=None, env=None):
+        self.calls.append(argv)
+        self.assertEqual(self.cli.read_bytes(), self.original)
+        if argv[:2] == ["owned-go", "build"]:
+            output = Path(argv[argv.index("-o") + 1])
+            self.assertEqual(output, self.root / "compiled-ollama")
+            self.assertFalse(output.exists())
+            self.assertIs(env, self.env)
+            self.assertEqual(cwd, self.candidate)
+            if self.mode != "missing":
+                output.write_bytes(b"" if self.mode == "empty" else self.compiled)
+                output.chmod(0o755)
+                self.compiled_mode = output.stat().st_mode
+            if self.mode == "failed":
+                raise self.refusal
+            return ""
+        if argv[:2] == ["lipo", "-archs"]:
+            self.assertEqual(Path(argv[2]), self.root / "compiled-ollama")
+            self.assertEqual(Path(argv[2]).read_bytes(), self.compiled)
+            return "x86_64" if self.mode == "wrong-architecture" else "arm64"
+        raise AssertionError("Unknown native compiler boundary command")
+
+    def publish(self):
+        with unittest.mock.patch.object(PRODUCER, "run", self.command):
+            PRODUCER.compile_native_cli(
+                self.options, self.candidate, self.root, self.cli, self.env, CONTRACT, "arm64"
+            )
+
+    def testFreshCompileVerifiesBeforeReplacingAuthenticatedCli(self):
+        self.publish()
+        self.assertEqual(self.cli.read_bytes(), self.compiled)
+        self.assertEqual(self.cli.stat().st_mode, self.compiled_mode)
+        self.assertEqual(
+            [row[:2] for row in self.calls], [["owned-go", "build"], ["lipo", "-archs"]]
+        )
+        self.assertFalse((self.root / "compiled-ollama").exists())
+
+    def testFailedCompilationPreservesOriginalCliAndExactError(self):
+        self.mode = "failed"
+        with self.assertRaises(subprocess.CalledProcessError) as raised:
+            self.publish()
+        self.assertIs(raised.exception, self.refusal)
+        self.assertEqual(self.cli.read_bytes(), self.original)
+        self.assertEqual(len(self.calls), 1)
+
+    def testMissingOrAlreadyOwnedOutputCannotReplaceCli(self):
+        for mode in ("missing", "empty"):
+            with self.subTest(mode=mode):
+                self.mode = mode
+                self.calls.clear()
+                with self.assertRaisesRegex(ValueError, "not a regular file"):
+                    self.publish()
+                self.assertEqual(self.cli.read_bytes(), self.original)
+                self.assertEqual(len(self.calls), 1)
+                if (self.root / "compiled-ollama").exists():
+                    (self.root / "compiled-ollama").unlink()
+        self.calls.clear()
+        (self.root / "compiled-ollama").write_bytes(b"Already owned candidate\n")
+        with self.assertRaisesRegex(ValueError, "already owned"):
+            self.publish()
+        self.assertEqual(self.cli.read_bytes(), self.original)
+        self.assertEqual(self.calls, [])
+
+    def testWrongArchitectureCannotReplaceAuthenticatedCli(self):
+        self.mode = "wrong-architecture"
+        with self.assertRaisesRegex(ValueError, "architecture changed"):
+            self.publish()
+        self.assertEqual(self.cli.read_bytes(), self.original)
+        self.assertEqual(len(self.calls), 2)
 
 
 class NativeGoPublisherPolicyTests(unittest.TestCase):

@@ -279,3 +279,21 @@ helpers.describe("the script-control picker configures before it binds", functio
 			.. "cancels the dialog")
 	end)
 end)
+
+helpers.it("blank free-language input leaves the existing binding unchanged", function()
+	local SU = helpers.load_with_stubs("ui.menu.shortcut_utils")
+	local changes = 0
+	local gestures = { get_action_label = function() return "translate" end,
+		parameter_prompt = function() return "target" end,
+		parameter_error = function() return "refused" end,
+		get_action_parameter = function() return "Esperanto" end,
+		validate_action_parameter = function() error("blank input must not acquire admission") end,
+		set_action_parameter = function() changes = changes + 1; return true end }
+	local dialog = package.loaded["infra.dialog_util"]
+	dialog.text_prompt = function(_, _, prior, confirm)
+		helpers.assert_eq(prior, "Esperanto")
+		return confirm, ""
+	end
+	helpers.assert_eq(SU.prompt_action_parameter(gestures, "return_key", "llm_translate_context", "llm_language"), false)
+	helpers.assert_eq(changes, 0)
+end)

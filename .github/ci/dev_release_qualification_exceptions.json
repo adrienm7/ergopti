@@ -1,6 +1,6 @@
 {
 	"schema": 1,
-	"id": "dev-release-20261009-renewed",
+	"id": "dev-release-20261009-diagnostic-prerelease",
 	"expires_at": "2026-10-10T07:00:00Z",
 	"repository": "adrienm7/ergopti",
 	"event_name": "push",
@@ -8,9 +8,9 @@
 	"release": true,
 	"prerelease": "true",
 	"channel": "dev",
-	"tag": "v0.0.0-dev.156",
-	"version": "0.0.0-dev.156",
-	"authorization_note": "The maintainer authorized temporary test-execution deferrals and renewed the request to publish after the hosted macOS consent cause was demonstrated. This single dev.156 profile expires on October 10 at 07:00 UTC. Every deferred scope is unqualified; no deadline fulfillment, feature completion or native pass is claimed.",
+	"tag": "v0.0.0-dev.157",
+	"version": "0.0.0-dev.157",
+	"authorization_note": "The maintainer explicitly authorized deferring all test suites to publish a prompt diagnostic dev.157 prerelease. The fast route supersedes the narrower five-scope deferral only for this tag and before the unchanged October 10 07:00 UTC expiry. Build, signing, source and asset integrity remain required. Core, unit, E2E, installation, launch and native qualification are DEFERRED and qualified:false, not passed. Default, Main, pull requests, dev.158 and other releases execute all assertions. No native acceptance or feature completion is claimed.",
 	"scopes": {
 		"windows-pac-full-url": {
 			"kind": "ahk_test",

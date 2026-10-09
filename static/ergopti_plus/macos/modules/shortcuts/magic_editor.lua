@@ -21,6 +21,7 @@ local JsonCodec = require("adapters.json_codec")
 local Paths = require("infra.paths")
 local Manifest = require("infra.manifest_reader")
 local MagicKeySource = require("modules.keymap.magic_key_source")
+local Geometry = require("adapters.keyboard_geometry")
 local Logger = require("infra.logger")
 
 local LOG = "shortcuts.magic_editor"
@@ -126,10 +127,12 @@ local function project(receipt, attempt)
 	local context = attempt.context
 	local candidates, remapped_candidates, known = {}, {}, {}
 	local by_native = {}
+	local keyboard_type = receipt and receipt.keyboard_type or nil
 	for code, entry in pairs(registry()) do
 		if entry.kind == "key" and type(entry.hs) == "number" then
 			known[code] = true
-			by_native[entry.hs] = code
+			local native = Geometry.physical_code(entry, keyboard_type)
+			if native ~= nil then by_native[native] = code end
 		end
 	end
 	for _, level in ipairs(receipt and receipt.levels or {}) do
@@ -137,7 +140,7 @@ local function project(receipt, attempt)
 		if code then
 			local remapped = MagicKeySource.remaps(level.code, {}, function()
 				return attempt.replace_active
-			end)
+			end, keyboard_type)
 			local candidate = {
 				code = code,
 				native_code = level.code,

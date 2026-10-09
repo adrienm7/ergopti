@@ -49,6 +49,7 @@ require("test.magic_key_source_contract")(helpers, Shared, {
 --- @return table keymap
 --- @return table tap The keyDown tap, whose callback is the production one.
 local function load_keymap()
+	package.loaded["adapters.keyboard_geometry"] = nil
 	for _, name in ipairs(RESET_MODULES) do package.loaded[name] = nil end
 	for name in pairs(package.loaded) do
 		if type(name) == "string" and (name:match("^modules%.keymap") or name:match("^modules%.llm")) then
@@ -73,6 +74,7 @@ local function load_keymap()
 		return tap
 	end
 	local keymap = helpers.load_with_stubs("modules.keymap", { eventtap = eventtap })
+	require("tests.support.keyboard_geometry").initialize(require("adapters.keyboard_geometry"))
 	return keymap, taps[1]
 end
 
@@ -80,9 +82,12 @@ end
 --- @param key_code number
 --- @param flags table
 --- @return table event
-local function key_down(key_code, flags)
+local function key_down(key_code, flags, keyboard_type)
 	local event = { text = "x", set = nil }
-	event.getProperty = function() return 0 end
+	event.getProperty = function(_, property)
+		if property == hs.eventtap.event.properties.keyboardEventKeyboardType then return keyboard_type end
+		return 0
+	end
 	event.getKeyCode = function() return key_code end
 	event.getFlags = function() return flags end
 	event.getCharacters = function() return event.text end
@@ -121,14 +126,18 @@ end)
 -- the other way round. Read in the ISO form alone, Backquote remapped the key
 -- left of Z in the driver's own Karabiner setup.
 helpers.describe("magic key source: the two keys ISO boards swap", function()
-	helpers.it("(magic-key-source) Backquote and IntlBackslash answer to both keycodes", function()
-		helpers.with_fresh_modules({ "modules.keymap.magic_key_source" }, function()
+	helpers.it("(magic-key-source) Backquote and IntlBackslash keep distinct physical positions", function()
+		helpers.with_fresh_modules({ "modules.keymap.magic_key_source", "adapters.keyboard_geometry" }, function()
+			require("tests.support.keyboard_geometry").initialize(require("adapters.keyboard_geometry"))
 			local Source = require("modules.keymap.magic_key_source")
 			local on = function() return true end
 			for _, code in ipairs({ "Backquote", "IntlBackslash" }) do
 				Source.set(code)
-				helpers.assert_true(Source.remaps(50, {}, on), code .. " behind Karabiner's ANSI keyboard (50)")
-				helpers.assert_true(Source.remaps(10, {}, on), code .. " on a bare ISO board (10)")
+				local ansi, iso = code == "Backquote" and 50 or 10, code == "Backquote" and 10 or 50
+				helpers.assert_true(Source.remaps(ansi, {}, on, 40), code .. " on ANSI")
+				helpers.assert_true(Source.remaps(iso, {}, on, 41), code .. " on ISO")
+				helpers.assert_eq(Source.remaps(iso, {}, on, 40), false, "the ANSI neighbor remains free")
+				helpers.assert_eq(Source.remaps(ansi, {}, on, 41), false, "the ISO neighbor remains free")
 				helpers.assert_eq(Source.remaps(38, {}, on), false, "and no other key")
 			end
 			Source.set("Backquote")
@@ -196,6 +205,12 @@ helpers.describe("magic key source: the keymap keyDown tap", function()
 		helpers.assert_nil(off.set, "the replace section gates the remap")
 
 		replace = true
+		helpers.assert_true(keymap.set_magic_key_source("Backquote"))
+		for _, row in ipairs({ { 50, 40, true }, { 10, 41, true }, { 10, 40, false }, { 50, 41, false } }) do
+			local event = key_down(row[1], {}, row[2])
+			tap.callback(event)
+			helpers.assert_eq(event.set == magic, row[3], "keymap reads the originating keyboard type")
+		end
 		helpers.assert_true(keymap.set_magic_key_source("auto"))
 		local automatic = key_down(KEYCODE_J, {})
 		tap.callback(automatic)
@@ -230,7 +245,7 @@ helpers.describe("magic key source: config.toml", function()
 end)
 
 helpers.describe("magic key source: acknowledged tap dispatcher", function()
- helpers.it("(magic-key-source) an acknowledged tap keeps both physical aliases without keymap mutation", function()
+ helpers.it("(magic-key-source) an acknowledged tap claims the same position on mixed keyboards", function()
   -- The earlier real keymap owns an always-on KC drain. Retire that exact
   -- producer before constructing another CoreState and its bridge owner.
   local prior_bridge = package.loaded["modules.keylogger.kc_bridge"]
@@ -249,22 +264,28 @@ helpers.describe("magic key source: acknowledged tap dispatcher", function()
    local actions = require("actions.assignable").build(require("_generated.action_catalogue"), Json.decode(f:read("*a")), "macos"); f:close()
    assert(Tap.apply_configuration({shortcuts={tap_keys={number_row_left="send_text"}}}, function(id) return actions[id] == true end))
    local ran, admitted = 0, true
-   sys.bind_tap_keys(function() return admitted end, function(code)
-    local action = Tap.decide(code)
+   sys.bind_tap_keys(function() return admitted end, function(code, keyboard_type)
+    local action = Tap.decide(code, keyboard_type)
     if action then return function() ran = ran + 1; return true end end
    end)
    local results = {}
-   for _, code in ipairs({50, 10}) do
-    local event = key_down(code, {})
+   for _, row in ipairs({{50,40}, {10,41}, {10,40}, {50,41}}) do
+    local code = row[1]
+    local event = key_down(code, {}, row[2])
     local keymap_consumed = keymap_tap.callback(event)
     local tap_consumed = spy.captured_cb(event)
-    fixture.run_screenshot_deferred(spy)
+    if tap_consumed then fixture.run_screenshot_deferred(spy) end
     results[#results+1] = {code=code, unicode=event.set, keymap=keymap_consumed, tap=tap_consumed, ran=ran}
    end
    helpers.assert_eq(results[1].tap, true)
    helpers.assert_eq(results[2].tap, true)
+   helpers.assert_eq(results[3].tap, false, "ANSI extra key remains native")
+   helpers.assert_eq(results[4].tap, false, "ISO extra key remains native")
    helpers.assert_eq(ran, 2)
    helpers.assert_nil(results[1].unicode, "a native accepted tap should not mutate the keymap's text context first")
+   helpers.assert_nil(results[2].unicode, "ISO delivery uses the same captured type in the claim projection")
+   helpers.assert_nil(results[3].unicode, "the ANSI neighbor is never remapped")
+   helpers.assert_nil(results[4].unicode, "the ISO neighbor is never remapped")
   end)
  end)
 end)

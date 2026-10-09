@@ -488,7 +488,8 @@ function loadPage(platform, current) {
 			check(
 				parsed !== null &&
 					parsed.profileId === vector.profile_id &&
-					parsed.numPredictions === expected,
+					parsed.numPredictions === expected &&
+					parsed.translationTarget === vector.translation_target,
 				`${vector.id}: the page reads ${JSON.stringify(parsed)}`
 			);
 		}
@@ -661,37 +662,38 @@ function loadPage(platform, current) {
 	);
 }
 
-// 10. The llm_language editor offers the host's languages, the interface
-//     language first, starts from the binding and saves the chosen value.
-{
-	const page = loadPage('ahk');
+// 10. Free language entry belongs to the host's existing InputBox, on all drivers.
+// The page must not synthesize a locale or overwrite the stored binding value.
+for (const platform of ['ahk', 'hs', 'linux']) {
+	const page = loadPage(platform);
 	vm.runInContext("doConfirm('llm_translate_selection')", page.context);
+	check(page.posted.length === 1, 'language choice is handed off once');
+	const handoff = page.posted[0];
 	check(
-		page.byId['param-language'].hidden === false &&
-			page.byId['param-input'].hidden === true &&
-			page.byId['param-vision'].hidden === true,
-		'the language editor replaces the text field'
+		handoff && handoff.action === 'confirm' && handoff.id === 'llm_translate_selection',
+		'exact language action is handed to its native parameter owner'
 	);
 	check(
-		page.byId['param-language-label'].textContent === 'Translate into',
-		'the language label is shown'
-	);
-	check(page.byId['param-language-select'].value === 'ja', 'the editor starts from the binding');
-	check(
-		page.byId['param-language-select'].children[0].value === 'ui',
-		'the interface language comes first'
-	);
-	page.byId['param-language-select'].value = 'ui';
-	page.keydown({ key: 'Enter', code: 'Enter' });
-	check(
-		page.posted.length === 1 &&
-			page.posted[0].id === 'llm_translate_selection' &&
-			page.posted[0].parameter === 'ui',
-		'Enter saves the chosen language'
+		handoff && !Object.hasOwn(handoff, 'parameter'),
+		'the page cannot invent a target-language receipt'
 	);
 	check(
-		vm.runInContext("parseParameter('llm_language', 'xx')", page.context) === null,
-		'a language the host does not offer is refused'
+		vm.runInContext('editing === null', page.context),
+		'the closed locale catalogue never opens'
+	);
+	page.context.__value = 'translate|2|Esperanto';
+	const receipt = vm.runInContext('parseLlmPrompt(__value)', page.context);
+	check(
+		receipt &&
+			receipt.profileId === 'translate' &&
+			receipt.numPredictions === 2 &&
+			receipt.translationTarget === 'Esperanto',
+		'the typed per-binding target stays literal'
+	);
+	page.context.__value = 'rewrite|2|Esperanto';
+	check(
+		vm.runInContext('parseLlmPrompt(__value)', page.context) === null,
+		'a target cannot silently change an unrelated prompt'
 	);
 }
 

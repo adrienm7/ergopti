@@ -6,7 +6,7 @@
 --- Drives the real diagnostics window through its usercontent message handler,
 --- the way the shared page posts to it:
 --- 1. "ready" answers with the page's configuration and the first snapshot,
----    and starts the probes;
+---    and keeps subprocess probes opt-in;
 --- 2. an action the allowlist refuses changes nothing and is logged;
 --- 3. copy writes the redacted report, and a refused clipboard keeps the
 ---    window open and says so to the page;
@@ -63,7 +63,8 @@ local function load_window(controls)
 		end,
 	}
 	package.loaded["ui.healthcheck.probes"] = {
-		start = function(_, snapshot)
+		start = function(_, snapshot, on_result)
+			context.probe_result = on_result
 			context.started_probes = context.started_probes + 1
 			context.probe_snapshot = snapshot
 			return { cancel = function() context.cancelled_probes = context.cancelled_probes + 1 end }
@@ -121,6 +122,7 @@ local function load_window(controls)
 		return {
 			schema_version = 2, driver = "macos", generated_at = "2026-09-24T10:00:00Z",
 			detailed = type(opts) == "table" and opts.detailed == true or false,
+			extensive = type(opts) == "table" and opts.extensive == true or false,
 			sections = { paths = { diagnostics_dir = HOME .. "/Library/Logs/ergopti_plus/diagnostics" } },
 			probes = { github_api = { state = "pending" } },
 		}
@@ -154,6 +156,17 @@ local function as_jdoe(body)
 	if not ok then error(err, 0) end
 end
 
+local function share_action(context, action)
+	context.page({ body = { action = "export_snapshot", export_sequence = 1 } })
+	local messages = page_messages(context)
+	local fresh = messages[#messages]
+	helpers.assert_eq(fresh.action, "export_snapshot")
+	helpers.assert_type(fresh.share_text, "string")
+	action.text = fresh.share_text
+	context.page({ body = action })
+	return fresh.share_text
+end
+
 helpers.describe("diagnostics window: the page's bridge (macOS)", function()
 	helpers.it("registers the handler host_bridge.js posts to, and polls nothing", function()
 		local core, context = load_window()
@@ -164,7 +177,7 @@ helpers.describe("diagnostics window: the page's bridge (macOS)", function()
 		helpers.assert_eq(context.every, 0, "no recurring timer may poll the page")
 	end)
 
-	helpers.it("answers ready with the configuration and the snapshot, then starts the probes", function()
+	helpers.it("answers ready with a quick snapshot and starts probes only after explicit opt-in", function()
 		as_jdoe(function()
 			local core, context = load_window()
 			core.show_window({ mode = "report" })
@@ -177,6 +190,9 @@ helpers.describe("diagnostics window: the page's bridge (macOS)", function()
 			helpers.assert_eq(messages[1].config.context.home, HOME)
 			helpers.assert_eq(messages[1].config.context.case_insensitive, true)
 			helpers.assert_eq(messages[1].snapshot.driver, "macos")
+			helpers.assert_eq(context.started_probes, 0, "opening the window must not start subprocess probes")
+			helpers.assert_eq(messages[1].snapshot.extensive, false)
+			context.page({ body = { action = "refresh", extensive = true } })
 			helpers.assert_eq(context.started_probes, 1)
 			-- The probes complete the snapshot the page shows: its paths, its
 			-- peripherals and whether details are included (bluetooth-peripherals)
@@ -203,8 +219,9 @@ helpers.describe("diagnostics window: the page's bridge (macOS)", function()
 		as_jdoe(function()
 			local core, context = load_window()
 			core.show_window()
-			context.page({ body = { action = "copy", text = "log at /Users/jdoe/Library/Logs by jdoe" } })
-			helpers.assert_eq(context.copied, { "log at ~/Library/Logs by <user>" })
+			local approved = share_action(context, { action = "copy", text = "log at /Users/jdoe/Library/Logs by jdoe" })
+			helpers.assert_eq(context.copied, { approved })
+			helpers.assert_true(not approved:find("/Users/", 1, true), "Shared output contains no local path")
 			local messages = page_messages(context)
 			helpers.assert_eq(messages[#messages].type, "action")
 			helpers.assert_eq(messages[#messages].action, "copy")
@@ -228,12 +245,13 @@ helpers.describe("diagnostics window: the page's bridge (macOS)", function()
 					return { start = function() return true end }
 				end,
 			}
-			local ok, err = pcall(context.page, { body = { action = "report",
+			local ok, approved = pcall(share_action, context, { action = "report",
 				text = "log at /Users/jdoe/Library/Logs by jdoe",
-				fields = { version = "2.4.0", os = "macOS 15.1", driver = "macos" } } })
+				fields = { version = "2.4.0", os = "macOS 15.1", driver = "macos" } })
 			package.loaded["adapters.shell_runner"] = nil
-			helpers.assert_true(ok, tostring(err))
-			helpers.assert_eq(context.copied, { "log at ~/Library/Logs by <user>" })
+			helpers.assert_true(ok, tostring(approved))
+			helpers.assert_eq(context.copied, { approved })
+			helpers.assert_true(not approved:find("/Users/", 1, true), "Shared output contains no local path")
 			helpers.assert_eq(#context.opened_urls, 1, "the bug form opens once")
 			local encoded = context.opened_urls[1]:match("[?&]diagnostics=([^&]*)")
 			local diagnostics = encoded and encoded:gsub("%%(%x%x)", function(hex) return string.char(tonumber(hex, 16)) end)
@@ -251,7 +269,7 @@ helpers.describe("diagnostics window: the page's bridge (macOS)", function()
 		as_jdoe(function()
 			local core, context = load_window({ clipboard = false })
 			core.show_window()
-			context.page({ body = { action = "copy", text = "report" } })
+			share_action(context, { action = "copy", text = "report" })
 			helpers.assert_eq(context.deleted, 0, "a refused copy must not close the only copy source")
 			local messages = page_messages(context)
 			helpers.assert_eq(messages[#messages].ok, false)
@@ -274,6 +292,7 @@ helpers.describe("diagnostics window: the page's bridge (macOS)", function()
 			local core, context = load_window()
 			core.show_window()
 			context.page({ body = "ready" })
+			context.page({ body = { action = "refresh", extensive = true } })
 			context.page({ body = { action = "close" } })
 			helpers.assert_eq(context.deleted, 1)
 			helpers.assert_eq(context.cancelled_probes, 1)
@@ -297,12 +316,51 @@ helpers.describe("diagnostics window: the page's bridge (macOS)", function()
 			local core, context = load_window()
 			core.show_window()
 			context.page({ body = "ready" })
-			context.page({ body = { action = "refresh", detailed = true } })
+			context.page({ body = { action = "refresh", extensive = true } })
+			context.page({ body = { action = "refresh", detailed = true, extensive = true } })
 			local messages = page_messages(context)
 			helpers.assert_eq(messages[#messages].type, "snapshot")
 			helpers.assert_eq(messages[#messages].snapshot.detailed, true)
 			helpers.assert_eq(context.started_probes, 2)
 			helpers.assert_eq(context.cancelled_probes, 1)
+		end)
+	end)
+end)
+
+
+helpers.describe("diagnostics user presentation admission", function()
+	for _, mode in ipairs({ "false", "throw" }) do
+		helpers.it("diagnostics foreground refuses focus " .. mode, function()
+			as_jdoe(function()
+			local core, context = load_window()
+			package.loaded["ui.ui_builder"].force_focus = function()
+				if mode == "throw" then error("owned presentation failure") end
+				return false
+			end
+			helpers.assert_eq(core.show_window(), false)
+			helpers.assert_eq(context.deleted, 0, "Presentation refusal must preserve the shown report")
+			helpers.assert_eq(context.released, 0, "The current page handler remains owned")
+			context.page({ body = "ready" })
+			local messages = page_messages(context)
+			helpers.assert_eq(messages[#messages].type, "init", "The retained report remains usable")
+			helpers.assert_true(#context.errors > 0)
+			end)
+		end)
+	end
+
+	helpers.it("diagnostics background probe completion never steals window focus", function()
+		as_jdoe(function()
+			local core, context = load_window()
+			helpers.assert_true(core.show_window())
+			context.page({ body = "ready" })
+			context.page({ body = { action = "refresh", extensive = true } })
+			helpers.assert_eq(context.started_probes, 1)
+			helpers.assert_type(context.probe_result, "function")
+			context.probe_result("github_api", { state = "ok", ms = 1 }, {})
+			helpers.assert_eq(context.focused, 1, "Only the user's original open may request focus")
+			context.page({ body = { action = "close" } })
+			context.probe_result("github_api", { state = "ok", ms = 2 }, {})
+			helpers.assert_eq(context.focused, 1, "Late retired completion must stay inert")
 		end)
 	end)
 end)
