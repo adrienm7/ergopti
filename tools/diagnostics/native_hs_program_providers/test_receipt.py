@@ -2,8 +2,11 @@
 """Portable parser controls only; this does not produce a native PASS verdict."""
 
 import copy
+from contextlib import ExitStack
 import json
+import os
 from pathlib import Path
+import stat
 import tempfile
 import sys
 import unittest
@@ -79,6 +82,352 @@ DIAGNOSTIC_FILES = (
     "tools/diagnostics/native_hs_program_providers/run_native.py",
 )
 DIAGNOSTIC_HASHES = {path: "d" * 64 for path in DIAGNOSTIC_FILES}
+
+
+class InterpreterLinkFixture:
+    """Own parser-only link metadata without requiring Windows symlink privilege."""
+
+    marker = b"owned interpreter metadata fixture\n"
+
+    def __init__(self):
+        self.links = {}
+        self.retained = []
+        self.original_lstat = Path.lstat
+        self.observation = self.original_lstat
+        self.patch = None
+
+    def __enter__(self):
+        if sys.platform == "win32":
+            self.patch = mock.patch.object(
+                Path, "lstat", lambda path, *args, **kwargs: self.lstat(path, *args, **kwargs)
+            )
+            self.patch.__enter__()
+        return self
+
+    def create(self, base):
+        (base / "bin").mkdir()
+        link = base / "bin/python3"
+        if sys.platform != "win32":
+            link.symlink_to(Path(sys.executable).resolve())
+            return
+        retained = link.open("x+b")
+        # Adopt before writing so any failed preparation still closes this fd.
+        self.retained.append(retained)
+        self.links[link.absolute()] = retained
+        retained.write(self.marker)
+        retained.flush()
+
+    def lstat(self, path, *args, **kwargs):
+        current = self.observation(path, *args, **kwargs)
+        retained = self.links.get(path.absolute())
+        if retained is None or retained.closed:
+            return current
+        opened = os.fstat(retained.fileno())
+        if (
+            not stat.S_ISREG(current.st_mode)
+            or not stat.S_ISREG(opened.st_mode)
+            or (current.st_dev, current.st_ino) != (opened.st_dev, opened.st_ino)
+            or current.st_size != len(self.marker)
+            or opened.st_size != len(self.marker)
+        ):
+            return current
+        retained.seek(0)
+        if retained.read(len(self.marker) + 1) != self.marker:
+            return current
+        after = os.fstat(retained.fileno())
+        if (opened.st_dev, opened.st_ino, opened.st_size) != (
+            after.st_dev,
+            after.st_ino,
+            after.st_size,
+        ):
+            return current
+        # Only the exact owned fixture's link-kind projection changes. The real
+        # name/fd identities and target stat still reach the production predicate.
+        return os.stat_result((stat.S_IFLNK | stat.S_IMODE(current.st_mode), *current[1:]))
+
+    def __exit__(self, kind, value, traceback):
+        try:
+            if self.patch is not None:
+                self.patch.__exit__(kind, value, traceback)
+        finally:
+            for retained in self.retained:
+                if not retained.closed:
+                    retained.close()
+
+
+class PacketReaderFixture:
+    """Record POSIX reader requests on Windows, never certify native NOFOLLOW."""
+
+    nonblock = 1 << 24
+    nofollow = 1 << 25
+    debts = []
+
+    def __init__(self, root):
+        self.root = root.absolute()
+        self.root_stat = self.root.lstat()
+        self.records = {}
+        self.descriptors = {}
+        self.original_open = os.open
+        self.original_close = os.close
+        self.original_lstat = Path.lstat
+        self.observation = self.original_lstat
+        self.patches = ExitStack()
+
+    @staticmethod
+    def identity(info):
+        return info.st_dev, info.st_ino
+
+    def __enter__(self):
+        if sys.platform == "win32":
+            self.patches.enter_context(
+                mock.patch.object(os, "O_NONBLOCK", self.nonblock, create=True)
+            )
+            self.patches.enter_context(
+                mock.patch.object(os, "O_NOFOLLOW", self.nofollow, create=True)
+            )
+            self.patches.enter_context(mock.patch.object(os, "open", self.open))
+            self.patches.enter_context(mock.patch.object(os, "close", self.close))
+        return self
+
+    def own(self, path):
+        if sys.platform != "win32":
+            return
+        name = path.absolute()
+        if not name.is_relative_to(self.root) or name in self.records:
+            raise ValueError("fixture_packet_scope_refused")
+        named = self.original_lstat(name)
+        if not stat.S_ISREG(named.st_mode) or name.is_symlink() or name.is_junction():
+            raise ValueError("fixture_packet_kind_refused")
+        retained = name.open("rb")
+        self.records[name] = (retained, None)
+        if self.identity(os.fstat(retained.fileno())) != self.identity(named):
+            raise ValueError("fixture_packet_identity_refused")
+        raw = retained.read(subject.BYTE_LIMIT + 1)
+        if len(raw) > subject.BYTE_LIMIT:
+            raise ValueError("fixture_packet_bytes_refused")
+        self.records[name] = (retained, raw)
+
+    def open(self, path, flags, *args, **kwargs):
+        if type(flags) is not int or flags != os.O_RDONLY | self.nonblock | self.nofollow:
+            raise ValueError("fixture_packet_flags_refused")
+        name = Path(path).absolute()
+        if not name.is_relative_to(self.root):
+            raise ValueError("fixture_packet_scope_refused")
+        record = self.records.get(name)
+        if record is None:
+            # A genuine absent-name observation preserves the original missing
+            # facts failure, without admitting or opening any unowned file.
+            self.original_lstat(name)
+            raise ValueError("fixture_packet_scope_refused")
+        retained, raw = record
+        if retained.closed or raw is None or args or kwargs:
+            raise ValueError("fixture_packet_owner_refused")
+        named = self.observation(name)
+        opened = os.fstat(retained.fileno())
+        if not stat.S_ISREG(named.st_mode) or not stat.S_ISREG(opened.st_mode):
+            raise ValueError("fixture_packet_kind_refused")
+        if self.identity(named) != self.identity(opened):
+            raise ValueError("fixture_packet_identity_refused")
+        if self.identity(self.original_lstat(self.root)) != self.identity(self.root_stat):
+            raise ValueError("fixture_packet_root_refused")
+        if name.is_symlink() or name.is_junction() or name.resolve() != name:
+            raise ValueError("fixture_packet_link_refused")
+        retained.seek(0)
+        if retained.read(subject.BYTE_LIMIT + 1) != raw:
+            raise ValueError("fixture_packet_bytes_refused")
+        # Recording flags are checked above, not passed off as Windows flags.
+        # The owned regular-file primitive is real, read-only and noninheritable.
+        descriptor = self.original_open(name, os.O_RDONLY | os.O_BINARY | os.O_NOINHERIT)
+        self.descriptors[descriptor] = (name, record, self.identity(opened))
+        try:
+            actual = os.fstat(descriptor)
+            if not stat.S_ISREG(actual.st_mode) or self.identity(actual) != self.identity(opened):
+                raise ValueError("fixture_packet_identity_refused")
+            if os.read(descriptor, subject.BYTE_LIMIT + 1) != raw:
+                raise ValueError("fixture_packet_bytes_refused")
+            os.lseek(descriptor, 0, os.SEEK_SET)
+            return descriptor
+        except BaseException:
+            self.close(descriptor)
+            raise
+
+    def close(self, descriptor):
+        owned = self.descriptors.get(descriptor)
+        if owned is None:
+            raise ValueError("fixture_packet_descriptor_refused")
+        name, (retained, raw), expected = owned
+        if self.identity(os.fstat(descriptor)) != expected:
+            raise ValueError("fixture_packet_descriptor_refused")
+        refusal = None
+        try:
+            if retained.closed or self.identity(os.fstat(retained.fileno())) != expected:
+                raise ValueError("fixture_packet_owner_refused")
+            if self.identity(self.original_lstat(name)) != expected:
+                raise ValueError("fixture_packet_identity_refused")
+            if self.identity(self.original_lstat(self.root)) != self.identity(self.root_stat):
+                raise ValueError("fixture_packet_root_refused")
+            retained.seek(0)
+            if retained.read(subject.BYTE_LIMIT + 1) != raw:
+                raise ValueError("fixture_packet_bytes_refused")
+        except BaseException as failure:
+            refusal = failure
+        # Admission revocation cannot block exact fd cleanup. The real close
+        # must succeed before this descriptor leaves ownership, then refusal wins.
+        self.original_close(descriptor)
+        del self.descriptors[descriptor]
+        if refusal is not None:
+            raise refusal
+
+    def __exit__(self, kind, value, traceback):
+        try:
+            for descriptor in tuple(self.descriptors):
+                self.close(descriptor)
+            for retained, _ in self.records.values():
+                if not retained.closed:
+                    retained.close()
+        except BaseException:
+            self.debts.append(self)
+            raise
+        finally:
+            self.patches.close()
+
+
+def interpreter_fixture_refusals(control):
+    """Drive the genuine run_case refusal before acquiring any process owner."""
+    if sys.platform != "win32":
+        return
+    for fault in ("kind", "inode", "bytes", "closed_owner", "outside_path"):
+        with (
+            control.subTest(interpreter_fixture=fault),
+            tempfile.TemporaryDirectory() as temporary,
+            InterpreterLinkFixture() as links,
+        ):
+            output = Path(temporary)
+            acquisition = mock.Mock(side_effect=AssertionError("refused metadata cannot acquire"))
+            owner = type("OwnershipPort", (), {"acquire_owned": staticmethod(acquisition)})()
+
+            def prepare(base, *arguments):
+                links.create(base)
+                link = base / "bin/python3"
+                if fault == "kind":
+                    observed = links.original_lstat(base / "bin")
+                    links.observation = lambda path, *args, **kwargs: (
+                        observed if path == link else links.original_lstat(path, *args, **kwargs)
+                    )
+                elif fault == "inode":
+                    foreign = base / "foreign"
+                    foreign.write_bytes(links.marker)
+                    observed = links.original_lstat(foreign)
+                    control.assertNotEqual(
+                        (observed.st_dev, observed.st_ino),
+                        (links.original_lstat(link).st_dev, links.original_lstat(link).st_ino),
+                    )
+                    links.observation = lambda path, *args, **kwargs: (
+                        observed if path == link else links.original_lstat(path, *args, **kwargs)
+                    )
+                elif fault == "bytes":
+                    retained = links.links[link.absolute()]
+                    retained.seek(0)
+                    retained.write(b"x" * len(links.marker))
+                    retained.flush()
+                elif fault == "closed_owner":
+                    links.links[link.absolute()].close()
+                else:
+                    outside = base / "outside"
+                    outside.write_bytes(links.marker)
+                    control.assertTrue(stat.S_ISREG(outside.lstat().st_mode))
+                    control.assertNotIn(outside.absolute(), links.links)
+                    links.links.clear()
+                return {"receipt": str(output / "missing")}
+
+            with (
+                mock.patch.object(subject, "prepare", side_effect=prepare),
+                mock.patch.object(subject, "runtime_origin", return_value={}),
+            ):
+                with control.assertRaisesRegex(ValueError, "runtime_link_witness_refused"):
+                    subject.run_case(
+                        "full",
+                        Path("application"),
+                        Path("source"),
+                        SHA,
+                        output,
+                        HASHES,
+                        object(),
+                        owner,
+                    )
+            acquisition.assert_not_called()
+
+
+def packet_fixture_refusals(control):
+    """Keep refused primitive inputs outside actual read_packet admission."""
+    if sys.platform != "win32":
+        return
+    expected = {
+        "flags": "fixture_packet_flags_refused",
+        "foreign": "fixture_packet_scope_refused",
+        "closed_owner": "fixture_packet_owner_refused",
+        "kind": "fixture_packet_kind_refused",
+        "inode": "fixture_packet_identity_refused",
+        "bytes": "fixture_packet_bytes_refused",
+        "read_mutation": "fixture_packet_bytes_refused",
+        "link": "fixture_packet_link_refused",
+    }
+    for fault, reason in expected.items():
+        with (
+            control.subTest(packet_fixture=fault),
+            tempfile.TemporaryDirectory() as temporary,
+            PacketReaderFixture(Path(temporary)) as packets,
+        ):
+            path = Path(temporary) / "packet.json"
+            path.write_text(json.dumps(packet()))
+            packets.own(path)
+            if fault == "flags":
+                with control.assertRaisesRegex(ValueError, reason):
+                    subject.os.open(path, os.O_RDONLY | packets.nonblock)
+            else:
+                if fault == "foreign":
+                    path = Path(temporary) / "foreign.json"
+                    path.write_text(json.dumps(packet()))
+                elif fault == "closed_owner":
+                    packets.records[path.absolute()][0].close()
+                elif fault in ("kind", "inode"):
+                    if fault == "kind":
+                        observed = packets.original_lstat(Path(temporary))
+                    else:
+                        foreign = Path(temporary) / "foreign.json"
+                        foreign.write_text(json.dumps(packet()))
+                        observed = packets.original_lstat(foreign)
+                        control.assertNotEqual(
+                            packets.identity(observed),
+                            packets.identity(packets.original_lstat(path)),
+                        )
+                    packets.observation = lambda name: observed
+                elif fault == "bytes":
+                    path.write_bytes(b"x" * path.stat().st_size)
+                if fault == "read_mutation":
+                    original_read = os.read
+                    reads = 0
+
+                    def read_then_mutate(descriptor, size):
+                        nonlocal reads
+                        raw = original_read(descriptor, size)
+                        reads += 1
+                        if reads == 2:
+                            path.write_bytes(b"x" * path.stat().st_size)
+                        return raw
+
+                    with mock.patch.object(os, "read", read_then_mutate):
+                        with control.assertRaisesRegex(ValueError, reason):
+                            subject.read_packet(path)
+                    control.assertEqual(reads, 2, "the mutation follows the actual parser read")
+                elif fault == "link":
+                    with mock.patch.object(Path, "is_symlink", lambda name: name == path):
+                        with control.assertRaisesRegex(ValueError, reason):
+                            subject.read_packet(path)
+                else:
+                    with control.assertRaisesRegex(ValueError, reason):
+                        subject.read_packet(path)
+            control.assertEqual(packets.descriptors, {}, "refusal opens no packet descriptor")
 
 
 def facts():
@@ -208,12 +557,14 @@ class ReceiptControls(unittest.TestCase):
             raise KeyboardInterrupt("controlled handoff interruption")
 
         owner = type("OwnershipPort", (), {"acquire_owned": staticmethod(acquire)})()
-        with tempfile.TemporaryDirectory() as temporary:
+        with (
+            tempfile.TemporaryDirectory() as temporary,
+            InterpreterLinkFixture() as links,
+        ):
             output = Path(temporary)
 
             def prepare_owned_link(base, *arguments):
-                (base / "bin").mkdir()
-                (base / "bin/python3").symlink_to(Path(sys.executable).resolve())
+                links.create(base)
                 return {"receipt": str(output / "missing")}
 
             with (
@@ -238,6 +589,7 @@ class ReceiptControls(unittest.TestCase):
                 json.loads(physical[0].read_text()), {"controlled_parser_fixture_only": True}
             )
         self.assertEqual(retained.calls, ["settle"])
+        interpreter_fixture_refusals(self)
 
     def test_timeout_and_early_exit_never_admit_missing_receipt(self):
         with tempfile.TemporaryDirectory() as temporary:
@@ -286,14 +638,18 @@ class DiagnosticFactControls(unittest.TestCase):
             return retained
 
         owner = type("OwnershipPort", (), {"acquire_owned": staticmethod(acquire)})()
-        with tempfile.TemporaryDirectory() as temporary:
+        with (
+            tempfile.TemporaryDirectory() as temporary,
+            InterpreterLinkFixture() as links,
+            PacketReaderFixture(Path(temporary)) as packets,
+        ):
             output = Path(temporary)
             primary = output / "primary.json"
             primary.write_text(json.dumps(packet()))
+            packets.own(primary)
 
             def prepare_owned_link(base, *arguments):
-                (base / "bin").mkdir()
-                (base / "bin/python3").symlink_to(Path(sys.executable).resolve())
+                links.create(base)
                 return {"receipt": str(primary)}
 
             with (
@@ -318,6 +674,7 @@ class DiagnosticFactControls(unittest.TestCase):
             self.assertEqual(len(list(output.glob("*/physical-group.json"))), 1)
         retained.settle.assert_called_once()
         retained.wait_for_exit.assert_not_called()
+        packet_fixture_refusals(self)
 
     def test_valid_failure_facts_never_promote_primary_failure(self):
         primary = packet()
@@ -492,6 +849,8 @@ class ClosedDiagnosticLogControls(unittest.TestCase):
             with (
                 self.subTest(scenario=scenario),
                 tempfile.TemporaryDirectory() as temporary,
+                InterpreterLinkFixture() as links,
+                PacketReaderFixture(Path(temporary)) as packets,
             ):
                 output = Path(temporary)
                 primary, value = packet(), facts()
@@ -524,11 +883,12 @@ class ClosedDiagnosticLogControls(unittest.TestCase):
                 owner = type("OwnershipPort", (), {"acquire_owned": staticmethod(acquire)})()
 
                 def prepare_owned_link(base, *arguments):
-                    (base / "bin").mkdir()
-                    (base / "bin/python3").symlink_to(Path(sys.executable).resolve())
+                    links.create(base)
                     path = base / "primary.json"
                     path.write_text(json.dumps(primary))
+                    packets.own(path)
                     (base / "diagnostic-facts.json").write_text(json.dumps(value))
+                    packets.own(base / "diagnostic-facts.json")
                     return {"receipt": str(path)}
 
                 logged = io.StringIO()
