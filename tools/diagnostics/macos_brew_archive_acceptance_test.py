@@ -4068,5 +4068,121 @@ class PhysicalFixtureRootControls(unittest.TestCase):
         self.assertEqual(acquisitions, 6, "all six real root acquisitions must be present")
 
 
+class FirstPositiveAutomationPrerequisiteControls(unittest.TestCase):
+    """Model the first-send prerequisite order, without claiming native TCC consent."""
+
+    def invoke(self, root, statuses, *, allow=True):
+        judge = AppleEventBoundaryControls()
+        (root / "sandbox.sb").write_text(judge.policy)
+        owner = judge.model(root)
+        owner.allow_automation_consent = allow
+        owner.allow_owned_consent_ui = False
+        original_run = owner.run
+        observations = []
+        queue = iter(statuses)
+        confirmed = False
+
+        def run(arguments, **options):
+            nonlocal confirmed
+            if "-o" in arguments:
+                executable = Path(arguments[arguments.index("-o") + 1])
+                executable.write_bytes(
+                    b"Independent modeled signed input " + executable.name.encode()
+                )
+            mode = arguments[-1]
+            if mode.startswith("permission-"):
+                self.assertTrue(allow)
+                self.assertEqual(
+                    arguments[:3],
+                    ["/usr/bin/sandbox-exec", "-f", str(root / "sandbox-appleevent-positive.sb")],
+                )
+                self.assertEqual(
+                    arguments[3:6],
+                    [
+                        str(root / "OwnedAppleEvent-sender.app/Contents/MacOS/sender"),
+                        "73136",
+                        judge.nonce,
+                    ],
+                )
+                self.assertEqual(options, {"check": False, "timeout": 30})
+                self.assertEqual((root / "sandbox.sb").read_text(), judge.policy)
+                self.assertEqual(
+                    Path(arguments[2]).read_text(),
+                    judge.policy.replace("(deny appleevent-send)\n", ""),
+                )
+                status = next(queue)
+                observations.append((mode, status))
+                confirmed = status == 0 and mode == "permission-query" and len(observations) >= 2
+                return subprocess.CompletedProcess(
+                    arguments,
+                    0 if status == 0 else 67,
+                    f"OWNED_APPLEEVENT_PREFLIGHT/1 mode={mode.removeprefix('permission-')} osstatus={status}\n",
+                    "",
+                )
+            if mode in ("success", "denied"):
+                self.assertTrue(
+                    not allow or confirmed,
+                    "first mandatory send preceded normal consent prerequisite",
+                )
+                observations.append((mode, None))
+            return original_run(arguments, **options)
+
+        owner.run = run
+        self.last_owner = owner
+        self.last_observations = observations
+        with (
+            patch.object(probe.uuid, "uuid4", return_value=judge.nonce),
+            patch.object(probe, "native_compiler", return_value=["modeled-native-clang"]),
+        ):
+            receipt = probe.admit_appleevent_boundary(owner, root)
+        return owner, observations, receipt
+
+    def test_fresh_owned_permission_precedes_first_positive_and_keeps_all_three_routes(self):
+        with TemporaryDirectory() as directory:
+            owner, observations, receipt = self.invoke(Path(directory), (-1744, 0, 0))
+            self.assertEqual(
+                observations,
+                [
+                    ("permission-query", -1744),
+                    ("permission-request", 0),
+                    ("permission-query", 0),
+                    ("success", None),
+                    ("success", None),
+                    ("denied", None),
+                ],
+            )
+            self.assertEqual(len(owner.sender_calls), 3)
+            self.assertEqual(owner.deliveries, 2)
+            self.assertTrue(receipt["receiver_retired"])
+            self.assertEqual(receipt["denied_status"], -1743)
+            self.assertEqual(
+                receipt["permission_prerequisite"]["statuses"],
+                [
+                    {"mode": "query", "osstatus": -1744},
+                    {"mode": "request", "osstatus": 0},
+                    {"mode": "query", "osstatus": 0},
+                ],
+            )
+
+    def test_refused_or_unconfirmed_permission_never_acquires_first_positive(self):
+        for statuses in ((-1743,), (-1744, -1743), (-1744, -1744), (0, -1744)):
+            with self.subTest(statuses=statuses), TemporaryDirectory() as directory:
+                with self.assertRaises(probe.AppleEventBoundaryError) as refusal:
+                    self.invoke(Path(directory), statuses)
+                self.assertIsInstance(refusal.exception.__cause__, probe.AdmissionError)
+                self.assertEqual(self.last_owner.sender_calls, [])
+                self.assertEqual(self.last_owner.deliveries, 0)
+                self.assertEqual(len(self.last_owner.active), 1)
+                self.assertFalse(self.last_owner.groups[self.last_owner.active[0]].reaped)
+
+    def test_default_shared_image_never_requests_consent_and_keeps_original_routes(self):
+        with TemporaryDirectory() as directory:
+            owner, observations, receipt = self.invoke(Path(directory), (), allow=False)
+            self.assertEqual(observations, [("success", None), ("success", None), ("denied", None)])
+            self.assertEqual(len(owner.sender_calls), 3)
+            self.assertTrue(receipt["receiver_retired"])
+            self.assertNotIn("permission_prerequisite", receipt)
+
+
 if __name__ == "__main__":
     unittest.main()
