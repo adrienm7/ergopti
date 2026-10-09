@@ -97,6 +97,34 @@ function verifyAggregate({
 	const deferredEvidence = new Map();
 	for (const document of evidence) {
 		validateEvidenceDocument(document, expectedSha);
+		if (document.suite_qualification !== undefined) {
+			const scope = { 'test-linux': 'linux-unit-suite', 'e2e-linux': 'linux-e2e-suite' }[
+				document.job
+			];
+			if (
+				!scope ||
+				typeof document.subjects !== 'object' ||
+				Object.keys(document.subjects).length ||
+				document.qualification !== undefined
+			)
+				fail('Invalid deferred Linux suite envelope.');
+			qualification.validateQualificationReceipt(
+				document.suite_qualification,
+				scope,
+				expectedSha,
+				qualificationContext,
+				qualificationNow
+			);
+			const contract = manifest.jobs[document.job];
+			if (!contract) fail('Deferred suite names an unclassified job.');
+			for (const subject of Object.keys(contract.subjects)) {
+				const key = document.job + '/' + subject;
+				if (deferredEvidence.has(key) || indexedEvidence.has(key))
+					fail('Duplicate deferred suite evidence.');
+				deferredEvidence.set(key, document.suite_qualification);
+			}
+			continue;
+		}
 		if (document.qualification !== undefined) {
 			if (
 				document.job !== 'e2e-linux' ||
@@ -230,9 +258,46 @@ function loadEvidence(directory) {
 		.map((entry) => readJson(path.join(directory, entry), `evidence ${entry}`));
 }
 
+/** Records an empty executed-subject set; the exact authorized suite receipt is the only omission. */
+function recordDeferredSuite(options) {
+	const scope = { 'test-linux': 'linux-unit-suite', 'e2e-linux': 'linux-e2e-suite' }[options.job];
+	if (
+		!scope ||
+		!options.receipt ||
+		!options.output ||
+		!options.sha ||
+		!options.architecture ||
+		options.subjects.length
+	)
+		fail('Invalid deferred suite record request.');
+	const receipt = readJson(options.receipt, 'suite qualification receipt');
+	qualification.validateQualificationReceipt(
+		receipt,
+		scope,
+		options.sha,
+		qualification.environmentContext()
+	);
+	const document = {
+		schema_version: 1,
+		job: options.job,
+		sha: options.sha,
+		architecture: options.architecture,
+		distro: 'ubuntu',
+		session: 'not-run-deferred',
+		interpreter: 'not-run-deferred',
+		subjects: {},
+		suite_qualification: receipt
+	};
+	fs.mkdirSync(path.dirname(options.output), { recursive: true });
+	fs.writeFileSync(options.output, JSON.stringify(document, null, 2) + '\n');
+}
 function main(argv) {
 	const [command, ...rest] = argv;
 	const options = parseArgs(rest);
+	if (command === 'record-deferred-suite') {
+		recordDeferredSuite(options);
+		return;
+	}
 	if (command === 'record') {
 		record(options);
 		return;
@@ -249,7 +314,7 @@ function main(argv) {
 		});
 		if (!result.qualified)
 			process.stdout.write(
-				'[DEFERRED] Linux native window qualification: ' + JSON.stringify(result) + '\n'
+				'[DEFERRED] Linux test/native qualification: ' + JSON.stringify(result) + '\n'
 			);
 		return;
 	}
