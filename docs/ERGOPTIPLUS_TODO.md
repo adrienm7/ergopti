@@ -9639,12 +9639,51 @@ Current Group 3 source checkpoint (item 111, 2026-10-06): [Group 3 current check
   Six controlled real-Notepad caller cases passing do not qualify the
   physical/default InputHook trigger or close this incident.
 
+- [ ] **115.** Qualify the portable JavaScript suite on its Windows host.
+
+  At `b06aefcb6386aa4b875c1c86c29e27c07ab8f951`, the local suite passes
+  378 of 387 controls; hosted Core passes all 387. Preserve every assertion
+  and native target qualification while correcting the host-bound fixtures:
+  - Domain build and Linux installer sandbox: native archive construction
+    refuses Windows; the sandbox's subsequent missing-service read hides the
+    original installer failure. Keep genuine Linux compiler/ELF admission.
+  - Installed Linux layout discovery: the Windows Lua fixture supplies a
+    drive-qualified source coordinate to a POSIX constructor, which refuses
+    before extension discovery. The downstream missing-layout counts do not
+    demonstrate missing packaged TOML files.
+  - Managed HTTP phase model: the retained wrapper hides its child error;
+    positive closure still depends on POSIX ownership/mode facts. Capture the
+    actual refusal before proposing a correction.
+  - Linux updater provider model: host `path.join` emits backslashes for the
+    POSIX `LUA_CPATH_5_4` vector. Preserve versioned native ABI/ELF controls.
+  - Sparkle portable controls: Windows cannot supply the expected POSIX mode;
+    two socket refusals still hide their underlying exceptions. Account for
+    the two existing POSIX signal exclusions without adding test skips.
+  - Brew and provider receipt controls: existing symlink cases fail with
+    Windows privilege error 1314. Preserve wrong-kind, hardlink and ownership
+    refusals when providing explicit portable filesystem ports.
+  - Opaque macOS proxy fixture: local commit `05cb477fd` supplies exact POSIX
+    vectors inside all four Bash entry paths before policy capture. All 57
+    original assertions remain; nine new assertions cover actual case-sensitive
+    receiving and literal shell values. Pinned Windows Node 22.22.2 passes all
+    49 controls; the original and export-removal inverse both fail.
+
+  The complete local suite now passes 379 of 387 controls. The sole changed
+  result is the corrected proxy fixture; the other eight failures match the
+  pre-fix full run. This does not qualify native macOS execution.
+
+  These are local-host findings, not additional release deferrals or proof
+  of a driver failure on its native OS. Linux implementation changes remain
+  with their Linux owner. Production proxy precedence is unchanged.
+
 ## Temporary dev release qualification deferrals
 
 The maintainer requested a release before 2026-10-09 09:00 Europe/Paris and
 explicitly authorized temporary test-execution deferrals when necessary.
 The closed policy in `.github/ci/dev_release_qualification_exceptions.json`
-applies only to the dev push prerelease `v0.0.0-dev.156` before 07:00 UTC.
+now applies only to the dev push prerelease `v0.0.0-dev.156` before
+2026-10-10 07:00 UTC, following the renewed publication request after the
+hosted consent diagnosis. The original October 9 deadline was missed.
 Main, pull requests, local runs and the next dev tag retain full execution.
 Every deferred qualification remains open and must never count as a pass:
 
@@ -9661,10 +9700,12 @@ Every deferred qualification remains open and must never count as a pass:
 - [ ] Qualify native macOS Shortcuts catalogue discovery. The first
       `app.shortcuts()` call exceeded twenty seconds; preserve the portable
       parser/JXA controls and do not infer permission or successful discovery.
-- [ ] Verify the corrected Windows SHA-256 staging operation on hosted
-      Windows. Local actual PowerShell controls, AHK generated-script contract,
-      whole-graph compilation and 70 E2E cases pass; cancelled CI receiving
-      does not prove the complete native download/trust chain.
+- [x] Verify the corrected Windows SHA-256 staging operation on hosted
+      Windows. CI run `37868449649` at
+      `b06aefcb6386aa4b875c1c86c29e27c07ab8f951` passes 10,454 unit cases,
+      including trusted native CA/static/PAC readiness and exact cleanup,
+      followed by E2E, packaging and installation/launch. The separate
+      full-URL PAC qualification above remains deferred.
 - [ ] Publish exact DEFERRED/source-bound receipts and these limitations in
       the prerelease notes, then complete and re-enable every missing native
       qualification. The temporary profile expires automatically and cannot
@@ -9673,6 +9714,44 @@ Every deferred qualification remains open and must never count as a pass:
 These deferrals do not close groups 2, 4 or 7, the Notepad/default-trigger
 qualification, recurring input incident 114 or promo follow-up 113. Their
 existing requirements and retained evidence remain authoritative.
+
+CI run `37868449649` passes Core and every Windows/Linux job under the
+documented four-scope profile. Diagnostic run `37898352401` reuses its exact
+archive on ARM and Intel and shows an unanswered Automation consent dialog:
+hosted-compute-agent requests control of ErgoptiPlus. Onboarding, continued
+application lifetime and normal Quit succeed. This establishes the external
+test precondition failure, not a Lua defect or a successful permission grant.
+
+- [ ] Qualify external macOS AppleEvents and the dependent native timer,
+      Karabiner and ScriptScope assertions on both architectures. The renewed
+      single-release profile records the four clean/Karabiner launch legs as
+      DEFERRED with `qualified:false`; lifecycle, other scenarios, packaging,
+      signing and installation remain required. Default, Main, PR and dev.157
+      runs must execute the complete assertions.
+
+- [ ] **116.** Provide a guided third-party prerelease validation report.
+      The maintainer requested a Debugging menu button that runs the needed
+      checks and returns one local file to share. Reuse asynchronous diagnostic
+      ownership, progress, cancellation and redacted export. Package the small
+      native probe graph through the canonical bundle owner. Keep quick export
+      as the default on all three OSes. Offer an unchecked "Include in-depth
+      tests (may take a long time)" checkbox, with progress, cancellation and
+      partial results. Reuse CI assertions that are safe in a personal session;
+      keep install, reload and profile-replacement suites in an explicitly
+      isolated mode and explain every unavailable prerequisite.
+      Bind results to
+      the actual version, source, package identity, OS and architecture; report
+      PASS, FAIL or NOT_RUN and observed permission/cleanup failures separately.
+      Run timers and Karabiner generation in private fixtures, external
+      AppleEvents only through normal user consent, and read-only Shortcuts
+      discovery. Run complete isolated Brew acceptance only when its declared
+      prerequisites exist. Never call CI profile seeding on a personal Mac,
+      change TCC, execute a personal shortcut or stop the resident driver.
+      Keep private text, configuration, shortcut names and credentials out of
+      the archive. Do not upload automatically. Match the menu/report contract
+      on all three drivers, with translated reasons for OS-specific checks.
+      An ARM report does not qualify Intel, future sources or hosted consent.
+      This follow-up does not delay the immediate dev.156 publication.
 
 ## Time estimate
 

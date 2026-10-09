@@ -4,6 +4,7 @@
 from contextlib import contextmanager
 import ast
 import inspect
+import io
 import json
 import hashlib
 from types import SimpleNamespace
@@ -64,6 +65,238 @@ def owned_directory_link(outer, link, target):
             link.rmdir()
         else:
             link.unlink()
+
+
+class OwnedCaptureLinkModel:
+    """Bind the single modeled Windows link to two retained real file streams."""
+
+    def __init__(self, path, target, value, capture_stream, target_stream):
+        if type(capture_stream) is not io.FileIO or type(target_stream) is not io.FileIO:
+            raise AssertionError("Capture link model requires actual unbuffered file owners")
+        self.path, self.target, self.value = path, target, value
+        self.capture_stream, self.target_stream = capture_stream, target_stream
+        self.native_lstat, self.native_fstat = Path.lstat, os.fstat
+        self.identities = {
+            path: self.identity(self.native_fstat(capture_stream.fileno())),
+            target: self.identity(self.native_fstat(target_stream.fileno())),
+        }
+        self.validate(path)
+
+    @staticmethod
+    def identity(metadata):
+        return metadata.st_dev, metadata.st_ino
+
+    def validate(self, observed):
+        if observed != self.path:
+            raise AssertionError("Foreign capture link projection refused")
+        for path, stream in ((self.path, self.capture_stream), (self.target, self.target_stream)):
+            if stream.closed or Path(stream.name) != path:
+                raise AssertionError("Closed or foreign capture stream refused")
+            retained = self.native_fstat(stream.fileno())
+            current = self.native_lstat(path)
+            if (
+                not stat.S_ISREG(retained.st_mode)
+                or not stat.S_ISREG(current.st_mode)
+                or retained.st_nlink != 1
+                or current.st_nlink != 1
+                or self.identity(retained) != self.identities[path]
+                or self.identity(current) != self.identities[path]
+            ):
+                raise AssertionError("Capture link file identity or regular kind changed")
+            stream.seek(0)
+            if retained.st_size != len(self.value) or stream.read(129) != self.value:
+                raise AssertionError("Retained capture link bytes changed")
+
+    def project(self, observed):
+        self.validate(observed)
+        metadata = self.native_lstat(observed)
+        modeled = list(metadata)
+        modeled[0] = stat.S_IFLNK | stat.S_IMODE(metadata.st_mode)
+        return os.stat_result(modeled)
+
+
+@contextmanager
+def owned_capture_file_link(path, target):
+    """Use real POSIX links; Windows projects only the exact retained file's type."""
+    path, target = Path(path), Path(target)
+    parent = path.parent.resolve(strict=True)
+    if path.parent != parent or target.parent != parent or path.exists():
+        raise AssertionError("Capture link must have one acquired physical parent and absent name")
+    target_info = target.lstat()
+    if not stat.S_ISREG(target_info.st_mode) or target_info.st_nlink != 1:
+        raise AssertionError("Capture link target must be the exact single-link regular fixture")
+    if os.name != "nt":
+        path.symlink_to(target)
+        yield None
+        return
+    with target.open("rb", buffering=0) as target_stream:
+        value = target_stream.read(129)
+        if not 0 < len(value) <= 128:
+            raise AssertionError("Capture link bytes exceed the existing parser bound")
+        with path.open("xb") as writer:
+            writer.write(value)
+        with path.open("rb", buffering=0) as capture_stream:
+            model = OwnedCaptureLinkModel(path, target, value, capture_stream, target_stream)
+            original_lstat = Path.lstat
+
+            def lstat(observed, *arguments, **options):
+                if observed != path:
+                    return original_lstat(observed, *arguments, **options)
+                if arguments or options:
+                    raise AssertionError("Unexpected capture-link metadata protocol")
+                return model.project(observed)
+
+            with patch.object(Path, "lstat", autospec=True, side_effect=lstat):
+                yield model
+
+
+def reject_changed_capture_link_inputs(case, model):
+    """Exercise the real model against foreign metadata, changed bytes and closed owners."""
+    foreign = model.path.parent / "foreign-link-model.stderr"
+    with foreign.open("xb") as writer:
+        writer.write(model.value)
+    try:
+        foreign_metadata = model.native_lstat(foreign)
+        original_lstat = model.native_lstat
+        with patch.object(
+            model,
+            "native_lstat",
+            side_effect=lambda path: (
+                foreign_metadata if path == model.path else original_lstat(path)
+            ),
+        ):
+            with case.assertRaisesRegex(AssertionError, "file identity"):
+                model.project(model.path)
+        wrong_kind = list(foreign_metadata)
+        wrong_kind[0] = stat.S_IFDIR | stat.S_IMODE(foreign_metadata.st_mode)
+        with patch.object(
+            model,
+            "native_lstat",
+            side_effect=lambda path: (
+                os.stat_result(wrong_kind) if path == model.path else original_lstat(path)
+            ),
+        ):
+            with case.assertRaisesRegex(AssertionError, "regular kind"):
+                model.project(model.path)
+        with case.assertRaisesRegex(AssertionError, "Foreign capture link"):
+            model.project(foreign)
+        with model.path.open("wb") as writer:
+            writer.write(b"changed owned bytes\n")
+        try:
+            with case.assertRaisesRegex(AssertionError, "bytes changed"):
+                model.project(model.path)
+        finally:
+            with model.path.open("wb") as writer:
+                writer.write(model.value)
+        case.assertTrue(stat.S_ISLNK(model.project(model.path).st_mode))
+        model.capture_stream.close()
+        with case.assertRaisesRegex(AssertionError, "Closed or foreign"):
+            model.project(model.path)
+    finally:
+        foreign.unlink()
+
+
+@contextmanager
+def owned_registration_capture_ports(root, path):
+    """Record POSIX directory/no-follow metadata only on the exact Windows capture.
+
+    Real regular-file open/read/fstat/close preserve bytes, device/inode and nlink.
+    These ports exercise the unchanged parser; they do not qualify native POSIX APIs.
+    """
+    if os.name != "nt":
+        yield None
+        return
+    if root != root.resolve(strict=True) or path.parent != root:
+        raise AssertionError("Registration ports require one acquired physical capture parent")
+    native_open, native_fstat, native_read, native_close = os.open, os.fstat, os.read, os.close
+    metadata = root.lstat()
+    if not stat.S_ISDIR(metadata.st_mode):
+        raise AssertionError("Registration port parent must remain an actual directory")
+    # Nonzero protocol sentinels are recording-only and never reach native Windows open.
+    model_directory, model_nofollow, model_nonblock = 1 << 24, 1 << 25, 1 << 26
+    modeled_bits = model_directory | model_nofollow | model_nonblock
+    directory_flags = os.O_RDONLY | model_directory | model_nofollow
+    file_flags = os.O_RDONLY | model_nofollow | model_nonblock
+    directory_metadata = list(metadata)
+    directory_metadata[0] = stat.S_IFDIR | 0o700
+    directory_token = object()
+    live_directory = False
+    directory_acquired = False
+    file_attempted = False
+    files = set()
+    witness = {"link_refusals": 0, "file_stats": 0, "reads": 0, "file_closes": 0, "flags": []}
+
+    def opening(value, flags, mode=0o777, *, dir_fd=None):
+        nonlocal live_directory, directory_acquired, file_attempted
+        if dir_fd is None and Path(value) == root and not directory_acquired:
+            if type(flags) is not int or flags != directory_flags:
+                raise OSError("Recorded directory capture flags refused")
+            witness["flags"].append(flags)
+            live_directory = True
+            directory_acquired = True
+            return directory_token
+        if (
+            dir_fd is not directory_token
+            or not live_directory
+            or value != path.name
+            or file_attempted
+        ):
+            raise AssertionError("Foreign, closed or duplicate capture opening refused")
+        if type(flags) is not int or flags != file_flags:
+            raise OSError("Recorded file capture flags refused")
+        witness["flags"].append(flags)
+        file_attempted = True
+        if path.is_symlink():
+            witness["link_refusals"] += 1
+            raise OSError("Controlled no-follow capture link refusal")
+        descriptor = native_open(path, flags & ~modeled_bits)
+        files.add(descriptor)
+        return descriptor
+
+    def fstat(descriptor):
+        if descriptor is directory_token and live_directory:
+            return os.stat_result(directory_metadata)
+        if descriptor not in files:
+            raise AssertionError("Foreign or closed capture observation refused")
+        witness["file_stats"] += 1
+        result = native_fstat(descriptor)
+        current = path.stat()
+        if (result.st_dev, result.st_ino) != (current.st_dev, current.st_ino):
+            raise AssertionError("The actual capture descriptor must retain its file identity")
+        return result
+
+    def reading(descriptor, limit):
+        if descriptor not in files or limit != 129:
+            raise AssertionError("Capture read must retain its exact descriptor and byte bound")
+        witness["reads"] += 1
+        return native_read(descriptor, limit)
+
+    def closing(descriptor):
+        nonlocal live_directory
+        if descriptor is directory_token and live_directory:
+            live_directory = False
+            return
+        if descriptor not in files:
+            raise AssertionError("Foreign or duplicate capture close refused")
+        native_close(descriptor)
+        files.remove(descriptor)
+        witness["file_closes"] += 1
+
+    with (
+        patch.object(probe.os, "O_DIRECTORY", model_directory, create=True),
+        patch.object(probe.os, "O_NOFOLLOW", model_nofollow, create=True),
+        patch.object(probe.os, "O_NONBLOCK", model_nonblock, create=True),
+        patch.object(probe.os, "getuid", return_value=metadata.st_uid, create=True),
+        patch.object(probe.os, "open", side_effect=opening),
+        patch.object(probe.os, "fstat", side_effect=fstat),
+        patch.object(probe.os, "read", side_effect=reading),
+        patch.object(probe.os, "close", side_effect=closing),
+    ):
+        try:
+            yield witness
+        finally:
+            if files or live_directory:
+                raise AssertionError("Exact registration capture retirement remains unacknowledged")
 
 
 class ReceiptLinkModel:
@@ -1989,12 +2222,51 @@ class AppKitRegistrationFactControls(unittest.TestCase):
             root = Path(directory).resolve(strict=True)
             children, receiver, path = self.capture(root, self.line(2))
             original = root / "original.stderr"
+            with owned_registration_capture_ports(root, path) as witness:
+                self.assertTrue(
+                    probe.appleevent_registration_fact(children, receiver),
+                    "The real owned capture must reach the unchanged parser",
+                )
+                if witness is not None:
+                    self.assertEqual(
+                        (witness["file_stats"], witness["reads"], witness["file_closes"]), (1, 1, 1)
+                    )
+                    self.assertEqual(
+                        witness["flags"],
+                        [
+                            probe.os.O_RDONLY | probe.os.O_DIRECTORY | probe.os.O_NOFOLLOW,
+                            probe.os.O_RDONLY | probe.os.O_NOFOLLOW | probe.os.O_NONBLOCK,
+                        ],
+                    )
+                    with self.assertRaisesRegex(AssertionError, "Foreign or closed"):
+                        probe.os.fstat(object())
+                    with self.assertRaisesRegex(AssertionError, "Foreign, closed or duplicate"):
+                        probe.os.open(root, probe.os.O_RDONLY)
+                    with self.assertRaisesRegex(AssertionError, "Foreign, closed or duplicate"):
+                        probe.os.open("foreign.stderr", probe.os.O_RDONLY, dir_fd=object())
             path.rename(original)
-            path.symlink_to(original)
-            self.assertEqual(probe.appleevent_registration_fact(children, receiver), {})
+            with owned_capture_file_link(path, original) as link_model:
+                with owned_registration_capture_ports(root, path) as witness:
+                    self.assertEqual(probe.appleevent_registration_fact(children, receiver), {})
+                    self.assertTrue(path.is_symlink(), "The exact link-kind witness is required")
+                    if witness is not None:
+                        self.assertEqual(witness["link_refusals"], 1)
+                        self.assertEqual(
+                            (witness["file_stats"], witness["reads"], witness["file_closes"]),
+                            (0, 0, 0),
+                        )
+                if link_model is not None:
+                    reject_changed_capture_link_inputs(self, link_model)
             path.unlink()
             os.link(original, path)
-            self.assertEqual(probe.appleevent_registration_fact(children, receiver), {})
+            with path.open("rb") as capture:
+                self.assertEqual(os.fstat(capture.fileno()).st_nlink, 2)
+            with owned_registration_capture_ports(root, path) as witness:
+                self.assertEqual(probe.appleevent_registration_fact(children, receiver), {})
+                if witness is not None:
+                    self.assertEqual(
+                        (witness["file_stats"], witness["reads"], witness["file_closes"]), (1, 0, 1)
+                    )
             path.unlink()
             original.rename(path)
             root.chmod(0o755)
@@ -2136,12 +2408,51 @@ class AppKitPolicyStateControls(unittest.TestCase):
             value = self.frame("regular", "prohibited")
             children, receiver, path = self.capture(root, value)
             original = root / "original.stderr"
+            with owned_registration_capture_ports(root, path) as witness:
+                self.assertTrue(
+                    probe.appleevent_registration_fact(children, receiver),
+                    "The real owned capture must reach the unchanged parser",
+                )
+                if witness is not None:
+                    self.assertEqual(
+                        (witness["file_stats"], witness["reads"], witness["file_closes"]), (1, 1, 1)
+                    )
+                    self.assertEqual(
+                        witness["flags"],
+                        [
+                            probe.os.O_RDONLY | probe.os.O_DIRECTORY | probe.os.O_NOFOLLOW,
+                            probe.os.O_RDONLY | probe.os.O_NOFOLLOW | probe.os.O_NONBLOCK,
+                        ],
+                    )
+                    with self.assertRaisesRegex(AssertionError, "Foreign or closed"):
+                        probe.os.fstat(object())
+                    with self.assertRaisesRegex(AssertionError, "Foreign, closed or duplicate"):
+                        probe.os.open(root, probe.os.O_RDONLY)
+                    with self.assertRaisesRegex(AssertionError, "Foreign, closed or duplicate"):
+                        probe.os.open("foreign.stderr", probe.os.O_RDONLY, dir_fd=object())
             path.rename(original)
-            path.symlink_to(original)
-            self.assertEqual(probe.appleevent_registration_fact(children, receiver), {})
+            with owned_capture_file_link(path, original) as link_model:
+                with owned_registration_capture_ports(root, path) as witness:
+                    self.assertEqual(probe.appleevent_registration_fact(children, receiver), {})
+                    self.assertTrue(path.is_symlink(), "The exact link-kind witness is required")
+                    if witness is not None:
+                        self.assertEqual(witness["link_refusals"], 1)
+                        self.assertEqual(
+                            (witness["file_stats"], witness["reads"], witness["file_closes"]),
+                            (0, 0, 0),
+                        )
+                if link_model is not None:
+                    reject_changed_capture_link_inputs(self, link_model)
             path.unlink()
             os.link(original, path)
-            self.assertEqual(probe.appleevent_registration_fact(children, receiver), {})
+            with path.open("rb") as capture:
+                self.assertEqual(os.fstat(capture.fileno()).st_nlink, 2)
+            with owned_registration_capture_ports(root, path) as witness:
+                self.assertEqual(probe.appleevent_registration_fact(children, receiver), {})
+                if witness is not None:
+                    self.assertEqual(
+                        (witness["file_stats"], witness["reads"], witness["file_closes"]), (1, 0, 1)
+                    )
             path.unlink()
             original.rename(path)
             root.chmod(0o755)

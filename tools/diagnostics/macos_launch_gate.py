@@ -46,6 +46,7 @@ other argument and runs on any host, because it launches nothing.
 
 import argparse
 import datetime
+import gzip
 import json
 import os
 from pathlib import Path
@@ -307,12 +308,12 @@ def seed(scenario, home, seed_tag, today):
 # ===================================
 
 
-def evaluate(scenario, observation):
+def evaluate(scenario, observation, *, defer_native=False):
     """Return every failed criterion for one scenario; an empty list is a pass."""
     failures = []
     if observation.get("managed_launch_observation_error") == "observer-cleanup-unsettled":
         failures.append("the supplemental managed public observer cleanup has not settled")
-    if scenario in ("clean", "karabiner_config"):
+    if not defer_native and scenario in ("clean", "karabiner_config"):
         if observation.get("native_transport_control_error"):
             failures.append(
                 "the native AppleEvent control failed: "
@@ -328,7 +329,7 @@ def evaluate(scenario, observation):
                 )
             except ValueError as error:
                 failures.append(f"the native AppleEvent control proof is incomplete: {error}")
-    if scenario == "karabiner_config":
+    if not defer_native and scenario == "karabiner_config":
         if observation.get("native_karabiner_config_error"):
             failures.append(
                 "the native Karabiner build/merge probe failed: "
@@ -339,7 +340,7 @@ def evaluate(scenario, observation):
                 validate_karabiner_summary(observation.get("native_karabiner_config"))
             except ValueError as error:
                 failures.append(f"the native Karabiner build/merge proof is incomplete: {error}")
-    if scenario == "clean":
+    if not defer_native and scenario == "clean":
         probe_error = observation.get("native_delayed_timer_error")
         if probe_error:
             failures.append(f"the native delayed-timer probe failed: {probe_error}")
@@ -576,27 +577,61 @@ def collect(output, state, home, executables):
         ["screencapture", "-x", str(output / "desktop.png")], capture_output=True, timeout=30
     )
     windows = collect_owned_windows(output, executables)
-    # Unified log and crash reports explain a child that dies or a launcher that
-    # stops logging, which the file logs alone cannot distinguish.
-    try:
-        unified = subprocess.run(
-            [
-                "log",
-                "show",
-                "--style",
-                "syslog",
-                "--last",
-                "4m",
-                "--predicate",
-                'process == "ErgoptiPlus" OR process == "Hammerspoon"',
-            ],
-            capture_output=True,
-            text=True,
-            timeout=120,
-        )
-        (output / "unified.log").write_text(unified.stdout[-400000:], encoding="utf-8")
-    except (OSError, subprocess.TimeoutExpired) as error:
-        (output / "unified.log").write_text(f"{type(error).__name__}: {error}\n", encoding="utf-8")
+    # Application-only logs omit the system service handling an AppleEvent
+    # authorization request. Keep its evidence separate on this disposable CI
+    # host, with the system's default privacy redaction and the same time bound.
+    unified_logs = []
+    for filename, predicate in (
+        ("unified.log", 'process == "ErgoptiPlus" OR process == "Hammerspoon"'),
+        (
+            "appleevents-system.log",
+            'process == "tccd" OR process == "appleeventsd" '
+            'OR subsystem == "com.apple.TCC" OR subsystem == "com.apple.appleevents"',
+        ),
+    ):
+        receipt = {"file": filename, "status": "unavailable"}
+        unified_logs.append(receipt)
+        try:
+            unified = subprocess.run(
+                [
+                    "log",
+                    "show",
+                    "--style",
+                    "syslog",
+                    "--info",
+                    "--debug",
+                    "--last",
+                    "4m",
+                    "--predicate",
+                    predicate,
+                ],
+                capture_output=True,
+                text=True,
+                timeout=120,
+            )
+            receipt.update(exit_status=unified.returncode, stderr=unified.stderr[-4000:])
+            # The tail is a preview: verbose TCC traffic can otherwise discard
+            # the initial consent request that explains a later native timeout.
+            receipt.update(
+                characters=len(unified.stdout),
+                preview_truncated=len(unified.stdout) > 400000,
+            )
+            archive_file = filename + ".gz"
+            with gzip.open(output / archive_file, "wt", encoding="utf-8") as handle:
+                handle.write(unified.stdout)
+            receipt["archive_file"] = archive_file
+            (output / filename).write_text(unified.stdout[-400000:], encoding="utf-8")
+            if unified.returncode == 0:
+                receipt["status"] = "captured"
+        except (OSError, subprocess.TimeoutExpired) as error:
+            receipt["cause"] = f"{type(error).__name__}: {error}"
+            try:
+                (output / filename).write_text(receipt["cause"] + "\n", encoding="utf-8")
+            except OSError as write_error:
+                receipt["preview_error"] = f"{type(write_error).__name__}: {write_error}"
+    (output / "unified-log-collection.json").write_text(
+        json.dumps(unified_logs, indent=2) + "\n", encoding="utf-8"
+    )
     for folder in (
         home / "Library/Logs/DiagnosticReports",
         Path("/Library/Logs/DiagnosticReports"),
@@ -608,7 +643,7 @@ def collect(output, state, home, executables):
                 ):
                     (output / "crash-reports").mkdir(exist_ok=True)
                     shutil.copyfile(report, output / "crash-reports" / report.name)
-    return {"errors": errors, "windows": windows}
+    return {"errors": errors, "windows": windows, "unified_logs": unified_logs}
 
 
 def print_native_probe_diagnostics(report):
@@ -670,8 +705,37 @@ def launch_command(scenario, app):
     return ["open", "-n", str(app)]
 
 
-def run(app, output, scenario, seed_tag):
+def read_launch_qualification(receipt_path, scenario):
+    """Validate the explicit CLI record before profile mutation; ambient profile is insufficient."""
+    helper = Path(__file__).resolve().parents[1] / "ci/dev-release-qualification.cjs"
+    result = subprocess.run(
+        [
+            "node",
+            str(helper),
+            "--scope",
+            "macos-launch-appleevents",
+            "--scenario",
+            scenario,
+            "--runner",
+            os.environ.get("MATRIX_RUNNER", ""),
+            "--validate-launch-receipt",
+            str(receipt_path),
+        ],
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+    return json.loads(result.stdout)
+
+
+def run(app, output, scenario, seed_tag, qualification_receipt=None):
     """Seed one state, launch the application, and return the complete report."""
+    qualification = (
+        read_launch_qualification(qualification_receipt, scenario)
+        if qualification_receipt is not None
+        else None
+    )
+    defer_native = qualification is not None
     home = Path.home()
     launcher = app / "Contents/MacOS/ErgoptiPlus"
     child = app / "Contents/Frameworks/Hammerspoon.app/Contents/MacOS/Hammerspoon"
@@ -684,6 +748,9 @@ def run(app, output, scenario, seed_tag):
         bundle_id = plistlib.load(handle)["CFBundleIdentifier"]
     arch = subprocess.run(["uname", "-m"], capture_output=True, text=True).stdout.strip()
     report = {"scenario": scenario, "machine": arch, "samples": []}
+    if defer_native:
+        report["qualification"] = qualification
+        report["native_qualified"] = False
     state = seed(scenario, home, seed_tag, datetime.date.today().isoformat())
     started = time.monotonic()
     observation = {}
@@ -691,10 +758,10 @@ def run(app, output, scenario, seed_tag):
     native_probe = None
     native_result_key = None
     native_owner_settled = False
-    if scenario == "clean":
+    if not defer_native and scenario == "clean":
         native_probe = NativeDelayedTimerProbe(app, output, HS_DOMAIN)
         native_result_key = "native_delayed_timer"
-    elif scenario == "karabiner_config":
+    elif not defer_native and scenario == "karabiner_config":
         native_probe = NativeKarabinerConfigProbe(app, output, HS_DOMAIN)
         native_result_key = "native_karabiner_config"
     try:
@@ -888,7 +955,7 @@ def run(app, output, scenario, seed_tag):
             report[native_result_key + "_error"] = observation[native_result_key + "_error"]
     report["quit_seconds"] = observation.get("quit_seconds")
     report["alive_after_window"] = observation.get("alive_after_window", False)
-    report["failures"] = evaluate(scenario, observation)
+    report["failures"] = evaluate(scenario, observation, defer_native=defer_native)
     if observation.get("launch_gate_error"):
         report["failures"].append(observation["launch_gate_error"])
     if diagnostic_errors:
@@ -912,7 +979,7 @@ def run(app, output, scenario, seed_tag):
             "status": "not_executed",
             "reason": "blocked by required original launch failure",
         }
-    elif scenario == "karabiner_config":
+    elif not defer_native and scenario == "karabiner_config":
         # Independent installed SDK/participant proof uses the same exact native
         # startup owner after every prior owner has retired. It cannot replace
         # the required managed launch or original feature verdict.
@@ -983,10 +1050,18 @@ def parse_arguments(argv):
     parser.add_argument(
         "--seed-tag", default="", help="older release whose files seed personal state"
     )
+    parser.add_argument(
+        "--qualification-receipt",
+        help="explicit source-bound missing-proof record; default runs every native probe",
+    )
     args = parser.parse_args(argv)
     launch_arguments = (args.app, args.output, args.scenario)
     if args.print_matrix is not None:
-        if any(value is not None for value in launch_arguments) or args.seed_tag:
+        if (
+            any(value is not None for value in launch_arguments)
+            or args.seed_tag
+            or args.qualification_receipt
+        ):
             parser.error("--print-matrix takes no launch argument")
     elif any(value is None for value in launch_arguments):
         parser.error("the launch mode needs app, output and scenario")
@@ -1005,7 +1080,9 @@ def main(argv=None):
         )
     output = Path(args.output).resolve()
     output.mkdir(parents=True, exist_ok=False)
-    report = run(Path(args.app).resolve(), output, args.scenario, args.seed_tag)
+    report = run(
+        Path(args.app).resolve(), output, args.scenario, args.seed_tag, args.qualification_receipt
+    )
     (output / "result.json").write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
     if report.get("supplementary_native_bootstrap"):
         print(
@@ -1021,6 +1098,11 @@ def main(argv=None):
         print_native_probe_diagnostics(report)
         print_tails(output)
         return 1
+    if report.get("qualification"):
+        print(
+            f"[DEFERRED] macos-launch-appleevents: {args.scenario}; native/feature qualified=false. Lifecycle checks completed; no native PASS recorded."
+        )
+        return 0
     print(
         f"macOS launch gate [{args.scenario}] passed on {report['machine']}; "
         f"quit in {report['quit_seconds']} s"
