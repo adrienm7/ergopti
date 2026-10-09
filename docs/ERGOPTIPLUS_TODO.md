@@ -5238,6 +5238,17 @@ original future-backend assertions. Independent source/control reviews are
 qualified; complete final-source gates and native UI, E2E, packaging, installation
 and physical acceptance remain separate requirements. Item31 remains partial.
 
+Closed native failure observations now retain bounded public context from the
+existing compiler journal and retired VirtualHID reference receipt. The journal
+projection preserves lexical integers, live-parent lineage, independent frozen
+vectors and the original Guardian result; the reference projection exposes only
+42 fixed ordinals and typed comparison flags. Original compile deadlines,
+source/currentness checks, 38 reference controls and the independent 42-record
+package corpus are unchanged. Thirty-three journal controls and eight reference
+projection controls are registered; Foundation, console transport and matching
+macOS execution remain unqualified here. These diagnostics do not prove a
+compiler timeout cause, authorize a driver or complete item31 and items16/38.
+
 - [~] **33.** Config policy for the files other than config.toml (the former
   item 25): Published in the second 2026-09-30 release for the files the review
   listed; see `docs/memory/text-input-and-config.md`. Current source already
