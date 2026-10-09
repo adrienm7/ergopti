@@ -3,6 +3,7 @@
 
 """Real loopback transport controls; native updater admission is separate."""
 
+import ast
 import contextlib
 import ctypes
 import errno
@@ -10,6 +11,7 @@ import hashlib
 import io
 import http.client
 import importlib.util
+import inspect
 import json
 import os
 from pathlib import Path
@@ -22,6 +24,7 @@ import subprocess
 import sys
 import tempfile
 import time
+from types import SimpleNamespace
 import unittest
 from unittest import mock
 
@@ -1240,6 +1243,144 @@ class PrivateNumericLoopbackBindTests(unittest.TestCase):
 
 class AcceptedSocketStopControls(unittest.TestCase):
     """Real loopback EOF/close; filesystem and Windows signal ports are modeled."""
+
+    def testOwnedStoppedReceiveGuardsRequireExactCompletedShutdownAndReadOrigin(self):
+        """Nineteen pure controls model Windows errors; no socket or native API is acquired."""
+        spec = importlib.util.spec_from_file_location("sparkle_stopped_receive_guards", HELPER)
+        helper = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(helper)
+        request = object()
+        modeled_errno = errno.EPIPE
+
+        def modeled_read():
+            raise BrokenPipeError(modeled_errno, "MODELED_PRIVATE_RECEIVE")
+
+        def modeled_write():
+            raise BrokenPipeError(modeled_errno, "MODELED_PRIVATE_WRITE")
+
+        def observed(action):
+            try:
+                action()
+            except OSError as failure:
+                return failure
+            self.fail("The controlled origin must produce an actual traceback")
+
+        read_failure, write_failure = observed(modeled_read), observed(modeled_write)
+        code = modeled_read.__code__
+        state = {"stopping": True}
+
+        def owner(**changed):
+            return SimpleNamespace(
+                **{
+                    "active_request": request,
+                    "active_stop_attempted": True,
+                    "active_handler_admitted": False,
+                    "active_stop_acknowledged": request,
+                    "stop_failure": None,
+                    **changed,
+                }
+            )
+
+        with (
+            mock.patch.object(helper.sys, "platform", "win32"),
+            mock.patch.object(helper.errno, "WSAESHUTDOWN", modeled_errno, create=True),
+        ):
+            predicate = helper._owned_stopped_receive
+            with self.subTest(control="exact-completed-owned-read"):
+                self.assertTrue(predicate(owner(), request, state, read_failure, code))
+            for label, held, lifecycle, failure in (
+                ("ack-absent", owner(active_stop_acknowledged=None), state, read_failure),
+                ("attempt-absent", owner(active_stop_attempted=False), state, read_failure),
+                ("shutdown-refused", owner(stop_failure=OSError(errno.EPERM)), state, read_failure),
+                ("non-stop", owner(), {"stopping": False}, read_failure),
+                ("foreign-active", owner(active_request=object()), state, read_failure),
+                ("foreign-ack", owner(active_stop_acknowledged=object()), state, read_failure),
+                ("handler-admitted", owner(active_handler_admitted=True), state, read_failure),
+                ("write-origin", owner(), state, write_failure),
+                ("malformed-stop", owner(), {"stopping": "true"}, read_failure),
+            ):
+                with self.subTest(control=label):
+                    self.assertFalse(predicate(held, request, lifecycle, failure, code))
+            for platform in ("darwin", "linux"):
+                with (
+                    self.subTest(control=platform),
+                    mock.patch.object(helper.sys, "platform", platform),
+                ):
+                    self.assertFalse(predicate(owner(), request, state, read_failure, code))
+            with (
+                self.subTest(control="unsupported-errno"),
+                mock.patch.object(helper.errno, "WSAESHUTDOWN", None),
+            ):
+                self.assertFalse(predicate(owner(), request, state, read_failure, code))
+            with self.subTest(control="malformed-owner"):
+                self.assertFalse(predicate(SimpleNamespace(), request, state, read_failure, code))
+            with self.subTest(control="genuine-read-code-refuses-modeled-origin"):
+                self.assertFalse(
+                    predicate(
+                        owner(), request, state, read_failure, socket.SocketIO.readinto.__code__
+                    )
+                )
+
+            tree = ast.parse(inspect.getsource(helper.serve))
+            classes = [
+                node
+                for node in tree.body[0].body
+                if isinstance(node, ast.ClassDef) and node.name == "PrivateServer"
+            ]
+            self.assertEqual(
+                len(classes), 1, "The actual retained server class must be uniquely selected"
+            )
+            methods = [
+                node
+                for node in classes[0].body
+                if isinstance(node, ast.FunctionDef) and node.name == "request_stop"
+            ]
+            self.assertEqual(
+                len(methods), 1, "The actual shutdown method must be uniquely selected"
+            )
+            scope = {"socket": socket, "state": {"stopping": False}}
+            exec(
+                compile(
+                    ast.Module(body=methods, type_ignores=[]), "actual-owned-stop-method", "exec"
+                ),
+                scope,
+            )
+            for mode in ("success", "inflight", "foreign-after-return", "failure"):
+                with self.subTest(control=mode):
+                    held = SimpleNamespace(
+                        active_request=None,
+                        active_stop_attempted=False,
+                        active_handler_admitted=False,
+                        active_stop_acknowledged=None,
+                        stop_failure=None,
+                    )
+                    calls = []
+
+                    def shutdown(how):
+                        self.assertEqual(how, socket.SHUT_RDWR)
+                        calls.append(how)
+                        self.assertIsNone(
+                            held.active_stop_acknowledged, "ACK cannot precede syscall completion"
+                        )
+                        if mode == "inflight":
+                            self.assertFalse(
+                                predicate(
+                                    held, held.active_request, scope["state"], read_failure, code
+                                )
+                            )
+                        if mode == "foreign-after-return":
+                            held.active_request = object()
+                        if mode == "failure":
+                            raise OSError(errno.EPERM, "MODELED_PRIVATE_STOP_REFUSAL")
+
+                    exact = SimpleNamespace(shutdown=shutdown)
+                    held.active_request = exact
+                    scope["request_stop"](held)
+                    self.assertEqual(calls, [socket.SHUT_RDWR])
+                    self.assertEqual(
+                        held.active_stop_acknowledged is exact, mode in ("success", "inflight")
+                    )
+                    self.assertEqual(held.stop_failure is not None, mode == "failure")
 
     def observe_stop(
         self, partial=False, native_signal=False, shutdown_refused=False, publication_cut=False

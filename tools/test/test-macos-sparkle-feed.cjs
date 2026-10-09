@@ -1005,14 +1005,14 @@ try {
 	assert.ifError(result.error);
 	assert.equal(result.signal, null, result.stderr);
 	assert.equal(result.status, 0, result.stderr);
-	assert.match(result.stderr, /Ran 46 tests in /);
+	assert.match(result.stderr, /Ran 47 tests in /);
 	const skipped = process.platform === 'win32' ? 17 : process.platform === 'darwin' ? 1 : 0;
 	assert.match(
 		result.stderr,
 		skipped ? new RegExp(`\\nOK \\(skipped=${skipped}\\)\\s*$`) : /\nOK\s*$/
 	);
 	console.log(
-		`Sparkle transport controls: ${46 - skipped} passed, ${skipped} platform cases skipped.`
+		`Sparkle transport controls: ${47 - skipped} passed, ${skipped} platform cases skipped.`
 	);
 	const fixture = fs.readFileSync(
 		path.join(
