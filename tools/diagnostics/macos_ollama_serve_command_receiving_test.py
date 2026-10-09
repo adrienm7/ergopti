@@ -3,6 +3,7 @@
 
 import os
 import shutil
+import shlex
 from pathlib import Path
 import subprocess
 import sys
@@ -32,6 +33,7 @@ class EmittedServeCommand(unittest.TestCase):
         )
         command = emitted.stdout.strip()
         self.assertTrue(command.startswith("exec "))
+        self.assertEqual(shlex.split(command)[:3], ["exec", sys.executable, "-IB"])
         self.assertEqual(emitted.stderr, "")
         self.assertNotIn("apply_system_network", command)
         self.assertNotIn("while IFS=", command)
@@ -85,6 +87,9 @@ class EmittedServeCommand(unittest.TestCase):
                 capture_output=True,
                 text=True,
                 timeout=30,
+            )
+            self.assertEqual(
+                shlex.split(emitted.stdout.strip())[:3], ["exec", sys.executable, "-IB"]
             )
             environment = dict(os.environ)
             home = Path(directory) / "home"

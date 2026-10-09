@@ -35,7 +35,7 @@ case(function()
 	check(Hint.matches(contract, catalogue, receipt, "macos-amd64", cd, rd), false)
 	check(Hint.matches(contract, catalogue, receipt, "macos-arm64", "", rd), false)
 end)
-local files, binary_present, network_calls, python = {}, true, 0, "/workspace/.tools/python/bin/python"
+local files, binary_present, network_calls, python = {}, true, 0, arg[4] or "/fixture/native/python"
 local raw_contract, raw_catalogue = Json.encode(contract), Json.encode(catalogue)
 local driver = root .. "/static/ergopti_plus/macos"
 local receipt_path = native:gsub("/ollama$", "/.ergopti-managed-runtime.json")
