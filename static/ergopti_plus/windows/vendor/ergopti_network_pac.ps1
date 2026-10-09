@@ -153,17 +153,29 @@ public static class ErgoptiNetworkPac
             return complete;
         }
     }
+    private static bool SameAuthority(Uri initial,Uri current)
+    {
+        return String.Equals(initial.Scheme,current.Scheme,StringComparison.OrdinalIgnoreCase) &&
+            String.Equals(initial.DnsSafeHost,current.DnsSafeHost,StringComparison.OrdinalIgnoreCase) &&
+            initial.Port==current.Port;
+    }
+    private static HttpWebRequest CreateSourceRequest(Uri initial,Uri current)
+    {
+        HttpWebRequest request=(HttpWebRequest)WebRequest.Create(current);
+        request.Credentials=SameAuthority(initial,current)?CredentialCache.DefaultNetworkCredentials:null;
+        return request;
+    }
     private static byte[] Fetch(string location,long deadline,long retirementDeadline,int maximum,int maxRedirects)
     {
         Uri current=AdmitLocation(location);
+        Uri initial=current;
         for(int hop=0;hop<=maxRedirects;hop++) {
             int remaining=Remaining(deadline);
             if(remaining==0)throw new TimeoutException();
-            HttpWebRequest request=(HttpWebRequest)WebRequest.Create(current);
+            HttpWebRequest request=CreateSourceRequest(initial,current);
             request.Proxy=null;
             request.AllowAutoRedirect=false;
             request.CachePolicy=new RequestCachePolicy(RequestCacheLevel.NoCacheNoStore);
-            request.Credentials=CredentialCache.DefaultNetworkCredentials;
             request.PreAuthenticate=false;
             request.Timeout=remaining;request.ReadWriteTimeout=remaining;
             request.Method="GET";request.KeepAlive=true;
@@ -337,6 +349,26 @@ public static class ErgoptiNetworkPac
 
 function Resolve-ErgoptiFullUrlPac {
     param([string]$DestinationUrl, [string]$PacUrl, [bool]$AutoDetect, [long]$Deadline, $Policy)
+    $Native = $Policy.native_pac
+    $Source = $Native.source_acquisition
+    $Fields = 'allowed_schemes,credential_scope,credentials,encodings,forbid_https_downgrade,required_status,route,strict_decoding'
+    if ($Source -isnot [Management.Automation.PSCustomObject] -or
+        (@($Source.PSObject.Properties.Name | Sort-Object) -join ',') -cne $Fields -or
+        $Source.route -isnot [string] -or $Source.route -cne 'direct' -or
+        $Source.credentials -isnot [string] -or $Source.credentials -cne 'native-default' -or
+        $Source.credential_scope -isnot [string] -or $Source.credential_scope -cne 'initial_authority' -or
+        $Source.allowed_schemes -isnot [Array] -or $Source.allowed_schemes.Count -ne 2 -or
+        @($Source.allowed_schemes | Where-Object { $_ -isnot [string] }).Count -ne 0 -or (@($Source.allowed_schemes) -join ',') -cne 'http,https' -or
+        $Source.encodings -isnot [Array] -or $Source.encodings.Count -ne 4 -or
+        @($Source.encodings | Where-Object { $_ -isnot [string] }).Count -ne 0 -or (@($Source.encodings) -join ',') -cne 'utf-8,utf-8-bom,utf-16le-bom,utf-16be-bom' -or
+        -not (Test-ErgoptiNetworkInt32 $Source.required_status) -or $Source.required_status -ne 200 -or
+        $Source.strict_decoding -isnot [bool] -or -not $Source.strict_decoding -or
+        $Source.forbid_https_downgrade -isnot [bool] -or -not $Source.forbid_https_downgrade) {
+        throw 'Canonical PAC source acquisition was refused.'
+    }
+    foreach ($Value in @($Native.max_script_bytes,$Native.max_heap_bytes,$Native.max_native_queries)) {
+        if (-not (Test-ErgoptiNetworkInt32 $Value) -or $Value -lt 1) { throw 'Canonical PAC bounds were refused.' }
+    }
     if ($PacUrl -eq '') {
         if (-not $AutoDetect) { throw 'Automatic configuration authority was refused.' }
         $Discovery = [ErgoptiNetworkPac]::Discover($Policy.max_proxy_bytes,$Deadline,[ErgoptiNativeProxyEx]::CleanupReserveMilliseconds)
@@ -345,10 +377,6 @@ function Resolve-ErgoptiFullUrlPac {
     }
     $null = Get-ErgoptiDestination $PacUrl
     $Destination = Get-ErgoptiDestination $DestinationUrl
-    $Native = $Policy.native_pac
-    foreach ($Value in @($Native.max_script_bytes,$Native.max_heap_bytes,$Native.max_native_queries)) {
-        if (-not (Test-ErgoptiNetworkInt32 $Value) -or $Value -lt 1) { throw 'Canonical PAC bounds were refused.' }
-    }
     $ManifestPath = Join-Path $PSScriptRoot 'ergopti_network_pac.json'
     $ManifestOwner = [IO.FileStream]::new($ManifestPath,[IO.FileMode]::Open,[IO.FileAccess]::Read,[IO.FileShare]::Read)
     try {
