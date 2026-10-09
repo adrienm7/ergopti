@@ -7547,6 +7547,15 @@ is committed; one request is one commit with its regression test.
   successful complete component chains; the Mac package remains failed and its
   installed upgrade cannot yet be claimed. No new hardware-only task is required.
 
+  Whole-suite validation prerequisite: the published Group1 boot-refusal
+  fixture patch now preserves the exact caller coordinator and every pending
+  field on both normal and throwing exits. All seven original registrations
+  and refusal assertions remain; definedness, accepted intent and genuine
+  pending-state controls are additive. Its exact current preimage and existing
+  coordinator/lease APIs were checked before receiving. Native AHK and the
+  ordered whole-suite join remain unrun on this source until final Windows CI;
+  no product writer is changed and this does not complete item71.
+
 - [ ] **73.** Use translated physical-key catalogue labels for every
       combination family/pair on all drivers, preserving the complete 182-entry
       matrix, action IDs, press order, setter refusals and three hidden
