@@ -25,7 +25,17 @@
 	"native_pac": {
 		"max_script_bytes": 1048576,
 		"max_heap_bytes": 67108864,
-		"max_native_queries": 128
+		"max_native_queries": 128,
+		"source_acquisition": {
+			"route": "direct",
+			"credentials": "native-default",
+			"credential_scope": "initial_authority",
+			"allowed_schemes": ["http", "https"],
+			"required_status": 200,
+			"encodings": ["utf-8", "utf-8-bom", "utf-16le-bom", "utf-16be-bom"],
+			"strict_decoding": true,
+			"forbid_https_downgrade": true
+		}
 	},
 	"max_proxy_bytes": 65536,
 	"selected_proxy_bypass": "environment",

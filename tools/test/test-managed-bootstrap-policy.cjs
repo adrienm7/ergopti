@@ -240,4 +240,58 @@ for (const [file, members] of [
 	);
 	controls++;
 }
+// The PAC source contract is explicit; caps still come from their existing owners.
+const sourcePolicy = JSON.parse(proxy).native_pac.source_acquisition;
+assert.deepEqual(sourcePolicy, {
+	route: 'direct',
+	credentials: 'native-default',
+	credential_scope: 'initial_authority',
+	allowed_schemes: ['http', 'https'],
+	required_status: 200,
+	encodings: ['utf-8', 'utf-8-bom', 'utf-16le-bom', 'utf-16be-bom'],
+	strict_decoding: true,
+	forbid_https_downgrade: true
+});
+controls++;
+for (const [key, value] of [
+	['route', 'system'],
+	['credentials', 'stored'],
+	['credential_scope', 'every_authority'],
+	['allowed_schemes', ['https']],
+	['allowed_schemes', ['http', 'https', 'file']],
+	['allowed_schemes', 'http,https'],
+	['required_status', true],
+	['required_status', 201],
+	['encodings', ['utf-8']],
+	['encodings', 'utf-8,utf-8-bom,utf-16le-bom,utf-16be-bom'],
+	['strict_decoding', false],
+	['strict_decoding', 1],
+	['forbid_https_downgrade', false],
+	['forbid_https_downgrade', 1],
+	['foreign', 1]
+]) {
+	const original = JSON.parse(proxy);
+	original.native_pac.source_acquisition[key] = value;
+	assert.throws(() => render(bootstrap, Buffer.from(JSON.stringify(original))));
+	controls++;
+}
+for (const key of Object.keys(sourcePolicy)) {
+	const original = JSON.parse(proxy);
+	delete original.native_pac.source_acquisition[key];
+	assert.throws(() => render(bootstrap, Buffer.from(JSON.stringify(original))));
+	controls++;
+}
+for (const [area, field, value] of [
+	['native_pac', 'max_script_bytes', 0],
+	['native_pac', 'max_script_bytes', true],
+	['native_pac', 'max_script_bytes', 2147483648],
+	['redirects', 'max_hops', 0],
+	['redirects', 'max_hops', 1.5],
+	['redirects', 'max_hops', 2147483648]
+]) {
+	const original = JSON.parse(proxy);
+	original[area][field] = value;
+	assert.throws(() => render(bootstrap, Buffer.from(JSON.stringify(original))));
+	controls++;
+}
 console.log(`Managed bootstrap policy: ${controls} controls passed; native SDK not executed.`);

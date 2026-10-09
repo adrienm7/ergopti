@@ -354,6 +354,26 @@ jobs:
           if-no-files-found: warn
           retention-days: 7
           path: ${{ env.ERGOPTI_OLLAMA_BUILD_ROOT }}/listener-xctest.log
+      - name: Qualify actual native PAC source ownership XCTest controls
+        if: ${{ !cancelled() }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "$ERGOPTI_NATIVE_HTTP_PYTHON"
+          test -x "$ERGOPTI_NATIVE_HTTP_PYTHON"
+          test -z "${ERGOPTI_DEV_QUALIFICATION_PROFILE:-}"
+          transcript="$ERGOPTI_OLLAMA_BUILD_ROOT/native-pac-source-xctest.log"
+          source_receipt="$ERGOPTI_OLLAMA_BUILD_ROOT/native-pac-source-inputs.json"
+          node tools/diagnostics/native_pac_source_evidence.cjs begin "$GITHUB_SHA" "$GITHUB_RUN_ID" "$GITHUB_RUN_ATTEMPT" "$ERGOPTI_OLLAMA_EXPECTED_ARCHITECTURE" "$source_receipt"
+          set +e
+          swift test --package-path static/ergopti_plus/macos/launcher \
+            --scratch-path "$ERGOPTI_OLLAMA_BUILD_ROOT/swift" \
+            --filter '(^|[.])ManagedPACSourceTests([/.]|$)' 2>&1 | tee "$transcript"
+          source_statuses=("${PIPESTATUS[@]}")
+          set -e
+          test "${#source_statuses[@]}" -eq 2
+          node tools/diagnostics/native_pac_source_evidence.cjs judge "$transcript" "${source_statuses[0]}" "${source_statuses[1]}" "$GITHUB_SHA" "$GITHUB_RUN_ID" "$GITHUB_RUN_ATTEMPT" "$ERGOPTI_OLLAMA_EXPECTED_ARCHITECTURE" "$source_receipt" "$ERGOPTI_OLLAMA_BUILD_ROOT/native-pac-source-verdict.json"
+        timeout-minutes: 10
       - name: Qualify actual native PAC and WPAD XCTest controls
         if: ${{ !cancelled() }}
         shell: bash
@@ -394,6 +414,9 @@ jobs:
           path: |
             ${{ env.ERGOPTI_OLLAMA_BUILD_ROOT }}/native-pac-xctest.log
             ${{ env.ERGOPTI_OLLAMA_BUILD_ROOT }}/native-pac-verdict.json
+            ${{ env.ERGOPTI_OLLAMA_BUILD_ROOT }}/native-pac-source-xctest.log
+            ${{ env.ERGOPTI_OLLAMA_BUILD_ROOT }}/native-pac-source-inputs.json
+            ${{ env.ERGOPTI_OLLAMA_BUILD_ROOT }}/native-pac-source-verdict.json
       - name: Receive actual independent managed HTTP native clients
         if: ${{ !cancelled() }}
         shell: bash
