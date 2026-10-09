@@ -96,8 +96,39 @@ function nativeLlmParentPublication(source, builderSource, definition, topLevel,
 		!one(loadTop, '::continue::') ||
 		!one(
 			loadTop,
-			'table.insert(result, { id = entry.id, greyed_when_paused = entry.greyed_when_paused == true })'
-		)
+			'local projected = { id = entry.id, greyed_when_paused = entry.greyed_when_paused == true }'
+		) ||
+		!one(loadTop, 'if entry.disabled == true then') ||
+		!one(
+			loadTop,
+			'projected.disabled, projected.i18n, projected.reason_key = true, entry.i18n, entry.reason_key'
+		) ||
+		!one(loadTop, 'table.insert(result, projected)') ||
+		positions(loadTop, 'projected').length !== 5
+	)
+		return false;
+	const loopAt = rootPositions(loadTop, 'for _, entry in ipairs(data.top_level) do')[0],
+		loopEnd = loadTop.closes.get(loopAt),
+		projectionAt = positions(loadTop, 'local projected =')[0],
+		disabledAt = positions(loadTop, 'if entry.disabled == true then')[0],
+		metadataAt = positions(
+			loadTop,
+			'projected.disabled, projected.i18n, projected.reason_key ='
+		)[0],
+		insertAt = positions(loadTop, 'table.insert(result, projected)')[0];
+	if (
+		loopEnd === undefined ||
+		!(
+			loopAt < projectionAt &&
+			projectionAt < disabledAt &&
+			disabledAt < metadataAt &&
+			metadataAt < insertAt &&
+			insertAt < loopEnd
+		) ||
+		loadTop.scopes[projectionAt] !== 1 ||
+		loadTop.scopes[disabledAt] !== 1 ||
+		loadTop.scopes[metadataAt] !== 2 ||
+		loadTop.scopes[insertAt] !== 1
 	)
 		return false;
 	const generate = body(builder, 'function M.generate(ctx, menu_mods, actions)');
