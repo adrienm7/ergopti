@@ -5936,6 +5936,13 @@ restore exact module identities. These focused results do not replace the
 complete selected gate, three-driver CI or installed-device qualification.
 Items 54 and 81 remain partial.
 
+The Windows LLM parent fixture follows the independently declared seven-row
+inventory after the published retirement of Live mode. Original native route
+and withdrawal checks remain, with independent controls for revived, missing,
+duplicate and reordered declarations. Source review passed; corrected native
+AHK cases and the complete Windows cohort remain unrun. Items 54 and 81 remain
+partial, including full three-driver and installed-device qualification.
+
 - [ ] **62.** Downloads on managed company networks: system trust and
       system proxy for every download child (Ollama installation/server/pull,
       updater/rollback and remote AI), with translated certificate/proxy/blocked/
@@ -7821,6 +7828,13 @@ controls cover idle stop omission and missing-owner refusal; fixture scopes
 restore exact module identities. These focused results do not replace the
 complete selected gate, three-driver CI or installed-device qualification.
 Items 54 and 81 remain partial.
+
+The Windows LLM parent fixture follows the independently declared seven-row
+inventory after the published retirement of Live mode. Original native route
+and withdrawal checks remain, with independent controls for revived, missing,
+duplicate and reordered declarations. Source review passed; corrected native
+AHK cases and the complete Windows cohort remain unrun. Items 54 and 81 remain
+partial, including full three-driver and installed-device qualification.
 
 - [~] **88.** **Partial: native prediction tooltip appearance.** Shared
   llm-line-style policy and the unchanged independent line corpus retain grey
