@@ -288,7 +288,7 @@ helpers.describe("dynamic expansion events carry the privacy verdict", function(
 
 	helpers.it("a date rule does not, because a date is not a secret", function()
 		with_fixture(function()
-			local fired, event = dh.on_trigger("dt\\", "\\")
+			local fired, event = dh.on_trigger("dt\\", "\\", true)
 			helpers.assert_true(fired, "'dt\\\\' is a registered date rule and must fire")
 			helpers.assert_true(event ~= nil, "a fired expansion returns its event")
 			helpers.assert_true(event.is_private ~= true,
@@ -313,7 +313,7 @@ helpers.describe("dynamic expansion events carry the privacy verdict", function(
 
 		with_fixture(function()
 			local personal_fired = dh.on_trigger("@p\\", "\\")
-			local date_fired = dh.on_trigger("dt\\", "\\")
+			local date_fired = dh.on_trigger("dt\\", "\\", true)
 			local combo_fired = dh.on_trigger("@np\\", "\\")
 			helpers.assert_true(personal_fired and date_fired and combo_fired,
 				"all three real output paths must reach the observing injector")
