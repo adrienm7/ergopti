@@ -33,6 +33,9 @@ local TaskLifecycle = require("adapters.task_lifecycle")
 local TimerScheduler = require("adapters.timer_scheduler")
 local JsonCodec = require("adapters.json_codec")
 local MlxRepo = require("ui.menu.menu_llm.models_manager_mlx_repo")
+local _module_source = (debug.getinfo(1, "S").source or ""):gsub("^@", ""):gsub("\\", "/")
+local _native_network_directory = _module_source:match("^(.*)/ui/menu/menu_llm/[^/]+$")
+_native_network_directory = _native_network_directory and (_native_network_directory .. "/platform/network")
 
 -- Optional download-progress webview; absent in headless/unusual layouts.
 local ok_dw, download_window = pcall(require, "ui.download_window")
@@ -1119,7 +1122,8 @@ function M.install(ctx)
 
 			local clean_repo = repo:gsub("[%c%s]", "")
 			local network_prelude, network_err = NetworkEnv.opaque_prelude("MLX")
-			if not network_prelude then
+			local native_directory_literal = _native_network_directory and JsonCodec.encode(_native_network_directory)
+			if not network_prelude or type(native_directory_literal) ~= "string" then
 				Logger.error(LOG, "The MLX model download cannot start: %s.", tostring(network_err))
 				do_cancel(true, "network_policy_missing")
 				return false
@@ -1152,6 +1156,9 @@ function M.install(ctx)
 			py:write("atexit.register(_write_exit, 1)\n")
 			py:write("try:\n")
 			py:write("    import truststore; truststore.inject_into_ssl()\n")
+			py:write("    sys.path.insert(0, " .. native_directory_literal .. ")\n")
+			py:write("    from managed_http import install_huggingface_transport\n")
+			py:write("    install_huggingface_transport()\n")
 			py:write("    from huggingface_hub import snapshot_download\n")
 			py:write("except Exception:\n")
 			py:write("    print('--- ERREUR DEPENDANCES ---', flush=True)\n")
@@ -1256,7 +1263,7 @@ function M.install(ctx)
 			-- Dependencies are pinned in pyproject.toml and installed by uv pip
 			-- sync — no runtime install/upgrade. Just verify the imports succeed.
 			f:write("\"$PYTHON_BIN\" -c 'import huggingface_hub, truststore' >/dev/null 2>&1 || { echo '[MLX] ❌ huggingface_hub/truststore manquants — relancez ensure-mlx-deps.sh'; exit 1; }\n")
-			f:write("\"$PYTHON_BIN\" -c 'import hf_transfer' 2>/dev/null && export HF_HUB_ENABLE_HF_TRANSFER=1 || export HF_HUB_ENABLE_HF_TRANSFER=0\n")
+			f:write("export HF_HUB_ENABLE_HF_TRANSFER=0\n")
 			f:write("HUB_DIR=\"$HOME/.cache/huggingface/hub\"\n")
 			f:write("SNAP_DIR=\"$HUB_DIR/" .. safe_repo_bash .. "/snapshots\"\n")
 			f:write("HAS_WEIGHTS=0\n")

@@ -646,6 +646,9 @@ jobs:
           # set. Historical published releases retain their attached feed.
           if [ "$create_release" = true ]; then
               node tools/build/macos-release-publication.cjs validate release-assets
+              python3 tools/build/verify-macos-managed-ollama-publication.py \
+                  --assets release-assets --tag "$TAG" \
+                  --version "${TAG#v}" --channel "$CHANNEL"
           fi
           echo "create_tag=$create_tag" >> "$GITHUB_OUTPUT"
           echo "create_release=$create_release" >> "$GITHUB_OUTPUT"

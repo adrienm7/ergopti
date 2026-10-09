@@ -49,7 +49,7 @@ _Updater_FindAsset(Json, AssetName, Tag) {
 		return 0
 	ExpectedUrl := "https://github.com/" . UPDATER_GH_OWNER . "/"
 		. UPDATER_GH_REPO . "/releases/download/" . Tag . "/" . AssetName
-	for _, Asset in Assets {
+	for AssetIndex, Asset in Assets {
 		if !(Asset is Map)
 			continue
 		if !Asset.Has("name") || !Asset.Has("browser_download_url")
@@ -65,7 +65,17 @@ _Updater_FindAsset(Json, AssetName, Tag) {
 			return 0
 		if !RegExMatch(DigestField, "i)^sha256:([0-9a-f]{64})$", &Match)
 			return 0
-		return { Url: Url, Digest: StrLower(Match[1]) }
+		if !Asset.Has("size") || Type(Asset["size"]) != "Integer"
+			|| Asset["size"] <= 0 || Asset["size"] > 2147483647
+			return 0
+		; JsonParse intentionally represents true as the native integer 1. Use
+		; canonical source spans of this exact selected asset to retain JSON kind,
+		; including decoded keys and the parser's last-member-wins identity.
+		AssetSpans := JsonArrayElementSpans(JsonObjectMemberSpans(Json)["assets"]["text"])
+		SizeToken := JsonObjectMemberSpans(AssetSpans[AssetIndex]["text"])["size"]["text"]
+		if !RegExMatch(SizeToken, "^(?:0|[1-9][0-9]*)$")
+			return 0
+		return { Url: Url, Digest: StrLower(Match[1]), Size: Asset["size"] }
 	}
 	return 0
 }
@@ -835,6 +845,58 @@ global UPDATER_SWAP_WAIT_OBJECT_0 := 0x00000000
 global UPDATER_SWAP_WAIT_TIMEOUT := 0x00000102
 global UPDATER_SWAP_WAIT_FAILED := 0xFFFFFFFF
 global UPDATER_SWAP_RESUME_FAILED := 0xFFFFFFFF
+#Include %A_LineFile%\..\..\..\adapters\updater_curl_capture.ahk
+
+global _UpdaterCurlCaptureDebt := Map()
+global _UpdaterCurlCaptureRetry := 0
+
+_Updater_RetireCurlCapture(Capture) {
+	global _UpdaterCurlCaptureDebt, _UpdaterCurlCaptureRetry, UPDATER_SWAP_CLEANUP_RETRY_MS
+	if !(Capture is _UpdaterCurlCaptureLedger)
+		return true
+	_UpdaterCurlCaptureDebt[ObjPtr(Capture)] := Capture
+	try Closed := Capture.Retire()
+	catch
+		Closed := false
+	if Closed {
+		if _UpdaterCurlCaptureDebt.Has(ObjPtr(Capture))
+			_UpdaterCurlCaptureDebt.Delete(ObjPtr(Capture))
+		return true
+	}
+	_UpdaterCurlCaptureDebt[ObjPtr(Capture)] := Capture
+	if !HasMethod(_UpdaterCurlCaptureRetry, "Call") {
+		Retry := _Updater_RetryCurlCaptureDebt
+		_UpdaterCurlCaptureRetry := Retry
+		Armed := false
+		try Armed := TimerArmOneShotMs(Retry, UPDATER_SWAP_CLEANUP_RETRY_MS)
+		catch
+			Armed := false
+		if !Armed && _UpdaterCurlCaptureRetry == Retry {
+			_UpdaterCurlCaptureRetry := 0
+			try LoggerWarn("Updater", "Curl capture retirement retry scheduling was refused; ownership debt is retained.")
+		}
+	}
+	return false
+}
+
+_Updater_RetryCurlCaptureDebt(*) {
+	global _UpdaterCurlCaptureDebt, _UpdaterCurlCaptureRetry
+	_UpdaterCurlCaptureRetry := 0
+	Pending := []
+	for OwnerKey, Capture in _UpdaterCurlCaptureDebt
+		Pending.Push(Capture)
+	for Capture in Pending
+		_Updater_RetireCurlCapture(Capture)
+	return _UpdaterCurlCaptureDebt.Count == 0
+}
+
+_Updater_RetireCurlCaptureArtifacts(Artifacts) {
+	if IsObject(Artifacts) && Artifacts.HasOwnProp("CurlCapture")
+		return _Updater_RetireCurlCapture(Artifacts.CurlCapture)
+	return true
+}
+
+
 global _UpdaterSwapCleanupDebt := Map()
 global _UpdaterSwapCleanupDebtCounter := 0
 global _UpdaterSwapCleanupRetryTimer := 0
@@ -1835,7 +1897,7 @@ _Updater_PublishManagedFailure(Failure, Owner, StagingEpoch) {
 _Updater_TryReserveDownloadTransaction(Request, BoundarySuspended, ExpectedFailureOwner := 0) {
 	global _UpdaterDownloadInProgress, _UpdaterSelfUpdateEpoch
 	global _UpdaterDownloadRequest, _UpdaterRecoveryPublishTarget
-	global _UpdaterDownloadStartedTick
+	global _UpdaterDownloadStartedTick, _UpdaterCurlCaptureDebt
 	global UPDATER_REQUEST_POLICY_ALLOW
 	Outcome := {
 		Reserved: false,
@@ -1853,7 +1915,7 @@ _Updater_TryReserveDownloadTransaction(Request, BoundarySuspended, ExpectedFailu
 		} else if (_Updater_RequestPolicy(Request, BoundarySuspended)
 			!= UPDATER_REQUEST_POLICY_ALLOW) {
 			Outcome.ShouldDrop := true
-		} else if (_UpdaterRecoveryPublishTarget != "") {
+		} else if (_UpdaterRecoveryPublishTarget != "" || _UpdaterCurlCaptureDebt.Count != 0) {
 			Outcome.RecoveryBusy := true
 		} else if _UpdaterDownloadInProgress {
 			Outcome.DuplicateDownload := true
@@ -2053,7 +2115,7 @@ Updater_DownloadAndInstall(Release, Request := unset, IsSuspended := unset, Rebu
 	}
 
 	_Updater_StartStagingWorker(AssetUrl, Asset.Digest, NewExe, SwapScriptPath,
-		CurrentExe, Release.Tag, StagingEpoch, Release, Request, InstallObserver)
+		CurrentExe, Release.Tag, StagingEpoch, Release, Request, InstallObserver, Asset.Size)
 	if !_Updater_SelfUpdateEpochIsCurrent(StagingEpoch)
 		return false
 	if IsObject(RebuildFn)
@@ -2106,7 +2168,7 @@ _Updater_EncodeUtf8Payload(Text) {
 _Updater_BuildStagingTransport(Script, SwapScript, AssetUrl, ExpectedSha256, NewExe,
 	SwapScriptPath, CurrentExe,
 	MinimumSize, TimeoutMs, DownloadModulePath := "", DeadlineMs := 0, StartedTick := 0,
-	ProxyPolicyPath := "", UpdaterDefaultsPath := "") {
+	ProxyPolicyPath := "", UpdaterDefaultsPath := "", AuthenticatedSize := 0) {
 	global _UpdaterStagingTransportCounter, UPDATER_STAGING_ENV_MAX_CHARS, UPDATER_STAGING_MAX_SCRIPT_CHUNKS
 	_UpdaterStagingTransportCounter += 1
 	Prefix := "ERGOPTI_UPDATER_" . DllCall("GetCurrentProcessId", "UInt")
@@ -2131,7 +2193,8 @@ _Updater_BuildStagingTransport(Script, SwapScript, AssetUrl, ExpectedSha256, New
 		{ Name: Prefix . "_DEADLINE", Value: DeadlineMs },
 		{ Name: Prefix . "_STARTED_TICK", Value: StartedTick },
 		{ Name: Prefix . "_PROXY_POLICY", Value: ProxyPolicyPath },
-		{ Name: Prefix . "_UPDATER_DEFAULTS", Value: UpdaterDefaultsPath }
+		{ Name: Prefix . "_UPDATER_DEFAULTS", Value: UpdaterDefaultsPath },
+		{ Name: Prefix . "_AUTHENTICATED_SIZE", Value: AuthenticatedSize }
 	]
 	Environment.Push({ Name: Prefix . "_SCRIPT_COUNT", Value: ScriptChunkCount })
 	Loop ScriptChunkCount - 1 {
@@ -2157,17 +2220,23 @@ _Updater_BuildStagingTransport(Script, SwapScript, AssetUrl, ExpectedSha256, New
 		if StrLen(Pair.Value) > UPDATER_STAGING_ENV_MAX_CHARS
 			throw ValueError("Staging environment value exceeds the cmd.exe inheritance budget")
 	}
+	; Consumed payloads must not overflow the Framework compiler's inherited ANSI environment.
 	Bootstrap := '$ErrorActionPreference=' . Chr(39) . 'Stop' . Chr(39) . ';'
 		. '$ProgressPreference=' . Chr(39) . 'SilentlyContinue' . Chr(39) . ';'
-		. '$scriptPayload=$env:' . Prefix . '_SCRIPT;'
-		. 'for($i=2;$i -le [int]$env:' . Prefix . '_SCRIPT_COUNT;$i++){$scriptPayload+=[Environment]::GetEnvironmentVariable(' . Chr(39) . Prefix . '_SCRIPT_' . Chr(39) . '+$i)};'
+		. 'if($env:' . Prefix . '_SCRIPT_COUNT -cne ' . Chr(39) . ScriptChunkCount . Chr(39) . ' -or $env:' . Prefix . '_SWAP_COUNT -cne ' . Chr(39) . SwapChunkCount . Chr(39) . '){throw "Staging fragment counts were refused"};'
+		. '$scriptPayload=$env:' . Prefix . '_SCRIPT;if([string]::IsNullOrEmpty($scriptPayload)){throw "Staging source fragment was refused"};'
+		. 'for($i=2;$i -le [int]$env:' . Prefix . '_SCRIPT_COUNT;$i++){$chunk=[Environment]::GetEnvironmentVariable(' . Chr(39) . Prefix . '_SCRIPT_' . Chr(39) . '+$i);if([string]::IsNullOrEmpty($chunk)){throw "Staging source fragment was refused"};$scriptPayload+=$chunk};'
 		. '$source=[Text.Encoding]::Unicode.GetString([Convert]::FromBase64String($scriptPayload));'
 		. '$swapPayload=' . Chr(39) . Chr(39) . ';'
-		. 'for($i=1;$i -le [int]$env:' . Prefix . '_SWAP_COUNT;$i++){$swapPayload+=[Environment]::GetEnvironmentVariable(' . Chr(39) . Prefix . '_SWAP_' . Chr(39) . '+$i)};'
+		. 'for($i=1;$i -le [int]$env:' . Prefix . '_SWAP_COUNT;$i++){$chunk=[Environment]::GetEnvironmentVariable(' . Chr(39) . Prefix . '_SWAP_' . Chr(39) . '+$i);if([string]::IsNullOrEmpty($chunk)){throw "Staging swap fragment was refused"};$swapPayload+=$chunk};'
+		. 'for($i=1;$i -le [int]$env:' . Prefix . '_SCRIPT_COUNT;$i++){$chunkName=if($i -eq 1){' . Chr(39) . Prefix . '_SCRIPT' . Chr(39) . '}else{' . Chr(39) . Prefix . '_SCRIPT_' . Chr(39) . '+$i};[Environment]::SetEnvironmentVariable($chunkName,[NullString]::Value)};'
+		. '[Environment]::SetEnvironmentVariable(' . Chr(39) . Prefix . '_SCRIPT_COUNT' . Chr(39) . ',[NullString]::Value);'
+		. 'for($i=1;$i -le [int]$env:' . Prefix . '_SWAP_COUNT;$i++){[Environment]::SetEnvironmentVariable(' . Chr(39) . Prefix . '_SWAP_' . Chr(39) . '+$i,[NullString]::Value)};'
+		. '[Environment]::SetEnvironmentVariable(' . Chr(39) . Prefix . '_SWAP_COUNT' . Chr(39) . ',[NullString]::Value);'
 		. '$worker=[ScriptBlock]::Create($source);'
 		. '& $worker $env:' . Prefix . '_URL $env:' . Prefix . '_DIGEST $env:' . Prefix . '_NEW_EXE $env:' . Prefix . '_SWAP_PATH $env:' . Prefix . '_CURRENT'
 		. ' ([int64]$env:' . Prefix . '_MINIMUM) ([int]$env:' . Prefix . '_TIMEOUT'
-		. ') $swapPayload $env:' . Prefix . '_DOWNLOAD_MODULE ([int]$env:' . Prefix . '_DEADLINE) ([int64]$env:' . Prefix . '_STARTED_TICK) $env:' . Prefix . '_PROXY_POLICY $env:' . Prefix . '_UPDATER_DEFAULTS'
+		. ') $swapPayload $env:' . Prefix . '_DOWNLOAD_MODULE ([int]$env:' . Prefix . '_DEADLINE) ([int64]$env:' . Prefix . '_STARTED_TICK) $env:' . Prefix . '_PROXY_POLICY $env:' . Prefix . '_UPDATER_DEFAULTS -AuthenticatedSize ([int64]$env:' . Prefix . '_AUTHENTICATED_SIZE)'
 	Args := ["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass",
 		"-EncodedCommand", _Updater_EncodePowerShellCommand(Bootstrap)]
 	for Arg in Args {
@@ -2196,6 +2265,31 @@ _Updater_BuildStagingTransport(Script, SwapScript, AssetUrl, ExpectedSha256, New
 	}
 }
 
+; Bind only the parent's exact owned capture through the existing private transport.
+_Updater_BindCurlCaptureTransport(Transport, Capture) {
+	global UPDATER_STAGING_ENV_MAX_CHARS
+	if !(Capture is _UpdaterCurlCaptureLedger) || Capture.Retired || Capture.Acquiring
+		|| Type(Transport) != "Object" || !Transport.HasOwnProp("Environment")
+		|| !(Transport.Environment is Array) || Transport.Environment.Length == 0
+		|| !Capture.ValidatePaths()
+		throw Error("Parent-owned curl capture transport was refused.")
+	if StrLen(Capture.Path) > UPDATER_STAGING_ENV_MAX_CHARS
+		throw ValueError("Curl capture exceeds the private inheritance budget.")
+	First := Transport.Environment[1].Name
+	if !RegExMatch(First, "\A(ERGOPTI_UPDATER_[0-9]+_[0-9]+_[0-9]+)_SCRIPT\z", &Prefix)
+		throw Error("Curl capture requires the original staging environment owner.")
+	Name := Prefix[1] . "_CURL_CAPTURE"
+	for Pair in Transport.Environment
+		if Pair.Name == Name
+			throw Error("Curl capture transport has already been initialized.")
+	Transport.Environment.Push({Name: Name, Value: Capture.Path})
+	EnvSet(Name, Capture.Path)
+	Transport.Bootstrap .= ' -OwnedCaptureDirectory $env:' . Name
+	Transport.Args := ["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass",
+		"-EncodedCommand", _Updater_EncodePowerShellCommand(Transport.Bootstrap)]
+}
+
+
 _Updater_ClearStagingTransport(Transport) {
 	if (Type(Transport) != "Object" or !Transport.HasOwnProp("Environment"))
 		return
@@ -2203,10 +2297,10 @@ _Updater_ClearStagingTransport(Transport) {
 		try EnvSet(Pair.Name, "")
 }
 
-_Updater_StartStagingWorker(AssetUrl, ExpectedSha256, NewExe, SwapScriptPath, CurrentExe, Tag, StagingEpoch, Release := 0, Request := 0, InstallObserver := unset) {
+_Updater_StartStagingWorker(AssetUrl, ExpectedSha256, NewExe, SwapScriptPath, CurrentExe, Tag, StagingEpoch, Release := 0, Request := 0, InstallObserver := unset, AuthenticatedSize := 0) {
 	global _UpdaterDownloadWorker, UPDATER_HTTP_DOWNLOAD_RECEIVE_TIMEOUT_MS, UPDATER_MIN_EXE_SIZE_BYTES
 	global _VendorDir, _SharedDir, UPDATER_HTTP_DOWNLOAD_DEADLINE_MS, _UpdaterDownloadStartedTick
-	global _UpdaterDownloadInProgress, _UpdaterSelfUpdateEpoch
+	global _UpdaterDownloadInProgress, _UpdaterSelfUpdateEpoch, _UpdaterDownloadArtifacts
 	StagingScript := _Updater_BuildStagingWorkerScript()
 	SwapScript := _Updater_BuildSwapWorkerScript()
 	FailureOwner := IsSet(InstallObserver)
@@ -2222,17 +2316,36 @@ _Updater_StartStagingWorker(AssetUrl, ExpectedSha256, NewExe, SwapScriptPath, Cu
 	Started := false
 	Published := false
 	StartError := ""
+	Capture := 0
 	try {
+		if AuthenticatedSize > 0 {
+			Capture := _UpdaterCurlCaptureLedger()
+			PreviousCritical := Critical("On")
+			try {
+				if !_Updater_SelfUpdateEpochIsCurrent(StagingEpoch) || !IsObject(_UpdaterDownloadArtifacts)
+					throw Error("Curl capture transaction is no longer current.")
+				_UpdaterDownloadArtifacts.CurlCapture := Capture
+			} finally Critical(PreviousCritical)
+			SplitPath(NewExe, , &CaptureParent)
+			Capture.Acquire(CaptureParent)
+			if !_Updater_SelfUpdateEpochIsCurrent(StagingEpoch)
+				throw Error("Curl capture allocation crossed transaction retirement.")
+		}
 		Transport := _Updater_BuildStagingTransport(
 			StagingScript, SwapScript, AssetUrl, ExpectedSha256, NewExe, SwapScriptPath, CurrentExe,
 			UPDATER_MIN_EXE_SIZE_BYTES, UPDATER_HTTP_DOWNLOAD_RECEIVE_TIMEOUT_MS,
 			_VendorDir . "\ergopti_updater_download.ps1", UPDATER_HTTP_DOWNLOAD_DEADLINE_MS,
 			_UpdaterDownloadStartedTick,
 			_SharedDir . "\modules\network\proxy_policy.json",
-			_SharedDir . "\modules\updater\defaults.json")
+			_SharedDir . "\modules\updater\defaults.json", AuthenticatedSize)
+		if IsObject(Capture)
+			_Updater_BindCurlCaptureTransport(Transport, Capture)
 		if _Updater_SelfUpdateEpochIsCurrent(StagingEpoch) {
+			NativeAdopt := IsObject(Capture) ? ObjBindMethod(Capture, "OnNativeAdopt") : 0
 			Worker := ShellRunner_SpawnTreeOwned(
-				_Updater_PowerShellPath(), Transport.Args, _OnDone)
+				_Updater_PowerShellPath(), Transport.Args, _OnDone, , NativeAdopt)
+			if IsObject(Capture)
+				Capture.Attach(Worker)
 			PreviousCritical := Critical("On")
 			try {
 				if (_UpdaterDownloadInProgress
@@ -2256,6 +2369,8 @@ _Updater_StartStagingWorker(AssetUrl, ExpectedSha256, NewExe, SwapScriptPath, Cu
 		_Updater_ClearStagingTransport(Transport)
 	}
 	if !Started {
+		if IsObject(Capture)
+			_Updater_RetireCurlCapture(Capture)
 		PreviousCritical := Critical("On")
 		try {
 			if (IsObject(Worker) and IsObject(_UpdaterDownloadWorker)
@@ -2329,7 +2444,9 @@ _Updater_CancelSelfUpdateForSuspend() {
 
 _Updater_QuiesceSelfUpdateForSuspend() {
 	_Updater_CancelSelfUpdateForSuspend()
-	return _Updater_RetrySwapCleanupDebt()
+	SwapClosed := _Updater_RetrySwapCleanupDebt()
+	CaptureClosed := _Updater_RetryCurlCaptureDebt()
+	return SwapClosed && CaptureClosed
 }
 
 _Updater_CancelSelfUpdateTransaction(LogMessage, RebuildMenu := true, SurfacePausedRequest := false, ExpectedEpoch := 0) {
@@ -2372,7 +2489,8 @@ _Updater_CancelSelfUpdateTransaction(LogMessage, RebuildMenu := true, SurfacePau
 		try Worker.terminate()
 	if (Owner is Map)
 		_Updater_CloseSwapOwner(Owner, true)
-	if IsObject(Artifacts) {
+	CaptureClosed := _Updater_RetireCurlCaptureArtifacts(Artifacts)
+	if IsObject(Artifacts) && CaptureClosed {
 		for Name in ["NewExe", "SwapScript"] {
 			Path := Artifacts.HasOwnProp(Name) ? Artifacts.%Name% : ""
 			if (Path != "" and FSExists(Path) and !FSDelete(Path))
@@ -2456,6 +2574,12 @@ _Updater_PollDownloadAsync(ExitCode, Stdout, Stderr, SwapScriptPath, NewExe, Cur
 		return
 	if !_Updater_AdmitStagingCompletion(StagingEpoch)
 		return
+	global _UpdaterDownloadArtifacts
+	if !_Updater_RetireCurlCaptureArtifacts(_UpdaterDownloadArtifacts) {
+		_Updater_ReportInstallFailure("updater.install_error_download", "changelog_window.install_error_download")
+		_Updater_EndDownloadTransaction(StagingEpoch)
+		return
+	}
 	if A_IsSuspended {
 		try LoggerWarn("Updater", "Update staging completion discarded while suspended.")
 		_Updater_NotifyInstallPhase("failed", "changelog_window.install_error_download")
@@ -2485,9 +2609,9 @@ _Updater_PollDownloadAsync(ExitCode, Stdout, Stderr, SwapScriptPath, NewExe, Cur
 ; Returns the compact staging orchestrator. Trusted helper paths and release
 ; data use the private inherited environment, never PowerShell interpolation.
 _Updater_BuildStagingWorkerScript() {
-	return 'param([string]$Url, [string]$ExpectedSha256, [string]$NewExe, [string]$SwapScriptPath, [string]$CurrentExe, [int64]$MinimumSize, [int]$TimeoutMs, [string]$SwapScriptPayload, [string]$DownloadModulePath, [int]$DeadlineMs, [int64]$StartedTick, [string]$ProxyPolicyPath, [string]$UpdaterDefaultsPath, [scriptblock]$ReadConfig=$null, [scriptblock]$ReadEnvironment=$null)' . "`n"
+	return 'param([string]$Url, [string]$ExpectedSha256, [string]$NewExe, [string]$SwapScriptPath, [string]$CurrentExe, [int64]$MinimumSize, [int]$TimeoutMs, [string]$SwapScriptPayload, [string]$DownloadModulePath, [int]$DeadlineMs, [int64]$StartedTick, [string]$ProxyPolicyPath, [string]$UpdaterDefaultsPath, [scriptblock]$ReadConfig=$null, [scriptblock]$ReadEnvironment=$null, [int64]$AuthenticatedSize=0, [string]$OwnedCaptureDirectory="")' . "`n"
 		. '$ErrorActionPreference = "Stop"' . "`n"
-		. '$State=@{Stage="proxy_resolve";Reason="download";Receipt=@{};CleanupDebt=@()}' . "`n"
+		. '$State=@{Stage="proxy_resolve";Reason="download";Receipt=@{};CleanupDebt=@()};if ($OwnedCaptureDirectory -ne "") {$State.OwnedCaptureDirectory=$OwnedCaptureDirectory}' . "`n"
 		. 'function CleanWorker($Path,$Name){try{[IO.File]::Delete($Path)}catch{if(Get-Command Add-ErgoptiUpdaterCleanupDebt -ErrorAction SilentlyContinue){Add-ErgoptiUpdaterCleanupDebt $State $Name "file_remove" $_.Exception}else{$State.CleanupDebt+=@{resource=$Name;receipt=@{backend="dotnet";stage="file_remove";failure_provenance="unknown"}}}}}' . "`n"
 		. 'try {' . "`n"
 		. '  . $DownloadModulePath' . "`n"
@@ -2495,7 +2619,7 @@ _Updater_BuildStagingWorkerScript() {
 		. '  $Resolver={param($Destination,$Budget) Resolve-ErgoptiNativeNetworkRoutes $Destination $Budget $ReadConfig $ReadEnvironment $ProxyPolicyPath $UpdaterDefaultsPath}' . "`n"
 		. '  $Request=[System.Net.HttpWebRequest]::Create($Url)' . "`n"
 		. '  $Request.ReadWriteTimeout = $TimeoutMs' . "`n"
-		. '  $ExpectedSize=Invoke-ErgoptiUpdaterDownload $Request $NewExe $TimeoutMs $State $Resolver $DeadlineMs $StartedTick' . "`n"
+		. '  if ($AuthenticatedSize -gt 0) {$ExpectedSize=Invoke-ErgoptiUpdaterCurlDownload ([Uri]$Url) $NewExe $TimeoutMs $State $Resolver $DeadlineMs $StartedTick $AuthenticatedSize $ProxyPolicyPath $UpdaterDefaultsPath $ReadEnvironment} else {$ExpectedSize=Invoke-ErgoptiUpdaterDownload $Request $NewExe $TimeoutMs $State $Resolver $DeadlineMs $StartedTick}' . "`n"
 		. '  $State.Stage="file_read"' . "`n"
 		. '  $ActualSize=(Get-Item -LiteralPath $NewExe).Length' . "`n"
 		. '  if ($ExpectedSize -gt 0 -and $ActualSize -ne $ExpectedSize) { throw "Content-Length mismatch" }' . "`n"
@@ -2505,18 +2629,19 @@ _Updater_BuildStagingWorkerScript() {
 		. '  $null=Get-ErgoptiUpdaterRemainingMilliseconds $StartedTick $DeadlineMs $State' . "`n"
 		. '  if ($ActualDigest -cne $ExpectedSha256) { $State.Reason="verify";throw "SHA-256 digest mismatch" }' . "`n"
 		. '  $SwapSource=[Text.Encoding]::UTF8.GetString([Convert]::FromBase64String($SwapScriptPayload))' . "`n"
-		. '  $State.Stage="file_remove";[IO.File]::Delete($SwapScriptPath)' . "`n"
+		. '  if ($AuthenticatedSize -le 0) {$State.Stage="file_remove";[IO.File]::Delete($SwapScriptPath)}' . "`n"
 		. '  $State.Stage="file_write"' . "`n"
 		. '  $null=Get-ErgoptiUpdaterRemainingMilliseconds $StartedTick $DeadlineMs $State' . "`n"
-		. '  [IO.File]::WriteAllText($SwapScriptPath,$SwapSource,[Text.UTF8Encoding]::new($false))' . "`n"
+		. '  if ($AuthenticatedSize -le 0) {[IO.File]::WriteAllText($SwapScriptPath,$SwapSource,[Text.UTF8Encoding]::new($false))} else {$SwapOutput=$null;try{$State.Stage="file_create";$SwapOutput=[IO.File]::Open($SwapScriptPath,[IO.FileMode]::CreateNew,[IO.FileAccess]::Write,[IO.FileShare]::None);$State.SwapWorkerOwned=$true;$State.Stage="file_write";$SwapBytes=[Text.Encoding]::UTF8.GetBytes($SwapSource);$SwapOutput.Write($SwapBytes,0,$SwapBytes.Length);$SwapOutput.Flush($true)}finally{Close-ErgoptiUpdaterResource $SwapOutput "swap_worker" "file_write" $State}}' . "`n"
 		. '  $null=Get-ErgoptiUpdaterRemainingMilliseconds $StartedTick $DeadlineMs $State' . "`n"
+		. '  if ($State.NativeCleanupDebt -or $State.CleanupDebt.Count -ne 0) {throw "Staging resources have unacknowledged retirement"}' . "`n"
 		. '  Write-Output "READY"' . "`n"
 		. '  exit 0' . "`n"
 		. '} catch {' . "`n"
 		. '  $Receipt=@{}' . "`n"
 		. '  if (Get-Command Get-ErgoptiUpdaterFailureReceipt -ErrorAction SilentlyContinue) { $Receipt=Get-ErgoptiUpdaterFailureReceipt $_.Exception $State }' . "`n"
-		. '  CleanWorker $NewExe "staged_executable"' . "`n"
-		. '  CleanWorker $SwapScriptPath "swap_worker"' . "`n"
+		. '  if ($AuthenticatedSize -le 0 -or $State.StagedExecutableOwned) {CleanWorker $NewExe "staged_executable"}' . "`n"
+		. '  if ($AuthenticatedSize -le 0 -or $State.SwapWorkerOwned) {CleanWorker $SwapScriptPath "swap_worker"}' . "`n"
 		. '  @{schema_version=1;state="failed";operation="download";reason=$State.Reason;receipt=$Receipt;cleanup_debt=$State.CleanupDebt;native_cleanup_debt=[bool]$State.NativeCleanupDebt}|ConvertTo-Json -Depth 4 -Compress' . "`n"
 		. '  exit 1' . "`n"
 		. '}'
@@ -3598,10 +3723,12 @@ _Updater_TransferExitIntentAfterShutdownGates() {
 _Updater_EndDownloadTransaction(StagingEpoch := 0) {
 	global _UpdaterDownloadInProgress, _UpdaterDownloadRequest, _UpdaterSelfUpdateEpoch
 	global _UpdaterDownloadArtifacts, _UpdaterDownloadStartedTick
+	Artifacts := 0
 	PreviousCritical := Critical("On")
 	try {
 		if (StagingEpoch and _UpdaterSelfUpdateEpoch != StagingEpoch)
 			return false
+		Artifacts := _UpdaterDownloadArtifacts
 		_UpdaterDownloadInProgress := false
 		_UpdaterDownloadRequest := 0
 		_UpdaterDownloadArtifacts := 0
@@ -3609,6 +3736,7 @@ _Updater_EndDownloadTransaction(StagingEpoch := 0) {
 	} finally {
 		Critical(PreviousCritical)
 	}
+	_Updater_RetireCurlCaptureArtifacts(Artifacts)
 	try SetTimer((*) => _Updater_RebuildMenu(), -50)
 	return true
 }

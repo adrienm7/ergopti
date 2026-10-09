@@ -306,7 +306,10 @@
 			"reason_key": "platform_reason.tray_top_level_rows_are_each_drivers"
 		},
 		{
-			"id": "about"
+			"type": "group",
+			"id": "about",
+			"i18n": "menu.about.title",
+			"rows": []
 		},
 		{
 			"type": "group",
@@ -5209,6 +5212,20 @@
 			"unavailable": "hide"
 		}
 	],
+	"llm_native_parent": [
+		{
+			"type": "group",
+			"id": "llm_parent_content",
+			"i18n": "menu.llm.title",
+			"checked_when": [
+				"llm_parent_enabled"
+			],
+			"platforms": [
+				"hs"
+			],
+			"unavailable": "hide"
+		}
+	],
 	"llm_download_shortcut_frame": [
 		{
 			"type": "command",
@@ -6484,6 +6501,212 @@
 			"i18n": "menu.agent.system2",
 			"caption_getter": "agent_system_backend_current_caption",
 			"caption_format": "numbered",
+			"platforms": [
+				"linux"
+			],
+			"unavailable": "hide"
+		}
+	],
+	"llm_profile_parent_ahk": [
+		{
+			"type": "group",
+			"id": "llm_profile_parent",
+			"i18n": "menu.profiles.profile_label_prefix",
+			"caption_getter": "llm_profile_parent_caption",
+			"disabled_when": [
+				"llm_profile_parent_ready"
+			],
+			"platforms": [
+				"ahk"
+			],
+			"unavailable": "hide"
+		}
+	],
+	"llm_profile_parent_frame_ahk": [
+		{
+			"type": "list",
+			"id": "llm_profile_parent_rows",
+			"platforms": [
+				"ahk"
+			],
+			"unavailable": "hide"
+		},
+		{
+			"type": "include",
+			"section": "llm_after_profile_boundary"
+		}
+	],
+	"llm_backend_option_caption_frame_ahk": [
+		{
+			"type": "include",
+			"section": "llm_backend_ollama_option_caption_ahk",
+			"present_when": "llm_backend_option_is_ollama"
+		},
+		{
+			"type": "include",
+			"section": "llm_backend_api_option_caption_ahk",
+			"present_when": "llm_backend_option_is_api"
+		}
+	],
+	"llm_backend_ollama_option_caption_ahk": [
+		{
+			"type": "label",
+			"id": "llm_backend_ollama_option_caption",
+			"i18n": "menu.llm.backend_ollama_suffix",
+			"caption_getter": "llm_backend_option_brand",
+			"caption_layout": "suffix",
+			"caption_joiner": " — ",
+			"platforms": [
+				"ahk"
+			],
+			"unavailable": "hide"
+		}
+	],
+	"llm_backend_api_option_caption_ahk": [
+		{
+			"type": "label",
+			"id": "llm_backend_api_option_caption",
+			"i18n": "menu.llm.backend_api_suffix",
+			"caption_getter": "llm_backend_option_brand",
+			"caption_layout": "suffix",
+			"caption_joiner": " — ",
+			"platforms": [
+				"ahk"
+			],
+			"unavailable": "hide"
+		}
+	],
+	"llm_backend_ollama_port_control_ahk": [
+		{
+			"type": "command",
+			"id": "llm_backend_ollama_port",
+			"i18n": "menu.llm.ollama_port_label",
+			"caption_getter": "llm_backend_ollama_port_caption",
+			"platforms": [
+				"ahk"
+			],
+			"unavailable": "hide"
+		}
+	],
+	"llm_backend_ollama_port_frame_ahk": [
+		{
+			"type": "include",
+			"section": "llm_backend_ollama_port_control_ahk"
+		},
+		{
+			"type": "include",
+			"section": "llm_native_numeric_reset",
+			"present_when": "llm_backend_ollama_port_customized"
+		}
+	],
+	"llm_backend_child_frame_ahk": [
+		{
+			"type": "include",
+			"section": "llm_backend_child_choices_ahk"
+		},
+		{
+			"type": "include",
+			"section": "llm_backend_choice_boundary"
+		},
+		{
+			"type": "include",
+			"section": "llm_backend_child_port_rows_ahk"
+		},
+		{
+			"type": "include",
+			"section": "llm_backend_child_local_rows_ahk"
+		}
+	],
+	"llm_backend_child_choices_ahk": [
+		{
+			"type": "list",
+			"id": "llm_backend_child_choices",
+			"platforms": [
+				"ahk"
+			],
+			"unavailable": "hide"
+		}
+	],
+	"llm_backend_child_port_rows_ahk": [
+		{
+			"type": "list",
+			"id": "llm_backend_child_port_rows",
+			"platforms": [
+				"ahk"
+			],
+			"unavailable": "hide"
+		}
+	],
+	"llm_backend_child_local_rows_ahk": [
+		{
+			"type": "list",
+			"id": "llm_backend_child_local_rows",
+			"platforms": [
+				"ahk"
+			],
+			"unavailable": "hide"
+		}
+	],
+	"llm_backend_parent_ahk": [
+		{
+			"type": "group",
+			"id": "llm_backend_parent",
+			"caption_source": "native",
+			"caption_getter": "llm_backend_parent_caption",
+			"disabled_when": [
+				"llm_backend_parent_ready"
+			],
+			"platforms": [
+				"ahk"
+			],
+			"unavailable": "hide"
+		}
+	],
+	"llm_backend_parent_frame_ahk": [
+		{
+			"type": "include",
+			"section": "llm_backend_warning_rows_ahk"
+		},
+		{
+			"type": "list",
+			"id": "llm_backend_parent_rows",
+			"platforms": [
+				"ahk"
+			],
+			"unavailable": "hide"
+		}
+	],
+	"llm_backend_warning_rows_ahk": [
+		{
+			"type": "list",
+			"id": "llm_backend_warning_rows",
+			"platforms": [
+				"ahk"
+			],
+			"unavailable": "hide"
+		}
+	],
+	"slot_binding_frame": [
+		{
+			"type": "command",
+			"id": "slot_binding_pick",
+			"i18n": "dialog.action_picker.menu_label",
+			"platforms": [
+				"linux"
+			],
+			"unavailable": "hide"
+		},
+		{
+			"type": "include",
+			"section": "slot_binding_clear_frame",
+			"present_when": "slot_binding_has_action"
+		}
+	],
+	"slot_binding_clear_frame": [
+		{
+			"type": "command",
+			"id": "slot_binding_clear",
+			"i18n": "dialog.action_picker.disabled",
 			"platforms": [
 				"linux"
 			],

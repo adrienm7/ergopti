@@ -103,6 +103,10 @@
 			"checksum": 15000,
 			"archive": 300000,
 			"hash": 15000
+		},
+		"transport": {
+			"max_header_bytes": 262144,
+			"revocation_best_effort": false
 		}
 	}
 }

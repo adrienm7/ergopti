@@ -197,6 +197,7 @@
 	"config_cleanup.intro": "Проверьте настройки, которые ErgoptiPlus больше не использует.",
 	"dialog.action_picker.disabled": "∅ Ничего",
 	"dialog.action_picker.label": "Действие:",
+	"dialog.action_picker.menu_label": "Действие:…",
 	"dialog.action_picker.back": "← Назад",
 	"dialog.action_picker.capture_key": "Нажмите клавишу, которую нужно отправить, или введите её название.",
 	"dialog.action_picker.capture_shortcut": "Нажмите сочетание клавиш, которое нужно отправить, или введите его.",

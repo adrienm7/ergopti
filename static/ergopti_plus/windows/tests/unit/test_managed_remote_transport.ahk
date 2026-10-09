@@ -59,6 +59,123 @@ _ManagedRemoteFixtureEmitDiagnostic(State) {
 	}
 }
 
+; Project the already-closed owner and final receipt before their private removal.
+_ManagedRemoteFixtureGroup6CleanupDiagnosticFact(State, Completions) {
+	try {
+		if !(State is Map) || !(Completions is Array) || Completions.Length > 4096
+			return ""
+		Phase := State.Get("state", "unknown")
+		if !(Phase is String) || !RegExMatch(Phase, "\A(?:unknown|starting|ready|failed|stopped)\z")
+			Phase := "unknown"
+		Stage := State.Get("root_install_stage", "unknown")
+		if !(Stage is String) || !RegExMatch(Stage, "\A(?:unknown|none|create_store|open_store|verify_absent|export_public|add_root|verify_present|close_store|complete)\z")
+			Stage := "unknown"
+		Fact := "state=" . Phase . " root_install_stage=" . Stage
+		for Name in ["root_removed", "service_stopped", "server_tls_source_unchanged"] {
+			Value := State.Get(Name, -1)
+			if Type(Value) != "Integer" || (Value != 0 && Value != 1)
+				Value := -1
+			Fact .= " " . Name . "=" . Value
+		}
+		for Name in ["ServiceFailures", "server_tls_owned_streams", "server_tls_owned_modules", "server_tls_owned_source_fences"] {
+			Value := State.Get(Name, -1)
+			if Type(Value) != "Integer" || Value < -1 || Value > 4096
+				Value := -1
+			Fact .= " " . Name . "=" . Value
+		}
+		Fact .= " completions=" . Completions.Length
+		ExitCode := "unknown"
+		Marker := "unknown"
+		if Completions.Length == 1 && Completions[1] is Map {
+			Code := Completions[1].Get("exit", "unknown")
+			if Type(Code) == "Integer" && Code >= -2147483648 && Code <= 4294967295
+				ExitCode := Format("{:d}", Code)
+			Out := Completions[1].Get("stdout", "")
+			if Out is String
+				Marker := Trim(Out, "`r`n ") == "OWNED_FIXTURE_STOPPED_ROOT_REMOVED" ? "match" : "mismatch"
+		}
+		return Fact . " exit=" . ExitCode . " marker=" . Marker
+	}
+	return ""
+}
+
+_ManagedRemoteFixtureGroup6CleanupDiagnostic(State, Completions) {
+	try {
+		Fact := _ManagedRemoteFixtureGroup6CleanupDiagnosticFact(State, Completions)
+		if Fact != ""
+			_TestPrint("::notice title=Windows native cleanup receipt::" . Fact)
+	}
+}
+
+; Observe only a dialog class belonging to the still-owned native child, before termination.
+; Window text and certificate identities never leave the private owner.
+_ManagedRemoteFixtureGroup6ObserveDialog(Handle) {
+	Callback := 0
+	try {
+		Pid := Handle.processId()
+		if !(Pid is Integer) || Pid <= 0 || Pid > 4294967295
+			return
+		Observation := Map("dialog", 0, "visible", 0, "failed", false)
+		Callback := CallbackCreate(_ManagedRemoteFixtureGroup6InspectWindow.Bind(Pid, Observation), "", 2)
+		if !DllCall("User32\EnumWindows", "Ptr", Callback, "Ptr", 0, "Int") || Observation["failed"]
+			return
+		_TestPrint("::notice title=Windows native owned dialog::dialog=" . Observation["dialog"] . " visible=" . Observation["visible"])
+	} finally {
+		if Callback
+			CallbackFree(Callback)
+	}
+}
+
+_ManagedRemoteFixtureGroup6InspectWindow(Pid, Observation, Window, Parameter) {
+	try {
+		WindowPid := 0
+		if !DllCall("User32\GetWindowThreadProcessId", "Ptr", Window, "UInt*", &WindowPid, "UInt") {
+			Observation["failed"] := true
+			return 1
+		}
+		if WindowPid != Pid
+			return 1
+		ClassName := Buffer(128, 0)
+		if !DllCall("User32\GetClassNameW", "Ptr", Window, "Ptr", ClassName, "Int", 64, "Int") {
+			Observation["failed"] := true
+			return 1
+		}
+		if StrGet(ClassName, "UTF-16") == "#32770" {
+			Observation["dialog"] := 1
+			if DllCall("User32\IsWindowVisible", "Ptr", Window, "Int")
+				Observation["visible"] := 1
+		}
+	} catch {
+		Observation["failed"] := true
+	}
+	return 1
+}
+
+_ManagedRemoteFixtureGroup6CleanupDiagnosticControls() {
+	State := Map("state", "stopped", "root_removed", true, "service_stopped", true,
+		"server_tls_source_unchanged", true, "ServiceFailures", 0, "server_tls_owned_streams", 0,
+		"server_tls_owned_modules", 0, "server_tls_owned_source_fences", 0)
+	Completion := Map("exit", 0, "stdout", "OWNED_FIXTURE_STOPPED_ROOT_REMOVED", "stderr", "private")
+	Expected := "state=stopped root_install_stage=unknown root_removed=1 service_stopped=1 server_tls_source_unchanged=1"
+		. " ServiceFailures=0 server_tls_owned_streams=0 server_tls_owned_modules=0 server_tls_owned_source_fences=0"
+		. " completions=1 exit=0 marker=match"
+	AssertEqual(Expected, _ManagedRemoteFixtureGroup6CleanupDiagnosticFact(State, [Completion]))
+	for Pair in [["state", "stopped`nprivate"], ["root_install_stage", "add_root`nprivate"], ["root_removed", "private"],
+		["server_tls_owned_streams", 4097], ["ServiceFailures", -2]] {
+		Invalid := State.Clone()
+		Invalid[Pair[1]] := Pair[2]
+		Fact := _ManagedRemoteFixtureGroup6CleanupDiagnosticFact(Invalid, [Completion])
+		AssertTrue(Fact != "", "unknown scalar observations must remain explicit")
+		AssertTrue(!InStr(Fact, "private"), "private values cannot enter the diagnostic")
+	}
+	Completion["stdout"] := "private signed URL and credentials"
+	AssertContains(_ManagedRemoteFixtureGroup6CleanupDiagnosticFact(State, [Completion]), "marker=mismatch")
+	AssertTrue(!InStr(_ManagedRemoteFixtureGroup6CleanupDiagnosticFact(State, [Completion]), "private"))
+	AssertContains(_ManagedRemoteFixtureGroup6CleanupDiagnosticFact(State, []), "completions=0 exit=unknown marker=unknown")
+	AssertEqual("", _ManagedRemoteFixtureGroup6CleanupDiagnosticFact(0, []))
+}
+Test("managed remote native: closed cleanup projection excludes private captures", _ManagedRemoteFixtureGroup6CleanupDiagnosticControls)
+
 ; Graceful receipt failures also occur without any native service exception.
 ; Project only gate outcomes; private state, streams and exception text stay owned.
 _ManagedRemoteFixtureCleanupDiagnostic(Completions, State, ReadStatus, ExpectedScope := 0) {
@@ -783,11 +900,14 @@ class _ManagedRemoteFixtureOwner {
 		Run["deadline_ms"] := LLM_REMOTE_READY_PING_DEADLINE_MS
 		this.ReadinessRuns[this.ReadinessCount] := Run
 		ReadyPort := this.Port.Clone()
-		Factory := _LLM_CurlArtifactPortFn(this.Port, "create_http", () => CurlAsyncRequest())
-		ReadyPort["create_http"] := _ManagedRemoteFixtureCaptureReadinessHttp.Bind(Run, Factory)
 		ProviderId := "managed_network_" . this.Identity
 		AssertFalse(LLM_API_PROVIDERS.Has(ProviderId), "owned acceptance provider identity must be unique")
 		Result := []
+		Observation := Map("http", 0)
+		ObservedPort := this.Port.Clone()
+		Factory := _LLM_CurlArtifactPortFn(this.Port, "create_http", () => CurlAsyncRequest())
+		ObservedPort["create_http"] := _ManagedRemoteCaptureReadinessHttp.Bind(Observation, Factory)
+		ReadyPort["create_http"] := _ManagedRemoteFixtureCaptureReadinessHttp.Bind(Run, ObservedPort["create_http"])
 		Owner := LLM_AuxBegin(ProviderId, Map("backend", "api", "endpoint", this.BaseUrl, "identity", ProviderId))
 		Run["owner"] := Owner
 		this.ReadyOwners.Push(Owner)
@@ -800,8 +920,10 @@ class _ManagedRemoteFixtureOwner {
 				_SR_TreePoll()
 				Sleep(10)
 			}
-			if Result.Length != 1 || Result[1] != ExpectedSuccess
+			if Result.Length != 1 || Result[1] != ExpectedSuccess {
 				_ManagedRemoteFixtureEmitReadinessDiagnostic(this, Run, Result, ExpectedSuccess)
+				_ManagedRemoteEmitReadinessDiagnostic(this, ExpectedSuccess, Result, Observation, Owner, LLM_REMOTE_READY_PING_DEADLINE_MS)
+			}
 			AssertEqual(1, Result.Length, "actual readiness must settle once within its native budget")
 			AssertEqual(ExpectedSuccess, Result[1], "readiness must obey the actual system root and selected relay")
 		} finally {
@@ -879,6 +1001,7 @@ class _ManagedRemoteFixtureOwner {
 			return false
 		this.Closing := true
 		FinalState := 0
+		FinalObservation := 0
 		ReceiptRead := "not_read"
 		try {
 			if !this.RetireRequests()
@@ -892,6 +1015,8 @@ class _ManagedRemoteFixtureOwner {
 						Sleep(10)
 					}
 				}
+				if this.Completions.Length == 0
+					try _ManagedRemoteFixtureGroup6ObserveDialog(this.Handle)
 				if !this.Handle.terminate()
 					return false
 				if this.NativeState is Map && !this.NativeState.Get("TreeQuiesced", false)
@@ -900,8 +1025,10 @@ class _ManagedRemoteFixtureOwner {
 			; Reuse the original owned state after native tree quiescence, before its removal.
 			; Diagnostic I/O is bounded and cannot replace the original cleanup assertion.
 			try {
-				if this.Capture is Map && FileGetSize(this.Capture["TmpFile"]) <= 8192
-					_ManagedRemoteFixtureEmitDiagnostic(JsonParse(FileRead(this.Capture["TmpFile"], "UTF-8")))
+				if this.Capture is Map && FileGetSize(this.Capture["TmpFile"]) <= 8192 {
+					FinalObservation := JsonParse(FileRead(this.Capture["TmpFile"], "UTF-8"))
+					_ManagedRemoteFixtureEmitDiagnostic(FinalObservation)
+				}
 			}
 			if this.Completions.Length == 1 && this.Completions[1]["exit"] == 0
 					&& Trim(this.Completions[1]["stdout"], "`r`n ") == "OWNED_FIXTURE_STOPPED_ROOT_REMOVED"
@@ -974,9 +1101,11 @@ class _ManagedRemoteFixtureOwner {
 			return false
 		} finally {
 			try {
-				if !this.GracefulReceiptVerified
+				if !this.GracefulReceiptVerified {
+					_ManagedRemoteFixtureGroup6CleanupDiagnostic(FinalObservation, this.Completions)
 					this.CleanupDiagnosticStatus := _ManagedRemoteFixtureEmitCleanupDiagnostic(
 						this.Completions, FinalState, ReceiptRead, this.CleanupDiagnosticPrinter, this.RootStoreScope)
+				}
 			} finally this.Closing := false
 		}
 	}
@@ -2032,6 +2161,119 @@ _ManagedRemoteGenerationDiagnosticReceiptControls() {
 	}
 }
 Test("managed remote native: generation checkpoint rejects malformed native receipt (managed-fixture-generation-diagnostic)", _ManagedRemoteGenerationDiagnosticReceiptControls)
+
+; Wrap the declared creator while returning the exact object it produced.
+_ManagedRemoteCaptureReadinessHttp(Observation, Factory) {
+	Http := Factory.Call()
+	Observation["http"] := Http
+	return Http
+}
+
+_ManagedRemoteReadinessDiagnostic(Mode, Expected, Results, Elapsed, Budget, Status, Receipt) {
+	global _SharedDir
+	Policy := ManagedNetworkFailureContract(JsonParse(FileRead(_SharedDir . "\modules\network\managed_network.json", "UTF-8"))).Policy
+	Admitted := _ManagedRemoteFixtureGenerationReceipt(Receipt, Policy)
+	Fields := Admitted["fields"]
+	Fact := "mode=" . _ManagedRemoteFixtureDiagnosticEnum(Mode, "fixed|pac")
+		. " expected=" . _ManagedRemoteFixtureDiagnosticBoolean(Expected)
+		. " callbacks=" . (Results is Array ? _ManagedRemoteFixtureGenerationInteger(Results.Length, 0, 65535) : "unknown")
+		. " ready=" . (Results is Array && Results.Length == 1 ? _ManagedRemoteFixtureDiagnosticBoolean(Results[1]) : "unknown")
+		. " elapsed_ms=" . _ManagedRemoteFixtureGenerationInteger(Elapsed, 0, 2147483647)
+		. " budget_ms=" . _ManagedRemoteFixtureGenerationInteger(Budget, 1, 2147483647)
+		. " http_status=" . _ManagedRemoteFixtureGenerationInteger(Status, 0, 599)
+		. " native_receipt=" . Admitted["state"]
+	for Name in ["backend", "stage", "failure_provenance", "tls_status", "tls_verification", "proxy_resolution_status"] {
+		Value := _ManagedNetwork_Get(Fields, Name, "")
+		Definition := Policy["fields"][Name]
+		Fact .= " " . Name . "=" . (Value is String && Value != "" && _ManagedNetwork_Scalar(Value, Definition) ? Value : "unknown")
+	}
+	return Fact . " curl_exit=" . _ManagedRemoteFixtureGenerationInteger(_ManagedNetwork_Get(Fields, "curl_exit", ""), 0, 255)
+}
+
+_ManagedRemoteEmitReadinessDiagnostic(Fixture, Expected, Results, Observation, Owner, Budget) {
+	try {
+		Http := Observation.Get("http", 0)
+		Receipt := 0
+		Status := "unknown"
+		if Http is CurlAsyncRequest {
+			Status := Http.Status
+			if Type(Http.ManagedTransport) == "Integer" && Http.ManagedTransport == true
+				Receipt := Http.NativeReceipt
+		}
+		Start := Owner.Get("network_start_tick", 0)
+		Elapsed := Type(Start) == "Integer" && Start > 0 ? TickElapsed64(Start) : "unknown"
+		Fact := _ManagedRemoteReadinessDiagnostic(Fixture.Mode, Expected, Results, Elapsed, Budget, Status, Receipt)
+		Printer := Fixture.HasOwnProp("Group6ReadinessDiagnosticPrinter") ? Fixture.Group6ReadinessDiagnosticPrinter : _TestPrint
+		Printer.Call("::notice title=Windows native readiness diagnostic::" . Fact)
+	} catch Any {
+		; Projection/printing failure cannot replace the original readiness assertion.
+	}
+}
+
+_ManagedRemoteReadinessDiagnosticControls() {
+	Receipt := Map("backend", "curl", "stage", "tls", "failure_provenance", "verified",
+		"tls_verification", "enforced", "tls_status", "untrusted_certificate", "curl_exit", 60)
+	Fact := _ManagedRemoteReadinessDiagnostic("fixed", true, [false], 1234, 3000, 0, Receipt)
+	AssertContains(Fact, "mode=fixed expected=true callbacks=1 ready=false elapsed_ms=1234 budget_ms=3000 http_status=0 native_receipt=admitted")
+	AssertContains(Fact, "stage=tls failure_provenance=verified tls_status=untrusted_certificate tls_verification=enforced")
+	AssertContains(Fact, "curl_exit=60")
+	Receipt["PRIVATE_URL"] := "PRIVATE_TOKEN"
+	Fact := _ManagedRemoteReadinessDiagnostic("PRIVATE_MODE", true, [], "3000", "3000", "200", Receipt)
+	AssertContains(Fact, "mode=unknown")
+	AssertContains(Fact, "callbacks=0 ready=unknown elapsed_ms=unknown budget_ms=unknown http_status=unknown native_receipt=invalid")
+	AssertFalse(InStr(Fact, "PRIVATE"), "unknown or private receipt fields cannot enter the projection")
+	Http := Object()
+	Observation := Map("http", 0)
+	Control := {Calls: 0}
+	Factory := () => (Control.Calls += 1, Http)
+	Returned := _ManagedRemoteCaptureReadinessHttp(Observation, Factory)
+	AssertTrue(Returned == Http && Observation["http"] == Http, "the declared factory's exact object returns unchanged")
+	AssertEqual(1, Control.Calls, "the passive wrapper creates no additional worker")
+}
+Test("managed remote native: readiness observations retain exact factory and closed native facts", _ManagedRemoteReadinessDiagnosticControls)
+
+class _ManagedRemoteGroup6ReadinessDiagnosticOwner extends _ManagedRemoteFixtureOwner {
+	__New(Printer) {
+		this.Identity := "readiness_diagnostic_" . _ManagedRemoteFixtureGuid()
+		this.Mode := "fixed"
+		this.BaseUrl := "https://managed-fixture.invalid:443/v1"
+		this.Http := _ManagedRemoteGenerationDiagnosticHttp(_ManagedRemoteGenerationDiagnosticReceipt())
+		this.ReadyOwners := []
+		this.ReadyCancels := []
+		this.Group6ReadinessDiagnosticPrinter := Printer
+		this.ReadinessCount := 0
+		this.ReadinessRuns := Map()
+		this.ReadinessDiagnosticPrinter := _TestPrint
+		this.ReadinessDiagnosticStatus := "not_requested"
+		this.FactoryCalls := 0
+		this.Port := Map("managed_settings", (*) => Map(), "create_http", ObjBindMethod(this, "CreateHttp"))
+	}
+	CreateHttp() {
+		this.FactoryCalls += 1
+		return this.Http
+	}
+}
+
+_ManagedRemoteGroup6ReadinessDiagnosticProducer(RefusePrinter := false) {
+	Control := Map("calls", 0, "fact", "", "refuse", RefusePrinter)
+	Fixture := _ManagedRemoteGroup6ReadinessDiagnosticOwner(_ManagedRemoteGenerationCollect.Bind(Control))
+	Caught := 0
+	try Fixture.CheckReadiness(true)
+	catch Error as Failure {
+		Caught := Failure
+	}
+	AssertEqual("Error", Type(Caught), "the real receiving entry retains its readiness assertion")
+	AssertEqual("readiness must obey the actual system root and selected relay - expected: <1>, actual: <0>", Caught.Message)
+	AssertEqual(1, Control["calls"], "the actual receiving entry diagnoses before its unchanged assertion")
+	AssertEqual(1, Fixture.FactoryCalls, "the declared HTTP creator is used exactly once")
+	AssertTrue(Fixture.Http.Polls >= 2, "the real readiness poll produces its callback")
+	AssertContains(Control["fact"], "mode=fixed expected=true callbacks=1 ready=false")
+	AssertContains(Control["fact"], "http_status=0 native_receipt=admitted backend=curl stage=connect")
+	AssertContains(Control["fact"], "curl_exit=60")
+	AssertFalse(InStr(Control["fact"], "managed-fixture.invalid"), "the actual receiving observation never publishes its destination")
+}
+Test("managed remote native: actual readiness receiving entry reports its retained transport", _ManagedRemoteGroup6ReadinessDiagnosticProducer)
+Test("managed remote native: readiness reporter refusal preserves the original assertion", _ManagedRemoteGroup6ReadinessDiagnosticProducer.Bind(true))
 
 
 ; Capture exact factory returns without changing dispatch, callback or retirement.

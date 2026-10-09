@@ -69,7 +69,7 @@ _UpdaterTest_NestedAssetMetadata() {
 	Url := "https://github.com/" . UPDATER_GH_OWNER . "/" . UPDATER_GH_REPO
 		. "/releases/download/" . Tag . "/ErgoptiPlus.exe"
 	Digest := "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
-	ReleaseJson := '{"assets":[{"id":17,"uploader":{"login":"release-bot","profile":{"label":"nested"}},"name":"ErgoptiPlus.exe","browser_download_url":"' . Url . '","digest":"sha256:' . Digest . '"}]}'
+	ReleaseJson := '{"assets":[{"id":17,"uploader":{"login":"release-bot","profile":{"label":"nested"}},"name":"ErgoptiPlus.exe","browser_download_url":"' . Url . '","size":524288,"digest":"sha256:' . Digest . '"}]}'
 	Asset := _Updater_FindAsset(ReleaseJson, "ErgoptiPlus.exe", Tag)
 	Assert(IsObject(Asset),
 		"(ahk7-01-updater-nested-asset) an exact authenticated asset must resolve")
@@ -89,7 +89,7 @@ _UpdaterTest_AssetResolutionIsStructuralAndExact() {
 		. '{"uploader":{"name":"ErgoptiPlus.exe","browser_download_url":"https://evil.test/nested.exe"},'
 		. '"name":"ErgoptiPlus.exe.bak","browser_download_url":"https://example.test/backup.exe"},'
 		. '{"name":"ErgoptiPlus.exe","browser_download_url":"' . ExactUrl . '",'
-		. '"digest":"sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"}'
+		. '"size":524288,"digest":"sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"}'
 		. ']}'
 	Asset := _Updater_FindAsset(ReleaseJson, "ErgoptiPlus.exe", Tag)
 	Assert(IsObject(Asset), "an exact authenticated asset must resolve")
@@ -117,7 +117,7 @@ _UpdaterTest_AssetRequiresGitHubSha256Digest() {
 		. "/releases/download/" . Tag . "/ErgoptiPlus.exe"
 	Digest := "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
 	ReleaseJson := '{"assets":[{"name":"ErgoptiPlus.exe",'
-		. '"browser_download_url":"' . Url . '","digest":"sha256:' . Digest . '"}]}'
+		. '"browser_download_url":"' . Url . '","size":524288,"digest":"sha256:' . Digest . '"}]}'
 	Asset := _Updater_FindAsset(ReleaseJson, "ErgoptiPlus.exe", Tag)
 	Assert(IsObject(Asset),
 		"an exact release asset with a GitHub SHA-256 digest must be accepted")
@@ -125,16 +125,46 @@ _UpdaterTest_AssetRequiresGitHubSha256Digest() {
 		"the authenticated asset must preserve its exact download URL")
 	AssertEqual(Digest, Asset.Digest,
 		"the authenticated asset must expose the normalized lowercase SHA-256 digest")
+	AssertEqual(524288, Asset.Size, "authenticated asset retains its independently supplied byte bound")
+	for BadSize in ["0", "-1", "524288.5", "524288e0", "2147483648", '"524288"', "true", "null"]
+		Assert(!IsObject(_Updater_FindAsset(StrReplace(ReleaseJson, '"size":524288', '"size":' . BadSize), "ErgoptiPlus.exe", Tag)),
+			"malformed or unbounded authenticated asset sizes refuse before transport")
+	Assert(!IsObject(_Updater_FindAsset(StrReplace(ReleaseJson, '"size":524288,', ""), "ErgoptiPlus.exe", Tag)),
+		"missing authenticated size cannot borrow the content-length of an untrusted transfer")
 
 	for InvalidJson in [
 		'{"assets":[{"name":"ErgoptiPlus.exe","browser_download_url":"' . Url . '"}]}',
 		'{"assets":[{"name":"ErgoptiPlus.exe","browser_download_url":"' . Url . '","digest":""}]}',
 		'{"assets":[{"name":"ErgoptiPlus.exe","browser_download_url":"' . Url . '","digest":"md5:' . Digest . '"}]}',
-		'{"assets":[{"name":"ErgoptiPlus.exe","browser_download_url":"' . Url . '","digest":"sha256:1234"}]}'
+		'{"assets":[{"name":"ErgoptiPlus.exe","browser_download_url":"' . Url . '","size":524288,"digest":"sha256:1234"}]}'
 	] {
 		Assert(!IsObject(_Updater_FindAsset(InvalidJson, "ErgoptiPlus.exe", Tag)),
 			"a release asset without one exact trusted SHA-256 digest must fail closed")
 	}
+	EscapedInteger := StrReplace(ReleaseJson, '"size":524288', '"\u0073ize":524288')
+	Assert(IsObject(_Updater_FindAsset(EscapedInteger, "ErgoptiPlus.exe", Tag)),
+		"decoded asset size keys retain a genuine integer token")
+	LastInteger := StrReplace(ReleaseJson, '"size":524288', '"size":true,"\u0073ize":524288')
+	Assert(IsObject(_Updater_FindAsset(LastInteger, "ErgoptiPlus.exe", Tag)),
+		"last decoded duplicate member wins with its genuine integer token")
+	for BooleanJson in [
+		StrReplace(ReleaseJson, '"size":524288', '"size":524288,"\u0073ize":true'),
+		StrReplace(ReleaseJson, '"size":524288', '"\u0073ize":true'),
+		StrReplace(ReleaseJson, '"size":524288', '"nested":{"size":524288},"size":true')
+	]
+		Assert(!IsObject(_Updater_FindAsset(BooleanJson, "ErgoptiPlus.exe", Tag)),
+			"Boolean size cannot borrow integer provenance from a nested or earlier member")
+	SkippedAssets := StrReplace(ReleaseJson, '{"assets":[',
+		'{"assets":[true,1,null,{"name":"other.exe","size":true,"nested":{"size":524288}},')
+	Assert(IsObject(_Updater_FindAsset(SkippedAssets, "ErgoptiPlus.exe", Tag)),
+		"raw array span index follows the exact selected asset after every skipped element")
+	ArraySource := JsonObjectMemberSpans(ReleaseJson)["assets"]["text"]
+	LastAssets := '{"assets":[true],"\u0061ssets":' . ArraySource . '}'
+	Assert(IsObject(_Updater_FindAsset(LastAssets, "ErgoptiPlus.exe", Tag)),
+		"source lookup follows the last decoded duplicate assets member")
+	IntegerOne := StrReplace(ReleaseJson, '"size":524288', '"size":1')
+	Assert(IsObject(_Updater_FindAsset(IntegerOne, "ErgoptiPlus.exe", Tag)),
+		"JSON integer one is distinct from Boolean true before installation minimum validation")
 	for ForeignJson in [
 		StrReplace(ReleaseJson,
 			"github.com/" . UPDATER_GH_OWNER . "/" . UPDATER_GH_REPO,
