@@ -5,7 +5,7 @@
 # Ergopti
 
 **An ergonomic keyboard layout optimised for French, English and code —
-and Ergopti+, the free, 100 % local typing-automation suite that works on _any_ layout.**
+and Ergopti+, the free, local-first typing-automation suite that works on _any_ layout.**
 
 [![CI](https://github.com/adrienm7/ergopti/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/adrienm7/ergopti/actions/workflows/ci.yml)
 [![Latest release](https://img.shields.io/github/v/release/adrienm7/ergopti)](https://github.com/adrienm7/ergopti/releases/latest)
@@ -23,6 +23,7 @@ and Ergopti+, the free, 100 % local typing-automation suite that works on _any_ 
 
 - [The Ergopti layout](#the-ergopti-layout)
 - [The Ergopti+ suite](#the-ergopti-suite)
+  - [See it in action](#see-it-in-action)
 - [Installation](#installation)
   - [Install the layout](#install-the-layout)
   - [Install Ergopti+](#install-ergopti)
@@ -71,8 +72,9 @@ most common shortcuts (<kbd>Ctrl</kbd>+<kbd>A/C/V/X/Z</kbd>) stay on the left ha
 
 Ergopti+ is the companion software — a complete typing-automation layer that runs
 on **any** layout (AZERTY, QWERTY, Bépo, …). The Ergopti layout unlocks extra
-bonuses, but is entirely optional. Everything is **free, open-source, local-only,
-with no account and no telemetry**.
+bonuses, but is entirely optional. Everything is **free, open-source and
+local-first, with no account and no telemetry**: typing data never leaves the
+machine, and the AI runs locally or through the API you choose.
 
 ![Base layer +](static/img/ergopti_plus.jpg)
 
@@ -88,6 +90,46 @@ with no account and no telemetry**.
 The three drivers share a single source of truth (`static/ergopti_plus/_shared/`)
 for hotstrings, the LLM catalogue, locales, menus and webview UIs — so Windows,
 macOS and Linux behave the same by construction.
+
+### See it in action
+
+Each clip is rendered from the driver's own windows and data by the
+[`video/`](video/STORYBOARD.md) project, so it shows the current UI.
+
+<table>
+<tr>
+<td width="50%"><b>Works on every system</b><br><img src="docs/media/ergoptiplus/three-os.gif" alt="Hotstrings firing on Windows, macOS and Linux"></td>
+<td width="50%"><b>The tray menu</b><br><img src="docs/media/ergoptiplus/menu.gif" alt="Every feature in the tray menu"></td>
+</tr>
+<tr>
+<td width="50%"><b>Tap-holds</b><br><img src="docs/media/ergoptiplus/tap-holds.gif" alt="One key with a tap action and a hold action"></td>
+<td width="50%"><b>Navigation layer</b><br><img src="docs/media/ergoptiplus/nav-layer.gif" alt="Arrows, words and selections on the home row"></td>
+</tr>
+<tr>
+<td width="50%"><b>Shortcuts</b><br><img src="docs/media/ergoptiplus/shortcuts.gif" alt="Win + letter shortcuts, each re-assignable"></td>
+<td width="50%"><b>Wrap any selection</b><br><img src="docs/media/ergoptiplus/shortcut-wrap.gif" alt="Typing a bracket or a quote wraps the selected text"></td>
+</tr>
+<tr>
+<td width="50%"><b>Trackpad gestures</b><br><img src="docs/media/ergoptiplus/gestures.gif" alt="Three-finger tap and swipe gestures"></td>
+<td width="50%"><b>Your own hotstrings</b><br><img src="docs/media/ergoptiplus/personal-hotstrings.gif" alt="Creating a hotstring in the editor, then using it"></td>
+</tr>
+<tr>
+<td width="50%"><b>A few keys, a whole phrase</b><br><img src="docs/media/ergoptiplus/extreme-hotstrings.gif" alt="Short abbreviations and an AI prediction writing a sentence"></td>
+<td width="50%"><b>Typing metrics</b><br><img src="docs/media/ergoptiplus/metrics.gif" alt="The typing metrics dashboard: savings, speed, words, shortcuts"></td>
+</tr>
+<tr>
+<td width="50%"><b>Screen time</b><br><img src="docs/media/ergoptiplus/screen-time.gif" alt="Time spent per application"></td>
+<td width="50%"><b>AI predictions</b><br><img src="docs/media/ergoptiplus/ai-predictions.gif" alt="A prediction tooltip fixing and completing a sentence"></td>
+</tr>
+<tr>
+<td width="50%"><b>AI in every app</b><br><img src="docs/media/ergoptiplus/ai-everywhere.gif" alt="Predictions in a terminal, an IDE, a browser, Teams and WhatsApp"></td>
+<td width="50%"><b>Local models or an API</b><br><img src="docs/media/ergoptiplus/ai-local.gif" alt="The model catalogue window"></td>
+</tr>
+<tr>
+<td width="50%"><b>Rewrite, translate, ask</b><br><img src="docs/media/ergoptiplus/ai-actions.gif" alt="AI actions on a selected sentence"></td>
+<td></td>
+</tr>
+</table>
 
 ---
 
@@ -174,6 +216,8 @@ static/ergopti/           Ergopti layout artefacts (keylayout, XKB, XCompose)
 static/drivers/           Driver support assets (alfred, espanso, kalamine)
 tools/                    Build, codegen, lint and test tooling
 docs/                     Engineering docs — start with docs/memory/README.md
+video/                    Remotion promo film and README GIFs, rendered from the
+                          driver's own windows and data (see video/README.md)
 ```
 
 ---
