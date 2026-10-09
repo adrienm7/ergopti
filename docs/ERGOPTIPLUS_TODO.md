@@ -7828,6 +7828,19 @@ The complete macOS Layout presentation family now consumes 17 canonical shared s
   supported X11/Wayland seats and multi-keyboard delivery; Xvfb and wire doubles
   do not establish these behaviors.
 
+  The public simultaneous-combination software path now joins the original
+  installed Manager generation, native input broker and action receiver before
+  buffering. Detached or replaced configuration sources cannot mint delivery
+  authority. Typed delay/symmetry settings, saved third slots and copy-tap-to-chord
+  use the shared declaration and acknowledged local/global configuration scopes;
+  masters, personal actions and unknown future fields retain their own policies.
+  Bounded menus use existing labels in all 21 languages. The earlier ordered
+  path and original reload refusals are preserved, including loader replacement
+  during decoding or construction. Caps Word and OneShot recommendations remain
+  unavailable without their missing native joins. Final current-Dev software
+  and three-OS CI qualification remain required; this does not qualify native
+  buffered receiving, physical devices or complete item93.
+
 - [ ] **96.** Remove the separate Ergopti+ AltGr-adjustments option:
       selecting Ergopti+ in the existing emulation picker must suffice. Implemented:
       the old public checkbox is removed; an internal closed variant preserves

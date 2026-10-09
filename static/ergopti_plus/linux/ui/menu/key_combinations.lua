@@ -1,7 +1,7 @@
 --- ui/menu/key_combinations.lua
 
 --- Renders shared ordered slots through the actual native picker and publisher.
---- Chord buffering is not offered by this Linux owner.
+--- Same-device chord choices retain the original source and publication owner.
 local Shared = require("tap_hold.key_combinations")
 local HoldOptions = require("tap_hold.hold_options")
 local KeyCatalog = require("tap_hold.key_catalog")
@@ -22,6 +22,12 @@ function M.build(ctx,ui)
 	local t,renderer = ui.get,ui.manifest
 	if type(th)~="table" or type(actions)~="table" or type(ctx.is_paused)~="function" then return {} end
 	local keys,holds = th.key_catalog(),th.hold_options()
+	local delay_entry=Features.find_entry_by_path("mod_combos.simultaneous_threshold_ms")
+	local symmetry_entry=Features.find_entry_by_path("mod_combos.symmetric")
+	local chord_declared=type(delay_entry)=="table" and delay_entry.type=="number"
+		and type(symmetry_entry)=="table" and symmetry_entry.type=="boolean"
+		and type(pairs.get_chord)=="function" and type(pairs.chord_settings)=="function"
+		and type(pairs.chord_pair)=="function"
 	local function feedback(accepted)
 		if accepted~=true then ui.error(t("dialog.bulk_toggle.save_failed"),t("common.error_title")) end
 		if accepted==true and type(ctx.on_menu_changed)=="function" then ctx.on_menu_changed() end
@@ -58,17 +64,19 @@ function M.build(ctx,ui)
 	local function hold_option(value)
 		for _,choice in ipairs(holds) do if (choice.kind=="none" and value==Shared.NONE) or choice.id==value then return choice end end
 	end
-	local function pick(pair,label,current)
+	local function pick(pair,label,current,kind)
+		kind=kind or "tap"
 		local source=snapshot();if not source then return feedback(false) end
 		local binding=Shared.BINDING_SCOPE.."__"..pair
 		local items={}
 		for _,row in ipairs(actions.get_picker_items()) do
-			if row.type~="action" or pairs.validate_slot("tap",pair,row.id)==true then items[#items+1]=row end
+			if row.type~="action" or pairs.validate_slot(kind,pair,row.id)==true then items[#items+1]=row end
 		end
 		return ui.open_picker(label,current,binding,function(action,picked)
 			local checked,current=pcall(source.guard)
-			if not checked or current~=true or pairs.validate_slot("tap",pair,action)~=true then return feedback(false) end
-			local rows={{section=Shared.TAP_SECTION,key=pair,value=action}}
+			if not checked or current~=true or pairs.validate_slot(kind,pair,action)~=true then return feedback(false) end
+			local rows=kind=="combo" and {Features.sparse_operation("mod_combos.config."..pair..".combo",action)}
+				or {{section=Shared.TAP_SECTION,key=pair,value=action}}
 			local spec=actions.get_action_parameter_spec(action)
 			if spec then
 				local value=picked
@@ -108,20 +116,30 @@ function M.build(ctx,ui)
 				if first.id~=second.id then
 					local pair=Shared.pair(first.id,second.id)
 					local tap,hold=pairs.get_action(pair),pairs.get_hold(pair)
+					local chord_pair=chord_declared and pairs.chord_pair(pair) or nil
+					local chord=chord_pair and pairs.get_chord(pair) or Shared.NONE
 					local label=ui.key_label(first).." → "..ui.key_label(second)
 					local tap_label=action_label(tap)
 					local chosen=hold_option(hold)
 					local hold_label=chosen and HoldOptions.label(chosen,t) or t("tap_hold.hold.none")
-					local assigned=tap~=Shared.NONE or hold~=Shared.NONE
+					local assigned=tap~=Shared.NONE or hold~=Shared.NONE or chord~=Shared.NONE
 					local sub=renderer.build("key_combination_pair_menu","KeyCombinations",nil,nil,{
 						commands={["key_combination_clear"]=function()
-							return edit({{section=Shared.TAP_SECTION,key=pair,delete=true},{section=Shared.HOLD_SECTION,key=pair,delete=true}},snapshot())
+							local rows={{section=Shared.TAP_SECTION,key=pair,delete=true},{section=Shared.HOLD_SECTION,key=pair,delete=true}}
+							if chord_pair then rows[#rows+1]={section="mod_combos.config."..chord_pair,key="combo",delete=true} end
+							return edit(rows,snapshot())
 						end},state_getters={key_combination_pair_assigned=function() return assigned end}},
-						{["key_combination_slots"]=function() return {
+						{["key_combination_slots"]=function() local slots={
 							{label=string.format(t("menu.shortcuts.key_combinations_hold_tap"),tap_label),disabled=not editable,
 								action=function() return pick(pair,label,tap) end},
 							{label=string.format(t("menu.shortcuts.key_combinations_hold_hold"),hold_label),disabled=not editable,action=function() return pick_hold(pair,label,hold_label) end},
-						} end})
+						}
+						if chord_pair then slots[#slots+1]={
+							label=string.format(t("menu.shortcuts.key_combinations_chord"),action_label(chord)),disabled=not editable,
+							action=function() return pick(chord_pair,label,chord,"combo") end}
+						end
+						return slots
+					end})
 					rows[#rows+1]={label=label.."  :  "..tap_label.."  /  "..hold_label,checked=assigned or nil,submenu=sub}
 				end
 			end
@@ -133,7 +151,46 @@ function M.build(ctx,ui)
 		local source=snapshot();if not source then return feedback(false) end
 		return feedback(Scope.set_enabled(not pairs.is_enabled(),ctx.is_paused,source))
 	end
+	render.commands["scope_restore"]=function()
+		local source=snapshot();if not source then return feedback(false) end
+		return feedback(Scope.apply("recommended",ctx.is_paused,source))
+	end
+	render.commands["scope_clear"]=function()
+		local source=snapshot();if not source then return feedback(false) end
+		return feedback(Scope.apply("clear",ctx.is_paused,source))
+	end
+	render.state_getters["combo_symmetric"]=function()
+		local settings=chord_declared and pairs.chord_settings() or nil
+		return settings~=nil and settings.combo_symmetric==true
+	end
+	if chord_declared then
+	render.commands["combo_symmetric"]=function()
+		local source=snapshot();local settings=chord_declared and pairs.chord_settings() or nil
+		if not source or not settings then return feedback(false) end
+		settings.combo_symmetric=not settings.combo_symmetric
+		return feedback(Scope.set_chord_settings(settings,ctx.is_paused,source))
+	end
+	render.commands["copy_tap_to_combo"]=function()
+		local source=snapshot();if not source or not chord_declared then return feedback(false) end
+		return feedback(Scope.copy_taps_to_chords(ctx.is_paused,source))
+	end
+	end
+	local function timing_rows()
+		local settings=chord_declared and pairs.chord_settings() or nil
+		if not settings then return {} end
+		return {{label=string.format(t("menu.tapholds.simultaneous_title"),tostring(settings.simultaneous_threshold_ms).." ms"),
+			disabled=not editable,action=function()
+				local source=snapshot();if not source or type(ui.prompt_delay)~="function" then return feedback(false) end
+				local selected=ui.prompt_delay(settings.simultaneous_threshold_ms,delay_entry.default)
+				if selected==nil then return false end
+				if type(selected)~="string" or not selected:match("^%s*%d+%.?%d*%s*$") then return feedback(false) end
+				local delay=tonumber(selected)
+				if not delay or delay<=0 or delay>=math.huge or source.guard()~=true then return feedback(false) end
+				return feedback(Scope.set_chord_settings({simultaneous_threshold_ms=delay,combo_symmetric=settings.combo_symmetric},ctx.is_paused,source))
+			end}}
+	end
 	return renderer.build("key_combinations_group","KeyCombinations",nil,nil,render,{
+		["combo_timings"]=timing_rows,
 		["key_combination_rows_left"]=function() return hand_rows("left") end,
 		["key_combination_rows_right"]=function() return hand_rows("right") end,
 	})

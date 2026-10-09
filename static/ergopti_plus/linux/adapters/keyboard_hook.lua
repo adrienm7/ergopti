@@ -82,8 +82,8 @@ local original_caps_constructor = assert(caps_constructor_source
 local NativeCapsWord = assert(original_caps_constructor())
 local caps_ports = { capture = NativeCapsWord.capture, current = NativeCapsWord.current, plan = NativeCapsWord.plan }
 local original_input_hook_ports = {}
-local INPUT_HOOK_PORT_NAMES = { "capture_input_owner", "input_owner_current", "arm_one_shot", "arm_caps_word", "plan_caps_word", "set_remapper", "stop", "emergency_stop", "key_text" }
-local INPUT_PORT_NAMES = { "capture_input_owner", "input_owner_current", "capture_input_guard", "arm_one_shot", "arm_caps_word", "ack_caps_word", "input_owner_state", "clear_input_arm" }
+local INPUT_HOOK_PORT_NAMES = { "capture_input_owner", "input_owner_current", "arm_one_shot", "arm_caps_word", "plan_caps_word", "set_remapper", "stop", "emergency_stop", "key_text", "capture_buffered_input", "buffered_input_current", "buffered_input_view", "retire_buffered_input" }
+local INPUT_PORT_NAMES = { "capture_input_owner", "input_owner_current", "capture_input_guard", "arm_one_shot", "arm_caps_word", "ack_caps_word", "input_owner_state", "clear_input_arm", "buffered_request_current" }
 local _input_ports = {}
 for _, name in ipairs(INPUT_PORT_NAMES) do _input_ports[name] = rawget(InputIssuer, name) end
 
@@ -161,6 +161,7 @@ local _broker = nil
 local _output_owners = {}
 local _remapper_generation = 0
 local _synthetic_source_of = {}
+local _buffer_dispatch
 local _event_receipts = setmetatable({}, { __mode = "k" })
 local _wire_source_of = setmetatable({}, { __mode = "k" })
 local _release_forwarded_sources
@@ -177,6 +178,7 @@ local _input_output_owner = nil
 local _input_source_owners = nil
 local _input_source_observers, _input_pointer_observers = nil, nil
 local _leased_reader_cleanup = nil
+local _buffered_reader_cleanup, _buffered_record = nil, nil
 local _leased_remapper_cleanup = nil
 local _input_pointer_owners = nil
 local _live_input_context, _armed_input = nil, nil
@@ -558,6 +560,76 @@ local function _input_runtime_current(ctx, active)
 		and _input_reader_ports.source_current(ctx.origin, ctx.sources[keyboard_slot(ctx.source)],
 			ctx.source_observers[keyboard_slot(ctx.source)], _input_reader_ports.capture_source_owner,
 			_input_reader_ports.source_owner_current, _input_reader_ports.retire_source) == true and _input_exports_current()
+end
+
+-- Pending first presses are issued only inside actual original dispatch. A
+-- decoded table, positive caller closure or detached key-state bitmap cannot
+-- mint this opaque source/output capability.
+do
+	local receipts = setmetatable({}, {__mode="k"})
+	_buffered_record=function(token) return receipts[token] end
+	local function current(record, held)
+		if not record or _input_runtime_current(record,false) ~= true then return false end
+		-- Original observers above may run callbacks; private issuer currency is
+		-- checked last. Held state follows processed events, never future ioctl bits.
+		return _running and _intercept and _remapper == record.engine and _remapper_generation == record.generation
+			and _broker == record.broker and _emit_raw == record.emitter and _on_tap == record.callback
+			and _input_source_owners == record.sources and _input_source_observers == record.source_observers
+			and _origin_ready and _origin_generation == record.origin_generation and not _source_reconciliation
+			and _physical_sources[record.source] == true and not _sync_dropped[record.source]
+			and (held ~= true or _physical_down[record.stamp] == record.down)
+	end
+	function M.capture_buffered_input(engine, code, at_ms)
+		local dispatch = _buffer_dispatch
+		if not dispatch or dispatch.engine ~= engine or engine ~= _remapper or dispatch.event.code ~= code
+			or dispatch.event.value ~= InputEvent.VALUE_DOWN or dispatch.at_ms ~= at_ms or dispatch.event.remapped
+			or dispatch.acquired or dispatch.acquiring or _input_ports.buffered_request_current(engine,code,at_ms) ~= true then return nil end
+		local origin, source = dispatch.origin, dispatch.source
+		local view = origin and _input_exports_current() and _input_reader_ports.event_view(origin)
+		local stamp = source_key(source,code)
+		local down = _physical_down[stamp]
+		if not view or view.origin ~= "native-evdev" or view.source ~= source or view.code ~= code or view.value ~= 1
+			or not down or down.origin ~= origin or not _remapper_input_owner then return nil end
+		local hook_ports = {}; for _,name in ipairs(INPUT_HOOK_PORT_NAMES) do hook_ports[name] = rawget(M,name) end
+		local finder = package.loaded["modules.hotstrings.device_finder"]
+		local record = {engine=engine,generation=_remapper_generation,issuer=_remapper_input_owner,origin=origin,
+			engine_release_all=rawget(engine,"release_all"),engine_ack_retirement=rawget(engine,"ack_retirement"),
+			view=view,source=source,stamp=stamp,down=down,at_ms=at_ms,hook_ports=hook_ports,
+			finder=finder,classify_source=type(finder)=="table" and rawget(finder,"physical_sources") or nil,
+			origin_generation=_origin_generation,sources=_input_source_owners,source_observers=_input_source_observers,
+			pointer_sources=_input_pointer_owners,pointer_observers=_input_pointer_observers,
+			broker=_broker,output_issuer=_input_output_owner,emitter=_emit_raw,callback=_on_tap,
+			output_view=_broker and rawget(_broker,"view"),output_debt=_broker and rawget(_broker,"has_debt"),
+			output_current=_broker and rawget(_broker,"output_current"),output_retire=_broker and rawget(_broker,"retire"),output_retired=_input_output_owner and _input_output_owner.terminal}
+		dispatch.acquiring=true
+		local called,admitted=pcall(current,record,true)
+		dispatch.acquiring=nil
+		if not called or admitted~=true then return nil end
+		if _buffer_dispatch~=dispatch or dispatch.acquired or _input_ports.buffered_request_current(engine,code,at_ms) ~= true then return nil end
+		local token = {}; receipts[token]=record; dispatch.acquired=true
+		-- Stop/hotplug cleanup retains this captured cohort, never a later owner
+		-- that happens to reuse a slot or numeric descriptor.
+		_buffered_reader_cleanup={}
+		for slot,lease in pairs(record.sources) do _buffered_reader_cleanup[slot]=lease end
+		for slot,lease in pairs(record.pointer_sources) do _buffered_reader_cleanup[slot]=lease end
+		return token
+	end
+	--- Retires only this issuer's original unforwarded physical lifetime. No IO,
+	--- source acquisition or output right is granted by this cleanup observation.
+	function M.retire_buffered_input(token,engine)
+		local record=receipts[token]
+		if not record or record.engine~=engine then return false end
+		if _physical_down[record.stamp]==record.down then _remap_orphans[record.stamp]=true end
+		return true
+	end
+	function M.buffered_input_current(token, held) return current(receipts[token],held) end
+	function M.buffered_input_view(token)
+		local record=receipts[token]
+		if not current(record,false) then return nil end
+		local view={}; for key,value in pairs(record.view) do view[key]=value end
+		return {source=record.source,at_ms=record.at_ms,origin=record.origin,origin_view=view,
+			generation=record.generation,physical_generation=record.origin_generation,code=record.view.code}
+	end
 end
 
 local function _caps_semantics_current(ctx)
@@ -1531,14 +1603,23 @@ local function _dispatch_event(ev, source)
 		local custody = {}
 		if _remapper then
 			local receipt = _remapper.has_combinations and _combination_source(source) or nil
+			local previous_buffer = _buffer_dispatch
+			_buffer_dispatch = {engine=_remapper,event=ev,source=source,origin=origin,at_ms=at_ms}
+
 			if _armed_input and _armed_input.action == "caps_word" then
 				local prior = _caps_planning_context
 				_caps_planning_context = _armed_input
 				local ok, rows, requested, selected, owned_frame = pcall(_remapper.process, _remapper, ev.code, ev.value, at_ms, receipt)
 				_caps_planning_context = prior
-				if not ok then _withdraw_input_arm(_armed_input); error(rows) end
+				if not ok then _buffer_dispatch = previous_buffer; _withdraw_input_arm(_armed_input); error(rows) end
 				out, tap, binding, frame = rows, requested, selected, owned_frame
-			else out, tap, binding, frame = _remapper:process(ev.code, ev.value, at_ms, receipt) end
+			else
+				local called,rows,requested,selected,owned_frame = pcall(_remapper.process,_remapper,ev.code,ev.value,at_ms,receipt)
+				_buffer_dispatch = previous_buffer
+				if not called then error(rows,0) end
+				out,tap,binding,frame=rows,requested,selected,owned_frame
+			end
+			_buffer_dispatch = previous_buffer
 			if _remapper.take_custody then custody = _remapper:take_custody() end
 		end
 		local consuming = _armed_input
@@ -1564,20 +1645,33 @@ local function _dispatch_event(ev, source)
 		if out then
 			if frame and frame.owned then
 				local exact = _remapper
-				local accepted = _deliver_owned_rows(exact, out, source)
+				local buffered = frame.buffered and original_input_hook_ports.buffered_input_view(frame.buffered) or nil
+				if frame.buffered and not buffered then M.emergency_stop("buffered input source refused"); return end
+				local delivery_source = buffered and buffered.source or source
+				local accepted = _deliver_owned_rows(exact, out, delivery_source, frame)
 				if frame.ack(accepted) ~= true then
+					if frame.buffered and (_broker.has_debt() or _broker.output_retired()==true) then _retired_input_context=_buffered_record(frame.buffered) end
 					if _armed_input then M.emergency_stop("owned input delivery acknowledgement refused") end
 					return
+				end
+				for _,token in ipairs(frame.orphans or {}) do
+					if original_input_hook_ports.retire_buffered_input(token,exact) ~= true then return end
+				end
+				if buffered then
+					if frame.admit(_combination_source(delivery_source)) ~= true then
+						M.emergency_stop("buffered input terminal source refused"); return
+					end
+					_run_owned_tap_frame(frame,tap,binding,exact,original_generation,buffered.origin,buffered.origin_view,delivery_source,buffered.at_ms)
 				end
 				if frame.replay then
 					_remap_owned[owned_key] = nil
 					_dispatch_event(ev, source)
 					return
 				end
-				_run_owned_tap_frame(frame, tap, binding, exact, original_generation, origin, origin_view, source, at_ms)
-				local restored, restore_frame = frame.restore(_combination_source(source))
+				if not buffered then _run_owned_tap_frame(frame, tap, binding, exact, original_generation, origin, origin_view, source, at_ms) end
+				local restored, restore_frame = frame.restore(_combination_source(delivery_source))
 				if restore_frame then
-					local restored_ack = _deliver_owned_rows(exact, restored, source)
+					local restored_ack = _deliver_owned_rows(exact, restored, delivery_source)
 					restore_frame.ack(restored_ack)
 				end
 				return
@@ -1669,11 +1763,17 @@ end
 --- Releases every key the tap-hold engine holds (a hold modifier, a layer
 --- chord, a one-shot Shift) through the normal path, so the virtual keyboard
 --- and the modifier state both see the key-ups.
-_dispatch_owned_rows = function(rows, source, exact)
+_dispatch_owned_rows = function(rows, source, exact, frame)
 	if #rows == 0 then return true end
 	if not _running or not _intercept or type(_emit_raw) ~= "function" then return false end
 	local generation, output, armed = _remapper_generation, _broker, _armed_input
+	local function buffered_current()
+		if not frame or not frame.buffered then return true end
+		if original_input_hook_ports.buffered_input_current(frame.buffered,false) ~= true or frame.delivery_current() ~= true then return false end
+		return _remapper == exact and _remapper_generation == generation and _broker == output
+	end
 	for _, row in ipairs(rows) do
+		if not buffered_current() then return false end
 		if armed and (_remapper ~= exact or _remapper_generation ~= generation or _broker ~= output
 			or row.value ~= InputEvent.VALUE_UP and not _input_guard_current(armed)) then
 			_withdraw_input_arm(armed); return false
@@ -1685,17 +1785,17 @@ _dispatch_owned_rows = function(rows, source, exact)
 			holder = row.holder or (exact.output_holder and exact:output_holder(row)), handoff = row.handoff, original_owner = row.physical == true }, source)
 		_owned_row_receipt = prior
 		if not dispatched then return false end
-		if receipt.count ~= 1 or receipt.accepted ~= true then return false end
+		if receipt.count ~= 1 or receipt.accepted ~= true or not buffered_current() then return false end
 		if armed and (_remapper ~= exact or _remapper_generation ~= generation or _broker ~= output
 			or not _input_guard_current(armed)) then _withdraw_input_arm(armed); return false end
 	end
 	return true
 end
 
-_deliver_owned_rows = function(exact, rows, source)
+_deliver_owned_rows = function(exact, rows, source, frame)
 	local token = exact:begin_delivery(rows)
 	if not token then return false end
-	local accepted = _dispatch_owned_rows(rows, source, exact)
+	local accepted = _dispatch_owned_rows(rows, source, exact, frame)
 	if exact:end_delivery(token) ~= true then return false end
 	return accepted
 end
@@ -1759,7 +1859,20 @@ _tick_remapper = function(now_ms)
 	for _, due in ipairs(due_rows) do
 		if not _remapper_batch_current(exact, generation, output) then return false end
 		if due.owned_rows then
-			due.frame.ack(_deliver_owned_rows(exact, due.owned_rows, _device))
+			local buffered = due.frame.buffered and original_input_hook_ports.buffered_input_view(due.frame.buffered) or nil
+			if due.frame.buffered and not buffered then M.emergency_stop("buffered deadline source refused"); return false end
+			local source = buffered and buffered.source or _device
+			if due.frame.ack(_deliver_owned_rows(exact,due.owned_rows,source,due.frame)) ~= true then
+				if due.frame.buffered and (_broker.has_debt() or _broker.output_retired()==true) then _retired_input_context=_buffered_record(due.frame.buffered) end
+				return false
+			end
+			for _,token in ipairs(due.frame.orphans or {}) do
+				if original_input_hook_ports.retire_buffered_input(token,exact) ~= true then return false end
+			end
+			if buffered then
+				if due.frame.admit(_combination_source(source)) ~= true then M.emergency_stop("buffered deadline terminal source refused"); return false end
+				_run_owned_tap_frame(due.frame,due.tap,due.binding,exact,generation,buffered.origin,buffered.origin_view,source,buffered.at_ms)
+			end
 		elseif due.tap ~= nil then
 			-- The action of a key replayed under a hold that just came due.
 			if _on_tap then _call_callback("tap action callback", _on_tap, due.tap, due.binding) end
@@ -1812,6 +1925,7 @@ local function _dispatch_pointer(ev)
 		-- A finger landing on a touchpad (BTN_TOUCH, BTN_TOOL_*) is neither.
 		if _remapper and InputEvent.is_pointer_button(ev.code) and ev.value ~= InputEvent.VALUE_REPEAT then
 			_remapper:activity()
+			local at_ms=_event_clock_now_ms(); if at_ms then _tick_remapper(at_ms) end
 		end
 		-- The daemon hears of every press, the touch included: with tap-to-click
 		-- the kernel reports a touch and no BTN_LEFT, and that touch moves the
@@ -1825,6 +1939,7 @@ local function _dispatch_pointer(ev)
 		-- wheel, as on Windows and macOS: every EV_REL used to count, so a hand
 		-- that merely moved the mouse while tapping CapsLock typed no Enter.
 		_remapper:activity()
+		local at_ms=_event_clock_now_ms(); if at_ms then _tick_remapper(at_ms) end
 	end
 end
 
@@ -2175,6 +2290,9 @@ local function _close_paths(paths, slot_for, tx)
 		elseif _leased_reader_cleanup then
 			local lease = _leased_reader_cleanup[slot]
 			if lease then _input_reader_ports.retire_source(lease) end
+		elseif _buffered_reader_cleanup then
+			local lease=_buffered_reader_cleanup[slot]
+			if lease then _input_reader_ports.retire_source(lease) end
 		else EvdevReader.close(slot) end
 		_pending_events[slot] = nil
 	end
@@ -2436,6 +2554,14 @@ local function _publish_source_transaction(tx)
 	if tx.native_complete and tx.authority then
 		_input_source_owners, _input_source_observers = tx.sources, tx.source_observers
 		_input_pointer_owners, _input_pointer_observers = tx.pointers, tx.pointer_observers
+		-- Successful original Hook publication replaces its exact cleanup cohort.
+		-- A foreign slot replacement without this transaction remains unowned.
+		if _buffered_reader_cleanup then
+			local cleanup={}
+			for slot,lease in pairs(tx.sources) do cleanup[slot]=lease end
+			for slot,lease in pairs(tx.pointers) do cleanup[slot]=lease end
+			_buffered_reader_cleanup=cleanup
+		end
 	else
 		_input_source_owners, _input_source_observers, _input_pointer_owners, _input_pointer_observers = nil, nil, nil, nil
 	end
@@ -2977,6 +3103,7 @@ function M.stop()
 	end
 	_close_paths(_pointer_devices, pointer_slot)
 	_close_paths(_devices, keyboard_slot)
+	_buffered_reader_cleanup=nil
 	_pointer_devices = {}
 	_devices = {}
 	_device  = nil
@@ -3028,6 +3155,7 @@ function M.emergency_stop(reason)
 	end
 	_close_paths(_pointer_devices, pointer_slot)
 	_close_paths(_devices, keyboard_slot)
+	_buffered_reader_cleanup=nil
 	_pointer_devices = {}
 	_devices = {}
 	_device = nil

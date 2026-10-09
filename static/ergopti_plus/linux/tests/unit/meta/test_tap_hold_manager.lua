@@ -704,3 +704,63 @@ helpers.describe("OneShot construction-original text source", function()
 		end)
 	end
 end)
+
+
+helpers.describe("original loader export refusal preserves the installed engine",function()
+ for _,spec in ipairs({{"load","reload"},{"load_document","apply_configuration"}}) do
+  helpers.it("refuses a replaced "..spec[1].." before invoking or installing it",function()
+   local Manager,hook,_,user_path=manager()
+   local running,calls=hook.engine,hook.calls
+   local Loader=require("platform.remap.tap_hold_loader")
+   local original,foreign_calls=Loader[spec[1]],0
+   Loader[spec[1]]=function(...)foreign_calls=foreign_calls+1;return original(...)end
+   local original_open,source_reads=io.open,0
+   io.open=function(path,...)
+    if path==DEFAULTS or path==user_path then source_reads=source_reads+1 end
+    return original_open(path,...)
+   end
+   local ok,failure=pcall(function()
+    local accepted
+    if spec[2]=="reload" then accepted=Manager.reload()
+    else accepted=Manager.apply_configuration({tap_hold={enabled=false}}) end
+    helpers.assert_eq(accepted,false)
+    helpers.assert_eq(foreign_calls,0,"unknown live exports are never invoked")
+    helpers.assert_eq(source_reads,0,"refused source exports are checked before any configuration file read")
+    helpers.assert_eq(hook.engine,running,"original installation remains owned")
+    helpers.assert_eq(hook.calls,calls,"no native install is attempted")
+   end)
+   io.open=original_open
+   Loader[spec[1]]=original
+   Manager._reset_for_test();os.remove(user_path)
+   if not ok then error(failure,0) end
+  end)
+ end
+end)
+
+
+helpers.describe("loader currency after the last construction callback",function()
+ helpers.it("retains the original tuple after catalogue callbacks replace the candidate loader",function()
+  local Manager,hook,_,user_path=manager()
+  Manager._reset_for_test()
+  local Loader=require("platform.remap.tap_hold_loader")
+  local original=Loader.load_document
+  local original_names=require("modules.gestures.manager").get_executable_action_names
+  local change=false
+  Manager.init({keyboard_hook=hook,execute_action=function()end,on_text_injected=function()end,
+   action_names=function()
+    if change then change=false;Loader.load_document=function(...)return original(...)end end
+    return original_names()
+   end,defaults_path=DEFAULTS,user_path=user_path})
+  local running,calls=hook.engine,hook.calls
+  change=true
+  local ok,failure=pcall(function()
+   helpers.assert_eq(Manager.reload(),false)
+   helpers.assert_eq(change,false,"the actual catalogue callback ran during construction")
+   helpers.assert_eq(hook.engine,running)
+   helpers.assert_eq(hook.calls,calls,"no partial new installation is delivered")
+  end)
+  Loader.load_document=original
+  Manager._reset_for_test();os.remove(user_path)
+  if not ok then error(failure,0) end
+ end)
+end)

@@ -405,3 +405,69 @@ helpers.describe("scope fixture native loop custody", function()
 	end)
 end)
 local result=helpers.get_results();print('GLOBAL_PAIR_SUMMARY '..result.passed..'/'..result.failed);if result.failed~=0 then os.exit(1) end
+
+-- These additive controls use actual declared Linux data, pair source leases,
+-- parameter owners and conditional publication. Device/file edges are controlled.
+local public_source = source .. '[mod_combos]\nenabled=false\nsimultaneous_threshold_ms=75\nsymmetric=true\n'
+ .. '[mod_combos.config.caps_lock_then_tab]\ncombo="copy"\nfuture=17\n'
+ .. '[mod_combos.config.future_then_tab]\ncombo="foreign_action"\n'
+ .. '[category_enabled]\nkey_combinations=false\n'
+local function seed_public_global(s)
+ local token={}
+ helpers.assert_true(s.pairs.acquire_configuration(token))
+ s.bytes[path]=public_source
+ helpers.assert_true(s.pairs.apply_configuration(token,s.pairs.configuration_candidate(Codec.decode(public_source),true)))
+ helpers.assert_true(s.pairs.release_configuration(token))
+end
+helpers.describe("global scope includes only original known simultaneous leaves",function()
+ for _,mode in ipairs({"clear","recommended"}) do
+  helpers.it(mode.." retires known third slots while preserving foreign records and disabled switches",function()
+   with_owner(function(s)
+    helpers.assert_eq(s.pairs.get_chord(pair),"copy")
+    helpers.assert_true(s.scope.apply(mode))
+    local doc=Codec.decode(s.bytes[path])
+    helpers.assert_eq(doc.mod_combos.config[pair].combo,nil)
+    helpers.assert_eq(doc.mod_combos.config[pair].future,17)
+    helpers.assert_eq(doc.mod_combos.config.future_then_tab.combo,"foreign_action")
+    helpers.assert_eq(doc.mod_combos.enabled,false)
+    if mode=="clear" then helpers.assert_eq(doc.category_enabled.key_combinations,false)
+    else helpers.assert_eq(doc.category_enabled.key_combinations,nil) end
+    helpers.assert_eq(doc.mod_combos.simultaneous_threshold_ms,nil)
+    helpers.assert_eq(doc.mod_combos.symmetric,nil)
+    helpers.assert_eq(doc.shortcuts.key_combination_taps.future_then_tab,"future")
+    helpers.assert_eq(doc.gesture_parameters[parameter],nil)
+    helpers.assert_eq(doc.unrelated.keep,42)
+    helpers.assert_eq(s.pairs.get_chord(pair),"none")
+    helpers.assert_eq(s.pairs.chord_settings(),{simultaneous_threshold_ms=100,combo_symmetric=false})
+    helpers.assert_eq(s.scope.pending(),false)
+    helpers.assert_true(s.scope.revert());helpers.assert_eq(s.bytes[path],public_source)
+    helpers.assert_eq(s.pairs.get_chord(pair),"copy")
+    helpers.assert_eq(s.pairs.chord_settings(),{simultaneous_threshold_ms=75,combo_symmetric=true})
+   end,false,seed_public_global)
+  end)
+ end
+ helpers.it("retains a foreign parameter owner without publishing or erasing third slots",function()
+  with_owner(function(s)
+   local foreign={};helpers.assert_true(s.gestures.acquire_parameter_configuration(foreign))
+   helpers.assert_eq(s.scope.apply("clear"),false)
+   helpers.assert_eq(s.publications,0);helpers.assert_eq(s.bytes[path],public_source)
+   helpers.assert_eq(s.pairs.get_chord(pair),"copy");helpers.assert_eq(s.scope.pending(),false)
+   helpers.assert_eq(s.pairs.configuration_pending(),false)
+   helpers.assert_eq(s.gestures.acquire_parameter_configuration({}),false)
+   helpers.assert_true(s.gestures.release_parameter_configuration(foreign))
+   helpers.assert_true(s.scope.retry_restore());helpers.assert_eq(s.bytes[path],public_source)
+   helpers.assert_eq(s.scope.pending(),false)
+  end,false,seed_public_global)
+ end)
+ helpers.it("refuses stale third-source ownership before backup and restores no foreign bytes",function()
+  with_owner(function(s)
+   local foreign=public_source:gsub('combo="copy"','combo="open_url"',1)
+   s.bytes[path]=foreign
+   helpers.assert_eq(s.scope.apply("clear"),false)
+   helpers.assert_eq(s.publications,0);helpers.assert_eq(s.bytes[backup],nil)
+   helpers.assert_eq(s.bytes[path],foreign)
+   s.bytes[path]=public_source;helpers.assert_true(s.scope.retry_restore())
+   helpers.assert_eq(s.bytes[path],public_source);helpers.assert_eq(s.pairs.get_chord(pair),"copy")
+  end,false,seed_public_global)
+ end)
+end)
