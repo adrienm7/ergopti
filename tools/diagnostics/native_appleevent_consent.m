@@ -338,7 +338,7 @@ static void observe_refused_identity(AXUIElementRef window, NSString *sender, NS
             if ([value rangeOfString:sender].location != NSNotFound) factIdentitySender = YES;
             if ([value rangeOfString:receiver].location != NSNotFound) factIdentityReceiver = YES;
         }
-        id children = identity_attribute(element, kAXChildrenAttribute);
+        NSArray *children = identity_attribute(element, kAXChildrenAttribute);
         if (strcmp(factIdentityRefusal, "none") != 0) return;
         if (children == nil && (attributeError == kAXErrorSuccess || attributeError == kAXErrorAttributeUnsupported)) {
             factIdentityError = 0;
