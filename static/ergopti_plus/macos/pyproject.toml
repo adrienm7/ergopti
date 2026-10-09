@@ -28,7 +28,7 @@ dependencies = [
 
 	# Used by data/generate_models.py to scrape the HuggingFace MLX
 	# community organization page when refreshing data/llm_models.json.
-	"requests==2.32.3",
+	"requests==2.33.0",
 	"beautifulsoup4==4.12.3",
 
 	# System trust store for Python TLS. The MLX download / server scripts call
