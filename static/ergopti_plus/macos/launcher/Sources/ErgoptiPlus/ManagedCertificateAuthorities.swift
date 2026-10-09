@@ -11,12 +11,12 @@ enum ManagedCertificateAuthorities {
 	/// Certificate data is bounded independently of the network request. These
 	/// paths arrive only from the admitted immutable private bootstrap snapshot.
 	static func load(environment: [String: String]) throws -> [SecCertificate] {
-		let names = ManagedBootstrapPolicy.trustEnvironment
+		let names = ManagedNetworkBootstrapPolicy.trustEnvironment
 		var bytesRead = 0
 		var filesRead = 0
 		var certificates: [SecCertificate] = []
 		func read(_ path: String) throws {
-			guard !path.isEmpty, !path.utf8.contains(0), filesRead < ManagedBootstrapPolicy.maximumCertificateFiles else { throw Refusal.certificate }
+			guard !path.isEmpty, !path.utf8.contains(0), filesRead < ManagedNetworkBootstrapPolicy.maximumCertificateFiles else { throw Refusal.certificate }
 			filesRead += 1
 			// Stock Go certificate directories permit hashed symlink entries. The
 			// resolved regular FD owns only certificate data, never executable or
@@ -26,7 +26,7 @@ enum ManagedCertificateAuthorities {
 			var owned = descriptor
 			defer { if owned >= 0 { Darwin.close(owned) } }
 			var identity = stat()
-			let available = ManagedBootstrapPolicy.maximumCertificateBytes - bytesRead
+			let available = ManagedNetworkBootstrapPolicy.maximumCertificateBytes - bytesRead
 			guard fstat(descriptor, &identity) == 0, (identity.st_mode & S_IFMT) == S_IFREG,
 				identity.st_size > 0, identity.st_size <= available else { throw Refusal.certificate }
 			var data = Data()
@@ -50,7 +50,7 @@ enum ManagedCertificateAuthorities {
 			for path in value.components(separatedBy: ":") {
 				guard !path.isEmpty, !path.utf8.contains(0) else { throw Refusal.certificate }
 				let entries = try FileManager.default.contentsOfDirectory(atPath: path).sorted()
-				guard entries.count <= ManagedBootstrapPolicy.maximumCertificateFiles - filesRead else { throw Refusal.certificate }
+				guard entries.count <= ManagedNetworkBootstrapPolicy.maximumCertificateFiles - filesRead else { throw Refusal.certificate }
 				for entry in entries {
 					let file = (path as NSString).appendingPathComponent(entry)
 					var directory = ObjCBool(false)

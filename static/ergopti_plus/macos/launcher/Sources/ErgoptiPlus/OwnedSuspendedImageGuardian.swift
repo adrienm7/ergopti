@@ -56,7 +56,7 @@ struct OwnedSuspendedImageRequest {
 			let executable = fields["executable"] as? String, validPath(executable),
 			let session = fields["session_path"] as? String, validPath(session),
 			let home = fields["home"] as? String, validPath(home),
-			let models = fields["models_path"] as? String, !models.utf8.contains(0), models.utf8.count <= ManagedBootstrapPolicy.maximumProxyBytes,
+			let models = fields["models_path"] as? String, !models.utf8.contains(0), models.utf8.count <= ManagedNetworkBootstrapPolicy.maximumProxyBytes,
 				fields["bootstrap_path"] != nil || models.isEmpty || validPath(models),
 			let policy = fields["network_policy"] as? String, validPath(policy),
 			let host = fields["host"] as? String, validLoopback(host, prefix: "127.0.0.1:"),
@@ -325,7 +325,7 @@ enum OwnedSuspendedImageGuardian {
 				&& UInt64(UInt32(bitPattern: held.st_dev)) == bootstrap.device && UInt64(held.st_ino) == bootstrap.inode
 				&& held.st_dev == initialBootstrap.st_dev && held.st_ino == initialBootstrap.st_ino
 				&& held.st_dev == named.st_dev && held.st_ino == named.st_ino
-				&& (empty ? held.st_size == 0 : held.st_size > 0 && held.st_size <= ManagedBootstrapPolicy.maximumMetadataBytes)
+				&& (empty ? held.st_size == 0 : held.st_size > 0 && held.st_size <= ManagedNetworkBootstrapPolicy.maximumMetadataBytes)
 		}
 		guard bootstrapAdmitted(empty: true) else { _ = send("V1 REFUSED \(ESTALE)"); return 0 }
 		guard let argv = duplicateCStringVector([request.executable] + request.arguments) else {
