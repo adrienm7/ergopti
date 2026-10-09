@@ -313,6 +313,12 @@ jobs:
       fail-fast: false
       matrix:
         suite: ${{ fromJSON(github.ref == 'refs/heads/main' && '["js","properties","mutation"]' || '["js","properties"]') }}
+    env:
+      ERGOPTI_DEV_RELEASE_RELEASE: ${{ needs.validate.outputs.release }}
+      ERGOPTI_DEV_RELEASE_PRERELEASE: ${{ needs.validate.outputs.prerelease }}
+      ERGOPTI_DEV_RELEASE_CHANNEL: ${{ needs.validate.outputs.channel }}
+      ERGOPTI_DEV_RELEASE_TAG: ${{ needs.validate.outputs.tag }}
+      ERGOPTI_DEV_RELEASE_VERSION: ${{ needs.validate.outputs.version }}
     steps:
       - uses: actions/checkout@v4
 
@@ -347,7 +353,21 @@ jobs:
           node tools/lint/format.cjs --check
 
       - name: Run shared validation suite
-        run: npm run test:${{ matrix.suite }}
+        run: |
+          set -euo pipefail
+          mode=full
+          if [ "${{ matrix.suite }}" = js ]; then
+              receipt="$RUNNER_TEMP/stable-core-js-suite.json"
+              node tools/ci/dev-release-qualification.cjs --scope core-js-suite --receipt "$receipt"
+              mode="$(node tools/ci/dev-release-qualification.cjs --scope core-js-suite --validate-scope-receipt "$receipt")"
+          fi
+          if [ "$mode" = deferred ]; then
+              echo '[DEFERRED] core-js-suite: qualified=false; properties and mutation unchanged.'
+          elif [ "$mode" = full ]; then
+              npm run test:${{ matrix.suite }}
+          else
+              exit 1
+          fi
 
       # Actual WebView rendering belongs to the shared JS lane. Native bridges
       # are recorded; Chromium and WebKit cover both renderer families.
@@ -366,6 +386,14 @@ jobs:
       - name: Test shared Versions installation rendering
         if: matrix.suite == 'js'
         run: npm run test:browser:changelog-install
+
+      - name: Retain the source-bound Core JavaScript qualification
+        if: always() && matrix.suite == 'js'
+        uses: actions/upload-artifact@v4
+        with:
+          name: assets-qualification-core-js
+          path: ${{ runner.temp }}/stable-core-js-suite.json
+          if-no-files-found: warn
 
   macos:
     name: 'macOS'

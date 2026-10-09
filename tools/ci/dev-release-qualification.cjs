@@ -20,6 +20,22 @@ const SCOPE_IDS = Object.freeze([
 	'macos-launch-appleevents'
 ]);
 const STABLE_EXTRA_SCOPES = Object.freeze({
+	'core-js-suite': { path: '.github/workflows/ci.yml', args: ['core', 'npm run test:js'] },
+	'macos-native-model-receiving': {
+		path: '.github/workflows/ci-macos.yml',
+		args: [
+			'managed-ollama-native',
+			'Receive actual native model create, pull, inference and retirement'
+		]
+	},
+	'linux-unit-suite': {
+		path: '.github/workflows/ci-linux.yml',
+		args: ['test-linux', 'Run the driver unit test suite']
+	},
+	'linux-e2e-suite': {
+		path: '.github/workflows/ci-linux.yml',
+		args: ['e2e-linux', 'Linux E2E test suite bodies including live fixture chain']
+	},
 	'macos-native-pac': {
 		path: '.github/workflows/ci-macos.yml',
 		args: ['managed-ollama-native', 'Qualify actual native PAC and WPAD XCTest controls']
@@ -106,7 +122,7 @@ function validatePolicy(value) {
 	if (
 		stable &&
 		(value.repository !== 'adrienm7/ergopti' ||
-			value.expires_at !== '2026-10-09T22:00:00Z' ||
+			value.expires_at !== '2026-10-10T00:00:00Z' ||
 			value.tag !== 'v1.0.0' ||
 			value.version !== '1.0.0')
 	)
@@ -419,7 +435,7 @@ function stablePublicationNotice(id, context, sha, now = new Date()) {
 			.join(' ') +
 		' ' +
 		'Compilation, packaging, macOS signing, source and asset integrity, installation and all other tests remain required. Windows signature evidence is disclosed separately. ' +
-		'[Qualification records](https://github.com/adrienm7/ergopti/releases/tag/v1.0.0) retain the exact source-bound deferred scopes. Packaging does not prove native feature acceptance. This exception applies only to v1.0.0 before 2026-10-09T22:00:00Z.' +
+		'[Qualification records](https://github.com/adrienm7/ergopti/releases/tag/v1.0.0) retain the exact source-bound deferred scopes. Packaging does not prove native feature acceptance. This exception applies only to v1.0.0 before 2026-10-10T00:00:00Z.' +
 		' Known macOS reports remain under investigation: Karabiner lease failures (including watchdog exit 73 and PONG/READY timeouts), and an active Homebrew upgrade leaving Hammerspoon running without ErgoptiPlus. This release does not claim those reports repaired.'
 	);
 }
@@ -452,7 +468,11 @@ function admitCommandReceipts(directory, context, sha, now = new Date()) {
 		'macos-stubbed-unit': [''],
 		'macos-stubbed-e2e': [''],
 		'windows-native-desktop': [''],
-		'linux-simultaneous-native': ['']
+		'linux-simultaneous-native': [''],
+		'linux-unit-suite': [''],
+		'linux-e2e-suite': [''],
+		'core-js-suite': [''],
+		'macos-native-model-receiving': ['arm64', 'amd64']
 	};
 	for (const [scope, suffixes] of Object.entries(expected)) {
 		for (const suffix of suffixes) {

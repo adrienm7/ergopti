@@ -4098,6 +4098,27 @@ for (const [what, from, to] of [
 // The temporary Mac exception still requires closed context and retained gates.
 require('./test-macos-dev-qualification-deferral.cjs');
 
+// GitHub Pages reads the domain from the deployed root after each replacement.
+const siteRoot = path.resolve(__dirname, '../..');
+assert.equal(fs.readFileSync(path.join(siteRoot, 'static/CNAME'), 'utf8'), 'ergopti.fr\n');
+const siteWorkflow = fs.readFileSync(
+	path.join(siteRoot, '.github/workflows/deploy-site.yml'),
+	'utf8'
+);
+assert.match(siteWorkflow, /^      - 'static\/CNAME'$/m, 'a domain-only change must deploy');
+assert.match(
+	siteWorkflow,
+	/        run: \|\n          npm run build\n          cmp -- static\/CNAME build\/CNAME\n/,
+	'the exact built domain must be verified before destructive deployment'
+);
+assert.ok(
+	siteWorkflow.indexOf('cmp -- static/CNAME build/CNAME') <
+		siteWorkflow.indexOf('- name: Deploy to GitHub Pages'),
+	'the domain guard precedes the deployment step'
+);
+assert.match(siteWorkflow, /cp -r build\/\. "\$GHP"\//, 'main deploy retains built static assets');
+assert.match(siteWorkflow, /cp -r build\/\. "\$GHP\/\$DEPLOY_DIR\/"/, 'dev deploy remains scoped');
+
 if (errors.length > 0) {
 	console.error(
 		'[FAIL] the CI pipeline wiring can skip a gate, publish a wrong or partial release, or draw a tangled graph:'
