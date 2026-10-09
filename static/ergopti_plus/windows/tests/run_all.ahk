@@ -516,6 +516,7 @@ InstallSendNoOps()
 #Include unit/test_uninstall.ahk
 #Include unit/test_uninstall_source_run.ahk
 #Include unit/test_start_at_login.ahk
+#Include unit/test_start_at_login_other_source.ahk
 #Include meta/test_uninstall_shutdown_gate.ahk
 #Include unit/test_updater_channel_registry.ahk
 #Include unit/test_updater_schedule_vectors.ahk

@@ -5213,11 +5213,31 @@ function languageParentSource(source, driver) {
 		[{ type: 'group', id: 'about', i18n: 'menu.about.title', rows: [] }]
 	);
 	assert.deepEqual(hand.prior_top_level_record, { id: 'about' });
-	assert.deepEqual(
-		menu.about_menu,
-		hand.about_child_declarations,
-		'all original child identities and behavior metadata remain unchanged'
-	);
+	function requireAboutMetadata(rows) {
+		assert.deepEqual(
+			rows,
+			hand.about_child_declarations,
+			'all child identities and metadata include the intended startup command guard'
+		);
+	}
+	requireAboutMetadata(menu.about_menu);
+	for (const patch of [
+		{ disabled_when: undefined },
+		{ disabled_when: ['start_at_login_enabled'] },
+		{ disabled_reason_key: undefined },
+		{ disabled_reason_key: 'menu.about.source_run_reason' }
+	]) {
+		const rows = structuredClone(menu.about_menu);
+		Object.assign(
+			rows.find((row) => row.id === 'start_at_login'),
+			patch
+		);
+		assert.throws(
+			() => requireAboutMetadata(rows),
+			{ code: 'ERR_ASSERTION' },
+			'absent or wrong startup availability/reason must refuse the genuine metadata oracle'
+		);
+	}
 	assert.equal(
 		Object.keys(hand.locales).length,
 		21,

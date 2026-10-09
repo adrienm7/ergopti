@@ -3281,5 +3281,6 @@
 	"healthcheck.summary.scope": "Výsledky se týkají pouze zaznamenaných kontrol. Izolované testovací sady nebyly spuštěny.",
 	"healthcheck.problem.diagnostic_check": "Diagnostická kontrola selhala: %s.",
 	"healthcheck.export.privacy_notice": "Tato zpráva sdílí pouze povolené technické údaje. Protokoly, volný text, cesty a identifikační údaje jsou vynechány i při zapnutých podrobnostech. Místní testy stránky nejsou zahrnuty.",
-	"sg_actions.llm_translate_context": "🌐 Přeložit aktuální větu [nastavitelné]"
+	"sg_actions.llm_translate_context": "🌐 Přeložit aktuální větu [nastavitelné]",
+	"menu.about.startup_other_command_reason": "Jiný příkaz při spuštění: Spouštění je nastaveno pro jiný příkaz nebo instalaci. Stávající nastavení zůstává zachováno."
 }

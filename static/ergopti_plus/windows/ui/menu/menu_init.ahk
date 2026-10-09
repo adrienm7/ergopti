@@ -489,7 +489,8 @@ _MI_BuildAboutMenu(StartupCommand := 0, StartupState := 0) {
 	; A local version run from source has nothing to uninstall: the row stays,
 	; greyed, and says why (the manifest's disabled_reason_key).
 	StateGetters := Map("installed_build", () => !Updater_IsLocalSource(),
-		"start_at_login_enabled", StartupState)
+		"start_at_login_enabled", StartupState,
+		"startup_command_available", StartAtLoginCommandAvailable)
 	return MenuRenderer_Build("about_menu", "About", "", "", Providers, Commands, StateGetters)
 }
 

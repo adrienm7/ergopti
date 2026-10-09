@@ -3281,5 +3281,6 @@
 	"healthcheck.summary.scope": "Resultatene gjelder bare de registrerte kontrollene. Isolerte testsuiter ble ikke kjørt.",
 	"healthcheck.problem.diagnostic_check": "Diagnostisk kontroll mislyktes: %s.",
 	"healthcheck.export.privacy_notice": "Denne rapporten deler bare tillatte tekniske opplysninger. Logger, fritekst, stier og identifiserende opplysninger utelates også når detaljer er aktivert. Lokale sidetester er ikke inkludert.",
-	"sg_actions.llm_translate_context": "🌐 Oversett gjeldende setning [kan tilpasses]"
+	"sg_actions.llm_translate_context": "🌐 Oversett gjeldende setning [kan tilpasses]",
+	"menu.about.startup_other_command_reason": "Annen oppstartskommando: Oppstart er konfigurert for en annen kommando eller installasjon. Den eksisterende innstillingen beholdes."
 }
