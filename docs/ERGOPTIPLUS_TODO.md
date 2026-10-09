@@ -5811,6 +5811,20 @@ producer/ownership reviews pass; native receiving of these observations and
 the remaining causal fixes still require the next Windows dispatch. These are
 observations, not proof that the13 failures are fixed. Items62/16/38 stay open.
 
+Native macOS checkpoint (2026-10-09): manual37873740234 at
+`a81dd0d2c834dbaa751a273d3cd96822ffd59119` completes with failure.
+Core JavaScript/properties, macOS stubbed unit/E2E and the native tooltip
+captures pass; both managed-runtime architectures and cold bootstrap fail at
+a duplicate Swift type declaration before SDK/model receiving. Package and
+installation are skipped, and Release is skipped. The canonical generator now
+names the new network enum ManagedNetworkBootstrapPolicy; its six consumers
+follow that name. The existing download policy/parser and both JSON policies
+remain exact. Forty portable controls, including the actual36-source Swift
+inventory and causal declaration/consumer mutants, pass. Actual native
+compilation, SDK41/Go48, model exchange, package and installation after this
+namespace correction still require a new dispatch; the production guard
+remains closed and items36/62/16/38 are not qualified by source checks.
+
 The early native updater sidecar now retains its exact closed stage,
 exception family and signed HRESULT before file-read admission; v1 remains
 exactly five fields and v2 requires all eight. No message, stack or destination

@@ -83,4 +83,161 @@ assert.notEqual(
 	render(bootstrap, proxy)
 );
 controls++;
+// Scan actual Swift target inputs, rather than only comparing the generated
+// file to its own generator: that drift check missed a duplicate type owner.
+const launcherSources = path.join(root, 'static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus');
+function swiftSources(directory, prefix = '') {
+	const sources = new Map();
+	for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
+		assert.equal(entry.isSymbolicLink(), false, 'Swift source inventory must be physical');
+		const name = prefix + entry.name;
+		if (entry.isDirectory()) {
+			for (const [relative, bytes] of swiftSources(path.join(directory, entry.name), name + '/'))
+				sources.set(relative, bytes);
+		} else if (entry.isFile() && entry.name.endsWith('.swift')) {
+			sources.set(name, fs.readFileSync(path.join(directory, entry.name), 'utf8'));
+		}
+	}
+	return sources;
+}
+
+// A bounded nominal-type source guard, not a Swift compiler. Ignore comments,
+// strings (including raw/multiline strings) and nested nominal declarations.
+function topLevelPolicyTypes(source) {
+	const tokens = [];
+	let at = 0;
+	while (at < source.length) {
+		if (source.startsWith('//', at)) {
+			const next = source.indexOf('\n', at);
+			at = next < 0 ? source.length : next + 1;
+			continue;
+		}
+		if (source.startsWith('/*', at)) {
+			let depth = 1;
+			at += 2;
+			while (at < source.length && depth) {
+				if (source.startsWith('/*', at)) {
+					depth++;
+					at += 2;
+				} else if (source.startsWith('*/', at)) {
+					depth--;
+					at += 2;
+				} else at++;
+			}
+			assert.equal(depth, 0, 'unterminated Swift comment');
+			continue;
+		}
+		const opening = /^(#*)("""|")/.exec(source.slice(at));
+		if (opening) {
+			const end = opening[2] + opening[1];
+			const escape = '\\' + opening[1];
+			at += opening[0].length;
+			let closed = false;
+			while (at < source.length) {
+				if (source.startsWith(escape, at)) at += escape.length + 1;
+				else if (source.startsWith(end, at)) {
+					at += end.length;
+					closed = true;
+					break;
+				} else at++;
+			}
+			assert.equal(closed, true, 'unterminated Swift string');
+			continue;
+		}
+		const name = /^[A-Za-z_][A-Za-z0-9_]*/.exec(source.slice(at));
+		if (name) {
+			tokens.push(name[0]);
+			at += name[0].length;
+		} else {
+			if ('{}'.includes(source[at])) tokens.push(source[at]);
+			at++;
+		}
+	}
+	let depth = 0;
+	const names = [];
+	for (let index = 0; index < tokens.length; index++) {
+		if (tokens[index] === '{') depth++;
+		else if (tokens[index] === '}') depth--;
+		else if (
+			depth === 0 &&
+			['enum', 'struct', 'class', 'actor', 'protocol', 'typealias'].includes(tokens[index])
+		) {
+			const name = tokens[index + 1];
+			if (['ManagedBootstrapPolicy', 'ManagedNetworkBootstrapPolicy'].includes(name))
+				names.push(name);
+		}
+		assert.ok(depth >= 0, 'Swift declaration scope is balanced');
+	}
+	assert.equal(depth, 0, 'Swift declaration scope is balanced');
+	return names;
+}
+
+function assertPolicyOwners(sources) {
+	const expected = new Map([
+		['ManagedBootstrapPolicy', 'ManagedBootstrapDownload.swift'],
+		['ManagedNetworkBootstrapPolicy', 'ManagedBootstrapPolicy.generated.swift']
+	]);
+	const actual = new Map([...expected.keys()].map((name) => [name, []]));
+	for (const [file, source] of sources) {
+		for (const name of topLevelPolicyTypes(source)) actual.get(name).push(file);
+	}
+	for (const [name, file] of expected)
+		assert.deepEqual(actual.get(name), [file], name + ' has one exact owner');
+}
+
+const sources = swiftSources(launcherSources);
+assertPolicyOwners(sources);
+controls++;
+const duplicate = new Map(sources);
+duplicate.set('ForeignPolicy.swift', 'struct ManagedNetworkBootstrapPolicy {}\n');
+assert.throws(() => assertPolicyOwners(duplicate));
+controls++;
+const oldCollision = new Map(sources);
+oldCollision.set(
+	'ManagedBootstrapPolicy.generated.swift',
+	generated.replace('enum ManagedNetworkBootstrapPolicy', 'enum ManagedBootstrapPolicy')
+);
+assert.throws(() => assertPolicyOwners(oldCollision));
+controls++;
+for (const name of ['ManagedBootstrapPolicy', 'ManagedNetworkBootstrapPolicy']) {
+	const missing = new Map(sources);
+	const file =
+		name === 'ManagedBootstrapPolicy'
+			? 'ManagedBootstrapDownload.swift'
+			: 'ManagedBootstrapPolicy.generated.swift';
+	missing.set(
+		file,
+		missing.get(file).replace(new RegExp('\\b' + name + '\\b', 'g'), 'UnrelatedPolicy')
+	);
+	assert.throws(() => assertPolicyOwners(missing));
+	controls++;
+}
+const misleading = new Map(sources);
+misleading.set(
+	'CommentAndNestedPolicy.swift',
+	'// struct ManagedBootstrapPolicy {}\n/* enum ManagedNetworkBootstrapPolicy {} /* struct ManagedBootstrapPolicy {} */ */\nlet text = #"enum ManagedNetworkBootstrapPolicy {}"#\nlet multiline = """\nstruct ManagedBootstrapPolicy {}\n"""\nstruct Container { struct ManagedBootstrapPolicy {} }\n'
+);
+assertPolicyOwners(misleading);
+controls++;
+for (const [file, members] of [
+	['OwnedSuspendedImageGuardian.swift', ['maximumProxyBytes', 'maximumMetadataBytes']],
+	[
+		'ManagedCertificateAuthorities.swift',
+		[
+			'trustEnvironment',
+			'maximumCertificateFiles',
+			'maximumCertificateBytes',
+			'maximumCertificateFiles'
+		]
+	]
+]) {
+	const reads = [
+		...sources.get(file).matchAll(/\bManaged(?:Network)?BootstrapPolicy\.([A-Za-z_][A-Za-z0-9_]*)/g)
+	];
+	assert.deepEqual(
+		reads.map((match) => match[0]),
+		members.map((member) => 'ManagedNetworkBootstrapPolicy.' + member)
+	);
+	controls++;
+}
 console.log(`Managed bootstrap policy: ${controls} controls passed; native SDK not executed.`);
