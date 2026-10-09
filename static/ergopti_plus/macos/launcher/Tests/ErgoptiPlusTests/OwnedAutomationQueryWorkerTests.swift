@@ -407,7 +407,7 @@ final class OwnedAutomationQueryWorkerTests: XCTestCase {
 		XCTAssertTrue(transcript.accept("Q1 DATA " + bytes.base64EncodedString(), arguments: args))
 		XCTAssertNil(transcript.publishablePayload(guardianStatus: 0, cancelled: false, beforeDeadline: true))
 		XCTAssertTrue(transcript.accept("Q1 RETIRED 0", arguments: args))
-		XCTAssertEqual(transcript.publishablePayload(guardianStatus: 0, cancelled: false, beforeDeadline: true), bytes)
+		XCTAssertEqual(transcript.publishablePayload(guardianStatus: 0, cancelled: false, beforeDeadline: true), "Q1 DATA " + bytes.base64EncodedString())
 		XCTAssertNil(transcript.publishablePayload(guardianStatus: 0, cancelled: true, beforeDeadline: true))
 		XCTAssertNil(transcript.publishablePayload(guardianStatus: 0, cancelled: false, beforeDeadline: false))
 	}
