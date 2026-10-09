@@ -3728,6 +3728,10 @@ the complete three-OS checkpoint remain pending.
 - [ ] **36.** Packaging remainder (the former item 21): macOS release archive as
       `.tar.xz` (verify Sparkle, the Homebrew cask and CI install first).
 
+The actual Brew failure occurs before the existing opt-in normal permission prerequisite is reached. The reviewed follow-up moves that unchanged exact-owned preflight block before the first mandatory unconfined-positive send. All original132 portable cases and36 source controls remain; three additive modeled ordering controls fail on the old sequence and pass on the corrected sequence. This does not prove a native TCC grant or waive either mandatory positive, the six real Brew operations, receiver custody or900/10/30-second budgets. Corrected actual native Brew acceptance remains pending.
+
+Integrated manual37917921507 on cbb0efd43 executes the independent exact25 archive cohort:24PASS/1FAIL/0SKIP. All8 archive,15 Sparkle (including actual tar.xz upgrade/refusals and signaled-child capture) and1 consent tests pass; the one Brew consumer fails its unchanged mandatory unconfined-positive receipt with AppleEvent-1744/exit66. This is not full-package or installation qualification. The actual cold app build also refuses an unsigned nested SystemSwitcherState during host signing; the reviewed central builder correction signs both existing helpers before the host, preserving identities, entitlements, the outer signature and strict verification. Corrected native signing remains pending.
+
 Manual macOS qualification now has an independent archive cohort: the existing
 eight archive, fifteen Sparkle, one six-scenario Homebrew and one consent
 XCTest methods run without waiting for the managed HTTP job. Its closed selected
@@ -5803,6 +5807,10 @@ The separately reviewed combined LLM/About menu-parent tranche preserves native 
       Complete native, package, installation and enterprise acceptance remains
       open. macOS system trust and explicit proxy relays are integrated, while
       opaque-client full-URL PAC/WPAD/fallback/redirect routing remains CODE.
+
+The same integrated manual passes the actual41-case native SDK cohort on both macOS architectures. The separate12-case PAC/WPAD cohort fails two completed wire methods, then the direct HTTP PAC method observes one wrong default route instead of three ordered routes and traps on an unchecked array index; the remaining nine controls, including decisive HTTPS path/query receiving, do not execute. Three reviewed post-assertion cardinality guards retain the original failures and avoid this fixture crash, allowing later original methods to run. They do not repair or establish a cause for the production routing/trust-restoration failure. Corrected native receiving remains pending.
+
+Integrated manual37917921507 on cbb0efd43 stops Windows before the full AHK suite: the native parser refuses the optional diagnostic inline empty catch at test_updater_curl_artifact.ahk:662. No native unit case or previous seven failure has been requalified by this run; downstream E2E/package/install are skipped. The reviewed correction changes only that catch to a multiline empty block, preserving all136 assertions,15 registrations, clocks and Job closure. Corrected native execution remains pending; separate actual PAC producer17/platform6 and navigation34 controls pass.
 
 Current composed receiving qualification adds an independent exact twelve-case native PAC/WPAD XCTest cohort on both macOS architectures, including the existing real CFNetwork HTTPS path/query control. Its strict reader refuses missing, skipped, duplicated, foreign or failed cases; it does not qualify the full package or installation. The final composite preserves the published Group1 menu delivery and Group3 documentation. The dedicated XcodeGen metadata token remains absent until the Group5 scoped consumer and child-environment removal are integrated together. Native execution of this current candidate is pending the final integrated all-OS manual CI; previous failures and the remaining software/device tasks below remain open.
 
