@@ -436,6 +436,335 @@ local function genuine_gesture_providers(damage)
 	return {}, result, observed
 end
 
+--- Follows the registered Hotstrings closure through its actual language producer
+--- and canonical list renderer. A provider name alone grants no coverage: both
+--- declared lists must yield native callbacks consumed by the returned language
+--- parent and by the successful native Hotstrings result.
+local function genuine_language_providers(damage, exercise)
+	local loaded, getenv, original_safe = {}, os.getenv, rawget(_G, "i18n_safe")
+	for name, value in pairs(package.loaded) do loaded[name] = value end
+	local names = { "infra.i18n", "infra.locale", "locale.core", "infra.manifest_menu",
+		"ui.menu.menu_builder", "infra.paths", "json", "menu.renderer",
+		"infra.hotstring_preferences", "infra.config_paths", "adapters.storage",
+		"modules.hotstrings.magic_key", "modules.hotstrings.magic_key_source" }
+	local directory, path, filesystem, created
+	local restore = function() end
+	local observed = { switch_calls = 0, category_calls = 0, effects = 0,
+		audit_events = {}, audit_notifications = 0, publication_calls = 0 }
+	local bytes = '[hotstrings]\nmagic_key_source = "auto"\n'
+	local ok, result = xpcall(function()
+		directory = os.tmpname(); assert(os.remove(directory))
+		filesystem = require("lfs"); assert(filesystem.mkdir(directory)); created = true
+		path = directory .. "/config.toml"
+		os.getenv = function(name)
+			if name == "XDG_CONFIG_HOME" or name == "XDG_DATA_HOME" or name == "XDG_STATE_HOME" then return directory end
+			return getenv(name)
+		end
+		for _, name in ipairs(names) do package.loaded[name] = nil end
+		local file = assert(io.open(path, "wb")); assert(file:write(bytes)); assert(file:close())
+		require("infra.i18n").init()
+		assert(require("infra.hotstring_preferences")._set_file_for_test(path))
+		local manifest, builder = require("infra.manifest_menu"), require("ui.menu.menu_builder")
+		local function upvalue(owner, wanted)
+			if type(owner) ~= "function" then return nil end
+			for index = 1, 100 do
+				local name, value = debug.getupvalue(owner, index)
+				if not name then break end
+				if name == wanted then return value, index end
+			end
+		end
+		local closure, slot = upvalue(builder.build, "_build_hotstrings")
+		assert(type(closure) == "function" and slot, "the registered native Hotstrings closure is required")
+		local body, body_slot = upvalue(closure, "_manifest_hotstring_rows")
+		assert(type(body) == "function" and body_slot, "the actual native Hotstrings body is required")
+		local root, build, template, check, render = manifest.get_root(), manifest.build,
+			manifest.template_rows, manifest.check_row, manifest.render_rows
+		local frames = { "hotstring_language_frame", "hotstring_language_parent_lua", "hotstring_scope_checkbox", "hotstrings_menu", "top_level" }
+		local saved = {}; for _, key in ipairs(frames) do saved[key] = root[key] end
+		local notification, notification_slot = upvalue(body, "show_error")
+		assert(type(notification) == "function" and notification_slot, "the actual refusal notification port is required")
+		restore = function()
+			manifest.build, manifest.template_rows, manifest.check_row = build, template, check
+			manifest.render_rows = render
+			for _, key in ipairs(frames) do root[key] = saved[key] end
+			debug.setupvalue(builder.build, slot, closure)
+			debug.setupvalue(closure, body_slot, body)
+			debug.setupvalue(body, notification_slot, notification)
+		end
+		-- Use the actual declared Hotstrings row unchanged, through the genuine
+		-- public registration and final renderer. Other tray owners are outside
+		-- this bounded input, so their declarations are not exercised here.
+		local declared
+		for _, row in ipairs(manifest.get_array("top_level")) do
+			if row.id == "hotstrings" then declared = row end
+		end
+		assert(type(declared) == "table", "the actual top-level Hotstrings declaration is required")
+		root.top_level = { declared }
+		-- Independently authored catalogue input; all menu/list/callback producers
+		-- remain the genuine production functions. These callbacks record targets,
+		-- not native storage publication or runtime admission.
+		local categories = {
+			french_magickey = { id = "french_magickey", count = 7,
+				sections = { beta = { count = 7 } }, sections_order = { "beta" } },
+			french_autocorrection = { id = "french_autocorrection", count = 3,
+				sections = { alpha = { count = 3 } }, sections_order = { "alpha" } },
+		}
+		local audit, acknowledgement = false, true
+		local config = {
+			get_groups = function() return { "french_magickey", "french_autocorrection" } end,
+			get_categories = function() return categories end,
+			get_category = function(id) return categories[id] end,
+			is_group_enabled = function() return true end,
+			is_section_enabled = function() return true end,
+			language_packs = function()
+				return { { id = "french", locale = "fr", categories = { "magickey", "absent", "autocorrection" } } }
+			end,
+			set_categories_sections = function(ids, enabled)
+				if audit then
+					observed.audit_events[#observed.audit_events + 1] = {
+						kind = "scope", selected = table.concat(ids, ","), enabled = enabled }
+					return acknowledgement
+				end
+				observed.effects = observed.effects + 1
+				observed.selected, observed.enabled = table.concat(ids, ","), enabled
+				return true
+			end,
+			toggle_section = function(id, section)
+				if audit then
+					observed.audit_events[#observed.audit_events + 1] = { kind = "section", category = id, section = section }
+					return acknowledgement
+				end
+				observed.effects = observed.effects + 1
+				observed.category, observed.section = id, section
+				return true
+			end,
+			set_category_scope_enabled = function(ids, enabled)
+				assert(audit, "category scope is exercised only in the explicit target audit")
+				observed.audit_events[#observed.audit_events + 1] = {
+					kind = "category_scope", selected = table.concat(ids, ","), enabled = enabled }
+				return acknowledgement
+			end,
+			resolve = function() return { delay = 0.75, color = "#1e88e5", has_override = false } end,
+			get_global_delay = function() return 0.75 end,
+			has_global_delay_override = function() return false end,
+		}
+		local function contains(rows, callback)
+			if type(rows) ~= "table" or type(callback) ~= "function" then return false end
+			for _, row in ipairs(rows) do
+				if type(row) == "table" then
+					if rawequal(row.action or row.fn, callback) then return true end
+					if contains(row.items or row.submenu or row.menu, callback) then return true end
+				end
+			end
+			return false
+		end
+		local function native_callback(callback)
+			return type(callback) == "function" and rawequal(upvalue(callback, "config"), config)
+				and debug.getinfo(callback, "S").source == debug.getinfo(body, "S").source
+		end
+		local native_switches = {}
+		manifest.check_row = function(key, id, commands, getters)
+			local row = check(key, id, commands, getters)
+			local owner = type(commands) == "table" and commands.hotstring_scope_all_sections or nil
+			if key == "hotstring_scope_checkbox" and id == "hotstring_scope_all_sections"
+				and native_callback(owner) and type(row) == "table" and type(row.action) == "function" then
+				-- The canonical checkbox deliberately wraps the native action with
+				-- its retained readiness check. Preserve and prove that exact wrapper.
+				native_switches[row.action] = owner
+			end
+			return row
+		end
+		local switch, category_callbacks, category_actions, rendered_frame, parent, pending = nil, nil, nil, nil, nil, {}
+		local category_owners = {}
+		manifest.template_rows = function(key, commands, getters, providers)
+			local delegated, supplied = {}, {}
+			for id, provider in pairs(providers or {}) do
+				delegated[id] = type(provider) == "function" and function(...)
+					local rows = provider(...)
+					if key == "hotstring_language_frame" then
+						if id == "hotstring_language_switch" then observed.switch_calls = observed.switch_calls + 1 end
+						if id == "hotstring_language_categories" then observed.category_calls = observed.category_calls + 1 end
+						supplied[id] = rows
+					end
+					return rows
+				end or provider
+			end
+			local rows = template(key, commands, getters, delegated)
+			if key == "hotstring_language_frame" then
+				local switches, sections = supplied.hotstring_language_switch, supplied.hotstring_language_categories
+				if type(switches) == "table" and #switches == 1 and type(sections) == "table" and #sections == 2 then
+					local action = switches[1].action or switches[1].fn
+					local owner = native_switches[action]
+					local ids = upvalue(owner, "ids")
+					local valid = native_callback(owner) and type(ids) == "table"
+						and table.concat(ids, ",") == "french_magickey,french_absent,french_autocorrection"
+						and contains(rows, action)
+					local callbacks, actions = {}, {}
+					for index, expected in ipairs({ { "french_magickey", "beta" }, { "french_autocorrection", "alpha" } }) do
+						local row = sections[index]
+						local children = type(row) == "table" and (row.submenu or row.menu or row.items) or nil
+						local leaf, enable, disable, actionable = nil, nil, nil, 0
+						for _, child in ipairs(children or {}) do
+							local callback = child.action or child.fn
+							if type(callback) == "function" then actionable = actionable + 1 end
+							if native_callback(callback) and upvalue(callback, "id") == expected[1]
+								and upvalue(callback, "name") == expected[2] then leaf = callback end
+							local owner = category_owners[callback]
+							if owner and owner.id == expected[1] then
+								if owner.enabled == true then enable = callback else disable = callback end
+							end
+						end
+						callbacks[index] = leaf
+						actions[index] = { leaf, enable, disable }
+						valid = valid and actionable == 3 and leaf ~= nil and enable ~= nil and disable ~= nil
+							and contains(rows, leaf) and contains(rows, enable) and contains(rows, disable)
+					end
+					if valid and type(root.hotstring_language_frame) == "table" then
+						switch, category_callbacks, category_actions, rendered_frame = action, callbacks, actions, rows
+						for _, entry in ipairs(manifest.get_array(key)) do
+							if entry.type == "list" and supplied[entry.id]
+								and (entry.id == "hotstring_language_switch" or entry.id == "hotstring_language_categories") then
+								pending[entry.id] = true
+							end
+						end
+					end
+				end
+			elseif key == "hotstring_language_parent_lua" and rendered_frame and switch
+				and type(root.hotstring_language_frame) == "table" and type(root.hotstring_language_parent_lua) == "table"
+				and contains(rows, switch) and contains(rows, category_callbacks[1]) and contains(rows, category_callbacks[2]) then
+				parent = rows
+			end
+			return rows
+		end
+		local consumed, reached = false, false
+		manifest.build = function(key, ...)
+			local arguments = { ... }
+			local commands = type(arguments[4]) == "table" and arguments[4].commands or nil
+			local rows = build(key, ...)
+			if key == "hotstring_category_menu" and type(commands) == "table" then
+				for _, command in ipairs({ { "hotstring_category_enable_all", true }, { "hotstring_category_disable_all", false } }) do
+					local callback = commands[command[1]]
+					local owner = upvalue(callback, "commit_scope")
+					local id = upvalue(owner, "id")
+					if native_callback(owner) and categories[id] ~= nil and contains(rows, callback) then
+						category_owners[callback] = { id = id, enabled = command[2] }
+					end
+				end
+			end
+			if key == "hotstrings_menu" then
+				reached = true
+				consumed = parent ~= nil and contains(rows, switch)
+					and contains(rows, category_callbacks[1]) and contains(rows, category_callbacks[2])
+			end
+			return rows
+		end
+		local published
+		manifest.render_rows = function(rows, key, ...)
+			local result = render(rows, key, ...)
+			if key == "top_level" then
+				observed.publication_calls = observed.publication_calls + 1
+				if consumed and contains(rows, switch) and contains(rows, category_callbacks[1])
+					and contains(rows, category_callbacks[2]) and contains(result, switch)
+					and contains(result, category_callbacks[1]) and contains(result, category_callbacks[2]) then
+					published = result
+				end
+			end
+			return result
+		end
+		if damage then damage(builder, slot, closure, body_slot, manifest, root) end
+		local active, active_body = select(2, debug.getupvalue(builder.build, slot)), select(2, debug.getupvalue(closure, body_slot))
+		local found = {}
+		if type(active) == "function" then
+			local rows = builder.build({ config = config, _version = "provider-evidence",
+				on_menu_changed = function() observed.effects = observed.effects + 1 end })
+			if rawequal(active, closure) and rawequal(active_body, body) and reached and consumed and published
+				and type(root.hotstring_language_frame) == "table"
+				and type(root.hotstring_language_parent_lua) == "table" and type(root.hotstrings_menu) == "table"
+				and type(rows) == "table" and contains(rows, switch)
+				and contains(rows, category_callbacks[1]) and contains(rows, category_callbacks[2]) then
+				-- Invoke only callbacks retained in the actual public publication.
+				-- Recorders prove target/acknowledgement behavior without claiming
+				-- native storage effects. The notification port alone is recorded.
+				local function retained(list, wanted)
+					for _, row in ipairs(list or {}) do
+						if rawequal(row.fn or row.action, wanted) then return row.fn or row.action end
+						local callback = retained(row.menu or row.submenu or row.items, wanted)
+						if callback then return callback end
+					end
+				end
+				switch = assert(retained(rows, switch))
+				for index, callback in ipairs(category_callbacks) do category_callbacks[index] = assert(retained(rows, callback)) end
+				for _, callbacks in ipairs(category_actions) do
+					for index, callback in ipairs(callbacks) do callbacks[index] = assert(retained(rows, callback)) end
+				end
+				audit = true
+				debug.setupvalue(body, notification_slot, function() observed.audit_notifications = observed.audit_notifications + 1 end)
+				local function scope_event(before)
+					assert(#observed.audit_events == before + 1, "scope callback reaches exactly one target")
+					local event = observed.audit_events[#observed.audit_events]
+					assert(event.kind == "scope" and event.selected == "french_magickey,french_absent,french_autocorrection"
+						and event.enabled == false, "retained scope callback dispatches exact independently authored targets")
+				end
+				local checkbox = root.hotstring_scope_checkbox
+				assert(manifest.resolve_disabled_when("hotstring_scope_checkbox", "hotstring_scope_all_sections", {}) == false)
+				root.hotstring_scope_checkbox = nil
+				assert(manifest.resolve_disabled_when("hotstring_scope_checkbox", "hotstring_scope_all_sections", {}) == true)
+				local before = #observed.audit_events
+				assert(switch() == false, "retained canonical wrapper refuses withdrawn actual declaration")
+				assert(#observed.audit_events == before, "canonical readiness refusal reaches no scope target")
+				observed.readiness_refused = true
+				root.hotstring_scope_checkbox = checkbox
+				assert(manifest.resolve_disabled_when("hotstring_scope_checkbox", "hotstring_scope_all_sections", {}) == false)
+				assert(switch() == true); scope_event(before)
+				observed.readiness_recovered = true
+				acknowledgement = false; before = #observed.audit_events
+				assert(switch() == false, "scope refuses a non-acknowledged target result"); scope_event(before)
+				for index, expected in ipairs({ { "french_magickey", "beta" }, { "french_autocorrection", "alpha" } }) do
+					for action_index, callback in ipairs(category_actions[index]) do
+						for _, accepted in ipairs({ true, false }) do
+							acknowledgement = accepted; before = #observed.audit_events
+							assert(callback() == accepted, "each retained category callback respects target acknowledgement")
+							assert(#observed.audit_events == before + 1, "each category callback reaches exactly one target")
+							local event = observed.audit_events[#observed.audit_events]
+							if action_index == 1 then
+								assert(event.kind == "section" and event.category == expected[1] and event.section == expected[2],
+									"every actual retained section callback dispatches its independently authored exact target")
+							else
+								assert(event.kind == "category_scope" and event.selected == expected[1] and event.enabled == (action_index == 2),
+									"every actual retained category scope callback dispatches its independently authored exact target")
+							end
+						end
+					end
+				end
+				assert(observed.audit_notifications == 7, "only non-acknowledged target results reach the refusal notification port")
+				acknowledgement, audit = true, false
+				debug.setupvalue(body, notification_slot, notification)
+				for id in pairs(pending) do found[id] = true end
+			end
+		end
+		assert(observed.effects == 0, "building provider evidence cannot publish or invoke callbacks")
+		if exercise and found.hotstring_language_switch and found.hotstring_language_categories then
+			assert(switch() == true); assert(category_callbacks[1]() == true)
+		end
+		local current = assert(io.open(path, "rb")); local actual = assert(current:read("*a")); assert(current:close())
+		assert(actual == bytes, "provider evidence cannot write native preferences")
+		return found
+	end, debug.traceback)
+	local cleaned, cleanup_error = pcall(restore)
+	os.getenv = getenv; rawset(_G, "i18n_safe", original_safe)
+	for name in pairs(package.loaded) do if loaded[name] == nil then package.loaded[name] = nil end end
+	for name, value in pairs(loaded) do package.loaded[name] = value end
+	local file = path and io.open(path, "rb")
+	if file then assert(file:close()); assert(os.remove(path)) end
+	if created then assert(filesystem.rmdir(directory)) end
+	assert(rawequal(os.getenv, getenv) and rawequal(rawget(_G, "i18n_safe"), original_safe))
+	for name, value in pairs(loaded) do assert(rawequal(package.loaded[name], value), name) end
+	for name in pairs(package.loaded) do assert(loaded[name] ~= nil, name) end
+	if not cleaned then error(cleanup_error, 0) end
+	if ok then return result, nil, observed end
+	return {}, result, observed
+end
+
 --- Every list id the menu builder registers a provider for.
 --- @return table Set of ids.
 local function registered_providers(omitted_delegate)
@@ -475,6 +804,14 @@ local function registered_providers(omitted_delegate)
 		for id in pairs(genuine_shared_providers()) do found[id] = true end
 	end
 	for id in pairs(genuine_trigger_providers()) do found[id] = true end
+	-- Scoped language lists need executed native evidence even if a future
+	-- spelling happens to match the broad lexical inventory above.
+	local language = genuine_language_providers()
+	for _, entry in ipairs(declared_lists()) do
+		if entry.menu == "hotstring_language_frame" then
+			found[entry.id] = language[entry.id] == true or nil
+		end
+	end
 	if omitted_delegate ~= "ui.gesture_conflicts" then
 		for id in pairs(genuine_gesture_providers()) do found[id] = true end
 	end
@@ -762,4 +1099,188 @@ helpers.describe("Gesture status list evidence follows genuine native publicatio
 		rawset(_G, "i18n_safe", original)
 		if not ok then error(err, 0) end
 	end)
+end)
+
+helpers.describe("actual scoped Hotstrings language list coverage", function()
+	helpers.it("requires both actual providers and consumed native switch/category callbacks", function()
+		local found, err, observed = genuine_language_providers(nil, true)
+		helpers.assert_nil(err)
+		helpers.assert_true(found.hotstring_language_switch == true)
+		helpers.assert_true(found.hotstring_language_categories == true)
+		helpers.assert_eq(observed.switch_calls, 1)
+		helpers.assert_eq(observed.category_calls, 1)
+		helpers.assert_eq(observed.effects, 2, "only explicit callback exercise reaches the injected target recorders")
+		helpers.assert_eq(observed.selected, "french_magickey,french_absent,french_autocorrection")
+		helpers.assert_eq(observed.enabled, false)
+		helpers.assert_eq(observed.category, "french_magickey")
+		helpers.assert_eq(observed.section, "beta")
+	end)
+	local mutations = {
+		{ name = "withdrawn registered Hotstrings closure", apply = function(builder, slot)
+			debug.setupvalue(builder.build, slot, nil)
+		end },
+		{ name = "outer native closure discards genuine Hotstrings content", apply = function(builder, slot)
+			local original = select(2, debug.getupvalue(builder.build, slot))
+			debug.setupvalue(builder.build, slot, function(...) original(...); return {} end)
+		end },
+		{ name = "withdrawn native manifest body", apply = function(_, _, closure, slot)
+			debug.setupvalue(closure, slot, nil)
+		end },
+		{ name = "native body discards genuine language content", apply = function(_, _, closure, slot)
+			local original = select(2, debug.getupvalue(closure, slot))
+			debug.setupvalue(closure, slot, function(...) original(...); return {} end)
+		end },
+		{ name = "withdrawn canonical template", apply = function(_, _, _, _, manifest)
+			manifest.template_rows = nil
+		end },
+		{ name = "withdrawn canonical native build", apply = function(_, _, _, _, manifest)
+			manifest.build = nil
+		end },
+		{ name = "withdrawn genuine checkbox wrapper", apply = function(_, _, _, _, manifest)
+			manifest.check_row = nil
+		end },
+		{ name = "checkbox result replaced by a borrowed fake callback", apply = function(_, _, _, _, manifest)
+			local original = manifest.check_row
+			manifest.check_row = function(...)
+				original(...)
+				return { label = "borrowed fake switch", action = function() return true end }
+			end
+		end },
+		{ name = "native build discards successfully rendered content", apply = function(_, _, _, _, manifest)
+			local original = manifest.build
+			manifest.build = function(...) original(...); return {} end
+		end },
+	}
+	for _, key in ipairs({ "hotstring_language_frame", "hotstring_language_parent_lua", "hotstring_scope_checkbox", "hotstrings_menu" }) do
+		local frame = key
+		mutations[#mutations + 1] = { name = "withdrawn actual " .. frame, apply = function(_, _, _, _, _, root)
+			root[frame] = nil
+		end }
+	end
+	for _, key in ipairs({ "hotstring_language_frame", "hotstring_language_parent_lua" }) do
+		local frame = key
+		mutations[#mutations + 1] = { name = "template discards genuine " .. frame, apply = function(_, _, _, _, manifest)
+			local original = manifest.template_rows
+			manifest.template_rows = function(key, ...)
+				local rows = original(key, ...)
+				if key == frame then return {} end
+				return rows
+			end
+		end }
+		mutations[#mutations + 1] = { name = "late declaration withdrawal after genuine " .. frame, apply = function(_, _, _, _, manifest, root)
+			local original = manifest.template_rows
+			manifest.template_rows = function(key, ...)
+				local rows = original(key, ...)
+				if key == frame then root[frame] = nil end
+				return rows
+			end
+		end }
+	end
+	for _, id in ipairs({ "hotstring_language_switch", "hotstring_language_categories" }) do
+		for _, value in ipairs({ false, "not callable", function() return {} end,
+			function() return { { label = "borrowed fake section", action = function() return true end } } end }) do
+			local provider_id, replacement = id, value
+			mutations[#mutations + 1] = { name = "withdrawn or fabricated callable " .. provider_id .. " " .. type(value),
+				apply = function(_, _, _, _, manifest)
+					local original = manifest.template_rows
+					manifest.template_rows = function(key, commands, getters, providers)
+						if key == "hotstring_language_frame" then providers[provider_id] = replacement ~= false and replacement or nil end
+						return original(key, commands, getters, providers)
+					end
+				end }
+		end
+	end
+	for index, mutation in ipairs(mutations) do
+		helpers.it("denies scoped language provider credit: " .. index .. " " .. mutation.name, function()
+			local found, _, observed = genuine_language_providers(mutation.apply)
+			helpers.assert_nil(found.hotstring_language_switch)
+			helpers.assert_nil(found.hotstring_language_categories)
+			helpers.assert_eq(observed.effects, 0)
+			local repaired, repair_error = genuine_language_providers()
+			helpers.assert_nil(repair_error)
+			helpers.assert_true(repaired.hotstring_language_switch == true)
+			helpers.assert_true(repaired.hotstring_language_categories == true)
+		end)
+	end
+	helpers.it("restores raw globals and all loaded module owners on success and raised evidence", function()
+		local original = rawget(_G, "i18n_safe")
+		local ok, err = pcall(function()
+			for _, prior in ipairs({ {}, { value = false }, { value = {} } }) do
+				for _, raised in ipairs({ false, true }) do
+					rawset(_G, "i18n_safe", prior.value)
+					local damage = raised and function() error("controlled language provider evidence") end or nil
+					local found, refusal = genuine_language_providers(damage)
+					helpers.assert_true(rawequal(rawget(_G, "i18n_safe"), prior.value))
+					if raised then
+						helpers.assert_nil(found.hotstring_language_switch)
+						helpers.assert_nil(found.hotstring_language_categories)
+						helpers.assert_true(type(refusal) == "string" and refusal:find("controlled language provider evidence", 1, true) ~= nil)
+					else
+						helpers.assert_nil(refusal)
+						helpers.assert_true(found.hotstring_language_switch == true)
+						helpers.assert_true(found.hotstring_language_categories == true)
+					end
+				end
+			end
+		end)
+		rawset(_G, "i18n_safe", original)
+		if not ok then error(err, 0) end
+	end)
+end)
+
+helpers.describe("actual public Hotstrings publication and retained callback audit", function()
+	helpers.it("consumes the registered root and proves canonical readiness plus every category target", function()
+		local found, err, observed = genuine_language_providers()
+		helpers.assert_nil(err)
+		helpers.assert_true(found.hotstring_language_switch == true)
+		helpers.assert_true(found.hotstring_language_categories == true)
+		helpers.assert_eq(observed.publication_calls, 1)
+		helpers.assert_true(observed.readiness_refused == true)
+		helpers.assert_true(observed.readiness_recovered == true)
+		helpers.assert_eq(observed.effects, 0, "the original build counter excludes explicit recorder-only callback audit")
+		helpers.assert_eq(observed.audit_notifications, 7)
+		helpers.assert_eq(observed.audit_events, {
+			{ kind = "scope", selected = "french_magickey,french_absent,french_autocorrection", enabled = false },
+			{ kind = "scope", selected = "french_magickey,french_absent,french_autocorrection", enabled = false },
+			{ kind = "section", category = "french_magickey", section = "beta" },
+			{ kind = "section", category = "french_magickey", section = "beta" },
+			{ kind = "category_scope", selected = "french_magickey", enabled = true },
+			{ kind = "category_scope", selected = "french_magickey", enabled = true },
+			{ kind = "category_scope", selected = "french_magickey", enabled = false },
+			{ kind = "category_scope", selected = "french_magickey", enabled = false },
+			{ kind = "section", category = "french_autocorrection", section = "alpha" },
+			{ kind = "section", category = "french_autocorrection", section = "alpha" },
+			{ kind = "category_scope", selected = "french_autocorrection", enabled = true },
+			{ kind = "category_scope", selected = "french_autocorrection", enabled = true },
+			{ kind = "category_scope", selected = "french_autocorrection", enabled = false },
+			{ kind = "category_scope", selected = "french_autocorrection", enabled = false },
+		})
+	end)
+	local mutations = {
+		{ name = "withdrawn canonical root renderer", apply = function(_, _, _, _, manifest)
+			manifest.render_rows = nil
+		end },
+		{ name = "canonical root wrapper discards genuine publication", apply = function(_, _, _, _, manifest)
+			local original = manifest.render_rows
+			manifest.render_rows = function(...) original(...); return {} end
+		end },
+		{ name = "withdrawn actual root registration declaration", apply = function(_, _, _, _, _, root)
+			root.top_level = nil
+		end },
+		{ name = "raised canonical root publication", apply = function(_, _, _, _, manifest)
+			manifest.render_rows = function() error("controlled root publication refusal") end
+		end },
+	}
+	for _, mutation in ipairs(mutations) do
+		helpers.it("denies public language coverage: " .. mutation.name, function()
+			local found, _, observed = genuine_language_providers(mutation.apply)
+			helpers.assert_nil(found.hotstring_language_switch)
+			helpers.assert_nil(found.hotstring_language_categories)
+			helpers.assert_eq(observed.effects, 0)
+			local repaired, err = genuine_language_providers()
+			helpers.assert_nil(err)
+			helpers.assert_true(repaired.hotstring_language_switch == true)
+			helpers.assert_true(repaired.hotstring_language_categories == true)
+		end)
+	end
 end)
