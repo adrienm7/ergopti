@@ -26,6 +26,20 @@ const consentSource = fs.readFileSync(
 	path.join(ROOT, 'static/ergopti_plus/macos/launcher/Tests/ErgoptiPlusTests', consentFile),
 	'utf8'
 );
+const stableConfiguration = JSON.parse(
+	fs.readFileSync(path.join(ROOT, '.github/ci/stable_release_qualification_exception.json'), 'utf8')
+);
+const policySelector =
+	'\tlet policyFilename: String\n' +
+	'\tif selected == "' +
+	stableConfiguration.id +
+	'" {\n' +
+	'\t\tpolicyFilename = "stable_release_qualification_exception.json"\n' +
+	'\t} else if selected == "' +
+	configuration.id +
+	'" {\n' +
+	'\t\tpolicyFilename = "dev_release_qualification_exceptions.json"\n' +
+	'\t} else { fatalError("Unknown native qualification profile.") }';
 const clock = new Date('2026-10-08T20:00:00Z');
 const sha = '0123456789abcdef0123456789abcdef01234567';
 const context = {
@@ -116,7 +130,7 @@ const PAC_STEP_NAME = 'Qualify actual native PAC and WPAD XCTest controls';
 const PAC_FILTER =
 	"--filter 'ManagedHTTPWorkerTests|ManagedHTTPWireTests|ManagedHTTPWPADWireTests'";
 const PAC_STEP_SOURCE =
-	'      - name: Qualify actual native PAC and WPAD XCTest controls\n        if: ${{ !cancelled() }}\n        shell: bash\n        run: |\n          set -euo pipefail\n          test -n "$ERGOPTI_NATIVE_HTTP_PYTHON"\n          test -x "$ERGOPTI_NATIVE_HTTP_PYTHON"\n          transcript="$ERGOPTI_OLLAMA_BUILD_ROOT/native-pac-xctest.log"\n          set +e\n          swift test --package-path static/ergopti_plus/macos/launcher \\\n            --scratch-path "$ERGOPTI_OLLAMA_BUILD_ROOT/swift" \\\n            --filter \'ManagedHTTPWorkerTests|ManagedHTTPWireTests|ManagedHTTPWPADWireTests\' 2>&1 | tee "$transcript"\n          pac_statuses=("${PIPESTATUS[@]}")\n          set -e\n          node tools/diagnostics/managed_http_pac_xctest_evidence.cjs "$transcript" "${pac_statuses[0]}" "${pac_statuses[1]}" "$ERGOPTI_OLLAMA_BUILD_ROOT/native-pac-verdict.json"\n        timeout-minutes: 10\n';
+	'      - name: Qualify actual native PAC and WPAD XCTest controls\n        if: ${{ !cancelled() }}\n        shell: bash\n        run: |\n          set -euo pipefail\n          receipt="$RUNNER_TEMP/stable-macos-native-pac-${{ matrix.architecture }}.json"\n          mkdir -p "$(dirname "$receipt")"\n          node tools/ci/dev-release-qualification.cjs --scope macos-native-pac --receipt "$receipt"\n          mode="$(node tools/ci/dev-release-qualification.cjs --scope macos-native-pac --validate-scope-receipt "$receipt")"\n          if [ "$mode" = deferred ]; then\n              echo "[DEFERRED] macos-native-pac: qualified=false; original command not executed."\n          elif [ "$mode" = full ]; then\n              set -euo pipefail\n              test -n "$ERGOPTI_NATIVE_HTTP_PYTHON"\n              test -x "$ERGOPTI_NATIVE_HTTP_PYTHON"\n              transcript="$ERGOPTI_OLLAMA_BUILD_ROOT/native-pac-xctest.log"\n              set +e\n              swift test --package-path static/ergopti_plus/macos/launcher \\\n                --scratch-path "$ERGOPTI_OLLAMA_BUILD_ROOT/swift" \\\n                --filter \'ManagedHTTPWorkerTests|ManagedHTTPWireTests|ManagedHTTPWPADWireTests\' 2>&1 | tee "$transcript"\n              pac_statuses=("${PIPESTATUS[@]}")\n              set -e\n              node tools/diagnostics/managed_http_pac_xctest_evidence.cjs "$transcript" "${pac_statuses[0]}" "${pac_statuses[1]}" "$ERGOPTI_OLLAMA_BUILD_ROOT/native-pac-verdict.json"\n          else\n              echo "Invalid command qualification disposition" >&2\n              exit 1\n          fi\n        timeout-minutes: 10\n\n';
 function admitNativePacSelector(mac) {
 	if (mac.split(PAC_FILTER).length !== 2) return null;
 	const jobs = [
@@ -264,7 +278,13 @@ function sourceProblems(pkg, mac, rootCaller) {
 		'guard let selected = environment["ERGOPTI_DEV_QUALIFICATION_PROFILE"], !selected.isEmpty else {\n\t\treturn []',
 		'full-default'
 	);
-	requireText(pkg, '.github/ci/dev_release_qualification_exceptions.json', 'canonical-policy');
+	requireText(
+		pkg,
+		'repository.appendingPathComponent(".github/ci/" + policyFilename)',
+		'canonical-policy'
+	);
+	if (pkg.split(policySelector).length !== 2) errors.push('closed-policy-selector');
+	const outsideSelector = pkg.replace(policySelector, '');
 	requireText(pkg, 'profile == selected', 'profile-identity');
 	requireText(pkg, 'Date() < expiry', 'expiry');
 	requireText(
@@ -305,9 +325,13 @@ function sourceProblems(pkg, mac, rootCaller) {
 		configuration.expires_at,
 		brew.path,
 		configuration.tag,
-		configuration.version
+		configuration.version,
+		stableConfiguration.id,
+		stableConfiguration.expires_at,
+		stableConfiguration.tag,
+		stableConfiguration.version
 	])
-		if (pkg.includes(value)) errors.push('duplicated-policy');
+		if (outsideSelector.includes(value)) errors.push('duplicated-policy');
 	requireText(
 		mac,
 		'python3 -m unittest discover -s tools/diagnostics -p macos_brew_archive_acceptance_test.py -v',
@@ -393,6 +417,37 @@ function consentSourceProblems(native, portable, pkg) {
 check('complete-source-guard', () =>
 	assert.deepEqual(sourceProblems(packageSource, workflow, caller), [])
 );
+for (const [name, before, after] of [
+	['missing-selector', policySelector, ''],
+	[
+		'foreign-stable-file',
+		'policyFilename = "stable_release_qualification_exception.json"',
+		'policyFilename = "foreign.json"'
+	],
+	[
+		'foreign-dev-file',
+		'policyFilename = "dev_release_qualification_exceptions.json"',
+		'policyFilename = "foreign.json"'
+	],
+	[
+		'unknown-profile-admitted',
+		'else { fatalError("Unknown native qualification profile.") }',
+		'else { policyFilename = "dev_release_qualification_exceptions.json" }'
+	],
+	['duplicate-selector', policySelector, policySelector + '\n' + policySelector],
+	[
+		'duplicate-policy-outside-selector',
+		policySelector,
+		policySelector + '\nlet duplicatedProfile = "' + configuration.id + '"'
+	]
+])
+	check(name, () => {
+		assert.equal(packageSource.split(before).length, 2, 'exact actual selector mutation preimage');
+		assert.ok(
+			sourceProblems(packageSource.replace(before, after), workflow, caller).length > 0,
+			'the admitted selector cannot hide a different policy or duplicated policy data'
+		);
+	});
 for (const [name, token, replacement, target] of [
 	['default-must-be-full', 'return []', 'return ["other.swift"]', 'package'],
 	['expired-profile-refuses', 'Date() < expiry', 'Date() >= expiry', 'package'],
@@ -894,9 +949,40 @@ check('source cohort must precede PAC receiving', () => {
 	);
 });
 
-assert.equal(passed, 64);
+// The approved receipt wrapper retains the strict full command and an explicit refusal.
+for (const [name, from, to] of [
+	['PAC policy scope', '--scope macos-native-pac --receipt', '--scope macos-native-http --receipt'],
+	[
+		'PAC receipt validation',
+		'--validate-scope-receipt "$receipt"',
+		'--validate-scope-receipt "foreign"'
+	],
+	['PAC receipt generation', '--receipt "$receipt"', '--receipt "foreign"'],
+	[
+		'PAC deferred status',
+		'qualified=false; original command not executed.',
+		'qualified=true; command passed.'
+	],
+	['PAC full disposition', 'elif [ "$mode" = full ]; then', 'elif [ "$mode" = deferred ]; then'],
+	[
+		'PAC unknown disposition',
+		'              exit 1\n          fi',
+		'              exit 0\n          fi'
+	],
+	['PAC original command status', '"${pac_statuses[0]}"', '"0"'],
+	['PAC capture command status', '"${pac_statuses[1]}"', '"0"']
+])
+	check(name, () => {
+		assert.ok(PAC_STEP_SOURCE.includes(from));
+		assert.ok(workflow.includes(PAC_STEP_SOURCE));
+		const changed = workflow.replace(PAC_STEP_SOURCE, PAC_STEP_SOURCE.replace(from, to));
+		assert.notEqual(changed, workflow);
+		assert.equal(admitNativeSdkSelector(changed), null);
+	});
+
+assert.equal(passed, 78);
 console.log(
-	'PASS: Mac qualification deferral source/typed-receipt controls=64; Swift/native execution unqualified.'
+	'PASS: Mac qualification deferral source/typed-receipt controls=78; Swift/native execution unqualified.'
 );
 
 require('./test-item36-native-qualification.cjs')({

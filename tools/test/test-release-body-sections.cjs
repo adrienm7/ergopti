@@ -51,6 +51,9 @@ const CHANGELOG_UI = path.join(SHARED, 'ui', 'changelog');
 const CORPUS = path.join(SHARED, 'tests', 'corpus', 'updater');
 const WORKFLOW = path.join(ROOT, '.github', 'workflows', 'ci.yml');
 const BODY_STEP = 'Write release body with platform sections';
+const qualification = require('../ci/dev-release-qualification.cjs');
+const signing = require('../ci/windows-stable-signing.cjs');
+const crypto = require('node:crypto');
 const MIN_VECTORS = 8;
 const EN = JSON.parse(fs.readFileSync(path.join(SHARED, 'data', 'locales', 'en.json'), 'utf8'));
 const CI_ENV = {
@@ -172,7 +175,13 @@ function expand(text, env, escapable) {
  * Interprets the release-body step for one set of inputs and returns the
  * body file it writes.
  */
-function buildCiBody(inputs, changelog, script = releaseBodyScript()) {
+function buildCiBody(
+	inputs,
+	changelog,
+	script = releaseBodyScript(),
+	qualificationNow = new Date(),
+	signingFixture = null
+) {
 	const env = { ...inputs };
 	let body = '';
 	let inGroup = false;
@@ -181,6 +190,81 @@ function buildCiBody(inputs, changelog, script = releaseBodyScript()) {
 		const line = script[i];
 		const trimmed = line.trim();
 		if (trimmed === '' || trimmed.startsWith('#')) continue;
+		if (trimmed === 'if [ -n "${ERGOPTI_NATIVE_QUALIFICATION_NOTE:-}" ]; then') {
+			if (skipping) throw new Error('nested qualification conditions are not modelled');
+			skipping = !env.ERGOPTI_NATIVE_QUALIFICATION_NOTE;
+			continue;
+		}
+		if (
+			trimmed ===
+			'printf \'\\n## Native qualification limits\\n\\n%s\\n\' "$ERGOPTI_NATIVE_QUALIFICATION_NOTE" >> "$body_file"'
+		) {
+			if (skipping) continue;
+			body += '\n## Native qualification limits\n\n' + env.ERGOPTI_NATIVE_QUALIFICATION_NOTE + '\n';
+			continue;
+		}
+		if (trimmed === 'node tools/ci/dev-release-qualification.cjs --publication-admit >/dev/null') {
+			const notice = qualification.stablePublicationNotice(
+				env.ERGOPTI_NATIVE_QUALIFICATION_PROFILE || '',
+				qualification.environmentContext(env),
+				env.GITHUB_SHA,
+				qualificationNow
+			);
+			assert.equal(
+				env.ERGOPTI_NATIVE_QUALIFICATION_NOTE || '',
+				notice,
+				'the public notice must be the admitted source-bound text'
+			);
+			continue;
+		}
+
+		if (trimmed === 'node tools/ci/windows-stable-signing.cjs --publication-admit >/dev/null') {
+			let notice = '';
+			if (signingFixture) {
+				signing.requireFreshUnsigned(env.ERGOPTI_WINDOWS_CREATE_RELEASE);
+				signing.validateReceipt(
+					signingFixture.receipt,
+					qualification.environmentContext(env),
+					env.GITHUB_SHA,
+					signingFixture.checkout,
+					crypto.createHash('sha256').update(signingFixture.image).digest('hex'),
+					qualificationNow
+				);
+				notice = signing.notice(env.GITHUB_SHA);
+			} else if (
+				env.ERGOPTI_DEV_RELEASE_TAG === signing.POLICY.tag &&
+				env.ERGOPTI_DEV_RELEASE_CHANNEL === signing.POLICY.channel
+			) {
+				assert.equal(
+					env.ERGOPTI_WINDOWS_SIGNING_CONFIGURED,
+					'true',
+					'a stable body without an unsigned receipt requires the full signing configuration'
+				);
+			}
+			assert.equal(
+				env.ERGOPTI_WINDOWS_SIGNING_QUALIFICATION_NOTE || '',
+				notice,
+				'the public Windows notice must be the actual admitted artifact-bound text'
+			);
+			continue;
+		}
+		if (trimmed === 'if [ -n "${ERGOPTI_WINDOWS_SIGNING_QUALIFICATION_NOTE:-}" ]; then') {
+			if (skipping) throw new Error('nested signing conditions are not modelled');
+			skipping = !env.ERGOPTI_WINDOWS_SIGNING_QUALIFICATION_NOTE;
+			continue;
+		}
+		if (
+			trimmed ===
+			'printf \'\\n## Windows signature qualification\\n\\n%s\\n\' "$ERGOPTI_WINDOWS_SIGNING_QUALIFICATION_NOTE" >> "$body_file"'
+		) {
+			if (skipping) continue;
+			body +=
+				'\n## Windows signature qualification\n\n' +
+				env.ERGOPTI_WINDOWS_SIGNING_QUALIFICATION_NOTE +
+				'\n';
+			continue;
+		}
+
 		// `[ -s file ]` is true for a non-empty changelog file only.
 		if (trimmed === 'if [ -s "$RUNNER_TEMP/changelog.md" ]; then') {
 			if (skipping) throw new Error('nested changelog conditions are not modelled');
@@ -741,9 +825,156 @@ function checkNotesPane() {
 	expect(refused, 'the pane must fail loudly when the host seeded no release body');
 }
 
+function checkNativeQualificationBody(modules) {
+	const before = new Date('2026-10-09T21:00:00Z');
+	const selected = {
+		...CI_ENV,
+		TAG: 'v1.0.0',
+		VERSION: '1.0.0',
+		GITHUB_ACTIONS: 'true',
+		GITHUB_EVENT_NAME: 'push',
+		GITHUB_REF: 'refs/heads/main',
+		GITHUB_SHA: 'a'.repeat(40),
+		ERGOPTI_DEV_RELEASE_RELEASE: 'true',
+		ERGOPTI_DEV_RELEASE_PRERELEASE: 'false',
+		ERGOPTI_DEV_RELEASE_CHANNEL: 'main',
+		ERGOPTI_DEV_RELEASE_TAG: 'v1.0.0',
+		ERGOPTI_DEV_RELEASE_VERSION: '1.0.0',
+		ERGOPTI_NATIVE_QUALIFICATION_PROFILE: 'stable-v1-20261009-macos-native-deferred',
+		ERGOPTI_WINDOWS_SIGNING_CONFIGURED: 'true'
+	};
+	selected.ERGOPTI_NATIVE_QUALIFICATION_NOTE = qualification.stablePublicationNotice(
+		selected.ERGOPTI_NATIVE_QUALIFICATION_PROFILE,
+		qualification.environmentContext(selected),
+		selected.GITHUB_SHA,
+		before
+	);
+	const body = buildCiBody(selected, CHANGELOG_MD, releaseBodyScript(), before);
+	assert.ok(body.includes(selected.ERGOPTI_NATIVE_QUALIFICATION_NOTE));
+	assert.ok(body.includes('qualified:false'));
+	const sections = modules.splitReleaseBody(body);
+	assert.ok(sections.changelog && sections.downloads && sections.intro && sections.footer);
+	assert.throws(
+		() =>
+			buildCiBody(selected, CHANGELOG_MD, releaseBodyScript(), new Date('2026-10-09T22:00:00Z')),
+		/not authorized/
+	);
+	assert.throws(
+		() =>
+			buildCiBody(
+				{ ...selected, GITHUB_SHA: 'b'.repeat(40) },
+				CHANGELOG_MD,
+				releaseBodyScript(),
+				before
+			),
+		/source-bound text/
+	);
+	assert.throws(
+		() =>
+			buildCiBody(
+				{ ...selected, ERGOPTI_DEV_RELEASE_TAG: 'v1.0.1' },
+				CHANGELOG_MD,
+				releaseBodyScript(),
+				before
+			),
+		/not authorized/
+	);
+	const ordinary = buildCiBody(CI_ENV, CHANGELOG_MD);
+	assert.ok(!ordinary.includes('Native qualification limits'));
+}
+
+function checkUnsignedQualificationBody(modules) {
+	const now = new Date('2026-10-09T21:00:00Z');
+	const env = {
+		...CI_ENV,
+		TAG: 'v1.0.0',
+		VERSION: '1.0.0',
+		GITHUB_ACTIONS: 'true',
+		GITHUB_EVENT_NAME: 'push',
+		GITHUB_REF: 'refs/heads/main',
+		GITHUB_SHA: 'a'.repeat(40),
+		ERGOPTI_DEV_RELEASE_RELEASE: 'true',
+		ERGOPTI_DEV_RELEASE_PRERELEASE: 'false',
+		ERGOPTI_DEV_RELEASE_CHANNEL: 'main',
+		ERGOPTI_DEV_RELEASE_TAG: 'v1.0.0',
+		ERGOPTI_DEV_RELEASE_VERSION: '1.0.0',
+		ERGOPTI_WINDOWS_CREATE_RELEASE: 'true'
+	};
+	const image = Buffer.from('independent unsigned fixture bytes, not an executable');
+	const hash = crypto.createHash('sha256').update(image).digest('hex');
+	const fixture = {
+		image,
+		checkout: env.GITHUB_SHA,
+		receipt: signing.receipt(
+			qualification.environmentContext(env),
+			env.GITHUB_SHA,
+			env.GITHUB_SHA,
+			hash,
+			now
+		)
+	};
+	env.ERGOPTI_WINDOWS_SIGNING_QUALIFICATION_NOTE = signing.notice(env.GITHUB_SHA);
+	const body = buildCiBody(env, CHANGELOG_MD, releaseBodyScript(), now, fixture);
+	assert.ok(body.includes(env.ERGOPTI_WINDOWS_SIGNING_QUALIFICATION_NOTE));
+	assert.ok(
+		body.includes('qualified:false') && body.includes('windows-signing-qualification.json')
+	);
+	const sections = modules.splitReleaseBody(body);
+	assert.ok(sections.changelog && sections.downloads && sections.intro && sections.footer);
+	checkPageOrder('CI unsigned signature notes', body, 'Ci: Mark the release body sections');
+	for (const bad of [
+		{ ...fixture, image: Buffer.from('tampered bytes') },
+		{ ...fixture, checkout: 'b'.repeat(40) },
+		{ ...fixture, receipt: { ...fixture.receipt, qualified: true } }
+	])
+		assert.throws(
+			() => buildCiBody(env, CHANGELOG_MD, releaseBodyScript(), now, bad),
+			/not admitted/
+		);
+	assert.throws(
+		() =>
+			buildCiBody(
+				{ ...env, ERGOPTI_WINDOWS_CREATE_RELEASE: 'false' },
+				CHANGELOG_MD,
+				releaseBodyScript(),
+				now,
+				fixture
+			),
+		/not admitted/
+	);
+	assert.throws(
+		() =>
+			buildCiBody(
+				env,
+				CHANGELOG_MD,
+				releaseBodyScript(),
+				new Date('2026-10-09T22:00:00Z'),
+				fixture
+			),
+		/not admitted/
+	);
+	assert.throws(
+		() =>
+			buildCiBody(
+				{ ...env, ERGOPTI_WINDOWS_SIGNING_QUALIFICATION_NOTE: 'invented' },
+				CHANGELOG_MD,
+				releaseBodyScript(),
+				now,
+				fixture
+			),
+		/artifact-bound text/
+	);
+	assert.throws(
+		() => buildCiBody(env, CHANGELOG_MD, releaseBodyScript(), now),
+		/full signing configuration/
+	);
+}
+
 for (const [name, check] of [
 	['vectors', checkVectors],
 	['CI body', checkCiBody],
+	['source-bound native qualification body', checkNativeQualificationBody],
+	['artifact-bound unsigned qualification body', checkUnsignedQualificationBody],
 	['Node body interpreter', checkNodeBodyInterpreter],
 	['Atom bodies', checkAtomBodies],
 	['Versions page', checkVersionsPage],

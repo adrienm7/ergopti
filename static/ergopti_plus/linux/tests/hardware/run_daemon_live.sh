@@ -52,8 +52,29 @@ fi
 # Saved simultaneous configuration crosses the original Manager and publisher.
 # Its distinct kernel supplement retains the existing subreaper deadline.
 if [ "${CUSTODY}" = "0" ]; then
-	python3 tests/hardware/run_native_subreaper.py luajit tests/hardware/run_simultaneous_configuration_real.lua
-	CUSTODY=$?
+	if [ "${GITHUB_ACTIONS:-}" = true ]; then
+		mode=full
+		if [ -z "${RUNNER_TEMP:-}" ]; then CUSTODY=2; fi
+		receipt="${RUNNER_TEMP:-}/stable-linux-simultaneous-native.json"
+		if [ "$CUSTODY" = "0" ]; then
+			node ../../../tools/ci/dev-release-qualification.cjs --scope linux-simultaneous-native --receipt "$receipt" || CUSTODY=$?
+		fi
+		if [ "$CUSTODY" = "0" ]; then
+			mode="$(node ../../../tools/ci/dev-release-qualification.cjs --scope linux-simultaneous-native --validate-scope-receipt "$receipt")" || CUSTODY=$?
+		fi
+	else
+		mode=full
+	fi
+	if [ "$CUSTODY" != "0" ]; then
+		: # The existing owned-host failure enclosure below performs cleanup.
+	elif [ "$mode" = deferred ]; then
+		echo '[DEFERRED] linux-simultaneous-native: qualified=false; saved-configuration supplement not executed.'
+	elif [ "$mode" = full ]; then
+		python3 tests/hardware/run_native_subreaper.py luajit tests/hardware/run_simultaneous_configuration_real.lua
+		CUSTODY=$?
+	else
+		CUSTODY=2
+	fi
 fi
 if [ "${CUSTODY}" != "0" ]; then
 	# shellcheck disable=SC2086

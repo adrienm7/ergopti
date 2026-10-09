@@ -276,6 +276,9 @@ function M.build(ctx, actions)
 		getters[key] = getter
 	end
 	getters["installed_build"] = function() return not is_local_source() end
+	-- SMAppService.mainApp exposes no other registration destination. Keep
+	-- owned status truthful; legacy cross-install conflict detection is unqualified.
+	getters["startup_command_available"] = function() return true end
 	getters["start_at_login_enabled"] = function()
 		return require("ui.menu.start_at_login").enabled()
 	end

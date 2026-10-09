@@ -176,6 +176,78 @@ StartupApprovalEnabled(Value) {
 	throw Error("Unknown startup approval state")
 }
 
+
+; Observation only: source structure and its canonical repository/version siblings
+; identify a different startup command. This never grants deletion or migration.
+; @param Script {String} Absolute script path from an exact native shortcut.
+; @param ReadFn {Object} Bounded source reader; tests may supply inert file bytes.
+; @returns {Boolean} Whether the existing source tree identifies this product.
+_StartupOtherSourceIdentity(Script, ReadFn := FSReadBounded) {
+	global UPDATER_GH_OWNER, UPDATER_GH_REPO
+	if !_StartupIsAbsolutePath(Script) || !FileExist(Script)
+		return false
+	SplitPath(Script, &Name, &Directory)
+	if !(Name == "ErgoptiPlus.ahk")
+		return false
+	; A fixed upper bound is a parser input limit, never an execution capability.
+	Limit := 1048576
+	Entry := ReadFn.Call(Script, Limit)
+	Bundle := ReadFn.Call(Directory . "\infra\bundle.ahk", Limit)
+	Defaults := ReadFn.Call(Directory . "\..\_shared\modules\updater\defaults.json", Limit)
+	if !(Entry is String) || !(Bundle is String) || !(Defaults is String)
+		return false
+	if !RegExMatch(Entry, "im)^#Requires\s+Autohotkey\s+v2\.0\+")
+		|| !RegExMatch(Entry, "im)^#Include\s+infra/bundle\.ahk\s*$")
+		|| !RegExMatch(Entry, "im)^#Include\s+modules/updater\.ahk\s*$")
+		|| !RegExMatch(Bundle, 'm)^global BUNDLE_VERSION\s*:=\s*"__BUNDLE_VERSION__"\s*$')
+		return false
+	try Identity := JsonParse(Defaults)
+	catch
+		return false
+	return Identity is Map && Identity.Has("github") && Identity["github"] is Map
+		&& Identity["github"].Get("owner", "") == UPDATER_GH_OWNER
+		&& Identity["github"].Get("repo", "") == UPDATER_GH_REPO
+}
+
+; A different enabled source command is a read-only conflict, never an owned link.
+; Exact argument shape, source identity and actual shortcut approval all apply.
+; @param Folder {String} Startup directory, injectable for private fixtures.
+; @param Command {Map} Current command from the canonical launch constructor.
+; @param ApprovalFn {Object} Existing native approval reader.
+; @param ReadFn {Object} Bounded source reader.
+; @returns {Boolean} Whether another enabled local-source command is configured.
+StartupOtherSourceConfigured(Folder, Command, ApprovalFn := _StartupReadApproval, ReadFn := FSReadBounded) {
+	if Command["source"]
+		return false
+	for Link in FSListDirectoryStrict(Folder) {
+		SplitPath(Link, &Name, , &Extension)
+		if Extension != "lnk"
+			continue
+		if IsObject(_StartupShortcutReceipt(Link, Command))
+			continue
+		FileGetShortcut(Link, &Target, , &Arguments)
+		if Arguments == ""
+			Script := Target
+		else if RegExMatch(Arguments, '^"([^"]+)"$', &Quoted)
+			Script := Quoted[1]
+		else
+			continue
+		if !_StartupOtherSourceIdentity(Script, ReadFn)
+			continue
+		Other := StartupLaunchCommand(true, Script, Target)
+		Receipt := _StartupShortcutReceipt(Link, Other)
+		if IsObject(Receipt) && StartupApprovalEnabled(ApprovalFn.Call(Receipt["name"]))
+			return true
+	}
+	return false
+}
+
+; Reads conflict state without transferring shortcut ownership.
+StartAtLoginCommandAvailable(*) {
+	Command := StartupLaunchCommand(Updater_IsLocalSource(), A_ScriptFullPath, A_AhkPath)
+	return !StartupOtherSourceConfigured(A_Startup, Command)
+}
+
 ; Reads the effective state without changing the Startup folder or registry.
 StartAtLoginEnabled(*) {
 	try {
@@ -209,6 +281,8 @@ SetStartupShortcut(Enabled, Link, Target, Arguments := "", Directory := "") {
 ToggleStartAtLogin(*) {
 	try {
 		Command := StartupLaunchCommand(Updater_IsLocalSource(), A_ScriptFullPath, A_AhkPath)
+		if StartupOtherSourceConfigured(A_Startup, Command)
+			throw Error("Another startup command is configured")
 		Enabled := StartAtLoginEnabled()
 		if !Enabled {
 			if !SetStartupFolder(true, A_Startup, Command)

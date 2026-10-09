@@ -343,8 +343,8 @@ module.exports = function run({ workflow, admitNativePacSelector, PAC_FILTER }) 
 		['wrong-reader', 'managed_http_pac_xctest_evidence.cjs', 'swift_xctest_evidence.cjs'],
 		[
 			'changed-deadline',
-			'native-pac-verdict.json"\n        timeout-minutes: 10',
-			'native-pac-verdict.json"\n        timeout-minutes: 20'
+			'native-pac-verdict.json"\n          else\n              echo "Invalid command qualification disposition" >&2\n              exit 1\n          fi\n        timeout-minutes: 10',
+			'native-pac-verdict.json"\n          else\n              echo "Invalid command qualification disposition" >&2\n              exit 1\n          fi\n        timeout-minutes: 20'
 		]
 	])
 		check(label, () => {

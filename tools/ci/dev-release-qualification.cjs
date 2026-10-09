@@ -7,12 +7,52 @@ const POLICY_PATH = path.resolve(
 	__dirname,
 	'../../.github/ci/dev_release_qualification_exceptions.json'
 );
+const STABLE_POLICY_PATH = path.resolve(
+	__dirname,
+	'../../.github/ci/stable_release_qualification_exception.json'
+);
+const STABLE_PROFILE_ID = 'stable-v1-20261009-macos-native-deferred';
 const SCOPE_IDS = Object.freeze([
 	'windows-pac-full-url',
 	'linux-window-receipts',
 	'macos-brew-archive',
 	'macos-shortcuts-discovery',
 	'macos-launch-appleevents'
+]);
+const STABLE_EXTRA_SCOPES = Object.freeze({
+	'macos-native-pac': {
+		path: '.github/workflows/ci-macos.yml',
+		args: ['managed-ollama-native', 'Qualify actual native PAC and WPAD XCTest controls']
+	},
+	'macos-native-http': {
+		path: '.github/workflows/ci-macos.yml',
+		args: ['managed-ollama-native', 'Receive actual independent managed HTTP native clients']
+	},
+	'macos-stubbed-unit': {
+		path: '.github/workflows/ci-macos.yml',
+		args: ['test-hs', 'Run unit + meta tests']
+	},
+	'macos-stubbed-e2e': {
+		path: '.github/workflows/ci-macos.yml',
+		args: ['e2e-hs', 'Run virtual-keyboard harness (stubbed hs.* — no real Hammerspoon)']
+	},
+	'windows-native-desktop': {
+		path: '.github/workflows/ci-windows.yml',
+		args: ['test-ahk', 'Run native desktop AHK cohorts']
+	},
+	'linux-simultaneous-native': {
+		path: 'static/ergopti_plus/linux/tests/hardware/run_daemon_live.sh',
+		args: [
+			'python3',
+			'tests/hardware/run_native_subreaper.py',
+			'luajit',
+			'tests/hardware/run_simultaneous_configuration_real.lua'
+		]
+	}
+});
+const STABLE_SCOPE_IDS = Object.freeze([
+	...SCOPE_IDS.slice(2),
+	...Object.keys(STABLE_EXTRA_SCOPES)
 ]);
 const CONTEXT_KEYS = [
 	'github_actions',
@@ -62,6 +102,15 @@ function parseClosedJson(raw) {
 	return value;
 }
 function validatePolicy(value) {
+	const stable = value && value.id === STABLE_PROFILE_ID;
+	if (
+		stable &&
+		(value.repository !== 'adrienm7/ergopti' ||
+			value.expires_at !== '2026-10-09T22:00:00Z' ||
+			value.tag !== 'v1.0.0' ||
+			value.version !== '1.0.0')
+	)
+		refuse('Invalid one-candidate stable boundary.');
 	keys(value, [
 		'schema',
 		'id',
@@ -82,10 +131,10 @@ function validatePolicy(value) {
 		typeof value.id !== 'string' ||
 		!/^[a-z0-9-]+$/.test(value.id) ||
 		value.release !== true ||
-		value.prerelease !== 'true' ||
-		value.channel !== 'dev' ||
+		value.prerelease !== (stable ? 'false' : 'true') ||
+		value.channel !== (stable ? 'main' : 'dev') ||
 		value.event_name !== 'push' ||
-		value.ref !== 'refs/heads/dev' ||
+		value.ref !== (stable ? 'refs/heads/main' : 'refs/heads/dev') ||
 		typeof value.repository !== 'string' ||
 		!/^\w[\w-]*\/[\w.-]+$/.test(value.repository) ||
 		typeof value.authorization_note !== 'string' ||
@@ -97,15 +146,17 @@ function validatePolicy(value) {
 		!/^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\dZ$/.test(value.expires_at) ||
 		!Number.isFinite(Date.parse(value.expires_at)) ||
 		typeof value.version !== 'string' ||
-		!/^\d+\.\d+\.\d+-dev\.\d+$/.test(value.version) ||
+		!(stable ? /^1\.0\.0$/ : /^\d+\.\d+\.\d+-dev\.\d+$/).test(value.version) ||
 		value.tag !== 'v' + value.version
 	)
 		refuse('Invalid qualification release boundary.');
-	keys(value.scopes, SCOPE_IDS);
+	const policyScopes = stable ? STABLE_SCOPE_IDS : SCOPE_IDS;
+	keys(value.scopes, policyScopes);
 	const kinds = ['ahk_test', 'linux_fixture', 'swift_test_file', 'command', 'macos_launch'];
 	const names = new Set();
-	for (let i = 0; i < SCOPE_IDS.length; i++) {
-		const row = value.scopes[SCOPE_IDS[i]];
+	for (const scope of policyScopes) {
+		const i = SCOPE_IDS.indexOf(scope);
+		const row = value.scopes[scope];
 		const expected =
 			i === 0
 				? ['kind', 'name', 'reason']
@@ -116,13 +167,19 @@ function validatePolicy(value) {
 						: ['kind', 'path', 'args', 'reason'];
 		keys(row, expected);
 		if (
+			i < 0 &&
+			(row.path !== STABLE_EXTRA_SCOPES[scope].path ||
+				JSON.stringify(row.args) !== JSON.stringify(STABLE_EXTRA_SCOPES[scope].args))
+		)
+			refuse('Invalid closed stable command scope.');
+		if (
 			i === 4 &&
 			(JSON.stringify(row.scenarios) !== '["clean","karabiner_config"]' ||
 				JSON.stringify(row.runners) !== '["macos-15","macos-15-intel"]')
 		)
 			refuse('Invalid closed Mac launch qualification matrix.');
 		if (
-			row.kind !== kinds[i] ||
+			row.kind !== (i < 0 ? 'command' : kinds[i]) ||
 			typeof row.reason !== 'string' ||
 			!row.reason ||
 			/[\r\n]/.test(row.reason)
@@ -162,30 +219,37 @@ function freeze(value) {
 	return value;
 }
 const POLICY = freeze(validatePolicy(parseClosedJson(fs.readFileSync(POLICY_PATH, 'utf8'))));
-function eligible(context, now) {
+const STABLE_POLICY = freeze(
+	validatePolicy(parseClosedJson(fs.readFileSync(STABLE_POLICY_PATH, 'utf8')))
+);
+function eligible(context, now, policy = POLICY) {
 	keys(context, CONTEXT_KEYS);
 	const stamp = now instanceof Date ? now.getTime() : Date.parse(now);
 	if (!Number.isFinite(stamp)) refuse('Invalid qualification clock.');
 	return (
 		context.github_actions === 'true' &&
-		CONTEXT_KEYS.filter((k) => k !== 'github_actions').every((k) => context[k] === POLICY[k]) &&
-		stamp < Date.parse(POLICY.expires_at)
+		CONTEXT_KEYS.filter((k) => k !== 'github_actions').every((k) => context[k] === policy[k]) &&
+		stamp < Date.parse(policy.expires_at)
 	);
 }
 /** Automatic mismatch, expiry and later tags retain full default execution. */
-function resolveQualificationProfile(context, now = new Date()) {
-	return eligible(context, now) ? POLICY : null;
+function resolveQualificationProfile(context, now = new Date(), scope = null) {
+	if ((scope === null || SCOPE_IDS.includes(scope)) && eligible(context, now)) return POLICY;
+	return STABLE_SCOPE_IDS.includes(scope) && eligible(context, now, STABLE_POLICY)
+		? STABLE_POLICY
+		: null;
 }
 /** An explicit profile request refuses every unknown or ineligible context. */
 function authorizeQualificationProfile(id, context, now = new Date()) {
-	if (id !== POLICY.id || !eligible(context, now))
+	const policy = id === POLICY.id ? POLICY : id === STABLE_POLICY.id ? STABLE_POLICY : null;
+	if (!policy || !eligible(context, now, policy))
 		refuse('Qualification profile is not authorized for this context.');
-	return POLICY;
+	return policy;
 }
 function deferredScopes(profile) {
 	if (profile === null) return [];
-	if (profile !== POLICY) refuse('Unknown qualification profile.');
-	return SCOPE_IDS.slice();
+	if (profile !== POLICY && profile !== STABLE_POLICY) refuse('Unknown qualification profile.');
+	return Object.keys(profile.scopes);
 }
 function sourceSha(value) {
 	if (typeof value !== 'string' || !/^[0-9a-f]{40}$/.test(value))
@@ -194,20 +258,20 @@ function sourceSha(value) {
 }
 /** Closed missing-proof metadata never conveys native lease or feature authority. */
 function qualificationReceipt(profile, scope, details) {
-	if (profile !== POLICY || !SCOPE_IDS.includes(scope))
+	if ((profile !== POLICY && profile !== STABLE_POLICY) || !deferredScopes(profile).includes(scope))
 		refuse('Unknown qualification receipt scope.');
 	keys(details, ['source_sha']);
 	return {
 		schema: 1,
-		profile_id: POLICY.id,
+		profile_id: profile.id,
 		scope,
-		tag: POLICY.tag,
-		version: POLICY.version,
-		expires_at: POLICY.expires_at,
+		tag: profile.tag,
+		version: profile.version,
+		expires_at: profile.expires_at,
 		status: 'deferred',
 		qualified: false,
-		reason: POLICY.scopes[scope].reason,
-		artifact: POLICY.scopes[scope],
+		reason: profile.scopes[scope].reason,
+		artifact: profile.scopes[scope],
 		source_sha: sourceSha(details.source_sha)
 	};
 }
@@ -221,7 +285,7 @@ function validateQualificationReceipt(receipt, scope, sha, context, now = new Da
 /** Binds missing native proof to one retained lifecycle matrix row. */
 function launchQualificationReceipt(profile, scenario, runner, details) {
 	const scope = 'macos-launch-appleevents';
-	const row = POLICY.scopes[scope];
+	const row = (profile || POLICY).scopes[scope];
 	keys(details, ['source_sha']);
 	if (
 		typeof scenario !== 'string' ||
@@ -254,7 +318,7 @@ function validateLaunchQualificationReceipt(
 	now = new Date()
 ) {
 	const expected = launchQualificationReceipt(
-		resolveQualificationProfile(context, now),
+		resolveQualificationProfile(context, now, 'macos-launch-appleevents'),
 		scenario,
 		runner,
 		{ source_sha: sha }
@@ -336,105 +400,90 @@ function ahkQualificationManifest(tap, execution, profile, sha) {
 		entries
 	};
 }
-/** One explicitly authorized prerelease may defer suites, never build integrity. */
-function fastPrerelease(context, now = new Date()) {
-	const profile = resolveQualificationProfile(context, now);
+/** Selects only this one proposed stable publication; existing callers remain full. */
+function stablePublicationProfile(context, now = new Date()) {
+	const selected = resolveQualificationProfile(context, now, 'macos-brew-archive');
+	return selected === STABLE_POLICY ? selected : null;
+}
+/** Fresh admission precedes every publication side effect; missing proof stays explicit. */
+function stablePublicationNotice(id, context, sha, now = new Date()) {
+	if (id === '') return '';
+	if (id !== STABLE_POLICY.id) refuse('Unknown stable publication selection.');
+	const profile = authorizeQualificationProfile(id, context, now);
 	return (
-		profile !== null &&
-		profile.id === 'dev-release-20261009-diagnostic-prerelease' &&
-		profile.tag === 'v0.0.0-dev.157' &&
-		profile.version === '0.0.0-dev.157' &&
-		profile.expires_at === '2026-10-10T07:00:00Z'
+		'NATIVE AND HARNESS QUALIFICATION DEFERRED / qualified:false (source ' +
+		sourceSha(sha) +
+		'): ' +
+		deferredScopes(profile)
+			.map((scope) => scope + ': ' + profile.scopes[scope].reason)
+			.join(' ') +
+		' ' +
+		'Compilation, packaging, macOS signing, source and asset integrity, installation and all other tests remain required. Windows signature evidence is disclosed separately. ' +
+		'[Qualification records](https://github.com/adrienm7/ergopti/releases/tag/v1.0.0) retain the exact source-bound deferred scopes. Packaging does not prove native feature acceptance. This exception applies only to v1.0.0 before 2026-10-09T22:00:00Z.' +
+		' Known macOS reports remain under investigation: Karabiner lease failures (including watchdog exit 73 and PONG/READY timeouts), and an active Homebrew upgrade leaving Hammerspoon running without ErgoptiPlus. This release does not claim those reports repaired.'
 	);
 }
-function validateFastPrerelease(requested, context, now = new Date()) {
-	if (typeof requested !== 'boolean') refuse('Fast prerelease requires a Boolean.');
-	if (requested && !fastPrerelease(context, now))
-		refuse('Temporary fast prerelease is not authorized for this context.');
-	return requested;
-}
-function fastPrereleaseReceipt(lane, needs, sha, context, now = new Date()) {
-	validateFastPrerelease(true, context, now);
+/** Validates existing source-bound scope receipts before a command can be deferred. */
+function scopeDisposition(receipt, scope, sha, context, now = new Date()) {
+	if (receipt && receipt.status === 'deferred') {
+		validateQualificationReceipt(receipt, scope, sha, context, now);
+		return 'deferred';
+	}
 	const expected = {
-		windows: {
-			'test-ahk': 'skipped',
-			'e2e-ahk': 'skipped',
-			'package-windows': 'success',
-			'launch-windows': 'skipped'
-		},
-		macos: {
-			'cold-bootstrap-native': 'skipped',
-			'test-hs': 'skipped',
-			'e2e-hs': 'skipped',
-			'package-macos': 'success',
-			launch: 'skipped',
-			'tooltip-canvas': 'skipped',
-			'managed-ollama-native': 'success'
-		},
-		linux: {
-			'test-linux': 'skipped',
-			'e2e-linux': 'skipped',
-			'package-linux': 'success',
-			'install-linux': 'skipped'
-		}
-	}[lane];
-	if (!expected) refuse('Unknown fast prerelease lane.');
-	keys(needs, Object.keys(expected));
-	for (const [name, result] of Object.entries(expected)) {
-		if (!needs[name] || needs[name].result !== result)
-			refuse('Fast prerelease has missing, failed or unexpected mandatory jobs.');
-	}
-	return {
 		schema: 1,
-		profile_id: POLICY.id,
-		lane,
-		tag: POLICY.tag,
-		version: POLICY.version,
-		expires_at: POLICY.expires_at,
-		source_sha: sourceSha(sha),
-		status: 'UNQUALIFIED',
+		profile_id: null,
+		scope,
+		status: 'full',
 		qualified: false,
-		tests: 'DEFERRED',
-		build_verification: 'required',
-		jobs: expected
+		source_sha: sourceSha(sha)
 	};
+	if (
+		JSON.stringify(receipt) !== JSON.stringify(expected) ||
+		resolveQualificationProfile(context, now, scope) !== null
+	)
+		refuse('Invalid full command qualification receipt.');
+	return 'full';
 }
-function fastMain(argv) {
-	const context = environmentContext();
-	if (argv.length === 2 && argv[1] === 'select') {
-		const selected = fastPrerelease(context);
-		if (!process.env.GITHUB_OUTPUT) refuse('Fast selection needs its owned output.');
-		fs.appendFileSync(process.env.GITHUB_OUTPUT, 'fast_prerelease=' + selected + '\n');
-		console.log(
-			selected
-				? 'UNQUALIFIED dev157: tests deferred; builds/signing remain required.'
-				: 'Full default qualification remains required.'
-		);
-		return;
+/** Requires every actually emitted command scope receipt before public disclosure. */
+function admitCommandReceipts(directory, context, sha, now = new Date()) {
+	const expected = {
+		'macos-native-pac': ['arm64', 'amd64'],
+		'macos-native-http': ['arm64', 'amd64'],
+		'macos-stubbed-unit': [''],
+		'macos-stubbed-e2e': [''],
+		'windows-native-desktop': [''],
+		'linux-simultaneous-native': ['']
+	};
+	for (const [scope, suffixes] of Object.entries(expected)) {
+		for (const suffix of suffixes) {
+			const file = path.join(directory, 'stable-' + scope + (suffix ? '-' + suffix : '') + '.json');
+			const record = parseClosedJson(fs.readFileSync(file, 'utf8'));
+			if (scopeDisposition(record, scope, sha, context, now) !== 'deferred')
+				refuse('Missing approved deferred command receipt.');
+		}
 	}
-	const requested = process.env.ERGOPTI_FAST_PRERELEASE;
-	if (requested !== 'true' && requested !== 'false')
-		refuse('Missing Boolean fast prerelease input.');
-	validateFastPrerelease(requested === 'true', context);
-	if (argv.length === 2 && argv[1] === 'admit') return;
-	if (argv.length !== 4 || argv[1] !== 'receipt' || argv[2] !== '--lane' || requested !== 'true')
-		refuse('Invalid fast prerelease command.');
-	const receipt = fastPrereleaseReceipt(
-		argv[3],
-		parseClosedJson(process.env.NEEDS || ''),
-		process.env.GITHUB_SHA,
-		context
-	);
-	fs.writeFileSync('fast-prerelease-' + argv[3] + '.json', JSON.stringify(receipt, null, 2) + '\n');
-	console.log(JSON.stringify(receipt));
-	if (process.env.GITHUB_STEP_SUMMARY)
-		fs.appendFileSync(
-			process.env.GITHUB_STEP_SUMMARY,
-			'## UNQUALIFIED diagnostic prerelease\nTests DEFERRED; packaging success is not native or feature acceptance.\n'
-		);
 }
 function main(argv) {
-	if (argv[0] === '--fast-action') return fastMain(argv);
+	if (argv.length === 1 && argv[0] === '--publication-select') {
+		const profile = stablePublicationProfile(environmentContext());
+		console.log('native_qualification_profile=' + (profile ? profile.id : ''));
+		return;
+	}
+	if (argv.length === 1 && argv[0] === '--publication-admit') {
+		const notice = stablePublicationNotice(
+			process.env.ERGOPTI_NATIVE_QUALIFICATION_PROFILE || '',
+			environmentContext(),
+			process.env.GITHUB_SHA
+		);
+		if (notice)
+			admitCommandReceipts(
+				path.resolve(__dirname, '../../release-assets'),
+				environmentContext(),
+				process.env.GITHUB_SHA
+			);
+		console.log('ERGOPTI_NATIVE_QUALIFICATION_NOTE=' + notice);
+		return;
+	}
 	const options = {};
 	for (let i = 0; i < argv.length; i += 2) {
 		if (
@@ -446,6 +495,7 @@ function main(argv) {
 				'--execution-manifest',
 				'--scenario',
 				'--runner',
+				'--validate-scope-receipt',
 				'--validate-launch-receipt'
 			].includes(argv[i]) ||
 			!argv[i + 1] ||
@@ -455,9 +505,21 @@ function main(argv) {
 		options[argv[i]] = argv[i + 1];
 	}
 	const scope = options['--scope'];
-	if (!SCOPE_IDS.includes(scope)) refuse('Unknown qualification scope.');
+	if (![...SCOPE_IDS, ...STABLE_SCOPE_IDS].includes(scope)) refuse('Unknown qualification scope.');
 	const context = environmentContext(),
-		profile = resolveQualificationProfile(context);
+		profile = resolveQualificationProfile(context, new Date(), scope);
+	if (options['--validate-scope-receipt']) {
+		if (!Object.hasOwn(STABLE_EXTRA_SCOPES, scope)) refuse('Unknown command qualification scope.');
+		console.log(
+			scopeDisposition(
+				parseClosedJson(fs.readFileSync(options['--validate-scope-receipt'], 'utf8')),
+				scope,
+				process.env.GITHUB_SHA,
+				context
+			)
+		);
+		return;
+	}
 	if (scope === 'macos-launch-appleevents') {
 		const receipt = options['--validate-launch-receipt']
 			? parseClosedJson(fs.readFileSync(options['--validate-launch-receipt'], 'utf8'))
@@ -542,10 +604,12 @@ function main(argv) {
 	}
 }
 module.exports = {
+	admitCommandReceipts,
+	scopeDisposition,
+	stablePublicationProfile,
+	stablePublicationNotice,
 	POLICY_PATH,
-	fastPrerelease,
-	validateFastPrerelease,
-	fastPrereleaseReceipt,
+	STABLE_POLICY_PATH,
 	resolveQualificationProfile,
 	authorizeQualificationProfile,
 	deferredScopes,

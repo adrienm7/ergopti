@@ -13,11 +13,6 @@ name: Windows
 on:
   workflow_call:
     inputs:
-      fast_prerelease:
-        description: Temporary unqualified dev157 test deferral; defaults remain full
-        required: false
-        default: false
-        type: boolean
       release:
         description: True when ci.yml's plan resolved a free release tag
         required: true
@@ -58,14 +53,12 @@ env:
   ERGOPTI_DEV_RELEASE_CHANNEL: ${{ inputs.channel }}
   ERGOPTI_DEV_RELEASE_TAG: ${{ inputs.tag }}
   ERGOPTI_DEV_RELEASE_VERSION: ${{ inputs.version }}
-  ERGOPTI_FAST_PRERELEASE: ${{ inputs.fast_prerelease }}
 
 jobs:
   # ─────────────────────────────────────────────────
   # 1) AHK unit, native and contract tests
   # ─────────────────────────────────────────────────
   test-ahk:
-    if: ${{ !inputs.fast_prerelease }}
     name: 'Unit tests'
     runs-on: windows-latest
 
@@ -279,7 +272,27 @@ jobs:
       - name: Run native desktop AHK cohorts
         shell: pwsh
         timeout-minutes: 25
-        run: ./tools/test/run-windows-native-desktop.ps1
+        run: |
+          $receipt = Join-Path $env:RUNNER_TEMP 'stable-windows-native-desktop.json'
+          node tools/ci/dev-release-qualification.cjs --scope windows-native-desktop --receipt $receipt
+          if ($LASTEXITCODE -ne 0) { throw 'Native desktop qualification selection refused.' }
+          $mode = node tools/ci/dev-release-qualification.cjs --scope windows-native-desktop --validate-scope-receipt $receipt
+          if ($LASTEXITCODE -ne 0) { throw 'Native desktop qualification receipt refused.' }
+          if ($mode -ceq 'deferred') {
+              Write-Host '[DEFERRED] windows-native-desktop: qualified=false; no desktop cohort executed.'
+          } elseif ($mode -ceq 'full') {
+              ./tools/test/run-windows-native-desktop.ps1
+          } else {
+              throw 'Invalid native desktop qualification disposition.'
+          }
+
+      - name: Retain the source-bound Windows qualification receipt
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: assets-qualification-windows
+          path: ${{ runner.temp }}/stable-windows-native-desktop.json
+          if-no-files-found: warn
 
       - name: Publish native desktop AHK evidence
         if: always()
@@ -287,7 +300,9 @@ jobs:
         with:
           overwrite: true
           name: windows-ahk-native-desktop
-          path: ${{ runner.temp }}/windows-ahk-native-desktop/
+          path: |
+            ${{ runner.temp }}/windows-ahk-native-desktop/
+            ${{ runner.temp }}/stable-windows-native-desktop.json
           if-no-files-found: error
 
       # The isolated LLM suites. They cannot join run_all.ahk: each installs
@@ -411,7 +426,6 @@ jobs:
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
   e2e-ahk:
-    if: ${{ !inputs.fast_prerelease }}
     name: 'E2E tests (engine)'
     needs: [test-ahk]
     runs-on: windows-latest
@@ -519,21 +533,12 @@ jobs:
   # alters; nothing here disables or restores Defender.
   package-windows:
     name: 'Package'
-    if: ${{ !cancelled() && ((inputs.fast_prerelease && needs.e2e-ahk.result == 'skipped') || (!inputs.fast_prerelease && needs.e2e-ahk.result == 'success')) }}
     needs: [e2e-ahk]
     runs-on: windows-latest
 
     steps:
       # A shallow clone: no step of this job reads git history.
       - uses: actions/checkout@v4
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version-file: '.node-version'
-
-      - name: Recheck temporary fast prerelease authorization
-        shell: bash
-        run: node tools/ci/dev-release-qualification.cjs --fast-action admit
 
       - name: Build and test native navigation event owner
         shell: pwsh
@@ -672,6 +677,11 @@ jobs:
         shell: pwsh
         env:
           ERGOPTI_RELEASE_PRERELEASE: ${{ inputs.prerelease }}
+          ERGOPTI_DEV_RELEASE_RELEASE: ${{ inputs.release }}
+          ERGOPTI_DEV_RELEASE_PRERELEASE: ${{ inputs.prerelease }}
+          ERGOPTI_DEV_RELEASE_CHANNEL: ${{ inputs.channel }}
+          ERGOPTI_DEV_RELEASE_TAG: ${{ inputs.tag }}
+          ERGOPTI_DEV_RELEASE_VERSION: ${{ inputs.version }}
           WINDOWS_SIGNING_CERTIFICATE_BASE64: ${{ secrets.WINDOWS_SIGNING_CERTIFICATE_BASE64 }}
           WINDOWS_SIGNING_CERTIFICATE_PASSWORD: ${{ secrets.WINDOWS_SIGNING_CERTIFICATE_PASSWORD }}
           WINDOWS_SIGNER_SUBJECT: ${{ secrets.WINDOWS_SIGNER_SUBJECT }}
@@ -689,7 +699,19 @@ jobs:
                   Write-Warning "Publishing an unsigned Windows artifact for the dev prerelease channel."
                   exit 0
               }
-              throw "Stable Windows releases require every signing secret."
+              $exe = "${{ github.workspace }}\static\ergopti_plus\windows\ErgoptiPlus.exe"
+              $signature = Get-AuthenticodeSignature -LiteralPath $exe
+              if ($signature.Status -ne 'NotSigned' -or $null -ne $signature.SignerCertificate) {
+                  throw "The unsigned exception refuses an invalid or existing signature."
+              }
+              $env:ERGOPTI_WINDOWS_AUTHENTICODE_STATUS = 'NotSigned'
+              $env:ERGOPTI_UNSIGNED_ARTIFACT_SHA256 = (Get-FileHash -LiteralPath $exe -Algorithm SHA256).Hash.ToLowerInvariant()
+              $receipt = & node tools/ci/windows-stable-signing.cjs --receipt
+              if ($LASTEXITCODE -ne 0) { throw "Stable Windows releases require every signing secret." }
+              [IO.File]::WriteAllText("${{ github.workspace }}\static\ergopti_plus\windows\windows-signing-qualification.json",
+                  ($receipt -join "`n") + "`n", [Text.UTF8Encoding]::new($false))
+              Write-Warning "Publishing the explicitly authorized unsigned v1.0.0 artifact with public signature disclosure."
+              exit 0
           }
           if ($missing.Count -gt 0) {
               throw "Partial Windows signing configuration; missing: $($missing -join ', ')."
@@ -746,10 +768,10 @@ jobs:
           if-no-files-found: error
           path: |
             static/ergopti_plus/windows/ErgoptiPlus.exe
+            static/ergopti_plus/windows/windows-signing-qualification.json
             static/ergopti/windows/Ergopti_windows.exe
 
   launch-windows:
-    if: ${{ !inputs.fast_prerelease }}
     name: 'Install and launch'
     needs: [package-windows]
     runs-on: windows-latest
@@ -1273,32 +1295,16 @@ jobs:
           node-version-file: '.node-version'
 
       - name: Download launch evidence
-        if: ${{ !inputs.fast_prerelease }}
         uses: actions/download-artifact@v4
         with:
           pattern: windows-launch-evidence
           path: ${{ runner.temp }}/launch-evidence
 
       - name: Install locked evidence validation dependencies
-        if: ${{ !inputs.fast_prerelease }}
         run: npm ci --ignore-scripts
 
       - name: Verify mandatory jobs and launch scenarios
-        if: ${{ !inputs.fast_prerelease }}
         env:
           NEEDS: ${{ toJSON(needs) }}
           RELEASE: ${{ inputs.release }}
         run: node tools/test/desktop-ci-evidence.cjs verify windows "$RUNNER_TEMP/launch-evidence"
-      - name: Record UNQUALIFIED temporary test deferral
-        if: ${{ inputs.fast_prerelease }}
-        env:
-          NEEDS: ${{ toJSON(needs) }}
-        run: node tools/ci/dev-release-qualification.cjs --fast-action receipt --lane windows
-
-      - name: Retain the explicit unqualified test receipt
-        if: ${{ inputs.fast_prerelease }}
-        uses: actions/upload-artifact@v4
-        with:
-          name: fast-prerelease-unqualified-windows
-          path: fast-prerelease-windows.json
-          if-no-files-found: error

@@ -9,9 +9,9 @@
 
 local helpers = require("tests.helpers")
 
---- Evaluates only the menu-ready source slice, never the driver entrypoint.
+--- Prepares only the menu-ready source slice, never the driver entrypoint.
 --- @param available boolean Whether the recording menu commits.
---- @return boolean ok
+--- @return boolean ok Whether the exact bounded startup slice committed.
 --- @return table facts
 --- @return nil|string result The actual chunk return or fatal startup diagnostic.
 local function startup_slice(available)
@@ -58,6 +58,7 @@ helpers.describe("startup without retired VS Code bridge", function()
 		local ok, facts, result = startup_slice(false)
 		helpers.assert_eq(ok, false)
 		helpers.assert_type(result, "string")
+		helpers.assert_true(result:find("menu.start did not commit", 1, true) ~= nil, "the actual menu refusal must survive")
 		helpers.assert_eq(result:match(": ([^\n]+)$"), "menu.start did not commit")
 		helpers.assert_eq(facts.menu_calls, 1)
 		helpers.assert_eq(facts.bridge_calls, 0)

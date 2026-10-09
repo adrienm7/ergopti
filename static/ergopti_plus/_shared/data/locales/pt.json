@@ -3281,5 +3281,6 @@
 	"healthcheck.summary.scope": "Os resultados abrangem apenas as verificações registadas. Os testes isolados não foram executados.",
 	"healthcheck.problem.diagnostic_check": "Falha na verificação de diagnóstico: %s.",
 	"healthcheck.export.privacy_notice": "Este relatório partilha apenas dados técnicos permitidos. Registos, texto livre, caminhos e dados identificativos são excluídos mesmo com os detalhes ativados. Os testes locais da página não estão incluídos.",
-	"sg_actions.llm_translate_context": "🌐 Traduzir a frase atual [configurável]"
+	"sg_actions.llm_translate_context": "🌐 Traduzir a frase atual [configurável]",
+	"menu.about.startup_other_command_reason": "Outro comando de arranque: O arranque está configurado para outro comando ou instalação. A configuração existente é mantida."
 }

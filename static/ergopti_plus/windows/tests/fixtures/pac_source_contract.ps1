@@ -240,7 +240,17 @@ try {
         try {
             $null = $Fetch.Invoke($null, @(('http://127.0.0.1:' + $First.Port + '/' + $Path),
                 [long]$Deadline, [long]($Deadline + 1000), [int]1048576, [int]50))
-        } catch [Reflection.TargetInvocationException] { $Refused = $true }
+        } catch [Text.DecoderFallbackException] {
+            $Refused = $Path -ceq 'invalid'
+        } catch [Net.WebException] {
+            $Failure = $_.Exception.GetBaseException()
+            $Refused = $Path -ceq 'unavailable' -and $Failure -is [Net.WebException] -and
+                $Failure.Status -eq [Net.WebExceptionStatus]::ProtocolError -and
+                $Failure.Response -is [Net.HttpWebResponse] -and
+                [int]$Failure.Response.StatusCode -eq 503
+        } catch [InvalidOperationException] {
+            $Refused = $Path -ceq 'oversized'
+        }
         if (-not $Refused) { throw 'Real malformed/non200/oversized source was admitted.' }
         $Controls++
     }
