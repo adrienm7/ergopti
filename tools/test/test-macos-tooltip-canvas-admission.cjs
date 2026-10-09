@@ -17,7 +17,7 @@ const assert = require('node:assert/strict');
 const path = require('node:path');
 const { verify } = require('./desktop-ci-evidence.cjs');
 const { coldBootstrapRecord } = require('./fixtures/macos-cold-bootstrap-receipt.cjs');
-const pipeline = require('./ci-pipeline.cjs');
+const pipeline = require('./ci-full-default.cjs');
 const { run } = require('./run-macos-tooltip-canvas-tests.cjs');
 const { selectGates, GATE_COMMANDS } = require('./verify-change.cjs');
 

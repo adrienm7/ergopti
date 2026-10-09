@@ -12,13 +12,13 @@ module.exports = function run({ workflow, admitNativePacSelector, PAC_FILTER }) 
 	const full = require('../diagnostics/swift_xctest_evidence.cjs');
 	const repository = path.resolve(__dirname, '../..');
 	const classes = ['ManagedHTTPWorkerTests', 'ManagedHTTPWireTests', 'ManagedHTTPWPADWireTests'];
-	const counts = [10, 1, 1];
+	const counts = [12, 1, 1];
 	let passed = 0;
 	const check = (label, action) => {
 		action();
 		passed++;
 	};
-	// The unchanged existing test definitions are the independent oracle; the
+	// The source definitions are the independent method oracle; the
 	// newly authored reader's method table never generates its expected receipts.
 	const definitions = classes.map((suite, index) => {
 		const file = path.join(
@@ -47,18 +47,24 @@ module.exports = function run({ workflow, admitNativePacSelector, PAC_FILTER }) 
 		lines.push(`Test Suite '${suite}' started at 2026-10-09 00:00:00.`);
 		for (const method of methods) {
 			lines.push(`Test Case '-[ErgoptiPlusTests.${suite} ${method}]' started.`);
+			if (method === 'testActualCFNetworkHTTPPACArgumentShapeObservation')
+				lines.push('PAC_ARGUMENT_SHAPE purpose=http type=http port=20000');
+			if (method === 'testActualCFNetworkHTTPSPACArgumentShapeObservation')
+				lines.push('PAC_ARGUMENT_SHAPE purpose=https type=https port=20000');
 			lines.push(`Test Case '-[ErgoptiPlusTests.${suite} ${method}]' passed (0.001 seconds).`);
 		}
 		lines.push(`Test Suite '${suite}' passed at 2026-10-09 00:00:01.`, summary(methods.length));
 	}
 	lines.push(
 		"Test Suite 'ErgoptiPlusPackageTests.xctest' passed at 2026-10-09 00:00:01.",
-		summary(12),
+		summary(14),
 		"Test Suite 'Selected tests' passed at 2026-10-09 00:00:01.",
-		summary(12)
+		summary(14)
 	);
 	const valid = lines.join('\n') + '\n';
-	check('exact-existing-twelve', () => assert.equal(reader.evaluate(valid, 0, 0).complete, true));
+	check('exact-original-twelve-and-two-observations', () =>
+		assert.equal(reader.evaluate(valid, 0, 0).complete, true)
+	);
 	check('PTY-normalization', () =>
 		assert.equal(
 			reader.evaluate('\x1b[32m' + valid.replaceAll('\n', '\r\n') + '\x1b[0m', 0, 0).complete,
@@ -73,6 +79,174 @@ module.exports = function run({ workflow, admitNativePacSelector, PAC_FILTER }) 
 			definitions[0].methods.includes('testActualCFNetworkPACReceivesDistinctHTTPSPathsAndQueries')
 		)
 	);
+	const observations = [
+		'testActualCFNetworkHTTPPACArgumentShapeObservation',
+		'testActualCFNetworkHTTPSPACArgumentShapeObservation'
+	];
+	check('two-explicit-observations-preserve-original-twelve', () => {
+		assert.equal(
+			definitions[0].methods.filter((method) => !observations.includes(method)).length,
+			10
+		);
+		for (const method of observations)
+			assert.equal(definitions[0].methods.filter((actual) => actual === method).length, 1);
+	});
+	let originalOnly = valid;
+	for (const method of observations) {
+		const name = `-[ErgoptiPlusTests.ManagedHTTPWorkerTests ${method}]`;
+		const purpose =
+			method === 'testActualCFNetworkHTTPPACArgumentShapeObservation' ? 'http' : 'https';
+		const observationPair = `Test Case '${name}' started.\nPAC_ARGUMENT_SHAPE purpose=${purpose} type=${purpose} port=20000\nTest Case '${name}' passed (0.001 seconds).\n`;
+		assert.ok(valid.includes(observationPair));
+		check('missing-observation-' + method, () =>
+			assert.equal(reader.evaluate(valid.replace(observationPair, ''), 0, 0).complete, false)
+		);
+		check('failed-observation-' + method, () =>
+			assert.equal(
+				reader.evaluate(
+					valid.replace(`Test Case '${name}' passed`, `Test Case '${name}' failed`),
+					0,
+					0
+				).complete,
+				false
+			)
+		);
+		check('skipped-observation-' + method, () =>
+			assert.equal(
+				reader.evaluate(
+					valid.replace(`Test Case '${name}' passed`, `Test Case '${name}' skipped`),
+					0,
+					0
+				).complete,
+				false
+			)
+		);
+		originalOnly = originalOnly.replace(observationPair, '');
+	}
+	originalOnly = originalOnly
+		.replace(summary(12), summary(10))
+		.replaceAll(summary(14), summary(12));
+	check('original-twelve-alone-cannot-qualify-fourteen', () => {
+		const verdict = reader.evaluate(originalOnly, 0, 0);
+		assert.equal(verdict.complete, false);
+		assert.equal(verdict.observed, 12);
+		assert.equal(verdict.expected, 14);
+	});
+	const httpReceipt = 'PAC_ARGUMENT_SHAPE purpose=http type=http port=20000\n';
+	const httpsReceipt = 'PAC_ARGUMENT_SHAPE purpose=https type=https port=20000\n';
+	check('fixed-receipt-ports', () =>
+		assert.deepEqual(reader.evaluate(valid, 0, 0).argument_observations, {
+			http: 20000,
+			https: 20000
+		})
+	);
+	check('other-closed-shape-does-not-waive-original-tests', () =>
+		assert.equal(reader.evaluate(valid.replaceAll('port=20000', 'port=20075'), 0, 0).complete, true)
+	);
+	check('buffered-receipts-do-not-invent-delivery-order', () =>
+		assert.equal(
+			reader.evaluate(
+				valid.replace(httpReceipt, '').replace(httpsReceipt, '') + httpsReceipt + httpReceipt,
+				0,
+				0
+			).complete,
+			true
+		)
+	);
+	for (const [label, bad] of [
+		['missing-http-receipt', valid.replace(httpReceipt, '')],
+		['missing-https-receipt', valid.replace(httpsReceipt, '')],
+		['duplicate-receipt', valid + httpReceipt],
+		['foreign-purpose', valid.replace('purpose=http ', 'purpose=ftp ')],
+		['unused-codebook-slot', valid.replace('port=20000', 'port=20009')],
+		[
+			'trailing-receipt-data',
+			valid.replace(
+				'purpose=http type=http port=20000',
+				'purpose=http type=http port=20000 extra=unadmitted'
+			)
+		],
+		[
+			'raw-value-receipt',
+			valid.replace(
+				'purpose=http type=http port=20000',
+				'purpose=http type=http port=http://same.example/a'
+			)
+		]
+	])
+		check(label, () => assert.equal(reader.evaluate(bad, 0, 0).complete, false));
+	for (const method of [
+		'testActualCFNetworkPACReceivesDistinctHTTPSPathsAndQueries',
+		'testActualCFNetworkPACPreservesHTTPPathAndOrderedNativeChoices'
+	])
+		check('original-full-url-failure-remains-failure-' + method, () =>
+			assert.equal(
+				reader.evaluate(
+					valid.replace(
+						`Test Case '-[ErgoptiPlusTests.ManagedHTTPWorkerTests ${method}]' passed`,
+						`Test Case '-[ErgoptiPlusTests.ManagedHTTPWorkerTests ${method}]' failed`
+					),
+					0,
+					0
+				).complete,
+				false
+			)
+		);
+	const narrative = valid.replace(httpReceipt, '').replace(httpsReceipt, '');
+	const narrativeLines = narrative.trimEnd().split('\n');
+	const summaryPositions = narrativeLines.flatMap((line, index) =>
+		/^\s*Executed /.test(line) ? [index] : []
+	);
+	assert.equal(summaryPositions.length, 5);
+	for (const position of summaryPositions) {
+		const placed = [...narrativeLines];
+		placed.splice(position, 0, httpReceipt.trimEnd(), httpsReceipt.trimEnd());
+		check('observations-before-summary-' + position, () =>
+			assert.equal(reader.evaluate(placed.join('\n') + '\n', 0, 0).complete, true)
+		);
+	}
+	for (const [label, placed] of [
+		['before-root', httpReceipt + httpsReceipt + narrative],
+		['after-root', narrative + httpReceipt + httpsReceipt],
+		[
+			'between-cases',
+			narrative.replace(
+				'passed (0.001 seconds).\n',
+				'passed (0.001 seconds).\n' + httpReceipt + httpsReceipt
+			)
+		]
+	])
+		check('observations-' + label, () =>
+			assert.equal(reader.evaluate(placed, 0, 0).complete, true)
+		);
+	check('foreign-prefix-observation-refused', () =>
+		assert.equal(reader.evaluate(valid + 'FOREIGN ' + httpReceipt, 0, 0).complete, false)
+	);
+	check('fixed-public-proxy-types', () =>
+		assert.deepEqual(reader.evaluate(valid, 0, 0).argument_proxy_types, {
+			http: 'http',
+			https: 'https'
+		})
+	);
+	for (const [label, typed] of [
+		[
+			'http-purpose-https-tunnel',
+			valid.replace('purpose=http type=http', 'purpose=http type=https')
+		],
+		[
+			'https-purpose-http-proxy',
+			valid.replace('purpose=https type=https', 'purpose=https type=http')
+		]
+	])
+		check(label, () => assert.equal(reader.evaluate(typed, 0, 0).complete, true));
+	for (const [label, typed] of [
+		['socks-type', valid.replace('type=http', 'type=socks')],
+		['unknown-type', valid.replace('type=http', 'type=auto')],
+		['missing-type', valid.replace('type=http ', '')],
+		['noncanonical-type', valid.replace('type=http', 'type=HTTP')],
+		['duplicate-type-field', valid.replace('type=http', 'type=http type=https')]
+	])
+		check(label, () => assert.equal(reader.evaluate(typed, 0, 0).complete, false));
 	const first = `-[ErgoptiPlusTests.${definitions[0].suite} ${definitions[0].methods[0]}]`;
 	const second = `-[ErgoptiPlusTests.${definitions[0].suite} ${definitions[0].methods[1]}]`;
 	const pair = `Test Case '${first}' started.\nTest Case '${first}' passed (0.001 seconds).\n`;
@@ -104,13 +278,13 @@ module.exports = function run({ workflow, admitNativePacSelector, PAC_FILTER }) 
 		],
 		['failed', valid.replace(`Test Case '${first}' passed`, `Test Case '${first}' failed`)],
 		['skipped', valid.replace(`Test Case '${first}' passed`, `Test Case '${first}' skipped`)],
-		['wrong-class-count', valid.replace(summary(10), summary(9))],
-		['wrong-bundle-count', valid.replace(summary(12), summary(11))],
-		['wrong-root-count', valid.slice(0, valid.lastIndexOf(summary(12))) + summary(11) + '\n'],
+		['wrong-class-count', valid.replace(summary(12), summary(11))],
+		['wrong-bundle-count', valid.replace(summary(14), summary(13))],
+		['wrong-root-count', valid.slice(0, valid.lastIndexOf(summary(14))) + summary(13) + '\n'],
 		['wrong-root', valid.replaceAll("'Selected tests'", "'All tests'")],
 		['duplicate-root', valid + valid],
-		['extra-summary', valid + summary(12) + '\n'],
-		['noncanonical-count', valid.replace('Executed 10 tests', 'Executed 010 tests')],
+		['extra-summary', valid + summary(14) + '\n'],
+		['noncanonical-count', valid.replace('Executed 12 tests', 'Executed 012 tests')],
 		['foreign-bundle', valid.replaceAll('ErgoptiPlusPackageTests.xctest', 'Foreign.xctest')],
 		[
 			'wrong-suite',
@@ -124,8 +298,8 @@ module.exports = function run({ workflow, admitNativePacSelector, PAC_FILTER }) 
 		[
 			'summary-skip',
 			valid.replace(
-				summary(10),
-				' Executed 10 tests, with 1 test skipped and 0 failures (0 unexpected) in 1.0 seconds'
+				summary(12),
+				' Executed 12 tests, with 1 test skipped and 0 failures (0 unexpected) in 1.0 seconds'
 			)
 		],
 		['before-root', pair + valid.replace(pair, '')],
@@ -216,6 +390,8 @@ module.exports = function run({ workflow, admitNativePacSelector, PAC_FILTER }) 
 					'schema',
 					'cohort',
 					'expected',
+					'argument_observations',
+					'argument_proxy_types',
 					'observed',
 					'complete',
 					'swift_status',
@@ -227,9 +403,9 @@ module.exports = function run({ workflow, admitNativePacSelector, PAC_FILTER }) 
 	} finally {
 		fs.rmSync(temporary, { recursive: true, force: true });
 	}
-	assert.equal(passed, 45);
+	assert.equal(passed, 82);
 	console.log(
-		'PASS: native PAC/WPAD selected-cohort portable controls=45; actual Darwin/native12 execution UNRUN.'
+		'PASS: native PAC/WPAD selected-cohort portable controls=82; actual Darwin/native14 execution UNRUN.'
 	);
 };
 // A normal suite entry executes the complete owning source guard, which invokes

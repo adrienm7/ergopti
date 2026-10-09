@@ -9,8 +9,9 @@ const vm = require('node:vm');
 const ROOT = path.resolve(__dirname, '../..');
 const policy = require('../ci/dev-release-qualification.cjs');
 const configuration = JSON.parse(fs.readFileSync(policy.POLICY_PATH, 'utf8'));
-const workflow = fs.readFileSync(path.join(ROOT, '.github/workflows/ci-macos.yml'), 'utf8');
-const caller = fs.readFileSync(path.join(ROOT, '.github/workflows/ci.yml'), 'utf8');
+const fullDefault = require('./ci-full-default.cjs');
+const workflow = fullDefault.file('.github/workflows/ci-macos.yml');
+const caller = fullDefault.file('.github/workflows/ci.yml');
 const packageSource = fs.readFileSync(
 	path.join(ROOT, 'static/ergopti_plus/macos/launcher/Package.swift'),
 	'utf8'

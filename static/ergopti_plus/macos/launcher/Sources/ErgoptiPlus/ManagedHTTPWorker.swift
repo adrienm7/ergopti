@@ -118,30 +118,35 @@ enum ManagedProxyLookup {
 		#endif
 		guard let candidates = initial as? [[String: Any]], !candidates.isEmpty || discoveryEnabled,
 			candidates.count <= maximumSelections else { return nil }
+		// A native PAC callback owns the complete choice list. Initial fallback
+		// entries cannot add DIRECT or fixed proxies that the script omitted.
+		let hasNativePAC = candidates.contains(where: {
+			let kind = $0[kCFProxyTypeKey as String] as? String
+			return kind == kCFProxyTypeAutoConfigurationURL as String
+				|| kind == kCFProxyTypeAutoConfigurationJavaScript as String
+		})
 		var routes: [[String: Any]] = []
 		let deadline = ProcessInfo.processInfo.systemUptime + budget
 		for candidate in candidates {
 			guard let kind = candidate[kCFProxyTypeKey as String] as? String else { return nil }
 			if kind == kCFProxyTypeAutoConfigurationURL as String {
 				guard let pacURL = candidate[kCFProxyAutoConfigurationURLKey as String] as? URL,
-					let expanded = evaluate(url: url, pacURL: pacURL, script: nil, deadline: deadline) else { return nil }
+					let expanded = evaluate(url: url, pacURL: pacURL, script: nil, deadline: deadline),
+					!expanded.isEmpty else { return nil }
 				routes.append(contentsOf: expanded)
 			} else if kind == kCFProxyTypeAutoConfigurationJavaScript as String {
 				guard let script = candidate[kCFProxyAutoConfigurationJavaScriptKey as String] as? String,
-					let expanded = evaluate(url: url, pacURL: nil, script: script, deadline: deadline) else { return nil }
+					let expanded = evaluate(url: url, pacURL: nil, script: script, deadline: deadline),
+					!expanded.isEmpty else { return nil }
 				routes.append(contentsOf: expanded)
-			} else { routes.append(candidate) }
+			} else if !hasNativePAC { routes.append(candidate) }
 			guard routes.count <= maximumSelections else { return nil }
 		}
 		// CFNetwork can expose discovery as a flag without a PAC candidate.
 		// Join that native state to public DHCP/DNS discovery metadata; never
 		// relabel the initial DIRECT entry as proof that WPAD has completed.
 		if discoveryEnabled,
-			!candidates.contains(where: {
-				let kind = $0[kCFProxyTypeKey as String] as? String
-				return kind == kCFProxyTypeAutoConfigurationURL as String
-					|| kind == kCFProxyTypeAutoConfigurationJavaScript as String
-			}) {
+			!hasNativePAC {
 			guard let discovered = discover(url: url, deadline: deadline,
 				maximumSelections: maximumSelections, metadataProvider: discoveryMetadataProvider) else { return nil }
 			routes = discovered

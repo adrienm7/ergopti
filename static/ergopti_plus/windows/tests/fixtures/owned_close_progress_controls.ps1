@@ -128,9 +128,9 @@ public static class QueuedTlsShutdownControls {
     static int BioRead(IntPtr bio,IntPtr target,int count){if(drained++>0)return -1;Marshal.Copy(new byte[]{9,0,255},0,target,3);return 3;}
     static int BioWrite(IntPtr bio,IntPtr bytes,int count){Require(count==3,"actual_input_length");byte[] actual=new byte[3];Marshal.Copy(bytes,actual,0,3);Require(actual[0]==3&&actual[1]==0&&actual[2]==254,"actual_input_bytes");inputBytes+=count;return count;}
     static void Require(bool value,string label){if(!value)throw new InvalidDataException(label);}
-    sealed class ObservedInput:NetworkStream {
+    sealed class ObservedInput:ErgoptiFixtureNetworkStream {
         public int Reads;
-        public ObservedInput(Socket socket):base(socket,true){ }
+        public ObservedInput(Socket socket):base(socket){ }
         public override int Read(byte[] bytes,int offset,int count){Reads++;return base.Read(bytes,offset,Math.Min(count,3));}
     }
     static void Case(int choice,bool queued,bool expectedFailure,int expectedCalls,int expectedErrors) {
@@ -151,6 +151,7 @@ public static class QueuedTlsShutdownControls {
             Require(fact!=null&&fact.ShutdownResult==(choice==0||choice==1?1:-1)&&fact.NetworkClosed==1,"actual_final_shutdown_fact");
             Require(inputBytes==(queued?3:0)&&network.Reads==(queued?1:0),"only_already_readable_input");
             Require(fact.Received==9+(queued?3:0)&&fact.Written==14&&fact.CloseWritten==3&&fact.Pending==(choice==6?1:0),"retained_exact_byte_accounting");
+            Require(network.DiscardedInputBytes==(choice==6?3:0),"only_captured_raw_bytes_retired_outside_TLS");
             Require(freed==1&&owner.OwnedStreams==0,"actual_native_and_network_retirement");
             stream.Dispose();Require(freed==1&&owner.ReadClosedStream().Sequence==1,"no_duplicate_shutdown_owner");
             NetworkStream received=peer.GetStream();Require(received.ReadByte()==9&&received.ReadByte()==0&&received.ReadByte()==255&&received.ReadByte()==-1,"actual_output_and_eof");
