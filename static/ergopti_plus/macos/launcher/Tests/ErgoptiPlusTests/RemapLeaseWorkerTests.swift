@@ -7078,3 +7078,284 @@ extension KarabinerLeaseWorkerTests {
 		}
 	}
 }
+
+#if ERGOPTI_GUARDIAN_TEST_SUPPORT
+extension KarabinerLeaseWorkerTests {
+	private func withDiagnosticDirectory(_ body: (URL, URL) throws -> Void) throws {
+		let parent = FileManager.default.temporaryDirectory.resolvingSymlinksInPath()
+			.appendingPathComponent("lease-store-test-" + UUID().uuidString, isDirectory: true)
+		try FileManager.default.createDirectory(at: parent, withIntermediateDirectories: false,
+			attributes: [.posixPermissions: 0o700])
+		defer { try? FileManager.default.removeItem(at: parent) }
+		try body(parent, parent.appendingPathComponent("ergopti_plus", isDirectory: true))
+	}
+
+	private func diagnosticLiteral(_ role: LeaseTerminalRole = .outer) -> Data {
+		if role == .inner {
+			return Data(#"{"schema":1,"role":"inner","boundary":"outer-silent","command":"none","cli":"none","stopping":false,"gateHeld":false,"deadlineArmed":false,"fence":"exhausted","exit":"inner-failed"}"#.utf8)
+		}
+		return Data(#"{"schema":1,"role":"outer","boundary":"private-deadline","command":"heartbeat","cli":"none","stopping":false,"gateHeld":true,"deadlineArmed":true,"fence":"recovered","exit":"inner-failed"}"#.utf8)
+	}
+
+	private func createDiagnosticDirectory(_ directory: URL) throws {
+		try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: false,
+			attributes: [.posixPermissions: 0o700])
+	}
+
+	@discardableResult private func putDiagnostic(_ directory: URL, data: Data, role: String = "outer") throws -> URL {
+		let file = directory.appendingPathComponent("remap-lease-diagnostic-" + role + ".json")
+		try data.write(to: file)
+		XCTAssertEqual(Darwin.chmod(file.path, 0o600), 0)
+		return file
+	}
+
+	func testRetainedDiagnosticMissingDirectoryDoesNotCreate() throws {
+		try withDiagnosticDirectory { _, directory in
+			let observation = RemapLeaseDiagnosticStore(testingDirectory: directory).observe()
+			XCTAssertEqual(observation.state, .unobserved)
+			XCTAssertTrue(observation.records.isEmpty)
+			XCTAssertFalse(FileManager.default.fileExists(atPath: directory.path))
+		}
+	}
+
+	func testRetainedDiagnosticPrivateRecordsAndAtomicReplacement() throws {
+		try withDiagnosticDirectory { _, directory in
+			let store = RemapLeaseDiagnosticStore(testingDirectory: directory)
+			let inner = try XCTUnwrap(LeaseTerminalExport.decode(diagnosticLiteral(.inner)))
+			let outer = try XCTUnwrap(LeaseTerminalExport.decode(diagnosticLiteral()))
+			XCTAssertTrue(store.retain(outer))
+			XCTAssertTrue(store.retain(inner))
+			XCTAssertTrue(store.retain(outer))
+			let observation = store.observe()
+			XCTAssertEqual(observation.state, .observed)
+			XCTAssertEqual(observation.records, [inner, outer])
+			XCTAssertEqual(observation.retention, "historical")
+			XCTAssertEqual(observation.currentness, "unknown")
+			XCTAssertEqual(Set(try FileManager.default.contentsOfDirectory(atPath: directory.path)),
+				Set(["remap-lease-diagnostic-inner.json", "remap-lease-diagnostic-outer.json"]))
+			var metadata = stat()
+			XCTAssertEqual(Darwin.lstat(directory.appendingPathComponent("remap-lease-diagnostic-outer.json").path, &metadata), 0)
+			XCTAssertEqual(metadata.st_uid, geteuid())
+			XCTAssertEqual(metadata.st_mode & 0o7777, 0o600)
+			XCTAssertEqual(metadata.st_nlink, 1)
+		}
+	}
+
+	func testRetainedDiagnosticUnknownPIIFieldsNeverExport() throws {
+		try withDiagnosticDirectory { _, directory in
+			try createDiagnosticDirectory(directory)
+			let literal = #"{"schema":1,"role":"outer","boundary":"private-deadline","command":"heartbeat","cli":"none","stopping":false,"gateHeld":true,"deadlineArmed":true,"fence":"recovered","exit":"inner-failed","private":"/Users/synthetic/token=secret https://proxy.invalid"}"#
+			try putDiagnostic(directory, data: Data(literal.utf8))
+			let observation = RemapLeaseDiagnosticStore(testingDirectory: directory).observe()
+			XCTAssertEqual(observation.state, .unobserved)
+			XCTAssertTrue(observation.records.isEmpty)
+			let output = try XCTUnwrap(observation.encodedEnvelope())
+			XCTAssertFalse(String(decoding: output, as: UTF8.self).contains("synthetic"))
+			XCTAssertFalse(String(decoding: output, as: UTF8.self).contains("secret"))
+		}
+	}
+
+	func testRetainedDiagnosticWrongRoleFilenameRefused() throws {
+		try withDiagnosticDirectory { _, directory in
+			try createDiagnosticDirectory(directory)
+			try putDiagnostic(directory, data: diagnosticLiteral(.inner))
+			XCTAssertEqual(RemapLeaseDiagnosticStore(testingDirectory: directory).observe().state, .unobserved)
+		}
+	}
+
+	func testRetainedDiagnosticPublicRecordRefusedWithoutChmod() throws {
+		try withDiagnosticDirectory { _, directory in
+			try createDiagnosticDirectory(directory)
+			let file = try putDiagnostic(directory, data: diagnosticLiteral())
+			XCTAssertEqual(Darwin.chmod(file.path, 0o644), 0)
+			XCTAssertEqual(RemapLeaseDiagnosticStore(testingDirectory: directory).observe().state, .unobserved)
+			var metadata = stat()
+			XCTAssertEqual(Darwin.lstat(file.path, &metadata), 0)
+			XCTAssertEqual(metadata.st_mode & 0o7777, 0o644)
+		}
+	}
+
+	func testRetainedDiagnosticSymlinkRecordRefusedWithoutTargetMutation() throws {
+		try withDiagnosticDirectory { parent, directory in
+			try createDiagnosticDirectory(directory)
+			let target = parent.appendingPathComponent("target")
+			try diagnosticLiteral().write(to: target)
+			let file = directory.appendingPathComponent("remap-lease-diagnostic-outer.json")
+			XCTAssertEqual(Darwin.symlink(target.path, file.path), 0)
+			XCTAssertEqual(RemapLeaseDiagnosticStore(testingDirectory: directory).observe().state, .unobserved)
+			XCTAssertEqual(try Data(contentsOf: target), diagnosticLiteral())
+		}
+	}
+
+	func testRetainedDiagnosticHardlinkRecordRefusedWithoutMutation() throws {
+		try withDiagnosticDirectory { parent, directory in
+			try createDiagnosticDirectory(directory)
+			let file = try putDiagnostic(directory, data: diagnosticLiteral())
+			let alias = parent.appendingPathComponent("hardlink")
+			XCTAssertEqual(Darwin.link(file.path, alias.path), 0)
+			XCTAssertEqual(RemapLeaseDiagnosticStore(testingDirectory: directory).observe().state, .unobserved)
+			var metadata = stat()
+			XCTAssertEqual(Darwin.lstat(file.path, &metadata), 0)
+			XCTAssertEqual(metadata.st_nlink, 2)
+			XCTAssertEqual(try Data(contentsOf: alias), diagnosticLiteral())
+		}
+	}
+
+	func testRetainedDiagnosticFIFORefusedBeforeContentRead() throws {
+		try withDiagnosticDirectory { _, directory in
+			try createDiagnosticDirectory(directory)
+			let file = directory.appendingPathComponent("remap-lease-diagnostic-outer.json")
+			XCTAssertEqual(Darwin.mkfifo(file.path, 0o600), 0)
+			var reads = 0
+			let store = RemapLeaseDiagnosticStore(testingDirectory: directory, afterSingleRead: { _ in reads += 1 })
+			XCTAssertEqual(store.observe().state, .unobserved)
+			XCTAssertEqual(reads, 0)
+		}
+	}
+
+	func testRetainedDiagnosticOversizeRefusedBeforeContentRead() throws {
+		try withDiagnosticDirectory { _, directory in
+			try createDiagnosticDirectory(directory)
+			try putDiagnostic(directory, data: Data(repeating: 0x20, count: 513))
+			var reads = 0
+			let store = RemapLeaseDiagnosticStore(testingDirectory: directory, afterSingleRead: { _ in reads += 1 })
+			XCTAssertEqual(store.observe().state, .unobserved)
+			XCTAssertEqual(reads, 0)
+		}
+	}
+
+	func testRetainedDiagnosticFileReplacementAfterCapturedReadRefused() throws {
+		try withDiagnosticDirectory { parent, directory in
+			try createDiagnosticDirectory(directory)
+			let file = try putDiagnostic(directory, data: diagnosticLiteral())
+			var reads = 0
+			let store = RemapLeaseDiagnosticStore(testingDirectory: directory, afterSingleRead: { _ in
+				reads += 1
+				XCTAssertEqual(Darwin.rename(file.path, parent.appendingPathComponent("old-record").path), 0)
+				XCTAssertNoThrow(try self.putDiagnostic(directory, data: self.diagnosticLiteral()))
+			})
+			XCTAssertEqual(store.observe().state, .unobserved)
+			XCTAssertEqual(reads, 1)
+		}
+	}
+
+	func testRetainedDiagnosticDirectoryReplacementAfterCapturedReadRefused() throws {
+		try withDiagnosticDirectory { parent, directory in
+			try createDiagnosticDirectory(directory)
+			try putDiagnostic(directory, data: diagnosticLiteral())
+			var reads = 0
+			let store = RemapLeaseDiagnosticStore(testingDirectory: directory, afterSingleRead: { _ in
+				reads += 1
+				XCTAssertEqual(Darwin.rename(directory.path, parent.appendingPathComponent("old-directory").path), 0)
+				XCTAssertNoThrow(try self.createDiagnosticDirectory(directory))
+				XCTAssertNoThrow(try self.putDiagnostic(directory, data: self.diagnosticLiteral()))
+			})
+			XCTAssertEqual(store.observe().state, .unobserved)
+			XCTAssertEqual(reads, 1)
+		}
+	}
+
+	func testRetainedDiagnosticLateAncestorAliasRefused() throws {
+		try withDiagnosticDirectory { parent, directory in
+			try createDiagnosticDirectory(directory)
+			try putDiagnostic(directory, data: diagnosticLiteral())
+			let parked = parent.appendingPathComponent("old-directory")
+			var reads = 0
+			let store = RemapLeaseDiagnosticStore(testingDirectory: directory, afterSingleRead: { _ in
+				reads += 1
+				XCTAssertEqual(Darwin.rename(directory.path, parked.path), 0)
+				XCTAssertEqual(Darwin.symlink(parked.path, directory.path), 0)
+			})
+			XCTAssertEqual(store.observe().state, .unobserved)
+			XCTAssertEqual(reads, 1)
+		}
+	}
+
+	func testRetainedDiagnosticInitialDirectoryAliasRefused() throws {
+		try withDiagnosticDirectory { parent, directory in
+			let target = parent.appendingPathComponent("private-target")
+			try createDiagnosticDirectory(target)
+			try putDiagnostic(target, data: diagnosticLiteral())
+			XCTAssertEqual(Darwin.symlink(target.path, directory.path), 0)
+			XCTAssertEqual(RemapLeaseDiagnosticStore(testingDirectory: directory).observe().state, .unobserved)
+			XCTAssertEqual(try Data(contentsOf: target.appendingPathComponent("remap-lease-diagnostic-outer.json")), diagnosticLiteral())
+		}
+	}
+
+	func testRetainedDiagnosticWriterRefusesUnownedShapeWithoutMutation() throws {
+		try withDiagnosticDirectory { _, directory in
+			try createDiagnosticDirectory(directory)
+			let file = try putDiagnostic(directory, data: diagnosticLiteral())
+			XCTAssertEqual(Darwin.chmod(file.path, 0o644), 0)
+			let record = try XCTUnwrap(LeaseTerminalExport.decode(diagnosticLiteral(.inner)))
+			let outer = try XCTUnwrap(LeaseTerminalExport.decode(diagnosticLiteral()))
+			XCTAssertFalse(RemapLeaseDiagnosticStore(testingDirectory: directory).retain(outer))
+			XCTAssertEqual(try Data(contentsOf: file), diagnosticLiteral())
+			XCTAssertTrue(RemapLeaseDiagnosticStore(testingDirectory: directory).retain(record))
+		}
+	}
+
+	func testRetainedDiagnosticDispatcherRejectsPathOverrideBeforeBootstrap() {
+		XCTAssertTrue(KarabinerLeaseWorker.handles(arguments: ["launcher", "--remap-lease-diagnostic-snapshot"]))
+		XCTAssertEqual(KarabinerLeaseWorker.run(arguments: ["launcher", "--remap-lease-diagnostic-snapshot", "/Users/synthetic/private"]), LeaseWorkerExit.invalidArguments.rawValue)
+	}
+
+	func testRetainedDiagnosticEnvelopeClosedMetadataAndBound() throws {
+		let empty = LeaseDiagnosticEnvelope(state: .unobserved, records: [])
+		let data = try XCTUnwrap(empty.encodedEnvelope())
+		let object = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])
+		XCTAssertEqual(Set(object.keys), Set(["schema", "state", "retention", "currentness", "records"]))
+		XCTAssertEqual(object["state"] as? String, "unobserved")
+		XCTAssertEqual(object["retention"] as? String, "historical")
+		XCTAssertEqual(object["currentness"] as? String, "unknown")
+		XCTAssertLessThanOrEqual(data.count, 2048)
+		let outer = try XCTUnwrap(LeaseTerminalExport.decode(diagnosticLiteral()))
+		let inner = try XCTUnwrap(LeaseTerminalExport.decode(diagnosticLiteral(.inner)))
+		XCTAssertNil(LeaseDiagnosticEnvelope(state: .observed, records: []).encodedEnvelope())
+		XCTAssertNil(LeaseDiagnosticEnvelope(state: .unobserved, records: [outer]).encodedEnvelope())
+		XCTAssertNil(LeaseDiagnosticEnvelope(state: .observed, records: [outer, outer]).encodedEnvelope())
+		XCTAssertNil(LeaseDiagnosticEnvelope(state: .observed, records: [outer, inner]).encodedEnvelope())
+		XCTAssertNotNil(LeaseDiagnosticEnvelope(state: .observed, records: [inner, outer]).encodedEnvelope())
+	}
+}
+#endif
+
+#if ERGOPTI_GUARDIAN_TEST_SUPPORT
+extension KarabinerLeaseWorkerTests {
+	func testRetainedDiagnosticTrueParentAliasPreservingLeafInodesRefused() throws {
+		try withDiagnosticDirectory { parent, directory in
+			try createDiagnosticDirectory(directory)
+			let file = try putDiagnostic(directory, data: diagnosticLiteral())
+			let parked = parent.deletingLastPathComponent()
+				.appendingPathComponent(parent.lastPathComponent + "-parked", isDirectory: true)
+			defer { try? FileManager.default.removeItem(at: parked) }
+			var originalDirectory = stat(), originalRecord = stat()
+			XCTAssertEqual(Darwin.lstat(directory.path, &originalDirectory), 0)
+			XCTAssertEqual(Darwin.lstat(file.path, &originalRecord), 0)
+			var reads = 0
+			let store = RemapLeaseDiagnosticStore(testingDirectory: directory, afterSingleRead: { role in
+				XCTAssertEqual(role, .outer)
+				reads += 1
+				XCTAssertEqual(Darwin.rename(parent.path, parked.path), 0)
+				XCTAssertEqual(Darwin.symlink(parked.path, parent.path), 0)
+				var aliasedDirectory = stat(), aliasedRecord = stat(), alias = stat()
+				XCTAssertEqual(Darwin.lstat(parent.path, &alias), 0)
+				XCTAssertEqual(alias.st_mode & S_IFMT, S_IFLNK)
+				XCTAssertEqual(Darwin.lstat(directory.path, &aliasedDirectory), 0)
+				XCTAssertEqual(Darwin.lstat(file.path, &aliasedRecord), 0)
+				XCTAssertEqual(aliasedDirectory.st_dev, originalDirectory.st_dev)
+				XCTAssertEqual(aliasedDirectory.st_ino, originalDirectory.st_ino)
+				XCTAssertEqual(aliasedDirectory.st_mode, originalDirectory.st_mode)
+				XCTAssertEqual(aliasedRecord.st_dev, originalRecord.st_dev)
+				XCTAssertEqual(aliasedRecord.st_ino, originalRecord.st_ino)
+				XCTAssertEqual(aliasedRecord.st_mode, originalRecord.st_mode)
+				XCTAssertEqual(aliasedRecord.st_size, originalRecord.st_size)
+			})
+			let observation = store.observe()
+			XCTAssertEqual(reads, 1)
+			XCTAssertEqual(observation.state, .unobserved)
+			XCTAssertTrue(observation.records.isEmpty)
+		}
+	}
+}
+#endif

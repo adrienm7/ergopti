@@ -1638,6 +1638,7 @@ private func reportLeaseTerminalSnapshot(_ snapshot: LeaseTerminalSnapshot, fenc
 	guard let data = snapshot.exportableRecord(fenced: fenced, result: result).encodedRecord(),
 		let json = String(data: data, encoding: .utf8)
 	else { return }
+	_ = RemapLeaseDiagnosticStore().retain(snapshot.exportableRecord(fenced: fenced, result: result))
 	let message = "remap lease terminal record=" + json
 	guard message.utf8.count <= 512 else { return }
 	LauncherLog.write(message)
@@ -3084,6 +3085,8 @@ private func runPOSIXTestHelper(arguments: [String]) -> Int32 {
 #endif
 
 /// Dispatches validated headless roles from the signed launcher executable.
+private let kRemapLeaseDiagnosticSnapshotFlag = "--remap-lease-diagnostic-snapshot"
+
 enum KarabinerLeaseWorker {
 	/// Detects every headless role before any NSApplication side effect.
 	/// - Parameter arguments: Complete process argv.
@@ -3097,7 +3100,8 @@ enum KarabinerLeaseWorker {
 			return true
 		}
 		#endif
-		return arguments[1] == kKarabinerLeaseWorkerFlag
+		return arguments[1] == kRemapLeaseDiagnosticSnapshotFlag
+			|| arguments[1] == kKarabinerLeaseWorkerFlag
 			|| arguments[1] == kKarabinerLeaseRevokeFlag
 			|| arguments[1] == kKarabinerLeaseInnerFlag
 			|| arguments[1] == kKarabinerLeaseGuardianFlag
@@ -3112,6 +3116,15 @@ enum KarabinerLeaseWorker {
 	/// - Returns: Stable process exit status.
 	static func run(arguments: [String]) -> Int32 {
 		guard arguments.count > 1 else { return LeaseWorkerExit.invalidArguments.rawValue }
+		// Passive retained history is read before lease reaping, signal policy, or bootstrap.
+		if arguments[1] == kRemapLeaseDiagnosticSnapshotFlag {
+			guard arguments.count == 2 else { return LeaseWorkerExit.invalidArguments.rawValue }
+			guard let data = RemapLeaseDiagnosticStore().observe().encodedEnvelope() else {
+				return LeaseWorkerExit.innerFailed.rawValue
+			}
+			let written = data.withUnsafeBytes { Darwin.write(STDOUT_FILENO, $0.baseAddress!, $0.count) }
+			return written == data.count ? LeaseWorkerExit.success.rawValue : LeaseWorkerExit.innerFailed.rawValue
+		}
 		// Ignored SIGCHLD and SA_NOCLDWAIT survive exec and would auto-reap the
 		// exact child whose unreaped PID proves private-group ownership
 		prepareLeaseChildReaping()

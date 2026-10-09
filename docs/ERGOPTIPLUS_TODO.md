@@ -3132,6 +3132,14 @@ Windows PC acceptance, delegated to the maintainer:
   seventeen additive controls require exact-source native execution. The first
   tap-hold exit73 cause and physical recovery remain unqualified. Item24 stays
   partial; no permission, fencing or liveness protection is relaxed.
+
+  A passive signed-launcher reader now exposes at most two private retained
+  role records as historical observations, with currentness explicitly unknown.
+  It accepts no path override and performs no log read, directory creation,
+  permission change, profile or lease operation. Strict metadata and namespace
+  cuts reject aliases and changed records; seventeen additive native filesystem
+  controls require exact-source macOS execution. This diagnostic does not fix
+  the first tap-hold exit73 or complete item24.
   Native permission UI qualification is now registered in the Swift target:
   ten frozen cases require actual WebKit DOM/bridge callbacks, visible native
   window identities, retirement, deferred log purge and scheduler cleanup.
