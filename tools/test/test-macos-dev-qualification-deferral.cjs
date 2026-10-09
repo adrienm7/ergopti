@@ -229,7 +229,29 @@ function admitItem36Selector(mac) {
 	)
 		return null;
 	const position = jobs[0].index + steps[0].index + step.indexOf(ITEM36_FILTER);
-	return mac.slice(0, position) + mac.slice(position + ITEM36_FILTER.length);
+	return admitPermissionObservationSelector(
+		mac.slice(0, position) + mac.slice(position + ITEM36_FILTER.length)
+	);
+}
+
+// Only the independent no-prompt permission metadata case can use this selector.
+const PERMISSION_FILTER =
+	"--filter 'OwnedAutomationQueryWorkerTests.testActualNoPromptPermissionAPIOnlyPublishesRetiredMetadata'";
+const PERMISSION_STEP_SOURCE =
+	'      - name: Observe the actual no-prompt SDK permission API independently\n        if: ${{ !cancelled() }}\n        shell: bash\n        env:\n          SWIFT_BACKTRACE: enable=yes\n        run: |\n          set -euo pipefail\n          node tools/test/test-macos-swift-launcher-ci.cjs\n          evidence="$RUNNER_TEMP/swift-launcher-evidence"\n          transcript="$evidence/sdk-permission-xctest.log"\n          source_receipt="$evidence/sdk-permission-source.json"\n          node tools/diagnostics/sdk_permission_xctest_evidence.cjs begin "$GITHUB_SHA" "$source_receipt"\n          set +e\n          script -q /dev/null swift test --package-path static/ergopti_plus/macos/launcher \\\n            --scratch-path "$RUNNER_TEMP/swift-launcher-ci" \\\n            --filter \'OwnedAutomationQueryWorkerTests.testActualNoPromptPermissionAPIOnlyPublishesRetiredMetadata\' 2>&1 | tee "$transcript"\n          sdk_statuses=("${PIPESTATUS[@]}")\n          set -e\n          node tools/diagnostics/sdk_permission_xctest_evidence.cjs judge "$transcript" "${sdk_statuses[0]}" "${sdk_statuses[1]}" "$GITHUB_SHA" "$source_receipt" "$evidence/sdk-permission-verdict.json"\n        timeout-minutes: 3\n';
+function admitPermissionObservationSelector(mac) {
+	const jobs = [...mac.matchAll(/^  item36-native:\n[\s\S]*?(?=^  [A-Za-z][\w-]*:|(?![\s\S]))/gm)];
+	if (jobs.length !== 1 || mac.split(PERMISSION_FILTER).length !== 2) return null;
+	const job = jobs[0][0];
+	if (job.split(PERMISSION_STEP_SOURCE).length !== 2) return null;
+	const archive = job.indexOf(
+		'      - name: Qualify scoped item 36 native archive XCTest controls\n'
+	);
+	const observation = job.indexOf(PERMISSION_STEP_SOURCE);
+	const retention = job.indexOf('      - name: Retain scoped item 36 native diagnostics\n');
+	if (archive < 0 || archive >= observation || retention <= observation) return null;
+	const position = jobs[0].index + observation + PERMISSION_STEP_SOURCE.indexOf(PERMISSION_FILTER);
+	return mac.slice(0, position) + mac.slice(position + PERMISSION_FILTER.length);
 }
 
 function sourceProblems(pkg, mac, rootCaller) {

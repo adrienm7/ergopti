@@ -13,6 +13,7 @@ local helpers = require("tests.helpers")
 --- @param available boolean Whether the recording menu commits.
 --- @return boolean ok
 --- @return table facts
+--- @return nil|string result The actual chunk return or fatal startup diagnostic.
 local function startup_slice(available)
 	local source = helpers.read_driver_source("local function has_common_hotstring_groups")
 	helpers.assert_type(source, "string")
@@ -39,22 +40,25 @@ local function startup_slice(available)
 	}
 	setmetatable(env, { __index = _G })
 	local chunk = assert(load(slice, "@owned-menu-startup-slice", "t", env))
-	local ok = pcall(chunk)
-	return ok, facts
+	local ok, result = pcall(chunk)
+	return ok, facts, result
 end
 
 helpers.describe("startup without retired VS Code bridge", function()
 	helpers.it("commits normal menu readiness with zero bridge activation", function()
-		local ok, facts = startup_slice(true)
+		local ok, facts, result = startup_slice(true)
 		helpers.assert_true(ok, "the existing UI can progress without the retired feature")
+		helpers.assert_eq(result, nil, "committed menu startup returns no domain value")
 		helpers.assert_eq(facts.menu_calls, 1)
 		helpers.assert_eq(facts.bridge_calls, 0)
 		helpers.assert_eq(facts.marks[#facts.marks], "UI: menu ready")
 		helpers.assert_eq(facts.stages[#facts.stages], "File watchers armed")
 	end)
 	helpers.it("still refuses UI readiness when the actual menu does not commit", function()
-		local ok, facts = startup_slice(false)
+		local ok, facts, result = startup_slice(false)
 		helpers.assert_eq(ok, false)
+		helpers.assert_type(result, "string")
+		helpers.assert_eq(result:match(": ([^\n]+)$"), "menu.start did not commit")
 		helpers.assert_eq(facts.menu_calls, 1)
 		helpers.assert_eq(facts.bridge_calls, 0)
 		helpers.assert_eq(#facts.marks, 0)

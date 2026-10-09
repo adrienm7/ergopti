@@ -1277,3 +1277,569 @@ helpers.describe("consumed source withdrawal exact native inverse settlement (co
 	end)
 
 end)
+
+
+helpers.describe("same-device third slot through original production consumers (controlled transport)",function()
+	local Fixture = require("tests.support.input_owner_fixture")
+	local function source(extra)
+		return '[mod_combos]\nsimultaneous_threshold_ms = 100\nsymmetric = true\n[mod_combos.config.tab_then_caps_lock]\ncombo = "copy"\n' .. (extra or "")
+	end
+	local function with_chord(options,body)
+		options=options or {}
+		local before=options.before_manager
+		options.before_manager=function(s) s.bytes=source(); if before then before(s) end end
+		Fixture.with_manager_session(options,function(s) s.rows={}; body(s) end)
+	end
+	local function native_rows(s)
+		local out={}; for _, row in ipairs(s.rows) do out[#out+1]=row[1]..":"..row[2] end
+		return table.concat(out," ")
+	end
+	for _,order in ipairs({{58,15},{15,58}}) do
+		helpers.it("consumes both original presses symmetrically "..order[1],function()
+			with_chord({},function(s)
+				s.edge("a",order[1],1,1000)
+				helpers.assert_eq(native_rows(s),"","first owns no premature standalone output")
+				s.edge("a",order[2],1,1010)
+				helpers.assert_eq(s.actions,{{"copy","combination__tab_then_caps_lock"}})
+				s.edge("a",order[1],2,1011); s.edge("a",order[2],2,1012)
+				s.edge("a",order[1],0,1020); s.edge("a",order[2],0,1021)
+				helpers.assert_eq(native_rows(s),""); helpers.assert_eq(#s.actions,1)
+			end)
+		end)
+	end
+	helpers.it("admits equality at the positive delay without an early tick",function()
+		with_chord({},function(s)
+			s.edge("a",58,1,1000); s.edge("a",15,1,1100)
+			helpers.assert_eq(s.actions,{{"copy","combination__tab_then_caps_lock"}})
+			s.edge("a",58,0,1101);s.edge("a",15,0,1102)
+			helpers.assert_eq(native_rows(s),"")
+		end)
+	end)
+	helpers.it("replays the original first hold before an expired native second",function()
+		with_chord({},function(s)
+			s.edge("a",58,1,1000);s.edge("a",15,1,1101)
+			helpers.assert_eq(s.actions,{})
+			helpers.assert_eq(native_rows(s),"29:1 15:1")
+			s.edge("a",15,0,1102);s.edge("a",58,0,1103)
+			helpers.assert_eq(native_rows(s),"29:1 15:1 15:0 29:0")
+		end)
+	end)
+	helpers.it("resolves a foreign keyboard in original native output order",function()
+		with_chord({},function(s)
+			s.edge("a",58,1,1000);s.edge("b",30,1,1010)
+			helpers.assert_eq(s.actions,{});helpers.assert_eq(native_rows(s),"29:1 30:1")
+			s.edge("b",30,0,1011);s.edge("a",58,0,1012)
+			helpers.assert_eq(native_rows(s),"29:1 30:1 30:0 29:0")
+		end)
+	end)
+	helpers.it("withdraws a pending original press on canonical third-slot change",function()
+		with_chord({},function(s)
+			s.edge("a",58,1,1000);helpers.assert_eq(native_rows(s),"")
+			s.bytes=source():gsub('combo = "copy"','combo = "paste"')
+			s.edge("a",15,1,1010)
+			helpers.assert_eq(s.actions,{})
+			helpers.assert_eq(native_rows(s):find("29:1",1,true),nil,"revoked first never reacquires standalone Ctrl")
+			s.edge("a",58,0,1011);s.edge("a",15,0,1012)
+		end)
+	end)
+	helpers.it("cannot mint pending rights outside original dispatch or from a caller table",function()
+		with_chord({},function(s)
+			helpers.assert_eq(s.hook.capture_buffered_input(s.engine,58,1000),nil)
+			helpers.assert_eq(s.hook.buffered_input_current({},true),false)
+			s.edge("a",58,1,1000);helpers.assert_eq(native_rows(s),"")
+			s.edge("a",15,1,1010);helpers.assert_eq(#s.actions,1)
+			s.edge("a",15,0,1011);s.edge("a",58,0,1012)
+		end)
+	end)
+	for _,change in ipairs({
+		{ name="missing delay", apply=function(text) return text:gsub("simultaneous_threshold_ms = 100\n","") end },
+		{ name="missing symmetry", apply=function(text) return text:gsub("symmetric = true\n","") end },
+		{ name="zero delay", apply=function(text) return text:gsub("simultaneous_threshold_ms = 100","simultaneous_threshold_ms = 0") end },
+		{ name="mistyped symmetry", apply=function(text) return text:gsub("symmetric = true",'symmetric = "true"') end },
+		{ name="unissued leaf", apply=function(text) return text:gsub('combo = "copy"','unknown = "copy"') end },
+		{ name="disabled third slots", apply=function(text) return text:gsub("%[mod_combos%]","[mod_combos]\nenabled = false") end },
+	}) do
+		helpers.it("preserves immediate ordered behavior for "..change.name,function()
+			with_chord({before_manager=function(s) s.bytes=change.apply(s.bytes) end},function(s)
+				s.edge("a",58,1,1000)
+				helpers.assert_eq(native_rows(s),"29:1","unissued third slot never delays original hold")
+				s.edge("a",58,0,1200); helpers.assert_eq(s.actions,{})
+			end)
+		end)
+	end
+	for _,order in ipairs({{15,58},{58,15}}) do
+		helpers.it("retains explicit asymmetric order "..order[1],function()
+			with_chord({before_manager=function(s) s.bytes=s.bytes:gsub("symmetric = true","symmetric = false") end},function(s)
+				s.edge("a",order[1],1,1000);s.edge("a",order[2],1,1010)
+				helpers.assert_eq(#s.actions,order[1]==15 and 1 or 0)
+				s.edge("a",order[2],0,1011);s.edge("a",order[1],0,1012)
+			end)
+		end)
+	end
+	helpers.it("replays a quick original release after its standalone first hold",function()
+		with_chord({},function(s)
+			s.edge("a",58,1,1000);s.edge("a",58,0,1050)
+			helpers.assert_eq(s.actions,{})
+			helpers.assert_eq(native_rows(s),"29:1 29:0 28:1 28:0")
+		end)
+	end)
+	helpers.it("does not steal a matching second from a different original device",function()
+		with_chord({},function(s)
+			s.edge("a",58,1,1000);s.edge("b",15,1,1010)
+			helpers.assert_eq(s.actions,{});helpers.assert_eq(native_rows(s),"29:1 15:1")
+			s.edge("b",15,0,1011);s.edge("a",58,0,1200)
+			helpers.assert_eq(native_rows(s),"29:1 15:1 15:0 29:0")
+		end)
+	end)
+	for _,field in ipairs({"symmetric", "simultaneous_threshold_ms"}) do
+		helpers.it("revokes the retained third-slot source when "..field.." changes",function()
+			with_chord({},function(s)
+				s.edge("a",58,1,1000)
+				s.bytes=field=="symmetric" and s.bytes:gsub("symmetric = true","symmetric = false")
+					or s.bytes:gsub("simultaneous_threshold_ms = 100","simultaneous_threshold_ms = 101")
+				s.edge("a",15,1,1010);helpers.assert_eq(s.actions,{})
+				helpers.assert_eq(native_rows(s):find("29:1",1,true),nil)
+				s.edge("a",15,0,1011);s.edge("a",58,0,1012)
+			end)
+		end)
+	end
+	helpers.it("retains pending physical lifetimes across acknowledged pause",function()
+		with_chord({},function(s)
+			s.edge("a",58,1,1000);helpers.assert_true(s.manager.set_paused(true))
+			s.edge("a",58,0,1010);helpers.assert_eq(native_rows(s),"")
+			helpers.assert_eq(s.actions,{})
+		end)
+	end)
+	helpers.it("never matches after original evdev backlog loss",function()
+		with_chord({},function(s)
+			s.edge("a",58,1,1000);s.event("a",0,3,0,1001)
+			s.edge("a",15,1,1010);helpers.assert_eq(s.actions,{})
+			helpers.assert_eq(native_rows(s):find("29:1",1,true),nil)
+			s.hook.stop();helpers.assert_true(s.hook.set_remapper(nil))
+		end)
+	end)
+	helpers.it("prevents a source callback from borrowing the live capture role",function()
+		local options={}
+		options.on_guard=function(s)
+			if s.engine then
+				s.borrowed=s.hook.capture_buffered_input(s.engine,58,1000) or s.borrowed
+			end
+		end
+		with_chord(options,function(s)
+			s.edge("a",58,1,1000);helpers.assert_eq(s.borrowed,nil)
+			s.edge("a",15,1,1010);helpers.assert_eq(#s.actions,1)
+			s.edge("a",15,0,1011);s.edge("a",58,0,1012)
+		end)
+	end)
+
+	helpers.it("refuses a caller-normalized table even on an original installed Pair issuer",function()
+		with_chord({},function(s)
+			local Engine=require("platform.remap.tap_hold_engine")
+			local Pair=require("platform.remap.key_combination_engine")
+			local config={keys={"tab","caps_lock"},taps={},holds={},thresholds={tab=100,caps_lock=100},enabled=true,revision=0,
+				chords={tab_then_caps_lock="copy"},chord_settings={simultaneous_threshold_ms=100,combo_symmetric=true},
+				capture=function()return function()return true end end,capture_action=function()return function()return true end end,
+				capture_chord=function()return function()return true end end}
+			helpers.assert_eq(require("modules.shortcuts.key_combinations").buffered_settings_current(config),false)
+			local base=Engine.new({keys={caps_lock={tap_action="enter",hold_modifier="ctrl",time_activation_seconds=.3}},tap_min_ms=0,one_shot_timeout_ms=1000})
+			local extra=Pair.new(base,config,{capture_buffered_input=s.hook.capture_buffered_input,
+				buffered_input_current=s.hook.buffered_input_current,buffered_input_view=s.hook.buffered_input_view})
+			helpers.assert_true(s.hook.set_remapper(extra,function(action)s.actions[#s.actions+1]={action}end))
+			s.edge("a",58,1,1000)
+			helpers.assert_eq(native_rows(s),"29:1","caller timing/source booleans confer no delayed physical intake")
+			s.edge("a",58,0,1200);helpers.assert_eq(s.actions,{})
+		end)
+	end)
+	helpers.it("retires a source-callback reentrant process without a stale pending owner",function()
+		local options={}
+		options.on_guard=function(s)
+			if s.engine and s.revoking then
+				s.revoking=false
+				s.reentrant=s.engine:process(30,1,1001,{source="foreign",physical=true,ready=true,generation=1})
+			end
+		end
+		with_chord(options,function(s)
+			s.revoking=true;s.edge("a",58,1,1000)
+			helpers.assert_eq(s.actions,{});helpers.assert_eq(native_rows(s),"")
+			s.edge("a",15,1,1010);helpers.assert_eq(s.actions,{})
+			s.edge("a",15,0,1011);s.edge("a",58,0,1012)
+		end)
+	end)
+	helpers.it("does not replay a foreign key after an acknowledged first-row callback revokes source",function()
+		local options={}
+		options.after_sync=function(s,code,value)
+			if code==29 and value==1 then options.after_sync=nil;s.bytes=source():gsub('combo = "copy"','combo = "paste"') end
+		end
+		with_chord(options,function(s)
+			s.edge("a",58,1,1000);s.edge("b",30,1,1010)
+			helpers.assert_eq(s.actions,{})
+			helpers.assert_eq(native_rows(s):find("30:1",1,true),nil,"unacknowledged buffered frame cannot release incoming replay")
+			s.hook.stop();helpers.assert_true(s.hook.set_remapper(nil))
+			helpers.assert_eq(native_rows(s),"29:1 29:0","same original holder retires its acknowledged DOWN")
+		end)
+	end)
+	helpers.it("retains original retirement when first-row native SYN refuses",function()
+		local options={fail_sync=function(_,code,value)return code==29 and value==1 end}
+		with_chord(options,function(s)
+			s.edge("a",58,1,1000);s.edge("b",30,1,1010)
+			helpers.assert_eq(s.actions,{})
+			helpers.assert_eq(native_rows(s):find("30:1",1,true),nil)
+			options.fail_sync=nil
+			s.hook.stop();helpers.assert_true(s.hook.set_remapper(nil))
+			helpers.assert_true(s.broker.output_retired(),"Only original native output retirement can settle the refused SYN")
+			helpers.assert_true(s.broker.has_debt(),"Retirement does not erase the recorded failed commit")
+		end)
+	end)
+	helpers.it("does not retire a replacement original Reader lease after pending source reuse",function()
+		with_chord({recycle_descriptor=true},function(s)
+			s.edge("a",58,1,1000)
+			local slot="keyboard:"..s.paths.a
+			local old=assert(s.reader.capture_source_owner(slot));helpers.assert_true(s.reader.close(slot))
+			helpers.assert_true(s.reader.open(s.paths.a,slot));helpers.assert_true(s.reader.grab(slot))
+			local fresh=assert(s.reader.capture_source_owner(slot))
+			s.edge("a",15,1,1010);helpers.assert_eq(s.actions,{})
+			helpers.assert_eq(native_rows(s):find("29:1",1,true),nil)
+			s.hook.stop();helpers.assert_true(s.hook.set_remapper(nil))
+			helpers.assert_true(s.reader.source_owner_current(fresh))
+			helpers.assert_true(s.reader.retire_source(old));helpers.assert_true(s.reader.source_owner_current(fresh))
+			helpers.assert_true(s.reader.retire_source(fresh))
+		end)
+	end)
+
+end)
+
+helpers.describe("acknowledged buffered Reader cohort replacement (controlled transport)",function()
+	helpers.it("closes newly Hook-owned readers after remove and successful re-add",function()
+		local Fixture=require("tests.support.input_owner_fixture")
+		Fixture.with_manager_session({before_manager=function(s)
+			s.bytes='[mod_combos]\nsimultaneous_threshold_ms = 100\nsymmetric = true\n[mod_combos.config.tab_then_caps_lock]\ncombo = "copy"\n'
+		end},function(s)
+			s.edge("a",58,1,1000);s.edge("a",15,1,1010)
+			s.edge("a",58,0,1020);s.edge("a",15,0,1021)
+			local finder=require("modules.hotstrings.device_finder")
+			local slot="keyboard:"..s.paths.a
+			local first=assert(s.reader.capture_source_owner(slot))
+			local function reconcile()
+				local result
+				for _=1,s.hook.DEVICE_CHECK_TICKS do result=s.hook.check_device() end
+				return result
+			end
+			finder.find_devices=function()return {s.paths.b},{} end
+			helpers.assert_true(reconcile(),"legitimate removal publishes")
+			helpers.assert_eq(s.reader.source_owner_current(first),false)
+			finder.find_devices=function()return {s.paths.a,s.paths.b},{} end
+			helpers.assert_true(reconcile(),"legitimate re-add publishes")
+			local fresh=assert(s.reader.capture_source_owner(slot))
+			helpers.assert_true(s.reader.source_owner_current(fresh))
+			helpers.assert_true(s.hook.isRunning())
+			s.hook.stop()
+			local current,opened=s.reader.source_owner_current(fresh),s.reader.is_open(slot)
+			-- Cleanup only this controlled probe's captured original lease after
+			-- observing the product Stop; it cannot make those observations pass.
+			s.reader.retire_source(fresh)
+			helpers.assert_eq(current,false,"Stop retires newly Hook-owned published reader")
+			helpers.assert_eq(opened,false,"No reconciled reader remains open")
+		end)
+	end)
+end)
+
+helpers.describe("generated Linux defaults received by original native combination constructors (controlled transport)",function()
+ local Fixture=require("tests.support.input_owner_fixture")
+ local function with_public(options,body)
+  options=options or {};options.public_chords=true
+  local before=options.before_manager
+  options.before_manager=function(s)
+   s.bytes='[mod_combos.config.tab_then_caps_lock]\ncombo="copy"\n'
+   if before then before(s) end
+  end
+  Fixture.with_manager_session(options,function(s) s.rows={};body(s) end)
+ end
+ helpers.it("receives the declared sparse100ms/asymmetric source at the inclusive boundary",function()
+  with_public({},function(s)
+   helpers.assert_eq(s.owner.chord_settings(),{simultaneous_threshold_ms=100,combo_symmetric=false})
+   s.edge("a",15,1,1000);helpers.assert_eq(s.rows,{})
+   s.edge("a",58,1,1100)
+   helpers.assert_eq(s.actions,{{"copy","combination__tab_then_caps_lock"}})
+   s.edge("a",15,0,1101);s.edge("a",58,0,1102)
+   helpers.assert_eq(s.rows,{});helpers.assert_eq(#s.actions,1)
+  end)
+ end)
+ helpers.it("does not borrow symmetric behavior from the Mac timing defaults",function()
+  with_public({},function(s)
+   s.edge("a",58,1,1000);s.edge("a",15,1,1010)
+   helpers.assert_eq(s.actions,{})
+   s.edge("a",15,0,1100);s.edge("a",58,0,1101)
+  end)
+ end)
+ helpers.it("declaration alone and allNone slots create no pending first-press custody",function()
+  with_public({before_manager=function(s) s.bytes="" end},function(s)
+   helpers.assert_eq(s.owner.get_chord("tab_then_caps_lock"),"none")
+   s.edge("a",58,1,1000)
+   helpers.assert_eq(s.rows[1],{29,1},"ordinary first hold remains immediate without an assigned chord")
+   helpers.assert_eq(s.actions,{})
+   s.edge("a",58,0,1100)
+  end)
+ end)
+ for _,field in ipairs({"default_for","find_entry_by_path"}) do
+  helpers.it("retires pending input after replaced declared getter "..field,function()
+   with_public({},function(s)
+    local features=require("infra.manifest_reader");local original=features[field]
+    s.edge("a",15,1,1000);helpers.assert_eq(s.rows,{})
+    features[field]=function(...) return original(...) end
+    local called,detail=pcall(function()
+     s.edge("a",58,1,1010);helpers.assert_eq(s.actions,{})
+     helpers.assert_eq(s.owner.capture_runtime(),nil,"a replacement public getter is not declaration currency")
+     s.edge("a",58,0,1100);s.edge("a",15,0,1101)
+    end)
+    features[field]=original
+    if not called then error(detail,0) end
+   end)
+  end)
+ end
+ helpers.it("retires pending input after mutation of the original declared default map",function()
+  with_public({},function(s)
+   local features=require("infra.manifest_reader")
+   local entry=features.find_entry_by_path("mod_combos.simultaneous_threshold_ms");local previous=entry.default
+   s.edge("a",15,1,1000);helpers.assert_eq(s.rows,{})
+   entry.default=101
+   local called,detail=pcall(function()
+    s.edge("a",58,1,1010);helpers.assert_eq(s.actions,{})
+    helpers.assert_eq(s.owner.capture_runtime(),nil)
+    s.edge("a",58,0,1100);s.edge("a",15,0,1101)
+   end)
+   entry.default=previous
+   if not called then error(detail,0) end
+  end)
+ end)
+ for _,text in ipairs({'[mod_combos]\nsymmetric="false"\n[mod_combos.config.tab_then_caps_lock]\ncombo="copy"\n',
+  '[mod_combos]\nconfig=[]\n','mod_combos="occupied"\n','[mod_combos]\nsimultaneous_threshold_ms=0\n[mod_combos.config.tab_then_caps_lock]\ncombo="copy"\n'}) do
+  helpers.it("never normalizes a malformed namespace or setting into delayed authority",function()
+   with_public({before_manager=function(s) s.bytes=text end},function(s)
+    s.edge("a",58,1,1000);helpers.assert_eq(s.rows[1],{29,1})
+    helpers.assert_eq(s.actions,{})
+    s.edge("a",58,0,1100)
+   end)
+  end)
+ end
+end)
+
+
+helpers.describe("original managed saved configuration enrollment (controlled transport)",function()
+ local Fixture=require("tests.support.input_owner_fixture")
+ local function public(body,options)
+  options=options or {};options.public_chords=true
+  options.before_manager=function(s)
+   s.bytes='[mod_combos.config.tab_then_caps_lock]\ncombo="copy"\n'
+  end
+  Fixture.with_manager_session(options,function(s) s.rows={};body(s) end)
+ end
+ local function detach(s,configured)
+  local Base=require("platform.remap.tap_hold_engine")
+  local Pair=require("platform.remap.key_combination_engine")
+  local base=Base.new({keys={tab={tap_action="enter",hold_modifier="ctrl",time_activation_seconds=.3}},
+   tap_min_ms=0,one_shot_timeout_ms=1000})
+  local received={}
+  local pair=Pair.new(base,configured,{capture_buffered_input=s.hook.capture_buffered_input,
+   buffered_input_current=s.hook.buffered_input_current,buffered_input_view=s.hook.buffered_input_view,
+   retire_buffered_input=s.hook.retire_buffered_input})
+  helpers.assert_true(s.hook.set_remapper(pair,function(action) received[#received+1]=action;return true end))
+  s.rows={};s.edge("a",15,1,1000)
+  local pending=#s.rows==0
+  s.edge("a",58,1,1010)
+  s.edge("a",58,0,1011);s.edge("a",15,0,1012)
+  helpers.assert_true(s.hook.set_remapper(nil))
+  helpers.assert_true(s.broker.output_current())
+  helpers.assert_eq(next(s.broker.view().owners),nil,"exact original output holders retired")
+  helpers.assert_eq(pending,false,"detached options have no first-press custody")
+  helpers.assert_eq(received,{},"caller selected action policy cannot dispatch a saved chord")
+ end
+ helpers.it("rejects an invented catalogue through the real saved route and original Hook",function()
+  public(function(s)
+   s.bytes='[mod_combos.config.tab_then_caps_lock]\ncombo="private_unlisted"\n'
+   local Source=require("modules.shortcuts.key_combinations")
+   local Catalogue=require("_generated.action_catalogue")
+   helpers.assert_eq(Catalogue.actions.private_unlisted,nil)
+   local caller=Source.new({keys={{id="tab",key="tab"},{id="caps_lock",key="caps_lock"}},
+    hold_picker={modifiers={"ctrl"},layers={}},is_paused=function()return false end,
+    changed=function()return true end,actions={is_assignable=function()return true end}})
+   helpers.assert_eq(caller.get_chord("tab_then_caps_lock"),"private_unlisted")
+   local configured=caller.engine_options({tab=300,caps_lock=300})
+   helpers.assert_eq(Source.buffered_settings_current(configured),false)
+   detach(s,configured)
+  end)
+ end)
+ helpers.it("rejects invented physical key identifiers with an otherwise real catalogue action",function()
+  public(function(s)
+   s.bytes='[mod_combos.config.foreign_a_then_foreign_b]\ncombo="copy"\n'
+   local Source=require("modules.shortcuts.key_combinations")
+   local caller=Source.new({keys={{id="foreign_a",key="foreign_a"},{id="foreign_b",key="foreign_b"}},
+    hold_picker={modifiers={"ctrl"},layers={}},is_paused=function()return false end,
+    changed=function()return true end,actions={is_assignable=function(action)return action=="copy" end}})
+   helpers.assert_eq(caller.get_chord("foreign_a_then_foreign_b"),"copy")
+   helpers.assert_eq(Source.buffered_settings_current(caller.engine_options({foreign_a=300,foreign_b=300})),false)
+  end)
+ end)
+ helpers.it("does not enroll a fresh options object requested directly from the actual installed owner",function()
+  public(function(s)
+   local Source=require("modules.shortcuts.key_combinations")
+   local thresholds={}
+   for _,row in ipairs(s.manager.configuration_snapshot().loaded.catalog) do thresholds[row.id]=300 end
+   local configured=s.owner.engine_options(thresholds)
+   helpers.assert_eq(s.manager.managed_pair_options_current(s.owner,configured),false)
+   helpers.assert_eq(Source.buffered_settings_current(configured),false)
+   detach(s,configured)
+  end)
+ end)
+ local function mutate_during_pending(s,change,restore)
+  s.edge("a",15,1,1000);helpers.assert_eq(s.rows,{})
+  change()
+  local ok,err=pcall(function()
+   s.edge("a",58,1,1010)
+   helpers.assert_eq(s.actions,{},"changed constructor/catalogue has no late action authority")
+   s.edge("a",58,0,1011);s.edge("a",15,0,1012)
+   helpers.assert_true(s.hook.set_remapper(nil))
+   helpers.assert_true(s.broker.output_current())
+   helpers.assert_eq(next(s.broker.view().owners),nil)
+  end)
+  restore()
+  if not ok then error(err,0) end
+ end
+ for _,spec in ipairs({{"modules.shortcuts.key_combinations","new"},
+  {"platform.remap.tap_hold_engine","new"},{"platform.remap.key_combination_engine","new"},
+  {"platform.remap.tap_hold_loader","load"},{"platform.remap.tap_hold_loader","load_document"}}) do
+  helpers.it("retires pending custody after original constructor replacement "..spec[1].."."..spec[2],function()
+   public(function(s)
+    local module=require(spec[1]);local original=module[spec[2]]
+    mutate_during_pending(s,function()module[spec[2]]=function(...)return original(...)end end,
+     function()module[spec[2]]=original end)
+   end)
+  end)
+ end
+ helpers.it("retires pending custody after the live generated catalogue is changed",function()
+  public(function(s)
+   local catalogue=require("_generated.action_catalogue");local previous=catalogue.actions.copy
+   mutate_during_pending(s,function()catalogue.actions.copy=nil end,function()catalogue.actions.copy=previous end)
+  end)
+ end)
+ helpers.it("retires pending custody after the original source getter is replaced",function()
+  public(function(s)
+   local original=s.owner.engine_options
+   mutate_during_pending(s,function()s.owner.engine_options=function(...)return original(...)end end,
+    function()s.owner.engine_options=original end)
+  end)
+ end)
+ helpers.it("refuses a replaced Manager observer even when it returns a positive Boolean",function()
+  public(function(s)
+   local original=s.manager.managed_pair_options_current
+   mutate_during_pending(s,function()s.manager.managed_pair_options_current=function()return true end end,
+    function()s.manager.managed_pair_options_current=original end)
+  end)
+ end)
+ helpers.it("rechecks the exact installed generation after the canonical source callback pauses the owner",function()
+  local options={}
+  options.on_guard=function(s)
+   if s.revoke then s.revoke=false;helpers.assert_true(s.manager.set_paused(true)) end
+  end
+  public(function(s)
+   s.edge("a",15,1,1000);helpers.assert_eq(s.rows,{})
+   s.revoke=true;s.edge("a",58,1,1010)
+   helpers.assert_eq(s.actions,{})
+   helpers.assert_true(s.broker.output_current())
+   helpers.assert_eq(next(s.broker.view().owners),nil)
+   helpers.assert_eq(s.manager.is_active(),false,"callback-revoked installation remains paused")
+   s.edge("a",58,0,1011);s.edge("a",15,0,1012)
+   helpers.assert_true(s.hook.set_remapper(nil))
+  end,options)
+ end)
+ helpers.it("checks the original loaded physical catalogue after external source callbacks",function()
+  local options={}
+  options.on_guard=function(s)
+   if s.revoke then s.revoke=false;s.snapshot.loaded.catalog[1].id="foreign_key" end
+  end
+  public(function(s)
+   s.snapshot=s.manager.configuration_snapshot()
+   local original=s.snapshot.loaded.catalog[1].id
+   s.edge("a",15,1,1000);helpers.assert_eq(s.rows,{})
+   s.revoke=true
+   local ok,err=pcall(function()
+    s.edge("a",58,1,1010);helpers.assert_eq(s.actions,{})
+    s.edge("a",58,0,1011);s.edge("a",15,0,1012)
+    helpers.assert_true(s.hook.set_remapper(nil))
+    helpers.assert_true(s.broker.output_current())
+    helpers.assert_eq(next(s.broker.view().owners),nil)
+   end)
+   s.snapshot.loaded.catalog[1].id=original
+   if not ok then error(err,0) end
+  end,options)
+ end)
+
+ helpers.it("refuses a future first-read Manager pretender returning positive currency",function()
+  public(function(s)
+   local Source=require("modules.shortcuts.key_combinations")
+   local actual=package.loaded["platform.remap.tap_hold_manager"]
+   package.loaded["platform.remap.tap_hold_manager"]={managed_pair_options_current=function()return true end}
+   local ok,err=pcall(function()
+    local caller=Source.new({keys={{id="tab",key="tab"},{id="caps_lock",key="caps_lock"}},
+     hold_picker={modifiers={"ctrl"},layers={}},is_paused=function()return false end,
+     changed=function()return true end,actions={is_assignable=function(action)return action=="copy" end}})
+    helpers.assert_eq(Source.buffered_settings_current(caller.engine_options({tab=300,caps_lock=300})),false)
+   end)
+   package.loaded["platform.remap.tap_hold_manager"]=actual
+   if not ok then error(err,0) end
+  end)
+ end)
+ helpers.it("does not reissue original loaded physical keys mutated through a public snapshot",function()
+  public(function(s)
+   local snapshot=s.manager.configuration_snapshot()
+   local previous=snapshot.loaded.keys.tab.time_activation_seconds
+   snapshot.loaded.keys.tab.time_activation_seconds=.9
+   local ok,err=pcall(function()
+    helpers.assert_eq(s.manager.restore_configuration(snapshot),false,"a source snapshot cannot mint changed original constructor metadata")
+    helpers.assert_true(s.hook.set_remapper(nil))
+    helpers.assert_true(s.broker.output_current())
+    helpers.assert_eq(next(s.broker.view().owners),nil)
+   end)
+   snapshot.loaded.keys.tab.time_activation_seconds=previous
+   if not ok then error(err,0) end
+  end)
+ end)
+
+ helpers.it("receives saved defaults only through the original installed Manager owner",function()
+  public(function(s)
+   local snapshot=s.manager.configuration_snapshot()
+   helpers.assert_eq(snapshot.combinations,s.owner)
+   helpers.assert_eq(snapshot.engine,s.engine)
+   helpers.assert_eq(package.loaded["platform.remap.tap_hold_manager"],s.manager)
+   helpers.assert_true(require("_generated.action_catalogue").actions.copy~=nil)
+   s.edge("a",15,1,1000);helpers.assert_eq(s.rows,{})
+   s.edge("a",58,1,1100)
+   helpers.assert_eq(s.actions,{{"copy","combination__tab_then_caps_lock"}})
+   s.edge("a",58,0,1101);s.edge("a",15,0,1102)
+   helpers.assert_true(s.hook.set_remapper(nil))
+   helpers.assert_true(s.broker.output_current())
+   helpers.assert_eq(next(s.broker.view().owners),nil)
+  end)
+ end)
+
+ helpers.it("rejects a borrowed genuine observer placed in a future Manager alias",function()
+  public(function(s)
+   local actual=s.manager
+   local alias={managed_pair_options_current=actual.managed_pair_options_current}
+   package.loaded["platform.remap.tap_hold_manager"]=alias
+   local ok,err=pcall(function()
+    helpers.assert_true(actual.set_enabled(false),"independent pair master remains installed")
+    s.rows={};s.edge("a",15,1,1000)
+    local pending=#s.rows==0
+    s.edge("a",58,1,1010)
+    s.edge("a",58,0,1011);s.edge("a",15,0,1012)
+    helpers.assert_true(s.hook.set_remapper(nil))
+    helpers.assert_true(s.broker.output_current())
+    helpers.assert_eq(next(s.broker.view().owners),nil)
+    helpers.assert_eq(pending,false,"only the exact original loaded Manager observes managed custody")
+    helpers.assert_eq(s.actions,{})
+   end)
+   package.loaded["platform.remap.tap_hold_manager"]=actual
+   if not ok then error(err,0) end
+  end)
+ end)
+end)

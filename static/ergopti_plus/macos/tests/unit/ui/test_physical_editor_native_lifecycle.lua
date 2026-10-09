@@ -52,7 +52,14 @@ local run_contract = function(helpers, load_host, load_builder)
     function view:windowCallback(fn)self.closing=fn;return self end
     function view:navigationCallback(fn)self.navigation=fn;return self end
     function view:evaluateJavaScript()return self end
-    function view:hswindow()return{raise=noop,focus=noop,moveToScreen=noop}end
+    function view:hswindow()
+     local window={raise=noop,focus=noop,moveToScreen=noop}
+     function window:unminimize()
+      c.restore_calls=(c.restore_calls or 0)+1
+      return self
+     end
+     return window
+    end
     function view:html()
      if c.during_html then c.during_html(self,c.bridges[#c.bridges])end
      return self
@@ -175,6 +182,13 @@ local run_contract = function(helpers, load_host, load_builder)
     helpers.assert_eq(host.open(options),true);local old=c.views[1].closing;helpers.assert_eq(host.close(),true)
     helpers.assert_eq(host.open(options),true);old('closing');helpers.assert_true(getmetatable(c.views[2])~=nil)
     c.bridges[2].callback({body={action='ready'}});helpers.assert_eq(c.received,1);helpers.assert_eq(host.close(),true)
+   end)
+  end)
+  helpers.it('(physical-editor-lifecycle) foreground restoration receives the exact native window acknowledgement',function()
+   fixture(function(host,c,options)
+    helpers.assert_eq(host.open(options),true)
+    helpers.assert_eq(c.restore_calls,1,'Actual Builder restores the acquired window before accepting the host')
+    helpers.assert_eq(host.close(),true)
    end)
   end)
  end)

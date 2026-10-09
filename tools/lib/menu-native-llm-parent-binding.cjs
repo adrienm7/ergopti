@@ -94,10 +94,7 @@ function nativeLlmParentPublication(source, builderSource, definition, topLevel,
 		positions(loadTop, 'data =').length !== 1 ||
 		rootPositions(loadTop, 'for _, entry in ipairs(data.top_level) do').length !== 1 ||
 		!one(loadTop, '::continue::') ||
-		!one(
-			loadTop,
-			'table.insert(result, { id = entry.id, greyed_when_paused = entry.greyed_when_paused == true })'
-		)
+		!nativeTopLevelProjection(loadTop, lex)
 	)
 		return false;
 	const generate = body(builder, 'function M.generate(ctx, menu_mods, actions)');
@@ -121,6 +118,54 @@ function nativeLlmParentPublication(source, builderSource, definition, topLevel,
 	)
 		return false;
 	return true;
+}
+
+/** Exact executable bodies for the retained historical and disabled-row projections.
+ * This finite owner policy accepts formatting/comments, not arbitrary Lua rewrites.
+ * Checking the whole body binds the actual append to its source, filters and cache.
+ */
+function nativeTopLevelProjection(unit, lex) {
+	if (!unit) return false;
+	const current = `
+	if _top_level_cache then return _top_level_cache end
+	local data = load_manifest()
+	if not data or type(data.top_level) ~= "table" then
+		Logger.error(LOG, "Failed to load top_level from manifest — the tray has no row.")
+		return {}
+	end
+	local result = {}
+	for _, entry in ipairs(data.top_level) do
+		if type(entry) ~= "table" or type(entry.id) ~= "string" then goto continue end
+		if type(entry.platforms) == "table" then
+			local for_hs = false
+			for _, p in ipairs(entry.platforms) do
+				if p == "hs" then for_hs = true; break end
+			end
+			if not for_hs then goto continue end
+		end
+		local projected = { id = entry.id, greyed_when_paused = entry.greyed_when_paused == true }
+		if entry.disabled == true then
+			projected.disabled, projected.i18n, projected.reason_key = true, entry.i18n, entry.reason_key
+		end
+		table.insert(result, projected)
+		::continue::
+	end
+	Logger.debug(LOG, "Top level loaded from manifest (%d item(s)).", #result)
+	_top_level_cache = result
+	return _top_level_cache`;
+	const historical = current.replace(
+		`		local projected = { id = entry.id, greyed_when_paused = entry.greyed_when_paused == true }
+		if entry.disabled == true then
+			projected.disabled, projected.i18n, projected.reason_key = true, entry.i18n, entry.reason_key
+		end
+		table.insert(result, projected)`,
+		`		table.insert(result, { id = entry.id, greyed_when_paused = entry.greyed_when_paused == true })`
+	);
+	const shape = (value) => value.tokens.map((token) => [token.kind, token.value]);
+	return [historical, current].some((text) => {
+		const expected = lex(text);
+		return expected && isDeepStrictEqual(shape(unit), shape(expected));
+	});
 }
 
 /** Parses bounded executable Lua scopes; quoted/comment decoys never supply a body. */
@@ -1297,8 +1342,68 @@ function closedNativeReads(unit, allowContext = false) {
 	return true;
 }
 
+/** The tray supports only its exact historical route or the adopted inert disabled row.
+ * The current branch retains the same declared row and single native append before Quit;
+ * its caption call retains the actual imported i18n helper, with no local replacement.
+ */
+function nativeLinuxDisabledTopLevelBranch(unit, builder) {
+	if (!unit || !builder) return null;
+	const { lex, positions, rootPositions, body, one } = luaPublicationParser();
+	const prefix =
+		'local build = builders[id] if not build then Logger.error(LOG, "No builder for top-level row \'%s\' — the entry is missing.", tostring(id))';
+	const suffix = 'elseif id == "quit" then quit_row = build(ctx)';
+	const disabled =
+		'elseif row.disabled == true then rows[#rows + 1] = { label = i18n_safe(row.i18n), disabled = true, disabled_reason_key = row.reason_key }';
+	const historical = one(unit, prefix + ' ' + suffix);
+	const current = one(unit, prefix + ' ' + disabled + ' ' + suffix);
+	if (historical === current) return null;
+	// Every source-row use belongs to the actual declared loop and its retained fields.
+	// Extra aliases, lexical shadows and indexed/field writes cannot supply metadata.
+	const rowReads = [
+		'for _, row in ipairs(declared) do',
+		'if type(row) == "table" then',
+		'local id = row.id',
+		'elseif _row_is_for_linux(row) then',
+		'elseif ctx.paused == true and row.greyed_when_paused == true then',
+		...(current ? [disabled] : [])
+	];
+	const captured = new Set();
+	for (const statement of rowReads) {
+		const starts = positions(unit, statement);
+		if (starts.length !== 1) return null;
+		scriptTokens(statement, '.lua').forEach((token, n) => {
+			if (token.kind === 'identifier' && token.value === 'row') captured.add(starts[0] + n);
+		});
+	}
+	if (
+		unit.tokens.some(
+			(token, at) => token.kind === 'identifier' && token.value === 'row' && !captured.has(at)
+		) ||
+		positions(unit, 'id =').filter((at) => unit.tokens[at + 2]?.value !== '=').length !== 1
+	)
+		return null;
+	if (historical) return 0;
+	const caption = body(builder, 'function i18n_safe(key)');
+	const expected = lex(
+		'local ok, i18n = pcall(require, "infra.i18n") if ok and i18n and type(i18n.get) == "function" then local val = i18n.get(key) if val and val ~= key then return val end end return key'
+	);
+	const shape = (value) => value?.tokens.map((token) => [token.kind, token.value]);
+	if (
+		rootPositions(builder, 'function i18n_safe(key)').length !== 1 ||
+		positions(builder, 'local i18n_safe').length ||
+		positions(builder, 'i18n_safe =').length ||
+		unit.tokens.filter((token) => token.kind === 'identifier' && token.value === 'i18n_safe')
+			.length !== 1 ||
+		!isDeepStrictEqual(shape(caption), shape(expected))
+	)
+		return null;
+	return 1;
+}
+
 /** Admits the small executable tray/caller call grammar, including diagnostics, without wildcard calls. */
-function closedPublicationCalls(unit, role) {
+function closedPublicationCalls(unit, role, builder) {
+	const disabled = role === 'tray' ? nativeLinuxDisabledTopLevelBranch(unit, builder) : 0;
+	if (disabled === null) return false;
 	const expected =
 		role === 'tray'
 			? {
@@ -1311,7 +1416,8 @@ function closedPublicationCalls(unit, role) {
 					tostring: 1,
 					build: 3,
 					_grey_for_pause: 1,
-					render_rows: 1
+					render_rows: 1,
+					...(disabled === 1 ? { i18n_safe: 1 } : {})
 				}
 			: role === 'agentCaller'
 				? {
@@ -1345,7 +1451,7 @@ function closedPublicationCalls(unit, role) {
 }
 
 /** Requires each executable outer branch/loop to be a declared publication/refusal route. */
-function closedNativeControl(unit, role) {
+function closedNativeControl(unit, role, builder) {
 	if (!unit || !closedNativeReads(unit, role === 'tray')) return false;
 	const { rootPositions, positions } = luaPublicationParser();
 	for (const at of unit.closes.keys())
@@ -1392,23 +1498,27 @@ function closedNativeControl(unit, role) {
 		expected.some((statement) => rootPositions(unit, statement).length !== 1)
 	)
 		return false;
-	if (['tray', 'agentCaller'].includes(role) && !closedPublicationCalls(unit, role)) return false;
+	if (['tray', 'agentCaller'].includes(role) && !closedPublicationCalls(unit, role, builder))
+		return false;
 	if (role === 'tray') {
+		const disabled = nativeLinuxDisabledTopLevelBranch(unit, builder);
+		if (disabled === null) return false;
 		const conditions = [
 			'if type(row) == "table" then',
 			'if id == "---" then',
 			'if not build then',
 			'elseif _row_is_for_linux(row) then',
 			'elseif id == "quit" then',
-			'elseif ctx.paused == true and row.greyed_when_paused == true then'
+			'elseif ctx.paused == true and row.greyed_when_paused == true then',
+			...(disabled === 1 ? ['elseif row.disabled == true then'] : [])
 		];
 		if (
 			positions(unit, 'if').length !== 6 ||
-			positions(unit, 'elseif').length !== 3 ||
+			positions(unit, 'elseif').length !== 3 + disabled ||
 			positions(unit, 'return').length !== 3 ||
 			conditions.some((text) => positions(unit, text).length !== 1) ||
-			positions(unit, 'rows [').length !== 6 ||
-			positions(unit, 'rows [ # rows + 1 ] =').length !== 6 ||
+			positions(unit, 'rows [').length !== 6 + disabled ||
+			positions(unit, 'rows [ # rows + 1 ] =').length !== 6 + disabled ||
 			positions(unit, 'build ( ctx )').length !== 3 ||
 			positions(unit, 'ManifestMenu =').length
 		)
@@ -1597,7 +1707,7 @@ function nativeLinuxAiParentPublication(sources, manifest, kind, platform) {
 	if (
 		!tray ||
 		!caller ||
-		!closedNativeControl(tray, 'tray') ||
+		!closedNativeControl(tray, 'tray', builder) ||
 		!one(tray, '["' + kind + '"] = _build_' + kind + ',') ||
 		positions(builder, '_build_' + kind + ' =').length ||
 		!one(tray, 'local declared = ManifestMenu and ManifestMenu.get_array("top_level") or {}') ||
@@ -1713,4 +1823,8 @@ function nativeLinuxAiParentPublication(sources, manifest, kind, platform) {
 	return true;
 }
 
-module.exports = { nativeLlmParentPublication, nativeLinuxAiParentPublication };
+module.exports = {
+	nativeLlmParentPublication,
+	nativeLinuxAiParentPublication,
+	nativeTopLevelProjection
+};
