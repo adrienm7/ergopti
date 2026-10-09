@@ -197,6 +197,7 @@
 	"config_cleanup.intro": "检查 ErgoptiPlus 不再使用的设置。",
 	"dialog.action_picker.disabled": "∅ 无",
 	"dialog.action_picker.label": "动作：",
+	"dialog.action_picker.menu_label": "动作：…",
 	"dialog.action_picker.back": "← 返回",
 	"dialog.action_picker.capture_key": "按下要发送的键，或输入它的名称。",
 	"dialog.action_picker.capture_shortcut": "按下要发送的快捷键，或直接输入。",

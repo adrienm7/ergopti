@@ -4883,7 +4883,7 @@ integrated, then publish one grouped release.
 
 - [~] **54.** Every menu is declared in the shared menu manifest, never in
   driver code. The ratchet `npm run test:native-menu-rows` counts the rows
-  drivers still build (current baseline: Windows 27, macOS 22, Linux 30, each
+  drivers still build (current baseline: Windows 27, macOS 21, Linux 27, each
   site listed in tools/test/native-menu-rows-baseline.json); migrate them to
   zero. Each OS-limited row declares `unavailable = "hide"` (not
   applicable) or `"grey"` (not yet ported, with its reason); classify the
@@ -5735,6 +5735,8 @@ The registered regression exercises 103 real child controls, including nineteen
 and zero remaining sites and failed writes. This validation correction changes
 no native menu behavior or generated artifact. The remaining menu families and
 item 38 device acceptance stay open, and items 54/81 remain partial.
+
+The separately reviewed combined LLM/About menu-parent tranche preserves native callbacks, dynamic children and all21 caption catalogues. Its historical exact-source run37896215435 passes the six selected menu/encoding/format targets, 11,951 Linux units, Linux E2E/package and17 installation scenarios, plus17,503 portable macOS units and the native tooltip captures. Windows executes10,489 passing checks with its sole remaining failure in canonical WinHTTP PAC routing; Windows E2E/package/install are skipped. macOS Brew packaging fails its native AppleEvent receiver case and installation is skipped. These receipts qualify the owned menu tranche at its recorded source tree; they are not blanket native, packaging or device success. Current upstream translations and keyboard policy remain preserved by the new three-way source composition. Remaining native menu families and items54/81 stay partial.
 
 - [ ] **62.** Downloads on managed company networks: system trust and
       system proxy for every download child (Ollama installation/server/pull,

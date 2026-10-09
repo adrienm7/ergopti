@@ -200,3 +200,172 @@ helpers.describe("tray (linux): keyboard slot groups need a key catalogue", func
 		end)
 	end)
 end)
+
+--- Retrieves the actual local slot builder retained by the public tray builder.
+--- The test executes native closures; it does not copy their implementation or
+--- publish a test-only API in the driver.
+local function slot_builder_from(module)
+	local gestures
+	for index = 1, math.huge do
+		local name, value = debug.getupvalue(module.build, index)
+		if name == nil then break end
+		if name == "_build_gestures" then gestures = value break end
+	end
+	helpers.assert_type(gestures, "function", "the real gestures tray builder is retained")
+	for index = 1, math.huge do
+		local name, value = debug.getupvalue(gestures, index)
+		if name == nil then break end
+		if name == "slot_binding_rows" then
+			helpers.assert_type(value, "function", "the real slot menu closure is retained")
+			return value
+		end
+	end
+	error("The gestures tray builder lost its actual slot menu closure")
+end
+
+--- Uses the real shared renderer and generated declarations. Only the native
+--- picker and action-registry boundary are controlled; no GUI is exercised.
+local function with_slot_frame(locale, mutation, body)
+	local saved = {}
+	for name, value in pairs(package.loaded) do saved[name] = value end
+	local saved_i18n_safe = rawget(_G, "i18n_safe")
+	local ok, raised = pcall(function()
+		local Paths = require("infra.paths")
+		local json = require("json")
+		local file = assert(io.open(Paths.shared("data/locales/" .. locale .. ".json"), "rb"))
+		local catalogue = json.decode(file:read("*a"))
+		assert(file:close())
+		local state = { opened = {}, assigned = {}, accepts = true, catalogue = catalogue }
+		local function translate(key) return catalogue[key] or key end
+		-- Both the old native path and shared rendering receive the same real
+		-- catalogue, so predecessor comparisons do not invent a locale failure.
+		package.loaded["infra.i18n"] = { get = translate, section = translate,
+			get_locale = function() return locale end }
+		local renderer = assert(require("menu.renderer").new({
+			platform = "linux",
+			manifest_path = function() return Paths.shared("modules/menu/menu_manifest.json") end,
+			json_decode = json.decode,
+			i18n = { get = translate, section = translate },
+			logger = helpers.make_logger_stub(),
+		}))
+		local declarations = renderer.get_root()
+		if mutation then mutation(declarations) end
+		state.items = { { id = "open_url", label = "Controlled native picker choice" } }
+		package.loaded["modules.gestures.manager"] = {
+			get_picker_items = function() return state.items end,
+			get_picker_parameter_fields = function(items, binding)
+				state.editor_items, state.editor_binding = items, binding
+				return { send_vocabulary = {}, parameter_strings = {}, prompt_choices = {},
+					vision_choices = {}, language_choices = {}, default_count = 1,
+					edit_current_label = "Controlled native editor label" }
+			end,
+		}
+		package.loaded["ui.action_picker.bridge"] = {
+			open = function(options, confirm)
+				state.opened[#state.opened + 1] = options
+				state.confirm = confirm
+				return true
+			end,
+		}
+		local module = helpers.load_module_with_dependency("ui.menu.menu_builder", "infra.manifest_menu", renderer)
+		local build_rows = slot_builder_from(module)
+		function state.assign(option, picked)
+			state.assigned[#state.assigned + 1] = { option = option, picked = picked }
+			return state.accepts
+		end
+		function state.rows(bound) return build_rows("Actual caller slot", bound, "ctrl_a", state.assign) end
+		body(state)
+	end)
+	for name in pairs(package.loaded) do
+		if saved[name] == nil then package.loaded[name] = nil end
+	end
+	for name, value in pairs(saved) do package.loaded[name] = value end
+	_G.i18n_safe = saved_i18n_safe
+	if not ok then error(raised, 0) end
+end
+
+helpers.describe("Linux shared slot picker and conditional clear frame", function()
+	-- Independent expectations preserve the original bound ~= "none" policy,
+	-- including the legacy empty-string case rather than deriving expectations
+	-- from the new declaration or implementation.
+	for _, vector in ipairs({
+		{ bound = "none", count = 1 },
+		{ bound = "open_url", count = 2 },
+		{ bound = "send_shortcut", count = 2 },
+		{ bound = "", count = 2 },
+	}) do
+		helpers.it("retains picker then optional clear for '" .. vector.bound .. "'", function()
+			with_slot_frame("en", nil, function(state)
+				local rows = state.rows(vector.bound)
+				helpers.assert_eq(#rows, vector.count)
+				helpers.assert_eq(rows[1].label, state.catalogue["dialog.action_picker.label"] .. "…")
+				helpers.assert_type(rows[1].action, "function")
+				if vector.count == 2 then
+					helpers.assert_eq(rows[2].label, state.catalogue["dialog.action_picker.disabled"])
+					helpers.assert_type(rows[2].action, "function")
+				end
+				helpers.assert_eq(#state.opened, 0, "building a row never opens the picker")
+				helpers.assert_eq(#state.assigned, 0, "building a row never publishes an assignment")
+			end)
+		end)
+	end
+	for _, locale in ipairs({ "ar", "cs", "da", "de", "en", "es", "fr", "he", "hi", "it", "ja",
+		"ko", "nl", "no", "pl", "pt", "ru", "sv", "tr", "uk", "zh" }) do
+		helpers.it("retains the genuine " .. locale .. " picker caption and ellipsis", function()
+			with_slot_frame(locale, nil, function(state)
+				helpers.assert_eq(state.rows("none")[1].label, state.catalogue["dialog.action_picker.label"] .. "…")
+			end)
+		end)
+	end
+	for _, accepts in ipairs({ true, false }) do
+		helpers.it("retains native picker confirmation result " .. tostring(accepts), function()
+			with_slot_frame("en", nil, function(state)
+				state.accepts = accepts
+				local rows = state.rows("open_url")
+				rows[1].action()
+				helpers.assert_eq(#state.opened, 1)
+				helpers.assert_eq(state.opened[1].title, "Actual caller slot")
+				helpers.assert_eq(state.opened[1].current, "open_url")
+				helpers.assert_true(state.opened[1].items == state.items, "the native catalogue identity is forwarded")
+				helpers.assert_true(state.editor_items == state.items, "the native editor receives that same catalogue")
+				helpers.assert_eq(state.editor_binding, "ctrl_a")
+				local picked = { shortcut = "Ctrl+Shift+Q" }
+				helpers.assert_eq(state.confirm("send_shortcut", {}, picked), accepts)
+				helpers.assert_eq(#state.assigned, 1)
+				helpers.assert_eq(state.assigned[1].option, "send_shortcut")
+				helpers.assert_true(state.assigned[1].picked == picked, "the original native picker value identity is forwarded")
+				rows[2].action()
+				helpers.assert_eq(#state.assigned, 2)
+				helpers.assert_eq(state.assigned[2].option, "none")
+				helpers.assert_nil(state.assigned[2].picked)
+				helpers.assert_eq(#state.opened, 1, "clearing never opens a picker")
+			end)
+		end)
+	end
+	local refusals = {
+		{ name = "withdrawn complete frame", mutate = function(root) root.slot_binding_frame = nil end },
+		{ name = "withdrawn late clear frame", mutate = function(root) root.slot_binding_clear_frame = nil end },
+		{ name = "empty late clear frame", mutate = function(root) root.slot_binding_clear_frame = {} end },
+		{ name = "unknown late clear callback", mutate = function(root) root.slot_binding_clear_frame[1].id = "unowned_clear" end },
+		{ name = "wrong-platform late clear", mutate = function(root) root.slot_binding_clear_frame[1].platforms = { "hs" } end },
+		{ name = "unknown presence getter", mutate = function(root) root.slot_binding_frame[2].present_when = "unowned_presence" end },
+		{ name = "non-string presence getter", mutate = function(root) root.slot_binding_frame[2].present_when = 1 end },
+		{ name = "additional declared picker", mutate = function(root) root.slot_binding_frame[3] = root.slot_binding_frame[1] end },
+	}
+	for _, refusal in ipairs(refusals) do
+		helpers.it("refuses " .. refusal.name .. " without opening or assigning", function()
+			with_slot_frame("en", refusal.mutate, function(state)
+				helpers.assert_eq(#state.rows("open_url"), 0, "a failed frame cannot leave a partial picker submenu")
+				helpers.assert_eq(#state.opened, 0)
+				helpers.assert_eq(#state.assigned, 0)
+			end)
+		end)
+	end
+	helpers.it("refuses a withdrawn clear declaration even while the slot is unbound", function()
+		with_slot_frame("en", function(root) root.slot_binding_clear_frame = nil end, function(state)
+			helpers.assert_eq(#state.rows("none"), 0)
+			helpers.assert_eq(#state.opened, 0)
+			helpers.assert_eq(#state.assigned, 0)
+		end)
+	end)
+end)

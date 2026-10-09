@@ -69,7 +69,10 @@ _LLM_Menu_BackendOptionLabel(BackendId) {
 	if !(BackendId is String) || !Brands.Has(BackendId)
 		throw ValueError("The Backend submenu offers no backend '"
 			. ((BackendId is String) ? BackendId : Type(BackendId)) . "'.")
-	return Brands[BackendId] . " — " . t("menu.llm.backend_" . BackendId . "_suffix")
+	CaptionRows := _LLM_Menu_BackendOptionCaptionRows(BackendId, Brands[BackendId])
+	if !(CaptionRows is Array) || CaptionRows.Length != 1
+		throw Error("Declared backend option caption was refused.")
+	return CaptionRows[1]["label"]
 }
 
 /**
@@ -108,33 +111,32 @@ _LLM_Menu_BackendRowLabel() {
  */
 _LLM_Menu_BackendRows() {
 	global _LLM_Menu
-	Rows := []
-	for backend_id in LLM_MENU_BACKEND_OPTIONS {
-		Rows.Push(Map(
-			"label",   _LLM_Menu_BackendOptionLabel(backend_id),
+	; Admit the genuine boundary and complete static presentation before state reads.
+	BoundaryRows := MenuRenderer_TemplateRows("llm_backend_choice_boundary", Map(), Map(), Map())
+	Admission := _LLM_Menu_BackendChildFrameRows([], [], [])
+	; These nonpublished numeric witnesses exercise both real port/reset declarations.
+	PortAdmission := _LLM_Menu_BackendPortRows("0", "1")
+	if !(BoundaryRows is Array) || !(Admission is Array) || !(PortAdmission is Array)
+		return []
+	BackendOptions := LLM_MENU_BACKEND_OPTIONS, OptionCaptions := []
+	for backend_id in BackendOptions
+		OptionCaptions.Push(_LLM_Menu_BackendOptionLabel(backend_id))
+	ChoiceRows := []
+	for Index, backend_id in BackendOptions {
+		ChoiceRows.Push(Map(
+			"label",   OptionCaptions[Index],
 			"checked", (backend_id == _LLM_Menu["backend"]),
 			"action",  _LLM_Menu_MakeSetBackendHandler(backend_id)))
 	}
 
-	; Ollama server port — the local daemon's port (11434 by default). Configurable
-	; so a user running Ollama on a non-standard port (or behind a proxy) can still
-	; reach it. Shown unconditionally: the user may set it before switching backend.
-	BoundaryRows := MenuRenderer_TemplateRows("llm_backend_choice_boundary", Map(), Map(), Map())
-	if !(BoundaryRows is Array)
-		return []
-	for Row in BoundaryRows
-		Rows.Push(Row)
+	; Original current/default reads and late reset-default callback remain native.
 	port_display := _LLM_Menu.Has("ollama_port") ? _LLM_Menu["ollama_port"] : _LLM_DefaultFor("llm_ollama_port")
-	Rows.Push(Map(
-		"label",  StrReplace(t("menu.llm.ollama_port_label"), "%s", port_display),
-		"action", (*) => LLM_Menu_PromptOllamaPort()))
-	_LLM_MaybeResetRow(Rows,
-		port_display,
-		_LLM_DefaultFor("llm_ollama_port"),
-		(*) => LLM_Menu_ResetOllamaPort(_LLM_DefaultFor("llm_ollama_port")))
-	for Row in LLM_Menu_LocalServersRows()
-		Rows.Push(Row)
-	return Rows
+	PortRows := _LLM_Menu_BackendPortRows(port_display, _LLM_DefaultFor("llm_ollama_port"))
+	if !(PortRows is Array)
+		return []
+	LocalRows := LLM_Menu_LocalServersRows()
+	Rows := _LLM_Menu_BackendChildFrameRows(ChoiceRows, PortRows, LocalRows)
+	return Rows is Array ? Rows : []
 }
 
 
@@ -819,4 +821,68 @@ _LLM_Menu_ModelBrowserRow(OpenFn := 0) {
 	return MenuRenderer_CommandRow("llm_model_commands", "llm_browse_models",
 		Map("llm_browse_models", OpenFn),
 		Map("llm_model_browser_ready", () => IsObject(OpenFn) && HasMethod(OpenFn, "Call")))
+}
+
+
+; Real native brands feed shared suffix policy without inventing a backend catalogue.
+_LLM_Menu_BackendOptionCaptionRows(BackendId, Brand) {
+	Root := _MR_GetManifestRoot(), Definitions := Map()
+	for Key in ["llm_backend_option_caption_frame_ahk", "llm_backend_ollama_option_caption_ahk", "llm_backend_api_option_caption_ahk"]
+		Definitions[Key] := Root.Get(Key, false)
+	Getters := Map("llm_backend_option_brand", (*) => Brand,
+		"llm_backend_option_is_ollama", (*) => BackendId == "ollama",
+		"llm_backend_option_is_api", (*) => BackendId == "api")
+	Rows := MenuRenderer_TemplateRows("llm_backend_option_caption_frame_ahk", Map(), Getters, Map())
+	if !(Rows is Array) || Rows.Length != 1 || _MR_GetManifestRoot() != Root
+		return false
+	for Key, Definition in Definitions
+		if Root.Get(Key, false) != Definition
+			return false
+	return Rows
+}
+
+; The canonical port/reset frame consumes native numeric data and original callbacks.
+_LLM_Menu_BackendPortRows(CurrentPort, DefaultPort, PromptCallback := unset, ResetCallback := unset) {
+	Root := _MR_GetManifestRoot(), Definitions := Map()
+	for Key in ["llm_backend_ollama_port_frame_ahk", "llm_backend_ollama_port_control_ahk", "llm_native_numeric_reset"]
+		Definitions[Key] := Root.Get(Key, false)
+	Prompt := IsSet(PromptCallback) ? PromptCallback : (*) => LLM_Menu_PromptOllamaPort()
+	Reset := IsSet(ResetCallback) ? ResetCallback : (*) => LLM_Menu_ResetOllamaPort(_LLM_DefaultFor("llm_ollama_port"))
+	Customized := !(CurrentPort = DefaultPort)
+	Getters := Map("llm_backend_ollama_port_caption", (*) => "" . CurrentPort,
+		"llm_numeric_reset_caption", (*) => "" . DefaultPort,
+		"llm_backend_ollama_port_customized", (*) => Customized)
+	Rows := MenuRenderer_TemplateRows("llm_backend_ollama_port_frame_ahk",
+		Map("llm_backend_ollama_port", Prompt, "llm_native_numeric_reset", Reset), Getters, Map())
+	if !(Rows is Array) || Rows.Length != (Customized ? 2 : 1) || _MR_GetManifestRoot() != Root
+		return false
+	for Key, Definition in Definitions
+		if Root.Get(Key, false) != Definition
+			return false
+	return Rows
+}
+
+; The actual catalogue, numeric controls and local-server owner retain row identities.
+_LLM_Menu_BackendChildFrameRows(ChoiceRows, PortRows, LocalRows) {
+	for Rows in [ChoiceRows, PortRows, LocalRows] {
+		if !(Rows is Array)
+			return false
+		Loop Rows.Length
+			if !Rows.Has(A_Index) || !(Rows[A_Index] is Map)
+				return false
+	}
+	Root := _MR_GetManifestRoot(), Definitions := Map()
+	for Key in ["llm_backend_child_frame_ahk", "llm_backend_child_choices_ahk", "llm_backend_choice_boundary",
+		"llm_backend_child_port_rows_ahk", "llm_backend_child_local_rows_ahk"]
+		Definitions[Key] := Root.Get(Key, false)
+	Rows := MenuRenderer_TemplateRows("llm_backend_child_frame_ahk", Map(), Map(),
+		Map("llm_backend_child_choices", (*) => ChoiceRows,
+			"llm_backend_child_port_rows", (*) => PortRows,
+			"llm_backend_child_local_rows", (*) => LocalRows))
+	if !(Rows is Array) || _MR_GetManifestRoot() != Root
+		return false
+	for Key, Definition in Definitions
+		if Root.Get(Key, false) != Definition
+			return false
+	return Rows
 }
