@@ -336,105 +336,7 @@ function ahkQualificationManifest(tap, execution, profile, sha) {
 		entries
 	};
 }
-/** One explicitly authorized prerelease may defer suites, never build integrity. */
-function fastPrerelease(context, now = new Date()) {
-	const profile = resolveQualificationProfile(context, now);
-	return (
-		profile !== null &&
-		profile.id === 'dev-release-20261009-diagnostic-prerelease' &&
-		profile.tag === 'v0.0.0-dev.157' &&
-		profile.version === '0.0.0-dev.157' &&
-		profile.expires_at === '2026-10-10T07:00:00Z'
-	);
-}
-function validateFastPrerelease(requested, context, now = new Date()) {
-	if (typeof requested !== 'boolean') refuse('Fast prerelease requires a Boolean.');
-	if (requested && !fastPrerelease(context, now))
-		refuse('Temporary fast prerelease is not authorized for this context.');
-	return requested;
-}
-function fastPrereleaseReceipt(lane, needs, sha, context, now = new Date()) {
-	validateFastPrerelease(true, context, now);
-	const expected = {
-		windows: {
-			'test-ahk': 'skipped',
-			'e2e-ahk': 'skipped',
-			'package-windows': 'success',
-			'launch-windows': 'skipped'
-		},
-		macos: {
-			'cold-bootstrap-native': 'skipped',
-			'test-hs': 'skipped',
-			'e2e-hs': 'skipped',
-			'package-macos': 'success',
-			launch: 'skipped',
-			'tooltip-canvas': 'skipped',
-			'managed-ollama-native': 'success'
-		},
-		linux: {
-			'test-linux': 'skipped',
-			'e2e-linux': 'skipped',
-			'package-linux': 'success',
-			'install-linux': 'skipped'
-		}
-	}[lane];
-	if (!expected) refuse('Unknown fast prerelease lane.');
-	keys(needs, Object.keys(expected));
-	for (const [name, result] of Object.entries(expected)) {
-		if (!needs[name] || needs[name].result !== result)
-			refuse('Fast prerelease has missing, failed or unexpected mandatory jobs.');
-	}
-	return {
-		schema: 1,
-		profile_id: POLICY.id,
-		lane,
-		tag: POLICY.tag,
-		version: POLICY.version,
-		expires_at: POLICY.expires_at,
-		source_sha: sourceSha(sha),
-		status: 'UNQUALIFIED',
-		qualified: false,
-		tests: 'DEFERRED',
-		build_verification: 'required',
-		jobs: expected
-	};
-}
-function fastMain(argv) {
-	const context = environmentContext();
-	if (argv.length === 2 && argv[1] === 'select') {
-		const selected = fastPrerelease(context);
-		if (!process.env.GITHUB_OUTPUT) refuse('Fast selection needs its owned output.');
-		fs.appendFileSync(process.env.GITHUB_OUTPUT, 'fast_prerelease=' + selected + '\n');
-		console.log(
-			selected
-				? 'UNQUALIFIED dev157: tests deferred; builds/signing remain required.'
-				: 'Full default qualification remains required.'
-		);
-		return;
-	}
-	const requested = process.env.ERGOPTI_FAST_PRERELEASE;
-	if (requested !== 'true' && requested !== 'false')
-		refuse('Missing Boolean fast prerelease input.');
-	validateFastPrerelease(requested === 'true', context);
-	if (argv.length === 2 && argv[1] === 'admit') return;
-	if (argv.length !== 4 || argv[1] !== 'receipt' || argv[2] !== '--lane' || requested !== 'true')
-		refuse('Invalid fast prerelease command.');
-	const receipt = fastPrereleaseReceipt(
-		argv[3],
-		parseClosedJson(process.env.NEEDS || ''),
-		process.env.GITHUB_SHA,
-		context
-	);
-	fs.writeFileSync('fast-prerelease-' + argv[3] + '.json', JSON.stringify(receipt, null, 2) + '\n');
-	console.log(JSON.stringify(receipt));
-	if (process.env.GITHUB_STEP_SUMMARY)
-		fs.appendFileSync(
-			process.env.GITHUB_STEP_SUMMARY,
-			'## UNQUALIFIED diagnostic prerelease\nTests DEFERRED; packaging success is not native or feature acceptance.\n'
-		);
-}
 function main(argv) {
-	if (argv[0] === '--fast-action') return fastMain(argv);
 	const options = {};
 	for (let i = 0; i < argv.length; i += 2) {
 		if (
@@ -543,9 +445,6 @@ function main(argv) {
 }
 module.exports = {
 	POLICY_PATH,
-	fastPrerelease,
-	validateFastPrerelease,
-	fastPrereleaseReceipt,
 	resolveQualificationProfile,
 	authorizeQualificationProfile,
 	deferredScopes,
