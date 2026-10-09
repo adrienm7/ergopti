@@ -161,3 +161,14 @@ SC036::
 	KeyCombinationFireHotkey()
 }
 #HotIf
+
+; A custom combination outranks standalone SC138 variants. Keep these after
+; the ordinary pair block (whose exact catalogue coverage remains unchanged)
+; and before altgr.ahk's custom variants through remap.ahk's include order.
+; The ~ prefix preserves real LCtrl's own key-down owner. A native AltGr pair
+; also passes RAlt through; its effect owner sends only additional members.
+#HotIf not LayerEnabled and KeyCombinationOwnsAltGrSuffix(false)
+~SC01D & SC138:: KeyCombinationFireAltGrSuffix(false)
+#HotIf not LayerEnabled and KeyCombinationOwnsAltGrSuffix(true)
+~SC01D & ~SC138:: KeyCombinationFireAltGrSuffix(true)
+#HotIf

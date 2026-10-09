@@ -76,6 +76,9 @@ global _KeyCombinationKeysByScanName := Map()
 ; @returns {String}
 KeyCombinationPairId(First, Second) {
 	global KEY_COMBINATION_PAIR_SEPARATOR
+	; Parse-time criteria may run before the canonical slot grammar is assigned.
+	if !IsSet(KEY_COMBINATION_PAIR_SEPARATOR)
+		return ""
 	return First . KEY_COMBINATION_PAIR_SEPARATOR . Second
 }
 
@@ -217,6 +220,9 @@ KeyCombinationTapOf(PairId) {
 ; The hold a pair takes while its second key stays down, or "none".
 KeyCombinationHoldOf(PairId) {
 	global KeyCombinationHolds, KEY_COMBINATION_NONE
+	; Missing boot metadata is refusal, never a guessed canonical hold value.
+	if !IsSet(KeyCombinationHolds) || !IsSet(KEY_COMBINATION_NONE)
+		return ""
 	return KeyCombinationHolds.Get(PairId, KEY_COMBINATION_NONE)
 }
 
@@ -724,4 +730,58 @@ _KeyCombinationHoldOptionRow(PairId, Option, Current) {
 	Label := (Option["i18n"] != "") ? t(Option["i18n"]) : _TH_HoldOptionLabel(Option["id"])
 	return Map("label", Label, "checked", HoldId == Current,
 		"action", (*) => SetKeyCombinationHold(PairId, HoldId))
+}
+
+; Standard AltGr reaches AHK as fake SC01D followed by SC138. Its custom
+; combination outranks the ordinary SC138 hotkeys, even though those were
+; created first. These two early custom variants share the existing pair
+; admission and effects; QWERTY and Kana keep their existing standalone paths.
+; @param Passthrough {Boolean} Which custom variant is being evaluated.
+; @param IsDownFn {Func} Physical-key port used by the registered unit cases.
+KeyCombinationOwnsAltGrSuffix(Passthrough, IsDownFn := 0) {
+	global _KeyCombinationTaken, KeyCombinationHolds, KEY_COMBINATION_NONE
+	global KEY_COMBINATION_PAIR_SEPARATOR, LayerEnabled
+	; Another key's layer owns AltGr before a new pair can claim its press.
+	if !IsSet(LayerEnabled) || LayerEnabled
+		return false
+	; #HotIf is armed before the first extraction pump initializes these owners.
+	; Refuse before KeyCombinationOwns can publish a partial pair admission.
+	if !IsSet(_KeyCombinationTaken) || !IsSet(KeyCombinationHolds)
+		|| !IsSet(KEY_COMBINATION_NONE) || !IsSet(KEY_COMBINATION_PAIR_SEPARATOR)
+		|| TapHoldHoldOptions().Length == 0
+		return false
+	if !KS_AltGrAddsFakeLCtrl() || !KeyCombinationOwns("alt_gr", IsDownFn)
+		return false
+	PairId := KeyCombinationPairId(_KeyCombinationTaken["alt_gr"], "alt_gr")
+	Hold := KeyCombinationHoldOf(PairId)
+	Native := Hold != KEY_COMBINATION_NONE && !_KeyCombinationHoldIsLayer(Hold)
+		&& _AltGrHoldHoldsAltGr(ResolveHoldModifierKey(Hold, "alt_gr"))
+	return Native == Passthrough
+}
+
+; The physical RAlt is already Down for a native AltGr hold. Its owner sends
+; only the other members; suppressing/reinjecting RAlt clears AHK's SC01D
+; prefix when Windows generates the fake LCtrl-up and kills AltGr suffixes.
+_KeyCombinationAltGrSuffixPorts(Passthrough) {
+	Ports := _KeyCombinationPorts().Clone()
+	if Passthrough
+		Ports["own_modifier"] := (Second, ModKey, Seconds) => TapHoldOwnImmediateModifier(
+			Second, _KeyCombinationScanNames[Second], ModKey, Seconds,
+			,,,,,, KS_AltGrKeyName())
+	return Ports
+}
+
+; The ordinary AltGr owner is bypassed by this admitted pair. Hand its fake
+; LCtrl back before publishing the pair's hold or invoking its action, so a
+; remapped left_ctrl hold cannot survive as an unrelated pair modifier. The
+; original LCtrl owner retains its release debt and cancels its own tap.
+; @param Passthrough {Boolean} Whether the selected pair holds native AltGr.
+; @param Ports {Map} Effects port; production uses the native suffix owner.
+KeyCombinationFireAltGrSuffix(Passthrough, Ports := 0) {
+	global _KeyCombinationTaken
+	if !_KeyCombinationTaken.Has("alt_gr")
+		return ""
+	TapHoldAltGrTakesItsLCtrl(Passthrough)
+	return KeyCombinationFire("alt_gr", Ports is Map ? Ports
+		: _KeyCombinationAltGrSuffixPorts(Passthrough))
 }

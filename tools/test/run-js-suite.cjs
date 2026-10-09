@@ -37,6 +37,12 @@ const CHECKS = [
 		repro: 'node tools/test/test-item36-native-qualification.cjs'
 	},
 	{
+		name: 'Signed native query CI publisher retains compiler and nested-signature provenance',
+		cmd: process.execPath,
+		args: ['tools/test/test-automation-query-ci-publisher.cjs'],
+		repro: 'npm run test:automation-query-ci-publisher'
+	},
+	{
 		name: 'dev156 qualification deferrals retain full default execution and strict accounting',
 		cmd: process.execPath,
 		args: ['tools/test/test-dev-release-qualification.cjs'],
@@ -389,6 +395,12 @@ const CHECKS = [
 		cmd: 'node',
 		args: ['tools/test/test-native-menu-rows.cjs'],
 		repro: 'npm run test:native-menu-rows'
+	},
+	{
+		name: 'native-menu census admits migration to zero only with intact legacy detection and complete source coverage',
+		cmd: 'node',
+		args: ['tools/test/test-native-menu-census-admission.cjs'],
+		repro: 'node tools/test/test-native-menu-census-admission.cjs'
 	},
 	{
 		name: 'no restore or clear row asks a question on any driver (restore-recommended-no-confirm)',
@@ -1121,6 +1133,18 @@ const CHECKS = [
 		cmd: 'node',
 		args: ['tools/test/test-desktop-ci-evidence.cjs'],
 		repro: 'npm run test:desktop-ci-evidence'
+	},
+	{
+		name: 'Windows native desktop cohorts require exact native completion and mandatory evidence',
+		cmd: process.execPath,
+		args: ['tools/test/test-windows-native-desktop.cjs'],
+		repro: 'npm run test:windows-native-desktop'
+	},
+	{
+		name: 'Compiled upgrade admission requires actual prior-package and committed full-save evidence',
+		cmd: process.execPath,
+		args: ['tools/test/test-compiled-save-upgrade.cjs'],
+		repro: 'node tools/test/test-compiled-save-upgrade.cjs'
 	},
 	{
 		name: 'macOS canvas job admission and pure Python ownership remain mandatory',

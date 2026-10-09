@@ -186,9 +186,9 @@ TestFMv2_LayoutDefaults() {
 	AssertTrue(Built["layout"].Has("ergopti_base"))
 	AssertTrue(Built["layout"].Has("direct_access_digits"))
 	AssertTrue(Built["layout"].Has("ergopti_alt_gr"))
-	AssertTrue(Built["layout"].Has("ergopti_plus"))
+	AssertTrue(Built["layout"].Has("ergopti_variant"))
 	AssertEqual(false, Built["layout"]["ergopti_base"])
-	AssertEqual(false, Built["layout"]["ergopti_plus"])
+	AssertEqual("none", Built["layout"]["ergopti_variant"])
 }
 Test("ManifestBuildFeaturesMap: layout features are plain booleans (no .enabled wrapper)",
 	TestFMv2_LayoutDefaults)
@@ -2211,7 +2211,7 @@ Test("configuration snapshot: exact fixture row selection rejects initialized si
 _FMS_FullSnapshotParentSource(Literal) {
 	return '[_meta]`nschema_version = ' . ConfigMigrateCurrentVersion()
 		. '`n[hotstrings]`nautocorrection = ' . Literal . ' # retained until explicit cleanup`n'
-		. '[layout]`nergopti_plus = false`n'
+		. '[layout]`nergopti_variant = "ergopti"`n'
 		. '[private]`n"literal.dot" = { keep = [1, "x"], date = 1979-05-27, count = 9223372036854775807 } # future source`n'
 		. '[[private."future.rows"]]`nvalue = "first"`n[[private."future.rows"]]`nvalue = "second"`n'
 }
@@ -2252,7 +2252,7 @@ _FMS_FullSnapshotParent(Path, Literal, Scenario := "complete") {
 	Original := FSReadUtf8Exact(Path), Target := ManifestBuildFeaturesMap()
 	BeforeFeatures := _HSDeepCloneMap(Features), Borrowed := 0, Collected := 0
 	Foreign := Original . "# external generation during actual collection`n"
-	Expected := StrReplace(Original, "ergopti_plus = false`n", "ergopti_plus = true`n")
+	Expected := StrReplace(Original, 'ergopti_variant = "ergopti"`n', 'ergopti_variant = "ergopti_plus"`n')
 	Collect() {
 		Collected += 1
 		Rows := _ConfigCollectFullSaveUpdates(Target, false)
@@ -2275,7 +2275,7 @@ _FMS_FullSnapshotParent(Path, Literal, Scenario := "complete") {
 		AssertEqual(0, _ConfigBootRejectedOverrides)
 		Assert(_ConfigBootOutdatedEntries.Has("hotstrings`nautocorrection"), "the actual loader owns the obsolete parent classification")
 		AssertFalse(Target["hotstrings"]["autocorrection"]["names"]["enabled"])
-		Target["layout"]["ergopti_plus"] := true
+		Target["layout"]["ergopti_variant"] := "ergopti_plus"
 		if Scenario == "nonneutral" || Scenario == "late-neutral"
 			Target["hotstrings"]["autocorrection"]["names"]["enabled"] := true
 		_I18nLocale := "fr", LOGGER_MIN_LEVEL := "INFO"
@@ -2298,7 +2298,7 @@ _FMS_FullSnapshotParent(Path, Literal, Scenario := "complete") {
 			Repair := StrReplace(Original, 'autocorrection = ' . Literal . ' # retained until explicit cleanup`n',
 				'[hotstrings.autocorrection.names]`nenabled = true`n')
 			Assert(FSWriteDurable(Path, Repair))
-			Expected := StrReplace(Repair, "ergopti_plus = false`n", "ergopti_plus = true`n")
+			Expected := StrReplace(Repair, 'ergopti_variant = "ergopti"`n', 'ergopti_variant = "ergopti_plus"`n')
 			Expected := StrReplace(Expected, "enabled = true`n", "")
 			Assert(_ConfigBootOutdatedEntries.Has("hotstrings`nautocorrection"), "the stale warning is deliberately retained")
 		}
@@ -2371,7 +2371,7 @@ _FMS_FullSnapshotParent(Path, Literal, Scenario := "complete") {
 			AssertEqual(Requested, _ConfigFullSaveCoordinator().settled_generation)
 			AssertFalse(_ConfigFullSaveHasPending())
 			Doc := TOML_ParseDocument(FSReadUtf8Exact(Path))
-			AssertTrue(Doc["layout"]["ergopti_plus"].Value)
+			AssertEqual("ergopti_plus", Doc["layout"]["ergopti_variant"])
 			if Scenario == "repair"
 				Assert(Doc["hotstrings"]["autocorrection"]["names"] is Map && Doc["hotstrings"]["autocorrection"]["names"].Count == 0)
 			else
@@ -2383,7 +2383,7 @@ _FMS_FullSnapshotParent(Path, Literal, Scenario := "complete") {
 				Reloaded := ManifestBuildFeaturesMap()
 				ApplyConfigToml(Reloaded, Restart, &Rejected, , &Outdated)
 				AssertEqual(0, Rejected)
-				AssertTrue(Reloaded["layout"]["ergopti_plus"])
+				AssertEqual("ergopti_plus", Reloaded["layout"]["ergopti_variant"])
 				AssertFalse(Reloaded["hotstrings"]["autocorrection"]["names"]["enabled"])
 				if Scenario != "repair"
 					Assert(Outdated.Has("hotstrings`nautocorrection"))

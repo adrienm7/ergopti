@@ -3,4 +3,4 @@ description = "A file without a legacy common section receives only the shipped 
 drivers = ["ahk", "hs", "linux"]
 outcome = "migrated"
 from_version = 10
-to_version = 11
+to_version = 12

@@ -1,0 +1,9 @@
+[registry]
+current_version = 2
+unstamped_version = 1
+[steps.v1_to_v2]
+from = 1
+to = 2
+drivers = ["ahk", "hs", "linux"]
+reason = "Independent joint helper-variant intent contract."
+ops = [{ op = "move_ergopti_variant", section = "layout", key = "ergopti_plus", to_key = "ergopti_variant", base_key = "ergopti_base", alt_gr_key = "ergopti_alt_gr", source_key = "emulated_layout", false_variant = "ergopti", true_variant = "ergopti_plus", neutral_variant = "none" }]

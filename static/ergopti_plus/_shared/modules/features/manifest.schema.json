@@ -261,7 +261,7 @@
 				"superseded_reason_key": {
 					"type": "string",
 					"pattern": "^[a-z][a-z0-9_.]*$",
-					"description": "Locale key explaining why this feature is off while the Windows driver emulates a registry layout (layout.emulated_layout): the master gate turns it off and the menu greys its row with this reason. Only on a Windows-only boolean; the generator refuses it anywhere else."
+					"description": "Locale key explaining why this feature is off while the Windows driver emulates a registry layout (layout.emulated_layout): the master gate turns it off and the menu greys its row with this reason. Only on a Windows-only boolean or the exact declared helper-backed Ergopti variant; the generator refuses other enums."
 				},
 				"platforms": {
 					"type": "array",

@@ -25,6 +25,8 @@
 
 local M = {}
 
+local ModifierBroker = require("adapters.modifier_broker")
+
 local VALUE_UP = 0
 local VALUE_DOWN = 1
 
@@ -38,6 +40,9 @@ function M.new(channel)
 	local down_stack = {}
 	local physical_modifiers = {}
 	local finished = false
+	local broker = ModifierBroker.for_channel(channel)
+	local reservation = broker and broker.begin() or nil
+	if broker and not reservation then failure = "output broker reservation refused" end
 
 	local function mark_failed(reason, phase)
 		if not failure then
@@ -47,6 +52,7 @@ function M.new(channel)
 	end
 
 	local function channel_open()
+		if broker then return reservation ~= nil and reservation.is_open() end
 		if type(channel) ~= "table" or type(channel.emit) ~= "function" then return false end
 		if type(channel.is_open) ~= "function" then return true end
 		local ok, open = pcall(channel.is_open)
@@ -59,7 +65,11 @@ function M.new(channel)
 			mark_failed("uinput channel is not open", phase)
 			return false
 		end
-		local ok, emitted = pcall(channel.emit, code, value)
+		local ok, emitted
+		if reservation and phase == "physical modifier up" then ok, emitted = pcall(reservation.neutralize, code)
+		elseif reservation and (phase == "physical modifier restore" or phase == "physical modifier restore retry") then
+			ok, emitted = pcall(reservation.restore, code)
+		else ok, emitted = pcall(reservation and reservation.emit or channel.emit, code, value) end
 		if not ok or emitted ~= true then
 			if cleanup then cleanup_ok = false end
 			mark_failed(ok and "uinput emit returned false" or emitted, phase)
@@ -108,9 +118,13 @@ function M.new(channel)
 	--- @return boolean
 	function tx.neutralize(codes)
 		if finished or failure then return false end
+		local seen = {}
 		for _, code in ipairs(codes or {}) do
-			physical_modifiers[#physical_modifiers + 1] = code
-			if not wire(code, VALUE_UP, "physical modifier up", false) then return false end
+			if not seen[code] then
+				seen[code] = true
+				physical_modifiers[#physical_modifiers + 1] = code
+				if not wire(code, VALUE_UP, "physical modifier up", false) then return false end
+			end
 		end
 		return true
 	end
@@ -173,6 +187,10 @@ function M.new(channel)
 			end
 		end
 		physical_modifiers = {}
+		if reservation and not reservation.finish() then
+			cleanup_ok = false
+			mark_failed("output broker settlement refused", "finish")
+		end
 
 		return {
 			ok = failure == nil and cleanup_ok,

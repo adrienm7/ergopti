@@ -60,6 +60,7 @@ _ConfigMigrateOpFields() {
 	static Fields := Map(
 		"rename", [["section", "key"], ["to_section", "to_key"]],
 		"copy_if_absent", [["section", "key"], ["to_section", "to_key"]],
+		"move_ergopti_variant", [["section", "key", "to_key", "base_key", "alt_gr_key", "source_key", "false_variant", "true_variant"], ["neutral_variant"]],
 		"move_chord_action", [["section", "key", "to_section", "action", "conditional_key", "disabled_action", "platform"], []],
 		"move_section", [["section", "to_section"], []],
 		"merge_into", [["section", "to_section"], []],
@@ -128,6 +129,24 @@ _ConfigMigrateValidateOp(Op, Where) {
 	}
 	if ((Op["op"] == "rename" || Op["op"] == "copy_if_absent") && !Op.Has("to_section") && !Op.Has("to_key"))
 		throw Error(Where . ": " . Op["op"] . " needs to_section or to_key")
+	if Op["op"] == "move_ergopti_variant" {
+		for Field in ["base_key", "alt_gr_key", "source_key", "false_variant", "true_variant"] {
+			if !_ConfigMigrateIsBareKey(Op[Field])
+				throw Error(Where . ": variant intent fields must be declared bare identifiers")
+		}
+		if Op["key"] == Op["to_key"] || Op["false_variant"] == Op["true_variant"]
+			throw Error(Where . ": variant handoff requires distinct source, destination and choices")
+		if Op.Has("neutral_variant") && (!_ConfigMigrateIsBareKey(Op["neutral_variant"])
+			|| StrCompare(Op["neutral_variant"], Op["false_variant"], true) == 0
+			|| StrCompare(Op["neutral_variant"], Op["true_variant"], true) == 0)
+			throw Error(Where . ": neutral variant must be a distinct declared bare identifier")
+		Seen := Map()
+		for Field in ["key", "to_key", "base_key", "alt_gr_key", "source_key"] {
+			if Seen.Has(Op[Field])
+				throw Error(Where . ": variant intent participants must be distinct")
+			Seen[Op[Field]] := true
+		}
+	}
 	if (Op["op"] == "move_chord_action") {
 		if !(Op["platform"] is String) || !(Op["platform"] == "macos")
 			throw Error(Where . ": move_chord_action requires platform macos")
@@ -490,6 +509,8 @@ _ConfigMigrateApplyOp(Model, Op, Context := 0) {
 			if !Model.Has(ToSection)
 				Model[ToSection] := Map()
 			Model[ToSection][ToKey] := ManifestCloneValue(Model[Section][Op["key"]])
+		case "move_ergopti_variant":
+			_ConfigMigrateMoveErgoptiVariant(Model, Op)
 		case "move_chord_action":
 			_ConfigMigrateMoveChordAction(Model, Op, Context)
 		case "move_section":
@@ -719,12 +740,23 @@ ConfigMigratePlan(Source, Registry, Driver, Context := 0) {
 		Plan["detail"] := "legacy metadata is not addressable by this migration owner"
 		return Plan
 	}
+	try _ConfigMigrateVariantSourceWitness(Source, Scan, Before, Registry, Driver, Version)
+	catch ConfigMigrateVariantRefusal as Err {
+		Plan["outcome"] := "invalid"
+		Plan["detail"] := Err.Message
+		return Plan
+	}
 	try _ConfigMigrateRecordValidateSources(Scan, Before, Registry, Driver, Version)
 	catch as Err {
 		Plan["detail"] := "the migration record source refused: " . Err.Message
 		return Plan
 	}
-	After := ConfigMigrateApplySteps(_ConfigMigrateClone(Before), Registry, Driver, Version, Context)
+	try After := ConfigMigrateApplySteps(_ConfigMigrateClone(Before), Registry, Driver, Version, Context)
+	catch ConfigMigrateVariantRefusal as Err {
+		Plan["outcome"] := "invalid"
+		Plan["detail"] := Err.Message
+		return Plan
+	}
 	Updates := _ConfigMigrateWriterBatch(Before, After, &DropSections)
 	try {
 		if Updates.Length == 1 && DropSections.Length == 0
@@ -884,9 +916,12 @@ ConfigMigrateRun(FilePath, Registry := 0, Stamp := "", BackupFn := 0, PublishFn 
 		if !(Source is String)
 			return Refuse("failed", "the file is not exact UTF-8, so it cannot be backed up byte for byte")
 		Plan := ConfigMigratePlan(Source, Registry, "ahk", Context)
-		if (Plan["outcome"] != "migrated")
-			return Refuse("failed", Plan["detail"] != "" ? Plan["detail"]
+		if (Plan["outcome"] != "migrated") {
+			VariantInvalid := Plan["outcome"] == "invalid"
+				&& SubStr(Plan["detail"], 1, StrLen("Ergopti variant migration refused:")) == "Ergopti variant migration refused:"
+			return Refuse(VariantInvalid ? "invalid" : "failed", Plan["detail"] != "" ? Plan["detail"]
 				: "the file changed while it was classified")
+		}
 
 		BackupPath := ConfigMigrateBackupPath(FilePath, Registry["current"],
 			Stamp != "" ? Stamp : FormatTime(A_Now, "yyyyMMdd-HHmmss"))
@@ -913,7 +948,7 @@ ConfigMigrateRun(FilePath, Registry := 0, Stamp := "", BackupFn := 0, PublishFn 
 ; refusal, so a defect in the engine can never leave the session writing a
 ; file it did not version.
 ConfigMigrateBoot(FilePath) {
-	try return ConfigMigrateRun(FilePath)
+	try Result := ConfigMigrateRun(FilePath)
 	catch as Err {
 		Detail := "the config migration raised: " . Err.Message
 		TOML_RefuseWrites(FilePath, Detail)
@@ -922,4 +957,141 @@ ConfigMigrateBoot(FilePath) {
 		return Map("status", "failed", "read_only", 1, "from", "", "to", "", "backup", "",
 			"detail", Detail)
 	}
+	VariantRefusal := _ConfigMigrateVariantBootRefusal(Result, FilePath)
+	if VariantRefusal != "" {
+		if !Result.Get("read_only", false)
+			TOML_RefuseWrites(FilePath, VariantRefusal)
+		throw ConfigMigrateVariantRefusal(VariantRefusal)
+	}
+	return Result
+}
+
+; This typed refusal rejects successor readiness instead of changing helper ownership.
+class ConfigMigrateVariantRefusal extends Error {
+}
+
+; A scalar participant does not authorize an ancestor or descendant namespace.
+_ConfigMigrateVariantNamespaceClear(Model, Section, Key) {
+	View := _ConfigMigrateClone(Model)
+	if View.Has(Section) && View[Section].Has(Key)
+		View[Section].Delete(Key)
+	return _ConfigMigrateCopyDestinationAbsent(View, Section, Key)
+}
+
+_ConfigMigrateMoveErgoptiVariant(Model, Op) {
+	Section := Op["section"]
+	Entries := Model.Get(Section, Map())
+	Refuse := (Detail) => ConfigMigrateVariantRefusal("Ergopti variant migration refused: " . Detail)
+	for Field in ["key", "to_key", "base_key", "alt_gr_key", "source_key"] {
+		if !_ConfigMigrateVariantNamespaceClear(Model, Section, Op[Field])
+			throw Refuse("an intent participant has an occupied namespace")
+	}
+	for Field in ["base_key", "alt_gr_key"] {
+		if Entries.Has(Op[Field]) {
+			Gate := Entries[Op[Field]]
+			if !(Gate is TOML_Bool) || !(Gate.Value is Integer) || (Gate.Value != 0 && Gate.Value != 1)
+				throw Refuse("an independent layer gate is not an exact TOML boolean")
+		}
+	}
+	if Entries.Has(Op["source_key"]) {
+		Selected := Entries[Op["source_key"]]
+		if !(Selected is String) || (Selected != "" && !RegExMatch(Selected, "^[a-z][a-z0-9_]*$"))
+			throw Refuse("the registry source intent is malformed")
+	}
+	if Entries.Has(Op["to_key"]) {
+		Target := Entries[Op["to_key"]]
+		if !(Target is String) || !(StrCompare(Target, Op["false_variant"], true) == 0 || StrCompare(Target, Op["true_variant"], true) == 0
+			|| (Op.Has("neutral_variant") && StrCompare(Target, Op["neutral_variant"], true) == 0))
+			throw Refuse("the new variant is not a recognized exact choice")
+	}
+	if !Entries.Has(Op["key"])
+		return
+	Legacy := Entries[Op["key"]]
+	if !(Legacy is TOML_Bool) || !(Legacy.Value is Integer) || (Legacy.Value != 0 && Legacy.Value != 1)
+		throw Refuse("the historical variant is not an exact TOML boolean")
+	Variant := Legacy.Value ? Op["true_variant"] : Op["false_variant"]
+	if Entries.Has(Op["to_key"]) && StrCompare(Entries[Op["to_key"]], Variant, true) != 0
+		throw Refuse("recognized old and new variants conflict")
+	; Every typed/source/namespace witness precedes source consumption.
+	Entries[Op["to_key"]] := Variant
+	Entries.Delete(Op["key"])
+}
+
+
+; Joint intent reads require the same semantic, flat-model and physical owner.
+; Table arrays, root/inline owners and quoted/dotted aliases cannot stand in for
+; an addressable leaf, including when that leaf is retained rather than deleted.
+_ConfigMigrateVariantSourceWitness(Source, Scan, Before, Registry, Driver, FromVersion) {
+	Document := TOML_ParseDocument(Source)
+	for Step in Registry["steps"] {
+		if Step["from"] < FromVersion || !Step["drivers"].Has(Driver)
+			continue
+		for Op in Step["ops"] {
+			if Op["op"] != "move_ergopti_variant"
+				continue
+			Entries := Before.Get(Op["section"], Map())
+			for Field in ["key", "to_key", "base_key", "alt_gr_key", "source_key"] {
+				Key := Op[Field]
+				Parts := StrSplit(Op["section"], ".")
+				Parts.Push(Key)
+				Read := _TOML_DocumentLookup(Document, Parts)
+				if Read["blocked"] || Read["found"] != Entries.Has(Key)
+					throw ConfigMigrateVariantRefusal("Ergopti variant migration refused: joint source ownership disagrees")
+				if !Read["found"]
+					continue
+				if !ConfigMigrateSameValue(Read["value"], Entries[Key])
+					throw ConfigMigrateVariantRefusal("Ergopti variant migration refused: joint source types disagree")
+				Addressable := 0
+				for Record in Scan.Records {
+					if Record.Addressable && StrCompare(Record.Header.ModelSection, Op["section"], true) == 0
+							&& StrCompare(Record.Key, Key, true) == 0
+						Addressable += 1
+				}
+				if Addressable != 1
+					throw ConfigMigrateVariantRefusal("Ergopti variant migration refused: joint source is not one addressable physical leaf")
+			}
+		}
+	}
+}
+
+
+; A generic physical-record refusal must not silently erase an unmigrated
+; helper owner. Other migration refusals retain their existing startup policy.
+_ConfigMigrateVariantBootRefusal(Result, FilePath) {
+	Prefix := "Ergopti variant migration refused:"
+	if SubStr(Result.Get("detail", ""), 1, StrLen(Prefix)) == Prefix
+		return Result["detail"]
+	try {
+		Source := FSReadUtf8Exact(FilePath)
+		if !(Source is String)
+			return ""
+		Document := TOML_ParseDocument(Source)
+		Legacy := _TOML_DocumentLookup(Document, ["layout", "ergopti_plus"])
+		Variant := _TOML_DocumentLookup(Document, ["layout", "ergopti_variant"])
+	} catch {
+		return ""
+	}
+	if Legacy["found"] || Legacy["blocked"] || Variant["blocked"]
+		return Prefix . " historical or occupied variant ownership remains unadmitted"
+	if !Variant["found"]
+		return ""
+	Value := Variant["value"]
+	if !(Value is String) || (StrCompare(Value, "none", true) != 0 && StrCompare(Value, "ergopti", true) != 0 && StrCompare(Value, "ergopti_plus", true) != 0)
+		return Prefix . " current variant ownership is not a recognized exact choice"
+	if Result.Get("read_only", false)
+		return Prefix . " the joint source remains refused by its migration owner"
+	for Field in ["ergopti_base", "ergopti_alt_gr", "emulated_layout"] {
+		Read := _TOML_DocumentLookup(Document, ["layout", Field])
+		if Read["blocked"]
+			return Prefix . " an independent intent participant has an occupied namespace"
+		if !Read["found"]
+			continue
+		Value := Read["value"]
+		if Field == "emulated_layout" {
+			if !(Value is String) || (Value != "" && !RegExMatch(Value, "^[a-z][a-z0-9_]*$"))
+				return Prefix . " the registry source intent is malformed"
+		} else if !(Value is TOML_Bool) || !(Value.Value is Integer) || (Value.Value != 0 && Value.Value != 1)
+			return Prefix . " an independent layer gate is not an exact TOML boolean"
+	}
+	return ""
 }

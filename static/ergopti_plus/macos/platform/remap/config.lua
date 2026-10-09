@@ -887,4 +887,43 @@ function M.save_user_config(state, user_config_path, overwrite_corrupt, expected
 	return true, nil, receipt
 end
 
+
+--- Prepares only the chord leaves from an exact fresh settings source.
+--- Ordinary setters retain their existing save path and source policy.
+function M.prepare_copy_taps_to_chords(entries, actions, path)
+	local source, status = FileSystem.read_with_status(path)
+	assert(status == "absent" or (status == "ok" and type(source) == "string"), "fresh chord source could not be read")
+	local expected = { status = status, content = source }
+	local known = {}; for _, action in ipairs(actions) do known[action.id] = true end
+	local plan = require("tap_hold.key_combinations").plan_chord_copy(status == "absent" and "" or source, {
+		entries = entries, is_action = function(action) return known[action] == true end,
+		settings = { simultaneous_threshold_ms = SIMULTANEOUS_THRESHOLD_MS_DEFAULT, combo_symmetric = COMBO_SYMMETRIC_DEFAULT },
+	})
+	local prepared, detail, content, witnessed = require("toml_codec.writer").prepare_batch(path, plan.rows, FileSystem, expected)
+	assert(prepared == true and type(content) == "string" and type(witnessed) == "table", detail or "chord source preparation refused")
+	plan.path, plan.expected_source, plan.candidate = path, expected, content
+	return plan
+end
+
+--- Publishes only the exact prepared sparse candidate; retains native cleanup debt.
+function M.publish_copy_taps_to_chords(plan, current_path, admission)
+	assert(type(plan) == "table" and plan.path == current_path, "chord copy route changed")
+	assert(admission == nil or type(admission) == "function", "chord copy admission must be a function")
+	local Writer = require("toml_codec.writer")
+	local function admitted()
+		if Writer.write_refusal(plan.path) ~= nil then return false end
+		local accepted = admission == nil or admission() == true
+		return accepted and Writer.write_refusal(plan.path) == nil
+	end
+	-- The shared publisher owns session refusal and requires the same native
+	-- owner to run this captured admission after its final source observations.
+	-- A missing admitted capability refuses; the direct writer is no substitute.
+	local called, written, detail, cleanup = pcall(Writer.publish_if_unchanged,
+		plan.path, plan.candidate, FileSystem, plan.expected_source, nil, admitted)
+	local receipt = { path = plan.path, source = plan.expected_source, candidate = plan.candidate, verify_absence = true }
+	if type(cleanup) == "function" then receipt.publication_cleanup = cleanup end
+	if not called or written ~= true then return false, called and detail or written, type(cleanup) == "function" and receipt or nil end
+	return true, nil, receipt
+end
+
 return M

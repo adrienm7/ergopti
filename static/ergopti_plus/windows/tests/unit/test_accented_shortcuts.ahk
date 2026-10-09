@@ -184,19 +184,21 @@ _ACS_LayoutProviderPlacement(Tokens, AnyLayout) {
 	SavedState := State.Clone()
 	try {
 		Features := Map("layout", Map("ergopti_base", true, "ergopti_alt_gr", true,
-			"ergopti_plus", true, "ctrl_magic_save", false,
+			"ergopti_variant", "ergopti_plus", "ctrl_magic_save", false,
 			"direct_access_digits", "digits", "emulated_layout", ""))
 		State["initialized"] := false
 		Rows := _LAY_LayoutFeatureAltGrRows()
-		AssertEqual(2, Rows.Length, "the actual AltGr provider owns exactly its two declared overlays")
-		Expected := ["ergopti_alt_gr", "ergopti_plus"]
+		AssertEqual(1, Rows.Length, "the actual AltGr provider owns only its independent general layer")
+		Expected := ["ergopti_alt_gr"]
 		for Index, Id in Expected {
 			Entry := ManifestFindEntryByPath("layout." . Id)
 			Assert(Entry is Map, "each independently expected overlay must be declared")
 			AssertEqual(MenuLabelFromManifestEntry(Entry), Rows[Index]["label"],
-				"actual provider order must retain the two overlays without a digit-row duplicate")
+				"actual provider order retains the general layer without a variant or digit-row control")
 			AssertTrue(HasMethod(Rows[Index]["action"], "Call"), "each real overlay retains its native action")
 		}
+		AssertEqual(0, _ACS_CountLayoutToken(Tokens, "layout.ergopti_plus"), "the retired variant switch cannot reappear")
+		AssertEqual(0, _ACS_CountLayoutToken(Tokens, "layout.ergopti_variant"), "the internal variant cannot become a replacement public control")
 		Count := 0
 		for Index, Token in Tokens {
 			if Token == "number_row_policy" {

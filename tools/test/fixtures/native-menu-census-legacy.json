@@ -1,0 +1,1133 @@
+{
+	"_comment": "Frozen b06 legacy detector oracle and production traversal requirements. Expected sites come verbatim from the pre-existing recorded baseline, not from the scanner under test. Source excerpts retain the exact original line bytes (without LF). This is a static scanner fixture, not driver runtime evidence.",
+	"sourceCommit": "b06aefcb6386aa4b875c1c86c29e27c07ab8f951",
+	"baselineSha256": "c9551d611e87f09c02cf45f9e26d66b802fa8070f8b9f468d1331e52e64337f4",
+	"baseline": {
+		"_comment": "Native menu rows still built in driver code (tools/test/test-native-menu-rows.cjs). Lower with --update-baseline as rows move to the shared manifest; never raise.",
+		"windows": {
+			"count": 27,
+			"sites": [
+				"windows/infra/tray_bootstrap.ahk:54 add",
+				"windows/ui/menu/menu_hotstrings.ahk:913 append",
+				"windows/ui/menu/menu_hotstrings.ahk:1074 append",
+				"windows/ui/menu/menu_hotstrings.ahk:1251 append",
+				"windows/ui/menu/menu_hotstrings.ahk:1265 append",
+				"windows/ui/menu/menu_init.ahk:48 append",
+				"windows/ui/menu/menu_init.ahk:67 add",
+				"windows/ui/menu/menu_llm/menu_agent.ahk:50 append",
+				"windows/ui/menu/menu_llm/menu_agent.ahk:55 append",
+				"windows/ui/menu/menu_llm/menu_main.ahk:177 append",
+				"windows/ui/menu/menu_llm/menu_main.ahk:257 add",
+				"windows/ui/menu/menu_llm/menu_main.ahk:388 append",
+				"windows/ui/menu/menu_llm/menu_main.ahk:397 append",
+				"windows/ui/menu/menu_llm/menu_main.ahk:399 append",
+				"windows/ui/menu/menu_llm/menu_main.ahk:403 append",
+				"windows/ui/menu/menu_llm/menu_main.ahk:407 append",
+				"windows/ui/menu/menu_llm/menu_main.ahk:411 append",
+				"windows/ui/menu/menu_llm/menu_main.ahk:415 append",
+				"windows/ui/menu/menu_llm/menu_models.ahk:257 append",
+				"windows/ui/menu/menu_llm/menu_models.ahk:289 append",
+				"windows/ui/menu/menu_llm/menu_models.ahk:295 append",
+				"windows/ui/menu/menu_llm/menu_models.ahk:336 append",
+				"windows/ui/menu/menu_shortcuts.ahk:195 append",
+				"windows/ui/menu/menu_shortcuts.ahk:200 append",
+				"windows/ui/menu/menu_submenus.ahk:62 separator",
+				"windows/ui/menu/menu_submenus.ahk:170 separator",
+				"windows/ui/menu/menu_submenus.ahk:209 separator"
+			]
+		},
+		"macos": {
+			"count": 22,
+			"sites": [
+				"macos/ui/menu/builder.lua:452 separator",
+				"macos/ui/menu/builder.lua:876 separator",
+				"macos/ui/menu/menu_gestures.lua:205 static",
+				"macos/ui/menu/menu_gestures.lua:257 static",
+				"macos/ui/menu/menu_hotstrings.lua:297 static",
+				"macos/ui/menu/menu_hotstrings.lua:518 separator",
+				"macos/ui/menu/menu_hotstrings_custom.lua:259 static",
+				"macos/ui/menu/menu_hotstrings_management.lua:713 static",
+				"macos/ui/menu/menu_keyboard_slots.lua:152 static",
+				"macos/ui/menu/menu_keyboard_slots.lua:153 static",
+				"macos/ui/menu/menu_keyboard_slots.lua:218 static",
+				"macos/ui/menu/menu_keyboard_slots.lua:219 static",
+				"macos/ui/menu/menu_llm/init.lua:1955 static",
+				"macos/ui/menu/menu_llm/init.lua:2003 native",
+				"macos/ui/menu/menu_llm/models_manager_mlx_hf.lua:830 static",
+				"macos/ui/menu/menu_llm/profiles_manager.lua:1068 static",
+				"macos/ui/menu/menu_paths.lua:537 static",
+				"macos/ui/menu/menu_paths.lua:610 static",
+				"macos/ui/menu/menu_shortcuts.lua:541 static",
+				"macos/ui/menu/menu_shortcuts.lua:644 separator",
+				"macos/ui/menu/menu_tap_holds.lua:1155 static",
+				"macos/ui/menu/menu_tap_keys.lua:59 static"
+			]
+		},
+		"linux": {
+			"count": 30,
+			"sites": [
+				"linux/ui/menu/menu_builder.lua:255 static",
+				"linux/ui/menu/menu_builder.lua:283 static",
+				"linux/ui/menu/menu_builder.lua:289 static",
+				"linux/ui/menu/menu_builder.lua:369 static",
+				"linux/ui/menu/menu_builder.lua:523 static",
+				"linux/ui/menu/menu_builder.lua:561 static",
+				"linux/ui/menu/menu_builder.lua:824 static",
+				"linux/ui/menu/menu_builder.lua:991 static",
+				"linux/ui/menu/menu_builder.lua:1016 separator",
+				"linux/ui/menu/menu_builder.lua:1475 static",
+				"linux/ui/menu/menu_builder.lua:1493 separator",
+				"linux/ui/menu/menu_builder.lua:1497 separator",
+				"linux/ui/menu/menu_builder.lua:1795 static",
+				"linux/ui/menu/menu_builder.lua:2048 static",
+				"linux/ui/menu/menu_builder.lua:2090 static",
+				"linux/ui/menu/menu_builder.lua:2152 static",
+				"linux/ui/menu/menu_builder.lua:2859 static",
+				"linux/ui/menu/menu_builder.lua:2868 static",
+				"linux/ui/menu/menu_builder.lua:3391 static",
+				"linux/ui/menu/menu_builder.lua:3829 static",
+				"linux/ui/menu/menu_builder.lua:3883 static",
+				"linux/ui/menu/menu_builder.lua:3914 static",
+				"linux/ui/menu/menu_builder.lua:3915 static",
+				"linux/ui/menu/menu_builder.lua:4048 static",
+				"linux/ui/menu/menu_builder.lua:4057 static",
+				"linux/ui/menu/menu_builder.lua:4207 static",
+				"linux/ui/menu/menu_builder.lua:4588 static",
+				"linux/ui/menu/menu_builder.lua:4660 static",
+				"linux/ui/menu/menu_builder.lua:4945 separator",
+				"linux/ui/menu/menu_builder.lua:4969 separator"
+			]
+		}
+	},
+	"drivers": {
+		"windows": {
+			"sourceFiles": [
+				"windows/ErgoptiPlus.ahk",
+				"windows/adapters/app_launcher.ahk",
+				"windows/adapters/boot_clock.ahk",
+				"windows/adapters/clipboard.ahk",
+				"windows/adapters/console_window.ahk",
+				"windows/adapters/crash_report_worker.ahk",
+				"windows/adapters/crypto.ahk",
+				"windows/adapters/editor_replace.ahk",
+				"windows/adapters/file_system.ahk",
+				"windows/adapters/graphics_renderer.ahk",
+				"windows/adapters/hotkey_registrar.ahk",
+				"windows/adapters/http_client.ahk",
+				"windows/adapters/key_state.ahk",
+				"windows/adapters/keyboard_hook.ahk",
+				"windows/adapters/llm_nav_event_owner.ahk",
+				"windows/adapters/mouse_control.ahk",
+				"windows/adapters/native_folder_picker.ahk",
+				"windows/adapters/native_number.ahk",
+				"windows/adapters/network_failure_host.ahk",
+				"windows/adapters/network_info.ahk",
+				"windows/adapters/notifier.ahk",
+				"windows/adapters/process_lifecycle.ahk",
+				"windows/adapters/program_providers.ahk",
+				"windows/adapters/screen_brightness.ahk",
+				"windows/adapters/secure_field_detector.ahk",
+				"windows/adapters/shell_runner.ahk",
+				"windows/adapters/storage.ahk",
+				"windows/adapters/system_control.ahk",
+				"windows/adapters/text_sender.ahk",
+				"windows/adapters/timer_scheduler.ahk",
+				"windows/adapters/tooltip_renderer.ahk",
+				"windows/adapters/tray_startup_click.ahk",
+				"windows/adapters/tray_startup_commands.ahk",
+				"windows/adapters/uia_worker.ahk",
+				"windows/adapters/user_hotstrings_native.ahk",
+				"windows/adapters/webview_profiles.ahk",
+				"windows/adapters/window_info.ahk",
+				"windows/adapters/window_manager.ahk",
+				"windows/infra/altgr_family.ahk",
+				"windows/infra/app_picker.ahk",
+				"windows/infra/app_state.ahk",
+				"windows/infra/boot.ahk",
+				"windows/infra/boot_profiler.ahk",
+				"windows/infra/bundle.ahk",
+				"windows/infra/chord.ahk",
+				"windows/infra/config_global_scope.ahk",
+				"windows/infra/config_io.ahk",
+				"windows/infra/config_migrate.ahk",
+				"windows/infra/config_migrate_records.ahk",
+				"windows/infra/config_registry_cache.ahk",
+				"windows/infra/config_scope.ahk",
+				"windows/infra/config_shortcuts.ahk",
+				"windows/infra/config_transition.ahk",
+				"windows/infra/config_transition_runtime.ahk",
+				"windows/infra/config_unused_keys.ahk",
+				"windows/infra/config_write_lease.ahk",
+				"windows/infra/diagnostic_snapshot.ahk",
+				"windows/infra/error_net.ahk",
+				"windows/infra/error_policy.ahk",
+				"windows/infra/error_report.ahk",
+				"windows/infra/external_url_policy.ahk",
+				"windows/infra/feature_io.ahk",
+				"windows/infra/feature_state.ahk",
+				"windows/infra/file_read_activity.ahk",
+				"windows/infra/first_boot.ahk",
+				"windows/infra/hook_dispatcher.ahk",
+				"windows/infra/hotpath_profiler.ahk",
+				"windows/infra/hotstrings/common_autocorrection_migration.ahk",
+				"windows/infra/hotstrings/extension_packs.ahk",
+				"windows/infra/hotstrings/hotstring_buffer_effects.ahk",
+				"windows/infra/hotstrings/hotstring_builder.ahk",
+				"windows/infra/hotstrings/hotstring_count_policy.ahk",
+				"windows/infra/hotstrings/hotstring_dispatch.ahk",
+				"windows/infra/hotstrings/hotstring_engine.ahk",
+				"windows/infra/hotstrings/hotstring_engine_main.ahk",
+				"windows/infra/hotstrings/hotstring_inputhook.ahk",
+				"windows/infra/hotstrings/hotstring_live_toggle.ahk",
+				"windows/infra/hotstrings/hotstring_match.ahk",
+				"windows/infra/hotstrings/hotstring_prefix_watcher.ahk",
+				"windows/infra/hotstrings/hotstring_registry.ahk",
+				"windows/infra/hotstrings/hotstring_send.ahk",
+				"windows/infra/hotstrings/hotstrings_cache.ahk",
+				"windows/infra/hotstrings/hotstrings_catalogue.ahk",
+				"windows/infra/hotstrings/hotstrings_config.ahk",
+				"windows/infra/hotstrings/hotstrings_io.ahk",
+				"windows/infra/hotstrings/hotstrings_scope.ahk",
+				"windows/infra/hotstrings/personal_file_controls.ahk",
+				"windows/infra/hotstrings/personal_toml_io.ahk",
+				"windows/infra/i18n.ahk",
+				"windows/infra/issue_link.ahk",
+				"windows/infra/issue_report.ahk",
+				"windows/infra/json.ahk",
+				"windows/infra/key_combinations.ahk",
+				"windows/infra/lifecycle.ahk",
+				"windows/infra/lifecycle_transition.ahk",
+				"windows/infra/llm_defaults.ahk",
+				"windows/infra/locale.ahk",
+				"windows/infra/logger.ahk",
+				"windows/infra/magic_editor.ahk",
+				"windows/infra/manifest_descriptions.ahk",
+				"windows/infra/manifest_reader.ahk",
+				"windows/infra/master_gates.ahk",
+				"windows/infra/menu_command_origin.ahk",
+				"windows/infra/menu_helpers.ahk",
+				"windows/infra/menu_manifest.ahk",
+				"windows/infra/menu_population.ahk",
+				"windows/infra/menu_startup_commands.ahk",
+				"windows/infra/metrics/metrics_filters.ahk",
+				"windows/infra/metrics/metrics_shortcuts.ahk",
+				"windows/infra/native_dialogs.ahk",
+				"windows/infra/native_folder_picker.ahk",
+				"windows/infra/nav_layer_helpers.ahk",
+				"windows/infra/number.ahk",
+				"windows/infra/personal_features.ahk",
+				"windows/infra/personal_info_mask.ahk",
+				"windows/infra/personal_info_preview.ahk",
+				"windows/infra/program_actions.ahk",
+				"windows/infra/program_parameter.ahk",
+				"windows/infra/redact.ahk",
+				"windows/infra/registry.ahk",
+				"windows/infra/reload_deferral.ahk",
+				"windows/infra/reload_successor.ahk",
+				"windows/infra/reload_terminal_handoff.ahk",
+				"windows/infra/script_altgr_hotkeys.ahk",
+				"windows/infra/send_input_parameter.ahk",
+				"windows/infra/single_instance_gate.ahk",
+				"windows/infra/sqlite3.ahk",
+				"windows/infra/start_at_login.ahk",
+				"windows/infra/startup_smoke.ahk",
+				"windows/infra/suppressive_inputhook_ownership.ahk",
+				"windows/infra/suspend_handoff.ahk",
+				"windows/infra/tap_keys.ahk",
+				"windows/infra/text_case.ahk",
+				"windows/infra/text_utils.ahk",
+				"windows/infra/tick_count.ahk",
+				"windows/infra/timings/timings_config.ahk",
+				"windows/infra/toml/config_snapshot.ahk",
+				"windows/infra/toml/toml_config_loader.ahk",
+				"windows/infra/toml/toml_document.ahk",
+				"windows/infra/toml/toml_helpers.ahk",
+				"windows/infra/toml/toml_inline_tables.ahk",
+				"windows/infra/toml/toml_loader.ahk",
+				"windows/infra/tray_bootstrap.ahk",
+				"windows/infra/ui_style.ahk",
+				"windows/infra/uninstall.ahk",
+				"windows/infra/wall_clock.ahk",
+				"windows/infra/webview_browser_warmup.ahk",
+				"windows/infra/webview_script.ahk",
+				"windows/infra/webview_utils.ahk",
+				"windows/infra/window_utils.ahk",
+				"windows/infra/wrap_pair.ahk",
+				"windows/infra/wrap_symbols_config.ahk",
+				"windows/modules/diagnostics/crash_reporter.ahk",
+				"windows/modules/dynamic_hotstrings/dynamic_hotstrings.ahk",
+				"windows/modules/dynamic_hotstrings/user_code.ahk",
+				"windows/modules/gestures/actions.ahk",
+				"windows/modules/gestures/click.ahk",
+				"windows/modules/gestures/config.ahk",
+				"windows/modules/gestures/constants.ahk",
+				"windows/modules/gestures/init.ahk",
+				"windows/modules/gestures/screenshots.ahk",
+				"windows/modules/gestures/system_actions.ahk",
+				"windows/modules/gestures/touchpad_registry.ahk",
+				"windows/modules/gestures/virtual_desktops.ahk",
+				"windows/modules/gestures/window_cycle.ahk",
+				"windows/modules/hotstrings.ahk",
+				"windows/modules/hotstrings/hotstrings_autocorrection.ahk",
+				"windows/modules/hotstrings/hotstrings_distances.ahk",
+				"windows/modules/hotstrings/hotstrings_helpers.ahk",
+				"windows/modules/hotstrings/hotstrings_personal.ahk",
+				"windows/modules/hotstrings/hotstrings_text_expansion.ahk",
+				"windows/modules/keylogger/keylogger.ahk",
+				"windows/modules/keylogger/keylogger_app_categories.ahk",
+				"windows/modules/keylogger/keylogger_av_state.ahk",
+				"windows/modules/keylogger/keylogger_clipboard.ahk",
+				"windows/modules/keylogger/keylogger_constants.ahk",
+				"windows/modules/keylogger/keylogger_device.ahk",
+				"windows/modules/keylogger/keylogger_ergonomics.ahk",
+				"windows/modules/keylogger/keylogger_event_id.ahk",
+				"windows/modules/keylogger/keylogger_health.ahk",
+				"windows/modules/keylogger/keylogger_hook.ahk",
+				"windows/modules/keylogger/keylogger_hotstring_log.ahk",
+				"windows/modules/keylogger/keylogger_hotstring_units.ahk",
+				"windows/modules/keylogger/keylogger_ingest.ahk",
+				"windows/modules/keylogger/keylogger_journal.ahk",
+				"windows/modules/keylogger/keylogger_journal_io.ahk",
+				"windows/modules/keylogger/keylogger_journal_owner.ahk",
+				"windows/modules/keylogger/keylogger_json.ahk",
+				"windows/modules/keylogger/keylogger_llm_journal.ahk",
+				"windows/modules/keylogger/keylogger_mouse.ahk",
+				"windows/modules/keylogger/keylogger_network.ahk",
+				"windows/modules/keylogger/keylogger_password.ahk",
+				"windows/modules/keylogger/keylogger_prefetch.ahk",
+				"windows/modules/keylogger/keylogger_prefetch_seed.ahk",
+				"windows/modules/keylogger/keylogger_reader.ahk",
+				"windows/modules/keylogger/keylogger_reader_cache.ahk",
+				"windows/modules/keylogger/keylogger_reader_db.ahk",
+				"windows/modules/keylogger/keylogger_reader_ledger_catalog.ahk",
+				"windows/modules/keylogger/keylogger_reader_manifest.ahk",
+				"windows/modules/keylogger/keylogger_reader_manifest_json.ahk",
+				"windows/modules/keylogger/keylogger_reader_ngrams.ahk",
+				"windows/modules/keylogger/keylogger_reader_rebuild.ahk",
+				"windows/modules/keylogger/keylogger_roi_prune.ahk",
+				"windows/modules/keylogger/keylogger_rollover.ahk",
+				"windows/modules/keylogger/keylogger_sensors.ahk",
+				"windows/modules/keylogger/keylogger_session_events.ahk",
+				"windows/modules/keylogger/keylogger_shutdown.ahk",
+				"windows/modules/keylogger/keylogger_sql.ahk",
+				"windows/modules/keylogger/keylogger_sql_append.ahk",
+				"windows/modules/keylogger/keylogger_system_event_owner.ahk",
+				"windows/modules/keylogger/keylogger_system_events.ahk",
+				"windows/modules/keylogger/keylogger_system_intervals.ahk",
+				"windows/modules/keylogger/keylogger_text_cipher.ahk",
+				"windows/modules/keylogger/keylogger_text_migration.ahk",
+				"windows/modules/keylogger/keylogger_trigger_roi.ahk",
+				"windows/modules/keylogger/keylogger_ui.ahk",
+				"windows/modules/keylogger/keylogger_walker.ahk",
+				"windows/modules/keylogger/keylogger_walker_core.ahk",
+				"windows/modules/keylogger/keylogger_walker_events.ahk",
+				"windows/modules/keylogger/keylogger_walker_sql.ahk",
+				"windows/modules/keylogger/keylogger_watchers.ahk",
+				"windows/modules/keylogger/keylogger_webview.ahk",
+				"windows/modules/keylogger/keylogger_webview_range_mount.ahk",
+				"windows/modules/keylogger/keylogger_webview_range_script.ahk",
+				"windows/modules/keylogger/keylogger_window_topology.ahk",
+				"windows/modules/keymap/keylayout/keylayout_emulation.ahk",
+				"windows/modules/keymap/keylayout/keylayout_parser.ahk",
+				"windows/modules/keymap/keylayout/keylayout_tables.ahk",
+				"windows/modules/keymap/keylayout/layout_catalogue.ahk",
+				"windows/modules/keymap/keylayout/layout_extension.ahk",
+				"windows/modules/keymap/keylayout/layout_registry.ahk",
+				"windows/modules/keymap/layout.ahk",
+				"windows/modules/keymap/layout/accented_shortcuts.ahk",
+				"windows/modules/keymap/layout/layout_altgr.ahk",
+				"windows/modules/keymap/layout/layout_ergopti.ahk",
+				"windows/modules/keymap/layout/layout_shift_caps.ahk",
+				"windows/modules/keymap/layout_poll_helper.ahk",
+				"windows/modules/keymap/llm_bridge.ahk",
+				"windows/modules/keymap/uia_selection_worker.ahk",
+				"windows/modules/keymap/uia_selection_worker_entry.ahk",
+				"windows/modules/llm/agent.ahk",
+				"windows/modules/llm/agent_action.ahk",
+				"windows/modules/llm/agent_connectors.ahk",
+				"windows/modules/llm/api_common.ahk",
+				"windows/modules/llm/api_ollama.ahk",
+				"windows/modules/llm/api_ollama/curl_environment.ahk",
+				"windows/modules/llm/api_ollama/init.ahk",
+				"windows/modules/llm/api_ollama/ollama_http.ahk",
+				"windows/modules/llm/api_ollama/ollama_payload.ahk",
+				"windows/modules/llm/api_ollama/ollama_streaming.ahk",
+				"windows/modules/llm/api_ollama/ollama_warmup.ahk",
+				"windows/modules/llm/api_remote.ahk",
+				"windows/modules/llm/api_token_crypto.ahk",
+				"windows/modules/llm/local_model_offer.ahk",
+				"windows/modules/llm/local_server_models.ahk",
+				"windows/modules/llm/local_servers.ahk",
+				"windows/modules/llm/models.ahk",
+				"windows/modules/llm/ollama_deps_checker.ahk",
+				"windows/modules/llm/ollama_webview.ahk",
+				"windows/modules/llm/option_validation.ahk",
+				"windows/modules/llm/parser.ahk",
+				"windows/modules/llm/prediction_engine.ahk",
+				"windows/modules/llm/prediction_exec.ahk",
+				"windows/modules/llm/prediction_keylogger.ahk",
+				"windows/modules/llm/prediction_live.ahk",
+				"windows/modules/llm/profiles.ahk",
+				"windows/modules/llm/prompt_action.ahk",
+				"windows/modules/llm/remote_formats.ahk",
+				"windows/modules/llm/rewrite.ahk",
+				"windows/modules/llm/tone.ahk",
+				"windows/modules/llm/tone_action.ahk",
+				"windows/modules/llm/translate.ahk",
+				"windows/modules/llm/translate_action.ahk",
+				"windows/modules/llm/vision.ahk",
+				"windows/modules/llm/vision_action.ahk",
+				"windows/modules/shortcuts.ahk",
+				"windows/modules/shortcuts/capsword.ahk",
+				"windows/modules/shortcuts/ctrl.ahk",
+				"windows/modules/shortcuts/tap_keys.ahk",
+				"windows/modules/shortcuts/utils.ahk",
+				"windows/modules/shortcuts/win.ahk",
+				"windows/modules/take_note.ahk",
+				"windows/modules/updater.ahk",
+				"windows/modules/updater/changelog.ahk",
+				"windows/modules/updater/channels.ahk",
+				"windows/modules/updater/config_backup.ahk",
+				"windows/modules/updater/core.ahk",
+				"windows/modules/updater/release_install.ahk",
+				"windows/modules/updater/schedule.ahk",
+				"windows/modules/updater/self_update.ahk",
+				"windows/platform/remap.ahk",
+				"windows/platform/remap/altgr.ahk",
+				"windows/platform/remap/altgr_criteria.ahk",
+				"windows/platform/remap/backspace.ahk",
+				"windows/platform/remap/capslock.ahk",
+				"windows/platform/remap/constants.ahk",
+				"windows/platform/remap/delete.ahk",
+				"windows/platform/remap/enter.ahk",
+				"windows/platform/remap/escape.ahk",
+				"windows/platform/remap/key_combination_keys.ahk",
+				"windows/platform/remap/lalt.ahk",
+				"windows/platform/remap/layers_loader.ahk",
+				"windows/platform/remap/lshift_lctrl.ahk",
+				"windows/platform/remap/nav_layer.ahk",
+				"windows/platform/remap/nav_layer_table.ahk",
+				"windows/platform/remap/one_shot_shift.ahk",
+				"windows/platform/remap/rctrl.ahk",
+				"windows/platform/remap/rshift.ahk",
+				"windows/platform/remap/space.ahk",
+				"windows/platform/remap/tab.ahk",
+				"windows/platform/remap/tap_hold_loader.ahk",
+				"windows/platform/remap/tap_hold_roll.ahk",
+				"windows/platform/remap/tap_hold_roll_keys.ahk",
+				"windows/platform/remap/tap_hold_writer.ahk",
+				"windows/platform/remap/win.ahk",
+				"windows/ui/action_picker/init.ahk",
+				"windows/ui/action_picker_webview.ahk",
+				"windows/ui/changelog/init.ahk",
+				"windows/ui/config_cleanup/init.ahk",
+				"windows/ui/console_window.ahk",
+				"windows/ui/download_window/init.ahk",
+				"windows/ui/download_window/session.ahk",
+				"windows/ui/editors.ahk",
+				"windows/ui/error_dialog/init.ahk",
+				"windows/ui/gesture_conflicts.ahk",
+				"windows/ui/healthcheck/actions.ahk",
+				"windows/ui/healthcheck/core.ahk",
+				"windows/ui/healthcheck/helpers.ahk",
+				"windows/ui/healthcheck/init.ahk",
+				"windows/ui/healthcheck/probes.ahk",
+				"windows/ui/healthcheck/report.ahk",
+				"windows/ui/hotstrings_config_window/hcw_helpers.ahk",
+				"windows/ui/hotstrings_config_window/hcw_mutations.ahk",
+				"windows/ui/hotstrings_config_window/init.ahk",
+				"windows/ui/hotstrings_config_window/webview.ahk",
+				"windows/ui/layer_editor/init.ahk",
+				"windows/ui/layout_manager/init.ahk",
+				"windows/ui/log_openers.ahk",
+				"windows/ui/menu/menu_actions.ahk",
+				"windows/ui/menu/menu_gestures.ahk",
+				"windows/ui/menu/menu_hotstring_switches.ahk",
+				"windows/ui/menu/menu_hotstrings.ahk",
+				"windows/ui/menu/menu_init.ahk",
+				"windows/ui/menu/menu_layout.ahk",
+				"windows/ui/menu/menu_llm/_index.ahk",
+				"windows/ui/menu/menu_llm/actions.ahk",
+				"windows/ui/menu/menu_llm/aux_ownership.ahk",
+				"windows/ui/menu/menu_llm/backend_lifecycle.ahk",
+				"windows/ui/menu/menu_llm/enable_admission.ahk",
+				"windows/ui/menu/menu_llm/hotkey_identity.ahk",
+				"windows/ui/menu/menu_llm/init.ahk",
+				"windows/ui/menu/menu_llm/local_server_panel.ahk",
+				"windows/ui/menu/menu_llm/menu_agent.ahk",
+				"windows/ui/menu/menu_llm/menu_api_entries.ahk",
+				"windows/ui/menu/menu_llm/menu_build_coordinator.ahk",
+				"windows/ui/menu/menu_llm/menu_main.ahk",
+				"windows/ui/menu/menu_llm/menu_models.ahk",
+				"windows/ui/menu/menu_llm/menu_profiles.ahk",
+				"windows/ui/menu/menu_llm/menu_settings.ahk",
+				"windows/ui/menu/menu_llm/persist.ahk",
+				"windows/ui/menu/menu_llm/tab_accept.ahk",
+				"windows/ui/menu/menu_llm/transactions.ahk",
+				"windows/ui/menu/menu_metrics.ahk",
+				"windows/ui/menu/menu_metrics_actions.ahk",
+				"windows/ui/menu/menu_shortcuts.ahk",
+				"windows/ui/menu/menu_submenus.ahk",
+				"windows/ui/menu/menu_taphold.ahk",
+				"windows/ui/model_browser/init.ahk",
+				"windows/ui/onboarding/answers.ahk",
+				"windows/ui/onboarding/core.ahk",
+				"windows/ui/onboarding/finish.ahk",
+				"windows/ui/onboarding/gesture_registration.ahk",
+				"windows/ui/onboarding/init.ahk",
+				"windows/ui/onboarding/webview.ahk",
+				"windows/ui/paths_editor/init.ahk",
+				"windows/ui/personal_info_editor/init.ahk",
+				"windows/ui/personal_toml_editor.ahk",
+				"windows/ui/personal_toml_editor_webview.ahk",
+				"windows/ui/prompt_editor/init.ahk",
+				"windows/ui/spotlight/init.ahk",
+				"windows/ui/spotlight/ownership.ahk",
+				"windows/ui/tooltip/border_gdi_ownership.ahk",
+				"windows/ui/tooltip/core.ahk",
+				"windows/ui/tooltip/helpers.ahk",
+				"windows/ui/tooltip/init.ahk",
+				"windows/ui/tooltip/llm.ahk",
+				"windows/ui/tooltip/measure_gdi_ownership.ahk",
+				"windows/ui/tooltip/position_receipt.ahk",
+				"windows/ui/tooltip/position_refinement.ahk",
+				"windows/ui/tooltip/tooltip_llm.ahk",
+				"windows/ui/tray_menu.ahk",
+				"windows/ui/update_check/init.ahk",
+				"windows/ui/wpm/init.ahk",
+				"windows/ui/wpm/wpm_config.ahk",
+				"windows/ui/wpm/wpm_display.ahk",
+				"windows/ui/wpm/wpm_gdiplus_ownership.ahk",
+				"windows/ui/wpm/wpm_widget.ahk"
+			],
+			"excerpts": [
+				{
+					"path": "windows/infra/tray_bootstrap.ahk",
+					"sourceSha256": "646af344664856b8b453f67577f5947f7784705f8742054b2c8e29df36b7b9c1",
+					"lines": [
+						{
+							"line": 54,
+							"source": "\t\tMenuObj.Add(Label, _TrayBootstrapNoOp)",
+							"expectedSite": "windows/infra/tray_bootstrap.ahk:54 add"
+						}
+					]
+				},
+				{
+					"path": "windows/ui/menu/menu_hotstrings.ahk",
+					"sourceSha256": "3a98a160df15a0beed82ee78a36ac540f2ed838487fea1a29f010ff268c96ccc",
+					"lines": [
+						{
+							"line": 913,
+							"source": "\t\tif MenuRenderer_AppendTemplate(DefaultSectionMenu, \"hotstring_personal_default_frame\", DefaultCommands, DefaultGetters, DefaultProviders, &WholeTreeAdmitted) != DefaultRows.Length + 1 || !WholeTreeAdmitted",
+							"expectedSite": "windows/ui/menu/menu_hotstrings.ahk:913 append"
+						},
+						{
+							"line": 1074,
+							"source": "\tif MenuRenderer_AppendTemplate(TFMenu, \"hotstring_personal_file_frame\", Commands, Getters, Providers, &WholeTreeAdmitted) != 1 + ControlRows.Length + SectionRows.Length || !WholeTreeAdmitted",
+							"expectedSite": "windows/ui/menu/menu_hotstrings.ahk:1074 append"
+						},
+						{
+							"line": 1251,
+							"source": "\t\tif MenuRenderer_AppendTemplate(FolderMenu, \"hotstring_personal_directory_frame\", Map(), Getters, Providers, &WholeTreeAdmitted) != SubfolderRows.Length + FileRows.Length || !WholeTreeAdmitted",
+							"expectedSite": "windows/ui/menu/menu_hotstrings.ahk:1251 append"
+						},
+						{
+							"line": 1265,
+							"source": "\t} else if MenuRenderer_AppendTemplate(ParentMenu, \"hotstring_personal_directory_frame\", Map(), Getters, Providers, &WholeTreeAdmitted) != FolderRows.Length || !WholeTreeAdmitted",
+							"expectedSite": "windows/ui/menu/menu_hotstrings.ahk:1265 append"
+						}
+					]
+				},
+				{
+					"path": "windows/ui/menu/menu_init.ahk",
+					"sourceSha256": "4abbdb94abdbed56d64b53d0a4609381d046158bcf33a1504e9f43009ff26f6d",
+					"lines": [
+						{
+							"line": 48,
+							"source": "\tMenuRenderer_AppendTemplate(ShortcutsMenu, \"personal_shortcuts_frame\", Map(), Map(),",
+							"expectedSite": "windows/ui/menu/menu_init.ahk:48 append"
+						},
+						{
+							"line": 67,
+							"source": "\t\t\tA_TrayMenu.Add(t(\"menu.global.language\"), StagedMenu)",
+							"expectedSite": "windows/ui/menu/menu_init.ahk:67 add"
+						}
+					]
+				},
+				{
+					"path": "windows/ui/menu/menu_llm/menu_agent.ahk",
+					"sourceSha256": "7120ce73672ea0cba2b5be99ec59a464257c3beec400996613a555639b3855a4",
+					"lines": [
+						{
+							"line": 50,
+							"source": "\tMenuRenderer_AppendRows(Target, \"agent_menu\", Key, [_LLM_Agent_SystemRow(Key)])",
+							"expectedSite": "windows/ui/menu/menu_llm/menu_agent.ahk:50 append"
+						},
+						{
+							"line": 55,
+							"source": "\tMenuRenderer_AppendRows(Target, \"agent_menu\", \"agent_disabled_apps\", [_LLM_Agent_AppsRow()])",
+							"expectedSite": "windows/ui/menu/menu_llm/menu_agent.ahk:55 append"
+						}
+					]
+				},
+				{
+					"path": "windows/ui/menu/menu_llm/menu_main.ahk",
+					"sourceSha256": "ed74417ce0dcb3e4483ef1018b9954fb6f756fc762fd7a4b1e8c9887897ccb0b",
+					"lines": [
+						{
+							"line": 177,
+							"source": "\t\tMenuRenderer_AppendRows(TargetMenu, \"llm_menu\", \"install_warning\", WarningRows)",
+							"expectedSite": "windows/ui/menu/menu_llm/menu_main.ahk:177 append"
+						},
+						{
+							"line": 257,
+							"source": "\t_LLM_Menu_Handle.Add(label, target)",
+							"expectedSite": "windows/ui/menu/menu_llm/menu_main.ahk:257 add"
+						},
+						{
+							"line": 388,
+							"source": "\t\t\tMenuRenderer_AppendRows(_LLM_Menu_Handle, \"llm_menu\", \"llm_thinking_info\", InfoRows)",
+							"expectedSite": "windows/ui/menu/menu_llm/menu_main.ahk:388 append"
+						},
+						{
+							"line": 397,
+							"source": "\t\tMenuRenderer_AppendRows(_LLM_Menu_Handle, \"llm_menu\", \"llm_after_profile_boundary\", BoundaryRows)",
+							"expectedSite": "windows/ui/menu/menu_llm/menu_main.ahk:397 append"
+						},
+						{
+							"line": 399,
+							"source": "\t\tif !MenuRenderer_AppendGroup(_LLM_Menu_Handle, \"llm_menu\", \"llm_trigger\",",
+							"expectedSite": "windows/ui/menu/menu_llm/menu_main.ahk:399 append"
+						},
+						{
+							"line": 403,
+							"source": "\t\tif !MenuRenderer_AppendGroup(_LLM_Menu_Handle, \"llm_menu\", \"llm_live_mode\",",
+							"expectedSite": "windows/ui/menu/menu_llm/menu_main.ahk:403 append"
+						},
+						{
+							"line": 407,
+							"source": "\t\tif !MenuRenderer_AppendGroup(_LLM_Menu_Handle, \"llm_menu\", \"llm_generation_settings\",",
+							"expectedSite": "windows/ui/menu/menu_llm/menu_main.ahk:407 append"
+						},
+						{
+							"line": 411,
+							"source": "\t\tif !MenuRenderer_AppendGroup(_LLM_Menu_Handle, \"llm_menu\", \"llm_display\",",
+							"expectedSite": "windows/ui/menu/menu_llm/menu_main.ahk:411 append"
+						},
+						{
+							"line": 415,
+							"source": "\t\tif !MenuRenderer_AppendGroup(_LLM_Menu_Handle, \"llm_menu\", \"llm_navigation\",",
+							"expectedSite": "windows/ui/menu/menu_llm/menu_main.ahk:415 append"
+						}
+					]
+				},
+				{
+					"path": "windows/ui/menu/menu_llm/menu_models.ahk",
+					"sourceSha256": "6ca16b808fe16052aca941eb2620253a0f9e34e59ab7d360bb7c88696813b01a",
+					"lines": [
+						{
+							"line": 257,
+							"source": "\tMenuRenderer_AppendRows(m, \"llm_menu\", \"llm_model\", HeadRows)",
+							"expectedSite": "windows/ui/menu/menu_llm/menu_models.ahk:257 append"
+						},
+						{
+							"line": 289,
+							"source": "\t\tMenuRenderer_AppendRows(m, \"llm_menu\", \"llm_model\", TagRows)",
+							"expectedSite": "windows/ui/menu/menu_llm/menu_models.ahk:289 append"
+						},
+						{
+							"line": 295,
+							"source": "\tMenuRenderer_AppendRows(m, \"llm_menu\", \"llm_model\", _LLM_Menu_ModelTailRows())",
+							"expectedSite": "windows/ui/menu/menu_llm/menu_models.ahk:295 append"
+						},
+						{
+							"line": 336,
+							"source": "\tMenuRenderer_AppendRows(m, \"llm_menu\", \"llm_model\", Rows)",
+							"expectedSite": "windows/ui/menu/menu_llm/menu_models.ahk:336 append"
+						}
+					]
+				},
+				{
+					"path": "windows/ui/menu/menu_shortcuts.ahk",
+					"sourceSha256": "40d8acad6195f64529aa7e46e87ea79c02dcc0cecc97f091de1288c9de4cb7de",
+					"lines": [
+						{
+							"line": 195,
+							"source": "\t\t\t\t\tif MenuRenderer_AppendTemplate(ExtMenu, \"shortcut_extension_error_frame\", Map(), MarkerState, Map()) == 0",
+							"expectedSite": "windows/ui/menu/menu_shortcuts.ahk:195 append"
+						},
+						{
+							"line": 200,
+							"source": "\t\t\t\tif MenuRenderer_AppendTemplate(ExtMenu, \"shortcut_extension_empty_frame\", Map(), Map(), Map()) == 0",
+							"expectedSite": "windows/ui/menu/menu_shortcuts.ahk:200 append"
+						}
+					]
+				},
+				{
+					"path": "windows/ui/menu/menu_submenus.ahk",
+					"sourceSha256": "b0dee4a66d91987b20da3a71ef3ff8ca7d601c2a4fc40dc2aaeea9018b70bd36",
+					"lines": [
+						{
+							"line": 62,
+							"source": "\t\t\t\t\t\t\tRows.Push(Map(\"separator\", true))",
+							"expectedSite": "windows/ui/menu/menu_submenus.ahk:62 separator"
+						},
+						{
+							"line": 170,
+							"source": "\t\tItems.Push(Map(\"separator\", true))",
+							"expectedSite": "windows/ui/menu/menu_submenus.ahk:170 separator"
+						},
+						{
+							"line": 209,
+							"source": "\t\t\tRows.Push(Map(\"separator\", true))",
+							"expectedSite": "windows/ui/menu/menu_submenus.ahk:209 separator"
+						}
+					]
+				}
+			]
+		},
+		"macos": {
+			"sourceFiles": [
+				"macos/ui/menu/base_delay_transaction.lua",
+				"macos/ui/menu/builder.lua",
+				"macos/ui/menu/canvas_badge.lua",
+				"macos/ui/menu/gesture_scope.lua",
+				"macos/ui/menu/global_actions_transaction.lua",
+				"macos/ui/menu/global_scope.lua",
+				"macos/ui/menu/hotstring_counter.lua",
+				"macos/ui/menu/hotstrings_scope.lua",
+				"macos/ui/menu/init.lua",
+				"macos/ui/menu/keymap_lifecycle.lua",
+				"macos/ui/menu/llm_scope.lua",
+				"macos/ui/menu/magic_key_source_menu.lua",
+				"macos/ui/menu/menu_about.lua",
+				"macos/ui/menu/menu_apps.lua",
+				"macos/ui/menu/menu_gestures.lua",
+				"macos/ui/menu/menu_hotstrings.lua",
+				"macos/ui/menu/menu_hotstrings_custom.lua",
+				"macos/ui/menu/menu_hotstrings_management.lua",
+				"macos/ui/menu/menu_keyboard_layout.lua",
+				"macos/ui/menu/menu_keyboard_slots.lua",
+				"macos/ui/menu/menu_llm/activation_pause_owner.lua",
+				"macos/ui/menu/menu_llm/agent_panel.lua",
+				"macos/ui/menu/menu_llm/api_panel.lua",
+				"macos/ui/menu/menu_llm/backend_labels.lua",
+				"macos/ui/menu/menu_llm/backend_panel.lua",
+				"macos/ui/menu/menu_llm/init.lua",
+				"macos/ui/menu/menu_llm/live_mode_panel.lua",
+				"macos/ui/menu/menu_llm/local_server_panel.lua",
+				"macos/ui/menu/menu_llm/menu_layout.lua",
+				"macos/ui/menu/menu_llm/mlx_repair_offer.lua",
+				"macos/ui/menu/menu_llm/model_switcher.lua",
+				"macos/ui/menu/menu_llm/models_manager.lua",
+				"macos/ui/menu/menu_llm/models_manager_mlx.lua",
+				"macos/ui/menu/menu_llm/models_manager_mlx_download.lua",
+				"macos/ui/menu/menu_llm/models_manager_mlx_hf.lua",
+				"macos/ui/menu/menu_llm/models_manager_mlx_repo.lua",
+				"macos/ui/menu/menu_llm/models_manager_mlx_server.lua",
+				"macos/ui/menu/menu_llm/models_manager_ollama.lua",
+				"macos/ui/menu/menu_llm/models_selector.lua",
+				"macos/ui/menu/menu_llm/ollama_enable_probe.lua",
+				"macos/ui/menu/menu_llm/prediction_lock_registry.lua",
+				"macos/ui/menu/menu_llm/profile_label.lua",
+				"macos/ui/menu/menu_llm/profiles_manager.lua",
+				"macos/ui/menu/menu_llm/requirement_operation_registry.lua",
+				"macos/ui/menu/menu_llm/runtime_install_offer.lua",
+				"macos/ui/menu/menu_llm/scope_runtime.lua",
+				"macos/ui/menu/menu_llm/settings_manager.lua",
+				"macos/ui/menu/menu_llm/startup_controller.lua",
+				"macos/ui/menu/menu_llm/streaming_panel.lua",
+				"macos/ui/menu/menu_llm/temperature_panel.lua",
+				"macos/ui/menu/menu_llm/trigger_orchestrator.lua",
+				"macos/ui/menu/menu_llm/trigger_panel.lua",
+				"macos/ui/menu/menu_llm/unreachable_backend_offer.lua",
+				"macos/ui/menu/menu_llm/warmup_controller.lua",
+				"macos/ui/menu/menu_metrics.lua",
+				"macos/ui/menu/menu_paths.lua",
+				"macos/ui/menu/menu_shortcuts.lua",
+				"macos/ui/menu/menu_state.lua",
+				"macos/ui/menu/menu_tap_holds.lua",
+				"macos/ui/menu/menu_tap_keys.lua",
+				"macos/ui/menu/menu_utils.lua",
+				"macos/ui/menu/menu_watchers.lua",
+				"macos/ui/menu/metrics_scope.lua",
+				"macos/ui/menu/preferences_transaction.lua",
+				"macos/ui/menu/preview_transaction.lua",
+				"macos/ui/menu/program_parameter_transaction.lua",
+				"macos/ui/menu/programmatic_hotstrings.lua",
+				"macos/ui/menu/quit_layout.lua",
+				"macos/ui/menu/recoverable_file_moves.lua",
+				"macos/ui/menu/remap_switch.lua",
+				"macos/ui/menu/scoped_preferences.lua",
+				"macos/ui/menu/script_chords_transaction.lua",
+				"macos/ui/menu/session_demotions.lua",
+				"macos/ui/menu/shortcut_utils.lua",
+				"macos/ui/menu/shortcuts_scope.lua",
+				"macos/ui/menu/start_at_login.lua",
+				"macos/ui/menu/uninstall.lua",
+				"macos/ui/menu/unused_keys_cleanup.lua"
+			],
+			"excerpts": [
+				{
+					"path": "macos/ui/menu/builder.lua",
+					"sourceSha256": "3a108269abab0aa297a5783035812bb1a10f4b4c71f8a21c6200b13a47abb878",
+					"lines": [
+						{
+							"line": 452,
+							"source": "\t\titems[#items + 1] = { separator = true }",
+							"expectedSite": "macos/ui/menu/builder.lua:452 separator"
+						},
+						{
+							"line": 876,
+							"source": "\t\t\ttable.insert(items, { separator = true })",
+							"expectedSite": "macos/ui/menu/builder.lua:876 separator"
+						}
+					]
+				},
+				{
+					"path": "macos/ui/menu/menu_gestures.lua",
+					"sourceSha256": "658889a17c3a0cc720868d48e37f1f33097fa0681427399496d2b9cac5639e15",
+					"lines": [
+						{
+							"line": 205,
+							"source": "\t\tlabel    = i18n.get(\"menu.gestures.title\"),",
+							"expectedSite": "macos/ui/menu/menu_gestures.lua:205 static"
+						},
+						{
+							"line": 257,
+							"source": "\t\t\tlabel   = i18n.get(\"dialog.action_picker.label\"),",
+							"expectedSite": "macos/ui/menu/menu_gestures.lua:257 static"
+						}
+					]
+				},
+				{
+					"path": "macos/ui/menu/menu_hotstrings.lua",
+					"sourceSha256": "f9781b09cd9f7bf2abebd7bb70f616a25b6515d827a9f698b5f3a28aedf5c8e7",
+					"lines": [
+						{
+							"line": 297,
+							"source": "\t\t\tlabel = i18n.get(\"menu.shortcuts.edit_personal_info\"),",
+							"expectedSite": "macos/ui/menu/menu_hotstrings.lua:297 static"
+						},
+						{
+							"line": 518,
+							"source": "\t\t\t\t\t\t\tsec_menu[#sec_menu + 1] = { separator = true }",
+							"expectedSite": "macos/ui/menu/menu_hotstrings.lua:518 separator"
+						}
+					]
+				},
+				{
+					"path": "macos/ui/menu/menu_hotstrings_custom.lua",
+					"sourceSha256": "7f418dcf3b177c9a97e8bd1ceb357d5aa82d78577a8982b0cc9d542f66501fad",
+					"lines": [
+						{
+							"line": 259,
+							"source": "\t\tlabel    = i18n.get(\"menu.hotstrings.enable_all_sections\"),",
+							"expectedSite": "macos/ui/menu/menu_hotstrings_custom.lua:259 static"
+						}
+					]
+				},
+				{
+					"path": "macos/ui/menu/menu_hotstrings_management.lua",
+					"sourceSha256": "ef7c9618ce03f112c2ffa5e9d33e182bc470a1e1ebb3f824eb0df066cd1f17ff",
+					"lines": [
+						{
+							"line": 713,
+							"source": "\treturn { title = i18n.get(\"menu.hotstrings.params\"), menu = rows }",
+							"expectedSite": "macos/ui/menu/menu_hotstrings_management.lua:713 static"
+						}
+					]
+				},
+				{
+					"path": "macos/ui/menu/menu_keyboard_slots.lua",
+					"sourceSha256": "35131be4ee551bcbb679bad1f7a43d03a72f4049d2e4eb077bdbf5a7f3e59a9d",
+					"lines": [
+						{
+							"line": 152,
+							"source": "\t\ttitle   = i18n.get(\"dialog.keyboard_shortcut.title_prefix\") .. KbShortcuts.get_keyboard_slot_label(slot_id),",
+							"expectedSite": "macos/ui/menu/menu_keyboard_slots.lua:152 static"
+						},
+						{
+							"line": 153,
+							"source": "\t\tlabel   = i18n.get(\"dialog.action_picker.label\"),",
+							"expectedSite": "macos/ui/menu/menu_keyboard_slots.lua:153 static"
+						},
+						{
+							"line": 218,
+							"source": "\t\ttitle   = i18n.get(\"dialog.keyboard_shortcut.title_prefix\"),",
+							"expectedSite": "macos/ui/menu/menu_keyboard_slots.lua:218 static"
+						},
+						{
+							"line": 219,
+							"source": "\t\tlabel   = i18n.get(\"dialog.keyboard_shortcut.prompt\"),",
+							"expectedSite": "macos/ui/menu/menu_keyboard_slots.lua:219 static"
+						}
+					]
+				},
+				{
+					"path": "macos/ui/menu/menu_llm/init.lua",
+					"sourceSha256": "62e7b28037a623ebcf508b48bc91c758d4cdfb186cfa6d88f7d4e7452d6ed30d",
+					"lines": [
+						{
+							"line": 1955,
+							"source": "\t\t\t\t\t\tlabel   = i18n.get(\"menu.llm.title\"),",
+							"expectedSite": "macos/ui/menu/menu_llm/init.lua:1955 static"
+						},
+						{
+							"line": 2003,
+							"source": "\t\t\t\treturn { title = row.label, fn = row.action }",
+							"expectedSite": "macos/ui/menu/menu_llm/init.lua:2003 native"
+						}
+					]
+				},
+				{
+					"path": "macos/ui/menu/menu_llm/models_manager_mlx_hf.lua",
+					"sourceSha256": "84c2a38c82125fdac6c0a606b20b3120ba350e28b70c900b050e3eda8c3d92bb",
+					"lines": [
+						{
+							"line": 830,
+							"source": "\t\t\t\ttitle             = i18n.get(\"mlx.hf_login_title\"),",
+							"expectedSite": "macos/ui/menu/menu_llm/models_manager_mlx_hf.lua:830 static"
+						}
+					]
+				},
+				{
+					"path": "macos/ui/menu/menu_llm/profiles_manager.lua",
+					"sourceSha256": "d376dfa8fcef416df95e15892cac152addb0fc3ff9dfa42b5f28f00bed9d6341",
+					"lines": [
+						{
+							"line": 1068,
+							"source": "\t\t\t\t\t\t\ttitle = i18n.get(\"menu.profiles.shortcut_title\"),",
+							"expectedSite": "macos/ui/menu/menu_llm/profiles_manager.lua:1068 static"
+						}
+					]
+				},
+				{
+					"path": "macos/ui/menu/menu_paths.lua",
+					"sourceSha256": "b5fae31d0bd13e647ba288fd811a59ce86b21e559f41bb1be2b4118ae77d1376",
+					"lines": [
+						{
+							"line": 537,
+							"source": "\t\ttitle       = i18n.get(\"menu.paths.window_title\"),",
+							"expectedSite": "macos/ui/menu/menu_paths.lua:537 static"
+						},
+						{
+							"line": 610,
+							"source": "\t\tlabel  = i18n.get(\"menu.paths.menu_item\"),",
+							"expectedSite": "macos/ui/menu/menu_paths.lua:610 static"
+						}
+					]
+				},
+				{
+					"path": "macos/ui/menu/menu_shortcuts.lua",
+					"sourceSha256": "c86ed856ffd3babc5cce97d5aeb83567d3e1ce82cb75a6319671dc81c90362d8",
+					"lines": [
+						{
+							"line": 541,
+							"source": "\t\tlabel    = i18n.get(\"menu.shortcuts.title\"),",
+							"expectedSite": "macos/ui/menu/menu_shortcuts.lua:541 static"
+						},
+						{
+							"line": 644,
+							"source": "\t\t\t\t\ttable.insert(sub, { separator = true })",
+							"expectedSite": "macos/ui/menu/menu_shortcuts.lua:644 separator"
+						}
+					]
+				},
+				{
+					"path": "macos/ui/menu/menu_tap_holds.lua",
+					"sourceSha256": "581e1fc8c3d2429dd8aadf3647bfe5a3ae10b723f17231ab3137ee100db1aa42",
+					"lines": [
+						{
+							"line": 1155,
+							"source": "\t\tlabel   = i18n.get(\"menu.tapholds.title\"),",
+							"expectedSite": "macos/ui/menu/menu_tap_holds.lua:1155 static"
+						}
+					]
+				},
+				{
+					"path": "macos/ui/menu/menu_tap_keys.lua",
+					"sourceSha256": "ad9629f2df5a3668ce422484836ace595c375936ecc4d74b2354f00b4b73f4c8",
+					"lines": [
+						{
+							"line": 59,
+							"source": "\t\tlabel   = i18n.get(\"dialog.action_picker.label\"),",
+							"expectedSite": "macos/ui/menu/menu_tap_keys.lua:59 static"
+						}
+					]
+				}
+			]
+		},
+		"linux": {
+			"sourceFiles": [
+				"linux/ui/menu/agent_rows.lua",
+				"linux/ui/menu/key_combinations.lua",
+				"linux/ui/menu/llm_backend_rows.lua",
+				"linux/ui/menu/local_server_rows.lua",
+				"linux/ui/menu/menu_builder.lua",
+				"linux/ui/menu/programmatic_hotstrings.lua",
+				"linux/ui/menu/start_at_login.lua",
+				"linux/ui/menu/uninstall.lua",
+				"linux/ui/menu/unused_keys_cleanup.lua"
+			],
+			"excerpts": [
+				{
+					"path": "linux/ui/menu/menu_builder.lua",
+					"sourceSha256": "1cd6e0343cb99b9e4a59d63cca57f31e934a1ba4eed68959b0eb879cc3bb6ff9",
+					"lines": [
+						{
+							"line": 255,
+							"source": "\t\tlabel = i18n_safe(\"dialog.action_picker.label\"),",
+							"expectedSite": "linux/ui/menu/menu_builder.lua:255 static"
+						},
+						{
+							"line": 283,
+							"source": "\t\t\tlabel = i18n_safe(\"dialog.action_picker.label\") .. \"…\",",
+							"expectedSite": "linux/ui/menu/menu_builder.lua:283 static"
+						},
+						{
+							"line": 289,
+							"source": "\t\t\tlabel = i18n_safe(\"dialog.action_picker.disabled\"),",
+							"expectedSite": "linux/ui/menu/menu_builder.lua:289 static"
+						},
+						{
+							"line": 369,
+							"source": "\t\t\tlabel = i18n_safe(\"menu.builder.title_paused\") .. \" — \" .. version,",
+							"expectedSite": "linux/ui/menu/menu_builder.lua:369 static"
+						},
+						{
+							"line": 523,
+							"source": "\t\t\t\tNotifier.send(i18n_safe(key), { title = i18n_safe(\"dialog.magic_key_source.title\"), level = level })",
+							"expectedSite": "linux/ui/menu/menu_builder.lua:523 static"
+						},
+						{
+							"line": 561,
+							"source": "\treturn { label = i18n_safe(\"menu.layout.title\"), submenu = rows }",
+							"expectedSite": "linux/ui/menu/menu_builder.lua:561 static"
+						},
+						{
+							"line": 824,
+							"source": "\t\t\tlabel   = i18n_safe(\"menu.hotstrings.enable_all_sections\"),",
+							"expectedSite": "linux/ui/menu/menu_builder.lua:824 static"
+						},
+						{
+							"line": 991,
+							"source": "\t\t\t\tlabel = i18n_safe(\"menu.hotstrings.no_group_loaded\"), disabled = true,",
+							"expectedSite": "linux/ui/menu/menu_builder.lua:991 static"
+						},
+						{
+							"line": 1016,
+							"source": "\t\t\tlocal items = { all_sections_row(ids), { separator = true } }",
+							"expectedSite": "linux/ui/menu/menu_builder.lua:1016 separator"
+						},
+						{
+							"line": 1475,
+							"source": "\t\t\t\t\tlabel = i18n_safe(\"menu.shortcuts.edit_personal_info\"),",
+							"expectedSite": "linux/ui/menu/menu_builder.lua:1475 static"
+						},
+						{
+							"line": 1493,
+							"source": "\t\t\t\tsub[#sub + 1] = { separator = true }",
+							"expectedSite": "linux/ui/menu/menu_builder.lua:1493 separator"
+						},
+						{
+							"line": 1497,
+							"source": "\t\t\t\t\t\tsub[#sub + 1] = { separator = true }",
+							"expectedSite": "linux/ui/menu/menu_builder.lua:1497 separator"
+						},
+						{
+							"line": 1795,
+							"source": "\t\t\t\t\tlabel    = i18n_safe(\"menu.extensions.none_installed\"),",
+							"expectedSite": "linux/ui/menu/menu_builder.lua:1795 static"
+						},
+						{
+							"line": 2048,
+							"source": "\t\treturn { label = i18n_safe(\"menu.hotstrings.title\"), items = status_rows }",
+							"expectedSite": "linux/ui/menu/menu_builder.lua:2048 static"
+						},
+						{
+							"line": 2090,
+							"source": "\t\treturn { label = i18n_safe(\"menu.llm.title\"), items = status_rows }",
+							"expectedSite": "linux/ui/menu/menu_builder.lua:2090 static"
+						},
+						{
+							"line": 2152,
+							"source": "\t\t\t\t\ttitle = i18n_safe(\"menu.llm.trigger_menu_title\"),",
+							"expectedSite": "linux/ui/menu/menu_builder.lua:2152 static"
+						},
+						{
+							"line": 2859,
+							"source": "\treturn { label = i18n_safe(\"menu.llm.title\"), checked = enabled, submenu = items }",
+							"expectedSite": "linux/ui/menu/menu_builder.lua:2859 static"
+						},
+						{
+							"line": 2868,
+							"source": "\t\treturn { label = i18n_safe(\"menu.agent.title\"), disabled = true }",
+							"expectedSite": "linux/ui/menu/menu_builder.lua:2868 static"
+						},
+						{
+							"line": 3391,
+							"source": "\t\treturn { label = i18n_safe(\"menu.shortcuts.title\"), items = status_rows }",
+							"expectedSite": "linux/ui/menu/menu_builder.lua:3391 static"
+						},
+						{
+							"line": 3829,
+							"source": "\treturn { label = i18n_safe(\"menu.shortcuts.title\"), checked = enabled, submenu = items }",
+							"expectedSite": "linux/ui/menu/menu_builder.lua:3829 static"
+						},
+						{
+							"line": 3883,
+							"source": "\t\treturn { label = i18n_safe(\"menu.tapholds.title\"), disabled = true }",
+							"expectedSite": "linux/ui/menu/menu_builder.lua:3883 static"
+						},
+						{
+							"line": 3914,
+							"source": "\t\t\ttitle = i18n_safe(\"tap_hold.picker.title_prefix\") .. _tap_hold_key_label(catalog_entry),",
+							"expectedSite": "linux/ui/menu/menu_builder.lua:3914 static"
+						},
+						{
+							"line": 3915,
+							"source": "\t\t\tlabel = i18n_safe(\"dialog.action_picker.label\"),",
+							"expectedSite": "linux/ui/menu/menu_builder.lua:3915 static"
+						},
+						{
+							"line": 4048,
+							"source": "\treturn { label = i18n_safe(\"menu.tapholds.title\"), submenu = rows }",
+							"expectedSite": "linux/ui/menu/menu_builder.lua:4048 static"
+						},
+						{
+							"line": 4057,
+							"source": "\t\treturn { label = i18n_safe(\"menu.gestures.title\"), items = status_rows }",
+							"expectedSite": "linux/ui/menu/menu_builder.lua:4057 static"
+						},
+						{
+							"line": 4207,
+							"source": "\treturn { label = i18n_safe(\"menu.gestures.title\"), checked = gestures_on, submenu = menu }",
+							"expectedSite": "linux/ui/menu/menu_builder.lua:4207 static"
+						},
+						{
+							"line": 4588,
+							"source": "\t\t\ttitle = i18n_safe(\"menu.global.uninstall\"),",
+							"expectedSite": "linux/ui/menu/menu_builder.lua:4588 static"
+						},
+						{
+							"line": 4660,
+							"source": "\treturn { label = i18n_safe(\"menu.about.title\"), submenu = rows }",
+							"expectedSite": "linux/ui/menu/menu_builder.lua:4660 static"
+						},
+						{
+							"line": 4945,
+							"source": "\t\t\t\trows[#rows + 1] = { separator = true }",
+							"expectedSite": "linux/ui/menu/menu_builder.lua:4945 separator"
+						},
+						{
+							"line": 4969,
+							"source": "\t\trows[#rows + 1] = { separator = true }",
+							"expectedSite": "linux/ui/menu/menu_builder.lua:4969 separator"
+						}
+					]
+				}
+			]
+		}
+	}
+}

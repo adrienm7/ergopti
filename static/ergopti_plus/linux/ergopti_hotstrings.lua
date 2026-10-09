@@ -1645,7 +1645,23 @@ local function main()
 		capture_owned_scancodes[scancode] = nil
 	end)
 
+	-- Retain the selected inverse publisher before any source-acquisition callback.
+	local capture_layout = keyboard_layout
+	local capture_publish, capture_ready = keyboard_layout.publish_current_capture, keyboard_layout.is_ready
+	local capture_override = opts.keymap
+	local function publish_reacquired_capture()
+		local function current()
+			return package.loaded["adapters.keyboard_layout"] == capture_layout
+				and capture_layout.publish_current_capture == capture_publish
+				and capture_layout.is_ready == capture_ready and opts.keymap == capture_override
+		end
+		if not current() or type(capture_publish) ~= "function" or type(capture_ready) ~= "function" then return false end
+		if capture_publish(capture_override) ~= true or not current() then return false end
+		return capture_ready() == true and current()
+	end
+
 	keyboard_hook.start({
+		onCaptureReacquired = publish_reacquired_capture,
 		device = device,
 		pinned = opts.device ~= nil,
 		layout = opts.layout,
@@ -1666,6 +1682,8 @@ local function main()
 		-- which is why the measurement lives there and the accounting here.
 		onHold = on_hold,
 		onEmitRaw  = injector.emit_key,
+		outputBroker = injector.output_broker(),
+		requireOutputBroker = opts.grab == true,
 	})
 	Logger.info(LOG, "Keyboard hook started in %s mode.",
 		opts.grab and "INTERCEPT (device grabbed)" or "OBSERVE (--no-grab)")
@@ -1674,6 +1692,29 @@ local function main()
 		Logger.error(LOG, "Keyboard hook failed to start — exiting.")
 		print("Error: could not start the keyboard hook.")
 		os.exit(1)
+	end
+	-- start() recreates capture and seeds CapsLock from the acquired keyboard.
+	-- Publish the selected inverse on that exact state before any input is pumped.
+	do
+		local await_retirement = event_loop.run
+		local publication, ready, running = keyboard_layout.publish_current_capture,
+			keyboard_layout.is_ready, keyboard_hook.isRunning
+		local ok, published = pcall(function()
+			return type(publication) == "function" and publication(opts.keymap) == true
+				and running() == true and ready() == true
+		end)
+		if not ok or published ~= true or keyboard_layout.publish_current_capture ~= publication
+			or keyboard_layout.is_ready ~= ready or keyboard_hook.isRunning ~= running
+			or event_loop.run ~= await_retirement
+			or running() ~= true then
+			shutdown.request("startup layout publication refused", "startup layout publication refused")
+			if shutdown.is_pending() then
+				await_retirement({ onIdle = shutdown.poll, onPeriodic = shutdown.poll, periodSec = 0.25 })
+			end
+			if shutdown.is_pending() then error("Startup native cleanup remains unacknowledged", 0) end
+			if injector.close_fast_channel() ~= true then error("Startup output retirement remains unacknowledged", 0) end
+			error("Current capture inverse publication refused at startup", 0)
+		end
 	end
 	BootProfiler.stage_done("input hooks", string.format("mode %s, layout %s",
 		tostring(keyboard_hook.get_mode and keyboard_hook.get_mode() or "unknown"),

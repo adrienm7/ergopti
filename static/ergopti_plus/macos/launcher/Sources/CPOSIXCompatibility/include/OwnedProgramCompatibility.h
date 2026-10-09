@@ -64,6 +64,15 @@ int ergopti_owned_program_prepare_with_tty_source(
 	int source_descriptor,
 	ergopti_owned_program **owner
 );
+// Query roles capture into caller-owned pipes; retirement uses the same native custody.
+int ergopti_owned_query_prepare(
+	const char *executable,
+	char *const arguments[],
+	char *const environment[],
+	int output_descriptor,
+	int error_descriptor,
+	ergopti_owned_program **owner
+);
 ergopti_owned_program_receipt ergopti_owned_program_activate(ergopti_owned_program *owner);
 ergopti_owned_program_receipt ergopti_owned_program_cancel(ergopti_owned_program *owner);
 ergopti_owned_program_receipt ergopti_owned_program_poll(ergopti_owned_program *owner);

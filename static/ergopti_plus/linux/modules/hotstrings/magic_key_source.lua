@@ -197,9 +197,13 @@ end
 --- @return table source Epoch, status and detached native candidates.
 function M.editor_source()
 	local Capture = require("adapters.xkb_capture")
-	local xkb_generation, why = Capture.source_generation()
-	local magic = _deps and _deps.magic_key() or require("modules.hotstrings.magic_key").get()
+	local source_generation, direct_sources, preference_generation = Capture.source_generation, Capture.direct_sources, Preferences.generation
+	local deps, callbacks = _deps, {}
+	for name, callback in pairs(deps or {}) do if type(callback) == "function" then callbacks[name] = callback end end
 	local value, candidates, native_codes, codes, seen = M.get(), {}, {}, {}, {}
+	local preference = preference_generation()
+	local xkb_generation, why, observed_current = source_generation()
+	local magic = deps and callbacks.magic_key() or require("modules.hotstrings.magic_key").get()
 	for code, record in pairs(registry().keys) do
 		if type(record.evdev) == "number" then
 			if not codes[record.evdev] or code < codes[record.evdev] then codes[record.evdev] = code end
@@ -207,10 +211,12 @@ function M.editor_source()
 		end
 	end
 	table.sort(native_codes)
-	local origin = _deps and _deps.input_source_receipt and _deps.input_source_receipt() or nil
-	local rows = xkb_generation and (origin == nil or origin.ready == true) and Capture.direct_sources(native_codes) or nil
+	local origin = deps and callbacks.input_source_receipt and callbacks.input_source_receipt() or nil
+	-- Keep primitive origin facts; later collaborators cannot rewrite this proof.
+	if type(origin) == "table" then origin = { generation = origin.generation, ready = origin.ready } end
+	local rows = xkb_generation and (origin == nil or origin.ready == true) and direct_sources(native_codes) or nil
 	local configured = M.evdev_code()
-	local plan = _deps and _deps.typing_plan and _deps.typing_plan(magic) or nil
+	local plan = deps and callbacks.typing_plan and callbacks.typing_plan(magic) or nil
 	local typable = false
 	-- Qualify the injector's actual plan against the current native group.
 	-- Its cached inverse table alone cannot prove a remap after a group switch.
@@ -222,16 +228,16 @@ function M.editor_source()
 			if same then typable = true end
 		end
 	end
-	local remapped = configured ~= nil and _deps ~= nil and _deps.is_active() == true
-		and _deps.can_capture() == true and _deps.replace_on() == true and _deps.can_type(magic) == true and typable
+	local remapped = configured ~= nil and deps ~= nil and callbacks.is_active() == true
+		and callbacks.can_capture() == true and callbacks.replace_on() == true and callbacks.can_type(magic) == true and typable
 	if rows then
 		for _, row in ipairs(rows) do
 			-- A proven chosen replacement owns the effective source. Automatic or
 			-- ineffective settings retain every actual native candidate instead.
 			if not remapped or row.code == configured then
 				local mapped = remapped and row.code == configured and row.plain == true
-				local admitted = _deps == nil or _deps.direct_source_admitted == nil
-					or _deps.direct_source_admitted(row.code, remapped and row.code == configured) == true
+				local admitted = deps == nil or callbacks.direct_source_admitted == nil
+					or callbacks.direct_source_admitted(row.code, remapped and row.code == configured) == true
 				candidates[#candidates + 1] = { code = codes[row.code], native_code = row.code,
 					identity = "evdev:" .. row.code, text = mapped and magic or row.text, native_text = row.text,
 					direct = admitted and (mapped or row.direct == true),
@@ -239,8 +245,40 @@ function M.editor_source()
 			end
 		end
 	end
+	-- Enumeration's inner fence ends before layout/remap/admission callbacks.
+	-- Rejoin the same owners after those callbacks, then seal already-observed
+	-- native currency without another query. This is no physical delivery lease.
+	local function private_current()
+		if _deps ~= deps or package.loaded["adapters.xkb_capture"] ~= Capture
+			or Capture.source_generation ~= source_generation or Capture.direct_sources ~= direct_sources
+			or Preferences.generation ~= preference_generation or preference_generation() ~= preference then return false end
+		for name, callback in pairs(callbacks) do if deps[name] ~= callback then return false end end
+		return true
+	end
+	local current = private_current()
+	-- Run the last callback-shaped native read before rejoining magic/origin.
+	-- Those final collaborators may themselves retire Capture, so its retained
+	-- owner/epoch/issuer closure below is the terminal RAM-only source check.
+	if current then
+		local called, current_generation = pcall(source_generation)
+		current = called and current_generation == xkb_generation and private_current()
+	end
+	if current and deps then
+		local called, current_magic = pcall(callbacks.magic_key)
+		current = called and current_magic == magic and private_current()
+	end
+	if current and origin ~= nil then
+		local called, current_origin = pcall(callbacks.input_source_receipt)
+		current = called and type(current_origin) == "table" and current_origin.ready == origin.ready
+			and current_origin.generation == origin.generation and private_current()
+	end
+	if current and type(observed_current) == "function" then
+		local called, observed = pcall(observed_current)
+		current = called and observed == true and private_current()
+	end
+	if not current then rows, candidates, why = nil, {}, "direct-source-changed" end
 	-- A single epoch covers source preferences, native group and remap/tap proof.
-	local signature = Json.encode({ preference = Preferences.generation(), native = xkb_generation,
+	local signature = Json.encode({ preference = preference, native = xkb_generation,
 		value = value, trigger = magic, remapped = remapped, origin = origin, candidates = candidates })
 	if signature ~= _editor_signature then
 		_editor_signature = signature
