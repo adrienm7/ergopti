@@ -4968,7 +4968,7 @@ integrated, then publish one grouped release.
 
 - [~] **54.** Every menu is declared in the shared menu manifest, never in
   driver code. The ratchet `npm run test:native-menu-rows` counts the rows
-  drivers still build (current baseline: Windows 25, macOS 19, Linux 22, each
+  drivers still build (current baseline: Windows 25, macOS 19, Linux 21, each
   site listed in tools/test/native-menu-rows-baseline.json); migrate them to
   zero. Each OS-limited row declares `unavailable = "hide"` (not
   applicable) or `"grey"` (not yet ported, with its reason); classify the
@@ -4991,6 +4991,14 @@ integrated, then publish one grouped release.
   caption owner, preserving historical producer checks and every old assertion.
   The whole source-parity target passes with 16 new refusal/inverse controls
   per parent kind; complete final-source qualification remains required.
+  The Linux standard-category empty status now consumes the existing shared
+  list's inert declaration through the genuine completed Hotstrings menu.
+  All 21 captions are independently frozen; nonempty ordering and callbacks
+  are unchanged. The focused module passes 40/0 on both Lua engines, versus
+  original production 12/28; seven native-builder causal controls fail against
+  its predecessor. Genuine owners regenerate the menu and nonincreasing
+  25/19/21 census. Full final-source and installed native acceptance remain
+  required; these bounded slices do not close this item or item 81.
   The macOS badge caption and following boundary now consume a complete
   shared frame before native measurement or canvas allocation. Independent
   consumer tests pass 38/0 against predecessor 26/12; the genuine root route
@@ -7512,7 +7520,7 @@ is committed; one request is one commit with its regression test.
 
 - [~] **81.** The maintainer asks to treat item 54 now (every menu row is
   declared in the shared manifest, none built in a driver's folder):
-  Windows 25, macOS 19 and Linux 22 rows are still built by the
+  Windows 25, macOS 19 and Linux 21 rows are still built by the
   drivers (`tools/test/native-menu-rows-baseline.json`). The current census
   was regenerated on 2026-10-09. The sites are of four kinds, and three need the
   manifest to say more than it can today:
