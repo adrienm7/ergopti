@@ -396,10 +396,19 @@ class Receiver:
         http_binary = self.http_app / "Contents/MacOS/ErgoptiPlus"
         http_binary.parent.mkdir(parents=True)
         worker = self.work / "ManagedHTTPWorker.swift"
+        certificates = self.work / "ManagedCertificateAuthorities.swift"
+        bootstrap_policy = self.work / "ManagedBootstrapPolicy.generated.swift"
         main = self.work / "native_http_fixture_main.swift"
         self.copy_source(
             "static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/ManagedHTTPWorker.swift", worker
         )
+        for name, destination in (
+            ("ManagedCertificateAuthorities.swift", certificates),
+            ("ManagedBootstrapPolicy.generated.swift", bootstrap_policy),
+        ):
+            self.copy_source(
+                "static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/" + name, destination
+            )
         self.copy_source(
             "static/ergopti_plus/macos/tests/support/native_http_fixture_main.swift", main
         )
@@ -442,6 +451,14 @@ class Receiver:
                 "static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/ManagedHTTPWorker.swift",
                 worker,
             ),
+            (
+                "static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/ManagedCertificateAuthorities.swift",
+                certificates,
+            ),
+            (
+                "static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/ManagedBootstrapPolicy.generated.swift",
+                bootstrap_policy,
+            ),
             ("static/ergopti_plus/macos/tests/support/native_http_fixture_main.swift", main),
         ]:
             inputs.append((self.root / relative, destination, self.source_hashes[relative]))
@@ -459,6 +476,8 @@ class Receiver:
                 "-framework",
                 "SystemConfiguration",
                 str(worker),
+                str(certificates),
+                str(bootstrap_policy),
                 str(main),
                 "-o",
                 str(http_binary),

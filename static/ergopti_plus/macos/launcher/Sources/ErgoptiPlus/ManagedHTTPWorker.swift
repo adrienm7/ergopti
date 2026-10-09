@@ -7,6 +7,7 @@ import CoreFoundation
 import CPOSIXCompatibility
 import Darwin
 import Foundation
+import Security
 import SystemConfiguration
 
 /// One exact, replayable HTTP request. Redirects belong to the caller, so every
@@ -289,6 +290,7 @@ private final class ManagedHTTPSession: NSObject, URLSessionDataDelegate, @unche
 	private var deliveredBytes = false
 	private var refusedTCPConnect = false
 	private var proxyAuthenticationObserved = false
+	private let certificates: [SecCertificate]
 	private let output: (Data) -> Bool
 	private(set) var exitStatus: Int32 = 74
 	var permitsProxyFailover: Bool {
@@ -296,8 +298,9 @@ private final class ManagedHTTPSession: NSObject, URLSessionDataDelegate, @unche
 			&& !receivedHeaders && !nativeResponseObserved && !deliveredBytes
 	}
 
-	init(output: @escaping (Data) -> Bool) {
+	init(output: @escaping (Data) -> Bool, certificates: [SecCertificate]) {
 		self.output = output
+		self.certificates = certificates
 	}
 
 	private func write(tag: UInt8, bytes: Data) -> Bool {
@@ -416,7 +419,24 @@ private final class ManagedHTTPSession: NSObject, URLSessionDataDelegate, @unche
 
 	func urlSession(_ session: URLSession, task: URLSessionTask, didReceive challenge: URLAuthenticationChallenge,
 		completionHandler: @escaping (URLSession.AuthChallengeDisposition, URLCredential?) -> Void) {
+		answer(challenge, completionHandler: completionHandler)
+	}
+
+	func urlSession(_ session: URLSession, didReceive challenge: URLAuthenticationChallenge,
+		completionHandler: @escaping (URLSession.AuthChallengeDisposition, URLCredential?) -> Void) {
+		answer(challenge, completionHandler: completionHandler)
+	}
+
+	private func answer(_ challenge: URLAuthenticationChallenge,
+		completionHandler: @escaping (URLSession.AuthChallengeDisposition, URLCredential?) -> Void) {
 		if challenge.protectionSpace.isProxy() { proxyAuthenticationObserved = true }
+		if challenge.protectionSpace.authenticationMethod == NSURLAuthenticationMethodServerTrust, !certificates.isEmpty {
+			guard let trust = challenge.protectionSpace.serverTrust,
+				ManagedCertificateAuthorities.evaluate(trust, adding: certificates) else {
+				failure = "certificate"; completionHandler(.cancelAuthenticationChallenge, nil); return
+			}
+			completionHandler(.useCredential, URLCredential(trust: trust)); return
+		}
 		completionHandler(.performDefaultHandling, nil)
 	}
 }
@@ -496,7 +516,11 @@ enum ManagedHTTPWorker {
 		started: TimeInterval = ProcessInfo.processInfo.systemUptime,
 		settingsProvider: () -> CFDictionary? = { CFNetworkCopySystemProxySettings()?.takeRetainedValue() },
 		discoveryMetadataProvider: () -> ManagedWPADMetadata = { ManagedProxyLookup.discoveryMetadata() },
+		environment: [String: String] = ProcessInfo.processInfo.environment,
 		output: @escaping (Data) -> Bool) -> Int32 {
+		let certificates: [SecCertificate]
+		do { certificates = try ManagedCertificateAuthorities.load(environment: environment) }
+		catch { return refuse(reason: "certificate", status: 74, output: output) }
 		guard maximumSelections > 0 else { return refuse(reason: "unavailable", status: 78, output: output) }
 		let routes: [[String: Any]]
 		if request.direct { routes = [[kCFProxyTypeKey as String: kCFProxyTypeNone as String]] }
@@ -516,7 +540,7 @@ enum ManagedHTTPWorker {
 			if let remaining, remaining <= 0 { return refuse(reason: "deadline", status: 75, output: output) }
 			let scoped = ManagedHTTPRequest(url: request.url, method: request.method,
 				headers: request.headers, timeout: remaining, idleTimeout: request.idleTimeout, direct: request.direct)
-			let owned = ManagedHTTPSession(output: output)
+			let owned = ManagedHTTPSession(output: output, certificates: certificates)
 			let status = owned.execute(scoped, proxy: proxy)
 			if status == 0 || !owned.permitsProxyFailover || index == routes.count - 1 {
 				return owned.publishTerminal()

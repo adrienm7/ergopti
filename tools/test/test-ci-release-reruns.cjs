@@ -89,7 +89,17 @@ const MANAGED_PUBLICATION_SOURCES = [
 	'static/ergopti_plus/_shared/go/native_http/transport.go',
 	'static/ergopti_plus/_shared/go/native_http/worker_darwin.go',
 	'static/ergopti_plus/_shared/go/native_http/worker_other.go',
-	'static/ergopti_plus/_shared/go/native_http/admission.go'
+	'static/ergopti_plus/_shared/go/native_http/admission.go',
+	'static/ergopti_plus/_shared/go/native_http/network_bootstrap.go',
+	'static/ergopti_plus/_shared/go/native_http/network_bootstrap_posix.go',
+	'static/ergopti_plus/_shared/go/native_http/network_bootstrap_unsupported.go',
+	'static/ergopti_plus/_shared/go/native_http/transport_test.go',
+	'static/ergopti_plus/_shared/go/native_http/admission_test.go',
+	'static/ergopti_plus/_shared/go/native_http/network_bootstrap_test.go',
+	'static/ergopti_plus/_shared/go/native_http/network_bootstrap_darwin_test.go',
+	'static/ergopti_plus/_shared/modules/llm/managed_ollama_bootstrap.json',
+	'static/ergopti_plus/_shared/modules/network/proxy_policy.json',
+	'tools/diagnostics/macos_owned_process.py'
 ];
 function copyManagedPublicationSources(work) {
 	for (const relative of MANAGED_PUBLICATION_SOURCES) {

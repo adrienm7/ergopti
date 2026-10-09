@@ -89,6 +89,67 @@ class StandaloneCompilerControls(unittest.TestCase):
             self.subject.prepare()
         self.fixture._command.assert_called_once()
 
+    def test_bootstrap_dependencies_are_original_retained_compiler_inputs(self):
+        class CompilerBoundary(Exception):
+            pass
+
+        def inspect(arguments, *, timeout):
+            self.assertEqual(timeout, 90)
+            context = self.subject.outgoing_context
+            retained = {str(path): (fd, expected) for path, fd, _, expected in context._inputs}
+            for name in (
+                "ManagedCertificateAuthorities.swift",
+                "ManagedBootstrapPolicy.generated.swift",
+            ):
+                relative = "static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/" + name
+                original = ROOT / relative
+                copied = self.subject.work / name
+                expected = hashlib.sha256(original.read_bytes()).hexdigest()
+                self.assertIn(str(copied), arguments)
+                self.assertEqual(copied.read_bytes(), original.read_bytes())
+                self.assertEqual(self.subject.source_hashes[relative], expected)
+                for path in (original, copied):
+                    descriptor, frozen = retained[str(path)]
+                    self.assertEqual(frozen, expected)
+                    self.assertEqual(os.fstat(descriptor).st_ino, path.stat().st_ino)
+                    self.assertFalse(os.get_inheritable(descriptor))
+                    self.assertEqual(
+                        os.pread(descriptor, path.stat().st_size, 0), path.read_bytes()
+                    )
+            raise CompilerBoundary()
+
+        self.fixture._command.side_effect = inspect
+        with (
+            patch.object(RECEIVING, "load", return_value=self.wire),
+            patch.object(RECEIVING, "Registry"),
+            self.assertRaises(CompilerBoundary),
+        ):
+            self.subject.prepare()
+        self.fixture._command.assert_called_once()
+        self.assertEqual(self.subject.outgoing_context._inputs, [])
+
+    def test_changed_bootstrap_dependency_refuses_before_compiler(self):
+        original_copy = self.subject.copy_source
+
+        def mutate(relative, destination):
+            original_copy(relative, destination)
+            if relative.endswith("/ManagedCertificateAuthorities.swift"):
+                destination.write_bytes(b"foreign certificate policy")
+
+        def compiler_must_not_run(*arguments, **options):
+            raise AssertionError("changed bootstrap dependency reached compiler")
+
+        self.subject.copy_source = mutate
+        self.fixture._command.side_effect = compiler_must_not_run
+        with (
+            patch.object(RECEIVING, "load", return_value=self.wire),
+            patch.object(RECEIVING, "Registry"),
+            self.assertRaisesRegex(RECEIVING.QUALIFIED.QualificationRefusal, "source"),
+        ):
+            self.subject.prepare()
+        self.fixture._command.assert_not_called()
+        self.assertEqual(self.subject.outgoing_context._inputs, [])
+
     def test_changed_public_header_copy_refuses_before_compiler(self):
         original_copy = self.subject.copy_source
 

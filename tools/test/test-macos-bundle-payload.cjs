@@ -223,6 +223,80 @@ const CURATED_READS = [
 		why: 'session authentication reuses the shared runtime admission policy'
 	},
 	{
+		reader: 'ergopti_plus/macos/modules/llm/managed_ollama_serve.py',
+		needles: [
+			'with_name("managed_ollama_runtime.py")',
+			'DRIVER / "platform/suspended_image_owner.py"',
+			'DRIVER / "platform/source_alias_owner.py"',
+			'DRIVER / "platform/ollama_bootstrap_owner.py"',
+			'DRIVER / "platform/ollama_daemon_authority.py"',
+			'SHARED / "python/network_proxy_policy.py"',
+			'DRIVER / "platform/network/native_http.py"',
+			'SHARED / "modules/llm/managed_ollama_bootstrap.json"',
+			'SHARED / "modules/network/proxy_policy.json"'
+		],
+		targets: [
+			'ergopti_plus/macos/modules/llm/managed_ollama_runtime.py',
+			'ergopti_plus/macos/platform/suspended_image_owner.py',
+			'ergopti_plus/macos/platform/source_alias_owner.py',
+			'ergopti_plus/macos/platform/ollama_bootstrap_owner.py',
+			'ergopti_plus/macos/platform/ollama_daemon_authority.py',
+			'ergopti_plus/_shared/python/network_proxy_policy.py',
+			'ergopti_plus/macos/platform/network/native_http.py',
+			'ergopti_plus/_shared/modules/llm/managed_ollama_bootstrap.json',
+			'ergopti_plus/_shared/modules/network/proxy_policy.json'
+		],
+		why: 'the serve owner binds original source, empty bootstrap and sealed daemon authority'
+	},
+	{
+		reader: 'ergopti_plus/macos/platform/suspended_image_owner.py',
+		needles: ['Path(__file__).with_name("trusted_native_guardian.py")'],
+		targets: ['ergopti_plus/macos/platform/trusted_native_guardian.py'],
+		why: 'the suspended original image uses only the admitted bundle guardian'
+	},
+	{
+		reader: 'ergopti_plus/macos/platform/trusted_native_guardian.py',
+		needles: ['Path(__file__).parent / "network/native_http.py"'],
+		targets: ['ergopti_plus/macos/platform/network/native_http.py'],
+		why: 'guardian admission retains the existing native helper trust boundary'
+	},
+	{
+		reader: 'ergopti_plus/macos/platform/ollama_bootstrap_owner.py',
+		needles: [
+			'Path(__file__).with_name("suspended_image_owner.py")',
+			'Path(__file__).absolute().parents[2] / "_shared/python/managed_ollama_bootstrap.py"'
+		],
+		targets: [
+			'ergopti_plus/macos/platform/suspended_image_owner.py',
+			'ergopti_plus/_shared/python/managed_ollama_bootstrap.py'
+		],
+		why: 'native descriptor ownership delegates bootstrap data and policy to shared code'
+	},
+	{
+		reader: 'ergopti_plus/macos/platform/ollama_daemon_authority.py',
+		needles: [
+			'Path(__file__).with_name("suspended_image_owner.py")',
+			'Path(__file__).absolute().parents[2] / "_shared/python/managed_ollama_daemon_authority.py"'
+		],
+		targets: [
+			'ergopti_plus/macos/platform/suspended_image_owner.py',
+			'ergopti_plus/_shared/python/managed_ollama_daemon_authority.py'
+		],
+		why: 'the same-session source receipt retains its shared lexical authority'
+	},
+	{
+		reader: 'ergopti_plus/_shared/python/managed_ollama_daemon_authority.py',
+		needles: [
+			'Path(__file__).with_name("managed_ollama_runtime.py")',
+			'Path(__file__).with_name("managed_source_alias.py")'
+		],
+		targets: [
+			'ergopti_plus/_shared/python/managed_ollama_runtime.py',
+			'ergopti_plus/_shared/python/managed_source_alias.py'
+		],
+		why: 'sealed source admission preserves the original session and strict alias policy'
+	},
+	{
 		reader: 'ergopti_plus/macos/platform/source_alias_owner.py',
 		needles: ['Path(__file__).resolve().parents[2] / "_shared/python/managed_source_alias.py"'],
 		targets: ['ergopti_plus/_shared/python/managed_source_alias.py'],

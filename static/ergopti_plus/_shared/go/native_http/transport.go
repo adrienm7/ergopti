@@ -5,6 +5,8 @@ package nativehttp
 import (
 	"bufio"
 	"context"
+	"crypto/tls"
+	"crypto/x509"
 	"encoding/binary"
 	"encoding/json"
 	"errors"
@@ -104,6 +106,13 @@ func Do(client *http.Client, request *http.Request) (*http.Response, error) {
 	if errors.Is(err, context.DeadlineExceeded) {
 		return response, &Error{Reason: "deadline", cause: err}
 	}
+	var verification *tls.CertificateVerificationError
+	var authority x509.UnknownAuthorityError
+	var hostname x509.HostnameError
+	var invalid x509.CertificateInvalidError
+	if errors.As(err, &verification) || errors.As(err, &authority) || errors.As(err, &hostname) || errors.As(err, &invalid) {
+		return response, &Error{Reason: "certificate", cause: err}
+	}
 	return response, &Error{Reason: "connect", cause: err}
 }
 
@@ -131,6 +140,10 @@ func readPolicy(path string) (*Policy, error) {
 	if err != nil || len(bytes) > maximumFrame {
 		return nil, fail("protocol")
 	}
+	return parsePolicy(bytes)
+}
+
+func parsePolicy(bytes []byte) (*Policy, error) {
 	var policy Policy
 	if json.Unmarshal(bytes, &policy) != nil || policy.Version != 1 || len(policy.Orders["https"]) == 0 || len(policy.Orders["http"]) == 0 || len(policy.BypassOrder) == 0 || len(policy.Loopback.Hosts) == 0 || len(policy.Loopback.Networks) == 0 || len(policy.Loopback.IPv6) == 0 {
 		return nil, fail("protocol")
@@ -281,6 +294,13 @@ func Wrap(original http.RoundTripper) http.RoundTripper {
 	if os.Getenv("ERGOPTI_OLLAMA_NATIVE_HTTP") != "1" {
 		return original
 	}
+	snapshot, bootstrapErr := loadNetworkBootstrap()
+	if bootstrapErr != nil {
+		return unavailableTransport{}
+	}
+	if snapshot != nil {
+		return &Transport{Fallback: original, Policy: snapshot.policy, IdleTimeout: snapshot.idle, ResolveWorker: resolveWorker, Environment: snapshot.copyEnvironment}
+	}
 	policy, err := readPolicy(os.Getenv("ERGOPTI_OLLAMA_NETWORK_POLICY"))
 	idle, parseErr := strconv.ParseFloat(os.Getenv("ERGOPTI_OLLAMA_NATIVE_HTTP_IDLE_TIMEOUT"), 64)
 	if err != nil || parseErr != nil || math.IsNaN(idle) || math.IsInf(idle, 0) || idle <= 0 || idle > float64((1<<63-1)/int64(time.Second)) {
@@ -319,6 +339,10 @@ func (t *Transport) RoundTrip(request *http.Request) (*http.Response, error) {
 				}
 				clone := transport.Clone()
 				clone.Proxy = http.ProxyURL(relay)
+				clone.TLSClientConfig, err = bootstrapTLSConfig(clone.TLSClientConfig, environment)
+				if err != nil {
+					return nil, err
+				}
 				response, err := clone.RoundTrip(request)
 				if err != nil {
 					clone.CloseIdleConnections()
@@ -371,6 +395,10 @@ func (t *Transport) RoundTrip(request *http.Request) (*http.Response, error) {
 	}
 	command := exec.CommandContext(request.Context(), worker, "--managed-http-worker", strconv.FormatFloat(t.IdleTimeout.Seconds(), 'g', -1, 64), absolute)
 	command.Stderr = io.Discard
+	command.Env, err = nativeWorkerEnvironment(environment)
+	if err != nil {
+		return nil, err
+	}
 	stdout, err := command.StdoutPipe()
 	if err != nil {
 		return nil, fail("unavailable")
