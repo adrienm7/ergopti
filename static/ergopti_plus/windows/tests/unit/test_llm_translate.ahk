@@ -149,15 +149,15 @@ _LTR_ParameterKind() {
 	AssertTrue(GestureValidateActionParameter("llm_translate_selection", "ui"), "ui validates")
 	AssertTrue(GestureValidateActionParameter("llm_translate_selection", "ja"), "a locale code validates")
 	ErrorText := ""
-	AssertFalse(GestureValidateActionParameter("llm_translate_selection", "FR", &ErrorText),
-		"the code is compared exactly")
+	AssertFalse(GestureValidateActionParameter("llm_translate_selection", "French|2", &ErrorText),
+		"reserved action syntax is refused")
 	AssertEqual(t("dialog.gestures.param_err_llm_language"), ErrorText, "with the kind's refusal")
 	AssertFalse(GestureValidateActionParameter("llm_translate_selection", " ja"), "a padded value is refused")
 	Prompt := GestureActionParameterPrompt("llm_translate_selection")
 	AssertFalse(InStr(Prompt, "{1}"), "the list is filled in")
-	AssertContains(Prompt, "ui — " . LLM_Translate_ShippedChoices()[1]["label"] . "`n", "the prompt lists ui first")
-	AssertContains(Prompt, "ja — " . LLM_Translate_LocaleNames()["locales"]["ja"]["flag"] . " 日本語",
-		"then every locale")
+	AssertEqual(StrReplace(t("dialog.gestures.param_llm_language"), "{1}",
+		LLM_Translate_Config()["max_language_bytes"]), Prompt, "the bounded language InputBox")
+	AssertTrue(GestureValidateActionParameter("llm_translate_selection", "Esperanto"), "free language is admitted")
 }
 Test("LLM translate: the llm_language parameter validates, lists and prompts", _LTR_ParameterKind)
 
@@ -345,7 +345,7 @@ _LTR_InvalidParameter() {
 	Screen := _LTN_Screen(LTR_SELECTION)
 	_LTR_Run(_LPP_Menu(), Screen, "fr", _Body)
 	_Body(Calls, Lines, Sent) {
-		AssertFalse(_LTR_Invoke("klingon"), "an invalid stored value")
+		AssertFalse(_LTR_Invoke("Klingon|2"), "an invalid stored value")
 		AssertEqual(0, Screen.Reads, "reads nothing")
 		AssertEqual(1, _LPP_LinesWith(Lines, "WARNING", "binding's language"), "and is logged")
 	}
@@ -390,3 +390,53 @@ _LTR_NewTriggerSupersedes() {
 	}
 }
 Test("LLM translate: a new trigger supersedes the translation in progress", _LTR_NewTriggerSupersedes)
+
+
+/** Exercises free language admission and the exact request-local override owner. */
+_LTR_FreeLanguageReceipt() {
+	Config := LLM_Translate_Config()
+	Names := LLM_Translate_LocaleNames()
+	AssertEqual("Esperanto", LLM_Translate_Parse("Esperanto", Config, Names))
+	AssertEqual("Esperanto", LLM_Translate_ResolveLanguage("Esperanto", Config, Names, "fr"))
+	AssertEqual("", LLM_Translate_ResolveLanguage("ui", Config, Names, "missing"))
+	AssertEqual("", LLM_Translate_Parse("English|2", Config, Names))
+	Parsed := LLM_PromptAction_Parse("translate|2|ქართული")
+	AssertTrue(Parsed is Map)
+	AssertEqual("ქართული", Parsed["translation_target"])
+	Checked := _LLM_Engine_NormalizePromptOverride(Parsed)
+	Parsed["translation_target"] := "Esperanto"
+	AssertEqual("ქართული", Checked["translation_target"], "request receipt is detached")
+	Profile := LLM_Translate_PredictionProfile(Checked["translation_target"])
+	AssertTrue(Profile is Map)
+	AssertTrue(InStr(Profile["system_single"], "Translate TAIL into ქართული", true) > 0)
+	AssertTrue(LLM_Rewrite_IsRewriteProfile(Profile))
+	AssertEqual("translate", _LLM_Engine_NormalizePromptOverride(Map("profile_id", "translate"))["profile_id"],
+		"a bare legacy/custom id remains ordinary")
+	AssertThrows(() => _LLM_Engine_NormalizePromptOverride(Map("profile_id", "TRANSLATE", "translation_target", "Esperanto")), ValueError)
+}
+Test("LLM translate: free-language request receipt is detached and fail-closed", _LTR_FreeLanguageReceipt)
+
+
+_LTR_FreeLanguageSelection() {
+	Screen := _LTN_Screen(LTR_SELECTION)
+	_LTR_Run(_LPP_Menu(), Screen, "fr", _Body)
+	_Body(Calls, Lines, Sent) {
+		AssertTrue(_LTR_Invoke("Klingon"), "an admitted free-language binding")
+		AssertEqual(1, Screen.Reads, "the real selection owner reads once")
+		AssertEqual(1, Calls.Length, "the existing text transport receives one request")
+		_LTR_AssertRequest(Calls[1], "Klingon", LTR_SELECTION)
+		AssertEqual(0, Sent.Length, "nothing is published before actual acceptance")
+	}
+}
+Test("LLM translate: a free-language selection uses the existing admitted request", _LTR_FreeLanguageSelection)
+
+_LTR_TypedReceiptBounds() {
+	Value := ""
+	Loop LLM_Translate_Config()["max_language_bytes"]
+		Value .= "a"
+	AssertTrue(GestureValidateActionParameter("llm_prompt_prediction", "translate|1|" . Value))
+	AssertFalse(GestureValidateActionParameter("llm_prompt_prediction", "translate|1|" . Value . "a"))
+	AssertFalse(LLM_PromptAction_Parse("TRANSLATE|1|Esperanto") is Map)
+	AssertTrue(LLM_PromptAction_Parse("translate") is Map, "bare profile lookup is unchanged")
+}
+Test("LLM translate: typed target admission enforces the shared bound and exact discriminator", _LTR_TypedReceiptBounds)

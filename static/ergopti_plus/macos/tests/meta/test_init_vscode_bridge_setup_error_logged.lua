@@ -1,81 +1,62 @@
 --- tests/meta/test_init_vscode_bridge_setup_error_logged.lua
 
 --- ==============================================================================
---- MODULE: Regression — vscode_bridge.setup() failure surfaced at the boot call site (F-MED-7)
+--- MODULE: Startup Without Retired VS Code Bridge
 --- DESCRIPTION:
---- init.lua wired the VS Code caret bridge with a bare
---- `pcall(function() require("infra.vscode_bridge").setup() end)`, discarding
---- BOTH pcall return values. A setup() throw (a failed extension install, a
---- port bind failure, …) vanished with no trace anywhere in the boot log.
----
---- Fix: capture (ok, err) and call Logger.error(...) on failure, so the
---- failure is visible in the unified log like every other boot step.
----
---- init.lua is a top-level boot script with many side effects (hs.reload,
---- eventtap creation, TOML discovery) and is never `require()`d or executed
---- end-to-end by the test suite (see the sibling tests/meta/test_init_*.lua
---- files, all of which are source-position/invariant scans for the same
---- reason). This test follows that established convention: a source scan
---- asserting the pcall's return values are captured into named locals and
---- that the failure branch calls Logger.error referencing vscode_bridge.
+--- Executes the real bounded menu-ready startup slice over declared inert ports.
+--- Bridge absence cannot abort UI progress; a refused menubar remains fatal.
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
 
-local function read_init_src()
-	-- Selected by a declaration unique to init.lua rather than by
-	-- path, so moving or splitting the module cannot turn this invariant
-	-- into a path error.
-	local src = helpers.read_driver_source("local function has_common_hotstring_groups")
-	helpers.assert_true(src ~= nil, "init.lua source must be locatable")
-	return src
+--- Evaluates only the menu-ready source slice, never the driver entrypoint.
+--- @param available boolean Whether the recording menu commits.
+--- @return boolean ok
+--- @return table facts
+local function startup_slice(available)
+	local source = helpers.read_driver_source("local function has_common_hotstring_groups")
+	helpers.assert_type(source, "string")
+	local start = source:find('Boot.stage("UI: menu.start (menubar + state sync + engines + LLM handler)")', 1, true)
+	local finish = source:find('Boot.stage("File watchers armed")', start or 1, true)
+	helpers.assert_true(start ~= nil and finish ~= nil and finish > start, "real startup boundaries must be present")
+	local slice = source:sub(start, finish + #'Boot.stage("File watchers armed")' - 1)
+	helpers.assert_true(#slice > 0, "source extraction cannot pass vacuously")
+	local facts = { bridge_calls = 0, menu_calls = 0, marks = {}, stages = {} }
+	local logger = {}
+	for _, level in ipairs({ "debug", "error", "info" }) do logger[level] = function() end end
+	local env = {
+		Boot = { stage = function(name) facts.stages[#facts.stages + 1] = name end,
+			mark = function(name) facts.marks[#facts.marks + 1] = name end },
+		Logger = logger, LOG = "controlled-init", config_paths = { get = function() return "/owned" end },
+		ExtensionPacks = { catalogue = function() return {} end },
+		menu = { start = function() facts.menu_calls = facts.menu_calls + 1; return available and {} or nil end },
+		package = { loaded = {} },
+		require = function(name)
+			helpers.assert_eq(name, "infra.vscode_bridge")
+			facts.bridge_calls = facts.bridge_calls + 1
+			error("retired feature must not load or install")
+		end,
+	}
+	setmetatable(env, { __index = _G })
+	local chunk = assert(load(slice, "@owned-menu-startup-slice", "t", env))
+	local ok = pcall(chunk)
+	return ok, facts
 end
 
-helpers.describe("F-MED-7: vscode_bridge.setup() failure is logged at the boot call site", function()
-
-	helpers.it("the vscode_bridge.setup() call site no longer uses a bare, return-discarding pcall", function()
-		local src = read_init_src()
-
-		local setup_pos = src:find('require("infra.vscode_bridge").setup()', 1, true)
-		helpers.assert_true(setup_pos ~= nil, "init.lua must call lib.vscode_bridge's setup()")
-
-		-- The old bug pattern: pcall(function() ... setup() ... end) with no
-		-- assignment at all — i.e. a bare pcall(...) statement, not `local ok, err = pcall(...)`.
-		local window_before = src:sub(math.max(1, setup_pos - 200), setup_pos)
-		helpers.assert_true(
-			window_before:find("ok_vscode") ~= nil,
-			"init.lua must capture the pcall's return values into named locals (e.g. ok_vscode) " ..
-			"instead of a bare, return-discarding pcall(...) statement (F-MED-7)")
+helpers.describe("startup without retired VS Code bridge", function()
+	helpers.it("commits normal menu readiness with zero bridge activation", function()
+		local ok, facts = startup_slice(true)
+		helpers.assert_true(ok, "the existing UI can progress without the retired feature")
+		helpers.assert_eq(facts.menu_calls, 1)
+		helpers.assert_eq(facts.bridge_calls, 0)
+		helpers.assert_eq(facts.marks[#facts.marks], "UI: menu ready")
+		helpers.assert_eq(facts.stages[#facts.stages], "File watchers armed")
 	end)
-
-	helpers.it("Logger.error is called when vscode_bridge.setup() throws", function()
-		local src = read_init_src()
-
-		local setup_pos = src:find('require("infra.vscode_bridge").setup()', 1, true)
-		helpers.assert_true(setup_pos ~= nil, "init.lua must call lib.vscode_bridge's setup()")
-
-		-- Logger.error must appear shortly after the pcall, inside the same guard block.
-		local window_after = src:sub(setup_pos, math.min(#src, setup_pos + 400))
-		local log_pos = window_after:find("Logger.error", 1, true)
-		helpers.assert_true(log_pos ~= nil,
-			"init.lua must call Logger.error(...) when vscode_bridge.setup() throws (F-MED-7)")
-
-		local log_line = window_after:sub(log_pos, log_pos + 120)
-		helpers.assert_true(log_line:find("vscode", 1, true) ~= nil or log_line:find("VS Code", 1, true) ~= nil,
-			"the Logger.error message must mention the VS Code bridge so the failure is identifiable in the log")
-	end)
-
-	helpers.it("a false VS Code bridge setup rolls back and aborts root initialization", function()
-		local src = read_init_src()
-		local guard_pos = src:find("if not ok_vscode or vscode_result ~= true then", 1, true)
-		helpers.assert_true(guard_pos ~= nil,
-			"root initialization must treat an exact false setup result as failure")
-		local guard_window = src:sub(guard_pos, math.min(#src, guard_pos + 1200))
-		local rollback_pos = guard_window:find("stop_server()", 1, true)
-		local abort_pos = guard_window:find('error("VS Code caret bridge setup did not commit")', 1, true)
-		helpers.assert_true(rollback_pos ~= nil,
-			"root initialization must retry exact VS Code server cleanup before aborting")
-		helpers.assert_true(abort_pos ~= nil and rollback_pos < abort_pos,
-			"root initialization must abort only after attempting bridge rollback")
+	helpers.it("still refuses UI readiness when the actual menu does not commit", function()
+		local ok, facts = startup_slice(false)
+		helpers.assert_eq(ok, false)
+		helpers.assert_eq(facts.menu_calls, 1)
+		helpers.assert_eq(facts.bridge_calls, 0)
+		helpers.assert_eq(#facts.marks, 0)
 	end)
 end)

@@ -91,10 +91,8 @@ helpers.describe("llm_language parameter: native prompt, picker choices and refu
 			end
 
 			local prompt = Actions.parameter_prompt(ACTION)
-			helpers.assert_true(prompt:find("Languages:\nui — Menu language (Français)\n", 1, true) == 1,
-				"the localized template, the interface language on the first line: " .. prompt)
-			helpers.assert_true(prompt:find("ja — " .. names.locales.ja.flag .. " 日本語", 1, true) ~= nil,
-				"each language is listed as '<code> — <label>': " .. prompt)
+			helpers.assert_eq(prompt, "Languages:\n" .. tostring(read_json("modules/llm/translate.json").max_language_bytes),
+				"the InputBox substitutes the declared byte limit instead of a locale catalogue")
 		end)
 	end)
 

@@ -11,9 +11,9 @@
 --- window at its preview, and "Suggest a feature".
 ---
 --- FEATURES & RATIONALE:
---- 1. Every text that leaves the machine goes through diagnostics.redact
----    again here, whatever the page did: the home folder, the account name and
----    token-like secrets are removed from the clipboard, the file and the URL.
+--- 1. Shared output is rebuilt from the host snapshot through a closed typed
+---    policy. Free text, paths and unknown fields are excluded regardless of
+---    the page or details checkbox. Only approved technical content leaves.
 --- 2. GitHub answers 414 a little above 8 KB, so the issue link cuts a long
 ---    report to its budget; the clipboard holds it whole. A report saves no
 ---    file and opens no folder: the file manager would take the focus from
@@ -32,6 +32,7 @@ local M = {}
 local Logger      = require("logger.shim")
 local IssueLink   = require("diagnostics.issue_link")
 local Redact      = require("diagnostics.redact")
+local Share       = require("healthcheck.share")
 
 local LOG = "healthcheck.report"
 
@@ -176,11 +177,17 @@ end
 --- @param context table The redaction context.
 --- @param overrides table|nil Replacement side effects (tests only).
 --- @return table { ok = boolean, path = string|nil, missing = true|nil }
-function M.perform(action, paths, documents, context, overrides)
+function M.perform(action, paths, documents, context, overrides, snapshot)
 	local effects = effects_with(overrides)
-	local function redact(text) return Redact.apply(text, documents.redaction, context) end
+	local function redact(text) return text end
 	Logger.start(LOG, "Diagnostics action '%s'…", action.action)
 	local ok, result = xpcall(function()
+		if action.action == "copy" or action.action == "save" or action.action == "report" then
+			local document = Share.document(snapshot, documents.schema,
+				require("infra.i18n").get(documents.schema.share_policy.notice_key))
+			assert(action.text == document.text, "Diagnostic sharing preview is stale or invalid")
+			action = { action = action.action, text = document.text, fields = document.fields, name = document.name }
+		end
 		if action.action == "copy" then
 			if not effects.copy(redact(action.text)) then error("the clipboard refused the report") end
 			return {}
@@ -245,12 +252,9 @@ function M.suggest_feature(overrides)
 		local Bridge = require("ui.healthcheck.bridge")
 		local documents = Bridge.config()
 		local context = M.redaction_context(overrides)
-		local sections = Bridge.build_snapshot(require("ui.webview_manager").get_daemon_state(), false).sections
-		local url = IssueLink.build_url(documents.templates, documents.repository, "feature", {
-			version = Redact.apply(tostring(sections.versions.ergopti_version or "unknown"), documents.redaction, context),
-			os      = Redact.apply(tostring(sections.system.os or "unknown"), documents.redaction, context),
-			driver  = Bridge.DRIVER,
-		})
+		local document = Share.document(Bridge.build_snapshot(require("ui.webview_manager").get_daemon_state(), false), documents.schema,
+			require("infra.i18n").get(documents.schema.share_policy.notice_key))
+		local url = IssueLink.build_url(documents.templates, documents.repository, "feature", document.fields)
 		if not effects.open_url(url) then error("the browser could not be opened") end
 	end, debug.traceback)
 	if not ok then

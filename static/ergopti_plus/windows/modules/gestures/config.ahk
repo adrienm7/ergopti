@@ -149,7 +149,9 @@ GestureValidateActionParameter(ActionName, Value, &ErrorText := "") {
 		; shared rules accept. Whether the prompt still exists is checked when the
 		; action runs, so deleting a prompt never invalidates the configuration.
 		if (Spec = "llm_prompt") {
-				if (LLM_PromptAction_Parse(Value) is Map)
+				Parsed := LLM_PromptAction_Parse(Value)
+				if (Parsed is Map) && (!Parsed.Has("translation_target")
+						|| LLM_Translate_IsValid(Parsed["translation_target"]))
 						return true
 				ErrorText := t("dialog.gestures.param_err_llm_prompt")
 				return false
@@ -169,7 +171,7 @@ GestureValidateActionParameter(ActionName, Value, &ErrorText := "") {
 				ErrorText := t("dialog.gestures.param_err_app")
 				return false
 		}
-		; A closed list: "ui" or a shipped locale code, compared exactly.
+		; An admitted per-binding language name or retained locale code, compared exactly.
 		if (Spec = "llm_language") {
 				if LLM_Translate_IsValid(Value)
 						return true
@@ -235,7 +237,7 @@ GestureActionParameterPrompt(ActionName) {
 								LLM_Vision_BackendChoicesText())
 				case "llm_language":
 						return StrReplace(t("dialog.gestures.param_llm_language"), "{1}",
-								LLM_Translate_ChoicesText())
+								LLM_Translate_Config()["max_language_bytes"])
 		}
 		throw ValueError("No prompt for the parameter of action '" . ActionName . "'.")
 }
@@ -297,14 +299,13 @@ GesturePromptActionParameter(BindingId, ActionName) {
 				; The wrap-pair, shortcut and prompt-choice prompts list a catalogue under their text.
 				Listed := (Spec = "wrap_pair" || Spec = "shortcut" || Spec = "llm_prompt" || Spec = "llm_vision")
 				Size := Listed ? "w680 h300" : (Spec = "key") ? "w680 h220" : "w680 h160"
-				; One line per shipped locale: the language list needs the height of 22 rows
-				if (Spec = "llm_language")
-						Size := "w680 h560"
 				Result := Ui_InputBox(Prompt, Title, Size, Existing)
 				if (Result.Result != "OK")
 						return false
 				; A text to type keeps its spaces; every other kind is trimmed.
 				Value := (Spec = "text") ? Result.Value : Trim(Result.Value)
+				if (Spec == "llm_language" && Value == "")
+					return false
 				ErrorText := ""
 				if GestureValidateActionParameter(ActionName, Value, &ErrorText)
 						return Map("has_value", true,

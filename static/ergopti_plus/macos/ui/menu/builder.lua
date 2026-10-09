@@ -302,7 +302,11 @@ local function load_top_level()
 			end
 			if not for_hs then goto continue end
 		end
-		table.insert(result, { id = entry.id, greyed_when_paused = entry.greyed_when_paused == true })
+		local projected = { id = entry.id, greyed_when_paused = entry.greyed_when_paused == true }
+		if entry.disabled == true then
+			projected.disabled, projected.i18n, projected.reason_key = true, entry.i18n, entry.reason_key
+		end
+		table.insert(result, projected)
 		::continue::
 	end
 	Logger.debug(LOG, "Top level loaded from manifest (%d item(s)).", #result)
@@ -878,6 +882,9 @@ function M.generate(ctx, menu_mods, actions)
 		local id = entry.id
 		if id == "---" then
 			table.insert(items, { separator = true })
+		elseif entry.disabled == true then
+			table.insert(items, { label = i18n.get(entry.i18n), disabled = true,
+				disabled_reason_key = entry.reason_key })
 		elseif type(builders[id]) ~= "function" then
 			-- A declared row this driver has no builder for is a row the user was
 			-- promised and will not see.

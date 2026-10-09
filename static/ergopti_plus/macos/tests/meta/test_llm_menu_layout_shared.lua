@@ -40,7 +40,6 @@ local CANON = {
 	{ id = "llm_model",               greys_off = false, dot = true  },
 	{ id = "llm_profile",             greys_off = true,  dot = false },
 	{ id = "llm_trigger",             greys_off = true,  dot = false },
-	{ id = "llm_live_mode",           greys_off = true,  dot = false },
 	{ id = "llm_generation_settings", greys_off = true,  dot = false },
 	{ id = "llm_display",             greys_off = true,  dot = false },
 	{ id = "llm_navigation",          greys_off = true,  dot = false },
@@ -194,7 +193,7 @@ helpers.describe("shared fixed LLM group declarations", function()
 				helpers.assert_eq(row.disabled_when_off, true)
 				helpers.assert_eq(row.health_dot, false)
 				count = count + 1
-			elseif row.id == "llm_live_mode" or row.id == "llm_generation_settings" then
+			elseif row.id == "llm_generation_settings" then
 				helpers.assert_eq(row.type, "group")
 				helpers.assert_eq(row.disabled_when_off, true)
 				helpers.assert_eq(row.health_dot, false)
@@ -204,6 +203,13 @@ helpers.describe("shared fixed LLM group declarations", function()
 			end
 		end
 		helpers.assert_eq(count, 3)
-		helpers.assert_eq(additional_groups, 2)
+		helpers.assert_eq(additional_groups, 1)
+	end)
+end)
+
+helpers.describe("Single manual LLM profile selection", function()
+	helpers.it("retires shortcut overrides without losing the original transaction returns", function()
+		local source = read_source("deps.settle_llm_switcher_recovery = switcher.settle_recovery_debts")
+		require("test.manual_profile_selection").assert_selection(helpers, "hs", source)
 	end)
 end)

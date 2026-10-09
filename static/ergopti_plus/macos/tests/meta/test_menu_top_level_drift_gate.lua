@@ -247,6 +247,11 @@ local function id_of(row)
 		for _, expected in ipairs({ key, without_symbol(i18n.get(key)) }) do
 			-- The Hotstrings title carries its live count: « ⚡ Hotstrings (123) ».
 			if title == expected or title:sub(1, #expected + 2) == expected .. " (" then return id end
+			if id == "agent" and row.disabled == true and row.fn == nil and row.menu == nil then
+				for _, reason in ipairs({ "menu.agent.not_ready", i18n.get("menu.agent.not_ready") }) do
+					if title == expected .. " — " .. reason then return id end
+				end
+			end
 		end
 	end
 	return "?" .. tostring(row.title)
@@ -444,5 +449,14 @@ helpers.describe("topology fixture owns genuine native Language data", function(
 			helpers.assert_eq(parent.menu[index].title, expected.mac, "actual completed native caption/order")
 			helpers.assert_type(parent.menu[index].fn, "function", "original native setter closure survives rendering")
 		end
+	end)
+end)
+
+helpers.describe("Agent-only disabled macOS root composition", function()
+	helpers.it("does not build Agent actions and preserves neighboring provider model and prediction rows", function()
+		local source, detail = helpers.read_driver_unit("function M.generate(ctx, menu_mods, actions)")
+		helpers.assert_true(source ~= nil, "actual root source must exist: " .. tostring(detail))
+		local root = assert(require("json").decode(read_manifest_text()))
+		require("test.agent_menu_root").assert_disabled_root(helpers, "hs", source, root.top_level)
 	end)
 end)

@@ -229,10 +229,11 @@ _ErrorDialog_PushFolded(Epoch) {
 
 ; The report of one error, from the diagnostics snapshot.
 ; @param Record {Map} { kind, module, message, time, log_path?, open_id? }
-; @returns {Map} { report, paths, config, log_path, open_id }
-_ErrorDialog_BuildReport(Record) {
+; @param SnapshotFn {Func} Snapshot collector; tests supply an inert producer.
+; @returns {Map} { report, snapshot, paths, config, log_path, open_id }
+_ErrorDialog_BuildReport(Record, SnapshotFn := HealthCheck_Run) {
 	Config := HealthCheck_Config()
-	Snapshot := HealthCheck_Run(false)
+	Snapshot := SnapshotFn.Call(false)
 	Sections := Snapshot["sections"]
 	Versions := Sections.Get("versions", Map())
 	System := Sections.Get("system", Map())
@@ -261,7 +262,7 @@ _ErrorDialog_BuildReport(Record) {
 	}
 	if !Paths.Has(OpenId) || (Paths[OpenId] == "")
 		throw Error("The file this error is logged in is unknown.")
-	return Map("report", Report, "paths", Paths, "config", Config, "log_path", Paths[OpenId], "open_id", OpenId)
+	return Map("report", Report, "snapshot", Snapshot, "paths", Paths, "config", Config, "log_path", Paths[OpenId], "open_id", OpenId)
 }
 
 
@@ -277,10 +278,10 @@ ErrorDialog_Report(Record, PerformFn := 0) {
 		LoggerError("ErrorDialog", "The report of '{1}' could not be built: {2}", Record["module"], Err.Message)
 		return false
 	}
-	Report := Fields["report"]
+	Report := HealthCheck_ShareDocument(Fields["snapshot"], Fields["config"]["schema"])
 	Perform := HasMethod(PerformFn, "Call") ? PerformFn : HealthCheck_PerformAction
 	Outcome := Perform.Call(Map("action", "report", "text", Report["text"], "fields", Report["fields"]),
-		Fields["paths"], Fields["config"])
+		Fields["paths"], Fields["config"], 0, Fields["snapshot"])
 	return Outcome["ok"] ? true : false
 }
 
@@ -527,6 +528,8 @@ _ErrorDialog_Perform(Epoch, ActionName, PerformFn := 0) {
 	}
 	Session := _ED_Session
 	Report := Session["report"]
+	if ActionName == "copy" || ActionName == "report"
+		Report := HealthCheck_ShareDocument(Session["snapshot"], Session["config"]["schema"])
 	switch ActionName {
 		case "copy":
 			PageAction := Map("action", "copy", "text", Report["text"])
@@ -536,7 +539,7 @@ _ErrorDialog_Perform(Epoch, ActionName, PerformFn := 0) {
 			PageAction := Map("action", "open_path", "id", Session["open_id"])
 	}
 	Perform := HasMethod(PerformFn, "Call") ? PerformFn : HealthCheck_PerformAction
-	ActionOutcome := Perform.Call(PageAction, Session["paths"], Session["config"])
+	ActionOutcome := Perform.Call(PageAction, Session["paths"], Session["config"], 0, Session["snapshot"])
 	Json := '{"type":"action","action":' . JsonStringLiteral(ActionName) . ',"ok":' . (ActionOutcome["ok"] ? "true" : "false")
 	if ActionOutcome.Get("missing", false)
 		Json .= ',"missing":true'

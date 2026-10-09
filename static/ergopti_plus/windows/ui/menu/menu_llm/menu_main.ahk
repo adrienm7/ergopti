@@ -181,7 +181,6 @@ _LLM_Menu_GroupBuilders() {
 	return Map("llm_trigger", LLM_Menu_BuildTriggerMenu,
 		"llm_display", LLM_Menu_BuildDisplayMenu,
 		"llm_navigation", LLM_Menu_BuildNavMenu,
-		"llm_live_mode", LLM_Menu_BuildLiveModeMenu,
 		"llm_generation_settings", LLM_Menu_BuildGenerationMenu)
 }
 
@@ -325,7 +324,6 @@ _LLM_MenuLayout_Fallback() {
 		Map("id", "llm_model",               "disabled_when_off", false, "health_dot", true),
 		Map("id", "llm_profile",             "disabled_when_off", true,  "health_dot", false),
 		Map("id", "llm_trigger",             "disabled_when_off", true,  "health_dot", false),
-		Map("id", "llm_live_mode",           "disabled_when_off", true,  "health_dot", false),
 		Map("id", "llm_generation_settings", "disabled_when_off", true,  "health_dot", false),
 		Map("id", "llm_display",             "disabled_when_off", true,  "health_dot", false),
 		Map("id", "llm_navigation",          "disabled_when_off", true,  "health_dot", false)
@@ -446,10 +444,6 @@ _LLM_Menu_EmitRow(id, disabled, llm_is_operational, has_health_dot := false, Cap
 		if !MenuRenderer_AppendGroup(_LLM_Menu_Handle, "llm_menu", "llm_trigger",
 			Map("llm_trigger", LLM_Menu_BuildTriggerMenu), disabled)
 			throw Error("Declared LLM group 'llm_trigger' was refused.")
-	case "llm_live_mode":
-		if !MenuRenderer_AppendGroup(_LLM_Menu_Handle, "llm_menu", "llm_live_mode",
-			Map("llm_live_mode", LLM_Menu_BuildLiveModeMenu), disabled)
-			throw Error("Declared LLM group 'llm_live_mode' was refused.")
 	case "llm_generation_settings":
 		if !MenuRenderer_AppendGroup(_LLM_Menu_Handle, "llm_menu", "llm_generation_settings",
 			Map("llm_generation_settings", LLM_Menu_BuildGenerationMenu), disabled)

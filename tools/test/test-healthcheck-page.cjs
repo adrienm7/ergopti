@@ -97,7 +97,20 @@ function makeDocument() {
 function loadPage() {
 	const posted = [];
 	const document = makeDocument();
-	const sandbox = { document, console, posted };
+	const scheduled = new Map();
+	let timerId = 0;
+	const sandbox = {
+		document,
+		console,
+		posted,
+		setTimeout(fn) {
+			scheduled.set(++timerId, fn);
+			return timerId;
+		},
+		clearTimeout(id) {
+			scheduled.delete(id);
+		}
+	};
 	sandbox.window = sandbox;
 	sandbox.window.webkit = {
 		messageHandlers: { healthcheck: { postMessage: (payload) => posted.push(payload) } }
@@ -121,7 +134,7 @@ function loadPage() {
 	sandbox.window.i18n_apply(
 		JSON.parse(fs.readFileSync(path.join(SHARED, 'data', 'locales', 'en.json'), 'utf8'))
 	);
-	return { sandbox, document, posted, elements: document.elements };
+	return { sandbox, document, posted, scheduled, elements: document.elements };
 }
 
 // ==================================
@@ -210,7 +223,7 @@ function init(page, detailed, mode) {
 	for (const [area, expected] of [
 		['left', ['btn-open-logs']],
 		['center', ['btn-copy', 'btn-save', 'btn-report']],
-		['right', ['btn-refresh']]
+		['right', ['btn-cancel', 'btn-refresh']]
 	]) {
 		const group = new RegExp(`<div class="toolbar-${area}">([\\s\\S]*?)</div>`).exec(markup);
 		const ids = group ? [...group[1].matchAll(/\bid="(btn-[a-z-]+)"/g)].map((m) => m[1]) : [];
@@ -241,16 +254,50 @@ function init(page, detailed, mode) {
 	if (!preview.includes('# ErgoptiPlus')) fail('the preview is not the Markdown report');
 	if (preview.includes('/home/jdoe') || preview.includes('abcdef123456'))
 		fail('the preview is not redacted');
-	if (!preview.includes('~/.local/state/ergopti_plus/logs'))
-		fail('the preview lost the redacted home path');
+	if (preview.includes('~/.local/state/ergopti_plus/logs'))
+		fail('the share preview leaked even a redacted path');
 	if (!page.elements.content.innerHTML.includes('<h2>')) fail('the page rendered no section');
 
 	page.elements['btn-copy'].dispatch('click');
+	{
+		const request = page.posted.at(-1);
+		if (request.action !== 'export_snapshot')
+			fail('copy bypassed the actual cleanup snapshot fence');
+		page.sandbox.receiveDiagnostics({
+			type: 'action',
+			action: 'export_snapshot',
+			ok: true,
+			export_sequence: request.export_sequence,
+			snapshot: snapshot(true),
+			share_text: page.sandbox.ErgoptiDiagnostics.formatShareable(
+				snapshot(true),
+				schema,
+				(key) => page.sandbox._i18n_strings[key] || key
+			)
+		});
+	}
 	const copy = page.posted[page.posted.length - 1];
 	if (!copy || copy.action !== 'copy') fail('Copy did not post a copy action');
 	else if (copy.text !== preview) fail('Copy sends a text other than the preview');
 
 	page.elements['btn-report'].dispatch('click');
+	{
+		const request = page.posted.at(-1);
+		if (request.action !== 'export_snapshot')
+			fail('report bypassed the actual cleanup snapshot fence');
+		page.sandbox.receiveDiagnostics({
+			type: 'action',
+			action: 'export_snapshot',
+			ok: true,
+			export_sequence: request.export_sequence,
+			snapshot: snapshot(true),
+			share_text: page.sandbox.ErgoptiDiagnostics.formatShareable(
+				snapshot(true),
+				schema,
+				(key) => page.sandbox._i18n_strings[key] || key
+			)
+		});
+	}
 	const report = page.posted[page.posted.length - 1];
 	if (!report || report.action !== 'report') fail('Report did not post a report action');
 	else {
@@ -270,6 +317,23 @@ function init(page, detailed, mode) {
 	}
 
 	page.elements['btn-save'].dispatch('click');
+	{
+		const request = page.posted.at(-1);
+		if (request.action !== 'export_snapshot')
+			fail('save bypassed the actual cleanup snapshot fence');
+		page.sandbox.receiveDiagnostics({
+			type: 'action',
+			action: 'export_snapshot',
+			ok: true,
+			export_sequence: request.export_sequence,
+			snapshot: snapshot(true),
+			share_text: page.sandbox.ErgoptiDiagnostics.formatShareable(
+				snapshot(true),
+				schema,
+				(key) => page.sandbox._i18n_strings[key] || key
+			)
+		});
+	}
 	const save = page.posted[page.posted.length - 1];
 	if (!save || save.action !== 'save' || save.text !== preview)
 		fail('Save does not send the preview');
@@ -292,13 +356,21 @@ function init(page, detailed, mode) {
 		fail('a row button did not post its action');
 
 	// Details: unticking drops the opt-in values at once, then asks the host
-	if (!preview.includes('Secret Keyboard')) fail('the detailed preview misses the device name');
+	if (preview.includes('Secret Keyboard'))
+		fail('the detailed share preview leaked the device name');
+	if (!page.elements.content.innerHTML.includes('Secret Keyboard'))
+		fail('the local detailed view lost its independently collected device name');
 	page.elements['chk-details'].checked = false;
 	page.elements['chk-details'].dispatch('change', { target: page.elements['chk-details'] });
 	if (page.elements['preview-text'].textContent.includes('Secret Keyboard'))
 		fail('unticking details kept a device name in the preview');
 	const refresh = page.posted[page.posted.length - 1];
-	if (!refresh || refresh.action !== 'refresh' || refresh.detailed !== false)
+	if (
+		!refresh ||
+		refresh.action !== 'refresh' ||
+		refresh.detailed !== false ||
+		refresh.extensive !== false
+	)
 		fail('unticking details did not ask for a plain snapshot');
 
 	// A probe answer fills its field
@@ -417,6 +489,191 @@ function init(page, detailed, mode) {
 		fail('a real WebView2 failure must leave structured native diagnostics');
 	if (/EditCtl[\s\S]*?HealthCheck_FormatPlain\(Snapshot\)/.test(host))
 		fail('the diagnostics window must not fall back to a raw-text report');
+}
+
+{
+	const page = loadPage();
+	const quick = snapshot(true);
+	quick.extensive = false;
+	for (const id of Object.keys(quick.probes))
+		quick.probes[id] = { state: 'not_run', reason: 'opt_in_required' };
+	page.sandbox.receiveDiagnostics({
+		type: 'init',
+		config: { schema, redaction, context },
+		snapshot: quick
+	});
+	if (page.elements['chk-extensive'].checked || page.scheduled.size !== 0)
+		fail('quick diagnostics ran controls or selected extensive tests implicitly');
+	if (!page.elements['chk-details'].checked)
+		fail('extensive selection overwrote the independent privacy opt-in');
+	page.elements['chk-extensive'].checked = true;
+	page.elements['chk-extensive'].dispatch('change');
+	const request = page.posted.at(-1);
+	if (request.extensive !== true || request.detailed !== true)
+		fail('explicit extensive selection lost its independent privacy flag');
+	const deep = snapshot(false);
+	deep.extensive = true;
+	page.sandbox.receiveDiagnostics({ type: 'snapshot', snapshot: deep });
+	if (page.scheduled.size !== 1 || page.elements['btn-cancel'].disabled)
+		fail('extensive diagnostics have no live progress/cancel owner');
+	page.elements['btn-cancel'].dispatch('click');
+	if (page.posted.at(-1).action !== 'cancel' || page.scheduled.size !== 0)
+		fail('Cancel did not stop the model queue and request actual host cancellation');
+	const text = page.elements['preview-text'].textContent;
+	if (!text.includes('cancelled') || !text.includes('not_collected'))
+		fail('cancelled partial exports lose their precise outcomes');
+}
+
+{
+	const page = loadPage();
+	const current = snapshot(false);
+	current.extensive = false;
+	current.probes.github_api = { state: 'timeout', cleanup: 'pending' };
+	page.sandbox.receiveDiagnostics({
+		type: 'init',
+		config: { schema, redaction, context },
+		snapshot: current
+	});
+	page.elements['btn-copy'].dispatch('click');
+	const request = page.posted.at(-1);
+	if (
+		request.action !== 'export_snapshot' ||
+		page.posted.some((row) => row && row.action === 'copy')
+	)
+		fail('an export bypassed the pre-format cleanup snapshot receipt');
+	const fresh = snapshot(false);
+	fresh.extensive = false;
+	fresh.probes.github_api = {
+		state: 'timeout',
+		cleanup: 'settled',
+		native_status: -1712,
+		runtime_pid: 4321,
+		detail: 'native_timeout',
+		sender_context: 'driver_spawned_osascript',
+		qualification_scope: 'local_runtime_nonce'
+	};
+	page.sandbox.receiveDiagnostics({
+		type: 'action',
+		action: 'export_snapshot',
+		ok: true,
+		export_sequence: request.export_sequence + 1,
+		snapshot: fresh,
+		share_text: page.sandbox.ErgoptiDiagnostics.formatShareable(
+			fresh,
+			schema,
+			(key) => page.sandbox._i18n_strings[key] || key
+		)
+	});
+	if (page.posted.some((row) => row && row.action === 'copy'))
+		fail('a foreign export sequence was accepted');
+	page.sandbox.receiveDiagnostics({
+		type: 'action',
+		action: 'export_snapshot',
+		ok: true,
+		export_sequence: request.export_sequence,
+		snapshot: fresh,
+		share_text: page.sandbox.ErgoptiDiagnostics.formatShareable(
+			fresh,
+			schema,
+			(key) => page.sandbox._i18n_strings[key] || key
+		)
+	});
+	const copy = page.posted.at(-1);
+	if (
+		copy.action !== 'copy' ||
+		!copy.text.includes('"state":"timeout"') ||
+		!copy.text.includes('"native_status":-1712') ||
+		!copy.text.includes('"runtime_pid":4321') ||
+		!copy.text.includes('"cleanup":"settled"') ||
+		!copy.text.includes('"qualification_scope":"local_runtime_nonce"')
+	)
+		fail('the fresh precise owner receipt was not exported');
+	if (copy.text.includes('Resource cleanup is pending'))
+		fail('the export used text from before genuine cleanup observation');
+	page.elements['btn-copy'].dispatch('click');
+	const stale = page.posted.at(-1);
+	page.elements['btn-refresh'].dispatch('click');
+	const before = page.posted.length;
+	page.sandbox.receiveDiagnostics({
+		type: 'action',
+		action: 'export_snapshot',
+		ok: true,
+		export_sequence: stale.export_sequence,
+		snapshot: fresh,
+		share_text: page.sandbox.ErgoptiDiagnostics.formatShareable(
+			fresh,
+			schema,
+			(key) => page.sandbox._i18n_strings[key] || key
+		)
+	});
+	if (page.posted.length !== before) fail('an obsolete export survived a new snapshot request');
+}
+
+{
+	for (const location of ['current', 'retired', 'model', 'unknown']) {
+		const page = loadPage();
+		const value = snapshot(false);
+		value.extensive = false;
+		for (const id of Object.keys(value.probes))
+			value.probes[id] = { state: 'not_run', reason: 'opt_in_required' };
+		const debt = {
+			state: 'timeout',
+			cleanup: location === 'unknown' ? 'unknown' : 'pending',
+			ms: 17
+		};
+		if (location === 'retired') value.retired_probes = [{ probes: { github_api: debt } }];
+		else value.probes.github_api = debt;
+		page.sandbox.receiveDiagnostics({
+			type: 'init',
+			config: { schema, redaction, context },
+			snapshot: value
+		});
+		if (location === 'model') {
+			delete value.probes.github_api.cleanup;
+			value.diagnostic_checks.schema_fields = debt;
+			debt.cleanup = 'pending';
+			page.sandbox.receiveDiagnostics({ type: 'probe', id: 'github_api', result: { state: 'ok' } });
+		}
+		if (page.elements['btn-cancel'].disabled)
+			fail(location + ' terminal business result hid an unsettled cleanup owner');
+		const originalState = debt.state;
+		page.elements['btn-cancel'].dispatch('click');
+		if (page.posted.at(-1).action !== 'cancel')
+			fail(location + ' cleanup cancellation was not requested');
+		if (debt.state !== originalState || debt.cleanup === 'settled')
+			fail(location + ' page cancellation fabricated a result or a cleanup acknowledgement');
+		if (page.elements['btn-cancel'].disabled)
+			fail(location + ' cleanup retry became inaccessible before a host acknowledgement');
+		const settled = JSON.parse(JSON.stringify(value));
+		if (location === 'retired') settled.retired_probes[0].probes.github_api.cleanup = 'settled';
+		else if (location === 'model') {
+			// The action handler deliberately retains the current model results.
+			// Their owner has no native resources; this control records its exact ACK.
+			value.diagnostic_checks.schema_fields.cleanup = 'settled';
+		} else settled.probes.github_api.cleanup = 'settled';
+		page.sandbox.receiveDiagnostics({
+			type: 'action',
+			action: 'cancel',
+			ok: true,
+			snapshot: settled
+		});
+		if (!page.elements['btn-cancel'].disabled)
+			fail(location + ' settled acknowledgement left idle cancellation enabled');
+		if (debt.state !== originalState)
+			fail(location + ' host cleanup observation changed a sticky business result');
+	}
+	const idle = loadPage();
+	const value = snapshot(false);
+	value.extensive = false;
+	for (const id of Object.keys(value.probes))
+		value.probes[id] = { state: 'not_run', reason: 'opt_in_required' };
+	idle.sandbox.receiveDiagnostics({
+		type: 'init',
+		config: { schema, redaction, context },
+		snapshot: value
+	});
+	if (!idle.elements['btn-cancel'].disabled)
+		fail('a quick idle snapshot enabled cancellation without work or cleanup debt');
 }
 
 if (failures.length > 0) {
