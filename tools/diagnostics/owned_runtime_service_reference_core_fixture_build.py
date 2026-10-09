@@ -23,11 +23,11 @@ import uuid
 SOURCE_PINS = (
     (
         "tools/build/remap_runtime_build.py",
-        "c62f4184a4876783044a5a047b8d41f6009162a89897bf697714c75cced8fd6c",
+        "12dfa8d5eaa9048a5a78a55111e547b875b0a1aa379c8a4a203024cb792355ca",
     ),
     (
         "tools/build/remap_runtime_source.py",
-        "50fb679becd85980354858e38a4231488839bedfbf013b203505b7a5912c66bc",
+        "71237241a3a43fa3dbc5c5b8db488432b9051ed66322cbdf497959b3724b10a1",
     ),
     (
         "tools/build/remap_runtime_patch.py",

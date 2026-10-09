@@ -486,7 +486,7 @@ class DistributionSigningCustodyControls(unittest.TestCase):
         self.case.record.update(
             schema=2,
             source_profile="owned_vhd_broker_source_v1",
-            source_factory_sha256="50fb679becd85980354858e38a4231488839bedfbf013b203505b7a5912c66bc",
+            source_factory_sha256="71237241a3a43fa3dbc5c5b8db488432b9051ed66322cbdf497959b3724b10a1",
             source_inventory_entries=4505,
             owned_replacements=64,
             staged_files=4528,

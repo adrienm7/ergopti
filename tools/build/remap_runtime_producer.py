@@ -444,8 +444,60 @@ def owned_input_values_queue_acquisition(source):
         "  void start_input_values_queue() {",
         "  bool start_input_values_queue() {",
     )
-    return replace_once(
+    source = replace_once(
         source,
         "        IOHIDQueueStart(*input_values_queue_);\n      }\n    }\n  }\n",
         "        IOHIDQueueStart(*input_values_queue_);\n      }\n    }\n    return static_cast<bool>(input_values_queue_);\n  }\n",
+    )
+    return owned_input_values_queue_errors(source)
+
+
+def owned_input_values_queue_errors(source):
+    """Route active queue callback failures through the existing original signal."""
+    source = replace_once(
+        source,
+        "  static void static_input_values_available_callback(void* context,\n"
+        "                                                     IOReturn result,\n"
+        "                                                     void* sender) {\n"
+        "    if (result != kIOReturnSuccess) {\n"
+        "      return;\n"
+        "    }\n\n"
+        "    auto self = static_cast<iokit_hid_device_events_monitor*>(context);\n"
+        "    if (!self) {\n"
+        "      return;\n"
+        "    }\n\n"
+        "    self->input_values_available_callback();\n"
+        "  }\n",
+        "  static void static_input_values_available_callback(void* context,\n"
+        "                                                     IOReturn result,\n"
+        "                                                     void* sender) {\n"
+        "    auto self = static_cast<iokit_hid_device_events_monitor*>(context);\n"
+        "    if (!self) {\n"
+        "      return;\n"
+        "    }\n\n"
+        "    if (result != kIOReturnSuccess) {\n"
+        "      self->input_values_error_callback(result);\n"
+        "      return;\n"
+        "    }\n\n"
+        "    self->input_values_available_callback();\n"
+        "  }\n",
+    )
+    return replace_once(
+        source,
+        "  void input_values_available_callback() {\n",
+        "  void input_values_error_callback(IOReturn result) {\n"
+        "    // IOKit may invoke callbacks while device open has failed or stopped.\n"
+        "    // Preserve closed-device silence and the original dispatcher signal.\n"
+        "    {\n"
+        "      std::lock_guard<std::mutex> lock(open_options_mutex_);\n"
+        "      if (!current_open_options_) {\n"
+        "        return;\n"
+        "      }\n"
+        "    }\n\n"
+        "    iokit_return r = result;\n"
+        "    enqueue_to_dispatcher([this, r] {\n"
+        '      error_occurred("input values callback error", r);\n'
+        "    });\n"
+        "  }\n\n"
+        "  void input_values_available_callback() {\n",
     )

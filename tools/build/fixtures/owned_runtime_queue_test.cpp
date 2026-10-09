@@ -163,6 +163,156 @@ void pending_failure_before_dispatch() {
   monitor->async_stop(); queue_ports::settle(); monitor.reset(); queue_ports::settle();
   require(status(owner).at("ready") == false && status(owner).at("monitors").empty(), "Final stop and retirement preserve currentness");
 }
+// Independent queue-error controls frozen before the owned error projection.
+// Actual vendor callback/drain bodies execute through modeled IOKit ports only.
+constexpr IOReturn injected_queue_error = -73;
+constexpr IOReturn injected_open_error = -79;
+struct queue_error_control {
+  fixture input;
+  runtime owner;
+  runtime::inventory_watch watcher;
+  std::unique_ptr<krbn::hid_device_events_monitor> monitor;
+  producer_ports::value escape_release{&input.escape, 0, 1000};
+  producer_ports::value space_press{&input.space, 1, 1001};
+  unsigned started = 0, stopped = 0, delivered_values = 0;
+  std::vector<std::string> delivered, messages;
+  std::vector<pqrs::osx::iokit_return> results;
+  queue_error_control() : watcher(runtime::watch_inventory()) {
+    watcher.publish({41}, true, false);
+    monitor = std::make_unique<krbn::hid_device_events_monitor>(
+        std::weak_ptr<pqrs::dispatcher::dispatcher>{}, std::make_shared<pqrs::cf::run_loop_thread>(),
+        &input.device, krbn::device_properties{41, "HS274 CI Keyboard", {}},
+        krbn::hid_device_events_monitor::configuration{});
+    monitor->started.connect([&] { ++started; delivered.push_back("started"); });
+    monitor->stopped.connect([&] { ++stopped; delivered.push_back("stopped"); });
+    monitor->values_arrived.connect([&](auto values) {
+      delivered.push_back("values");
+      require(values->size() == 2 && values->at(0).get_usage() == 41 &&
+              values->at(0).get_integer_value() == 0 && values->at(0).get_time_stamp() == 1000 &&
+              values->at(1).get_usage() == 44 && values->at(1).get_integer_value() == 1 &&
+              values->at(1).get_time_stamp() == 1001,
+              "The original remapping callback must retain both independent values in order");
+      delivered_values += values->size();
+    });
+    monitor->error_occurred.connect([&](const std::string& message, pqrs::osx::iokit_return result) {
+      require(!result, "An injected nonzero native callback result must never become success");
+      delivered.push_back("error"); messages.push_back(message); results.push_back(result);
+    });
+  }
+  void start() {
+    monitor->async_start(0, std::chrono::milliseconds(1)); queue_ports::settle();
+    require(started == 1 && messages.empty() && status(owner).at("ready") == true,
+            "The actual healthy acquisition must precede every active queue-error control");
+    require(queue_ports::native_queue.callback != nullptr && queue_ports::native_queue.context != nullptr,
+            "The test must use the callback registered by the actual vendor class");
+  }
+  json lease() {
+    auto opened = opening(owner);
+    require(opened.at("coverage") == "fixture_only", "Queue-error controls never qualify complete coverage");
+    json request{{"version", 1u}, {"action", "baseline"}, {"incarnation", opened.at("incarnation")},
+                 {"lease", opened.at("lease")}};
+    const auto page = owner.request(9, request);
+    require(page.at("rows").size() == 4, "The existing complete fixture baseline remains unchanged");
+    request["baseline_ack"] = std::to_string(page.at("next").get<std::size_t>());
+    require(owner.request(9, request).at("kind") == "baseline_ready", "The exact lease must acknowledge its own baseline");
+    return {{"version", 1u}, {"action", "pull"}, {"incarnation", opened.at("incarnation")},
+            {"lease", opened.at("lease")}};
+  }
+  void callback(IOReturn result) {
+    auto& queue = queue_ports::native_queue;
+    require(queue.callback && queue.context, "A real registered callback and live context are mandatory");
+    queue.callback(queue.context, result, &queue);
+  }
+  void values() {
+    queue_ports::native_queue.values = {&escape_release, &space_press};
+    callback(kIOReturnSuccess);
+    require(queue_ports::queue_reads == 3 && queue_ports::native_queue.values.empty(),
+            "The actual unchanged vendor loop must copy both modeled values then observe null");
+  }
+  void error(const json& pull) {
+    require(messages.empty(), "No earlier native failure may satisfy the queue-error assertion");
+    callback(injected_queue_error);
+    require(messages.empty() && status(owner).at("ready") == true,
+            "The original error signal and revocation remain dispatcher-owned");
+    queue_ports::dispatcher();
+    require(messages == std::vector<std::string>{"input values callback error"} &&
+            results.size() == 1 && results[0] == pqrs::osx::iokit_return(injected_queue_error),
+            "An active queue error must forward exactly its original nonzero IOReturn");
+    require(status(owner).at("ready") == false && owner.request(9, pull).at("kind") == "lost",
+            "The actual wrapper must revoke physical readiness and the exact active lease on queue error");
+    require(queue_ports::closes == 0 && queue_ports::creates == 1 && queue_ports::opens == 1 && started == 1,
+            "A queue error must not close, reopen or manufacture a successful acquisition");
+  }
+  void finish() {
+    monitor->async_stop(); queue_ports::settle(); monitor.reset(); queue_ports::settle();
+    require(status(owner).at("ready") == false && status(owner).at("monitors").empty(),
+            "Final settled fixture stop and registration retirement must remain whole");
+    owner.peer_closed(9);
+  }
+};
+void queue_error_case(const std::string& scenario) {
+  queue_ports::reset();
+  queue_error_control control;
+  if (scenario == "error-unopened") {
+    queue_ports::open_result = injected_open_error;
+    control.monitor->async_start(0, std::chrono::milliseconds(1)); queue_ports::settle();
+    require(control.started == 0 && control.messages == std::vector<std::string>{"IOHIDDeviceOpen is failed."} &&
+            control.results.size() == 1 && control.results[0] == pqrs::osx::iokit_return(injected_open_error) &&
+            status(control.owner).at("ready") == false,
+            "The genuine queue-before-open path must retain its independent native open refusal");
+    control.callback(injected_queue_error); queue_ports::dispatcher();
+    require(control.messages.size() == 1 && control.started == 0 && queue_ports::queue_reads == 0 &&
+            status(control.owner).at("ready") == false,
+            "A callback error from an unopened device must not add an error or grant readiness");
+  } else {
+    control.start();
+    auto pull = control.lease();
+    if (scenario == "error-healthy-values") {
+      control.values(); queue_ports::dispatcher();
+      const auto batch = control.owner.request(9, pull);
+      require(batch.at("kind") == "batch" && batch.at("records").size() == 2 &&
+              batch.at("records")[0].at("cookie") == 141 && batch.at("records")[0].at("sequence") == "1" &&
+              batch.at("records")[0].at("timestamp") == "1000" && batch.at("records")[0].at("value") == "0" &&
+              batch.at("records")[1].at("cookie") == 144 && batch.at("records")[1].at("sequence") == "2" &&
+              batch.at("records")[1].at("timestamp") == "1001" && batch.at("records")[1].at("value") == "1" &&
+              control.delivered_values == 2 && control.messages.empty() && status(control.owner).at("ready") == true,
+              "Successful queue delivery must preserve raw identities, timestamps, order and readiness");
+    } else if (scenario == "error-stopped") {
+      control.monitor->async_stop(); queue_ports::settle();
+      control.callback(injected_queue_error); queue_ports::dispatcher();
+      require(control.messages.empty() && control.started == 1 && control.stopped == 1 &&
+              status(control.owner).at("ready") == false && control.owner.request(9, pull).at("kind") == "lost",
+              "A retained callback with a live closed monitor must not add failure or revive its stopped lease");
+    } else if (scenario == "error-pending-values") {
+      control.values(); control.callback(injected_queue_error);
+      require(control.delivered == std::vector<std::string>{"started"} && control.messages.empty(),
+              "No dispatcher callback may be manufactured by modeled native enqueue");
+      queue_ports::dispatcher();
+      require(control.delivered == std::vector<std::string>{"started", "values", "error"} &&
+              control.messages == std::vector<std::string>{"input values callback error"} && control.results.size() == 1 &&
+              control.results[0] == pqrs::osx::iokit_return(injected_queue_error) && control.delivered_values == 2 &&
+              status(control.owner).at("ready") == false && control.owner.request(9, pull).at("kind") == "lost",
+              "Same-client FIFO must deliver original values before the error revokes its exact physical lease");
+    } else {
+      control.error(pull);
+      if (scenario == "error-active") {
+        control.values(); queue_ports::dispatcher();
+        require(control.delivered_values == 2 && control.messages.size() == 1 && status(control.owner).at("ready") == false,
+                "Later original remapping values must not silently recover physical readiness after queue error");
+      } else if (scenario == "error-restart") {
+        // Loss keeps the old preparation owned until the caller retires it.
+        control.owner.peer_closed(9);
+        control.monitor->async_stop(); queue_ports::settle();
+        control.monitor->async_start(kIOHIDOptionsTypeSeizeDevice, std::chrono::milliseconds(1)); queue_ports::settle();
+        require(control.delivered == std::vector<std::string>{"started", "error", "stopped", "started"} &&
+                control.started == 2 && control.stopped == 1 && control.monitor->seized() &&
+                status(control.owner).at("ready") == true && opening(control.owner).at("coverage") == "fixture_only",
+                "Only a genuine fresh stopped/started acquisition may recover through its own baseline");
+      } else throw std::runtime_error("Unknown independent queue-error scenario");
+    }
+  }
+  control.finish();
+}
 int main(int argc, char** argv) {
   try {
     const std::string scenario = argc == 2 ? argv[1] : "";
@@ -170,6 +320,8 @@ int main(int argc, char** argv) {
       owned_case(scenario);
     else if (scenario == "unobserved-values") unobserved_values();
     else if (scenario == "pending-native-before-dispatch") pending_failure_before_dispatch();
+    else if (scenario == "error-healthy-values" || scenario == "error-active" || scenario == "error-unopened" ||
+             scenario == "error-stopped" || scenario == "error-restart" || scenario == "error-pending-values") queue_error_case(scenario);
     else throw std::runtime_error("Unknown independent queue acquisition scenario");
     std::cout << "PASS actual vendor queue acquisition " << scenario << "; modeled native ports only\n";
     return 0;

@@ -110,10 +110,18 @@ namespace type_safe { template <typename T> T get(T value) { return value; } }
 namespace queue_ports {
 inline bool creation_fails = false;
 inline unsigned creates = 0, adds = 0, queue_starts = 0, queue_stops = 0;
-inline unsigned opens = 0, closes = 0;
+inline unsigned opens = 0, closes = 0, queue_reads = 0;
+inline int open_result = 0;
 inline std::vector<std::string> order;
 inline std::deque<std::function<void()>> run_loop_jobs, dispatcher_jobs;
-struct queue { IOHIDDeviceRef device; };
+// Keep the genuine registered callback and explicit borrowed fixture values.
+// Retaining this modeled context proves no native callback retirement.
+struct queue {
+  IOHIDDeviceRef device = nullptr;
+  void (*callback)(void*, int, void*) = nullptr;
+  void* context = nullptr;
+  std::deque<IOHIDValueRef> values;
+};
 inline queue native_queue{};
 inline void run_loop() {
   for (unsigned count = 0; !run_loop_jobs.empty(); ++count) {
@@ -130,7 +138,8 @@ inline void dispatcher() {
 inline void settle() { run_loop(); dispatcher(); }
 inline void reset() {
   if (!run_loop_jobs.empty() || !dispatcher_jobs.empty()) throw std::runtime_error("Pending model work");
-  creation_fails = false; creates = adds = queue_starts = queue_stops = opens = closes = 0; order.clear();
+  creation_fails = false; creates = adds = queue_starts = queue_stops = opens = closes = queue_reads = 0;
+  open_result = 0; native_queue = {}; order.clear();
 }
 }
 using IOHIDQueueRef = queue_ports::queue*;
@@ -143,17 +152,23 @@ inline void* CFRunLoopGetCurrent() { return nullptr; }
 inline IOHIDQueueRef IOHIDQueueCreate(const void*, IOHIDDeviceRef device, CFIndex, IOOptionBits) {
   ++queue_ports::creates; queue_ports::order.push_back("create");
   if (queue_ports::creation_fails) return nullptr;
-  queue_ports::native_queue.device = device; return &queue_ports::native_queue;
+  queue_ports::native_queue = {}; queue_ports::native_queue.device = device; return &queue_ports::native_queue;
 }
 inline void IOHIDQueueAddElement(IOHIDQueueRef, IOHIDElementRef) { ++queue_ports::adds; }
-template <typename Callback> inline void IOHIDQueueRegisterValueAvailableCallback(IOHIDQueueRef, Callback, void*) {}
+template <typename Callback> inline void IOHIDQueueRegisterValueAvailableCallback(IOHIDQueueRef queue, Callback callback, void* context) {
+  queue->callback = callback; queue->context = context;
+}
 inline void IOHIDQueueScheduleWithRunLoop(IOHIDQueueRef, void*, const char*) {}
 inline void IOHIDQueueUnscheduleFromRunLoop(IOHIDQueueRef, void*, const char*) {}
 inline void IOHIDQueueStart(IOHIDQueueRef) { ++queue_ports::queue_starts; queue_ports::order.push_back("queue-start"); }
 inline void IOHIDQueueStop(IOHIDQueueRef) { ++queue_ports::queue_stops; }
-inline IOHIDValueRef IOHIDQueueCopyNextValueWithTimeout(IOHIDQueueRef, double) { return nullptr; }
+inline IOHIDValueRef IOHIDQueueCopyNextValueWithTimeout(IOHIDQueueRef queue, double) {
+  ++queue_ports::queue_reads;
+  if (queue->values.empty()) return nullptr;
+  auto value = queue->values.front(); queue->values.pop_front(); return value;
+}
 inline IOReturn IOHIDDeviceOpen(IOHIDDeviceRef, IOOptionBits) {
-  ++queue_ports::opens; queue_ports::order.push_back("device-open"); return kIOReturnSuccess;
+  ++queue_ports::opens; queue_ports::order.push_back("device-open"); return queue_ports::open_result;
 }
 inline IOReturn IOHIDDeviceClose(IOHIDDeviceRef, IOOptionBits) { ++queue_ports::closes; return kIOReturnSuccess; }
 template <typename Callback> inline void IOHIDDeviceRegisterRemovalCallback(IOHIDDeviceRef, Callback, void*) {}

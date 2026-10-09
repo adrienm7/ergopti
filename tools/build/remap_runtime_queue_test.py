@@ -77,6 +77,20 @@ def outputs():
     if OPTIONS.original_monitor:
         path = "vendor/vendor/include/pqrs/osx/iokit_hid_device_events_monitor.hpp"
         result[path] = originals[path]
+    before_errors = getattr(OPTIONS, "before_queue_errors", None)
+    if before_errors is not None:
+        import hashlib
+
+        # Only the immutable published queue prerequisite is a genuine before.
+        # The pristine --original-monitor source removes its null-create guard.
+        if (
+            OPTIONS.original_monitor
+            or type(before_errors) is not bytes
+            or hashlib.sha256(before_errors).hexdigest()
+            != "34271d6a5e65f490e0887a3480016a454b41c46b4f10365679b05ced51cf57c1"
+        ):
+            raise RuntimeError("Genuine published queue-error predecessor source refused")
+        result["vendor/vendor/include/pqrs/osx/iokit_hid_device_events_monitor.hpp"] = before_errors
     return result
 
 
@@ -171,6 +185,53 @@ class NativeQueueAcquisitionBehavior(unittest.TestCase):
         )
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("Unknown independent queue acquisition scenario", result.stderr)
+
+
+# This separate cohort leaves both original acquisition methods byte-exact.
+ERROR_SCENARIOS = (
+    "error-healthy-values",
+    "error-active",
+    "error-unopened",
+    "error-stopped",
+    "error-restart",
+    "error-pending-values",
+)
+
+
+class NativeQueueErrorBehavior(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.temporary = tempfile.TemporaryDirectory(prefix="actual-owned-queue-errors-")
+        cls.addClassCleanup(cls.temporary.cleanup)
+        cls.binary = executable(Path(cls.temporary.name), outputs())
+
+    def test_handwritten_active_queue_error_scenarios(self):
+        for scenario in ERROR_SCENARIOS:
+            with self.subTest(scenario=scenario):
+                result = subprocess.run(
+                    [str(self.binary), scenario],
+                    capture_output=True,
+                    text=True,
+                    timeout=5,
+                )
+                self.assertEqual(result.returncode, 0, result.stderr)
+                self.assertEqual(result.stderr, "")
+                self.assertEqual(
+                    result.stdout,
+                    "PASS actual vendor queue acquisition "
+                    + scenario
+                    + "; modeled native ports only\n",
+                )
+
+    def test_unknown_queue_error_scenario_refuses(self):
+        result = subprocess.run(
+            [str(self.binary), "unknown-queue-error-case"],
+            capture_output=True,
+            text=True,
+            timeout=5,
+        )
+        self.assertNotEqual(result.returncode, 0)
+        self.assertEqual(result.stderr, "Unknown independent queue acquisition scenario\n")
 
 
 if __name__ == "__main__":

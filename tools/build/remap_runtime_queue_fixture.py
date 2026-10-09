@@ -14,7 +14,7 @@ import unittest
 
 import remap_runtime_inventory_fixture as inventory
 
-QUEUE_SOURCE_SHA256 = "c45241a8eaec6a85ac2c501a7adc794391722244aa90ea1052adb30e5a61187b"
+QUEUE_SOURCE_SHA256 = "ca54e61d19dd071fc23ce991efc1a9a2798304a6486872261a092019ad97ec58"
 REPORT = "PASS owned runtime queue acquisition=6 unknown=1; modeled platform ports only\n"
 SCENARIOS = (
     "null-queue",

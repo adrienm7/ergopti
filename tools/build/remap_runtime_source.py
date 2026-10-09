@@ -46,7 +46,7 @@ DEPENDENCIES = (
     ),
     (
         "tools/build/remap_runtime_producer.py",
-        "8b132f2e26351104c39c2461b156671df5cda0cb96ab8aa720326765a5a9c413",
+        "9c1318b77219663f7328be5795f129fad64803211fddb952f82a886897240843",
     ),
     (
         "tools/diagnostics/hs274-key-element.hpp",
@@ -1022,7 +1022,7 @@ def current_staged_source(image, absolute_deadline):
     )
     expected = _staged_expectations(image.projection)
     require(
-        len(image.files) == 4527
+        len(image.files) == 4528
         and len(image.links) == 4
         and {row.path for row in image.files}
         == {path for path, (mode, _) in expected.items() if mode != "120000"}

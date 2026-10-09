@@ -5112,6 +5112,23 @@ private packet; its controller cause is not yet observed. The diagnostic grants
 no permission, installation, remapping or runtime authority. Item31 and
 transverse16/38 remain open.
 
+The full-source admission count is corrected from4527 to4528 regular
+files plus four links, preserving the independently fixed4532 paths, exact
+hashes, modes and link targets. Four physical filesystem controls pass in
+normal and optimized Python; genuine prior admission fails all four. Test
+contents and original-source admission are explicitly modeled; a complete
+compilable native materialization remains unqualified. The actual generator
+preserves all63 other products and the exact inverse recovers genuine vendor
+source. An active vendor queue error now forwards its original nonzero
+IOReturn through the existing owner failure route. Six fixed scenarios and
+unknown refusal pass using actual C++ with modeled IOKit/scheduler ports;
+genuine prior source fails active, pending-value and restart assertions.
+The new restart fixture retires its old peer before acquiring again; the
+initial incorrect fixture failure is retained. All31 passing bounded commands
+execute510 test methods, with five expected predecessor failures and zero
+skips/timeouts. Darwin delivery, retirement, drain, cutover and physical capture
+remain unqualified. Item31 and transverse16/38 remain incomplete.
+
 Latest manual macOS qualification, run37880447936 at7c88374f12ab6682fd7460cf10b69efcf41e05e6,
 completed all467 Swift cases:442 passed,10 failed and15 skipped. Packaging and
 native verdicts fail; installation and Release are skipped. All37 keyboard
