@@ -55,6 +55,13 @@ pending_signals = []
 def group_is_alive():
     try: os.killpg(proc.pid, 0)
     except ProcessLookupError: return False
+    except PermissionError:
+        # Darwin can report EPERM for a group containing only the unreaped
+        # zombie leader. Reap that exact child, then require a fresh ESRCH;
+        # a live or still-inaccessible group remains a real refusal.
+        if proc.poll() is None: raise
+        try: os.killpg(proc.pid, 0)
+        except ProcessLookupError: return False
     return True
 
 def escalate_if_due(now):
