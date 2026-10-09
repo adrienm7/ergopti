@@ -5046,6 +5046,72 @@ inputs restore all 233 unchanged controls; independent replay also passes the
 34 existing missing/owned refusal controls. Final composed verification remains
 pending. No assertion, native requirement or item is waived.
 
+The private macOS Configuration menu preparation presents the admitted runtime
+through one shared read-only row. Its unsupported owned or unavailable intent
+preserves consent and disables shared integration callbacks, stale tap-hold
+mutations and rule removal through fresh admission checks. Existing translations, supported
+shared behavior and every original ordered menu assertion remain mandatory.
+The original nine-row caption oracle gains the independently declared status
+row; eleven upstream action-picker cases receive actual scoped runtime inputs
+without changing their bodies, counters, faults or cleanup. Independent replay
+passes 98 focused controls. Full composed local and native qualification is
+recorded separately; owned installation/start and physical acceptance remain
+unfinished. Item31 and transverse16/38 stay open.
+
+The physical-source selector's two Lua child fixtures now receive the actual
+absolute shared source directory as an argument. Relative constructor coordinates
+failed when the runner lacked a native current-directory provider; the production
+constructor authority remains unchanged. Both actual Lua54 and LuaJIT preserve
+all three migration and eight restore/clear assertions with and without LFS,
+and reject a foreign constructor. The complete six-case selector passes after
+the correction versus four passes and two failures without LFS before it.
+Exact-source manual run37862638268 at41be2e93 passes all389 Core JS checks,
+including the six-case selector, and18,686 stubbed macOS units. Native runtime
+acceptance remains pending; this fixture repair does not complete item31 or
+transverse16/38.
+
+The independently reviewed T2 expected-inventory preparation is published only
+on the dedicated test CI branch at4f34f9aa, followed by the genuine current-dev
+merge87bbe0b6. It is not integrated into the feature branch or dev. The source
+retains33 original inputs,36 dependencies and63 generated outputs. Its normal
+XCTest registration preserves all seven original producer methods and two
+inventory methods, including37 scenarios and unknown refusal. The composed
+source passes formatting,389 JS checks and18,686 portable macOS cases; the
+actual Linux Clang19/Blocks replay passes nine methods in25.722 seconds under 30. Fresh current-dev Windows-only corrections remain whole; their BOM/LF gate
+passes1876 sources, with Windows native execution deferred. Darwin execution of
+this new registration, native queue acquisition/cutover and complete coverage
+remain unexecuted. Owned runtime stays disabled and fixture_only.
+
+Manual macOS run37862638268 at41be2e93 is terminal FAILURE. The Swift step reaches
+its original25-minute limit with93 started cases:84 pass,8 fail and one remains
+unfinished. Both owned whole-compilation attempts refuse at their original
+300-second boundary, although their Core builds pass117.525s and92.790s. The
+first Console build and the second CLI build remain without completion receipts;
+retained object files do not establish completed target qualification. Separate
+CoreService/CLI calibration passes185.911s. Apple keychain settings performs a
+normal atomic file replacement, which the current fixed-inode custody refuses;
+simply recapturing an inode would violate the original foreign-replacement
+controls. Owned configuration has a complete eight-variant private packet but
+its outer admission refuses. A reviewed fixed-field failure observation passes
+all24 portable controls; its new native XCTest remains unexecuted. Permission
+UI and protected VHD remain failed or unqualified. The exact root-process
+observation names preflight_compiler_owner: the selected compiler fails its
+required owner predicate before privileged bootstrap; no ownership guard is
+relaxed. Keyboard/TIS cases are not reached; installation and Release are
+skipped. These results do not qualify item31 or transverse16/38.
+
+Windows PC follow-up for the final integrated Group5 source: retain the exact
+dev SHA and run the normal Windows unit/meta, E2E, packaging and installation
+qualification after the managed-network owner resolves its native PAC refusal.
+Manual run37857293152 at944b1425fdb7d9a09e79714b67cec25d3b3d6740 reports
+10,436 unit passes and one failure, case6687 in test_managed_routes_native.ahk:
+the first independent PAC vector expects three routes but observes one direct
+native bypass. Its cause remains unqualified; no Group5 source is attributed.
+Windows E2E, package and installation are skipped, and the native-port step is
+not executed. Preserve that assertion and its independent vector; the maintainer
+will resume Windows-only qualification on their PC. Mac acceptance and item31
+remain incomplete.
+
 - [~] **33.** Config policy for the files other than config.toml (the former
   item 25): Published in the second 2026-09-30 release for the files the review
   listed; see `docs/memory/text-input-and-config.md`. Current source already
@@ -6513,6 +6579,14 @@ repository validation and actual signed-runtime acquisition, native JSON/files,
 process retirement and elapsed-time acceptance remain distinct requirements.
 This does not recover the unavailable 25-rule backup, diagnose that exact report,
 qualify confirmation UI or complete TODO43.
+
+Exact41be manual run37862638268 now supplies closed native Hammerspoon artifact
+receipts: all six original cleanup cases and the four owner, four refusal and
+four source cases pass over actual private files. Each receipt reports its
+source/owner closure and retained elapsed time. The whole Swift/CI run fails
+separately; installation, remap lease initialization, physical input and actual
+confirmation UI remain unexecuted. The unavailable25-rule user backup is not
+reconstructed, so TODO43 remains partial.
 
 The actual native method in [37411747843](https://github.com/adrienm7/ergopti/actions/runs/37411747843)
 passed its six cleanup cases, but printing its full JSON as one huge console line
