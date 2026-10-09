@@ -30,6 +30,9 @@ Test("managed network: legacy native-owner debt stops subsequent lookups and par
 
 ; Project only enumerated stages and bounded scalars from the settled owner capture.
 _SystemProxy_RetirementDiagnostic(Observation) {
+	Raw := _SystemProxy_RetirementRawFlagsFact(Observation.Get("stderr", ""))
+	if Raw != ""
+		_TestPrint("::notice title=Windows legacy PAC raw contract::" . Raw)
 	Out := Observation.Get("stdout", "")
 	if !(Out is String) || StrLen(Out) > 8192
 		return
@@ -91,3 +94,54 @@ _SystemProxy_RetirementCauseProjectionControls() {
 	AssertEqual(Boundary, _SystemProxy_RetirementCauseFact(Prefix . Boundary, "1", "prepare_control"))
 }
 Test("managed network: closed legacy cause projection refuses foreign, duplicate and unbounded receipts", _SystemProxy_RetirementCauseProjectionControls)
+
+; Raw contract values remain fixed booleans from the same settled stderr receipt.
+_SystemProxy_RetirementRawFlagsFact(Err) {
+	if !(Err is String) || StrLen(Err) > 8192
+		return ""
+	Diagnostic := "m)^RETIREMENT_DIAG control=5 stage=raw_proxy_contract child_exit=0 stdout_units=(0|[1-9][0-9]{0,3}) stderr_units=0`r?$"
+	if !RegExMatch(Err, Diagnostic, &Owner) || Integer(Owner[1]) > 8192
+		return ""
+	FirstOwner := InStr(Err, "RETIREMENT_DIAG")
+	if InStr(Err, "RETIREMENT_DIAG", , FirstOwner + 1)
+		return ""
+	Pattern := "m)^RETIREMENT_RAW_FLAGS control=5 schema=1 ok_bool=([01]) ok_true=([01]) kind_text=([01]) kind_named=([01]) access_integer=([01]) access_three=([01]) proxy_text=([01]) proxy_literal=([01]) proxy_legacy_ipv6_literal=([01]) bypass_text=([01]) bypass_empty=([01]) native_integer=([01]) native_zero=([01])`r?$"
+	if !RegExMatch(Err, Pattern, &Fact)
+		return ""
+	FirstRaw := InStr(Err, "RETIREMENT_RAW_FLAGS")
+	if InStr(Err, "RETIREMENT_RAW_FLAGS", , FirstRaw + 1)
+		return ""
+	return RTrim(SubStr(Fact[0], StrLen("RETIREMENT_RAW_FLAGS ") + 1), "`r")
+}
+
+_SystemProxy_RetirementRawProjectionControls() {
+	Owner := "RETIREMENT_DIAG control=5 stage=raw_proxy_contract child_exit=0 stdout_units=200 stderr_units=0"
+	Fields := "control=5 schema=1 ok_bool=1 ok_true=1 kind_text=1 kind_named=1 access_integer=1 access_three=1 proxy_text=1 proxy_literal=0 proxy_legacy_ipv6_literal=1 bypass_text=1 bypass_empty=1 native_integer=1 native_zero=1"
+	Raw := "RETIREMENT_RAW_FLAGS " . Fields
+	AssertEqual(Fields, _SystemProxy_RetirementRawFlagsFact(Owner . "`n" . Raw . "`n"))
+	AssertEqual(Fields, _SystemProxy_RetirementRawFlagsFact(Owner . "`r`n" . Raw . "`r`n"))
+	for Name in ["ok_bool", "ok_true", "kind_text", "kind_named", "access_integer", "access_three",
+		"proxy_text", "proxy_literal", "proxy_legacy_ipv6_literal", "bypass_text", "bypass_empty", "native_integer", "native_zero"] {
+		Value := RegExReplace(Fields, "\b" . Name . "=[01]", Name . "=0")
+		AssertEqual(Value, _SystemProxy_RetirementRawFlagsFact(Owner . "`nRETIREMENT_RAW_FLAGS " . Value))
+	}
+	for Value in [Raw, Owner, Owner . "`n" . Raw . "`n" . Raw,
+		Owner . "`n" . Raw . "`nRETIREMENT_RAW_FLAGS malformed",
+		Owner . "`n" . Raw . "`nRETIREMENT_DIAG malformed",
+		StrReplace(Owner, "control=5", "control=4") . "`n" . Raw,
+		StrReplace(Owner, "raw_proxy_contract", "frame_contract") . "`n" . Raw,
+		StrReplace(Owner, "child_exit=0", "child_exit=1") . "`n" . Raw,
+		StrReplace(Owner, "stdout_units=200", "stdout_units=8193") . "`n" . Raw,
+		StrReplace(Owner, "stderr_units=0", "stderr_units=1") . "`n" . Raw,
+		Owner . "`n" . StrReplace(Raw, "control=5", "control=4"),
+		Owner . "`n" . StrReplace(Raw, "schema=1", "schema=2"),
+		Owner . "`n" . StrReplace(Raw, "ok_bool=1", "ok_bool=true"),
+		Owner . "`n" . StrReplace(Raw, "ok_bool=1", "ok_bool=2"),
+		Owner . "`n" . StrReplace(Raw, "proxy_literal=0", "proxy_literal=PRIVATE"),
+		Owner . "`n" . Raw . " extra=PRIVATE", Owner . "`nforeign " . Raw] {
+		AssertEqual("", _SystemProxy_RetirementRawFlagsFact(Value), "only one same-owner closed boolean receipt may be projected")
+	}
+	AssertEqual("", _SystemProxy_RetirementRawFlagsFact(Map()))
+	AssertEqual("", _SystemProxy_RetirementRawFlagsFact(Owner . "`n" . Raw . StrReplace(Format("{:8193}", ""), " ", "x")))
+}
+Test("managed network: raw legacy contract projection requires same settled stderr owner and bounded booleans", _SystemProxy_RetirementRawProjectionControls)

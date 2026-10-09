@@ -175,6 +175,50 @@ class PrivateSessionReceiving(unittest.TestCase):
             SESSIONS.select(self.root, 11434, EXPECTED, self.authenticate, 2)
         self.assertEqual(self.calls, [])
 
+    def test_injected_bound_reader_keeps_original_clock_and_expected_source_filter(self):
+        self.write()
+        clock = [100.0]
+        calls = []
+
+        def reader(directory, name):
+            calls.append((directory, name))
+            clock[0] += 1.5
+            return dict(SESSION)
+
+        with patch.object(SESSIONS.time, "monotonic", side_effect=lambda: clock[0]):
+            result = SESSIONS.select(
+                self.root, 11434, EXPECTED, self.authenticate, 2, read_candidate=reader
+            )
+        self.assertEqual(result, "authenticated-live-listener")
+        self.assertEqual(calls, [(self.root, "daemon-owned.json")])
+        self.assertEqual(self.calls, [SESSION])
+
+    def test_injected_reader_cancellation_propagates_before_authentication(self):
+        self.write()
+
+        def reader(*arguments):
+            raise KeyboardInterrupt()
+
+        with self.assertRaises(KeyboardInterrupt):
+            SESSIONS.select(self.root, 11434, EXPECTED, self.authenticate, 2, read_candidate=reader)
+        self.assertEqual(self.calls, [])
+
+    def test_fifo_default_session_refuses_without_unowned_writer(self):
+        path = self.root / "daemon-fifo.json"
+        os.mkfifo(path, 0o600)
+        native_open = os.open
+
+        def finite_open(name, flags, *arguments, **options):
+            if name == path.name:
+                self.assertTrue(flags & os.O_NONBLOCK)
+            return native_open(name, flags, *arguments, **options)
+
+        with patch.object(SESSIONS.os, "open", finite_open):
+            with self.assertRaises(SESSIONS.POLICY.RuntimeRefusal):
+                SESSIONS.read_session(self.root, path.name)
+        self.assertTrue(path.exists())
+        self.assertEqual(self.calls, [])
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -82,4 +82,10 @@ for _, bad in ipairs({ "CURL_CONNECT_TIMEOUT_SEC=0\nCURL_STALL_SEC=60\nCURL_MAX_
 end
 check(Adapter.handles((os.getenv("HOME") or "") .. "/Library/Application Support/Ergopti/ollama-native-http/ollama"), true)
 check(Adapter.handles("/external/ollama"), false)
+-- A directory basename is not managed ownership; only the exact HOME path
+-- enters the separate Python admission route, which still verifies its source.
+check(Adapter.handles("/opt/independent/ollama-native-http/ollama"), false)
+check(Adapter.handles((os.getenv("HOME") or "") .. ".independent/Library/Application Support/Ergopti/ollama-native-http/ollama"), false)
+check(Adapter.handles((os.getenv("HOME") or "") .. "/Library/Application Support/Ergopti/ollama-native-http/ollama.foreign"), false)
+check(Adapter.handles(nil), false)
 print("Managed Ollama injected adapter controls passed: " .. assertions)

@@ -85,13 +85,28 @@ def request(deadline):
 
 def select_owner(value, deadline, idle_timeout, maximum_bytes):
     contract_bytes, catalogue_bytes, host, contract, asset = RUNTIME.inputs()
-    binary = RUNTIME.native_verify(
-        RUNTIME.owned_directory(),
-        contract,
-        asset,
-        RUNTIME.POLICY.receipt(contract_bytes, catalogue_bytes, host, asset),
-        deadline,
-    )
+    try:
+        binary = RUNTIME.native_verify(
+            RUNTIME.owned_directory(),
+            contract,
+            asset,
+            RUNTIME.POLICY.receipt(contract_bytes, catalogue_bytes, host, asset),
+            deadline,
+        )
+    except RUNTIME.POLICY.RuntimeRefusal as error:
+        if str(error) != "runtime":
+            raise
+        return select_alias_owner(
+            value,
+            deadline,
+            idle_timeout,
+            maximum_bytes,
+            contract_bytes,
+            catalogue_bytes,
+            host,
+            contract,
+            asset,
+        )
     actual = binary.stat(follow_symlinks=False)
     expected = {
         "source_commit": asset["source_commit"],
@@ -118,6 +133,116 @@ def select_owner(value, deadline, idle_timeout, maximum_bytes):
         expected,
         authenticate,
         remaining,
+    )
+    owner.contract_sha256 = AUTH.digest(contract_bytes)
+    owner.catalogue_sha256 = AUTH.digest(catalogue_bytes)
+    return owner
+
+
+def select_alias_owner(
+    value,
+    deadline,
+    idle_timeout,
+    maximum_bytes,
+    contract_bytes,
+    catalogue_bytes,
+    host,
+    contract,
+    asset,
+):
+    """A sealed sidecar only supplies a claim; re-admit catalogue and actual socket."""
+    import stat
+
+    source = load("ergopti_pull_daemon_authority", DRIVER / "platform/ollama_daemon_authority.py")
+    bootstrap = load("ergopti_pull_bootstrap_policy", DRIVER / "platform/ollama_bootstrap_owner.py")
+    proxy = load("ergopti_pull_bootstrap_proxy", SHARED / "python/network_proxy_policy.py")
+    catalogue = RUNTIME.POLICY.metadata_bytes(catalogue_bytes)
+    expected_policy = catalogue["repository_source_sha256"].get(
+        "static/ergopti_plus/_shared/modules/llm/managed_ollama_bootstrap.json"
+    )
+    if expected_policy is None:
+        raise POLICY.RuntimeRefusal("session")
+    policy = bootstrap.BootstrapPolicy(
+        SHARED / "modules/llm/managed_ollama_bootstrap.json",
+        proxy.ProxyPolicy(),
+        expected_contract_sha256=expected_policy,
+    )
+    target = RUNTIME.owned_directory()
+    binary = target / contract["binary_path"]
+    actual = binary.stat(follow_symlinks=False)
+    if not stat.S_ISREG(actual.st_mode) or actual.st_uid != os.geteuid() or actual.st_mode & 0o022:
+        raise POLICY.RuntimeRefusal("session")
+    expected = {
+        "source_commit": asset["source_commit"],
+        "binary_sha256": asset["binary_sha256"],
+        "asset_sha256": asset["sha256"],
+        "device": str(actual.st_dev),
+        "inode": str(actual.st_ino),
+    }
+    candidate = None
+
+    def progress():
+        if deadline - time.monotonic() <= 0:
+            raise POLICY.RuntimeRefusal("deadline")
+
+    def read_candidate(directory, name):
+        nonlocal candidate
+        try:
+            session, claim = source.read_pair(
+                directory, name, policy.shared, os.geteuid(), progress=progress
+            )
+        except Exception as error:
+            if getattr(error, "cleanup", None) is not None:
+                # Unknown descriptor closure forbids any successor admission.
+                raise
+            # A cleanup wrapper preserves cancellation as a distinct primary;
+            # do not turn it into permission to authenticate another candidate.
+            for interruption in (getattr(error, "primary", None), getattr(error, "cleanup", None)):
+                if isinstance(interruption, BaseException) and not isinstance(
+                    interruption, Exception
+                ):
+                    raise interruption
+            raise SESSIONS.POLICY.RuntimeRefusal("session") from None
+        candidate = session, claim
+        return session
+
+    def authenticate(session, remaining):
+        if candidate is None or candidate[0] is not session:
+            raise SESSIONS.POLICY.RuntimeRefusal("session")
+        claim = candidate[1]
+        try:
+            RUNTIME.native_verify(
+                target,
+                contract,
+                asset,
+                RUNTIME.POLICY.receipt(contract_bytes, catalogue_bytes, host, asset),
+                deadline,
+                source_alias=claim["source_alias"],
+                source_identity={"device": session["device"], "inode": session["inode"]},
+            )
+            ports = source.POLICY.BoundAliasPorts(PORTS, claim, session, os.geteuid())
+            owner = PULL.PullOwner(session, str(binary), ports, idle_timeout, maximum_bytes)
+            owner.source_alias = claim["source_alias"]
+            progress()
+            owner.admit(deadline - time.monotonic())
+        except (
+            RUNTIME.POLICY.RuntimeRefusal,
+            POLICY.RuntimeRefusal,
+            source.POLICY.AuthorityRefusal,
+            PORTS.ENGINE.NativeHTTPError,
+            OSError,
+        ):
+            raise SESSIONS.POLICY.RuntimeRefusal("session") from None
+        return owner
+
+    progress()
+    owner = SESSIONS.select(
+        target.parent / "ollama-native-sessions",
+        value["port"],
+        expected,
+        authenticate,
+        deadline - time.monotonic(),
+        read_candidate=read_candidate,
     )
     owner.contract_sha256 = AUTH.digest(contract_bytes)
     owner.catalogue_sha256 = AUTH.digest(catalogue_bytes)

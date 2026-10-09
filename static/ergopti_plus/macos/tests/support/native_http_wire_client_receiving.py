@@ -27,6 +27,28 @@ wire = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(wire)
 
 
+def worker_receiving_facts(receiver):
+    process = getattr(receiver, "_process", None)
+    closed = getattr(receiver, "_closed", False) is True
+    created = process is not None
+    reaped = created and process.returncode is not None
+    stdin_closed = created and process.stdin is not None and process.stdin.closed
+    stdout_closed = created and process.stdout is not None and process.stdout.closed
+    return {
+        "created": int(created),
+        "closed": int(closed),
+        "reaped": int(reaped),
+        "stdin_closed": int(stdin_closed),
+        "stdout_closed": int(stdout_closed),
+        "settled": int(closed and (not created or (reaped and stdin_closed and stdout_closed))),
+        "exit_complete": int(reaped and process.returncode == 0),
+        "exit_deadline": int(reaped and process.returncode == 75),
+        "exit_refused": int(reaped and process.returncode == 74),
+        "exit_killed": int(reaped and process.returncode == -9),
+        "exit_other": int(reaped and process.returncode not in (0, 75, 74, -9)),
+    }
+
+
 class RealNativeClientReceiving(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
@@ -40,6 +62,7 @@ class RealNativeClientReceiving(unittest.TestCase):
         # This owner supplies native WNOWAIT/group retirement for compilation,
         # signing and the fixture security commands too.
         cls.fixture = wire.WireFixture()
+        cls.receiving_workers = []
         cls.root = None
         try:
             cls.root = Path(tempfile.mkdtemp(prefix="ergopti-native-client-app-"))
@@ -192,7 +215,28 @@ class RealNativeClientReceiving(unittest.TestCase):
 
     @classmethod
     def tearDownClass(cls):
-        cls.fixture.close()
+        try:
+            cls.fixture.close()
+        finally:
+            # Observe the unchanged restoration outcome, including refusal.
+            # Printing never pays a cleanup debt or replaces its primary error.
+            try:
+                print(
+                    "# native_http_fixture_closure "
+                    + json.dumps(
+                        {
+                            "version": 1,
+                            "closed": int(cls.fixture.closed),
+                            "trust_unsettled": int(cls.fixture.trust_attempted),
+                            "keychain_unsettled": int(cls.fixture.keychain_created),
+                            "active": cls.fixture.receiving_facts()["active"],
+                        },
+                        sort_keys=True,
+                    ),
+                    flush=True,
+                )
+            except OSError:
+                pass
         receipt = json.loads((cls.root / "source-receipt.json").read_text())
         for relative, digest in receipt["source_hashes"].items():
             if hashlib.sha256((ROOT / relative).read_bytes()).hexdigest() != digest:
@@ -205,6 +249,8 @@ class RealNativeClientReceiving(unittest.TestCase):
         ):
             raise RuntimeError("Native receiving final signed binary receipt diverged")
         shutil.rmtree(cls.root)
+        if all(worker_receiving_facts(value)["settled"] for value in cls.receiving_workers):
+            cls.receiving_workers.clear()
 
     def setUp(self):
         clean = dict(os.environ)
@@ -217,7 +263,52 @@ class RealNativeClientReceiving(unittest.TestCase):
         self.environment_scope = mock.patch.dict(os.environ, clean, clear=True)
         self.environment_scope.start()
         self.addCleanup(self.environment_scope.stop)
+        self.receiving_start = len(self.receiving_workers)
+        original = self.managed.Native.NativeHTTPResponse._open_wire
+
+        def observe(receiver, *arguments, **keywords):
+            # This test owner retains only the exact caller object, before its
+            # unchanged open/close implementation runs. It never selects a PID.
+            self.receiving_workers.append(receiver)
+            return original(receiver, *arguments, **keywords)
+
+        observer = mock.patch.object(self.managed.Native.NativeHTTPResponse, "_open_wire", observe)
+        observer.start()
+        self.addCleanup(observer.stop)
+        self.addCleanup(self.report_receiving_facts)
         self.settings(False)
+
+    def report_receiving_facts(self):
+        owners = self.receiving_workers[self.receiving_start :]
+        facts = [worker_receiving_facts(value) for value in owners]
+        print(
+            "# native_http_receiving "
+            + json.dumps(
+                {
+                    "version": 1,
+                    "peer": self.fixture.receiving_facts(),
+                    "worker_count": min(65535, len(facts)),
+                    **{
+                        key: min(65535, sum(value[key] for value in facts))
+                        for key in (
+                            "created",
+                            "closed",
+                            "reaped",
+                            "stdin_closed",
+                            "stdout_closed",
+                            "settled",
+                            "exit_complete",
+                            "exit_deadline",
+                            "exit_refused",
+                            "exit_killed",
+                            "exit_other",
+                        )
+                    },
+                },
+                sort_keys=True,
+            ),
+            flush=True,
+        )
 
     def settings(self, pac_url):
         fields = {

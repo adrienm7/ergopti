@@ -13,6 +13,7 @@ const {
 	SOURCE,
 	SHELL_OUTPUT,
 	METADATA_OUTPUT,
+	LUA_LOCATOR_OUTPUT,
 	render,
 	generate
 } = require('../codegen/codegen-managed-python-release.cjs');
@@ -61,7 +62,45 @@ assert.ok(
 	output[SHELL_OUTPUT].includes('MANAGED_PYTHON_REQUEST="cpython-3.11.16-macos-x86_64-none"\n')
 );
 assert.deepEqual(JSON.parse(output[METADATA_OUTPUT]), data.downloads);
+assert.equal(
+	LUA_LOCATOR_OUTPUT,
+	'static/ergopti_plus/_shared/lua/core/llm/managed_python_locator.lua'
+);
+assert.match(
+	output[LUA_LOCATOR_OUTPUT],
+	/arm64 = "cpython-3\.11\.16-macos-aarch64-none\/bin\/python3\.11",/
+);
+assert.match(
+	output[LUA_LOCATOR_OUTPUT],
+	/x86_64 = "cpython-3\.11\.16-macos-x86_64-none\/bin\/python3\.11",/
+);
+assert.ok(
+	Buffer.byteLength(output[LUA_LOCATOR_OUTPUT]) < 1024,
+	'the UI locator has bounded reviewed shape'
+);
+assert.doesNotMatch(
+	output[LUA_LOCATOR_OUTPUT].replace(/^---[^\n]*$/gm, ''),
+	/https?:|[.]json|[.]read|io[.]open/,
+	'locator data cannot perform runtime IO'
+);
+
 assert.ok(Object.values(output).every((contents) => !contents.includes('\r')));
+// A valid later patch selection must own locator data; no runtime version guess.
+const later = structuredClone(data);
+for (const [family, oldKey] of [
+	['aarch64', key],
+	['x86_64', intelKey]
+]) {
+	const entry = later.downloads[oldKey];
+	delete later.downloads[oldKey];
+	entry.patch = 17;
+	entry.url = entry.url.replace('3.11.16', '3.11.17');
+	later.downloads[`cpython-3.11.17-darwin-${family}-none`] = entry;
+}
+const laterLocator = render(later)[LUA_LOCATOR_OUTPUT];
+assert.match(laterLocator, /cpython-3\.11\.17-macos-aarch64-none\/bin\/python3\.11/);
+assert.match(laterLocator, /cpython-3\.11\.17-macos-x86_64-none\/bin\/python3\.11/);
+assert.doesNotMatch(laterLocator, /3\.11\.16/);
 
 for (const mutate of [
 	(value) => {
@@ -128,8 +167,20 @@ try {
 		fs.copyFileSync(path.join(root, relative), target);
 	}
 	assert.throws(() => generate(temporary, { check: true }), /projection drift/);
-	assert.equal(generate(temporary).length, 2);
-	assert.equal(generate(temporary, { check: true }).length, 2);
+	assert.equal(generate(temporary).length, 3);
+	assert.equal(generate(temporary, { check: true }).length, 3);
+
+	const luaLocator = path.join(temporary, LUA_LOCATOR_OUTPUT);
+	const literalLocator = fs.readFileSync(luaLocator, 'utf8');
+	fs.appendFileSync(luaLocator, '\n-- Independent locator drift witness.\n');
+	const locatorDrift = fs.readFileSync(luaLocator);
+	assert.throws(() => generate(temporary, { check: true }), /projection drift/);
+	assert.ok(
+		fs.readFileSync(luaLocator).equals(locatorDrift),
+		'check mode preserves edited locator data'
+	);
+	generate(temporary);
+	assert.equal(fs.readFileSync(luaLocator, 'utf8'), literalLocator);
 	const shell = path.join(temporary, SHELL_OUTPUT);
 	const parser = spawnSync(bashExecutable(), ['-n', shell.replace(/\\/g, '/')], {
 		encoding: 'utf8',

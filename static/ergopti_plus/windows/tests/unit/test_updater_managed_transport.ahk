@@ -123,6 +123,48 @@ _UpdaterNativeStagingDiagnosticFact(Diagnostic) {
 		. " actual_" . StrReplace(DiagnosticActual, " ", " actual_")
 }
 
+_UpdaterNativeStagingSetupDiagnosticFact(Fact) {
+	if !(Fact is Map) || Fact.Count != 6
+		return ""
+	for Key in Fact
+		if !(Key is String) || !RegExMatch(Key, "\A(?:schema_version|site|line|exception|error|hresult)\z")
+			return ""
+	if !(Fact.Get("schema_version", "") is Integer) || Fact["schema_version"] != 1
+		|| !(Fact.Get("line", "") is Integer) || Fact["line"] < 0 || Fact["line"] > 8192
+		|| !(Fact.Get("hresult", "") is Integer) || Fact["hresult"] < -2147483648 || Fact["hresult"] > 2147483647
+		return ""
+	for Pair in [["site", "download_module_load|download_module_reconstruct|native_routes_load|route_call|unknown"],
+		["exception", "invalid_operation|runtime|argument|io|other"],
+		["error", "compiler|type_exists|type_missing|method_missing|command_missing|property_missing|method_invocation|variable_refused|route_refused|observation_seam|other"]]
+		if !(Fact.Get(Pair[1], "") is String) || !RegExMatch(Fact[Pair[1]], "\A(?:" . Pair[2] . ")\z")
+			return ""
+	return "site=" . Fact["site"] . " line=" . Fact["line"] . " exception=" . Fact["exception"]
+		. " error=" . Fact["error"] . " hresult=" . Format("{:d}", Fact["hresult"])
+}
+
+_UpdaterNativeEmitSetupDiagnostic(Run) {
+	try {
+		if !Run.HasOwnProp("StagingSetupDiagnosticPath")
+			return
+		Path := Run.StagingSetupDiagnosticPath
+		if FSSize(Path) > 2048
+			return
+		Text := FSReadUtf8Exact(Path)
+		if !(Text is String) || StrLen(Text) > 2048 || RegExMatch(Text, '"(?:schema_version|line|hresult)"\s*:\s*(?:true|false|null)\b')
+			return
+		for Key in ["schema_version", "site", "line", "exception", "error", "hresult"] {
+			Pattern := '"' . Key . '"\s*:'
+			if !RegExMatch(Text, Pattern, &Seen) || RegExMatch(Text, Pattern, , Seen.Pos + Seen.Len)
+				return
+		}
+		Fact := _UpdaterNativeStagingSetupDiagnosticFact(JsonParse(Text))
+		if Fact != ""
+			Run.RefusalDiagnosticPrinter.Call("::notice title=Windows staging setup::" . Fact)
+	} catch Any {
+		; Optional fixture observation never changes admission or refusal.
+	}
+}
+
 _UpdaterNativeReadStagingDiagnostic(Path) {
 	if !(Path is String) || Path == "" || FSSize(Path) > 2048
 		return ""
@@ -183,6 +225,7 @@ _UpdaterNativeReadRouteShape(Path) {
 }
 
 _UpdaterNativeEmitRouteShape(Run) {
+	_UpdaterNativeEmitSetupDiagnostic(Run)
 	try {
 		if Run.HasOwnProp("RouteShapeDiagnosticPath") {
 			Fact := _UpdaterNativeReadRouteShape(Run.RouteShapeDiagnosticPath)
@@ -247,6 +290,7 @@ class _UpdaterNativeDownloadRun {
 		this.NewExe := this.Directory . "staged.exe"
 		this.SwapPath := this.Directory . "swap.ps1"
 		this.StagingDiagnosticPath := this.Directory . "staging-diagnostic.json"
+		this.StagingSetupDiagnosticPath := this.StagingDiagnosticPath . ".setup"
 		this.RouteShapeDiagnosticPath := this.Directory . "route-shape.json"
 		FileAppend(this.OldBytes, this.CurrentExe, "UTF-8-RAW")
 		if this.DenyFile
@@ -413,7 +457,7 @@ class _UpdaterNativeDownloadRun {
 				return false
 		}
 		if this.Directory != "" {
-			for Name in ["CurrentExe", "NewExe", "SwapPath", "StagingDiagnosticPath", "RouteShapeDiagnosticPath"] {
+			for Name in ["CurrentExe", "NewExe", "SwapPath", "StagingDiagnosticPath", "StagingSetupDiagnosticPath", "RouteShapeDiagnosticPath"] {
 				if !this.HasOwnProp(Name)
 					continue
 				Path := this.%Name%
@@ -899,6 +943,17 @@ _UpdaterNativeEarlyStagingFactControls() {
 	Fact["observed_stage"] := "proxy_resolve"
 	Fact.Delete("hresult")
 	AssertEqual("", _UpdaterNativeStagingDiagnosticFact(Fact), "partial extended facts are refused")
+	Setup := Map("schema_version", 1, "site", "native_routes_load", "line", 30,
+		"exception", "invalid_operation", "error", "compiler", "hresult", -2146233079)
+	AssertEqual("site=native_routes_load line=30 exception=invalid_operation error=compiler hresult=-2146233079", _UpdaterNativeStagingSetupDiagnosticFact(Setup))
+	for Pair in [["site", "PRIVATE_URL"], ["line", 8193], ["line", "30"], ["exception", "PRIVATE_ERROR"],
+		["error", "PRIVATE_TOKEN"], ["hresult", 2147483648], ["schema_version", 2]] {
+		Changed := Setup.Clone()
+		Changed[Pair[1]] := Pair[2]
+		AssertEqual("", _UpdaterNativeStagingSetupDiagnosticFact(Changed), "setup observations reject malformed private fields")
+	}
+	Setup["private"] := "PRIVATE"
+	AssertEqual("", _UpdaterNativeStagingSetupDiagnosticFact(Setup))
 }
 Test("updater fixture: early staging diagnostics retain actual bounded operation provenance",
 	_UpdaterNativeEarlyStagingFactControls)

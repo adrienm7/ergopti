@@ -19,6 +19,26 @@
 #include <time.h>
 #include <unistd.h>
 
+// Foundation Process starts its child as a process-group leader. Such a child
+// cannot call setsid directly. Join only the exact current parent's group in
+// the same session before creating a new private session; no payload exists yet.
+int ergopti_owned_program_create_private_session(void) {
+	pid_t identifier = getpid();
+	if (identifier <= 0) { return EPROTO; }
+	if (setsid() != identifier) {
+		int failure = errno == 0 ? EIO : errno;
+		if (failure != EPERM || getpgid(0) != identifier || getsid(0) == identifier) { return failure; }
+		pid_t parent = getppid();
+		pid_t session = getsid(0);
+		pid_t parent_group = getpgid(parent);
+		if (parent <= 1 || session <= 0 || parent_group <= 0 || parent_group == identifier
+			|| getsid(parent) != session || getppid() != parent
+			|| getpgid(parent) != parent_group || getsid(parent) != session) { return ESTALE; }
+		if (setpgid(0, parent_group) != 0 || setsid() != identifier) { return errno == 0 ? EIO : errno; }
+	}
+	return getpgid(0) == identifier && getsid(0) == identifier ? 0 : EPROTO;
+}
+
 typedef struct {
 	pid_t identifier;
 	uint64_t start_seconds;

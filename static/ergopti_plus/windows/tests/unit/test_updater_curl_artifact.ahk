@@ -126,6 +126,9 @@ class _ArtifactNtlmProxyOwner {
 			}
 			try {
 				FirstFact := _ArtifactNtlmFirstFailureDiagnostic(this.State)
+				TunnelFact := _ArtifactNtlmTunnelFailureDiagnostic(this.State)
+				if TunnelFact != ""
+					_TestPrint("::notice title=Windows native SSPI tunnel failure::" . TunnelFact)
 				if FirstFact != ""
 					_TestPrint("::notice title=Windows native SSPI first failure::" . FirstFact)
 			} catch Any {
@@ -398,7 +401,7 @@ _ArtifactNtlmFirstFailureDiagnostic(State) {
 	Site := State.Get("first_failure_site", "")
 	Family := State.Get("first_failure_family", "")
 	Code := State.Get("first_failure_code", "")
-	if !(Site is String) || !RegExMatch(Site, "\A(?:none|accept|configure_client|get_client_stream|read_header|parse_header|write_pac|write_challenge|acquire_credentials|accept_context|context_token|identity_match|connect_target|register_target|write_tunnel|get_target_stream|start_receiver|forward_request|forward_response|join_receiver|delete_replaced_context|free_context_buffer|close_context_token|delete_context|free_credentials)\z")
+	if !(Site is String) || !RegExMatch(Site, "\A(?:none|accept|configure_client|get_client_stream|read_header|parse_header|write_pac|write_challenge|acquire_credentials|accept_context|context_token|identity_match|connect_target|register_target|write_tunnel|get_target_stream|start_receiver|forward_request|forward_response|half_close_request|join_receiver|delete_replaced_context|free_context_buffer|close_context_token|delete_context|free_credentials)\z")
 		|| !(Family is String) || !RegExMatch(Family, "\A(?:none|winsock|io|invalid_operation|argument|other|sspi|win32)\z")
 		|| Type(Code) != "Integer" || Code < -2147483648 || Code > 2147483647
 		return ""
@@ -428,3 +431,97 @@ _ArtifactNtlmFirstFailureDiagnosticControls() {
 	AssertEqual("", _ArtifactNtlmFirstFailureDiagnostic(0))
 }
 Test("artifact curl: first failure projection excludes private text and preserves native numeric domains", _ArtifactNtlmFirstFailureDiagnosticControls)
+
+; Join the operation and close snapshot from the same immutable first failure.
+_ArtifactNtlmTunnelFailureDiagnostic(State) {
+	if _ArtifactNtlmFirstFailureDiagnostic(State) == "" || State.Get("first_failure_site", "") != "forward_response"
+		return ""
+	Operation := State.Get("first_failure_operation", "")
+	Stop := State.Get("first_failure_stop_requested", "")
+	Close := State.Get("first_failure_target_close_state", "")
+	if !(Operation is String) || !RegExMatch(Operation, "\A(?:read|write)\z")
+		|| Type(Stop) != "Integer" || (Stop != 0 && Stop != 1)
+		|| Type(Close) != "Integer" || Close < 0 || Close > 2
+		return ""
+	return "operation=" . Operation . " stop_requested=" . Format("{:d}", Stop) . " target_close_state=" . Format("{:d}", Close)
+}
+
+_ArtifactNtlmTunnelFailureProjectionControls() {
+	for Operation in ["read", "write"] {
+		for Close in [0, 1, 2] {
+			State := Map("first_failure_site", "forward_response", "first_failure_family", "winsock", "first_failure_code", 10004,
+				"first_failure_operation", Operation, "first_failure_stop_requested", 0, "first_failure_target_close_state", Close)
+			Expected := "operation=" . Operation . " stop_requested=0 target_close_state=" . Close
+			AssertEqual(Expected, _ArtifactNtlmTunnelFailureDiagnostic(State))
+		}
+	}
+	State := Map("first_failure_site", "forward_response", "first_failure_family", "invalid_operation", "first_failure_code", -2146232798,
+		"first_failure_operation", "read", "first_failure_stop_requested", 0, "first_failure_target_close_state", 2)
+	AssertEqual("operation=read stop_requested=0 target_close_state=2", _ArtifactNtlmTunnelFailureDiagnostic(State))
+	for Pair in [["first_failure_operation", "PRIVATE"], ["first_failure_operation", "none"],
+		["first_failure_stop_requested", "0"], ["first_failure_stop_requested", 2],
+		["first_failure_target_close_state", "2"], ["first_failure_target_close_state", -1],
+		["first_failure_target_close_state", 3], ["first_failure_target_close_state", 1.5],
+		["first_failure_site", "forward_request"], ["first_failure_family", "PRIVATE"], ["first_failure_code", "10004"]] {
+		Foreign := State.Clone()
+		Foreign[Pair[1]] := Pair[2]
+		AssertEqual("", _ArtifactNtlmTunnelFailureDiagnostic(Foreign), "foreign or ill-typed close snapshots remain private")
+	}
+	AssertEqual("", _ArtifactNtlmTunnelFailureDiagnostic(Map()))
+	AssertEqual("", _ArtifactNtlmTunnelFailureDiagnostic(0))
+}
+Test("artifact curl: immutable tunnel failure projection retains actual operation and bounded owner close states", _ArtifactNtlmTunnelFailureProjectionControls)
+
+_ArtifactNtlmTunnelCopyControls() {
+	global _DriverDir
+	Observed := []
+	Handle := 0
+	try {
+		Handle := ShellRunner_SpawnTreeOwned(_Updater_PowerShellPath(),
+			["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-File",
+				_DriverDir . "\tests\fixtures\artifact_relay_controls.ps1", "-ProxyPath",
+				_DriverDir . "\tests\fixtures\artifact_ntlm_proxy.ps1"],
+			(Code, Out, Err) => Observed.Push(Map("exit", Code, "stdout", Out, "stderr", Err)))
+		AssertTrue(Handle.start(), "actual relay source TCP component process starts")
+		Started := A_TickCount
+		while Observed.Length == 0 && !TickExpired64(Started, 15000) {
+			_SR_TreePoll()
+			Sleep(10)
+		}
+		AssertEqual(1, Observed.Length)
+		AssertEqual(0, Observed[1]["exit"])
+		AssertEqual("ARTIFACT_RELAY_TCP_CONTROLS:4", Trim(Observed[1]["stdout"], "`r`n "))
+		AssertEqual("", Observed[1]["stderr"])
+	} finally {
+		if IsObject(Handle)
+			AssertTrue(Handle.terminate(), "actual relay source TCP component Job retires")
+	}
+}
+Test("artifact curl: actual relay copier distinguishes owned interrupted reads from foreign writes and retains failures", _ArtifactNtlmTunnelCopyControls)
+
+_ArtifactNtlmFullDuplexRetirementControls() {
+	global _DriverDir
+	Observed := []
+	Handle := 0
+	try {
+		Handle := ShellRunner_SpawnTreeOwned(_Updater_PowerShellPath(),
+			["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-File",
+				_DriverDir . "\tests\fixtures\artifact_tunnel_retirement_controls.ps1", "-ProxyPath",
+				_DriverDir . "\tests\fixtures\artifact_ntlm_proxy.ps1"],
+			(Code, Out, Err) => Observed.Push(Map("exit", Code, "stdout", Out, "stderr", Err)))
+		AssertTrue(Handle.start(), "actual full-duplex relay source process starts")
+		Started := A_TickCount
+		while Observed.Length == 0 && !TickExpired64(Started, 15000) {
+			_SR_TreePoll()
+			Sleep(10)
+		}
+		AssertEqual(1, Observed.Length)
+		AssertEqual(0, Observed[1]["exit"])
+		AssertEqual("ARTIFACT_TUNNEL_RETIREMENT_CONTROLS:6", Trim(Observed[1]["stdout"], "`r`n "))
+		AssertEqual("", Observed[1]["stderr"])
+	} finally {
+		if IsObject(Handle)
+			AssertTrue(Handle.terminate(), "actual full-duplex relay component Job retires")
+	}
+}
+Test("artifact curl: full-duplex response survives request EOF and bounded retirement still refuses unfinished or foreign work", _ArtifactNtlmFullDuplexRetirementControls)

@@ -173,7 +173,11 @@ const CURATED_READS = [
 			'SHARED / "python/managed_ollama_sessions.py"',
 			'SHARED / "python/managed_operation_receipt.py"',
 			'SHARED / "python/managed_ollama_operation_authority.py"',
-			'with_name("managed_ollama_cleanup.py")'
+			'with_name("managed_ollama_cleanup.py")',
+			'DRIVER / "platform/ollama_daemon_authority.py"',
+			'DRIVER / "platform/ollama_bootstrap_owner.py"',
+			'SHARED / "python/network_proxy_policy.py"',
+			'SHARED / "modules/llm/managed_ollama_bootstrap.json"'
 		],
 		targets: [
 			'ergopti_plus/macos/platform/network/native_ollama_api.py',
@@ -182,7 +186,11 @@ const CURATED_READS = [
 			'ergopti_plus/_shared/python/managed_ollama_sessions.py',
 			'ergopti_plus/_shared/python/managed_operation_receipt.py',
 			'ergopti_plus/_shared/python/managed_ollama_operation_authority.py',
-			'ergopti_plus/macos/modules/llm/managed_ollama_cleanup.py'
+			'ergopti_plus/macos/modules/llm/managed_ollama_cleanup.py',
+			'ergopti_plus/macos/platform/ollama_daemon_authority.py',
+			'ergopti_plus/macos/platform/ollama_bootstrap_owner.py',
+			'ergopti_plus/_shared/python/network_proxy_policy.py',
+			'ergopti_plus/_shared/modules/llm/managed_ollama_bootstrap.json'
 		],
 		why: 'the request owner loads its original session, receipt and cleanup authorities'
 	},
@@ -201,6 +209,37 @@ const CURATED_READS = [
 			'ergopti_plus/_shared/python/managed_operation_receipt.py'
 		],
 		why: 'explicit retirement resumes only the original request authority'
+	},
+	{
+		reader: 'ergopti_plus/macos/adapters/managed_ollama_hint.lua',
+		needles: ['driver .. "/modules/llm/managed_ollama_hint.py"'],
+		targets: ['ergopti_plus/macos/modules/llm/managed_ollama_hint.py'],
+		why: 'asynchronous metadata dispatch reads the fixed bundled native hint entry'
+	},
+	{
+		reader: 'ergopti_plus/macos/modules/llm/managed_ollama_hint.py',
+		needles: [
+			'SHARED / "python/managed_ollama_runtime.py"',
+			'SHARED / "python/managed_ollama_hint.py"',
+			'DRIVER / "platform/ollama_hint_metadata.py"',
+			'driver / "modules/llm/network-retry.sh"',
+			'driver.parent / "_shared/modules/llm"',
+			'shared / "managed_ollama_bootstrap.json"',
+			'shared / "managed_ollama_runtime.json"',
+			'shared / "managed_ollama_release.json"',
+			'driver.parent / "_shared/modules/network/bootstrap_retry.json"'
+		],
+		targets: [
+			'ergopti_plus/_shared/python/managed_ollama_runtime.py',
+			'ergopti_plus/_shared/python/managed_ollama_hint.py',
+			'ergopti_plus/macos/platform/ollama_hint_metadata.py',
+			'ergopti_plus/macos/modules/llm/network-retry.sh',
+			'ergopti_plus/_shared/modules/llm/managed_ollama_bootstrap.json',
+			'ergopti_plus/_shared/modules/llm/managed_ollama_runtime.json',
+			'ergopti_plus/_shared/modules/llm/managed_ollama_release.json',
+			'ergopti_plus/_shared/modules/network/bootstrap_retry.json'
+		],
+		why: 'bounded metadata reads retain actual shared policy, native FD owner and catalogue inputs'
 	},
 	{
 		reader: 'ergopti_plus/_shared/python/managed_ollama_pull.py',
@@ -316,9 +355,25 @@ const CURATED_READS = [
 	},
 	{
 		reader: 'ergopti_plus/macos/modules/llm/managed_native_python.lua',
-		needles: ['driver .. "/../_shared/modules/llm/managed_python_release.json"'],
-		targets: ['ergopti_plus/_shared/modules/llm/managed_python_release.json'],
-		why: 'the native interpreter resolver reads the pinned private Python catalogue'
+		needles: [
+			'require("core.llm.managed_python_locator")',
+			'require("adapters.native_python_probe")',
+			'require("adapters.timer_scheduler")',
+			'require("modules.llm.bootstrap_retry_generated")'
+		],
+		targets: [
+			'ergopti_plus/_shared/lua/core/llm/managed_python_locator.lua',
+			'ergopti_plus/macos/adapters/native_python_probe.lua',
+			'ergopti_plus/macos/adapters/timer_scheduler.lua',
+			'ergopti_plus/macos/modules/llm/bootstrap_retry_generated.lua'
+		],
+		why: 'private Python selection consumes the generated pinned locator and retained native header probe'
+	},
+	{
+		reader: 'ergopti_plus/macos/adapters/native_python_probe.lua',
+		needles: ['require("modules.llm.bootstrap_retry_generated")'],
+		targets: ['ergopti_plus/macos/modules/llm/bootstrap_retry_generated.lua'],
+		why: 'the exact native header probe preserves canonical original admission and retirement budgets'
 	},
 	{
 		reader: 'ergopti_plus/_shared/python/network_proxy_policy.py',

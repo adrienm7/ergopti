@@ -160,7 +160,9 @@ private final class ManagedOllamaConnection {
 	func line(limit: Int) throws -> Data {
 		while true {
 			if let end = buffered.range(of: Data([13, 10])) {
-				guard end.lowerBound <= limit else { throw ManagedOllamaFailure.protocolError }
+				// Data removal preserves its collection index origin. Bound the
+				// current line bytes, including the empty final chunk terminator.
+				guard buffered.distance(from: buffered.startIndex, to: end.lowerBound) <= limit else { throw ManagedOllamaFailure.protocolError }
 				let value = Data(buffered[..<end.lowerBound]); buffered.removeSubrange(..<end.upperBound)
 				return value
 			}

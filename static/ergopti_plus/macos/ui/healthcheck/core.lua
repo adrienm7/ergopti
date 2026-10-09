@@ -226,6 +226,17 @@ end
 -- the flag disagrees with what it finds.
 local ADAPTER_SPECS = {
 	{
+		id       = "adapters.managed_ollama_hint",
+		contract = { "get", "cancel" },
+		-- Structural dispatch wiring; source and image admission stay independent.
+		wired    = true,
+	},
+	{
+		id       = "adapters.native_python_probe",
+		contract = { "get", "cancel", "onSettled" },
+		wired    = true,
+	},
+	{
 		id       = "adapters.native_bootstrap_pty",
 		contract = { "prepare" },
 		wired    = true,

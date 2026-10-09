@@ -153,13 +153,18 @@ private final class BootstrapNativeTLSFixture {
 		// CI provides the pinned Python interpreter. This independent real TLS
 		// peer binds port zero and never changes account trust or proxy settings.
 		let source = """
-		import http.server, ssl, sys
+		import http.server, socketserver, ssl, sys
 		class Handler(http.server.BaseHTTPRequestHandler):
 		    def do_GET(self):
 		        body=b'independent-native-tls-body'
 		        self.send_response(200); self.send_header('Content-Length',str(len(body))); self.end_headers(); self.wfile.write(body)
 		    def log_message(self,*args): pass
-		server=http.server.HTTPServer(('127.0.0.1',0),Handler)
+		class NumericLoopbackServer(http.server.HTTPServer):
+		    def server_bind(self):
+		        # The peer never needs DNS: retain only its actual numeric bind.
+		        socketserver.TCPServer.server_bind(self)
+		        self.server_name, self.server_port = self.server_address[:2]
+		server=NumericLoopbackServer(('127.0.0.1',0),Handler)
 		context=ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER); context.load_cert_chain(sys.argv[1],sys.argv[2])
 		server.socket=context.wrap_socket(server.socket,server_side=True)
 		print(server.server_address[1],flush=True)

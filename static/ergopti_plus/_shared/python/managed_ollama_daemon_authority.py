@@ -76,3 +76,22 @@ def authenticate(wire, session_bytes, policy, expected_uid):
     except RUNTIME.RuntimeRefusal:
         raise AuthorityRefusal("session") from None
     return validate(value, session, expected_uid)
+
+
+class BoundAliasPorts:
+    """Compare the original acquired native image before any authenticated byte."""
+
+    def __init__(self, ports, authority, session, expected_uid):
+        value = validate(authority, session, expected_uid)
+        self.ports, self.proof, self.expected = ports, value["source_alias"], value["listener"]
+
+    def discover(self, *arguments):
+        result = self.ports.discover(*arguments, source_alias=self.proof)
+        if result != self.expected:
+            raise AuthorityRefusal("session")
+        return result
+
+    def open_request(self, *arguments):
+        if len(arguments) < 5 or arguments[4] != self.expected:
+            raise AuthorityRefusal("session")
+        return self.ports.open_request(*arguments, source_alias=self.proof)

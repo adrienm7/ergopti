@@ -485,5 +485,77 @@ class ColdIdentityReceiptTests(unittest.TestCase):
         self.assertEqual(receipt, [{"device": "9007199254740993", "inode": "18446744073709551615"}])
 
 
+class OfficialVersionTimeoutDiscriminatorTests(unittest.TestCase):
+    """Actual POSIX socket routes and redacted captured timeout boundaries only."""
+
+    def test_actual_route_refusal_does_not_accept_a_listening_peer(self):
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as lease:
+            lease.bind(("127.0.0.1", 0))
+            self.assertEqual(
+                cold.qualify_version_probe_route(lease.getsockname()),
+                {"kind": "actual kernel loopback connection", "result": "ECONNREFUSED"},
+            )
+            lease.listen(1)
+            with self.assertRaisesRegex(RuntimeError, "did not refuse.*0"):
+                cold.qualify_version_probe_route(lease.getsockname())
+
+    def test_refused_route_prevents_cli_invocation_and_retains_lease_cleanup(self):
+        diagnostics = {}
+        with mock.patch.object(
+            cold, "qualify_version_probe_route", side_effect=RuntimeError("route refused")
+        ):
+            with mock.patch.object(cold.subprocess, "run") as run:
+                with self.assertRaisesRegex(RuntimeError, "route refused"):
+                    cold.probe_installed_client_version(
+                        Path("/owned/ollama"), Path("/owned/policy"), {}, diagnostics
+                    )
+        run.assert_not_called()
+        self.assertIs(diagnostics["lease_closed"], True)
+
+    def test_timeout_keeps_primary_exception_and_only_fingerprints_captured_prefix(self):
+        diagnostics = {}
+        expected = b"Warning: could not connect to a running Ollama instance\nWarning: client version is 0.24.0\n"
+        refusal = subprocess.TimeoutExpired(["/owned/ollama"], 30, output=expected, stderr=b"")
+        with mock.patch.object(cold.subprocess, "run", side_effect=refusal):
+            with self.assertRaises(subprocess.TimeoutExpired) as observed:
+                cold.probe_installed_client_version(
+                    Path("/owned/ollama"), Path("/owned/policy"), {}, diagnostics
+                )
+        self.assertIs(observed.exception, refusal)
+        self.assertIs(diagnostics["lease_closed"], True)
+        self.assertEqual(diagnostics["route"]["result"], "ECONNREFUSED")
+        self.assertIs(diagnostics["failure"]["expected_version_lines_complete"], True)
+        self.assertEqual(diagnostics["failure"]["output"]["stdout"]["sample_bytes"], len(expected))
+        self.assertNotIn(expected.decode(), json.dumps(diagnostics))
+
+    def test_oversized_and_unicode_captured_outputs_have_bounded_redacted_samples(self):
+        for payload in (b"private-unrelated-output" * 10000, "💡" * 10000, "\ud800" * 10000):
+            with self.subTest(kind=type(payload).__name__):
+                refusal = subprocess.TimeoutExpired(
+                    ["/owned/ollama"], 30, output=payload, stderr=None
+                )
+                observation = cold.version_timeout_observation(refusal)
+                self.assertIs(observation["expected_version_lines_complete"], False)
+                self.assertLessEqual(observation["output"]["stdout"]["sample_bytes"], 4096)
+                self.assertIs(observation["output"]["stdout"]["sample_truncated"], True)
+                self.assertEqual(observation["output"]["stdout"]["captured_size"], len(payload))
+                self.assertNotIn("private-unrelated-output", json.dumps(observation))
+
+    def test_unclosed_or_foreign_version_lines_cannot_credit_completed_version_output(self):
+        for payload in (
+            b"Warning: client version is 0.24.0\n",
+            b"Warning: could not connect to a running Ollama instance\nWarning: client version is 0.24.1\n",
+            b"Warning: could not connect to a running Ollama instance\nWarning: client version is 0.24.0",
+        ):
+            with self.subTest(output=payload):
+                refusal = subprocess.TimeoutExpired(
+                    ["/owned/ollama"], 30, output=payload, stderr=b""
+                )
+                self.assertIs(
+                    cold.version_timeout_observation(refusal)["expected_version_lines_complete"],
+                    False,
+                )
+
+
 if __name__ == "__main__":
     unittest.main()

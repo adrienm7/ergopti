@@ -73,17 +73,21 @@ public sealed class ErgoptiArtifactNtlmProxy : IDisposable {
     public int SecurityStatus;
     public string FailureStage="none";
     public sealed class FailureObservation {
-        public readonly string Site, Family;
-        public readonly int Code;
-        public FailureObservation(string site, string family, int code) { Site=site; Family=family; Code=code; }
+        public readonly string Site, Family, Operation;
+        public readonly int Code, TargetCloseState;
+        public readonly bool StopRequested;
+        public FailureObservation(string site, string family, int code, string operation, int targetCloseState, bool stopRequested) {
+            Site=site; Family=family; Code=code; Operation=operation;
+            TargetCloseState=targetCloseState; StopRequested=stopRequested;
+        }
     }
     FailureObservation firstFailure;
     public FailureObservation FirstFailure { get { return Interlocked.CompareExchange(ref firstFailure,null,null); } }
-    void ObserveCode(string site, string family, int code) {
-        try { Interlocked.CompareExchange(ref firstFailure,new FailureObservation(site,family,code),null); }
+    void ObserveCode(string site, string family, int code, string operation="none", int targetCloseState=0, bool stopRequested=false) {
+        try { Interlocked.CompareExchange(ref firstFailure,new FailureObservation(site,family,code,operation,targetCloseState,stopRequested),null); }
         catch { /* Optional observation cannot affect the original failure counter. */ }
     }
-    void ObserveException(string site, Exception failure) {
+    void ObserveException(string site, Exception failure, string operation="none", int targetCloseState=0, bool stopRequested=false) {
         try {
             SocketException socket=failure as SocketException;
             if(socket==null && failure is IOException) socket=failure.InnerException as SocketException;
@@ -91,7 +95,7 @@ public sealed class ErgoptiArtifactNtlmProxy : IDisposable {
                 failure is InvalidOperationException ? "invalid_operation" :
                 failure is ArgumentException ? "argument" : "other";
             int code=socket!=null ? socket.NativeErrorCode : failure.HResult;
-            ObserveCode(site,family,code);
+            ObserveCode(site,family,code,operation,targetCloseState,stopRequested);
         } catch { /* No raw exception, provider data or retry authority is published. */ }
     }
     public ErgoptiArtifactNtlmProxy(int port, bool negotiate) : this(port,negotiate,false) { }
@@ -237,11 +241,38 @@ public sealed class ErgoptiArtifactNtlmProxy : IDisposable {
             }
         }
     }
+    // CopyTo merges reader and writer failures. Keep the same bounded chunk,
+    // EOF and failure behavior while recording which actual operation refused.
+    static void CopyResponse(Stream remote, Stream client, Action<string,Exception> failed) {
+        string operation="read";
+        try {
+            byte[] buffer=new byte[81920];
+            while(true) {
+                operation="read"; int count=remote.Read(buffer,0,buffer.Length);
+                if(count==0) return;
+                operation="write"; client.Write(buffer,0,count);
+            }
+        } catch(Exception failure) { failed(operation,failure); }
+    }
+    // Request EOF finishes only the send direction. Closing the receive
+    // direction here interrupts our own still-active response reader.
+    static void CopyRequestAndRetireResponse(Stream stream, Stream remote, TcpClient upstream, Thread reverse, Action<string> reached) {
+        reached("forward_request");
+        try { stream.CopyTo(remote); } catch(IOException) { }
+        finally {
+            reached("half_close_request"); upstream.Client.Shutdown(SocketShutdown.Send);
+            // An earlier non-IO copy failure must retain its original site.
+            reached("forward_request");
+        }
+        reached("join_receiver");
+        if(!reverse.Join(1000)) throw new InvalidOperationException("Owned tunnel receiver did not retire.");
+    }
     void Serve(TcpClient client) {
         Interlocked.Increment(ref Active);
         Handle credential=InvalidHandle(), context=InvalidHandle();
         bool hasCredential=false, hasContext=false;
         TcpClient upstream=null;
+        int targetCloseState=0;
         string site="configure_client";
         try {
             client.ReceiveTimeout=10000; client.SendTimeout=10000;
@@ -313,16 +344,18 @@ public sealed class ErgoptiArtifactNtlmProxy : IDisposable {
                 site="write_tunnel"; Write(stream,"HTTP/1.1 200 Connection Established\r\n\r\n");
                 site="get_target_stream"; NetworkStream remote=upstream.GetStream();
                 site="start_receiver"; Thread reverse=new Thread(delegate() {
-                    try { remote.CopyTo(stream); } catch(Exception failure) { if(!stopping) {
-                        ObserveException("forward_response",failure); Interlocked.Increment(ref Failures);
-                    } }
+                    try { CopyResponse(remote,stream,delegate(string operation, Exception failure) {
+                        bool stopRequested=stopping;
+                        int closeState=Interlocked.CompareExchange(ref targetCloseState,0,0);
+                        if(!stopRequested) {
+                            ObserveException("forward_response",failure,operation,closeState,stopRequested);
+                            Interlocked.Increment(ref Failures);
+                        }
+                    }); }
                     finally { client.Close(); }
                 }); reverse.IsBackground=true;
                 lock(gate) { workers.Add(reverse); } reverse.Start();
-                site="forward_request";
-                try { stream.CopyTo(remote); } catch(IOException) { } finally { upstream.Close(); }
-                site="join_receiver";
-                if(!reverse.Join(1000)) throw new InvalidOperationException("Owned tunnel receiver did not retire.");
+                CopyRequestAndRetireResponse(stream,remote,upstream,reverse,delegate(string value) { site=value; });
                 return;
             }
             throw new InvalidDataException("Native exchange exceeded its bound.");
@@ -330,7 +363,12 @@ public sealed class ErgoptiArtifactNtlmProxy : IDisposable {
             ObserveException(site,failure); Interlocked.Increment(ref Failures);
         } }
         finally {
-            if(upstream!=null) upstream.Close(); client.Close();
+            if(upstream!=null) {
+                Interlocked.Exchange(ref targetCloseState,1);
+                upstream.Close();
+                Interlocked.Exchange(ref targetCloseState,2);
+            }
+            client.Close();
             if(hasContext) {
                 int retirement=DeleteSecurityContext(ref context);
                 if(retirement!=0) { ObserveCode("delete_context","sspi",retirement); Interlocked.Increment(ref Failures); }
@@ -373,8 +411,11 @@ function Publish {
         $Observation=$Proxy.FirstFailure
         if ($null -eq $Observation) {
             $State.first_failure_site='none'; $State.first_failure_family='none'; $State.first_failure_code=0
+            $State.first_failure_operation='none'; $State.first_failure_stop_requested=0; $State.first_failure_target_close_state=0
         } else {
             $State.first_failure_site=$Observation.Site; $State.first_failure_family=$Observation.Family; $State.first_failure_code=$Observation.Code
+            $State.first_failure_operation=$Observation.Operation; $State.first_failure_stop_requested=[int]$Observation.StopRequested
+            $State.first_failure_target_close_state=$Observation.TargetCloseState
         }
     }
     $Pending=$StatePath+'.pending'

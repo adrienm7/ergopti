@@ -64,16 +64,16 @@ if not ok_dw then download_window = nil end
 --- Finds the absolute path to the Ollama binary.
 --- @return string|nil The path or nil if not found.
 local function get_ollama_path()
-	local path = OllamaBinary.resolve()
-	return path
+	local path, _, source = OllamaBinary.resolve()
+	return path, source
 end
 
 --- Resolves the executable for an action that cannot proceed without it.
 --- @param operation string Developer-facing operation label.
 --- @return string|nil path
 local function require_ollama_path(operation)
-	local path, resolve_err = OllamaBinary.resolve()
-	if path then return path end
+	local path, resolve_err, source = OllamaBinary.resolve()
+	if path then return path, source end
 	Logger.error(LOG, "Cannot %s because Ollama executable resolution failed: %s",
 		tostring(operation), tostring(resolve_err))
 	return nil
@@ -342,17 +342,25 @@ function M.new(deps, presets, ram_getter)
 	end
 
 	local function build_ollama_restart_command()
-		local ollama_bin = require_ollama_path("restart the daemon")
+		local ollama_bin, source_kind = require_ollama_path("restart the daemon")
 		if not ollama_bin then return nil end
 		
 		-- Launch daemon via bash nohup to ensure it survives subprocess termination.
 		-- The shared foreground pipeline uses a `while read` loop because macOS'
 		-- default BWK awk lacks gawk's strftime() / fflush(file) builtins.
 		local launch_cmd, command_err = OllamaServerCommand.build(
-			ollama_bin, Logger.today_log_path(), OllamaEndpoint.get_port())
+			ollama_bin, Logger.today_log_path(), OllamaEndpoint.get_port(), source_kind)
 		if not launch_cmd then
 			Logger.error(LOG, "Could not build Ollama daemon command: %s", tostring(command_err))
 			return nil
+		end
+		if type(OllamaBinary.SOURCE_NATIVE_MANAGED) == "string"
+			and source_kind == OllamaBinary.SOURCE_NATIVE_MANAGED
+			and ManagedPullReceipt.handles(ollama_bin) then
+			-- Do not execute an inherited shell startup file before the native
+			-- source owner. Relay, trust, model store and cwd remain unchanged.
+			return "nohup /usr/bin/env -u BASH_ENV -u ENV /bin/sh -c " .. text_utils.shell_quote(launch_cmd)
+				.. " </dev/null >/dev/null 2>&1 &"
 		end
 		return "nohup /bin/bash -c " .. text_utils.shell_quote(launch_cmd)
 			.. " </dev/null >/dev/null 2>&1 &"
@@ -1311,10 +1319,10 @@ function M.new(deps, presets, ram_getter)
 
 	local pending_cleanup = setmetatable({}, { __mode = "k" })
 
-	--- Dispatches cleanup only for the exact original pending managed pull.
-	--- This dormant API never retries a model, changes selection or publishes success.
-	--- @param expected_task userdata|table Exact occupied original pull task.
-	--- @return boolean dispatched A separate cleanup worker was accepted.
+	--- Joins cleanup only for the exact original pending managed pull or preparation.
+	--- This API never retries a model, changes selection or publishes success.
+	--- @param expected_task userdata|table Exact occupied original pull owner.
+	--- @return boolean settled Cleanup was dispatched or pre-dispatch rollback settled.
 	function obj.cleanup_pending_pull(expected_task)
 		if expected_task == nil or type(deps.active_tasks) ~= "table"
 			or deps.active_tasks.ollama_pull ~= expected_task then return false end
@@ -1384,25 +1392,32 @@ function M.new(deps, presets, ram_getter)
 			settle_cancel("busy")
 			return false
 		end
-		local bin = require_ollama_path("pull a model")
+		local bin, bin_source = require_ollama_path("pull a model")
 		if not bin then
 			pcall(notifications.notify, i18n.get("ollama.fail_title"),
 				string.format(i18n.get("ollama.download_error"), tostring(target_model)), "error")
 			settle_cancel("binary_unavailable")
 			return false
 		end
-		local network, network_err = NetworkEnv.opaque_prelude("OLLAMA-PULL")
-		if not network then
-			Logger.error(LOG, "The Ollama model pull cannot start: %s.", tostring(network_err))
-			settle_cancel("network_policy_missing")
-			return false
+		local managed = type(bin_source) == "string"
+			and bin_source == OllamaBinary.SOURCE_NATIVE_MANAGED
+			and ManagedPullReceipt.handles(bin) == true
+		local managed_handle
+		local pull_executable, pull_arguments, pull_command
+		if managed ~= true then
+			local network, network_err = NetworkEnv.opaque_prelude("OLLAMA-PULL")
+			if not network then
+				Logger.error(LOG, "The Ollama model pull cannot start: %s.", tostring(network_err))
+				settle_cancel("network_policy_missing")
+				return false
+			end
+			-- This is the original pull task, not a separate preflight lifecycle.
+			-- exec preserves its PID, cancellation, adoption and retry ownership.
+			-- The daemon retains its existing static environment; this refuses an
+			-- unsupported automatic route before asking that daemon to fetch.
+			pull_command = network .. "exec " .. text_utils.shell_quote(bin)
+				.. " pull " .. text_utils.shell_quote(repo)
 		end
-		-- This is the original pull task, not a separate preflight lifecycle.
-		-- exec preserves its PID, cancellation, adoption and retry ownership.
-		-- The daemon retains its existing static environment; this refuses an
-		-- unsupported automatic route before asking that daemon to fetch.
-		local pull_command = network .. "exec " .. text_utils.shell_quote(bin)
-			.. " pull " .. text_utils.shell_quote(repo)
 		local network_admission = NetworkAdmission.new()
 		local pull_output = ""
 		local maybe_release_pull_owner
@@ -1410,6 +1425,13 @@ function M.new(deps, presets, ram_getter)
 		local function settle_pull_task(callback_status)
 			if owner.task_settled == true or owner.receipt_joining == true then return false end
 			owner.receipt_joining = true
+			if owner.start_attempted ~= true and managed_handle ~= nil then
+				local rolled_back, closed = pcall(managed_handle.rollback)
+				if not rolled_back or closed ~= true then
+					owner.receipt_joining = false
+					return false
+				end
+			end
 			local join = owner.start_attempted == true
 				and ManagedPullReceipt.retire or ManagedPullReceipt.rollback
 			local joined, retired = pcall(join, task, callback_status)
@@ -1419,7 +1441,11 @@ function M.new(deps, presets, ram_getter)
 				return false
 			end
 			owner.task_settled = true
-			_active_tasks[task] = nil
+			if type(owner.release_task_pin) == "function" then
+				owner.release_task_pin()
+			else
+				_active_tasks[task] = nil
+			end
 			pending_cleanup[task] = nil
 			if deps.active_tasks["ollama_pull"] == task then
 				deps.active_tasks["ollama_pull"] = nil
@@ -1692,6 +1718,11 @@ function M.new(deps, presets, ram_getter)
 		end
 
 		local function query_pending_cleanup()
+			if owner.start_attempted ~= true then
+				if not requirement_task_proven_not_running(task,
+					"Undispatched managed Ollama pull") then return false end
+				return settle_pull_task()
+			end
 			local recorded = owner.cleanup
 			if recorded ~= nil and recorded.callback_seen == true and recorded.joining ~= true
 				and type(recorded.receive) == "function" then
@@ -1793,7 +1824,56 @@ function M.new(deps, presets, ram_getter)
 			return true
 		end
 
-		task = TaskLifecycle.native("Ollama model pull", BASH_BIN, function(code, stdout, stderr)
+		local function retain_preparation()
+			if managed_handle == nil then return true end
+			local function rollback()
+				if owner.receipt_joining == true then return false end
+				owner.receipt_joining = true
+				local rolled_back, closed = pcall(managed_handle.rollback)
+				owner.receipt_joining = false
+				if not rolled_back or closed ~= true then return false end
+				_active_tasks[owner], pending_cleanup[owner] = nil, nil
+				if deps.active_tasks.ollama_pull == owner then deps.active_tasks.ollama_pull = nil end
+				return release_requirement_task(owner)
+			end
+			-- A partial preparation owns real private files even without a task.
+			-- Keep its exact capability in the same admission slot until rollback.
+			_active_tasks[owner], deps.active_tasks.ollama_pull = true, owner
+			pending_cleanup[owner], owner.pause_join = rollback, rollback
+			owner.task = owner
+			owner.authorized = false
+			if type(requirement_lifecycle) == "table"
+				and type(requirement_lifecycle.adopt) == "function" then
+				if requirement_lifecycle.adopt(owner, owner.pause_join,
+					"Ollama managed pull preparation") == true then
+					owner.requirement_registered = true
+				end
+			end
+			return rollback()
+		end
+
+		if managed then
+			local resolved, python = pcall(function()
+				return require("modules.llm.managed_native_python").resolve()
+			end)
+			if not resolved or type(python) ~= "string" then
+				complete_progress_ui(owner, false, target_model)
+				settle_cancel("native_interpreter_unavailable")
+				return false
+			end
+			local prepared, handle, ready = pcall(ManagedPullReceipt.prepare_owned,
+				repo, OllamaEndpoint.get_port(), python)
+			if type(handle) == "table" then managed_handle = handle end
+			if not prepared or managed_handle == nil or ready ~= true then
+				retain_preparation()
+				complete_progress_ui(owner, false, target_model)
+				settle_cancel("managed_preparation_refused")
+				return false
+			end
+			pull_executable, pull_arguments = handle.executable, handle.arguments
+		end
+
+		local function receive_pull(code, stdout, stderr)
 			-- A native-faithful double can invoke completion from inside :start()
 			-- before :start() reports whether launch committed. Buffer that result so
 			-- a refused launch cannot publish model state from an unowned callback.
@@ -1802,7 +1882,8 @@ function M.new(deps, presets, ram_getter)
 				return true
 			end
 			return finish_pull(code, stdout, stderr)
-		end, function(...)
+		end
+		local function receive_pull_stream(...)
 			if start_in_progress == true then
 				if pending_completion == nil then
 					pending_chunks[#pending_chunks + 1] = table.pack(...)
@@ -1810,98 +1891,136 @@ function M.new(deps, presets, ram_getter)
 				return true
 			end
 			return process_pull_stream(...)
-		end, {"-c", pull_command})
-		
-		if task then
-			if not current_or_cancel() then return false end
-			_active_tasks[task] = true
-			deps.active_tasks["ollama_pull"] = task
-			owner.task = task
+		end
+		local function ollama_pull_start_owned_task(owner, task, managed_handle)
+			if task then
+				if managed ~= true and not current_or_cancel() then return false end
+				_active_tasks[task] = true
+				deps.active_tasks["ollama_pull"] = task
+				owner.task = task
 
-			pending_cleanup[task] = query_pending_cleanup
-			owner.release_slot = function(exact_task)
-				if deps.active_tasks["ollama_pull"] == exact_task then
-					deps.active_tasks["ollama_pull"] = nil
+				pending_cleanup[task] = query_pending_cleanup
+				owner.release_slot = function(exact_task)
+					if deps.active_tasks["ollama_pull"] == exact_task then
+						deps.active_tasks["ollama_pull"] = nil
+					end
 				end
-			end
-			owner.pause_join = function()
-				owner.authorized = false
-				local cleanup = owner.cleanup
-				if cleanup ~= nil and cleanup.task ~= nil and cleanup.termination_accepted ~= true then
-					local signaled, accepted = pcall(function() return cleanup.task:terminate() end)
-					if signaled and accepted ~= nil and accepted ~= false then cleanup.termination_accepted = true end
+				owner.pause_join = function()
+					owner.authorized = false
+					local cleanup = owner.cleanup
+					if cleanup ~= nil and cleanup.task ~= nil and cleanup.termination_accepted ~= true then
+						local signaled, accepted = pcall(function() return cleanup.task:terminate() end)
+						if signaled and accepted ~= nil and accepted ~= false then cleanup.termination_accepted = true end
+					end
+					cancel_current_pull()
+					cancel_retry_timer()
+					maybe_release_pull_owner()
+					return owner.settled == true
 				end
-				cancel_current_pull()
-				cancel_retry_timer()
-				maybe_release_pull_owner()
-				return owner.settled == true
-			end
-			if type(requirement_lifecycle) == "table"
-				and type(requirement_lifecycle.adopt) == "function" then
-				if requirement_lifecycle.adopt(owner, owner.pause_join,
-					"Ollama requirement pull") ~= true then
+				if type(requirement_lifecycle) == "table"
+					and type(requirement_lifecycle.adopt) == "function" then
+					if requirement_lifecycle.adopt(owner, owner.pause_join,
+						"Ollama requirement pull") ~= true then
+						owner.authorized = false
+						owner.cancel_requested = true
+						if requirement_task_proven_not_running(task,
+							"Ollama pull adoption refusal") then
+							settle_pull_task()
+						else
+							cancel_current_pull()
+						end
+						settle_cancel("requirement_owner_adoption_refused")
+						return false
+					end
+					owner.requirement_registered = true
+				end
+				if managed_handle ~= nil then
+					local bound, assigned = pcall(managed_handle.bind_input, task)
+					if not bound or assigned ~= true or not current_or_cancel() then
+						owner.authorized = false
+						owner.cancel_requested = true
+						if requirement_task_proven_not_running(task, "Managed Ollama input refusal") then
+							settle_pull_task()
+						else
+							cancel_current_pull()
+						end
+						complete_progress_ui(owner, false, target_model)
+						settle_cancel("managed_input_refused")
+						return false
+					end
+				end
+				owner.start_attempted = true
+				local marked, ready = pcall(ManagedPullReceipt.mark_start_attempted, task)
+				local started = marked == true and ready == true
+					and TaskLifecycle.start(task, "Ollama model pull")
+				-- Post-dispatch callbacks release this exact pin only through the
+				-- physical receipt gate in settle_pull_task. Pre-start refusals keep
+				-- its original direct release because dispatch has not occurred.
+				owner.release_task_pin = function()
+					_active_tasks[task] = nil
+				end
+				start_in_progress = false
+				if started ~= true then
 					owner.authorized = false
 					owner.cancel_requested = true
-					if requirement_task_proven_not_running(task,
-						"Ollama pull adoption refusal") then
+					pending_chunks = {}
+					if pending_completion ~= nil then
+						local callback_status = pending_completion[1]
+						pending_completion = nil
+						owner.completion_seen = true
+						owner.callback_status = callback_status
+						settle_pull_task(callback_status)
+					elseif requirement_task_proven_not_running(task,
+						"Ollama pull start refusal") then
 						settle_pull_task()
 					else
 						cancel_current_pull()
 					end
-					settle_cancel("requirement_owner_adoption_refused")
+					complete_progress_ui(owner, false, target_model)
+					settle_cancel("task_start_refused")
 					return false
 				end
-				owner.requirement_registered = true
-			end
-			owner.start_attempted = true
-			local marked, ready = pcall(ManagedPullReceipt.mark_start_attempted, task)
-			local started = marked == true and ready == true
-				and TaskLifecycle.start(task, "Ollama model pull")
-			start_in_progress = false
-			if started ~= true then
-				owner.authorized = false
-				owner.cancel_requested = true
+				owner.start_committed = true
+				local committed_chunks = pending_chunks
 				pending_chunks = {}
+				for _, chunk in ipairs(committed_chunks) do
+					local keep_streaming = process_pull_stream(
+						table.unpack(chunk, 1, chunk.n))
+					if keep_streaming == false then
+						cancel_current_pull()
+						break
+					end
+				end
 				if pending_completion ~= nil then
-					local callback_status = pending_completion[1]
-					pending_completion = nil
-					owner.completion_seen = true
-					owner.callback_status = callback_status
-					settle_pull_task(callback_status)
-				elseif requirement_task_proven_not_running(task,
-					"Ollama pull start refusal") then
-					settle_pull_task()
-				else
-					cancel_current_pull()
+					return finish_pull(table.unpack(pending_completion, 1, pending_completion.n))
 				end
+				if not current_or_cancel() then
+					cancel_current_pull()
+					return false
+				end
+			else
+				retain_preparation()
 				complete_progress_ui(owner, false, target_model)
-				settle_cancel("task_start_refused")
+				settle_cancel("task_construction_failed")
 				return false
 			end
-			owner.start_committed = true
-			local committed_chunks = pending_chunks
-			pending_chunks = {}
-			for _, chunk in ipairs(committed_chunks) do
-				local keep_streaming = process_pull_stream(
-					table.unpack(chunk, 1, chunk.n))
-				if keep_streaming == false then
-					cancel_current_pull()
-					break
-				end
-			end
-			if pending_completion ~= nil then
-				return finish_pull(table.unpack(pending_completion, 1, pending_completion.n))
-			end
-			if not current_or_cancel() then
-				cancel_current_pull()
-				return false
-			end
-		else
-			complete_progress_ui(owner, false, target_model)
-			settle_cancel("task_construction_failed")
-			return false
+			return true
 		end
-		return true
+		if managed_handle ~= nil then
+			local constructed = pcall(function()
+				task = TaskLifecycle.native("Ollama model pull",
+					pull_executable, receive_pull, receive_pull_stream, pull_arguments)
+			end)
+			if constructed ~= true then task = nil end
+			return ollama_pull_start_owned_task(owner, task, managed_handle)
+		else
+			task = TaskLifecycle.native("Ollama model pull", BASH_BIN, function(...)
+				return receive_pull(...)
+			end, function(...)
+				return receive_pull_stream(...)
+			end, {"-c", pull_command})
+			return ollama_pull_start_owned_task(owner, task, managed_handle)
+		end
 	end
 
 	function obj.install_ollama_then_pull(target_model, repo, on_success, on_cancel, opts)

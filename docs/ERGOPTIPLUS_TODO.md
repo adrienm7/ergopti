@@ -7084,6 +7084,65 @@ release assets. Linux's 44 Go observations and portable controls do not qualify
 those Darwin cases. Final-source qualification, genuine model exchange and
 complete native packaging/install remain required; items 62, 16 and 38 stay open.
 
+The canonical macOS serve/restart and model-pull callers now forward the explicit
+managed-source kind and retain the reviewed daemon session and cleanup owner.
+Public receipt hints use one bounded native task instead of reading complete
+metadata on the GUI thread; private Python selection uses the generated pinned
+locator and one exact native header probe. Preparation, asynchronous continuation
+and physical retirement consume the original caller deadline, including initial
+filesystem and system-interpreter lookup time. Missing clocks, terminal refusal
+and unsettled cleanup cannot admit a successor or refresh the budget. Portable
+receiving passes the original eight interpreter controls, 45 exact preflight
+cases/331 assertions, 29 hint cases/361 assertions, the composed caller controls
+and three genuine Linux descriptor/header controls. These component observations
+do not establish actual Darwin task/image or installed-application behavior.
+
+Hosted macOS manual37877137440 atfc1d16e83 compiles both native architectures,
+but the mandatory SDK cohort fails bootstrap/held-image retirement and chunked
+API receiving. Actual independent HTTP receiving reaches its deadline; the cold
+Ollama version probe reaches its unchanged 30-second bound. Native source/model
+receiving and package/install are unqualified. Production source activation
+remains guarded; these native failures still require feasible code corrections
+and another hosted run before any device-only remainder is claimed. Hosted
+Windows manual37875482474 at1ad9514c passes10,475 of10,486 controls and fails11;
+its E2E/package/install are skipped. Both items36/62 and transverse16/38 remain
+open with their existing acceptance requirements.
+
+The next candidate corrects advanced Data indices in chunked API line limits,
+creates a verified private session when Foundation starts its guardian as a
+process-group leader, and removes DNS discovery from the numeric TLS test peer.
+The canonical pull dispatcher shares one task-start owner across both routes;
+constructor/start refusals retain partially acquired tasks until their exact
+physical settlement receipt. Optional runtime absence and unavailable native
+clock ports refuse without logging a directory-enumeration error or renewing
+the original deadline. Existing assertions and native activation guards remain.
+HTTP deadline observations now distinguish actual CONNECT 407 refusal from a
+delivered tunnel response and retain bounded cleanup facts. The cold version
+probe records bounded timeout evidence without extending its 30-second limit.
+Managed Python hint and serve commands explicitly retain isolation while
+disabling bytecode writes in the immutable payload; real copied-command controls
+refuse on Linux as before and prove that their module imports leave no caches.
+Final selected Linux-hosted gates pass formatting, BOM/LF, all 396 JS checks,
+17,527 Hammerspoon-port unit controls, 101 E2E scenarios with one explicit skip,
+11,878 Linux unit controls and 189 Linux E2E scenarios. Actual AHK and Darwin
+Swift validation remain explicitly deferred. The terminal supervisor was lost
+before producing its native closure receipt, so passing completed tests do not
+qualify that supervisor's physical cleanup. Hosted native SDK, HTTP, source/model,
+packaging and installation qualification still remain required. These results
+do not establish a device-only remainder or finish item 62.
+
+The Windows receiving candidate reads the legacy raw-contract flags from their
+actual strict stderr frame and half-closes only the proxy request direction at
+EOF, preserving the response direction until its existing retirement bound.
+Startup failures retain bounded setup observations in an explicitly owned
+sidecar included in the original nonrecursive cleanup inventory. Directory
+capture observations use bounded absolute source and restoration paths without
+changing process CWD, waiving the original attacks or claiming Windows rename
+success. The composed portable PowerShell/C#/TCP controls and preserved AHK
+assertions have passed review; actual Windows SSPI, capture, staging and WinHTTP
+execution still require the next non-release hosted run. The earlier eleven
+native failures and skipped E2E/package/install remain unqualified meanwhile.
+
 - [~] **63.** Layer actions: screen brightness up/down are now shared, labelled
   through the existing 21-locale action catalogue, and implemented for keyboard
   layers on all three drivers. Windows and macOS also support their existing
