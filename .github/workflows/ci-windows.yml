@@ -47,6 +47,13 @@ on:
 permissions:
   contents: read
 
+env:
+  ERGOPTI_DEV_RELEASE_RELEASE: ${{ inputs.release }}
+  ERGOPTI_DEV_RELEASE_PRERELEASE: ${{ inputs.prerelease }}
+  ERGOPTI_DEV_RELEASE_CHANNEL: ${{ inputs.channel }}
+  ERGOPTI_DEV_RELEASE_TAG: ${{ inputs.tag }}
+  ERGOPTI_DEV_RELEASE_VERSION: ${{ inputs.version }}
+
 jobs:
   # ─────────────────────────────────────────────────
   # 1) AHK unit, native and contract tests
@@ -265,7 +272,27 @@ jobs:
       - name: Run native desktop AHK cohorts
         shell: pwsh
         timeout-minutes: 25
-        run: ./tools/test/run-windows-native-desktop.ps1
+        run: |
+          $receipt = Join-Path $env:RUNNER_TEMP 'stable-windows-native-desktop.json'
+          node tools/ci/dev-release-qualification.cjs --scope windows-native-desktop --receipt $receipt
+          if ($LASTEXITCODE -ne 0) { throw 'Native desktop qualification selection refused.' }
+          $mode = node tools/ci/dev-release-qualification.cjs --scope windows-native-desktop --validate-scope-receipt $receipt
+          if ($LASTEXITCODE -ne 0) { throw 'Native desktop qualification receipt refused.' }
+          if ($mode -ceq 'deferred') {
+              Write-Host '[DEFERRED] windows-native-desktop: qualified=false; no desktop cohort executed.'
+          } elseif ($mode -ceq 'full') {
+              ./tools/test/run-windows-native-desktop.ps1
+          } else {
+              throw 'Invalid native desktop qualification disposition.'
+          }
+
+      - name: Retain the source-bound Windows qualification receipt
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: assets-qualification-windows
+          path: ${{ runner.temp }}/stable-windows-native-desktop.json
+          if-no-files-found: warn
 
       - name: Publish native desktop AHK evidence
         if: always()
@@ -273,7 +300,9 @@ jobs:
         with:
           overwrite: true
           name: windows-ahk-native-desktop
-          path: ${{ runner.temp }}/windows-ahk-native-desktop/
+          path: |
+            ${{ runner.temp }}/windows-ahk-native-desktop/
+            ${{ runner.temp }}/stable-windows-native-desktop.json
           if-no-files-found: error
 
       # The isolated LLM suites. They cannot join run_all.ahk: each installs

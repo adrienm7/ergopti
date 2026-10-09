@@ -61,6 +61,13 @@ on:
 permissions:
   contents: read
 
+env:
+  ERGOPTI_DEV_RELEASE_RELEASE: ${{ inputs.release }}
+  ERGOPTI_DEV_RELEASE_PRERELEASE: ${{ inputs.prerelease }}
+  ERGOPTI_DEV_RELEASE_CHANNEL: ${{ inputs.channel }}
+  ERGOPTI_DEV_RELEASE_TAG: ${{ inputs.tag }}
+  ERGOPTI_DEV_RELEASE_VERSION: ${{ inputs.version }}
+
 jobs:
   # ─────────────────────────────────────────────────
   # 1) Linux Lua driver unit and native contract tests
@@ -1327,7 +1334,19 @@ jobs:
           # HTTP request (the AI phase) run on it.
           sudo python3 "$GITHUB_WORKSPACE/tools/ci/ubuntu_apt.py" -y --no-install-recommends at-spi2-core openbox python3-gi gir1.2-gtk-3.0 \
             dbus-x11 xvfb x11-xkb-utils libayatana-appindicator3-1 lua-luv
-          sudo bash static/ergopti_plus/linux/tests/hardware/run_daemon_live.sh
+          sudo env \
+            GITHUB_ACTIONS="$GITHUB_ACTIONS" \
+            GITHUB_REPOSITORY="$GITHUB_REPOSITORY" \
+            GITHUB_EVENT_NAME="$GITHUB_EVENT_NAME" \
+            GITHUB_REF="$GITHUB_REF" \
+            GITHUB_SHA="$GITHUB_SHA" \
+            RUNNER_TEMP="$RUNNER_TEMP" \
+            ERGOPTI_DEV_RELEASE_RELEASE="$ERGOPTI_DEV_RELEASE_RELEASE" \
+            ERGOPTI_DEV_RELEASE_PRERELEASE="$ERGOPTI_DEV_RELEASE_PRERELEASE" \
+            ERGOPTI_DEV_RELEASE_CHANNEL="$ERGOPTI_DEV_RELEASE_CHANNEL" \
+            ERGOPTI_DEV_RELEASE_TAG="$ERGOPTI_DEV_RELEASE_TAG" \
+            ERGOPTI_DEV_RELEASE_VERSION="$ERGOPTI_DEV_RELEASE_VERSION" \
+            bash static/ergopti_plus/linux/tests/hardware/run_daemon_live.sh
         timeout-minutes: 6
 
       # The updater a user runs, run: this tree built as an old release and
@@ -1336,6 +1355,14 @@ jobs:
       # daemon on it. An installed prerelease once asked the "stable" channel
       # and never found an update; an installed update once waited for the
       # next login.
+      - name: Retain the source-bound simultaneous supplement qualification
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: assets-qualification-linux-simultaneous
+          path: ${{ runner.temp }}/stable-linux-simultaneous-native.json
+          if-no-files-found: warn
+
       - name: Update to the newest release and restart
         if: ${{ !cancelled() }}
         env:

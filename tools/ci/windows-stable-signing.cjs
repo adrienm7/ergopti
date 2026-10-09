@@ -123,7 +123,7 @@ function receipt(context, source, checkout, sha256, now = new Date(), policy = P
 		sha256,
 		signature: 'NotSigned',
 		qualified: false,
-		tests: 'mandatory-full'
+		tests: 'mandatory-outside-published-native-desktop-scope'
 	};
 }
 function validateReceipt(
@@ -156,7 +156,7 @@ function notice(source) {
 		'WINDOWS AUTHENTICODE UNSIGNED / qualified:false (source ' +
 		source +
 		'): ErgoptiPlus.exe has no Windows code-signing certificate for this v1.0.0 release. ' +
-		'All Windows tests, source and asset integrity checks remain mandatory. ' +
+		'All Windows checks outside the separately published native-desktop scope, source and asset integrity checks remain mandatory. ' +
 		'Windows may show an unknown-publisher warning. [Signature evidence](https://github.com/adrienm7/ergopti/releases/download/v1.0.0/windows-signing-qualification.json). ' +
 		'Future signing requires SignPath Foundation enrollment and qualified GitHub integration.'
 	);

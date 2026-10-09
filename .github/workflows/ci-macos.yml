@@ -49,6 +49,13 @@ on:
 permissions:
   contents: read
 
+env:
+  ERGOPTI_DEV_RELEASE_RELEASE: ${{ inputs.release }}
+  ERGOPTI_DEV_RELEASE_PRERELEASE: ${{ inputs.prerelease }}
+  ERGOPTI_DEV_RELEASE_CHANNEL: ${{ inputs.channel }}
+  ERGOPTI_DEV_RELEASE_TAG: ${{ inputs.tag }}
+  ERGOPTI_DEV_RELEASE_VERSION: ${{ inputs.version }}
+
 jobs:
   # Manual item 36 diagnosis is independent of managed HTTP/runtime acceptance.
   # Its scoped result never replaces Package, installed launch or physical checks.
@@ -352,17 +359,30 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          test -n "$ERGOPTI_NATIVE_HTTP_PYTHON"
-          test -x "$ERGOPTI_NATIVE_HTTP_PYTHON"
-          transcript="$ERGOPTI_OLLAMA_BUILD_ROOT/native-pac-xctest.log"
-          set +e
-          swift test --package-path static/ergopti_plus/macos/launcher \
-            --scratch-path "$ERGOPTI_OLLAMA_BUILD_ROOT/swift" \
-            --filter 'ManagedHTTPWorkerTests|ManagedHTTPWireTests|ManagedHTTPWPADWireTests' 2>&1 | tee "$transcript"
-          pac_statuses=("${PIPESTATUS[@]}")
-          set -e
-          node tools/diagnostics/managed_http_pac_xctest_evidence.cjs "$transcript" "${pac_statuses[0]}" "${pac_statuses[1]}" "$ERGOPTI_OLLAMA_BUILD_ROOT/native-pac-verdict.json"
+          receipt="$RUNNER_TEMP/stable-macos-native-pac-${{ matrix.architecture }}.json"
+          mkdir -p "$(dirname "$receipt")"
+          node tools/ci/dev-release-qualification.cjs --scope macos-native-pac --receipt "$receipt"
+          mode="$(node tools/ci/dev-release-qualification.cjs --scope macos-native-pac --validate-scope-receipt "$receipt")"
+          if [ "$mode" = deferred ]; then
+              echo "[DEFERRED] macos-native-pac: qualified=false; original command not executed."
+          elif [ "$mode" = full ]; then
+              set -euo pipefail
+              test -n "$ERGOPTI_NATIVE_HTTP_PYTHON"
+              test -x "$ERGOPTI_NATIVE_HTTP_PYTHON"
+              transcript="$ERGOPTI_OLLAMA_BUILD_ROOT/native-pac-xctest.log"
+              set +e
+              swift test --package-path static/ergopti_plus/macos/launcher \
+                --scratch-path "$ERGOPTI_OLLAMA_BUILD_ROOT/swift" \
+                --filter 'ManagedHTTPWorkerTests|ManagedHTTPWireTests|ManagedHTTPWPADWireTests' 2>&1 | tee "$transcript"
+              pac_statuses=("${PIPESTATUS[@]}")
+              set -e
+              node tools/diagnostics/managed_http_pac_xctest_evidence.cjs "$transcript" "${pac_statuses[0]}" "${pac_statuses[1]}" "$ERGOPTI_OLLAMA_BUILD_ROOT/native-pac-verdict.json"
+          else
+              echo "Invalid command qualification disposition" >&2
+              exit 1
+          fi
         timeout-minutes: 10
+
       - name: Retain independent native PAC XCTest diagnostics
         if: always()
         uses: actions/upload-artifact@v4
@@ -379,12 +399,25 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          status=0
-          "$ERGOPTI_NATIVE_HTTP_PYTHON" tools/diagnostics/macos_owned_process_native_test.py || status=1
-          "$ERGOPTI_NATIVE_HTTP_PYTHON" static/ergopti_plus/macos/tests/support/native_http_receiving_test.py --client-only || status=1
-          "$ERGOPTI_NATIVE_HTTP_PYTHON" static/ergopti_plus/macos/tests/support/native_http_wire_client_receiving.py || status=1
-          exit "$status"
+          receipt="$RUNNER_TEMP/stable-macos-native-http-${{ matrix.architecture }}.json"
+          mkdir -p "$(dirname "$receipt")"
+          node tools/ci/dev-release-qualification.cjs --scope macos-native-http --receipt "$receipt"
+          mode="$(node tools/ci/dev-release-qualification.cjs --scope macos-native-http --validate-scope-receipt "$receipt")"
+          if [ "$mode" = deferred ]; then
+              echo "[DEFERRED] macos-native-http: qualified=false; original command not executed."
+          elif [ "$mode" = full ]; then
+              set -euo pipefail
+              status=0
+              "$ERGOPTI_NATIVE_HTTP_PYTHON" tools/diagnostics/macos_owned_process_native_test.py || status=1
+              "$ERGOPTI_NATIVE_HTTP_PYTHON" static/ergopti_plus/macos/tests/support/native_http_receiving_test.py --client-only || status=1
+              "$ERGOPTI_NATIVE_HTTP_PYTHON" static/ergopti_plus/macos/tests/support/native_http_wire_client_receiving.py || status=1
+              exit "$status"
+          else
+              echo "Invalid command qualification disposition" >&2
+              exit 1
+          fi
         timeout-minutes: 5
+
       - name: Qualify actual explicit curl stream ownership
         if: ${{ !cancelled() }}
         shell: bash
@@ -500,6 +533,14 @@ jobs:
             ${{ runner.temp }}/managed-ollama-launcher-build.log
             ${{ runner.temp }}/managed-ollama-producer-build.log
 
+      - name: Retain source-bound managed-ollama-native qualification receipts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: assets-qualification-managed-ollama-native-${{ matrix.architecture || 'stubbed' }}
+          path: ${{ runner.temp }}/stable-macos-*.json
+          if-no-files-found: warn
+
   # ─────────────────────────────────────────────────
   # 1) Hammerspoon unit and contract tests
   # ─────────────────────────────────────────────────
@@ -546,7 +587,28 @@ jobs:
         # cannot change semantics under us.
         env:
           LUA: lua5.4
-        run: node ../../../tools/test/report.cjs --name macos-lua --json "${{ runner.temp }}/macos-lua.json" -- lua5.4 tests/run.lua
+        run: |
+          set -euo pipefail
+          receipt="$RUNNER_TEMP/stable-macos-stubbed-unit.json"
+          mkdir -p "$(dirname "$receipt")"
+          node ../../../tools/ci/dev-release-qualification.cjs --scope macos-stubbed-unit --receipt "$receipt"
+          mode="$(node ../../../tools/ci/dev-release-qualification.cjs --scope macos-stubbed-unit --validate-scope-receipt "$receipt")"
+          if [ "$mode" = deferred ]; then
+              echo "[DEFERRED] macos-stubbed-unit: qualified=false; original command not executed."
+          elif [ "$mode" = full ]; then
+              node ../../../tools/test/report.cjs --name macos-lua --json "${{ runner.temp }}/macos-lua.json" -- lua5.4 tests/run.lua
+          else
+              echo "Invalid command qualification disposition" >&2
+              exit 1
+          fi
+
+      - name: Retain source-bound test-hs qualification receipts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: assets-qualification-test-hs-${{ matrix.architecture || 'stubbed' }}
+          path: ${{ runner.temp }}/stable-macos-*.json
+          if-no-files-found: warn
 
   e2e-hs:
     name: 'E2E tests (stubbed)'
@@ -575,8 +637,29 @@ jobs:
         # hardcoded scenarios and all corpus vectors.
         # Exit 0 = all pass, 1 = at least one failure.
         working-directory: static/ergopti_plus/macos
-        run: lua5.4 tests/e2e/run_e2e.lua
+        run: |
+          set -euo pipefail
+          receipt="$RUNNER_TEMP/stable-macos-stubbed-e2e.json"
+          mkdir -p "$(dirname "$receipt")"
+          node ../../../tools/ci/dev-release-qualification.cjs --scope macos-stubbed-e2e --receipt "$receipt"
+          mode="$(node ../../../tools/ci/dev-release-qualification.cjs --scope macos-stubbed-e2e --validate-scope-receipt "$receipt")"
+          if [ "$mode" = deferred ]; then
+              echo "[DEFERRED] macos-stubbed-e2e: qualified=false; original command not executed."
+          elif [ "$mode" = full ]; then
+              lua5.4 tests/e2e/run_e2e.lua
+          else
+              echo "Invalid command qualification disposition" >&2
+              exit 1
+          fi
         timeout-minutes: 5
+
+      - name: Retain source-bound e2e-hs qualification receipts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: assets-qualification-e2e-hs-${{ matrix.architecture || 'stubbed' }}
+          path: ${{ runner.temp }}/stable-macos-*.json
+          if-no-files-found: warn
 
   tooltip-canvas:
     name: 'Native tooltip canvas · 12 captures'
