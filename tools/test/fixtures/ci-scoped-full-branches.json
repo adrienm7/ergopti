@@ -98,6 +98,15 @@
 			"suffix": "\nelse\n    exit 1\nfi",
 			"strip": 0,
 			"format": "bash"
+		},
+		{
+			"scope": "macos-native-http",
+			"prefix": "set -euo pipefail\nstatus=0\n\"$ERGOPTI_NATIVE_HTTP_PYTHON\" tools/diagnostics/macos_owned_process_native_test.py || status=1\n\"$ERGOPTI_NATIVE_HTTP_PYTHON\" static/ergopti_plus/macos/tests/support/native_http_receiving_test.py --client-only || status=1\nreceipt=\"$RUNNER_TEMP/stable-macos-native-http-package.json\"\nmkdir -p \"$(dirname \"$receipt\")\"\nnode tools/ci/dev-release-qualification.cjs --scope macos-native-http --receipt \"$receipt\"\nmode=\"$(node tools/ci/dev-release-qualification.cjs --scope macos-native-http --validate-scope-receipt \"$receipt\")\"\nif [ \"$mode\" = deferred ]; then\n    echo \"[DEFERRED] macos-native-http: qualified=false; duplicate native wire receiving not executed; owned-process and client-only controls remain mandatory.\"\nelif [ \"$mode\" = full ]; then\n",
+			"suffix": "\nelse\n    echo \"Invalid command qualification disposition\" >&2\n    exit 1\nfi\nexit \"$status\"",
+			"strip": 4,
+			"format": "bash",
+			"retained_prefix": "set -euo pipefail\nstatus=0\n\"$ERGOPTI_NATIVE_HTTP_PYTHON\" tools/diagnostics/macos_owned_process_native_test.py || status=1\n\"$ERGOPTI_NATIVE_HTTP_PYTHON\" static/ergopti_plus/macos/tests/support/native_http_receiving_test.py --client-only || status=1",
+			"retained_suffix": "exit \"$status\""
 		}
 	],
 	"slots": [
@@ -134,7 +143,7 @@
 		{
 			"file": ".github/workflows/ci-macos.yml",
 			"job": "e2e-hs",
-			"step": "Run virtual-keyboard harness (stubbed hs.* — no real Hammerspoon)",
+			"step": "Run virtual-keyboard harness (stubbed hs.* \u2014 no real Hammerspoon)",
 			"protocol": 5
 		},
 		{
@@ -896,7 +905,7 @@
 		{
 			"file": ".github/workflows/ci-linux.yml",
 			"job": "e2e-linux",
-			"step": "The whole daemon, live — a trigger typed, a tray shown",
+			"step": "The whole daemon, live \u2014 a trigger typed, a tray shown",
 			"protocol": 9
 		},
 		{
@@ -1060,6 +1069,14 @@
 			"job": "e2e-linux",
 			"step": "Record mandatory E2E evidence",
 			"protocol": 11
+		},
+		{
+			"file": ".github/workflows/ci-macos.yml",
+			"job": "package-macos",
+			"step": "Receive actual managed HTTP native clients",
+			"protocol": 12,
+			"owner_job": "managed-ollama-native",
+			"owner_step": "Receive actual independent managed HTTP native clients"
 		}
 	],
 	"linux_harness": {

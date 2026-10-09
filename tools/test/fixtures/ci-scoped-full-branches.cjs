@@ -38,7 +38,9 @@ function unwrap(code, protocol) {
 	// The wrapper adds the same strict shell setup as the retained original body.
 	// Two identical consecutive setups convey one full-default command boundary.
 	full = full.replace(/^set -euo pipefail\nset -euo pipefail\n/, 'set -euo pipefail\n');
-	return full;
+	return [protocol.retained_prefix, full, protocol.retained_suffix]
+		.filter((part) => part !== undefined)
+		.join('\n');
 }
 function projectScopedSteps(text, rel) {
 	const policy = validateBoundary();
@@ -64,7 +66,39 @@ function projectScopedSteps(text, rel) {
 			const slot = matches[0],
 				protocol = contract.protocols[slot.protocol];
 			assert.equal(policy.scopes[protocol.scope].path, rel, 'scope and workflow owner must agree');
-			assert.equal(policy.scopes[protocol.scope].args[0], job.id, 'scope and job owner must agree');
+			if (slot.owner_job !== undefined) {
+				assert.equal(
+					protocol.scope,
+					'macos-native-http',
+					'only the reviewed native-wire duplicate has a sibling owner'
+				);
+				assert.equal(job.id, 'package-macos', 'native-wire duplicate job must remain');
+				assert.equal(
+					step.name,
+					'Receive actual managed HTTP native clients',
+					'native-wire duplicate step must remain'
+				);
+				assert.equal(
+					slot.owner_job,
+					'managed-ollama-native',
+					'native-wire original owner must remain'
+				);
+				assert.equal(
+					slot.owner_step,
+					'Receive actual independent managed HTTP native clients',
+					'native-wire original step must remain'
+				);
+				assert.equal(
+					policy.scopes[protocol.scope].args[1],
+					slot.owner_step,
+					'scope and original step owner must agree'
+				);
+			}
+			assert.equal(
+				policy.scopes[protocol.scope].args[0],
+				slot.owner_job ?? job.id,
+				'scope and job owner must agree'
+			);
 			const identity = job.id + '/' + step.name;
 			assert.ok(!seen.has(identity), 'duplicate scoped command owner');
 			seen.add(identity);

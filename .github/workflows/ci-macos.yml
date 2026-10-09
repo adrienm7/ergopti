@@ -873,13 +873,26 @@ jobs:
 
       # Keep XCTest serial: the lease tests install process-wide signal handlers
       # and fork/reap real children, so parallel workers would race each other.
+      # This duplicate wire receiver belongs to the existing macos-native-http scope.
+      # The owned-process and client-only controls remain mandatory here.
       - name: Receive actual managed HTTP native clients
         run: |
           set -euo pipefail
           status=0
           "$ERGOPTI_NATIVE_HTTP_PYTHON" tools/diagnostics/macos_owned_process_native_test.py || status=1
           "$ERGOPTI_NATIVE_HTTP_PYTHON" static/ergopti_plus/macos/tests/support/native_http_receiving_test.py --client-only || status=1
-          "$ERGOPTI_NATIVE_HTTP_PYTHON" static/ergopti_plus/macos/tests/support/native_http_wire_client_receiving.py || status=1
+          receipt="$RUNNER_TEMP/stable-macos-native-http-package.json"
+          mkdir -p "$(dirname "$receipt")"
+          node tools/ci/dev-release-qualification.cjs --scope macos-native-http --receipt "$receipt"
+          mode="$(node tools/ci/dev-release-qualification.cjs --scope macos-native-http --validate-scope-receipt "$receipt")"
+          if [ "$mode" = deferred ]; then
+              echo "[DEFERRED] macos-native-http: qualified=false; duplicate native wire receiving not executed; owned-process and client-only controls remain mandatory."
+          elif [ "$mode" = full ]; then
+              "$ERGOPTI_NATIVE_HTTP_PYTHON" static/ergopti_plus/macos/tests/support/native_http_wire_client_receiving.py || status=1
+          else
+              echo "Invalid command qualification disposition" >&2
+              exit 1
+          fi
           exit "$status"
         timeout-minutes: 5
 
@@ -939,7 +952,9 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: native-brew-qualification-${{ github.run_id }}-${{ github.run_attempt }}
-          path: ${{ runner.temp }}/dev-release-qualification/macos-brew-archive.json
+          path: |
+            ${{ runner.temp }}/dev-release-qualification/macos-brew-archive.json
+            ${{ runner.temp }}/stable-macos-native-http-package.json
           if-no-files-found: error
 
       - name: Upload Swift launcher failure transcript
