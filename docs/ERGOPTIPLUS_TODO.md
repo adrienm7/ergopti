@@ -8271,7 +8271,12 @@ and installation qualification are still required.
   new retirement test compares the returned String wire line with JSON Data.
   Its expected value now matches the complete Q1 DATA line containing the same
   original base64 bytes; all seven retirement/cancellation/deadline assertions
-  remain intact. Fresh native compilation is required. The default workflow
+  remain intact. Integrated run
+  [37911147375](https://github.com/adrienm7/ergopti/actions/runs/37911147375)
+  at `a5f6300d8` compiles the native launcher and passes all 17
+  OwnedAutomationQueryWorker tests, including the three new permission and
+  retirement controls. These controlled packets do not execute or qualify the
+  SDK permission API. The default workflow
   does not execute the signed SDK observer: authenticated app publication,
   actual permission observation, Darwin retirement and final CI provenance
   remain UNRUN. Controlled metadata tests do not qualify the native SDK call.
@@ -8287,8 +8292,13 @@ and installation qualification are still required.
   lock immutability unchanged. Final native tracked-input admission and signed
   helper execution remain unrun. Native
   qualification: genuine Unicode/space/empty/literal argv, refused start, exit
-  errors and cancellation, then final three-OS package/install/startup. Mac
-  Sparkle/Brew/switcher package failures remain software/ownership blockers.
+  errors and cancellation, then final three-OS package/install/startup.
+  In that integrated run, native Sparkle archive acceptance passes all 15
+  tests; the complete native XCTest suite still fails two assertions in one
+  Homebrew test (357 cases), with AppleEvent error -1744. The separate
+  Shortcuts discovery gate still reaches checkpoint1 and retires at its
+  unchanged 20-second deadline, without a catalogue. Brew/Shortcuts package
+  failures and skipped native installation remain software/ownership blockers.
   Device work is limited to automation requiring actual peripherals or user
   sessions; discovery, ordinary execution and packaging remain software tasks.
 
