@@ -159,6 +159,7 @@ graph TD
         WINDOWS_tray_startup_click["TrayStartupClick.ahk"]
         WINDOWS_tray_startup_commands["TrayStartupCommands.ahk"]
         WINDOWS_uia_worker["UiaWorker.ahk"]
+        WINDOWS_updater_curl_capture["UpdaterCurlCapture.ahk"]
         WINDOWS_user_hotstrings_native["UserHotstringsNative.ahk"]
         WINDOWS_webview_profiles["WebviewProfiles.ahk"]
         WINDOWS_window_info["WindowInfo.ahk"]
