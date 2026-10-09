@@ -1,0 +1,110 @@
+{
+	"description": "Frozen original native macOS outer IA parent. Titles are the unchanged preimage catalogue, not candidate-rendered output. Original false and nil omit checked; true ticks. Construction has no parent callback or effects. Native child and toggle callback identity are asserted separately.",
+	"key": "menu.llm.title",
+	"states": [
+		{
+			"value": "nil",
+			"checked_present": false
+		},
+		{
+			"value": "false",
+			"checked_present": false
+		},
+		{
+			"value": "true",
+			"checked_present": true,
+			"checked": true
+		}
+	],
+	"captions": [
+		{
+			"locale": "ar",
+			"title": "✨ الذكاء الاصطناعي"
+		},
+		{
+			"locale": "cs",
+			"title": "✨ Umělá inteligence"
+		},
+		{
+			"locale": "da",
+			"title": "✨ Kunstig intelligens"
+		},
+		{
+			"locale": "de",
+			"title": "✨ Künstliche Intelligenz"
+		},
+		{
+			"locale": "en",
+			"title": "✨ Artificial Intelligence"
+		},
+		{
+			"locale": "es",
+			"title": "✨ Inteligencia Artificial"
+		},
+		{
+			"locale": "fr",
+			"title": "✨ Intelligence Artificielle"
+		},
+		{
+			"locale": "he",
+			"title": "✨ בינה מלאכותית"
+		},
+		{
+			"locale": "hi",
+			"title": "✨ कृत्रिम बुद्धिमत्ता"
+		},
+		{
+			"locale": "it",
+			"title": "✨ Intelligenza artificiale"
+		},
+		{
+			"locale": "ja",
+			"title": "✨ 人工知能"
+		},
+		{
+			"locale": "ko",
+			"title": "✨ 인공 지능"
+		},
+		{
+			"locale": "nl",
+			"title": "✨ Kunstmatige intelligentie"
+		},
+		{
+			"locale": "no",
+			"title": "✨ Kunstig intelligens"
+		},
+		{
+			"locale": "pl",
+			"title": "✨ Sztuczna inteligencja"
+		},
+		{
+			"locale": "pt",
+			"title": "✨ Inteligência Artificial"
+		},
+		{
+			"locale": "ru",
+			"title": "✨ Искусственный интеллект"
+		},
+		{
+			"locale": "sv",
+			"title": "✨ Artificiell intelligens"
+		},
+		{
+			"locale": "tr",
+			"title": "✨ Yapay Zeka"
+		},
+		{
+			"locale": "uk",
+			"title": "✨ Штучний інтелект"
+		},
+		{
+			"locale": "zh",
+			"title": "✨ 人工智能"
+		}
+	],
+	"original_parent_source": "\t\t\t\treturn {\n\t\t\t\t\t\tlabel   = i18n.get(\"menu.llm.title\"),\n\t\t\t\t\t\tchecked = state.llm_enabled or nil,\n\t\t\t\t\t\tsubmenu = main_menu\n\t\t\t\t}",
+	"parent_callback": false,
+	"construction_saves": 0,
+	"construction_updates": 0,
+	"construction_notifications": 0
+}
