@@ -192,7 +192,7 @@ extension HS274NativePolicyQualificationTests {
 				XCTAssertEqual(partial?["qualification"] as? String,
 					"unsigned_actual_core_constructor_compilation_only")
 				XCTAssertEqual(partial?["producer_sha256"] as? String,
-					"1a49ed91cfe1a45be436c4756135bb3c3b0035af26c1cf09908009dcdbf3a789")
+					"dddb305314151e0d50b4a36482c38b8f4614651bfc535c04d7547dadc70b5a42")
 				XCTAssertEqual(partial?["source_factory_sha256"] as? String,
 					"50fb679becd85980354858e38a4231488839bedfbf013b203505b7a5912c66bc")
 				XCTAssertEqual(partial?["architectures"] as? [String], ["arm64", "x86_64"])
@@ -430,7 +430,8 @@ extension HS274NativePolicyQualificationTests {
 
 extension HS274NativePolicyQualificationTests {
 	func testPortableInitializerDeliveryRetainsAllTwentyTwoFrozenControls() throws {
-		try fixture { root in
+		let parent = try compilationEvidenceParent()
+		try fixture(parent: parent) { root in
 			let cases: [String] = ["healthy", "unbound", "bytes_mismatch", "empty", "noncanonical", "error", "unknown_response", "duplicate", "retired", "changed_peer", "timer", "queue_refusal", "callback", "foreign_debt", "timer_observation", "empty_refusal", "reserved_kind", "outbound_wire", "pending_cancel", "completion_reentry", "peer_reentry", "completion_exception"]
 			let modes: [[String]] = [[], ["-O"]]
 			for selected in cases {

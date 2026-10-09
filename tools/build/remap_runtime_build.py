@@ -20,7 +20,7 @@ import time
 import uuid
 
 BASE_PATH = Path(__file__).resolve().parents[1] / "diagnostics/hs274_native_build.py"
-BASE_SHA256 = "6ba213bd8fe086f7b8807974242189917f1cd8ae2b69d30e107ba171ad0d674f"
+BASE_SHA256 = "9695174913fec75b4f0ea1b58b1fed70a06f31fc88dcc7b521ca93eb730d9fe6"
 PROVIDER_SHA256 = "c29ceb96e73655cadea7763805b9468c32744033c2f177bae492e4ce9fe4100a"
 
 
@@ -40,6 +40,9 @@ if hashlib.sha256(BASE_SOURCE).hexdigest() != BASE_SHA256:
 BASE = _load("four_target_native_phase_owner", BASE_PATH, BASE_SOURCE)
 _REQUIRE = BASE.require
 _RUN_PHASE = BASE.run_phase
+_BEGIN_PHASE = BASE.begin_phase
+_FINISH_PHASE = BASE.finish_phase
+_PHASE_READY = BASE.phase_ready
 _READ_REGULAR = BASE.read_regular
 _WRITE_EXCLUSIVE = BASE.write_exclusive
 _OWNER = BASE.validate_owner_root
@@ -492,6 +495,49 @@ def _observe_span(stage, phase=None):
 def _observed_run_phase(name, args, cwd, owner, deadline):
     with _observe_span("native_dispatch", name):
         return _RUN_PHASE(name, args, cwd, owner, deadline)
+
+
+class _DispatchSpan:
+    """Coordinator-only logical span; it never borrows the nested observer stack."""
+
+    def __init__(self, journal, phase):
+        self.journal, self.phase = journal, phase
+        self.finished = False
+        self.entered = False
+        self.span = self.parent = self.started = 0
+        if journal is None or journal.disabled or journal.closed:
+            return
+        journal.next_span += 1
+        self.span = journal.next_span
+        self.parent = journal.stack[-1][0] if journal.stack else 0
+        self.entered = journal._append("enter", self.span, self.parent, "native_dispatch", phase)
+        try:
+            self.started = _boundary_clock()
+        except _BoundaryStopped:
+            journal.disabled = True
+            self.entered = False
+
+
+def _begin_dispatch_span(phase):
+    if type(phase) is not str or phase not in _BOUNDARY_PHASES:
+        raise ValueError("phase")
+    return _DispatchSpan(_BOUNDARY_OBSERVER.get(), phase)
+
+
+def _finish_dispatch_span(token, error=None):
+    if type(token) is not _DispatchSpan or token.finished:
+        raise ValueError("dispatch_span")
+    token.finished = True
+    if token.entered:
+        token.journal.finish_span(
+            "complete" if error is None else "refused",
+            token.span,
+            token.parent,
+            "native_dispatch",
+            token.phase,
+            token.started,
+            "" if error is None else _boundary_code(error),
+        )
 
 
 def _factory_span(factory, operation):
@@ -1879,6 +1925,10 @@ def _compile_product_images(
     Source composition and native phase ownership remain separate.
     Only actual native phases may produce its four product observations.
     """
+    if staged_image is not None:
+        return _compile_owned_product_images(
+            source_snapshot, owner, tools, deadline, staged_image, shipping_sink
+        )
     _REQUIRE(sys.platform == "darwin", "tool_unavailable", "Actual Darwin SDK is mandatory")
     owner = _OWNER(owner)
     _current_build_inputs(source_snapshot, deadline, staged_image)
@@ -2007,6 +2057,230 @@ def _compile_product_images(
     if staged_image is not None:
         return observed, tuple(phases), tuple(retained)
     return observed, tuple(phases)
+
+
+def _compile_owned_product_images(
+    source_snapshot, owner, tools, deadline, staged_image, shipping_sink
+):
+    """Run the fixed owned DAG with one coordinator and retained native child owners."""
+    _REQUIRE(sys.platform == "darwin", "tool_unavailable", "Actual Darwin SDK is mandatory")
+    owner = _OWNER(owner)
+    _current_build_inputs(source_snapshot, deadline, staged_image)
+    _REQUIRE(
+        type(tools) is dict and set(tools) == {"xcodegen", "xcodebuild", "xcrun"},
+        "tool_unavailable",
+        "Exact actual native tool inventory is required",
+    )
+    tool_inputs = []
+    for value in tools.values():
+        path = Path(value)
+        _REQUIRE(
+            path.is_absolute() and path.resolve(strict=True) == path,
+            "tool_unavailable",
+            "Native tool redirects or is relative",
+        )
+        tool_inputs.append((path, _identity(path.stat())))
+    retained, owners = [], []
+    phases, products = {}, {}
+    captured = set()
+    primary = None
+    secondary_failures = []
+
+    def current():
+        _current_build_inputs(source_snapshot, deadline, staged_image)
+        _preparation_current(shipping_sink, retained, deadline)
+        for previous, root in retained:
+            current_product(previous, root)
+        for path, identity in tool_inputs:
+            _REQUIRE(
+                path.resolve(strict=True) == path and _identity(path.stat()) == identity,
+                "source_identity",
+                "Native tool image changed across actual compilation",
+            )
+        check_deadline(deadline)
+
+    def generate(label, recipe, relative):
+        current()
+        project = source_snapshot.root / recipe
+        output = project / relative
+        _REQUIRE(
+            not output.exists() and not output.is_symlink(),
+            "product_identity",
+            "A native product predates this actual build",
+        )
+        phases[label] = {
+            "generate": _observed_run_phase(
+                label + "_generate", [tools["xcodegen"], "generate"], project, owner, deadline
+            )
+        }
+        current()
+        recipe_input = _ordinary(
+            project / "project.yml", source_snapshot.root, BASE.MAX_INPUT_BYTES
+        )
+        names = [
+            line[6:].strip()
+            for line in recipe_input.data.decode("utf-8").splitlines()
+            if line.startswith("name: ")
+        ]
+        _REQUIRE(
+            len(names) == 1 and re.fullmatch(r"[A-Za-z0-9_-]+", names[0]),
+            "source_identity",
+            "The actual verified project name is not closed",
+        )
+        project_file = project / (names[0] + ".xcodeproj") / "project.pbxproj"
+        retained.append(
+            (product_snapshot(project_file, source_snapshot.root), source_snapshot.root)
+        )
+        current()
+
+    def observe(label, recipe, relative):
+        current()
+        project, output = source_snapshot.root / recipe, source_snapshot.root / recipe / relative
+        image = product_snapshot(output, source_snapshot.root)
+        retained.append((image, source_snapshot.root))
+        current()
+        phases[label]["architectures"] = _observed_run_phase(
+            label + "_architectures",
+            [tools["xcrun"], "lipo", "-archs", str(output)],
+            project,
+            owner,
+            deadline,
+        )
+        current()
+        current_product(image, source_snapshot.root)
+        lipo_output = _ordinary(owner / (label + "_architectures.stdout"), owner, 1024)
+        retained.append((lipo_output, owner))
+        slices = architectures(lipo_output.data)
+        current_product(image, source_snapshot.root)
+        _current_build_inputs(source_snapshot, deadline, staged_image)
+        if label in {"core", "console"}:
+            plist = product_snapshot(output.parents[1] / "Info.plist", source_snapshot.root)
+            retained.append((plist, source_snapshot.root))
+            validate_plist(
+                plist.data, label, repository=staged_image.projection.repository, deadline=deadline
+            )
+            current_product(plist, source_snapshot.root)
+            current_product(image, source_snapshot.root)
+            _current_build_inputs(source_snapshot, deadline, staged_image)
+        products[label] = {
+            "target": label,
+            "path": image.path,
+            "sha256": BASE.digest(image.data),
+            "bytes": len(image.data),
+            "architectures": list(slices),
+        }
+        current()
+        if shipping_sink is not None:
+            for candidate, _, _ in TARGETS[1:]:
+                if candidate not in products:
+                    break
+                if candidate not in captured:
+                    shipping_sink.capture(candidate, source_snapshot.root, deadline)
+                    captured.add(candidate)
+                    current()
+
+    def complete(entry, *, observations):
+        label, operation, token = entry
+        if token.finished:
+            return
+        try:
+            record = _FINISH_PHASE(operation)
+        except BaseException as error:
+            _finish_dispatch_span(token, error)
+            raise
+        _finish_dispatch_span(token)
+        phases[label]["build"] = record
+        if observations:
+            _, recipe, relative = next(row for row in TARGETS if row[0] == label)
+            current()
+            observe(label, recipe, relative)
+
+    try:
+        label, recipe, relative = TARGETS[0]
+        generate(label, recipe, relative)
+        current()
+        phases[label]["build"] = _observed_run_phase(
+            label + "_build",
+            build_command(tools["xcodebuild"], source_snapshot.root / recipe),
+            source_snapshot.root / recipe,
+            owner,
+            deadline,
+        )
+        current()
+        if shipping_sink is not None:
+            shipping_sink.capture(label, source_snapshot.root, deadline)
+        observe(label, recipe, relative)
+        for label, recipe, relative in TARGETS[1:]:
+            generate(label, recipe, relative)
+        for label, recipe, _ in TARGETS[1:]:
+            current()
+            for entry in tuple(owners):
+                if not entry[2].finished and _PHASE_READY(entry[1]):
+                    complete(entry, observations=True)
+            current()
+            token = _begin_dispatch_span(label + "_build")
+            registered = []
+
+            def register(operation):
+                _REQUIRE(not registered, "phase_failed", "Native phase registered twice")
+                registered.append(operation)
+                owners.append((label, operation, token))
+
+            command = build_command(tools["xcodebuild"], source_snapshot.root / recipe)
+            if label == "core":
+                command += ["ASSETCATALOG_COMPILER_GENERATE_ASSET_SYMBOLS=NO"]
+            try:
+                acquired = _BEGIN_PHASE(
+                    label + "_build",
+                    command,
+                    source_snapshot.root / recipe,
+                    owner,
+                    deadline,
+                    register,
+                )
+                _REQUIRE(
+                    len(registered) == 1 and acquired is registered[0],
+                    "phase_failed",
+                    "Native acquisition lost its retained original owner",
+                )
+            except BaseException as error:
+                if not registered:
+                    _finish_dispatch_span(token, error)
+                raise
+        for entry in owners:
+            complete(entry, observations=True)
+        current()
+    except BaseException as error:
+        primary = error
+    finally:
+        for entry in owners:
+            if not entry[2].finished:
+                try:
+                    complete(entry, observations=False)
+                except BaseException as error:
+                    if primary is None:
+                        primary = error
+                    else:
+                        secondary_failures.append(error)
+        # The retaining list stays live through every attempted drain; no canceled
+        # future or direct-child wait becomes the Guardian's group retirement ACK.
+    if primary is not None:
+        # At most three retained owners can fail while draining. Keep every
+        # secondary object alongside the original exception, without raw output.
+        primary._owned_phase_failures = tuple(secondary_failures)
+        raise primary
+    for previous, root in retained:
+        check_deadline(deadline)
+        current_product(previous, root)
+        check_deadline(deadline)
+    _current_build_inputs(source_snapshot, deadline, staged_image)
+    result = validate_products([products[label] for label, _, _ in TARGETS])
+    ordered = tuple(
+        phases[label][phase]
+        for label, _, _ in TARGETS
+        for phase in ("generate", "build", "architectures")
+    )
+    return result, ordered, tuple(retained)
 
 
 def parse_json(data):

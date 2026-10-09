@@ -10,8 +10,8 @@ from pathlib import Path
 import stat
 import sys
 
-BUILDER_SHA256 = "58eb1a5243b80ec4e64d0d58dece1443079ee4ec40149c30429c0c75cca5e19d"
-BUILDER_SOURCE_BYTES = 134324
+BUILDER_SHA256 = "c62f4184a4876783044a5a047b8d41f6009162a89897bf697714c75cced8fd6c"
+BUILDER_SOURCE_BYTES = 144976
 MAX_RECORD_BYTES = 4096
 MAX_CAPTURE_BYTES = 32 * 1024 * 1024
 MAX_PUBLIC_BYTES = 2048
@@ -97,7 +97,7 @@ def load_builder():
         data = source_image(root / "build/remap_runtime_build.py", BUILDER_SHA256, sources)
         source_image(
             root / "diagnostics/hs274_native_build.py",
-            "6ba213bd8fe086f7b8807974242189917f1cd8ae2b69d30e107ba171ad0d674f",
+            "9695174913fec75b4f0ea1b58b1fed70a06f31fc88dcc7b521ca93eb730d9fe6",
             sources,
         )
         declarations = [

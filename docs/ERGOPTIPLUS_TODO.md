@@ -5112,6 +5112,21 @@ private packet; its controller cause is not yet observed. The diagnostic grants
 no permission, installation, remapping or runtime authority. Item31 and
 transverse16/38 remain open.
 
+Latest manual macOS qualification, run37880447936 at7c88374f12ab6682fd7460cf10b69efcf41e05e6,
+completed all467 Swift cases:442 passed,10 failed and15 skipped. Packaging and
+native verdicts fail; installation and Release are skipped. All37 keyboard
+source cases, eight private configuration variants and the vendor queue-creation
+refusal pass. Six Carbon evidence records close with no omitted events; this
+qualifies actual US/French selection and restoration, not physical keyboards.
+Owned compilation refuses inventory before the build DAG; pkgutil's prerequisite
+refuses a stale reference pin before native marker operations. Permission UI
+reaches stage8.5 but its ten-case acceptance remains incomplete. The protected
+root prerequisite refuses the selected Xcode compiler's observed UID501 under
+its unchanged UID-0 guard. One initializer control refuses after complete
+unittest discovery; its precise case is unknown because captures were outside
+the archived parent. Original assertions, budgets and all native requirements
+remain active. Item31 and transverse16/38 remain incomplete.
+
 - [~] **33.** Config policy for the files other than config.toml (the former
   item 25): Published in the second 2026-09-30 release for the files the review
   listed; see `docs/memory/text-input-and-config.md`. Current source already

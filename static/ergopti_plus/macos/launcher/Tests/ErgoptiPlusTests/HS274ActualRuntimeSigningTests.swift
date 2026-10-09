@@ -426,7 +426,7 @@ extension HS274NativePolicyQualificationTests {
 		try fixture(parent: parent) { root in
 			let diagnostics = source("hs274_native_build.py").deletingLastPathComponent()
 			let repository = diagnostics.deletingLastPathComponent().deletingLastPathComponent()
-			let fixtureScript = diagnostics.appendingPathComponent("hs274_native_signing_fixture.py")
+			let fixtureScript = diagnostics.appendingPathComponent("hs274_native_credential_owner.py")
 			let observerScript = diagnostics.appendingPathComponent("hs274_signed_runtime_observation.py")
 			// Kept outside swift-launcher-evidence, including every refusal path.
 			let privateRoot = try nativeSigningParent(FileManager.default.temporaryDirectory)
@@ -463,7 +463,7 @@ extension HS274NativePolicyQualificationTests {
 				// The credential exists before the ONE live compile/copy/sign handoff.
 				let signed = try runOwnedRuntimeCompilation([repository.path, owner.path, "--sign-owned",
 					"--budget", "300", "--signing-identity", identity, "--signing-keychain",
-					privateRoot.appendingPathComponent("fixture.keychain-db").path, "--signing-public-leaf",
+					privateRoot.appendingPathComponent("native-db/fixture.keychain-db").path, "--signing-public-leaf",
 					privateRoot.appendingPathComponent("public-leaf.der").path], root: root)
 				let expected = "PASS unsigned actual owned four-target compilation; signing and activation unqualified\n"
 					+ "PASS retained unsigned runtime snapshot; native shipping and installation unqualified\n"

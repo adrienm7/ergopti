@@ -18,7 +18,7 @@ import time
 import types
 
 ROOT = Path(__file__).resolve().parent
-REFERENCE_SHA256 = "642baf8c465d5d6e3d87fdc04050060ac393c0b4d4e47e29cbcd0c6d1b9a213d"
+REFERENCE_SHA256 = "5c8e6d89177c23697e6910fa5a2ca7245617cfc066b3b85f04c5b422fe06bc4a"
 TOOLS = {"pkgbuild": Path("/usr/bin/pkgbuild"), "pkgutil": Path("/usr/sbin/pkgutil")}
 MARKER_NAME = "ergopti-capability.txt"
 MARKER = b"Ergopti pkgutil capability fixture\n"

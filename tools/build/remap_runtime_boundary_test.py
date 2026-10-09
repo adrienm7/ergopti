@@ -403,5 +403,73 @@ class SameInodeCloseControl(unittest.TestCase):
                         pass
 
 
+def concurrent_boundary_control_suite():
+    """Independent coordinator tokens; native process endpoints unexecuted."""
+
+    class ConcurrentBoundaryControls(unittest.TestCase):
+        def setUp(self):
+            self.case = IndependentBoundaryControls(methodName="runTest")
+            self.case.setUp()
+            self.addCleanup(self.case.doCleanups)
+
+        def test_overlapping_tokens_are_siblings_not_stack_parents(self):
+            with B._observe_compilation(self.case.owner) as journal:
+                core = B._begin_dispatch_span("core_build")
+                console = B._begin_dispatch_span("console_build")
+                self.assertEqual(journal.stack, [])
+                with B._observe_span("inputs"):
+                    pass
+                B._finish_dispatch_span(console)
+                B._finish_dispatch_span(core)
+            rows = self.case.rows()
+            entered = [r for r in rows if r["event"] == "enter"]
+            self.assertEqual([r["parent"] for r in entered], [0, 0, 0])
+            complete = [r for r in rows if r["event"] == "complete"]
+            self.assertEqual([r["span"] for r in complete], [3, 2, 1])
+
+        def test_duplicate_finish_is_refused_without_second_completion(self):
+            with B._observe_compilation(self.case.owner):
+                token = B._begin_dispatch_span("core_build")
+                B._finish_dispatch_span(token)
+                with self.assertRaises(ValueError):
+                    B._finish_dispatch_span(token)
+            self.assertEqual(sum(r["event"] == "complete" for r in self.case.rows()), 1)
+
+        def test_refusal_closes_only_its_token_without_payload(self):
+            with B._observe_compilation(self.case.owner):
+                token = B._begin_dispatch_span("core_build")
+                error = B.BASE.NativeBuildError("phase_failed", "SECRET foreign native details")
+                B._finish_dispatch_span(token, error)
+            refused = [r for r in self.case.rows() if r["event"] == "refused"]
+            self.assertEqual(
+                [(r["phase"], r["code"]) for r in refused], [("core_build", "phase_failed")]
+            )
+
+    return unittest.defaultTestLoader.loadTestsFromTestCase(ConcurrentBoundaryControls)
+
+
+if __name__ == "__main__":
+    concurrent_result = unittest.TextTestRunner(verbosity=2).run(
+        concurrent_boundary_control_suite()
+    )
+    print(
+        "PARALLEL CONTROLS tests="
+        + str(concurrent_result.testsRun)
+        + " failures="
+        + str(len(concurrent_result.failures))
+        + " errors="
+        + str(len(concurrent_result.errors))
+        + " skipped="
+        + str(len(concurrent_result.skipped))
+        + " native=unexecuted",
+        file=sys.stderr,
+    )
+    if not (
+        concurrent_result.wasSuccessful()
+        and concurrent_result.testsRun == 3
+        and not concurrent_result.skipped
+    ):
+        raise SystemExit(1)
+
 if __name__ == "__main__":
     unittest.main()

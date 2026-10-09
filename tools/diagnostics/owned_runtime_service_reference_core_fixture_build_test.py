@@ -392,10 +392,10 @@ class CoreFixtureContracts(unittest.TestCase):
             self.assertEqual(
                 [__import__("hashlib").sha256(h.data).hexdigest() for h in held.holds],
                 [
-                    "58eb1a5243b80ec4e64d0d58dece1443079ee4ec40149c30429c0c75cca5e19d",
+                    "c62f4184a4876783044a5a047b8d41f6009162a89897bf697714c75cced8fd6c",
                     "50fb679becd85980354858e38a4231488839bedfbf013b203505b7a5912c66bc",
                     "c29ceb96e73655cadea7763805b9468c32744033c2f177bae492e4ce9fe4100a",
-                    "6ba213bd8fe086f7b8807974242189917f1cd8ae2b69d30e107ba171ad0d674f",
+                    "9695174913fec75b4f0ea1b58b1fed70a06f31fc88dcc7b521ca93eb730d9fe6",
                 ],
             )
             self.assertEqual(

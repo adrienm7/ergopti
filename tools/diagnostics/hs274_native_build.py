@@ -922,6 +922,268 @@ def run_phase(name, args, cwd, owner, deadline):
     return record
 
 
+class _ConcurrentPhase:
+    """One preallocated native child/stream debt retained by the coordinator."""
+
+    def __init__(self, name, args, cwd, owner, deadline):
+        self.name, self.args, self.cwd, self.owner = name, args, cwd, owner
+        self.deadline = deadline
+        self.started = time.monotonic()
+        self.process = None
+        self.streams = []
+        self.descriptors = []
+        self.stamps = []
+        self.close_attempts = set()
+        self.stream_transfer_started = set()
+        self.launch_debt = False
+        self.waited = False
+        self.finish_started = False
+        self.finished = False
+        self.debt = False
+        self.failure = None
+        self.secondary_failures = ()
+        self.record = None
+
+
+def _phase_descriptor_identity(info):
+    return (info.st_dev, info.st_ino, info.st_uid, info.st_mode, info.st_nlink)
+
+
+def begin_phase(name, args, cwd, owner, deadline, register):
+    """Acquire an inherited-group child after registering its original debt owner."""
+    owner, cwd = validate_owner_root(owner), Path(cwd)
+    require(
+        isinstance(name, str) and re.fullmatch(r"[a-z][a-z0-9_]{0,63}", name) is not None,
+        "unsafe_path",
+        "Phase name is not an ordinary evidence basename",
+    )
+    require(
+        cwd.is_absolute()
+        and cwd.resolve(strict=True) == cwd
+        and cwd.is_dir()
+        and (cwd == owner or owner in cwd.parents),
+        "unsafe_path",
+        "Phase working directory escapes ownership",
+    )
+    require(
+        isinstance(args, list)
+        and args
+        and all(isinstance(item, str) and "\0" not in item for item in args),
+        "unsafe_path",
+        "Phase child arguments are not exact ordinary strings",
+    )
+    require(
+        type(deadline) in (int, float) and math.isfinite(deadline) and time.monotonic() < deadline,
+        "phase_deadline",
+        "Calibration deadline elapsed before child acquisition",
+    )
+    require(callable(register), "unsafe_path", "Native phase needs its retaining coordinator")
+    operation = _ConcurrentPhase(name, tuple(args), cwd, owner, deadline)
+    register(operation)  # No evidence FD or process exists before retention.
+    try:
+        write_json(
+            owner / (name + ".begin.json"), {"schema": 1, "phase": name, "status": "pending"}
+        )
+        for suffix in ("stdout", "stderr"):
+            path = owner / (name + "." + suffix)
+            descriptor = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600)
+            operation.descriptors.append(descriptor)
+            operation.stamps.append(None)
+            info = os.fstat(descriptor)
+            operation.stamps[-1] = _phase_descriptor_identity(info)
+            require(
+                stat.S_ISREG(info.st_mode)
+                and info.st_uid == os.getuid()
+                and stat.S_IMODE(info.st_mode) == 0o600
+                and info.st_nlink == 1
+                and _phase_descriptor_identity(path.lstat()) == operation.stamps[-1],
+                "phase_failed",
+                "Native phase stream incarnation differs",
+            )
+            operation.stream_transfer_started.add(len(operation.descriptors) - 1)
+            stream = os.fdopen(descriptor, "wb")
+            operation.streams.append(stream)
+        require(
+            time.monotonic() < deadline,
+            "phase_deadline",
+            "Calibration deadline elapsed before native process acquisition",
+        )
+        operation.launch_debt = True
+        operation.process = subprocess.Popen(
+            list(operation.args),
+            cwd=cwd,
+            stdin=subprocess.DEVNULL,
+            stdout=operation.streams[0],
+            stderr=operation.streams[1],
+        )
+        operation.launch_debt = False
+        return operation
+    except BaseException as error:
+        operation.failure = (
+            NativeBuildError("phase_failed", "Native phase child acquisition failed: " + name)
+            if isinstance(error, OSError)
+            else error
+        )
+        if operation.failure is error:
+            raise
+        raise operation.failure from error
+
+
+def phase_ready(operation):
+    """Readiness alone never grants phase completion or inherited-group retirement."""
+    require(type(operation) is _ConcurrentPhase, "phase_failed", "Native phase owner differs")
+    return operation.process is None or operation.process.poll() is not None
+
+
+def _close_phase_streams(operation):
+    failures = []
+    for index, descriptor in enumerate(operation.descriptors):
+        if index in operation.close_attempts:
+            continue
+        operation.close_attempts.add(index)
+        try:
+            stamp = operation.stamps[index]
+            require(
+                stamp is not None and _phase_descriptor_identity(os.fstat(descriptor)) == stamp,
+                "phase_failed",
+                "Native stream FD no longer has its original incarnation",
+            )
+            if index < len(operation.streams):
+                operation.streams[index].close()
+            else:
+                require(
+                    index not in operation.stream_transfer_started,
+                    "phase_failed",
+                    "Native stream transfer retains unknown close debt",
+                )
+                os.close(descriptor)
+        except BaseException as error:
+            operation.debt = True
+            failures.append(error)
+    return failures
+
+
+def finish_phase(operation):
+    """Close streams before the completion clock; the Guardian still owns the group."""
+    require(type(operation) is _ConcurrentPhase, "phase_failed", "Native phase owner differs")
+    if operation.finished:
+        if operation.failure is not None:
+            raise operation.failure
+        return operation.record
+    require(
+        not operation.finish_started, "phase_failed", "Native phase wait retains unresolved debt"
+    )
+    operation.finish_started = True
+    failure = operation.failure
+    secondary = []
+    status = None
+
+    def refuse(error):
+        nonlocal failure
+        if failure is None:
+            failure = (
+                NativeBuildError(
+                    "phase_failed", "Native phase evidence or wait failed: " + operation.name
+                )
+                if isinstance(error, OSError)
+                else error
+            )
+        elif error is not failure:
+            secondary.append(error)
+
+    try:
+        if operation.process is not None:
+            status = operation.process.wait()
+            operation.waited = True
+        for index, stream in enumerate(operation.streams):
+            stream.flush()
+            os.fsync(stream.fileno())
+            named = operation.owner / (
+                operation.name + "." + ("stdout" if index == 0 else "stderr")
+            )
+            require(
+                _phase_descriptor_identity(named.lstat()) == operation.stamps[index]
+                and _phase_descriptor_identity(os.fstat(stream.fileno()))
+                == operation.stamps[index],
+                "phase_failed",
+                "Native phase output was replaced",
+            )
+    except BaseException as error:
+        refuse(error)
+    finally:
+        operation.debt = operation.debt or operation.launch_debt
+        if operation.process is not None and not operation.waited:
+            operation.debt = True
+        else:
+            closing = _close_phase_streams(operation)
+            if closing:
+                operation.debt = True
+                secondary.extend(closing)
+                if failure is None:
+                    failure = NativeBuildError(
+                        "phase_failed", "Native phase stream retirement failed"
+                    )
+    # Original run_phase samples completion after both with-block closes. A
+    # canceled future, a direct-child exit, or an earlier clock cannot replace it.
+    ended = time.monotonic()
+    if operation.debt and failure is None:
+        failure = NativeBuildError(
+            "phase_failed", "Native phase retains unresolved acquisition debt"
+        )
+    if status is None:
+        record = {
+            "schema": 1,
+            "phase": operation.name,
+            "status": "launch_refused",
+            "elapsed_seconds": ended - operation.started,
+        }
+    else:
+        record = {
+            "schema": 1,
+            "phase": operation.name,
+            "status": "refused"
+            if failure is not None or ended > operation.deadline
+            else ("passed" if status == 0 else "failed"),
+            "exit_status": status,
+            "elapsed_seconds": ended - operation.started,
+        }
+    try:
+        write_json(operation.owner / (operation.name + ".receipt.json"), record)
+        operation.record = record
+        if failure is None:
+            require(
+                status is not None, "phase_failed", "Native phase did not acquire its exact child"
+            )
+            require(
+                all(
+                    (operation.owner / (operation.name + "." + suffix)).stat().st_size
+                    <= MAX_LOG_BYTES
+                    for suffix in ("stdout", "stderr")
+                ),
+                "phase_log_limit",
+                "Native phase output exceeded its retained evidence bound",
+            )
+            require(
+                status == 0, "phase_failed", "Native phase exited unsuccessfully: " + operation.name
+            )
+            require(
+                ended <= operation.deadline,
+                "phase_deadline",
+                "Native phase completed after calibration deadline: " + operation.name,
+            )
+    except BaseException as error:
+        refuse(error)
+    finally:
+        # Two stream closes plus the finite wait/evidence/publication cuts bound
+        # actual secondary errors. Objects remain private; no payload is exported.
+        operation.secondary_failures = tuple(secondary)
+        operation.finished = operation.process is None or operation.waited
+        operation.failure = failure
+    if failure is not None:
+        raise failure
+    return operation.record
+
+
 def compile_native(source, owner, seconds, seal_path=None, *, metadata_token=None):
     """Calibrate actual unsigned pinned Core-Service/CLI compilation without activation."""
     metadata_token = _validated_tool_metadata_token(metadata_token)

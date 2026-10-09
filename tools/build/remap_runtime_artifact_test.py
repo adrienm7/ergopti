@@ -540,6 +540,10 @@ class ActualBuilderCustodyControls(unittest.TestCase):
             patch.object(self.builder, "_source_factory", return_value=self.factory),
             patch.object(self.builder.shutil, "which", return_value="/usr/bin/true"),
             patch.object(self.builder, "_RUN_PHASE", side_effect=self.phase),
+            # These owner ports model Apple native dispatch only.
+            patch.object(self.builder, "_BEGIN_PHASE", side_effect=self.begin_phase),
+            patch.object(self.builder, "_FINISH_PHASE", side_effect=self.finish_phase),
+            patch.object(self.builder, "_PHASE_READY", return_value=False),
             patch.object(self.builder.BASE, "acquire_xcodegen", side_effect=self.acquire),
             patch.object(self.builder, "materialize_owned_source", side_effect=self.materialize),
             patch.object(self.builder, "capture_generated_inputs", side_effect=self.generated),
@@ -636,6 +640,23 @@ class ActualBuilderCustodyControls(unittest.TestCase):
             "elapsed_seconds": 0,
             "exit_status": 0,
         }
+
+    def begin_phase(self, name, command, cwd, owner, deadline, register):
+        """Retain a modeled native phase; its original output body runs on finish."""
+        operation = self.namespace(
+            name=name, command=command, cwd=cwd, owner=owner, deadline=deadline, finished=False
+        )
+        register(operation)
+        return operation
+
+    def finish_phase(self, operation):
+        """Modeled child wait, never native process-group retirement authority."""
+        if operation.finished:
+            raise RuntimeError("Modeled native owner finished twice")
+        operation.finished = True
+        return self.phase(
+            operation.name, operation.command, operation.cwd, operation.owner, operation.deadline
+        )
 
     def invoke(self, preparation=False):
         method = (
