@@ -683,6 +683,7 @@ global _LLM_Menu_Loaded := false
 ; Definitions-only chord translation and hotkey identities; registers no hotkey.
 #Include ../ui/menu/menu_llm/hotkey_identity.ahk
 #Include ../adapters/llm_nav_event_owner.ahk
+#Include ../adapters/llm_automation.ahk
 #Include ../ui/menu/menu_llm/tab_accept.ahk
 ; Definitions-only boot restore helper. LLM_Menu_Init is never invoked by the
 ; harness; the regression suite calls only its one-shot saved-options seam.

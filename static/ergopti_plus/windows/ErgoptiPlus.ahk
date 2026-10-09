@@ -385,6 +385,7 @@ BootProfile_Stamp("Diagnostics and core state initialised")
 #Include adapters/network_info.ahk
 #Include adapters/keyboard_hook.ahk
 #Include adapters/llm_nav_event_owner.ahk
+#Include adapters/llm_automation.ahk
 #Include adapters/mouse_control.ahk
 #Include adapters/window_manager.ahk
 #Include adapters/system_control.ahk
