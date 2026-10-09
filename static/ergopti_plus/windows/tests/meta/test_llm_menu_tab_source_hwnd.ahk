@@ -282,8 +282,22 @@ _TLTSH_EveryDirectAcceptCallIsCanonical() {
 	OnAcceptRefs := _TLTSH_Count(DriverSrc, "LLM_Bridge_OnAccept(")
 	AssertEqual(2, OnAcceptRefs,
 		"LLM_Bridge_OnAccept must have exactly one definition and one call from the shared claim helper; any extra call bypasses policy")
-	AssertEqual(3, _TLTSH_Count(DriverSrc, "_LLM_Accept_ClaimAndDispatch("),
-		"the shared claim helper must have one definition plus exactly the Tab and validation-chord primitives as callers")
+	AssertEqual(4, _TLTSH_Count(DriverSrc, "_LLM_Accept_ClaimAndDispatch("),
+		"the shared claim helper must have one definition plus exactly the Tab, validation-chord and automation primitives as callers")
+	; Third canonical primitive (llm-automation-accepts): defined once and driven
+	; only by the registered message an external program posts, never by a key,
+	; gesture, macro or text send of the driver.
+	AssertEqual(2, _TLTSH_Count(DriverSrc, "LLM_Tooltip_TryAcceptAutomation("),
+		"LLM_Tooltip_TryAcceptAutomation must have one definition plus the single message-driven caller")
+	Assert(InStr(_DriverFuncBody("_LLM_Automation_Accept"),
+		"LLM_Tooltip_TryAcceptAutomation()") > 0,
+		"the automation request must insert through the canonical automation primitive")
+	for HandlerName in ["_LLM_Automation_OnAcceptMessage", "_LLM_Automation_Accept"] {
+		Assert(InStr(_DriverFuncBody(HandlerName), "A_IsSuspended || !_LLM_Bridge_Active") > 0,
+			HandlerName . " must ignore requests while suspended or while the bridge is inactive")
+	}
+	AssertEqual(4, _TLTSH_Count(DriverSrc, "_LLM_Automation_Listen("),
+		"the automation listener must have one definition plus the two bridge activations and the stop")
 	; Second canonical primitive (llm-val-chord-inserts): defined once and driven
 	; only by the release wait armed from the native jump-receipt drain.
 	AssertEqual(2, _TLTSH_Count(DriverSrc, "LLM_Tooltip_TryAcceptSlot("),
