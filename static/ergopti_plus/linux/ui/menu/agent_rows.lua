@@ -242,6 +242,9 @@ end
 --- @return table Row data { label, submenu }.
 function M.build(ctx, dialogs)
 	local ManifestMenu = require("infra.manifest_menu")
+	local NativeParent = require("ui.menu.ai_parent")
+	local parent = NativeParent.begin(ManifestMenu, "agent", ctx, AgentSettings)
+	if not parent then return nil end
 	local llm = ctx.llm
 	local function changed()
 		if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
@@ -294,7 +297,8 @@ function M.build(ctx, dialogs)
 			agent_mode_ready = function() return llm ~= nil and type(llm.set_agent_mode) == "function" end,
 		},
 	}
-	return { label = tr("menu.agent.title"), submenu = ManifestMenu.build("agent_menu", "Agent", handlers, nil, menu_ctx, {}) }
+	local children = ManifestMenu.build("agent_menu", "Agent", handlers, nil, menu_ctx, {})
+	return NativeParent.finish(parent, children)
 end
 
 return M

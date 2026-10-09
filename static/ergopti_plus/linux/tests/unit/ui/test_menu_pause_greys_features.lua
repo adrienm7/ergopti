@@ -51,6 +51,9 @@ end
 local function build(paused, resumed)
 	local mb = helpers.load_module("ui.menu.menu_builder")
 	return mb.build({
+		-- This fixture tests pause policy with the genuine present native owner.
+		-- No engine initialization, bootstrap or network action runs here.
+		llm = require("modules.llm.prediction_engine"),
 		config = fake_config(),
 		_version = "0.0.0-dev.12",
 		paused = paused,

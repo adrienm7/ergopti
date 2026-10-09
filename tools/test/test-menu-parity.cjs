@@ -555,7 +555,10 @@ const OPENS_SUBMENU = {
 		{ menu: 'programmable_hotstring_entry', platforms: ['hs', 'linux'] },
 		{ menu: 'programmable_hotstrings', platforms: ['ahk'] }
 	],
-	programmable_hotstrings: { menu: 'programmable_hotstrings', platforms: ['hs', 'linux'] },
+	programmable_hotstrings: {
+		menu: 'programmable_hotstrings',
+		platforms: ['hs', 'linux']
+	},
 	// Each standard category provider opens the shared explicit command head.
 	hotstring_categories_standard: 'hotstring_category_menu',
 	gestures: [
@@ -651,7 +654,10 @@ const OPENS_SUBMENU = {
 			native_sources: { hs: 'macos/ui/menu/menu_gestures.lua' }
 		}
 	],
-	gesture_mode_options: { menu: 'gesture_slot_mode_commands', platforms: ['hs'] },
+	gesture_mode_options: {
+		menu: 'gesture_slot_mode_commands',
+		platforms: ['hs']
+	},
 	gesture_sensitivity_options: {
 		menu: 'gesture_sensitivity_head',
 		platforms: ['hs'],
@@ -712,8 +718,14 @@ const OPENS_SUBMENU = {
 	],
 	// Both drivers render each pair's declaration: Windows opens it at the
 	// pointer, while macOS hangs it under the cached pair row.
-	key_combination_rows_left: { menu: 'key_combination_pair_menu', platforms: ['ahk', 'hs'] },
-	key_combination_rows_right: { menu: 'key_combination_pair_menu', platforms: ['ahk', 'hs'] },
+	key_combination_rows_left: {
+		menu: 'key_combination_pair_menu',
+		platforms: ['ahk', 'hs']
+	},
+	key_combination_rows_right: {
+		menu: 'key_combination_pair_menu',
+		platforms: ['ahk', 'hs']
+	},
 	// « Raccourcis de gestion du script », the script chords of the three drivers.
 	script_control: 'script_control_group',
 	accented_letters: 'accented_letters_group',
@@ -1253,6 +1265,18 @@ OPENS_SUBMENU.llm.push({
 	completed_parent: { hs: 'llm' }
 });
 OPENS_SUBMENU.llm_parent_content = 'llm_menu';
+for (const kind of ['llm', 'agent']) {
+	OPENS_SUBMENU[kind].push({
+		menu: kind === 'llm' ? 'llm_native_parent_linux' : 'agent_native_parent',
+		platforms: ['linux'],
+		kind: 'compose',
+		native_sources: { linux: 'linux/ui/menu/ai_parent.lua' },
+		completed_linux_ai_parent: kind
+	});
+}
+OPENS_SUBMENU.llm_parent_linux = 'llm_menu';
+OPENS_SUBMENU.agent_parent_linux = 'agent_menu';
+
 OPENS_SUBMENU.llm.push({
 	menu: 'llm_download_shortcut_frame',
 	platforms: ['hs'],
@@ -1584,6 +1608,25 @@ const PERSONAL_DEFAULT_GROUP_PROOF = OPENS_SUBMENU.hotstring_personal[0].selecte
  * @param {string} driver Host source syntax.
  * @returns {boolean}
  */
+// The actual language provider composes the checkbox, completed frame and native parent.
+const {
+	hotstringLanguagePublication,
+	files: languageOwnerFiles
+} = require('../lib/menu-hotstring-language-binding.cjs');
+OPENS_SUBMENU.hotstring_languages = [
+	{ menu: 'hotstring_scope_checkbox', platforms: ['ahk', 'hs', 'linux'] },
+	{ menu: 'hotstring_language_frame', platforms: ['ahk', 'hs', 'linux'] },
+	{ menu: 'hotstring_language_parent_windows', platforms: ['ahk'] },
+	{ menu: 'hotstring_language_parent_lua', platforms: ['hs', 'linux'] }
+].map((edge) => ({
+	...edge,
+	kind: 'compose',
+	hotstring_language_owner: true,
+	native_sources: Object.fromEntries(
+		edge.platforms.map((platform) => [platform, languageOwnerFiles[platform][0]])
+	)
+}));
+
 function personalCommandReference(text, driver) {
 	const method = driver === 'windows' ? 'MenuRenderer_CommandRow' : 'ManifestMenu\\.command_row';
 	return new RegExp(
@@ -1735,9 +1778,15 @@ function project(menuKey, platform, visiting = new Set(), rowId) {
 			identities.length > new Set(identities).size,
 			'nested duplicate commands remain detectable'
 		);
-		root.splice(0, root.length, { type: 'include', section: 'tap_hold_key_rows' });
+		root.splice(0, root.length, {
+			type: 'include',
+			section: 'tap_hold_key_rows'
+		});
 		assert.throws(() => project('tap_hold_key_rows', 'ahk'), /cyclic menu include/);
-		root.splice(0, root.length, { type: 'include', section: 'absent_child_template' });
+		root.splice(0, root.length, {
+			type: 'include',
+			section: 'absent_child_template'
+		});
 		assert.throws(() => project('tap_hold_key_rows', 'ahk'), /missing menu include/);
 	} finally {
 		root.splice(0, root.length, ...original);
@@ -1904,6 +1953,28 @@ const {
 		true,
 		'actual imported parent binds its completed child to the real top-level caller'
 	);
+	// Admission preserves the complete untrusted definition: only the exact
+	// reviewed Linux counterpart may accompany the unchanged HS declaration.
+	assert.equal(credits(source, builder, [rows[0]]), true);
+	assert.equal(
+		credits(source, builder, [...rows, { type: 'group', id: 'foreign', platforms: ['linux'] }]),
+		false
+	);
+	assert.equal(credits(source, builder, [...rows, rows[0]]), false);
+	if (rows.length === 2) {
+		for (const mutation of [
+			{ id: 'foreign' },
+			{ i18n: 'common.error_title' },
+			{ disabled_when: [] },
+			{ disabled_reason_key: undefined },
+			{ checked_when: ['foreign'] },
+			{ platforms: ['hs'] },
+			{ unavailable: 'disable' },
+			{ action: 'foreign' }
+		])
+			assert.equal(credits(source, builder, [rows[0], { ...rows[1], ...mutation }]), false);
+		assert.equal(credits(source, builder, [rows[1], rows[0]]), false);
+	}
 	const controls = [
 		[
 			'local ManifestMenu     = require("infra.manifest_menu")',
@@ -2114,7 +2185,11 @@ const {
 // including one sharing the same target, still owes a usable child on that OS.
 const readout = { type: 'label', id: 'readout', i18n: 'menu.metrics.status' };
 const separator = { type: SEPARATOR };
-const header = { type: 'section_header', id: 'readout_header', i18n: 'menu.metrics.status' };
+const header = {
+	type: 'section_header',
+	id: 'readout_header',
+	i18n: 'menu.metrics.status'
+};
 for (const rows of [
 	[readout],
 	[separator],
@@ -2144,7 +2219,10 @@ for (const rows of [
 	if (isComposedFragment(rows, new Set(['compose'])))
 		throw new Error('Accepted an undeclared composed readout shape.');
 }
-const platformKinds = { linux: new Set(['compose']), ahk: new Set(['submenu']) };
+const platformKinds = {
+	linux: new Set(['compose']),
+	ahk: new Set(['submenu'])
+};
 if (
 	!isComposedFragment([readout], platformKinds.linux) ||
 	isComposedFragment([readout], platformKinds.ahk)
@@ -2262,7 +2340,10 @@ function publishesIncludedCommands(source, extension, section, declarations, pla
 					(row) => (row.section === section ? { ...row, section: 'unowned_app_frame' } : row)
 				);
 			if (mutation === 'cycle')
-				changed[section].push({ type: 'include', section: 'agent_linux_disabled_apps_children' });
+				changed[section].push({
+					type: 'include',
+					section: 'agent_linux_disabled_apps_children'
+				});
 			if (mutation === 'wrong_type') changed[section][0].type = 'list';
 			assert.equal(
 				publishesIncludedCommands(native, '.lua', section, changed, 'linux'),
@@ -2784,6 +2865,440 @@ function publishesIncludedCommands(source, extension, section, declarations, pla
 	}
 }
 
+// Actual Linux parents require their reviewed algorithm AND native producer/caller.
+const linuxAiSources = Object.fromEntries(
+	[
+		'linux/ui/menu/ai_parent.lua',
+		'linux/ui/menu/agent_rows.lua',
+		'linux/ui/menu/menu_builder.lua'
+	].map((file) => [file, fs.readFileSync(path.join(SP, file), 'utf8')])
+);
+const { nativeLinuxAiParentPublication } = require('../lib/menu-native-llm-parent-binding.cjs');
+{
+	const assert = require('node:assert/strict');
+	for (const kind of ['llm', 'agent']) {
+		const parentFrame = kind === 'llm' ? 'llm_native_parent_linux' : 'agent_native_parent';
+		const admits = (sources = linuxAiSources, root = manifest, platform = 'linux') =>
+			nativeLinuxAiParentPublication(sources, root, kind, platform);
+		assert.equal(
+			admits(),
+			true,
+			'actual Linux completed ' + kind + ' producer reaches the genuine tray'
+		);
+		assert.equal(admits(linuxAiSources, manifest, 'hs'), false);
+		for (const file of Object.keys(linuxAiSources)) {
+			assert.equal(
+				admits({ ...linuxAiSources, [file]: '' }),
+				false,
+				'withdrawn whole executable body'
+			);
+		}
+		for (const section of [parentFrame, kind + '_menu', 'top_level']) {
+			const missing = { ...manifest };
+			delete missing[section];
+			assert.equal(admits(linuxAiSources, missing), false, 'withdrawn actual shared source');
+		}
+		const duplicate = {
+			...manifest,
+			[parentFrame]: [...manifest[parentFrame], manifest[parentFrame].at(-1)]
+		};
+		assert.equal(
+			admits(linuxAiSources, duplicate),
+			false,
+			'duplicate native group cannot own the parent'
+		);
+		const topDuplicate = {
+			...manifest,
+			top_level: [...manifest.top_level, manifest.top_level.find((row) => row.id === kind)]
+		};
+		assert.equal(admits(linuxAiSources, topDuplicate), false, 'duplicate genuine tray declaration');
+		const producerFile =
+			kind === 'agent' ? 'linux/ui/menu/agent_rows.lua' : 'linux/ui/menu/menu_builder.lua';
+		const replacements = [
+			[
+				producerFile,
+				'local NativeParent = require("ui.menu.ai_parent")',
+				'local NativeParent = require("foreign.owner")'
+			],
+			[
+				producerFile,
+				'local parent = NativeParent.begin(ManifestMenu, "' +
+					kind +
+					'", ctx' +
+					(kind === 'agent' ? ', AgentSettings)' : ')'),
+				'local parent = nil'
+			],
+			[
+				producerFile,
+				'return NativeParent.finish(parent, ' + (kind === 'agent' ? 'children' : 'items') + ')',
+				'return NativeParent.finish(parent, {})'
+			],
+			[
+				producerFile,
+				'return NativeParent.finish(parent, ' + (kind === 'agent' ? 'children' : 'items') + ')',
+				'if false then return NativeParent.finish(parent, ' +
+					(kind === 'agent' ? 'children' : 'items') +
+					') end return nil'
+			],
+			['linux/ui/menu/menu_builder.lua', '["' + kind + '"]', '["withdrawn_' + kind + '"]'],
+			['linux/ui/menu/menu_builder.lua', 'rows[#rows + 1] = build(ctx)', 'build(ctx)'],
+			[
+				'linux/ui/menu/menu_builder.lua',
+				'return ManifestMenu.render_rows(rows, "top_level")',
+				'return {}'
+			],
+			[
+				'linux/ui/menu/ai_parent.lua',
+				'local current_enabled = enabled(ticket)',
+				'local current_enabled = ticket.enabled'
+			],
+			[
+				'linux/ui/menu/ai_parent.lua',
+				'if not current(ticket) or not unchanged(native_children)',
+				'if not unchanged(native_children)'
+			],
+			['linux/ui/menu/ai_parent.lua', 'not unchanged(getter_snapshot)', 'false'],
+			['linux/ui/menu/ai_parent.lua', 'not rawequal(rawget(row, "submenu"), children)', 'false'],
+			['linux/ui/menu/ai_parent.lua', 'api_method(renderer, method)', 'renderer[method]'],
+			['linux/ui/menu/ai_parent.lua', 'return row\nend', 'return { label = "synthetic" }\nend']
+		];
+		if (kind === 'agent')
+			replacements.push(
+				[producerFile, 'llm.set_agent_mode(id)', 'true'],
+				[
+					producerFile,
+					'local children = ManifestMenu.build("agent_menu", "Agent", handlers, nil, menu_ctx, {})',
+					'local children = {}'
+				],
+				[
+					producerFile,
+					'local NativeParent = require("ui.menu.ai_parent")',
+					'local NativeParent = require("ui.menu.ai_parent")\nlocal NativeParent = {}'
+				]
+			);
+
+		replacements.push(
+			[
+				'linux/ui/menu/menu_builder.lua',
+				'function M.build(ctx)\n',
+				'function M.build(ctx)\ndo return {} end\n'
+			],
+			[
+				'linux/ui/menu/menu_builder.lua',
+				'local build = builders[id]',
+				'local build = builders[id]\nlocal build = function() return nil end'
+			]
+		);
+		if (kind === 'agent')
+			replacements.push(
+				[
+					producerFile,
+					'function M.build(ctx, dialogs)\n',
+					'function M.build(ctx, dialogs)\ndo return nil end\n'
+				],
+				[
+					producerFile,
+					'local NativeParent = require("ui.menu.ai_parent")',
+					'local NativeParent = require("ui.menu.ai_parent")\nNativeParent.finish = function() return nil end'
+				],
+				[
+					producerFile,
+					'local NativeParent = require("ui.menu.ai_parent")',
+					'local NativeParent = require("ui.menu.ai_parent")\nNativeParent["finish"] = function() return { label = "synthetic" } end'
+				],
+				[
+					producerFile,
+					'local committed = llm.set_agent_mode(id) == true',
+					'do return false end\nlocal committed = llm.set_agent_mode(id) == true'
+				]
+			);
+		else
+			replacements.push(
+				[
+					producerFile,
+					'local function _build_llm(ctx)\n',
+					'local function _build_llm(ctx)\ndo return nil end\n'
+				],
+				[
+					producerFile,
+					'local NativeParent = require("ui.menu.ai_parent")',
+					'local NativeParent = require("ui.menu.ai_parent")\nNativeParent.finish = function() return nil end'
+				],
+				[
+					producerFile,
+					'if llm.toggle then llm.toggle(ctx.on_menu_changed) end',
+					'do return end\nif llm.toggle then llm.toggle(ctx.on_menu_changed) end'
+				]
+			);
+
+		replacements.push(
+			[
+				'linux/ui/menu/menu_builder.lua',
+				'local function _build_agent(ctx)\n',
+				'local function _build_agent(ctx)\ndo return nil end\n'
+			],
+			[
+				'linux/ui/menu/menu_builder.lua',
+				'\nreturn M\n',
+				'\nM.build = function() return {} end\nreturn M\n'
+			],
+			[
+				'linux/ui/menu/agent_rows.lua',
+				'\nreturn M\n',
+				'\nM.build = function() return nil end\nreturn M\n'
+			],
+			[
+				'linux/ui/menu/menu_builder.lua',
+				'\nreturn M\n',
+				'\nM["build"] = function() return {} end\nreturn M\n'
+			],
+			[
+				'linux/ui/menu/agent_rows.lua',
+				'\nreturn M\n',
+				'\nrawset(M, "build", function() return nil end)\nreturn M\n'
+			]
+		);
+		if (kind === 'agent')
+			replacements.push([
+				producerFile,
+				'local function changed()\n',
+				'local function changed()\ndo return nil end\n'
+			]);
+		replacements.push(
+			[
+				'linux/ui/menu/menu_builder.lua',
+				'local NumberRowPolicy = require("layout.number_row_policy")',
+				'local NumberRowPolicy = require("foreign.owner")'
+			],
+			[
+				'linux/ui/menu/menu_builder.lua',
+				'NumberRowPolicy.native_rows(ManifestMenu',
+				'foreign_native_rows(ManifestMenu'
+			],
+			[
+				'linux/ui/menu/menu_builder.lua',
+				'local function _grey_for_pause(row)\n',
+				'local function _grey_for_pause(row)\ndo return nil end\n'
+			],
+			[
+				'linux/ui/menu/menu_builder.lua',
+				'local function _row_is_for_linux(row)\n',
+				'local function _row_is_for_linux(row)\ndo return false end\n'
+			],
+			[
+				'linux/ui/menu/menu_builder.lua',
+				'\nreturn M\n',
+				'\nlocal unrelated = error("withdrawing real module")\nreturn M\n'
+			],
+			[producerFile, 'local llm = ctx.llm', 'local llm = ctx.llm\nctx.llm = nil']
+		);
+		replacements.push(
+			[
+				'linux/ui/menu/menu_builder.lua',
+				'["agent"]           = _build_agent,',
+				'["agent"]           = _build_agent,\n["agent"] = function() return nil end,'
+			],
+			[
+				'linux/ui/menu/menu_builder.lua',
+				'rows[#rows + 1] = build(ctx)',
+				'rows[#rows + 1] = build(ctx) and {}'
+			],
+			[
+				'linux/ui/menu/agent_rows.lua',
+				'local children = ManifestMenu.build("agent_menu", "Agent", handlers, nil, menu_ctx, {})',
+				'local children = ManifestMenu.build("agent_menu", "Agent", handlers, nil, menu_ctx, {}) and { { title = "synthetic" } }'
+			],
+			[
+				'linux/ui/menu/agent_rows.lua',
+				'\tend\n\tlocal handlers = {}',
+				'\tend\n\tlocal changed = function() return nil end\n\tlocal handlers = {}'
+			],
+			[
+				'linux/ui/menu/agent_rows.lua',
+				'local children = ManifestMenu.build(',
+				'menu_ctx.commands.agent_mode = function() return false end\nlocal children = ManifestMenu.build('
+			],
+			[
+				'linux/ui/menu/menu_builder.lua',
+				'local rendered = ManifestMenu\n\t\tand ManifestMenu.build("llm_menu"',
+				'llm_ctx.commands["llm_toggle"] = function() return false end\nlocal rendered = ManifestMenu\n\t\tand ManifestMenu.build("llm_menu"'
+			]
+		);
+		replacements.push([
+			'linux/ui/menu/menu_builder.lua',
+			'\nreturn M\n',
+			'\nlocal foreign = require("foreign.native_owner")\nreturn M\n'
+		]);
+		const nativeBeginRefusal =
+			'local parent = NativeParent.begin(ManifestMenu, "' +
+			kind +
+			'", ctx' +
+			(kind === 'agent' ? ', AgentSettings)' : ')') +
+			'\n\tif not parent then return nil end';
+		for (const statement of [
+			'error("owned native publication refused")',
+			'rawset(ctx, "llm", nil)',
+			'pcall(rawset, ctx, "llm", nil)',
+			'local mutate = rawset; mutate(ctx, "llm", nil)'
+		])
+			replacements.push([producerFile, nativeBeginRefusal, nativeBeginRefusal + '\n' + statement]);
+		for (const expression of [
+			'; (function() error("owned immediate producer refused") end)()',
+			'; (_G.error)("owned indirect producer refused")',
+			'; _G["error"]("owned computed producer refused")',
+			'; (_G.error) "owned literal-argument producer refused"'
+		])
+			replacements.push([producerFile, nativeBeginRefusal, nativeBeginRefusal + '\n' + expression]);
+
+		const completedFinish =
+			'return NativeParent.finish(parent, ' + (kind === 'agent' ? 'children' : 'items') + ')';
+		const childName = kind === 'agent' ? 'children' : 'items';
+		for (const statement of [
+			childName + '[1] = nil',
+			childName + ' = {}',
+			'local ' + childName + ' = {}',
+			'local retained_child_alias = ' + childName + '; retained_child_alias[1] = nil',
+			'local mutate_child = function() ' + childName + '[1] = nil end; mutate_child()',
+			childName + '[#' + childName + ' + 1] = {}'
+		])
+			replacements.push([producerFile, completedFinish, statement + '\n\t' + completedFinish]);
+		if (kind === 'llm') {
+			for (const statement of [
+				'rendered[1] = nil',
+				'rendered = {}',
+				'local rendered = {}',
+				'local retained_rendered_alias = rendered',
+				'local items = {}; items[1] = nil'
+			])
+				replacements.push([producerFile, completedFinish, statement + '\n\t' + completedFinish]);
+			replacements.push([
+				producerFile,
+				'return NativeParent.finish(parent, ManifestMenu.render_rows(status_rows, "linux_llm_absent_rows"))',
+				'status_rows[1] = nil\n\t\treturn NativeParent.finish(parent, ManifestMenu.render_rows(status_rows, "linux_llm_absent_rows"))'
+			]);
+		}
+
+		for (const statement of [
+			'local llm = nil',
+			'local shadow_marker, llm = nil, nil',
+			'local ctx = {}',
+			'local parent = {}',
+			'local native_alias = llm; native_alias.toggle = nil',
+			'local context_alias = ctx; context_alias.llm = nil',
+			'local ticket_alias = parent; ticket_alias.enabled = false',
+			'local shadowed = function(llm) return llm end',
+			'local nested = function() local llm = nil end'
+		])
+			replacements.push([
+				producerFile,
+				'local llm = ctx.llm',
+				'local llm = ctx.llm\n\t' + statement
+			]);
+
+		const rootRegistration =
+			kind === 'agent' ? 'local handlers = {}' : 'local dynamic_handlers = {}';
+		const rootName = kind === 'agent' ? 'handlers' : 'dynamic_handlers';
+		for (const statement of ['local ' + rootName + ' = {}', rootName + ' = {}'])
+			replacements.push([producerFile, rootRegistration, rootRegistration + '\n\t' + statement]);
+		if (kind === 'llm')
+			for (const statement of ['local enabled = false', 'enabled = false'])
+				replacements.push([
+					producerFile,
+					'local enabled = parent.enabled',
+					'local enabled = parent.enabled\n\t' + statement
+				]);
+
+		for (const statement of [
+			'local native_alias = ctx.llm; native_alias.toggle = nil',
+			'local NativeParent = require("foreign.native_owner")',
+			'local captured = function(NativeParent) return NativeParent end',
+			'local ManifestMenu = require("foreign.native_renderer")',
+			'local captured = function(ManifestMenu) return ManifestMenu end',
+			'local AgentSettings = require("foreign.native_settings")'
+		])
+			replacements.push([
+				producerFile,
+				'local llm = ctx.llm',
+				'local llm = ctx.llm\n\t' + statement
+			]);
+
+		const agentRegistrationFile = 'linux/ui/menu/agent_rows.lua';
+		const nativeCallbackEnd = '\t\t\t\treturn committed\n\t\t\tend,\n\t\t},';
+		for (const field of [
+			'agent_mode = false',
+			'["agent_mode"] = false',
+			'["agent_" .. "mode"] = false',
+			'[command_key] = false'
+		])
+			replacements.push([
+				agentRegistrationFile,
+				nativeCallbackEnd,
+				'\t\t\t\treturn committed\n\t\t\tend,\n\t\t\t' + field + ',\n\t\t},'
+			]);
+		replacements.push([
+			agentRegistrationFile,
+			'\tlocal menu_ctx = {\n\t\tcommands = {',
+			'\tlocal menu_ctx = {\n\t\tcommands = false and {'
+		]);
+		replacements.push([
+			agentRegistrationFile,
+			'\tlocal menu_ctx = {\n\t\tcommands = {',
+			'\tlocal menu_ctx = false and {\n\t\tcommands = {'
+		]);
+		replacements.push([
+			agentRegistrationFile,
+			'\t\tstate_getters = {',
+			'\t\tstate_getters = false and {'
+		]);
+		replacements.push([
+			agentRegistrationFile,
+			'["llm.agent_mode"] = AgentSettings.get_mode,',
+			'["llm.agent_mode"] = AgentSettings.get_mode, ["llm.agent_mode"] = false,'
+		]);
+		replacements.push([
+			agentRegistrationFile,
+			'\n\t}\n\tlocal children = ManifestMenu.build',
+			'\n\t\tcommands = {},\n\t}\n\tlocal children = ManifestMenu.build'
+		]);
+		replacements.push([
+			agentRegistrationFile,
+			'\n\t}\n\tlocal children = ManifestMenu.build',
+			'\n\t\t["state_getters"] = {},\n\t}\n\tlocal children = ManifestMenu.build'
+		]);
+		for (const [file, before, after] of replacements) {
+			assert.ok(
+				linuxAiSources[file].includes(before),
+				'mutation must change actual production: ' + before
+			);
+			assert.equal(
+				admits({
+					...linuxAiSources,
+					[file]: linuxAiSources[file].replace(before, after)
+				}),
+				false,
+				'actual producer/source mutation: ' + before
+			);
+		}
+		const quoted = {
+			...linuxAiSources,
+			'linux/ui/menu/ai_parent.lua':
+				linuxAiSources['linux/ui/menu/ai_parent.lua'] + '\n-- foreign owner comment\n'
+		};
+		assert.equal(
+			admits(quoted),
+			true,
+			'inert comments do not provide or withdraw an executable route'
+		);
+	}
+}
+
+// Physical withdrawal controls prevent graph entries from becoming decorative orphan exemptions.
+{
+	const assert = require('node:assert/strict');
+	const controls = require('./fixtures/hotstring-language-owner-counterexamples.cjs')(SP, manifest);
+	assert(controls > 100, 'actual source/declaration refusal controls must all execute');
+}
+
 // Iterated to a fixed point rather than walked once: the graph is shallow today
 // but a group nested inside a group would make a single pass depth-dependent,
 // and a check that silently depends on declaration order is a check that breaks
@@ -2802,6 +3317,15 @@ for (let pass = 0; pass < MENU_KEYS.length + 1; pass += 1) {
 				const target = typeof opened === 'string' ? opened : opened.menu;
 				const only = typeof opened === 'string' ? PLATFORMS : opened.platforms;
 				const kind = row.type === 'include' || opened.kind === 'compose' ? 'compose' : 'submenu';
+				if (
+					opened.completed_linux_ai_parent !== undefined &&
+					(opened.completed_linux_ai_parent !== row.id ||
+						!nativeLinuxAiParentPublication(linuxAiSources, manifest, row.id, 'linux'))
+				) {
+					errors.push(`${menuKey}/${row.id}: actual completed Linux AI publication refused`);
+					continue;
+				}
+
 				const effective = PLATFORMS.filter(
 					(p) =>
 						visibleOn(row, p) &&
@@ -2820,40 +3344,54 @@ for (let pass = 0; pass < MENU_KEYS.length + 1; pass += 1) {
 					if (
 						typeof file !== 'string' ||
 						!file.startsWith(driver + '/') ||
-						!(opened.completed_parent?.[platform] === 'llm'
-							? require('../lib/menu-native-llm-parent-binding.cjs').nativeLlmParentPublication(
-									fs.readFileSync(path.join(SP, file), 'utf8'),
-									fs.readFileSync(path.join(SP, 'macos/ui/menu/builder.lua'), 'utf8'),
-									manifest[target],
-									manifest.top_level,
-									platform
-								)
-							: opened.forwarded_template?.[platform] === 'layout'
-								? require('../lib/menu-native-layout-binding.cjs').nativeLayoutTemplatePublication(
-										fs.readFileSync(path.join(SP, file), 'utf8'),
-										target,
-										manifest[target]
+						!(opened.completed_linux_ai_parent === row.id && platform === 'linux'
+							? nativeLinuxAiParentPublication(linuxAiSources, manifest, row.id, platform)
+							: opened.hotstring_language_owner
+								? hotstringLanguagePublication(
+										Object.fromEntries(
+											languageOwnerFiles[platform].map((file) => [
+												file,
+												fs.readFileSync(path.join(SP, file), 'utf8')
+											])
+										),
+										manifest,
+										platform,
+										target
 									)
-								: opened.selected_group?.[platform]
-									? publishesSelectedMenuGroup(
+								: opened.completed_parent?.[platform] === 'llm'
+									? require('../lib/menu-native-llm-parent-binding.cjs').nativeLlmParentPublication(
 											fs.readFileSync(path.join(SP, file), 'utf8'),
-											path.extname(file),
-											target,
+											fs.readFileSync(path.join(SP, 'macos/ui/menu/builder.lua'), 'utf8'),
 											manifest[target],
-											opened.selected_group[platform]
-										)
-									: publishesTemplate(
-											fs.readFileSync(path.join(SP, file), 'utf8'),
-											path.extname(file),
-											target
-										) ||
-										publishesIncludedCommands(
-											fs.readFileSync(path.join(SP, file), 'utf8'),
-											path.extname(file),
-											target,
-											manifest,
+											manifest.top_level,
 											platform
-										))
+										)
+									: opened.forwarded_template?.[platform] === 'layout'
+										? require('../lib/menu-native-layout-binding.cjs').nativeLayoutTemplatePublication(
+												fs.readFileSync(path.join(SP, file), 'utf8'),
+												target,
+												manifest[target]
+											)
+										: opened.selected_group?.[platform]
+											? publishesSelectedMenuGroup(
+													fs.readFileSync(path.join(SP, file), 'utf8'),
+													path.extname(file),
+													target,
+													manifest[target],
+													opened.selected_group[platform]
+												)
+											: publishesTemplate(
+													fs.readFileSync(path.join(SP, file), 'utf8'),
+													path.extname(file),
+													target
+												) ||
+												publishesIncludedCommands(
+													fs.readFileSync(path.join(SP, file), 'utf8'),
+													path.extname(file),
+													target,
+													manifest,
+													platform
+												))
 					)
 						errors.push(
 							`${menuKey}/${row.id}: ${kind} ${target} has no native template publication on ${platform}`
@@ -3184,7 +3722,10 @@ if (unreasoned.length < UNREASONED_BASELINE) {
 // Linux 19 → 20: navigation and validation now use their declared list providers.
 const RENDERED_THROUGH_SHARED = { hs: 22, linux: 20 };
 
-const DRIVER_ROOTS = { hs: path.join(SP, 'macos'), linux: path.join(SP, 'linux') };
+const DRIVER_ROOTS = {
+	hs: path.join(SP, 'macos'),
+	linux: path.join(SP, 'linux')
+};
 
 /**
  * The whole Lua source of a driver, concatenated, tests excluded.
@@ -3208,7 +3749,10 @@ function driverSource(root) {
 		}
 	};
 	walk(root);
-	return { src: out, delegated: delegatedMenuSources(sources, path.join(SP, '_shared', 'lua')) };
+	return {
+		src: out,
+		delegated: delegatedMenuSources(sources, path.join(SP, '_shared', 'lua'))
+	};
 }
 
 /** Resolve only the actual read-only number-row provider's shared getter owner. */
@@ -3467,7 +4011,12 @@ console.log(
 	manifest[names[0]] = [{ type: 'include', section: names[1], row_id: 'clone' }];
 	manifest[names[1]] = [
 		{ type: 'command', id: 'create', i18n: 'menu.profiles.create_profile' },
-		{ type: 'command', id: 'clone', i18n: 'menu.profiles.clone_builtin', platforms: ['hs'] }
+		{
+			type: 'command',
+			id: 'clone',
+			i18n: 'menu.profiles.clone_builtin',
+			platforms: ['hs']
+		}
 	];
 	try {
 		assert.deepEqual(
@@ -3993,7 +4542,14 @@ function languageParentSource(source, driver) {
 	);
 	assert.deepEqual(
 		menu.top_level.filter((row) => row.id === 'configuration'),
-		[{ type: 'group', id: 'configuration', i18n: 'menu.configuration.title', rows: [] }]
+		[
+			{
+				type: 'group',
+				id: 'configuration',
+				i18n: 'menu.configuration.title',
+				rows: []
+			}
+		]
 	);
 	const hand = JSON.parse(
 		fs.readFileSync(path.join(base, '_shared/tests/corpus/menus/configuration_parent.json'), 'utf8')

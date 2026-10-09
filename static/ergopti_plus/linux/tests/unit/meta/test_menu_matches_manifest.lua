@@ -85,6 +85,19 @@ end
 local function find_item(items, title)
 	for _, item in ipairs(items or {}) do
 		if item.title == title then return item end
+		-- Absent native owners retain the declared inert child and its exact reason.
+		local reasoned = nil
+		for _, key in ipairs({ "llm_native_parent_linux", "agent_native_parent" }) do
+			for _, declaration in ipairs(ManifestMenu.get_array(key) or {}) do
+				if declaration.type == "group" and i18n.get(declaration.i18n) == title
+					and type(declaration.disabled_reason_key) == "string" then
+					local projected = ManifestMenu.render_rows({ { label = title, disabled = true,
+						disabled_reason_key = declaration.disabled_reason_key } }, "absent-parent-selection")
+					if #projected == 1 then reasoned = projected[1].title end
+				end
+			end
+		end
+		if item.disabled == true and reasoned ~= nil and item.title == reasoned then return item end
 		local nested = type(item.menu) == "table" and find_item(item.menu, title) or nil
 		if nested then return nested end
 	end

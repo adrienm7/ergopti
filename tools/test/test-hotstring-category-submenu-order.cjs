@@ -22,6 +22,15 @@ const { scriptTokens } = require('../lib/script-source.cjs');
 const ROOT = path.resolve(__dirname, '..', '..');
 const SP = path.join(ROOT, 'static', 'ergopti_plus');
 
+const manifest = JSON.parse(
+	fs.readFileSync(path.join(SP, '_shared/modules/menu/menu_manifest.json'), 'utf8')
+);
+const {
+	hotstringScopePublication,
+	hotstringLanguagePublication,
+	files: languageOwnerFiles
+} = require('../lib/menu-hotstring-language-binding.cjs');
+
 const ALL_SECTIONS_KEY = 'menu.hotstrings.enable_all_sections';
 
 // Label keys retired with the pairs and the alternating gate labels. A driver
@@ -156,7 +165,7 @@ const LANGUAGE_REGIONS = [
 		driver: 'windows',
 		file: 'windows/ui/menu/menu_submenus.ahk',
 		from: '_HS_LanguageRows() {',
-		to: 'Rows.Push(Map(\n\t\t\t"label", HotstringsLanguageName',
+		to: '\n}',
 		// The language checkbox has a builder of its own here, which the unit
 		// harness can reach; it draws the row through _HS_AllSectionsRow.
 		call: '_HS_LanguageSwitchRow('
@@ -171,7 +180,7 @@ const LANGUAGE_REGIONS = [
 		driver: 'linux',
 		file: 'linux/ui/menu/menu_builder.lua',
 		from: 'local function language_rows()',
-		to: 'label = string.format("%s (%d)", language_label(pack.locale), total)'
+		to: '\n\tend'
 	}
 ];
 
@@ -222,7 +231,13 @@ for (const d of DRIVERS) {
 	const helper = slice(d.driver, d.helper);
 	if (helper !== null) {
 		regions += 1;
-		if (!helper.includes(ALL_SECTIONS_KEY)) {
+		if (
+			!hotstringScopePublication(
+				read(d.driver, d.helper.file),
+				{ windows: 'ahk', macos: 'hs', linux: 'linux' }[d.driver],
+				manifest
+			)
+		) {
 			errors.push(`${d.driver}: the « all sections » helper never names ${ALL_SECTIONS_KEY}`);
 		}
 	}
@@ -259,9 +274,6 @@ const expectedDeclaration = [
 function validateDeclaration(rows) {
 	assert.deepEqual(rows, expectedDeclaration);
 }
-const manifest = JSON.parse(
-	fs.readFileSync(path.join(SP, '_shared/modules/menu/menu_manifest.json'), 'utf8')
-);
 try {
 	validateDeclaration(manifest.hotstring_category_menu);
 	// Independent negative controls keep the oracle sensitive to the old toggle,
@@ -433,6 +445,24 @@ for (const region of LANGUAGE_REGIONS) {
 		);
 	}
 }
+
+// Shared declarations keep the original label, order, checked getter and scope callback causal.
+for (const platform of ['ahk', 'hs', 'linux']) {
+	const sources = Object.fromEntries(
+		languageOwnerFiles[platform].map((file) => [file, fs.readFileSync(path.join(SP, file), 'utf8')])
+	);
+	const target =
+		platform === 'ahk' ? 'hotstring_language_parent_windows' : 'hotstring_language_parent_lua';
+	if (!hotstringLanguagePublication(sources, manifest, platform, target))
+		errors.push(
+			`${platform}: actual language checkbox, frame and native child publication refused`
+		);
+}
+const languageControls = require('./fixtures/hotstring-language-owner-counterexamples.cjs')(
+	SP,
+	manifest
+);
+assert(languageControls > 100, 'all physical source and malformed declaration controls execute');
 
 const expected =
 	DRIVERS.reduce((n, d) => n + 1 + d.files.length, 0) +
