@@ -22,7 +22,8 @@ on:
             published_with_dependency,
             native_helper,
             helper_environment,
-            helper_registration
+            helper_registration,
+            ci_archive_appleevents
           ]
       tag:
         description: Existing release tag to reproduce
@@ -37,6 +38,7 @@ concurrency:
   cancel-in-progress: false
 jobs:
   observe:
+    if: inputs.scenario != 'ci_archive_appleevents'
     runs-on: macos-15
     timeout-minutes: 20
     steps:
@@ -135,3 +137,91 @@ jobs:
             build/macos-native-helper/ErgoptiPlus.app.zip
             ${{ runner.temp }}/native-helper.json
           if-no-files-found: error
+
+  appleevent-diagnostics:
+    if: inputs.scenario == 'ci_archive_appleevents'
+    name: AppleEvent diagnostics · ${{ matrix.runner }}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        runner: [macos-15, macos-15-intel]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Verify the retained failing archive source
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh api repos/adrienm7/ergopti/actions/runs/37868449649 > "$RUNNER_TEMP/archive-run.json"
+          python3 - "$RUNNER_TEMP/archive-run.json" <<'PY'
+          import json
+          import sys
+          with open(sys.argv[1], encoding="utf-8") as handle:
+              run = json.load(handle)
+          if (run["id"] != 37868449649
+                  or run["head_sha"] != "b06aefcb6386aa4b875c1c86c29e27c07ab8f951"
+                  or run["repository"]["full_name"] != "adrienm7/ergopti"
+                  or run["status"] != "completed"):
+              raise RuntimeError("Retained diagnostic archive source differs")
+          PY
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: assets-macos
+          run-id: 37868449649
+          github-token: ${{ github.token }}
+          path: ${{ runner.temp }}/package
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: ci-macos-archive-source
+          run-id: 37868449649
+          github-token: ${{ github.token }}
+          path: ${{ runner.temp }}/package
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .node-version
+
+      - name: Install the unchanged archive for diagnostic observation
+        run: |
+          set -euo pipefail
+          test ! -e /Applications/ErgoptiPlus.app
+          stamp="0083;$(printf '%x' "$(date +%s)");Safari;$(uuidgen)"
+          node tools/build/macos-release-archives.cjs --ci-install "$RUNNER_TEMP/package" /Applications "$stamp" \
+              > "$RUNNER_TEMP/package-install.json"
+          xattr -r -w com.apple.quarantine "$stamp" /Applications/ErgoptiPlus.app
+          xattr -dr com.apple.quarantine /Applications/ErgoptiPlus.app
+          if xattr -r /Applications/ErgoptiPlus.app | grep -q com.apple.quarantine; then
+              echo "::error::the documented quarantine removal left an attribute behind"
+              exit 1
+          fi
+          git rev-parse HEAD > "$RUNNER_TEMP/diagnostic-source.txt"
+
+      - name: Check diagnostic collection regressions
+        working-directory: tools/diagnostics
+        run: >
+          python3 -m unittest
+          macos_launch_gate_test.VerdictTests.test_appleevent_diagnostics_retain_system_logs_and_collection_failures
+          macos_launch_gate_test.VerdictTests.test_window_timeout_does_not_discard_other_native_evidence
+
+      - name: Observe the original clean-launch failure with system logs
+        run: >
+          python3 tools/diagnostics/macos_launch_gate.py
+          /Applications/ErgoptiPlus.app "$RUNNER_TEMP/launch-gate" clean
+
+      - name: Retain diagnostics and exact archive provenance
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: appleevent-diagnostics-${{ matrix.runner }}-${{ github.run_id }}
+          if-no-files-found: error
+          path: |
+            ${{ runner.temp }}/launch-gate
+            ${{ runner.temp }}/archive-run.json
+            ${{ runner.temp }}/package-install.json
+            ${{ runner.temp }}/package/*.ci-receipt.json
+            ${{ runner.temp }}/diagnostic-source.txt
