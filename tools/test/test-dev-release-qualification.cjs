@@ -467,102 +467,149 @@ async function simulate(context, status = 0, entries = fixtures, afterFamilySign
 	process.exitCode = 1;
 });
 
-// Fast publication is intentionally unqualified, and never a default test pass.
+// Full execution replaces the retired one-release all-suite bypass.
 {
-	const context = {
-		github_actions: 'true',
-		repository: 'adrienm7/ergopti',
-		event_name: 'push',
-		ref: 'refs/heads/dev',
-		release: true,
-		prerelease: 'true',
-		channel: 'dev',
-		tag: 'v0.0.0-dev.157',
-		version: '0.0.0-dev.157'
+	const pipeline = require('./ci-pipeline.cjs');
+	const workflows = {
+		'ci.yml': ['validate', 'core', 'macos', 'windows', 'linux', 'manual-verdict', 'release'],
+		'ci-windows.yml': ['test-ahk', 'e2e-ahk', 'package-windows', 'launch-windows', 'windows-ok'],
+		'ci-macos.yml': [
+			'item36-native',
+			'managed-ollama-native',
+			'test-hs',
+			'e2e-hs',
+			'tooltip-canvas',
+			'package-macos',
+			'launch',
+			'cold-bootstrap-native',
+			'macos-ok'
+		],
+		'ci-linux.yml': ['test-linux', 'e2e-linux', 'package-linux', 'install-linux', 'linux-ok']
 	};
-	const now = new Date('2026-10-09T14:00:00Z');
-	assert.equal(q.fastPrerelease(context, now), true);
-	assert.equal(q.validateFastPrerelease(false, context, now), false);
-	for (const change of [
-		{ github_actions: '' },
-		{ repository: 'other/ergopti' },
-		{ event_name: 'pull_request' },
-		{ event_name: 'workflow_dispatch' },
-		{ ref: 'refs/heads/main' },
-		{ release: false },
-		{ prerelease: 'false' },
-		{ channel: 'main' },
-		{ tag: 'v0.0.0-dev.158', version: '0.0.0-dev.158' },
-		{ tag: 'v0.0.0-dev.156', version: '0.0.0-dev.156' }
-	]) {
-		assert.equal(q.fastPrerelease({ ...context, ...change }, now), false);
-		assert.throws(
-			() => q.validateFastPrerelease(true, { ...context, ...change }, now),
-			/not authorized/
-		);
-	}
-	assert.equal(q.fastPrerelease(context, new Date('2026-10-10T07:00:00Z')), false);
-	assert.throws(
-		() => q.validateFastPrerelease(true, context, new Date('2026-10-10T07:00:00Z')),
-		/not authorized/
-	);
-	assert.throws(() => q.validateFastPrerelease('true', context, now), /Boolean/);
-	assert.throws(() => q.fastPrerelease({ ...context, extra: true }, now), /closed/);
-	const outcomes = {
-		windows: {
-			'test-ahk': 'skipped',
-			'e2e-ahk': 'skipped',
-			'package-windows': 'success',
-			'launch-windows': 'skipped'
-		},
-		macos: {
-			'cold-bootstrap-native': 'skipped',
-			'test-hs': 'skipped',
-			'e2e-hs': 'skipped',
-			'package-macos': 'success',
-			launch: 'skipped',
-			'tooltip-canvas': 'skipped',
-			'managed-ollama-native': 'success'
-		},
-		linux: {
-			'test-linux': 'skipped',
-			'e2e-linux': 'skipped',
-			'package-linux': 'success',
-			'install-linux': 'skipped'
-		}
+	const ordinaryConditions = {
+		macos: "needs.validate.outputs.lane_macos == 'true'",
+		windows: "needs.validate.outputs.lane_windows == 'true'",
+		linux: "needs.validate.outputs.lane_linux == 'true'",
+		'manual-verdict': "always() && github.event_name == 'workflow_dispatch'",
+		release: "github.event_name == 'push' && needs.validate.outputs.release == 'true'",
+		'windows-ok': 'always()',
+		'item36-native': "${{ github.event_name == 'workflow_dispatch' && !inputs.release }}",
+		'macos-ok': 'always()',
+		'package-linux':
+			"${{ !cancelled() && (needs.e2e-linux.result == 'success' || (github.event_name == 'workflow_dispatch' && needs.e2e-linux.result == 'failure')) }}",
+		'linux-ok': 'always()'
 	};
-	for (const [lane, expected] of Object.entries(outcomes)) {
-		const needs = Object.fromEntries(
-			Object.entries(expected).map(([name, result]) => [name, { result }])
+	let jobs = 0,
+		steps = 0;
+	for (const [file, required] of Object.entries(workflows)) {
+		const relative = '.github/workflows/' + file;
+		const source = fs.readFileSync(path.join(ROOT, relative), 'utf8');
+		assert.doesNotMatch(
+			source,
+			/fast_prerelease|ERGOPTI_FAST_PRERELEASE|--fast-action/,
+			file + ': retired input, command and receipt wiring cannot authorize skips'
 		);
-		const receipt = q.fastPrereleaseReceipt(lane, needs, 'a'.repeat(40), context, now);
-		assert.equal(receipt.qualified, false);
-		assert.equal(receipt.status, 'UNQUALIFIED');
-		assert.equal(receipt.tests, 'DEFERRED');
-		assert.equal(receipt.source_sha, 'a'.repeat(40));
-		for (const name of Object.keys(needs)) {
-			assert.throws(
-				() =>
-					q.fastPrereleaseReceipt(
-						lane,
-						{ ...needs, [name]: { result: 'failure' } },
-						'a'.repeat(40),
-						context,
-						now
-					),
-				/mandatory jobs/
+		const actual = pipeline.jobsOfText(source, relative);
+		assert.deepEqual(
+			actual.map((job) => job.id),
+			required,
+			file + ': every job class is retained'
+		);
+		for (const job of actual) {
+			jobs++;
+			assert.notEqual(job.body.trim(), '', job.id + ': job evidence cannot be empty');
+			assert.equal(
+				pipeline.field(job.body, 'if'),
+				ordinaryConditions[job.id] ?? null,
+				job.id + ': only the original ordinary admission may select this full job'
 			);
+			assert.equal(
+				pipeline.field(job.body, 'continue-on-error'),
+				null,
+				job.id + ': a failure cannot be converted into success'
+			);
+			for (const step of pipeline.steps(job.body)) {
+				steps++;
+				assert.doesNotMatch(
+					step.body,
+					/fast_prerelease|ERGOPTI_FAST_PRERELEASE|--fast-action/,
+					job.id + ': every retained step uses its ordinary admission'
+				);
+			}
 		}
-		const missing = { ...needs };
-		delete missing[Object.keys(needs)[0]];
-		assert.throws(
-			() => q.fastPrereleaseReceipt(lane, missing, 'a'.repeat(40), context, now),
-			/closed/
-		);
-		assert.throws(() => q.fastPrereleaseReceipt(lane, needs, '', context, now), /SHA/);
 	}
-	assert.throws(
-		() => q.fastPrereleaseReceipt('other', {}, 'a'.repeat(40), context, now),
-		/Unknown/
+	assert.equal(jobs, 26);
+	assert(steps > 150, 'full step inventory cannot be vacuous');
+	const rootSource = fs.readFileSync(path.join(ROOT, '.github/workflows/ci.yml'), 'utf8');
+	const rootJobs = pipeline.jobsOfText(rootSource, '.github/workflows/ci.yml');
+	const release = rootJobs.find((job) => job.id === 'release');
+	assert(release, 'the real release owner is retained');
+	assert.equal(
+		pipeline.field(release.body, 'if'),
+		"github.event_name == 'push' && needs.validate.outputs.release == 'true'"
+	);
+	assert.deepEqual(pipeline.needsOf(release.body), [
+		'validate',
+		'core',
+		'macos',
+		'windows',
+		'linux'
+	]);
+	const owner = fs.mkdtempSync(path.join(os.tmpdir(), 'ergopti-retired-fast-cli-'));
+	try {
+		for (const event of ['push', 'pull_request', 'workflow_dispatch']) {
+			for (const args of [
+				['--fast-action', 'select'],
+				['--fast-action', 'admit'],
+				['--fast-action', 'receipt', '--lane', 'windows'],
+				['--fast-action', 'receipt', '--lane', 'macos'],
+				['--fast-action', 'receipt', '--lane', 'linux']
+			]) {
+				const result = spawnSync(
+					process.execPath,
+					[path.join(ROOT, 'tools/ci/dev-release-qualification.cjs'), ...args],
+					{
+						cwd: owner,
+						encoding: 'utf8',
+						env: {
+							...process.env,
+							GITHUB_ACTIONS: 'true',
+							GITHUB_REPOSITORY: policy.repository,
+							GITHUB_EVENT_NAME: event,
+							GITHUB_REF: policy.ref,
+							GITHUB_SHA: sha,
+							ERGOPTI_DEV_RELEASE_RELEASE: 'true',
+							ERGOPTI_DEV_RELEASE_PRERELEASE: 'true',
+							ERGOPTI_DEV_RELEASE_CHANNEL: policy.channel,
+							ERGOPTI_DEV_RELEASE_TAG: policy.tag,
+							ERGOPTI_DEV_RELEASE_VERSION: policy.version,
+							ERGOPTI_FAST_PRERELEASE: 'true',
+							GITHUB_OUTPUT: path.join(owner, 'output.txt'),
+							GITHUB_STEP_SUMMARY: path.join(owner, 'summary.txt')
+						}
+					}
+				);
+				assert.equal(result.error, undefined, 'the actual closed CLI executes');
+				assert.equal(result.status, 1, event + ': the retired request is refused');
+				assert.match(result.stderr, /^Invalid qualification command arguments\.\r?\n$/);
+				assert.equal(result.stdout, '', 'no historical receipt is minted as present authority');
+				assert.deepEqual(
+					fs.readdirSync(owner),
+					[],
+					'refusal creates no output, receipt or summary'
+				);
+			}
+		}
+	} finally {
+		fs.rmSync(owner, { recursive: true, force: true });
+	}
+	for (const name of ['fastPrerelease', 'validateFastPrerelease', 'fastPrereleaseReceipt'])
+		assert.equal(
+			Object.hasOwn(q, name),
+			false,
+			name + ': retired API cannot grant execution authority'
+		);
+	console.log(
+		'Retired fast157: all26 job classes and retained steps use full defaults; actual obsolete CLI refuses without side effects.'
 	);
 }

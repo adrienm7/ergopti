@@ -66,7 +66,6 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       release: ${{ steps.meta.outputs.release }}
-      fast_prerelease: ${{ steps.fast.outputs.fast_prerelease }}
       tag: ${{ steps.meta.outputs.tag }}
       version: ${{ steps.meta.outputs.version }}
       title: ${{ steps.meta.outputs.title }}
@@ -279,16 +278,6 @@ jobs:
           echo "Resolved: tag=$tag version=$version prerelease=$prerelease channel=$channel"
           echo "Title: $title"
 
-      - name: Resolve authorized temporary fast prerelease
-        id: fast
-        env:
-          ERGOPTI_DEV_RELEASE_RELEASE: ${{ steps.meta.outputs.release }}
-          ERGOPTI_DEV_RELEASE_PRERELEASE: ${{ steps.meta.outputs.prerelease }}
-          ERGOPTI_DEV_RELEASE_CHANNEL: ${{ steps.meta.outputs.channel }}
-          ERGOPTI_DEV_RELEASE_TAG: ${{ steps.meta.outputs.tag }}
-          ERGOPTI_DEV_RELEASE_VERSION: ${{ steps.meta.outputs.version }}
-        run: node tools/ci/dev-release-qualification.cjs --fast-action select
-
   # ========================================================
   # ========================================================
   # ======= 2/ One lane per OS: tests, package, gate =======
@@ -308,7 +297,6 @@ jobs:
   core:
     name: 'Core / ${{ matrix.suite }}'
     needs: [validate]
-    if: needs.validate.outputs.fast_prerelease != 'true'
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -374,7 +362,6 @@ jobs:
     if: needs.validate.outputs.lane_macos == 'true'
     uses: ./.github/workflows/ci-macos.yml
     with:
-      fast_prerelease: ${{ needs.validate.outputs.fast_prerelease == 'true' }}
       release: ${{ needs.validate.outputs.release == 'true' }}
       version: ${{ needs.validate.outputs.version }}
       tag: ${{ needs.validate.outputs.tag }}
@@ -395,7 +382,6 @@ jobs:
     if: needs.validate.outputs.lane_windows == 'true'
     uses: ./.github/workflows/ci-windows.yml
     with:
-      fast_prerelease: ${{ needs.validate.outputs.fast_prerelease == 'true' }}
       release: ${{ needs.validate.outputs.release == 'true' }}
       version: ${{ needs.validate.outputs.version }}
       tag: ${{ needs.validate.outputs.tag }}
@@ -415,7 +401,6 @@ jobs:
     if: needs.validate.outputs.lane_linux == 'true'
     uses: ./.github/workflows/ci-linux.yml
     with:
-      fast_prerelease: ${{ needs.validate.outputs.fast_prerelease == 'true' }}
       release: ${{ needs.validate.outputs.release == 'true' }}
       version: ${{ needs.validate.outputs.version }}
       tag: ${{ needs.validate.outputs.tag }}
@@ -472,18 +457,12 @@ jobs:
   release:
     name: 'Release / Publish'
     needs: [validate, core, macos, windows, linux]
-    if: ${{ !cancelled() && github.event_name == 'push' && needs.validate.result == 'success' && needs.validate.outputs.release == 'true' && needs.macos.result == 'success' && needs.windows.result == 'success' && needs.linux.result == 'success' && ((needs.validate.outputs.fast_prerelease == 'true' && needs.core.result == 'skipped') || (needs.validate.outputs.fast_prerelease != 'true' && needs.core.result == 'success')) }}
+    if: github.event_name == 'push' && needs.validate.outputs.release == 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: write
     env:
       LINUX_BUNDLE_ASSET: ${{ needs.validate.outputs.linux_bundle }}
-      ERGOPTI_FAST_PRERELEASE: ${{ needs.validate.outputs.fast_prerelease }}
-      ERGOPTI_DEV_RELEASE_RELEASE: ${{ needs.validate.outputs.release }}
-      ERGOPTI_DEV_RELEASE_PRERELEASE: ${{ needs.validate.outputs.prerelease }}
-      ERGOPTI_DEV_RELEASE_CHANNEL: ${{ needs.validate.outputs.channel }}
-      ERGOPTI_DEV_RELEASE_TAG: ${{ needs.validate.outputs.tag }}
-      ERGOPTI_DEV_RELEASE_VERSION: ${{ needs.validate.outputs.version }}
 
     steps:
       - uses: actions/checkout@v4
@@ -496,16 +475,6 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version-file: '.node-version'
-
-      - name: Recheck temporary publication authorization
-        env:
-          ERGOPTI_DEV_RELEASE_RELEASE: ${{ needs.validate.outputs.release }}
-          ERGOPTI_DEV_RELEASE_PRERELEASE: ${{ needs.validate.outputs.prerelease }}
-          ERGOPTI_DEV_RELEASE_CHANNEL: ${{ needs.validate.outputs.channel }}
-          ERGOPTI_DEV_RELEASE_TAG: ${{ needs.validate.outputs.tag }}
-          ERGOPTI_DEV_RELEASE_VERSION: ${{ needs.validate.outputs.version }}
-          ERGOPTI_FAST_PRERELEASE: ${{ needs.validate.outputs.fast_prerelease }}
-        run: node tools/ci/dev-release-qualification.cjs --fast-action admit
 
       - name: Download all build artifacts
         # Restricted to assets-*: the lanes also upload evidence (launch-gate-*,
@@ -695,7 +664,6 @@ jobs:
           GH_TOKEN: ${{ secrets.PAT_ERGOPTI }}
         run: |
           set -euo pipefail
-          node tools/ci/dev-release-qualification.cjs --fast-action admit
           tag="${{ needs.validate.outputs.tag }}"
           sha="${{ github.sha }}"
           gh api repos/${{ github.repository }}/git/refs \
@@ -720,7 +688,6 @@ jobs:
           TITLE: ${{ needs.validate.outputs.title }}
         run: |
           set -euo pipefail
-          node tools/ci/dev-release-qualification.cjs --fast-action admit
           mapfile -t assets < <(find release-assets -type f)
           echo "Assets to attach (${#assets[@]}):"
           printf '  %s\n' "${assets[@]}"
@@ -734,10 +701,6 @@ jobs:
               false) ;;
               *) echo "::error::plan's prerelease output is '$PRERELEASE', expected true or false."; exit 1 ;;
           esac
-
-          if [[ "$ERGOPTI_FAST_PRERELEASE" == true ]]; then
-            flags+=("--notes" "UNQUALIFIED diagnostic dev157 (source $GITHUB_SHA): core, unit, E2E, installation, launch and independent native qualification suites are DEFERRED by explicit user authorization; qualified:false. Build, signing, asset integrity and source verification remain mandatory. Packaging success is not native or feature acceptance. Full execution returns for other tags or after 2026-10-10T07:00:00Z.")
-          fi
 
           gh release create "$TAG" \
               --repo "$GITHUB_REPOSITORY" \
@@ -1023,9 +986,7 @@ jobs:
             for (const [scope, record] of Object.entries(policy.scopes)) {
               console.log('- **DEFERRED — ' + scope + ':** ' + record.reason + ' (qualified:false)');
             }
-            const qualification = process.env.ERGOPTI_FAST_PRERELEASE === 'true' ?
-              'This diagnostic dev157 build is UNQUALIFIED: core, unit, E2E, installation, launch and native qualification suites are DEFERRED by explicit user authorization. Build, signing, asset integrity and source verification remain mandatory; successful packaging is not test or feature acceptance.' : 'Build, signing, installation and all other test requirements remain active.';
-            console.log('\nThe CI qualification artifacts record the exact source and missing evidence. ' + qualification + ' Full execution returns for the next tag or after ' + policy.expires_at + '.\n');
+            console.log('\nThe CI qualification artifacts record the exact source and missing evidence. Build, signing, installation and all other test requirements remain active. Full execution returns for the next tag or after ' + policy.expires_at + '.\n');
           }
           NODE
 
