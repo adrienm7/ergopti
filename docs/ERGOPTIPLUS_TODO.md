@@ -7913,6 +7913,15 @@ The complete macOS Layout presentation family now consumes 17 canonical shared s
   Device work: physical positions/modifiers and Unicode/dead-key behavior across
   actual layouts, repeats and supported seats after those owners are qualified.
 
+  The controlled macOS physical-editor lifecycle fixture now models the
+  original window restoration acknowledgement required by the current Builder.
+  Both Lua ABIs reproduce the prior fixture failure (0 passes / 16 failures)
+  and pass the corrected 17 cases; all 16 original bodies/assertions and the
+  existing host case remain intact. Native restore throw/refusal controls and
+  product focus behavior remain unchanged. Actual macOS GUI execution and final
+  joined-source delivery qualification remain required; this grants no physical
+  capture, assignment or output authority and does not complete item 97.
+
 - [~] **98.** Replace fixed make-J-the-star-key with a user-chosen
   physical position and arbitrary output, including explicit None, through
   item 97's model rather than another layout switch. Implemented: the shared
