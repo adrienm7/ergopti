@@ -12,6 +12,7 @@ import os
 from pathlib import Path
 import shutil
 import signal
+import stat
 import sys
 import tempfile
 import unittest
@@ -47,6 +48,105 @@ def worker_receiving_facts(receiver):
         "exit_killed": int(reaped and process.returncode == -9),
         "exit_other": int(reaped and process.returncode not in (0, 75, 74, -9)),
     }
+
+
+WORKER_STAGES = (
+    "entry",
+    "arguments",
+    "stdin_eof",
+    "request",
+    "settings",
+    "policy",
+    "execute",
+    "settings_provider",
+    "first_frame",
+    "returned",
+)
+
+
+class WorkerStageReceipt:
+    """Retain one exact private regular FD through its real child retirement."""
+
+    def __init__(self, target):
+        self.target = target
+        self.descriptor = os.open(target, os.O_RDWR | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600)
+        self.identity = os.fstat(self.descriptor)
+        self.name_pending = True
+        self.close_uncertain = False
+
+    @property
+    def closed(self):
+        return self.descriptor is None and not self.name_pending
+
+    def facts(self, receiver):
+        if self.close_uncertain:
+            return {"state": "refused", "stages": []}
+        if not worker_receiving_facts(receiver)["settled"]:
+            return {"state": "unsettled", "stages": []}
+        current = os.fstat(self.descriptor)
+        named = os.stat(self.target, follow_symlinks=False)
+        if (
+            (current.st_dev, current.st_ino) != (named.st_dev, named.st_ino)
+            or not stat.S_ISREG(current.st_mode)
+            or current.st_nlink != 1
+            or current.st_uid != os.getuid()
+            or stat.S_IMODE(current.st_mode) != 0o600
+            or current.st_size > 256
+        ):
+            return {"state": "refused", "stages": []}
+        os.lseek(self.descriptor, 0, os.SEEK_SET)
+        raw = os.read(self.descriptor, 257)
+        if len(raw) != current.st_size or (raw and not raw.endswith(b"\n")):
+            return {"state": "refused", "stages": []}
+        try:
+            stages = raw.decode("ascii").splitlines()
+            indices = [WORKER_STAGES.index(stage) for stage in stages]
+        except (UnicodeError, ValueError):
+            return {"state": "refused", "stages": []}
+        if indices != sorted(set(indices)):
+            return {"state": "refused", "stages": []}
+        return {"state": "observed" if stages else "empty", "stages": stages}
+
+    def retire_name(self, receiver, destination):
+        if self.close_uncertain:
+            raise RuntimeError("Native fixture stage FD close outcome is uncertain")
+        if not worker_receiving_facts(receiver)["settled"]:
+            raise RuntimeError("Previous native fixture worker remains unsettled")
+        named = os.stat(self.target, follow_symlinks=False)
+        if (named.st_dev, named.st_ino) != (self.identity.st_dev, self.identity.st_ino):
+            raise RuntimeError("Native fixture stage name identity diverged")
+        os.link(self.target, destination, follow_symlinks=False)
+        os.unlink(self.target)
+        self.target = destination
+
+    def close(self):
+        if self.close_uncertain:
+            # A failed raw close can already have retired the physical FD. A
+            # reused integer, even for the same inode, grants no retry authority.
+            raise RuntimeError("Native fixture stage FD close outcome is uncertain")
+        if self.descriptor is not None:
+            current = os.fstat(self.descriptor)
+            if (current.st_dev, current.st_ino) != (self.identity.st_dev, self.identity.st_ino):
+                raise RuntimeError("Native fixture stage FD identity diverged")
+            # Preserve the exact FD on a refused close; the pathname cannot be
+            # retired before its physical descriptor closure succeeds.
+            try:
+                os.close(self.descriptor)
+            except BaseException:
+                self.close_uncertain = True
+                raise
+            self.descriptor = None
+        if self.name_pending:
+            try:
+                current = os.stat(self.target, follow_symlinks=False)
+            except FileNotFoundError:
+                self.name_pending = False
+                return
+            if (current.st_dev, current.st_ino) == (self.identity.st_dev, self.identity.st_ino):
+                os.unlink(self.target)
+            # A foreign replacement remains untouched. A refused unlink keeps
+            # the original name debt available to the same owner's next close.
+            self.name_pending = False
 
 
 class RealNativeClientReceiving(unittest.TestCase):
@@ -235,7 +335,7 @@ class RealNativeClientReceiving(unittest.TestCase):
                     ),
                     flush=True,
                 )
-            except OSError:
+            except (OSError, ValueError):
                 pass
         receipt = json.loads((cls.root / "source-receipt.json").read_text())
         for relative, digest in receipt["source_hashes"].items():
@@ -248,6 +348,12 @@ class RealNativeClientReceiving(unittest.TestCase):
             != receipt["binary_sha256"]
         ):
             raise RuntimeError("Native receiving final signed binary receipt diverged")
+        if any(
+            (receipt := getattr(worker, "_fixture_stage_receipt", None)) is not None
+            and not receipt.closed
+            for worker in cls.receiving_workers
+        ):
+            raise RuntimeError("Native fixture stage receipt closure remains unsettled")
         shutil.rmtree(cls.root)
         if all(worker_receiving_facts(value)["settled"] for value in cls.receiving_workers):
             cls.receiving_workers.clear()
@@ -269,7 +375,17 @@ class RealNativeClientReceiving(unittest.TestCase):
         def observe(receiver, *arguments, **keywords):
             # This test owner retains only the exact caller object, before its
             # unchanged open/close implementation runs. It never selects a PID.
+            if len(self.receiving_workers) > self.receiving_start:
+                previous = self.receiving_workers[-1]
+                previous_receipt = getattr(previous, "_fixture_stage_receipt", None)
+                if previous_receipt is not None:
+                    previous_receipt.retire_name(
+                        previous,
+                        self.resources / f"fixture-worker-stages-{len(self.receiving_workers)}",
+                    )
             self.receiving_workers.append(receiver)
+            receipt = WorkerStageReceipt(self.resources / "fixture-worker-stages")
+            receiver._fixture_stage_receipt = receipt
             return original(receiver, *arguments, **keywords)
 
         observer = mock.patch.object(self.managed.Native.NativeHTTPResponse, "_open_wire", observe)
@@ -281,12 +397,44 @@ class RealNativeClientReceiving(unittest.TestCase):
     def report_receiving_facts(self):
         owners = self.receiving_workers[self.receiving_start :]
         facts = [worker_receiving_facts(value) for value in owners]
+        stages = []
+        for owner in owners:
+            receipt = getattr(owner, "_fixture_stage_receipt", None)
+            if receipt is None:
+                stages.append({"state": "unavailable", "stages": []})
+                continue
+            try:
+                stages.append(receipt.facts(owner))
+            except OSError:
+                stages.append({"state": "refused", "stages": []})
+            finally:
+                if worker_receiving_facts(owner)["settled"]:
+                    try:
+                        receipt.close()
+                    except (OSError, RuntimeError):
+                        stages[-1] = {"state": "refused", "stages": []}
         print(
             "# native_http_receiving "
             + json.dumps(
                 {
                     "version": 1,
                     "peer": self.fixture.receiving_facts(),
+                    "entry_stages": {
+                        stage: min(65535, sum(stage in row["stages"] for row in stages))
+                        for stage in WORKER_STAGES
+                    },
+                    "stage_receipts": {
+                        state: min(65535, sum(row["state"] == state for row in stages))
+                        for state in ("observed", "empty", "unavailable", "refused", "unsettled")
+                    },
+                    "stage_closure_unsettled": min(
+                        65535,
+                        sum(
+                            (receipt := getattr(owner, "_fixture_stage_receipt", None)) is not None
+                            and not receipt.closed
+                            for owner in owners
+                        ),
+                    ),
                     "worker_count": min(65535, len(facts)),
                     **{
                         key: min(65535, sum(value[key] for value in facts))

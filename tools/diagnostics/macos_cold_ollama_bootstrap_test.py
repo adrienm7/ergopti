@@ -13,6 +13,7 @@ import errno
 import os
 import socket
 import subprocess
+import time
 from unittest import mock
 
 import macos_cold_ollama_bootstrap as cold
@@ -238,12 +239,48 @@ class InstalledArchiveTests(unittest.TestCase):
             compare_installed_archive(self.archive, self.directory)
 
 
+def receive_owned_version_error(address):
+    with socket.create_connection(address, timeout=1) as peer:
+        peer.sendall(
+            b"GET /api/version HTTP/1.1\r\nHost: 127.0.0.1:"
+            + str(address[1]).encode("ascii")
+            + b"\r\nConnection: close\r\n\r\n"
+        )
+        response = bytearray()
+        while part := peer.recv(4096):
+            response.extend(part)
+        return bytes(response)
+
+
 class OfficialClientVersionProbeTests(unittest.TestCase):
     """Actual loopback lease tests; mocked CLI output gives no native Mac credit."""
 
-    def assert_port_released(self, address):
-        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as successor:
-            successor.bind(address)
+    def setUp(self):
+        self.owners = []
+        original = cold.OwnedVersionErrorRoute.open
+
+        def observe(owner):
+            original(owner)
+            self.owners.append((owner, (owner.listener, owner.wake_read, owner.wake_write)))
+
+        observer = mock.patch.object(cold.OwnedVersionErrorRoute, "open", new=observe)
+        observer.start()
+        self.addCleanup(observer.stop)
+
+    def assert_owner_retired(self, address):
+        matching = [
+            (owner, descriptors) for owner, descriptors in self.owners if owner.address == address
+        ]
+        self.assertEqual(len(matching), 1)
+        owner, descriptors = matching[0]
+        self.assertTrue(owner.closed)
+        self.assertTrue(owner.worker_retired)
+        self.assertFalse(owner.worker.is_alive())
+        self.assertEqual([descriptor.fileno() for descriptor in descriptors], [-1, -1, -1])
+        self.assertIsNone(owner.connection)
+        self.assertIsNone(owner.listener)
+        self.assertIsNone(owner.wake_read)
+        self.assertIsNone(owner.wake_write)
 
     def test_inherited_foreign_host_is_overridden_only_for_the_actual_probe_child(self):
         foreign = "http://foreign-daemon.invalid:11434"
@@ -270,7 +307,11 @@ class OfficialClientVersionProbeTests(unittest.TestCase):
                     {key: value for key, value in options["env"].items() if key != "OLLAMA_HOST"},
                     {key: value for key, value in environment.items() if key != "OLLAMA_HOST"},
                 )
-                self.assertEqual(options["timeout"], 30)
+                self.assertGreater(options["timeout"], 0)
+                self.assertLessEqual(options["timeout"], 30)
+                self.assertEqual(
+                    receive_owned_version_error(observed["address"]), cold.VERSION_ROUTE_RESPONSE
+                )
                 self.assertIs(options["check"], True)
                 return subprocess.CompletedProcess(
                     arguments,
@@ -288,18 +329,19 @@ class OfficialClientVersionProbeTests(unittest.TestCase):
             self.assertEqual(
                 receipt,
                 {
-                    "kind": "retained non-listening loopback socket",
+                    "kind": "retained owned loopback HTTP503 peer",
                     "address": "127.0.0.1",
                     "port": observed["address"][1],
                     "environment_scope": "version child only",
                     "command_closed": True,
                     "lease_closed": True,
+                    "route_worker_retired": True,
                     "client_version": "0.24.0",
                 },
             )
-            self.assert_port_released(observed["address"])
+            self.assert_owner_retired(observed["address"])
 
-    def test_real_non_listening_socket_blocks_rebind_and_refuses_connections_until_command_returns(
+    def test_real_owned_error_listener_blocks_rebind_until_command_returns(
         self,
     ):
         observed = {}
@@ -313,9 +355,10 @@ class OfficialClientVersionProbeTests(unittest.TestCase):
                 with self.assertRaises(OSError) as conflict:
                     competitor.bind(observed["address"])
                 self.assertEqual(conflict.exception.errno, errno.EADDRINUSE)
-            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as client:
-                client.settimeout(0.2)
-                self.assertEqual(client.connect_ex(observed["address"]), errno.ECONNREFUSED)
+            self.assertEqual(
+                receive_owned_version_error(observed["address"]),
+                b"HTTP/1.1 503 Service Unavailable\r\nContent-Length: 0\r\nConnection: close\r\n\r\n",
+            )
             return subprocess.CompletedProcess(
                 arguments,
                 0,
@@ -327,7 +370,7 @@ class OfficialClientVersionProbeTests(unittest.TestCase):
             cold.probe_installed_client_version(
                 Path("/owned/ollama"), Path("/owned/isolation.sb"), {}
             )
-        self.assert_port_released(observed["address"])
+        self.assert_owner_retired(observed["address"])
 
     def test_literal_local_version_refuses_foreign_server_wrong_version_and_substring_spoof(
         self,
@@ -355,7 +398,7 @@ class OfficialClientVersionProbeTests(unittest.TestCase):
                         cold.probe_installed_client_version(
                             Path("/owned/ollama"), Path("/owned/isolation.sb"), {}
                         )
-                self.assert_port_released(observed["address"])
+                self.assert_owner_retired(observed["address"])
 
     def test_timeout_and_command_refusal_release_only_the_owned_socket(self):
         for reason in ("timeout", "exit"):
@@ -378,7 +421,7 @@ class OfficialClientVersionProbeTests(unittest.TestCase):
                         cold.probe_installed_client_version(
                             Path("/owned/ollama"), Path("/owned/isolation.sb"), {}
                         )
-                self.assert_port_released(observed["address"])
+                self.assert_owner_retired(observed["address"])
 
 
 class ColdIsolationLipoGrammarTests(unittest.TestCase):
@@ -488,16 +531,22 @@ class ColdIdentityReceiptTests(unittest.TestCase):
 class OfficialVersionTimeoutDiscriminatorTests(unittest.TestCase):
     """Actual POSIX socket routes and redacted captured timeout boundaries only."""
 
-    def test_actual_route_refusal_does_not_accept_a_listening_peer(self):
-        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as lease:
-            lease.bind(("127.0.0.1", 0))
+    def test_actual_owned_route_returns_only_empty_http_error_and_physically_retires(self):
+        owner = cold.OwnedVersionErrorRoute(time.monotonic() + 30)
+        try:
+            owner.open()
             self.assertEqual(
-                cold.qualify_version_probe_route(lease.getsockname()),
-                {"kind": "actual kernel loopback connection", "result": "ECONNREFUSED"},
+                cold.qualify_version_probe_route(owner),
+                {"kind": "actual owned loopback HTTP response", "result": "HTTP503-empty-body"},
             )
-            lease.listen(1)
-            with self.assertRaisesRegex(RuntimeError, "did not refuse.*0"):
-                cold.qualify_version_probe_route(lease.getsockname())
+            self.assertEqual(owner.complete_responses(), 1)
+            self.assertFalse(owner.closed)
+            self.assertTrue(owner.worker.is_alive())
+        finally:
+            owner.retire()
+        self.assertTrue(owner.closed)
+        self.assertTrue(owner.worker_retired)
+        self.assertFalse(owner.worker.is_alive())
 
     def test_refused_route_prevents_cli_invocation_and_retains_lease_cleanup(self):
         diagnostics = {}
@@ -523,7 +572,7 @@ class OfficialVersionTimeoutDiscriminatorTests(unittest.TestCase):
                 )
         self.assertIs(observed.exception, refusal)
         self.assertIs(diagnostics["lease_closed"], True)
-        self.assertEqual(diagnostics["route"]["result"], "ECONNREFUSED")
+        self.assertEqual(diagnostics["route"]["result"], "HTTP503-empty-body")
         self.assertIs(diagnostics["failure"]["expected_version_lines_complete"], True)
         self.assertEqual(diagnostics["failure"]["output"]["stdout"]["sample_bytes"], len(expected))
         self.assertNotIn(expected.decode(), json.dumps(diagnostics))
@@ -555,6 +604,268 @@ class OfficialVersionTimeoutDiscriminatorTests(unittest.TestCase):
                     cold.version_timeout_observation(refusal)["expected_version_lines_complete"],
                     False,
                 )
+
+
+class OwnedVersionErrorRouteTests(unittest.TestCase):
+    def test_warning_lines_without_actual_cli_request_cannot_claim_a_version_probe(self):
+        result = subprocess.CompletedProcess(
+            [],
+            0,
+            "Warning: could not connect to a running Ollama instance\nWarning: client version is 0.24.0\n",
+            "",
+        )
+        diagnostics = {}
+        with mock.patch.object(cold.subprocess, "run", return_value=result):
+            with self.assertRaisesRegex(RuntimeError, "did not receive the owned error route"):
+                cold.probe_installed_client_version(
+                    Path("/owned/ollama"), Path("/owned/policy"), {}, diagnostics
+                )
+        self.assertIs(diagnostics["lease_closed"], True)
+        self.assertIs(diagnostics["route_worker_retired"], True)
+
+    def test_owned_route_never_answers_another_path_or_supplies_daemon_json(self):
+        owner = cold.OwnedVersionErrorRoute(time.monotonic() + 30)
+        try:
+            owner.open()
+            with socket.create_connection(owner.address, timeout=1) as peer:
+                peer.sendall(
+                    b"GET /api/tags HTTP/1.1\r\nHost: 127.0.0.1:"
+                    + str(owner.address[1]).encode()
+                    + b"\r\n\r\n"
+                )
+                self.assertEqual(peer.recv(4096), b"")
+            self.assertEqual(owner.complete_responses(), 0)
+        finally:
+            owner.retire()
+        self.assertIsNotNone(owner.failure)
+        self.assertTrue(owner.worker_retired)
+        self.assertTrue(owner.closed)
+
+    def test_original_deadline_includes_route_qualification_before_version_child(self):
+        clock = [1.0]
+        qualify = cold.qualify_version_probe_route
+
+        def consumed(owner):
+            value = qualify(owner)
+            clock[0] = 12.0
+            return value
+
+        def run(arguments, **options):
+            self.assertEqual(options["timeout"], 19.0)
+            address = ("127.0.0.1", int(options["env"]["OLLAMA_HOST"].rsplit(":", 1)[1]))
+            self.assertEqual(receive_owned_version_error(address), cold.VERSION_ROUTE_RESPONSE)
+            return subprocess.CompletedProcess(
+                arguments,
+                0,
+                "Warning: could not connect to a running Ollama instance\nWarning: client version is 0.24.0\n",
+                "",
+            )
+
+        with mock.patch.object(cold.time, "monotonic", side_effect=lambda: clock[0]):
+            with mock.patch.object(cold, "qualify_version_probe_route", side_effect=consumed):
+                with mock.patch.object(cold.subprocess, "run", side_effect=run):
+                    receipt = cold.probe_installed_client_version(
+                        Path("/owned/ollama"), Path("/owned/policy"), {}
+                    )
+        self.assertIs(receipt["lease_closed"], True)
+        self.assertIs(receipt["route_worker_retired"], True)
+
+    def test_closed_descriptor_uncertainty_retains_primary_and_cannot_turn_green_on_retry(self):
+        held = []
+        qualify = cold.qualify_version_probe_route
+
+        def remember(owner):
+            owner.test_listener = owner.listener
+            held.append(owner)
+            return qualify(owner)
+
+        close = socket.socket.close
+
+        def refused(descriptor):
+            is_owned_listener = bool(held) and descriptor is held[0].test_listener
+            close(descriptor)
+            if is_owned_listener:
+                raise OSError("independent close acknowledgement uncertainty")
+
+        with mock.patch.object(cold, "qualify_version_probe_route", side_effect=remember):
+            with mock.patch.object(
+                cold.subprocess, "run", side_effect=RuntimeError("independent primary")
+            ):
+                with mock.patch.object(socket.socket, "close", new=refused):
+                    with self.assertRaisesRegex(RuntimeError, "independent primary") as observed:
+                        cold.probe_installed_client_version(
+                            Path("/owned/ollama"), Path("/owned/policy"), {}
+                        )
+        self.assertIs(observed.exception.route_owner, held[0])
+        self.assertIsNotNone(observed.exception.route_cleanup_refusal)
+        self.assertFalse(held[0].closed)
+        self.assertTrue(held[0].worker_retired)
+        with self.assertRaisesRegex(RuntimeError, "descriptor closure remains unsettled"):
+            held[0].retire()
+
+    def test_expired_original_clock_starts_no_cli_and_never_accepts_timeout_as_refusal(self):
+        clock = [1.0]
+        held = []
+        qualify = cold.qualify_version_probe_route
+
+        def expired(owner):
+            held.append(owner)
+            value = qualify(owner)
+            clock[0] = 32.0
+            return value
+
+        with mock.patch.object(cold.time, "monotonic", side_effect=lambda: clock[0]):
+            with mock.patch.object(cold, "qualify_version_probe_route", side_effect=expired):
+                with mock.patch.object(cold.subprocess, "run") as child:
+                    with self.assertRaises(TimeoutError):
+                        cold.probe_installed_client_version(
+                            Path("/owned/ollama"), Path("/owned/policy"), {}
+                        )
+        child.assert_not_called()
+        # The same exact owner may finish retirement after scheduling catches up;
+        # this observes thread completion without supplying a renewed clock.
+        held[0].worker.join(1)
+        held[0].retire()
+        self.assertTrue(held[0].worker_retired)
+        self.assertTrue(held[0].closed)
+
+    def test_pre_close_refusal_retains_exact_native_object_until_physical_retry(self):
+        owner = cold.OwnedVersionErrorRoute(time.monotonic() + 30)
+        owner.open()
+        listener = owner.listener
+        original = socket.socket.close
+
+        def refuse(descriptor):
+            if descriptor is listener:
+                raise OSError("independent refusal before native close")
+            return original(descriptor)
+
+        with mock.patch.object(socket.socket, "close", new=refuse):
+            with self.assertRaisesRegex(RuntimeError, "descriptor closure remains unsettled"):
+                owner.retire()
+        self.assertIs(owner.listener, listener)
+        self.assertGreaterEqual(listener.fileno(), 0)
+        self.assertFalse(owner.closed)
+        with self.assertRaisesRegex(RuntimeError, "descriptor closure remains unsettled"):
+            owner.retire()
+        self.assertEqual(listener.fileno(), -1)
+        self.assertIsNone(owner.listener)
+        self.assertTrue(owner.worker_retired)
+        self.assertFalse(owner.closed)
+
+    def test_foreign_error_peer_cannot_qualify_another_retained_listener(self):
+        owner = cold.OwnedVersionErrorRoute(time.monotonic() + 30)
+        foreign = cold.OwnedVersionErrorRoute(time.monotonic() + 30)
+        try:
+            owner.open()
+            foreign.open()
+            original = owner.address
+            owner.address = foreign.address
+            with self.assertRaisesRegex(RuntimeError, "Owned version error response refused"):
+                cold.qualify_version_probe_route(owner)
+            self.assertEqual(owner.complete_responses(), 0)
+            self.assertEqual(foreign.complete_responses(), 1)
+            owner.address = original
+        finally:
+            owner.retire()
+            foreign.retire()
+        self.assertTrue(owner.closed)
+        self.assertTrue(foreign.closed)
+
+    def test_protocol_failure_and_actual_connection_close_uncertainty_are_both_retained(self):
+        owner = cold.OwnedVersionErrorRoute(time.monotonic() + 30)
+        original = socket.socket.close
+
+        def refused(descriptor):
+            is_connection = descriptor is owner.connection
+            original(descriptor)
+            if is_connection:
+                raise OSError("independent accepted socket close uncertainty")
+
+        try:
+            owner.open()
+            with mock.patch.object(socket.socket, "close", new=refused):
+                with socket.create_connection(owner.address, timeout=1) as peer:
+                    peer.sendall(
+                        b"GET /api/tags HTTP/1.1\r\nHost: 127.0.0.1:"
+                        + str(owner.address[1]).encode()
+                        + b"\r\n\r\n"
+                    )
+                    self.assertEqual(peer.recv(4096), b"")
+                owner.worker.join(1)
+            self.assertIsInstance(owner.failure, RuntimeError)
+            self.assertEqual(str(owner.failure), "Owned version request refused")
+            self.assertIsInstance(owner.close_debt, OSError)
+        finally:
+            with self.assertRaisesRegex(RuntimeError, "descriptor closure remains unsettled"):
+                owner.retire()
+        self.assertTrue(owner.worker_retired)
+        self.assertIsNone(owner.connection)
+        self.assertIsNone(owner.listener)
+        self.assertFalse(owner.closed)
+
+    def test_final_closed_route_rechecks_exchange_after_actual_peer_retirement(self):
+        original = cold.OwnedVersionErrorRoute.retire
+
+        def late(owner):
+            self.assertEqual(
+                receive_owned_version_error(owner.address), cold.VERSION_ROUTE_RESPONSE
+            )
+            original(owner)
+
+        def run(arguments, **options):
+            address = ("127.0.0.1", int(options["env"]["OLLAMA_HOST"].rsplit(":", 1)[1]))
+            self.assertEqual(receive_owned_version_error(address), cold.VERSION_ROUTE_RESPONSE)
+            return subprocess.CompletedProcess(
+                arguments,
+                0,
+                "Warning: could not connect to a running Ollama instance\nWarning: client version is 0.24.0\n",
+                "",
+            )
+
+        diagnostics = {}
+        with mock.patch.object(cold.subprocess, "run", side_effect=run):
+            with mock.patch.object(cold.OwnedVersionErrorRoute, "retire", new=late):
+                with self.assertRaisesRegex(
+                    RuntimeError, "Final version error route exchange differs"
+                ):
+                    cold.probe_installed_client_version(
+                        Path("/owned/ollama"), Path("/owned/policy"), {}, diagnostics
+                    )
+        self.assertIs(diagnostics["lease_closed"], True)
+        self.assertIs(diagnostics["route_worker_retired"], True)
+
+    def test_known_request_refusal_survives_retirement_latched_after_actual_close(self):
+        owner = cold.OwnedVersionErrorRoute(time.monotonic() + 30)
+        original_close = owner._close_owned
+
+        def close_then_stop(name):
+            result = original_close(name)
+            if name == "connection":
+                # Actual socket EOF can let the caller retire before the outer
+                # worker exception handler runs. Latch that exact ordering.
+                owner.stopping.set()
+            return result
+
+        owner._close_owned = close_then_stop
+        try:
+            owner.open()
+            with socket.create_connection(owner.address, timeout=1) as peer:
+                peer.sendall(
+                    b"GET /api/tags HTTP/1.1\r\nHost: 127.0.0.1:"
+                    + str(owner.address[1]).encode()
+                    + b"\r\n\r\n"
+                )
+                self.assertEqual(peer.recv(4096), b"")
+            self.assertEqual(owner.complete_responses(), 0)
+        finally:
+            owner.retire()
+        self.assertIsInstance(owner.failure, RuntimeError)
+        self.assertEqual(str(owner.failure), "Owned version request refused")
+        self.assertTrue(owner.worker_retired)
+        self.assertTrue(owner.closed)
+        self.assertIsNone(owner.connection)
+        self.assertIsNone(owner.listener)
 
 
 if __name__ == "__main__":
