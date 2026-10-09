@@ -5018,7 +5018,7 @@ integrated, then publish one grouped release.
 
 - [~] **54.** Every menu is declared in the shared menu manifest, never in
   driver code. The ratchet `npm run test:native-menu-rows` counts the rows
-  drivers still build (current baseline: Windows 25, macOS 19, Linux 21, each
+  drivers still build (current baseline: Windows 23, macOS 19, Linux 21, each
   site listed in tools/test/native-menu-rows-baseline.json); migrate them to
   zero. Each OS-limited row declares `unavailable = "hide"` (not
   applicable) or `"grey"` (not yet ported, with its reason); classify the
@@ -5994,6 +5994,14 @@ unknown-cleanup, 23 ms and cancellation assertion. Group3 explicitly released
 only this fixture scope. Independent source review passed; corrected native
 AHK execution remains unrun. Privacy, schema, collector, report and production
 cancellation owners are unchanged. Items 54 and 81 remain partial.
+
+The Windows configured-section and dynamic-section boundaries now consume the
+existing shared inert separator instead of constructing native rows. Source
+order and leading/adjacent suppression remain unchanged; missing, empty or
+duplicated declarations refuse detached construction. All original helper tests
+remain, with three registered native refusal/availability cases added. The
+actual census owner regenerates 23/19/21 sites; no independent legacy corpus or
+historical floor is regenerated. Native qualification of this slice is pending.
 
 - [ ] **62.** Downloads on managed company networks: system trust and
       system proxy for every download child (Ollama installation/server/pull,
@@ -7617,7 +7625,7 @@ is committed; one request is one commit with its regression test.
 
 - [~] **81.** The maintainer asks to treat item 54 now (every menu row is
   declared in the shared manifest, none built in a driver's folder):
-  Windows 25, macOS 19 and Linux 21 rows are still built by the
+  Windows 23, macOS 19 and Linux 21 rows are still built by the
   drivers (`tools/test/native-menu-rows-baseline.json`). The current census
   was regenerated on 2026-10-09. The sites are of four kinds, and three need the
   manifest to say more than it can today:
@@ -7895,6 +7903,14 @@ unknown-cleanup, 23 ms and cancellation assertion. Group3 explicitly released
 only this fixture scope. Independent source review passed; corrected native
 AHK execution remains unrun. Privacy, schema, collector, report and production
 cancellation owners are unchanged. Items 54 and 81 remain partial.
+
+The Windows configured-section and dynamic-section boundaries now consume the
+existing shared inert separator instead of constructing native rows. Source
+order and leading/adjacent suppression remain unchanged; missing, empty or
+duplicated declarations refuse detached construction. All original helper tests
+remain, with three registered native refusal/availability cases added. The
+actual census owner regenerates 23/19/21 sites; no independent legacy corpus or
+historical floor is regenerated. Native qualification of this slice is pending.
 
 - [~] **88.** **Partial: native prediction tooltip appearance.** Shared
   llm-line-style policy and the unchanged independent line corpus retain grey
