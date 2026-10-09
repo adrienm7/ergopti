@@ -1573,6 +1573,8 @@ def _validate_owned_automation_ui_fact(packet):
             in (
                 {"schema", "subrole", "type", "error"},
                 {"schema", "subrole", "type", "error", "window"},
+                {"schema", "subrole", "type", "error", "labels"},
+                {"schema", "subrole", "type", "error", "window", "labels"},
             ),
             "Unadmitted refused button fact fields",
         )
@@ -1667,6 +1669,50 @@ def _validate_owned_automation_ui_fact(packet):
                         and (control["error"] == 0 or control["type"] == "absent")
                     ),
                     "Window control identity lacks a successful exact AX element observation",
+                )
+        if "labels" in button:
+            labels = button["labels"]
+            require(
+                type(labels) is dict and set(labels) == {"description", "value"},
+                "Unadmitted exact refused button label fields",
+            )
+            for label in labels.values():
+                require(
+                    type(label) is dict
+                    and set(label) == {"type", "error", "family"}
+                    and type(label["error"]) is int
+                    and -(2**31) <= label["error"] < 2**31
+                    and type(label["type"]) is str
+                    and label["type"]
+                    in {"absent", "ax-element", "string", "array", "number", "other"}
+                    and type(label["family"]) is str
+                    and label["family"]
+                    in {
+                        "allow",
+                        "deny",
+                        "close",
+                        "minimize",
+                        "zoom",
+                        "other",
+                        "absent",
+                        "wrong-type",
+                    },
+                    "Unadmitted exact refused button label observation",
+                )
+                require(
+                    (label["type"] == "absent" and label["family"] == "absent")
+                    or (
+                        label["error"] == 0
+                        and label["type"] == "string"
+                        and label["family"]
+                        in {"allow", "deny", "close", "minimize", "zoom", "other"}
+                    )
+                    or (
+                        label["error"] == 0
+                        and label["type"] not in {"absent", "string"}
+                        and label["family"] == "wrong-type"
+                    ),
+                    "Refused button label type and family disagree",
                 )
     return dict(packet)
 

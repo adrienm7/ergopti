@@ -4377,5 +4377,96 @@ class RefusedButtonWindowControlFactControls(unittest.TestCase):
                 evidence.close()
 
 
+class RefusedButtonLabelFactControls(unittest.TestCase):
+    """Closed labels are observations; no localized string or consent authority crosses the frame."""
+
+    def packet(self):
+        packet = RefusedButtonWindowControlFactControls().packet()
+        packet["first_button"]["labels"] = {
+            "description": {"type": "string", "error": 0, "family": "close"},
+            "value": {"type": "absent", "error": -25205, "family": "absent"},
+        }
+        return packet
+
+    def test_closed_label_families_retain_original_title_refusal(self):
+        for family in ("allow", "deny", "close", "minimize", "zoom", "other"):
+            with self.subTest(family=family):
+                packet = self.packet()
+                packet["first_button"]["labels"]["description"]["family"] = family
+                self.assertEqual(probe._validate_owned_automation_ui_fact(packet), packet)
+                self.assertEqual(packet["first_attribute"], "button-title")
+                self.assertEqual(packet["first_error"], -25205)
+                self.assertEqual(packet["candidates"], 0)
+                self.assertEqual(packet["matches"], 0)
+        packet = self.packet()
+        packet["first_button"]["labels"]["value"] = {
+            "type": "number",
+            "error": 0,
+            "family": "wrong-type",
+        }
+        self.assertEqual(probe._validate_owned_automation_ui_fact(packet), packet)
+
+    def test_failed_private_or_malformed_labels_cannot_claim_observation(self):
+        for replacement in (
+            {"type": "absent", "error": -25205, "family": "allow"},
+            {"type": "string", "error": -25204, "family": "close"},
+            {"type": "number", "error": 0, "family": "close"},
+            {"type": "string", "error": True, "family": "close"},
+            {"type": "string", "error": 2**31, "family": "close"},
+            {"type": "string", "error": 0, "family": "private-description"},
+            {"type": "string", "error": 0, "family": "close", "accepted": True},
+        ):
+            with self.subTest(replacement=replacement), self.assertRaises(probe.AdmissionError):
+                packet = self.packet()
+                packet["first_button"]["labels"]["description"] = replacement
+                probe._validate_owned_automation_ui_fact(packet)
+        for labels in (
+            None,
+            {},
+            {"description": {"type": "string", "error": 0, "family": "close"}},
+            {"description": {}, "value": {}, "title": {}},
+        ):
+            with self.subTest(labels=labels), self.assertRaises(probe.AdmissionError):
+                packet = self.packet()
+                packet["first_button"]["labels"] = labels
+                probe._validate_owned_automation_ui_fact(packet)
+
+    def test_real_private_label_receipt_never_admits_consent_or_closure(self):
+        with TemporaryDirectory() as directory, patch.object(probe, "NativeProcessGroups"):
+            root = Path(directory)
+            evidence_dir = root / "evidence"
+            evidence_dir.mkdir(mode=0o700)
+            evidence = probe.PhaseEvidence(evidence_dir)
+            owner = probe.Children(root, evidence=evidence)
+            packet = self.packet()
+            primary = subprocess.CompletedProcess(
+                [], 67, "OWNED_AUTOMATION_UI/1 state=observation-refused\n", ""
+            )
+
+            def producer(arguments, **options):
+                self.assertEqual(arguments[:-1], ["/owned/helper", "sender", "receiver", "73"])
+                self.assertEqual(options, {"check": False, "timeout": 2})
+                path = Path(arguments[-1])
+                self.assertEqual(path.parent, root)
+                self.assertEqual(stat.S_IMODE(path.stat().st_mode), 0o600)
+                path.write_text(json.dumps(packet))
+                return primary
+
+            owner.run = Mock(side_effect=producer)
+            try:
+                result = probe._owned_automation_ui_run(
+                    owner, ["/owned/helper", "sender", "receiver", "73"], 2
+                )
+                self.assertIs(result, primary)
+                self.assertEqual(result.returncode, 67)
+                receipt = json.loads((evidence_dir / "checkpoint.json").read_text())
+                self.assertEqual(receipt["native_ui"], packet)
+                self.assertEqual(receipt["status"], "refused")
+                self.assertFalse(receipt["ownership_closed"])
+                self.assertEqual(list(root.glob("automation-ui-fact-*")), [])
+            finally:
+                evidence.close()
+
+
 if __name__ == "__main__":
     unittest.main()
