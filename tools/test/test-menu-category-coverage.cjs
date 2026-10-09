@@ -47,6 +47,44 @@ const { scriptTokens } = require('../lib/script-source.cjs');
 
 const { validateChildTemplates } = require('../lib/menu-row-availability.cjs');
 
+// Independent native count-format controls call the genuine exported compiler validator.
+{
+	const row = {
+		type: 'group',
+		id: 'native_count_parent',
+		caption_source: 'native',
+		caption_getter: 'native_name',
+		caption_count_getter: 'native_count',
+		caption_count_format: '%s (%s)',
+		unavailable: 'hide'
+	};
+	const vectors = [
+		['%s (%s)', true],
+		['%s (%s) %%s', true],
+		['%%%s (%s)', true],
+		['%s %%s', false],
+		['%%s', false],
+		['%s', false],
+		['%s %s %s', false],
+		['%s (%q)', false],
+		['%s (%s) %', false]
+	];
+	for (const [format, admitted] of vectors) {
+		const validate = () =>
+			validateChildTemplates({
+				count_frame: [
+					{
+						...row,
+						caption_count_format: format
+					}
+				]
+			});
+		if (admitted) assert.doesNotThrow(validate, format);
+		else assert.throws(validate, /two ordered scalar slots/, format);
+	}
+	console.log('[OK] 9 independent native count-format validator controls.');
+}
+
 const { nativeTemplateBinding } = require('../lib/menu-template-binding.cjs');
 
 const { nativeLayoutRowOwnership } = require('../lib/menu-native-layout-binding.cjs');

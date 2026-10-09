@@ -445,20 +445,24 @@ local function build_hotstrings_rows(ctx, menu_mods)
 			only[name] = true
 			names[#names + 1] = name
 		end
-		local items = {}
 		local bulk = type(menu_mods.hotstrings.build_language_bulk_actions) == "function"
 			and menu_mods.hotstrings.build_language_bulk_actions(ctx, names) or {}
-		for _, row in ipairs(bulk) do items[#items + 1] = row end
-		items[#items + 1] = { separator = true }
+		local categories = collect_groups(only, counts)
+		local items = ManifestMenu.template_rows("hotstring_language_frame", {}, {}, {
+			hotstring_language_switch = function() return bulk end,
+			hotstring_language_categories = function() return categories end,
+		})
 		local total = 0
-		for _, row in ipairs(collect_groups(only, counts)) do items[#items + 1] = row end
 		for _, name in ipairs(names) do
 			total = total + ((counts and counts.group_counts and counts.group_counts[name]) or 0)
 		end
-		language_rows[#language_rows + 1] = {
-			label = language_label(pack.locale) .. " (" .. fmt_grand(total) .. ")",
-			items = items,
-		}
+		if items then
+			local parents = ManifestMenu.template_rows("hotstring_language_parent_lua", {}, {
+				hotstring_language_name = function() return language_label(pack.locale) end,
+				hotstring_language_count = function() return fmt_grand(total) end,
+			}, { hotstring_language_children = items })
+			for _, row in ipairs(parents or {}) do language_rows[#language_rows + 1] = row end
+		end
 	end
 	local custom_item = type(menu_mods.hotstrings.build_custom) == "function"
 		and Logger.build(LOG, "hotstrings.build_custom", function(c) return menu_mods.hotstrings.build_custom(c, counts) end, ctx)
