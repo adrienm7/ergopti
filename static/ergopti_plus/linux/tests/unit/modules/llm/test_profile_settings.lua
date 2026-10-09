@@ -11,6 +11,42 @@ local helpers = require("tests.helpers")
 local PreferencesFixture = require("tests.support.llm_preferences_fixture")
 local RegistryCodec = require("modules.llm.profile_registry_codec")
 
+
+--- Binds the actual idle live owner without replacing the profile/save collaborators.
+--- Every native owner is fresh; all module identities/absence are journalled.
+local function with_idle_live_owner(settings, body)
+	local journal = {}
+	for name, value in pairs(package.loaded) do journal[name] = value end
+	local owner
+	local ok, err = xpcall(function()
+		for _, name in ipairs({ "modules.llm.prediction_engine", "modules.llm.profiles", "modules.llm.settings" }) do
+			package.loaded[name] = nil
+		end
+		owner = require("modules.llm.prediction_engine")
+		helpers.assert_true(rawequal(require("modules.llm.profile_settings"), settings),
+			"the native engine captures the actual fixture profile owner")
+		helpers.assert_nil(owner.init(), "fresh native initialization retains its original nil receipt")
+		helpers.assert_type(owner.get_live, "function")
+		helpers.assert_type(owner.set_live, "function")
+		helpers.assert_nil(owner.get_live(), "the genuine initialized fixture starts with no temporary override")
+		helpers.assert_eq(owner.set_live(nil), true, "the actual idle stop owner acknowledges exact nil")
+		helpers.assert_nil(owner.get_live(), "idle acknowledgement cannot introduce a temporary override")
+		body(owner)
+	end, debug.traceback)
+	local cleaned, cleanup_err = pcall(function()
+		if owner then
+			helpers.assert_eq(owner.stop_runtime(), true, "the fresh engine retains no native runtime debt")
+			helpers.assert_eq(owner.runtime_pending(), false)
+			helpers.assert_nil(owner.get_live(), "profile-only fixture actions cannot start live mode")
+		end
+	end)
+	-- This journal also removes dependencies introduced by the genuine engine.
+	for name in pairs(package.loaded) do if journal[name] == nil then package.loaded[name] = nil end end
+	for name, value in pairs(journal) do package.loaded[name] = value end
+	if not ok then error(err, 0) end
+	if not cleaned then error(cleanup_err, 0) end
+end
+
 local held = {}
 
 local function replace(name, value)
@@ -372,32 +408,38 @@ helpers.describe("LLM profile settings: a prompt named by a binding", function()
 	end)
 
 	helpers.it("lists the rewrite prompt in the AI menu under its own label", function()
-		local settings = load_settings({ ["llm.profiles.auto_profile_for_model"] = false })
-		local menu_builder = helpers.load_module("ui.menu.menu_builder")
-		local menu = menu_builder.build({
-			llm = {
-				is_enabled = function() return true end,
-				toggle = function() return true end,
-				get_models = function() return {} end,
-				get_current_model = function() return "small" end,
-			},
-			on_menu_changed = function() end,
-		})
-		local function find(rows, title)
-			for _, row in ipairs(rows or {}) do
-				if row.title == title then return row end
-				local nested = find(row.menu, title)
-				if nested then return nested end
-			end
-		end
-		local i18n = require("infra.i18n")
-		local rewrite = find(menu, i18n.get("llm.profile.rewrite.label"))
-		helpers.assert_not_nil(rewrite, "the rewrite prompt has its row")
-		helpers.assert_not_nil(find(menu, i18n.get("llm.profile.basic.label")),
-			"the basic row is its label alone, with no count appended")
-		rewrite.fn()
-		helpers.assert_eq(settings.get("active"), "rewrite", "choosing the row selects the prompt")
+		local ok, err = xpcall(function()
+			local settings = load_settings({ ["llm.profiles.auto_profile_for_model"] = false })
+			with_idle_live_owner(settings, function(live_owner)
+				local menu_builder = helpers.load_module("ui.menu.menu_builder")
+				local menu = menu_builder.build({
+					llm = {
+						is_enabled = function() return true end,
+						toggle = function() return true end,
+						get_models = function() return {} end,
+						get_current_model = function() return "small" end,
+						get_live = live_owner.get_live, set_live = live_owner.set_live,
+					},
+					on_menu_changed = function() end,
+				})
+				local function find(rows, title)
+					for _, row in ipairs(rows or {}) do
+						if row.title == title then return row end
+						local nested = find(row.menu, title)
+						if nested then return nested end
+					end
+				end
+				local i18n = require("infra.i18n")
+				local rewrite = find(menu, i18n.get("llm.profile.rewrite.label"))
+				helpers.assert_not_nil(rewrite, "the rewrite prompt has its row")
+				helpers.assert_not_nil(find(menu, i18n.get("llm.profile.basic.label")),
+					"the basic row is its label alone, with no count appended")
+				rewrite.fn()
+				helpers.assert_eq(settings.get("active"), "rewrite", "choosing the row selects the prompt")
+			end)
+		end, debug.traceback)
 		restore()
+		if not ok then error(err, 0) end
 	end)
 end)
 

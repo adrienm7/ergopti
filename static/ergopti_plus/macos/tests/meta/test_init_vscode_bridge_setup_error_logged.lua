@@ -11,8 +11,9 @@ local helpers = require("tests.helpers")
 
 --- Prepares only the menu-ready source slice, never the driver entrypoint.
 --- @param available boolean Whether the recording menu commits.
---- @return function chunk
+--- @return boolean ok Whether the exact bounded startup slice committed.
 --- @return table facts
+--- @return nil|string result The actual chunk return or fatal startup diagnostic.
 local function startup_slice(available)
 	local source = helpers.read_driver_source("local function has_common_hotstring_groups")
 	helpers.assert_type(source, "string")
@@ -39,24 +40,26 @@ local function startup_slice(available)
 	}
 	setmetatable(env, { __index = _G })
 	local chunk = assert(load(slice, "@owned-menu-startup-slice", "t", env))
-	return chunk, facts
+	local ok, result = pcall(chunk)
+	return ok, facts, result
 end
 
 helpers.describe("startup without retired VS Code bridge", function()
 	helpers.it("commits normal menu readiness with zero bridge activation", function()
-		local chunk, facts = startup_slice(true)
-		chunk()
+		local ok, facts, result = startup_slice(true)
+		helpers.assert_true(ok, "the existing UI can progress without the retired feature")
+		helpers.assert_eq(result, nil, "committed menu startup returns no domain value")
 		helpers.assert_eq(facts.menu_calls, 1)
 		helpers.assert_eq(facts.bridge_calls, 0)
 		helpers.assert_eq(facts.marks[#facts.marks], "UI: menu ready")
 		helpers.assert_eq(facts.stages[#facts.stages], "File watchers armed")
 	end)
 	helpers.it("still refuses UI readiness when the actual menu does not commit", function()
-		local chunk, facts = startup_slice(false)
-		local ok, err = pcall(chunk)
+		local ok, facts, result = startup_slice(false)
 		helpers.assert_eq(ok, false)
-		helpers.assert_type(err, "string")
-		helpers.assert_true(err:find("menu.start did not commit", 1, true) ~= nil, "the actual menu refusal must survive")
+		helpers.assert_type(result, "string")
+		helpers.assert_true(result:find("menu.start did not commit", 1, true) ~= nil, "the actual menu refusal must survive")
+		helpers.assert_eq(result:match(": ([^\n]+)$"), "menu.start did not commit")
 		helpers.assert_eq(facts.menu_calls, 1)
 		helpers.assert_eq(facts.bridge_calls, 0)
 		helpers.assert_eq(#facts.marks, 0)

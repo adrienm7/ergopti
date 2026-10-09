@@ -5,6 +5,7 @@
 const { isDeepStrictEqual } = require('node:util');
 const { scriptTokens } = require('./script-source.cjs');
 const { nativeTemplateBinding } = require('./menu-template-binding.cjs');
+const { nativeTopLevelProjection } = require('./menu-native-llm-parent-binding.cjs');
 
 /** A finite physical Lua route check, not runtime authority or general data-flow analysis. */
 function nativeBadgeRootComposition(sources, manifest, platform) {
@@ -382,18 +383,7 @@ function nativeBadgeRootComposition(sources, manifest, platform) {
 		!unique(loadRoot, 'return ManifestMenu.get_root()') ||
 		!soleLocal(loadTop, 'data', 'local data = load_manifest()') ||
 		!soleLocal(loadTop, 'result', 'local result = {}') ||
-		!unique(
-			loadTop,
-			'local projected = { id = entry.id, greyed_when_paused = entry.greyed_when_paused == true }'
-		) ||
-		!unique(loadTop, 'if entry.disabled == true then') ||
-		!unique(
-			loadTop,
-			'projected.disabled, projected.i18n, projected.reason_key = true, entry.i18n, entry.reason_key'
-		) ||
-		!unique(loadTop, 'table.insert(result, projected)') ||
-		loadTop.tokens.filter((token) => token.kind === 'identifier' && token.value === 'projected')
-			.length !== 5 ||
+		!nativeTopLevelProjection(loadTop, lex) ||
 		writes(loadTop, '_top_level_cache').length !== 1 ||
 		writes(loadTop, '_top_level_cache')[0] !==
 			matches(loadTop, '_top_level_cache = result', 0)[0] ||
@@ -402,27 +392,6 @@ function nativeBadgeRootComposition(sources, manifest, platform) {
 		!unique(loadTop, '_top_level_cache = result return _top_level_cache') ||
 		!soleLocal(generate, 'items', 'local items = {}') ||
 		!unique(generate, 'table.insert(items, row)')
-	)
-		return false;
-	const projectionLoop = matches(loadTop, 'for _, entry in ipairs(data.top_level) do')[0],
-		projectionEnd = loadTop.closes.get(projectionLoop),
-		projection = matches(loadTop, 'local projected =')[0],
-		disabled = matches(loadTop, 'if entry.disabled == true then')[0],
-		metadata = matches(loadTop, 'projected.disabled, projected.i18n, projected.reason_key =')[0],
-		insertion = matches(loadTop, 'table.insert(result, projected)')[0];
-	if (
-		projectionEnd === undefined ||
-		!(
-			projectionLoop < projection &&
-			projection < disabled &&
-			disabled < metadata &&
-			metadata < insertion &&
-			insertion < projectionEnd
-		) ||
-		loadTop.scopes[projection] !== 1 ||
-		loadTop.scopes[disabled] !== 1 ||
-		loadTop.scopes[metadata] !== 2 ||
-		loadTop.scopes[insertion] !== 1
 	)
 		return false;
 	for (const source of [builder, badge]) {

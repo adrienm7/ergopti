@@ -63,11 +63,39 @@ function reset() {
 	write(TOOL, tool);
 	write(CORPUS, corpusBytes);
 	write(BASELINE, JSON.stringify(legacy.baseline, null, '\t') + '\n');
+	// Current retirement needs real declaration and lexer inputs on every reset.
+	write(
+		'static/ergopti_plus/_shared/modules/features/manifest.toml',
+		'[menu]\nowner = "retained"\n'
+	);
+	write(
+		'static/ergopti_plus/_shared/modules/menu/menu_manifest.json',
+		JSON.stringify({
+			top_level: [{ id: 'llm' }],
+			llm_menu: [{ id: 'llm_toggle' }]
+		})
+	);
+	write(
+		'tools/lib/script-source.cjs',
+		fs.readFileSync(path.join(ROOT, 'tools/lib/script-source.cjs'))
+	);
 }
 
 function rows(driver, count) {
-	const known = legacy.drivers[driver].excerpts.flatMap((excerpt) =>
-		excerpt.lines.map((entry) => ({ rel: excerpt.path, source: entry.source }))
+	const known = legacy.drivers[driver].excerpts
+		.flatMap((excerpt) =>
+			excerpt.lines.map((entry) => ({ rel: excerpt.path, source: entry.source }))
+		)
+		.filter((entry) => {
+			// The immutable legacy classifier still receives every original excerpt.
+			// Current fixture actors cannot resurrect retired menu identities.
+			const retired =
+				/\b(?:live_mode_panel|LiveModePanel|llm_live_mode(?:_off)?|llm_live_controls|llm_live_is_off|llm_live_off_ready|llm_live_off_boundary|LLM_Menu_BuildLiveModeMenu|_LLM_Menu_LiveModeRows|_LLM_Menu_MakeLiveModeHandler)\b/i;
+			return entry.rel !== RETIRED && !retired.test(entry.source);
+		});
+	assert.ok(
+		known.length > 0,
+		'current native count fixtures have actual retained classifier inputs'
 	);
 	for (let i = 0; i < count; i++) {
 		const entry = known[i % known.length];
@@ -239,6 +267,126 @@ try {
 			refusesBoth(/the baseline must/);
 		}
 	}
+
+	// The frozen historical paths remain unchanged. Only the recorded orphan
+	// may be absent, with independently authored current declaration controls.
+	const retired = 'macos/ui/menu/menu_llm/live_mode_panel.lua';
+	const features = 'static/ergopti_plus/_shared/modules/features/manifest.toml';
+	const generated = 'static/ergopti_plus/_shared/modules/menu/menu_manifest.json';
+	const lexer = 'tools/lib/script-source.cjs';
+	const retiredFixture = () => {
+		reset();
+		write(features, '[menu]\nowner = "retained"\n');
+		write(
+			generated,
+			JSON.stringify({
+				top_level: [{ id: 'llm' }],
+				llm_menu: [{ id: 'llm_toggle' }]
+			})
+		);
+		write(lexer, fs.readFileSync(path.join(ROOT, lexer)));
+	};
+	retiredFixture();
+	accepts({ windows: 0, macos: 0, linux: 0 });
+	for (const symbol of [
+		'live_mode_panel',
+		'ui.menu.menu_llm.live_mode_panel',
+		'LiveModePanel',
+		'llm_live_mode',
+		'llm_live_controls',
+		'llm_live_mode_off',
+		'llm_live_is_off',
+		'llm_live_off_ready',
+		'llm_live_off_boundary',
+		'LLM_Menu_BuildLiveModeMenu',
+		'_LLM_Menu_LiveModeRows',
+		'_LLM_Menu_MakeLiveModeHandler'
+	]) {
+		retiredFixture();
+		write(features, `[menu]\nowner = "${symbol}"\n`);
+		refusesBoth(/retired live-menu declaration reappeared/);
+		retiredFixture();
+		const m = { top_level: [{ id: 'llm' }], llm_menu: [{ id: symbol }] };
+		write(generated, JSON.stringify(m));
+		refusesBoth(/retired live-menu compiled owner reappeared/);
+		for (const platform of ['macos', 'windows', 'linux']) {
+			retiredFixture();
+			const rel = legacy.drivers[platform].sourceFiles.find(
+				(p) => p.includes('/ui/menu/') && p !== retired
+			);
+			assert.ok(rel, 'real independently frozen menu path for executable control');
+			fs.appendFileSync(path.join(sourceRoot, rel), `\nOwner = "${symbol}"\n`);
+			refusesBoth(/retired live-menu executable owner reappeared/);
+		}
+	}
+	// Exact retired AHK provider identities are case-insensitive, and Lua
+	// require accepts the same module through a slash-delimited name.
+	for (const name of [
+		'LLM_Menu_BuildLiveModeMenu',
+		'_LLM_Menu_LiveModeRows',
+		'_LLM_Menu_MakeLiveModeHandler'
+	]) {
+		for (const spelling of [name.toUpperCase(), name.toLowerCase()]) {
+			retiredFixture();
+			const rel = legacy.drivers.windows.sourceFiles.find((p) => p.includes('/ui/menu/'));
+			fs.appendFileSync(path.join(sourceRoot, rel), `\n${spelling}() {\n}\n`);
+			refusesBoth(/retired live-menu executable owner reappeared/);
+		}
+	}
+	for (const platform of ['macos', 'linux']) {
+		retiredFixture();
+		const rel = legacy.drivers[platform].sourceFiles.find((p) => p !== retired);
+		fs.appendFileSync(
+			path.join(sourceRoot, rel),
+			'\nlocal panel = require("ui/menu/menu_llm/live_mode_panel")\n'
+		);
+		refusesBoth(/retired live-menu executable owner reappeared/);
+	}
+	for (const key of ['llm_live_controls', 'llm_live_off_boundary']) {
+		retiredFixture();
+		write(
+			generated,
+			JSON.stringify({
+				top_level: [{ id: 'llm' }],
+				llm_menu: [{ id: 'llm_toggle' }],
+				[key]: []
+			})
+		);
+		refusesBoth(/retired live-menu compiled declaration reappeared/);
+	}
+	for (const damaged of [
+		'missing-features',
+		'empty-features',
+		'comment-only-features',
+		'missing-compiled',
+		'malformed-compiled',
+		'empty-compiled'
+	]) {
+		retiredFixture();
+		if (damaged === 'missing-features') fs.rmSync(path.join(fixture, features));
+		if (damaged === 'empty-features') write(features, '');
+		if (damaged === 'comment-only-features') write(features, '# no declarations\n');
+		if (damaged === 'missing-compiled') fs.rmSync(path.join(fixture, generated));
+		if (damaged === 'malformed-compiled') write(generated, '{ malformed');
+		if (damaged === 'empty-compiled') write(generated, '{}');
+		refusesBoth(/ENOENT|SyntaxError|retired live-menu admission requires/);
+	}
+	retiredFixture();
+	fs.rmSync(
+		path.join(
+			sourceRoot,
+			legacy.drivers.macos.sourceFiles.find((p) => p !== retired)
+		)
+	);
+	refusesBoth(/source coverage .* is incomplete/);
+	retiredFixture();
+	write(features, '[menu]\nowner = "llm_live_prompt_toggle"\n# llm_live_mode is retired\n');
+	const retained = legacy.drivers.macos.sourceFiles.find((p) => p !== retired);
+	fs.appendFileSync(
+		path.join(sourceRoot, retained),
+		'\n-- LiveModePanel is retired\nlocal action = "llm_live_prompt_toggle"\n'
+	);
+	accepts({ windows: 0, macos: 0, linux: 0 });
 
 	reset();
 	write(TOOL, tool.replace('/\\bRegisterMenuItem\\(/', '/NEVER_A_MENU_ROW/'));

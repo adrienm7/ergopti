@@ -2,6 +2,8 @@
 
 # Group 3 partial stable-release delivery
 
+The [published Linux and native continuation](linux-and-native-continuation.md) records the later feature sources, exact local outcomes, recoverable inactive preparations and remaining software/native acceptance. This capture precedes its next integration; it does not claim stable-release qualification.
+
 The [latest integrated tranche and qualification](latest-delivery.md) extends
 this historical delivery; its exact-source evidence and inactive preparations
 are recorded separately.

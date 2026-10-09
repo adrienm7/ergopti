@@ -1182,6 +1182,20 @@ function M:release_all()
 	return out
 end
 
+
+--- Pure first-press eligibility before acquiring any standalone hold. Navigation,
+--- existing owners and native-under-modifier/instant precedence are unchanged.
+function M:combination_first_available(code)
+	if self.layer_depth > 0 or self.undecided or next(self.held) or self.held[code] or self.native_keys[code] or self.instant_down[code]
+		or self.layer_keys[code] or self.one_shot_until or caps_word_owners[self] then return false end
+	local config = self.by_code[code]
+	if config then
+		if config.instant or config.tap_at_down or (NATIVE_UNDER_MODIFIER[code] or config.native_under_modifier) and modifier_held(self) then return false end
+		for _, blocker in ipairs(config.skip_while_down or {}) do if self.physical_down[blocker] then return false end end
+	end
+	return true
+end
+
 --- Narrow composition ports for configured ordered pairs. These retain the
 --- existing reference counts: lifting one owner's Ctrl cannot lift another's.
 function M:combination_hold(spec)
