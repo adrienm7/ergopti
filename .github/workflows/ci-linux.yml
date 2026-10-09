@@ -102,13 +102,22 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          receipt="$RUNNER_TEMP/stable-linux-unit-suite.json"
+          node ../../../tools/ci/dev-release-qualification.cjs --scope linux-unit-suite --receipt "$receipt"
+          mode="$(node ../../../tools/ci/dev-release-qualification.cjs --scope linux-unit-suite --validate-scope-receipt "$receipt")"
+          if [ "$mode" = deferred ]; then
+              echo "[DEFERRED] linux-unit-suite: qualified=false; no suite assertion count is claimed."
+          elif [ "$mode" = full ]; then
+          set -euo pipefail
           set +e
           node ../../../tools/test/report.cjs --name linux-lua --json "${{ runner.temp }}/linux-lua.json" -- luajit tests/run.lua 2>&1 | tee "$RUNNER_TEMP/linux-unit.log"
           unit_pipeline_status=("${PIPESTATUS[@]}")
           set -e
           if [ "${unit_pipeline_status[0]}" -ne 0 ]; then exit "${unit_pipeline_status[0]}"; fi
           exit "${unit_pipeline_status[1]}"
-
+          else
+              exit 1
+          fi
       # A failed unit receipt stays red; this artifact keeps only its public log.
       - name: Upload failed unit log
         if: ${{ failure() && !cancelled() && steps.linux_unit.outcome == 'failure' }}
@@ -150,6 +159,14 @@ jobs:
       - name: Record mandatory unit evidence
         run: |
           set -euo pipefail
+          receipt="$RUNNER_TEMP/stable-linux-unit-suite.json"
+          node tools/ci/dev-release-qualification.cjs --scope linux-unit-suite --receipt "$receipt"
+          mode="$(node tools/ci/dev-release-qualification.cjs --scope linux-unit-suite --validate-scope-receipt "$receipt")"
+          if [ "$mode" = deferred ]; then
+              echo "[DEFERRED] linux-unit-suite: qualified=false; no suite assertion count is claimed."
+              node tools/test/linux-ci-evidence.cjs record-deferred-suite --job test-linux --output "$RUNNER_TEMP/linux-ci-evidence/test-linux.json" --sha "$GITHUB_SHA" --architecture "$RUNNER_ARCH" --receipt "$receipt"
+          elif [ "$mode" = full ]; then
+          set -euo pipefail
           unit_assertions=$(jq -r '.passed' "$RUNNER_TEMP/linux-lua.json")
           node tools/test/linux-ci-evidence.cjs record \
               --job test-linux \
@@ -160,7 +177,9 @@ jobs:
               --session x11-wayland-headless \
               --interpreter "$(luajit -v 2>&1 | head -1)" \
               --subject "unit=$unit_assertions"
-
+          else
+              exit 1
+          fi
       - name: Upload mandatory unit evidence
         uses: actions/upload-artifact@v4
         with:
@@ -169,6 +188,14 @@ jobs:
           retention-days: 7
           path: ${{ runner.temp }}/linux-ci-evidence/test-linux.json
           if-no-files-found: error
+
+      - name: Retain the source-bound linux-unit-suite qualification
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: assets-qualification-linux-unit-suite
+          path: ${{ runner.temp }}/stable-linux-unit-suite.json
+          if-no-files-found: warn
 
   e2e-linux:
     name: 'E2E tests'
@@ -185,8 +212,18 @@ jobs:
         # Test discovery alone does not prove their filesystem admission.
         # Canonical XKB controls below require xkbcli before their first use.
         run: |
+          set -euo pipefail
+          receipt="$RUNNER_TEMP/stable-linux-e2e-suite.json"
+          node tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --receipt "$receipt"
+          mode="$(node tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --validate-scope-receipt "$receipt")"
+          if [ "$mode" = deferred ]; then
+              echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
+          elif [ "$mode" = full ]; then
           sudo python3 "$GITHUB_WORKSPACE/tools/ci/ubuntu_apt.py" -y luajit lua-luv lua-filesystem sqlite3 libxkbcommon-tools xkb-data
           luajit -e 'assert(require("luv"), "native E2E luv integration is mandatory")'
+          else
+              exit 1
+          fi
         timeout-minutes: 10
 
       # The virtual-keyboard harness, stubbed: this step runs on ubuntu-latest
@@ -207,138 +244,327 @@ jobs:
         working-directory: static/ergopti_plus/linux
         run: |
           set -euo pipefail
+          receipt="$RUNNER_TEMP/stable-linux-e2e-suite.json"
+          node ../../../tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --receipt "$receipt"
+          mode="$(node ../../../tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --validate-scope-receipt "$receipt")"
+          if [ "$mode" = deferred ]; then
+              echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
+          elif [ "$mode" = full ]; then
+          set -euo pipefail
           luajit tests/e2e/run_e2e.lua | tee "$RUNNER_TEMP/linux-e2e.log"
+          else
+              exit 1
+          fi
         timeout-minutes: 5
 
       # Separate preparation attempts cannot suppress another role's acquisition.
       # The original signed in-case checks and one-minute receiving clocks remain.
       - name: Prepare native GTK dependencies
         if: ${{ !cancelled() }}
-        run: sudo python3 "$GITHUB_WORKSPACE/tools/ci/ubuntu_apt.py" -y --no-install-recommends libgtk-3-bin dbus-x11 xvfb x11-utils
+        run: |
+          set -euo pipefail
+          receipt="$RUNNER_TEMP/stable-linux-e2e-suite.json"
+          node tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --receipt "$receipt"
+          mode="$(node tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --validate-scope-receipt "$receipt")"
+          if [ "$mode" = deferred ]; then
+              echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
+          elif [ "$mode" = full ]; then
+          sudo python3 "$GITHUB_WORKSPACE/tools/ci/ubuntu_apt.py" -y --no-install-recommends libgtk-3-bin dbus-x11 xvfb x11-utils
+          else
+              exit 1
+          fi
         timeout-minutes: 10
 
       - name: Prepare native process and compiler dependencies
         if: ${{ !cancelled() }}
-        run: sudo python3 "$GITHUB_WORKSPACE/tools/ci/ubuntu_apt.py" -y --no-install-recommends build-essential curl libffi-dev liblua5.4-dev lua-luv lua5.4 meson ninja-build openssl pkg-config python3 strace
+        run: |
+          set -euo pipefail
+          receipt="$RUNNER_TEMP/stable-linux-e2e-suite.json"
+          node tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --receipt "$receipt"
+          mode="$(node tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --validate-scope-receipt "$receipt")"
+          if [ "$mode" = deferred ]; then
+              echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
+          elif [ "$mode" = full ]; then
+          sudo python3 "$GITHUB_WORKSPACE/tools/ci/ubuntu_apt.py" -y --no-install-recommends build-essential curl libffi-dev liblua5.4-dev lua-luv lua5.4 meson ninja-build openssl pkg-config python3 strace
+          else
+              exit 1
+          fi
         timeout-minutes: 10
 
       - name: Launch option-looking application ids through actual GTK desktop entries
         if: ${{ !cancelled() }}
         working-directory: static/ergopti_plus/linux
         run: |
+          set -euo pipefail
+          receipt="$RUNNER_TEMP/stable-linux-e2e-suite.json"
+          node ../../../tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --receipt "$receipt"
+          mode="$(node ../../../tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --validate-scope-receipt "$receipt")"
+          if [ "$mode" = deferred ]; then
+              echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
+          elif [ "$mode" = full ]; then
           sudo python3 "$GITHUB_WORKSPACE/tools/ci/ubuntu_apt.py" -y --no-install-recommends libgtk-3-bin dbus-x11 xvfb x11-utils
           python3 tests/hardware/test_application_operand_diagnostics.py
           python3 tests/hardware/run_application_operand_receipts.py --evidence-dir "$RUNNER_TEMP/linux-application-operands"
+          else
+              exit 1
+          fi
         timeout-minutes: 1
 
       - name: Terminate real descendants after their process leader exits
         if: ${{ !cancelled() }}
         working-directory: static/ergopti_plus/linux
         run: |
+          set -euo pipefail
+          receipt="$RUNNER_TEMP/stable-linux-e2e-suite.json"
+          node ../../../tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --receipt "$receipt"
+          mode="$(node ../../../tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --validate-scope-receipt "$receipt")"
+          if [ "$mode" = deferred ]; then
+              echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
+          elif [ "$mode" = full ]; then
           sudo python3 "$GITHUB_WORKSPACE/tools/ci/ubuntu_apt.py" -y --no-install-recommends lua-luv lua5.4 curl openssl python3 strace build-essential meson ninja-build liblua5.4-dev libffi-dev pkg-config
           env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" luajit tests/hardware/run_process_groups.lua
+          else
+              exit 1
+          fi
         timeout-minutes: 1
 
       - name: Reject real ENOSPC write and buffered-close failures
         if: ${{ !cancelled() }}
         working-directory: static/ergopti_plus/linux
         run: |
+          set -euo pipefail
+          receipt="$RUNNER_TEMP/stable-linux-e2e-suite.json"
+          node ../../../tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --receipt "$receipt"
+          mode="$(node ../../../tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --validate-scope-receipt "$receipt")"
+          if [ "$mode" = deferred ]; then
+              echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
+          elif [ "$mode" = full ]; then
           env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" luajit tests/hardware/run_file_write_failures.lua
+          else
+              exit 1
+          fi
         timeout-minutes: 1
 
       - name: Derive encryption keys from the actual D-Bus machine ID
         if: ${{ !cancelled() }}
         working-directory: static/ergopti_plus/linux
         run: |
+          set -euo pipefail
+          receipt="$RUNNER_TEMP/stable-linux-e2e-suite.json"
+          node ../../../tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --receipt "$receipt"
+          mode="$(node ../../../tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --validate-scope-receipt "$receipt")"
+          if [ "$mode" = deferred ]; then
+              echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
+          elif [ "$mode" = full ]; then
           sudo python3 "$GITHUB_WORKSPACE/tools/ci/ubuntu_apt.py" -y --no-install-recommends dbus-x11 util-linux
           task_uid=$(id -u)
           task_gid=$(id -g)
           sudo unshare --mount --propagation private bash tests/hardware/run_machine_id_fallback_receipts.sh "$task_uid" "$task_gid"
+          else
+              exit 1
+          fi
         timeout-minutes: 2
 
       - name: Reject unsuccessful at-rest cryptography receipts
         if: ${{ !cancelled() }}
         working-directory: static/ergopti_plus/linux
         run: |
+          set -euo pipefail
+          receipt="$RUNNER_TEMP/stable-linux-e2e-suite.json"
+          node ../../../tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --receipt "$receipt"
+          mode="$(node ../../../tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --validate-scope-receipt "$receipt")"
+          if [ "$mode" = deferred ]; then
+              echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
+          elif [ "$mode" = full ]; then
           env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" luajit tests/hardware/run_openssl_exit_receipts.lua
+          else
+              exit 1
+          fi
         timeout-minutes: 2
 
       - name: Reject unsuccessful native process supervision receipts
         if: ${{ !cancelled() }}
         working-directory: static/ergopti_plus/linux
         run: |
+          set -euo pipefail
+          receipt="$RUNNER_TEMP/stable-linux-e2e-suite.json"
+          node ../../../tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --receipt "$receipt"
+          mode="$(node ../../../tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --validate-scope-receipt "$receipt")"
+          if [ "$mode" = deferred ]; then
+              echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
+          elif [ "$mode" = full ]; then
           env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" luajit tests/hardware/run_process_supervision_receipts.lua
+          else
+              exit 1
+          fi
         timeout-minutes: 1
 
       - name: Refuse incomplete native diagnostics exports
         if: ${{ !cancelled() }}
         working-directory: static/ergopti_plus/linux
         run: |
+          set -euo pipefail
+          receipt="$RUNNER_TEMP/stable-linux-e2e-suite.json"
+          node ../../../tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --receipt "$receipt"
+          mode="$(node ../../../tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --validate-scope-receipt "$receipt")"
+          if [ "$mode" = deferred ]; then
+              echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
+          elif [ "$mode" = full ]; then
           env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" python3 tests/hardware/run_diagnostics_save_receipts.py
+          else
+              exit 1
+          fi
         timeout-minutes: 1
 
       - name: Preserve current SQLite device schema and its native readers
         if: ${{ !cancelled() }}
         working-directory: static/ergopti_plus/linux
         run: |
+          set -euo pipefail
+          receipt="$RUNNER_TEMP/stable-linux-e2e-suite.json"
+          node ../../../tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --receipt "$receipt"
+          mode="$(node ../../../tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --validate-scope-receipt "$receipt")"
+          if [ "$mode" = deferred ]; then
+              echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
+          elif [ "$mode" = full ]; then
           env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" luajit tests/hardware/run_sqlite_device_schema_receipts.lua
+          else
+              exit 1
+          fi
         timeout-minutes: 1
 
       - name: Preserve native SQLite device registration and refused transactions
         if: ${{ !cancelled() }}
         working-directory: static/ergopti_plus/linux
         run: |
+          set -euo pipefail
+          receipt="$RUNNER_TEMP/stable-linux-e2e-suite.json"
+          node ../../../tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --receipt "$receipt"
+          mode="$(node ../../../tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --validate-scope-receipt "$receipt")"
+          if [ "$mode" = deferred ]; then
+              echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
+          elif [ "$mode" = full ]; then
           env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" luajit tests/hardware/run_sqlite_device_registration_receipts.lua
+          else
+              exit 1
+          fi
         timeout-minutes: 1
 
       - name: Preserve SQLite event IDs across native collectors and invalid cursors
         if: ${{ !cancelled() }}
         working-directory: static/ergopti_plus/linux
         run: |
+          set -euo pipefail
+          receipt="$RUNNER_TEMP/stable-linux-e2e-suite.json"
+          node ../../../tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --receipt "$receipt"
+          mode="$(node ../../../tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --validate-scope-receipt "$receipt")"
+          if [ "$mode" = deferred ]; then
+              echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
+          elif [ "$mode" = full ]; then
           env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" luajit tests/hardware/run_sqlite_event_id_receipts.lua
           env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" luajit tests/hardware/run_sqlite_event_id_cursor_receipts.lua
+          else
+              exit 1
+          fi
         timeout-minutes: 2
 
       - name: Preserve literal SQLite filesystem paths through native CLI arguments
         if: ${{ !cancelled() }}
         working-directory: static/ergopti_plus/linux
         run: |
+          set -euo pipefail
+          receipt="$RUNNER_TEMP/stable-linux-e2e-suite.json"
+          node ../../../tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --receipt "$receipt"
+          mode="$(node ../../../tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --validate-scope-receipt "$receipt")"
+          if [ "$mode" = deferred ]; then
+              echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
+          elif [ "$mode" = full ]; then
           env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" luajit tests/hardware/run_sqlite_filesystem_paths.lua
           env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" lua5.4 tests/hardware/run_sqlite_filesystem_paths.lua
+          else
+              exit 1
+          fi
         timeout-minutes: 1
 
       - name: Reject silent SQLite failures without staging typed SQL
         if: ${{ !cancelled() }}
         working-directory: static/ergopti_plus/linux
         run: |
+          set -euo pipefail
+          receipt="$RUNNER_TEMP/stable-linux-e2e-suite.json"
+          node ../../../tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --receipt "$receipt"
+          mode="$(node ../../../tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --validate-scope-receipt "$receipt")"
+          if [ "$mode" = deferred ]; then
+              echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
+          elif [ "$mode" = full ]; then
           env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" luajit tests/hardware/run_sqlite_write_receipts.lua
+          else
+              exit 1
+          fi
         timeout-minutes: 1
 
       - name: Reject failed native SQLite migration and dashboard rows
         if: ${{ !cancelled() }}
         working-directory: static/ergopti_plus/linux
         run: |
+          set -euo pipefail
+          receipt="$RUNNER_TEMP/stable-linux-e2e-suite.json"
+          node ../../../tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --receipt "$receipt"
+          mode="$(node ../../../tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --validate-scope-receipt "$receipt")"
+          if [ "$mode" = deferred ]; then
+              echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
+          elif [ "$mode" = full ]; then
           env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" luajit tests/hardware/run_sqlite_read_receipts.lua
+          else
+              exit 1
+          fi
         timeout-minutes: 1
 
       - name: Preserve actual SQLite metric literals and application filters
         if: ${{ !cancelled() }}
         working-directory: static/ergopti_plus/linux
         run: |
+          set -euo pipefail
+          receipt="$RUNNER_TEMP/stable-linux-e2e-suite.json"
+          node ../../../tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --receipt "$receipt"
+          mode="$(node ../../../tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --validate-scope-receipt "$receipt")"
+          if [ "$mode" = deferred ]; then
+              echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
+          elif [ "$mode" = full ]; then
           env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" luajit tests/hardware/run_sqlite_literal_receipts.lua
+          else
+              exit 1
+          fi
         timeout-minutes: 1
 
       - name: Preserve native decrypted migration values and foreign ownership
         if: ${{ !cancelled() }}
         working-directory: static/ergopti_plus/linux
         run: |
+          set -euo pipefail
+          receipt="$RUNNER_TEMP/stable-linux-e2e-suite.json"
+          node ../../../tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --receipt "$receipt"
+          mode="$(node ../../../tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --validate-scope-receipt "$receipt")"
+          if [ "$mode" = deferred ]; then
+              echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
+          elif [ "$mode" = full ]; then
           env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" luajit tests/hardware/run_text_migration_literal_receipts.lua
+          else
+              exit 1
+          fi
         timeout-minutes: 1
 
       - name: Isolate SQLite from an actual disposable user's personal init
         if: ${{ !cancelled() }}
         working-directory: static/ergopti_plus/linux
         run: |
+          set -euo pipefail
+          receipt="$RUNNER_TEMP/stable-linux-e2e-suite.json"
+          node ../../../tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --receipt "$receipt"
+          mode="$(node ../../../tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --validate-scope-receipt "$receipt")"
+          if [ "$mode" = deferred ]; then
+              echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
+          elif [ "$mode" = full ]; then
           set -euo pipefail
           profile_user="ergopti_sqlite_${RANDOM}"
           # A new account cannot traverse the runner's private temporary parent.
@@ -358,185 +584,405 @@ jobs:
           sudo chown -R "$profile_user:$profile_user" "$profile_home"
           sudo chmod -R u+rwX,go-rwx "$profile_home"
           sudo runuser -u "$profile_user" -- sh -ec 'cd "$1"; exec env TMPDIR="$2" LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" luajit tests/hardware/run_sqlite_init_receipts.lua' sh "$profile_home/source/linux" "$profile_home"
+          else
+              exit 1
+          fi
         timeout-minutes: 1
 
       - name: Keep native shell capture failures free of caller text
         if: ${{ !cancelled() }}
         working-directory: static/ergopti_plus/linux
         run: |
+          set -euo pipefail
+          receipt="$RUNNER_TEMP/stable-linux-e2e-suite.json"
+          node ../../../tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --receipt "$receipt"
+          mode="$(node ../../../tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --validate-scope-receipt "$receipt")"
+          if [ "$mode" = deferred ]; then
+              echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
+          elif [ "$mode" = full ]; then
           env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" luajit tests/hardware/run_shell_capture_error_receipts.lua
+          else
+              exit 1
+          fi
         timeout-minutes: 1
 
       - name: Refuse truncated native process names and arguments
         if: ${{ !cancelled() }}
         working-directory: static/ergopti_plus/linux
         run: |
+          set -euo pipefail
+          receipt="$RUNNER_TEMP/stable-linux-e2e-suite.json"
+          node ../../../tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --receipt "$receipt"
+          mode="$(node ../../../tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --validate-scope-receipt "$receipt")"
+          if [ "$mode" = deferred ]; then
+              echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
+          elif [ "$mode" = full ]; then
           env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" luajit tests/hardware/run_spawn_nul_receipts.lua
+          else
+              exit 1
+          fi
         timeout-minutes: 1
 
       - name: Check native path existence without opening readable streams
         if: ${{ !cancelled() }}
         working-directory: static/ergopti_plus/linux
         run: |
+          set -euo pipefail
+          receipt="$RUNNER_TEMP/stable-linux-e2e-suite.json"
+          node ../../../tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --receipt "$receipt"
+          mode="$(node ../../../tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --validate-scope-receipt "$receipt")"
+          if [ "$mode" = deferred ]; then
+              echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
+          elif [ "$mode" = full ]; then
           env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" luajit tests/hardware/run_file_exists_receipts.lua
+          else
+              exit 1
+          fi
         timeout-minutes: 1
 
       - name: Delete files using native permission and symlink receipts
         if: ${{ !cancelled() }}
         working-directory: static/ergopti_plus/linux
         run: |
+          set -euo pipefail
+          receipt="$RUNNER_TEMP/stable-linux-e2e-suite.json"
+          node ../../../tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --receipt "$receipt"
+          mode="$(node ../../../tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --validate-scope-receipt "$receipt")"
+          if [ "$mode" = deferred ]; then
+              echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
+          elif [ "$mode" = full ]; then
           env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" luajit tests/hardware/run_file_delete_receipts.lua
+          else
+              exit 1
+          fi
         timeout-minutes: 1
 
       - name: Refuse truncated native paths and retain literal filenames
         if: ${{ !cancelled() }}
         working-directory: static/ergopti_plus/linux
         run: |
+          set -euo pipefail
+          receipt="$RUNNER_TEMP/stable-linux-e2e-suite.json"
+          node ../../../tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --receipt "$receipt"
+          mode="$(node ../../../tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --validate-scope-receipt "$receipt")"
+          if [ "$mode" = deferred ]; then
+              echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
+          elif [ "$mode" = full ]; then
           env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" luajit tests/hardware/run_file_path_receipts.lua
+          else
+              exit 1
+          fi
         timeout-minutes: 1
 
       - name: Retain native timer ownership across garbage collection
         if: ${{ !cancelled() }}
         working-directory: static/ergopti_plus/linux
         run: |
+          set -euo pipefail
+          receipt="$RUNNER_TEMP/stable-linux-e2e-suite.json"
+          node ../../../tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --receipt "$receipt"
+          mode="$(node ../../../tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --validate-scope-receipt "$receipt")"
+          if [ "$mode" = deferred ]; then
+              echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
+          elif [ "$mode" = full ]; then
           env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" luajit tests/hardware/run_timer_gc_receipts.lua
+          else
+              exit 1
+          fi
         timeout-minutes: 1
 
       - name: Preserve process baselines after native snapshot refusal
         if: ${{ !cancelled() }}
         working-directory: static/ergopti_plus/linux
         run: |
+          set -euo pipefail
+          receipt="$RUNNER_TEMP/stable-linux-e2e-suite.json"
+          node ../../../tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --receipt "$receipt"
+          mode="$(node ../../../tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --validate-scope-receipt "$receipt")"
+          if [ "$mode" = deferred ]; then
+              echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
+          elif [ "$mode" = full ]; then
           env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" luajit tests/hardware/run_process_snapshot_receipts.lua
+          else
+              exit 1
+          fi
         timeout-minutes: 1
 
       - name: Retire native logger channels after failed writes or flushes
         if: ${{ !cancelled() }}
         working-directory: static/ergopti_plus/linux
         run: |
+          set -euo pipefail
+          receipt="$RUNNER_TEMP/stable-linux-e2e-suite.json"
+          node ../../../tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --receipt "$receipt"
+          mode="$(node ../../../tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --validate-scope-receipt "$receipt")"
+          if [ "$mode" = deferred ]; then
+              echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
+          elif [ "$mode" = full ]; then
           env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" luajit tests/hardware/run_logger_write_receipts.lua
+          else
+              exit 1
+          fi
         timeout-minutes: 1
 
       - name: Stop the native event loop without retiring foreign resources
         if: ${{ !cancelled() }}
         working-directory: static/ergopti_plus/linux
         run: |
+          set -euo pipefail
+          receipt="$RUNNER_TEMP/stable-linux-e2e-suite.json"
+          node ../../../tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --receipt "$receipt"
+          mode="$(node ../../../tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --validate-scope-receipt "$receipt")"
+          if [ "$mode" = deferred ]; then
+              echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
+          elif [ "$mode" = full ]; then
           env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" luajit tests/hardware/run_event_loop_stop_receipts.lua
+          else
+              exit 1
+          fi
         timeout-minutes: 1
 
       - name: Retain native event-loop ownership during callback reentry
         if: ${{ !cancelled() }}
         working-directory: static/ergopti_plus/linux
         run: |
+          set -euo pipefail
+          receipt="$RUNNER_TEMP/stable-linux-e2e-suite.json"
+          node ../../../tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --receipt "$receipt"
+          mode="$(node ../../../tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --validate-scope-receipt "$receipt")"
+          if [ "$mode" = deferred ]; then
+              echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
+          elif [ "$mode" = full ]; then
           env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" luajit "$PWD/tests/fixtures/native_event_loop_reentry.lua"
           env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" lua5.4 "$PWD/tests/fixtures/native_event_loop_reentry.lua"
+          else
+              exit 1
+          fi
         timeout-minutes: 1
 
       - name: Refuse non-finite native timer and deferred durations
         if: ${{ !cancelled() }}
         working-directory: static/ergopti_plus/linux
         run: |
+          set -euo pipefail
+          receipt="$RUNNER_TEMP/stable-linux-e2e-suite.json"
+          node ../../../tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --receipt "$receipt"
+          mode="$(node ../../../tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --validate-scope-receipt "$receipt")"
+          if [ "$mode" = deferred ]; then
+              echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
+          elif [ "$mode" = full ]; then
           env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" luajit "$PWD/tests/fixtures/native_timer_finite_admission.lua"
           env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" lua5.4 "$PWD/tests/fixtures/native_timer_finite_admission.lua"
+          else
+              exit 1
+          fi
         timeout-minutes: 1
 
       - name: Refuse non-finite native event-loop periods before allocation
         if: ${{ !cancelled() }}
         working-directory: static/ergopti_plus/linux
         run: |
+          set -euo pipefail
+          receipt="$RUNNER_TEMP/stable-linux-e2e-suite.json"
+          node ../../../tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --receipt "$receipt"
+          mode="$(node ../../../tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --validate-scope-receipt "$receipt")"
+          if [ "$mode" = deferred ]; then
+              echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
+          elif [ "$mode" = full ]; then
           env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" luajit "$PWD/tests/fixtures/native_event_loop_periodic_admission.lua"
           env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" lua5.4 "$PWD/tests/fixtures/native_event_loop_periodic_admission.lua"
+          else
+              exit 1
+          fi
         timeout-minutes: 1
 
       - name: Isolate actual callback error objects without invoking their formatters
         if: ${{ !cancelled() }}
         working-directory: static/ergopti_plus/linux
         run: |
+          set -euo pipefail
+          receipt="$RUNNER_TEMP/stable-linux-e2e-suite.json"
+          node ../../../tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --receipt "$receipt"
+          mode="$(node ../../../tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --validate-scope-receipt "$receipt")"
+          if [ "$mode" = deferred ]; then
+              echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
+          elif [ "$mode" = full ]; then
           for callback_source in after every idle periodic "registered idle" deferred; do
             for callback_failure in object string; do
               env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" luajit "$PWD/tests/fixtures/native_callback_error_description.lua" "$callback_source" "$callback_failure"
               env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" lua5.4 "$PWD/tests/fixtures/native_callback_error_description.lua" "$callback_source" "$callback_failure"
             done
           done
+          else
+              exit 1
+          fi
         timeout-minutes: 1
 
       - name: Project native modifier-hold statistics into actual dashboard consumers
         if: ${{ !cancelled() }}
         working-directory: static/ergopti_plus/linux
         run: |
+          set -euo pipefail
+          receipt="$RUNNER_TEMP/stable-linux-e2e-suite.json"
+          node ../../../tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --receipt "$receipt"
+          mode="$(node ../../../tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --validate-scope-receipt "$receipt")"
+          if [ "$mode" = deferred ]; then
+              echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
+          elif [ "$mode" = full ]; then
           env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" node tests/hardware/run_sqlite_kc_hold_consumers.cjs
           env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" ERGOPTI_READER_TEST_LUA=lua5.4 node tests/hardware/run_sqlite_kc_hold_consumers.cjs
+          else
+              exit 1
+          fi
         timeout-minutes: 1
 
       - name: Refuse malformed release pages through existing strict JSON admission
         if: ${{ !cancelled() }}
         working-directory: static/ergopti_plus/linux
         run: |
+          set -euo pipefail
+          receipt="$RUNNER_TEMP/stable-linux-e2e-suite.json"
+          node ../../../tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --receipt "$receipt"
+          mode="$(node ../../../tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --validate-scope-receipt "$receipt")"
+          if [ "$mode" = deferred ]; then
+              echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
+          elif [ "$mode" = full ]; then
           python3 tests/hardware/run_updater_release_json_admission.py
           ERGOPTI_HTTP_TEST_LUA=lua5.4 python3 tests/hardware/run_updater_release_json_admission.py
+          else
+              exit 1
+          fi
         timeout-minutes: 1
 
       - name: Isolate terminal callback diagnostics with real provider TLS receipts
         if: ${{ !cancelled() }}
         working-directory: static/ergopti_plus/linux
         run: |
+          set -euo pipefail
+          receipt="$RUNNER_TEMP/stable-linux-e2e-suite.json"
+          node ../../../tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --receipt "$receipt"
+          mode="$(node ../../../tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --validate-scope-receipt "$receipt")"
+          if [ "$mode" = deferred ]; then
+              echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
+          elif [ "$mode" = full ]; then
           python3 tests/hardware/run_llm_remote_provider_callbacks.py
           ERGOPTI_HTTP_TEST_LUA=lua5.4 python3 tests/hardware/run_llm_remote_provider_callbacks.py
           python3 tests/hardware/run_llm_remote_callback_siblings.py
           ERGOPTI_HTTP_TEST_LUA=lua5.4 python3 tests/hardware/run_llm_remote_callback_siblings.py
+          else
+              exit 1
+          fi
         timeout-minutes: 3
 
       - name: Preserve additional synthetic sources through native SQLite projections
         if: ${{ !cancelled() }}
         working-directory: static/ergopti_plus/linux
         run: |
+          set -euo pipefail
+          receipt="$RUNNER_TEMP/stable-linux-e2e-suite.json"
+          node ../../../tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --receipt "$receipt"
+          mode="$(node ../../../tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --validate-scope-receipt "$receipt")"
+          if [ "$mode" = deferred ]; then
+              echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
+          elif [ "$mode" = full ]; then
           env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" luajit tests/hardware/run_sqlite_ngram_extra_sources.lua
           env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" lua5.4 tests/hardware/run_sqlite_ngram_extra_sources.lua
           env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" luajit tests/hardware/run_sqlite_ngram_source_controls.lua
           env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" lua5.4 tests/hardware/run_sqlite_ngram_source_controls.lua
           env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" python3 tests/hardware/run_sqlite_ngram_collector_sources.py luajit
           env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" python3 tests/hardware/run_sqlite_ngram_collector_sources.py lua5.4
+          else
+              exit 1
+          fi
         timeout-minutes: 1
 
       - name: Preserve pending synthetic source labels in native live projections
         if: ${{ !cancelled() }}
         working-directory: static/ergopti_plus/linux
         run: |
+          set -euo pipefail
+          receipt="$RUNNER_TEMP/stable-linux-e2e-suite.json"
+          node ../../../tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --receipt "$receipt"
+          mode="$(node ../../../tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --validate-scope-receipt "$receipt")"
+          if [ "$mode" = deferred ]; then
+              echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
+          elif [ "$mode" = full ]; then
           env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" luajit tests/hardware/run_sqlite_live_source_projection.lua
           env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" lua5.4 tests/hardware/run_sqlite_live_source_projection.lua
+          else
+              exit 1
+          fi
         timeout-minutes: 1
 
       - name: Accumulate arbitrary ngram source keys across native SQLite conflicts
         if: ${{ !cancelled() }}
         working-directory: static/ergopti_plus/linux
         run: |
+          set -euo pipefail
+          receipt="$RUNNER_TEMP/stable-linux-e2e-suite.json"
+          node ../../../tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --receipt "$receipt"
+          mode="$(node ../../../tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --validate-scope-receipt "$receipt")"
+          if [ "$mode" = deferred ]; then
+              echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
+          elif [ "$mode" = full ]; then
           export LUA_PATH='./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;'
           for ERGOPTI_SOURCE_RUNTIME in luajit lua5.4; do
             ERGOPTI_SOURCE_PROOF=$(mktemp -d)
             "$ERGOPTI_SOURCE_RUNTIME" tests/hardware/run_sqlite_ngram_source_maps.lua "$ERGOPTI_SOURCE_PROOF"
             python3 tests/hardware/run_sqlite_ngram_source_maps.py "$ERGOPTI_SOURCE_PROOF"
           done
+          else
+              exit 1
+          fi
         timeout-minutes: 1
 
       - name: Encode literal synthetic source keys through native SQLite
         if: ${{ !cancelled() }}
         working-directory: static/ergopti_plus/linux
         run: |
+          set -euo pipefail
+          receipt="$RUNNER_TEMP/stable-linux-e2e-suite.json"
+          node ../../../tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --receipt "$receipt"
+          mode="$(node ../../../tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --validate-scope-receipt "$receipt")"
+          if [ "$mode" = deferred ]; then
+              echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
+          elif [ "$mode" = full ]; then
           env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" python3 tests/hardware/run_sqlite_ngram_source_key_encoding.py luajit
           env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" python3 tests/hardware/run_sqlite_ngram_source_key_encoding.py lua5.4
+          else
+              exit 1
+          fi
         timeout-minutes: 1
 
       - name: Roll back refused ngram groups and trigger effects in native SQLite
         if: ${{ !cancelled() }}
         working-directory: static/ergopti_plus/linux
         run: |
+          set -euo pipefail
+          receipt="$RUNNER_TEMP/stable-linux-e2e-suite.json"
+          node ../../../tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --receipt "$receipt"
+          mode="$(node ../../../tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --validate-scope-receipt "$receipt")"
+          if [ "$mode" = deferred ]; then
+              echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
+          elif [ "$mode" = full ]; then
           env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" python3 tests/hardware/run_sqlite_ngram_group_fail.py luajit
           env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" python3 tests/hardware/run_sqlite_ngram_group_fail.py lua5.4
+          else
+              exit 1
+          fi
         timeout-minutes: 1
 
       - name: Preserve cumulative system-day metrics across native restarts
         if: ${{ !cancelled() }}
         working-directory: static/ergopti_plus/linux
         run: |
+          set -euo pipefail
+          receipt="$RUNNER_TEMP/stable-linux-e2e-suite.json"
+          node ../../../tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --receipt "$receipt"
+          mode="$(node ../../../tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --validate-scope-receipt "$receipt")"
+          if [ "$mode" = deferred ]; then
+              echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
+          elif [ "$mode" = full ]; then
           export LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;"
           for ERGOPTI_SYSTEM_RUNTIME in luajit lua5.4; do
             ERGOPTI_SYSTEM_PROFILE=$(mktemp -d)
@@ -548,12 +994,22 @@ jobs:
             "$ERGOPTI_SYSTEM_RUNTIME" "$PWD/tests/hardware/run_system_day_restart.lua" first "$ERGOPTI_SYSTEM_PROFILE/native.sqlite" "$ERGOPTI_SYSTEM_PROFILE/first.json"
             "$ERGOPTI_SYSTEM_RUNTIME" "$PWD/tests/hardware/run_system_day_restart.lua" restart "$ERGOPTI_SYSTEM_PROFILE/native.sqlite" "$ERGOPTI_SYSTEM_PROFILE/first.json"
           done
+          else
+              exit 1
+          fi
         timeout-minutes: 3
 
       - name: Retain canonical backspace unigrams through native SQLite
         if: ${{ !cancelled() }}
         working-directory: static/ergopti_plus/linux
         run: |
+          set -euo pipefail
+          receipt="$RUNNER_TEMP/stable-linux-e2e-suite.json"
+          node ../../../tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --receipt "$receipt"
+          mode="$(node ../../../tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --validate-scope-receipt "$receipt")"
+          if [ "$mode" = deferred ]; then
+              echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
+          elif [ "$mode" = full ]; then
           set -o pipefail
           export LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;"
           for ERGOPTI_BACKSPACE_RUNTIME in luajit lua5.4; do
@@ -563,496 +1019,1129 @@ jobs:
             test -n "$ERGOPTI_BACKSPACE_PROFILE"
             python3 tests/hardware/run_sqlite_backspace_unigrams.py "$ERGOPTI_BACKSPACE_PROFILE"
           done
+          else
+              exit 1
+          fi
         timeout-minutes: 1
 
       - name: Preserve canonical Unicode character classes through native SQLite
         if: ${{ !cancelled() }}
         working-directory: static/ergopti_plus/linux
         run: |
+          set -euo pipefail
+          receipt="$RUNNER_TEMP/stable-linux-e2e-suite.json"
+          node ../../../tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --receipt "$receipt"
+          mode="$(node ../../../tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --validate-scope-receipt "$receipt")"
+          if [ "$mode" = deferred ]; then
+              echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
+          elif [ "$mode" = full ]; then
           env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" python3 tests/hardware/run_sqlite_unicode_metrics.py luajit
           env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" python3 tests/hardware/run_sqlite_unicode_metrics.py lua5.4
+          else
+              exit 1
+          fi
         timeout-minutes: 1
 
       - name: Propagate native fallback wait refusal and retain healthy recovery
         if: ${{ !cancelled() }}
         working-directory: static/ergopti_plus/linux
         run: |
+          set -euo pipefail
+          receipt="$RUNNER_TEMP/stable-linux-e2e-suite.json"
+          node ../../../tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --receipt "$receipt"
+          mode="$(node ../../../tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --validate-scope-receipt "$receipt")"
+          if [ "$mode" = deferred ]; then
+              echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
+          elif [ "$mode" = full ]; then
           env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" luajit "$PWD/tests/fixtures/native_event_loop_sleep_receipts.lua"
           env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" lua5.4 "$PWD/tests/fixtures/native_event_loop_sleep_receipts.lua"
+          else
+              exit 1
+          fi
         timeout-minutes: 1
 
       - name: Keep manual correction markers out of canonical character totals
         if: ${{ !cancelled() }}
         working-directory: static/ergopti_plus/linux
         run: |
+          set -euo pipefail
+          receipt="$RUNNER_TEMP/stable-linux-e2e-suite.json"
+          node ../../../tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --receipt "$receipt"
+          mode="$(node ../../../tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --validate-scope-receipt "$receipt")"
+          if [ "$mode" = deferred ]; then
+              echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
+          elif [ "$mode" = full ]; then
           env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" luajit tests/hardware/run_sqlite_manual_marker_chars.lua
           env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" lua5.4 tests/hardware/run_sqlite_manual_marker_chars.lua
+          else
+              exit 1
+          fi
         timeout-minutes: 1
 
       - name: Preserve hourly manual corrections and cumulative error histograms
         if: ${{ !cancelled() }}
         working-directory: static/ergopti_plus/linux
         run: |
+          set -euo pipefail
+          receipt="$RUNNER_TEMP/stable-linux-e2e-suite.json"
+          node ../../../tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --receipt "$receipt"
+          mode="$(node ../../../tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --validate-scope-receipt "$receipt")"
+          if [ "$mode" = deferred ]; then
+              echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
+          elif [ "$mode" = full ]; then
           env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" luajit tests/hardware/run_sqlite_hourly_manual_errors.lua
           env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" lua5.4 tests/hardware/run_sqlite_hourly_manual_errors.lua
+          else
+              exit 1
+          fi
         timeout-minutes: 1
 
       - name: Project directed application transitions with independent native SQL controls
         if: ${{ !cancelled() }}
         working-directory: static/ergopti_plus/linux
         run: |
+          set -euo pipefail
+          receipt="$RUNNER_TEMP/stable-linux-e2e-suite.json"
+          node ../../../tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --receipt "$receipt"
+          mode="$(node ../../../tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --validate-scope-receipt "$receipt")"
+          if [ "$mode" = deferred ]; then
+              echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
+          elif [ "$mode" = full ]; then
           env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" luajit tests/hardware/run_sqlite_switch_projection.lua
           env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" lua5.4 tests/hardware/run_sqlite_switch_projection.lua
           env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" luajit tests/hardware/run_sqlite_switch_sql_oracles.lua
           env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" lua5.4 tests/hardware/run_sqlite_switch_sql_oracles.lua
+          else
+              exit 1
+          fi
         timeout-minutes: 1
 
       - name: Publish native layout counts in the canonical shared manifest field
         if: ${{ !cancelled() }}
         working-directory: static/ergopti_plus/linux
         run: |
+          set -euo pipefail
+          receipt="$RUNNER_TEMP/stable-linux-e2e-suite.json"
+          node ../../../tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --receipt "$receipt"
+          mode="$(node ../../../tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --validate-scope-receipt "$receipt")"
+          if [ "$mode" = deferred ]; then
+              echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
+          elif [ "$mode" = full ]; then
           env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" luajit tests/hardware/run_sqlite_layouts_seen.lua
           env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" lua5.4 tests/hardware/run_sqlite_layouts_seen.lua
+          else
+              exit 1
+          fi
         timeout-minutes: 1
 
       - name: Recover same-revision native reads without caching a refused manifest
         if: ${{ !cancelled() }}
         working-directory: static/ergopti_plus/linux
         run: |
+          set -euo pipefail
+          receipt="$RUNNER_TEMP/stable-linux-e2e-suite.json"
+          node ../../../tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --receipt "$receipt"
+          mode="$(node ../../../tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --validate-scope-receipt "$receipt")"
+          if [ "$mode" = deferred ]; then
+              echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
+          elif [ "$mode" = full ]; then
           env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" luajit tests/hardware/run_sqlite_manifest_completion.lua
           env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" lua5.4 tests/hardware/run_sqlite_manifest_completion.lua
           env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" luajit tests/hardware/run_sqlite_completion_public_cache.lua
           env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" lua5.4 tests/hardware/run_sqlite_completion_public_cache.lua
+          else
+              exit 1
+          fi
         timeout-minutes: 1
 
       - name: Roll back refused raw batches before the public flush retry
         if: ${{ !cancelled() }}
         working-directory: static/ergopti_plus/linux
         run: |
+          set -euo pipefail
+          receipt="$RUNNER_TEMP/stable-linux-e2e-suite.json"
+          node ../../../tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --receipt "$receipt"
+          mode="$(node ../../../tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --validate-scope-receipt "$receipt")"
+          if [ "$mode" = deferred ]; then
+              echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
+          elif [ "$mode" = full ]; then
           env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" luajit tests/hardware/run_sqlite_raw_batch_transactions.lua
           env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" lua5.4 tests/hardware/run_sqlite_raw_batch_transactions.lua
           env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" python3 tests/hardware/run_sqlite_raw_coherence.py --lua luajit
           env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" python3 tests/hardware/run_sqlite_raw_coherence.py --lua lua5.4
+          else
+              exit 1
+          fi
         timeout-minutes: 1
 
       - name: Preserve absent SQL scalars at the native Reader boundary
         if: ${{ !cancelled() }}
         working-directory: static/ergopti_plus/linux
         run: |
+          set -euo pipefail
+          receipt="$RUNNER_TEMP/stable-linux-e2e-suite.json"
+          node ../../../tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --receipt "$receipt"
+          mode="$(node ../../../tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --validate-scope-receipt "$receipt")"
+          if [ "$mode" = deferred ]; then
+              echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
+          elif [ "$mode" = full ]; then
           env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" luajit tests/hardware/run_sqlite_null_boundary.lua
           env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" lua5.4 tests/hardware/run_sqlite_null_boundary.lua
+          else
+              exit 1
+          fi
         timeout-minutes: 1
 
       - name: Preserve native n-gram text through SQLite JSON projection
         if: ${{ !cancelled() }}
         working-directory: static/ergopti_plus/linux
         run: |
+          set -euo pipefail
+          receipt="$RUNNER_TEMP/stable-linux-e2e-suite.json"
+          node ../../../tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --receipt "$receipt"
+          mode="$(node ../../../tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --validate-scope-receipt "$receipt")"
+          if [ "$mode" = deferred ]; then
+              echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
+          elif [ "$mode" = full ]; then
           env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" luajit tests/hardware/run_sqlite_ngram_text_receipts.lua
           env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" lua5.4 tests/hardware/run_sqlite_ngram_text_receipts.lua
+          else
+              exit 1
+          fi
         timeout-minutes: 1
 
       - name: Keep native event dates on the real local calendar day
         if: ${{ !cancelled() }}
         working-directory: static/ergopti_plus/linux
         run: |
+          set -euo pipefail
+          receipt="$RUNNER_TEMP/stable-linux-e2e-suite.json"
+          node ../../../tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --receipt "$receipt"
+          mode="$(node ../../../tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --validate-scope-receipt "$receipt")"
+          if [ "$mode" = deferred ]; then
+              echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
+          elif [ "$mode" = full ]; then
           env TZ=OWN-24 LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" luajit tests/hardware/run_sqlite_local_days_real_clock.lua
           env TZ=OWN-24 LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" lua5.4 tests/hardware/run_sqlite_local_days_real_clock.lua
           env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" luajit tests/hardware/run_sqlite_local_event_days.lua
+          else
+              exit 1
+          fi
         timeout-minutes: 1
 
       - name: Preserve fractional WPM through native collector and SQLite writes
         if: ${{ !cancelled() }}
         working-directory: static/ergopti_plus/linux
         run: |
+          set -euo pipefail
+          receipt="$RUNNER_TEMP/stable-linux-e2e-suite.json"
+          node ../../../tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --receipt "$receipt"
+          mode="$(node ../../../tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --validate-scope-receipt "$receipt")"
+          if [ "$mode" = deferred ]; then
+              echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
+          elif [ "$mode" = full ]; then
           env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" luajit tests/hardware/run_sqlite_wpm_fraction.lua
           env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" lua5.4 tests/hardware/run_sqlite_wpm_fraction.lua
+          else
+              exit 1
+          fi
         timeout-minutes: 1
 
       - name: Preserve supplied histogram key bytes in real SQLite
         if: ${{ !cancelled() }}
         working-directory: static/ergopti_plus/linux
         run: |
+          set -euo pipefail
+          receipt="$RUNNER_TEMP/stable-linux-e2e-suite.json"
+          node ../../../tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --receipt "$receipt"
+          mode="$(node ../../../tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --validate-scope-receipt "$receipt")"
+          if [ "$mode" = deferred ]; then
+              echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
+          elif [ "$mode" = full ]; then
           env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" luajit tests/hardware/run_sqlite_burst_histogram_keys.lua
           env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" lua5.4 tests/hardware/run_sqlite_burst_histogram_keys.lua
+          else
+              exit 1
+          fi
         timeout-minutes: 1
 
       - name: Roll back native category and score edits after SQLite refusal
         if: ${{ !cancelled() }}
         working-directory: static/ergopti_plus/linux
         run: |
+          set -euo pipefail
+          receipt="$RUNNER_TEMP/stable-linux-e2e-suite.json"
+          node ../../../tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --receipt "$receipt"
+          mode="$(node ../../../tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --validate-scope-receipt "$receipt")"
+          if [ "$mode" = deferred ]; then
+              echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
+          elif [ "$mode" = full ]; then
           env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" luajit tests/hardware/run_sqlite_category_edit_receipts.lua
           env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" lua5.4 tests/hardware/run_sqlite_category_edit_receipts.lua
+          else
+              exit 1
+          fi
         timeout-minutes: 1
 
       - name: Read actual canonical XKB symbol lists outside quoted metadata
         if: ${{ !cancelled() }}
         working-directory: static/ergopti_plus/linux
         run: |
+          set -euo pipefail
+          receipt="$RUNNER_TEMP/stable-linux-e2e-suite.json"
+          node ../../../tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --receipt "$receipt"
+          mode="$(node ../../../tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --validate-scope-receipt "$receipt")"
+          if [ "$mode" = deferred ]; then
+              echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
+          elif [ "$mode" = full ]; then
           env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" luajit tests/hardware/run_xkb_quoted_symbol_lists.lua
+          else
+              exit 1
+          fi
         timeout-minutes: 1
 
       - name: Parse actual canonical XKB keys without quoted declaration collisions
         if: ${{ !cancelled() }}
         working-directory: static/ergopti_plus/linux
         run: |
+          set -euo pipefail
+          receipt="$RUNNER_TEMP/stable-linux-e2e-suite.json"
+          node ../../../tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --receipt "$receipt"
+          mode="$(node ../../../tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --validate-scope-receipt "$receipt")"
+          if [ "$mode" = deferred ]; then
+              echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
+          elif [ "$mode" = full ]; then
           env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" luajit tests/hardware/run_xkb_quoted_key_definitions.lua
+          else
+              exit 1
+          fi
         timeout-minutes: 1
 
       - name: Parse actual canonical XKB blocks without quoted metadata collisions
         if: ${{ !cancelled() }}
         working-directory: static/ergopti_plus/linux
         run: |
+          set -euo pipefail
+          receipt="$RUNNER_TEMP/stable-linux-e2e-suite.json"
+          node ../../../tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --receipt "$receipt"
+          mode="$(node ../../../tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --validate-scope-receipt "$receipt")"
+          if [ "$mode" = deferred ]; then
+              echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
+          elif [ "$mode" = full ]; then
           env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" luajit tests/hardware/run_xkb_quoted_blocks.lua
+          else
+              exit 1
+          fi
         timeout-minutes: 1
 
       - name: Preserve UTF-8 boundaries in native provider error diagnostics
         if: ${{ !cancelled() }}
         working-directory: static/ergopti_plus/linux
         run: |
+          set -euo pipefail
+          receipt="$RUNNER_TEMP/stable-linux-e2e-suite.json"
+          node ../../../tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --receipt "$receipt"
+          mode="$(node ../../../tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --validate-scope-receipt "$receipt")"
+          if [ "$mode" = deferred ]; then
+              echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
+          elif [ "$mode" = full ]; then
           python3 tests/hardware/run_llm_server_message_utf8.py
           ERGOPTI_HTTP_TEST_LUA=lua5.4 python3 tests/hardware/run_llm_server_message_utf8.py
+          else
+              exit 1
+          fi
         timeout-minutes: 1
 
       - name: Refuse malformed structured provider completions through strict JSON
         if: ${{ !cancelled() }}
         working-directory: static/ergopti_plus/linux
         run: |
+          set -euo pipefail
+          receipt="$RUNNER_TEMP/stable-linux-e2e-suite.json"
+          node ../../../tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --receipt "$receipt"
+          mode="$(node ../../../tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --validate-scope-receipt "$receipt")"
+          if [ "$mode" = deferred ]; then
+              echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
+          elif [ "$mode" = full ]; then
           python3 tests/hardware/run_llm_response_syntax.py
           ERGOPTI_HTTP_TEST_LUA=lua5.4 python3 tests/hardware/run_llm_response_syntax.py
+          else
+              exit 1
+          fi
         timeout-minutes: 1
 
       - name: Refuse provider error envelopes before publishing completion text
         if: ${{ !cancelled() }}
         working-directory: static/ergopti_plus/linux
         run: |
+          set -euo pipefail
+          receipt="$RUNNER_TEMP/stable-linux-e2e-suite.json"
+          node ../../../tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --receipt "$receipt"
+          mode="$(node ../../../tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --validate-scope-receipt "$receipt")"
+          if [ "$mode" = deferred ]; then
+              echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
+          elif [ "$mode" = full ]; then
           python3 tests/hardware/run_llm_response_errors.py
           ERGOPTI_HTTP_TEST_LUA=lua5.4 python3 tests/hardware/run_llm_response_errors.py
+          else
+              exit 1
+          fi
         timeout-minutes: 1
 
       - name: Preserve complete native SQLite metadata scalar values
         if: ${{ !cancelled() }}
         working-directory: static/ergopti_plus/linux
         run: |
+          set -euo pipefail
+          receipt="$RUNNER_TEMP/stable-linux-e2e-suite.json"
+          node ../../../tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --receipt "$receipt"
+          mode="$(node ../../../tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --validate-scope-receipt "$receipt")"
+          if [ "$mode" = deferred ]; then
+              echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
+          elif [ "$mode" = full ]; then
           env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" luajit tests/hardware/run_sqlite_meta_values.lua
           env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" lua5.4 tests/hardware/run_sqlite_meta_values.lua
+          else
+              exit 1
+          fi
         timeout-minutes: 1
 
       - name: Dispatch provider requests through verified IPv4 and IPv6 TLS
         if: ${{ !cancelled() }}
         working-directory: static/ergopti_plus/linux
         run: |
+          set -euo pipefail
+          receipt="$RUNNER_TEMP/stable-linux-e2e-suite.json"
+          node ../../../tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --receipt "$receipt"
+          mode="$(node ../../../tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --validate-scope-receipt "$receipt")"
+          if [ "$mode" = deferred ]; then
+              echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
+          elif [ "$mode" = full ]; then
           python3 tests/hardware/run_llm_ipv6_endpoints.py
           ERGOPTI_HTTP_TEST_LUA=lua5.4 python3 tests/hardware/run_llm_ipv6_endpoints.py
+          else
+              exit 1
+          fi
         timeout-minutes: 1
 
       - name: Admit file watches only after native activation succeeds
         if: ${{ !cancelled() }}
         working-directory: static/ergopti_plus/linux
         run: |
+          set -euo pipefail
+          receipt="$RUNNER_TEMP/stable-linux-e2e-suite.json"
+          node ../../../tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --receipt "$receipt"
+          mode="$(node ../../../tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --validate-scope-receipt "$receipt")"
+          if [ "$mode" = deferred ]; then
+              echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
+          elif [ "$mode" = full ]; then
           env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" luajit tests/hardware/run_file_watch_receipts.lua
+          else
+              exit 1
+          fi
         timeout-minutes: 1
 
       - name: Hash real files across path boundaries and permission failures
         if: ${{ !cancelled() }}
         working-directory: static/ergopti_plus/linux
         run: |
+          set -euo pipefail
+          receipt="$RUNNER_TEMP/stable-linux-e2e-suite.json"
+          node ../../../tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --receipt "$receipt"
+          mode="$(node ../../../tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --validate-scope-receipt "$receipt")"
+          if [ "$mode" = deferred ]; then
+              echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
+          elif [ "$mode" = full ]; then
           env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" luajit tests/hardware/run_file_digest_receipts.lua
+          else
+              exit 1
+          fi
         timeout-minutes: 1
 
       - name: Hash independent byte vectors through real OpenSSL
         if: ${{ !cancelled() }}
         working-directory: static/ergopti_plus/linux
         run: |
+          set -euo pipefail
+          receipt="$RUNNER_TEMP/stable-linux-e2e-suite.json"
+          node ../../../tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --receipt "$receipt"
+          mode="$(node ../../../tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --validate-scope-receipt "$receipt")"
+          if [ "$mode" = deferred ]; then
+              echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
+          elif [ "$mode" = full ]; then
           env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" luajit tests/hardware/run_crypto_receipts.lua
+          else
+              exit 1
+          fi
         timeout-minutes: 1
 
       - name: Refuse failed native SHA-256 fallback output
         if: ${{ !cancelled() }}
         working-directory: static/ergopti_plus/linux
         run: |
+          set -euo pipefail
+          receipt="$RUNNER_TEMP/stable-linux-e2e-suite.json"
+          node ../../../tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --receipt "$receipt"
+          mode="$(node ../../../tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --validate-scope-receipt "$receipt")"
+          if [ "$mode" = deferred ]; then
+              echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
+          elif [ "$mode" = full ]; then
           env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" lua5.4 tests/hardware/run_crypto_cli_receipts.lua
+          else
+              exit 1
+          fi
         timeout-minutes: 1
 
       - name: Split native SQLite history at calendar-day boundaries
         if: ${{ !cancelled() }}
         working-directory: static/ergopti_plus/linux
         run: |
+          set -euo pipefail
+          receipt="$RUNNER_TEMP/stable-linux-e2e-suite.json"
+          node ../../../tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --receipt "$receipt"
+          mode="$(node ../../../tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --validate-scope-receipt "$receipt")"
+          if [ "$mode" = deferred ]; then
+              echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
+          elif [ "$mode" = full ]; then
           env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" luajit tests/hardware/run_sqlite_calendar_split.lua
+          else
+              exit 1
+          fi
         timeout-minutes: 1
 
       - name: Preserve empty native HTTP fields and existing metadata validation
         if: ${{ !cancelled() }}
         working-directory: static/ergopti_plus/linux
         run: |
+          set -euo pipefail
+          receipt="$RUNNER_TEMP/stable-linux-e2e-suite.json"
+          node ../../../tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --receipt "$receipt"
+          mode="$(node ../../../tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --validate-scope-receipt "$receipt")"
+          if [ "$mode" = deferred ]; then
+              echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
+          elif [ "$mode" = full ]; then
           env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" python3 tests/hardware/run_http_empty_headers.py
           env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" ERGOPTI_HTTP_TEST_LUA=lua5.4 python3 tests/hardware/run_http_empty_headers.py
+          else
+              exit 1
+          fi
         timeout-minutes: 1
 
       - name: Preserve asset identity in native release metadata
         if: ${{ !cancelled() }}
         working-directory: static/ergopti_plus/linux
         run: |
+          set -euo pipefail
+          receipt="$RUNNER_TEMP/stable-linux-e2e-suite.json"
+          node ../../../tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --receipt "$receipt"
+          mode="$(node ../../../tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --validate-scope-receipt "$receipt")"
+          if [ "$mode" = deferred ]; then
+              echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
+          elif [ "$mode" = full ]; then
           env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" python3 tests/hardware/run_updater_asset_metadata.py
           env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" ERGOPTI_HTTP_TEST_LUA=lua5.4 python3 tests/hardware/run_updater_asset_metadata.py
+          else
+              exit 1
+          fi
         timeout-minutes: 1
 
       - name: Decode native release notes exactly once
         if: ${{ !cancelled() }}
         working-directory: static/ergopti_plus/linux
         run: |
+          set -euo pipefail
+          receipt="$RUNNER_TEMP/stable-linux-e2e-suite.json"
+          node ../../../tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --receipt "$receipt"
+          mode="$(node ../../../tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --validate-scope-receipt "$receipt")"
+          if [ "$mode" = deferred ]; then
+              echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
+          elif [ "$mode" = full ]; then
           env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" python3 tests/hardware/run_updater_release_notes.py
           env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" ERGOPTI_HTTP_TEST_LUA=lua5.4 python3 tests/hardware/run_updater_release_notes.py
+          else
+              exit 1
+          fi
         timeout-minutes: 1
 
       - name: Decode native release tags from the selected JSON object
         if: ${{ !cancelled() }}
         working-directory: static/ergopti_plus/linux
         run: |
+          set -euo pipefail
+          receipt="$RUNNER_TEMP/stable-linux-e2e-suite.json"
+          node ../../../tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --receipt "$receipt"
+          mode="$(node ../../../tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --validate-scope-receipt "$receipt")"
+          if [ "$mode" = deferred ]; then
+              echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
+          elif [ "$mode" = full ]; then
           env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" python3 tests/hardware/run_updater_release_tags.py
           env ERGOPTI_HTTP_TEST_LUA=lua5.4 LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" python3 tests/hardware/run_updater_release_tags.py
+          else
+              exit 1
+          fi
         timeout-minutes: 1
 
       - name: Decode native release publication times at their JSON field
         if: ${{ !cancelled() }}
         working-directory: static/ergopti_plus/linux
         run: |
+          set -euo pipefail
+          receipt="$RUNNER_TEMP/stable-linux-e2e-suite.json"
+          node ../../../tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --receipt "$receipt"
+          mode="$(node ../../../tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --validate-scope-receipt "$receipt")"
+          if [ "$mode" = deferred ]; then
+              echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
+          elif [ "$mode" = full ]; then
           env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" python3 tests/hardware/run_updater_release_times.py
           env ERGOPTI_HTTP_TEST_LUA=lua5.4 LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" python3 tests/hardware/run_updater_release_times.py
+          else
+              exit 1
+          fi
         timeout-minutes: 1
 
       - name: Decode the selected release object's own prerelease Boolean
         if: ${{ !cancelled() }}
         working-directory: static/ergopti_plus/linux
         run: |
+          set -euo pipefail
+          receipt="$RUNNER_TEMP/stable-linux-e2e-suite.json"
+          node ../../../tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --receipt "$receipt"
+          mode="$(node ../../../tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --validate-scope-receipt "$receipt")"
+          if [ "$mode" = deferred ]; then
+              echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
+          elif [ "$mode" = full ]; then
           env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" python3 tests/hardware/run_updater_release_flags.py
           env ERGOPTI_HTTP_TEST_LUA=lua5.4 LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" python3 tests/hardware/run_updater_release_flags.py
+          else
+              exit 1
+          fi
         timeout-minutes: 1
 
       - name: Reject nested arrays instead of offering their release objects
         if: ${{ !cancelled() }}
         working-directory: static/ergopti_plus/linux
         run: |
+          set -euo pipefail
+          receipt="$RUNNER_TEMP/stable-linux-e2e-suite.json"
+          node ../../../tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --receipt "$receipt"
+          mode="$(node ../../../tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --validate-scope-receipt "$receipt")"
+          if [ "$mode" = deferred ]; then
+              echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
+          elif [ "$mode" = full ]; then
           env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" python3 tests/hardware/run_updater_release_array_admission.py
           env ERGOPTI_HTTP_TEST_LUA=lua5.4 LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" python3 tests/hardware/run_updater_release_array_admission.py
+          else
+              exit 1
+          fi
         timeout-minutes: 1
 
       - name: Reject interrupted conditional release responses before cache reuse
         if: ${{ !cancelled() }}
         working-directory: static/ergopti_plus/linux
         run: |
+          set -euo pipefail
+          receipt="$RUNNER_TEMP/stable-linux-e2e-suite.json"
+          node ../../../tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --receipt "$receipt"
+          mode="$(node ../../../tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --validate-scope-receipt "$receipt")"
+          if [ "$mode" = deferred ]; then
+              echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
+          elif [ "$mode" = full ]; then
           env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" python3 tests/hardware/run_updater_conditional_receipts.py
           env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" ERGOPTI_HTTP_TEST_LUA=lua5.4 python3 tests/hardware/run_updater_conditional_receipts.py
+          else
+              exit 1
+          fi
         timeout-minutes: 1
 
       - name: Refuse truncated native curl config URLs
         if: ${{ !cancelled() }}
         working-directory: static/ergopti_plus/linux
         run: |
+          set -euo pipefail
+          receipt="$RUNNER_TEMP/stable-linux-e2e-suite.json"
+          node ../../../tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --receipt "$receipt"
+          mode="$(node ../../../tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --validate-scope-receipt "$receipt")"
+          if [ "$mode" = deferred ]; then
+              echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
+          elif [ "$mode" = full ]; then
           env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" luajit tests/hardware/run_http_url_nul_receipts.lua
+          else
+              exit 1
+          fi
         timeout-minutes: 1
 
       - name: Keep caller HTTP credentials at their original native origin
         if: ${{ !cancelled() }}
         working-directory: static/ergopti_plus/linux
         run: |
+          set -euo pipefail
+          receipt="$RUNNER_TEMP/stable-linux-e2e-suite.json"
+          node ../../../tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --receipt "$receipt"
+          mode="$(node ../../../tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --validate-scope-receipt "$receipt")"
+          if [ "$mode" = deferred ]; then
+              echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
+          elif [ "$mode" = full ]; then
           env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" luajit tests/hardware/run_http_redirect_receipts.lua
+          else
+              exit 1
+          fi
         timeout-minutes: 1
 
       - name: Preserve native POST redirect method and body semantics
         if: ${{ !cancelled() }}
         working-directory: static/ergopti_plus/linux
         run: |
+          set -euo pipefail
+          receipt="$RUNNER_TEMP/stable-linux-e2e-suite.json"
+          node ../../../tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --receipt "$receipt"
+          mode="$(node ../../../tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --validate-scope-receipt "$receipt")"
+          if [ "$mode" = deferred ]; then
+              echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
+          elif [ "$mode" = full ]; then
           python3 tests/hardware/run_http_redirect_method_receipts.py
+          else
+              exit 1
+          fi
         timeout-minutes: 1
 
       - name: Preserve TLS on native HTTP redirect hops
         if: ${{ !cancelled() }}
         working-directory: static/ergopti_plus/linux
         run: |
+          set -euo pipefail
+          receipt="$RUNNER_TEMP/stable-linux-e2e-suite.json"
+          node ../../../tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --receipt "$receipt"
+          mode="$(node ../../../tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --validate-scope-receipt "$receipt")"
+          if [ "$mode" = deferred ]; then
+              echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
+          elif [ "$mode" = full ]; then
           python3 tests/hardware/run_http_tls_redirect_receipts.py
+          else
+              exit 1
+          fi
         timeout-minutes: 1
 
       - name: Refuse shortened native shell commands and stdin scripts
         if: ${{ !cancelled() }}
         working-directory: static/ergopti_plus/linux
         run: |
+          set -euo pipefail
+          receipt="$RUNNER_TEMP/stable-linux-e2e-suite.json"
+          node ../../../tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --receipt "$receipt"
+          mode="$(node ../../../tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --validate-scope-receipt "$receipt")"
+          if [ "$mode" = deferred ]; then
+              echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
+          elif [ "$mode" = full ]; then
           env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" luajit tests/hardware/run_shell_command_nul_receipts.lua
+          else
+              exit 1
+          fi
         timeout-minutes: 1
 
       - name: Preflight HTTP replacements before retiring their native owner
         if: ${{ !cancelled() }}
         working-directory: static/ergopti_plus/linux
         run: |
+          set -euo pipefail
+          receipt="$RUNNER_TEMP/stable-linux-e2e-suite.json"
+          node ../../../tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --receipt "$receipt"
+          mode="$(node ../../../tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --validate-scope-receipt "$receipt")"
+          if [ "$mode" = deferred ]; then
+              echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
+          elif [ "$mode" = full ]; then
           env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" luajit tests/hardware/run_http_preflight_receipts.lua
+          else
+              exit 1
+          fi
         timeout-minutes: 1
 
       - name: Refuse header injection before native HTTP owner replacement
         if: ${{ !cancelled() }}
         working-directory: static/ergopti_plus/linux
         run: |
+          set -euo pipefail
+          receipt="$RUNNER_TEMP/stable-linux-e2e-suite.json"
+          node ../../../tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --receipt "$receipt"
+          mode="$(node ../../../tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --validate-scope-receipt "$receipt")"
+          if [ "$mode" = deferred ]; then
+              echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
+          elif [ "$mode" = full ]; then
           env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" luajit tests/hardware/run_http_header_receipts.lua
+          else
+              exit 1
+          fi
         timeout-minutes: 1
 
       - name: Deliver large literal POST bodies through native anonymous pipes
         if: ${{ !cancelled() }}
         working-directory: static/ergopti_plus/linux
         run: |
+          set -euo pipefail
+          receipt="$RUNNER_TEMP/stable-linux-e2e-suite.json"
+          node ../../../tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --receipt "$receipt"
+          mode="$(node ../../../tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --validate-scope-receipt "$receipt")"
+          if [ "$mode" = deferred ]; then
+              echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
+          elif [ "$mode" = full ]; then
           python3 tests/hardware/run_http_body_pipe_receipts.py
+          else
+              exit 1
+          fi
         timeout-minutes: 2
 
       - name: Admit regular write destinations before truncation or append
         if: ${{ !cancelled() }}
         working-directory: static/ergopti_plus/linux
         run: |
+          set -euo pipefail
+          receipt="$RUNNER_TEMP/stable-linux-e2e-suite.json"
+          node ../../../tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --receipt "$receipt"
+          mode="$(node ../../../tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --validate-scope-receipt "$receipt")"
+          if [ "$mode" = deferred ]; then
+              echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
+          elif [ "$mode" = full ]; then
           python3 tests/hardware/run_file_write_special_receipts.py
           ERGOPTI_WRITE_BACKEND=luv python3 tests/hardware/run_file_write_special_receipts.py
           ERGOPTI_FILE_WRITE_TEST_LUA=lua5.4 ERGOPTI_WRITE_BACKEND=luv python3 tests/hardware/run_file_write_special_receipts.py
+          else
+              exit 1
+          fi
         timeout-minutes: 2
 
       - name: Retain native POST resources after simulated cleanup refusal
         if: ${{ !cancelled() }}
         working-directory: static/ergopti_plus/linux
         run: |
+          set -euo pipefail
+          receipt="$RUNNER_TEMP/stable-linux-e2e-suite.json"
+          node ../../../tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --receipt "$receipt"
+          mode="$(node ../../../tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --validate-scope-receipt "$receipt")"
+          if [ "$mode" = deferred ]; then
+              echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
+          elif [ "$mode" = full ]; then
           env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" luajit tests/hardware/run_http_body_cleanup_receipts.lua
+          else
+              exit 1
+          fi
         timeout-minutes: 1
 
       - name: Send literal at-prefixed HTTP bodies without native file loading
         if: ${{ !cancelled() }}
         working-directory: static/ergopti_plus/linux
         run: |
+          set -euo pipefail
+          receipt="$RUNNER_TEMP/stable-linux-e2e-suite.json"
+          node ../../../tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --receipt "$receipt"
+          mode="$(node ../../../tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --validate-scope-receipt "$receipt")"
+          if [ "$mode" = deferred ]; then
+              echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
+          elif [ "$mode" = full ]; then
           env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" luajit tests/hardware/run_http_literal_body_receipts.lua
+          else
+              exit 1
+          fi
         timeout-minutes: 1
 
       - name: Refuse non-HTTP native file and protocol transports
         if: ${{ !cancelled() }}
         working-directory: static/ergopti_plus/linux
         run: |
+          set -euo pipefail
+          receipt="$RUNNER_TEMP/stable-linux-e2e-suite.json"
+          node ../../../tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --receipt "$receipt"
+          mode="$(node ../../../tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --validate-scope-receipt "$receipt")"
+          if [ "$mode" = deferred ]; then
+              echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
+          elif [ "$mode" = full ]; then
           env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" luajit tests/hardware/run_http_transport_receipts.lua
+          else
+              exit 1
+          fi
         timeout-minutes: 1
 
       - name: Isolate native HTTP policy from inherited personal curl config
         if: ${{ !cancelled() }}
         working-directory: static/ergopti_plus/linux
         run: |
+          set -euo pipefail
+          receipt="$RUNNER_TEMP/stable-linux-e2e-suite.json"
+          node ../../../tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --receipt "$receipt"
+          mode="$(node ../../../tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --validate-scope-receipt "$receipt")"
+          if [ "$mode" = deferred ]; then
+              echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
+          elif [ "$mode" = full ]; then
           python3 tests/hardware/run_http_curlrc_receipts.py
+          else
+              exit 1
+          fi
         timeout-minutes: 4
 
       - name: Refuse foreign JSON staging and preserve kernel write failures
         if: ${{ !cancelled() }}
         working-directory: static/ergopti_plus/linux
         run: |
+          set -euo pipefail
+          receipt="$RUNNER_TEMP/stable-linux-e2e-suite.json"
+          node ../../../tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --receipt "$receipt"
+          mode="$(node ../../../tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --validate-scope-receipt "$receipt")"
+          if [ "$mode" = deferred ]; then
+              echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
+          elif [ "$mode" = full ]; then
           python3 tests/hardware/run_storage_temp_receipts.py
+          else
+              exit 1
+          fi
         timeout-minutes: 1
 
       - name: Inspect occupied JSON recovery paths without opening native endpoints
         if: ${{ !cancelled() }}
         working-directory: static/ergopti_plus/linux
         run: |
+          set -euo pipefail
+          receipt="$RUNNER_TEMP/stable-linux-e2e-suite.json"
+          node ../../../tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --receipt "$receipt"
+          mode="$(node ../../../tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --validate-scope-receipt "$receipt")"
+          if [ "$mode" = deferred ]; then
+              echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
+          elif [ "$mode" = full ]; then
           python3 tests/hardware/run_storage_backup_type_receipts.py
+          else
+              exit 1
+          fi
         timeout-minutes: 1
 
       - name: Preserve competing JSON backups at native publication
         if: ${{ !cancelled() }}
         working-directory: static/ergopti_plus/linux
         run: |
+          set -euo pipefail
+          receipt="$RUNNER_TEMP/stable-linux-e2e-suite.json"
+          node ../../../tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --receipt "$receipt"
+          mode="$(node ../../../tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --validate-scope-receipt "$receipt")"
+          if [ "$mode" = deferred ]; then
+              echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
+          elif [ "$mode" = full ]; then
           python3 tests/hardware/run_storage_backup_race_receipts.py
           ERGOPTI_STORAGE_TEST_LUA=lua5.4 python3 tests/hardware/run_storage_backup_race_receipts.py
+          else
+              exit 1
+          fi
         timeout-minutes: 2
 
       - name: Preserve release-page associations after failed native validator saves
         if: ${{ !cancelled() }}
         working-directory: static/ergopti_plus/linux
         run: |
+          set -euo pipefail
+          receipt="$RUNNER_TEMP/stable-linux-e2e-suite.json"
+          node ../../../tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --receipt "$receipt"
+          mode="$(node ../../../tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --validate-scope-receipt "$receipt")"
+          if [ "$mode" = deferred ]; then
+              echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
+          elif [ "$mode" = full ]; then
           python3 tests/hardware/run_updater_etag_receipts.py
+          else
+              exit 1
+          fi
         timeout-minutes: 2
 
       - name: Preserve native updater temporary-file ownership
         if: ${{ !cancelled() }}
         run: |
           set -euo pipefail
+          receipt="$RUNNER_TEMP/stable-linux-e2e-suite.json"
+          node tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --receipt "$receipt"
+          mode="$(node tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --validate-scope-receipt "$receipt")"
+          if [ "$mode" = deferred ]; then
+              echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
+          elif [ "$mode" = full ]; then
+          set -euo pipefail
           export ERGOPTI_MANAGED_NATIVE_EXPECTED_HEAD="$GITHUB_SHA"
           npm run --silent test:linux:updater-temp-native -- --fixture ownership | tee "$RUNNER_TEMP/linux-updater-temp-ownership.log"
+          else
+              exit 1
+          fi
         timeout-minutes: 22
 
       - name: Acknowledge native updater temporary-allocation refusals
         if: ${{ !cancelled() }}
         run: |
           set -euo pipefail
+          receipt="$RUNNER_TEMP/stable-linux-e2e-suite.json"
+          node tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --receipt "$receipt"
+          mode="$(node tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --validate-scope-receipt "$receipt")"
+          if [ "$mode" = deferred ]; then
+              echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
+          elif [ "$mode" = full ]; then
+          set -euo pipefail
           export ERGOPTI_MANAGED_NATIVE_EXPECTED_HEAD="$GITHUB_SHA"
           npm run --silent test:linux:updater-temp-native -- --fixture allocation | tee "$RUNNER_TEMP/linux-updater-temp-allocation.log"
+          else
+              exit 1
+          fi
         timeout-minutes: 22
 
       - name: Install native virtual audio locale prerequisites
         if: ${{ !cancelled() }}
         working-directory: static/ergopti_plus/linux
         run: |
+          set -euo pipefail
+          receipt="$RUNNER_TEMP/stable-linux-e2e-suite.json"
+          node ../../../tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --receipt "$receipt"
+          mode="$(node ../../../tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --validate-scope-receipt "$receipt")"
+          if [ "$mode" = deferred ]; then
+              echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
+          elif [ "$mode" = full ]; then
           # Ubuntu ships PulseAudio gettext catalogs in language packs.
           sudo python3 "$GITHUB_WORKSPACE/tools/ci/ubuntu_apt.py" -y --no-install-recommends pulseaudio pulseaudio-utils locales language-pack-fr language-pack-de
           sudo locale-gen fr_FR.UTF-8 de_DE.UTF-8
+          else
+              exit 1
+          fi
         timeout-minutes: 10
 
       - name: Parse native virtual audio state independently of user locale
         if: ${{ !cancelled() }}
         working-directory: static/ergopti_plus/linux
         run: |
+          set -euo pipefail
+          receipt="$RUNNER_TEMP/stable-linux-e2e-suite.json"
+          node ../../../tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --receipt "$receipt"
+          mode="$(node ../../../tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --validate-scope-receipt "$receipt")"
+          if [ "$mode" = deferred ]; then
+              echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
+          elif [ "$mode" = full ]; then
           python3 tests/hardware/run_system_audio_locale_receipts.py
           ERGOPTI_SYSTEM_TEST_LUA=lua5.4 python3 tests/hardware/run_system_audio_locale_receipts.py
+          else
+              exit 1
+          fi
         timeout-minutes: 2
 
       - name: Resolve native roots with literal POSIX bytes and the actual cwd
         if: ${{ !cancelled() }}
         working-directory: static/ergopti_plus/linux
         run: |
+          set -euo pipefail
+          receipt="$RUNNER_TEMP/stable-linux-e2e-suite.json"
+          node ../../../tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --receipt "$receipt"
+          mode="$(node ../../../tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --validate-scope-receipt "$receipt")"
+          if [ "$mode" = deferred ]; then
+              echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
+          elif [ "$mode" = full ]; then
           python3 tests/hardware/run_native_path_literal_receipts.py
           ERGOPTI_PATH_TEST_LUA=lua5.4 python3 tests/hardware/run_native_path_literal_receipts.py
+          else
+              exit 1
+          fi
         timeout-minutes: 1
 
       - name: Reject native special JSON storage sources without blocking
         if: ${{ !cancelled() }}
         working-directory: static/ergopti_plus/linux
         run: |
+          set -euo pipefail
+          receipt="$RUNNER_TEMP/stable-linux-e2e-suite.json"
+          node ../../../tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --receipt "$receipt"
+          mode="$(node ../../../tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --validate-scope-receipt "$receipt")"
+          if [ "$mode" = deferred ]; then
+              echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
+          elif [ "$mode" = full ]; then
           python3 tests/hardware/run_storage_special_source_receipts.py
           ERGOPTI_STORAGE_TEST_LUA=lua5.4 python3 tests/hardware/run_storage_special_source_receipts.py
+          else
+              exit 1
+          fi
         timeout-minutes: 1
 
       - name: Reject native special file sources in the generic and updater read ports
         if: ${{ !cancelled() }}
         working-directory: static/ergopti_plus/linux
         run: |
+          set -euo pipefail
+          receipt="$RUNNER_TEMP/stable-linux-e2e-suite.json"
+          node ../../../tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --receipt "$receipt"
+          mode="$(node ../../../tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --validate-scope-receipt "$receipt")"
+          if [ "$mode" = deferred ]; then
+              echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
+          elif [ "$mode" = full ]; then
           python3 tests/hardware/run_file_read_special_receipts.py
           ERGOPTI_FILE_READ_TEST_LUA=lua5.4 python3 tests/hardware/run_file_read_special_receipts.py
+          else
+              exit 1
+          fi
         timeout-minutes: 1
 
       - name: Reject special native diagnostic metadata sources
         if: ${{ !cancelled() }}
         working-directory: static/ergopti_plus/linux
         run: |
+          set -euo pipefail
+          receipt="$RUNNER_TEMP/stable-linux-e2e-suite.json"
+          node ../../../tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --receipt "$receipt"
+          mode="$(node ../../../tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --validate-scope-receipt "$receipt")"
+          if [ "$mode" = deferred ]; then
+              echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
+          elif [ "$mode" = full ]; then
           python3 tests/hardware/run_diagnostic_source_receipts.py
           ERGOPTI_DIAGNOSTIC_TEST_LUA=lua5.4 python3 tests/hardware/run_diagnostic_source_receipts.py
+          else
+              exit 1
+          fi
         timeout-minutes: 1
 
       - name: Reject special native build-stamp version sources
         if: ${{ !cancelled() }}
         working-directory: static/ergopti_plus/linux
         run: |
+          set -euo pipefail
+          receipt="$RUNNER_TEMP/stable-linux-e2e-suite.json"
+          node ../../../tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --receipt "$receipt"
+          mode="$(node ../../../tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --validate-scope-receipt "$receipt")"
+          if [ "$mode" = deferred ]; then
+              echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
+          elif [ "$mode" = full ]; then
           python3 tests/hardware/run_version_source_receipts.py
           ERGOPTI_VERSION_TEST_LUA=lua5.4 python3 tests/hardware/run_version_source_receipts.py
+          else
+              exit 1
+          fi
         timeout-minutes: 1
 
       - name: Preserve native file-read and close failure receipts
         if: ${{ !cancelled() }}
         working-directory: static/ergopti_plus/linux
         run: |
+          set -euo pipefail
+          receipt="$RUNNER_TEMP/stable-linux-e2e-suite.json"
+          node ../../../tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --receipt "$receipt"
+          mode="$(node ../../../tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --validate-scope-receipt "$receipt")"
+          if [ "$mode" = deferred ]; then
+              echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
+          elif [ "$mode" = full ]; then
           python3 tests/hardware/run_file_read_error_receipts.py
           ERGOPTI_FILE_READ_TEST_LUA=lua5.4 python3 tests/hardware/run_file_read_error_receipts.py
+          else
+              exit 1
+          fi
         timeout-minutes: 1
 
       - name: Hand off native restart relays after real zombie targets exit
         if: ${{ !cancelled() }}
         working-directory: static/ergopti_plus/linux
         run: |
+          set -euo pipefail
+          receipt="$RUNNER_TEMP/stable-linux-e2e-suite.json"
+          node ../../../tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --receipt "$receipt"
+          mode="$(node ../../../tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --validate-scope-receipt "$receipt")"
+          if [ "$mode" = deferred ]; then
+              echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
+          elif [ "$mode" = full ]; then
           python3 tests/hardware/run_restart_zombie_receipts.py
           ERGOPTI_RESTART_TEST_LUA=lua5.4 python3 tests/hardware/run_restart_zombie_receipts.py
+          else
+              exit 1
+          fi
         timeout-minutes: 1
 
       - name: Enforce exact native buffered HTTP body limits
@@ -1061,28 +2150,68 @@ jobs:
         env:
           LUA_PATH: './?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;'
         run: |
+          set -euo pipefail
+          receipt="$RUNNER_TEMP/stable-linux-e2e-suite.json"
+          node ../../../tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --receipt "$receipt"
+          mode="$(node ../../../tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --validate-scope-receipt "$receipt")"
+          if [ "$mode" = deferred ]; then
+              echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
+          elif [ "$mode" = full ]; then
           luajit tests/hardware/run_http_body_limit_receipts.lua
+          else
+              exit 1
+          fi
         timeout-minutes: 1
 
       - name: Preserve literal HTTP targets through every native curl method
         if: ${{ !cancelled() }}
         working-directory: static/ergopti_plus/linux
         run: |
+          set -euo pipefail
+          receipt="$RUNNER_TEMP/stable-linux-e2e-suite.json"
+          node ../../../tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --receipt "$receipt"
+          mode="$(node ../../../tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --validate-scope-receipt "$receipt")"
+          if [ "$mode" = deferred ]; then
+              echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
+          elif [ "$mode" = full ]; then
           env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" luajit tests/hardware/run_http_literal_url_receipts.lua
+          else
+              exit 1
+          fi
         timeout-minutes: 1
 
       - name: Retire native HTTP and digest process owners
         if: ${{ !cancelled() }}
         working-directory: static/ergopti_plus/linux
         run: |
+          set -euo pipefail
+          receipt="$RUNNER_TEMP/stable-linux-e2e-suite.json"
+          node ../../../tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --receipt "$receipt"
+          mode="$(node ../../../tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --validate-scope-receipt "$receipt")"
+          if [ "$mode" = deferred ]; then
+              echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
+          elif [ "$mode" = full ]; then
           env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" luajit tests/hardware/run_cli_exit_receipts.lua
+          else
+              exit 1
+          fi
         timeout-minutes: 1
 
       - name: Preserve JSON stores after native read refusals
         if: ${{ !cancelled() }}
         working-directory: static/ergopti_plus/linux
         run: |
+          set -euo pipefail
+          receipt="$RUNNER_TEMP/stable-linux-e2e-suite.json"
+          node ../../../tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --receipt "$receipt"
+          mode="$(node ../../../tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --validate-scope-receipt "$receipt")"
+          if [ "$mode" = deferred ]; then
+              echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
+          elif [ "$mode" = full ]; then
           env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" luajit tests/hardware/run_storage_read_receipts.lua
+          else
+              exit 1
+          fi
         timeout-minutes: 1
 
       # The only step in this workflow that touches a real kernel input path.
@@ -1100,6 +2229,13 @@ jobs:
       - name: Load the uinput module
         if: ${{ !cancelled() }}
         run: |
+          set -euo pipefail
+          receipt="$RUNNER_TEMP/stable-linux-e2e-suite.json"
+          node tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --receipt "$receipt"
+          mode="$(node tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --validate-scope-receipt "$receipt")"
+          if [ "$mode" = deferred ]; then
+              echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
+          elif [ "$mode" = full ]; then
           sudo modprobe uinput
           if [ ! -e /dev/uinput ]; then
               echo "::error::/dev/uinput is absent after modprobe — the runner image cannot host this test."
@@ -1107,7 +2243,9 @@ jobs:
               echo "ubuntu-latest image still ships the uinput module before touching the driver."
               exit 1
           fi
-
+          else
+              exit 1
+          fi
       - name: Round-trip real events through the kernel
         if: ${{ !cancelled() }}
         working-directory: static/ergopti_plus/linux
@@ -1116,7 +2254,17 @@ jobs:
         # `sudo -E` so the path is set explicitly and does not depend on which
         # variables the runner sudoers happens to preserve.
         run: |
+          set -euo pipefail
+          receipt="$RUNNER_TEMP/stable-linux-e2e-suite.json"
+          node ../../../tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --receipt "$receipt"
+          mode="$(node ../../../tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --validate-scope-receipt "$receipt")"
+          if [ "$mode" = deferred ]; then
+              echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
+          elif [ "$mode" = full ]; then
           sudo env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" luajit tests/hardware/run_uinput_roundtrip.lua
+          else
+              exit 1
+          fi
         timeout-minutes: 2
 
       # The property the whole Linux milestone is named after: keystrokes arriving
@@ -1129,7 +2277,17 @@ jobs:
         if: ${{ !cancelled() }}
         working-directory: static/ergopti_plus/linux
         run: |
+          set -euo pipefail
+          receipt="$RUNNER_TEMP/stable-linux-e2e-suite.json"
+          node ../../../tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --receipt "$receipt"
+          mode="$(node ../../../tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --validate-scope-receipt "$receipt")"
+          if [ "$mode" = deferred ]; then
+              echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
+          elif [ "$mode" = full ]; then
           sudo env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" luajit tests/hardware/run_grab_race.lua
+          else
+              exit 1
+          fi
         timeout-minutes: 2
 
       # No display server needed: `xkbcli compile-keymap --layout fr` produces the
@@ -1143,23 +2301,53 @@ jobs:
         if: ${{ !cancelled() }}
         working-directory: static/ergopti_plus/linux
         run: |
+          set -euo pipefail
+          receipt="$RUNNER_TEMP/stable-linux-e2e-suite.json"
+          node ../../../tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --receipt "$receipt"
+          mode="$(node ../../../tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --validate-scope-receipt "$receipt")"
+          if [ "$mode" = deferred ]; then
+              echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
+          elif [ "$mode" = full ]; then
           sudo python3 "$GITHUB_WORKSPACE/tools/ci/ubuntu_apt.py" -y --no-install-recommends libxkbcommon-tools xkb-data
           env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" luajit tests/hardware/run_layout_resolution.lua
+          else
+              exit 1
+          fi
         timeout-minutes: 3
 
       - name: Preserve native localectl layout and variant alignment
         if: ${{ !cancelled() }}
         working-directory: static/ergopti_plus/linux
         run: |
+          set -euo pipefail
+          receipt="$RUNNER_TEMP/stable-linux-e2e-suite.json"
+          node ../../../tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --receipt "$receipt"
+          mode="$(node ../../../tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --validate-scope-receipt "$receipt")"
+          if [ "$mode" = deferred ]; then
+              echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
+          elif [ "$mode" = full ]; then
           env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" luajit tests/hardware/run_xkb_localectl_variants.lua
+          else
+              exit 1
+          fi
         timeout-minutes: 1
 
       - name: Refuse malformed UTF-8 inverse plans before and after layout load
         if: ${{ !cancelled() }}
         working-directory: static/ergopti_plus/linux
         run: |
+          set -euo pipefail
+          receipt="$RUNNER_TEMP/stable-linux-e2e-suite.json"
+          node ../../../tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --receipt "$receipt"
+          mode="$(node ../../../tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --validate-scope-receipt "$receipt")"
+          if [ "$mode" = deferred ]; then
+              echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
+          elif [ "$mode" = full ]; then
           env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" luajit tests/hardware/run_xkb_plan_utf8.lua
           env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" luajit tests/hardware/run_xkb_plan_utf8_missing_map.lua
+          else
+              exit 1
+          fi
         timeout-minutes: 1
 
       # This fixture owns its Xvfb PID and reads actual native XKB group/map
@@ -1169,8 +2357,18 @@ jobs:
         working-directory: static/ergopti_plus/linux
         run: |
           set -euo pipefail
+          receipt="$RUNNER_TEMP/stable-linux-e2e-suite.json"
+          node ../../../tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --receipt "$receipt"
+          mode="$(node ../../../tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --validate-scope-receipt "$receipt")"
+          if [ "$mode" = deferred ]; then
+              echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
+          elif [ "$mode" = full ]; then
+          set -euo pipefail
           sudo python3 "$GITHUB_WORKSPACE/tools/ci/ubuntu_apt.py" -y --no-install-recommends libxkbcommon-x11-0 libx11-6 libx11-xcb1 libxtst6 xvfb x11-xkb-utils
           env LUA_PATH="./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;" luajit tests/hardware/run_xkb_source_qualification.lua | tee "$RUNNER_TEMP/linux-xkb-source.log"
+          else
+              exit 1
+          fi
         timeout-minutes: 3
 
       # A real X server and WM qualify logical RandR placement and input focus.
@@ -1185,8 +2383,18 @@ jobs:
           ERGOPTI_DEV_RELEASE_VERSION: ${{ inputs.version }}
         run: |
           set -euo pipefail
+          receipt="$RUNNER_TEMP/stable-linux-e2e-suite.json"
+          node tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --receipt "$receipt"
+          mode="$(node tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --validate-scope-receipt "$receipt")"
+          if [ "$mode" = deferred ]; then
+              echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
+          elif [ "$mode" = full ]; then
+          set -euo pipefail
           sudo python3 "$GITHUB_WORKSPACE/tools/ci/ubuntu_apt.py" -y --no-install-recommends luajit lua-luv python3 xvfb openbox xdotool x11-utils x11-xserver-utils coreutils xfonts-base
           npm run test:linux:window-switch | tee "$RUNNER_TEMP/linux-window-switch.log"
+          else
+              exit 1
+          fi
         timeout-minutes: 4
 
       # "Needs a display server" sounded like "needs a desktop", and it does not.
@@ -1203,6 +2411,13 @@ jobs:
         if: ${{ !cancelled() }}
         working-directory: static/ergopti_plus/linux
         run: |
+          set -euo pipefail
+          receipt="$RUNNER_TEMP/stable-linux-e2e-suite.json"
+          node ../../../tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --receipt "$receipt"
+          mode="$(node ../../../tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --validate-scope-receipt "$receipt")"
+          if [ "$mode" = deferred ]; then
+              echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
+          elif [ "$mode" = full ]; then
           sudo python3 "$GITHUB_WORKSPACE/tools/ci/ubuntu_apt.py" -y --no-install-recommends xvfb sway libxkbcommon-tools xkb-data x11-utils
           export LUA_PATH='./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;'
 
@@ -1243,6 +2458,9 @@ jobs:
           set -e
           kill "$SWAY_PID" 2>/dev/null || true
           exit $STATUS
+          else
+              exit 1
+          fi
         timeout-minutes: 6
 
       # An FFI binding is a set of NAMES — three sonames and thirteen symbols —
@@ -1257,8 +2475,18 @@ jobs:
         if: ${{ !cancelled() }}
         working-directory: static/ergopti_plus/linux
         run: |
+          set -euo pipefail
+          receipt="$RUNNER_TEMP/stable-linux-e2e-suite.json"
+          node ../../../tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --receipt "$receipt"
+          mode="$(node ../../../tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --validate-scope-receipt "$receipt")"
+          if [ "$mode" = deferred ]; then
+              echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
+          elif [ "$mode" = full ]; then
           sudo python3 "$GITHUB_WORKSPACE/tools/ci/ubuntu_apt.py" -y --no-install-recommends libayatana-appindicator3-1 libgtk-3-0
           env LUA_PATH='./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;' luajit tests/hardware/run_tray_symbols.lua
+          else
+              exit 1
+          fi
         timeout-minutes: 4
 
       # The symbols resolving is not the icon appearing. A panel shows a tray
@@ -1273,6 +2501,13 @@ jobs:
         if: ${{ !cancelled() }}
         working-directory: static/ergopti_plus/linux
         run: |
+          set -euo pipefail
+          receipt="$RUNNER_TEMP/stable-linux-e2e-suite.json"
+          node ../../../tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --receipt "$receipt"
+          mode="$(node ../../../tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --validate-scope-receipt "$receipt")"
+          if [ "$mode" = deferred ]; then
+              echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
+          elif [ "$mode" = full ]; then
           sudo python3 "$GITHUB_WORKSPACE/tools/ci/ubuntu_apt.py" -y --no-install-recommends python3-gi gir1.2-glib-2.0 dbus xvfb
           dbus-run-session -- python3 tests/hardware/test_startup_desktop.py
           export LUA_PATH='./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;'
@@ -1297,6 +2532,9 @@ jobs:
             [ -f "$ERGOPTI_TRAY_CLICK_FILE" ] || { echo "::error::a menu click never reached its row"; exit 1; }
             [ "$(cat "$ERGOPTI_TRAY_CLICK_FILE")" = "clicked 1" ] || { echo "::error::the replacement submenu click never reached its row"; exit 1; }
             exit "$status"'
+          else
+              exit 1
+          fi
         timeout-minutes: 4
 
       # The secure-field probe decides whether ANY expansion may fire (it fails
@@ -1307,16 +2545,36 @@ jobs:
       - name: The secure-field probe on a real accessibility bus
         if: ${{ !cancelled() }}
         run: |
+          set -euo pipefail
+          receipt="$RUNNER_TEMP/stable-linux-e2e-suite.json"
+          node tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --receipt "$receipt"
+          mode="$(node tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --validate-scope-receipt "$receipt")"
+          if [ "$mode" = deferred ]; then
+              echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
+          elif [ "$mode" = full ]; then
           sudo python3 "$GITHUB_WORKSPACE/tools/ci/ubuntu_apt.py" -y --no-install-recommends at-spi2-core openbox python3-gi gir1.2-gtk-3.0 dbus-x11 xvfb
           bash static/ergopti_plus/linux/tests/hardware/run_atspi_focus.sh
+          else
+              exit 1
+          fi
         timeout-minutes: 5
 
       - name: Launch the bounded accessibility helper with Lua interpreter options
         if: ${{ !cancelled() }}
         working-directory: static/ergopti_plus/linux
         run: |
+          set -euo pipefail
+          receipt="$RUNNER_TEMP/stable-linux-e2e-suite.json"
+          node ../../../tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --receipt "$receipt"
+          mode="$(node ../../../tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --validate-scope-receipt "$receipt")"
+          if [ "$mode" = deferred ]; then
+              echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
+          elif [ "$mode" = full ]; then
           sudo python3 "$GITHUB_WORKSPACE/tools/ci/ubuntu_apt.py" -y --no-install-recommends xdotool
           python3 tests/hardware/run_atspi_interpreter_receipts.py
+          else
+              exit 1
+          fi
         timeout-minutes: 1
 
       # The program a user starts, started: the real daemon with --tray on a
@@ -1329,6 +2587,13 @@ jobs:
       - name: The whole daemon, live — a trigger typed, a tray shown
         if: ${{ !cancelled() }}
         run: |
+          set -euo pipefail
+          receipt="$RUNNER_TEMP/stable-linux-e2e-suite.json"
+          node tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --receipt "$receipt"
+          mode="$(node tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --validate-scope-receipt "$receipt")"
+          if [ "$mode" = deferred ]; then
+              echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
+          elif [ "$mode" = full ]; then
           sudo modprobe uinput
           # lua-luv as install.sh installs it: the daemon's timers and every
           # HTTP request (the AI phase) run on it.
@@ -1347,6 +2612,9 @@ jobs:
             ERGOPTI_DEV_RELEASE_TAG="$ERGOPTI_DEV_RELEASE_TAG" \
             ERGOPTI_DEV_RELEASE_VERSION="$ERGOPTI_DEV_RELEASE_VERSION" \
             bash static/ergopti_plus/linux/tests/hardware/run_daemon_live.sh
+          else
+              exit 1
+          fi
         timeout-minutes: 6
 
       # The updater a user runs, run: this tree built as an old release and
@@ -1355,22 +2623,24 @@ jobs:
       # daemon on it. An installed prerelease once asked the "stable" channel
       # and never found an update; an installed update once waited for the
       # next login.
-      - name: Retain the source-bound simultaneous supplement qualification
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: assets-qualification-linux-simultaneous
-          path: ${{ runner.temp }}/stable-linux-simultaneous-native.json
-          if-no-files-found: warn
-
       - name: Update to the newest release and restart
         if: ${{ !cancelled() }}
         env:
           GITHUB_TOKEN: ${{ github.token }}
           ERGOPTI_UPDATER_LIVE_EVIDENCE_DIR: ${{ runner.temp }}/linux-updater-live
         run: |
+          set -euo pipefail
+          receipt="$RUNNER_TEMP/stable-linux-e2e-suite.json"
+          node tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --receipt "$receipt"
+          mode="$(node tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --validate-scope-receipt "$receipt")"
+          if [ "$mode" = deferred ]; then
+              echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
+          elif [ "$mode" = full ]; then
           sudo python3 "$GITHUB_WORKSPACE/tools/ci/ubuntu_apt.py" -y --no-install-recommends lua-luv
           bash static/ergopti_plus/linux/tests/hardware/run_updater_live.sh
+          else
+              exit 1
+          fi
         timeout-minutes: 10
 
       # A refused release check is diagnostic evidence, never a passed E2E
@@ -1382,7 +2652,9 @@ jobs:
           name: linux-updater-live-diagnostics
           overwrite: true
           retention-days: 7
-          path: ${{ runner.temp }}/linux-updater-live
+          path: |
+            ${{ runner.temp }}/linux-updater-live
+            ${{ runner.temp }}/stable-linux-e2e-suite.json
           if-no-files-found: error
 
       # This loopback fixture uses the actual libuv/curl adapter, including a
@@ -1392,8 +2664,18 @@ jobs:
         if: ${{ !cancelled() }}
         run: |
           set -euo pipefail
+          receipt="$RUNNER_TEMP/stable-linux-e2e-suite.json"
+          node tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --receipt "$receipt"
+          mode="$(node tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --validate-scope-receipt "$receipt")"
+          if [ "$mode" = deferred ]; then
+              echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
+          elif [ "$mode" = full ]; then
+          set -euo pipefail
           sudo python3 "$GITHUB_WORKSPACE/tools/ci/ubuntu_apt.py" -y --no-install-recommends curl lua-luv
           npm run test:linux:http-stream | tee "$RUNNER_TEMP/linux-http-stream.log"
+          else
+              exit 1
+          fi
         timeout-minutes: 3
 
       # This lane qualifies native runtime admission and installed helper paths.
@@ -1402,21 +2684,48 @@ jobs:
         if: ${{ !cancelled() }}
         run: |
           set -euo pipefail
+          receipt="$RUNNER_TEMP/stable-linux-e2e-suite.json"
+          node tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --receipt "$receipt"
+          mode="$(node tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --validate-scope-receipt "$receipt")"
+          if [ "$mode" = deferred ]; then
+              echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
+          elif [ "$mode" = full ]; then
+          set -euo pipefail
           sudo python3 "$GITHUB_WORKSPACE/tools/ci/ubuntu_apt.py" -y --no-install-recommends luajit lua-luv glib-networking gsettings-desktop-schemas
           npm run test:linux:network-runtime | tee "$RUNNER_TEMP/linux-network-runtime.log"
+          else
+              exit 1
+          fi
         timeout-minutes: 3
       # Independent NIST vectors use retained, already unlinked descriptors.
       - name: Qualify native retained FD SHA-256
         if: ${{ !cancelled() }}
         run: |
           set -euo pipefail
+          receipt="$RUNNER_TEMP/stable-linux-e2e-suite.json"
+          node tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --receipt "$receipt"
+          mode="$(node tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --validate-scope-receipt "$receipt")"
+          if [ "$mode" = deferred ]; then
+              echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
+          elif [ "$mode" = full ]; then
+          set -euo pipefail
           npm run --silent test:linux:fd-sha256-native | tee "$RUNNER_TEMP/linux-fd-sha256-native.log"
+          else
+              exit 1
+          fi
         timeout-minutes: 3
 
       # Tool admissions are private and scoped; product curl remains unchanged.
       - name: Prepare authenticated managed HTTP validation tools
         if: ${{ !cancelled() }}
         run: |
+          set -euo pipefail
+          receipt="$RUNNER_TEMP/stable-linux-e2e-suite.json"
+          node tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --receipt "$receipt"
+          mode="$(node tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --validate-scope-receipt "$receipt")"
+          if [ "$mode" = deferred ]; then
+              echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
+          elif [ "$mode" = full ]; then
           set -euo pipefail
           sudo python3 "$GITHUB_WORKSPACE/tools/ci/ubuntu_apt.py" -y --no-install-recommends build-essential pkg-config libssl-dev zlib1g-dev gpgv debian-archive-keyring luajit lua-luv libglib2.0-dev libglib2.0-bin glib-networking gsettings-desktop-schemas dconf-gsettings-backend dbus openssl libnghttp2-14 libidn2-0 librtmp1 libssh2-1t64 libpsl5t64 libgssapi-krb5-2 libsasl2-2 libzstd1 libbrotli1
           umask 077
@@ -1436,6 +2745,9 @@ jobs:
             if ! node tools/test/linux-managed-http-evidence.cjs --setup-diagnostic "$validation_parent/setup.stdout.private"; then echo "::error::Authenticated managed HTTP validation setup failed; fixed diagnostic unavailable; private inputs retained."; fi
             exit 1
           fi
+          else
+              exit 1
+          fi
         timeout-minutes: 35
 
       - name: Qualify native managed HTTP public and retained output
@@ -1444,8 +2756,18 @@ jobs:
           ERGOPTI_MANAGED_NATIVE_EXPECTED_HEAD: ${{ github.sha }}
         run: |
           set -euo pipefail
+          receipt="$RUNNER_TEMP/stable-linux-e2e-suite.json"
+          node tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --receipt "$receipt"
+          mode="$(node tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --validate-scope-receipt "$receipt")"
+          if [ "$mode" = deferred ]; then
+              echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
+          elif [ "$mode" = full ]; then
+          set -euo pipefail
           unset PKG_CONFIG_SYSROOT_DIR ERGOPTI_MANAGED_NATIVE_GIO_SYSROOT
           npm run --silent test:linux:managed-http-native | tee "$RUNNER_TEMP/linux-managed-http-native.log"
+          else
+              exit 1
+          fi
         timeout-minutes: 35
 
       # Actual owner-built installed-prefix archive chain; no mocked production I/O.
@@ -1456,8 +2778,18 @@ jobs:
           ERGOPTI_BUILD_VERSION: ${{ inputs.version }}
         run: |
           set -euo pipefail
+          receipt="$RUNNER_TEMP/stable-linux-e2e-suite.json"
+          node tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --receipt "$receipt"
+          mode="$(node tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --validate-scope-receipt "$receipt")"
+          if [ "$mode" = deferred ]; then
+              echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
+          elif [ "$mode" = full ]; then
+          set -euo pipefail
           export ERGOPTI_MANAGED_NATIVE_EXPECTED_HEAD="$GITHUB_SHA"
           env -u PKG_CONFIG_SYSROOT_DIR -u ERGOPTI_MANAGED_NATIVE_GIO_SYSROOT npm run --silent test:linux:updater-archive-native | tee "$RUNNER_TEMP/linux-updater-archive-native.log"
+          else
+              exit 1
+          fi
         timeout-minutes: 35
 
       # Controlled metadata and real filesystem guards are separate from native provider proof.
@@ -1465,7 +2797,17 @@ jobs:
         if: ${{ !cancelled() }}
         run: |
           set -euo pipefail
+          receipt="$RUNNER_TEMP/stable-linux-e2e-suite.json"
+          node tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --receipt "$receipt"
+          mode="$(node tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --validate-scope-receipt "$receipt")"
+          if [ "$mode" = deferred ]; then
+              echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
+          elif [ "$mode" = full ]; then
+          set -euo pipefail
           npm run --silent test:linux:archive-source-controls | tee "$RUNNER_TEMP/linux-archive-source-controls.log"
+          else
+              exit 1
+          fi
         timeout-minutes: 3
 
       # This prerequisite proof is independent of official runtime/model downloads.
@@ -1473,8 +2815,18 @@ jobs:
         if: ${{ !cancelled() }}
         run: |
           set -euo pipefail
+          receipt="$RUNNER_TEMP/stable-linux-e2e-suite.json"
+          node tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --receipt "$receipt"
+          mode="$(node tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --validate-scope-receipt "$receipt")"
+          if [ "$mode" = deferred ]; then
+              echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
+          elif [ "$mode" = full ]; then
+          set -euo pipefail
           sudo python3 "$GITHUB_WORKSPACE/tools/ci/ubuntu_apt.py" -y --no-install-recommends zstd
           npm run test:linux:runtime-native | tee "$RUNNER_TEMP/linux-runtime-native.log"
+          else
+              exit 1
+          fi
         timeout-minutes: 5
 
       # The AI a user runs locally, run: the official Ollama serving a small
@@ -1486,6 +2838,13 @@ jobs:
         if: ${{ !cancelled() }}
         run: |
           set -euo pipefail
+          receipt="$RUNNER_TEMP/stable-linux-e2e-suite.json"
+          node tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --receipt "$receipt"
+          mode="$(node tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --validate-scope-receipt "$receipt")"
+          if [ "$mode" = deferred ]; then
+              echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
+          elif [ "$mode" = full ]; then
+          set -euo pipefail
           sudo python3 "$GITHUB_WORKSPACE/tools/ci/ubuntu_apt.py" -y --no-install-recommends lua-luv
           curl -fsSL https://ollama.com/install.sh | sh
           (ollama serve > "$RUNNER_TEMP/ollama.log" 2>&1 &) || true
@@ -1495,6 +2854,9 @@ jobs:
           HOME="$(mktemp -d)" XDG_CONFIG_HOME= \
             LUA_PATH='./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;' \
             luajit tests/hardware/run_ollama_live.lua qwen2.5:0.5b
+          else
+              exit 1
+          fi
         timeout-minutes: 12
 
       # touchpad_finder reads capability bits out of a printed bitmap, and that
@@ -1512,9 +2874,19 @@ jobs:
         if: ${{ !cancelled() }}
         working-directory: static/ergopti_plus/linux
         run: |
+          set -euo pipefail
+          receipt="$RUNNER_TEMP/stable-linux-e2e-suite.json"
+          node ../../../tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --receipt "$receipt"
+          mode="$(node ../../../tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --validate-scope-receipt "$receipt")"
+          if [ "$mode" = deferred ]; then
+              echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
+          elif [ "$mode" = full ]; then
           sudo modprobe uinput || true
           sudo chmod 0666 /dev/uinput
           env LUA_PATH='./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;' luajit tests/hardware/run_touchpad_capability.lua
+          else
+              exit 1
+          fi
         timeout-minutes: 4
 
       # test_mt_decoder feeds the decoder a table written by hand from the
@@ -1537,11 +2909,21 @@ jobs:
         if: ${{ !cancelled() }}
         working-directory: static/ergopti_plus/linux
         run: |
+          set -euo pipefail
+          receipt="$RUNNER_TEMP/stable-linux-e2e-suite.json"
+          node ../../../tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --receipt "$receipt"
+          mode="$(node ../../../tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --validate-scope-receipt "$receipt")"
+          if [ "$mode" = deferred ]; then
+              echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
+          elif [ "$mode" = full ]; then
           # sudo, like the grab harness: the event node the kernel publishes for a
           # new uinput device belongs to root:input at 0660, and the runner's user
           # is in neither. Creating the device needs only /dev/uinput; READING it
           # back needs the node, which is the half this harness exists for.
           sudo env LUA_PATH='./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;' luajit tests/hardware/run_gesture_roundtrip.lua
+          else
+              exit 1
+          fi
         timeout-minutes: 4
 
       # Both hotstrings bridges were changed from RETURNING their payload to
@@ -1563,59 +2945,138 @@ jobs:
       - name: Install WebKit2GTK and lgi
         if: ${{ !cancelled() }}
         run: |
+          set -euo pipefail
+          receipt="$RUNNER_TEMP/stable-linux-e2e-suite.json"
+          node tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --receipt "$receipt"
+          mode="$(node tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --validate-scope-receipt "$receipt")"
+          if [ "$mode" = deferred ]; then
+              echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
+          elif [ "$mode" = full ]; then
           sudo python3 "$GITHUB_WORKSPACE/tools/ci/ubuntu_apt.py" -y --no-install-recommends \
             xvfb lua-lgi gir1.2-webkit2-4.1 gir1.2-gtk-3.0
+          else
+              exit 1
+          fi
         timeout-minutes: 20
 
       - name: Install virtual screenshot capture tools
         if: ${{ !cancelled() }}
-        run: sudo python3 "$GITHUB_WORKSPACE/tools/ci/ubuntu_apt.py" -y --no-install-recommends maim imagemagick lua-luv
+        run: |
+          set -euo pipefail
+          receipt="$RUNNER_TEMP/stable-linux-e2e-suite.json"
+          node tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --receipt "$receipt"
+          mode="$(node tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --validate-scope-receipt "$receipt")"
+          if [ "$mode" = deferred ]; then
+              echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
+          elif [ "$mode" = full ]; then
+          sudo python3 "$GITHUB_WORKSPACE/tools/ci/ubuntu_apt.py" -y --no-install-recommends maim imagemagick lua-luv
+          else
+              exit 1
+          fi
         timeout-minutes: 20
 
       - name: Keep virtual screenshots inside literal private paths
         if: ${{ !cancelled() }}
         working-directory: static/ergopti_plus/linux
         run: |
+          set -euo pipefail
+          receipt="$RUNNER_TEMP/stable-linux-e2e-suite.json"
+          node ../../../tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --receipt "$receipt"
+          mode="$(node ../../../tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --validate-scope-receipt "$receipt")"
+          if [ "$mode" = deferred ]; then
+              echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
+          elif [ "$mode" = full ]; then
           export LUA_PATH='./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;'
           xvfb-run -a luajit tests/hardware/run_screen_path_receipts.lua
+          else
+              exit 1
+          fi
         timeout-minutes: 2
 
       - name: Successful native model pulls retire stale retries
         if: ${{ !cancelled() }}
         working-directory: static/ergopti_plus/linux
         run: |
+          set -euo pipefail
+          receipt="$RUNNER_TEMP/stable-linux-e2e-suite.json"
+          node ../../../tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --receipt "$receipt"
+          mode="$(node ../../../tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --validate-scope-receipt "$receipt")"
+          if [ "$mode" = deferred ]; then
+              echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
+          elif [ "$mode" = full ]; then
           sudo python3 "$GITHUB_WORKSPACE/tools/ci/ubuntu_apt.py" -y --no-install-recommends curl lua-luv dbus-x11
           export LUA_PATH='./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;/usr/share/lua/5.1/?.lua;/usr/share/lua/5.1/?/init.lua;;'
           export LUA_CPATH='/usr/lib/x86_64-linux-gnu/lua/5.1/?.so;;'
           dbus-run-session -- xvfb-run -a luajit tests/hardware/run_model_pull_receipts.lua
+          else
+              exit 1
+          fi
         timeout-minutes: 2
 
       - name: Preserve literal desktop notification text
         if: ${{ !cancelled() }}
         working-directory: static/ergopti_plus/linux
         run: |
+          set -euo pipefail
+          receipt="$RUNNER_TEMP/stable-linux-e2e-suite.json"
+          node ../../../tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --receipt "$receipt"
+          mode="$(node ../../../tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --validate-scope-receipt "$receipt")"
+          if [ "$mode" = deferred ]; then
+              echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
+          elif [ "$mode" = full ]; then
           sudo python3 "$GITHUB_WORKSPACE/tools/ci/ubuntu_apt.py" -y --no-install-recommends dunst libnotify-bin lua-luv dbus-x11
           export LUA_PATH='./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;'
           ERGOPTI_TEST_PRIVATE_DBUS=1 dbus-run-session -- xvfb-run -a luajit tests/hardware/run_notification_text_receipts.lua
+          else
+              exit 1
+          fi
         timeout-minutes: 2
 
       - name: Install portable network staging prerequisites
         if: ${{ !cancelled() }}
         run: |
+          set -euo pipefail
+          receipt="$RUNNER_TEMP/stable-linux-e2e-suite.json"
+          node tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --receipt "$receipt"
+          mode="$(node tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --validate-scope-receipt "$receipt")"
+          if [ "$mode" = deferred ]; then
+              echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
+          elif [ "$mode" = full ]; then
           sudo python3 "$GITHUB_WORKSPACE/tools/ci/ubuntu_apt.py" -y --no-install-recommends \
             luajit lua-luv curl binutils pkg-config libglib2.0-dev \
             glib-networking dconf-gsettings-backend gsettings-desktop-schemas
+          else
+              exit 1
+          fi
         timeout-minutes: 20
 
       - name: Qualify actual staged portable network runtime and retirement
         if: ${{ !cancelled() }}
-        run: npm run test:linux:portable-network-native
+        run: |
+          set -euo pipefail
+          receipt="$RUNNER_TEMP/stable-linux-e2e-suite.json"
+          node tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --receipt "$receipt"
+          mode="$(node tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --validate-scope-receipt "$receipt")"
+          if [ "$mode" = deferred ]; then
+              echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
+          elif [ "$mode" = full ]; then
+          npm run test:linux:portable-network-native
+          else
+              exit 1
+          fi
         timeout-minutes: 10
 
       - name: The webview push reaches a real WebKit page
         if: ${{ !cancelled() }}
         working-directory: static/ergopti_plus/linux
         run: |
+          set -euo pipefail
+          receipt="$RUNNER_TEMP/stable-linux-e2e-suite.json"
+          node ../../../tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --receipt "$receipt"
+          mode="$(node ../../../tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --validate-scope-receipt "$receipt")"
+          if [ "$mode" = deferred ]; then
+              echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
+          elif [ "$mode" = full ]; then
           export LUA_PATH='./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;'
           # lua-lgi installs for the distro's Lua, not for LuaJIT, so the module
           # path has to be widened rather than assumed. Reported, not guessed at:
@@ -1642,6 +3103,9 @@ jobs:
             exit 1
           fi
           exit $STATUS
+          else
+              exit 1
+          fi
         timeout-minutes: 8
 
       # The other direction: the metrics page posts its own {action: 'ready'}
@@ -1652,20 +3116,40 @@ jobs:
         if: ${{ !cancelled() }}
         working-directory: static/ergopti_plus/linux
         run: |
+          set -euo pipefail
+          receipt="$RUNNER_TEMP/stable-linux-e2e-suite.json"
+          node ../../../tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --receipt "$receipt"
+          mode="$(node ../../../tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --validate-scope-receipt "$receipt")"
+          if [ "$mode" = deferred ]; then
+              echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
+          elif [ "$mode" = full ]; then
           export LUA_PATH='./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;'
           export LUA_PATH="$LUA_PATH;/usr/share/lua/5.1/?.lua;/usr/share/lua/5.1/?/init.lua"
           export LUA_CPATH="/usr/lib/x86_64-linux-gnu/lua/5.1/?.so;;"
           xvfb-run -a luajit tests/hardware/run_webview_roundtrip.lua
+          else
+              exit 1
+          fi
         timeout-minutes: 5
 
       - name: Typing NONE clears actual WebKit rows and retains ALL controls
         if: ${{ !cancelled() }}
         working-directory: static/ergopti_plus/linux
         run: |
+          set -euo pipefail
+          receipt="$RUNNER_TEMP/stable-linux-e2e-suite.json"
+          node ../../../tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --receipt "$receipt"
+          mode="$(node ../../../tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --validate-scope-receipt "$receipt")"
+          if [ "$mode" = deferred ]; then
+              echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
+          elif [ "$mode" = full ]; then
           export LUA_PATH='./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;'
           export LUA_PATH="$LUA_PATH;/usr/share/lua/5.1/?.lua;/usr/share/lua/5.1/?/init.lua"
           export LUA_CPATH="/usr/lib/x86_64-linux-gnu/lua/5.1/?.so;;"
           timeout 180s dbus-run-session -- xvfb-run -a luajit tests/hardware/run_typing_none_webkit.lua
+          else
+              exit 1
+          fi
         timeout-minutes: 5
 
       # The release list a user opens from the tray, opened: real WebKit, the
@@ -1678,11 +3162,21 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ github.token }}
         run: |
+          set -euo pipefail
+          receipt="$RUNNER_TEMP/stable-linux-e2e-suite.json"
+          node ../../../tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --receipt "$receipt"
+          mode="$(node ../../../tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --validate-scope-receipt "$receipt")"
+          if [ "$mode" = deferred ]; then
+              echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
+          elif [ "$mode" = full ]; then
           sudo python3 "$GITHUB_WORKSPACE/tools/ci/ubuntu_apt.py" -y --no-install-recommends lua-luv
           export LUA_PATH='./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;'
           export LUA_PATH="$LUA_PATH;/usr/share/lua/5.1/?.lua;/usr/share/lua/5.1/?/init.lua"
           export LUA_CPATH="/usr/lib/x86_64-linux-gnu/lua/5.1/?.so;;"
           xvfb-run -a luajit tests/hardware/run_changelog_live.lua
+          else
+              exit 1
+          fi
         timeout-minutes: 5
 
       # The typing-speed readouts, drawn: the floating pill through its real GTK
@@ -1694,6 +3188,13 @@ jobs:
         if: ${{ !cancelled() }}
         working-directory: static/ergopti_plus/linux
         run: |
+          set -euo pipefail
+          receipt="$RUNNER_TEMP/stable-linux-e2e-suite.json"
+          node ../../../tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --receipt "$receipt"
+          mode="$(node ../../../tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --validate-scope-receipt "$receipt")"
+          if [ "$mode" = deferred ]; then
+              echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
+          elif [ "$mode" = full ]; then
           sudo python3 "$GITHUB_WORKSPACE/tools/ci/ubuntu_apt.py" -y --no-install-recommends xdotool python3-gi gir1.2-glib-2.0 dbus xvfb
           export LUA_PATH='./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;'
           export LUA_PATH="$LUA_PATH;/usr/share/lua/5.1/?.lua;/usr/share/lua/5.1/?/init.lua"
@@ -1714,6 +3215,9 @@ jobs:
             [ "$probe" = "0" ] || exit "$probe"
             grep -q "ergopti-plus-wpm" "$RUNNER_TEMP/sni-wpm.json" || { echo "::error::the readout item never registered"; exit 1; }
             exit "$status"'
+          else
+              exit 1
+          fi
         timeout-minutes: 5
 
       # window.setData is undefined in the settings window, so the host's
@@ -1731,6 +3235,13 @@ jobs:
         if: ${{ !cancelled() }}
         working-directory: static/ergopti_plus/linux
         run: |
+          set -euo pipefail
+          receipt="$RUNNER_TEMP/stable-linux-e2e-suite.json"
+          node ../../../tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --receipt "$receipt"
+          mode="$(node ../../../tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --validate-scope-receipt "$receipt")"
+          if [ "$mode" = deferred ]; then
+              echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
+          elif [ "$mode" = full ]; then
           export LUA_PATH='./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;'
           export LUA_PATH="$LUA_PATH;/usr/share/lua/5.1/?.lua;/usr/share/lua/5.1/?/init.lua"
           export LUA_CPATH="/usr/lib/x86_64-linux-gnu/lua/5.1/?.so;;"
@@ -1743,6 +3254,9 @@ jobs:
             exit 1
           fi
           exit $STATUS
+          else
+              exit 1
+          fi
         timeout-minutes: 5
 
       # Standard signed-APT Nix tool, one local store, existing physical phase owner.
@@ -1751,6 +3265,13 @@ jobs:
         env:
           ERGOPTI_NIX_EXPECTED_HEAD: ${{ github.sha }}
         run: |
+          set -euo pipefail
+          receipt="$RUNNER_TEMP/stable-linux-e2e-suite.json"
+          node tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --receipt "$receipt"
+          mode="$(node tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --validate-scope-receipt "$receipt")"
+          if [ "$mode" = deferred ]; then
+              echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
+          elif [ "$mode" = full ]; then
           set -euo pipefail
           sudo python3 "$GITHUB_WORKSPACE/tools/ci/ubuntu_apt.py" -y --no-install-recommends nix-bin
           # This dedicated ephemeral runner may not adopt an occupied foreign store.
@@ -1776,6 +3297,9 @@ jobs:
           sudo install -d -m 0755 -o "$runner_uid" -g "$runner_gid" /nix/store /nix/var/nix /nix/var/log/nix
           umask 077
           npm run --silent test:linux:nix-native | tee "$RUNNER_TEMP/linux-nix-native.log"
+          else
+              exit 1
+          fi
         timeout-minutes: 35
 
       - name: Record mandatory E2E evidence
@@ -1786,6 +3310,15 @@ jobs:
           ERGOPTI_DEV_RELEASE_TAG: ${{ inputs.tag }}
           ERGOPTI_DEV_RELEASE_VERSION: ${{ inputs.version }}
         run: |
+          set -euo pipefail
+          receipt="$RUNNER_TEMP/stable-linux-e2e-suite.json"
+          node tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --receipt "$receipt"
+          mode="$(node tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --validate-scope-receipt "$receipt")"
+          if [ "$mode" = deferred ]; then
+              echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
+              node tools/test/linux-ci-evidence.cjs record-deferred-suite --job e2e-linux --output "$RUNNER_TEMP/linux-ci-evidence/e2e-linux.json" --sha "$GITHUB_SHA" --architecture "$RUNNER_ARCH" --receipt "$receipt"
+              node tools/ci/dev-release-qualification.cjs --scope linux-simultaneous-native --receipt "$RUNNER_TEMP/stable-linux-simultaneous-native.json"
+          elif [ "$mode" = full ]; then
           set -euo pipefail
           e2e_assertions=$(sed -n 's/^1\.\.\([0-9][0-9]*\)$/\1/p' "$RUNNER_TEMP/linux-e2e.log" | tail -1)
           xkb_source_assertions=$(sed -n 's/^=== \([0-9][0-9]*\) check(s), 0 failure(s) ===$/\1/p' "$RUNNER_TEMP/linux-xkb-source.log" | tail -1)
@@ -1850,7 +3383,9 @@ jobs:
               --subject webview-roundtrip=1 \
               --subject page-load-errors=1 \
               --subject "hotstring-e2e=$e2e_assertions"
-
+          else
+              exit 1
+          fi
       - name: Upload mandatory E2E evidence
         uses: actions/upload-artifact@v4
         with:
@@ -1860,37 +3395,52 @@ jobs:
           path: ${{ runner.temp }}/linux-ci-evidence/e2e-linux.json
           if-no-files-found: error
 
-  # ─────────────────────────────────────────────────
-  # 3) Assemble the driver once, build every package, smoke two of them
-  # ─────────────────────────────────────────────────
-  # One assembly and one packaging pass per run, CI and release alike: the files
-  # uploaded below as assets-linux are the ones the three package smoke rows install
-  # and, on a release run, the ones ci.yml's release job publishes. The assembly
-  # keeps its own smoke (no --skip-smoke), so the require checks that used to
-  # run only on a release now run on every push and pull request.
-  #
-  # The driver's own version comes from inputs.version, the version ci.yml's plan
-  # job computed ('' outside a release): ERGOPTI_BUILD_VERSION is stamped into
-  # build/linux/_shared/build_stamp.txt by build-linux-driver.sh, and every
-  # later verify in this job requires that same value, so the tray, the
-  # healthcheck and the updater report the published release. The package
-  # METADATA still takes its version from package.json, so the .deb "Version:"
-  # and the .rpm "Version:" can lag the release tag: on dev the version is
-  # 0.0.0-dev.N, and rpm rejects a hyphen in Version:, so the same value that a
-  # .deb accepts would abort rpmbuild. Every published package is therefore
-  # renamed below to a name that carries no version at all, so no asset can be
-  # misnamed and the website's exact-name lookup keeps working.
-  #
-  # After e2e-linux: automatic runs require successful unit and E2E receiving.
-  # Manual diagnostics can still receive packages after an E2E failure, with
-  # successful unit admission retained through the E2E dependency. linux-ok
-  # continues to reject every failed mandatory job and missing native subject.
-  #
-  # The Flatpak and tarball smokes run here, on the build host, because neither
-  # needs a pristine machine: the build only runs `flatpak build-bundle`, so
-  # installing the bundle is still a first install, and the tarball installs
-  # under $HOME. The .deb, .rpm and AppImage smokes each prove a dependency the
-  # host must NOT already have, so they keep their own runners below.
+      # ─────────────────────────────────────────────────
+      # 3) Assemble the driver once, build every package, smoke two of them
+      # ─────────────────────────────────────────────────
+      # One assembly and one packaging pass per run, CI and release alike: the files
+      # uploaded below as assets-linux are the ones the three package smoke rows install
+      # and, on a release run, the ones ci.yml's release job publishes. The assembly
+      # keeps its own smoke (no --skip-smoke), so the require checks that used to
+      # run only on a release now run on every push and pull request.
+      #
+      # The driver's own version comes from inputs.version, the version ci.yml's plan
+      # job computed ('' outside a release): ERGOPTI_BUILD_VERSION is stamped into
+      # build/linux/_shared/build_stamp.txt by build-linux-driver.sh, and every
+      # later verify in this job requires that same value, so the tray, the
+      # healthcheck and the updater report the published release. The package
+      # METADATA still takes its version from package.json, so the .deb "Version:"
+      # and the .rpm "Version:" can lag the release tag: on dev the version is
+      # 0.0.0-dev.N, and rpm rejects a hyphen in Version:, so the same value that a
+      # .deb accepts would abort rpmbuild. Every published package is therefore
+      # renamed below to a name that carries no version at all, so no asset can be
+      # misnamed and the website's exact-name lookup keeps working.
+      #
+      # After e2e-linux: automatic runs require successful unit and E2E receiving.
+      # Manual diagnostics can still receive packages after an E2E failure, with
+      # successful unit admission retained through the E2E dependency. linux-ok
+      # continues to reject every failed mandatory job and missing native subject.
+      #
+      # The Flatpak and tarball smokes run here, on the build host, because neither
+      # needs a pristine machine: the build only runs `flatpak build-bundle`, so
+      # installing the bundle is still a first install, and the tarball installs
+      # under $HOME. The .deb, .rpm and AppImage smokes each prove a dependency the
+      # host must NOT already have, so they keep their own runners below.
+      - name: Retain the source-bound linux-e2e-suite qualification
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: assets-qualification-linux-e2e-suite
+          path: ${{ runner.temp }}/stable-linux-e2e-suite.json
+          if-no-files-found: warn
+      - name: Retain the contained simultaneous qualification
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: assets-qualification-simultaneous-contained
+          path: ${{ runner.temp }}/stable-linux-simultaneous-native.json
+          if-no-files-found: warn
+
   package-linux:
     name: 'Package'
     runs-on: ubuntu-latest

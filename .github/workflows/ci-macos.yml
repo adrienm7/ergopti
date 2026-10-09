@@ -488,6 +488,13 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          receipt="$RUNNER_TEMP/stable-macos-native-model-receiving-${{ matrix.architecture }}.json"
+          node tools/ci/dev-release-qualification.cjs --scope macos-native-model-receiving --receipt "$receipt"
+          mode="$(node tools/ci/dev-release-qualification.cjs --scope macos-native-model-receiving --validate-scope-receipt "$receipt")"
+          if [ "$mode" = deferred ]; then
+              echo '[DEFERRED] macos-native-model-receiving: qualified=false; producer/catalogue/assets still mandatory.'
+          elif [ "$mode" = full ]; then
+          set -euo pipefail
           test -f tools/diagnostics/macos_managed_ollama_receiving.py
           mkdir "$ERGOPTI_OLLAMA_BUILD_ROOT/receiving"
           for profile in pac-inline pac-url explicit-proxy; do
@@ -496,6 +503,9 @@ jobs:
               --launcher "$ERGOPTI_OLLAMA_LAUNCHER" --framework "$ERGOPTI_OLLAMA_FRAMEWORK" \
               --output "$ERGOPTI_OLLAMA_BUILD_ROOT/receiving/$profile" --profile "$profile"
           done
+          else
+              exit 1
+          fi
       - name: Upload qualified native inputs for the application catalogue
         uses: actions/upload-artifact@v4
         with:

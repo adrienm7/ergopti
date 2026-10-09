@@ -639,7 +639,11 @@ async function simulate(context, status = 0, entries = fixtures, afterFamilySign
 		'macos-stubbed-unit',
 		'macos-stubbed-e2e',
 		'windows-native-desktop',
-		'linux-simultaneous-native'
+		'linux-simultaneous-native',
+		'linux-unit-suite',
+		'linux-e2e-suite',
+		'core-js-suite',
+		'macos-native-model-receiving'
 	]);
 	assert.equal(
 		q.resolveQualificationProfile(exact, before),
@@ -717,8 +721,8 @@ async function simulate(context, status = 0, entries = fixtures, afterFamilySign
 	);
 	assert.equal(
 		q.deferredScopes(accepted).length,
-		9,
-		'only the six explicitly approved added scopes extend the original three'
+		13,
+		'only the ten explicitly approved added scopes extend the original three'
 	);
 	assert.ok(
 		notice.includes(
@@ -744,7 +748,7 @@ async function simulate(context, status = 0, entries = fixtures, afterFamilySign
 	broadened.scopes['windows-pac-full-url'] = policy.scopes['windows-pac-full-url'];
 	assert.throws(() => q.validatePolicy(broadened), /Invalid closed qualification fields/);
 	console.log(
-		'Draft stable v1.0.0: exact nine approved scopes, all unlisted work full, strict expiry and source-bound public limits PASS.'
+		'Draft stable v1.0.0: exact thirteen approved scopes, all unlisted work full, strict expiry and source-bound public limits PASS.'
 	);
 }
 
@@ -855,4 +859,87 @@ async function simulate(context, status = 0, entries = fixtures, afterFamilySign
 	assert(Signing.notice(source).includes('UNSIGNED / qualified:false'));
 	assert(Signing.notice(source).includes('SignPath Foundation'));
 	console.log('[OK] one-candidate unsigned signature permission and source-bound receipt guards.');
+}
+
+// Suite deferrals carry empty execution counts and cannot waive package/install evidence.
+{
+	const stable = JSON.parse(fs.readFileSync(q.STABLE_POLICY_PATH, 'utf8'));
+	const exact = {
+		...ctx,
+		ref: stable.ref,
+		event_name: stable.event_name,
+		prerelease: stable.prerelease,
+		channel: stable.channel,
+		tag: stable.tag,
+		version: stable.version
+	};
+	const time = '2026-10-09T21:00:00Z';
+	const admitted = q.authorizeQualificationProfile(stable.id, exact, time);
+	const manifest = { schema_version: 1, jobs: {} };
+	const needs = {};
+	const evidence = [];
+	for (const job of ['test-linux', 'e2e-linux', 'package-linux', 'install-linux']) {
+		manifest.jobs[job] = { classification: 'mandatory', subjects: { assertions: 1 } };
+		needs[job] = { result: 'success' };
+		const doc = {
+			schema_version: 1,
+			job,
+			sha,
+			architecture: 'amd64',
+			distro: 'ubuntu',
+			session: 'fixture',
+			interpreter: 'fixture',
+			subjects: { assertions: 1 }
+		};
+		if (job === 'test-linux' || job === 'e2e-linux') {
+			doc.subjects = {};
+			doc.suite_qualification = q.qualificationReceipt(
+				admitted,
+				job === 'test-linux' ? 'linux-unit-suite' : 'linux-e2e-suite',
+				{ source_sha: sha }
+			);
+		}
+		evidence.push(doc);
+	}
+	const args = {
+		manifest,
+		needs,
+		evidence,
+		expectedSha: sha,
+		qualificationContext: exact,
+		qualificationNow: time
+	};
+	assert.equal(
+		verifyAggregate(args).qualified,
+		false,
+		'actual aggregate reports deferred, never qualified'
+	);
+	for (const value of [1, 'empty', []]) {
+		const bad = structuredClone(evidence);
+		bad[0].subjects = value;
+		assert.throws(
+			() => verifyAggregate({ ...args, evidence: bad }),
+			'malformed empty subjects refuse'
+		);
+	}
+	const nonempty = structuredClone(evidence);
+	nonempty[0].subjects = { assertions: 1 };
+	assert.throws(() => verifyAggregate({ ...args, evidence: nonempty }));
+	const foreign = structuredClone(evidence);
+	foreign[0].suite_qualification.source_sha = 'b'.repeat(40);
+	assert.throws(() => verifyAggregate({ ...args, evidence: foreign }));
+	assert.throws(() => verifyAggregate({ ...args, qualificationNow: stable.expires_at }));
+	for (const job of ['package-linux', 'install-linux']) {
+		assert.throws(
+			() => verifyAggregate({ ...args, evidence: evidence.filter((doc) => doc.job !== job) }),
+			'package/install evidence remains mandatory'
+		);
+		assert.throws(
+			() => verifyAggregate({ ...args, needs: { ...needs, [job]: { result: 'cancelled' } } }),
+			'package/install cancellation refuses'
+		);
+	}
+	console.log(
+		'Linux deferred suite envelopes: actual aggregate plus ten malformed/source/expiry/package/install refusals PASS.'
+	);
 }

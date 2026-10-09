@@ -20,6 +20,22 @@ const SCOPE_IDS = Object.freeze([
 	'macos-launch-appleevents'
 ]);
 const STABLE_EXTRA_SCOPES = Object.freeze({
+	'core-js-suite': { path: '.github/workflows/ci.yml', args: ['core', 'npm run test:js'] },
+	'macos-native-model-receiving': {
+		path: '.github/workflows/ci-macos.yml',
+		args: [
+			'managed-ollama-native',
+			'Receive actual native model create, pull, inference and retirement'
+		]
+	},
+	'linux-unit-suite': {
+		path: '.github/workflows/ci-linux.yml',
+		args: ['test-linux', 'Run the driver unit test suite']
+	},
+	'linux-e2e-suite': {
+		path: '.github/workflows/ci-linux.yml',
+		args: ['e2e-linux', 'Linux E2E test suite bodies including live fixture chain']
+	},
 	'macos-native-pac': {
 		path: '.github/workflows/ci-macos.yml',
 		args: ['managed-ollama-native', 'Qualify actual native PAC and WPAD XCTest controls']
@@ -452,7 +468,11 @@ function admitCommandReceipts(directory, context, sha, now = new Date()) {
 		'macos-stubbed-unit': [''],
 		'macos-stubbed-e2e': [''],
 		'windows-native-desktop': [''],
-		'linux-simultaneous-native': ['']
+		'linux-simultaneous-native': [''],
+		'linux-unit-suite': [''],
+		'linux-e2e-suite': [''],
+		'core-js-suite': [''],
+		'macos-native-model-receiving': ['arm64', 'amd64']
 	};
 	for (const [scope, suffixes] of Object.entries(expected)) {
 		for (const suffix of suffixes) {
