@@ -1,0 +1,32 @@
+{
+	"section": "hotstrings_menu",
+	"provider": "hotstring_categories_standard",
+	"status": "no_groups",
+	"row": {
+		"type": "label",
+		"i18n": "menu.hotstrings.no_group_loaded"
+	},
+	"captions": {
+		"ar": "(لم يتم تحميل أي مجموعة)",
+		"cs": "(žádná skupina není načtena)",
+		"da": "(ingen gruppe indlæst)",
+		"de": "(keine Gruppe geladen)",
+		"en": "(no group loaded)",
+		"es": "(ningún grupo cargado)",
+		"fr": "(aucun groupe chargé)",
+		"he": "(לא נטענה קבוצה)",
+		"hi": "(कोई समूह लोड नहीं)",
+		"it": "(nessun gruppo caricato)",
+		"ja": "(グループが読み込まれていません)",
+		"ko": "(불러온 그룹 없음)",
+		"nl": "(geen groep geladen)",
+		"no": "(ingen gruppe lastet)",
+		"pl": "(nie wczytano grupy)",
+		"pt": "(nenhum grupo carregado)",
+		"ru": "(группы не загружены)",
+		"sv": "(ingen grupp inläst)",
+		"tr": "(grup yüklenmedi)",
+		"uk": "(групи не завантажено)",
+		"zh": "（未加载任何分组）"
+	}
+}

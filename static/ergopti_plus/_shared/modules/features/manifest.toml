@@ -5621,6 +5621,9 @@ i18n = "menu.hotstrings.header_common"
 [[menu.hotstrings_menu]]
 type = "list"
 id = "hotstring_categories_standard"
+# Linux retains its inert empty-category marker; other drivers keep their
+# existing empty-list posture and never request this named provider status.
+status_rows.no_groups = [{ type = "label", i18n = "menu.hotstrings.no_group_loaded" }]
 
 [[menu.hotstrings_menu]]
 type = "list"

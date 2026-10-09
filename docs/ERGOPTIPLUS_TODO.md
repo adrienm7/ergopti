@@ -4507,6 +4507,14 @@ The packaged macOS launch matrix now contains a Karabiner configuration scenario
 The signed native checkpoint 37116923472 reached the actual independent JSON codec and production build/merge owners, then refused its first variant because the canonical French action registry gives distinct Cmd+Tab and Option+F17 outputs the same localized label. Legacy reconstruction now keeps validated action-label candidates: unused descriptive ambiguity cannot block foreign profiles, while a complete historical block referencing distinct candidates remains unowned and refuses publication. The eight real-catalogue default/recommended switch vectors prove merge, exact-source publication and unchanged confirmation locally. Signed native qualification of all eight variants remains pending; the original AppleEvent controls and deadlines remain mandatory.
 
 - [~] **42.** config.toml batch writer follow-ups (`toml-batch-existing-key`):
+  Windows direct full-save intent is now recorded before the unchanged unsafe
+  serializer refusal. The existing safe path resolver refuses absent or empty
+  paths without creating a generation; implicit drains remain separate.
+  Four additive registered controls cover retained mandatory intent, zero native
+  write/collection during refusal, terminal veto, exact repair retry and native
+  owner restoration. Original assertions are retained. Source review and
+  portable guards pass; actual Windows unit/E2E/package/install and startup
+  qualification are pending, so this slice does not close the item.
   macOS conditional writes, unchanged acknowledgements and removals now
   support a captured strict final logical admission. The new APIs detach
   classified source scalars before native callbacks; refused operations
@@ -4966,13 +4974,37 @@ integrated, then publish one grouped release.
 
 - [~] **54.** Every menu is declared in the shared menu manifest, never in
   driver code. The ratchet `npm run test:native-menu-rows` counts the rows
-  drivers still build (current baseline: Windows 26, macOS 19, Linux 22, each
+  drivers still build (current baseline: Windows 25, macOS 19, Linux 21, each
   site listed in tools/test/native-menu-rows-baseline.json); migrate them to
   zero. Each OS-limited row declares `unavailable = "hide"` (not
   applicable) or `"grey"` (not yet ported, with its reason); classify the
   existing rows during the migration (proposal in the menu-first-group
   report: most hide; greyed: Linux edit_shortcuts, Linux key
   combinations, Linux metrics shortcut rows, Windows preview_bubbles).
+  Current trigger/privacy source checks now stop at the actual Windows
+  constructor boundary after the orphan Live builder was retired. The
+  independent boundary corpus is unchanged: retained trigger/display and
+  all 21 caption sets remain checked, while retired Live declarations,
+  providers, native module and consumer routes are explicitly refused.
+  The complete menu-manifest gate passes locally. The independent retired-Live
+  census exception also refuses revived declarations, modules and consumer
+  routes while retaining every frozen rule, excerpt and historical floor.
+  All 263 census admission controls pass, and the genuine owner regenerates
+  the nonincreasing 25/19/22 baseline. The macOS LLM and badge-root consumers
+  share the same exact current/historical top-level projection rule, with
+  additional source withdrawal controls. The Linux parent proof now binds the
+  genuine inert disabled top-level branch and its captured row, identifier and
+  caption owner, preserving historical producer checks and every old assertion.
+  The whole source-parity target passes with 16 new refusal/inverse controls
+  per parent kind; complete final-source qualification remains required.
+  The Linux standard-category empty status now consumes the existing shared
+  list's inert declaration through the genuine completed Hotstrings menu.
+  All 21 captions are independently frozen; nonempty ordering and callbacks
+  are unchanged. The focused module passes 40/0 on both Lua engines, versus
+  original production 12/28; seven native-builder causal controls fail against
+  its predecessor. Genuine owners regenerate the menu and nonincreasing
+  25/19/21 census. Full final-source and installed native acceptance remain
+  required; these bounded slices do not close this item or item 81.
   The macOS badge caption and following boundary now consume a complete
   shared frame before native measurement or canvas allocation. Independent
   consumer tests pass 38/0 against predecessor 26/12; the genuine root route
@@ -5883,6 +5915,41 @@ corrected fixture's native execution remains pending. Three original managed
 network failures remain with their owner; native desktop, engine E2E, packaging
 and installation are skipped after the main refusal. This does not close the
 remaining menu migration or installed-device acceptance.
+
+Current Linux menu qualification distinguishes the disabled public Agent policy
+from component coverage using the independently published 1028 available
+source declaration. Actual current renderers, engines, settings and retained
+callbacks remain exercised; every original assertion and independent corpus
+is preserved. Complete focused modules pass 27 outer-parent, 278 manifest-menu
+and 100 Agent-settings cases on each Lua runtime, with zero failures or skips.
+Current public cases retain the exact unavailable reason and expose no child
+or command; throwing scopes restore the original declaration and module owners.
+These focused receipts do not qualify the full suite or installed devices.
+
+The Linux profile-menu fixtures now supply the genuine current idle live-mode
+read and stop owners within their existing preference scopes. Every original
+assertion, native nil/true callback receipt, pause policy and independent corpus
+is retained. Complete profile-settings and canonical-profile modules pass 24/0
+and 138/0 respectively on LuaJIT and Lua 5.4, with zero skips. Added native-owner
+controls cover idle stop omission and missing-owner refusal; fixture scopes
+restore exact module identities. These focused results do not replace the
+complete selected gate, three-driver CI or installed-device qualification.
+Items 54 and 81 remain partial.
+
+The Windows LLM parent fixture follows the independently declared seven-row
+inventory after the published retirement of Live mode. Original native route
+and withdrawal checks remain, with independent controls for revived, missing,
+duplicate and reordered declarations. Source review passed; corrected native
+AHK cases and the complete Windows cohort remain unrun. Items 54 and 81 remain
+partial, including full three-driver and installed-device qualification.
+
+The cancellation/export-history unit fixture now supplies the known Windows
+host identity required by the unchanged typed-sharing owner. Genuine missing
+and invalid identity refusals remain, as do every original timeout,
+unknown-cleanup, 23 ms and cancellation assertion. Group3 explicitly released
+only this fixture scope. Independent source review passed; corrected native
+AHK execution remains unrun. Privacy, schema, collector, report and production
+cancellation owners are unchanged. Items 54 and 81 remain partial.
 
 - [ ] **62.** Downloads on managed company networks: system trust and
       system proxy for every download child (Ollama installation/server/pull,
@@ -7506,7 +7573,7 @@ is committed; one request is one commit with its regression test.
 
 - [~] **81.** The maintainer asks to treat item 54 now (every menu row is
   declared in the shared manifest, none built in a driver's folder):
-  Windows 26, macOS 19 and Linux 22 rows are still built by the
+  Windows 25, macOS 19 and Linux 21 rows are still built by the
   drivers (`tools/test/native-menu-rows-baseline.json`). The current census
   was regenerated on 2026-10-09. The sites are of four kinds, and three need the
   manifest to say more than it can today:
@@ -7749,6 +7816,41 @@ The shared per-model Specifications and Capabilities frames retire four genuine 
 The completed macOS image/download root now consumes shared typed slot order and conditional boundary policy while preserving the native finished objects, resources and callbacks. The composer re-admits the exact canonical owner and validates every finished tree before mutating its existing target; prefix submenus that alias that target refuse without writes. Independent actual-source controls pass the original60 historical and74 LIVE obligations with genuine positives. Focused shared native controls pass29/0 on each Lua runtime versus the identical29 original composer27/2; the real image producer passes49/0 and the real download producer10/0. Original menu assertions and independently frozen order/caption corpora remain intact. Selected portable gates pass382 JS, 17,325 macOS and11,731 Linux units, plus101 macOS and189 Linux E2E scenarios with one macOS host skip. Windows units remain unexecuted locally; hosted native packaging/installation and item38 device acceptance remain separate. Items54/81 stay partial.
 
 The complete macOS Layout presentation family now consumes 17 canonical shared sections, including switching/pause/resume, genuine native record choices, bundle install/update/status/variant frames and the finished parent. Exactly 3 additive caption keys are translated in all 21 actual catalogues. Existing native TIS, install/consent, Guardian, async and callback owners remain unchanged. The bounded shared caption ABI adds ordered format values, strict native-record captions and an explicit numbered scalar mode while retaining the prior percent-scalar bodies and completed-root composer. Actual private source qualification passes 97 tray,6 async and 17 version subjects, plus 51 Layout and 21 numbered contract subjects on each Lua runtime. New Windows Layout 28 and numbered 22 subjects, plus five genuine throwing-reader/full-group Win32 controls, remain unexecuted locally. Typed group captions retain literal ampersand transport without false empty-key translation warnings; a throwing vector reader refuses before native writes. The complete tray fixture now constructs and restores its renderer inside the same scoped boundary. Registered source controls pass after exact adoption; actual dynamic callback and inert-caption ownership controls retain zero gaps. Seven actual macOS fixture modules pass 40/0 after supplying their required canonical renderer inputs; every original fixture assertion remains, and the provider-label meta subject now proves actual DATA-to-native delivery rather than a withdrawn literal assignment. The owning generator lowers macOS 27 to 22 native sites while Windows 27/Linux 31 remain. These bounded receipts do not replace full-source three-driver CI, packaging/installation or item 38 device acceptance; items 54/81 remain partial.
+
+Current Linux menu qualification distinguishes the disabled public Agent policy
+from component coverage using the independently published 1028 available
+source declaration. Actual current renderers, engines, settings and retained
+callbacks remain exercised; every original assertion and independent corpus
+is preserved. Complete focused modules pass 27 outer-parent, 278 manifest-menu
+and 100 Agent-settings cases on each Lua runtime, with zero failures or skips.
+Current public cases retain the exact unavailable reason and expose no child
+or command; throwing scopes restore the original declaration and module owners.
+These focused receipts do not qualify the full suite or installed devices.
+
+The Linux profile-menu fixtures now supply the genuine current idle live-mode
+read and stop owners within their existing preference scopes. Every original
+assertion, native nil/true callback receipt, pause policy and independent corpus
+is retained. Complete profile-settings and canonical-profile modules pass 24/0
+and 138/0 respectively on LuaJIT and Lua 5.4, with zero skips. Added native-owner
+controls cover idle stop omission and missing-owner refusal; fixture scopes
+restore exact module identities. These focused results do not replace the
+complete selected gate, three-driver CI or installed-device qualification.
+Items 54 and 81 remain partial.
+
+The Windows LLM parent fixture follows the independently declared seven-row
+inventory after the published retirement of Live mode. Original native route
+and withdrawal checks remain, with independent controls for revived, missing,
+duplicate and reordered declarations. Source review passed; corrected native
+AHK cases and the complete Windows cohort remain unrun. Items 54 and 81 remain
+partial, including full three-driver and installed-device qualification.
+
+The cancellation/export-history unit fixture now supplies the known Windows
+host identity required by the unchanged typed-sharing owner. Genuine missing
+and invalid identity refusals remain, as do every original timeout,
+unknown-cleanup, 23 ms and cancellation assertion. Group3 explicitly released
+only this fixture scope. Independent source review passed; corrected native
+AHK execution remains unrun. Privacy, schema, collector, report and production
+cancellation owners are unchanged. Items 54 and 81 remain partial.
 
 - [~] **88.** **Partial: native prediction tooltip appearance.** Shared
   llm-line-style policy and the unchanged independent line corpus retain grey
