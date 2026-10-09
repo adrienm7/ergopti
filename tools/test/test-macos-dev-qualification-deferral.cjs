@@ -108,8 +108,69 @@ function admitNativeSdkSelector(mac) {
 		'            exit 1\n          fi\n';
 	if (step.split(skippedRefusal).length !== 2) return null;
 	const position = jobs[0].index + steps[0].index + step.indexOf(SDK_FILTER);
-	return mac.slice(0, position) + mac.slice(position + SDK_FILTER.length);
+	return admitItem36Selector(mac.slice(0, position) + mac.slice(position + SDK_FILTER.length));
 }
+// Admit only the additional manual diagnostic selector and its exact source owner.
+const ITEM36_FILTER =
+	"--filter 'ReleaseArchiveStagingTests|SparkleArchiveUpdateAcceptanceTests|HomebrewArchiveAcceptanceTests|HomebrewAutomationConsentTests'";
+function admitItem36Selector(mac) {
+	const jobs = [...mac.matchAll(/^  item36-native:\n[\s\S]*?(?=^  [A-Za-z][\w-]*:|(?![\s\S]))/gm)];
+	if (jobs.length !== 1) return null;
+	const job = jobs[0][0];
+	for (const line of [
+		"    if: ${{ github.event_name == 'workflow_dispatch' && !inputs.release }}",
+		'    runs-on: macos-latest',
+		'    timeout-minutes: 25',
+		"          python-version: '3.13'",
+		"          node-version-file: '.node-version'"
+	])
+		if (job.split('\n').filter((actual) => actual === line).length !== 1) return null;
+	if (/^    (?:needs|continue-on-error|outputs|secrets):/m.test(job)) return null;
+	const steps = [
+		...job.matchAll(
+			/^      - name: Qualify scoped item 36 native archive XCTest controls\n[\s\S]*?(?=^      - |(?![\s\S]))/gm
+		)
+	];
+	if (steps.length !== 1) return null;
+	const step = steps[0][0];
+	if (
+		!step.startsWith(
+			'      - name: Qualify scoped item 36 native archive XCTest controls\n        shell: bash\n        env:\n'
+		) ||
+		/^        (?:if|continue-on-error):/m.test(step)
+	)
+		return null;
+	const command =
+		'          script -q /dev/null swift test --package-path static/ergopti_plus/macos/launcher \\\n' +
+		'            --scratch-path "$RUNNER_TEMP/swift-launcher-ci" \\\n' +
+		`            ${ITEM36_FILTER} 2>&1 | tee "$transcript"\n`;
+	if (step.split(command).length !== 2 || job.split(ITEM36_FILTER).length !== 2) return null;
+	for (const line of [
+		"          ERGOPTI_BREW_ALLOW_AUTOMATION_CONSENT: '1'",
+		"          ERGOPTI_BREW_ALLOW_OWNED_CONSENT_UI: '1'",
+		'          set -euo pipefail',
+		'          test -z "${ERGOPTI_DEV_QUALIFICATION_PROFILE:-}"',
+		'          export ERGOPTI_ARCHIVE_EVIDENCE_DIR="$(mktemp -d "$evidence/archive-session.XXXXXX")"',
+		'          node tools/diagnostics/item36_xctest_evidence.cjs begin "$GITHUB_SHA" "$source_receipt"',
+		'          item36_statuses=("${PIPESTATUS[@]}")',
+		'          node tools/diagnostics/item36_xctest_evidence.cjs judge "$transcript" "${item36_statuses[0]}" "${item36_statuses[1]}" "$GITHUB_SHA" "$source_receipt" "$evidence/item36-verdict.json"',
+		'        timeout-minutes: 20'
+	])
+		if (step.split('\n').filter((actual) => actual === line).length !== 1) return null;
+	const packages = [
+		...mac.matchAll(/^  package-macos:\n[\s\S]*?(?=^  [A-Za-z][\w-]*:|(?![\s\S]))/gm)
+	];
+	if (
+		packages.length !== 1 ||
+		!packages[0][0].includes(
+			'          script -q /dev/null swift test --package-path static/ergopti_plus/macos/launcher --scratch-path "$RUNNER_TEMP/swift-launcher-ci" 2>&1 | tee "$xctest_log"\n'
+		)
+	)
+		return null;
+	const position = jobs[0].index + steps[0].index + step.indexOf(ITEM36_FILTER);
+	return mac.slice(0, position) + mac.slice(position + ITEM36_FILTER.length);
+}
+
 function sourceProblems(pkg, mac, rootCaller) {
 	const errors = consentSourceProblems(brewSource, consentSource, pkg);
 	const requireText = (value, token, name) => {
@@ -715,3 +776,5 @@ assert.equal(passed, 52);
 console.log(
 	'PASS: Mac qualification deferral source/typed-receipt controls=52; Swift/native execution unqualified.'
 );
+
+require('./test-item36-native-qualification.cjs')({ workflow, admitItem36Selector, ITEM36_FILTER });

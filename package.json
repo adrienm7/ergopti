@@ -130,6 +130,7 @@
 		"test:macos-keyboard-layout-bundle": "node ./tools/test/test-macos-keyboard-layout-bundle.cjs",
 		"test:macos-launcher-universal": "node ./tools/test/test-macos-launcher-universal.cjs",
 		"test:macos-swift-launcher-ci": "node ./tools/test/test-macos-swift-launcher-ci.cjs",
+		"test:item36-native-qualification": "node ./tools/test/test-item36-native-qualification.cjs",
 		"test:swift-xctest-evidence": "node ./tools/test/test-swift-xctest-evidence.cjs",
 		"test:macos-swift-launcher": "node ./tools/test/run-macos-swift-launcher.cjs",
 		"test:macos-remap-launchagent": "node ./tools/test/test-macos-remap-launchagent.cjs",

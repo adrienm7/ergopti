@@ -31,6 +31,12 @@ const FULL = process.argv.includes('--full');
 // Each check mirrors a CI "Validate ·" step. command/args are run from ROOT.
 const CHECKS = [
 	{
+		name: 'macOS archive qualification requires exact native cases and compiler inputs',
+		cmd: process.execPath,
+		args: ['tools/test/test-item36-native-qualification.cjs'],
+		repro: 'node tools/test/test-item36-native-qualification.cjs'
+	},
+	{
 		name: 'dev156 qualification deferrals retain full default execution and strict accounting',
 		cmd: process.execPath,
 		args: ['tools/test/test-dev-release-qualification.cjs'],

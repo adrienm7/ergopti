@@ -178,6 +178,7 @@ const PLAN_STEPS = ['Load the Linux release artifact contract', 'Compute tag and
 // accepted value. Every other step runs whenever its job runs, so no edit can
 // skip a gate while its job stays green.
 const MACOS_NATIVE_STEP_CONDITIONS = [
+	[MACOS_BOX, 'item36-native', 'Retain scoped item 36 native diagnostics', 'always()'],
 	[
 		MACOS_BOX,
 		'managed-ollama-native',
@@ -1009,6 +1010,7 @@ function graphProblems(files) {
 		const exposed =
 			rel === MACOS_BOX
 				? [
+						'item36-native',
 						'managed-ollama-native',
 						...sequence.slice(0, 2),
 						'tooltip-canvas',
@@ -1050,6 +1052,19 @@ function graphProblems(files) {
 			}
 		}
 		if (rel === MACOS_BOX) {
+			const scoped = jobs.find((candidate) => candidate.id === 'item36-native');
+			if (
+				!scoped ||
+				pipeline.needsOf(scoped.body).length !== 0 ||
+				pipeline.field(scoped.body, 'if') !==
+					"${{ github.event_name == 'workflow_dispatch' && !inputs.release }}" ||
+				pipeline.field(scoped.body, 'continue-on-error') !== null ||
+				pipeline.field(scoped.body, 'outputs') !== null ||
+				pipeline.field(scoped.body, 'secrets') !== null
+			)
+				problems.push(
+					'item36-native must retain its independent manual nonrelease diagnosis boundary'
+				);
 			for (const id of MACOS_NATIVE_ENTRIES) {
 				const native = jobs.find((candidate) => candidate.id === id);
 				if (!native || pipeline.needsOf(native.body).length !== 0) {
@@ -1080,10 +1095,15 @@ function graphProblems(files) {
 			.filter((candidate) => !needed.has(candidate.id))
 			.map((candidate) => candidate.id);
 		if (rel === MACOS_BOX) {
-			const expectedEntries = ['managed-ollama-native', 'test-hs', 'cold-bootstrap-native'];
+			const expectedEntries = [
+				'item36-native',
+				'managed-ollama-native',
+				'test-hs',
+				'cold-bootstrap-native'
+			];
 			if (JSON.stringify(entries) !== JSON.stringify(expectedEntries)) {
 				problems.push(
-					`${rel} must have exactly the three entries [${expectedEntries.join(', ')}]; got [${entries.join(', ')}]`
+					`${rel} must have exactly the four declared entries [${expectedEntries.join(', ')}]; got [${entries.join(', ')}]`
 				);
 			}
 		} else if (entries.length !== 1) {
@@ -1091,9 +1111,14 @@ function graphProblems(files) {
 				`${rel} must have exactly one entry job, which needs no job of its file; got [${entries.join(', ')}]`
 			);
 		}
-		if (exits.length !== 1) {
+		const expectedExits = rel === MACOS_BOX ? ['item36-native', 'macos-ok'] : [sequence[4]];
+		if (
+			rel === MACOS_BOX
+				? JSON.stringify(exits) !== JSON.stringify(expectedExits)
+				: exits.length !== 1
+		) {
 			problems.push(
-				`${rel} must have exactly one exit job, which no job of its file needs; got [${exits.join(', ')}]`
+				`${rel} must preserve exactly its declared verdict and scoped diagnostic exits; got [${exits.join(', ')}]`
 			);
 		}
 		for (const [id, needs] of needsOfJob) {
@@ -1139,6 +1164,30 @@ for (const id of MACOS_NATIVE_ENTRIES) {
 		mustCatch(`${id}: ${what}`, MACOS_BOX, from, to, graphProblems);
 	}
 }
+for (const [what, from, to] of [
+	['missing scoped item36 node', '  item36-native:\n', '  omitted-item36-native:\n'],
+	[
+		'coupled scoped item36 entry',
+		'  item36-native:\n',
+		'  item36-native:\n    needs: package-macos\n'
+	],
+	[
+		'forgiven scoped item36 failure',
+		'  item36-native:\n',
+		'  item36-native:\n    continue-on-error: true\n'
+	],
+	[
+		'broad scoped item36 admission',
+		"    if: ${{ github.event_name == 'workflow_dispatch' && !inputs.release }}\n",
+		'    if: always()\n'
+	],
+	[
+		'unqualified scoped item36 release output',
+		'  item36-native:\n',
+		'  item36-native:\n    outputs:\n      assets: fake\n'
+	]
+])
+	mustCatch(what, MACOS_BOX, from, to, graphProblems);
 errors.push(...graphProblems(pipeline.files()));
 for (const [what, rel, from, to] of [
 	[
@@ -3523,6 +3572,6 @@ if (errors.length > 0) {
 
 console.log(
 	`[OK] one root (${ROOT}) with ${planOutputs.size} plan outputs, ${callers.length} lane callers with ` +
-		`three mandatory macOS entries, one Windows/Linux entry and one exit per lane, and ${gatedSecrets} release-only secrets are wired as designed, ` +
+		`three mandatory macOS entries plus one manual diagnostic, one Windows/Linux entry and the declared exits, and ${gatedSecrets} release-only secrets are wired as designed, ` +
 		`${CONDITIONS.size} conditional steps are the only ones, and the release preflight runs before any side effect.`
 );
