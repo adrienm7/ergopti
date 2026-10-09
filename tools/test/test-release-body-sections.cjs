@@ -373,7 +373,7 @@ function checkNodeBodyInterpreter(modules) {
 		);
 	}
 	assert.ok(body.includes(policy.expires_at));
-	for (const tag of ['v0.0.0-dev.155', 'v0.0.0-dev.157', 'v1.2.3']) {
+	for (const tag of ['v0.0.0-dev.155', 'v0.0.0-dev.158', 'v1.2.3']) {
 		const other = buildCiBody({ ...CI_ENV, TAG: tag }, CHANGELOG_MD);
 		assert.ok(
 			!other.includes('Native validation limitations'),
