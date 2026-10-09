@@ -27,3 +27,8 @@ static/layouts/registry/index.json
 
 # Third-party code kept byte-identical to its upstream release
 **/vendor/
+
+# Promo video: public/ is a hard-link mirror of static/ (formatting it would
+# rewrite the originals through the links) and out/ holds renders.
+/video/public
+/video/out
