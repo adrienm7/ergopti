@@ -15,7 +15,7 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const VIDEO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
-const OUT_DIR = join(VIDEO_ROOT, '..', 'docs/media/ergoptiplus');
+const OUT_DIR = join(VIDEO_ROOT, '..', 'static/media/ergopti_plus');
 const WORK_DIR = join(VIDEO_ROOT, 'out/gif-work');
 const GIF_WIDTH = 800;
 const GIF_FPS = 12;
