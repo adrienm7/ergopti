@@ -31,6 +31,12 @@ const FULL = process.argv.includes('--full');
 // Each check mirrors a CI "Validate ·" step. command/args are run from ROOT.
 const CHECKS = [
 	{
+		name: 'Signed native query CI publisher retains compiler and nested-signature provenance',
+		cmd: process.execPath,
+		args: ['tools/test/test-automation-query-ci-publisher.cjs'],
+		repro: 'npm run test:automation-query-ci-publisher'
+	},
+	{
 		name: 'dev156 qualification deferrals retain full default execution and strict accounting',
 		cmd: process.execPath,
 		args: ['tools/test/test-dev-release-qualification.cjs'],
@@ -1121,6 +1127,18 @@ const CHECKS = [
 		cmd: 'node',
 		args: ['tools/test/test-desktop-ci-evidence.cjs'],
 		repro: 'npm run test:desktop-ci-evidence'
+	},
+	{
+		name: 'Windows native desktop cohorts require exact native completion and mandatory evidence',
+		cmd: process.execPath,
+		args: ['tools/test/test-windows-native-desktop.cjs'],
+		repro: 'npm run test:windows-native-desktop'
+	},
+	{
+		name: 'Compiled upgrade admission requires actual prior-package and committed full-save evidence',
+		cmd: process.execPath,
+		args: ['tools/test/test-compiled-save-upgrade.cjs'],
+		repro: 'node tools/test/test-compiled-save-upgrade.cjs'
 	},
 	{
 		name: 'macOS canvas job admission and pure Python ownership remain mandatory',

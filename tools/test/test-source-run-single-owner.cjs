@@ -101,7 +101,7 @@ const WINDOWS_MECHANICS = {
 	'infra/toml/toml_helpers.ahk': "the compiled exe's former paths.toml location",
 	'infra/diagnostic_snapshot.ahk': 'the snapshot reports the flag itself',
 	'infra/startup_smoke.ahk':
-		'the native readiness receipt identifies its executable and reports the compiled flag',
+		'the startup receipt identity owner reports its executable and compiled flag',
 	'modules/keymap/uia_selection_worker.ahk': 'how a worker process is spawned',
 	'modules/keylogger/keylogger_prefetch.ahk': 'how a worker process is spawned',
 	'modules/dynamic_hotstrings/user_code.ahk':
@@ -131,11 +131,34 @@ expect(
 	'the provider uses the compiled flag only to refuse its executable as an AHK interpreter'
 );
 expect(readinessPublisher !== '', 'the native readiness publisher must exist');
+const fullSavePublisher = ahkBody('infra/startup_smoke.ahk', 'StartupSmokePublishFullSave');
+const startupIdentity = ahkBody('infra/startup_smoke.ahk', '_StartupSmokeRuntimeIdentity');
+expect(fullSavePublisher !== '', 'the native full-save publisher must exist');
+expect(startupIdentity !== '', 'both startup receipts must have a native runtime identity owner');
 expect(
-	readinessPublisher.split('A_IsCompiled').length === 3 &&
-		code('windows', 'infra/startup_smoke.ahk', ahkComment).split('A_IsCompiled').length === 3,
-	'the readiness owner reports runtime identity only; product decisions still ask Updater_IsLocalSource'
+	startupIdentity.split('A_IsCompiled').length === 2 &&
+		code('windows', 'infra/startup_smoke.ahk', ahkComment).split('A_IsCompiled').length === 2 &&
+		/Compiled := A_IsCompiled/.test(startupIdentity) &&
+		/SystemControl\(\)\.OwnPid\(\)/.test(startupIdentity) &&
+		/executable: Compiled \? A_ScriptFullPath : A_AhkPath, compiled: Compiled/.test(
+			startupIdentity
+		),
+	'the startup identity owner reads the native flag once for its own PID and executable'
 );
+for (const [name, publisher] of [
+	['readiness', readinessPublisher],
+	['full-save', fullSavePublisher]
+]) {
+	expect(
+		publisher.split('A_IsCompiled').length === 1 &&
+			publisher.split('_StartupSmokeRuntimeIdentity()').length === 2 &&
+			/Identity := _StartupSmokeRuntimeIdentity\(\)/.test(publisher) &&
+			/Pid := Identity\.pid/.test(publisher) &&
+			/Executable := Identity\.executable/.test(publisher) &&
+			/Identity\.compiled \? "true" : "false"/.test(publisher),
+		`the ${name} receipt must report the shared native runtime identity without another compiled decision`
+	);
+}
 const owner = ahkBody('modules/updater/core.ahk', 'Updater_IsLocalSource');
 expect(/return !A_IsCompiled/.test(owner), 'Updater_IsLocalSource must stay the Windows owner');
 expect(

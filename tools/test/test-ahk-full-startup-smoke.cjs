@@ -32,6 +32,7 @@ const os = require('os');
 const path = require('path');
 const { spawnSync } = require('child_process');
 const crypto = require('node:crypto');
+const { parse: parseToml } = require('smol-toml');
 const {
 	createStartupCodeFixture,
 	prepareStartupPersonalInclude
@@ -78,6 +79,13 @@ const CHORD_CONFIGS = {
 		running: SCRIPT_CHORD_SLOTS.filter((slot) => slot !== 'script_altgr_enter')
 	}
 };
+// These fields are foreign data after the dedicated Metrics bindings retired.
+// The real boot and its existing acknowledged full save must retain both their
+// values and their independently written source comments.
+const RETIRED_METRICS_SOURCE =
+	'# retained legacy dashboard bindings\n[metrics]\n' +
+	'metrics_shortcut_typing = "Ctrl+Alt+M" # retained typing\n' +
+	'metrics_shortcut_apps = { future = { keep = 9 }, enabled = false } # retained apps\n';
 if (Object.keys(SEEDED_CONFIGS).length < 4) {
 	throw new Error(
 		'full AHK startup smoke: the migration corpus holds fewer than three Windows releases'
@@ -257,6 +265,39 @@ function fullSaveReceiptProblem(configRoot, pid, nonce) {
 	return null;
 }
 
+/**
+ * Checks the actual saved image after the boot generation has committed.
+ * @param {string} configRoot Exclusive startup fixture directory.
+ * @returns {string | null} Closed refusal text, without configuration contents.
+ */
+function retiredMetricsProblem(configRoot) {
+	let saved;
+	let decoded;
+	try {
+		// The native ordinary writer emits a UTF-8 BOM; it is encoding metadata,
+		// outside the unknown logical records checked below.
+		saved = fs
+			.readFileSync(path.join(configRoot, 'config/autohotkey/config.toml'), 'utf8')
+			.replace(/^\uFEFF/, '');
+		decoded = parseToml(saved);
+	} catch {
+		return 'the retired Metrics full-save image is missing or invalid';
+	}
+	const rows = saved.split('\n');
+	for (const record of RETIRED_METRICS_SOURCE.trimEnd().split('\n')) {
+		if (rows.filter((row) => row === record).length !== 1)
+			return 'the retired Metrics full save did not preserve an unowned source record exactly once';
+	}
+	const metrics = decoded.metrics;
+	if (
+		metrics?.metrics_shortcut_typing !== 'Ctrl+Alt+M' ||
+		metrics?.metrics_shortcut_apps?.future?.keep !== 9 ||
+		metrics?.metrics_shortcut_apps?.enabled !== false
+	)
+		return 'the retired Metrics full save changed an unowned typed value';
+	return null;
+}
+
 function logTail(configRoot) {
 	// Under the smoke, boot puts the default logs folder at
 	// <smoke dir>\<AppDirsWindowsLogsRelative()>.
@@ -341,11 +382,17 @@ async function main() {
 			'extension-neutral',
 			'extension-enabled',
 			'extension-master-off',
+			'retired-metrics-config',
 			...Object.keys(CHORD_CONFIGS),
 			...Object.keys(SEEDED_CONFIGS)
 		]) {
 			const configRoot = path.join(scratch, fixture);
 			fs.mkdirSync(configRoot, { recursive: true });
+			if (fixture === 'retired-metrics-config') {
+				const config = path.join(configRoot, 'config', 'autohotkey');
+				fs.mkdirSync(config, { recursive: true });
+				fs.writeFileSync(path.join(config, 'config.toml'), RETIRED_METRICS_SOURCE);
+			}
 			if (SEEDED_CONFIGS[fixture]) {
 				const config = path.join(configRoot, 'config', 'autohotkey');
 				fs.mkdirSync(config, { recursive: true });
@@ -412,6 +459,10 @@ async function main() {
 			if (readiness) return fail(fixture + ': ' + readiness);
 			const fullSave = fullSaveReceiptProblem(configRoot, result.pid, nonce);
 			if (fullSave) return fail(fixture + ': ' + fullSave);
+			if (fixture === 'retired-metrics-config') {
+				const retiredMetrics = retiredMetricsProblem(configRoot);
+				if (retiredMetrics) return fail(fixture + ': ' + retiredMetrics);
+			}
 			if (!fs.existsSync(path.join(configRoot, 'startup-pump.txt')))
 				return fail(
 					`${fixture}: timers did not progress while the headless tray request was retained`
@@ -481,7 +532,7 @@ async function main() {
 		}
 		console.log(
 			'\x1b[32m[OK] full AHK startup smoke: fresh, reloaded, independent, suspend-marker, extension opt-in, ' +
-				'script-chord, neutral-defaults and older-release boots reached ready with no error logged ' +
+				'script-chord, retired-Metrics, neutral-defaults and older-release boots reached ready with no error logged ' +
 				'and every script chord registered.\x1b[0m'
 		);
 		return 0;

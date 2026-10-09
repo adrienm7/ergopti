@@ -28,6 +28,7 @@ function M.new(options)
 	local planner = Entries.new(model, catalogue, { parameter_section = options.parameter_section })
 	local owner, inventory, source, draft = {}, nil, nil, nil
 	local alive, busy, generation, serial = true, false, 0, 0
+	local position = nil
 	local function current()
 		if not alive or source == nil then return false end
 		local expected, epoch = source, generation
@@ -65,10 +66,77 @@ function M.new(options)
 			if not captured then return nil, refusal or "source_changed" end
 			local entries = records()
 			if not current() then return nil end
-			return { entries = entries, positions = options.positions, capture = false }
+			return { entries = entries, positions = options.positions, capture = type(options.capture_position) == "function"
+				and type(options.cancel_position) == "function" and type(options.position_available) == "function"
+				and type(options.position_field) == "string"
+				and options.position_available() == true and current() }
 		end)
 		busy = false
 		return called and packet or nil, called and reason or "window_unavailable"
+	end
+	--- Cancels an observation without changing the configured key or draft.
+	--- @return boolean retired Exact native request acknowledged.
+	function owner.cancel_position()
+		local record = position
+		if not record then return true end
+		record.cancelled = true
+		if record.token == nil or record.retiring then return false end
+		record.retiring = true
+		local called, retired = pcall(options.cancel_position, record.token)
+		record.retiring = false
+		if not called or retired ~= true then return false end
+		if position == record then position = nil end
+		return true
+	end
+	--- Requests detached position facts from an original native observation owner.
+	--- @param request table Page-local request_id only; browser keys are not evidence.
+	--- @return boolean enrolled
+	function owner.capture_position(request)
+		if busy then return false end
+		-- Reserve this session before any native/source getter can reenter it.
+		busy = true
+		local called, enrolled = pcall(function()
+			if not current() or not closed(request, { request_id = true })
+				or type(request.request_id) ~= "number" or request.request_id < 1 or request.request_id % 1 ~= 0
+				or type(options.capture_position) ~= "function" or type(options.cancel_position) ~= "function"
+				or type(options.position_field) ~= "string" then return false end
+			if owner.cancel_position() ~= true then return false end
+			local record = { source = source, epoch = generation, request_id = request.request_id }
+			position = record
+			local function owned()
+				return rawequal(position, record) and not record.cancelled and rawequal(source, record.source)
+					and generation == record.epoch
+			end
+			local function exact()
+				return owned() and current() and owned()
+			end
+			local began, token = pcall(options.capture_position, exact, function(facts)
+				if busy or record.completed or record.token == nil then return false end
+				busy = true
+				local received, accepted = pcall(function()
+					if not exact() or not closed(facts, { native_code = true, mods = true }) then return false end
+					local code = model.code_for(facts.native_code, options.position_field, options.position_form)
+					local slot = code and model.encode(code, facts.mods)
+					local descriptor = slot and model.parse(slot)
+					if not descriptor or not exact() then return false end
+					local packet = { action = "captured", request_id = record.request_id,
+						code = descriptor.code, mods = descriptor.mods }
+					local sent = options.emit_position(packet)
+					return sent == true and exact()
+				end)
+				-- A native request observes at most one primary key, even when a port
+				-- returns a duplicate callback. Its exact cancellation token is retained.
+				record.completed = true
+				busy = false
+				return received and accepted == true
+			end)
+			if not began or type(token) ~= "table" then if position == record then position = nil end; return false end
+			record.token = token
+			if not exact() then owner.cancel_position(); return false end
+			return true
+		end)
+		busy = false
+		return called and enrolled == true
 	end
 	--- Opens the existing action picker without publishing its result.
 	--- @param request table Manual position, exact modifiers and optional old slot.
@@ -77,7 +145,7 @@ function M.new(options)
 		if busy then return false end
 		busy = true
 		local accepted, result = pcall(function()
-			if not current() or not closed(request, { code = true, mods = true, previous_slot = true, request_id = true })
+			if owner.cancel_position() ~= true or not current() or not closed(request, { code = true, mods = true, previous_slot = true, request_id = true })
 				or type(request.request_id) ~= "number" or request.request_id < 1 or request.request_id % 1 ~= 0 then return false end
 			local slot = model.encode(request.code, request.mods)
 			local previous = request.previous_slot
@@ -162,7 +230,9 @@ function M.new(options)
 	--- Retires drafts without touching native configuration or foreign windows.
 	function owner.close()
 		alive, draft = false, nil
+		if owner.cancel_position() ~= true then return false end
 		generation = generation + 1
+		return true
 	end
 	return owner
 end

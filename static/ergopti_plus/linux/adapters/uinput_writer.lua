@@ -45,6 +45,7 @@
 --- ==============================================================================
 
 local M = {}
+local original_output_observer_factory, original_capture_output = nil, nil
 
 local Logger = require("logger.shim")
 local LOG = "adapters.uinput_writer"
@@ -82,6 +83,9 @@ local UI_DEV_DESTROY = 0x5502
 -- grabbed high key is swallowed and then "re-emitted" to a device that
 -- cannot emit it — the write succeeds while the application sees nothing.
 local KEY_CODE_MAX = 0x2FF
+
+-- File descriptors are non-negative signed native int values.
+local MAX_DESCRIPTOR = 0x7FFFFFFF
 
 -- struct input_event is 24 bytes on 64-bit: timeval (2 × 8) + type/code (2 × 2)
 -- + value (4).
@@ -209,6 +213,112 @@ local _backend = nil
 -- backend swap mid-session cannot leave a stale fd behind.
 local _fd = nil
 
+-- A constructor or wire operation owns the channel before calling any provider.
+-- The capability never exposes a descriptor: a recycled numeric fd is not an owner.
+local _busy = false
+local _output = nil
+local _transaction = nil
+local _dispatch = nil
+local _debt = false
+local _constructor_debt = nil
+local _generation = 0
+local _strict_constructor = false
+local _constructor_ports = nil
+local _legacy_wire = false
+local encode_event = M.encode_event
+local encode_setup = M.encode_setup
+
+--- Checks only private observed currency; this is not a kernel state lease.
+--- @param output table Issued private record.
+--- @return boolean current
+local function output_identity(output)
+	return output ~= nil and rawequal(output, _output) and not output.retired
+		and rawequal(output.backend, _backend) and output.fd == _fd
+		and rawequal(output.write, rawget(output.backend, "write"))
+		and rawequal(output.ioctl, rawget(output.backend, "ioctl"))
+		and rawequal(output.close, rawget(output.backend, "close"))
+end
+
+--- Checks exact capability identity without invoking a replaceable export.
+--- @param capability table Opaque capability.
+--- @return boolean current
+local function output_current(capability)
+	return not _busy and not _debt and _transaction == nil and output_identity(_output)
+		and rawequal(capability, _output.capability)
+end
+
+--- Writes a complete KEY/SYN attempt through one captured native owner.
+--- @param capability table Opaque capability.
+--- @param code integer evdev keycode.
+--- @param value integer Native up/down/repeat value.
+--- @return boolean acknowledged
+local function emit_owned(capability, code, value, transaction)
+	local output = _output
+	if _busy or _debt or not output_identity(output)
+		or not rawequal(capability, output.capability)
+		or (_transaction ~= nil and not rawequal(transaction, _transaction)) then return false end
+	if type(code) ~= "number" or code ~= math.floor(code) or code < 1 or code > KEY_CODE_MAX
+		or (value ~= 0 and value ~= 1 and value ~= 2) then return false end
+	_busy = true
+	output.write_epoch = output.write_epoch + 1
+	local called, acknowledged = pcall(function()
+		if output.write(output.fd, encode_event(EV_KEY, code, value)) ~= true then return false end
+		if not output_identity(output) then return false end
+		if output.write(output.fd, encode_event(EV_SYN, SYN_REPORT, 0)) ~= true then return false end
+		return output_identity(output)
+	end)
+	if not called or acknowledged ~= true then
+		_debt = true
+		output.write_debt = true
+		pcall(Logger.error, LOG, "An owned native KEY/SYN attempt was not acknowledged.")
+	end
+	if called and acknowledged == true then
+		if value == 1 then output.down[code] = true
+		elseif value == 0 then output.down[code] = nil
+		elseif output.down[code] ~= true then output.roster_known = false end
+		if transaction ~= nil then transaction.write_epoch = output.write_epoch end
+	end
+	_busy = false
+	return called and acknowledged == true
+end
+
+--- Retires only the captured native descriptor, never a successor's descriptor.
+--- @param capability table Opaque capability.
+--- @return boolean retired
+local function close_owned(capability, transaction)
+	local output = _output
+	if _busy or not output_identity(output) or output.close_attempted
+		or not rawequal(capability, output.capability)
+		or (_transaction ~= nil and not rawequal(transaction, _transaction)) then return false end
+	_busy = true
+	output.close_attempted = true
+	pcall(Logger.start, LOG, "Retiring the exact owned virtual keyboard…")
+	local destroyed, destroy_ack = pcall(output.ioctl, output.fd, UI_DEV_DESTROY, 0)
+	local closed, close_ack = pcall(output.close, output.fd)
+	local same = output_identity(output)
+	if closed and close_ack == true and same then
+		_fd = nil
+		output.retired = true
+	end
+	local acknowledged = destroyed and destroy_ack == true and closed and close_ack == true and same
+	if acknowledged then
+		output.retirement_ack = true
+		_output = nil
+		if _transaction ~= nil then _transaction.retired = true end
+		_transaction = nil
+		_debt = false
+		_strict_constructor = false
+		_legacy_wire = false
+	else
+		-- A failed close may already have recycled its fd. It must never be retried.
+		_debt = true
+	end
+	pcall(acknowledged and Logger.success or Logger.error, LOG,
+		acknowledged and "Owned virtual keyboard retired." or "Native retirement remains unacknowledged; the descriptor will not be retried.")
+	_busy = false
+	return acknowledged
+end
+
 --- Replaces the syscall backend. Test seam.
 ---
 --- A backend implements:
@@ -218,6 +328,8 @@ local _fd = nil
 ---   close(handle)
 --- @param backend table|nil
 function M._set_backend(backend)
+	if backend ~= nil and type(backend) ~= "table" then return false end
+	if _busy or _output ~= nil or _debt or _fd ~= nil then return false end
 	_backend = backend
 	_fd = nil
 	Logger.debug(LOG, "Backend replaced: %s.", backend and "custom" or "none")
@@ -225,10 +337,16 @@ end
 
 --- Drops the backend and any open handle. Test seam.
 function M._reset_backend()
+	if _busy or _debt then return false end
+	if _output ~= nil and not close_owned(_output.capability) then return false end
+	_busy = true
 	if _fd and _backend and _backend.close then pcall(_backend.close, _fd) end
 	_backend = nil
 	_fd = nil
-	Logger.debug(LOG, "Backend reset.")
+	_strict_constructor = false
+	_legacy_wire = false
+	pcall(Logger.debug, LOG, "Backend reset.")
+	_busy = false
 end
 
 --- Builds the LuaJIT FFI backend, or nil when FFI is unavailable.
@@ -255,27 +373,31 @@ local function build_ffi_backend()
 		return nil, "ffi.cdef failed: " .. tostring(cdef_err)
 	end
 
+	-- Resolve while the constructor/binder is reserved; public ffi table mutation
+	-- cannot substitute a syscall after the native channel is acknowledged.
+	local native_open, native_close = ffi.C.open, ffi.C.close
+	local native_ioctl, native_write, cast = ffi.C.ioctl, ffi.C.write, ffi.cast
 	return {
 		open = function(path, flags)
-			local fd = ffi.C.open(path, flags)
+			local fd = native_open(path, flags)
 			if fd < 0 then return nil, "open failed" end
 			return fd
 		end,
 		ioctl = function(fd, request, arg)
 			local rc
 			if type(arg) == "string" then
-				rc = ffi.C.ioctl(fd, request, ffi.cast("const char *", arg))
+				rc = native_ioctl(fd, request, cast("const char *", arg))
 			else
-				rc = ffi.C.ioctl(fd, request, ffi.cast("int", arg or 0))
+				rc = native_ioctl(fd, request, cast("int", arg or 0))
 			end
 			return rc >= 0
 		end,
 		write = function(fd, bytes)
-			local n = ffi.C.write(fd, bytes, #bytes)
+			local n = native_write(fd, bytes, #bytes)
 			return tonumber(n) == #bytes
 		end,
 		close = function(fd)
-			ffi.C.close(fd)
+			return native_close(fd) == 0
 		end,
 	}
 end
@@ -283,13 +405,16 @@ end
 --- Binds the production FFI backend.
 --- @return boolean True when a backend is available.
 function M.use_ffi_backend()
-	local backend, err = build_ffi_backend()
-	if not backend then
-		Logger.debug(LOG, "FFI backend unavailable: %s.", tostring(err))
+	if _busy or _output ~= nil or _debt or _fd ~= nil then return false end
+	_busy = true
+	local called, backend = pcall(build_ffi_backend)
+	if not called or backend == nil then
+		_busy = false
 		return false
 	end
 	_backend = backend
-	Logger.debug(LOG, "FFI backend bound.")
+	pcall(Logger.debug, LOG, "FFI backend bound.")
+	_busy = false
 	return true
 end
 
@@ -331,6 +456,7 @@ end
 --- Test seam: points every probe and open() at another node.
 --- @param path string|nil nil restores /dev/uinput.
 function M._set_path_for_test(path)
+	if _busy or _output ~= nil or _debt then return false end
 	_uinput_path = path or UINPUT_PATH
 end
 
@@ -343,69 +469,95 @@ end
 --- working.
 --- @return boolean True when the device is ready to accept events.
 function M.open()
-	if _fd then
-		Logger.debug(LOG, "open(): already open.")
-		return true
-	end
-	if not _backend and not M.use_ffi_backend() then
-		Logger.warn(LOG, "open(): no backend available.")
-		return false
-	end
-
-	local fd, err = _backend.open(_uinput_path, OPEN_FLAGS)
-	if not fd then
-		Logger.warn(LOG, "open(): cannot open %s (%s).", _uinput_path, tostring(err))
-		return false
-	end
-
-	if not _backend.ioctl(fd, UI_SET_EVBIT, EV_KEY) then
-		Logger.error(LOG, "open(): UI_SET_EVBIT(EV_KEY) failed.")
-		_backend.close(fd)
-		return false
-	end
-	for code = 1, KEY_CODE_MAX do
-		if not _backend.ioctl(fd, UI_SET_KEYBIT, code) then
-			Logger.error(LOG, "open(): UI_SET_KEYBIT(%d) failed.", code)
-			_backend.close(fd)
-			return false
+	if _busy or _debt then return false end
+	if _fd then return true end
+	-- Reserve before lazy FFI loading: even require/cdef can reenter the writer.
+	_busy = true
+	local backend, descriptor = _backend, nil
+	local open_port, ioctl_port, write_port, close_port
+	local strict = true
+	pcall(Logger.start, LOG, "Creating the native virtual keyboard…")
+	local called, created = pcall(function()
+		if backend == nil then
+			backend = build_ffi_backend()
+			if backend == nil then return false end
+			_backend = backend
 		end
-	end
-	-- EV_SYN last among the capability bits, but still before UI_DEV_CREATE.
-	if not _backend.ioctl(fd, UI_SET_EVBIT, EV_SYN) then
-		Logger.error(LOG, "open(): UI_SET_EVBIT(EV_SYN) failed.")
-		_backend.close(fd)
+		open_port, ioctl_port, write_port, close_port = rawget(backend, "open"), rawget(backend, "ioctl"), rawget(backend, "write"), rawget(backend, "close")
+		local function unchanged()
+			return rawequal(backend, _backend) and rawequal(open_port, rawget(backend, "open"))
+				and rawequal(ioctl_port, rawget(backend, "ioctl")) and rawequal(write_port, rawget(backend, "write"))
+				and rawequal(close_port, rawget(backend, "close"))
+		end
+		descriptor = open_port(_uinput_path, OPEN_FLAGS)
+		if not unchanged() then return false end
+		if descriptor == nil or descriptor == false then return false end
+		local function admit(request, argument)
+			local result = ioctl_port(descriptor, request, argument)
+			if not unchanged() then return false end
+			if result ~= true then strict = false end
+			return result
+		end
+		if not admit(UI_SET_EVBIT, EV_KEY) then return false end
+		for code = 1, KEY_CODE_MAX do
+			if not admit(UI_SET_KEYBIT, code) then return false end
+		end
+		if not admit(UI_SET_EVBIT, EV_SYN) then return false end
+		if not admit(UI_DEV_SETUP, encode_setup()) then return false end
+		if not admit(UI_DEV_CREATE, 0) then return false end
+		return true
+	end)
+	if not called or created ~= true then
+		if descriptor ~= nil and descriptor ~= false and backend ~= nil then
+			local closed, ack = pcall(close_port, descriptor)
+			if not closed or ack ~= true then
+				_debt = true
+				_constructor_debt = { backend = backend, fd = descriptor, close = close_port }
+			end
+		end
+		pcall(Logger.error, LOG, "Native virtual keyboard creation was not acknowledged.")
+		_busy = false
 		return false
 	end
-
-	if not _backend.ioctl(fd, UI_DEV_SETUP, M.encode_setup()) then
-		Logger.error(LOG, "open(): UI_DEV_SETUP failed.")
-		_backend.close(fd)
-		return false
-	end
-	if not _backend.ioctl(fd, UI_DEV_CREATE, 0) then
-		Logger.error(LOG, "open(): UI_DEV_CREATE failed.")
-		_backend.close(fd)
-		return false
-	end
-
-	_fd = fd
-	Logger.success(LOG, "Virtual keyboard created on %s.", _uinput_path)
+	_fd = descriptor
+	_generation = _generation + 1
+	_constructor_ports = { open = open_port, ioctl = ioctl_port, write = write_port, close = close_port }
+	_strict_constructor = strict and type(descriptor) == "number"
+		and descriptor == math.floor(descriptor) and descriptor >= 0 and descriptor <= MAX_DESCRIPTOR
+	_legacy_wire = false
+	pcall(Logger.success, LOG, "Virtual keyboard created on %s.", _uinput_path)
+	_busy = false
 	return true
 end
 
 --- Destroys the virtual keyboard and closes the descriptor.
 function M.close()
+	if _busy or _debt then return false end
+	if _output ~= nil then return close_owned(_output.capability) end
 	if not _fd then return end
-	Logger.start(LOG, "Destroying the virtual keyboard…")
+	_busy = true
+	pcall(Logger.start, LOG, "Destroying the virtual keyboard…")
 	pcall(_backend.ioctl, _fd, UI_DEV_DESTROY, 0)
 	pcall(_backend.close, _fd)
 	_fd = nil
-	Logger.success(LOG, "Virtual keyboard destroyed.")
+	_strict_constructor = false
+	_legacy_wire = false
+	pcall(Logger.success, LOG, "Virtual keyboard destroyed.")
+	_busy = false
 end
 
 --- @return boolean True when the device is open and emit() will work.
 function M.is_open()
 	return _fd ~= nil
+end
+
+--- Positively observes an idle unavailable channel before any caller acquires it.
+--- A failed constructor can retain native debt while is_open() is false.
+--- @return boolean unavailable
+--- @return integer generation Last successfully created native generation.
+function M.unavailable_for_output()
+	return _fd == nil and not _busy and not _debt and _constructor_debt == nil
+		and _output == nil and _transaction == nil and _dispatch == nil, _generation
 end
 
 
@@ -431,6 +583,15 @@ end
 --- @param value integer 0 release, 1 press, 2 autorepeat.
 --- @return boolean
 function M.emit(code, value)
+	if _dispatch then
+		local request = _dispatch
+		if request.used or request.code ~= code or request.value ~= value then return false end
+		request.used = true
+		request.ack = M.transaction_emit(request.token, code, value)
+		return request.ack
+	end
+	if _busy or _debt or _transaction ~= nil then return false end
+	if _output ~= nil then return emit_owned(_output.capability, code, value) end
 	if type(code) ~= "number" or type(value) ~= "number" then
 		Logger.error(LOG, "emit(): invalid arguments — code=%s value=%s.",
 			tostring(code), tostring(value))
@@ -441,6 +602,7 @@ function M.emit(code, value)
 		return false
 	end
 
+	_legacy_wire = true
 	if not _backend.write(_fd, M.encode_event(EV_KEY, code, value)) then
 		Logger.warn(LOG, "emit(%d:%d): key write failed.", code, value)
 		return false
@@ -450,6 +612,264 @@ function M.emit(code, value)
 		return false
 	end
 	return true
+end
+
+--- Captures a fresh, strictly acknowledged channel before any untracked wire attempt.
+--- @return table|nil capability Opaque; carries no descriptor/backend.
+--- @return function|nil factory Original private observer issuer; grants no new rights.
+function M.capture_output()
+	if _busy or _debt or _transaction ~= nil or _fd == nil or not _strict_constructor or _legacy_wire then return nil end
+	if _output ~= nil then
+		if output_identity(_output) then return _output.capability, original_output_observer_factory end
+		return nil
+	end
+	if _constructor_ports == nil or not rawequal(_constructor_ports.open, rawget(_backend, "open"))
+		or not rawequal(_constructor_ports.ioctl, rawget(_backend, "ioctl"))
+		or not rawequal(_constructor_ports.write, rawget(_backend, "write"))
+		or not rawequal(_constructor_ports.close, rawget(_backend, "close")) then return nil end
+	if type(rawget(_backend, "write")) ~= "function" or type(rawget(_backend, "ioctl")) ~= "function"
+		or type(rawget(_backend, "close")) ~= "function" then return nil end
+	local capability = {}
+	_output = { capability = capability, backend = _backend, fd = _fd,
+		write = rawget(_backend, "write"), ioctl = rawget(_backend, "ioctl"), close = rawget(_backend, "close"),
+		generation = _generation, write_epoch = 0, down = {}, roster_known = true }
+	return capability, original_output_observer_factory
+end
+
+--- Pure observation of one exact issued capability; never reads native state.
+--- @param capability table Opaque capability.
+--- @return boolean current
+function M.output_current(capability)
+	return output_current(capability)
+end
+
+--- Returns detached transport currency, never fd or backend authority.
+--- @param capability table Opaque capability.
+--- @return table|nil view
+function M.output_view(capability)
+	if not output_current(capability) then return nil end
+	local down = {}
+	for code in pairs(_output.down) do down[#down + 1] = code end
+	table.sort(down)
+	return { generation = _output.generation, write_epoch = _output.write_epoch,
+		down = down, roster_known = _output.roster_known }
+end
+
+--- Captures a pure observer of this exact private output issuer.
+--- It accepts only the original capability and compares the caller's expected
+--- cursor/roster against private acknowledged state; public views grant no rights.
+--- @param capability table Original opaque output capability.
+--- @param capture_getter function|nil Original constructor getter when wiring input proof.
+--- @return function|nil observer No syscall, reservation, mutation or new authority.
+--- @return function|nil retired Exact original destroy/close acknowledgement only.
+function M.capture_output_observer(capability, capture_getter)
+	if capture_getter ~= nil and capture_getter ~= original_capture_output then return nil end
+	if not output_current(capability) then return nil end
+	local output = _output
+	if not output.observer then
+		local factory, view = M.capture_output_observer, M.output_view
+		output.observer = function(original, cursor, expected)
+			if not rawequal(original, output.capability) or not output_current(original)
+				or not rawequal(_output, output) or rawget(M, "capture_output_observer") ~= factory
+				or rawget(M, "output_view") ~= view or output.roster_known ~= true or cursor ~= output.write_epoch
+				or type(expected) ~= "table" or getmetatable(expected) ~= nil then return false end
+			local seen, count = {}, 0
+			for index, code in pairs(expected) do
+				if type(index) ~= "number" or index % 1 ~= 0 or index < 1 or index > #expected
+					or type(code) ~= "number" or seen[code] or output.down[code] ~= true then return false end
+				seen[code], count = true, count + 1
+			end
+			if count ~= #expected then return false end
+			for code in pairs(output.down) do if seen[code] ~= true then return false end end
+			return true
+		end
+	end
+	if not output.retirement_observer then
+		-- This closure survives successor construction. It refers only to this
+		-- private original lifetime, never public views or the mutable current slot.
+		output.retirement_observer = function(original)
+			return rawequal(original, output.capability) and output.retirement_ack == true
+		end
+	end
+	return output.observer, output.retirement_observer
+end
+
+--- Emits one exact native key and its SYN through the captured channel.
+--- @param capability table Opaque capability.
+--- @param code integer evdev keycode.
+--- @param value integer Native up/down/repeat value.
+--- @return boolean acknowledged
+function M.emit_owned(capability, code, value)
+	return emit_owned(capability, code, value)
+end
+
+--- Requires exact destroy/close acknowledgements; unknown close is never retried.
+--- @param capability table Opaque capability.
+--- @return boolean retired
+function M.close_owned(capability)
+	return close_owned(capability)
+end
+
+--- Reports unresolved write/constructor/retirement custody.
+--- @return boolean pending
+function M.has_output_debt()
+	return _debt == true or (_output ~= nil and not output_identity(_output))
+end
+
+--- Checks private transport reservation; does not assert physical/native input state.
+--- @param token table Opaque transaction capability.
+--- @return boolean current
+local function transaction_current(token)
+	local transaction = _transaction
+	return not _busy and not _debt and transaction ~= nil and not transaction.retired
+		and rawequal(token, transaction.capability) and output_identity(transaction.output)
+		and transaction.output.roster_known == true
+		and transaction.write_epoch == transaction.output.write_epoch
+end
+
+--- Checks exact acknowledged roster equality without external callbacks.
+--- @param transaction table Private transaction record.
+--- @return boolean restored
+local function transaction_restored(transaction)
+	for code in pairs(transaction.baseline) do
+		if transaction.output.down[code] ~= true then return false end
+	end
+	for code in pairs(transaction.output.down) do
+		if transaction.baseline[code] ~= true then return false end
+	end
+	return true
+end
+
+--- Reserves the exact acknowledged output roster against other channel callers.
+--- No physical origin or global desktop modifier state is inferred from this roster.
+--- @param capability table Issued output capability.
+--- @return table|nil token Opaque transaction capability.
+function M.acquire_transaction(capability)
+	if not output_current(capability) or _output.roster_known ~= true then return nil end
+	local baseline = {}
+	for code in pairs(_output.down) do baseline[code] = true end
+	local token = {}
+	_transaction = { capability = token, output = _output, baseline = baseline,
+		write_epoch = _output.write_epoch, retired = false }
+	return token
+end
+
+--- Pure observation of the exact transport reservation.
+--- @param token table Opaque transaction capability.
+--- @return boolean current
+function M.transaction_current(token)
+	return transaction_current(token)
+end
+
+--- Returns detached acknowledged rows, never native descriptors or authority.
+--- @param token table Opaque transaction capability.
+--- @return table|nil view
+function M.transaction_view(token)
+	if not transaction_current(token) then return nil end
+	local down, baseline = {}, {}
+	for code in pairs(_transaction.output.down) do down[#down + 1] = code end
+	for code in pairs(_transaction.baseline) do baseline[#baseline + 1] = code end
+	table.sort(down)
+	table.sort(baseline)
+	return { generation = _transaction.output.generation, write_epoch = _transaction.write_epoch,
+		down = down, baseline = baseline, restored = transaction_restored(_transaction) }
+end
+
+--- Emits only a transition consistent with the acknowledged transaction roster.
+--- Duplicate downs, unmatched ups and unmatched repeats are refused before native IO.
+--- @param token table Opaque transaction capability.
+--- @param code integer Native evdev keycode.
+--- @param value integer Native up/down/repeat value.
+--- @return boolean acknowledged
+function M.transaction_emit(token, code, value)
+	if not transaction_current(token) then return false end
+	local down = _transaction.output.down[code] == true
+	if (value == 1 and down) or ((value == 0 or value == 2) and not down) then return false end
+	return emit_owned(_transaction.output.capability, code, value, _transaction)
+end
+
+--- Invokes the forwarding adapter with exactly one reserved native attempt.
+--- Reentry cannot issue another write through the ordinary channel.
+--- @param token table Exact reservation.
+--- @param callback function Forwarding adapter.
+--- @param code integer Keycode.
+--- @param value integer Transition.
+--- @return boolean acknowledged
+function M.dispatch_transaction(token, callback, code, value)
+	if _dispatch or not transaction_current(token) or type(callback) ~= "function" then return false end
+	local request = { token = token, code = code, value = value, used = false, ack = false }
+	_dispatch = request
+	local ok, accepted = pcall(callback, code, value)
+	_dispatch = nil
+	return ok and accepted == true and request.used and request.ack and transaction_current(token)
+end
+
+--- Commits an exact acknowledged persistent roster without weakening restoration.
+--- @param token table Exact reservation.
+--- @param expected table Sorted unique keycodes owned by the broker.
+--- @return boolean committed
+function M.commit_transaction(token, expected)
+	if _dispatch or not transaction_current(token) or type(expected) ~= "table" or getmetatable(expected) ~= nil then return false end
+	local count = 0
+	for index in pairs(expected) do
+		if type(index) ~= "number" or index % 1 ~= 0 or index < 1 or index > #expected then return false end
+		count = count + 1
+	end
+	if count ~= #expected then return false end
+	local seen = {}
+	for index, code in ipairs(expected) do
+		if type(code) ~= "number" or seen[code] or _transaction.output.down[code] ~= true then return false end
+		if index > 1 and expected[index - 1] >= code then return false end
+		seen[code] = true
+	end
+	for code in pairs(_transaction.output.down) do if not seen[code] then return false end end
+	_transaction.retired = true
+	_transaction = nil
+	return true
+end
+
+--- Compensates only changes in this reservation's acknowledged roster.
+--- Failed native acknowledgement retains the reservation/debt; no borrowed list is read.
+--- @param token table Opaque transaction capability.
+--- @return boolean restored
+function M.restore_transaction(token)
+	if not transaction_current(token) then return false end
+	local transaction, release, restore = _transaction, {}, {}
+	for code in pairs(transaction.output.down) do
+		if transaction.baseline[code] ~= true then release[#release + 1] = code end
+	end
+	for code in pairs(transaction.baseline) do
+		if transaction.output.down[code] ~= true then restore[#restore + 1] = code end
+	end
+	table.sort(release)
+	table.sort(restore)
+	for _, code in ipairs(release) do
+		if not emit_owned(transaction.output.capability, code, 0, transaction) then return false end
+	end
+	for _, code in ipairs(restore) do
+		if not emit_owned(transaction.output.capability, code, 1, transaction) then return false end
+	end
+	return transaction_current(token) and transaction_restored(transaction)
+end
+
+--- Opens delivery only after exact private roster restoration, without callbacks.
+--- @param token table Opaque transaction capability.
+--- @return boolean released
+function M.release_transaction(token)
+	if not transaction_current(token) or not transaction_restored(_transaction) then return false end
+	_transaction.retired = true
+	_transaction = nil
+	return true
+end
+
+--- Retires this reservation's exact native channel after unresolved wire debt.
+--- Ambiguous native close remains non-retryable; no successor descriptor is touched.
+--- @param token table Opaque transaction capability.
+--- @return boolean retired
+function M.retire_transaction(token)
+	local transaction = _transaction
+	if transaction == nil or not rawequal(token, transaction.capability) or transaction.retired then return false end
+	return close_owned(transaction.output.capability, transaction)
 end
 
 -- Exposed for the tests that pin the wire format and the ioctl order.
@@ -464,5 +884,7 @@ M.UI_DEV_SETUP   = UI_DEV_SETUP
 M.UI_DEV_CREATE  = UI_DEV_CREATE
 M.UI_DEV_DESTROY = UI_DEV_DESTROY
 M.UINPUT_PATH = UINPUT_PATH
+
+original_output_observer_factory, original_capture_output = M.capture_output_observer, M.capture_output
 
 return M

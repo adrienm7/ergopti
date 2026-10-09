@@ -34,8 +34,8 @@ _LSD_DeclaredCase() {
 	Declared := Map()
 	for Entry in LayoutSupersededFeatures()
 		Declared[Entry["path"]] := Entry["superseded_reason_key"]
-	Assert(Declared.Count >= 3, "the three Ergopti boolean emulation features must remain declared, got " . Declared.Count)
-	for Path in ["layout.ergopti_base", "layout.ergopti_alt_gr", "layout.ergopti_plus"]
+	Assert(Declared.Count >= 3, "the three Ergopti emulation features must remain declared, got " . Declared.Count)
+	for Path in ["layout.ergopti_base", "layout.ergopti_alt_gr", "layout.ergopti_variant"]
 		Assert(Declared.Has(Path), Path . " must be declared as superseded by an emulated layout")
 	for Path in ["layout.ctrl_magic_save", "layout.emulated_layout", "layout.direct_access_digits"]
 		AssertFalse(Declared.Has(Path), Path . " works whatever the layout and must not be declared")
@@ -79,8 +79,8 @@ Test("layout supersession: a superseded row is greyed with its reason while a la
 	_LSD_ReasonCase)
 
 _LSD_ReasonCase() {
-	Entry := ManifestFindEntryByPath("layout.ergopti_plus")
-	Assert(Entry is Map, "layout.ergopti_plus must be in the manifest")
+	Entry := ManifestFindEntryByPath("layout.ergopti_variant")
+	Assert(Entry is Map, "layout.ergopti_variant must be in the manifest")
 	Emulating := Map("layout", Map("emulated_layout", "ergol"))
 	NotEmulating := Map("layout", Map("emulated_layout", ""))
 	AssertEqual(Entry["superseded_reason_key"], LayoutSupersededReason(Entry, Emulating))

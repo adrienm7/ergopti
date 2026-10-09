@@ -5,4 +5,4 @@ description = "The shipped v5 to v6 step maps macOS's duplicate app and window s
 drivers = ["hs"]
 outcome = "migrated"
 from_version = 5
-to_version = 11
+to_version = 12
