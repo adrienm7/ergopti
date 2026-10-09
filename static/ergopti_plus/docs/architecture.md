@@ -92,6 +92,7 @@ graph TD
         MACOS_input_source_broker["InputSourceBroker.lua"]
         MACOS_json_codec["JsonCodec.lua"]
         MACOS_key_state["KeyState.lua"]
+        MACOS_keyboard_geometry["KeyboardGeometry.lua"]
         MACOS_keyboard_hook["KeyboardHook.lua"]
         MACOS_keyboard_source_probe["KeyboardSourceProbe.lua"]
         MACOS_log_transport["LogTransport.lua"]

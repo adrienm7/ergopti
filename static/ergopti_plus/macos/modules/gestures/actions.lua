@@ -1351,6 +1351,11 @@ for _, screen_action in ipairs(SCREEN_ANSWER_ACTIONS) do
 end
 -- Translation of the selection (llm_translate_selection): the target language
 -- is the binding's own parameter, through the keymap bridge like the tone steps.
+sg("llm_translate_context", function(binding)
+	local value = M.get_action_parameter(binding, "llm_translate_context")
+	if not M.validate_action_parameter("llm_translate_context", value) then return false end
+	return request_prompt_prediction("llm_translate_context", PromptAction.format("translate", 1, value))
+end)
 sg("llm_translate_selection", function(binding)
 	local value = M.get_action_parameter(binding, "llm_translate_selection")
 	if not M.validate_action_parameter("llm_translate_selection", value) then
@@ -2324,7 +2329,11 @@ function M.validate_action_parameter(action, value)
 	if spec == "wrap_pair" then return (M.wrap_pair_for(value)) ~= nil end
 	-- Syntax only: whether the profile still exists is checked when the action runs,
 	-- so deleting a custom prompt does not wipe the bindings that name it
-	if spec == "llm_prompt" then return PromptAction.is_valid(value) end
+	if spec == "llm_prompt" then
+		local parsed = PromptAction.parse(value)
+		return parsed ~= nil and (parsed.translation_target == nil
+			or require("modules.llm.selection_translation").is_valid(parsed.translation_target))
+	end
 	-- Syntax only too: whether the provider exists is checked when the action runs
 	if spec == "llm_vision" then return Vision.is_valid(value) end
 	if spec == "llm_language" then return require("modules.llm.selection_translation").is_valid(value) end
@@ -2376,11 +2385,8 @@ function M.parameter_prompt(action)
 		return fill_placeholder(i18n.get("dialog.gestures.param_llm_vision"), table.concat(lines, "\n"))
 	end
 	if spec == "llm_language" then
-		local lines = {}
-		for _, choice in ipairs(M.llm_language_choices()) do
-			lines[#lines + 1] = choice.value .. " — " .. choice.label
-		end
-		return fill_placeholder(i18n.get("dialog.gestures.param_llm_language"), table.concat(lines, "\n"))
+		return fill_placeholder(i18n.get("dialog.gestures.param_llm_language"),
+			tostring(require("modules.llm.selection_translation").config().max_language_bytes))
 	end
 	if spec == "wrap_pair" then
 		local template = i18n.get("dialog.gestures.param_wrap_pair")

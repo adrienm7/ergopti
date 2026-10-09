@@ -473,13 +473,23 @@ helpers.describe("translation of the selection end to end (llm_translate_selecti
 		end)
 	end)
 
-	helpers.it("refuses a binding whose language is not shipped", function()
+	helpers.it("refuses a binding whose language contains an action separator", function()
 		with_world(SELECTION, "fr", function(world)
-			helpers.assert_eq(world.actions.set_action_parameter("tap_3", "llm_translate_selection", "xx"), false,
+			helpers.assert_eq(world.actions.set_action_parameter("tap_3", "llm_translate_selection", "English|2"), false,
 				"the validator refuses it")
 			world.actions.execute_single("llm_translate_selection", "tap_3")
 			settle(world)
 			helpers.assert_eq(#world.keys + #world.posts, 0, "nothing is read or sent")
 		end)
+	end)
+end)
+
+helpers.it("translates a free language name through the existing selection owner", function()
+	with_world(SELECTION, "fr", function(world)
+		helpers.assert_eq(world.actions.set_action_parameter("tap_3", "llm_translate_selection", "Esperanto"), true)
+		world.actions.execute_single("llm_translate_selection", "tap_3")
+		settle(world)
+		helpers.assert_eq(#world.posts, 1)
+		assert_request(world.posts[1], "Esperanto")
 	end)
 end)

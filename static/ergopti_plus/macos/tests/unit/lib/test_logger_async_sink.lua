@@ -16,12 +16,13 @@ helpers.describe("logger: native asynchronous sink ownership", function()
 	helpers.it("classifies complete managed authority, complete absence, and every partial set", function()
 		Fixture.with_policy_logger(function(Logger)
 			local keys = {
+				"ERGOPTI_KEYBOARD_GEOMETRY_V1",
 				"ERGOPTI_LAUNCHER_PID",
 				"ERGOPTI_LAUNCHER_BUNDLE_ID",
 				"ERGOPTI_LOG_PORT",
 				"ERGOPTI_LOG_TOKEN",
 			}
-			for mask = 0, 15 do
+			for mask = 0, 31 do
 				local environment = {}
 				for index, name in ipairs(keys) do
 					if math.floor(mask / (2 ^ (index - 1))) % 2 == 1 then
@@ -35,7 +36,7 @@ helpers.describe("logger: native asynchronous sink ownership", function()
 					helpers.assert_eq(mode, "standalone",
 						"complete absence must remain distinguishable for root fail-closed diagnosis")
 					helpers.assert_nil(detail)
-				elseif mask == 15 then
+				elseif mask == 31 then
 					helpers.assert_eq(mode, "managed",
 						"all identity and credential fields must select the native worker")
 					helpers.assert_nil(detail)

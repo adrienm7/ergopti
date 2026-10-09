@@ -39,18 +39,39 @@
  * @param {String} Value The stored parameter.
  * @param {Map} Config The decoded translate.json.
  * @param {Map} Names The decoded locale_names.json.
- * @returns {String} "ui" or a locale code; "" when invalid.
+ * @returns {String} Admitted language value; "" when invalid.
  */
 LLM_Translate_Parse(Value, Config, Names) {
-	if !(Value is String) || Value == ""
+	if !LLM_Translate_IsLanguageText(Value) || StrPut(Value, "UTF-8") - 1 > Config["max_language_bytes"]
 		return ""
-	if (Value == Config["ui_value"])
-		return Value
-	Locales := (Names is Map) ? Names.Get("locales", "") : ""
-	; Map keys compare case-sensitively, like the Lua table lookup
-	if (Locales is Map) && Locales.Has(Value) && (Locales[Value] is Map)
-		return Value
-	return ""
+	return Value
+}
+
+/**
+ * Validates the Unicode and reserved-character syntax independent of runtime limits.
+ * @param {String} Value Stored target token or language name.
+ * @returns {Integer} True for syntactically valid language text.
+ */
+LLM_Translate_IsLanguageText(Value) {
+	if !(Value is String) || Value == "" || Value != Trim(Value, " `t`r`n`v`f")
+		return false
+	if RegExMatch(Value, "[|{}\x00-\x1f\x7f-\x9f]")
+		return false
+	Offset := 1
+	while (Offset <= StrLen(Value)) {
+		ScalarUnit := Ord(SubStr(Value, Offset, 1))
+		if (ScalarUnit >= 0xD800 && ScalarUnit <= 0xDBFF) {
+			if (Offset == StrLen(Value))
+				return false
+			Following := Ord(SubStr(Value, Offset + 1, 1))
+			if (Following < 0xDC00 || Following > 0xDFFF)
+				return false
+			Offset += 1
+		} else if (ScalarUnit >= 0xDC00 && ScalarUnit <= 0xDFFF)
+			return false
+		Offset += 1
+	}
+	return true
 }
 
 /**
@@ -248,10 +269,44 @@ LLM_Translate_ChoicesText() {
 _LLM_Translate_ValidateConfig(Candidate, Path) {
 	if !(Candidate is Map)
 		throw ValueError(Path . ": the root must be an object.")
-	for Key in ["ui_value", "tag", "user_prefix", "prompt"] {
+	for Key in ["ui_value", "tag", "user_prefix", "prompt", "prediction_prompt"] {
 		if !(Candidate.Get(Key, "") is String) || Candidate[Key] == ""
 			throw ValueError(Path . ": " . Key . " must be a non-empty string.")
 	}
+	if !(Candidate.Get("max_language_bytes", "") is Integer) || Candidate["max_language_bytes"] < 1
+		throw ValueError(Path . ": max_language_bytes must be a positive integer.")
 	if !(Candidate.Get("max_tokens", "") is Integer) || Candidate["max_tokens"] <= 0
 		throw ValueError(Path . ": max_tokens must be a positive integer.")
+}
+
+/**
+ * Resolves a validated per-binding language; an unknown UI locale refuses.
+ * @param {String} Value Stored binding target.
+ * @param {Map} Config Shared configuration.
+ * @param {Map} Names Shared locale names.
+ * @param {String} UiLocale Current interface locale.
+ * @returns {String} Language name, or "" on refusal.
+ */
+LLM_Translate_ResolveLanguage(Value, Config, Names, UiLocale) {
+	Target := LLM_Translate_Parse(Value, Config, Names)
+	if (Target == "")
+		return ""
+	if (Target == Config["ui_value"])
+		return LLM_Translate_LanguageName(UiLocale, Names)
+	KnownName := LLM_Translate_LanguageName(Target, Names)
+	return (KnownName == "") ? Target : KnownName
+}
+
+/**
+ * Builds a detached contextual profile without changing menu preferences.
+ * @param {String} Target Per-binding target language.
+ * @returns {Map|Integer} Ephemeral rewrite profile, or 0 on refusal.
+ */
+LLM_Translate_PredictionProfile(Target) {
+	Config := LLM_Translate_Config()
+	Language := LLM_Translate_ResolveLanguage(Target, Config, LLM_Translate_LocaleNames(), I18nGetLocale())
+	if (Language == "")
+		return 0
+	return Map("id", "translate", "label", Language, "batch", false,
+		"system_single", StrReplace(Config["prediction_prompt"], "{language}", Language))
 }

@@ -43,26 +43,6 @@
 				"hs": [],
 				"linux": []
 			}
-		},
-		"live": {
-			"section": "llm_live_off_boundary",
-			"platforms": ["hs"],
-			"rows": [
-				{
-					"type": "---",
-					"platforms": ["hs"],
-					"unavailable": "hide"
-				}
-			],
-			"projections": {
-				"ahk": [],
-				"hs": [
-					{
-						"separator": true
-					}
-				],
-				"linux": []
-			}
 		}
 	},
 	"marker_key": "button.cancel",
@@ -84,5 +64,6 @@
 	],
 	"display_inline_english": "✍️ Inline auto-type (Copilot-style)",
 	"live_off_english": "Off",
-	"trigger_remaining_english": "Exclude from automatic AI generation…"
+	"trigger_remaining_english": "Exclude from automatic AI generation…",
+	"retired_menu_sections": ["llm_live_controls", "llm_live_off_boundary"]
 }

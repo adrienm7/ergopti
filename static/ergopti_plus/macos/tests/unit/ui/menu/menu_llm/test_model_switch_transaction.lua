@@ -85,7 +85,7 @@ local function with_fixture(spec, body)
 
 		local state = {
 			llm_backend = "ollama",
-			llm_enabled = true,
+			llm_enabled = spec.enabled ~= false,
 			llm_active_profile = "basic",
 			llm_model = "A",
 			llm_model_power = 1,
@@ -112,7 +112,7 @@ local function with_fixture(spec, body)
 		end
 		local calls = {
 			core_models = {}, keymap_models = {}, display_models = {},
-			profiles = {}, saves = 0, menus = 0, profile_gates = 0,
+			profiles = {}, saves = 0, menus = 0, profile_gates = 0, requirements = 0,
 		}
 
 		local core_llm = {
@@ -138,7 +138,11 @@ local function with_fixture(spec, body)
 
 		local model_info = spec.completion_model and {type = "completion"} or {params = 1}
 		local manager = {
-			check_requirements = function(_, on_success) return on_success() end,
+			check_requirements = function(_, on_success)
+				calls.requirements = calls.requirements + 1
+				if spec.requirements_refused then return false end
+				return on_success()
+			end,
 			get_presets = function() return {} end,
 			get_model_info = function() return model_info end,
 			get_actual_model_name = function(name) return "actual:" .. tostring(name) end,
@@ -485,6 +489,28 @@ helpers.describe("HS-027 model switch is one recoverable transaction", function(
 			helpers.assert_eq(fixture.calls.display_models, {""})
 			helpers.assert_eq(fixture.calls.saves, 1)
 			helpers.assert_eq(fixture.calls.menus, 1)
+		end)
+	end)
+end)
+
+helpers.describe("model-before-enable configuration", function()
+	helpers.it("commits actual model identity while disabled without runtime requirements", function()
+		with_fixture({ enabled = false, requirements_refused = true }, function(fixture)
+			helpers.assert_eq(fixture.switcher.switch_model("B"), true)
+			helpers.assert_eq(fixture.calls.requirements, 0)
+			helpers.assert_eq(fixture.state.llm_enabled, false)
+			helpers.assert_eq(fixture.state.llm_model, "B")
+			helpers.assert_eq(fixture.runtime.core_model, "actual:B")
+			helpers.assert_eq(fixture.runtime.keymap_model, "actual:B")
+			helpers.assert_eq(fixture.persisted().llm_model, "B")
+			helpers.assert_eq(fixture.rendered().llm_model, "B")
+		end)
+	end)
+	helpers.it("retains readiness refusal for enabled model changes", function()
+		with_fixture({ requirements_refused = true }, function(fixture)
+			helpers.assert_eq(fixture.switcher.switch_model("B"), false)
+			helpers.assert_eq(fixture.calls.requirements, 1)
+			assert_old_identity(fixture)
 		end)
 	end)
 end)

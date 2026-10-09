@@ -205,6 +205,11 @@ for (const key of [
 	'healthcheck.probe.disabled',
 	'healthcheck.probe.unsupported',
 	'healthcheck.problem.none',
+	'healthcheck.summary.quick',
+	'healthcheck.summary.incomplete',
+	'healthcheck.summary.observed',
+	'healthcheck.summary.scope',
+	'healthcheck.problem.diagnostic_check',
 	'healthcheck.problem.paused',
 	'healthcheck.problem.permission',
 	'healthcheck.problem.unavailable',
@@ -592,8 +597,10 @@ if (Model.renderHtml(hostile, schema, t).includes('<img src=x'))
 	healthy.sections.developer.modules_failed = [];
 	if (Model.problems(healthy, schema).length !== 0)
 		fail('a healthy Windows snapshot lists problems');
-	if (!Model.renderHtml(healthy, schema, t).includes(t('healthcheck.problem.none'))) {
-		fail('a healthy summary does not say no problem was found');
+	if (!Model.renderHtml(healthy, schema, t).includes(t('healthcheck.summary.quick'))) {
+		fail(
+			'a healthy quick snapshot must state its limited scope without claiming in-depth acceptance'
+		);
 	}
 	const linux = fixture('linux');
 	linux.sections.input.keymap_resolved = false;
@@ -712,6 +719,10 @@ for (const vector of vectors.file_name_vectors || []) {
 // ======= 8/ Verdict ======
 // =========================
 // =========================
+
+require('./fixtures/healthcheck-sharing-controls.cjs').run(ROOT);
+require('./fixtures/diagnostic-checks-controls.cjs').run(ROOT);
+require('./fixtures/diagnostic-summary-controls.cjs').run(ROOT);
 
 if (failures.length > 0) {
 	console.error(`[FAIL] diagnostics page model: ${failures.length} failure(s)`);

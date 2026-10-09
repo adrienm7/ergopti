@@ -74,7 +74,7 @@ helpers.describe("boot journal (boot-stage-trail)", function()
 		helpers.assert_eq(table.concat(present, ","), "ERGOPTI_LAUNCHER_PID,ERGOPTI_LOG_TOKEN")
 		helpers.assert_true(#missing >= 10, "every other exported key is reported missing")
 		for _, name in ipairs(missing) do
-			helpers.assert_true(name:match("^ERGOPTI_[A-Z_]+$") ~= nil, "names only: " .. name)
+			helpers.assert_true(name:match("^ERGOPTI_[A-Z0-9_]+$") ~= nil, "names only: " .. name)
 		end
 		helpers.assert_true(not table.concat(present, ","):find("secret", 1, true))
 	end)

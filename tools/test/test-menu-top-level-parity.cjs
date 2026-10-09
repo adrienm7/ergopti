@@ -488,6 +488,82 @@ if (tailAt < 0 || pauseMarked < 7) {
 // ==================================================
 // ==================================================
 
+// Only this unfinished component is presentation-disabled. The neighboring
+// AI component keeps its original provider/model/prediction subtree owner.
+const agentDeclarations = topLevel.filter((row) => row.id === 'agent');
+if (
+	agentDeclarations.length !== 1 ||
+	agentDeclarations[0].disabled !== true ||
+	agentDeclarations[0].i18n !== 'menu.agent.title' ||
+	agentDeclarations[0].reason_key !== 'menu.agent.not_ready' ||
+	agentDeclarations[0].platforms !== undefined
+)
+	errors.push(
+		'Agent IA must be explicitly disabled on all three top-level menus with its exact reason.'
+	);
+for (const row of topLevel) {
+	if (row.id !== 'agent' && row.disabled !== undefined)
+		errors.push(`The Agent-only presentation gate reached neighboring row ${row.id}.`);
+}
+for (const locale of [
+	'ar',
+	'cs',
+	'da',
+	'de',
+	'en',
+	'es',
+	'fr',
+	'he',
+	'hi',
+	'it',
+	'ja',
+	'ko',
+	'nl',
+	'no',
+	'pl',
+	'pt',
+	'ru',
+	'sv',
+	'tr',
+	'uk',
+	'zh'
+]) {
+	const dictionary = JSON.parse(
+		fs.readFileSync(path.join(SP, '_shared', 'data', 'locales', locale + '.json'), 'utf8')
+	);
+	if (
+		typeof dictionary['menu.agent.not_ready'] !== 'string' ||
+		dictionary['menu.agent.not_ready'].trim() === ''
+	)
+		errors.push(`${locale}: Agent IA needs its localized unready reason.`);
+}
+
+const availability = require('../lib/menu-row-availability.cjs');
+const disabledBase = {
+	id: 'agent',
+	disabled: true,
+	i18n: 'menu.agent.title',
+	reason_key: 'menu.agent.not_ready'
+};
+for (const [patch, owner, message] of [
+	[{ disabled: 'true' }, 'menu.top_level row "agent"', 'boolean top-level'],
+	[{}, 'menu.agent_menu row "agent"', 'boolean top-level'],
+	[{ i18n: '' }, 'menu.top_level row "agent"', 'exact label and reason'],
+	[{ reason_key: '' }, 'menu.top_level row "agent"', 'exact label and reason'],
+	[{ reason_key: false }, 'menu.top_level row "agent"', 'exact label and reason'],
+	[{ id: '---' }, 'menu.top_level row "agent"', 'exact label and reason'],
+	[{ disabled_when: ['hidden_condition'] }, 'menu.top_level row "agent"', 'exact label and reason']
+]) {
+	let refused = false;
+	try {
+		availability.classifyMenuRow({ ...disabledBase, ...patch }, owner);
+	} catch (error) {
+		refused = error instanceof Error && error.message.includes(message);
+	}
+	if (!refused)
+		errors.push('Disabled root declaration must refuse ' + JSON.stringify(patch) + ' in ' + owner);
+}
+
 if (errors.length > 0) {
 	console.error('\x1b[31m[FAIL] menu top-level parity:\x1b[0m');
 	for (const e of errors) console.error(`  - ${e}`);
@@ -502,4 +578,38 @@ console.log(
 );
 for (const [driver, why] of Object.entries(KNOWN_ORDER_DIVERGENCES)) {
 	console.log(`     · ${driver} order: ${why}`);
+}
+
+// Disabled metadata remains rejected by the same inert owner on every compiler path.
+{
+	const assert = require('node:assert/strict');
+	const { classifyMenuRow } = require('../lib/menu-row-availability.cjs');
+	for (const [type, reason] of [
+		['section_header', /section header needs a caption without behavior metadata/],
+		['label', /inert label needs an identity and caption without behavior metadata/]
+	]) {
+		for (const disabled of [true, false, 'unowned', 1])
+			assert.throws(
+				() =>
+					classifyMenuRow(
+						{ type, id: 'inert', i18n: 'caption', disabled },
+						'menu.fixture row "inert"'
+					),
+				reason
+			);
+	}
+	assert.throws(
+		() =>
+			classifyMenuRow(
+				{ type: 'group', id: 'agent', i18n: 'caption', disabled: 'true' },
+				'menu.top_level row "agent"'
+			),
+		/disabled is a boolean top-level presentation gate/
+	);
+	assert.doesNotThrow(() =>
+		classifyMenuRow(
+			{ type: 'group', id: 'agent', i18n: 'caption', disabled: true, reason_key: 'reason' },
+			'menu.top_level row "agent"'
+		)
+	);
 }

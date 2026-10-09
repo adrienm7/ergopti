@@ -24,6 +24,7 @@ local function recording_view(with_window)
 	local calls = { levels = {}, fronts = 0, shows = 0, raises = 0, focuses = 0 }
 	local window = {}
 	function window:moveToScreen() return self end
+	function window:unminimize() return self end
 	function window:raise() calls.raises = calls.raises + 1; return self end
 	function window:focus() calls.focuses = calls.focuses + 1; return self end
 	local view = {}

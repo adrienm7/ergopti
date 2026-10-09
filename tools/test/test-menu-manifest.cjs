@@ -1308,7 +1308,7 @@ function checkAutomaticTriggerControls() {
 		[
 			'linux/ui/menu/menu_builder.lua',
 			'group_builders["llm_trigger"] = function',
-			'group_builders["llm_live_mode"] = function'
+			'dynamic_handlers["llm_profile"] = function'
 		]
 	]) {
 		const source = readFileSync(resolve(SHARED, '..', file), 'utf8');
@@ -1537,7 +1537,7 @@ function checkPrivacyTriggerControls() {
 		[
 			'linux/ui/menu/menu_builder.lua',
 			'group_builders["llm_trigger"] = function',
-			'group_builders["llm_live_mode"] = function'
+			'dynamic_handlers["llm_profile"] = function'
 		]
 	]) {
 		const source = readFileSync(resolve(SHARED, '..', file), 'utf8');
@@ -5446,7 +5446,7 @@ function consumesProfileFrameCommand(source, file, menu, section, id) {
 		['llm_backend', 'llm_model', 'llm_profile'].includes(row.id)
 	))
 		assert.equal(row.type, 'dynamic', 'other dynamic child families keep their existing API');
-	for (const id of ['llm_live_mode', 'llm_generation_settings']) {
+	for (const id of ['llm_generation_settings']) {
 		const rows = menu.llm_menu.filter((row) => row.id === id);
 		assert.equal(rows.length, 1, 'the complete fixed parent has one genuine identity');
 		assert.equal(rows[0].type, 'group', 'the migrated complete child is a shared native group');
@@ -5530,10 +5530,6 @@ function consumesProfileFrameCommand(source, file, menu, section, id) {
 				',',
 				'LLM_Menu_BuildNavMenu',
 				',',
-				'llm_live_mode',
-				',',
-				'LLM_Menu_BuildLiveModeMenu',
-				',',
 				'llm_generation_settings',
 				',',
 				'LLM_Menu_BuildGenerationMenu',
@@ -5542,7 +5538,7 @@ function consumesProfileFrameCommand(source, file, menu, section, id) {
 			assert.deepEqual(
 				scriptTokens(actualGroupBody, ext).map((token) => token.value),
 				values,
-				'actual returned group Map is the complete native five-child construction'
+				'actual returned group Map is the complete native four-child construction'
 			);
 			assert.ok(
 				hasSequence(actualGroupBody, ext, values),
@@ -11250,5 +11246,28 @@ console.log(
 		const withdrawn = source.replace(from, to);
 		assert.notEqual(withdrawn, source);
 		assert.equal(proves(withdrawn, section, key), false, `withdrawn native port: ${key}`);
+	}
+}
+
+// One visible profile owns typing predictions; configured prompt actions stay public.
+{
+	const assert = require('node:assert/strict');
+	const root = JSON.parse(readFileSync(MENU_PATH, 'utf8'));
+	assert.equal(root.llm_menu.filter((row) => row.id === 'llm_profile').length, 1);
+	assert.equal(
+		root.llm_menu.some((row) => row.id === 'llm_live_mode'),
+		false
+	);
+	for (const [platform, path, binding] of [
+		['macos', 'ui/menu/menu_llm/init.lua', 'child_group_for("llm_live_mode"'],
+		['linux', 'ui/menu/menu_builder.lua', 'group_builders["llm_live_mode"]'],
+		['windows', 'ui/menu/menu_llm/menu_main.ahk', 'case "llm_live_mode":']
+	]) {
+		const source = readFileSync(resolve(REPO_ROOT, 'static/ergopti_plus', platform, path), 'utf8');
+		assert.equal(
+			source.includes(binding),
+			false,
+			platform + ' cannot bind the retired visible selector'
+		);
 	}
 }

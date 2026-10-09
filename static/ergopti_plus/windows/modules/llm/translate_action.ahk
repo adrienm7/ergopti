@@ -83,11 +83,11 @@ LLM_Translate_Trigger(Value) {
 	Names := LLM_Translate_LocaleNames()
 	Target := LLM_Translate_Parse(Value, Config, Names)
 	if (Target == "") {
-		LoggerWarn("LLM", "Translation ignored: the binding's language is not 'ui' or a shipped locale code.")
+		LoggerWarn("LLM", "Translation ignored: the binding's language parameter is invalid.")
 		return false
 	}
 	Locale := LLM_Translate_TargetLocale(Target, Config, I18nGetLocale())
-	Language := LLM_Translate_LanguageName(Locale, Names)
+	Language := LLM_Translate_ResolveLanguage(Target, Config, Names, I18nGetLocale())
 	if (Language == "") {
 		LoggerError("LLM", "Translation refused: the locale '{1}' has no name in locale_names.json.", Locale)
 		_LLM_Menu_ShowManualPredictionNotice("llm.translate.failed")

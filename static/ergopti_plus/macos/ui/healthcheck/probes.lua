@@ -71,21 +71,38 @@ end
 --- @param run table The probe run (see M.start).
 --- @param id string Probe id.
 --- @param timeout_ms number
---- @param body function(done, register_cancel) Starts the probe; calls done(result, sections).
+--- @param body function(done, register_cancel, started_ms) Starts the probe with the original clock.
 local function start_probe(run, id, timeout_ms, body)
 	local started = now_ms()
 	local settled = false
 	local cancellers = {}
 	local timer = nil
+	local actor = nil
 	local function finish(result, sections)
 		if settled then return end
 		settled = true
-		if timer then require("adapters.timer_scheduler").cancel(timer) end
+		if id == "appleevent_transport" then
+			local parent_result = {}
+			for key, value in pairs(result) do parent_result[key] = value end
+			result = parent_result
+		end
+		if timer and require("adapters.timer_scheduler").cancel(timer) == true then
+			timer = nil
+			run.watchdogs[id] = nil
+		end
 		result.ms = math.floor(now_ms() - started + 0.5)
 		for _, cancel in ipairs(cancellers) do
 			local ok, err = pcall(cancel)
 			if not ok then Logger.error(LOG, "Probe '%s' could not be stopped: %s.", id, tostring(err)) end
 		end
+		if actor and type(actor.snapshot) == "function" then
+			result.cleanup = actor.snapshot().cleanup
+		end
+		if id == "appleevent_transport" and run.watchdogs[id] then
+			result.cleanup = "pending"
+			if result.state == "ok" then result.state, result.detail = "error", "watchdog_cleanup_debt" end
+		end
+		run.results[id] = result
 		if run.cancelled then
 			Logger.done(LOG, "Probe '%s' cancelled after %d ms.", id, result.ms)
 			return
@@ -93,18 +110,46 @@ local function start_probe(run, id, timeout_ms, body)
 		Logger.done(LOG, "Probe '%s' answered: %s (%d ms).", id, result.state, result.ms)
 		run.publish(id, result, sections)
 	end
-	run.finishers[#run.finishers + 1] = function() finish({ state = "cancelled" }) end
+	run.finishers[#run.finishers + 1] = function()
+		if not settled then finish({ state = "cancelled" }) return end
+		-- A settled business result can still retain exact native cleanup debt.
+		-- Retry its capabilities without calling finish or publishing again.
+		if actor and type(actor.cancel) == "function" then
+			local ok, err = pcall(actor.cancel)
+			if not ok then Logger.error(LOG, "Probe '%s' could not be stopped: %s.", id, tostring(err)) end
+		end
+		local retained = run.watchdogs[id]
+		if retained then
+			local ok, acknowledged = pcall(require("adapters.timer_scheduler").cancel, retained)
+			if ok and acknowledged == true then
+				if run.watchdogs[id] == retained then run.watchdogs[id] = nil end
+				if timer == retained then timer = nil end
+			end
+		end
+	end
 	Logger.trace(LOG, "Probe '%s' started (timeout %d ms)…", id, timeout_ms)
 	local handle, committed = require("adapters.timer_scheduler").after(timeout_ms / 1000, function()
 		finish({ state = "timeout" })
 	end)
+	if id == "appleevent_transport" and handle then
+		run.watchdogs[id] = handle
+		if require("adapters.timer_scheduler").onSettled(handle, function()
+			if run.watchdogs[id] == handle then run.watchdogs[id] = nil end
+		end) ~= true then
+			timer = handle
+			finish({ state = "error", detail = "watchdog_observer_refused", cleanup = "pending" })
+			return
+		end
+	end
 	if committed ~= true then
+		timer = handle
 		finish({ state = "error", detail = "the timeout could not be armed" })
 		return
 	end
 	timer = handle
 	local ok, err = xpcall(function()
-		body(finish, function(cancel) cancellers[#cancellers + 1] = cancel end)
+		actor = body(finish, function(cancel) cancellers[#cancellers + 1] = cancel end, started)
+		if actor then run.actors[id] = actor end
 	end, debug.traceback)
 	if not ok then finish({ state = "error", detail = tostring(err):match("^[^\n]*") }) end
 end
@@ -386,7 +431,7 @@ end
 --- @param publish function(id, result, sections) Receives each answer once.
 --- @return table run { cancel = function() } Cancels every probe still running.
 function M.start(schema, snapshot, publish)
-	local run = { cancelled = false, finishers = {}, publish = publish }
+	local run = { cancelled = false, finishers = {}, actors = {}, results = {}, watchdogs = {}, publish = publish }
 	local config = schema.probes
 	local sections = snapshot.sections
 	start_probe(run, "github_api", config.github_api.timeout_ms, github_api(config.github_api))
@@ -395,9 +440,32 @@ function M.start(schema, snapshot, publish)
 	start_probe(run, "cpu_load", config.cpu_load.timeout_ms, cpu_load(config.cpu_load))
 	start_probe(run, "bluetooth", config.bluetooth.timeout_ms,
 		bluetooth(sections.peripherals.items or {}, snapshot.detailed == true))
+	start_probe(run, "appleevent_transport", config.appleevent_transport.timeout_ms,
+		require("ui.healthcheck.appleevents").body(config.appleevent_transport))
+	function run.refresh_cleanup()
+		for id, owned in pairs(run.actors) do
+			local result = run.results[id]
+			if result then
+				local status = owned.snapshot()
+				result.cleanup = run.watchdogs[id] and "pending" or status.cleanup
+				result.runtime_pid = status.runtime_pid
+				result.sender_context = status.sender_context
+				result.qualification_scope = status.qualification_scope
+				result.native_status = status.native_status
+			end
+		end
+	end
+	function run.has_pending_cleanup()
+		if next(run.watchdogs) then return true end
+		for _, owned in pairs(run.actors) do
+			if owned.snapshot().cleanup ~= "settled" then return true end
+		end
+		return false
+	end
 	function run.cancel()
 		run.cancelled = true
 		for _, finisher in ipairs(run.finishers) do finisher() end
+		run.refresh_cleanup()
 	end
 	return run
 end

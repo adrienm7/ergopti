@@ -8,6 +8,28 @@ const path = require('node:path');
 const { spawnSync } = require('node:child_process');
 const { pythonExecutable } = require('../lib/python.cjs');
 
+/** Require one complete planned-count line across LF and CRLF transports. */
+function hasPlannedCases(output, count) {
+	if (typeof output !== 'string' || !output.endsWith('\n')) return false;
+	const witness = `Planned cases: ${count}`;
+	return output.split(/\r?\n/).filter((line) => line === witness).length === 1;
+}
+
+// These portable parser controls run in the existing mandatory receiving owner.
+for (const ending of ['\n', '\r\n']) {
+	assert.ok(hasPlannedCases('Planned cases: 2' + ending, 2));
+}
+for (const rejected of [
+	'',
+	'Planned cases: 3\n',
+	'Planned cases: 2',
+	'Planned cases: 2\r',
+	'Planned cases: 2\nPlanned cases: 2\n',
+	'Planned cases: 2\r\nPlanned cases: 2\r\n'
+]) {
+	assert.equal(hasPlannedCases(rejected, 2), false);
+}
+
 const root = path.resolve(__dirname, '../..');
 const selection = process.platform === 'win32' ? '--policy-only' : '--protocol-only';
 const expectedCases = process.platform === 'win32' ? 2 : 10;
@@ -19,7 +41,7 @@ const result = spawnSync(
 assert.equal(result.error, undefined, 'the receiving interpreter must start');
 assert.equal(result.signal, null, 'the receiving process must finish within its bound');
 assert.equal(result.status, 0, result.stderr || result.stdout);
-assert.ok(result.stdout.includes(`Planned cases: ${expectedCases}\n`));
+assert.ok(hasPlannedCases(result.stdout, expectedCases));
 assert.ok(result.stderr.includes(`Ran ${expectedCases} tests in`));
 assert.match(result.stderr, /\bOK\b/);
 assert.doesNotMatch(result.stderr, /skipped=/);
