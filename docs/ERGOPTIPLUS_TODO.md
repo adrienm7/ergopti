@@ -5725,6 +5725,17 @@ The completed macOS image/download root now consumes shared typed slot order and
 
 The complete macOS Layout presentation family now consumes 17 canonical shared sections, including switching/pause/resume, genuine native record choices, bundle install/update/status/variant frames and the finished parent. Exactly 3 additive caption keys are translated in all 21 actual catalogues. Existing native TIS, install/consent, Guardian, async and callback owners remain unchanged. The bounded shared caption ABI adds ordered format values, strict native-record captions and an explicit numbered scalar mode while retaining the prior percent-scalar bodies and completed-root composer. Actual private source qualification passes 97 tray,6 async and 17 version subjects, plus 51 Layout and 21 numbered contract subjects on each Lua runtime. New Windows Layout 28 and numbered 22 subjects, plus five genuine throwing-reader/full-group Win32 controls, remain unexecuted locally. Typed group captions retain literal ampersand transport without false empty-key translation warnings; a throwing vector reader refuses before native writes. The complete tray fixture now constructs and restores its renderer inside the same scoped boundary. Registered source controls pass after exact adoption; actual dynamic callback and inert-caption ownership controls retain zero gaps. Seven actual macOS fixture modules pass 40/0 after supplying their required canonical renderer inputs; every original fixture assertion remains, and the provider-label meta subject now proves actual DATA-to-native delivery rather than a withdrawn literal assignment. The owning generator lowers macOS 27 to 22 native sites while Windows 27/Linux 31 remain. These bounded receipts do not replace full-source three-driver CI, packaging/installation or item 38 device acceptance; items 54/81 remain partial.
 
+Native menu census validation now admits genuine migration below twenty
+remaining sites while retaining its anti-vacuity checks. The original matchers,
+self-tests and literal floors are preserved against independently frozen
+pre-existing Windows/macOS/Linux classifications. Every normal scan and baseline
+update requires complete nonempty production-source coverage; missing inputs,
+damaged detection, malformed ledgers and increases refuse before publication.
+The registered regression exercises 103 real child controls, including nineteen
+and zero remaining sites and failed writes. This validation correction changes
+no native menu behavior or generated artifact. The remaining menu families and
+item 38 device acceptance stay open, and items 54/81 remain partial.
+
 - [ ] **62.** Downloads on managed company networks: system trust and
       system proxy for every download child (Ollama installation/server/pull,
       updater/rollback and remote AI), with translated certificate/proxy/blocked/
