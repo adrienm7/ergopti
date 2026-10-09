@@ -1201,6 +1201,12 @@ const CHECKS = [
 		repro: 'npm run test:ci-pipeline'
 	},
 	{
+		name: 'Full default CI source admission preserves mandatory gates and bounded diagnostic policy',
+		cmd: 'node',
+		args: ['tools/test/test-ci-full-default.cjs'],
+		repro: 'node tools/test/test-ci-full-default.cjs'
+	},
+	{
 		name: 'CI pipeline wiring (one root, plan outputs, lane callers, secrets and permissions, no skippable job or gate step, release preflight before any side effect)',
 		cmd: 'node',
 		args: ['tools/test/test-ci-pipeline-wiring.cjs'],

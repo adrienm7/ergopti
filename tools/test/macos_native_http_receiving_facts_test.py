@@ -36,6 +36,48 @@ WIRE = load("receiving_fact_wire", SUPPORT / "native_http_wire_fixture.py")
 CLIENT = load("receiving_fact_client", SUPPORT / "native_http_wire_client_receiving.py")
 
 
+# Preserve the diagnostic-only release pin across the separately reviewed PAC
+# ownership repair afb1f15d. Each complete, unique span must be enrolled before
+# any inversion; the whole historical hash still protects every unrelated byte.
+PAC_OWNERSHIP_INVERSE = (
+    (
+        "\t\t// A native PAC callback owns the complete choice list. Initial fallback\n\t\t// entries cannot add DIRECT or fixed proxies that the script omitted.\n\t\tlet hasNativePAC = candidates.contains(where: {\n\t\t\tlet kind = $0[kCFProxyTypeKey as String] as? String\n\t\t\treturn kind == kCFProxyTypeAutoConfigurationURL as String\n\t\t\t\t|| kind == kCFProxyTypeAutoConfigurationJavaScript as String\n\t\t})\n",
+        "",
+    ),
+    (
+        "\t\t\t\tguard let pacURL = candidate[kCFProxyAutoConfigurationURLKey as String] as? URL,\n\t\t\t\t\tlet expanded = evaluate(url: url, pacURL: pacURL, script: nil, deadline: deadline),\n\t\t\t\t\t!expanded.isEmpty else { return nil }\n",
+        "\t\t\t\tguard let pacURL = candidate[kCFProxyAutoConfigurationURLKey as String] as? URL,\n\t\t\t\t\tlet expanded = evaluate(url: url, pacURL: pacURL, script: nil, deadline: deadline) else { return nil }\n",
+    ),
+    (
+        "\t\t\t\tguard let script = candidate[kCFProxyAutoConfigurationJavaScriptKey as String] as? String,\n\t\t\t\t\tlet expanded = evaluate(url: url, pacURL: nil, script: script, deadline: deadline),\n\t\t\t\t\t!expanded.isEmpty else { return nil }\n",
+        "\t\t\t\tguard let script = candidate[kCFProxyAutoConfigurationJavaScriptKey as String] as? String,\n\t\t\t\t\tlet expanded = evaluate(url: url, pacURL: nil, script: script, deadline: deadline) else { return nil }\n",
+    ),
+    (
+        "\t\t\t} else if !hasNativePAC { routes.append(candidate) }\n",
+        "\t\t\t} else { routes.append(candidate) }\n",
+    ),
+    (
+        "\t\tif discoveryEnabled,\n\t\t\t!hasNativePAC {\n",
+        "\t\tif discoveryEnabled,\n\t\t\t!candidates.contains(where: {\n\t\t\t\tlet kind = $0[kCFProxyTypeKey as String] as? String\n\t\t\t\treturn kind == kCFProxyTypeAutoConfigurationURL as String\n\t\t\t\t\t|| kind == kCFProxyTypeAutoConfigurationJavaScript as String\n\t\t\t}) {\n",
+    ),
+)
+HISTORICAL_HTTP_RELEASE_SHA256 = "68659ddec98c9a427244b315b69c17750b743eab2cdd3688308690a66d1c6e98"
+
+
+def historical_pac_ownership_projection(source):
+    """Accept the exact legacy source or the complete approved ownership repair."""
+    if hashlib.sha256(source.encode("utf-8")).hexdigest() == HISTORICAL_HTTP_RELEASE_SHA256:
+        return source
+    if any(source.count(new) != 1 or (old and old in source) for new, old in PAC_OWNERSHIP_INVERSE):
+        raise ValueError("PAC ownership source enrollment refused")
+    projected = source
+    for new, old in PAC_OWNERSHIP_INVERSE:
+        projected = projected.replace(new, old, 1)
+    if hashlib.sha256(projected.encode("utf-8")).hexdigest() != HISTORICAL_HTTP_RELEASE_SHA256:
+        raise ValueError("Historical HTTP release source refused")
+    return projected
+
+
 class NativeHTTPReceivingFactsTests(unittest.TestCase):
     def setUp(self):
         self.fixture = WIRE.WireFixture(native=False)
@@ -588,6 +630,7 @@ class NativeHTTPStageReceiptTests(unittest.TestCase):
             source,
             flags=re.MULTILINE | re.DOTALL,
         )
+        release = historical_pac_ownership_projection(release)
         self.assertEqual(
             hashlib.sha256(release.encode("utf-8")).hexdigest(),
             "68659ddec98c9a427244b315b69c17750b743eab2cdd3688308690a66d1c6e98",
@@ -1283,6 +1326,7 @@ class NativeSelectedRouteObservationTests(unittest.TestCase):
             worker,
             flags=re.MULTILINE | re.DOTALL,
         )
+        release = historical_pac_ownership_projection(release)
         self.assertEqual(
             hashlib.sha256(release.encode()).hexdigest(),
             "68659ddec98c9a427244b315b69c17750b743eab2cdd3688308690a66d1c6e98",
@@ -1649,6 +1693,81 @@ class NativeServerRetirementTests(unittest.TestCase):
             self.fixture.servers[0].shutdown()
             held[0].join(2)
             self.assertFalse(held[0].is_alive())
+
+
+class HistoricalPACOwnershipProjectionTests(unittest.TestCase):
+    @staticmethod
+    def release_source():
+        source = (
+            SUPPORT.parents[1] / "launcher/Sources/ErgoptiPlus/ManagedHTTPWorker.swift"
+        ).read_text(encoding="utf-8")
+        return re.sub(
+            r"^[ \t]*#if ERGOPTI_MANAGED_HTTP_FIXTURE_DIAGNOSTICS\n.*?^[ \t]*#endif\n",
+            "",
+            source,
+            flags=re.MULTILINE | re.DOTALL,
+        )
+
+    def test41CompleteApprovedRepairAndExactLegacyKeepOriginalWholePin(self):
+        source = self.release_source()
+        legacy = historical_pac_ownership_projection(source)
+        self.assertEqual(
+            hashlib.sha256(legacy.encode()).hexdigest(), HISTORICAL_HTTP_RELEASE_SHA256
+        )
+        self.assertEqual(historical_pac_ownership_projection(legacy), legacy)
+        approved = legacy
+        for new, old in PAC_OWNERSHIP_INVERSE:
+            if old:
+                self.assertEqual(approved.count(old), 1)
+                approved = approved.replace(old, new, 1)
+            else:
+                anchor = "\t\tvar routes: [[String: Any]] = []\n"
+                self.assertEqual(approved.count(anchor), 1)
+                approved = approved.replace(anchor, new + anchor, 1)
+        self.assertEqual(historical_pac_ownership_projection(approved), legacy)
+
+    def test42EveryPartialOrMalformedOwnershipSpanRefusesBeforeHistoricalAdmission(self):
+        source = self.release_source()
+        for new, old in PAC_OWNERSHIP_INVERSE:
+            with self.subTest(span=new):
+                self.assertEqual(source.count(new), 1)
+                with self.assertRaises(ValueError):
+                    historical_pac_ownership_projection(source.replace(new, old, 1))
+                with self.assertRaises(ValueError):
+                    historical_pac_ownership_projection(
+                        source.replace(new, new + "// unapproved\n", 1)
+                    )
+
+    def test43DuplicateAndHybridEnrollmentCannotNormalizeOutUnapprovedSource(self):
+        source = self.release_source()
+        for new, old in PAC_OWNERSHIP_INVERSE:
+            with self.subTest(span=new):
+                with self.assertRaises(ValueError):
+                    historical_pac_ownership_projection(source.replace(new, new + new, 1))
+                if old:
+                    with self.assertRaises(ValueError):
+                        historical_pac_ownership_projection(source.replace(new, new + old, 1))
+
+    def test44UnrelatedCallbackRoutingDeadlineAndLegacyDriftRemainWholeHashProtected(self):
+        source = self.release_source()
+        legacy = historical_pac_ownership_projection(source)
+        for before, after in (
+            (
+                "routes.append(contentsOf: expanded)",
+                "routes.append(contentsOf: expanded.reversed())",
+            ),
+            (
+                "let deadline = ProcessInfo.processInfo.systemUptime + budget",
+                "let deadline = ProcessInfo.processInfo.systemUptime + budget + 1",
+            ),
+            ("CFRunLoopRunInMode", "UnapprovedRunLoopRunInMode"),
+            ("URLSession(configuration:", "UnapprovedSession(configuration:"),
+        ):
+            for candidate in (source, legacy):
+                with self.subTest(change=before, legacy=candidate == legacy):
+                    self.assertIn(before, candidate)
+                    with self.assertRaises(ValueError):
+                        historical_pac_ownership_projection(candidate.replace(before, after, 1))
 
 
 if __name__ == "__main__":

@@ -587,6 +587,7 @@ _LogBootProgress("loading LLM modules")
 #Include unit/test_llm_engine_read_guarded_in_timer.ahk
 #Include unit/test_llm_api_remote.ahk
 #Include unit/test_curl_proxy_auth_integration.ahk
+#Include unit/test_curl_proxy_discovery.ahk
 #Include unit/test_managed_curl_owner.ahk
 #Include unit/test_managed_curl_callers.ahk
 #Include unit/test_curl_proxy_auth_policy.ahk
