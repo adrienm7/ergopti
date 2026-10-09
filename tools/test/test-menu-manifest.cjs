@@ -1299,11 +1299,7 @@ function checkAutomaticTriggerControls() {
 		assert.deepEqual(declaration.disabled_when, ['llm_trigger_ready']);
 	}
 	for (const [file, first, last] of [
-		[
-			'windows/ui/menu/menu_llm/menu_settings.ahk',
-			'LLM_Menu_BuildTriggerMenu(',
-			'LLM_Menu_BuildLiveModeMenu('
-		],
+		['windows/ui/menu/menu_llm/menu_settings.ahk', 'LLM_Menu_BuildTriggerMenu(', '\n}'],
 		['macos/ui/menu/menu_llm/trigger_panel.lua', 'function M.build(', '\nreturn M\n'],
 		[
 			'linux/ui/menu/menu_builder.lua',
@@ -1528,11 +1524,7 @@ function checkPrivacyTriggerControls() {
 		assert.deepEqual(declaration.disabled_when, [expected.id + '_ready']);
 	}
 	for (const [file, startToken, endToken] of [
-		[
-			'windows/ui/menu/menu_llm/menu_settings.ahk',
-			'LLM_Menu_BuildTriggerMenu(',
-			'LLM_Menu_BuildLiveModeMenu('
-		],
+		['windows/ui/menu/menu_llm/menu_settings.ahk', 'LLM_Menu_BuildTriggerMenu(', '\n}'],
 		['macos/ui/menu/menu_llm/trigger_panel.lua', 'function M.build(', '\nreturn M\n'],
 		[
 			'linux/ui/menu/menu_builder.lua',
@@ -5284,7 +5276,7 @@ function consumesProfileFrameCommand(source, file, menu, section, id) {
 	}
 }
 
-// Native trigger, display and live separators keep their true platform-specific roles.
+// Native boundaries and the retained manual profiles keep their platform-specific roles.
 {
 	const assert = require('node:assert/strict');
 	const expected = JSON.parse(
@@ -5300,7 +5292,6 @@ function consumesProfileFrameCommand(source, file, menu, section, id) {
 			'MenuRenderer_TemplateRows',
 			['trigger', 'display']
 		],
-		['macos', 'ui/menu/menu_llm/live_mode_panel.lua', 'ManifestMenu.template_rows', ['live']],
 		['linux', 'ui/menu/menu_builder.lua', 'ManifestMenu.template_rows', ['trigger']]
 	]) {
 		const source = readFileSync(
@@ -5310,9 +5301,51 @@ function consumesProfileFrameCommand(source, file, menu, section, id) {
 		for (const key of keys)
 			assert.ok(source.includes(call + '("' + expected.boundaries[key].section + '"'));
 	}
+	// The removed Live selector is replaced by the actual manual-profile frame,
+	// including its separators and command boundaries, not an empty Mac menu.
+	const { publishesMenuTemplate } = require('../lib/menu-shared-delegation.cjs');
+	const profile = JSON.parse(
+		readFileSync(resolve(SHARED, 'tests/corpus/menus/profile_ordered_frame.json'), 'utf8')
+	);
+	const stop = JSON.parse(
+		readFileSync(resolve(SHARED, 'tests/corpus/menus/llm_live_off.json'), 'utf8')
+	);
+	assert.deepEqual(stop.retired_menu_sections, expected.retired_menu_sections);
+	for (const section of stop.retired_menu_sections)
+		assert.equal(Object.hasOwn(menu, section), false, `retired selector declaration: ${section}`);
+	assert.equal(menu.llm_menu.filter((row) => row.id === 'llm_profile').length, 1);
+	assert.equal(
+		menu.llm_menu.some((row) => row.id === 'llm_live_mode'),
+		false
+	);
+	for (const [driver, relative, extension, section] of [
+		['macos', 'ui/menu/menu_llm/profiles_manager.lua', '.lua', 'llm_profile_lua_frame'],
+		['linux', 'ui/menu/menu_builder.lua', '.lua', 'llm_profile_lua_frame'],
+		['windows', 'ui/menu/menu_llm/menu_profiles.ahk', '.ahk', 'llm_profile_windows_frame']
+	]) {
+		assert.ok(Array.isArray(profile.sections[section]) && profile.sections[section].length > 0);
+		// Upstream added an explicit omission fence to this presentation include;
+		// preserve the independent frame order and require that exact new policy.
+		const expectedFrame = structuredClone(profile.sections[section]);
+		const builtin = expectedFrame.filter((row) => row.section === 'llm_profile_builtin_heading');
+		assert.equal(builtin.length, 1);
+		builtin[0].on_refusal = 'omit_presentation';
+		assert.deepEqual(menu[section], expectedFrame);
+		const source = readFileSync(
+			resolve(REPO_ROOT, 'static/ergopti_plus', driver, relative),
+			'utf8'
+		);
+		assert.ok(source.trim().length > 0);
+		assert.ok(
+			publishesMenuTemplate(source, extension, section),
+			`${driver} actual manual profile frame`
+		);
+		for (const retired of stop.retired_menu_sections)
+			assert.equal(publishesMenuTemplate(source, extension, retired), false);
+	}
 	for (const file of readdirSync(LOCALES_DIR).filter((name) => name.endsWith('.json'))) {
 		const locale = JSON.parse(readFileSync(resolve(LOCALES_DIR, file), 'utf8'));
-		for (const key of expected.caption_keys) {
+		for (const key of [...expected.caption_keys, stop.stop_notice_key]) {
 			assert.equal(typeof locale[key], 'string');
 			assert.ok(locale[key].trim().length > 0 && locale[key] !== key);
 		}
