@@ -7701,6 +7701,16 @@ and installation qualification are still required.
   actual permission observation, Darwin retirement and final CI provenance
   remain UNRUN. Controlled metadata tests do not qualify the native SDK call.
 
+  An additive process-level XCTest now starts the actual SwiftPM launcher
+  through its existing production permission-observation role, requires the
+  original HELD/ACTIVATE/exact-retirement protocol and normal exit, and retains
+  the fixed actual SDK OSStatus under caller=native-test-product. All 17
+  predecessor cases, five-second test polling and 20-second production
+  supervision remain unchanged. Source review and portable causal controls
+  pass; fresh native compilation and the new API execution remain UNRUN.
+  Its result cannot qualify the signed application or osascript principal,
+  catalogue discovery, consent or shortcut invocation.
+
   Remaining software: inventory supported automation/application providers and
   implement their real availability/invocation contracts. Add bounded Apple
   Shortcuts catalogue ownership, chosen-ID revalidation, safe native invocation,
