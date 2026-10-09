@@ -4268,5 +4268,114 @@ class RefusedButtonSubroleFactControls(unittest.TestCase):
                 evidence.close()
 
 
+class RefusedButtonWindowControlFactControls(unittest.TestCase):
+    """Fixed same-window identity receipts are observations, never native AX consent."""
+
+    def packet(self):
+        packet = RefusedButtonSubroleFactControls().packet("absent", "absent", -25205)
+        packet["first_button"]["window"] = {
+            "schema": 1,
+            "role": "window",
+            "type": "string",
+            "error": 0,
+            "controls": {
+                "close": {"type": "ax-element", "error": 0, "relation": "same"},
+                "minimize": {"type": "ax-element", "error": 0, "relation": "different"},
+                "zoom": {"type": "absent", "error": -25205, "relation": "unobserved"},
+            },
+        }
+        return packet
+
+    def test_closed_window_reference_facts_preserve_absent_subrole_and_primary_refusal(self):
+        packet = self.packet()
+        self.assertEqual(probe._validate_owned_automation_ui_fact(packet), packet)
+        self.assertEqual(packet["first_error"], -25205)
+        self.assertEqual(packet["first_button"]["subrole"], "absent")
+        self.assertEqual(packet["candidates"], 0)
+        self.assertEqual(packet["matches"], 0)
+        for role, kind, error in (
+            ("sheet", "string", 0),
+            ("other", "string", 0),
+            ("absent", "absent", -25205),
+            ("wrong-type", "number", 0),
+        ):
+            with self.subTest(role=role):
+                packet = self.packet()
+                packet["first_button"]["window"].update(role=role, type=kind, error=error)
+                self.assertEqual(probe._validate_owned_automation_ui_fact(packet), packet)
+
+    def test_unobserved_or_foreign_reference_cannot_claim_same_native_button(self):
+        for control in (
+            {"type": "absent", "error": -25205, "relation": "same"},
+            {"type": "string", "error": 0, "relation": "same"},
+            {"type": "ax-element", "error": -25204, "relation": "same"},
+            {"type": "ax-element", "error": 0, "relation": "unobserved"},
+            {"type": "ax-element", "error": True, "relation": "same"},
+            {"type": "ax-element", "error": 0, "relation": "private-title"},
+            {"type": "ax-element", "error": 0, "relation": "same", "accepted": True},
+        ):
+            with self.subTest(control=control), self.assertRaises(probe.AdmissionError):
+                packet = self.packet()
+                packet["first_button"]["window"]["controls"]["close"] = control
+                probe._validate_owned_automation_ui_fact(packet)
+        for change in (
+            "missing-control",
+            "foreign-control",
+            "wrong-role",
+            "private-role",
+            "boolean-status",
+        ):
+            with self.subTest(change=change), self.assertRaises(probe.AdmissionError):
+                packet = self.packet()
+                window = packet["first_button"]["window"]
+                if change == "missing-control":
+                    del window["controls"]["zoom"]
+                elif change == "foreign-control":
+                    window["controls"]["other"] = window["controls"]["close"]
+                elif change == "wrong-role":
+                    window["role"] = "wrong-type"
+                elif change == "private-role":
+                    window["role"] = "private-window-role"
+                else:
+                    window["error"] = True
+                probe._validate_owned_automation_ui_fact(packet)
+
+    def test_real_private_window_receipt_cannot_authorize_action_or_closure(self):
+        with TemporaryDirectory() as directory, patch.object(probe, "NativeProcessGroups"):
+            root = Path(directory)
+            evidence_dir = root / "evidence"
+            evidence_dir.mkdir(mode=0o700)
+            evidence = probe.PhaseEvidence(evidence_dir)
+            owner = probe.Children(root, evidence=evidence)
+            packet = self.packet()
+            primary = subprocess.CompletedProcess(
+                [], 67, "OWNED_AUTOMATION_UI/1 state=observation-refused\n", ""
+            )
+
+            def producer(arguments, **options):
+                self.assertEqual(arguments[:-1], ["/owned/helper", "sender", "receiver", "73"])
+                self.assertEqual(options, {"check": False, "timeout": 2})
+                path = Path(arguments[-1])
+                self.assertEqual(path.parent, root)
+                self.assertEqual(stat.S_IMODE(path.stat().st_mode), 0o600)
+                path.write_text(json.dumps(packet))
+                return primary
+
+            owner.run = Mock(side_effect=producer)
+            try:
+                result = probe._owned_automation_ui_run(
+                    owner, ["/owned/helper", "sender", "receiver", "73"], 2
+                )
+                self.assertIs(result, primary)
+                self.assertEqual(result.returncode, 67)
+                receipt = json.loads((evidence_dir / "checkpoint.json").read_text())
+                self.assertEqual(receipt["native_ui"], packet)
+                self.assertEqual(receipt["status"], "refused")
+                self.assertFalse(receipt["ownership_closed"])
+                self.assertEqual(list(root.glob("automation-ui-fact-*")), [])
+            finally:
+                evidence.close()
+
+
 if __name__ == "__main__":
     unittest.main()
