@@ -25,7 +25,7 @@
 //
 // Exit 0 when clean, 1 with a list of violations otherwise.
 
-const { readFileSync, readdirSync } = require('fs');
+const { existsSync, readFileSync, readdirSync } = require('fs');
 const { resolve, dirname } = require('path');
 const { parse: parseToml } = require('smol-toml');
 
@@ -1299,11 +1299,7 @@ function checkAutomaticTriggerControls() {
 		assert.deepEqual(declaration.disabled_when, ['llm_trigger_ready']);
 	}
 	for (const [file, first, last] of [
-		[
-			'windows/ui/menu/menu_llm/menu_settings.ahk',
-			'LLM_Menu_BuildTriggerMenu(',
-			'LLM_Menu_BuildLiveModeMenu('
-		],
+		['windows/ui/menu/menu_llm/menu_settings.ahk', 'LLM_Menu_BuildTriggerMenu(', '\n}'],
 		['macos/ui/menu/menu_llm/trigger_panel.lua', 'function M.build(', '\nreturn M\n'],
 		[
 			'linux/ui/menu/menu_builder.lua',
@@ -1528,11 +1524,7 @@ function checkPrivacyTriggerControls() {
 		assert.deepEqual(declaration.disabled_when, [expected.id + '_ready']);
 	}
 	for (const [file, startToken, endToken] of [
-		[
-			'windows/ui/menu/menu_llm/menu_settings.ahk',
-			'LLM_Menu_BuildTriggerMenu(',
-			'LLM_Menu_BuildLiveModeMenu('
-		],
+		['windows/ui/menu/menu_llm/menu_settings.ahk', 'LLM_Menu_BuildTriggerMenu(', '\n}'],
 		['macos/ui/menu/menu_llm/trigger_panel.lua', 'function M.build(', '\nreturn M\n'],
 		[
 			'linux/ui/menu/menu_builder.lua',
@@ -5284,13 +5276,38 @@ function consumesProfileFrameCommand(source, file, menu, section, id) {
 	}
 }
 
-// Native trigger, display and live separators keep their true platform-specific roles.
+// Retained native separators and explicitly retired owners keep their distinct roles.
 {
 	const assert = require('node:assert/strict');
 	const expected = JSON.parse(
 		readFileSync(resolve(SHARED, 'tests/corpus/menus/llm_control_boundaries.json'), 'utf8')
 	);
 	const menu = JSON.parse(readFileSync(MENU_PATH, 'utf8'));
+	assert.deepEqual(expected.retired_menu_sections, ['llm_live_controls', 'llm_live_off_boundary']);
+	for (const section of expected.retired_menu_sections) {
+		assert.equal(Object.hasOwn(menu, section), false, 'retired Live section cannot be published');
+		for (const rows of Object.values(menu).filter(Array.isArray))
+			assert.equal(
+				rows.some((row) => row.id === section),
+				false,
+				'retired Live provider cannot be reached'
+			);
+	}
+	assert.equal(
+		existsSync(
+			resolve(REPO_ROOT, 'static/ergopti_plus/macos/ui/menu/menu_llm/live_mode_panel.lua')
+		),
+		false,
+		'the retired Live provider cannot regain a native owner'
+	);
+	for (const [relative, retired] of [
+		['windows/ui/menu/menu_llm/menu_settings.ahk', 'LLM_Menu_BuildLiveModeMenu'],
+		['macos/ui/menu/menu_llm/init.lua', 'ui.menu.menu_llm.live_mode_panel']
+	]) {
+		const source = readFileSync(resolve(REPO_ROOT, 'static/ergopti_plus', relative), 'utf8');
+		assert.ok(source.trim().length > 0, 'retirement is judged against an actual native consumer');
+		assert.equal(source.includes(retired), false, 'a retired Live consumer cannot be restored');
+	}
 	for (const boundary of Object.values(expected.boundaries))
 		assert.deepEqual(menu[boundary.section], boundary.rows);
 	for (const [driver, relative, call, keys] of [
@@ -5300,7 +5317,6 @@ function consumesProfileFrameCommand(source, file, menu, section, id) {
 			'MenuRenderer_TemplateRows',
 			['trigger', 'display']
 		],
-		['macos', 'ui/menu/menu_llm/live_mode_panel.lua', 'ManifestMenu.template_rows', ['live']],
 		['linux', 'ui/menu/menu_builder.lua', 'ManifestMenu.template_rows', ['trigger']]
 	]) {
 		const source = readFileSync(

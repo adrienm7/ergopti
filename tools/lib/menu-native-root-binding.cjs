@@ -5,6 +5,7 @@
 const { isDeepStrictEqual } = require('node:util');
 const { scriptTokens } = require('./script-source.cjs');
 const { nativeTemplateBinding } = require('./menu-template-binding.cjs');
+const { nativeTopLevelProjection } = require('./menu-native-llm-parent-binding.cjs');
 
 /** A finite physical Lua route check, not runtime authority or general data-flow analysis. */
 function nativeBadgeRootComposition(sources, manifest, platform) {
@@ -382,10 +383,7 @@ function nativeBadgeRootComposition(sources, manifest, platform) {
 		!unique(loadRoot, 'return ManifestMenu.get_root()') ||
 		!soleLocal(loadTop, 'data', 'local data = load_manifest()') ||
 		!soleLocal(loadTop, 'result', 'local result = {}') ||
-		!unique(
-			loadTop,
-			'table.insert(result, { id = entry.id, greyed_when_paused = entry.greyed_when_paused == true })'
-		) ||
+		!nativeTopLevelProjection(loadTop, lex) ||
 		writes(loadTop, '_top_level_cache').length !== 1 ||
 		writes(loadTop, '_top_level_cache')[0] !==
 			matches(loadTop, '_top_level_cache = result', 0)[0] ||

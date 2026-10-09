@@ -2104,6 +2104,93 @@ const {
 		true,
 		'inert text neither supplies nor withdraws executable parent authority'
 	);
+	// The upstream disabled-row projection preserves the actual binding; the
+	// prior direct append remains a supported, independently recorded source form.
+	const projection = `		local projected = { id = entry.id, greyed_when_paused = entry.greyed_when_paused == true }
+		if entry.disabled == true then
+			projected.disabled, projected.i18n, projected.reason_key = true, entry.i18n, entry.reason_key
+		end
+		table.insert(result, projected)`;
+	const historicalProjection = `		table.insert(result, { id = entry.id, greyed_when_paused = entry.greyed_when_paused == true })`;
+	assert.equal(builder.split(projection).length - 1, 1, 'exact current projected-row preimage');
+	assert.equal(
+		credits(source, builder.replace(projection, historicalProjection)),
+		true,
+		'the historical executable top-level projection remains supported'
+	);
+	const projectionControls = [
+		[
+			projection,
+			projection.replace('id = entry.id', 'id = "foreign"'),
+			'foreign projected identity'
+		],
+		[
+			projection,
+			projection.replace('entry.greyed_when_paused == true', 'false'),
+			'lost pause metadata'
+		],
+		[
+			projection,
+			projection.replace('if entry.disabled == true then', 'if false then'),
+			'dead disabled forwarding'
+		],
+		[
+			projection,
+			projection.replace(
+				'true, entry.i18n, entry.reason_key',
+				'false, entry.i18n, entry.reason_key'
+			),
+			'lost disabled flag'
+		],
+		[
+			projection,
+			projection.replace('true, entry.i18n, entry.reason_key', 'true, "foreign", entry.reason_key'),
+			'foreign disabled label'
+		],
+		[
+			projection,
+			projection.replace('true, entry.i18n, entry.reason_key', 'true, entry.i18n, "foreign"'),
+			'foreign disabled reason'
+		],
+		['table.insert(result, projected)', 'table.insert(result, {})', 'discarded projected object'],
+		[
+			'table.insert(result, projected)',
+			'projected = {}\n\t\ttable.insert(result, projected)',
+			'rebound projected object'
+		],
+		[
+			'table.insert(result, projected)',
+			'do local projected = {}\n\t\ttable.insert(result, projected) end',
+			'shadowed projected object'
+		],
+		[projection, 'if false then\n' + projection + '\nend', 'unreachable projection'],
+		[
+			'table.insert(result, projected)',
+			'table.insert({}, projected)',
+			'foreign append destination'
+		],
+		['\n\treturn _top_level_cache\nend', '\n\treturn {}\nend', 'discarded completed projection']
+	];
+	assert.equal(
+		projectionControls.length,
+		12,
+		'all projected transport refusal controls registered'
+	);
+	for (const [before, after, reason] of projectionControls) {
+		assert.equal(builder.split(before).length - 1, 1, reason + ': exact source preimage');
+		const candidate = builder.replace(before, after);
+		assert.notEqual(candidate, builder, reason + ': actual source changes');
+		assert.equal(credits(source, candidate), false, reason);
+		assert.equal(credits(source, builder), true, reason + ': genuine source inverse restores');
+	}
+	assert.equal(
+		credits(
+			source,
+			builder.replace('local projected = {', '-- retained comment\n\t\tlocal projected = {')
+		),
+		true,
+		'comments and formatting do not replace executable authority'
+	);
 	assert.equal(credits(), true, 'exact source repair restores the genuine live parent');
 }
 
@@ -2779,6 +2866,90 @@ function publishesIncludedCommands(source, extension, section, declarations, pla
 		true,
 		'the actual LIVE completed root must be admitted before negative controls'
 	);
+	// The live badge root uses the same exact owner projection policy as the IA parent.
+	const builder = sources['macos/ui/menu/builder.lua'];
+	const withBuilder = (candidate) => admits({ ...sources, 'macos/ui/menu/builder.lua': candidate });
+	const projection = `		local projected = { id = entry.id, greyed_when_paused = entry.greyed_when_paused == true }
+		if entry.disabled == true then
+			projected.disabled, projected.i18n, projected.reason_key = true, entry.i18n, entry.reason_key
+		end
+		table.insert(result, projected)`;
+	const historicalProjection = `		table.insert(result, { id = entry.id, greyed_when_paused = entry.greyed_when_paused == true })`;
+	assert.equal(
+		builder.split(projection).length - 1,
+		1,
+		'badge root: exact current projected-row preimage'
+	);
+	assert.equal(
+		withBuilder(builder.replace(projection, historicalProjection)),
+		true,
+		'badge root: the historical executable top-level projection remains supported'
+	);
+	const projectionControls = [
+		[
+			projection,
+			projection.replace('id = entry.id', 'id = "foreign"'),
+			'foreign projected identity'
+		],
+		[
+			projection,
+			projection.replace('entry.greyed_when_paused == true', 'false'),
+			'lost pause metadata'
+		],
+		[
+			projection,
+			projection.replace('if entry.disabled == true then', 'if false then'),
+			'dead disabled forwarding'
+		],
+		[
+			projection,
+			projection.replace(
+				'true, entry.i18n, entry.reason_key',
+				'false, entry.i18n, entry.reason_key'
+			),
+			'lost disabled flag'
+		],
+		[
+			projection,
+			projection.replace('true, entry.i18n, entry.reason_key', 'true, "foreign", entry.reason_key'),
+			'foreign disabled label'
+		],
+		[
+			projection,
+			projection.replace('true, entry.i18n, entry.reason_key', 'true, entry.i18n, "foreign"'),
+			'foreign disabled reason'
+		],
+		['table.insert(result, projected)', 'table.insert(result, {})', 'discarded projected object'],
+		[
+			'table.insert(result, projected)',
+			'projected = {}\n\t\ttable.insert(result, projected)',
+			'rebound projected object'
+		],
+		[
+			'table.insert(result, projected)',
+			'do local projected = {}\n\t\ttable.insert(result, projected) end',
+			'shadowed projected object'
+		],
+		[projection, 'if false then\n' + projection + '\nend', 'unreachable projection'],
+		[
+			'table.insert(result, projected)',
+			'table.insert({}, projected)',
+			'foreign append destination'
+		],
+		['\n\treturn _top_level_cache\nend', '\n\treturn {}\nend', 'discarded completed projection']
+	];
+	assert.equal(
+		projectionControls.length,
+		12,
+		'all 12 badge root projected transport refusals remain registered'
+	);
+	for (const [before, after, reason] of projectionControls) {
+		assert.equal(builder.split(before).length - 1, 1, reason + ': exact source preimage');
+		const candidate = builder.replace(before, after);
+		assert.notEqual(candidate, builder, reason + ': actual source changes');
+		assert.equal(withBuilder(candidate), false, reason);
+		assert.equal(withBuilder(builder), true, reason + ': genuine source inverse restores');
+	}
 	for (const control of controls) {
 		const source = sources[control.path];
 		assert.equal(
@@ -2885,6 +3056,115 @@ const { nativeLinuxAiParentPublication } = require('../lib/menu-native-llm-paren
 			true,
 			'actual Linux completed ' + kind + ' producer reaches the genuine tray'
 		);
+
+		// The adopted unavailable top row is an inert declaration projection, before Quit.
+		const builderFile = 'linux/ui/menu/menu_builder.lua';
+		const builder = linuxAiSources[builderFile];
+		const disabledBranch = `				elseif row.disabled == true then
+					rows[#rows + 1] = { label = i18n_safe(row.i18n), disabled = true,
+						disabled_reason_key = row.reason_key }
+`;
+		assert.equal(
+			builder.split(disabledBranch).length - 1,
+			1,
+			'exact adopted disabled top-row branch'
+		);
+		const withBuilder = (source) => admits({ ...linuxAiSources, [builderFile]: source });
+		assert.equal(
+			withBuilder(builder.replace(disabledBranch, '')),
+			true,
+			'historical native top-row route remains supported'
+		);
+		const disabledControls = [
+			[
+				disabledBranch,
+				disabledBranch.replace('disabled = true', 'disabled = false'),
+				'lost disabled flag'
+			],
+			[
+				disabledBranch,
+				disabledBranch.replace('i18n_safe(row.i18n)', '"foreign"'),
+				'foreign caption'
+			],
+			[disabledBranch, disabledBranch.replace('row.reason_key', '"foreign"'), 'foreign reason'],
+			[
+				disabledBranch,
+				disabledBranch.replaceAll('row.', 'foreign_row.'),
+				'foreign declaration row'
+			],
+			[
+				disabledBranch,
+				disabledBranch.replace('rows[#rows + 1]', 'row = {}\n					rows[#rows + 1]'),
+				'rebound declaration row'
+			],
+			[
+				disabledBranch,
+				disabledBranch.replace('row.disabled == true', 'false and row.disabled == true'),
+				'dead disabled branch'
+			],
+			[
+				disabledBranch + '				elseif id == "quit" then\n					quit_row = build(ctx)\n',
+				'				elseif id == "quit" then\n					quit_row = build(ctx)\n' + disabledBranch,
+				'reordered native branch'
+			],
+			[disabledBranch, disabledBranch + disabledBranch, 'multiple disabled appends'],
+			[
+				disabledBranch,
+				disabledBranch.replace('i18n_safe(row.i18n)', 'i18n_safe(row.reason_key)'),
+				'wrong caption input'
+			],
+			[
+				disabledBranch,
+				disabledBranch.replace(
+					'disabled_reason_key = row.reason_key',
+					'disabled_reason_key = row.reason_key, action = function() return true end'
+				),
+				'disabled row gains action'
+			],
+			[
+				disabledBranch,
+				disabledBranch.replace('rows[#rows + 1]', 'foreign_rows[#foreign_rows + 1]'),
+				'foreign append destination'
+			],
+			[
+				'for _, row in ipairs(declared) do\n',
+				'for _, row in ipairs(declared) do\nlocal row = { id = "llm", disabled = true }\n',
+				'shadowed declared source row'
+			],
+			[
+				'\t\t\tlocal id = row.id\n',
+				'\t\t\tlocal id = row.id\nid = "llm"\n',
+				'rebound declared source identity'
+			],
+			[
+				'function M.build(ctx)\n',
+				'function M.build(ctx)\nlocal i18n_safe = function(key) return key end\n',
+				'shadowed native caption owner'
+			],
+			[
+				'local ok, i18n = pcall(require, "infra.i18n")',
+				'local ok, i18n = pcall(require, "foreign.i18n")',
+				'foreign caption import'
+			],
+			[
+				'function i18n_safe(key)\n',
+				'function i18n_safe(key)\ndo return "foreign" end\n',
+				'bypassed caption owner'
+			]
+		];
+		assert.equal(
+			disabledControls.length,
+			16,
+			'all bounded disabled top-row controls remain registered'
+		);
+		for (const [before, after, reason] of disabledControls) {
+			assert.equal(builder.split(before).length - 1, 1, reason + ': exact current preimage');
+			const changed = builder.replace(before, after);
+			assert.notEqual(changed, builder, reason + ': actual source changes');
+			assert.equal(withBuilder(changed), false, reason + ': no native parent credit');
+			assert.equal(withBuilder(builder), true, reason + ': actual inverse restores');
+		}
+
 		assert.equal(admits(linuxAiSources, manifest, 'hs'), false);
 		for (const file of Object.keys(linuxAiSources)) {
 			assert.equal(

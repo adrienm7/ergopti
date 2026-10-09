@@ -4968,13 +4968,29 @@ integrated, then publish one grouped release.
 
 - [~] **54.** Every menu is declared in the shared menu manifest, never in
   driver code. The ratchet `npm run test:native-menu-rows` counts the rows
-  drivers still build (current baseline: Windows 26, macOS 19, Linux 22, each
+  drivers still build (current baseline: Windows 25, macOS 19, Linux 22, each
   site listed in tools/test/native-menu-rows-baseline.json); migrate them to
   zero. Each OS-limited row declares `unavailable = "hide"` (not
   applicable) or `"grey"` (not yet ported, with its reason); classify the
   existing rows during the migration (proposal in the menu-first-group
   report: most hide; greyed: Linux edit_shortcuts, Linux key
   combinations, Linux metrics shortcut rows, Windows preview_bubbles).
+  Current trigger/privacy source checks now stop at the actual Windows
+  constructor boundary after the orphan Live builder was retired. The
+  independent boundary corpus is unchanged: retained trigger/display and
+  all 21 caption sets remain checked, while retired Live declarations,
+  providers, native module and consumer routes are explicitly refused.
+  The complete menu-manifest gate passes locally. The independent retired-Live
+  census exception also refuses revived declarations, modules and consumer
+  routes while retaining every frozen rule, excerpt and historical floor.
+  All 263 census admission controls pass, and the genuine owner regenerates
+  the nonincreasing 25/19/22 baseline. The macOS LLM and badge-root consumers
+  share the same exact current/historical top-level projection rule, with
+  additional source withdrawal controls. The Linux parent proof now binds the
+  genuine inert disabled top-level branch and its captured row, identifier and
+  caption owner, preserving historical producer checks and every old assertion.
+  The whole source-parity target passes with 16 new refusal/inverse controls
+  per parent kind; complete final-source qualification remains required.
   The macOS badge caption and following boundary now consume a complete
   shared frame before native measurement or canvas allocation. Independent
   consumer tests pass 38/0 against predecessor 26/12; the genuine root route
@@ -7496,7 +7512,7 @@ is committed; one request is one commit with its regression test.
 
 - [~] **81.** The maintainer asks to treat item 54 now (every menu row is
   declared in the shared manifest, none built in a driver's folder):
-  Windows 26, macOS 19 and Linux 22 rows are still built by the
+  Windows 25, macOS 19 and Linux 22 rows are still built by the
   drivers (`tools/test/native-menu-rows-baseline.json`). The current census
   was regenerated on 2026-10-09. The sites are of four kinds, and three need the
   manifest to say more than it can today:
