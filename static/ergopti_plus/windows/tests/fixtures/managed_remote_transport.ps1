@@ -255,6 +255,50 @@ using System.Text;
 using System.Threading;
 
 // Fixture-only native TLS: the clients still use Windows Schannel and system trust.
+// A bounded TLS shutdown may leave already-queued encrypted input.
+// .NET Framework NetworkStream.Dispose adds SD_RECEIVE, which resets such TCP sockets.
+// Retire only the captured queued bytes, then close this exact owned Socket before base Dispose.
+public class ErgoptiFixtureNetworkStream : NetworkStream {
+    private int retired;
+    public int DiscardedInputBytes { get; private set; }
+    public ErgoptiFixtureNetworkStream(Socket socket):base(socket,true) { }
+    protected override void Dispose(bool disposing) {
+        if (System.Threading.Interlocked.Exchange(ref retired,1)!=0) return;
+        Exception primary=null, cleanup=null;
+        if (disposing) {
+            byte[] queued=null;
+            try {
+                int pending;
+                try { pending=Socket.Available; }
+                catch(ObjectDisposedException) { pending=0; } // The exact managed Socket reference is already retired.
+                if (pending<0 || pending>16384)
+                    throw new InvalidDataException("Owned TCP retirement input ceiling refused.");
+                if (pending>0) {
+                    queued=new byte[pending];
+                    Socket.Blocking=false;
+                    for (int attempts=0; attempts<512 && DiscardedInputBytes<pending; attempts++) {
+                        int count=Socket.Receive(queued,DiscardedInputBytes,pending-DiscardedInputBytes,SocketFlags.None);
+                        if (count<=0 || count>pending-DiscardedInputBytes)
+                            throw new EndOfStreamException("Owned TCP captured input retirement refused.");
+                        DiscardedInputBytes+=count;
+                    }
+                    if (DiscardedInputBytes!=pending)
+                        throw new InvalidDataException("Owned TCP retirement progress ceiling refused.");
+                }
+            } catch(Exception failure) { primary=failure; }
+            finally {
+                if (queued!=null) Array.Clear(queued,0,queued.Length);
+                try { Socket.Close(); } catch(Exception failure) { cleanup=failure; }
+            }
+        }
+        try { base.Dispose(disposing); }
+        catch(Exception failure) { cleanup=cleanup==null?failure:new AggregateException(cleanup,failure); }
+        if (primary!=null && cleanup!=null) throw new AggregateException(primary,cleanup);
+        if (primary!=null) System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(primary).Throw();
+        if (cleanup!=null) System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(cleanup).Throw();
+    }
+}
+
 public sealed class ErgoptiFixtureOpenSsl : IDisposable
 {
     private sealed class ImageFence : IDisposable
@@ -1057,7 +1101,7 @@ public sealed class ErgoptiManagedRemoteFixture : IDisposable
     }
     private void Tls(TcpClient client)
     {
-        using (Stream tls = NativeTls.Open(client.GetStream(), () => TrustAdmitted)) {
+        using (Stream tls = NativeTls.Open(new ErgoptiFixtureNetworkStream(client.Client), () => TrustAdmitted)) {
             try { NativeTls.Authenticate(tls); }
             catch (System.Security.Authentication.AuthenticationException) { Interlocked.Increment(ref FailedTls); return; }
             catch (IOException) { Interlocked.Increment(ref FailedTls); return; }

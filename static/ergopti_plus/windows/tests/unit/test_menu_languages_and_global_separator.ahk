@@ -37,15 +37,44 @@ Test("menu layout: the hotstring language rows sit under their own header (menu-
 	_MLG_LanguagesHaveTheirHeader)
 
 _MLG_LanguageRowCarriesItsFlag() {
-	Path := I18nFlagIconPath("fr")
-	AssertTrue(SubStr(Path, -StrLen("\img\flags\fr.bmp")) == "\img\flags\fr.bmp",
-		"the French flag icon must be the one the language selector draws, got " . Path)
-	AssertTrue(FileExist(Path) != "", "the French flag icon must ship at " . Path)
-	AssertEqual("", I18nFlagIconPath("xx"), "a locale without a flag icon draws none")
-	Body := _DriverFuncBody("_HS_LanguageRows")
-	AssertTrue(Body != "", "_HS_LanguageRows must be found")
-	AssertTrue(InStr(Body, '"icon",  I18nFlagIconPath(Pack["locale"])') > 0,
-		"each language pack row must carry its locale's flag icon")
+	global SubMenus, _FmtCountCache, _I18nFlagExistsCache
+	SavedMenus := IsSet(SubMenus) ? SubMenus : unset
+	SavedCounts := IsSet(_FmtCountCache) ? _FmtCountCache : unset
+	SavedFlags := IsSet(_I18nFlagExistsCache) ? _I18nFlagExistsCache : unset
+	try {
+		SubMenus := Map(), _FmtCountCache := Map(), _I18nFlagExistsCache := Map()
+		Path := I18nFlagIconPath("fr")
+		AssertTrue(SubStr(Path, -StrLen("\img\flags\fr.bmp")) == "\img\flags\fr.bmp",
+			"the French flag icon must be the one the language selector draws, got " . Path)
+		AssertTrue(FileExist(Path) != "", "the French flag icon must ship at " . Path)
+		AssertEqual("", I18nFlagIconPath("xx"), "a locale without a flag icon draws none")
+		Body := _DriverFuncBody("_HS_LanguageRows")
+		AssertTrue(Body != "", "_HS_LanguageRows must be found")
+		; Empty category menus avoid borrowing native category/count ownership;
+		; the real language switch and declared parent still render for every pack.
+		Packs := HotstringsLanguageCategories()
+		AssertTrue(Packs is Array && Packs.Length > 0, "the declared language packs must be present")
+		Rows := _HS_LanguageRows()
+		AssertTrue(Rows is Array, "the real language provider must return rows")
+		AssertEqual(Packs.Length, Rows.Length, "every declared language pack must render one parent")
+		for Index, Pack in Packs {
+			Row := Rows[Index]
+			AssertTrue(Row is Map, "each declared language parent must be a row")
+			AssertEqual(HotstringsLanguageName(Pack["locale"]) . " (" . FmtCount(0) . ")",
+				Row.Get("label", ""), "the parent must belong to the corresponding locale")
+			ExpectedIcon := I18nFlagIconPath(Pack["locale"])
+			AssertTrue(ExpectedIcon != "" && FileExist(ExpectedIcon) != "",
+				"each declared language pack must ship its locale's flag icon")
+			AssertTrue(Row.Has("icon") && Type(Row["icon"]) == "String",
+				"each language pack row must carry its locale's flag icon")
+			AssertEqual(ExpectedIcon, Row["icon"],
+				"the real language row must carry its own locale's flag icon")
+		}
+	} finally {
+		SubMenus := IsSet(SavedMenus) ? SavedMenus : unset
+		_FmtCountCache := IsSet(SavedCounts) ? SavedCounts : unset
+		_I18nFlagExistsCache := IsSet(SavedFlags) ? SavedFlags : unset
+	}
 }
 Test("menu layout: each hotstring language row carries its locale's flag (menu-languages-flag)",
 	_MLG_LanguageRowCarriesItsFlag)

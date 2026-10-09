@@ -713,8 +713,13 @@ Test("artifact curl: canonical receipt ownership preserves filesystem stage and 
 ; Failure facts contain only the exact controlled Case identity and bounded scalars.
 ; Original native errors, the seven-case census and the 15000ms caller stay authoritative.
 _ArtifactQueuedTlsFailureFact(Out) {
-	if !(Out is String) || StrLen(Out) > 131072 || InStr(Out, Chr(0))
+	if !(Out is String) || StrLen(Out) > 131072
 		return 0
+	; InStr searches a NUL-terminated needle even when Chr(0) has length one.
+	; Inspect each declared UTF-16 unit so both literal and appended NULs refuse.
+	Loop StrLen(Out)
+		if Ord(SubStr(Out, A_Index, 1)) == 0
+			return 0
 	Candidate := 0
 	Number := "(-?(?:0|[1-9][0-9]{0,9}))"
 	Pattern := "^OWNED_QUEUED_TLS_SHUTDOWN_FAILURE case=([0-6])"

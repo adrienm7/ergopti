@@ -25,7 +25,7 @@ const path = require('node:path');
 const crypto = require('node:crypto');
 const timerContract = require('../diagnostics/hs_delayed_timer_contract.json');
 const karabinerContract = require('../diagnostics/hs_karabiner_config_contract.json');
-const pipeline = require('./ci-pipeline.cjs');
+const pipeline = require('./ci-full-default.cjs');
 const {
 	healthyUpgrade,
 	runContractCases,

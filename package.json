@@ -351,6 +351,7 @@
 		"test:release-packaging-workflow": "node ./tools/test/test-release-packaging-workflow.cjs",
 		"test:ci-pipeline": "node ./tools/test/test-ci-pipeline.cjs",
 		"test:ci-kana-install": "node ./tools/test/test-ci-kana-install.cjs",
+		"test:ci-full-default": "node ./tools/test/test-ci-full-default.cjs",
 		"test:ci-pipeline-wiring": "node ./tools/test/test-ci-pipeline-wiring.cjs",
 		"test:ubuntu-ci-acquisition": "node ./tools/test/test-ubuntu-ci-acquisition.cjs",
 		"test:ci-release-reruns": "node ./tools/test/test-ci-release-reruns.cjs",
