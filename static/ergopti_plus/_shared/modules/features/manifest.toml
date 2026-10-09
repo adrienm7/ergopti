@@ -4079,13 +4079,6 @@ disabled_when_off = true
 health_dot = false
 platforms = ["ahk", "hs", "linux"]
 
-# Fixed Off choice; prompts remain the native live-mode provider's data.
-[[menu.llm_live_controls]]
-type = "check"
-id = "llm_live_mode_off"
-i18n = "menu.llm.live_mode_off"
-checked_when = ["llm_live_is_off"]
-disabled_when = ["llm_live_off_ready"]
 
 [[menu.llm_menu]]
 type = "group"
@@ -4214,10 +4207,6 @@ type = "---"
 platforms = ["ahk"]
 unavailable = "hide"
 
-[[menu.llm_live_off_boundary]]
-type = "---"
-platforms = ["hs"]
-unavailable = "hide"
 
 [[menu.llm_trigger_menu]]
 type = "list"

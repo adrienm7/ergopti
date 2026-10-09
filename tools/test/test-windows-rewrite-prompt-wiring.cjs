@@ -30,7 +30,7 @@
  *    seams they run through exist.
  * 7. Live mode (modules/llm/prediction_live.ahk) is included by the prediction
  *    engine, its action is registered, the automatic trigger and the hotstring
- *    chain arm its override, pausing ends it and the AI menu draws its row.
+ *    chain arm its override and pausing ends it; the duplicate menu is retired.
  * 8. "Why this error?" (llm_screen_error) is a screen action drafting
  *    vision.json's error_answers; the selection translation port
  *    (modules/llm/translate.ahk) and its action (translate_action.ahk) are
@@ -411,11 +411,38 @@ check(
 	bodyOf(read('infra/lifecycle.ahk'), 'Ergopti_OnSuspendEnter').includes('"llm-live-mode"'),
 	'pausing must turn live mode off'
 );
+const menuEmit = bodyOf(read('ui/menu/menu_llm/menu_main.ahk'), '_LLM_Menu_EmitRow');
+const menuSettings = read('ui/menu/menu_llm/menu_settings.ahk');
 check(
-	bodyOf(read('ui/menu/menu_llm/menu_main.ahk'), '_LLM_Menu_EmitRow').includes(
-		'case "llm_live_mode":'
-	),
-	'the AI menu must draw the llm_live_mode row'
+	menuEmit !== '' &&
+		!menuEmit.includes('case "llm_live_mode":') &&
+		!menuEmit.includes('Map("llm_live_mode", LLM_Menu_BuildLiveModeMenu)'),
+	'the genuine AI menu emitter must not reintroduce a duplicate live selector'
+);
+for (const name of [
+	'LLM_Menu_BuildLiveModeMenu',
+	'_LLM_Menu_LiveModeRows',
+	'_LLM_Menu_MakeLiveModeHandler'
+]) {
+	check(
+		bodyOf(menuSettings, name) === '',
+		`the unreachable live menu provider ${name} must be retired`
+	);
+}
+const liveStart = bodyOf(menuSettings, 'LLM_Menu_StartLiveMode');
+const liveStop = bodyOf(menuSettings, 'LLM_Menu_StopLiveMode');
+check(
+	liveStart !== '' &&
+		liveStart.includes('LLM_Menu_ManualPredictionRefusal(') &&
+		liveStart.includes('LLM_Engine_LiveStart(') &&
+		liveStart.includes('return false'),
+	'the retained shortcut start must still validate admission before its actual engine owner'
+);
+check(
+	liveStop !== '' &&
+		liveStop.includes('if !LLM_Engine_LiveStop(') &&
+		liveStop.indexOf('return false') < liveStop.indexOf('_LLM_Menu_ShowNotice('),
+	'the retained stop must preserve an inactive engine refusal before any success notice'
 );
 check(
 	bodyOf(
@@ -473,10 +500,57 @@ for (const [needle, why] of [
 	['if (Spec = "llm_language") {', 'validates the llm_language kind'],
 	['t("dialog.gestures.param_err_llm_language")', "refuses with the kind's error text"],
 	['case "llm_language":', 'prompts for the llm_language kind'],
-	['LLM_Translate_ChoicesText()', 'lists the languages in the prompt']
+	['LLM_Translate_Config()["max_language_bytes"]', 'declares the free-language input limit']
 ]) {
 	check(gestureConfig.includes(needle), `modules/gestures/config.ahk ${why}: ${needle}`);
 }
+/** Receives the nonempty native language candidate path, never an optional empty helper. */
+function languageInputWiring(source) {
+	const prompt = bodyOf(source, 'GesturePromptActionParameter');
+	if (prompt === '') return false;
+	const input = prompt.indexOf('Result := Ui_InputBox(Prompt, Title, Size, Existing)');
+	const cancel = prompt.indexOf('if (Result.Result != "OK")');
+	const blank = prompt.indexOf('if (Spec == "llm_language" && Value == "")');
+	const validate = prompt.indexOf(
+		'if GestureValidateActionParameter(ActionName, Value, &ErrorText)'
+	);
+	const candidate = prompt.indexOf(
+		'"key", GestureActionParameterKey(BindingId, ActionName)',
+		validate
+	);
+	return (
+		input >= 0 &&
+		cancel > input &&
+		blank > cancel &&
+		validate > blank &&
+		candidate > validate &&
+		/if \(Result\.Result != "OK"\)\s+return false/.test(prompt) &&
+		/if \(Spec == "llm_language" && Value == ""\)\s+return false/.test(prompt) &&
+		!prompt.includes('LLM_Translate_ChoicesText()')
+	);
+}
+check(
+	languageInputWiring(gestureConfig),
+	'the native language InputBox must refuse cancel/blank and build only a validated per-binding candidate'
+);
+for (const [needle, label] of [
+	['if (Result.Result != "OK")', 'cancel'],
+	['if (Spec == "llm_language" && Value == "")', 'blank'],
+	['if GestureValidateActionParameter(ActionName, Value, &ErrorText)', 'typed validation'],
+	['"key", GestureActionParameterKey(BindingId, ActionName)', 'binding identity']
+]) {
+	const prompt = bodyOf(gestureConfig, 'GesturePromptActionParameter');
+	check(
+		prompt !== '' &&
+			prompt.includes(needle) &&
+			!languageInputWiring(gestureConfig.replaceAll(needle, 'REMOVED_REQUIRED_BOUNDARY')),
+		`the native input guard must detect omission of ${label}`
+	);
+}
+check(
+	!languageInputWiring(''),
+	'a missing native language owner can never satisfy the input guard'
+);
 for (const field of ['languageChoices', 'languageLabel']) {
 	check(picker.includes(`"${field}"`), `the Windows action picker host must send ${field}`);
 }

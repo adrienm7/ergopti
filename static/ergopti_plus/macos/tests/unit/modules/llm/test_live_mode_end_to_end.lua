@@ -512,157 +512,94 @@ helpers.describe("live mode end to end (llm-live-mode)", function()
 		helpers.assert_eq(#world.posts, 3, "the chain dispatches outside live mode")
 	end)
 
-	helpers.it("drives the same live state from the AI menu's live-mode submenu", function()
+	helpers.it("runs every retained rewrite shortcut without a second profile chooser", function()
 		local world = build_world()
 		world.core_state.user_profiles = {
 			{ id = "custom_7", label = "My translator", system_single = "Translate TAIL. REWRITE: <text>" },
 			{ id = "custom_8", label = "My continuation", system_single = "Continue TAIL." },
 		}
-		-- The keymap bridge's two live-mode entry points, over the real engine
-		local keymap = {
-			get_live_prompt = world.engine.get_live_prompt,
-			set_live_prompt = function(value)
-				if value == nil then
-					world.engine.stop_live_prompt("menu", false)
-					return world.engine.get_live_prompt() == nil
-				end
-				return world.engine.start_live_prompt(value)
-			end,
-		}
-		package.loaded["ui.menu.menu_llm.live_mode_panel"] = nil
-		local Panel = require("ui.menu.menu_llm.live_mode_panel")
-		local redraws = 0
-		local function build()
-			return Panel.build({
-				llm_mod = world.core, keymap = keymap, count = 1, is_disabled = false,
-				update_menu = function() redraws = redraws + 1 end,
-			})
-		end
-
 		local expected = {}
 		for _, profile in ipairs(world.core.BUILTIN_PROFILES) do
 			if Rewrite.is_rewrite_profile(profile) then expected[#expected + 1] = profile.id end
 		end
 		expected[#expected + 1] = "custom_7"
 		local builtin_ids = table.concat(expected, ",")
-		helpers.assert_true(builtin_ids:find("translate_en,translate_ja", 1, true) ~= nil,
-			"the translations are offered: " .. builtin_ids)
-		helpers.assert_true(builtin_ids:find("advanced", 1, true) == nil, "a continuation prompt is not")
-
-		local rows = build()
-		helpers.assert_eq(#rows, 2 + #expected, "Off, a separator, then every rewrite prompt")
-		helpers.assert_eq(rows[1].checked, true, "Off is checked while live mode is off")
-		helpers.assert_eq(rows[2].title, "-")
-		local prompts = Panel.live_prompts(world.core, 1)
-		for index, id in ipairs(expected) do
-			helpers.assert_eq(prompts[index].id, id, "prompt " .. index)
-			helpers.assert_eq(rows[2 + index].title, prompts[index].label, id .. " is labelled like the prompt list")
+		helpers.assert_true(builtin_ids:find("translate_en,translate_ja", 1, true) ~= nil)
+		helpers.assert_true(builtin_ids:find("advanced", 1, true) == nil)
+		for _, id in ipairs(expected) do
+			helpers.assert_true(toggle(world, id), "retained prompt action " .. id)
+			helpers.assert_eq(world.engine.get_live_prompt().profile_id, id)
+			helpers.assert_nil(world.engine.get_live_prompt().num_predictions, "the normal menu owns the inherited count")
+			helpers.assert_true(toggle(world, "translate_en"))
+			helpers.assert_nil(world.engine.get_live_prompt(), "any retained binding stops the same override")
+			helpers.assert_true(notice_is(world.notices[#world.notices], "llm.live.off"))
 		end
-
-		local ja_row = rows[2 + #expected - 1]
-		helpers.assert_eq(prompts[#expected - 1].id, "translate_ja")
-		helpers.assert_eq(ja_row.fn(), true)
-		helpers.assert_eq(world.engine.get_live_prompt().profile_id, "translate_ja", "the menu turns live mode on")
-		helpers.assert_eq(world.engine.get_live_prompt().num_predictions, nil, "with the menu's count")
-		helpers.assert_eq(redraws, 1)
-		rows = build()
-		helpers.assert_eq(rows[1].checked, false)
-		helpers.assert_eq(rows[2 + #expected - 1].checked, true, "the current prompt is checked")
-
-		-- The action and the menu share one state: a toggle turns the menu's choice off
-		helpers.assert_eq(toggle(world, "translate_en"), true)
-		helpers.assert_eq(world.engine.get_live_prompt(), nil)
-		helpers.assert_eq(build()[1].checked, true)
-
-		helpers.assert_eq(build()[2 + #expected].fn(), true)
-		helpers.assert_eq(world.engine.get_live_prompt().profile_id, "custom_7", "a custom rewrite prompt")
-		helpers.assert_eq(build()[1].fn(), true)
-		helpers.assert_eq(world.engine.get_live_prompt(), nil, "Off turns live mode off")
-		helpers.assert_true(notice_is(world.notices[#world.notices], "llm.live.off"))
+		helpers.assert_true(toggle(world, "custom_7|2"))
+		helpers.assert_eq(world.engine.get_live_prompt().num_predictions, 2, "explicit shortcut count is retained")
+		helpers.assert_true(toggle(world, "custom_7|2")); helpers.assert_nil(world.engine.get_live_prompt())
 		assert_menu_untouched(world)
 	end)
 end)
 
 
-helpers.describe("declared live Off choice", function()
+helpers.describe("retained live shortcut stop", function()
 	local function corpus()
 		local file = assert(io.open(helpers.shared("tests/corpus/menus/llm_live_off.json"), "r"))
 		local value = json.decode(file:read("*a")); file:close(); return value
 	end
 
-	helpers.it("retains the actual bridge and refuses a retained row after admission changes", function()
+	helpers.it("retains the actual action bridge and refuses after its capability is withdrawn", function()
 		local world = build_world()
-		local Panel = require("ui.menu.menu_llm.live_mode_panel")
-		local calls, redraws = 0, 0
-		local keymap = { get_live_prompt = world.engine.get_live_prompt,
-			set_live_prompt = function(value)
-				calls = calls + 1
-				if value == nil then world.engine.stop_live_prompt("menu", false); return world.engine.get_live_prompt() == nil end
-				return world.engine.start_live_prompt(value)
-			end }
-		local ctx = { llm_mod = world.core, keymap = keymap, count = 1, is_disabled = false,
-			update_menu = function() redraws = redraws + 1 end }
-		helpers.assert_true(world.engine.start_live_prompt("translate_en"))
+		helpers.assert_true(toggle(world, "translate_en"))
 		local before = world.engine.get_live_prompt()
-		local row = Panel.build(ctx)[1]
-		helpers.assert_eq(row.checked, false)
-		ctx.is_disabled = true
-		local result = row.fn()
-		helpers.assert_eq(result, false, "the retained declaration rechecks current admission")
-		helpers.assert_eq(calls, 0, "refusal happens before entering the bridge")
-		helpers.assert_eq(redraws, 0)
+		local keymap = package.loaded["modules.keymap"]
+		package.loaded["modules.keymap"] = {}
+		local result = toggle(world, "translate_en")
+		helpers.assert_true(result, "the registered action keeps dispatch ownership without a guessed bridge")
 		helpers.assert_eq(world.engine.get_live_prompt(), before)
-		ctx.is_disabled = false
-		helpers.assert_eq(row.fn(), true)
-		helpers.assert_eq(calls, 1)
-		helpers.assert_eq(redraws, 1)
+		package.loaded["modules.keymap"] = keymap
+		helpers.assert_true(toggle(world, "translate_en"))
 		helpers.assert_nil(world.engine.get_live_prompt())
-		helpers.assert_eq(Panel.build(ctx)[1].checked, true)
+		helpers.assert_true(notice_is(world.notices[#world.notices], "llm.live.off"))
 		assert_menu_untouched(world)
 	end)
 
-	helpers.it("uses all actual locale labels and preserves refused bridge state", function()
+	helpers.it("uses all actual stop notices and preserves refused action bridge state", function()
 		local world = build_world()
-		local Panel = require("ui.menu.menu_llm.live_mode_panel")
 		local i18n = require("infra.i18n")
-		local saved_get = i18n.get
-		local spec = corpus()
-		local calls, redraws, result = 0, 0, false
-		local before = { profile_id = "translate_en" }
-		local ctx = { llm_mod = world.core, count = 1,
-			keymap = { get_live_prompt = function() return before end,
-				set_live_prompt = function(value) calls = calls + 1; return result end },
-			update_menu = function() redraws = redraws + 1 end }
+		local saved_get, spec = i18n.get, corpus()
+		local keymap, calls = package.loaded["modules.keymap"], 0
 		local ok, err = xpcall(function()
 			for _, code in ipairs(spec.locales) do
 				local file = assert(io.open(helpers.shared("data/locales/" .. code .. ".json"), "r"))
 				local catalog = json.decode(file:read("*a")); file:close()
 				i18n.get = function(key) return catalog[key] or key end
-				local row = Panel.build(ctx)[1]
-				helpers.assert_eq(row.title, catalog[spec.label_key], code)
-				helpers.assert_eq(row.checked, false)
-				local observed = row.fn()
-				helpers.assert_eq(observed, false)
-				helpers.assert_eq(ctx.keymap.get_live_prompt(), before)
+				helpers.assert_true(toggle(world, "translate_en"))
+				helpers.assert_eq(world.engine.get_live_prompt() == nil, false)
+				helpers.assert_true(toggle(world, "translate_ja"))
+				helpers.assert_nil(world.engine.get_live_prompt())
+				helpers.assert_eq(world.notices[#world.notices], catalog[spec.stop_notice_key], code)
 			end
+			helpers.assert_true(toggle(world, "translate_en"))
+			local before = world.engine.get_live_prompt()
 			for _, refusal in ipairs(spec.refusals) do
-				ctx.keymap.set_live_prompt = function()
-					calls = calls + 1
+				package.loaded["modules.keymap"] = { toggle_live_prompt = function(value)
+					calls = calls + 1; helpers.assert_eq(value, "translate_en")
 					if refusal == "throw" then error("owned live refusal") end
 					if refusal == "number" then return 2 end
 					if refusal == "nil" then return nil end
 					return false
-				end
-				local invoked, receipt = pcall(Panel.build(ctx)[1].fn)
-				if refusal == "throw" then helpers.assert_eq(invoked, false)
-				else helpers.assert_eq(invoked, true); helpers.assert_eq(receipt, false) end
-				helpers.assert_eq(ctx.keymap.get_live_prompt(), before)
+				end }
+				local invoked, receipt = pcall(toggle, world, "translate_en")
+				-- The action dispatcher retains its established bridge return shape.
+				helpers.assert_true(invoked, "the actual dispatcher contains the callback failure")
+				helpers.assert_eq(receipt, refusal ~= "throw", "dispatch ownership is distinct from business refusal")
+				helpers.assert_eq(world.engine.get_live_prompt(), before)
 			end
 		end, debug.traceback)
-		i18n.get = saved_get
-		helpers.assert_true(ok, err)
-		helpers.assert_eq(calls, 25)
-		helpers.assert_eq(redraws, 24, "existing Mac redraw-on-refusal ABI is retained")
+		i18n.get = saved_get; package.loaded["modules.keymap"] = keymap
+		helpers.assert_true(ok, err); helpers.assert_eq(calls, #spec.refusals)
+		assert_menu_untouched(world)
 	end)
 end)
 
@@ -681,7 +618,7 @@ local function with_live_boundary_owner(scenario)
 	local ok, detail = xpcall(function()
 		world = build_world()
 		for _, name in ipairs({ "infra.i18n", "infra.locale", "locale.core", "infra.manifest_menu",
-			"ui.menu.menu_llm.live_mode_panel", "ui.menu.menu_llm.profile_label" }) do package.loaded[name] = nil end
+			"ui.menu.menu_llm.profile_label" }) do package.loaded[name] = nil end
 		native = require("infra.i18n")
 		local backend = require("infra.locale")
 		native.set_locale_injector(function(code) backend.set_locale(code) end)
@@ -690,7 +627,7 @@ local function with_live_boundary_owner(scenario)
 		acquired = native.scope_acquire(owner); helpers.assert_eq(acquired, true)
 		receipt = assert(native.scope_capture(owner)); helpers.assert_eq(native.scope_apply(owner, receipt, "en"), true)
 		local menu = require("infra.manifest_menu"); assert(menu.get_root())
-		scenario(world, require("ui.menu.menu_llm.live_mode_panel"), menu, native)
+		scenario(world, world.engine, menu, native)
 	end, debug.traceback)
 	local restored, released, forgotten = true, true, true
 	if receipt then restored = native.scope_restore(owner, receipt) == true end
@@ -716,67 +653,23 @@ local function with_live_boundary_owner(scenario)
 end
 
 helpers.describe("llm-control-boundaries: actual live prompt owner", function()
-	helpers.it("consumes the shared boundary without changing Off/prompt admission or callbacks (llm-control-boundaries)", function()
-		with_live_boundary_owner(function(world, panel, menu)
-			local expected = control_boundary_corpus()
-			local boundary = expected.boundaries.live
-			local root, original = menu.get_root(), menu.get_array(boundary.section)
-			local calls, redraws = 0, 0
-			local context = { llm_mod = world.core, count = 1, is_disabled = false,
-				keymap = { get_live_prompt = world.engine.get_live_prompt,
-					set_live_prompt = function(id)
-						calls = calls + 1
-						if id == nil then world.engine.stop_live_prompt("menu", false); return world.engine.get_live_prompt() == nil end
-						return world.engine.start_live_prompt(id)
-					end }, update_menu = function() redraws = redraws + 1 end }
-			local function build() return panel.build(context) end
-			local rows, prompts = build(), panel.live_prompts(world.core, 1)
-			helpers.assert_true(#prompts > 0, "genuine builtin rewrite prompts must be reached")
-			helpers.assert_eq(#rows, #prompts + 2)
-			helpers.assert_eq(rows[1].title, expected.live_off_english)
-			helpers.assert_eq(rows[1].checked, true); helpers.assert_type(rows[1].fn, "function")
-			helpers.assert_eq(rows[2].title, "-")
-			for index, prompt in ipairs(prompts) do
-				helpers.assert_eq(rows[index + 2].title, prompt.label); helpers.assert_type(rows[index + 2].fn, "function")
+	helpers.it("retires the second menu declaration without changing prompt admission or shortcut callbacks (llm-control-boundaries)", function()
+		with_live_boundary_owner(function(world, engine, menu)
+			local root = menu.get_root()
+			for _, section in ipairs(control_boundary_corpus().retired_menu_sections) do
+				helpers.assert_nil(root[section], "retired presentation " .. section)
 			end
-			local ok, detail = xpcall(function()
-				root[boundary.section] = { { type = "label", id = "hand_live_boundary", i18n = expected.marker_key,
-					platforms = { "hs" }, unavailable = "hide" } }
-				rows = build()
-				helpers.assert_eq(rows[2].title, expected.marker_english)
-				helpers.assert_eq(rows[2].disabled, true); helpers.assert_nil(rows[2].fn)
-				helpers.assert_eq(rows[3].title, prompts[1].label)
-				helpers.assert_eq(rows[3].fn(), true)
-				helpers.assert_eq(world.engine.get_live_prompt().profile_id, prompts[1].id)
-				helpers.assert_eq(calls, 1); helpers.assert_eq(redraws, 1)
-				local retained = rows[1]
-				context.is_disabled = true
-				helpers.assert_eq(retained.fn(), false)
-				helpers.assert_eq(calls, 1); helpers.assert_eq(redraws, 1)
-				rows = build(); helpers.assert_eq(rows[1].disabled, true); helpers.assert_nil(rows[3].fn)
-				context.is_disabled = false
-				helpers.assert_eq(build()[1].fn(), true); helpers.assert_nil(world.engine.get_live_prompt())
-				helpers.assert_eq(calls, 2); helpers.assert_eq(redraws, 2)
-				root[boundary.section] = nil
-				helpers.assert_eq(build(), {}, "no native fallback after a real declaration withdrawal")
-				root[boundary.section] = { { type = "command", id = "hand_unbound_live_boundary", i18n = expected.marker_key } }
-				helpers.assert_eq(build(), {})
-				helpers.assert_eq(calls, 2); helpers.assert_eq(redraws, 2)
-				context.keymap = nil
-				rows = build(); helpers.assert_eq(#rows, 1); helpers.assert_eq(rows[1].disabled, true)
-				helpers.assert_eq(rows[1].title, expected.live_off_english)
-			end, debug.traceback)
-			root[boundary.section] = original
-			if not ok then error(detail, 0) end
-			context.keymap = { get_live_prompt = world.engine.get_live_prompt,
-				set_live_prompt = function() error("construction cannot enter the native bridge") end }
-			rows = build(); helpers.assert_eq(rows[2].title, "-")
-			helpers.assert_eq(rows[1].checked, true); helpers.assert_eq(calls, 2); helpers.assert_eq(redraws, 2)
+			helpers.assert_eq(engine.start_live_prompt("missing_retired_prompt"), false)
+			helpers.assert_nil(engine.get_live_prompt())
+			helpers.assert_true(toggle(world, "translate_en"))
+			helpers.assert_eq(engine.get_live_prompt().profile_id, "translate_en")
+			helpers.assert_true(toggle(world, "translate_ja"))
+			helpers.assert_nil(engine.get_live_prompt())
 			assert_menu_untouched(world)
 		end)
 	end)
 
-	helpers.it("projects all three presentation roles and each genuine cross-platform absence (llm-control-boundaries)", function()
+	helpers.it("projects retained presentation roles and retired Live absence on every platform (llm-control-boundaries)", function()
 		with_live_boundary_owner(function(_, _, _, native)
 			local expected = control_boundary_corpus()
 			for _, platform in ipairs({ "ahk", "hs", "linux" }) do
@@ -785,6 +678,9 @@ helpers.describe("llm-control-boundaries: actual live prompt owner", function()
 					json_decode = require("adapters.json_codec").decode, i18n = native, logger = require("infra.logger") }))
 				for _, boundary in pairs(expected.boundaries) do
 					helpers.assert_eq(renderer.template_rows(boundary.section, {}, {}, {}), boundary.projections[platform])
+				end
+				for _, section in ipairs(expected.retired_menu_sections) do
+					helpers.assert_nil(renderer.get_root()[section], platform .. ": retired presentation " .. section)
 				end
 			end
 		end)
