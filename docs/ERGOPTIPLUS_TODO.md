@@ -5853,6 +5853,17 @@ E2E scenarios. One existing macOS host scenario is skipped. Native Windows
 execution, final integrated native CI and installed-device acceptance remain
 required; these results do not close this item.
 
+The integrated Windows unit job in manual run 37940538605 at `1028f6bd3`
+executes 10,620 cases: 10,616 pass and four fail. The language-flag case still
+requires the retired inline icon Map text, although the declared parent now
+receives its locale-bound flag getter. Its corrected fixture preserves the
+French BMP, shipped-file, unknown-locale and producer-presence checks, and
+checks every actual language parent, order, label and shipped flag path. The
+corrected fixture's native execution remains pending. Three original managed
+network failures remain with their owner; native desktop, engine E2E, packaging
+and installation are skipped after the main refusal. This does not close the
+remaining menu migration or installed-device acceptance.
+
 - [ ] **62.** Downloads on managed company networks: system trust and
       system proxy for every download child (Ollama installation/server/pull,
       updater/rollback and remote AI), with translated certificate/proxy/blocked/
