@@ -4523,5 +4523,245 @@ class ForegroundRequestRefusalControls(unittest.TestCase):
                 self.assertEqual(len(self.calls), 1 if mode == "query" else 2)
 
 
+class ForegroundOriginalDeadlineControls(unittest.TestCase):
+    """Portable exact owner calls; the child port is explicit, not macOS credit."""
+
+    def owner(self, root):
+        with (
+            patch.object(probe, "NativeProcessGroups"),
+            patch.object(probe.os, "getuid", return_value=501, create=True),
+        ):
+            return probe.Children(root)
+
+    def physical_port(self, owner, *, acquired=None):
+        observed = {}
+
+        def acquire(arguments, native, register, **options):
+            observed["arguments"] = tuple(arguments)
+            observed["environment"] = options["env"]
+            process = subprocess.Popen(
+                [probe.sys.executable, "-I", "-B", "-c", "import time; time.sleep(0.05)"],
+                **options,
+            )
+            observed["process"] = process
+            group = SimpleNamespace(process=process, reaped=False)
+
+            def wait(timeout):
+                observed["wait"] = timeout
+                process.wait(timeout=timeout)
+
+            def settle():
+                if process.poll() is None:
+                    process.terminate()
+                process.wait(timeout=5)
+                group.reaped = True
+                return True
+
+            group.wait_for_exit, group.settle = wait, settle
+            observed["group"] = group
+            register(group)
+            if acquired is not None:
+                acquired()
+            return group
+
+        return observed, acquire
+
+    def test_expired_request_refuses_before_native_child_or_capture_allocation(self):
+        with TemporaryDirectory() as directory:
+            owner = self.owner(Path(directory))
+            with patch.object(probe.time, "monotonic_ns", return_value=1_000_000_000):
+                command = probe.OwnedAutomationRequest(["owned", "permission-request"], 30)
+            with (
+                patch.object(probe.time, "monotonic_ns", return_value=31_000_000_000),
+                patch.object(owner, "start") as start,
+            ):
+                with self.assertRaisesRegex(probe.AdmissionError, "exceeded deadline"):
+                    owner.run(command, timeout=30)
+                start.assert_not_called()
+            self.assertEqual(owner.sequence, 0)
+            self.assertEqual(list(Path(directory).iterdir()), [])
+
+    def test_mutated_argv_or_changed_budget_never_acquires_a_child(self):
+        with TemporaryDirectory() as directory:
+            owner = self.owner(Path(directory))
+            for fault in ("argv", "budget"):
+                with (
+                    self.subTest(fault=fault),
+                    patch.object(probe.time, "monotonic_ns", return_value=1_000_000_000),
+                ):
+                    command = probe.OwnedAutomationRequest(["owned", "permission-request"], 30)
+                    if fault == "argv":
+                        command.append("foreign")
+                    with patch.object(owner, "start") as start:
+                        with self.assertRaises(probe.AdmissionError):
+                            owner.run(command, timeout=31 if fault == "budget" else 30)
+                        start.assert_not_called()
+
+    def test_expired_ui_callback_physically_retires_actual_child_without_late_permission_credit(
+        self,
+    ):
+        with TemporaryDirectory() as directory:
+            owner = self.owner(Path(directory))
+            clock = [1_000_000_000]
+            with patch.object(probe.time, "monotonic_ns", side_effect=lambda: clock[0]):
+                command = probe.OwnedAutomationRequest(["owned", "permission-request"], 30)
+                with self.assertRaises(AttributeError):
+                    command.deadline_ns = 61_000_000_000
+                with self.assertRaises(AttributeError):
+                    command.timeout = 60
+                observed, acquire = self.physical_port(owner)
+
+                def callback(process, deadline):
+                    self.assertIs(process, observed["process"])
+                    self.assertEqual(deadline, 31)
+                    process.wait(timeout=5)
+                    clock[0] = 31_000_000_000
+
+                with patch.object(probe, "acquire_owned", side_effect=acquire):
+                    with self.assertRaisesRegex(probe.AdmissionError, "exceeded deadline"):
+                        owner.run(command, timeout=30, after_start=callback)
+            self.assertNotIn("wait", observed)
+            self.assertTrue(observed["group"].reaped)
+            self.assertIsNotNone(observed["process"].returncode)
+            self.assertEqual(owner.active, [])
+            self.assertEqual(owner.debt, [])
+
+    def test_clock_invalidity_or_regression_refuses_before_child(self):
+        for invalid in (True, -1, "clock", None):
+            with (
+                self.subTest(invalid=invalid),
+                patch.object(probe.time, "monotonic_ns", return_value=invalid),
+            ):
+                with self.assertRaisesRegex(probe.AdmissionError, "clock unavailable"):
+                    probe.OwnedAutomationRequest(["owned", "permission-request"], 30)
+        with patch.object(probe.time, "monotonic_ns", side_effect=(2, 1)):
+            command = probe.OwnedAutomationRequest(["owned", "permission-request"], 30)
+            with self.assertRaisesRegex(probe.AdmissionError, "clock unavailable"):
+                command.remaining()
+
+    def test_actual_child_environment_is_private_and_start_ui_wait_share_original_deadline(self):
+        with TemporaryDirectory() as directory:
+            owner = self.owner(Path(directory))
+            original = owner.environment.copy()
+            clock = [1_000_000_000]
+            with patch.object(probe.time, "monotonic_ns", side_effect=lambda: clock[0]):
+                command = probe.OwnedAutomationRequest(["owned", "permission-request"], 30)
+                clock[0] = 6_000_000_000
+                observed, acquire = self.physical_port(
+                    owner, acquired=lambda: clock.__setitem__(0, 21_000_000_000)
+                )
+
+                def callback(process, deadline):
+                    self.assertIs(process, observed["process"])
+                    self.assertEqual(deadline, 31)
+                    clock[0] = 26_000_000_000
+
+                with patch.object(probe, "acquire_owned", side_effect=acquire):
+                    result = owner.run(command, timeout=30, after_start=callback)
+            self.assertEqual(result.returncode, 0)
+            self.assertEqual(observed["wait"], 5)
+            self.assertEqual(observed["arguments"], ("owned", "permission-request"))
+            self.assertEqual(
+                observed["environment"],
+                {**original, "ERGOPTI_OWNED_AUTOMATION_DEADLINE_NS": "31000000000"},
+            )
+            self.assertEqual(owner.environment, original)
+            self.assertEqual(owner.active, [])
+            self.assertTrue(observed["group"].reaped)
+            self.assertEqual(observed["process"].returncode, 0)
+
+    def test_clock_failure_after_actual_acquisition_keeps_primary_and_retires_same_child(self):
+        with TemporaryDirectory() as directory:
+            owner = self.owner(Path(directory))
+            failure = RuntimeError("independent clock refused after real acquire")
+            acquired = [False]
+
+            def clock():
+                if acquired[0]:
+                    raise failure
+                return 1_000_000_000
+
+            with patch.object(probe.time, "monotonic_ns", side_effect=clock):
+                command = probe.OwnedAutomationRequest(["owned", "permission-request"], 30)
+                observed, acquire = self.physical_port(
+                    owner, acquired=lambda: acquired.__setitem__(0, True)
+                )
+                callback = Mock()
+                with patch.object(probe, "acquire_owned", side_effect=acquire):
+                    with self.assertRaises(RuntimeError) as caught:
+                        owner.run(command, timeout=30, after_start=callback)
+            self.assertIs(caught.exception, failure)
+            callback.assert_not_called()
+            self.assertNotIn("wait", observed)
+            self.assertTrue(observed["group"].reaped)
+            self.assertIsNotNone(observed["process"].returncode)
+            self.assertEqual(owner.active, [])
+            self.assertEqual(owner.debt, [])
+
+    def test_request_deadline_is_captured_before_checkpoint_without_changing_original_argv_options(
+        self,
+    ):
+        with TemporaryDirectory() as directory:
+            root = Path(directory)
+            sender, policy = root / "sender", root / "policy"
+            sender.write_bytes(b"source-bound original sender")
+            policy.write_bytes(b"source-bound original policy")
+            owner = SimpleNamespace(allow_automation_consent=True, allow_owned_consent_ui=False)
+            clock = [1_000_000_000]
+            calls = []
+
+            def checkpoint(phase):
+                if phase == "before-automation-request":
+                    clock[0] = 6_000_000_000
+
+            def run(arguments, **options):
+                self.assertEqual(options, {"check": False, "timeout": 30})
+                mode = arguments[-1]
+                self.assertEqual(
+                    arguments[:6],
+                    ["/usr/bin/sandbox-exec", "-f", str(policy), str(sender), "73136", "nonce"],
+                )
+                calls.append(mode)
+                if mode == "permission-request":
+                    self.assertIs(type(arguments), probe.OwnedAutomationRequest)
+                    self.assertEqual(arguments.deadline_ns, 31_000_000_000)
+                    self.assertEqual(arguments.remaining(), 25)
+                else:
+                    self.assertIs(type(arguments), list)
+                status = -1744 if len(calls) == 1 else 0
+                label = mode.removeprefix("permission-")
+                return subprocess.CompletedProcess(
+                    arguments,
+                    67 if status else 0,
+                    f"OWNED_APPLEEVENT_PREFLIGHT/1 mode={label} osstatus={status}\n",
+                    "",
+                )
+
+            owner.run = run
+            with patch.object(probe.time, "monotonic_ns", side_effect=lambda: clock[0]):
+                receipt = probe.admit_appleevent_permission_prerequisite(
+                    owner, [str(sender), "73136", "nonce"], policy, checkpoint
+                )
+            self.assertEqual(calls, ["permission-query", "permission-request", "permission-query"])
+            self.assertEqual([entry["osstatus"] for entry in receipt["statuses"]], [-1744, 0, 0])
+
+    def test_native_request_pump_uses_original_public_deadline_and_same_app_only(self):
+        source = Path(probe.__file__).with_name("native_appleevent_probe_sender.c").read_text()
+        start = source.index("static int admit_sender_foreground_request(")
+        body = source[start : source.index("/* A separate closed metadata frame", start)]
+        self.assertIn("foreground_deadline_ns(&deadline)", body)
+        self.assertIn("now < previous || now >= deadline", body)
+        self.assertIn("now >= previous && now < deadline ? 0 : 2", body)
+        self.assertIn("[application finishLaunching]", body)
+        self.assertIn("NSApplicationActivationPolicyAccessory", body)
+        self.assertIn("remaining < 0.05 ? remaining : 0.05", body)
+        self.assertIn("nextEventMatchingMask:NSEventMaskAny", body)
+        self.assertIn("inMode:NSDefaultRunLoopMode dequeue:YES", body)
+        self.assertIn("if (event != nil) [application sendEvent:event]", body)
+        self.assertNotIn("owned_appleevent_permission", body)
+        self.assertNotIn("NSApplicationActivationPolicyRegular", body)
+        self.assertNotIn("sleep(", body)
+
+
 if __name__ == "__main__":
     unittest.main()

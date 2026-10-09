@@ -67,6 +67,13 @@ const WRAPPERS = [
 		1
 	],
 	[MAC, 'managed-ollama-native', 'Retain independent native SDK XCTest diagnostics', 5, 6],
+	[
+		MAC,
+		'managed-ollama-native',
+		'Qualify actual native PAC source ownership XCTest controls',
+		7,
+		8
+	],
 	[MAC, 'managed-ollama-native', 'Qualify actual native PAC and WPAD XCTest controls', 7, 8],
 	[MAC, 'managed-ollama-native', 'Retain independent native PAC XCTest diagnostics', 5, 6],
 	[MAC, 'managed-ollama-native', 'Receive actual independent managed HTTP native clients', 7, 8],

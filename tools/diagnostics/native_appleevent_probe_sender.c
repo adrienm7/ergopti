@@ -9,6 +9,8 @@
 #include <stdbool.h>
 #include <sys/stat.h>
 #include <limits.h>
+#include <stdint.h>
+#include <mach/mach_time.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -176,14 +178,61 @@ static int observe_sender_policy(NSApplication *application) {
     }
 }
 
-/* The explicitly requested normal consent path may activate this same app.
- * Keep the admitted Accessory policy and require observed foreground readiness;
- * neither activation nor this precondition grants Automation permission. */
+/* Python's macOS monotonic_ns clock is this same public mach clock. */
+static bool foreground_now_ns(uint64_t *value) {
+    mach_timebase_info_data_t base;
+    if (mach_timebase_info(&base) != KERN_SUCCESS || base.numer == 0 || base.denom == 0)
+        return false;
+    const unsigned __int128 ns = (unsigned __int128)mach_absolute_time() * base.numer / base.denom;
+    if (ns > UINT64_MAX) return false;
+    *value = (uint64_t)ns;
+    return true;
+}
+
+static bool foreground_deadline_ns(uint64_t *value) {
+    const char *encoded = getenv("ERGOPTI_OWNED_AUTOMATION_DEADLINE_NS");
+    if (encoded == NULL || encoded[0] < '1' || encoded[0] > '9') return false;
+    size_t count = 0;
+    while (count < 21 && encoded[count] != '\0') count++;
+    if (count > 20) return false;
+    for (size_t index = 0; index < count; index++)
+        if (encoded[index] < '0' || encoded[index] > '9') return false;
+    errno = 0;
+    char *end = NULL;
+    const unsigned long long parsed = strtoull(encoded, &end, 10);
+    if (errno != 0 || end == encoded || *end != '\0' || parsed == 0) return false;
+    *value = (uint64_t)parsed;
+    return true;
+}
+
+/* Normal activation can complete asynchronously. Only this explicitly opted-in
+ * same app pumps its own events; fresh activity before the original deadline is
+ * mandatory, and neither activation nor event processing grants permission. */
 static int admit_sender_foreground_request(NSApplication *application) {
     if (application == nil) return 1;
-    if ([application isActive]) return 0;
+    uint64_t deadline, now, previous;
+    if (!foreground_deadline_ns(&deadline) || !foreground_now_ns(&now) || now >= deadline)
+        return 2;
+    previous = now;
+    if ([application isActive]) {
+        return foreground_now_ns(&now) && now >= previous && now < deadline ? 0 : 2;
+    }
+    [application finishLaunching];
+    if ([application activationPolicy] != NSApplicationActivationPolicyAccessory) return 2;
     [application activateIgnoringOtherApps:YES];
-    return [application isActive] ? 0 : 2;
+    while (true) {
+        if (!foreground_now_ns(&now) || now < previous || now >= deadline) return 2;
+        previous = now;
+        if ([application isActive]) {
+            return foreground_now_ns(&now) && now >= previous && now < deadline ? 0 : 2;
+        }
+        const double remaining = (double)(deadline - now) / 1000000000.0;
+        const double slice = remaining < 0.05 ? remaining : 0.05;
+        NSEvent *event = [application nextEventMatchingMask:NSEventMaskAny
+            untilDate:[NSDate dateWithTimeIntervalSinceNow:slice]
+            inMode:NSDefaultRunLoopMode dequeue:YES];
+        if (event != nil) [application sendEvent:event];
+    }
 }
 
 /* A separate closed metadata frame never changes nonce/reply admission. */

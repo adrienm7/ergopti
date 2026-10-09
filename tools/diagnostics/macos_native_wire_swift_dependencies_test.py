@@ -145,6 +145,7 @@ class StandaloneSwiftDependencies(unittest.TestCase):
                 "static/ergopti_plus/macos/platform/network/native_http.py",
                 "static/ergopti_plus/macos/platform/network/managed_http.py",
                 "static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/ManagedHTTPWorker.swift",
+                "static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/ManagedPACSource.swift",
                 "static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/ManagedCertificateAuthorities.swift",
                 "static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/ManagedBootstrapPolicy.generated.swift",
             ):
@@ -174,6 +175,41 @@ class StandaloneSwiftDependencies(unittest.TestCase):
         self.assertEqual(self.closed, [True])
         self.assertEqual(self.arguments, [])
         self.assertIsNone(self.module.RealNativeClientReceiving.root)
+
+    def test_compiler_receives_exact_real_pac_source_owner(self):
+        def inspect(arguments):
+            copied = self.module.RealNativeClientReceiving.root / "ManagedPACSource.swift"
+            original = self.module.MAC / "launcher/Sources/ErgoptiPlus/ManagedPACSource.swift"
+            self.assertIn(str(copied), arguments)
+            self.assertEqual(copied.read_bytes(), original.read_bytes())
+            raise CompilerBoundary()
+
+        self.inspect = inspect
+        with self.assertRaises(CompilerBoundary):
+            self.run_recipe()
+        self.assertEqual(len(self.arguments), 1)
+        self.assert_retired()
+
+    def test_modified_pac_source_copy_refuses_before_compiler(self):
+        copy = self.module.shutil.copy2
+
+        def mutate(source, destination, *arguments, **options):
+            result = copy(source, destination, *arguments, **options)
+            if Path(destination).name == "ManagedPACSource.swift":
+                Path(destination).write_bytes(b"foreign PAC source owner")
+            return result
+
+        self.inspect = lambda arguments: self.fail("modified PAC source reached compiler")
+        with patch.object(self.module.shutil, "copy2", mutate):
+            with self.assertRaisesRegex(
+                RuntimeError, "Native Swift source changed before compilation"
+            ):
+                self.run_recipe()
+        self.assertEqual(self.arguments, [])
+        self.assert_retired()
+
+    def test_missing_real_pac_source_retires_before_compiler(self):
+        self.missing_source("ManagedPACSource.swift")
 
 
 if __name__ == "__main__":

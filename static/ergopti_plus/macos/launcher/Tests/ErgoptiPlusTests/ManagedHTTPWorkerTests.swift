@@ -225,7 +225,7 @@ final class ManagedHTTPWorkerTests: XCTestCase {
 			return "PROXY pac-shape.invalid:" + (20000 + 10 * u + h);
 		}
 		"""
-		let routes = try XCTUnwrap(ManagedProxyLookup.evaluate(url: url,
+		let routes = try XCTUnwrap(ManagedProxyLookup.evaluateNative(url: url,
 			pacURL: nil, script: script, deadline: deadline))
 		XCTAssertEqual(routes.count, 1)
 		guard routes.count == 1 else { return }
