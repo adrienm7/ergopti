@@ -8345,6 +8345,16 @@ and installation qualification are still required.
   actual permission observation, Darwin retirement and final CI provenance
   remain UNRUN. Controlled metadata tests do not qualify the native SDK call.
 
+  An additive process-level XCTest now starts the actual SwiftPM launcher
+  through its existing production permission-observation role, requires the
+  original HELD/ACTIVATE/exact-retirement protocol and normal exit, and retains
+  the fixed actual SDK OSStatus under caller=native-test-product. All 17
+  predecessor cases, five-second test polling and 20-second production
+  supervision remain unchanged. Source review and portable causal controls
+  pass; fresh native compilation and the new API execution remain UNRUN.
+  Its result cannot qualify the signed application or osascript principal,
+  catalogue discovery, consent or shortcut invocation.
+
   Remaining software: inventory supported automation/application providers and
   implement their real availability/invocation contracts. Add bounded Apple
   Shortcuts catalogue ownership, chosen-ID revalidation, safe native invocation,
@@ -8418,6 +8428,17 @@ Final joined-source gates and remote Shortcut retirement remain required.
   All 15 original cases and 79 assertions remain; the expanded registered owner
   tests pass 22/0 on LuaJIT and Lua 5.4, and the previous source fails all seven
   added cases. Native TIS/GUI and final installed qualification remain pending.
+
+  The macOS consumer also captures its original plain probe module and exact
+  getter/request before external construction reads. Every observation,
+  asynchronous projection, native registration and delivery rejoins that
+  issuer; replaced exports refuse before allocation or action. Original
+  query/handle cancellation and retry debts remain owned after revocation.
+  All 22 prior cases and 109 assertions remain byte-exact; 40 focused cases
+  pass on both Lua ABIs, the former producer fails all 18 additions, and
+  nine independent omissions fail on both ABIs. These observed identity
+  barriers do not establish a native source epoch or unseen ABA transition.
+  Actual TIS/GUI, packaging and installed qualification remain pending.
 
   Remaining software: finish live effective-source retargeting, collisions
   against every owner and current modifier/output custody without overriding
