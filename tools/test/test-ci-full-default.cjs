@@ -423,6 +423,97 @@ check('full Linux package retains cancellation and manual receiving allowance', 
 			}
 	assert.equal(cases, 72);
 });
+check('package duplicate HTTP receiving scopes only the native wire command', () => {
+	const job = Raw.jobsOfText(source.find((entry) => entry.rel === MAC).text, MAC).find(
+		(entry) => entry.id === 'package-macos'
+	);
+	const code = Raw.runOf(Raw.step(job.body, 'Receive actual managed HTTP native clients')).join(
+		'\n'
+	);
+	const first =
+		'"$ERGOPTI_NATIVE_HTTP_PYTHON" tools/diagnostics/macos_owned_process_native_test.py || status=1';
+	const second =
+		'"$ERGOPTI_NATIVE_HTTP_PYTHON" static/ergopti_plus/macos/tests/support/native_http_receiving_test.py --client-only || status=1';
+	const wire =
+		'"$ERGOPTI_NATIVE_HTTP_PYTHON" static/ergopti_plus/macos/tests/support/native_http_wire_client_receiving.py || status=1';
+	assert.ok(code.indexOf(first) < code.indexOf('--scope macos-native-http'));
+	assert.ok(code.indexOf(second) < code.indexOf('--scope macos-native-http'));
+	assert.ok(code.includes('elif [ "$mode" = full ]; then\n    ' + wire));
+	assert.ok(code.includes('stable-macos-native-http-package.json'));
+	assert.equal(
+		Full.runOf(
+			Full.step(Full.job('package-macos'), 'Receive actual managed HTTP native clients')
+		).join('\n'),
+		['set -euo pipefail', 'status=0', first, second, wire, 'exit "$status"'].join('\n')
+	);
+});
+check('package duplicate keeps both mandatory failure acknowledgments', () => {
+	const original = source.find((entry) => entry.rel === MAC);
+	const job = Raw.jobsOfText(original.text, MAC).find((entry) => entry.id === 'package-macos');
+	const step = Raw.step(job.body, 'Receive actual managed HTTP native clients');
+	for (const command of [
+		'macos_owned_process_native_test.py',
+		'native_http_receiving_test.py --client-only'
+	]) {
+		const before = command + ' || status=1';
+		const mutated = step.replace(before, command + ' || true');
+		assert.notEqual(mutated, step);
+		assert.throws(() => Full.fromFiles(changed(MAC, step, mutated)), /admission/);
+	}
+	const uploader = Raw.step(job.body, 'Retain scoped native Brew qualification receipt');
+	assert.ok(
+		uploader.includes('${{ runner.temp }}/dev-release-qualification/macos-brew-archive.json')
+	);
+	assert.ok(uploader.includes('${{ runner.temp }}/stable-macos-native-http-package.json'));
+	assert.equal(Raw.stepField(uploader, 'if'), '${{ always() }}');
+	assert.match(uploader, /^ {10}if-no-files-found: error$/m);
+});
+check(
+	'duplicate native HTTP scope remains full for every foreign stable context and expiry',
+	() => {
+		const stable = JSON.parse(fs.readFileSync(Policy.STABLE_POLICY_PATH, 'utf8'));
+		const admitted = Object.fromEntries(
+			['repository', 'event_name', 'ref', 'release', 'prerelease', 'channel', 'tag', 'version'].map(
+				(key) => [key, stable[key]]
+			)
+		);
+		admitted.github_actions = 'true';
+		const clock = new Date('2026-10-09T20:00:00Z');
+		assert.equal(
+			Policy.resolveQualificationProfile(admitted, clock, 'macos-native-http').id,
+			stable.id
+		);
+		for (const [key, value] of [
+			['github_actions', 'false'],
+			['repository', 'foreign/ergopti'],
+			['event_name', 'pull_request'],
+			['event_name', 'workflow_dispatch'],
+			['ref', 'refs/heads/dev'],
+			['release', false],
+			['prerelease', 'true'],
+			['channel', 'dev'],
+			['tag', 'v1.0.1'],
+			['version', '1.0.1']
+		])
+			assert.equal(
+				Policy.resolveQualificationProfile(
+					{ ...admitted, [key]: value },
+					clock,
+					'macos-native-http'
+				),
+				null
+			);
+		assert.equal(
+			Policy.resolveQualificationProfile(
+				admitted,
+				new Date(stable.expires_at),
+				'macos-native-http'
+			),
+			null
+		);
+		assert.equal(Object.keys(stable.scopes).length, 13);
+	}
+);
 console.log(
 	`PASS: raw full-default and retired-route source controls=${passed}; native execution UNRUN.`
 );
