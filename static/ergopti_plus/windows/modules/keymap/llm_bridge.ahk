@@ -800,6 +800,56 @@ _LLM_SlotAccept_Insert(State) {
 		State["slot"], Gate != "" ? Gate : "another acceptance owned the claim")
 }
 
+/**
+ * Third canonical acceptance primitive: inserts the active slot of the shown
+ * prediction because an external program asked for it
+ * (llm-automation-accepts). The request proves intent only, so it keeps the
+ * checks a chord's insertion keeps: no modifier held and verified focus in
+ * the control that owns the render.
+ * @param {Map} InputSnapshot - Optional current physical/focus snapshot.
+ * @param {Func} AcceptFn - Optional injection callback.
+ * @returns {boolean} True when the prediction was claimed and dispatched.
+ */
+LLM_Tooltip_TryAcceptAutomation(InputSnapshot := unset, AcceptFn := unset) {
+	Presented := LLM_Tooltip_GetAcceptSnapshot()
+	if !IsSet(InputSnapshot)
+		InputSnapshot := _LLM_Accept_ReadInputSnapshot()
+	Gate := _LLM_Accept_AutomationRefusal(Presented, InputSnapshot)
+	if Gate == "" && _LLM_Accept_ClaimAndDispatch(Presented, AcceptFn?)
+		return true
+	; The requester sees nothing typed, so the refusal must be named.
+	try LoggerWarn("LLM", "Automation request did not insert the prediction: {1}.",
+		Gate != "" ? Gate : "another acceptance owned the claim")
+	return false
+}
+
+; The first condition of the automation policy that fails, or "" when it admits
+; the insertion: the single implementation of that policy.
+_LLM_Accept_AutomationRefusal(Presented, InputSnapshot) {
+	if !IsObject(Presented)
+		return "no prediction offers an acceptable snapshot"
+	if !(InputSnapshot is Map)
+		return "the input snapshot is missing"
+	for Key in ["known", "ctrl_down", "alt_down", "shift_down", "win_down"] {
+		if !InputSnapshot.Has(Key) || !(InputSnapshot[Key] is Integer)
+			return "the input snapshot is incomplete"
+	}
+	if _LLM_Accept_AnyModifierDown(InputSnapshot)
+		return "a modifier is physically held"
+	if !_LLM_Accept_FocusMatchesSource(InputSnapshot, Presented.AcceptSource)
+		return "the focus is not the control the prediction was rendered for"
+	return ""
+}
+
+; Runs one automation request off the message thread
+; (adapters/llm_automation.ahk); the bridge may have stopped since it arrived.
+_LLM_Automation_Accept() {
+	if A_IsSuspended || !_LLM_Bridge_Active
+		return
+	if LLM_Tooltip_TryAcceptAutomation()
+		LLM_Engine_CancelTimer()
+}
+
 ; Emit Tab normally whenever canonical acceptance rejects it. A tap-hold's Tab
 ; tap passes TapHoldTapProvenance(), the user's own key, and accepts like the
 ; physical Tab; a gesture keeps the default false provenance, so it navigates as
@@ -850,6 +900,7 @@ LLM_Bridge_Start(opts) {
 		throw Err
 	}
 	_LLM_Bridge_Active := true
+	_LLM_Automation_Listen(true)
 	try LoggerInfo("LLM", "Bridge engine ready — keystrokes via HookDispatcher until PrefixWatcher starts.")
 }
 
@@ -864,6 +915,7 @@ _LLM_Bridge_Activate(source) {
 	_LLM_PointerWatch_Start()
 	_LLM_Bridge_UnregisterDispatcherFallback()
 	_LLM_Bridge_Active := true
+	_LLM_Automation_Listen(true)
 	try LoggerInfo("LLM", "Bridge active — keystrokes via {1}.", source)
 }
 
@@ -943,6 +995,7 @@ LLM_Bridge_Stop() {
 	LLM_Bridge_CancelPrefixObserver()
 	_LLM_Bridge_UnregisterDispatcherFallback()
 	_LLM_PointerWatch_Stop()
+	_LLM_Automation_Listen(false)
 	if !_LLM_Bridge_Active
 		return
 	_LLM_Bridge_Active := false
