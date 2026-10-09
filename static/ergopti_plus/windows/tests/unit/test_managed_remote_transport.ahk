@@ -311,12 +311,13 @@ Test("managed remote native: failed printer preserves cleanup result and fence (
 ; restore the caller's exact timing state even when dispatch or assertions fail.
 _ManagedRemoteFixtureWithLlmTimings(Callback) {
 	global LLM_OLLAMA_POLL_MS, LLM_REMOTE_TIMEOUT_MS, LLM_REMOTE_POLL_MS
-	global LLM_INSTALLED_CACHE_TTL_MS, LLM_DEPS_POLL_TIMEOUT_MS
+	global LLM_INSTALLED_CACHE_TTL_MS, LLM_DEPS_POLL_TIMEOUT_MS, LLM_REMOTE_READY_PING_DEADLINE_MS
 	Previous := [IsSet(LLM_OLLAMA_POLL_MS) ? LLM_OLLAMA_POLL_MS : unset,
 		IsSet(LLM_REMOTE_TIMEOUT_MS) ? LLM_REMOTE_TIMEOUT_MS : unset,
 		IsSet(LLM_REMOTE_POLL_MS) ? LLM_REMOTE_POLL_MS : unset,
 		IsSet(LLM_INSTALLED_CACHE_TTL_MS) ? LLM_INSTALLED_CACHE_TTL_MS : unset,
-		IsSet(LLM_DEPS_POLL_TIMEOUT_MS) ? LLM_DEPS_POLL_TIMEOUT_MS : unset]
+		IsSet(LLM_DEPS_POLL_TIMEOUT_MS) ? LLM_DEPS_POLL_TIMEOUT_MS : unset,
+		IsSet(LLM_REMOTE_READY_PING_DEADLINE_MS) ? LLM_REMOTE_READY_PING_DEADLINE_MS : unset]
 	try {
 		LLMApiLoadTimings()
 		return Callback.Call()
@@ -326,6 +327,7 @@ _ManagedRemoteFixtureWithLlmTimings(Callback) {
 		LLM_REMOTE_POLL_MS := Previous.Has(3) ? Previous[3] : unset
 		LLM_INSTALLED_CACHE_TTL_MS := Previous.Has(4) ? Previous[4] : unset
 		LLM_DEPS_POLL_TIMEOUT_MS := Previous.Has(5) ? Previous[5] : unset
+		LLM_REMOTE_READY_PING_DEADLINE_MS := Previous.Has(6) ? Previous[6] : unset
 	}
 }
 
@@ -546,6 +548,10 @@ class _ManagedRemoteFixtureOwner {
 		this.GenerationCount := 0
 		this.GenerationDiagnosticPrinter := _TestPrint
 		this.GenerationDiagnosticStatus := "not_requested"
+		this.ReadinessCount := 0
+		this.ReadinessRuns := Map()
+		this.ReadinessDiagnosticPrinter := _TestPrint
+		this.ReadinessDiagnosticStatus := "not_requested"
 		this.Mode := "fixed"
 		this.Capture := 0
 		this.State := Map()
@@ -758,10 +764,11 @@ class _ManagedRemoteFixtureOwner {
 		AssertFalse(_LLM_Remote_Async.Has(ReqId), "settled generation must retire its own registry entry")
 	}
 
-	ReadyCompleted(Result, Owner, Ready) {
+	ReadyCompleted(Result, Owner, Run, Ready) {
 		CancelFn := Owner.Get("cancel", 0)
 		if HasMethod(CancelFn, "Call")
 			this.ReadyCancels.Push(CancelFn)
+		_ManagedRemoteFixtureCaptureReadinessCallback(this, Run, Owner)
 		Result.Push(Ready)
 	}
 
@@ -770,21 +777,31 @@ class _ManagedRemoteFixtureOwner {
 	}
 
 	_CheckReadiness(ExpectedSuccess) {
-		global LLM_API_PROVIDERS
+		global LLM_API_PROVIDERS, LLM_REMOTE_READY_PING_DEADLINE_MS
+		this.ReadinessCount += 1
+		Run := Map("mode", this.Mode, "ordinal", this.ReadinessCount, "http", [], "capture", "retained")
+		Run["deadline_ms"] := LLM_REMOTE_READY_PING_DEADLINE_MS
+		this.ReadinessRuns[this.ReadinessCount] := Run
+		ReadyPort := this.Port.Clone()
+		Factory := _LLM_CurlArtifactPortFn(this.Port, "create_http", () => CurlAsyncRequest())
+		ReadyPort["create_http"] := _ManagedRemoteFixtureCaptureReadinessHttp.Bind(Run, Factory)
 		ProviderId := "managed_network_" . this.Identity
 		AssertFalse(LLM_API_PROVIDERS.Has(ProviderId), "owned acceptance provider identity must be unique")
 		Result := []
 		Owner := LLM_AuxBegin(ProviderId, Map("backend", "api", "endpoint", this.BaseUrl, "identity", ProviderId))
+		Run["owner"] := Owner
 		this.ReadyOwners.Push(Owner)
 		LLM_API_PROVIDERS[ProviderId] := Map("Format", "openai", "BaseUrl", this.BaseUrl)
 		try {
 			LLM_RemoteIsReady_Async(Map("Provider", ProviderId, "Token", "managed-network-fixture-token"),
-				ObjBindMethod(this, "ReadyCompleted", Result, Owner), Owner, this.Port)
+				ObjBindMethod(this, "ReadyCompleted", Result, Owner, Run), Owner, ReadyPort)
 			Started := A_TickCount
 			while Result.Length == 0 && !TickExpired64(Started, 18000) {
 				_SR_TreePoll()
 				Sleep(10)
 			}
+			if Result.Length != 1 || Result[1] != ExpectedSuccess
+				_ManagedRemoteFixtureEmitReadinessDiagnostic(this, Run, Result, ExpectedSuccess)
 			AssertEqual(1, Result.Length, "actual readiness must settle once within its native budget")
 			AssertEqual(ExpectedSuccess, Result[1], "readiness must obey the actual system root and selected relay")
 		} finally {
@@ -1112,10 +1129,11 @@ Test("managed remote native: filtered generation owns canonical poll timing (man
 
 _ManagedRemoteTimingScopeBody(Control) {
 	global LLM_OLLAMA_POLL_MS, LLM_REMOTE_TIMEOUT_MS, LLM_REMOTE_POLL_MS
-	global LLM_INSTALLED_CACHE_TTL_MS, LLM_DEPS_POLL_TIMEOUT_MS
+	global LLM_INSTALLED_CACHE_TTL_MS, LLM_DEPS_POLL_TIMEOUT_MS, LLM_REMOTE_READY_PING_DEADLINE_MS
 	Control["calls"] += 1
 	AssertEqual(TimingsGet("llm", "poll_interval_ms"), LLM_OLLAMA_POLL_MS)
 	AssertEqual(TimingsGet("llm", "request_timeout_ms"), LLM_REMOTE_TIMEOUT_MS)
+	AssertEqual(TimingsGet("llm", "request_timeout_ms"), LLM_REMOTE_READY_PING_DEADLINE_MS)
 	AssertEqual(TimingsGet("llm", "poll_interval_ms"), LLM_REMOTE_POLL_MS)
 	AssertEqual(TimingsGet("llm", "installed_cache_ttl_ms"), LLM_INSTALLED_CACHE_TTL_MS)
 	AssertEqual(TimingsGet("llm", "dependency_bootstrap_timeout_ms"), LLM_DEPS_POLL_TIMEOUT_MS)
@@ -1126,12 +1144,13 @@ _ManagedRemoteTimingScopeBody(Control) {
 
 _ManagedRemoteTimingScopeRestores() {
 	global LLM_OLLAMA_POLL_MS, LLM_REMOTE_TIMEOUT_MS, LLM_REMOTE_POLL_MS
-	global LLM_INSTALLED_CACHE_TTL_MS, LLM_DEPS_POLL_TIMEOUT_MS, _TimingsCache
+	global LLM_INSTALLED_CACHE_TTL_MS, LLM_DEPS_POLL_TIMEOUT_MS, LLM_REMOTE_READY_PING_DEADLINE_MS, _TimingsCache
 	Previous := [IsSet(LLM_OLLAMA_POLL_MS) ? LLM_OLLAMA_POLL_MS : unset,
 		IsSet(LLM_REMOTE_TIMEOUT_MS) ? LLM_REMOTE_TIMEOUT_MS : unset,
 		IsSet(LLM_REMOTE_POLL_MS) ? LLM_REMOTE_POLL_MS : unset,
 		IsSet(LLM_INSTALLED_CACHE_TTL_MS) ? LLM_INSTALLED_CACHE_TTL_MS : unset,
-		IsSet(LLM_DEPS_POLL_TIMEOUT_MS) ? LLM_DEPS_POLL_TIMEOUT_MS : unset]
+		IsSet(LLM_DEPS_POLL_TIMEOUT_MS) ? LLM_DEPS_POLL_TIMEOUT_MS : unset,
+		IsSet(LLM_REMOTE_READY_PING_DEADLINE_MS) ? LLM_REMOTE_READY_PING_DEADLINE_MS : unset]
 	Cache := _TimingsCache
 	try {
 		for Mode in ["success", "body_failure", "loader_failure", "unset"] {
@@ -1140,6 +1159,7 @@ _ManagedRemoteTimingScopeRestores() {
 			LLM_REMOTE_POLL_MS := Mode == "unset" ? unset : 107
 			LLM_INSTALLED_CACHE_TTL_MS := Mode == "unset" ? unset : 109
 			LLM_DEPS_POLL_TIMEOUT_MS := Mode == "unset" ? unset : 113
+			LLM_REMOTE_READY_PING_DEADLINE_MS := Mode == "unset" ? unset : 127
 			_TimingsCache := Mode == "loader_failure" ? Map() : Cache
 			Control := Map("calls", 0, "fail", Mode == "body_failure", "failure", ValueError("controlled timing body failure"))
 			Caught := false
@@ -1156,13 +1176,15 @@ _ManagedRemoteTimingScopeRestores() {
 			AssertEqual(Mode == "loader_failure" ? 0 : 1, Control["calls"], "failed initialization never admits the operation")
 			if Mode == "unset" {
 				AssertFalse(IsSet(LLM_OLLAMA_POLL_MS) || IsSet(LLM_REMOTE_TIMEOUT_MS) || IsSet(LLM_REMOTE_POLL_MS)
-					|| IsSet(LLM_INSTALLED_CACHE_TTL_MS) || IsSet(LLM_DEPS_POLL_TIMEOUT_MS), "unset ownership is restored exactly")
+					|| IsSet(LLM_INSTALLED_CACHE_TTL_MS) || IsSet(LLM_DEPS_POLL_TIMEOUT_MS)
+					|| IsSet(LLM_REMOTE_READY_PING_DEADLINE_MS), "unset ownership is restored exactly")
 			} else {
 				AssertEqual(101, LLM_OLLAMA_POLL_MS)
 				AssertEqual(103, LLM_REMOTE_TIMEOUT_MS)
 				AssertEqual(107, LLM_REMOTE_POLL_MS)
 				AssertEqual(109, LLM_INSTALLED_CACHE_TTL_MS)
 				AssertEqual(113, LLM_DEPS_POLL_TIMEOUT_MS)
+				AssertEqual(127, LLM_REMOTE_READY_PING_DEADLINE_MS)
 			}
 		}
 	} finally {
@@ -1172,6 +1194,7 @@ _ManagedRemoteTimingScopeRestores() {
 		LLM_REMOTE_POLL_MS := Previous.Has(3) ? Previous[3] : unset
 		LLM_INSTALLED_CACHE_TTL_MS := Previous.Has(4) ? Previous[4] : unset
 		LLM_DEPS_POLL_TIMEOUT_MS := Previous.Has(5) ? Previous[5] : unset
+		LLM_REMOTE_READY_PING_DEADLINE_MS := Previous.Has(6) ? Previous[6] : unset
 	}
 }
 Test("managed remote native: canonical timing scope preserves assigned and unset owners (managed-fixture-timing)",
@@ -1809,6 +1832,12 @@ _ManagedRemoteFixtureGenerationDiagnostic(Mode, Ordinal, ExpectedSuccess, Result
 		. " failure_callbacks=" . (Failure is Array ? _ManagedRemoteFixtureGenerationInteger(Failure.Length, 0, 65535) : "unknown")
 		. " callback_reason=" . Reason
 		. " callback_status=" . _ManagedRemoteFixtureGenerationInteger(_ManagedNetwork_Get(Info, "status", ""), 0, 599)
+	return Fact . _ManagedRemoteFixtureTransportDiagnostic(Receipt, Policy)
+}
+
+; Both checkpoints use the same existing closed receipt parser and field projection.
+_ManagedRemoteFixtureTransportDiagnostic(Receipt, Policy) {
+	Fact := ""
 	Admitted := _ManagedRemoteFixtureGenerationReceipt(Receipt, Policy)
 	Fact .= " native_receipt=" . Admitted["state"]
 	Fields := Admitted["fields"]
@@ -2003,3 +2032,290 @@ _ManagedRemoteGenerationDiagnosticReceiptControls() {
 	}
 }
 Test("managed remote native: generation checkpoint rejects malformed native receipt (managed-fixture-generation-diagnostic)", _ManagedRemoteGenerationDiagnosticReceiptControls)
+
+
+; Capture exact factory returns without changing dispatch, callback or retirement.
+_ManagedRemoteFixtureCaptureReadinessHttp(Run, Factory) {
+	Http := Factory.Call()
+	try Run["http"].Push(Http)
+	catch Any {
+		Run["capture"] := "unavailable"
+	}
+	return Http
+}
+
+; This observer never changes completion or cleanup, including a failed clock/read.
+_ManagedRemoteFixtureCaptureReadinessCallback(Fixture, Run, Owner, TickFn := 0) {
+	global TICK_MAX_DURATION_MS
+	try {
+		if !(Run is Map) || !(Owner is Map) || !(Fixture.ReadinessRuns is Map)
+				|| !Fixture.ReadinessRuns.Has(Run.Get("ordinal", 0))
+				|| Fixture.ReadinessRuns[Run["ordinal"]] != Run || Run.Get("owner", 0) != Owner
+			return false
+		Run["callback_capture"] := "unavailable"
+		Run["callback_snapshot"] := 0
+		if Run.Get("capture", "") != "retained" || !(Run["http"] is Array) || Run["http"].Length != 1
+			return false
+		Http := Run["http"][1]
+		if !(Http is CurlAsyncRequest)
+			return false
+		Snapshot := Map()
+		for Pair in [["send_started", "SendStarted"], ["managed_transport", "ManagedTransport"],
+				["payload_reserved", "ManagedPayloadPublished"], ["completed", "Completed"], ["aborted", "Aborted"]] {
+			Property := Pair[2]
+			Value := Http.%Property%
+			if Type(Value) == "Integer" && (Value == 0 || Value == 1)
+				Snapshot[Pair[1]] := Value
+		}
+		Snapshot["handle_retained"] := IsObject(Http.Handle)
+		Snapshot["admission_fn_retained"] := IsObject(Http.ManagedAdmissionFn)
+		Snapshot["owner_current"] := LLM_AuxIsCurrent(Owner)
+		Tick := HasMethod(TickFn, "Call") ? TickFn.Call() : A_TickCount
+		Elapsed := TickElapsed64(Owner.Get("network_start_tick", ""), Tick)
+		if Type(Elapsed) == "Integer" && Elapsed >= 0 && Elapsed <= TICK_MAX_DURATION_MS
+			Snapshot["elapsed_ms"] := Elapsed
+		Deadline := Run.Get("deadline_ms", "")
+		if Type(Deadline) == "Integer" && Deadline >= 0 && Deadline <= TICK_MAX_DURATION_MS
+			Snapshot["deadline_ms"] := Deadline
+		Run["callback_snapshot"] := Snapshot
+		Run["callback_capture"] := "retained"
+		return true
+	} catch Any {
+		; Unavailable observation cannot suppress the original Boolean callback.
+		return false
+	}
+}
+
+_ManagedRemoteFixtureReadinessCallbackDiagnostic(Snapshot) {
+	global TICK_MAX_DURATION_MS
+	Fields := Snapshot is Map ? Snapshot : Map()
+	Fact := ""
+	for Name in ["send_started", "managed_transport", "payload_reserved", "completed", "aborted",
+			"handle_retained", "admission_fn_retained", "owner_current"]
+		Fact .= " callback_" . Name . "=" . _ManagedRemoteFixtureDiagnosticBoolean(Fields.Get(Name, ""))
+	for Name in ["elapsed_ms", "deadline_ms"]
+		Fact .= " callback_" . Name . "=" . _ManagedRemoteFixtureGenerationInteger(Fields.Get(Name, ""), 0, TICK_MAX_DURATION_MS)
+	return Fact
+}
+
+_ManagedRemoteFixtureReadinessDiagnostic(Mode, Ordinal, ExpectedSuccess, Result, Created, Status, Capture, Receipt := 0, CallbackSnapshot := 0, CallbackCapture := "unavailable") {
+	global _SharedDir
+	Policy := ManagedNetworkFailureContract(JsonParse(FileRead(_SharedDir . "\modules\network\managed_network.json", "UTF-8"))).Policy
+	Actual := Result is Array && Result.Length == 1 ? _ManagedRemoteFixtureDiagnosticBoolean(Result[1]) : "unknown"
+	Fact := "readiness_mode=" . _ManagedRemoteFixtureDiagnosticEnum(Mode, "fixed|pac")
+		. " readiness_ordinal=" . _ManagedRemoteFixtureGenerationInteger(Ordinal, 1, 4)
+		. " expected_success=" . _ManagedRemoteFixtureDiagnosticBoolean(ExpectedSuccess)
+		. " callbacks=" . (Result is Array ? _ManagedRemoteFixtureGenerationInteger(Result.Length, 0, 65535) : "unknown")
+		. " callback_success=" . Actual
+		. " capture=" . _ManagedRemoteFixtureDiagnosticEnum(Capture, "retained|unavailable")
+		. " http_created=" . _ManagedRemoteFixtureGenerationInteger(Created, 0, 65535)
+		. " request_status=" . _ManagedRemoteFixtureGenerationInteger(Status, 0, 599)
+	return Fact . " callback_capture=" . _ManagedRemoteFixtureDiagnosticEnum(CallbackCapture, "retained|unavailable")
+		. _ManagedRemoteFixtureReadinessCallbackDiagnostic(CallbackSnapshot) . _ManagedRemoteFixtureTransportDiagnostic(Receipt, Policy)
+}
+
+_ManagedRemoteFixtureEmitReadinessDiagnostic(Fixture, Run, Result, ExpectedSuccess) {
+	Fixture.ReadinessDiagnosticStatus := "unavailable"
+	try {
+		Receipt := 0
+		Created := ""
+		Status := ""
+		Capture := "unavailable"
+		if Run is Map && Fixture.ReadinessRuns is Map
+			&& Fixture.ReadinessRuns.Has(Run["ordinal"]) && Fixture.ReadinessRuns[Run["ordinal"]] == Run {
+			Capture := Run["capture"]
+			if Capture == "retained" && Run["http"] is Array {
+				Created := Run["http"].Length
+				if Created == 1 {
+					Http := Run["http"][1]
+					if Http is CurlAsyncRequest {
+						Status := Http.Status
+						if Type(Http.ManagedTransport) == "Integer" && Http.ManagedTransport == true
+							Receipt := Http.NativeReceipt
+					}
+				}
+			}
+		}
+		Fact := _ManagedRemoteFixtureReadinessDiagnostic(Run["mode"], Run["ordinal"], ExpectedSuccess, Result, Created, Status, Capture, Receipt,
+			Run.Get("callback_snapshot", 0), Run.Get("callback_capture", "unavailable"))
+		Fixture.ReadinessDiagnosticPrinter.Call("::notice title=Windows native readiness diagnostic::" . Fact)
+		Fixture.ReadinessDiagnosticStatus := "reported"
+	} catch Any {
+		; Reporting refusal cannot replace the original readiness assertion.
+		Fixture.ReadinessDiagnosticStatus := "unavailable"
+	}
+}
+
+class _ManagedRemoteReadinessDiagnosticOwner extends _ManagedRemoteGenerationDiagnosticOwner {
+	__New(Printer, Receipt) {
+		super.__New(Printer, Receipt)
+		this.Identity := "readiness-diagnostic-control"
+		this.ReadyOwners := []
+		this.ReadyCancels := []
+		this.ReadinessCount := 0
+		this.ReadinessRuns := Map()
+		this.ReadinessDiagnosticPrinter := Printer
+		this.ReadinessDiagnosticStatus := "not_requested"
+	}
+}
+
+_ManagedRemoteReadinessDiagnosticProducer(RefusePrinter := false, ExpectedSuccess := true, Reachable := false, RefuseObservation := false) {
+	Control := Map("calls", 0, "fact", "", "refuse", RefusePrinter)
+	Fixture := _ManagedRemoteReadinessDiagnosticOwner(_ManagedRemoteGenerationCollect.Bind(Control), _ManagedRemoteGenerationDiagnosticReceipt())
+	Fixture.Http.Status := Reachable ? 200 : 0
+	if RefuseObservation
+		Fixture.Http.DefineProp("SendStarted", {Get: _ManagedRemoteReadinessCallbackThrow})
+	Caught := 0
+	try Fixture.CheckReadiness(ExpectedSuccess)
+	catch Error as Failure {
+		Caught := Failure
+	}
+	if ExpectedSuccess != Reachable {
+		AssertEqual("Error", Type(Caught))
+		AssertEqual("readiness must obey the actual system root and selected relay - expected: <1>, actual: <0>", Caught.Message)
+		AssertEqual(1, Control["calls"], "the actual producer must emit its retained readiness fact before the unchanged assertion")
+		AssertContains(Control["fact"], "readiness_mode=fixed readiness_ordinal=1 expected_success=true callbacks=1 callback_success=false capture=retained http_created=1 request_status=0")
+		AssertContains(Control["fact"], "native_receipt=admitted backend=curl stage=connect")
+		AssertEqual(RefusePrinter ? "unavailable" : "reported", Fixture.ReadinessDiagnosticStatus)
+	} else {
+		AssertEqual(0, Caught)
+		AssertEqual(0, Control["calls"], "an expected false result does not emit a mismatch")
+		AssertEqual("not_requested", Fixture.ReadinessDiagnosticStatus)
+	}
+	AssertTrue(Fixture.Http.Polls >= 2, "the existing real poll delivers the callback")
+	AssertTrue(Fixture.ReadinessRuns[1]["http"][1] == Fixture.Http, "the factory forwarded the same retained transport")
+	Run := Fixture.ReadinessRuns[1]
+	if RefuseObservation {
+		AssertEqual("unavailable", Run["callback_capture"], "a refused observation remains explicit without replacing completion")
+		AssertEqual(0, Run["callback_snapshot"])
+		AssertContains(Control["fact"], "callback_send_started=unknown")
+	} else {
+		AssertEqual("retained", Run["callback_capture"])
+		AssertEqual(true, Run["callback_snapshot"]["owner_current"], "capture precedes the real auxiliary finish")
+		AssertEqual(Run["deadline_ms"], Run["callback_snapshot"]["deadline_ms"], "observation retains the dispatch's original deadline")
+		AssertTrue(Type(Run["callback_snapshot"]["elapsed_ms"]) == "Integer" && Run["callback_snapshot"]["elapsed_ms"] >= 0)
+	}
+	for Owner in Fixture.ReadyOwners
+		AssertFalse(LLM_AuxIsCurrent(Owner), "the original owner finishes on the original callback path")
+	for CancelFn in Fixture.ReadyCancels
+		AssertTrue(CancelFn.Call(), "the original exact cancellation remains available")
+	AssertFalse(InStr(Control["fact"], "managed-fixture.invalid"))
+	AssertFalse(InStr(Control["fact"], "PRIVATE_"))
+}
+Test("managed remote native: readiness checkpoint observes actual false callback (managed-fixture-readiness-diagnostic)", _ManagedRemoteReadinessDiagnosticProducer)
+Test("managed remote native: readiness reporter refusal preserves original assertion (managed-fixture-readiness-diagnostic)", _ManagedRemoteReadinessDiagnosticProducer.Bind(true))
+Test("managed remote native: expected false readiness emits no mismatch (managed-fixture-readiness-diagnostic)", _ManagedRemoteReadinessDiagnosticProducer.Bind(false, false))
+Test("managed remote native: successful readiness emits no mismatch (managed-fixture-readiness-diagnostic)", _ManagedRemoteReadinessDiagnosticProducer.Bind(false, true, true))
+Test("managed remote native: callback observation refusal preserves original false result and cleanup (managed-fixture-readiness-callback)",
+	_ManagedRemoteReadinessDiagnosticProducer.Bind(false, true, false, true))
+
+_ManagedRemoteReadinessCallbackThrow(Args*) {
+	throw Error("PRIVATE_OBSERVATION_FAILURE")
+}
+
+_ManagedRemoteReadinessCallbackClosedControl() {
+	Fixture := _ManagedRemoteReadinessDiagnosticOwner((*) => 0, Map())
+	Owner := LLM_AuxBegin(Fixture.Identity)
+	Owner["network_start_tick"] := 100
+	Run := Map("ordinal", 1, "owner", Owner, "deadline_ms", 3000, "capture", "retained", "http", [Fixture.Http])
+	Fixture.ReadinessRuns[1] := Run
+	try {
+		AssertTrue(_ManagedRemoteFixtureCaptureReadinessCallback(Fixture, Run, Owner, (*) => 137))
+		AssertEqual(37, Run["callback_snapshot"]["elapsed_ms"], "elapsed belongs to the original network clock")
+		AssertEqual(3000, Run["callback_snapshot"]["deadline_ms"])
+		AssertEqual(false, Run["callback_snapshot"]["aborted"])
+		Fixture.Http.Aborted := true
+		AssertEqual(false, Run["callback_snapshot"]["aborted"], "later cleanup cannot rewrite the callback snapshot")
+		Foreign := Run.Clone()
+		AssertFalse(_ManagedRemoteFixtureCaptureReadinessCallback(Fixture, Foreign, Owner, (*) => 137), "equal metadata does not replace the exact Run")
+		AssertFalse(_ManagedRemoteFixtureCaptureReadinessCallback(Fixture, Run, Owner.Clone(), (*) => 137), "a borrowed owner cannot supply callback context")
+		AssertFalse(_ManagedRemoteFixtureCaptureReadinessCallback(Fixture, Run, Owner, _ManagedRemoteReadinessCallbackThrow))
+		AssertEqual("unavailable", Run["callback_capture"])
+		AssertEqual(0, Run["callback_snapshot"], "failed observation cannot reuse prior scalars")
+	} finally _LLM_AuxRetireOwner(Owner)
+}
+Test("managed remote native: callback scalar capture owns Run clock and immutable observation (managed-fixture-readiness-callback)",
+	_ManagedRemoteReadinessCallbackClosedControl)
+
+_ManagedRemoteReadinessCallbackScalarPrivacy(Value) {
+	Fields := Map()
+	for Name in ["send_started", "managed_transport", "payload_reserved", "completed", "aborted",
+			"handle_retained", "admission_fn_retained", "owner_current", "elapsed_ms", "deadline_ms"]
+		Fields[Name] := Value
+	Fact := _ManagedRemoteFixtureReadinessCallbackDiagnostic(Fields)
+	AssertFalse(InStr(Fact, "PRIVATE_"))
+	AssertContains(Fact, "callback_send_started=unknown")
+	AssertContains(Fact, "callback_elapsed_ms=unknown")
+}
+for Index, Value in ["PRIVATE_CALLBACK", "true", 1.5, Map("PRIVATE_FIELD", "PRIVATE_VALUE"), [], -1]
+	Test("managed remote native: callback scalar " . Type(Value) . " case " . Index . " remains closed (managed-fixture-readiness-callback)",
+		_ManagedRemoteReadinessCallbackScalarPrivacy.Bind(Value))
+
+_ManagedRemoteReadinessDiagnosticScalars(Value) {
+	Fact := _ManagedRemoteFixtureReadinessDiagnostic(Value, Value, Value, [Value], Value, Value, Value, Value)
+	AssertFalse(InStr(Fact, "PRIVATE_"))
+	AssertContains(Fact, "readiness_mode=unknown")
+	AssertContains(Fact, "native_receipt=" . (Value is Map ? "invalid" : "unavailable"))
+}
+for Value in ["PRIVATE_SECRET", 1.5, Map("PRIVATE_FIELD", "PRIVATE_SECRET"), [], "true"]
+	Test("managed remote native: readiness scalar " . Type(Value) . " refuses private facts (managed-fixture-readiness-diagnostic)",
+		_ManagedRemoteReadinessDiagnosticScalars.Bind(Value))
+
+_ManagedRemoteReadinessDiagnosticMalformedReceipt() {
+	Receipt := _ManagedRemoteGenerationDiagnosticReceipt()
+	Receipt["PRIVATE_FIELD"] := "PRIVATE_SECRET"
+	Fact := _ManagedRemoteFixtureReadinessDiagnostic("pac", 3, true, [false], 1, 0, "retained", Receipt)
+	AssertContains(Fact, "native_receipt=invalid")
+	AssertContains(Fact, "backend=unknown")
+	AssertFalse(InStr(Fact, "PRIVATE_"))
+	for Pair in [["stage", "PRIVATE_STAGE"], ["backend", "PRIVATE_BACKEND"], ["curl_exit", 1.5]] {
+		Receipt := _ManagedRemoteGenerationDiagnosticReceipt()
+		Receipt[Pair[1]] := Pair[2]
+		Fact := _ManagedRemoteFixtureReadinessDiagnostic("fixed", 2, true, [false], 1, 0, "retained", Receipt)
+		AssertContains(Fact, "native_receipt=invalid")
+		AssertFalse(InStr(Fact, "PRIVATE_"))
+	}
+	Receipt := _ManagedRemoteGenerationDiagnosticReceipt()
+	Receipt["native_errno"] := "PRIVATE_NOT_AN_INTEGER"
+	Fact := _ManagedRemoteFixtureReadinessDiagnostic("fixed", 2, true, [false], 1, 0, "retained", Receipt)
+	AssertContains(Fact, "native_errno=unknown")
+	AssertFalse(InStr(Fact, "PRIVATE_"))
+}
+Test("managed remote native: readiness malformed receipt emits no native facts (managed-fixture-readiness-diagnostic)", _ManagedRemoteReadinessDiagnosticMalformedReceipt)
+
+
+_ManagedRemoteReadinessFactoryRefusal(Failure) {
+	throw Failure
+}
+
+_ManagedRemoteReadinessFactoryPrimary() {
+	Run := Map("http", [], "capture", "retained")
+	Primary := Error("PRIVATE_FACTORY_REFUSAL")
+	Observed := 0
+	try _ManagedRemoteFixtureCaptureReadinessHttp(Run, _ManagedRemoteReadinessFactoryRefusal.Bind(Primary))
+	catch Any as Failure {
+		Observed := Failure
+	}
+	AssertTrue(Observed == Primary, "observation never replaces the original factory exception")
+	AssertEqual(0, Run["http"].Length)
+}
+Test("managed remote native: readiness capture preserves factory failure (managed-fixture-readiness-diagnostic)", _ManagedRemoteReadinessFactoryPrimary)
+
+_ManagedRemoteTimingChangedRegistryBudget(Expected, *) {
+	global LLM_REMOTE_READY_PING_DEADLINE_MS
+	AssertEqual(Expected, LLM_REMOTE_READY_PING_DEADLINE_MS, "the genuine timing loader consumes the changed canonical value")
+}
+
+_ManagedRemoteTimingReadinessRegistryChange() {
+	global _TimingsCache
+	Previous := _TimingsCache
+	Changed := Previous.Clone()
+	Changed["llm"] := Previous["llm"].Clone()
+	Changed["llm"]["request_timeout_ms"] := 7000
+	try {
+		_TimingsCache := Changed
+		_ManagedRemoteFixtureWithLlmTimings(_ManagedRemoteTimingChangedRegistryBudget.Bind(7000))
+	} finally _TimingsCache := Previous
+}
+Test("managed remote native: readiness loader consumes changed canonical request timing (ready-canonical-budget)",
+	_ManagedRemoteTimingReadinessRegistryChange)
