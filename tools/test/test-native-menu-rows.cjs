@@ -169,7 +169,18 @@ function inventory(driver) {
 			sites.push(...sitesOf(rel, text, ext));
 		}
 	}
-	const required = LEGACY.drivers[driver].sourceFiles;
+	const retired = CURRENT_SOURCE_RETIREMENTS[driver] || [];
+	for (const rel of retired) {
+		assert.ok(
+			LEGACY.drivers[driver].sourceFiles.includes(rel),
+			'retirement must name an exact historical source'
+		);
+		assert.ok(
+			!fs.existsSync(path.join(SP, rel)),
+			`${driver}: retired production source must remain absent: ${rel}`
+		);
+	}
+	const required = LEGACY.drivers[driver].sourceFiles.filter((rel) => !retired.includes(rel));
 	assert.ok(
 		traversed.size >= required.length,
 		`${driver}: source coverage ${traversed.size}/${required.length} is incomplete`
@@ -232,6 +243,13 @@ assert.equal(
 	'the independent b06 legacy oracle must remain unchanged'
 );
 const LEGACY = JSON.parse(legacyBytes.toString('utf8'));
+
+// Explicit current retirement keeps every historical excerpt and floor intact.
+// Any other absent source, or resurrection of this removed provider, refuses.
+const CURRENT_SOURCE_RETIREMENTS = Object.freeze({
+	macos: Object.freeze(['macos/ui/menu/menu_llm/live_mode_panel.lua'])
+});
+
 const SOURCE_COUNTS = {};
 const errors = [];
 for (const driver of DRIVERS) {

@@ -22,6 +22,7 @@ const { spawnSync } = require('node:child_process');
 
 const ROOT = path.resolve(__dirname, '..', '..');
 const DRIVERS = ['windows', 'macos', 'linux'];
+const RETIRED = 'macos/ui/menu/menu_llm/live_mode_panel.lua';
 const TOOL = 'tools/test/test-native-menu-rows.cjs';
 const CORPUS = 'tools/test/fixtures/native-menu-census-legacy.json';
 const BASELINE = 'tools/test/native-menu-rows-baseline.json';
@@ -53,6 +54,7 @@ function reset() {
 	fs.rmSync(sourceRoot, { recursive: true, force: true });
 	for (const driver of DRIVERS) {
 		for (const rel of legacy.drivers[driver].sourceFiles) {
+			if (rel === RETIRED) continue;
 			// Independent path coverage metadata supplies stand-ins only for the
 			// traversal precondition; the real child still reads every actual file.
 			write(`static/ergopti_plus/${rel}`, driver === 'windows' ? 'Anchor() {\n}\n' : 'return {}\n');
@@ -250,6 +252,13 @@ try {
 	reset();
 	write(CORPUS, Buffer.concat([corpusBytes, Buffer.from(' ')]));
 	refusesBoth(/independent b06 legacy oracle must remain unchanged/);
+
+	reset();
+	write('static/ergopti_plus/' + RETIRED, 'return {}\n');
+	refusesBoth(/retired production source must remain absent/);
+	reset();
+	fs.rmSync(path.join(sourceRoot, 'macos/ui/menu/menu_llm/init.lua'));
+	refusesBoth(/source coverage .* is incomplete/);
 
 	reset();
 	fs.rmSync(baselinePath);
