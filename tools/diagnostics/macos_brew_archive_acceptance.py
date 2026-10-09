@@ -2389,8 +2389,20 @@ def _admit_appleevent_boundary(children, repository):
             time.monotonic() < deadline, "Owned AppleEvent receiver did not acknowledge readiness"
         )
         time.sleep(0.02)
-    same_live_receiver("before-unconfined-positive")
     sender = [*executables["sender"], str(receiver.pid), nonce]
+    policy = (root / "sandbox.sb").read_text(encoding="utf-8")
+    deny = "(deny appleevent-send)\n"
+    require(
+        policy.count(deny) == 1, "Full native policy does not contain exactly one AppleEvent denial"
+    )
+    removed = root / "sandbox-appleevent-positive.sb"
+    removed.write_text(policy.replace(deny, ""), encoding="utf-8", newline="\n")
+    permission = None
+    if getattr(children, "allow_automation_consent", False) is True:
+        permission = admit_appleevent_permission_prerequisite(
+            children, sender, removed, same_live_receiver
+        )
+    same_live_receiver("before-unconfined-positive")
     positive = _run_appleevent_sender(
         children, receiver, group, "unconfined-positive", [*sender, "success"]
     )
@@ -2414,18 +2426,6 @@ def _admit_appleevent_boundary(children, repository):
         not Path(str(marker) + ".2").exists(), "Unexpected delivery preceded deny-removal control"
     )
     same_live_receiver("before-deny-removal-positive")
-    policy = (root / "sandbox.sb").read_text(encoding="utf-8")
-    deny = "(deny appleevent-send)\n"
-    require(
-        policy.count(deny) == 1, "Full native policy does not contain exactly one AppleEvent denial"
-    )
-    removed = root / "sandbox-appleevent-positive.sb"
-    removed.write_text(policy.replace(deny, ""), encoding="utf-8", newline="\n")
-    permission = None
-    if getattr(children, "allow_automation_consent", False) is True:
-        permission = admit_appleevent_permission_prerequisite(
-            children, sender, removed, same_live_receiver
-        )
     positive = _run_appleevent_sender(
         children,
         receiver,
