@@ -73,7 +73,8 @@ extension HS274NativePolicyQualificationTests {
 				}
 			}
 			// Successful fixtures retire private captures; keep the bounded closed observation in the CI log.
-			print("ERGOPTI_CLT_CANDIDATE_METADATA " + receipt.stdout.trimmingCharacters(in: .newlines))
+			FileHandle.standardError.write(Data(("ERGOPTI_CLT_CANDIDATE_METADATA "
+				+ receipt.stdout.trimmingCharacters(in: .newlines) + "\n").utf8))
 		}
 	}
 

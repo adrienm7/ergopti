@@ -5193,6 +5193,38 @@ packaging, installation, physical acceptance, item31 and transverse16/38 remain
 incomplete. Windows-only follow-up stays delegated to the maintainer as recorded
 above; no item is removed and no untested source is called integrated.
 
+Exact macOS-only manual run [37891123181](https://github.com/adrienm7/ergopti/actions/runs/37891123181)
+at d2b93289 is terminal CANCELLED by the platform's 45-minute package limit,
+not by this task. Its 67 native source images match feature commit4639de64;
+the private CI metadata environment, TODO and preserved checkpoint differ.
+Swift reaches its unchanged25-minute step limit with54 passed, six failed and
+one unfinished method; there is no complete suite summary. The fresh baseline
+reaches the separate owned compilation, but that compilation and the separate
+Core constructor return124 within their original300-second calibrations.
+Their combined method takes849.990seconds; this is not one compiler deadline.
+Source controls also return124 after300.855seconds. Root/SDK/signing, permission
+UI, VHD package ordinals and later keyboard/TIS cohorts are not reached.
+Installation and Release are skipped; the all-page exact-SHA census has no
+automatic runs. The task never cancelled the manual validation.
+
+The successful actual CLT metadata method takes0.252seconds, but its diagnostic
+marker is absent from the complete log. Its existing bounded, admitted receipt
+is now written directly to Foundation stderr with the same prefix and newline,
+without another read, changed fields, authority, assertion or budget. Independent
+source review and exact inverse recovery pass; native Foundation transport and
+actual log retention still require a matching-source run. No buffering cause,
+root-owned SDK presence, compiler selection or completed TODO31 is inferred.
+
+The full Swift evidence upload fails after enumerating47,769files and uploading
+1,023,410,176bytes: a previously enumerated temporary Console object in the
+failed owned-build fixture is absent at the ZIP read. No Swift archive is
+published. Runner teardown later terminates12 orphan clang processes; their
+fixture/parent/group attribution and the temporary-file mutation actor remain
+unknown. The closed inherited process group does not prove closure of escaped
+compiler sessions. Preserve original compilation, retirement and corpus
+assertions while qualifying this boundary; do not treat a larger CI budget as
+a correction of the native compilation refusals. Item31 remains partial.
+
 - [~] **33.** Config policy for the files other than config.toml (the former
   item 25): Published in the second 2026-09-30 release for the files the review
   listed; see `docs/memory/text-input-and-config.md`. Current source already
@@ -6758,6 +6790,15 @@ artifact remains blocked by the cloud network policy. The whole Swift step
 times out, with packaging and installation skipped; these passing methods do
 not qualify final-source confirmation UI, physical input or the unavailable
 historical25-rule configuration. Item43 remains partial.
+
+The authentic d2b93289 transcript in manual run37891123181 records failures of
+the original six-case cleanup method and the three four-case consent cohorts
+at official-runtime acquisition (`stage_refused`), before their cleanup
+operations. These do not replace the earlier passing private-file receipts or
+establish a regression in the remover. The new run ends at the platform limit;
+its full Swift capture upload fails, so the exact acquisition cause is unknown.
+Confirmation UI, final-source installation, physical acceptance and the
+unavailable historical25-rule backup remain unqualified. Item43 stays partial.
 
 - [~] **44.** CapsWord is no longer cancelled by the pointer when Karabiner
   activated it (AltGr + CapsLock): the watcher probed the variable with
