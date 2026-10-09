@@ -54,6 +54,11 @@ _NetworkPAC_SourceFailureSummary(Stderr) {
 	return "kind=" . Kind . " line=" . Line . " cs=" . Code
 }
 
+; The settled tree owner combines both native streams in stdout.
+_NetworkPAC_SourceObservationFailureSummary(Observation) {
+	return _NetworkPAC_SourceFailureSummary(Observation["stdout"])
+}
+
 _NetworkPAC_SourceContractAcceptance() {
 	global _VendorDir, _DriverDir, _SharedDir
 	Observed := []
@@ -75,7 +80,7 @@ _NetworkPAC_SourceContractAcceptance() {
 		if Observed.Length != 1
 			return
 		AssertEqual(0, Observed[1]["exit"], "real source/credential/body refusals must preserve the production contract"
-			. (Observed[1]["exit"] == 0 ? "" : " [" . _NetworkPAC_SourceFailureSummary(Observed[1]["stderr"]) . "]"))
+			. (Observed[1]["exit"] == 0 ? "" : " [" . _NetworkPAC_SourceObservationFailureSummary(Observed[1]) . "]"))
 		AssertEqual("", Observed[1]["stderr"], "source decode and physical native retirement refusals remain red")
 		AssertContains(Observed[1]["stdout"], "PAC_SOURCE_NATIVE controls=44 owners_retired=true")
 	} finally {
@@ -128,3 +133,34 @@ _NetworkPAC_SourceFailureDiagnosticRefusals() {
 		_NetworkPAC_SourceFailureSummary("At C:\private\pac_source_contract.ps1:8 char:1`nAt C:\private\pac_source_contract.ps1:8 char:1"))
 }
 Test("managed PAC source: invalid and ambiguous diagnostics never expose private capture", _NetworkPAC_SourceFailureDiagnosticRefusals)
+
+_NetworkPAC_SourceFailureDiagnosticOwnedCapture() {
+	Observed := []
+	Handle := 0
+	Command := "$ErrorActionPreference = 'Stop'; throw 'Production source policy mutation did not refuse before acquisition.'"
+	try {
+		Handle := ShellRunner_SpawnTreeOwned(A_WinDir . "\System32\WindowsPowerShell\v1.0\powershell.exe",
+			["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-Command", Command],
+			(Code, Out, Err) => Observed.Push(Map("exit", Code, "stdout", Out, "stderr", Err)), , , 8192)
+		AssertTrue(Handle.start(), "the genuine native diagnostic error child must start")
+		Started := A_TickCount
+		while Observed.Length == 0 && !TickExpired64(Started, 55000) {
+			_SR_TreePoll()
+			Sleep(10)
+		}
+		AssertEqual(1, Observed.Length, "the exact diagnostic error owner must settle once within its original caller bound")
+		if Observed.Length != 1
+			return
+		AssertEqual(1, Observed[1]["exit"], "the fixed native policy exception must remain a failure")
+		AssertTrue(Observed[1]["stdout"] is String && StrLen(Observed[1]["stdout"]) > 0,
+			"the settled native owner must retain its nonempty combined output")
+		AssertTrue(Observed[1]["stderr"] == "", "the tree owner keeps its separate stderr slot empty")
+		AssertEqual("kind=unknown line=0 cs=none", _NetworkPAC_SourceFailureSummary(Observed[1]["stderr"]),
+			"the former stderr projection cannot diagnose this genuine captured failure")
+		AssertEqual("kind=policy_refusal line=0 cs=none", _NetworkPAC_SourceObservationFailureSummary(Observed[1]),
+			"the same Source44 selector must classify the genuine combined error capture")
+	} finally {
+		AssertTrue(IsObject(Handle) ? Handle.terminate() : true, "the exact diagnostic error tree must physically retire")
+	}
+}
+Test("managed PAC source: owned native error capture feeds the closed diagnostic", _NetworkPAC_SourceFailureDiagnosticOwnedCapture)
