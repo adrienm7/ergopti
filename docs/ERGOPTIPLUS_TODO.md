@@ -3145,6 +3145,14 @@ Windows PC acceptance, delegated to the maintainer:
   now retains the replacement and refusal assertions without allowing an error
   to escape the nonthrowing read hook. Fresh native test compilation and all
   filesystem executions remain required.
+  A separate passive next-record observer now uses read-only retained namespace
+  witnesses and an armed NDJSON handshake before bounded monotonic waiting.
+  It exports only one qualified new typed role record, or unobserved, with
+  currentness unknown. It performs no lease, guardian, profile or permission
+  operation. The original 146-method cohort, including its 17 filesystem cases,
+  remains whole; the observer has a separate native test class. Native execution
+  and the one-tap real-Mac experiment remain pending. A new record narrows the
+  first failing boundary; it does not prove input causality, recovery or a fix.
   Native permission UI qualification is now registered in the Swift target:
   ten frozen cases require actual WebKit DOM/bridge callbacks, visible native
   window identities, retirement, deferred log purge and scheduler cleanup.

@@ -85,8 +85,10 @@ After ownership is released, use the owned `codex/ci-macos-input` branch, cancel
 only automatic runs of each exact pushed SHA, then dispatch `ci.yml` with
 `os_lanes=macos`. Verify the actual tested source/tree and terminal test counts;
 a zero-test match or cohort pass is not full-suite/package/install acceptance.
-Leave manual validations running. Do not move `codex/ci-validation` or acquire
-`codex/ci-lock` during the existing Group 6 integration phase.
+Leave manual validations running. Group 6 has released its lock after its
+terminal failed validation; Group 5 has ceded the next integration slot to Group 3
+in [6085546492](https://github.com/adrienm7/ergopti/issues/86#issuecomment-6085546492).
+Do not move `codex/ci-validation` or acquire `codex/ci-lock` during that slot.
 
 ## Diagnostic availability and remaining scope
 
@@ -94,8 +96,11 @@ The diagnostic chain is `a9d951677` (closed terminal boundary), `3adffa730`
 (private historical retention/passive reader), and `c80ff645` (nonthrowing test
 callback repair). The 3ad release build passed, but its test build failed; fresh
 corrected native execution remains unrun. The source census is 146 total methods,
-not 146 plus 17. The exact passive contract is in
-[6084503817](https://github.com/adrienm7/ergopti/issues/86#issuecomment-6084503817).
+not 146 plus 17. The passive flag is exactly
+`--remap-lease-diagnostic-snapshot`; the previously documented
+`--observe-remap-lease-diagnostics` is not a published alias. The closed record
+contract and flag correction are in
+[6085741982](https://github.com/adrienm7/ergopti/issues/86#issuecomment-6085741982).
 Fetched `dev` at `e896bd3e` lacks this diagnostic chain. Its presence must be
 verified before claiming a shared export contains the native snapshot. Historical
 records carry no currentness, readiness or receiver-fence authority.
@@ -107,3 +112,44 @@ installation/lifecycle/coexistence, configuration/CLI routing and production
 capture admission. These are software and native-proof gaps, not just physical
 tests. Preserve transverse 16/38 and the withdrawn status of item 22. No branch
 may be deleted or group completion claimed from this checkpoint.
+
+## Passive next-record experiment
+
+The no-extra-arguments `--observe-next-remap-lease-diagnostics` flag emits closed
+NDJSON frames with exactly `schema`, `scope`, `phase`, `currentness` and `records`.
+Schema is 1; scope is `first-observed-new-record`; currentness stays `unknown`.
+A qualified read-only baseline emits `armed` with no records, then a single
+`observed` or `unobserved` final frame. Observed contains one existing typed
+terminal record; unobserved contains none. A refused baseline emits only
+unobserved. Each frame is at most 2,048 bytes and ends in LF. Partial stdout
+or a nonzero process exit cannot qualify a result. No arbitrary error, path,
+process identity, token, machine or input content is exported.
+
+The observer holds its original directory and role-file descriptors internally.
+A different qualified vnode is new, including identical typed content; changed
+content on the original vnode is not new. The observer performs no directory
+creation, permission repair, lease operation, guardian operation or profile
+change. Its monotonic deadline includes the armed callback, checks again before
+latching, and permits at most 30 seconds of scheduled waiting. Syscall/output
+latency is not a proven hard process deadline.
+
+For the real-Mac experiment, first verify that the tested signed executable
+contains this exact source. Reload, arm this passive observer and wait for its
+armed frame, then try one problematic tap-hold. Retain the final closed frame
+before further recovery tests. Polling can miss intervening replacements; even
+a qualified new record does not prove physical-first order, publication after
+the visible handshake, generation, reproduction ownership or the underlying
+cause. Currentness stays unknown and an exhausted fence remains failure.
+
+The initial boundary can differ from final exit73: fencing an earlier error can
+also fail. Inner `cli-failed` / `set-mode` / `output` means the owned CLI child
+was reaped with output, classified before its exit status; it is not an ACK
+timeout. Inner `cli=timeout` means the child remained unreaped at the CLI
+deadline. Strict-empty CLI output remains necessary because upstream
+set-variables exceptions can print an error and still return zero.
+
+The observer has a separate native XCTest class with 19 methods. It preserves
+the original 146-method worker cohort and its 17 filesystem methods; that older scoped
+receiver does not qualify the new class. Native compilation, native method
+execution, real-Mac reproduction, packaging and installation remain separate
+requirements. No first-tap cause or recovery is claimed by this source addition.

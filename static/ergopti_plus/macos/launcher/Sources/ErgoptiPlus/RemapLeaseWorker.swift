@@ -3086,6 +3086,7 @@ private func runPOSIXTestHelper(arguments: [String]) -> Int32 {
 
 /// Dispatches validated headless roles from the signed launcher executable.
 private let kRemapLeaseDiagnosticSnapshotFlag = "--remap-lease-diagnostic-snapshot"
+private let kRemapLeaseDiagnosticNextFlag = "--observe-next-remap-lease-diagnostics"
 
 enum KarabinerLeaseWorker {
 	/// Detects every headless role before any NSApplication side effect.
@@ -3101,6 +3102,7 @@ enum KarabinerLeaseWorker {
 		}
 		#endif
 		return arguments[1] == kRemapLeaseDiagnosticSnapshotFlag
+			|| arguments[1] == kRemapLeaseDiagnosticNextFlag
 			|| arguments[1] == kKarabinerLeaseWorkerFlag
 			|| arguments[1] == kKarabinerLeaseRevokeFlag
 			|| arguments[1] == kKarabinerLeaseInnerFlag
@@ -3124,6 +3126,16 @@ enum KarabinerLeaseWorker {
 			}
 			let written = data.withUnsafeBytes { Darwin.write(STDOUT_FILENO, $0.baseAddress!, $0.count) }
 			return written == data.count ? LeaseWorkerExit.success.rawValue : LeaseWorkerExit.innerFailed.rawValue
+		}
+		if arguments[1] == kRemapLeaseDiagnosticNextFlag {
+			guard arguments.count == 2 else { return LeaseWorkerExit.invalidArguments.rawValue }
+			let delivered = RemapLeaseDiagnosticStore().observeNext { frame in
+				guard var data = frame.encodedFrame() else { return false }
+				data.append(0x0a)
+				let written = data.withUnsafeBytes { Darwin.write(STDOUT_FILENO, $0.baseAddress!, $0.count) }
+				return written == data.count
+			}
+			return delivered ? LeaseWorkerExit.success.rawValue : LeaseWorkerExit.innerFailed.rawValue
 		}
 		// Ignored SIGCHLD and SA_NOCLDWAIT survive exec and would auto-reap the
 		// exact child whose unreaped PID proves private-group ownership
