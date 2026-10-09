@@ -55,30 +55,29 @@
 		]
 	},
 	"linux": {
-		"count": 22,
+		"count": 21,
 		"sites": [
 			"linux/ui/menu/menu_builder.lua:255 static",
 			"linux/ui/menu/menu_builder.lua:369 static",
 			"linux/ui/menu/menu_builder.lua:523 static",
 			"linux/ui/menu/menu_builder.lua:561 static",
-			"linux/ui/menu/menu_builder.lua:990 static",
-			"linux/ui/menu/menu_builder.lua:1481 static",
-			"linux/ui/menu/menu_builder.lua:1499 separator",
-			"linux/ui/menu/menu_builder.lua:1503 separator",
-			"linux/ui/menu/menu_builder.lua:1801 static",
-			"linux/ui/menu/menu_builder.lua:2054 static",
-			"linux/ui/menu/menu_builder.lua:2161 static",
-			"linux/ui/menu/menu_builder.lua:3378 static",
-			"linux/ui/menu/menu_builder.lua:3816 static",
-			"linux/ui/menu/menu_builder.lua:3870 static",
-			"linux/ui/menu/menu_builder.lua:3901 static",
-			"linux/ui/menu/menu_builder.lua:3902 static",
-			"linux/ui/menu/menu_builder.lua:4035 static",
-			"linux/ui/menu/menu_builder.lua:4044 static",
-			"linux/ui/menu/menu_builder.lua:4194 static",
-			"linux/ui/menu/menu_builder.lua:4575 static",
-			"linux/ui/menu/menu_builder.lua:5005 separator",
-			"linux/ui/menu/menu_builder.lua:5032 separator"
+			"linux/ui/menu/menu_builder.lua:1483 static",
+			"linux/ui/menu/menu_builder.lua:1501 separator",
+			"linux/ui/menu/menu_builder.lua:1505 separator",
+			"linux/ui/menu/menu_builder.lua:1803 static",
+			"linux/ui/menu/menu_builder.lua:2056 static",
+			"linux/ui/menu/menu_builder.lua:2163 static",
+			"linux/ui/menu/menu_builder.lua:3380 static",
+			"linux/ui/menu/menu_builder.lua:3818 static",
+			"linux/ui/menu/menu_builder.lua:3872 static",
+			"linux/ui/menu/menu_builder.lua:3903 static",
+			"linux/ui/menu/menu_builder.lua:3904 static",
+			"linux/ui/menu/menu_builder.lua:4037 static",
+			"linux/ui/menu/menu_builder.lua:4046 static",
+			"linux/ui/menu/menu_builder.lua:4196 static",
+			"linux/ui/menu/menu_builder.lua:4577 static",
+			"linux/ui/menu/menu_builder.lua:5007 separator",
+			"linux/ui/menu/menu_builder.lua:5034 separator"
 		]
 	}
 }
