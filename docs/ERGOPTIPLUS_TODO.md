@@ -2,14 +2,32 @@
 
 # ErgoptiPlus continuation checklist
 
-Updated: 2026-10-04. Latest release: v0.0.0-dev.155 (c9e4c64ab); `dev` is
-ahead of it without a release (CI cancelled on purpose).
+Updated: 2026-10-09. Latest release: [v0.0.0-dev.156](https://github.com/adrienm7/ergopti/releases/tag/v0.0.0-dev.156)
+at `55144c29c91f6660635802d2646aae2edf9fc4fd`, published at 09:10:36 UTC.
 This checklist is the current handoff; older workflow task-status files are
 historical evidence.
 Item numbers are stable identifiers: a finished item is removed (its durable
 facts go to docs/memory), and the numbers of the others never change.
 
 ## Delivery checkpoint
+
+[CI 37904826837](https://github.com/adrienm7/ergopti/actions/runs/37904826837)
+completed successfully on attempt 2: 61 jobs passed and the conditional
+selected-OS verdict was skipped. The tag and release source match, all 16
+assets are published, and the release notes list the five temporary native
+qualification deferrals below. This does not close any deferred feature or
+groups 2, 4 and 7. The guided diagnostic checkbox in item 116 is not included
+in this release and remains under development.
+
+The first attempt passed 58 jobs; the clean Intel Mac fixture fetch failed
+with `Connection reset by peer` before installation. Rerunning failed jobs
+qualified that scenario and its dependent verdict without changing source or
+weakening assertions. All 389 JavaScript controls and 10,454 AHK unit cases
+passed. Published Mac archive sizes/digests match the publication manifest;
+the appcast points at the released TAR, and the Linux checksum matches the
+published bundle digest.
+
+### Earlier delivery history
 
 The overhaul is not finished. Eight reviewed integration commits ended at
 `eaa06eeba`, followed by the published handoff and CI repairs. The macOS
@@ -8670,10 +8688,11 @@ Every deferred qualification remains open and must never count as a pass:
       including trusted native CA/static/PAC readiness and exact cleanup,
       followed by E2E, packaging and installation/launch. The separate
       full-URL PAC qualification above remains deferred.
-- [ ] Publish exact DEFERRED/source-bound receipts and these limitations in
-      the prerelease notes, then complete and re-enable every missing native
-      qualification. The temporary profile expires automatically and cannot
-      justify skipped builds, installs, signing or unrelated tests.
+- [x] Publish exact DEFERRED/source-bound receipts and these limitations in
+      the dev.156 prerelease notes. Release and CI were verified on October 9.
+- [ ] Complete and re-enable every missing native qualification. The temporary
+      profile expires automatically and cannot justify skipped builds,
+      installs, signing or unrelated tests.
 
 These deferrals do not close groups 2, 4 or 7, the Notepad/default-trigger
 qualification, recurring input incident 114 or promo follow-up 113. Their
@@ -8693,29 +8712,191 @@ test precondition failure, not a Lua defect or a successful permission grant.
       signing and installation remain required. Default, Main, PR and dev.157
       runs must execute the complete assertions.
 
-- [ ] **116.** Provide a guided third-party prerelease validation report.
-      The maintainer requested a Debugging menu button that runs the needed
-      checks and returns one local file to share. Reuse asynchronous diagnostic
-      ownership, progress, cancellation and redacted export. Package the small
-      native probe graph through the canonical bundle owner. Keep quick export
-      as the default on all three OSes. Offer an unchecked "Include in-depth
-      tests (may take a long time)" checkbox, with progress, cancellation and
-      partial results. Reuse CI assertions that are safe in a personal session;
-      keep install, reload and profile-replacement suites in an explicitly
-      isolated mode and explain every unavailable prerequisite.
-      Bind results to
-      the actual version, source, package identity, OS and architecture; report
-      PASS, FAIL or NOT_RUN and observed permission/cleanup failures separately.
-      Run timers and Karabiner generation in private fixtures, external
-      AppleEvents only through normal user consent, and read-only Shortcuts
-      discovery. Run complete isolated Brew acceptance only when its declared
-      prerequisites exist. Never call CI profile seeding on a personal Mac,
-      change TCC, execute a personal shortcut or stop the resident driver.
-      Keep private text, configuration, shortcut names and credentials out of
-      the archive. Do not upload automatically. Match the menu/report contract
-      on all three drivers, with translated reasons for OS-specific checks.
-      An ARM report does not qualify Intel, future sources or hosted consent.
-      This follow-up does not delay the immediate dev.156 publication.
+- [~] **116.** Provide a guided third-party prerelease validation report.
+  The maintainer requested a Debugging menu button that runs the needed
+  checks and returns one local file to share. Reuse asynchronous diagnostic
+  ownership, progress, cancellation and redacted export. Package the small
+  native probe graph through the canonical bundle owner. Keep quick export
+  as the default on all three OSes. Offer an unchecked "Include in-depth
+  tests (may take a long time)" checkbox, with progress, cancellation and
+  partial results. Reuse CI assertions that are safe in a personal session;
+  keep install, reload and profile-replacement suites in an explicitly
+  isolated mode and explain every unavailable prerequisite.
+  Bind results to
+  the actual version, source, package identity, OS and architecture; report
+  PASS, FAIL or NOT_RUN and observed permission/cleanup failures separately.
+  Run timers and Karabiner generation in private fixtures, external
+  AppleEvents only through normal user consent, and read-only Shortcuts
+  discovery. Run complete isolated Brew acceptance only when its declared
+  prerequisites exist. Never call CI profile seeding on a personal Mac,
+  change TCC, execute a personal shortcut or stop the resident driver.
+  Keep private text, configuration, shortcut names and credentials out of
+  the archive. Do not upload automatically. Match the menu/report contract
+  on all three drivers, with translated reasons for OS-specific checks.
+  An ARM report does not qualify Intel, future sources or hosted consent.
+  This follow-up does not delay the immediate dev.156 publication.
+
+      The first implementation adds the unchecked in-depth option to the shared
+      diagnostic page, translated in all 21 locales. Quick collection does not
+      launch the asynchronous probes. The optional run records progress,
+      cancellation, a fresh redacted export and pending cleanup separately from
+      its result. Three bounded schema/inventory/redaction checks reuse the
+      installed model; the macOS nonce probe records the actual runtime PID,
+      native status and its local sender context. Driver, installation and
+      profile-replacement suites remain explicitly NOT_RUN. They are not
+      equivalent to the complete CI suite. The report's overall summary stays
+      incomplete while requested work or cleanup is pending.
+
+      This feature is not included in published dev.156. The actual Windows
+      diagnostic runner passes 83 cases, the full include graph compiles and
+      all 70 AHK E2E cases pass. Source and inert macOS controls do not qualify
+      native permission handling or the friend's package. Complete selected
+      verification, installed-page acceptance, explicit package provenance and
+      the additional isolated timer/Karabiner/Shortcuts/Brew checks remain
+      open. Any local nonce success applies to that sender, source and host;
+      it cannot establish consent for GitHub's hosted-compute-agent.
+
+- [ ] **117.** Resolve repeated Karabiner lease failures on Apple Silicon.
+
+  The maintainer reports that dev.155 and dev.156 repeatedly open lease error
+  windows and make the Mac driver nearly unusable; earlier releases worked.
+  The first tap-hold after reload reports watchdog exit 73. The supplied
+  trace also shows a PONG timeout, three READY timeouts and exhausted
+  recovery, ending in a failed remap phase. Exit 73 identifies the generic
+  inner-worker failure category; its cause and the last known good release
+  remain open. This workplace-Mac incident is distinct from hosted
+  AppleEvent consent. The requested issue was deleted after preserving its
+  private evidence locally; do not republish its contents.
+  Coordinate with Ergopti 5 (macos-input) on the cause and regression proof.
+  If no usable validated fix is available by 2026-10-09 17:00 Europe/Paris,
+  implement the maintainer-authorized temporary workaround, retain this
+  definitive-fix item and describe the resulting behavior precisely.
+  Preserve lease fencing, owned cleanup and the first visible failure; never
+  forge readiness or suppress diagnostic evidence. Check repeated recovery
+  generations and reloads: the current error UI already deduplicates messages
+  within a session and limits windows per hour. Turning off error windows
+  alone does not restore a failed lease. Verify the actual Apple Silicon
+  package with the reported failure before calling the incident resolved.
+
+- [~] **118.** Keep macOS ANSI/ISO physical positions distinct.
+
+  The maintainer reports that the shortcut for the key left of 1 instead
+  targets the extra ISO key beside left Shift. The macOS tap-key and magic-key
+  owners currently merge virtual codes 10 and 50. Resolve the originating
+  event's keyboard model through Carbon, rather than accepting both codes or
+  using the last selected keyboard. Cover raw ANSI, raw ISO, Karabiner's ANSI
+  virtual events, mixed keyboards and unavailable geometry. Apply the same
+  physical identity to magic-key capture, saved assignment conflicts and the
+  translated shortcut editor. Windows scan codes and Linux evdev positions
+  remain stable and must retain their existing shared registry mappings.
+  The original owners fail the new wrong-ISO-key regressions; the local Lua
+  correction passes those cases. Hosted run 37932298475 at source
+  `5ec5435f5b35959de467f42e88256c6b7e849a65` passed the seven native keyboard
+  geometry and 31 launcher-environment checks on both ARM and Intel.
+  Actual ISO/ANSI typing acceptance and the final rebased package remain open.
+  This fix is distinct from the Karabiner lease incident in item 117.
+
+- [~] **119.** Preserve the actual MLX bootstrap failure and handle automatic proxies.
+
+  The supplied Apple Silicon trace refuses downloads because the system PAC
+  configuration cannot be used by the installer. The PTY supervisor then
+  raises PermissionError while probing the exited process group and masks
+  the network refusal. Reap only the exact owned child and independently
+  re-probe the group; genuine or persistent permission failures remain errors.
+  Validate the wrapper with real bounded Darwin children on ARM and Intel.
+  This correction does not implement PAC support. Reuse trusted network
+  admission before classifying the installer failure; never infer a trusted
+  phase from arbitrary child text or a generic exit code. Preserve proxy
+  policy and avoid silent direct downloads.
+
+  The Python supervisor correction passed two real owned-child scenarios on
+  both Mac architectures in run 37932298475, plus all 16 portable controls.
+  A transient post-SIGKILL permission refusal is bounded by the existing drain
+  deadline; only a fresh ESRCH confirms retirement. Persistent uncertainty
+  still fails. The trusted network refusal is preserved by 37 registered
+  bootstrap controls. Installer PAC compatibility remains unresolved.
+
+- [~] **120.** Allow AI provider and model selection before enabling AI.
+
+  Selecting preferences while AI is disabled must not install a local
+  runtime, start an inference server or stop unrelated processes. Preserve
+  the existing model/configuration transaction and readiness checks when
+  enabling. Check all three drivers, including an absent or failed MLX
+  runtime and switching to API or Ollama. The enabled macOS backend path's
+  existing broad Ollama process termination remains separate ownership debt.
+
+  The macOS correction is committed locally with 64 registered controls
+  passing. Real installed-menu acceptance and final integration remain open.
+
+- [~] **121.** Mark the unfinished AI Agent submenu unavailable on every OS.
+
+  Use one shared availability declaration and a localized reason in all 21
+  locales. Grey only the Agent submenu; prediction, provider and model
+  controls remain available. Cover actual Windows, macOS and Linux menu
+  composition with regression tests.
+
+  Shared availability, all 21 translations and the three menu owners are
+  committed. Actual inert composition and bounded AHK regressions pass;
+  complete composed-menu qualification remains open.
+
+- [~] **122.** Focus Diagnostics when explicitly opened or reopened.
+
+  Restore a minimized window and activate, raise and focus its exact current
+  owner. A focus refusal must remain visible without deleting an existing
+  report or claiming success. Guard deferred operations against replacement
+  windows. Background collection or test completion must not steal focus.
+  Check equivalent Windows and Linux behavior and obtain actual Mac proof.
+
+  The macOS activation/restore/focus ordering and refusal preservation are
+  committed. All six registered focused modules pass; the retained causal
+  controls include four failing inverses. Physical Mac foreground behavior
+  still requires acceptance with the new package.
+
+- [ ] **123.** Make the shared diagnostic export safe for a workplace Mac.
+
+  The maintainer explicitly requires no personal or company data in the
+  report attached to GitHub. Restrict every shared export to allowed typed
+  technical facts and reject unknown fields. Omit free-form logs and strings
+  that can contain user, host, application or device names, personal paths,
+  entered text, window titles, credentials and internal PAC/proxy addresses.
+  Do not rely only on replacing the home directory or token-shaped strings.
+  Cover Markdown, nested JSON, clipboard, native export and issue URL paths
+  with synthetic adversarial fixtures on all three drivers. In-depth tests
+  must not broaden what can be shared. Keep local preview and no automatic
+  upload. Retain useful source/package/architecture, closed failure categories,
+  native status and cleanup evidence without personal payloads.
+
+  The maintainer can run the opt-in checks on a real Apple Silicon Mac and
+  share the resulting file through a new issue. Prioritize these urgent
+  fixes and guided diagnostics for a usable release on October 9 evening.
+  The target for dev.158 is every CI assertion restored and genuinely green;
+  a local ARM receipt does not qualify another source, Intel or GitHub's
+  hosted consent. Restore deferred tests based on actual evidence, not by
+  treating missing or locally successful checks as hosted passes.
+
+- [ ] **124.** Remove the redundant Live mode submenu on every OS.
+
+  The maintainer clarified that the AI menu already configures suggestions
+  while typing. Retain one profile selector and configurable shortcuts that
+  execute a specific prompt. A label-only distinction was rejected. Remove
+  the duplicate submenu through its shared owner and regenerate its output.
+  Preserve explicit prompt shortcuts and saved bindings. Ensure a hidden
+  temporary override cannot silently defeat the visible profile selection.
+  Cover the new menu contract and actual profile/prompt behavior on all three
+  drivers without broad changes to the prediction engine.
+
+- [ ] **125.** Configure an arbitrary translation target through an input box.
+
+  The maintainer requested one Translate action with a freely entered target
+  language, saved in its binding. Reuse the existing input dialog instead of
+  introducing another language catalogue. The current selection-translation
+  parser accepts only the 21 interface locales, while typing-context actions
+  use separate fixed English and Japanese profiles. Cover both actual
+  translation entry points as applicable; changing the selection-only parser
+  does not fix the typing-context limitation. Retain existing English/Japanese
+  bindings, current selection guards, prediction admission and response limits.
+  Use one shared parameter contract and matching Windows/Lua ports, with
+  invalid-input and non-interface-language regression cases on all three OSes.
 
 ## Time estimate
 
