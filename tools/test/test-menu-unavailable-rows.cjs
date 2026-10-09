@@ -13,7 +13,7 @@
  *     form of its translated reason (the text before its first colon).
  * A restricted row without the field is hidden, as before the field existed.
  * A row its `disabled_when` greys where it is drawn can say why in the same
- * form (`disabled_reason_key`, on a command row): the Uninstall row of a local
+ * form (`disabled_reason_key`, on a command or identified labelled group row): the Uninstall row of a local
  * version run from source. One rule for both, which differ only in how the
  * condition is evaluated.
  *
@@ -21,7 +21,7 @@
  *   1. Every declaration is one of the two values, on a row whose platforms
  *      leave some platform out; a hidden row has no reason_key; a greyed row
  *      has an i18n label and a reason_key; a disabled_reason_key sits on a
- *      command row with an i18n label and the disabled_when that greys it
+ *      command row or an identified group with an i18n label and the disabled_when that greys it
  *      (the generator refuses the same).
  *   2. Every greyed row's reason opens with a short head in every locale, so
  *      the stand-in label stays narrow on every tray.
@@ -71,8 +71,24 @@ function rowErrors(where, row) {
 	if (row.disabled_reason_key !== undefined) {
 		if (typeof row.disabled_reason_key !== 'string' || row.disabled_reason_key === '')
 			errors.push(`${where}: disabled_reason_key must name a locale key.`);
-		if (row.type !== 'command')
-			errors.push(`${where}: disabled_reason_key is read on command rows only.`);
+		if (row.type !== 'command' && row.type !== 'group')
+			errors.push(
+				`${where}: disabled_reason_key is read on command rows only, or identified labelled groups.`
+			);
+		if (
+			row.type === 'group' &&
+			(typeof row.id !== 'string' ||
+				row.id === '' ||
+				typeof row.i18n !== 'string' ||
+				row.i18n === '' ||
+				!Array.isArray(row.disabled_when) ||
+				row.disabled_when.length === 0 ||
+				Object.keys(row.disabled_when).length !== row.disabled_when.length ||
+				Array.from(row.disabled_when).some((key) => typeof key !== 'string' || key === ''))
+		)
+			errors.push(
+				`${where}: a reasoned group needs its identity, i18n label and nonempty disabled_when keys.`
+			);
 		if (!Array.isArray(row.disabled_when) || row.disabled_when.length === 0)
 			errors.push(`${where}: disabled_reason_key needs the disabled_when that greys the row.`);
 		if (typeof row.i18n !== 'string') errors.push(`${where}: a greyed row needs an i18n label.`);
@@ -590,4 +606,33 @@ console.log(
 	console.log(
 		'[OK] canonical MENU-only HIDE and semantic debt identities; numeric counterpart source routes (native execution not claimed).'
 	);
+}
+
+// The generic group owners now support the same reasoned projection as group_row.
+// Keep the earlier command/check invalid controls unchanged.
+{
+	const owner = require('../lib/menu-row-availability.cjs');
+	const parent = {
+		type: 'group',
+		id: 'native_parent',
+		i18n: 'menu.llm.title',
+		disabled_when: ['ready'],
+		disabled_reason_key: 'menu.llm.unavailable'
+	};
+	assert.equal(owner.classifyMenuRow(parent, 'qualified'), 'unclassified');
+	assert.deepEqual(rowErrors('qualified', parent), []);
+	for (const patch of [
+		{ id: '' },
+		{ i18n: '' },
+		{ disabled_when: [] },
+		{ disabled_when: [''] },
+		{ disabled_when: [false] },
+		{ disabled_when: new Array(1) }
+	]) {
+		assert.throws(
+			() => owner.classifyMenuRow({ ...parent, ...patch }, 'qualified'),
+			/reasoned group needs/
+		);
+		assert.ok(rowErrors('qualified', { ...parent, ...patch }).length > 0);
+	}
 }
