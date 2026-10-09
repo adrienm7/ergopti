@@ -82,9 +82,24 @@ INNER_STAGES = (
     "session_done",
 )
 ALL_STAGES = WORKER_STAGES + INNER_STAGES
+# Exactly one compact plan token can accompany the original stages. A sole
+# default-refused route differs from the authored fallback's ordered successor.
+# Missing/unqualified observation is unknown, never proof of a selected endpoint.
+ROUTE_STAGES = {
+    "r0": "sole_direct",
+    "r1": "sole_default_refused",
+    "r2": "default_refused_with_successor",
+    "r3": "other_http_first",
+    "r4": "socks_first",
+    "r5": "unknown",
+}
+
 # All unique closed labels, including mutually exclusive branches, fit the
 # existing 256-byte envelope. No transport clock or byte limit is increased.
-assert sum(len(stage) + 1 for stage in ALL_STAGES) <= 256
+assert (
+    sum(len(stage) + 1 for stage in ALL_STAGES) + max(len(token) + 1 for token in ROUTE_STAGES)
+    <= 256
+)
 
 
 class WorkerStageReceipt:
@@ -123,7 +138,11 @@ class WorkerStageReceipt:
             return {"state": "refused", "stages": []}
         try:
             stages = raw.decode("ascii").splitlines()
-            if any(stage not in ALL_STAGES for stage in stages) or len(stages) != len(set(stages)):
+            if (
+                any(stage not in ALL_STAGES and stage not in ROUTE_STAGES for stage in stages)
+                or len(stages) != len(set(stages))
+                or sum(stage in ROUTE_STAGES for stage in stages) > 1
+            ):
                 return {"state": "refused", "stages": []}
             indices = [WORKER_STAGES.index(stage) for stage in stages if stage in WORKER_STAGES]
         except (UnicodeError, ValueError):
@@ -319,6 +338,7 @@ class RealNativeClientReceiving(unittest.TestCase):
             cls.fixture._command(["/usr/bin/codesign", "--force", "--sign", "-", str(executable)])
             cls.fixture._command(["/usr/bin/codesign", "--verify", "--strict", str(executable)])
             cls.fixture.trust_query_executable = executable
+            cls.fixture.authorization_observation = True
             identity = executable.stat()
             (cls.root / "source-receipt.json").write_text(
                 json.dumps(
@@ -458,6 +478,23 @@ class RealNativeClientReceiving(unittest.TestCase):
                     "entry_stages": {
                         stage: min(65535, sum(stage in row["stages"] for row in stages))
                         for stage in ALL_STAGES
+                    },
+                    "selected_route": {
+                        kind: min(65535, sum(token in row["stages"] for row in stages))
+                        for token, kind in ROUTE_STAGES.items()
+                        if kind != "unknown"
+                    }
+                    | {
+                        "unknown": min(
+                            65535,
+                            sum(
+                                not any(
+                                    stage in ROUTE_STAGES and stage != "r5"
+                                    for stage in row["stages"]
+                                )
+                                for row in stages
+                            ),
+                        )
                     },
                     "stage_receipts": {
                         state: min(65535, sum(row["state"] == state for row in stages))

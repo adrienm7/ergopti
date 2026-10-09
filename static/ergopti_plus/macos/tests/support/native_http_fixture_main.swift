@@ -62,6 +62,7 @@ private func fixtureAdminTrustQuery() -> Int32 {
 private final class FixtureStages {
 	private var descriptor: Int32 = -1
 	private var seen = Set<String>()
+	private var defaultRoutePort: Int?
 	private let lock = NSLock()
 
 	init(executable: String) {
@@ -76,6 +77,47 @@ private final class FixtureStages {
 			Darwin.close(opened); return
 		}
 		descriptor = opened
+	}
+
+	// Only the existing authored script's exact final default endpoint qualifies
+	// this diagnostic. PAC URLs remain unknown; observation performs no fetch.
+	func bindDefaultRoute(settings: [String: Any]) {
+		guard let script = settings["ProxyAutoConfigJavaScript"] as? String,
+			script.utf8.prefix(65_537).count <= 65_536 else { return }
+		let prefix = "return \"PROXY 127.0.0.1:"
+		let suffix = "\"; }"
+		guard script.hasSuffix(suffix), let found = script.range(of: prefix, options: .backwards) else { return }
+		let end = script.index(script.endIndex, offsetBy: -suffix.count)
+		guard found.upperBound <= end else { return }
+		let digits = script[found.upperBound..<end]
+		guard !digits.isEmpty, digits.utf8.count <= 5,
+			digits.utf8.allSatisfy({ (48...57).contains($0) }),
+			let port = Int(digits), (1...65535).contains(port) else { return }
+		defaultRoutePort = port
+	}
+
+	func routes(_ routes: [[String: Any]]) {
+		// One explicit lookup has one plan. Refused observation stays unknown;
+		// it cannot change the order, route selection or request verdict.
+		guard lock.try() else { return }
+		defer { lock.unlock() }
+		guard descriptor >= 0, seen.insert("route_plan").inserted else { return }
+		var token = "r5"
+		if let first = routes.first, let kind = first[kCFProxyTypeKey as String] as? String {
+			if kind == kCFProxyTypeNone as String, routes.count == 1 { token = "r0" }
+			else if kind == kCFProxyTypeSOCKS as String { token = "r4" }
+			else if kind == kCFProxyTypeHTTP as String || kind == kCFProxyTypeHTTPS as String,
+				let host = first[kCFProxyHostNameKey as String] as? String,
+				let port = first[kCFProxyPortNumberKey as String] as? NSNumber,
+				CFGetTypeID(port) != CFBooleanGetTypeID(), port.doubleValue == Double(port.intValue),
+				(1...65535).contains(port.intValue), let expected = defaultRoutePort {
+				if host == "127.0.0.1", port.intValue == expected { token = routes.count == 1 ? "r1" : "r2" }
+				else { token = "r3" }
+			}
+		}
+		let bytes = Array((token + "\n").utf8)
+		let count = bytes.withUnsafeBytes { Darwin.write(descriptor, $0.baseAddress!, $0.count) }
+		if count != bytes.count { Darwin.close(descriptor); descriptor = -1 }
 	}
 
 	deinit { if descriptor >= 0 { Darwin.close(descriptor) } }
@@ -99,6 +141,10 @@ private enum FixtureHTTPObservation {
 
 func managedHTTPFixtureStage(_ stage: String) {
 	FixtureHTTPObservation.owner?.mark(stage)
+}
+
+func managedHTTPFixtureRoutes(_ routes: [[String: Any]]) {
+	FixtureHTTPObservation.owner?.routes(routes)
 }
 
 // The private fixture App binds fixed native settings beside its exact source
@@ -147,6 +193,7 @@ func fixtureMain() -> Int32 {
 	guard let settingsBytes = try? Data(contentsOf: privateSettings),
 		let settings = try? JSONSerialization.jsonObject(with: settingsBytes) as? [String: Any] else { return 78 }
 	stages.mark("settings")
+	stages.bindDefaultRoute(settings: settings)
 	let policy = privateSettings.deletingLastPathComponent()
 		.appendingPathComponent("static/ergopti_plus/_shared/modules/network/proxy_policy.json")
 	guard let policyBytes = try? Data(contentsOf: policy),

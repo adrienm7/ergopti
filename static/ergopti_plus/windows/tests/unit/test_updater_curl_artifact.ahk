@@ -263,7 +263,8 @@ _ArtifactCurlActualSspiAndStaging() {
 		} finally _UpdaterNative_Close(Tls)
 	}
 }
-Test("artifact curl: actual Schannel staging and SSPI bare NTLM CONNECT with no Negotiate downgrade", _ArtifactCurlActualSspiAndStaging)
+Test("artifact curl: actual Schannel staging and SSPI bare NTLM CONNECT with no Negotiate downgrade",
+	(*) => _UpdaterNative_WithContract((*) => _ArtifactCurlActualSspiAndStaging()))
 
 ; The source runner cannot call the compiled application's install dispatcher
 ; without taking its real installation reservation. Guard that single join,
@@ -651,6 +652,15 @@ _ArtifactQueuedTlsShutdownControls() {
 			Sleep(10)
 		}
 		AssertEqual(1, Observed.Length)
+		; The tree completion callback is downstream of exact process/Job HANDLE retirement.
+		; Print only one strict closed frame; optional publication preserves the original failure.
+		if Observed[1]["exit"] != 0 {
+			try {
+				Fact := _ArtifactQueuedTlsFailureFact(Observed[1]["stdout"])
+				if Fact is Map
+					FileAppend("# " . Fact["frame"] . "`n", "*", "UTF-8")
+			} catch { }
+		}
 		AssertEqual(0, Observed[1]["exit"])
 		AssertEqual("OWNED_QUEUED_TLS_SHUTDOWN_CONTROLLED_PORTS:7", Trim(Observed[1]["stdout"], "`r`n "))
 		AssertEqual("", Observed[1]["stderr"])
@@ -660,3 +670,122 @@ _ArtifactQueuedTlsShutdownControls() {
 	}
 }
 Test("artifact curl: queued peer TLS close is processed without a peer wait or error waiver", _ArtifactQueuedTlsShutdownControls)
+
+
+; The native scenario uses the existing shared receipt owner, just as the
+; legacy updater scenarios do. An absent owner intentionally removes fields;
+; it cannot qualify a typed native filesystem failure.
+_ArtifactCurlReceiptContractReceive(Raw, Contract, RaiseAfter := false) {
+	global _UpdaterManagedFailureContract
+	AssertTrue(_UpdaterManagedFailureContract == Contract, "the callback owns the actual canonical receipt contract")
+	Failure := _Updater_ParseStagingFailure(Raw)
+	AssertTrue(Failure["valid"], "the independent filesystem envelope is admitted by the actual parser")
+	AssertEqual("file_create", Failure["receipt"].Get("stage", ""), "the shared owner preserves the original filesystem operation")
+	AssertEqual("dotnet", Failure["receipt"].Get("backend", ""))
+	AssertEqual("80", Failure["receipt"].Get("native_errno", ""), "the literal native error survives without text-derived diagnosis")
+	if RaiseAfter
+		throw Error("ARTIFACT_RECEIPT_CONTROLLED_FAILURE")
+}
+
+_ArtifactCurlReceiptContractControls() {
+	global _UpdaterManagedFailureContract
+	Saved := _UpdaterManagedFailureContract
+	Raw := '{"schema_version":1,"state":"failed","operation":"download","reason":"download","receipt":{"backend":"dotnet","stage":"file_create","failure_provenance":"verified","native_errno_domain":"win32","native_errno":"80"},"cleanup_debt":[],"native_cleanup_debt":false}'
+	try {
+		_UpdaterManagedFailureContract := 0
+		Without := _Updater_ParseStagingFailure(Raw)
+		AssertTrue(Without["valid"], "absent presentation policy does not falsify envelope syntax")
+		AssertEqual(0, Without["receipt"].Count, "the unconfigured parser intentionally supplies no typed receipt")
+		_UpdaterNative_WithContract((Contract) => _ArtifactCurlReceiptContractReceive(Raw, Contract))
+		AssertEqual(0, _UpdaterManagedFailureContract, "the shared owner restores the exact absent predecessor after success")
+		Caught := false
+		try _UpdaterNative_WithContract((Contract) => _ArtifactCurlReceiptContractReceive(Raw, Contract, true))
+		catch Error as Failure
+			Caught := Failure.Message == "ARTIFACT_RECEIPT_CONTROLLED_FAILURE"
+		AssertTrue(Caught, "the original callback failure survives canonical owner retirement")
+		AssertEqual(0, _UpdaterManagedFailureContract, "the shared owner restores the exact absent predecessor after failure")
+	} finally _UpdaterManagedFailureContract := Saved
+}
+Test("artifact curl: canonical receipt ownership preserves filesystem stage and restores predecessor (artifact-receipt-contract-owner)", _ArtifactCurlReceiptContractControls)
+
+
+; Failure facts contain only the exact controlled Case identity and bounded scalars.
+; Original native errors, the seven-case census and the 15000ms caller stay authoritative.
+_ArtifactQueuedTlsFailureFact(Out) {
+	if !(Out is String) || StrLen(Out) > 131072 || InStr(Out, Chr(0))
+		return 0
+	Candidate := 0
+	Number := "(-?(?:0|[1-9][0-9]{0,9}))"
+	Pattern := "^OWNED_QUEUED_TLS_SHUTDOWN_FAILURE case=([0-6])"
+		. " phase=(assert_(?:queued|tls|calls|fact|input|bytes|retired|duplicate|output)|closed|unavailable)"
+		. " family=(socket|io|invalid_data|invalid_operation|other)"
+	for Field in ["code", "hresult", "fact", "sequence", "called", "result", "error", "received", "written", "close_written", "pending", "network_closed", "calls", "errors", "input"]
+		Pattern .= " " . Field . "=" . Number
+	Pattern .= "$"
+	for Row in StrSplit(Out, "`n", "`r") {
+		if !InStr(Row, "OWNED_QUEUED_TLS_SHUTDOWN_FAILURE")
+			continue
+		if Candidate is Map || StrLen(Row) > 512 || !RegExMatch(Row, Pattern, &Match)
+			return 0
+		Fact := Map("case", Integer(Match[1]), "phase", Match[2], "family", Match[3], "frame", Row)
+		for Index, Field in ["code", "hresult", "fact", "sequence", "called", "result", "error", "received", "written", "close_written", "pending", "network_closed", "calls", "errors", "input"] {
+			Value := Integer(Match[Index + 3])
+			if Value < -2147483648 || Value > 2147483647 || StrCompare(Match[Index + 3], "-0", true) == 0
+				return 0
+			Fact[Field] := Value
+		}
+		if (Fact["family"] == "socket" && Fact["code"] < 0)
+			|| (Fact["family"] != "socket" && Fact["code"] != -1)
+			|| (Fact["fact"] != 0 && Fact["fact"] != 1)
+			return 0
+		if Fact["fact"] == 0 {
+			if Fact["phase"] == "closed"
+				return 0
+			for Field in ["sequence", "called", "result", "error", "received", "written", "close_written", "pending", "network_closed", "calls", "errors", "input"]
+				if Fact[Field] != -1
+					return 0
+		} else {
+			if Fact["phase"] == "unavailable" || Fact["sequence"] != 1 || Fact["network_closed"] != 1
+				|| Fact["called"] < 0 || Fact["called"] > 1 || Fact["result"] < -1 || Fact["result"] > 1
+				|| !InStr("|0|1|2|3|6|", "|" . Fact["error"] . "|")
+				|| Fact["received"] < 0 || Fact["written"] < 0 || Fact["close_written"] < -1
+				|| Fact["pending"] < -1 || Fact["pending"] > 1
+				|| Fact["calls"] < 0 || Fact["calls"] > 512 || Fact["errors"] < 0 || Fact["errors"] > Fact["calls"]
+				|| Fact["input"] < 0 || Fact["input"] > 16384
+				|| (Fact["result"] >= 0 && Fact["error"] != 0)
+				|| (Fact["called"] == 0 && Fact["calls"] != 0)
+				|| (Fact["close_written"] >= 0 && Fact["close_written"] > Fact["written"])
+				return 0
+		}
+		Candidate := Fact
+	}
+	return Candidate
+}
+
+_ArtifactQueuedTlsFailureFactControls() {
+	Raw := "OWNED_QUEUED_TLS_SHUTDOWN_FAILURE case=6 phase=closed family=socket code=10054 hresult=-2146232800 fact=1 sequence=1 called=1 result=-1 error=2 received=12 written=14 close_written=3 pending=1 network_closed=1 calls=3 errors=2 input=3"
+	Fact := _ArtifactQueuedTlsFailureFact(Raw)
+	AssertTrue(Fact is Map, "independent closed failure frame is admitted")
+	AssertEqual(6, Fact["case"])
+	AssertEqual(10054, Fact["code"])
+	AssertEqual(12, Fact["received"])
+	AssertEqual(1, Fact["pending"])
+	AssertEqual(Raw, _ArtifactQueuedTlsFailureFact("Private unrelated exception text`r`n" . Raw . "`r`n")["frame"], "only the complete closed row can be published")
+	for Bad in [Raw . "`n" . Raw, Raw . " secret=x", "prefix " . Raw, Raw . Chr(0),
+		StrReplace(Raw, "case=6", "case=7"), StrReplace(Raw, "phase=closed", "phase=private"),
+		StrReplace(Raw, "code=10054", "code=010054"), StrReplace(Raw, "code=10054", "code=+10054"),
+		StrReplace(Raw, "code=10054", "code=2147483648"), StrReplace(Raw, "hresult=-2146232800", "hresult=-2147483649"),
+		StrReplace(Raw, "family=socket", "family=other"), StrReplace(Raw, "fact=1", "fact=0"),
+		StrReplace(Raw, "sequence=1", "sequence=2"), StrReplace(Raw, "network_closed=1", "network_closed=0"),
+		StrReplace(Raw, "received=12", "received=-1"), StrReplace(Raw, "close_written=3", "close_written=-2"),
+		StrReplace(Raw, "pending=1", "pending=2"), StrReplace(Raw, "calls=3", "calls=513"),
+		StrReplace(Raw, "errors=2", "errors=4"), StrReplace(Raw, "input=3", "input=16385"),
+		StrReplace(Raw, "code=10054", "code=-0"), StrReplace(Raw, "phase=closed", "phase=unavailable"),
+		StrReplace(Raw, "result=-1", "result=1"), StrReplace(Raw, "called=1", "called=0"),
+		StrReplace(Raw, "close_written=3", "close_written=15")]
+		AssertEqual(0, _ArtifactQueuedTlsFailureFact(Bad), "malformed/foreign/duplicate/unsettled failure frames cannot publish")
+	Unknown := "OWNED_QUEUED_TLS_SHUTDOWN_FAILURE case=0 phase=unavailable family=io code=-1 hresult=-2146232800 fact=0 sequence=-1 called=-1 result=-1 error=-1 received=-1 written=-1 close_written=-1 pending=-1 network_closed=-1 calls=-1 errors=-1 input=-1"
+	AssertTrue(_ArtifactQueuedTlsFailureFact(Unknown) is Map, "unknown owner facts remain explicitly unavailable")
+	AssertEqual(0, _ArtifactQueuedTlsFailureFact("Private raw exception with no closed frame"))
+}
+Test("artifact curl: bounded queued TLS failure facts preserve native refusal (queued-tls-failure-facts)", _ArtifactQueuedTlsFailureFactControls)

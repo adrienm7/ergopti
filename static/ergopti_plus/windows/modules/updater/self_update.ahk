@@ -2220,13 +2220,19 @@ _Updater_BuildStagingTransport(Script, SwapScript, AssetUrl, ExpectedSha256, New
 		if StrLen(Pair.Value) > UPDATER_STAGING_ENV_MAX_CHARS
 			throw ValueError("Staging environment value exceeds the cmd.exe inheritance budget")
 	}
+	; Consumed payloads must not overflow the Framework compiler's inherited ANSI environment.
 	Bootstrap := '$ErrorActionPreference=' . Chr(39) . 'Stop' . Chr(39) . ';'
 		. '$ProgressPreference=' . Chr(39) . 'SilentlyContinue' . Chr(39) . ';'
-		. '$scriptPayload=$env:' . Prefix . '_SCRIPT;'
-		. 'for($i=2;$i -le [int]$env:' . Prefix . '_SCRIPT_COUNT;$i++){$scriptPayload+=[Environment]::GetEnvironmentVariable(' . Chr(39) . Prefix . '_SCRIPT_' . Chr(39) . '+$i)};'
+		. 'if($env:' . Prefix . '_SCRIPT_COUNT -cne ' . Chr(39) . ScriptChunkCount . Chr(39) . ' -or $env:' . Prefix . '_SWAP_COUNT -cne ' . Chr(39) . SwapChunkCount . Chr(39) . '){throw "Staging fragment counts were refused"};'
+		. '$scriptPayload=$env:' . Prefix . '_SCRIPT;if([string]::IsNullOrEmpty($scriptPayload)){throw "Staging source fragment was refused"};'
+		. 'for($i=2;$i -le [int]$env:' . Prefix . '_SCRIPT_COUNT;$i++){$chunk=[Environment]::GetEnvironmentVariable(' . Chr(39) . Prefix . '_SCRIPT_' . Chr(39) . '+$i);if([string]::IsNullOrEmpty($chunk)){throw "Staging source fragment was refused"};$scriptPayload+=$chunk};'
 		. '$source=[Text.Encoding]::Unicode.GetString([Convert]::FromBase64String($scriptPayload));'
 		. '$swapPayload=' . Chr(39) . Chr(39) . ';'
-		. 'for($i=1;$i -le [int]$env:' . Prefix . '_SWAP_COUNT;$i++){$swapPayload+=[Environment]::GetEnvironmentVariable(' . Chr(39) . Prefix . '_SWAP_' . Chr(39) . '+$i)};'
+		. 'for($i=1;$i -le [int]$env:' . Prefix . '_SWAP_COUNT;$i++){$chunk=[Environment]::GetEnvironmentVariable(' . Chr(39) . Prefix . '_SWAP_' . Chr(39) . '+$i);if([string]::IsNullOrEmpty($chunk)){throw "Staging swap fragment was refused"};$swapPayload+=$chunk};'
+		. 'for($i=1;$i -le [int]$env:' . Prefix . '_SCRIPT_COUNT;$i++){$chunkName=if($i -eq 1){' . Chr(39) . Prefix . '_SCRIPT' . Chr(39) . '}else{' . Chr(39) . Prefix . '_SCRIPT_' . Chr(39) . '+$i};[Environment]::SetEnvironmentVariable($chunkName,[NullString]::Value)};'
+		. '[Environment]::SetEnvironmentVariable(' . Chr(39) . Prefix . '_SCRIPT_COUNT' . Chr(39) . ',[NullString]::Value);'
+		. 'for($i=1;$i -le [int]$env:' . Prefix . '_SWAP_COUNT;$i++){[Environment]::SetEnvironmentVariable(' . Chr(39) . Prefix . '_SWAP_' . Chr(39) . '+$i,[NullString]::Value)};'
+		. '[Environment]::SetEnvironmentVariable(' . Chr(39) . Prefix . '_SWAP_COUNT' . Chr(39) . ',[NullString]::Value);'
 		. '$worker=[ScriptBlock]::Create($source);'
 		. '& $worker $env:' . Prefix . '_URL $env:' . Prefix . '_DIGEST $env:' . Prefix . '_NEW_EXE $env:' . Prefix . '_SWAP_PATH $env:' . Prefix . '_CURRENT'
 		. ' ([int64]$env:' . Prefix . '_MINIMUM) ([int]$env:' . Prefix . '_TIMEOUT'

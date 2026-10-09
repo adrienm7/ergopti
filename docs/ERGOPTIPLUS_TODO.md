@@ -5802,6 +5802,40 @@ item 38 device acceptance stay open, and items 54/81 remain partial.
       open. macOS system trust and explicit proxy relays are integrated, while
       opaque-client full-URL PAC/WPAD/fallback/redirect routing remains CODE.
 
+The next reviewed receiving tranche (2026-10-09) preserves the original native
+bounds. Portable HTTP retirement now starts the six public server shutdowns
+concurrently, retains every exact worker before start and refuses namespace
+removal until all workers settle; forty controls keep the original60-second
+registration. Route observations are closed three-byte facts and do not prove
+HTTPS URL sanitization. The public admin authorization probe consumes the
+original removal budget; it can cache an existing right and never grants
+restoration authority.
+
+Windows clears only exact admitted SCRIPT/SWAP environment fragments after
+source decoding and before the compiler. The retained inherited-environment
+high-water assertion, decoded bytes, arguments, foreign variables, routing and
+original clocks remain. The native fixtures also correct AHKv2 UTF16 byte
+measurements, explicitly admit the existing artifact failure contract, and hold
+the exact queued diagnostics callback before its final acknowledgement. Queued
+TLS failure frames remain observational; unknown native codes are-1 and cannot
+become a successful transport or retirement claim. Independent causal and
+source-conservation reviews pass. Actual new Windows/macOS qualification is
+pending; previous manual37903142972 still has10,510 passes/seven failures.
+
+Remaining hosted/software steps, distinct from personal-device acceptance:
+
+- [ ] Windows: qualify the real Framework compiler and staging TLS/file-denial/live-body cases after consumed-fragment retirement, genuine junction/rename receiving, queued callback revocation, artifact receiving and all seven queued TLS modes. Diagnose any remaining failures through exact native receipts; preserve all original assertions and deadlines.
+- [ ] Windows: reach and qualify both authenticated current-user proxy scenarios and the strict NTLM-only bare challenge. Negotiate success does not qualify bare NTLM; implement any missing bounded scheme discovery only after native receiving and shared capability review, without silent downgrade.
+- [ ] macOS: qualify the independent25 archive/Sparkle/Brew/consent XCTest cases and all six Homebrew scenarios, the full native suite, final package and actual installed upgrade/relaunch. Preserve both Brew positives and policy denial; no supported consent-grant path is established yet.
+- [ ] macOS: qualify actual CFNetwork full-URL PAC/WPAD/fallback/redirect routing and owned trust restoration. The41 SDK cases passed on both architectures atfa330029, but final-source HTTP/model receiving and production activation remain unqualified. Keep the existing activation guard until these receipts pass.
+- [ ] All three drivers: complete final-source unit/E2E/package/install/launch and managed-network acceptance, including system trust, proxy authentication and distinct safe translated failure recovery. Official cold runtime/version probes do not qualify an unexecuted daemon/model installation.
+
+Personal-device steps remain separately required for genuine enterprise network
+configurations and installed-application behavior on Windows/macOS, alongside
+the unchanged physical obligations in item38. They do not replace feasible
+software repairs or hosted qualification. Items36/62 and transversal16/38 stay
+open; this receiving tranche does not qualify a stable release.
+
 The Windows updater capture ledger's native implementation now lives in its
 native adapter, included through the original updater owner. The complete class
 bytes and all transaction/retirement policies are unchanged. This restores the
