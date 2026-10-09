@@ -1112,7 +1112,7 @@ M.unavailable = {
 		path = "layout.ergopti_alt_gr", section = "layout", reason_key = "", platforms = { "ahk" },
 	},
 	{
-		path = "layout.ergopti_plus", section = "layout", reason_key = "", platforms = { "ahk" },
+		path = "layout.ergopti_variant", section = "layout", reason_key = "platform_reason.legacy_helpers_use_windows_scan_code_hotkeys", platforms = { "ahk" },
 	},
 	{
 		path = "layout.ctrl_magic_save", section = "layout", reason_key = "", platforms = { "ahk" },

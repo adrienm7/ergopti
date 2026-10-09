@@ -72,14 +72,18 @@ public static class CensusControlProcess {
             if (WaitNative(handle,5000) != 0 || !ExitNative(handle,out exit) || exit != 7)
                 throw new InvalidOperationException("Cooperative query barrier did not exit with7.");
         }
-        if (Mode.Contains("query") || Mode == "native-terminal")
+        if ((Mode.Contains("query") && !Mode.StartsWith("reap-")) || Mode == "native-terminal")
             throw new InvalidOperationException("Controlled native identity query refusal.");
-        return Mode == "accepted";
+        return Mode == "accepted" || Mode.StartsWith("reap-");
+    }
+    public static bool GetExitCodeProcess(IntPtr handle, out uint exit) {
+        exit = Mode == "reap-exited-unsignaled" ? 1u : 259u;
+        return Mode != "reap-exit-query-refusal";
     }
     public static bool TerminateProcess(IntPtr handle, uint exit) {
         Terminated++;
         if (Native) throw new InvalidOperationException("A terminal native candidate acquired termination authority.");
-        return true;
+        return Mode != "reap-terminate-refusal";
     }
     public static bool CloseHandle(IntPtr handle) {
         Closed++;
@@ -213,3 +217,41 @@ foreach ($mode in @('native-terminal', 'native-exit-during-query')) {
     }
 }
 Write-Output '[OK] Two exact native child exits preserve the primary refusal without acquiring termination authority.'
+
+# Additive diagnostic controls exercise the same extracted executable census.
+# Neither accepted termination nor an exit code substitutes for a terminal wait.
+if (!$NativeOnly) {
+    foreach ($case in @(
+        @{ mode='reap-timeout'; final=[uint32]0x102; terminated=$true; exit_accepted=$true; exit_code=259 },
+        @{ mode='reap-wait-failed'; final=[uint32]::MaxValue; terminated=$true; exit_accepted=$true; exit_code=259 },
+        @{ mode='reap-terminate-refusal'; final=[uint32]0x102; terminated=$false; exit_accepted=$true; exit_code=259 },
+        @{ mode='reap-exit-query-refusal'; final=[uint32]0x102; terminated=$true; exit_accepted=$false; exit_code=-1 },
+        @{ mode='reap-exited-unsignaled'; final=[uint32]0x102; terminated=$true; exit_accepted=$true; exit_code=1 }
+    )) {
+        [CensusControlProcess]::Reset($case.mode)
+        [CensusControlProcess]::Waits.Enqueue([uint32]0x102)
+        [CensusControlProcess]::Waits.Enqueue($case.final)
+        $errorText = Invoke-CensusControl
+        $prefix = 'An owned failed source reload could not be reaped. source-reap-evidence='
+        if (!$errorText.StartsWith($prefix)) {
+            throw ('The genuine cleanup refusal lost its native diagnostics: ' + $case.mode)
+        }
+        $record = $errorText.Substring($prefix.Length) | ConvertFrom-Json
+        $names = @($record.PSObject.Properties | ForEach-Object Name | Sort-Object)
+        $expectedNames = @('schema_version', 'identity_matches', 'before_wait', 'terminate_accepted',
+            'terminate_error', 'terminal_wait', 'wait_error', 'exit_query_accepted', 'exit_query_error', 'exit_code') | Sort-Object
+        if (@(Compare-Object $names $expectedNames).Count -ne 0 -or
+            $record.schema_version -ne 1 -or $record.identity_matches -isnot [bool] -or
+            $record.identity_matches -ne $true -or $record.before_wait -ne 0x102 -or
+            $record.terminate_accepted -isnot [bool] -or $record.terminate_accepted -ne $case.terminated -or
+            $record.terminal_wait -ne $case.final -or $record.exit_query_accepted -isnot [bool] -or
+            $record.exit_query_accepted -ne $case.exit_accepted -or $record.exit_code -ne $case.exit_code -or
+            [CensusControlProcess]::Opened -ne 1 -or [CensusControlProcess]::Queried -ne 1 -or
+            [CensusControlProcess]::Observed -ne 2 -or [CensusControlProcess]::Terminated -ne 1 -or
+            [CensusControlProcess]::Closed -ne 1 -or ![CensusControlProcess]::CloseAcknowledged -or
+            [CensusControlProcess]::Waits.Count -ne 0) {
+            throw ('The exact admitted-handle diagnostic control was refused: ' + $case.mode)
+        }
+    }
+    Write-Output '[OK] Five admitted-handle reap diagnostics distinguish timeout, failed wait, terminate refusal, query refusal and an unsignaled exited handle.'
+}

@@ -360,7 +360,6 @@ jobs:
         id: swift-launcher-tests
         env:
           SWIFT_BACKTRACE: enable=yes
-          ERGOPTI_NATIVE_XCODEGEN_METADATA_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
           mkdir -p "$RUNNER_TEMP/swift-launcher-evidence"

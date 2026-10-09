@@ -43,16 +43,11 @@ end
 --- @return table layout, table commands
 local function load_with(kind, answers, env)
 	local commands = {}
-	-- Capture accepts any text; its inverse table is the text parser's answer,
-	-- which is enough to exercise WHICH source the keymap came from.
-	local loaded_text = nil
-	package.loaded["adapters.xkb_capture"] = {
-		load = function(text) loaded_text = text; return true end,
-		is_ready = function() return true end,
-		inverse_table = function()
-			return (package.loaded["adapters.keyboard_layout"].build(loaded_text))
-		end,
-	}
+	-- A controlled map acknowledgement owns the parser's inverse data and
+	-- receipt. This checks source order without granting native source currency.
+	package.loaded["adapters.xkb_capture"] = require("tests.support.layout_cohort_fixture").capture(function(text)
+		return package.loaded["adapters.keyboard_layout"].build(text)
+	end)
 	local Shell = helpers.load_module("adapters.shell_runner")
 	Shell._set_runner(function(cmd)
 		commands[#commands + 1] = cmd

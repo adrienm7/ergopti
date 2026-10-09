@@ -223,7 +223,7 @@ end
 --- Reads actual native server state, requiring the capture owner's exact map.
 --- @param expected string Canonical serialization of the loaded native keymap.
 --- @param groups integer Number of groups in that loaded native keymap.
---- @return table|nil receipt { group, generation, backend }.
+--- @return table|nil receipt { group, generation, backend, observed_current }.
 --- @return string|nil reason Native qualification refusal.
 local function read(expected, groups, require_locked, require_input)
 	assert(type(expected) == "string" and expected ~= "", "the acknowledged keymap identity is required")
@@ -325,7 +325,17 @@ local function read(expected, groups, require_locked, require_input)
 			end }
 
 	end
-	return { group = group, generation = _generation, backend = "x11" }
+	local observed_connection, observed_native = connection, native
+	local observed_map, observed_expected = _last_canonical_keymap, _last_canonical_expected
+	local observed_source = _generation
+	return { group = group, generation = _generation, backend = "x11",
+		-- Group-only admission preserves ordinary modifier semantics while
+		-- retaining the actual issuer after a later callback. No native query runs.
+		observed_current = function()
+			return _connection == observed_connection and _native == observed_native
+				and _generation == observed_source and _last_group == group
+				and _last_canonical_keymap == observed_map and _last_canonical_expected == observed_expected
+		end }
 end
 
 

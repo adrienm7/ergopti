@@ -431,3 +431,424 @@ helpers.describe("keyboard_hook: a consumed dead key leaves no Compose pending",
 		helpers.assert_eq(drive(true, true), { "e" }, "nor any auto-repeat of it")
 	end)
 end)
+
+-- These actual Reader/Hook consumers use controlled FFI bytes, not kernel devices.
+local function with_position_capture(options, body)
+	local previous = package.loaded["adapters.xkb_capture"]
+	package.loaded["adapters.xkb_capture"] = nil
+	local Capture = require("adapters.xkb_capture")
+	local state = { epoch = 7 }
+	local backend = { create = function() return { identity = "controlled-position-map" } end,
+		destroy = function() end, update_key = function() end, key_sym = function(_, code) return code end,
+		sym_utf8 = function(code) return code == 30 and "a" or nil end,
+		key_utf8 = function(_, code) return code == 30 and "a" or nil end,
+		compose_feed = function() end, compose_status = function() return "nothing" end,
+		compose_reset = function() end, modifier_role = function(code) return require("infra.evdev_codes").MODIFIER_OF[code] end }
+	backend.source_group = function()
+		local epoch = state.epoch
+		return 0, epoch, function() return state.epoch == epoch end
+	end
+	Capture._set_backend(backend); assert(Capture.load("controlled-position-source", "C.UTF-8"))
+	options = options or {}; options.position_bits, options.capture = true, Capture
+	local called, detail = pcall(function()
+		require("tests.support.input_owner_fixture").with_session(options, function(session) body(session, state, Capture) end)
+	end)
+	Capture._reset_backend(); package.loaded["adapters.xkb_capture"] = previous
+	if not called then error(detail, 0) end
+end
+
+helpers.describe("Original Hook physical editor position observation", function()
+	helpers.it("captures detached original positions/modifiers without changing key forwarding", function()
+		with_position_capture(nil, function(s)
+			local captured, rows = {}, #s.rows
+			local token = s.hook.capture_position(function() return true end, function(facts)
+				captured[#captured + 1] = facts; return true
+			end)
+			helpers.assert_true(type(token) == "table", "original Reader source owner under controlled grab ACK enrolls observation")
+			s.edge("b", 42, 1, 10); s.edge("a", 30, 1, 20); s.edge("a", 30, 2, 30); s.edge("a", 30, 0, 40)
+			helpers.assert_eq(captured, { { native_code = 30, mods = { shift = true } } }, "original two-source physical bitmap owns modifier facts")
+			helpers.assert_eq({ s.rows[rows + 1], s.rows[rows + 2], s.rows[rows + 3], s.rows[rows + 4] },
+				{ { 42, 1 }, { 30, 1 }, { 30, 2 }, { 30, 0 } }, "capture borrows no suppressed DOWN/repeat/UP")
+			helpers.assert_true(s.hook.cancel_position(token), "exact completed observation cancellation remains idempotent")
+			helpers.assert_true(not s.hook.cancel_position({}), "copied token cannot retire a successor")
+		end)
+	end)
+	helpers.it("cannot authenticate fabricated positive predicates and caller-created event rows", function()
+		with_position_capture(nil, function(s)
+			local calls = 0
+			s.hook.capture_position(function() return true end, function() calls = calls + 1; return true end)
+			s.hook._test_drive({ { type = 1, code = 30, value = 1 } }, { physicalSource = true, onEmitRaw = function() return true end }, true)
+			helpers.assert_eq(calls, 0, "public detail/positive predicate has no actual Reader event capability")
+		end)
+	end)
+	helpers.it("refuses virtual sources and custom Reader providers before enrollment", function()
+		with_position_capture(nil, function(s)
+			s.virtual = true; s.hook.physical_source_receipt()
+			helpers.assert_eq(s.hook.capture_position(function() return true end, function() error("no virtual capture") end), nil)
+		end)
+		with_position_capture({ custom_reader = true }, function(s)
+			helpers.assert_eq(s.hook.capture_position(function() return true end, function() error("no custom backend capture") end), nil)
+		end)
+	end)
+	helpers.it("refuses ambiguous physical RightAlt instead of inventing AltGr or Alt", function()
+		with_position_capture(nil, function(s)
+			local calls = 0
+			s.edge("b", 100, 1, 10)
+			s.hook.capture_position(function() return true end, function() calls = calls + 1; return true end)
+			s.edge("a", 30, 1, 20)
+			helpers.assert_eq(calls, 0, "native RightAlt observation is not a proved W3C modifier role")
+		end)
+	end)
+	helpers.it("rechecks page/source currency after native key queries and the final callback", function()
+		local options = {}
+		with_position_capture(options, function(s, state)
+			local calls, page = 0, true
+			local token = s.hook.capture_position(function() return page end, function() calls = calls + 1; return true end)
+			options.on_key_query = function() page = false end
+			s.edge("a", 30, 1, 10)
+			helpers.assert_eq(calls, 0, "query callback cannot revoke page and still deliver")
+			helpers.assert_true(s.hook.cancel_position(token))
+			options.on_key_query, page = nil, true
+			token = s.hook.capture_position(function() return page end, function()
+				calls = calls + 1; state.epoch = state.epoch + 1
+				helpers.assert_eq(s.hook.capture_position(function() return true end, function() end), nil, "receive cannot reenter enrollment")
+				return true
+			end)
+			s.edge("a", 31, 1, 20)
+			helpers.assert_eq(calls, 1, "actual original occurrence was observed once")
+			helpers.assert_true(s.hook.cancel_position(token), "revoked source retains exact cancellation capability without output")
+		end)
+	end)
+	helpers.it("refuses replacement Reader/source/page guards without invoking foreign callbacks", function()
+		with_position_capture(nil, function(s)
+			local calls = 0
+			local token = s.hook.capture_position(function() return true end, function() calls = calls + 1; return true end)
+			local original = s.reader.pressed_keys_current
+			s.reader.pressed_keys_current = function() error("foreign observation port") end
+			s.edge("a", 30, 1, 10)
+			helpers.assert_eq(calls, 0, "public replacement is refused before receipt observations")
+			s.reader.pressed_keys_current = original
+			helpers.assert_true(s.hook.cancel_position(token))
+		end)
+	end)
+	helpers.it("requires complete held-byte acknowledgements and the actual primary held key", function()
+		with_position_capture({ short_key_query = true }, function(s)
+			local calls = 0
+			local token = s.hook.capture_position(function() return true end, function() calls = calls + 1; return true end)
+			helpers.assert_true(type(token) == "table", "observation is enrolled before actual held IO")
+			s.edge("a", 30, 1, 10)
+			helpers.assert_eq(calls, 0, "successful syscall without complete copied bytes cannot supply modifiers")
+			helpers.assert_true(s.hook.cancel_position(token))
+		end)
+		local options = {}
+		with_position_capture(options, function(s)
+			local calls = 0
+			local token = s.hook.capture_position(function() return true end, function() calls = calls + 1; return true end)
+			options.on_key_query = function() s.held[s.paths.a][30] = nil end
+			s.edge("a", 30, 1, 10)
+			helpers.assert_eq(calls, 0, "queued original DOWN does not prove the primary is still physically held")
+			helpers.assert_true(s.hook.cancel_position(token))
+		end)
+	end)
+	helpers.it("withdraws observation when the final page callback changes the native source", function()
+		with_position_capture(nil, function(s, state)
+			local calls, page_reads = 0, 0
+			local token = s.hook.capture_position(function()
+				page_reads = page_reads + 1
+				if page_reads == 3 then state.epoch = state.epoch + 1 end
+				return true
+			end, function() calls = calls + 1; return true end)
+			helpers.assert_true(type(token) == "table")
+			s.edge("a", 30, 1, 10)
+			helpers.assert_eq(page_reads, 3, "the final page query actually runs after native source seal acquisition")
+			helpers.assert_eq(calls, 0, "positive page callback cannot conceal a changed source seal")
+			helpers.assert_true(s.hook.cancel_position(token))
+		end)
+	end)
+	helpers.it("withdraws when original source classification is republished during observation", function()
+		with_position_capture(nil, function(s)
+			local calls, page_reads = 0, 0
+			local token = s.hook.capture_position(function()
+				page_reads = page_reads + 1
+				if page_reads == 3 then s.virtual = true; s.hook.physical_source_receipt() end
+				return true
+			end, function() calls = calls + 1; return true end)
+			helpers.assert_true(type(token) == "table")
+			s.edge("a", 30, 1, 10)
+			helpers.assert_eq(calls, 0, "published physical-source revocation survives a positive page callback")
+			helpers.assert_true(s.hook.cancel_position(token))
+		end)
+	end)
+	helpers.it("rejects replaced observation exports and exact cancellation during a native query", function()
+		with_position_capture(nil, function(s)
+			local calls, foreign = 0, 0
+			local token = s.hook.capture_position(function() return true end, function() calls = calls + 1; return true end)
+			local original = s.hook.position_capture_available
+			s.hook.position_capture_available = function() foreign = foreign + 1; return true end
+			s.edge("a", 30, 1, 10)
+			helpers.assert_eq(calls, 0, "public query replacement withdraws the original enrollment")
+			helpers.assert_eq(foreign, 0, "native observation never executes a foreign public export")
+			s.hook.position_capture_available = original
+			helpers.assert_true(s.hook.cancel_position(token))
+		end)
+		local options = {}
+		with_position_capture(options, function(s)
+			local calls = 0
+			local token = s.hook.capture_position(function() return true end, function() calls = calls + 1; return true end)
+			options.on_key_query = function()
+				helpers.assert_eq(s.hook.capture_position(function() return true end, function() end), nil, "native query cannot reenter enrollment")
+				helpers.assert_true(s.hook.cancel_position(token), "exact observation retires without claiming a key UP")
+			end
+			s.edge("a", 30, 1, 10)
+			helpers.assert_eq(calls, 0, "cancelled request cannot receive even when IO acknowledges")
+			helpers.assert_eq(s.rows[#s.rows], { 30, 1 }, "cancellation preserves actual forwarding")
+		end)
+	end)
+
+	helpers.it("retains idempotent cancellation without retaining completed page callbacks", function()
+		local weak = setmetatable({}, { __mode = "k" })
+		local original_hook, original_registry, completed_record, retire_page
+		-- End the setup/caller scope before collection, while retaining the actual
+		-- Hook and exact issued record. A compiled caller may keep its own locals.
+		with_position_capture(nil, function(s)
+			original_hook = s.hook
+			local function observe()
+				local page = {}
+				retire_page = function() page = nil end
+				local token = s.hook.capture_position(function() return page ~= nil end, function() return true end)
+				weak[token], weak[page] = "token", "page"
+				-- Inspection grants no runtime authority: read the original private
+				-- registry entry that the actual producer bound to its original token.
+				local index = 1
+				while true do
+					local name, registry = debug.getupvalue(original_hook.capture_position, index)
+					if name == nil then break end
+					if name == "position_capture" then
+						original_registry, completed_record = registry, registry.tokens[token]
+						break
+					end
+					index = index + 1
+				end
+				helpers.assert_true(type(completed_record) == "table" and rawequal(completed_record.token, token),
+					"inspection retains the exact private native producer record, never a fabricated record")
+				s.edge("a", 30, 1, 10)
+				collectgarbage("collect")
+				helpers.assert_true(s.hook.cancel_position(token), "completed identity survives collection while its page owns the token")
+			end
+			observe()
+		end)
+		for _, name in ipairs({ "token", "current", "receive", "session", "options", "sources", "observers", "finder", "classify" }) do
+			helpers.assert_eq(completed_record[name], nil, "acknowledged record relinquishes its original " .. name)
+		end
+		helpers.assert_true(type(original_hook.cancel_position) == "function", "original Hook remains strongly live during lifetime proof")
+		-- The real page owner retires its getter cell only after exact native ACK
+		-- and after proving the producer has relinquished every original closure.
+		retire_page(); retire_page = nil
+		collectgarbage("collect"); collectgarbage("collect")
+		local _, kind = next(weak)
+		helpers.assert_eq(kind, nil, "settled registry does not retain its own weak key or retired page closure")
+		helpers.assert_true(type(original_hook.cancel_position) == "function" and type(original_registry.tokens) == "table",
+			"original Hook and private registry stay strongly live through both collections")
+	end)
+	helpers.it("joins the original Reader occurrence to the actual host and shared editor without writes", function()
+		with_position_capture(nil, function(s)
+			local names = { "ui.physical_shortcuts.bridge", "ui.webview_manager", "modules.gestures.manager",
+				"infra.paths", "infra.i18n", "logger.shim" }
+			local previous = {}; for _, name in ipairs(names) do previous[name] = { package.loaded[name] } end
+			local host, receipt, epoch, sends, writes, paused = nil, {}, 0, {}, 0, false
+			local called, detail = pcall(function()
+				package.loaded["ui.webview_manager"] = { native_available = function() return true end,
+					current_epoch = function() return epoch > 0 and epoch or nil end,
+					page_current = function(_, exact) return epoch > 0 and epoch == exact end,
+					show = function() epoch = 53; return host.on_window_acquiring(epoch) end,
+					hide = function(_, exact) if exact ~= epoch then return false end; local old = epoch; epoch = 0; host.on_window_closed(old); return true end,
+					eval_js = function(_, script) sends[#sends + 1] = script; return true end }
+				package.loaded["modules.gestures.manager"] = { is_assignable = function(action) return action == "none" end,
+					get_action_parameter_spec = function() end, validate_action_parameter = function() return false end,
+					split_action_parameter_key = function() end, get_action_label = function(action) return action end }
+				package.loaded["infra.paths"] = { shared = function(path) return helpers.driver_root() .. "/../_shared/" .. path end }
+				package.loaded["infra.i18n"] = { get = function(key) return key end }
+				package.loaded["logger.shim"] = helpers.make_logger_stub()
+				host = helpers.load_module("ui.physical_shortcuts.bridge")
+				local scope = { physical_delivery_available = function() return true end,
+					capture_editor_inventory = function() return { assignments = {}, parameters = {} }, receipt end,
+					editor_source_current = function(exact) return rawequal(exact, receipt) end,
+					edit = function() writes = writes + 1; return false end }
+				helpers.assert_true(host.open({ scope = scope, is_paused = function() return paused end }),
+					"controlled host prerequisite is not public native delivery qualification")
+				local function message(value) return host.on_message(value, {}, { app_name = "physical_shortcuts", epoch = epoch }) end
+				helpers.assert_true(message({ action = "ready" }))
+				helpers.assert_true(message({ action = "capture_position", request = { request_id = 7 } }))
+				s.edge("b", 42, 1, 10); s.edge("a", 36, 1, 20)
+				local json = sends[#sends]:match("^captured%((.*)%)$")
+				helpers.assert_true(type(json) == "string", "actual original Hook emits through the retained page controller")
+				local packet = require("json").decode(json)
+				helpers.assert_eq(packet.code, "KeyJ", "original native36 crosses the shared registry")
+				helpers.assert_eq(packet.mods, { shift = true }, "another original physical source owns Shift")
+				helpers.assert_eq(packet.request_id, 7, "page request identity survives all producers")
+				helpers.assert_eq(writes, 0, "joint capture publishes no assignment, parameter or output")
+				helpers.assert_true(message({ action = "capture_position", request = { request_id = 8 } }))
+				local sent = #sends
+				paused = true
+				s.edge("a", 37, 1, 25)
+				helpers.assert_eq(#sends, sent, "live pause withdraws the actual host enrollment before Reader delivery")
+				helpers.assert_true(host.close(), "page retirement cancels only observation")
+				s.edge("a", 36, 0, 30); s.edge("b", 42, 0, 40)
+				helpers.assert_eq(s.rows[#s.rows - 1], { 36, 0 }, "closing page cannot orphan primary physical UP")
+				helpers.assert_eq(s.rows[#s.rows], { 42, 0 }, "closing page cannot orphan modifier physical UP")
+			end)
+			if host then host.close() end
+			for _, name in ipairs(names) do package.loaded[name] = previous[name][1] end
+			if not called then error(detail, 0) end
+		end)
+	end)
+
+end)
+
+helpers.describe("Position capture native effect ownership", function()
+	helpers.it("refuses a replaced native effect port and permits a fresh original request after restoration", function()
+		with_position_capture(nil, function(s)
+			local names = { "ui.physical_shortcuts.bridge", "ui.webview_manager", "modules.gestures.manager",
+				"infra.paths", "infra.i18n", "logger.shim" }
+			local previous = {}; for _, name in ipairs(names) do previous[name] = { package.loaded[name] } end
+			local host, receipt, epoch, sends, writes, paused = nil, {}, 0, {}, 0, false
+			local called, detail = pcall(function()
+				package.loaded["ui.webview_manager"] = { native_available = function() return true end,
+					current_epoch = function() return epoch > 0 and epoch or nil end,
+					page_current = function(_, exact) return epoch > 0 and epoch == exact end,
+					show = function() epoch = 53; return host.on_window_acquiring(epoch) end,
+					hide = function(_, exact) if exact ~= epoch then return false end; local old = epoch; epoch = 0; host.on_window_closed(old); return true end,
+					eval_js = function(_, script) sends[#sends + 1] = script; return true end }
+				package.loaded["modules.gestures.manager"] = { is_assignable = function(action) return action == "none" end,
+					get_action_parameter_spec = function() end, validate_action_parameter = function() return false end,
+					split_action_parameter_key = function() end, get_action_label = function(action) return action end }
+				package.loaded["infra.paths"] = { shared = function(path) return helpers.driver_root() .. "/../_shared/" .. path end }
+				package.loaded["infra.i18n"] = { get = function(key) return key end }
+				package.loaded["logger.shim"] = helpers.make_logger_stub()
+				host = helpers.load_module("ui.physical_shortcuts.bridge")
+				local scope = { physical_delivery_available = function() return true end,
+					capture_editor_inventory = function() return { assignments = {}, parameters = {} }, receipt end,
+					editor_source_current = function(exact) return rawequal(exact, receipt) end,
+					edit = function() writes = writes + 1; return false end }
+				helpers.assert_true(host.open({ scope = scope, is_paused = function() return paused end }),
+					"controlled host prerequisite is not public native delivery qualification")
+				local function message(value) return host.on_message(value, {}, { app_name = "physical_shortcuts", epoch = epoch }) end
+				helpers.assert_true(message({ action = "ready" }))
+				helpers.assert_true(message({ action = "capture_position", request = { request_id = 7 } }))
+				local manager = package.loaded["ui.webview_manager"]
+				local original_eval = manager.eval_js
+				local foreign_calls = 0
+				manager.eval_js = function(_, script)
+					foreign_calls = foreign_calls + 1
+					sends[#sends + 1] = script
+					return true
+				end
+				s.edge("b", 42, 1, 10); s.edge("a", 36, 1, 20)
+				print("INDEPENDENT_FOREIGN_EFFECT_CALLS", foreign_calls, "WRITES", writes)
+				manager.eval_js = original_eval
+				helpers.assert_eq(foreign_calls, 0, "replacement native effect port must not receive physical position")
+				for _, script in ipairs(sends) do
+					helpers.assert_true(not script:match("^captured%("), "refused event reaches no retained or foreign page effect")
+				end
+				helpers.assert_eq(writes, 0, "effect replacement never authorizes a publisher")
+				s.edge("a", 36, 0, 30); s.edge("b", 42, 0, 40)
+				helpers.assert_true(message({ action = "capture_position", request = { request_id = 8 } }), "original port restoration permits a separate observation")
+				s.edge("b", 42, 1, 50); s.edge("a", 36, 1, 60)
+				local json = sends[#sends]:match("^captured%((.*)%)$")
+				helpers.assert_true(type(json) == "string", "actual original Hook emits through the retained page controller")
+				local packet = require("json").decode(json)
+				helpers.assert_eq(packet.code, "KeyJ", "original native36 crosses the shared registry")
+				helpers.assert_eq(packet.mods, { shift = true }, "another original physical source owns Shift")
+				helpers.assert_eq(packet.request_id, 8, "page request identity survives all producers")
+				helpers.assert_eq(writes, 0, "joint capture publishes no assignment, parameter or output")
+				helpers.assert_true(message({ action = "capture_position", request = { request_id = 9 } }))
+				local sent = #sends
+				paused = true
+				s.edge("a", 37, 1, 70)
+				helpers.assert_eq(#sends, sent, "live pause withdraws the actual host enrollment before Reader delivery")
+				helpers.assert_true(host.close(), "page retirement cancels only observation")
+				s.edge("a", 36, 0, 80); s.edge("b", 42, 0, 90)
+				helpers.assert_eq(s.rows[#s.rows - 1], { 36, 0 }, "closing page cannot orphan primary physical UP")
+				helpers.assert_eq(s.rows[#s.rows], { 42, 0 }, "closing page cannot orphan modifier physical UP")
+			end)
+			if host then host.close() end
+			for _, name in ipairs(names) do package.loaded[name] = previous[name][1] end
+			if not called then error(detail, 0) end
+		end)
+	end)
+
+	helpers.it("refuses effect replacement inside an original canonical getter before delivery", function()
+		with_position_capture(nil, function(s)
+			local names = { "ui.physical_shortcuts.bridge", "ui.webview_manager", "modules.gestures.manager",
+				"infra.paths", "infra.i18n", "logger.shim" }
+			local previous = {}; for _, name in ipairs(names) do previous[name] = { package.loaded[name] } end
+			local host, receipt, epoch, sends, writes, paused = nil, {}, 0, {}, 0, false
+			local replace_on_current
+			local called, detail = pcall(function()
+				package.loaded["ui.webview_manager"] = { native_available = function() return true end,
+					current_epoch = function() return epoch > 0 and epoch or nil end,
+					page_current = function(_, exact) return epoch > 0 and epoch == exact end,
+					show = function() epoch = 53; return host.on_window_acquiring(epoch) end,
+					hide = function(_, exact) if exact ~= epoch then return false end; local old = epoch; epoch = 0; host.on_window_closed(old); return true end,
+					eval_js = function(_, script) sends[#sends + 1] = script; return true end }
+				package.loaded["modules.gestures.manager"] = { is_assignable = function(action) return action == "none" end,
+					get_action_parameter_spec = function() end, validate_action_parameter = function() return false end,
+					split_action_parameter_key = function() end, get_action_label = function(action) return action end }
+				package.loaded["infra.paths"] = { shared = function(path) return helpers.driver_root() .. "/../_shared/" .. path end }
+				package.loaded["infra.i18n"] = { get = function(key) return key end }
+				package.loaded["logger.shim"] = helpers.make_logger_stub()
+				host = helpers.load_module("ui.physical_shortcuts.bridge")
+				local scope = { physical_delivery_available = function() return true end,
+					capture_editor_inventory = function() return { assignments = {}, parameters = {} }, receipt end,
+					editor_source_current = function(exact)
+						if replace_on_current then local replace = replace_on_current; replace_on_current = nil; replace() end
+						return rawequal(exact, receipt)
+					end,
+					edit = function() writes = writes + 1; return false end }
+				helpers.assert_true(host.open({ scope = scope, is_paused = function() return paused end }),
+					"controlled host prerequisite is not public native delivery qualification")
+				local function message(value) return host.on_message(value, {}, { app_name = "physical_shortcuts", epoch = epoch }) end
+				helpers.assert_true(message({ action = "ready" }))
+				helpers.assert_true(message({ action = "capture_position", request = { request_id = 7 } }))
+				local manager = package.loaded["ui.webview_manager"]
+				local original_eval = manager.eval_js
+				local foreign_calls = 0
+				replace_on_current = function() manager.eval_js = function(_, script)
+					foreign_calls = foreign_calls + 1
+					sends[#sends + 1] = script
+					return true
+				end end
+				s.edge("b", 42, 1, 10); s.edge("a", 36, 1, 20)
+				print("INDEPENDENT_FOREIGN_EFFECT_CALLS", foreign_calls, "WRITES", writes)
+				manager.eval_js = original_eval
+				helpers.assert_eq(foreign_calls, 0, "replacement native effect port must not receive physical position")
+				for _, script in ipairs(sends) do
+					helpers.assert_true(not script:match("^captured%("), "refused event reaches no retained or foreign page effect")
+				end
+				helpers.assert_eq(writes, 0, "effect replacement never authorizes a publisher")
+				s.edge("a", 36, 0, 30); s.edge("b", 42, 0, 40)
+				helpers.assert_true(message({ action = "capture_position", request = { request_id = 8 } }), "original port restoration permits a separate observation")
+				s.edge("b", 42, 1, 50); s.edge("a", 36, 1, 60)
+				local json = sends[#sends]:match("^captured%((.*)%)$")
+				helpers.assert_true(type(json) == "string", "actual original Hook emits through the retained page controller")
+				local packet = require("json").decode(json)
+				helpers.assert_eq(packet.code, "KeyJ", "original native36 crosses the shared registry")
+				helpers.assert_eq(packet.mods, { shift = true }, "another original physical source owns Shift")
+				helpers.assert_eq(packet.request_id, 8, "page request identity survives all producers")
+				helpers.assert_eq(writes, 0, "joint capture publishes no assignment, parameter or output")
+				helpers.assert_true(message({ action = "capture_position", request = { request_id = 9 } }))
+				local sent = #sends
+				paused = true
+				s.edge("a", 37, 1, 70)
+				helpers.assert_eq(#sends, sent, "live pause withdraws the actual host enrollment before Reader delivery")
+				helpers.assert_true(host.close(), "page retirement cancels only observation")
+				s.edge("a", 36, 0, 80); s.edge("b", 42, 0, 90)
+				helpers.assert_eq(s.rows[#s.rows - 1], { 36, 0 }, "closing page cannot orphan primary physical UP")
+				helpers.assert_eq(s.rows[#s.rows], { 42, 0 }, "closing page cannot orphan modifier physical UP")
+			end)
+			if host then host.close() end
+			for _, name in ipairs(names) do package.loaded[name] = previous[name][1] end
+			if not called then error(detail, 0) end
+		end)
+	end)
+end)

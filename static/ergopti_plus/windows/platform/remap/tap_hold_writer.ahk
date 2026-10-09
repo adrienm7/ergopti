@@ -206,6 +206,9 @@ TapHoldKeyDefsOfHand(Hand) {
 ; Return the ordered hold-option array.
 TapHoldHoldOptions() {
 	global _TH_HoldOptions
+	; Parse-time criteria have no hold catalogue until its shared source is read.
+	if !IsSet(_TH_HoldOptions)
+		return []
 	return _TH_HoldOptions
 }
 

@@ -1,0 +1,8 @@
+[_meta]
+schema_version = 1
+[layout]
+ergopti_variant = "ERGOPTI_PLUS"
+ergopti_base = false
+ergopti_alt_gr = false
+emulated_layout = ""
+future_owner = "retain"

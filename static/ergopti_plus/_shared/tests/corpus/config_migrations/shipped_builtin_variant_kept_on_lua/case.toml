@@ -1,0 +1,6 @@
+[case]
+description = "shipped builtin variant kept on lua preserves unsupported-driver semantics."
+drivers = ["hs", "linux"]
+outcome = "migrated"
+from_version = 11
+to_version = 12
