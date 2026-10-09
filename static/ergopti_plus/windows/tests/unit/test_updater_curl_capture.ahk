@@ -708,8 +708,13 @@ _CurlCaptureNativeHybridNamespace(UseJunction := false) {
 		}
 		; Every child still resolves to its original volume/file ID. This proves
 		; the counterexample cannot be rejected by file-only identity checks.
+		ChildIndex := 0
 		for Name, Entry in Capture.Files {
+			ChildIndex += 1
 			Probe := Capture.Open(Entry["path"], 0, 3, false)
+			ProbeError := Probe ? 0 : A_LastError
+			if UseJunction && !Probe
+				_CurlCaptureReportJunctionProbe(ReparseOwner, Moved, ChildIndex, ProbeError)
 			AssertTrue(Probe != 0)
 			try AssertTrue(Capture.Same(Capture.Snapshot(Entry["handle"]), Capture.Snapshot(Probe)),
 				"the child file identity is genuine despite its foreign namespace")
@@ -778,6 +783,54 @@ _CurlCaptureNativeHeldNamespaceLease() {
 }
 Test("updater curl capture: held native namespace prevents rename and preserves partial retirement retry",
 	_CurlCaptureNativeHeldNamespaceLease)
+
+; A declared UTF-16 field must match all bytes, including any embedded NUL.
+; This pure projection conveys no namespace, file or process authority.
+_CurlCaptureJunctionTargetMatches(Data, Returned, Target) {
+	if !(Data is Buffer) || !(Returned is Integer) || !(Target is String) || Target == ""
+		|| Data.Size > 16384 || Returned < 16 || Returned > Data.Size
+		|| NumGet(Data, 0, "UInt") != 0xA0000003
+		return false
+	Length := NumGet(Data, 4, "UShort")
+	SubstituteOffset := NumGet(Data, 8, "UShort")
+	SubstituteLength := NumGet(Data, 10, "UShort")
+	PrintOffset := NumGet(Data, 12, "UShort")
+	PrintLength := NumGet(Data, 14, "UShort")
+	if Length < 8 || Length + 8 > Returned
+		|| Mod(SubstituteOffset, 2) != 0 || Mod(SubstituteLength, 2) != 0
+		|| Mod(PrintOffset, 2) != 0 || Mod(PrintLength, 2) != 0
+		|| SubstituteOffset + SubstituteLength > Length - 8
+		|| PrintOffset + PrintLength > Length - 8
+		|| SubstituteLength != StrLen("\??\" . Target) * 2 || PrintLength != StrLen(Target) * 2
+		return false
+	return StrGet(Data.Ptr + 16 + SubstituteOffset, -(SubstituteLength // 2), "UTF-16") == ("\??\" . Target)
+		&& StrGet(Data.Ptr + 16 + PrintOffset, -(PrintLength // 2), "UTF-16") == Target
+}
+
+; Failure-only native facts never lend reparse or path observation as capture
+; authority. Read the exact retained reparse owner, keep the original child-open
+; errno, emit only fixed scalars, and leave the original strict assertion intact.
+_CurlCaptureReportJunctionProbe(Handle, Target, Child, OpenError) {
+	if !Handle || !(Child is Integer) || Child < 1 || Child > 4
+		|| !(OpenError is Integer) || OpenError < 0 || OpenError > 0xFFFFFFFF
+		return false
+	try {
+		Data := Buffer(16384, 0)
+		Returned := 0
+		Read := DllCall("kernel32\DeviceIoControl", "Ptr", Handle, "UInt", 0x900A8,
+			"Ptr", 0, "UInt", 0, "Ptr", Data, "UInt", Data.Size,
+			"UInt*", &Returned, "Ptr", 0, "Int")
+		ReadError := Read ? 0 : A_LastError
+		Matches := Read && _CurlCaptureJunctionTargetMatches(Data, Returned, Target)
+		_TestAppendProgress("# curl_junction_probe child=" . Child . " open_errno=" . OpenError
+			. " target_exists=" . (DirExist(Target) ? 1 : 0) . " reparse_read=" . (Read ? 1 : 0)
+			. " reparse_match=" . (Matches ? 1 : 0) . " reparse_errno=" . ReadError)
+		return true
+	} catch {
+		; Diagnostics may be unavailable; never replace the primary assertion.
+		return false
+	}
+}
 
 ; Public SDK mount-point reparse ABI. The caller retains the exact directory
 ; it created; no global privilege, symlink setting or foreign path is modified.
@@ -1480,7 +1533,10 @@ _CurlCaptureDirectoryMoveGraphForeignRollback() {
 		Capture.GraphPaths.Delete(Owner.Source)
 		AssertEqual(Capture.Path, Owner.Rollback())
 		_CurlCaptureDirectoryMoveGraphCheck(Capture, Capture.Path)
-	} finally _CurlCaptureDirectoryMoveFixtureDebt.Delete(ObjPtr(Capture))
+	} finally {
+		if _CurlCaptureDirectoryMoveFixtureDebt.Has(ObjPtr(Capture)) && _CurlCaptureDirectoryMoveFixtureDebt[ObjPtr(Capture)] == Owner
+			_CurlCaptureDirectoryMoveFixtureDebt.Delete(ObjPtr(Capture))
+	}
 }
 Test("updater curl capture: a foreign graph rollback target retains every original transition debt",
 	_CurlCaptureDirectoryMoveGraphForeignRollback)
@@ -1517,7 +1573,10 @@ _CurlCaptureDirectoryMoveGraphForeignHolding() {
 		AssertEqual(999, Capture.GraphPaths[Owner.NewHoldingPath()], "failed exclusive allocation never retires foreign holding data")
 		_CurlCaptureDirectoryMoveGraphCheck(Capture, Capture.Path)
 		AssertTrue(Owner.Closed)
-	} finally _CurlCaptureDirectoryMoveFixtureDebt.Delete(ObjPtr(Capture))
+	} finally {
+		if _CurlCaptureDirectoryMoveFixtureDebt.Has(ObjPtr(Capture)) && _CurlCaptureDirectoryMoveFixtureDebt[ObjPtr(Capture)] == Owner
+			_CurlCaptureDirectoryMoveFixtureDebt.Delete(ObjPtr(Capture))
+	}
 }
 Test("updater curl capture: foreign graph holding allocation preserves all foreign identities",
 	_CurlCaptureDirectoryMoveGraphForeignHolding)
@@ -1532,7 +1591,50 @@ _CurlCaptureDirectoryMoveGraphReentry() {
 		AssertFalse(Owner.Reentry)
 		AssertFalse(Owner.Running)
 		_CurlCaptureDirectoryMoveGraphCheck(Capture, Owner.Target)
-	} finally _CurlCaptureDirectoryMoveFixtureDebt.Delete(ObjPtr(Capture))
+	} finally {
+		if _CurlCaptureDirectoryMoveFixtureDebt.Has(ObjPtr(Capture)) && _CurlCaptureDirectoryMoveFixtureDebt[ObjPtr(Capture)] == Owner
+			_CurlCaptureDirectoryMoveFixtureDebt.Delete(ObjPtr(Capture))
+	}
 }
 Test("updater curl capture: graph mutation reentry cannot resume the same running transition",
 	_CurlCaptureDirectoryMoveGraphReentry)
+
+; Real in-memory mount-point ABI vectors. No filesystem/handle port is faked.
+_CurlCaptureJunctionTargetVector(Target, SubstituteSuffix := false, PrintSuffix := false) {
+	Substitute := "\??\" . Target
+	SubstitutePlainBytes := (StrPut(Substitute, "UTF-16") - 1) * 2
+	PrintPlainBytes := (StrPut(Target, "UTF-16") - 1) * 2
+	SuffixBytes := (StrPut("suffix", "UTF-16") - 1) * 2
+	SubstituteBytes := SubstitutePlainBytes + (SubstituteSuffix ? 2 + SuffixBytes : 0)
+	PrintBytes := PrintPlainBytes + (PrintSuffix ? 2 + SuffixBytes : 0)
+	Paths := SubstituteBytes + 2 + PrintBytes + 2
+	Data := Buffer(16 + Paths, 0)
+	NumPut("UInt", 0xA0000003, "UShort", 8 + Paths, Data, 0)
+	NumPut("UShort", 0, "UShort", SubstituteBytes, "UShort", SubstituteBytes + 2, "UShort", PrintBytes, Data, 8)
+	StrPut(Substitute, Data.Ptr + 16, SubstitutePlainBytes // 2 + 1, "UTF-16")
+	if SubstituteSuffix
+		StrPut("suffix", Data.Ptr + 16 + SubstitutePlainBytes + 2, 7, "UTF-16")
+	PrintAddress := Data.Ptr + 16 + SubstituteBytes + 2
+	StrPut(Target, PrintAddress, PrintPlainBytes // 2 + 1, "UTF-16")
+	if PrintSuffix
+		StrPut("suffix", PrintAddress + PrintPlainBytes + 2, 7, "UTF-16")
+	return Data
+}
+_CurlCaptureJunctionExactTargetControls() {
+	Target := "C:\fixture\original"
+	Normal := _CurlCaptureJunctionTargetVector(Target)
+	AssertTrue(_CurlCaptureJunctionTargetMatches(Normal, Normal.Size, Target), "the real declared target bytes match")
+	SubstituteSuffix := _CurlCaptureJunctionTargetVector(Target, true)
+	AssertEqual("\??\" . Target, StrGet(SubstituteSuffix.Ptr + 16,
+		NumGet(SubstituteSuffix, 10, "UShort") // 2, "UTF-16"), "positive-length StrGet exposes the old NUL-prefix ambiguity")
+	AssertFalse(_CurlCaptureJunctionTargetMatches(SubstituteSuffix, SubstituteSuffix.Size, Target),
+		"declared substitute bytes cannot hide a suffix after NUL")
+	PrintSuffix := _CurlCaptureJunctionTargetVector(Target, false, true)
+	AssertEqual(Target, StrGet(PrintSuffix.Ptr + 16 + NumGet(PrintSuffix, 12, "UShort"),
+		NumGet(PrintSuffix, 14, "UShort") // 2, "UTF-16"), "the old print-name copy also loses declared trailing bytes")
+	AssertFalse(_CurlCaptureJunctionTargetMatches(PrintSuffix, PrintSuffix.Size, Target),
+		"declared print bytes cannot hide a suffix after NUL")
+	AssertFalse(_CurlCaptureJunctionTargetMatches(Normal, 15, Target), "partial native header is not an exact target")
+	AssertFalse(_CurlCaptureJunctionTargetMatches(Normal, Normal.Size, ""), "empty target cannot request implicit-length copies")
+}
+Test("updater curl capture: exact declared junction fields cannot lend a NUL-prefix target", _CurlCaptureJunctionExactTargetControls)

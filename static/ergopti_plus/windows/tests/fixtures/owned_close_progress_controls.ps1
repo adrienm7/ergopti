@@ -1,6 +1,6 @@
 # tests/fixtures/owned_close_progress_controls.ps1
 # Exact source closure/copy methods use controlled native ports and real TCP.
-param([Parameter(Mandatory=$true)][string]$FixturePath,[Parameter(Mandatory=$true)][string]$ProxyPath)
+param([Parameter(Mandatory=$true)][string]$FixturePath,[Parameter(Mandatory=$true)][string]$ProxyPath,[switch]$QueuedShutdown)
 $ErrorActionPreference='Stop'
 $Fixture=[IO.File]::ReadAllText($FixturePath)
 $Blocks=[regex]::Matches($Fixture,"(?s)Add-Type -TypeDefinition @'\n(.*?)\n'@")
@@ -110,6 +110,55 @@ public static class OwnedCloseProgressControls {
         return 10;
     }
 }
+// Actual source Dispose uses controlled TLS ports; socket input/closure are real.
+public static class QueuedTlsShutdownControls {
+    const BindingFlags Private=BindingFlags.Instance|BindingFlags.NonPublic;
+    static int calls,errors,freed,drained,inputBytes,mode;
+    static object Empty(Type type) {
+        Type factory=Type.GetType("System.Runtime.Serialization.FormatterServices, mscorlib",false);
+        if(factory==null)factory=Type.GetType("System.Runtime.Serialization.FormatterServices, System.Runtime.Serialization.Formatters",true);
+        return factory.GetMethod("GetUninitializedObject",BindingFlags.Static|BindingFlags.Public).Invoke(null,new object[]{type});
+    }
+    static void Set(object owner,string field,object value){owner.GetType().GetField(field,Private).SetValue(owner,value);}
+    static void Bind(object owner,string field,string method){FieldInfo member=owner.GetType().GetField(field,Private);member.SetValue(owner,Delegate.CreateDelegate(member.FieldType,typeof(QueuedTlsShutdownControls).GetMethod(method,BindingFlags.Static|BindingFlags.NonPublic)));}
+    static int Shutdown(IntPtr ssl){calls++;if(calls==1)return 0;if(mode==0 || (mode==1&&calls==3))return 1;return -1;}
+    static int Error(IntPtr ssl,int value){errors++;return mode==2 || (mode==5&&calls==3)?1:mode==4?3:2;}
+    static void Free(IntPtr ssl){freed++;}
+    static void Clear(){ }
+    static int BioRead(IntPtr bio,IntPtr target,int count){if(drained++>0)return -1;Marshal.Copy(new byte[]{9,0,255},0,target,3);return 3;}
+    static int BioWrite(IntPtr bio,IntPtr bytes,int count){Require(count==3,"actual_input_length");byte[] actual=new byte[3];Marshal.Copy(bytes,actual,0,3);Require(actual[0]==3&&actual[1]==0&&actual[2]==254,"actual_input_bytes");inputBytes+=count;return count;}
+    static void Require(bool value,string label){if(!value)throw new InvalidDataException(label);}
+    sealed class ObservedInput:NetworkStream {
+        public int Reads;
+        public ObservedInput(Socket socket):base(socket,true){ }
+        public override int Read(byte[] bytes,int offset,int count){Reads++;return base.Read(bytes,offset,Math.Min(count,3));}
+    }
+    static void Case(int choice,bool queued,bool expectedFailure,int expectedCalls,int expectedErrors) {
+        TcpListener listener=new TcpListener(IPAddress.Loopback,0);TcpClient peer=new TcpClient(),origin=null;Stream stream=null;
+        try {
+            listener.Start();peer.Connect((IPEndPoint)listener.LocalEndpoint);origin=listener.AcceptTcpClient();peer.ReceiveTimeout=3000;origin.ReceiveTimeout=3000;
+            var network=new ObservedInput(origin.Client);
+            if(queued){peer.GetStream().Write(choice==6?new byte[]{3,0,254,3,0,254}:new byte[]{3,0,254},0,choice==6?6:3);var elapsed=System.Diagnostics.Stopwatch.StartNew();while(!network.DataAvailable && elapsed.ElapsedMilliseconds<3000)System.Threading.Thread.Yield();Require(network.DataAvailable,"actual_input_queued");}
+            mode=choice;calls=errors=freed=drained=inputBytes=0;
+            var owner=(ErgoptiFixtureOpenSsl)Empty(typeof(ErgoptiFixtureOpenSsl));Set(owner,"gate",new object());Set(owner,"streams",1);
+            Bind(owner,"shutdown","Shutdown");Bind(owner,"sslError","Error");Bind(owner,"sslFree","Free");Bind(owner,"bioRead","BioRead");Bind(owner,"bioWrite","BioWrite");Bind(owner,"clearError","Clear");
+            Type type=typeof(ErgoptiFixtureOpenSsl).GetNestedType("NativeStream",BindingFlags.NonPublic);stream=(Stream)Empty(type);type.GetField("Owner").SetValue(stream,owner);
+            Set(stream,"network",network);Set(stream,"encrypted",new byte[16384]);Set(stream,"ssl",new IntPtr(1));Set(stream,"authenticated",true);Set(stream,"receivedEncrypted",9);Set(stream,"writtenEncrypted",11);
+            bool failed=false;try{stream.Dispose();}catch(InvalidOperationException){failed=true;}
+            var fact=owner.ReadClosedStream();
+            Require(failed==expectedFailure,"original_tls_error_not_waived");
+            Require(calls==expectedCalls && errors==expectedErrors,"exact_calls_zero_never_get_error");
+            Require(fact!=null&&fact.ShutdownResult==(choice==0||choice==1?1:-1)&&fact.NetworkClosed==1,"actual_final_shutdown_fact");
+            Require(inputBytes==(queued?3:0)&&network.Reads==(queued?1:0),"only_already_readable_input");
+            Require(fact.Received==9+(queued?3:0)&&fact.Written==14&&fact.CloseWritten==3&&fact.Pending==(choice==6?1:0),"retained_exact_byte_accounting");
+            Require(freed==1&&owner.OwnedStreams==0,"actual_native_and_network_retirement");
+            stream.Dispose();Require(freed==1&&owner.ReadClosedStream().Sequence==1,"no_duplicate_shutdown_owner");
+            NetworkStream received=peer.GetStream();Require(received.ReadByte()==9&&received.ReadByte()==0&&received.ReadByte()==255&&received.ReadByte()==-1,"actual_output_and_eof");
+        } finally {if(stream!=null)stream.Dispose();if(origin!=null)origin.Close();peer.Close();listener.Stop();}
+    }
+    public static int Run(){Case(0,false,false,2,0);Case(1,true,false,3,1);Case(2,false,true,2,1);Case(3,false,false,2,1);Case(4,false,false,2,1);Case(5,true,true,3,2);Case(6,true,false,3,2);return 7;}
+}
+
 '@
 $Definitions+=$Control
 $Imports=@(); $Bodies=@()
@@ -118,6 +167,10 @@ foreach($Definition in $Definitions){
     $Bodies += [regex]::Replace($Definition,'(?m)^using [^;]+;\r?\n','')
 }
 Add-Type -TypeDefinition ((($Imports | Select-Object -Unique) -join "`n")+"`n"+($Bodies -join "`n"))
+if($QueuedShutdown){
+    [Console]::Out.WriteLine('OWNED_QUEUED_TLS_SHUTDOWN_CONTROLLED_PORTS:'+([QueuedTlsShutdownControls]::Run()))
+    return
+}
 $Count=[OwnedCloseProgressControls]::Run()
 # Call the exact publisher with a failed new getter; original failure/state publication must survive.
 $Ast=[Management.Automation.Language.Parser]::ParseInput($Fixture,[ref]$null,[ref]$null)
