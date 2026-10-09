@@ -2,6 +2,56 @@
 # Executes the actual source fetcher; portable mode qualifies only pure URI scope.
 param([Parameter(Mandatory=$true)][string]$WorkerPath, [Parameter(Mandatory=$true)][string]$PolicyPath, [switch]$Portable)
 $ErrorActionPreference = 'Stop'
+# The original terminating error remains the failure owner; formatting cannot hide its line.
+trap {
+    $SourceErrorRecord = $_
+    try {
+        $SourceErrorLine = 0
+        if ($null -ne $SourceErrorRecord.InvocationInfo -and
+            $SourceErrorRecord.InvocationInfo.ScriptName -ceq $PSCommandPath) {
+            $CandidateLine = [int]$SourceErrorRecord.InvocationInfo.ScriptLineNumber
+            if ($CandidateLine -ge 1 -and $CandidateLine -le 4095) { $SourceErrorLine = $CandidateLine }
+        }
+        $SourceErrorClasses = @(
+            'MethodException',
+            'MethodInvocationException',
+            'RuntimeException',
+            'TargetInvocationException',
+            'TargetParameterCountException',
+            'MissingMethodException',
+            'ArgumentException',
+            'ArgumentNullException',
+            'ArgumentOutOfRangeException',
+            'InvalidOperationException',
+            'InvalidDataException',
+            'DecoderFallbackException',
+            'FileNotFoundException',
+            'DirectoryNotFoundException',
+            'IOException',
+            'UnauthorizedAccessException',
+            'TimeoutException',
+            'WebException',
+            'ObjectDisposedException',
+            'PacOwnerDebtException',
+            'TypeInitializationException',
+            'NotSupportedException',
+            'PlatformNotSupportedException',
+            'Win32Exception'
+        )
+        $SourceErrorClass = 'unknown'
+        $SourceErrorException = $SourceErrorRecord.Exception
+        for ($Depth = 0; $Depth -lt 4 -and $null -ne $SourceErrorException; $Depth++) {
+            $CandidateClass = $SourceErrorException.GetType().Name
+            $SourceErrorClass = if ($SourceErrorClasses -ccontains $CandidateClass) { $CandidateClass } else { 'unknown' }
+            $SourceErrorException = $SourceErrorException.InnerException
+        }
+        if ($null -ne $SourceErrorException) { $SourceErrorClass = 'unknown' }
+        [Console]::Error.WriteLine(('PAC_SOURCE_ERROR exception={0} line={1}' -f $SourceErrorClass, $SourceErrorLine))
+    } catch {
+        # A diagnostic writer refusal cannot replace the original terminating error.
+    }
+    break
+}
 $Definition = [IO.File]::ReadAllText($WorkerPath, [Text.UTF8Encoding]::new($false, $true))
 $Match = [regex]::Match($Definition, "Add-Type -TypeDefinition @'\n([\s\S]*?)\n'@")
 if (-not $Match.Success) { throw 'Production PAC executor definition was refused.' }

@@ -4,6 +4,16 @@
 _NetworkPAC_SourceFailureSummary(Stderr) {
 	if !(Stderr is String) || StrLen(Stderr) > 8192
 		return "kind=invalid_capture line=0 cs=none"
+	RecordClass := ""
+	RecordLine := 0
+	RecordPattern := "m)^PAC_SOURCE_ERROR exception=(unknown|MethodException|MethodInvocationException|RuntimeException|TargetInvocationException|TargetParameterCountException|MissingMethodException|ArgumentException|ArgumentNullException|ArgumentOutOfRangeException|InvalidOperationException|InvalidDataException|DecoderFallbackException|FileNotFoundException|DirectoryNotFoundException|IOException|UnauthorizedAccessException|TimeoutException|WebException|ObjectDisposedException|PacOwnerDebtException|TypeInitializationException|NotSupportedException|PlatformNotSupportedException|Win32Exception) line=(0|[1-9][0-9]{0,3})`r?$"
+	if RegExMatch(Stderr, RecordPattern, &RecordFact)
+		&& InStr(Stderr, "PAC_SOURCE_ERROR", true) == RecordFact.Pos
+		&& !InStr(Stderr, "PAC_SOURCE_ERROR", true, RecordFact.Pos + StrLen("PAC_SOURCE_ERROR"))
+		&& Integer(RecordFact[2]) <= 4095 {
+		RecordClass := RecordFact[1]
+		RecordLine := Integer(RecordFact[2])
+	}
 	Kind := "unknown"
 	Codes := Map()
 	Offset := 1
@@ -51,7 +61,10 @@ _NetworkPAC_SourceFailureSummary(Stderr) {
 	if Codes.Count == 1
 		for Candidate, _ in Codes
 			Code := "CS" . Candidate
+	if RecordClass != ""
+		Line := RecordLine
 	return "kind=" . Kind . " line=" . Line . " cs=" . Code
+		. (RecordClass == "" ? "" : " exception=" . RecordClass)
 }
 
 ; The settled tree owner combines both native streams in stdout.
@@ -164,3 +177,18 @@ _NetworkPAC_SourceFailureDiagnosticOwnedCapture() {
 	}
 }
 Test("managed PAC source: owned native error capture feeds the closed diagnostic", _NetworkPAC_SourceFailureDiagnosticOwnedCapture)
+
+_NetworkPAC_SourceFailureDiagnosticErrorRecord() {
+	Frame := "PAC_SOURCE_ERROR exception=TargetParameterCountException line=183"
+	AssertEqual("kind=method_arity line=183 cs=none exception=TargetParameterCountException", _NetworkPAC_SourceFailureSummary(Frame))
+	AssertEqual("kind=unknown line=0 cs=none exception=unknown", _NetworkPAC_SourceFailureSummary("PAC_SOURCE_ERROR exception=unknown line=0"))
+	for Invalid in [Frame . "`n" . Frame,
+		Frame . "`nPAC_SOURCE_ERROR exception=diagnostic-private-sentinel line=1",
+		"PAC_SOURCE_ERROR exception=TargetParameterCountException line=4096",
+		"PAC_SOURCE_ERROR exception=TargetParameterCountException line=-1",
+		"PAC_SOURCE_ERROR exception=TargetParameterCountException line=01",
+		Frame . " private=diagnostic-private-sentinel"]
+		AssertEqual("kind=method_arity line=0 cs=none", _NetworkPAC_SourceFailureSummary(Invalid))
+	AssertEqual("kind=unknown line=0 cs=none", _NetworkPAC_SourceFailureSummary("PAC_SOURCE_ERROR exception=diagnostic-private-sentinel line=183"))
+}
+Test("managed PAC source: original ErrorRecord diagnostics admit only closed unique facts", _NetworkPAC_SourceFailureDiagnosticErrorRecord)
