@@ -3279,5 +3279,6 @@
 	"healthcheck.summary.incomplete": "Einige angeforderte Prüfungen stehen aus, wurden abgebrochen oder ihre Bereinigung ist noch nicht bestätigt.",
 	"healthcheck.summary.observed": "In den abgeschlossenen Prüfungen wurde kein Problem erkannt.",
 	"healthcheck.summary.scope": "Die Ergebnisse gelten nur für die protokollierten Prüfungen. Isolierte Testsuiten wurden nicht ausgeführt.",
-	"healthcheck.problem.diagnostic_check": "Diagnoseprüfung fehlgeschlagen: %s."
+	"healthcheck.problem.diagnostic_check": "Diagnoseprüfung fehlgeschlagen: %s.",
+	"healthcheck.export.privacy_notice": "Dieser Bericht teilt nur freigegebene technische Angaben. Protokolle, Freitext, Pfade und identifizierende Angaben bleiben auch bei aktivierten Details ausgeschlossen. Lokale Seitentests sind nicht enthalten."
 }

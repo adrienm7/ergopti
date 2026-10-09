@@ -3279,5 +3279,6 @@
 	"healthcheck.summary.incomplete": "Niektóre żądane kontrole oczekują, zostały anulowane lub nie potwierdzono zwolnienia ich zasobów.",
 	"healthcheck.summary.observed": "Nie wykryto problemów w ukończonych kontrolach.",
 	"healthcheck.summary.scope": "Wyniki dotyczą tylko zarejestrowanych kontroli. Izolowane zestawy testów nie zostały uruchomione.",
-	"healthcheck.problem.diagnostic_check": "Kontrola diagnostyczna nie powiodła się: %s."
+	"healthcheck.problem.diagnostic_check": "Kontrola diagnostyczna nie powiodła się: %s.",
+	"healthcheck.export.privacy_notice": "Ten raport udostępnia tylko dozwolone dane techniczne. Logi, dowolny tekst, ścieżki i dane identyfikujące są pomijane również przy włączonych szczegółach. Lokalne testy strony nie są uwzględnione."
 }

@@ -3279,5 +3279,6 @@
 	"healthcheck.summary.incomplete": "Noen forespurte kontroller venter, er avbrutt eller har ubekreftet opprydding.",
 	"healthcheck.summary.observed": "Ingen problemer funnet i de fullførte kontrollene.",
 	"healthcheck.summary.scope": "Resultatene gjelder bare de registrerte kontrollene. Isolerte testsuiter ble ikke kjørt.",
-	"healthcheck.problem.diagnostic_check": "Diagnostisk kontroll mislyktes: %s."
+	"healthcheck.problem.diagnostic_check": "Diagnostisk kontroll mislyktes: %s.",
+	"healthcheck.export.privacy_notice": "Denne rapporten deler bare tillatte tekniske opplysninger. Logger, fritekst, stier og identifiserende opplysninger utelates også når detaljer er aktivert. Lokale sidetester er ikke inkludert."
 }

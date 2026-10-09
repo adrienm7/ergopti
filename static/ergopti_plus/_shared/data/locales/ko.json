@@ -3279,5 +3279,6 @@
 	"healthcheck.summary.incomplete": "요청한 일부 검사가 대기 중이거나 취소되었거나 리소스 정리가 확인되지 않았습니다.",
 	"healthcheck.summary.observed": "완료된 검사에서 문제가 발견되지 않았습니다.",
 	"healthcheck.summary.scope": "결과는 기록된 검사에만 해당합니다. 격리된 테스트 모음은 실행되지 않았습니다.",
-	"healthcheck.problem.diagnostic_check": "진단 검사 실패: %s."
+	"healthcheck.problem.diagnostic_check": "진단 검사 실패: %s.",
+	"healthcheck.export.privacy_notice": "이 보고서는 허용된 기술 정보만 공유합니다. 상세 정보를 켜도 로그, 자유 형식 텍스트, 경로 및 식별 정보는 제외됩니다. 로컬 페이지 테스트는 포함되지 않습니다."
 }

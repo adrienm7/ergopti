@@ -3279,5 +3279,6 @@
 	"healthcheck.summary.incomplete": "Algumas verificações solicitadas estão pendentes, foram canceladas ou a sua limpeza não foi confirmada.",
 	"healthcheck.summary.observed": "Nenhum problema detetado nas verificações concluídas.",
 	"healthcheck.summary.scope": "Os resultados abrangem apenas as verificações registadas. Os testes isolados não foram executados.",
-	"healthcheck.problem.diagnostic_check": "Falha na verificação de diagnóstico: %s."
+	"healthcheck.problem.diagnostic_check": "Falha na verificação de diagnóstico: %s.",
+	"healthcheck.export.privacy_notice": "Este relatório partilha apenas dados técnicos permitidos. Registos, texto livre, caminhos e dados identificativos são excluídos mesmo com os detalhes ativados. Os testes locais da página não estão incluídos."
 }

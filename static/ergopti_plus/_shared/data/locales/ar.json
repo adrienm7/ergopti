@@ -3279,5 +3279,6 @@
 	"healthcheck.summary.incomplete": "بعض الفحوصات المطلوبة معلّقة أو ملغاة أو لم يُؤكّد تنظيف مواردها.",
 	"healthcheck.summary.observed": "لم تُكتشف مشكلة في الفحوصات المكتملة.",
 	"healthcheck.summary.scope": "تقتصر النتائج على الفحوصات المسجّلة. لم تُشغّل مجموعات الاختبارات المعزولة.",
-	"healthcheck.problem.diagnostic_check": "فشل فحص التشخيص: %s."
+	"healthcheck.problem.diagnostic_check": "فشل فحص التشخيص: %s.",
+	"healthcheck.export.privacy_notice": "يشارك هذا التقرير الحقائق التقنية المسموح بها فقط. تُستبعد السجلات والنصوص الحرة والمسارات وبيانات الهوية، حتى عند تفعيل التفاصيل. اختبارات الصفحة المحلية غير مضمنة."
 }

@@ -3279,5 +3279,6 @@
 	"healthcheck.summary.incomplete": "部分请求的检查仍在等待、已取消，或尚未确认资源清理完成。",
 	"healthcheck.summary.observed": "已完成的检查中未发现问题。",
 	"healthcheck.summary.scope": "结果仅涵盖已记录的检查。未运行隔离环境中的测试套件。",
-	"healthcheck.problem.diagnostic_check": "诊断检查失败：%s。"
+	"healthcheck.problem.diagnostic_check": "诊断检查失败：%s。",
+	"healthcheck.export.privacy_notice": "此报告仅分享允许的技术信息。即使启用详细信息，也不包含日志、自由文本、路径或身份识别信息。本地页面测试不包含在内。"
 }

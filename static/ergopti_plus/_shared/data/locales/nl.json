@@ -3279,5 +3279,6 @@
 	"healthcheck.summary.incomplete": "Sommige aangevraagde controles zijn nog bezig, geannuleerd of het opruimen is nog niet bevestigd.",
 	"healthcheck.summary.observed": "Geen probleem gevonden in de voltooide controles.",
 	"healthcheck.summary.scope": "De resultaten gelden alleen voor de vastgelegde controles. Geïsoleerde testsuites zijn niet uitgevoerd.",
-	"healthcheck.problem.diagnostic_check": "Diagnostische controle mislukt: %s."
+	"healthcheck.problem.diagnostic_check": "Diagnostische controle mislukt: %s.",
+	"healthcheck.export.privacy_notice": "Dit rapport deelt alleen toegestane technische gegevens. Logboeken, vrije tekst, paden en identificerende gegevens blijven uitgesloten, ook als details zijn ingeschakeld. Lokale paginatests zijn niet opgenomen."
 }

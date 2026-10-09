@@ -3279,5 +3279,6 @@
 	"healthcheck.summary.incomplete": "Alcuni controlli richiesti sono in attesa, sono stati annullati o la loro pulizia non è confermata.",
 	"healthcheck.summary.observed": "Nessun problema rilevato nei controlli completati.",
 	"healthcheck.summary.scope": "I risultati riguardano solo i controlli registrati. Le suite isolate non sono state eseguite.",
-	"healthcheck.problem.diagnostic_check": "Controllo diagnostico non riuscito: %s."
+	"healthcheck.problem.diagnostic_check": "Controllo diagnostico non riuscito: %s.",
+	"healthcheck.export.privacy_notice": "Questo rapporto condivide solo dati tecnici consentiti. Registri, testo libero, percorsi e dati identificativi sono esclusi anche con i dettagli attivati. I test locali della pagina non sono inclusi."
 }

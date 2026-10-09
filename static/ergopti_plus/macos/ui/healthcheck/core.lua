@@ -764,7 +764,9 @@ local function perform_action(session, action, documents)
 	Cleanup.refresh(session)
 	if action.action == "export_snapshot" then
 		send(session, { type = "action", action = "export_snapshot", ok = true,
-			export_sequence = action.export_sequence, snapshot = session.snapshot })
+			export_sequence = action.export_sequence, snapshot = session.snapshot,
+			share_text = require("healthcheck.share").document(session.snapshot, documents.schema,
+				require("infra.i18n").get(documents.schema.share_policy.notice_key)).text })
 	elseif action.action == "close" then
 		close_owned_window(session.webview, "page close")
 	elseif action.action == "cancel" then
@@ -779,7 +781,7 @@ local function perform_action(session, action, documents)
 		start_probes(session)
 	else
 		local Report = require("ui.healthcheck.report")
-		local result = Report.perform(action, session.snapshot.sections.paths, documents, Report.redaction_context())
+		local result = Report.perform(action, session.snapshot.sections.paths, documents, Report.redaction_context(), nil, session.snapshot)
 		result.type = "action"
 		result.action = action.action
 		send(session, result)

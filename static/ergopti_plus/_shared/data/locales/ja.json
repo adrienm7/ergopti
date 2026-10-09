@@ -3279,5 +3279,6 @@
 	"healthcheck.summary.incomplete": "要求されたチェックの一部は保留中、キャンセル済み、またはリソース解放の確認待ちです。",
 	"healthcheck.summary.observed": "完了したチェックでは問題は検出されませんでした。",
 	"healthcheck.summary.scope": "結果は記録されたチェックのみを対象とします。隔離環境でのテストスイートは実行されていません。",
-	"healthcheck.problem.diagnostic_check": "診断チェックに失敗しました: %s。"
+	"healthcheck.problem.diagnostic_check": "診断チェックに失敗しました: %s。",
+	"healthcheck.export.privacy_notice": "このレポートは許可された技術情報のみを共有します。詳細を有効にしても、ログ、自由記述、パス、個人を特定する情報は含まれません。ページのローカルテストは含まれません。"
 }

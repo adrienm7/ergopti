@@ -3279,5 +3279,6 @@
 	"healthcheck.summary.incomplete": "חלק מהבדיקות שהתבקשו ממתינות, בוטלו או שניקוי המשאבים שלהן טרם אושר.",
 	"healthcheck.summary.observed": "לא זוהתה בעיה בבדיקות שהושלמו.",
 	"healthcheck.summary.scope": "התוצאות מתייחסות רק לבדיקות שתועדו. חבילות הבדיקות המבודדות לא הופעלו.",
-	"healthcheck.problem.diagnostic_check": "בדיקת האבחון נכשלה: %s."
+	"healthcheck.problem.diagnostic_check": "בדיקת האבחון נכשלה: %s.",
+	"healthcheck.export.privacy_notice": "הדוח משתף רק נתונים טכניים מותרים. יומנים, טקסט חופשי, נתיבים ופרטים מזהים אינם נכללים גם כשהפרטים מופעלים. בדיקות העמוד המקומיות אינן נכללות."
 }
