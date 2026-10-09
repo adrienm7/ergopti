@@ -40,6 +40,7 @@
 const fs = require('fs');
 const path = require('path');
 const assert = require('node:assert/strict');
+const crypto = require('node:crypto');
 
 const ROOT = path.resolve(__dirname, '..', '..');
 const SP = path.join(ROOT, 'static', 'ergopti_plus');
@@ -143,13 +144,42 @@ function inventory(driver) {
 		driver === 'windows' ? [path.join(SP, 'windows')] : [path.join(SP, driver, 'ui', 'menu')];
 	const ext = driver === 'windows' ? '.ahk' : '.lua';
 	const sites = [];
+	const traversed = new Set();
 	for (const root of roots) {
+		assert.ok(
+			fs.existsSync(root) && fs.statSync(root).isDirectory(),
+			`${driver}: mandatory source root must exist: ${root}`
+		);
 		for (const file of sourceFiles(root, ext)) {
 			const rel = path.relative(SP, file).split(path.sep).join('/');
 			if (WINDOWS_RENDERER.has(rel)) continue;
-			sites.push(...sitesOf(rel, fs.readFileSync(file, 'utf8'), ext));
+			const text = fs.readFileSync(file, 'utf8');
+			// File coverage is independent of how many handwritten rows remain.
+			// Full-line comments and block comments alone are not source evidence.
+			const code =
+				ext === '.ahk'
+					? text.replace(/\/\*[\s\S]*?\*\//g, '')
+					: text.replace(/--\[(=*)\[[\s\S]*?\]\1\]/g, '');
+			const comment = ext === '.ahk' ? /^\s*;/ : /^\s*--/;
+			assert.ok(
+				code.split('\n').some((line) => line.trim() && !comment.test(line)),
+				`${driver}: production source must be nonempty: ${rel}`
+			);
+			traversed.add(rel);
+			sites.push(...sitesOf(rel, text, ext));
 		}
 	}
+	const required = LEGACY.drivers[driver].sourceFiles;
+	assert.ok(
+		traversed.size >= required.length,
+		`${driver}: source coverage ${traversed.size}/${required.length} is incomplete`
+	);
+	for (const rel of required)
+		assert.ok(
+			traversed.has(rel),
+			`${driver}: mandatory production source was not traversed: ${rel}`
+		);
+	SOURCE_COUNTS[driver] = traversed.size;
 	return sites;
 }
 
@@ -190,26 +220,45 @@ function inventory(driver) {
 // ==================================================
 
 const DRIVERS = ['windows', 'macos', 'linux'];
-// A scan that stops matching would pass with nothing counted.
+// A scan that stops matching would pass with nothing counted. Keep the original
+// minimum against the immutable pre-migration oracle, not the migration debt.
 const FLOORS = { windows: 20, macos: 20, linux: 20 };
+const LEGACY_PATH = path.join(__dirname, 'fixtures', 'native-menu-census-legacy.json');
+const LEGACY_SHA256 = '6ffcfa0a4da1c47fbbf299d62624e4a33933fe2908a17001b14e3592f9753aba';
+const legacyBytes = fs.readFileSync(LEGACY_PATH);
+assert.equal(
+	crypto.createHash('sha256').update(legacyBytes).digest('hex'),
+	LEGACY_SHA256,
+	'the independent b06 legacy oracle must remain unchanged'
+);
+const LEGACY = JSON.parse(legacyBytes.toString('utf8'));
+const SOURCE_COUNTS = {};
+const errors = [];
+for (const driver of DRIVERS) {
+	const observed = [];
+	const ext = driver === 'windows' ? '.ahk' : '.lua';
+	for (const excerpt of LEGACY.drivers[driver].excerpts) {
+		const lines = Array(excerpt.lines.at(-1).line).fill('');
+		for (const entry of excerpt.lines) lines[entry.line - 1] = entry.source;
+		observed.push(...sitesOf(excerpt.path, lines.join('\n'), ext));
+	}
+	const count = observed.length;
+	if (count < FLOORS[driver])
+		errors.push(
+			`${driver}: counted ${count} site(s), floor ${FLOORS[driver]} — the scan is broken.`
+		);
+	assert.deepEqual(
+		observed,
+		LEGACY.baseline[driver].sites,
+		`${driver}: every recorded b06 legacy site must retain its original classification`
+	);
+}
 
 const current = {};
 for (const driver of DRIVERS) current[driver] = inventory(driver);
 
-if (UPDATE) {
-	const out = {
-		_comment:
-			'Native menu rows still built in driver code (tools/test/test-native-menu-rows.cjs). ' +
-			'Lower with --update-baseline as rows move to the shared manifest; never raise.'
-	};
-	for (const driver of DRIVERS)
-		out[driver] = { count: current[driver].length, sites: current[driver] };
-	fs.writeFileSync(BASELINE_PATH, JSON.stringify(out, null, '\t') + '\n');
-	console.log(`test-native-menu-rows: baseline written to ${path.relative(ROOT, BASELINE_PATH)}`);
-	process.exit(0);
-}
-
-const errors = [];
+// Read and validate the debt ledger in both modes, before any write. Updating
+// a malformed ledger or raising a count would silently bypass the ratchet.
 const baseline = JSON.parse(fs.readFileSync(BASELINE_PATH, 'utf8'));
 const summary = [];
 for (const driver of DRIVERS) {
@@ -219,10 +268,21 @@ for (const driver of DRIVERS) {
 		errors.push(`${driver}: the baseline must record a count and one site per counted row.`);
 		continue;
 	}
-	if (count < FLOORS[driver])
+	const sitePattern = new RegExp(
+		`^${driver}/[^:]+:\\d+ (?:register|append|static|separator|add|native)$`
+	);
+	if (
+		!Number.isSafeInteger(recorded.count) ||
+		recorded.count < 0 ||
+		recorded.count > LEGACY.baseline[driver].count ||
+		new Set(recorded.sites).size !== recorded.sites.length ||
+		!recorded.sites.every((site) => typeof site === 'string' && sitePattern.test(site))
+	) {
 		errors.push(
-			`${driver}: counted ${count} site(s), floor ${FLOORS[driver]} — the scan is broken.`
+			`${driver}: the baseline must contain a valid non-increasing count and unique native sites.`
 		);
+		continue;
+	}
 	if (count > recorded.count) {
 		const known = new Set(recorded.sites.map((site) => site.replace(/:\d+ /, ' ')));
 		const added = current[driver].filter((site) => !known.has(site.replace(/:\d+ /, ' ')));
@@ -241,8 +301,24 @@ if (errors.length > 0) {
 	process.exit(1);
 }
 
+if (UPDATE) {
+	const out = {
+		_comment:
+			'Native menu rows still built in driver code (tools/test/test-native-menu-rows.cjs). ' +
+			'Lower with --update-baseline as rows move to the shared manifest; never raise.'
+	};
+	for (const driver of DRIVERS)
+		out[driver] = { count: current[driver].length, sites: current[driver] };
+	fs.writeFileSync(BASELINE_PATH, JSON.stringify(out, null, '\t') + '\n');
+	console.log(`test-native-menu-rows: baseline written to ${path.relative(ROOT, BASELINE_PATH)}`);
+	process.exit(0);
+}
+
 const lowered = DRIVERS.filter((driver) => current[driver].length < baseline[driver].count);
 console.log(
 	`\x1b[32m[OK] native menu row sites within the baseline (${summary.join(', ')}).\x1b[0m` +
-		(lowered.length > 0 ? ` ${lowered.join(', ')} dropped: lock it in with --update-baseline.` : '')
+		(lowered.length > 0
+			? ` ${lowered.join(', ')} dropped: lock it in with --update-baseline.`
+			: '') +
+		` Source coverage: ${DRIVERS.map((driver) => `${driver} ${SOURCE_COUNTS[driver]}`).join(', ')}.`
 );

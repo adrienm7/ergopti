@@ -308,7 +308,9 @@ try {
 		);
 	} else {
 		const xml = fs.readFileSync(outputPath, 'utf8');
-		const xmlCheck = spawnSync('xmllint', ['--noout', outputPath], { encoding: 'utf8' });
+		const xmlCheck = spawnSync('xmllint', ['--noout', outputPath], {
+			encoding: 'utf8'
+		});
 		if (xmlCheck.error) {
 			errors.push(
 				`xmllint is required to validate the generated appcast: ${xmlCheck.error.message}`
@@ -381,7 +383,9 @@ try {
 		OUTPUT_PATH: path.join(directory, 'appcast-dev.xml')
 	});
 	check('actual ordered signing and feed bytes', ({ directory, observations, execute }) => {
-		Publication.signArchives(directory, 'owned-signer', 'owned-key', { execute });
+		Publication.signArchives(directory, 'owned-signer', 'owned-key', {
+			execute
+		});
 		const checked = Publication.validatePublication(directory);
 		assert.equal(checked[0].name, 'ErgoptiPlus.app.tar.xz');
 		assert.equal(observations.length, policy.length * 2);
@@ -398,7 +402,9 @@ try {
 		assert.equal((xml.match(/sparkle:edSignature=/g) ?? []).length, 1);
 	});
 	check('appcast publication date binds the exact source revision', ({ directory, execute }) => {
-		Publication.signArchives(directory, 'owned-signer', 'owned-key', { execute });
+		Publication.signArchives(directory, 'owned-signer', 'owned-key', {
+			execute
+		});
 		const revision = 'a'.repeat(40);
 		const published = 'Fri, 3 Oct 2025 12:34:56 +0000';
 		const requests = [];
@@ -423,19 +429,28 @@ try {
 	check(
 		'appcast refuses failed or absent source-date acknowledgements',
 		({ directory, execute }) => {
-			Publication.signArchives(directory, 'owned-signer', 'owned-key', { execute });
+			Publication.signArchives(directory, 'owned-signer', 'owned-key', {
+				execute
+			});
 			const inputs = { ...env(directory), GITHUB_SHA: 'b'.repeat(40) };
 			fs.writeFileSync(inputs.OUTPUT_PATH, 'previous feed');
 			for (const result of [
 				undefined,
 				{ status: 1, stdout: 'Fri, 3 Oct 2025 12:34:56 +0000' },
-				{ status: 0, signal: 'SIGTERM', stdout: 'Fri, 3 Oct 2025 12:34:56 +0000' },
+				{
+					status: 0,
+					signal: 'SIGTERM',
+					stdout: 'Fri, 3 Oct 2025 12:34:56 +0000'
+				},
 				{ status: 0, error: new Error('private native failure'), stdout: '' },
 				{ status: 0 },
 				{ status: false, stdout: '' },
 				{ status: 0, stdout: '' },
 				{ status: 0, stdout: 'not a publication date' },
-				{ status: 0, stdout: 'Fri, 3 Oct 2025 12:34:56 +0000\nSat, 4 Oct 2025 12:34:56 +0000' }
+				{
+					status: 0,
+					stdout: 'Fri, 3 Oct 2025 12:34:56 +0000\nSat, 4 Oct 2025 12:34:56 +0000'
+				}
 			]) {
 				assert.throws(() => Publication.generateAppcast(inputs, { execute: () => result }));
 				assert.equal(fs.readFileSync(inputs.OUTPUT_PATH, 'utf8'), 'previous feed');
@@ -443,7 +458,9 @@ try {
 		}
 	);
 	check('appcast refuses malformed explicit source revisions', ({ directory, execute }) => {
-		Publication.signArchives(directory, 'owned-signer', 'owned-key', { execute });
+		Publication.signArchives(directory, 'owned-signer', 'owned-key', {
+			execute
+		});
 		for (const revision of [
 			'',
 			'HEAD',
@@ -471,7 +488,9 @@ try {
 		}
 	});
 	check('appcast validates explicit publication dates before writing', ({ directory, execute }) => {
-		Publication.signArchives(directory, 'owned-signer', 'owned-key', { execute });
+		Publication.signArchives(directory, 'owned-signer', 'owned-key', {
+			execute
+		});
 		const inputs = { ...env(directory), GITHUB_SHA: 'c'.repeat(40) };
 		for (const pubDate of [
 			'',
@@ -494,7 +513,9 @@ try {
 		);
 	});
 	check('local appcast date acknowledges current checkout source', ({ directory, execute }) => {
-		Publication.signArchives(directory, 'owned-signer', 'owned-key', { execute });
+		Publication.signArchives(directory, 'owned-signer', 'owned-key', {
+			execute
+		});
 		const expected = spawnSync('git', ['-C', root, 'show', '-s', '--format=%cD', 'HEAD'], {
 			encoding: 'utf8'
 		});
@@ -511,7 +532,9 @@ try {
 	check('missing fresh preferred output refuses', ({ directory, observations, execute }) => {
 		fs.unlinkSync(path.join(directory, policy[0].name));
 		assert.throws(() =>
-			Publication.signArchives(directory, 'owned-signer', 'owned-key', { execute })
+			Publication.signArchives(directory, 'owned-signer', 'owned-key', {
+				execute
+			})
 		);
 		assert.equal(observations.length, 0);
 		assert.equal(fs.existsSync(path.join(directory, Publication.RECEIPT)), false);
@@ -567,7 +590,9 @@ try {
 		assert.equal(fs.existsSync(path.join(directory, Publication.RECEIPT)), false);
 	});
 	check('ambiguous signing receipt encoding refuses', ({ directory, execute }) => {
-		Publication.signArchives(directory, 'owned-signer', 'owned-key', { execute });
+		Publication.signArchives(directory, 'owned-signer', 'owned-key', {
+			execute
+		});
 		const target = path.join(directory, Publication.RECEIPT);
 		fs.writeFileSync(
 			target,
@@ -578,7 +603,9 @@ try {
 		assert.throws(() => Publication.validatePublication(directory));
 	});
 	check('same-length crossed fragment refuses before feed', ({ directory, execute }) => {
-		Publication.signArchives(directory, 'owned-signer', 'owned-key', { execute });
+		Publication.signArchives(directory, 'owned-signer', 'owned-key', {
+			execute
+		});
 		const receipt = Publication.validatePublication(directory);
 		fs.copyFileSync(
 			path.join(directory, receipt[1].signature_name),
@@ -588,7 +615,9 @@ try {
 		assert.equal(fs.existsSync(env(directory).OUTPUT_PATH), false);
 	});
 	check('same-length substituted archive refuses', ({ directory, execute }) => {
-		Publication.signArchives(directory, 'owned-signer', 'owned-key', { execute });
+		Publication.signArchives(directory, 'owned-signer', 'owned-key', {
+			execute
+		});
 		fs.writeFileSync(path.join(directory, policy[0].name), Buffer.alloc(32, 7));
 		assert.throws(() => Publication.validatePublication(directory));
 	});
@@ -661,7 +690,9 @@ try {
 			fs.unlinkSync(path.join(directory, policy[0].name));
 			fs.symlinkSync(policy[1].name, path.join(directory, policy[0].name));
 			assert.throws(() =>
-				Publication.signArchives(directory, 'owned-signer', 'owned-key', { execute })
+				Publication.signArchives(directory, 'owned-signer', 'owned-key', {
+					execute
+				})
 			);
 			assert.equal(observations.length, 0);
 		}
@@ -685,7 +716,11 @@ try {
 	check('published both chooses preferred', () => {
 		assert.equal(
 			Publication.selectPublished(
-				{ isDraft: false, tagName: 'v1.2.3', assets: policy.map((a) => asset(a)) },
+				{
+					isDraft: false,
+					tagName: 'v1.2.3',
+					assets: policy.map((a) => asset(a))
+				},
 				'v1.2.3'
 			).name,
 			'ErgoptiPlus.app.tar.xz'
@@ -705,7 +740,11 @@ try {
 		delete preferred.digest;
 		assert.throws(() =>
 			Publication.selectPublished(
-				{ isDraft: false, tagName: 'v1.2.3', assets: [preferred, asset(policy[1])] },
+				{
+					isDraft: false,
+					tagName: 'v1.2.3',
+					assets: [preferred, asset(policy[1])]
+				},
 				'v1.2.3'
 			)
 		);
@@ -714,7 +753,11 @@ try {
 		const preferred = asset(policy[0]);
 		assert.throws(() =>
 			Publication.selectPublished(
-				{ isDraft: false, tagName: 'v1.2.3', assets: [preferred, preferred, asset(policy[1])] },
+				{
+					isDraft: false,
+					tagName: 'v1.2.3',
+					assets: [preferred, preferred, asset(policy[1])]
+				},
 				'v1.2.3'
 			)
 		);
@@ -805,7 +848,11 @@ try {
 	});
 	// REST_GH_DIGEST_TESTS_BEGIN
 	check('raw REST retains fields dropped by the actual old CLI export', ({ directory }) => {
-		const raw = { draft: false, tag_name: 'v1.2.3', assets: [asset(policy[0])] };
+		const raw = {
+			draft: false,
+			tag_name: 'v1.2.3',
+			assets: [asset(policy[0])]
+		};
 		// GH v2.46 ReleaseAsset/ExportData lacks Digest despite a REST receipt.
 		const projected = {
 			isDraft: raw.draft,
@@ -845,7 +892,11 @@ try {
 			{ draft: 'false', tag_name: 'v1.2.3', assets: [asset(policy[0])] },
 			{ draft: false, tag_name: 'other', assets: [asset(policy[0])] },
 			{ draft: false, tag_name: 'v1.2.3', assets: null },
-			{ draft: false, tag_name: 'v1.2.3', assets: [malformedPreferred, asset(policy[1])] },
+			{
+				draft: false,
+				tag_name: 'v1.2.3',
+				assets: [malformedPreferred, asset(policy[1])]
+			},
 			{
 				draft: false,
 				tag_name: 'v1.2.3',
@@ -871,7 +922,11 @@ try {
 		}
 	});
 	check('API failed HTTP and malformed process receipts refuse', ({ directory }) => {
-		const body = JSON.stringify({ draft: false, tag_name: 'v1.2.3', assets: [asset(policy[0])] });
+		const body = JSON.stringify({
+			draft: false,
+			tag_name: 'v1.2.3',
+			assets: [asset(policy[0])]
+		});
 		for (const [index, receipt] of [
 			{ status: 1, stdout: body }, // gh api returns nonzero for non2xx.
 			{ status: false, stdout: body },
@@ -901,7 +956,11 @@ try {
 		const payloadPath = path.join(directory, policy[0].name);
 		fs.writeFileSync(
 			rawPath,
-			JSON.stringify({ draft: false, tag_name: tag, assets: [asset(policy[0])] })
+			JSON.stringify({
+				draft: false,
+				tag_name: tag,
+				assets: [asset(policy[0])]
+			})
 		);
 		const shim = path.join(bin, process.platform === 'win32' ? 'gh-shim.cjs' : 'gh');
 		fs.writeFileSync(
@@ -1005,7 +1064,7 @@ try {
 	assert.ifError(result.error);
 	assert.equal(result.signal, null, result.stderr);
 	assert.equal(result.status, 0, result.stderr);
-	assert.match(result.stderr, /Ran 48 tests in /);
+	assert.match(result.stderr, /Ran 53 tests in /);
 	// The two existing POSIX signal controls also remain excluded on Windows.
 	const skipped = process.platform === 'win32' ? 19 : process.platform === 'darwin' ? 1 : 0;
 	assert.match(
@@ -1013,7 +1072,7 @@ try {
 		skipped ? new RegExp(`\\nOK \\(skipped=${skipped}\\)\\s*$`) : /\nOK\s*$/
 	);
 	console.log(
-		`Sparkle transport controls: ${48 - skipped} passed, ${skipped} platform cases skipped.`
+		`Sparkle transport controls: ${53 - skipped} passed, ${skipped} platform cases skipped.`
 	);
 	const fixture = fs.readFileSync(
 		path.join(
@@ -1235,8 +1294,8 @@ try {
 		[
 			'unobserved child status',
 			fixture.replace(
-				'guard launched, observedExit, !process.isRunning',
-				'guard launched, !process.isRunning'
+				'func observedTerminationFacts() -> ObservedTermination {\n\t\t\tguard launched, observedExit, !process.isRunning',
+				'func observedTerminationFacts() -> ObservedTermination {\n\t\t\tguard launched, !process.isRunning'
 			)
 		],
 		[
@@ -1408,7 +1467,10 @@ try {
 			source,
 			/guard retired\.status == 0 else \{ throw Failure\.evidence\("server-retirement"\) \}/
 		);
-		assert.match(source, /let listening = try waitFor\("server-start", root: www, seconds: 10\)/);
+		assert.match(
+			source,
+			/let listening = try ArchiveAcceptanceEvidence\.preservingPrimaryFailure\([\s\S]*?operation: \{ try waitFor\("server-start", root: www, seconds: 10\) \}/
+		);
 		assert.match(source, /func testStartupFramesDistinguishActualPrefixEmptyAndRefusedCapture\(\)/);
 	}
 	assertStartupProjection(fixture, helper);

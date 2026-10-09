@@ -26,6 +26,8 @@
 @property(nonatomic) NSApplicationActivationPolicy observedPolicy;
 @property(nonatomic) unsigned int setCalls;
 @property(nonatomic) unsigned int readCalls;
+@property(nonatomic) BOOL observationThrows;
+@property(nonatomic) BOOL observationThrowsOnce;
 @end
 
 @implementation RegistrationProbe
@@ -36,7 +38,10 @@
 }
 - (NSApplicationActivationPolicy)activationPolicy {
     self.readCalls += 1;
-    return self.readCalls == 1 ? self.initialPolicy : self.observedPolicy;
+    if (self.observationThrows || (self.observationThrowsOnce && self.readCalls == 1)) [NSException raise:NSInternalInconsistencyException format:@"CONTROL_POLICY_OBSERVATION"];
+    // A failed optional first observation consumes no functional policy state.
+    const unsigned int initialRead = self.observationThrowsOnce ? 2 : 1;
+    return self.readCalls == initialRead ? self.initialPolicy : self.observedPolicy;
 }
 @end
 
@@ -93,20 +98,44 @@ int main(void) {
         admitted.observedPolicy = NSApplicationActivationPolicyAccessory;
         assert(admit_appkit((NSApplication *)admitted) == AppKitAdmitted);
         assert(admitted.setCalls == 1 && admitted.readCalls == 2);
-        // Literal same-state controls run the actual included admission body.
-        // A refused setter must never be invoked when state is already correct.
+        /* A repeated admission observes the required state without attempting a switch. */
         RegistrationProbe *alreadyAccessory = [RegistrationProbe new];
         alreadyAccessory.initialPolicy = NSApplicationActivationPolicyAccessory;
-        alreadyAccessory.acceptsPolicy = NO;
         alreadyAccessory.observedPolicy = NSApplicationActivationPolicyAccessory;
+        alreadyAccessory.acceptsPolicy = NO;
         assert(admit_appkit((NSApplication *)alreadyAccessory) == AppKitAdmitted);
         assert(alreadyAccessory.setCalls == 0 && alreadyAccessory.readCalls == 2);
+        assert(admit_appkit((NSApplication *)alreadyAccessory) == AppKitAdmitted);
+        assert(alreadyAccessory.setCalls == 0 && alreadyAccessory.readCalls == 4);
         RegistrationProbe *changedAccessory = [RegistrationProbe new];
         changedAccessory.initialPolicy = NSApplicationActivationPolicyAccessory;
         changedAccessory.acceptsPolicy = NO;
         changedAccessory.observedPolicy = NSApplicationActivationPolicyRegular;
         assert(admit_appkit((NSApplication *)changedAccessory) == AppKitPolicyUnconfirmed);
         assert(changedAccessory.setCalls == 0 && changedAccessory.readCalls == 2);
+        /* Separate metadata controls never provide real NSApplication proof. */
+        struct AppKitPolicyObservation observed = observe_appkit_policy(nil);
+        assert(observed.available == 0 && observed.policy == 3);
+        observed = observe_appkit_policy((NSApplication *)refused);
+        assert(observed.available == 1 && observed.policy == 1);
+        refused.observedPolicy = (NSApplicationActivationPolicy)99;
+        observed = observe_appkit_policy((NSApplication *)refused);
+        assert(observed.available == 0 && observed.policy == 3);
+        refused.observationThrows = YES;
+        observed = observe_appkit_policy((NSApplication *)refused);
+        assert(observed.available == 0 && observed.policy == 3);
+        RegistrationProbe *optionalUnavailable = [RegistrationProbe new];
+        optionalUnavailable.initialPolicy = NSApplicationActivationPolicyRegular;
+        optionalUnavailable.acceptsPolicy = YES;
+        optionalUnavailable.observedPolicy = NSApplicationActivationPolicyAccessory;
+        optionalUnavailable.observationThrowsOnce = YES;
+        struct AppKitPolicyObservation before;
+        const enum AppKitAdmission functional = observe_appkit_admission((NSApplication *)optionalUnavailable, &before);
+        /* Actual composed caller/body over explicit Objective-C policy ports. */
+        assert(functional == AppKitAdmitted);
+        assert(before.available == 0 && before.policy == 3);
+        assert(optionalUnavailable.setCalls == 1 && optionalUnavailable.readCalls == 3);
+        assert_private_probe_event();
         /* The sender's independent actual registration body has the same refusal coverage. */
         assert(admit_sender_appkit(nil) == 1);
         for (unsigned int mode = 0; mode < 5; mode++) {

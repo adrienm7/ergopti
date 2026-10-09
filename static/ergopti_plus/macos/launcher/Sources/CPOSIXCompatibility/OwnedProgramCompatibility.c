@@ -359,6 +359,98 @@ int ergopti_owned_program_prepare_with_tty_source(
 	return program_prepare(executable, arguments, environment, tty_descriptor, source_descriptor, owner_out);
 }
 
+// Separate bounded query transport; the existing suppressed-output program ABI stays intact.
+int ergopti_owned_query_prepare(
+	const char *executable,
+	char *const arguments[],
+	char *const environment[],
+	int output_descriptor,
+	int error_descriptor,
+	ergopti_owned_program **owner_out
+) {
+	if (owner_out == NULL || *owner_out != NULL || executable == NULL
+		|| executable[0] != '/' || arguments == NULL || arguments[0] == NULL || environment == NULL) {
+		return EINVAL;
+	}
+	struct stat output_stat;
+	struct stat error_stat;
+	if (output_descriptor <= STDERR_FILENO || error_descriptor <= STDERR_FILENO
+		|| fstat(output_descriptor, &output_stat) != 0 || fstat(error_descriptor, &error_stat) != 0
+		|| !S_ISFIFO(output_stat.st_mode) || !S_ISFIFO(error_stat.st_mode)) { return EINVAL; }
+	// The signed query supervisor owns a separate session outside the query group.
+	if (getsid(0) != getpid()) { return EPERM; }
+	ergopti_owned_program *owner = calloc(1, sizeof(*owner));
+	if (owner == NULL) { return ENOMEM; }
+	owner->monitor = -1;
+	owner->executable = strdup(executable);
+	int max_processes = 0;
+	size_t limit_size = sizeof(max_processes);
+	int error = 0;
+	if (owner->executable == NULL) { error = ENOMEM; }
+	else if (stat(executable, &owner->executable_identity) != 0) { error = errno; }
+	else if (!S_ISREG(owner->executable_identity.st_mode)) { error = EINVAL; }
+	else if (sysctlbyname("kern.maxproc", &max_processes, &limit_size, NULL, 0) != 0) { error = errno; }
+	else if (limit_size != sizeof(max_processes) || max_processes <= 0
+		|| (size_t)max_processes > (INT_MAX / sizeof(pid_t)) - 20) { error = EOVERFLOW; }
+	if (error == 0) {
+		owner->census_capacity = (size_t)max_processes + 20;
+		owner->first_pids = calloc(owner->census_capacity, sizeof(pid_t));
+		owner->second_pids = calloc(owner->census_capacity, sizeof(pid_t));
+		owner->first_identities = calloc(owner->census_capacity, sizeof(program_identity));
+		if (owner->first_pids == NULL || owner->second_pids == NULL || owner->first_identities == NULL) {
+			error = ENOMEM;
+		}
+	}
+	if (error != 0) { program_release_storage(owner); return error; }
+
+	posix_spawnattr_t attributes;
+	posix_spawn_file_actions_t actions;
+	error = posix_spawnattr_init(&attributes);
+	if (error != 0) { program_release_storage(owner); return error; }
+	error = posix_spawn_file_actions_init(&actions);
+	if (error != 0) {
+		posix_spawnattr_destroy(&attributes);
+		program_release_storage(owner);
+		return error;
+	}
+	sigset_t default_signals;
+	sigset_t empty_mask;
+	sigfillset(&default_signals);
+	sigdelset(&default_signals, SIGKILL);
+	sigdelset(&default_signals, SIGSTOP);
+	sigemptyset(&empty_mask);
+	short flags = POSIX_SPAWN_SETPGROUP | POSIX_SPAWN_START_SUSPENDED
+		| POSIX_SPAWN_CLOEXEC_DEFAULT | POSIX_SPAWN_SETSIGDEF | POSIX_SPAWN_SETSIGMASK;
+	if ((error = posix_spawnattr_setflags(&attributes, flags)) == 0
+		&& (error = posix_spawnattr_setpgroup(&attributes, 0)) == 0
+		&& (error = posix_spawnattr_setsigdefault(&attributes, &default_signals)) == 0
+		&& (error = posix_spawnattr_setsigmask(&attributes, &empty_mask)) == 0) {
+		error = posix_spawn_file_actions_addopen(&actions, STDIN_FILENO, "/dev/null", O_RDONLY, 0);
+		if (error == 0) { error = posix_spawn_file_actions_adddup2(&actions, output_descriptor, STDOUT_FILENO); }
+		if (error == 0) { error = posix_spawn_file_actions_adddup2(&actions, error_descriptor, STDERR_FILENO); }
+	}
+	if (error == 0) {
+		error = posix_spawn(&owner->leader, executable, &actions, &attributes, arguments, environment);
+	}
+	posix_spawn_file_actions_destroy(&actions);
+	posix_spawnattr_destroy(&attributes);
+	if (error != 0) { program_release_storage(owner); return error; }
+	// Publication precedes every post-spawn check: failures retain real cleanup debt.
+	*owner_out = owner;
+	struct proc_bsdinfo info;
+	error = program_bsd_info(owner->leader, &info);
+	if (error == 0) {
+		owner->identity = program_identity_from_info(&info);
+		owner->identity_valid = true;
+		if (info.pbi_ppid != (uint32_t)getpid() || info.pbi_pgid != (uint32_t)owner->leader
+			|| getsid(owner->leader) != getpid()) { error = EPROTO; }
+	}
+	if (error == 0) { owner->monitor = ergopti_process_exit_monitor_open(owner->leader, &error); }
+	owner->error_code = error;
+	if (error != 0) { ergopti_owned_program_cancel(owner); }
+	return error;
+}
+
 ergopti_owned_program_receipt ergopti_owned_program_activate(ergopti_owned_program *owner) {
 	if (owner == NULL) { return program_receipt(owner); }
 	if (owner->retired || owner->cancelled || owner->active || owner->error_code != 0

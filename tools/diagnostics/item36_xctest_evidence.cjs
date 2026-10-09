@@ -32,6 +32,7 @@ const METHODS = Object.freeze({
 		'testNetworkProgressCounterDoesNotInventSuccessfulDelivery',
 		'testServerExitRefusalMessageProjectsOnlyClosedFacts',
 		'testDirectNativeChildExitACKAndCaptureRetirementAreIdempotent',
+		'testSignaledOwnedChildProvidesTerminalCapturesWithoutAdmittingFinish',
 		'testOwnedCensusPathAdmitsParentAliasWithoutAdoptingDirectoryReplacement',
 		'testStartupFramesDistinguishActualPrefixEmptyAndRefusedCapture',
 		'testActualSparkleTarXZUpdateRefusesWrongKeyPreservesOldAppAndRetriesThroughRelaunch'
@@ -86,7 +87,7 @@ function evaluate(text, scriptStatus, teeStatus) {
 				/^\s*Executed (0|[1-9][0-9]*) tests?, with (\d+) failures? \((\d+) unexpected\) in /.exec(
 					line
 				);
-			const expected = summary === 'root' || summary === 'bundle' ? 24 : METHODS[summary].length;
+			const expected = summary === 'root' || summary === 'bundle' ? 25 : METHODS[summary].length;
 			if (!count || Number(count[1]) !== expected || count[2] !== '0' || count[3] !== '0')
 				reject('summary');
 			if (summary === 'root') root = 'after';
@@ -163,8 +164,8 @@ function evaluate(text, scriptStatus, teeStatus) {
 		active !== null ||
 		summary !== null ||
 		suites.size !== 4 ||
-		starts.size !== 24 ||
-		terminals.size !== 24 ||
+		starts.size !== 25 ||
+		terminals.size !== 25 ||
 		NAMES.some((name) => !starts.has(name) || !terminals.has(name))
 	)
 		reject('incomplete');

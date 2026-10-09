@@ -17,7 +17,7 @@ module.exports = function run({ workflow, admitItem36Selector, ITEM36_FILTER }) 
 		'HomebrewArchiveAcceptanceTests',
 		'HomebrewAutomationConsentTests'
 	];
-	const counts = [8, 14, 1, 1];
+	const counts = [8, 15, 1, 1];
 	let passed = 0;
 	const check = (label, action) => {
 		action();
@@ -50,12 +50,12 @@ module.exports = function run({ workflow, admitItem36Selector, ITEM36_FILTER }) 
 	}
 	lines.push(
 		"Test Suite 'ErgoptiPlusPackageTests.xctest' passed at 2026-10-09 00:00:01.",
-		summary(24),
+		summary(25),
 		"Test Suite 'Selected tests' passed at 2026-10-09 00:00:01.",
-		summary(24)
+		summary(25)
 	);
 	const valid = lines.join('\n') + '\n';
-	check('exact-independent-24', () => assert.equal(reader.evaluate(valid, 0, 0).complete, true));
+	check('exact-independent-25', () => assert.equal(reader.evaluate(valid, 0, 0).complete, true));
 	check('PTY-normalization', () =>
 		assert.equal(
 			reader.evaluate('\x1b[32m' + valid.replaceAll('\n', '\r\n') + '\x1b[0m', 0, 0).complete,
@@ -65,6 +65,38 @@ module.exports = function run({ workflow, admitItem36Selector, ITEM36_FILTER }) 
 	check('full-reporter-still-refuses-filtered', () =>
 		assert.notEqual(full.evaluate(valid, 0, 0).exit_status, 0)
 	);
+	const signalMethod = 'testSignaledOwnedChildProvidesTerminalCapturesWithoutAdmittingFinish';
+	const signalName = `-[ErgoptiPlusTests.SparkleArchiveUpdateAcceptanceTests ${signalMethod}]`;
+	const signalOpening = `Test Case '${signalName}' started.`;
+	const signalTerminal = `Test Case '${signalName}' passed (0.001 seconds).`;
+	check('independent-new-signal-identity', () =>
+		assert.equal(definitions[1].methods.filter((method) => method === signalMethod).length, 1)
+	);
+	const stale = valid
+		.replace(`${signalOpening}\n${signalTerminal}\n`, '')
+		.replace(summary(15), summary(14))
+		.replaceAll(summary(25), summary(24));
+	for (const [label, bad] of [
+		['stale-independent-24', stale],
+		['new-signal-missing', valid.replace(`${signalOpening}\n${signalTerminal}\n`, '')],
+		['new-signal-duplicate', valid.replace(signalOpening, `${signalOpening}\n${signalOpening}`)],
+		[
+			'new-signal-failed',
+			valid.replace(signalTerminal, signalTerminal.replace(' passed ', ' failed '))
+		],
+		[
+			'new-signal-skipped',
+			valid.replace(signalTerminal, signalTerminal.replace(' passed ', ' skipped '))
+		],
+		[
+			'new-signal-foreign-same-count',
+			valid.replaceAll(
+				signalName,
+				'-[ErgoptiPlusTests.SparkleArchiveUpdateAcceptanceTests testForeignSignal]'
+			)
+		]
+	])
+		check(label, () => assert.equal(reader.evaluate(bad, 0, 0).complete, false));
 	const firstName = `-[ErgoptiPlusTests.${definitions[0].suite} ${definitions[0].methods[0]}]`;
 	for (const [label, bad] of [
 		['partial', valid.slice(0, valid.lastIndexOf("Test Suite 'Selected tests' passed"))],
@@ -96,8 +128,8 @@ module.exports = function run({ workflow, admitItem36Selector, ITEM36_FILTER }) 
 			valid.replace(`Test Case '${firstName}' passed`, `Test Case '${firstName}' skipped`)
 		],
 		['wrong-class-census', valid.replace(summary(8), summary(7))],
-		['wrong-bundle-census', valid.replace(summary(24), summary(23))],
-		['wrong-root-census', valid.slice(0, valid.lastIndexOf(summary(24))) + summary(23) + '\n'],
+		['wrong-bundle-census', valid.replace(summary(25), summary(24))],
+		['wrong-root-census', valid.slice(0, valid.lastIndexOf(summary(25))) + summary(24) + '\n'],
 		['wrong-root', valid.replaceAll("'Selected tests'", "'All tests'")],
 		['foreign-bundle', valid.replaceAll('ErgoptiPlusPackageTests.xctest', 'Foreign.xctest')],
 		[

@@ -543,12 +543,25 @@ const layoutCode = files
 	.join('\n');
 if (!/^RegisterAltGrLayer\(\)\s*$/m.test(layoutCode))
 	errors.push('modules/keymap/layout.ahk must still register the AltGr layer unconditionally');
-const altGrRegistrations = files
-	.map(
-		(f) =>
-			(stripComments(fs.readFileSync(f, 'utf8')).match(/Hotkey\("SC138 & " \. SC,/g) || []).length
-	)
-	.reduce((a, b) => a + b, 0);
+const nativeAltGrProducer = files
+	.filter((f) => f.replace(/\\/g, '/').endsWith('modules/keymap/layout/layout_altgr.ahk'))
+	.map((f) => stripComments(fs.readFileSync(f, 'utf8')))
+	.join('\n')
+	.match(
+		/^RegisterAltGrLayer\(HotkeyFn := Hotkey, HotIfFn := HotIf, DispatchFn := AltGrShiftDispatch, RealAltGrFn := IsRealAltGrPress\) \{([\s\S]*?)^\}/m
+	);
+const nativePortRegistrations =
+	nativeAltGrProducer && !/^\s*HotkeyFn\s*:=/m.test(nativeAltGrProducer[1])
+		? (nativeAltGrProducer[1].match(/^\s*HotkeyFn\.Call\("SC138 & " \. SC,/gm) || []).length
+		: 0;
+const altGrRegistrations =
+	nativePortRegistrations +
+	files
+		.map(
+			(f) =>
+				(stripComments(fs.readFileSync(f, 'utf8')).match(/Hotkey\("SC138 & " \. SC,/g) || []).length
+		)
+		.reduce((a, b) => a + b, 0);
 if (altGrRegistrations < 3)
 	errors.push('the AltGr layer must still register its keys as "SC138 & SCnnn" hotkeys');
 const characters = characterKeys();

@@ -1136,6 +1136,10 @@ if ManagedHTTPWorker.handles(arguments: CommandLine.arguments) {
 	Darwin.exit(ManagedHTTPWorker.run(arguments: CommandLine.arguments))
 }
 
+if OwnedAutomationQueryWorker.handles(arguments: CommandLine.arguments) {
+	Darwin.exit(OwnedAutomationQueryWorker.run(arguments: CommandLine.arguments))
+}
+
 if OwnedProgramWorker.handles(arguments: CommandLine.arguments) {
 	Darwin.exit(OwnedProgramWorker.run(arguments: CommandLine.arguments))
 }
