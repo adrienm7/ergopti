@@ -825,6 +825,18 @@ local function arm_ack_timer(generation, expected, grace)
 		fail_generation(generation, "timeout waiting for " .. expected)
 	end)
 	if schedule_ok then timer = timer_or_err end
+	-- Preserve a newer ACK slot or retired STOP owner installed by the constructor.
+	local owns_generation = _state and (
+		(expected == "STOPPED" and generation.stop_requested
+			and _state.retiring[generation.token] == generation)
+		or (expected ~= "STOPPED" and not generation.stop_requested
+			and _state.current == generation)
+	)
+	if not owns_generation or generation.failed or generation.safe
+		or generation.ack_timer ~= nil or generation.awaiting ~= expected then
+		rollback_uncommitted_timer(timer, "Lease ACK timer")
+		return
+	end
 	generation.ack_timer = timer
 	if committed ~= true or type(timer) ~= "table" or timer.fired == true or fired_before_arm then
 		generation.ack_timer = nil
@@ -951,6 +963,13 @@ local function arm_heartbeat_timer(generation)
 		send_ping(generation, "timer")
 	end)
 	if schedule_ok then timer = timer_or_err end
+	-- The constructor may stop, fail or replace this generation before returning.
+	-- Reject its exact handle before publishing timer ownership or READY success.
+	if not _state or _state.current ~= generation
+		or generation.failed or generation.stop_requested then
+		rollback_uncommitted_timer(timer, "Lease heartbeat timer")
+		return false
+	end
 	generation.heartbeat_timer = timer
 	if committed ~= true or type(timer) ~= "table" or timer.fired == true then
 		generation.heartbeat_timer = nil
@@ -989,6 +1008,15 @@ local function schedule_heartbeat_retry(generation)
 		end
 	end)
 	if schedule_ok then timer = timer_or_err end
+	-- A stop, replacement or clean mode ACK may supersede the negative heartbeat.
+	if not _state or _state.current ~= generation
+		or generation.failed or generation.stop_requested
+		or generation.heartbeat_retry_timer ~= nil
+		or generation.phase ~= "recovering"
+		or (generation.heartbeat_transport_failures or 0) == 0 then
+		rollback_uncommitted_timer(timer, "Lease heartbeat retry timer")
+		return false
+	end
 	generation.heartbeat_retry_timer = timer
 	if committed ~= true or type(timer) ~= "table" or timer.fired == true or fired_before_arm then
 		generation.heartbeat_retry_timer = nil

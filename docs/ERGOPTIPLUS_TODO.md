@@ -3140,6 +3140,19 @@ Windows PC acceptance, delegated to the maintainer:
   cuts reject aliases and changed records; seventeen additive native filesystem
   controls require exact-source macOS execution. This diagnostic does not fix
   the first tap-hold exit73 or complete item24.
+  Native release compilation passed, but two filesystem fixture callbacks failed
+  test compilation when Swift inferred throwing closures. Explicit error capture
+  now retains the replacement and refusal assertions without allowing an error
+  to escape the nonthrowing read hook. Fresh native test compilation and all
+  filesystem executions remain required.
+  A separate passive next-record observer now uses read-only retained namespace
+  witnesses and an armed NDJSON handshake before bounded monotonic waiting.
+  It exports only one qualified new typed role record, or unobserved, with
+  currentness unknown. It performs no lease, guardian, profile or permission
+  operation. The original 146-method cohort, including its 17 filesystem cases,
+  remains whole; the observer has a separate native test class. Native execution
+  and the one-tap real-Mac experiment remain pending. A new record narrows the
+  first failing boundary; it does not prove input causality, recovery or a fix.
   Native permission UI qualification is now registered in the Swift target:
   ten frozen cases require actual WebKit DOM/bridge callbacks, visible native
   window identities, retirement, deferred log purge and scheduler cleanup.
@@ -3226,6 +3239,28 @@ The original ten native cases, probe order, refusal and deadlines remain whole.
 Exact-source native execution of this successor, the actual late-window cause
 and physical guardian/Login Items/tap-hold acceptance remain open. This is
 prepared source, not feature adoption or completion of item24.
+
+Lease timer constructors now reject candidates superseded by STOP, replacement,
+failure or a matching ACK before publishing an owned handle. The ACK admission
+preserves a newer STOP watchdog and the exact retiring generation; negative
+heartbeat retry admission also rejects a clean mode recovery. Rejected handles
+use the existing inert cleanup backlog, and timer cleanup does not establish
+STOPPED or guardian removal. Thirteen additive real-controller controls and
+the 102 unchanged lease ownership controls pass on Lua 5.4 with modeled native
+ports. Exact-source macOS execution remains required. The first tap-hold exit
+73 cause remains unknown; this ownership correction does not qualify incident recovery or complete item 24. The separate
+heartbeat cadence proposal remains on hold, and fallback policy is unchanged.
+
+The independently reviewed native cohort preparation and the failed cadence
+proposal are preserved in docs/handovers/2026-10-09-group5-native-qualification.
+The superseding eight-path CI preparation now receives the genuine published
+Group 6 helper and preserves every original control and full-suite budget.
+Its independently frozen 146-case receiver refuses empty/partial runs; 44
+independent controls, two causal malformed-summary controls and the registered
+51 portable controls pass. Strict fast wrappers preserve the authorized
+temporary deferral and default route. Actual native execution is still unrun;
+Group 3 enrollment composition and Group 1 generator coordination are pending.
+No first-tap exit 73 cause is established, and item 24 stays partial.
 
 - [~] **30.** Physical magic-key setting on all three OSes: one
   `hotstrings.magic_key_source` (a KeyboardEvent.code, `auto` by default),

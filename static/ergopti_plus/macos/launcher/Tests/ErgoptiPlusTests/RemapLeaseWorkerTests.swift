@@ -7232,7 +7232,11 @@ extension KarabinerLeaseWorkerTests {
 			let store = RemapLeaseDiagnosticStore(testingDirectory: directory, afterSingleRead: { _ in
 				reads += 1
 				XCTAssertEqual(Darwin.rename(file.path, parent.appendingPathComponent("old-record").path), 0)
-				XCTAssertNoThrow(try self.putDiagnostic(directory, data: self.diagnosticLiteral()))
+				do {
+					try self.putDiagnostic(directory, data: self.diagnosticLiteral())
+				} catch {
+					XCTFail("Owned diagnostic record replacement fixture failed.")
+				}
 			})
 			XCTAssertEqual(store.observe().state, .unobserved)
 			XCTAssertEqual(reads, 1)
@@ -7247,8 +7251,16 @@ extension KarabinerLeaseWorkerTests {
 			let store = RemapLeaseDiagnosticStore(testingDirectory: directory, afterSingleRead: { _ in
 				reads += 1
 				XCTAssertEqual(Darwin.rename(directory.path, parent.appendingPathComponent("old-directory").path), 0)
-				XCTAssertNoThrow(try self.createDiagnosticDirectory(directory))
-				XCTAssertNoThrow(try self.putDiagnostic(directory, data: self.diagnosticLiteral()))
+				do {
+					try self.createDiagnosticDirectory(directory)
+				} catch {
+					XCTFail("Owned diagnostic directory replacement fixture failed.")
+				}
+				do {
+					try self.putDiagnostic(directory, data: self.diagnosticLiteral())
+				} catch {
+					XCTFail("Owned diagnostic record replacement fixture failed.")
+				}
 			})
 			XCTAssertEqual(store.observe().state, .unobserved)
 			XCTAssertEqual(reads, 1)
