@@ -34,6 +34,8 @@ enum ManagedOllamaListenerFixture {
 	private static func retained(arguments: [String]) -> Int32 {
 		// This is a native probe, not an assumption that script FD execution
 		// implies Mach-O/dyld or proc_pidpath semantics on either architecture.
+		// Darwin executes the explicitly admitted same-vnode VREG alias; it
+		// does not execute /dev/fd (whose VNON exec is refused by the kernel).
 		let cancellation = ManagedOllamaProbeCancellation()
 		var signals: [DispatchSourceSignal] = []
 		for kind in [SIGTERM, SIGINT, SIGHUP] {
@@ -55,10 +57,33 @@ enum ManagedOllamaListenerFixture {
 			fcntl(descriptor, F_GETFL) & O_ACCMODE == O_RDONLY,
 			let argv = duplicateCStringVector([arguments[0], flag, arguments[2], arguments[3], arguments[4]]) else { return 74 }
 		defer { for case let value? in argv { free(value) } }
-		guard let envp = duplicateCStringVector(ProcessInfo.processInfo.environment.keys.sorted().map {
-			$0 + "=" + ProcessInfo.processInfo.environment[$0]!
+		// The image has not yet been admitted by the native child witness.
+		// No inherited credential or private session byte crosses this spawn.
+		let environment = ["HOME": arguments[2], "PATH": "/usr/bin:/bin", "LANG": "C", "LC_ALL": "C"]
+		guard let envp = duplicateCStringVector(environment.keys.sorted().map {
+			$0 + "=" + environment[$0]!
 		}) else { return 74 }
 		defer { for case let value? in envp { free(value) } }
+		let deadline = ProcessInfo.processInfo.systemUptime + 25
+		var sourceAlias: ManagedImageAlias?
+		func progress() throws { guard !cancellation.cancelled && ProcessInfo.processInfo.systemUptime < deadline else { throw ManagedImageAlias.Failure.admission } }
+		let alias: ManagedImageAlias
+		do {
+			let fingerprint = try ManagedImageAlias.fingerprint(descriptor, progress: progress)
+			alias = try ManagedImageAlias.acquire(retainedSource: descriptor,
+				directory: URL(fileURLWithPath: arguments[0]).deletingLastPathComponent().path,
+				device: UInt64(UInt32(bitPattern: image.st_dev)), inode: UInt64(image.st_ino), fingerprint: fingerprint,
+				register: { sourceAlias = $0 }, progress: progress)
+			guard let proof = try? JSONSerialization.data(withJSONObject: alias.proof.fields, options: [.sortedKeys]),
+				publish(proof, path: arguments[2] + "/source-alias-proof.json") else { throw ManagedImageAlias.Failure.file }
+		} catch {
+			if let sourceAlias { try? sourceAlias.retire() }; return failure(stage: 3, error: EIO)
+		}
+		if ProcessInfo.processInfo.environment["ERGOPTI_FIXTURE_UNLINK_ORIGINAL_IMAGE"] == "1" {
+			guard Darwin.unlink(arguments[0]) == 0 else { try? alias.retire(); return failure(stage: 3, error: errno) }
+		}
+		var child: pid_t = 0, childReaped = false, aliasRetired = false
+		defer { if !aliasRetired && (child == 0 || childReaped) { try? alias.retire() } }
 		var actions: posix_spawn_file_actions_t?
 		guard posix_spawn_file_actions_init(&actions) == 0 else { return 74 }
 		defer { posix_spawn_file_actions_destroy(&actions) }
@@ -71,19 +96,17 @@ enum ManagedOllamaListenerFixture {
 		for kind in [SIGTERM, SIGINT, SIGHUP] { sigaddset(&defaults, kind) }
 		guard posix_spawnattr_setsigdefault(&attributes, &defaults) == 0,
 			posix_spawnattr_setflags(&attributes, Int16(POSIX_SPAWN_CLOEXEC_DEFAULT | POSIX_SPAWN_SETSIGDEF)) == 0 else { return 74 }
-		var child: pid_t = 0
 		var argumentsVector = argv, environmentVector = envp
 		let status = argumentsVector.withUnsafeMutableBufferPointer { arguments in
 			environmentVector.withUnsafeMutableBufferPointer { environment in
-				posix_spawn(&child, "/dev/fd/3", &actions, &attributes, arguments.baseAddress, environment.baseAddress)
+				posix_spawn(&child, alias.executable, &actions, &attributes, arguments.baseAddress, environment.baseAddress)
 			}
 		}
-		guard status == 0, child > 0 else { return failure(stage: 2, error: status) }
-		let deadline = ProcessInfo.processInfo.systemUptime + 25
+		guard status == 0, child > 0 else { try? alias.retire(); return failure(stage: 2, error: status) }
 		var observation: Int32 = 0, timedOut = false
 		while true {
 			let waited = waitpid(child, &observation, WNOHANG)
-			if waited == child { break }
+			if waited == child { childReaped = true; break }
 			if waited < 0 && errno == EINTR { continue }
 			guard waited == 0 else { return 74 }
 			if !timedOut && (cancellation.cancelled || ProcessInfo.processInfo.systemUptime >= deadline) {
@@ -93,10 +116,12 @@ enum ManagedOllamaListenerFixture {
 			usleep(10_000)
 		}
 		guard Darwin.close(descriptor) == 0 else { return 74 }; retained = false
+		do { try alias.retire(); aliasRetired = true } catch { return failure(stage: 4, error: EIO) }
 		let exit = (observation & 0x7f) == 0 ? (observation >> 8) & 0xff : 128 + (observation & 0x7f)
 		guard let receipt = try? JSONSerialization.data(withJSONObject: [
 			"child": child, "parent": getpid(), "device": String(UInt32(bitPattern: image.st_dev)),
 			"inode": String(UInt64(image.st_ino)), "read_only": true, "reaped": true,
+			"source_execution": "owned-source-alias",
 			"descriptor_closed": true, "exit_status": exit,
 		], options: [.sortedKeys]), publish(receipt, path: arguments[2] + "/retained-image.json") else { return 74 }
 		if timedOut || exit != 0 {

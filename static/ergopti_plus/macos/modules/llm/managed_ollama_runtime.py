@@ -35,6 +35,7 @@ BOOTSTRAP = load(
     "ergopti_managed_ollama_bootstrap", DRIVER / "modules/llm/managed_bootstrap_http.py"
 )
 PROXY = load("ergopti_managed_ollama_proxy", SHARED / "python/network_proxy_policy.py")
+ALIASES = load("ergopti_managed_source_alias", SHARED / "python/managed_source_alias.py")
 
 
 class CurlResponse:
@@ -242,7 +243,14 @@ class CurlResponse:
 
 
 def runtime_request(
-    url, *, headers, timeout, idle_timeout, direct, connect_timeout, minimum_bytes_per_second
+    url,
+    *,
+    headers,
+    timeout,
+    idle_timeout,
+    direct,
+    connect_timeout,
+    minimum_bytes_per_second,
 ):
     mode, proxy = PROXY.ProxyPolicy().route(url, dict(os.environ))
     if mode == "environment":
@@ -257,7 +265,11 @@ def runtime_request(
             minimum_bytes_per_second=minimum_bytes_per_second,
         )
     return BOOTSTRAP._native_request(
-        url, headers=headers, timeout=timeout, idle_timeout=idle_timeout, direct=mode == "direct"
+        url,
+        headers=headers,
+        timeout=timeout,
+        idle_timeout=idle_timeout,
+        direct=mode == "direct",
     )
 
 
@@ -281,8 +293,49 @@ def owned_directory():
     return Path(home) / "Library/Application Support/Ergopti/ollama-native-http"
 
 
-def native_verify(root, contract, asset, expected_receipt, deadline):
-    binary = POLICY.verify_directory(root, contract, asset, expected_receipt)
+def native_verify(
+    root,
+    contract,
+    asset,
+    expected_receipt,
+    deadline,
+    *,
+    source_alias=None,
+    source_identity=None,
+):
+    if source_alias is None:
+        if source_identity is not None:
+            raise POLICY.RuntimeRefusal("runtime")
+        return _native_verify(root, contract, asset, expected_receipt, deadline)
+
+    def progress():
+        if deadline - time.monotonic() <= 0:
+            raise POLICY.RuntimeRefusal("deadline")
+
+    try:
+        with ALIASES.AliasContext(
+            root,
+            source_alias,
+            source_identity,
+            asset["binary_sha256"],
+            progress=progress,
+        ) as alias_context:
+            return _native_verify(
+                root,
+                contract,
+                asset,
+                expected_receipt,
+                deadline,
+                alias_context=alias_context,
+            )
+    except ALIASES.AliasRefusal as error:
+        raise POLICY.RuntimeRefusal("runtime") from error
+
+
+def _native_verify(root, contract, asset, expected_receipt, deadline, *, alias_context=None):
+    binary = POLICY.verify_directory(
+        root, contract, asset, expected_receipt, alias_context=alias_context
+    )
     remaining = deadline - time.monotonic()
     if remaining <= 0:
         raise POLICY.RuntimeRefusal("deadline")
@@ -315,7 +368,11 @@ def native_verify(root, contract, asset, expected_receipt, deadline):
 
 
 def install(
-    deadline, idle_timeout, fixture_url=None, connect_timeout=None, minimum_bytes_per_second=None
+    deadline,
+    idle_timeout,
+    fixture_url=None,
+    connect_timeout=None,
+    minimum_bytes_per_second=None,
 ):
     """Download actual catalogue bytes and publish only a new owned directory.
 
@@ -366,7 +423,13 @@ def install(
             minimum_bytes_per_second=minimum_bytes_per_second,
         )
         BOOTSTRAP.download(
-            url, archive, asset["sha256"], asset["bytes"], deadline, idle_timeout, request=request
+            url,
+            archive,
+            asset["sha256"],
+            asset["bytes"],
+            deadline,
+            idle_timeout,
+            request=request,
         )
         stage = root / "runtime"
         stage.mkdir(mode=0o700)
@@ -456,7 +519,11 @@ if __name__ == "__main__":
 
     if any(
         not math.isfinite(value) or value <= 0
-        for value in (arguments.timeout, arguments.idle_timeout, arguments.connect_timeout)
+        for value in (
+            arguments.timeout,
+            arguments.idle_timeout,
+            arguments.connect_timeout,
+        )
     ):
         raise SystemExit(64)
     if arguments.minimum_bytes_per_second <= 0:

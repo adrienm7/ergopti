@@ -642,10 +642,17 @@ function checkManagedOllamaNative(body) {
 		body,
 		'Qualify actual SDK accepted-owner and deadline XCTest controls'
 	);
-	assert.match(listener, /--filter 'ManagedOllamaAPIWorkerTests\|ManagedPTYWorkerTests'/);
+	assert.match(
+		listener,
+		/--filter 'ManagedOllamaAPIWorkerTests\|ManagedPTYWorkerTests\|ManagedImageAliasTests\|OwnedSuspendedImageTests\|ManagedListenerPathIdentityTests'/
+	);
 	assert.match(listener, /Executed 12 tests, with 0 failures/);
 	assert.match(listener, /Executed 11 tests, with 0 failures/);
 	assert.match(listener, /ManagedPTYWorkerTests/);
+	assert.match(listener, /Executed 4 tests, with 0 failures/);
+	assert.match(listener, /Executed 6 tests, with 0 failures/);
+	assert.match(listener, /Executed 2 tests, with 0 failures/);
+	assert.match(listener, /Executed 35 tests, with 0 failures/);
 	assert.equal(pipeline.stepField(listener, 'continue-on-error'), null);
 	const receive = pipeline.step(
 		body,

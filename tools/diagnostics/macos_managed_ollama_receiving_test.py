@@ -7,6 +7,7 @@ import importlib.util
 import json
 import os
 from pathlib import Path
+import signal
 import ssl
 import unittest
 import tempfile
@@ -164,6 +165,16 @@ class RetainedSourceControls(unittest.TestCase):
                 ROOT / "static/ergopti_plus/_shared/python/managed_ollama_runtime.py",
             ),
         )
+
+        def make_empty_session(deadline, port):
+            path = create_session(deadline, port)
+            return SimpleNamespace(
+                path=path,
+                data=self.session | {"port": str(port)},
+                retire=lambda: None,
+            )
+
+        subject.make_empty_session = make_empty_session
         original_descriptor = os.open(self.binary, os.O_RDONLY)
         try:
             with self.assertRaisesRegex(RuntimeError, "actual_retained_source_identity"):
@@ -187,6 +198,108 @@ class RetainedSourceControls(unittest.TestCase):
                 RECEIVING.check_retained_source(self.binary, descriptor, self.session)
         finally:
             os.close(descriptor)
+
+    def test_duplicate_start_cannot_overwrite_live_session_or_source_owner(self):
+        subject = RECEIVING.Receiver.__new__(RECEIVING.Receiver)
+        live = SimpleNamespace(physically_retired=False)
+        subject.daemon = live
+        subject.make_empty_session = Mock()
+        old_session = SimpleNamespace(path=self.root / "existing-session")
+        subject.session_owner = old_session
+        descriptor = os.open(self.binary, os.O_RDONLY)
+        subject.binary_descriptor = descriptor
+        try:
+            with self.assertRaisesRegex(RuntimeError, "actual_receiver_start_state"):
+                subject.start()
+            subject.make_empty_session.assert_not_called()
+            self.assertIs(subject.session_owner, old_session)
+            self.assertIs(subject.daemon, live)
+            self.assertEqual(subject.binary_descriptor, descriptor)
+            self.assertIsNotNone(os.fstat(descriptor))
+        finally:
+            os.close(descriptor)
+
+    def test_real_source_close_sigint_keeps_debt_without_closing_reused_fd(self):
+        subject = RECEIVING.Receiver.__new__(RECEIVING.Receiver)
+        subject.daemon = None
+        descriptor = os.open(self.binary, os.O_RDONLY)
+        subject.binary_descriptor = descriptor
+        actual_close = os.close
+        reused = None
+
+        def interrupted(value):
+            nonlocal reused
+            actual_close(value)
+            reused = os.open(self.binary, os.O_RDONLY)
+            self.assertEqual(reused, value)
+            signal.raise_signal(signal.SIGINT)
+
+        try:
+            with patch.object(RECEIVING.os, "close", side_effect=interrupted):
+                with self.assertRaisesRegex(RuntimeError, "actual_source_close_debt"):
+                    subject.stop()
+            self.assertIsNone(subject.binary_descriptor)
+            self.assertIsInstance(subject._source_close_debt, KeyboardInterrupt)
+            self.assertIsNotNone(os.fstat(reused))
+            with self.assertRaisesRegex(RuntimeError, "actual_source_close_debt"):
+                subject.stop()
+            self.assertIsNotNone(os.fstat(reused))
+        finally:
+            if reused is not None:
+                actual_close(reused)
+
+
+class BoundAliasOwnerControls(unittest.TestCase):
+    def setUp(self):
+        self.api = SimpleNamespace(discover=Mock(), open_request=Mock())
+        self.expected = {
+            "pid": 123,
+            "uid": os.geteuid(),
+            "start_seconds": "100",
+            "start_microseconds": "250",
+            "device": "1",
+            "inode": "9007199254740993",
+        }
+        self.proof = {"version": 1, "nonce": "a" * 32}
+        self.ports = RECEIVING.BoundAliasPorts(self.api, self.proof, self.expected)
+
+    def test_zero_byte_discovery_binds_exact_acquired_child_before_hmac(self):
+        self.api.discover.return_value = dict(self.expected)
+        observed = self.ports.discover("/owned/ollama", "1", "9007199254740993", 11434, 5, 60)
+        self.assertEqual(observed, self.expected)
+        self.api.discover.assert_called_once_with(
+            "/owned/ollama",
+            "1",
+            "9007199254740993",
+            11434,
+            5,
+            60,
+            source_alias=self.proof,
+        )
+        self.api.open_request.assert_not_called()
+
+    def test_foreign_daemon_with_same_catalogue_inode_refuses_before_secret_request(self):
+        self.api.discover.return_value = self.expected | {"pid": 124}
+        with self.assertRaisesRegex(RuntimeError, "actual_acquired_daemon_listener"):
+            self.ports.discover("/owned/ollama", "1", "9007199254740993", 11434, 5, 60)
+        self.api.open_request.assert_not_called()
+
+    def test_private_api_request_cannot_replace_original_child_start_tuple(self):
+        with self.assertRaisesRegex(RuntimeError, "actual_acquired_daemon_listener"):
+            self.ports.open_request(
+                "/owned/ollama",
+                "1",
+                "9007199254740993",
+                11434,
+                self.expected | {"start_seconds": "101"},
+                "GET",
+                "/admission",
+                [],
+                "",
+                5,
+                60,
+            )
+        self.api.open_request.assert_not_called()
 
 
 class ActualPeerReceiving(unittest.TestCase):

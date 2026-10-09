@@ -19,9 +19,24 @@ ENGINE = importlib.util.module_from_spec(specification)
 sys.modules[specification.name] = ENGINE
 specification.loader.exec_module(ENGINE)
 
-LISTENER_FIELDS = {"pid", "uid", "start_seconds", "start_microseconds", "device", "inode"}
+LISTENER_FIELDS = {
+    "pid",
+    "uid",
+    "start_seconds",
+    "start_microseconds",
+    "device",
+    "inode",
+}
 REASONS = frozenset(
-    ("complete", "admission", "protocol", "deadline", "cancelled", "connect", "unavailable")
+    (
+        "complete",
+        "admission",
+        "protocol",
+        "deadline",
+        "cancelled",
+        "connect",
+        "unavailable",
+    )
 )
 
 
@@ -55,6 +70,21 @@ def listener(value):
     return value
 
 
+def source_alias_proof(value):
+    """Receive only the canonical optional alias schema; no filesystem admission here."""
+    policy_path = Path(__file__).resolve().parents[3] / "_shared/python/managed_source_alias.py"
+    try:
+        spec = importlib.util.spec_from_file_location("ergopti_ollama_alias_schema", policy_path)
+        policy = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(policy)
+    except (OSError, ValueError, TypeError):
+        raise ENGINE.NativeHTTPError("unavailable") from None
+    try:
+        return policy.proof_fields(value)
+    except policy.AliasRefusal:
+        raise ENGINE.NativeHTTPError("protocol") from None
+
+
 class NativeOllamaResponse(ENGINE.NativeHTTPResponse):
     _terminal_reasons = REASONS
 
@@ -71,6 +101,8 @@ class NativeOllamaResponse(ENGINE.NativeHTTPResponse):
         path=None,
         headers=(),
         body="",
+        *,
+        source_alias=None,
     ):
         if (
             type(port) is not int
@@ -173,6 +205,8 @@ class NativeOllamaResponse(ENGINE.NativeHTTPResponse):
                 str(request["idle_ms"]),
                 str(milliseconds) if milliseconds is not None else "none",
             ]
+        if source_alias is not None:
+            request["source_alias"] = source_alias_proof(source_alias)
         # These roles read one LF-terminated JSON line. The generic HTTP role's
         # EOF framing remains unchanged in the shared process owner.
         encoded = (
@@ -221,13 +255,33 @@ class NativeOllamaResponse(ENGINE.NativeHTTPResponse):
         return dict(self._terminal_value["listener"])
 
 
-def discover(executable, device, inode, port, timeout, idle_timeout):
-    with NativeOllamaResponse(executable, device, inode, port, timeout, idle_timeout) as response:
+def discover(executable, device, inode, port, timeout, idle_timeout, *, source_alias=None):
+    with NativeOllamaResponse(
+        executable,
+        device,
+        inode,
+        port,
+        timeout,
+        idle_timeout,
+        source_alias=source_alias,
+    ) as response:
         return response.listener
 
 
 def open_request(
-    executable, device, inode, port, expected, method, path, headers, body, timeout, idle_timeout
+    executable,
+    device,
+    inode,
+    port,
+    expected,
+    method,
+    path,
+    headers,
+    body,
+    timeout,
+    idle_timeout,
+    *,
+    source_alias=None,
 ):
     return NativeOllamaResponse(
         executable,
@@ -241,4 +295,5 @@ def open_request(
         path,
         headers,
         body,
+        source_alias=source_alias,
     )

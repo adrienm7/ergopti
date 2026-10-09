@@ -19,7 +19,7 @@ private final class ManagedOllamaTestSession {
 	let device: String
 	let inode: String
 	private var closed = false
-	init(mode: String = "length", connections: Int = 2, foreign: Bool = false, retainedMachO: Bool = false) throws {
+	init(mode: String = "length", connections: Int = 2, foreign: Bool = false, retainedMachO: Bool = false, unlinkOriginal: Bool = false) throws {
 		let manager = FileManager.default
 		root = manager.temporaryDirectory.appendingPathComponent("ergopti-native-listener-" + UUID().uuidString).resolvingSymlinksInPath()
 		runtime = root.appendingPathComponent("Library/Application Support/Ergopti/ollama-native-http/ollama")
@@ -37,7 +37,9 @@ private final class ManagedOllamaTestSession {
 		device = String(UInt32(bitPattern: native.st_dev)); inode = String(UInt64(native.st_ino))
 		peer.executableURL = foreign ? original : runtime
 		peer.arguments = [retainedMachO ? ManagedOllamaListenerFixture.retainedFlag : ManagedOllamaListenerFixture.flag, root.path, mode, String(connections)]
-		var environment = ProcessInfo.processInfo.environment; environment["HOME"] = root.path; peer.environment = environment
+		var environment = ProcessInfo.processInfo.environment; environment["HOME"] = root.path
+		if unlinkOriginal { environment["ERGOPTI_FIXTURE_UNLINK_ORIGINAL_IMAGE"] = "1" }
+		peer.environment = environment
 		peer.standardInput = FileHandle.nullDevice; peer.standardOutput = FileHandle.nullDevice; peer.standardError = peerDiagnostics
 		try peer.run(); try peerDiagnostics.fileHandleForWriting.close()
 		let deadline = ProcessInfo.processInfo.systemUptime + 5
@@ -66,8 +68,11 @@ private final class ManagedOllamaTestSession {
 		if !closed { try? FileManager.default.removeItem(at: root) }
 	}
 	func common() -> [String: Any] {
-		return ["version": 1, "executable": runtime.path, "device": device, "inode": inode,
+		var fields: [String: Any] = ["version": 1, "executable": runtime.path, "device": device, "inode": inode,
 			"port": profile["port"]!, "timeout_ms": 5_000]
+		if let bytes = try? Data(contentsOf: root.appendingPathComponent("source-alias-proof.json")),
+			let proof = try? JSONSerialization.jsonObject(with: bytes) as? [String: Any] { fields["source_alias"] = proof }
+		return fields
 	}
 	func request(identity: [String: Any], post: Bool = false) -> [String: Any] {
 		var fields = common()
@@ -84,14 +89,20 @@ private final class ManagedOllamaTestSession {
 		if post { fields["headers"] = (fields["headers"] as! [[String]]) + [["X-Ergopti-Native-Operation", String(repeating: "c", count: 32)]] }
 		return fields
 	}
-	func worker(_ fields: [String: Any], probe: Bool) throws -> (Int32, [(UInt8, Data)]) {
+	func worker(_ fields: [String: Any], probe: Bool, homeOverride: String? = nil) throws -> (Int32, [(UInt8, Data)]) {
 		let process = Process(), input = Pipe(), output = Pipe(), diagnostics = Pipe()
 		process.executableURL = original
 		if probe { process.arguments = [ManagedOllamaAPIWorker.probeFlag, "5000"] } else {
 			let absolute = fields["timeout_ms"] is NSNull ? "none" : String((fields["timeout_ms"] as! NSNumber).intValue)
 			process.arguments = [ManagedOllamaAPIWorker.requestFlag, String((fields["idle_ms"] as! NSNumber).intValue), absolute]
 		}
-		var environment = ProcessInfo.processInfo.environment; environment["HOME"] = root.path
+		var environment = ProcessInfo.processInfo.environment
+		#if ERGOPTI_GUARDIAN_TEST_SUPPORT
+		environment["HOME"] = homeOverride ?? root.path
+		#else
+		guard homeOverride == nil else { throw Failure.prerequisite }
+		environment["HOME"] = root.path
+		#endif
 		environment["ERGOPTI_MANAGED_LISTENER_DIAGNOSTICS"] = "1"
 		if let knownPeer = profile["pid"] as? NSNumber, knownPeer.int64Value > 0, knownPeer.int64Value <= Int64(Int32.max) {
 			environment["ERGOPTI_MANAGED_LISTENER_DIAGNOSTIC_PID"] = String(knownPeer.int64Value)
@@ -294,3 +305,163 @@ final class ManagedOllamaAPIWorkerTests: XCTestCase {
 		try session.finish()
 	}
 }
+
+final class ManagedImageAliasTests: XCTestCase {
+	func testActualRetainedVnodeExecAndAcceptedOwnerSurviveOriginalUnlink() throws {
+		let session = try ManagedOllamaTestSession(retainedMachO: true, unlinkOriginal: true)
+		XCTAssertFalse(FileManager.default.fileExists(atPath: session.runtime.path))
+		let (status, frames) = try session.worker(session.common(), probe: true)
+		XCTAssertEqual(status, 0); XCTAssertEqual(frames.map { $0.0 }, [67])
+		let receipt = try XCTUnwrap(JSONSerialization.jsonObject(with: try XCTUnwrap(frames.last).1) as? [String: Any])
+		XCTAssertEqual(receipt["success"] as? Bool, true)
+		let identity = try XCTUnwrap(receipt["listener"] as? [String: Any])
+		XCTAssertEqual(identity["inode"] as? String, session.inode); XCTAssertEqual(identity["device"] as? String, session.device)
+		XCTAssertEqual((identity["pid"] as? NSNumber)?.intValue, (session.profile["pid"] as? NSNumber)?.intValue)
+		XCTAssertEqual(try session.captured(0), Data())
+		let (requestStatus, response) = try session.worker(session.request(identity: identity), probe: false)
+		XCTAssertEqual(requestStatus, 0)
+		XCTAssertEqual(response.filter { $0.0 == 68 }.reduce(Data()) { $0 + $1.1 }, Data("oneTWO".utf8))
+		_ = try session.captured(1); try session.finish()
+	}
+	func testUnknownAliasLeaseCannotAuthorizeAnyPrivateHeader() throws {
+		let session = try ManagedOllamaTestSession(connections: 1, retainedMachO: true)
+		var fields = session.common()
+		var proof = try XCTUnwrap(fields["source_alias"] as? [String: Any]); proof["nonce"] = String(repeating: "f", count: 32)
+		fields["source_alias"] = proof
+		let (status, frames) = try session.worker(fields, probe: true)
+		XCTAssertEqual(status, 74); XCTAssertEqual(frames.map { $0.0 }, [67])
+		let receipt = try XCTUnwrap(JSONSerialization.jsonObject(with: try XCTUnwrap(frames.last).1) as? [String: Any])
+		XCTAssertEqual(receipt["success"] as? Bool, false); XCTAssertEqual(receipt["reason"] as? String, "admission")
+		XCTAssertTrue(receipt["listener"] is NSNull); XCTAssertEqual(try session.captured(0), Data())
+		try session.finish()
+	}
+	private func aliasSource() throws -> (URL, Int32, UInt64, UInt64, String) {
+		let manager = FileManager.default
+		let root = manager.temporaryDirectory.appendingPathComponent("ergopti-alias-close-" + UUID().uuidString)
+		try manager.createDirectory(at: root, withIntermediateDirectories: false, attributes: [.posixPermissions: 0o700])
+		let directory = root.appendingPathComponent("runtime")
+		try manager.createDirectory(at: directory, withIntermediateDirectories: false, attributes: [.posixPermissions: 0o755])
+		let source = directory.appendingPathComponent("ollama")
+		try Data("independent retained source".utf8).write(to: source)
+		try manager.setAttributes([.posixPermissions: 0o755], ofItemAtPath: source.path)
+		let descriptor = Darwin.open(source.path, O_RDONLY | O_NOFOLLOW | O_CLOEXEC)
+		guard descriptor >= 0 else { throw ManagedImageAlias.Failure.file }
+		var identity = stat()
+		guard fstat(descriptor, &identity) == 0 else { _ = Darwin.close(descriptor); throw ManagedImageAlias.Failure.file }
+		let fingerprint = try ManagedImageAlias.fingerprint(descriptor, progress: {})
+		return (directory, descriptor, UInt64(UInt32(bitPattern: identity.st_dev)), UInt64(identity.st_ino), fingerprint)
+	}
+	func testActualUncertainCloseCannotRecloseAReusedForeignDescriptor() throws {
+		let (directory, source, device, inode, fingerprint) = try aliasSource()
+		defer { _ = Darwin.close(source); try? FileManager.default.removeItem(at: directory.deletingLastPathComponent()) }
+		let alias = try ManagedImageAlias.acquire(retainedSource: source, directory: directory.path,
+			device: device, inode: inode, fingerprint: fingerprint, register: { _ in }, progress: {})
+		let foreign = directory.appendingPathComponent("foreign")
+		try Data("foreign descriptor stays open".utf8).write(to: foreign)
+		var reused: Int32 = -1, attempts = 0
+		defer { if reused >= 0 { _ = Darwin.close(reused) } }
+		alias.receivingMarkerCloser = { descriptor in
+			attempts += 1
+			XCTAssertEqual(Darwin.close(descriptor), 0)
+			let replacement = Darwin.open(foreign.path, O_RDONLY | O_CLOEXEC)
+			XCTAssertGreaterThanOrEqual(replacement, 0)
+			if replacement != descriptor {
+				XCTAssertEqual(dup2(replacement, descriptor), descriptor); _ = Darwin.close(replacement)
+			}
+			reused = descriptor; errno = EINTR; return -1
+		}
+		XCTAssertThrowsError(try alias.retire())
+		XCTAssertThrowsError(try alias.retire())
+		XCTAssertEqual(attempts, 1)
+		var bytes = [UInt8](repeating: 0, count: 128)
+		let count = pread(reused, &bytes, bytes.count, 0)
+		XCTAssertGreaterThan(count, 0)
+		if count > 0 { XCTAssertEqual(Data(bytes.prefix(count)), Data("foreign descriptor stays open".utf8)) }
+	}
+	func testActualAcquisitionFailurePreservesPrimaryAndCleanupDebt() throws {
+		enum Primary: Error { case injected }
+		let (directory, source, device, inode, fingerprint) = try aliasSource()
+		defer { _ = Darwin.close(source); try? FileManager.default.removeItem(at: directory.deletingLastPathComponent()) }
+		var registered: ManagedImageAlias?, attempts = 0
+		do {
+			_ = try ManagedImageAlias.acquire(retainedSource: source, directory: directory.path,
+				device: device, inode: inode, fingerprint: fingerprint, register: { value in
+					registered = value
+					value.receivingMarkerCloser = { descriptor in
+						attempts += 1; XCTAssertEqual(Darwin.close(descriptor), 0); errno = EINTR; return -1
+					}
+				}, progress: { if registered?.proof != nil { throw Primary.injected } })
+			XCTFail("The actual marker-write boundary must preserve the injected primary failure")
+		} catch ManagedImageAlias.Failure.operation(let primary, let cleanup) {
+			guard let primary = primary as? Primary, case .injected = primary else { return XCTFail("Primary failure was replaced") }
+			guard let cleanup = cleanup as? ManagedImageAlias.Failure, case .cleanup = cleanup else { return XCTFail("Cleanup debt was lost") }
+		} catch { XCTFail("Primary and cleanup failures must remain distinct") }
+		XCTAssertEqual(attempts, 1)
+		let owner = try XCTUnwrap(registered)
+		XCTAssertThrowsError(try owner.retire()); XCTAssertEqual(attempts, 1)
+	}
+}
+
+#if ERGOPTI_GUARDIAN_TEST_SUPPORT
+// An actual /var alias must retain every SDK witness, not just a path match.
+final class ManagedListenerPathIdentityTests: XCTestCase {
+	private func varHome(_ session: ManagedOllamaTestSession) throws -> String {
+		let resolved = session.root.path.withCString { Darwin.realpath($0, nil) }
+		guard let resolved else { throw ManagedOllamaTestSession.Failure.prerequisite }
+		defer { Darwin.free(resolved) }
+		let physical = String(cString: resolved)
+		XCTAssertTrue(physical.hasPrefix("/private/var/"))
+		guard physical.hasPrefix("/private/var/") else { throw ManagedOllamaTestSession.Failure.prerequisite }
+		let lexical = String(physical.dropFirst("/private".count))
+		XCTAssertTrue(lexical.hasPrefix("/var/")); XCTAssertNotEqual(lexical, physical)
+		var actual = stat(), aliased = stat()
+		guard lstat(session.runtime.path, &actual) == 0,
+			lstat(lexical + "/Library/Application Support/Ergopti/ollama-native-http/ollama", &aliased) == 0
+		else { throw ManagedOllamaTestSession.Failure.prerequisite }
+		XCTAssertEqual(actual.st_dev, aliased.st_dev); XCTAssertEqual(actual.st_ino, aliased.st_ino)
+		XCTAssertEqual(actual.st_uid, geteuid()); XCTAssertEqual(aliased.st_uid, geteuid())
+		return lexical
+	}
+	private func terminal(_ frames: [(UInt8, Data)]) throws -> [String: Any] {
+		XCTAssertEqual(frames.filter { $0.0 == 67 }.count, 1)
+		let last = try XCTUnwrap(frames.last); XCTAssertEqual(last.0, 67)
+		return try XCTUnwrap(JSONSerialization.jsonObject(with: last.1) as? [String: Any])
+	}
+	func testActualVarAliasRetainsSDKAcceptedOwnerBeforePrivateGET() throws {
+		let session = try ManagedOllamaTestSession(), home = try varHome(session)
+		let executable = home + "/Library/Application Support/Ergopti/ollama-native-http/ollama"
+		var discovery = session.common(); discovery["executable"] = executable
+		let (probeStatus, probeFrames) = try session.worker(discovery, probe: true, homeOverride: home)
+		XCTAssertEqual(probeStatus, 0); XCTAssertEqual(probeFrames.map { $0.0 }, [67])
+		let observed = try terminal(probeFrames); XCTAssertEqual(observed["success"] as? Bool, true)
+		let identity = try XCTUnwrap(observed["listener"] as? [String: Any])
+		XCTAssertEqual((identity["pid"] as? NSNumber)?.int32Value, session.peer.processIdentifier)
+		XCTAssertEqual((identity["uid"] as? NSNumber)?.uint32Value, geteuid())
+		XCTAssertEqual(identity["device"] as? String, session.device); XCTAssertEqual(identity["inode"] as? String, session.inode)
+		XCTAssertEqual(try session.captured(0), Data(), "Discovery cannot send private HTTP bytes")
+		var request = session.request(identity: identity); request["executable"] = executable
+		let (status, frames) = try session.worker(request, probe: false, homeOverride: home)
+		XCTAssertEqual(status, 0); XCTAssertEqual(frames.first?.0, 72)
+		XCTAssertEqual(frames.filter { $0.0 == 68 }.reduce(Data()) { $0 + $1.1 }, Data("oneTWO".utf8))
+		let completed = try terminal(frames); XCTAssertEqual(completed["success"] as? Bool, true)
+		let returned = try XCTUnwrap(completed["listener"] as? [String: Any])
+		XCTAssertEqual(NSDictionary(dictionary: returned), NSDictionary(dictionary: identity))
+		let captured = String(decoding: try session.captured(1), as: UTF8.self)
+		XCTAssertTrue(captured.hasPrefix("GET /api/ergopti-native-http-admission HTTP/1.1\r\n"))
+		XCTAssertTrue(captured.contains("X-Ergopti-Native-Session: " + String(repeating: "a", count: 64)))
+		try session.finish()
+	}
+	func testActualVarAliasCannotSupplyWrongOriginalInodeBeforeAnyHTTP() throws {
+		let session = try ManagedOllamaTestSession(connections: 1), home = try varHome(session)
+		XCTAssertNotEqual(session.inode, "1")
+		var request = session.common()
+		request["executable"] = home + "/Library/Application Support/Ergopti/ollama-native-http/ollama"
+		request["inode"] = "1"
+		let (status, frames) = try session.worker(request, probe: true, homeOverride: home)
+		XCTAssertNotEqual(status, 0); XCTAssertEqual(frames.map { $0.0 }, [67])
+		let refused = try terminal(frames); XCTAssertEqual(refused["success"] as? Bool, false)
+		XCTAssertTrue(refused["listener"] is NSNull)
+		XCTAssertEqual(try session.captured(0), Data()); try session.finish()
+	}
+}
+#endif

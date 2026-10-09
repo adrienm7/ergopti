@@ -15,6 +15,7 @@ import json
 import os
 from pathlib import Path
 import re
+import secrets
 import shutil
 import socket
 import socketserver
@@ -44,6 +45,12 @@ def load(name, path):
     sys.modules[name] = module
     specification.loader.exec_module(module)
     return module
+
+
+QUALIFIED = load(
+    "ollama_receiver_outgoing_qualification",
+    Path(__file__).with_name("macos_qualified_outgoing_worker.py"),
+)
 
 
 def digest(path):
@@ -258,6 +265,22 @@ class Registry:
         request.close_connection = True
 
 
+class BoundAliasPorts:
+    """Zero-byte discovery must match the acquired child before any HMAC request."""
+
+    def __init__(self, api, proof, expected):
+        self.api, self.proof, self.expected = api, dict(proof), dict(expected)
+
+    def discover(self, *arguments):
+        result = self.api.discover(*arguments, source_alias=self.proof)
+        require(result == self.expected, "actual_acquired_daemon_listener")
+        return result
+
+    def open_request(self, *arguments):
+        require(arguments[4] == self.expected, "actual_acquired_daemon_listener")
+        return self.api.open_request(*arguments, source_alias=self.proof)
+
+
 class Receiver:
     def __init__(self, options):
         self.options = options
@@ -271,6 +294,10 @@ class Receiver:
         os.chmod(self.work, 0o700)
         self.fixture = None
         self.daemon = None
+        self.alias_owner = None
+        self.session_owner = None
+        self.outgoing_context = None
+        self._source_close_debt = None
         self.source_hashes = {}
         self.input_hashes = {
             name: digest(getattr(options, name)) for name in ("archive", "catalogue", "launcher")
@@ -323,6 +350,9 @@ class Receiver:
             "_shared/python/network_proxy_policy.py",
             "_shared/modules/llm/managed_ollama_runtime.json",
             "_shared/python/managed_ollama_runtime.py",
+            "_shared/python/managed_source_alias.py",
+            "macos/platform/source_alias_owner.py",
+            "macos/platform/suspended_image_owner.py",
             "_shared/python/managed_ollama_pull.py",
             "_shared/modules/llm/managed_python_release.json",
             "macos/platform/network/native_http.py",
@@ -349,6 +379,11 @@ class Receiver:
         }
 
     def prepare(self):
+        require(
+            getattr(self, "fixture", None) is None
+            and getattr(self, "outgoing_context", None) is None,
+            "actual_receiver_duplicate_prepare",
+        )
         wire = load(
             "ollama_real_native_peers", self.mac / "tests/support/native_http_wire_fixture.py"
         )
@@ -376,6 +411,8 @@ class Receiver:
             "CPOSIXCompatibility.h",
             "OwnedProgramCompatibility.h",
             "LoopbackListenerCompatibility.h",
+            "OwnedImageAliasCompatibility.h",
+            "OwnedSuspendedImageCompatibility.h",
         ):
             relative = (
                 "static/ergopti_plus/macos/launcher/Sources/CPOSIXCompatibility/include/" + name
@@ -393,7 +430,26 @@ class Receiver:
             "}\n",
             encoding="utf-8",
         )
-        self.fixture._command(
+        inputs = [
+            (self.root / relative, compatibility_module / Path(relative).name, frozen)
+            for relative, frozen in self.source_hashes.items()
+            if relative.startswith(
+                "static/ergopti_plus/macos/launcher/Sources/CPOSIXCompatibility/include/"
+            )
+        ]
+        for relative, destination in [
+            (
+                "static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/ManagedHTTPWorker.swift",
+                worker,
+            ),
+            ("static/ergopti_plus/macos/tests/support/native_http_fixture_main.swift", main),
+        ]:
+            inputs.append((self.root / relative, destination, self.source_hashes[relative]))
+        module_map = compatibility_module / "module.modulemap"
+        inputs.append((module_map, module_map, digest(module_map)))
+        self.outgoing_context = QUALIFIED.OwnedOutgoingWorkerQualification.build(
+            http_binary,
+            inputs,
             [
                 "/usr/bin/xcrun",
                 "swiftc",
@@ -407,7 +463,8 @@ class Receiver:
                 "-o",
                 str(http_binary),
             ],
-            timeout=90,
+            self.fixture._command,
+            register=lambda owner: setattr(self, "outgoing_context", owner),
         )
         api_binary = self.api_app / "Contents/MacOS/ErgoptiPlus"
         api_binary.parent.mkdir(parents=True)
@@ -415,7 +472,7 @@ class Receiver:
         frameworks = self.api_app / "Contents/Frameworks"
         frameworks.mkdir()
         shutil.copytree(self.options.framework, frameworks / "Sparkle.framework", symlinks=True)
-        for binary in (http_binary, api_binary):
+        for binary in (api_binary,):
             self.fixture._command(["/usr/bin/codesign", "--force", "--sign", "-", str(binary)])
             self.fixture._command(["/usr/bin/codesign", "--verify", "--strict", str(binary)])
         self.fixture.trust(True)
@@ -496,54 +553,140 @@ class Receiver:
         self.pull = load(
             "ollama_fixture_pull_owner", self.api_payload / "_shared/python/managed_ollama_pull.py"
         )
+        self.alias_native = load(
+            "ollama_alias_acquisition", self.http_payload / "macos/platform/source_alias_owner.py"
+        )
+        self.image_native = load(
+            "ollama_suspended_native_owner",
+            self.http_payload / "macos/platform/suspended_image_owner.py",
+        )
+        qualification_source = "tools/diagnostics/macos_qualified_outgoing_worker.py"
+        self.source_hashes[qualification_source] = digest(self.root / qualification_source)
         self.receipt["asset_sha256"] = digest(archive)
         self.receipt["catalogue_sha256"] = digest(self.options.catalogue)
         self.receipt["source_hashes"] = self.source_hashes
         self.receipt["outgoing_worker_sha256"] = digest(http_binary)
         self.receipt["listener_worker_sha256"] = digest(api_binary)
 
+    def make_empty_session(self, deadline, port):
+        with patch.dict(os.environ, self.http_environment, clear=True):
+            contract_bytes, catalogue_bytes, host, contract, asset = self.runtime.inputs()
+            target = self.runtime.owned_directory()
+            self.runtime.native_verify(
+                target,
+                contract,
+                asset,
+                self.runtime.POLICY.receipt(contract_bytes, catalogue_bytes, host, asset),
+                deadline,
+            )
+        observed = self.binary.stat(follow_symlinks=False)
+        data = self.runtime.POLICY.private_session(
+            {
+                "version": 1,
+                "token": secrets.token_hex(32),
+                "port": str(port),
+                "source_commit": asset["source_commit"],
+                "asset_sha256": asset["sha256"],
+                "binary_sha256": asset["binary_sha256"],
+                "device": str(observed.st_dev),
+                "inode": str(observed.st_ino),
+            }
+        )
+        return self.image_native.EmptySession.acquire(
+            target.parent / "ollama-native-sessions",
+            data,
+            register=lambda owner: setattr(self, "session_owner", owner),
+        )
+
+    def verify_alias_source(self, deadline):
+        binary = self.api_app / "Contents/MacOS/ErgoptiPlus"
+        identity = binary.stat(follow_symlinks=False)
+        require(
+            stat.S_ISREG(identity.st_mode)
+            and identity.st_uid == os.geteuid()
+            and (str(identity.st_dev), str(identity.st_ino))
+            == (
+                self.api_environment["ERGOPTI_LAUNCHER_DEVICE"],
+                self.api_environment["ERGOPTI_LAUNCHER_INODE"],
+            )
+            and digest(binary) == self.receipt["listener_worker_sha256"],
+            "actual_listener_worker_changed",
+        )
+        with patch.dict(os.environ, self.http_environment, clear=True):
+            contract_bytes, catalogue_bytes, host, contract, asset = self.runtime.inputs()
+            return self.runtime.native_verify(
+                self.binary.parent,
+                contract,
+                asset,
+                self.runtime.POLICY.receipt(contract_bytes, catalogue_bytes, host, asset),
+                deadline,
+                source_alias=self.alias_owner.proof,
+                source_identity={key: self.session_owner.data[key] for key in ("device", "inode")},
+            )
+
     def start(self, producer=False):
+        require(
+            self.daemon is None
+            and getattr(self, "alias_owner", None) is None
+            and getattr(self, "session_owner", None) is None
+            and getattr(self, "binary_descriptor", None) is None
+            and getattr(self, "_source_close_debt", None) is None,
+            "actual_receiver_start_state",
+        )
+        deadline = time.monotonic() + 60
         with socket.socket() as reservation:
             reservation.bind(("127.0.0.1", 0))
             self.port = reservation.getsockname()[1]
-        with patch.dict(os.environ, self.http_environment, clear=True):
-            self.session_path = Path(self.runtime.create_session(time.monotonic() + 60, self.port))
-        environment = self.http_environment | {
-            "OLLAMA_HOST": "127.0.0.1:" + str(self.port),
-            "ERGOPTI_OLLAMA_NATIVE_HTTP": "1",
-            "ERGOPTI_OLLAMA_NATIVE_SESSION": str(self.session_path),
-            "ERGOPTI_OLLAMA_NETWORK_POLICY": str(
-                self.http_payload / "_shared/modules/network/proxy_policy.json"
-            ),
-            "ERGOPTI_OLLAMA_NATIVE_HTTP_IDLE_TIMEOUT": "60",
-        }
-        if producer:
-            environment["OLLAMA_MODELS"] = str(self.work / "producer-models")
-        if self.options.profile == "explicit-proxy" and not producer:
-            environment["https_proxy"] = f"http://127.0.0.1:{self.fixture.ports['first']}"
-        self.daemon_log = (self.work / ("producer.log" if producer else "receiver.log")).open("xb")
-        session = self.runtime.POLICY.private_session(
-            self.runtime.POLICY.metadata_bytes(self.session_path.read_bytes())
-        )
+        self.session_owner = self.make_empty_session(deadline, self.port)
+        self.session_path = self.session_owner.path
+        session = self.session_owner.data
         self.binary_descriptor = retained_source(self.binary, session)
-        try:
-            check_retained_source(self.binary, self.binary_descriptor, session)
-            self.fixture.groups.acquire_owned(
-                ["/dev/fd/" + str(self.binary_descriptor), "serve"],
-                self.fixture.native_groups,
-                lambda owner: setattr(self, "daemon", owner),
-                pass_fds=(self.binary_descriptor,),
-                stdin=subprocess.DEVNULL,
-                stdout=self.daemon_log,
-                stderr=self.daemon_log,
-                env=environment,
-            )
-        except OSError as error:
-            self.receipt["source_exec_errno"] = error.errno
-            raise RuntimeError("actual_retained_source_exec") from None
-        self.receipt["source_exec"] = "actual Python Popen retained-FD exec; no pathname fallback"
+
+        def progress():
+            require(time.monotonic() < deadline, "actual_source_admission_deadline")
+
+        self.alias_owner = self.alias_native.AliasOwner.acquire(
+            self.binary.parent,
+            self.binary_descriptor,
+            {key: session[key] for key in ("device", "inode")},
+            session["binary_sha256"],
+            register=lambda owner: setattr(self, "alias_owner", owner),
+            progress=progress,
+        )
+        request = {
+            "version": 1,
+            "executable": str(self.alias_owner.executable),
+            "arguments": ["serve"],
+            "device": session["device"],
+            "inode": session["inode"],
+            "session_path": str(self.session_path),
+            "remaining_ms": min(30000, int((deadline - time.monotonic()) * 1000)),
+            "home": str(self.home.resolve(strict=True)),
+            "models_path": str(self.home / "producer-models") if producer else "",
+            "network_policy": str(self.http_payload / "_shared/modules/network/proxy_policy.json"),
+            "host": "127.0.0.1:" + str(self.port),
+            "proxy_url": (
+                f"http://127.0.0.1:{self.fixture.ports['first']}"
+                if self.options.profile == "explicit-proxy" and not producer
+                else ""
+            ),
+            **self.outgoing_context.fields(progress=progress),
+        }
+        progress()
+        self.daemon = self.image_native.SuspendedImageOwner(
+            self.api_app / "Contents/MacOS/ErgoptiPlus",
+            request,
+            self.session_owner,
+            lambda: self.verify_alias_source(deadline),
+            self.outgoing_context,
+            register=lambda owner: setattr(self, "daemon", owner),
+        )
+        self.alias_owner.bind_operation(self.daemon)
+        self.daemon.start()
+        self.receipt["source_exec"] = (
+            "same-vnode owned alias; native suspended mapped image before session bytes"
+        )
         opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
-        deadline = time.monotonic() + 60
         while time.monotonic() < deadline:
             require(self.daemon.process.poll() is None, "actual_daemon_start")
             try:
@@ -553,34 +696,50 @@ class Receiver:
                     require(json.load(response)["version"] == "0.24.0", "actual_daemon_version")
                     with patch.dict(os.environ, self.api_environment, clear=True):
                         self.owner()
-                    check_retained_source(self.binary, self.binary_descriptor, session)
+                    self.verify_alias_source(deadline)
                     return
             except (OSError, ValueError):
                 time.sleep(0.1)
         raise RuntimeError("actual_daemon_readiness")
 
     def stop(self):
+        acknowledged = True
         if self.daemon is not None:
-            require(self.daemon.settle(timeout=15), "actual_daemon_retirement")
-            self.daemon = None
-            self.daemon_log.close()
-        # Keep source ownership through failed admission or exact group cleanup.
-        # Closing a parent's descriptor does not retire its inherited child FD.
+            acknowledged = self.daemon.settle(timeout=15)
+            self.receipt["suspended_image_retirement"] = self.daemon.public_receipt()
+            require(self.daemon.physically_retired, "actual_daemon_retirement")
+            # A pre-payload REFUSED can physically close every owner while its
+            # admission correctly remains failed. Failed RETIRED close acks
+            # must still fail the actual native receiving result after cleanup.
+            acknowledged = acknowledged or self.daemon._refused is not None
+        alias = getattr(self, "alias_owner", None)
+        if alias is not None:
+            alias.retire()
+            self.alias_owner = None
+        session = getattr(self, "session_owner", None)
+        if session is not None:
+            session.retire()
+            self.session_owner = None
         descriptor = getattr(self, "binary_descriptor", None)
         if descriptor is not None:
-            os.close(descriptor)
             self.binary_descriptor = None
-        log = getattr(self, "daemon_log", None)
-        if log is not None and not log.closed:
-            log.close()
+            try:
+                os.close(descriptor)
+            except BaseException as error:
+                if getattr(self, "_source_close_debt", None) is None:
+                    self._source_close_debt = error
+        require(getattr(self, "_source_close_debt", None) is None, "actual_source_close_debt")
+        self.daemon = None
+        require(acknowledged, "actual_daemon_retirement_acknowledgement")
 
     def owner(self):
         session = self.runtime.POLICY.private_session(
             self.runtime.POLICY.metadata_bytes(self.session_path.read_bytes())
         )
-        owner = self.pull.PullOwner(session, str(self.binary), self.api, 60, 65536)
+        ports = BoundAliasPorts(self.api, self.alias_owner.proof, self.daemon.listener)
+        owner = self.pull.PullOwner(session, str(self.binary), ports, 60, 65536)
         owner.admit(10)
-        require(owner.listener["pid"] == self.daemon.process.pid, "actual_owned_daemon_listener")
+        require(owner.listener == self.daemon.listener, "actual_owned_daemon_listener")
         return owner
 
     def retirement(self, owner):
@@ -611,13 +770,13 @@ class Receiver:
         self.own_command(
             [str(self.binary), "create", "native-source", "-f", str(modelfile)], environment
         )
-        manifests = list((self.work / "producer-models/manifests").rglob("latest"))
+        manifests = list((self.home / "producer-models/manifests").rglob("latest"))
         require(len(manifests) == 1, "actual_created_manifest")
         manifest = manifests[0].read_bytes()
         value = json.loads(manifest)
         blobs = {}
         for layer in [value["config"], *value["layers"]]:
-            path = self.work / "producer-models/blobs" / layer["digest"].replace(":", "-")
+            path = self.home / "producer-models/blobs" / layer["digest"].replace(":", "-")
             data = path.read_bytes()
             require(
                 len(data) == layer["size"]
@@ -743,6 +902,9 @@ class Receiver:
 
     def close(self):
         self.stop()
+        if self.outgoing_context is not None:
+            self.outgoing_context.close()
+            self.outgoing_context = None
         self.receipt["private_children_retired"] = True
         if self.fixture is not None:
             self.fixture.close()
