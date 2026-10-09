@@ -130,7 +130,7 @@ const PAC_STEP_NAME = 'Qualify actual native PAC and WPAD XCTest controls';
 const PAC_FILTER =
 	"--filter 'ManagedHTTPWorkerTests|ManagedHTTPWireTests|ManagedHTTPWPADWireTests'";
 const PAC_STEP_SOURCE =
-	'      - name: Qualify actual native PAC and WPAD XCTest controls\n        if: ${{ !cancelled() }}\n        shell: bash\n        run: |\n          set -euo pipefail\n          test -n "$ERGOPTI_NATIVE_HTTP_PYTHON"\n          test -x "$ERGOPTI_NATIVE_HTTP_PYTHON"\n          transcript="$ERGOPTI_OLLAMA_BUILD_ROOT/native-pac-xctest.log"\n          set +e\n          swift test --package-path static/ergopti_plus/macos/launcher \\\n            --scratch-path "$ERGOPTI_OLLAMA_BUILD_ROOT/swift" \\\n            --filter \'ManagedHTTPWorkerTests|ManagedHTTPWireTests|ManagedHTTPWPADWireTests\' 2>&1 | tee "$transcript"\n          pac_statuses=("${PIPESTATUS[@]}")\n          set -e\n          node tools/diagnostics/managed_http_pac_xctest_evidence.cjs "$transcript" "${pac_statuses[0]}" "${pac_statuses[1]}" "$ERGOPTI_OLLAMA_BUILD_ROOT/native-pac-verdict.json"\n        timeout-minutes: 10\n';
+	'      - name: Qualify actual native PAC and WPAD XCTest controls\n        if: ${{ !cancelled() }}\n        shell: bash\n        run: |\n          set -euo pipefail\n          receipt="$RUNNER_TEMP/stable-macos-native-pac-${{ matrix.architecture }}.json"\n          mkdir -p "$(dirname "$receipt")"\n          node tools/ci/dev-release-qualification.cjs --scope macos-native-pac --receipt "$receipt"\n          mode="$(node tools/ci/dev-release-qualification.cjs --scope macos-native-pac --validate-scope-receipt "$receipt")"\n          if [ "$mode" = deferred ]; then\n              echo "[DEFERRED] macos-native-pac: qualified=false; original command not executed."\n          elif [ "$mode" = full ]; then\n              set -euo pipefail\n              test -n "$ERGOPTI_NATIVE_HTTP_PYTHON"\n              test -x "$ERGOPTI_NATIVE_HTTP_PYTHON"\n              transcript="$ERGOPTI_OLLAMA_BUILD_ROOT/native-pac-xctest.log"\n              set +e\n              swift test --package-path static/ergopti_plus/macos/launcher \\\n                --scratch-path "$ERGOPTI_OLLAMA_BUILD_ROOT/swift" \\\n                --filter \'ManagedHTTPWorkerTests|ManagedHTTPWireTests|ManagedHTTPWPADWireTests\' 2>&1 | tee "$transcript"\n              pac_statuses=("${PIPESTATUS[@]}")\n              set -e\n              node tools/diagnostics/managed_http_pac_xctest_evidence.cjs "$transcript" "${pac_statuses[0]}" "${pac_statuses[1]}" "$ERGOPTI_OLLAMA_BUILD_ROOT/native-pac-verdict.json"\n          else\n              echo "Invalid command qualification disposition" >&2\n              exit 1\n          fi\n        timeout-minutes: 10\n\n';
 function admitNativePacSelector(mac) {
 	if (mac.split(PAC_FILTER).length !== 2) return null;
 	const jobs = [
@@ -151,8 +151,40 @@ function admitNativePacSelector(mac) {
 	);
 	if (before < 0 || before >= steps[0].index || after <= steps[0].index) return null;
 	const position = jobs[0].index + steps[0].index + steps[0][0].indexOf(PAC_FILTER);
-	return admitItem36Selector(mac.slice(0, position) + mac.slice(position + PAC_FILTER.length));
+	return admitNativeSourceSelector(
+		mac.slice(0, position) + mac.slice(position + PAC_FILTER.length)
+	);
 }
+// Admit only the exact source-owner cohort with unchanged source/run/attempt receipts.
+const SOURCE_STEP_NAME = 'Qualify actual native PAC source ownership XCTest controls';
+const SOURCE_FILTER = "--filter '(^|[.])ManagedPACSourceTests([/.]|$)'";
+const SOURCE_STEP_SOURCE =
+	'      - name: Qualify actual native PAC source ownership XCTest controls\n        if: ${{ !cancelled() }}\n        shell: bash\n        run: |\n          set -euo pipefail\n          test -n "$ERGOPTI_NATIVE_HTTP_PYTHON"\n          test -x "$ERGOPTI_NATIVE_HTTP_PYTHON"\n          test -z "${ERGOPTI_DEV_QUALIFICATION_PROFILE:-}"\n          transcript="$ERGOPTI_OLLAMA_BUILD_ROOT/native-pac-source-xctest.log"\n          source_receipt="$ERGOPTI_OLLAMA_BUILD_ROOT/native-pac-source-inputs.json"\n          node tools/diagnostics/native_pac_source_evidence.cjs begin "$GITHUB_SHA" "$GITHUB_RUN_ID" "$GITHUB_RUN_ATTEMPT" "$ERGOPTI_OLLAMA_EXPECTED_ARCHITECTURE" "$source_receipt"\n          set +e\n          swift test --package-path static/ergopti_plus/macos/launcher \\\n            --scratch-path "$ERGOPTI_OLLAMA_BUILD_ROOT/swift" \\\n            --filter \'(^|[.])ManagedPACSourceTests([/.]|$)\' 2>&1 | tee "$transcript"\n          source_statuses=("${PIPESTATUS[@]}")\n          set -e\n          test "${#source_statuses[@]}" -eq 2\n          node tools/diagnostics/native_pac_source_evidence.cjs judge "$transcript" "${source_statuses[0]}" "${source_statuses[1]}" "$GITHUB_SHA" "$GITHUB_RUN_ID" "$GITHUB_RUN_ATTEMPT" "$ERGOPTI_OLLAMA_EXPECTED_ARCHITECTURE" "$source_receipt" "$ERGOPTI_OLLAMA_BUILD_ROOT/native-pac-source-verdict.json"\n        timeout-minutes: 10\n';
+function admitNativeSourceSelector(mac) {
+	if (mac.split(SOURCE_FILTER).length !== 2) return null;
+	const jobs = [
+		...mac.matchAll(/^  managed-ollama-native:\n[\s\S]*?(?=^  [A-Za-z][\w-]*:|(?![\s\S]))/gm)
+	];
+	if (jobs.length !== 1) return null;
+	const job = jobs[0][0];
+	const steps = [
+		...job.matchAll(
+			/^      - name: Qualify actual native PAC source ownership XCTest controls\n[\s\S]*?(?=^      - |(?![\s\S]))/gm
+		)
+	];
+	if (
+		steps.length !== 1 ||
+		steps[0][0] !== SOURCE_STEP_SOURCE ||
+		job.split(SOURCE_FILTER).length !== 2
+	)
+		return null;
+	const sdk = job.indexOf(`      - name: ${SDK_STEP_NAME}\n`);
+	const pac = job.indexOf(`      - name: ${PAC_STEP_NAME}\n`);
+	if (sdk < 0 || sdk >= steps[0].index || pac <= steps[0].index) return null;
+	const position = jobs[0].index + steps[0].index + steps[0][0].indexOf(SOURCE_FILTER);
+	return admitItem36Selector(mac.slice(0, position) + mac.slice(position + SOURCE_FILTER.length));
+}
+
 // Admit only the additional manual diagnostic selector and its exact source owner.
 const ITEM36_FILTER =
 	"--filter 'ReleaseArchiveStagingTests|SparkleArchiveUpdateAcceptanceTests|HomebrewArchiveAcceptanceTests|HomebrewAutomationConsentTests'";
@@ -879,9 +911,78 @@ if (process.argv[2] === '--package-dump') {
 		'SwiftPM target exclusion binding verified: ' + mode + '; native/feature qualified=false.'
 	);
 }
-assert.equal(passed, 58);
+// These new source-only controls leave all original selector controls in place.
+check('source owner admission is exact and disjoint', () => {
+	const admitted = admitNativeSdkSelector(workflow);
+	assert.notEqual(admitted, null);
+	assert.equal(/--filter|--skip|XCTSkip/.test(admitted), false);
+});
+for (const [name, from, to] of [
+	['missing source cohort', SOURCE_STEP_SOURCE, ''],
+	['duplicate source cohort', SOURCE_STEP_SOURCE, SOURCE_STEP_SOURCE + SOURCE_STEP_SOURCE],
+	['disabled source cohort', 'if: ${{ !cancelled() }}', 'if: false'],
+	['source selector prefix expansion', SOURCE_FILTER, "--filter 'ManagedPACSourceTests'"],
+	['source context missing candidate', 'begin "$GITHUB_SHA"', 'begin "foreign"'],
+	['source context missing attempt', '"$GITHUB_RUN_ATTEMPT"', '"1"'],
+	['source pipeline status ignored', '"${source_statuses[0]}"', '"0"'],
+	['source capture status ignored', '"${source_statuses[1]}"', '"0"'],
+	[
+		'source before receipt omitted',
+		'"$source_receipt" "$ERGOPTI_OLLAMA_BUILD_ROOT/native-pac-source-verdict.json"',
+		'"foreign" "$ERGOPTI_OLLAMA_BUILD_ROOT/native-pac-source-verdict.json"'
+	],
+	['source profile activated', 'test -z "${ERGOPTI_DEV_QUALIFICATION_PROFILE:-}"', 'true']
+])
+	check(name, () => {
+		assert.ok(SOURCE_STEP_SOURCE.includes(from));
+		const changed = workflow.replace(SOURCE_STEP_SOURCE, SOURCE_STEP_SOURCE.replace(from, to));
+		assert.equal(admitNativeSdkSelector(changed), null);
+	});
+check('source cohort must precede PAC receiving', () => {
+	assert.equal(
+		admitNativeSdkSelector(
+			workflow
+				.replace(SOURCE_STEP_SOURCE, '')
+				.replace(PAC_STEP_SOURCE, PAC_STEP_SOURCE + SOURCE_STEP_SOURCE)
+		),
+		null
+	);
+});
+
+// The approved receipt wrapper retains the strict full command and an explicit refusal.
+for (const [name, from, to] of [
+	['PAC policy scope', '--scope macos-native-pac --receipt', '--scope macos-native-http --receipt'],
+	[
+		'PAC receipt validation',
+		'--validate-scope-receipt "$receipt"',
+		'--validate-scope-receipt "foreign"'
+	],
+	['PAC receipt generation', '--receipt "$receipt"', '--receipt "foreign"'],
+	[
+		'PAC deferred status',
+		'qualified=false; original command not executed.',
+		'qualified=true; command passed.'
+	],
+	['PAC full disposition', 'elif [ "$mode" = full ]; then', 'elif [ "$mode" = deferred ]; then'],
+	[
+		'PAC unknown disposition',
+		'              exit 1\n          fi',
+		'              exit 0\n          fi'
+	],
+	['PAC original command status', '"${pac_statuses[0]}"', '"0"'],
+	['PAC capture command status', '"${pac_statuses[1]}"', '"0"']
+])
+	check(name, () => {
+		assert.ok(PAC_STEP_SOURCE.includes(from));
+		assert.ok(workflow.includes(PAC_STEP_SOURCE));
+		const changed = workflow.replace(PAC_STEP_SOURCE, PAC_STEP_SOURCE.replace(from, to));
+		assert.notEqual(changed, workflow);
+		assert.equal(admitNativeSdkSelector(changed), null);
+	});
+
+assert.equal(passed, 78);
 console.log(
-	'PASS: Mac qualification deferral source/typed-receipt controls=58; Swift/native execution unqualified.'
+	'PASS: Mac qualification deferral source/typed-receipt controls=78; Swift/native execution unqualified.'
 );
 
 require('./test-item36-native-qualification.cjs')({

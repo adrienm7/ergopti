@@ -907,6 +907,36 @@ class PhaseEvidence:
             os.close(descriptor)
 
 
+class OwnedAutomationRequest(list):
+    """The existing request argv and its one original public monotonic deadline."""
+
+    def __init__(self, arguments, timeout):
+        super().__init__(arguments)
+        require(type(timeout) is int and timeout > 0, "Owned Automation budget refused")
+        now = time.monotonic_ns()
+        require(type(now) is int and now >= 0, "Owned Automation clock unavailable")
+        self.original_arguments = tuple(arguments)
+        self._timeout = timeout
+        self._deadline_ns = now + timeout * 1_000_000_000
+        self.last_ns = now
+        require(self.deadline_ns <= 2**64 - 1, "Owned Automation deadline unavailable")
+
+    @property
+    def timeout(self):
+        return self._timeout
+
+    @property
+    def deadline_ns(self):
+        return self._deadline_ns
+
+    def remaining(self):
+        require(tuple(self) == self.original_arguments, "Owned Automation request argv changed")
+        now = time.monotonic_ns()
+        require(type(now) is int and now >= self.last_ns, "Owned Automation clock unavailable")
+        self.last_ns = now
+        return max(0, self.deadline_ns - now) / 1_000_000_000
+
+
 class Children:
     """Own process groups and settle descendants before removing their inputs."""
 
@@ -953,6 +983,13 @@ class Children:
 
     def start(self, arguments, *, confined=False):
         """Acquire an asynchronous native child and every input/capture needed to retire it."""
+        environment = self.environment
+        if type(arguments) is OwnedAutomationRequest:
+            require(arguments.remaining() > 0, "Owned Automation request exceeded deadline")
+            environment = {
+                **self.environment,
+                "ERGOPTI_OWNED_AUTOMATION_DEADLINE_NS": str(arguments.deadline_ns),
+            }
         self.sequence += 1
         output = self.root / f"child-{self.sequence}.stdout"
         errors = self.root / f"child-{self.sequence}.stderr"
@@ -975,7 +1012,7 @@ class Children:
                 self.native_groups,
                 register,
                 cwd=self.root,
-                env=self.environment,
+                env=environment,
                 stdout=out,
                 stderr=err,
             )
@@ -985,11 +1022,23 @@ class Children:
         """Capture into owned files, cap diagnostics, preserve exact exit status."""
         if self.evidence is not None:
             self.evidence.record("command.begin", command=Path(arguments[0]).name)
+        request = arguments if type(arguments) is OwnedAutomationRequest else None
+        if request is not None:
+            require(timeout == request.timeout, "Owned Automation request budget changed")
+            require(request.remaining() > 0, "Owned Automation request exceeded deadline")
         process = self.start(arguments, confined=confined)
         output, errors = self.captures[process]
         failure = None
         try:
-            if after_start is None:
+            if request is not None:
+                require(request.remaining() > 0, "Owned Automation request exceeded deadline")
+                if after_start is not None:
+                    after_start(process, request.deadline_ns / 1_000_000_000)
+                remaining = request.remaining()
+                require(remaining > 0, "Owned Automation request exceeded deadline")
+                self.groups[process].wait_for_exit(remaining)
+                require(request.remaining() > 0, "Owned Automation request exceeded deadline")
+            elif after_start is None:
                 self.groups[process].wait_for_exit(timeout)
             else:
                 deadline = time.monotonic() + timeout
@@ -1487,7 +1536,8 @@ def _validate_owned_automation_ui_fact(packet):
         "first_error",
     }
     require(
-        type(packet) is dict and set(packet) in (keys, keys | {"first_button"}),
+        type(packet) is dict
+        and set(packet) in (keys, keys | {"first_button"}, keys | {"first_button", "identity"}),
         "Unadmitted Automation UI fact fields",
     )
     require(
@@ -1714,6 +1764,49 @@ def _validate_owned_automation_ui_fact(packet):
                     ),
                     "Refused button label type and family disagree",
                 )
+    if "identity" in packet:
+        identity = packet["identity"]
+        require(
+            packet["first_attribute"] == "button-title"
+            and packet["first_type"] == "absent"
+            and packet["first_error"] == -25205
+            and type(identity) is dict
+            and set(identity)
+            == {"schema", "sender", "receiver", "complete", "nodes", "refusal", "error"},
+            "Unadmitted passive window identity fields or original refusal",
+        )
+        require(
+            type(identity["schema"]) is int
+            and identity["schema"] == 1
+            and all(type(identity[key]) is bool for key in ("sender", "receiver", "complete"))
+            and type(identity["nodes"]) is int
+            and 0 <= identity["nodes"] <= 256
+            and type(identity["error"]) is int
+            and -(2**31) <= identity["error"] < 2**31
+            and type(identity["refusal"]) is str
+            and identity["refusal"]
+            in {
+                "none",
+                "deadline",
+                "timeout",
+                "node-limit",
+                "node-type",
+                "role",
+                "value",
+                "children",
+            },
+            "Unadmitted passive window identity scalar facts",
+        )
+        require(
+            (
+                identity["complete"]
+                and identity["refusal"] == "none"
+                and identity["error"] == 0
+                and identity["nodes"] > 0
+            )
+            or (not identity["complete"] and identity["refusal"] != "none"),
+            "Passive window completion and refusal disagree",
+        )
     return dict(packet)
 
 
@@ -1834,6 +1927,9 @@ def admit_appleevent_permission_prerequisite(children, sender, policy, checkpoin
     statuses = []
 
     def query(mode):
+        arguments = ["/usr/bin/sandbox-exec", "-f", str(policy), *sender, "permission-" + mode]
+        if mode == "request":
+            arguments = OwnedAutomationRequest(arguments, 30)
         checkpoint("before-automation-" + mode)
         options = {}
         ui_observation = {}
@@ -1848,7 +1944,7 @@ def admit_appleevent_permission_prerequisite(children, sender, policy, checkpoin
 
             options["after_start"] = observe_ui
         result = children.run(
-            ["/usr/bin/sandbox-exec", "-f", str(policy), *sender, "permission-" + mode],
+            arguments,
             check=False,
             timeout=30,
             **options,
