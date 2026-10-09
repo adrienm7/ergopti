@@ -7888,6 +7888,16 @@ The complete macOS Layout presentation family now consumes 17 canonical shared s
   and three-OS CI qualification remain required; this does not qualify native
   buffered receiving, physical devices or complete item93.
 
+  A reviewed real-kernel saved-configuration supplement is now enrolled
+  sequentially after the original 132-case input-owner block, using the
+  unchanged subreaper and failure teardown. Independent literal KEY/SYN
+  expectations cover saved delay/symmetry, copy, pause/resume and cleanup
+  through the actual Manager and configuration publisher. Its registered
+  guard preserves the original modifier cases, budgets and workflow envelope.
+  This container lacks /dev/uinput and /dev/input: the real wrapper refuses
+  with exit 2 and zero scenarios/resources. Native execution is UNRUN;
+  hosted kernel CI and physical receiving remain required.
+
 - [ ] **96.** Remove the separate Ergopti+ AltGr-adjustments option:
       selecting Ergopti+ in the existing emulation picker must suffice. Implemented:
       the old public checkbox is removed; an internal closed variant preserves
