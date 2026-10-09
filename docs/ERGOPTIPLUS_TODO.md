@@ -8395,6 +8395,16 @@ and installation qualification are still required.
   Its result cannot qualify the signed application or osascript principal,
   catalogue discovery, consent or shortcut invocation.
 
+  The chosen-ID tap-key fixture now initializes the existing geometry owner
+  with its controlled native-map helper and supplies the originating ANSI
+  model. Every original UUID, task and source assertion remains; four additive
+  assertions refuse absent, unknown and mismatched ANSI/ISO models. Authentic
+  Lua 5.4 replay changes 34 passed / 1 failed to 35 passed / 0 failed;
+  independently omitting geometry boot or the event model restores the failure.
+  This is software fixture admission, not native keyboard classification.
+  LuaJIT replay remains blocked by existing upstream key_state bitwise syntax;
+  actual macOS execution and final composed-source qualification remain open.
+
   Remaining software: inventory supported automation/application providers and
   implement their real availability/invocation contracts. Add bounded Apple
   Shortcuts catalogue ownership, chosen-ID revalidation, safe native invocation,
