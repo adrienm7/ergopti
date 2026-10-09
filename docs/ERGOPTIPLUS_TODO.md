@@ -7194,6 +7194,54 @@ SSPI11/TCP4+6 controls pass; the new14 AHK graph cases, original physical attack
 TLS/SSPI failures, all native Windows code and E2E/package/install still require
 exact-source hosted qualification. Items36/62 and transversal16/38 remain open.
 
+Hosted macOS manual37893618153 at8bedc59d4 passes the actual cold MLX/Ollama
+job, including the official cold Ollama installer. Its daemon/model exchange
+is explicitly not executed by that installer control. Both SDK architectures
+still fail one of41 cases (two assertions): the custom-anchor TLS peer refuses
+its certificate. The independent HTTP worker reaches settings_provider but
+never emits its first response frame; its original deadline and mandatory
+physical settlement remain. Admin trust removal also reaches its unchanged
+15-second deadline. Package/install are skipped; these observations do not
+establish a device-only remainder or complete items36/62.
+
+The app-supplied TLS anchor fixture now declares serverAuth explicitly, as
+required by the Apple SSL server policy for its newly issued certificate.
+The original six assertions remain unchanged; eight independent source/DER
+controls retain wrong-purpose and absent-purpose refusals. Test-only HTTP
+observations distinguish proxy-copy, PAC callback/run-loop and session stages
+within the original private256-byte bound. A contended observation lock refuses
+immediately; the release source is byte-identical after removing the fixture
+compilation guards. The original15 portable controls and both native test
+methods remain intact; the receiving successor adds three meaningful controls.
+Missing optional stages remain unknown. Native compilation and the positive
+Apple Security verdict still require exact-source macOS qualification.
+
+Hosted Windows manual37895077474 atc415887e9 finishes10,501 successful and10
+failed unit controls. Core JS/properties pass; E2E/package/install are skipped
+and Release/Publish is skipped. The native PAC unresolved-root regression now
+passes. Remaining failures expose the staging observer's encoded-source size,
+three successful graph finalizers accessing already-retired entries, an
+unobserved junction child-open error, a legacy raw IPv6 spelling mismatch and
+three SSPI physical-close refusals. None of these failures is waived or
+qualified by Linux portable controls. Their feasible corrections and another
+non-release native run remain required; items36/62 and transversal16/38 stay open.
+
+The optional admin-trust observer uses the same already compiled signed fixture
+and reads only the exact owned certificate's trust presence and a strictly
+validated admin entry count. It cannot mutate trust or grant permission. Input,
+child/pipe settlement and the query consume the original removal deadline;
+refusal cannot clear restoration debt. Exact parent file/pipe objects retain
+closure debt, including actual FileIO errors that retire Python's closed marker
+before the OS descriptor closes. The stdin close observer preserves timed
+communicate and records errors even when its BrokenPipe handling suppresses
+them. Uncertain retired owners cannot be retried, authorize a successor or
+permit private fixture deletion. Twenty-eight portable controls pass; original
+assertions remain, with only explicit standalone-owner initialization and a
+controlled live-child flush prerequisite added. Actual Security reads, admin
+entry counts, runtime authorization and restoration still need hosted macOS
+observations. The source mechanism for removing the last admin entry remains
+conditional; no external/device-only cause is established.
+
 - [~] **63.** Layer actions: screen brightness up/down are now shared, labelled
   through the existing 21-locale action catalogue, and implemented for keyboard
   layers on all three drivers. Windows and macOS also support their existing

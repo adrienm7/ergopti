@@ -85,6 +85,9 @@ private final class ManagedPACResult {
 }
 
 private func managedPACCallback(_ context: UnsafeMutableRawPointer, _ proxies: CFArray, _ error: CFError?) {
+	#if ERGOPTI_MANAGED_HTTP_FIXTURE_DIAGNOSTICS
+	managedHTTPFixtureStage("pac_callback")
+	#endif
 	let result = Unmanaged<ManagedPACResult>.fromOpaque(context).takeUnretainedValue()
 	result.proxies = error == nil ? proxies : nil
 	result.failed = error != nil
@@ -106,7 +109,13 @@ enum ManagedProxyLookup {
 		guard let settings = settingsProvider() else { return nil }
 		let dictionary = (settings as AnyObject) as? [String: Any]
 		let discoveryEnabled = (dictionary?[kCFNetworkProxiesProxyAutoDiscoveryEnable as String] as? NSNumber)?.boolValue == true
+		#if ERGOPTI_MANAGED_HTTP_FIXTURE_DIAGNOSTICS
+		managedHTTPFixtureStage("proxy_copy")
+		#endif
 		let initial: AnyObject = CFNetworkCopyProxiesForURL(url as CFURL, settings).takeRetainedValue()
+		#if ERGOPTI_MANAGED_HTTP_FIXTURE_DIAGNOSTICS
+		managedHTTPFixtureStage("proxy_copied")
+		#endif
 		guard let candidates = initial as? [[String: Any]], !candidates.isEmpty || discoveryEnabled,
 			candidates.count <= maximumSelections else { return nil }
 		var routes: [[String: Any]] = []
@@ -137,6 +146,9 @@ enum ManagedProxyLookup {
 				maximumSelections: maximumSelections, metadataProvider: discoveryMetadataProvider) else { return nil }
 			routes = discovered
 		}
+		#if ERGOPTI_MANAGED_HTTP_FIXTURE_DIAGNOSTICS
+		managedHTTPFixtureStage("routes_done")
+		#endif
 		return routes.isEmpty ? nil : routes
 	}
 
@@ -202,13 +214,22 @@ enum ManagedProxyLookup {
 			info: Unmanaged.passUnretained(result).toOpaque(), retain: nil, release: nil, copyDescription: nil)
 		let source: CFRunLoopSource?
 		if let pacURL {
+			#if ERGOPTI_MANAGED_HTTP_FIXTURE_DIAGNOSTICS
+			managedHTTPFixtureStage("pac_url")
+			#endif
 			source = CFNetworkExecuteProxyAutoConfigurationURL(pacURL as CFURL, url as CFURL,
 				managedPACCallback, &context)
 		} else if let script {
+			#if ERGOPTI_MANAGED_HTTP_FIXTURE_DIAGNOSTICS
+			managedHTTPFixtureStage("pac_script")
+			#endif
 			source = CFNetworkExecuteProxyAutoConfigurationScript(script as CFString, url as CFURL,
 				managedPACCallback, &context)
 		} else { return nil }
 		guard let source else { return nil }
+		#if ERGOPTI_MANAGED_HTTP_FIXTURE_DIAGNOSTICS
+		managedHTTPFixtureStage("pac_source")
+		#endif
 		let loop = CFRunLoopGetCurrent()
 		CFRunLoopAddSource(loop, source, CFRunLoopMode.defaultMode)
 		defer {
@@ -218,9 +239,15 @@ enum ManagedProxyLookup {
 		while !result.received {
 			let remaining = deadline - ProcessInfo.processInfo.systemUptime
 			guard remaining > 0 else { return nil }
+			#if ERGOPTI_MANAGED_HTTP_FIXTURE_DIAGNOSTICS
+			managedHTTPFixtureStage("pac_wait")
+			#endif
 			CFRunLoopRunInMode(CFRunLoopMode.defaultMode, remaining, true)
 		}
 		guard !result.failed, let proxies = result.proxies else { return nil }
+		#if ERGOPTI_MANAGED_HTTP_FIXTURE_DIAGNOSTICS
+		managedHTTPFixtureStage("pac_done")
+		#endif
 		let object: AnyObject = proxies
 		return object as? [[String: Any]]
 	}
@@ -328,8 +355,17 @@ private final class ManagedHTTPSession: NSObject, URLSessionDataDelegate, @unche
 		var native = URLRequest(url: request.url)
 		native.httpMethod = request.method
 		for (name, value) in request.headers { native.setValue(value, forHTTPHeaderField: name) }
+		#if ERGOPTI_MANAGED_HTTP_FIXTURE_DIAGNOSTICS
+		managedHTTPFixtureStage("session_resume")
+		#endif
 		owned.dataTask(with: native).resume()
+		#if ERGOPTI_MANAGED_HTTP_FIXTURE_DIAGNOSTICS
+		managedHTTPFixtureStage("session_wait")
+		#endif
 		completion.wait()
+		#if ERGOPTI_MANAGED_HTTP_FIXTURE_DIAGNOSTICS
+		managedHTTPFixtureStage("session_done")
+		#endif
 		session = nil
 		return exitStatus
 	}
@@ -404,6 +440,9 @@ private final class ManagedHTTPSession: NSObject, URLSessionDataDelegate, @unche
 
 	func urlSession(_ session: URLSession, didBecomeInvalidWithError error: Error?) {
 		if failure == nil, let error { failure = managedHTTPFailure(error as NSError) }
+		#if ERGOPTI_MANAGED_HTTP_FIXTURE_DIAGNOSTICS
+		managedHTTPFixtureStage("session_invalid")
+		#endif
 		exitStatus = failure == nil ? 0 : 74
 		completion.signal()
 	}

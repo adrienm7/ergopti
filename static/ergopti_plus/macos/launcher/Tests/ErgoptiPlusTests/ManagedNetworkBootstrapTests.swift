@@ -143,7 +143,7 @@ private final class BootstrapNativeTLSFixture {
 		try manager.createDirectory(at: root, withIntermediateDirectories: false, attributes: [.posixPermissions: 0o700])
 		certificate = root.appendingPathComponent("ca.pem")
 		let key = root.appendingPathComponent("private-key.pem"), config = root.appendingPathComponent("openssl.cnf")
-		try Data("[req]\ndistinguished_name=dn\nprompt=no\nx509_extensions=extensions\n[dn]\nCN=Independent loopback\n[extensions]\nsubjectAltName=IP:127.0.0.1\nbasicConstraints=critical,CA:TRUE\nkeyUsage=critical,digitalSignature,keyEncipherment,keyCertSign\n".utf8).write(to: config)
+		try Data("[req]\ndistinguished_name=dn\nprompt=no\nx509_extensions=extensions\n[dn]\nCN=Independent loopback\n[extensions]\nsubjectAltName=IP:127.0.0.1\nbasicConstraints=critical,CA:TRUE\nkeyUsage=critical,digitalSignature,keyEncipherment,keyCertSign\nextendedKeyUsage=serverAuth\n".utf8).write(to: config)
 		let openssl = Process(); openssl.executableURL = URL(fileURLWithPath: "/usr/bin/openssl")
 		openssl.arguments = ["req", "-x509", "-newkey", "rsa:2048", "-nodes", "-days", "1", "-config", config.path, "-out", certificate.path, "-keyout", key.path]
 		openssl.standardOutput = FileHandle.nullDevice; openssl.standardError = FileHandle.nullDevice

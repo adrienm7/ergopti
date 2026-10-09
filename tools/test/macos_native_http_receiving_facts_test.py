@@ -1,5 +1,7 @@
 """Portable physical peers and passive owned-child receiving facts."""
 
+import hashlib
+import re
 import importlib.util
 import contextlib
 import io
@@ -121,7 +123,9 @@ class NativeHTTPReceivingFactsTests(unittest.TestCase):
 
     def test05PassiveOwnerFactsRequireActualReapAndBothPipeClosures(self):
         process = subprocess.Popen(
-            [sys.executable, "-c", "pass"], stdin=subprocess.PIPE, stdout=subprocess.PIPE
+            [sys.executable, "-c", "pass"],
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
         )
         receiver = SimpleNamespace(_process=process, _closed=False)
         try:
@@ -199,7 +203,13 @@ class NativeHTTPReceivingFactsTests(unittest.TestCase):
         self.assertIs(refusal.exception, primary)
         self.assertEqual(
             json.loads(output.getvalue().removeprefix("# native_http_fixture_closure ")),
-            {"version": 1, "closed": 0, "trust_unsettled": 1, "keychain_unsettled": 1, "active": 2},
+            {
+                "version": 1,
+                "closed": 0,
+                "trust_unsettled": 1,
+                "keychain_unsettled": 1,
+                "active": 2,
+            },
         )
         with mock.patch("builtins.print", side_effect=BrokenPipeError()):
             with self.assertRaises(RuntimeError) as refusal:
@@ -284,7 +294,8 @@ class NativeHTTPStageReceiptTests(unittest.TestCase):
                 os.ftruncate(self.receipt.descriptor, 0)
                 self.write(body)
                 self.assertEqual(
-                    self.receipt.facts(self.receiver), {"state": "refused", "stages": []}
+                    self.receipt.facts(self.receiver),
+                    {"state": "refused", "stages": []},
                 )
         os.ftruncate(self.receipt.descriptor, 0)
         self.assertEqual(self.receipt.facts(self.receiver), {"state": "empty", "stages": []})
@@ -353,7 +364,9 @@ class NativeHTTPStageReceiptTests(unittest.TestCase):
     def test04RetiredWorkerKeepsDistinctFDReceiptAcrossNextExclusiveChild(self):
         self.write(b"entry\narguments\n")
         self.receiver._process = SimpleNamespace(
-            returncode=0, stdin=SimpleNamespace(closed=True), stdout=SimpleNamespace(closed=True)
+            returncode=0,
+            stdin=SimpleNamespace(closed=True),
+            stdout=SimpleNamespace(closed=True),
         )
         previous = self.target.with_name("previous")
         self.receipt.retire_name(self.receiver, previous)
@@ -417,12 +430,14 @@ class NativeHTTPStageReceiptTests(unittest.TestCase):
     def test06ActualCommandExitAndDeadlineKeepFixedPhaseWithoutPrivateArguments(self):
         owner = WIRE.WireFixture.__new__(WIRE.WireFixture)
         owner.groups = None
+        owner.command_file_debt = []
         with self.assertRaises(WIRE.FixtureFailure):
             owner._command([sys.executable, "-c", "raise SystemExit(7)", "private-secret"])
         self.assertEqual(owner.command_fact, {"phase": "exit", "status": 7})
         with self.assertRaises(subprocess.TimeoutExpired):
             owner._command(
-                [sys.executable, "-c", "import time;time.sleep(5)", "private-secret"], timeout=0.1
+                [sys.executable, "-c", "import time;time.sleep(5)", "private-secret"],
+                timeout=0.1,
             )
         self.assertEqual(owner.command_fact, {"phase": "deadline", "status": None})
         self.assertNotIn("private-secret", json.dumps(owner.command_fact))
@@ -461,6 +476,676 @@ class NativeHTTPStageReceiptTests(unittest.TestCase):
             with self.assertRaises(RuntimeError) as refusal:
                 CLIENT.RealNativeClientReceiving.tearDownClass.__func__(fixture_owner)
         self.assertIs(refusal.exception, primary)
+
+    def test08ActualRetiredChildReportsAllClosedInternalLabelsWithinOriginalBound(self):
+        labels = (
+            "entry",
+            "arguments",
+            "stdin_eof",
+            "request",
+            "settings",
+            "policy",
+            "execute",
+            "settings_provider",
+            "proxy_copy",
+            "proxy_copied",
+            "pac_url",
+            "pac_script",
+            "pac_callback",
+            "pac_source",
+            "pac_wait",
+            "pac_done",
+            "routes_done",
+            "session_resume",
+            "session_wait",
+            "first_frame",
+            "session_invalid",
+            "session_done",
+            "returned",
+        )
+        raw = ("\n".join(labels) + "\n").encode("ascii")
+        self.assertLessEqual(len(raw), 256)
+        process = subprocess.Popen(
+            [
+                sys.executable,
+                "-c",
+                "import os,sys;data=sys.stdin.buffer.read();fd=os.open(sys.argv[1],os.O_WRONLY|os.O_APPEND);os.write(fd,data);os.close(fd)",
+                str(self.target),
+            ],
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+        )
+        self.receiver._process = process
+        try:
+            self.assertEqual(self.receipt.facts(self.receiver)["state"], "unsettled")
+            process.communicate(raw, timeout=3)
+            self.assertEqual(process.returncode, 0)
+            self.assertEqual(
+                self.receipt.facts(self.receiver),
+                {"state": "observed", "stages": list(labels)},
+            )
+        finally:
+            if process.poll() is None:
+                process.kill()
+            process.wait()
+            for stream in (process.stdin, process.stdout):
+                stream.close()
+
+    def test09InternalCallbackInterleavingPreservesOriginalOrderAndClosedGrammar(self):
+        valid = b"entry\nproxy_copy\narguments\npac_callback\npac_source\nfirst_frame\nreturned\n"
+        self.write(valid)
+        self.assertEqual(
+            self.receipt.facts(self.receiver)["stages"],
+            valid.decode("ascii").splitlines(),
+        )
+        for invalid in (
+            b"entry\npac_wait\npac_wait\n",
+            b"arguments\npac_callback\nentry\n",
+            b"entry\nprivate-URL-or-certificate\n",
+        ):
+            with self.subTest(payload=invalid):
+                os.ftruncate(self.receipt.descriptor, 0)
+                self.write(invalid)
+                self.assertEqual(
+                    self.receipt.facts(self.receiver),
+                    {"state": "refused", "stages": []},
+                )
+
+    def test10FixtureFlagCannotChangeReleaseOperationsOrMoveCausalBoundaries(self):
+        worker = SUPPORT.parents[1] / "launcher/Sources/ErgoptiPlus/ManagedHTTPWorker.swift"
+        source = worker.read_text(encoding="utf-8")
+        blocks = re.findall(
+            r"^[ \t]*#if ERGOPTI_MANAGED_HTTP_FIXTURE_DIAGNOSTICS\n.*?^[ \t]*#endif\n",
+            source,
+            re.MULTILINE | re.DOTALL,
+        )
+        labels = tuple(
+            re.search(r'managedHTTPFixtureStage\("([a-z_]+)"\)', block).group(1) for block in blocks
+        )
+        self.assertEqual(
+            set(labels),
+            {
+                "proxy_copy",
+                "proxy_copied",
+                "pac_url",
+                "pac_script",
+                "pac_source",
+                "pac_wait",
+                "pac_callback",
+                "pac_done",
+                "routes_done",
+                "session_resume",
+                "session_wait",
+                "session_invalid",
+                "session_done",
+            },
+        )
+        self.assertEqual(len(labels), 13)
+        release = re.sub(
+            r"^[ \t]*#if ERGOPTI_MANAGED_HTTP_FIXTURE_DIAGNOSTICS\n.*?^[ \t]*#endif\n",
+            "",
+            source,
+            flags=re.MULTILINE | re.DOTALL,
+        )
+        self.assertEqual(
+            hashlib.sha256(release.encode("utf-8")).hexdigest(),
+            "68659ddec98c9a427244b315b69c17750b743eab2cdd3688308690a66d1c6e98",
+        )
+        copy = "CFNetworkCopyProxiesForURL(url as CFURL, settings).takeRetainedValue()"
+        self.assertLess(source.index('managedHTTPFixtureStage("proxy_copy")'), source.index(copy))
+        self.assertLess(source.index(copy), source.index('managedHTTPFixtureStage("proxy_copied")'))
+        self.assertLess(
+            source.index('managedHTTPFixtureStage("pac_script")'),
+            source.index("source = CFNetworkExecuteProxyAutoConfigurationScript"),
+        )
+        self.assertLess(
+            source.index('managedHTTPFixtureStage("pac_url")'),
+            source.index("source = CFNetworkExecuteProxyAutoConfigurationURL"),
+        )
+        self.assertLess(
+            source.index('managedHTTPFixtureStage("pac_wait")'),
+            source.index("CFRunLoopRunInMode"),
+        )
+        self.assertLess(
+            source.index('managedHTTPFixtureStage("session_resume")'),
+            source.index("owned.dataTask(with: native).resume()"),
+        )
+        self.assertLess(
+            source.index('managedHTTPFixtureStage("session_wait")'),
+            source.index("completion.wait()"),
+        )
+        self.assertLess(
+            source.index("completion.wait()"),
+            source.index('managedHTTPFixtureStage("session_done")'),
+        )
+        fixture = (SUPPORT / "native_http_fixture_main.swift").read_text(encoding="utf-8")
+        self.assertIn("guard lock.try() else { return }", fixture)
+        self.assertIn("defer { lock.unlock() }", fixture)
+        self.assertNotIn("lock.lock()", fixture)
+        self.assertIn("FixtureHTTPObservation.owner?.mark(stage)", fixture)
+        compiler = (SUPPORT / "native_http_wire_client_receiving.py").read_text(encoding="utf-8")
+        self.assertIn(
+            '"-D",\n                    "ERGOPTI_MANAGED_HTTP_FIXTURE_DIAGNOSTICS",',
+            compiler,
+        )
+
+
+class NativeAdminTrustObservationTests(unittest.TestCase):
+    # These controls exercise real portable children and restoration arbitration;
+    # they do not substitute for the public Security APIs on macOS.
+    def setUp(self):
+        self.fixture = WIRE.WireFixture(native=False)
+        self.addCleanup(self.fixture.close)
+
+    def receipt(self, **changes):
+        fields = {
+            "version": 1,
+            "export_status": 0,
+            "entry_count": 1,
+            "owned_status": 0,
+            "owned_present": 1,
+        }
+        fields.update(changes)
+        return json.dumps(fields).encode()
+
+    def test19StrictCountOnlyReceiptRejectsMalformedAndInconsistentClaims(self):
+        source = (SUPPORT / "native_http_fixture_main.swift").read_text(encoding="utf-8")
+        query = source.split("private func fixtureAdminTrustQuery() -> Int32 {", 1)[1].split(
+            "// Fixed lexical stages", 1
+        )[0]
+        self.assertEqual(
+            re.findall(r"\b(Sec\w+)\(", query),
+            [
+                "SecCertificateCreateWithData",
+                "SecTrustSettingsCopyTrustSettings",
+                "SecTrustSettingsCreateExternalRepresentation",
+            ],
+        )
+        self.assertIn("Darwin.read(STDIN_FILENO", query)
+        self.assertIn('Set(fields.keys) == Set(["trustVersion", "trustList"])', query)
+        self.assertIn("CFGetTypeID(version) != CFBooleanGetTypeID()", query)
+        self.assertIn("SecTrustSettingsCopyTrustSettings(certificate, .admin", query)
+        self.assertIn("SecTrustSettingsCreateExternalRepresentation(.admin", query)
+        main = source.split("func fixtureMain() -> Int32 {", 1)[1]
+        self.assertLess(
+            main.index("fixtureAdminTrustQuery()"), main.index("let stages = FixtureStages")
+        )
+        self.assertEqual(WIRE.WireFixture._admin_trust_fact(self.receipt())["entry_count"], 1)
+        self.assertEqual(
+            WIRE.WireFixture._admin_trust_fact(
+                self.receipt(
+                    export_status=-25263, entry_count=0, owned_status=-25300, owned_present=0
+                )
+            )["owned_present"],
+            0,
+        )
+        self.assertIsNone(
+            WIRE.WireFixture._admin_trust_fact(
+                self.receipt(
+                    export_status=-36, entry_count=None, owned_status=-36, owned_present=None
+                )
+            )["entry_count"]
+        )
+        refused = [
+            b"[]",
+            b"null",
+            b"{}",
+            b"{",
+            b"x" * 1025,
+            self.receipt(version=True),
+            self.receipt(version=2),
+            self.receipt(entry_count=True),
+            self.receipt(entry_count=-1),
+            self.receipt(entry_count=65536),
+            self.receipt(entry_count=0),
+            self.receipt(owned_present=True),
+            self.receipt(owned_present=0),
+            self.receipt(owned_status=True),
+            self.receipt(export_status=2**31),
+            self.receipt(export_status=-36),
+            self.receipt(export_status=-25263),
+            self.receipt(owned_status=-25300),
+            self.receipt(owned_status=-36),
+            self.receipt(raw_certificate="private certificate"),
+            self.receipt().replace(b'"version": 1', b'"version": 1, "version": 1'),
+        ]
+        for raw in refused:
+            with self.subTest(raw_length=len(raw)):
+                with self.assertRaises(WIRE.FixtureFailure):
+                    WIRE.WireFixture._admin_trust_fact(raw)
+
+    def command_control(self, query_body, removal_failure=None):
+        original = self.fixture._command
+        received, removals, children = [], [], []
+        real_popen = subprocess.Popen
+
+        def acquire(*arguments, **options):
+            child = real_popen(*arguments, **options)
+            child.controlled_output = options["stdout"]
+            child.controlled_errors = options["stderr"]
+            children.append(child)
+            return child
+
+        def command(arguments, input_bytes=b"", **options):
+            if arguments[0] == "portable-owned-query":
+                received.append(input_bytes)
+                return original([sys.executable, "-B", "-c", query_body], input_bytes, **options)
+            removals.append((arguments, options, time.monotonic()))
+            if removal_failure is not None:
+                raise removal_failure
+            return 0, b""
+
+        self.fixture.native = True
+        self.fixture.trust_attempted = True
+        self.fixture.trust_query_executable = "portable-owned-query"
+        return command, acquire, received, removals, children
+
+    def test20ActualQueryIsReapedBeforeReceiptAndConsumesOriginalRemovalBudget(self):
+        body = (
+            "import sys,time; data=sys.stdin.buffer.read(); time.sleep(.08); sys.stdout.buffer.write("
+            + repr(self.receipt())
+            + ")"
+        )
+        command, acquire, received, removals, children = self.command_control(body)
+        output = io.StringIO()
+        before = time.monotonic()
+        with mock.patch.object(self.fixture, "_command", side_effect=command):
+            with mock.patch.object(WIRE.subprocess, "Popen", side_effect=acquire):
+                with contextlib.redirect_stdout(output):
+                    self.fixture.trust(False)
+        after = time.monotonic()
+        self.assertEqual(received, [ssl.PEM_cert_to_DER_cert(self.fixture.ca.read_text())])
+        self.assertEqual(len(children), 1)
+        self.assertEqual(children[0].returncode, 0)
+        self.assertTrue(children[0].stdin.closed)
+        self.assertTrue(children[0].controlled_output.closed)
+        self.assertTrue(children[0].controlled_errors.closed)
+        self.assertEqual(len(removals), 1)
+        arguments, options, invoked = removals[0]
+        self.assertEqual(arguments[3:5], ["remove-trusted-cert", "-d"])
+        self.assertGreaterEqual(options["deadline"], before + 15)
+        self.assertLessEqual(options["deadline"], after + 15)
+        self.assertLess(options["deadline"] - invoked, 14.95)
+        self.assertFalse(self.fixture.trust_attempted)
+        self.assertEqual(json.loads(output.getvalue().split(" ", 2)[2])["observed"], 1)
+
+    def test21RefusedOrMalformedQueryDoesNotPayFailedRemovalDebt(self):
+        for body in (
+            "import sys; sys.stdin.buffer.read(); sys.exit(7)",
+            "import sys; sys.stdin.buffer.read(); print('{}')",
+        ):
+            primary = RuntimeError("original controlled removal refusal")
+            command, acquire, _, removals, children = self.command_control(body, primary)
+            output = io.StringIO()
+            with mock.patch.object(self.fixture, "_command", side_effect=command):
+                with mock.patch.object(WIRE.subprocess, "Popen", side_effect=acquire):
+                    with contextlib.redirect_stdout(output):
+                        with self.assertRaises(RuntimeError) as refusal:
+                            self.fixture.trust(False)
+            self.assertIs(refusal.exception, primary)
+            self.assertTrue(self.fixture.trust_attempted)
+            self.assertEqual(len(removals), 1)
+            self.assertIsNotNone(children[0].returncode)
+            self.assertTrue(children[0].stdin.closed)
+            self.assertEqual(
+                json.loads(output.getvalue().split(" ", 2)[2]), {"version": 1, "observed": 0}
+            )
+        self.fixture.native = False
+        self.fixture.trust_attempted = False
+
+    def test22ExhaustedOriginalBudgetCannotAcquireRemovalOrRetireDebt(self):
+        self.fixture.native = True
+        self.fixture.trust_attempted = True
+        deadlines = []
+
+        def observe(deadline):
+            deadlines.append(deadline)
+
+        with mock.patch.object(self.fixture, "_observe_admin_trust", side_effect=observe):
+            with mock.patch.object(WIRE.time, "monotonic", side_effect=[100.0, 115.0]):
+                with mock.patch.object(self.fixture, "_command") as command:
+                    with self.assertRaises(subprocess.TimeoutExpired):
+                        self.fixture.trust(False)
+        self.assertEqual(deadlines, [115.0])
+        command.assert_not_called()
+        self.assertTrue(self.fixture.trust_attempted)
+        self.assertEqual(self.fixture.command_fact, {"phase": "deadline", "status": None})
+        self.fixture.native = False
+        self.fixture.trust_attempted = False
+
+    def test23UnsettledQueryAndClosedOutputPreserveOriginalClosureAuthority(self):
+        self.fixture.trust_query_executable = "portable-owned-query"
+        primary = RuntimeError("original controlled query closure refusal")
+
+        def refuse(*arguments, **options):
+            self.fixture.command_fact = {"phase": "settle", "status": None}
+            raise primary
+
+        with mock.patch.object(self.fixture, "_command", side_effect=refuse):
+            with mock.patch("builtins.print") as output:
+                with self.assertRaises(RuntimeError) as refusal:
+                    self.fixture._observe_admin_trust(time.monotonic() + 15)
+        self.assertIs(refusal.exception, primary)
+        output.assert_not_called()
+        self.fixture.command_fact = None
+        for failure in (
+            OSError("closed controlled output"),
+            ValueError("closed controlled output"),
+        ):
+            with mock.patch.object(self.fixture, "_command", return_value=(0, self.receipt())):
+                with mock.patch("builtins.print", side_effect=failure):
+                    self.fixture._observe_admin_trust(time.monotonic() + 15)
+
+    def test24CommandAbsoluteDeadlineRefusesAcquisitionAndClosesActualTimedChild(self):
+        arguments = [sys.executable, "-B", "-c", "import time; time.sleep(30)"]
+        with mock.patch.object(WIRE.subprocess, "Popen") as acquire:
+            with self.assertRaises(subprocess.TimeoutExpired):
+                self.fixture._command(arguments, deadline=time.monotonic() - 1)
+        acquire.assert_not_called()
+        real_popen = subprocess.Popen
+        children = []
+
+        def capture(*arguments, **options):
+            child = real_popen(*arguments, **options)
+            children.append(child)
+            return child
+
+        with mock.patch.object(WIRE.subprocess, "Popen", side_effect=capture):
+            with self.assertRaises(subprocess.TimeoutExpired):
+                self.fixture._command(arguments, deadline=time.monotonic() + 0.05)
+        self.assertEqual(len(children), 1)
+        self.assertIsNotNone(children[0].returncode)
+        self.assertTrue(children[0].stdin.closed)
+        self.assertEqual(self.fixture.command_fact["phase"], "deadline")
+
+    def test25RealTemporaryOutputCloseRefusalRetainsExactOwnerAndTrustDebt(self):
+        original = self.fixture._command
+        primary = RuntimeError("controlled exact output close refusal")
+        real_temporary_file = tempfile.TemporaryFile
+        held, removals = [], []
+        body = (
+            "import sys;sys.stdin.buffer.read();sys.stdout.buffer.write("
+            + repr(self.receipt())
+            + ")"
+        )
+
+        class RetainedOutput:
+            allow_close = False
+
+            def __init__(self, owner):
+                self.owner = owner
+
+            def __getattr__(self, name):
+                return getattr(self.owner, name)
+
+            def close(self):
+                if not self.allow_close:
+                    raise primary
+                self.owner.close()
+
+        def allocate(*arguments, **options):
+            owner = real_temporary_file(*arguments, **options)
+            if not held:
+                owner = RetainedOutput(owner)
+                held.append(owner)
+            return owner
+
+        def command(arguments, input_bytes=b"", **options):
+            if arguments[0] == "portable-owned-query":
+                return original([sys.executable, "-B", "-c", body], input_bytes, **options)
+            removals.append(arguments)
+            return 0, b""
+
+        self.fixture.native = True
+        self.fixture.trust_attempted = True
+        self.fixture.trust_query_executable = "portable-owned-query"
+        with mock.patch.object(self.fixture, "_command", side_effect=command):
+            with mock.patch.object(WIRE.tempfile, "TemporaryFile", side_effect=allocate):
+                with mock.patch("builtins.print") as output:
+                    with self.assertRaises(RuntimeError) as refusal:
+                        self.fixture.trust(False)
+        self.assertIs(refusal.exception, primary)
+        output.assert_not_called()
+        self.assertEqual(removals, [])
+        self.assertTrue(self.fixture.trust_attempted)
+        self.assertEqual(self.fixture.command_file_debt, [{"stream": held[0], "uncertain": False}])
+        self.assertFalse(held[0].closed)
+        os.fstat(held[0].fileno())
+        self.assertEqual(self.fixture.command_fact["phase"], "settle")
+        self.assertFalse(self.fixture._retire_command_files())
+        with mock.patch.object(WIRE.subprocess, "Popen") as acquire:
+            with self.assertRaises(WIRE.FixtureFailure):
+                original([sys.executable, "-B", "-c", "pass"])
+        acquire.assert_not_called()
+        self.assertEqual(self.fixture.command_file_debt, [{"stream": held[0], "uncertain": False}])
+        held[0].allow_close = True
+        self.assertTrue(self.fixture._retire_command_files())
+        self.assertTrue(held[0].closed)
+        self.assertEqual(self.fixture.command_file_debt, [])
+        self.fixture.native = False
+        self.fixture.trust_attempted = False
+
+    def test26RealGroupedStdinRefusalPreservesPrimaryAndExactPipeAfterPhysicalReap(self):
+        # The controlled group adapter kills/reaps real portable children. It is
+        # deliberately not evidence about Darwin LibProc ownership.
+        primary = RuntimeError("controlled exact stdin close refusal")
+        write_primary = RuntimeError("controlled exact stdin write refusal")
+        original = self.fixture._command
+        real_popen = subprocess.Popen
+        held, children, removals = [], [], []
+        fail_write = False
+
+        class RetainedInput:
+            allow_close = False
+
+            def __init__(self, owner):
+                self.owner = owner
+
+            def __getattr__(self, name):
+                return getattr(self.owner, name)
+
+            def write(self, data):
+                if fail_write:
+                    raise write_primary
+                count = self.owner.write(data)
+                self.owner.flush()
+                return count
+
+            def close(self):
+                if not self.allow_close:
+                    raise primary
+                self.owner.close()
+
+        class OwnedControl:
+            def __init__(self, child):
+                self.process = child
+
+            def wait_for_exit(self, timeout):
+                self.process.wait(timeout=timeout)
+
+            def settle(self):
+                if self.process.poll() is None:
+                    self.process.kill()
+                self.process.wait()
+                return True
+
+        class ControlledGroups:
+            def acquire_owned(self, arguments, native_groups, register, **options):
+                child = real_popen(arguments, **options)
+                child.stdin = RetainedInput(child.stdin)
+                held.append(child.stdin)
+                children.append(child)
+                register(OwnedControl(child))
+
+        def command(arguments, input_bytes=b"", **options):
+            if arguments[0] == "portable-owned-query":
+                return original(
+                    [sys.executable, "-B", "-c", "import sys;sys.stdin.buffer.read()"],
+                    input_bytes,
+                    **options,
+                )
+            removals.append(arguments)
+            return 0, b""
+
+        self.fixture.native = True
+        self.fixture.trust_attempted = True
+        self.fixture.trust_query_executable = "portable-owned-query"
+        self.fixture.groups = ControlledGroups()
+        self.fixture.native_groups = None
+        for fail_write in (False, True):
+            with mock.patch.object(self.fixture, "_command", side_effect=command):
+                with mock.patch("builtins.print") as output:
+                    with self.assertRaises(RuntimeError) as refusal:
+                        self.fixture.trust(False)
+            self.assertIs(refusal.exception, write_primary if fail_write else primary)
+            output.assert_not_called()
+            self.assertTrue(self.fixture.trust_attempted)
+            self.assertEqual(removals, [])
+            self.assertIsNotNone(children[-1].returncode)
+            self.assertFalse(held[-1].closed)
+            os.fstat(held[-1].fileno())
+            self.assertEqual(
+                self.fixture.command_file_debt, [{"stream": held[-1], "uncertain": False}]
+            )
+            self.assertEqual(self.fixture.command_fact["phase"], "settle")
+            held[-1].allow_close = True
+            self.assertTrue(self.fixture._retire_command_files())
+            self.assertTrue(held[-1].closed)
+        self.fixture.groups = None
+        self.fixture.native = False
+        self.fixture.trust_attempted = False
+
+    def test27RetiredCloseMarkerCannotPayPhysicalUncertaintyOrAuthorizeAnotherClose(self):
+        original = self.fixture._command
+        primary = OSError("controlled retired marker before physical close")
+        real_temporary_file = tempfile.TemporaryFile
+        held, removals = [], []
+
+        class RetiredMarker:
+            marker = False
+            close_calls = 0
+
+            def __init__(self, owner):
+                self.owner = owner
+
+            def __getattr__(self, name):
+                return getattr(self.owner, name)
+
+            @property
+            def closed(self):
+                return self.marker
+
+            def close(self):
+                self.close_calls += 1
+                self.marker = True
+                raise primary
+
+        def allocate(*arguments, **options):
+            owner = real_temporary_file(*arguments, **options)
+            if not held:
+                owner = RetiredMarker(owner)
+                held.append(owner)
+            return owner
+
+        def command(arguments, input_bytes=b"", **options):
+            if arguments[0] == "portable-owned-query":
+                return original(
+                    [sys.executable, "-B", "-c", "import sys;sys.stdin.buffer.read()"],
+                    input_bytes,
+                    **options,
+                )
+            removals.append(arguments)
+            return 0, b""
+
+        self.fixture.native = True
+        self.fixture.trust_attempted = True
+        self.fixture.trust_query_executable = "portable-owned-query"
+        with mock.patch.object(self.fixture, "_command", side_effect=command):
+            with mock.patch.object(WIRE.tempfile, "TemporaryFile", side_effect=allocate):
+                with mock.patch("builtins.print") as output:
+                    with self.assertRaises(OSError) as refusal:
+                        self.fixture.trust(False)
+        self.assertIs(refusal.exception, primary)
+        output.assert_not_called()
+        self.assertEqual(removals, [])
+        self.assertTrue(self.fixture.trust_attempted)
+        self.assertTrue(held[0].closed)
+        self.assertFalse(held[0].owner.closed)
+        os.fstat(held[0].owner.fileno())
+        debt = [{"stream": held[0], "uncertain": True}]
+        self.assertEqual(self.fixture.command_file_debt, debt)
+        self.assertFalse(self.fixture._retire_command_files())
+        with mock.patch.object(WIRE.subprocess, "Popen") as acquire:
+            with self.assertRaises(WIRE.FixtureFailure):
+                original([sys.executable, "-B", "-c", "pass"])
+        acquire.assert_not_called()
+        self.fixture.native = False
+        self.fixture.trust_attempted = False
+        with self.assertRaises(WIRE.FixtureFailure):
+            self.fixture.close()
+        self.assertFalse(self.fixture.closed)
+        self.assertTrue(self.fixture.root.exists())
+        self.assertEqual(self.fixture.command_file_debt, debt)
+        self.assertEqual(held[0].close_calls, 1)
+        # Only this control retains independent authority over the underlying
+        # real file. It physically retires that file before releasing its ledger.
+        held[0].owner.close()
+        self.assertTrue(held[0].owner.closed)
+        self.fixture.command_file_debt = []
+
+    def test28PortableCommunicateRetiredStdinMarkerKeepsNativeCloseUncertainty(self):
+        primary = OSError("controlled communicate close uncertainty")
+        real_popen = subprocess.Popen
+        held, children = [], []
+
+        class RetiredInput:
+            marker = False
+            close_calls = 0
+
+            def __init__(self, owner):
+                self.owner = owner
+
+            def __getattr__(self, name):
+                return getattr(self.owner, name)
+
+            @property
+            def closed(self):
+                return self.marker
+
+            def close(self):
+                self.close_calls += 1
+                self.marker = True
+                raise primary
+
+        def acquire(*arguments, **options):
+            child = real_popen(*arguments, **options)
+            child.stdin = RetiredInput(child.stdin)
+            held.append(child.stdin)
+            children.append(child)
+            return child
+
+        with mock.patch.object(WIRE.subprocess, "Popen", side_effect=acquire):
+            with self.assertRaises(OSError) as refusal:
+                self.fixture._command(
+                    [sys.executable, "-B", "-c", "import sys;sys.stdin.buffer.read()"]
+                )
+        self.assertIs(refusal.exception, primary)
+        self.assertIsNotNone(children[0].returncode)
+        self.assertTrue(held[0].closed)
+        self.assertFalse(held[0].owner.closed)
+        os.fstat(held[0].owner.fileno())
+        debt = [{"stream": held[0], "uncertain": True}]
+        self.assertEqual(self.fixture.command_file_debt, debt)
+        self.assertEqual(self.fixture.command_fact["phase"], "settle")
+        self.assertFalse(self.fixture._retire_command_files())
+        with mock.patch.object(WIRE.subprocess, "Popen") as next_acquisition:
+            with self.assertRaises(WIRE.FixtureFailure):
+                self.fixture._command([sys.executable, "-B", "-c", "pass"])
+        next_acquisition.assert_not_called()
+        self.assertEqual(held[0].close_calls, 1)
+        held[0].owner.close()
+        self.assertTrue(held[0].owner.closed)
+        self.fixture.command_file_debt = []
 
 
 if __name__ == "__main__":
