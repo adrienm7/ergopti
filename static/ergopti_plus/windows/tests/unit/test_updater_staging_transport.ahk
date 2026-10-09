@@ -107,7 +107,7 @@ _UST_ReceiveNativeCmd(State, MultiChunk, ExitCode, Stdout, Stderr) {
 	State.Done := true
 }
 
-_UST_RealCmdEnvironmentRoundTrip(MultiChunk := false) {
+_UST_RealCmdEnvironmentRoundTrip(MultiChunk := false, CompilerHighWater := false) {
 	global _UpdaterStagingTransportCounter, UPDATER_STAGING_ENV_MAX_CHARS
 	SavedCounter := _UpdaterStagingTransportCounter
 	Transport := 0
@@ -136,9 +136,18 @@ _UST_RealCmdEnvironmentRoundTrip(MultiChunk := false) {
 			'$swapBytes=[Convert]::FromBase64String($SwapScriptPayload);$sha=[Security.Cryptography.SHA256]::Create();try{if(([BitConverter]::ToString($sha.ComputeHash($swapBytes))).Replace("-","").ToLowerInvariant() -cne "' . ExpectedSwapHash . '"){throw "swap exact UTF-8 digest mismatch"}}finally{$sha.Dispose()}')
 		; The output marker must occur after all padding: a lost source tail cannot pass.
 		Script := StrReplace(Script, 'Write-Output "TRANSPORT_OK"', "")
-		Script .= "`n" . '$environmentUnits=1;foreach($entry in [Environment]::GetEnvironmentVariables().GetEnumerator()){$environmentUnits+=$entry.Key.Length+$entry.Value.Length+2};[Console]::Error.WriteLine("ENV_UNITS:"+$environmentUnits)'
+		Script .= "`n" . '$environmentUnits=$script:StagingTransportIngressUnits;[Console]::Error.WriteLine("ENV_UNITS:"+$environmentUnits)'
+	}
+	if MultiChunk {
+		Script .= "`n" . 'foreach($name in $script:StagingTransportConsumedNames){if([Environment]::GetEnvironmentVariables().Contains($name)){throw "Consumed source chunk is still inherited"}}'
+		Script .= "`n" . 'foreach($pair in $script:StagingTransportRetainedEnvironment.GetEnumerator()){if([Environment]::GetEnvironmentVariable($pair.Key) -cne $pair.Value){throw "Unconsumed transport environment changed"}}'
+	}
+	if CompilerHighWater {
+		Script .= "`n" . 'Add-Type -TypeDefinition "public static class ErgoptiStagingCompilerEnvironmentProbe { public static int Value = 19; }" -ErrorAction Stop;if([ErgoptiStagingCompilerEnvironmentProbe]::Value -ne 19){throw "Actual framework compiler result refused"}'
 	}
 	TargetPayloadSize := MultiChunk ? UPDATER_STAGING_ENV_MAX_CHARS * 2 + 100 : 6000
+	if CompilerHighWater
+		TargetPayloadSize := 54000
 	while StrLen(_Updater_EncodePowerShellCommand(Script)) < TargetPayloadSize
 		Script .= "`n# transport padding 0123456789abcdef0123456789abcdef"
 	if MultiChunk
@@ -159,14 +168,40 @@ _UST_RealCmdEnvironmentRoundTrip(MultiChunk := false) {
 			Assert(StrLen(Transport.ScriptPayload) <= UPDATER_STAGING_ENV_MAX_CHARS,
 				"positive control: the real cmd probe must stay inside the production guard")
 		else {
-			AssertEqual(3, Transport.ScriptChunkCount, "actual cmd control must exercise three inherited fragments")
+			if CompilerHighWater
+				AssertEqual(8, Transport.ScriptChunkCount, "actual compiler control must exercise eight bounded inherited fragments")
+			else
+				AssertEqual(3, Transport.ScriptChunkCount, "actual cmd control must exercise three inherited fragments")
 			Assert(Transport.SwapChunkCount >= 3, "actual cmd control must receive the production UTF-8 swap worker across at least three fragments")
 			Assert(StrLen(Transport.ScriptPayload) > UPDATER_STAGING_ENV_MAX_CHARS * 2,
 				"an unchunked predecessor cannot admit this actual high-water worker")
 		}
+		if CompilerHighWater
+			Assert(StrLen(Transport.ScriptPayload) + StrLen(Transport.SwapScriptPayload) > 0xFFFF,
+				"actual inherited payload alone exceeds the Framework ANSI compiler environment bound")
 		for Pair in Transport.Environment
 			Assert(StrLen(Pair.Value) <= UPDATER_STAGING_ENV_MAX_CHARS,
 				"every actual cmd inherited fragment retains the original guarded value bound")
+		if MultiChunk {
+			; Receive actual ingress before consuming chunks, then observe the
+			; independent post-decode environment inside the unchanged worker.
+			Prefix := RegExReplace(Transport.Environment[1].Name, "_SCRIPT$")
+			Ingress := '$script:StagingTransportIngressUnits=1;foreach($entry in [Environment]::GetEnvironmentVariables().GetEnumerator()){$script:StagingTransportIngressUnits+=$entry.Key.Length+$entry.Value.Length+2};'
+			ConsumedNames := ""
+			for Pair in Transport.Environment {
+				Suffix := SubStr(Pair.Name, StrLen(Prefix) + 2)
+				if RegExMatch(Suffix, "\A(?:SCRIPT(?:_COUNT|_[0-9]+)?|SWAP_(?:COUNT|[0-9]+))\z")
+					ConsumedNames .= (ConsumedNames == "" ? "" : ",") . Chr(39) . Pair.Name . Chr(39)
+			}
+			Ingress .= '$script:StagingTransportConsumedNames=@(' . ConsumedNames . ');'
+			for Suffix in ["_SCRIPT_FOREIGN", "_SWAP_99"] {
+				Name := Prefix . Suffix
+				EnvSet(Name, "OWNED_FOREIGN")
+				Transport.Environment.Push({ Name: Name, Value: "OWNED_FOREIGN" })
+			}
+			Ingress .= '$script:StagingTransportRetainedEnvironment=@{};foreach($name in @(' . Chr(39) . Prefix . '_URL' . Chr(39) . ',' . Chr(39) . Prefix . '_DEADLINE' . Chr(39) . ',' . Chr(39) . Prefix . '_STARTED_TICK' . Chr(39) . ',' . Chr(39) . Prefix . '_SCRIPT_FOREIGN' . Chr(39) . ',' . Chr(39) . Prefix . '_SWAP_99' . Chr(39) . ',' . Chr(39) . 'HTTPS_PROXY' . Chr(39) . ',' . Chr(39) . 'SSL_CERT_FILE' . Chr(39) . ')){$script:StagingTransportRetainedEnvironment[$name]=[Environment]::GetEnvironmentVariable($name)};'
+			Transport.Args[6] := _Updater_EncodePowerShellCommand(Ingress . Transport.Bootstrap)
+		}
 		Worker := ShellRunner_SpawnTreeOwned(
 			_Updater_PowerShellPath(), Transport.Args, OnDone)
 		Assert(IsObject(Worker) and Worker.start(),
@@ -251,3 +286,7 @@ _UST_CombinedNativeReceiptRejectsExtraOutput() {
 
 Test("Updater staging transport: actual merged native receipt refuses undeclared output",
 	_UST_CombinedNativeReceiptRejectsExtraOutput)
+
+
+Test("Updater staging transport: consumed chunks permit the actual framework compiler (updater-consumed-compiler-env)",
+	_UST_RealCmdEnvironmentRoundTrip.Bind(true, true))

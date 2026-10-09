@@ -3,11 +3,12 @@
 --- ==============================================================================
 --- MODULE: Ollama Server Command Builder
 --- DESCRIPTION:
---- Builds the single long-lived Ollama server pipeline shared by the API and
---- model-manager launch paths. The pipeline captures only the stable log
+--- Builds the long-lived Ollama server command shared by the API and
+--- model-manager launch paths. The stock pipeline captures only the stable log
 --- directory and resolves the dated ErgoptiPlus filename for every output line,
 --- so a daemon that survives midnight follows the logger's daily rollover.
---- The service pulls the models itself: it starts with the system network
+--- The optional managed daemon uses its foreground source owner and original
+--- inherited network settings. Stock serving starts with the system network
 --- settings (modules/llm/network_env.lua), since Ollama reads only its own
 --- relay variables and a managed network lets nothing else out.
 --- ==============================================================================
@@ -43,13 +44,40 @@ local function resolve_log_dir(unified_log_file)
 	return log_dir, nil
 end
 
+--- Builds the source-admitted optional server command without rewriting relays.
+--- @param executable string Exact native managed candidate.
+--- @param port integer Canonical local port.
+--- @return string|nil command Managed source owner invocation.
+--- @return string|nil reason Fixed internal preparation failure.
+local function managed_service(executable, port)
+	local Binary = require("modules.llm.ollama_binary")
+	local candidate, budgets = Binary.native_candidate()
+	if executable ~= candidate then return nil, "managed runtime selection is unavailable" end
+	local Python = require("modules.llm.managed_native_python")
+	local FileSystem = require("adapters.file_system")
+	local python = Python.resolve()
+	local source = debug.getinfo(1, "S").source:sub(2)
+	local driver = source:match("^(.*)/modules/llm/ollama_server_command%.lua$")
+	if not python or not driver then return nil, "managed native daemon admission is unavailable" end
+	local script = driver .. "/modules/llm/managed_ollama_serve.py"
+	if not FileSystem.exists(script) then return nil, "managed native daemon owner is unavailable" end
+	local admission, idle, retirement = budgets and budgets.admission, budgets and budgets.idle, budgets and budgets.retirement
+	if not admission or not idle or not retirement then return nil, "managed native budgets are unavailable" end
+	return text_utils.shell_quote(python) .. " -IB " .. text_utils.shell_quote(script)
+		.. " --port " .. string.format("%.0f", port)
+		.. " --timeout " .. string.format("%.0f", admission)
+		.. " --idle-timeout " .. string.format("%.0f", idle)
+		.. " --retirement-timeout " .. string.format("%.0f", retirement), nil
+end
+
 --- Builds the foreground `ollama serve` pipeline.
 --- @param ollama_bin string Absolute Ollama executable path.
 --- @param unified_log_file string Logger.today_log_path() at launch.
 --- @param port integer Canonical configured Ollama port.
+--- @param source_kind string|nil Explicit provisional resolver classification.
 --- @return string|nil command
 --- @return string|nil error_message
-function M.build(ollama_bin, unified_log_file, port)
+function M.build(ollama_bin, unified_log_file, port, source_kind)
 	if type(ollama_bin) ~= "string" or ollama_bin == "" then
 		return nil, "Ollama executable path is absent"
 	end
@@ -60,6 +88,14 @@ function M.build(ollama_bin, unified_log_file, port)
 	end
 	local log_dir, dir_err = resolve_log_dir(unified_log_file)
 	if not log_dir then return nil, dir_err end
+	local Binary = require("modules.llm.ollama_binary")
+	if type(Binary.SOURCE_NATIVE_MANAGED) == "string" and source_kind == Binary.SOURCE_NATIVE_MANAGED then
+		local service, service_err = managed_service(ollama_bin, port)
+		if not service then return nil, service_err end
+		-- The source owner must remain the foreground process. A log pipeline's
+		-- last successful write cannot turn a guarded refusal into exit zero.
+		return "exec " .. service, nil
+	end
 	local network, network_err = NetworkEnv.prelude("OLLAMA-SERVER")
 	if not network then return nil, network_err end
 

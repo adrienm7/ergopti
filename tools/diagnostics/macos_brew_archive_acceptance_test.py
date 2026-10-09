@@ -468,6 +468,8 @@ class ArchiveAcceptanceControls(unittest.TestCase):
                 "tools/diagnostics/macos_owned_process.py",
                 "tools/diagnostics/native_appleevent_probe_receiver.c",
                 "tools/diagnostics/native_appleevent_probe_sender.c",
+                "tools/diagnostics/native_appleevent_permission.c",
+                "tools/diagnostics/native_appleevent_consent.m",
                 "tools/diagnostics/native_appleevent_registration_test.m",
                 "tools/diagnostics/native_appleevent_probe_protocol.h",
                 "tools/diagnostics/native_appleevent_probe_pair.m",
@@ -518,6 +520,8 @@ class ArchiveAcceptanceControls(unittest.TestCase):
                 "tools/diagnostics/macos_owned_process.py",
                 "tools/diagnostics/native_appleevent_probe_receiver.c",
                 "tools/diagnostics/native_appleevent_probe_sender.c",
+                "tools/diagnostics/native_appleevent_permission.c",
+                "tools/diagnostics/native_appleevent_consent.m",
                 "tools/diagnostics/native_appleevent_registration_test.m",
                 "tools/diagnostics/native_appleevent_probe_protocol.h",
                 "tools/diagnostics/native_appleevent_probe_pair.m",
@@ -854,16 +858,25 @@ class AppleEventBoundaryControls(unittest.TestCase):
                 self.deliveries = 0
 
             def start(self, arguments):
-                judge.assertEqual(
-                    arguments[:2],
-                    [str(root / "OwnedAppleEvent.app/Contents/MacOS/owned-probe"), "receiver"],
-                )
-                judge.assertEqual(len(arguments), 5)
+                if getattr(self, "allow_automation_consent", False) is True:
+                    judge.assertEqual(
+                        arguments[0],
+                        str(root / "OwnedAppleEvent-receiver.app/Contents/MacOS/receiver"),
+                    )
+                    judge.assertEqual(len(arguments), 4)
+                    ready_index = 1
+                else:
+                    judge.assertEqual(
+                        arguments[:2],
+                        [str(root / "OwnedAppleEvent.app/Contents/MacOS/owned-probe"), "receiver"],
+                    )
+                    judge.assertEqual(len(arguments), 5)
+                    ready_index = 2
                 child = Mock(pid=73136)
                 self.active.append(child)
                 self.groups[child] = Mock(reaped=False)
                 self.groups[child].observe_exit.return_value = None
-                Path(arguments[2]).write_bytes(
+                Path(arguments[ready_index]).write_bytes(
                     b"" if partial_ready else b"73136\n" + judge.nonce.encode() + b"\n"
                 )
                 return child
@@ -2944,6 +2957,516 @@ class SenderNonpromptPermissionControls(unittest.TestCase):
             probe.run_appleevent_sender(owner, [], "unconfined-positive")
 
 
+class AutomationPrerequisiteControls(unittest.TestCase):
+    """Model normal consent receipt admission, without claiming a native OS grant."""
+
+    def invoke(self, root, statuses, *, allow=True, mutate=None, error=None, raw=None, ui=False):
+        sender = root / "OwnedAppleEvent-sender.app/Contents/MacOS/sender"
+        sender.parent.mkdir(parents=True)
+        sender.write_bytes(b"Independent final signed executable identity\n")
+        policy = root / "sandbox-appleevent-positive.sb"
+        policy.write_text("(version 1)\n(deny file-write*)\n(deny network-outbound)\n")
+        owner = Mock(allow_automation_consent=allow)
+        owner.allow_owned_consent_ui = ui
+        owner.automation_sender_name = "Owned sender identity"
+        owner.automation_receiver_name = "Owned receiver identity"
+        observed = []
+        queue = iter(statuses)
+
+        def run(arguments, **options):
+            self.assertEqual(arguments[:3], ["/usr/bin/sandbox-exec", "-f", str(policy)])
+            self.assertEqual(arguments[3:6], [str(sender), "73136", "owned-nonce"])
+            mode = arguments[-1].removeprefix("permission-")
+            callback = options.pop("after_start", None)
+            self.assertEqual(options, {"check": False, "timeout": 30})
+            if ui and mode == "request":
+                self.assertTrue(callable(callback))
+                callback("exact-owned-requester", 30)
+            else:
+                self.assertIsNone(callback)
+            if error is not None:
+                raise error
+            status = next(queue)
+            if mutate is not None:
+                (sender if mutate == "sender" else policy).write_bytes(b"Replaced identity\n")
+            if raw is not None:
+                stdout, stderr, code = raw
+            else:
+                stdout = f"OWNED_APPLEEVENT_PREFLIGHT/1 mode={mode} osstatus={status}\n"
+                stderr, code = "", 0 if status == 0 else 67
+            return subprocess.CompletedProcess(arguments, code, stdout, stderr)
+
+        owner.run.side_effect = run
+        receipt = probe.admit_appleevent_permission_prerequisite(
+            owner, [str(sender), "73136", "owned-nonce"], policy, observed.append
+        )
+        return owner, observed, receipt
+
+    def test_missing_explicit_boolean_opt_in_never_starts_a_native_request(self):
+        for value in (False, None, 1, "true"):
+            with self.subTest(value=value), TemporaryDirectory() as directory:
+                with self.assertRaisesRegex(probe.AdmissionError, "not explicitly authorized"):
+                    self.invoke(Path(directory), (), allow=value)
+
+    def test_existing_permission_requires_two_fresh_exact_context_queries(self):
+        with TemporaryDirectory() as directory:
+            owner, observed, receipt = self.invoke(Path(directory), (0, 0))
+            self.assertEqual(owner.run.call_count, 2)
+            self.assertEqual(
+                observed,
+                [
+                    "before-automation-query",
+                    "after-automation-query",
+                    "before-automation-query",
+                    "after-automation-query",
+                ],
+            )
+            self.assertEqual(receipt["statuses"], [{"mode": "query", "osstatus": 0}] * 2)
+
+    def test_ui_opt_in_only_observes_the_exact_owned_request_mode(self):
+        with (
+            TemporaryDirectory() as directory,
+            patch.object(
+                probe, "approve_owned_automation_prompt", return_value="pressed"
+            ) as approval,
+        ):
+            owner, observed, receipt = self.invoke(Path(directory), (-1744, 0, 0), ui=True)
+        approval.assert_called_once_with(
+            owner, "exact-owned-requester", 30, "Owned sender identity", "Owned receiver identity"
+        )
+        self.assertEqual(
+            receipt["statuses"][1],
+            {
+                "mode": "request",
+                "osstatus": 0,
+                "native_ui": "pressed",
+            },
+        )
+        self.assertEqual(receipt["statuses"][2], {"mode": "query", "osstatus": 0})
+
+    def test_consent_required_request_and_fresh_query_keep_original_sender_and_policy(self):
+        with TemporaryDirectory() as directory:
+            root = Path(directory)
+            owner, observed, receipt = self.invoke(root, (-1744, 0, 0))
+            self.assertEqual(owner.run.call_count, 3)
+            self.assertEqual(
+                [call.args[0][-1] for call in owner.run.call_args_list],
+                [
+                    "permission-query",
+                    "permission-request",
+                    "permission-query",
+                ],
+            )
+            self.assertEqual(len(observed), 6)
+            self.assertEqual(
+                receipt["statuses"],
+                [
+                    {"mode": "query", "osstatus": -1744},
+                    {"mode": "request", "osstatus": 0},
+                    {"mode": "query", "osstatus": 0},
+                ],
+            )
+            self.assertEqual(
+                receipt["sender_sha256"],
+                probe.digest(root / "OwnedAppleEvent-sender.app/Contents/MacOS/sender"),
+            )
+
+    def test_refused_permission_or_unavailable_target_never_becomes_a_grant(self):
+        for statuses in ((-1743,), (-600,), (-1744, -1743), (-1744, -600), (-1744, -1744)):
+            with self.subTest(statuses=statuses), TemporaryDirectory() as directory:
+                with self.assertRaisesRegex(probe.AdmissionError, "was not granted"):
+                    self.invoke(Path(directory), statuses)
+
+    def test_initial_or_requested_grant_requires_fresh_nonprompt_confirmation(self):
+        for statuses in ((0, -1744), (-1744, 0, -1743)):
+            with self.subTest(statuses=statuses), TemporaryDirectory() as directory:
+                with self.assertRaisesRegex(probe.AdmissionError, "Fresh nonprompt"):
+                    self.invoke(Path(directory), statuses)
+
+    def test_prompt_timeout_preserves_the_native_owner_failure(self):
+        failure = probe.AdmissionError("Owned native command exceeded deadline")
+        with TemporaryDirectory() as directory:
+            with self.assertRaises(probe.AdmissionError) as caught:
+                self.invoke(Path(directory), (), error=failure)
+            self.assertIs(caught.exception, failure)
+
+    def test_changed_executable_or_policy_cannot_borrow_permission_receipt(self):
+        for target in ("sender", "policy"):
+            with self.subTest(target=target), TemporaryDirectory() as directory:
+                with self.assertRaisesRegex(probe.AdmissionError, "identity changed"):
+                    self.invoke(Path(directory), (0,), mutate=target)
+
+    def test_dirty_mismatched_or_noncanonical_receipts_cannot_grant_permission(self):
+        for raw in (
+            ("OWNED_APPLEEVENT_PREFLIGHT/1 mode=query osstatus=0\n", "dirty", 0),
+            ("OWNED_APPLEEVENT_PREFLIGHT/1 mode=request osstatus=0\n", "", 0),
+            ("OWNED_APPLEEVENT_PREFLIGHT/1 mode=query osstatus=00\n", "", 0),
+            ("OWNED_APPLEEVENT_PREFLIGHT/1 mode=query osstatus=-0\n", "", 0),
+            ("OWNED_APPLEEVENT_PREFLIGHT/1 mode=query osstatus=2147483648\n", "", 67),
+            ("OWNED_APPLEEVENT_PREFLIGHT/1 mode=query osstatus=0\n", "", 67),
+            ("OWNED_APPLEEVENT_PREFLIGHT/1 mode=query osstatus=-1744\n", "", 0),
+            ("OWNED_APPLEEVENT_PREFLIGHT/1 mode=query osstatus=0\n" * 2, "", 0),
+        ):
+            with self.subTest(raw=raw), TemporaryDirectory() as directory:
+                with self.assertRaises(probe.AdmissionError):
+                    self.invoke(Path(directory), (0,), raw=raw)
+
+    def test_consented_prerequisite_never_replaces_original_positive_or_denial_receipts(self):
+        with TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / "sandbox.sb").write_text(AppleEventBoundaryControls.policy)
+            judge = AppleEventBoundaryControls()
+            owner = judge.model(root)
+            owner.allow_automation_consent = True
+            permission = {"sender_sha256": "a" * 64, "statuses": [{"mode": "query", "osstatus": 0}]}
+            with (
+                patch.object(probe.uuid, "uuid4", return_value=judge.nonce),
+                patch.object(probe, "native_compiler", return_value=["modeled-native-clang"]),
+                patch.object(
+                    probe, "admit_appleevent_permission_prerequisite", return_value=permission
+                ) as request,
+            ):
+                receipt = probe.admit_appleevent_boundary(owner, root)
+            self.assertEqual(len(owner.sender_calls), 3)
+            self.assertEqual(owner.deliveries, 2)
+            self.assertEqual(receipt["unconfined_status"], 0)
+            self.assertEqual(receipt["deny_removal_status"], 0)
+            self.assertEqual(receipt["denied_status"], -1743)
+            self.assertEqual(receipt["permission_prerequisite"], permission)
+            self.assertTrue(receipt["receiver_retired"])
+            request.assert_called_once()
+            arguments = request.call_args.args
+            self.assertIs(arguments[0], owner)
+            self.assertEqual(arguments[1][1:], ["73136", judge.nonce])
+            self.assertEqual(arguments[2], root / "sandbox-appleevent-positive.sb")
+
+
+class OwnedConsentUIControls(unittest.TestCase):
+    """Bounded exact-requester controls; actual secure OS UI is native-only."""
+
+    def owner(self, packets, *, terminal=None, reaped=False):
+        process = Mock(pid=73136)
+        group = Mock(process=process, reaped=reaped)
+        group.observe_exit.return_value = terminal
+        owner = Mock(root=Path("/owned-private-root"), groups={process: group})
+        owner.run.side_effect = [
+            subprocess.CompletedProcess([], code, out, err) for code, out, err in packets
+        ]
+        return owner, process, group
+
+    def test_absent_then_unique_pressed_prompt_stays_inside_request_deadline(self):
+        owner, process, group = self.owner(
+            [
+                (0, "OWNED_AUTOMATION_UI/1 state=absent\n", ""),
+                (0, "OWNED_AUTOMATION_UI/1 state=pressed\n", ""),
+            ]
+        )
+        with (
+            patch.object(probe.time, "monotonic", return_value=20),
+            patch.object(probe.time, "sleep") as sleep,
+        ):
+            probe.approve_owned_automation_prompt(owner, process, 22, "sender", "receiver")
+        self.assertEqual(owner.run.call_count, 2)
+        self.assertEqual(group.observe_exit.call_count, 2)
+        sleep.assert_called_once_with(0.05)
+        for call in owner.run.call_args_list:
+            self.assertEqual(
+                call.args[0],
+                [str(owner.root / "native-appleevent-consent"), "sender", "receiver", "73136"],
+            )
+            self.assertEqual(call.kwargs, {"check": False, "timeout": 2})
+
+    def test_terminal_requester_never_acquires_or_presses_a_consent_window(self):
+        owner, process, group = self.owner([], terminal=object())
+        probe.approve_owned_automation_prompt(owner, process, 0, "sender", "receiver")
+        owner.run.assert_not_called()
+
+    def test_lost_or_replaced_requester_reservation_never_acquires_ui(self):
+        for fault in ("reaped", "replaced", "missing"):
+            owner, process, group = self.owner([], reaped=fault == "reaped")
+            if fault == "replaced":
+                group.process = Mock()
+            if fault == "missing":
+                owner.groups = {}
+            with (
+                self.subTest(fault=fault),
+                self.assertRaisesRegex(probe.AdmissionError, "reservation changed"),
+            ):
+                probe.approve_owned_automation_prompt(owner, process, 100, "sender", "receiver")
+            owner.run.assert_not_called()
+
+    def test_missing_permission_identity_or_unqualified_native_ui_never_grants(self):
+        for state in (
+            "accessibility-unavailable",
+            "identity-unqualified",
+            "observation-refused",
+            "approval-refused",
+            "requester-unavailable",
+        ):
+            owner, process, group = self.owner(
+                [(67, "OWNED_AUTOMATION_UI/1 state=" + state + "\n", "")]
+            )
+            with self.subTest(state=state), patch.object(probe.time, "monotonic", return_value=0):
+                with self.assertRaisesRegex(probe.AdmissionError, state):
+                    probe.approve_owned_automation_prompt(owner, process, 30, "sender", "receiver")
+            self.assertEqual(owner.run.call_count, 1)
+
+    def test_dirty_or_ambiguous_frame_never_exposes_private_capture(self):
+        for packet in (
+            (0, "OWNED_AUTOMATION_UI/1 state=pressed\n", "private-capture"),
+            (67, "private-path-or-nonce\n", ""),
+            (67, "OWNED_AUTOMATION_UI/1 state=pressed\n", ""),
+            (0, "OWNED_AUTOMATION_UI/1 state=pressed\n" * 2, ""),
+        ):
+            owner, process, group = self.owner([packet])
+            with patch.object(probe.time, "monotonic", return_value=0):
+                with self.assertRaises(probe.AdmissionError) as caught:
+                    probe.approve_owned_automation_prompt(owner, process, 30, "sender", "receiver")
+            self.assertNotIn("private-", str(caught.exception))
+
+    def test_expired_outer_deadline_never_acquires_native_ui(self):
+        owner, process, group = self.owner([])
+        with patch.object(probe.time, "monotonic", return_value=30):
+            with self.assertRaisesRegex(probe.AdmissionError, "deadline"):
+                probe.approve_owned_automation_prompt(owner, process, 30, "sender", "receiver")
+        owner.run.assert_not_called()
+
+    def test_after_start_exception_physically_settles_same_native_requester(self):
+        with (
+            TemporaryDirectory() as directory,
+            patch.object(probe, "NativeProcessGroups"),
+            patch.object(probe.os, "getuid", return_value=501, create=True),
+        ):
+            owner = probe.Children(Path(directory))
+            child = Mock(pid=73136, returncode=None)
+            refusal = probe.AdmissionError("Normal UI refused owned prompt")
+            callback = Mock(side_effect=refusal)
+            with (
+                patch.object(probe.subprocess, "Popen", return_value=child),
+                patch.object(owner, "settle") as settle,
+                patch.object(OwnedProcessGroup, "wait_for_exit") as wait,
+            ):
+                with self.assertRaises(probe.AdmissionError) as caught:
+                    owner.run(["owned-requester"], timeout=30, after_start=callback)
+                self.assertIs(caught.exception, refusal)
+                callback.assert_called_once()
+                self.assertIs(callback.call_args.args[0], child)
+                wait.assert_not_called()
+                settle.assert_called_once_with(child)
+            self.assertEqual(owner.active, [])
+
+    def test_ui_callback_does_not_restart_original_native_request_deadline(self):
+        with (
+            TemporaryDirectory() as directory,
+            patch.object(probe, "NativeProcessGroups"),
+            patch.object(probe.os, "getuid", return_value=501, create=True),
+        ):
+            owner = probe.Children(Path(directory))
+            child = Mock(pid=73136, returncode=0)
+            callback = Mock()
+            with (
+                patch.object(probe.subprocess, "Popen", return_value=child),
+                patch.object(owner, "settle") as settle,
+                patch.object(OwnedProcessGroup, "wait_for_exit") as wait,
+                patch.object(probe.time, "monotonic", side_effect=(20, 45)),
+            ):
+                result = owner.run(["owned-requester"], timeout=30, after_start=callback)
+                self.assertEqual(result.returncode, 0)
+                callback.assert_called_once_with(child, 50)
+                wait.assert_called_once_with(5)
+                settle.assert_called_once_with(child)
+            self.assertEqual(owner.active, [])
+
+    def test_pending_native_ipc_then_pressed_reuses_requester_and_original_budget(self):
+        owner, process, group = self.owner(
+            [
+                (0, "OWNED_AUTOMATION_UI/1 state=observation-pending\n", ""),
+                (0, "OWNED_AUTOMATION_UI/1 state=pressed\n", ""),
+            ]
+        )
+        with (
+            patch.object(probe.time, "monotonic", side_effect=(20, 20, 21)),
+            patch.object(probe.time, "sleep") as sleep,
+        ):
+            self.assertEqual(
+                probe.approve_owned_automation_prompt(owner, process, 22, "sender", "receiver"),
+                "pressed",
+            )
+        self.assertEqual(group.observe_exit.call_count, 2)
+        self.assertEqual([c.kwargs["timeout"] for c in owner.run.call_args_list], [2, 1])
+        self.assertTrue(all(c.args[0][-1] == "73136" for c in owner.run.call_args_list))
+        sleep.assert_called_once_with(0.05)
+
+    def test_persistent_pending_native_ipc_is_refused_at_original_deadline(self):
+        owner, process, group = self.owner(
+            [
+                (0, "OWNED_AUTOMATION_UI/1 state=observation-pending\n", ""),
+                (0, "OWNED_AUTOMATION_UI/1 state=observation-pending\n", ""),
+            ]
+        )
+        with (
+            patch.object(probe.time, "monotonic", side_effect=(0, 0, 1, 1, 2)),
+            patch.object(probe.time, "sleep"),
+        ):
+            with self.assertRaisesRegex(probe.AdmissionError, "deadline"):
+                probe.approve_owned_automation_prompt(owner, process, 2, "sender", "receiver")
+        self.assertEqual(owner.run.call_count, 2)
+        self.assertEqual(group.observe_exit.call_count, 3)
+        self.assertEqual([c.kwargs["timeout"] for c in owner.run.call_args_list], [2, 1])
+
+    def test_terminal_requester_after_pending_never_acquires_another_ui(self):
+        owner, process, group = self.owner(
+            [
+                (0, "OWNED_AUTOMATION_UI/1 state=observation-pending\n", ""),
+            ]
+        )
+        group.observe_exit.side_effect = (None, 0)
+        with (
+            patch.object(probe.time, "monotonic", return_value=0),
+            patch.object(probe.time, "sleep"),
+        ):
+            self.assertEqual(
+                probe.approve_owned_automation_prompt(owner, process, 2, "sender", "receiver"),
+                "request-ended",
+            )
+        self.assertEqual(owner.run.call_count, 1)
+
+    def test_pending_native_frame_requires_zero_exit_and_complete_clean_capture(self):
+        for packet in (
+            (67, "OWNED_AUTOMATION_UI/1 state=observation-pending\n", ""),
+            (0, "OWNED_AUTOMATION_UI/1 state=observation-pending\n", "private"),
+            (0, "OWNED_AUTOMATION_UI/1 state=observation-pending\n" * 2, ""),
+        ):
+            with self.subTest(packet=packet):
+                owner, process, group = self.owner([packet])
+                with patch.object(probe.time, "monotonic", return_value=0):
+                    with self.assertRaises(probe.AdmissionError):
+                        probe.approve_owned_automation_prompt(
+                            owner, process, 2, "sender", "receiver"
+                        )
+                self.assertEqual(owner.run.call_count, 1)
+
+
+class OwnedAutomationUIFactControls(unittest.TestCase):
+    """Private enum evidence controls do not claim macOS AX observation."""
+
+    @staticmethod
+    def packet():
+        return {
+            "schema": 1,
+            "ax_trusted": True,
+            "requester_qualified": True,
+            "scanned_agents": 2,
+            "windows": 1,
+            "nodes": 7,
+            "candidates": 0,
+            "matches": 0,
+            "first_agent": 1,
+            "first_attribute": "windows",
+            "first_type": "absent",
+            "first_error": -25205,
+        }
+
+    def test_literal_ax_error_and_agent_enum_remain_closed_without_ui_text(self):
+        packet = self.packet()
+        self.assertEqual(probe._validate_owned_automation_ui_fact(packet), packet)
+        for key, value in (
+            ("schema", True),
+            ("ax_trusted", 1),
+            ("scanned_agents", True),
+            ("nodes", 1048577),
+            ("first_agent", 4),
+            ("first_error", 2**31),
+            ("first_attribute", "private-window-title"),
+            ("first_type", "private-text"),
+        ):
+            invalid = dict(packet)
+            invalid[key] = value
+            with self.subTest(key=key), self.assertRaises(probe.AdmissionError):
+                probe._validate_owned_automation_ui_fact(invalid)
+        packet["private_text"] = "not-admitted"
+        with self.assertRaises(probe.AdmissionError):
+            probe._validate_owned_automation_ui_fact(packet)
+
+    def test_private_capture_preserves_primary_native_refusal_and_exports_only_enum_facts(self):
+        with TemporaryDirectory() as directory, patch.object(probe, "NativeProcessGroups"):
+            root = Path(directory)
+            evidence_dir = root / "evidence"
+            evidence_dir.mkdir(mode=0o700)
+            evidence = probe.PhaseEvidence(evidence_dir)
+            owner = probe.Children(root, evidence=evidence)
+            packet = self.packet()
+            primary = subprocess.CompletedProcess(
+                [], 67, "OWNED_AUTOMATION_UI/1 state=observation-refused\n", ""
+            )
+
+            def producer(arguments, **kwargs):
+                self.assertEqual(arguments[:-1], ["/owned/helper", "sender", "receiver", "73"])
+                self.assertEqual(kwargs, {"check": False, "timeout": 2})
+                path = Path(arguments[-1])
+                self.assertEqual(path.parent, root)
+                self.assertEqual(stat.S_IMODE(path.stat().st_mode), 0o600)
+                path.write_text(json.dumps(packet))
+                return primary
+
+            owner.run = Mock(side_effect=producer)
+            try:
+                result = probe._owned_automation_ui_run(
+                    owner, ["/owned/helper", "sender", "receiver", "73"], 2
+                )
+                self.assertIs(result, primary)
+                exported = json.loads((evidence_dir / "checkpoint.json").read_text())
+                self.assertEqual(exported["native_ui"], packet)
+                self.assertEqual(exported["phase"], "automation.ui-observation")
+                self.assertEqual(exported["status"], "refused")
+                self.assertFalse(exported["ownership_closed"])
+                self.assertEqual(list(root.glob("automation-ui-fact-*")), [])
+            finally:
+                evidence.close()
+
+    def test_replaced_diagnostic_path_is_neither_read_as_fact_nor_unlinked(self):
+        with TemporaryDirectory() as directory, patch.object(probe, "NativeProcessGroups"):
+            root = Path(directory)
+            owner = probe.Children(root)
+            captured = []
+
+            def producer(arguments, **kwargs):
+                path = Path(arguments[-1])
+                path.unlink()
+                path.write_text("foreign-replacement")
+                captured.append(path)
+                return subprocess.CompletedProcess(
+                    [], 67, "OWNED_AUTOMATION_UI/1 state=observation-refused\n", ""
+                )
+
+            owner.run = Mock(side_effect=producer)
+            with self.assertRaisesRegex(probe.AdmissionError, "identity or bound"):
+                probe._owned_automation_ui_run(
+                    owner, ["/owned/helper", "sender", "receiver", "73"], 2
+                )
+            self.assertEqual(captured[0].read_text(), "foreign-replacement")
+
+    def test_observation_packet_cannot_claim_acceptance_or_physical_closure(self):
+        with TemporaryDirectory() as directory:
+            root = Path(directory)
+            root.chmod(0o700)
+            for status, closed in (("accepted", False), ("pending", True)):
+                evidence = probe.PhaseEvidence(root)
+                try:
+                    self.assertFalse(
+                        evidence.record(
+                            "automation.ui-observation",
+                            status=status,
+                            closed=closed,
+                            native_ui=self.packet(),
+                        )
+                    )
+                    self.assertTrue(evidence.failed)
+                    self.assertFalse((root / "checkpoint.json").exists())
+                finally:
+                    evidence.close()
+
+
 class ComposedNativeDiagnosticControls(unittest.TestCase):
     """Independent joint grammar and real adapter controls, not macOS admission."""
 
@@ -3298,6 +3821,78 @@ class SenderRegistrationIdentityControls(unittest.TestCase):
                     AppleEventBoundaryControls().invoke(
                         directory, registration_output=original.replace(absent, "")
                     )
+
+
+class ConsentPairMergeJoinControls(unittest.TestCase):
+    def test_explicit_consent_keeps_two_named_roles_and_default_shared_image(self):
+        import plistlib
+
+        nonce = "54bc7a36-e2f0-43f8-917e-ce3d286d7520"
+        with TemporaryDirectory() as directory:
+            root = Path(directory)
+            calls = []
+            owner = SimpleNamespace(
+                run=lambda args, **options: calls.append((args, options)),
+                allow_automation_consent=True,
+                allow_owned_consent_ui=True,
+            )
+            roles = probe._build_appleevent_consent_pair(owner, root, root, ["owned-clang"], nonce)
+            self.assertEqual(set(roles), {"sender", "receiver"})
+            self.assertNotEqual(roles["sender"][0], roles["receiver"][0])
+            for role in ("sender", "receiver"):
+                app = root / ("OwnedAppleEvent-" + role + ".app")
+                properties = plistlib.loads((app / "Contents/Info.plist").read_bytes())
+                self.assertEqual(
+                    properties["CFBundleIdentifier"],
+                    "com.ergopti.private.appleevent." + role + "." + nonce,
+                )
+                self.assertEqual(
+                    properties["CFBundleName"], "Owned AppleEvent " + role + " " + nonce
+                )
+                self.assertEqual(roles[role], [str(app / "Contents/MacOS" / role)])
+                self.assertTrue(properties["LSUIElement"])
+                self.assertFalse(any("Entitlement" in key for key in properties))
+            self.assertEqual(owner.automation_sender_name, "Owned AppleEvent sender " + nonce)
+            self.assertEqual(owner.automation_receiver_name, "Owned AppleEvent receiver " + nonce)
+            compilations = [args for args, _ in calls if args[0] == "owned-clang"]
+            self.assertEqual(len(compilations), 3)
+            sender = [
+                args
+                for args in compilations
+                if str(root / "tools/diagnostics/native_appleevent_probe_sender.c") in args
+            ]
+            receiver = [
+                args
+                for args in compilations
+                if str(root / "tools/diagnostics/native_appleevent_probe_receiver.c") in args
+            ]
+            self.assertEqual(len(sender), 1)
+            self.assertEqual(len(receiver), 1)
+            for recipe in (sender[0], receiver[0]):
+                self.assertIn("-fobjc-arc", recipe)
+                self.assertEqual(recipe[recipe.index("-x") + 1], "objective-c")
+                for framework in ("ApplicationServices", "Carbon", "AppKit", "Security"):
+                    self.assertIn(framework, recipe)
+            self.assertIn(str(root / "tools/diagnostics/native_appleevent_permission.c"), sender[0])
+            self.assertNotIn(
+                str(root / "tools/diagnostics/native_appleevent_permission.c"), receiver[0]
+            )
+            self.assertTrue(all(options == {"confined": True} for _, options in calls))
+        with TemporaryDirectory() as directory:
+            root = Path(directory)
+            calls = []
+            owner = SimpleNamespace(run=lambda args, **options: calls.append(args))
+            roles = probe._build_appleevent_pair(owner, root, root, ["owned-clang"], nonce)
+            image = str(root / "OwnedAppleEvent.app/Contents/MacOS/owned-probe")
+            self.assertEqual(roles["sender"], [image, "sender"])
+            self.assertEqual(roles["receiver"], [image, "receiver"])
+            shared_compile = [args for args in calls if args[0] == "owned-clang"]
+            self.assertEqual(len(shared_compile), 1)
+            self.assertIn(
+                str(root / "tools/diagnostics/native_appleevent_permission.c"), shared_compile[0]
+            )
+            self.assertFalse(hasattr(owner, "automation_sender_name"))
+            self.assertFalse(hasattr(owner, "automation_receiver_name"))
 
 
 class ComposedSenderIdentityControls(unittest.TestCase):

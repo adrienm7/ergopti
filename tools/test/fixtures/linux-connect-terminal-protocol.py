@@ -38,7 +38,11 @@ class TerminalProtocol(unittest.TestCase):
     def fixture(self, client_failure=None, valid=True):
         client, backend = Endpoint(client_failure), Endpoint()
         handler = SimpleNamespace(
-            server=SimpleNamespace(requests=[], tls_origin=SimpleNamespace(server_port=443)),
+            server=SimpleNamespace(
+                requests=[],
+                tls_origin=SimpleNamespace(server_port=443),
+                expected_certificate_reset=False,
+            ),
             path="first.corporate.invalid:443" if valid else "other.corporate.invalid:443",
             headers={},
             connection=client,
@@ -92,6 +96,52 @@ class TerminalProtocol(unittest.TestCase):
         self.assertEqual(handler.codes, [200])
         self.assertTrue(handler.close_connection)
 
+    def test_explicit_failed_trust_client_reset_keeps_owned_tunnel_terminal(self):
+        handler, client, backend = self.fixture(ConnectionResetError(104, "owned TLS refusal"))
+        handler.server.expected_certificate_reset = True
+        self.invoke(handler, backend, [client])
+        self.assertEqual(handler.codes, [200])
+        self.assertTrue(handler.close_connection)
+
+    def test_failed_trust_marker_never_suppresses_other_peer_reset(self):
+        handler, client, backend = self.fixture()
+        handler.server.expected_certificate_reset = True
+        backend.failure = ConnectionResetError(104, "unqualified backend reset")
+        with self.assertRaises(ConnectionResetError):
+            self.invoke(handler, backend, [backend])
+        self.assertEqual(handler.codes, [200])
+        self.assertTrue(handler.close_connection)
+
+    def test_failed_trust_marker_never_suppresses_backend_write_reset(self):
+        handler, client, backend = self.fixture()
+        handler.server.expected_certificate_reset = True
+        client.recv = lambda count: b"independent client bytes"
+
+        def refused_write(data):
+            self.assertEqual(data, b"independent client bytes")
+            raise ConnectionResetError(104, "unqualified backend write reset")
+
+        backend.sendall = refused_write
+        with self.assertRaises(ConnectionResetError):
+            self.invoke(handler, backend, [client])
+        self.assertEqual(handler.codes, [200])
+        self.assertTrue(handler.close_connection)
+
+    def test_owned_tunnel_keeps_admitted_marker_after_case_marker_retires(self):
+        handler, client, backend = self.fixture()
+        handler.server.expected_certificate_reset = True
+
+        def retired_case_recv(count):
+            self.assertEqual(count, 65536)
+            handler.server.expected_certificate_reset = False
+            raise ConnectionResetError(104, "admitted owned client reset")
+
+        client.recv = retired_case_recv
+        self.invoke(handler, backend, [client])
+        self.assertFalse(handler.server.expected_certificate_reset)
+        self.assertEqual(handler.codes, [200])
+        self.assertTrue(handler.close_connection)
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
@@ -106,12 +156,13 @@ if __name__ == "__main__":
     MODULE = importlib.util.module_from_spec(spec)
     loader.exec_module(MODULE)  # Only when root explicitly executes this control.
     # Only the new control framework output is adapted; every original case
-    # body, assertion and five-case floor remains unchanged.
+    # body and assertion remains unchanged; four independent reset controls add
+    # coverage without accepting an unknown or other-peer reset.
     transcript = io.StringIO()
     suite = unittest.defaultTestLoader.loadTestsFromTestCase(TerminalProtocol)
     result = unittest.TextTestRunner(stream=transcript, verbosity=2).run(suite)
-    assert result.testsRun == 5
+    assert result.testsRun == 9
     if not result.wasSuccessful():
         sys.stderr.write(transcript.getvalue())  # Private original phase sink.
         raise SystemExit(1)
-    print("CONNECT terminal protocol controls: 5 passed; 0 skipped; modeled socket/select only.")
+    print("CONNECT terminal protocol controls: 9 passed; 0 skipped; modeled socket/select only.")

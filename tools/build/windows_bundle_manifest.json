@@ -30,7 +30,7 @@
 		{
 			"source": "static/ergopti_plus/windows/vendor",
 			"dest": "vendor",
-			"why": "Native libraries and PowerShell workers resolved through _VendorDir: sqlite3.dll, 64bit/WebView2Loader.dll, ergopti_nav_owner.dll, the uninstall, crash-report and screen-brightness workers."
+			"why": "Native libraries and PowerShell workers resolved through _VendorDir: sqlite3.dll, 64bit/WebView2Loader.dll, ergopti_nav_owner.dll, the uninstall, crash-report and screen-brightness workers, and the bounded PAC worker with its runtime identity receipt and license."
 		}
 	],
 	"exclude": [
@@ -75,11 +75,15 @@
 			"name": "other-driver-data",
 			"globs": [
 				"static/ergopti_plus/_shared/assets/**",
+				"static/ergopti_plus/_shared/python/**",
+				"static/ergopti_plus/_shared/modules/llm/managed_python_release.json",
 				"static/ergopti_plus/_shared/data/keycodes/evdev.json",
 				"static/ergopti_plus/_shared/data/keycodes/hid_usages.json",
-				"static/ergopti_plus/_shared/modules/features/linux_evidence.json"
+				"static/ergopti_plus/_shared/modules/features/linux_evidence.json",
+				"static/ergopti_plus/_shared/modules/llm/managed_ollama_runtime.json",
+				"static/ergopti_plus/_shared/modules/llm/managed_ollama_release.json"
 			],
-			"why": "The macOS and Linux tray PNGs, the Linux evdev key codes, the HID usages only the macOS codegen reads, and the Linux feature evidence ledger; the Windows tray uses the .ico files and Windows reads key positions from physical_keys.json."
+			"why": "The macOS and Linux tray PNGs, shared Python runtime and caches, the macOS MLX Python bootstrap catalogue, the Linux evdev key codes, the HID usages only the macOS codegen reads, and the Linux feature evidence ledger; the Windows tray uses the .ico files and Windows reads key positions from physical_keys.json. The optional native macOS Ollama source and produced asset catalogues are not read by Windows."
 		},
 		{
 			"name": "website-logos",
@@ -97,8 +101,12 @@
 		},
 		{
 			"name": "compile-time-sources",
-			"globs": ["static/ergopti_plus/windows/vendor/*.ahk"],
-			"why": "AutoHotkey libraries #Included when Ahk2Exe compiles the exe, which already contains them. The programmable-hotstring worker is executed separately by the shipped interpreter and must remain a runtime source.",
+			"globs": [
+				"static/ergopti_plus/windows/vendor/*.ahk",
+				"static/ergopti_plus/_shared/native/**",
+				"static/ergopti_plus/_shared/go/**"
+			],
+			"why": "AutoHotkey libraries #Included when Ahk2Exe compiles the exe, which already contains them. The programmable-hotstring worker is executed separately by the shipped interpreter and must remain a runtime source. Shared native sources are compiled into platform executables and are never read by the Windows runtime. Shared Go sources are compiled into the optional macOS runtime.",
 			"except": ["static/ergopti_plus/windows/vendor/ergopti_user_hotstrings.ahk"]
 		},
 		{
@@ -129,6 +137,10 @@
 		}
 	],
 	"required": [
+		{
+			"source": "static/ergopti_plus/windows/vendor/ergopti_curl_attempt.ps1",
+			"dest": "vendor/ergopti_curl_attempt.ps1"
+		},
 		{
 			"source": "static/ergopti_plus/windows/vendor/ergopti_uninstall.ps1",
 			"dest": "vendor/ergopti_uninstall.ps1"
@@ -184,6 +196,22 @@
 		{
 			"source": "static/layouts/registry/ergopti/hotstrings/magickeyreplace.toml",
 			"dest": "static/layouts/registry/ergopti/hotstrings/magickeyreplace.toml"
+		},
+		{
+			"source": "static/ergopti_plus/windows/vendor/ergopti_network_pac.ps1",
+			"dest": "vendor/ergopti_network_pac.ps1"
+		},
+		{
+			"source": "static/ergopti_plus/windows/vendor/ergopti_network_pac.exe",
+			"dest": "vendor/ergopti_network_pac.exe"
+		},
+		{
+			"source": "static/ergopti_plus/windows/vendor/ergopti_network_pac.json",
+			"dest": "vendor/ergopti_network_pac.json"
+		},
+		{
+			"source": "static/ergopti_plus/windows/vendor/ergopti_network_pac.LICENSE.txt",
+			"dest": "vendor/ergopti_network_pac.LICENSE.txt"
 		}
 	]
 }

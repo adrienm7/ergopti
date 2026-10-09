@@ -27,7 +27,7 @@
 				"archive-source-crypto": 8,
 				"archive-source-bin-parent": 4,
 				"archive-private-snapshot": 5,
-				"connect-terminal-protocol-model": 5,
+				"connect-terminal-protocol-model": 9,
 				"x11-display": 1,
 				"wayland-display": 1,
 				"tray-symbols": 1,

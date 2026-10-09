@@ -278,7 +278,7 @@ check('portable Brew ownership controls remain registered and mandatory', () => 
 	assert.ifError(result.error);
 	assert.strictEqual(result.signal, null, result.stderr);
 	assert.strictEqual(result.status, 0, result.stderr);
-	assert.match(result.stderr, /Ran 105 tests in /);
+	assert.match(result.stderr, /Ran 132 tests in /);
 	assert.match(result.stderr, /\nOK\s*$/);
 	assert.doesNotMatch(result.stderr, /skipped=/);
 });
@@ -388,7 +388,7 @@ check(
 		assert.strictEqual(typeof pairRecipe, 'string');
 		assert.strictEqual(
 			require('node:crypto').createHash('sha256').update(pairRecipe).digest('hex'),
-			'31e50ced3bd9fa1012a51113b601a38da098c7fbd6bc1dba288ac6b27defbf3d',
+			'a6cb300a26bc105bfa0fc6ad2ec00d97b2710e7c68014aa7d235f70eb4552297',
 			'the unique active pair builder must retain its exact compiler/signature/nonce recipe'
 		);
 		assert.match(
@@ -846,9 +846,27 @@ check('shared native process ownership controls remain registered and mandatory'
 	assert.ifError(result.error);
 	assert.strictEqual(result.signal, null, result.stderr);
 	assert.strictEqual(result.status, 0, result.stderr);
-	assert.match(result.stderr, /Ran 15 tests in /);
+	assert.match(result.stderr, /Ran 29 tests in /);
 	assert.match(result.stderr, /\nOK\s*$/);
 	assert.doesNotMatch(result.stderr, /skipped=/);
+	const workflow = require('yaml').parse(
+		fs.readFileSync(path.join(ROOT, '.github/workflows/ci-macos.yml'), 'utf8')
+	);
+	const command =
+		'"$ERGOPTI_NATIVE_HTTP_PYTHON" tools/diagnostics/macos_owned_process_native_test.py';
+	for (const [job, name] of [
+		['managed-ollama-native', 'Receive actual independent managed HTTP native clients'],
+		['package-macos', 'Receive actual managed HTTP native clients']
+	]) {
+		const steps = workflow.jobs[job].steps.filter((step) => step.name === name);
+		assert.strictEqual(steps.length, 1, `${job} needs one actual native receiving owner`);
+		const script = steps[0].run;
+		assert.ok(script.startsWith('set -euo pipefail\nstatus=0\n'));
+		assert.strictEqual(script.split(command).length - 1, 1);
+		assert.ok(script.includes(`${command} || status=1\n`));
+		assert.ok(script.endsWith('exit "$status"\n'));
+		assert.notStrictEqual(steps[0]['continue-on-error'], true);
+	}
 });
 
 check(
@@ -1171,6 +1189,98 @@ check(
 	}
 );
 // SENDER_NONPROMPT_PERMISSION_DIAGNOSTIC_END
+
+check('normal Automation consent stays explicitly scoped and independently admitted', () => {
+	const source = (name) => fs.readFileSync(path.join(ROOT, 'tools/diagnostics', name), 'utf8');
+	const helper = source('macos_brew_archive_acceptance.py');
+	const sender = source('native_appleevent_probe_sender.c');
+	const worker = source('native_appleevent_permission.c');
+	const ui = source('native_appleevent_consent.m');
+	function assertScopedConsent(candidate) {
+		const begin = candidate.helper.indexOf('def approve_owned_automation_prompt(');
+		const end = candidate.helper.indexOf('def appleevent_registration_fact(', begin);
+		assert.ok(begin >= 0 && end > begin, 'New consent has its own source scope');
+		const scope = candidate.helper.slice(begin, end);
+		assert.match(scope, /getattr\(children, "allow_automation_consent", False\) is True/);
+		assert.match(
+			scope,
+			/mode == "request" and getattr\(children, "allow_owned_consent_ui", False\) is True/
+		);
+		assert.match(scope, /timeout=30/);
+		assert.match(scope, /timeout=min\(3, remaining\)/);
+		assert.match(scope, /children\.groups\[process\]\.process is process/);
+		assert.match(scope, /not children\.groups\[process\]\.reaped/);
+		assert.match(
+			scope,
+			/digest\(executable\) == original_digest and digest\(policy\) == original_policy/
+		);
+		assert.match(scope, /if status == -1744:\s*status = query\("request"\)/);
+		assert.match(scope, /require\(status == 0,/);
+		assert.match(scope, /require\(query\("query"\) == 0,/);
+		assert.match(scope, /result\.returncode == \(0 if status == 0 else 67\)/);
+		assert.match(
+			candidate.helper,
+			/deadline = time\.monotonic\(\) \+ timeout\s*after_start\(process, deadline\)\s*self\.groups\[process\]\.wait_for_exit\(max\(0, deadline - time\.monotonic\(\)\)\)/
+		);
+		assert.match(
+			candidate.sender,
+			/owned_appleevent_permission\(&address, probe_class, probe_event,\s*strcmp\(argv\[3\], "permission-request"\) == 0\)/
+		);
+		assert.match(candidate.worker, /pthread_create\(&worker, NULL, query_permission, &request\)/);
+		assert.match(candidate.worker, /pthread_join\(worker, NULL\)/);
+		assert.match(
+			candidate.worker,
+			/request->target, request->event_class, request->event_id, request->ask/
+		);
+		assert.match(candidate.worker, /return request\.status == noErr \? 0 : 67/);
+		assert.match(candidate.ui, /kAXTrustedCheckOptionPrompt: @NO/);
+		assert.match(candidate.ui, /SecRequirementCreateWithString\(CFSTR\("anchor apple"\)/);
+		assert.match(candidate.ui, /SecCodeCopyDesignatedRequirement/);
+		assert.match(candidate.ui, /SecCodeCheckValidity\(code, kSecCSStrictValidate, designated\)/);
+		assert.match(candidate.ui, /identifier isEqualToString:application\.bundleIdentifier/);
+		assert.equal((candidate.ui.match(/same_signed_sender\(/g) || []).length, 3);
+		assert.match(candidate.ui, /@"com\.ergopti\.private\.appleevent\.sender\."/);
+		assert.match(candidate.ui, /if \(!senderSeen \|\| !denySeen \|\| buttons\.count != 1\)/);
+		assert.match(candidate.ui, /if \(targetUnqualified \|\| approvedButtons\.count > 1\)/);
+		assert.match(
+			candidate.ui,
+			/agent\.terminated \|\| !apple_signed_process\(agent\) \|\| !same_signed_sender\(requester, sender\)/
+		);
+		assert.match(candidate.ui, /\+\+examined > 256/);
+		assert.match(candidate.ui, /windows\.count > 8/);
+		assert.match(candidate.ui, /applications\.count > 512/);
+		assert.equal((candidate.ui.match(/AXUIElementPerformAction\(/g) || []).length, 1);
+		assert.doesNotMatch(
+			scope + candidate.worker + candidate.ui,
+			/tccutil|TCC\.db|kAEInteractWithAll|sqlite3|typeWildCard/
+		);
+	}
+	const original = { helper, sender, worker, ui };
+	assertScopedConsent(original);
+	for (const [file, before, after] of [
+		[
+			'helper',
+			'getattr(children, "allow_automation_consent", False) is True,\n        "Automation consent request',
+			'True,\n        "Automation consent request'
+		],
+		['helper', 'timeout=30,', 'timeout=180,'],
+		['helper', 'query("query") == 0', 'True'],
+		[
+			'sender',
+			'owned_appleevent_permission(&address, probe_class, probe_event,',
+			'owned_appleevent_permission(&address, typeWildCard, typeWildCard,'
+		],
+		['worker', 'return request.status == noErr ? 0 : 67;', 'return 0;'],
+		['ui', 'kAXTrustedCheckOptionPrompt: @NO', 'kAXTrustedCheckOptionPrompt: @YES'],
+		['ui', 'CFSTR("anchor apple")', 'CFSTR("identifier anything")'],
+		['ui', 'approvedButtons.count > 1', 'approvedButtons.count > 2']
+	]) {
+		assert.equal(original[file].split(before).length - 1, 1, 'One independent scope mutation');
+		assert.throws(() =>
+			assertScopedConsent({ ...original, [file]: original[file].replace(before, after) })
+		);
+	}
+});
 
 check(
 	'composed native sender reuses one receiver observation and retains both bounded refusals',

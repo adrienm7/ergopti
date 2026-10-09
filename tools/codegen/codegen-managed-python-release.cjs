@@ -1,0 +1,201 @@
+// tools/codegen/codegen-managed-python-release.cjs
+
+/** Project the reviewed uv Python metadata for bootstrap without an interpreter. */
+'use strict';
+
+const fs = require('node:fs');
+const path = require('node:path');
+const { REPO_ROOT, sharedRel } = require('../lib/paths.cjs');
+
+const SOURCE = sharedRel('modules', 'llm', 'managed_python_release.json');
+const SHELL_OUTPUT = 'static/ergopti_plus/macos/modules/llm/managed-python-release.sh';
+const METADATA_OUTPUT = 'static/ergopti_plus/macos/modules/llm/managed-python-downloads.json';
+const LUA_LOCATOR_OUTPUT = sharedRel('lua', 'core', 'llm', 'managed_python_locator.lua');
+
+function exactKeys(value, expected) {
+	if (!value || typeof value !== 'object' || Array.isArray(value))
+		throw new TypeError('Managed Python metadata requires an object.');
+	const keys = Object.keys(value).sort();
+	const required = [...expected].sort();
+	if (keys.length !== required.length || keys.some((key, index) => key !== required[index]))
+		throw new TypeError('Managed Python metadata has an unknown or missing field.');
+}
+
+/** Refuse unsupported platforms and unsafe shell values before generating output. */
+function validate(data) {
+	exactKeys(data, ['schema_version', 'uv_release', 'source', 'downloads']);
+	if (
+		data.schema_version !== 1 ||
+		typeof data.uv_release !== 'string' ||
+		!/^\d+\.\d+\.\d+$/.test(data.uv_release)
+	)
+		throw new TypeError('Managed Python metadata schema or uv release refused.');
+	exactKeys(data.source, ['url', 'sha256', 'bytes']);
+	if (
+		data.source.url !==
+			`https://raw.githubusercontent.com/astral-sh/uv/${data.uv_release}/crates/uv-python/download-metadata.json` ||
+		typeof data.source.sha256 !== 'string' ||
+		!/^[a-f0-9]{64}$/.test(data.source.sha256) ||
+		!Number.isSafeInteger(data.source.bytes) ||
+		data.source.bytes <= 0
+	)
+		throw new TypeError('Managed Python upstream metadata identity refused.');
+	const keys = Object.keys(data.downloads || {});
+	if (keys.length !== 2) throw new TypeError('Managed Python platform selection is unavailable.');
+	const selections = ['aarch64', 'x86_64'].map((family) => {
+		const matches = keys.filter((key) => data.downloads[key]?.arch?.family === family);
+		if (matches.length !== 1)
+			throw new TypeError('Managed Python native architecture is unavailable or duplicated.');
+		const key = matches[0],
+			entry = data.downloads[key];
+		exactKeys(entry, [
+			'name',
+			'arch',
+			'os',
+			'libc',
+			'major',
+			'minor',
+			'patch',
+			'prerelease',
+			'url',
+			'sha256',
+			'variant',
+			'build'
+		]);
+		exactKeys(entry.arch, ['family', 'variant']);
+		if (
+			entry.name !== 'cpython' ||
+			entry.arch.family !== family ||
+			entry.arch.variant !== null ||
+			entry.os !== 'darwin' ||
+			entry.libc !== 'none' ||
+			entry.variant !== null ||
+			entry.prerelease !== '' ||
+			entry.major !== 3 ||
+			entry.minor !== 11 ||
+			!Number.isSafeInteger(entry.patch) ||
+			entry.patch < 0 ||
+			typeof entry.build !== 'string' ||
+			!/^\d{8}$/.test(entry.build) ||
+			typeof entry.sha256 !== 'string' ||
+			!/^[a-f0-9]{64}$/.test(entry.sha256)
+		)
+			throw new TypeError('Managed Python native platform identity refused.');
+		const version = `${entry.major}.${entry.minor}.${entry.patch}`;
+		if (
+			key !== `cpython-${version}-darwin-${family}-none` ||
+			entry.url !==
+				`https://github.com/astral-sh/python-build-standalone/releases/download/${entry.build}/cpython-${version}%2B${entry.build}-${family}-apple-darwin-install_only_stripped.tar.gz`
+		)
+			throw new TypeError('Managed Python archive identity refused.');
+		return { key, entry, version, nativeArchitecture: family === 'aarch64' ? 'arm64' : 'x86_64' };
+	});
+	if (
+		selections.some(
+			({ entry, version }) =>
+				version !== selections[0].version || entry.build !== selections[0].entry.build
+		)
+	)
+		throw new TypeError(
+			'Managed Python native architectures require the same interpreter release.'
+		);
+	return selections;
+}
+
+/** Render deterministic projections; the original metadata still owns uv extraction. */
+function render(data) {
+	const selections = validate(data);
+	const branches = selections
+		.map(({ entry, version, nativeArchitecture }) => {
+			const basename =
+				entry.sha256.slice(0, 9) + '-' + entry.url.split('/').at(-1).replace('%2B', '-');
+			return `\t${nativeArchitecture})
+\t\tMANAGED_PYTHON_REQUEST="cpython-${version}-macos-${entry.arch.family}-none"
+\t\tMANAGED_PYTHON_URL="${entry.url}"
+\t\tMANAGED_PYTHON_SHA256="${entry.sha256}"
+\t\tMANAGED_PYTHON_CACHE_BASENAME="${basename}"
+\t\t;;`;
+		})
+		.join('\n');
+	const locator = selections
+		.map(
+			({ entry, version, nativeArchitecture }) =>
+				`\t${nativeArchitecture} = "cpython-${version}-macos-${entry.arch.family}-none/bin/python${entry.major}.${entry.minor}",`
+		)
+		.join('\n');
+	return {
+		[LUA_LOCATOR_OUTPUT]: `--- _shared/lua/core/llm/managed_python_locator.lua
+--- Generated by tools/codegen/codegen-managed-python-release.cjs; do not edit.
+--- Source: _shared/modules/llm/managed_python_release.json.
+--- These pinned namespace hints never authorize an executable or its native architecture.
+
+return {
+${locator}
+}
+`,
+		[SHELL_OUTPUT]: `#!/bin/bash
+# modules/llm/managed-python-release.sh
+
+# Generated by tools/codegen/codegen-managed-python-release.cjs; do not edit.
+# Source: _shared/modules/llm/managed_python_release.json.
+# uv owns hash verification, offline extraction and interpreter publication.
+
+MANAGED_PYTHON_UV_RELEASE="${data.uv_release}"
+case "\${ERGOPTI_NATIVE_ARCH:-$(/usr/bin/uname -m)}" in
+${branches}
+\t*) return 78 2>/dev/null || exit 78 ;;
+esac
+MANAGED_PYTHON_DOWNLOADS_BASENAME="managed-python-downloads.json"
+`,
+		[METADATA_OUTPUT]: JSON.stringify(data.downloads, null, '\t') + '\n'
+	};
+}
+
+/** Check all projections without mutation, or regenerate them from the canonical source. */
+function generate(root = REPO_ROOT, { check = false } = {}) {
+	if (!path.isAbsolute(root) || typeof check !== 'boolean')
+		throw new TypeError('Managed Python generator options refused.');
+	const data = JSON.parse(fs.readFileSync(path.join(root, SOURCE), 'utf8'));
+	const uv = fs.readFileSync(
+		path.join(root, 'static/ergopti_plus/macos/modules/llm/uv-release.sh'),
+		'utf8'
+	);
+	const version = uv.match(/^UV_RELEASE_VERSION="([0-9]+\.[0-9]+\.[0-9]+)"$/m);
+	if (!version || version[1] !== data.uv_release)
+		throw new TypeError('Managed Python metadata does not belong to the installed uv release.');
+	const outputs = render(data);
+	for (const [relative, contents] of Object.entries(outputs)) {
+		const target = path.join(root, relative);
+		if (check) {
+			if (!fs.existsSync(target) || !fs.readFileSync(target).equals(Buffer.from(contents)))
+				throw new Error(`Managed Python projection drift: ${relative}.`);
+		} else {
+			fs.mkdirSync(path.dirname(target), { recursive: true });
+			fs.writeFileSync(target, contents, 'utf8');
+		}
+	}
+	return Object.keys(outputs);
+}
+
+if (require.main === module) {
+	try {
+		const args = process.argv.slice(2);
+		if (args.length > 1 || args.some((arg) => arg !== '--check'))
+			throw new TypeError('Usage: node tools/codegen/codegen-managed-python-release.cjs [--check]');
+		generate(REPO_ROOT, { check: args.includes('--check') });
+		console.log('Managed Python release projections are current.');
+	} catch (error) {
+		console.error(error.message);
+		process.exitCode = 1;
+	}
+}
+
+module.exports = {
+	SOURCE,
+	SHELL_OUTPUT,
+	METADATA_OUTPUT,
+	LUA_LOCATOR_OUTPUT,
+	validate,
+	render,
+	generate
+};

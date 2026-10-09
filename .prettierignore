@@ -19,6 +19,7 @@ yarn.lock
 static/ergopti_plus/_shared/core/ports/contracts.json
 static/ergopti_plus/_shared/data/metrics_general_category_aliases.json
 static/ergopti_plus/_shared/modules/menu/menu_manifest.json
+static/ergopti_plus/macos/modules/llm/managed-python-downloads.json
 static/ergopti_plus/docs/architecture.md
 static/layouts/registry/index.json
 

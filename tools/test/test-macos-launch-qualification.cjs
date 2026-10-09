@@ -152,17 +152,41 @@ try {
 				});
 			}
 		}
+	// Reuse the independently authored oracle without running its test module.
+	const coldFactory = fs
+		.readFileSync(path.join(__dirname, 'test-desktop-ci-evidence.cjs'), 'utf8')
+		.match(/^function coldBootstrapRecord\(\) \{[\s\S]*?^\}/m);
+	assert.ok(coldFactory, 'The independent cold-bootstrap receipt factory must exist');
+	const coldBootstrap = JSON.parse(
+		JSON.stringify(
+			vm.runInNewContext('(' + coldFactory[0] + ')()', {
+				fs,
+				path,
+				crypto: require('node:crypto'),
+				__dirname
+			})
+		)
+	);
+	coldBootstrap.sha = sha;
+	coldBootstrap.receipt.sha = sha;
+	coldBootstrap.receipt.build_commit = sha;
 	const state = {
 		platform: 'macos',
 		release: true,
 		scenarios,
 		sha,
 		evidence: records,
+		coldBootstrap: [coldBootstrap],
 		needs: Object.fromEntries(
-			['test-hs', 'e2e-hs', 'package-macos', 'launch', 'tooltip-canvas'].map((name) => [
-				name,
-				{ result: 'success' }
-			])
+			[
+				'test-hs',
+				'e2e-hs',
+				'package-macos',
+				'launch',
+				'tooltip-canvas',
+				'managed-ollama-native',
+				'cold-bootstrap-native'
+			].map((name) => [name, { result: 'success' }])
 		),
 		qualificationContext: context,
 		qualificationNow: now

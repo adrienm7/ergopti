@@ -131,7 +131,16 @@ for (const [before, after] of [
 	['path: ${{ runner.temp }}/windows-ahk-native-desktop/', 'path: unrelated/'],
 	['if-no-files-found: error', 'if-no-files-found: warn']
 ]) {
-	const changed = body.replace(before, after);
+	// Bind every mutation to its own step; earlier diagnostics share upload fields.
+	const target = pipeline.step(
+		body,
+		before.startsWith('run:')
+			? 'Run native desktop AHK cohorts'
+			: 'Publish native desktop AHK evidence'
+	);
+	const changedTarget = target.replace(before, after);
+	assert.notEqual(changedTarget, target, 'the mutation must alter the native desktop step');
+	const changed = body.replace(target, changedTarget);
 	assert.notEqual(changed, body);
 	assert.throws(() => checkWorkflow(changed));
 	refused += 1;

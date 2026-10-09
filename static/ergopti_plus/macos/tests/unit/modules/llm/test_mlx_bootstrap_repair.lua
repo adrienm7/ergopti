@@ -42,6 +42,7 @@ local OWNED = {
 	"ui.menu.menu_llm.runtime_install_offer", "ui.menu.menu_llm.mlx_repair_offer",
 	"adapters.python_interpreter", "ui.python_runtime_offer",
 	"adapters.file_system",
+	"adapters.native_bootstrap_pty",
 }
 
 -- The closing lines ensure-mlx-deps.sh prints after any failed uv sync: they
@@ -134,8 +135,17 @@ local function task_api(world)
 		new = function(executable, completion, stream, args)
 			if type(stream) == "table" then args, stream = stream, nil end
 			local task = { executable = executable, args = args or {}, completion = completion, stream = stream }
-			function task:start() return self end
-			function task:terminate() return self end
+			function task:start()
+				if type(world.on_start) == "function" then world.on_start(self) end
+				if world.start_mode == "false" then return false end
+				if world.start_mode == "nil" then return nil end
+				if world.start_mode == "throw" then error("Independent native start refusal") end
+				return self
+			end
+			function task:terminate()
+				self.terminate_calls = (self.terminate_calls or 0) + 1
+				return self
+			end
 			function task:isRunning() return false end
 			function task.emit(stdout, stderr) return task.stream(task, stdout or "", stderr or "") end
 			function task.finish(code, stdout, stderr) return task.completion(code, stdout or "", stderr or "") end
@@ -428,6 +438,62 @@ helpers.describe("A failed MLX bootstrap names its cause (mlx-bootstrap-exit-std
 			message)
 		helpers.assert_true(message:find("No module named 'mlx'", 1, true) ~= nil, message)
 	end))
+end)
+
+helpers.describe("Native PTY caller joins the original MLX task transaction", function()
+	for _, start_mode in ipairs({ "false", "nil", "throw" }) do
+		helpers.it("retains native " .. start_mode .. " start until its exact retirement receipt", scoped(function()
+			local world = new_world()
+			world.start_mode = start_mode
+			local checker = load_world(world)
+			package.loaded["adapters.python_interpreter"]._set_deps({
+				read_head = function() return nil end,
+				realpath = function(path) return path end,
+				getenv = function() return nil end,
+				select_link_target = function() return nil end,
+				process_arch = function() return "arm64" end,
+			})
+			local retired, start_attempted, bound, pause_owner = false, false, false, nil
+			helpers.assert_true(checker.configure_pause_owner({
+				is_paused = function() return false end,
+				is_pause_transition_pending = function() return false end,
+				get_pause_epoch = function() return 0 end,
+				register_pause_owner = function(_, owner) pause_owner = owner; return true end,
+			}))
+			package.loaded["adapters.native_bootstrap_pty"] = {
+				prepare = function(source, environment, budget)
+					helpers.assert_true(source:match("/modules/llm/ensure%-mlx%-deps%.sh$") ~= nil)
+					helpers.assert_eq(budget, 1800000, "original bootstrap budget is preserved")
+					helpers.assert_eq(#environment, 3, "original bootstrap environment joins native source")
+					return {
+						executable = "/Applications/ErgoptiPlus.app/Contents/MacOS/ErgoptiPlus",
+						arguments = { "--managed-pty-worker", tostring(budget) },
+						bind_input = function(task) bound = task; return true end,
+						mark_start_attempted = function() start_attempted = true; return true end,
+						rollback = function() return true end,
+						settle = function(status) helpers.assert_eq(status, 64); return retired end,
+					}, true
+				end,
+			}
+			world.on_start = function(task)
+				helpers.assert_eq(bound, task, "private input joins the same native handle before start")
+				helpers.assert_true(start_attempted)
+				helpers.assert_true(checker.is_task_running(), "original task slot is published before start")
+			end
+			helpers.assert_eq(checker.install_for_selection(nil), false)
+			helpers.assert_eq(#world.tasks, 1, "no Python or alternate native task may be created")
+			local task = world.tasks[1]
+			helpers.assert_eq(task.executable, "/Applications/ErgoptiPlus.app/Contents/MacOS/ErgoptiPlus")
+			helpers.assert_eq(task.terminate_calls, 1, "start refusal joins the exact original rollback")
+			helpers.assert_true(checker.is_task_running(), "signal acceptance is not native settlement")
+			task.finish(64, "", "")
+			helpers.assert_true(checker.is_task_running(), "callback without receipt retains native cleanup debt")
+			helpers.assert_eq(checker.reset_bootstrap_state(), false)
+			retired = true
+			helpers.assert_true(pause_owner.pause(), "pause retries the same retained physical receipt")
+			helpers.assert_eq(checker.is_task_running(), false)
+		end))
+	end
 end)
 
 

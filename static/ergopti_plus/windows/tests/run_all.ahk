@@ -1098,9 +1098,13 @@ _LogBootProgress("keylogger modules + tests included")
 #Include unit/test_managed_network_failure.ahk
 #Include unit/test_managed_network_windows_actions.ahk
 #Include unit/test_managed_terminal_failure.ahk
+#Include unit/test_system_proxy_retirement.ahk
 #Include unit/test_managed_routes_native.ahk
 #Include unit/test_managed_remote_transport.ahk
 #Include unit/test_updater_managed_transport.ahk
+#Include unit/test_updater_curl_artifact.ahk
+#Include unit/test_updater_curl_capture.ahk
+#Include unit/test_managed_remote_sspi.ahk
 #Include meta/test_remote_connect_timeout_bounded.ahk
 #Include meta/test_keylogger_json_64bit_decode.ahk
 #Include meta/test_crash_build_offthread.ahk
