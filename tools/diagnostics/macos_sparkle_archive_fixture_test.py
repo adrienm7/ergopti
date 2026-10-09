@@ -17,6 +17,7 @@ import os
 from pathlib import Path
 import shutil
 import signal
+import stat
 import struct
 import socket
 import threading
@@ -651,6 +652,54 @@ class NativeCensusStageControls(unittest.TestCase):
             )
 
 
+class OwnedWindowsDirectoryMetadataModel:
+    """Project mode/UID only for one retained physical directory; no native POSIX claim."""
+
+    def __init__(self, root):
+        self.root = root
+        self.native_lstat = Path.lstat
+        original = self.native_lstat(root)
+        if root != root.resolve(strict=True) or not stat.S_ISDIR(original.st_mode):
+            raise AssertionError("Directory model requires one actual canonical directory")
+        self.identity = original.st_dev, original.st_ino
+        self.owner = original.st_uid
+        self.uid = self.owner
+        self.mode = 0o700
+        self.kind = stat.S_IFDIR
+        self.live = True
+
+    def project(self, observed, *arguments, **options):
+        # Missing paths retain their actual FileNotFoundError before projection eligibility.
+        current = self.native_lstat(observed, *arguments, **options)
+        if observed != self.root:
+            raise OSError(errno.EXDEV, "Foreign directory metadata projection refused")
+        if not self.live:
+            raise OSError(errno.EBADF, "Closed directory metadata projection refused")
+        if not stat.S_ISDIR(current.st_mode) or (current.st_dev, current.st_ino) != self.identity:
+            raise OSError(errno.ESTALE, "Actual directory metadata identity or kind changed")
+        modeled = list(current)
+        modeled[0] = self.kind | self.mode
+        modeled[4] = self.uid
+        return os.stat_result(modeled)
+
+
+@contextlib.contextmanager
+def owned_windows_directory_metadata(helper, root):
+    """Keep POSIX native checks; Windows uses exact physical identity with modeled mode/UID."""
+    if os.name != "nt":
+        yield None
+        return
+    model = OwnedWindowsDirectoryMetadataModel(root)
+    with (
+        mock.patch.object(Path, "lstat", autospec=True, side_effect=model.project),
+        mock.patch.object(helper.os, "geteuid", return_value=model.owner, create=True),
+    ):
+        try:
+            yield model
+        finally:
+            model.live = False
+
+
 class NativeDirectoryReasonControls(unittest.TestCase):
     """Reason projection observes unchanged native admission and exact exceptions."""
 
@@ -786,27 +835,64 @@ class NativeDirectoryReasonControls(unittest.TestCase):
         helper = self.helper
         with tempfile.TemporaryDirectory(prefix="sparkle-directory-control-") as temporary:
             root = Path(temporary).resolve()
-            root.chmod(0o700)
-            self.assertEqual(helper.private_directory(root), root)
-            root.chmod(0o755)
-            with self.assertRaisesRegex(
-                RuntimeError, "^Private Sparkle directory refused$"
-            ) as caught:
-                helper.private_directory(root)
-            self.assertEqual(caught.exception._sparkle_directory_reason, "mode")
-            root.chmod(0o700)
-            with self.assertRaises(FileNotFoundError) as caught:
-                helper.private_directory(root / "PRIVATE_MISSING")
-            self.assertEqual(caught.exception._sparkle_directory_reason, "missing")
-            if os.name != "nt":
-                (root / "physical").mkdir(mode=0o700)
-                (root / "alias").symlink_to(root / "physical", target_is_directory=True)
-                (root / "physical" / "child").mkdir(mode=0o700)
+            with owned_windows_directory_metadata(helper, root) as model:
+                root.chmod(0o700)
+                self.assertEqual(helper.private_directory(root), root)
+                root.chmod(0o755)
+                if model is not None:
+                    model.mode = 0o755
                 with self.assertRaisesRegex(
                     RuntimeError, "^Private Sparkle directory refused$"
                 ) as caught:
-                    helper.private_directory(root / "alias" / "child")
-                self.assertEqual(caught.exception._sparkle_directory_reason, "canonical")
+                    helper.private_directory(root)
+                self.assertEqual(caught.exception._sparkle_directory_reason, "mode")
+                root.chmod(0o700)
+                if model is not None:
+                    model.mode = 0o700
+                with self.assertRaises(FileNotFoundError) as caught:
+                    helper.private_directory(root / "PRIVATE_MISSING")
+                self.assertEqual(caught.exception._sparkle_directory_reason, "missing")
+                if os.name != "nt":
+                    (root / "physical").mkdir(mode=0o700)
+                    (root / "alias").symlink_to(root / "physical", target_is_directory=True)
+                    (root / "physical" / "child").mkdir(mode=0o700)
+                    with self.assertRaisesRegex(
+                        RuntimeError, "^Private Sparkle directory refused$"
+                    ) as caught:
+                        helper.private_directory(root / "alias" / "child")
+                    self.assertEqual(caught.exception._sparkle_directory_reason, "canonical")
+                if model is not None:
+                    for attribute, changed, reason in (
+                        ("uid", model.owner + 1, "owner"),
+                        ("kind", stat.S_IFREG, "not-directory"),
+                    ):
+                        original = getattr(model, attribute)
+                        try:
+                            setattr(model, attribute, changed)
+                            with self.assertRaisesRegex(
+                                RuntimeError, "^Private Sparkle directory refused$"
+                            ) as caught:
+                                helper.private_directory(root)
+                            self.assertEqual(caught.exception._sparkle_directory_reason, reason)
+                        finally:
+                            setattr(model, attribute, original)
+                    foreign = root / "foreign-physical-directory"
+                    foreign.mkdir()
+                    foreign_metadata = model.native_lstat(foreign)
+                    with mock.patch.object(model, "native_lstat", return_value=foreign_metadata):
+                        with self.assertRaises(OSError) as caught:
+                            helper.private_directory(root)
+                        self.assertEqual(caught.exception.errno, errno.ESTALE)
+                        self.assertEqual(caught.exception._sparkle_directory_reason, "metadata")
+                    with self.assertRaises(OSError) as caught:
+                        helper.private_directory(foreign)
+                    self.assertEqual(caught.exception.errno, errno.EXDEV)
+                    self.assertEqual(caught.exception._sparkle_directory_reason, "metadata")
+                    model.live = False
+                    with self.assertRaises(OSError) as caught:
+                        helper.private_directory(root)
+                    self.assertEqual(caught.exception.errno, errno.EBADF)
+                    self.assertEqual(caught.exception._sparkle_directory_reason, "metadata")
         for reason in [None, True, ["mode"], "PRIVATE_KEY", "mode\nPRIVATE_ARGV"]:
             failure = RuntimeError("PRIVATE_METADATA")
             failure._sparkle_census_stage = "private-root"
