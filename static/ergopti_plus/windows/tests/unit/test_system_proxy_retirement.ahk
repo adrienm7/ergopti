@@ -30,7 +30,7 @@ Test("managed network: legacy native-owner debt stops subsequent lookups and par
 
 ; Project only enumerated stages and bounded scalars from the settled owner capture.
 _SystemProxy_RetirementDiagnostic(Observation) {
-	Raw := _SystemProxy_RetirementRawFlagsFact(Observation.Get("stderr", ""))
+	Raw := _SystemProxy_RetirementRawFlagsFact(Observation.Get("stdout", ""))
 	if Raw != ""
 		_TestPrint("::notice title=Windows legacy PAC raw contract::" . Raw)
 	Out := Observation.Get("stdout", "")
@@ -95,7 +95,7 @@ _SystemProxy_RetirementCauseProjectionControls() {
 }
 Test("managed network: closed legacy cause projection refuses foreign, duplicate and unbounded receipts", _SystemProxy_RetirementCauseProjectionControls)
 
-; Raw contract values remain fixed booleans from the same settled stderr receipt.
+; Tree completion merges both streams into the same settled stdout capture.
 _SystemProxy_RetirementRawFlagsFact(Err) {
 	if !(Err is String) || StrLen(Err) > 8192
 		return ""
@@ -105,7 +105,7 @@ _SystemProxy_RetirementRawFlagsFact(Err) {
 	FirstOwner := InStr(Err, "RETIREMENT_DIAG")
 	if InStr(Err, "RETIREMENT_DIAG", , FirstOwner + 1)
 		return ""
-	Pattern := "m)^RETIREMENT_RAW_FLAGS control=5 schema=1 ok_bool=([01]) ok_true=([01]) kind_text=([01]) kind_named=([01]) access_integer=([01]) access_three=([01]) proxy_text=([01]) proxy_literal=([01]) proxy_legacy_ipv6_literal=([01]) bypass_text=([01]) bypass_empty=([01]) native_integer=([01]) native_zero=([01])`r?$"
+	Pattern := "m)^RETIREMENT_RAW_FLAGS control=5 schema=1 ok_bool=([01]) ok_true=([01]) kind_text=([01]) kind_named=([01]) access_integer=([01]) access_three=([01]) proxy_text=([01]) proxy_literal=([01]) proxy_legacy_ipv6_literal=([01]) bypass_text=([01]) bypass_empty=([01]) native_integer=([01]) native_zero=([01])(?: proxy_ipv6_bracket=([01]) proxy_ipv6_authority=([01]) proxy_ipv6_port=([01]) proxy_ipv6_normalized_literal=([01]))?`r?$"
 	if !RegExMatch(Err, Pattern, &Fact)
 		return ""
 	FirstRaw := InStr(Err, "RETIREMENT_RAW_FLAGS")
@@ -145,3 +145,19 @@ _SystemProxy_RetirementRawProjectionControls() {
 	AssertEqual("", _SystemProxy_RetirementRawFlagsFact(Owner . "`n" . Raw . StrReplace(Format("{:8193}", ""), " ", "x")))
 }
 Test("managed network: raw legacy contract projection requires same settled stderr owner and bounded booleans", _SystemProxy_RetirementRawProjectionControls)
+
+
+_SystemProxy_RetirementMergedCaptureControls() {
+	Owner := "RETIREMENT_DIAG control=5 stage=raw_proxy_contract child_exit=0 stdout_units=200 stderr_units=0"
+	Fields := "control=5 schema=1 ok_bool=1 ok_true=1 kind_text=1 kind_named=1 access_integer=1 access_three=1 proxy_text=1 proxy_literal=0 proxy_legacy_ipv6_literal=1 bypass_text=1 bypass_empty=1 native_integer=1 native_zero=1"
+	Details := " proxy_ipv6_bracket=1 proxy_ipv6_authority=1 proxy_ipv6_port=1 proxy_ipv6_normalized_literal=1"
+	Raw := "RETIREMENT_RAW_FLAGS " . Fields . Details
+	Capture := Raw . "`r`n" . Owner . "`r`nLegacy proxy retirement protocol failed.`r`n"
+	AssertEqual(Fields . Details, _SystemProxy_RetirementRawFlagsFact(Capture), "facts may precede the primary assertion in the exact merged capture")
+	for Value in [StrReplace(Capture, "proxy_ipv6_bracket=1", "proxy_ipv6_bracket=PRIVATE"),
+		StrReplace(Capture, "proxy_ipv6_port=1", "proxy_ipv6_port=2"),
+		StrReplace(Capture, " proxy_ipv6_normalized_literal=1", ""),
+		Capture . Raw, Capture . "RETIREMENT_DIAG malformed"]
+		AssertEqual("", _SystemProxy_RetirementRawFlagsFact(Value), "partial or foreign authority facts remain private")
+}
+Test("managed network: settled merged capture admits only closed IPv6 authority flags", _SystemProxy_RetirementMergedCaptureControls)

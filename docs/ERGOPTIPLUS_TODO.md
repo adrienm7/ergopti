@@ -7174,6 +7174,26 @@ packets; these diagnostics do not establish the remaining native TLS, worker
 startup or trust-restoration causes. Final selected gates and exact-source
 non-release macOS CI remain required; items 36/62 and transversal 16/38 stay open.
 
+The Windows receiving successor repairs one proven fixture setup failure: the
+unresolved vendor path produced the wrong shared defaults directory and the
+same PathNotFound HRESULT observed in native run37886569318. Normalize that
+existing path before deriving its parents. The exact old source fails the
+physical source-linked regression; all three corrected path controls pass.
+The legacy raw-proxy observer now reads the actual physically settled merged
+stdout instead of its empty stderr field. Original IPv6 assertions remain.
+Setup failures retain only closed command/category/language/compile-ID facts.
+SSPI observations retain acknowledged TLS-close byte counts and first relay
+progress without joining a possibly stale disposed stream to that failure;
+original SSL calls, security predicates, errors and deadlines remain intact.
+The three retained-directory attacks now stage their original children through
+an owned holding directory before moving the empty root, preserving all native
+identity handles. Refused staging/restoration/closure retains its exact actor;
+no production Running state or cleanup debt is fabricated. Independent reviews
+approve these source changes. Portable setup15, source receivers32, path3 and
+SSPI11/TCP4+6 controls pass; the new14 AHK graph cases, original physical attacks,
+TLS/SSPI failures, all native Windows code and E2E/package/install still require
+exact-source hosted qualification. Items36/62 and transversal16/38 remain open.
+
 - [~] **63.** Layer actions: screen brightness up/down are now shared, labelled
   through the existing 21-locale action catalogue, and implemented for keyboard
   layers on all three drivers. Windows and macOS also support their existing

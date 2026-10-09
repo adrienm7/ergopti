@@ -251,6 +251,275 @@ _CurlCaptureNativeCancellation(Contract) {
 Test("updater curl capture: actual progressing native body retires after cancellation and original deadline",
 	(*) => _UpdaterNative_WithContract(_CurlCaptureNativeCancellation))
 
+; Windows cannot rename a directory containing open descendant files. Stage
+; those exact originals outside it first; retained metadata identities never
+; close, and every mutation uses a proved DELETE-capable handle without replace.
+global _CurlCaptureDirectoryMoveFixtureDebt := Map()
+
+class _CurlCaptureDirectoryMoveFixture {
+	__New(Capture, Source, Target, Parent) {
+		global _CurlCaptureDirectoryMoveFixtureDebt
+		if Capture.HasOwnProp("FixtureDirectoryMove") && IsObject(Capture.FixtureDirectoryMove)
+			throw Error("Exact directory move fixture already retains transition debt.")
+		this.Capture := Capture
+		this.Source := Source
+		this.Target := Target
+		this.Parent := Parent
+		this.RootPath := Source
+		this.Holding := 0
+		this.HoldingPath := ""
+		this.HoldingCreated := false
+		this.HoldingLease := 0
+		this.PlacementLease := 0
+		this.StageLease := 0
+		this.Extras := Map()
+		this.Locations := Map()
+		this.Identities := Map("root", Capture.Snapshot(Capture.Directory["handle"]))
+		this.Closed := false
+		this.Running := false
+		_CurlCaptureHandleRenameBuffer(Source, Parent, 3, 0)
+		_CurlCaptureHandleRenameBuffer(Target, Parent, 3, 0)
+		for Name, Entry in Capture.Files {
+			this.Identities[Name] := Capture.Snapshot(Entry["handle"])
+			this.Locations[Name] := Source . "\" . Name
+		}
+		if Capture.Files.Count != 4 || Capture.ProbeCloseDebt.Length || Capture.Running || Capture.Retired
+			throw Error("Exact directory move fixture admission was refused.")
+		; Retain fixture transition debt separately from production process and
+		; retirement state. Fixture finally must settle this exact owner first.
+		PreviousCritical := A_IsCritical
+		Critical("On")
+		try {
+			Capture.FixtureDirectoryMove := this
+			_CurlCaptureDirectoryMoveFixtureDebt[ObjPtr(Capture)] := this
+		} finally Critical(PreviousCritical ? PreviousCritical : "Off")
+	}
+	Execute() {
+		PreviousCritical := A_IsCritical
+		Critical("On")
+		Started := false
+		try {
+			this.Begin()
+			Started := true
+			if this.Exists(this.Target)
+				throw Error("Exact directory move fixture target is unavailable.")
+			this.OpenOriginals()
+			this.AllocateHolding()
+			this.StageChildren()
+			this.MoveRoot(this.Target)
+			this.PlaceChildren(this.Target)
+			this.Finish()
+			return true
+		} finally {
+			if Started
+				this.Running := false
+			Critical(PreviousCritical ? PreviousCritical : "Off")
+		}
+	}
+	Rollback() {
+		PreviousCritical := A_IsCritical
+		Critical("On")
+		Started := false
+		try {
+			this.Begin()
+			Started := true
+			this.ClosePlacementLease()
+			this.OpenOriginals()
+			if this.HoldingCreated {
+				if !(this.Holding is Map) || !this.Holding.Get("handle", 0)
+					throw Error("Exact holding-directory authority remains unproven.")
+				this.StageChildren()
+				if this.RootPath != this.Source
+					this.MoveRoot(this.Source)
+				this.PlaceChildren(this.Source)
+			}
+			this.Finish()
+			return this.Source
+		} finally {
+			if Started
+				this.Running := false
+			Critical(PreviousCritical ? PreviousCritical : "Off")
+		}
+	}
+	Begin() {
+		this.EnsureOwner()
+		if this.Running || this.Closed
+			throw Error("Exact directory move fixture is already running or closed.")
+		this.Running := true
+	}
+	OpenOriginals() {
+		this.Prove("root", this.Capture.Directory["handle"])
+		for Name, Path in this.Locations
+			this.OpenOriginal(Name, Path, false)
+	}
+	OpenOriginal(Name, Path, Directory) {
+		if !this.Extras.Has(Name) || !this.Extras[Name] {
+			Handle := this.Open(Path, 0x10000, Directory)
+			if !Handle
+				throw Error("Exact directory move DELETE handle was refused.")
+			this.Extras[Name] := Handle
+		}
+		this.Prove(Name, this.Extras[Name])
+	}
+	Prove(Name, Handle) {
+		this.EnsureOwner()
+		Capture := this.Capture
+		Retained := Name == "root" ? Capture.Directory["handle"] : Capture.Files[Name]["handle"]
+		Original := this.Identities[Name]
+		Actual := Capture.Snapshot(Handle)
+		if Capture.ProbeCloseDebt.Length || !Capture.Same(Original, Capture.Snapshot(Retained))
+			|| !Capture.Same(Original, Actual) || Actual["delete_pending"]
+			|| (Name != "root" && Actual["links"] != 1)
+			throw Error("Exact directory move native identity was refused.")
+	}
+	AllocateHolding() {
+		this.HoldingPath := this.NewHoldingPath()
+		if !this.Create(this.HoldingPath)
+			throw Error("Exact holding-directory allocation was refused.")
+		this.HoldingCreated := true
+		this.Holding := Map("path", this.HoldingPath, "handle", 0, "directory", true)
+		this.Holding["handle"] := this.Open(this.HoldingPath, 0, true)
+		if !this.Holding["handle"] || !this.Capture.Snapshot(this.Holding["handle"]).Get("ok", false)
+			throw Error("Exact holding-directory identity was refused.")
+		this.HoldingIdentity := this.Capture.Snapshot(this.Holding["handle"])
+		this.HoldingLease := this.Open(this.HoldingPath, 0, true, 3)
+		if !this.HoldingLease || !this.Capture.Same(this.HoldingIdentity, this.Capture.Snapshot(this.HoldingLease))
+			throw Error("Exact holding-directory namespace lease was refused.")
+	}
+	StageChildren() {
+		if this.Extras.Has("root") && this.Extras["root"] {
+			if !this.Close(this.Extras["root"])
+				throw Error("Exact directory DELETE-handle closure was refused.")
+			this.Extras["root"] := 0
+		}
+		; A genuine sharing3 namespace lease, rather than a production-state
+		; flag, excludes timer retirement during a partial staging refusal.
+		if !this.StageLease
+			this.StageLease := this.Open(this.RootPath, 0, true, 3)
+		if !this.StageLease
+			throw Error("Exact staging namespace lease was refused.")
+		this.Prove("root", this.StageLease)
+		if !this.Capture.Same(this.HoldingIdentity, this.Capture.Snapshot(this.Holding["handle"]))
+			throw Error("Exact holding-directory identity changed.")
+		for Name, Path in this.Locations {
+			Destination := this.HoldingPath . "\" . Name
+			if Path != Destination
+				this.MoveChild(Name, Destination)
+		}
+		if !this.Close(this.StageLease)
+			throw Error("Exact staging namespace lease closure was refused.")
+		this.StageLease := 0
+	}
+	PlaceChildren(Directory) {
+		if this.Extras.Has("root") && this.Extras["root"] {
+			if !this.Close(this.Extras["root"])
+				throw Error("Exact directory DELETE-handle closure was refused.")
+			this.Extras["root"] := 0
+		}
+		; Access-zero sharing3 binds the destination namespace without a DELETE
+		; request that could conflict with the filesystem's target-parent open.
+		this.PlacementLease := this.Open(Directory, 0, true, 3)
+		if !this.PlacementLease
+			throw Error("Exact destination namespace lease was refused.")
+		this.Prove("root", this.PlacementLease)
+		for Name, Path in this.Locations {
+			Destination := Directory . "\" . Name
+			if Path != Destination
+				this.MoveChild(Name, Destination)
+		}
+	}
+	MoveChild(Name, Destination) => this.Commit("child", Name, Destination)
+	MoveRoot(Destination) {
+		this.OpenOriginal("root", this.RootPath, true)
+		this.Commit("root", "root", Destination)
+	}
+	Commit(Kind, Name, Destination) {
+		; Native return and its exact location publication are one fixture step.
+		; Timer reentry cannot observe an unrecorded physical rename commitment.
+		PreviousCritical := A_IsCritical
+		Critical("On")
+		try {
+			this.Prove(Name, this.Extras[Name])
+			if this.Exists(Destination) || !this.Rename(this.Extras[Name], Destination)
+				throw Error("Exact retained " . Kind . " move was refused.")
+			if Kind == "root"
+				this.RootPath := Destination
+			else
+				this.Locations[Name] := Destination
+			this.Prove(Name, this.Extras[Name])
+		} finally Critical(PreviousCritical ? PreviousCritical : "Off")
+	}
+	Finish() {
+		global _CurlCaptureDirectoryMoveFixtureDebt
+		this.ClosePlacementLease()
+		for Name, Handle in this.Extras {
+			if Handle {
+				this.Prove(Name, Handle)
+				if !this.Close(Handle)
+					throw Error("Exact directory move handle closure was refused.")
+				this.Extras[Name] := 0
+			}
+		}
+		if this.HoldingLease {
+			if !this.Close(this.HoldingLease)
+				throw Error("Exact holding namespace lease closure was refused.")
+			this.HoldingLease := 0
+		}
+		if this.Holding is Map && !this.RemoveHolding(this.Holding)
+			throw Error("Exact empty holding-directory retirement was refused.")
+		this.EnsureOwner()
+		this.Closed := true
+		this.Capture.FixtureDirectoryMove := 0
+		_CurlCaptureDirectoryMoveFixtureDebt.Delete(ObjPtr(this.Capture))
+	}
+	ClosePlacementLease() {
+		if this.PlacementLease {
+			if !this.Close(this.PlacementLease)
+				throw Error("Exact destination namespace lease closure was refused.")
+			this.PlacementLease := 0
+		}
+	}
+	EnsureOwner() {
+		global _CurlCaptureDirectoryMoveFixtureDebt
+		if !_CurlCaptureDirectoryMoveFixtureDebt.Has(ObjPtr(this.Capture))
+			|| _CurlCaptureDirectoryMoveFixtureDebt[ObjPtr(this.Capture)] != this
+			|| !this.Capture.HasOwnProp("FixtureDirectoryMove") || this.Capture.FixtureDirectoryMove != this
+			|| this.Capture.ProbeCloseDebt.Length
+			throw Error("Exact directory move fixture owner or physical closure was refused.")
+	}
+	NewHoldingPath() {
+		Guid := Buffer(16, 0)
+		if DllCall("ole32\CoCreateGuid", "Ptr", Guid, "Int") != 0
+			throw Error("Exact holding-directory nonce allocation was refused.")
+		Nonce := ""
+		loop 16
+			Nonce .= Format("{:02x}", NumGet(Guid, A_Index - 1, "UChar"))
+		return this.Parent . "\holding." . Nonce
+	}
+	Open(Path, Access, Directory, Sharing := 7) => this.Capture.Open(Path, Access, 3, Directory, Sharing)
+	Exists(Path) => FileExist(Path) != ""
+	Create(Path) => DllCall("kernel32\CreateDirectoryW", "Str", Path, "Ptr", 0, "Int")
+	Close(Handle) => this.Capture.CloseProbe(Handle)
+	RemoveHolding(Entry) => this.Capture.RetireEntry(Entry)
+	Rename(Handle, Destination) {
+		SplitPath(Destination, , &Parent)
+		Data := _CurlCaptureHandleRenameBuffer(Destination, Parent, 3, 0)
+		return DllCall("kernel32\SetFileInformationByHandle", "Ptr", Handle,
+			"Int", 3, "Ptr", Data, "UInt", Data.Size, "Int")
+	}
+}
+
+_CurlCaptureMoveRetainedDirectory(Capture, Source, Target, Parent) {
+	Owner := _CurlCaptureDirectoryMoveFixture(Capture, Source, Target, Parent)
+	return Owner.Execute()
+}
+
+_CurlCaptureRollbackDirectoryMove(Capture) {
+	if Capture.HasOwnProp("FixtureDirectoryMove") && IsObject(Capture.FixtureDirectoryMove)
+		return Capture.FixtureDirectoryMove.Rollback()
+	return ""
+}
+
 _CurlCaptureNativeDirectoryControls() {
 	global _UpdaterCurlCaptureDebt, UPDATER_REQUEST_ORIGIN_MANUAL
 	Parent := RTrim(_SR_AcquireCaptureDirectory(), "\")
@@ -262,8 +531,10 @@ _CurlCaptureNativeDirectoryControls() {
 	try {
 		Capture.Acquire(Parent)
 		Moved := Parent . "\moved-owned-directory"
-		AssertTrue(DllCall("kernel32\MoveFileW", "Str", Capture.Path, "Str", Moved, "Int"),
+		AssertTrue(_CurlCaptureMoveRetainedDirectory(Capture, Capture.Path, Moved, Parent),
 			"the real retained owned directory can be moved without destroying its identities")
+		AssertFalse(Capture.Running, "fixture setup leaves the genuine production retirement state unchanged")
+		AssertEqual(0, Capture.FixtureDirectoryMove, "the complete native setup has no pending fixture transition")
 		AssertTrue(DllCall("kernel32\CreateDirectoryW", "Str", Capture.Path, "Ptr", 0, "Int"))
 		ForeignHandle := Capture.Open(Capture.Path, 0, 3, true)
 		AssertTrue(ForeignHandle != 0)
@@ -278,7 +549,7 @@ _CurlCaptureNativeDirectoryControls() {
 		AssertFalse(Outcome.Reserved, "an actual successor cannot reserve while capture debt survives")
 		AssertTrue(Outcome.RecoveryBusy, "the actual production policy consumes retained capture debt")
 		AssertTrue(Capture.RetireEntry(Foreign), "only its independent native owner can retire the foreign directory")
-		AssertTrue(DllCall("kernel32\MoveFileW", "Str", Moved, "Str", Capture.Path, "Int"))
+		AssertTrue(_CurlCaptureMoveRetainedDirectory(Capture, Moved, Capture.Path, Parent))
 		Moved := ""
 		AssertTrue(_Updater_RetireCurlCapture(Capture), "restored exact native directory identity permits retirement")
 		AssertFalse(_UpdaterCurlCaptureDebt.Has(ObjPtr(Capture)))
@@ -350,6 +621,11 @@ _CurlCaptureFinishNativeFixture(Capture, Parent, Failed, Primary, Foreign := 0, 
 	CleanupFailure := 0
 	Capture.FixtureCleanupContext := Map("foreign", Foreign, "moved", Moved, "event", Event, "parent", Parent)
 	try {
+		OriginalSource := _CurlCaptureRollbackDirectoryMove(Capture)
+		if Directory && OriginalSource == Capture.Directory["path"] {
+			Moved := ""
+			Capture.FixtureCleanupContext["moved"] := ""
+		}
 		if Foreign is Map && !Capture.RetireEntry(Foreign)
 			throw Error("Independent native foreign fixture retirement was refused.")
 		if Moved != "" {
@@ -363,8 +639,11 @@ _CurlCaptureFinishNativeFixture(Capture, Parent, Failed, Primary, Foreign := 0, 
 			} finally Capture.CloseProbe(Probe)
 			if Capture.ProbeCloseDebt.Length || FileExist(Entry["path"])
 				throw Error("Original fixture path cannot replace an unowned entry.")
-			if !DllCall("kernel32\MoveFileW", "Str", Moved, "Str", Entry["path"], "Int")
+			Restored := Directory ? _CurlCaptureMoveRetainedDirectory(Capture, Moved, Entry["path"], Parent)
+				: DllCall("kernel32\MoveFileW", "Str", Moved, "Str", Entry["path"], "Int")
+			if !Restored
 				throw Error("Exact moved fixture restoration was refused.")
+			Capture.FixtureCleanupContext["moved"] := ""
 		}
 		if !_Updater_RetireCurlCapture(Capture)
 			throw Error("Native capture fixture retained physical or identity debt.")
@@ -410,7 +689,9 @@ _CurlCaptureNativeHybridNamespace(UseJunction := false) {
 		}
 		AssertEqual(4, Capture.ObserveBody(Worker, 16), "the original namespace admits the actual four-byte body")
 		Moved := Parent . "\moved-original-namespace"
-		AssertTrue(DllCall("kernel32\MoveFileW", "Str", Capture.Path, "Str", Moved, "Int"))
+		AssertTrue(_CurlCaptureMoveRetainedDirectory(Capture, Capture.Path, Moved, Parent))
+		AssertFalse(Capture.Running, "fixture setup leaves the genuine production retirement state unchanged")
+		AssertEqual(0, Capture.FixtureDirectoryMove, "the complete native setup has no pending fixture transition")
 		AssertTrue(DllCall("kernel32\CreateDirectoryW", "Str", Capture.Path, "Ptr", 0, "Int"))
 		Foreign := Map("path", Capture.Path, "handle", 0, "directory", true)
 		ForeignHandle := Capture.Open(Capture.Path, 0, 3, true)
@@ -534,6 +815,11 @@ _CurlCaptureFinishHybridNamespace(Capture, Parent, Failed, Primary, Foreign, Mov
 	try {
 		if IsObject(Capture.Worker) && !Capture.Worker.terminate()
 			throw Error("Hybrid namespace fixture retained its actual native worker.")
+		OriginalSource := _CurlCaptureRollbackDirectoryMove(Capture)
+		if OriginalSource == Capture.Directory["path"] {
+			Moved := ""
+			Capture.FixtureCleanupContext["moved"] := ""
+		}
 		if Foreign is Map {
 			if Junction && ReparseOwner {
 				_CurlCaptureRemoveNativeJunction(ReparseOwner)
@@ -544,6 +830,19 @@ _CurlCaptureFinishHybridNamespace(Capture, Parent, Failed, Primary, Foreign, Mov
 				for Name, Entry in Capture.Files {
 					if Entry.Get("retired", false) && !Entry["handle"]
 						continue
+					AlreadyMoved := Moved . "\" . Name
+					if FileExist(AlreadyMoved) {
+						Probe := Capture.Open(AlreadyMoved, 0, 3, false, 3)
+						if !Probe
+							throw Error("Partially transplanted original identity was unavailable.")
+						try {
+							if !Capture.Same(Capture.Snapshot(Entry["handle"]), Capture.Snapshot(Probe))
+								throw Error("Partially transplanted original identity was refused.")
+						} finally Capture.CloseProbe(Probe)
+						if Capture.ProbeCloseDebt.Length
+							throw Error("Partially transplanted probe closure was refused.")
+						continue
+					}
 					Probe := Capture.Open(Entry["path"], 0, 3, false, 3)
 					if !Probe
 						throw Error("Transplanted original fixture identity was unavailable.")
@@ -998,3 +1297,242 @@ _CurlCaptureNativeHandleRenameReceiving() {
 }
 Test("updater curl capture: public handle-rename receiving distinguishes empty controls from held descendants",
 	_CurlCaptureNativeHandleRenameReceiving)
+
+; These graph ports receive the actual fixture owner above. They model the
+; independent documented open-descendant denial, not native Windows success.
+class _CurlCaptureDirectoryMoveGraphCapture extends _UpdaterCurlCaptureLedger {
+	__New() {
+		super.__New()
+		this.Path := "C:\owned\original"
+		this.Directory := Map("path", this.Path, "handle", 10, "directory", true)
+		this.GraphHandles := Map(10, 10)
+		this.GraphDirectories := Map(10, true)
+		this.GraphPaths := Map(this.Path, 10)
+		Id := 20
+		for Name in ["artifact.bin", "headers.bin", "capability.json", "transport.conf"] {
+			this.GraphHandles[Id] := Id
+			this.GraphDirectories[Id] := false
+			this.GraphPaths[this.Path . "\" . Name] := Id
+			this.Files[Name] := Map("path", this.Path . "\" . Name, "handle", Id, "directory", false)
+			Id += 1
+		}
+	}
+	Snapshot(Handle) {
+		if !this.GraphHandles.Has(Handle)
+			return Map("ok", false)
+		Id := this.GraphHandles[Handle]
+		return Map("ok", true, "directory", this.GraphDirectories[Id], "volume", 1,
+			"index_high", 0, "index_low", Id, "delete_pending", false, "links", 1)
+	}
+}
+class _CurlCaptureDirectoryMoveGraph extends _CurlCaptureDirectoryMoveFixture {
+	__New(Capture, FailurePoint := 0) {
+		this.RenameCalls := 0
+		this.FailurePoint := FailurePoint
+		this.NextHandle := 100
+		this.Denials := 0
+		this.CloseRefused := false
+		super.__New(Capture, Capture.Path, "C:\owned\moved", "C:\owned")
+	}
+	NewHoldingPath() => "C:\owned\holding.graph"
+	Exists(Path) => this.Capture.GraphPaths.Has(Path)
+	Create(Path) {
+		if this.Exists(Path)
+			return false
+		this.Capture.GraphPaths[Path] := 40
+		this.Capture.GraphDirectories[40] := true
+		return true
+	}
+	Open(Path, Access, Directory, Sharing := 7) {
+		if !this.Exists(Path)
+			return 0
+		Handle := this.NextHandle++
+		this.Capture.GraphHandles[Handle] := this.Capture.GraphPaths[Path]
+		return Handle
+	}
+	Close(Handle) {
+		if this.CloseRefused {
+			this.Capture.ProbeCloseDebt.Push(Handle)
+			return false
+		}
+		AssertTrue(Handle >= 100, "no original metadata reference can close during fixture transition")
+		AssertTrue(this.Capture.GraphHandles.Has(Handle))
+		this.Capture.GraphHandles.Delete(Handle)
+		return true
+	}
+	RemoveHolding(Entry) {
+		for Path, Id in this.Capture.GraphPaths {
+			if SubStr(Path, 1, StrLen(Entry["path"]) + 1) == Entry["path"] . "\"
+				return false
+		}
+		if !this.Close(Entry["handle"])
+			return false
+		Entry["handle"] := 0
+		Entry["retired"] := true
+		this.Capture.GraphPaths.Delete(Entry["path"])
+		return true
+	}
+	Rename(Handle, Destination) {
+		if this.HasOwnProp("Reentry") && this.Reentry {
+			this.Reentry := false
+			AssertThrows(ObjBindMethod(this, "Rollback"), "a running mutation cannot borrow its own retained cleanup owner")
+			AssertTrue(this.Running)
+		}
+		this.RenameCalls += 1
+		if this.FailurePoint && this.RenameCalls == this.FailurePoint {
+			this.FailurePoint := 0
+			return false
+		}
+		if this.Exists(Destination) || !this.Capture.GraphHandles.Has(Handle)
+			return false
+		Id := this.Capture.GraphHandles[Handle]
+		Source := ""
+		for Path, PathId in this.Capture.GraphPaths {
+			if PathId == Id
+				Source := Path
+		}
+		if Source == ""
+			return false
+		if this.Capture.GraphDirectories[Id] {
+			for Path, ChildId in this.Capture.GraphPaths {
+				if SubStr(Path, 1, StrLen(Source) + 1) == Source . "\" {
+					for ChildHandle, HeldId in this.Capture.GraphHandles {
+						if HeldId == ChildId {
+							this.Denials += 1
+							return false
+						}
+					}
+				}
+			}
+		}
+		this.Capture.GraphPaths.Delete(Source)
+		this.Capture.GraphPaths[Destination] := Id
+		return true
+	}
+}
+
+_CurlCaptureDirectoryMoveGraphCheck(Capture, Root) {
+	AssertEqual(10, Capture.GraphPaths[Root], "the original directory identity reaches the exact graph namespace")
+	AssertEqual(10, Capture.Directory["handle"], "original root metadata authority stays open")
+	for Name, Entry in Capture.Files {
+		AssertEqual(Entry["handle"], Capture.GraphPaths[Root . "\" . Name], "each held child identity reaches the requested namespace")
+		AssertTrue(Capture.GraphHandles.Has(Entry["handle"]), "every original child metadata handle remains held")
+	}
+	AssertEqual(0, Capture.ProbeCloseDebt.Length)
+}
+_CurlCaptureDirectoryMoveGraphCase(Point := 0) {
+	global _CurlCaptureDirectoryMoveFixtureDebt
+	Capture := _CurlCaptureDirectoryMoveGraphCapture()
+	Owner := _CurlCaptureDirectoryMoveGraph(Capture, Point)
+	try {
+		if Point {
+			AssertThrows(ObjBindMethod(Owner, "Execute"), "an actual owner transition refusal cannot claim complete setup")
+			AssertTrue(Capture.FixtureDirectoryMove == Owner, "the exact partial transition owner remains published")
+			AssertFalse(Owner.Closed)
+			AssertFalse(Capture.Running, "fixture debt never fabricates production retirement state")
+			AssertTrue(_CurlCaptureDirectoryMoveFixtureDebt[ObjPtr(Capture)] == Owner,
+				"the exact fixture owner retains incomplete transitions separately")
+			AssertEqual(Capture.Path, Owner.Rollback(), "the same owner restores its exact original namespace")
+			_CurlCaptureDirectoryMoveGraphCheck(Capture, Capture.Path)
+			AssertFalse(Owner.Exists(Owner.Target))
+		} else {
+			Probe := Owner.Open(Owner.Source, 0x10000, true)
+			AssertFalse(Owner.Rename(Probe, Owner.Target), "the original populated-directory graph setup is independently denied")
+			AssertTrue(Owner.Close(Probe))
+			AssertEqual(1, Owner.Denials)
+			Owner.RenameCalls := 0
+			AssertTrue(Owner.Execute())
+			_CurlCaptureDirectoryMoveGraphCheck(Capture, Owner.Target)
+			AssertEqual(9, Owner.RenameCalls, "four staging moves, one empty root move, and four placement moves actually commit")
+			AssertFalse(Owner.Exists(Owner.Source))
+		}
+		AssertTrue(Owner.Closed)
+		AssertFalse(Capture.Running)
+		AssertEqual(0, Capture.FixtureDirectoryMove)
+		AssertFalse(Owner.Exists(Owner.HoldingPath), "the exact empty holding namespace retires only after all children leave")
+		AssertEqual(5, Capture.GraphHandles.Count, "only the five original metadata authorities remain")
+	} finally {
+		if _CurlCaptureDirectoryMoveFixtureDebt.Has(ObjPtr(Capture)) && _CurlCaptureDirectoryMoveFixtureDebt[ObjPtr(Capture)] == Owner
+			_CurlCaptureDirectoryMoveFixtureDebt.Delete(ObjPtr(Capture))
+	}
+}
+Test("updater curl capture: actual fixture owner stages retained children before the empty graph root move",
+	_CurlCaptureDirectoryMoveGraphCase)
+loop 9
+	Test("updater curl capture: exact graph transition " . A_Index . " refusal restores every held identity",
+		_CurlCaptureDirectoryMoveGraphCase.Bind(A_Index))
+
+_CurlCaptureDirectoryMoveGraphForeignRollback() {
+	global _CurlCaptureDirectoryMoveFixtureDebt
+	Capture := _CurlCaptureDirectoryMoveGraphCapture()
+	Owner := _CurlCaptureDirectoryMoveGraph(Capture, 6)
+	try {
+		AssertThrows(ObjBindMethod(Owner, "Execute"))
+		Capture.GraphPaths[Owner.Source] := 999
+		Capture.GraphPaths[Owner.Source . "\foreign.bytes"] := 998
+		AssertThrows(ObjBindMethod(Owner, "Rollback"), "restoration cannot replace an independently owned foreign namespace")
+		AssertEqual(999, Capture.GraphPaths[Owner.Source])
+		AssertEqual(998, Capture.GraphPaths[Owner.Source . "\foreign.bytes"])
+		AssertFalse(Owner.Closed)
+		AssertTrue(Capture.FixtureDirectoryMove == Owner)
+		; Only this graph's independent foreign owner removes its own entries.
+		Capture.GraphPaths.Delete(Owner.Source . "\foreign.bytes")
+		Capture.GraphPaths.Delete(Owner.Source)
+		AssertEqual(Capture.Path, Owner.Rollback())
+		_CurlCaptureDirectoryMoveGraphCheck(Capture, Capture.Path)
+	} finally _CurlCaptureDirectoryMoveFixtureDebt.Delete(ObjPtr(Capture))
+}
+Test("updater curl capture: a foreign graph rollback target retains every original transition debt",
+	_CurlCaptureDirectoryMoveGraphForeignRollback)
+
+_CurlCaptureDirectoryMoveGraphCloseDebt() {
+	global _CurlCaptureDirectoryMoveFixtureDebt
+	Capture := _CurlCaptureDirectoryMoveGraphCapture()
+	Owner := _CurlCaptureDirectoryMoveGraph(Capture)
+	try {
+		Owner.CloseRefused := true
+		AssertThrows(ObjBindMethod(Owner, "Execute"))
+		AssertEqual(1, Capture.ProbeCloseDebt.Length, "the actual owner retains exact failed native closure")
+		Calls := Owner.RenameCalls
+		AssertThrows(ObjBindMethod(Owner, "Rollback"), "unknown physical closure cannot authorize another mutation")
+		AssertEqual(Calls, Owner.RenameCalls)
+		AssertFalse(Owner.Closed)
+		AssertTrue(Capture.FixtureDirectoryMove == Owner)
+		for Name, Entry in Capture.Files
+			AssertTrue(Capture.GraphHandles.Has(Entry["handle"]), "original metadata references survive exact close refusal")
+	} finally _CurlCaptureDirectoryMoveFixtureDebt.Delete(ObjPtr(Capture))
+}
+Test("updater curl capture: graph close refusal cannot acknowledge transition cleanup",
+	_CurlCaptureDirectoryMoveGraphCloseDebt)
+
+_CurlCaptureDirectoryMoveGraphForeignHolding() {
+	global _CurlCaptureDirectoryMoveFixtureDebt
+	Capture := _CurlCaptureDirectoryMoveGraphCapture()
+	Owner := _CurlCaptureDirectoryMoveGraph(Capture)
+	try {
+		Capture.GraphPaths[Owner.NewHoldingPath()] := 999
+		AssertThrows(ObjBindMethod(Owner, "Execute"))
+		AssertFalse(Owner.HoldingCreated)
+		AssertEqual(Capture.Path, Owner.Rollback())
+		AssertEqual(999, Capture.GraphPaths[Owner.NewHoldingPath()], "failed exclusive allocation never retires foreign holding data")
+		_CurlCaptureDirectoryMoveGraphCheck(Capture, Capture.Path)
+		AssertTrue(Owner.Closed)
+	} finally _CurlCaptureDirectoryMoveFixtureDebt.Delete(ObjPtr(Capture))
+}
+Test("updater curl capture: foreign graph holding allocation preserves all foreign identities",
+	_CurlCaptureDirectoryMoveGraphForeignHolding)
+
+_CurlCaptureDirectoryMoveGraphReentry() {
+	global _CurlCaptureDirectoryMoveFixtureDebt
+	Capture := _CurlCaptureDirectoryMoveGraphCapture()
+	Owner := _CurlCaptureDirectoryMoveGraph(Capture)
+	try {
+		Owner.Reentry := true
+		AssertTrue(Owner.Execute())
+		AssertFalse(Owner.Reentry)
+		AssertFalse(Owner.Running)
+		_CurlCaptureDirectoryMoveGraphCheck(Capture, Owner.Target)
+	} finally _CurlCaptureDirectoryMoveFixtureDebt.Delete(ObjPtr(Capture))
+}
+Test("updater curl capture: graph mutation reentry cannot resume the same running transition",
+	_CurlCaptureDirectoryMoveGraphReentry)
