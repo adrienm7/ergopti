@@ -632,3 +632,31 @@ _ArtifactOwnedCloseProgressControls() {
 	}
 }
 Test("artifact curl: actual owned TLS-close/copy methods preserve failures with controlled native ports", _ArtifactOwnedCloseProgressControls)
+
+_ArtifactQueuedTlsShutdownControls() {
+	global _DriverDir
+	Observed := []
+	Handle := 0
+	try {
+		Handle := ShellRunner_SpawnTreeOwned(_Updater_PowerShellPath(),
+			["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-File",
+				_DriverDir . "\tests\fixtures\owned_close_progress_controls.ps1", "-FixturePath",
+				_DriverDir . "\tests\fixtures\managed_remote_transport.ps1", "-QueuedShutdown", "-ProxyPath",
+				_DriverDir . "\tests\fixtures\artifact_ntlm_proxy.ps1"],
+			(Code, Out, Err) => Observed.Push(Map("exit", Code, "stdout", Out, "stderr", Err)))
+		AssertTrue(Handle.start(), "actual owned close methods component process starts")
+		Started := A_TickCount
+		while Observed.Length == 0 && !TickExpired64(Started, 15000) {
+			_SR_TreePoll()
+			Sleep(10)
+		}
+		AssertEqual(1, Observed.Length)
+		AssertEqual(0, Observed[1]["exit"])
+		AssertEqual("OWNED_QUEUED_TLS_SHUTDOWN_CONTROLLED_PORTS:7", Trim(Observed[1]["stdout"], "`r`n "))
+		AssertEqual("", Observed[1]["stderr"])
+	} finally {
+		if IsObject(Handle)
+			AssertTrue(Handle.terminate(), "owned close source component Job retires")
+	}
+}
+Test("artifact curl: queued peer TLS close is processed without a peer wait or error waiver", _ArtifactQueuedTlsShutdownControls)

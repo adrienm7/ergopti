@@ -824,16 +824,29 @@ public sealed class ErgoptiFixtureOpenSsl : IDisposable
                 bool networkClosed=false;
                 try {
                     if (authenticated && ssl != IntPtr.Zero) {
-                        Owner.clearError();
-                        int result = Owner.shutdown(ssl);
-                        int error = result < 0 ? Owner.sslError(ssl, result) : 0;
-                        shutdownCalled=1; shutdownResult=result; shutdownError=error;
-                        if (result < 0 && error != 2 && error != 3 && error != 6)
-                            throw new InvalidOperationException("Native TLS close notification refused.");
-                        // Send close_notify once; never wait for a peer during retirement.
                         int priorWritten=writtenEncrypted;
-                        try { Drain(); }
-                        finally {
+                        try {
+                            bool settled=false, receivedInput=false;
+                            for (int attempts=0; attempts<512; attempts++) {
+                                Owner.clearError();
+                                int result=Owner.shutdown(ssl);
+                                int error=result<0 ? Owner.sslError(ssl,result) : 0;
+                                shutdownCalled=1; shutdownResult=result; shutdownError=error;
+                                if (result<0 && error!=2 && error!=3 && error!=6)
+                                    throw new InvalidOperationException("Native TLS close notification refused.");
+                                int written=Drain();
+                                if (result==1 || error==6) { settled=true; break; }
+                                // The first zero sends our alert. Let TLS inspect its existing BIO before closing.
+                                if (result==0 && attempts==0) continue;
+                                // Admit at most one existing encrypted buffer; readable peer data cannot renew retirement.
+                                if ((result==0 || error==2) && !receivedInput && network.DataAvailable) {
+                                    Receive(); receivedInput=true; continue;
+                                }
+                                if (error==3 && written>0) continue;
+                                settled=true; break;
+                            }
+                            if (!settled) throw new InvalidDataException("Native TLS shutdown progress ceiling exceeded.");
+                        } finally {
                             closeWritten=writtenEncrypted==Int32.MaxValue ? -1 : writtenEncrypted-priorWritten;
                         }
                     }

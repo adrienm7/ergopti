@@ -50,9 +50,12 @@ _UpdaterNativeObservedStagingScript(OriginalScript) {
 	HeaderEnd := InStr(OriginalScript, "`n")
 	if !HeaderEnd
 		throw Error("The actual staging parameter declaration is unavailable.")
+	; A literal here-string avoids redundant Base64 expansion of trusted source.
+	; A closing delimiter cannot escape into the surrounding fixture worker.
+	if RegExMatch(OriginalScript, "(?:\A|[\r\n])'@")
+		throw Error("The staging fixture source contains a literal delimiter.")
 	return SubStr(OriginalScript, 1, HeaderEnd) . Helper . "`n"
-		. '$StagingSource=[Text.Encoding]::UTF8.GetString([Convert]::FromBase64String("'
-		. _Updater_EncodeUtf8Payload(OriginalScript) . '"))' . "`n"
+		. "$StagingSource=@'`n" . OriginalScript . "`n'@`n"
 		. '$StagingObserved=New-ErgoptiObservedStagingScript $StagingSource ""' . "`n"
 		. '& ([scriptblock]::Create($StagingObserved.Source)) @PSBoundParameters'
 }
@@ -1058,3 +1061,41 @@ _UpdaterNativeSetupDetailControls() {
 	AssertEqual("", _UpdaterNativeStagingSetupDiagnosticFact(Fact), "partial detail sets are refused")
 }
 Test("updater fixture: setup details require direct closed compiler provenance", _UpdaterNativeSetupDetailControls)
+
+
+_UpdaterNativeObservedSourceBudget() {
+	global UPDATER_STAGING_ENV_MAX_CHARS, UPDATER_STAGING_MAX_SCRIPT_CHUNKS
+	Original := _Updater_BuildStagingWorkerScript()
+	Observed := _UpdaterNativeObservedStagingScript(Original)
+	Payload := _Updater_EncodePowerShellCommand(Observed)
+	AssertTrue(Ceil(StrLen(Payload) / UPDATER_STAGING_ENV_MAX_CHARS) <= UPDATER_STAGING_MAX_SCRIPT_CHUNKS,
+		"the exact observed native worker fits the unchanged production transport bound")
+	Transport := _Updater_BuildStagingTransport(Observed, _Updater_BuildSwapWorkerScript(),
+		"https://fixture.invalid/staging", "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+		"C:\fixture\new.exe", "C:\fixture\swap.ps1", "C:\fixture\current.exe", 524288, 5000)
+	try AssertEqual(Observed, _UST_DecodeUtf16Base64(Transport.ScriptPayload),
+		"the actual bounded environment transport preserves the full observed worker")
+	finally _Updater_ClearStagingTransport(Transport)
+}
+Test("updater native: exact observed source fits unchanged encoded chunk transport", _UpdaterNativeObservedSourceBudget)
+
+_UpdaterNativeObservedSourceLiteral() {
+	Original := _Updater_BuildStagingWorkerScript()
+	Observed := _UpdaterNativeObservedStagingScript(Original)
+	Start := InStr(Observed, "$StagingSource=@'`n")
+	AssertTrue(Start > 0, "the real constructor contains its quoted literal boundary")
+	Start += StrLen("$StagingSource=@'`n")
+	End := InStr(Observed, "`n'@`n", true, Start)
+	AssertTrue(End > Start, "the real constructor has one complete literal")
+	AssertEqual(Original, SubStr(Observed, Start, End - Start),
+		"all production statements reach the observation transform without encoding duplication")
+}
+Test("updater native: literal fixture transport conserves every original source byte", _UpdaterNativeObservedSourceLiteral)
+
+Test("updater native: a here-string closing delimiter cannot escape the source fixture", (*) =>
+	AssertThrows(() => _UpdaterNativeObservedStagingScript("param()`n'@"),
+		"a source delimiter must refuse before it can become surrounding PowerShell"))
+
+Test("updater native: CR-only source delimiters cannot escape the literal fixture", (*) =>
+	AssertThrows(() => _UpdaterNativeObservedStagingScript("param()`n# source`r'@`r$script:escaped=1"),
+		"PowerShell CR boundaries refuse before any injected statement can execute"))

@@ -7242,6 +7242,35 @@ entry counts, runtime authorization and restoration still need hosted macOS
 observations. The source mechanism for removing the last admin entry remains
 conditional; no external/device-only cause is established.
 
+The next Windows receiving tranche preserves its actual bounded staging
+transport instead of enlarging it: an exact PowerShell source literal removes
+redundant encoding, reducing nine chunks to eight under the unchanged7000x8
+limit. The explicit CR/LF delimiter guard rejects a real parser escape; three
+actual PowerShell literal/parser/budget controls and independent causal mutations
+pass. Original15 observation controls remain, with three additional receivers
+and four actual-constructor AHK controls awaiting Windows execution. The legacy
+raw IPv6 fixture pins the independently documented and observed Windows
+System.Uri host spelling; its strict guard and original five cases remain.
+Thirteen guard and seven literal controls pass. Current product updater/remote
+paths use the canonical resolver; no legacy IPv6 product success is inferred.
+
+Three graph finalizers now check the exact remaining owner before removing an
+entry already retired by successful cleanup. The original218 assertions and16
+registrations remain prefixes. The junction child-open predicate remains strict;
+only bounded failure facts are added. Its reparse matcher requires exact UTF16
+lengths and fixed-length reads, with a genuine Buffer/embedded-NUL regression.
+The actual Windows junction cause and the added225-assertion/17-case fixture
+remain unqualified. Native TLS stream retirement now consumes at most one
+already readable encrypted buffer through the original TLS engine, without a
+peer wait or new clock. Real Linux OpenSSL/TLS receiving reproduces the original
+queued-close failure and passes the candidate; unexpected application data is
+still refused. The original11 component controls plus seven new controls pass,
+as do four causal mutations and scope/parser checks. This protocol proof does
+not qualify Windows socket lifetime, SSPI/Schannel or the observed10054 reset.
+Independent reviews approve these sources; exact-source Windows qualification
+and E2E/package/install remain required. No item or transversal requirement is
+removed.
+
 - [~] **63.** Layer actions: screen brightness up/down are now shared, labelled
   through the existing 21-locale action catalogue, and implemented for keyboard
   layers on all three drivers. Windows and macOS also support their existing

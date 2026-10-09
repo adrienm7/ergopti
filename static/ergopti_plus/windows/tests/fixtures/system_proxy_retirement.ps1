@@ -59,6 +59,27 @@ function Get-ErgoptiLegacyRawContractFlags {
         proxy_ipv6_port=[int]$Ipv6Port;proxy_ipv6_normalized_literal=[int]$Ipv6Literal
     }
 }
+function Test-ErgoptiLegacyIpv6LiteralControls {
+    # Independent fixed vectors pin the Windows legacy host spelling. Equivalent
+    # addresses must not weaken the exact raw receipt assertion below.
+    $Expected='[2001:0DB8:0000:0000:0000:0000:0000:0001]:3129'
+    $Vectors=@(
+        @{Raw='[2001:0DB8:0000:0000:0000:0000:0000:0001]:3129';Literal=1},
+        @{Raw='[2001:0db8:0000:0000:0000:0000:0000:0001]:3129';Literal=0},
+        @{Raw='[2001:0DB8:0000:0000:0000:0000:0000:0002]:3129';Literal=0},
+        @{Raw='[2001:0DB8:0000:0000:0000:0000:0000:0001]:3130';Literal=0},
+        @{Raw='2001:0DB8:0000:0000:0000:0000:0000:0001:3129';Literal=0},
+        @{Raw='[2001:db8::1]:3129';Literal=0},
+        @{Raw='[2001:0DB8:0000:0000:0000:0000:0000:0001]:3129 extra';Literal=0})
+    foreach($Vector in $Vectors) {
+        $Item=[pscustomobject]@{ok=$true;kind='named_proxy';access_type=3;
+            proxy=$Vector.Raw;bypass='';native_error=0}
+        $Flags=Get-ErgoptiLegacyRawContractFlags $Item $Expected
+        if($Flags.proxy_literal -ne $Vector.Literal) {
+            throw 'Fixed legacy IPv6 raw contract control was refused.'
+        }
+    }
+}
 function Get-ErgoptiRetirementSourceHash {
     param([string]$Path)
     # The isolated native caller disables module auto-loading. Hash the held
@@ -75,6 +96,7 @@ function Get-ErgoptiRetirementSourceHash {
     }
 }
 try {
+    Test-ErgoptiLegacyIpv6LiteralControls
     $null=[IO.Directory]::CreateDirectory($Root)
     $Source=[IO.File]::ReadAllBytes($WorkerPath)
     $ControlledPorts=@'
@@ -103,7 +125,9 @@ function ConvertFrom-ErgoptiPacRoutes {
         @{DebtAt=2;Calls=2;Exit=1;Status='refused';Results=0},
         @{DebtAt=0;Calls=3;Exit=0;Status='completed';Results=3},
         @{DebtAt=0;Calls=1;Exit=0;Status='completed';Results=1;Proxy=$true;Raw='raw-fixture.invalid:3128'},
-        @{DebtAt=0;Calls=1;Exit=0;Status='completed';Results=1;Proxy=$true;Ipv6=$true;Raw='[2001:db8::1]:3129'})
+        # Windows PowerShell's legacy System.Uri.Host uses uppercase X4 IPv6
+        # segments. This is the raw Host+Port receipt, not an RFC 5952 string.
+        @{DebtAt=0;Calls=1;Exit=0;Status='completed';Results=1;Proxy=$true;Ipv6=$true;Raw='[2001:0DB8:0000:0000:0000:0000:0000:0001]:3129'})
     foreach($Control in $Controls) {
         $DiagnosticControl++
         $DiagnosticStage='prepare_control'
