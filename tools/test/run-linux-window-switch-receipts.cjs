@@ -34,7 +34,7 @@ async function run({
 	debts = UNRESOLVED,
 	log = console.log,
 	error = console.error,
-	qualificationContext = qualification.environmentContext(),
+	qualificationContext = null,
 	qualificationNow = new Date(),
 	recordQualification = (receipt) => {
 		const fs = require('node:fs');
@@ -57,7 +57,11 @@ async function run({
 		);
 		return 1;
 	}
-	const profile = qualification.resolveQualificationProfile(qualificationContext, qualificationNow);
+	// Embedded family/recovery callers retain full execution despite inherited CI intent.
+	const profile =
+		qualificationContext === null
+			? null
+			: qualification.resolveQualificationProfile(qualificationContext, qualificationNow);
 	if (profile) {
 		const scope = profile.scopes['linux-window-receipts'];
 		if (
@@ -258,7 +262,7 @@ async function run({
 }
 
 if (require.main === module)
-	run().then(
+	run({ qualificationContext: qualification.environmentContext() }).then(
 		(status) => {
 			process.exitCode = status;
 		},
