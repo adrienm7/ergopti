@@ -5943,6 +5943,14 @@ duplicate and reordered declarations. Source review passed; corrected native
 AHK cases and the complete Windows cohort remain unrun. Items 54 and 81 remain
 partial, including full three-driver and installed-device qualification.
 
+The cancellation/export-history unit fixture now supplies the known Windows
+host identity required by the unchanged typed-sharing owner. Genuine missing
+and invalid identity refusals remain, as do every original timeout,
+unknown-cleanup, 23 ms and cancellation assertion. Group3 explicitly released
+only this fixture scope. Independent source review passed; corrected native
+AHK execution remains unrun. Privacy, schema, collector, report and production
+cancellation owners are unchanged. Items 54 and 81 remain partial.
+
 - [ ] **62.** Downloads on managed company networks: system trust and
       system proxy for every download child (Ollama installation/server/pull,
       updater/rollback and remote AI), with translated certificate/proxy/blocked/
@@ -7835,6 +7843,14 @@ and withdrawal checks remain, with independent controls for revived, missing,
 duplicate and reordered declarations. Source review passed; corrected native
 AHK cases and the complete Windows cohort remain unrun. Items 54 and 81 remain
 partial, including full three-driver and installed-device qualification.
+
+The cancellation/export-history unit fixture now supplies the known Windows
+host identity required by the unchanged typed-sharing owner. Genuine missing
+and invalid identity refusals remain, as do every original timeout,
+unknown-cleanup, 23 ms and cancellation assertion. Group3 explicitly released
+only this fixture scope. Independent source review passed; corrected native
+AHK execution remains unrun. Privacy, schema, collector, report and production
+cancellation owners are unchanged. Items 54 and 81 remain partial.
 
 - [~] **88.** **Partial: native prediction tooltip appearance.** Shared
   llm-line-style policy and the unchanged independent line corpus retain grey
