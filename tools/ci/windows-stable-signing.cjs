@@ -59,7 +59,7 @@ function validatePolicy(value) {
 		typeof value.authorized !== 'boolean' ||
 		value.authorization_date !== '2026-10-09' ||
 		value.authorization_quote !== QUOTE ||
-		value.expires_at !== '2026-10-10T00:00:00Z' ||
+		value.expires_at !== '2026-10-10T02:00:00Z' ||
 		value.repository !== 'adrienm7/ergopti' ||
 		value.event_name !== 'push' ||
 		value.ref !== 'refs/heads/main' ||

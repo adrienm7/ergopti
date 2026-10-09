@@ -15,11 +15,18 @@ The original October 9 publication deadline was missed. After midnight Paris,
 the maintainer renewed the immediate v1.0.0 publication request because the
 website needs an actual latest stable release for its download buttons. The
 same thirteen already approved qualification reports and unsigned Windows
-permission are now bounded to October 10 at 00:00 UTC (02:00 Paris), only for
+permission are now bounded to October 10 at 02:00 UTC (04:00 Paris), only for
 v1.0.0. No additional test scope is excluded. Compilation, packaging, source
 and asset integrity, installation and all unlisted checks remain mandatory.
 Public receipts must state DEFERRED and qualified:false; this is not full
 native qualification. Actual tag, source and assets still require verification.
+
+The maintainer explicitly approved the further bounded renewal: “Oui, mêmes
+limites jusqu’à 04 h”. Only the expiry changes to 02:00 UTC (04:00 Paris);
+the same thirteen qualification reports and separate unsigned Windows
+allowance remain unqualified and source/artifact-bound. There is no new
+scope or permission for v1.0.1. Do not renew beyond this window without
+a separate explicit human answer.
 
 Both published histories and the local video commits are retained without
 force-push or squashing. Promo item 113 implementations remain local and are
@@ -9438,7 +9445,7 @@ test precondition failure, not a Lua defect or a successful permission grant.
   in `d9e747660c`; all scopes remain unqualified. The original 22:00 UTC expiry
   was retained. The requested 23:59 Paris publication deadline was missed;
   the later immediate-release instruction renews only the existing limits
-  until October 10 at 00:00 UTC as stated in the delivery checkpoint. Do not
+  until October 10 at 02:00 UTC as stated in the delivery checkpoint. Do not
   renew this policy or the unsigned Windows permission beyond that window.
 
   First stable attempt 37994227917 exposed 61 Linux unit failures, six Core
