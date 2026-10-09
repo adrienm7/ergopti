@@ -280,6 +280,21 @@ final class ManagedNetworkBootstrapTests: XCTestCase {
 		let body = admitted.filter { $0.count > 5 && $0[4] == 68 }.reduce(Data()) { $0 + $1.dropFirst(5) }
 		XCTAssertEqual(String(decoding: body, as: UTF8.self), "independent-native-tls-body")
 		let certificates = try ManagedCertificateAuthorities.load(environment: ["SSL_CERT_FILE": fixture.certificate.path])
+		// Bounded closed observations distinguish native trust from transport;
+		// never emit certificate subjects, URLs, frame bodies, or native errors.
+		let terminal = admitted.last.flatMap { frame -> [String: Any]? in
+			guard frame.count >= 5, frame[4] == 67 else { return nil }
+			return (try? JSONSerialization.jsonObject(with: frame.dropFirst(5))) as? [String: Any]
+		}
+		let knownReasons = ["complete", "protocol", "deadline", "cancelled", "offline", "certificate", "connect", "unavailable", "proxy", "content_encoding"]
+		let reason = terminal?["reason"] as? String
+		let terminalReason = reason.flatMap { knownReasons.contains($0) ? $0 : nil } ?? "unknown"
+		var positiveTrust: SecTrust?
+		let positiveCreated = SecTrustCreateWithCertificates(certificates as CFArray,
+			SecPolicyCreateSSL(true, "127.0.0.1" as CFString), &positiveTrust)
+		let positiveTrusted = positiveCreated == errSecSuccess
+			&& positiveTrust.map { ManagedCertificateAuthorities.evaluate($0, adding: certificates) } == true
+		print("BOOTSTRAP_TLS_OBSERVATION terminal=\(terminalReason) custom_anchor_peer=\(positiveTrusted ? 1 : 0)")
 		var trust: SecTrust?
 		XCTAssertEqual(SecTrustCreateWithCertificates(certificates as CFArray, SecPolicyCreateSSL(true, "foreign.invalid" as CFString), &trust), errSecSuccess)
 		XCTAssertFalse(ManagedCertificateAuthorities.evaluate(try XCTUnwrap(trust), adding: certificates))

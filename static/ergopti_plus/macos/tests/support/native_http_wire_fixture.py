@@ -109,45 +109,66 @@ class WireFixture:
             raise
 
     def _command(self, arguments, input_bytes=b"", tolerate=False, timeout=15):
-        with tempfile.TemporaryFile() as output, tempfile.TemporaryFile() as errors:
-            if self.groups:
-                owned = None
+        phase = "setup"
+        status = None
+        self.command_fact = None
+        try:
+            with tempfile.TemporaryFile() as output, tempfile.TemporaryFile() as errors:
+                if self.groups:
+                    owned = None
 
-                def register(value):
-                    nonlocal owned
-                    owned = value
+                    def register(value):
+                        nonlocal owned
+                        owned = value
 
-                try:
-                    self.groups.acquire_owned(
-                        arguments,
-                        self.native_groups,
-                        register,
-                        stdin=subprocess.PIPE,
-                        stdout=output,
-                        stderr=errors,
+                    try:
+                        phase = "acquire"
+                        self.groups.acquire_owned(
+                            arguments,
+                            self.native_groups,
+                            register,
+                            stdin=subprocess.PIPE,
+                            stdout=output,
+                            stderr=errors,
+                        )
+                        phase = "input"
+                        owned.process.stdin.write(input_bytes)
+                        owned.process.stdin.close()
+                        phase = "wait"
+                        owned.wait_for_exit(timeout)
+                    finally:
+                        try:
+                            if owned is not None and not owned.settle():
+                                raise FixtureFailure("Native fixture child closure refused")
+                        except BaseException:
+                            phase = "settle"
+                            raise
+                    status = owned.process.returncode
+                else:
+                    phase = "acquire"
+                    child = subprocess.Popen(
+                        arguments, stdin=subprocess.PIPE, stdout=output, stderr=errors
                     )
-                    owned.process.stdin.write(input_bytes)
-                    owned.process.stdin.close()
-                    owned.wait_for_exit(timeout)
-                finally:
-                    if owned is not None and not owned.settle():
-                        raise FixtureFailure("Native fixture child closure refused")
-                status = owned.process.returncode
-            else:
-                child = subprocess.Popen(
-                    arguments, stdin=subprocess.PIPE, stdout=output, stderr=errors
-                )
-                try:
-                    child.communicate(input_bytes, timeout=timeout)
-                finally:
-                    if child.poll() is None:
-                        child.kill()
-                    child.wait()
-                status = child.returncode
-            if status != 0 and not tolerate:
-                raise FixtureFailure("Native fixture command refused")
-            output.seek(0)
-            return status, output.read(65536)
+                    try:
+                        phase = "wait"
+                        child.communicate(input_bytes, timeout=timeout)
+                    finally:
+                        if child.poll() is None:
+                            child.kill()
+                        child.wait()
+                    status = child.returncode
+                phase = "exit"
+                if status != 0 and not tolerate:
+                    raise FixtureFailure("Native fixture command refused")
+                self.command_fact = {"phase": "complete", "status": status}
+                output.seek(0)
+                return status, output.read(65536)
+        except BaseException as failure:
+            self.command_fact = {
+                "phase": "deadline" if isinstance(failure, subprocess.TimeoutExpired) else phase,
+                "status": status if type(status) is int and -65535 <= status <= 65535 else None,
+            }
+            raise
 
     def _certificates(self):
         config = self.root / "cert.conf"
@@ -633,6 +654,17 @@ class WireFixture:
         with self.lock:
             return {"version": 1, "records": list(self.records), "active": len(self.connections)}
 
+    def _report_restoration_failure(self, operation):
+        fact = self.command_fact or {"phase": "unknown", "status": None}
+        try:
+            print(
+                "# native_http_restoration_failure "
+                + json.dumps({"version": 1, "operation": operation, **fact}, sort_keys=True),
+                flush=True,
+            )
+        except (OSError, ValueError):
+            pass
+
     def close(self):
         if self.closed:
             return
@@ -652,11 +684,14 @@ class WireFixture:
         if hasattr(self, "refused"):
             self.refused.close()
         if self.trust_attempted:
+            self.command_fact = None
             try:
                 self.trust(False)
             except BaseException:
                 failures.append("trust")
+                self._report_restoration_failure("trust")
         if self.keychain_created:
+            self.command_fact = None
             try:
                 self._command(["/usr/bin/security", "delete-keychain", str(self.keychain)])
                 _, current = self._command(["/usr/bin/security", "list-keychains", "-d", "user"])
@@ -670,6 +705,7 @@ class WireFixture:
                 self.keychain_created = False
             except BaseException:
                 failures.append("keychain")
+                self._report_restoration_failure("keychain")
         if failures:
             # Keep the private fixture packet when restoration is incomplete.
             raise FixtureFailure("Owned native fixture restoration refused")

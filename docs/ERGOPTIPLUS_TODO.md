@@ -7154,6 +7154,26 @@ corrects a fixture prerequisite; native custom-anchor TLS, managed HTTP startup,
 Windows qualification and archive/install acceptance remain pending. Item 62
 remains open.
 
+The next macOS receiving tranche replaces the nonportable bound-but-unlistened
+TCP version witness with one exclusively owned loopback HTTP 503 peer returning
+an empty body. It preserves the pinned real client, original 30-second clock,
+child-only route override and mandatory physical socket/thread retirement.
+Thirty-four portable controls pass, including a genuine socket-close race that
+requires a known request refusal to survive concurrent retirement; the exact
+preimage fails this control. Four causal mutations refuse. Native Darwin
+client/version acceptance remains unexecuted. The bootstrap TLS positive
+case additionally observes only its closed terminal reason and a separate real
+SSL hostname/custom-anchor evaluation; all six tests and assertions remain.
+Managed HTTP fixture startup records bounded lexical stages in a private owned
+receipt, observes them only after exact worker/pipe settlement, and retains
+uncertain closure debt without retrying a possibly reused descriptor. Fifteen
+portable controls pass with the original eight intact and five causal mutations
+refused. Trust restoration exposes only closed command/phase/status facts and
+still refuses incomplete restoration. Independent reviews approve all three
+packets; these diagnostics do not establish the remaining native TLS, worker
+startup or trust-restoration causes. Final selected gates and exact-source
+non-release macOS CI remain required; items 36/62 and transversal 16/38 stay open.
+
 - [~] **63.** Layer actions: screen brightness up/down are now shared, labelled
   through the existing 21-locale action catalogue, and implemented for keyboard
   layers on all three drivers. Windows and macOS also support their existing

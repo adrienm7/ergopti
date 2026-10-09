@@ -3,7 +3,6 @@
 """Receive a real Hammerspoon -> native PTY -> pinned official Ollama installation without Python."""
 
 import argparse
-import errno
 import hashlib
 import json
 import os
@@ -11,6 +10,8 @@ from pathlib import Path, PurePosixPath
 import platform
 import signal
 import socket
+import select
+import threading
 import shutil
 import stat
 import tarfile
@@ -152,16 +153,190 @@ def digest(path):
     return hashlib.sha256(Path(path).read_bytes()).hexdigest()
 
 
-def qualify_version_probe_route(address):
-    """Require actual kernel refusal on our retained route before running the CLI."""
-    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as witness:
-        witness.settimeout(0.25)
-        result = witness.connect_ex(address)
-    if result != errno.ECONNREFUSED:
-        raise RuntimeError(
-            "Reserved local version route did not refuse the native connection: " + str(result)
+VERSION_ROUTE_RESPONSE = (
+    b"HTTP/1.1 503 Service Unavailable\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"
+)
+
+
+class OwnedVersionErrorRoute:
+    """Retain one exclusive loopback error peer; it never supplies a version."""
+
+    def __init__(self, deadline):
+        self.deadline = deadline
+        self.listener = self.wake_read = self.wake_write = None
+        self.worker = None
+        self.connection = None
+        self.address = None
+        self.stopping = threading.Event()
+        self.lock = threading.Lock()
+        self.responses = 0
+        self.failure = None
+        self.closed = False
+        self.worker_retired = False
+        self.close_debt = None
+
+    def remaining(self):
+        remaining = self.deadline - time.monotonic()
+        if remaining <= 0:
+            raise TimeoutError("Owned version route deadline expired")
+        return remaining
+
+    def open(self):
+        # Register returned descriptors before a pending cancellation is delivered.
+        previous = signal.pthread_sigmask(
+            signal.SIG_BLOCK, {signal.SIGINT, signal.SIGTERM, signal.SIGHUP}
         )
-    return {"kind": "actual kernel loopback connection", "result": "ECONNREFUSED"}
+        try:
+            self.listener = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            self.wake_read, self.wake_write = socket.socketpair()
+        finally:
+            signal.pthread_sigmask(signal.SIG_SETMASK, previous)
+        self.listener.bind(("127.0.0.1", 0))
+        self.listener.listen(1)
+        self.listener.setblocking(False)
+        self.wake_read.setblocking(False)
+        self.wake_write.setblocking(False)
+        self.address = self.listener.getsockname()
+        self.worker = threading.Thread(
+            target=self._serve, args=(self.listener, self.wake_read), daemon=True
+        )
+        self.remaining()
+        self.worker.start()
+
+    def _ready(self, readable, wake):
+        ready, _, _ = select.select([readable, wake], [], [], self.remaining())
+        return readable in ready and wake not in ready and not self.stopping.is_set()
+
+    def _serve(self, listener, wake):
+        try:
+            while not self.stopping.is_set() and self._ready(listener, wake):
+                connection, _ = listener.accept()
+                self.connection = connection
+                primary = None
+                try:
+                    connection.setblocking(False)
+                    request = bytearray()
+                    while not request.endswith(b"\r\n\r\n"):
+                        if not self._ready(connection, wake):
+                            return
+                        part = connection.recv(4096 - len(request))
+                        if not part or len(request) >= 4096:
+                            raise RuntimeError("Owned version request refused")
+                        request.extend(part)
+                    lines = bytes(request).split(b"\r\n")
+                    expected_host = b"host: 127.0.0.1:" + str(self.address[1]).encode("ascii")
+                    hosts = [
+                        line.lower() for line in lines[1:] if line.lower().startswith(b"host:")
+                    ]
+                    if (
+                        lines[0] != b"GET /api/version HTTP/1.1"
+                        or hosts != [expected_host]
+                        or any(line.lower().startswith(b"transfer-encoding:") for line in lines[1:])
+                        or any(
+                            line.lower().startswith(b"content-length:")
+                            and line.lower() != b"content-length: 0"
+                            for line in lines[1:]
+                        )
+                    ):
+                        raise RuntimeError("Owned version request refused")
+                    # Small fixed error bytes fit a fresh loopback socket. Any
+                    # refused/partial send is failure, never a completed response.
+                    connection.sendall(VERSION_ROUTE_RESPONSE)
+                    with self.lock:
+                        self.responses = min(3, self.responses + 1)
+                except BaseException as error:
+                    primary = error
+                    # Preserve a known operation refusal before close publishes
+                    # EOF and a concurrent retire can latch stopping.
+                    self.failure = self.failure or error
+                    raise
+                finally:
+                    if not self._close_owned("connection"):
+                        self.failure = self.failure or primary or self.close_debt
+                        if primary is None:
+                            return
+        except BaseException as error:
+            if not self.stopping.is_set():
+                self.failure = error
+
+    def complete_responses(self):
+        with self.lock:
+            return self.responses
+
+    def _close_owned(self, name):
+        descriptor = getattr(self, name)
+        if descriptor is None:
+            return True
+        acknowledged = False
+        try:
+            descriptor.close()
+            acknowledged = True
+        except BaseException as error:
+            self.close_debt = self.close_debt or error
+        try:
+            physically_closed = descriptor.fileno() == -1
+        except BaseException as error:
+            self.close_debt = self.close_debt or error
+            physically_closed = False
+        if physically_closed:
+            # The native object has retired its numeric descriptor. Never
+            # retry an uncertain close through a possibly reused integer.
+            setattr(self, name, None)
+        elif acknowledged:
+            self.close_debt = self.close_debt or RuntimeError(
+                "Native socket close was not acknowledged"
+            )
+        return acknowledged and physically_closed
+
+    def retire(self):
+        self.stopping.set()
+        if self.wake_write is not None:
+            try:
+                self.wake_write.send(b"x")
+            except OSError as error:
+                self.close_debt = self.close_debt or error
+        if self.worker is not None and self.worker.ident is not None:
+            self.worker.join(max(0, self.deadline - time.monotonic()))
+            self.worker_retired = not self.worker.is_alive()
+        else:
+            self.worker_retired = True
+        # Retain the namespace/FD owner if the exact thread still has access.
+        if not self.worker_retired:
+            raise RuntimeError("Owned version route retirement remains unsettled")
+        for name in ("connection", "listener", "wake_read", "wake_write"):
+            self._close_owned(name)
+        if self.close_debt is not None:
+            raise RuntimeError(
+                "Owned version route descriptor closure remains unsettled"
+            ) from self.close_debt
+        self.closed = True
+
+
+def qualify_version_probe_route(owner):
+    """Receive an actual empty HTTP503 from the exact retained loopback peer."""
+    before = owner.complete_responses()
+    with socket.create_connection(owner.address, timeout=owner.remaining()) as witness:
+        witness.sendall(
+            b"GET /api/version HTTP/1.1\r\nHost: 127.0.0.1:"
+            + str(owner.address[1]).encode("ascii")
+            + b"\r\nConnection: close\r\n\r\n"
+        )
+        received = bytearray()
+        while True:
+            witness.settimeout(owner.remaining())
+            part = witness.recv(len(VERSION_ROUTE_RESPONSE) + 1 - len(received))
+            if not part:
+                break
+            received.extend(part)
+            if len(received) > len(VERSION_ROUTE_RESPONSE):
+                raise RuntimeError("Owned version error response refused")
+    if (
+        bytes(received) != VERSION_ROUTE_RESPONSE
+        or owner.failure is not None
+        or owner.complete_responses() != before + 1
+    ):
+        raise RuntimeError("Owned version error response refused")
+    return {"kind": "actual owned loopback HTTP response", "result": "HTTP503-empty-body"}
 
 
 def version_timeout_observation(error):
@@ -204,26 +379,25 @@ def version_timeout_observation(error):
 
 
 def probe_installed_client_version(binary, profile, environment, diagnostics=None):
-    """Hold an unserved loopback port until the exact version child is reaped."""
-    # The pinned upstream versionHandler prints the daemon version when it
-    # answers. Reserve a non-listening socket so an unrelated daemon can never
-    # supply that answer, without stopping it or changing the caller's route.
-    lease = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    address = None
+    """Own an empty error route until the exact version child and peer retire."""
+    # VersionHandler prints a daemon's version if a request succeeds. The exact
+    # owned HTTP503 peer instead forces the pinned client's local-version branch,
+    # without relying on platform-specific behavior of an unlistened TCP socket.
+    owner = OwnedVersionErrorRoute(time.monotonic() + 30)
+    primary = cleanup = None
     try:
-        lease.bind(("127.0.0.1", 0))
-        address = lease.getsockname()
-        route = qualify_version_probe_route(address)
+        owner.open()
+        route = qualify_version_probe_route(owner)
         if diagnostics is not None:
             diagnostics["route"] = route
         child_environment = environment.copy()
-        child_environment["OLLAMA_HOST"] = "http://127.0.0.1:" + str(address[1])
+        child_environment["OLLAMA_HOST"] = "http://127.0.0.1:" + str(owner.address[1])
         try:
             probe = subprocess.run(
                 ["/usr/bin/sandbox-exec", "-f", str(profile), str(binary), "--version"],
                 capture_output=True,
                 text=True,
-                timeout=30,
+                timeout=owner.remaining(),
                 env=child_environment,
                 check=True,
             )
@@ -231,27 +405,45 @@ def probe_installed_client_version(binary, profile, environment, diagnostics=Non
             if diagnostics is not None:
                 diagnostics["failure"] = version_timeout_observation(error)
             raise
-        # subprocess.run waits/reaps on success or refusal and kills/waits on
-        # timeout. Only then does finally release our exclusive bound socket.
+        # run() reaps success/refusal and kills/waits on timeout. Its route remains
+        # held throughout that exact lifetime; no foreign daemon can answer it.
         expected = [
             "Warning: could not connect to a running Ollama instance",
             "Warning: client version is " + OFFICIAL_VERSION,
         ]
         if (probe.stdout + probe.stderr).splitlines() != expected:
             raise RuntimeError("Installed official client does not report the pinned local version")
+        if owner.failure is not None or owner.complete_responses() != 2:
+            raise RuntimeError("Actual version client did not receive the owned error route")
+    except BaseException as error:
+        primary = error
     finally:
-        lease.close()
+        try:
+            owner.retire()
+        except BaseException as error:
+            cleanup = error
         if diagnostics is not None:
-            diagnostics["lease_closed"] = lease.fileno() == -1
-    if lease.fileno() != -1:
-        raise RuntimeError("Native version probe socket lease remains open")
+            diagnostics["lease_closed"] = owner.closed
+            diagnostics["route_worker_retired"] = owner.worker_retired
+            diagnostics["route_cleanup_unsettled"] = cleanup is not None
+    if primary is not None:
+        if cleanup is not None:
+            primary.route_cleanup_refusal = cleanup
+            primary.route_owner = owner
+        raise primary
+    if cleanup is not None:
+        cleanup.route_owner = owner
+        raise cleanup
+    if owner.failure is not None or owner.complete_responses() != 2:
+        raise RuntimeError("Final version error route exchange differs")
     return {
-        "kind": "retained non-listening loopback socket",
-        "address": address[0],
-        "port": address[1],
+        "kind": "retained owned loopback HTTP503 peer",
+        "address": owner.address[0],
+        "port": owner.address[1],
         "environment_scope": "version child only",
         "command_closed": True,
         "lease_closed": True,
+        "route_worker_retired": True,
         "client_version": OFFICIAL_VERSION,
     }
 
