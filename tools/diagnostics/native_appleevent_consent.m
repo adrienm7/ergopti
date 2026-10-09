@@ -26,6 +26,10 @@ static AXError attributeError = kAXErrorSuccess;
 static BOOL factButtonObserved = NO;
 static int factButtonError = 0;
 static const char *factButtonSubrole = "absent", *factButtonType = "absent";
+static BOOL factLabelsObserved = NO;
+static int factLabelErrors[2] = {0, 0};
+static const char *factLabelTypes[2] = {"absent", "absent"};
+static const char *factLabelFamilies[2] = {"absent", "absent"};
 static BOOL factWindowObserved = NO;
 static int factWindowError = 0, factControlErrors[3] = {0, 0, 0};
 static const char *factWindowRole = "absent", *factWindowType = "absent";
@@ -67,12 +71,21 @@ static void publish_facts(void) {
                 factControlErrors[2], factControlTypes[2], factControlRelations[2]);
             if (windowLength <= 0 || windowLength >= (int)sizeof(windowPacket)) windowPacket[0] = '\0';
         }
+        char labelsPacket[256] = "";
+        if (factLabelsObserved) {
+            int labelsLength = snprintf(labelsPacket, sizeof(labelsPacket),
+                ",\"labels\":{\"description\":{\"error\":%d,\"type\":\"%s\",\"family\":\"%s\"},"
+                "\"value\":{\"error\":%d,\"type\":\"%s\",\"family\":\"%s\"}}",
+                factLabelErrors[0], factLabelTypes[0], factLabelFamilies[0],
+                factLabelErrors[1], factLabelTypes[1], factLabelFamilies[1]);
+            if (labelsLength <= 0 || labelsLength >= (int)sizeof(labelsPacket)) labelsPacket[0] = '\0';
+        }
         char buttonPacket[768] = "";
         if (factButtonObserved) {
             int buttonLength = snprintf(buttonPacket, sizeof(buttonPacket),
                 ",\"first_button\":{\"schema\":1,\"subrole\":\"%s\","
-                "\"type\":\"%s\",\"error\":%d%s}",
-                factButtonSubrole, factButtonType, factButtonError, windowPacket);
+                "\"type\":\"%s\",\"error\":%d%s%s}",
+                factButtonSubrole, factButtonType, factButtonError, windowPacket, labelsPacket);
             if (buttonLength <= 0 || buttonLength >= (int)sizeof(buttonPacket)) buttonPacket[0] = '\0';
         }
         char packet[1024];
@@ -193,6 +206,27 @@ static void observe_window_control(AXUIElementRef window, AXUIElementRef button,
         factControlRelations[index] = CFEqual((__bridge CFTypeRef)value, button) ? "same" : "different";
 }
 
+// Read only two informational attributes of the exact refused button.
+// Fixed English labels are diagnostic observations, never identity or consent.
+static const char *button_label_family(id value) {
+    if (value == nil) return "absent";
+    if (![value isKindOfClass:[NSString class]]) return "wrong-type";
+    if ([value isEqualToString:@"Allow"] || [value isEqualToString:@"allow"]) return "allow";
+    if ([value isEqualToString:@"Don't Allow"] || [value isEqualToString:@"Don’t Allow"] ||
+        [value isEqualToString:@"don't allow"] || [value isEqualToString:@"don’t allow"]) return "deny";
+    if ([value isEqualToString:@"Close"] || [value isEqualToString:@"close"]) return "close";
+    if ([value isEqualToString:@"Minimize"] || [value isEqualToString:@"minimize"]) return "minimize";
+    if ([value isEqualToString:@"Zoom"] || [value isEqualToString:@"zoom"]) return "zoom";
+    return "other";
+}
+
+static void observe_button_label(AXUIElementRef button, CFStringRef key, int index) {
+    id value = attribute(button, key);
+    factLabelErrors[index] = (int)attributeError;
+    factLabelTypes[index] = kind(value);
+    factLabelFamilies[index] = button_label_family(value);
+}
+
 // Observe only the same first refused button. These fixed facts never
 // authorize a button, alter the original refusal or disclose a UI string.
 static void observe_refused_button(AXUIElementRef window, AXUIElementRef element) {
@@ -217,6 +251,9 @@ static void observe_refused_button(AXUIElementRef window, AXUIElementRef element
     observe_window_control(window, element, kAXMinimizeButtonAttribute, 1);
     observe_window_control(window, element, kAXZoomButtonAttribute, 2);
     factWindowObserved = YES;
+    observe_button_label(element, kAXDescriptionAttribute, 0);
+    observe_button_label(element, kAXValueAttribute, 1);
+    factLabelsObserved = YES;
     factButtonObserved = YES;
 }
 
