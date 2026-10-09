@@ -1,0 +1,6 @@
+[case]
+description = "shipped builtin variant windows preserves unsupported-driver semantics."
+drivers = ["ahk"]
+outcome = "migrated"
+from_version = 11
+to_version = 12

@@ -85,7 +85,9 @@ _MG_DisableFeatureNode(Node, Prefix) {
 			continue
 		}
 		Entry := ManifestFindEntryByPath(Path)
-		if (Entry is Map) && Entry.Get("type", "") == "boolean"
+		if Path == "layout.ergopti_variant"
+			Node[Key] := "ergopti"
+		else if (Entry is Map) && Entry.Get("type", "") == "boolean"
 			Node[Key] := false
 		else if Prefix == "shortcuts.personal" && (Value is Integer) && (Value == 0 || Value == 1)
 			Node[Key] := false
@@ -188,7 +190,7 @@ LayoutSupersededFeatures() {
 LayoutSupersededReason(ManifestEntry, FeaturesSource := unset) {
 		; These switches choose registry layers too; only Ergopti-specific
 		; overlays become unavailable when another source is selected.
-		if ManifestEntry["section"] == "layout" && ManifestEntry["id"] != "ergopti_plus"
+		if ManifestEntry["section"] == "layout" && ManifestEntry["id"] != "ergopti_variant"
 				return ""
 		Reason := ManifestEntry.Get("superseded_reason_key", "")
 		if (Reason == "")
@@ -221,8 +223,10 @@ _MG_SupersedeForEmulatedLayout(FeaturesTarget, Entries := unset) {
 						Node := Node[Part]
 				}
 				Id := Entry["id"]
+				if Entry["section"] == "layout" && Id == "ergopti_variant" && (Node is Map) && Node.Get(Id, "ergopti") == "ergopti"
+						continue
 				if (Node is Map) and Node.Has(Id) and Node[Id] {
-						Node[Id] := false
+						Node[Id] := Entry["section"] == "layout" && Id == "ergopti_variant" ? "ergopti" : false
 						Count += 1
 				}
 		}

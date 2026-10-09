@@ -94,6 +94,37 @@ static enum AppKitAdmission admit_appkit(NSApplication *application) {
     return AppKitAdmitted;
 }
 
+/* Closed diagnostic metadata; an unavailable sample never supplies a policy. */
+struct AppKitPolicyObservation {
+    int available;
+    int policy; /* 0 regular, 1 accessory, 2 prohibited; 3 unavailable only. */
+};
+
+static struct AppKitPolicyObservation observe_appkit_policy(NSApplication *application) {
+    struct AppKitPolicyObservation observation = {0, 3};
+    if (application == nil) return observation;
+    @try {
+        const NSApplicationActivationPolicy policy = [application activationPolicy];
+        if (policy >= NSApplicationActivationPolicyRegular &&
+            policy <= NSApplicationActivationPolicyProhibited) {
+            observation.available = 1;
+            observation.policy = (int)policy;
+        }
+    } @catch (NSException *observationFailure) {
+        (void)observationFailure;
+        /* Keep the original admission/exit verdict; export no exception text. */
+    }
+    return observation;
+}
+
+/* Observation health is separate from the unchanged functional admission. */
+static enum AppKitAdmission observe_appkit_admission(NSApplication *application,
+    struct AppKitPolicyObservation *before) {
+    *before = observe_appkit_policy(application);
+    const enum AppKitAdmission admission = admit_appkit(application);
+    return admission;
+}
+
 static const char *appkit_policy_label(NSApplicationActivationPolicy policy) {
     switch (policy) {
         case NSApplicationActivationPolicyRegular: return "regular";
@@ -114,18 +145,19 @@ static int receiver_main(int argc, char **argv) {
         return 65;
     }
     NSApplication *application = [NSApplication sharedApplication];
-    const char *initial_policy = application == nil ? "unrecognized" :
-        appkit_policy_label([application activationPolicy]);
-    const enum AppKitAdmission admission = admit_appkit(application);
+    struct AppKitPolicyObservation before;
+    const enum AppKitAdmission admission = observe_appkit_admission(application, &before);
     if (admission != AppKitAdmitted) {
-        // This reason is not an OSStatus. Existing bounded terminal diagnostics
-        // retain it as unclassified instead of inventing a Carbon status.
-        fprintf(stderr, "Owned AppleEvent recipient AppKit admission refused (reason %d).\n", (int)admission);
+        const struct AppKitPolicyObservation after = observe_appkit_policy(application);
+        /* Only the original admission refusal supplies the functional reason. */
+        const int reason = (int)admission;
+        fprintf(stderr, "Owned AppleEvent recipient AppKit admission refused (reason %d; before %d/%d; after %d/%d).\n",
+            reason, before.available, before.policy, after.available, after.policy);
         if (admission == AppKitPolicyRefused) {
-            // A refusal remains mandatory even if both instantaneous states
-            // are accessory. No retry or readiness credit follows these facts.
-            fprintf(stderr, "APPKIT_POLICY/1 initial=%s after=%s\n", initial_policy,
-                appkit_policy_label([application activationPolicy]));
+            // Closed observations cannot change the refusal or create readiness.
+            fprintf(stderr, "APPKIT_POLICY/1 initial=%s after=%s\n",
+                appkit_policy_label((NSApplicationActivationPolicy)before.policy),
+                appkit_policy_label((NSApplicationActivationPolicy)after.policy));
         }
         return 65;
     }

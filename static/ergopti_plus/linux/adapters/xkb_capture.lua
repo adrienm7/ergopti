@@ -114,14 +114,20 @@ local _locale = nil
 local _source_generation = 0
 local _physical_probe_epoch = 0
 local _physical_chord_receipts = setmetatable({}, { __mode = "k" })
+local _chord_output_receipts = setmetatable({}, { __mode = "k" })
+local _chord_output_occurrence = nil
+local original_process
 local _source_group = nil
 local _source_native_generation = nil
 local _capture_group, _capture_generation = nil, 0
+local _inverse_receipts = setmetatable({}, { __mode = "k" })
+-- A reset keeps the loaded map owner; a load or backend replacement retires it.
+local _inverse_map_owner = 0
 
 --- Tracks source changes without treating an ordinary key-up as a rebind.
 local function source_identity()
 	if not _session or type(_backend.source_group) ~= "function" then return nil, "the capture backend cannot prove its active group" end
-	local ok, group, native_generation = pcall(_backend.source_group, _session)
+	local ok, group, native_generation, observed_current = pcall(_backend.source_group, _session)
 	if not ok or type(group) ~= "number" or group < 0 or group % 1 ~= 0 then
 		return nil, type(native_generation) == "string" and native_generation or "the capture backend returned no active group"
 	end
@@ -129,7 +135,7 @@ local function source_identity()
 		_source_group, _source_native_generation = group, native_generation
 		_source_generation = _source_generation + 1
 	end
-	return _source_generation
+	return _source_generation, nil, observed_current
 end
 
 -- The reconstructed capture state is useful for native-library qualification,
@@ -172,6 +178,7 @@ function M._set_backend(backend)
 	_locale = nil
 	_source_group, _source_native_generation = nil, nil
 	_capture_group, _capture_generation = nil, _capture_generation + 1
+	_inverse_map_owner = _inverse_map_owner + 1
 	_source_generation = _source_generation + 1
 end
 
@@ -286,6 +293,13 @@ local function bind_ffi_backend()
 	end
 
 	local backend = { desktop_proof = true }
+	local SourceProbe = require("adapters.xkb_source_probe")
+	local source_read = SourceProbe.read
+	local source_close = SourceProbe.close
+	local function probe_current()
+		return package.loaded["adapters.xkb_source_probe"] == SourceProbe
+			and SourceProbe.read == source_read and SourceProbe.close == source_close
+	end
 
 	function backend.create(text, locale)
 		local session = {}
@@ -374,15 +388,20 @@ local function bind_ffi_backend()
 
 	function backend.source_group(session, allow_seed)
 		if not session.identity then return nil, "native-keymap-identity-unavailable" end
-		local receipt, reason = require("adapters.xkb_source_probe").read(session.identity, session.groups)
+		if not probe_current() then return nil, "native-source-issuer-replaced" end
+		local receipt, reason = source_read(session.identity, session.groups)
 		if not receipt then return nil, reason end
+		local observed_current = receipt.observed_current
+		if type(observed_current) ~= "function" then return nil, "native-source-issuer-unsealed" end
 		if backend.capture_group(session) ~= receipt.group then
 			lib.xkb_state_update_mask(session.state,
 				lib.xkb_state_serialize_mods(session.state, 1), lib.xkb_state_serialize_mods(session.state, 2),
 				lib.xkb_state_serialize_mods(session.state, 4), 0, 0, receipt.group)
 			if not allow_seed then return nil, "native-group-resynchronized" end
 		end
-		return receipt.group, receipt.generation
+		return receipt.group, receipt.generation, function()
+			return probe_current() and observed_current() == true
+		end
 	end
 
 	function backend.direct_sources(session, codes, group)
@@ -557,7 +576,7 @@ local function bind_ffi_backend()
 		return (evdev >= 1 and evdev <= 58) or evdev == 86
 	end
 
-	function backend.inverse(session)
+	function backend.inverse(session, group)
 		local table_out = {}
 		local low = math.max(tonumber(lib.xkb_keymap_min_keycode(session.keymap)) or 8, 8)
 		local high = tonumber(lib.xkb_keymap_max_keycode(session.keymap)) or 255
@@ -573,6 +592,9 @@ local function bind_ffi_backend()
 				if name and not name:match("^KP") then
 					local state = lib.xkb_state_new(session.keymap)
 					if state ~= nil then
+						-- Detached output chords retain the selected group while
+						-- discarding held, latched and locked modifiers.
+						lib.xkb_state_update_mask(state, 0, 0, 0, 0, 0, group)
 						for _, mod_key in ipairs(chord.keys) do
 							lib.xkb_state_update_key(state, mod_key, XKB_KEY_DOWN)
 						end
@@ -646,6 +668,7 @@ function M.load(text, locale)
 	_locale = selected_locale
 	_source_group, _source_native_generation = nil, nil
 	_capture_group, _capture_generation = nil, _capture_generation + 1
+	_inverse_map_owner = _inverse_map_owner + 1
 	_source_generation = _source_generation + 1
 	destroy(previous)
 	return true
@@ -676,6 +699,7 @@ function M.clear()
 	_locale = nil
 	_source_group, _source_native_generation = nil, nil
 	_capture_group, _capture_generation = nil, _capture_generation + 1
+	_inverse_map_owner = _inverse_map_owner + 1
 	_source_generation = _source_generation + 1
 end
 
@@ -706,17 +730,160 @@ end
 --- which moves the caret, differently from one start to the next; on the
 --- Ergopti layout, whose types put Shift on level 3, most characters came out
 --- wrong or went through the clipboard.
+--- @param require_source boolean|nil Require the existing native desktop acknowledgement.
 --- @return table|nil char → { keycode = evdev, level = integer, mods = table }
 --- @return string|nil error
-function M.inverse_table()
+--- @return table|nil Opaque reconstructed-state receipt, never desktop authority.
+function M.inverse_table(require_source)
 	if not _session then return nil, "XKB capture state is not ready" end
 	if type(_backend.inverse) ~= "function" then
 		return nil, "the capture backend cannot enumerate the keymap"
 	end
-	local ok, built = pcall(_backend.inverse, _session)
+	local session, backend, raw_map = _session, _backend, _keymap_text
+	local native_map = session.identity
+	local getter = backend.capture_group or backend.source_group
+	local enumerate = backend.inverse
+	local source_getter = backend.source_group
+	local desktop_generation, desktop_observed, desktop_error
+	if require_source == true then desktop_generation, desktop_error, desktop_observed = source_identity() end
+	if require_source == true and (not desktop_generation or type(_source_native_generation) ~= "number"
+		or _source_native_generation < 0 or _source_native_generation % 1 ~= 0
+		or type(desktop_observed) ~= "function") then return nil, "inverse-desktop-source-unavailable" end
+	local desktop_epoch = _source_generation
+	local generation, group = capture_identity()
+	if _session ~= session or _backend ~= backend or _keymap_text ~= raw_map
+		or session.identity ~= native_map or backend.inverse ~= enumerate
+		or require_source == true and backend.source_group ~= source_getter
+		or (backend.capture_group or backend.source_group) ~= getter then return nil, "inverse-source-changed" end
+	if type(getter) == "function" and (not generation or type(group) ~= "number"
+		or group < 0 or group % 1 ~= 0 or type(session.groups) == "number" and group >= session.groups) then
+		return nil, "inverse-group-unavailable"
+	end
+	local epoch = _capture_generation
+	local ok, built = pcall(enumerate, session, group)
 	if not ok then return nil, tostring(built) end
-	return built
+	local after_desktop, after_observed, after_error
+	if require_source == true then after_desktop, after_error, after_observed = source_identity() end
+	local after_generation, after_group = capture_identity()
+	local sealed, current = true, true
+	if require_source == true then sealed, current = pcall(after_observed) end
+	if _session ~= session or _backend ~= backend or _keymap_text ~= raw_map
+		or session.identity ~= native_map or _capture_generation ~= epoch
+		or backend.inverse ~= enumerate or (backend.capture_group or backend.source_group) ~= getter
+		or require_source == true and (not after_desktop or after_desktop ~= desktop_generation
+			or _source_generation ~= desktop_epoch or backend.source_group ~= source_getter or not sealed or current ~= true)
+		or after_generation ~= generation or after_group ~= group then return nil, "inverse-source-changed" end
+	if type(built) ~= "table" or getmetatable(built) ~= nil then return nil, "invalid-inverse-table" end
+	local detached = {}
+	for char, row in pairs(built) do
+		if type(char) ~= "string" or type(row) ~= "table" or getmetatable(row) ~= nil
+			or type(row.keycode) ~= "number" or row.keycode < 0 or row.keycode % 1 ~= 0
+			or type(row.level) ~= "number" or row.level < 1 or row.level % 1 ~= 0
+			or type(row.mods) ~= "table" or getmetatable(row.mods) ~= nil then return nil, "invalid-inverse-table" end
+		local mods = {}
+		for index, mod in ipairs(row.mods) do
+			if type(mod) ~= "string" then return nil, "invalid-inverse-table" end
+			mods[index] = mod
+		end
+		for index in pairs(row.mods) do
+			if type(index) ~= "number" or index < 1 or index % 1 ~= 0 or index > #mods then return nil, "invalid-inverse-table" end
+		end
+		detached[char] = { keycode = row.keycode, level = row.level, mods = mods }
+	end
+	-- Legacy no-getter fixtures retain enumeration without acquiring currency.
+	if type(getter) ~= "function" then return detached end
+	local receipt = {}
+	_inverse_receipts[receipt] = { session = session, backend = backend, raw_map = raw_map,
+		native_map = native_map, getter = getter, inverse = enumerate, generation = generation,
+		map_owner = _inverse_map_owner, create = backend.create, destroy = backend.destroy,
+		group = group, epoch = epoch, desktop_generation = desktop_generation,
+		desktop_epoch = desktop_epoch, desktop_native_generation = _source_native_generation,
+		source_getter = source_getter, observed_current = after_observed }
+	return detached, nil, receipt
 end
+
+--- Checks an exact inverse receipt against its original reconstructed source.
+--- Ordinary key transitions preserve it; observed group ABA and reload retire it.
+--- @param receipt table Opaque receipt returned by inverse_table().
+--- @param cached boolean|nil True for an observation-only RAM seal after callbacks.
+--- @return boolean Never a desktop, seat or physical delivery capability.
+function M.inverse_current(receipt, cached)
+	local owned = _inverse_receipts[receipt]
+	if not owned or owned.revoked then return false end
+	local function refuse()
+		owned.revoked = true
+		return false
+	end
+	local function same_owner()
+		return _session == owned.session and _backend == owned.backend and _keymap_text == owned.raw_map
+			and owned.session.identity == owned.native_map and _capture_generation == owned.epoch
+			and (_backend.capture_group or _backend.source_group) == owned.getter and _backend.inverse == owned.inverse
+			and (not owned.desktop_generation or _source_generation == owned.desktop_epoch
+				and _backend.source_group == owned.source_getter)
+	end
+	if not same_owner() then return refuse() end
+	if cached == true then
+		if owned.desktop_generation then
+			local ok, current = pcall(owned.observed_current)
+			if not ok or current ~= true or not same_owner() then return refuse() end
+		end
+		if _capture_group ~= owned.group then return refuse() end
+		return true
+	end
+	if owned.desktop_generation then
+		local desktop_generation, _, observed_current = source_identity()
+		if not same_owner() or desktop_generation ~= owned.desktop_generation then return refuse() end
+		if type(observed_current) ~= "function" then return refuse() end
+		owned.observed_current = observed_current
+	end
+	local generation, group = capture_identity()
+	if not same_owner() or generation ~= owned.generation or group ~= owned.group then return refuse() end
+	if owned.desktop_generation then
+		local ok, current = pcall(owned.observed_current)
+		if not ok or current ~= true or not same_owner() then return refuse() end
+	end
+	return true
+end
+
+local issue_inverse, check_inverse = M.inverse_table, M.inverse_current
+
+--- Publishes a fresh inverse for an unchanged map recreated by reset_state().
+--- The prior receipt provides provenance only; its retired currency is never revived.
+--- @param previous table Opaque inverse receipt issued before the reset.
+--- @param require_source boolean|nil Preserve the original native desktop requirement.
+--- @return table|nil Detached inverse table.
+--- @return string|nil Refusal reason.
+--- @return table|nil Fresh opaque receipt.
+function M.inverse_republish(previous, require_source)
+	local owned = _inverse_receipts[previous]
+	local function provenance()
+		return owned and _session and _session ~= owned.session
+			and _backend == owned.backend and _keymap_text == owned.raw_map
+			and _inverse_map_owner == owned.map_owner
+			and _backend.create == owned.create and _backend.destroy == owned.destroy
+			and (_backend.capture_group or _backend.source_group) == owned.getter
+			and _backend.inverse == owned.inverse
+			and (not owned.desktop_generation or _backend.source_group == owned.source_getter)
+			and M.inverse_table == issue_inverse and M.inverse_current == check_inverse
+	end
+	if not provenance() or (require_source == true) ~= (owned.desktop_generation ~= nil) then
+		return nil, "inverse-reset-provenance-refused"
+	end
+	-- Retire the original even if a fresh acquisition subsequently refuses.
+	owned.revoked = true
+	local built, reason, receipt = issue_inverse(require_source)
+	local fresh = _inverse_receipts[receipt]
+	if not built or not fresh then return nil, reason or "inverse-reset-publication-refused" end
+	local checked, current = pcall(check_inverse, receipt)
+	if not provenance() or not checked or current ~= true or fresh.group ~= owned.group
+		or fresh.map_owner ~= owned.map_owner
+		or owned.desktop_generation and fresh.desktop_native_generation ~= owned.desktop_native_generation then
+		fresh.revoked = true
+		return nil, "inverse-reset-source-changed"
+	end
+	return built, nil, receipt
+end
+
 
 --- Enumerates every plain output in a detached state of the active group.
 --- This preserves duplicates for the shared owner to refuse ambiguity.
@@ -726,21 +893,38 @@ end
 function M.direct_sources(codes)
 	if not _session then return nil, "XKB capture state is not ready" end
 	if type(codes) ~= "table" then return nil, "direct source codes are required" end
-	local count, seen = 0, {}
+	local count, seen, expected = 0, {}, {}
 	for key, code in pairs(codes) do
 		if type(key) ~= "number" or key % 1 ~= 0 or key < 1 or key > #codes
 			or type(code) ~= "number" or code < 1 or code > UINPUT_KEY_MAX or code % 1 ~= 0 or seen[code] then
 			return nil, "invalid direct source codes"
 		end
-		seen[code], count = true, count + 1
+		seen[code], expected[key], count = true, code, count + 1
 	end
 	if count ~= #codes then return nil, "direct source codes must be dense" end
 	if type(_backend.direct_sources) ~= "function" then return nil, "the capture backend cannot prove direct sources" end
+	local session, backend, raw_map = _session, _backend, _keymap_text
 	local generation, detail = source_identity()
 	if not generation then return nil, detail end
-	local ok, rows, err = pcall(_backend.direct_sources, _session, codes, _source_group)
+	if _session ~= session or _backend ~= backend or _keymap_text ~= raw_map then
+		return nil, "direct-source-changed"
+	end
+	local group, native_map = _source_group, session.identity
+	local snapshot = {}; for index, code in ipairs(expected) do snapshot[index] = code end
+	local ok, rows, err = pcall(backend.direct_sources, session, snapshot, group)
 	if not ok then return nil, tostring(rows) end
 	if type(rows) ~= "table" then return nil, err or "the capture backend returned no direct sources" end
+	local after_generation = source_identity()
+	if _session ~= session or _backend ~= backend or _keymap_text ~= raw_map
+		or after_generation ~= generation or _source_group ~= group or session.identity ~= native_map then
+		return nil, "direct-source-changed"
+	end
+	local snapshot_count = 0
+	for index, code in pairs(snapshot) do
+		if expected[index] ~= code then return nil, "direct-source-invalid-response" end
+		snapshot_count = snapshot_count + 1
+	end
+	if snapshot_count ~= count then return nil, "direct-source-invalid-response" end
 	return rows
 end
 
@@ -938,6 +1122,72 @@ function M.chord_source_current(capability)
 	return called and observed == true and private()
 end
 
+-- Output currency is a separate owner. Physical editor receipts retain their
+-- original epoch and never borrow a synthetic transition's acknowledgement.
+function M.capture_chord_output(capability)
+	if not M.chord_source_current(capability) then return nil end
+	local record = _physical_chord_receipts[capability]
+	local copy = {}; for key, value in pairs(record) do copy[key] = value end
+	local owner = {}; _chord_output_receipts[owner] = copy
+	return owner
+end
+
+function M.chord_output_current(owner)
+	local record = _chord_output_receipts[owner]
+	if not record or getmetatable(owner) ~= nil or next(owner) ~= nil then return false end
+	local scope = _chord_output_occurrence
+	local epoch = record.probe_epoch
+	if scope and scope.owner == owner then
+		if scope.processing or scope.refused then return false end
+		epoch = scope.processed and scope.next_epoch or epoch
+	end
+	local function private()
+		return M.process == original_process and _session == record.session and _backend == record.backend
+			and _source_generation == record.epoch and _physical_probe_epoch == epoch
+			and _source_group == record.group and _source_native_generation == record.locked.generation
+			and _keymap_text == record.raw_map and record.session.identity == record.native_map
+	end
+	if not private() then return false end
+	local called, observed = pcall(record.locked.observed_current)
+	return called and observed == true and private()
+end
+
+-- The private Hook producer supplies the dispatch and actual original broker
+-- outcome. This port grants no output rights and never mutates physical proof.
+function M.with_chord_output(owner, code, value, dispatch, acknowledged)
+	local record = _chord_output_receipts[owner]
+	if _chord_output_occurrence then _chord_output_occurrence.refused = true; return false end
+	if not record or not M.chord_output_current(owner)
+		or type(dispatch) ~= "function" or type(acknowledged) ~= "function" then return false end
+	local scope = { owner = owner, next_epoch = record.probe_epoch }
+	_chord_output_occurrence = scope
+	local function process(actual_code, actual_value)
+		if _chord_output_occurrence ~= scope or scope.processing or scope.processed or scope.refused
+			or actual_code ~= code or actual_value ~= value or not M.chord_output_current(owner) then
+			scope.refused = true; return nil, nil, "owned-output-capture-refused"
+		end
+		scope.processing = true
+		local called, text, identity, reason = pcall(original_process, actual_code, actual_value)
+		scope.processing = false
+		scope.processed = true
+		scope.next_epoch = record.probe_epoch + 1
+		if not called or reason ~= nil or not M.chord_output_current(owner) then
+			scope.refused = true
+			return nil, nil, called and reason or "owned-output-capture-error"
+		end
+		return text, identity, nil
+	end
+	local called = pcall(dispatch, process)
+	local observed, accepted = false, false
+	if called and not scope.refused and M.chord_output_current(owner) then
+		observed, accepted = pcall(acknowledged)
+	end
+	local current = called and observed and accepted == true and not scope.refused and M.chord_output_current(owner)
+	if current then record.probe_epoch = scope.next_epoch else _chord_output_receipts[owner] = nil end
+	_chord_output_occurrence = nil
+	return current == true
+end
+
 --- Native-library-only probe; never qualifies desktop source or physical delivery.
 function M._capture_chord_sources_for_test(requests)
 	local _, group = capture_identity()
@@ -948,7 +1198,29 @@ end
 --- The validated keymap and active-group epoch, independent of ordinary keys.
 --- @return integer|nil generation
 --- @return string|nil error
-function M.source_generation() return source_identity() end
+function M.source_generation()
+	local session, backend, map, epoch = _session, _backend, _keymap_text, _capture_generation
+	local getter = backend and backend.source_group
+	local native_map = session and session.identity
+	local function same_owner()
+		return _session == session and _backend == backend and _keymap_text == map and _capture_generation == epoch
+			and (not session or session.identity == native_map) and (not backend or backend.source_group == getter)
+	end
+	local generation, reason, observed_current = source_identity()
+	if not same_owner() then return nil, "native-source-owner-changed" end
+	-- Missing issuer currency remains missing; a controlled tuple is not a lease.
+	if not generation or type(observed_current) ~= "function" then return generation, reason, observed_current end
+	local group, native_generation = _source_group, _source_native_generation
+	local function current()
+		return same_owner() and _source_generation == generation
+			and _source_group == group and _source_native_generation == native_generation
+	end
+	return generation, reason, function()
+		if not current() then return false end
+		local called, observed = pcall(observed_current)
+		return called and observed == true and current()
+	end
+end
 
 --- Native-library test seam; intentionally supplies no desktop qualification.
 function M._capture_source_generation_for_test() return capture_identity() end
@@ -1073,4 +1345,5 @@ end
 
 M.EVDEV_TO_XKB_OFFSET = EVDEV_TO_XKB_OFFSET
 
+original_process = M.process
 return M

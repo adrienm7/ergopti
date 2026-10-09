@@ -1,0 +1,4 @@
+[case]
+description = "Absent legacy source cannot admit unknown or case-distinct current ownership."
+drivers = ["ahk", "hs", "linux"]
+outcome = "invalid"

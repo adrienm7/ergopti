@@ -130,19 +130,12 @@ end
 -- ================================
 
 package.preload["adapters.keyboard_layout"] = function()
-	return {
-		refresh = function() return true end,
-		is_ready = function() return true end,
-		source = function() return "scripted" end,
-		resolve = function() return { keycode = 30, level = 1, mods = {} } end,
-		plan = function() return {} end,
-		shortcut_keycode = function(_, us_code) return us_code end,
-		_set_table_for_test = function() end,
-	}
+	-- The layout is controlled; opaque plan custody is actual KeyboardLayout logic.
+	return require("tests.support.layout_cohort_fixture").layout(function() return 30 end)
 end
 package.preload["adapters.uinput_writer"] = function()
-	local function ok() return true end
-	return { is_available = ok, open = ok, close = ok, is_open = ok, sync = ok, emit = ok }
+	-- Capability/reservation lifecycle is real Writer logic; syscalls are controlled.
+	return require("tests.fakes").uinput_writer()
 end
 package.preload["adapters.secure_field_detector"] = function()
 	return {

@@ -1358,6 +1358,22 @@ local function chord_state()
 	return _key_actions, _chords_on
 end
 
+--- Captures the genuine script chord assignment and tap lifecycle without IO.
+--- @param binding string Canonical script binding.
+--- @param action string Exact selected action.
+--- @return function|nil guard Pure terminal seal.
+function M.capture_action_delivery_guard(binding, action)
+	if type(binding) ~= "string" or binding:sub(1, #M.BINDING_PREFIX) ~= M.BINDING_PREFIX then return nil end
+	local slot = binding:sub(#M.BINDING_PREFIX + 1)
+	local assignments, enabled = chord_state()
+	local generation, pause_epoch = _tap_generation, _pause_epoch
+	if not enabled or assignments[slot] ~= action then return nil end
+	return function()
+		return _key_actions == assignments and _chords_on == true and assignments[slot] == action
+			and not _is_paused and _tap_committed and _tap_generation == generation and _pause_epoch == pause_epoch
+	end
+end
+
 local function dispatch_action(action, binding)
 	if type(action) ~= "string" or action == "none" or action == "--" then return false end
 
