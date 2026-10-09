@@ -489,7 +489,7 @@ end
 --- @param state table Daemon state.
 --- @param detailed boolean Whether the user ticked "Include details".
 --- @return table
-function M.build_snapshot(state, detailed)
+function M.build_snapshot(state, detailed, extensive)
 	state = type(state) == "table" and state or {}
 	-- The budget is the collection's: the shared documents load once per
 	-- session, before the clock starts
@@ -518,8 +518,9 @@ function M.build_snapshot(state, detailed)
 		driver         = M.DRIVER,
 		generated_at   = Snapshot.utc_now(),
 		detailed       = detailed == true,
+		extensive      = extensive == true,
 		sections       = sections,
-		probes         = Snapshot.pending_probes(schema, M.DRIVER),
+		probes         = Snapshot.pending_probes(schema, M.DRIVER, extensive == true),
 	}
 	local elapsed = now_ms() - started
 	sections.developer.phase_a_ms = elapsed
@@ -572,11 +573,28 @@ local function cancel_probes(session)
 	end
 end
 
+--- Archives only reported cleanup metadata; no native owner is adopted or released.
+--- @param session table The exact window session being refreshed.
+local function archive_cleanup_metadata(session)
+	local rows = {}
+	for id, result in pairs(session.snapshot.probes) do
+		if result.state == "pending" or (result.cleanup ~= nil and result.cleanup ~= "settled") then
+			local copied = {}
+			for key, value in pairs(result) do copied[key] = value end
+			if copied.state == "pending" then copied.state, copied.cleanup = "cancelled", "pending" end
+			rows[id] = copied
+		end
+	end
+	session.cleanup_history = session.cleanup_history or {}
+	if next(rows) then session.cleanup_history[#session.cleanup_history + 1] = { probes = rows } end
+end
+
 --- Starts the probes of a session's snapshot.
 --- @param session table
 --- @param state table Daemon state.
 local function start_probes(session, state)
 	cancel_probes(session)
+	if session.snapshot.extensive ~= true then return end
 	session.probes = require("ui.healthcheck.probes").start(M.config().schema, session.snapshot.sections.paths, state,
 		function(id, result, sections)
 			if _session ~= session then return end
@@ -625,9 +643,23 @@ end
 local function perform(session, action, state, context)
 	local Report = require("ui.healthcheck.report")
 	local documents = M.config()
+	if action.action == "export_snapshot" then
+		return { type = "action", action = "export_snapshot", ok = true,
+			export_sequence = action.export_sequence, snapshot = session.snapshot }
+	end
+	if action.action == "cancel" then
+		cancel_probes(session)
+		for id, result in pairs(session.snapshot.probes) do
+			if result.state == "pending" then session.snapshot.probes[id] = { state = "cancelled", cleanup = "pending" } end
+		end
+		return { type = "action", action = "cancel", ok = true, snapshot = session.snapshot }
+	end
 	if action.action == "refresh" then
+		cancel_probes(session)
+		archive_cleanup_metadata(session)
 		session.detailed = action.detailed
-		session.snapshot = M.build_snapshot(state, action.detailed)
+		session.snapshot = M.build_snapshot(state, action.detailed, action.extensive)
+		session.snapshot.retired_probes = session.cleanup_history
 		start_probes(session, state)
 		return { type = "snapshot", snapshot = session.snapshot }
 	end

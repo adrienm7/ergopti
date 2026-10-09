@@ -30,6 +30,7 @@ local Logger   = require("infra.logger")
 local H        = require("ui.healthcheck.helpers")
 local Paths    = require("infra.paths")
 local Snapshot = require("healthcheck.snapshot")
+local Cleanup = require("healthcheck.cleanup")
 local Actions  = require("healthcheck.actions")
 local TimerScheduler = require("adapters.timer_scheduler")
 
@@ -618,6 +619,7 @@ end
 function M.run(opts)
 	opts = type(opts) == "table" and opts or {}
 	local detailed = opts.detailed == true
+	local extensive = opts.extensive == true
 	Logger.start(LOG, "Collecting the diagnostics…")
 	-- The budget is the collection's: the shared documents load once per
 	-- session, before the clock starts
@@ -658,8 +660,9 @@ function M.run(opts)
 		driver         = M.DRIVER,
 		generated_at   = Snapshot.utc_now(),
 		detailed       = detailed,
+		extensive      = extensive,
 		sections       = sections,
-		probes         = Snapshot.pending_probes(schema, M.DRIVER),
+		probes         = Snapshot.pending_probes(schema, M.DRIVER, extensive),
 	}
 
 	local elapsed = (hs.timer.absoluteTime() - started) / 1e6
@@ -720,10 +723,13 @@ end
 --- snapshot and pushed into the page.
 --- @param session table
 local function start_probes(session)
-	if session.probes then session.probes.cancel() end
+	Cleanup.archive(session)
+	Cleanup.refresh(session)
+	if session.snapshot.extensive ~= true then return end
+	local captured = session.snapshot
 	session.probes = require("ui.healthcheck.probes").start(M.config().schema, session.snapshot,
 		function(id, result, sections)
-			if _session ~= session then return end
+			if _session ~= session or session.snapshot ~= captured then return end
 			session.snapshot.probes[id] = result
 			for section_id, values in pairs(sections or {}) do
 				local target = session.snapshot.sections[section_id]
@@ -755,11 +761,20 @@ end
 --- @param action table From healthcheck.actions.validate.
 --- @param documents table M.config().
 local function perform_action(session, action, documents)
-	if action.action == "close" then
+	Cleanup.refresh(session)
+	if action.action == "export_snapshot" then
+		send(session, { type = "action", action = "export_snapshot", ok = true,
+			export_sequence = action.export_sequence, snapshot = session.snapshot })
+	elseif action.action == "close" then
 		close_owned_window(session.webview, "page close")
+	elseif action.action == "cancel" then
+		Cleanup.cancel(session)
+		send(session, { type = "action", action = "cancel", ok = true, snapshot = session.snapshot })
 	elseif action.action == "refresh" then
+		Cleanup.archive(session)
 		session.detailed = action.detailed
-		session.snapshot = M.run({ detailed = action.detailed })
+		session.snapshot = M.run({ detailed = action.detailed, extensive = action.extensive })
+		Cleanup.refresh(session)
 		send(session, { type = "snapshot", snapshot = session.snapshot })
 		start_probes(session)
 	else

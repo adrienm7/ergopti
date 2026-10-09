@@ -162,7 +162,17 @@ HealthCheck_ValidateAction(Message, Context) {
 			Detailed := Message.Get("detailed", false)
 			if !(Detailed is Integer) || (Detailed != 0 && Detailed != 1)
 				return _HCActions_Refuse("bad_detailed")
-			return Map("action", Map("action", "refresh", "detailed", Detailed = 1))
+			Extensive := Message.Get("extensive", false)
+			if !(Extensive is Integer) || (Extensive != 0 && Extensive != 1)
+				return _HCActions_Refuse("bad_extensive")
+			return Map("action", Map("action", "refresh", "detailed", Detailed = 1, "extensive", Extensive = 1))
+		case "export_snapshot":
+			ExportSequence := Message.Get("export_sequence", 0)
+			if !(ExportSequence is Integer) || ExportSequence <= 0 || ExportSequence > Schema["report"]["export_sequence_max"]
+				return _HCActions_Refuse("bad_export_sequence")
+			return Map("action", Map("action", "export_snapshot", "export_sequence", ExportSequence))
+		case "cancel":
+			return Map("action", Map("action", "cancel"))
 		case "close":
 			return Map("action", Map("action", "close"))
 	}

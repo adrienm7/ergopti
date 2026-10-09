@@ -6,7 +6,7 @@
 --- Drives the real diagnostics window through its usercontent message handler,
 --- the way the shared page posts to it:
 --- 1. "ready" answers with the page's configuration and the first snapshot,
----    and starts the probes;
+---    and keeps subprocess probes opt-in;
 --- 2. an action the allowlist refuses changes nothing and is logged;
 --- 3. copy writes the redacted report, and a refused clipboard keeps the
 ---    window open and says so to the page;
@@ -121,6 +121,7 @@ local function load_window(controls)
 		return {
 			schema_version = 2, driver = "macos", generated_at = "2026-09-24T10:00:00Z",
 			detailed = type(opts) == "table" and opts.detailed == true or false,
+			extensive = type(opts) == "table" and opts.extensive == true or false,
 			sections = { paths = { diagnostics_dir = HOME .. "/Library/Logs/ergopti_plus/diagnostics" } },
 			probes = { github_api = { state = "pending" } },
 		}
@@ -164,7 +165,7 @@ helpers.describe("diagnostics window: the page's bridge (macOS)", function()
 		helpers.assert_eq(context.every, 0, "no recurring timer may poll the page")
 	end)
 
-	helpers.it("answers ready with the configuration and the snapshot, then starts the probes", function()
+	helpers.it("answers ready with a quick snapshot and starts probes only after explicit opt-in", function()
 		as_jdoe(function()
 			local core, context = load_window()
 			core.show_window({ mode = "report" })
@@ -177,6 +178,9 @@ helpers.describe("diagnostics window: the page's bridge (macOS)", function()
 			helpers.assert_eq(messages[1].config.context.home, HOME)
 			helpers.assert_eq(messages[1].config.context.case_insensitive, true)
 			helpers.assert_eq(messages[1].snapshot.driver, "macos")
+			helpers.assert_eq(context.started_probes, 0, "opening the window must not start subprocess probes")
+			helpers.assert_eq(messages[1].snapshot.extensive, false)
+			context.page({ body = { action = "refresh", extensive = true } })
 			helpers.assert_eq(context.started_probes, 1)
 			-- The probes complete the snapshot the page shows: its paths, its
 			-- peripherals and whether details are included (bluetooth-peripherals)
@@ -274,6 +278,7 @@ helpers.describe("diagnostics window: the page's bridge (macOS)", function()
 			local core, context = load_window()
 			core.show_window()
 			context.page({ body = "ready" })
+			context.page({ body = { action = "refresh", extensive = true } })
 			context.page({ body = { action = "close" } })
 			helpers.assert_eq(context.deleted, 1)
 			helpers.assert_eq(context.cancelled_probes, 1)
@@ -297,7 +302,8 @@ helpers.describe("diagnostics window: the page's bridge (macOS)", function()
 			local core, context = load_window()
 			core.show_window()
 			context.page({ body = "ready" })
-			context.page({ body = { action = "refresh", detailed = true } })
+			context.page({ body = { action = "refresh", extensive = true } })
+			context.page({ body = { action = "refresh", detailed = true, extensive = true } })
 			local messages = page_messages(context)
 			helpers.assert_eq(messages[#messages].type, "snapshot")
 			helpers.assert_eq(messages[#messages].snapshot.detailed, true)
