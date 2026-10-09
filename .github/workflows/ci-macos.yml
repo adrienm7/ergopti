@@ -325,6 +325,33 @@ jobs:
           if-no-files-found: warn
           retention-days: 7
           path: ${{ env.ERGOPTI_OLLAMA_BUILD_ROOT }}/listener-xctest.log
+      - name: Qualify actual native PAC and WPAD XCTest controls
+        if: ${{ !cancelled() }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "$ERGOPTI_NATIVE_HTTP_PYTHON"
+          test -x "$ERGOPTI_NATIVE_HTTP_PYTHON"
+          transcript="$ERGOPTI_OLLAMA_BUILD_ROOT/native-pac-xctest.log"
+          set +e
+          swift test --package-path static/ergopti_plus/macos/launcher \
+            --scratch-path "$ERGOPTI_OLLAMA_BUILD_ROOT/swift" \
+            --filter 'ManagedHTTPWorkerTests|ManagedHTTPWireTests|ManagedHTTPWPADWireTests' 2>&1 | tee "$transcript"
+          pac_statuses=("${PIPESTATUS[@]}")
+          set -e
+          node tools/diagnostics/managed_http_pac_xctest_evidence.cjs "$transcript" "${pac_statuses[0]}" "${pac_statuses[1]}" "$ERGOPTI_OLLAMA_BUILD_ROOT/native-pac-verdict.json"
+        timeout-minutes: 10
+      - name: Retain independent native PAC XCTest diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          overwrite: true
+          name: managed-http-pac-xctest-${{ matrix.architecture }}-${{ github.run_id }}
+          if-no-files-found: warn
+          retention-days: 7
+          path: |
+            ${{ env.ERGOPTI_OLLAMA_BUILD_ROOT }}/native-pac-xctest.log
+            ${{ env.ERGOPTI_OLLAMA_BUILD_ROOT }}/native-pac-verdict.json
       - name: Receive actual independent managed HTTP native clients
         if: ${{ !cancelled() }}
         shell: bash

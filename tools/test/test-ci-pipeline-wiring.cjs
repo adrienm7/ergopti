@@ -178,6 +178,18 @@ const PLAN_STEPS = ['Load the Linux release artifact contract', 'Compute tag and
 // accepted value. Every other step runs whenever its job runs, so no edit can
 // skip a gate while its job stays green.
 const MACOS_NATIVE_STEP_CONDITIONS = [
+	[
+		MACOS_BOX,
+		'managed-ollama-native',
+		'Qualify actual native PAC and WPAD XCTest controls',
+		NOT_CANCELLED
+	],
+	[
+		MACOS_BOX,
+		'managed-ollama-native',
+		'Retain independent native PAC XCTest diagnostics',
+		'always()'
+	],
 	[MACOS_BOX, 'item36-native', 'Retain scoped item 36 native diagnostics', 'always()'],
 	[
 		MACOS_BOX,

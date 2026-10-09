@@ -5804,6 +5804,8 @@ The separately reviewed combined LLM/About menu-parent tranche preserves native 
       open. macOS system trust and explicit proxy relays are integrated, while
       opaque-client full-URL PAC/WPAD/fallback/redirect routing remains CODE.
 
+Current composed receiving qualification adds an independent exact twelve-case native PAC/WPAD XCTest cohort on both macOS architectures, including the existing real CFNetwork HTTPS path/query control. Its strict reader refuses missing, skipped, duplicated, foreign or failed cases; it does not qualify the full package or installation. The final composite preserves the published Group1 menu delivery and Group3 documentation. The dedicated XcodeGen metadata token remains absent until the Group5 scoped consumer and child-environment removal are integrated together. Native execution of this current candidate is pending the final integrated all-OS manual CI; previous failures and the remaining software/device tasks below remain open.
+
 The next reviewed receiving tranche (2026-10-09) preserves the original native
 bounds. Portable HTTP retirement now starts the six public server shutdowns
 concurrently, retains every exact worker before start and refuses namespace
