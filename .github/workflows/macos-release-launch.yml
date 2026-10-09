@@ -184,7 +184,7 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version-file: .node-version
+          node-version-file: '.node-version'
 
       - name: Install the unchanged archive for diagnostic observation
         run: |
