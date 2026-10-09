@@ -50,6 +50,156 @@ return function(config)
 		results[#results + 1] = { id = id, passed = true }
 	end
 
+	-- These passive tuples describe first-seen held state, never terminal readiness.
+	local progress_enabled = type(config) == "table" and getmetatable(config) == nil
+		and rawget(config, "progress_observation") == true
+	local progress_pid, progress_version, progress_nonce = hs.processInfo.processID, hs.processInfo.version, config.nonce
+	local progress_cases = {
+		"tap_holds_off_keeps_banner", "accessibility_precedes_login_items", "accessibility_later_native_bridge",
+		"login_items_native_dom_and_window", "unknown_status_keeps_steps", "open_settings_native_bridge",
+		"later_dismisses_and_spends_offer", "explicit_reopen_creates_new_view", "native_delete_reports_close",
+		"observed_ready_auto_closes",
+	}
+	local progress_prefixes = {
+		[1] = { [0] = true, [1] = true }, [1.5] = { [1] = true }, [2] = { [2] = true },
+		[3] = { [2] = true }, [4] = { [2] = true }, [5] = { [3] = true },
+		[6] = { [4] = true }, [7] = { [5] = true }, [8] = { [6] = true },
+		[8.5] = { [7] = true }, [9] = { [8] = true }, [9.5] = { [9] = true },
+		[10] = { [9] = true, [10] = true },
+	}
+	local progress_stages = { [1] = "1", [1.5] = "1.5", [2] = "2", [3] = "3", [4] = "4",
+		[5] = "5", [6] = "6", [7] = "7", [8] = "8", [8.5] = "8.5", [9] = "9",
+		[9.5] = "9.5", [10] = "10" }
+	local progress_seen, progress_sequence, progress_limit = {}, 0, 0
+	for _, counts in pairs(progress_prefixes) do
+		for _ in pairs(counts) do progress_limit = progress_limit + 2 end -- Both Boolean observations; at most 30 tuples.
+	end
+
+	--- Copies a strict original prefix before any foreign encoding or write callback.
+	local function progress_observation()
+		if not progress_enabled then return end
+		local saved_stage, saved_busy = stage, busy
+		if type(results) ~= "table" or getmetatable(results) ~= nil then return end
+		local saved_count = #results
+		if type(saved_stage) ~= "number" or not progress_stages[saved_stage]
+			or type(saved_busy) ~= "boolean" or math.type(saved_count) ~= "integer"
+			or not progress_prefixes[saved_stage][saved_count]
+			or getmetatable(results) ~= nil then return end
+		local slots = 0
+		for key in pairs(results) do
+			if math.type(key) ~= "integer" or key < 1 or key > saved_count then return end
+			slots = slots + 1
+		end
+		if slots ~= saved_count then return end
+		for i = 1, saved_count do
+			local row = rawget(results, i)
+			if type(row) ~= "table" or getmetatable(row) ~= nil
+				or rawget(row, "id") ~= progress_cases[i] or rawget(row, "passed") ~= true then return end
+			local fields = 0
+			for _ in pairs(row) do fields = fields + 1 end
+			if fields ~= 2 then return end
+		end
+		if math.type(progress_pid) ~= "integer" or progress_pid <= 0 or progress_pid > 2147483647
+			or type(progress_nonce) ~= "string" or #progress_nonce ~= 32 or not progress_nonce:match("^[a-f0-9]+$")
+			or type(progress_version) ~= "string" or #progress_version > 32
+			or not progress_version:match("^[A-Za-z0-9][A-Za-z0-9._+%-]*$") then return end
+		local key = progress_stages[saved_stage] .. "/" .. tostring(saved_busy) .. "/" .. saved_count
+		if progress_seen[key] or progress_sequence >= progress_limit then return end
+		-- Publish custody before entering the foreign sink; reentry cannot duplicate it.
+		progress_seen[key] = true
+		progress_sequence = progress_sequence + 1
+		local saved_sequence = progress_sequence
+		pcall(function()
+			local encoded = string.format(
+				'ERGOPTI_PERMISSION_UI_PROGRESS {"schema":1,"kind":"permission_ui_first_seen_progress","authority":false,"native_verdict":"unchanged","pid":%d,"nonce":"%s","version":"%s","sequence":%d,"stage":%s,"busy":%s,"recorded_case_count":%d}\n',
+				progress_pid, progress_nonce, progress_version, saved_sequence, progress_stages[saved_stage],
+				saved_busy and "true" or "false", saved_count)
+			if #encoded <= 512 then io.stderr:write(encoded) end
+		end)
+	end
+
+	-- Stage-4 facts only: capture original operand results without extra queries.
+	local stage4_pending, stage4_seen, stage4_sequence = nil, {}, 0
+	local function stage4_value(name, value)
+		if stage4_pending ~= nil then stage4_pending[name] = value end
+		return value
+	end
+	local function stage4_window(value)
+		if stage4_pending ~= nil then stage4_pending.native_window = value == nil and "nil" or "non_nil" end
+		return value
+	end
+	local function stage4_observation()
+		local saved = stage4_pending
+		stage4_pending = nil
+		if not progress_enabled or saved == nil then return end
+		local later = saved.later
+		local views, login_items = saved.views, saved.login_items
+		local visible, native_window = saved.visible, saved.native_window
+		if type(later) ~= "boolean"
+			or (views ~= "not_read" and (math.type(views) ~= "integer" or views < 0 or views > 4))
+			or (login_items ~= "not_read" and type(login_items) ~= "boolean")
+			or (visible ~= "not_read" and type(visible) ~= "boolean")
+			or (native_window ~= "not_read" and native_window ~= "nil" and native_window ~= "non_nil") then return end
+		if math.type(progress_pid) ~= "integer" or progress_pid <= 0 or progress_pid > 2147483647
+			or type(progress_nonce) ~= "string" or #progress_nonce ~= 32 or not progress_nonce:match("^[a-f0-9]+$")
+			or type(progress_version) ~= "string" or #progress_version > 32
+			or not progress_version:match("^[A-Za-z0-9][A-Za-z0-9._+%-]*$") then return end
+		local later_json = later and '"accepted"' or '"not_observed"'
+		local views_json = views == "not_read" and '"not_read"' or tostring(views)
+		local login_json = login_items == "not_read" and '"not_read"' or tostring(login_items)
+		local visible_json = visible == "not_read" and '"not_read"' or tostring(visible)
+		local key = table.concat({ later_json, views_json, login_json, visible_json, native_window }, "/")
+		if stage4_seen[key] or stage4_sequence >= 32 then return end
+		stage4_seen[key] = true
+		stage4_sequence = stage4_sequence + 1
+		local saved_sequence = stage4_sequence
+		pcall(function()
+			local encoded = string.format(
+				'ERGOPTI_PERMISSION_UI_STAGE4 {"schema":1,"kind":"permission_ui_stage4_branch_observation","authority":false,"native_verdict":"unchanged","pid":%d,"nonce":"%s","version":"%s","sequence":%d,"later":%s,"views":%s,"login_items":%s,"visible":%s,"native_window":"%s"}\n',
+				progress_pid, progress_nonce, progress_version, saved_sequence,
+				later_json, views_json, login_json, visible_json, native_window)
+			if #encoded <= 512 then io.stderr:write(encoded) end
+		end)
+	end
+
+	-- Reopened-window facts retain only original stage-8.5/9.5 operand reads.
+	local window_pending, window_seen, window_sequence = nil, {}, 0
+	local function window_value(name, value)
+		if window_pending ~= nil then window_pending[name] = value end
+		return value
+	end
+	local function window_handle(value)
+		if window_pending ~= nil then window_pending.native_window = value == nil and "nil" or "non_nil" end
+		return value
+	end
+	local function window_observation()
+		local saved = window_pending
+		window_pending = nil
+		if not progress_enabled or saved == nil then return end
+		local saved_stage, saved_view = saved.stage, saved.view
+		local visible, native_window = saved.visible, saved.native_window
+		if (saved_stage ~= 8.5 or saved_view ~= 3) and (saved_stage ~= 9.5 or saved_view ~= 4) then return end
+		if (visible ~= "not_read" and type(visible) ~= "boolean")
+			or (native_window ~= "not_read" and native_window ~= "nil" and native_window ~= "non_nil") then return end
+		if math.type(progress_pid) ~= "integer" or progress_pid <= 0 or progress_pid > 2147483647
+			or type(progress_nonce) ~= "string" or #progress_nonce ~= 32 or not progress_nonce:match("^[a-f0-9]+$")
+			or type(progress_version) ~= "string" or #progress_version > 32
+			or not progress_version:match("^[A-Za-z0-9][A-Za-z0-9._+%-]*$") then return end
+		local visible_json = visible == "not_read" and '"not_read"' or tostring(visible)
+		local key = table.concat({ tostring(saved_stage), tostring(saved_view), visible_json, native_window }, "/")
+		if window_seen[key] or window_sequence >= 32 then return end
+		window_seen[key] = true
+		window_sequence = window_sequence + 1
+		local saved_sequence = window_sequence
+		pcall(function()
+			local encoded = string.format(
+				'ERGOPTI_PERMISSION_UI_WINDOW_BRANCH {"schema":1,"kind":"permission_ui_window_branch_observation","authority":false,"native_verdict":"unchanged","pid":%d,"nonce":"%s","version":"%s","sequence":%d,"stage":%s,"view":%d,"visible":%s,"native_window":"%s"}\n',
+				progress_pid, progress_nonce, progress_version, saved_sequence, tostring(saved_stage), saved_view,
+				visible_json, native_window)
+			if #encoded <= 512 then io.stderr:write(encoded) end
+		end)
+	end
+
 	local function stage_failure(boundary, saved_stage, saved_checkpoint, saved_count, saved_busy)
 		if not stage_failure_enabled then return end
 		-- Plain saved state is diagnostic only; captured stderr is best effort.
@@ -115,8 +265,12 @@ return function(config)
 	UI.show_webview = forwarder
 	local function remember_window(view)
 		check(type(view) == "userdata", "Actual native view missing")
-		if view:isVisible() ~= true then return nil end
-		local window = view:hswindow()
+		if progress_enabled and (stage == 8.5 or stage == 9.5) then
+			window_pending = { stage = stage, view = stage == 8.5 and 3 or 4,
+				visible = "not_read", native_window = "not_read" }
+		end
+		if window_value("visible", stage4_value("visible", view:isVisible())) ~= true then return nil end
+		local window = window_handle(stage4_window(view:hswindow()))
 		if window == nil then return nil end -- Bounded readiness only; no substituted AX handle.
 		local id = window:id()
 		check(math.type(id) == "integer" and id > 0, "Actual native window ID unavailable")
@@ -131,15 +285,18 @@ return function(config)
 	local function javascript(view, source, receive)
 		check(not busy, "Overlapping native JavaScript operation")
 		busy = true
+		progress_observation()
 		view:evaluateJavaScript(source, function(value, err)
 			-- Assertions are evaluated by the outer driver, never swallowed by WebKit's pcall.
 			busy = false
+			progress_observation()
 			if WebViewResult.is_error(err) then failure = "Actual WK evaluation failed"; return end
 			local ok, detail = xpcall(receive, debug.traceback, value)
 			if not ok then failure = detail end
 		end)
 	end
 	local function finish()
+		progress_observation()
 		finish_checkpoint = "entered"
 		if failure ~= nil then
 			stage_failure("failure_finish_entered", stage, finish_checkpoint, #results, busy)
@@ -214,7 +371,10 @@ return function(config)
 				check(value == true, "Accessibility DOM action refused"); later_done = true
 			end)
 		elseif stage == 4 then
-			if not later_done or #observations < 2 or not Dialog.is_open("login_items") then return end
+			stage4_pending = { later = false, views = "not_read", login_items = "not_read",
+				visible = "not_read", native_window = "not_read" }
+			if not stage4_value("later", later_done) or stage4_value("views", #observations) < 2
+				or not stage4_value("login_items", Dialog.is_open("login_items")) then return end
 			check(#observations == 2 and not Dialog.is_open("accessibility"), "Queued Login Items duplicated views")
 			check(no_window(observations[1], ids[1]), "Accessibility native window survived Later")
 			current = observations[2]
@@ -293,6 +453,7 @@ return function(config)
 		end
 	end
 	observer = hs.timer.new(0.02, function()
+		progress_observation()
 		local ok, detail = xpcall(tick, debug.traceback)
 		if not ok then
 			failure = detail
@@ -305,6 +466,8 @@ return function(config)
 			end
 			if not finished then Logger.error("permission_fixture", "%s", tostring(err)) end
 		end
+		stage4_observation()
+		window_observation()
 	end)
 	assert(observer:start())
 end

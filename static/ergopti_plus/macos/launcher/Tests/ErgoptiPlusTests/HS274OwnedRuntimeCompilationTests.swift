@@ -192,9 +192,9 @@ extension HS274NativePolicyQualificationTests {
 				XCTAssertEqual(partial?["qualification"] as? String,
 					"unsigned_actual_core_constructor_compilation_only")
 				XCTAssertEqual(partial?["producer_sha256"] as? String,
-					"bbd44055d0e426b78f612a4cb2585b42373045f31042fd2bc4d957905ef4de45")
+					"729c33710cab92d63af6c27c16c6705c3e629edb5867766873c5f8089fcaa42b")
 				XCTAssertEqual(partial?["source_factory_sha256"] as? String,
-					"854dc3ef556e2540d4a64e0d935610a2a2fe8c947e3f7fe315c1641ceaaedd7d")
+					"71237241a3a43fa3dbc5c5b8db488432b9051ed66322cbdf497959b3724b10a1")
 				XCTAssertEqual(partial?["architectures"] as? [String], ["arm64", "x86_64"])
 				XCTAssertEqual(partial?["core_relative_path"] as? String,
 					"upstream/src/apps/CoreService/build/Release/ErgoptiPlus-Remap-Core.app")
@@ -430,7 +430,8 @@ extension HS274NativePolicyQualificationTests {
 
 extension HS274NativePolicyQualificationTests {
 	func testPortableInitializerDeliveryRetainsAllTwentyTwoFrozenControls() throws {
-		try fixture { root in
+		let parent = try compilationEvidenceParent()
+		try fixture(parent: parent) { root in
 			let cases: [String] = ["healthy", "unbound", "bytes_mismatch", "empty", "noncanonical", "error", "unknown_response", "duplicate", "retired", "changed_peer", "timer", "queue_refusal", "callback", "foreign_debt", "timer_observation", "empty_refusal", "reserved_kind", "outbound_wire", "pending_cancel", "completion_reentry", "peer_reentry", "completion_exception"]
 			let modes: [[String]] = [[], ["-O"]]
 			for selected in cases {

@@ -23,11 +23,11 @@ import uuid
 SOURCE_PINS = (
     (
         "tools/build/remap_runtime_build.py",
-        "e8891edda6f25de3ab4361143c51ce55b4289368e6dfb69102f671681081d1d6",
+        "12dfa8d5eaa9048a5a78a55111e547b875b0a1aa379c8a4a203024cb792355ca",
     ),
     (
         "tools/build/remap_runtime_source.py",
-        "854dc3ef556e2540d4a64e0d935610a2a2fe8c947e3f7fe315c1641ceaaedd7d",
+        "71237241a3a43fa3dbc5c5b8db488432b9051ed66322cbdf497959b3724b10a1",
     ),
     (
         "tools/build/remap_runtime_patch.py",
@@ -35,7 +35,7 @@ SOURCE_PINS = (
     ),
     (
         "tools/diagnostics/hs274_native_build.py",
-        "ff8de375cb2fc8a801a144974418300e8e290a1efe2107338972b937d659dd80",
+        "9695174913fec75b4f0ea1b58b1fed70a06f31fc88dcc7b521ca93eb730d9fe6",
     ),
 )
 MAX_BYTES = 128 * 1024 * 1024

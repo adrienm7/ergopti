@@ -29,6 +29,10 @@ DEPENDENCIES = (
         "6640d31e02d80497af63df1287b03f31415f57c81af7892aec1cd2457675613e",
     ),
     (
+        "tools/build/remap_runtime_inventory.hpp",
+        "5a033ca40c506b654f62fd3e1a0b9eee7a74396c8fd68f2319aba38173e92515",
+    ),
+    (
         "tools/build/remap_runtime_parent.hpp",
         "04bd8cc05fa0eeb104a45ace09743d83f7acb2fe61485a31551187d9f82e4d61",
     ),
@@ -39,6 +43,10 @@ DEPENDENCIES = (
     (
         "tools/build/remap_runtime_patch.py",
         "c29ceb96e73655cadea7763805b9468c32744033c2f177bae492e4ce9fe4100a",
+    ),
+    (
+        "tools/build/remap_runtime_producer.py",
+        "9c1318b77219663f7328be5795f129fad64803211fddb952f82a886897240843",
     ),
     (
         "tools/diagnostics/hs274-key-element.hpp",
@@ -204,6 +212,21 @@ STREAM_INPUTS = (
         "b4e2ed11067107c6097ea2ca37bbdd50ec146954eef95dc8340cd5a082be8a53",
     ),
 )
+OWNED_INVENTORY_INPUTS = (
+    (
+        "vendor/vendor/include/pqrs/osx/iokit_service_monitor.hpp",
+        "be44570d9a122d48dfe76ff784188989a7c6c6aae708638ab21237594fbcaa44",
+    ),
+    (
+        "vendor/vendor/include/pqrs/osx/iokit_hid_manager.hpp",
+        "18249036caf2ccf25e21023fa929a49687f45d333a671c2aa337c12d44aabc6b",
+    ),
+    (
+        "vendor/vendor/include/pqrs/osx/iokit_hid_device_events_monitor.hpp",
+        "f0071627fb9a38747ae5a9ac911dc3251cb7c39f095719920b26622f0f193ff7",
+    ),
+)
+
 AUTH_VENDOR_ORIGINAL_PREIMAGES = (
     (
         "vendor/vendor/include/pqrs/unix_domain_stream/impl/peer.hpp",
@@ -383,17 +406,19 @@ def load_fixed(name, input_file):
 def capture_dependencies(repository, absolute_deadline):
     require(
         type(DEPENDENCIES) is tuple
-        and len(DEPENDENCIES) == 32
+        and len(DEPENDENCIES) == 34
         and tuple(path for path, _ in DEPENDENCIES)
         == tuple(
             sorted(
                 (
                     "tools/build/remap_runtime_patch.py",
+                    "tools/build/remap_runtime_producer.py",
                     "tools/build/remap_runtime_auth_transport.py",
                     "tools/diagnostics/hs274_raw_patch.py",
                     "tools/diagnostics/hs274_stream_patch.py",
                     "tools/build/remap_runtime_parent.hpp",
                     "tools/build/remap_runtime_identity.hpp",
+                    "tools/build/remap_runtime_inventory.hpp",
                     "tools/build/remap_runtime_parent_policy.hpp",
                     "tools/build/remap_runtime_auth.hpp",
                     "tools/build/remap_runtime_auth_policy.hpp",
@@ -429,11 +454,13 @@ def _assemble_outputs(originals, dependencies, absolute_deadline):
         "fixed_owned_source_provider", by_path["tools/build/remap_runtime_patch.py"]
     )
     raw = load_fixed("hs274_raw_patch", by_path["tools/diagnostics/hs274_raw_patch.py"])
+    producer = load_fixed("fixed_owned_producer", by_path["tools/build/remap_runtime_producer.py"])
     stream = load_fixed(
         "fixed_owned_source_stream", by_path["tools/diagnostics/hs274_stream_patch.py"]
     )
     transport = load_fixed(
-        "fixed_owned_source_transport", by_path["tools/build/remap_runtime_auth_transport.py"]
+        "fixed_owned_source_transport",
+        by_path["tools/build/remap_runtime_auth_transport.py"],
     )
     wanted = dict(provider.PARENT_PREIMAGES)
     wanted[provider.PARENT_LIFECYCLE_PREIMAGE[0]] = provider.PARENT_LIFECYCLE_PREIMAGE[1]
@@ -444,7 +471,7 @@ def _assemble_outputs(originals, dependencies, absolute_deadline):
             "Source scopes disagree on genuine bytes",
         )
         wanted[path] = expected
-    for path, expected in STREAM_INPUTS:
+    for path, expected in (*STREAM_INPUTS, *OWNED_INVENTORY_INPUTS):
         require(
             path not in wanted or wanted[path] == expected,
             "preimage",
@@ -490,12 +517,15 @@ def _assemble_outputs(originals, dependencies, absolute_deadline):
     }
     prepared.update(
         transport.assemble_owned_auth_transport(
-            vendor_inputs, by_path["tools/build/remap_runtime_auth.hpp"].data, absolute_deadline
+            vendor_inputs,
+            by_path["tools/build/remap_runtime_auth.hpp"].data,
+            absolute_deadline,
         )
     )
     prepared.update(
         provider.assemble_auth_link_dependencies(
-            {path: prepared[path] for path, _ in provider.AUTH_RECIPE_PREIMAGES}, absolute_deadline
+            {path: prepared[path] for path, _ in provider.AUTH_RECIPE_PREIMAGES},
+            absolute_deadline,
         )
     )
     prepared["src/share/remap_runtime_auth.hpp"] = by_path[
@@ -505,8 +535,8 @@ def _assemble_outputs(originals, dependencies, absolute_deadline):
         "tools/build/remap_runtime_auth_policy.hpp"
     ].data
     functions = (
-        stream.stream_monitor,
-        raw.instrument_shutdown,
+        lambda source: producer.owned_stream_monitor(stream.stream_monitor(source)),
+        producer.owned_stream_shutdown,
         stream.stream_socket_ops,
         stream.stream_server,
         stream.stream_operations,
@@ -520,21 +550,50 @@ def _assemble_outputs(originals, dependencies, absolute_deadline):
         prepared[path] = transform(prepared.get(path, originals[path]).decode("utf-8")).encode(
             "utf-8"
         )
+    for (path, _), transform in zip(
+        OWNED_INVENTORY_INPUTS,
+        (
+            producer.owned_inventory_service_monitor,
+            producer.owned_inventory_hid_manager,
+            producer.owned_input_values_queue_acquisition,
+        ),
+        strict=True,
+    ):
+        deadline(absolute_deadline)
+        prepared[path] = transform(originals[path].decode("utf-8")).encode("utf-8")
+    prepared["src/share/ergopti-owned-native-inventory.hpp"] = by_path[
+        "tools/build/remap_runtime_inventory.hpp"
+    ].data
     for name in STREAM_HEADERS:
         path = "src/share/" + name
-        prepared[path] = by_path["tools/diagnostics/" + name].data
+        source = by_path["tools/diagnostics/" + name].data
+        owned_projection = {
+            "hs274-stream-runtime.hpp": producer.owned_stream_runtime,
+            "hs274-stream-source.hpp": producer.owned_inventory_source,
+            "hs274-stream-baseline-probe.hpp": producer.owned_stream_baseline_probe,
+            "hs274-raw-capture.hpp": producer.owned_stream_record,
+        }.get(name)
+        prepared[path] = (
+            owned_projection(source.decode("utf-8")).encode("utf-8")
+            if owned_projection is not None
+            else source
+        )
     expected_outputs = (
         set(wanted)
         | set(headers)
-        | {"src/share/remap_runtime_auth.hpp", "src/share/remap_runtime_auth_policy.hpp"}
+        | {
+            "src/share/remap_runtime_auth.hpp",
+            "src/share/remap_runtime_auth_policy.hpp",
+        }
         | {"src/share/" + name for name in STREAM_HEADERS}
+        | {"src/share/ergopti-owned-native-inventory.hpp"}
     )
     require(
         set(prepared) == expected_outputs
-        and len(prepared) == 57
+        and len(prepared) == 61
         and all(type(data) is bytes for data in prepared.values()),
         "inventory",
-        "Complete actual owned output inventory differs from the fixed 57 leaves",
+        "Complete actual owned output inventory differs from the fixed 61 leaves",
     )
     deadline(absolute_deadline)
     return tuple(sorted(prepared.items()))
@@ -569,7 +628,10 @@ def capture_vhd_dependencies(repository, absolute_deadline):
     require(
         type(VHD_DEPENDENCIES) is tuple
         and tuple(path for path, _ in VHD_DEPENDENCIES)
-        == ("tools/build/remap_runtime_vhd.hpp", "tools/build/remap_runtime_vhd_transport.py"),
+        == (
+            "tools/build/remap_runtime_vhd.hpp",
+            "tools/build/remap_runtime_vhd_transport.py",
+        ),
         "dependency_unreleased",
         "Official broker dependency scope differs",
     )
@@ -604,11 +666,12 @@ def _assemble_vhd_outputs(originals, dependencies, absolute_deadline):
             "Actual official broker caller preimage differs",
         )
         del base_originals[path]
-    base = dict(_assemble_outputs(base_originals, dependencies[:32], absolute_deadline))
-    require(len(base) == 57, "inventory", "Original auth projection scope differs")
+    base = dict(_assemble_outputs(base_originals, dependencies[:34], absolute_deadline))
+    require(len(base) == 61, "inventory", "Original auth projection scope differs")
     by_path = {row.path: row for row in dependencies}
     transport = load_fixed(
-        "fixed_official_vhd_source_transport", by_path["tools/build/remap_runtime_vhd_transport.py"]
+        "fixed_official_vhd_source_transport",
+        by_path["tools/build/remap_runtime_vhd_transport.py"],
     )
     require(
         tuple(path for path, _ in transport.PREIMAGES)
@@ -627,14 +690,28 @@ def _assemble_vhd_outputs(originals, dependencies, absolute_deadline):
     changed = transport.assemble_vhd_transport(
         selected, by_path["tools/build/remap_runtime_vhd.hpp"].data, absolute_deadline
     )
-    require(set(changed) == set(selected), "inventory", "Official broker output scope differs")
+    require(
+        set(changed) == set(selected),
+        "inventory",
+        "Official broker output scope differs",
+    )
     old_unchanged = {path: data for path, data in base.items() if path not in changed}
-    require(len(old_unchanged) == 54, "inventory", "Original auth conserved scope differs")
+    require(len(old_unchanged) == 58, "inventory", "Original auth conserved scope differs")
     base.update(changed)
-    require(VHD_NATIVE_HEADER not in base, "inventory", "Official broker header already owned")
+    grabber = "src/apps/CoreService/include/core_service/daemon/device_grabber.hpp"
+    producer = load_fixed(
+        "fixed_owned_inventory_producer",
+        by_path["tools/build/remap_runtime_producer.py"],
+    )
+    base[grabber] = producer.owned_inventory_grabber(base[grabber].decode("utf-8")).encode("utf-8")
+    require(
+        VHD_NATIVE_HEADER not in base,
+        "inventory",
+        "Official broker header already owned",
+    )
     base[VHD_NATIVE_HEADER] = by_path["tools/build/remap_runtime_vhd.hpp"].data
     require(
-        len(base) == 60 and all(base[path] == data for path, data in old_unchanged.items()),
+        len(base) == 64 and all(base[path] == data for path, data in old_unchanged.items()),
         "inventory",
         "Complete following projection or conserved auth bytes differ",
     )
@@ -666,7 +743,7 @@ def prepare_owned_source(repository, upstream, absolute_deadline):
             "Source scopes disagree on genuine bytes",
         )
         wanted[path] = expected
-    for path, expected in STREAM_INPUTS:
+    for path, expected in (*STREAM_INPUTS, *OWNED_INVENTORY_INPUTS):
         require(
             path not in wanted or wanted[path] == expected,
             "preimage",
@@ -757,7 +834,11 @@ def revalidate_owned_source(projection, absolute_deadline):
     )
     require(
         projection.pins
-        == (("upstream", provider.UPSTREAM), ("cpm", provider.CPM), ("vhd", provider.VHD)),
+        == (
+            ("upstream", provider.UPSTREAM),
+            ("cpm", provider.CPM),
+            ("vhd", provider.VHD),
+        ),
         "pin",
         "Retained source projection pins differ",
     )
@@ -799,8 +880,11 @@ def _staged_expectations(projection):
     for path, data in projection.replacements:
         if path == VHD_NATIVE_HEADER:
             continue
-        rows[path] = (rows.get(path, ("100644", ""))[0], hashlib.sha256(data).hexdigest())
-    require(len(rows) == 4530, "inventory", "Actual full staged source inventory differs")
+        rows[path] = (
+            rows.get(path, ("100644", ""))[0],
+            hashlib.sha256(data).hexdigest(),
+        )
+    require(len(rows) == 4531, "inventory", "Actual full staged source inventory differs")
     header = next(
         (row for row in projection.dependencies if row.path == "tools/build/remap_runtime_vhd.hpp"),
         None,
@@ -814,7 +898,7 @@ def _staged_expectations(projection):
     )
     rows[VHD_NATIVE_HEADER] = ("100644", hashlib.sha256(header.data).hexdigest())
     require(
-        len(rows) == 4531,
+        len(rows) == 4532,
         "inventory",
         "Actual official broker full staged source inventory differs",
     )
@@ -925,7 +1009,11 @@ def validate_staged_source(projection, staging_root, absolute_deadline):
 
 def current_staged_source(image, absolute_deadline):
     """Recheck every retained staged physical leaf; generated output needs its owner."""
-    require(type(image) is StagedSource, "source_changed", "Actual staged image type differs")
+    require(
+        type(image) is StagedSource,
+        "source_changed",
+        "Actual staged image type differs",
+    )
     revalidate_owned_source(image.projection, absolute_deadline)
     require(
         root_identity(image.root) == image.root_identity,
@@ -934,7 +1022,7 @@ def current_staged_source(image, absolute_deadline):
     )
     expected = _staged_expectations(image.projection)
     require(
-        len(image.files) == 4527
+        len(image.files) == 4528
         and len(image.links) == 4
         and {row.path for row in image.files}
         == {path for path, (mode, _) in expected.items() if mode != "120000"}
@@ -974,7 +1062,9 @@ def current_staged_source(image, absolute_deadline):
     for path in actual_paths - set(expected):
         row = read_input(image.root, path, 8 * 1024 * 1024, absolute_deadline)
         require(
-            row.data == generated[path], "source_changed", "Actual version-generated source differs"
+            row.data == generated[path],
+            "source_changed",
+            "Actual version-generated source differs",
         )
     deadline(absolute_deadline)
 
@@ -1019,6 +1109,10 @@ def _staged_generator_outputs(image):
 
 def expected_generated_outputs(image):
     """Return pure template bytes; the builder owns output FD/currentness checks."""
-    require(type(image) is StagedSource, "source_changed", "Actual staged image type differs")
+    require(
+        type(image) is StagedSource,
+        "source_changed",
+        "Actual staged image type differs",
+    )
     _, generated = _staged_generator_outputs(image)
     return tuple(sorted(generated.items()))

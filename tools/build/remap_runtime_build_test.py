@@ -94,6 +94,7 @@ class PreparationControls(unittest.TestCase):
                 "CODE_SIGNING_ALLOWED=NO",
                 "CODE_SIGNING_REQUIRED=NO",
                 "GCC_GENERATE_DEBUGGING_SYMBOLS=NO",
+                "SWIFT_ENABLE_EXPLICIT_MODULES=NO",
             ],
         )
 
@@ -530,6 +531,7 @@ class PreparationControls(unittest.TestCase):
                     "CODE_SIGNING_ALLOWED=NO",
                     "CODE_SIGNING_REQUIRED=NO",
                     "GCC_GENERATE_DEBUGGING_SYMBOLS=NO",
+                    "SWIFT_ENABLE_EXPLICIT_MODULES=NO",
                 ]
                 if label == "core":
                     expected_command.append("ASSETCATALOG_COMPILER_GENERATE_ASSET_SYMBOLS=NO")
@@ -729,6 +731,277 @@ class OwnedRecordControls(unittest.TestCase):
                 SUBJECT.owned_output(status, stdout, stderr)
             self.assertEqual(caught.exception.code, "owned_receipt_refused")
 
+
+def concurrent_owned_control_suite():
+    """Actual filesystem/coordinator controls with visibly modeled Apple owner ports."""
+
+    class ConcurrentOwnedControls(unittest.TestCase):
+        def setUp(self):
+            from unittest.mock import patch
+
+            path = Path(__file__).with_name("remap_runtime_artifact_test.py")
+            spec = importlib.util.spec_from_file_location(
+                "independent_parallel_fixture_" + str(id(self)), path
+            )
+            module = importlib.util.module_from_spec(spec)
+            sys.modules[spec.name] = module
+            spec.loader.exec_module(module)
+            self.case = module.ActualBuilderCustodyControls(methodName="runTest")
+            self.case.setUp()
+            self.addCleanup(self.case.doCleanups)
+            self.builder = self.case.builder
+            self.begins, self.finishes, self.owners = [], [], []
+            self.begin_fault = None
+            self.finish_fault = None
+            for name, function in (
+                ("_BEGIN_PHASE", self.begin),
+                ("_FINISH_PHASE", self.finish),
+                ("_PHASE_READY", lambda h: False),
+            ):
+                item = patch.object(self.builder, name, side_effect=function)
+                item.start()
+                self.addCleanup(item.stop)
+
+        def begin(self, name, command, cwd, owner, deadline, register):
+            h = self.case.namespace(
+                name=name, command=command, cwd=cwd, owner=owner, deadline=deadline, drained=False
+            )
+            register(h)
+            self.owners.append(h)
+            self.begins.append(name)
+            if self.begin_fault is not None:
+                self.begin_fault(h)
+            return h
+
+        def finish(self, h):
+            self.assertFalse(h.drained, "No owner may be waited twice")
+            h.drained = True
+            self.finishes.append(h.name)
+            row = self.case.phase(h.name, h.command, h.cwd, h.owner, h.deadline)
+            if self.finish_fault is not None:
+                self.finish_fault(h)
+            return row
+
+        def test_exact_dag_and_canonical_results(self):
+            row = self.case.invoke()
+            self.assertEqual(self.begins, ["core_build", "console_build", "cli_build"])
+            self.assertEqual(self.finishes, ["core_build", "console_build", "cli_build"])
+            self.assertTrue(all(h.drained for h in self.owners))
+            self.assertEqual(
+                [r["target"] for r in row["products"]], ["duktape", "core", "console", "cli"]
+            )
+            expected = [
+                n + "_" + phase
+                for n in ("duktape", "core", "console", "cli")
+                for phase in ("generate", "build", "architectures")
+            ]
+            self.assertEqual([r["phase"] for r in row["phases"][-12:]], expected)
+            self.assertTrue(all(h.deadline == self.owners[0].deadline for h in self.owners))
+
+        def test_source_refusal_stops_new_acquisition_and_drains_core(self):
+            def mutate(h):
+                if h.name == "core_build":
+                    path = self.case.stage / "src/apps/CoreService/project.yml"
+                    path.rename(path.with_name("old.yml"))
+                    path.write_bytes(b"name: Model_core\n")
+
+            self.begin_fault = mutate
+            with self.assertRaises(self.builder.BASE.NativeBuildError) as caught:
+                self.case.invoke()
+            self.assertEqual(caught.exception.code, "source_identity")
+            self.assertEqual(self.begins, ["core_build"])
+            self.assertEqual(self.finishes, ["core_build"])
+            self.assertFalse((self.case.owner / "owned-native-build-result.json").exists())
+
+        def test_begin_refusal_retains_failed_owner_and_drains_sibling(self):
+            error = self.builder.BASE.NativeBuildError("phase_failed", "MODELED begin refusal")
+
+            def fail(h):
+                if h.name == "console_build":
+                    raise error
+
+            self.begin_fault = fail
+            with self.assertRaises(self.builder.BASE.NativeBuildError) as caught:
+                self.case.invoke()
+            self.assertIs(caught.exception, error)
+            self.assertEqual(self.begins, ["core_build", "console_build"])
+            self.assertEqual(self.finishes, ["core_build", "console_build"])
+            self.assertTrue(all(h.drained for h in self.owners))
+            self.assertFalse((self.case.owner / "owned-native-build-result.json").exists())
+
+        def test_finish_refusal_drains_pending_cli_without_publication(self):
+            error = self.builder.BASE.NativeBuildError(
+                "phase_failed", "MODELED native finish refusal"
+            )
+
+            def fail(h):
+                if h.name == "console_build":
+                    raise error
+
+            self.finish_fault = fail
+            with self.assertRaises(self.builder.BASE.NativeBuildError) as caught:
+                self.case.invoke()
+            self.assertIs(caught.exception, error)
+            self.assertEqual(self.finishes, ["core_build", "console_build", "cli_build"])
+            self.assertTrue(all(h.drained for h in self.owners))
+            self.assertFalse((self.case.owner / "owned-native-build-result.json").exists())
+
+        def test_later_completed_child_cannot_replace_earlier_image(self):
+            def mutate(h):
+                if h.name == "cli_build":
+                    path = self.case.stage / self.builder.TARGETS[1][1] / self.builder.TARGETS[1][2]
+                    path.write_bytes(b"foreign later compiler image\n")
+
+            self.finish_fault = mutate
+            with self.assertRaises(self.builder.BASE.NativeBuildError) as caught:
+                self.case.invoke()
+            self.assertEqual(caught.exception.code, "source_identity")
+            self.assertTrue(all(h.drained for h in self.owners))
+            self.assertFalse((self.case.owner / "owned-native-build-result.json").exists())
+
+        def test_actual_build_commands_are_fixed_release_two_architectures(self):
+            self.case.invoke()
+            for h, label, recipe in zip(
+                self.owners,
+                ("core", "console", "cli"),
+                ("src/apps/CoreService", "src/apps/ConsoleUserServer", "src/bin/cli"),
+                strict=True,
+            ):
+                expected = [
+                    "/usr/bin/true",
+                    "-configuration",
+                    "Release",
+                    "-alltargets",
+                    "SYMROOT=" + str(self.case.stage / recipe / "build"),
+                    "ARCHS=arm64 x86_64",
+                    "ONLY_ACTIVE_ARCH=NO",
+                    "CODE_SIGNING_ALLOWED=NO",
+                    "CODE_SIGNING_REQUIRED=NO",
+                    "GCC_GENERATE_DEBUGGING_SYMBOLS=NO",
+                    "SWIFT_ENABLE_EXPLICIT_MODULES=NO",
+                ]
+                if label == "core":
+                    expected.append("ASSETCATALOG_COMPILER_GENERATE_ASSET_SYMBOLS=NO")
+                self.assertEqual(h.command, expected)
+
+        def test_ready_core_finishes_before_console_acquisition(self):
+            from unittest.mock import patch
+
+            events = []
+            old_begin, old_finish = self.begin, self.finish
+
+            def begin(*arguments):
+                events.append(("begin", arguments[0]))
+                return old_begin(*arguments)
+
+            def finish(owner):
+                events.append(("finish", owner.name))
+                return old_finish(owner)
+
+            with (
+                patch.object(self.builder, "_BEGIN_PHASE", side_effect=begin),
+                patch.object(self.builder, "_FINISH_PHASE", side_effect=finish),
+                patch.object(
+                    self.builder, "_PHASE_READY", side_effect=lambda h: h.name == "core_build"
+                ),
+            ):
+                self.case.invoke()
+            self.assertLess(
+                events.index(("finish", "core_build")), events.index(("begin", "console_build"))
+            )
+            self.assertTrue(all(h.drained for h in self.owners))
+
+        def test_reverse_ready_completion_keeps_canonical_array_order(self):
+            from unittest.mock import patch
+
+            with patch.object(
+                self.builder, "_PHASE_READY", side_effect=lambda h: h.name == "console_build"
+            ):
+                row = self.case.invoke()
+            self.assertEqual(self.finishes, ["console_build", "core_build", "cli_build"])
+            self.assertEqual(
+                [r["target"] for r in row["products"]], ["duktape", "core", "console", "cli"]
+            )
+            expected = [
+                n + "_" + phase
+                for n in ("duktape", "core", "console", "cli")
+                for phase in ("generate", "build", "architectures")
+            ]
+            self.assertEqual([r["phase"] for r in row["phases"][-12:]], expected)
+
+        def test_unfinished_sibling_image_is_never_observed(self):
+            from unittest.mock import patch
+
+            original = self.builder.product_snapshot
+            observed = []
+
+            def capture(path, root):
+                for label in ("core", "console", "cli"):
+                    _, recipe, relative = next(
+                        row for row in self.builder.TARGETS if row[0] == label
+                    )
+                    if Path(path) == self.case.stage / recipe / relative:
+                        matching = [h for h in self.owners if h.name == label + "_build"]
+                        self.assertEqual(len(matching), 1)
+                        self.assertTrue(matching[0].drained)
+                        observed.append(label)
+                return original(path, root)
+
+            with (
+                patch.object(self.builder, "product_snapshot", side_effect=capture),
+                patch.object(
+                    self.builder, "_PHASE_READY", side_effect=lambda h: h.name == "console_build"
+                ),
+            ):
+                self.case.invoke()
+            self.assertEqual(observed[0], "console")
+            self.assertTrue(all(h.drained for h in self.owners))
+
+        def test_primary_preserves_both_later_drain_refusals(self):
+            primary = self.builder.BASE.NativeBuildError("phase_failed", "MODELED begin refusal")
+            core = self.builder.BASE.NativeBuildError("phase_failed", "MODELED core drain refusal")
+            console = self.builder.BASE.NativeBuildError(
+                "phase_failed", "MODELED console drain refusal"
+            )
+
+            def begin_fault(owner):
+                if owner.name == "console_build":
+                    raise primary
+
+            def finish_fault(owner):
+                raise core if owner.name == "core_build" else console
+
+            self.begin_fault, self.finish_fault = begin_fault, finish_fault
+            with self.assertRaises(self.builder.BASE.NativeBuildError) as caught:
+                self.case.invoke()
+            self.assertIs(caught.exception, primary)
+            self.assertEqual(caught.exception._owned_phase_failures, (core, console))
+            self.assertTrue(all(h.drained for h in self.owners))
+            self.assertFalse((self.case.owner / "owned-native-build-result.json").exists())
+
+    return unittest.defaultTestLoader.loadTestsFromTestCase(ConcurrentOwnedControls)
+
+
+if __name__ == "__main__":
+    concurrent_result = unittest.TextTestRunner(verbosity=2).run(concurrent_owned_control_suite())
+    print(
+        "PARALLEL CONTROLS tests="
+        + str(concurrent_result.testsRun)
+        + " failures="
+        + str(len(concurrent_result.failures))
+        + " errors="
+        + str(len(concurrent_result.errors))
+        + " skipped="
+        + str(len(concurrent_result.skipped))
+        + " native=unexecuted",
+        file=sys.stderr,
+    )
+    if not (
+        concurrent_result.wasSuccessful()
+        and concurrent_result.testsRun == 10
+        and not concurrent_result.skipped
+    ):
+        raise SystemExit(1)
 
 if __name__ == "__main__":
     suite = unittest.defaultTestLoader.loadTestsFromModule(sys.modules[__name__])

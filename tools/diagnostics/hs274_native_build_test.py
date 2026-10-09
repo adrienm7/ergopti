@@ -1210,6 +1210,282 @@ print(json.dumps({'status':status,'compile_absent':not observed,'parent_absent':
         self.assertNotIn(SENTINEL, result.stdout + result.stderr)
 
 
+def concurrent_phase_control_suite():
+    """Independent real portable subprocess controls; Apple endpoints unexecuted."""
+
+    class ConcurrentPhaseControls(unittest.TestCase):
+        def setUp(self):
+            self.tmp = tempfile.TemporaryDirectory()
+            self.addCleanup(self.tmp.cleanup)
+            self.owner = Path(self.tmp.name).resolve()
+            self.owner.chmod(0o700)
+            self.handles = []
+            self.deadline = time.monotonic() + 10
+
+        def begin(self, name, program):
+            return subject.begin_phase(
+                name,
+                [sys.executable, "-c", program],
+                self.owner,
+                self.owner,
+                self.deadline,
+                self.handles.append,
+            )
+
+        def test_three_real_children_overlap_before_release(self):
+            program = "from pathlib import Path; import time,sys; p=Path(sys.argv[1]); p.write_text('ready'); g=Path(sys.argv[2]);\nwhile not g.exists(): time.sleep(0.005)\nprint('finished')"
+            for name in ("core_build", "console_build", "cli_build"):
+                h = subject.begin_phase(
+                    name,
+                    [
+                        sys.executable,
+                        "-c",
+                        program,
+                        str(self.owner / (name + ".ready")),
+                        str(self.owner / "release"),
+                    ],
+                    self.owner,
+                    self.owner,
+                    self.deadline,
+                    self.handles.append,
+                )
+                self.assertIs(h, self.handles[-1])
+            try:
+                while not all(
+                    (self.owner / (n + ".ready")).exists()
+                    for n in ("core_build", "console_build", "cli_build")
+                ):
+                    self.assertLess(time.monotonic(), self.deadline)
+                    time.sleep(0.005)
+                self.assertEqual(len({h.process.pid for h in self.handles}), 3)
+                self.assertTrue(all(not subject.phase_ready(h) for h in self.handles))
+            finally:
+                (self.owner / "release").write_text("release")
+                for h in self.handles:
+                    subject.finish_phase(h)
+            self.assertTrue(all(h.finished and not h.debt for h in self.handles))
+            for name in ("core_build", "console_build", "cli_build"):
+                self.assertEqual((self.owner / (name + ".stdout")).read_bytes(), b"finished\n")
+
+        def test_expired_phase_has_no_registration_or_files(self):
+            with self.assertRaises(subject.NativeBuildError) as caught:
+                subject.begin_phase(
+                    "core_build",
+                    [sys.executable, "-c", "pass"],
+                    self.owner,
+                    self.owner,
+                    time.monotonic() - 1,
+                    self.handles.append,
+                )
+            self.assertEqual(caught.exception.code, "phase_deadline")
+            self.assertEqual(self.handles, [])
+            self.assertEqual(list(self.owner.iterdir()), [])
+
+        def test_registration_precedes_first_owned_side_effect(self):
+            observed = []
+
+            def register(handle):
+                self.assertEqual(list(self.owner.iterdir()), [])
+                self.assertIsNone(handle.process)
+                observed.append(handle)
+
+            handle = subject.begin_phase(
+                "core_build",
+                [sys.executable, "-c", "pass"],
+                self.owner,
+                self.owner,
+                self.deadline,
+                register,
+            )
+            self.assertIs(handle, observed[0])
+            self.assertEqual(subject.finish_phase(handle)["exit_status"], 0)
+
+        def test_failed_child_keeps_actual_status_and_retires_streams(self):
+            handle = self.begin("core_build", "import sys; print('kept'); sys.exit(7)")
+            with self.assertRaises(subject.NativeBuildError) as caught:
+                subject.finish_phase(handle)
+            self.assertEqual(caught.exception.code, "phase_failed")
+            self.assertEqual(
+                json.loads((self.owner / "core_build.receipt.json").read_text())["exit_status"], 7
+            )
+            self.assertTrue(handle.finished)
+            self.assertTrue(all(s.closed for s in handle.streams))
+            self.assertEqual((self.owner / "core_build.stdout").read_bytes(), b"kept\n")
+
+        def test_launch_failure_retains_preallocated_owner(self):
+            with self.assertRaises(subject.NativeBuildError):
+                subject.begin_phase(
+                    "core_build",
+                    ["/no/such/independent/compiler"],
+                    self.owner,
+                    self.owner,
+                    self.deadline,
+                    self.handles.append,
+                )
+            self.assertEqual(len(self.handles), 1)
+            h = self.handles[0]
+            with self.assertRaises(subject.NativeBuildError):
+                subject.finish_phase(h)
+            self.assertTrue(h.finished)
+            self.assertTrue(all(s.closed for s in h.streams))
+            self.assertTrue(
+                h.debt, "A constructor exception cannot prove absence of a native side effect"
+            )
+
+        def test_failed_finish_is_sticky_without_rewait(self):
+            handle = self.begin("core_build", "import sys; sys.exit(3)")
+            with self.assertRaises(subject.NativeBuildError) as first:
+                subject.finish_phase(handle)
+            with self.assertRaises(subject.NativeBuildError) as second:
+                subject.finish_phase(handle)
+            self.assertIs(first.exception, second.exception)
+
+        def test_stdout_path_replacement_refused_after_real_child(self):
+            handle = self.begin("core_build", "print('original')")
+            handle.process.wait()
+            path = self.owner / "core_build.stdout"
+            path.rename(self.owner / "old-output")
+            path.write_bytes(b"foreign")
+            with self.assertRaises(subject.NativeBuildError) as caught:
+                subject.finish_phase(handle)
+            self.assertEqual(caught.exception.code, "phase_failed")
+            self.assertEqual(path.read_bytes(), b"foreign")
+            self.assertTrue(all(s.closed for s in handle.streams))
+
+        def test_same_deadline_identity_is_retained(self):
+            handle = self.begin("core_build", "pass")
+            self.assertEqual(handle.deadline, self.deadline)
+            record = subject.finish_phase(handle)
+            self.assertEqual(record["phase"], "core_build")
+            self.assertEqual(record["status"], "passed")
+
+        def test_slow_close_is_inside_original_phase_deadline(self):
+            from unittest.mock import patch
+
+            self.deadline = time.monotonic() + 1
+            handle = self.begin("core_build", "pass")
+            handle.process.wait()
+            self.assertLess(time.monotonic(), self.deadline)
+            original = subject._close_phase_streams
+
+            def delayed(operation):
+                errors = original(operation)
+                time.sleep(1.05)  # Modeled close-boundary delay, actual monotonic deadline.
+                return errors
+
+            with patch.object(subject, "_close_phase_streams", side_effect=delayed):
+                with self.assertRaises(subject.NativeBuildError) as caught:
+                    subject.finish_phase(handle)
+            self.assertEqual(caught.exception.code, "phase_deadline")
+            self.assertEqual(
+                json.loads((self.owner / "core_build.receipt.json").read_text())["status"],
+                "refused",
+            )
+            self.assertTrue(all(s.closed for s in handle.streams))
+
+        def test_close_error_cannot_publish_a_passed_phase(self):
+            from unittest.mock import patch
+
+            handle = self.begin("core_build", "pass")
+            original = subject._close_phase_streams
+            fault = OSError("MODELED stream close boundary refusal")
+
+            def failed_close(operation):
+                errors = original(operation)
+                operation.debt = True
+                return errors + [fault]
+
+            with patch.object(subject, "_close_phase_streams", side_effect=failed_close):
+                with self.assertRaises(subject.NativeBuildError) as caught:
+                    subject.finish_phase(handle)
+            self.assertEqual(caught.exception.code, "phase_failed")
+            self.assertEqual(
+                json.loads((self.owner / "core_build.receipt.json").read_text())["status"],
+                "refused",
+            )
+            self.assertEqual(handle.secondary_failures, (fault,))
+            self.assertTrue(handle.debt)
+
+            self.assertEqual(
+                json.loads((self.owner / "core_build.receipt.json").read_text())["exit_status"], 0
+            )
+
+        def test_primary_retains_all_modeled_secondary_close_failures(self):
+            from unittest.mock import patch
+
+            handle = self.begin("core_build", "pass")
+            primary = subject.NativeBuildError("phase_failed", "MODELED primary refusal")
+            handle.failure = primary
+            original = subject._close_phase_streams
+            faults = (OSError("MODELED stdout close"), OSError("MODELED stderr close"))
+
+            def failed_close(operation):
+                errors = original(operation)
+                operation.debt = True
+                return errors + list(faults)
+
+            with patch.object(subject, "_close_phase_streams", side_effect=failed_close):
+                with self.assertRaises(subject.NativeBuildError) as caught:
+                    subject.finish_phase(handle)
+            self.assertIs(caught.exception, primary)
+            self.assertEqual(handle.secondary_failures, faults)
+            self.assertTrue(all(s.closed for s in handle.streams))
+
+        def test_acquired_child_close_refusal_retains_exact_zero_and_nonzero_status(self):
+            from unittest.mock import patch
+
+            original = subject._close_phase_streams
+            for status in (0, 7):
+                with self.subTest(actual_portable_child_status=status):
+                    name = "observed_close_" + str(status)
+                    handle = self.begin(name, "import sys; sys.exit(" + str(status) + ")")
+                    fault = OSError("MODELED close refusal after actual child exit")
+
+                    def failed_close(operation):
+                        errors = original(operation)
+                        operation.debt = True
+                        return errors + [fault]
+
+                    with patch.object(subject, "_close_phase_streams", side_effect=failed_close):
+                        with self.assertRaises(subject.NativeBuildError):
+                            subject.finish_phase(handle)
+                    record = json.loads((self.owner / (name + ".receipt.json")).read_text())
+                    self.assertEqual(
+                        set(record), {"schema", "phase", "status", "exit_status", "elapsed_seconds"}
+                    )
+                    self.assertEqual(record["schema"], 1)
+                    self.assertEqual(record["phase"], name)
+                    self.assertEqual(record["status"], "refused")
+                    self.assertIs(type(record["exit_status"]), int)
+                    self.assertEqual(record["exit_status"], status)
+                    self.assertTrue(handle.waited)
+                    self.assertTrue(all(s.closed for s in handle.streams))
+                    self.assertEqual(handle.secondary_failures, (fault,))
+
+    return unittest.defaultTestLoader.loadTestsFromTestCase(ConcurrentPhaseControls)
+
+
+if __name__ == "__main__":
+    concurrent_result = unittest.TextTestRunner(verbosity=2).run(concurrent_phase_control_suite())
+    print(
+        "PARALLEL CONTROLS tests="
+        + str(concurrent_result.testsRun)
+        + " failures="
+        + str(len(concurrent_result.failures))
+        + " errors="
+        + str(len(concurrent_result.errors))
+        + " skipped="
+        + str(len(concurrent_result.skipped))
+        + " native=unexecuted",
+        file=sys.stderr,
+    )
+    if not (
+        concurrent_result.wasSuccessful()
+        and concurrent_result.testsRun == 12
+        and not concurrent_result.skipped
+    ):
+        raise SystemExit(1)
+
 if __name__ == "__main__":
     suite = unittest.defaultTestLoader.loadTestsFromTestCase(ControllerContract)
     result = unittest.TextTestRunner(verbosity=2).run(suite)

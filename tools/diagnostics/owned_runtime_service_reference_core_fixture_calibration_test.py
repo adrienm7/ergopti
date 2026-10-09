@@ -11,7 +11,7 @@ from unittest import mock
 
 SOURCE = Path(__file__).with_name("owned_runtime_service_reference_core_fixture_calibration.py")
 CORE = "tools/diagnostics/owned_runtime_service_reference_core_fixture_build.py"
-CORE_SHA = "bbd44055d0e426b78f612a4cb2585b42373045f31042fd2bc4d957905ef4de45"
+CORE_SHA = "729c33710cab92d63af6c27c16c6705c3e629edb5867766873c5f8089fcaa42b"
 
 
 class CoreCalibrationContracts(unittest.TestCase):

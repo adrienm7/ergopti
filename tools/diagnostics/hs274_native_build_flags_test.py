@@ -85,6 +85,8 @@ class CalibrationFlagsTests(unittest.TestCase):
         for argv in builds:
             with self.subTest(tool=argv[0]):
                 self.assertIn("GCC_GENERATE_DEBUGGING_SYMBOLS=NO", argv)
+                self.assertEqual(argv.count("SWIFT_ENABLE_EXPLICIT_MODULES=NO"), 1)
+                self.assertEqual(argv[-1], "SWIFT_ENABLE_EXPLICIT_MODULES=NO")
 
     def test_original_targets_release_architecture_and_owner_contracts_are_preserved(self):
         self.collect()

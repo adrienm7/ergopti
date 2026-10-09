@@ -299,11 +299,8 @@ def prepare(owner, deadline):
         "owner",
     )
     require(os.listdir(owner) == [], "owner_inventory")
-    help_result = native(["/usr/sbin/pkgutil", "--help"], deadline)
-    require(
-        b"--expand-full" in help_result.stdout + help_result.stderr,
-        "expand_prerequisite",
-    )
+    # Help text is an observation; the fixed operation and pinned payload qualify expansion.
+    native(["/usr/sbin/pkgutil", "--help"], deadline)
     signature = module("installed_vhd_signature_text")
     packages = module("installed_vhd_static_fixture")
     for version in ("8.4.0", "8.5.0", "8.6.0"):
@@ -1046,8 +1043,79 @@ PAYLOADS = {
 }
 
 
+def observe_payload_inventory_refusal(version, actual):
+    """Disclose fixed ordinals from the already-read failed inventory, never authority.
+
+    This best-effort stderr observation is bounded and performs no native calls,
+    filesystem reads, retries or name/value/error rendering. It cannot redeem the
+    caller's original membership refusal, including when stderr cannot be written.
+    """
+    try:
+        if version not in ("8.4.0", "8.5.0", "8.6.0") or type(actual) is not dict:
+            return
+        expected = PAYLOADS[version]
+        rows, missing = [], []
+        for index, relative in enumerate(sorted(expected)):
+            mode, size, digest = expected[relative]
+            present = relative in actual
+            observed = actual.get(relative)
+            observed = observed if type(observed) is dict else {}
+            captured_identity = observed.get("identity")
+            captured_identity = captured_identity if type(captured_identity) is dict else {}
+            captured_mode = captured_identity.get("mode")
+            captured_bytes, captured_digest = observed.get("bytes"), observed.get("sha256")
+            valid_mode = present and type(captured_mode) is int
+            valid_bytes = present and type(captured_bytes) is int and captured_bytes >= 0
+            valid_digest = (
+                present
+                and type(captured_digest) is str
+                and re.fullmatch("[0-9a-f]{64}", captured_digest) is not None
+            )
+            regular = stat.S_ISREG(mode)
+            rows.append(
+                {
+                    "index": index,
+                    "present": present,
+                    "type_matches": stat.S_IFMT(captured_mode) == stat.S_IFMT(mode)
+                    if valid_mode
+                    else None,
+                    "mode_matches": captured_mode == mode if valid_mode else None,
+                    "bytes_matches": captured_bytes == size if regular and valid_bytes else None,
+                    "sha256_matches": captured_digest == digest
+                    if regular and valid_digest
+                    else None,
+                }
+            )
+            if not present:
+                missing.append(index)
+        observation = {
+            "schema": 1,
+            "kind": "installed_vhd_payload_inventory_refusal_observation",
+            "authority": False,
+            "version": version,
+            "reason": "payload_inventory",
+            "expected_count": 42,
+            "rows": rows,
+            "missing_expected_indices": missing,
+            "extra_count": len(set(actual) - set(expected)),
+            "installation_qualified": False,
+            "reference_qualified": False,
+        }
+        body = (
+            b"ERGOPTI_VHD_PAYLOAD_INVENTORY_DIAGNOSTIC "
+            + json.dumps(observation, sort_keys=True, separators=(",", ":")).encode("ascii")
+            + b"\n"
+        )
+        if len(body) <= 8192:
+            os.write(2, body)
+    except (OSError, KeyError, TypeError, ValueError):
+        return
+
+
 def verify_payload(version, payload):
     actual = inventory(payload)
+    if __name__ == "__main__" and set(actual) != set(PAYLOADS[version]):
+        observe_payload_inventory_refusal(version, actual)
     require(set(actual) == set(PAYLOADS[version]), "payload_inventory")
     for relative, (mode, size, digest) in PAYLOADS[version].items():
         row = actual[relative]

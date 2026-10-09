@@ -81,6 +81,21 @@ extension HS274NativePolicyQualificationTests {
 		}
 	}
 
+	func testPortablePermissionUiFirstSeenProgressRetainsFortyFourControls() throws {
+		try fixture { root in
+			let controls = source("permission_ui_progress_test.py")
+			let receipt = try run(URL(fileURLWithPath: "/usr/bin/env"),
+				["python3", controls.path], root: root)
+			XCTAssertEqual(receipt.status, 0,
+				"Portable first-seen progress controls refused; native UI remains unexecuted.")
+			XCTAssertTrue(receipt.stdout.isEmpty)
+			let complete = #"\A[.]{44}\n[-]{70}\nRan 44 tests in [0-9]+\.[0-9]{3}s\n\nOK\n\z"#
+			XCTAssertLessThanOrEqual(receipt.stderr.utf8.count, 4096)
+			XCTAssertNotNil(receipt.stderr.range(of: complete, options: .regularExpression),
+				"Only the complete executed receipt qualifies; native UI remains unexecuted.")
+		}
+	}
+
 	private static func permissionUiDiagnosticSummary(_ stderr: String) -> String {
 		let unsupported = "UI observation unsupported"
 		guard stderr.utf8.count <= 8192,
@@ -192,6 +207,8 @@ extension HS274NativePolicyQualificationTests {
 	import hashlib
 	import json
 	import math
+	import os
+	import stat
 	from pathlib import Path
 	import shutil
 	import sys
@@ -766,6 +783,216 @@ extension HS274NativePolicyQualificationTests {
 	    )
 
 
+	PROGRESS_PREFIX = "ERGOPTI_PERMISSION_UI_PROGRESS "
+	PROGRESS_DIAGNOSTIC_PREFIX = "ERGOPTI_PERMISSION_UI_PROGRESS_DIAGNOSTIC "
+	PROGRESS_PREFIXES = {
+	    1: {0, 1},
+	    1.5: {1},
+	    2: {2},
+	    3: {2},
+	    4: {2},
+	    5: {3},
+	    6: {4},
+	    7: {5},
+	    8: {6},
+	    8.5: {7},
+	    9: {8},
+	    9.5: {9},
+	    10: {9, 10},
+	}
+	PROGRESS_LIMIT = sum(len(counts) * 2 for counts in PROGRESS_PREFIXES.values())
+
+
+	def progress_failure_observation(data, report, pid, nonce, version, before, after):
+	    """Admit first-seen held facts only; they never describe terminal/current state."""
+	    unsupported = {
+	        "schema": 1,
+	        "kind": "permission_ui_first_seen_progress_observation",
+	        "authority": False,
+	        "native_verdict": "unchanged",
+	        "status": "unsupported",
+	        "coverage": "first_seen_only",
+	        "last_entered_stage": None,
+	        "observations": [],
+	    }
+	    try:
+	        operation = operation_failure_observation(report, pid, before, after)
+	        require(
+	            operation["status"] == "observed"
+	            and operation["controller_check"] == "observation_deadline",
+	            "Unsupported operation",
+	        )
+	        require(
+	            type(nonce) is str
+	            and len(nonce) == 32
+	            and all(c in "0123456789abcdef" for c in nonce),
+	            "Unsupported nonce",
+	        )
+	        require(type(version) is str and 0 < len(version) <= 32, "Unsupported version")
+	        require(
+	            type(data) is bytes and 0 < len(data) <= 65536,
+	            "Unsupported captured stream",
+	        )
+
+	        def closed_object(pairs):
+	            result = {}
+	            for key, value in pairs:
+	                require(key not in result, "Duplicate observation field")
+	                result[key] = value
+	            return result
+
+	        def nonfinite(_value):
+	            raise ValueError("Nonfinite observation")
+
+	        fields = {
+	            "schema",
+	            "kind",
+	            "authority",
+	            "native_verdict",
+	            "pid",
+	            "nonce",
+	            "version",
+	            "sequence",
+	            "stage",
+	            "busy",
+	            "recorded_case_count",
+	        }
+	        observations, seen = [], set()
+	        previous_stage, previous_count = 0, 0
+	        for raw in data.decode("utf-8", errors="strict").splitlines(keepends=True):
+	            if not raw.startswith(PROGRESS_PREFIX):
+	                require(PROGRESS_PREFIX not in raw, "Embedded observation prefix")
+	                continue
+	            require(
+	                raw.endswith("\n") and len(raw.encode("utf-8")) <= 512,
+	                "Observation line bound",
+	            )
+	            require(len(observations) < PROGRESS_LIMIT, "Observation census bound")
+	            packet = json.loads(
+	                raw[len(PROGRESS_PREFIX) :],
+	                object_pairs_hook=closed_object,
+	                parse_constant=nonfinite,
+	            )
+	            require(
+	                type(packet) is dict and set(packet) == fields,
+	                "Observation fields differ",
+	            )
+	            require(
+	                type(packet["schema"]) is int
+	                and packet["schema"] == 1
+	                and packet["kind"] == "permission_ui_first_seen_progress"
+	                and packet["authority"] is False
+	                and packet["native_verdict"] == "unchanged",
+	                "Observation cannot grant authority",
+	            )
+	            require(
+	                type(packet["pid"]) is int
+	                and packet["pid"] == pid
+	                and packet["nonce"] == nonce
+	                and type(packet["nonce"]) is str
+	                and packet["version"] == version
+	                and type(packet["version"]) is str,
+	                "Foreign observation identity",
+	            )
+	            stage, busy, count = (
+	                packet["stage"],
+	                packet["busy"],
+	                packet["recorded_case_count"],
+	            )
+	            require(
+	                type(stage) is int or type(stage) is float and stage in (1.5, 8.5, 9.5),
+	                "Unknown declared stage",
+	            )
+	            require(
+	                stage in PROGRESS_PREFIXES
+	                and type(busy) is bool
+	                and type(count) is int
+	                and count in PROGRESS_PREFIXES[stage],
+	                "Unsupported strict stage prefix",
+	            )
+	            require(
+	                type(packet["sequence"]) is int
+	                and packet["sequence"] == len(observations) + 1,
+	                "Observation sequence differs",
+	            )
+	            key = (stage, busy, count)
+	            require(
+	                key not in seen and stage >= previous_stage and count >= previous_count,
+	                "Repeated or regressed observation",
+	            )
+	            seen.add(key)
+	            observations.append(
+	                {"stage": stage, "busy": busy, "recorded_case_count": count}
+	            )
+	            previous_stage, previous_count = stage, count
+	        require(bool(observations), "No owned first-seen observation")
+	        return dict(
+	            unsupported,
+	            status="observed",
+	            last_entered_stage=previous_stage,
+	            observations=observations,
+	        )
+	    except Exception:
+	        return unsupported
+
+
+	def read_progress_failure_observation(path, report, pid, nonce, version, before, after):
+	    """Read the original captured stderr only after the original native owner retires."""
+	    unsupported = progress_failure_observation(
+	        None, report, pid, nonce, version, before, after
+	    )
+	    operation = operation_failure_observation(report, pid, before, after)
+	    if (
+	        operation["status"] != "observed"
+	        or operation["controller_check"] != "observation_deadline"
+	    ):
+	        return unsupported
+	    descriptor = None
+	    try:
+	        require(
+	            isinstance(path, Path) and path.name == "launch.stderr",
+	            "Unknown capture role",
+	        )
+	        descriptor = os.open(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
+	        initial = os.fstat(descriptor)
+	        require(
+	            stat.S_ISREG(initial.st_mode)
+	            and initial.st_uid == os.getuid()
+	            and initial.st_nlink == 1
+	            and initial.st_mode & 0o022 == 0
+	            and 0 < initial.st_size <= 65536,
+	            "Foreign captured stream",
+	        )
+	        with os.fdopen(descriptor, "rb") as stream:
+	            descriptor = None
+	            data = stream.read(65537)
+	            final = os.fstat(stream.fileno())
+	        require(
+	            stat.S_IFMT(initial.st_mode) == stat.S_IFMT(final.st_mode)
+	            and all(
+	                getattr(initial, field) == getattr(final, field)
+	                for field in (
+	                    "st_dev", "st_ino", "st_uid", "st_gid", "st_nlink", "st_mode",
+	                    "st_size", "st_mtime_ns", "st_ctime_ns",
+	                )
+	            )
+	            and len(data) == initial.st_size,
+	            "Captured stream changed",
+	        )
+	        return progress_failure_observation(
+	            data, report, pid, nonce, version, before, after
+	        )
+	    except Exception:
+	        return unsupported
+	    finally:
+	        if descriptor is not None:
+	            os.close(descriptor)
+
+
+	def progress_diagnostic_line(value):
+	    return PROGRESS_DIAGNOSTIC_PREFIX + json.dumps(
+	        value, sort_keys=True, separators=(",", ":"), allow_nan=False
+	    )
 	def native(repo, root):
 	    require(
 	        sys.platform == "darwin" and sys.version_info >= (3, 13),
@@ -795,6 +1022,7 @@ extension HS274NativePolicyQualificationTests {
 	            "version": provision["version"],
 	            "bundle": str(executable.parent.parent.parent),
 	            "stage_failure_observation": True,
+	            "progress_observation": True,
 	        },
 	    )
 	    config = output / "init.lua"
@@ -882,6 +1110,10 @@ extension HS274NativePolicyQualificationTests {
 	            deadline,
 	        )
 	    except ValueError:
+	        # Hold the closed observation bytes before existing foreign diagnostic writes.
+	        progress_line = progress_diagnostic_line(read_progress_failure_observation(
+	            output / "launch.stderr", report, actual_pid, nonce, provision["version"], before, after
+	        ))
 	        diagnostic = failure_observation(
 	            report.get("native_result"),
 	            report,
@@ -900,6 +1132,7 @@ extension HS274NativePolicyQualificationTests {
 	            ),
 	            file=sys.stderr,
 	        )
+	        print(progress_line, file=sys.stderr)
 	        raise
 	    packet["observation_retirement_seconds"] = time.monotonic() - start
 	    packet["runtime_provisioning"] = provision

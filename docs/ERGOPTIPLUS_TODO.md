@@ -3197,6 +3197,18 @@ Earlier Python control drafts remain private evidence, not SDK registration.
 Native execution of this new diagnostic remains UNEXECUTED; it grants no UI,
 permission, retirement or ready authority. Item 24 remains partial.
 
+Private continuation after actual macOS run37880447936 at7c88374f12ab6682fd7460cf10b69efcf41e05e6:
+the permission probe reaches stage4 but refuses the unchanged stage8.5 window
+predicate. A prepared failure-only observation retains bounded already-read
+view/window facts at stages8.5 and9.5. Independent Lua5.4 replay passes all32
+modeled controls, conserving the original12; removing the observation fails
+eight of20 additive controls without load errors. The original31-pass/one-fail
+oracle draft and LuaJIT dependency/ABI failures remain retained and unqualified.
+The original ten native cases, probe order, refusal and deadlines remain whole.
+Exact-source native execution of this successor, the actual late-window cause
+and physical guardian/Login Items/tap-hold acceptance remain open. This is
+prepared source, not feature adoption or completion of item24.
+
 - [~] **30.** Physical magic-key setting on all three OSes: one
   `hotstrings.magic_key_source` (a KeyboardEvent.code, `auto` by default),
   config schema v5 migrating every spelling of the Windows
@@ -5111,6 +5123,75 @@ Windows E2E, package and installation are skipped, and the native-port step is
 not executed. Preserve that assertion and its independent vector; the maintainer
 will resume Windows-only qualification on their PC. Mac acceptance and item31
 remain incomplete.
+
+Actual manual macOS run37880447936 tests exact7c88374f12ab6682fd7460cf10b69efcf41e05e6
+and completes all467 Swift cases:442 passed,10 failed,15 skipped. Packaging and
+native verdicts fail; installation and Release are skipped. All37 keyboard
+source cases, eight private configuration variants and the vendor null-queue
+acquisition refusal pass. Six Carbon evidence records close without omitted
+events and prove actual US/French source selection/restoration, not physical
+keyboards or capture. Owned compilation refuses inventory before the build DAG;
+pkgutil refuses stale reference pins before native marker operations. Permission
+UI reaches stage8.5 without completing its ten-case acceptance. The root
+prerequisite refuses the selected Xcode compiler's observed UID501 under its
+unchanged UID-zero guard. An initializer case refuses after completed unittest
+discovery; its detailed case remains unknown because captures were outside the
+archived parent. These results are retained separately from earlier41be failures.
+
+The current private continuation is bound to a reviewed67-path native transfer
+inventory. The36-path continuation is now published only on the owned test CI
+branch in queue commit8d2a49db and diagnostic commitd2b93289; it remains outside
+the feature and dev. Source adoption is conditional on postimage conservation and
+fresh gates on a clean composition starting from the actual feature. The held
+C33 callback/model/manifest work, canonical checkpoint, original Windows PC
+follow-up and every earlier native requirement remain unchanged. No workflow
+or toolchain-selection authority follows from this preparation.
+
+The prepared full-source guard counts4528 regular files plus four links,
+conserving all4532 independently fixed paths, hashes, modes and link targets.
+Four physical-filesystem controls pass in normal and optimized Python; their
+small file contents and original-source admission are explicitly modeled, so
+they do not prove a compilable full native materialization. The queue successor
+forwards the actual vendor callback's original nonzero IOReturn through its
+existing failure route. Six scenarios plus unknown refusal use actual C++ with
+modeled IOKit/scheduler ports. Thirty-one passing bounded commands execute510
+methods with zero skips/timeouts; five expected predecessor assertion failures
+and one genuine initial restart-fixture failure are retained separately. The
+real generator preserves the other63 products and the exact original vendor
+inverse. Darwin delivery, drain, retirement, cutover and physical capture remain
+unexecuted for these sources.
+
+The prepared protected-VHD diagnostic passes all38 portable controls while
+preserving the original30 and all three independent42-member corpora. It emits
+only a bounded ordinal from the original inventory read. Twelve expected
+assertion-red commands and278 positive method invocations are retained; actual
+Darwin expansion and any missing AppleDouble cause remain unobserved. Two
+pkgutil reference pins follow the corrected image; the final composition must
+retain and execute all eleven original controls and the actual native marker
+qualification. No package, signature, ownership or expansion guard is relaxed.
+
+The read-only CLT successor passes all20 portable controls in normal and
+optimized Python, both before and after exact restoration, plus the independent
+late-alias control. Ten expected assertion-red replays reject the predecessor
+and four mutations with zero errors. Ordinary Linux metadata proves only its
+private filesystem observations; actual runner CLT/compiler/SDK presence and
+ownership remain unobserved. The helper executes no tools, selects no toolchain,
+grants no authority and never relaxes mandatory UID-zero admission.
+
+Prepared initializer capture retention uses the existing uploaded evidence
+parent while preserving all44 invocations, assertions and native budgets; the
+actual refusal cause and successor native execution remain unqualified. The
+separately prepared build coordinator passes682 primary portable invocations
+and22 causal replays, preserving historical consumers and source policies.
+Those results do not prove actual full-source admission, native parallel-build
+budget fit or signed products. Root reports the private36-path gate passed in
+969 seconds with389 JS and18,718 Hammerspoon cases; Swift is explicitly deferred
+on Linux. This is not qualification of the distinct clean feature composition.
+Manual macOS run37891123181 atd2b93289 is in progress with no release; no native
+result is inferred before its final outcome. Signing, root prerequisites, protected expansion,
+packaging, installation, physical acceptance, item31 and transverse16/38 remain
+incomplete. Windows-only follow-up stays delegated to the maintainer as recorded
+above; no item is removed and no untested source is called integrated.
 
 - [~] **33.** Config policy for the files other than config.toml (the former
   item 25): Published in the second 2026-09-30 release for the files the review

@@ -147,6 +147,57 @@ def admit(packet, report, nonce, pid, executable, domain):
     return probe.validate_owned_receipt(packet, nonce, pid, executable, domain)
 
 
+def admit_with_failure_observation(packet, report, nonce, pid, executable, domain):
+    """Retain the original refusal while projecting only closed controller facts."""
+    try:
+        return admit(packet, report, nonce, pid, executable, domain)
+    except Exception:
+        # A diagnostic sink cannot replace the primary failure or grant authority.
+        try:
+            operation, cleanup, retirement = "unavailable", "unavailable", "unavailable"
+            if type(report) is dict:
+                error = dict.get(report, "operation_error")
+                if error is None:
+                    operation = "none"
+                elif type(error) is str:
+                    operation = {
+                        "Native private publication observation deadline": "observation_deadline",
+                        "Native private publication receipt deadline": "receipt_deadline",
+                        "Exact native publication child exited before receipt": "child_exited_before_receipt",
+                        "Exact native publication child exited during receipt": "child_exited_during_receipt",
+                        "Source identity changed": "source_identity_changed",
+                        "Native private publication controller deadline": "controller_deadline",
+                    }.get(error, "unclassified_refusal")
+                errors = dict.get(report, "cleanup_errors")
+                if type(errors) is list:
+                    cleanup = "refused" if errors else "none"
+                acknowledged = dict.get(report, "application_cleanup")
+                if type(acknowledged) is str:
+                    if acknowledged == "confirmed inherited PGID retired":
+                        retirement = "acknowledged"
+                    elif acknowledged == "unconfirmed; inputs retained":
+                        retirement = "unconfirmed"
+            observation = {
+                "schema": 1,
+                "kind": "owned_configuration_controller_failure_observation",
+                "authority": False,
+                "native_verdict": "unchanged",
+                "operation": operation,
+                "cleanup": cleanup,
+                "retirement": retirement,
+            }
+            text = (
+                "ERGOPTI_OWNED_CONFIGURATION_FAILURE "
+                + json.dumps(observation, sort_keys=True, separators=(",", ":"), allow_nan=False)
+                + "\n"
+            )
+            if len(text) <= 512:
+                sys.stderr.write(text)
+        except Exception:
+            pass
+        raise
+
+
 def admit_files(root, packet, original):
     """Read the actual final full document and the distinct personal sentinel independently."""
     root = Path(root)
@@ -380,7 +431,7 @@ end)
     finally:
         os.umask(previous_umask)
     unchanged()
-    summary = admit(
+    summary = admit_with_failure_observation(
         report.get("native_result"),
         report,
         nonce,
