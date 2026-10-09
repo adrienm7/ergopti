@@ -98,35 +98,35 @@ Each clip is rendered from the driver's own windows and data by the
 
 <table>
 <tr>
-<td width="50%"><b>Works on every system</b><br><img src="docs/media/ergoptiplus/three-os.gif" alt="Hotstrings firing on Windows, macOS and Linux"></td>
-<td width="50%"><b>The tray menu</b><br><img src="docs/media/ergoptiplus/menu.gif" alt="Every feature in the tray menu"></td>
+<td width="50%"><b>Works on every system</b><br><img src="static/media/ergopti_plus/three-os.gif" alt="Hotstrings firing on Windows, macOS and Linux"></td>
+<td width="50%"><b>The tray menu</b><br><img src="static/media/ergopti_plus/menu.gif" alt="Every feature in the tray menu"></td>
 </tr>
 <tr>
-<td width="50%"><b>Tap-holds</b><br><img src="docs/media/ergoptiplus/tap-holds.gif" alt="One key with a tap action and a hold action"></td>
-<td width="50%"><b>Navigation layer</b><br><img src="docs/media/ergoptiplus/nav-layer.gif" alt="Arrows, words and selections on the home row"></td>
+<td width="50%"><b>Tap-holds</b><br><img src="static/media/ergopti_plus/tap-holds.gif" alt="One key with a tap action and a hold action"></td>
+<td width="50%"><b>Navigation layer</b><br><img src="static/media/ergopti_plus/nav-layer.gif" alt="Arrows, words and selections on the home row"></td>
 </tr>
 <tr>
-<td width="50%"><b>Shortcuts</b><br><img src="docs/media/ergoptiplus/shortcuts.gif" alt="Win + letter shortcuts, each re-assignable"></td>
-<td width="50%"><b>Wrap any selection</b><br><img src="docs/media/ergoptiplus/shortcut-wrap.gif" alt="Typing a bracket or a quote wraps the selected text"></td>
+<td width="50%"><b>Shortcuts</b><br><img src="static/media/ergopti_plus/shortcuts.gif" alt="Win + letter shortcuts, each re-assignable"></td>
+<td width="50%"><b>Wrap any selection</b><br><img src="static/media/ergopti_plus/shortcut-wrap.gif" alt="Typing a bracket or a quote wraps the selected text"></td>
 </tr>
 <tr>
-<td width="50%"><b>Trackpad gestures</b><br><img src="docs/media/ergoptiplus/gestures.gif" alt="Three-finger tap and swipe gestures"></td>
-<td width="50%"><b>Your own hotstrings</b><br><img src="docs/media/ergoptiplus/personal-hotstrings.gif" alt="Creating a hotstring in the editor, then using it"></td>
+<td width="50%"><b>Trackpad gestures</b><br><img src="static/media/ergopti_plus/gestures.gif" alt="Three-finger tap and swipe gestures"></td>
+<td width="50%"><b>Your own hotstrings</b><br><img src="static/media/ergopti_plus/personal-hotstrings.gif" alt="Creating a hotstring in the editor, then using it"></td>
 </tr>
 <tr>
-<td width="50%"><b>A few keys, a whole phrase</b><br><img src="docs/media/ergoptiplus/extreme-hotstrings.gif" alt="Short abbreviations and an AI prediction writing a sentence"></td>
-<td width="50%"><b>Typing metrics</b><br><img src="docs/media/ergoptiplus/metrics.gif" alt="The typing metrics dashboard: savings, speed, words, shortcuts"></td>
+<td width="50%"><b>A few keys, a whole phrase</b><br><img src="static/media/ergopti_plus/extreme-hotstrings.gif" alt="Short abbreviations and an AI prediction writing a sentence"></td>
+<td width="50%"><b>Typing metrics</b><br><img src="static/media/ergopti_plus/metrics.gif" alt="The typing metrics dashboard: savings, speed, words, shortcuts"></td>
 </tr>
 <tr>
-<td width="50%"><b>Screen time</b><br><img src="docs/media/ergoptiplus/screen-time.gif" alt="Time spent per application"></td>
-<td width="50%"><b>AI predictions</b><br><img src="docs/media/ergoptiplus/ai-predictions.gif" alt="A prediction tooltip fixing and completing a sentence"></td>
+<td width="50%"><b>Screen time</b><br><img src="static/media/ergopti_plus/screen-time.gif" alt="Time spent per application"></td>
+<td width="50%"><b>AI predictions</b><br><img src="static/media/ergopti_plus/ai-predictions.gif" alt="A prediction tooltip fixing and completing a sentence"></td>
 </tr>
 <tr>
-<td width="50%"><b>AI in every app</b><br><img src="docs/media/ergoptiplus/ai-everywhere.gif" alt="Predictions in a terminal, an IDE, a browser, Teams and WhatsApp"></td>
-<td width="50%"><b>Local models or an API</b><br><img src="docs/media/ergoptiplus/ai-local.gif" alt="The model catalogue window"></td>
+<td width="50%"><b>AI in every app</b><br><img src="static/media/ergopti_plus/ai-everywhere.gif" alt="Predictions in a terminal, an IDE, a browser, Teams and WhatsApp"></td>
+<td width="50%"><b>Local models or an API</b><br><img src="static/media/ergopti_plus/ai-local.gif" alt="The model catalogue window"></td>
 </tr>
 <tr>
-<td width="50%"><b>Rewrite, translate, ask</b><br><img src="docs/media/ergoptiplus/ai-actions.gif" alt="AI actions on a selected sentence"></td>
+<td width="50%"><b>Rewrite, translate, ask</b><br><img src="static/media/ergopti_plus/ai-actions.gif" alt="AI actions on a selected sentence"></td>
 <td></td>
 </tr>
 </table>

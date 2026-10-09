@@ -55,7 +55,7 @@ npm run gifs
 ```
 
 Renders every scene flagged `gif` in `src/data/timeline.json` to
-`docs/media/ergoptiplus/<id>.gif` for the README, at 800 px and 12 fps. A GIF
+`static/media/ergopti_plus/<id>.gif` for the README, at 800 px and 12 fps. A GIF
 over 3 MB, or a scene that flickers, fails the run instead of landing in git.
 `npm run gifs -- metrics` renders one.
 
