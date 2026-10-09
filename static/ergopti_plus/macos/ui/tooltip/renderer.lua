@@ -25,8 +25,6 @@ local SharedLayout = require("tooltip.layout")
 -- so macOS and Windows round identically — never hardcode it here.
 local CORNER_RADIUS = Config.layout.corner_radius
 
-local ok_bridge, vscode_bridge = pcall(require, "infra.vscode_bridge")
-if not ok_bridge then vscode_bridge = nil end
 
 
 
@@ -263,11 +261,6 @@ end
 --- Resolves the best screen coordinates to display the tooltip.
 --- @return table|nil Table containing x, y, and optionally h and type.
 function M.resolve_anchor()
-	if vscode_bridge and type(vscode_bridge.is_vscode) == "function" and vscode_bridge.is_vscode() then
-		local ok_estimate, position = pcall(vscode_bridge.estimate_position)
-		if ok_estimate and type(position) == "table" then return position end
-	end
-
 	local ok_ax, position_ax = pcall(function()
 		local ax_engine = require("hs.axuielement")
 		local focused_element = ax_engine.systemWideElement():attributeValue("AXFocusedUIElement")

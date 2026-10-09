@@ -35,6 +35,7 @@ local EventProvenance = require("adapters.event_provenance")
 local Shared          = require("keymap.magic_key_source")
 local ManifestMenu    = require("infra.manifest_menu")
 local Source          = require("modules.keymap.magic_key_source")
+local Geometry        = require("adapters.keyboard_geometry")
 
 local LOG = "menu.magic_key_source"
 
@@ -123,15 +124,15 @@ function M.capture(ctx)
 		Logger.debug(LOG, "A capture is already waiting for a key.")
 		return false
 	end
-	local resolver = Source.resolver()
+	Source.resolver() -- Warm the registry before the event callback.
 	local live = { answered = false }
-	local function settle(keycode)
+	local function settle(keycode, keyboard_type)
 		if not stop_capture(live) then return end
 		if keycode == nil then
 			Logger.info(LOG, "Physical magic key capture ended with no key: nothing changed.")
 			return
 		end
-		local code = resolver.code_for(keycode)
+		local code = Source.code_for(keycode, keyboard_type)
 		if code == nil then
 			Logger.warn(LOG, "Keycode %s cannot type the magic key.", tostring(keycode))
 			Notifications.notify(i18n.get("dialog.magic_key_source.title"),
@@ -152,10 +153,13 @@ function M.capture(ctx)
 		end
 		live.answered = true
 		local keycode = event:getKeyCode()
+		local keyboard_type = Geometry.event_type(event)
+		local candidate = Source.code_for(keycode, keyboard_type)
 		-- Decided on the next run-loop turn: saving the choice is file work, which
 		-- must not run inside an event tap.
-		Timer.after(0, function() settle(keycode ~= Keycodes.ESCAPE and keycode or nil) end)
-		return true, fence_events
+		Timer.after(0, function() settle(keycode ~= Keycodes.ESCAPE and keycode or nil, keyboard_type) end)
+		-- An unproved physical position remains native; no adjacent key is claimed.
+		return keycode == Keycodes.ESCAPE or candidate ~= nil, fence_events
 	end)
 	live.timer = Timer.after(Timings.sec("ui", "magic_key_capture_timeout_ms"), function() settle(nil) end)
 	_capture = live
@@ -192,7 +196,12 @@ function M.rows(ctx)
 		t = i18n.get,
 		current = Source.get(),
 		reason = Source.choice_reason,
-		key_text = function(code) return key_text(resolver.native(code)) end,
+		key_text = function(code)
+			local native = resolver.native(code)
+			-- Without an originating model, a swapped glyph could name its neighbor.
+			if Source.code_for(native, nil) ~= code then return nil end
+			return key_text(native)
+		end,
 		choose = function(value) M.choose(ctx, value) end,
 		capture = ctx.paused ~= true and function() M.capture(ctx) end or nil,
 	})

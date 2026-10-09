@@ -275,10 +275,12 @@ end
 --- @param schema table
 --- @param driver string
 --- @return table { <probe id> = { state = "pending" } }
-function M.pending_probes(schema, driver)
+function M.pending_probes(schema, driver, selected)
 	local probes = {}
 	for id, probe in pairs(schema.probes) do
-		if M.applies(probe, driver) then probes[id] = { state = "pending" } end
+		if M.applies(probe, driver) then
+			probes[id] = selected == false and { state = "not_run", reason = "opt_in_required" } or { state = "pending" }
+		end
 	end
 	return probes
 end

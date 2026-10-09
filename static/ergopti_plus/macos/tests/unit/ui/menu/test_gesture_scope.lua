@@ -226,3 +226,211 @@ end)
 
 package.loaded["adapters.file_system"] = FileSystem
 package.loaded["infra.preferences"] = nil
+
+
+
+
+
+-- ========================================================
+-- ========================================================
+-- ======= 2/ Recommended Two-finger Swipe Emission =======
+-- ========================================================
+-- ========================================================
+
+local function actual_frame_fixture(source)
+	package.loaded["adapters.file_system"] = FileSystem
+	package.loaded["modules.gestures.engine"] = nil
+	package.loaded["modules.gestures.conflicts"] = nil
+	local recording = require("tests.support.synthetic_action_fixture").load("modules.gestures.actions")
+	local actions = recording.subject
+	local core, initialize = nil, actions.init
+	actions.init = function(candidate)
+		core = candidate
+		return initialize(candidate)
+	end
+	package.loaded["modules.gestures"] = nil
+	package.loaded["modules.gestures.init"] = nil
+	local loaded, gestures = xpcall(function() return require("modules.gestures") end, debug.traceback)
+	actions.init = initialize
+	if not loaded then error(gestures, 0) end
+	assert(type(core) == "table", "the actual gesture constructor did not publish its CoreState")
+	local engine = require("modules.gestures.engine")
+	assert(engine.init(core, actions) == true, "the actual engine refused the constructor's exact dependencies")
+	assert(gestures.enable_all() == true, "the actual gesture master did not enable")
+	local controls, state, files = {}, { gestures = true }, {}
+	local original = source or '[gestures]\nenabled = true\ntap_4 = "open_url"\nmodes = { swipe_3_horiz = "incremental", future = "keep" }\nsensitivities = { swipe_3_horiz = 9, future = 17 }\naction_parameters = { tap_4__open_url = "https://apple.com", keyboard__cmd_k__open_url = "https://example.com", future = { preserve = 7 } }\n[future]\nkeep = 42\n'
+	files.config = original
+	if source == false then files.config = nil end
+	local writes, backup_generation = 0, 0
+	gestures.set_action("tap_4", "open_url")
+	gestures.set_mode("swipe_3_horiz", "incremental")
+	gestures.set_sensitivity("swipe_3_horiz", 9)
+	gestures.set_action_parameter("tap_4", "open_url", "https://apple.com")
+	gestures.set_action_parameter("keyboard__cmd_k", "open_url", "https://example.com")
+	local files_port = {
+		read_with_status = function(path) return files[path], files[path] and "ok" or "absent" end,
+		write = function() error("unguarded write") end,
+		write_if_unchanged = function(path, value, expected)
+			if controls.refuse_write and path == "config" then return false end
+			if expected.status == "ok" and files[path] ~= expected.content then return false end
+			if expected.status == "absent" and files[path] ~= nil then return false end
+			if path == "config" and controls.during_write then controls.during_write() end
+			files[path] = value
+			writes = writes + 1
+			return true
+		end,
+	}
+	package.loaded["adapters.file_system"] = files_port
+	local prefs = helpers.load_with_stubs("infra.preferences")
+	prefs.load("config")
+	local PT = require("ui.menu.preferences_transaction")
+	local modules = { gestures = gestures }
+	local demotions = require("ui.menu.session_demotions").new()
+	controls.demotions = demotions
+	local save, checkpoint = PT.bind(prefs, {
+		path = "config", state = state, hotfiles = {}, core_modules = modules,
+		initial_state = state, initial_preferences = prefs.snapshot(state, {}, modules),
+		snapshot_view = demotions.persisted_view,
+		restore_runtime = function(snapshot)
+			gestures.set_action("tap_4", snapshot.gesture_actions.tap_4)
+			return true
+		end,
+	})
+	local owner = require("ui.menu.gesture_scope").new({
+		path = "config", files = files_port, state = state, gestures = gestures,
+		preferences = prefs, checkpoint = checkpoint,
+		demotions = demotions,
+		capture_preferences = function() return prefs.snapshot(state, {}, modules) end,
+		backup_path = function()
+			backup_generation = backup_generation + 1
+			return "backup-" .. backup_generation
+		end,
+		paused = function() return controls.paused == true end,
+		admission = function(_, callback) return callback() end,
+	})
+	return owner, gestures, files, state, recording, core, engine
+end
+
+--- Captures the actual menu provider while retaining its canonical templates.
+--- @param owner table Actual scoped preference owner.
+--- @param gestures table Actual gesture module.
+--- @param state table Menu feature state.
+--- @return table commands Menu commands.
+--- @return table providers Menu data providers.
+local function actual_menu_frame(owner, gestures, state)
+	local renderer = require("infra.manifest_menu")
+	local original_build, commands, providers = renderer.build, nil, nil
+	renderer.build = function(_, _, _, _, context, dynamic)
+		commands, providers = context.commands, dynamic
+		return {}
+	end
+	local ok, detail = xpcall(function()
+		require("ui.menu.menu_gestures").build({ gestures = gestures, state = state, paused = false,
+			apply_gesture_scope = owner.apply,
+			save_prefs = function() error("the scope must not use an ordinary save") end,
+			updateMenu = function() end })
+	end, debug.traceback)
+	renderer.build = original_build
+	if not ok then error(detail, 0) end
+	return commands, providers
+end
+
+helpers.describe("macOS two-finger neutral recommendations", function()
+	for _, restore in ipairs({ true, false }) do
+		local title = restore and "clear then recommended leaves every two-contact gesture to the OS"
+			or "an explicit custom two-contact binding remains unchanged and emits its tagged key"
+		helpers.it(title, function()
+			local previous_files = package.loaded["adapters.file_system"]
+			helpers.with_stub_scope({
+				"modules.gestures", "modules.gestures.init", "modules.gestures.engine",
+				"modules.gestures.actions", "modules.gestures.conflicts", "modules.gestures.actions_click",
+				"modules.gestures.actions_aux_owner", "modules.gestures.sticky_modifiers",
+				"adapters.file_system",
+				"adapters.synthetic_input", "adapters.event_provenance", "adapters.timer_scheduler",
+				"infra.preferences", "ui.menu.gesture_scope", "ui.menu.scoped_preferences",
+				"ui.menu.preferences_transaction", "ui.menu.menu_gestures", "infra.manifest_menu",
+			}, function()
+				local original = '[gestures]\nenabled = true\nswipe_2_left = "arrow_up"\n'
+				local owner, gestures, files, state, recording, core, engine = actual_frame_fixture(original)
+				helpers.assert_eq(gestures.set_action("swipe_2_left", "arrow_up"), true)
+				local prior_first_frame = rawget(_G, "ERGOPTI_GESTURES_RECEIVED_FIRST_FRAME")
+				local ok, detail = xpcall(function()
+					local commands = actual_menu_frame(owner, gestures, state)
+					if restore then
+						helpers.assert_eq(commands.scope_clear(), true)
+						helpers.assert_eq(core.ga.swipe_2_left, "none")
+						helpers.assert_eq(commands.scope_restore(), true)
+						local decoded = Codec.decode(files.config)
+						for _, slot in ipairs({ "tap_2", "swipe_2_left", "swipe_2_right", "swipe_2_up", "swipe_2_down",
+							"swipe_2_left_up", "swipe_2_right_up", "swipe_2_left_down", "swipe_2_right_down" }) do
+							helpers.assert_eq(gestures.get_action(slot), "none", slot)
+							helpers.assert_eq(decoded.gestures[slot], nil, "the neutral default must not persist a custom binding: " .. slot)
+						end
+					else
+						helpers.assert_eq(files.config, original, "new recommendations must not rewrite an authored file")
+						helpers.assert_eq(core.ga.swipe_2_left, "arrow_up")
+					end
+					helpers.assert_eq(core.enabled, true)
+					local _, providers = actual_menu_frame(owner, gestures, state)
+					local expected_label = restore and "gesture.slots.swipe_2_left : sg_actions.none"
+						or "gesture.slots.swipe_2_left : arrow_up"
+					local found = 0
+					for _, row in ipairs(providers.gesture_slots_2()) do
+						if row.label == expected_label then found = found + 1 end
+					end
+					helpers.assert_eq(found, 1, "the actual UI must describe the same owner's effective binding")
+					local scroll_tap
+					for _, tap in ipairs(recording.hs.eventtap.__taps) do
+						if tap.types and tap.types[1] == recording.hs.eventtap.event.types.scrollWheel then scroll_tap = tap end
+					end
+					helpers.assert_true(scroll_tap ~= nil and scroll_tap:isEnabled(), "the real engine tap must be live")
+					local clock = 1000
+					recording.hs.timer.secondsSinceEpoch = function() return clock end
+					local before = recording.synthetic.stats()
+					local function frame(x, y, lifted)
+						local touches = lifted and {} or {
+							{ absoluteVector = { position = { x = x, y = y } } },
+							{ absoluteVector = { position = { x = x + 10, y = y } } },
+						}
+						helpers.assert_eq(engine.process_frame(touches), nil, "frame observation is not an input consume return")
+						helpers.assert_eq(engine.is_blocking_scroll(), false)
+						for _, event_type in ipairs({ recording.hs.eventtap.event.types.scrollWheel, recording.hs.eventtap.event.types.gesture }) do
+							helpers.assert_eq(scroll_tap.fn({ getType = function() return event_type end }), false,
+								"the actual scroll/gesture callback must preserve OS input")
+						end
+						clock = clock + 0.02
+					end
+					local movements = restore and { { -12, 0 }, { 12, 0 }, { 0, -12 }, { 0, 12 },
+						{ -12, -12 }, { 12, -12 }, { -12, 12 }, { 12, 12 }, { 0, 0 } } or { { -12, 0 } }
+					for _, movement in ipairs(movements) do
+						for _ = 1, 8 do frame(100, 100) end
+						frame(100 + movement[1], 100 + movement[2])
+						frame(100 + movement[1], 100 + movement[2])
+						frame(0, 0, true)
+					end
+					if restore then
+						local after = recording.synthetic.stats()
+						helpers.assert_eq(after.action_handoffs, before.action_handoffs, "none must not dispatch an action")
+						helpers.assert_eq(after.pending, before.pending, "none must not enqueue a key")
+					else
+						local events, down, up = recording.drain("test.trackpad.custom")
+						helpers.assert_eq(#events, 2)
+						helpers.assert_eq(events[1].key, "up")
+						helpers.assert_eq(events[2].key, "up")
+						helpers.assert_eq(events[1].isDown, true)
+						helpers.assert_eq(events[2].isDown, false)
+						helpers.assert_eq(#events[1].mods, 0)
+						helpers.assert_eq(#events[2].mods, 0)
+						helpers.assert_eq(down.effect, "action")
+						helpers.assert_eq(up.effect, "action")
+					end
+				end, debug.traceback)
+				_G.ERGOPTI_GESTURES_RECEIVED_FIRST_FRAME = prior_first_frame
+				assert(engine.stop() == true, "the exact inert engine tap must retire")
+				if not ok then error(detail, 0) end
+			end)
+			helpers.assert_true(rawequal(package.loaded["adapters.file_system"], previous_files),
+				"the complete actual-owner case must restore the exact filesystem adapter")
+		end)
+	end
+end)

@@ -28,6 +28,12 @@ local ERRORS_FILE = HOME .. "/Library/Logs/ergopti_plus/ErgoptiPlus_errors_2026-
 --- @return table dialog, table context
 local function load_dialog(controls)
 	controls = controls or {}
+	local Json = require("json")
+	local function document(name)
+		local file = assert(io.open(helpers.driver_root() .. "/../_shared/modules/diagnostics/" .. name .. ".json", "rb"))
+		local value = Json.decode(file:read("*a")); assert(file:close()); return value
+	end
+	local sharing_schema = document("schema")
 	for _, name in ipairs({
 		"ui.error_dialog", "ui.healthcheck.core", "ui.healthcheck.report", "infra.logger", "infra.i18n",
 		"infra.locale", "ui.ui_builder", "adapters.timer_scheduler", "adapters.storage", "infra.manifest_reader",
@@ -80,14 +86,16 @@ local function load_dialog(controls)
 				redaction = { home_placeholder = "~", account_placeholder = "<user>", secret_placeholder = "<secret>",
 					min_account_name_length = 3, token_prefixes = {}, bearer_min_length = 8, secret_keys = {},
 					secret_value_min_length = 6 },
-				templates = {}, repository = {},
+				templates = document("issue_templates"), repository = document("../updater/defaults").github, schema = sharing_schema,
 			}
 		end,
 		run = function()
 			return {
+				driver = "macos",
 				generated_at = "2026-09-24T08:15:02Z",
+				probes = { appleevent_transport = { state = "error", native_status = -1744, ms = 12, cleanup = "settled" } },
 				sections = {
-					versions = { ergopti_version = "2.1.0", commit = "abc1234 (build)" },
+					versions = { ergopti_version = context.version or "2.1.0", commit = "abc1234 (build)" },
 					system = { os = "macOS 15.1" },
 					issues = { warn_count = 1, err_count = 2, recent = { "2026-09-24 10:15:02:117 [ERROR] [keylogger] x" } },
 					paths = { errors_today = ERRORS_FILE, diagnostics_dir = HOME .. "/Library/Logs/ergopti_plus/diagnostics" },
@@ -102,6 +110,24 @@ local function load_dialog(controls)
 			return { ok = true }
 		end,
 	}
+
+
+	if controls.real_report then
+		package.loaded["ui.healthcheck.report"] = nil
+		local actual = require("ui.healthcheck.report")
+		package.loaded["ui.healthcheck.report"] = {
+			redaction_context = function() return actual.redaction_context({ identity = function() return { home = HOME, user = "synthetic" } end }) end,
+			perform = function(action, paths, documents, context_value, _, snapshot)
+				return actual.perform(action, paths, documents, context_value, {
+					copy = function(text)
+						context.copied = text
+						return controls.copy ~= false
+					end,
+					open_url = function(url) context.opened = url; return true end,
+				}, snapshot)
+			end,
+		}
+	end
 
 	local webview = {}
 	for _, method in ipairs({
@@ -290,10 +316,10 @@ helpers.describe("error window (macOS): page and actions (error-dialog-macos)", 
 		helpers.assert_eq(#context.performed, 3, "three actions must reach the diagnostics actions")
 		local copy, report, open = context.performed[1].action, context.performed[2].action, context.performed[3].action
 		helpers.assert_eq(copy.action, "copy")
-		helpers.assert_true(copy.text:find("Flush failed: disk full", 1, true) ~= nil, "copy sends the report")
+		helpers.assert_true(copy.text:find("Flush failed: disk full", 1, true) == nil, "shared copy excludes free error text")
 		helpers.assert_eq(report.action, "report")
 		helpers.assert_eq(report.text, copy.text, "report sends the same report")
-		helpers.assert_eq(report.fields.title, "keylogger: Flush failed: disk full", "the issue title names the error")
+		helpers.assert_eq(report.fields.title, nil, "a shared title never contains free error text")
 		-- The host prefills the report itself and saves no file (report-focus)
 		helpers.assert_eq(report.name, nil, "a report names no file to save")
 		helpers.assert_eq(report.fields.diagnostics, nil, "the report field is filled from the text, not a summary")
@@ -331,5 +357,39 @@ helpers.describe("error window (macOS): page and actions (error-dialog-macos)", 
 		helpers.assert_eq(#context.timers, 1, "after the close box, a new error opens a window again")
 		page({ body = { action = "copy" } })
 		helpers.assert_eq(#context.performed, 0, "a message of the closed window is inert")
+	end)
+end)
+
+
+helpers.describe("error window sharing uses the real report sink", function()
+	helpers.it("retains the host snapshot and excludes the local error from the issue (error-sharing-owner)", function()
+		local dialog, context = load_dialog({ real_report = true })
+		helpers.assert_true(dialog.report({ kind = "error", module = "synthetic", message = "CANARY-private.invalid/notes", time = "local" }))
+		helpers.assert_type(context.copied, "string")
+		helpers.assert_type(context.opened, "string")
+		helpers.assert_true(context.copied:find("CANARY", 1, true) == nil)
+		helpers.assert_true(context.opened:find("CANARY", 1, true) == nil)
+		local refusing, refusal = load_dialog({ real_report = true, copy = false })
+		helpers.assert_eq(refusing.report({ kind = "error", module = "synthetic", message = "CANARY", time = "local" }), false)
+		helpers.assert_nil(refusal.opened, "clipboard refusal must prevent the browser")
+	end)
+end)
+
+
+helpers.describe("error window retains its captured sharing identity", function()
+	helpers.it("keeps local details and shares its own snapshot after another collection (error-sharing-owner)", function()
+		local dialog, context = load_dialog({ real_report = true })
+		dialog.init()
+		dialog.on_error("synthetic", "Private sentinel", "CANARY-private.invalid/notes")
+		fire_timers(context)
+		context.page({ body = "ready" })
+		helpers.assert_true(page_messages(context)[1].text:find("CANARY", 1, true) ~= nil, "local detail remains visible")
+		context.version = "9.9.9"
+		context.page({ body = { action = "copy", text = "forged" } })
+		helpers.assert_type(context.copied, "string")
+		helpers.assert_true(context.copied:find("CANARY", 1, true) == nil)
+		helpers.assert_true(context.copied:find("2.1.0", 1, true) ~= nil)
+		helpers.assert_true(context.copied:find("9.9.9", 1, true) == nil)
+		helpers.assert_true(context.copied:find("-1744", 1, true) ~= nil, "admitted technical status remains useful")
 	end)
 end)

@@ -14,6 +14,7 @@ local OWNED_MODULES = {
 	"hs", "infra.logger", "infra.paths", "infra.manifest_reader",
 	"adapters.file_system", "adapters.input_source_broker", "adapters.keyboard_source_probe",
 	"adapters.hotkey_registrar", "modules.keymap.magic_key_source", "modules.shortcuts.magic_editor",
+	"adapters.keyboard_geometry", "shortcuts.magic_editor",
 }
 
 local function with_fixture(callback)
@@ -21,21 +22,23 @@ local function with_fixture(callback)
 		local native = dofile("tests/stubs/hs.lua")
 		native.keycodes.map = { a = 0, c = 8, b = 11, j = 38 }
 		_G.hs, package.loaded.hs = native, native
+		package.loaded["adapters.keyboard_geometry"] = require("tests.support.keyboard_geometry_ports").new(native.eventtap.event.properties)
 		package.loaded["infra.logger"] = helpers.make_logger_stub()
 		package.loaded["infra.paths"] = { shared = function() return "physical-registry.json" end }
 		package.loaded["infra.manifest_reader"] = {
 			default_for = function() return "open_hotstrings_editor" end,
 		}
 		package.loaded["adapters.file_system"] = { read = function()
-			return '{"keys":{"KeyA":{"kind":"key","hs":0},"KeyC":{"kind":"key","hs":8},"KeyB":{"kind":"key","hs":11},"KeyJ":{"kind":"key","hs":38},"Backquote":{"kind":"key","hs":50},"IntlBackslash":{"kind":"key","hs":10}}}'
+			return '{"keys":{"KeyA":{"kind":"key","hs":0},"KeyC":{"kind":"key","hs":8},"KeyB":{"kind":"key","hs":11},"KeyJ":{"kind":"key","hs":38},"Backquote":{"kind":"key","hs":50,"macos_iso":{"hs":10}},"IntlBackslash":{"kind":"key","hs":10,"macos_iso":{"hs":50}}}}'
 		end }
 		local state = {
 			source_id = "source.first", trigger = "★", magic_source = "automatic",
 			replace_active = false, paused = false, inhibited = false, current = true,
-			requests = {}, actions = {}, cancel_refuses = false,
+			requests = {}, actions = {}, cancel_refuses = false, projections = {}, remap_types = {},
 		}
 		package.loaded["modules.keymap.magic_key_source"] = {
-			remaps = function(code, _, active)
+			remaps = function(code, _, active, keyboard_type)
+				state.remap_types[#state.remap_types + 1] = { code = code, keyboard_type = keyboard_type }
 				return (state.remap_code == code or (state.remap_codes or {})[code] == true) and active() == true
 			end,
 		}
@@ -60,6 +63,11 @@ local function with_fixture(callback)
 				return retained.operation
 			end,
 		}
+		local policy = require("shortcuts.magic_editor")
+		package.loaded["shortcuts.magic_editor"] = setmetatable({ resolve = function(options)
+			state.projections[#state.projections + 1] = options
+			return policy.resolve(options)
+		end }, { __index = policy })
 		local registrar = require("adapters.hotkey_registrar")
 		local subject = require("modules.shortcuts.magic_editor")
 		local spec = {
@@ -80,7 +88,7 @@ local function with_fixture(callback)
 				inhibited = function() return state.inhibited end,
 			},
 		}
-		local function respond(index, levels)
+		local function respond(index, levels, keyboard_type)
 			local retained = state.requests[index or #state.requests]
 			retained.settled = true
 			if retained.on_settled then retained.on_settled() end
@@ -95,7 +103,7 @@ local function with_fixture(callback)
 				ordered[#ordered + 1] = selected[code] or { code = code, text = "", direct = false, dead = false }
 			end
 			retained.observer({
-				version = 1, source_id = retained.request.source_id, keyboard_type = 40,
+				version = 1, source_id = retained.request.source_id, keyboard_type = keyboard_type or 40,
 				levels = ordered,
 			})
 		end
@@ -167,7 +175,7 @@ helpers.describe("conditional editor shortcut: native source and ordinary owners
 		end)
 	end)
 
-	helpers.it("refuses the ISO owner's two effective physical identities", function()
+	helpers.it("refuses a collaborator's two ambiguous effective physical identities", function()
 		with_fixture(function(subject, registrar, _, state, spec, respond)
 			state.magic_source, state.replace_active = "Backquote", true
 			state.remap_codes = { [10] = true, [50] = true }
@@ -783,5 +791,47 @@ helpers.describe("conditional editor shortcut: original signed-source issuer", f
 			helpers.assert_eq(#state.requests, 1)
 			helpers.assert_eq(registrar.live_count(), 0)
 		end)
+	end)
+end)
+
+
+helpers.describe("conditional editor shortcut: receipt-bound keyboard geometry", function()
+	for _, row in ipairs({
+		{ name = "ISO Backquote", model = 7002, native = 10, physical = "Backquote" },
+		{ name = "ISO neighbor", model = 7002, native = 50, physical = "IntlBackslash" },
+		{ name = "ANSI Backquote", model = 7001, native = 50, physical = "Backquote" },
+	}) do
+		helpers.it("projects " .. row.name .. " using the native translation receipt", function()
+			with_fixture(function(subject, registrar, native, state, spec, respond)
+				helpers.assert_eq(subject.start(spec), true)
+				respond(nil, { { code = row.native, text = "★", direct = true, dead = false } }, row.model)
+				helpers.assert_eq(registrar.live_count(), 1)
+				helpers.assert_eq(native.hotkey._bound[1].key, row.native)
+				local selected
+				for _, candidate in ipairs(state.projections[1].source.candidates) do
+					if candidate.native_code == row.native then selected = candidate end
+				end
+				helpers.assert_not_nil(selected)
+				helpers.assert_eq(selected.code, row.physical, "the numeric chord alone must not hide a swapped canonical slot")
+				for _, call in ipairs(state.remap_types) do
+					helpers.assert_eq(call.keyboard_type, row.model, "replacement ownership must use this exact translation receipt")
+				end
+				native.hotkey._bound[1].pressed_fn()
+				helpers.assert_eq(#state.actions, 1)
+				helpers.assert_eq(subject.stop(), true)
+				helpers.assert_eq(registrar.live_count(), 0)
+			end)
+		end)
+	end
+	helpers.it("does not acquire a JIS or unknown swapped receipt as its ANSI neighbor", function()
+		for _, model in ipairs({ 7003, 7004 }) do
+			with_fixture(function(subject, registrar, _, state, spec, respond)
+				helpers.assert_eq(subject.start(spec), true)
+				respond(nil, { { code = 10, text = "★", direct = true, dead = false } }, model)
+				helpers.assert_eq(registrar.live_count(), 0)
+				helpers.assert_eq(#state.actions, 0)
+				helpers.assert_eq(subject.stop(), true)
+			end)
+		end
 	end)
 end)

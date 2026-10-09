@@ -282,11 +282,11 @@ _LMNM_AddRoute(Tail) {
 	return Capture && Join && ReturnPosition && Capture < Join && Join < ReturnPosition
 }
 
-_LMNM_LiveRoute(Emit) {
-	CasePosition := _LMNM_ExecutableStatement(Emit, 'm)^[ \t]*(case) "llm_live_mode":[ \t]*$', 2)
+_LMNM_GenerationRoute(Emit) {
+	CasePosition := _LMNM_ExecutableStatement(Emit, 'm)^[ \t]*(case) "llm_generation_settings":[ \t]*$', 2)
 	Draw := _LMNM_ExecutableStatement(Emit,
-		'm)^[ \t]*(if) !MenuRenderer_AppendGroup\(_LLM_Menu_Handle, "llm_menu", "llm_live_mode",[ \t]*\n[ \t]*Map\("llm_live_mode", LLM_Menu_BuildLiveModeMenu\), disabled\)', 2)
-	NextCase := _LMNM_ExecutableStatement(Emit, 'm)^[ \t]*(case) "llm_generation_settings":[ \t]*$', 2)
+		'm)^[ \t]*(if) !MenuRenderer_AppendGroup\(_LLM_Menu_Handle, "llm_menu", "llm_generation_settings",[ \t]*\n[ \t]*Map\("llm_generation_settings", LLM_Menu_BuildGenerationMenu\), disabled\)', 2)
+	NextCase := _LMNM_ExecutableStatement(Emit, 'm)^[ \t]*(case) "llm_display":[ \t]*$', 2)
 	return CasePosition && Draw && NextCase && CasePosition < Draw && Draw < NextCase
 }
 
@@ -294,24 +294,24 @@ _LMNM_NativeBindingRouteControls() {
 	Tail := _DriverFuncBody("_LLM_Menu_ModelTailRows"), Emit := _DriverFuncBody("_LLM_Menu_EmitRow")
 	Assert(Tail != "" && Emit != "", "both genuine native binding owners must exist")
 	AssertTrue(_LMNM_AddRoute(Tail))
-	AssertTrue(_LMNM_LiveRoute(Emit))
+	AssertTrue(_LMNM_GenerationRoute(Emit))
 	AssertFalse(_LMNM_AddRoute(""))
-	AssertFalse(_LMNM_LiveRoute(""))
+	AssertFalse(_LMNM_GenerationRoute(""))
 	for Needle in ['AddRows := MenuRenderer_TemplateRows', '"llm_add_model_entry", (*) => LLM_Menu_PromptAddModel()',
 		'TailRows.Push(Row)', 'return TailRows'] {
 		Assert(InStr(Tail, Needle) > 0, "the Add mutation must alter its real native owner")
 		AssertFalse(_LMNM_AddRoute(StrReplace(Tail, Needle, "WithdrawnAddRoute")))
 	}
-	for Needle in ['if !MenuRenderer_AppendGroup(_LLM_Menu_Handle, "llm_menu", "llm_live_mode",',
-		'Map("llm_live_mode", LLM_Menu_BuildLiveModeMenu)', 'case "llm_live_mode":'] {
-		Assert(InStr(Emit, Needle) > 0, "the live mutation must alter its real native owner")
-		AssertFalse(_LMNM_LiveRoute(StrReplace(Emit, Needle, "WithdrawnLiveRoute")))
+	for Needle in ['if !MenuRenderer_AppendGroup(_LLM_Menu_Handle, "llm_menu", "llm_generation_settings",',
+		'Map("llm_generation_settings", LLM_Menu_BuildGenerationMenu)', 'case "llm_generation_settings":'] {
+		Assert(InStr(Emit, Needle) > 0, "the generation mutation must alter its real native owner")
+		AssertFalse(_LMNM_GenerationRoute(StrReplace(Emit, Needle, "WithdrawnGenerationRoute")))
 	}
 	for Prefix in ["; ", '"'] {
 		AssertFalse(_LMNM_AddRoute(StrReplace(Tail, 'AddRows := MenuRenderer_TemplateRows', Prefix . 'AddRows := MenuRenderer_TemplateRows')))
-		AssertFalse(_LMNM_LiveRoute(StrReplace(Emit, 'if !MenuRenderer_AppendGroup', Prefix . 'if !MenuRenderer_AppendGroup')))
+		AssertFalse(_LMNM_GenerationRoute(StrReplace(Emit, 'if !MenuRenderer_AppendGroup', Prefix . 'if !MenuRenderer_AppendGroup')))
 	}
 	AssertTrue(_LMNM_AddRoute(Tail), "exact native Add repair restores source credit")
-	AssertTrue(_LMNM_LiveRoute(Emit), "exact native live-group repair restores source credit")
+	AssertTrue(_LMNM_GenerationRoute(Emit), "exact native generation-group repair restores source credit")
 }
-Test("menu_llm: named Add/live bindings are executable consumed routes, not source data", _LMNM_NativeBindingRouteControls)
+Test("menu_llm: named Add/generation bindings are executable consumed routes, not source data", _LMNM_NativeBindingRouteControls)

@@ -32,6 +32,7 @@ local pasteboard    = hs.pasteboard
 local notifications = require("infra.notifications")
 local EventProvenance = require("adapters.event_provenance")
 local KeyState      = require("adapters.key_state")
+local KeyboardGeometry = require("adapters.keyboard_geometry")
 local Logger        = require("infra.logger")
 local text_utils = require("infra.text_utils")
 local Timings       = require("infra.timings")
@@ -834,14 +835,15 @@ end
 --- This projection reads its existing owner, admission and assignment callback.
 --- @param keycode integer Native key identity.
 --- @param flags table|nil Native modifiers of the press.
+--- @param keyboard_type integer|nil Originating keyboard model.
 --- @return boolean|nil claimed Nil when the assignment callback could not be read.
-function M.has_tap_key_claim(keycode, flags)
+function M.has_tap_key_claim(keycode, flags, keyboard_type)
 	flags = flags or {}
 	if flags.cmd or flags.alt or flags.ctrl or flags.shift or flags.fn then return false end
 	for owner, claim in pairs(_tap_key_claims) do
 		if owner.delivering == true and owner.released ~= true
 			and raw_binding_admitted(claim.admission) then
-			local called, action = pcall(claim.decide, keycode)
+			local called, action = pcall(claim.decide, keycode, keyboard_type)
 			if not called then
 				Logger.error(LOG, "Tap assignment projection was refused: %s.", tostring(action))
 				return nil
@@ -860,7 +862,7 @@ end
 --- key, or unassigned). An auto-repeat of an assigned key is consumed and runs
 --- nothing, so holding the key cannot fire the action thirty times a second.
 --- @param admission_guard function|nil The owning layer's delivery admission.
---- @param decide function keycode -> function|nil: what a plain tap runs.
+--- @param decide function (keycode, keyboard_type) -> function|nil: what a plain tap runs.
 ---   Asked inside the callback, so it may only consult memory.
 --- @return table Fake-hotkey object with :delete().
 function M.bind_tap_keys(admission_guard, decide)
@@ -880,7 +882,7 @@ function M.bind_tap_keys(admission_guard, decide)
 			or flags.cmd or flags.alt or flags.ctrl or flags.shift or flags.fn then
 			return finish_tap(false, fence_events)
 		end
-		local run = decide(keycode)
+		local run = decide(keycode, KeyboardGeometry.event_type(e))
 		if type(run) ~= "function" then return finish_tap(false, fence_events) end
 
 		local ok_repeat, repeat_flag = pcall(function()

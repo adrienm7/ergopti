@@ -1,70 +1,63 @@
 --- tests/meta/test_vscode_bridge_lifecycle_wired.lua
 
 --- ==============================================================================
---- MODULE: Regression — vscode_bridge.setup() and stop_server() wired in boot (M-10)
+--- MODULE: Retired VS Code Bridge Ownership
 --- DESCRIPTION:
---- Before M-10, infra/vscode_bridge.lua was required by the tooltip renderer but
---- M.setup() (the only path that installs the extension and starts the HTTP server
---- on :7878) had no caller in the macOS boot tree. The bridge was effectively dead
---- in production: get_caret() always returned nil because start_server() never ran.
----
---- Fix: init.lua calls require("infra.vscode_bridge").setup() after menu.start(), and
---- the shutdownCallback calls stop_server().
----
---- Tests (source scan — no hs environment needed):
----   1. init.lua calls vscode_bridge.setup() (setup is wired into boot).
----   2. init.lua's shutdownCallback calls stop_server() (teardown is wired).
+--- Retirement removes activation and keeps cleanup of already loaded owners.
+--- The tooltip continues to use its existing standard caret and window locator.
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
+local Fixture = require("tests.support.tooltip_renderer_fixture")
 
--- Takes a selector unique to one production file rather than that file's
--- path, so moving or splitting a module cannot turn these invariants into
--- path errors.
-local function read_src(selector)
-	local src = helpers.read_driver_source(selector)
-	return src
-end
-
-
-
-
-
--- ======================================================================
--- ======================================================================
--- ======= 1/ init.lua wires vscode_bridge.setup() on boot (M-10) =======
--- ======================================================================
--- ======================================================================
-
-helpers.describe("M-10: vscode_bridge lifecycle wired in init.lua", function()
-
-	helpers.it("init.lua calls vscode_bridge.setup() after menu.start()", function()
-		local src = read_src("local function has_common_hotstring_groups") -- init.lua
-
-		helpers.assert_true(src:find("vscode_bridge", 1, true) ~= nil,
-			"init.lua must reference vscode_bridge to wire the bridge on boot (M-10)")
-
-		helpers.assert_true(src:find("%.setup()", 1, true) ~= nil or
-			src:find(".setup()", 1, true) ~= nil,
-			"init.lua must call .setup() on the bridge so the HTTP server starts")
-
-		-- setup() must appear AFTER menu.start (tooltip subsystem must be up first).
-		--
-		-- Anchored on the SETUP CALL, not on the first mention of the module. The
-		-- shutdown callback also requires vscode_bridge — for stop_server — and it
-		-- is armed early in boot, so the first mention is the teardown's and says
-		-- nothing about when the server starts.
-		local menu_pos  = src:find("menu.start(", 1, true)
-		local setup_pos = src:find('require("infra.vscode_bridge").setup()', 1, true)
-		helpers.assert_true(menu_pos ~= nil, "init.lua must call menu.start()")
-		helpers.assert_true(setup_pos ~= nil, "init.lua must call vscode_bridge.setup()")
-		helpers.assert_true(setup_pos > menu_pos,
-			"vscode_bridge.setup() must be called after menu.start() in init.lua")
+helpers.describe("retired VS Code bridge", function()
+	helpers.it("never activates a retired bridge but preserves loaded-owner shutdown", function()
+		local source = helpers.read_driver_source("local function has_common_hotstring_groups")
+		helpers.assert_type(source, "string")
+		helpers.assert_true(#source > 0, "the real startup source must be present")
+		helpers.assert_nil(source:find('require("infra.vscode_bridge").setup()', 1, true))
+		local owner = source:match('name = "vscode%-bridge"([%s%S]-)name = "llm%-helper%-processes"')
+		helpers.assert_type(owner, "string")
+		helpers.assert_true(owner:find('package.loaded["infra.vscode_bridge"]', 1, true) ~= nil)
+		helpers.assert_true(owner:find("return module.stop_server()", 1, true) ~= nil)
+		helpers.assert_true(owner:find("module == nil then return true", 1, true) ~= nil)
 	end)
+end)
 
-	helpers.it("init.lua shutdownCallback calls stop_server()", function()
-		local src = read_src("local function has_common_hotstring_groups") -- init.lua
-		helpers.assert_true(src:find("stop_server", 1, true) ~= nil,
-			"init.lua shutdownCallback must call stop_server() to clean up the bridge HTTP server (M-10)")
+Fixture.it("tooltip uses the standard caret locator without the retired bridge", function()
+	helpers.with_stub_scope({ "hs.axuielement" }, function()
+		local legacy_calls = 0
+		package.loaded["infra.vscode_bridge"] = {
+			is_vscode = function() legacy_calls = legacy_calls + 1; return true end,
+			estimate_position = function() return { x = 999, y = 999, h = 20, type = "retired" } end,
+		}
+		local renderer = Fixture.load()
+		local selected = { location = 4, length = 3 }
+		local element = {
+			attributeValue = function(_, name)
+				if name == "AXSelectedTextRange" then return selected end
+			end,
+			parameterizedAttributeValue = function(_, name, range)
+				helpers.assert_eq(name, "AXBoundsForRange")
+				helpers.assert_eq(range.location, 4)
+				helpers.assert_eq(range.length, 0)
+				return { x = 120, y = 140, h = 20 }
+			end,
+		}
+		package.loaded["hs.axuielement"] = { systemWideElement = function()
+			return { attributeValue = function() return element end }
+		end }
+		local position = renderer.resolve_anchor()
+		helpers.assert_eq(position.x, 120)
+		helpers.assert_eq(position.y, 140)
+		helpers.assert_eq(position.type, "caret")
+		helpers.assert_eq(legacy_calls, 0, "a cached retired owner cannot replace the standard locator")
+		package.loaded["hs.axuielement"] = { systemWideElement = function() error("controlled AX refusal") end }
+		hs.window.focusedWindow = function() return { frame = function() return { x = 10, y = 20, w = 80, h = 60 } end } end
+		position = renderer.resolve_anchor()
+		helpers.assert_eq(position.type, "window")
+		helpers.assert_eq(position.x, 50)
+		hs.window.focusedWindow = function() return nil end
+		helpers.assert_nil(renderer.resolve_anchor(), "unavailable standard geometry remains refused")
 	end)
 end)

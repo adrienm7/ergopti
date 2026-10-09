@@ -47,6 +47,8 @@ _LPA_ReplayCorpus() {
 		if Valid {
 			AssertTrue(Parsed is Map, Vector["id"] . ": a valid value parses")
 			AssertEqual(Vector["profile_id"], Parsed["profile_id"], Vector["id"] . ": profile_id")
+			AssertEqual(Vector.Get("translation_target", ""), Parsed.Get("translation_target", ""),
+				Vector["id"] . ": target receipt")
 			if Vector.Has("num_predictions")
 				AssertEqual(Vector["num_predictions"], Parsed.Get("num_predictions", 0),
 					Vector["id"] . ": num_predictions")
@@ -54,7 +56,7 @@ _LPA_ReplayCorpus() {
 				AssertFalse(Parsed.Has("num_predictions"),
 					Vector["id"] . ": no count of its own means the AI menu's count")
 			AssertEqual(Vector["value"], LLM_PromptAction_Format(Parsed["profile_id"],
-				Parsed.Get("num_predictions", 0)), Vector["id"] . ": format round-trips")
+				Parsed.Get("num_predictions", 0), Parsed.Get("translation_target", "")), Vector["id"] . ": format round-trips")
 		} else {
 			AssertFalse(Parsed is Map, Vector["id"] . ": an invalid value is refused")
 			AssertTrue(Reason != "", Vector["id"] . ": a refusal names its reason")

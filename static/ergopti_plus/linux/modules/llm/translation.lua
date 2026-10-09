@@ -50,12 +50,14 @@ local _data = nil
 function M.parse(config_text, names_text, order_text)
 	local config = type(config_text) == "string" and Json.decode(config_text) or nil
 	if type(config) ~= "table" then return nil, "translate.json is missing or not JSON" end
-	for _, key in ipairs({ "ui_value", "tag", "user_prefix", "prompt" }) do
+	for _, key in ipairs({ "ui_value", "tag", "user_prefix", "prompt", "prediction_prompt" }) do
 		if type(config[key]) ~= "string" or config[key] == "" then return nil, "translate.json has no " .. key end
 	end
 	if type(config.max_tokens) ~= "number" or config.max_tokens < 1 or config.max_tokens % 1 ~= 0 then
 		return nil, "translate.json max_tokens is not a positive integer"
 	end
+	if type(config.max_language_bytes) ~= "number" or config.max_language_bytes < 1
+		or config.max_language_bytes % 1 ~= 0 then return nil, "translate.json has no language byte limit" end
 	local names = type(names_text) == "string" and Json.decode(names_text) or nil
 	if type(names) ~= "table" or type(names.locales) ~= "table" then
 		return nil, "locale_names.json is missing or has no locales"

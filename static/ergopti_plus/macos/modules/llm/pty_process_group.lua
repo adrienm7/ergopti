@@ -55,6 +55,16 @@ pending_signals = []
 def group_is_alive():
     try: os.killpg(proc.pid, 0)
     except ProcessLookupError: return False
+    except PermissionError:
+        # Darwin can report EPERM for a group containing only the unreaped
+        # zombie leader. Reap that exact child, then require a fresh ESRCH.
+        # After KILL, orphan zombies may await their own parent's reaping;
+        # unconfirmed retirement consumes only the existing drain budget.
+        if proc.poll() is None: raise
+        try: os.killpg(proc.pid, 0)
+        except ProcessLookupError: return False
+        except PermissionError:
+            if not kill_sent: raise
     return True
 
 def escalate_if_due(now):
@@ -79,7 +89,7 @@ while True:
         break
     if kill_sent and kill_deadline is not None and now >= kill_deadline:
         drain_timed_out = True
-        sys.stderr.write("PTY process group remained live after SIGKILL drain deadline.\n")
+        sys.stderr.write("PTY process group retirement was unconfirmed after SIGKILL drain deadline.\n")
         sys.stderr.flush()
         break
 
