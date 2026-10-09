@@ -5926,6 +5926,16 @@ Current public cases retain the exact unavailable reason and expose no child
 or command; throwing scopes restore the original declaration and module owners.
 These focused receipts do not qualify the full suite or installed devices.
 
+The Linux profile-menu fixtures now supply the genuine current idle live-mode
+read and stop owners within their existing preference scopes. Every original
+assertion, native nil/true callback receipt, pause policy and independent corpus
+is retained. Complete profile-settings and canonical-profile modules pass 24/0
+and 138/0 respectively on LuaJIT and Lua 5.4, with zero skips. Added native-owner
+controls cover idle stop omission and missing-owner refusal; fixture scopes
+restore exact module identities. These focused results do not replace the
+complete selected gate, three-driver CI or installed-device qualification.
+Items 54 and 81 remain partial.
+
 - [ ] **62.** Downloads on managed company networks: system trust and
       system proxy for every download child (Ollama installation/server/pull,
       updater/rollback and remote AI), with translated certificate/proxy/blocked/
@@ -7801,6 +7811,16 @@ and 100 Agent-settings cases on each Lua runtime, with zero failures or skips.
 Current public cases retain the exact unavailable reason and expose no child
 or command; throwing scopes restore the original declaration and module owners.
 These focused receipts do not qualify the full suite or installed devices.
+
+The Linux profile-menu fixtures now supply the genuine current idle live-mode
+read and stop owners within their existing preference scopes. Every original
+assertion, native nil/true callback receipt, pause policy and independent corpus
+is retained. Complete profile-settings and canonical-profile modules pass 24/0
+and 138/0 respectively on LuaJIT and Lua 5.4, with zero skips. Added native-owner
+controls cover idle stop omission and missing-owner refusal; fixture scopes
+restore exact module identities. These focused results do not replace the
+complete selected gate, three-driver CI or installed-device qualification.
+Items 54 and 81 remain partial.
 
 - [~] **88.** **Partial: native prediction tooltip appearance.** Shared
   llm-line-style policy and the unchanged independent line corpus retain grey
