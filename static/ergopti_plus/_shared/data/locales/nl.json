@@ -1483,6 +1483,7 @@
 	"menu.llm.trigger_menu_title": "KI-activering",
 	"menu.llm.live_mode_title": "⚡ Live-modus",
 	"menu.agent.title": "🤖 AI-agent",
+	"menu.agent.not_ready": "Nog niet klaar",
 	"menu.agent.system1": "⚡ Systeem 1 (snel): {1}",
 	"menu.agent.system2": "🧠 Systeem 2 (grondig): {1}",
 	"menu.agent.off": "Uit",

@@ -1483,6 +1483,7 @@
 	"menu.llm.trigger_menu_title": "YZ Tetikleme",
 	"menu.llm.live_mode_title": "⚡ Canlı mod",
 	"menu.agent.title": "🤖 Yapay zekâ ajanı",
+	"menu.agent.not_ready": "Henüz hazır değil",
 	"menu.agent.system1": "⚡ Sistem 1 (hızlı): {1}",
 	"menu.agent.system2": "🧠 Sistem 2 (düşünceli): {1}",
 	"menu.agent.off": "Kapalı",

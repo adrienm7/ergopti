@@ -1483,6 +1483,7 @@
 	"menu.llm.trigger_menu_title": "Acionamento de IA",
 	"menu.llm.live_mode_title": "⚡ Modo em direto",
 	"menu.agent.title": "🤖 Agente de IA",
+	"menu.agent.not_ready": "Ainda não está pronto",
 	"menu.agent.system1": "⚡ Sistema 1 (rápido): {1}",
 	"menu.agent.system2": "🧠 Sistema 2 (ponderado): {1}",
 	"menu.agent.off": "Desativado",

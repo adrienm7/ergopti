@@ -1483,6 +1483,7 @@
 	"menu.llm.trigger_menu_title": "AIトリガー",
 	"menu.llm.live_mode_title": "⚡ ライブモード",
 	"menu.agent.title": "🤖 AI エージェント",
+	"menu.agent.not_ready": "まだ準備ができていません",
 	"menu.agent.system1": "⚡ システム1（高速）：{1}",
 	"menu.agent.system2": "🧠 システム2（熟考）：{1}",
 	"menu.agent.off": "オフ",

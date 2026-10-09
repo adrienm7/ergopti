@@ -1483,6 +1483,7 @@
 	"menu.llm.trigger_menu_title": "AI-utlösare",
 	"menu.llm.live_mode_title": "⚡ Liveläge",
 	"menu.agent.title": "🤖 AI-agent",
+	"menu.agent.not_ready": "Inte redo ännu",
 	"menu.agent.system1": "⚡ System 1 (snabbt): {1}",
 	"menu.agent.system2": "🧠 System 2 (eftertänksamt): {1}",
 	"menu.agent.off": "Av",

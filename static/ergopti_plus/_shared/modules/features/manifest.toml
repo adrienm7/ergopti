@@ -3839,6 +3839,9 @@ greyed_when_paused = true
 [[menu.top_level]]
 id = "agent"
 greyed_when_paused = true
+disabled = true
+i18n = "menu.agent.title"
+reason_key = "menu.agent.not_ready"
 
 [[menu.top_level]]
 id = "---"

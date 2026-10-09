@@ -1483,6 +1483,7 @@
 	"menu.llm.trigger_menu_title": "AI 트리거",
 	"menu.llm.live_mode_title": "⚡ 실시간 모드",
 	"menu.agent.title": "🤖 AI 에이전트",
+	"menu.agent.not_ready": "아직 준비되지 않았습니다",
 	"menu.agent.system1": "⚡ 시스템 1 (빠름): {1}",
 	"menu.agent.system2": "🧠 시스템 2 (신중함): {1}",
 	"menu.agent.off": "꺼짐",

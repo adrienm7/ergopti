@@ -1483,6 +1483,7 @@
 	"menu.llm.trigger_menu_title": "AI-udløsning",
 	"menu.llm.live_mode_title": "⚡ Live-tilstand",
 	"menu.agent.title": "🤖 AI-agent",
+	"menu.agent.not_ready": "Ikke klar endnu",
 	"menu.agent.system1": "⚡ System 1 (hurtigt): {1}",
 	"menu.agent.system2": "🧠 System 2 (grundigt): {1}",
 	"menu.agent.off": "Slået fra",

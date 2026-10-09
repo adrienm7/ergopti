@@ -1495,6 +1495,7 @@
 	"menu.llm.trigger_menu_title": "Déclenchement de l’IA",
 	"menu.llm.live_mode_title": "⚡ Mode direct",
 	"menu.agent.title": "🤖 Agent IA",
+	"menu.agent.not_ready": "Pas encore prêt",
 	"menu.agent.system1": "⚡ Système 1 (rapide) : {1}",
 	"menu.agent.system2": "🧠 Système 2 (réfléchi) : {1}",
 	"menu.agent.off": "Désactivé",

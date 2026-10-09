@@ -113,3 +113,11 @@ helpers.describe("the tray root follows the manifest (Linux)", function()
 			"built outside the manifest's order; everything else is dispatched from the declared ids")
 	end)
 end)
+
+helpers.describe("Agent-only disabled Linux root composition", function()
+	helpers.it("does not build Agent actions and preserves neighboring provider model and prediction rows", function()
+		local renderer = helpers.load_module("infra.manifest_menu")
+		require("test.agent_menu_root").assert_disabled_root(helpers, "linux", builder_source(),
+			renderer.get_array("top_level"))
+	end)
+end)

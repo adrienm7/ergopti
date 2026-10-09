@@ -1495,6 +1495,7 @@
 	"menu.llm.trigger_menu_title": "AI Triggering",
 	"menu.llm.live_mode_title": "⚡ Live mode",
 	"menu.agent.title": "🤖 AI agent",
+	"menu.agent.not_ready": "Not ready yet",
 	"menu.agent.system1": "⚡ System 1 (fast): {1}",
 	"menu.agent.system2": "🧠 System 2 (thorough): {1}",
 	"menu.agent.off": "Off",

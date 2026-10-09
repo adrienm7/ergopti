@@ -1483,6 +1483,7 @@
 	"menu.llm.trigger_menu_title": "AI ट्रिगर करना",
 	"menu.llm.live_mode_title": "⚡ लाइव मोड",
 	"menu.agent.title": "🤖 AI एजेंट",
+	"menu.agent.not_ready": "अभी तैयार नहीं है",
 	"menu.agent.system1": "⚡ सिस्टम 1 (तेज़): {1}",
 	"menu.agent.system2": "🧠 सिस्टम 2 (विचारशील): {1}",
 	"menu.agent.off": "बंद",
