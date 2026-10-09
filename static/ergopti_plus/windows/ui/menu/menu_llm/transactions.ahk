@@ -146,7 +146,7 @@ _LLM_Menu_PublishCandidate(CandidateFeatures, CandidateMenu) {
  * Applies a durable manual profile choice without a temporary prompt override.
  * @returns {Boolean} True after the existing runtime application commits.
  */
-_LLM_Menu_ApplyProfileCommitted(*) {
+_LLM_Menu_ApplyManualProfileCommitted(*) {
 	LLM_Engine_LiveStop("the active profile was selected")
 	if LLM_Engine_LiveIsActive()
 		return false

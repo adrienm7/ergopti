@@ -924,17 +924,23 @@ Test("LLM live mode: shared Off label edits preserve actual native prompt unique
 
 ; A durable menu profile choice retires its temporary shortcut override.
 _LLV_ManualProfileRetiresOverride() {
-	_LLV_Run(LLV_SENTENCE, (Calls, Lines, Builds) => _Check())
+	global _LLM_Menu
+	; The post-commit owner projects the complete menu, unlike prediction-only cases.
+	Menu := LLM_Menu_DeepClone(_LLM_Menu)
+	for Key, Value in _LPP_Menu()
+		Menu[Key] := Value
+	Menu["app_profile_overrides"] := Map()
+	_LLV_Run(LLV_SENTENCE, (Calls, Lines, Builds) => _Check(), Menu)
 	_Check() {
 		global _LLM_Menu, _LLM_Engine
 		LLM_Engine_LiveStart("translate_ja", 0)
 		AssertTrue(LLM_Engine_LiveIsActive(), "precondition: the shortcut override is active")
 		_LLM_Menu["profile_id"] := "advanced"
-		AssertTrue(_LLM_Menu_ApplyProfileCommitted(), "the actual post-commit owner applies the chosen profile")
+		AssertTrue(_LLM_Menu_ApplyManualProfileCommitted(), "the actual post-commit owner applies the chosen profile")
 		AssertFalse(LLM_Engine_LiveIsActive(), "manual selection cannot retain the temporary override")
 		AssertEqual("advanced", _LLM_Engine["profile_id"], "the chosen normal profile reaches the real engine")
 		Setter := _DriverFuncBody("LLM_Menu_SetProfile")
-		AssertContains(Setter, "_LLM_Menu_ApplyProfileCommitted", "the genuine manual transaction consumes this owner")
+		AssertContains(Setter, "_LLM_Menu_ApplyManualProfileCommitted", "the genuine manual transaction consumes this owner")
 	}
 }
 Test("LLM live mode: manual profile publication retires the temporary shortcut override", _LLV_ManualProfileRetiresOverride)
