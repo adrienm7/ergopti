@@ -186,6 +186,7 @@ function M.plan_chord_copy(source, options)
 	assert(type(source) == "string" and type(options) == "table" and type(options.entries) == "table",
 		"exact source and declared copy catalogue required")
 	assert(type(options.is_action) == "function", "native action admission required")
+	assert(options.tap_section == nil or options.tap_section == M.TAP_SECTION, "copy source section must be explicitly declared")
 	local Codec = require("toml_codec")
 	local KeyPath = require("toml_codec.key_path")
 	local document, shapes = Codec.decode_with_shapes(source)
@@ -197,6 +198,8 @@ function M.plan_chord_copy(source, options)
 	end
 	local combos = namespace(document, "mod_combos")
 	local stored = namespace(combos, "config")
+	local linux_taps = options.tap_section == M.TAP_SECTION
+		and namespace(namespace(document, "shortcuts"), "key_combination_taps") or nil
 	local declared = M.chord_settings(options.settings)
 	local delay = combos.simultaneous_threshold_ms
 	if delay == nil then delay = declared.simultaneous_threshold_ms end
@@ -212,6 +215,10 @@ function M.plan_chord_copy(source, options)
 		local slots = {}
 		for _, slot in ipairs({ "tap", "hold", "combo" }) do
 			local value = config[slot]
+			if linux_taps then
+				if slot == "tap" then value = linux_taps[entry.id]
+				elseif slot == "hold" then value = M.NONE end
+			end
 			if value == nil then value = M.NONE end
 			assert(id(value) and (value == M.NONE or options.is_action(value) == true), "chord source contains an unadmitted action")
 			slots[slot] = value

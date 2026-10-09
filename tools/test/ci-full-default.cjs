@@ -42,6 +42,7 @@ const CONDITIONS = [
 ];
 // [file, job, exact step name (null means job), raw condition, full condition].
 const WRAPPERS = [
+	[MAC, 'item36-native', 'Observe the actual no-prompt SDK permission API independently', 7, 8],
 	[ENTRY_REL, 'core', null, 0, 1],
 	[ENTRY_REL, 'release', null, 2, 3],
 	[MAC, 'managed-ollama-native', 'Prepare locked native HTTP receiving clients', 4, 1],
