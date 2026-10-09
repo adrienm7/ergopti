@@ -4,9 +4,11 @@
  * Read the mandatory full CI graph without rewriting any source predicate.
  * The temporary all-suite fast route is retired. Its reintroduction refuses;
  * the independent bounded qualification scopes remain owned by their policy.
- * Other contract guards receive the exact raw scripts and unknown step conditions.
+ * Known scoped wrappers are admitted before inspecting their retained full commands.
+ * All workflow predicates and unrelated scripts remain unchanged.
  */
 const raw = require('./ci-pipeline.cjs');
+const { projectScopedSteps } = require('./fixtures/ci-scoped-full-branches.cjs');
 const ROOT = raw.ROOT;
 const ENTRY_REL = raw.ENTRY_REL;
 const JOBS = [
@@ -388,7 +390,10 @@ function validateRaw(files) {
 }
 function fromFiles(files) {
 	validateRaw(files);
-	const projected = files.map((entry) => ({ ...entry }));
+	const projected = files.map((entry) => ({
+		...entry,
+		text: projectScopedSteps(entry.text, entry.rel)
+	}));
 	const file = (rel) => {
 		const found = projected.find((f) => f.rel === rel);
 		if (!found) refuse(`unknown file ${rel}`);
@@ -416,6 +421,7 @@ function fromFiles(files) {
 	return {
 		...raw,
 		files: () => projected.map((f) => ({ ...f })),
+		rawFiles: () => files.map((f) => ({ ...f })),
 		file,
 		text,
 		jobs,

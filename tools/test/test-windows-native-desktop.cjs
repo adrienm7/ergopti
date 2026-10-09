@@ -7,7 +7,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const { spawnSync } = require('node:child_process');
-const pipeline = require('./ci-pipeline.cjs');
+const pipeline = require('./ci-full-default.cjs');
 const { stripComments } = require('../lib/script-source.cjs');
 
 const root = path.resolve(__dirname, '../..');
@@ -69,7 +69,10 @@ function checkWorkflow(body) {
 	assert.equal(pipeline.stepField(upload, 'uses'), 'actions/upload-artifact@v4');
 	assert.equal(pipeline.stepField(upload, 'continue-on-error'), null);
 	assert.match(upload, /name: windows-ahk-native-desktop\n/);
-	assert.match(upload, /path: \$\{\{ runner\.temp \}\}\/windows-ahk-native-desktop\/\n/);
+	assert.match(
+		upload,
+		/path: \|\n            \$\{\{ runner\.temp \}\}\/windows-ahk-native-desktop\/\n            \$\{\{ runner\.temp \}\}\/stable-windows-native-desktop\.json\n/
+	);
 	assert.match(upload, /if-no-files-found: error/);
 	assert.match(upload, /overwrite: true/);
 }
@@ -128,7 +131,7 @@ for (const [before, after] of [
 		'name: Publish native desktop AHK evidence\n        if: always()',
 		'name: Publish native desktop AHK evidence\n        if: success()'
 	],
-	['path: ${{ runner.temp }}/windows-ahk-native-desktop/', 'path: unrelated/'],
+	['            ${{ runner.temp }}/windows-ahk-native-desktop/', '            unrelated/'],
 	['if-no-files-found: error', 'if-no-files-found: warn']
 ]) {
 	// Bind every mutation to its own step; earlier diagnostics share upload fields.

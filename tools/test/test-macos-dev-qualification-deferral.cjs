@@ -143,7 +143,11 @@ function admitNativePacSelector(mac) {
 			/^      - name: Qualify actual native PAC and WPAD XCTest controls\n[\s\S]*?(?=^      - |(?![\s\S]))/gm
 		)
 	];
-	if (steps.length !== 1 || steps[0][0] !== PAC_STEP_SOURCE || job.split(PAC_FILTER).length !== 2)
+	if (
+		steps.length !== 1 ||
+		steps[0][0].replace(/\n+$/, '\n') !== PAC_STEP_SOURCE ||
+		job.split(PAC_FILTER).length !== 2
+	)
 		return null;
 	const before = job.indexOf(`      - name: ${SDK_STEP_NAME}\n`);
 	const after = job.indexOf(
