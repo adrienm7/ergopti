@@ -8434,6 +8434,14 @@ and installation qualification are still required.
   LuaJIT replay remains blocked by existing upstream key_state bitwise syntax;
   actual macOS execution and final composed-source qualification remain open.
 
+  The gesture action fixture now owns and restores the real transitive
+  llm.translate module, including absent, false and existing cache identities
+  after success, callback failure and construction failure. All original
+  identity and no-residue assertions remain. Authentic Lua 5.4 changes
+  2 passed / 9 failed to 11 passed / 0 failed; omitting only the new owner
+  registration reproduces the nine failures. This is controlled fixture
+  isolation, not native macOS execution or automation invocation.
+
   Remaining software: inventory supported automation/application providers and
   implement their real availability/invocation contracts. Add bounded Apple
   Shortcuts catalogue ownership, chosen-ID revalidation, safe native invocation,
