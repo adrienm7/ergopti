@@ -290,14 +290,24 @@ _TLTSH_EveryDirectAcceptCallIsCanonical() {
 	AssertEqual(2, _TLTSH_Count(DriverSrc, "LLM_Tooltip_TryAcceptAutomation("),
 		"LLM_Tooltip_TryAcceptAutomation must have one definition plus the single message-driven caller")
 	Assert(InStr(_DriverFuncBody("_LLM_Automation_Accept"),
-		"LLM_Tooltip_TryAcceptAutomation()") > 0,
+		"LLM_Tooltip_TryAcceptAutomation(InputSnapshot?, AcceptFn?, State.Presented, State.Generation)") > 0,
 		"the automation request must insert through the canonical automation primitive")
 	for HandlerName in ["_LLM_Automation_OnAcceptMessage", "_LLM_Automation_Accept"] {
 		Assert(InStr(_DriverFuncBody(HandlerName), "A_IsSuspended || !_LLM_Bridge_Active") > 0,
 			HandlerName . " must ignore requests while suspended or while the bridge is inactive")
 	}
-	AssertEqual(4, _TLTSH_Count(DriverSrc, "_LLM_Automation_Listen("),
-		"the automation listener must have one definition plus the two bridge activations and the stop")
+	AssertEqual(3, _TLTSH_Count(DriverSrc, "_LLM_Automation_Listen("),
+		"the automation listener must have one definition plus its guarded starter and the stop")
+	AssertEqual(3, _TLTSH_Count(DriverSrc, "_LLM_Automation_StartListener("),
+		"both bridge activation paths must use the single guarded listener starter")
+	QueuedBody := _DriverFuncBody("_LLM_Automation_Queue")
+	Assert(QueuedBody != "" && InStr(QueuedBody, "_LLM_Automation_Accept.Bind(State)"),
+		"the deferred callback must retain its admitted render owner")
+	StopBody := _DriverFuncBody("LLM_Bridge_Stop")
+	FenceAt := InStr(StopBody, "_LLM_Bridge_Active := false")
+	RetireAt := InStr(StopBody, "_LLM_Automation_Listen(false)")
+	Assert(StopBody != "" && FenceAt > 0 && RetireAt > FenceAt,
+		"stop must fence acceptance before attempting listener retirement")
 	; Second canonical primitive (llm-val-chord-inserts): defined once and driven
 	; only by the release wait armed from the native jump-receipt drain.
 	AssertEqual(2, _TLTSH_Count(DriverSrc, "LLM_Tooltip_TryAcceptSlot("),
