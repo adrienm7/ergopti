@@ -59,11 +59,94 @@ function Write-ErgoptiStagingDiagnostic {
     }
 }
 
+function Get-ErgoptiStagingRouteKind {
+    param($Value)
+    if ($null -eq $Value) { return 'absent' }
+    if ($Value -is [bool]) { return 'bool' }
+    if ($Value -is [int]) { return 'int32' }
+    if ($Value -is [long]) { return 'int64' }
+    if ($Value -is [array]) { return 'array' }
+    if ($Value -is [hashtable]) { return 'hashtable' }
+    if ($Value -is [string]) { return 'string' }
+    return 'other'
+}
+
+function Get-ErgoptiStagingRouteShape {
+    param($Selection)
+    # Do not enumerate or read property getters on unexpected resolver output.
+    # Only the real canonical Hashtable has fields inspected; no field value
+    # containing a URL, native input or exception text enters this receipt.
+    $Fact = @{ schema_version = 1; selection_kind = (Get-ErgoptiStagingRouteKind $Selection);
+        selection_arity = 1; ok_kind = 'unobserved'; ok_value = 'unavailable';
+        routes_kind = 'unobserved'; routes_count = -1;
+        max_routes_kind = 'unobserved'; max_routes_value = -1;
+        max_redirects_kind = 'unobserved'; max_redirects_value = -1;
+        receipt_kind = 'unobserved'; receipt_count = -1;
+        receipt_backend_kind = 'unobserved'; receipt_stage_kind = 'unobserved' }
+    if ($null -eq $Selection) { $Fact.selection_arity = 0 }
+    elseif ($Selection -is [array]) {
+        $Fact.selection_arity = if ($Selection.Length -le 4096) { $Selection.Length } else { -1 }
+    }
+    if ($Selection -isnot [hashtable]) { return $Fact }
+    $Fact.ok_kind = Get-ErgoptiStagingRouteKind $Selection['Ok']
+    if ($Selection['Ok'] -is [bool]) {
+        $Fact.ok_value = if ($Selection['Ok']) { 'true' } else { 'false' }
+    }
+    $Fact.routes_kind = Get-ErgoptiStagingRouteKind $Selection['Routes']
+    if ($Selection['Routes'] -is [array] -and $Selection['Routes'].Length -le 4096) {
+        $Fact.routes_count = $Selection['Routes'].Length
+    }
+    foreach ($Pair in @(@('MaxRoutes', 'max_routes'), @('MaxRedirects', 'max_redirects'))) {
+        $Value = $Selection[$Pair[0]]
+        $Fact[$Pair[1] + '_kind'] = Get-ErgoptiStagingRouteKind $Value
+        if (($Value -is [int] -or $Value -is [long]) -and $Value -ge -1 -and $Value -le [int]::MaxValue) {
+            $Fact[$Pair[1] + '_value'] = [long]$Value
+        }
+    }
+    $Receipt = $Selection['Receipt']
+    $Fact.receipt_kind = Get-ErgoptiStagingRouteKind $Receipt
+    if ($Receipt -is [hashtable] -and $Receipt.Count -le 64) {
+        $Fact.receipt_count = $Receipt.Count
+        $Fact.receipt_backend_kind = Get-ErgoptiStagingRouteKind $Receipt['backend']
+        $Fact.receipt_stage_kind = Get-ErgoptiStagingRouteKind $Receipt['stage']
+    }
+    return $Fact
+}
+
+function Write-ErgoptiStagingRouteShape {
+    param([string]$Path, [hashtable]$State)
+    $Stream = $null
+    try {
+        if ($Path -eq '' -or -not $State.ContainsKey('FixtureRouteShape')) { return }
+        $Bytes = [Text.UTF8Encoding]::new($false).GetBytes(($State.FixtureRouteShape | ConvertTo-Json -Depth 2 -Compress))
+        if ($Bytes.Length -gt 2048) { throw 'Route observation bound refused.' }
+        $Stream = [IO.File]::Open($Path, [IO.FileMode]::CreateNew, [IO.FileAccess]::Write, [IO.FileShare]::None)
+        $Stream.Write($Bytes, 0, $Bytes.Length)
+        $Stream.Flush($true)
+    } catch {
+        # This private optional observation never supplies routing authority.
+        $script:StagingRouteShapeHealth = 'unavailable'
+    } finally {
+        if ($null -ne $Stream) { try { $Stream.Dispose() } catch { $script:StagingRouteShapeHealth = 'unavailable' } }
+    }
+}
+
+function New-ErgoptiObservedDownloadFunction {
+    param([string]$Source)
+    $Before = '            $Selection = & $ResolveRoutes $Destination.AbsoluteUri $Remaining'
+    $After = $Before + "`n" + '            try { $State.FixtureRouteShape = Get-ErgoptiStagingRouteShape $Selection } catch { $script:StagingRouteShapeHealth = "unavailable" }'
+    if (($Source.Split([string[]]@($Before), [StringSplitOptions]::None)).Length -ne 2) {
+        throw 'Legacy route observation seam drifted.'
+    }
+    return [pscustomobject]@{ Source = $Source.Replace($Before, $After); Before = $Before; After = $After }
+}
+
 function New-ErgoptiObservedStagingScript {
     param([string]$Source, [string]$DiagnosticPath)
     # The unique fixture environment supplies the path; it never comes from user data.
     $Initialization = '$StagingDiagnosticExpected=$null;$StagingDiagnosticActual=$null;$StagingDiagnosticOperation="not_file_read"'
     $Seams = @(
+        @{ before = '  . $DownloadModulePath'; after = '  . $DownloadModulePath' + "`n" + '  $ObservedDownload=New-ErgoptiObservedDownloadFunction ((Get-Command Invoke-ErgoptiUpdaterDownload).Definition);${function:Invoke-ErgoptiUpdaterDownload}=[scriptblock]::Create($ObservedDownload.Source)' },
         @{ before = '$ErrorActionPreference = "Stop"'; after = ('$ErrorActionPreference = "Stop"' + "`n" + $Initialization) },
         @{ before = '  $State.Stage="file_read"'; after = '  $State.Stage="file_read";$StagingDiagnosticExpected=$ExpectedSize;$StagingDiagnosticOperation="metadata"' },
         @{ before = '  if ($ExpectedSize -gt 0'; after = '  $StagingDiagnosticActual=$ActualSize;$StagingDiagnosticOperation="content_length"' + "`n" + '  if ($ExpectedSize -gt 0' },
@@ -71,7 +154,7 @@ function New-ErgoptiObservedStagingScript {
         @{ before = '  if ($ExpectedSha256 -cnotmatch'; after = '  $StagingDiagnosticOperation="digest_format"' + "`n" + '  if ($ExpectedSha256 -cnotmatch' },
         @{ before = '  $ActualDigest='; after = '  $StagingDiagnosticOperation="digest_read"' + "`n" + '  $ActualDigest=' },
         @{ before = '  $null=Get-ErgoptiUpdaterRemainingMilliseconds $StartedTick $DeadlineMs $State' + "`n" + '  if ($ActualDigest'; after = '  $StagingDiagnosticOperation="budget"' + "`n" + '  $null=Get-ErgoptiUpdaterRemainingMilliseconds $StartedTick $DeadlineMs $State' + "`n" + '  $StagingDiagnosticOperation="digest_compare"' + "`n" + '  if ($ActualDigest' },
-        @{ before = '} catch {'; after = '} catch {' + "`n" + '  Write-ErgoptiStagingDiagnostic $env:ERGOPTI_FIXTURE_STAGING_DIAGNOSTIC $StagingDiagnosticOperation $StagingDiagnosticExpected $StagingDiagnosticActual $_.Exception $State.Stage' }
+        @{ before = '} catch {'; after = '} catch {' + "`n" + '  Write-ErgoptiStagingDiagnostic $env:ERGOPTI_FIXTURE_STAGING_DIAGNOSTIC $StagingDiagnosticOperation $StagingDiagnosticExpected $StagingDiagnosticActual $_.Exception $State.Stage' + "`n" + '  Write-ErgoptiStagingRouteShape $env:ERGOPTI_FIXTURE_STAGING_ROUTE_SHAPE $State'  }
     )
     foreach ($Seam in $Seams) {
         if (($Source.Split([string[]]@($Seam.before), [StringSplitOptions]::None)).Length -ne 2) { throw 'Staging observation seam drifted.' }

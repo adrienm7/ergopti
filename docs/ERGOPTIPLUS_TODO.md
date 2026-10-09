@@ -5789,6 +5789,28 @@ Portable source, include-graph and encoding checks pass; genuine AHK parsing,
 E2E and package/install receiving remain required. This structural correction
 does not qualify the outstanding capture namespace or network failures.
 
+Native Windows receiving checkpoint (2026-10-09): manual37867543036 at
+`e2edb24a4044b828ffb642528e428da8edaaf3e7` completes10,473 controls:
+10,460 pass and13 fail. Linux unit/E2E/package and17 installations pass;
+Windows E2E/package/install are skipped and Release is skipped. The legacy
+fixture now reaches the unchanged fifth raw-proxy assertion; staging refuses
+at proxy resolution before the file-denial or live-body controls. SSPI has
+real current-user identities but still fails physical closure. Three existing
+capture attacks fail before their attack at the initial directory move; no
+immediate errno was previously retained, so their cause remains unknown.
+
+Additive receiving now preserves the exact first SSPI operation and same-call
+signed status; closed legacy IPv6 formatting flags; pre-Require WinHTTP
+stage/family/status; and the actual resolver selection shape without pipeline
+output or routing authority. One new five-phase capture probe records immediate
+native move errno and held identity. Its exact strong owner survives refused
+restoration/closure; a successful restoration is acknowledged before later
+retirement debt and is not repeated on retry. All original assertions, clocks,
+refusals and eight capture-case bytes remain unchanged. Independent portable
+producer/ownership reviews pass; native receiving of these observations and
+the remaining causal fixes still require the next Windows dispatch. These are
+observations, not proof that the13 failures are fixed. Items62/16/38 stay open.
+
 The early native updater sidecar now retains its exact closed stage,
 exception family and signed HRESULT before file-read admission; v1 remains
 exactly five fields and v2 requires all eight. No message, stack or destination

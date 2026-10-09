@@ -14,6 +14,31 @@ $DiagnosticStage='prepare'
 $DiagnosticExit=-999
 $DiagnosticOut=-1
 $DiagnosticErr=-1
+$DiagnosticRawFlags=$null
+function Get-ErgoptiLegacyRawContractFlags {
+    param($Item,[string]$ExpectedRaw)
+    $Values=@{}
+    foreach($Name in @('ok','kind','access_type','proxy','bypass','native_error')) {
+        $Property=$Item.PSObject.Properties[$Name]
+        $Values[$Name]=if($null -ne $Property){$Property.Value}else{$null}
+    }
+    $OkBool=$Values.ok -is [bool]
+    $KindText=$Values.kind -is [string]
+    $AccessInteger=($Values.access_type -is [int] -or $Values.access_type -is [long])
+    $ProxyText=$Values.proxy -is [string]
+    $BypassText=$Values.bypass -is [string]
+    $NativeInteger=($Values.native_error -is [int] -or $Values.native_error -is [long])
+    # Emit fixed booleans only. Never project a relay, URI, token or source value.
+    return @{
+        ok_bool=[int]$OkBool;ok_true=[int]($OkBool -and $Values.ok -eq $true)
+        kind_text=[int]$KindText;kind_named=[int]($KindText -and $Values.kind -ceq 'named_proxy')
+        access_integer=[int]$AccessInteger;access_three=[int]($AccessInteger -and $Values.access_type -eq 3)
+        proxy_text=[int]$ProxyText;proxy_literal=[int]($ProxyText -and $Values.proxy -ceq $ExpectedRaw)
+        proxy_legacy_ipv6_literal=[int]($ProxyText -and $Values.proxy -ceq '[2001:0DB8:0000:0000:0000:0000:0000:0001]:3129')
+        bypass_text=[int]$BypassText;bypass_empty=[int]($BypassText -and $Values.bypass -ceq '')
+        native_integer=[int]$NativeInteger;native_zero=[int]($NativeInteger -and $Values.native_error -eq 0)
+    }
+}
 function Get-ErgoptiRetirementSourceHash {
     param([string]$Path)
     # The isolated native caller disables module auto-loading. Hash the held
@@ -62,7 +87,7 @@ function ConvertFrom-ErgoptiPacRoutes {
     foreach($Control in $Controls) {
         $DiagnosticControl++
         $DiagnosticStage='prepare_control'
-        $DiagnosticExit=-999;$DiagnosticOut=-1;$DiagnosticErr=-1
+        $DiagnosticExit=-999;$DiagnosticOut=-1;$DiagnosticErr=-1;$DiagnosticRawFlags=$null
         $Case=Join-Path $Root ([Guid]::NewGuid().ToString('N'))
         $null=[IO.Directory]::CreateDirectory($Case)
         $Worker=Join-Path $Case 'worker.ps1'
@@ -116,6 +141,9 @@ function ConvertFrom-ErgoptiPacRoutes {
             throw 'Legacy worker started after native debt or published a partial completed receipt.'
         }
         $DiagnosticStage='raw_proxy_contract'
+        if($Control.ContainsKey('Proxy') -and $Control.Proxy) {
+            $DiagnosticRawFlags=Get-ErgoptiLegacyRawContractFlags $Frame.results[0] $Control.Raw
+        }
         if($Control.ContainsKey('Proxy') -and $Control.Proxy -and ($Frame.results[0].ok -ne $true -or
             $Frame.results[0].kind -cne 'named_proxy' -or $Frame.results[0].access_type -ne 3 -or
             $Frame.results[0].proxy -cne $Control.Raw -or
@@ -141,6 +169,17 @@ function ConvertFrom-ErgoptiPacRoutes {
     try {[Console]::Out.WriteLine('::notice title=Windows legacy PAC closed cause::control='+$DiagnosticControl+
         ' stage='+$DiagnosticStage+' cause='+$Cause+' line='+$CauseLine)} catch { }
     try {[Console]::Error.WriteLine('RETIREMENT_DIAG control='+$DiagnosticControl+' stage='+$DiagnosticStage+' child_exit='+$DiagnosticExit+' stdout_units='+$DiagnosticOut+' stderr_units='+$DiagnosticErr)} catch { }
+    if($null -ne $DiagnosticRawFlags) {
+        try {
+            $Flags='RETIREMENT_RAW_FLAGS control='+$DiagnosticControl+' schema=1'
+            foreach($Name in @('ok_bool','ok_true','kind_text','kind_named','access_integer','access_three',
+                'proxy_text','proxy_literal','proxy_legacy_ipv6_literal','bypass_text','bypass_empty',
+                'native_integer','native_zero')) {
+                $Flags+=' '+$Name+'='+[string]$DiagnosticRawFlags[$Name]
+            }
+            [Console]::Error.WriteLine($Flags)
+        } catch { }
+    }
     [Console]::Error.WriteLine('Legacy proxy retirement protocol failed.')
 } finally {
     if($null -ne $Child) {

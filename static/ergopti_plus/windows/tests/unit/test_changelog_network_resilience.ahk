@@ -823,15 +823,39 @@ Test("system proxy native: one usable relay or supported scheme map is selected 
 
 ; Project only enumerated stages and bounded scalars from the settled owner capture.
 _CNR_NativePacDiagnostic(Observation) {
-	Out := Observation.Get("stdout", "")
-	if !(Out is String) || StrLen(Out) > 8192
-		return
-	Pattern := "m)^PROXY_NATIVE_DIAG stage=(abi|native_cases|https_scope|direct|bad_script|missing_script|failover|entrypoint_input|entrypoint_start|entrypoint_wait|entrypoint_process|entrypoint_privacy|entrypoint_frame|server_receipt) passed=([0-9]{1,2})`r?$"
-	if !RegExMatch(Out, Pattern, &Fact)
-		return
-	if RegExMatch(Out, Pattern, , Fact.Pos + Fact.Len)
-		return
-	if Integer(Fact[2]) > 11
-		return
-	_TestPrint("::notice title=Windows canonical PAC entrypoint::" . SubStr(Fact[0], StrLen("PROXY_NATIVE_DIAG ")+1))
+	Fact := _CNR_NativePacDiagnosticFact(Observation.Get("stdout", ""))
+	if Fact != ""
+		_TestPrint("::notice title=Windows canonical PAC entrypoint::" . Fact)
 }
+
+_CNR_NativePacDiagnosticFact(Out) {
+	if !(Out is String) || StrLen(Out) > 8192
+		return ""
+	Pattern := "m)^PROXY_NATIVE_DIAG stage=(source_load|source_parse|native_compile|fixture_compile|abi|server_setup|native_call|native_cases|https_scope|direct|bad_script|missing_script|failover|entrypoint_input|entrypoint_start|entrypoint_wait|entrypoint_read|entrypoint_process|entrypoint_privacy|entrypoint_parse|entrypoint_frame|server_receipt|cleanup) passed=([0-9]|10|11) family=(win32|command_missing|io|argument|invalid_operation|timeout|runtime|other) code=(-?(?:0|[1-9][0-9]{0,9}))`r?$"
+	if !RegExMatch(Out, Pattern, &Fact)
+		return ""
+	Prefix := "m)^PROXY_NATIVE_DIAG "
+	if !RegExMatch(Out, Prefix, &First) || First.Pos != Fact.Pos
+		return ""
+	if RegExMatch(Out, Prefix, , Fact.Pos + Fact.Len)
+		return ""
+	if Fact[4] == "-0" || Integer(Fact[4]) < -2147483648 || Integer(Fact[4]) > 2147483647
+		return ""
+	return SubStr(RTrim(Fact[0], "`r"), StrLen("PROXY_NATIVE_DIAG ")+1)
+}
+
+_CNR_NativePacDiagnosticProtocol() {
+	Early := "PROXY_NATIVE_DIAG stage=native_compile passed=0 family=runtime code=-2146233087"
+	AssertEqual("stage=native_compile passed=0 family=runtime code=-2146233087", _CNR_NativePacDiagnosticFact(Early))
+	AssertEqual("stage=native_call passed=5 family=win32 code=12180", _CNR_NativePacDiagnosticFact("PROXY_NATIVE_DIAG stage=native_call passed=5 family=win32 code=12180`r`n"))
+	AssertEqual("stage=cleanup passed=11 family=io code=-2147483648", _CNR_NativePacDiagnosticFact("PROXY_NATIVE_DIAG stage=cleanup passed=11 family=io code=-2147483648"))
+	for Refused in [StrReplace(Early, "native_compile", "private_url"), StrReplace(Early, "family=runtime", "family=secret"),
+		StrReplace(Early, "passed=0", "passed=12"), StrReplace(Early, "code=-2146233087", "code=2147483648"),
+		StrReplace(Early, "code=-2146233087", "code=-2147483649"), StrReplace(Early, "code=-2146233087", "code=01"),
+		StrReplace(Early, "code=-2146233087", "code=-0"), Early . "`n" . Early,
+		"PROXY_NATIVE_DIAG unadmitted=private`n" . Early, Early . "`nPROXY_NATIVE_DIAG unadmitted=private",
+		Early . " secret=fixture-secret", Early . StrReplace(Format("{:8192}", ""), " ", "x")] {
+		AssertEqual("", _CNR_NativePacDiagnosticFact(Refused), "unadmitted diagnostic data must remain private")
+	}
+}
+Test("system proxy native: early failure diagnostic admits only one closed scalar frame", _CNR_NativePacDiagnosticProtocol)

@@ -72,6 +72,28 @@ public sealed class ErgoptiArtifactNtlmProxy : IDisposable {
     public bool IdentityMatched, RefusedRouteVerified;
     public int SecurityStatus;
     public string FailureStage="none";
+    public sealed class FailureObservation {
+        public readonly string Site, Family;
+        public readonly int Code;
+        public FailureObservation(string site, string family, int code) { Site=site; Family=family; Code=code; }
+    }
+    FailureObservation firstFailure;
+    public FailureObservation FirstFailure { get { return Interlocked.CompareExchange(ref firstFailure,null,null); } }
+    void ObserveCode(string site, string family, int code) {
+        try { Interlocked.CompareExchange(ref firstFailure,new FailureObservation(site,family,code),null); }
+        catch { /* Optional observation cannot affect the original failure counter. */ }
+    }
+    void ObserveException(string site, Exception failure) {
+        try {
+            SocketException socket=failure as SocketException;
+            if(socket==null && failure is IOException) socket=failure.InnerException as SocketException;
+            string family=socket!=null ? "winsock" : failure is IOException ? "io" :
+                failure is InvalidOperationException ? "invalid_operation" :
+                failure is ArgumentException ? "argument" : "other";
+            int code=socket!=null ? socket.NativeErrorCode : failure.HResult;
+            ObserveCode(site,family,code);
+        } catch { /* No raw exception, provider data or retry authority is published. */ }
+    }
     public ErgoptiArtifactNtlmProxy(int port, bool negotiate) : this(port,negotiate,false) { }
     public ErgoptiArtifactNtlmProxy(int port, bool negotiate, bool pac) {
         targetPort=port; advertiseNegotiate=negotiate; serveRemotePac=pac;
@@ -114,7 +136,9 @@ public sealed class ErgoptiArtifactNtlmProxy : IDisposable {
                 }
                 worker.Start();
             }
-        } catch { if (!stopping) Interlocked.Increment(ref Failures); }
+        } catch(Exception failure) { if (!stopping) {
+            ObserveException("accept",failure); Interlocked.Increment(ref Failures);
+        } }
     }
     string ReadHeader(NetworkStream stream) {
         MemoryStream bytes=new MemoryStream();
@@ -166,12 +190,15 @@ public sealed class ErgoptiArtifactNtlmProxy : IDisposable {
             // cannot fabricate retirement authority from a zero-initialized out.
             if(ValidHandle(next)) {
                 if(hasContext && (context.Lower!=next.Lower || context.Upper!=next.Upper)) {
-                    if(DeleteSecurityContext(ref context)!=0) Interlocked.Increment(ref Failures);
+                    int retirement=DeleteSecurityContext(ref context);
+                    if(retirement!=0) { ObserveCode("delete_replaced_context","sspi",retirement); Interlocked.Increment(ref Failures); }
                 }
                 context=next; hasContext=true;
             }
             // CONNECTION and ALLOCATE_MEMORY bind this exchange to its socket.
-            if(status!=0 && status!=0x90312) { SecurityStatus=status; FailureStage="accept_context"; throw new InvalidOperationException("Native SSPI acceptance refused."); }
+            if(status!=0 && status!=0x90312) { SecurityStatus=status; FailureStage="accept_context";
+                if(!stopping) ObserveCode("accept_context","sspi",status);
+                throw new InvalidOperationException("Native SSPI acceptance refused."); }
             if(!hasContext) throw new InvalidOperationException("Native SSPI accepted without a context.");
             complete=status==0;
             if(buffer.Size<0 || buffer.Size>65536 || (buffer.Size>0 && providerOutput==IntPtr.Zero))
@@ -184,7 +211,10 @@ public sealed class ErgoptiArtifactNtlmProxy : IDisposable {
             if(inputData!=IntPtr.Zero) {
                 for(int n=0;n<token.Length;n++) Marshal.WriteByte(inputData,n,0);
             }
-            if(providerOutput!=IntPtr.Zero && FreeContextBuffer(providerOutput)!=0) Interlocked.Increment(ref Failures);
+            if(providerOutput!=IntPtr.Zero) {
+                int retirement=FreeContextBuffer(providerOutput);
+                if(retirement!=0) { ObserveCode("free_context_buffer","sspi",retirement); Interlocked.Increment(ref Failures); }
+            }
             if(outputBuffer!=IntPtr.Zero) Marshal.FreeHGlobal(outputBuffer);
             if(inputBuffer!=IntPtr.Zero) Marshal.FreeHGlobal(inputBuffer);
             if(inputData!=IntPtr.Zero) Marshal.FreeHGlobal(inputData);
@@ -194,12 +224,17 @@ public sealed class ErgoptiArtifactNtlmProxy : IDisposable {
         IntPtr token=IntPtr.Zero;
         try {
             int status=QuerySecurityContextToken(ref context,ref token);
-            if(status!=0 || token==IntPtr.Zero) { SecurityStatus=status; FailureStage="context_token"; return false; }
+            if(status!=0 || token==IntPtr.Zero) { SecurityStatus=status; FailureStage="context_token";
+                if(status!=0 && !stopping) ObserveCode("context_token","sspi",status);
+                return false; }
             using(WindowsIdentity identity=new WindowsIdentity(token)) { return expectedUser.Equals(identity.User); }
         } finally {
             // Account any token actually returned by the native call even
             // when its status refuses identity publication.
-            if(token!=IntPtr.Zero && !CloseHandle(token)) Interlocked.Increment(ref Failures);
+            if(token!=IntPtr.Zero && !CloseHandle(token)) {
+                int retirement=Marshal.GetLastWin32Error();
+                ObserveCode("close_context_token","win32",retirement); Interlocked.Increment(ref Failures);
+            }
         }
     }
     void Serve(TcpClient client) {
@@ -207,17 +242,19 @@ public sealed class ErgoptiArtifactNtlmProxy : IDisposable {
         Handle credential=InvalidHandle(), context=InvalidHandle();
         bool hasCredential=false, hasContext=false;
         TcpClient upstream=null;
+        string site="configure_client";
         try {
             client.ReceiveTimeout=10000; client.SendTimeout=10000;
-            NetworkStream stream=client.GetStream();
+            site="get_client_stream"; NetworkStream stream=client.GetStream();
             for(int round=0;round<4;round++) {
-                string header=ReadHeader(stream);
+                site="read_header"; string header=ReadHeader(stream);
+                site="parse_header";
                 string[] lines=header.Split(new string[]{"\r\n"},StringSplitOptions.None);
                 if(serveRemotePac && lines[0]=="GET /remote-ordered.pac HTTP/1.1") {
                     string destination="https://managed-fixture.invalid:"+targetPort+"/v1/chat/completions?marker=managed-network-fixture";
                     string script="function FindProxyForURL(url,host){if(url==='"+destination+"')return 'PROXY 127.0.0.1:"+
                         closedPort+"; PROXY 127.0.0.1:"+Port+"; DIRECT';return 'DIRECT';}";
-                    byte[] bytes=Encoding.UTF8.GetBytes(script);
+                    site="write_pac"; byte[] bytes=Encoding.UTF8.GetBytes(script);
                     Write(stream,"HTTP/1.1 200 OK\r\nConnection: close\r\nCache-Control: no-store\r\nContent-Type: application/x-ns-proxy-autoconfig\r\nContent-Length: "+bytes.Length+"\r\n\r\n");
                     stream.Write(bytes,0,bytes.Length); stream.Flush();
                     Interlocked.Increment(ref PacRequests); return;
@@ -232,10 +269,10 @@ public sealed class ErgoptiArtifactNtlmProxy : IDisposable {
                     }
                 }
                 if(authorization==null) {
-                    Interlocked.Increment(ref Bare); Write(stream,Challenge(null,true)); return;
+                    Interlocked.Increment(ref Bare); site="write_challenge"; Write(stream,Challenge(null,true)); return;
                 }
                 if(authorization.StartsWith("Negotiate ",StringComparison.OrdinalIgnoreCase)) {
-                    Interlocked.Increment(ref Negotiate); Write(stream,Challenge(null,true)); return;
+                    Interlocked.Increment(ref Negotiate); site="write_challenge"; Write(stream,Challenge(null,true)); return;
                 }
                 if(!authorization.StartsWith("NTLM ",StringComparison.OrdinalIgnoreCase) || authorization.Length>90000)
                     throw new InvalidDataException("Unexpected proxy authentication scheme.");
@@ -249,41 +286,59 @@ public sealed class ErgoptiArtifactNtlmProxy : IDisposable {
                     long expiry;
                     // AcceptSecurityContext requires SECPKG_CRED_INBOUND (1), not the
                     // outbound credential direction used by an SSPI client.
+                    site="acquire_credentials";
                     int status=AcquireCredentialsHandle(null,"NTLM",1,IntPtr.Zero,IntPtr.Zero,IntPtr.Zero,IntPtr.Zero,ref credential,out expiry);
                     hasCredential=ValidHandle(credential);
                     if(status!=0 || !hasCredential) { SecurityStatus=status; FailureStage="acquire_credentials";
+                        // Preserve the exact return from this call, not the
+                        // generic HRESULT of the existing managed refusal.
+                        if(status!=0 && !stopping) ObserveCode("acquire_credentials","sspi",status);
                         throw new InvalidOperationException("Native inbound credentials refused."); }
                 }
                 bool complete;
+                site="accept_context";
                 byte[] output=AcceptToken(ref credential,ref context,ref hasContext,token,out complete);
                 if(!complete) {
-                    try { Write(stream,Challenge(Convert.ToBase64String(output),false)); }
+                    try { site="write_challenge"; Write(stream,Challenge(Convert.ToBase64String(output),false)); }
                     finally { Array.Clear(output,0,output.Length); }
                     continue;
                 }
                 Array.Clear(output,0,output.Length);
+                site="identity_match";
                 if(!SameUser(ref context)) { if(FailureStage=="none") FailureStage="identity_match";
                     throw new InvalidOperationException("Authenticated identity differs from current user."); }
                 IdentityMatched=true; Interlocked.Increment(ref Authenticated);
-                upstream=new TcpClient(); upstream.Connect(IPAddress.Loopback,targetPort);
-                lock(gate) { clients.Add(upstream); }
-                Write(stream,"HTTP/1.1 200 Connection Established\r\n\r\n");
-                NetworkStream remote=upstream.GetStream();
-                Thread reverse=new Thread(delegate() {
-                    try { remote.CopyTo(stream); } catch { if(!stopping) Interlocked.Increment(ref Failures); }
+                site="connect_target"; upstream=new TcpClient(); upstream.Connect(IPAddress.Loopback,targetPort);
+                site="register_target"; lock(gate) { clients.Add(upstream); }
+                site="write_tunnel"; Write(stream,"HTTP/1.1 200 Connection Established\r\n\r\n");
+                site="get_target_stream"; NetworkStream remote=upstream.GetStream();
+                site="start_receiver"; Thread reverse=new Thread(delegate() {
+                    try { remote.CopyTo(stream); } catch(Exception failure) { if(!stopping) {
+                        ObserveException("forward_response",failure); Interlocked.Increment(ref Failures);
+                    } }
                     finally { client.Close(); }
                 }); reverse.IsBackground=true;
                 lock(gate) { workers.Add(reverse); } reverse.Start();
+                site="forward_request";
                 try { stream.CopyTo(remote); } catch(IOException) { } finally { upstream.Close(); }
+                site="join_receiver";
                 if(!reverse.Join(1000)) throw new InvalidOperationException("Owned tunnel receiver did not retire.");
                 return;
             }
             throw new InvalidDataException("Native exchange exceeded its bound.");
-        } catch { if(!stopping) Interlocked.Increment(ref Failures); }
+        } catch(Exception failure) { if(!stopping) {
+            ObserveException(site,failure); Interlocked.Increment(ref Failures);
+        } }
         finally {
             if(upstream!=null) upstream.Close(); client.Close();
-            if(hasContext && DeleteSecurityContext(ref context)!=0) Interlocked.Increment(ref Failures);
-            if(hasCredential && FreeCredentialsHandle(ref credential)!=0) Interlocked.Increment(ref Failures);
+            if(hasContext) {
+                int retirement=DeleteSecurityContext(ref context);
+                if(retirement!=0) { ObserveCode("delete_context","sspi",retirement); Interlocked.Increment(ref Failures); }
+            }
+            if(hasCredential) {
+                int retirement=FreeCredentialsHandle(ref credential);
+                if(retirement!=0) { ObserveCode("free_credentials","sspi",retirement); Interlocked.Increment(ref Failures); }
+            }
             Interlocked.Decrement(ref Active);
         }
     }
@@ -314,6 +369,13 @@ function Publish {
         $State.identity_matched=$Proxy.IdentityMatched; $State.active=$Proxy.Active; $State.failures=$Proxy.Failures
         $State.security_status=$Proxy.SecurityStatus; $State.failure_stage=$Proxy.FailureStage; $State.pac_requests=$Proxy.PacRequests
         $State.refused_route_verified=$Proxy.RefusedRouteVerified
+        # Read one immutable snapshot; concurrent workers cannot mix observations.
+        $Observation=$Proxy.FirstFailure
+        if ($null -eq $Observation) {
+            $State.first_failure_site='none'; $State.first_failure_family='none'; $State.first_failure_code=0
+        } else {
+            $State.first_failure_site=$Observation.Site; $State.first_failure_family=$Observation.Family; $State.first_failure_code=$Observation.Code
+        }
     }
     $Pending=$StatePath+'.pending'
     [IO.File]::WriteAllText($Pending,($State|ConvertTo-Json -Compress),[Text.UTF8Encoding]::new($false))
