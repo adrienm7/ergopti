@@ -12,7 +12,8 @@
 --- 1. Key identity is shared data (_shared/modules/actions/tap_keys.json). The
 ---    key left of 1 has two macOS keycodes: kVK_ANSI_Grave (50) on an ANSI
 ---    keyboard and behind Karabiner's ANSI virtual keyboard, kVK_ISO_Section
----    (10) on a bare ISO one.
+---    (10) on a bare ISO one. Each event's native keyboard model chooses one
+---    code, so the extra ISO key is never mistaken for the key left of 1.
 --- 2. Assignments live in canonical config.toml, beside the
 ---    keyboard slots, and are cached by load(): the shortcut layer's eventtap
 ---    asks decide() on every press of these keys, and an eventtap callback may
@@ -21,8 +22,8 @@
 ---    until the user explicitly assigns an action.
 --- 3. This module decides; the raw eventtap (actions/system.lua bind_tap_keys)
 ---    consumes the event and runs the action behind the callback.
---- 4. The menu names each key by the character the current input source puts on
----    it (infra/keycodes over hs.keycodes.map), never a fixed legend.
+--- 4. The menu uses the physical position for a key whose virtual code depends
+---    on its keyboard, and the current input-source character for stable codes.
 --- ==============================================================================
 
 local M = {}
@@ -35,6 +36,7 @@ local ConfigOutdated = require("config_outdated")
 local Keycodes   = require("infra.keycodes")
 local FileSystem = require("adapters.file_system")
 local JsonCodec  = require("adapters.json_codec")
+local Geometry   = require("adapters.keyboard_geometry")
 local Writer     = require("toml_codec.writer")
 local Codec      = require("toml_codec")
 local Preferences = require("infra.preferences")
@@ -269,12 +271,13 @@ end
 
 --- The tap key a keycode belongs to.
 --- @param keycode integer
+--- @param keyboard_type integer|nil Originating keyboard model.
 --- @return string|nil id
-function M.key_for_keycode(keycode)
+function M.key_for_keycode(keycode, keyboard_type)
+	if type(keycode) ~= "number" then return nil end
 	for _, key in ipairs(M.keys()) do
-		for _, code in ipairs(key.hs) do
-			if code == keycode then return key.id end
-		end
+		local code = Geometry.native_code(key.hs[1], key.hs[2] or key.hs[1], keyboard_type)
+		if code == keycode then return key.id end
 	end
 	return nil
 end
@@ -283,9 +286,10 @@ end
 --- the keycode is no tap key or its key is unassigned. Memory only: it runs in
 --- the eventtap callback.
 --- @param keycode integer
+--- @param keyboard_type integer|nil Originating keyboard model.
 --- @return string|nil action, string|nil binding
-function M.decide(keycode)
-	local id = M.key_for_keycode(keycode)
+function M.decide(keycode, keyboard_type)
+	local id = M.key_for_keycode(keycode, keyboard_type)
 	if not id or not _assignments then return nil, nil end
 	local action = _assignments[id] or "none"
 	if action == "none" then return nil, nil end
@@ -302,15 +306,17 @@ end
 -- ====================================
 
 --- The key's name in a menu row: the character the current input source puts
---- on it (read from its first keycode), or a localized description of its
---- position when it produces nothing printable.
+--- on an unambiguous code, or a localized physical position when its code
+--- depends on the originating keyboard or produces nothing printable.
 --- @param id string
 --- @param i18n table The i18n module.
 --- @return string
 function M.display_name(id, i18n)
 	local code = nil
 	for _, key in ipairs(M.keys()) do
-		if key.id == id then code = key.hs[1] end
+		-- A menu has no originating keyboard event. Prefer its physical position
+		-- over labelling the swapped key with another keyboard's character.
+		if key.id == id and #key.hs == 1 then code = key.hs[1] end
 	end
 	local char = code and Keycodes.character_for(code) or nil
 	if type(char) ~= "string" or char == "" or char:match("^%s*$") then
