@@ -731,6 +731,12 @@ jobs:
     env:
       # Older release whose shipped personal files seed upgraded states.
       SEED_TAG: v0.0.0-dev.24
+      MATRIX_RUNNER: ${{ matrix.runner }}
+      ERGOPTI_DEV_RELEASE_RELEASE: ${{ inputs.release }}
+      ERGOPTI_DEV_RELEASE_PRERELEASE: ${{ inputs.prerelease }}
+      ERGOPTI_DEV_RELEASE_CHANNEL: ${{ inputs.channel }}
+      ERGOPTI_DEV_RELEASE_TAG: ${{ inputs.tag }}
+      ERGOPTI_DEV_RELEASE_VERSION: ${{ inputs.version }}
 
     steps:
       - uses: actions/checkout@v4
@@ -775,10 +781,17 @@ jobs:
           lipo -archs /Applications/ErgoptiPlus.app/Contents/MacOS/ErgoptiPlus
           echo "runner machine: $(uname -m)"
 
+      - name: Record the launch qualification scope
+        run: >
+          node tools/ci/dev-release-qualification.cjs --scope macos-launch-appleevents
+          --scenario "${{ matrix.scenario }}" --runner "${{ matrix.runner }}"
+          --receipt "$RUNNER_TEMP/launch-qualification.json"
+
       - name: Launch over the user state and judge it
         run: >
           python3 tools/diagnostics/macos_launch_gate.py /Applications/ErgoptiPlus.app
           "$RUNNER_TEMP/launch-gate" "${{ matrix.scenario }}" --seed-tag "$SEED_TAG"
+          --qualification-receipt "$RUNNER_TEMP/launch-qualification.json"
 
       - name: Record mandatory launch evidence
         env:
@@ -803,6 +816,12 @@ jobs:
     needs: [test-hs, e2e-hs, package-macos, launch, tooltip-canvas]
     if: always()
     runs-on: ubuntu-latest
+    env:
+      ERGOPTI_DEV_RELEASE_RELEASE: ${{ inputs.release }}
+      ERGOPTI_DEV_RELEASE_PRERELEASE: ${{ inputs.prerelease }}
+      ERGOPTI_DEV_RELEASE_CHANNEL: ${{ inputs.channel }}
+      ERGOPTI_DEV_RELEASE_TAG: ${{ inputs.tag }}
+      ERGOPTI_DEV_RELEASE_VERSION: ${{ inputs.version }}
     steps:
       - uses: actions/checkout@v4
 

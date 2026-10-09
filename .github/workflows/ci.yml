@@ -981,7 +981,7 @@ jobs:
             console.log('\n### Native validation limitations\n');
             console.log('This dev prerelease has maintainer-authorized temporary qualification deferrals. Deferred checks are not passes and do not certify the affected features.\n');
             for (const [scope, record] of Object.entries(policy.scopes)) {
-              console.log('- **DEFERRED — ' + scope + ':** ' + record.reason);
+              console.log('- **DEFERRED — ' + scope + ':** ' + record.reason + ' (qualified:false)');
             }
             console.log('\nThe CI qualification artifacts record the exact source and missing evidence. Build, signing, installation and all other test requirements remain active. Full execution returns for the next tag or after ' + policy.expires_at + '.\n');
           }

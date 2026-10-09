@@ -1064,14 +1064,15 @@ try {
 	assert.ifError(result.error);
 	assert.equal(result.signal, null, result.stderr);
 	assert.equal(result.status, 0, result.stderr);
-	assert.match(result.stderr, /Ran 51 tests in /);
+	assert.match(result.stderr, /Ran 52 tests in /);
+	// The two existing POSIX signal controls also remain excluded on Windows.
 	const skipped = process.platform === 'win32' ? 19 : process.platform === 'darwin' ? 1 : 0;
 	assert.match(
 		result.stderr,
 		skipped ? new RegExp(`\\nOK \\(skipped=${skipped}\\)\\s*$`) : /\nOK\s*$/
 	);
 	console.log(
-		`Sparkle transport controls: ${51 - skipped} passed, ${skipped} platform cases skipped.`
+		`Sparkle transport controls: ${52 - skipped} passed, ${skipped} platform cases skipped.`
 	);
 	const fixture = fs.readFileSync(
 		path.join(

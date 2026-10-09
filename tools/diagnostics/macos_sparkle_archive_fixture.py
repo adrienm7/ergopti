@@ -46,6 +46,7 @@ def startup_phase(phase):
 startup_phase("python-entry")
 
 import ctypes
+import errno
 import hashlib
 import http.server
 import importlib.util
@@ -300,6 +301,33 @@ def private_directory(path):
         raise
 
 
+def _owned_stopped_receive(server, request, state, failure, readinto_code):
+    """Accept only the exact Windows receive failure after acknowledged owned shutdown."""
+    try:
+        if sys.platform != "win32" or not isinstance(failure, OSError):
+            return False
+        expected = getattr(errno, "WSAESHUTDOWN", None)
+        if type(expected) is not int or type(failure.errno) is not int or failure.errno != expected:
+            return False
+        if (
+            state.get("stopping") is not True
+            or server.active_request is not request
+            or server.active_stop_attempted is not True
+            or server.active_handler_admitted is not False
+            or server.active_stop_acknowledged is not request
+            or server.stop_failure is not None
+        ):
+            return False
+        trace = failure.__traceback__
+        if trace is None:
+            return False
+        while trace.tb_next is not None:
+            trace = trace.tb_next
+        return trace.tb_frame.f_code is readinto_code
+    except Exception:
+        return False
+
+
 def serve(root, nonce):
     """Allow exactly two loopback-only resources; retain each served-byte digest."""
     global SERVER_DIAGNOSTIC_PHASE
@@ -311,6 +339,7 @@ def serve(root, nonce):
         raise RuntimeError("Private Sparkle session refused")
     startup_phase("nonce-admitted")
     state = {"stopping": False, "requests": 0}
+    readinto_code = socket.SocketIO.readinto.__code__
 
     class Handler(http.server.BaseHTTPRequestHandler):
         # Apply the I/O timeout before reading the first request line or headers.
@@ -381,6 +410,7 @@ def serve(root, nonce):
             self.active_request = None
             self.active_handler_admitted = False
             self.active_stop_attempted = False
+            self.active_stop_acknowledged = None
             self.stop_failure = None
             super().__init__(*arguments, **options)
 
@@ -394,6 +424,9 @@ def serve(root, nonce):
                 # This is the exact accepted socket, retained before the handler
                 # reads headers. A flag alone cannot interrupt that blocking read.
                 request.shutdown(socket.SHUT_RDWR)
+                # Publication after successful return is distinct from an in-flight attempt.
+                if self.active_request is request:
+                    self.active_stop_acknowledged = request
             except OSError as failure:
                 # A refused shutdown is never a close ACK or a successful stop.
                 # Keep the first refusal until the original request physically exits.
@@ -405,18 +438,25 @@ def serve(root, nonce):
                 raise RuntimeError("Private Sparkle accepted-socket owner is already active")
             self.active_handler_admitted = False
             self.active_stop_attempted = False
+            self.active_stop_acknowledged = None
             self.active_request = request
             # BaseServer's error callback may raise before its own shutdown.
             # The native accepted socket has one unconditional physical owner.
             try:
                 if not state["stopping"]:
                     self.finish_request(request, client_address)
+            except OSError as failure:
+                # Keep exact accepted ownership through the cancellation decision.
+                # Every non-receive, foreign, failed or in-flight stop still raises.
+                if not _owned_stopped_receive(self, request, state, failure, readinto_code):
+                    raise
             finally:
                 # Header/body handling is now terminal; the local request still
                 # owns its capability while canonical shutdown closes it below.
                 self.active_request = None
                 self.active_handler_admitted = False
                 self.shutdown_request(request)
+                self.active_stop_acknowledged = None
 
         def handle_error(self, _request, _address):
             raise RuntimeError("Private Sparkle resource handling refused")
