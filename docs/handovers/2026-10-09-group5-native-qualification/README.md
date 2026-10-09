@@ -205,3 +205,69 @@ STOPPED or fallback tombstones are not receiver acknowledgements; guardian
 unregistration is not universal proof of process exit during a permanent drain
 error. Physical release and exact owner retirement remain unqualified on the
 user's Mac. This workaround does not resolve the cause.
+
+## Terminal native qualification
+
+Manual macOS run [37979226215](https://github.com/adrienm7/ergopti/actions/runs/37979226215)
+completed with failure on exact `a9e8b1722164347d56989a483675ec660063bffb`.
+Its tree is identical to published feature `5844c9b34`. Six jobs succeeded,
+three failed and four were skipped; none was cancelled. Production release
+launcher compilation, JS/property checks, simulated macOS unit/E2E tests and
+12 native tooltip captures passed. The full Swift launcher step and native
+Apple Shortcuts discovery failed. Final application packaging, signing,
+startup smoke and installation were not executed after the package refusal.
+Release was skipped.
+
+The accessible Swift failure annotations identify the native HS274 policy
+qualification prerequisite: protected VirtualHID reference acquisition refuses
+with `payload_inventory`; fresh baseline preparation refuses with
+`xcodegen_transport`; the owned four-target compilation preparation refuses
+with `unclassified` and no expected success output. The original assertions
+remain unchanged. These annotations do not establish a first tap-hold cause.
+Native archive notices separately report Sparkle passed and Brew failed.
+The full-package verdict stays failed.
+
+The individual Swift artifact `11642006556` and raw job log return HTTP 403
+on `productionresultssa13.blob.core.windows.net`. The official complete-run logs
+endpoint succeeds. Its original Swift step contains all independently frozen
+worker and observer identities, each with one start and one terminal frame:
+140 worker methods passed, six failed and none skipped; three observer methods
+passed, 16 failed and none skipped. All 146 and 19 methods completed. The full
+XCTest collector reports 590 completed cases, script status 1, capture status 0
+and a failed verdict. These results refuse native qualification of this packet.
+
+Positive retained publication returns false; private snapshots remain unobserved
+and expected after-read callbacks remain zero. Most observer failures precede
+the armed callback, so their missing mutation witnesses do not prove a failed
+atomic rename. A common initial directory admission failure is consistent with
+the observations. Foundation temporary-path normalization and a saved directory
+link count checked after the writer creates its own regular file are hypotheses
+requiring a separate native syscall observation. Preserve every original
+assertion and the regular-record hardlink refusal; no cause 73 claim follows.
+
+The saved network draft preserves every existing custom rule and adds only that
+missing GitHub Actions host. It requires environment-settings review/save and
+publication and does not change the running policy. This is still needed for
+individual artifact access, but no longer blocks reading the original XCTest
+frames through the supported complete-run export. No policy bypass or proxy
+credential extraction is used.
+
+The integrator received the complete minimum pre/post hash manifest in
+[6088058935](https://github.com/adrienm7/ergopti/issues/86#issuecomment-6088058935),
+the public standalone packet in
+[6088084768](https://github.com/adrienm7/ergopti/issues/86#issuecomment-6088084768),
+and the actual native assertions/outcome in
+[6088178066](https://github.com/adrienm7/ergopti/issues/86#issuecomment-6088178066).
+Latest fetched Dev `bc0400388` still matches all four packet preimages; the
+actual stable assembly must check its own preimages. No complete feature import,
+Dev integration, minimal Dev-context native qualification, Intel execution,
+physical lease retirement or causal exit 73 correction is claimed. Item 24 and
+incident 117 remain partial/open; no TODO item is removed by this evidence.
+
+The stable integrator froze its assembly and retained these four Swift postimages
+for a later release. No Group 5 change to that frozen checkout, Dev, main or the
+release is authorized by this checkpoint. The corrected actual cohort outcomes
+were transmitted in
+[6088356106](https://github.com/adrienm7/ergopti/issues/86#issuecomment-6088356106).
+Keep the source packet and exact original run receipts; native diagnostic
+admission must be corrected and qualified before treating the observer as usable.
