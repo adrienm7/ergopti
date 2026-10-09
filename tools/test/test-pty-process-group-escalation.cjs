@@ -65,7 +65,9 @@ ALIVE = True
 CLOCK = 0.0
 SELECT_CALLS = 0
 REAPED = False
-ZOMBIE_MODES = {"zombie-only", "zombie-descendant", "exited-permission", "live-permission"}
+KILL_AT = None
+POST_KILL_MODES = {"post-kill-transient", "post-kill-persistent"}
+ZOMBIE_MODES = {"zombie-only", "zombie-descendant", "exited-permission", "live-permission"} | POST_KILL_MODES
 REAL_PRINT = builtins.print
 
 if not hasattr(signal, "SIGHUP"):
@@ -116,12 +118,17 @@ class FakeProcess:
 subprocess.Popen = FakeProcess
 
 def fake_killpg(pid, sig):
-    global ALIVE
+    global ALIVE, KILL_AT
     if sig == 0:
         if MODE in ZOMBIE_MODES:
             EVENTS.append(["probe", pid, bool(REAPED)])
             if pid != 4242:
                 raise RuntimeError("signal probe targeted an unrelated group")
+            if MODE in POST_KILL_MODES and KILL_AT is not None:
+                if MODE == "post-kill-persistent" or CLOCK < KILL_AT + 0.15:
+                    EVENTS.append(["unconfirmed", CLOCK])
+                    raise PermissionError(1, "Operation not permitted")
+                ALIVE = False
             if MODE in {"live-permission", "exited-permission"} or not REAPED:
                 raise PermissionError(1, "Operation not permitted")
             if MODE == "zombie-only":
@@ -135,6 +142,9 @@ def fake_killpg(pid, sig):
             FakeProcess.active.returncode = -signal.SIGTERM
         return None
     if sig == signal.SIGKILL:
+        if MODE in POST_KILL_MODES:
+            KILL_AT = CLOCK
+            return None
         if MODE != "stubborn-after-kill":
             ALIVE = False
             if MODE not in ZOMBIE_MODES:
@@ -370,10 +380,14 @@ test(
 	!zombieGoneContract(runWrapper(python, noReap, 'zombie-only'))
 );
 
+const postKillGuard = '        except PermissionError:\n            if not kill_sent: raise';
+const reprobeBlock =
+	'        try: os.killpg(proc.pid, 0)\n        except ProcessLookupError: return False' +
+	(wrapper.includes(postKillGuard) ? '\n' + postKillGuard : '');
 const noReprobe = wrapper.includes('except PermissionError:')
 	? replaceExactly(
 			wrapper,
-			'        try: os.killpg(proc.pid, 0)\n        except ProcessLookupError: return False',
+			reprobeBlock,
 			'        return False  # mutation: group disappearance inferred from leader exit'
 		)
 	: wrapper;
@@ -385,13 +399,36 @@ test(
 const swallowPermission = wrapper.includes('except PermissionError:')
 	? replaceExactly(
 			wrapper,
-			'        try: os.killpg(proc.pid, 0)\n        except ProcessLookupError: return False',
+			reprobeBlock,
 			'        try: os.killpg(proc.pid, 0)\n        except (ProcessLookupError, PermissionError): return False'
 		)
 	: wrapper;
 test(
 	'mutation guard detects persistent permission refusal hidden as gone',
 	!permissionRefusalContract(runWrapper(python, swallowPermission, 'exited-permission'), 2, 78)
+);
+
+const retiring = runWrapper(python, wrapper, 'post-kill-transient');
+test(
+	'post-KILL uncertainty waits for observed disappearance within the existing drain budget',
+	escalationContract(retiring) &&
+		retiring.payload.exit === 78 &&
+		eventsOf(retiring, 'unconfirmed').length >= 2,
+	JSON.stringify(retiring)
+);
+const unconfirmed = runWrapper(python, wrapper, 'post-kill-persistent');
+test(
+	'persistent post-KILL uncertainty times out without reporting retirement',
+	boundedDrainContract(unconfirmed) && eventsOf(unconfirmed, 'unconfirmed').length >= 2,
+	JSON.stringify(unconfirmed)
+);
+test(
+	'mutation guard rejects inferring post-KILL retirement from permission refusal',
+	!escalationContract(runWrapper(python, swallowPermission, 'post-kill-transient'))
+);
+test(
+	'mutation guard keeps the existing deadline for unconfirmed post-KILL retirement',
+	!boundedDrainContract(runWrapper(python, noHardDeadline, 'post-kill-persistent'))
 );
 
 report();
