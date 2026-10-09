@@ -1135,6 +1135,10 @@ local function create_menu(deps)
 								is_paused     = deps.script_control and deps.script_control.is_paused,
 						})
 
+						-- The selector owns provider DATA. Complete that child once before
+						-- appending this owner's already-rendered native port controls.
+						local native_model_submenu = ManifestMenu.render_rows(model_submenu, "llm_model")
+
 						-- MLX server port — Ergopti's own server, so let the user move it off
 						-- the default if it collides with another local server they run. Changing
 						-- it persists (api_mlx → hs.settings), then relaunches the server on the
@@ -1176,9 +1180,10 @@ local function create_menu(deps)
 											(type(tail.items) ~= "table" and type(tail.submenu) ~= "table") and tail.action or nil)
 										or not rawequal(rendered[1].image, tail.image)) then return {} end
 								for index = first_new, #rendered do
-										table.insert(model_submenu, rendered[index])
+										table.insert(native_model_submenu, rendered[index])
 								end
 						end
+						model_submenu = native_model_submenu
 				end
 
 				row_for("llm_model", {
@@ -1202,7 +1207,18 @@ local function create_menu(deps)
 
 				local profiles_item = profiles_mgr.get_menu_item()
 				profiles_item.disabled = MenuLayout.row_disabled("llm_profile", is_disabled, paused)
-				row_for("llm_profile", profiles_item)
+				-- The profile owner returns a DATA caption over completed native children.
+				-- Materialize only that parent; keep its existing child tree by identity.
+				local native_profile = ManifestMenu.render_rows({ {
+					label = profiles_item.label,
+					disabled = profiles_item.disabled,
+					submenu = profiles_item.menu,
+				} }, "llm_profile")
+				if #native_profile ~= 1 or not rawequal(native_profile[1].menu, profiles_item.menu) then
+					Logger.error(LOG, "Profile parent native handoff refused.")
+					return {}
+				end
+				row_for("llm_profile", native_profile[1])
 				local profile_boundary_rows = ManifestMenu.template_rows("llm_after_profile_boundary", {}, {}, {})
 				if not profile_boundary_rows then return {} end
 				list_providers.llm_after_profile_boundary = function() return profile_boundary_rows end

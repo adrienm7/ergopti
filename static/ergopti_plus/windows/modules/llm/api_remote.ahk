@@ -1310,10 +1310,10 @@ _LLMRemoteResolveEntry(Entry) {
 ; for completion, so even a hung connect never freezes
 ; the main message pump.
 global LLM_REMOTE_READY_PING_TIMEOUT_MS := 2000
-; Absolute-time cap (ms) for the readiness poll loop. Sized one cadence above
-; the per-phase timeout so a silent connection drop (no WinHTTP timeout fires)
-; still ends the timer chain promptly instead of polling forever.
-global LLM_REMOTE_READY_PING_DEADLINE_MS := 3000
+; Whole-request readiness budget, loaded by LLMApiLoadTimings from the shared
+; remote request timing. Native discovery and acknowledged retirement belong
+; to the same absolute clock as transport; connect retains its own short cap.
+global LLM_REMOTE_READY_PING_DEADLINE_MS := 0
 ; Poll cadence (ms) for the readiness ping. A reachability check does not need
 ; sub-100 ms reactivity, so a relaxed cadence keeps timer pressure off the
 ; message loop (mirrors LLM_OllamaIsRunning_Async's 500 ms).
@@ -1348,6 +1348,10 @@ LLM_RemoteIsReady_Async(Entry, on_result, Owner := 0, Port := 0) {
     NetworkStart := A_TickCount
     global LLM_API_PROVIDERS, LLM_LOCAL_API_SERVERS
     global LLM_REMOTE_READY_PING_TIMEOUT_MS, LLM_REMOTE_READY_PING_DEADLINE_MS
+    if !IsSet(LLM_REMOTE_READY_PING_DEADLINE_MS) || !(LLM_REMOTE_READY_PING_DEADLINE_MS is Integer)
+            || LLM_REMOTE_READY_PING_DEADLINE_MS <= 0 || LLM_REMOTE_READY_PING_DEADLINE_MS > 0x7fffffff
+        throw Error("Readiness requires an initialized canonical request budget.")
+    NetworkTimeout := LLM_REMOTE_READY_PING_DEADLINE_MS
 
     ProviderId := _LLMRemoteEntryGet(Entry, "Provider", "openai_compat")
     if !(Owner is Map) {
@@ -1376,8 +1380,9 @@ LLM_RemoteIsReady_Async(Entry, on_result, Owner := 0, Port := 0) {
     }
 
     Owner["network_start_tick"] := NetworkStart
+    Owner["network_timeout_ms"] := NetworkTimeout
     LLM_AuxSchedule(Owner, _LLMRemote_ReadyDeadline.Bind(Owner, on_result),
-        -LLM_REMOTE_READY_PING_DEADLINE_MS)
+        -Owner["network_timeout_ms"])
     Owner["local_server"] := LocalServerAuthTokenAllowed(ProviderId, "", LLM_LOCAL_API_SERVERS)
     ProvFmt := Provider["Format"]
     PingUrl := ""
@@ -1410,9 +1415,9 @@ LLM_RemoteIsReady_Async(Entry, on_result, Owner := 0, Port := 0) {
     return Owner
 }
 
-; Readiness uses its original 3s origin across every native discovery/auth phase.
+; Readiness retains its configured original budget across native discovery/auth.
 _LLMRemote_DispatchManagedReady(Owner, on_result, PingUrl, ProvFmt, Token, Port := 0) {
-    global LLM_REMOTE_READY_PING_DEADLINE_MS, LLM_REMOTE_READY_PING_TIMEOUT_MS
+    global LLM_REMOTE_READY_PING_TIMEOUT_MS
     if !_LLMRemote_ReadyOwnerIsCurrent(Owner) || A_IsSuspended
         return false
     CreateFn := _LLM_CurlArtifactPortFn(Port, "create_http", () => CurlAsyncRequest())
@@ -1421,7 +1426,7 @@ _LLMRemote_DispatchManagedReady(Owner, on_result, PingUrl, ProvFmt, Token, Port 
         return false
     try {
         Http.SetManagedRouting(Port is Map ? Port.Get("managed_settings", 0) : 0, () => _LLMRemote_ReadyOwnerIsCurrent(Owner))
-        Http.SetDeadline(Owner["network_start_tick"], LLM_REMOTE_READY_PING_DEADLINE_MS)
+        Http.SetDeadline(Owner["network_start_tick"], Owner["network_timeout_ms"])
         Http.ConnectTimeoutMs := LLM_REMOTE_READY_PING_TIMEOUT_MS
         Http.Open("GET", PingUrl, true)
         _LLMRemoteSetAuthHeaders(Http, ProvFmt, Token)
@@ -1435,16 +1440,16 @@ _LLMRemote_DispatchManagedReady(Owner, on_result, PingUrl, ProvFmt, Token, Port 
         Http.Abort()
         return _LLMRemote_CompleteReady(Owner, on_result, false)
     }
-    _LLMRemote_PollReady(Http, on_result, Owner["network_start_tick"], LLM_REMOTE_READY_PING_DEADLINE_MS, Owner)
+    _LLMRemote_PollReady(Http, on_result, Owner["network_start_tick"], Owner["network_timeout_ms"], Owner)
     return true
 }
 
 ; Only the still-current auxiliary owner may create or send the readiness child.
 _LLMRemote_DispatchReady(Owner, on_result, PingUrl, ProvFmt, Token, Port, CreateFn, BindFn, ResolveFn, ProxySelection) {
-    global LLM_REMOTE_READY_PING_TIMEOUT_MS, LLM_REMOTE_READY_PING_DEADLINE_MS
+    global LLM_REMOTE_READY_PING_TIMEOUT_MS
     if !_LLMRemote_ReadyOwnerIsCurrent(Owner)
         return false
-    if _HTTP_CurlRemaining(Owner["network_start_tick"], LLM_REMOTE_READY_PING_DEADLINE_MS) <= 0
+    if _HTTP_CurlRemaining(Owner["network_start_tick"], Owner["network_timeout_ms"]) <= 0
         return _LLMRemote_CompleteReady(Owner, on_result, false)
     if A_IsSuspended || !(ProxySelection is Map) || !ProxySelection.Get("ok", false)
         return _LLMRemote_CompleteReady(Owner, on_result, false)
@@ -1461,7 +1466,7 @@ _LLMRemote_DispatchReady(Owner, on_result, PingUrl, ProvFmt, Token, Port, Create
         if !ProxySelection.Get("inherit", false)
             Http.SetProxy(ProxySelection.Get("proxy", ""))
         if HasMethod(Http, "SetDeadline")
-            Http.SetDeadline(Owner["network_start_tick"], LLM_REMOTE_READY_PING_DEADLINE_MS)
+            Http.SetDeadline(Owner["network_start_tick"], Owner["network_timeout_ms"])
         if HasMethod(Http, "SetProxyAdmission")
             Http.SetProxyAdmission(ProxySelection, ResolveFn)
         _LLMRemoteSetAuthHeaders(Http, ProvFmt, Token)
@@ -1477,7 +1482,7 @@ _LLMRemote_DispatchReady(Owner, on_result, PingUrl, ProvFmt, Token, Port, Create
         return false
     }
     PollFn := _LLM_CurlArtifactPortFn(Port, "poll_ready", _LLMRemote_PollReady)
-    PollFn.Call(Http, on_result, Owner["network_start_tick"], LLM_REMOTE_READY_PING_DEADLINE_MS, Owner)
+    PollFn.Call(Http, on_result, Owner["network_start_tick"], Owner["network_timeout_ms"], Owner)
     return true
 }
 

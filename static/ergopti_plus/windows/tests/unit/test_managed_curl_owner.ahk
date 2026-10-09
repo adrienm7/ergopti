@@ -50,13 +50,58 @@ _ManagedCurlControlState() {
 	return Map("spawns", 0, "starts", 0, "terminates", [], "retire", true)
 }
 
-_ManagedCurlControlAck(State, Mode := "valid") {
+_ManagedCurlControlAck(State, Mode := "valid", OpenFn := 0) {
 	Request := State["request"]
 	Ack := '{"schema_version":1,"state":"ready","request_id":'
 		. JsonStringLiteral(Mode == "foreign" ? "foreign_request" : Request.CleanupDebtId)
 	Ack .= ',"tls_backend":"schannel","child_quiesced":' . (Mode == "forged" ? '"1"' : "true") . '}'
-	AssertTrue(FSWrite(State["directory"] . "admission.json", Ack), "the explicit native-receipt port must stage its owned control")
+	; Match the worker's private stage/rename protocol: the active admission timer
+	; must never see a final receipt while its bytes are still being written.
+	Stage := State["directory"] . "admission.pending"
+	AssertTrue(FSWrite(Stage, Ack, OpenFn), "the explicit native-receipt port must stage its owned control")
+	AssertEqual(1, FSAtomicMoveCreate(Stage, State["directory"] . "admission.json"),
+		"only the complete exact staged admission may acquire the final path")
 }
+
+_ManagedCurlControlAckOpenDuringPoll(State, Path, Mode, Encoding) {
+	File := FileOpen(Path, Mode, Encoding)
+	if !IsObject(File)
+		return File
+	try {
+		State["poll_during_ack_write"] += 1
+		Request := State["request"]
+		Request._PollManagedAdmission()
+		AssertFalse(Request.Aborted, "an incomplete private stage cannot retire the request")
+		AssertFalse(Request.ManagedPayloadPublished, "an incomplete ACK cannot admit secrets")
+		AssertFalse(FileExist(State["directory"] . "admission.json"), "the final ACK stays absent until its staged bytes close")
+		AssertFalse(FileExist(State["directory"] . "transport.json"), "transport stays absent during the controlled publication boundary")
+		return File
+	} catch as Failure {
+		File.Close()
+		throw Failure
+	}
+}
+
+_ManagedCurlControlAckPublicationBoundary() {
+	State := _ManagedCurlControlState()
+	State["poll_during_ack_write"] := 0
+	Request := _ManagedCurlControlNew(State)
+	try {
+		AssertTrue(Request.Send("private-user-payload"))
+		_ManagedCurlControlAck(State, "valid", _ManagedCurlControlAckOpenDuringPoll.Bind(State))
+		AssertEqual(1, State["poll_during_ack_write"], "the control must poll after real file creation and before any ACK bytes")
+		Request._PollManagedAdmission()
+		AssertFalse(Request.Aborted, "complete owned publication preserves the original request")
+		AssertTrue(Request.ManagedPayloadPublished, "only the complete admitted ACK releases transport staging")
+		Published := JsonParse(FileRead(State["directory"] . "transport.json", "UTF-8"))
+		AssertEqual(Request.CleanupDebtId, Published["request_id"], "publication retains the exact native request identity")
+		AssertEqual("private-user-payload", Published["body"])
+		AssertEqual(State["origin"], Request.DeadlineStart, "publication cannot restart the native clock")
+		AssertEqual(20000, Request.DeadlineTimeout, "publication cannot increase the original budget")
+	} finally _ManagedCurlControlRelease(State)
+}
+Test("managed curl owner: a poll during ACK staging cannot observe partial admission (managed-ack-publication)",
+	_ManagedCurlControlAckPublicationBoundary)
 
 _ManagedCurlControlSecretsWaitForNativeAdmission() {
 	State := _ManagedCurlControlState()
@@ -108,6 +153,10 @@ _ManagedCurlControlExpiredAck() {
 	Request := _ManagedCurlControlNew(State)
 	try {
 		AssertTrue(Request.Send("private-user-payload"))
+		; This control manually delivers the poll after expiry. Stop only this
+		; request's admission callback before ACK publication can make it due.
+		AssertTrue(IsObject(Request.ManagedAdmissionFn), "manual expiry must own the actual admission callback")
+		SetTimer(Request.ManagedAdmissionFn, 0)
 		_ManagedCurlControlAck(State)
 		Request.DeadlineStart := 0
 		Request.DeadlineTimeout := 1
@@ -230,7 +279,7 @@ _ManagedCurlControlIdentityFactory(State) {
 	return State["request"]
 }
 
-_ManagedCurlControlGenerationAdmissionRevoked(ReplaceOwner := false) {
+_ManagedCurlControlGenerationAdmissionRevoked(ReplaceOwner := false, YieldAfterAck := false) {
 	global _LLM_Remote_Async
 	Saved := _LLM_Remote_Async
 	_LLM_Remote_Async := Map()
@@ -245,7 +294,23 @@ _ManagedCurlControlGenerationAdmissionRevoked(ReplaceOwner := false) {
 			"create_http", _ManagedCurlControlIdentityFactory.Bind(State))
 		AssertTrue(_LLMRemote_DispatchManagedCurl(State["id"], State["reservation"], Resolved,
 			"https://safe.invalid/api", "private-user-payload", Port))
+		; These controls deliver the poll only after generation revocation. Hold
+		; this request's timer before the completed ACK can make admission due.
+		AssertTrue(IsObject(Request.ManagedAdmissionFn), "manual generation revocation must own the actual admission callback")
+		if YieldAfterAck {
+			AssertEqual(0, A_IsCritical, "the interleave control must allow actual timer dispatch")
+			SetTimer(Request.ManagedAdmissionFn, -1)
+		}
+		SetTimer(Request.ManagedAdmissionFn, 0)
 		_ManagedCurlControlAck(State)
+		if YieldAfterAck {
+			Sleep(30)
+			AssertTrue(IsObject(Request.ManagedAdmissionFn), "holding this timer preserves the exact callback until manual revocation")
+			AssertFalse(Request.ManagedPayloadPublished, "a yielded completed ACK cannot bypass manual generation revocation")
+			AssertFalse(Request.Aborted, "holding admission leaves the original request live until revocation")
+			AssertEqual(State["reservation"]["start_tick"], Request.DeadlineStart, "the interleave cannot restart the original clock")
+			AssertEqual(State["reservation"]["timeout_ms"], Request.DeadlineTimeout, "the interleave cannot extend the original budget")
+		}
 		Critical("On")
 		if ReplaceOwner {
 			State["replacement"] := Map("cancelled", false)
@@ -268,3 +333,5 @@ _ManagedCurlControlGenerationAdmissionRevoked(ReplaceOwner := false) {
 }
 Test("managed curl owner: real generation cancellation revokes a queued native admission", _ManagedCurlControlGenerationAdmissionRevoked)
 Test("managed curl owner: generation replacement after Send revokes native admission", _ManagedCurlControlGenerationAdmissionRevoked.Bind(true))
+Test("managed curl owner: queued admission cannot beat cancellation after a yielded ACK", _ManagedCurlControlGenerationAdmissionRevoked.Bind(false, true))
+Test("managed curl owner: queued admission cannot beat replacement after a yielded ACK", _ManagedCurlControlGenerationAdmissionRevoked.Bind(true, true))

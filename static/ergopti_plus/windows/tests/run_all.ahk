@@ -42,6 +42,7 @@ _RejectRunnerArguments(Message) {
 global _AHK_DRY_RUN := false
 global _AHK_ONLY_FILTER := ""
 global _AHK_INTERACTIVE := false
+global _AHK_QUALIFICATION_PROFILE := ""
 _riArgIndex := 1
 while (_riArgIndex <= A_Args.Length) {
 	_riArg := A_Args[_riArgIndex]
@@ -49,6 +50,13 @@ while (_riArgIndex <= A_Args.Length) {
 		_AHK_DRY_RUN := true
 	else if (_riArg == "--interactive")
 		_AHK_INTERACTIVE := true
+	else if (SubStr(_riArg, 1, 24) == "--qualification-profile=") {
+		if _AHK_QUALIFICATION_PROFILE != ""
+			_RejectRunnerArguments("--qualification-profile may be supplied only once")
+		_AHK_QUALIFICATION_PROFILE := SubStr(_riArg, 25)
+		if _AHK_QUALIFICATION_PROFILE == ""
+			_RejectRunnerArguments("--qualification-profile requires a non-empty id")
+	}
 	else if (_riArg == "--only" || SubStr(_riArg, 1, 7) == "--only=") {
 		if StrLen(_AHK_ONLY_FILTER) > 0
 			_RejectRunnerArguments("--only may be supplied only once")
@@ -267,6 +275,8 @@ global _DefaultLogsDir := _LogsDir
 ; json.ahk must precede locale.ahk — _I18nLoadLocaleMap delegates to JsonParse.
 #Include ../infra/registry.ahk
 #Include ../infra/json.ahk
+; Keep the standalone assertion library independent of production JSON symbols.
+TestQualificationRegisterParser(JsonParse)
 #Include ../infra/program_parameter.ahk
 #Include ../adapters/program_providers.ahk
 #Include ../ui/action_picker_webview.ahk
@@ -1079,6 +1089,7 @@ _LogBootProgress("keylogger modules + tests included")
 #Include meta/test_run_all_include_integrity.ahk
 #Include meta/test_runner_only_filter.ahk
 #Include meta/test_runner_failure_ergonomics.ahk
+#Include unit/test_qualification_parser_owner.ahk
 #Include meta/test_ahk_os_purity_ratchet.ahk
 #Include meta/test_ahk_os_purity_inputs.ahk
 #Include meta/test_logger_pairing.ahk

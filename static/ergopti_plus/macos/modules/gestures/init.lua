@@ -13,6 +13,7 @@
 --- ==============================================================================
 
 local M = {}
+local BindingPublication = require("config_binding_publication")
 
 local hs            = hs
 local notifications = require("infra.notifications")
@@ -93,6 +94,37 @@ function M.gesture_slot_catalogue()
 		assert(count == #list, "gestures: invalid published slot catalogue")
 	end
 	return { prefix = "", slots = slots }
+end
+
+-- Preserve the constructor's genuine source identities and ordered scalar image.
+-- Public runtime tables cannot certify retirement after replacement or mutation.
+local gesture_slot_getter = M.gesture_slot_catalogue
+local gesture_slot_sources = { M.SINGLE_SLOTS, M.AXIS_SLOTS }
+local gesture_slot_ids = { {}, {} }
+for list_index, source in ipairs(gesture_slot_sources) do
+	for index, slot in ipairs(source) do gesture_slot_ids[list_index][index] = slot end
+end
+
+--- Returns the complete native gesture domain only while its issuer and source live.
+--- Malformed current inventories remain errors; well-formed changed sources withdraw
+--- judgment. No public replacement getter is invoked and no IO is performed.
+--- @return table|nil catalogue Detached current gesture identities.
+function M.published_binding_catalogue()
+	if not BindingPublication.owner_is_current("gesture", "modules.gestures", M)
+		or not rawequal(rawget(M, "gesture_slot_catalogue"), gesture_slot_getter) then return nil end
+	local single, axis = rawget(M, "SINGLE_SLOTS"), rawget(M, "AXIS_SLOTS")
+	assert(type(single) == "table" and type(axis) == "table"
+		and getmetatable(single) == nil and getmetatable(axis) == nil,
+		"gestures: invalid published slot catalogue")
+	local current = gesture_slot_getter()
+	for list_index, source in ipairs({ single, axis }) do
+		if not rawequal(source, gesture_slot_sources[list_index])
+			or #source ~= #gesture_slot_ids[list_index] then return nil end
+		for index, slot in ipairs(gesture_slot_ids[list_index]) do
+			if rawget(source, index) ~= slot then return nil end
+		end
+	end
+	return current
 end
 
 -- Neutral bindings come from the shared manifest; recommendations are applied
@@ -1553,5 +1585,7 @@ function M.diagnose()
 	end
 	Logger.info(LOG, "============== end diagnose ==============")
 end
+
+BindingPublication.register("gesture", "modules.gestures", M, M.published_binding_catalogue)
 
 return M

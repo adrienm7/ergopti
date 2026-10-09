@@ -3244,5 +3244,19 @@
 	"physical_shortcuts.windows_unavailable": "Endnu ikke på Windows: Editoren til fysiske genveje er endnu ikke tilgængelig på Windows.",
 	"physical_shortcuts.collision": "Denne tastkombination er allerede i brug. Vælg en anden.",
 	"physical_shortcuts.window_unavailable": "Dette vindue er ikke tilgængeligt: Prøv at åbne det igen.",
-	"platform_reason.legacy_helpers_use_windows_scan_code_hotkeys": "Disse ældre emuleringsfunktioner bruger Windows-genveje baseret på scankoder. Andre systemer bruger deres indbyggede tastaturlayouts."
+	"platform_reason.legacy_helpers_use_windows_scan_code_hotkeys": "Disse ældre emuleringsfunktioner bruger Windows-genveje baseret på scankoder. Andre systemer bruger deres indbyggede tastaturlayouts.",
+	"gestures.system.conflicts_caption": "⚠ %s mulige konflikter",
+	"gestures.system.pinch_enabled": "Systemets knibebevægelse : Aktiveret",
+	"gestures.system.pinch_disabled": "Systemets knibebevægelse : Deaktiveret",
+	"gestures.system.pinch_unknown": "Systemets knibebevægelse : Systembevægelser: ikke kontrolleret",
+	"gestures.system.slot_unknown_caption": "%s — Systembevægelser: ikke kontrolleret",
+	"gestures.system.slot_configured_caption": "%s — Konfigureret til ErgoptiPlus",
+	"gestures.system.slot_not_configured_caption": "%s — Ikke konfigureret til ErgoptiPlus",
+	"menu.global.reload_macos": "↺ Genindlæs",
+	"menu.global.quit_macos": "✕ Afslut",
+	"menu.layout.pause_picker_caption": "  ↳ Layout når scriptet er sat på pause : %s",
+	"menu.layout.resume_picker_caption": "  ↳ Layout når scriptet er aktivt : %s",
+	"menu.layout.native_variant_caption": "%s v%s",
+	"app_picker.agent_remove_marker": "✗",
+	"app_picker.agent_exclude_current_caption": "Udeluk %s (aktuel)"
 }

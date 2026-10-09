@@ -3244,5 +3244,19 @@
 	"physical_shortcuts.windows_unavailable": "Pas encore sur Windows: L’éditeur de raccourcis physiques n’est pas encore disponible sur Windows.",
 	"physical_shortcuts.collision": "Cette combinaison est déjà utilisée. Choisissez-en une autre.",
 	"physical_shortcuts.window_unavailable": "Cette fenêtre est indisponible: Essayez de la rouvrir.",
-	"platform_reason.legacy_helpers_use_windows_scan_code_hotkeys": "Ces fonctions d’émulation héritées utilisent des raccourcis Windows fondés sur les codes de balayage. Les autres systèmes utilisent les correspondances de leur disposition native."
+	"platform_reason.legacy_helpers_use_windows_scan_code_hotkeys": "Ces fonctions d’émulation héritées utilisent des raccourcis Windows fondés sur les codes de balayage. Les autres systèmes utilisent les correspondances de leur disposition native.",
+	"gestures.system.conflicts_caption": "⚠ %s conflit(s) potentiel(s)",
+	"gestures.system.pinch_enabled": "Pincement système : Activé",
+	"gestures.system.pinch_disabled": "Pincement système : Désactivé",
+	"gestures.system.pinch_unknown": "Pincement système : Gestes système : non vérifiés",
+	"gestures.system.slot_unknown_caption": "%s — Gestes système : non vérifiés",
+	"gestures.system.slot_configured_caption": "%s — Configuré pour ErgoptiPlus",
+	"gestures.system.slot_not_configured_caption": "%s — Non configuré pour ErgoptiPlus",
+	"menu.global.reload_macos": "↺ Recharger",
+	"menu.global.quit_macos": "✕ Quitter",
+	"menu.layout.pause_picker_caption": "  ↳ Disposition quand script en pause : %s",
+	"menu.layout.resume_picker_caption": "  ↳ Disposition quand script actif : %s",
+	"menu.layout.native_variant_caption": "%s v%s",
+	"app_picker.agent_remove_marker": "✗",
+	"app_picker.agent_exclude_current_caption": "Exclure %s (actuelle)"
 }

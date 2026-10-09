@@ -465,7 +465,8 @@
 		"test:ahk-e2e-manifest": "node ./tools/test/test-ahk-e2e-manifest.cjs",
 		"test:menu-shared-delegation": "node ./tools/test/test-menu-shared-delegation.cjs",
 		"test:linux:fd-sha256-native": "node ./tools/test/run-linux-fd-sha256-native.cjs",
-		"test:linux-fd-sha256-native-gate": "node ./tools/test/test-linux-fd-sha256-native-gate.cjs"
+		"test:linux-fd-sha256-native-gate": "node ./tools/test/test-linux-fd-sha256-native-gate.cjs",
+		"test:dev-release-qualification": "node ./tools/test/test-dev-release-qualification.cjs"
 	},
 	"type": "module",
 	"dependencies": {

@@ -3244,5 +3244,19 @@
 	"physical_shortcuts.windows_unavailable": "Not yet on Windows: The physical shortcut editor is not yet available on Windows.",
 	"physical_shortcuts.collision": "This key combination is already in use. Choose another.",
 	"physical_shortcuts.window_unavailable": "This window is unavailable: Try reopening it.",
-	"platform_reason.legacy_helpers_use_windows_scan_code_hotkeys": "These legacy emulation helpers use Windows scan-code hotkeys. Other systems use their native layout mappings."
+	"platform_reason.legacy_helpers_use_windows_scan_code_hotkeys": "These legacy emulation helpers use Windows scan-code hotkeys. Other systems use their native layout mappings.",
+	"gestures.system.conflicts_caption": "⚠ %s potential conflict(s)",
+	"gestures.system.pinch_enabled": "System pinch gesture : Enabled",
+	"gestures.system.pinch_disabled": "System pinch gesture : Disabled",
+	"gestures.system.pinch_unknown": "System pinch gesture : System gestures: unverified",
+	"gestures.system.slot_unknown_caption": "%s — System gestures: unverified",
+	"gestures.system.slot_configured_caption": "%s — Configured for ErgoptiPlus",
+	"gestures.system.slot_not_configured_caption": "%s — Not configured for ErgoptiPlus",
+	"menu.global.reload_macos": "↺ Reload",
+	"menu.global.quit_macos": "✕ Quit",
+	"menu.layout.pause_picker_caption": "  ↳ Layout when script is paused : %s",
+	"menu.layout.resume_picker_caption": "  ↳ Layout when script is active : %s",
+	"menu.layout.native_variant_caption": "%s v%s",
+	"app_picker.agent_remove_marker": "✗",
+	"app_picker.agent_exclude_current_caption": "Exclude %s (current)"
 }

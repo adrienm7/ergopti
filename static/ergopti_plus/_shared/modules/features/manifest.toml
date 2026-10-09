@@ -3893,11 +3893,29 @@ reason_key = "platform_reason.tray_top_level_rows_are_each_drivers"
 type = "command"
 id = "reload"
 i18n = "menu.global.reload"
+platforms = ["ahk", "linux"]
+unavailable = "hide"
+
+[[menu.top_level]]
+type = "command"
+id = "reload"
+i18n = "menu.global.reload_macos"
+platforms = ["hs"]
+unavailable = "hide"
 
 [[menu.top_level]]
 type = "command"
 id = "quit"
 i18n = "menu.global.quit"
+platforms = ["ahk", "linux"]
+unavailable = "hide"
+
+[[menu.top_level]]
+type = "command"
+id = "quit"
+i18n = "menu.global.quit_macos"
+platforms = ["hs"]
+unavailable = "hide"
 
 [[menu.top_level]]
 type = "group"
@@ -4350,6 +4368,8 @@ type = "---"
 type = "command"
 id = "agent_system_model"
 i18n = "menu.agent.model"
+caption_getter = "agent_system_model_caption"
+caption_format = "numbered"
 disabled_when = ["agent_system_model_ready"]
 
 # The native observed installed status uses the same model command owner.
@@ -4360,6 +4380,8 @@ type = "---"
 type = "command"
 id = "agent_system_model"
 i18n = "menu.agent.model_installed"
+caption_getter = "agent_system_model_caption"
+caption_format = "numbered"
 disabled_when = ["agent_system_model_ready"]
 
 # The native observed missing status uses the same model command owner.
@@ -4370,6 +4392,8 @@ type = "---"
 type = "command"
 id = "agent_system_model"
 i18n = "menu.agent.model_missing"
+caption_getter = "agent_system_model_caption"
+caption_format = "numbered"
 disabled_when = ["agent_system_model_ready"]
 
 # The Applications submenu, macOS only: it lists the bundled applications
@@ -8531,3 +8555,681 @@ i18n = "menu.hotstrings.magic_key_reset"
 platforms = ["linux"]
 unavailable = "hide"
 label_prefix = "    "
+
+# Complete native keyboard-group content; only the genuine binding callbacks stay native.
+[[menu.keyboard_group_frame]]
+type = "include"
+section = "keyboard_group_fixed_frame"
+present_when = "keyboard_group_has_fixed"
+
+[[menu.keyboard_group_frame]]
+type = "list"
+id = "keyboard_group_assigned_rows"
+platforms = ["hs"]
+unavailable = "hide"
+
+[[menu.keyboard_group_frame]]
+type = "include"
+section = "keyboard_group_add_option_control"
+present_when = "keyboard_group_add_option"
+
+[[menu.keyboard_group_frame]]
+type = "include"
+section = "keyboard_group_add_ctrl_control"
+present_when = "keyboard_group_add_ctrl"
+
+[[menu.keyboard_group_frame]]
+type = "include"
+section = "keyboard_group_add_ctrl_shift_control"
+present_when = "keyboard_group_add_ctrl_shift"
+
+[[menu.keyboard_group_frame]]
+type = "include"
+section = "keyboard_group_add_cmd_control"
+present_when = "keyboard_group_add_cmd"
+
+[[menu.keyboard_group_frame]]
+type = "include"
+section = "keyboard_group_add_cmd_shift_control"
+present_when = "keyboard_group_add_cmd_shift"
+
+[[menu.keyboard_group_fixed_frame]]
+type = "list"
+id = "keyboard_group_fixed_rows"
+platforms = ["hs"]
+unavailable = "hide"
+
+[[menu.keyboard_group_fixed_frame]]
+type = "---"
+platforms = ["hs"]
+unavailable = "hide"
+
+[[menu.keyboard_group_add_option_control]]
+type = "command"
+id = "keyboard_group_add_option"
+command = "keyboard_group_add"
+i18n = "menu.shortcuts.alt_add"
+disabled_when = ["keyboard_group_ready"]
+platforms = ["hs"]
+unavailable = "hide"
+
+[[menu.keyboard_group_add_ctrl_control]]
+type = "command"
+id = "keyboard_group_add_ctrl"
+command = "keyboard_group_add"
+i18n = "menu.shortcuts.ctrl_add"
+disabled_when = ["keyboard_group_ready"]
+platforms = ["hs"]
+unavailable = "hide"
+
+[[menu.keyboard_group_add_ctrl_shift_control]]
+type = "command"
+id = "keyboard_group_add_ctrl_shift"
+command = "keyboard_group_add"
+i18n = "menu.shortcuts.ctrl_shift_add"
+disabled_when = ["keyboard_group_ready"]
+platforms = ["hs"]
+unavailable = "hide"
+
+[[menu.keyboard_group_add_cmd_control]]
+type = "command"
+id = "keyboard_group_add_cmd"
+command = "keyboard_group_add"
+i18n = "menu.shortcuts.cmd_add"
+disabled_when = ["keyboard_group_ready"]
+platforms = ["hs"]
+unavailable = "hide"
+
+[[menu.keyboard_group_add_cmd_shift_control]]
+type = "command"
+id = "keyboard_group_add_cmd_shift"
+command = "keyboard_group_add"
+i18n = "menu.shortcuts.cmd_shift_add"
+disabled_when = ["keyboard_group_ready"]
+platforms = ["hs"]
+unavailable = "hide"
+
+# Action-picker composition retains the actual native catalogue and selection owners.
+[[menu.tap_hold_action_picker_frame]]
+type = "list"
+id = "tap_hold_picker_special_rows"
+platforms = ["hs"]
+unavailable = "hide"
+
+[[menu.tap_hold_action_picker_frame]]
+type = "include"
+section = "tap_hold_action_picker_boundary"
+present_when = "tap_hold_picker_has_boundary"
+
+[[menu.tap_hold_action_picker_frame]]
+type = "list"
+id = "tap_hold_picker_grouped_rows"
+platforms = ["hs"]
+unavailable = "hide"
+
+[[menu.tap_hold_action_picker_boundary]]
+type = "---"
+platforms = ["hs"]
+unavailable = "hide"
+
+# Cached system status presentation; native inventories and settings/probes stay native.
+[[menu.gesture_system_status_windows_frame]]
+type = "include"
+section = "gesture_system_status_unknown"
+present_when = "gesture_system_is_unverified"
+
+[[menu.gesture_system_status_windows_frame]]
+type = "include"
+section = "gesture_system_status_clear"
+present_when = "gesture_system_is_clear"
+
+[[menu.gesture_system_status_windows_frame]]
+type = "include"
+section = "gesture_system_status_conflicts"
+present_when = "gesture_system_has_conflicts"
+
+# macOS has cached native conflict/pinch data; its existing parent has only clear/count states.
+[[menu.gesture_system_status_macos_frame]]
+type = "include"
+section = "gesture_system_status_clear"
+present_when = "gesture_system_is_clear"
+
+[[menu.gesture_system_status_macos_frame]]
+type = "include"
+section = "gesture_system_status_conflicts"
+present_when = "gesture_system_has_conflicts"
+
+# Portable Linux cannot certify a native desktop gesture policy.
+[[menu.gesture_system_status_linux_frame]]
+type = "include"
+section = "gesture_system_status_unknown"
+
+[[menu.gesture_system_status_unknown]]
+type = "group"
+id = "gesture_system_unknown_children"
+i18n = "gestures.system.unknown"
+platforms = ["ahk", "linux"]
+unavailable = "hide"
+
+# Linux cannot verify the compositor's gesture policy; it retains the unknown branch.
+[[menu.gesture_system_status_clear]]
+type = "group"
+id = "gesture_system_clear_children"
+i18n = "gestures.system.clear"
+platforms = ["ahk", "hs"]
+unavailable = "hide"
+
+[[menu.gesture_system_status_conflicts]]
+type = "group"
+id = "gesture_system_conflict_children"
+i18n = "gestures.system.conflicts_caption"
+caption_getter = "gesture_system_conflict_count"
+platforms = ["ahk", "hs"]
+unavailable = "hide"
+
+[[menu.gesture_system_windows_children]]
+type = "list"
+id = "gesture_system_cached_slots"
+platforms = ["ahk"]
+unavailable = "hide"
+
+[[menu.gesture_system_windows_children]]
+type = "include"
+section = "gesture_system_status_controls"
+
+[[menu.gesture_system_macos_children]]
+type = "list"
+id = "gesture_system_cached_conflicts"
+platforms = ["hs"]
+unavailable = "hide"
+
+[[menu.gesture_system_macos_children]]
+type = "include"
+section = "gesture_system_pinch_frame"
+
+[[menu.gesture_system_macos_children]]
+type = "include"
+section = "gesture_system_status_controls"
+
+[[menu.gesture_system_linux_children]]
+type = "include"
+section = "gesture_system_linux_reading_frame"
+
+[[menu.gesture_system_linux_children]]
+type = "list"
+id = "gesture_system_cached_overlap"
+platforms = ["linux"]
+unavailable = "hide"
+
+[[menu.gesture_system_linux_children]]
+type = "include"
+section = "gesture_system_linux_settings_unavailable"
+present_when = "gesture_system_settings_unavailable"
+
+# Only native Windows cached settings can select configured/not-configured states.
+[[menu.gesture_system_slot_windows_frame]]
+type = "include"
+section = "gesture_system_slot_unknown"
+present_when = "gesture_system_slot_unverified"
+
+[[menu.gesture_system_slot_windows_frame]]
+type = "include"
+section = "gesture_system_slot_configured"
+present_when = "gesture_system_slot_configured"
+
+[[menu.gesture_system_slot_windows_frame]]
+type = "include"
+section = "gesture_system_slot_not_configured"
+present_when = "gesture_system_slot_not_configured"
+
+[[menu.gesture_system_slot_linux_frame]]
+type = "include"
+section = "gesture_system_slot_unknown"
+
+[[menu.gesture_system_slot_unknown]]
+type = "command"
+id = "gesture_system_open_unknown_slot"
+i18n = "gestures.system.slot_unknown_caption"
+caption_getter = "gesture_system_slot_caption"
+platforms = ["ahk", "linux"]
+unavailable = "hide"
+
+[[menu.gesture_system_slot_configured]]
+type = "command"
+id = "gesture_system_open_configured_slot"
+i18n = "gestures.system.slot_configured_caption"
+caption_getter = "gesture_system_slot_caption"
+platforms = ["ahk"]
+unavailable = "hide"
+
+[[menu.gesture_system_slot_not_configured]]
+type = "command"
+id = "gesture_system_open_not_configured_slot"
+i18n = "gestures.system.slot_not_configured_caption"
+caption_getter = "gesture_system_slot_caption"
+platforms = ["ahk"]
+unavailable = "hide"
+
+# The native cached macOS pinch state has no Windows/Linux equivalent.
+[[menu.gesture_system_pinch_frame]]
+type = "include"
+section = "gesture_system_pinch_enabled"
+present_when = "gesture_system_pinch_is_enabled"
+
+[[menu.gesture_system_pinch_frame]]
+type = "include"
+section = "gesture_system_pinch_disabled"
+present_when = "gesture_system_pinch_is_disabled"
+
+[[menu.gesture_system_pinch_frame]]
+type = "include"
+section = "gesture_system_pinch_unknown"
+present_when = "gesture_system_pinch_is_unknown"
+
+[[menu.gesture_system_pinch_enabled]]
+type = "command"
+id = "gesture_system_open_enabled_pinch"
+i18n = "gestures.system.pinch_enabled"
+platforms = ["hs"]
+unavailable = "hide"
+
+[[menu.gesture_system_pinch_disabled]]
+type = "command"
+id = "gesture_system_open_disabled_pinch"
+i18n = "gestures.system.pinch_disabled"
+platforms = ["hs"]
+unavailable = "hide"
+
+[[menu.gesture_system_pinch_unknown]]
+type = "command"
+id = "gesture_system_open_unknown_pinch"
+i18n = "gestures.system.pinch_unknown"
+platforms = ["hs"]
+unavailable = "hide"
+
+[[menu.gesture_system_linux_reading_frame]]
+type = "include"
+section = "gesture_system_linux_reading_on"
+present_when = "gesture_system_reader_active"
+
+[[menu.gesture_system_linux_reading_frame]]
+type = "include"
+section = "gesture_system_linux_reading_off"
+present_when = "gesture_system_reader_inactive"
+
+[[menu.gesture_system_linux_reading_on]]
+type = "label"
+id = "gesture_system_linux_reading_on"
+i18n = "menu.gestures.reading_on"
+platforms = ["linux"]
+unavailable = "hide"
+
+[[menu.gesture_system_linux_reading_off]]
+type = "label"
+id = "gesture_system_linux_reading_off"
+i18n = "menu.gestures.reading_off"
+platforms = ["linux"]
+unavailable = "hide"
+
+[[menu.gesture_system_linux_settings_unavailable]]
+type = "label"
+id = "gesture_system_linux_settings_unavailable"
+i18n = "gestures.system.unknown"
+platforms = ["linux"]
+unavailable = "hide"
+
+# Native macOS canvas/image allocation retains the actual badge click and lifetime.
+# This frame owns only the two existing badge captions and following boundary.
+[[menu.macos_canvas_badge_frame]]
+type = "include"
+section = "macos_canvas_badge_paused"
+present_when = "macos_badge_is_paused"
+
+[[menu.macos_canvas_badge_frame]]
+type = "include"
+section = "macos_canvas_badge_active"
+present_when = "macos_badge_is_active"
+
+[[menu.macos_canvas_badge_frame]]
+type = "---"
+platforms = ["hs"]
+unavailable = "hide"
+
+[[menu.macos_canvas_badge_paused]]
+type = "label"
+id = "macos_badge_paused_caption"
+i18n = "menu.builder.title_paused"
+platforms = ["hs"]
+unavailable = "hide"
+
+[[menu.macos_canvas_badge_active]]
+type = "label"
+id = "macos_badge_active_caption"
+i18n = "menu.builder.title"
+platforms = ["hs"]
+unavailable = "hide"
+
+# Completed native objects retain their native resource/callback owners.
+# Composition declares order only; no DATA conversion or runtime getter is used.
+[[menu.macos_download_root]]
+type = "native_content"
+id = "download"
+kind = "command"
+platforms = ["hs"]
+unavailable = "hide"
+
+[[menu.macos_download_root]]
+type = "---"
+after = "download"
+platforms = ["hs"]
+unavailable = "hide"
+
+[[menu.macos_download_root]]
+type = "native_content"
+id = "body"
+kind = "rows"
+target = true
+platforms = ["hs"]
+unavailable = "hide"
+
+[[menu.macos_canvas_badge_root]]
+type = "native_content"
+id = "badge"
+kind = "image"
+platforms = ["hs"]
+unavailable = "hide"
+
+[[menu.macos_canvas_badge_root]]
+type = "native_content"
+id = "boundary"
+kind = "boundary"
+platforms = ["hs"]
+unavailable = "hide"
+
+[[menu.macos_canvas_badge_root]]
+type = "native_content"
+id = "body"
+kind = "rows"
+target = true
+platforms = ["hs"]
+unavailable = "hide"
+
+# Complete macOS automatic-switching policy frame; TIS ownership remains native.
+[[menu.layout_switching_frame]]
+type = "check"
+id = "layout_switch_toggle"
+i18n = "menu.layout.pause_layout_enabled"
+checked_when = ["layout_switch_checked"]
+platforms = ["hs"]
+unavailable = "hide"
+
+[[menu.layout_switching_frame]]
+type = "group"
+id = "layout_pause_picker"
+i18n = "menu.layout.pause_picker_caption"
+caption_getter = "layout_pause_caption"
+disabled_when = ["layout_switch_ready"]
+platforms = ["hs"]
+unavailable = "hide"
+
+[[menu.layout_switching_frame]]
+type = "group"
+id = "layout_resume_picker"
+i18n = "menu.layout.resume_picker_caption"
+caption_getter = "layout_resume_caption"
+disabled_when = ["layout_switch_ready"]
+platforms = ["hs"]
+unavailable = "hide"
+
+[[menu.layout_switch_picker_frame]]
+type = "check"
+id = "layout_picker_auto"
+i18n = "menu.layout.layout_auto"
+checked_when = ["layout_picker_auto_checked"]
+platforms = ["hs"]
+unavailable = "hide"
+
+[[menu.layout_switch_picker_frame]]
+type = "include"
+section = "layout_switch_picker_choices_frame"
+present_when = "layout_picker_has_choices"
+
+[[menu.layout_switch_picker_choices_frame]]
+type = "---"
+
+[[menu.layout_switch_picker_choices_frame]]
+type = "list"
+id = "layout_picker_choices"
+platforms = ["hs"]
+unavailable = "hide"
+
+# Complete macOS Layout frames; native providers supply exact records and callbacks.
+# Native record captions are literal data, never placeholder translation identities.
+
+[[menu.layout_native_record_choice]]
+type = "check"
+id = "layout_native_select"
+caption_source = "native"
+caption_getter = "layout_native_caption"
+checked_when = ["layout_native_selected"]
+disabled_when = ["layout_native_ready"]
+platforms = ["hs"]
+unavailable = "hide"
+
+[[menu.layout_bundle_installed]]
+type = "label"
+id = "layout_installed_caption"
+i18n = "menu.layout.installed_version"
+caption_getters = ["layout_install_scope", "layout_install_latest"]
+platforms = ["hs"]
+unavailable = "hide"
+
+[[menu.layout_bundle_update]]
+type = "command"
+id = "layout_install"
+i18n = "menu.layout.update_version"
+caption_getters = ["layout_install_scope", "layout_install_old", "layout_install_latest"]
+platforms = ["hs"]
+unavailable = "hide"
+
+[[menu.layout_bundle_install]]
+type = "command"
+id = "layout_install"
+i18n = "menu.layout.install_version"
+caption_getters = ["layout_install_emoji", "layout_install_scope", "layout_install_latest"]
+platforms = ["hs"]
+unavailable = "hide"
+
+[[menu.layout_bundle_in_list]]
+type = "label"
+id = "layout_in_list_caption"
+i18n = "menu.layout.in_list"
+caption_getter = "layout_bundle_version"
+platforms = ["hs"]
+unavailable = "hide"
+
+[[menu.layout_bundle_update_install_first]]
+type = "label"
+id = "layout_update_install_first_caption"
+i18n = "menu.layout.update_list_install_first"
+caption_getter = "layout_bundle_version"
+platforms = ["hs"]
+unavailable = "hide"
+
+[[menu.layout_bundle_upgrade]]
+type = "command"
+id = "layout_upgrade_list"
+i18n = "menu.layout.update_list"
+caption_getters = ["layout_bundle_old_version", "layout_bundle_version"]
+platforms = ["hs"]
+unavailable = "hide"
+
+[[menu.layout_bundle_upgrade_to]]
+type = "command"
+id = "layout_upgrade_list"
+i18n = "menu.layout.update_list_to"
+caption_getter = "layout_bundle_version"
+platforms = ["hs"]
+unavailable = "hide"
+
+[[menu.layout_bundle_variant_added]]
+type = "label"
+id = "layout_added_variant_caption"
+i18n = "menu.layout.already_added"
+caption_getters = ["layout_variant_label", "layout_bundle_version"]
+platforms = ["hs"]
+unavailable = "hide"
+
+[[menu.layout_bundle_variant_add]]
+type = "command"
+id = "layout_enable_variant"
+i18n = "menu.layout.native_variant_caption"
+caption_getters = ["layout_variant_label", "layout_bundle_version"]
+platforms = ["hs"]
+unavailable = "hide"
+
+[[menu.layout_bundle_variant_parent]]
+type = "group"
+id = "layout_variant_choices"
+i18n = "menu.layout.add_to_list"
+caption_getter = "layout_bundle_version"
+platforms = ["hs"]
+unavailable = "hide"
+
+[[menu.layout_bundle_install_first]]
+type = "label"
+id = "layout_install_first_caption"
+i18n = "menu.layout.install_first"
+platforms = ["hs"]
+unavailable = "hide"
+
+[[menu.layout_bundle_frame]]
+type = "list"
+id = "layout_bundle_system"
+platforms = ["hs"]
+unavailable = "hide"
+
+[[menu.layout_bundle_frame]]
+type = "list"
+id = "layout_bundle_user"
+platforms = ["hs"]
+unavailable = "hide"
+
+[[menu.layout_bundle_frame]]
+type = "list"
+id = "layout_bundle_status"
+platforms = ["hs"]
+unavailable = "hide"
+
+[[menu.layout_native_parent]]
+type = "group"
+id = "layout_parent_content"
+i18n = "menu.layout.title"
+platforms = ["hs"]
+unavailable = "hide"
+
+# Linux Agent excluded-app data retains its actual settings and dialog owners.
+[[menu.agent_linux_disabled_apps_frame]]
+type = "group"
+id = "agent_disabled_apps"
+i18n = "menu.agent.disabled_apps"
+caption_getter = "agent_disabled_apps_count"
+caption_format = "numbered"
+platforms = ["linux"]
+unavailable = "hide"
+
+[[menu.agent_linux_disabled_app_remove]]
+type = "command"
+id = "agent_disabled_app_remove"
+i18n = "app_picker.agent_remove_marker"
+caption_getter = "agent_disabled_app_caption"
+caption_layout = "suffix"
+caption_joiner = "  "
+platforms = ["linux"]
+unavailable = "hide"
+
+[[menu.agent_linux_disabled_apps_children]]
+type = "list"
+id = "agent_disabled_app_records"
+platforms = ["linux"]
+unavailable = "hide"
+
+[[menu.agent_linux_disabled_apps_children]]
+type = "include"
+section = "agent_linux_disabled_apps_boundary"
+present_when = "agent_disabled_apps_present"
+
+[[menu.agent_linux_disabled_apps_children]]
+type = "include"
+section = "agent_linux_disabled_app_current"
+present_when = "agent_disabled_app_current_present"
+
+[[menu.agent_linux_disabled_apps_children]]
+type = "include"
+section = "agent_linux_disabled_app_add"
+
+[[menu.agent_linux_disabled_apps_boundary]]
+type = "---"
+platforms = ["linux"]
+unavailable = "hide"
+
+[[menu.agent_linux_disabled_app_current]]
+type = "command"
+id = "agent_disabled_app_current"
+i18n = "app_picker.agent_exclude_current_caption"
+caption_getter = "agent_disabled_app_current_caption"
+platforms = ["linux"]
+unavailable = "hide"
+
+[[menu.agent_linux_disabled_app_add]]
+type = "command"
+id = "agent_disabled_app_add"
+i18n = "app_picker.add_another_app"
+platforms = ["linux"]
+unavailable = "hide"
+
+# Backend descriptors remain native data; shared policy owns their presentation.
+[[menu.agent_linux_system_backend_record]]
+type = "check"
+id = "agent_system_backend"
+caption_source = "native"
+caption_getter = "agent_system_backend_label"
+checked_when = ["agent_system_backend_selected"]
+platforms = ["linux"]
+unavailable = "hide"
+
+[[menu.agent_linux_system_children]]
+type = "list"
+id = "agent_system_off_rows"
+platforms = ["linux"]
+unavailable = "hide"
+
+[[menu.agent_linux_system_children]]
+type = "list"
+id = "agent_system_backend_rows"
+platforms = ["linux"]
+unavailable = "hide"
+
+[[menu.agent_linux_system_children]]
+type = "list"
+id = "agent_system_model_rows"
+platforms = ["linux"]
+unavailable = "hide"
+
+[[menu.agent_linux_system1_frame]]
+type = "group"
+id = "agent_system1"
+i18n = "menu.agent.system1"
+caption_getter = "agent_system_backend_current_caption"
+caption_format = "numbered"
+platforms = ["linux"]
+unavailable = "hide"
+
+[[menu.agent_linux_system2_frame]]
+type = "group"
+id = "agent_system2"
+i18n = "menu.agent.system2"
+caption_getter = "agent_system_backend_current_caption"
+caption_format = "numbered"
+platforms = ["linux"]
+unavailable = "hide"

@@ -14,6 +14,7 @@ local I18n = require("infra.i18n")
 local Storage = require("adapters.storage")
 local Shell = require("adapters.shell_runner")
 local Logger = require("logger.shim")
+local ManifestMenu = require("infra.manifest_menu")
 local LOG = "gesture_conflicts"
 local boot_notified = false
 
@@ -109,19 +110,32 @@ end
 --- @param gestures table Live gesture manager.
 --- @return table rows
 function M.rows(gestures)
-	local children = { {
-		label = I18n.get(gestures.is_reading() and "menu.gestures.reading_on" or "menu.gestures.reading_off"),
-		disabled = true,
-	} }
+	local reading = gestures.is_reading()
+	local overlap = {}
+	local open_settings = M.open_settings
 	for _, group in ipairs(M.groups(gestures)) do
-		children[#children + 1] = { label = I18n.get("gesture.slots." .. group.slot)
-			.. " — " .. I18n.get("gestures.system.unknown"), action = M.open_settings }
+		local rows = ManifestMenu.template_rows("gesture_system_slot_linux_frame", {
+			["gesture_system_open_unknown_slot"] = function(...) return open_settings(...) end,
+		}, {
+			["gesture_system_slot_caption"] = function() return I18n.get("gesture.slots." .. group.slot) end,
+		}, {})
+		if type(rows) ~= "table" or #rows ~= 1 then return {} end
+		overlap[#overlap + 1] = rows[1]
 	end
 	local supported = M.settings_command(os.getenv("XDG_CURRENT_DESKTOP") or os.getenv("DESKTOP_SESSION")) ~= nil
-	if not supported then
-		children[#children + 1] = { label = I18n.get("gestures.system.unknown"), disabled = true }
-	end
-	return { { label = I18n.get("gestures.system.unknown"), items = children } }
+	local children = ManifestMenu.template_rows("gesture_system_linux_children", {}, {
+		["gesture_system_reader_active"] = function() return not not reading end,
+		["gesture_system_reader_inactive"] = function() return not reading end,
+		["gesture_system_settings_unavailable"] = function() return not supported end,
+	}, {
+		["gesture_system_cached_overlap"] = function() return overlap end,
+	})
+	if type(children) ~= "table" then return {} end
+	local rows = ManifestMenu.template_rows("gesture_system_status_linux_frame", {}, {}, {
+		["gesture_system_unknown_children"] = function() return children end,
+	})
+	if type(rows) ~= "table" or #rows ~= 1 then return {} end
+	return rows
 end
 
 return M

@@ -346,3 +346,47 @@ _MSC_NativeLifecycleFixtureOwnership() {
 }
 Test("menu startup: omitted boot callbacks have typed observable fixture ownership (shared-lifecycle)",
 	_MSC_NativeLifecycleFixtureOwnership)
+
+
+; The real lifecycle stages must ignore hidden caption variants in either source order.
+_MSC_DisjointLifecycleSource(Mode) {
+	global _TrayMenuStage
+	Root := _MR_GetManifestRoot()
+	Assert(Root is Map && Root.Has("top_level"), "the real canonical root is available")
+	Top := Root["top_level"]
+	SavedStage := _TrayMenuStage
+	NativeRows := Map(), HiddenRows := Map()
+	for Item in Top {
+		if !(Item is Map) || (Item.Get("id", "") != "reload" && Item.Get("id", "") != "quit")
+			continue
+		Id := Item["id"]
+		if _MR_IsForAhk(Item)
+			NativeRows[Id] := Item
+		else
+			HiddenRows[Id] := Item
+	}
+	Assert(NativeRows.Count == 2 && HiddenRows.Count == 2,
+		"the exact real lifecycle source owns two disjoint native/hidden caption pairs")
+	try {
+		if Mode == "hidden-first"
+			Root["top_level"] := [HiddenRows["reload"], HiddenRows["quit"], NativeRows["reload"], NativeRows["quit"]]
+		else
+			Root["top_level"] := [NativeRows["reload"], NativeRows["quit"], HiddenRows["reload"], HiddenRows["quit"]]
+		Assert(_MR_FindItemById("top_level", "reload") == NativeRows["reload"])
+		Assert(_MR_FindItemById("top_level", "quit") == NativeRows["quit"])
+		_TrayMenuStage := false
+		TrayMenuStage_Begin()
+		_MI_StageReload()
+		_MI_StageQuit()
+		AssertEqual(2, _TrayMenuStage.Length, "both actual native lifecycle builders stage their visible source owners")
+		AssertEqual(t("menu.global.reload"), _TrayMenuStage[1]["label"])
+		AssertEqual(t("menu.global.quit"), _TrayMenuStage[2]["label"])
+		Assert(HasMethod(_TrayMenuStage[1]["target"], "Call") && HasMethod(_TrayMenuStage[2]["target"], "Call"),
+			"the actual native startup command wrappers are retained")
+	} finally {
+		Root["top_level"] := Top
+		_TrayMenuStage := SavedStage
+	}
+}
+for Mode in ["hidden-first", "native-first"]
+	Test("menu startup: disjoint native lifecycle captions " . Mode . " (native-visible-lookup)", _MSC_DisjointLifecycleSource.Bind(Mode))

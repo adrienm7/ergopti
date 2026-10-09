@@ -37,6 +37,12 @@ const CHECKS = [
 		repro: 'npm run test:automation-query-ci-publisher'
 	},
 	{
+		name: 'dev156 qualification deferrals retain full default execution and strict accounting',
+		cmd: process.execPath,
+		args: ['tools/test/test-dev-release-qualification.cjs'],
+		repro: 'npm run test:dev-release-qualification'
+	},
+	{
 		name: 'source toolchain admission preserves genuine compiler, headers and checkout',
 		cmd: process.execPath,
 		args: ['tools/test/test-linux-source-toolchain.cjs'],

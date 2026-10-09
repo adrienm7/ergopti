@@ -169,6 +169,11 @@ jobs:
         timeout-minutes: 25
         env:
           ERGOPTI_MANAGED_FIXTURE_ROOT_SCOPE: LocalMachine
+          ERGOPTI_DEV_RELEASE_RELEASE: ${{ inputs.release }}
+          ERGOPTI_DEV_RELEASE_PRERELEASE: ${{ inputs.prerelease }}
+          ERGOPTI_DEV_RELEASE_CHANNEL: ${{ inputs.channel }}
+          ERGOPTI_DEV_RELEASE_TAG: ${{ inputs.tag }}
+          ERGOPTI_DEV_RELEASE_VERSION: ${{ inputs.version }}
         run: |
           $ahk = Get-ChildItem "C:\AutoHotkey" -Filter "AutoHotkey64.exe" |
               Select-Object -First 1 -ExpandProperty FullName
@@ -193,7 +198,10 @@ jobs:
           # #Include) errors to stderr and exits non-zero instead of popping a modal
           # dialog that no one can dismiss headlessly — which otherwise hangs the
           # runner until the 15 min step timeout. Must precede the script path.
-          $proc = Start-Process -FilePath $ahk -ArgumentList "/ErrorStdOut `"$runner`"" -NoNewWindow -PassThru
+          $qualificationProfile = node -e "const q=require('./tools/ci/dev-release-qualification.cjs'); const p=q.resolveQualificationProfile(q.environmentContext()); if(p)process.stdout.write(p.id)"
+          if ($LASTEXITCODE -ne 0) { throw "Qualification policy refused." }
+          $qualificationArgument = if ($qualificationProfile) { " --qualification-profile=$qualificationProfile" } else { "" }
+          $proc = Start-Process -FilePath $ahk -ArgumentList "/ErrorStdOut `"$runner`"$qualificationArgument" -NoNewWindow -PassThru
           # Retain the native handle while the asynchronous child is alive.
           $null = $proc.Handle
           $sw = [System.Diagnostics.Stopwatch]::StartNew()
@@ -220,6 +228,12 @@ jobs:
           $manifestExit = $LASTEXITCODE
           if ($manifestExit -ne 0) {
               Write-Error "AHK planned/executed manifest is incomplete."; exit $manifestExit
+          }
+          if ($qualificationProfile) {
+              node tools/ci/dev-release-qualification.cjs --scope windows-pac-full-url `
+                  --ahk-tap $resultsFile --execution-manifest $manifestFile `
+                  --receipt "$env:RUNNER_TEMP/windows-qualification.json"
+              if ($LASTEXITCODE -ne 0) { throw "Full qualification registry is incomplete or expired." }
           }
           if ($exit -ne 0) {
               Write-Host "::error::AHK native process failed (exit $exit)."
@@ -302,6 +316,7 @@ jobs:
           name: windows-ahk-execution-manifest
           path: |
             ${{ runner.temp }}/windows-ahk-execution-manifest.json
+            ${{ runner.temp }}/windows-qualification.json
             ${{ runner.temp }}/windows-ahk-isolated-*.json
             ${{ runner.temp }}/ergopti-ahk-menu-lifecycle-*/**
           if-no-files-found: warn

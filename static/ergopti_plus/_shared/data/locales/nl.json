@@ -3244,5 +3244,19 @@
 	"physical_shortcuts.windows_unavailable": "Nog niet op Windows: De editor voor fysieke sneltoetsen is nog niet beschikbaar op Windows.",
 	"physical_shortcuts.collision": "Deze toetsencombinatie is al in gebruik. Kies een andere.",
 	"physical_shortcuts.window_unavailable": "Dit venster is niet beschikbaar: Probeer het opnieuw te openen.",
-	"platform_reason.legacy_helpers_use_windows_scan_code_hotkeys": "Deze oudere emulatiehulpfuncties gebruiken Windows-sneltoetsen op basis van scancodes. Andere systemen gebruiken de toewijzingen van hun eigen toetsenbordindelingen."
+	"platform_reason.legacy_helpers_use_windows_scan_code_hotkeys": "Deze oudere emulatiehulpfuncties gebruiken Windows-sneltoetsen op basis van scancodes. Andere systemen gebruiken de toewijzingen van hun eigen toetsenbordindelingen.",
+	"gestures.system.conflicts_caption": "⚠ %s mogelijke conflicten",
+	"gestures.system.pinch_enabled": "Knijpgebaar van het systeem : Ingeschakeld",
+	"gestures.system.pinch_disabled": "Knijpgebaar van het systeem : Uitgeschakeld",
+	"gestures.system.pinch_unknown": "Knijpgebaar van het systeem : Systeemgebaren: niet gecontroleerd",
+	"gestures.system.slot_unknown_caption": "%s — Systeemgebaren: niet gecontroleerd",
+	"gestures.system.slot_configured_caption": "%s — Geconfigureerd voor ErgoptiPlus",
+	"gestures.system.slot_not_configured_caption": "%s — Niet geconfigureerd voor ErgoptiPlus",
+	"menu.global.reload_macos": "↺ Herladen",
+	"menu.global.quit_macos": "✕ Afsluiten",
+	"menu.layout.pause_picker_caption": "  ↳ Indeling wanneer script gepauzeerd : %s",
+	"menu.layout.resume_picker_caption": "  ↳ Indeling wanneer script actief : %s",
+	"menu.layout.native_variant_caption": "%s v%s",
+	"app_picker.agent_remove_marker": "✗",
+	"app_picker.agent_exclude_current_caption": "%s uitsluiten (huidig)"
 }

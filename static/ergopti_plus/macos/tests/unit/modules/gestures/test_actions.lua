@@ -613,6 +613,83 @@ helpers.describe("gestures.actions: published parameter binding identity", funct
 			helpers.assert_eq(actions.get_all_action_parameters(), snapshot)
 		end)
 	end)
+
+	helpers.it("withdraws gesture judgment without invoking replaced native accessors", function()
+		with_actions(function(actions, gestures)
+			local getter, published = gestures.gesture_slot_catalogue, gestures.published_binding_catalogue
+			local calls = 0
+			local function replacement()
+				calls = calls + 1
+				return { prefix = "", slots = { tap_2 = true } }
+			end
+			helpers.assert_eq(actions.action_parameter_binding_fits("tap_3"), true)
+			gestures.gesture_slot_catalogue = replacement
+			helpers.assert_nil(actions.action_parameter_binding_fits("tap_3"))
+			helpers.assert_nil(published(), "retained issuer cannot borrow a changed native accessor")
+			helpers.assert_eq(calls, 0)
+			gestures.gesture_slot_catalogue = getter
+			gestures.published_binding_catalogue = replacement
+			helpers.assert_nil(actions.action_parameter_binding_fits("tap_3"))
+			helpers.assert_nil(published(), "retained issuer cannot borrow a changed publication export")
+			helpers.assert_eq(calls, 0)
+			gestures.published_binding_catalogue = published
+			helpers.assert_eq(actions.action_parameter_binding_fits("tap_3"), true)
+			helpers.assert_eq(actions.action_parameter_binding_fits("removed_gesture_slot"), false)
+		end)
+	end)
+
+	helpers.it("does not grant copied or withdrawn gesture owners retirement authority", function()
+		with_actions(function(actions, gestures)
+			local copied = {}
+			for key, value in pairs(gestures) do copied[key] = value end
+			package.loaded["modules.gestures"] = copied
+			helpers.assert_nil(actions.action_parameter_binding_fits("removed_gesture_slot"))
+			helpers.assert_nil(copied.published_binding_catalogue())
+			local effects = 0
+			package.loaded["modules.gestures"] = setmetatable({}, {
+				__index = function() effects = effects + 1; return gestures.gesture_slot_catalogue end,
+			})
+			helpers.assert_nil(actions.action_parameter_binding_fits("removed_gesture_slot"))
+			helpers.assert_eq(effects, 0, "an inherited accessor is not a native publication")
+			package.loaded["modules.gestures"] = nil
+			helpers.assert_nil(actions.action_parameter_binding_fits("removed_gesture_slot"))
+			package.loaded["modules.gestures"] = gestures
+			helpers.assert_eq(actions.action_parameter_binding_fits("removed_gesture_slot"), false)
+		end)
+	end)
+
+	helpers.it("withdraws gesture judgment for replaced complete sources and repairs exact ownership", function()
+		with_actions(function(actions, gestures)
+			local original = gestures.SINGLE_SLOTS
+			local copied = {}
+			for index, slot in ipairs(original) do copied[index] = slot end
+			gestures.SINGLE_SLOTS = copied
+			helpers.assert_nil(actions.action_parameter_binding_fits("tap_3"))
+			helpers.assert_nil(actions.action_parameter_binding_fits("removed_gesture_slot"))
+			gestures.SINGLE_SLOTS = original
+			helpers.assert_eq(actions.action_parameter_binding_fits("tap_3"), true)
+		end)
+	end)
+
+	helpers.it("withdraws in-place gesture source changes without deleting retained parameters", function()
+		with_actions(function(actions, gestures)
+			local snapshot = { tap_3__open_url = "https://prior.example" }
+			helpers.assert_eq(actions.replace_action_parameters(snapshot), true)
+			local slots, original = gestures.SINGLE_SLOTS, gestures.SINGLE_SLOTS[2]
+			helpers.assert_eq(original, "tap_3", "independent native slot vector")
+			slots[2] = "changed_tap_3"
+			helpers.assert_nil(actions.action_parameter_binding_fits("tap_3"))
+			helpers.assert_nil(actions.action_parameter_binding_fits("changed_tap_3"))
+			helpers.assert_eq(actions.get_all_action_parameters(), snapshot)
+			slots[2] = original
+			helpers.assert_eq(actions.action_parameter_binding_fits("tap_3"), true)
+			slots[1], slots[2] = slots[2], slots[1]
+			helpers.assert_nil(actions.action_parameter_binding_fits("tap_3"), "same membership cannot hide changed native order")
+			slots[1], slots[2] = slots[2], slots[1]
+			helpers.assert_eq(actions.action_parameter_binding_fits("tap_3"), true)
+			helpers.assert_eq(actions.get_all_action_parameters(), snapshot)
+		end)
+	end)
 end)
 
 helpers.describe("gestures.actions: malformed native catalogue refusal", function()
