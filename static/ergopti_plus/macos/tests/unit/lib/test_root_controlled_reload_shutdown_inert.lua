@@ -18,6 +18,7 @@ local MODULE_NAMES = {
 	"tests.stubs.hs",
 	"infra.logger",
 	"adapters.timer_scheduler",
+	"adapters.keyboard_geometry",
 	"adapters.synthetic_input",
 	"platform.remap.ke_lifecycle",
 	"platform.remap.lease_controller",
