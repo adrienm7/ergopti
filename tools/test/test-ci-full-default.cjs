@@ -1,6 +1,6 @@
 'use strict';
 
-/** Constructed source controls only; skipped native work never receives credit. */
+/** Raw full-default controls; source models never qualify skipped native work. */
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const Full = require('./ci-full-default.cjs');
@@ -15,21 +15,42 @@ function check(name, fn) {
 	passed++;
 }
 function changed(rel, before, after) {
-	return source.map((f) => {
-		if (f.rel !== rel) return { ...f };
-		assert.equal(f.text.split(before).length, 2, `one genuine mutation seam: ${before}`);
-		return { ...f, text: f.text.replace(before, () => after) };
+	return source.map((entry) => {
+		if (entry.rel !== rel) return { ...entry };
+		assert.equal(entry.text.split(before).length, 2, `one genuine mutation seam: ${before}`);
+		return { ...entry, text: entry.text.replace(before, () => after) };
 	});
 }
-check('raw loader remains raw and exact', () => {
-	assert.equal(
-		Raw.field(Raw.job('core'), 'if'),
-		"needs.validate.outputs.fast_prerelease != 'true'"
-	);
-	assert.equal(Raw.field(Raw.job('tooltip-canvas'), 'if'), '${{ !inputs.fast_prerelease }}');
-	for (const f of source) assert.equal(f.text, fs.readFileSync(`${Raw.ROOT}/${f.rel}`, 'utf8'));
+check('raw loader and full view retain every exact source byte', () => {
+	const view = Full.fromFiles(source);
+	assert.deepEqual(view.files(), source);
+	for (const entry of source) {
+		assert.equal(entry.text, fs.readFileSync(`${Raw.ROOT}/${entry.rel}`, 'utf8'));
+		assert.equal(view.file(entry.rel), entry.text);
+	}
+	assert.equal(view.text(), Raw.text());
+	assert.deepEqual(view.calls(), Raw.calls());
+	assert.equal(Raw.field(Raw.job('core'), 'if'), null);
+	assert.equal(Raw.field(Raw.job('tooltip-canvas'), 'if'), null);
 });
-check('opt-in mandatory full/default predicates', () => {
+check('all product scripts remain exact, without a projection', () => {
+	let jobs = 0,
+		steps = 0;
+	for (const entry of source)
+		for (const job of Raw.jobsOfText(entry.text, entry.rel)) {
+			jobs++;
+			assert.equal(Full.job(job.id), job.body);
+			for (const step of Raw.steps(job.body)) {
+				if (!step.name) continue;
+				steps++;
+				assert.equal(Full.step(Full.job(job.id), step.name), step.body);
+				assert.equal(Full.stepField(step.body, 'run'), Raw.stepField(step.body, 'run'));
+			}
+		}
+	assert.equal(jobs, 26);
+	assert.ok(steps > 150, 'the full retained script inventory is nonvacuous');
+});
+check('mandatory default predicates are the actual workflow predicates', () => {
 	assert.equal(Full.field(Full.job('core'), 'if'), null);
 	assert.equal(Full.field(Full.job('tooltip-canvas'), 'if'), null);
 	assert.equal(
@@ -57,178 +78,114 @@ check('opt-in mandatory full/default predicates', () => {
 		'${{ !cancelled() }}'
 	);
 });
-check('all old product scripts remain exact', () => {
-	for (const f of source)
-		for (const j of Raw.jobsOfText(f.text, f.rel)) {
-			for (const s of Raw.steps(j.body)) {
-				if (
-					[
-						'Resolve authorized temporary fast prerelease',
-						'Recheck temporary publication authorization',
-						'Recheck temporary fast prerelease authorization',
-						'Record UNQUALIFIED temporary test deferral',
-						'Retain the explicit unqualified test receipt'
-					].includes(s.name) ||
-					!s.name
-				)
-					continue;
-				assert.equal(
-					Full.stepField(Full.step(Full.job(j.id), s.name), 'run'),
-					Raw.stepField(s.body, 'run'),
-					`${j.id}/${s.name}`
-				);
-			}
-		}
-});
-for (const [name, rel, before, after] of [
-	[
-		'default true',
-		MAC,
-		'        default: false\n        type: boolean',
-		'        default: true\n        type: boolean'
-	],
-	[
-		'duplicate global authority',
-		MAC,
-		'  ERGOPTI_FAST_PRERELEASE: ${{ inputs.fast_prerelease }}\n',
-		'  ERGOPTI_FAST_PRERELEASE: ${{ inputs.fast_prerelease }}\n  ERGOPTI_FAST_PRERELEASE: false\n'
-	],
-	[
-		'wrong input type',
-		MAC,
-		'        default: false\n        type: boolean',
-		'        default: false\n        type: string'
-	],
-	[
-		'duplicate input',
-		MAC,
-		'      fast_prerelease:\n',
-		'      fast_prerelease:\n        type: boolean\n      fast_prerelease:\n'
-	],
-	[
-		'foreign selector',
-		ENTRY,
-		'run: node tools/ci/dev-release-qualification.cjs --fast-action select',
-		'run: echo fast_prerelease=true >> "$GITHUB_OUTPUT"'
-	],
-	['skippable selector', ENTRY, '        id: fast\n', '        id: fast\n        if: false\n'],
-	[
-		'ignored selector error',
-		ENTRY,
-		'        id: fast\n',
-		'        id: fast\n        continue-on-error: true\n'
-	],
-	[
-		'duplicate selector context',
-		ENTRY,
-		'          ERGOPTI_DEV_RELEASE_TAG: ${{ steps.meta.outputs.tag }}\n',
-		'          ERGOPTI_DEV_RELEASE_TAG: ${{ steps.meta.outputs.tag }}\n          ERGOPTI_DEV_RELEASE_TAG: v0.0.0-dev.158\n'
-	],
-	[
-		'unbound output',
-		ENTRY,
-		'      fast_prerelease: ${{ steps.fast.outputs.fast_prerelease }}',
-		'      fast_prerelease: true'
-	],
-	[
-		'foreign job condition',
-		MAC,
-		'  managed-ollama-native:\n',
-		'  managed-ollama-native:\n    if: ${{ inputs.fast_prerelease }}\n'
-	],
-	[
-		'arbitrary SDK exclusion',
-		MAC,
-		'      - name: Qualify actual SDK accepted-owner and deadline XCTest controls\n        if: ${{ !inputs.fast_prerelease }}',
-		'      - name: Qualify actual SDK accepted-owner and deadline XCTest controls\n        if: ${{ false }}'
-	],
-	[
-		'arbitrary additional SDK predicate',
-		MAC,
-		'      - name: Qualify actual SDK accepted-owner and deadline XCTest controls\n        if: ${{ !inputs.fast_prerelease }}',
-		'      - name: Qualify actual SDK accepted-owner and deadline XCTest controls\n        if: ${{ !inputs.fast_prerelease && false }}'
-	],
-	[
-		'changed receipt command',
-		MAC,
-		'run: node tools/ci/dev-release-qualification.cjs --fast-action receipt --lane macos',
-		'run: echo qualified:true'
-	],
-	[
-		'missing actual needs',
-		MAC,
-		'          NEEDS: ${{ toJSON(needs) }}\n        run: node tools/ci/dev-release-qualification.cjs --fast-action receipt --lane macos',
-		'          NEEDS: "{}"\n        run: node tools/ci/dev-release-qualification.cjs --fast-action receipt --lane macos'
-	],
-	[
-		'wrong receipt path',
-		MAC,
-		'          path: fast-prerelease-macos.json',
-		'          path: foreign.json'
-	],
-	[
-		'ignored missing receipt',
-		MAC,
-		'          path: fast-prerelease-macos.json\n          if-no-files-found: error',
-		'          path: fast-prerelease-macos.json\n          if-no-files-found: ignore'
-	],
-	[
-		'wrong package admission',
-		'.github/workflows/ci-windows.yml',
-		'run: node tools/ci/dev-release-qualification.cjs --fast-action admit',
-		'run: true'
-	],
-	[
-		'changed pinned duplicate Node',
-		'.github/workflows/ci-windows.yml',
-		"node-version-file: '.node-version'\n\n      - name: Recheck temporary fast prerelease authorization",
-		'node-version: latest\n\n      - name: Recheck temporary fast prerelease authorization'
-	]
-]) {
-	check(`refuse ${name}`, () => assert.throws(() => Full.fromFiles(changed(rel, before, after))));
+for (const entry of source) {
+	for (const [name, fragment] of [
+		['public input', '      fast_prerelease: true\n'],
+		['environment authority', '  ERGOPTI_FAST_PRERELEASE: true\n'],
+		['selector', '        run: node tools/ci/dev-release-qualification.cjs --fast-action select\n'],
+		['admission', '        run: node tools/ci/dev-release-qualification.cjs --fast-action admit\n'],
+		[
+			'receipt',
+			'        run: node tools/ci/dev-release-qualification.cjs --fast-action receipt --lane macos\n'
+		]
+	])
+		check(`${entry.rel} refuses retired ${name}`, () => {
+			const mutated = source.map((file) =>
+				file.rel === entry.rel ? { ...file, text: file.text + fragment } : { ...file }
+			);
+			assert.throws(() => Full.fromFiles(mutated), /retired fast route/);
+		});
+	for (const job of Raw.jobsOfText(entry.text, entry.rel)) {
+		check(`${job.id} cannot acquire a skipping predicate`, () => {
+			const condition = Raw.field(job.body, 'if');
+			const body =
+				condition === null
+					? '    if: false\n' + job.body
+					: job.body.replace(`    if: ${condition}\n`, '    if: false\n');
+			assert.notEqual(body, job.body);
+			assert.throws(() => Full.fromFiles(changed(entry.rel, job.body, body)), /full job condition/);
+		});
+		check(`${job.id} cannot forgive its failure`, () => {
+			assert.throws(
+				() =>
+					Full.fromFiles(changed(entry.rel, job.body, '    continue-on-error: true\n' + job.body)),
+				/failure must remain fatal/
+			);
+		});
+	}
 }
-check('refuse genuine late package admission (ci-full-default-late-admission)', () => {
-	const rel = '.github/workflows/ci-windows.yml';
-	const entry = source.find((f) => f.rel === rel);
-	const job = Raw.jobsOfText(entry.text, rel).find((j) => j.id === 'package-windows');
-	const admission = Raw.step(job.body, 'Recheck temporary fast prerelease authorization');
-	const build = Raw.step(job.body, 'Build and test native navigation event owner');
-	const moved = job.body
-		.replace(admission + '\n', '')
-		.replace(build, () => build + '\n\n' + admission);
-	assert.equal(
-		Raw.steps(moved).filter((s) => s.name === 'Recheck temporary fast prerelease authorization')
-			.length,
-		1
+for (const [name, files] of [
+	['duplicate workflow', [...source, { ...source[0] }]],
+	['missing workflow', source.slice(1)],
+	[
+		'foreign workflow',
+		source.map((entry, index) => (index === 0 ? { ...entry, rel: 'foreign.yml' } : { ...entry }))
+	]
+])
+	check(`refuse ${name}`, () => assert.throws(() => Full.fromFiles(files)));
+for (const lane of ['macos', 'windows', 'linux']) {
+	const job = Raw.jobsOfText(source.find((entry) => entry.rel === ENTRY).text, ENTRY).find(
+		(entry) => entry.id === lane
 	);
-	assert.equal(
-		Raw.steps(moved).filter((s) => s.name === 'Build and test native navigation event owner')
-			.length,
-		1
+	check(`${lane} cannot substitute a foreign caller`, () => {
+		const body = job.body.replace(
+			`uses: ./.github/workflows/ci-${lane}.yml`,
+			'uses: foreign/workflow@main'
+		);
+		assert.notEqual(body, job.body);
+		assert.throws(() => Full.fromFiles(changed(ENTRY, job.body, body)), /actual caller/);
+	});
+	for (const key of ['release', 'prerelease', 'channel', 'tag', 'version'])
+		check(`${lane} retains source-bound ${key}`, () => {
+			const expression =
+				key === 'release'
+					? "needs.validate.outputs.release == 'true'"
+					: `needs.validate.outputs.${key}`;
+			const body = job.body.replace(
+				`      ${key}: \${{ ${expression} }}\n`,
+				`      ${key}: true\n`
+			);
+			assert.notEqual(body, job.body);
+			assert.throws(() => Full.fromFiles(changed(ENTRY, job.body, body)), /source binding/);
+		});
+}
+for (const [rel, id, name] of [
+	[MAC, 'managed-ollama-native', 'Qualify actual SDK accepted-owner and deadline XCTest controls'],
+	[MAC, 'managed-ollama-native', 'Qualify actual native PAC and WPAD XCTest controls'],
+	[MAC, 'macos-ok', 'Verify mandatory jobs and launch scenarios'],
+	['.github/workflows/ci-windows.yml', 'windows-ok', 'Verify mandatory jobs and launch scenarios'],
+	['.github/workflows/ci-linux.yml', 'linux-ok', 'Assert all mandatory subjects ran and passed']
+]) {
+	const job = Raw.jobsOfText(source.find((entry) => entry.rel === rel).text, rel).find(
+		(entry) => entry.id === id
 	);
-	assert.ok(moved.indexOf(admission) > moved.indexOf(build));
-	assert.throws(
-		() => Full.fromFiles(changed(rel, job.body, moved)),
-		/package-windows admission before product\/publication work/
+	const step = Raw.step(job.body, name);
+	check(`${id}/${name} cannot skip`, () => {
+		const condition = Raw.stepField(step, 'if');
+		const body =
+			condition === null
+				? step.replace(`      - name: ${name}\n`, `      - name: ${name}\n        if: false\n`)
+				: step.replace(`        if: ${condition}\n`, '        if: false\n');
+		assert.notEqual(body, step);
+		assert.throws(() => Full.fromFiles(changed(rel, step, body)), /full step condition/);
+	});
+	check(`${id}/${name} cannot forgive failure`, () => {
+		const body = step.replace(
+			`      - name: ${name}\n`,
+			`      - name: ${name}\n        continue-on-error: true\n`
+		);
+		assert.notEqual(body, step);
+		assert.throws(() => Full.fromFiles(changed(rel, step, body)), /failure must remain fatal/);
+	});
+}
+check('unknown step conditions stay visible to existing mandatory guards', () => {
+	const view = Full.fromFiles(
+		changed(
+			MAC,
+			'      - name: Admit the canonical native toolchain and public inputs\n',
+			'      - name: Admit the canonical native toolchain and public inputs\n        if: false\n'
+		)
 	);
-});
-check('caller literal true is never normalized', () => {
-	const rel = ENTRY;
-	const f = source.find((f) => f.rel === rel);
-	const j = Raw.jobsOfText(f.text, rel).find((j) => j.id === 'macos');
-	const body = j.body.replace(
-		"fast_prerelease: ${{ needs.validate.outputs.fast_prerelease == 'true' }}",
-		'fast_prerelease: true'
-	);
-	assert.throws(() => Full.fromFiles(changed(rel, j.body, body)));
-});
-check('unknown conditions remain visible to old mandatory guards', () => {
-	const modified = changed(
-		MAC,
-		'      - name: Admit the canonical native toolchain and public inputs\n',
-		'      - name: Admit the canonical native toolchain and public inputs\n        if: false\n'
-	);
-	const view = Full.fromFiles(modified);
 	assert.equal(
 		view.stepField(
 			view.step(
@@ -240,21 +197,17 @@ check('unknown conditions remain visible to old mandatory guards', () => {
 		'false'
 	);
 });
-const context = {
-	github_actions: 'true',
-	repository: 'adrienm7/ergopti',
-	event_name: 'push',
-	ref: 'refs/heads/dev',
-	release: true,
-	prerelease: 'true',
-	channel: 'dev',
-	tag: 'v0.0.0-dev.157',
-	version: '0.0.0-dev.157'
-};
-const eligible = new Date('2026-10-09T14:00:00Z');
-check('sole authorized diagnostic context', () =>
-	assert.equal(Policy.fastPrerelease(context, eligible), true)
+check('retired exported grants are absent', () => {
+	for (const name of ['fastPrerelease', 'validateFastPrerelease', 'fastPrereleaseReceipt'])
+		assert.equal(Object.hasOwn(Policy, name), false, name);
+});
+const configuration = JSON.parse(fs.readFileSync(Policy.POLICY_PATH, 'utf8'));
+const context = Object.fromEntries(
+	['repository', 'event_name', 'ref', 'release', 'prerelease', 'channel', 'tag', 'version'].map(
+		(key) => [key, configuration[key]]
+	)
 );
+context.github_actions = 'true';
 for (const [key, value] of [
 	['github_actions', 'false'],
 	['repository', 'foreign/ergopti'],
@@ -266,72 +219,57 @@ for (const [key, value] of [
 	['channel', 'main'],
 	['tag', 'v0.0.0-dev.158'],
 	['version', '0.0.0-dev.158']
-]) {
-	check(`full for ${key}=${value}`, () => {
+])
+	check(`bounded scopes keep full defaults for ${key}=${value}`, () => {
 		const foreign = { ...context, [key]: value };
-		assert.equal(Policy.fastPrerelease(foreign, eligible), false);
-		assert.throws(() => Policy.validateFastPrerelease(true, foreign, eligible));
-		assert.equal(Policy.validateFastPrerelease(false, foreign, eligible), false);
-	});
-}
-check('expiry restores full route', () => {
-	const expired = new Date('2026-10-10T07:00:00Z');
-	assert.equal(Policy.fastPrerelease(context, expired), false);
-	assert.throws(() => Policy.validateFastPrerelease(true, context, expired));
-});
-const sha = '1'.repeat(40);
-const needs = {
-	windows: {
-		'test-ahk': 'skipped',
-		'e2e-ahk': 'skipped',
-		'package-windows': 'success',
-		'launch-windows': 'skipped'
-	},
-	macos: {
-		'cold-bootstrap-native': 'skipped',
-		'test-hs': 'skipped',
-		'e2e-hs': 'skipped',
-		'package-macos': 'success',
-		launch: 'skipped',
-		'tooltip-canvas': 'skipped',
-		'managed-ollama-native': 'success'
-	},
-	linux: {
-		'test-linux': 'skipped',
-		'e2e-linux': 'skipped',
-		'package-linux': 'success',
-		'install-linux': 'skipped'
-	}
-};
-for (const [lane, result] of Object.entries(needs))
-	check(`${lane} never qualifies skipped work`, () => {
-		const receipt = Policy.fastPrereleaseReceipt(
-			lane,
-			Object.fromEntries(Object.entries(result).map(([k, v]) => [k, { result: v }])),
-			sha,
-			context,
-			eligible
+		assert.equal(
+			Policy.resolveQualificationProfile(foreign, new Date('2026-10-09T14:00:00Z')),
+			null
 		);
-		assert.equal(receipt.status, 'UNQUALIFIED');
-		assert.equal(receipt.qualified, false);
-		assert.equal(receipt.tests, 'DEFERRED');
+		assert.throws(() =>
+			Policy.authorizeQualificationProfile(
+				configuration.id,
+				foreign,
+				new Date('2026-10-09T14:00:00Z')
+			)
+		);
 	});
-check('full release predicate preserves implicit successful dependencies', () => {
-	const expression = Raw.field(Raw.job('release'), 'if').slice(3, -2);
-	const evaluate = new Function('needs', 'github', 'cancelled', `return (${expression});`);
+check('expiry cannot authorize any remaining scope', () => {
+	assert.equal(
+		Policy.resolveQualificationProfile(context, new Date(configuration.expires_at)),
+		null
+	);
+	assert.throws(() =>
+		Policy.authorizeQualificationProfile(
+			configuration.id,
+			context,
+			new Date(configuration.expires_at)
+		)
+	);
+});
+check('release keeps real full predicates and implicit successful dependency admission', () => {
+	const expression = Raw.field(Raw.job('release'), 'if');
+	assert.equal(
+		expression,
+		"github.event_name == 'push' && needs.validate.outputs.release == 'true'"
+	);
+	const evaluate = new Function('needs', 'github', `return (${expression});`);
 	const names = ['validate', 'core', 'macos', 'windows', 'linux'];
+	assert.deepEqual(Raw.needsOf(Raw.job('release')), names);
 	let cases = 0;
 	for (const failure of names)
-		for (const status of ['success', 'failure', 'cancelled', 'skipped', 'unknown', null]) {
+		for (const status of ['success', 'failure', 'cancelled', 'skipped', 'unknown', null])
 			for (const event of ['push', 'workflow_dispatch'])
 				for (const release of ['true', 'false'])
 					for (const cancelled of [false, true]) {
 						const needs = Object.fromEntries(
 							names.map((name) => [name, { result: name === failure ? status : 'success' }])
 						);
-						needs.validate.outputs = { release, fast_prerelease: 'false' };
+						needs.validate.outputs = { release };
+						const implicitSuccess =
+							!cancelled && names.every((name) => needs[name].result === 'success');
 						assert.equal(
-							evaluate(needs, { event_name: event }, () => cancelled),
+							implicitSuccess && evaluate(needs, { event_name: event }),
 							!cancelled &&
 								event === 'push' &&
 								release === 'true' &&
@@ -339,31 +277,19 @@ check('full release predicate preserves implicit successful dependencies', () =>
 						);
 						cases++;
 					}
-		}
 	assert.equal(cases, 240);
 });
-check('full Linux package keeps cancellation and manual receiving allowance', () => {
+check('full Linux package retains cancellation and manual receiving allowance', () => {
 	const expression = Raw.field(Raw.job('package-linux'), 'if')
 		.slice(3, -2)
 		.replaceAll('needs.e2e-linux.result', "needs['e2e-linux'].result");
-	const evaluate = new Function(
-		'inputs',
-		'needs',
-		'github',
-		'cancelled',
-		`return (${expression});`
-	);
+	const evaluate = new Function('needs', 'github', 'cancelled', `return (${expression});`);
 	let cases = 0;
 	for (const event of ['push', 'pull_request', 'workflow_dispatch', 'schedule', 'unknown', null])
 		for (const result of ['success', 'failure', 'cancelled', 'skipped', 'unknown', null])
 			for (const cancelled of [false, true]) {
 				assert.equal(
-					evaluate(
-						{ fast_prerelease: false },
-						{ 'e2e-linux': { result } },
-						{ event_name: event },
-						() => cancelled
-					),
+					evaluate({ 'e2e-linux': { result } }, { event_name: event }, () => cancelled),
 					!cancelled &&
 						(result === 'success' || (event === 'workflow_dispatch' && result === 'failure'))
 				);
@@ -371,23 +297,6 @@ check('full Linux package keeps cancellation and manual receiving allowance', ()
 			}
 	assert.equal(cases, 72);
 });
-for (const lane of ['macos', 'windows', 'linux'])
-	check(`fatal retained receipt failure ${lane} (ci-full-default-receipt-retention)`, () => {
-		const rel = `.github/workflows/ci-${lane}.yml`;
-		const job = Raw.jobsOfText(source.find((f) => f.rel === rel).text, rel).find(
-			(j) => j.id === `${lane}-ok`
-		);
-		const retain = Raw.step(job.body, 'Retain the explicit unqualified test receipt');
-		const ignored = retain.replace(
-			'      - name: Retain the explicit unqualified test receipt\n',
-			'      - name: Retain the explicit unqualified test receipt\n        continue-on-error: true\n'
-		);
-		assert.notEqual(ignored, retain);
-		assert.throws(
-			() => Full.fromFiles(changed(rel, retain, ignored)),
-			/retained receipt failure must remain fatal/
-		);
-	});
 console.log(
-	`PASS: explicit full-default/raw fast-route source controls=${passed}; native execution UNRUN.`
+	`PASS: raw full-default and retired-route source controls=${passed}; native execution UNRUN.`
 );
