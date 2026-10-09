@@ -230,10 +230,13 @@ final class ManagedHTTPWorkerTests: XCTestCase {
 		XCTAssertEqual(routes.count, 1)
 		guard routes.count == 1 else { return }
 		let route = routes[0]
-		XCTAssertTrue(route[kCFProxyTypeKey as String] as? String == kCFProxyTypeHTTP as String)
+		let nativeKind = route[kCFProxyTypeKey as String] as? String
+		let proxyType: String? = nativeKind == kCFProxyTypeHTTP as String ? "http"
+			: nativeKind == kCFProxyTypeHTTPS as String ? "https" : nil
+		XCTAssertNotNil(proxyType)
+		guard let proxyType else { return }
 		XCTAssertTrue(route[kCFProxyHostNameKey as String] as? String == "pac-shape.invalid")
-		guard route[kCFProxyTypeKey as String] as? String == kCFProxyTypeHTTP as String,
-			route[kCFProxyHostNameKey as String] as? String == "pac-shape.invalid" else { return }
+		guard route[kCFProxyHostNameKey as String] as? String == "pac-shape.invalid" else { return }
 		let number = try XCTUnwrap(route[kCFProxyPortNumberKey as String] as? NSNumber)
 		let integral = CFGetTypeID(number) != CFBooleanGetTypeID()
 			&& number.doubleValue == Double(number.intValue)
@@ -248,6 +251,6 @@ final class ManagedHTTPWorkerTests: XCTestCase {
 		let recognized = (0...7).contains(urlShape) && (0...5).contains(hostShape)
 		XCTAssertTrue(recognized)
 		guard recognized else { return }
-		print("PAC_ARGUMENT_SHAPE purpose=\(scheme) port=\(code)")
+		print("PAC_ARGUMENT_SHAPE purpose=\(scheme) type=\(proxyType) port=\(code)")
 	}
 }

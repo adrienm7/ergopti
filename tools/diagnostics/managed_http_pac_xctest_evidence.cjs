@@ -126,20 +126,23 @@ function serialCohort(clean) {
 // Fixed observations need no invented stdout/XCTest delivery ordering.
 function argumentObservations(clean) {
 	const ports = { http: null, https: null };
+	const types = { http: null, https: null };
 	let valid = true;
 	const lines = clean.split('\n');
 	const admitted = new Set();
 	for (const [index, line] of lines.entries()) {
 		if (!line.includes('PAC_ARGUMENT_SHAPE')) continue;
-		const match = /^PAC_ARGUMENT_SHAPE purpose=(http|https) port=(200[0-7][0-5])$/.exec(line);
+		const match =
+			/^PAC_ARGUMENT_SHAPE purpose=(http|https) type=(http|https) port=(200[0-7][0-5])$/.exec(line);
 		if (!match || ports[match[1]] !== null) {
 			valid = false;
 			continue;
 		}
-		ports[match[1]] = Number(match[2]);
+		ports[match[1]] = Number(match[3]);
+		types[match[1]] = match[2];
 		admitted.add(index);
 	}
-	return { complete: valid && ports.http !== null && ports.https !== null, ports, admitted };
+	return { complete: valid && ports.http !== null && ports.https !== null, ports, types, admitted };
 }
 
 function evaluate(text, swiftStatus, captureStatus) {
@@ -187,6 +190,7 @@ function evaluate(text, swiftStatus, captureStatus) {
 		cohort: 'managed-http-pac-wpad',
 		expected: 14,
 		argument_observations: observations.ports,
+		argument_proxy_types: observations.types,
 		observed: Math.min(names.length, 65535),
 		complete,
 		swift_status: base.script_status,

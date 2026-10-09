@@ -26,6 +26,11 @@ static AXError attributeError = kAXErrorSuccess;
 static BOOL factButtonObserved = NO;
 static int factButtonError = 0;
 static const char *factButtonSubrole = "absent", *factButtonType = "absent";
+static BOOL factWindowObserved = NO;
+static int factWindowError = 0, factControlErrors[3] = {0, 0, 0};
+static const char *factWindowRole = "absent", *factWindowType = "absent";
+static const char *factControlTypes[3] = {"absent", "absent", "absent"};
+static const char *factControlRelations[3] = {"unobserved", "unobserved", "unobserved"};
 
 static const char *kind(id value) {
     if (value == nil) return "absent";
@@ -49,12 +54,25 @@ static void publish_facts(void) {
     struct stat named;
     if (lstat(factPath, &named) == 0 && named.st_dev == factIdentity.st_dev &&
         named.st_ino == factIdentity.st_ino) {
-        char buttonPacket[256] = "";
+        char windowPacket[512] = "";
+        if (factWindowObserved) {
+            int windowLength = snprintf(windowPacket, sizeof(windowPacket),
+                ",\"window\":{\"schema\":1,\"role\":\"%s\",\"type\":\"%s\",\"error\":%d,"
+                "\"controls\":{\"close\":{\"error\":%d,\"type\":\"%s\",\"relation\":\"%s\"},"
+                "\"minimize\":{\"error\":%d,\"type\":\"%s\",\"relation\":\"%s\"},"
+                "\"zoom\":{\"error\":%d,\"type\":\"%s\",\"relation\":\"%s\"}}}",
+                factWindowRole, factWindowType, factWindowError,
+                factControlErrors[0], factControlTypes[0], factControlRelations[0],
+                factControlErrors[1], factControlTypes[1], factControlRelations[1],
+                factControlErrors[2], factControlTypes[2], factControlRelations[2]);
+            if (windowLength <= 0 || windowLength >= (int)sizeof(windowPacket)) windowPacket[0] = '\0';
+        }
+        char buttonPacket[768] = "";
         if (factButtonObserved) {
             int buttonLength = snprintf(buttonPacket, sizeof(buttonPacket),
                 ",\"first_button\":{\"schema\":1,\"subrole\":\"%s\","
-                "\"type\":\"%s\",\"error\":%d}",
-                factButtonSubrole, factButtonType, factButtonError);
+                "\"type\":\"%s\",\"error\":%d%s}",
+                factButtonSubrole, factButtonType, factButtonError, windowPacket);
             if (buttonLength <= 0 || buttonLength >= (int)sizeof(buttonPacket)) buttonPacket[0] = '\0';
         }
         char packet[1024];
@@ -163,9 +181,21 @@ static id attribute(AXUIElementRef element, CFStringRef key) {
     return CFBridgingRelease(value);
 }
 
+// Compare only fixed chrome attributes of the already inspected window to
+// the same refused button. Missing references never become identity evidence.
+static void observe_window_control(AXUIElementRef window, AXUIElementRef button,
+    CFStringRef key, int index) {
+    id value = attribute(window, key);
+    factControlErrors[index] = (int)attributeError;
+    factControlTypes[index] = kind(value);
+    if (attributeError == kAXErrorSuccess && value != nil &&
+        CFGetTypeID((__bridge CFTypeRef)value) == AXUIElementGetTypeID())
+        factControlRelations[index] = CFEqual((__bridge CFTypeRef)value, button) ? "same" : "different";
+}
+
 // Observe only the same first refused button. These fixed facts never
 // authorize a button, alter the original refusal or disclose a UI string.
-static void observe_refused_button(AXUIElementRef element) {
+static void observe_refused_button(AXUIElementRef window, AXUIElementRef element) {
     id value = attribute(element, kAXSubroleAttribute);
     factButtonError = (int)attributeError;
     factButtonType = kind(value);
@@ -175,7 +205,35 @@ static void observe_refused_button(AXUIElementRef element) {
     else if ([value isEqualToString:(__bridge NSString *)kAXMinimizeButtonSubrole]) factButtonSubrole = "minimize";
     else if ([value isEqualToString:(__bridge NSString *)kAXZoomButtonSubrole]) factButtonSubrole = "zoom";
     else factButtonSubrole = "unknown";
+    id role = attribute(window, kAXRoleAttribute);
+    factWindowError = (int)attributeError;
+    factWindowType = kind(role);
+    if (role == nil) factWindowRole = "absent";
+    else if (![role isKindOfClass:[NSString class]]) factWindowRole = "wrong-type";
+    else if ([role isEqualToString:(__bridge NSString *)kAXWindowRole]) factWindowRole = "window";
+    else if ([role isEqualToString:(__bridge NSString *)kAXSheetRole]) factWindowRole = "sheet";
+    else factWindowRole = "other";
+    observe_window_control(window, element, kAXCloseButtonAttribute, 0);
+    observe_window_control(window, element, kAXMinimizeButtonAttribute, 1);
+    observe_window_control(window, element, kAXZoomButtonAttribute, 2);
+    factWindowObserved = YES;
     factButtonObserved = YES;
+}
+
+// A failed title is ignorable only for an exact chrome reference returned by
+// this already inspected AXWindow. Diagnostic facts cannot authorize this path.
+static BOOL owned_window_chrome(AXUIElementRef window, AXUIElementRef button) {
+    id role = attribute(window, kAXRoleAttribute);
+    if (attributeError != kAXErrorSuccess || ![role isKindOfClass:[NSString class]] ||
+        ![role isEqualToString:(__bridge NSString *)kAXWindowRole]) return NO;
+    CFStringRef keys[3] = {kAXCloseButtonAttribute, kAXMinimizeButtonAttribute, kAXZoomButtonAttribute};
+    for (int index = 0; index < 3; index++) {
+        id value = attribute(window, keys[index]);
+        if (attributeError == kAXErrorSuccess && value != nil &&
+            CFGetTypeID((__bridge CFTypeRef)value) == AXUIElementGetTypeID() &&
+            CFEqual((__bridge CFTypeRef)value, button)) return YES;
+    }
+    return NO;
 }
 
 static BOOL inspect_window(AXUIElementRef window, NSString *sender, NSString *receiver,
@@ -201,16 +259,20 @@ static BOOL inspect_window(AXUIElementRef window, NSString *sender, NSString *re
             NSString *title = attribute(element, kAXTitleAttribute);
             AXError titleError = attributeError;
             NSNumber *enabled = attribute(element, kAXEnabledAttribute);
-            if (![title isKindOfClass:[NSString class]]) {
-                BOOL firstButton = strcmp(factAttribute, "none") == 0 && factDescriptor >= 0;
-                refused_fact(agent, "button-title", title, titleError);
-                if (firstButton) observe_refused_button(element);
-                return NO;
+            BOOL chrome = title == nil && titleError == kAXErrorAttributeUnsupported &&
+                owned_window_chrome(window, element);
+            if (!chrome) {
+                if (![title isKindOfClass:[NSString class]]) {
+                    BOOL firstButton = strcmp(factAttribute, "none") == 0 && factDescriptor >= 0;
+                    refused_fact(agent, "button-title", title, titleError);
+                    if (firstButton) observe_refused_button(window, element);
+                    return NO;
+                }
+                if (![enabled isKindOfClass:[NSNumber class]]) { refused_fact(agent, "button-enabled", enabled, attributeError); return NO; }
+                if ([title isEqualToString:@"Allow"] && enabled.boolValue) [allowButtons addObject:item];
+                if ([title isEqualToString:@"Don't Allow"] || [title isEqualToString:@"Don’t Allow"])
+                    *denySeen = YES;
             }
-            if (![enabled isKindOfClass:[NSNumber class]]) { refused_fact(agent, "button-enabled", enabled, attributeError); return NO; }
-            if ([title isEqualToString:@"Allow"] && enabled.boolValue) [allowButtons addObject:item];
-            if ([title isEqualToString:@"Don't Allow"] || [title isEqualToString:@"Don’t Allow"])
-                *denySeen = YES;
         }
         NSArray *children = attribute(element, kAXChildrenAttribute);
         if (children == nil) continue;

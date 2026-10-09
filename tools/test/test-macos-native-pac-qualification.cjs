@@ -48,9 +48,9 @@ module.exports = function run({ workflow, admitNativePacSelector, PAC_FILTER }) 
 		for (const method of methods) {
 			lines.push(`Test Case '-[ErgoptiPlusTests.${suite} ${method}]' started.`);
 			if (method === 'testActualCFNetworkHTTPPACArgumentShapeObservation')
-				lines.push('PAC_ARGUMENT_SHAPE purpose=http port=20000');
+				lines.push('PAC_ARGUMENT_SHAPE purpose=http type=http port=20000');
 			if (method === 'testActualCFNetworkHTTPSPACArgumentShapeObservation')
-				lines.push('PAC_ARGUMENT_SHAPE purpose=https port=20000');
+				lines.push('PAC_ARGUMENT_SHAPE purpose=https type=https port=20000');
 			lines.push(`Test Case '-[ErgoptiPlusTests.${suite} ${method}]' passed (0.001 seconds).`);
 		}
 		lines.push(`Test Suite '${suite}' passed at 2026-10-09 00:00:01.`, summary(methods.length));
@@ -96,7 +96,7 @@ module.exports = function run({ workflow, admitNativePacSelector, PAC_FILTER }) 
 		const name = `-[ErgoptiPlusTests.ManagedHTTPWorkerTests ${method}]`;
 		const purpose =
 			method === 'testActualCFNetworkHTTPPACArgumentShapeObservation' ? 'http' : 'https';
-		const observationPair = `Test Case '${name}' started.\nPAC_ARGUMENT_SHAPE purpose=${purpose} port=20000\nTest Case '${name}' passed (0.001 seconds).\n`;
+		const observationPair = `Test Case '${name}' started.\nPAC_ARGUMENT_SHAPE purpose=${purpose} type=${purpose} port=20000\nTest Case '${name}' passed (0.001 seconds).\n`;
 		assert.ok(valid.includes(observationPair));
 		check('missing-observation-' + method, () =>
 			assert.equal(reader.evaluate(valid.replace(observationPair, ''), 0, 0).complete, false)
@@ -132,8 +132,8 @@ module.exports = function run({ workflow, admitNativePacSelector, PAC_FILTER }) 
 		assert.equal(verdict.observed, 12);
 		assert.equal(verdict.expected, 14);
 	});
-	const httpReceipt = 'PAC_ARGUMENT_SHAPE purpose=http port=20000\n';
-	const httpsReceipt = 'PAC_ARGUMENT_SHAPE purpose=https port=20000\n';
+	const httpReceipt = 'PAC_ARGUMENT_SHAPE purpose=http type=http port=20000\n';
+	const httpsReceipt = 'PAC_ARGUMENT_SHAPE purpose=https type=https port=20000\n';
 	check('fixed-receipt-ports', () =>
 		assert.deepEqual(reader.evaluate(valid, 0, 0).argument_observations, {
 			http: 20000,
@@ -161,11 +161,17 @@ module.exports = function run({ workflow, admitNativePacSelector, PAC_FILTER }) 
 		['unused-codebook-slot', valid.replace('port=20000', 'port=20009')],
 		[
 			'trailing-receipt-data',
-			valid.replace('purpose=http port=20000', 'purpose=http port=20000 extra=unadmitted')
+			valid.replace(
+				'purpose=http type=http port=20000',
+				'purpose=http type=http port=20000 extra=unadmitted'
+			)
 		],
 		[
 			'raw-value-receipt',
-			valid.replace('purpose=http port=20000', 'purpose=http port=http://same.example/a')
+			valid.replace(
+				'purpose=http type=http port=20000',
+				'purpose=http type=http port=http://same.example/a'
+			)
 		]
 	])
 		check(label, () => assert.equal(reader.evaluate(bad, 0, 0).complete, false));
@@ -216,6 +222,31 @@ module.exports = function run({ workflow, admitNativePacSelector, PAC_FILTER }) 
 	check('foreign-prefix-observation-refused', () =>
 		assert.equal(reader.evaluate(valid + 'FOREIGN ' + httpReceipt, 0, 0).complete, false)
 	);
+	check('fixed-public-proxy-types', () =>
+		assert.deepEqual(reader.evaluate(valid, 0, 0).argument_proxy_types, {
+			http: 'http',
+			https: 'https'
+		})
+	);
+	for (const [label, typed] of [
+		[
+			'http-purpose-https-tunnel',
+			valid.replace('purpose=http type=http', 'purpose=http type=https')
+		],
+		[
+			'https-purpose-http-proxy',
+			valid.replace('purpose=https type=https', 'purpose=https type=http')
+		]
+	])
+		check(label, () => assert.equal(reader.evaluate(typed, 0, 0).complete, true));
+	for (const [label, typed] of [
+		['socks-type', valid.replace('type=http', 'type=socks')],
+		['unknown-type', valid.replace('type=http', 'type=auto')],
+		['missing-type', valid.replace('type=http ', '')],
+		['noncanonical-type', valid.replace('type=http', 'type=HTTP')],
+		['duplicate-type-field', valid.replace('type=http', 'type=http type=https')]
+	])
+		check(label, () => assert.equal(reader.evaluate(typed, 0, 0).complete, false));
 	const first = `-[ErgoptiPlusTests.${definitions[0].suite} ${definitions[0].methods[0]}]`;
 	const second = `-[ErgoptiPlusTests.${definitions[0].suite} ${definitions[0].methods[1]}]`;
 	const pair = `Test Case '${first}' started.\nTest Case '${first}' passed (0.001 seconds).\n`;
@@ -360,6 +391,7 @@ module.exports = function run({ workflow, admitNativePacSelector, PAC_FILTER }) 
 					'cohort',
 					'expected',
 					'argument_observations',
+					'argument_proxy_types',
 					'observed',
 					'complete',
 					'swift_status',
@@ -371,9 +403,9 @@ module.exports = function run({ workflow, admitNativePacSelector, PAC_FILTER }) 
 	} finally {
 		fs.rmSync(temporary, { recursive: true, force: true });
 	}
-	assert.equal(passed, 74);
+	assert.equal(passed, 82);
 	console.log(
-		'PASS: native PAC/WPAD selected-cohort portable controls=74; actual Darwin/native14 execution UNRUN.'
+		'PASS: native PAC/WPAD selected-cohort portable controls=82; actual Darwin/native14 execution UNRUN.'
 	);
 };
 // A normal suite entry executes the complete owning source guard, which invokes

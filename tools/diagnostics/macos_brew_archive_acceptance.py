@@ -1569,7 +1569,11 @@ def _validate_owned_automation_ui_fact(packet):
             packet["first_attribute"] == "button-title"
             and packet["first_type"] != "string"
             and type(button) is dict
-            and set(button) == {"schema", "subrole", "type", "error"},
+            and set(button)
+            in (
+                {"schema", "subrole", "type", "error"},
+                {"schema", "subrole", "type", "error", "window"},
+            ),
             "Unadmitted refused button fact fields",
         )
         require(
@@ -1601,6 +1605,69 @@ def _validate_owned_automation_ui_fact(packet):
             ),
             "Refused button type and enum disagree",
         )
+        if "window" in button:
+            window = button["window"]
+            require(
+                type(window) is dict
+                and set(window) == {"schema", "role", "type", "error", "controls"}
+                and type(window["schema"]) is int
+                and window["schema"] == 1
+                and type(window["error"]) is int
+                and -(2**31) <= window["error"] < 2**31,
+                "Unadmitted refused button window fact fields",
+            )
+            kinds = {"absent", "ax-element", "string", "array", "number", "other"}
+            require(
+                type(window["type"]) is str
+                and window["type"] in kinds
+                and type(window["role"]) is str
+                and window["role"] in {"absent", "wrong-type", "window", "sheet", "other"},
+                "Unadmitted refused button window enum",
+            )
+            require(
+                (window["type"] == "absent" and window["role"] == "absent")
+                or (
+                    window["type"] == "string"
+                    and window["error"] == 0
+                    and window["role"] in {"window", "sheet", "other"}
+                )
+                or (
+                    window["type"] not in {"absent", "string"}
+                    and window["error"] == 0
+                    and window["role"] == "wrong-type"
+                ),
+                "Refused button window type and role disagree",
+            )
+            controls = window["controls"]
+            require(
+                type(controls) is dict and set(controls) == {"close", "minimize", "zoom"},
+                "Unadmitted fixed window control fields",
+            )
+            for control in controls.values():
+                require(
+                    type(control) is dict
+                    and set(control) == {"type", "error", "relation"}
+                    and type(control["error"]) is int
+                    and -(2**31) <= control["error"] < 2**31
+                    and type(control["type"]) is str
+                    and control["type"] in kinds
+                    and type(control["relation"]) is str
+                    and control["relation"] in {"same", "different", "unobserved"},
+                    "Unadmitted fixed window control observation",
+                )
+                require(
+                    (
+                        control["error"] == 0
+                        and control["type"] == "ax-element"
+                        and control["relation"] in {"same", "different"}
+                    )
+                    or (
+                        control["type"] != "ax-element"
+                        and control["relation"] == "unobserved"
+                        and (control["error"] == 0 or control["type"] == "absent")
+                    ),
+                    "Window control identity lacks a successful exact AX element observation",
+                )
     return dict(packet)
 
 
