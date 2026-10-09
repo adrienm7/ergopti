@@ -124,6 +124,13 @@ class _ArtifactNtlmProxyOwner {
 			} catch Any {
 				; Closed scalar observation cannot replace physical retirement assertions.
 			}
+			try {
+				FirstFact := _ArtifactNtlmFirstFailureDiagnostic(this.State)
+				if FirstFact != ""
+					_TestPrint("::notice title=Windows native SSPI first failure::" . FirstFact)
+			} catch Any {
+				; Passive provenance cannot change service/refusal/physical-close assertions.
+			}
 			AssertTrue(this.NativeState is Map && this.NativeState.Get("TreeQuiesced", false), "SSPI service process and Job handles close")
 			AssertEqual(1, this.Results.Length)
 			AssertEqual(0, this.Results[1]["exit"], "SSPI service closes with no retained thread or security-context debt")
@@ -384,3 +391,40 @@ _ArtifactNtlmClosureDiagnosticControls() {
 	AssertEqual("", _ArtifactNtlmClosureDiagnostic(0))
 }
 Test("artifact curl: closure counters remain bounded and exclude private state", _ArtifactNtlmClosureDiagnosticControls)
+
+_ArtifactNtlmFirstFailureDiagnostic(State) {
+	if !(State is Map)
+		return ""
+	Site := State.Get("first_failure_site", "")
+	Family := State.Get("first_failure_family", "")
+	Code := State.Get("first_failure_code", "")
+	if !(Site is String) || !RegExMatch(Site, "\A(?:none|accept|configure_client|get_client_stream|read_header|parse_header|write_pac|write_challenge|acquire_credentials|accept_context|context_token|identity_match|connect_target|register_target|write_tunnel|get_target_stream|start_receiver|forward_request|forward_response|join_receiver|delete_replaced_context|free_context_buffer|close_context_token|delete_context|free_credentials)\z")
+		|| !(Family is String) || !RegExMatch(Family, "\A(?:none|winsock|io|invalid_operation|argument|other|sspi|win32)\z")
+		|| Type(Code) != "Integer" || Code < -2147483648 || Code > 2147483647
+		return ""
+	if (Site == "none") != (Family == "none") || (Site == "none" && Code != 0)
+		return ""
+	return "site=" . Site . " family=" . Family . " code=" . Format("{:d}", Code)
+}
+
+_ArtifactNtlmFirstFailureDiagnosticControls() {
+	AssertEqual("site=forward_response family=winsock code=10054", _ArtifactNtlmFirstFailureDiagnostic(
+		Map("first_failure_site", "forward_response", "first_failure_family", "winsock", "first_failure_code", 10054, "private", "PRIVATE_URL")))
+	AssertEqual("site=delete_context family=sspi code=-2146893054", _ArtifactNtlmFirstFailureDiagnostic(
+		Map("first_failure_site", "delete_context", "first_failure_family", "sspi", "first_failure_code", -2146893054)))
+	for Site in ["acquire_credentials", "accept_context", "context_token"]
+		AssertEqual("site=" . Site . " family=sspi code=-2146893054", _ArtifactNtlmFirstFailureDiagnostic(
+			Map("first_failure_site", Site, "first_failure_family", "sspi", "first_failure_code", -2146893054)))
+	for Site in ["configure_client", "get_client_stream", "write_pac", "register_target", "write_tunnel", "get_target_stream", "start_receiver"]
+		AssertEqual("site=" . Site . " family=io code=-2146232800", _ArtifactNtlmFirstFailureDiagnostic(
+			Map("first_failure_site", Site, "first_failure_family", "io", "first_failure_code", -2146232800)))
+	AssertEqual("site=none family=none code=0", _ArtifactNtlmFirstFailureDiagnostic(
+		Map("first_failure_site", "none", "first_failure_family", "none", "first_failure_code", 0)))
+	for Triple in [["PRIVATE_SITE", "winsock", 10054], ["forward_response", "PRIVATE_FAMILY", 10054],
+		["forward_response", "winsock", "10054"], ["forward_response", "winsock", 1.5],
+		["forward_response", "winsock", 2147483648], ["none", "io", 0], ["accept", "none", 0], ["none", "none", 1]]
+		AssertEqual("", _ArtifactNtlmFirstFailureDiagnostic(Map("first_failure_site", Triple[1], "first_failure_family", Triple[2], "first_failure_code", Triple[3])))
+	AssertEqual("", _ArtifactNtlmFirstFailureDiagnostic(Map()))
+	AssertEqual("", _ArtifactNtlmFirstFailureDiagnostic(0))
+}
+Test("artifact curl: first failure projection excludes private text and preserves native numeric domains", _ArtifactNtlmFirstFailureDiagnosticControls)

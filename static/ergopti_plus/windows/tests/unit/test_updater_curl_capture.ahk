@@ -567,3 +567,272 @@ _CurlCaptureFinishHybridNamespace(Capture, Parent, Failed, Primary, Foreign, Mov
 	if IsObject(CleanupFailure)
 		throw CleanupFailure
 }
+
+
+; Additive native receiving only: a denied setup does not qualify any of the
+; original replacement/transplant/junction assertions. Every phase reports only
+; fixed scalar facts, and the original eight controls remain unchanged.
+global _CurlCaptureMoveProbeFixtureDebt := Map()
+
+_CurlCaptureMoveProbeEmptyDirectory(HeldRoot := false) {
+	global _CurlCaptureMoveProbeFixtureDebt
+	Parent := RTrim(_SR_AcquireCaptureDirectory(), "\")
+	Owner := _UpdaterCurlCaptureLedger()
+	Source := Parent . "\empty-original"
+	Target := Parent . "\empty-moved"
+	Entry := 0
+	Failed := false
+	Primary := 0
+	CleanupFailure := 0
+	Context := Map("parent", Parent, "source", Source, "target", Target, "owner", Owner, "entry", 0)
+	_CurlCaptureMoveProbeFixtureDebt[ObjPtr(Owner)] := Context
+	try {
+		AssertTrue(DllCall("kernel32\CreateDirectoryW", "Str", Source, "Ptr", 0, "Int"))
+		Entry := Map("path", Source, "handle", Owner.Open(Source, 0, 3, true), "directory", true)
+		Context["entry"] := Entry
+		AssertTrue(Entry["handle"] != 0)
+		Original := Owner.Snapshot(Entry["handle"])
+		Context["original"] := Original
+		AssertTrue(Original.Get("ok", false) && Original["directory"] && !Original["delete_pending"])
+		if !HeldRoot {
+			AssertTrue(Owner.CloseProbe(Entry["handle"]), "the positive control has no retained handle during rename")
+			Entry["handle"] := 0
+		}
+		BeforeSource := DirExist(Source) != ""
+		BeforeTarget := DirExist(Target) != ""
+		AssertTrue(BeforeSource && !BeforeTarget, "the independent same-parent positive control is exclusive")
+		DllCall("kernel32\SetLastError", "UInt", 0)
+		Moved := DllCall("kernel32\MoveFileW", "Str", Source, "Str", Target, "Int")
+		MoveError := A_LastError
+		AfterSource := DirExist(Source) != ""
+		AfterTarget := DirExist(Target) != ""
+		Phase := HeldRoot ? "root_only" : "empty"
+		HeldSame := HeldRoot && Owner.Same(Original, Owner.Snapshot(Entry["handle"]))
+		_TestAppendProgress("# curl_move_probe phase=" . Phase . " moved=" . (Moved ? 1 : 0)
+			. " errno=" . MoveError . " errno_valid=" . (Moved ? 0 : 1)
+			. " source_before=" . (BeforeSource ? 1 : 0) . " target_before=" . (BeforeTarget ? 1 : 0)
+			. " source_after=" . (AfterSource ? 1 : 0) . " target_after=" . (AfterTarget ? 1 : 0)
+			. " held_root=" . (HeldRoot ? 1 : 0) . " identity_checked=" . (HeldRoot ? 1 : 0)
+			. " directory_same=" . (HeldSame ? 1 : 0))
+		if Moved
+			Entry["path"] := Target
+		AssertTrue(MoveError is Integer && MoveError >= 0 && MoveError <= 0xFFFFFFFF)
+		if HeldRoot
+			AssertTrue(HeldSame, "the root-only probe preserves its exact held directory identity")
+		if !HeldRoot
+			AssertTrue(Moved, "the actual unheld empty-directory positive control must rename")
+		if Moved
+			AssertTrue(!AfterSource && AfterTarget, "a successful independent setup reaches its exact target")
+		else {
+			AssertTrue(MoveError != 0, "the diagnostic root-only refusal has an actual native error")
+			AssertTrue(AfterSource && !AfterTarget, "a refused root-only setup preserves its exact namespace")
+		}
+		if !Entry["handle"]
+			Entry["handle"] := Owner.Open(Entry["path"], 0, 3, true)
+		AssertTrue(Entry["handle"] != 0 && Owner.Same(Original, Owner.Snapshot(Entry["handle"])),
+			"the independent renamed positive control retains its original native identity")
+	} catch Any as Failure {
+		Failed := true
+		Primary := Failure
+	} finally {
+		try {
+			if !(Entry is Map) || !IsSet(Original) || Owner.ProbeCloseDebt.Length
+				throw Error("Native move positive-control authority was unavailable.")
+			if !Entry["handle"]
+				Entry["handle"] := Owner.Open(Entry["path"], 0, 3, true)
+			if !Entry["handle"] || !Owner.Same(Original, Owner.Snapshot(Entry["handle"])) || !Owner.RetireEntry(Entry)
+				throw Error("Native move positive-control retirement was refused.")
+			AssertEqual(0, Owner.ProbeCloseDebt.Length)
+			DirDelete(Parent, false)
+			_CurlCaptureMoveProbeFixtureDebt.Delete(ObjPtr(Owner))
+		} catch Any as Failure {
+			CleanupFailure := Failure
+		}
+	}
+	if Failed
+		throw Primary
+	if IsObject(CleanupFailure)
+		throw CleanupFailure
+}
+
+_CurlCaptureMoveProbeAllocatedNamespace(Phase, LiveBody := false, HeldLease := false) {
+	global _CurlCaptureMoveProbeFixtureDebt
+	Parent := RTrim(_SR_AcquireCaptureDirectory(), "\")
+	Capture := _UpdaterCurlCaptureLedger()
+	Lease := 0
+	MovedPath := ""
+	Failed := false
+	Primary := 0
+	Context := Map("capture", Capture, "parent", Parent, "lease", 0, "moved", "")
+	_CurlCaptureMoveProbeFixtureDebt[ObjPtr(Capture)] := Context
+	try {
+		AssertTrue(Phase == "allocated" || Phase == "live_body" || Phase == "held_lease")
+		Capture.Acquire(Parent)
+		AssertEqual(4, Capture.Files.Count, "the probe uses the actual four-file production ledger")
+		AssertTrue(Capture.ValidatePaths(), "all exact production references precede the native setup attempt")
+		AssertEqual(0, Capture.ProbeCloseDebt.Length)
+		if LiveBody {
+			Path := StrReplace(Capture.Files["artifact.bin"]["path"], "'", "''")
+			Script := "$ErrorActionPreference='Stop';[IO.File]::WriteAllBytes('" . Path
+				. "',[byte[]](1,2,3,4));Start-Sleep -Milliseconds 30000"
+			Worker := ShellRunner_SpawnTreeOwned(_Updater_PowerShellPath(),
+				["-NoProfile", "-NonInteractive", "-EncodedCommand", _Updater_EncodePowerShellCommand(Script)],
+				, , ObjBindMethod(Capture, "OnNativeAdopt"))
+			Capture.Attach(Worker)
+			AssertTrue(Worker.start(), "the diagnostic body has a real independently owned native Job")
+			Start := A_TickCount
+			while !TickExpired64(Start, 10000) && Capture.ObserveBody(Worker, 16) != 4 {
+				_SR_TreePoll()
+				Sleep(10)
+			}
+			AssertEqual(4, Capture.ObserveBody(Worker, 16), "the exact real four-byte native body precedes the diagnostic move")
+			AssertEqual(0, Capture.ProbeCloseDebt.Length, "all observation probes closed before the diagnostic move")
+		}
+		if HeldLease {
+			Lease := Capture.AcquireDirectoryLease()
+			Context["lease"] := Lease
+			AssertTrue(Lease != 0, "the comparison phase holds the actual delete-excluding production lease")
+		}
+		DirectoryBefore := Capture.Snapshot(Capture.Directory["handle"])
+		AssertTrue(DirectoryBefore.Get("ok", false) && DirectoryBefore["directory"] && !DirectoryBefore["delete_pending"])
+		FilesBefore := Map()
+		for Name, Entry in Capture.Files {
+			FilesBefore[Name] := Capture.Snapshot(Entry["handle"])
+			AssertTrue(FilesBefore[Name].Get("ok", false) && !FilesBefore[Name]["directory"]
+				&& !FilesBefore[Name]["delete_pending"] && FilesBefore[Name]["links"] == 1)
+		}
+		Target := Parent . "\move-probe-target"
+		BeforeSource := DirExist(Capture.Path) != ""
+		BeforeTarget := DirExist(Target) != ""
+		AssertTrue(BeforeSource && !BeforeTarget, "the target is absent in the exact same private parent")
+		DllCall("kernel32\SetLastError", "UInt", 0)
+		Moved := DllCall("kernel32\MoveFileW", "Str", Capture.Path, "Str", Target, "Int")
+		MoveError := A_LastError
+		if Moved {
+			MovedPath := Target
+			Context["moved"] := MovedPath
+		}
+		AfterSource := DirExist(Capture.Path) != ""
+		AfterTarget := DirExist(Target) != ""
+		DirectorySame := Capture.Same(DirectoryBefore, Capture.Snapshot(Capture.Directory["handle"]))
+		FilesSame := true
+		for Name, Entry in Capture.Files {
+			Actual := Capture.Snapshot(Entry["handle"])
+			FilesSame := Capture.Same(FilesBefore[Name], Actual) && FilesSame
+		}
+		_TestAppendProgress("# curl_move_probe phase=" . Phase . " moved=" . (Moved ? 1 : 0)
+			. " errno=" . MoveError . " errno_valid=" . (Moved ? 0 : 1)
+			. " source_before=" . (BeforeSource ? 1 : 0) . " target_before=" . (BeforeTarget ? 1 : 0)
+			. " source_after=" . (AfterSource ? 1 : 0) . " target_after=" . (AfterTarget ? 1 : 0)
+			. " directory_same=" . (DirectorySame ? 1 : 0) . " files_same=" . (FilesSame ? 1 : 0)
+			. " held_lease=" . (Lease ? 1 : 0))
+		AssertTrue(MoveError is Integer && MoveError >= 0 && MoveError <= 0xFFFFFFFF)
+		AssertTrue(DirectorySame && FilesSame, "the observation never replaces or closes original authority")
+		if HeldLease {
+			AssertFalse(Moved, "the actual held admission must deny the native move")
+			AssertTrue(MoveError == 5 || MoveError == 32, "held-lease denial has an actual access or sharing error")
+		}
+		if Moved {
+			AssertTrue(!AfterSource && AfterTarget, "a successful native setup physically reaches its target")
+			if LiveBody
+				AssertEqual(0, Capture.ObserveBody(Capture.Worker, 16), "missing original namespace refuses body admission")
+			Probe := Capture.Open(Target, 0, 3, true)
+			AssertTrue(Probe != 0)
+			try AssertTrue(Capture.Same(DirectoryBefore, Capture.Snapshot(Probe)))
+			finally AssertTrue(Capture.CloseProbe(Probe))
+			Restored := DllCall("kernel32\MoveFileW", "Str", Target, "Str", Capture.Path, "Int")
+			RestoreError := A_LastError
+			_TestAppendProgress("# curl_move_probe phase=restore source_phase=" . Phase
+				. " moved=" . (Restored ? 1 : 0) . " errno=" . RestoreError . " errno_valid=" . (Restored ? 0 : 1))
+			AssertTrue(Restored, "only the exact unchanged moved namespace is restored")
+			MovedPath := ""
+			Context["moved"] := MovedPath
+		} else {
+			AssertTrue(MoveError != 0, "a refused setup must report the actual native error")
+			AssertTrue(AfterSource && !AfterTarget, "a denied move preserves the original named namespace")
+		}
+		AssertTrue(Capture.ValidatePaths(), "diagnostic receiving leaves all exact file and directory paths admitted")
+		if LiveBody
+			AssertEqual(4, Capture.ObserveBody(Capture.Worker, 16), "the real owned body remains observable in its restored namespace")
+	} catch Any as Failure {
+		Failed := true
+		Primary := Failure
+	} finally _CurlCaptureMoveProbeFinishOwnedContext(Context, Failed, Primary)
+}
+
+; A restoration refusal can precede production debt registration. This exact
+; external owner exists before Acquire and survives every cleanup exception.
+; A retry uses this same context and already-acquired native references only.
+_CurlCaptureMoveProbeFinishOwnedContext(Context, Failed := false, Primary := 0) {
+	global _CurlCaptureMoveProbeFixtureDebt
+	Capture := Context["capture"]
+	Key := ObjPtr(Capture)
+	if !_CurlCaptureMoveProbeFixtureDebt.Has(Key) || _CurlCaptureMoveProbeFixtureDebt[Key] != Context
+		throw Error("Native move diagnostic fixture owner was replaced.")
+	if Capture.ProbeCloseDebt.Length {
+		if Failed
+			throw Primary
+		throw Error("Native move diagnostic retained unknown close debt.")
+	}
+	Lease := Context["lease"]
+	if Lease {
+		if Capture.CloseProbe(Lease)
+			Context["lease"] := 0
+		else if !Failed {
+			Failed := true
+			Primary := Error("Native move diagnostic lease closure was refused.")
+		}
+	}
+	CleanupFailure := 0
+	try {
+		; Receive cleanup's physical completion separately from the original
+		; assertion failure, which remains primary after this actual receipt.
+		_CurlCaptureMoveProbeRestoreOwnedNamespace(Context)
+		_CurlCaptureFinishNativeFixture(Capture, Context["parent"], false, 0, 0, Context["moved"], true)
+		if !_CurlCaptureMoveProbeFixtureDebt.Has(Key) || _CurlCaptureMoveProbeFixtureDebt[Key] != Context
+			throw Error("Native move diagnostic fixture owner changed during cleanup.")
+		_CurlCaptureMoveProbeFixtureDebt.Delete(Key)
+	} catch Any as Failure {
+		CleanupFailure := Failure
+	}
+	if Failed
+		throw Primary
+	if IsObject(CleanupFailure)
+		throw CleanupFailure
+}
+
+_CurlCaptureMoveProbeRestoreOwnedNamespace(Context) {
+	Moved := Context["moved"]
+	if Moved == ""
+		return
+	Capture := Context["capture"]
+	Probe := Capture.Open(Moved, 0, 3, true)
+	if !Probe
+		throw Error("Native move diagnostic original restoration identity was unavailable.")
+	try {
+		Original := Capture.Snapshot(Capture.Directory["handle"])
+		Actual := Capture.Snapshot(Probe)
+		if !Capture.Same(Original, Actual) || !Actual["directory"] || Actual["delete_pending"]
+			throw Error("Native move diagnostic original restoration identity was refused.")
+	} finally Capture.CloseProbe(Probe)
+	if Capture.ProbeCloseDebt.Length || FileExist(Capture.Directory["path"])
+		throw Error("Native move diagnostic restoration cannot replace an unowned namespace.")
+	Restored := DllCall("kernel32\MoveFileW", "Str", Moved, "Str", Capture.Directory["path"], "Int")
+	RestoreError := A_LastError
+	if Restored
+		Context["moved"] := ""
+	_TestAppendProgress("# curl_move_probe phase=cleanup_restore moved=" . (Restored ? 1 : 0)
+		. " errno=" . RestoreError . " errno_valid=" . (Restored ? 0 : 1))
+	if !Restored
+		throw OSError(RestoreError, "Native move diagnostic exact original restoration was refused.")
+}
+
+_CurlCaptureNativeMovePreconditionProbe() {
+	_CurlCaptureMoveProbeEmptyDirectory()
+	_CurlCaptureMoveProbeEmptyDirectory(true)
+	_CurlCaptureMoveProbeAllocatedNamespace("allocated")
+	_CurlCaptureMoveProbeAllocatedNamespace("live_body", true)
+	_CurlCaptureMoveProbeAllocatedNamespace("held_lease", false, true)
+}
+Test("updater curl capture: additive native move precondition facts preserve original attack requirements",
+	_CurlCaptureNativeMovePreconditionProbe)

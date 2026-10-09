@@ -237,7 +237,7 @@ finishStagingObservation(stagingOwned, stagingResult, () => {
 	assert.equal(stagingResult.stderr, '');
 	assert.equal(
 		stagingResult.stdout.trim(),
-		'PASS: staging observation checks=8 native_watch=0 network=0 certificate=0'
+		'PASS: staging observation checks=15 native_watch=0 network=0 certificate=0'
 	);
 });
 

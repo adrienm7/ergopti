@@ -134,6 +134,66 @@ _UpdaterNativeReadStagingDiagnostic(Path) {
 	return _UpdaterNativeStagingDiagnosticFact(JsonParse(DiagnosticText))
 }
 
+_UpdaterNativeRouteShapeFact(Fact) {
+	if !(Fact is Map) || Fact.Count != 15 || !(Fact.Get("schema_version", "") is Integer) || Fact.Get("schema_version", 0) != 1
+		return ""
+	ExpectedKeys := "schema_version|selection_kind|selection_arity|ok_kind|ok_value|routes_kind|routes_count|max_routes_kind|max_routes_value|max_redirects_kind|max_redirects_value|receipt_kind|receipt_count|receipt_backend_kind|receipt_stage_kind"
+	for Key in Fact
+		if !(Key is String) || !RegExMatch(Key, "\A(?:" . ExpectedKeys . ")\z")
+			return ""
+	Kinds := "absent|bool|int32|int64|array|hashtable|string|other|unobserved"
+	for Key in ["selection_kind", "ok_kind", "routes_kind", "max_routes_kind", "max_redirects_kind", "receipt_kind", "receipt_backend_kind", "receipt_stage_kind"]
+		if !(Fact[Key] is String) || !RegExMatch(Fact[Key], "\A(?:" . Kinds . ")\z")
+			return ""
+	for Key in ["schema_version", "selection_arity", "routes_count", "max_routes_value", "max_redirects_value", "receipt_count"]
+		if !(Fact[Key] is Integer) || Fact[Key] < -1 || Fact[Key] > 2147483647
+			return ""
+	if Fact["selection_kind"] == "unobserved" || Fact["selection_arity"] > 4096
+		|| (Fact["selection_kind"] == "absent" && Fact["selection_arity"] != 0)
+		|| (Fact["selection_kind"] != "absent" && Fact["selection_kind"] != "array" && Fact["selection_arity"] != 1)
+		|| !(Fact["ok_value"] is String) || !RegExMatch(Fact["ok_value"], "\A(?:true|false|unavailable)\z")
+		|| (Fact["ok_kind"] == "bool" ? Fact["ok_value"] == "unavailable" : Fact["ok_value"] != "unavailable")
+		|| Fact["routes_count"] > 4096 || Fact["receipt_count"] > 64
+		return ""
+	if Fact["selection_kind"] != "hashtable" {
+		for Key in ["ok_kind", "routes_kind", "max_routes_kind", "max_redirects_kind", "receipt_kind", "receipt_backend_kind", "receipt_stage_kind"]
+			if Fact[Key] != "unobserved"
+				return ""
+	}
+	for Pair in [["routes_kind", "routes_count", "array"], ["receipt_kind", "receipt_count", "hashtable"]]
+		if Fact[Pair[1]] != Pair[3] && Fact[Pair[2]] != -1
+			return ""
+	for Prefix in ["max_routes", "max_redirects"]
+		if Fact[Prefix . "_kind"] != "int32" && Fact[Prefix . "_kind"] != "int64" && Fact[Prefix . "_value"] != -1
+			return ""
+	Text := ""
+	for Key in ["selection_kind", "selection_arity", "ok_kind", "ok_value", "routes_kind", "routes_count", "max_routes_kind", "max_routes_value", "max_redirects_kind", "max_redirects_value", "receipt_kind", "receipt_count", "receipt_backend_kind", "receipt_stage_kind"]
+		Text .= (Text == "" ? "" : " ") . Key . "=" . Fact[Key]
+	return Text
+}
+
+_UpdaterNativeReadRouteShape(Path) {
+	if !(Path is String) || Path == "" || FSSize(Path) > 2048
+		return ""
+	Text := FSReadUtf8Exact(Path)
+	if !(Text is String) || StrLen(Text) > 2048
+		|| RegExMatch(Text, '"(?:schema_version|selection_arity|routes_count|max_routes_value|max_redirects_value|receipt_count)"\s*:\s*(?:true|false|null)\b')
+		return ""
+	return _UpdaterNativeRouteShapeFact(JsonParse(Text))
+}
+
+_UpdaterNativeEmitRouteShape(Run) {
+	try {
+		if Run.HasOwnProp("RouteShapeDiagnosticPath") {
+			Fact := _UpdaterNativeReadRouteShape(Run.RouteShapeDiagnosticPath)
+			if Fact != ""
+				Run.RefusalDiagnosticPrinter.Call("::notice title=Windows staging route shape diagnostic::" . Fact)
+		}
+	} catch Any {
+		; Optional shape observation cannot replace the real route/refusal assertions.
+	}
+}
+
 class _UpdaterNativeTransportOwner extends _ManagedRemoteFixtureOwner {
 	__New() {
 		super.__New()
@@ -187,6 +247,7 @@ class _UpdaterNativeDownloadRun {
 		this.NewExe := this.Directory . "staged.exe"
 		this.SwapPath := this.Directory . "swap.ps1"
 		this.StagingDiagnosticPath := this.Directory . "staging-diagnostic.json"
+		this.RouteShapeDiagnosticPath := this.Directory . "route-shape.json"
 		FileAppend(this.OldBytes, this.CurrentExe, "UTF-8-RAW")
 		if this.DenyFile
 			DirCreate(this.NewExe)
@@ -209,11 +270,14 @@ class _UpdaterNativeDownloadRun {
 			this.Transport.Environment.Push(Pair)
 			DiagnosticPair := {Name: Prefix . "_TEST_STAGING_DIAGNOSTIC", Value: this.StagingDiagnosticPath}
 			this.Transport.Environment.Push(DiagnosticPair)
+			RouteShapePair := {Name: Prefix . "_TEST_ROUTE_SHAPE", Value: this.RouteShapeDiagnosticPath}
+			this.Transport.Environment.Push(RouteShapePair)
+			EnvSet(RouteShapePair.Name, RouteShapePair.Value)
 			EnvSet(DiagnosticPair.Name, DiagnosticPair.Value)
 			EnvSet(Pair.Name, Pair.Value)
 			; Add declared trusted callbacks to the real transport invocation only.
 			; Passive observation chunks preserve every original worker operation and guard.
-			Admission := '$env:ERGOPTI_FIXTURE_STAGING_DIAGNOSTIC=$env:' . DiagnosticPair.Name . ';$ownedPac=$env:' . Pair.Name . ';'
+			Admission := '$env:ERGOPTI_FIXTURE_STAGING_ROUTE_SHAPE=$env:' . RouteShapePair.Name . ';$env:ERGOPTI_FIXTURE_STAGING_DIAGNOSTIC=$env:' . DiagnosticPair.Name . ';$ownedPac=$env:' . Pair.Name . ';'
 				. '$reader={param($MaxBytes)[pscustomobject]@{Ok=$true;AutoDetect=$false;Absent=$false;PacUrl=$ownedPac;Proxy="";Bypass="";NativeError=0;FailureOrigin=""}}.GetNewClosure();'
 				. '$environment={param($Name)return ""};'
 			Bootstrap := Admission . this.Transport.Bootstrap . ' -ReadConfig $reader -ReadEnvironment $environment'
@@ -243,6 +307,7 @@ class _UpdaterNativeDownloadRun {
 	Accepted() {
 		Result := this.Wait()
 		if Result["exit"] != 0 {
+			_UpdaterNativeEmitRouteShape(this)
 			this.RefusalDiagnosticStatus := "unavailable"
 			this.StagingDiagnosticStatus := "unavailable"
 			try {
@@ -304,6 +369,7 @@ class _UpdaterNativeDownloadRun {
 			; Optional observation cannot replace the original refusal assertion.
 			this.StagingDiagnosticStatus := "unavailable"
 		}
+		_UpdaterNativeEmitRouteShape(this)
 		AssertEqual(Reason, Failure["reason"])
 		if Stage != ""
 			AssertEqual(Stage, Failure["receipt"].Get("stage", ""))
@@ -347,7 +413,7 @@ class _UpdaterNativeDownloadRun {
 				return false
 		}
 		if this.Directory != "" {
-			for Name in ["CurrentExe", "NewExe", "SwapPath", "StagingDiagnosticPath"] {
+			for Name in ["CurrentExe", "NewExe", "SwapPath", "StagingDiagnosticPath", "RouteShapeDiagnosticPath"] {
 				if !this.HasOwnProp(Name)
 					continue
 				Path := this.%Name%
@@ -783,6 +849,7 @@ _UpdaterNativePartialStageDiagnostic(Kind, Completions, State, Elapsed) {
 }
 
 _UpdaterNativeEmitPartialStageDiagnostic(Run, Kind) {
+	_UpdaterNativeEmitRouteShape(Run)
 	try {
 		Elapsed := TickElapsed64(Run.StartedTick)
 		Fact := _UpdaterNativePartialStageDiagnostic(Kind, Run.Results, Run.NativeState, Elapsed)
@@ -871,3 +938,33 @@ _UpdaterNativeRefusedSidecarControls(Contract) {
 	}
 }
 Test("updater native: refusal sidecar observation preserves the original stage assertion", _UpdaterNative_WithContract.Bind(_UpdaterNativeRefusedSidecarControls))
+
+_UpdaterNativeRouteShapeControls() {
+	; Independent literal receipt: no route, endpoint, URL or credential is copied.
+	Text := '{"schema_version":1,"selection_kind":"hashtable","selection_arity":1,"ok_kind":"bool","ok_value":"false","routes_kind":"array","routes_count":0,"max_routes_kind":"absent","max_routes_value":-1,"max_redirects_kind":"absent","max_redirects_value":-1,"receipt_kind":"hashtable","receipt_count":4,"receipt_backend_kind":"string","receipt_stage_kind":"string"}'
+	Fact := JsonParse(Text)
+	AssertContains(_UpdaterNativeRouteShapeFact(Fact), "selection_kind=hashtable selection_arity=1 ok_kind=bool ok_value=false")
+	AssertContains(_UpdaterNativeRouteShapeFact(Fact), "receipt_kind=hashtable receipt_count=4 receipt_backend_kind=string receipt_stage_kind=string")
+	Fact["private"] := "PRIVATE_URL_TOKEN"
+	AssertEqual("", _UpdaterNativeRouteShapeFact(Fact), "unknown/private shape fields are refused")
+	Fact.Delete("private")
+	Fact["selection_kind"] := "PRIVATE_URL_TOKEN"
+	AssertEqual("", _UpdaterNativeRouteShapeFact(Fact), "unlisted kinds never reach scalar notices")
+	Fact["selection_kind"] := "hashtable"
+	Fact["max_routes_value"] := "8"
+	AssertEqual("", _UpdaterNativeRouteShapeFact(Fact), "string policy values remain unavailable")
+	Directory := _SR_AcquireCaptureDirectory()
+	Path := Directory . "route-shape.json"
+	try {
+		FileAppend(Text, Path, "UTF-8-RAW")
+		AssertContains(_UpdaterNativeReadRouteShape(Path), "routes_kind=array routes_count=0", "actual bounded sidecar joins the receiving validator")
+		FileDelete(Path)
+		FileAppend(StrReplace(Text, '"routes_count":0', '"routes_count":false'), Path, "UTF-8-RAW")
+		AssertEqual("", _UpdaterNativeReadRouteShape(Path), "JSON booleans cannot masquerade as policy integer observations")
+	} finally {
+		if FileExist(Path)
+			FileDelete(Path)
+		DirDelete(Directory, false)
+	}
+}
+Test("updater staging: closed route-shape observation preserves typed policy and private bounds", _UpdaterNativeRouteShapeControls)
