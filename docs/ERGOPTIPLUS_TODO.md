@@ -3651,6 +3651,18 @@ Windows diagnostic run37456524038 resolves the five publisher source guards, glo
 
 The shared AutoHotkey keyboard identity rule now matches the existing Lua policy and replays17 additive independent handwritten vectors. Native source admission rejects sparse arrays, named metadata and derived prototypes before accessors run; five registered Windows cases cover retirement, omission and callback-free refusal. Independent pure Lua replay passes83/0 on each runtime. This is preparatory policy only: no complete Windows catalogue, loader publication or late parameter getter is changed or claimed implemented. Actual native AHK qualification and coordinated action-owner integration remain required.
 
+The Windows native write issuer now admits only its exact privately issued,
+plain data token or five-field terminal bundle. Cloned, extra-field, accessor,
+subclass, sparse and retired owners refuse before observer or authority effects;
+acknowledged release retires private ownership, while failed release remains
+retryable. The compatible updater keeps its bounded receipt outside this native
+object, preserving the original operation and ownership contracts. All four
+original barrier tests and 37 assertion/registration calls remain; eight frozen
+issuer cases and 21 additive controls are registered. Three portable source
+guards pass; genuine AHK, E2E, packaging and installation for these 33 cases
+remain unexecuted pending Windows CI. This bounded issuer change does not close
+the full migration/writer composition or the external retained-wrapper follow-up.
+
 - [~] **34.** Match the Windows recommended hotstring delays to the shared
   manifest, and make hand-written `[[hotstrings.terminators]]` lists editable.
   The shared AHK override policy now writes an explicit recommended delay only
@@ -4712,6 +4724,18 @@ executed as the ordinary CI user. Its earlier incomplete-prerequisite attempt
 three comments; this is executable-body equivalence evidence, not a claimed
 second full V2 run. Corrected hosted current-source, macOS SDK, Windows and
 physical-device qualification are not inferred. TODO42 remains partial.
+
+The Windows native write issuer now admits only its exact privately issued,
+plain data token or five-field terminal bundle. Cloned, extra-field, accessor,
+subclass, sparse and retired owners refuse before observer or authority effects;
+acknowledged release retires private ownership, while failed release remains
+retryable. The compatible updater keeps its bounded receipt outside this native
+object, preserving the original operation and ownership contracts. All four
+original barrier tests and 37 assertion/registration calls remain; eight frozen
+issuer cases and 21 additive controls are registered. Three portable source
+guards pass; genuine AHK, E2E, packaging and installation for these 33 cases
+remain unexecuted pending Windows CI. This bounded issuer change does not close
+the full migration/writer composition or the external retained-wrapper follow-up.
 
 - [~] **43.** A Mac upgraded from a pre-lease release could not deploy (dev.149:
   « Merge aborted: 25 ambiguous legacy ErgoptiPlus rules … matches the

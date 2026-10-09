@@ -44,8 +44,80 @@ _ConfigWriteLeaseKey(Path) {
 	return FileReadActivityKey(Path)
 }
 
-_ConfigWriteLeaseTryAcquire(Path, Kind := "targeted") {
-	State := _ConfigWriteLeaseState()
+; Intrinsic inspection precedes any virtual method, getter or container read.
+; These helpers validate data shape only; private issuer receipts still own
+; authority, including retirement of the exact originally issued object.
+_ConfigWriteLeasePlainContainer(Value, Prototype) {
+	if !IsObject(Value) || ObjGetBase(Value) != Prototype
+		return false
+	for Name in ObjOwnProps(Value)
+		return false
+	return true
+}
+
+_ConfigWriteLeaseDataObject(Owner, Fields) {
+	if !IsObject(Owner) || ObjGetBase(Owner) != Object.Prototype
+		return false
+	Names := Map()
+	Names.CaseSense := "On"
+	for Name in ObjOwnProps(Owner) {
+		Descriptor := Object.Prototype.GetOwnPropDesc.Call(Owner, Name)
+		if !Descriptor.HasOwnProp("Value")
+			return false
+		Names[Name] := true
+	}
+	if Names.Count != Fields.Length
+		return false
+	for Name in Fields {
+		if !Names.Has(Name)
+			return false
+	}
+	return true
+}
+
+_ConfigWriteLeaseStateIsData(State) {
+	return _ConfigWriteLeaseDataObject(State, ["owners", "terminal", "next_id"])
+		&& _ConfigWriteLeasePlainContainer(State.owners, Map.Prototype)
+		&& (State.next_id is Integer) && State.next_id >= 0
+		&& (IsObject(State.terminal) || ((State.terminal is Integer) && State.terminal == 0))
+}
+
+_ConfigWriteLeaseTryAcquire(Path, Kind := "targeted", InspectToken := unset, Retire := false) {
+	static StateOwner := _ConfigWriteLeaseState
+	static DataOwner := _ConfigWriteLeaseDataObject, ContainerOwner := _ConfigWriteLeasePlainContainer
+	static StateDataOwner := _ConfigWriteLeaseStateIsData
+	if StateOwner != _ConfigWriteLeaseState || DataOwner != _ConfigWriteLeaseDataObject
+			|| ContainerOwner != _ConfigWriteLeasePlainContainer || StateDataOwner != _ConfigWriteLeaseStateIsData
+		return false
+	static Issued := Map(), ActiveKeys := Map()
+	if IsSet(InspectToken) {
+		PreviousCritical := Critical("On")
+		try {
+			if (InspectToken is Integer) && InspectToken == 0
+				return ActiveKeys.Count > 0
+			if !Issued.Has(InspectToken)
+					|| !DataOwner.Call(InspectToken, ["key", "id", "kind"])
+				return false
+			Receipt := Issued[InspectToken]
+			State := StateOwner.Call()
+			if !StateDataOwner.Call(State) || State.terminal is Object
+					|| !(InspectToken.key is String) || !(InspectToken.kind is String)
+					|| !(InspectToken.id is Integer) || InspectToken.id != Receipt.id
+					|| StrCompare(InspectToken.kind, Receipt.kind, true) != 0
+					|| StrCompare(InspectToken.key, Receipt.key, true) != 0
+					|| !ActiveKeys.Has(Receipt.key) || ActiveKeys[Receipt.key] != InspectToken
+					|| !State.owners.Has(Receipt.key) || State.owners[Receipt.key] != Receipt.token
+				return false
+			if Retire {
+				ActiveKeys.Delete(Receipt.key)
+				Issued.Delete(InspectToken)
+			}
+			return true
+		} finally Critical(PreviousCritical)
+	}
+	State := StateOwner.Call()
+	if !StateDataOwner.Call(State)
+		return false
 	Owners := State.owners
 	Key := _ConfigWriteLeaseKey(Path)
 	PreviousCritical := Critical("On")
@@ -53,11 +125,16 @@ _ConfigWriteLeaseTryAcquire(Path, Kind := "targeted") {
 		; A path relocation/reload is a machine-wide config transition. Blocking
 		; only config.toml still lets sibling writers (hotstring overrides, prompt
 		; stores, metrics) commit to the directory the next boot is abandoning.
-		if (State.terminal is Object) || Owners.Has(Key) || FileReadActivityBusy(Path)
+		if !StateDataOwner.Call(State) || State != StateOwner.Call()
+				|| Owners != State.owners || !ContainerOwner.Call(Owners, Map.Prototype)
+				|| _ConfigWriteTerminalTryAcquire([], 0)
+				|| (State.terminal is Object) || ActiveKeys.Has(Key) || Owners.Has(Key) || FileReadActivityBusy(Path)
 			return false
 		State.next_id += 1
 		Token := { key: Key, id: State.next_id, kind: Kind }
 		Owners[Key] := Token
+		Issued[Token] := { token: Token, key: Key, id: Token.id, kind: Kind }
+		ActiveKeys[Key] := Token
 		return Token
 	} finally {
 		Critical(PreviousCritical)
@@ -74,8 +151,11 @@ _ConfigWriteLeaseTryAcquire(Path, Kind := "targeted") {
 ConfigWriteLeaseBusy() {
 	State := _ConfigWriteLeaseState()
 	PreviousCritical := Critical("On")
-	try return !(State.terminal is Object) && State.owners.Count > 0
-	finally Critical(PreviousCritical)
+	try {
+		if !_ConfigWriteLeaseStateIsData(State)
+			return true
+		return !(State.terminal is Object) && State.owners.Count > 0
+	} finally Critical(PreviousCritical)
 }
 
 /** Defers mutation commands without invalidating concurrent source readers. */
@@ -86,13 +166,18 @@ ConfigMutationBusy() {
 }
 
 _ConfigWriteLeaseRelease(Token) {
-	if !(Token is Object) || !Token.HasOwnProp("key") || !Token.HasOwnProp("id")
+	if !_ConfigWriteLeaseOwns(Token)
 		return false
 	Owners := _ConfigWriteLeaseOwners()
 	PreviousCritical := Critical("On")
 	try {
 		State := _ConfigWriteLeaseState()
+		if !_ConfigWriteLeaseStateIsData(State) || !_ConfigWriteLeaseOwns(Token)
+				|| Owners != State.owners
+			return false
 		if (State.terminal is Object) {
+			if !_ConfigWriteTerminalTryAcquire([], State.terminal)
+				return false
 			for TerminalToken in State.terminal.tokens {
 				if (TerminalToken is Object) && TerminalToken.id = Token.id
 					return false
@@ -102,6 +187,8 @@ _ConfigWriteLeaseRelease(Token) {
 			return false
 		Current := Owners[Token.key]
 		if !(Current is Object) || !Current.HasOwnProp("id") || Current.id != Token.id
+			return false
+		if !_ConfigWriteLeaseTryAcquire("", "", Token, true)
 			return false
 		Owners.Delete(Token.key)
 		return true
@@ -115,9 +202,60 @@ _ConfigWriteLeaseRelease(Token) {
 ; ordinary config writer can enter on any sibling path until the whole bundle
 ; is released. Paths may be a String or an Array and are de-duplicated by their
 ; normalized physical key.
-_ConfigWriteTerminalTryAcquire(Paths) {
-	State := _ConfigWriteLeaseState()
+_ConfigWriteTerminalTryAcquire(Paths, InspectOwner := unset, Retire := false) {
+	static StateOwner := _ConfigWriteLeaseState
+	static OrdinaryIssuer := _ConfigWriteLeaseTryAcquire
+	static DataOwner := _ConfigWriteLeaseDataObject, ContainerOwner := _ConfigWriteLeasePlainContainer
+	static StateDataOwner := _ConfigWriteLeaseStateIsData
+	if StateOwner != _ConfigWriteLeaseState || DataOwner != _ConfigWriteLeaseDataObject
+			|| ContainerOwner != _ConfigWriteLeasePlainContainer || StateDataOwner != _ConfigWriteLeaseStateIsData
+		return false
+	static Issued := false
+	if IsSet(InspectOwner) {
+		PreviousCritical := Critical("On")
+		try {
+			if (InspectOwner is Integer) && InspectOwner == 0
+				return Issued is Object
+			if !(Issued is Object) || !IsObject(InspectOwner)
+				return false
+			Bundle := Issued.bundle
+			State := StateOwner.Call()
+			if !StateDataOwner.Call(State) || State.terminal != Bundle
+					|| !DataOwner.Call(Bundle, ["id", "kind", "tokens", "authorized", "shutdown_claimed"])
+					|| !(Bundle.kind is String)
+					|| !(Bundle.id is Integer) || Bundle.id != Issued.id || StrCompare(Bundle.kind, "terminal_bundle", true) != 0
+					|| !(Bundle.authorized is Integer) || (Bundle.authorized != 0 && Bundle.authorized != 1)
+					|| !(Bundle.shutdown_claimed is Integer) || (Bundle.shutdown_claimed != 0 && Bundle.shutdown_claimed != 1)
+					|| Bundle.tokens != Issued.token_array
+					|| !ContainerOwner.Call(Bundle.tokens, Array.Prototype)
+					|| Bundle.tokens.Length != Issued.tokens.Length
+				return false
+			Found := InspectOwner == Bundle
+			for Index, Receipt in Issued.tokens {
+				Token := Receipt.token
+				if !Bundle.tokens.Has(Index) || Bundle.tokens[Index] != Token
+						|| !DataOwner.Call(Token, ["key", "id", "kind"])
+						|| !(Token.key is String) || !(Token.kind is String)
+						|| StrCompare(Token.key, Receipt.key, true) != 0 || !(Token.id is Integer) || Token.id != Receipt.id
+						|| StrCompare(Token.kind, "terminal", true) != 0 || !State.owners.Has(Receipt.key) || State.owners[Receipt.key] != Token
+					return false
+				if InspectOwner == Token
+					Found := true
+			}
+			if Retire && Found && InspectOwner == Bundle
+				Issued := false
+			return Found
+		} finally Critical(PreviousCritical)
+	}
+	if Issued is Object || OrdinaryIssuer != _ConfigWriteLeaseTryAcquire
+			|| OrdinaryIssuer.Call("", "", 0)
+		return false
+	State := StateOwner.Call()
+	if !StateDataOwner.Call(State)
+		return false
 	PathList := (Paths is Array) ? Paths : [Paths]
+	if !ContainerOwner.Call(PathList, Array.Prototype)
+		return false
 	Keys := Map()
 	for Path in PathList {
 		Key := _ConfigWriteLeaseKey(Path)
@@ -129,7 +267,10 @@ _ConfigWriteTerminalTryAcquire(Paths) {
 		return false
 	PreviousCritical := Critical("On")
 	try {
-		if (State.terminal is Object) || State.owners.Count > 0 || FileReadActivityBusy()
+		if !StateDataOwner.Call(State) || State != StateOwner.Call()
+				|| Issued is Object || OrdinaryIssuer != _ConfigWriteLeaseTryAcquire
+				|| OrdinaryIssuer.Call("", "", 0)
+				|| (State.terminal is Object) || State.owners.Count > 0 || FileReadActivityBusy()
 			return false
 		Tokens := []
 		for Key, _ in Keys {
@@ -142,6 +283,10 @@ _ConfigWriteTerminalTryAcquire(Paths) {
 		Bundle := { kind: "terminal_bundle", id: State.next_id,
 			tokens: Tokens, authorized: false, shutdown_claimed: false }
 		State.terminal := Bundle
+		Receipts := []
+		for Token in Tokens
+			Receipts.Push({ token: Token, key: Token.key, id: Token.id })
+		Issued := { bundle: Bundle, id: Bundle.id, token_array: Tokens, tokens: Receipts }
 		return Bundle
 	} finally Critical(PreviousCritical)
 }
@@ -167,19 +312,19 @@ ConfigWriteAcquireLifecycleBundle(AdditionalPaths := 0) {
 }
 
 _ConfigWriteTerminalIsActive() {
-	State := _ConfigWriteLeaseState()
-	PreviousCritical := Critical("On")
-	try return State.terminal is Object
-	finally Critical(PreviousCritical)
+	; Public table withdrawal cannot retire an actual native barrier.
+	return _ConfigWriteTerminalTryAcquire([], 0)
 }
 
 _ConfigWriteTerminalRelease(Bundle) {
-	if !(Bundle is Object) || !Bundle.HasOwnProp("id")
+	if !IsObject(Bundle)
 		return false
 	State := _ConfigWriteLeaseState()
 	PreviousCritical := Critical("On")
 	try {
-		if !(State.terminal is Object) || State.terminal.id != Bundle.id
+		if !_ConfigWriteTerminalTryAcquire([], Bundle) || !(State.terminal is Object) || State.terminal != Bundle
+			return false
+		if !_ConfigWriteTerminalTryAcquire([], Bundle, true)
 			return false
 		for Token in State.terminal.tokens {
 			if State.owners.Has(Token.key) {
@@ -194,28 +339,26 @@ _ConfigWriteTerminalRelease(Bundle) {
 }
 
 _ConfigWriteLeaseSelectOwner(OwnerOrBundle, Path) {
-	if !(OwnerOrBundle is Object)
+	if !IsObject(OwnerOrBundle)
 		return false
-	if OwnerOrBundle.HasOwnProp("kind")
-			&& OwnerOrBundle.kind = "terminal_bundle"
-			&& OwnerOrBundle.HasOwnProp("tokens") {
+	if _ConfigWriteTerminalTryAcquire([], OwnerOrBundle)
+			&& _ConfigWriteLeaseDataObject(OwnerOrBundle, ["id", "kind", "tokens", "authorized", "shutdown_claimed"]) {
 		for Token in OwnerOrBundle.tokens {
 			if _ConfigWriteLeaseOwns(Token, Path)
 				return Token
 		}
 		return false
 	}
-	return _ConfigWriteLeaseOwns(OwnerOrBundle, Path)
-		? OwnerOrBundle : false
+	return _ConfigWriteLeaseOwns(OwnerOrBundle, Path) ? OwnerOrBundle : false
 }
 
 _ConfigWriteTerminalAuthorize(Bundle) {
-	if !(Bundle is Object) || !Bundle.HasOwnProp("id")
+	if !IsObject(Bundle)
 		return false
 	State := _ConfigWriteLeaseState()
 	PreviousCritical := Critical("On")
 	try {
-		if !(State.terminal is Object) || State.terminal.id != Bundle.id || FileReadActivityBusy()
+		if !_ConfigWriteTerminalTryAcquire([], Bundle) || !(State.terminal is Object) || State.terminal != Bundle || FileReadActivityBusy()
 			return false
 		for Token in Bundle.tokens {
 			if !_ConfigWriteLeaseOwns(Token)
@@ -227,12 +370,12 @@ _ConfigWriteTerminalAuthorize(Bundle) {
 }
 
 _ConfigWriteTerminalClaimShutdown(Bundle) {
-	if !(Bundle is Object) || !Bundle.HasOwnProp("id")
+	if !IsObject(Bundle)
 		return false
 	State := _ConfigWriteLeaseState()
 	PreviousCritical := Critical("On")
 	try {
-		if !(State.terminal is Object) || State.terminal.id != Bundle.id || FileReadActivityBusy()
+		if !_ConfigWriteTerminalTryAcquire([], Bundle) || !(State.terminal is Object) || State.terminal != Bundle || FileReadActivityBusy()
 			return false
 		if !Bundle.authorized || Bundle.shutdown_claimed
 			return false
@@ -249,12 +392,12 @@ _ConfigWriteTerminalClaimShutdown(Bundle) {
 ; Only the exact currently-live bundle may be rearmed; a lookalike id or stale
 ; object cannot make shutdown authority reusable.
 _ConfigWriteTerminalCancelShutdown(Bundle) {
-	if !(Bundle is Object) || !Bundle.HasOwnProp("id")
+	if !IsObject(Bundle)
 		return false
 	State := _ConfigWriteLeaseState()
 	PreviousCritical := Critical("On")
 	try {
-		if !(State.terminal is Object) || State.terminal != Bundle
+		if !_ConfigWriteTerminalTryAcquire([], Bundle) || !(State.terminal is Object) || State.terminal != Bundle
 			return false
 		for Token in Bundle.tokens {
 			if !_ConfigWriteLeaseOwns(Token)
@@ -268,21 +411,22 @@ _ConfigWriteTerminalCancelShutdown(Bundle) {
 }
 
 _ConfigWriteLeaseOwns(Token, Path := unset) {
-	if !(Token is Object) || !Token.HasOwnProp("key") || !Token.HasOwnProp("id")
+	static TargetIssuer := _ConfigWriteLeaseTryAcquire, TerminalIssuer := _ConfigWriteTerminalTryAcquire
+	static StateOwner := _ConfigWriteLeaseState, DataOwner := _ConfigWriteLeaseDataObject
+	if TargetIssuer != _ConfigWriteLeaseTryAcquire || TerminalIssuer != _ConfigWriteTerminalTryAcquire
+			|| StateOwner != _ConfigWriteLeaseState || DataOwner != _ConfigWriteLeaseDataObject
 		return false
-	if IsSet(Path) && Token.key != _ConfigWriteLeaseKey(Path)
+	; Integer zero is an internal activity query, not an issued target token.
+	; An actual bundle is also distinct from its admitted three-field targets.
+	if !DataOwner.Call(Token, ["key", "id", "kind"])
 		return false
-	Owners := _ConfigWriteLeaseOwners()
 	PreviousCritical := Critical("On")
 	try {
-		if !Owners.Has(Token.key)
+		; Both issuers prove intrinsic data descriptors before exposing any field.
+		if !TerminalIssuer.Call([], Token) && !TargetIssuer.Call("", "", Token)
 			return false
-		Current := Owners[Token.key]
-		return (Current is Object) && Current.HasOwnProp("id")
-			&& Current.id = Token.id
-	} finally {
-		Critical(PreviousCritical)
-	}
+		return !IsSet(Path) || Token.key == _ConfigWriteLeaseKey(Path)
+	} finally Critical(PreviousCritical)
 }
 
 _ConfigWriteLeaseCurrent(Path) {
@@ -291,4 +435,23 @@ _ConfigWriteLeaseCurrent(Path) {
 	PreviousCritical := Critical("On")
 	try return Owners.Has(Key) ? Owners[Key] : false
 	finally Critical(PreviousCritical)
+}
+
+
+/** Checks an actual native-issued terminal bundle and its exact target token. */
+_ConfigWriteTerminalOwnsExact(Bundle, Path) {
+	static Issuer := _ConfigWriteTerminalTryAcquire, Select := _ConfigWriteLeaseSelectOwner
+	static DataOwner := _ConfigWriteLeaseDataObject
+	if Issuer != _ConfigWriteTerminalTryAcquire || Select != _ConfigWriteLeaseSelectOwner
+			|| DataOwner != _ConfigWriteLeaseDataObject
+		return false
+	; The issuer's private activity query/member-token result is not a bundle.
+	if !DataOwner.Call(Bundle, ["id", "kind", "tokens", "authorized", "shutdown_claimed"])
+		return false
+	PreviousCritical := Critical("On")
+	try {
+		if !_ConfigWriteTerminalTryAcquire([], Bundle)
+			return false
+		return _ConfigWriteLeaseSelectOwner(Bundle, Path) is Object
+	} finally Critical(PreviousCritical)
 }
