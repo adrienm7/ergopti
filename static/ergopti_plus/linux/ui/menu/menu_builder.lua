@@ -986,9 +986,11 @@ local function _manifest_hotstring_rows(ctx, config)
 			end
 		end
 		if added == 0 then
-			items[#items + 1] = {
-				label = i18n_safe("menu.hotstrings.no_group_loaded"), disabled = true,
-			}
+			if type(ManifestMenu.status_rows) ~= "function" then return end
+			local status = ManifestMenu.status_rows("hotstrings_menu", "hotstring_categories_standard", "no_groups")
+			for _, row in ipairs(type(status) == "table" and status or {}) do
+				items[#items + 1] = row
+			end
 		end
 	end
 
