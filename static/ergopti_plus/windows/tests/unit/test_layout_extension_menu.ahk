@@ -25,7 +25,6 @@ _L4M_MenuDesired() {
 		State := MasterGateState(), SavedState := State.Clone()
 		Fixture := _ScopeOwnerFixture(), Bundle := 0, Refusal := 0, FileMenu := 0
 		Fixture.source .= '[hotstrings.groups]`n"ext:sample:words" = true`n'
-		Fixture.source := _CMJFixtureCurrentSource(Fixture.source)
 		Assert(FSWriteDurable(Fixture.path, Fixture.source))
 		Launch(_Success, Borrowed, Refused) {
 			Bundle := Borrowed
@@ -139,7 +138,6 @@ _L4M_CategoryScope(Enabled, Immediate) {
 		Fixture := _ScopeOwnerFixture(), Refusal := 0, Bundle := 0, Launches := 0
 		OriginalPack := FSReadUtf8Exact(Path)
 		Fixture.source := '[category_enabled]`nhotstrings = false`nrolls = true`n[hotstrings.groups]`n"ext:sample:words" = true`n"ext:other:keep" = true`n[hotstrings.modules."ext:sample:words"]`nwanted = false`nhidden = true`n[private]`ncredential = "extension-scope-fixture"`n'
-		Fixture.source := _CMJFixtureCurrentSource(Fixture.source)
 		Assert(FSWriteDurable(Fixture.path, Fixture.source))
 		Launch(_Success, Borrowed, Refused) {
 			Launches += 1

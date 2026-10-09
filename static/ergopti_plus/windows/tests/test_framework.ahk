@@ -66,6 +66,13 @@ if !IsSet(_AHK_DRY_RUN)
 if !IsSet(_AHK_ONLY_FILTER)
 	global _AHK_ONLY_FILTER := ""
 
+if !IsSet(_AHK_QUALIFICATION_PROFILE)
+	global _AHK_QUALIFICATION_PROFILE := ""
+
+; Only the principal runner owns parser registration. Including assertion
+; helpers alone must not create an undeclared function dependency at load time.
+global _TEST_QUALIFICATION_PARSER := 0
+
 ; Desktop-affecting callbacks require an explicit runner flag even when --only
 ; selects them. Hidden process launch does not suppress GUI or keyboard effects.
 if !IsSet(_AHK_INTERACTIVE)
@@ -584,6 +591,67 @@ _SelectTests(Registry, Filter, AllowInteractive, &Excluded) {
 	return Selected
 }
 
+/**
+ * Registers the principal runner's parser once, after its implementation loads.
+ * @param {Func} Parser The actual parser retained by the principal runner.
+ * @returns {Integer} One after exact registration; invalid or repeated calls throw.
+ */
+TestQualificationRegisterParser(Parser) {
+	global _TEST_QUALIFICATION_PARSER
+	if _TEST_QUALIFICATION_PARSER is Func
+		throw Error("The qualification parser is already registered.")
+	if !(Parser is Func)
+		throw TypeError("Qualification parser registration requires a function.")
+	_TEST_QUALIFICATION_PARSER := Parser
+	return 1
+}
+
+; Qualification deferrals are execution metadata, never native permission.
+_TestDevQualificationName() {
+	global _AHK_DRY_RUN, _AHK_ONLY_FILTER, _AHK_QUALIFICATION_PROFILE
+	global _TEST_QUALIFICATION_PARSER
+	Profile := _AHK_QUALIFICATION_PROFILE
+	if Profile == "" || _AHK_DRY_RUN
+		return ""
+	if _AHK_ONLY_FILTER != ""
+		throw Error("Qualification deferral requires the complete eligible registry.")
+	Parser := _TEST_QUALIFICATION_PARSER
+	if !(Parser is Func)
+		throw Error("The principal runner has not registered its qualification parser.")
+	SplitPath(A_LineFile, , &TestsDir)
+	Policy := Parser.Call(FileRead(TestsDir . "\..\..\..\..\.github\ci\dev_release_qualification_exceptions.json", "UTF-8"))
+	if !(Policy is Map) || !(Profile == Policy["id"]) || !(EnvGet("GITHUB_ACTIONS") == "true")
+		throw Error("Qualification profile is not authorized.")
+	for Pair in [["GITHUB_REPOSITORY", "repository"], ["GITHUB_EVENT_NAME", "event_name"], ["GITHUB_REF", "ref"],
+		["ERGOPTI_DEV_RELEASE_PRERELEASE", "prerelease"], ["ERGOPTI_DEV_RELEASE_CHANNEL", "channel"],
+		["ERGOPTI_DEV_RELEASE_TAG", "tag"], ["ERGOPTI_DEV_RELEASE_VERSION", "version"]] {
+		if !(EnvGet(Pair[1]) == Policy[Pair[2]])
+			throw Error("Qualification context does not match its release boundary.")
+	}
+	Expiry := RegExReplace(Policy["expires_at"], "[-:TZ]", "")
+	if !(EnvGet("ERGOPTI_DEV_RELEASE_RELEASE") == "true") || Policy["release"] != true
+		|| !RegExMatch(Expiry, "^[0-9]{14}$") || A_NowUTC >= Expiry
+		throw Error("Qualification release profile expired or was refused.")
+	return Policy["scopes"]["windows-pac-full-url"]["name"]
+}
+
+; Preserve the full eligible snapshot and remove only one exact declared name.
+_SelectQualificationTests(Eligible, Name, &Deferred) {
+	Deferred := []
+	if Name == ""
+		return Eligible
+	Selected := []
+	for Entry in Eligible {
+		if Entry.name == Name
+			Deferred.Push(Entry)
+		else
+			Selected.Push(Entry)
+	}
+	if Deferred.Length != 1
+		throw Error("Qualification test must match the complete registry exactly once.")
+	return Selected
+}
+
 ; True when ``Name`` should run under the active ``--only`` filter. An empty
 ; filter matches every test; otherwise the match is a case-insensitive substring,
 ; so a distinctive slug (e.g. a trailing "(my-slug)") selects a single test.
@@ -742,6 +810,14 @@ RunTests() {
 	; loop both operate on the selected subset so a filtered run is a valid, fast
 	; replay of a single failing test.
 	ActiveTests := _SelectTests(TEST_REGISTRY, _AHK_ONLY_FILTER, _AHK_INTERACTIVE, &Excluded)
+	DeferredName := _TestDevQualificationName()
+	if DeferredName != "" {
+		for Index, Entry in ActiveTests
+			_TestPrint("# QUALIFICATION_ELIGIBLE " . Index . " - " . Entry.name)
+	}
+	ActiveTests := _SelectQualificationTests(ActiveTests, DeferredName, &Deferred)
+	for Entry in Deferred
+		_TestPrint("# DEFERRED qualification - " . Entry.name)
 	_TestPrint("1.." . ActiveTests.Length)
 	for Entry in Excluded
 		_TestPrint("# excluded (requires --interactive): " . Entry.name)

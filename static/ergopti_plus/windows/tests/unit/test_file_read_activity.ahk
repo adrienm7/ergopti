@@ -225,10 +225,7 @@ _FRAI_RunNative(Mode) {
 	Published := _FRAI_CopyNativeModules(Directory, Fixture)
 	Path := Published["_FSReadUtf8ExactImpl"]
 	Source := FileRead(Path, "UTF-8")
-	; Match the actual declaration, including its genuine optional ByRef ABI,
-	; rather than requiring the historical three-argument header spelling.
-	Start := RegExMatch(Source, "m)^_FSReadUtf8ExactImpl\([^`r`n]*\)[ `t]*\{[ `t]*$")
-	AssertTrue(Start > 0, "The exact copied native reader declaration must exist before dependent source searches.")
+	Start := InStr(Source, "_FSReadUtf8ExactImpl(Path, MaxBytes, Bounded) {")
 	End := InStr(Source, Chr(10) . "; Admit only the target", true, Start)
 	AssertTrue(Start > 0 && End > Start, "The actual reader body must exist before native instrumentation.")
 	Body := SubStr(Source, Start, End - Start)

@@ -236,7 +236,6 @@ _TDL_ConfigSummaryCountsUnknownKeys() {
 	Path := A_Temp . "\ergopti_tdl_config_" . A_TickCount . ".toml"
 	try {
 		FileAppend("[shortcuts]`nzqx_not_a_feature = true`n[layout]`nzqx_unknown_leaf = true`n", Path, "UTF-8-RAW")
-		_CMJFixtureReadonly(Path)
 		_TDL_ResetLog()
 		ApplyConfigToml(ManifestBuildFeaturesMap(), Path)
 		Text := _TDL_RingText()

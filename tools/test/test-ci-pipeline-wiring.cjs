@@ -226,6 +226,12 @@ const STEP_CONDITIONS = [
 	[
 		MACOS_BOX,
 		'package-macos',
+		'Retain scoped native Brew qualification receipt',
+		'${{ always() }}'
+	],
+	[
+		MACOS_BOX,
+		'package-macos',
 		'Retain archive diagnostic session',
 		"${{ always() && steps.swift-launcher-tests.outputs.archive_session_dir != '' }}"
 	],
@@ -1826,8 +1832,8 @@ for (const [what, rel, from, to] of [
 	[
 		'`|| true` after the continued evidence verdict',
 		LINUX_BOX,
-		'              --sha "$GITHUB_SHA"\n          echo "Linux driver:',
-		'              --sha "$GITHUB_SHA" || true\n          echo "Linux driver:'
+		'              --sha "$GITHUB_SHA"\n          echo "Linux mandatory evidence verified;',
+		'              --sha "$GITHUB_SHA" || true\n          echo "Linux mandatory evidence verified;'
 	],
 	[
 		'a `| tee` left without pipefail',
@@ -2002,7 +2008,7 @@ function concurrencyProblems(files) {
 	const problems = [];
 	const expected =
 		"group: ci-${{ github.ref }}-${{ github.event_name == 'workflow_dispatch' && github.run_id || 'automatic' }}\n" +
-		'  cancel-in-progress: true';
+		"  cancel-in-progress: ${{ github.ref != 'refs/heads/dev' || github.event_name != 'push' }}";
 	for (const entry of files) {
 		const text = codeOf(entry.text);
 		// Top-level keys and job fields have fixed columns. Text inside run: |
@@ -2013,7 +2019,7 @@ function concurrencyProblems(files) {
 			const blocks = [...header.matchAll(/^concurrency:\n((?: {2}[^\n]*\n|[ \t]*\n)*)/gm)];
 			if (roots.length !== 1 || blocks.length !== 1 || blocks[0][1].trim() !== expected)
 				problems.push(
-					'manual CI must have one unique run group; automatic branch runs must still supersede each other'
+					'manual CI must have one unique run group; dev pushes must finish while other automatic runs supersede'
 				);
 		} else if (roots.length !== 0) {
 			problems.push(`${entry.rel}: a called workflow must not add its own concurrency group`);
@@ -2108,9 +2114,44 @@ for (const [what, from, to] of [
 	],
 	['manual duplicate-SHA collision', '&& github.run_id', '&& github.sha'],
 	['automatic runs never supersede', "|| 'automatic'", '|| github.run_id'],
-	['automatic cancellation disabled', 'cancel-in-progress: true', 'cancel-in-progress: false']
+	[
+		'dev release starvation restored',
+		"cancel-in-progress: ${{ github.ref != 'refs/heads/dev' || github.event_name != 'push' }}",
+		'cancel-in-progress: true'
+	],
+	[
+		'other automatic cancellation disabled',
+		"cancel-in-progress: ${{ github.ref != 'refs/heads/dev' || github.event_name != 'push' }}",
+		'cancel-in-progress: false'
+	]
 ]) {
 	mustCatch(what, ENTRY, from, to, concurrencyProblems);
+}
+
+// Evaluate the real GitHub expression, rather than trusting the pinned spelling.
+const cancellationLine = rootConcurrencyBlock?.match(/^ {2}cancel-in-progress: (.+)$/m)?.[1];
+function cancellationFor(value, github) {
+	if (value === 'true' || value === 'false') return value === 'true';
+	const expression = /^\$\{\{\s*(.*?)\s*\}\}$/.exec(value ?? '')?.[1];
+	if (expression === undefined) throw new Error('The cancellation expression is unavailable.');
+	const result = require('node:vm').runInNewContext(expression, { github }, { timeout: 100 });
+	if (typeof result !== 'boolean') throw new Error('Cancellation must be a Boolean.');
+	return result;
+}
+for (const [ref, event_name, expected] of [
+	['refs/heads/dev', 'push', false],
+	['refs/heads/main', 'push', true],
+	['refs/pull/18/merge', 'pull_request', true],
+	['refs/heads/dev', 'pull_request', true],
+	['refs/heads/dev', 'workflow_dispatch', true],
+	['refs/heads/main', 'workflow_dispatch', true]
+]) {
+	if (cancellationFor(cancellationLine, { ref, event_name }) !== expected) {
+		errors.push(`the actual cancellation policy is wrong for ${ref} ${event_name}`);
+	}
+}
+if (cancellationFor('true', { ref: 'refs/heads/dev', event_name: 'push' }) === false) {
+	errors.push('the original unconditional cancellation must fail the dev-release control');
 }
 
 /** Requires real reporter subprocess regressions on each native host before product units. */
@@ -3306,6 +3347,9 @@ for (const [what, from, to] of [
 ]) {
 	mustCatch(what, LINUX_BOX, from, to, linuxAudioPrerequisiteProblems);
 }
+
+// The temporary Mac exception still requires closed context and retained gates.
+require('./test-macos-dev-qualification-deferral.cjs');
 
 if (errors.length > 0) {
 	console.error(

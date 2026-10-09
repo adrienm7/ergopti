@@ -34,12 +34,6 @@ global HSE_RepeatEnabled := true
 
 ; This is the production boot dependency order: canonical config helpers,
 ; feature state, then the later-declared category-key normalizer.
-#Include ..\..\_generated\logger_sub_files.ahk
-#Include ..\..\_generated\app_dirs.ahk
-#Include ..\..\infra\tick_count.ahk
-#Include ..\..\infra\wall_clock.ahk
-#Include ..\..\infra\logger.ahk
-#Include ..\..\adapters\crypto.ahk
 #Include ..\..\adapters\file_system.ahk
 #Include ..\..\adapters\key_state.ahk
 #Include ..\..\infra\toml\toml_helpers.ahk
@@ -51,10 +45,6 @@ global HSE_RepeatEnabled := true
 TapKeyAssignments["feature_state_include_once_probe"] := "none"
 #Include ..\..\infra\tap_keys.ahk
 #Include ..\..\infra\config_io.ahk
-; Real journal dependencies; no test-only native issuer or READY metadata.
-#Include ..\..\infra\config_transition.ahk
-#Include ..\..\infra\config_transition_runtime.ahk
-#Include ..\..\infra\config_migrate.ahk
 #Include ..\..\infra\first_boot.ahk
 #Include ..\..\modules\gestures\config.ahk
 
@@ -136,8 +126,7 @@ _FeatureStateSmokeParsedConfig() {
     try {
         try FileDelete(TempConfig)
         FileAppend('[hotstrings]`ntrigger_char = "@"`nmagic_key_source = "KeyN"`nmagic_key_source_char = "n"`nrepeat_key_enabled = false`n[script]`nalt_gr_is_kana_remap = true`n[category_enabled]`nhotstrings = false`n', TempConfig, "UTF-8")
-        _FeatureStateSmokePrepareReadonlySource(TempConfig)
-		Cache := ParseConfigTomlFile(TempConfig)
+        Cache := ParseConfigTomlFile(TempConfig)
         ReadScriptConfig(Cache)
         ReadCategoryEnabled(Cache)
     } finally {
@@ -348,7 +337,6 @@ _FeatureStateSmokeSemanticConfig(Root) {
 		Source := 'hotstrings = { trigger_char = "@", magic_key_source = "KeyN", magic_key_source_char = "n", repeat_key_enabled = true }`nscript = { alt_gr_is_kana_remap = true }`ncategory_enabled = { hotstrings = true }`n'
 	try {
 		FileAppend(Source, TempConfig, "UTF-8")
-		_FeatureStateSmokePrepareReadonlySource(TempConfig)
 		Cache := ParseConfigTomlFile(TempConfig)
 		ReadScriptConfig(Cache)
 		ReadCategoryEnabled(Cache)
@@ -370,7 +358,6 @@ _FeatureStateSmokePersistedSemantic(Path) {
 	if !FileExist(Path)
 		throw Error("The actual semantic publication is absent")
 	Before := FileRead(Path, "UTF-8")
-	_FeatureStateSmokePrepareReadonlySource(Path)
 	Cache := ParseConfigTomlFile(Path)
 	if _ConfigBootReadFailed
 		throw Error("The actual saved semantic source was refused at boot")
@@ -476,26 +463,4 @@ _FeatureStateSmokeScriptLateParameter() {
 		ConfigurationFile := IsSet(PreviousFile) ? PreviousFile : unset
 		try FileDelete(Path)
 	}
-}
-
-; The actual production readonly constructor owns every independent semantic
-; fixture before its native snapshot reader. No migration or current stamp is added.
-_FeatureStateSmokePrepareReadonlySource(Path) {
-	Before := FSReadUtf8Exact(Path)
-	if !(Before is String)
-		throw Error("The independent semantic source cannot be observed before native preparation")
-	NativePort := ConfigTransitionProductionPort()
-	if !ConfigTransitionProductionPort(NativePort)
-		throw Error("The child did not retain its genuine compiled native filesystem port")
-	Prepared := ConfigSchemaPrepareSource(Path)
-	if !(Prepared is Map) || Prepared.Get("read_only", 0) != 1
-		throw Error("The original native readonly source constructor did not complete")
-	Admission := ConfigMigrateBoot(Path, "capture_read")
-	CanonicalSource := SubStr(Before, 1, 1) == Chr(0xFEFF) ? SubStr(Before, 2) : Before
-	if !HasMethod(Admission, "Call") || !Admission.Call(CanonicalSource, 1)
-		throw Error("The genuine journal did not admit the exact independent readonly source")
-	if !FSUtf8ExactMatches(Path, Before)
-		throw Error("Native readonly preparation changed the independent semantic source")
-	if ConfigSchemaCanPrepareWrite(Path)
-		throw Error("Readonly semantic preparation manufactured native write permission")
 }

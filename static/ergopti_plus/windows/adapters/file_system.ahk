@@ -512,15 +512,10 @@ FSCloseExclusiveGuard(Handle) {
 ; Idempotent strict deletion for recovery protocols. Unlike FSDelete, this
 ; does not route through FileExist (whose empty result conflates absence with
 ; an OS probe failure). Non-absence failures are surfaced to the journal.
-FSDeleteStrict(Path, AdmissionFn := 0) {
+FSDeleteStrict(Path) {
 	if !(Path is String) or Path = ""
 		throw ValueError("A strict delete requires a non-empty path.")
-	PreviousCritical := Critical("On")
-	try {
-		if !_FSNativeAdmissionAccepted(AdmissionFn)
-			return 0
-		Receipt := _FSDeleteNativeReceipt(Path)
-	} finally Critical(PreviousCritical)
+	Receipt := _FSDeleteNativeReceipt(Path)
 	if Receipt["deleted"]
 		return 1
 	ErrorCode := Receipt["error"]
@@ -574,9 +569,8 @@ FSReadBounded(Path, MaxBytes) {
 ; and malformed/non-canonical UTF-8 must be refused rather than normalized to
 ; replacement characters. FILE_SHARE_READ excludes concurrent writers while
 ; the snapshot handle is open.
-FSReadUtf8Exact(Path, &NativeOpenError := 0) {
-	; Optional diagnostic data, not a publication/admission capability.
-	return _FSReadUtf8ExactImpl(Path, 0, false, &NativeOpenError)
+FSReadUtf8Exact(Path) {
+	return _FSReadUtf8ExactImpl(Path, 0, false)
 }
 
 ; Byte-faithful verification for staged UTF-8 control/source artifacts. The
@@ -596,8 +590,7 @@ FSReadUtf8ExactBounded(Path, MaxBytes) {
 	return _FSReadUtf8ExactImpl(Path, MaxBytes, true)
 }
 
-_FSReadUtf8ExactImpl(Path, MaxBytes, Bounded, &NativeOpenError := 0) {
-	NativeOpenError := 0
+_FSReadUtf8ExactImpl(Path, MaxBytes, Bounded) {
 	if !(Path is String) || Path == ""
 		return false
 	static GENERIC_READ := 0x80000000
@@ -620,8 +613,6 @@ _FSReadUtf8ExactImpl(Path, MaxBytes, Bounded, &NativeOpenError := 0) {
 			"Ptr", 0,
 			"Ptr")
 		OpeningReturned := true
-		if Handle == -1
-			NativeOpenError := A_LastError ; Capture the actual failed CreateFileW before cleanup.
 		if Handle != -1 {
 			FileReadActivityBind(ReadActivity, Handle)
 			Content := _FSReadUtf8ExactHandle(Handle, MaxBytes, Bounded)
@@ -705,20 +696,15 @@ FSAtomicTempOwnerIsGone(FileName, TargetName) {
 ; Failure retains Source and leaves Destination untouched.
 ; NativeError reports the immediate Win32 error; zero also denotes unavailable
 ; native information on invalid arguments or a DllCall exception.
-FSAtomicMoveReplace(Source, Destination, &NativeError := 0, AdmissionFn := 0) {
+FSAtomicMoveReplace(Source, Destination, &NativeError := 0) {
 	NativeError := 0
 	if !(Source is String) or Source = ""
 		or !(Destination is String) or Destination = ""
 		return false
 	static MOVEFILE_REPLACE_EXISTING := 0x00000001
 	static MOVEFILE_WRITE_THROUGH := 0x00000008
-	PreviousCritical := Critical("On")
 	try {
 		DllCall("kernel32\SetLastError", "UInt", 0)
-		if !_FSNativeAdmissionAccepted(AdmissionFn) {
-			NativeError := 995 ; ERROR_OPERATION_ABORTED: no native rename was attempted.
-			return false
-		}
 		Moved := DllCall("MoveFileExW", "Str", Source, "Str", Destination,
 			"UInt", MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH, "Int")
 		NativeError := A_LastError
@@ -727,26 +713,21 @@ FSAtomicMoveReplace(Source, Destination, &NativeError := 0, AdmissionFn := 0) {
 		; No completed native receipt is available for a DllCall exception.
 		NativeError := 0
 		return false
-	} finally Critical(PreviousCritical)
+	}
 }
 
 ; Publishes Source only when Destination is still absent. Omitting
 ; MOVEFILE_REPLACE_EXISTING makes the directory-entry operation atomic and
 ; collision-preserving; WRITE_THROUGH makes the rename a durable boundary.
-FSAtomicMoveCreate(Source, Destination, AdmissionFn := 0) {
+FSAtomicMoveCreate(Source, Destination) {
 	if !(Source is String) or Source = ""
 		or !(Destination is String) or Destination = ""
 		return 0
 	static MOVEFILE_WRITE_THROUGH := 0x00000008
-	PreviousCritical := Critical("On")
-	try {
-		if !_FSNativeAdmissionAccepted(AdmissionFn)
-			return 0
-		return DllCall("kernel32\MoveFileExW", "Str", Source,
-			"Str", Destination, "UInt", MOVEFILE_WRITE_THROUGH, "Int") ? 1 : 0
-	} catch {
+	try return DllCall("kernel32\MoveFileExW", "Str", Source,
+		"Str", Destination, "UInt", MOVEFILE_WRITE_THROUGH, "Int") ? 1 : 0
+	catch
 		return 0
-	} finally Critical(PreviousCritical)
 }
 
 ; Atomically replaces Destination with Source when both are on the same volume.
@@ -941,26 +922,3 @@ global ADAPTER_FILE_SYSTEM := Map(
     "exists", FSExists,
     "delete", FSDelete,
 )
-
-
-; This pure predicate runs only inside the actual native acknowledgement span.
-; Calling it elsewhere is validation, not a durable/native receipt.
-_FSNativeAdmissionAccepted(AdmissionFn) {
-	if (AdmissionFn is Integer) && AdmissionFn == 0
-		return true
-	if !HasMethod(AdmissionFn, "Call")
-		return false
-	try {
-		Accepted := AdmissionFn.Call()
-		return (Accepted is Integer) && Accepted == 1
-	} catch {
-		return false
-	}
-}
-
-/** Acknowledges a genuinely unchanged native target with a strict pure guard. */
-FSNativeAcknowledge(AdmissionFn := 0) {
-	PreviousCritical := Critical("On")
-	try return _FSNativeAdmissionAccepted(AdmissionFn)
-	finally Critical(PreviousCritical)
-}

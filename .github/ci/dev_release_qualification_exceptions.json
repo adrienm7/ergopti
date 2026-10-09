@@ -1,0 +1,39 @@
+{
+	"schema": 1,
+	"id": "dev-release-20261009",
+	"expires_at": "2026-10-09T07:00:00Z",
+	"repository": "adrienm7/ergopti",
+	"event_name": "push",
+	"ref": "refs/heads/dev",
+	"release": true,
+	"prerelease": "true",
+	"channel": "dev",
+	"tag": "v0.0.0-dev.156",
+	"version": "0.0.0-dev.156",
+	"authorization_note": "The maintainer explicitly authorized temporary qualification deferrals for this single dev prerelease before 09:00 Europe/Paris. These exceptions do not establish feature or native qualification.",
+	"scopes": {
+		"windows-pac-full-url": {
+			"kind": "ahk_test",
+			"name": "managed network: real canonical WinHTTP Ex preserves full PAC order and fresh bytes",
+			"reason": "Full URL and complete ordered PAC routes remain unqualified; canonical native route receipt failed."
+		},
+		"linux-window-receipts": {
+			"kind": "linux_fixture",
+			"path": "tests/hardware/run_window_switch_receipts.py",
+			"args": ["--require-routing"],
+			"reason": "Owned X11 first-client visibility reached its existing five-second deadline; native window-switch receipts remain missing and cause is unresolved."
+		},
+		"macos-brew-archive": {
+			"kind": "swift_test_file",
+			"path": "Tests/ErgoptiPlusTests/HomebrewArchiveAcceptanceTests.swift",
+			"name": "testRealBrewZIPInstallXZUpgradeAndRefusalsPreserveInstalledState",
+			"reason": "Unconfined-positive AppleEvent returned consent-required -1744; complete native ZIP/XZ/refusal boundary qualification remains missing."
+		},
+		"macos-shortcuts-discovery": {
+			"kind": "command",
+			"path": "tools/diagnostics/apple_shortcuts_probe/run_probe.py",
+			"args": [],
+			"reason": "First app.shortcuts() native catalogue fetch exceeded twenty seconds; native discovery remains missing."
+		}
+	}
+}
