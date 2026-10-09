@@ -48,6 +48,11 @@
 			"target": "ergopti_plus/macos/socket/core.so",
 			"owner": "bundle-macos-luasocket.sh",
 			"reason": "The native half of the bundled LuaSocket."
+		},
+		{
+			"target": "ergopti_plus/_shared/modules/llm/managed_ollama_release.json",
+			"owner": "tools/build/stage-macos-managed-ollama-inputs.py",
+			"reason": "Generated conditionally from both genuine native producer archives and provenance receipts through the source-qualified catalogue owner; never committed."
 		}
 	],
 	"exclude": [

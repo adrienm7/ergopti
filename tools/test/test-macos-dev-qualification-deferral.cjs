@@ -58,7 +58,8 @@ function check(name, callback) {
 // Admit only the independent native SDK receiving selector; the full package
 // suite and every other job keep the blanket exclusion refusal.
 const SDK_STEP_NAME = 'Qualify actual SDK accepted-owner and deadline XCTest controls';
-const SDK_FILTER = "--filter 'ManagedOllamaAPIWorkerTests|ManagedPTYWorkerTests'";
+const SDK_FILTER =
+	"--filter 'ManagedOllamaAPIWorkerTests|ManagedPTYWorkerTests|ManagedImageAliasTests|OwnedSuspendedImageTests|ManagedListenerPathIdentityTests'";
 function admitNativeSdkSelector(mac) {
 	const jobs = [
 		...mac.matchAll(/^  managed-ollama-native:\n[\s\S]*?(?=^  [A-Za-z][\w-]*:|(?![\s\S]))/gm)
@@ -88,6 +89,13 @@ function admitNativeSdkSelector(mac) {
 		'          grep -Fq \'Executed 12 tests, with 0 failures\' "$transcript"',
 		'          grep -Fq "Test Suite \'ManagedPTYWorkerTests\' passed" "$transcript"',
 		'          grep -Fq \'Executed 11 tests, with 0 failures\' "$transcript"',
+		'          grep -Fq "Test Suite \'ManagedImageAliasTests\' passed" "$transcript"',
+		'          grep -Fq \'Executed 4 tests, with 0 failures\' "$transcript"',
+		'          grep -Fq "Test Suite \'OwnedSuspendedImageTests\' passed" "$transcript"',
+		'          grep -Fq \'Executed 6 tests, with 0 failures\' "$transcript"',
+		'          grep -Fq "Test Suite \'ManagedListenerPathIdentityTests\' passed" "$transcript"',
+		'          grep -Fq \'Executed 2 tests, with 0 failures\' "$transcript"',
+		'          grep -Fq \'Executed 35 tests, with 0 failures\' "$transcript"',
 		'        timeout-minutes: 10'
 	]) {
 		if (step.split('\n').filter((actual) => actual === line).length !== 1) return null;
@@ -305,6 +313,56 @@ for (const [name, token, replacement] of [
 		'sdk-missing-pty-transcript-is-red',
 		'Executed 11 tests, with 0 failures',
 		'Executed 10 tests, with 0 failures'
+	],
+	[
+		'sdk-missing-alias-suite-is-red',
+		"Test Suite 'ManagedImageAliasTests' passed",
+		"Test Suite 'ManagedImageAliasTests' unavailable"
+	],
+	[
+		'sdk-wrong-alias-census-is-red',
+		'Executed 4 tests, with 0 failures',
+		'Executed 3 tests, with 0 failures'
+	],
+	[
+		'sdk-missing-alias-selector-is-red',
+		"--filter 'ManagedOllamaAPIWorkerTests|ManagedPTYWorkerTests|ManagedImageAliasTests|OwnedSuspendedImageTests|ManagedListenerPathIdentityTests'",
+		"--filter 'ManagedOllamaAPIWorkerTests|ManagedPTYWorkerTests|OwnedSuspendedImageTests|ManagedListenerPathIdentityTests'"
+	],
+	[
+		'sdk-missing-suspended-suite-is-red',
+		"Test Suite 'OwnedSuspendedImageTests' passed",
+		"Test Suite 'OwnedSuspendedImageTests' unavailable"
+	],
+	[
+		'sdk-wrong-suspended-census-is-red',
+		'Executed 6 tests, with 0 failures',
+		'Executed 5 tests, with 0 failures'
+	],
+	[
+		'sdk-missing-suspended-selector-is-red',
+		"--filter 'ManagedOllamaAPIWorkerTests|ManagedPTYWorkerTests|ManagedImageAliasTests|OwnedSuspendedImageTests|ManagedListenerPathIdentityTests'",
+		"--filter 'ManagedOllamaAPIWorkerTests|ManagedPTYWorkerTests|ManagedImageAliasTests|ManagedListenerPathIdentityTests'"
+	],
+	[
+		'sdk-missing-physical-path-suite-is-red',
+		"Test Suite 'ManagedListenerPathIdentityTests' passed",
+		"Test Suite 'ManagedListenerPathIdentityTests' unavailable"
+	],
+	[
+		'sdk-wrong-physical-path-census-is-red',
+		'Executed 2 tests, with 0 failures',
+		'Executed 1 tests, with 0 failures'
+	],
+	[
+		'sdk-missing-physical-path-selector-is-red',
+		"--filter 'ManagedOllamaAPIWorkerTests|ManagedPTYWorkerTests|ManagedImageAliasTests|OwnedSuspendedImageTests|ManagedListenerPathIdentityTests'",
+		"--filter 'ManagedOllamaAPIWorkerTests|ManagedPTYWorkerTests|ManagedImageAliasTests|OwnedSuspendedImageTests'"
+	],
+	[
+		'sdk-incomplete-total-is-red',
+		'Executed 35 tests, with 0 failures',
+		'Executed 34 tests, with 0 failures'
 	],
 	['sdk-ignored-swift-status-is-red', '          test "${statuses[0]}" -eq 0', '          true'],
 	['sdk-ignored-tee-status-is-red', '          test "${statuses[1]}" -eq 0', '          true'],
@@ -636,7 +694,7 @@ if (process.argv[2] === '--package-dump') {
 		'SwiftPM target exclusion binding verified: ' + mode + '; native/feature qualified=false.'
 	);
 }
-assert.equal(passed, 39);
+assert.equal(passed, 49);
 console.log(
-	'PASS: Mac qualification deferral source/typed-receipt controls=39; Swift/native execution unqualified.'
+	'PASS: Mac qualification deferral source/typed-receipt controls=49; Swift/native execution unqualified.'
 );

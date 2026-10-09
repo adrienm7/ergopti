@@ -51,7 +51,22 @@ static int path_identity(pid_t pid, const char *executable, uint64_t device, uin
 	if (count <= 0 || count >= sizeof(path) || memchr(path, 0, sizeof(path)) == NULL) {
 		return errno == 0 ? EIO : errno;
 	}
-	if (strcmp(path, executable) != 0) { return ENOENT; }
+	// proc_pidpath reports the physical spelling (for example /private/var),
+	// while the independently pinned request can retain /var. Canonicalization
+	// compares names only: both named source and actual image still need the
+	// caller's original regular-file UID, device and inode witnesses.
+	struct stat requested;
+	if (lstat(executable, &requested) != 0) { return errno; }
+	if (!S_ISREG(requested.st_mode) || requested.st_uid != geteuid()
+		|| (uint64_t)(uint32_t)requested.st_dev != device || (uint64_t)requested.st_ino != inode) {
+		return ESTALE;
+	}
+	errno = 0;
+	char *canonical = realpath(executable, NULL);
+	if (canonical == NULL) { return errno == 0 ? EIO : errno; }
+	bool path_matches = strcmp(path, canonical) == 0;
+	free(canonical);
+	if (!path_matches) { return ENOENT; }
 	struct stat named;
 	if (lstat(path, &named) != 0) { return errno; }
 	if (!S_ISREG(named.st_mode) || named.st_uid != geteuid()
@@ -227,6 +242,41 @@ static int candidate(int descriptor, pid_t pid, const char *executable,
 		.device = device, .inode = inode };
 	return 0;
 }
+// This is a separate pre-execution image witness. Existing socket admission
+// still requires its own positive accepted-connection witness.
+int ergopti_suspended_image_validate(const char *executable,
+	const ergopti_listener_identity *expected, uint32_t remaining_ms,
+	ergopti_listener_identity *identity) {
+	if (identity == NULL) { return EINVAL; }
+	*identity = (ergopti_listener_identity) {0};
+	if (expected == NULL || executable == NULL || executable[0] != '/'
+		|| expected->pid <= 0 || expected->uid != geteuid()
+		|| expected->start_microseconds >= 1000000 || remaining_ms == 0) { return EINVAL; }
+	struct timespec started;
+	int error = monotonic(&started);
+	if (error != 0) { return error; }
+	struct proc_bsdinfo before, after;
+	if ((error = bsd_identity(expected->pid, &before)) != 0) { return error; }
+	if (before.pbi_start_tvsec != expected->start_seconds
+		|| before.pbi_start_tvusec != expected->start_microseconds
+		|| before.pbi_status != SSTOP || before.pbi_ppid != (uint32_t)getpid()
+		|| before.pbi_pgid != (uint32_t)expected->pid
+		|| getsid(expected->pid) != getpid()) { return ESTALE; }
+	if (expired(&started, remaining_ms)) { return ETIMEDOUT; }
+	if ((error = path_identity(expected->pid, executable, expected->device, expected->inode)) != 0) { return error; }
+	if ((error = executable_mapping(expected->pid, expected->device, expected->inode,
+		&started, remaining_ms)) != 0) { return error; }
+	if (expired(&started, remaining_ms)) { return ETIMEDOUT; }
+	if ((error = bsd_identity(expected->pid, &after)) != 0) { return error; }
+	if ((error = path_identity(expected->pid, executable, expected->device, expected->inode)) != 0) { return error; }
+	if (!same_process(&before, &after) || after.pbi_status != SSTOP
+		|| after.pbi_ppid != (uint32_t)getpid() || after.pbi_pgid != (uint32_t)expected->pid
+		|| getsid(expected->pid) != getpid()) { return ESTALE; }
+	if (expired(&started, remaining_ms)) { return ETIMEDOUT; }
+	*identity = *expected;
+	return 0;
+}
+
 int ergopti_listener_validate(int descriptor, const char *executable,
 	const ergopti_listener_identity *expected, uint32_t remaining_ms, ergopti_listener_identity *identity) {
 	if (expected == NULL || identity == NULL || executable == NULL || executable[0] != '/'

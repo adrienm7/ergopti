@@ -55,4 +55,9 @@ void ergopti_listener_known_peer_diagnostic(pid_t pid, const char *executable,
 int ergopti_listener_validate(int connected_socket, const char *executable,
 	const ergopti_listener_identity *expected, uint32_t remaining_ms,
 	ergopti_listener_identity *identity);
+// Pre-execution image witness only; it supplies no socket or HTTP authority.
+// The exact owned child must remain suspended throughout the bounded observation.
+int ergopti_suspended_image_validate(const char *executable,
+	const ergopti_listener_identity *expected, uint32_t remaining_ms,
+	ergopti_listener_identity *identity);
 #endif

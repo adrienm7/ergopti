@@ -3891,7 +3891,7 @@ Native macOS requirement-display qualification remains blocked: the actual owned
 
 The actual macOS codesign display packet in run37165861602 exits zero and emits one commented "# designated => " record containing its native cdhash alternatives. The extraction owner now recognizes exactly that observed prefix alongside the existing bare prefix, counts both before stripping or trimming, and still refuses missing, empty, mixed/duplicate and nonzero displays. The unchanged deep/strict requirement verifier owns signature admission. All earlier XCTest assertions and archive-byte/mode/symlink/metadata, source, environment and physical-retirement checks remain intact; the native test additionally requires the parsed requirement to match its actual signed source. 54 actual Linux-shell profiles/cases with typed native-tool ports pass; three causal mutations fail. Native macOS signature/extraction and Swift execution remain required before consumer qualification or producer delivery. TODO36 remains partial.
 
-TODO 36 remains partial. The pending dual-archive producer accepts only the observed native bare or fixed commented designated-requirement prefix, rejects duplicate/empty requirements before any archive writer, and verifies both restored bundles against the exact extracted requirement. The maximum exposed native XZ preset is 9; the existing ZIP and helper ZIP remain unchanged. Native macOS consumer PASS is required before producer delivery, then actual native producer signing/extraction/readback tests, Sparkle feed and Homebrew migration remain pending.
+TODO36 remains partial. The dual ZIP/tar.xz producer is implemented and invoked by the actual application builder after signed-bundle verification. It requires one native bare or fixed commented designated requirement and verifies restored signatures, bytes, modes and symlinks before publication; native XZ uses preset 9 and the separate helper ZIP is unchanged. Shared archive bindings also drive release signing, the preferred Sparkle feed, Homebrew cask selection and CI installation. Native tests invoke the real producer and retain independent signing, extraction, metadata and refusal assertions. Current-source Darwin archive receiving, real Sparkle wrong-key refusal/retry/installation/relaunch, Brew consent/containment/install/upgrade/refusal/recovery, and complete packaging/install qualification remain required. Portable tests and historical native passes do not qualify the final sources; items 16/38 remain open.
 
 The stable-signing replay admits only the actual archive producer path with its signed app and build directory, and checks both signature verifications precede that call. Native-helper ZIP behavior and all existing identity/keychain cleanup assertions remain intact. The original replay fails; the corrected replay passes, while the original identity defect, permissive producer port and missing archive-order guard each fail. This fixture-only evidence does not qualify physical native archive/signing; final composed and hosted native validation remain pending.
 
@@ -4309,6 +4309,18 @@ remain unexecuted on this source. Explicit XCTest/CI fixture opt-ins are prepare
 quiet invocations never request or approve consent. Item36 stays open until actual
 native receiving succeeds; source preparation and portable controls do not qualify
 the release archive lifecycle.
+
+The native receiving source now retains one private alias of the original
+executable vnode and verifies the actual physical spelling without losing its
+device/inode, current-UID or TCP-listener admissions. A suspended-image guardian
+checks the original acquired process before accepting the private session key;
+retirement requires its exact reap, stream EOF and checked handle closure before
+alias removal. Portable controls are registered with exact case counts. The
+native selected SDK census retains the original API12 and PTY11 and adds alias4,
+suspended-image6 and physical-spelling2, requiring all35 rather than allowing an
+arbitrary filter. Native compilation, the complete model receiver, package and
+all eleven installation legs must still succeed on the same final source.
+These source repairs do not complete item36 or transversal16/38.
 
 - [~] **37.** Always show the shipped Ergopti hotstring pack, including when
   its keyboard layout is not installed. Move French `suffixes_a` and magic-key
@@ -5828,6 +5840,18 @@ unexecuted until targeted native CI. The original legacy slow receiving vector,
 authorization, publication and retirement clocks remain unchanged.
 
 The actual cold receiver now transports device/inode identities as canonical uint64 decimal strings, preserving the observed APFS inode1152921500312523020 without JavaScript rounding. The first official-installer correction set COPYFILE_DISABLE for its exact tar child; native37853243814 showed that this alone did not disable the separate BSD archive reader's AppleDouble consumption. The successor also sets the documented child-only TAR_READER_OPTIONS=tar:!mac-ext, preserving the literal pinned members without changing GNU tar arguments or the archive oracle. Genuine libarchive receiving passes four cases, including retained AppleDouble bytes/modes and inherited-parent override; the original enabled reader fails the causal control. Original physical sandbox, mode, whole-archive and retirement assertions remain. Successor Darwin cold receiving remains required.
+
+The source-bound macOS pull/retirement prerequisites now preserve the original
+session, immutable operation authority and acknowledgement through explicit
+cleanup retries. A failed local deletion resumes only the remaining owned files;
+it cannot issue another pull, reset the clock or release an unresolved slot.
+Unknown/expired retirement remains conservative. The original manager's managed
+dispatch remains dormant pending source-qualified native receiving. The real
+model fixture joins the retained alias and suspended-image owner and refuses
+duplicate prepare/start before acquiring new resources. Actual production serve,
+session handoff, approved proxy/certificate environment and custom OLLAMA_MODELS
+paths remain CODE, followed by genuine native create/pull/infer/cancel receiving.
+Portable receipts do not qualify those pending paths or close item62.
 
 The native listener worker now records bounded debug-only lexical/physical path and inode-match scalars for its known fixture PID, from the same native snapshot. This evidence does not authorize listener admission, and all twelve original API methods remain byte-identical. Sixteen portable C controls and independent privacy/refusal controls pass; actual ARM and Intel SDK observation must establish the remaining listener refusal before changing any production path predicate.
 

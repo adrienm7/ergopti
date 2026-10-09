@@ -8,6 +8,7 @@ import Foundation
 
 struct ManagedOllamaRequest {
 	let executable: String
+	let sourceAlias: ManagedImageAliasProof?
 	let device: UInt64
 	let inode: UInt64
 	let port: UInt16
@@ -30,7 +31,7 @@ struct ManagedOllamaRequest {
 		let request: Set<String> = ["pid", "start_seconds", "start_microseconds", "method", "path", "headers", "body", "idle_ms"]
 		guard data.count <= 131_072, home.hasPrefix("/"), !home.utf8.contains(0),
 			let fields = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-			Set(fields.keys) == (discovery ? common : common.union(request)),
+			Set(fields.keys) == (discovery ? common : common.union(request)).union(fields["source_alias"] == nil ? [] : ["source_alias"]),
 			ManagedBootstrapRequest.integer(fields["version"]) == 1,
 			let executable = fields["executable"] as? String,
 			executable == URL(fileURLWithPath: home).appendingPathComponent("Library/Application Support/Ergopti/ollama-native-http/ollama").standardizedFileURL.path,
@@ -38,6 +39,8 @@ struct ManagedOllamaRequest {
 			let inode = integer(fields["inode"]), inode > 0,
 			let port = ManagedBootstrapRequest.integer(fields["port"]), port > 1023, port <= 65535
 		else { return nil }
+		let sourceAlias = ManagedImageAliasProof.parse(fields["source_alias"])
+		guard fields["source_alias"] == nil || sourceAlias != nil else { return nil }
 		let budget: Int?
 		if fields["timeout_ms"] is NSNull {
 			guard !discovery else { return nil }; budget = nil
@@ -51,7 +54,7 @@ struct ManagedOllamaRequest {
 			idle = Int(value)
 		}
 		if discovery {
-			return ManagedOllamaRequest(executable: executable, device: device, inode: inode, port: UInt16(port),
+			return ManagedOllamaRequest(executable: executable, sourceAlias: sourceAlias, device: device, inode: inode, port: UInt16(port),
 				milliseconds: budget, idleMilliseconds: idle, expected: nil, method: nil, path: nil, headers: [], body: Data())
 		}
 		guard let pid = ManagedBootstrapRequest.integer(fields["pid"]), pid > 0, pid <= Int64(Int32.max),
@@ -80,7 +83,7 @@ struct ManagedOllamaRequest {
 		guard headers.first(where: { $0.0.lowercased() == "x-ergopti-native-body-sha256" })?.1 == digest else { return nil }
 		let expected = ergopti_listener_identity(pid: Int32(pid), uid: geteuid(), start_seconds: seconds,
 			start_microseconds: microseconds, device: device, inode: inode)
-		return ManagedOllamaRequest(executable: executable, device: device, inode: inode, port: UInt16(port),
+		return ManagedOllamaRequest(executable: executable, sourceAlias: sourceAlias, device: device, inode: inode, port: UInt16(port),
 			milliseconds: budget, idleMilliseconds: idle, expected: expected, method: method, path: path, headers: headers, body: body)
 	}
 }
@@ -285,11 +288,22 @@ enum ManagedOllamaAPIWorker {
 				}
 			}
 			#endif
+			var sourceAlias: ManagedImageAlias?
+			defer { if let sourceAlias { try? sourceAlias.closeBorrow() } }
+			if let proof = request.sourceAlias {
+				do {
+					sourceAlias = try ManagedImageAlias.admit(proof: proof,
+						directory: URL(fileURLWithPath: request.executable).deletingLastPathComponent().path,
+						device: request.device, inode: request.inode, progress: { _ = try connection.remaining() })
+				} catch let failure as ManagedOllamaFailure { throw failure }
+				catch { throw ManagedOllamaFailure.admission }
+			}
+			let admittedExecutable = sourceAlias?.executable ?? request.executable
 			while listener == nil {
 				var observed = ergopti_listener_identity()
 				let remaining = try connection.remaining()
 				let expected = request.expected
-				let result = request.executable.withCString { path -> Int32 in
+				let result = admittedExecutable.withCString { path -> Int32 in
 					if var exact = expected { return ergopti_listener_validate(socket, path, &exact, remaining, &observed) }
 					#if ERGOPTI_GUARDIAN_TEST_SUPPORT
 					if diagnosticsEnabled {
@@ -312,6 +326,7 @@ enum ManagedOllamaAPIWorker {
 			_ = try connection.remaining()
 			if request.method != nil { try perform(request, connection: connection) }
 			guard connection.close(), let listener else { return 74 }
+			if let sourceAlias { try sourceAlias.closeBorrow() }
 			try connection.terminal(["version": 1, "success": true, "reason": "complete", "listener": identityFields(listener)])
 			return 0
 		} catch let error as ManagedOllamaFailure {

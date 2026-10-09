@@ -69,6 +69,8 @@ class RealNativeClientReceiving(unittest.TestCase):
                 "CPOSIXCompatibility.h",
                 "OwnedProgramCompatibility.h",
                 "LoopbackListenerCompatibility.h",
+                "OwnedImageAliasCompatibility.h",
+                "OwnedSuspendedImageCompatibility.h",
             )
         )
         # Retain exact compiler inputs in the private packet. A concurrent edit

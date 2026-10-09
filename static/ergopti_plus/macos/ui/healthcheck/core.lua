@@ -418,6 +418,14 @@ local ADAPTER_SPECS = {
 		wired    = true,
 	},
 	{
+		id       = "adapters.managed_ollama_pull",
+		contract = {
+			"handles", "prepare", "prepare_owned", "mark_start_attempted",
+			"rollback", "retire", "prepare_cleanup", "finish_cleanup",
+		},
+		wired    = true,
+	},
+	{
 		id       = "adapters.task_environment",
 		contract = { "sanitize" },
 		wired    = true,

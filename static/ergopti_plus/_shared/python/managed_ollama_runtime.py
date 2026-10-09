@@ -93,7 +93,10 @@ def relative_name(name):
 
 
 def select_asset(contract_bytes, catalogue_bytes, host):
-    contract, catalogue = metadata_bytes(contract_bytes), metadata_bytes(catalogue_bytes)
+    contract, catalogue = (
+        metadata_bytes(contract_bytes),
+        metadata_bytes(catalogue_bytes),
+    )
     if (
         set(catalogue) != CATALOGUE_FIELDS
         or type(catalogue["schema_version"]) is not int
@@ -166,7 +169,11 @@ def select_asset(contract_bytes, catalogue_bytes, host):
         raise RuntimeRefusal("metadata")
     for name, digest in libraries.items():
         relative_name(name)
-        if name in (contract["binary_path"], contract["license_path"], RECEIPT_BASENAME):
+        if name in (
+            contract["binary_path"],
+            contract["license_path"],
+            RECEIPT_BASENAME,
+        ):
             raise RuntimeRefusal("metadata")
         if not isinstance(digest, str) or SHA256.fullmatch(digest) is None:
             raise RuntimeRefusal("metadata")
@@ -187,7 +194,7 @@ def receipt(contract_bytes, catalogue_bytes, host, asset):
     }
 
 
-def verify_directory(root, contract, asset, expected_receipt=None):
+def verify_directory(root, contract, asset, expected_receipt=None, *, alias_context=None):
     """Require every native runtime file and in-tree link, never a capability probe alone."""
     root = Path(root)
     if root.is_symlink() or not root.is_dir():
@@ -198,8 +205,20 @@ def verify_directory(root, contract, asset, expected_receipt=None):
     allowed = set(expected) | {relative_name(contract["license_path"])}
     if expected_receipt is not None:
         allowed.add(RECEIPT_BASENAME)
+    additional = set()
+    if alias_context is not None:
+        alias_context.validate()
+        if alias_context.root != root:
+            raise RuntimeRefusal("runtime")
+        additional = set(alias_context.additional_files)
+        if allowed.intersection(additional):
+            raise RuntimeRefusal("runtime")
+        allowed.update(additional)
     found = set()
     for path in root.rglob("*"):
+        if path.relative_to(root).as_posix() in additional:
+            found.add(path.relative_to(root).as_posix())
+            continue
         try:
             actual = path.resolve(strict=True)
             actual.relative_to(resolved)
@@ -220,6 +239,8 @@ def verify_directory(root, contract, asset, expected_receipt=None):
     if expected_receipt is not None:
         if metadata_bytes((root / RECEIPT_BASENAME).read_bytes()) != expected_receipt:
             raise RuntimeRefusal("runtime")
+    if alias_context is not None:
+        alias_context.validate()
     return root / contract["binary_path"]
 
 
@@ -332,7 +353,12 @@ def authenticated_receipt(session, headers, payload, challenge, listener, operat
         "port",
     }
     if operation is not None:
-        fields |= {"operation_id", "operation_state", "native_helpers", "background_downloads"}
+        fields |= {
+            "operation_id",
+            "operation_state",
+            "native_helpers",
+            "background_downloads",
+        }
     if (
         set(data) != fields
         or type(data["version"]) is not int
@@ -343,7 +369,14 @@ def authenticated_receipt(session, headers, payload, challenge, listener, operat
         or data["pid"] != listener.get("pid")
     ):
         raise RuntimeRefusal("session")
-    for name in ("source_commit", "binary_sha256", "asset_sha256", "device", "inode", "port"):
+    for name in (
+        "source_commit",
+        "binary_sha256",
+        "asset_sha256",
+        "device",
+        "inode",
+        "port",
+    ):
         if data[name] != session[name]:
             raise RuntimeRefusal("session")
     if data["lease_id"] != sha256(session["token"].encode("ascii")):

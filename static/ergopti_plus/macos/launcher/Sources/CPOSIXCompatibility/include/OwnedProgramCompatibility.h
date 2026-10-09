@@ -20,6 +20,10 @@ typedef struct {
 } ergopti_owned_program_observation;
 ergopti_owned_program_observation ergopti_owned_program_observe(pid_t process_id);
 
+// Only an owned, unactivated, exact suspended child can supply this observation.
+// Refusal does not cancel, transfer or release the caller's cleanup authority.
+ergopti_owned_program_observation ergopti_owned_program_prepared_identity(ergopti_owned_program *owner);
+
 typedef struct {
 	int error_code;
 	bool active;
