@@ -1,7 +1,7 @@
 // tools/diagnostics/managed_http_pac_xctest_evidence.cjs
 'use strict';
 
-/** Exact existing twelve-case native PAC/WPAD cohort; never full-suite evidence. */
+/** Exact twelve original PAC/WPAD cases and two bounded argument observations; never full-suite evidence. */
 const fs = require('node:fs');
 const { cleanTranscript, evaluate: fullEvaluate } = require('./swift_xctest_evidence.cjs');
 const METHODS = Object.freeze({
@@ -15,7 +15,9 @@ const METHODS = Object.freeze({
 		'testWPADMetadataUsesDHCPOwnerOrNativeResolverWithoutSuffixConstruction',
 		'testWPADNativeDNSAdmissionIncludesSingleLabelCompanyDomains',
 		'testWPADUnresolvedNativeStateNeverFallsBackToInitialDirectOrFixedProxy',
-		'testResolvedNativePACOwnsDiscoveryWithoutReadingForeignMetadata'
+		'testResolvedNativePACOwnsDiscoveryWithoutReadingForeignMetadata',
+		'testActualCFNetworkHTTPPACArgumentShapeObservation',
+		'testActualCFNetworkHTTPSPACArgumentShapeObservation'
 	]),
 	ManagedHTTPWireTests: Object.freeze([
 		'testRealNativeTLSFullURLPACOrderedFallbackAndOwnedClosure'
@@ -49,7 +51,7 @@ function serialCohort(clean) {
 			const count = /^\s*Executed (\d+) tests?, with (\d+) failures? \((\d+) unexpected\) in /.exec(
 				line
 			);
-			const expected = summary === 'root' || summary === 'bundle' ? 12 : METHODS[summary].length;
+			const expected = summary === 'root' || summary === 'bundle' ? 14 : METHODS[summary].length;
 			require(count && count[1] === String(expected) && count[2] === '0' && count[3] === '0');
 			if (summary === 'root') root = 'after';
 			if (summary === 'bundle') bundle = 'after';
@@ -117,12 +119,43 @@ function serialCohort(clean) {
 		suite === null &&
 		active === null &&
 		opened.size === 3 &&
-		started.size === 12
+		started.size === 14
 	);
 }
 
+// Fixed observations need no invented stdout/XCTest delivery ordering.
+function argumentObservations(clean) {
+	const ports = { http: null, https: null };
+	const types = { http: null, https: null };
+	let valid = true;
+	const lines = clean.split('\n');
+	const admitted = new Set();
+	for (const [index, line] of lines.entries()) {
+		if (!line.includes('PAC_ARGUMENT_SHAPE')) continue;
+		const match =
+			/^PAC_ARGUMENT_SHAPE purpose=(http|https) type=(http|https) port=(200[0-7][0-5])$/.exec(line);
+		if (!match || ports[match[1]] !== null) {
+			valid = false;
+			continue;
+		}
+		ports[match[1]] = Number(match[3]);
+		types[match[1]] = match[2];
+		admitted.add(index);
+	}
+	return { complete: valid && ports.http !== null && ports.https !== null, ports, types, admitted };
+}
+
 function evaluate(text, swiftStatus, captureStatus) {
-	const clean = cleanTranscript(text);
+	const received = cleanTranscript(text);
+	const observations = argumentObservations(received);
+	// Validate the complete closed observation cohort first. Only those exact
+	// admitted frames leave the otherwise unchanged XCTest narrative.
+	const clean = observations.complete
+		? received
+				.split('\n')
+				.filter((_, index) => !observations.admitted.has(index))
+				.join('\n')
+		: received;
 	// Adapt only this strictly selected root to the shared complete-XCTest
 	// reader. Its full-package caller and parser are never changed.
 	const selected =
@@ -136,8 +169,8 @@ function evaluate(text, swiftStatus, captureStatus) {
 	const base = fullEvaluate(normalized, swiftStatus, captureStatus);
 	const names = base.completed_tests.map((test) => test.name);
 	const inventory =
-		names.length === 12 &&
-		NAMES.length === 12 &&
+		names.length === 14 &&
+		NAMES.length === 14 &&
 		NAMES.every((name) => names.filter((actual) => actual === name).length === 1);
 	const suites = Object.keys(METHODS).every(
 		(suite) =>
@@ -146,15 +179,18 @@ function evaluate(text, swiftStatus, captureStatus) {
 	const errors = [];
 	if (!selected) errors.push('selected-root');
 	if (!base.complete || base.failures.length) errors.push('incomplete-failed-or-skipped');
-	if (!inventory) errors.push('exact-twelve-inventory');
+	if (!inventory) errors.push('exact-fourteen-inventory');
 	if (!suites) errors.push('three-complete-native-suites');
 	if (!serialCohort(clean)) errors.push('serial-native-cohort');
+	if (!observations.complete) errors.push('bounded-argument-observations');
 	if (base.script_status || base.tee_status) errors.push('pipeline-status');
 	const complete = errors.length === 0;
 	return {
 		schema: 1,
 		cohort: 'managed-http-pac-wpad',
-		expected: 12,
+		expected: 14,
+		argument_observations: observations.ports,
+		argument_proxy_types: observations.types,
 		observed: Math.min(names.length, 65535),
 		complete,
 		swift_status: base.script_status,
@@ -175,7 +211,7 @@ if (require.main === module) {
 	);
 	fs.writeFileSync(process.argv[5], JSON.stringify(result, null, 2) + '\n');
 	console.log(
-		`PAC_XCTEST qualified=${result.complete} cases=${result.observed}/12 swift=${result.swift_status} capture=${result.capture_status}`
+		`PAC_XCTEST qualified=${result.complete} cases=${result.observed}/14 swift=${result.swift_status} capture=${result.capture_status}`
 	);
 	process.exitCode = result.exit_status;
 }

@@ -176,6 +176,16 @@ static int observe_sender_policy(NSApplication *application) {
     }
 }
 
+/* The explicitly requested normal consent path may activate this same app.
+ * Keep the admitted Accessory policy and require observed foreground readiness;
+ * neither activation nor this precondition grants Automation permission. */
+static int admit_sender_foreground_request(NSApplication *application) {
+    if (application == nil) return 1;
+    if ([application isActive]) return 0;
+    [application activateIgnoringOtherApps:YES];
+    return [application isActive] ? 0 : 2;
+}
+
 /* A separate closed metadata frame never changes nonce/reply admission. */
 static void emit_sender_identity(const struct SenderIdentityObservation *identity,
     int before_policy, int after_policy) {
@@ -276,6 +286,16 @@ int main(int argc, char **argv) {
             fputs("Owned Automation target construction failed\n", stderr);
             AEDisposeDesc(&address);
             return 65;
+        }
+        if (strcmp(argv[3], "permission-request") == 0) {
+            const int foreground = admit_sender_foreground_request(application);
+            if (foreground != 0) {
+                const char *state = foreground == 1 ? "unavailable" :
+                    foreground == 2 ? "inactive" : "unadmitted";
+                fprintf(stderr, "OWNED_APPLEEVENT_FOREGROUND/1 state=%s\n", state);
+                AEDisposeDesc(&address);
+                return 65;
+            }
         }
         const int outcome = owned_appleevent_permission(&address, probe_class, probe_event,
             strcmp(argv[3], "permission-request") == 0);

@@ -52,15 +52,8 @@ try {
     $null = Get-RemainingBudget
     $Policy = Get-ErgoptiNetworkPolicy $InputValue.policy_path
     $Destination = Get-ErgoptiDestination $InputValue.url
-    $OriginalOrigin = $Destination.GetLeftPart([UriPartial]::Authority)
-    $Method = $InputValue.method
-    $SendBody = $true
-    $SendHeaders = $true
-    $Capability = $null
-    $TransportAdmitted = $false
-    $Redirects = 0
-    while ($true) {
-        $Answer.receipt = @{ backend = 'curl'; stage = 'proxy_resolve'; failure_provenance = 'unknown' }
+    function Resolve-ErgoptiManagedFreshSelection {
+        param([Uri]$Destination)
         if ($InputValue.fixed_proxy -is [string]) {
             $Endpoint = $InputValue.fixed_proxy
             if ($Endpoint -ne '') { $Endpoint = Get-ErgoptiHttpRelay $Endpoint $Policy }
@@ -92,6 +85,18 @@ try {
             $Selection.Routes = @(@{ Kind = 'direct'; Endpoint = ''; Authentication = 'none'; Source = 'environment_bypass' })
         }
         $null = Get-RemainingBudget
+        return $Selection
+    }
+    $OriginalOrigin = $Destination.GetLeftPart([UriPartial]::Authority)
+    $Method = $InputValue.method
+    $SendBody = $true
+    $SendHeaders = $true
+    $Capability = $null
+    $TransportAdmitted = $false
+    $Redirects = 0
+    while ($true) {
+        $Answer.receipt = @{ backend = 'curl'; stage = 'proxy_resolve'; failure_provenance = 'unknown' }
+        $Selection = Resolve-ErgoptiManagedFreshSelection $Destination
         $Metrics = $null
         if ($null -eq $Capability) {
             # OS trust belongs to DIRECT requests too. SSPI/SPNEGO admission is
@@ -138,16 +143,27 @@ try {
             # Route the exact complete URL again before the first transport.
             if ($InputValue.fixed_proxy -isnot [string]) { continue }
         }
-        foreach ($Route in $Selection.Routes) {
+        for ($DiscoveryOrdinal = 0; $DiscoveryOrdinal -lt $Selection.Routes.Count; $DiscoveryOrdinal++) {
+            $Route = $Selection.Routes[$DiscoveryOrdinal]
             if ($Route.Kind -cnotin @('direct', 'proxy')) { throw 'A native route kind was refused.' }
             if ($Route.Kind -ceq 'proxy') {
                 if (-not $Capability.sspi -or -not $Capability.spnego -or
                     $Route.Authentication -cne 'current_user_proxy_only') { throw 'Sole Negotiate native proxy admission was refused.' }
             }
             $Answer.receipt = @{ backend = 'curl'; stage = 'connect'; failure_provenance = 'verified'; tls_verification = 'enforced' }
-            $Metrics = $AttemptEngine.InvokeRoute($Destination, $Route, 'negotiate', $Method, $SendBody, $SendHeaders)
-            if ($AttemptEngine.TestNtlmChallenge($Destination, $Route, $Metrics, $Capability)) {
-                $Metrics = $AttemptEngine.InvokeRoute($Destination, $Route, 'ntlm', $Method, $SendBody, $SendHeaders)
+            if ($Route.Kind -ceq 'proxy' -and $Destination.Scheme -ceq 'https') {
+                $Discovery = $AttemptEngine.DiscoverProxy($Destination, $Route, $Capability, $Selection, $DiscoveryOrdinal)
+                if ($Discovery.ready) {
+                    # Re-evaluate the complete original URL after the anonymous
+                    # child's actual EOF/reap, before current-user credentials.
+                    $FreshSelection = Resolve-ErgoptiManagedFreshSelection $Destination
+                    $Metrics = $AttemptEngine.InvokeDiscoveredRoute($Destination, $Route, $Method, $SendBody, $SendHeaders, $FreshSelection)
+                } else { $Metrics = $Discovery.metrics }
+            } else {
+                $Metrics = $AttemptEngine.InvokeRoute($Destination, $Route, 'negotiate', $Method, $SendBody, $SendHeaders)
+                if ($AttemptEngine.TestNtlmChallenge($Destination, $Route, $Metrics, $Capability)) {
+                    $Metrics = $AttemptEngine.InvokeRoute($Destination, $Route, 'ntlm', $Method, $SendBody, $SendHeaders)
+                }
             }
             if ($Metrics.exit -eq 0) { break }
             $Answer.receipt.curl_exit = [int]$Metrics.exit

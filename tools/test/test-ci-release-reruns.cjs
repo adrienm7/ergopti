@@ -222,6 +222,8 @@ function repository(name, branch) {
 		'tools/build/publish-verified-release.cjs',
 		'tools/build/macos-release-publication.cjs',
 		'tools/build/macos-release-archives.cjs',
+		'tools/ci/dev-release-qualification.cjs',
+		'.github/ci/dev_release_qualification_exceptions.json',
 		'tools/lib/paths.cjs',
 		'static/ergopti_plus/_shared/modules/updater/defaults.json',
 		'static/ergopti_plus/_shared/modules/updater/channels.json',
@@ -1114,7 +1116,10 @@ check('the stable channel compares stable tags only', () => {
 const createScript = scriptOf(pipeline.step(releaseJob, CREATE_RELEASE), CREATE_RELEASE);
 
 /** Runs the release creation with `prerelease`; returns the result and gh's arguments. */
-function createRelease(prerelease, { mode = '', missing = '', incomplete = '' } = {}) {
+function createRelease(
+	prerelease,
+	{ mode = '', missing = '', incomplete = '', fastPrerelease = 'false' } = {}
+) {
 	const assets = path.join(runner, 'release-assets');
 	fs.rmSync(assets, { recursive: true, force: true });
 	fs.mkdirSync(assets);
@@ -1141,6 +1146,7 @@ function createRelease(prerelease, { mode = '', missing = '', incomplete = '' } 
 		{
 			TAG: 'v0.0.0-dev.30',
 			PRERELEASE: prerelease,
+			ERGOPTI_FAST_PRERELEASE: fastPrerelease,
 			TITLE: 'Ergopti v0.0.0-dev.30',
 			GITHUB_SHA: head,
 			GITHUB_REPOSITORY: REPOSITORY,
@@ -1164,6 +1170,48 @@ function createRelease(prerelease, { mode = '', missing = '', incomplete = '' } 
 		state: JSON.parse(fs.readFileSync(stateFile, 'utf8'))
 	};
 }
+
+check(
+	'full release fixtures admit the real policy with explicit false (release-full-default-policy)',
+	() => {
+		const result = createRelease('true');
+		assert.equal(result.status, 0, result.stdout + result.stderr);
+		assert.ok(
+			!result.args.includes('--notes'),
+			'Full execution cannot borrow fast prerelease notes.'
+		);
+	}
+);
+
+check(
+	'an unbound fast release request refuses before publication (release-fast-unbound-refusal)',
+	() => {
+		const result = createRelease('true', { fastPrerelease: 'true' });
+		assert.notEqual(result.status, 0);
+		assert.match(result.stderr, /Temporary fast prerelease is not authorized for this context\./);
+		assert.deepEqual(
+			result.calls,
+			[],
+			'An unauthorized fast request cannot call the publication port.'
+		);
+	}
+);
+
+check(
+	'missing and malformed fast release input refuse before publication (release-fast-input-refusal)',
+	() => {
+		for (const fastPrerelease of ['', 'TRUE', '1']) {
+			const result = createRelease('true', { fastPrerelease });
+			assert.notEqual(result.status, 0);
+			assert.match(result.stderr, /Missing Boolean fast prerelease input\./);
+			assert.deepEqual(
+				result.calls,
+				[],
+				'Malformed policy input cannot call the publication port.'
+			);
+		}
+	}
+);
 
 /** Splits `gh release create` arguments into the tag, its options and its files. */
 function parseCreate(args) {
