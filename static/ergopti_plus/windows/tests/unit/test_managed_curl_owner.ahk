@@ -279,7 +279,7 @@ _ManagedCurlControlIdentityFactory(State) {
 	return State["request"]
 }
 
-_ManagedCurlControlGenerationAdmissionRevoked(ReplaceOwner := false) {
+_ManagedCurlControlGenerationAdmissionRevoked(ReplaceOwner := false, YieldAfterAck := false) {
 	global _LLM_Remote_Async
 	Saved := _LLM_Remote_Async
 	_LLM_Remote_Async := Map()
@@ -294,7 +294,23 @@ _ManagedCurlControlGenerationAdmissionRevoked(ReplaceOwner := false) {
 			"create_http", _ManagedCurlControlIdentityFactory.Bind(State))
 		AssertTrue(_LLMRemote_DispatchManagedCurl(State["id"], State["reservation"], Resolved,
 			"https://safe.invalid/api", "private-user-payload", Port))
+		; These controls deliver the poll only after generation revocation. Hold
+		; this request's timer before the completed ACK can make admission due.
+		AssertTrue(IsObject(Request.ManagedAdmissionFn), "manual generation revocation must own the actual admission callback")
+		if YieldAfterAck {
+			AssertEqual(0, A_IsCritical, "the interleave control must allow actual timer dispatch")
+			SetTimer(Request.ManagedAdmissionFn, -1)
+		}
+		SetTimer(Request.ManagedAdmissionFn, 0)
 		_ManagedCurlControlAck(State)
+		if YieldAfterAck {
+			Sleep(30)
+			AssertTrue(IsObject(Request.ManagedAdmissionFn), "holding this timer preserves the exact callback until manual revocation")
+			AssertFalse(Request.ManagedPayloadPublished, "a yielded completed ACK cannot bypass manual generation revocation")
+			AssertFalse(Request.Aborted, "holding admission leaves the original request live until revocation")
+			AssertEqual(State["reservation"]["start_tick"], Request.DeadlineStart, "the interleave cannot restart the original clock")
+			AssertEqual(State["reservation"]["timeout_ms"], Request.DeadlineTimeout, "the interleave cannot extend the original budget")
+		}
 		Critical("On")
 		if ReplaceOwner {
 			State["replacement"] := Map("cancelled", false)
@@ -317,3 +333,5 @@ _ManagedCurlControlGenerationAdmissionRevoked(ReplaceOwner := false) {
 }
 Test("managed curl owner: real generation cancellation revokes a queued native admission", _ManagedCurlControlGenerationAdmissionRevoked)
 Test("managed curl owner: generation replacement after Send revokes native admission", _ManagedCurlControlGenerationAdmissionRevoked.Bind(true))
+Test("managed curl owner: queued admission cannot beat cancellation after a yielded ACK", _ManagedCurlControlGenerationAdmissionRevoked.Bind(false, true))
+Test("managed curl owner: queued admission cannot beat replacement after a yielded ACK", _ManagedCurlControlGenerationAdmissionRevoked.Bind(true, true))
