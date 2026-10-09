@@ -46,6 +46,7 @@ other argument and runs on any host, because it launches nothing.
 
 import argparse
 import datetime
+import gzip
 import json
 import os
 from pathlib import Path
@@ -609,12 +610,25 @@ def collect(output, state, home, executables):
                 timeout=120,
             )
             receipt.update(exit_status=unified.returncode, stderr=unified.stderr[-4000:])
+            # The tail is a preview: verbose TCC traffic can otherwise discard
+            # the initial consent request that explains a later native timeout.
+            receipt.update(
+                characters=len(unified.stdout),
+                preview_truncated=len(unified.stdout) > 400000,
+            )
+            archive_file = filename + ".gz"
+            with gzip.open(output / archive_file, "wt", encoding="utf-8") as handle:
+                handle.write(unified.stdout)
+            receipt["archive_file"] = archive_file
+            (output / filename).write_text(unified.stdout[-400000:], encoding="utf-8")
             if unified.returncode == 0:
                 receipt["status"] = "captured"
-            (output / filename).write_text(unified.stdout[-400000:], encoding="utf-8")
         except (OSError, subprocess.TimeoutExpired) as error:
             receipt["cause"] = f"{type(error).__name__}: {error}"
-            (output / filename).write_text(receipt["cause"] + "\n", encoding="utf-8")
+            try:
+                (output / filename).write_text(receipt["cause"] + "\n", encoding="utf-8")
+            except OSError as write_error:
+                receipt["preview_error"] = f"{type(write_error).__name__}: {write_error}"
     (output / "unified-log-collection.json").write_text(
         json.dumps(unified_logs, indent=2) + "\n", encoding="utf-8"
     )

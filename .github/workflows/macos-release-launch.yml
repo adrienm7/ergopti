@@ -206,6 +206,8 @@ jobs:
         run: >
           python3 -m unittest
           macos_launch_gate_test.VerdictTests.test_appleevent_diagnostics_retain_system_logs_and_collection_failures
+          macos_launch_gate_test.VerdictTests.test_unified_log_archive_preserves_initial_authorization_after_preview_limit
+          macos_launch_gate_test.VerdictTests.test_unified_log_capture_requires_completed_archive_and_preview_writes
           macos_launch_gate_test.VerdictTests.test_window_timeout_does_not_discard_other_native_evidence
 
       - name: Observe the original clean-launch failure with system logs
