@@ -33,7 +33,13 @@ func deferredDevReleaseTestFiles() -> [String] {
 	}
 	var repository = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
 	for _ in 0..<4 { repository.deleteLastPathComponent() }
-	let policyURL = repository.appendingPathComponent(".github/ci/dev_release_qualification_exceptions.json")
+	let policyFilename: String
+	if selected == "stable-v1-20261009-macos-native-deferred" {
+		policyFilename = "stable_release_qualification_exception.json"
+	} else if selected == "dev-release-20261009-diagnostic-prerelease" {
+		policyFilename = "dev_release_qualification_exceptions.json"
+	} else { fatalError("Unknown native qualification profile.") }
+	let policyURL = repository.appendingPathComponent(".github/ci/" + policyFilename)
 	guard let data = try? Data(contentsOf: policyURL),
 		let policy = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any],
 		let schema = policy["schema"] as? NSNumber,

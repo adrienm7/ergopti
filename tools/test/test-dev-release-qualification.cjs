@@ -613,3 +613,236 @@ async function simulate(context, status = 0, entries = fixtures, afterFamilySign
 		'Retired fast157: all26 job classes and retained steps use full defaults; actual obsolete CLI refuses without side effects.'
 	);
 }
+
+// The proposed stable option is isolated from the original five-scope dev policy.
+{
+	const stable = q.parseClosedJson(fs.readFileSync(q.STABLE_POLICY_PATH, 'utf8'));
+	const exact = {
+		github_actions: 'true',
+		repository: 'adrienm7/ergopti',
+		event_name: 'push',
+		ref: 'refs/heads/main',
+		release: true,
+		prerelease: 'false',
+		channel: 'main',
+		tag: 'v1.0.0',
+		version: '1.0.0'
+	};
+	const before = new Date('2026-10-09T21:00:00Z');
+	const accepted = q.authorizeQualificationProfile(stable.id, exact, before);
+	assert.deepEqual(q.deferredScopes(accepted), [
+		'macos-brew-archive',
+		'macos-shortcuts-discovery',
+		'macos-launch-appleevents'
+	]);
+	assert.equal(
+		q.resolveQualificationProfile(exact, before),
+		null,
+		'unscoped Windows/Linux callers stay full'
+	);
+	for (const scope of ['windows-pac-full-url', 'linux-window-receipts']) {
+		assert.equal(q.resolveQualificationProfile(exact, before, scope), null);
+		assert.throws(
+			() => q.qualificationReceipt(accepted, scope, { source_sha: sha }),
+			/Unknown qualification receipt scope/
+		);
+	}
+	for (const scope of q.deferredScopes(accepted)) {
+		assert.equal(q.resolveQualificationProfile(exact, before, scope), accepted);
+		const receipt = q.qualificationReceipt(accepted, scope, { source_sha: sha });
+		assert.equal(receipt.qualified, false);
+		assert.equal(receipt.status, 'deferred');
+		assert.equal(receipt.source_sha, sha);
+		assert.equal(receipt.tag, 'v1.0.0');
+		assert.equal(receipt.expires_at, '2026-10-09T22:00:00Z');
+		q.validateQualificationReceipt(receipt, scope, sha, exact, before);
+		assert.throws(() =>
+			q.validateQualificationReceipt({ ...receipt, qualified: true }, scope, sha, exact, before)
+		);
+		assert.throws(() =>
+			q.validateQualificationReceipt(receipt, scope, 'b'.repeat(40), exact, before)
+		);
+	}
+	for (const runner of ['macos-15', 'macos-15-intel']) {
+		for (const scenario of ['clean', 'karabiner_config']) {
+			const row = q.launchQualificationReceipt(accepted, scenario, runner, { source_sha: sha });
+			assert.equal(row.status, 'deferred');
+			assert.equal(row.qualified, false);
+			q.validateLaunchQualificationReceipt(row, scenario, runner, sha, exact, before);
+		}
+		assert.equal(
+			q.launchQualificationReceipt(accepted, 'configured_symlink', runner, { source_sha: sha })
+				.status,
+			'full',
+			'unrelated launch scenarios remain mandatory'
+		);
+	}
+	for (const [field, value] of [
+		['github_actions', 'false'],
+		['repository', 'foreign/repo'],
+		['event_name', 'workflow_dispatch'],
+		['event_name', 'pull_request'],
+		['ref', 'refs/heads/dev'],
+		['release', false],
+		['release', 'true'],
+		['prerelease', 'true'],
+		['channel', 'dev'],
+		['tag', 'v1.0.1'],
+		['version', '1.0.1']
+	]) {
+		assert.equal(q.stablePublicationProfile({ ...exact, [field]: value }, before), null);
+		assert.throws(() =>
+			q.authorizeQualificationProfile(stable.id, { ...exact, [field]: value }, before)
+		);
+	}
+	assert.equal(q.stablePublicationProfile(exact, new Date(stable.expires_at)), null);
+	assert.throws(() =>
+		q.stablePublicationNotice(stable.id, exact, sha, new Date(stable.expires_at))
+	);
+	assert.throws(() => q.stablePublicationNotice(stable.id, exact, '', before));
+	assert.throws(() => q.stablePublicationNotice('foreign', exact, sha, before));
+	const notice = q.stablePublicationNotice(stable.id, exact, sha, before);
+	assert.match(notice, /MACOS NATIVE QUALIFICATION DEFERRED \/ qualified:false/);
+	assert.ok(notice.includes(sha));
+	assert.ok(
+		notice.includes(
+			'Known macOS reports remain under investigation: Karabiner lease failures (including watchdog exit 73 and PONG/READY timeouts), and an active Homebrew upgrade leaving Hammerspoon running without ErgoptiPlus. This release does not claim those reports repaired.'
+		)
+	);
+	assert.equal(q.deferredScopes(accepted).length, 3, 'known reports do not add deferral scopes');
+	assert.ok(
+		notice.includes(
+			'All other tests, macOS signing, source and asset integrity, installation and launch lifecycle checks remain required'
+		)
+	);
+	assert.equal(
+		q.stablePublicationNotice('', { ...exact, event_name: 'pull_request' }, '', before),
+		''
+	);
+	for (const [field, value] of [
+		['tag', 'v1.0.1'],
+		['version', '1.0.1'],
+		['expires_at', '2026-10-10T22:00:00Z'],
+		['repository', 'foreign/repo']
+	]) {
+		assert.throws(
+			() => q.validatePolicy({ ...stable, [field]: value }),
+			/Invalid one-candidate stable boundary/
+		);
+	}
+	const broadened = JSON.parse(JSON.stringify(stable));
+	broadened.scopes['windows-pac-full-url'] = policy.scopes['windows-pac-full-url'];
+	assert.throws(() => q.validatePolicy(broadened), /Invalid closed qualification fields/);
+	console.log(
+		'Draft stable v1.0.0: exact three Mac scopes, full Windows/Linux, strict expiry and source-bound public limits PASS.'
+	);
+}
+
+// Both fresh clock and artifact guards must immediately precede each external channel push.
+{
+	const workflow = fs.readFileSync(path.join(ROOT, '.github/workflows/ci.yml'), 'utf8');
+	const guard = 'node tools/ci/dev-release-qualification.cjs --publication-admit >/dev/null';
+	const signatureGuard = 'node tools/ci/windows-stable-signing.cjs --publication-admit >/dev/null';
+	function requirePublicationGuard(source, push) {
+		assert.equal(source.split(push).length, 2, 'the actual publication push must be unique');
+		const prefix = source.slice(0, source.indexOf(push)).trimEnd();
+		assert.equal(
+			prefix
+				.split(/\r?\n/)
+				.slice(-2)
+				.map((line) => line.trim())
+				.join('\n'),
+			guard + '\n' + signatureGuard,
+			'fresh qualification admission must precede publication'
+		);
+	}
+	for (const push of [
+		'git -C "$worktree" push origin "HEAD:refs/heads/${branch}"',
+		'git -C "$tap" push origin HEAD'
+	]) {
+		requirePublicationGuard(workflow, push);
+		const actual = guard + '\n              ' + signatureGuard + '\n              ' + push;
+		assert.ok(workflow.includes(actual), 'the inverse must withdraw the exact executed guard');
+		assert.throws(
+			() => requirePublicationGuard(workflow.replace(actual, push), push),
+			/fresh qualification admission/
+		);
+		for (const replacement of [
+			guard + '\n              ' + push,
+			signatureGuard + '\n              ' + push,
+			signatureGuard + '\n              ' + guard + '\n              ' + push
+		]) {
+			assert.throws(
+				() => requirePublicationGuard(workflow.replace(actual, replacement), push),
+				/fresh qualification admission/
+			);
+		}
+	}
+	console.log(
+		'Stable publication: both actual external channel pushes retain fresh admission; guard omission refuses.'
+	);
+}
+
+// Windows signature permission is distinct from the three native test deferrals.
+{
+	const Signing = require('../ci/windows-stable-signing.cjs');
+	const context = {
+		github_actions: 'true',
+		repository: 'adrienm7/ergopti',
+		event_name: 'push',
+		ref: 'refs/heads/main',
+		release: true,
+		prerelease: 'false',
+		channel: 'main',
+		tag: 'v1.0.0',
+		version: '1.0.0'
+	};
+	const source = 'a'.repeat(40),
+		hash = 'b'.repeat(64),
+		clock = new Date('2026-10-09T21:59:59Z');
+	Signing.admit(context, source, source, clock);
+	Signing.requireFreshUnsigned('true');
+	for (const value of ['false', undefined, '', true]) {
+		assert.throws(() => Signing.requireFreshUnsigned(value));
+	}
+	for (const patch of [
+		{ github_actions: 'false' },
+		{ event_name: 'workflow_dispatch' },
+		{ event_name: 'pull_request' },
+		{ ref: 'refs/heads/dev' },
+		{ release: false },
+		{ prerelease: 'true' },
+		{ channel: 'dev' },
+		{ tag: 'v1.0.1' },
+		{ version: '1.0.1' },
+		{ repository: 'foreign/repository' }
+	]) {
+		assert.throws(() => Signing.admit({ ...context, ...patch }, source, source, clock));
+	}
+	assert.throws(() => Signing.admit(context, source, 'c'.repeat(40), clock));
+	assert.throws(() => Signing.admit(context, 'A'.repeat(40), 'A'.repeat(40), clock));
+	assert.throws(() => Signing.admit(context, source, source, new Date('2026-10-09T22:00:00Z')));
+	assert.throws(() => Signing.admit(context, source, source, new Date('invalid')));
+	assert.throws(() =>
+		Signing.admit(context, source, source, clock, { ...Signing.POLICY, authorized: false })
+	);
+	const value = Signing.receipt(context, source, source, hash, clock);
+	Signing.validateReceipt(value, context, source, source, hash, clock);
+	for (const patch of [
+		{ signature: 'Valid' },
+		{ qualified: true },
+		{ tests: 'deferred' },
+		{ source_sha: 'c'.repeat(40) },
+		{ sha256: 'd'.repeat(64) },
+		{ tag: 'v1.0.1' },
+		{ artifact: 'foreign.exe' },
+		{ extra: true }
+	]) {
+		assert.throws(() =>
+			Signing.validateReceipt({ ...value, ...patch }, context, source, source, hash, clock)
+		);
+	}
+	assert(Signing.notice(source).includes('UNSIGNED / qualified:false'));
+	assert(Signing.notice(source).includes('SignPath Foundation'));
+	console.log('[OK] one-candidate unsigned signature permission and source-bound receipt guards.');
+}

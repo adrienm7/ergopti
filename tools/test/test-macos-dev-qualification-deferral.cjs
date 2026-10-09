@@ -26,6 +26,20 @@ const consentSource = fs.readFileSync(
 	path.join(ROOT, 'static/ergopti_plus/macos/launcher/Tests/ErgoptiPlusTests', consentFile),
 	'utf8'
 );
+const stableConfiguration = JSON.parse(
+	fs.readFileSync(path.join(ROOT, '.github/ci/stable_release_qualification_exception.json'), 'utf8')
+);
+const policySelector =
+	'\tlet policyFilename: String\n' +
+	'\tif selected == "' +
+	stableConfiguration.id +
+	'" {\n' +
+	'\t\tpolicyFilename = "stable_release_qualification_exception.json"\n' +
+	'\t} else if selected == "' +
+	configuration.id +
+	'" {\n' +
+	'\t\tpolicyFilename = "dev_release_qualification_exceptions.json"\n' +
+	'\t} else { fatalError("Unknown native qualification profile.") }';
 const clock = new Date('2026-10-08T20:00:00Z');
 const sha = '0123456789abcdef0123456789abcdef01234567';
 const context = {
@@ -210,7 +224,13 @@ function sourceProblems(pkg, mac, rootCaller) {
 		'guard let selected = environment["ERGOPTI_DEV_QUALIFICATION_PROFILE"], !selected.isEmpty else {\n\t\treturn []',
 		'full-default'
 	);
-	requireText(pkg, '.github/ci/dev_release_qualification_exceptions.json', 'canonical-policy');
+	requireText(
+		pkg,
+		'repository.appendingPathComponent(".github/ci/" + policyFilename)',
+		'canonical-policy'
+	);
+	if (pkg.split(policySelector).length !== 2) errors.push('closed-policy-selector');
+	const outsideSelector = pkg.replace(policySelector, '');
 	requireText(pkg, 'profile == selected', 'profile-identity');
 	requireText(pkg, 'Date() < expiry', 'expiry');
 	requireText(
@@ -251,9 +271,13 @@ function sourceProblems(pkg, mac, rootCaller) {
 		configuration.expires_at,
 		brew.path,
 		configuration.tag,
-		configuration.version
+		configuration.version,
+		stableConfiguration.id,
+		stableConfiguration.expires_at,
+		stableConfiguration.tag,
+		stableConfiguration.version
 	])
-		if (pkg.includes(value)) errors.push('duplicated-policy');
+		if (outsideSelector.includes(value)) errors.push('duplicated-policy');
 	requireText(
 		mac,
 		'python3 -m unittest discover -s tools/diagnostics -p macos_brew_archive_acceptance_test.py -v',
@@ -339,6 +363,37 @@ function consentSourceProblems(native, portable, pkg) {
 check('complete-source-guard', () =>
 	assert.deepEqual(sourceProblems(packageSource, workflow, caller), [])
 );
+for (const [name, before, after] of [
+	['missing-selector', policySelector, ''],
+	[
+		'foreign-stable-file',
+		'policyFilename = "stable_release_qualification_exception.json"',
+		'policyFilename = "foreign.json"'
+	],
+	[
+		'foreign-dev-file',
+		'policyFilename = "dev_release_qualification_exceptions.json"',
+		'policyFilename = "foreign.json"'
+	],
+	[
+		'unknown-profile-admitted',
+		'else { fatalError("Unknown native qualification profile.") }',
+		'else { policyFilename = "dev_release_qualification_exceptions.json" }'
+	],
+	['duplicate-selector', policySelector, policySelector + '\n' + policySelector],
+	[
+		'duplicate-policy-outside-selector',
+		policySelector,
+		policySelector + '\nlet duplicatedProfile = "' + configuration.id + '"'
+	]
+])
+	check(name, () => {
+		assert.equal(packageSource.split(before).length, 2, 'exact actual selector mutation preimage');
+		assert.ok(
+			sourceProblems(packageSource.replace(before, after), workflow, caller).length > 0,
+			'the admitted selector cannot hide a different policy or duplicated policy data'
+		);
+	});
 for (const [name, token, replacement, target] of [
 	['default-must-be-full', 'return []', 'return ["other.swift"]', 'package'],
 	['expired-profile-refuses', 'Date() < expiry', 'Date() >= expiry', 'package'],
@@ -802,9 +857,9 @@ if (process.argv[2] === '--package-dump') {
 		'SwiftPM target exclusion binding verified: ' + mode + '; native/feature qualified=false.'
 	);
 }
-assert.equal(passed, 52);
+assert.equal(passed, 58);
 console.log(
-	'PASS: Mac qualification deferral source/typed-receipt controls=52; Swift/native execution unqualified.'
+	'PASS: Mac qualification deferral source/typed-receipt controls=58; Swift/native execution unqualified.'
 );
 
 require('./test-item36-native-qualification.cjs')({
