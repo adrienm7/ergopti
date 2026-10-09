@@ -1666,7 +1666,8 @@
 			"i18n": "common.restore_recommended",
 			"platforms": [
 				"ahk",
-				"hs"
+				"hs",
+				"linux"
 			],
 			"reason_key": "platform_reason.remap_engine_is_per_driver"
 		},
@@ -1676,7 +1677,8 @@
 			"i18n": "common.clear_to_system",
 			"platforms": [
 				"ahk",
-				"hs"
+				"hs",
+				"linux"
 			],
 			"reason_key": "platform_reason.remap_engine_is_per_driver"
 		},
@@ -1684,7 +1686,8 @@
 			"type": "---",
 			"platforms": [
 				"ahk",
-				"hs"
+				"hs",
+				"linux"
 			]
 		},
 		{
@@ -1695,7 +1698,8 @@
 				"combo_symmetric"
 			],
 			"platforms": [
-				"hs"
+				"hs",
+				"linux"
 			],
 			"reason_key": "platform_reason.remap_engine_is_per_driver"
 		},
@@ -1703,7 +1707,8 @@
 			"type": "list",
 			"id": "combo_timings",
 			"platforms": [
-				"hs"
+				"hs",
+				"linux"
 			],
 			"reason_key": "platform_reason.remap_engine_is_per_driver"
 		},
@@ -1712,7 +1717,8 @@
 			"id": "copy_tap_to_combo",
 			"i18n": "menu.tapholds.copy_tap_to_combo",
 			"platforms": [
-				"hs"
+				"hs",
+				"linux"
 			],
 			"reason_key": "platform_reason.remap_engine_is_per_driver"
 		},

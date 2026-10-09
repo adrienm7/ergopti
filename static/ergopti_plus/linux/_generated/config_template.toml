@@ -338,6 +338,10 @@ alt_gr_then_left_alt = "none"
 alt_gr_then_caps_lock = "none"
 left_alt_then_caps_lock = "none"
 
+[mod_combos]
+simultaneous_threshold_ms = 100
+symmetric = false
+
 [shortcuts.script_control]
 chords_enabled = true
 script_altgr_backspace = "script_reload"

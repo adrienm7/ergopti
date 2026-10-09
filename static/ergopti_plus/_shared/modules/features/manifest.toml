@@ -237,6 +237,12 @@ platforms = ["ahk", "hs"]
 description_key = "menu.ui"
 platforms = ["hs"]
 
+# Linux native simultaneous timing and symmetry. Third slots remain neutral.
+[sections.mod_combos]
+description_key = "menu.shortcuts.key_combinations"
+platforms = ["linux"]
+reason_key = "platform_reason.remap_engine_is_per_driver"
+
 [sections.shortcuts.key_combination_taps]
 description_key = "menu.shortcuts.key_combinations"
 platforms = ["ahk", "linux"]
@@ -1960,6 +1966,27 @@ type = "action"
 description_key = "menu.shortcuts.key_combinations"
 
 
+
+# Linux declares its own values; no runtime fallback to Mac hs_timeouts.
+[[features.mod_combos]]
+id = "simultaneous_threshold_ms"
+platforms = ["linux"]
+default = 100
+recommended = 100
+input_altering = false
+type = "number"
+description_key = "menu.tapholds.simultaneous_dialog_title"
+reason_key = "platform_reason.remap_engine_is_per_driver"
+
+[[features.mod_combos]]
+id = "symmetric"
+platforms = ["linux"]
+default = false
+recommended = false
+input_altering = false
+type = "boolean"
+description_key = "menu.tapholds.symmetric"
+reason_key = "platform_reason.remap_engine_is_per_driver"
 
 # ====================================
 # ===== 3.5.6 shortcuts.personal =====
@@ -4755,8 +4782,8 @@ platforms = ["ahk", "hs", "linux"]
 
 # « Combinaisons de touches »: every combination of two tap-hold keys, in one
 # group with a first-row switch of its own. Its rows are
-# key_combinations_group. Linux owns ordered tap/hold slots; simultaneous
-# first-press chord buffering remains unavailable there.
+# key_combinations_group. Linux owns ordered tap/hold and same-device
+# simultaneous slots through its native first-press receipt owner.
 # A separator sets it apart from the submenus above, which each create
 # shortcuts under one modifier.
 [[menu.shortcuts_menu]]
@@ -4993,41 +5020,41 @@ reason_key = "platform_reason.remap_engine_is_per_driver"
 type = "command"
 id = "scope_restore"
 i18n = "common.restore_recommended"
-platforms = ["ahk", "hs"]
+platforms = ["ahk", "hs", "linux"]
 reason_key = "platform_reason.remap_engine_is_per_driver"
 
 [[menu.key_combinations_group]]
 type = "command"
 id = "scope_clear"
 i18n = "common.clear_to_system"
-platforms = ["ahk", "hs"]
+platforms = ["ahk", "hs", "linux"]
 reason_key = "platform_reason.remap_engine_is_per_driver"
 
 [[menu.key_combinations_group]]
 type = "---"
-platforms = ["ahk", "hs"]
+platforms = ["ahk", "hs", "linux"]
 
-# macOS: the Karabiner chords' symmetry, their activation delay, and the
+# macOS and Linux: owned chords' symmetry, their activation delay, and the
 # bulk copy of every pair's tap slot into its chord slot.
 [[menu.key_combinations_group]]
 type = "check"
 id = "combo_symmetric"
 i18n = "menu.tapholds.symmetric"
 checked_when = ["combo_symmetric"]
-platforms = ["hs"]
+platforms = ["hs", "linux"]
 reason_key = "platform_reason.remap_engine_is_per_driver"
 
 [[menu.key_combinations_group]]
 type = "list"
 id = "combo_timings"
-platforms = ["hs"]
+platforms = ["hs", "linux"]
 reason_key = "platform_reason.remap_engine_is_per_driver"
 
 [[menu.key_combinations_group]]
 type = "command"
 id = "copy_tap_to_combo"
 i18n = "menu.tapholds.copy_tap_to_combo"
-platforms = ["hs"]
+platforms = ["hs", "linux"]
 reason_key = "platform_reason.remap_engine_is_per_driver"
 
 [[menu.key_combinations_group]]
@@ -5036,7 +5063,7 @@ type = "---"
 # One row per ordered pair of tap-hold keys: the key held first, then the key
 # struck under it, so LAlt then CapsLock is not CapsLock then LAlt. Each pair
 # has its slots: « Maintenir 1 + taper 2 → » and « Maintenir 1 + maintenir
-# 2 → » on both, and on macOS « Accord (simultané) → », which Windows does
+# 2 → » on both, and on macOS/Linux « Accord (simultané) → », which Windows does
 # not have yet (it needs the first key of a chord to wait for the second).
 #
 # Two lists, by the hand of the key held first as [tap_hold.catalog] assigns it
@@ -6465,7 +6492,7 @@ action_parameters = { domains = ["combination"], restore = "remove" }
 prefixes = ["shortcuts.key_combination_taps", "shortcuts.key_combination_holds", "mod_combos", "category_enabled.key_combinations"]
 restore_exclude = []
 clear_exclude = ["mod_combos.enabled", "category_enabled.key_combinations"]
-dynamic_defaults = [{ prefix = "shortcuts.key_combination_taps", depth = 1, default = "none", recommended = "none" }, { prefix = "shortcuts.key_combination_holds", depth = 1, default = "none", recommended = "none" }]
+dynamic_defaults = [{ prefix = "shortcuts.key_combination_taps", depth = 1, default = "none", recommended = "none" }, { prefix = "shortcuts.key_combination_holds", depth = 1, default = "none", recommended = "none" }, { prefix = "mod_combos.config", depth = 2, suffix = "combo", default = "none", recommended = "none" }]
 
 # The Gestures clear removes the assignments and keeps the switch, like the
 # Tap-Holds one: the user assigns the next gesture from there.

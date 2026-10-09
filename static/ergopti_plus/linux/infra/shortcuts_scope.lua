@@ -226,6 +226,15 @@ function M.new(options)
 					end
 					for pair in pairs(seen) do pair_paths[#pair_paths + 1] = "shortcuts." .. record[1] .. "." .. pair end
 				end
+				-- Only catalogue-issued third leaves join bulk clear/restore. Future
+				-- records and sibling fields stay outside this transaction's scope.
+				local configured = type(document.mod_combos) == "table" and document.mod_combos.config or nil
+				local seen = {}
+				for pair, value in pairs(desired.chords or {}) do if value ~= "none" then seen[pair] = true end end
+				for pair, row in pairs(type(configured) == "table" and configured or {}) do
+					if desired.chords and desired.chords[pair] ~= nil and type(row) == "table" and row.combo ~= nil then seen[pair] = true end
+				end
+				for pair in pairs(seen) do pair_paths[#pair_paths + 1] = "mod_combos.config." .. pair .. ".combo" end
 				return pair_paths
 			end,
 		}, validators)
