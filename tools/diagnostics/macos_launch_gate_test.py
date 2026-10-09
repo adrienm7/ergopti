@@ -417,6 +417,62 @@ class VerdictTests(unittest.TestCase):
     def test_healthy_launch_passes(self):
         self.assertEqual(gate.evaluate("clean", observe()), [])
 
+    def test_appleevent_diagnostics_retain_system_logs_and_collection_failures(self):
+        for outcome in ("success", "refused", "timeout"):
+            with self.subTest(outcome=outcome), tempfile.TemporaryDirectory() as folder:
+                output = Path(folder) / "output"
+                output.mkdir()
+                home = Path(folder) / "home"
+                home.mkdir()
+                log_calls = []
+
+                def native_run(arguments, **options):
+                    if arguments[0] == "log":
+                        log_calls.append(arguments)
+                        if outcome == "timeout":
+                            raise subprocess.TimeoutExpired(arguments, options["timeout"])
+                        return subprocess.CompletedProcess(
+                            arguments,
+                            64 if outcome == "refused" else 0,
+                            "native log evidence",
+                            "log collection refused" if outcome == "refused" else "",
+                        )
+                    return subprocess.CompletedProcess(arguments, 0, "", "")
+
+                with (
+                    mock.patch.object(gate.subprocess, "run", side_effect=native_run),
+                    mock.patch.object(gate, "processes", return_value=[]),
+                ):
+                    collected = gate.collect(
+                        output,
+                        {"logs_dir": home / "missing"},
+                        home,
+                        (Path("/private/owned/Hammerspoon"),),
+                    )
+                self.assertEqual(len(log_calls), 2)
+                system_call = log_calls[1]
+                predicate = system_call[system_call.index("--predicate") + 1]
+                self.assertIn('process == "tccd"', predicate)
+                self.assertIn('subsystem == "com.apple.appleevents"', predicate)
+                self.assertIn("--info", system_call)
+                self.assertIn("--debug", system_call)
+                self.assertEqual(system_call[system_call.index("--last") + 1], "4m")
+                diagnostics = collected["unified_logs"]
+                self.assertEqual(len(diagnostics), 2)
+                for receipt in diagnostics:
+                    self.assertEqual(
+                        receipt["status"], "captured" if outcome == "success" else "unavailable"
+                    )
+                    if outcome == "refused":
+                        self.assertEqual(receipt["exit_status"], 64)
+                        self.assertIn("log collection refused", receipt["stderr"])
+                    if outcome == "timeout":
+                        self.assertIn("TimeoutExpired", receipt["cause"])
+                self.assertEqual(
+                    json.loads((output / "unified-log-collection.json").read_text()), diagnostics
+                )
+                self.assertTrue((output / "appleevents-system.log").exists())
+
     def test_window_timeout_does_not_discard_other_native_evidence(self):
         with tempfile.TemporaryDirectory() as folder:
             home = Path(folder) / "home"
