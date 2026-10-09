@@ -550,7 +550,7 @@ _TestHC_CancelRefreshExportHistory(Refresh := true) {
 	SavedSession := _HC_Session, SavedReset := _HC_ResetDone
 	try {
 		_HC_ResetDone := true
-		_HC_Session := Map("snapshot", Map("probes", Map(
+		_HC_Session := Map("snapshot", Map("driver", "windows", "probes", Map(
 			"github_api", Map("state", "timeout", "cleanup", "unknown", "ms", 23),
 			"ai_health", Map("state", "pending"))), "extensive", false, "detailed", false)
 		Config := HealthCheck_Config()
