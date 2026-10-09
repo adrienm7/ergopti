@@ -24,6 +24,7 @@ async function observe(source, root, scenario) {
 	const anchor = fs.realpathSync(owned);
 	const diagnostics = [];
 	let warmCalls = 0;
+	let retiredMetricsCalls = 0;
 	let initialReceipt;
 	let initialNonce;
 	let initialFullSave;
@@ -63,6 +64,32 @@ async function observe(source, root, scenario) {
 							const probe = options.env.ERGOPTI_STARTUP_SMOKE_DIR;
 							assert.equal(path.relative(anchor, fs.realpathSync(probe)).startsWith('..'), false);
 							const fixture = path.basename(probe);
+							if (fixture === 'retired-metrics-config') {
+								retiredMetricsCalls++;
+								const file = path.join(probe, 'config/autohotkey/config.toml');
+								const original = fs.readFileSync(file, 'utf8');
+								assert.equal(
+									original,
+									'# retained legacy dashboard bindings\n[metrics]\n' +
+										'metrics_shortcut_typing = "Ctrl+Alt+M" # retained typing\n' +
+										'metrics_shortcut_apps = { future = { keep = 9 }, enabled = false } # retained apps\n',
+									'the actual runner seeds all independently authored retired records'
+								);
+								let saved = original + '\n[fixture_owned]\nboot_saved = true\n';
+								if (scenario === 'retired-comment') saved = saved.replace(' # retained typing', '');
+								if (scenario === 'retired-banner')
+									saved = saved.replace('# retained legacy dashboard bindings\n', '');
+								if (scenario === 'retired-string')
+									saved = saved.replace('Ctrl+Alt+M', 'Ctrl+Alt+N');
+								if (scenario === 'retired-future') saved = saved.replace('keep = 9', 'keep = 10');
+								if (scenario === 'retired-false')
+									saved = saved.replace('enabled = false', 'enabled = 0');
+								if (scenario === 'retired-malformed') saved += '\n[broken\n';
+								if (scenario === 'retired-duplicate')
+									saved += '# retained legacy dashboard bindings\n';
+								if (scenario === 'retired-missing') fs.unlinkSync(file);
+								else fs.writeFileSync(file, '\uFEFF' + saved);
+							}
 							const warm = fixture === 'fresh-config' && initialReceipt !== undefined;
 							if (warm) warmCalls++;
 							const pid = ++launchPid;
@@ -174,13 +201,14 @@ async function observe(source, root, scenario) {
 							return result;
 						}
 					};
+				if (name === 'smol-toml') return require(require.resolve(name, { paths: [root] }));
 				assert.ok(['fs', 'path', 'node:crypto'].includes(name), 'unexpected dependency: ' + name);
 				return require(name);
 			}
 		});
 		vm.runInContext(executable, context, { filename: OWNER });
 		const status = await context.bootMain();
-		return { status, warmCalls, diagnostics };
+		return { status, warmCalls, retiredMetricsCalls, diagnostics };
 	} finally {
 		assert.equal(
 			fs.realpathSync(owned),
@@ -214,6 +242,14 @@ async function check(source, root = ROOT) {
 		'save-zero',
 		'save-malformed',
 		'first-save-missing',
+		'retired-comment',
+		'retired-banner',
+		'retired-string',
+		'retired-future',
+		'retired-false',
+		'retired-malformed',
+		'retired-duplicate',
+		'retired-missing',
 		'ready'
 	]) {
 		const result = await observe(source, root, scenario);
@@ -236,6 +272,17 @@ async function check(source, root = ROOT) {
 			assert.match(result.diagnostics.join('\n'), /reloaded-config:.*no fresh readiness/);
 		if (scenario === 'logged-error')
 			assert.match(result.diagnostics.join('\n'), /reloaded-config reached ready with 1 error/);
+		if (scenario.startsWith('retired-') || scenario === 'ready')
+			assert.equal(
+				result.retiredMetricsCalls,
+				1,
+				'the actual retired-Metrics boot must execute once'
+			);
+		if (scenario.startsWith('retired-'))
+			assert.match(
+				result.diagnostics.join('\n'),
+				/retired-metrics-config:.*retired Metrics full.save/
+			);
 	}
 	return observations;
 }
@@ -244,7 +291,7 @@ if (require.main === module)
 	check(fs.readFileSync(path.join(ROOT, OWNER), 'utf8')).then(
 		() =>
 			console.log(
-				'[OK] Twenty-one inert actual startup admission cases reject stale readiness and uncommitted full saves.'
+				'[OK] Twenty-nine inert actual startup admission cases reject stale readiness, uncommitted saves and retired-Metrics source loss.'
 			),
 		(error) => {
 			console.error(error);

@@ -398,5 +398,76 @@ do
 	end
 end
 
+-- This is native-library qualification of selected-group enumeration, not
+-- a desktop source receipt, kernel output or physical keyboard delivery.
+print("--- inverse output after a native group switch (us,de) ---")
+do
+	local Capture = require("adapters.xkb_capture")
+	local map = compile("us,de", "grp:alt_shift_toggle")
+	check(map ~= nil and load_through_driver(map), "the independently compiled US/German native map loads")
+	if map then
+		local initial = Capture.inverse_table()
+		check(initial and initial.z and initial.z.keycode == 44, "US initially types z on its literal evdev44 key")
+		for _, edge in ipairs({ { 56, 1 }, { 42, 1 }, { 42, 0 }, { 56, 0 } }) do
+			Capture.process(edge[1], edge[2])
+		end
+		local _, group = Capture._capture_source_generation_for_test()
+		check(group == 1, "the actual native Alt+Shift group action selects German")
+		local switched = Capture.inverse_table()
+		check(switched and switched.z and switched.z.keycode == 21,
+			"German z inverse uses its literal evdev21 position rather than the US position")
+		local received
+		if switched and switched.z then
+			local _, identity = Capture.process(switched.z.keycode, 1)
+			received = identity
+			Capture.process(switched.z.keycode, 0)
+		end
+		check(received == "z", "replaying the actual inverse key in native German state produces z, not y")
+		for _, edge in ipairs({ { 56, 1 }, { 42, 1 }, { 42, 0 }, { 56, 0 } }) do
+			Capture.process(edge[1], edge[2])
+		end
+		local restored = Capture.inverse_table()
+		check(restored and restored.z and restored.z.keycode == 44, "native return to US enumerates its current output position")
+	end
+end
+
+-- These are reconstructed native-library controls, not desktop source authority.
+print("--- cached inverse retirement after native group and capture changes ---")
+do
+	local Capture = require("adapters.xkb_capture")
+	local map = compile("us,de", "grp:alt_shift_toggle")
+	check(map ~= nil and load_through_driver(map), "the cache witness loads the actual US/German native map")
+	if map then
+		local admitted, _, receipt = KeyboardLayout.plan("z")
+		check(admitted and admitted[1].keycode == 44, "the initial cached US z uses literal evdev44")
+		for _, edge in ipairs({ { 56, 1 }, { 42, 1 }, { 42, 0 }, { 56, 0 } }) do Capture.process(edge[1], edge[2]) end
+		check(not KeyboardLayout.is_ready(), "actual native group change retires cached readiness")
+		check(KeyboardLayout.resolve("z") == nil, "cached US z is refused rather than emitting German y")
+		check(KeyboardLayout.plan("z") == nil, "the entire old group plan is unavailable")
+		check(type(KeyboardLayout.plan_current) == "function" and not KeyboardLayout.plan_current(receipt), "the originally admitted plan owner is retired")
+		for _, edge in ipairs({ { 56, 1 }, { 42, 1 }, { 42, 0 }, { 56, 0 } }) do Capture.process(edge[1], edge[2]) end
+		check(not KeyboardLayout.is_ready(), "returning to the same group never revives its observed retired cohort")
+		check(load_through_driver(map) and KeyboardLayout.is_ready(), "explicit refresh publishes a new valid native cohort")
+		check(type(KeyboardLayout.plan_current) == "function" and not KeyboardLayout.plan_current(receipt), "refresh never transfers authority to a predecessor plan")
+		check(Capture.reset_state() and not KeyboardLayout.is_ready(), "same-map native session replacement retires its cached inverse")
+	end
+end
+
+-- Native inverse modifier arrays must not expose the enumerator's chord policy.
+print("--- native inverse data ownership ---")
+do
+	local Capture = require("adapters.xkb_capture")
+	local map = compile("us")
+	if map and load_through_driver(map) then
+		local first = Capture.inverse_table()
+		if first and first.Z then first.Z.mods[1] = "altgr" end
+		local second = Capture.inverse_table()
+		check(second and second.Z and second.Z.mods[1] == "shift",
+			"caller mutation cannot change the native enumerator's retained Shift chord")
+	else
+		check(false, "the native inverse ownership witness requires the real US map")
+	end
+end
+
 print(string.format("=== %d check(s), %d failure(s) ===", _checks, _failures))
 os.exit(_failures == 0 and 0 or 1)

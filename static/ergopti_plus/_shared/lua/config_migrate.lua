@@ -136,6 +136,7 @@ local STEP_FIELDS = { from = true, to = true, drivers = true, reason = true, ops
 local OPS = {
 	rename        = { required = { "section", "key" }, optional = { "to_section", "to_key" } },
 	copy_if_absent = { required = { "section", "key" }, optional = { "to_section", "to_key" } },
+	move_ergopti_variant = { required = { "section", "key", "to_key", "base_key", "alt_gr_key", "source_key", "false_variant", "true_variant" }, optional = { "neutral_variant" } },
 	move_chord_action = { required = { "section", "key", "to_section", "action", "conditional_key", "disabled_action", "platform" }, optional = {} },
 	move_section  = { required = { "section", "to_section" }, optional = {} },
 	merge_into    = { required = { "section", "to_section" }, optional = {} },
@@ -415,6 +416,22 @@ local function validate_op(op)
 	if (op.op == "rename" or op.op == "copy_if_absent") and op.to_section == nil and op.to_key == nil then
 		return false, op.op .. " needs to_section or to_key"
 	end
+	if op.op == "move_ergopti_variant" then
+		for _, field in ipairs({ "base_key", "alt_gr_key", "source_key", "false_variant", "true_variant" }) do
+			if not is_bare_key(op[field]) then return false, "variant intent fields must be declared bare identifiers" end
+		end
+		if op.key == op.to_key or op.false_variant == op.true_variant then
+			return false, "variant handoff requires distinct source, destination and choices"
+		end
+		if op.neutral_variant ~= nil and (not is_bare_key(op.neutral_variant) or op.neutral_variant == op.false_variant or op.neutral_variant == op.true_variant) then
+			return false, "neutral variant must be a distinct declared bare identifier"
+		end
+		local seen = {}
+		for _, field in ipairs({ "key", "to_key", "base_key", "alt_gr_key", "source_key" }) do
+			if seen[op[field]] then return false, "variant intent participants must be distinct" end
+			seen[op[field]] = true
+		end
+	end
 	if op.op == "move_chord_action" then
 		if op.platform ~= "macos" then return false, "move_chord_action requires platform macos" end
 		for _, field in ipairs({ "action", "disabled_action" }) do
@@ -671,6 +688,90 @@ local function copy_destination_absent(sections, section, key)
 	end
 	local destination = section .. "." .. key
 	return #sections_at_or_below(sections, destination) == 0
+end
+
+local VARIANT_REFUSAL = "Ergopti variant migration refused:"
+
+
+-- Every new operation names jointly retained physical and semantic owners.
+-- A root scalar, inline record, quoted leaf or array namespace is not an
+-- absent participant just because the addressable flat model omits it.
+local function variant_parts_under(parts, prefix)
+	if type(parts) ~= "table" or #parts < #prefix then return false end
+	for index, part in ipairs(prefix) do if parts[index] ~= part then return false end end
+	return true
+end
+
+local function variant_source_witness(source, scan, before, operations)
+	local decoded
+	for _, op in ipairs(operations) do
+		if op.op == "move_ergopti_variant" then
+			decoded = decoded or TomlCodec.decode(source)
+			local entries = before.sections[op.section] or {}
+			local function refuse(detail) error(VARIANT_REFUSAL .. " " .. detail, 0) end
+			for _, field in ipairs({ "key", "to_key", "base_key", "alt_gr_key", "source_key" }) do
+				local parts = {}; for segment in op.section:gmatch("[^.]+") do parts[#parts + 1] = segment end
+				parts[#parts + 1] = op[field]
+				local value = decoded
+				for _, segment in ipairs(parts) do
+					if value == nil then break end
+					if type(value) ~= "table" then refuse("joint source has an occupied ancestor") end
+					value = value[segment]
+				end
+				if (value ~= nil) ~= (entries[op[field]] ~= nil) then refuse("joint source ownership disagrees") end
+				if value ~= nil and not same_value(value, entries[op[field]].value) then refuse("joint source types disagree") end
+				for _, record in ipairs(scan.records) do
+					if variant_parts_under(record.path, parts) or variant_parts_under(parts, record.path or {}) then
+						if not record.addressable or #record.path ~= #parts then
+							refuse("joint source is not an addressable physical leaf")
+						end
+					end
+				end
+				for section in pairs(before.opaque_sections or {}) do
+					if op.section == section or op.section:sub(1, #section + 1) == section .. "." then
+						refuse("joint source has an opaque table namespace")
+					end
+				end
+			end
+		end
+	end
+end
+
+function APPLY.move_ergopti_variant(sections, op)
+	local source = sections[op.section] or {}
+	local function refuse(detail) error(VARIANT_REFUSAL .. " " .. detail, 0) end
+	for _, field in ipairs({ "key", "to_key", "base_key", "alt_gr_key", "source_key" }) do
+		local view = {}
+		for name, entries in pairs(sections) do
+			local copy = {}; for key, entry in pairs(entries) do copy[key] = entry end
+			view[name] = copy
+		end
+		if view[op.section] then view[op.section][op[field]] = nil end
+		if not copy_destination_absent(view, op.section, op[field]) then
+			refuse("an intent participant has an occupied namespace")
+		end
+	end
+	for _, field in ipairs({ "base_key", "alt_gr_key" }) do
+		if source[op[field]] and type(source[op[field]].value) ~= "boolean" then
+			refuse("an independent layer gate is not an exact TOML boolean")
+		end
+	end
+	local selected = source[op.source_key]
+	if selected and (type(selected.value) ~= "string" or (selected.value ~= "" and not selected.value:match("^[a-z][a-z0-9_]*$"))) then
+		refuse("the registry source intent is malformed")
+	end
+	local target = source[op.to_key]
+	if target and (type(target.value) ~= "string" or (target.value ~= op.false_variant and target.value ~= op.true_variant and target.value ~= op.neutral_variant)) then
+		refuse("the new variant is not a recognized exact choice")
+	end
+	local legacy = source[op.key]
+	if not legacy then return end
+	if type(legacy.value) ~= "boolean" then refuse("the historical variant is not an exact TOML boolean") end
+	local variant = legacy.value and op.true_variant or op.false_variant
+	if target and target.value ~= variant then refuse("recognized old and new variants conflict") end
+	-- All typed/source/namespace witnesses precede source consumption.
+	source[op.to_key] = { value = variant }
+	source[op.key] = nil
 end
 
 function APPLY.copy_if_absent(sections, op)
@@ -987,7 +1088,20 @@ function M.plan(source, registry, driver, context)
 	if not before then return { outcome = "failed", detail = scan } end
 	local outcome, version = M.classify(before, registry)
 	if outcome ~= "migrate" then return { outcome = outcome, version = version } end
-	local after = M.apply_steps(clone_model(before), registry, driver, version, context)
+	local applied, after = pcall(function()
+		for _, step in ipairs(registry.steps) do
+			if step.from >= version and step.drivers[driver] then
+				variant_source_witness(source, scan, before, step.ops)
+			end
+		end
+		return M.apply_steps(clone_model(before), registry, driver, version, context)
+	end)
+	if not applied then
+		if tostring(after):sub(1, #VARIANT_REFUSAL) == VARIANT_REFUSAL then
+			return { outcome = "invalid", version = version, detail = tostring(after) }
+		end
+		error(after, 0)
+	end
 	local candidate, render_err = render(source, scan, before, after)
 	if not candidate then return { outcome = "failed", version = version, detail = render_err } end
 	local reread = M.model_from_source(candidate)
@@ -1014,8 +1128,27 @@ function M.plan_operations(source, operations)
 	end
 	local before, scan = M.model_from_source(source)
 	if not before then return { outcome = "failed", detail = scan } end
+	local witnessed, refusal = pcall(variant_source_witness, source, scan, before, operations)
+	if not witnessed then
+		if tostring(refusal):sub(1, #VARIANT_REFUSAL) == VARIANT_REFUSAL then
+			return { outcome = "invalid", detail = tostring(refusal) }
+		end
+		error(refusal, 0)
+	end
 	local after = clone_model(before)
-	for _, op in ipairs(operations) do APPLY[op.op](after.sections, op, nil, after) end
+	for _, op in ipairs(operations) do
+		if op.op == "move_ergopti_variant" then
+			local accepted, refusal = pcall(APPLY[op.op], after.sections, op, nil, after)
+			if not accepted then
+				if tostring(refusal):sub(1, #VARIANT_REFUSAL) == VARIANT_REFUSAL then
+					return { outcome = "invalid", detail = tostring(refusal) }
+				end
+				error(refusal, 0)
+			end
+		else
+			APPLY[op.op](after.sections, op, nil, after)
+		end
+	end
 	if same_value(M.plain(before), M.plain(after)) then
 		return { outcome = "current", candidate = source, model = after }
 	end
@@ -1256,6 +1389,9 @@ function M.run(opts)
 			.. ", newer than this build's v" .. version_text(registry.current))
 	end
 	if plan.outcome == "invalid" then
+		if type(plan.detail) == "string" and plan.detail:find("Ergopti variant migration refused:", 1, true) == 1 then
+			return refuse("invalid", plan.detail)
+		end
 		return refuse("invalid", "[_meta] schema_version is not a positive integer")
 	end
 	if plan.outcome == "unsupported" then

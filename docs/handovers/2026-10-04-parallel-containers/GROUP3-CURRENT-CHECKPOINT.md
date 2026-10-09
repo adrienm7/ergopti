@@ -2,6 +2,10 @@
 
 # Group 3 current source checkpoint and remaining work
 
+The [7 October continuation](GROUP3-2026-10-07-CONTINUATION.md) supersedes
+older source and remaining-work claims below. Its exact pending/failed native
+receipts do not claim completion of any Group3 item.
+
 The [6 October continuation](GROUP3-2026-10-06-CONTINUATION.md) records the newer
 Windows provider source, terminal native CI and inactive preparation archive.
 The qualification below remains historical and must not override that newer

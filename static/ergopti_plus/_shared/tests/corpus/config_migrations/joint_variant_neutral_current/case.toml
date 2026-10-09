@@ -1,0 +1,6 @@
+[case]
+description = "Independent neutral internal variant ownership."
+drivers = ["ahk", "hs", "linux"]
+outcome = "migrated"
+from_version = 1
+to_version = 2

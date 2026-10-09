@@ -47,25 +47,48 @@ local M = {}
 --- @return table
 function M.uinput_writer(opts)
 	opts = opts or {}
-	local fake = { events = {}, opened = false, closed = false, test = {} }
-
+	-- Reuse the actual Writer's opaque capability/reservation/retirement logic.
+	-- Only its syscall port is controlled: no device, kernel ACK or origin exists.
+	local source = debug.getinfo(1, "S").source:gsub("^@", "")
+	local driver = assert(source:match("^(.*)/tests/fakes/init.lua$"))
+	local fake = assert(loadfile(driver .. "/adapters/uinput_writer.lua"))()
+	fake.events, fake.opened, fake.closed, fake.test = {}, false, false, {}
+	local pending
+	local function uint(bytes, at, count)
+		local value = 0
+		for index = count - 1, 0, -1 do value = value * 256 + bytes:byte(at + index) end
+		return value
+	end
+	local backend = {
+		open = function() if opts.open_fails then return nil, "controlled open refusal" end return 1 end,
+		ioctl = function() return true end,
+		close = function() fake.closed = true; fake.opened = false; pending = nil; return true end,
+		write = function(_, bytes)
+			if #bytes ~= 24 then return false end
+			local kind, code, value = uint(bytes, 17, 2), uint(bytes, 19, 2), uint(bytes, 21, 4)
+			if kind == 1 then pending = { code = code, value = value }; return true end
+			if kind ~= 0 or code ~= 0 or not pending then return false end
+			local row = pending; pending = nil
+			if opts.on_emit and opts.on_emit(row.code, row.value) ~= true then return false end
+			fake.events[#fake.events + 1] = row
+			return true
+		end,
+	}
+	fake._set_backend(backend)
+	local open, close = fake.open, fake.close
 	function fake.is_available() return opts.available ~= false end
+	function fake.use_ffi_backend() return true end -- Retains the controlled backend; never loads native syscalls.
 	function fake.open()
-		if opts.open_fails then return false end
-		fake.opened = true
-		return true
+		local opened, reason = open()
+		fake.opened = opened == true
+		if opened then fake.closed = false end
+		return opened, reason
 	end
-	function fake.close() fake.closed = true ; fake.opened = false ; return true end
-	function fake.is_open() return fake.opened end
-	function fake.emit(code, value)
-		fake.events[#fake.events + 1] = { code = code, value = value }
-		return true
+	function fake.close()
+		local closed = close()
+		if closed then fake.closed = true; fake.opened = false end
+		return closed
 	end
-	function fake.encode_event(ev_type, code, value) return { ev_type, code, value } end
-	function fake.encode_setup() return "" end
-	function fake.use_ffi_backend() return true end
-	function fake._set_backend() end
-	function fake._reset_backend() end
 
 	--- The codes pressed, in order, ignoring releases.
 	--- @return table
@@ -76,7 +99,6 @@ function M.uinput_writer(opts)
 		end
 		return out
 	end
-
 	return fake
 end
 
@@ -94,6 +116,20 @@ function M.evdev_reader(opts)
 		POINTER = "pointer",
 		TOUCHPAD = "touchpad",
 	}
+
+	-- Scripted table rows/held sets are not native Reader-origin receipts.
+	-- Refuse that optional protocol explicitly; ordinary callback replay remains.
+	function fake.capture_event() return nil end
+	function fake.event_current() return false end
+	function fake.event_view() return nil end
+	function fake.source_current() return false end
+	function fake.capture_source_owner() return nil end
+	function fake.source_owner_current() return false end
+	function fake.retire_source() return false end
+	function fake.capture_pressed_keys() return nil end
+	function fake.pressed_keys_current() return false end
+	function fake.pressed_keys_view() return nil end
+	function fake.has_native_origin_debt() return false end
 
 	function fake.is_available() return true end
 	function fake.open(path, slot)

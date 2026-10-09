@@ -5,4 +5,4 @@ description = "All shipped drivers preserve retired scalar and false settings fo
 drivers = ["ahk", "hs", "linux"]
 outcome = "migrated"
 from_version = 2
-to_version = 11
+to_version = 12

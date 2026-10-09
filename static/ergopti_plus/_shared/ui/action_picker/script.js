@@ -105,6 +105,7 @@ function init(data) {
 	hostPlatform = data.platform || '';
 	paramStrings = data.parameterStrings || null;
 	programProviders = data.programProviders || null;
+	automationProviders = data.automationProviders || null;
 	programProviderStrings = data.programProviderStrings || {};
 	promptChoices = Array.isArray(data.promptChoices) ? data.promptChoices : null;
 	defaultCount = typeof data.defaultCount === 'number' ? data.defaultCount : null;
@@ -482,6 +483,7 @@ let sendVocabulary = null;
 let hostPlatform = '';
 let paramStrings = null;
 let programProviders = null;
+let automationProviders = null;
 let programProviderStrings = {};
 
 // Host-supplied for llm_prompt: the prompt profiles a binding may run
@@ -801,6 +803,7 @@ function openParamEditor(entry) {
 		for (const argument of current === null ? [] : current.arguments)
 			appendProgramArgument(argument);
 		fillProgramProviders();
+		fillAutomationInventory();
 		el('param-program-executable').focus();
 		return;
 	}
@@ -870,6 +873,38 @@ function programProviderRefused() {
 	if (!editing || editing.parameter !== 'program') return;
 	el('param-error').textContent = programProviderStrings.changed || '';
 	el('param-error').hidden = false;
+}
+
+// Readonly automation names never enter the ordinary script selector.
+function fillAutomationInventory() {
+	if (automationProviders === null) return;
+	el('param-program-automation').hidden = false;
+	el('param-program-automation-title').textContent = automationProviders.title || '';
+	el('param-program-automation-reason').textContent =
+		programProviderStrings.unavailableBinding || '';
+	const list = el('param-program-automation-list');
+	list.replaceChildren();
+	for (const choice of Array.isArray(automationProviders.choices)
+		? automationProviders.choices
+		: []) {
+		if (typeof choice.label !== 'string') continue;
+		const item = document.createElement('li');
+		item.textContent = choice.label;
+		list.appendChild(item);
+	}
+	if (automationProviders.truncated === true) {
+		const more = document.createElement('li');
+		more.textContent = '…';
+		list.appendChild(more);
+	}
+}
+
+// Readonly asynchronous inventory updates preserve the current action/editor.
+function updateAutomationProviders(packet) {
+	if (!packet || typeof packet !== 'object') return;
+	automationProviders = packet;
+	if (!editing || editing.parameter !== 'program') return;
+	fillAutomationInventory();
 }
 
 function appendProgramArgument(value) {

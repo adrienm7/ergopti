@@ -52,7 +52,7 @@ const SINGLE_DRIVER_KEYS = [
 	// The Windows layout is installed by the AHK driver's own remapper.
 	['layout.ergopti_base', 'ahk'],
 	['layout.ergopti_alt_gr', 'ahk'],
-	['layout.ergopti_plus', 'ahk'],
+	['layout.ergopti_variant', 'ahk'],
 	// Per-category master switches exist only in the AHK tray menu.
 	['category_enabled.hotstrings', 'ahk'],
 	['category_enabled.layout', 'ahk'],
