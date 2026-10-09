@@ -8409,10 +8409,10 @@ and installation qualification are still required.
   at `a5f6300d8` compiles the native launcher and passes all 17
   OwnedAutomationQueryWorker tests, including the three new permission and
   retirement controls. These controlled packets do not execute or qualify the
-  SDK permission API. The default workflow
-  does not execute the signed SDK observer: authenticated app publication,
-  actual permission observation, Darwin retirement and final CI provenance
-  remain UNRUN. Controlled metadata tests do not qualify the native SDK call.
+  SDK permission API. The original workflow filters did not select the
+  actual API observer. Authenticated app publication, actual permission
+  observation, Darwin retirement and final CI provenance remain UNRUN.
+  Controlled metadata tests do not qualify the native SDK call.
 
   An additive process-level XCTest now starts the actual SwiftPM launcher
   through its existing production permission-observation role, requires the
@@ -8423,6 +8423,14 @@ and installation qualification are still required.
   pass; fresh native compilation and the new API execution remain UNRUN.
   Its result cannot qualify the signed application or osascript principal,
   catalogue discovery, consent or shortcut invocation.
+
+  A separate manual-only CI step now selects that exact process-level API
+  case after the unchanged 25-test archive cohort, including after its
+  failure. It retains the original job budget, checks both Swift/tee exit
+  statuses and requires exact current-source, one-case/zero-skip evidence.
+  The original 41/25 filters and assertions remain unchanged. The registered
+  workflow guards and strict evidence reader pass their causal controls;
+  actual native API execution remains UNRUN until the new CI completes.
 
   The chosen-ID tap-key fixture now initializes the existing geometry owner
   with its controlled native-map helper and supplies the originating ANSI

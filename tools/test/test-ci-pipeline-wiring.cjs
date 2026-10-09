@@ -190,6 +190,12 @@ const MACOS_NATIVE_STEP_CONDITIONS = [
 		'Retain independent native PAC XCTest diagnostics',
 		'always()'
 	],
+	[
+		MACOS_BOX,
+		'item36-native',
+		'Observe the actual no-prompt SDK permission API independently',
+		NOT_CANCELLED
+	],
 	[MACOS_BOX, 'item36-native', 'Retain scoped item 36 native diagnostics', 'always()'],
 	[
 		MACOS_BOX,
@@ -1534,6 +1540,26 @@ function stepProblems(files) {
 				const code = (pipeline.runOf(found.body) ?? []).filter(
 					(line) => !line.trimStart().startsWith('#')
 				);
+				// This condition admits one native SDK case, not a broader filtered cohort.
+				if (
+					where ===
+					conditionKey(
+						MACOS_BOX,
+						'item36-native',
+						'Observe the actual no-prompt SDK permission API independently'
+					)
+				) {
+					const commands = logicalLines(found.body).filter((line) => /\bswift test\b/.test(line));
+					const expectedCommand =
+						'script -q /dev/null swift test --package-path static/ergopti_plus/macos/launcher' +
+						' --scratch-path "$RUNNER_TEMP/swift-launcher-ci"' +
+						" --filter 'OwnedAutomationQueryWorkerTests.testActualNoPromptPermissionAPIOnlyPublishesRetiredMetadata'" +
+						' 2>&1 | tee "$transcript"';
+					if (commands.length !== 1 || commands[0].replace(/\s+/g, ' ') !== expectedCommand)
+						problems.push(
+							`${where} must select only the original production-process SDK observation case`
+						);
+				}
 				if (
 					code.some((line) => /\|\s*tee\b/.test(line)) &&
 					pipeline.stepField(found.body, 'shell') !== 'bash' &&
@@ -1643,6 +1669,74 @@ for (const [rel, job, name, condition] of MACOS_NATIVE_STEP_CONDITIONS) {
 		stepProblems
 	);
 }
+// A narrowly admitted SDK condition must never migrate to another job or selector.
+{
+	const name = 'Observe the actual no-prompt SDK permission API independently';
+	const key = conditionKey(MACOS_BOX, 'item36-native', name);
+	assert.equal(CONDITIONS.get(key), '${{ !cancelled() }}');
+	for (const [rel, job, changed] of [
+		[MACOS_BOX, 'package-macos', name],
+		[MACOS_BOX, 'managed-ollama-native', name],
+		[MACOS_BOX, 'item36-unknown', name],
+		[WINDOWS_BOX, 'item36-native', name],
+		[MACOS_BOX, 'item36-native', 'Unknown SDK observation']
+	])
+		assert.equal(CONDITIONS.has(conditionKey(rel, job, changed)), false);
+	const head = `      - name: ${name}\n`;
+	for (const changed of ['always()', 'failure()', '${{ !cancelled() && false }}'])
+		mustCatch(
+			`SDK observation replaced condition ${changed}`,
+			MACOS_BOX,
+			head + '        if: ${{ !cancelled() }}\n',
+			head + `        if: ${changed}\n`,
+			stepProblems
+		);
+	mustCatch(
+		'unknown SDK observation name',
+		MACOS_BOX,
+		head,
+		'      - name: Unknown SDK observation\n',
+		stepProblems
+	);
+	const filter =
+		"--filter 'OwnedAutomationQueryWorkerTests.testActualNoPromptPermissionAPIOnlyPublishesRetiredMetadata'";
+	for (const changed of [
+		"--filter 'OwnedAutomationQueryWorkerTests'",
+		"--filter '.*'",
+		"--filter 'OwnedAutomationQueryWorkerTests.testConstructedPacket'",
+		'--skip-build ' + filter
+	])
+		mustCatch(
+			`SDK observation broadened or substituted selector ${changed}`,
+			MACOS_BOX,
+			filter,
+			changed,
+			stepProblems
+		);
+	const mac = pipeline.file(MACOS_BOX);
+	const start = mac.indexOf(head);
+	const end = mac.indexOf('      - name: Retain scoped item 36 native diagnostics\n', start);
+	assert.ok(start > 0 && end > start);
+	const step = mac.slice(start, end);
+	const moved = mac
+		.replace(step, '')
+		.replace(
+			'  managed-ollama-native:\n',
+			'  unknown-sdk-job:\n    runs-on: macos-latest\n    steps:\n' +
+				step +
+				'\n  managed-ollama-native:\n'
+		);
+	const problems = stepProblems(
+		pipeline
+			.files()
+			.map((entry) => (entry.rel === MACOS_BOX ? { rel: entry.rel, text: moved } : entry))
+	);
+	assert.ok(
+		problems.some((problem) => problem.includes('unknown-sdk-job') && problem.includes(name))
+	);
+	assert.ok(problems.some((problem) => problem.includes('STEP_CONDITIONS lists ' + key)));
+}
+
 const officialColdHead = '      - name: Receive actual official cold Ollama without stock Python\n';
 for (const condition of [
 	'always()',
