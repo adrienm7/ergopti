@@ -177,7 +177,7 @@ try {
     $First.ForeignPort = $Second.Port
     foreach ($Path in @('utf8','utf16','redirect','foreign')) {
         $Deadline = [ErgoptiNetworkPac]::CurrentTick() + 5000
-        $Bytes = $Fetch.Invoke($null, @('http://127.0.0.1:' + $First.Port + '/' + $Path,
+        $Bytes = $Fetch.Invoke($null, @(('http://127.0.0.1:' + $First.Port + '/' + $Path),
             [long]$Deadline, [long]($Deadline + 1000), [int]1048576, [int]50))
         if ([Text.UTF8Encoding]::new($false,$true).GetString($Bytes) -cne "function FindProxyForURL(u,h){return 'DIRECT';}") {
             throw 'Real source fetch did not preserve the complete script.'
@@ -188,7 +188,7 @@ try {
         $Refused = $false
         $Deadline = [ErgoptiNetworkPac]::CurrentTick() + 5000
         try {
-            $null = $Fetch.Invoke($null, @('http://127.0.0.1:' + $First.Port + '/' + $Path,
+            $null = $Fetch.Invoke($null, @(('http://127.0.0.1:' + $First.Port + '/' + $Path),
                 [long]$Deadline, [long]($Deadline + 1000), [int]1048576, [int]50))
         } catch [Reflection.TargetInvocationException] { $Refused = $true }
         if (-not $Refused) { throw 'Real malformed/non200/oversized source was admitted.' }
