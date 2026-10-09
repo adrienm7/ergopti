@@ -1,0 +1,30 @@
+{
+	"description": "Golden vectors for the wrap_pair parameter of the wrap_selection action: which left/right symbols a stored value names. Replayed by the macOS, Linux and Windows suites against the built-in catalogue _shared/modules/wrap_symbols/wrap_symbols.json.",
+	"rule": "The value is trimmed first. A value equal to the trimmed opening symbol of a catalogue pair names that pair; otherwise a value equal to the trimmed closing symbol of a catalogue pair names it (opening symbols win, in catalogue order, because a symbol such as “ opens one pair and closes another). Otherwise a value holding exactly one | with non-blank text on both sides is a custom pair: the text before and after the | are used verbatim. Anything else, including an empty value and a value holding a line break, is invalid.",
+	"vectors": [
+		{ "id": "catalogue_opening_parenthesis", "value": "(", "left": "(", "right": ")" },
+		{ "id": "catalogue_closing_parenthesis", "value": ")", "left": "(", "right": ")" },
+		{ "id": "catalogue_guillemet_without_its_space", "value": "«", "left": "« ", "right": " »" },
+		{ "id": "catalogue_closing_guillemet", "value": "»", "left": "« ", "right": " »" },
+		{ "id": "opening_symbol_wins_over_closing_symbol", "value": "“", "left": "“", "right": "”" },
+		{ "id": "catalogue_symmetric_symbol", "value": "*", "left": "*", "right": "*" },
+		{ "id": "catalogue_pipe_is_a_symbol_not_a_separator", "value": "|", "left": "|", "right": "|" },
+		{ "id": "surrounding_spaces_are_trimmed", "value": "  [  ", "left": "[", "right": "]" },
+		{ "id": "custom_pair", "value": "<<|>>", "left": "<<", "right": ">>" },
+		{
+			"id": "custom_pair_keeps_its_inner_spaces",
+			"value": "<< | >>",
+			"left": "<< ",
+			"right": " >>"
+		},
+		{ "id": "custom_markdown_bold", "value": "**|**", "left": "**", "right": "**" },
+		{ "id": "empty", "value": "", "valid": false },
+		{ "id": "blank", "value": "   ", "valid": false },
+		{ "id": "unknown_symbol", "value": "xyz", "valid": false },
+		{ "id": "custom_pair_without_right", "value": "<<|", "valid": false },
+		{ "id": "custom_pair_without_left", "value": "|>>", "valid": false },
+		{ "id": "custom_pair_with_blank_side", "value": "<<|  ", "valid": false },
+		{ "id": "two_separators", "value": "a|b|c", "valid": false },
+		{ "id": "line_break", "value": "(\n)", "valid": false }
+	]
+}

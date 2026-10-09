@@ -1,0 +1,257 @@
+{
+	"source": "Prior physical macos/ui/menu/builder.lua Reload/Quit prefix plus Lua C-locale ASCII whitespace token stripping; frozen before candidate preparation",
+	"captions": {
+		"ar": {
+			"reload": {
+				"source": "🔄 إعادة تحميل",
+				"macos": "↺ إعادة تحميل",
+				"other": "🔄 إعادة تحميل"
+			},
+			"quit": {
+				"source": "⏹ إنهاء",
+				"macos": "✕ إنهاء",
+				"other": "⏹ إنهاء"
+			}
+		},
+		"cs": {
+			"reload": {
+				"source": "🔄 Znovu načíst",
+				"macos": "↺ Znovu načíst",
+				"other": "🔄 Znovu načíst"
+			},
+			"quit": {
+				"source": "⏹ Ukončit",
+				"macos": "✕ Ukončit",
+				"other": "⏹ Ukončit"
+			}
+		},
+		"da": {
+			"reload": {
+				"source": "🔄 Genindlæs",
+				"macos": "↺ Genindlæs",
+				"other": "🔄 Genindlæs"
+			},
+			"quit": {
+				"source": "⏹ Afslut",
+				"macos": "✕ Afslut",
+				"other": "⏹ Afslut"
+			}
+		},
+		"de": {
+			"reload": {
+				"source": "🔄 Neu laden",
+				"macos": "↺ Neu laden",
+				"other": "🔄 Neu laden"
+			},
+			"quit": {
+				"source": "⏹ Beenden",
+				"macos": "✕ Beenden",
+				"other": "⏹ Beenden"
+			}
+		},
+		"en": {
+			"reload": {
+				"source": "🔄 Reload",
+				"macos": "↺ Reload",
+				"other": "🔄 Reload"
+			},
+			"quit": {
+				"source": "⏹ Quit",
+				"macos": "✕ Quit",
+				"other": "⏹ Quit"
+			}
+		},
+		"es": {
+			"reload": {
+				"source": "🔄 Recargar",
+				"macos": "↺ Recargar",
+				"other": "🔄 Recargar"
+			},
+			"quit": {
+				"source": "⏹ Salir",
+				"macos": "✕ Salir",
+				"other": "⏹ Salir"
+			}
+		},
+		"fr": {
+			"reload": {
+				"source": "🔄 Recharger",
+				"macos": "↺ Recharger",
+				"other": "🔄 Recharger"
+			},
+			"quit": {
+				"source": "⏹ Quitter",
+				"macos": "✕ Quitter",
+				"other": "⏹ Quitter"
+			}
+		},
+		"he": {
+			"reload": {
+				"source": "🔄 טען מחדש",
+				"macos": "↺ טען מחדש",
+				"other": "🔄 טען מחדש"
+			},
+			"quit": {
+				"source": "⏹ צא",
+				"macos": "✕ צא",
+				"other": "⏹ צא"
+			}
+		},
+		"hi": {
+			"reload": {
+				"source": "🔄 पुनः लोड करें",
+				"macos": "↺ पुनः लोड करें",
+				"other": "🔄 पुनः लोड करें"
+			},
+			"quit": {
+				"source": "⏹ बंद करें",
+				"macos": "✕ बंद करें",
+				"other": "⏹ बंद करें"
+			}
+		},
+		"it": {
+			"reload": {
+				"source": "🔄 Ricarica",
+				"macos": "↺ Ricarica",
+				"other": "🔄 Ricarica"
+			},
+			"quit": {
+				"source": "⏹ Esci",
+				"macos": "✕ Esci",
+				"other": "⏹ Esci"
+			}
+		},
+		"ja": {
+			"reload": {
+				"source": "🔄 リロード",
+				"macos": "↺ リロード",
+				"other": "🔄 リロード"
+			},
+			"quit": {
+				"source": "⏹ 終了",
+				"macos": "✕ 終了",
+				"other": "⏹ 終了"
+			}
+		},
+		"ko": {
+			"reload": {
+				"source": "🔄 다시 로드",
+				"macos": "↺ 다시 로드",
+				"other": "🔄 다시 로드"
+			},
+			"quit": {
+				"source": "⏹ 종료",
+				"macos": "✕ 종료",
+				"other": "⏹ 종료"
+			}
+		},
+		"nl": {
+			"reload": {
+				"source": "🔄 Herladen",
+				"macos": "↺ Herladen",
+				"other": "🔄 Herladen"
+			},
+			"quit": {
+				"source": "⏹ Afsluiten",
+				"macos": "✕ Afsluiten",
+				"other": "⏹ Afsluiten"
+			}
+		},
+		"no": {
+			"reload": {
+				"source": "🔄 Oppdater",
+				"macos": "↺ Oppdater",
+				"other": "🔄 Oppdater"
+			},
+			"quit": {
+				"source": "⏹ Avslutt",
+				"macos": "✕ Avslutt",
+				"other": "⏹ Avslutt"
+			}
+		},
+		"pl": {
+			"reload": {
+				"source": "🔄 Przeładuj",
+				"macos": "↺ Przeładuj",
+				"other": "🔄 Przeładuj"
+			},
+			"quit": {
+				"source": "⏹ Zakończ",
+				"macos": "✕ Zakończ",
+				"other": "⏹ Zakończ"
+			}
+		},
+		"pt": {
+			"reload": {
+				"source": "🔄 Recarregar",
+				"macos": "↺ Recarregar",
+				"other": "🔄 Recarregar"
+			},
+			"quit": {
+				"source": "⏹ Sair",
+				"macos": "✕ Sair",
+				"other": "⏹ Sair"
+			}
+		},
+		"ru": {
+			"reload": {
+				"source": "🔄 Перезагрузить",
+				"macos": "↺ Перезагрузить",
+				"other": "🔄 Перезагрузить"
+			},
+			"quit": {
+				"source": "⏹ Выйти",
+				"macos": "✕ Выйти",
+				"other": "⏹ Выйти"
+			}
+		},
+		"sv": {
+			"reload": {
+				"source": "🔄 Läs in på nytt",
+				"macos": "↺ Läs in på nytt",
+				"other": "🔄 Läs in på nytt"
+			},
+			"quit": {
+				"source": "⏹ Avsluta",
+				"macos": "✕ Avsluta",
+				"other": "⏹ Avsluta"
+			}
+		},
+		"tr": {
+			"reload": {
+				"source": "🔄 Yeniden yükle",
+				"macos": "↺ Yeniden yükle",
+				"other": "🔄 Yeniden yükle"
+			},
+			"quit": {
+				"source": "⏹ Çıkış",
+				"macos": "✕ Çıkış",
+				"other": "⏹ Çıkış"
+			}
+		},
+		"uk": {
+			"reload": {
+				"source": "🔄 Перезавантажити",
+				"macos": "↺ Перезавантажити",
+				"other": "🔄 Перезавантажити"
+			},
+			"quit": {
+				"source": "⏹ Вийти",
+				"macos": "✕ Вийти",
+				"other": "⏹ Вийти"
+			}
+		},
+		"zh": {
+			"reload": {
+				"source": "🔄 重新加载",
+				"macos": "↺ 重新加载",
+				"other": "🔄 重新加载"
+			},
+			"quit": {
+				"source": "⏹ 退出",
+				"macos": "✕ 退出",
+				"other": "⏹ 退出"
+			}
+		}
+	}
+}

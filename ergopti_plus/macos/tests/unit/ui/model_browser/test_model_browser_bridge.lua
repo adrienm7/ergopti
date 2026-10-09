@@ -1,0 +1,541 @@
+--- tests/unit/ui/model_browser/test_model_browser_bridge.lua
+
+--- ==============================================================================
+--- MODULE: Regression — Model Browser bridge silently no-ops on real WKWebView tables (F-HIGH-29)
+--- DESCRIPTION:
+--- host_bridge.js's makeHostBridge() posts non-string payloads RAW on WKWebView
+--- (no JSON.stringify — WebKit itself converts the JS object into a native Lua
+--- table), but ensure_ucc()'s callback ran pcall(hs.json.decode, body) on that
+--- already-a-table `body`. hs.json.decode expects a JSON *string*, so the decode
+--- always threw, the pcall swallowed the error, and BOTH row-click actions —
+--- "open_url" (the source-page link) and "select_model" ("Use this model") —
+--- silently no-oped with zero logging.
+---
+--- Fix: read msg.body directly as a table (no hs.json.decode), matching the
+--- convention already used by action_picker / hotstring_editor /
+--- hotstrings_config_window / metrics_apps (and the sibling changelog window,
+--- F-MED-14).
+---
+--- This test drives the REAL contract: the captured bridge callback is invoked
+--- with `{ body = { action = ..., ... } }` — a native Lua table, exactly what
+--- WKWebView delivers for a raw-object postMessage — NOT a JSON string. It
+--- fails before the fix (hs.json.decode(table) throws, swallowed silently,
+--- neither select_model nor open_url fires) and passes after.
+--- ==============================================================================
+
+local helpers = require("tests.helpers")
+
+--- Builds the hs stub surface the model browser window needs to open without
+--- a real WKWebView (screen geometry, webview/usercontent constructors, urlevent).
+--- @return function get_bridge_callback Returns the captured setCallback fn once M.open() has run.
+local function install_hs_stubs()
+	_G.hs = _G.hs or {}
+	local state = {
+		creates = 0,
+		delete_throws = false,
+		deletes = 0,
+		errors = {},
+		bridge_callbacks = {},
+		webviews = {},
+	}
+
+	_G.hs.screen = {
+		mainScreen = function()
+			return {
+				frame     = function() return { x = 0, y = 0, w = 1920, h = 1080 } end,
+				fullFrame = function() return { x = 0, y = 0, w = 1920, h = 1080 } end,
+			}
+		end,
+		primaryScreen = function() return hs.screen.mainScreen() end,
+	}
+
+	_G.hs.webview = _G.hs.webview or {}
+	_G.hs.webview.usercontent = {
+		new = function(_name)
+			return {
+				setCallback = function(_self, fn)
+					state.bridge_callbacks[#state.bridge_callbacks + 1] = fn
+				end,
+			}
+		end,
+	}
+	_G.hs.webview.new = function()
+		state.creates = state.creates + 1
+		local webview = {
+			windowStyle     = function(self) return self end,
+			windowTitle     = function(self) return self end,
+			closeOnEscape   = function(self) return self end,
+			level           = function(self) return self end,
+			shadow          = function(self) return self end,
+			allowTextEntry  = function(self) return self end,
+			allowGestures   = function(self) return self end,
+			allowNewWindows = function(self) return self end,
+			windowCallback  = function(self, callback)
+				self.window_callback = callback
+				return self
+			end,
+			navigationCallback = function(self, callback)
+				self.navigation_callback = callback
+				return self
+			end,
+			html            = function(self) return self end,
+			evaluateJavaScript = function(self, code)
+				self.evaluations[#self.evaluations + 1] = code
+				return self
+			end,
+			show            = function(self)
+				if state.close_during_show and self.window_callback then
+					state.close_during_show = false
+					self.window_callback("closing")
+				end
+				return self
+			end,
+			delete          = function(self)
+				state.deletes = state.deletes + 1
+				if state.delete_throws then error("synthetic webview delete refusal") end
+				return self
+			end,
+			hswindow        = function() return nil end,
+			frame           = function(self) return { x = 0, y = 0, w = 880, h = 560 } end,
+			evaluations = {},
+		}
+		state.webviews[#state.webviews + 1] = webview
+		return webview
+	end
+
+	_G.hs.urlevent = _G.hs.urlevent or {}
+	_G.hs.json = _G.hs.json or {}
+	_G.hs.json.encode = function(_t) return "mock_json" end
+
+	-- ui_builder's post-open focus retry (try_focus, added 2026-06-09) always
+	-- runs on M.open() and falls into its "handle not ready" branch here since
+	-- this stub's webview mock has no working hswindow()/focus(); without a
+	-- doAfter stub the very first retry crashes with "attempt to call a nil
+	-- value (field 'doAfter')" before the test ever reaches the bridge
+	-- assertions. Invoking synchronously just drains the bounded retry loop
+	-- (max_attempts = 20) down to the pcall-guarded bringToFront fallback.
+	_G.hs.timer = _G.hs.timer or {}
+	_G.hs.timer.doAfter = _G.hs.timer.doAfter or function(_delay, fn) fn() end
+
+	local logger = helpers.make_logger_stub()
+	logger.callback = function(_, label, fn, ...)
+		local args = table.pack(...)
+		local results = table.pack(xpcall(function()
+			return fn(table.unpack(args, 1, args.n))
+		end, debug.traceback))
+		if not results[1] then
+			state.errors[#state.errors + 1] = tostring(label) .. ": " .. tostring(results[2])
+			return false, results[2]
+		end
+		return true, table.unpack(results, 2, results.n)
+	end
+	package.loaded["infra.logger"] = logger
+
+	return function() return state.bridge_callbacks[#state.bridge_callbacks] end, state
+end
+
+helpers.describe("model_browser bridge: reads WKWebView tables directly (F-HIGH-29)", function()
+	for _, refused in ipairs({ false, true }) do
+		helpers.it("(webview-focus-owner) model browser retirement revokes focus, delete refused=" .. tostring(refused), function()
+			local _, state = install_hs_stubs()
+			package.loaded["infra.deferred_work"] = { after = function() return true end }
+			package.loaded["ui.model_browser"] = nil
+			package.loaded["ui.ui_builder"] = nil
+			local browser = require("ui.model_browser")
+			local builder = require("ui.ui_builder")
+			local show_webview = builder.show_webview
+			builder.show_webview = function(options)
+				state.factory_options = options
+				return show_webview(options)
+			end
+			local context = { presets = {}, active_backend = "mlx" }
+			helpers.assert_true(browser.open(context))
+			require("tests.support.webview_focus_fixture").check(state.webviews[1],
+				function() return browser.open(context) end,
+				function() state.delete_throws = refused; helpers.assert_eq(browser.close(), not refused) end,
+				state.factory_options)
+		end)
+	end
+
+	helpers.it("(model-browser-operation-session) does not transfer selection authority through logger reentry", function()
+		local bridge, state = install_hs_stubs()
+		package.loaded["infra.deferred_work"] = { after = function() return true end }
+		package.loaded["ui.model_browser"] = nil
+		package.loaded["ui.ui_builder"] = nil
+		local browser = require("ui.model_browser")
+		local calls = {}
+		local function context(name)
+			return { presets = {}, active_backend = "mlx", on_select = function()
+				calls[#calls + 1] = name
+				return false
+			end }
+		end
+		helpers.assert_true(browser.open(context("old")))
+		local reentered = false
+		package.loaded["infra.logger"].info = function(_, message)
+			if not reentered and message:find("Model selected", 1, true) then
+				reentered = true
+				helpers.assert_true(browser.open(context("new")))
+			end
+		end
+		bridge()({ body = { action = "select_model", name = "old", session = 1 } })
+		helpers.assert_true(reentered)
+		helpers.assert_eq(calls, {})
+		bridge()({ body = { action = "select_model", name = "new", session = 2 } })
+		helpers.assert_eq(calls, { "new" })
+		helpers.assert_eq(state.deletes, 0)
+	end)
+
+	helpers.it("(model-browser-operation-session) rejects old and untagged actions on native reuse", function()
+		local bridge, state = install_hs_stubs()
+		package.loaded["infra.deferred_work"] = { after = function() return true end }
+		package.loaded["ui.model_browser"] = nil
+		package.loaded["ui.ui_builder"] = nil
+		local browser = require("ui.model_browser")
+		local selected, urls, payloads = {}, {}, {}
+		local debug_messages = {}
+		package.loaded["infra.logger"].debug = function(module_name, message, ...)
+			if module_name == "model_browser" then
+				debug_messages[#debug_messages + 1] = string.format(message, ...)
+			end
+		end
+		hs.json.encode = function(payload)
+			payloads[#payloads + 1] = payload
+			return "mock_json"
+		end
+		hs.urlevent.openURL = function(url) urls[#urls + 1] = url; return true end
+		local function context(backend)
+			return { presets = {}, active_backend = backend, on_select = function(name)
+				selected[#selected + 1] = name
+				return false
+			end }
+		end
+		helpers.assert_true(browser.open(context("mlx")))
+		bridge()({ body = "ready" })
+		helpers.assert_true(browser.open(context("ollama")))
+		for _, session in ipairs({ 1, false, "2", 0 }) do
+			bridge()({ body = { action = "select_model", name = "old", session = session or nil } })
+			bridge()({ body = { action = "open_url", url = "https://huggingface.co/old", session = session or nil } })
+		end
+		helpers.assert_eq(selected, {}, "old page actions must not select a model for the successor")
+		helpers.assert_eq(urls, {})
+		helpers.assert_eq(debug_messages, {
+			"Rejected model browser action (received_session=1, current_session=2); repeats suppressed for this operation.",
+		})
+		helpers.assert_eq(payloads[1].session, 1)
+		helpers.assert_eq(payloads[2].session, 2)
+		bridge()({ body = { action = "select_model", name = "current", session = 2 } })
+		bridge()({ body = { action = "open_url", url = "https://huggingface.co/current", session = 2 } })
+		helpers.assert_eq(selected, { "current" })
+		helpers.assert_eq(urls, { "https://huggingface.co/current" })
+		helpers.assert_eq(#debug_messages, 1)
+		helpers.assert_true(browser.open(context("mlx")))
+		for _ = 1, 3 do
+			bridge()({ body = { action = "select_model", name = "private model", session = "private session" } })
+		end
+		helpers.assert_eq(#debug_messages, 2)
+		helpers.assert_eq(debug_messages[2],
+			"Rejected model browser action (received_session=string, current_session=3); repeats suppressed for this operation.")
+		helpers.assert_eq(state.creates, 1)
+	end)
+
+	helpers.it("(model-browser-queue-owner) stops flushing after synchronous native replacement", function()
+		local bridge, state = install_hs_stubs()
+		package.loaded["infra.deferred_work"] = { after = function() return true end }
+		package.loaded["ui.model_browser"] = nil
+		package.loaded["ui.ui_builder"] = nil
+		local browser = require("ui.model_browser")
+		local context = { presets = {}, active_backend = "mlx" }
+		helpers.assert_true(browser.open(context))
+		helpers.assert_true(browser.open(context))
+		helpers.assert_true(browser.open(context))
+		local first = state.webviews[1]
+		first.evaluateJavaScript = function(self)
+			helpers.assert_true(browser.close())
+			helpers.assert_true(browser.open({ presets = {}, active_backend = "ollama" }))
+			return self
+		end
+		bridge()({ body = "ready" })
+		helpers.assert_eq(state.creates, 2)
+		helpers.assert_eq(#state.webviews[2].evaluations, 0,
+			"the previous native window cannot submit its queued catalogue to the replacement")
+	end)
+
+	for _, mode in ipairs({ "raise", "nil", "false", "async", "success" }) do
+		helpers.it("(model-browser-javascript-boundary) observes " .. mode .. " without logging catalogue data", function()
+			local bridge, state = install_hs_stubs()
+			package.loaded["infra.deferred_work"] = { after = function() return true end }
+			local errors = {}
+			package.loaded["infra.logger"].error = function(_, fmt, ...)
+				errors[#errors + 1] = string.format(fmt, ...)
+			end
+			package.loaded["ui.model_browser"] = nil
+			package.loaded["ui.ui_builder"] = nil
+			local browser = require("ui.model_browser")
+			helpers.assert_true(browser.open({ presets = {}, active_backend = "mlx" }))
+			state.webviews[1].evaluateJavaScript = function(self, _, callback)
+				if mode == "raise" then error("private catalogue payload") end
+				if mode == "nil" then return nil end
+				if mode == "false" then return false end
+				if callback then callback(nil, mode == "async" and { message = "private catalogue payload" } or nil) end
+				return self
+			end
+			bridge()({ body = "ready" })
+			bridge()({ body = "ready" })
+			helpers.assert_eq(#errors, mode == "success" and 0 or 1,
+				"native failure categories must be visible once per window")
+			for _, message in ipairs(errors) do
+				helpers.assert_eq(message:find("private catalogue payload", 1, true), nil)
+			end
+		end)
+	end
+
+	helpers.it("(model-browser-ready-fallback) injects the catalogue without either readiness notification", function()
+		local _, state = install_hs_stubs()
+		local fallback
+		package.loaded["infra.deferred_work"] = {
+			after = function(_, callback, label)
+				if label == "model_browser.ready_fallback" then fallback = callback end
+				return true
+			end,
+		}
+		package.loaded["ui.model_browser"] = nil
+		package.loaded["ui.ui_builder"] = nil
+		local browser = require("ui.model_browser")
+		helpers.assert_true(browser.open({ presets = {}, active_backend = "mlx" }))
+		helpers.assert_type(fallback, "function")
+		helpers.assert_eq(#state.webviews[1].evaluations, 0)
+		fallback()
+		helpers.assert_eq(state.webviews[1].evaluations, { "injectModels(mock_json)" },
+			"fallback must deliver data, not merely mark an empty queue ready")
+		fallback()
+		helpers.assert_eq(#state.webviews[1].evaluations, 1)
+	end)
+
+	helpers.it("select_model posted as a native table fires on_select and closes the window", function()
+		local get_bridge_callback = install_hs_stubs()
+
+		local opened_url = nil
+		_G.hs.urlevent.openURL = function(url) opened_url = url; return true end
+
+		package.loaded["ui.model_browser"] = nil
+		package.loaded["ui.ui_builder"]    = nil
+		local ModelBrowser = require("ui.model_browser")
+
+		local selected_name = nil
+		helpers.assert_eq(ModelBrowser.open({
+			presets       = {},
+			active_backend = "mlx",
+			active_model  = "",
+			models_mgr    = nil,
+			on_select     = function(name) selected_name = name end,
+		}), true, "a created model browser must report strict open success")
+
+		local bridge_callback = get_bridge_callback()
+		helpers.assert_true(type(bridge_callback) == "function", "bridge callback must be registered by M.open()")
+
+		-- Real WKWebView contract: msg.body is a native Lua table, not a JSON string.
+		bridge_callback({ body = { action = "select_model", name = "gemma-4-E4B-it", session = 1 } })
+
+		helpers.assert_eq(selected_name, "gemma-4-E4B-it",
+			"a native-table select_model message must invoke on_select with the model name (F-HIGH-29)")
+		helpers.assert_nil(opened_url, "select_model must not also open a URL")
+	end)
+
+	helpers.it("open_url posted as a native table opens the model's source page", function()
+		local get_bridge_callback = install_hs_stubs()
+
+		local opened_url = nil
+		_G.hs.urlevent.openURL = function(url) opened_url = url; return true end
+
+		package.loaded["ui.model_browser"] = nil
+		package.loaded["ui.ui_builder"]    = nil
+		local ModelBrowser = require("ui.model_browser")
+
+		local selected_name = nil
+		ModelBrowser.open({
+			presets        = {},
+			active_backend = "mlx",
+			active_model   = "",
+			models_mgr     = nil,
+			on_select      = function(name) selected_name = name end,
+		})
+
+		local bridge_callback = get_bridge_callback()
+		helpers.assert_true(type(bridge_callback) == "function", "bridge callback must be registered by M.open()")
+
+		local mock_url = "https://huggingface.co/mlx-community/gemma-4-E4B-it"
+		bridge_callback({ body = { action = "open_url", url = mock_url, session = 1 } })
+
+		helpers.assert_eq(opened_url, mock_url,
+			"a native-table open_url message must open the model's source page (F-HIGH-29)")
+		helpers.assert_nil(selected_name, "open_url must not also select a model")
+
+		for _, blocked_url in ipairs({
+			"shortcuts://run-shortcut?name=fixture",
+			"file:///tmp/fixture",
+			"javascript:alert(1)",
+			"https:///missing-host",
+			"https://safe.example/path\nshortcuts://run-shortcut",
+		}) do
+			opened_url = nil
+			bridge_callback({ body = { action = "open_url", url = blocked_url, session = 1 } })
+			helpers.assert_nil(opened_url,
+				"the model browser bridge must reject non-HTTP or malformed URLs: " .. blocked_url)
+		end
+
+		local mixed_case_url = "HtTp://example.test/model"
+		bridge_callback({ body = { action = "open_url", url = mixed_case_url, session = 1 } })
+		helpers.assert_eq(opened_url, mixed_case_url,
+			"the HTTP scheme allowlist must be case-insensitive")
+	end)
+
+	helpers.it("keeps a refused or throwing model selection open for retry", function()
+		local get_bridge_callback, state = install_hs_stubs()
+
+		package.loaded["ui.model_browser"] = nil
+		package.loaded["ui.ui_builder"]    = nil
+		local ModelBrowser = require("ui.model_browser")
+
+		local attempts = 0
+		ModelBrowser.open({
+			presets        = {},
+			active_backend = "mlx",
+			active_model   = "",
+			models_mgr     = nil,
+			on_select      = function()
+				attempts = attempts + 1
+				if attempts == 1 then return false end
+				error("model activation exploded")
+			end,
+		})
+
+		local bridge_callback = get_bridge_callback()
+		bridge_callback({ body = { action = "select_model", name = "retry-model", session = 1 } })
+		helpers.assert_eq(attempts, 1)
+		helpers.assert_eq(state.deletes, 0,
+			"an explicit activation refusal must keep the browser open")
+
+		bridge_callback({ body = { action = "select_model", name = "retry-model", session = 1 } })
+		helpers.assert_eq(attempts, 2)
+		helpers.assert_eq(state.deletes, 0,
+			"a throwing activation callback must keep the browser open")
+		helpers.assert_eq(#state.errors, 1,
+			"the activation exception must reach the central logger once")
+		helpers.assert_contains(state.errors[1], "model activation exploded")
+	end)
+
+	helpers.it("blocks browser reuse until an ambiguous native delete settles", function()
+		local get_bridge_callback, state = install_hs_stubs()
+		package.loaded["ui.model_browser"] = nil
+		package.loaded["ui.ui_builder"] = nil
+		local ModelBrowser = require("ui.model_browser")
+		local selections = 0
+		local context = {
+			presets = {},
+			active_backend = "mlx",
+			active_model = "",
+			on_select = function() selections = selections + 1 end,
+		}
+
+		ModelBrowser.open(context)
+		helpers.assert_eq(state.creates, 1)
+		state.delete_throws = true
+		helpers.assert_eq(ModelBrowser.close(), false,
+			"a throwing native delete must remain an explicit close refusal")
+		helpers.assert_eq(ModelBrowser.open(context), false,
+			"an ambiguous close must not be reported as a reusable open window")
+		helpers.assert_eq(state.creates, 1,
+			"a refused cleanup retry must block creation of a second native window")
+		helpers.assert_eq(state.deletes, 2,
+			"open must retry deletion of the exact retained cleanup owner")
+		get_bridge_callback()({ body = { action = "select_model", name = "cleanup-ghost", session = 2 } })
+		helpers.assert_eq(selections, 0,
+			"a cleanup-only browser must fence late bridge business")
+
+		state.delete_throws = false
+		helpers.assert_eq(ModelBrowser.open(context), true,
+			"open may continue only after the exact retained owner settles")
+		helpers.assert_eq(state.creates, 2,
+			"only a committed delete may permit a replacement window")
+		helpers.assert_eq(state.deletes, 3)
+	end)
+
+	helpers.it("does not publish a browser closed synchronously during construction", function()
+		local _, state = install_hs_stubs()
+		package.loaded["ui.model_browser"] = nil
+		package.loaded["ui.ui_builder"] = nil
+		local ModelBrowser = require("ui.model_browser")
+		local context = {
+			presets = {},
+			active_backend = "mlx",
+			active_model = "",
+		}
+
+		state.close_during_show = true
+		helpers.assert_eq(ModelBrowser.open(context), false,
+			"a synchronously closed construction candidate must not report success")
+		helpers.assert_eq(state.creates, 1)
+		helpers.assert_eq(ModelBrowser.open(context), true,
+			"the closed candidate must not block a fresh browser")
+		helpers.assert_eq(state.creates, 2,
+			"the retry must construct a new native window instead of reusing a ghost")
+	end)
+
+	helpers.it("ignores a deferred navigation callback from a replaced browser", function()
+		local _, state = install_hs_stubs()
+		local timers = {}
+		package.loaded["infra.deferred_work"] = {
+			after = function(delay, callback, label)
+				timers[#timers + 1] = { delay = delay, callback = callback, label = label }
+				return true
+			end,
+		}
+		package.loaded["ui.model_browser"] = nil
+		package.loaded["ui.ui_builder"] = nil
+		local ModelBrowser = require("ui.model_browser")
+		local function context(model)
+			return { presets = {}, active_backend = "mlx", active_model = model }
+		end
+
+		helpers.assert_eq(ModelBrowser.open(context("old")), true)
+		state.webviews[1].navigation_callback("didFinishNavigation")
+		local stale_navigation = nil
+		for _, timer in ipairs(timers) do
+			if timer.label == "model_browser.navigation" then stale_navigation = timer.callback end
+		end
+		helpers.assert_true(type(stale_navigation) == "function",
+			"the first browser must own a deferred navigation callback")
+		helpers.assert_eq(ModelBrowser.close(), true)
+		helpers.assert_eq(ModelBrowser.open(context("new")), true)
+		helpers.assert_eq(#state.webviews[2].evaluations, 0)
+
+		stale_navigation()
+		helpers.assert_eq(#state.webviews[2].evaluations, 0,
+			"a stale browser callback must not flush or inject into its successor")
+	end)
+
+	helpers.it("ignores bridge messages from a replaced browser controller", function()
+		local _, state = install_hs_stubs()
+		package.loaded["infra.deferred_work"] = {
+			after = function() return true end,
+		}
+		package.loaded["ui.model_browser"] = nil
+		package.loaded["ui.ui_builder"] = nil
+		local ModelBrowser = require("ui.model_browser")
+		local function context(model)
+			return { presets = {}, active_backend = "mlx", active_model = model }
+		end
+
+		helpers.assert_eq(ModelBrowser.open(context("old")), true)
+		local stale_bridge = state.bridge_callbacks[1]
+		helpers.assert_true(type(stale_bridge) == "function")
+		helpers.assert_eq(ModelBrowser.close(), true)
+		helpers.assert_eq(ModelBrowser.open(context("new")), true)
+		helpers.assert_eq(#state.webviews[2].evaluations, 0)
+
+		stale_bridge({ body = "ready" })
+		helpers.assert_eq(#state.webviews[2].evaluations, 0,
+			"a stale usercontent controller must not mark its successor ready")
+	end)
+end)

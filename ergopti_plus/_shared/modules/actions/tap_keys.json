@@ -1,0 +1,8 @@
+{
+	"description": "The number-row tap keys: the key left of 1 and the two right of 0, each assignable to any catalogue action and swallowed when tapped alone. Their defaults live in the features manifest (shortcuts.tap_keys.<id>). `ahk` is the AutoHotkey scancode, `hs` contains the ANSI virtual keycode followed by an optional ISO override; select one using the event keyboard model, never claim both codes. Karabiner ANSI virtual events use the ANSI position. Without an originating event the menu uses a localized physical position for the swapped pair. `linux` is the evdev keycode. Pinned to the Windows hotkeys by tools/test/test-tap-keys-single-source.cjs.",
+	"keys": [
+		{ "id": "number_row_left", "ahk": "SC029", "hs": [50, 10], "linux": 41 },
+		{ "id": "number_row_right_1", "ahk": "SC00C", "hs": [27], "linux": 12 },
+		{ "id": "number_row_right_2", "ahk": "SC00D", "hs": [24], "linux": 13 }
+	]
+}

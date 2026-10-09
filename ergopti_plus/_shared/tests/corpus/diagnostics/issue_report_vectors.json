@@ -1,0 +1,83 @@
+{
+	"description": "Golden vectors for the bug-report text: dump (every snapshot field, keys sorted; integral numbers without a fraction, others with two decimals; an empty table is (none) and an empty string (empty); continuation lines of a multi-line value are indented two spaces), the Markdown report (its fence outgrows every backtick run of the body) and the saved file's name. Booleans and nulls are left out because the AHK JSON reader has neither. dump and markdown are replayed by the macOS and Linux Lua suites and the AHK suite; the file name, which only the diagnostics page's Save button uses, by the page model (tools/test/test-healthcheck-model.cjs).",
+	"dump_vectors": [
+		{
+			"id": "sorted_nested_and_lists",
+			"input": {
+				"version": "2.1.0",
+				"uptime_sec": 125,
+				"sys": { "os_name": "Fedora Linux 41", "cpu_cores": 16, "arch": "x64" },
+				"failed_adapters": [],
+				"ports_validated": ["engine", "config"],
+				"last_error": "",
+				"ram_gb": 15.5
+			},
+			"expected": "failed_adapters: (none)\nlast_error: (empty)\nports_validated:\n  - engine\n  - config\nram_gb: 15.50\nsys:\n  arch: x64\n  cpu_cores: 16\n  os_name: Fedora Linux 41\nuptime_sec: 125\nversion: 2.1.0"
+		},
+		{
+			"id": "multi_line_values",
+			"input": {
+				"recent_issues": [
+					"2026-09-23 10:00:01:002 [ERROR] [Probe] boom\nstack traceback:\n\tinit.lua:12",
+					"2026-09-23 10:00:02:003 [WARNING] [Layout] next"
+				]
+			},
+			"expected": "recent_issues:\n  - 2026-09-23 10:00:01:002 [ERROR] [Probe] boom\n    stack traceback:\n    \tinit.lua:12\n  - 2026-09-23 10:00:02:003 [WARNING] [Layout] next"
+		},
+		{
+			"id": "list_of_tables",
+			"input": {
+				"coverage": {
+					"entries": [
+						{ "path": "gestures", "reason": "macOS only" },
+						{ "path": "apps", "reason": "not here" }
+					],
+					"total": 2
+				}
+			},
+			"expected": "coverage:\n  entries:\n    -\n      path: gestures\n      reason: macOS only\n    -\n      path: apps\n      reason: not here\n  total: 2"
+		}
+	],
+	"markdown_vectors": [
+		{
+			"id": "report_document",
+			"info": {
+				"version": "2.1.0",
+				"commit": "f58d15798 (build)",
+				"os": "Linux | Fedora\n41",
+				"driver": "linux",
+				"generated_utc": "2026-09-23T10:00:00Z",
+				"warn_count": 2,
+				"err_count": 0
+			},
+			"body": "version: 2.1.0",
+			"expected": "# ErgoptiPlus diagnostics\n\n| Field | Value |\n| --- | --- |\n| Version | 2.1.0 |\n| Commit | f58d15798 (build) |\n| OS | Linux \\| Fedora 41 |\n| Driver | linux |\n| Generated (UTC) | 2026-09-23T10:00:00Z |\n| Warnings / errors this session | 2 / 0 |\n\n```text\nversion: 2.1.0\n```\n"
+		},
+		{
+			"id": "fence_outgrows_backticks",
+			"info": {
+				"version": "2.1.0",
+				"commit": "",
+				"os": "macOS",
+				"driver": "macos",
+				"generated_utc": "2026-09-23T10:00:00Z",
+				"warn_count": 0,
+				"err_count": 0
+			},
+			"body": "last_error: a ```` fenced ``` value",
+			"expected": "# ErgoptiPlus diagnostics\n\n| Field | Value |\n| --- | --- |\n| Version | 2.1.0 |\n| Commit |  |\n| OS | macOS |\n| Driver | macos |\n| Generated (UTC) | 2026-09-23T10:00:00Z |\n| Warnings / errors this session | 0 / 0 |\n\n`````text\nlast_error: a ```` fenced ``` value\n`````\n"
+		}
+	],
+	"file_name_vectors": [
+		{
+			"id": "plain",
+			"info": { "driver": "macos", "version": "2.1.0", "file_stamp": "20260923T100000Z" },
+			"expected": "ergopti-diagnostics-macos-2.1.0-20260923T100000Z.md"
+		},
+		{
+			"id": "unsafe_characters",
+			"info": { "driver": "linux", "version": "2.1.0+dev/1 é", "file_stamp": "20260923T100000Z" },
+			"expected": "ergopti-diagnostics-linux-2.1.0_dev_1__-20260923T100000Z.md"
+		}
+	]
+}

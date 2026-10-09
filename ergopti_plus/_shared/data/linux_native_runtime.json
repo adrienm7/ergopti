@@ -1,0 +1,220 @@
+{
+	"version": 1,
+	"description": "Native runtime libraries used by LuaJIT FFI and separate source-install compiler prerequisites; Xvfb remains validation-only.",
+	"archive_build_packages": {
+		"apt": ["gcc", "libc6-dev", "linux-libc-dev"],
+		"dnf": ["gcc", "glibc-devel", "kernel-headers"],
+		"zypper": ["gcc", "glibc-devel", "linux-glibc-devel"],
+		"pacman": ["gcc", "glibc", "linux-api-headers"],
+		"xbps": null,
+		"apk": ["gcc", "musl-dev", "linux-headers"]
+	},
+	"libraries": {
+		"xkbcommon": {
+			"soname": "libxkbcommon.so.0",
+			"packages": {
+				"apt": "libxkbcommon0",
+				"dnf": "libxkbcommon",
+				"zypper": "libxkbcommon0",
+				"pacman": "libxkbcommon",
+				"xbps": "libxkbcommon",
+				"apk": "libxkbcommon"
+			},
+			"nix_package": "libxkbcommon"
+		},
+		"xkbcommon_x11": {
+			"soname": "libxkbcommon-x11.so.0",
+			"packages": {
+				"apt": "libxkbcommon-x11-0",
+				"dnf": "libxkbcommon-x11",
+				"zypper": "libxkbcommon-x11-0",
+				"pacman": "libxkbcommon-x11",
+				"xbps": "libxkbcommon-x11",
+				"apk": "libxkbcommon-x11"
+			},
+			"nix_package": "libxkbcommon"
+		},
+		"x11": {
+			"soname": "libX11.so.6",
+			"packages": {
+				"apt": "libx11-6",
+				"dnf": "libX11",
+				"zypper": "libX11-6",
+				"pacman": "libx11",
+				"xbps": "libX11",
+				"apk": "libx11"
+			},
+			"nix_package": "xorg.libX11"
+		},
+		"x11_xcb": {
+			"soname": "libX11-xcb.so.1",
+			"packages": {
+				"apt": "libx11-xcb1",
+				"dnf": "libX11-xcb",
+				"zypper": "libX11-xcb1",
+				"pacman": "libx11",
+				"xbps": "libX11",
+				"apk": "libx11"
+			},
+			"nix_package": "xorg.libX11"
+		}
+	},
+	"package_requirements": {
+		"deb": [
+			"luajit (>= 2.1)",
+			"xclip",
+			"libnotify-bin",
+			"curl",
+			"libxkbcommon0",
+			"libxkbcommon-tools",
+			"at-spi2-core",
+			"pkexec",
+			"kmod",
+			"udev",
+			"libayatana-appindicator3-1",
+			"zenity",
+			"login",
+			"passwd",
+			"util-linux",
+			"lua-lgi",
+			"gir1.2-webkit2-4.1",
+			"glib-networking",
+			"gsettings-desktop-schemas",
+			"lua-luv"
+		],
+		"rpm": [
+			"luajit >= 2.1",
+			"xclip",
+			"libnotify",
+			"curl",
+			"libxkbcommon",
+			"libxkbcommon-utils",
+			"at-spi2-core",
+			"polkit",
+			"kmod",
+			"systemd-udev",
+			"libayatana-appindicator-gtk3",
+			"zenity",
+			"shadow-utils",
+			"util-linux"
+		],
+		"arch": ["luajit", "xclip", "libnotify", "curl", "libxkbcommon", "at-spi2-core"],
+		"nix_library_path": [
+			"libayatana-appindicator",
+			"gtk3",
+			"glib",
+			"libxkbcommon",
+			"at-spi2-core",
+			"glib-networking",
+			"libproxy",
+			"dconf",
+			"openssl"
+		]
+	},
+	"package_sources": {
+		"apt": "https://packages.debian.org/stable/libxkbcommon-x11-0",
+		"dnf": "https://src.fedoraproject.org/rpms/libxkbcommon/blob/rawhide/f/libxkbcommon.spec",
+		"zypper": "https://src.opensuse.org/rpm/libxkbcommon/src/branch/factory/libxkbcommon.spec",
+		"pacman": "https://gitlab.archlinux.org/archlinux/packaging/packages/libxkbcommon/-/blob/main/PKGBUILD",
+		"xbps": "https://github.com/void-linux/void-packages/blob/master/srcpkgs/libxkbcommon/template",
+		"apk": "https://github.com/alpinelinux/aports/blob/master/main/libxkbcommon/APKBUILD"
+	},
+	"network_runtime": {
+		"libraries": {
+			"gio": "libgio-2.0.so.0",
+			"gobject": "libgobject-2.0.so.0",
+			"glib": "libglib-2.0.so.0"
+		},
+		"proxy_schema": "org.gnome.system.proxy",
+		"providers": {
+			"apt": ["glib-networking", "gsettings-desktop-schemas", "lua-luv"],
+			"dnf": null,
+			"zypper": ["glib-networking", "gsettings-desktop-schemas", "luajit-luv"],
+			"pacman": ["glib-networking", "gsettings-desktop-schemas", "lua51-luv"],
+			"xbps": null,
+			"apk": ["glib-networking", "gsettings-desktop-schemas", "lua5.1-luv"]
+		},
+		"description": "A provider list is admitted only from recorded distribution metadata; null means no verified repair provider. Actual LuaJIT ABI, supported GIO resolver and required GNOME schema are always re-probed. Libproxy selection does not prove every desktop setting or PAC evaluation.",
+		"curl_package": "curl",
+		"source_luv_build_packages": {
+			"apt": null,
+			"dnf": [
+				"git",
+				"gcc",
+				"glibc-devel",
+				"make",
+				"cmake",
+				"pkgconf-pkg-config",
+				"luajit-devel",
+				"glib-networking",
+				"gsettings-desktop-schemas",
+				"dconf"
+			],
+			"zypper": null,
+			"pacman": null,
+			"xbps": null,
+			"apk": null
+		},
+		"portable": {
+			"gio_modules": ["libgiognomeproxy.so", "libgiolibproxy.so", "libdconfsettings.so"],
+			"system_ca_files": [
+				"/etc/ssl/certs/ca-certificates.crt",
+				"/etc/pki/tls/certs/ca-bundle.crt",
+				"/usr/share/ssl/certs/ca-bundle.crt",
+				"/usr/local/share/certs/ca-root-nss.crt",
+				"/etc/ssl/cert.pem"
+			],
+			"flatpak_sources": {
+				"luv": {
+					"url": "https://github.com/luvit/luv.git",
+					"commit": "26e62e49b0230891ece45a78cc1f63c074e60020"
+				},
+				"schemas": {
+					"url": "https://github.com/GNOME/gsettings-desktop-schemas.git",
+					"commit": "cf1946e8886bb29d9c4b793d0ee4253e38ae6fa8"
+				},
+				"krb5": {
+					"url": "https://github.com/krb5/krb5.git",
+					"commit": "8570e77819563e036027e1da789d08ec9333ed4d"
+				},
+				"curl": {
+					"url": "https://github.com/curl/curl.git",
+					"commit": "01346829096c61b372692f6dc43ffa778c6caccd"
+				},
+				"duktape": {
+					"url": "https://github.com/svaarala/duktape/releases/download/v2.7.0/duktape-2.7.0.tar.xz",
+					"sha256": "90f8d2fa8b5567c6899830ddef2c03f3c27960b11aca222fa17aa7ac613c2890"
+				},
+				"libproxy": {
+					"url": "https://github.com/libproxy/libproxy.git",
+					"commit": "99da01926b1b1e303a4d2331bbd74bed424863e7"
+				},
+				"glib_networking": {
+					"url": "https://github.com/GNOME/glib-networking.git",
+					"commit": "1417a8dd98c46c208853c5ed95de61c384acea21"
+				}
+			},
+			"description": "AppImage copies the actual build-host ELF closure and retains the recipient glibc and certificate trust. Flatpak builds its native modules under /app. Runtime admission proves ABI/schema/backend availability, not desktop/PAC settings or transport delivery."
+		}
+	},
+	"archive_digest_runtime": {
+		"soname": "libcrypto.so.3",
+		"nix_package": "openssl",
+		"deb_dependency_alternatives": ["libssl3t64", "libssl3"],
+		"package_alternatives": {
+			"apt": ["libssl3t64", "libssl3"],
+			"dnf": null,
+			"zypper": null,
+			"pacman": null,
+			"xbps": null,
+			"apk": null
+		},
+		"portable_dlopen_roots": ["libcrypto.so.3"],
+		"description": "Exact OpenSSL3 runtime for retained-FD EVP digest. Alternatives mean one currently available provider, never a command-line list installing both. Debian and pre-t64 Ubuntu use libssl3; t64 Ubuntu uses libssl3t64. Null means no reviewed repair package mapping, not proof the loaded native capability is absent. Every target must re-probe actual SONAME and EVP APIs; OpenSSL1.1 is not a fallback.",
+		"package_sources": {
+			"apt_debian": "https://packages.debian.org/bookworm/libssl3",
+			"apt_ubuntu_22_04": "https://packages.ubuntu.com/jammy/libssl3",
+			"apt_ubuntu_24_04": "https://packages.ubuntu.com/noble/libssl3t64"
+		}
+	}
+}

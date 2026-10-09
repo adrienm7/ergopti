@@ -1,0 +1,158 @@
+/* _shared/ui/config_cleanup/style.css */
+
+/* The HTML loads the error window palette before these layout overrides. */
+
+:root {
+	color-scheme: light dark;
+}
+
+html,
+body {
+	height: 100%;
+	min-height: 0;
+	overflow: hidden;
+}
+body {
+	display: flex;
+	flex-direction: column;
+	margin: 0;
+}
+header {
+	flex: none;
+	padding: 24px 24px 0;
+}
+h1 {
+	color: var(--text);
+	margin: 0 0 8px;
+}
+.intro {
+	margin: 0 0 12px;
+}
+.path {
+	color: var(--muted);
+	font:
+		12px/1.5 ui-monospace,
+		monospace;
+	margin: 0;
+	max-height: 3em;
+	overflow: auto;
+	overflow-wrap: anywhere;
+}
+main {
+	display: flex;
+	flex: 1;
+	flex-direction: column;
+	min-height: 0;
+	overflow: hidden;
+	padding: 16px 24px 0;
+}
+h2 {
+	color: var(--muted);
+	flex: none;
+	font-size: 13px;
+	font-weight: 600;
+	margin: 0 0 10px;
+}
+.settings {
+	background: var(--panel);
+	border: 1px solid var(--border);
+	border-radius: 10px;
+	flex: 1;
+	min-height: 0;
+	overflow: auto;
+	scrollbar-gutter: stable;
+}
+ul {
+	list-style: none;
+	margin: 0;
+	padding: 0;
+}
+li {
+	border-bottom: 1px solid var(--border);
+	overflow-wrap: anywhere;
+	padding: 10px 14px;
+}
+li:last-child {
+	border-bottom: 0;
+}
+.setting-key {
+	direction: ltr;
+	display: block;
+	font:
+		600 12px/1.5 ui-monospace,
+		monospace;
+	unicode-bidi: plaintext;
+}
+.setting-value {
+	color: var(--muted);
+	direction: ltr;
+	display: block;
+	font:
+		12px/1.5 ui-monospace,
+		monospace;
+	margin-top: 3px;
+	unicode-bidi: plaintext;
+	white-space: pre-wrap;
+}
+#status {
+	flex: none;
+	font-size: 13px;
+	line-height: 1.5;
+	margin: 10px 0 0;
+	max-height: 5em;
+	overflow: auto;
+	overflow-wrap: anywhere;
+	white-space: pre-wrap;
+}
+#status:empty {
+	display: none;
+}
+#status.removed {
+	color: var(--ok);
+}
+#status.failed {
+	color: var(--fail);
+}
+footer {
+	flex: none;
+	padding: 14px 24px 20px;
+}
+.backup-hint {
+	color: var(--muted);
+	font-size: 12px;
+	line-height: 1.5;
+	margin: 0 0 14px;
+}
+.buttons {
+	align-items: center;
+	background: transparent;
+	border: 0;
+	display: flex;
+	flex-wrap: wrap;
+	gap: 8px;
+	padding: 0;
+}
+.spacer {
+	flex: 1;
+}
+button {
+	white-space: normal;
+}
+button:focus-visible,
+.settings:focus-visible {
+	outline: 2px solid var(--accent);
+	outline-offset: 3px;
+}
+@media (max-height: 420px) {
+	header {
+		padding-top: 12px;
+	}
+	.intro,
+	.backup-hint {
+		margin-bottom: 6px;
+	}
+	footer {
+		padding-bottom: 10px;
+		padding-top: 8px;
+	}
+}

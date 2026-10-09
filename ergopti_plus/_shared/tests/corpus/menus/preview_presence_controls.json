@@ -1,0 +1,51 @@
+{
+	"section": "preview_presence_controls",
+	"rows": [
+		{
+			"id": "preview_autocorrect_enabled",
+			"type": "check",
+			"i18n": "menu.hotstrings.tooltip_autocorrect",
+			"checked_when": ["hotstrings.preview_autocorrect_enabled"],
+			"disabled_when": ["preview_presence_ready"],
+			"platforms": ["hs", "linux"],
+			"unavailable": "grey",
+			"reason_key": "platform_reason.preview_bubbles_are_lua_previews"
+		},
+		{
+			"id": "preview_ai_enabled",
+			"type": "check",
+			"i18n": "menu.hotstrings.tooltip_ai",
+			"checked_when": ["hotstrings.preview_ai_enabled"],
+			"disabled_when": ["preview_presence_ready"],
+			"platforms": ["hs", "linux"],
+			"unavailable": "grey",
+			"reason_key": "platform_reason.preview_bubbles_are_lua_previews"
+		}
+	],
+	"positions": [2, 3],
+	"separator_position": 4,
+	"style_position": 5,
+	"locales": [
+		"ar",
+		"cs",
+		"da",
+		"de",
+		"en",
+		"es",
+		"fr",
+		"he",
+		"hi",
+		"it",
+		"ja",
+		"ko",
+		"nl",
+		"no",
+		"pl",
+		"pt",
+		"ru",
+		"sv",
+		"tr",
+		"uk",
+		"zh"
+	]
+}

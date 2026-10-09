@@ -1,0 +1,20 @@
+{
+	"row_id": "agent_system_off",
+	"label_key": "menu.agent.off",
+	"mutated_label_key": "menu.agent.title",
+	"systems": ["system1", "system2"],
+	"states": [
+		{
+			"spec": "",
+			"checked": true
+		},
+		{
+			"spec": "cerebras",
+			"checked": false
+		},
+		{
+			"spec": "local|qwen3:14b",
+			"checked": false
+		}
+	]
+}

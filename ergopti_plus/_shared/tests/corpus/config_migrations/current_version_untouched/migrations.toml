@@ -1,0 +1,14 @@
+# _shared/tests/corpus/config_migrations/current_version_untouched/migrations.toml
+
+[registry]
+current_version = 3
+unstamped_version = 2
+
+[steps.v2_to_v3]
+from = 2
+to = 3
+drivers = ["ahk", "hs", "linux"]
+reason = "Corpus: a step that would change the file if it ever ran."
+ops = [
+	{ op = "delete", section = "gestures", key = "space_wrap" },
+]

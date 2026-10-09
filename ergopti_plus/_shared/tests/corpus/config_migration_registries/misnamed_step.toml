@@ -1,0 +1,16 @@
+# _shared/tests/corpus/config_migration_registries/misnamed_step.toml
+#
+# The step is not named v<from>_to_v<to>.
+
+[registry]
+current_version = 2
+unstamped_version = 1
+
+[steps.first]
+from = 1
+to = 2
+drivers = ["ahk", "hs", "linux"]
+reason = "Corpus: one delete."
+ops = [
+	{ op = "delete", section = "gestures", key = "space_wrap" },
+]

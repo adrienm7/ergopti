@@ -1,0 +1,2510 @@
+{
+	"schema": 1,
+	"vectors": [
+		{
+			"name": "windows-false-base",
+			"snapshot": {
+				"schema_version": 2,
+				"driver": "windows",
+				"generated_at": "2026-10-09T14:00:00Z",
+				"detailed": false,
+				"extensive": true,
+				"sections": {
+					"versions": {
+						"ergopti_version": "0.0.0-dev.156",
+						"commit": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+						"channel": "dev",
+						"runtime": "1.1.1"
+					},
+					"hardware": {
+						"arch": "arm64",
+						"cpu_cores": 8
+					},
+					"system": {
+						"elevated": false,
+						"uptime": 17,
+						"os": "PRIVATE_ORG_SEQUOIA"
+					},
+					"input": {
+						"paused": false,
+						"remap_phase": "failed"
+					},
+					"issues": {
+						"err_count": 1,
+						"warn_count": 2,
+						"last_error": "PRIVATE_USER_ZEBRA PRIVATE_ORG_SEQUOIA PRIVATE_HOST_OPAL https://pac.internal.synthetic.example/private http://proxy.internal.synthetic.example:8080 /Users/PRIVATE_USER_ZEBRA/document PRIVATE_WINDOW_TITLE PRIVATE_TYPED_TEXT PRIVATE_TOKEN_A1B2 --private-argv=PRIVATE_ORG_SEQUOIA",
+						"recent": "PRIVATE_USER_ZEBRA PRIVATE_ORG_SEQUOIA PRIVATE_HOST_OPAL https://pac.internal.synthetic.example/private http://proxy.internal.synthetic.example:8080 /Users/PRIVATE_USER_ZEBRA/document PRIVATE_WINDOW_TITLE PRIVATE_TYPED_TEXT PRIVATE_TOKEN_A1B2 --private-argv=PRIVATE_ORG_SEQUOIA"
+					},
+					"paths": {
+						"config_dir": "/Users/PRIVATE_USER_ZEBRA/document"
+					},
+					"ai": {
+						"ai_enabled": true,
+						"ai_backend": "ollama",
+						"ai_model": "PRIVATE_USER_ZEBRA"
+					},
+					"permissions": {
+						"items": [
+							{
+								"id": "accessibility",
+								"state": "denied",
+								"name": "PRIVATE_USER_ZEBRA"
+							}
+						]
+					}
+				},
+				"probes": {
+					"appleevent_transport": {
+						"state": "timeout",
+						"ms": 99,
+						"cleanup": "pending",
+						"native_status": -1744,
+						"detail": "https://pac.internal.synthetic.example/private",
+						"argv": "--private-argv=PRIVATE_ORG_SEQUOIA",
+						"source_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+					},
+					"github_api": {
+						"state": "error",
+						"ms": 1,
+						"message": "PRIVATE_USER_ZEBRA PRIVATE_ORG_SEQUOIA PRIVATE_HOST_OPAL https://pac.internal.synthetic.example/private http://proxy.internal.synthetic.example:8080 /Users/PRIVATE_USER_ZEBRA/document PRIVATE_WINDOW_TITLE PRIVATE_TYPED_TEXT PRIVATE_TOKEN_A1B2 --private-argv=PRIVATE_ORG_SEQUOIA"
+					}
+				},
+				"retired_probes": [
+					{
+						"probes": {
+							"appleevent_transport": {
+								"state": "error",
+								"cleanup": "unknown",
+								"native_status": -1712,
+								"detail": "http://proxy.internal.synthetic.example:8080"
+							}
+						},
+						"unknown": "PRIVATE_WINDOW_TITLE"
+					}
+				],
+				"unknown_nested": {
+					"personal": [
+						"PRIVATE_USER_ZEBRA",
+						"PRIVATE_ORG_SEQUOIA",
+						"PRIVATE_HOST_OPAL",
+						"https://pac.internal.synthetic.example/private",
+						"http://proxy.internal.synthetic.example:8080",
+						"/Users/PRIVATE_USER_ZEBRA/document",
+						"PRIVATE_WINDOW_TITLE",
+						"PRIVATE_TYPED_TEXT",
+						"PRIVATE_TOKEN_A1B2",
+						"--private-argv=PRIVATE_ORG_SEQUOIA"
+					]
+				},
+				"diagnostic_checks": {
+					"schema_fields": {
+						"state": "ok",
+						"message": "PRIVATE_TYPED_TEXT"
+					}
+				}
+			},
+			"canaries": [
+				"PRIVATE_USER_ZEBRA",
+				"PRIVATE_ORG_SEQUOIA",
+				"PRIVATE_HOST_OPAL",
+				"https://pac.internal.synthetic.example/private",
+				"http://proxy.internal.synthetic.example:8080",
+				"/Users/PRIVATE_USER_ZEBRA/document",
+				"PRIVATE_WINDOW_TITLE",
+				"PRIVATE_TYPED_TEXT",
+				"PRIVATE_TOKEN_A1B2",
+				"--private-argv=PRIVATE_ORG_SEQUOIA"
+			]
+		},
+		{
+			"name": "windows-false-typed-contamination",
+			"snapshot": {
+				"schema_version": 2,
+				"driver": "windows",
+				"generated_at": "2026-10-09T14:00:00Z",
+				"detailed": false,
+				"extensive": true,
+				"sections": {
+					"versions": {
+						"ergopti_version": "0.0.0-dev.156",
+						"commit": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+						"channel": "dev",
+						"runtime": "PRIVATE_USER_ZEBRA"
+					},
+					"hardware": {
+						"arch": "PRIVATE_HOST_OPAL",
+						"cpu_cores": 8
+					},
+					"system": {
+						"elevated": false,
+						"uptime": 17,
+						"os": "PRIVATE_ORG_SEQUOIA"
+					},
+					"input": {
+						"paused": false,
+						"remap_phase": "failed"
+					},
+					"issues": {
+						"err_count": "PRIVATE_TOKEN_A1B2",
+						"warn_count": 2,
+						"last_error": "PRIVATE_USER_ZEBRA PRIVATE_ORG_SEQUOIA PRIVATE_HOST_OPAL https://pac.internal.synthetic.example/private http://proxy.internal.synthetic.example:8080 /Users/PRIVATE_USER_ZEBRA/document PRIVATE_WINDOW_TITLE PRIVATE_TYPED_TEXT PRIVATE_TOKEN_A1B2 --private-argv=PRIVATE_ORG_SEQUOIA",
+						"recent": "PRIVATE_USER_ZEBRA PRIVATE_ORG_SEQUOIA PRIVATE_HOST_OPAL https://pac.internal.synthetic.example/private http://proxy.internal.synthetic.example:8080 /Users/PRIVATE_USER_ZEBRA/document PRIVATE_WINDOW_TITLE PRIVATE_TYPED_TEXT PRIVATE_TOKEN_A1B2 --private-argv=PRIVATE_ORG_SEQUOIA"
+					},
+					"paths": {
+						"config_dir": "/Users/PRIVATE_USER_ZEBRA/document"
+					},
+					"ai": {
+						"ai_enabled": true,
+						"ai_backend": "ollama",
+						"ai_model": "PRIVATE_USER_ZEBRA"
+					},
+					"permissions": {
+						"items": [
+							{
+								"id": "accessibility",
+								"state": "denied",
+								"name": "PRIVATE_USER_ZEBRA"
+							}
+						]
+					}
+				},
+				"probes": {
+					"appleevent_transport": {
+						"state": "timeout",
+						"ms": 99,
+						"cleanup": "pending",
+						"native_status": -1744,
+						"detail": "https://pac.internal.synthetic.example/private",
+						"argv": "--private-argv=PRIVATE_ORG_SEQUOIA",
+						"source_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+					},
+					"github_api": {
+						"state": "https://pac.internal.synthetic.example/private",
+						"ms": 1,
+						"message": "PRIVATE_USER_ZEBRA PRIVATE_ORG_SEQUOIA PRIVATE_HOST_OPAL https://pac.internal.synthetic.example/private http://proxy.internal.synthetic.example:8080 /Users/PRIVATE_USER_ZEBRA/document PRIVATE_WINDOW_TITLE PRIVATE_TYPED_TEXT PRIVATE_TOKEN_A1B2 --private-argv=PRIVATE_ORG_SEQUOIA",
+						"native_status": "PRIVATE_TYPED_TEXT"
+					}
+				},
+				"retired_probes": [
+					{
+						"probes": {
+							"appleevent_transport": {
+								"state": "error",
+								"cleanup": "unknown",
+								"native_status": -1712,
+								"detail": "http://proxy.internal.synthetic.example:8080"
+							}
+						},
+						"unknown": "PRIVATE_WINDOW_TITLE"
+					}
+				],
+				"unknown_nested": {
+					"personal": [
+						"PRIVATE_USER_ZEBRA",
+						"PRIVATE_ORG_SEQUOIA",
+						"PRIVATE_HOST_OPAL",
+						"https://pac.internal.synthetic.example/private",
+						"http://proxy.internal.synthetic.example:8080",
+						"/Users/PRIVATE_USER_ZEBRA/document",
+						"PRIVATE_WINDOW_TITLE",
+						"PRIVATE_TYPED_TEXT",
+						"PRIVATE_TOKEN_A1B2",
+						"--private-argv=PRIVATE_ORG_SEQUOIA"
+					]
+				},
+				"diagnostic_checks": {
+					"schema_fields": {
+						"state": "ok",
+						"message": "PRIVATE_TYPED_TEXT"
+					}
+				}
+			},
+			"canaries": [
+				"PRIVATE_USER_ZEBRA",
+				"PRIVATE_ORG_SEQUOIA",
+				"PRIVATE_HOST_OPAL",
+				"https://pac.internal.synthetic.example/private",
+				"http://proxy.internal.synthetic.example:8080",
+				"/Users/PRIVATE_USER_ZEBRA/document",
+				"PRIVATE_WINDOW_TITLE",
+				"PRIVATE_TYPED_TEXT",
+				"PRIVATE_TOKEN_A1B2",
+				"--private-argv=PRIVATE_ORG_SEQUOIA"
+			]
+		},
+		{
+			"name": "windows-false-unknown-cohort",
+			"snapshot": {
+				"schema_version": 2,
+				"driver": "windows",
+				"generated_at": "2026-10-09T14:00:00Z",
+				"detailed": false,
+				"extensive": true,
+				"sections": {
+					"versions": {
+						"ergopti_version": "0.0.0-dev.156",
+						"commit": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+						"channel": "dev",
+						"runtime": "1.1.1"
+					},
+					"hardware": {
+						"arch": "arm64",
+						"cpu_cores": 8
+					},
+					"system": {
+						"elevated": false,
+						"uptime": 17,
+						"os": "PRIVATE_ORG_SEQUOIA"
+					},
+					"input": {
+						"paused": false,
+						"remap_phase": "failed"
+					},
+					"issues": {
+						"err_count": 1,
+						"warn_count": 2,
+						"last_error": "PRIVATE_USER_ZEBRA PRIVATE_ORG_SEQUOIA PRIVATE_HOST_OPAL https://pac.internal.synthetic.example/private http://proxy.internal.synthetic.example:8080 /Users/PRIVATE_USER_ZEBRA/document PRIVATE_WINDOW_TITLE PRIVATE_TYPED_TEXT PRIVATE_TOKEN_A1B2 --private-argv=PRIVATE_ORG_SEQUOIA",
+						"recent": "PRIVATE_USER_ZEBRA PRIVATE_ORG_SEQUOIA PRIVATE_HOST_OPAL https://pac.internal.synthetic.example/private http://proxy.internal.synthetic.example:8080 /Users/PRIVATE_USER_ZEBRA/document PRIVATE_WINDOW_TITLE PRIVATE_TYPED_TEXT PRIVATE_TOKEN_A1B2 --private-argv=PRIVATE_ORG_SEQUOIA"
+					},
+					"paths": {
+						"config_dir": "/Users/PRIVATE_USER_ZEBRA/document"
+					},
+					"ai": {
+						"ai_enabled": true,
+						"ai_backend": "ollama",
+						"ai_model": "PRIVATE_USER_ZEBRA"
+					},
+					"permissions": {
+						"items": [
+							{
+								"id": "accessibility",
+								"state": "denied",
+								"name": "PRIVATE_USER_ZEBRA"
+							}
+						]
+					}
+				},
+				"probes": {
+					"appleevent_transport": {
+						"state": "timeout",
+						"ms": 99,
+						"cleanup": "pending",
+						"native_status": -1744,
+						"detail": "https://pac.internal.synthetic.example/private",
+						"argv": "--private-argv=PRIVATE_ORG_SEQUOIA",
+						"source_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+					},
+					"github_api": {
+						"state": "error",
+						"ms": 1,
+						"message": "PRIVATE_USER_ZEBRA PRIVATE_ORG_SEQUOIA PRIVATE_HOST_OPAL https://pac.internal.synthetic.example/private http://proxy.internal.synthetic.example:8080 /Users/PRIVATE_USER_ZEBRA/document PRIVATE_WINDOW_TITLE PRIVATE_TYPED_TEXT PRIVATE_TOKEN_A1B2 --private-argv=PRIVATE_ORG_SEQUOIA"
+					}
+				},
+				"retired_probes": [
+					{
+						"probes": {
+							"appleevent_transport": {
+								"state": "error",
+								"cleanup": "unknown",
+								"native_status": -1712,
+								"detail": "http://proxy.internal.synthetic.example:8080"
+							}
+						},
+						"unknown": "PRIVATE_WINDOW_TITLE"
+					},
+					{
+						"probes": {
+							"private_probe": {
+								"state": "ok",
+								"host": "PRIVATE_HOST_OPAL"
+							},
+							"github_api": {
+								"state": "cancelled",
+								"cleanup": "unknown",
+								"message": "http://proxy.internal.synthetic.example:8080"
+							}
+						},
+						"message": "PRIVATE_ORG_SEQUOIA"
+					}
+				],
+				"unknown_nested": {
+					"personal": [
+						"PRIVATE_USER_ZEBRA",
+						"PRIVATE_ORG_SEQUOIA",
+						"PRIVATE_HOST_OPAL",
+						"https://pac.internal.synthetic.example/private",
+						"http://proxy.internal.synthetic.example:8080",
+						"/Users/PRIVATE_USER_ZEBRA/document",
+						"PRIVATE_WINDOW_TITLE",
+						"PRIVATE_TYPED_TEXT",
+						"PRIVATE_TOKEN_A1B2",
+						"--private-argv=PRIVATE_ORG_SEQUOIA"
+					]
+				},
+				"diagnostic_checks": {
+					"schema_fields": {
+						"state": "ok",
+						"message": "PRIVATE_TYPED_TEXT"
+					}
+				}
+			},
+			"canaries": [
+				"PRIVATE_USER_ZEBRA",
+				"PRIVATE_ORG_SEQUOIA",
+				"PRIVATE_HOST_OPAL",
+				"https://pac.internal.synthetic.example/private",
+				"http://proxy.internal.synthetic.example:8080",
+				"/Users/PRIVATE_USER_ZEBRA/document",
+				"PRIVATE_WINDOW_TITLE",
+				"PRIVATE_TYPED_TEXT",
+				"PRIVATE_TOKEN_A1B2",
+				"--private-argv=PRIVATE_ORG_SEQUOIA"
+			]
+		},
+		{
+			"name": "windows-true-base",
+			"snapshot": {
+				"schema_version": 2,
+				"driver": "windows",
+				"generated_at": "2026-10-09T14:00:00Z",
+				"detailed": true,
+				"extensive": true,
+				"sections": {
+					"versions": {
+						"ergopti_version": "0.0.0-dev.156",
+						"commit": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+						"channel": "dev",
+						"runtime": "1.1.1"
+					},
+					"hardware": {
+						"arch": "arm64",
+						"cpu_cores": 8
+					},
+					"system": {
+						"elevated": false,
+						"uptime": 17,
+						"os": "PRIVATE_ORG_SEQUOIA"
+					},
+					"input": {
+						"paused": false,
+						"remap_phase": "failed"
+					},
+					"issues": {
+						"err_count": 1,
+						"warn_count": 2,
+						"last_error": "PRIVATE_USER_ZEBRA PRIVATE_ORG_SEQUOIA PRIVATE_HOST_OPAL https://pac.internal.synthetic.example/private http://proxy.internal.synthetic.example:8080 /Users/PRIVATE_USER_ZEBRA/document PRIVATE_WINDOW_TITLE PRIVATE_TYPED_TEXT PRIVATE_TOKEN_A1B2 --private-argv=PRIVATE_ORG_SEQUOIA",
+						"recent": "PRIVATE_USER_ZEBRA PRIVATE_ORG_SEQUOIA PRIVATE_HOST_OPAL https://pac.internal.synthetic.example/private http://proxy.internal.synthetic.example:8080 /Users/PRIVATE_USER_ZEBRA/document PRIVATE_WINDOW_TITLE PRIVATE_TYPED_TEXT PRIVATE_TOKEN_A1B2 --private-argv=PRIVATE_ORG_SEQUOIA"
+					},
+					"paths": {
+						"config_dir": "/Users/PRIVATE_USER_ZEBRA/document"
+					},
+					"ai": {
+						"ai_enabled": true,
+						"ai_backend": "ollama",
+						"ai_model": "PRIVATE_USER_ZEBRA"
+					},
+					"permissions": {
+						"items": [
+							{
+								"id": "accessibility",
+								"state": "denied",
+								"name": "PRIVATE_USER_ZEBRA"
+							}
+						]
+					}
+				},
+				"probes": {
+					"appleevent_transport": {
+						"state": "timeout",
+						"ms": 99,
+						"cleanup": "pending",
+						"native_status": -1744,
+						"detail": "https://pac.internal.synthetic.example/private",
+						"argv": "--private-argv=PRIVATE_ORG_SEQUOIA",
+						"source_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+					},
+					"github_api": {
+						"state": "error",
+						"ms": 1,
+						"message": "PRIVATE_USER_ZEBRA PRIVATE_ORG_SEQUOIA PRIVATE_HOST_OPAL https://pac.internal.synthetic.example/private http://proxy.internal.synthetic.example:8080 /Users/PRIVATE_USER_ZEBRA/document PRIVATE_WINDOW_TITLE PRIVATE_TYPED_TEXT PRIVATE_TOKEN_A1B2 --private-argv=PRIVATE_ORG_SEQUOIA"
+					}
+				},
+				"retired_probes": [
+					{
+						"probes": {
+							"appleevent_transport": {
+								"state": "error",
+								"cleanup": "unknown",
+								"native_status": -1712,
+								"detail": "http://proxy.internal.synthetic.example:8080"
+							}
+						},
+						"unknown": "PRIVATE_WINDOW_TITLE"
+					}
+				],
+				"unknown_nested": {
+					"personal": [
+						"PRIVATE_USER_ZEBRA",
+						"PRIVATE_ORG_SEQUOIA",
+						"PRIVATE_HOST_OPAL",
+						"https://pac.internal.synthetic.example/private",
+						"http://proxy.internal.synthetic.example:8080",
+						"/Users/PRIVATE_USER_ZEBRA/document",
+						"PRIVATE_WINDOW_TITLE",
+						"PRIVATE_TYPED_TEXT",
+						"PRIVATE_TOKEN_A1B2",
+						"--private-argv=PRIVATE_ORG_SEQUOIA"
+					]
+				},
+				"diagnostic_checks": {
+					"schema_fields": {
+						"state": "ok",
+						"message": "PRIVATE_TYPED_TEXT"
+					}
+				}
+			},
+			"canaries": [
+				"PRIVATE_USER_ZEBRA",
+				"PRIVATE_ORG_SEQUOIA",
+				"PRIVATE_HOST_OPAL",
+				"https://pac.internal.synthetic.example/private",
+				"http://proxy.internal.synthetic.example:8080",
+				"/Users/PRIVATE_USER_ZEBRA/document",
+				"PRIVATE_WINDOW_TITLE",
+				"PRIVATE_TYPED_TEXT",
+				"PRIVATE_TOKEN_A1B2",
+				"--private-argv=PRIVATE_ORG_SEQUOIA"
+			]
+		},
+		{
+			"name": "windows-true-typed-contamination",
+			"snapshot": {
+				"schema_version": 2,
+				"driver": "windows",
+				"generated_at": "2026-10-09T14:00:00Z",
+				"detailed": true,
+				"extensive": true,
+				"sections": {
+					"versions": {
+						"ergopti_version": "0.0.0-dev.156",
+						"commit": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+						"channel": "dev",
+						"runtime": "PRIVATE_USER_ZEBRA"
+					},
+					"hardware": {
+						"arch": "PRIVATE_HOST_OPAL",
+						"cpu_cores": 8
+					},
+					"system": {
+						"elevated": false,
+						"uptime": 17,
+						"os": "PRIVATE_ORG_SEQUOIA"
+					},
+					"input": {
+						"paused": false,
+						"remap_phase": "failed"
+					},
+					"issues": {
+						"err_count": "PRIVATE_TOKEN_A1B2",
+						"warn_count": 2,
+						"last_error": "PRIVATE_USER_ZEBRA PRIVATE_ORG_SEQUOIA PRIVATE_HOST_OPAL https://pac.internal.synthetic.example/private http://proxy.internal.synthetic.example:8080 /Users/PRIVATE_USER_ZEBRA/document PRIVATE_WINDOW_TITLE PRIVATE_TYPED_TEXT PRIVATE_TOKEN_A1B2 --private-argv=PRIVATE_ORG_SEQUOIA",
+						"recent": "PRIVATE_USER_ZEBRA PRIVATE_ORG_SEQUOIA PRIVATE_HOST_OPAL https://pac.internal.synthetic.example/private http://proxy.internal.synthetic.example:8080 /Users/PRIVATE_USER_ZEBRA/document PRIVATE_WINDOW_TITLE PRIVATE_TYPED_TEXT PRIVATE_TOKEN_A1B2 --private-argv=PRIVATE_ORG_SEQUOIA"
+					},
+					"paths": {
+						"config_dir": "/Users/PRIVATE_USER_ZEBRA/document"
+					},
+					"ai": {
+						"ai_enabled": true,
+						"ai_backend": "ollama",
+						"ai_model": "PRIVATE_USER_ZEBRA"
+					},
+					"permissions": {
+						"items": [
+							{
+								"id": "accessibility",
+								"state": "denied",
+								"name": "PRIVATE_USER_ZEBRA"
+							}
+						]
+					}
+				},
+				"probes": {
+					"appleevent_transport": {
+						"state": "timeout",
+						"ms": 99,
+						"cleanup": "pending",
+						"native_status": -1744,
+						"detail": "https://pac.internal.synthetic.example/private",
+						"argv": "--private-argv=PRIVATE_ORG_SEQUOIA",
+						"source_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+					},
+					"github_api": {
+						"state": "https://pac.internal.synthetic.example/private",
+						"ms": 1,
+						"message": "PRIVATE_USER_ZEBRA PRIVATE_ORG_SEQUOIA PRIVATE_HOST_OPAL https://pac.internal.synthetic.example/private http://proxy.internal.synthetic.example:8080 /Users/PRIVATE_USER_ZEBRA/document PRIVATE_WINDOW_TITLE PRIVATE_TYPED_TEXT PRIVATE_TOKEN_A1B2 --private-argv=PRIVATE_ORG_SEQUOIA",
+						"native_status": "PRIVATE_TYPED_TEXT"
+					}
+				},
+				"retired_probes": [
+					{
+						"probes": {
+							"appleevent_transport": {
+								"state": "error",
+								"cleanup": "unknown",
+								"native_status": -1712,
+								"detail": "http://proxy.internal.synthetic.example:8080"
+							}
+						},
+						"unknown": "PRIVATE_WINDOW_TITLE"
+					}
+				],
+				"unknown_nested": {
+					"personal": [
+						"PRIVATE_USER_ZEBRA",
+						"PRIVATE_ORG_SEQUOIA",
+						"PRIVATE_HOST_OPAL",
+						"https://pac.internal.synthetic.example/private",
+						"http://proxy.internal.synthetic.example:8080",
+						"/Users/PRIVATE_USER_ZEBRA/document",
+						"PRIVATE_WINDOW_TITLE",
+						"PRIVATE_TYPED_TEXT",
+						"PRIVATE_TOKEN_A1B2",
+						"--private-argv=PRIVATE_ORG_SEQUOIA"
+					]
+				},
+				"diagnostic_checks": {
+					"schema_fields": {
+						"state": "ok",
+						"message": "PRIVATE_TYPED_TEXT"
+					}
+				}
+			},
+			"canaries": [
+				"PRIVATE_USER_ZEBRA",
+				"PRIVATE_ORG_SEQUOIA",
+				"PRIVATE_HOST_OPAL",
+				"https://pac.internal.synthetic.example/private",
+				"http://proxy.internal.synthetic.example:8080",
+				"/Users/PRIVATE_USER_ZEBRA/document",
+				"PRIVATE_WINDOW_TITLE",
+				"PRIVATE_TYPED_TEXT",
+				"PRIVATE_TOKEN_A1B2",
+				"--private-argv=PRIVATE_ORG_SEQUOIA"
+			]
+		},
+		{
+			"name": "windows-true-unknown-cohort",
+			"snapshot": {
+				"schema_version": 2,
+				"driver": "windows",
+				"generated_at": "2026-10-09T14:00:00Z",
+				"detailed": true,
+				"extensive": true,
+				"sections": {
+					"versions": {
+						"ergopti_version": "0.0.0-dev.156",
+						"commit": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+						"channel": "dev",
+						"runtime": "1.1.1"
+					},
+					"hardware": {
+						"arch": "arm64",
+						"cpu_cores": 8
+					},
+					"system": {
+						"elevated": false,
+						"uptime": 17,
+						"os": "PRIVATE_ORG_SEQUOIA"
+					},
+					"input": {
+						"paused": false,
+						"remap_phase": "failed"
+					},
+					"issues": {
+						"err_count": 1,
+						"warn_count": 2,
+						"last_error": "PRIVATE_USER_ZEBRA PRIVATE_ORG_SEQUOIA PRIVATE_HOST_OPAL https://pac.internal.synthetic.example/private http://proxy.internal.synthetic.example:8080 /Users/PRIVATE_USER_ZEBRA/document PRIVATE_WINDOW_TITLE PRIVATE_TYPED_TEXT PRIVATE_TOKEN_A1B2 --private-argv=PRIVATE_ORG_SEQUOIA",
+						"recent": "PRIVATE_USER_ZEBRA PRIVATE_ORG_SEQUOIA PRIVATE_HOST_OPAL https://pac.internal.synthetic.example/private http://proxy.internal.synthetic.example:8080 /Users/PRIVATE_USER_ZEBRA/document PRIVATE_WINDOW_TITLE PRIVATE_TYPED_TEXT PRIVATE_TOKEN_A1B2 --private-argv=PRIVATE_ORG_SEQUOIA"
+					},
+					"paths": {
+						"config_dir": "/Users/PRIVATE_USER_ZEBRA/document"
+					},
+					"ai": {
+						"ai_enabled": true,
+						"ai_backend": "ollama",
+						"ai_model": "PRIVATE_USER_ZEBRA"
+					},
+					"permissions": {
+						"items": [
+							{
+								"id": "accessibility",
+								"state": "denied",
+								"name": "PRIVATE_USER_ZEBRA"
+							}
+						]
+					}
+				},
+				"probes": {
+					"appleevent_transport": {
+						"state": "timeout",
+						"ms": 99,
+						"cleanup": "pending",
+						"native_status": -1744,
+						"detail": "https://pac.internal.synthetic.example/private",
+						"argv": "--private-argv=PRIVATE_ORG_SEQUOIA",
+						"source_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+					},
+					"github_api": {
+						"state": "error",
+						"ms": 1,
+						"message": "PRIVATE_USER_ZEBRA PRIVATE_ORG_SEQUOIA PRIVATE_HOST_OPAL https://pac.internal.synthetic.example/private http://proxy.internal.synthetic.example:8080 /Users/PRIVATE_USER_ZEBRA/document PRIVATE_WINDOW_TITLE PRIVATE_TYPED_TEXT PRIVATE_TOKEN_A1B2 --private-argv=PRIVATE_ORG_SEQUOIA"
+					}
+				},
+				"retired_probes": [
+					{
+						"probes": {
+							"appleevent_transport": {
+								"state": "error",
+								"cleanup": "unknown",
+								"native_status": -1712,
+								"detail": "http://proxy.internal.synthetic.example:8080"
+							}
+						},
+						"unknown": "PRIVATE_WINDOW_TITLE"
+					},
+					{
+						"probes": {
+							"private_probe": {
+								"state": "ok",
+								"host": "PRIVATE_HOST_OPAL"
+							},
+							"github_api": {
+								"state": "cancelled",
+								"cleanup": "unknown",
+								"message": "http://proxy.internal.synthetic.example:8080"
+							}
+						},
+						"message": "PRIVATE_ORG_SEQUOIA"
+					}
+				],
+				"unknown_nested": {
+					"personal": [
+						"PRIVATE_USER_ZEBRA",
+						"PRIVATE_ORG_SEQUOIA",
+						"PRIVATE_HOST_OPAL",
+						"https://pac.internal.synthetic.example/private",
+						"http://proxy.internal.synthetic.example:8080",
+						"/Users/PRIVATE_USER_ZEBRA/document",
+						"PRIVATE_WINDOW_TITLE",
+						"PRIVATE_TYPED_TEXT",
+						"PRIVATE_TOKEN_A1B2",
+						"--private-argv=PRIVATE_ORG_SEQUOIA"
+					]
+				},
+				"diagnostic_checks": {
+					"schema_fields": {
+						"state": "ok",
+						"message": "PRIVATE_TYPED_TEXT"
+					}
+				}
+			},
+			"canaries": [
+				"PRIVATE_USER_ZEBRA",
+				"PRIVATE_ORG_SEQUOIA",
+				"PRIVATE_HOST_OPAL",
+				"https://pac.internal.synthetic.example/private",
+				"http://proxy.internal.synthetic.example:8080",
+				"/Users/PRIVATE_USER_ZEBRA/document",
+				"PRIVATE_WINDOW_TITLE",
+				"PRIVATE_TYPED_TEXT",
+				"PRIVATE_TOKEN_A1B2",
+				"--private-argv=PRIVATE_ORG_SEQUOIA"
+			]
+		},
+		{
+			"name": "macos-false-base",
+			"snapshot": {
+				"schema_version": 2,
+				"driver": "macos",
+				"generated_at": "2026-10-09T14:00:00Z",
+				"detailed": false,
+				"extensive": true,
+				"sections": {
+					"versions": {
+						"ergopti_version": "0.0.0-dev.156",
+						"commit": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+						"channel": "dev",
+						"runtime": "1.1.1"
+					},
+					"hardware": {
+						"arch": "arm64",
+						"cpu_cores": 8
+					},
+					"system": {
+						"elevated": false,
+						"uptime": 17,
+						"os": "PRIVATE_ORG_SEQUOIA"
+					},
+					"input": {
+						"paused": false,
+						"remap_phase": "failed"
+					},
+					"issues": {
+						"err_count": 1,
+						"warn_count": 2,
+						"last_error": "PRIVATE_USER_ZEBRA PRIVATE_ORG_SEQUOIA PRIVATE_HOST_OPAL https://pac.internal.synthetic.example/private http://proxy.internal.synthetic.example:8080 /Users/PRIVATE_USER_ZEBRA/document PRIVATE_WINDOW_TITLE PRIVATE_TYPED_TEXT PRIVATE_TOKEN_A1B2 --private-argv=PRIVATE_ORG_SEQUOIA",
+						"recent": "PRIVATE_USER_ZEBRA PRIVATE_ORG_SEQUOIA PRIVATE_HOST_OPAL https://pac.internal.synthetic.example/private http://proxy.internal.synthetic.example:8080 /Users/PRIVATE_USER_ZEBRA/document PRIVATE_WINDOW_TITLE PRIVATE_TYPED_TEXT PRIVATE_TOKEN_A1B2 --private-argv=PRIVATE_ORG_SEQUOIA"
+					},
+					"paths": {
+						"config_dir": "/Users/PRIVATE_USER_ZEBRA/document"
+					},
+					"ai": {
+						"ai_enabled": true,
+						"ai_backend": "ollama",
+						"ai_model": "PRIVATE_USER_ZEBRA"
+					},
+					"permissions": {
+						"items": [
+							{
+								"id": "accessibility",
+								"state": "denied",
+								"name": "PRIVATE_USER_ZEBRA"
+							}
+						]
+					}
+				},
+				"probes": {
+					"appleevent_transport": {
+						"state": "timeout",
+						"ms": 99,
+						"cleanup": "pending",
+						"native_status": -1744,
+						"detail": "https://pac.internal.synthetic.example/private",
+						"argv": "--private-argv=PRIVATE_ORG_SEQUOIA",
+						"source_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+					},
+					"github_api": {
+						"state": "error",
+						"ms": 1,
+						"message": "PRIVATE_USER_ZEBRA PRIVATE_ORG_SEQUOIA PRIVATE_HOST_OPAL https://pac.internal.synthetic.example/private http://proxy.internal.synthetic.example:8080 /Users/PRIVATE_USER_ZEBRA/document PRIVATE_WINDOW_TITLE PRIVATE_TYPED_TEXT PRIVATE_TOKEN_A1B2 --private-argv=PRIVATE_ORG_SEQUOIA"
+					}
+				},
+				"retired_probes": [
+					{
+						"probes": {
+							"appleevent_transport": {
+								"state": "error",
+								"cleanup": "unknown",
+								"native_status": -1712,
+								"detail": "http://proxy.internal.synthetic.example:8080"
+							}
+						},
+						"unknown": "PRIVATE_WINDOW_TITLE"
+					}
+				],
+				"unknown_nested": {
+					"personal": [
+						"PRIVATE_USER_ZEBRA",
+						"PRIVATE_ORG_SEQUOIA",
+						"PRIVATE_HOST_OPAL",
+						"https://pac.internal.synthetic.example/private",
+						"http://proxy.internal.synthetic.example:8080",
+						"/Users/PRIVATE_USER_ZEBRA/document",
+						"PRIVATE_WINDOW_TITLE",
+						"PRIVATE_TYPED_TEXT",
+						"PRIVATE_TOKEN_A1B2",
+						"--private-argv=PRIVATE_ORG_SEQUOIA"
+					]
+				},
+				"diagnostic_checks": {
+					"schema_fields": {
+						"state": "ok",
+						"message": "PRIVATE_TYPED_TEXT"
+					}
+				}
+			},
+			"canaries": [
+				"PRIVATE_USER_ZEBRA",
+				"PRIVATE_ORG_SEQUOIA",
+				"PRIVATE_HOST_OPAL",
+				"https://pac.internal.synthetic.example/private",
+				"http://proxy.internal.synthetic.example:8080",
+				"/Users/PRIVATE_USER_ZEBRA/document",
+				"PRIVATE_WINDOW_TITLE",
+				"PRIVATE_TYPED_TEXT",
+				"PRIVATE_TOKEN_A1B2",
+				"--private-argv=PRIVATE_ORG_SEQUOIA"
+			]
+		},
+		{
+			"name": "macos-false-typed-contamination",
+			"snapshot": {
+				"schema_version": 2,
+				"driver": "macos",
+				"generated_at": "2026-10-09T14:00:00Z",
+				"detailed": false,
+				"extensive": true,
+				"sections": {
+					"versions": {
+						"ergopti_version": "0.0.0-dev.156",
+						"commit": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+						"channel": "dev",
+						"runtime": "PRIVATE_USER_ZEBRA"
+					},
+					"hardware": {
+						"arch": "PRIVATE_HOST_OPAL",
+						"cpu_cores": 8
+					},
+					"system": {
+						"elevated": false,
+						"uptime": 17,
+						"os": "PRIVATE_ORG_SEQUOIA"
+					},
+					"input": {
+						"paused": false,
+						"remap_phase": "failed"
+					},
+					"issues": {
+						"err_count": "PRIVATE_TOKEN_A1B2",
+						"warn_count": 2,
+						"last_error": "PRIVATE_USER_ZEBRA PRIVATE_ORG_SEQUOIA PRIVATE_HOST_OPAL https://pac.internal.synthetic.example/private http://proxy.internal.synthetic.example:8080 /Users/PRIVATE_USER_ZEBRA/document PRIVATE_WINDOW_TITLE PRIVATE_TYPED_TEXT PRIVATE_TOKEN_A1B2 --private-argv=PRIVATE_ORG_SEQUOIA",
+						"recent": "PRIVATE_USER_ZEBRA PRIVATE_ORG_SEQUOIA PRIVATE_HOST_OPAL https://pac.internal.synthetic.example/private http://proxy.internal.synthetic.example:8080 /Users/PRIVATE_USER_ZEBRA/document PRIVATE_WINDOW_TITLE PRIVATE_TYPED_TEXT PRIVATE_TOKEN_A1B2 --private-argv=PRIVATE_ORG_SEQUOIA"
+					},
+					"paths": {
+						"config_dir": "/Users/PRIVATE_USER_ZEBRA/document"
+					},
+					"ai": {
+						"ai_enabled": true,
+						"ai_backend": "ollama",
+						"ai_model": "PRIVATE_USER_ZEBRA"
+					},
+					"permissions": {
+						"items": [
+							{
+								"id": "accessibility",
+								"state": "denied",
+								"name": "PRIVATE_USER_ZEBRA"
+							}
+						]
+					}
+				},
+				"probes": {
+					"appleevent_transport": {
+						"state": "timeout",
+						"ms": 99,
+						"cleanup": "pending",
+						"native_status": -1744,
+						"detail": "https://pac.internal.synthetic.example/private",
+						"argv": "--private-argv=PRIVATE_ORG_SEQUOIA",
+						"source_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+					},
+					"github_api": {
+						"state": "https://pac.internal.synthetic.example/private",
+						"ms": 1,
+						"message": "PRIVATE_USER_ZEBRA PRIVATE_ORG_SEQUOIA PRIVATE_HOST_OPAL https://pac.internal.synthetic.example/private http://proxy.internal.synthetic.example:8080 /Users/PRIVATE_USER_ZEBRA/document PRIVATE_WINDOW_TITLE PRIVATE_TYPED_TEXT PRIVATE_TOKEN_A1B2 --private-argv=PRIVATE_ORG_SEQUOIA",
+						"native_status": "PRIVATE_TYPED_TEXT"
+					}
+				},
+				"retired_probes": [
+					{
+						"probes": {
+							"appleevent_transport": {
+								"state": "error",
+								"cleanup": "unknown",
+								"native_status": -1712,
+								"detail": "http://proxy.internal.synthetic.example:8080"
+							}
+						},
+						"unknown": "PRIVATE_WINDOW_TITLE"
+					}
+				],
+				"unknown_nested": {
+					"personal": [
+						"PRIVATE_USER_ZEBRA",
+						"PRIVATE_ORG_SEQUOIA",
+						"PRIVATE_HOST_OPAL",
+						"https://pac.internal.synthetic.example/private",
+						"http://proxy.internal.synthetic.example:8080",
+						"/Users/PRIVATE_USER_ZEBRA/document",
+						"PRIVATE_WINDOW_TITLE",
+						"PRIVATE_TYPED_TEXT",
+						"PRIVATE_TOKEN_A1B2",
+						"--private-argv=PRIVATE_ORG_SEQUOIA"
+					]
+				},
+				"diagnostic_checks": {
+					"schema_fields": {
+						"state": "ok",
+						"message": "PRIVATE_TYPED_TEXT"
+					}
+				}
+			},
+			"canaries": [
+				"PRIVATE_USER_ZEBRA",
+				"PRIVATE_ORG_SEQUOIA",
+				"PRIVATE_HOST_OPAL",
+				"https://pac.internal.synthetic.example/private",
+				"http://proxy.internal.synthetic.example:8080",
+				"/Users/PRIVATE_USER_ZEBRA/document",
+				"PRIVATE_WINDOW_TITLE",
+				"PRIVATE_TYPED_TEXT",
+				"PRIVATE_TOKEN_A1B2",
+				"--private-argv=PRIVATE_ORG_SEQUOIA"
+			]
+		},
+		{
+			"name": "macos-false-unknown-cohort",
+			"snapshot": {
+				"schema_version": 2,
+				"driver": "macos",
+				"generated_at": "2026-10-09T14:00:00Z",
+				"detailed": false,
+				"extensive": true,
+				"sections": {
+					"versions": {
+						"ergopti_version": "0.0.0-dev.156",
+						"commit": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+						"channel": "dev",
+						"runtime": "1.1.1"
+					},
+					"hardware": {
+						"arch": "arm64",
+						"cpu_cores": 8
+					},
+					"system": {
+						"elevated": false,
+						"uptime": 17,
+						"os": "PRIVATE_ORG_SEQUOIA"
+					},
+					"input": {
+						"paused": false,
+						"remap_phase": "failed"
+					},
+					"issues": {
+						"err_count": 1,
+						"warn_count": 2,
+						"last_error": "PRIVATE_USER_ZEBRA PRIVATE_ORG_SEQUOIA PRIVATE_HOST_OPAL https://pac.internal.synthetic.example/private http://proxy.internal.synthetic.example:8080 /Users/PRIVATE_USER_ZEBRA/document PRIVATE_WINDOW_TITLE PRIVATE_TYPED_TEXT PRIVATE_TOKEN_A1B2 --private-argv=PRIVATE_ORG_SEQUOIA",
+						"recent": "PRIVATE_USER_ZEBRA PRIVATE_ORG_SEQUOIA PRIVATE_HOST_OPAL https://pac.internal.synthetic.example/private http://proxy.internal.synthetic.example:8080 /Users/PRIVATE_USER_ZEBRA/document PRIVATE_WINDOW_TITLE PRIVATE_TYPED_TEXT PRIVATE_TOKEN_A1B2 --private-argv=PRIVATE_ORG_SEQUOIA"
+					},
+					"paths": {
+						"config_dir": "/Users/PRIVATE_USER_ZEBRA/document"
+					},
+					"ai": {
+						"ai_enabled": true,
+						"ai_backend": "ollama",
+						"ai_model": "PRIVATE_USER_ZEBRA"
+					},
+					"permissions": {
+						"items": [
+							{
+								"id": "accessibility",
+								"state": "denied",
+								"name": "PRIVATE_USER_ZEBRA"
+							}
+						]
+					}
+				},
+				"probes": {
+					"appleevent_transport": {
+						"state": "timeout",
+						"ms": 99,
+						"cleanup": "pending",
+						"native_status": -1744,
+						"detail": "https://pac.internal.synthetic.example/private",
+						"argv": "--private-argv=PRIVATE_ORG_SEQUOIA",
+						"source_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+					},
+					"github_api": {
+						"state": "error",
+						"ms": 1,
+						"message": "PRIVATE_USER_ZEBRA PRIVATE_ORG_SEQUOIA PRIVATE_HOST_OPAL https://pac.internal.synthetic.example/private http://proxy.internal.synthetic.example:8080 /Users/PRIVATE_USER_ZEBRA/document PRIVATE_WINDOW_TITLE PRIVATE_TYPED_TEXT PRIVATE_TOKEN_A1B2 --private-argv=PRIVATE_ORG_SEQUOIA"
+					}
+				},
+				"retired_probes": [
+					{
+						"probes": {
+							"appleevent_transport": {
+								"state": "error",
+								"cleanup": "unknown",
+								"native_status": -1712,
+								"detail": "http://proxy.internal.synthetic.example:8080"
+							}
+						},
+						"unknown": "PRIVATE_WINDOW_TITLE"
+					},
+					{
+						"probes": {
+							"private_probe": {
+								"state": "ok",
+								"host": "PRIVATE_HOST_OPAL"
+							},
+							"github_api": {
+								"state": "cancelled",
+								"cleanup": "unknown",
+								"message": "http://proxy.internal.synthetic.example:8080"
+							}
+						},
+						"message": "PRIVATE_ORG_SEQUOIA"
+					}
+				],
+				"unknown_nested": {
+					"personal": [
+						"PRIVATE_USER_ZEBRA",
+						"PRIVATE_ORG_SEQUOIA",
+						"PRIVATE_HOST_OPAL",
+						"https://pac.internal.synthetic.example/private",
+						"http://proxy.internal.synthetic.example:8080",
+						"/Users/PRIVATE_USER_ZEBRA/document",
+						"PRIVATE_WINDOW_TITLE",
+						"PRIVATE_TYPED_TEXT",
+						"PRIVATE_TOKEN_A1B2",
+						"--private-argv=PRIVATE_ORG_SEQUOIA"
+					]
+				},
+				"diagnostic_checks": {
+					"schema_fields": {
+						"state": "ok",
+						"message": "PRIVATE_TYPED_TEXT"
+					}
+				}
+			},
+			"canaries": [
+				"PRIVATE_USER_ZEBRA",
+				"PRIVATE_ORG_SEQUOIA",
+				"PRIVATE_HOST_OPAL",
+				"https://pac.internal.synthetic.example/private",
+				"http://proxy.internal.synthetic.example:8080",
+				"/Users/PRIVATE_USER_ZEBRA/document",
+				"PRIVATE_WINDOW_TITLE",
+				"PRIVATE_TYPED_TEXT",
+				"PRIVATE_TOKEN_A1B2",
+				"--private-argv=PRIVATE_ORG_SEQUOIA"
+			]
+		},
+		{
+			"name": "macos-true-base",
+			"snapshot": {
+				"schema_version": 2,
+				"driver": "macos",
+				"generated_at": "2026-10-09T14:00:00Z",
+				"detailed": true,
+				"extensive": true,
+				"sections": {
+					"versions": {
+						"ergopti_version": "0.0.0-dev.156",
+						"commit": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+						"channel": "dev",
+						"runtime": "1.1.1"
+					},
+					"hardware": {
+						"arch": "arm64",
+						"cpu_cores": 8
+					},
+					"system": {
+						"elevated": false,
+						"uptime": 17,
+						"os": "PRIVATE_ORG_SEQUOIA"
+					},
+					"input": {
+						"paused": false,
+						"remap_phase": "failed"
+					},
+					"issues": {
+						"err_count": 1,
+						"warn_count": 2,
+						"last_error": "PRIVATE_USER_ZEBRA PRIVATE_ORG_SEQUOIA PRIVATE_HOST_OPAL https://pac.internal.synthetic.example/private http://proxy.internal.synthetic.example:8080 /Users/PRIVATE_USER_ZEBRA/document PRIVATE_WINDOW_TITLE PRIVATE_TYPED_TEXT PRIVATE_TOKEN_A1B2 --private-argv=PRIVATE_ORG_SEQUOIA",
+						"recent": "PRIVATE_USER_ZEBRA PRIVATE_ORG_SEQUOIA PRIVATE_HOST_OPAL https://pac.internal.synthetic.example/private http://proxy.internal.synthetic.example:8080 /Users/PRIVATE_USER_ZEBRA/document PRIVATE_WINDOW_TITLE PRIVATE_TYPED_TEXT PRIVATE_TOKEN_A1B2 --private-argv=PRIVATE_ORG_SEQUOIA"
+					},
+					"paths": {
+						"config_dir": "/Users/PRIVATE_USER_ZEBRA/document"
+					},
+					"ai": {
+						"ai_enabled": true,
+						"ai_backend": "ollama",
+						"ai_model": "PRIVATE_USER_ZEBRA"
+					},
+					"permissions": {
+						"items": [
+							{
+								"id": "accessibility",
+								"state": "denied",
+								"name": "PRIVATE_USER_ZEBRA"
+							}
+						]
+					}
+				},
+				"probes": {
+					"appleevent_transport": {
+						"state": "timeout",
+						"ms": 99,
+						"cleanup": "pending",
+						"native_status": -1744,
+						"detail": "https://pac.internal.synthetic.example/private",
+						"argv": "--private-argv=PRIVATE_ORG_SEQUOIA",
+						"source_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+					},
+					"github_api": {
+						"state": "error",
+						"ms": 1,
+						"message": "PRIVATE_USER_ZEBRA PRIVATE_ORG_SEQUOIA PRIVATE_HOST_OPAL https://pac.internal.synthetic.example/private http://proxy.internal.synthetic.example:8080 /Users/PRIVATE_USER_ZEBRA/document PRIVATE_WINDOW_TITLE PRIVATE_TYPED_TEXT PRIVATE_TOKEN_A1B2 --private-argv=PRIVATE_ORG_SEQUOIA"
+					}
+				},
+				"retired_probes": [
+					{
+						"probes": {
+							"appleevent_transport": {
+								"state": "error",
+								"cleanup": "unknown",
+								"native_status": -1712,
+								"detail": "http://proxy.internal.synthetic.example:8080"
+							}
+						},
+						"unknown": "PRIVATE_WINDOW_TITLE"
+					}
+				],
+				"unknown_nested": {
+					"personal": [
+						"PRIVATE_USER_ZEBRA",
+						"PRIVATE_ORG_SEQUOIA",
+						"PRIVATE_HOST_OPAL",
+						"https://pac.internal.synthetic.example/private",
+						"http://proxy.internal.synthetic.example:8080",
+						"/Users/PRIVATE_USER_ZEBRA/document",
+						"PRIVATE_WINDOW_TITLE",
+						"PRIVATE_TYPED_TEXT",
+						"PRIVATE_TOKEN_A1B2",
+						"--private-argv=PRIVATE_ORG_SEQUOIA"
+					]
+				},
+				"diagnostic_checks": {
+					"schema_fields": {
+						"state": "ok",
+						"message": "PRIVATE_TYPED_TEXT"
+					}
+				}
+			},
+			"canaries": [
+				"PRIVATE_USER_ZEBRA",
+				"PRIVATE_ORG_SEQUOIA",
+				"PRIVATE_HOST_OPAL",
+				"https://pac.internal.synthetic.example/private",
+				"http://proxy.internal.synthetic.example:8080",
+				"/Users/PRIVATE_USER_ZEBRA/document",
+				"PRIVATE_WINDOW_TITLE",
+				"PRIVATE_TYPED_TEXT",
+				"PRIVATE_TOKEN_A1B2",
+				"--private-argv=PRIVATE_ORG_SEQUOIA"
+			]
+		},
+		{
+			"name": "macos-true-typed-contamination",
+			"snapshot": {
+				"schema_version": 2,
+				"driver": "macos",
+				"generated_at": "2026-10-09T14:00:00Z",
+				"detailed": true,
+				"extensive": true,
+				"sections": {
+					"versions": {
+						"ergopti_version": "0.0.0-dev.156",
+						"commit": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+						"channel": "dev",
+						"runtime": "PRIVATE_USER_ZEBRA"
+					},
+					"hardware": {
+						"arch": "PRIVATE_HOST_OPAL",
+						"cpu_cores": 8
+					},
+					"system": {
+						"elevated": false,
+						"uptime": 17,
+						"os": "PRIVATE_ORG_SEQUOIA"
+					},
+					"input": {
+						"paused": false,
+						"remap_phase": "failed"
+					},
+					"issues": {
+						"err_count": "PRIVATE_TOKEN_A1B2",
+						"warn_count": 2,
+						"last_error": "PRIVATE_USER_ZEBRA PRIVATE_ORG_SEQUOIA PRIVATE_HOST_OPAL https://pac.internal.synthetic.example/private http://proxy.internal.synthetic.example:8080 /Users/PRIVATE_USER_ZEBRA/document PRIVATE_WINDOW_TITLE PRIVATE_TYPED_TEXT PRIVATE_TOKEN_A1B2 --private-argv=PRIVATE_ORG_SEQUOIA",
+						"recent": "PRIVATE_USER_ZEBRA PRIVATE_ORG_SEQUOIA PRIVATE_HOST_OPAL https://pac.internal.synthetic.example/private http://proxy.internal.synthetic.example:8080 /Users/PRIVATE_USER_ZEBRA/document PRIVATE_WINDOW_TITLE PRIVATE_TYPED_TEXT PRIVATE_TOKEN_A1B2 --private-argv=PRIVATE_ORG_SEQUOIA"
+					},
+					"paths": {
+						"config_dir": "/Users/PRIVATE_USER_ZEBRA/document"
+					},
+					"ai": {
+						"ai_enabled": true,
+						"ai_backend": "ollama",
+						"ai_model": "PRIVATE_USER_ZEBRA"
+					},
+					"permissions": {
+						"items": [
+							{
+								"id": "accessibility",
+								"state": "denied",
+								"name": "PRIVATE_USER_ZEBRA"
+							}
+						]
+					}
+				},
+				"probes": {
+					"appleevent_transport": {
+						"state": "timeout",
+						"ms": 99,
+						"cleanup": "pending",
+						"native_status": -1744,
+						"detail": "https://pac.internal.synthetic.example/private",
+						"argv": "--private-argv=PRIVATE_ORG_SEQUOIA",
+						"source_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+					},
+					"github_api": {
+						"state": "https://pac.internal.synthetic.example/private",
+						"ms": 1,
+						"message": "PRIVATE_USER_ZEBRA PRIVATE_ORG_SEQUOIA PRIVATE_HOST_OPAL https://pac.internal.synthetic.example/private http://proxy.internal.synthetic.example:8080 /Users/PRIVATE_USER_ZEBRA/document PRIVATE_WINDOW_TITLE PRIVATE_TYPED_TEXT PRIVATE_TOKEN_A1B2 --private-argv=PRIVATE_ORG_SEQUOIA",
+						"native_status": "PRIVATE_TYPED_TEXT"
+					}
+				},
+				"retired_probes": [
+					{
+						"probes": {
+							"appleevent_transport": {
+								"state": "error",
+								"cleanup": "unknown",
+								"native_status": -1712,
+								"detail": "http://proxy.internal.synthetic.example:8080"
+							}
+						},
+						"unknown": "PRIVATE_WINDOW_TITLE"
+					}
+				],
+				"unknown_nested": {
+					"personal": [
+						"PRIVATE_USER_ZEBRA",
+						"PRIVATE_ORG_SEQUOIA",
+						"PRIVATE_HOST_OPAL",
+						"https://pac.internal.synthetic.example/private",
+						"http://proxy.internal.synthetic.example:8080",
+						"/Users/PRIVATE_USER_ZEBRA/document",
+						"PRIVATE_WINDOW_TITLE",
+						"PRIVATE_TYPED_TEXT",
+						"PRIVATE_TOKEN_A1B2",
+						"--private-argv=PRIVATE_ORG_SEQUOIA"
+					]
+				},
+				"diagnostic_checks": {
+					"schema_fields": {
+						"state": "ok",
+						"message": "PRIVATE_TYPED_TEXT"
+					}
+				}
+			},
+			"canaries": [
+				"PRIVATE_USER_ZEBRA",
+				"PRIVATE_ORG_SEQUOIA",
+				"PRIVATE_HOST_OPAL",
+				"https://pac.internal.synthetic.example/private",
+				"http://proxy.internal.synthetic.example:8080",
+				"/Users/PRIVATE_USER_ZEBRA/document",
+				"PRIVATE_WINDOW_TITLE",
+				"PRIVATE_TYPED_TEXT",
+				"PRIVATE_TOKEN_A1B2",
+				"--private-argv=PRIVATE_ORG_SEQUOIA"
+			]
+		},
+		{
+			"name": "macos-true-unknown-cohort",
+			"snapshot": {
+				"schema_version": 2,
+				"driver": "macos",
+				"generated_at": "2026-10-09T14:00:00Z",
+				"detailed": true,
+				"extensive": true,
+				"sections": {
+					"versions": {
+						"ergopti_version": "0.0.0-dev.156",
+						"commit": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+						"channel": "dev",
+						"runtime": "1.1.1"
+					},
+					"hardware": {
+						"arch": "arm64",
+						"cpu_cores": 8
+					},
+					"system": {
+						"elevated": false,
+						"uptime": 17,
+						"os": "PRIVATE_ORG_SEQUOIA"
+					},
+					"input": {
+						"paused": false,
+						"remap_phase": "failed"
+					},
+					"issues": {
+						"err_count": 1,
+						"warn_count": 2,
+						"last_error": "PRIVATE_USER_ZEBRA PRIVATE_ORG_SEQUOIA PRIVATE_HOST_OPAL https://pac.internal.synthetic.example/private http://proxy.internal.synthetic.example:8080 /Users/PRIVATE_USER_ZEBRA/document PRIVATE_WINDOW_TITLE PRIVATE_TYPED_TEXT PRIVATE_TOKEN_A1B2 --private-argv=PRIVATE_ORG_SEQUOIA",
+						"recent": "PRIVATE_USER_ZEBRA PRIVATE_ORG_SEQUOIA PRIVATE_HOST_OPAL https://pac.internal.synthetic.example/private http://proxy.internal.synthetic.example:8080 /Users/PRIVATE_USER_ZEBRA/document PRIVATE_WINDOW_TITLE PRIVATE_TYPED_TEXT PRIVATE_TOKEN_A1B2 --private-argv=PRIVATE_ORG_SEQUOIA"
+					},
+					"paths": {
+						"config_dir": "/Users/PRIVATE_USER_ZEBRA/document"
+					},
+					"ai": {
+						"ai_enabled": true,
+						"ai_backend": "ollama",
+						"ai_model": "PRIVATE_USER_ZEBRA"
+					},
+					"permissions": {
+						"items": [
+							{
+								"id": "accessibility",
+								"state": "denied",
+								"name": "PRIVATE_USER_ZEBRA"
+							}
+						]
+					}
+				},
+				"probes": {
+					"appleevent_transport": {
+						"state": "timeout",
+						"ms": 99,
+						"cleanup": "pending",
+						"native_status": -1744,
+						"detail": "https://pac.internal.synthetic.example/private",
+						"argv": "--private-argv=PRIVATE_ORG_SEQUOIA",
+						"source_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+					},
+					"github_api": {
+						"state": "error",
+						"ms": 1,
+						"message": "PRIVATE_USER_ZEBRA PRIVATE_ORG_SEQUOIA PRIVATE_HOST_OPAL https://pac.internal.synthetic.example/private http://proxy.internal.synthetic.example:8080 /Users/PRIVATE_USER_ZEBRA/document PRIVATE_WINDOW_TITLE PRIVATE_TYPED_TEXT PRIVATE_TOKEN_A1B2 --private-argv=PRIVATE_ORG_SEQUOIA"
+					}
+				},
+				"retired_probes": [
+					{
+						"probes": {
+							"appleevent_transport": {
+								"state": "error",
+								"cleanup": "unknown",
+								"native_status": -1712,
+								"detail": "http://proxy.internal.synthetic.example:8080"
+							}
+						},
+						"unknown": "PRIVATE_WINDOW_TITLE"
+					},
+					{
+						"probes": {
+							"private_probe": {
+								"state": "ok",
+								"host": "PRIVATE_HOST_OPAL"
+							},
+							"github_api": {
+								"state": "cancelled",
+								"cleanup": "unknown",
+								"message": "http://proxy.internal.synthetic.example:8080"
+							}
+						},
+						"message": "PRIVATE_ORG_SEQUOIA"
+					}
+				],
+				"unknown_nested": {
+					"personal": [
+						"PRIVATE_USER_ZEBRA",
+						"PRIVATE_ORG_SEQUOIA",
+						"PRIVATE_HOST_OPAL",
+						"https://pac.internal.synthetic.example/private",
+						"http://proxy.internal.synthetic.example:8080",
+						"/Users/PRIVATE_USER_ZEBRA/document",
+						"PRIVATE_WINDOW_TITLE",
+						"PRIVATE_TYPED_TEXT",
+						"PRIVATE_TOKEN_A1B2",
+						"--private-argv=PRIVATE_ORG_SEQUOIA"
+					]
+				},
+				"diagnostic_checks": {
+					"schema_fields": {
+						"state": "ok",
+						"message": "PRIVATE_TYPED_TEXT"
+					}
+				}
+			},
+			"canaries": [
+				"PRIVATE_USER_ZEBRA",
+				"PRIVATE_ORG_SEQUOIA",
+				"PRIVATE_HOST_OPAL",
+				"https://pac.internal.synthetic.example/private",
+				"http://proxy.internal.synthetic.example:8080",
+				"/Users/PRIVATE_USER_ZEBRA/document",
+				"PRIVATE_WINDOW_TITLE",
+				"PRIVATE_TYPED_TEXT",
+				"PRIVATE_TOKEN_A1B2",
+				"--private-argv=PRIVATE_ORG_SEQUOIA"
+			]
+		},
+		{
+			"name": "linux-false-base",
+			"snapshot": {
+				"schema_version": 2,
+				"driver": "linux",
+				"generated_at": "2026-10-09T14:00:00Z",
+				"detailed": false,
+				"extensive": true,
+				"sections": {
+					"versions": {
+						"ergopti_version": "0.0.0-dev.156",
+						"commit": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+						"channel": "dev",
+						"runtime": "1.1.1"
+					},
+					"hardware": {
+						"arch": "arm64",
+						"cpu_cores": 8
+					},
+					"system": {
+						"elevated": false,
+						"uptime": 17,
+						"os": "PRIVATE_ORG_SEQUOIA"
+					},
+					"input": {
+						"paused": false,
+						"remap_phase": "failed"
+					},
+					"issues": {
+						"err_count": 1,
+						"warn_count": 2,
+						"last_error": "PRIVATE_USER_ZEBRA PRIVATE_ORG_SEQUOIA PRIVATE_HOST_OPAL https://pac.internal.synthetic.example/private http://proxy.internal.synthetic.example:8080 /Users/PRIVATE_USER_ZEBRA/document PRIVATE_WINDOW_TITLE PRIVATE_TYPED_TEXT PRIVATE_TOKEN_A1B2 --private-argv=PRIVATE_ORG_SEQUOIA",
+						"recent": "PRIVATE_USER_ZEBRA PRIVATE_ORG_SEQUOIA PRIVATE_HOST_OPAL https://pac.internal.synthetic.example/private http://proxy.internal.synthetic.example:8080 /Users/PRIVATE_USER_ZEBRA/document PRIVATE_WINDOW_TITLE PRIVATE_TYPED_TEXT PRIVATE_TOKEN_A1B2 --private-argv=PRIVATE_ORG_SEQUOIA"
+					},
+					"paths": {
+						"config_dir": "/Users/PRIVATE_USER_ZEBRA/document"
+					},
+					"ai": {
+						"ai_enabled": true,
+						"ai_backend": "ollama",
+						"ai_model": "PRIVATE_USER_ZEBRA"
+					},
+					"permissions": {
+						"items": [
+							{
+								"id": "accessibility",
+								"state": "denied",
+								"name": "PRIVATE_USER_ZEBRA"
+							}
+						]
+					}
+				},
+				"probes": {
+					"appleevent_transport": {
+						"state": "timeout",
+						"ms": 99,
+						"cleanup": "pending",
+						"native_status": -1744,
+						"detail": "https://pac.internal.synthetic.example/private",
+						"argv": "--private-argv=PRIVATE_ORG_SEQUOIA",
+						"source_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+					},
+					"github_api": {
+						"state": "error",
+						"ms": 1,
+						"message": "PRIVATE_USER_ZEBRA PRIVATE_ORG_SEQUOIA PRIVATE_HOST_OPAL https://pac.internal.synthetic.example/private http://proxy.internal.synthetic.example:8080 /Users/PRIVATE_USER_ZEBRA/document PRIVATE_WINDOW_TITLE PRIVATE_TYPED_TEXT PRIVATE_TOKEN_A1B2 --private-argv=PRIVATE_ORG_SEQUOIA"
+					}
+				},
+				"retired_probes": [
+					{
+						"probes": {
+							"appleevent_transport": {
+								"state": "error",
+								"cleanup": "unknown",
+								"native_status": -1712,
+								"detail": "http://proxy.internal.synthetic.example:8080"
+							}
+						},
+						"unknown": "PRIVATE_WINDOW_TITLE"
+					}
+				],
+				"unknown_nested": {
+					"personal": [
+						"PRIVATE_USER_ZEBRA",
+						"PRIVATE_ORG_SEQUOIA",
+						"PRIVATE_HOST_OPAL",
+						"https://pac.internal.synthetic.example/private",
+						"http://proxy.internal.synthetic.example:8080",
+						"/Users/PRIVATE_USER_ZEBRA/document",
+						"PRIVATE_WINDOW_TITLE",
+						"PRIVATE_TYPED_TEXT",
+						"PRIVATE_TOKEN_A1B2",
+						"--private-argv=PRIVATE_ORG_SEQUOIA"
+					]
+				},
+				"diagnostic_checks": {
+					"schema_fields": {
+						"state": "ok",
+						"message": "PRIVATE_TYPED_TEXT"
+					}
+				}
+			},
+			"canaries": [
+				"PRIVATE_USER_ZEBRA",
+				"PRIVATE_ORG_SEQUOIA",
+				"PRIVATE_HOST_OPAL",
+				"https://pac.internal.synthetic.example/private",
+				"http://proxy.internal.synthetic.example:8080",
+				"/Users/PRIVATE_USER_ZEBRA/document",
+				"PRIVATE_WINDOW_TITLE",
+				"PRIVATE_TYPED_TEXT",
+				"PRIVATE_TOKEN_A1B2",
+				"--private-argv=PRIVATE_ORG_SEQUOIA"
+			]
+		},
+		{
+			"name": "linux-false-typed-contamination",
+			"snapshot": {
+				"schema_version": 2,
+				"driver": "linux",
+				"generated_at": "2026-10-09T14:00:00Z",
+				"detailed": false,
+				"extensive": true,
+				"sections": {
+					"versions": {
+						"ergopti_version": "0.0.0-dev.156",
+						"commit": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+						"channel": "dev",
+						"runtime": "PRIVATE_USER_ZEBRA"
+					},
+					"hardware": {
+						"arch": "PRIVATE_HOST_OPAL",
+						"cpu_cores": 8
+					},
+					"system": {
+						"elevated": false,
+						"uptime": 17,
+						"os": "PRIVATE_ORG_SEQUOIA"
+					},
+					"input": {
+						"paused": false,
+						"remap_phase": "failed"
+					},
+					"issues": {
+						"err_count": "PRIVATE_TOKEN_A1B2",
+						"warn_count": 2,
+						"last_error": "PRIVATE_USER_ZEBRA PRIVATE_ORG_SEQUOIA PRIVATE_HOST_OPAL https://pac.internal.synthetic.example/private http://proxy.internal.synthetic.example:8080 /Users/PRIVATE_USER_ZEBRA/document PRIVATE_WINDOW_TITLE PRIVATE_TYPED_TEXT PRIVATE_TOKEN_A1B2 --private-argv=PRIVATE_ORG_SEQUOIA",
+						"recent": "PRIVATE_USER_ZEBRA PRIVATE_ORG_SEQUOIA PRIVATE_HOST_OPAL https://pac.internal.synthetic.example/private http://proxy.internal.synthetic.example:8080 /Users/PRIVATE_USER_ZEBRA/document PRIVATE_WINDOW_TITLE PRIVATE_TYPED_TEXT PRIVATE_TOKEN_A1B2 --private-argv=PRIVATE_ORG_SEQUOIA"
+					},
+					"paths": {
+						"config_dir": "/Users/PRIVATE_USER_ZEBRA/document"
+					},
+					"ai": {
+						"ai_enabled": true,
+						"ai_backend": "ollama",
+						"ai_model": "PRIVATE_USER_ZEBRA"
+					},
+					"permissions": {
+						"items": [
+							{
+								"id": "accessibility",
+								"state": "denied",
+								"name": "PRIVATE_USER_ZEBRA"
+							}
+						]
+					}
+				},
+				"probes": {
+					"appleevent_transport": {
+						"state": "timeout",
+						"ms": 99,
+						"cleanup": "pending",
+						"native_status": -1744,
+						"detail": "https://pac.internal.synthetic.example/private",
+						"argv": "--private-argv=PRIVATE_ORG_SEQUOIA",
+						"source_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+					},
+					"github_api": {
+						"state": "https://pac.internal.synthetic.example/private",
+						"ms": 1,
+						"message": "PRIVATE_USER_ZEBRA PRIVATE_ORG_SEQUOIA PRIVATE_HOST_OPAL https://pac.internal.synthetic.example/private http://proxy.internal.synthetic.example:8080 /Users/PRIVATE_USER_ZEBRA/document PRIVATE_WINDOW_TITLE PRIVATE_TYPED_TEXT PRIVATE_TOKEN_A1B2 --private-argv=PRIVATE_ORG_SEQUOIA",
+						"native_status": "PRIVATE_TYPED_TEXT"
+					}
+				},
+				"retired_probes": [
+					{
+						"probes": {
+							"appleevent_transport": {
+								"state": "error",
+								"cleanup": "unknown",
+								"native_status": -1712,
+								"detail": "http://proxy.internal.synthetic.example:8080"
+							}
+						},
+						"unknown": "PRIVATE_WINDOW_TITLE"
+					}
+				],
+				"unknown_nested": {
+					"personal": [
+						"PRIVATE_USER_ZEBRA",
+						"PRIVATE_ORG_SEQUOIA",
+						"PRIVATE_HOST_OPAL",
+						"https://pac.internal.synthetic.example/private",
+						"http://proxy.internal.synthetic.example:8080",
+						"/Users/PRIVATE_USER_ZEBRA/document",
+						"PRIVATE_WINDOW_TITLE",
+						"PRIVATE_TYPED_TEXT",
+						"PRIVATE_TOKEN_A1B2",
+						"--private-argv=PRIVATE_ORG_SEQUOIA"
+					]
+				},
+				"diagnostic_checks": {
+					"schema_fields": {
+						"state": "ok",
+						"message": "PRIVATE_TYPED_TEXT"
+					}
+				}
+			},
+			"canaries": [
+				"PRIVATE_USER_ZEBRA",
+				"PRIVATE_ORG_SEQUOIA",
+				"PRIVATE_HOST_OPAL",
+				"https://pac.internal.synthetic.example/private",
+				"http://proxy.internal.synthetic.example:8080",
+				"/Users/PRIVATE_USER_ZEBRA/document",
+				"PRIVATE_WINDOW_TITLE",
+				"PRIVATE_TYPED_TEXT",
+				"PRIVATE_TOKEN_A1B2",
+				"--private-argv=PRIVATE_ORG_SEQUOIA"
+			]
+		},
+		{
+			"name": "linux-false-unknown-cohort",
+			"snapshot": {
+				"schema_version": 2,
+				"driver": "linux",
+				"generated_at": "2026-10-09T14:00:00Z",
+				"detailed": false,
+				"extensive": true,
+				"sections": {
+					"versions": {
+						"ergopti_version": "0.0.0-dev.156",
+						"commit": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+						"channel": "dev",
+						"runtime": "1.1.1"
+					},
+					"hardware": {
+						"arch": "arm64",
+						"cpu_cores": 8
+					},
+					"system": {
+						"elevated": false,
+						"uptime": 17,
+						"os": "PRIVATE_ORG_SEQUOIA"
+					},
+					"input": {
+						"paused": false,
+						"remap_phase": "failed"
+					},
+					"issues": {
+						"err_count": 1,
+						"warn_count": 2,
+						"last_error": "PRIVATE_USER_ZEBRA PRIVATE_ORG_SEQUOIA PRIVATE_HOST_OPAL https://pac.internal.synthetic.example/private http://proxy.internal.synthetic.example:8080 /Users/PRIVATE_USER_ZEBRA/document PRIVATE_WINDOW_TITLE PRIVATE_TYPED_TEXT PRIVATE_TOKEN_A1B2 --private-argv=PRIVATE_ORG_SEQUOIA",
+						"recent": "PRIVATE_USER_ZEBRA PRIVATE_ORG_SEQUOIA PRIVATE_HOST_OPAL https://pac.internal.synthetic.example/private http://proxy.internal.synthetic.example:8080 /Users/PRIVATE_USER_ZEBRA/document PRIVATE_WINDOW_TITLE PRIVATE_TYPED_TEXT PRIVATE_TOKEN_A1B2 --private-argv=PRIVATE_ORG_SEQUOIA"
+					},
+					"paths": {
+						"config_dir": "/Users/PRIVATE_USER_ZEBRA/document"
+					},
+					"ai": {
+						"ai_enabled": true,
+						"ai_backend": "ollama",
+						"ai_model": "PRIVATE_USER_ZEBRA"
+					},
+					"permissions": {
+						"items": [
+							{
+								"id": "accessibility",
+								"state": "denied",
+								"name": "PRIVATE_USER_ZEBRA"
+							}
+						]
+					}
+				},
+				"probes": {
+					"appleevent_transport": {
+						"state": "timeout",
+						"ms": 99,
+						"cleanup": "pending",
+						"native_status": -1744,
+						"detail": "https://pac.internal.synthetic.example/private",
+						"argv": "--private-argv=PRIVATE_ORG_SEQUOIA",
+						"source_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+					},
+					"github_api": {
+						"state": "error",
+						"ms": 1,
+						"message": "PRIVATE_USER_ZEBRA PRIVATE_ORG_SEQUOIA PRIVATE_HOST_OPAL https://pac.internal.synthetic.example/private http://proxy.internal.synthetic.example:8080 /Users/PRIVATE_USER_ZEBRA/document PRIVATE_WINDOW_TITLE PRIVATE_TYPED_TEXT PRIVATE_TOKEN_A1B2 --private-argv=PRIVATE_ORG_SEQUOIA"
+					}
+				},
+				"retired_probes": [
+					{
+						"probes": {
+							"appleevent_transport": {
+								"state": "error",
+								"cleanup": "unknown",
+								"native_status": -1712,
+								"detail": "http://proxy.internal.synthetic.example:8080"
+							}
+						},
+						"unknown": "PRIVATE_WINDOW_TITLE"
+					},
+					{
+						"probes": {
+							"private_probe": {
+								"state": "ok",
+								"host": "PRIVATE_HOST_OPAL"
+							},
+							"github_api": {
+								"state": "cancelled",
+								"cleanup": "unknown",
+								"message": "http://proxy.internal.synthetic.example:8080"
+							}
+						},
+						"message": "PRIVATE_ORG_SEQUOIA"
+					}
+				],
+				"unknown_nested": {
+					"personal": [
+						"PRIVATE_USER_ZEBRA",
+						"PRIVATE_ORG_SEQUOIA",
+						"PRIVATE_HOST_OPAL",
+						"https://pac.internal.synthetic.example/private",
+						"http://proxy.internal.synthetic.example:8080",
+						"/Users/PRIVATE_USER_ZEBRA/document",
+						"PRIVATE_WINDOW_TITLE",
+						"PRIVATE_TYPED_TEXT",
+						"PRIVATE_TOKEN_A1B2",
+						"--private-argv=PRIVATE_ORG_SEQUOIA"
+					]
+				},
+				"diagnostic_checks": {
+					"schema_fields": {
+						"state": "ok",
+						"message": "PRIVATE_TYPED_TEXT"
+					}
+				}
+			},
+			"canaries": [
+				"PRIVATE_USER_ZEBRA",
+				"PRIVATE_ORG_SEQUOIA",
+				"PRIVATE_HOST_OPAL",
+				"https://pac.internal.synthetic.example/private",
+				"http://proxy.internal.synthetic.example:8080",
+				"/Users/PRIVATE_USER_ZEBRA/document",
+				"PRIVATE_WINDOW_TITLE",
+				"PRIVATE_TYPED_TEXT",
+				"PRIVATE_TOKEN_A1B2",
+				"--private-argv=PRIVATE_ORG_SEQUOIA"
+			]
+		},
+		{
+			"name": "linux-true-base",
+			"snapshot": {
+				"schema_version": 2,
+				"driver": "linux",
+				"generated_at": "2026-10-09T14:00:00Z",
+				"detailed": true,
+				"extensive": true,
+				"sections": {
+					"versions": {
+						"ergopti_version": "0.0.0-dev.156",
+						"commit": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+						"channel": "dev",
+						"runtime": "1.1.1"
+					},
+					"hardware": {
+						"arch": "arm64",
+						"cpu_cores": 8
+					},
+					"system": {
+						"elevated": false,
+						"uptime": 17,
+						"os": "PRIVATE_ORG_SEQUOIA"
+					},
+					"input": {
+						"paused": false,
+						"remap_phase": "failed"
+					},
+					"issues": {
+						"err_count": 1,
+						"warn_count": 2,
+						"last_error": "PRIVATE_USER_ZEBRA PRIVATE_ORG_SEQUOIA PRIVATE_HOST_OPAL https://pac.internal.synthetic.example/private http://proxy.internal.synthetic.example:8080 /Users/PRIVATE_USER_ZEBRA/document PRIVATE_WINDOW_TITLE PRIVATE_TYPED_TEXT PRIVATE_TOKEN_A1B2 --private-argv=PRIVATE_ORG_SEQUOIA",
+						"recent": "PRIVATE_USER_ZEBRA PRIVATE_ORG_SEQUOIA PRIVATE_HOST_OPAL https://pac.internal.synthetic.example/private http://proxy.internal.synthetic.example:8080 /Users/PRIVATE_USER_ZEBRA/document PRIVATE_WINDOW_TITLE PRIVATE_TYPED_TEXT PRIVATE_TOKEN_A1B2 --private-argv=PRIVATE_ORG_SEQUOIA"
+					},
+					"paths": {
+						"config_dir": "/Users/PRIVATE_USER_ZEBRA/document"
+					},
+					"ai": {
+						"ai_enabled": true,
+						"ai_backend": "ollama",
+						"ai_model": "PRIVATE_USER_ZEBRA"
+					},
+					"permissions": {
+						"items": [
+							{
+								"id": "accessibility",
+								"state": "denied",
+								"name": "PRIVATE_USER_ZEBRA"
+							}
+						]
+					}
+				},
+				"probes": {
+					"appleevent_transport": {
+						"state": "timeout",
+						"ms": 99,
+						"cleanup": "pending",
+						"native_status": -1744,
+						"detail": "https://pac.internal.synthetic.example/private",
+						"argv": "--private-argv=PRIVATE_ORG_SEQUOIA",
+						"source_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+					},
+					"github_api": {
+						"state": "error",
+						"ms": 1,
+						"message": "PRIVATE_USER_ZEBRA PRIVATE_ORG_SEQUOIA PRIVATE_HOST_OPAL https://pac.internal.synthetic.example/private http://proxy.internal.synthetic.example:8080 /Users/PRIVATE_USER_ZEBRA/document PRIVATE_WINDOW_TITLE PRIVATE_TYPED_TEXT PRIVATE_TOKEN_A1B2 --private-argv=PRIVATE_ORG_SEQUOIA"
+					}
+				},
+				"retired_probes": [
+					{
+						"probes": {
+							"appleevent_transport": {
+								"state": "error",
+								"cleanup": "unknown",
+								"native_status": -1712,
+								"detail": "http://proxy.internal.synthetic.example:8080"
+							}
+						},
+						"unknown": "PRIVATE_WINDOW_TITLE"
+					}
+				],
+				"unknown_nested": {
+					"personal": [
+						"PRIVATE_USER_ZEBRA",
+						"PRIVATE_ORG_SEQUOIA",
+						"PRIVATE_HOST_OPAL",
+						"https://pac.internal.synthetic.example/private",
+						"http://proxy.internal.synthetic.example:8080",
+						"/Users/PRIVATE_USER_ZEBRA/document",
+						"PRIVATE_WINDOW_TITLE",
+						"PRIVATE_TYPED_TEXT",
+						"PRIVATE_TOKEN_A1B2",
+						"--private-argv=PRIVATE_ORG_SEQUOIA"
+					]
+				},
+				"diagnostic_checks": {
+					"schema_fields": {
+						"state": "ok",
+						"message": "PRIVATE_TYPED_TEXT"
+					}
+				}
+			},
+			"canaries": [
+				"PRIVATE_USER_ZEBRA",
+				"PRIVATE_ORG_SEQUOIA",
+				"PRIVATE_HOST_OPAL",
+				"https://pac.internal.synthetic.example/private",
+				"http://proxy.internal.synthetic.example:8080",
+				"/Users/PRIVATE_USER_ZEBRA/document",
+				"PRIVATE_WINDOW_TITLE",
+				"PRIVATE_TYPED_TEXT",
+				"PRIVATE_TOKEN_A1B2",
+				"--private-argv=PRIVATE_ORG_SEQUOIA"
+			]
+		},
+		{
+			"name": "linux-true-typed-contamination",
+			"snapshot": {
+				"schema_version": 2,
+				"driver": "linux",
+				"generated_at": "2026-10-09T14:00:00Z",
+				"detailed": true,
+				"extensive": true,
+				"sections": {
+					"versions": {
+						"ergopti_version": "0.0.0-dev.156",
+						"commit": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+						"channel": "dev",
+						"runtime": "PRIVATE_USER_ZEBRA"
+					},
+					"hardware": {
+						"arch": "PRIVATE_HOST_OPAL",
+						"cpu_cores": 8
+					},
+					"system": {
+						"elevated": false,
+						"uptime": 17,
+						"os": "PRIVATE_ORG_SEQUOIA"
+					},
+					"input": {
+						"paused": false,
+						"remap_phase": "failed"
+					},
+					"issues": {
+						"err_count": "PRIVATE_TOKEN_A1B2",
+						"warn_count": 2,
+						"last_error": "PRIVATE_USER_ZEBRA PRIVATE_ORG_SEQUOIA PRIVATE_HOST_OPAL https://pac.internal.synthetic.example/private http://proxy.internal.synthetic.example:8080 /Users/PRIVATE_USER_ZEBRA/document PRIVATE_WINDOW_TITLE PRIVATE_TYPED_TEXT PRIVATE_TOKEN_A1B2 --private-argv=PRIVATE_ORG_SEQUOIA",
+						"recent": "PRIVATE_USER_ZEBRA PRIVATE_ORG_SEQUOIA PRIVATE_HOST_OPAL https://pac.internal.synthetic.example/private http://proxy.internal.synthetic.example:8080 /Users/PRIVATE_USER_ZEBRA/document PRIVATE_WINDOW_TITLE PRIVATE_TYPED_TEXT PRIVATE_TOKEN_A1B2 --private-argv=PRIVATE_ORG_SEQUOIA"
+					},
+					"paths": {
+						"config_dir": "/Users/PRIVATE_USER_ZEBRA/document"
+					},
+					"ai": {
+						"ai_enabled": true,
+						"ai_backend": "ollama",
+						"ai_model": "PRIVATE_USER_ZEBRA"
+					},
+					"permissions": {
+						"items": [
+							{
+								"id": "accessibility",
+								"state": "denied",
+								"name": "PRIVATE_USER_ZEBRA"
+							}
+						]
+					}
+				},
+				"probes": {
+					"appleevent_transport": {
+						"state": "timeout",
+						"ms": 99,
+						"cleanup": "pending",
+						"native_status": -1744,
+						"detail": "https://pac.internal.synthetic.example/private",
+						"argv": "--private-argv=PRIVATE_ORG_SEQUOIA",
+						"source_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+					},
+					"github_api": {
+						"state": "https://pac.internal.synthetic.example/private",
+						"ms": 1,
+						"message": "PRIVATE_USER_ZEBRA PRIVATE_ORG_SEQUOIA PRIVATE_HOST_OPAL https://pac.internal.synthetic.example/private http://proxy.internal.synthetic.example:8080 /Users/PRIVATE_USER_ZEBRA/document PRIVATE_WINDOW_TITLE PRIVATE_TYPED_TEXT PRIVATE_TOKEN_A1B2 --private-argv=PRIVATE_ORG_SEQUOIA",
+						"native_status": "PRIVATE_TYPED_TEXT"
+					}
+				},
+				"retired_probes": [
+					{
+						"probes": {
+							"appleevent_transport": {
+								"state": "error",
+								"cleanup": "unknown",
+								"native_status": -1712,
+								"detail": "http://proxy.internal.synthetic.example:8080"
+							}
+						},
+						"unknown": "PRIVATE_WINDOW_TITLE"
+					}
+				],
+				"unknown_nested": {
+					"personal": [
+						"PRIVATE_USER_ZEBRA",
+						"PRIVATE_ORG_SEQUOIA",
+						"PRIVATE_HOST_OPAL",
+						"https://pac.internal.synthetic.example/private",
+						"http://proxy.internal.synthetic.example:8080",
+						"/Users/PRIVATE_USER_ZEBRA/document",
+						"PRIVATE_WINDOW_TITLE",
+						"PRIVATE_TYPED_TEXT",
+						"PRIVATE_TOKEN_A1B2",
+						"--private-argv=PRIVATE_ORG_SEQUOIA"
+					]
+				},
+				"diagnostic_checks": {
+					"schema_fields": {
+						"state": "ok",
+						"message": "PRIVATE_TYPED_TEXT"
+					}
+				}
+			},
+			"canaries": [
+				"PRIVATE_USER_ZEBRA",
+				"PRIVATE_ORG_SEQUOIA",
+				"PRIVATE_HOST_OPAL",
+				"https://pac.internal.synthetic.example/private",
+				"http://proxy.internal.synthetic.example:8080",
+				"/Users/PRIVATE_USER_ZEBRA/document",
+				"PRIVATE_WINDOW_TITLE",
+				"PRIVATE_TYPED_TEXT",
+				"PRIVATE_TOKEN_A1B2",
+				"--private-argv=PRIVATE_ORG_SEQUOIA"
+			]
+		},
+		{
+			"name": "linux-true-unknown-cohort",
+			"snapshot": {
+				"schema_version": 2,
+				"driver": "linux",
+				"generated_at": "2026-10-09T14:00:00Z",
+				"detailed": true,
+				"extensive": true,
+				"sections": {
+					"versions": {
+						"ergopti_version": "0.0.0-dev.156",
+						"commit": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+						"channel": "dev",
+						"runtime": "1.1.1"
+					},
+					"hardware": {
+						"arch": "arm64",
+						"cpu_cores": 8
+					},
+					"system": {
+						"elevated": false,
+						"uptime": 17,
+						"os": "PRIVATE_ORG_SEQUOIA"
+					},
+					"input": {
+						"paused": false,
+						"remap_phase": "failed"
+					},
+					"issues": {
+						"err_count": 1,
+						"warn_count": 2,
+						"last_error": "PRIVATE_USER_ZEBRA PRIVATE_ORG_SEQUOIA PRIVATE_HOST_OPAL https://pac.internal.synthetic.example/private http://proxy.internal.synthetic.example:8080 /Users/PRIVATE_USER_ZEBRA/document PRIVATE_WINDOW_TITLE PRIVATE_TYPED_TEXT PRIVATE_TOKEN_A1B2 --private-argv=PRIVATE_ORG_SEQUOIA",
+						"recent": "PRIVATE_USER_ZEBRA PRIVATE_ORG_SEQUOIA PRIVATE_HOST_OPAL https://pac.internal.synthetic.example/private http://proxy.internal.synthetic.example:8080 /Users/PRIVATE_USER_ZEBRA/document PRIVATE_WINDOW_TITLE PRIVATE_TYPED_TEXT PRIVATE_TOKEN_A1B2 --private-argv=PRIVATE_ORG_SEQUOIA"
+					},
+					"paths": {
+						"config_dir": "/Users/PRIVATE_USER_ZEBRA/document"
+					},
+					"ai": {
+						"ai_enabled": true,
+						"ai_backend": "ollama",
+						"ai_model": "PRIVATE_USER_ZEBRA"
+					},
+					"permissions": {
+						"items": [
+							{
+								"id": "accessibility",
+								"state": "denied",
+								"name": "PRIVATE_USER_ZEBRA"
+							}
+						]
+					}
+				},
+				"probes": {
+					"appleevent_transport": {
+						"state": "timeout",
+						"ms": 99,
+						"cleanup": "pending",
+						"native_status": -1744,
+						"detail": "https://pac.internal.synthetic.example/private",
+						"argv": "--private-argv=PRIVATE_ORG_SEQUOIA",
+						"source_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+					},
+					"github_api": {
+						"state": "error",
+						"ms": 1,
+						"message": "PRIVATE_USER_ZEBRA PRIVATE_ORG_SEQUOIA PRIVATE_HOST_OPAL https://pac.internal.synthetic.example/private http://proxy.internal.synthetic.example:8080 /Users/PRIVATE_USER_ZEBRA/document PRIVATE_WINDOW_TITLE PRIVATE_TYPED_TEXT PRIVATE_TOKEN_A1B2 --private-argv=PRIVATE_ORG_SEQUOIA"
+					}
+				},
+				"retired_probes": [
+					{
+						"probes": {
+							"appleevent_transport": {
+								"state": "error",
+								"cleanup": "unknown",
+								"native_status": -1712,
+								"detail": "http://proxy.internal.synthetic.example:8080"
+							}
+						},
+						"unknown": "PRIVATE_WINDOW_TITLE"
+					},
+					{
+						"probes": {
+							"private_probe": {
+								"state": "ok",
+								"host": "PRIVATE_HOST_OPAL"
+							},
+							"github_api": {
+								"state": "cancelled",
+								"cleanup": "unknown",
+								"message": "http://proxy.internal.synthetic.example:8080"
+							}
+						},
+						"message": "PRIVATE_ORG_SEQUOIA"
+					}
+				],
+				"unknown_nested": {
+					"personal": [
+						"PRIVATE_USER_ZEBRA",
+						"PRIVATE_ORG_SEQUOIA",
+						"PRIVATE_HOST_OPAL",
+						"https://pac.internal.synthetic.example/private",
+						"http://proxy.internal.synthetic.example:8080",
+						"/Users/PRIVATE_USER_ZEBRA/document",
+						"PRIVATE_WINDOW_TITLE",
+						"PRIVATE_TYPED_TEXT",
+						"PRIVATE_TOKEN_A1B2",
+						"--private-argv=PRIVATE_ORG_SEQUOIA"
+					]
+				},
+				"diagnostic_checks": {
+					"schema_fields": {
+						"state": "ok",
+						"message": "PRIVATE_TYPED_TEXT"
+					}
+				}
+			},
+			"canaries": [
+				"PRIVATE_USER_ZEBRA",
+				"PRIVATE_ORG_SEQUOIA",
+				"PRIVATE_HOST_OPAL",
+				"https://pac.internal.synthetic.example/private",
+				"http://proxy.internal.synthetic.example:8080",
+				"/Users/PRIVATE_USER_ZEBRA/document",
+				"PRIVATE_WINDOW_TITLE",
+				"PRIVATE_TYPED_TEXT",
+				"PRIVATE_TOKEN_A1B2",
+				"--private-argv=PRIVATE_ORG_SEQUOIA"
+			]
+		},
+		{
+			"name": "windows-false-collector-labels",
+			"snapshot": {
+				"schema_version": 2,
+				"driver": "windows",
+				"generated_at": "2026-10-09T14:00:00Z",
+				"detailed": false,
+				"extensive": true,
+				"sections": {
+					"versions": {
+						"ergopti_version": "0.0.0-dev.156",
+						"commit": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa (git)",
+						"channel": "dev",
+						"runtime": "AutoHotkey 2.0.19 64-bit"
+					},
+					"hardware": {
+						"arch": "arm64",
+						"cpu_cores": 8
+					},
+					"system": {
+						"elevated": false,
+						"uptime": 17,
+						"os": "Windows 10.0.26100.1"
+					},
+					"input": {
+						"paused": false,
+						"remap_phase": "failed"
+					},
+					"issues": {
+						"err_count": 1,
+						"warn_count": 2,
+						"last_error": "PRIVATE_USER_ZEBRA PRIVATE_ORG_SEQUOIA PRIVATE_HOST_OPAL https://pac.internal.synthetic.example/private http://proxy.internal.synthetic.example:8080 /Users/PRIVATE_USER_ZEBRA/document PRIVATE_WINDOW_TITLE PRIVATE_TYPED_TEXT PRIVATE_TOKEN_A1B2 --private-argv=PRIVATE_ORG_SEQUOIA",
+						"recent": "PRIVATE_USER_ZEBRA PRIVATE_ORG_SEQUOIA PRIVATE_HOST_OPAL https://pac.internal.synthetic.example/private http://proxy.internal.synthetic.example:8080 /Users/PRIVATE_USER_ZEBRA/document PRIVATE_WINDOW_TITLE PRIVATE_TYPED_TEXT PRIVATE_TOKEN_A1B2 --private-argv=PRIVATE_ORG_SEQUOIA"
+					},
+					"paths": {
+						"config_dir": "/Users/PRIVATE_USER_ZEBRA/document"
+					},
+					"ai": {
+						"ai_enabled": true,
+						"ai_backend": "ollama",
+						"ai_model": "PRIVATE_USER_ZEBRA"
+					},
+					"permissions": {
+						"items": [
+							{
+								"id": "accessibility",
+								"state": "denied",
+								"name": "PRIVATE_USER_ZEBRA"
+							}
+						]
+					}
+				},
+				"probes": {
+					"appleevent_transport": {
+						"state": "timeout",
+						"ms": 99,
+						"cleanup": "pending",
+						"native_status": -1744,
+						"detail": "https://pac.internal.synthetic.example/private",
+						"argv": "--private-argv=PRIVATE_ORG_SEQUOIA",
+						"source_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+					},
+					"github_api": {
+						"state": "error",
+						"ms": 1,
+						"message": "PRIVATE_USER_ZEBRA PRIVATE_ORG_SEQUOIA PRIVATE_HOST_OPAL https://pac.internal.synthetic.example/private http://proxy.internal.synthetic.example:8080 /Users/PRIVATE_USER_ZEBRA/document PRIVATE_WINDOW_TITLE PRIVATE_TYPED_TEXT PRIVATE_TOKEN_A1B2 --private-argv=PRIVATE_ORG_SEQUOIA"
+					}
+				},
+				"retired_probes": [
+					{
+						"probes": {
+							"appleevent_transport": {
+								"state": "error",
+								"cleanup": "unknown",
+								"native_status": -1712,
+								"detail": "http://proxy.internal.synthetic.example:8080"
+							}
+						},
+						"unknown": "PRIVATE_WINDOW_TITLE"
+					}
+				],
+				"unknown_nested": {
+					"personal": [
+						"PRIVATE_USER_ZEBRA",
+						"PRIVATE_ORG_SEQUOIA",
+						"PRIVATE_HOST_OPAL",
+						"https://pac.internal.synthetic.example/private",
+						"http://proxy.internal.synthetic.example:8080",
+						"/Users/PRIVATE_USER_ZEBRA/document",
+						"PRIVATE_WINDOW_TITLE",
+						"PRIVATE_TYPED_TEXT",
+						"PRIVATE_TOKEN_A1B2",
+						"--private-argv=PRIVATE_ORG_SEQUOIA"
+					]
+				},
+				"diagnostic_checks": {
+					"schema_fields": {
+						"state": "ok",
+						"message": "PRIVATE_TYPED_TEXT"
+					}
+				}
+			},
+			"canaries": [
+				"PRIVATE_USER_ZEBRA",
+				"PRIVATE_ORG_SEQUOIA",
+				"PRIVATE_HOST_OPAL",
+				"https://pac.internal.synthetic.example/private",
+				"http://proxy.internal.synthetic.example:8080",
+				"/Users/PRIVATE_USER_ZEBRA/document",
+				"PRIVATE_WINDOW_TITLE",
+				"PRIVATE_TYPED_TEXT",
+				"PRIVATE_TOKEN_A1B2",
+				"--private-argv=PRIVATE_ORG_SEQUOIA"
+			]
+		},
+		{
+			"name": "macos-false-collector-labels",
+			"snapshot": {
+				"schema_version": 2,
+				"driver": "macos",
+				"generated_at": "2026-10-09T14:00:00Z",
+				"detailed": false,
+				"extensive": true,
+				"sections": {
+					"versions": {
+						"ergopti_version": "0.0.0-dev.156",
+						"commit": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa (git)",
+						"channel": "dev",
+						"runtime": "Hammerspoon 1.1.1"
+					},
+					"hardware": {
+						"arch": "arm64",
+						"cpu_cores": 8
+					},
+					"system": {
+						"elevated": false,
+						"uptime": 17,
+						"os": "macOS 15.5"
+					},
+					"input": {
+						"paused": false,
+						"remap_phase": "failed"
+					},
+					"issues": {
+						"err_count": 1,
+						"warn_count": 2,
+						"last_error": "PRIVATE_USER_ZEBRA PRIVATE_ORG_SEQUOIA PRIVATE_HOST_OPAL https://pac.internal.synthetic.example/private http://proxy.internal.synthetic.example:8080 /Users/PRIVATE_USER_ZEBRA/document PRIVATE_WINDOW_TITLE PRIVATE_TYPED_TEXT PRIVATE_TOKEN_A1B2 --private-argv=PRIVATE_ORG_SEQUOIA",
+						"recent": "PRIVATE_USER_ZEBRA PRIVATE_ORG_SEQUOIA PRIVATE_HOST_OPAL https://pac.internal.synthetic.example/private http://proxy.internal.synthetic.example:8080 /Users/PRIVATE_USER_ZEBRA/document PRIVATE_WINDOW_TITLE PRIVATE_TYPED_TEXT PRIVATE_TOKEN_A1B2 --private-argv=PRIVATE_ORG_SEQUOIA"
+					},
+					"paths": {
+						"config_dir": "/Users/PRIVATE_USER_ZEBRA/document"
+					},
+					"ai": {
+						"ai_enabled": true,
+						"ai_backend": "ollama",
+						"ai_model": "PRIVATE_USER_ZEBRA"
+					},
+					"permissions": {
+						"items": [
+							{
+								"id": "accessibility",
+								"state": "denied",
+								"name": "PRIVATE_USER_ZEBRA"
+							}
+						]
+					}
+				},
+				"probes": {
+					"appleevent_transport": {
+						"state": "timeout",
+						"ms": 99,
+						"cleanup": "pending",
+						"native_status": -1744,
+						"detail": "https://pac.internal.synthetic.example/private",
+						"argv": "--private-argv=PRIVATE_ORG_SEQUOIA",
+						"source_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+					},
+					"github_api": {
+						"state": "error",
+						"ms": 1,
+						"message": "PRIVATE_USER_ZEBRA PRIVATE_ORG_SEQUOIA PRIVATE_HOST_OPAL https://pac.internal.synthetic.example/private http://proxy.internal.synthetic.example:8080 /Users/PRIVATE_USER_ZEBRA/document PRIVATE_WINDOW_TITLE PRIVATE_TYPED_TEXT PRIVATE_TOKEN_A1B2 --private-argv=PRIVATE_ORG_SEQUOIA"
+					}
+				},
+				"retired_probes": [
+					{
+						"probes": {
+							"appleevent_transport": {
+								"state": "error",
+								"cleanup": "unknown",
+								"native_status": -1712,
+								"detail": "http://proxy.internal.synthetic.example:8080"
+							}
+						},
+						"unknown": "PRIVATE_WINDOW_TITLE"
+					}
+				],
+				"unknown_nested": {
+					"personal": [
+						"PRIVATE_USER_ZEBRA",
+						"PRIVATE_ORG_SEQUOIA",
+						"PRIVATE_HOST_OPAL",
+						"https://pac.internal.synthetic.example/private",
+						"http://proxy.internal.synthetic.example:8080",
+						"/Users/PRIVATE_USER_ZEBRA/document",
+						"PRIVATE_WINDOW_TITLE",
+						"PRIVATE_TYPED_TEXT",
+						"PRIVATE_TOKEN_A1B2",
+						"--private-argv=PRIVATE_ORG_SEQUOIA"
+					]
+				},
+				"diagnostic_checks": {
+					"schema_fields": {
+						"state": "ok",
+						"message": "PRIVATE_TYPED_TEXT"
+					}
+				}
+			},
+			"canaries": [
+				"PRIVATE_USER_ZEBRA",
+				"PRIVATE_ORG_SEQUOIA",
+				"PRIVATE_HOST_OPAL",
+				"https://pac.internal.synthetic.example/private",
+				"http://proxy.internal.synthetic.example:8080",
+				"/Users/PRIVATE_USER_ZEBRA/document",
+				"PRIVATE_WINDOW_TITLE",
+				"PRIVATE_TYPED_TEXT",
+				"PRIVATE_TOKEN_A1B2",
+				"--private-argv=PRIVATE_ORG_SEQUOIA"
+			]
+		},
+		{
+			"name": "linux-false-collector-labels",
+			"snapshot": {
+				"schema_version": 2,
+				"driver": "linux",
+				"generated_at": "2026-10-09T14:00:00Z",
+				"detailed": false,
+				"extensive": true,
+				"sections": {
+					"versions": {
+						"ergopti_version": "0.0.0-dev.156",
+						"commit": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa (git)",
+						"channel": "dev",
+						"runtime": "LuaJIT 2.1.0-beta3"
+					},
+					"hardware": {
+						"arch": "arm64",
+						"cpu_cores": 8
+					},
+					"system": {
+						"elevated": false,
+						"uptime": 17,
+						"os": "Ubuntu 24.04"
+					},
+					"input": {
+						"paused": false,
+						"remap_phase": "failed"
+					},
+					"issues": {
+						"err_count": 1,
+						"warn_count": 2,
+						"last_error": "PRIVATE_USER_ZEBRA PRIVATE_ORG_SEQUOIA PRIVATE_HOST_OPAL https://pac.internal.synthetic.example/private http://proxy.internal.synthetic.example:8080 /Users/PRIVATE_USER_ZEBRA/document PRIVATE_WINDOW_TITLE PRIVATE_TYPED_TEXT PRIVATE_TOKEN_A1B2 --private-argv=PRIVATE_ORG_SEQUOIA",
+						"recent": "PRIVATE_USER_ZEBRA PRIVATE_ORG_SEQUOIA PRIVATE_HOST_OPAL https://pac.internal.synthetic.example/private http://proxy.internal.synthetic.example:8080 /Users/PRIVATE_USER_ZEBRA/document PRIVATE_WINDOW_TITLE PRIVATE_TYPED_TEXT PRIVATE_TOKEN_A1B2 --private-argv=PRIVATE_ORG_SEQUOIA"
+					},
+					"paths": {
+						"config_dir": "/Users/PRIVATE_USER_ZEBRA/document"
+					},
+					"ai": {
+						"ai_enabled": true,
+						"ai_backend": "ollama",
+						"ai_model": "PRIVATE_USER_ZEBRA"
+					},
+					"permissions": {
+						"items": [
+							{
+								"id": "accessibility",
+								"state": "denied",
+								"name": "PRIVATE_USER_ZEBRA"
+							}
+						]
+					}
+				},
+				"probes": {
+					"appleevent_transport": {
+						"state": "timeout",
+						"ms": 99,
+						"cleanup": "pending",
+						"native_status": -1744,
+						"detail": "https://pac.internal.synthetic.example/private",
+						"argv": "--private-argv=PRIVATE_ORG_SEQUOIA",
+						"source_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+					},
+					"github_api": {
+						"state": "error",
+						"ms": 1,
+						"message": "PRIVATE_USER_ZEBRA PRIVATE_ORG_SEQUOIA PRIVATE_HOST_OPAL https://pac.internal.synthetic.example/private http://proxy.internal.synthetic.example:8080 /Users/PRIVATE_USER_ZEBRA/document PRIVATE_WINDOW_TITLE PRIVATE_TYPED_TEXT PRIVATE_TOKEN_A1B2 --private-argv=PRIVATE_ORG_SEQUOIA"
+					}
+				},
+				"retired_probes": [
+					{
+						"probes": {
+							"appleevent_transport": {
+								"state": "error",
+								"cleanup": "unknown",
+								"native_status": -1712,
+								"detail": "http://proxy.internal.synthetic.example:8080"
+							}
+						},
+						"unknown": "PRIVATE_WINDOW_TITLE"
+					}
+				],
+				"unknown_nested": {
+					"personal": [
+						"PRIVATE_USER_ZEBRA",
+						"PRIVATE_ORG_SEQUOIA",
+						"PRIVATE_HOST_OPAL",
+						"https://pac.internal.synthetic.example/private",
+						"http://proxy.internal.synthetic.example:8080",
+						"/Users/PRIVATE_USER_ZEBRA/document",
+						"PRIVATE_WINDOW_TITLE",
+						"PRIVATE_TYPED_TEXT",
+						"PRIVATE_TOKEN_A1B2",
+						"--private-argv=PRIVATE_ORG_SEQUOIA"
+					]
+				},
+				"diagnostic_checks": {
+					"schema_fields": {
+						"state": "ok",
+						"message": "PRIVATE_TYPED_TEXT"
+					}
+				}
+			},
+			"canaries": [
+				"PRIVATE_USER_ZEBRA",
+				"PRIVATE_ORG_SEQUOIA",
+				"PRIVATE_HOST_OPAL",
+				"https://pac.internal.synthetic.example/private",
+				"http://proxy.internal.synthetic.example:8080",
+				"/Users/PRIVATE_USER_ZEBRA/document",
+				"PRIVATE_WINDOW_TITLE",
+				"PRIVATE_TYPED_TEXT",
+				"PRIVATE_TOKEN_A1B2",
+				"--private-argv=PRIVATE_ORG_SEQUOIA"
+			]
+		}
+	]
+}

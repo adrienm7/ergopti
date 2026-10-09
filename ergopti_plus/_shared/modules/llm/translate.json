@@ -1,0 +1,10 @@
+{
+	"_comment": "Per-binding translation language: ui, a retained locale code, or a bounded free language name. Selection and contextual prediction keep their existing request and acceptance owners.",
+	"ui_value": "ui",
+	"tag": "TRANSLATION:",
+	"max_tokens": 800,
+	"user_prefix": "TEXT:\n",
+	"prompt": "You translate for a keyboard assistant. TEXT is what the user selected.\nTranslate TEXT into {language}. Keep its meaning, tone, formatting and line breaks; keep names, code and URLs unchanged. If TEXT is already in {language}, return it unchanged.\nReply with one block — nothing else:\nTRANSLATION: <translation>",
+	"max_language_bytes": 256,
+	"prediction_prompt": "You are a live translation engine for a keyboard.\nYou receive PREFIX (the text typed so far) and TAIL (the sentence being typed, at the end of PREFIX).\nTranslate TAIL into {language}. Reply with exactly one line — nothing else:\nREWRITE: <translation>\n\nRules:\n- Translate the meaning naturally, as a native speaker would write it; keep names, numbers, the tone and the form of address.\n- TAIL may be unfinished or contain typos and abbreviations: translate what the user means so far.\n- If TAIL is already in {language}, correct it instead.\n- Translate TAIL only: never repeat PREFIX, never continue the text, never answer it.\n- No explanations, no markdown, no quotes."
+}

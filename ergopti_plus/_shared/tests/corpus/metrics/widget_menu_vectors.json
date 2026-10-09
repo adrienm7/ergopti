@@ -1,0 +1,121 @@
+{
+	"_comment": "Shared native Metrics widget menu contract: stored checks survive disablement; dependent rows need the metrics gate and visible widget.",
+	"fields": [
+		"keylogger_enabled",
+		"wpm_widget_visible",
+		"metrics_widget_colors",
+		"metrics_widget_graph"
+	],
+	"rows": [
+		{
+			"id": "wpm_widget",
+			"i18n": "menu.metrics.show_wpm_widget"
+		},
+		{
+			"id": "widget_colors",
+			"i18n": "menu.metrics.colors_by_source"
+		},
+		{
+			"id": "include_realtime",
+			"i18n": "menu.metrics.include_realtime"
+		}
+	],
+	"cases": [
+		{
+			"id": "0000",
+			"state": [false, false, false, false],
+			"checked": [false, false, false],
+			"disabled": [true, true, true]
+		},
+		{
+			"id": "0001",
+			"state": [false, false, false, true],
+			"checked": [false, false, true],
+			"disabled": [true, true, true]
+		},
+		{
+			"id": "0010",
+			"state": [false, false, true, false],
+			"checked": [false, true, false],
+			"disabled": [true, true, true]
+		},
+		{
+			"id": "0011",
+			"state": [false, false, true, true],
+			"checked": [false, true, true],
+			"disabled": [true, true, true]
+		},
+		{
+			"id": "0100",
+			"state": [false, true, false, false],
+			"checked": [true, false, false],
+			"disabled": [true, true, true]
+		},
+		{
+			"id": "0101",
+			"state": [false, true, false, true],
+			"checked": [true, false, true],
+			"disabled": [true, true, true]
+		},
+		{
+			"id": "0110",
+			"state": [false, true, true, false],
+			"checked": [true, true, false],
+			"disabled": [true, true, true]
+		},
+		{
+			"id": "0111",
+			"state": [false, true, true, true],
+			"checked": [true, true, true],
+			"disabled": [true, true, true]
+		},
+		{
+			"id": "1000",
+			"state": [true, false, false, false],
+			"checked": [false, false, false],
+			"disabled": [false, true, true]
+		},
+		{
+			"id": "1001",
+			"state": [true, false, false, true],
+			"checked": [false, false, true],
+			"disabled": [false, true, true]
+		},
+		{
+			"id": "1010",
+			"state": [true, false, true, false],
+			"checked": [false, true, false],
+			"disabled": [false, true, true]
+		},
+		{
+			"id": "1011",
+			"state": [true, false, true, true],
+			"checked": [false, true, true],
+			"disabled": [false, true, true]
+		},
+		{
+			"id": "1100",
+			"state": [true, true, false, false],
+			"checked": [true, false, false],
+			"disabled": [false, false, false]
+		},
+		{
+			"id": "1101",
+			"state": [true, true, false, true],
+			"checked": [true, false, true],
+			"disabled": [false, false, false]
+		},
+		{
+			"id": "1110",
+			"state": [true, true, true, false],
+			"checked": [true, true, false],
+			"disabled": [false, false, false]
+		},
+		{
+			"id": "1111",
+			"state": [true, true, true, true],
+			"checked": [true, true, true],
+			"disabled": [false, false, false]
+		}
+	]
+}

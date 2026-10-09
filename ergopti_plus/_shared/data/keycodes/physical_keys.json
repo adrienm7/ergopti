@@ -1,0 +1,1583 @@
+{
+	"_description": "Canonical physical-key registry. Every key, mouse button and wheel direction a layer can bind is keyed by its W3C UI Events KeyboardEvent.code (the ids Kalamine and Ergo-L use; mouse buttons and wheel directions are pseudo-codes). Each record carries the identifier every driver uses for that physical position, plus its geometry on an ANSI and an ISO full-size board. Single source of truth for physical-key identity: the keymap layer loaders resolve bindings through it, and tools/test/test-physical-keys-registry.cjs pins every older hand copy (evdev.json, azerty.json, heatmap_win.js, the frozen Karabiner legacy_layer_keys.json, kanata.kbd) to it.",
+	"_fields": {
+		"kind": "key | mouse_button | wheel.",
+		"group": "function | alphanumeric | navigation | numpad | media | mouse | wheel.",
+		"ahk": "AutoHotkey v2 hotkey name: SCnnn scan code for keys, the key name for mouse buttons and wheel directions.",
+		"ahk_send": "AutoHotkey Send name for a layout-independent key, or null for a character key (a Send of a character key uses {SCnnn} so the active layout cannot change which key is pressed).",
+		"evdev": "Linux input-event-codes.h KEY_* / BTN_* code; null for a wheel direction (a REL_WHEEL / REL_HWHEEL motion, described by axis and direction).",
+		"hs": "macOS virtual keycode (kVK_*) for keys, the NSEvent button number for mouse buttons; null for a wheel direction.",
+		"karabiner": "Karabiner-Elements event object ({key_code}, {consumer_key_code} or {pointing_button}); null for a wheel direction, which Karabiner cannot take as input.",
+		"kanata": "kanata key name, in the short form every kanata release accepts.",
+		"macos_iso": "Overrides for macOS on an ISO keyboard: macOS reports the key left of 1 and the key left of Z with swapped codes (kVK_ISO_Section / kVK_ANSI_Grave, and non_us_backslash / grave_accent_and_tilde in Karabiner).",
+		"geometry": "Per form factor (ansi, iso): row (0 = function row), col (left edge, in key units), width, and for a key taller than one row its height; the ISO Enter also gives bottom_col and bottom_width for its narrower lower row. A form a key is absent from has no entry.",
+		"axis": "Wheel only: vertical or horizontal.",
+		"direction": "Wheel only: +1 for up/right, -1 for down/left."
+	},
+	"schema_version": 1,
+	"forms": ["ansi", "iso"],
+	"keys": {
+		"Escape": {
+			"kind": "key",
+			"group": "function",
+			"ahk": "SC001",
+			"ahk_send": "Escape",
+			"evdev": 1,
+			"hs": 53,
+			"karabiner": { "key_code": "escape" },
+			"kanata": "esc",
+			"geometry": {
+				"ansi": { "row": 0, "col": 0, "width": 1 },
+				"iso": { "row": 0, "col": 0, "width": 1 }
+			}
+		},
+		"F1": {
+			"kind": "key",
+			"group": "function",
+			"ahk": "SC03B",
+			"ahk_send": "F1",
+			"evdev": 59,
+			"hs": 122,
+			"karabiner": { "key_code": "f1" },
+			"kanata": "f1",
+			"geometry": {
+				"ansi": { "row": 0, "col": 2, "width": 1 },
+				"iso": { "row": 0, "col": 2, "width": 1 }
+			}
+		},
+		"F2": {
+			"kind": "key",
+			"group": "function",
+			"ahk": "SC03C",
+			"ahk_send": "F2",
+			"evdev": 60,
+			"hs": 120,
+			"karabiner": { "key_code": "f2" },
+			"kanata": "f2",
+			"geometry": {
+				"ansi": { "row": 0, "col": 3, "width": 1 },
+				"iso": { "row": 0, "col": 3, "width": 1 }
+			}
+		},
+		"F3": {
+			"kind": "key",
+			"group": "function",
+			"ahk": "SC03D",
+			"ahk_send": "F3",
+			"evdev": 61,
+			"hs": 99,
+			"karabiner": { "key_code": "f3" },
+			"kanata": "f3",
+			"geometry": {
+				"ansi": { "row": 0, "col": 4, "width": 1 },
+				"iso": { "row": 0, "col": 4, "width": 1 }
+			}
+		},
+		"F4": {
+			"kind": "key",
+			"group": "function",
+			"ahk": "SC03E",
+			"ahk_send": "F4",
+			"evdev": 62,
+			"hs": 118,
+			"karabiner": { "key_code": "f4" },
+			"kanata": "f4",
+			"geometry": {
+				"ansi": { "row": 0, "col": 5, "width": 1 },
+				"iso": { "row": 0, "col": 5, "width": 1 }
+			}
+		},
+		"F5": {
+			"kind": "key",
+			"group": "function",
+			"ahk": "SC03F",
+			"ahk_send": "F5",
+			"evdev": 63,
+			"hs": 96,
+			"karabiner": { "key_code": "f5" },
+			"kanata": "f5",
+			"geometry": {
+				"ansi": { "row": 0, "col": 6.5, "width": 1 },
+				"iso": { "row": 0, "col": 6.5, "width": 1 }
+			}
+		},
+		"F6": {
+			"kind": "key",
+			"group": "function",
+			"ahk": "SC040",
+			"ahk_send": "F6",
+			"evdev": 64,
+			"hs": 97,
+			"karabiner": { "key_code": "f6" },
+			"kanata": "f6",
+			"geometry": {
+				"ansi": { "row": 0, "col": 7.5, "width": 1 },
+				"iso": { "row": 0, "col": 7.5, "width": 1 }
+			}
+		},
+		"F7": {
+			"kind": "key",
+			"group": "function",
+			"ahk": "SC041",
+			"ahk_send": "F7",
+			"evdev": 65,
+			"hs": 98,
+			"karabiner": { "key_code": "f7" },
+			"kanata": "f7",
+			"geometry": {
+				"ansi": { "row": 0, "col": 8.5, "width": 1 },
+				"iso": { "row": 0, "col": 8.5, "width": 1 }
+			}
+		},
+		"F8": {
+			"kind": "key",
+			"group": "function",
+			"ahk": "SC042",
+			"ahk_send": "F8",
+			"evdev": 66,
+			"hs": 100,
+			"karabiner": { "key_code": "f8" },
+			"kanata": "f8",
+			"geometry": {
+				"ansi": { "row": 0, "col": 9.5, "width": 1 },
+				"iso": { "row": 0, "col": 9.5, "width": 1 }
+			}
+		},
+		"F9": {
+			"kind": "key",
+			"group": "function",
+			"ahk": "SC043",
+			"ahk_send": "F9",
+			"evdev": 67,
+			"hs": 101,
+			"karabiner": { "key_code": "f9" },
+			"kanata": "f9",
+			"geometry": {
+				"ansi": { "row": 0, "col": 11, "width": 1 },
+				"iso": { "row": 0, "col": 11, "width": 1 }
+			}
+		},
+		"F10": {
+			"kind": "key",
+			"group": "function",
+			"ahk": "SC044",
+			"ahk_send": "F10",
+			"evdev": 68,
+			"hs": 109,
+			"karabiner": { "key_code": "f10" },
+			"kanata": "f10",
+			"geometry": {
+				"ansi": { "row": 0, "col": 12, "width": 1 },
+				"iso": { "row": 0, "col": 12, "width": 1 }
+			}
+		},
+		"F11": {
+			"kind": "key",
+			"group": "function",
+			"ahk": "SC057",
+			"ahk_send": "F11",
+			"evdev": 87,
+			"hs": 103,
+			"karabiner": { "key_code": "f11" },
+			"kanata": "f11",
+			"geometry": {
+				"ansi": { "row": 0, "col": 13, "width": 1 },
+				"iso": { "row": 0, "col": 13, "width": 1 }
+			}
+		},
+		"F12": {
+			"kind": "key",
+			"group": "function",
+			"ahk": "SC058",
+			"ahk_send": "F12",
+			"evdev": 88,
+			"hs": 111,
+			"karabiner": { "key_code": "f12" },
+			"kanata": "f12",
+			"geometry": {
+				"ansi": { "row": 0, "col": 14, "width": 1 },
+				"iso": { "row": 0, "col": 14, "width": 1 }
+			}
+		},
+		"Backquote": {
+			"kind": "key",
+			"group": "alphanumeric",
+			"ahk": "SC029",
+			"ahk_send": null,
+			"evdev": 41,
+			"hs": 50,
+			"karabiner": { "key_code": "grave_accent_and_tilde" },
+			"kanata": "grv",
+			"macos_iso": { "hs": 10, "karabiner": { "key_code": "non_us_backslash" } },
+			"geometry": {
+				"ansi": { "row": 1, "col": 0, "width": 1 },
+				"iso": { "row": 1, "col": 0, "width": 1 }
+			}
+		},
+		"Digit1": {
+			"kind": "key",
+			"group": "alphanumeric",
+			"ahk": "SC002",
+			"ahk_send": null,
+			"evdev": 2,
+			"hs": 18,
+			"karabiner": { "key_code": "1" },
+			"kanata": "1",
+			"geometry": {
+				"ansi": { "row": 1, "col": 1, "width": 1 },
+				"iso": { "row": 1, "col": 1, "width": 1 }
+			}
+		},
+		"Digit2": {
+			"kind": "key",
+			"group": "alphanumeric",
+			"ahk": "SC003",
+			"ahk_send": null,
+			"evdev": 3,
+			"hs": 19,
+			"karabiner": { "key_code": "2" },
+			"kanata": "2",
+			"geometry": {
+				"ansi": { "row": 1, "col": 2, "width": 1 },
+				"iso": { "row": 1, "col": 2, "width": 1 }
+			}
+		},
+		"Digit3": {
+			"kind": "key",
+			"group": "alphanumeric",
+			"ahk": "SC004",
+			"ahk_send": null,
+			"evdev": 4,
+			"hs": 20,
+			"karabiner": { "key_code": "3" },
+			"kanata": "3",
+			"geometry": {
+				"ansi": { "row": 1, "col": 3, "width": 1 },
+				"iso": { "row": 1, "col": 3, "width": 1 }
+			}
+		},
+		"Digit4": {
+			"kind": "key",
+			"group": "alphanumeric",
+			"ahk": "SC005",
+			"ahk_send": null,
+			"evdev": 5,
+			"hs": 21,
+			"karabiner": { "key_code": "4" },
+			"kanata": "4",
+			"geometry": {
+				"ansi": { "row": 1, "col": 4, "width": 1 },
+				"iso": { "row": 1, "col": 4, "width": 1 }
+			}
+		},
+		"Digit5": {
+			"kind": "key",
+			"group": "alphanumeric",
+			"ahk": "SC006",
+			"ahk_send": null,
+			"evdev": 6,
+			"hs": 23,
+			"karabiner": { "key_code": "5" },
+			"kanata": "5",
+			"geometry": {
+				"ansi": { "row": 1, "col": 5, "width": 1 },
+				"iso": { "row": 1, "col": 5, "width": 1 }
+			}
+		},
+		"Digit6": {
+			"kind": "key",
+			"group": "alphanumeric",
+			"ahk": "SC007",
+			"ahk_send": null,
+			"evdev": 7,
+			"hs": 22,
+			"karabiner": { "key_code": "6" },
+			"kanata": "6",
+			"geometry": {
+				"ansi": { "row": 1, "col": 6, "width": 1 },
+				"iso": { "row": 1, "col": 6, "width": 1 }
+			}
+		},
+		"Digit7": {
+			"kind": "key",
+			"group": "alphanumeric",
+			"ahk": "SC008",
+			"ahk_send": null,
+			"evdev": 8,
+			"hs": 26,
+			"karabiner": { "key_code": "7" },
+			"kanata": "7",
+			"geometry": {
+				"ansi": { "row": 1, "col": 7, "width": 1 },
+				"iso": { "row": 1, "col": 7, "width": 1 }
+			}
+		},
+		"Digit8": {
+			"kind": "key",
+			"group": "alphanumeric",
+			"ahk": "SC009",
+			"ahk_send": null,
+			"evdev": 9,
+			"hs": 28,
+			"karabiner": { "key_code": "8" },
+			"kanata": "8",
+			"geometry": {
+				"ansi": { "row": 1, "col": 8, "width": 1 },
+				"iso": { "row": 1, "col": 8, "width": 1 }
+			}
+		},
+		"Digit9": {
+			"kind": "key",
+			"group": "alphanumeric",
+			"ahk": "SC00A",
+			"ahk_send": null,
+			"evdev": 10,
+			"hs": 25,
+			"karabiner": { "key_code": "9" },
+			"kanata": "9",
+			"geometry": {
+				"ansi": { "row": 1, "col": 9, "width": 1 },
+				"iso": { "row": 1, "col": 9, "width": 1 }
+			}
+		},
+		"Digit0": {
+			"kind": "key",
+			"group": "alphanumeric",
+			"ahk": "SC00B",
+			"ahk_send": null,
+			"evdev": 11,
+			"hs": 29,
+			"karabiner": { "key_code": "0" },
+			"kanata": "0",
+			"geometry": {
+				"ansi": { "row": 1, "col": 10, "width": 1 },
+				"iso": { "row": 1, "col": 10, "width": 1 }
+			}
+		},
+		"Minus": {
+			"kind": "key",
+			"group": "alphanumeric",
+			"ahk": "SC00C",
+			"ahk_send": null,
+			"evdev": 12,
+			"hs": 27,
+			"karabiner": { "key_code": "hyphen" },
+			"kanata": "min",
+			"geometry": {
+				"ansi": { "row": 1, "col": 11, "width": 1 },
+				"iso": { "row": 1, "col": 11, "width": 1 }
+			}
+		},
+		"Equal": {
+			"kind": "key",
+			"group": "alphanumeric",
+			"ahk": "SC00D",
+			"ahk_send": null,
+			"evdev": 13,
+			"hs": 24,
+			"karabiner": { "key_code": "equal_sign" },
+			"kanata": "eql",
+			"geometry": {
+				"ansi": { "row": 1, "col": 12, "width": 1 },
+				"iso": { "row": 1, "col": 12, "width": 1 }
+			}
+		},
+		"Backspace": {
+			"kind": "key",
+			"group": "alphanumeric",
+			"ahk": "SC00E",
+			"ahk_send": "BackSpace",
+			"evdev": 14,
+			"hs": 51,
+			"karabiner": { "key_code": "delete_or_backspace" },
+			"kanata": "bspc",
+			"geometry": {
+				"ansi": { "row": 1, "col": 13, "width": 2 },
+				"iso": { "row": 1, "col": 13, "width": 2 }
+			}
+		},
+		"Tab": {
+			"kind": "key",
+			"group": "alphanumeric",
+			"ahk": "SC00F",
+			"ahk_send": "Tab",
+			"evdev": 15,
+			"hs": 48,
+			"karabiner": { "key_code": "tab" },
+			"kanata": "tab",
+			"geometry": {
+				"ansi": { "row": 2, "col": 0, "width": 1.5 },
+				"iso": { "row": 2, "col": 0, "width": 1.5 }
+			}
+		},
+		"KeyQ": {
+			"kind": "key",
+			"group": "alphanumeric",
+			"ahk": "SC010",
+			"ahk_send": null,
+			"evdev": 16,
+			"hs": 12,
+			"karabiner": { "key_code": "q" },
+			"kanata": "q",
+			"geometry": {
+				"ansi": { "row": 2, "col": 1.5, "width": 1 },
+				"iso": { "row": 2, "col": 1.5, "width": 1 }
+			}
+		},
+		"KeyW": {
+			"kind": "key",
+			"group": "alphanumeric",
+			"ahk": "SC011",
+			"ahk_send": null,
+			"evdev": 17,
+			"hs": 13,
+			"karabiner": { "key_code": "w" },
+			"kanata": "w",
+			"geometry": {
+				"ansi": { "row": 2, "col": 2.5, "width": 1 },
+				"iso": { "row": 2, "col": 2.5, "width": 1 }
+			}
+		},
+		"KeyE": {
+			"kind": "key",
+			"group": "alphanumeric",
+			"ahk": "SC012",
+			"ahk_send": null,
+			"evdev": 18,
+			"hs": 14,
+			"karabiner": { "key_code": "e" },
+			"kanata": "e",
+			"geometry": {
+				"ansi": { "row": 2, "col": 3.5, "width": 1 },
+				"iso": { "row": 2, "col": 3.5, "width": 1 }
+			}
+		},
+		"KeyR": {
+			"kind": "key",
+			"group": "alphanumeric",
+			"ahk": "SC013",
+			"ahk_send": null,
+			"evdev": 19,
+			"hs": 15,
+			"karabiner": { "key_code": "r" },
+			"kanata": "r",
+			"geometry": {
+				"ansi": { "row": 2, "col": 4.5, "width": 1 },
+				"iso": { "row": 2, "col": 4.5, "width": 1 }
+			}
+		},
+		"KeyT": {
+			"kind": "key",
+			"group": "alphanumeric",
+			"ahk": "SC014",
+			"ahk_send": null,
+			"evdev": 20,
+			"hs": 17,
+			"karabiner": { "key_code": "t" },
+			"kanata": "t",
+			"geometry": {
+				"ansi": { "row": 2, "col": 5.5, "width": 1 },
+				"iso": { "row": 2, "col": 5.5, "width": 1 }
+			}
+		},
+		"KeyY": {
+			"kind": "key",
+			"group": "alphanumeric",
+			"ahk": "SC015",
+			"ahk_send": null,
+			"evdev": 21,
+			"hs": 16,
+			"karabiner": { "key_code": "y" },
+			"kanata": "y",
+			"geometry": {
+				"ansi": { "row": 2, "col": 6.5, "width": 1 },
+				"iso": { "row": 2, "col": 6.5, "width": 1 }
+			}
+		},
+		"KeyU": {
+			"kind": "key",
+			"group": "alphanumeric",
+			"ahk": "SC016",
+			"ahk_send": null,
+			"evdev": 22,
+			"hs": 32,
+			"karabiner": { "key_code": "u" },
+			"kanata": "u",
+			"geometry": {
+				"ansi": { "row": 2, "col": 7.5, "width": 1 },
+				"iso": { "row": 2, "col": 7.5, "width": 1 }
+			}
+		},
+		"KeyI": {
+			"kind": "key",
+			"group": "alphanumeric",
+			"ahk": "SC017",
+			"ahk_send": null,
+			"evdev": 23,
+			"hs": 34,
+			"karabiner": { "key_code": "i" },
+			"kanata": "i",
+			"geometry": {
+				"ansi": { "row": 2, "col": 8.5, "width": 1 },
+				"iso": { "row": 2, "col": 8.5, "width": 1 }
+			}
+		},
+		"KeyO": {
+			"kind": "key",
+			"group": "alphanumeric",
+			"ahk": "SC018",
+			"ahk_send": null,
+			"evdev": 24,
+			"hs": 31,
+			"karabiner": { "key_code": "o" },
+			"kanata": "o",
+			"geometry": {
+				"ansi": { "row": 2, "col": 9.5, "width": 1 },
+				"iso": { "row": 2, "col": 9.5, "width": 1 }
+			}
+		},
+		"KeyP": {
+			"kind": "key",
+			"group": "alphanumeric",
+			"ahk": "SC019",
+			"ahk_send": null,
+			"evdev": 25,
+			"hs": 35,
+			"karabiner": { "key_code": "p" },
+			"kanata": "p",
+			"geometry": {
+				"ansi": { "row": 2, "col": 10.5, "width": 1 },
+				"iso": { "row": 2, "col": 10.5, "width": 1 }
+			}
+		},
+		"BracketLeft": {
+			"kind": "key",
+			"group": "alphanumeric",
+			"ahk": "SC01A",
+			"ahk_send": null,
+			"evdev": 26,
+			"hs": 33,
+			"karabiner": { "key_code": "open_bracket" },
+			"kanata": "lbrc",
+			"geometry": {
+				"ansi": { "row": 2, "col": 11.5, "width": 1 },
+				"iso": { "row": 2, "col": 11.5, "width": 1 }
+			}
+		},
+		"BracketRight": {
+			"kind": "key",
+			"group": "alphanumeric",
+			"ahk": "SC01B",
+			"ahk_send": null,
+			"evdev": 27,
+			"hs": 30,
+			"karabiner": { "key_code": "close_bracket" },
+			"kanata": "rbrc",
+			"geometry": {
+				"ansi": { "row": 2, "col": 12.5, "width": 1 },
+				"iso": { "row": 2, "col": 12.5, "width": 1 }
+			}
+		},
+		"Backslash": {
+			"kind": "key",
+			"group": "alphanumeric",
+			"ahk": "SC02B",
+			"ahk_send": null,
+			"evdev": 43,
+			"hs": 42,
+			"karabiner": { "key_code": "backslash" },
+			"kanata": "bksl",
+			"geometry": {
+				"ansi": { "row": 2, "col": 13.5, "width": 1.5 },
+				"iso": { "row": 3, "col": 12.75, "width": 1 }
+			}
+		},
+		"CapsLock": {
+			"kind": "key",
+			"group": "alphanumeric",
+			"ahk": "SC03A",
+			"ahk_send": "CapsLock",
+			"evdev": 58,
+			"hs": 57,
+			"karabiner": { "key_code": "caps_lock" },
+			"kanata": "caps",
+			"geometry": {
+				"ansi": { "row": 3, "col": 0, "width": 1.75 },
+				"iso": { "row": 3, "col": 0, "width": 1.75 }
+			}
+		},
+		"KeyA": {
+			"kind": "key",
+			"group": "alphanumeric",
+			"ahk": "SC01E",
+			"ahk_send": null,
+			"evdev": 30,
+			"hs": 0,
+			"karabiner": { "key_code": "a" },
+			"kanata": "a",
+			"geometry": {
+				"ansi": { "row": 3, "col": 1.75, "width": 1 },
+				"iso": { "row": 3, "col": 1.75, "width": 1 }
+			}
+		},
+		"KeyS": {
+			"kind": "key",
+			"group": "alphanumeric",
+			"ahk": "SC01F",
+			"ahk_send": null,
+			"evdev": 31,
+			"hs": 1,
+			"karabiner": { "key_code": "s" },
+			"kanata": "s",
+			"geometry": {
+				"ansi": { "row": 3, "col": 2.75, "width": 1 },
+				"iso": { "row": 3, "col": 2.75, "width": 1 }
+			}
+		},
+		"KeyD": {
+			"kind": "key",
+			"group": "alphanumeric",
+			"ahk": "SC020",
+			"ahk_send": null,
+			"evdev": 32,
+			"hs": 2,
+			"karabiner": { "key_code": "d" },
+			"kanata": "d",
+			"geometry": {
+				"ansi": { "row": 3, "col": 3.75, "width": 1 },
+				"iso": { "row": 3, "col": 3.75, "width": 1 }
+			}
+		},
+		"KeyF": {
+			"kind": "key",
+			"group": "alphanumeric",
+			"ahk": "SC021",
+			"ahk_send": null,
+			"evdev": 33,
+			"hs": 3,
+			"karabiner": { "key_code": "f" },
+			"kanata": "f",
+			"geometry": {
+				"ansi": { "row": 3, "col": 4.75, "width": 1 },
+				"iso": { "row": 3, "col": 4.75, "width": 1 }
+			}
+		},
+		"KeyG": {
+			"kind": "key",
+			"group": "alphanumeric",
+			"ahk": "SC022",
+			"ahk_send": null,
+			"evdev": 34,
+			"hs": 5,
+			"karabiner": { "key_code": "g" },
+			"kanata": "g",
+			"geometry": {
+				"ansi": { "row": 3, "col": 5.75, "width": 1 },
+				"iso": { "row": 3, "col": 5.75, "width": 1 }
+			}
+		},
+		"KeyH": {
+			"kind": "key",
+			"group": "alphanumeric",
+			"ahk": "SC023",
+			"ahk_send": null,
+			"evdev": 35,
+			"hs": 4,
+			"karabiner": { "key_code": "h" },
+			"kanata": "h",
+			"geometry": {
+				"ansi": { "row": 3, "col": 6.75, "width": 1 },
+				"iso": { "row": 3, "col": 6.75, "width": 1 }
+			}
+		},
+		"KeyJ": {
+			"kind": "key",
+			"group": "alphanumeric",
+			"ahk": "SC024",
+			"ahk_send": null,
+			"evdev": 36,
+			"hs": 38,
+			"karabiner": { "key_code": "j" },
+			"kanata": "j",
+			"geometry": {
+				"ansi": { "row": 3, "col": 7.75, "width": 1 },
+				"iso": { "row": 3, "col": 7.75, "width": 1 }
+			}
+		},
+		"KeyK": {
+			"kind": "key",
+			"group": "alphanumeric",
+			"ahk": "SC025",
+			"ahk_send": null,
+			"evdev": 37,
+			"hs": 40,
+			"karabiner": { "key_code": "k" },
+			"kanata": "k",
+			"geometry": {
+				"ansi": { "row": 3, "col": 8.75, "width": 1 },
+				"iso": { "row": 3, "col": 8.75, "width": 1 }
+			}
+		},
+		"KeyL": {
+			"kind": "key",
+			"group": "alphanumeric",
+			"ahk": "SC026",
+			"ahk_send": null,
+			"evdev": 38,
+			"hs": 37,
+			"karabiner": { "key_code": "l" },
+			"kanata": "l",
+			"geometry": {
+				"ansi": { "row": 3, "col": 9.75, "width": 1 },
+				"iso": { "row": 3, "col": 9.75, "width": 1 }
+			}
+		},
+		"Semicolon": {
+			"kind": "key",
+			"group": "alphanumeric",
+			"ahk": "SC027",
+			"ahk_send": null,
+			"evdev": 39,
+			"hs": 41,
+			"karabiner": { "key_code": "semicolon" },
+			"kanata": "scln",
+			"geometry": {
+				"ansi": { "row": 3, "col": 10.75, "width": 1 },
+				"iso": { "row": 3, "col": 10.75, "width": 1 }
+			}
+		},
+		"Quote": {
+			"kind": "key",
+			"group": "alphanumeric",
+			"ahk": "SC028",
+			"ahk_send": null,
+			"evdev": 40,
+			"hs": 39,
+			"karabiner": { "key_code": "quote" },
+			"kanata": "apos",
+			"geometry": {
+				"ansi": { "row": 3, "col": 11.75, "width": 1 },
+				"iso": { "row": 3, "col": 11.75, "width": 1 }
+			}
+		},
+		"Enter": {
+			"kind": "key",
+			"group": "alphanumeric",
+			"ahk": "SC01C",
+			"ahk_send": "Enter",
+			"evdev": 28,
+			"hs": 36,
+			"karabiner": { "key_code": "return_or_enter" },
+			"kanata": "ret",
+			"geometry": {
+				"iso": {
+					"row": 2,
+					"col": 13.5,
+					"width": 1.5,
+					"height": 2,
+					"bottom_col": 13.75,
+					"bottom_width": 1.25
+				},
+				"ansi": { "row": 3, "col": 12.75, "width": 2.25 }
+			}
+		},
+		"ShiftLeft": {
+			"kind": "key",
+			"group": "alphanumeric",
+			"ahk": "SC02A",
+			"ahk_send": "LShift",
+			"evdev": 42,
+			"hs": 56,
+			"karabiner": { "key_code": "left_shift" },
+			"kanata": "lsft",
+			"geometry": {
+				"ansi": { "row": 4, "col": 0, "width": 2.25 },
+				"iso": { "row": 4, "col": 0, "width": 1.25 }
+			}
+		},
+		"IntlBackslash": {
+			"kind": "key",
+			"group": "alphanumeric",
+			"ahk": "SC056",
+			"ahk_send": null,
+			"evdev": 86,
+			"hs": 10,
+			"karabiner": { "key_code": "non_us_backslash" },
+			"kanata": "102d",
+			"macos_iso": { "hs": 50, "karabiner": { "key_code": "grave_accent_and_tilde" } },
+			"geometry": { "iso": { "row": 4, "col": 1.25, "width": 1 } }
+		},
+		"KeyZ": {
+			"kind": "key",
+			"group": "alphanumeric",
+			"ahk": "SC02C",
+			"ahk_send": null,
+			"evdev": 44,
+			"hs": 6,
+			"karabiner": { "key_code": "z" },
+			"kanata": "z",
+			"geometry": {
+				"ansi": { "row": 4, "col": 2.25, "width": 1 },
+				"iso": { "row": 4, "col": 2.25, "width": 1 }
+			}
+		},
+		"KeyX": {
+			"kind": "key",
+			"group": "alphanumeric",
+			"ahk": "SC02D",
+			"ahk_send": null,
+			"evdev": 45,
+			"hs": 7,
+			"karabiner": { "key_code": "x" },
+			"kanata": "x",
+			"geometry": {
+				"ansi": { "row": 4, "col": 3.25, "width": 1 },
+				"iso": { "row": 4, "col": 3.25, "width": 1 }
+			}
+		},
+		"KeyC": {
+			"kind": "key",
+			"group": "alphanumeric",
+			"ahk": "SC02E",
+			"ahk_send": null,
+			"evdev": 46,
+			"hs": 8,
+			"karabiner": { "key_code": "c" },
+			"kanata": "c",
+			"geometry": {
+				"ansi": { "row": 4, "col": 4.25, "width": 1 },
+				"iso": { "row": 4, "col": 4.25, "width": 1 }
+			}
+		},
+		"KeyV": {
+			"kind": "key",
+			"group": "alphanumeric",
+			"ahk": "SC02F",
+			"ahk_send": null,
+			"evdev": 47,
+			"hs": 9,
+			"karabiner": { "key_code": "v" },
+			"kanata": "v",
+			"geometry": {
+				"ansi": { "row": 4, "col": 5.25, "width": 1 },
+				"iso": { "row": 4, "col": 5.25, "width": 1 }
+			}
+		},
+		"KeyB": {
+			"kind": "key",
+			"group": "alphanumeric",
+			"ahk": "SC030",
+			"ahk_send": null,
+			"evdev": 48,
+			"hs": 11,
+			"karabiner": { "key_code": "b" },
+			"kanata": "b",
+			"geometry": {
+				"ansi": { "row": 4, "col": 6.25, "width": 1 },
+				"iso": { "row": 4, "col": 6.25, "width": 1 }
+			}
+		},
+		"KeyN": {
+			"kind": "key",
+			"group": "alphanumeric",
+			"ahk": "SC031",
+			"ahk_send": null,
+			"evdev": 49,
+			"hs": 45,
+			"karabiner": { "key_code": "n" },
+			"kanata": "n",
+			"geometry": {
+				"ansi": { "row": 4, "col": 7.25, "width": 1 },
+				"iso": { "row": 4, "col": 7.25, "width": 1 }
+			}
+		},
+		"KeyM": {
+			"kind": "key",
+			"group": "alphanumeric",
+			"ahk": "SC032",
+			"ahk_send": null,
+			"evdev": 50,
+			"hs": 46,
+			"karabiner": { "key_code": "m" },
+			"kanata": "m",
+			"geometry": {
+				"ansi": { "row": 4, "col": 8.25, "width": 1 },
+				"iso": { "row": 4, "col": 8.25, "width": 1 }
+			}
+		},
+		"Comma": {
+			"kind": "key",
+			"group": "alphanumeric",
+			"ahk": "SC033",
+			"ahk_send": null,
+			"evdev": 51,
+			"hs": 43,
+			"karabiner": { "key_code": "comma" },
+			"kanata": "comm",
+			"geometry": {
+				"ansi": { "row": 4, "col": 9.25, "width": 1 },
+				"iso": { "row": 4, "col": 9.25, "width": 1 }
+			}
+		},
+		"Period": {
+			"kind": "key",
+			"group": "alphanumeric",
+			"ahk": "SC034",
+			"ahk_send": null,
+			"evdev": 52,
+			"hs": 47,
+			"karabiner": { "key_code": "period" },
+			"kanata": ".",
+			"geometry": {
+				"ansi": { "row": 4, "col": 10.25, "width": 1 },
+				"iso": { "row": 4, "col": 10.25, "width": 1 }
+			}
+		},
+		"Slash": {
+			"kind": "key",
+			"group": "alphanumeric",
+			"ahk": "SC035",
+			"ahk_send": null,
+			"evdev": 53,
+			"hs": 44,
+			"karabiner": { "key_code": "slash" },
+			"kanata": "/",
+			"geometry": {
+				"ansi": { "row": 4, "col": 11.25, "width": 1 },
+				"iso": { "row": 4, "col": 11.25, "width": 1 }
+			}
+		},
+		"ShiftRight": {
+			"kind": "key",
+			"group": "alphanumeric",
+			"ahk": "SC036",
+			"ahk_send": "RShift",
+			"evdev": 54,
+			"hs": 60,
+			"karabiner": { "key_code": "right_shift" },
+			"kanata": "rsft",
+			"geometry": {
+				"ansi": { "row": 4, "col": 12.25, "width": 2.75 },
+				"iso": { "row": 4, "col": 12.25, "width": 2.75 }
+			}
+		},
+		"ControlLeft": {
+			"kind": "key",
+			"group": "alphanumeric",
+			"ahk": "SC01D",
+			"ahk_send": "LCtrl",
+			"evdev": 29,
+			"hs": 59,
+			"karabiner": { "key_code": "left_control" },
+			"kanata": "lctl",
+			"geometry": {
+				"ansi": { "row": 5, "col": 0, "width": 1.25 },
+				"iso": { "row": 5, "col": 0, "width": 1.25 }
+			}
+		},
+		"MetaLeft": {
+			"kind": "key",
+			"group": "alphanumeric",
+			"ahk": "SC15B",
+			"ahk_send": "LWin",
+			"evdev": 125,
+			"hs": 55,
+			"karabiner": { "key_code": "left_command" },
+			"kanata": "lmet",
+			"geometry": {
+				"ansi": { "row": 5, "col": 1.25, "width": 1.25 },
+				"iso": { "row": 5, "col": 1.25, "width": 1.25 }
+			}
+		},
+		"AltLeft": {
+			"kind": "key",
+			"group": "alphanumeric",
+			"ahk": "SC038",
+			"ahk_send": "LAlt",
+			"evdev": 56,
+			"hs": 58,
+			"karabiner": { "key_code": "left_option" },
+			"kanata": "lalt",
+			"geometry": {
+				"ansi": { "row": 5, "col": 2.5, "width": 1.25 },
+				"iso": { "row": 5, "col": 2.5, "width": 1.25 }
+			}
+		},
+		"Space": {
+			"kind": "key",
+			"group": "alphanumeric",
+			"ahk": "SC039",
+			"ahk_send": "Space",
+			"evdev": 57,
+			"hs": 49,
+			"karabiner": { "key_code": "spacebar" },
+			"kanata": "spc",
+			"geometry": {
+				"ansi": { "row": 5, "col": 3.75, "width": 6.25 },
+				"iso": { "row": 5, "col": 3.75, "width": 6.25 }
+			}
+		},
+		"AltRight": {
+			"kind": "key",
+			"group": "alphanumeric",
+			"ahk": "SC138",
+			"ahk_send": "RAlt",
+			"evdev": 100,
+			"hs": 61,
+			"karabiner": { "key_code": "right_option" },
+			"kanata": "ralt",
+			"geometry": {
+				"ansi": { "row": 5, "col": 10, "width": 1.25 },
+				"iso": { "row": 5, "col": 10, "width": 1.25 }
+			}
+		},
+		"MetaRight": {
+			"kind": "key",
+			"group": "alphanumeric",
+			"ahk": "SC15C",
+			"ahk_send": "RWin",
+			"evdev": 126,
+			"hs": 54,
+			"karabiner": { "key_code": "right_command" },
+			"kanata": "rmet",
+			"geometry": {
+				"ansi": { "row": 5, "col": 11.25, "width": 1.25 },
+				"iso": { "row": 5, "col": 11.25, "width": 1.25 }
+			}
+		},
+		"ContextMenu": {
+			"kind": "key",
+			"group": "alphanumeric",
+			"ahk": "SC15D",
+			"ahk_send": "AppsKey",
+			"evdev": 127,
+			"hs": 110,
+			"karabiner": { "key_code": "application" },
+			"kanata": "comp",
+			"geometry": {
+				"ansi": { "row": 5, "col": 12.5, "width": 1.25 },
+				"iso": { "row": 5, "col": 12.5, "width": 1.25 }
+			}
+		},
+		"ControlRight": {
+			"kind": "key",
+			"group": "alphanumeric",
+			"ahk": "SC11D",
+			"ahk_send": "RCtrl",
+			"evdev": 97,
+			"hs": 62,
+			"karabiner": { "key_code": "right_control" },
+			"kanata": "rctl",
+			"geometry": {
+				"ansi": { "row": 5, "col": 13.75, "width": 1.25 },
+				"iso": { "row": 5, "col": 13.75, "width": 1.25 }
+			}
+		},
+		"Insert": {
+			"kind": "key",
+			"group": "navigation",
+			"ahk": "SC152",
+			"ahk_send": "Insert",
+			"evdev": 110,
+			"hs": 114,
+			"karabiner": { "key_code": "insert" },
+			"kanata": "ins",
+			"geometry": {
+				"ansi": { "row": 1, "col": 15.25, "width": 1 },
+				"iso": { "row": 1, "col": 15.25, "width": 1 }
+			}
+		},
+		"Delete": {
+			"kind": "key",
+			"group": "navigation",
+			"ahk": "SC153",
+			"ahk_send": "Delete",
+			"evdev": 111,
+			"hs": 117,
+			"karabiner": { "key_code": "delete_forward" },
+			"kanata": "del",
+			"geometry": {
+				"ansi": { "row": 2, "col": 15.25, "width": 1 },
+				"iso": { "row": 2, "col": 15.25, "width": 1 }
+			}
+		},
+		"Home": {
+			"kind": "key",
+			"group": "navigation",
+			"ahk": "SC147",
+			"ahk_send": "Home",
+			"evdev": 102,
+			"hs": 115,
+			"karabiner": { "key_code": "home" },
+			"kanata": "home",
+			"geometry": {
+				"ansi": { "row": 1, "col": 16.25, "width": 1 },
+				"iso": { "row": 1, "col": 16.25, "width": 1 }
+			}
+		},
+		"End": {
+			"kind": "key",
+			"group": "navigation",
+			"ahk": "SC14F",
+			"ahk_send": "End",
+			"evdev": 107,
+			"hs": 119,
+			"karabiner": { "key_code": "end" },
+			"kanata": "end",
+			"geometry": {
+				"ansi": { "row": 2, "col": 16.25, "width": 1 },
+				"iso": { "row": 2, "col": 16.25, "width": 1 }
+			}
+		},
+		"PageUp": {
+			"kind": "key",
+			"group": "navigation",
+			"ahk": "SC149",
+			"ahk_send": "PgUp",
+			"evdev": 104,
+			"hs": 116,
+			"karabiner": { "key_code": "page_up" },
+			"kanata": "pgup",
+			"geometry": {
+				"ansi": { "row": 1, "col": 17.25, "width": 1 },
+				"iso": { "row": 1, "col": 17.25, "width": 1 }
+			}
+		},
+		"PageDown": {
+			"kind": "key",
+			"group": "navigation",
+			"ahk": "SC151",
+			"ahk_send": "PgDn",
+			"evdev": 109,
+			"hs": 121,
+			"karabiner": { "key_code": "page_down" },
+			"kanata": "pgdn",
+			"geometry": {
+				"ansi": { "row": 2, "col": 17.25, "width": 1 },
+				"iso": { "row": 2, "col": 17.25, "width": 1 }
+			}
+		},
+		"ArrowUp": {
+			"kind": "key",
+			"group": "navigation",
+			"ahk": "SC148",
+			"ahk_send": "Up",
+			"evdev": 103,
+			"hs": 126,
+			"karabiner": { "key_code": "up_arrow" },
+			"kanata": "up",
+			"geometry": {
+				"ansi": { "row": 4, "col": 16.25, "width": 1 },
+				"iso": { "row": 4, "col": 16.25, "width": 1 }
+			}
+		},
+		"ArrowLeft": {
+			"kind": "key",
+			"group": "navigation",
+			"ahk": "SC14B",
+			"ahk_send": "Left",
+			"evdev": 105,
+			"hs": 123,
+			"karabiner": { "key_code": "left_arrow" },
+			"kanata": "left",
+			"geometry": {
+				"ansi": { "row": 5, "col": 15.25, "width": 1 },
+				"iso": { "row": 5, "col": 15.25, "width": 1 }
+			}
+		},
+		"ArrowDown": {
+			"kind": "key",
+			"group": "navigation",
+			"ahk": "SC150",
+			"ahk_send": "Down",
+			"evdev": 108,
+			"hs": 125,
+			"karabiner": { "key_code": "down_arrow" },
+			"kanata": "down",
+			"geometry": {
+				"ansi": { "row": 5, "col": 16.25, "width": 1 },
+				"iso": { "row": 5, "col": 16.25, "width": 1 }
+			}
+		},
+		"ArrowRight": {
+			"kind": "key",
+			"group": "navigation",
+			"ahk": "SC14D",
+			"ahk_send": "Right",
+			"evdev": 106,
+			"hs": 124,
+			"karabiner": { "key_code": "right_arrow" },
+			"kanata": "rght",
+			"geometry": {
+				"ansi": { "row": 5, "col": 17.25, "width": 1 },
+				"iso": { "row": 5, "col": 17.25, "width": 1 }
+			}
+		},
+		"NumLock": {
+			"kind": "key",
+			"group": "numpad",
+			"ahk": "SC145",
+			"ahk_send": "NumLock",
+			"evdev": 69,
+			"hs": 71,
+			"karabiner": { "key_code": "keypad_num_lock" },
+			"kanata": "nlck",
+			"geometry": {
+				"ansi": { "row": 1, "col": 18.5, "width": 1 },
+				"iso": { "row": 1, "col": 18.5, "width": 1 }
+			}
+		},
+		"NumpadDivide": {
+			"kind": "key",
+			"group": "numpad",
+			"ahk": "SC135",
+			"ahk_send": "NumpadDiv",
+			"evdev": 98,
+			"hs": 75,
+			"karabiner": { "key_code": "keypad_slash" },
+			"kanata": "kp/",
+			"geometry": {
+				"ansi": { "row": 1, "col": 19.5, "width": 1 },
+				"iso": { "row": 1, "col": 19.5, "width": 1 }
+			}
+		},
+		"NumpadMultiply": {
+			"kind": "key",
+			"group": "numpad",
+			"ahk": "SC037",
+			"ahk_send": "NumpadMult",
+			"evdev": 55,
+			"hs": 67,
+			"karabiner": { "key_code": "keypad_asterisk" },
+			"kanata": "kp*",
+			"geometry": {
+				"ansi": { "row": 1, "col": 20.5, "width": 1 },
+				"iso": { "row": 1, "col": 20.5, "width": 1 }
+			}
+		},
+		"NumpadSubtract": {
+			"kind": "key",
+			"group": "numpad",
+			"ahk": "SC04A",
+			"ahk_send": "NumpadSub",
+			"evdev": 74,
+			"hs": 78,
+			"karabiner": { "key_code": "keypad_hyphen" },
+			"kanata": "kp-",
+			"geometry": {
+				"ansi": { "row": 1, "col": 21.5, "width": 1 },
+				"iso": { "row": 1, "col": 21.5, "width": 1 }
+			}
+		},
+		"Numpad7": {
+			"kind": "key",
+			"group": "numpad",
+			"ahk": "SC047",
+			"ahk_send": "Numpad7",
+			"evdev": 71,
+			"hs": 89,
+			"karabiner": { "key_code": "keypad_7" },
+			"kanata": "kp7",
+			"geometry": {
+				"ansi": { "row": 2, "col": 18.5, "width": 1 },
+				"iso": { "row": 2, "col": 18.5, "width": 1 }
+			}
+		},
+		"Numpad8": {
+			"kind": "key",
+			"group": "numpad",
+			"ahk": "SC048",
+			"ahk_send": "Numpad8",
+			"evdev": 72,
+			"hs": 91,
+			"karabiner": { "key_code": "keypad_8" },
+			"kanata": "kp8",
+			"geometry": {
+				"ansi": { "row": 2, "col": 19.5, "width": 1 },
+				"iso": { "row": 2, "col": 19.5, "width": 1 }
+			}
+		},
+		"Numpad9": {
+			"kind": "key",
+			"group": "numpad",
+			"ahk": "SC049",
+			"ahk_send": "Numpad9",
+			"evdev": 73,
+			"hs": 92,
+			"karabiner": { "key_code": "keypad_9" },
+			"kanata": "kp9",
+			"geometry": {
+				"ansi": { "row": 2, "col": 20.5, "width": 1 },
+				"iso": { "row": 2, "col": 20.5, "width": 1 }
+			}
+		},
+		"NumpadAdd": {
+			"kind": "key",
+			"group": "numpad",
+			"ahk": "SC04E",
+			"ahk_send": "NumpadAdd",
+			"evdev": 78,
+			"hs": 69,
+			"karabiner": { "key_code": "keypad_plus" },
+			"kanata": "kp+",
+			"geometry": {
+				"ansi": { "row": 2, "col": 21.5, "width": 1, "height": 2 },
+				"iso": { "row": 2, "col": 21.5, "width": 1, "height": 2 }
+			}
+		},
+		"Numpad4": {
+			"kind": "key",
+			"group": "numpad",
+			"ahk": "SC04B",
+			"ahk_send": "Numpad4",
+			"evdev": 75,
+			"hs": 86,
+			"karabiner": { "key_code": "keypad_4" },
+			"kanata": "kp4",
+			"geometry": {
+				"ansi": { "row": 3, "col": 18.5, "width": 1 },
+				"iso": { "row": 3, "col": 18.5, "width": 1 }
+			}
+		},
+		"Numpad5": {
+			"kind": "key",
+			"group": "numpad",
+			"ahk": "SC04C",
+			"ahk_send": "Numpad5",
+			"evdev": 76,
+			"hs": 87,
+			"karabiner": { "key_code": "keypad_5" },
+			"kanata": "kp5",
+			"geometry": {
+				"ansi": { "row": 3, "col": 19.5, "width": 1 },
+				"iso": { "row": 3, "col": 19.5, "width": 1 }
+			}
+		},
+		"Numpad6": {
+			"kind": "key",
+			"group": "numpad",
+			"ahk": "SC04D",
+			"ahk_send": "Numpad6",
+			"evdev": 77,
+			"hs": 88,
+			"karabiner": { "key_code": "keypad_6" },
+			"kanata": "kp6",
+			"geometry": {
+				"ansi": { "row": 3, "col": 20.5, "width": 1 },
+				"iso": { "row": 3, "col": 20.5, "width": 1 }
+			}
+		},
+		"Numpad1": {
+			"kind": "key",
+			"group": "numpad",
+			"ahk": "SC04F",
+			"ahk_send": "Numpad1",
+			"evdev": 79,
+			"hs": 83,
+			"karabiner": { "key_code": "keypad_1" },
+			"kanata": "kp1",
+			"geometry": {
+				"ansi": { "row": 4, "col": 18.5, "width": 1 },
+				"iso": { "row": 4, "col": 18.5, "width": 1 }
+			}
+		},
+		"Numpad2": {
+			"kind": "key",
+			"group": "numpad",
+			"ahk": "SC050",
+			"ahk_send": "Numpad2",
+			"evdev": 80,
+			"hs": 84,
+			"karabiner": { "key_code": "keypad_2" },
+			"kanata": "kp2",
+			"geometry": {
+				"ansi": { "row": 4, "col": 19.5, "width": 1 },
+				"iso": { "row": 4, "col": 19.5, "width": 1 }
+			}
+		},
+		"Numpad3": {
+			"kind": "key",
+			"group": "numpad",
+			"ahk": "SC051",
+			"ahk_send": "Numpad3",
+			"evdev": 81,
+			"hs": 85,
+			"karabiner": { "key_code": "keypad_3" },
+			"kanata": "kp3",
+			"geometry": {
+				"ansi": { "row": 4, "col": 20.5, "width": 1 },
+				"iso": { "row": 4, "col": 20.5, "width": 1 }
+			}
+		},
+		"NumpadEnter": {
+			"kind": "key",
+			"group": "numpad",
+			"ahk": "SC11C",
+			"ahk_send": "NumpadEnter",
+			"evdev": 96,
+			"hs": 76,
+			"karabiner": { "key_code": "keypad_enter" },
+			"kanata": "kprt",
+			"geometry": {
+				"ansi": { "row": 4, "col": 21.5, "width": 1, "height": 2 },
+				"iso": { "row": 4, "col": 21.5, "width": 1, "height": 2 }
+			}
+		},
+		"Numpad0": {
+			"kind": "key",
+			"group": "numpad",
+			"ahk": "SC052",
+			"ahk_send": "Numpad0",
+			"evdev": 82,
+			"hs": 82,
+			"karabiner": { "key_code": "keypad_0" },
+			"kanata": "kp0",
+			"geometry": {
+				"ansi": { "row": 5, "col": 18.5, "width": 2 },
+				"iso": { "row": 5, "col": 18.5, "width": 2 }
+			}
+		},
+		"NumpadDecimal": {
+			"kind": "key",
+			"group": "numpad",
+			"ahk": "SC053",
+			"ahk_send": "NumpadDot",
+			"evdev": 83,
+			"hs": 65,
+			"karabiner": { "key_code": "keypad_period" },
+			"kanata": "kp.",
+			"geometry": {
+				"ansi": { "row": 5, "col": 20.5, "width": 1 },
+				"iso": { "row": 5, "col": 20.5, "width": 1 }
+			}
+		},
+		"AudioVolumeMute": {
+			"kind": "key",
+			"group": "media",
+			"ahk": "SC120",
+			"ahk_send": "Volume_Mute",
+			"evdev": 113,
+			"hs": 74,
+			"karabiner": { "consumer_key_code": "mute" },
+			"kanata": "mute"
+		},
+		"AudioVolumeDown": {
+			"kind": "key",
+			"group": "media",
+			"ahk": "SC12E",
+			"ahk_send": "Volume_Down",
+			"evdev": 114,
+			"hs": 73,
+			"karabiner": { "consumer_key_code": "volume_decrement" },
+			"kanata": "vold"
+		},
+		"AudioVolumeUp": {
+			"kind": "key",
+			"group": "media",
+			"ahk": "SC130",
+			"ahk_send": "Volume_Up",
+			"evdev": 115,
+			"hs": 72,
+			"karabiner": { "consumer_key_code": "volume_increment" },
+			"kanata": "volu"
+		},
+		"MouseLeft": {
+			"kind": "mouse_button",
+			"group": "mouse",
+			"ahk": "LButton",
+			"ahk_send": "LButton",
+			"evdev": 272,
+			"hs": 0,
+			"karabiner": { "pointing_button": "button1" },
+			"kanata": "mlft"
+		},
+		"MouseRight": {
+			"kind": "mouse_button",
+			"group": "mouse",
+			"ahk": "RButton",
+			"ahk_send": "RButton",
+			"evdev": 273,
+			"hs": 1,
+			"karabiner": { "pointing_button": "button2" },
+			"kanata": "mrgt"
+		},
+		"MouseMiddle": {
+			"kind": "mouse_button",
+			"group": "mouse",
+			"ahk": "MButton",
+			"ahk_send": "MButton",
+			"evdev": 274,
+			"hs": 2,
+			"karabiner": { "pointing_button": "button3" },
+			"kanata": "mmid"
+		},
+		"MouseBack": {
+			"kind": "mouse_button",
+			"group": "mouse",
+			"ahk": "XButton1",
+			"ahk_send": "XButton1",
+			"evdev": 275,
+			"hs": 3,
+			"karabiner": { "pointing_button": "button4" },
+			"kanata": "mbck"
+		},
+		"MouseForward": {
+			"kind": "mouse_button",
+			"group": "mouse",
+			"ahk": "XButton2",
+			"ahk_send": "XButton2",
+			"evdev": 276,
+			"hs": 4,
+			"karabiner": { "pointing_button": "button5" },
+			"kanata": "mfwd"
+		},
+		"WheelUp": {
+			"kind": "wheel",
+			"group": "wheel",
+			"ahk": "WheelUp",
+			"ahk_send": "WheelUp",
+			"evdev": null,
+			"hs": null,
+			"karabiner": null,
+			"kanata": "mwu",
+			"axis": "vertical",
+			"direction": 1
+		},
+		"WheelDown": {
+			"kind": "wheel",
+			"group": "wheel",
+			"ahk": "WheelDown",
+			"ahk_send": "WheelDown",
+			"evdev": null,
+			"hs": null,
+			"karabiner": null,
+			"kanata": "mwd",
+			"axis": "vertical",
+			"direction": -1
+		},
+		"WheelLeft": {
+			"kind": "wheel",
+			"group": "wheel",
+			"ahk": "WheelLeft",
+			"ahk_send": "WheelLeft",
+			"evdev": null,
+			"hs": null,
+			"karabiner": null,
+			"kanata": "mwl",
+			"axis": "horizontal",
+			"direction": -1
+		},
+		"WheelRight": {
+			"kind": "wheel",
+			"group": "wheel",
+			"ahk": "WheelRight",
+			"ahk_send": "WheelRight",
+			"evdev": null,
+			"hs": null,
+			"karabiner": null,
+			"kanata": "mwr",
+			"axis": "horizontal",
+			"direction": 1
+		}
+	}
+}

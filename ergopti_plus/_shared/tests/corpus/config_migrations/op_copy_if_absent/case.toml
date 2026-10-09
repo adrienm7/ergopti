@@ -1,0 +1,6 @@
+[case]
+description = "Conditional copies preserve every existing target and source, including false, same paths, absent sources and nested collections."
+drivers = ["ahk", "hs", "linux"]
+outcome = "migrated"
+from_version = 1
+to_version = 2

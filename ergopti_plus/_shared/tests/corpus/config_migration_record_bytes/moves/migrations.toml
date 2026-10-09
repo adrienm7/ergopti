@@ -1,0 +1,15 @@
+[registry]
+current_version = 2
+unstamped_version = 1
+
+[steps.v1_to_v2]
+from = 1
+to = 2
+drivers = ["ahk", "hs", "linux"]
+reason = "Independent contract: preserve every untouched migration record byte."
+ops = [
+	{ op = "move_section", section = "old", to_section = "new" },
+	{ op = "merge_into", section = "legacy", to_section = "target" },
+	{ op = "delete", section = "retired" },
+	{ op = "set_if_absent", section = "new", key = "label", value = "added" },
+]

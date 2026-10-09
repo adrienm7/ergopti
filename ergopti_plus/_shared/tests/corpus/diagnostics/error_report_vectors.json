@@ -1,0 +1,169 @@
+{
+	"description": "Golden vectors for the error window report of one error: compose(error, identity) returns the Markdown report (the identity table of the bug report, then the error and the recent warnings and errors, dumped with the bug report dump rules) and the prefilled bug form fields (title: the module and the first line of the message; version, os and driver from the identity). The report itself fills the form's report_field when it is sent, so no field repeats it. invalid_errors must be refused. Booleans and nulls are left out because the AHK JSON reader has neither. Replayed by the macOS and Linux Lua suites (_shared/lua/diagnostics/error_report.lua) and the AHK suite (windows/infra/error_report.ahk).",
+	"vectors": [
+		{
+			"id": "error_with_recent_issues",
+			"error": {
+				"kind": "error",
+				"module": "keylogger",
+				"message": "Flush failed: disk full",
+				"time": "2026-09-24 10:15:02:117",
+				"recent": [
+					"2026-09-24 10:15:02:117 [ERROR] [keylogger] Flush failed: disk full",
+					"2026-09-24 10:14:58:003 [WARNING] [keylogger] Flush slow: 812 ms"
+				]
+			},
+			"identity": {
+				"version": "2.1.0",
+				"commit": "f58d15798 (build)",
+				"os": "Windows 11 Home 26100.9457",
+				"driver": "windows",
+				"generated_utc": "2026-09-24T08:15:02Z",
+				"warn_count": 3,
+				"err_count": 1
+			},
+			"expected": {
+				"text": "# ErgoptiPlus diagnostics\n\n| Field | Value |\n| --- | --- |\n| Version | 2.1.0 |\n| Commit | f58d15798 (build) |\n| OS | Windows 11 Home 26100.9457 |\n| Driver | windows |\n| Generated (UTC) | 2026-09-24T08:15:02Z |\n| Warnings / errors this session | 3 / 1 |\n\n```text\nerror:\n  kind: error\n  message: Flush failed: disk full\n  module: keylogger\n  time: 2026-09-24 10:15:02:117\nrecent_issues:\n  - 2026-09-24 10:15:02:117 [ERROR] [keylogger] Flush failed: disk full\n  - 2026-09-24 10:14:58:003 [WARNING] [keylogger] Flush slow: 812 ms\n```\n",
+				"fields": {
+					"title": "keylogger: Flush failed: disk full",
+					"version": "2.1.0",
+					"os": "Windows 11 Home 26100.9457",
+					"driver": "windows"
+				}
+			}
+		},
+		{
+			"id": "crash_multi_line_without_recent_issues",
+			"error": {
+				"kind": "crash",
+				"module": "daemon",
+				"message": "attempt to index a nil value (field 'engine')\nstack traceback:\n\tergopti_hotstrings.lua:1510: in function 'main'",
+				"time": "2026-09-23T21:04:11Z",
+				"recent": []
+			},
+			"identity": {
+				"version": "local",
+				"commit": "",
+				"os": "Fedora Linux 41",
+				"driver": "linux",
+				"generated_utc": "2026-09-24T07:00:00Z",
+				"warn_count": 0,
+				"err_count": 0
+			},
+			"expected": {
+				"text": "# ErgoptiPlus diagnostics\n\n| Field | Value |\n| --- | --- |\n| Version | local |\n| Commit |  |\n| OS | Fedora Linux 41 |\n| Driver | linux |\n| Generated (UTC) | 2026-09-24T07:00:00Z |\n| Warnings / errors this session | 0 / 0 |\n\n```text\nerror:\n  kind: crash\n  message: attempt to index a nil value (field 'engine')\n    stack traceback:\n    \tergopti_hotstrings.lua:1510: in function 'main'\n  module: daemon\n  time: 2026-09-23T21:04:11Z\n```\n",
+				"fields": {
+					"title": "daemon: attempt to index a nil value (field 'engine')",
+					"version": "local",
+					"os": "Fedora Linux 41",
+					"driver": "linux"
+				}
+			}
+		},
+		{
+			"id": "backticks_lengthen_the_fence",
+			"error": {
+				"kind": "error",
+				"module": "hotstrings",
+				"message": "Unexpected ``` in « %s »",
+				"time": "2026-09-24 11:30:00:001",
+				"recent": ["2026-09-24 11:30:00:001 [ERROR] [hotstrings] Unexpected ``` in « %s »"]
+			},
+			"identity": {
+				"version": "2.2.0-beta.1",
+				"commit": "abc1234 (git)",
+				"os": "macOS 15.1 (24B83)",
+				"driver": "macos",
+				"generated_utc": "2026-09-24T09:30:00Z",
+				"warn_count": 12,
+				"err_count": 2
+			},
+			"expected": {
+				"text": "# ErgoptiPlus diagnostics\n\n| Field | Value |\n| --- | --- |\n| Version | 2.2.0-beta.1 |\n| Commit | abc1234 (git) |\n| OS | macOS 15.1 (24B83) |\n| Driver | macos |\n| Generated (UTC) | 2026-09-24T09:30:00Z |\n| Warnings / errors this session | 12 / 2 |\n\n````text\nerror:\n  kind: error\n  message: Unexpected ``` in « %s »\n  module: hotstrings\n  time: 2026-09-24 11:30:00:001\nrecent_issues:\n  - 2026-09-24 11:30:00:001 [ERROR] [hotstrings] Unexpected ``` in « %s »\n````\n",
+				"fields": {
+					"title": "hotstrings: Unexpected ``` in « %s »",
+					"version": "2.2.0-beta.1",
+					"os": "macOS 15.1 (24B83)",
+					"driver": "macos"
+				}
+			}
+		}
+	],
+	"invalid_errors": [
+		{
+			"id": "unknown_kind",
+			"error": {
+				"kind": "warning",
+				"module": "m",
+				"message": "x",
+				"time": "t",
+				"recent": []
+			},
+			"identity": {
+				"version": "1",
+				"commit": "",
+				"os": "o",
+				"driver": "linux",
+				"generated_utc": "g",
+				"warn_count": 0,
+				"err_count": 0
+			}
+		},
+		{
+			"id": "message_not_text",
+			"error": {
+				"kind": "error",
+				"module": "m",
+				"message": 42,
+				"time": "t",
+				"recent": []
+			},
+			"identity": {
+				"version": "1",
+				"commit": "",
+				"os": "o",
+				"driver": "linux",
+				"generated_utc": "g",
+				"warn_count": 0,
+				"err_count": 0
+			}
+		},
+		{
+			"id": "no_module",
+			"error": {
+				"kind": "error",
+				"message": "x",
+				"time": "t",
+				"recent": []
+			},
+			"identity": {
+				"version": "1",
+				"commit": "",
+				"os": "o",
+				"driver": "linux",
+				"generated_utc": "g",
+				"warn_count": 0,
+				"err_count": 0
+			}
+		},
+		{
+			"id": "recent_not_a_list",
+			"error": {
+				"kind": "error",
+				"module": "m",
+				"message": "x",
+				"time": "t",
+				"recent": "none"
+			},
+			"identity": {
+				"version": "1",
+				"commit": "",
+				"os": "o",
+				"driver": "linux",
+				"generated_utc": "g",
+				"warn_count": 0,
+				"err_count": 0
+			}
+		}
+	]
+}

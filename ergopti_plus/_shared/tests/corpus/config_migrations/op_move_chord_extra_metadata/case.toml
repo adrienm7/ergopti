@@ -1,0 +1,7 @@
+[case]
+description = "Unknown legacy metadata cannot be silently discarded."
+drivers = ["ahk", "hs", "linux"]
+outcome = "migrated"
+from_version = 1
+to_version = 2
+preserve_source = true

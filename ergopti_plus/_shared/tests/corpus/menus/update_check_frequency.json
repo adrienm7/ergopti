@@ -1,0 +1,77 @@
+{
+	"schema_version": 1,
+	"path": "updater.check_interval_seconds",
+	"id": "update_check_interval",
+	"i18n": "menu.about.frequency_menu",
+	"suffix": ": {1}",
+	"choices": [
+		{
+			"value": 300,
+			"i18n": "menu.about.frequency.5m"
+		},
+		{
+			"value": 1800,
+			"i18n": "menu.about.frequency.30m"
+		},
+		{
+			"value": 3600,
+			"i18n": "menu.about.frequency.1h"
+		},
+		{
+			"value": 21600,
+			"i18n": "menu.about.frequency.6h"
+		},
+		{
+			"value": 43200,
+			"i18n": "menu.about.frequency.12h"
+		},
+		{
+			"value": 86400,
+			"i18n": "menu.about.frequency.1d"
+		},
+		{
+			"value": 259200,
+			"i18n": "menu.about.frequency.3d"
+		},
+		{
+			"value": 604800,
+			"i18n": "menu.about.frequency.1w"
+		},
+		{
+			"value": 2592000,
+			"i18n": "menu.about.frequency.1mo"
+		},
+		{
+			"value": 0,
+			"i18n": "menu.about.frequency.never"
+		}
+	],
+	"snapped_states": [
+		{
+			"stored": 0,
+			"value": 0,
+			"code": "never"
+		},
+		{
+			"stored": 600,
+			"value": 300,
+			"code": "5m"
+		},
+		{
+			"stored": 900,
+			"value": 1800,
+			"code": "30m"
+		},
+		{
+			"stored": 86400,
+			"value": 86400,
+			"code": "1d"
+		},
+		{
+			"stored": 99999999,
+			"value": 2592000,
+			"code": "1mo"
+		}
+	],
+	"alternate_i18n": "menu.about.frequency.1w"
+}

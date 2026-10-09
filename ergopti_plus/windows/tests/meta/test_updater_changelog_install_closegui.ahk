@@ -1,0 +1,55 @@
+﻿; tests/meta/test_updater_changelog_install_closegui.ahk
+
+; ==============================================================================
+; MODULE: Updater Changelog Install-Button CloseGui Meta Test
+; DESCRIPTION:
+; Regression guard for finding F31: InstallSelected (the changelog window's
+; "Install this version" button handler, defined inside
+; _Updater_BuildChangelogGui) was the sole close path in
+; modules/updater/changelog.ahk that bypassed the _Updater_CloseGui helper --
+; every other close path (the channel picker, G's Close/Escape events) routes through
+; it. _Updater_CloseGui closes the WebView2 Controller before destroying the
+; Gui; a bare G.Destroy() skips that step.
+;
+; SCOPE: source introspection of modules/updater/changelog.ahk.
+; ==============================================================================
+
+#Requires AutoHotkey v2.0
+
+
+
+
+; ================================================================
+; ================================================================
+; ======= 1/ InstallSelected closes via _Updater_CloseGui ========
+; ================================================================
+; ================================================================
+
+_UCIG_CheckInstallSelectedUsesCloseGui() {
+	Body := _DriverFuncBody("_Updater_BuildChangelogGui")
+	Assert(Body != "", "_Updater_BuildChangelogGui must exist in modules/updater/changelog.ahk")
+
+	IdxAssign := InStr(Body, "InstallSelected := ")
+	Assert(IdxAssign > 0, "_Updater_BuildChangelogGui must still define InstallSelected")
+
+	; Bound the InstallSelected closure by the next statement (Picker.OnEvent)
+	; so a coincidental _Updater_CloseGui/G.Destroy() elsewhere in the
+	; surrounding Gui-builder cannot produce a false pass/fail.
+	IdxNext := InStr(Body, "Picker.OnEvent(", , IdxAssign)
+	Assert(IdxNext > IdxAssign, "could not bound the InstallSelected closure for inspection")
+	InstallSelectedBody := SubStr(Body, IdxAssign, IdxNext - IdxAssign)
+
+	HelperCall := InStr(InstallSelectedBody, "_Updater_InstallChosenRelease(G,")
+	Assert(HelperCall > 0,
+		"InstallSelected must delegate to the guarded chosen-release install helper")
+	Helper := _DriverFuncBody("_Updater_InstallChosenRelease")
+	Assert(Helper != "", "_Updater_InstallChosenRelease must exist in modules/updater/changelog.ahk")
+	Assert(InStr(Helper, "_Updater_CloseGui(G)") > 0,
+		"the guarded InstallSelected helper must close via _Updater_CloseGui(G), matching every other close path -- a bare G.Destroy() skips closing the WebView2 Controller first (updater-changelog-install-bare-destroy)")
+	Assert(InStr(InstallSelectedBody, "G.Destroy()") = 0,
+		"InstallSelected must not call the bare G.Destroy() -- it bypasses the _Updater_CloseGui helper that closes the WebView2 Controller before destroying the Gui (updater-changelog-install-bare-destroy)")
+	Assert(InStr(Helper, "G.Destroy()") = 0,
+		"the delegated InstallSelected helper must not destroy the Gui directly")
+}
+Test("updater changelog: InstallSelected closes via _Updater_CloseGui, not a bare G.Destroy() (updater-changelog-install-bare-destroy)",
+	_UCIG_CheckInstallSelectedUsesCloseGui)

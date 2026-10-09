@@ -1,0 +1,101 @@
+{
+	"description": "Golden vectors for diagnostics redaction with the rules of _shared/modules/diagnostics/redaction.json. `context` is the platform's home folder, account name and whether its paths compare case-insensitively (Windows). Replayed by the macOS and Linux Lua suites and the AHK suite.",
+	"vectors": [
+		{
+			"id": "mac_home_everywhere_in_free_text",
+			"context": { "home": "/Users/jdoe", "user": "jdoe", "case_insensitive": false },
+			"input": "config_dir: /Users/jdoe/.config/ergopti_plus\nlog: /Users/jdoe/Library/Logs/ergopti_plus/ErgoptiPlus_errors_2026-09-23.log",
+			"expected": "config_dir: ~/.config/ergopti_plus\nlog: ~/Library/Logs/ergopti_plus/ErgoptiPlus_errors_2026-09-23.log"
+		},
+		{
+			"id": "home_alone_and_trailing_slash_in_context",
+			"context": { "home": "/home/jdoe/", "user": "jdoe", "case_insensitive": false },
+			"input": "HOME=/home/jdoe and cwd /home/jdoe/",
+			"expected": "HOME=~ and cwd ~/"
+		},
+		{
+			"id": "a_sibling_folder_is_not_the_home",
+			"context": { "home": "/home/jdoe", "user": "jdoe", "case_insensitive": false },
+			"input": "/home/jdoe2/notes and /home/jdoe-backup and /home/jdoe.old",
+			"expected": "/home/jdoe2/notes and /home/<user>-backup and /home/<user>.old"
+		},
+		{
+			"id": "windows_home_both_slashes_any_case",
+			"context": { "home": "C:\\Users\\JDoe", "user": "JDoe", "case_insensitive": true },
+			"input": "C:\\Users\\JDoe\\AppData\\Local\\ergopti_plus\\logs and c:/users/jdoe/Documents and C:\\USERS\\JDOE",
+			"expected": "~\\AppData\\Local\\ergopti_plus\\logs and ~/Documents and ~"
+		},
+		{
+			"id": "account_name_outside_the_home",
+			"context": { "home": "/Users/jdoe", "user": "jdoe", "case_insensitive": false },
+			"input": "/Volumes/jdoe/Backups owned by jdoe (jdoe@example)",
+			"expected": "/Volumes/<user>/Backups owned by <user> (<user>@example)"
+		},
+		{
+			"id": "account_name_only_as_a_whole_word",
+			"context": { "home": "/Users/ann", "user": "ann", "case_insensitive": false },
+			"input": "ann wrote an annotation for Ann, anna and joann; ann_x stays",
+			"expected": "<user> wrote an annotation for Ann, anna and joann; ann_x stays"
+		},
+		{
+			"id": "account_name_case_folded_on_windows",
+			"context": { "home": "C:\\Users\\Admin", "user": "Admin", "case_insensitive": true },
+			"input": "D:\\Shares\\admin\\x and ADMIN but not administrator",
+			"expected": "D:\\Shares\\<user>\\x and <user> but not administrator"
+		},
+		{
+			"id": "short_account_name_is_never_redacted",
+			"context": { "home": "/home/al", "user": "al", "case_insensitive": false },
+			"input": "al at /home/al/x and /srv/al",
+			"expected": "al at ~/x and /srv/al"
+		},
+		{
+			"id": "no_context_keeps_text",
+			"context": {},
+			"input": "/Users/jdoe/file stays when nothing is known",
+			"expected": "/Users/jdoe/file stays when nothing is known"
+		},
+		{
+			"id": "token_prefixes",
+			"context": {},
+			"input": "openai sk-abcdefghijklmnopqrstuv github ghp_ABCDEFGHIJKLMNOPQRSTUVWX pat github_pat_11ABCDEFG_0123456789abcdef hf hf_abcdefghijklmnopqrstuvwxyz google AIzaSyA1234567890abcdefghijklmnopqrs",
+			"expected": "openai <secret> github <secret> pat <secret> hf <secret> google <secret>"
+		},
+		{
+			"id": "token_prefix_needs_a_long_body_and_a_word_start",
+			"context": {},
+			"input": "sk-short task-abcdefghijklmnopqrstuvwxyz disk-cache ghp_tooShort",
+			"expected": "sk-short task-abcdefghijklmnopqrstuvwxyz disk-cache ghp_tooShort"
+		},
+		{
+			"id": "bearer_credential",
+			"context": {},
+			"input": "Authorization: Bearer abc.DEF-123_xyz/+= next; bearer short",
+			"expected": "Authorization: Bearer <secret> next; bearer short"
+		},
+		{
+			"id": "key_value_secrets",
+			"context": {},
+			"input": "api_key=abcdef123456&x=1 password: hunter22 {\"token\": \"zyxwvu98\"} Api-Key = 'q1w2e3r4'",
+			"expected": "api_key=<secret>&x=1 password: <secret> {\"token\": \"<secret>\"} Api-Key = '<secret>'"
+		},
+		{
+			"id": "key_value_needs_a_whole_key_and_a_long_value",
+			"context": {},
+			"input": "max_tokens=512 tokens: 12345678 token_count=99 token: 12345 access_token=aaaaaaaa",
+			"expected": "max_tokens=512 tokens: 12345678 token_count=99 token: 12345 access_token=<secret>"
+		},
+		{
+			"id": "secret_containing_the_account_name_is_removed_whole",
+			"context": { "home": "/Users/jdoe", "user": "jdoe", "case_insensitive": false },
+			"input": "token=jdoe-4f5a6b7c at /Users/jdoe",
+			"expected": "token=<secret> at ~"
+		},
+		{
+			"id": "non_ascii_text_is_kept_byte_for_byte",
+			"context": { "home": "/Users/zoé", "user": "zoé", "case_insensitive": false },
+			"input": "Préférences de zoé dans /Users/zoé/Library — ✓ 😀",
+			"expected": "Préférences de <user> dans ~/Library — ✓ 😀"
+		}
+	]
+}

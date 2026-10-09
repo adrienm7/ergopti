@@ -1,0 +1,191 @@
+{
+	"$description": "Per-app geometry and metadata for every webview UI. Read by all three hosts (macOS ui_builder, Windows WebView_Host_Open, future Linux WebKitGTK host) so geometry is defined once. Entry path convention: _shared/ui/<id>/index.html. Locales base convention: _shared/data/locales/. Note: macOS metrics_typing and metrics_apps use screen-relative sizing (sf.w-100, sf.h-100) rather than fixed dimensions — the values here are recommended defaults for non-macOS hosts.",
+	"window_title": {
+		"prefix": "ErgoptiPlus",
+		"separator": " — "
+	},
+	"native_windows": {
+		"console": {
+			"width_ratio": 0.7,
+			"height_ratio": 0.75
+		}
+	},
+	"apps": {
+		"config_cleanup": {
+			"title_key": "dialog.unused_keys.title",
+			"width": 720,
+			"height": 560,
+			"min_width": 480,
+			"min_height": 320,
+			"vhost": "ergopti.configcleanup"
+		},
+		"action_picker": {
+			"title_key": "dialog.action_picker.label",
+			"width": 460,
+			"height": 560,
+			"min_width": 360,
+			"min_height": 360,
+			"vhost": "ergopti.actionpicker"
+		},
+		"changelog": {
+			"title_key": "changelog_window.window_title",
+			"width": 860,
+			"height": 580,
+			"min_width": 860,
+			"min_height": 540,
+			"vhost": "ergopti.changelog"
+		},
+		"download_window": {
+			"title_key": "download_window.window_title",
+			"width": 460,
+			"height": 380,
+			"min_width": 460,
+			"min_height": 380,
+			"vhost": "ergopti.download"
+		},
+		"permission_dialog": {
+			"title_key": "permission_dialog.window_title",
+			"width": 560,
+			"height": 520,
+			"min_width": 560,
+			"min_height": 520,
+			"vhost": "ergopti.permissiondialog"
+		},
+		"error_dialog": {
+			"title_key": "common.error_title",
+			"width": 560,
+			"height": 460,
+			"min_width": 440,
+			"min_height": 320,
+			"vhost": "ergopti.errordialog"
+		},
+		"healthcheck": {
+			"title_key": "menu.debug.healthcheck",
+			"width": 1060,
+			"height": 720,
+			"min_width": 640,
+			"min_height": 480,
+			"vhost": "ergopti.healthcheck"
+		},
+		"hotstrings_config_window": {
+			"title_key": "hs_config.window_title",
+			"width": 740,
+			"height": 660,
+			"min_width": 560,
+			"min_height": 320,
+			"vhost": "ergopti.hotstringsconfig"
+		},
+		"hotstring_editor": {
+			"title_key": "editor.hotstrings.window_title",
+			"width": 960,
+			"height": 640,
+			"min_width": 720,
+			"min_height": 520,
+			"vhost": "ergopti.hotstrings"
+		},
+		"layer_editor": {
+			"title_key": "layer_editor.window_title",
+			"width": 1120,
+			"height": 800,
+			"min_width": 900,
+			"min_height": 620,
+			"vhost": "ergopti.layereditor"
+		},
+		"layout_manager": {
+			"title_key": "layout_manager.window_title",
+			"width": 720,
+			"height": 560,
+			"min_width": 560,
+			"min_height": 400,
+			"vhost": "ergopti.layoutmanager"
+		},
+		"metrics_apps": {
+			"title_key": "metrics_apps.window_title",
+			"width": 940,
+			"height": 640,
+			"min_width": 720,
+			"min_height": 400,
+			"vhost": "ergopti.metricsapps"
+		},
+		"metrics_typing": {
+			"title_key": "metrics_apps.title",
+			"width": 1020,
+			"height": 680,
+			"min_width": 800,
+			"min_height": 500,
+			"vhost": "ergopti.metricstyping"
+		},
+		"model_browser": {
+			"title_key": "model_browser.window_title",
+			"width": 900,
+			"height": 580,
+			"min_width": 780,
+			"min_height": 460,
+			"vhost": "ergopti.modelbrowser"
+		},
+		"numeric_prompt": {
+			"title_key": "numeric_prompt.window_title",
+			"width": 420,
+			"height": 300,
+			"min_width": 360,
+			"min_height": 260,
+			"vhost": "ergopti.numericprompt"
+		},
+		"onboarding": {
+			"title_key": "onboarding.window_title",
+			"width": 720,
+			"height": 640,
+			"min_width": 560,
+			"min_height": 480,
+			"vhost": "ergopti.onboarding"
+		},
+		"paths_editor": {
+			"title_key": "menu.paths.window_title",
+			"width": 720,
+			"height": 440,
+			"min_width": 560,
+			"min_height": 200,
+			"vhost": "ergopti.paths"
+		},
+		"personal_info_editor": {
+			"title_key": "editor.personal_info.window_title",
+			"width": 560,
+			"height": 680,
+			"min_width": 480,
+			"min_height": 400,
+			"vhost": "ergopti.personalinfo"
+		},
+		"prompt_editor": {
+			"title_key": "prompt_editor.title_new",
+			"width": 560,
+			"height": 500,
+			"min_width": 480,
+			"min_height": 360,
+			"vhost": "ergopti.prompteditor"
+		},
+		"token_prompt": {
+			"title_key": "token_prompt.window_title",
+			"width": 720,
+			"height": 155,
+			"min_width": 720,
+			"min_height": 155,
+			"vhost": "ergopti.tokenprompt"
+		},
+		"update_check": {
+			"title_key": "update_check.window_title",
+			"width": 480,
+			"height": 320,
+			"min_width": 400,
+			"min_height": 260,
+			"vhost": "ergopti.updatecheck"
+		},
+		"physical_shortcuts": {
+			"title_key": "physical_shortcuts.window_title",
+			"width": 780,
+			"height": 660,
+			"min_width": 560,
+			"min_height": 420,
+			"vhost": "ergopti.physicalshortcuts"
+		}
+	}
+}

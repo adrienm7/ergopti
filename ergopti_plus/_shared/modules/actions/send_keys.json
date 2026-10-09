@@ -1,0 +1,60 @@
+{
+	"description": "The vocabulary of the send_key and send_shortcut action parameters, and the limit of send_text. The value grammar is pinned by _shared/tests/corpus/action_parameters/send_input_vectors.json, which the three driver suites replay. `ahk` is the AutoHotkey key or modifier name, `hs` the Hammerspoon one, `linux` the evdev keycode the Linux driver presses on its uinput device. `primary` is the portable modifier: Command on macOS, Control elsewhere.",
+	"text_max_code_points": 500,
+	"modifiers": [
+		{ "id": "primary", "aliases": [], "ahk": "Ctrl", "hs": "cmd", "linux": 29 },
+		{ "id": "ctrl", "aliases": ["control"], "ahk": "Ctrl", "hs": "ctrl", "linux": 29 },
+		{ "id": "alt", "aliases": ["option", "opt"], "ahk": "Alt", "hs": "alt", "linux": 56 },
+		{ "id": "shift", "aliases": [], "ahk": "Shift", "hs": "shift", "linux": 42 },
+		{
+			"id": "super",
+			"aliases": ["win", "cmd", "command", "meta"],
+			"ahk": "Win",
+			"hs": "cmd",
+			"linux": 125
+		}
+	],
+	"keys": [
+		{ "id": "enter", "aliases": ["return"], "ahk": "Enter", "hs": "return", "linux": 28 },
+		{ "id": "tab", "aliases": [], "ahk": "Tab", "hs": "tab", "linux": 15 },
+		{ "id": "escape", "aliases": ["esc"], "ahk": "Escape", "hs": "escape", "linux": 1 },
+		{ "id": "backspace", "aliases": [], "ahk": "Backspace", "hs": "delete", "linux": 14 },
+		{ "id": "delete", "aliases": ["del"], "ahk": "Delete", "hs": "forwarddelete", "linux": 111 },
+		{ "id": "insert", "aliases": ["ins"], "ahk": "Insert", "hs": "help", "linux": 110 },
+		{ "id": "space", "aliases": [], "ahk": "Space", "hs": "space", "linux": 57 },
+		{ "id": "up", "aliases": [], "ahk": "Up", "hs": "up", "linux": 103 },
+		{ "id": "down", "aliases": [], "ahk": "Down", "hs": "down", "linux": 108 },
+		{ "id": "left", "aliases": [], "ahk": "Left", "hs": "left", "linux": 105 },
+		{ "id": "right", "aliases": [], "ahk": "Right", "hs": "right", "linux": 106 },
+		{ "id": "home", "aliases": [], "ahk": "Home", "hs": "home", "linux": 102 },
+		{ "id": "end", "aliases": [], "ahk": "End", "hs": "end", "linux": 107 },
+		{ "id": "page_up", "aliases": ["pageup", "pgup"], "ahk": "PgUp", "hs": "pageup", "linux": 104 },
+		{
+			"id": "page_down",
+			"aliases": ["pagedown", "pgdn"],
+			"ahk": "PgDn",
+			"hs": "pagedown",
+			"linux": 109
+		},
+		{ "id": "f1", "aliases": [], "ahk": "F1", "hs": "f1", "linux": 59 },
+		{ "id": "f2", "aliases": [], "ahk": "F2", "hs": "f2", "linux": 60 },
+		{ "id": "f3", "aliases": [], "ahk": "F3", "hs": "f3", "linux": 61 },
+		{ "id": "f4", "aliases": [], "ahk": "F4", "hs": "f4", "linux": 62 },
+		{ "id": "f5", "aliases": [], "ahk": "F5", "hs": "f5", "linux": 63 },
+		{ "id": "f6", "aliases": [], "ahk": "F6", "hs": "f6", "linux": 64 },
+		{ "id": "f7", "aliases": [], "ahk": "F7", "hs": "f7", "linux": 65 },
+		{ "id": "f8", "aliases": [], "ahk": "F8", "hs": "f8", "linux": 66 },
+		{ "id": "f9", "aliases": [], "ahk": "F9", "hs": "f9", "linux": 67 },
+		{ "id": "f10", "aliases": [], "ahk": "F10", "hs": "f10", "linux": 68 },
+		{ "id": "f11", "aliases": [], "ahk": "F11", "hs": "f11", "linux": 87 },
+		{ "id": "f12", "aliases": [], "ahk": "F12", "hs": "f12", "linux": 88 },
+		{ "id": "f13", "aliases": [], "ahk": "F13", "hs": "f13", "linux": 183 },
+		{ "id": "f14", "aliases": [], "ahk": "F14", "hs": "f14", "linux": 184 },
+		{ "id": "f15", "aliases": [], "ahk": "F15", "hs": "f15", "linux": 185 },
+		{ "id": "f16", "aliases": [], "ahk": "F16", "hs": "f16", "linux": 186 },
+		{ "id": "f17", "aliases": [], "ahk": "F17", "hs": "f17", "linux": 187 },
+		{ "id": "f18", "aliases": [], "ahk": "F18", "hs": "f18", "linux": 188 },
+		{ "id": "f19", "aliases": [], "ahk": "F19", "hs": "f19", "linux": 189 },
+		{ "id": "f20", "aliases": [], "ahk": "F20", "hs": "f20", "linux": 190 }
+	]
+}

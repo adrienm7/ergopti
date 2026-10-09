@@ -1,0 +1,458 @@
+--- _shared/lua/keymap/terminators.lua
+
+--- ==============================================================================
+
+-- Resolved here rather than assumed to be a global. LuaJIT has no utf8 table,
+-- and this module was reading one: the daemon and the unit runner both install
+-- the compat shim before loading anything, so it worked from those two entry
+-- points and crashed from the E2E runner, which is a third. A shared module
+-- cannot depend on its caller having installed a global — the shim exports the
+-- same functions directly, so ask for them.
+local utf8_lib = (type(utf8) == "table" and utf8.offset and utf8.len) and utf8 or require("compat.utf8")
+
+--- MODULE: Keymap Terminators (Shared)
+--- DESCRIPTION:
+--- Owns the terminator catalogue (definitions, enable/disable state, custom
+--- user-added entries) and the O(1) lookup sets used by the per-keystroke
+--- hot path. Platform-neutral: no hs.* dependency, no i18n dependency —
+--- labels are static French strings usable as display text or as keys for
+--- upstream i18n resolution by host-driver shims.
+---
+--- FEATURES & RATIONALE:
+--- 1. Single Catalogue: TERMINATOR_DEFS is the only place that lists which
+---    characters can end a hotstring — menu builders and the expander read
+---    from here rather than re-declaring their own sets.
+--- 2. O(1) Hot Path: is_terminator() and terminator_is_consumed() go through
+---    pre-built hash sets rather than walking the definition list; the sets
+---    are rebuilt only on mutation (enable/disable, custom add/remove, magic-
+---    key rename), so keystroke-time cost is constant.
+--- 3. Multi-Codepoint Safety: both lookups also probe the first codepoint of
+---    `chars`, so dead-key / IME composition events whose leading codepoint
+---    is a terminator still fire their expansion.
+--- ==============================================================================
+
+local M   = {}
+local LOG = "keymap.terminators"
+
+-- French macOS layouts deliver spaced punctuation as one multi-codepoint
+-- keyDown payload. Keep the exact carrier spellings beside the terminator
+-- matcher so every magic-key consumer recognises the same physical action.
+local NBSP  = "\xC2\xA0"      -- U+00A0 NO-BREAK SPACE
+local NNBSP = "\xE2\x80\xAF"  -- U+202F NARROW NO-BREAK SPACE
+local ERGOPTI_SPACED_OUTPUTS = {
+	[":"] = true,
+	[";"] = true,
+	["!"] = true,
+	["?"] = true,
+	["%"] = true,
+	["€"] = true,
+}
+
+-- Use the canonical logger shim so shared code never reaches for a platform-
+-- specific module name (lib.logger is macOS-only; logger.shim is platform-neutral
+-- and falls back to print when no real logger is on the search path).
+local Logger = require("logger.shim")
+
+
+
+
+
+--- ==========================================
+--- ==========================================
+--- ======= 1/ Constants & Definitions =======
+--- ==========================================
+--- ==========================================
+
+--- Built-in terminator definitions. Each entry with a key produces one entry
+--- in the enable/disable table. Separators (type = "separator") are UI-only.
+--- Labels are static French strings; host drivers may resolve them further via i18n.
+---
+--- The catalogue DATA is generated from the single source of truth
+--- (_shared/core/domain/Terminators.spec.js → `npm run codegen:terminators`) so this
+--- module and the AHK driver can never drift. Only the data lives in the
+--- generated file; all logic below (O(1) caches, multi-codepoint safety, custom
+--- and magic-key lifecycle) stays hand-written here.
+M.TERMINATOR_DEFS = require("keymap.terminators_catalogue")
+
+
+-- Flat enable/disable table keyed by terminator key, seeded from default_enabled.
+local _enabled = {}
+for _, def in ipairs(M.TERMINATOR_DEFS) do
+	if def.key then
+		_enabled[def.key] = (def.default_enabled ~= false)
+	end
+end
+
+
+-- Cached O(1) lookup sets for the per-keystroke hot path. Every call to
+-- is_terminator() used to walk TERMINATOR_DEFS and each def's chars list
+-- (linear scan on every keydown); terminator_is_consumed() did the same.
+-- We rebuild these maps whenever terminator state changes so the keystroke
+-- path stays O(1).
+local _chars_set   = {}
+local _consume_set = {}
+local function build_cache(enabled)
+	local chars_set = {}
+	local consume_set = {}
+	for _, def in ipairs(M.TERMINATOR_DEFS) do
+		if def.key and enabled[def.key] and def.chars then
+			for _, c in ipairs(def.chars) do
+				if type(c) == "string" and c ~= "" then
+					chars_set[c] = true
+					if def.consume then consume_set[c] = true end
+				end
+			end
+		end
+	end
+	return chars_set, consume_set
+end
+
+local function rebuild_cache()
+	_chars_set, _consume_set = build_cache(_enabled)
+end
+rebuild_cache()
+
+
+--- Returns the first UTF-8 codepoint of `s`. Used by terminator matching so
+--- that a multi-codepoint event (e.g. dead-key sequences, IME composition)
+--- whose first codepoint is a single-char terminator still triggers.
+--- @param s string The input string.
+--- @return string The first UTF-8 character, or "" when s is empty.
+local function first_codepoint(s)
+	if type(s) ~= "string" or s == "" then return "" end
+	local ok, off = pcall(utf8_lib.offset, s, 2)
+	if ok and off then return s:sub(1, off - 1) end
+	return s:sub(1, 1)
+end
+
+--- Returns the last UTF-8 codepoint of `s`.
+---
+--- Needed because the macOS layout emits French punctuation as a SINGLE event
+--- carrying its typographic space first: ":" arrives as NBSP..":" and
+--- ";" / "!" / "?" as NNBSP..<char>. Those spaces are default-DISABLED
+--- terminators while the punctuation itself is default-enabled, so probing only
+--- the whole string and its FIRST codepoint missed every one of them - the
+--- enabled character was always the tail.
+--- @param s string The input string.
+--- @return string The last UTF-8 character, or "" when s is empty.
+local function last_codepoint(s)
+	if type(s) ~= "string" or s == "" then return "" end
+	local ok, len = pcall(utf8_lib.len, s)
+	if not ok or not len or len < 1 then return s:sub(-1) end
+	local ok_off, off = pcall(utf8_lib.offset, s, len)
+	if ok_off and off then return s:sub(off) end
+	return s:sub(-1)
+end
+
+--- Returns true when one physical keyDown payload denotes `magic_key`.
+---
+--- Equality is intentionally strict except for the two exact typographic-space
+--- carriers emitted with French spaced punctuation. A suffix test would also
+--- accept unrelated text such as `"x:"`, letting an IME/composed event trigger
+--- an action the user did not press.
+--- @param chars string Physical event characters.
+--- @param magic_key string Configured logical magic key.
+--- @return boolean
+function M.matches_magic_event(chars, magic_key)
+	if type(chars) ~= "string" or type(magic_key) ~= "string" or magic_key == "" then
+		return false
+	end
+	if chars == magic_key then return true end
+	if not ERGOPTI_SPACED_OUTPUTS[magic_key] then return false end
+	return chars == NBSP .. magic_key or chars == NNBSP .. magic_key
+end
+
+-- =========================================
+-- =========================================
+-- ======= 2/ Hot-Path Detection ===========
+-- =========================================
+-- =========================================
+
+--- Returns true if `chars` matches an enabled terminator. If `chars` is a
+--- multi-codepoint event, we also compare against its first codepoint so that
+--- dead-key / IME-composed sequences whose leading codepoint is a terminator
+--- still fire the expansion. Lookups go through a pre-built set so the hot
+--- path is O(1) regardless of how many terminator definitions exist.
+--- @param chars string The typed character(s) to check.
+--- @return boolean
+function M.is_terminator(chars)
+	if _chars_set[chars] then return true end
+	if #chars > 0 then
+		local first = first_codepoint(chars)
+		if first ~= chars and _chars_set[first] then return true end
+		-- ...and the LAST codepoint. autocorrection - the flagship feature - is
+		-- entirely non-auto French accent corrections that fire only on a
+		-- terminator, and four of the enabled defaults (? ! : ;) arrive from the
+		-- macOS layout with their typographic space PREPENDED in the same event.
+		-- Probing the whole string and its head alone therefore rejected every
+		-- French sentence ending: the correction silently did not fire while the
+		-- tooltip had already advertised the row.
+		local last = last_codepoint(chars)
+		local known_carrier = chars == NBSP .. last or chars == NNBSP .. last
+		if last ~= chars and known_carrier and _chars_set[last] then return true end
+	end
+	return false
+end
+
+--- Returns true if `chars` matches an enabled terminator that should be consumed
+--- (i.e., not re-typed after the expansion fires). Multi-codepoint events are
+--- consumed only for the exact NBSP/NNBSP carrier spellings emitted by the
+--- Ergopti layout. A leading terminator may still trigger an IME composition via
+--- is_terminator(), but the complete payload must then be replayed intact.
+--- @param chars string The typed character(s) to check.
+--- @return boolean
+function M.terminator_is_consumed(chars)
+	if _consume_set[chars] then return true end
+	if #chars > 0 then
+		-- The tail alias is narrower than detection by design: only a known
+		-- typographic carrier may transfer the consume policy to a multi-codepoint
+		-- event. Generic IME suffixes must be replayed rather than swallowed.
+		local last = last_codepoint(chars)
+		local known_carrier = chars == NBSP .. last or chars == NNBSP .. last
+		if last ~= chars and known_carrier and _consume_set[last] then return true end
+	end
+	return false
+end
+
+
+
+
+-- =========================================
+-- =========================================
+-- ======= 3/ Enable / Disable =============
+-- =========================================
+-- =========================================
+
+--- Enables or disables several terminators as one cache publication.
+--- Invalid input leaves both the enabled-state table and hot-path caches intact.
+--- @param changes table Map of terminator key to exact boolean state.
+--- @return boolean committed
+function M.set_terminators_enabled(changes)
+	if type(changes) ~= "table" then
+		Logger.error(LOG, "set_terminators_enabled: changes must be a table (got '%s').", type(changes))
+		return false
+	end
+
+	local candidate = {}
+	for key, enabled in pairs(_enabled) do candidate[key] = enabled end
+	local count = 0
+	for key, enabled in pairs(changes) do
+		if type(key) ~= "string" or key == "" or _enabled[key] == nil then
+			Logger.error(LOG, "set_terminators_enabled: unknown terminator key '%s'.", tostring(key))
+			return false
+		end
+		if type(enabled) ~= "boolean" then
+			Logger.error(LOG, "set_terminators_enabled: state for '%s' must be boolean (got '%s').",
+				key, type(enabled))
+			return false
+		end
+		candidate[key] = enabled
+		count = count + 1
+	end
+
+	local ok, chars_or_err, consume_set = xpcall(function()
+		return build_cache(candidate)
+	end, debug.traceback)
+	if not ok then
+		Logger.error(LOG, "set_terminators_enabled: cache rebuild refused — %s.", tostring(chars_or_err))
+		return false
+	end
+
+	_enabled = candidate
+	_chars_set = chars_or_err
+	_consume_set = consume_set
+	Logger.debug(LOG, "Terminator batch committed (%d change(s)).", count)
+	return true
+end
+
+--- Enables or disables a terminator by key.
+--- @param key string The terminator key identifier.
+--- @param en boolean True to enable, false to disable.
+--- @return boolean committed
+function M.set_terminator_enabled(key, en)
+	return M.set_terminators_enabled({ [key] = en })
+end
+
+--- Returns true if the given terminator key is currently enabled.
+--- @param key string The terminator key identifier.
+--- @return boolean
+function M.is_terminator_enabled(key)
+	return _enabled[key] == true
+end
+
+--- Returns the full terminator definitions table (by reference — do not mutate).
+--- @return table
+function M.get_terminator_defs()
+	return M.TERMINATOR_DEFS
+end
+
+
+
+
+-- =========================================
+-- =========================================
+-- ======= 4/ Custom Terminators ===========
+-- =========================================
+-- =========================================
+
+--- Validates one exact canonical UTF-8 scalar.
+--- @param char any Candidate character.
+--- @return boolean valid
+--- @return string|nil reason Stable refusal reason.
+function M.validate_character(char)
+	if type(char) ~= "string" or char == "" then return false, "invalid_character" end
+	local ok, length = pcall(utf8_lib.len, char)
+	if not ok or length ~= 1 then return false, "invalid_character" end
+	return true
+end
+
+-- A magic key must be rare in ordinary prose. This policy deliberately accepts
+-- symbol blocks and a small set of legacy Latin-1 symbols, rather than trying to
+-- blacklist every letter and digit in Unicode. A blacklist can never be
+-- complete: a script it forgot becomes a destructive trigger in normal words.
+local SAFE_MAGIC_CODEPOINTS = {
+	[0x00A4] = true, -- CURRENCY SIGN
+	[0x00A7] = true, -- SECTION SIGN
+	[0x00B1] = true, -- PLUS-MINUS SIGN
+	[0x00B6] = true, -- PILCROW SIGN
+	[0x00D7] = true, -- MULTIPLICATION SIGN
+	[0x00F7] = true, -- DIVISION SIGN
+}
+local SAFE_MAGIC_RANGES = {
+	{ 0x2190, 0x2BFF }, -- arrows, mathematical operators, shapes, symbols, dingbats
+	{ 0x1F300, 0x1FAFF }, -- emoji and pictographic symbols
+}
+
+--- Validates a magic key against the shared fail-closed symbol policy.
+--- @param char any Candidate character.
+--- @return boolean valid
+--- @return string|nil reason Stable refusal reason.
+function M.validate_magic_key(char)
+	local valid, reason = M.validate_character(char)
+	if not valid then return false, reason end
+	local ok, codepoint = pcall(utf8_lib.codepoint, char)
+	if not ok or type(codepoint) ~= "number" then return false, "invalid_character" end
+	if SAFE_MAGIC_CODEPOINTS[codepoint] then return true end
+	for _, range in ipairs(SAFE_MAGIC_RANGES) do
+		if codepoint >= range[1] and codepoint <= range[2] then return true end
+	end
+	return false, "unsafe_magic_key"
+end
+
+
+--- Validates one custom terminator candidate against catalogue identities.
+--- An existing custom key may be replayed or updated, but built-in keys and
+--- characters owned by any other slot remain immutable.
+--- @param key any Candidate slot identifier.
+--- @param char any Candidate character.
+--- @param label any Candidate display label.
+--- @param consume any Candidate consume policy.
+--- @return boolean valid
+--- @return string|nil reason Stable refusal reason.
+function M.validate_custom_terminator(key, char, label, consume)
+	if type(key) ~= "string" or key == "" then return false, "invalid_key" end
+	local char_valid, char_reason = M.validate_character(char)
+	if not char_valid then return false, char_reason end
+	if type(label) ~= "string" or label == "" then return false, "invalid_label" end
+	if type(consume) ~= "boolean" then return false, "invalid_consume" end
+
+	for _, def in ipairs(M.TERMINATOR_DEFS) do
+		if def.key == key and def.custom ~= true then return false, "key_collision" end
+		if def.key ~= key then
+			for _, existing_char in ipairs(type(def.chars) == "table" and def.chars or {}) do
+				if existing_char == char then return false, "character_collision" end
+			end
+		end
+	end
+	return true
+end
+
+--- Adds or updates a user-defined terminator.
+--- Idempotent: calling with the same key updates the existing definition in place.
+--- @param key string Unique identifier (e.g. "custom_dot").
+--- @param char string The trigger character.
+--- @param label string Human-readable label shown in the menu.
+--- @param consume boolean Whether to swallow the character after expansion.
+--- @return boolean committed
+function M.add_custom_terminator(key, char, label, consume)
+	local valid, reason = M.validate_custom_terminator(key, char, label, consume)
+	if not valid then
+		Logger.error(LOG, "add_custom_terminator: candidate refused (%s).", tostring(reason))
+		return false
+	end
+	-- Update in place if the key already exists (idempotent on reload).
+	for _, def in ipairs(M.TERMINATOR_DEFS) do
+		if def.key == key then
+			def.chars   = { char }
+			def.label   = label
+			def.consume = consume
+			rebuild_cache()
+			Logger.debug(LOG, "Custom terminator '%s' updated.", key)
+			return true
+		end
+	end
+	table.insert(M.TERMINATOR_DEFS, {
+		key             = key,
+		chars           = { char },
+		label           = label,
+		consume         = consume,
+		default_enabled = true,
+		custom          = true,
+	})
+	_enabled[key] = true
+	rebuild_cache()
+	Logger.info(LOG, "Custom terminator '%s' added.", key)
+	return true
+end
+
+--- Removes a user-defined terminator (no-op on built-in terminators).
+--- @param key string The unique identifier of the terminator to remove.
+function M.remove_custom_terminator(key)
+	for i, def in ipairs(M.TERMINATOR_DEFS) do
+		if def.key == key and def.custom then
+			table.remove(M.TERMINATOR_DEFS, i)
+			_enabled[key] = nil
+			rebuild_cache()
+			Logger.info(LOG, "Custom terminator '%s' removed.", key)
+			return true
+		end
+	end
+	Logger.warn(LOG, "remove_custom_terminator: key '%s' not found or not custom.", tostring(key))
+	return false
+end
+
+
+
+
+-- =========================================
+-- =========================================
+-- ======= 5/ Magic Key Sync ===============
+-- =========================================
+-- =========================================
+
+--- Reassigns the magic-key character carried by the "star" terminator entry.
+--- Called by Registry.update_trigger_char() whenever the user picks a new
+--- magic key, so both the mapping database AND the terminator set stay in
+--- sync on the same character.
+--- @param magic_key string The new trigger character.
+--- @return boolean committed
+function M.update_magic_key(magic_key)
+	local valid, reason = M.validate_character(magic_key)
+	if not valid then
+		Logger.error(LOG, "update_magic_key: candidate refused (%s).", tostring(reason))
+		return false
+	end
+	for _, def in ipairs(M.TERMINATOR_DEFS) do
+		if def.key == "star" then
+			def.chars = { magic_key }
+			def.label = magic_key .. " : Touche magique"
+			rebuild_cache()
+			return true
+		end
+	end
+	Logger.error(LOG, "update_magic_key: star definition is unavailable.")
+	return false
+end
+
+
+return M

@@ -1,0 +1,17 @@
+[registry]
+current_version = 2
+unstamped_version = 1
+
+[steps.v1_to_v2]
+from = 1
+to = 2
+drivers = ["ahk", "hs", "linux"]
+reason = "Corpus: occupied namespaces are explicit choices, including unsupported future values."
+ops = [
+	{ op = "copy_if_absent", section = "source", key = "choice", to_section = "settings.scalar", to_key = "child" },
+	{ op = "copy_if_absent", section = "source", key = "choice", to_section = "settings.disabled", to_key = "child" },
+	{ op = "copy_if_absent", section = "source", key = "choice", to_section = "settings.array.deep", to_key = "child" },
+	{ op = "copy_if_absent", section = "source", key = "choice", to_section = "settings.numeric", to_key = "child" },
+	{ op = "copy_if_absent", section = "source", key = "choice", to_section = "settings", to_key = "existing" },
+	{ op = "copy_if_absent", section = "source", key = "choice", to_section = "settings", to_key = "empty" },
+]

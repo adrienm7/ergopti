@@ -1,0 +1,13 @@
+# _shared/tests/corpus/config_migrations/shipped_switch_actions_kept_on_windows_and_linux/expected.toml
+
+[_meta]
+schema_version = 12
+
+[gestures]
+enabled = true
+swipe_3_left = "win_prev"
+swipe_3_right = "win_next"
+tap_3 = "app_switcher"
+
+[shortcuts.tap_keys]
+number_row_left = "app_switcher"

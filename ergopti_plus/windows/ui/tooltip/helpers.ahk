@@ -1,0 +1,1877 @@
+﻿; ui/tooltip/helpers.ahk
+; Requires: GraphicsRenderer
+
+; ==============================================================================
+; MODULE: Hotstring Tooltip / Internal Rendering Helpers
+; DESCRIPTION:
+; Surface lifecycle (suspend/reveal), screen clamping, stack presentation, dequeue rebuild, border teardown, GUI building, text measuring, stacked-corner rounding, border-alpha premultiply, the GDI border ring, DWM rounding control, accent resolution, tint mixing and caret-anchored positioning.
+;
+; Split out of the former infra/tooltip.ahk (the module split); see ui/tooltip/init.ahk
+; for the module overview. Functions and globals are hoisted, so load order
+; across the tooltip/*.ahk files is irrelevant.
+
+class TooltipNavOwnerRetryError extends Error {
+}
+class TooltipLlmTerminalOutcomeError extends Error {
+}
+class TooltipLlmStaleRenderError extends Error {
+}
+; ==============================================================================
+
+
+
+
+
+; ============================================================
+; ============================================================
+; ======= 2/ Internal helpers ===============================
+; ============================================================
+; ============================================================
+
+; Surface lifecycle — canonical phases in _shared/modules/tooltip/lifecycle.js.
+; AHK uses two HWNDs (content + border); PREPARE keeps both hidden until the
+; border DIB and content controls are ready, then REVEAL shows them together.
+
+; Native reveal seam. ShowWindow(SW_SHOWNOACTIVATE) shows a window in the z-order
+; slot it already holds, so the border landed above the content only while it was
+; created after it. A pooled border is always older than the fresh content Gui,
+; which then covered the whole ring except the corner pixels its rounded region
+; clips away. Every reveal therefore places the surface explicitly.
+class _TooltipRevealNative {
+	; HWND_TOPMOST: the top of the always-on-top band both tooltip surfaces use.
+	static InsertAfter := -1
+	; SWP_NOSIZE | SWP_NOMOVE | SWP_NOACTIVATE | SWP_SHOWWINDOW. SWP_NOZORDER is
+	; deliberately absent: the z-order placement is the purpose of the call.
+	static Flags := 0x0001 | 0x0002 | 0x0010 | 0x0040
+
+	static ShowOnTop(Hwnd) {
+		return DllCall("User32\SetWindowPos", "Ptr", Hwnd,
+			"Ptr", this.InsertAfter, "Int", 0, "Int", 0, "Int", 0, "Int", 0,
+			"UInt", this.Flags, "Int") != 0
+	}
+
+	; A failed synchronous flush only defers the paint to the queued WM_PAINT.
+	static PaintNow(Hwnd) {
+		return DllCall("User32\UpdateWindow", "Ptr", Hwnd, "Int") != 0
+	}
+}
+
+; Show content + border together after PREPARE completed while hidden.
+; The content is a normal Gui (background + text controls); the border is a
+; separate pre-painted layered window. Showing only QUEUES a WM_PAINT for the
+; content, so if the message queue is busy the border (already painted via
+; UpdateLayeredWindow) can appear for up to a few hundred ms over a still-blank
+; content window — the "border alone without background" flash. UpdateWindow
+; flushes the content's paint SYNCHRONOUSLY (it bypasses the queue), so the
+; background+text are on screen BEFORE the border is revealed and the two surfaces
+; appear as one. The border is raised last so it always stacks directly above
+; its content, whichever of the two HWNDs was created first.
+_TooltipRevealPreparedSurfaces(Surface, Native := _TooltipRevealNative, Breakdown := 0) {
+		if !(Breakdown is Array)
+				Breakdown := HotPath_BreakdownBegin()
+		if (Surface.Rows.Length > 0) {
+				ContentHwnd := Surface.Rows[1].Gui.Hwnd
+				ContentStart := HotPath_Now()
+				if !Native.ShowOnTop(ContentHwnd)
+						throw OSError(A_LastError, "SetWindowPos (tooltip content reveal)")
+				HotPath_BreakdownMark("reveal_content", ContentStart, Breakdown)
+				PaintStart := HotPath_Now()
+				Native.PaintNow(ContentHwnd)
+				HotPath_BreakdownMark("reveal_paint", PaintStart, Breakdown)
+		}
+		if Surface.Border {
+				BorderStart := HotPath_Now()
+				if !Native.ShowOnTop(Surface.Border.Hwnd)
+						throw OSError(A_LastError, "SetWindowPos (tooltip border reveal)")
+				HotPath_BreakdownMark("reveal_border", BorderStart, Breakdown)
+		}
+}
+
+; Hide only the explicit owner passed by the caller. Never consult the active
+; global here: a stale renderer may resume after a newer one has committed.
+_TooltipHideSurfaceObjects(Surface) {
+		if !IsObject(Surface)
+			return
+		if Surface.Border
+			try GR_Hide(Surface.Border.Hwnd)
+		for , Row in Surface.Rows
+			try DllCall("User32\ShowWindow", "Ptr", Row.Gui.Hwnd, "Int", 0)
+}
+
+; Candidate wrapper shared by stale-build cleanup and the final presenter.
+; HWND reads are best-effort because a concurrently destroyed detached Gui can
+; already have lost its native window; Gui.Destroy remains the second backstop.
+_TooltipCreateDetachedSurface(Row, Generation, Pos := 0) {
+		Surface := { Gui: Row.Gui, Rows: [Row], Border: 0, Pos: Pos, Anchor: 0,
+			ContentHwnds: [], BorderHwnds: [], Generation: Generation,
+			LlmPresented: 0 }
+		try Surface.ContentHwnds.Push(Row.Gui.Hwnd)
+		return Surface
+}
+
+_TooltipQueueSurfaceDisposal(Surface) {
+		if IsObject(Surface)
+			SetTimer(_TooltipDisposeRetired.Bind(Surface), -1)
+}
+
+; Pure selection used by the production commit and its re-entrance test. A
+; candidate that lost its immutable generation never becomes active and never
+; retires the surface installed by the newer renderer.
+_TooltipChoosePreparedSurface(ExpectedGeneration, CurrentGeneration,
+	CurrentSurface, CandidateSurface) {
+		if (ExpectedGeneration != CurrentGeneration)
+			return { Committed: false, Active: CurrentSurface, Retired: 0 }
+		return { Committed: true, Active: CandidateSurface, Retired: CurrentSurface }
+}
+
+; PREPARE + REVEAL for a built stack. Pos = { X, Y }, Row = { Gui, W, H }.
+; Shift an anchor so the W×H tooltip stays inside the work area of the monitor
+; under it (fall back to the primary monitor, then the full virtual screen). Without
+; this a wide tooltip anchored near the bottom-right caret overflows the screen and
+; is clipped — the truncation reported for long predictions in a corner.
+; The clamp maths, with the screen bounds passed IN.
+;
+; Split out of _TooltipClampToScreen so it can be driven with arbitrary bounds.
+; The wrapper below reads the real monitor work area from the OS, which meant no
+; test could ever supply the screenFrame the shared corpus carries — so the AHK
+; tooltip test validated the corpus's SHAPE and never compared one of its 6
+; golden positions. Pure arithmetic, no OS calls, same formula as before.
+;
+; @param X,Y,W,H  Proposed tooltip rect.
+; @param L,Top,R,B  Work-area bounds to clamp within.
+; @param Margin  Clearance kept at every edge.
+_TooltipClampRect(X, Y, W, H, L, Top, R, B, Margin) {
+		; clamp(x, L+margin, R-W-margin); same for y — identical to the macOS renderer.
+		return {
+				X: Max(L + Margin, Min(X, R - W - Margin)),
+				Y: Max(Top + Margin, Min(Y, B - H - Margin))
+		}
+}
+
+; Physical pixels per layout unit. Tooltip sizes are layout units (the Gui is
+; DPI-scaled) while caret, UIA, window and monitor coordinates are physical, so
+; every size or offset crossing that boundary goes through this one factor.
+_TooltipDpiScale() {
+		return A_ScreenDPI / 96
+}
+
+; Work area of the monitor holding (X, Y), in physical pixels; the primary
+; monitor when the point lies on none (a stale anchor after a monitor unplug).
+_TooltipWorkAreaAt(X, Y) {
+		Loop MonitorGetCount() {
+				MonitorGet(A_Index, &ml, &mt, &mr, &mb)
+				if (X >= ml and X < mr and Y >= mt and Y < mb) {
+						MonitorGetWorkArea(A_Index, &L, &Top, &R, &B)
+						return { L: L, T: Top, R: R, B: B }
+				}
+		}
+		MonitorGetWorkArea(MonitorGetPrimary(), &L, &Top, &R, &B)
+		return { L: L, T: Top, R: R, B: B }
+}
+
+; Clamps a W×H (layout units) tooltip whose top-left is (X, Y) (physical) into
+; the work area under it. Margin is the shared [layout].screen_margin.
+_TooltipClampToScreen(X, Y, W, H) {
+		global _TOOLTIP_SCREEN_MARGIN
+		Scale := _TooltipDpiScale()
+		Area := _TooltipWorkAreaAt(X, Y)
+		return _TooltipClampRect(X, Y, Round(W * Scale), Round(H * Scale),
+				Area.L, Area.T, Area.R, Area.B, Round(_TOOLTIP_SCREEN_MARGIN * Scale))
+}
+
+; Where the tooltip goes, given an anchor and the frame it must stay inside —
+; the Windows port of _shared/lua/tooltip/layout.lua compute_position (macOS),
+; replayed against _shared/tests/corpus/tooltip/layout_vectors.json. Pure: all
+; values share one unit system (the caller converts).
+;   caret     — below-right of the insertion point: x + CaretOffsetX,
+;               y + h + CaretOffsetY (a centred tooltip hides the typed word).
+;   input_box / window — centred under the anchor, flipped above on overflow.
+;   no anchor — centre-bottom of the frame.
+; @param Anchor  { Type, X, Y, H } or 0.
+; @param Opts    { CaretOffsetX, CaretOffsetY, WindowOffsetY, Margin }.
+; @returns { X, Y } clamped top-left corner.
+_TooltipPlaceAnchor(Anchor, W, H, L, Top, R, B, Opts) {
+		if IsObject(Anchor) {
+				if (Anchor.Type = "caret") {
+						X := Anchor.X + Opts.CaretOffsetX
+						Y := Anchor.Y + Anchor.H + Opts.CaretOffsetY
+				} else {
+						X := Anchor.X - W / 2
+						Y := Anchor.Y + Opts.WindowOffsetY
+						; Flip above rather than let the clamp shove the tooltip back
+						; over the element it annotates.
+						if (Y + H > B)
+								Y := Anchor.Y - H - Opts.WindowOffsetY
+				}
+		} else {
+				X := L + (R - L - W) / 2
+				Y := B - H - Opts.WindowOffsetY
+		}
+		return _TooltipClampRect(X, Y, W, H, L, Top, R, B, Opts.Margin)
+}
+
+; OS wrapper: places a W×H (layout units) tooltip for a physical-pixel anchor on
+; the monitor holding that anchor. Offsets and margin are shared layout units,
+; so they are scaled to physical pixels here, once.
+_TooltipPlaceOnScreen(Anchor, W, H) {
+		global _TOOLTIP_OFFSET_RIGHT, _TOOLTIP_OFFSET_BELOW
+		global _TOOLTIP_WINDOW_OFFSET_Y, _TOOLTIP_SCREEN_MARGIN
+		Scale := _TooltipDpiScale()
+		Area := _TooltipWorkAreaAt(Anchor.X, Anchor.Y)
+		Placed := _TooltipPlaceAnchor(Anchor, Round(W * Scale), Round(H * Scale),
+				Area.L, Area.T, Area.R, Area.B, {
+						CaretOffsetX: Round(_TOOLTIP_OFFSET_RIGHT * Scale),
+						CaretOffsetY: Round(_TOOLTIP_OFFSET_BELOW * Scale),
+						WindowOffsetY: Round(_TOOLTIP_WINDOW_OFFSET_Y * Scale),
+						Margin: Round(_TOOLTIP_SCREEN_MARGIN * Scale) })
+		return { X: Round(Placed.X), Y: Round(Placed.Y) }
+}
+
+_TooltipItemHasAbsoluteDeadline(Item) {
+		return (IsObject(Item)
+			and Item.HasOwnProp("ExpireOriginTick")
+			and Item.HasOwnProp("ExpireDurationMs")
+			and Item.ExpireDurationMs > 0)
+}
+
+; Keep the canonical origin/duration pair intact. In particular, never turn an
+; already-expired row into a live one by replacing a zero remainder with an
+; arbitrary positive SetTimer floor.
+_TooltipFilterUnexpiredDeadlineItems(Items, NowTick?) {
+		if !IsSet(NowTick)
+			NowTick := A_TickCount
+		LiveItems := []
+		for , Item in Items {
+			if (_TooltipItemHasAbsoluteDeadline(Item)
+				and TickExpired(Item.ExpireOriginTick, Item.ExpireDurationMs, NowTick))
+				continue
+			LiveItems.Push(Item)
+		}
+		return LiveItems
+}
+
+_TooltipAbsoluteDeadlinesStillLive(Items, NowTick?) {
+		if !IsSet(NowTick)
+			NowTick := A_TickCount
+		for , Item in Items {
+			if (_TooltipItemHasAbsoluteDeadline(Item)
+				and TickExpired(Item.ExpireOriginTick, Item.ExpireDurationMs, NowTick))
+				return false
+		}
+		return true
+}
+
+; Build the immutable lifecycle plan before any GUI/UIA work. The plan carries
+; origin/duration pairs, never a sampled remainder: a remainder becomes stale as
+; soon as an interruptible renderer pumps the message queue.
+_TooltipCreateLifecyclePlan(Items, DurationSec, OriginMs) {
+		global _TOOLTIP_TIMEOUT_DECREMENT_SEC, _TOOLTIP_TIMEOUT_FLOOR_SEC
+		HasAnyDur := false
+		HasMixedDur := false
+		FirstDur := 0
+		for , Item in Items {
+			D := Item.HasOwnProp("DurationSec") ? Item.DurationSec : 0
+			if (D > 0) {
+				HasAnyDur := true
+				if (FirstDur == 0)
+					FirstDur := D
+				else if (D != FirstDur)
+					HasMixedDur := true
+			}
+		}
+
+		HasAbsoluteDeadlines := false
+		for , Item in Items {
+			if Item.HasOwnProp("ExpireDurationMs") {
+				HasAbsoluteDeadlines := true
+				break
+			}
+		}
+
+		Plan := {
+			DequeueItems: 0,
+			DequeueActive: false,
+			DeadlineItems: [],
+			ArmExactDeadline: false
+		}
+		if (HasAbsoluteDeadlines or (HasAnyDur and HasMixedDur)) {
+			Plan.DequeueItems := []
+			for , Item in Items {
+				D := Item.HasOwnProp("DurationSec") ? Item.DurationSec : 0
+				HasAbsoluteDeadline := (Item.HasOwnProp("ExpireOriginTick")
+					and Item.HasOwnProp("ExpireDurationMs"))
+				if (HasAbsoluteDeadlines and HasAbsoluteDeadline) {
+					ExpOriginTick := Item.ExpireOriginTick
+					ExpDurationMs := Item.ExpireDurationMs
+				} else if (D > 0) {
+					Effective := Max(_TOOLTIP_TIMEOUT_FLOOR_SEC,
+						D - _TOOLTIP_TIMEOUT_DECREMENT_SEC)
+					ExpOriginTick := OriginMs
+					ExpDurationMs := Round(Effective * 1000)
+				} else {
+					ExpOriginTick := OriginMs
+					ExpDurationMs := 0
+				}
+				Copy := {}
+				for Key, Value in Item.OwnProps()
+					Copy.%Key% := Value
+				Copy.ExpireOriginTick := ExpOriginTick
+				Copy.ExpireDurationMs := ExpDurationMs
+				Plan.DequeueItems.Push(Copy)
+				if (ExpDurationMs > 0)
+					Plan.DeadlineItems.Push(Copy)
+			}
+			Plan.DequeueActive := true
+			Plan.ArmExactDeadline := Plan.DeadlineItems.Length > 0
+			return Plan
+		}
+
+		EffectiveDur := DurationSec
+		for , Item in Items {
+			D := Item.HasOwnProp("DurationSec") ? Item.DurationSec : 0
+			if (D > 0 and (EffectiveDur == 0 or D < EffectiveDur))
+				EffectiveDur := D
+		}
+		if (EffectiveDur > 0) {
+			Effective := Max(_TOOLTIP_TIMEOUT_FLOOR_SEC,
+				EffectiveDur - _TOOLTIP_TIMEOUT_DECREMENT_SEC)
+			Plan.DeadlineItems.Push({
+				ExpireOriginTick: OriginMs,
+				ExpireDurationMs: Round(Effective * 1000)
+			})
+			Plan.DequeueActive := true
+		}
+		return Plan
+}
+
+; Resolve the plan at the exact publication fence. Both timer owners derive
+; from one current tick, so GUI/UIA or callback latency cannot extend either.
+_TooltipLifecycleDeadlineBounds(Plan, NowTick?) {
+		if !IsSet(NowTick)
+			NowTick := A_TickCount
+		Bounds := { Expired: false, EarliestMs: 0, LatestMs: 0 }
+		if !IsObject(Plan) or !Plan.HasOwnProp("DeadlineItems")
+			return Bounds
+		for , Item in Plan.DeadlineItems {
+			Remaining := TickRemaining(
+				Item.ExpireOriginTick, Item.ExpireDurationMs, NowTick)
+			if (Remaining <= 0) {
+				Bounds.Expired := true
+				continue
+			}
+			if (Bounds.EarliestMs == 0 or Remaining < Bounds.EarliestMs)
+				Bounds.EarliestMs := Remaining
+			if (Remaining > Bounds.LatestMs)
+				Bounds.LatestMs := Remaining
+		}
+		return Bounds
+}
+
+; The watcher owns the single source of truth for whether a decision still
+; describes the current engine buffer. Missing integration is legitimate for
+; isolated tooltip tests; a present-but-failing integration must fail closed.
+_TooltipDecisionItemsStillCurrent(Items) {
+		if !IsSet(HotstringPrefixWatcherDecisionItemsStillCurrent)
+			return true
+		return HotstringPrefixWatcherDecisionItemsStillCurrent(Items)
+}
+
+_TooltipPublishVisibleDecisions(Items) {
+		if !IsSet(HotstringPrefixWatcherPublishVisibleDecisions)
+			return true
+		return HotstringPrefixWatcherPublishVisibleDecisions(Items)
+}
+
+; Non-transactional follow-up for work that belongs to a successfully visible
+; hotstring surface but may schedule more async work (metrics / LLM bridge).
+; Publication above remains the in-memory commit. This notification deliberately
+; runs only after Critical is restored; the watcher can no-op if its generation
+; changed between commit and callback.
+_TooltipNotifySurfacePresented(Items, SurfaceToken) {
+		if !IsSet(HotstringPrefixWatcherOnSurfacePresented)
+			return
+		; Restoring an inherited Critical state still leaves this thread critical.
+		; Hop to a fresh timer turn so metrics/privacy/LLM follow-up is never invoked
+		; under either our transaction or a keyboard caller's outer transaction.
+		if A_IsCritical {
+			SetTimer(_TooltipNotifySurfacePresented.Bind(Items, SurfaceToken), -1)
+			return
+		}
+		try HotstringPrefixWatcherOnSurfacePresented(Items, SurfaceToken)
+		catch Error as Err
+			_UiOracleReportError(
+				"Visible-decision post-present callback failed: " . Err.Message)
+}
+
+; Oracle hooks are intentionally invoked inside short presentation/hide
+; transactions. Their exceptional diagnostics must not turn an inherited
+; keyboard-path Critical span into synchronous logger I/O.
+_UiOracleReportError(Message) {
+		if A_IsCritical {
+			SetTimer(_UiOracleReportError.Bind(Message), -1)
+			return
+		}
+		try LoggerError("Tooltip", "{1}", Message)
+}
+
+; Sub-segmented on purpose. Tooltip.Present is the dominant hot-path offender in
+; production (102 of 194 slow lines on the first day after the UIA fix, ~12.9 ms
+; mean), but it aggregates steps whose individual costs all sit BELOW the
+; profiler's 5 ms reporting floor — so the parent's number never said which of
+; them moved, and every optimisation proposed against it was speculation. The
+; marks below cost two QPC reads each, accumulate without logging, and are
+; rendered into the parent's own already-gated line by HotPath_BreakdownDetail()
+; in _TooltipShowNow. This runs on the deferred render timer, never on the
+; keystroke callback.
+_TooltipPresentStack(Pos, Row, ArmSafety, Items, ExpectedGeneration,
+	ClearDequeue := false, ExpectedRequestSerial := -1,
+	LifecyclePlan := 0, CommitFn := 0, &Breakdown := unset, PositionContext := 0) {
+		; A provider receipt must survive GUI preparation, not just worker return.
+		global _TOOLTIP_SAFETY_SEC
+		global _TooltipActiveSurface
+		global _TooltipGeneration, _TooltipTimerGeneration
+		global _TooltipRequestSerial, _TooltipPendingRequest
+		global _TooltipDequeueItems, _TooltipDequeueActive
+		global _TooltipDequeueDeadlineTimer
+		; Every presenter carries the immutable generation it reserved. All expensive
+		; preparation below is detached: it cannot hide, destroy, round or reposition
+		; the active surface even if a newer renderer interrupts it.
+		Breakdown := HotPath_BreakdownBegin()
+		_hpCandidate := HotPath_Now()
+		PreparedSurface := _TooltipCreateDetachedSurface(Row,
+			ExpectedGeneration, Pos)
+		HotPath_BreakdownMark("candidate", _hpCandidate, Breakdown)
+		try {
+			_hpClamp := HotPath_Now()
+			PreparedSurface.Anchor := Pos
+			Pos := _TooltipPlaceOnScreen(Pos, Row.W, Row.H)
+			PreparedSurface.Pos := Pos
+			HotPath_BreakdownMark("clamp", _hpClamp, Breakdown)
+
+			_hpPrepare := HotPath_Now()
+			_TooltipPositionPreparedContent(Row, Pos.X, Pos.Y)
+			if (PreparedSurface.ContentHwnds.Length == 0)
+				PreparedSurface.ContentHwnds.Push(Row.Gui.Hwnd)
+			HotPath_BreakdownMark("prepare", _hpPrepare, Breakdown)
+
+			_hpCorners := HotPath_Now()
+			_TooltipApplyStackedCorners(Row)
+			HotPath_BreakdownMark("corners", _hpCorners, Breakdown)
+
+			_hpBorder := HotPath_Now()
+			PreparedSurface.Border := _TooltipBuildBorder(
+				Pos.X, Pos.Y, Row.W, Row.H)
+			if PreparedSurface.Border
+				PreparedSurface.BorderHwnds := [PreparedSurface.Border.Hwnd]
+			HotPath_BreakdownMark("border", _hpBorder, Breakdown)
+		} catch Error as Err {
+			SetTimer(_TooltipDisposeRetired.Bind(PreparedSurface), -1)
+			throw Err
+		}
+
+		CommitError := 0
+		CommitAllowed := false
+		SurfaceSwapped := false
+		NavSwap := 0
+		NavSwapCommitted := false
+		RetiredSurface := 0
+		Selection := { Committed: false }
+		PublishItems := IsObject(Items) ? Items : []
+		PreviousCritical := Critical("On")
+		try {
+			; A deferred request has a second owner in addition to its render
+			; generation. A may reserve a render, yield in GUI/UIA, then resume after
+			; request B was queued but before B's debounce fired; only this serial
+			; fence prevents A from repainting stale pixels during that interval.
+			_hpRequestOwner := HotPath_Now()
+			RequestOwnerCurrent := _TooltipRequestOwnerMatches(
+				ExpectedRequestSerial, _TooltipRequestSerial)
+			HotPath_BreakdownMark("request_owner", _hpRequestOwner, Breakdown)
+			_hpOwner := HotPath_Now()
+			if RequestOwnerCurrent {
+				Selection := _TooltipChoosePreparedSurface(ExpectedGeneration,
+					_TooltipGeneration, _TooltipActiveSurface, PreparedSurface)
+			}
+			HotPath_BreakdownMark("owner", _hpOwner, Breakdown)
+			if Selection.Committed {
+				_hpDecision := HotPath_Now()
+				DecisionCurrent := _TooltipDecisionItemsStillCurrent(PublishItems)
+				HotPath_BreakdownMark("decision", _hpDecision, Breakdown)
+				if DecisionCurrent {
+					_hpPositionContext := HotPath_Now()
+					PositionCurrent := _TooltipPreparedPositionStillCurrent(PositionContext)
+					HotPath_BreakdownMark("position_context", _hpPositionContext, Breakdown)
+					if !PositionCurrent
+						Selection.Committed := false
+					; Deadline is the last predicate before commit/reveal. A row with 1 ms
+					; remaining cannot expire while a slower decision oracle runs afterward.
+					_hpAbsoluteDeadline := HotPath_Now()
+					DeadlinesLive := _TooltipAbsoluteDeadlinesStillLive(
+						PublishItems)
+					HotPath_BreakdownMark("absolute_deadline",
+						_hpAbsoluteDeadline, Breakdown)
+					_hpDeadline := HotPath_Now()
+					DeadlineBounds := _TooltipLifecycleDeadlineBounds(
+						LifecyclePlan)
+					if DeadlineBounds.Expired
+						DeadlinesLive := false
+					HotPath_BreakdownMark("deadline", _hpDeadline, Breakdown)
+					if DeadlinesLive && PositionCurrent {
+						RetiredSurface := Selection.Retired
+
+						; Attach all semantic ownership to the detached candidate before
+						; the one active-surface publication. LLM candidates provide a
+						; pure commit callback; ordinary tooltip candidates retire any
+						; LLM lifecycle owned by the surface they replace. The callback
+						; must run before the old pixels are hidden so an invalid candidate
+						; cannot blank a still-valid visible prediction.
+						if HasMethod(CommitFn, "Call")
+							CommitFn.Call(PreparedSurface, RetiredSurface)
+
+						; Fence the native hook before changing the one active pointer.
+						; While the fence is open every navigation event is passed to
+						; Windows unchanged. A receipt committed immediately before the
+						; fence retains RetiredSurface by token and can never target B.
+						if IsSet(LLM_NavEventOwner_BeginSurfaceSwap) {
+							NavSwap := LLM_NavEventOwner_BeginSurfaceSwap(
+								RetiredSurface, PreparedSurface)
+							if !(NavSwap is Map)
+								throw Error("Navigation owner refused the surface fence.")
+							if NavSwap.Get("retry", false)
+								throw TooltipNavOwnerRetryError(
+									"Navigation repaint index changed before its fence.")
+						}
+						if IsSet(_LLM_TooltipRetireSurfaceRecord) {
+							Replacement := IsSet(_LLM_TooltipPresentedFromSurface)
+								? _LLM_TooltipPresentedFromSurface(PreparedSurface) : 0
+							ReplacementLifecycle := IsObject(Replacement)
+								&& Replacement.HasOwnProp("Lifecycle")
+								? Replacement.Lifecycle : 0
+							_LLM_TooltipRetireSurfaceRecord(RetiredSurface,
+								ReplacementLifecycle)
+						}
+
+						_hpRetire := HotPath_Now()
+						_TooltipHideSurfaceObjects(RetiredSurface)
+						HotPath_BreakdownMark("retire", _hpRetire, Breakdown)
+
+						; One assignment publishes content, border, trackers, position and
+						; owner generation together. No callback can observe a half-swap.
+						_TooltipActiveSurface := PreparedSurface
+						SurfaceSwapped := true
+						if NavSwap is Map {
+							if !LLM_NavEventOwner_CommitSurfaceSwap(NavSwap)
+								throw Error("Navigation owner surface commit failed.")
+							NavSwapCommitted := true
+						}
+						; Retire the exact pending request in the same pixel transaction.
+						; A newer B tuple has a different serial and remains untouched.
+						if (ExpectedRequestSerial != -1
+							and IsObject(_TooltipPendingRequest)
+							and _TooltipPendingRequest.Serial
+								== ExpectedRequestSerial)
+							_TooltipPendingRequest := 0
+						if ClearDequeue {
+							_TooltipDequeueItems := 0
+							_TooltipDequeueActive := false
+						}
+						if IsObject(LifecyclePlan) {
+							_TooltipDequeueItems := LifecyclePlan.DequeueItems
+							_TooltipDequeueActive := LifecyclePlan.DequeueActive
+						}
+						; Publish every expiry owner before revealing pixels or running
+						; interruptible post-present privacy/focus work.
+						_TooltipTimerGeneration := ExpectedGeneration
+						LlmPresented := IsSet(_LLM_TooltipPresentedFromSurface)
+							? _LLM_TooltipPresentedFromSurface(PreparedSurface) : 0
+						if (IsObject(LlmPresented)
+							and LlmPresented.Kind == "prediction"
+							and LlmPresented.TimeoutRemainingMs > 0) {
+							SetTimer(_TooltipTimerFn,
+								-Max(1, LlmPresented.TimeoutRemainingMs))
+						} else if (DeadlineBounds.LatestMs > 0) {
+							SetTimer(_TooltipTimerFn,
+								-Max(1, DeadlineBounds.LatestMs))
+						} else if ArmSafety {
+							SetTimer(_TooltipTimerFn,
+								-Round(_TOOLTIP_SAFETY_SEC * 1000))
+						}
+						if IsObject(_TooltipDequeueDeadlineTimer)
+							SetTimer(_TooltipDequeueDeadlineTimer, 0)
+						_TooltipDequeueDeadlineTimer := 0
+						if (IsObject(LifecyclePlan)
+							and LifecyclePlan.ArmExactDeadline
+							and DeadlineBounds.EarliestMs > 0) {
+							_TooltipDequeueDeadlineTimer :=
+								_TooltipDequeueDeadlineFn.Bind(
+									ExpectedGeneration, PreparedSurface)
+							SetTimer(_TooltipDequeueDeadlineTimer,
+								-Max(1, DeadlineBounds.EarliestMs))
+						}
+
+						_hpReveal := HotPath_Now()
+						_TooltipRevealPreparedSurfaces(PreparedSurface, _TooltipRevealNative, Breakdown)
+						; This total contains the preceding three reveal_* children.
+						HotPath_BreakdownMark("reveal_total", _hpReveal, Breakdown)
+
+						_hpPublish := HotPath_Now()
+						Published := _TooltipPublishVisibleDecisions(PublishItems)
+						HotPath_BreakdownMark("publish", _hpPublish, Breakdown)
+						if !Published
+							throw Error("Visible-decision publication refused the revealed surface.")
+						if IsSet(_LLM_TooltipMarkSurfaceSuggested)
+							_LLM_TooltipMarkSurfaceSuggested(PreparedSurface)
+						CommitAllowed := true
+					}
+				}
+			}
+		} catch Error as Err {
+			CommitError := Err
+		} finally {
+			if (NavSwap is Map) && !NavSwapCommitted && !SurfaceSwapped
+				try LLM_NavEventOwner_AbortSurfaceSwap(NavSwap)
+			Critical(PreviousCritical)
+		}
+
+		; Metrics and LLM scheduling may yield, so they are explicitly post-commit.
+		_hpPostPresent := HotPath_Now()
+		if CommitAllowed {
+			_TooltipNoteRenderPresented()
+			HotPath_BreakdownMark("accounting", _hpPostPresent, Breakdown)
+			_hpPostPresent := HotPath_Now()
+			_TooltipNotifySurfacePresented(PublishItems, PreparedSurface)
+			HotPath_BreakdownMark("notify", _hpPostPresent, Breakdown)
+			_hpPostPresent := HotPath_Now()
+		}
+		if IsSet(_LLM_TooltipScheduleMetricDrain)
+			_LLM_TooltipScheduleMetricDrain()
+		HotPath_BreakdownMark("post_present", _hpPostPresent, Breakdown)
+
+		; Destruction stays outside Critical and owns one detached record. If an
+		; exception happened after the swap, retire the OLD record; the caller's
+		; fail-closed hide owns the newly active candidate.
+		DisposalSurface := SurfaceSwapped ? RetiredSurface : PreparedSurface
+		_hpDispose := HotPath_Now()
+		_TooltipQueueSurfaceDisposal(DisposalSurface)
+		HotPath_BreakdownMark("dispose_schedule", _hpDispose, Breakdown)
+		if IsObject(CommitError) {
+			if CommitError is TooltipNavOwnerRetryError
+					|| CommitError is TooltipLlmTerminalOutcomeError
+					|| CommitError is TooltipLlmStaleRenderError
+				throw CommitError
+			_UiOracleReportError("Presentation commit failed: " . CommitError.Message)
+			throw CommitError
+		}
+		return CommitAllowed
+}
+
+; Detached destack rebuild owned by the exact generation/surface snapshot the
+; poll observed. A resumed old poll may dispose its own candidate, but it can
+; never hide, retire or republish over a newer tooltip.
+_TooltipDequeueRebuild(Items, ExpectedGeneration, ExpectedSurface) {
+		global _TooltipGeneration, _TooltipTimerGeneration, _TooltipDequeueActive
+		global _TooltipDequeueItems, _TooltipActiveSurface
+		global _TooltipDequeueDeadlineTimer
+		global _TooltipRequestSerial, _TooltipPendingRequest
+
+		if !_TooltipSurfaceOwnerMatches(ExpectedGeneration,
+			_TooltipGeneration, ExpectedSurface, _TooltipActiveSurface)
+			return false
+		; The poll selected these rows before this deferred rebuild began. Drop any
+		; row that expired in between, and never build a stack for a stale engine
+		; decision. The full-stack abort is intentional: correctness beats a flash
+		; of content whose advertised action can no longer fire.
+		Items := _TooltipFilterUnexpiredDeadlineItems(Items)
+		DecisionCurrent := false
+		try DecisionCurrent := _TooltipDecisionItemsStillCurrent(Items)
+		catch Error as Err {
+			_UiOracleReportError(
+				"Visible-decision freshness check failed during destack: " . Err.Message)
+			TooltipHide("DequeueDecisionCheckFail", true,
+				ExpectedGeneration, ExpectedSurface)
+			return false
+		}
+		if (Items.Length == 0 or !DecisionCurrent) {
+			TooltipHide("DequeueStaleBeforeBuild", true,
+				ExpectedGeneration, ExpectedSurface)
+			return false
+		}
+		; Preserve the original absolute deadlines through detached preparation.
+		; Their remainder is resolved only inside the common pixel commit.
+		LifecyclePlan := _TooltipCreateLifecyclePlan(
+			Items, 0, A_TickCount)
+		; Reserve the rebuild only if the polled owner is still exact. Clearing the
+		; old dequeue data prevents the repeating watchdog from starting a sibling
+		; rebuild while GUI/UIA preparation pumps messages.
+		PreviousCritical := Critical("On")
+		try {
+			if IsObject(_TooltipPendingRequest)
+				return false
+			if !_TooltipSurfaceOwnerMatches(ExpectedGeneration,
+				_TooltipGeneration, ExpectedSurface, _TooltipActiveSurface)
+				return false
+			if IsObject(_TooltipDequeueDeadlineTimer)
+				SetTimer(_TooltipDequeueDeadlineTimer, 0)
+			_TooltipDequeueDeadlineTimer := 0
+			_TooltipDequeueItems := 0
+			_TooltipDequeueActive := false
+			_TooltipGeneration += 1
+			RenderGeneration := _TooltipGeneration
+			RebuildRequestSerial := _TooltipRequestSerial
+			_TooltipTimerGeneration := RenderGeneration
+			SetTimer(_TooltipTimerFn, 0)
+			; Re-place from the same anchor: the destacked panel is smaller, and
+			; a centred anchor must stay centred on it.
+			Pos := (ExpectedSurface.HasOwnProp("Anchor")
+				and IsObject(ExpectedSurface.Anchor))
+				? ExpectedSurface.Anchor : 0
+		} finally {
+			Critical(PreviousCritical)
+		}
+
+		Row := 0
+		try {
+				Row := _TooltipBuildGui(Items)
+		} catch {
+				TooltipHide("DequeueBuildFail", true, RenderGeneration,
+					unset, RebuildRequestSerial)
+				return false
+		}
+		if (RenderGeneration != _TooltipGeneration) {
+				if IsObject(Row)
+					_TooltipQueueSurfaceDisposal(
+						_TooltipCreateDetachedSurface(Row, RenderGeneration))
+			return false
+		}
+
+		if !IsObject(Row) {
+				TooltipHide("DequeueNoRows", true, RenderGeneration,
+					unset, RebuildRequestSerial)
+				return false
+		}
+
+		if !IsObject(Pos)
+			Pos := _TooltipResolvePosition()
+		if (RenderGeneration != _TooltipGeneration) {
+				_TooltipQueueSurfaceDisposal(
+					_TooltipCreateDetachedSurface(Row, RenderGeneration))
+			return false
+		}
+		; The destack rebuild presents the same stack the render path does, so it must
+		; carry the same attribution — otherwise a slow row expiry looks like a slow
+		; render and the two are indistinguishable in the log.
+		_hpDqPresent := HotPath_Now()
+		Presented := false
+		try {
+				Presented := _TooltipPresentStack(Pos, Row, false, Items,
+					RenderGeneration, false, RebuildRequestSerial,
+					LifecyclePlan, 0, &PresentBreakdown)
+		} catch {
+				TooltipHide("DequeuePresentFail", true, RenderGeneration,
+					unset, RebuildRequestSerial)
+				return false
+		}
+		; Attribute even a refused commit using its own sub-step marks.
+		HotPath_LogIfSlow("Tooltip.DequeuePresent", _hpDqPresent, HotPath_BreakdownDetail(PresentBreakdown))
+		if !Presented {
+			TooltipHide("DequeueStaleBeforeReveal", true, RenderGeneration,
+				unset, RebuildRequestSerial)
+			return false
+		}
+		return true
+}
+
+; Does a row need its own full-width background band?
+;
+; The Gui's BackColor is already _TooltipMixTintHex(Items[1].ColorHex), and the
+; band spans (0, RowY, TotalW, RowH) — a strict sub-rectangle of the client area
+; that brush fills. For row 1 the two are the same pure function over the same
+; input, so the control repaints pixels that are already correct; the same is
+; true of any later row sharing the first row's tint. Each elided band saves one
+; CreateWindowEx plus one SetFont, on the ~97 % of renders that are single-row.
+;
+; Pure and hex-only so the decision is unit-testable without touching GDI.
+_TooltipRowNeedsBand(BgHex, GuiBgHex) {
+		return BgHex != GuiBgHex
+}
+
+; Build a single Gui that holds the entire tooltip stack.
+; Each row is rendered as a full-width background Text control (tinted per group)
+; with a smaller foreground Text control overlaid for the content and label.
+; A 1 px separator line is drawn between rows using a narrow background band.
+; Using one Gui eliminates all inter-window overlap — the only rendered surface
+; is a single window with a single GDI region, exactly like the Hammerspoon canvas.
+_TooltipBuildGui(Items) {
+		global _TOOLTIP_FONT_NAME, _TOOLTIP_FONT_SIZE, _TOOLTIP_LABEL_FONT_SIZE, _TOOLTIP_LABEL_GAP
+		global _TOOLTIP_PADDING_X, _TOOLTIP_PADDING_Y
+
+		G := 0
+		try {
+		; WinGetClientPos returns physical pixels — divide by DpiScale to get logical.
+		DpiScale := A_ScreenDPI / 96
+
+		; ── Measure all text items ──────────────────────────────────────────────
+		; GDI GetTextExtentPoint32W — same path as the LLM renderer. Transient
+		; Probe Guis inherit the OS default minimum client width (~640 logical px
+		; on Windows 11), which made compact rows (e.g. the violet « Génération en
+		; cours… » spinner) stretch far beyond their text.
+		Sizes := []
+		MaxW := 0
+		for , Item in Items {
+				S := _TooltipMeasureTextSize(Item.Text, _TOOLTIP_FONT_SIZE)
+				Sizes.Push(S)
+				if (S.W > MaxW)
+						MaxW := S.W
+		}
+
+		MaxLabelW := 0
+		LabelSizes := []
+		for , Item in Items {
+				Label := Item.HasOwnProp("TriggerLabel") ? Item.TriggerLabel : ""
+				if (Label != "") {
+						LS := _TooltipMeasureTextSize(Label, _TOOLTIP_LABEL_FONT_SIZE)
+						LabelSizes.Push(LS)
+						if (LS.W > MaxLabelW)
+								MaxLabelW := LS.W
+				} else {
+						LabelSizes.Push({ W: 0, H: 0 })
+				}
+		}
+
+		LabelZone := MaxLabelW > 0 ? (_TOOLTIP_LABEL_GAP + MaxLabelW) : 0
+		TotalW := _TOOLTIP_PADDING_X + MaxW + LabelZone + _TOOLTIP_PADDING_X
+		Count := Items.Length
+		SEP_H := 1   ; 1 px separator between rows, in logical pixels
+
+		; ── Compute per-row heights and total canvas height ─────────────────────
+		RowMeta := []
+		TotalH := 0
+		for Idx, Item in Items {
+				S := Sizes[Idx]
+				RowH := _TOOLTIP_PADDING_Y + S.H + _TOOLTIP_PADDING_Y
+				RowMeta.Push({ H: RowH, Y: TotalH })
+				TotalH += RowH
+				if (Idx < Count)
+						TotalH += SEP_H
+		}
+
+		; ── Build the single unified Gui ────────────────────────────────────────
+		; Default background matches the first item's tint (the Gui BackColor covers
+		; any gap the compositor might paint before controls are drawn).
+		FirstColorHex := Items[1].HasOwnProp("ColorHex") ? Items[1].ColorHex : ""
+		; Resolved once and kept as the reference every row's band is elided against.
+		GuiBgHex := _TooltipMixTintHex(FirstColorHex)
+		; WS_EX_TOOLWINDOW (0x80) suppresses the DWM drop shadow and rounded-corner
+		; treatment that Windows 11 applies to all top-level windows; combined with
+		; SetWindowRgn this gives us full control over the visible shape.
+		G := Gui("+AlwaysOnTop -Caption +E0x20 +E0x80 +LastFound")
+		G.BackColor := GuiBgHex
+		G.MarginX := 0
+		G.MarginY := 0
+
+		for Idx, Item in Items {
+				ColorHex := Item.HasOwnProp("ColorHex") ? Item.ColorHex : ""
+				BgHex := _TooltipMixTintHex(ColorHex)
+				S := Sizes[Idx]
+				Meta := RowMeta[Idx]
+				RowY := Meta.Y
+				RowH := Meta.H
+				IsDimmed := Item.HasOwnProp("IsDimmed") && Item.IsDimmed
+
+				; Full-width background band for this row's tint color — skipped when the
+				; Gui background already paints exactly that colour (see
+				; _TooltipRowNeedsBand). The 1 px separator below is a DIFFERENT colour
+				; and is never elided.
+				if _TooltipRowNeedsBand(BgHex, GuiBgHex) {
+						G.SetFont("norm s1", _TOOLTIP_FONT_NAME)
+						G.Add("Text", Format("Background{1} x0 y{2} w{3} h{4}", BgHex, RowY, TotalW, RowH), "")
+				}
+
+				; Main text overlay. Dimmed alternates (rows beyond the firing one of
+				; their group) get gray text + strikethrough so the user sees what is
+				; available without confusing it with the actual outcome. ``norm``
+				; resets any prior Strike/Bold/Italic before applying this row's style.
+				if IsDimmed {
+						G.SetFont("norm c" . _TOOLTIP_DIM_COLOR_HEX . " strike s" . _TOOLTIP_FONT_SIZE, _TOOLTIP_FONT_NAME)
+				} else if Item.HasOwnProp("TextColorHex") {
+						; The LLM loading panel: macOS draws its label italic in the
+						; shared loading_text colour.
+						G.SetFont("norm italic c" . Item.TextColorHex . " s" . _TOOLTIP_FONT_SIZE, _TOOLTIP_FONT_NAME)
+				} else {
+						G.SetFont("norm cFFFFFF s" . _TOOLTIP_FONT_SIZE, _TOOLTIP_FONT_NAME)
+				}
+				G.Add("Text", Format("BackgroundTrans x{1} y{2} w{3} h{4}",
+						_TOOLTIP_PADDING_X, RowY + _TOOLTIP_PADDING_Y, MaxW, S.H), Item.Text)
+
+				; Trigger label on the right.
+				Label := Item.HasOwnProp("TriggerLabel") ? Item.TriggerLabel : ""
+				if (Label != "" and LabelZone > 0) {
+						LS := LabelSizes[Idx]
+						LabelX := TotalW - _TOOLTIP_PADDING_X - MaxLabelW
+						; * sits high in its bounding box in Segoe UI — nudge down slightly.
+						StarFix      := (Label == "*") ? 1 : 0
+						RightFix     := (Label == "↵") ? 3 : 0
+						CenterOffset := Max(0, (S.H - LS.H) // 2)
+						; ↵ appears lower than center only when the row is tall enough for
+						; centering to kick in (multi-line text); for single-line rows the
+						; centering offset is 0 and no upward shift is needed.
+						DescenderFix := (Label == "↵" and CenterOffset > 0) ? 4 : 0
+						LabelY := RowY + _TOOLTIP_PADDING_Y + CenterOffset - DescenderFix + StarFix
+						; Dimmed rows get a darker label so the entire row reads as
+						; "disabled" — same visual treatment as the main text.
+						LabelColorHex := IsDimmed ? "707070" : _TOOLTIP_LABEL_COLOR_HEX
+						G.SetFont("norm c" . LabelColorHex . " s" . _TOOLTIP_LABEL_FONT_SIZE, _TOOLTIP_FONT_NAME)
+						G.Add("Text", Format("BackgroundTrans x{1} y{2} w{3} h{4}",
+								LabelX + RightFix, LabelY, MaxLabelW, LS.H), Label)
+				}
+
+				; 1 px separator — same opacity as the tooltip border (white alpha=0.25).
+				; Colors are pre-blended in UI_SEP_COLOR_HEX during UiStyle_LoadSharedConst.
+				if (Idx < Count) {
+						SepY := RowY + RowH
+						G.SetFont("s1", _TOOLTIP_FONT_NAME)
+						G.Add("Text", Format("Background{1} x0 y{2} w{3} h{4}", _TOOLTIP_SEP_COLOR_HEX, SepY, TotalW, SEP_H), "")
+				}
+		}
+
+		; Create and shape the native window while this candidate is still detached.
+		; Presentation then needs only a bounded SetWindowPos before the owner fence.
+		Row := { Gui: G, H: TotalH, W: TotalW, IsSep: false }
+		_TooltipPrepareContent(Row)
+		; Return a detached candidate. Nothing in the shared surface globals is
+		; touched until _TooltipPresentStack wins its final generation fence.
+		return Row
+		} catch Error as Err {
+			; Once Gui construction starts, the caller cannot see the partial object
+			; when a control/font operation throws. Retire it locally so an error can
+			; never leave an untracked top-level ghost behind.
+			if IsObject(G) {
+				try {
+					CleanupRow := { Gui: G, H: 0, W: 0, IsSep: false }
+					_TooltipQueueSurfaceDisposal(
+						_TooltipCreateDetachedSurface(CleanupRow, 0))
+				} catch {
+					; Best effort after the original build exception.
+				}
+			}
+			throw Err
+		}
+}
+
+; Cache of measurement HFONTs keyed by family, device-pixel height and weight.
+; The tooltip measures regular and bold at a couple of sizes; creating a
+; GDI font on every call (twice per render) is pure waste. The handles live for
+; the process — a tiny, bounded GDI cache.
+global _TooltipMeasureFontCache := Map()
+
+; Measure ``Text`` at a given font size. Delegates to _TooltipMeasureTextSize.
+_TooltipMeasureText(Text, Bold := false) {
+		global _TOOLTIP_FONT_SIZE
+		return _TooltipMeasureTextSize(Text, _TOOLTIP_FONT_SIZE, , , Bold)
+}
+
+; Measure ``Text`` width and height in pixels using a transient GDI font
+; at the specified FontSize. Returns { W, H } in layout units (logical pixels).
+_TooltipMeasureTextSize(Text, FontSize, Native := _TooltipMeasureGdiNative,
+		FontCache := 0, Bold := false) {
+		global _TOOLTIP_FONT_NAME, _TooltipMeasureFontCache
+
+		Fallback := { W: Max(80, StrLen(Text) * Round(FontSize * 0.75)),
+				H: FontSize + 8 }
+		if !(FontCache is Map)
+				FontCache := _TooltipMeasureFontCache
+		if !_TooltipMeasureDrainGdiDebt(Native)
+				return Fallback
+
+		Receipt := _TooltipMeasureNewGdiReceipt()
+		try {
+				Receipt["screen_dc"] := Native.GetScreenDC()
+				HDC := Receipt["screen_dc"]
+				if !HDC
+						return Fallback
+
+				; CreateFont expects a negative device-pixel character height.
+				DPI := Native.GetVerticalDpi(HDC)
+				if (DPI <= 0)
+						DPI := 96
+				HeightPx := -Round(FontSize * DPI / 72)
+				HFont := _TooltipMeasureAcquireCachedFont(HeightPx,
+						_TOOLTIP_FONT_NAME, FontCache, Native, Bold)
+				if !HFont
+						return Fallback
+
+				Receipt["old_font"] := Native.SelectObject(HDC, HFont)
+		if !_TooltipGdiSelectSucceeded(Receipt["old_font"])
+						return Fallback
+				Receipt["font_selected"] := true
+				Size := Buffer(8, 0)
+				Ok := Native.MeasureText(HDC, Text, Size)
+				Width := Ok ? NumGet(Size, 0, "Int") : Fallback.W
+				Height := Ok ? NumGet(Size, 4, "Int") : Fallback.H
+				if (Width <= 0 or Height <= 0)
+						return Fallback
+				; GDI measured device pixels, but every consumer lays out a DPI-scaled
+				; Gui in layout units: returning device pixels made each control, and
+				; the whole tooltip, DPI/96 times too wide (1.25x at 125 %).
+				return { W: Ceil(Width * 96 / DPI), H: Ceil(Height * 96 / DPI) }
+		} finally {
+				_TooltipMeasureSettleGdiReceipt(Receipt, Native)
+		}
+}
+
+; Physical geometry shared by the content window region and the layered border.
+; Tooltip sizes are layout units while SetWindowRgn and UpdateLayeredWindow take
+; physical pixels; the two surfaces only coincide when both derive from this one
+; conversion. UI_CORNER_RADIUS is the GDI ellipse *diameter* (nWidth/nHeight):
+; Hammerspoon uses xRadius=7 (radius), so diameter = 14 → 7 px arc per corner.
+; @param W {Number} Tooltip width in layout units.
+; @param H {Number} Tooltip height in layout units.
+; @param DpiScale {Number} Physical pixels per layout unit.
+; @returns {Object} { W, H, Diam } in physical pixels.
+_TooltipSurfaceGeometry(W, H, DpiScale) {
+		global _TOOLTIP_CORNER_RADIUS
+		Wp := Round(W * DpiScale)
+		Hp := Round(H * DpiScale)
+		return { W: Wp, H: Hp, Diam: Min(_TOOLTIP_CORNER_RADIUS, Wp, Hp) }
+}
+
+; Apply a fully-rounded region to the single unified tooltip Gui.
+; Since the stack is now a single window, all four corners are always
+; rounded — no top/middle/bottom split needed.
+_TooltipApplyStackedCorners(Row) {
+		if !IsObject(Row)
+				return
+		if (Row.HasOwnProp("CornersApplied") && Row.CornersApplied)
+				return
+		G := Row.Gui
+
+		Geometry := _TooltipSurfaceGeometry(Row.W, Row.H, _TooltipDpiScale())
+		if (Geometry.W <= 0 or Geometry.H <= 0)
+				return
+		if _TooltipApplyOwnedRegion(G.Hwnd, Geometry.W, Geometry.H, Geometry.Diam)
+				Row.CornersApplied := true
+}
+
+; Materialize the hidden content HWND once, before the presentation hot path.
+; Gui.Show creates child controls and DWM state; SetWindowRgn transfers ownership
+; of a new HRGN to the HWND. Both are immutable for a detached row's lifetime.
+_TooltipPrepareContent(Row) {
+		if !IsObject(Row)
+				throw TypeError("Tooltip row must be an object.")
+		if (Row.HasOwnProp("ContentPrepared") && Row.ContentPrepared)
+				return true
+		; Hide and NoActivate are mutually exclusive modes: the latter reveals the window.
+		Row.Gui.Show(Format("Hide w{1} h{2} x0 y0", Row.W, Row.H))
+		_TooltipDisableDwmRounding(Row.Gui.Hwnd)
+		_TooltipApplyStackedCorners(Row)
+		Row.ContentPrepared := true
+		return true
+}
+
+; Move an already materialized hidden candidate without re-running Gui.Show or
+; allocating a replacement window region. Coordinates are physical pixels in
+; this per-monitor-DPI-aware process, matching the layered border path.
+_TooltipPositionPreparedContent(Row, X, Y) {
+		_TooltipPrepareContent(Row)
+		Moved := DllCall("User32\SetWindowPos", "Ptr", Row.Gui.Hwnd, "Ptr", 0,
+				"Int", X, "Int", Y, "Int", 0, "Int", 0,
+				"UInt", 0x0015, "Int") ; NOACTIVATE | NOZORDER | NOSIZE
+		if !Moved
+				throw OSError(A_LastError, "SetWindowPos")
+		return true
+}
+
+; Rewrite every pixel GDI painted into the 32-bpp DIB to the premultiplied border
+; color. GDI FrameRgn writes opaque white (alpha byte 0); the layered window needs
+; premultiplied alpha, so each painted pixel must be overwritten. The outline is a
+; 1 px rounded-region frame, so the ONLY painted pixels are:
+;   - the two horizontal straight edges (rows y=0 and y=Hp-1), spanning the width;
+;   - the corner arcs, confined to the left/right corner-column zones of the rows
+;     within Diam of the top or bottom edge;
+;   - the two vertical straight edges (columns x=0 and x=Wp-1) on the middle rows.
+; Every other pixel is transparent. Scanning only those zones keeps the cost at
+; ~2*Wp + 4*Diam^2 instead of the former 2*Diam*Wp full-band scan — the win is
+; largest for the short 1-2 row preview tooltips, where the corner band spans
+; almost the entire height and the old scan re-read the transparent interior of
+; nearly every row (the BorderPixelLoop hot-path warnings clustered there).
+; Correctness is pinned by test_tooltip_border_alpha.ahk, which compares this
+; against a full O(Wp*Hp) reference scan over real GDI outline output, including
+; the production ring from _TooltipRasterizeBorderRing.
+; @param PixPtr {Ptr} Base pointer of the top-down 32-bpp BGRA DIB.
+; @param Wp {Integer} Bitmap width in physical pixels.
+; @param Hp {Integer} Bitmap height in physical pixels.
+; @param Diam {Integer} Corner diameter of the framed region (0 = square corners).
+; @param PremulPx {Integer} Premultiplied BGRA value to write into painted pixels.
+_TooltipFixBorderAlpha(PixPtr, Wp, Hp, Diam, PremulPx) {
+		if (Wp <= 0 or Hp <= 0)
+				return
+		BandRows := Min(Diam, Hp)
+		CornerCols := Min(Diam, Wp)
+		RightZoneStart := Wp - CornerCols   ; first column of the right corner zone
+		LastColOff := (Wp - 1) * 4
+		loop Hp {
+				RowY := A_Index - 1
+				RowBase := RowY * Wp * 4
+				if (RowY == 0 or RowY == Hp - 1) {
+						; Horizontal straight edge — the painted run spans the full width.
+						loop Wp {
+								Offset := RowBase + (A_Index - 1) * 4
+								if (NumGet(PixPtr, Offset, "UInt") != 0)
+										NumPut("UInt", PremulPx, PixPtr, Offset)
+						}
+				} else if (RowY < BandRows or RowY >= Hp - BandRows) {
+						; Corner-arc row — only the left and right corner column zones can
+						; carry painted pixels (the zones overlap harmlessly when Wp <= 2*Diam).
+						loop CornerCols {
+								Off := RowBase + (A_Index - 1) * 4
+								if (NumGet(PixPtr, Off, "UInt") != 0)
+										NumPut("UInt", PremulPx, PixPtr, Off)
+						}
+						loop CornerCols {
+								Off := RowBase + (RightZoneStart + A_Index - 1) * 4
+								if (NumGet(PixPtr, Off, "UInt") != 0)
+										NumPut("UInt", PremulPx, PixPtr, Off)
+						}
+				} else {
+						; Middle row — only the two vertical edge columns.
+						if (NumGet(PixPtr, RowBase, "UInt") != 0)
+								NumPut("UInt", PremulPx, PixPtr, RowBase)
+						if (NumGet(PixPtr, RowBase + LastColOff, "UInt") != 0)
+								NumPut("UInt", PremulPx, PixPtr, RowBase + LastColOff)
+				}
+		}
+}
+
+global TOOLTIP_BORDER_POOL_MAX := 8
+global _TooltipBorderPool := Map()
+global _TooltipBorderPoolOrder := []
+
+class TooltipBorderPoolStats {
+	static created := 0
+	static reused := 0
+	static destroyed := 0
+	static pooled := 0
+}
+
+_TooltipBorderPoolKey(Wp, Hp, Diam, AlphaByte) {
+	return Wp . "x" . Hp . ":" . Diam . ":" . AlphaByte
+}
+
+_TooltipBorderPoolForgetOrder(Border) {
+	global _TooltipBorderPoolOrder
+	for Idx, Candidate in _TooltipBorderPoolOrder {
+		if ObjPtr(Candidate) = ObjPtr(Border) {
+			_TooltipBorderPoolOrder.RemoveAt(Idx)
+			return true
+		}
+	}
+	return false
+}
+
+_TooltipBorderPoolRemoveObject(Border) {
+	global _TooltipBorderPool
+	PoolKey := ""
+	try PoolKey := Border._TooltipPoolKey
+	if (PoolKey = "" || !_TooltipBorderPool.Has(PoolKey))
+		return false
+	Bucket := _TooltipBorderPool[PoolKey]
+	for Idx, Candidate in Bucket {
+		if ObjPtr(Candidate) = ObjPtr(Border) {
+			Bucket.RemoveAt(Idx)
+			if (Bucket.Length == 0)
+				_TooltipBorderPool.Delete(PoolKey)
+			return true
+		}
+	}
+	return false
+}
+
+_TooltipDestroyBorder(Border) {
+	if !IsObject(Border)
+		return false
+	try Border.Destroy()
+	catch
+		return false
+	TooltipBorderPoolStats.destroyed += 1
+	return true
+}
+
+_TooltipTakePooledBorder(PoolKey, X, Y) {
+	global _TooltipBorderPool
+	loop {
+		PreviousCritical := Critical("On")
+		try {
+			if !_TooltipBorderPool.Has(PoolKey)
+				return 0
+			Bucket := _TooltipBorderPool[PoolKey]
+			if (Bucket.Length == 0) {
+				_TooltipBorderPool.Delete(PoolKey)
+				return 0
+			}
+			Border := Bucket.Pop()
+			TooltipBorderPoolStats.pooled -= 1
+			_TooltipBorderPoolForgetOrder(Border)
+			if (Bucket.Length == 0)
+				_TooltipBorderPool.Delete(PoolKey)
+		} finally {
+			Critical(PreviousCritical)
+		}
+		Hwnd := 0
+		try Hwnd := Border.Hwnd
+		if !Hwnd || !DllCall("User32\IsWindow", "Ptr", Hwnd, "Int") {
+			_TooltipDestroyBorder(Border)
+			continue
+		}
+		Moved := DllCall("User32\SetWindowPos", "Ptr", Hwnd, "Ptr", 0,
+			"Int", X, "Int", Y, "Int", 0, "Int", 0,
+			"UInt", 0x0015, "Int") ; NOACTIVATE | NOZORDER | NOSIZE
+		if !Moved {
+			_TooltipDestroyBorder(Border)
+			continue
+		}
+		TooltipBorderPoolStats.reused += 1
+		return Border
+	}
+}
+
+_TooltipRecycleBorder(Border) {
+	global _TooltipBorderPool, _TooltipBorderPoolOrder
+	global TOOLTIP_BORDER_POOL_MAX
+	if !IsObject(Border)
+		return false
+	PoolKey := ""
+	try PoolKey := Border._TooltipPoolKey
+	if (PoolKey = "")
+		return _TooltipDestroyBorder(Border)
+	try GR_Hide(Border.Hwnd)
+	catch
+		return _TooltipDestroyBorder(Border)
+	PreviousCritical := Critical("On")
+	try {
+		if (TOOLTIP_BORDER_POOL_MAX <= 0) {
+			Keep := false
+			Evicted := 0
+		} else {
+			Keep := true
+			Evicted := TooltipBorderPoolStats.pooled >= TOOLTIP_BORDER_POOL_MAX
+				? _TooltipBorderPoolOrder.RemoveAt(1) : 0
+			if IsObject(Evicted) {
+				_TooltipBorderPoolRemoveObject(Evicted)
+				TooltipBorderPoolStats.pooled -= 1
+			}
+			if !_TooltipBorderPool.Has(PoolKey)
+				_TooltipBorderPool[PoolKey] := []
+			_TooltipBorderPool[PoolKey].Push(Border)
+			_TooltipBorderPoolOrder.Push(Border)
+			TooltipBorderPoolStats.pooled += 1
+		}
+	} finally {
+		Critical(PreviousCritical)
+	}
+	if !Keep
+		return _TooltipDestroyBorder(Border)
+	if IsObject(Evicted) && !_TooltipDestroyBorder(Evicted)
+		try LoggerError("Tooltip",
+			"Could not destroy an evicted layered-border owner.")
+	return true
+}
+
+; Explicit owner cleanup for tests and terminal teardown. The active surface is
+; never in this pool; only hidden, fully detached borders are destroyed here.
+TooltipReleaseRenderResources() {
+	global _TooltipBorderPool, _TooltipBorderPoolOrder
+	PreviousCritical := Critical("On")
+	try {
+		RetiredPool := _TooltipBorderPool
+		_TooltipBorderPool := Map()
+		_TooltipBorderPoolOrder := []
+		TooltipBorderPoolStats.pooled := 0
+	} finally {
+		Critical(PreviousCritical)
+	}
+	Released := 0
+	for , Bucket in RetiredPool {
+		for , Border in Bucket {
+			if _TooltipDestroyBorder(Border)
+				Released += 1
+		}
+	}
+	return Released
+}
+
+; Show a 1 px semi-transparent border ring that exactly overlays the tooltip.
+; Strategy: create a WS_EX_LAYERED window and call UpdateLayeredWindow with a
+; 32-bpp pre-multiplied-alpha DIB.  The DIB is painted by framing the content
+; window's own rounded region (GDI writes opaque pixels), then every non-zero
+; pixel is rewritten to the desired opacity (0x40 = 25 %).  No DWM rounding can
+; affect the result because the window has zero client area — it is just a
+; bitmap handed to the compositor.
+_TooltipBuildBorder(X, Y, W, H) {
+		global _TooltipBorderGdiCleanupDebt
+
+		if !_TooltipBorderGdiTryBegin()
+				return
+		BorderGui := 0
+		GdiReceipt := _TooltipBorderNewGdiReceipt()
+		BuildSucceeded := false
+		try {
+		if _TooltipBorderGdiCleanupDebt is Map {
+				if !_TooltipBorderGdiRelease(_TooltipBorderGdiCleanupDebt)
+						throw Error("Previous tooltip border GDI cleanup is still pending")
+				_TooltipBorderGdiCleanupDebt := 0
+		}
+		Geometry := _TooltipSurfaceGeometry(W, H, _TooltipDpiScale())
+		Wp := Geometry.W
+		Hp := Geometry.H
+		if (Wp <= 0 or Hp <= 0)
+				return
+
+		Diam := Geometry.Diam
+		AlphaByte := Round(_TOOLTIP_BORDER_ALPHA * 255)
+		PoolKey := _TooltipBorderPoolKey(Wp, Hp, Diam, AlphaByte)
+		PooledBorder := _TooltipTakePooledBorder(PoolKey, X, Y)
+		if IsObject(PooledBorder)
+			return PooledBorder
+
+		; ── Build a 32-bpp DIB ───────────────────────────────────────────────────
+						BmpInfo := Buffer(40, 0)
+		NumPut("UInt", 40, BmpInfo, 0)   ; biSize
+		NumPut("Int", Wp, BmpInfo, 4)   ; biWidth
+		NumPut("Int", -Hp, BmpInfo, 8)   ; biHeight (top-down)
+		NumPut("UShort", 1, BmpInfo, 12)   ; biPlanes
+		NumPut("UShort", 32, BmpInfo, 14)   ; biBitCount
+		NumPut("UInt", 0, BmpInfo, 16)   ; biCompression = BI_RGB
+
+		GdiReceipt["screen_dc"] := DllCall("User32\GetDC", "Ptr", 0, "Ptr")
+		ScreenDC := GdiReceipt["screen_dc"]
+		if !ScreenDC
+				throw Error("GetDC failed for the tooltip border")
+		PixPtr := 0
+		GdiReceipt["bitmap"] := DllCall("Gdi32\CreateDIBSection",
+				"Ptr", ScreenDC, "Ptr", BmpInfo, "UInt", 0,
+				"Ptr*", &PixPtr, "Ptr", 0, "UInt", 0, "Ptr")
+		HBmp := GdiReceipt["bitmap"]
+		GdiReceipt["memory_dc"] := DllCall("Gdi32\CreateCompatibleDC",
+				"Ptr", ScreenDC, "Ptr")
+		MemDC := GdiReceipt["memory_dc"]
+		if !_TooltipBorderGdiNative.ReleaseScreenDC(ScreenDC)
+				throw Error("ReleaseDC failed for the tooltip border")
+		GdiReceipt["screen_dc"] := 0
+
+		if (!HBmp or !MemDC) {
+				; The finally-owned receipt releases whichever partial allocation
+				; succeeded; never operate on the missing sibling.
+				return
+		}
+		GdiReceipt["old_bitmap"] := DllCall("Gdi32\SelectObject", "Ptr", MemDC,
+				"Ptr", HBmp, "Ptr")
+		OldBmp := GdiReceipt["old_bitmap"]
+		if !_TooltipGdiSelectSucceeded(OldBmp)
+				throw Error("SelectObject refused the tooltip border bitmap")
+		GdiReceipt["bitmap_selected"] := true
+
+		; Clear to transparent black (all zeroes = BGRA 0,0,0,0).
+		if !DllCall("Gdi32\PatBlt", "Ptr", MemDC,
+				"Int", 0, "Int", 0, "Int", Wp, "Int", Hp, "UInt", 0x42)
+				throw Error("PatBlt failed for the tooltip border")
+
+		; Frame the content window's own region: the transparent corner pixels in the
+		; bitmap are what makes the border appear rounded (SetWindowRgn on a layered
+		; window is unreliable; per-pixel alpha is the authoritative shape), and they
+		; now coincide pixel for pixel with the clipped content underneath.
+		; GDI writes opaque (alpha=0) pixels into the DIB — we fix alpha below.
+		_TooltipRasterizeBorderRing(MemDC, Geometry)
+		; Fix pre-multiplied alpha for every pixel GDI painted (non-zero blue channel).
+		; Hammerspoon: strokeColor white alpha=0.25 → alpha_byte = Round(255*0.25)=64=0x40.
+		; Pre-multiplied: R=G=B = Round(255 * 0.25) = 64 = 0x40.
+		; DIB memory layout: B G R A (little-endian UInt = 0xAARRGGBB).
+		TotalPx := Wp * Hp
+		PremulPx := (AlphaByte << 24) | (AlphaByte << 16) | (AlphaByte << 8) | AlphaByte
+		_hpPix := HotPath_Now()
+		_TooltipFixBorderAlpha(PixPtr, Wp, Hp, Diam, PremulPx)
+		HotPath_LogIfSlow("Tooltip.BorderPixelLoop", _hpPix, TotalPx . " px")
+
+		; ── Create the layered window ─────────────────────────────────────────────
+		; WS_EX_TOOLWINDOW (0x80) suppresses DWM automatic corner rounding, same as
+		; the content Gui.  UpdateLayeredWindow is called BEFORE ShowWindow so the
+		; window is never visible in an unpainted state (no ghost flash).
+		BorderGui := Gui("+AlwaysOnTop -Caption +E0x80000 +E0x20 +E0x80 +LastFound")
+		BorderGui._TooltipPoolKey := PoolKey
+		TooltipBorderPoolStats.created += 1
+		Hwnd := BorderGui.Hwnd
+		_TooltipDisableDwmRounding(Hwnd)
+
+		; UpdateLayeredWindow expects screen physical pixels — same coordinate space as
+		; AHK v2 Gui.Show (AHK v2 is per-monitor DPI-aware, so Show("xX yY") already
+		; uses physical px).  No DpiScale multiplication needed here.
+		PtDest := Buffer(8, 0)
+		NumPut("Int", X, PtDest, 0)
+		NumPut("Int", Y, PtDest, 4)
+		SizeSrc := Buffer(8, 0)
+		NumPut("Int", Wp, SizeSrc, 0)
+		NumPut("Int", Hp, SizeSrc, 4)
+		PtSrc := Buffer(8, 0)   ; origin (0,0) in MemDC
+		Blend := Buffer(4, 0)
+		NumPut("UChar", 0, Blend, 0)   ; BlendOp  = AC_SRC_OVER
+		NumPut("UChar", 0, Blend, 1)   ; BlendFlags
+		NumPut("UChar", 255, Blend, 2)   ; SourceConstantAlpha = 255 (per-pixel alpha)
+		NumPut("UChar", 1, Blend, 3)   ; AlphaFormat = AC_SRC_ALPHA
+		Updated := DllCall("User32\UpdateLayeredWindow",
+				"Ptr", Hwnd,
+				"Ptr", 0,        ; hdcDst = NULL (use screen)
+				"Ptr", PtDest,
+				"Ptr", SizeSrc,
+				"Ptr", MemDC,
+				"Ptr", PtSrc,
+				"UInt", 0,
+				"Ptr", Blend,
+				"UInt", 2)       ; ULW_ALPHA
+		if !Updated
+				throw Error("UpdateLayeredWindow failed for the tooltip border (Win32 "
+						. A_LastError . ")")
+
+		; Detached and hidden. The final owner commit decides whether this exact
+		; object becomes global or is disposed as a stale candidate.
+		BuildSucceeded := true
+		return BorderGui
+		} catch Error as Err {
+			if IsObject(BorderGui) {
+				try BorderGui.Destroy()
+			}
+			throw Err
+		} finally {
+			Released := _TooltipBorderGdiRelease(GdiReceipt)
+			if !Released
+				_TooltipBorderGdiCleanupDebt := GdiReceipt
+			_TooltipBorderGdiEnd()
+			if BuildSucceeded and !Released {
+				if IsObject(BorderGui)
+					try BorderGui.Destroy()
+				throw Error("Tooltip border GDI cleanup was refused")
+			}
+		}
+}
+
+; Tell DWM not to apply Windows 11 automatic corner rounding on this window.
+; Without this, DWM rounds every top-level window regardless of SetWindowRgn,
+; and the DWM arc (large, OS-controlled) overrides our GDI region corners.
+_TooltipDisableDwmRounding(Hwnd) {
+		; DWMWA_WINDOW_CORNER_PREFERENCE = 33, DWMWCP_DONOTROUND = 1
+		Pref := Buffer(4, 0)
+		NumPut("UInt", 1, Pref)
+		DllCall("Dwmapi\DwmSetWindowAttribute", "Ptr", Hwnd, "UInt", 33, "Ptr", Pref, "UInt", 4)
+}
+
+; Resolve the accent hex for an LLM / hotstring tooltip context.
+; ``ai_loading`` — violet in-flight tint; user-overridable via the
+; ``llm_prediction`` hotstring colour (Delays / settings submenu on Windows).
+; Returns "" when no tint should be applied (final predictions by default).
+_TooltipResolveAccent(contextKey) {
+	global UI_AI_LOADING_HEX
+	if (contextKey = "ai_loading") {
+		try {
+			resolved := HotstringsResolve("llm_prediction", "")
+			if (resolved.Color != "")
+				return resolved.Color
+		}
+		if (IsSet(UI_AI_LOADING_HEX) and UI_AI_LOADING_HEX != "")
+			return "#" . UI_AI_LOADING_HEX
+	}
+	return ""
+}
+
+; Mix an accent colour with a near-black background, mirroring Hammerspoon's
+; renderer.lua: only the hue of the accent contributes — lightness is fixed
+; at _TOOLTIP_LIGHTNESS and saturation at _TOOLTIP_SATURATION, producing the
+; characteristic "dark grey with a coloured wash" look. An empty / invalid
+; hex falls back to the neutral default background. Returns a hex string
+; without the leading '#', upper-case (the form Gui.BackColor expects).
+_TooltipMixTintHex(AccentHex) {
+		global _TOOLTIP_DEFAULT_BG_HEX, _TOOLTIP_LIGHTNESS, _TOOLTIP_SATURATION
+
+		H := Trim(AccentHex)
+		if (SubStr(H, 1, 1) == "#") {
+				H := SubStr(H, 2)
+		}
+		if !RegExMatch(H, "^[0-9A-Fa-f]{6}$") {
+				return _TOOLTIP_DEFAULT_BG_HEX
+		}
+
+		R := Integer("0x" . SubStr(H, 1, 2)) / 255.0
+		G := Integer("0x" . SubStr(H, 3, 2)) / 255.0
+		B := Integer("0x" . SubStr(H, 5, 2)) / 255.0
+
+		MaxC := Max(R, G, B)
+		MinC := Min(R, G, B)
+		Delta := MaxC - MinC
+
+		; Achromatic accent (gray/white/black) — no hue to carry, mirror JS fallback
+		if (Delta <= 0.0001) {
+				return _TOOLTIP_DEFAULT_BG_HEX
+		}
+
+		Hue := 0.0
+		if (MaxC == R) {
+				Hue := Mod((G - B) / Delta + 6, 6)
+		} else if (MaxC == G) {
+				Hue := (B - R) / Delta + 2
+		} else {
+				Hue := (R - G) / Delta + 4
+		}
+		Hue := Hue / 6
+
+		L := _TOOLTIP_LIGHTNESS
+		S := _TOOLTIP_SATURATION
+		C := (1 - Abs(2 * L - 1)) * S
+		H6 := Hue * 6
+		X := C * (1 - Abs(Mod(H6, 2) - 1))
+		M := L - C / 2
+
+		Nr := 0.0
+		Ng := 0.0
+		Nb := 0.0
+		if (H6 < 1) {
+				Nr := C
+				Ng := X
+				Nb := 0
+		} else if (H6 < 2) {
+				Nr := X
+				Ng := C
+				Nb := 0
+		} else if (H6 < 3) {
+				Nr := 0
+				Ng := C
+				Nb := X
+		} else if (H6 < 4) {
+				Nr := 0
+				Ng := X
+				Nb := C
+		} else if (H6 < 5) {
+				Nr := X
+				Ng := 0
+				Nb := C
+		} else {
+				Nr := C
+				Ng := 0
+				Nb := X
+		}
+
+		R8 := Round((Nr + M) * 255)
+		G8 := Round((Ng + M) * 255)
+		B8 := Round((Nb + M) * 255)
+		R8 := Max(0, Min(255, R8))
+		G8 := Max(0, Min(255, G8))
+		B8 := Max(0, Min(255, B8))
+		return Format("{1:02X}{2:02X}{3:02X}", R8, G8, B8)
+}
+
+; Resolve the screen position where the tooltip should appear, mirroring the
+; Hammerspoon ``ui/tooltip/renderer.lua:resolve_anchor`` cascade:
+;
+;   1. Native caret via ``CaretGetPos`` — works for most native Win32 controls.
+;   2. UIA focused element bounding rectangle — the right answer for Electron,
+;      Chromium, UWP and other apps that do not expose a usable caret to
+;      ``CaretGetPos``. A small rectangle (height < MAX_CARET_HEIGHT) is
+;      treated as a caret anchor; a larger one as an "input box" anchor.
+;   3. Active window frame — bottom-centre of the foreground window, used
+;      when even UIA cannot identify a focused element.
+;   4. Mouse cursor — last-resort fallback.
+;
+; All positioning maths happen in screen coordinates because the Gui is
+; ``+AlwaysOnTop`` and uses absolute Show("xY yZ").
+; Has this process recently failed to answer a UIA probe? A hostile app costs a
+; full UIA timeout every time the position cache expires, so one failure buys a
+; quiet window rather than a repeating stall.
+_TooltipUiaProcessIsHostile(ProcName) {
+		global _TooltipUiaHostileCache
+		if (ProcName == "" or !_TooltipUiaHostileCache.Has(ProcName))
+				return false
+		Entry := _TooltipUiaHostileCache[ProcName]
+		if !TickExpired(Entry.Tick, Entry.DurationMs)
+				return true
+		_TooltipUiaHostileCache.Delete(ProcName)
+		return false
+}
+
+; Record that ``ProcName`` did not answer usefully, silencing UIA probes against
+; it for TOOLTIP_UIA_HOSTILE_TTL_MS. The map is keyed by process name and
+; entries expire, so it cannot grow without bound across a long session.
+_TooltipMarkUiaHostile(ProcName) {
+		global _TooltipUiaHostileCache, TOOLTIP_UIA_HOSTILE_TTL_MS
+		if (ProcName == "")
+				return
+		_TooltipUiaHostileCache[ProcName] := {
+				Tick: A_TickCount,
+				DurationMs: TOOLTIP_UIA_HOSTILE_TTL_MS
+		}
+}
+
+; Record which stage of the position cascade answered this call.
+; Counted per STAGE rather than as one "resolved" total: the two failure modes
+; this cascade actually has — "the position cache never hits" and "UIA never
+; answers" — are invisible in a total, and both have been argued about from the
+; log without a single number to settle them.
+; @param Stage {String} Cascade exit name (caret, cache, uia_caret, …).
+_TooltipCountResolveExit(Stage) {
+		global _TooltipResolveExits
+		_TooltipResolveExits[Stage] := _TooltipResolveExits.Get(Stage, 0) + 1
+}
+
+; Count one presented render and flush the accounting line every
+; _TOOLTIP_STATS_LOG_EVERY renders. This is the DENOMINATOR for every
+; "Slow Tooltip.*" warning in the same log.
+_TooltipNoteRenderPresented() {
+		global _TooltipRenderCount, _TOOLTIP_STATS_LOG_EVERY, _TooltipResolveExits
+		_TooltipRenderCount += 1
+		if (Mod(_TooltipRenderCount, _TOOLTIP_STATS_LOG_EVERY) != 0)
+				return
+		_TooltipLogRenderAccounting("periodic")
+}
+
+; A shutdown snapshot makes short sessions observable without per-render I/O.
+_TooltipLogRenderAccounting(Reason) {
+		global _TooltipRenderCount, _TooltipResolveExits
+		Parts := ""
+		for Stage, Count in _TooltipResolveExits
+				Parts .= (Parts == "" ? "" : ", ") . Stage . "=" . Count
+		try LoggerInfo("Tooltip", Format("{1} render(s) presented; position cascade exits: {2}; snapshot={3}.",
+				_TooltipRenderCount, (Parts == "") ? "none" : Parts, Reason))
+}
+
+_TooltipCurrentUiaContext() {
+		TopHwnd := WIGetForegroundHwnd()
+		Control := WIGetFocusedControlToken()
+		if !TopHwnd || !Control
+				return 0
+		ProcName := ""
+		try ProcName := WinGetProcessName("ahk_id " . TopHwnd)
+		return Map(
+				"Hwnd", TopHwnd,
+				"Control", Control,
+				"InputEpoch", KS_GetPhysicalInputEpoch(),
+				"ProcName", ProcName,
+				"Environment", _TooltipReadPositionReceipt(TopHwnd))
+}
+
+_TooltipParseUiaBounds(Status, Result) {
+		if (Status != "ok" || !(Result is Map))
+				return 0
+		Parts := StrSplit(Result.Get("Text", ""), "`n", "`r")
+		if (Parts.Length != 4)
+				return 0
+		Values := []
+		for Part in Parts {
+				if !RegExMatch(Part, "^-?(?:\d+(?:\.\d*)?|\.\d+)$")
+						return 0
+				Value := Number(Part)
+				if Abs(Value) > 10000000
+						return 0
+				Values.Push(Value)
+		}
+		if (Values[3] <= Values[1] || Values[4] <= Values[2])
+				return 0
+		return { l: Values[1], t: Values[2], r: Values[3], b: Values[4] }
+}
+
+_TooltipPositionFromUiaBounds(Rect) {
+		global _TOOLTIP_OFFSET_BELOW, _TOOLTIP_OFFSET_RIGHT
+		global _TOOLTIP_MAX_CARET_HEIGHT_PX
+		W := Rect.r - Rect.l
+		H := Rect.b - Rect.t
+		; UIA rects are physical pixels; the shared threshold is layout units.
+		if (H < _TOOLTIP_MAX_CARET_HEIGHT_PX * _TooltipDpiScale()) {
+				_TooltipCountResolveExit("uia_caret")
+				return { Type: "caret", X: Rect.l, Y: Rect.t, H: H }
+		}
+		_TooltipCountResolveExit("uia_box")
+		return { Type: "input_box", X: Rect.l + W // 2, Y: Rect.b, H: 0 }
+}
+
+_TooltipOnUiaBoundsTerminal(Status, Context, Result,
+		ContextFn := _TooltipCurrentUiaContext) {
+		global _TooltipUiaProbePending
+		if !IsObject(_TooltipUiaProbePending) || _TooltipUiaProbePending != Context
+				return false
+		_TooltipUiaProbePending := false
+		if A_IsSuspended
+				return false
+		Rect := _TooltipParseUiaBounds(Status, Result)
+		if !IsObject(Rect) {
+				if (Status = "timeout" || Status = "failed" || Status = "ok")
+						_TooltipMarkUiaHostile(Context.Get("ProcName", ""))
+				return false
+		}
+		Live := ContextFn.Call()
+		if !(Live is Map) || !UIASW_ContextMatches(Context, Result, Live)
+				|| !Context.Has("Environment") || !Live.Has("Environment")
+				|| !_TooltipPositionReceiptsEqual(
+						Context["Environment"], Live["Environment"])
+				return false
+		_TooltipCachePosition(Context["Hwnd"], _TooltipPositionFromUiaBounds(Rect))
+		return true
+}
+
+; Returns true when a worker request is owned or a cold worker is starting. In
+; both cases the coarse fallback must remain uncached so the next render retries.
+_TooltipScheduleUiaBounds(Context,
+		RequestFn := UIASW_RequestBounds, StartFn := UIASW_Start) {
+		global _TooltipUiaProbePending
+		if !(Context is Map)
+				return false
+		if IsObject(_TooltipUiaProbePending)
+				return true
+		Accepted := false
+		Started := false
+		_TooltipUiaProbePending := Context
+		try {
+				Accepted := !!RequestFn.Call(Context, _TooltipOnUiaBoundsTerminal)
+				if !Accepted
+						Started := !!StartFn.Call()
+				return Accepted || Started
+		} catch as Err {
+				try LoggerError("Tooltip", "UIA bounds worker dispatch failed: {1}.",
+						Err.Message)
+				return false
+		} finally {
+				if !Accepted && _TooltipUiaProbePending == Context
+						_TooltipUiaProbePending := false
+		}
+}
+
+; Height of the text caret, physical pixels. CaretGetPos reports only the
+; top-left corner, but the shared placement goes below the caret's BOTTOM
+; (macOS reads it from AXBoundsForRange). GetGUIThreadInfo carries the Win32
+; caret rectangle; apps that draw their own caret (browsers, Electron) expose
+; none, and the main tooltip line height stands in for their text line.
+_TooltipCaretHeightPx() {
+		static InfoSize := A_PtrSize == 8 ? 72 : 48
+		static CaretHwndOffset := 8 + 5 * A_PtrSize
+		static RectOffset := 8 + 6 * A_PtrSize
+		Info := Buffer(InfoSize, 0)
+		NumPut("UInt", InfoSize, Info, 0)
+		if DllCall("User32\GetGUIThreadInfo", "UInt", 0, "Ptr", Info, "Int")
+				and NumGet(Info, CaretHwndOffset, "Ptr") {
+				Height := NumGet(Info, RectOffset + 12, "Int")
+						- NumGet(Info, RectOffset + 4, "Int")
+				if (Height > 0)
+						return Height
+		}
+		return Round(_TooltipMeasureText("Ag").H * _TooltipDpiScale())
+}
+
+_TooltipResolvePosition(DeferUia := false) {
+		global _TOOLTIP_OFFSET_BELOW, _TOOLTIP_OFFSET_RIGHT
+		global _TOOLTIP_MAX_CARET_HEIGHT_PX, _TOOLTIP_WINDOW_BOTTOM_INSET_PX
+		global _TooltipPositionCache, TOOLTIP_POSITION_CACHE_MS
+		global TOOLTIP_UIA_IDLE_REQUIRED_MS
+
+		; ----- 1. Native caret -----------------------------------------------
+		; CoordMode is per-thread and defaults to "Client": without this line the
+		; caret of any window not at the screen origin lands the tooltip far away.
+		CoordMode("Caret", "Screen")
+		Cx := 0
+		Cy := 0
+		GotCaret := false
+		try GotCaret := CaretGetPos(&Cx, &Cy)
+		if (GotCaret and (Cx != 0 or Cy != 0)) {
+				_TooltipCountResolveExit("caret")
+				return _TooltipCachePosition(WinExist("A"),
+						{ Type: "caret", X: Cx, Y: Cy, H: _TooltipCaretHeightPx(),
+							NativeCaret: true })
+		}
+
+		ActiveHwnd := WinExist("A")
+		CurrentEnvironment := _TooltipReadPositionReceipt(ActiveHwnd)
+		; A plain global argument can read a newer object after a later call.
+		; Pair one local receipt with the native sample and keep its fields.
+		CachedPosition := _TooltipPositionCache
+		CacheNowTick := A_TickCount
+		if _TooltipPositionCacheCanReuse(CachedPosition, ActiveHwnd,
+				CurrentEnvironment, CacheNowTick, TOOLTIP_POSITION_CACHE_MS,
+				WIGetFocusedControlToken()) {
+				_TooltipCountResolveExit("cache")
+				return { Type: CachedPosition["type"],
+						X: CachedPosition["x"], Y: CachedPosition["y"],
+						H: CachedPosition["h"] }
+		}
+
+		; ----- 2. Disposable UIA bounds worker -------------------------------
+		ProcName := ""
+		try ProcName := WinGetProcessName("ahk_id " . ActiveHwnd)
+		UiaSkippedForIdle := (A_TimeIdlePhysical < TOOLTIP_UIA_IDLE_REQUIRED_MS)
+		UiaAllowed := !DeferUia && !UiaSkippedForIdle
+				and !_TooltipUiaProcessIsHostile(ProcName)
+		UiaProbeDeferred := DeferUia || UiaSkippedForIdle
+		if UiaAllowed {
+				Context := _TooltipCurrentUiaContext()
+				if (Context is Map) && Context["Hwnd"] = ActiveHwnd
+						UiaProbeDeferred := _TooltipScheduleUiaBounds(Context)
+				else if (Context is Map)
+						UiaProbeDeferred := true
+		}
+
+		; ----- 3. Active window frame ----------------------------------------
+		try {
+				Wx := 0
+				Wy := 0
+				Ww := 0
+				Wh := 0
+				WinGetPos(&Wx, &Wy, &Ww, &Wh, "ahk_id " . ActiveHwnd)
+				if (Ww > 0 and Wh > 0) {
+						_TooltipCountResolveExit("window")
+						return _TooltipCacheUnlessProbePending(ActiveHwnd,
+								{ Type: "window", X: Wx + Ww // 2, H: 0,
+										Y: Wy + Wh - Round(_TOOLTIP_WINDOW_BOTTOM_INSET_PX
+											* _TooltipDpiScale()) },
+								UiaProbeDeferred)
+				}
+		}
+
+		; ----- 4. Mouse cursor -----------------------------------------------
+		CoordMode("Mouse", "Screen")
+		Mx := 0
+		My := 0
+		try MouseGetPos(&Mx, &My)
+		_TooltipCountResolveExit("mouse")
+		return _TooltipCacheUnlessProbePending(ActiveHwnd,
+				{ Type: "caret", X: Mx, Y: My, H: 0 },
+				UiaProbeDeferred)
+}
+
+; Pins a FALLBACK anchor in the position cache only when that anchor is the best
+; the driver can currently produce.
+;
+; Stages 3 and 4 are reached both when UIA genuinely had nothing to offer and
+; when its probe never ran because the user was still mid-burst. Those two cases
+; deserve opposite treatment. A hostile or silent app will not answer for
+; TOOLTIP_UIA_HOSTILE_TTL_MS, so caching the coarse anchor is exactly right —
+; it buys a quiet window instead of re-paying a timeout. But when the probe was
+; merely deferred for idle, the coarse anchor is a stand-in for a measurement
+; that has not been taken yet: caching it would serve it for the whole
+; TOOLTIP_POSITION_CACHE_MS window and suppress the probe that would have
+; produced the real caret anchor, so the preview would sit at the bottom of the
+; window instead of under the caret.
+;
+; Stages 1 and 2 deliberately do NOT route through here: a native caret and a
+; resolved UIA rect are real measurements and must be cached unconditionally.
+_TooltipCacheUnlessProbePending(Hwnd, Pos, ProbePending) {
+		if ProbePending
+				return Pos
+		return _TooltipCachePosition(Hwnd, Pos)
+}
+
+_TooltipCachePosition(Hwnd, Pos, Context := 0) {
+		global _TooltipPositionCache
+		_TooltipPositionCache := Map(
+				"hwnd", Hwnd,
+				"control", Context is Map ? Context["Control"] : WIGetFocusedControlToken(),
+				"type", Pos.Type,
+				"x", Pos.X,
+				"y", Pos.Y,
+				"h", Pos.H,
+				"tick", A_TickCount,
+				"environment", Context is Map ? Context["Environment"]
+					: _TooltipReadPositionReceipt(Hwnd)
+		)
+		return Pos
+}

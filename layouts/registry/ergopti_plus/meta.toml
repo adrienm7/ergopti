@@ -1,0 +1,39 @@
+# static/layouts/registry/ergopti_plus/meta.toml
+# Ergopti+ (extra dead keys and rolls) for ISO keyboards.
+# ergopti_plus.keylayout is a byte copy of Ergopti_v2_2_2_plus.keylayout
+# from the latest macOS bundle (static/ergopti/macos/bundles); the registry
+# test fails when the two drift apart.
+
+name = "Ergopti+"
+# Catalogue family metadata; geometry hotstrings remain an independent
+# opt-in choice on every layout.
+family = "ergopti"
+extension_source = "ergopti"
+version = "2.2.2"
+author = "Adrien Moyaux"
+licence = "MIT"
+homepage = "https://ergopti.fr"
+languages = ["fr", "en"]
+variants = ["ergopti", "ergopti_ansi", "ergopti_plus_ansi"]
+source_url = "https://github.com/adrienm7/ergopti/tree/main/static/ergopti/macos/bundles/Ergopti_v2.2.2.bundle"
+platforms = ["linux", "macos", "windows"]
+# Apple ISO hardware numbering: code 10 is the key left of 1, code 50 the ISO
+# key left of Z. The ANSI variants keep this numbering and swap the two keys'
+# characters instead.
+keycode_convention = "iso"
+
+[xkb]
+# Keysyms the shipped Ergopti XKB files have always used for these outputs:
+# each guillemet with its no-break space, and the dead keys that have no XKB
+# dead keysym of their own (superscript, subscript, double-struck, Greek).
+keysym_overrides = [
+	["«\u00A0", "guillemotleft"],
+	["\u00A0»", "guillemotright"],
+	["ᵉ", "uparrow"],
+	["ᵢ", "downarrow"],
+	["ℝ", "infinity"],
+	["µ", "mu"],
+]
+# The magic key types ★ only on its base level; the others keep the letter
+# its action is named after (j).
+base_level_only = ["★"]

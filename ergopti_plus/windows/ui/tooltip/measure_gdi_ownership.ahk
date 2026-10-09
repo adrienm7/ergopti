@@ -1,0 +1,158 @@
+﻿; ui/tooltip/measure_gdi_ownership.ahk
+
+; ==============================================================================
+; MODULE: Tooltip measurement GDI ownership
+; DESCRIPTION:
+; Serializes first publication of cached HFONT handles and retains DC/font
+; cleanup receipts when native release is refused.
+; ==============================================================================
+
+#Requires AutoHotkey v2.0
+
+global _TooltipMeasureGdiCleanupDebt := []
+
+
+
+
+
+class _TooltipMeasureGdiNative {
+	static GetScreenDC() {
+		return DllCall("User32\GetDC", "Ptr", 0, "Ptr")
+	}
+
+	static ReleaseScreenDC(DeviceContext) {
+		return DllCall("User32\ReleaseDC", "Ptr", 0, "Ptr", DeviceContext,
+			"Int") != 0
+	}
+
+	static GetVerticalDpi(DeviceContext) {
+		return DllCall("Gdi32\GetDeviceCaps", "Ptr", DeviceContext,
+			"Int", 90, "Int")
+	}
+
+	static CreateFont(HeightPx, FontName, Bold := false) {
+		static FW_NORMAL := 400, FW_BOLD := 700
+		return DllCall("Gdi32\CreateFontW",
+			"Int", HeightPx, "Int", 0, "Int", 0, "Int", 0,
+			"Int", Bold ? FW_BOLD : FW_NORMAL, "UInt", 0, "UInt", 0, "UInt", 0,
+			"UInt", 1, "UInt", 0, "UInt", 0, "UInt", 0, "UInt", 0,
+			"WStr", FontName, "Ptr")
+	}
+
+	static DeleteObject(ObjectHandle) {
+		return DllCall("Gdi32\DeleteObject", "Ptr", ObjectHandle, "Int") != 0
+	}
+
+	static SelectObject(DeviceContext, ObjectHandle) {
+		return DllCall("Gdi32\SelectObject", "Ptr", DeviceContext,
+			"Ptr", ObjectHandle, "Ptr")
+	}
+
+	; DrawText, not GetTextExtentPoint32: the Text controls paint through
+	; DrawText, which substitutes a fallback font for glyphs Segoe UI lacks
+	; (⇧ ◀ ⏱). The raw extent measured those at the wrong width, so a footer
+	; sized by it wrapped its last word out of view.
+	static MeasureText(DeviceContext, Text, Size) {
+		static DT_CALCRECT_SINGLELINE_NOPREFIX := 0x400 | 0x20 | 0x800
+		Rect := Buffer(16, 0)
+		if !DllCall("User32\DrawTextW", "Ptr", DeviceContext, "WStr", Text,
+				"Int", StrLen(Text), "Ptr", Rect, "UInt", DT_CALCRECT_SINGLELINE_NOPREFIX, "Int")
+			return false
+		NumPut("Int", NumGet(Rect, 8, "Int") - NumGet(Rect, 0, "Int"), Size, 0)
+		NumPut("Int", NumGet(Rect, 12, "Int") - NumGet(Rect, 4, "Int"), Size, 4)
+		return true
+	}
+}
+
+
+
+
+
+_TooltipMeasureNewGdiReceipt() {
+	return Map("screen_dc", 0, "old_font", 0, "font_selected", false,
+		"uncached_font", 0)
+}
+
+_TooltipMeasureGdiRelease(Receipt, Native := _TooltipMeasureGdiNative) {
+	if !(Receipt is Map)
+		return true
+	try {
+		if Receipt.Get("font_selected", false) {
+			Restored := Native.SelectObject(Receipt["screen_dc"],
+				Receipt["old_font"])
+			if _TooltipGdiSelectSucceeded(Restored)
+				Receipt["font_selected"] := false
+		}
+		if Receipt.Get("screen_dc", 0) {
+			if Native.ReleaseScreenDC(Receipt["screen_dc"]) == true {
+				Receipt["screen_dc"] := 0
+				; Destroying the DC also retires any unresolved selection.
+				Receipt["font_selected"] := false
+			}
+		}
+		if Receipt.Get("uncached_font", 0)
+				and !Receipt.Get("font_selected", false) {
+			if Native.DeleteObject(Receipt["uncached_font"]) == true
+				Receipt["uncached_font"] := 0
+		}
+		return Receipt.Get("screen_dc", 0) == 0
+			and !Receipt.Get("font_selected", false)
+			and Receipt.Get("uncached_font", 0) == 0
+	} catch {
+		return false
+	}
+}
+
+_TooltipMeasureSettleGdiReceipt(Receipt,
+		Native := _TooltipMeasureGdiNative) {
+	global _TooltipMeasureGdiCleanupDebt
+	if !(Receipt is Map)
+		return true
+	PreviousCritical := Critical("On")
+	try {
+		if _TooltipMeasureGdiRelease(Receipt, Native)
+			return true
+		_TooltipMeasureGdiCleanupDebt.Push(Receipt)
+		return false
+	} finally Critical(PreviousCritical)
+}
+
+_TooltipMeasureDrainGdiDebt(Native := _TooltipMeasureGdiNative) {
+	global _TooltipMeasureGdiCleanupDebt
+	PreviousCritical := Critical("On")
+	try {
+		Pending := _TooltipMeasureGdiCleanupDebt
+		_TooltipMeasureGdiCleanupDebt := []
+		for Receipt in Pending {
+			if !_TooltipMeasureGdiRelease(Receipt, Native)
+				_TooltipMeasureGdiCleanupDebt.Push(Receipt)
+		}
+		return _TooltipMeasureGdiCleanupDebt.Length == 0
+	} finally Critical(PreviousCritical)
+}
+
+; The cache check, native creation, and publication form one non-interruptible
+; transaction. Otherwise two AHK threads can both observe a miss and the later
+; Map assignment silently loses the first process-lifetime HFONT handle.
+_TooltipMeasureAcquireCachedFont(HeightPx, FontName, FontCache,
+		Native := _TooltipMeasureGdiNative, Bold := false) {
+	if !(FontCache is Map)
+		throw TypeError("Tooltip measurement font cache must be a Map")
+	Key := HeightPx . "|" . (Bold ? "bold" : "regular") . "|" . FontName
+	CandidateReceipt := _TooltipMeasureNewGdiReceipt()
+	PreviousCritical := Critical("On")
+	try {
+		if FontCache.Has(Key)
+			return FontCache[Key]
+		CandidateReceipt["uncached_font"] := Native.CreateFont(HeightPx,
+			FontName, Bold)
+		if !CandidateReceipt["uncached_font"]
+			return 0
+		FontCache[Key] := CandidateReceipt["uncached_font"]
+		CandidateReceipt["uncached_font"] := 0
+		return FontCache[Key]
+	} finally {
+		try _TooltipMeasureSettleGdiReceipt(CandidateReceipt, Native)
+		finally Critical(PreviousCritical)
+	}
+}

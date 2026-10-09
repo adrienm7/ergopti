@@ -1,0 +1,6 @@
+[case]
+description = "Scalar and array ancestors and descendant tables are explicit choices; copies preserve their whole namespace and every source."
+drivers = ["ahk", "hs", "linux"]
+outcome = "migrated"
+from_version = 1
+to_version = 2

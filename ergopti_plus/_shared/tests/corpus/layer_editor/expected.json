@@ -1,0 +1,21 @@
+{
+	"description": "What edited_layers.toml resolves to on each OS, written by hand as the oracle of the layer editor's end-to-end path. edited_layers.toml is the file the scripted editing session of tools/test/test-layer-editor-model.cjs writes through _shared/ui/layer_editor/layer_model.js (the recommended layer, then KeyT edited once on each OS and KeyG given its normal behaviour back on Windows); each driver's host test saves it through its bridge and checks its generated layer. Values are the loaders' canonical resolution text; null means the key keeps its normal behaviour.",
+	"windows": {
+		"KeyT": "keystroke:ArrowUp@repeat",
+		"KeyG": null,
+		"KeyQ": "keystroke:ctrl+shift+Home",
+		"WheelUp": "keystroke:AudioVolumeUp@repeat"
+	},
+	"macos": {
+		"KeyT": "keystroke:shift+meta+KeyZ",
+		"KeyG": "keystroke:F12",
+		"KeyQ": "keystroke:shift+meta+ArrowUp",
+		"WheelUp": "keystroke:AudioVolumeUp@repeat"
+	},
+	"linux": {
+		"KeyT": "keystroke:AudioVolumeMute",
+		"KeyG": "keystroke:F12",
+		"KeyQ": "keystroke:ctrl+shift+Home",
+		"WheelUp": null
+	}
+}

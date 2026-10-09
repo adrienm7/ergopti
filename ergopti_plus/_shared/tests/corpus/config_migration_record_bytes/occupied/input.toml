@@ -1,0 +1,20 @@
+# Root preamble and every occupied future choice keep their exact bytes.
+root_choice = "outside migration ownership"
+
+[source] # own section spelling and comment
+choice = true # preserve source flag
+rows = [
+  ["[future.header]", "escaped\" # string"], # preserve nested values
+  ["tail", "hash # data"]
+]
+
+[settings]
+inline = { color = "future", visible = false, palette = [{ Key = "upper", key = "lower" }] } # keep presentation
+scalar = "future owner"
+disabled = false
+
+[settings.empty] # empty explicit destination namespace
+
+["future.owner"] # quoted dot is one opaque segment
+"Quoted.Key" = "stay exactly here" # preserve quoted identity
+when = 1979-05-27T07:32:00Z # opaque native date text remains untouched

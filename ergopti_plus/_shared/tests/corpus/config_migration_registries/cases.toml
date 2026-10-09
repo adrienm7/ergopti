@@ -1,0 +1,54 @@
+# _shared/tests/corpus/config_migration_registries/cases.toml
+# Registry defects every interpreter must reject: the Windows loader
+# (windows/infra/config_migrate.ahk), the Lua engine
+# (_shared/lua/config_migrate.lua) and tools/test/test-config-migrations.cjs.
+# A registry one driver accepts and another refuses would migrate a file on one
+# driver and leave the session read-only on the other.
+#
+# Every case is <name>.toml, the control registry with exactly one defect.
+# Every interpreter must accept the control, so a rejection proves the defect
+# and not a typo that breaks the whole file. The JS gate fails when these
+# names and the files differ.
+
+[corpus]
+control = "control"
+rejected = [
+	"chord_missing_action",
+	"chord_missing_platform",
+	"chord_wrong_platform",
+	"chord_platform_not_string",
+	"chord_conditional_key_not_bare",
+	"chord_action_not_string",
+	"chord_disabled_action_empty",
+	"chord_same_section",
+	"chord_unknown_field",
+	"chord_missing_conditional_key",
+
+	"chain_gap",
+	"misnamed_step",
+	"step_skips_a_version",
+	"unstamped_above_current",
+	"non_integer_version",
+	"unknown_registry_key",
+	"unknown_table",
+	"unknown_step_field",
+	"unknown_driver",
+	"no_driver",
+	"no_reason",
+	"blank_reason",
+	"ops_not_an_array",
+	"unknown_op",
+	"unknown_op_field",
+	"missing_op_field",
+	"rename_without_target",
+	"copy_without_target",
+	"copy_missing_source_key",
+	"copy_unknown_field",
+	"copy_target_not_path",
+	"copy_target_key_not_bare",
+	"section_not_bare",
+	"key_with_dot",
+	"map_entry_extra_field",
+	"map_entry_not_scalar",
+	"set_if_absent_inline_table",
+]

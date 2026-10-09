@@ -1,0 +1,389 @@
+﻿; adapters/network_failure_host.ahk
+
+; ==============================================================================
+; MODULE: Windows Managed Network Failure Actions
+; DESCRIPTION:
+; Loads the shared failure contract once. Native capabilities come from actual
+; settings registration, existing private log/output paths and captured request
+; owners. Reports never carry native paths, URLs, receipts or owner objects.
+; ==============================================================================
+
+#Requires AutoHotkey v2.0
+
+global _ManagedNetworkWindowsContract := 0
+global _ManagedNetworkWindowsPorts := 0
+global _ManagedNetworkWindowsInitializing := false
+
+; AHK native string searches terminate at NUL; inspect stored UTF-16 units.
+_ManagedNetworkWindows_HasStoredNul(Text) {
+	loop StrLen(Text)
+		if NumGet(StrPtr(Text), (A_Index - 1) * 2, "UShort") == 0
+			return true
+	return false
+}
+
+; Native locale access stays in the adapter; the presenter uses exact translated
+; bytes and validates them before constructing its renderer invocation.
+_ManagedNetworkWindows_LocaleScript() {
+	global _SharedDir, _I18nLocale
+	Raw := FileRead(_SharedDir . "\data\locales\" . _I18nLocale . ".json", "UTF-8")
+	if !(JsonParse(Raw) is Map)
+		throw TypeError("The managed failure locale is invalid")
+	return "window._i18n_strings=" . Raw . ";window.i18n_apply(window._i18n_strings);"
+}
+
+; Root boot owns initialization, after JSON, shared paths, i18n and logging.
+; @param Policy {Map|Unset} Canonical policy; omitted in production.
+; @param Ports {Map|Integer} Controlled native ports for isolated tests only.
+; @returns {Boolean} True after one successful initialization.
+ManagedNetworkFailureWindows_Init(Policy := unset, Ports := 0) {
+	global _ManagedNetworkWindowsContract, _ManagedNetworkWindowsPorts, _ManagedNetworkWindowsInitializing, _SharedDir
+	PreviousCritical := Critical("On")
+	try {
+		if IsObject(_ManagedNetworkWindowsContract) || _ManagedNetworkWindowsInitializing
+			throw Error("Windows managed network failure actions were initialized twice")
+		_ManagedNetworkWindowsInitializing := true
+	} finally {
+		Critical(PreviousCritical)
+	}
+	try {
+		if !IsSet(Policy)
+			Policy := JsonParse(FileRead(_SharedDir . "\modules\network\managed_network.json", "UTF-8"))
+		if !(Ports is Map) {
+			Ports := Map("pause_admitted", () => !A_IsSuspended,
+				"proxy_available", _ManagedNetworkWindows_ProxyAvailable,
+				"log_path", LoggerTodayLogPath,
+				"file_regular", _ManagedNetworkWindows_RegularFile,
+				"folder_regular", _ManagedNetworkWindows_RegularFolder,
+				"log_opener_available", () => _ManagedNetworkWindows_RegularFile(A_WinDir . "\System32\notepad.exe"),
+				"folder_opener_available", () => _ManagedNetworkWindows_RegularFile(A_WinDir . "\explorer.exe"),
+				"open_proxy", _ManagedNetworkWindows_OpenProxy,
+				"open_log", _ManagedNetworkWindows_OpenLog,
+				"open_folder", _ManagedNetworkWindows_OpenFolder,
+				"show_notice", _ManagedNetworkWindows_NativeNotice, "clock", () => A_TickCount)
+		}
+		for Name in ["pause_admitted", "proxy_available", "log_path", "file_regular",
+			"folder_regular", "log_opener_available", "folder_opener_available",
+			"open_proxy", "open_log", "open_folder", "show_notice", "clock"] {
+			if !Ports.Has(Name) || !HasMethod(Ports[Name], "Call")
+				throw TypeError("Windows managed network failure native port is missing: " . Name)
+		}
+		_ManagedNetworkWindows_RenderTimeout(Policy)
+		Contract := ManagedNetworkFailureContract(Policy)
+		PreviousCritical := Critical("On")
+		try {
+			_ManagedNetworkWindowsPorts := Ports
+			_ManagedNetworkWindowsContract := Contract
+		} finally {
+			Critical(PreviousCritical)
+		}
+		return true
+	} finally {
+		_ManagedNetworkWindowsInitializing := false
+	}
+}
+
+
+; SetTimer accepts a positive signed 32-bit interval; reject coercion or overflow.
+_ManagedNetworkWindows_RenderTimeout(Policy) {
+	Presentation := Policy is Map ? _ManagedNetwork_Get(Policy, "presentation") : 0
+	Value := Presentation is Map ? _ManagedNetwork_Get(Presentation, "render_ack_timeout_ms") : 0
+	if !(Value is Integer) || Value < 1 || Value > 2147483647
+		throw TypeError("The managed failure rendering deadline must be a positive signed 32-bit integer")
+	return Value
+}
+
+; @returns {Integer} Canonical shared presentation timeout, in milliseconds.
+ManagedNetworkFailureWindows_RenderAckTimeout() {
+	return _ManagedNetworkWindows_RenderTimeout(ManagedNetworkFailureWindows_Contract().Policy)
+}
+
+
+; @returns {Integer} Native monotonic GetTickCount64-domain milliseconds.
+ManagedNetworkFailureWindows_Now() {
+	global _ManagedNetworkWindowsPorts
+	_ManagedNetworkWindows_RequireInitialized()
+	Value := _ManagedNetworkWindowsPorts["clock"].Call()
+	if !(Value is Integer) || Value < 0
+		throw TypeError("The managed failure clock must be a nonnegative native monotonic integer")
+	return Value
+}
+
+; The private presenter has already retired page consent before this notice.
+; @param Key {String} Retained canonical translated cause message key.
+; @param IsCurrentFn {Func} Exact terminal native request admission.
+; @returns {Boolean} True only if the native notice begins for the current owner.
+ManagedNetworkFailureWindows_ShowNotice(Key, IsCurrentFn) {
+	global _ManagedNetworkWindowsPorts
+	if !_ManagedNetworkWindows_Current(IsCurrentFn)
+		return false
+	LoggerWarn("ManagedDownload", "The shared failure renderer is unavailable; showing the current cause in a native notice.")
+	if !_ManagedNetworkWindows_Current(IsCurrentFn)
+		return false
+	; The modal must not hold Critical and suspend unrelated native operations.
+	return _ManagedNetworkWindows_True(_ManagedNetworkWindowsPorts["show_notice"].Call(Key))
+}
+
+_ManagedNetworkWindows_True(Value) {
+	return Value is Integer && Value == true
+}
+
+_ManagedNetworkWindows_RequireInitialized() {
+	global _ManagedNetworkWindowsContract, _ManagedNetworkWindowsPorts
+	if !IsObject(_ManagedNetworkWindowsContract) || !(_ManagedNetworkWindowsPorts is Map)
+		throw Error("Windows managed network failure actions have no initialization owner")
+}
+
+; Supplies the same initialized policy interpreter to trusted native producers.
+; @returns {ManagedNetworkFailureContract} The root-owned immutable contract.
+ManagedNetworkFailureWindows_Contract() {
+	global _ManagedNetworkWindowsContract
+	_ManagedNetworkWindows_RequireInitialized()
+	return _ManagedNetworkWindowsContract
+}
+
+; Encodes only canonical page fields, even if an upstream object has extra data.
+; @param Report {Map} Canonical safe failure report.
+; @returns {String} JSON without private paths, URLs, receipts or owner objects.
+ManagedNetworkFailureWindows_ReportJson(Report) {
+	if !(Report is Map) || !(Report.Get("actions", 0) is Array)
+		throw TypeError("The managed failure page report is invalid")
+	Fields := ""
+	for Name in ["cause", "message_key", "evidence"] {
+		Value := Report.Get(Name, 0)
+		if !(Value is String)
+			throw TypeError("The managed failure page report has no canonical " . Name)
+		Fields .= (Fields == "" ? "" : ",") . JsonStringLiteral(Name) . ":" . JsonStringLiteral(Value)
+	}
+	Rows := ""
+	for Action in Report["actions"] {
+		if !(Action is Map) || !(Action.Get("id", 0) is String) || !(Action.Get("label_key", 0) is String)
+			throw TypeError("The managed failure page action is invalid")
+		Rows .= (Rows == "" ? "" : ",") . '{"id":' . JsonStringLiteral(Action["id"])
+			. ',"label_key":' . JsonStringLiteral(Action["label_key"]) . "}"
+	}
+	return "{" . Fields . ',"actions":[' . Rows . "]}"
+}
+
+; Every action requires the same current private request and current pause owner.
+; Capability probes may pump messages, so their caller rechecks this gate.
+_ManagedNetworkWindows_Current(IsCurrentFn) {
+	global _ManagedNetworkWindowsPorts
+	if !HasMethod(IsCurrentFn, "Call")
+		return false
+	return _ManagedNetworkWindows_True(_ManagedNetworkWindowsPorts["pause_admitted"].Call())
+		&& _ManagedNetworkWindows_True(IsCurrentFn.Call())
+}
+
+; This private snapshot must never be serialized to a page.
+_ManagedNetworkWindows_Snapshot(IsCurrentFn, RetryFn, OwnedFolderFn) {
+	global _ManagedNetworkWindowsPorts
+	_ManagedNetworkWindows_RequireInitialized()
+	Caps := Map("owner_alive", false, "retry_available", false,
+		"proxy_settings_available", false, "diagnostics_available", false,
+		"download_folder_available", false, "download_folder_owned", false)
+	Snapshot := Map("capabilities", Caps, "log_path", "", "download_folder", "")
+	if !_ManagedNetworkWindows_Current(IsCurrentFn)
+		return Snapshot
+	LogPath := _ManagedNetworkWindowsPorts["log_path"].Call()
+	LogAvailable := _ManagedNetworkWindows_True(_ManagedNetworkWindowsPorts["log_opener_available"].Call())
+		&& _ManagedNetworkWindows_True(_ManagedNetworkWindowsPorts["file_regular"].Call(LogPath))
+	ProxyAvailable := _ManagedNetworkWindows_True(_ManagedNetworkWindowsPorts["proxy_available"].Call())
+	Folder := HasMethod(OwnedFolderFn, "Call") ? OwnedFolderFn.Call() : ""
+	FolderAvailable := Folder is String && Folder != ""
+		&& _ManagedNetworkWindows_True(_ManagedNetworkWindowsPorts["folder_opener_available"].Call())
+		&& _ManagedNetworkWindows_True(_ManagedNetworkWindowsPorts["folder_regular"].Call(Folder))
+	if !_ManagedNetworkWindows_Current(IsCurrentFn)
+		return Snapshot
+	Caps["owner_alive"] := true
+	Caps["retry_available"] := HasMethod(RetryFn, "Call")
+	Caps["proxy_settings_available"] := ProxyAvailable
+	Caps["diagnostics_available"] := LogAvailable
+	Caps["download_folder_available"] := FolderAvailable
+	Caps["download_folder_owned"] := FolderAvailable
+	Snapshot["log_path"] := LogAvailable ? LogPath : ""
+	Snapshot["download_folder"] := FolderAvailable ? Folder : ""
+	return Snapshot
+}
+
+; Returns only the canonical safe report. Native receipts stay with their owner.
+; @param Receipt {Map} Actual typed receipt, or an empty map for unknown.
+; @param IsCurrentFn {Func} Closure bound to the exact private request/generation.
+; @param RetryFn {Func|Integer} Actual retry, or zero when unavailable.
+; @param OwnedFolderFn {Func|Integer} Private owned output-folder resolver, or zero.
+; @returns {Map} cause/message_key/evidence/actions, without native metadata.
+ManagedNetworkFailureWindows_Classify(Receipt, IsCurrentFn, RetryFn := 0, OwnedFolderFn := 0) {
+	global _ManagedNetworkWindowsContract
+	Snapshot := _ManagedNetworkWindows_Snapshot(IsCurrentFn, RetryFn, OwnedFolderFn)
+	return _ManagedNetworkWindowsContract.Classify(Receipt, Snapshot["capabilities"])
+}
+
+; Recomputes the actions from actual native capabilities at the time of use.
+; @param Cause {String} Canonical cause retained by the private host.
+; @param IsCurrentFn {Func} Closure retaining exact native intent.
+; @param RetryFn {Func|Integer} Actual retry or zero.
+; @param OwnedFolderFn {Func|Integer} Actual owned output folder or zero.
+; @returns {Array} Safe action records only.
+ManagedNetworkFailureWindows_CurrentActions(Cause, IsCurrentFn, RetryFn := 0, OwnedFolderFn := 0) {
+	global _ManagedNetworkWindowsContract
+	Snapshot := _ManagedNetworkWindows_Snapshot(IsCurrentFn, RetryFn, OwnedFolderFn)
+	return _ManagedNetworkWindowsContract.Actions(Cause, Snapshot["capabilities"])
+}
+
+; A host must fence its window/session/failure epoch inside IsCurrentFn too.
+; RetryFn retires that epoch before invoking the existing native retry owner.
+; @param Cause {String} Retained canonical cause, never supplied by the page.
+; @param Id {String} Action identifier; paths/URLs never come from the page.
+; @param IsCurrentFn {Func} Exact request and host epoch admission.
+; @param RetryFn {Func|Integer} Actual captured native retry or zero.
+; @param OwnedFolderFn {Func|Integer} Actual private output folder or zero.
+; @returns {Boolean} True only when an admitted native action starts.
+ManagedNetworkFailureWindows_PerformAction(Cause, Id, IsCurrentFn, RetryFn := 0, OwnedFolderFn := 0) {
+	global _ManagedNetworkWindowsContract, _ManagedNetworkWindowsPorts
+	Snapshot := _ManagedNetworkWindows_Snapshot(IsCurrentFn, RetryFn, OwnedFolderFn)
+	Admitted := false
+	for Action in _ManagedNetworkWindowsContract.Actions(Cause, Snapshot["capabilities"]) {
+		if _ManagedNetwork_Equal(Action["id"], Id)
+			Admitted := true
+	}
+	if !Admitted || !_ManagedNetworkWindows_Current(IsCurrentFn)
+		return false
+	switch Id {
+		case "retry":
+			return _ManagedNetworkWindows_True(RetryFn.Call())
+		case "proxy_settings":
+			return _ManagedNetworkWindows_OpenChecked(IsCurrentFn, _ManagedNetworkWindowsPorts["open_proxy"])
+		case "diagnostics":
+			return _ManagedNetworkWindows_OpenChecked(IsCurrentFn, _ManagedNetworkWindowsPorts["open_log"], Snapshot["log_path"])
+		case "download_folder":
+			return _ManagedNetworkWindows_OpenChecked(IsCurrentFn, _ManagedNetworkWindowsPorts["open_folder"], Snapshot["download_folder"])
+	}
+	return false
+}
+
+; Only the short native opener admission/start is atomic; probes and updater retry
+; remain outside this section and retain their own existing request reservation.
+_ManagedNetworkWindows_OpenChecked(IsCurrentFn, OpenFn, Args*) {
+	PreviousCritical := Critical("On")
+	try {
+		if !_ManagedNetworkWindows_Current(IsCurrentFn)
+			return false
+		return _ManagedNetworkWindows_True(OpenFn.Call(Args*))
+	} finally {
+		Critical(PreviousCritical)
+	}
+}
+
+_ManagedNetworkWindows_AbsolutePath(Path) {
+	return Path is String && RegExMatch(Path, "i)^(?:[a-z]:\\|\\\\[^\\]+\\[^\\]+\\)")
+		&& !InStr(Path, '"') && !InStr(Path, "`n") && !InStr(Path, "`r")
+}
+
+_ManagedNetworkWindows_RegularFile(Path) {
+	if !_ManagedNetworkWindows_AbsolutePath(Path)
+		return false
+	try Attributes := FileGetAttrib(Path)
+	catch
+		return false
+	return Attributes != "" && !InStr(Attributes, "D") && !InStr(Attributes, "L")
+}
+
+_ManagedNetworkWindows_RegularFolder(Path) {
+	if !_ManagedNetworkWindows_AbsolutePath(Path)
+		return false
+	try Attributes := FileGetAttrib(Path)
+	catch
+		return false
+	return InStr(Attributes, "D") != 0 && !InStr(Attributes, "L")
+}
+
+_ManagedNetworkWindows_ProxyAvailable() {
+	; Presence of the registered URI protocol is actual native capability evidence.
+	; A missing Windows Settings handler is unavailable, not an invented menu row.
+	try Protocol := RegRead("HKCR\ms-settings", "URL Protocol")
+	catch
+		return false
+	return Protocol is String
+}
+
+_ManagedNetworkWindows_OpenProxy() {
+	Run("ms-settings:network-proxy")
+	return true
+}
+
+_ManagedNetworkWindows_OpenLog(Path) {
+	Run('"' . A_WinDir . '\System32\notepad.exe" "' . Path . '"')
+	return true
+}
+
+_ManagedNetworkWindows_OpenFolder(Path) {
+	Run('"' . A_WinDir . '\explorer.exe" "' . Path . '"')
+	return true
+}
+
+_ManagedNetworkWindows_NativeNotice(Key) {
+	Ui_MsgBox(t(Key), t("download_window.window_title"), "Icon!")
+	return true
+}
+
+; Materialize a safe cause while the exact transport's caller still owns it.
+; Receipt keys come only from the canonical schema; native detail never leaves
+; this private helper, and stderr/status text cannot manufacture a cause.
+ManagedNetworkFailureWindows_FromTransport(Http, IsCurrentFn) {
+	if !(Http is CurlAsyncRequest) || !Http.ManagedTransport || !HasMethod(IsCurrentFn, "Call")
+		return 0
+	try {
+		Contract := ManagedNetworkFailureWindows_Contract()
+		Receipt := Map()
+		if Http.NativeReceipt is Map {
+			for Key, Value in Http.NativeReceipt
+				if Contract.Policy["fields"].Has(Key)
+					Receipt[Key] := Value
+		}
+		if Receipt.Count == 0 && Http.Status > 0
+			return 0
+		Report := ManagedNetworkFailureWindows_Classify(Receipt, IsCurrentFn)
+		if !_ManagedNetworkWindows_Current(IsCurrentFn)
+			return 0
+		; Clone through the safe serializer so added native fields are excluded.
+		return JsonParse(ManagedNetworkFailureWindows_ReportJson(Report))
+	} catch {
+		return 0
+	}
+}
+
+; UI text is admitted only from a canonical safe report, never a page string.
+ManagedNetworkFailureWindows_MessageKey(Report) {
+	if !(Report is Map)
+		return ""
+	try {
+		Contract := ManagedNetworkFailureWindows_Contract()
+		Cause := Report.Get("cause", "")
+		Definition := Contract.Policy["causes"].Get(Cause, 0)
+		if Definition is Map && Report.Get("message_key", "") == Definition["message_key"]
+			return Definition["message_key"]
+	}
+	return ""
+}
+
+; Reject contradictory or arbitrary safe-report keys before terminal transfer.
+ManagedNetworkFailureWindows_CanonicalReport(Report) {
+	if !(Report is Map) || !(Report.Get("actions", 0) is Array)
+		return false
+	try {
+		Policy := ManagedNetworkFailureWindows_Contract().Policy
+		Cause := Report.Get("cause", ""), Key := Report.Get("message_key", ""), Evidence := Report.Get("evidence", "")
+		Definition := _ManagedNetwork_Get(Policy["causes"], Cause)
+		if !(Definition is Map) || !_ManagedNetwork_Equal(Key, Definition["message_key"])
+			return false
+		if _ManagedNetwork_Equal(Cause, Policy["default_cause"])
+			&& (_ManagedNetwork_Equal(Evidence, "insufficient_evidence") || _ManagedNetwork_Equal(Evidence, "invalid_receipt"))
+			return true
+		for Rule in Policy["rules"]
+			if _ManagedNetwork_Equal(Rule["id"], Evidence) && _ManagedNetwork_Equal(Rule["cause"], Cause)
+				return true
+	} catch {
+		return false
+	}
+	return false
+}

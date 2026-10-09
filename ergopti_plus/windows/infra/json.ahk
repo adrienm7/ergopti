@@ -1,0 +1,467 @@
+﻿; infra/json.ahk
+
+; ==============================================================================
+; MODULE: Minimal JSON Codec
+; DESCRIPTION:
+; Pure-AHK v2 recursive-descent JSON parser. Returns Map for objects, Array for
+; arrays, plain numbers/strings/booleans for primitives, and the JSON_NULL
+; sentinel for null. JsonStringLiteral is the shared encoder for strings placed
+; in JSON documents or JavaScript source; schema-specific writers own containers.
+;
+; FEATURES & RATIONALE:
+; 1. Self-contained: AHK ships no JSON parser and we deliberately avoid
+;    ComObject('MSScriptControl.ScriptControl') because it is unavailable on
+;    64-bit AHK and deprecated on modern Windows. A 150-line hand-rolled
+;    parser keeps the driver dependency-free.
+; 2. Map for objects: AHK v2's Map preserves insertion order, which we rely
+;    on to keep models.json's curated provider / family ordering intact when
+;    rendering the tray menu.
+; 3. JSON_NULL sentinel: AHK Maps cannot store the language's "no value", so
+;    a global sentinel object stands in for JSON null. Callers must compare
+;    against ``JSON_NULL`` rather than checking for an unset value.
+; 4. Throws on syntax errors and NUL object keys, which native Maps cannot
+;    represent, rather than silently producing a corrupted half-tree.
+; ==============================================================================
+
+#Requires AutoHotkey v2.0
+
+#Include number.ahk
+
+
+
+
+; ==============================
+; ==============================
+; ======= 1/ Constants =========
+; ==============================
+; ==============================
+
+; Sentinel used in place of JSON ``null`` — Maps cannot hold AHK's nil value,
+; so callers compare against this object identity (``v == JSON_NULL``) to
+; detect a JSON null field.
+global JSON_NULL := Object()
+global JSON_MAX_NESTING_DEPTH := 128
+
+
+
+
+
+; =============================
+; =============================
+; ======= 2/ Public API =======
+; =============================
+; =============================
+
+/**
+ * Parses a JSON document into AHK structures.
+ * @param {string} text - The raw JSON text.
+ * @returns The root value (Map / Array / String / Number / Boolean / JSON_NULL).
+ */
+JsonParse(text) {
+	pos := 1
+	val := _JsonParseValue(&text, &pos, 0)
+	_JsonSkipWs(&text, &pos)
+	if (pos <= StrLen(text))
+		throw Error("JSON: unexpected trailing data at position " . pos . ".", -1)
+	return val
+}
+
+/**
+ * Returns original JSON member spans for an object selected by decoded key parts.
+ * Validates the complete document first and retains the parser's last-member-wins
+ * identity. Offsets are one-based UTF-16 positions for SubStr, not byte offsets.
+ * @param {string} text Complete JSON source.
+ * @param {Array} pathParts Decoded object keys, or omitted for the root object.
+ * @returns {Map} Decoded key -> value/member start, length and exact source text.
+ * @throws {Error} Invalid JSON, a missing key or a selected non-object value.
+ */
+JsonObjectMemberSpans(text, pathParts := unset) {
+	JsonParse(text)
+	parts := IsSet(pathParts) ? pathParts : []
+	if !(parts is Array)
+		throw TypeError("JSON member paths require an array of decoded string keys.")
+	position := 1
+	for part in parts {
+		if !(part is String)
+			throw TypeError("JSON member paths require decoded string keys.")
+		; Native Map keys stop at NUL; reject the complete decoded part before lookup.
+		loop StrLen(part)
+			if NumGet(StrPtr(part), (A_Index - 1) * 2, "UShort") = 0
+				throw ValueError("JSON member paths cannot contain NUL code units.")
+		members := _JsonObjectMemberSpansAt(&text, position)
+		if !members.Has(part)
+			throw ValueError("JSON object has no selected member.", -1, part)
+		position := members[part]["start"]
+	}
+	return _JsonObjectMemberSpansAt(&text, position)
+}
+
+; The public span owner validates the whole source before walking selected objects.
+; Reuse the codec's own token progress rather than a second JSON scanner.
+_JsonObjectMemberSpansAt(&text, position) {
+	_JsonSkipWs(&text, &position)
+	if (SubStr(text, position, 1) != "{")
+		throw TypeError("Selected JSON member is not an object.")
+	position++
+	members := Map()
+	_JsonSkipWs(&text, &position)
+	if (SubStr(text, position, 1) == "}")
+		return members
+	loop {
+		_JsonSkipWs(&text, &position)
+		memberStart := position
+		key := _JsonParseString(&text, &position, true)
+		_JsonSkipWs(&text, &position)
+		position++
+		_JsonSkipWs(&text, &position)
+		valueStart := position
+		_JsonParseValue(&text, &position, 1)
+		members[key] := Map("start", valueStart, "length", position - valueStart,
+			"text", SubStr(text, valueStart, position - valueStart),
+			"member_start", memberStart, "member_length", position - memberStart,
+			"member_text", SubStr(text, memberStart, position - memberStart))
+		_JsonSkipWs(&text, &position)
+		if (SubStr(text, position, 1) == "}")
+			return members
+		position++
+	}
+}
+
+/**
+ * Returns exact source spans for ordered elements of a complete JSON array.
+ * Validates the whole document with the canonical parser before reusing its
+ * token progress. Native numeric/Boolean aliases therefore retain provenance.
+ * Offsets are one-based UTF-16 positions for SubStr, not byte offsets.
+ * @param {string} text Complete JSON array source.
+ * @returns {Array} Element start, length and original validated source text.
+ * @throws {Error} Invalid JSON or a root that is not an array.
+ */
+JsonArrayElementSpans(text) {
+	parsed := JsonParse(text)
+	if !(parsed is Array)
+		throw TypeError("Selected JSON source is not an array.")
+	position := 1
+	_JsonSkipWs(&text, &position)
+	position++
+	spans := []
+	_JsonSkipWs(&text, &position)
+	if SubStr(text, position, 1) == "]"
+		return spans
+	loop {
+		_JsonSkipWs(&text, &position)
+		start := position
+		_JsonParseValue(&text, &position, 1)
+		spans.Push(Map("start", start, "length", position - start,
+			"text", SubStr(text, start, position - start)))
+		_JsonSkipWs(&text, &position)
+		if SubStr(text, position, 1) == "]"
+			return spans
+		position++
+	}
+}
+
+/**
+ * Encodes one value as a complete JSON string literal.
+ * @param value Value converted to String before encoding.
+ * @param {boolean} escapeHtml Also neutralise HTML parser delimiters when the
+ * literal is embedded in an inline script element.
+ * @returns {string} A quoted JSON/JavaScript string literal.
+ */
+JsonStringLiteral(value, escapeHtml := false) {
+	text := String(value)
+	; Most manifest keys need no escaping; scan natively before allocating per character.
+	if !RegExMatch(text, '[\x00-\x1f"\\\x{2028}\x{2029}]')
+			&& (!escapeHtml || !RegExMatch(text, '[&<>]'))
+		return '"' . text . '"'
+	out := '"'
+	; Loop Parse stops at NUL. Walk the stored UTF-16 length so escaping cannot
+	; silently discard that code unit and every character following it.
+	loop StrLen(text) {
+		code := NumGet(StrPtr(text), (A_Index - 1) * 2, "UShort")
+		switch code {
+			case 0x08: out .= "\b"
+			case 0x09: out .= "\t"
+			case 0x0A: out .= "\n"
+			case 0x0C: out .= "\f"
+			case 0x0D: out .= "\r"
+			case 0x22: out .= '\"'
+			case 0x5C: out .= "\\"
+			default:
+				if (code < 0x20 or code = 0x2028 or code = 0x2029
+						or (escapeHtml and (code = 0x26 or code = 0x3C or code = 0x3E)))
+					out .= Format("\u{:04x}", code)
+				else
+					out .= SubStr(text, A_Index, 1)
+		}
+	}
+	return out . '"'
+}
+
+/**
+ * Encodes the contents of a JSON string without the surrounding quotes.
+ * @param value Value converted to String before encoding.
+ * @param {boolean} escapeHtml Also neutralise HTML parser delimiters.
+ * @returns {string} Escaped JSON string contents.
+ */
+JsonStringContents(value, escapeHtml := false) {
+	literal := JsonStringLiteral(value, escapeHtml)
+	return SubStr(literal, 2, StrLen(literal) - 2)
+}
+
+/**
+ * Decodes JSON string contents whose surrounding quotes are owned by a caller.
+ * @param {string} contents Valid escaped contents from a JSON string token.
+ * @returns {string} The decoded string value.
+ */
+JsonStringDecodeContents(contents) {
+	return JsonParse('"' . String(contents) . '"')
+}
+
+
+
+
+
+; ==================================
+; ==================================
+; ======= 3/ Internal Parser =======
+; ==================================
+; ==================================
+
+_JsonSkipWs(&text, &pos) {
+	len := StrLen(text)
+	while (pos <= len) {
+		c := SubStr(text, pos, 1)
+		if (c == " " or c == "`t" or c == "`r" or c == "`n")
+			pos++
+		else
+			return
+	}
+}
+
+_JsonParseValue(&text, &pos, depth) {
+	global JSON_MAX_NESTING_DEPTH
+	if (depth > JSON_MAX_NESTING_DEPTH)
+		throw Error("JSON: maximum nesting depth exceeded at position " . pos . ".", -1)
+	_JsonSkipWs(&text, &pos)
+	if (pos > StrLen(text))
+		throw Error("JSON: unexpected end of input.", -1)
+	c := SubStr(text, pos, 1)
+	if (depth == JSON_MAX_NESTING_DEPTH and (c == "{" or c == "["))
+		throw Error("JSON: maximum nesting depth exceeded at position " . pos . ".", -1)
+	if (c == "{")
+		return _JsonParseObject(&text, &pos, depth)
+	if (c == "[")
+		return _JsonParseArray(&text, &pos, depth)
+	if (c == '"')
+		return _JsonParseString(&text, &pos)
+	if (c == "t" or c == "f")
+		return _JsonParseBool(&text, &pos)
+	if (c == "n")
+		return _JsonParseNull(&text, &pos)
+	return _JsonParseNumber(&text, &pos)
+}
+
+_JsonParseObject(&text, &pos, depth) {
+	pos++  ; consume {
+	obj := Map()
+	; Default case sensitivity is on — keep it so JSON keys keep their casing
+	; semantics (e.g. capitalised AHK Map keys would otherwise collide with
+	; lower-cased JSON keys at lookup time).
+	_JsonSkipWs(&text, &pos)
+	if (SubStr(text, pos, 1) == "}") {
+		pos++
+		return obj
+	}
+	loop {
+		_JsonSkipWs(&text, &pos)
+		if (SubStr(text, pos, 1) != '"')
+			throw Error("JSON: expected string key at position " . pos . ".", -1)
+		key := _JsonParseString(&text, &pos, true)
+		_JsonSkipWs(&text, &pos)
+		if (SubStr(text, pos, 1) != ":")
+			throw Error("JSON: expected ':' at position " . pos . ".", -1)
+		pos++  ; consume :
+		val := _JsonParseValue(&text, &pos, depth + 1)
+		obj[key] := val
+		_JsonSkipWs(&text, &pos)
+		c := SubStr(text, pos, 1)
+		if (c == ",") {
+			pos++
+			continue
+		}
+		if (c == "}") {
+			pos++
+			return obj
+		}
+		throw Error("JSON: expected ',' or '}' at position " . pos . ".", -1)
+	}
+}
+
+_JsonParseArray(&text, &pos, depth) {
+	pos++  ; consume [
+	arr := []
+	_JsonSkipWs(&text, &pos)
+	if (SubStr(text, pos, 1) == "]") {
+		pos++
+		return arr
+	}
+	loop {
+		val := _JsonParseValue(&text, &pos, depth + 1)
+		arr.Push(val)
+		_JsonSkipWs(&text, &pos)
+		c := SubStr(text, pos, 1)
+		if (c == ",") {
+			pos++
+			continue
+		}
+		if (c == "]") {
+			pos++
+			return arr
+		}
+		throw Error("JSON: expected ',' or ']' at position " . pos . ".", -1)
+	}
+}
+
+_JsonParseString(&text, &pos, ObjectKey := false) {
+	pos++  ; consume opening "
+	out := ""
+	len := StrLen(text)
+	while (pos <= len) {
+		c := SubStr(text, pos, 1)
+		if (Ord(c) < 0x20)
+			throw Error("JSON: unescaped control character at position " . pos . ".", -1)
+		if (c == '"') {
+			pos++
+			return out
+		}
+		if (c == '``') {  ; AHK escape — we won't see literal backtick in JSON
+			pos++
+			out .= c
+			continue
+		}
+		if (c == "\") {
+			pos++
+			esc := SubStr(text, pos, 1)
+			pos++
+			switch esc {
+				case '"': out .= '"'
+				case "\": out .= "\"
+				case "/": out .= "/"
+				case "b": out .= Chr(8)
+				case "f": out .= Chr(12)
+				case "n": out .= "`n"
+				case "r": out .= "`r"
+				case "t": out .= "`t"
+				case "u":
+					; Standard JSON \uXXXX escape — decode with surrogate-pair support.
+					hex := SubStr(text, pos, 4)
+					if !RegExMatch(hex, "^[0-9A-Fa-f]{4}$")
+						throw Error("JSON: invalid \u escape at position " . pos . ".", -1)
+					pos += 4
+					cp := Integer("0x" . hex)
+					; Native Map truncates keys at NUL, silently aliasing distinct
+					; JSON fields. Refuse that representation before assigning a value.
+					if ObjectKey && cp = 0
+						throw Error("JSON: NUL object key cannot be represented at position " . (pos - 4) . ".", -1)
+					; UTF-16 surrogate pair: high surrogate (D800-DBFF) must be followed
+					; by a low surrogate (DC00-DFFF) to form a non-BMP codepoint.
+					if (cp >= 0xD800 and cp <= 0xDBFF) {
+						if (SubStr(text, pos, 2) != "\u")
+							throw Error("JSON: high surrogate without low surrogate at position " . pos . ".", -1)
+						hex2 := SubStr(text, pos + 2, 4)
+						if !RegExMatch(hex2, "^[0-9A-Fa-f]{4}$")
+							throw Error("JSON: invalid low surrogate at position " . (pos + 2) . ".", -1)
+						low := Integer("0x" . hex2)
+						if (low < 0xDC00 or low > 0xDFFF)
+							throw Error("JSON: high surrogate without low surrogate at position " . pos . ".", -1)
+						pos += 6
+						cp := 0x10000 + (cp - 0xD800) * 0x400 + (low - 0xDC00)
+					} else if (cp >= 0xDC00 and cp <= 0xDFFF) {
+						throw Error("JSON: isolated low surrogate at position " . (pos - 4) . ".", -1)
+					}
+					out .= Chr(cp)
+				default:
+					throw Error("JSON: invalid escape sequence at position " . pos . ".", -1)
+			}
+		} else {
+			; Fast-path: copy the whole run of plain characters up to the next
+			; delimiter (" / \ / backtick) in one slice instead of appending one
+			; char at a time — the per-char ``out .= c`` is O(n^2) over the long
+			; unescaped spans that dominate locale strings (parsed once at boot
+			; for every i18n value). Behaviour is identical: the loop stops on the
+			; same delimiter the outer switch already handles
+			runStart := pos
+			pos++
+			while (pos <= len) {
+				cc := SubStr(text, pos, 1)
+				if (Ord(cc) < 0x20)
+					throw Error("JSON: unescaped control character at position " . pos . ".", -1)
+				if (cc == '"' or cc == "\" or cc == '``')
+					break
+				pos++
+			}
+			out .= SubStr(text, runStart, pos - runStart)
+		}
+	}
+	throw Error("JSON: unterminated string starting near position " . pos . ".", -1)
+}
+
+_JsonParseNumber(&text, &pos) {
+	start := pos
+	len := StrLen(text)
+	if (SubStr(text, pos, 1) == "-")
+		pos++
+	while (pos <= len) {
+		c := SubStr(text, pos, 1)
+		if (c == "")
+			break
+		; AHK v2's relational operators (>= / <=) coerce both sides to a
+		; number when one looks numeric — so ``c >= "0"`` throws on a
+		; non-numeric char like "," with "Expected a Number but got a
+		; String." Resolve via Ord() instead: code 48-57 is "0"-"9".
+		code := Ord(c)
+		if (code >= 48 and code <= 57)
+			pos++
+		else if (c == "." or c == "e" or c == "E" or c == "+" or c == "-")
+			pos++
+		else
+			break
+	}
+	s := SubStr(text, start, pos - start)
+	; Validate before coercion using the full JSON number grammar so malformed
+	; inputs like "1.2.3", "1e", "123-456" are caught here rather than
+	; propagating to AHK's + 0 coercion which surfaces a confusing internal error.
+	; JSON number: -?(0|[1-9][0-9]*)(\.[0-9]+)?([eE][+-]?[0-9]+)?
+	if (s == "" or !RegExMatch(s, "^-?(0|[1-9][0-9]*)(\.[0-9]+)?([eE][+-]?[0-9]+)?$"))
+		throw Error("JSON: invalid number at position " . start . ".", -1)
+	if !InStr(s, ".") and !InStr(s, "e") and !InStr(s, "E") {
+		if !NumberTryParseSignedInteger(s, &value)
+			throw Error("JSON: integer out of range at position " . start . ".", -1)
+		return value
+	}
+	; AHK publishes +/-infinity for an overflowing decimal float. Infinity is
+	; not a JSON number and later numeric validators otherwise accept +infinity.
+	if !NumberTryParseFiniteFloat(s, &value)
+		throw Error("JSON: number must be finite at position " . start . ".", -1)
+	return value
+}
+
+_JsonParseBool(&text, &pos) {
+	if (SubStr(text, pos, 4) == "true") {
+		pos += 4
+		return true
+	}
+	if (SubStr(text, pos, 5) == "false") {
+		pos += 5
+		return false
+	}
+	throw Error("JSON: expected boolean literal at position " . pos . ".", -1)
+}
+
+_JsonParseNull(&text, &pos) {
+	if (SubStr(text, pos, 4) == "null") {
+		pos += 4
+		return JSON_NULL
+	}
+	throw Error("JSON: expected 'null' literal at position " . pos . ".", -1)
+}

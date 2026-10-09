@@ -1,0 +1,17 @@
+# _shared/tests/corpus/config_migrations/op_set_if_absent/migrations.toml
+
+[registry]
+current_version = 2
+unstamped_version = 1
+
+[steps.v1_to_v2]
+from = 1
+to = 2
+drivers = ["ahk", "hs", "linux"]
+reason = "Corpus: freeze previous defaults."
+ops = [
+	{ op = "set_if_absent", section = "gestures", key = "enabled", value = true },
+	{ op = "set_if_absent", section = "metrics", key = "enabled", value = false },
+	{ op = "set_if_absent", section = "llm.display", key = "max_items", value = 3 },
+	{ op = "set_if_absent", section = "hotstrings", key = "excluded_apps", value = ["Terminal", "iTerm2"] },
+]

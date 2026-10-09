@@ -1,0 +1,166 @@
+{
+	"native_model": "Qwen3-Coder-30B-A3B-Instruct",
+	"raw_source": "https://ollama.com/library/qwen3-coder:30b",
+	"macos": {
+		"en": [
+			{
+				"label": "👉 Select this model",
+				"action": true,
+				"checked": false
+			},
+			{
+				"separator": true
+			},
+			{
+				"label": "Backend: Ollama 🦙",
+				"action": true
+			},
+			{
+				"label": "Source: https://ollama.com/library/qwen3-coder:30b",
+				"action": true
+			},
+			{
+				"separator": true
+			},
+			{
+				"label": "— SPECIFICATIONS —",
+				"action": false,
+				"disabled": true
+			},
+			{
+				"label": "Type: 💬 Chat",
+				"action": true
+			},
+			{
+				"label": "Update date: 03/12/2025",
+				"action": true
+			},
+			{
+				"label": "Parameters (Total): 30.53B",
+				"action": true
+			},
+			{
+				"label": "Parameters (Active): 3B",
+				"action": true
+			},
+			{
+				"separator": true
+			},
+			{
+				"label": "— CAPABILITIES —",
+				"action": false,
+				"disabled": true
+			},
+			{
+				"label": "Estimated speed: 80 tok/s",
+				"action": true
+			},
+			{
+				"label": "Tags: conversational, text, text-generation",
+				"action": true
+			},
+			{
+				"separator": true
+			},
+			{
+				"label": "— REQUIREMENTS (Ollama 🦙) —",
+				"action": false,
+				"disabled": true
+			},
+			{
+				"label": "Download: 19.0 GB",
+				"action": true
+			},
+			{
+				"label": "Memory (RAM): 22.8 GB",
+				"action": true
+			}
+		],
+		"fr": [
+			{
+				"label": "👉 Sélectionner ce modèle",
+				"action": true,
+				"checked": false
+			},
+			{
+				"separator": true
+			},
+			{
+				"label": "Backend : Ollama 🦙",
+				"action": true
+			},
+			{
+				"label": "Source : https://ollama.com/library/qwen3-coder:30b",
+				"action": true
+			},
+			{
+				"separator": true
+			},
+			{
+				"label": "— SPÉCIFICATIONS —",
+				"action": false,
+				"disabled": true
+			},
+			{
+				"label": "Type : 💬 Chat",
+				"action": true
+			},
+			{
+				"label": "Date de mise à jour : 03/12/2025",
+				"action": true
+			},
+			{
+				"label": "Paramètres (Total) : 30.53B",
+				"action": true
+			},
+			{
+				"label": "Paramètres (Actifs) : 3B",
+				"action": true
+			},
+			{
+				"separator": true
+			},
+			{
+				"label": "— CAPACITÉS —",
+				"action": false,
+				"disabled": true
+			},
+			{
+				"label": "Vitesse estimée : 80 tok/s",
+				"action": true
+			},
+			{
+				"label": "Tags : conversational, text, text-generation",
+				"action": true
+			},
+			{
+				"separator": true
+			},
+			{
+				"label": "— CONFIGURATION REQUISE (Ollama 🦙) —",
+				"action": false,
+				"disabled": true
+			},
+			{
+				"label": "Téléchargement : 19.0 Go",
+				"action": true
+			},
+			{
+				"label": "Mémoire (RAM) : 22.8 Go",
+				"action": true
+			}
+		]
+	},
+	"linux": [],
+	"float_spellings": {
+		"lua54": "19.0",
+		"luajit": "19"
+	},
+	"sections": [
+		"llm_model_action_rows",
+		"llm_model_identity_rows",
+		"llm_model_spec_rows",
+		"llm_model_capability_rows",
+		"llm_model_hardware_rows"
+	]
+}

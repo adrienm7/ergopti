@@ -1,0 +1,14 @@
+# _shared/tests/corpus/config_migrations/op_delete/input.toml
+
+[ahk.layout]
+ergopti_base = true
+
+[ahk.shortcuts.keys]
+a = "x"
+
+[gestures]
+enabled = false
+space_wrap = true
+
+[layout]
+only_key = 1

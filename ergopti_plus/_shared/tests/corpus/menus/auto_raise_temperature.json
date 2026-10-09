@@ -1,0 +1,10 @@
+{
+	"schema": 1,
+	"row": {
+		"id": "llm_auto_raise_temperature",
+		"i18n": "menu.llm.auto_raise_temp"
+	},
+	"alternate_i18n": "menu.llm.generation_menu_title",
+	"states": [false, true],
+	"prediction_counts": [1, 2]
+}

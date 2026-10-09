@@ -1,0 +1,52 @@
+{
+	"description": "Golden vectors for the app parameter of the open_app action: which values name an application, and how macOS turns one into the arguments of /usr/bin/open. Replayed by the macOS, Linux and Windows suites.",
+	"rule": "The value names the application the way the OS launches one: an application name, a path, a macOS bundle identifier, a Linux desktop-file id, or anything the Windows shell runs. It is valid when it is not empty, has no leading or trailing whitespace and holds no control character (U+0000 to U+001F, U+007F). Whether it names an installed application is checked when the action runs. macOS opens a value made of three or more dot-separated letters, digits and hyphens, not ending in .app, by bundle identifier (open -b), and every other value by name or path (open -a). Linux runs gtk-launch with the value; Windows runs the value.",
+	"vectors": [
+		{ "id": "application_name", "value": "Safari", "macos_open": ["-a", "Safari"] },
+		{
+			"id": "name_with_spaces",
+			"value": "Visual Studio Code",
+			"macos_open": ["-a", "Visual Studio Code"]
+		},
+		{
+			"id": "bundle_identifier",
+			"value": "com.apple.Safari",
+			"macos_open": ["-b", "com.apple.Safari"]
+		},
+		{
+			"id": "hyphenated_bundle_identifier",
+			"value": "com.microsoft.VSCode-insiders",
+			"macos_open": ["-b", "com.microsoft.VSCode-insiders"]
+		},
+		{
+			"id": "application_bundle_path",
+			"value": "/Applications/Visual Studio Code.app",
+			"macos_open": ["-a", "/Applications/Visual Studio Code.app"]
+		},
+		{ "id": "bundle_file_name", "value": "Notes.app", "macos_open": ["-a", "Notes.app"] },
+		{ "id": "two_part_name", "value": "Pages.2024", "macos_open": ["-a", "Pages.2024"] },
+		{
+			"id": "desktop_file_id",
+			"value": "org.gnome.Nautilus.desktop",
+			"macos_open": ["-b", "org.gnome.Nautilus.desktop"]
+		},
+		{ "id": "windows_program_path", "value": "C:\\Program Files\\Mozilla Firefox\\firefox.exe" },
+		{
+			"id": "windows_start_menu_shortcut",
+			"value": "C:\\ProgramData\\Microsoft\\Windows\\Start Menu\\Programs\\Excel.lnk"
+		},
+		{
+			"id": "windows_packaged_app",
+			"value": "shell:AppsFolder\\Microsoft.WindowsCalculator_8wekyb3d8bbwe!App"
+		},
+		{ "id": "unicode_name", "value": "Éditeur 🎉", "macos_open": ["-a", "Éditeur 🎉"] },
+		{ "id": "empty", "value": "", "valid": false },
+		{ "id": "blank", "value": "   ", "valid": false },
+		{ "id": "leading_space", "value": " Safari", "valid": false },
+		{ "id": "trailing_space", "value": "Safari ", "valid": false },
+		{ "id": "line_break", "value": "Safari\nTerminal", "valid": false },
+		{ "id": "tab", "value": "Safari\tTerminal", "valid": false },
+		{ "id": "delete_character", "value": "Safari\u007f", "valid": false },
+		{ "id": "escape_character", "value": "\u001b[0m", "valid": false }
+	]
+}

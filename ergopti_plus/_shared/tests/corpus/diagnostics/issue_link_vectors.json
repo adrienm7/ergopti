@@ -1,0 +1,177 @@
+{
+	"description": "Golden vectors for the GitHub issue-link builder: RFC 3986 percent-encoding of UTF-8 (only A-Z a-z 0-9 - . _ ~ stay literal, space is %20) and the byte-bounded prefilled URL. Parameters follow the template, then the title (with its prefix), then the declared fields in order; empty values are omitted. When the URL is longer than max_url_bytes, the last parameter is cut first, at a whole code point, and ends with the truncation marker; a parameter that cannot keep one code point plus the marker is dropped; the title is cut only after every field; the template is never cut, and a URL that still does not fit is an error. Fixture templates and repository, independent of the real ones. Replayed by tools/test/test-issue-link-vectors.cjs, the macOS and Linux Lua suites and the AHK suite.",
+	"templates": {
+		"issue_new_url": "https://github.com/{owner}/{repo}/issues/new",
+		"truncation_marker": " […]",
+		"templates": {
+			"bug": {
+				"file": "bug_report.yml",
+				"title_prefix": "[Bug] ",
+				"fields": ["version", "os", "driver", "diagnostics"]
+			},
+			"feature": {
+				"file": "feature_request.yml",
+				"title_prefix": "[Feature] ",
+				"fields": ["version", "os", "driver"]
+			}
+		}
+	},
+	"repository": {
+		"owner": "octo",
+		"repo": "demo"
+	},
+	"encode_vectors": [
+		{
+			"id": "unreserved_untouched",
+			"input": "abc-._~XYZ019",
+			"expected": "abc-._~XYZ019"
+		},
+		{
+			"id": "space",
+			"input": "a b",
+			"expected": "a%20b"
+		},
+		{
+			"id": "two_byte",
+			"input": "é",
+			"expected": "%C3%A9"
+		},
+		{
+			"id": "three_byte",
+			"input": "€",
+			"expected": "%E2%82%AC"
+		},
+		{
+			"id": "four_byte",
+			"input": "😀",
+			"expected": "%F0%9F%98%80"
+		},
+		{
+			"id": "reserved",
+			"input": "a&b=c?d#e/f+g%h",
+			"expected": "a%26b%3Dc%3Fd%23e%2Ff%2Bg%25h"
+		},
+		{
+			"id": "newline_and_tab",
+			"input": "line1\nline2\tend\r",
+			"expected": "line1%0Aline2%09end%0D"
+		},
+		{
+			"id": "sub_delims_js_leaves_alone",
+			"input": "!'()*",
+			"expected": "%21%27%28%29%2A"
+		}
+	],
+	"url_vectors": [
+		{
+			"id": "bug_all_fields_fit",
+			"template": "bug",
+			"max_url_bytes": 7000,
+			"values": {
+				"title": "Crash on boot",
+				"version": "2.1.0",
+				"os": "macOS 15.1",
+				"driver": "macos",
+				"diagnostics": "ok"
+			},
+			"expected": "https://github.com/octo/demo/issues/new?template=bug_report.yml&title=%5BBug%5D%20Crash%20on%20boot&version=2.1.0&os=macOS%2015.1&driver=macos&diagnostics=ok"
+		},
+		{
+			"id": "empty_values_are_omitted",
+			"template": "bug",
+			"max_url_bytes": 7000,
+			"values": {
+				"title": "",
+				"version": "2.1.0",
+				"os": ""
+			},
+			"expected": "https://github.com/octo/demo/issues/new?template=bug_report.yml&version=2.1.0"
+		},
+		{
+			"id": "feature_ignores_undeclared_fields",
+			"template": "feature",
+			"max_url_bytes": 7000,
+			"values": {
+				"version": "2.1.0",
+				"os": "Windows 11 Home",
+				"driver": "windows",
+				"diagnostics": "never sent"
+			},
+			"expected": "https://github.com/octo/demo/issues/new?template=feature_request.yml&version=2.1.0&os=Windows%2011%20Home&driver=windows"
+		},
+		{
+			"id": "last_field_truncated_first",
+			"template": "bug",
+			"max_url_bytes": 150,
+			"values": {
+				"version": "2.1.0",
+				"os": "Linux",
+				"driver": "linux",
+				"diagnostics": "abcdefghijklmnopqrstuvwxyz abcdefghijklmnopqrstuvwxyz abcdefghijklmnopqrstuvwxyz"
+			},
+			"expected": "https://github.com/octo/demo/issues/new?template=bug_report.yml&version=2.1.0&os=Linux&driver=linux&diagnostics=abcdefghijklmnopqrst%20%5B%E2%80%A6%5D"
+		},
+		{
+			"id": "truncation_keeps_whole_code_points",
+			"template": "bug",
+			"max_url_bytes": 130,
+			"values": {
+				"version": "2.1.0",
+				"diagnostics": "ééééééééééééééééééééééééééééé"
+			},
+			"expected": "https://github.com/octo/demo/issues/new?template=bug_report.yml&version=2.1.0&diagnostics=%C3%A9%C3%A9%C3%A9%20%5B%E2%80%A6%5D"
+		},
+		{
+			"id": "truncation_keeps_whole_emoji",
+			"template": "bug",
+			"max_url_bytes": 131,
+			"values": {
+				"version": "2.1.0",
+				"diagnostics": "😀😀😀😀😀😀😀😀😀😀"
+			},
+			"expected": "https://github.com/octo/demo/issues/new?template=bug_report.yml&version=2.1.0&diagnostics=%F0%9F%98%80%20%5B%E2%80%A6%5D"
+		},
+		{
+			"id": "field_dropped_when_nothing_fits",
+			"template": "bug",
+			"max_url_bytes": 100,
+			"values": {
+				"version": "2.1.0",
+				"os": "Linux",
+				"diagnostics": "a very long diagnostics summary that cannot fit at all"
+			},
+			"expected": "https://github.com/octo/demo/issues/new?template=bug_report.yml&version=2.1.0&os=Linux"
+		},
+		{
+			"id": "earlier_field_truncated_after_later_dropped",
+			"template": "bug",
+			"max_url_bytes": 150,
+			"values": {
+				"title": "Short",
+				"version": "2.1.0",
+				"os": "an operating system description that is long",
+				"diagnostics": "zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz"
+			},
+			"expected": "https://github.com/octo/demo/issues/new?template=bug_report.yml&title=%5BBug%5D%20Short&version=2.1.0&os=an%20operating%20system%20d%20%5B%E2%80%A6%5D"
+		},
+		{
+			"id": "title_truncated_last",
+			"template": "feature",
+			"max_url_bytes": 110,
+			"values": {
+				"title": "A feature title that is far too long for the budget",
+				"version": "2.1.0"
+			},
+			"expected": "https://github.com/octo/demo/issues/new?template=feature_request.yml&title=%5BFeature%5D%20A%20%5B%E2%80%A6%5D"
+		},
+		{
+			"id": "base_alone_too_long_is_an_error",
+			"template": "bug",
+			"max_url_bytes": 40,
+			"values": {
+				"version": "2.1.0"
+			},
+			"expect_error": true
+		}
+	]
+}

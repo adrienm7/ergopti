@@ -1,0 +1,517 @@
+--- modules/hotstrings/loader.lua
+
+--- ==============================================================================
+--- MODULE: Hotstring TOML Loader (Linux)
+--- DESCRIPTION:
+--- Loads hotstring definitions from TOML files that follow the schema defined
+--- in static/ergopti_plus/_shared/modules/hotstrings/schema.md. Delegates all
+--- TOML parsing to the shared toml_codec.reader module so the two
+--- implementations cannot diverge.
+---
+--- FEATURES & RATIONALE:
+--- 1. Single parser: parsing is handled by toml_codec.reader (shared across all
+---    Lua drivers), which soft-resolves lib.logger so it loads on this runtime.
+--- 2. The category is the FILE STEM, not the parent directory. This is the fix
+---    for a defect that made the whole category menu wrong: the five shared packs
+---    live flat in _shared/modules/hotstrings/ and install.sh copies them flat
+---    into ~/.config/ergopti/hotstrings/, so deriving the group from the
+---    directory collapsed magickey, autocorrection, rolls, sfbsreduction and
+---    distancesreduction into ONE group literally named "hotstrings". Nothing
+---    could match the manifest's category ids, so the menu rendered three
+---    "no group loaded" stubs and the single real group fell into the personal
+---    bucket by exclusion.
+--- 3. Metadata comes back with the mappings. [_meta] carries the localised
+---    description in 21 locales, the section order, the delay and the tooltip
+---    colour, and every one of them was being thrown away — so the menu could
+---    only ever show a raw file stem, unordered and untranslated.
+--- 4. Underscore-prefixed files are skipped. _index.toml is the menu manifest
+---    for this directory, not a category, and loading it as one produced a group
+---    called "_index" with no entries.
+--- 5. Graceful errors: a malformed file logs a warning and is skipped; valid
+---    entries from other files are still returned.
+--- ==============================================================================
+
+local M = {}
+
+
+-- =========================================
+-- =========================================
+-- ======= 1/ Dependencies =================
+-- =========================================
+-- =========================================
+
+local Logger = require("logger.shim")
+local Reader = require("toml_codec.reader")
+local Priority = require("hotstring_priority")
+local Paths  = require("infra.paths")
+local Shell  = require("adapters.shell_runner")
+local CatalogueFiles = require("hotstrings.catalogue_files")
+local PersonalFiles = require("hotstrings.personal_files")
+
+local LOG = "modules.hotstrings.loader"
+
+-- Last fully committed parse per source identity. A file watcher can observe a
+-- writer between truncate and close, and the shared reader deliberately returns
+-- committed=false for that state. Keep serving the last complete source instead
+-- of turning a transient write into a silently deleted hotstring category.
+local _source_snapshots = {}
+
+--- Canonical collision tiers, read once from the shared JSON. Kept as a lazily
+--- resolved local rather than a require-time read so a driver that never loads a
+--- hotstring never touches the filesystem for it.
+local _tiers = nil
+
+--- Loads _shared/modules/hotstrings/priority.json, falling back to the module's
+--- own defaults. A missing file is logged, never silently absorbed: the tiers
+--- decide which of two colliding hotstrings the user actually gets.
+--- @return table The tier table.
+local function tiers()
+	if _tiers then return _tiers end
+	_tiers = Priority.DEFAULT_TIERS
+	local ok, result = pcall(function()
+		local path = Paths.shared("modules/hotstrings/priority.json")
+		local fh   = io.open(path, "r")
+		if not fh then return nil end
+		local raw = fh:read("*a")
+		fh:close()
+		return require("json").decode(raw)
+	end)
+	if not ok or type(result) ~= "table" then
+		Logger.warn(LOG, "priority.json unreadable — keeping the default tiers (%s).", tostring(result))
+		return _tiers
+	end
+	local merged = {}
+	for key, fallback in pairs(Priority.DEFAULT_TIERS) do
+		merged[key] = type(result[key]) == "number" and result[key] or fallback
+	end
+	_tiers = merged
+	Logger.debug(LOG, "Priority tiers: common=%d, package=%d, personal=%d.",
+		merged.common, merged.package, merged.personal)
+	return _tiers
+end
+
+
+--- The category a TOML file belongs to: its file STEM.
+---
+--- Not the parent directory. The five shared packs live flat beside each other
+--- and are installed flat, so the directory is the same for all of them and the
+--- category the user sees would be the folder's name.
+--- @param path string Absolute path to a .toml file.
+--- @return string
+local function category_of(path)
+	local stem = path:match("([^/\\]+)%.toml$")
+	return stem or "unknown"
+end
+
+--- Counts the entries of a non-array table.
+--- @param t table
+--- @return integer
+local function count_categories(t)
+	local n = 0
+	for _ in pairs(t) do n = n + 1 end
+	return n
+end
+
+--- A set of section names from an optional source list.
+--- @param names table|nil Array of section names.
+--- @return table|nil Set, or nil when the source names none.
+local function section_set(names)
+	if names == nil then return nil end
+	local set = {}
+	for _, name in ipairs(names) do set[name] = true end
+	return set
+end
+
+--- Returns the stable identity of one logical catalogue source.
+--- @param path any Source path.
+--- @param forced_group any Optional namespaced category id.
+--- @return string
+local function source_identity(path, forced_group)
+	return tostring(path) .. "\0" .. tostring(forced_group or "")
+end
+
+--- Replaces the shipped magic-key suffix with the configured one.
+---
+--- The canonical TOMLs carry the shipped glyph because they are shared source
+--- data. Once parsed, every trigger ending in that glyph is owned by the magic
+--- key contract and must listen to the user's configured character instead.
+--- @param trigger string Parsed trigger.
+--- @param options table|nil { magic_key, canonical_magic_key }
+--- @return string
+local function configured_magic_trigger(trigger, options)
+	if type(trigger) ~= "string" or type(options) ~= "table" then return trigger end
+	local effective = options.magic_key
+	local canonical = options.canonical_magic_key
+	if type(effective) ~= "string" or effective == ""
+		or type(canonical) ~= "string" or canonical == ""
+		or effective == canonical or #trigger < #canonical
+	then
+		return trigger
+	end
+	if trigger:sub(-#canonical) ~= canonical then return trigger end
+	return trigger:sub(1, #trigger - #canonical) .. effective
+end
+
+
+
+
+-- =========================================
+-- =========================================
+-- ======= 2/ Public API ===================
+-- =========================================
+-- =========================================
+
+--- Loads hotstring definitions from a list of TOML file paths.
+--- Returns a flat array of mapping tables suitable for engine:load_mappings().
+--- @param paths table Array of absolute TOML file paths.
+--- @param options table|nil Magic-key substitution options.
+--- @return table  Flat array of mapping tables.
+function M.load(paths, options)
+	local catalogue = M.load_catalogue(paths, options)
+	if catalogue.committed ~= true then return {} end
+	return catalogue.mappings
+end
+
+--- Loads hotstring definitions AND the metadata the menu needs to describe them.
+---
+--- One pass, because the two answers come from the same parse: splitting them
+--- would mean reading a 300 KB magickey.toml twice to learn its name.
+--- @param paths table Array of absolute TOML file paths.
+--- @param options table|nil Magic-key substitution options.
+--- @return table { mappings = array, categories = { [stem] = category } }
+--- where a category is
+---   { id, path, description = {locale → text}, delay, show_tooltip, color,
+---     sections_order = array, sections = { [name] = { count } }, count }
+function M.load_catalogue(paths, options, prepared_sources)
+	Logger.start(LOG, "Loading hotstrings from %d file(s)…", type(paths) == "table" and #paths or 0)
+	if type(paths) ~= "table" then
+		Logger.error(LOG, "load_catalogue(): expected table of paths, got %s.", type(paths))
+		return { mappings = {}, categories = {}, errors = 1, committed = false }
+	end
+
+	local mappings = {}
+	local categories = {}
+	local errors = 0
+	local aggregate_committed = true
+
+	for _, source in ipairs(paths) do
+		-- A source is a path, or a table carrying a path and the category key it
+		-- must occupy. Extension packs need the second form: two extensions may
+		-- each ship `rolls.toml`, and keying those by stem would silently make one
+		-- replace the other — and replace the bundled category of that name too.
+		local path = type(source) == "table" and source.path or source
+		local forced_group = type(source) == "table" and source.category or nil
+		local extension = type(source) == "table" and source.extension or nil
+		local personal_source = type(source) == "table" and source.personal_source or nil
+		if personal_source ~= nil then
+			assert(PersonalFiles.is_descriptor(personal_source), "invalid personal source descriptor")
+			personal_source = PersonalFiles.copy(personal_source)
+		end
+		-- A layout extension may supply some sections of a bundled category: its
+		-- file loads only those (only_sections) and the bundled file loads the
+		-- rest (skip_sections). The category record, and so its metadata, comes
+		-- from whichever source the catalogue lists first.
+		local only_sections = section_set(type(source) == "table" and source.only_sections or nil)
+		local skip_sections = section_set(type(source) == "table" and source.skip_sections or nil)
+		local identity = source_identity(path, forced_group)
+		local prepared = prepared_sources and prepared_sources[path]
+		local ok, data, committed
+		if prepared ~= nil then
+			ok, data, committed = pcall(Reader.parse_text, prepared)
+		else
+			ok, data, committed = pcall(Reader.parse, path)
+		end
+		if not ok or committed ~= true or type(data) ~= "table" then
+			errors = errors + 1
+			data = _source_snapshots[identity]
+			if data then
+				Logger.warn(LOG, "Source '%s' did not commit — retaining its last healthy snapshot.",
+					tostring(path))
+			else
+				aggregate_committed = false
+				Logger.error(LOG, "Source '%s' did not commit and has no healthy snapshot.", tostring(path))
+			end
+		elseif prepared == nil then
+			_source_snapshots[identity] = data
+		end
+		if data then
+			local group = forced_group or category_of(path)
+			local meta = type(data.meta) == "table" and data.meta or {}
+
+			-- File-level priority override, the third rung of the cascade.
+			local file_priority = type(meta.priority) == "number" and meta.priority or nil
+			local section_priorities = type(meta.section_priorities) == "table"
+				and meta.section_priorities or {}
+
+			local category = categories[group] or {
+				id             = group,
+				path           = path,
+				personal_source = personal_source and PersonalFiles.copy(personal_source) or nil,
+				description    = type(meta.description) == "table" and meta.description or {},
+				delay          = tonumber(meta.delay),
+				show_tooltip   = meta.show_tooltip,
+				color          = meta.color,
+				-- The file-level priority, kept rather than only folded into each
+				-- entry: the settings window shows it as the category's default, and
+				-- reading it back from an entry would report whatever the last one
+				-- resolved to.
+				priority       = file_priority,
+				-- Set only for a pack that came from an extension. The menu groups
+				-- those under their own heading and labels them with the extension's
+				-- name, which a bare file stem like "demo-phrases" cannot convey.
+				extension      = extension,
+				sections_order = {},
+				sections       = {},
+				count          = 0,
+			}
+			categories[group] = category
+
+			-- The declared order, minus the "-" separators the menu renders itself.
+			-- A bound source adds only the sections it supplies that the order
+			-- does not already place.
+			local ordered = {}
+			for _, name in ipairs(category.sections_order) do ordered[name] = true end
+			for _, name in ipairs(meta.sections_order or data.sections_order or {}) do
+				if name ~= "-" and not ordered[name] and (not only_sections or only_sections[name]) then
+					category.sections_order[#category.sections_order + 1] = name
+					ordered[name] = true
+				end
+			end
+
+			local registrations = {}
+			for _, sec_name in ipairs(data.sections_order or {}) do
+				local section = data.sections[sec_name]
+				local selected = (not only_sections or only_sections[sec_name])
+					and not (skip_sections and skip_sections[sec_name])
+				if selected and section and type(section.entries) == "table" then
+					local entry_count = 0
+					registrations[sec_name] = {}
+					for index, entry in ipairs(section.entries) do
+						if type(entry.trigger) == "string" and type(entry.output) == "string" then
+							entry_count = entry_count + 1
+							registrations[sec_name][index] = {
+								trigger           = configured_magic_trigger(entry.trigger, options),
+								replacement       = entry.output,
+								is_word           = entry.is_word           or false,
+								is_case_sensitive = entry.is_case_sensitive or false,
+								-- The three flags the loader used to drop on the floor. Without
+								-- them every entry behaved as auto_expand + non-final +
+								-- case-folding, so "ya" fired inside "yaourt", nothing could
+								-- chain, and the 1 300 strict-case magickey entries matched
+								-- any casing — autocorrecting the very input they exist to
+								-- leave alone.
+								auto_expand       = entry.auto_expand       or false,
+								final_result      = entry.final_result      or false,
+								is_case_sensitive_strict = entry.is_case_sensitive_strict or false,
+								-- Marks a payload that must never be persisted or logged in
+								-- clear. No bundled pack sets it — the prefix expansions built
+								-- from personal_info.toml do, and those are assembled in code
+								-- rather than read from a file. It is read here all the same so
+								-- a user's own pack can declare it, and so the flag has exactly
+								-- one meaning whichever source produced the mapping.
+								is_private        = entry.is_private        or false,
+								-- Resolved here rather than in the engine because only the
+								-- loader knows which file and section an entry came from,
+								-- which is what the lower rungs of the cascade are. An
+								-- unresolved priority defaults to 0 in the engine, and 0
+								-- would let a deliberately low individual priority beat an
+								-- undeclared personal hotstring.
+								priority          = Priority.resolve(
+									entry.priority, section_priorities[sec_name], file_priority, group, tiers()),
+								-- Keep the highest cascade rung so the config manager can
+								-- re-resolve this mapping after a user priority edit.
+								_catalogue_priority = true,
+								_declared_priority  = type(entry.priority) == "number" and entry.priority or nil,
+								group             = group,
+								personal_source   = personal_source and PersonalFiles.copy(personal_source) or nil,
+								section           = sec_name,
+							}
+						end
+					end
+					-- The section's own TOML metadata, not just how many entries it
+					-- holds. `[_meta.section_delays]` is parsed by the shared reader
+					-- and was dropped here, so rung 3 of the five-rung cascade — the
+					-- section's declared delay — resolved to nil on this driver and a
+					-- pack shipping per-section timings had them silently ignored.
+					local section_meta = (meta.sections or {})[sec_name] or {}
+					category.sections[sec_name] = {
+						count    = entry_count,
+						description = section.description,
+						delay    = tonumber(section_meta.delay) or tonumber((meta.section_delays or {})[sec_name]),
+						color = section_meta.color,
+						show_tooltip = section_meta.show_tooltip,
+						priority = section_meta.priority or section_priorities[sec_name],
+						-- The extension a bound section comes from (Ergopti's repeat
+						-- corrections): the menu lists it under that extension.
+						extension = only_sections and extension or nil,
+					}
+					category.count = category.count + entry_count
+				end
+			end
+			for _, record in ipairs(Reader.registration_order(data, group)) do
+				local section = registrations[record.section]
+				local mapping = section and section[record.index]
+				if mapping then mappings[#mappings + 1] = mapping end
+			end
+		end
+	end
+
+	Logger.success(LOG, "Loaded %d mapping(s) across %d categor(ies).",
+		#mappings, count_categories(categories))
+	return {
+		mappings = mappings,
+		categories = categories,
+		errors = errors,
+		committed = aggregate_committed,
+	}
+end
+
+--- Whether a discovered .toml file is a hotstring pack.
+---
+--- Underscore-prefixed files in that directory are not categories: _index.toml
+--- is the menu index for the directory and defaults.toml holds the resolver's
+--- fallback values. Loading either as a pack produced an empty group sitting in
+--- the menu beside the real ones. The rule itself is shared with macOS
+--- (_shared/lua/hotstrings/catalogue_files.lua), whose own copy lacked the
+--- defaults.toml half.
+---
+--- A pure predicate rather than an inline condition inside the scan, because the
+--- scan shells out to `find` and cannot run on the interpreter this repo is
+--- developed on — the rule would otherwise be unassertable outside CI.
+--- @param path string A file path.
+--- @return boolean
+function M.is_pack_file(path)
+	return CatalogueFiles.is_category_file(path)
+end
+
+--- Scans a directory tree and returns every hotstring pack in it.
+--- Useful for pointing the loader at ~/.config/ergopti/hotstrings/.
+--- @param dir string Absolute path to the root directory to scan.
+--- @return table  Array of absolute .toml file paths.
+function M.find_toml_files(dir, max_directory_depth)
+	if type(dir) ~= "string" or dir == "" then return {} end
+	Logger.trace(LOG, "Scanning '%s' for hotstring packs…", dir)
+
+	-- Through the shell adapter rather than a hand-quoted io.popen: this is a
+	-- path that can come from a config file, and quoting re-derived at a call
+	-- site is quoting that is eventually wrong.
+	local result = {}
+	local limit = max_directory_depth and (" -maxdepth " .. tostring(max_directory_depth)) or ""
+	local out = Shell.exec(string.format(
+		"find %s%s -type f -name '*.toml' 2>/dev/null", Shell.quote(dir), limit))
+	for line in out:gmatch("[^\r\n]+") do
+		local path = line:match("^%s*(.-)%s*$")
+		if M.is_pack_file(path) then result[#result + 1] = path end
+	end
+
+	Logger.done(LOG, "Found %d pack(s) under '%s'.", #result, dir)
+	return result
+end
+
+--- Projects no-follow links and depth-boundary directories as diagnostics only.
+--- This never loads files below a skipped entry or creates a publication owner.
+--- @param dir string Actual configured additional-personal directory.
+--- @param max_directory_depth number Existing native discovery boundary.
+--- @return table directories Blocked relative labels and exact paths.
+function M.unavailable_directories(dir, max_directory_depth)
+	if type(dir) ~= "string" or dir == "" or type(max_directory_depth) ~= "number" then return {} end
+	local available, native = pcall(require, "lfs")
+	local stat = available and native.symlinkattributes or nil
+	if type(stat) ~= "function" then
+		available, native = pcall(require, "luv")
+		stat = available and native.fs_lstat or nil
+	end
+	if type(stat) ~= "function" then return {} end
+	local observed, root_attributes = pcall(stat, dir)
+	local root_mode = observed and type(root_attributes) == "table" and (root_attributes.mode or root_attributes.type)
+	if root_mode == "link" then
+		return { { path = dir, label = dir:gsub("/+$", ""):match("([^/]+)$"), reason = "linked-directory" } }
+	end
+	local prefix = dir:gsub("/+$", "") .. "/"
+	local rows = {}
+	local out = Shell.exec(string.format("find %s -maxdepth %d \\( -type l -o -type d \\) -print 2>/dev/null",
+		Shell.quote(dir), max_directory_depth))
+	for path in out:gmatch("[^\r\n]+") do
+		if path:sub(1, #prefix) == prefix then
+			local relative = path:sub(#prefix + 1)
+			local depth = 0; for _ in relative:gmatch("[^/]+") do depth = depth + 1 end
+			local called, attributes = pcall(stat, path)
+			local mode = called and type(attributes) == "table" and (attributes.mode or attributes.type)
+			if (mode == "link" and not relative:match("%.toml$")) or mode == "directory" and depth == max_directory_depth then
+				rows[#rows + 1] = { path = path, label = relative,
+					reason = mode == "link" and "linked-directory" or "scan-depth" }
+			end
+		end
+	end
+	table.sort(rows, function(left, right) return left.label < right.label end)
+	return rows
+end
+
+--- Lists the immediate subdirectories of a directory.
+---
+--- Extensions are one directory each, so discovery is a listing at depth 1 —
+--- `-maxdepth 1 -mindepth 1` rather than a recursive walk, which would descend
+--- into every `hotstrings/` and `shortcuts/` folder and report those as
+--- extensions too.
+--- @param dir string Absolute path.
+--- @return table Array of absolute directory paths.
+function M.list_subdirs(dir)
+	if type(dir) ~= "string" or dir == "" then return {} end
+	local result = {}
+	local out = Shell.exec(string.format(
+		"find %s -mindepth 1 -maxdepth 1 -type d 2>/dev/null", Shell.quote(dir)))
+	for line in out:gmatch("[^\r\n]+") do
+		local path = line:match("^%s*(.-)%s*$")
+		if path ~= "" then result[#result + 1] = path end
+	end
+	return result
+end
+
+--- Proves two routes still name the same regular native source file.
+--- Logical shipped categories can use a relative path or physical alias; a
+--- same-named user copy has a different identity and grants no shipped binding.
+--- Missing or unstable native identity support refuses this distinction.
+--- @param left string Requested source path.
+--- @param right string Canonical shipped source path.
+--- @return boolean same Stable native device/inode identity agrees.
+function M.same_file(left, right)
+	if type(left) ~= "string" or left == "" or left:find("\0", 1, true)
+		or type(right) ~= "string" or right == "" or right:find("\0", 1, true) then return false end
+	local available, native = pcall(require, "lfs")
+	local stat = available and type(native) == "table" and native.attributes or nil
+	if type(stat) ~= "function" then
+		available, native = pcall(require, "luv")
+		stat = available and type(native) == "table" and native.fs_stat or nil
+	end
+	if type(stat) ~= "function" then return false end
+	local function identity(path)
+		local ok, attrs = pcall(stat, path)
+		if not ok or type(attrs) ~= "table" or (attrs.mode ~= "file" and attrs.type ~= "file") then return nil end
+		local device, inode = attrs.dev, attrs.ino
+		if type(device) ~= "number" or type(inode) ~= "number"
+			or device ~= device or inode ~= inode or device < 0 or inode <= 0
+			or device == math.huge or inode == math.huge
+			or device % 1 ~= 0 or inode % 1 ~= 0 then return nil end
+		return tostring(device) .. ":" .. tostring(inode)
+	end
+	local first, second = identity(left), identity(right)
+	return first ~= nil and first == second and identity(left) == first and identity(right) == second
+end
+
+--- Reads a whole file, or nil when it is absent.
+---
+--- The extension scanner needs manifests, and an absent manifest is the ordinary
+--- case rather than an error — an extension without one is named after its
+--- folder.
+--- @param path string Absolute path.
+--- @return string|nil
+function M.read_file(path)
+	if type(path) ~= "string" or path == "" then return nil end
+	local fh = io.open(path, "r")
+	if not fh then return nil end
+	local text = fh:read("*a")
+	fh:close()
+	return text
+end
+
+return M

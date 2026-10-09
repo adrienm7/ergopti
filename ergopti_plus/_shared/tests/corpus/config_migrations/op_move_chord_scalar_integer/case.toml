@@ -1,0 +1,7 @@
+[case]
+description = "Numeric zero is not a Boolean disable choice."
+drivers = ["ahk", "hs", "linux"]
+outcome = "migrated"
+from_version = 1
+to_version = 2
+preserve_source = true

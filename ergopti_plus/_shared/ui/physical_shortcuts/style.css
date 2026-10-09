@@ -1,0 +1,42 @@
+/* _shared/ui/physical_shortcuts/style.css */
+:root {
+	color-scheme: light dark;
+	font-family: system-ui, sans-serif;
+}
+body {
+	margin: 24px;
+	max-width: 900px;
+}
+button,
+select {
+	margin: 4px;
+	padding: 8px 12px;
+}
+.entry {
+	align-items: center;
+	display: flex;
+	gap: 8px;
+	margin: 12px 0;
+}
+.entry span {
+	flex: 1;
+	overflow-wrap: anywhere;
+}
+fieldset {
+	margin: 12px 0;
+}
+fieldset label {
+	display: inline-flex;
+	gap: 4px;
+	margin-right: 12px;
+}
+#capture-reason,
+#manual-hint {
+	opacity: 0.8;
+}
+#status {
+	min-height: 1.5em;
+}
+[hidden] {
+	display: none !important;
+}

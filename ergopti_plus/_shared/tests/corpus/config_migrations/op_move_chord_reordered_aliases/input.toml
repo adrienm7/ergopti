@@ -1,0 +1,4 @@
+# Independent handoff input.
+[hotstrings.editor]
+shortcut = { mods = ["shift", "CTRL"], key = "return" }
+keep = "neighbor" # unchanged

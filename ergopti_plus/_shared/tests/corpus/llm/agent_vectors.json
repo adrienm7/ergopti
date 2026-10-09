@@ -1,0 +1,762 @@
+{
+	"_comment": "Pins _shared/lua/llm/agent.lua and windows/modules/llm/agent.ahk against _shared/modules/llm/agent.json. Generated from the Lua oracle. A triage of {\"absent\": true} means nothing readable. The actions vectors use `tools` and a decoder whose JSON null is recognized as absent; `rejected` counts the refused actions. jev_answers follow the TypeSafe /v1/systemone answer shape (answers.<question_id>.choice and .probabilities).",
+	"tools": ["Envoyer la facture", "Mode focus"],
+	"system1_prompt": [
+		{
+			"id": "with_tools",
+			"ctx": {
+				"app": "Slack",
+				"tools": ["Envoyer la facture", "Mode focus"]
+			},
+			"prompt": "You triage what a user is typing for a keyboard assistant. TEXT is the sentence being typed in Slack.\nDecide whether it asks for, or clearly implies, one action the assistant could prepare:\n- calendar: a meeting or an event at a given time\n- reminder: something to remember or to do later\n- mail: an email to write or to send\n- shortcut: one of the user's shortcuts: Envoyer la facture, Mode focus\n- none: anything else, including plain conversation\nReply with exactly two lines — nothing else:\nINTENT: <none|calendar|reminder|mail|shortcut>\nPROBABILITY: <a number from 0 to 1>"
+		},
+		{
+			"id": "no_tools",
+			"ctx": {
+				"app": "Notes",
+				"tools": []
+			},
+			"prompt": "You triage what a user is typing for a keyboard assistant. TEXT is the sentence being typed in Notes.\nDecide whether it asks for, or clearly implies, one action the assistant could prepare:\n- calendar: a meeting or an event at a given time\n- reminder: something to remember or to do later\n- mail: an email to write or to send\n- shortcut: one of the user's shortcuts: (none)\n- none: anything else, including plain conversation\nReply with exactly two lines — nothing else:\nINTENT: <none|calendar|reminder|mail|shortcut>\nPROBABILITY: <a number from 0 to 1>"
+		}
+	],
+	"system2_prompt": [
+		{
+			"id": "selection",
+			"ctx": {
+				"source": "selection",
+				"app": "Mail",
+				"window": "Re: devis",
+				"now": "2026-09-29T14:05",
+				"weekday": "Tuesday",
+				"timezone": "Europe/Paris",
+				"language": "fr",
+				"tools": ["Envoyer la facture", "Mode focus"]
+			},
+			"prompt": "You prepare actions for a keyboard assistant. SOURCE is text the user selected in Mail (window: Re: devis).\nNow is 2026-09-29T14:05, a Tuesday, time zone Europe/Paris. Write titles, subjects and bodies in the language of SOURCE; if it is ambiguous, in fr.\nPropose at most 3 actions the user most likely wants, the most likely first, using only these JSON objects:\n- {\"type\":\"calendar\",\"title\":\"…\",\"start\":\"YYYY-MM-DDTHH:MM\",\"end\":\"YYYY-MM-DDTHH:MM\",\"location\":\"…\",\"attendees\":[\"email\"],\"notes\":\"…\"}\n- {\"type\":\"reminder\",\"title\":\"…\",\"due\":\"YYYY-MM-DDTHH:MM\",\"notes\":\"…\"}\n- {\"type\":\"mail\",\"to\":[\"email\"],\"subject\":\"…\",\"body\":\"…\"}\n- {\"type\":\"shortcut\",\"name\":\"one of: Envoyer la facture, Mode focus\",\"input\":\"…\"}\nOnly title, start (calendar), body (mail) and name (shortcut) are required; omit any other field you do not know. Resolve relative dates such as \"thursday\" or \"tomorrow 9am\" against Now. Never invent an email address. If nothing fits, return [].\nReply with one block — nothing else:\nACTIONS: <JSON array>"
+		},
+		{
+			"id": "command_no_window",
+			"ctx": {
+				"source": "command",
+				"app": "Mail",
+				"window": "",
+				"now": "2026-09-29T14:05",
+				"weekday": "Tuesday",
+				"timezone": "Europe/Paris",
+				"language": "fr",
+				"tools": []
+			},
+			"prompt": "You prepare actions for a keyboard assistant. SOURCE is text the user typed as a command in Mail (window: ).\nNow is 2026-09-29T14:05, a Tuesday, time zone Europe/Paris. Write titles, subjects and bodies in the language of SOURCE; if it is ambiguous, in fr.\nPropose at most 3 actions the user most likely wants, the most likely first, using only these JSON objects:\n- {\"type\":\"calendar\",\"title\":\"…\",\"start\":\"YYYY-MM-DDTHH:MM\",\"end\":\"YYYY-MM-DDTHH:MM\",\"location\":\"…\",\"attendees\":[\"email\"],\"notes\":\"…\"}\n- {\"type\":\"reminder\",\"title\":\"…\",\"due\":\"YYYY-MM-DDTHH:MM\",\"notes\":\"…\"}\n- {\"type\":\"mail\",\"to\":[\"email\"],\"subject\":\"…\",\"body\":\"…\"}\n- {\"type\":\"shortcut\",\"name\":\"one of: (none)\",\"input\":\"…\"}\nOnly title, start (calendar), body (mail) and name (shortcut) are required; omit any other field you do not know. Resolve relative dates such as \"thursday\" or \"tomorrow 9am\" against Now. Never invent an email address. If nothing fits, return [].\nReply with one block — nothing else:\nACTIONS: <JSON array>"
+		}
+	],
+	"system2_user_text": [
+		{
+			"id": "multi_line",
+			"text": "On se voit jeudi 14h ?\nPaul",
+			"user_text": "SOURCE:\nOn se voit jeudi 14h ?\nPaul"
+		}
+	],
+	"system1_answers": [
+		{
+			"id": "plain",
+			"raw": "INTENT: calendar\nPROBABILITY: 0.86",
+			"triage": {
+				"intent": "calendar",
+				"probability": 0.86
+			}
+		},
+		{
+			"id": "case_and_spaces",
+			"raw": "intent :  Reminder\nprobability:1",
+			"triage": {
+				"intent": "reminder",
+				"probability": 1
+			}
+		},
+		{
+			"id": "none_intent",
+			"raw": "INTENT: none\nPROBABILITY: 0.97",
+			"triage": {
+				"intent": "none",
+				"probability": 0.97
+			}
+		},
+		{
+			"id": "percent_is_refused",
+			"raw": "INTENT: mail\nPROBABILITY: 85",
+			"triage": {
+				"absent": true
+			}
+		},
+		{
+			"id": "unknown_intent",
+			"raw": "INTENT: weather\nPROBABILITY: 0.9",
+			"triage": {
+				"absent": true
+			}
+		},
+		{
+			"id": "missing_probability",
+			"raw": "INTENT: calendar",
+			"triage": {
+				"absent": true
+			}
+		},
+		{
+			"id": "prose",
+			"raw": "I think the user wants a meeting.",
+			"triage": {
+				"absent": true
+			}
+		}
+	],
+	"jev_answers": [
+		{
+			"id": "choice",
+			"response": {
+				"model": "jev-latest",
+				"answers": {
+					"intent": {
+						"choice": "calendar",
+						"probabilities": {
+							"none": 0.1,
+							"calendar": 0.82,
+							"reminder": 0.05,
+							"mail": 0.02,
+							"shortcut": 0.01
+						},
+						"confidence": 0.7
+					}
+				}
+			},
+			"triage": {
+				"intent": "calendar",
+				"probability": 0.82
+			}
+		},
+		{
+			"id": "none_choice",
+			"response": {
+				"answers": {
+					"intent": {
+						"choice": "none",
+						"probabilities": {
+							"none": 0.93,
+							"calendar": 0.07
+						}
+					}
+				}
+			},
+			"triage": {
+				"intent": "none",
+				"probability": 0.93
+			}
+		},
+		{
+			"id": "unknown_choice",
+			"response": {
+				"answers": {
+					"intent": {
+						"choice": "weather",
+						"probabilities": {
+							"weather": 0.9
+						}
+					}
+				}
+			},
+			"triage": {
+				"absent": true
+			}
+		},
+		{
+			"id": "no_probabilities",
+			"response": {
+				"answers": {
+					"intent": {
+						"choice": "mail"
+					}
+				}
+			},
+			"triage": {
+				"absent": true
+			}
+		},
+		{
+			"id": "other_question",
+			"response": {
+				"answers": {
+					"topic": {
+						"choice": "mail",
+						"probabilities": {
+							"mail": 0.9
+						}
+					}
+				}
+			},
+			"triage": {
+				"absent": true
+			}
+		},
+		{
+			"id": "no_choice_most_probable",
+			"response": {
+				"answers": {
+					"intent": {
+						"type": "choice",
+						"probabilities": {
+							"none": 0.2,
+							"calendar": 0.1,
+							"reminder": 0.05,
+							"mail": 0.64,
+							"shortcut": 0.01
+						},
+						"confidence": 0.6
+					}
+				}
+			},
+			"triage": {
+				"intent": "mail",
+				"probability": 0.64
+			}
+		},
+		{
+			"id": "wrong_type",
+			"response": {
+				"answers": {
+					"intent": {
+						"type": "noul",
+						"noul": 0.9,
+						"probabilities": {
+							"mail": 0.9
+						}
+					}
+				}
+			},
+			"triage": {
+				"absent": true
+			}
+		}
+	],
+	"should_act": [
+		{
+			"id": "above",
+			"triage": {
+				"intent": "calendar",
+				"probability": 0.8
+			},
+			"threshold": 0.7,
+			"act": true
+		},
+		{
+			"id": "equal",
+			"triage": {
+				"intent": "mail",
+				"probability": 0.7
+			},
+			"threshold": 0.7,
+			"act": true
+		},
+		{
+			"id": "below",
+			"triage": {
+				"intent": "mail",
+				"probability": 0.69
+			},
+			"threshold": 0.7,
+			"act": false
+		},
+		{
+			"id": "none_never",
+			"triage": {
+				"intent": "none",
+				"probability": 0.99
+			},
+			"threshold": 0.5,
+			"act": false
+		}
+	],
+	"datetimes": [
+		{
+			"id": "plain",
+			"text": "2026-09-29T14:05",
+			"expected": {
+				"round_trip": "2026-09-29T14:05",
+				"valid": true
+			}
+		},
+		{
+			"id": "leap_day",
+			"text": "2028-02-29T09:00",
+			"expected": {
+				"round_trip": "2028-02-29T09:00",
+				"valid": true
+			}
+		},
+		{
+			"id": "not_leap",
+			"text": "2027-02-29T09:00",
+			"expected": {
+				"valid": false
+			}
+		},
+		{
+			"id": "century_not_leap",
+			"text": "2100-02-29T09:00",
+			"expected": {
+				"valid": false
+			}
+		},
+		{
+			"id": "month_13",
+			"text": "2026-13-01T09:00",
+			"expected": {
+				"valid": false
+			}
+		},
+		{
+			"id": "hour_24",
+			"text": "2026-09-29T24:00",
+			"expected": {
+				"valid": false
+			}
+		},
+		{
+			"id": "seconds",
+			"text": "2026-09-29T14:05:00",
+			"expected": {
+				"valid": false
+			}
+		},
+		{
+			"id": "space",
+			"text": "2026-09-29 14:05",
+			"expected": {
+				"valid": false
+			}
+		},
+		{
+			"id": "april_31",
+			"text": "2026-04-31T10:00",
+			"expected": {
+				"valid": false
+			}
+		},
+		{
+			"id": "midnight",
+			"text": "2026-12-31T00:00",
+			"expected": {
+				"round_trip": "2026-12-31T00:00",
+				"valid": true
+			}
+		}
+	],
+	"datetime_add": [
+		{
+			"id": "crosses_year",
+			"text": "2026-12-31T23:30",
+			"minutes": 60,
+			"result": "2027-01-01T00:30"
+		},
+		{
+			"id": "crosses_feb",
+			"text": "2028-02-28T23:00",
+			"minutes": 120,
+			"result": "2028-02-29T01:00"
+		}
+	],
+	"actions": [
+		{
+			"id": "calendar_default_end",
+			"raw": "ACTIONS: [{\"type\":\"calendar\",\"title\":\" Réunion avec Paul \",\"start\":\"2026-10-01T14:00\",\"location\":\"Salle B\"}]",
+			"expected": {
+				"actions": [
+					{
+						"end": "2026-10-01T15:00",
+						"location": "Salle B",
+						"start": "2026-10-01T14:00",
+						"title": "Réunion avec Paul",
+						"type": "calendar"
+					}
+				],
+				"readable": true,
+				"rejected": 0
+			}
+		},
+		{
+			"id": "fenced_and_prose",
+			"raw": "Sure!\nACTIONS:\n```json\n[{\"type\":\"reminder\",\"title\":\"Appeler le garage\",\"due\":\"2026-09-30T09:00\"}]\n```",
+			"expected": {
+				"actions": [
+					{
+						"due": "2026-09-30T09:00",
+						"title": "Appeler le garage",
+						"type": "reminder"
+					}
+				],
+				"readable": true,
+				"rejected": 0
+			}
+		},
+		{
+			"id": "null_is_absent",
+			"raw": "ACTIONS: [{\"type\":\"mail\",\"to\":[\"paul@example.com\"],\"subject\":null,\"body\":\"Bonjour Paul,\\nVoici le devis.\"}]",
+			"expected": {
+				"actions": [
+					{
+						"body": "Bonjour Paul,\nVoici le devis.",
+						"to": ["paul@example.com"],
+						"type": "mail"
+					}
+				],
+				"readable": true,
+				"rejected": 0
+			}
+		},
+		{
+			"id": "invalid_ones_dropped",
+			"raw": "ACTIONS: [{\"type\":\"calendar\",\"title\":\"X\",\"start\":\"demain\"},{\"type\":\"mail\",\"to\":[\"paul\"],\"body\":\"b\"},{\"type\":\"run\",\"cmd\":\"rm -rf /\"},{\"type\":\"reminder\",\"title\":\"ok\",\"extra\":1},{\"type\":\"reminder\",\"title\":\"Rappel\"}]",
+			"expected": {
+				"actions": [
+					{
+						"title": "Rappel",
+						"type": "reminder"
+					}
+				],
+				"readable": true,
+				"rejected": 4
+			}
+		},
+		{
+			"id": "end_before_start",
+			"raw": "ACTIONS: [{\"type\":\"calendar\",\"title\":\"T\",\"start\":\"2026-10-01T14:00\",\"end\":\"2026-10-01T13:00\"}]",
+			"expected": {
+				"actions": [],
+				"readable": true,
+				"rejected": 1
+			}
+		},
+		{
+			"id": "shortcut_must_be_a_tool",
+			"raw": "ACTIONS: [{\"type\":\"shortcut\",\"name\":\"Mode focus\"},{\"type\":\"shortcut\",\"name\":\"Delete everything\"}]",
+			"expected": {
+				"actions": [
+					{
+						"name": "Mode focus",
+						"type": "shortcut"
+					}
+				],
+				"readable": true,
+				"rejected": 1
+			}
+		},
+		{
+			"id": "capped_to_max",
+			"raw": "ACTIONS: [{\"type\":\"reminder\",\"title\":\"1\"},{\"type\":\"reminder\",\"title\":\"2\"},{\"type\":\"reminder\",\"title\":\"3\"},{\"type\":\"reminder\",\"title\":\"4\"}]",
+			"expected": {
+				"actions": [
+					{
+						"title": "1",
+						"type": "reminder"
+					},
+					{
+						"title": "2",
+						"type": "reminder"
+					},
+					{
+						"title": "3",
+						"type": "reminder"
+					}
+				],
+				"readable": true,
+				"rejected": 0
+			}
+		},
+		{
+			"id": "empty_list",
+			"raw": "ACTIONS: []",
+			"expected": {
+				"actions": [],
+				"readable": true,
+				"rejected": 0
+			}
+		},
+		{
+			"id": "missing_tag",
+			"raw": "[{\"type\":\"reminder\",\"title\":\"x\"}]",
+			"expected": {
+				"readable": false
+			}
+		},
+		{
+			"id": "broken_json",
+			"raw": "ACTIONS: [{\"type\":\"reminder\",\"title\":}]",
+			"expected": {
+				"readable": false
+			}
+		},
+		{
+			"id": "title_too_long",
+			"raw": "ACTIONS: [{\"type\":\"reminder\",\"title\":\"ééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééé\"}]",
+			"expected": {
+				"actions": [],
+				"readable": true,
+				"rejected": 1
+			}
+		}
+	],
+	"labels": [
+		{
+			"id": "calendar",
+			"action": {
+				"type": "calendar",
+				"title": "Réunion",
+				"start": "2026-10-01T14:00",
+				"end": "2026-10-01T15:00"
+			},
+			"expected": {
+				"args": ["Réunion", "2026-10-01 14:00"],
+				"key": "llm.agent.label.calendar"
+			}
+		},
+		{
+			"id": "reminder_due",
+			"action": {
+				"type": "reminder",
+				"title": "Garage",
+				"due": "2026-09-30T09:00"
+			},
+			"expected": {
+				"args": ["Garage", "2026-09-30 09:00"],
+				"key": "llm.agent.label.reminder_due"
+			}
+		},
+		{
+			"id": "reminder",
+			"action": {
+				"type": "reminder",
+				"title": "Garage"
+			},
+			"expected": {
+				"args": ["Garage"],
+				"key": "llm.agent.label.reminder"
+			}
+		},
+		{
+			"id": "shortcut",
+			"action": {
+				"type": "shortcut",
+				"name": "Mode focus"
+			},
+			"expected": {
+				"args": ["Mode focus"],
+				"key": "llm.agent.label.shortcut"
+			}
+		},
+		{
+			"id": "mail_to",
+			"action": {
+				"type": "mail",
+				"to": ["a@b.fr", "c@d.fr"],
+				"subject": "Devis",
+				"body": "x"
+			},
+			"expected": {
+				"args": ["Devis", "a@b.fr, c@d.fr"],
+				"key": "llm.agent.label.mail_to"
+			}
+		},
+		{
+			"id": "mail_body_topic",
+			"action": {
+				"type": "mail",
+				"body": "Bonjour Paul,\nVoici le devis."
+			},
+			"expected": {
+				"args": ["Bonjour Paul,"],
+				"key": "llm.agent.label.mail"
+			}
+		},
+		{
+			"id": "mail_long_topic",
+			"action": {
+				"type": "mail",
+				"body": "éééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééé"
+			},
+			"expected": {
+				"args": ["éééééééééééééééééééééééééééééééééééééééééééééééééééééééééééé…"],
+				"key": "llm.agent.label.mail"
+			}
+		}
+	],
+	"ics": [
+		{
+			"id": "event",
+			"uid": "ergopti-1@local",
+			"stamp": "20260929T120500Z",
+			"action": {
+				"type": "calendar",
+				"title": "Réunion; budget, Q4",
+				"start": "2026-10-01T14:00",
+				"end": "2026-10-01T15:30",
+				"location": "Salle B",
+				"attendees": ["paul@example.com"],
+				"notes": "Ligne 1\nLigne 2 \\ fin"
+			},
+			"ics": "BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//Ergopti+//Agent//EN\r\nBEGIN:VEVENT\r\nUID:ergopti-1@local\r\nDTSTAMP:20260929T120500Z\r\nDTSTART:20261001T140000\r\nDTEND:20261001T153000\r\nSUMMARY:Réunion\\; budget\\, Q4\r\nLOCATION:Salle B\r\nDESCRIPTION:Ligne 1\\nLigne 2 \\\\ fin\r\nATTENDEE:mailto:paul@example.com\r\nEND:VEVENT\r\nEND:VCALENDAR\r\n"
+		},
+		{
+			"id": "long_title_folds",
+			"uid": "u2",
+			"stamp": "20260929T120500Z",
+			"action": {
+				"type": "calendar",
+				"title": "Préparer la présentation trimestrielle avec l’équipe produit et les responsables régionaux",
+				"start": "2026-10-02T09:00",
+				"end": "2026-10-02T10:00"
+			},
+			"ics": "BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//Ergopti+//Agent//EN\r\nBEGIN:VEVENT\r\nUID:u2\r\nDTSTAMP:20260929T120500Z\r\nDTSTART:20261002T090000\r\nDTEND:20261002T100000\r\nSUMMARY:Préparer la présentation trimestrielle avec l’équipe produit e\r\n t les responsables régionaux\r\nEND:VEVENT\r\nEND:VCALENDAR\r\n"
+		},
+		{
+			"id": "task_due",
+			"uid": "u3",
+			"stamp": "20260929T120500Z",
+			"action": {
+				"type": "reminder",
+				"title": "Appeler le garage",
+				"due": "2026-09-30T09:00"
+			},
+			"ics": "BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//Ergopti+//Agent//EN\r\nBEGIN:VTODO\r\nUID:u3\r\nDTSTAMP:20260929T120500Z\r\nDUE:20260930T090000\r\nSUMMARY:Appeler le garage\r\nEND:VTODO\r\nEND:VCALENDAR\r\n"
+		},
+		{
+			"id": "task_no_due",
+			"uid": "u4",
+			"stamp": "20260929T120500Z",
+			"action": {
+				"type": "reminder",
+				"title": "Acheter du pain"
+			},
+			"ics": "BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//Ergopti+//Agent//EN\r\nBEGIN:VTODO\r\nUID:u4\r\nDTSTAMP:20260929T120500Z\r\nSUMMARY:Acheter du pain\r\nEND:VTODO\r\nEND:VCALENDAR\r\n"
+		}
+	],
+	"mailto": [
+		{
+			"id": "full",
+			"action": {
+				"type": "mail",
+				"to": ["paul@example.com", "anne+ops@example.org"],
+				"subject": "Devis & délai",
+				"body": "Bonjour Paul,\nVoici le devis ?"
+			},
+			"url": "mailto:paul@example.com,anne%2Bops@example.org?subject=Devis%20%26%20d%C3%A9lai&body=Bonjour%20Paul%2C%0D%0AVoici%20le%20devis%20%3F"
+		},
+		{
+			"id": "no_recipient",
+			"action": {
+				"type": "mail",
+				"body": "Juste un mot"
+			},
+			"url": "mailto:?body=Juste%20un%20mot"
+		}
+	],
+	"applescript": [
+		{
+			"id": "quotes_and_backslashes",
+			"text": "Il a dit \"oui\" \\ ok",
+			"literal": "\"Il a dit \\\"oui\\\" \\\\ ok\""
+		},
+		{
+			"id": "plain",
+			"text": "Réunion",
+			"literal": "\"Réunion\""
+		}
+	],
+	"learn": [
+		{
+			"id": "accepted",
+			"threshold": 0.7,
+			"accepted": true,
+			"threshold_after": 0.65
+		},
+		{
+			"id": "dismissed",
+			"threshold": 0.7,
+			"accepted": false,
+			"threshold_after": 0.75
+		},
+		{
+			"id": "floor",
+			"threshold": 0.52,
+			"accepted": true,
+			"threshold_after": 0.5
+		},
+		{
+			"id": "ceiling",
+			"threshold": 0.93,
+			"accepted": false,
+			"threshold_after": 0.95
+		}
+	],
+	"resolve_model": [
+		{
+			"id": "provider_default",
+			"value": "cerebras",
+			"expected": {
+				"model": "qwen-3.8-27b"
+			}
+		},
+		{
+			"id": "named_model",
+			"value": "cerebras|llama-3.3-70b",
+			"expected": {
+				"model": "llama-3.3-70b"
+			}
+		},
+		{
+			"id": "local_default",
+			"value": "local",
+			"expected": {
+				"model": "qwen2.5:7b"
+			}
+		},
+		{
+			"id": "local_named",
+			"value": "local|qwen3:14b",
+			"expected": {
+				"model": "qwen3:14b"
+			}
+		},
+		{
+			"id": "compat_needs_model",
+			"value": "openai_compat",
+			"expected": {}
+		},
+		{
+			"id": "unknown_provider",
+			"value": "nope",
+			"expected": {}
+		},
+		{
+			"id": "off",
+			"value": "",
+			"expected": {}
+		}
+	],
+	"jev_questions": [
+		{
+			"id": "triage",
+			"questions": {
+				"intent": {
+					"criteria": {
+						"calendar": "A meeting or an event at a given time",
+						"mail": "An email to write or to send",
+						"none": "Plain conversation or anything that needs no action",
+						"reminder": "Something to remember or to do later",
+						"shortcut": "Running one of the user's named shortcuts"
+					},
+					"instructions": "Which action does the user's text ask for, or clearly imply?",
+					"type": "choice"
+				}
+			}
+		}
+	]
+}

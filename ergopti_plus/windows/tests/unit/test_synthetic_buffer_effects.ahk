@@ -1,0 +1,262 @@
+﻿; static/ergopti_plus/windows/tests/unit/test_synthetic_buffer_effects.ahk
+
+; ==============================================================================
+; MODULE: Regression — synthetic navigation must invalidate both hotstring
+;         buffers (synthetic-buffer-effects)
+; DESCRIPTION:
+; Hold the Space nav layer, tap the Up-arrow layer key, release, then press the
+; magic key: the expansion fired with its {BackSpace N} at the NEW cursor
+; position and deleted characters of the line above.
+;
+; ROOT CAUSE ENCODED: HSE_Buffer and _PrefixBuffer both answer "what sits
+; immediately left of the caret?", and every expansion backspaces over exactly
+; that many characters. Eight sites reset them when the caret moves — but all
+; eight hang off the prefix watcher's InputHook, which runs at input level I1
+; and therefore CANNOT see the nav layer's own SendInput (SendLevel 0). The
+; layer moved the caret through a channel that structurally bypassed every
+; existing reset, so nothing was missing at any of those eight sites and no
+; amount of hardening there would have helped. The caller has to declare.
+;
+; The class assertion below is the important one: it re-derives the payload of
+; EVERY sending key of the recommended layer from the table the driver registers
+; (platform/remap/nav_layer_table.ahk) and requires each to be classified
+; correctly. A key added to the preset later is covered the day it is written,
+; which is the failure mode this driver keeps hitting — the one missed sibling
+; site.
+;
+; SCOPE: behavioural for the classifier and for every real layer payload;
+; positional for the ActionLayer wiring, because ActionLayer's own SendInput is
+; a live OS call in this runner and must not be fired at a real desktop.
+; ==============================================================================
+
+#Requires AutoHotkey v2.0
+
+
+
+
+; ==================================================================
+; ==================================================================
+; ======= 1/ The classifier's three verdicts =======================
+; ==================================================================
+; ==================================================================
+
+; Set both buffers to a known state, declare a payload, and report both results.
+; The full runner includes the watcher before this file; asserting only HSE_Buffer
+; let _PrefixBuffer retain a previous case and made this suite falsely green.
+_SBE_FeedFrom(Start, Payload) {
+	global HSE_Buffer, HSE_Suppressed, _PrefixBuffer
+	HSE_Suppressed := 0
+	HSE_Buffer := Start
+	_PrefixSetBuffer(Start)
+	HS_DeclareSyntheticEffect(Payload)
+	return { engine: HSE_Buffer, preview: _PrefixBuffer }
+}
+
+_SBE_AssertBoth(Expected, Start, Payload, Message) {
+	Result := _SBE_FeedFrom(Start, Payload)
+	AssertEqual(Expected, Result.engine, Message . " (engine)")
+	AssertEqual(Expected, Result.preview, Message . " (preview)")
+	return Result
+}
+
+; The audit's own repro, reduced: the tooltip offers an expansion for "att",
+; the user deletes one character through the layer, and the engine must now
+; believe the buffer is "at". Tracking the deletion precisely (rather than
+; resetting) is deliberate — after fixing a typo the user is usually back on a
+; live trigger and that suggestion should reappear.
+_SBE_BackspaceShrinksBuffer() {
+	_SBE_AssertBoth("at", "att", "{BackSpace}",
+		"a layer backspace must shrink the engine buffer by one, exactly as the physical VK_BACK branch does")
+	_SBE_AssertBoth("a", "att", "{BackSpace 2}",
+		"a repeated layer backspace must shrink the buffer once per repetition — the layer's repetition count is applied by the OS, so feeding it once leaves the buffer one or more characters ahead of the screen")
+	_SBE_AssertBoth("", "att", "{BackSpace 9}",
+		"deleting past the start of the buffer must empty it, never underflow")
+}
+
+; Every caret-moving payload lands the cursor somewhere the buffers cannot
+; describe. The next typed run has to start fresh, which is the same verdict the
+; watcher already reaches for a physical arrow key.
+_SBE_CaretMoveResetsBuffer() {
+	for Payload in ["{Up 1}", "{Down 3}", "{Home}", "{End}", "^{Home}", "^+{End}",
+		"!{Up 2}", "{End}{Enter 1}", "{Escape 1}", "+{Left 4}", "{F2}"] {
+		_SBE_AssertBoth("", "att", Payload,
+			"payload '" . Payload . "' moves the caret or the focus, so the engine buffer must be invalidated — leaving it makes the next expansion backspace over text it never saw")
+	}
+}
+
+; The allowlist must be real: if everything reset, the layer would destroy a
+; live preview on a volume tap and the guard would be indistinguishable from
+; wiping the buffer on every layer key.
+_SBE_NeutralPayloadIsPreserved() {
+	_SBE_AssertBoth("att", "att", "{Volume_Up 1}",
+		"a volume payload touches neither the caret nor the document, so it must leave both buffers alone")
+	_SBE_AssertBoth("att", "att", "{Volume_Down 2}",
+		"a volume payload touches neither the caret nor the document, so it must leave both buffers alone")
+}
+
+; A payload that deletes AND moves must not be mistaken for a plain deletion —
+; the backspace branch is anchored precisely so it cannot swallow one.
+_SBE_MixedPayloadIsTreatedAsAMove() {
+	_SBE_AssertBoth("", "att", "{End}{BackSpace 2}",
+		"a payload that also moves the caret must fall through to the reset branch — feeding it as two backspaces would leave the buffer describing a position the caret has left")
+}
+
+
+
+
+
+; ===================================================================
+; ===================================================================
+; ======= 2/ Every real layer payload, enumerated from source =======
+; ===================================================================
+; ===================================================================
+
+; Rebuild the payload of every layer key that sends, from the table the driver
+; registers for Ergopti's recommended layer (platform/remap/nav_layer_table.ahk).
+; A repeatable action carries its repetition count in the payload
+; ("{Up 2}"), so the table's open Send text is closed with a concrete count here.
+_SBE_LayerPayloads() {
+	SharedDir := A_ScriptDir . "\..\..\_shared"
+	Ctx := KeymapLayers_LoadContext(SharedDir)
+	Result := KeymapLayers_Load("windows", Ctx, FileRead(SharedDir . "\keymap\layers.recommended.toml", "UTF-8"))
+	Assert(Result["ok"] && Result["layers"].Has(NAV_LAYER_ID),
+		"the recommended layer must resolve for Windows before its payloads can be classified")
+	Payloads := []
+	for Row in NavLayer_BuildTable(Result["layers"][NAV_LAYER_ID], Ctx) {
+		if (SubStr(Row["action"], 1, 5) == "send:")
+			Payloads.Push(Row["send_open"] . (Row["counted"] ? " 2}" : "}"))
+	}
+	return Payloads
+}
+
+; The whole-class guard. Every layer key must land in one of the two safe
+; verdicts; a payload that leaves a stale buffer behind is the bug itself.
+_SBE_EveryLayerPayloadIsClassified() {
+	Payloads := _SBE_LayerPayloads()
+	; Non-vacuity floor: the nav layer binds well over twenty keys. A regex that
+	; silently stopped matching would otherwise make this test unable to fail.
+	Assert(Payloads.Length >= 20,
+		"the scan must reach the real nav-layer bindings (found only " . Payloads.Length . ") — a scan that matches nothing passes every assertion below")
+
+	for Payload in Payloads {
+		Pair := _SBE_FeedFrom("att", Payload)
+		Result := Pair.engine
+		AssertEqual(Pair.engine, Pair.preview,
+			"layer payload '" . Payload . "' must leave engine and preview identical")
+		; Match the DRIVER's own anchored pattern, never a copy of its logic.
+		; This loop used to re-implement the substring scan, so the test and the
+		; driver could drift apart about what "text-neutral" means and both stay
+		; green — the same duplicated-prediction shape the buffers themselves
+		; exist to avoid.
+		IsNeutral := RegExMatch(Payload, HS_BUFFER_NEUTRAL_PAYLOAD)
+		if (IsNeutral) {
+			AssertEqual("att", Result,
+				"layer payload '" . Payload . "' is on the text-neutral allowlist, so it must leave the buffer intact")
+		} else if RegExMatch(Payload, HS_BUFFER_BACKSPACE_PAYLOAD, &BsM) {
+			Reps := (BsM[1] != "") ? BsM[1] + 0 : 1
+			AssertEqual(SubStr("att", 1, Max(0, 3 - Reps)), Result,
+				"layer payload '" . Payload . "' is a pure deletion, so the buffer must shrink by exactly its repetition count rather than reset")
+		} else {
+			AssertEqual("", Result,
+				"layer payload '" . Payload . "' is neither text-neutral nor a pure deletion, so it must invalidate the buffer — this is the one-missed-sibling shape: a new layer key that moves the caret and says nothing")
+		}
+	}
+}
+
+
+
+; =====================================================
+; ===== 2.1) The allowlist is anchored, not loose =====
+; =====================================================
+
+; ROOT CAUSE: the allowlist used to be tested with InStr(Payload, "{Volume_Up") —
+; a substring match anywhere in the payload — while its comment claimed it
+; matched a prefix of the key token. Its sibling HS_BUFFER_BACKSPACE_PAYLOAD is
+; deliberately anchored precisely to stop the same fail-open ("{End}{BackSpace 2}"
+; must reset, not decrement). These cases pin the anchoring on BOTH sides: a bare
+; neutral key stays neutral, and a neutral key travelling with a caret move does
+; not. No production caller emits the compound shape today, which is exactly why
+; only a test can keep the hole closed.
+;
+; Asserted through HS_DeclareSyntheticEffect's observable EFFECT on the buffers
+; rather than by classifying the payload here — re-deriving the verdict in the
+; test is the very duplication this change removes.
+_SBE_NeutralAllowlistIsAnchored() {
+	for Payload in ["{Volume_Up}", "{Volume_Up 3}", "{Volume_Down}", "{Volume_Mute 2}"] {
+		_SBE_AssertBoth("att", "att", Payload,
+			"payload '" . Payload . "' is a bare text-neutral key press — it touches neither caret nor document, "
+			. "so both buffers must be left intact")
+	}
+
+	; The fail-open shapes. Each CONTAINS a neutral token but also moves the
+	; caret or edits the line, so it must fall through to the reset branch.
+	for Payload in ["{End}{Volume_Up}", "{Volume_Up}{End}", "{Volume_Up 2}{Left}"] {
+		_SBE_AssertBoth("", "att", Payload,
+			"payload '" . Payload . "' carries a neutral token but ALSO moves the caret, so it must invalidate both "
+			. "buffers. Testing the allowlist with a substring match anywhere in the payload waves it through as "
+			. "text-neutral and leaves both hotstring buffers describing text no longer on screen — the next "
+			. "expansion then backspaces over characters belonging to an earlier word. Anchor the match the way the "
+			. "sibling backspace pattern already is (hs-neutral-payload-substring-fails-open)")
+	}
+}
+
+
+Test("hotstring buffers: the text-neutral allowlist is anchored to a single key press (hs-neutral-payload-substring-fails-open)",
+	_SBE_NeutralAllowlistIsAnchored)
+
+
+
+
+
+; ===================================================================
+; ===================================================================
+; ======= 3/ The declaration is actually wired to the senders =======
+; ===================================================================
+; ===================================================================
+
+; ActionLayer must use the adapter path whose canonical owner commits both
+; buffers and the OS send under one Critical span. A raw declaration followed by
+; SendInput is still racy: the declaration's tooltip effects restore the initial
+; thread shield before Windows receives the caret move.
+_SBE_ActionLayerUsesAtomicSender() {
+	Body := _DriverFuncBody("ActionLayer")
+	Assert(Body != "", "ActionLayer() must exist in the driver source")
+
+	Assert(InStr(Body, '_TextSenderSendInput(Payload, "key press")') > 0
+		and InStr(Body, 'Payload := TapHoldAnyModifierHeld() ? "{Blind}" . action : action') > 0,
+		"ActionLayer must route its invisible SendInput through the canonical declared-send owner — separate HS_DeclareSyntheticEffect/SendInput statements let physical OnChar interleave between future buffer state and the real caret move")
+	Assert(InStr(Body, "HS_DeclareSyntheticEffect") == 0 and InStr(Body, "SendInput(action)") == 0,
+		"ActionLayer must not restore the former raw declaration/send pair")
+}
+
+; The two Win-shortcut siblings named in the same finding. They reach the caret
+; through SendFinalResult rather than ActionLayer, so the ActionLayer wiring
+; above does not cover them.
+_SBE_WinCaretShortcutsUseAtomicSender() {
+	for FuncName in ["SelectLine", "SurroundLineWithParentheses"] {
+		Body := _DriverFuncBody(FuncName)
+		Assert(Body != "", FuncName . "() must exist in the driver source")
+		Assert(InStr(Body, "{Home}") > 0,
+			FuncName . " must still be the caret-moving shortcut this guard was written for")
+		Assert(RegExMatch(Body, "SendFinalResult\([^\r\n]+,\s*false,\s*true\)") > 0,
+			FuncName . " must request SendFinalResult's atomic buffer-effect transaction for its invisible Home/End payload")
+		Assert(InStr(Body, "HS_DeclareSyntheticEffect") == 0,
+			FuncName . " must not restore a separate declaration which can become interruptible before SendFinalResult")
+	}
+}
+
+
+Test("synthetic-buffer-effects: a layer backspace shrinks the engine buffer",
+	_SBE_BackspaceShrinksBuffer)
+Test("synthetic-buffer-effects: a caret move invalidates the engine buffer",
+	_SBE_CaretMoveResetsBuffer)
+Test("synthetic-buffer-effects: a text-neutral payload preserves the buffer",
+	_SBE_NeutralPayloadIsPreserved)
+Test("synthetic-buffer-effects: a payload that moves and deletes is treated as a move",
+	_SBE_MixedPayloadIsTreatedAsAMove)
+Test("synthetic-buffer-effects: every nav-layer payload in source is classified",
+	_SBE_EveryLayerPayloadIsClassified)
+Test("synthetic-buffer-effects: ActionLayer uses the atomic declared sender",
+	_SBE_ActionLayerUsesAtomicSender)
+Test("synthetic-buffer-effects: the Win caret shortcuts use the atomic declared sender",
+	_SBE_WinCaretShortcutsUseAtomicSender)

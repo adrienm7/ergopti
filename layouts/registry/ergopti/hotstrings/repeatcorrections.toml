@@ -1,0 +1,44 @@
+# static/layouts/registry/ergopti/hotstrings/repeatcorrections.toml
+# ====================
+# ====================
+# ======= Meta =======
+# ====================
+# ====================
+
+[_meta]
+sections_order = ["repeat_corrections"]
+
+
+
+# =========================
+# ===== Meta.Sections =====
+# =========================
+
+[_meta.sections]
+repeat_corrections = { fr = "Corrections de faux positifs de la touche ★ répétition (ê→u)", en = "★ repeat key false positive fixes (ê→u)", de = "Fehlpositivkorrekturen der ★-Wiederholtaste (ê→u)", es = "Correcciones de falsos positivos de la tecla ★ repetir (ê→u)", zh = "★ 重复键假阳性修正 (ê→u)", ar = "تصحيح الإيجابيات الكاذبة لمفتاح ★ التكرار (ê→u)", cs = "Opravy falešných pozitiv opakované klávesy ★ (ê→u)", da = "★ gentast falsk positiv rettelser (ê→u)", he = "תיקוני חיובי שווא של מקש ★ חוזר (ê→u)", hi = "★ रिपीट कुंजी के गलत-सकारात्मक सुधार (ê→u)", it = "Correzioni falsi positivi tasto ★ ripeti (ê→u)", ja = "★ リピートキー誤検知修正 (ê→u)", ko = "★ 반복 키 오탐 수정 (ê→u)", nl = "★ herhaaltoets fout-positief correcties (ê→u)", no = "★ gjenta-tast falsk positiv rettelser (ê→u)", pl = "Poprawki fałszywych pozytywów klawisza ★ powtórz (ê→u)", pt = "Correções de falsos positivos da tecla ★ repetir (ê→u)", ru = "Исправления ложных срабатываний клавиши ★ повтор (ê→u)", sv = "★ upprepningstangent falskt positiva korrigeringar (ê→u)", tr = "★ tekrar tuşu yanlış pozitif düzeltmeleri (ê→u)", uk = "Виправлення хибно-позитивних спрацювань клавіші ★ повтор (ê→u)" }
+
+
+
+
+
+# ==================================
+# ==================================
+# ======= Repeat_corrections =======
+# ==================================
+# ==================================
+
+[[repeat_corrections]]
+"arrê" = { output = "arrê", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = true }
+"ccê" = { output = "ccu", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }
+"ddê" = { output = "ddu", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }
+"emmê" = { output = "emmê", is_word = true, auto_expand = true, is_case_sensitive = false, final_result = true }
+"ffê" = { output = "ffu", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }
+"ggê" = { output = "ggu", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }
+"honnê" = { output = "honnê", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = true }
+"llê" = { output = "llu", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }
+"mmê" = { output = "mmu", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }
+"nnê" = { output = "nnu", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }
+"ppê" = { output = "ppu", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }
+"rrê" = { output = "rru", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }
+"ssê" = { output = "ssu", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }
+"ttê" = { output = "ttu", is_word = false, auto_expand = true, is_case_sensitive = false, final_result = false }

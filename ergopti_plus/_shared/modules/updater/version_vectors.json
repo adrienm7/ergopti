@@ -1,0 +1,21 @@
+{
+	"_comment": "Cross-driver semver comparison vectors (D-1 parity gate). compare(a, b) MUST return `expect` (1 = a>b, -1 = a<b, 0 = equal-or-incomparable) in EVERY driver: JS compareVersions (_shared/modules/updater/version.js), AHK _Updater_CompareVersions (windows/lib/updater/core.ahk), macOS compare_versions (macos/lib/updater.lua). Non-semver tags are FAIL-CLOSED (expect 0): an ambiguous tag like '10' vs '9' must never order, so it can neither trigger nor suppress an update by accident. The three test suites read THIS file so the impls cannot drift.",
+	"vectors": [
+		{ "id": "equal_plain", "a": "2.5.0", "b": "2.5.0", "expect": 0 },
+		{ "id": "equal_v_prefix", "a": "v2.5.0", "b": "2.5.0", "expect": 0 },
+		{ "id": "patch_gt", "a": "2.5.1", "b": "2.5.0", "expect": 1 },
+		{ "id": "patch_lt", "a": "2.5.0", "b": "2.5.1", "expect": -1 },
+		{ "id": "minor_gt", "a": "2.6.0", "b": "2.5.9", "expect": 1 },
+		{ "id": "major_gt", "a": "3.0.0", "b": "2.99.99", "expect": 1 },
+		{ "id": "prerelease_increment", "a": "2.5.0-dev.4", "b": "2.5.0-dev.3", "expect": 1 },
+		{ "id": "prerelease_numeric_order", "a": "2.5.0-dev.10", "b": "2.5.0-dev.4", "expect": 1 },
+		{ "id": "stable_over_prerelease", "a": "2.5.0", "b": "2.5.0-dev.4", "expect": 1 },
+		{ "id": "prerelease_under_stable", "a": "2.5.0-dev.4", "b": "2.5.0", "expect": -1 },
+		{ "id": "shorter_prerelease_is_less", "a": "2.5.0-dev", "b": "2.5.0-dev.4", "expect": -1 },
+		{ "id": "nonsemver_numeric_trap", "a": "10", "b": "9", "expect": 0 },
+		{ "id": "nonsemver_pair", "a": "foo", "b": "bar", "expect": 0 },
+		{ "id": "nonsemver_identical", "a": "rolling", "b": "rolling", "expect": 0 },
+		{ "id": "semver_vs_nonsemver", "a": "2.5.0", "b": "garbage", "expect": 0 },
+		{ "id": "nonsemver_vs_semver", "a": "garbage", "b": "2.5.0", "expect": 0 }
+	]
+}

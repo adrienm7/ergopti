@@ -1,0 +1,8 @@
+# _shared/tests/corpus/config_migrations/shipped_duplicate_switch_actions_merged_on_macos/case.toml
+
+[case]
+description = "The shipped v5 to v6 step maps macOS's duplicate app and window switching actions to their twins in gesture slots, tap keys and script-control keys, which v6 to v7 then renames; a keyboard slot is not listed and keeps its value."
+drivers = ["hs"]
+outcome = "migrated"
+from_version = 5
+to_version = 12

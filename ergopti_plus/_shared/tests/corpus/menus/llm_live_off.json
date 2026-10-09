@@ -1,0 +1,39 @@
+{
+	"description": "Retained shortcut stop/admission contract; the retired Live menu owns no declaration or native presentation.",
+	"states": [
+		{
+			"live": false,
+			"checked": true
+		},
+		{
+			"live": true,
+			"checked": false
+		}
+	],
+	"refusals": ["false", "nil", "number", "throw"],
+	"locales": [
+		"ar",
+		"cs",
+		"da",
+		"de",
+		"en",
+		"es",
+		"fr",
+		"he",
+		"hi",
+		"it",
+		"ja",
+		"ko",
+		"nl",
+		"no",
+		"pl",
+		"pt",
+		"ru",
+		"sv",
+		"tr",
+		"uk",
+		"zh"
+	],
+	"retired_menu_sections": ["llm_live_controls", "llm_live_off_boundary"],
+	"stop_notice_key": "llm.live.off"
+}

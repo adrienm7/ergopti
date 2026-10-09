@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="UTF-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1" />
+		<title data-i18n="dialog.unused_keys.title"></title>
+		<link rel="stylesheet" href="../error_dialog/style.css" />
+		<link rel="stylesheet" href="style.css" />
+		<script src="../host_bridge.js"></script>
+		<script src="../i18n.js"></script>
+	</head>
+	<body>
+		<header>
+			<h1 data-i18n="dialog.unused_keys.title"></h1>
+			<p class="intro" data-i18n="config_cleanup.intro"></p>
+			<p id="path" class="path" dir="auto"></p>
+		</header>
+		<main>
+			<h2 id="count"></h2>
+			<div id="settings" class="settings" tabindex="0" role="region" aria-labelledby="count">
+				<ul id="keys"></ul>
+			</div>
+			<p id="status" role="status" aria-live="polite"></p>
+		</main>
+		<footer>
+			<p class="backup-hint" data-i18n="config_cleanup.backup_hint"></p>
+			<div class="buttons">
+				<button type="button" id="btn-refresh" disabled data-i18n="ui_apps.btn_refresh"></button>
+				<span class="spacer"></span>
+				<button type="button" id="btn-close" data-i18n="common.close"></button>
+				<button
+					type="button"
+					id="btn-clean"
+					class="primary"
+					disabled
+					data-i18n="config_cleanup.action"
+				></button>
+			</div>
+		</footer>
+		<script src="script.js"></script>
+	</body>
+</html>

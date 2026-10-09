@@ -1,0 +1,11 @@
+# _shared/tests/corpus/config_migrations/shipped_stamp_only_on_windows_and_linux/input.toml
+
+[_meta]
+schema_version = 2
+
+[gestures]
+enabled = true
+space_wrap = false
+
+[script]
+locale = "fr"

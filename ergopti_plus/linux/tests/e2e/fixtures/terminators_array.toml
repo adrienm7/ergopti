@@ -1,0 +1,19 @@
+# tests/e2e/fixtures/terminators_array.toml
+# A user-owned table-array list must remain writable through the shared owner.
+
+[script]
+locale = "en"
+
+[hotstrings]
+unknown = "kept"
+
+[[hotstrings.terminators]]
+key = "custom_¤"
+char = "¤"
+label = "¤"
+consume = true
+future = "kept"
+# Keep this user comment.
+
+[other]
+value = 42

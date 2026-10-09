@@ -1,0 +1,363 @@
+{
+	"description": "Explicit scoped category and section choices. Native owners must retain independent engine gates and unrelated choices, and commit the entire plan or refuse it. Inventory contains actionable sections only; separators and module placeholders belong to catalogue normalization.",
+	"vectors": [
+		{
+			"name": "enable-category",
+			"inventory": {
+				"rolls": ["hc", "sx"],
+				"french_autocorrection": ["accents"],
+				"personal": []
+			},
+			"targets": ["rolls"],
+			"enabled": true,
+			"expected": [
+				{
+					"group": "rolls",
+					"enabled": true
+				},
+				{
+					"group": "rolls",
+					"section": "hc",
+					"enabled": true
+				},
+				{
+					"group": "rolls",
+					"section": "sx",
+					"enabled": true
+				}
+			]
+		},
+		{
+			"name": "disable-category",
+			"inventory": {
+				"rolls": ["hc", "sx"],
+				"french_autocorrection": ["accents"],
+				"personal": []
+			},
+			"targets": ["rolls"],
+			"enabled": false,
+			"expected": [
+				{
+					"group": "rolls",
+					"enabled": false
+				},
+				{
+					"group": "rolls",
+					"section": "hc",
+					"enabled": false
+				},
+				{
+					"group": "rolls",
+					"section": "sx",
+					"enabled": false
+				}
+			]
+		},
+		{
+			"name": "enable-language",
+			"inventory": {
+				"rolls": ["hc", "sx"],
+				"french_autocorrection": ["accents"],
+				"personal": []
+			},
+			"targets": ["rolls", "french_autocorrection"],
+			"enabled": true,
+			"expected": [
+				{
+					"group": "rolls",
+					"enabled": true
+				},
+				{
+					"group": "rolls",
+					"section": "hc",
+					"enabled": true
+				},
+				{
+					"group": "rolls",
+					"section": "sx",
+					"enabled": true
+				},
+				{
+					"group": "french_autocorrection",
+					"enabled": true
+				},
+				{
+					"group": "french_autocorrection",
+					"section": "accents",
+					"enabled": true
+				}
+			]
+		},
+		{
+			"name": "disable-language",
+			"inventory": {
+				"rolls": ["hc", "sx"],
+				"french_autocorrection": ["accents"],
+				"personal": []
+			},
+			"targets": ["rolls", "french_autocorrection"],
+			"enabled": false,
+			"expected": [
+				{
+					"group": "rolls",
+					"enabled": false
+				},
+				{
+					"group": "rolls",
+					"section": "hc",
+					"enabled": false
+				},
+				{
+					"group": "rolls",
+					"section": "sx",
+					"enabled": false
+				},
+				{
+					"group": "french_autocorrection",
+					"enabled": false
+				},
+				{
+					"group": "french_autocorrection",
+					"section": "accents",
+					"enabled": false
+				}
+			]
+		},
+		{
+			"name": "enable-empty-personal-group",
+			"inventory": {
+				"rolls": ["hc", "sx"],
+				"french_autocorrection": ["accents"],
+				"personal": []
+			},
+			"targets": ["personal"],
+			"enabled": true,
+			"expected": [
+				{
+					"group": "personal",
+					"enabled": true
+				}
+			]
+		},
+		{
+			"name": "disable-empty-personal-group",
+			"inventory": {
+				"rolls": ["hc", "sx"],
+				"french_autocorrection": ["accents"],
+				"personal": []
+			},
+			"targets": ["personal"],
+			"enabled": false,
+			"expected": [
+				{
+					"group": "personal",
+					"enabled": false
+				}
+			]
+		},
+		{
+			"name": "empty-scope",
+			"inventory": {
+				"rolls": ["hc", "sx"],
+				"french_autocorrection": ["accents"],
+				"personal": []
+			},
+			"targets": [],
+			"enabled": true,
+			"refusal": "empty-scope"
+		},
+		{
+			"name": "unknown-category",
+			"inventory": {
+				"rolls": ["hc", "sx"],
+				"french_autocorrection": ["accents"],
+				"personal": []
+			},
+			"targets": ["rolls", "missing"],
+			"enabled": true,
+			"refusal": "unknown-category"
+		},
+		{
+			"name": "duplicate-category",
+			"inventory": {
+				"rolls": ["hc", "sx"],
+				"french_autocorrection": ["accents"],
+				"personal": []
+			},
+			"targets": ["rolls", "rolls"],
+			"enabled": false,
+			"refusal": "invalid-category"
+		},
+		{
+			"name": "dotted-category",
+			"inventory": {
+				"rolls": ["hc", "sx"],
+				"french_autocorrection": ["accents"],
+				"personal": []
+			},
+			"targets": ["bad.id"],
+			"enabled": true,
+			"refusal": "invalid-category"
+		},
+		{
+			"name": "nonboolean-target",
+			"inventory": {
+				"rolls": ["hc", "sx"],
+				"french_autocorrection": ["accents"],
+				"personal": []
+			},
+			"targets": ["rolls"],
+			"enabled": "true",
+			"refusal": "invalid-request"
+		},
+		{
+			"name": "duplicate-section",
+			"inventory": {
+				"rolls": ["hc", "hc"]
+			},
+			"targets": ["rolls"],
+			"enabled": true,
+			"refusal": "invalid-section"
+		},
+		{
+			"name": "separator-is-not-a-section",
+			"inventory": {
+				"rolls": ["hc", "-"]
+			},
+			"targets": ["rolls"],
+			"enabled": true,
+			"refusal": "invalid-section"
+		},
+		{
+			"name": "dotted-section",
+			"inventory": {
+				"rolls": ["hc", "bad.id"]
+			},
+			"targets": ["rolls"],
+			"enabled": true,
+			"refusal": "invalid-section"
+		},
+		{
+			"name": "disable-native-replacement-magic_key",
+			"inventory": {
+				"magic_key": ["text_expansion_symbols", "replace"]
+			},
+			"targets": ["magic_key"],
+			"enabled": false,
+			"expected": [
+				{
+					"group": "magic_key",
+					"enabled": false
+				},
+				{
+					"group": "magic_key",
+					"section": "text_expansion_symbols",
+					"enabled": false
+				},
+				{
+					"group": "magic_key",
+					"section": "replace",
+					"enabled": false
+				}
+			]
+		},
+		{
+			"name": "disable-native-replacement-magickey",
+			"inventory": {
+				"magickey": ["text_expansion_symbols", "replace"]
+			},
+			"targets": ["magickey"],
+			"enabled": false,
+			"expected": [
+				{
+					"group": "magickey",
+					"enabled": false
+				},
+				{
+					"group": "magickey",
+					"section": "text_expansion_symbols",
+					"enabled": false
+				},
+				{
+					"group": "magickey",
+					"section": "replace",
+					"enabled": false
+				}
+			]
+		},
+		{
+			"name": "disable-native-replacement-MagicKey",
+			"inventory": {
+				"MagicKey": ["text_expansion_symbols", "replace"]
+			},
+			"targets": ["MagicKey"],
+			"enabled": false,
+			"expected": [
+				{
+					"group": "MagicKey",
+					"enabled": false
+				},
+				{
+					"group": "MagicKey",
+					"section": "text_expansion_symbols",
+					"enabled": false
+				},
+				{
+					"group": "MagicKey",
+					"section": "replace",
+					"enabled": false
+				}
+			]
+		},
+		{
+			"name": "namespaced-extension-enable",
+			"inventory": {
+				"ext:demo:phrases": ["greetings", "résumé"],
+				"rolls": ["hc"]
+			},
+			"targets": ["ext:demo:phrases"],
+			"enabled": true,
+			"expected": [
+				{
+					"group": "ext:demo:phrases",
+					"enabled": true
+				},
+				{
+					"group": "ext:demo:phrases",
+					"section": "greetings",
+					"enabled": true
+				},
+				{
+					"group": "ext:demo:phrases",
+					"section": "résumé",
+					"enabled": true
+				}
+			]
+		},
+		{
+			"name": "namespaced-extension-disable",
+			"inventory": {
+				"ext:demo:phrases": ["greetings", "résumé"],
+				"rolls": ["hc"]
+			},
+			"targets": ["ext:demo:phrases"],
+			"enabled": false,
+			"expected": [
+				{
+					"group": "ext:demo:phrases",
+					"enabled": false
+				},
+				{
+					"group": "ext:demo:phrases",
+					"section": "greetings",
+					"enabled": false
+				},
+				{
+					"group": "ext:demo:phrases",
+					"section": "résumé",
+					"enabled": false
+				}
+			]
+		}
+	]
+}

@@ -1,0 +1,83 @@
+{
+	"value": "Native 🦀 %s 50%",
+	"rows": [
+		{ "type": "command", "id": "omitted", "i18n": "menu.hotstrings.magic_key_reset" },
+		{
+			"type": "command",
+			"id": "empty",
+			"i18n": "menu.hotstrings.magic_key_reset",
+			"label_prefix": ""
+		},
+		{
+			"type": "command",
+			"id": "indented",
+			"i18n": "menu.hotstrings.magic_key_reset",
+			"label_prefix": "    "
+		},
+		{
+			"type": "command",
+			"id": "unicode",
+			"i18n": "menu.hotstrings.magic_key_reset",
+			"label_prefix": "🦀 é "
+		},
+		{
+			"type": "command",
+			"id": "percent",
+			"i18n": "menu.hotstrings.magic_key_reset",
+			"label_prefix": "%s 50% "
+		},
+		{
+			"type": "command",
+			"id": "affix",
+			"i18n": "menu.hotstrings.magic_key_prefix",
+			"label_prefix": "    ",
+			"caption_layout": "prefix",
+			"caption_joiner": "",
+			"caption_getter": "detail"
+		},
+		{
+			"type": "command",
+			"id": "suffix",
+			"i18n": "menu.hotstrings.magic_key_prefix",
+			"label_prefix": "🦀 ",
+			"caption_layout": "suffix",
+			"caption_joiner": " / ",
+			"caption_getter": "detail"
+		}
+	],
+	"expected": {
+		"en": [
+			"Restore the default key",
+			"Restore the default key",
+			"    Restore the default key",
+			"🦀 é Restore the default key",
+			"%s 50% Restore the default key",
+			"    Magic key: Native 🦀 %s 50%",
+			"🦀 Native 🦀 %s 50% / Magic key: "
+		],
+		"fr": [
+			"Rétablir la touche par défaut",
+			"Rétablir la touche par défaut",
+			"    Rétablir la touche par défaut",
+			"🦀 é Rétablir la touche par défaut",
+			"%s 50% Rétablir la touche par défaut",
+			"    Touche magique : Native 🦀 %s 50%",
+			"🦀 Native 🦀 %s 50% / Touche magique : "
+		]
+	},
+	"legacy": {
+		"type": "command",
+		"id": "legacy",
+		"i18n": "menu.profiles.profile_label_prefix",
+		"caption_getter": "detail",
+		"label_prefix": "    "
+	},
+	"legacy_expected": {
+		"en": "    Profile: Native 🦀 %s 50%",
+		"fr": "    Profil : Native 🦀 %s 50%"
+	},
+	"disabled_expected": {
+		"en": "    Magic key: Native 🦀 %s 50% — Unavailable",
+		"fr": "    Touche magique : Native 🦀 %s 50% — Indisponible"
+	}
+}

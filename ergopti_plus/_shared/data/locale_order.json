@@ -1,0 +1,26 @@
+{
+	"description": "Canonical display order for the language menu, shared by all three drivers and the site so the list can never desync. Latin-script native names first (UTF-8 byte order), non-Latin scripts last — so accented/special-character names like Čeština sit after Türkçe, exactly as the menus render them. Every locale JSON shipped in data/locales/ MUST appear here. The site and the Linux driver read this order at runtime; the macOS and Windows tables are pinned to it. All four are enforced by tools/test/test-locale-order-single-source.cjs.",
+	"order": [
+		"da",
+		"de",
+		"en",
+		"es",
+		"fr",
+		"it",
+		"nl",
+		"no",
+		"pl",
+		"pt",
+		"sv",
+		"tr",
+		"cs",
+		"ru",
+		"uk",
+		"he",
+		"ar",
+		"hi",
+		"zh",
+		"ja",
+		"ko"
+	]
+}

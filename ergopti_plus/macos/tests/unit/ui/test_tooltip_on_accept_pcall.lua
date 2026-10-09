@@ -1,0 +1,52 @@
+--- tests/unit/ui/test_tooltip_on_accept_pcall.lua
+
+--- Regression test for ui-tooltip-1: every _state.on_accept() call site in
+--- tooltip_llm.lua must be dispatched after the eventtap callback. The shared
+--- SyntheticInput FIFO owns the xpcall/logger boundary; the behavioural proof
+--- (including a throwing callback) lives in test_tooltip_action_epoch_guard.lua.
+---
+--- Pre-fix: acceptance ran inline and a callback that throws() propagated into
+--- the eventtap infrastructure. Post-fix: every acceptance is nested inside a
+--- `defer_consumed_action(...)` closure, whose retained FIFO isolates failures
+--- and preserves physical ordering.
+
+local helpers = require("tests.helpers")
+
+-- Selected by a declaration unique to ui/tooltip/tooltip_llm.lua rather than by
+-- path, so moving or splitting the module cannot turn this invariant
+-- into a path error.
+local src = helpers.read_driver_source("local function refresh_chain_timing")
+helpers.assert_true(src ~= nil, "ui/tooltip/tooltip_llm.lua source must be locatable")
+
+local accept_dispatches = 0
+local cursor = 1
+while true do
+	local accept_at = src:find("accept_prediction,", cursor, true)
+	if not accept_at then break end
+	accept_dispatches = accept_dispatches + 1
+	local context_start = math.max(1, accept_at - 260)
+	local context = src:sub(context_start, accept_at)
+	helpers.assert_true(
+		context:find("defer_consumed_action%(") ~= nil,
+		"every acceptance dispatch must be nested in an ordered deferred action"
+	)
+	cursor = accept_at + 1
+end
+
+helpers.assert_eq(accept_dispatches, 4,
+	"Tab, both Enter modes, and numbered acceptance must all use the deferred boundary")
+
+local accept_helper = src:find("local function accept_prediction", 1, true)
+helpers.assert_true(accept_helper ~= nil, "tooltip_llm must centralise caller acceptance")
+local accept_body = src:sub(accept_helper, accept_helper + 500)
+helpers.assert_true(
+	accept_body:find('invoke_user_callback("Prediction acceptance", _state.on_accept, index)', 1, true) ~= nil,
+	"the deferred acceptance helper must invoke the caller through the strict logged boundary"
+)
+
+local adapter_src = helpers.read_driver_source("local function drain_deferred_lifecycle")
+helpers.assert_true(adapter_src ~= nil, "adapters/synthetic_input.lua source must be locatable")
+helpers.assert_true(adapter_src:find("run_logged%(call%.label, call%.callback") ~= nil,
+	"the deferred FIFO must keep its shared xpcall/logger boundary")
+
+print("[PASS] test_tooltip_on_accept_pcall")

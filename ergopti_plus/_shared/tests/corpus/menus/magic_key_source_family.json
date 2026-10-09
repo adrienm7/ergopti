@@ -1,0 +1,101 @@
+{
+	"description": "Independent physical hierarchy from the original MagicKeySourceMenuRows and shared M.menu_rows: Capture, separator, Automatic, separator, every candidate.",
+	"parent": [
+		{
+			"type": "group",
+			"id": "magic_key_source_heading",
+			"i18n": "menu.layout.magic_key_source"
+		}
+	],
+	"children": [
+		{
+			"type": "command",
+			"id": "magic_key_source_capture",
+			"i18n": "menu.layout.magic_key_source.capture",
+			"disabled_when": ["magic_key_source_capture_ready"]
+		},
+		{
+			"type": "---"
+		},
+		{
+			"type": "check",
+			"id": "magic_key_source_automatic",
+			"i18n": "menu.layout.magic_key_source.auto",
+			"checked_when": ["magic_key_source_is_automatic"]
+		},
+		{
+			"type": "---"
+		},
+		{
+			"type": "list",
+			"id": "magic_key_source_candidates"
+		}
+	],
+	"candidates": [
+		"Backquote",
+		"Digit1",
+		"Digit2",
+		"Digit3",
+		"Digit4",
+		"Digit5",
+		"Digit6",
+		"Digit7",
+		"Digit8",
+		"Digit9",
+		"Digit0",
+		"Minus",
+		"Equal",
+		"KeyQ",
+		"KeyW",
+		"KeyE",
+		"KeyR",
+		"KeyT",
+		"KeyY",
+		"KeyU",
+		"KeyI",
+		"KeyO",
+		"KeyP",
+		"BracketLeft",
+		"BracketRight",
+		"KeyA",
+		"KeyS",
+		"KeyD",
+		"KeyF",
+		"KeyG",
+		"KeyH",
+		"KeyJ",
+		"KeyK",
+		"KeyL",
+		"Semicolon",
+		"Quote",
+		"Backslash",
+		"IntlBackslash",
+		"KeyZ",
+		"KeyX",
+		"KeyC",
+		"KeyV",
+		"KeyB",
+		"KeyN",
+		"KeyM",
+		"Comma",
+		"Period",
+		"Slash"
+	],
+	"states": [
+		{
+			"current": "KeyJ",
+			"capture": true,
+			"blocked": "Backquote",
+			"shown": "j   (KeyJ)"
+		},
+		{
+			"current": "auto",
+			"capture": false,
+			"blocked": "",
+			"shown_key": "menu.layout.magic_key_source.auto"
+		}
+	],
+	"caption_separator": " : ",
+	"conflict_separator": " — ",
+	"reason_key": "menu.shortcuts.keyboard.magic_editor_reason.explicit_assignment"
+}

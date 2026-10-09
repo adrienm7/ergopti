@@ -1,0 +1,8 @@
+# _shared/tests/corpus/config_migrations/shipped_magic_key_source_unknown_scan_renamed_on_windows/case.toml
+
+[case]
+description = "A scan code of no candidate key keeps its value under the new name, where the drivers report it as outdated and the cleanup offers it; the migration never invents a key."
+drivers = ["ahk"]
+outcome = "migrated"
+from_version = 4
+to_version = 12

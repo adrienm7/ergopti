@@ -1,0 +1,86 @@
+﻿; tests/meta/test_menu_dynamic_hotstrings_category_gate.ahk
+
+; ==============================================================================
+; MODULE: DynamicHotstrings Category-Gate False-Positive Meta Test (Pattern 5)
+; DESCRIPTION:
+; Regression guard for the "IsCategoryGated unknown-category false positive"
+; finding. The greying logic checked
+; IsCategoryGated(StrSplit(V1CategoryPath, ".")[1]) unconditionally as a
+; second, redundant gate on top of _MasterCategoryFor's own check. For every
+; category BUT DynamicHotstrings this second check is a harmless no-op
+; (their sub-category IS in CategoryEnabled, since Autocorrection /
+; DistancesReduction / SFBsReduction / Rolls / MagicKey each have a real,
+; independent per-file gate). DynamicHotstrings is the one sub-category
+; with NO independent gate -- per menu_hotstrings.ahk's own
+; _HS_CategoriesDynamic comment, it "has no separate gate, so it follows
+; the master directly" -- so IsCategoryGated("DynamicHotstrings") logged a
+; spurious "unknown category" WARNING on every single menu build, for a
+; category name that structurally can never appear in CategoryEnabled.
+;
+; SCOPE: source introspection of ui/menu/menu_engine.ahk.
+;
+; The subject was MenuRowFromManifest until 2026-08-07, when the row and the
+; drawing were split: MenuRowFromManifest decides the label, the tick and the
+; greying, and MenuRowFromManifest is a two-line wrapper that hands the row
+; to the renderer. The rule below did not change -- it moved.
+; ==============================================================================
+
+#Requires AutoHotkey v2.0
+
+
+
+
+; =====================================================
+; =====================================================
+; ======= 1/ DynamicHotstrings is excluded ============
+; =====================================================
+; =====================================================
+
+_MDHCG_CheckDynamicHotstringsExcluded() {
+	Body := _DriverFuncBody("MenuRowFromManifest")
+	Assert(Body != "", "MenuRowFromManifest must exist in ui/menu/menu_engine.ahk")
+
+	Assert(InStr(Body, "IsCategoryGated(") == 0,
+		"editable children must not query independent gates, including categories without their own master")
+	Assert(InStr(Body, "ReadFeatureStateV2(") > 0,
+		"the actual row must retain the user's desired choice behind a disabled master")
+}
+Test("menu: MenuRowFromManifest excludes DynamicHotstrings from the redundant sub-category IsCategoryGated check (menu-category-gate-false-positive)",
+	_MDHCG_CheckDynamicHotstringsExcluded)
+
+_MDHCG_CheckOtherHotstringSubcategoriesStillChecked() {
+	Body := _DriverFuncBody("MenuRowFromManifest")
+	Assert(Body != "", "the manifest row builder must exist")
+	Projection := _DriverFuncBody("ApplyMasterGatesToFeatures")
+	Assert(Projection != "", "the effective-state projection must exist")
+	Assert(InStr(Projection, "CategoryGateFn.Call(SubV1)") > 0,
+		"real subcategory masters must keep gating native state while the menu remains editable")
+}
+Test("menu: real hotstring subcategories gate runtime independently of editable rows (menu-category-gate-false-positive)",
+	_MDHCG_CheckOtherHotstringSubcategoriesStillChecked)
+
+
+
+
+; =====================================================
+; =====================================================
+; ======= 2/ Long date uses one clock snapshot ========
+; =====================================================
+; =====================================================
+
+_MDHCG_LongDateUsesSharedFormatter() {
+	Body := _DriverFuncBody("_ApplyMenuLabelDynamicSubstitutions")
+	Assert(Body != "", "_ApplyMenuLabelDynamicSubstitutions must exist in ui/menu/menu_engine.ahk")
+
+	CasePos := InStr(Body, 'case "hotstrings.dynamic.date_long_fr":')
+	NextCasePos := InStr(Body, 'case "hotstrings.dynamic.date":', , CasePos + 1)
+	Assert(CasePos > 0 && NextCasePos > CasePos,
+		"the menu substitution switch must still contain the long French date case")
+	LongDateCase := SubStr(Body, CasePos, NextCasePos - CasePos)
+	Assert(InStr(LongDateCase, "_DateLongFr()") > 0,
+		"the menu label must use the shared single-snapshot French date formatter")
+	Assert(InStr(LongDateCase, "A_WDay") = 0 && InStr(LongDateCase, "FormatTime(") = 0,
+		"the menu label must not resample the live clock while assembling one date")
+}
+Test("menu: long French date label derives every field from one instant (menu-date-single-instant)",
+	_MDHCG_LongDateUsesSharedFormatter)

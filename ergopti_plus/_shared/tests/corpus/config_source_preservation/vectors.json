@@ -1,0 +1,237 @@
+{
+	"_comment": "Independent handwritten source records. Ordinary typed updates own their exact assignments; unknown records, standalone and inline comments, multiline values and foreign siblings retain their complete bytes. Windows adds its existing canonical UTF-8 BOM. The quoted literal-dot update explicitly records the existing Lua refusal boundary; Windows retains its independently tested canonical writable contract. Retained spans do not require a new owned row to occupy any fixed insertion point.",
+	"cases": [
+		{
+			"id": "retired_metrics_records",
+			"source": "# unowned dashboard shortcuts\n[metrics]\nmetrics_shortcut_typing = \"ctrl+alt+m\" # keep typing\nmetrics_shortcut_apps = { future = \"keep\" } # keep apps\n",
+			"updates": [
+				{
+					"section": "metrics",
+					"key": "metrics_enabled",
+					"kind": "boolean",
+					"value": true
+				}
+			],
+			"retained": [
+				"# unowned dashboard shortcuts\n",
+				"[metrics]\n",
+				"metrics_shortcut_typing = \"ctrl+alt+m\" # keep typing\n",
+				"metrics_shortcut_apps = { future = \"keep\" } # keep apps\n"
+			],
+			"owned": [
+				{
+					"section": "metrics",
+					"key": "metrics_enabled",
+					"kind": "boolean",
+					"value": true
+				}
+			]
+		},
+		{
+			"id": "foreign_sibling_comments",
+			"source": "# personal configuration\n[settings]\nenabled = false\n# future settings stay here\nfuture = \"keep # literal\" # private annotation\n\n[neighbor] # foreign owner\nvalue = { nested = \"keep\", flags = [true, false] } # keep structure\n",
+			"updates": [
+				{
+					"section": "settings",
+					"key": "enabled",
+					"kind": "boolean",
+					"value": true
+				}
+			],
+			"retained": [
+				"# personal configuration\n",
+				"\n# future settings stay here\nfuture = \"keep # literal\" # private annotation\n\n[neighbor] # foreign owner\nvalue = { nested = \"keep\", flags = [true, false] } # keep structure\n"
+			],
+			"owned": [
+				{
+					"section": "settings",
+					"key": "enabled",
+					"kind": "boolean",
+					"value": true
+				}
+			]
+		},
+		{
+			"id": "quoted_literal_owned_and_foreign_keys",
+			"source": "[settings]\n\"owned.literal\" = 1\n\"future.label\" = \"keep\" # quoted unknown identity\n",
+			"updates": [
+				{
+					"section": "settings",
+					"key": "owned.literal",
+					"kind": "integer",
+					"value": 2
+				}
+			],
+			"retained": ["\"future.label\" = \"keep\" # quoted unknown identity\n"],
+			"owned": [
+				{
+					"section": "settings",
+					"key": "owned.literal",
+					"kind": "integer",
+					"value": 2
+				}
+			],
+			"lua_admission": "refused_unaddressable",
+			"lua_refusal": "the batch cannot address settings.\"owned.literal\""
+		},
+		{
+			"id": "multiline_foreign_array",
+			"source": "[settings]\nfuture_values = [\n  \"[looks.like.a.header]\", # retain comment\n  \"end\",\n] # retain array footer\nknown = 7\n[neighbor]\nvalue = \"keep\" # future sibling\n",
+			"updates": [
+				{
+					"section": "settings",
+					"key": "known",
+					"kind": "integer",
+					"value": 8
+				}
+			],
+			"retained": [
+				"future_values = [\n  \"[looks.like.a.header]\", # retain comment\n  \"end\",\n] # retain array footer\n",
+				"[neighbor]\nvalue = \"keep\" # future sibling\n"
+			],
+			"owned": [
+				{
+					"section": "settings",
+					"key": "known",
+					"kind": "integer",
+					"value": 8
+				}
+			]
+		},
+		{
+			"id": "absent_deletions_keep_foreign_source",
+			"source": "[settings]\nknown = 7\nfuture = \"keep\" # unrelated row\n[neighbor]\nvalue = \"keep\" # unknown section\n",
+			"updates": [
+				{
+					"section": "settings",
+					"key": "absent",
+					"kind": "delete",
+					"delete": true
+				},
+				{
+					"section": "missing",
+					"key": "absent",
+					"kind": "delete",
+					"delete": true
+				},
+				{
+					"section": "settings",
+					"key": "known",
+					"kind": "integer",
+					"value": 9
+				}
+			],
+			"retained": [
+				"future = \"keep\" # unrelated row\n[neighbor]\nvalue = \"keep\" # unknown section\n"
+			],
+			"owned": [
+				{
+					"section": "settings",
+					"key": "known",
+					"kind": "integer",
+					"value": 9
+				}
+			]
+		},
+		{
+			"id": "standalone_comment_with_all_scalars_owned",
+			"source": "# standalone user annotation\n[settings]\nfirst = 1\n# between owned records\nsecond = 2\n",
+			"updates": [
+				{
+					"section": "settings",
+					"key": "first",
+					"kind": "integer",
+					"value": 3
+				},
+				{
+					"section": "settings",
+					"key": "second",
+					"kind": "integer",
+					"value": 4
+				}
+			],
+			"retained": ["# standalone user annotation\n", "# between owned records\n"],
+			"owned": [
+				{
+					"section": "settings",
+					"key": "first",
+					"kind": "integer",
+					"value": 3
+				},
+				{
+					"section": "settings",
+					"key": "second",
+					"kind": "integer",
+					"value": 4
+				}
+			]
+		},
+		{
+			"id": "header_comment_with_all_scalars_owned",
+			"source": "[settings] # unrelated header annotation\nfirst = 1\nsecond = 2\n",
+			"updates": [
+				{
+					"section": "settings",
+					"key": "first",
+					"kind": "integer",
+					"value": 3
+				},
+				{
+					"section": "settings",
+					"key": "second",
+					"kind": "integer",
+					"value": 4
+				}
+			],
+			"retained": ["[settings] # unrelated header annotation\n"],
+			"owned": [
+				{
+					"section": "settings",
+					"key": "first",
+					"kind": "integer",
+					"value": 3
+				},
+				{
+					"section": "settings",
+					"key": "second",
+					"kind": "integer",
+					"value": 4
+				}
+			]
+		},
+		{
+			"id": "all_owned_scalar_canonical_boundary",
+			"source": "[settings]\nz = 1\na = 2\n",
+			"updates": [
+				{
+					"section": "settings",
+					"key": "a",
+					"kind": "integer",
+					"value": 3
+				},
+				{
+					"section": "settings",
+					"key": "z",
+					"kind": "integer",
+					"value": 4
+				}
+			],
+			"retained": [],
+			"owned": [
+				{
+					"section": "settings",
+					"key": "a",
+					"kind": "integer",
+					"value": 3
+				},
+				{
+					"section": "settings",
+					"key": "z",
+					"kind": "integer",
+					"value": 4
+				}
+			],
+			"windows_canonical": "[settings]\na = 3\nz = 4\n"
+		}
+	]
+}

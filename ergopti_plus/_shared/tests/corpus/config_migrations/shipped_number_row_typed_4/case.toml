@@ -1,0 +1,6 @@
+[case]
+description = "Typed number-row migration preserves source ownership."
+drivers = ["ahk"]
+outcome = "migrated"
+from_version = 9
+to_version = 12

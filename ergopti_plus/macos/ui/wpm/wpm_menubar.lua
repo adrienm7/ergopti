@@ -1,0 +1,271 @@
+--- ui/wpm/wpm_menubar.lua
+
+--- ==============================================================================
+--- MODULE: WPM Menubar UI
+--- DESCRIPTION:
+--- Displays the current Words-Per-Minute typing speed directly in the macOS
+--- global menubar.
+---
+--- FEATURES & RATIONALE:
+--- 1. Unobtrusive: Only appears when the user is actively typing.
+--- 2. Decoupled: Polls the core keylogger engine autonomously.
+--- 3. Dynamic Styling: Matches widget coloring dynamically with a background.
+--- ==============================================================================
+
+local M = {}
+
+local hs        = hs
+local keylogger = require("modules.keylogger")
+local WPMShared = require("ui.wpm.shared")
+local Logger    = require("infra.logger")
+local TimerScheduler = require("adapters.timer_scheduler")
+
+local LOG = "wpm_menubar"
+
+local _menubar           = nil
+local _timer             = nil
+local _running           = false -- true between start() and stop(); guards redundant restarts
+-- A failed pause rollback can leave the runtime stopped while the pre-pause
+-- intent is still owed. Keep that ownership outside `_running` so a later
+-- pause transaction inventories this surface again and can finish restoring it.
+local _pause_restore_pending = false
+local _use_source_colors = true
+local _generation        = 0
+
+-- The colour hold and the refresh, from the shared timings registry — the
+-- same hold the floating widget reads, so the two agree on how long a source
+-- colour lingers. The registry fails fast on a missing key: no literal copy.
+local Timings = require("infra.timings")
+local COLOR_HOLD_S = Timings.sec("ui", "wpm_color_hold_ms")
+local UPDATE_S = Timings.sec("ui", "wpm_menubar_update_ms")
+
+
+
+
+
+-- =================================
+-- =================================
+-- ======= 1/ UI Operations ========
+-- =================================
+-- =================================
+
+-- Forward declaration: update_menubar() (the pcall wrapper) is defined before its
+-- body so the body can be a plain local function referenced by name below.
+local update_menubar_body
+local _update_failure_generation = nil
+
+local function is_current(generation)
+	return _running and generation == _generation
+end
+
+--- Fetches the live stats and updates the menubar item.
+--- Wrapped end-to-end in a pcall (mirrors tooltip_hotstring.lua / tooltip_llm.lua):
+--- this runs on a bare hs.timer callback with no caller to catch a raised error,
+--- and there is no hs.uncaughtErrorHandler anywhere in the tree, so an unguarded
+--- fault here would silently kill the 0.5 s timer with nothing in the file logger.
+local function update_menubar(generation)
+	if not is_current(generation) then return false end
+	local ok, result = pcall(update_menubar_body, generation)
+	if not ok and is_current(generation) and _update_failure_generation ~= generation then
+		_update_failure_generation = generation
+		Logger.error(LOG, "WPM menubar update failed (native or dependency failure; content withheld; repeats suppressed).")
+	end
+	return ok and result ~= false and is_current(generation)
+end
+
+--- Actual menubar-update body, wrapped by update_menubar() above.
+update_menubar_body = function(generation)
+	local stats = keylogger.get_live_stats()
+	if not is_current(generation) then return false end
+	local display_wpm = stats.wpm or 0
+	local now = hs.timer.absoluteTime() / 1000000000
+	local active_source = WPMShared.get_active_source(stats, COLOR_HOLD_S, now)
+	if not is_current(generation) then return false end
+	
+	local ok_tooltip, tooltip = pcall(require, "ui.tooltip")
+	local tooltip_visible = false
+	if ok_tooltip and type(tooltip) == "table" and type(tooltip.is_visible) == "function" then
+		tooltip_visible = tooltip.is_visible()
+	end
+	if not is_current(generation) then return false end
+	
+	if display_wpm > 0 or tooltip_visible or (active_source ~= "none") then
+		-- The readout's style: the shared canon's [menubar] section.
+		local canon = WPMShared.canon()
+		if not canon then return false end
+		local style = canon.menubar
+		if not _menubar then 
+			_menubar = hs.menubar.new() 
+			if not _menubar then error("Menubar construction refused") end
+			Logger.debug(LOG, "Menubar item created.")
+		end
+		if not is_current(generation) then return false end
+		local item = _menubar
+		
+		-- Add a translucent background to preserve readability in the menubar
+		local bg_color = nil
+		if _use_source_colors and active_source ~= "none" then
+			bg_color = WPMShared.get_source_color(active_source, style.background_alpha)
+		end
+		if not is_current(generation) or _menubar ~= item then return false end
+		
+		local attrs = { 
+			font = { name = ".AppleSystemUIFont", size = style.font_size },
+			color = { hex = style.text_color, alpha = 1 }
+		}
+		if bg_color then attrs.backgroundColor = bg_color end
+		
+		local styled_title = hs.styledtext.new(WPMShared.format_mpm_label(display_wpm, true), attrs)
+		if not is_current(generation) or _menubar ~= item then return false end
+		item:setTitle(styled_title)
+	else
+		if _menubar then 
+			local item = _menubar
+			item:delete()
+			if _menubar == item then _menubar = nil end
+			if not is_current(generation) then return false end
+			Logger.debug(LOG, "Menubar item hidden (idle).")
+		end
+	end
+end
+
+--- Releases the exact recurring timer while retaining refused cleanup debt.
+--- @return boolean settled True only when no native timer remains owned.
+local function release_timer(handle)
+	if not handle then return true end
+	local ok, settled = xpcall(function()
+		return TimerScheduler.cancel(handle)
+	end, debug.traceback)
+	if not ok or settled ~= true then
+		Logger.error(LOG, "WPM menubar timer cleanup failed; exact handle retained: %s.",
+			tostring(ok and settled or settled))
+		return false
+	end
+	if _timer == handle then _timer = nil end
+	return true
+end
+
+
+
+
+
+-- =====================================
+-- =====================================
+-- ======= 2/ Public Control API =======
+-- =====================================
+-- =====================================
+
+--- Starts the menubar monitoring loop.
+--- @return boolean committed True only when the recurring timer is active.
+function M.start()
+	-- Idempotent: the menu tree rebuild re-invokes start() on every refresh. Skip the
+	-- redundant timer restart and menubar re-render when already polling — the 0.5 s
+	-- timer already keeps the icon fresh.
+	if _running then
+		_pause_restore_pending = false
+		return true
+	end
+	local before_start = _generation
+	Logger.debug(LOG, "Starting WPM menubar widget…")
+	if before_start ~= _generation then return false end
+	if not release_timer(_timer) then
+		Logger.error(LOG, "WPM menubar start refused: prior timer cleanup remains pending.")
+		return false
+	end
+	if before_start ~= _generation then return false end
+
+	_generation = _generation + 1
+	local generation = _generation
+	local ok, candidate, committed = xpcall(function()
+		return TimerScheduler.every(UPDATE_S, function()
+			if not _running or generation ~= _generation then return end
+			update_menubar(generation)
+		end)
+	end, debug.traceback)
+	if type(candidate) == "table" then _timer = candidate end
+	if not ok or type(candidate) ~= "table" or committed ~= true then
+		_generation = _generation + 1
+		release_timer(_timer)
+		Logger.error(LOG, "WPM menubar timer acquisition failed: %s.",
+			tostring(ok and committed or candidate))
+		return false
+	end
+	_running = true
+	local updated = update_menubar(generation)
+	if not is_current(generation) then
+		Logger.debug(LOG, "Retired WPM menubar startup discarded.")
+		return false
+	end
+	if not updated then M.stop(); return false end
+	_pause_restore_pending = false
+	Logger.info(LOG, "WPM menubar widget started successfully.")
+	return is_current(generation)
+end
+
+--- Halts the menubar updating and removes the icon.
+--- @return boolean settled True only when the recurring timer was released.
+function M.stop()
+	-- Idempotent: a menu rebuild while the widget is off re-invokes stop() repeatedly.
+	-- Nothing to tear down means nothing to log — return before the start/stop banner.
+	if not _running and not _timer and not _menubar then return true end
+	_running = false
+	_generation = _generation + 1
+	local generation, handle, item = _generation, _timer, _menubar
+	local timer_stopped = release_timer(handle)
+	if item then
+		local ok = pcall(item.delete, item)
+		if not ok then
+			Logger.error(LOG, "WPM menubar item cleanup failed; exact item retained.")
+			return false
+		end
+		if _menubar == item then _menubar = nil end
+	end
+	if generation ~= _generation then return false end
+	Logger.debug(LOG, "Stopping WPM menubar widget…")
+	if generation ~= _generation then return false end
+	if not timer_stopped then
+		Logger.error(LOG, "WPM menubar stop incomplete: timer cleanup remains pending.")
+		return false
+	end
+	Logger.info(LOG, "WPM menubar widget stopped.")
+	return true
+end
+
+function M.is_running()
+	return _running == true or _pause_restore_pending == true
+end
+
+--- Restores a menubar surface that the pause registry previously stopped.
+--- @return boolean committed
+function M.resume_after_pause()
+	_pause_restore_pending = true
+	return M.start()
+end
+
+--- Enables or disables source-based menubar coloring.
+--- @param enabled boolean Whether source colors should be active.
+function M.set_use_source_colors(enabled)
+	_use_source_colors = enabled ~= false
+	Logger.debug(LOG, "WPM menubar source colors set to %s.", tostring(_use_source_colors))
+end
+
+--- Captures the exact display policy and current native lifecycle posture.
+--- @return table snapshot Detached settings, without canvas or timer handles.
+function M.configuration_snapshot()
+	return { running = M.is_running(), colors = _use_source_colors }
+end
+
+--- Reconciles scope settings through the existing terminal lifecycle owner.
+--- @param config table Previously captured or explicitly planned display settings.
+--- @return boolean committed True only after native resources settle.
+function M.apply_configuration(config)
+	assert(type(config) == "table" and type(config.running) == "boolean"
+		and type(config.colors) == "boolean", "invalid WPM scope configuration")
+	M.set_use_source_colors(config.colors)
+	if config.running then return M.start() == true end
+	if M.stop() ~= true then return false end
+	_pause_restore_pending = false
+	return M.is_running() == false
+end
+
+return M

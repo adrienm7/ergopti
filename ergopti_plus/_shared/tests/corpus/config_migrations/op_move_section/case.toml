@@ -1,0 +1,8 @@
+# _shared/tests/corpus/config_migrations/op_move_section/case.toml
+
+[case]
+description = "move_section moves a section and every section below it; an existing target key wins."
+drivers = ["ahk", "hs", "linux"]
+outcome = "migrated"
+from_version = 1
+to_version = 2

@@ -1,0 +1,27 @@
+# Independently authored foreign root and comments.
+owner = "unchanged"
+
+[autocorrection.caps]
+# Legacy notes survive owned leaf retirement.
+unknown = { preserve = "exact bytes" }
+
+[autocorrection.names]
+delay = 0.2 # Explicit new choice wins.
+show_tooltip = true
+color = "#123456"
+priority = 23
+
+[autocorrection.abbreviations]
+color = "#abcdef"
+delay = 0.875
+priority = 23
+show_tooltip = false
+
+[[foreign.records]]
+text = "caps is not a migration source here"
+
+[autocorrection.technical_terms]
+color = "#123456"
+delay = 0.875
+priority = 23
+show_tooltip = false

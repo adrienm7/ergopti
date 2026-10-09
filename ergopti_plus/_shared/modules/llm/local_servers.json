@@ -1,0 +1,30 @@
+{
+	"_comment": "Single source of truth for the local servers the AI menu detects: servers the user installed and runs, which answer the OpenAI Chat Completions dialect (GET <base_url>/models, POST <base_url>/chat/completions). The driver never installs or starts them: it lists one only when its models endpoint answers, and sends it the requests of the openai format of api_providers.json, with no key unless the user gives one. A server's id must not be a provider id of api_providers.json. base_url is each project's documented default; _source names where it was read. llama-server (llama.cpp) and LocalAI both listen on port 8080 by default, so one probe covers both and the row names both.",
+	"server_order": ["omlx", "lmstudio", "llamacpp", "jan"],
+	"servers": {
+		"omlx": {
+			"label": "oMLX",
+			"base_url": "http://localhost:8000/v1",
+			"_source": "github.com/jundot/omlx: README ('Any OpenAI-compatible client can connect to http://localhost:8000/v1'), omlx/settings.py (host 127.0.0.1, port 8000), omlx/server.py (GET /v1/models, POST /v1/chat/completions; a key only when one is configured).",
+			"auth": "optional"
+		},
+		"lmstudio": {
+			"label": "LM Studio",
+			"base_url": "http://localhost:1234/v1",
+			"_source": "github.com/lmstudio-ai/docs 1_developer/3_openai-compat/index.mdx (base_url http://localhost:1234/v1; GET /v1/models, POST /v1/chat/completions with text and images).",
+			"auth": "optional"
+		},
+		"llamacpp": {
+			"label": "llama.cpp / LocalAI",
+			"base_url": "http://localhost:8080/v1",
+			"_source": "github.com/ggml-org/llama.cpp tools/server/README.md (--host default 127.0.0.1, --port default 8080; GET /v1/models, POST /v1/chat/completions; images with --mmproj). github.com/mudler/LocalAI core/cli/run.go (LOCALAI_ADDRESS default :8080).",
+			"auth": "optional"
+		},
+		"jan": {
+			"label": "Jan",
+			"base_url": "http://localhost:1337/v1",
+			"_source": "github.com/janhq/jan docs/src/pages/docs/desktop/api-server.mdx (host 127.0.0.1, port 1337, prefix /v1; a key only when one is set).",
+			"auth": "optional"
+		}
+	}
+}

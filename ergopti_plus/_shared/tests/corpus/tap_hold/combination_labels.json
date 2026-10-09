@@ -1,0 +1,60 @@
+{
+	"vectors": [
+		{
+			"first": "left_option",
+			"second": "caps_lock",
+			"first_label": "tap_hold.group.left_option",
+			"second_label": "tap_hold.group.caps_lock",
+			"hand": "left",
+			"platforms": ["hs"]
+		},
+		{
+			"first": "right_option",
+			"second": "left_option",
+			"first_label": "tap_hold.group.right_option",
+			"second_label": "tap_hold.group.left_option",
+			"hand": "right",
+			"platforms": ["hs"]
+		},
+		{
+			"first": "fn",
+			"second": "enter",
+			"first_label": "tap_hold.group.fn",
+			"second_label": "tap_hold.group.enter",
+			"hand": "left",
+			"platforms": ["hs"]
+		},
+		{
+			"first": "escape",
+			"second": "enter",
+			"first_label": "tap_hold.group.escape",
+			"second_label": "tap_hold.group.enter",
+			"hand": "left",
+			"platforms": ["ahk", "hs", "linux"]
+		},
+		{
+			"first": "left_ctrl",
+			"second": "right_shift",
+			"first_label": "tap_hold.group.left_ctrl",
+			"second_label": "tap_hold.group.right_shift",
+			"hand": "left",
+			"platforms": ["ahk", "hs", "linux"]
+		},
+		{
+			"first": "alt_gr",
+			"second": "left_alt",
+			"first_label": "tap_hold.group.alt_gr",
+			"second_label": "tap_hold.group.left_alt",
+			"hand": "right",
+			"platforms": ["ahk", "linux"]
+		},
+		{
+			"first": "left_alt",
+			"second": "caps_lock",
+			"first_label": "tap_hold.group.left_alt",
+			"second_label": "tap_hold.group.caps_lock",
+			"hand": "left",
+			"platforms": ["ahk", "linux"]
+		}
+	]
+}

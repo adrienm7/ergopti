@@ -1,0 +1,163 @@
+{
+	"cases": [
+		{
+			"name": "increase",
+			"action": "brightness_up",
+			"before": 40,
+			"target": 45,
+			"receipt": {
+				"version": 1,
+				"action": "brightness_up",
+				"status": "applied",
+				"displays": [
+					{
+						"before": 40,
+						"target": 45,
+						"after": 45
+					}
+				]
+			},
+			"acknowledged": true
+		},
+		{
+			"name": "lower endpoint",
+			"action": "brightness_down",
+			"before": 2,
+			"target": 0,
+			"receipt": {
+				"version": 1,
+				"action": "brightness_down",
+				"status": "applied",
+				"displays": [
+					{
+						"before": 2,
+						"target": 0,
+						"after": 0
+					}
+				]
+			},
+			"acknowledged": true
+		},
+		{
+			"name": "upper endpoint",
+			"action": "brightness_up",
+			"before": 100,
+			"target": 100,
+			"receipt": {
+				"version": 1,
+				"action": "brightness_up",
+				"status": "applied",
+				"displays": [
+					{
+						"before": 100,
+						"target": 100,
+						"after": 100
+					}
+				]
+			},
+			"acknowledged": true
+		},
+		{
+			"name": "provider missing",
+			"action": "brightness_up",
+			"before": 40,
+			"target": 45,
+			"receipt": {
+				"version": 1,
+				"action": "brightness_up",
+				"status": "unsupported",
+				"displays": []
+			},
+			"acknowledged": false
+		},
+		{
+			"name": "write accepted without readback",
+			"action": "brightness_up",
+			"before": 40,
+			"target": 45,
+			"receipt": {
+				"version": 1,
+				"action": "brightness_up",
+				"status": "applied",
+				"displays": [
+					{
+						"before": 40,
+						"target": 45,
+						"after": 40
+					}
+				]
+			},
+			"acknowledged": false
+		},
+		{
+			"name": "foreign action",
+			"action": "brightness_up",
+			"before": 40,
+			"target": 45,
+			"receipt": {
+				"version": 1,
+				"action": "brightness_down",
+				"status": "applied",
+				"displays": [
+					{
+						"before": 40,
+						"target": 35,
+						"after": 35
+					}
+				]
+			},
+			"acknowledged": false
+		},
+		{
+			"name": "partial readback",
+			"action": "brightness_up",
+			"before": 40,
+			"target": 45,
+			"receipt": {
+				"version": 1,
+				"action": "brightness_up",
+				"status": "refused",
+				"displays": [
+					{
+						"before": 40,
+						"target": 45,
+						"after": 45
+					}
+				]
+			},
+			"acknowledged": false
+		},
+		{
+			"name": "no display proof",
+			"action": "brightness_up",
+			"before": 40,
+			"target": 45,
+			"receipt": {
+				"version": 1,
+				"action": "brightness_up",
+				"status": "applied",
+				"displays": []
+			},
+			"acknowledged": false
+		},
+		{
+			"name": "invalid native percent",
+			"action": "brightness_up",
+			"before": 40,
+			"target": 45,
+			"receipt": {
+				"version": 1,
+				"action": "brightness_up",
+				"status": "applied",
+				"displays": [
+					{
+						"before": 40.5,
+						"target": 45,
+						"after": 45
+					}
+				]
+			},
+			"acknowledged": false
+		}
+	]
+}

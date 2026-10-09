@@ -1,0 +1,6 @@
+{
+	"parallel": "basic",
+	"batch": "batch_advanced",
+	"parallel_advanced": "advanced",
+	"base_completion": "raw"
+}

@@ -1,0 +1,96 @@
+﻿; platform/remap/rshift.ahk
+; Requires: TextSender
+
+; ==============================================================================
+; MODULE: Tap-Holds — RShift
+; DESCRIPTION:
+; RShift tap-hold: any action from GESTURE_ACTIONS on tap, RShift on hold.
+; The OS passthrough (~ prefix) keeps RShift functional during the KeyWait
+; window so all Shift+key combinations still reach the OS on hold.
+;
+; Preserved subtleties:
+; - "~$" prefix: passthrough so the physical Shift still reaches the OS
+;   during the KeyWait window (e.g. hotkeys that include Shift still fire).
+; - A_PriorKey == "RShift" guard: allows firing the tap action for very fast
+;   presses that complete under the tap threshold yet still feel intentional,
+;   while blocking spurious taps triggered mid-shortcut.
+; ==============================================================================
+
+#Requires AutoHotkey v2.0
+
+
+
+
+
+; ==========================
+; ==========================
+; ======= 14/ RSHIFT =======
+; ==========================
+; ==========================
+
+_RShiftHoldModKey() {
+	return ResolveHoldModifierKey(TapHoldHoldModifier(TapHold, "right_shift"), "right_shift")
+}
+
+_RShiftHandleHold(PhysicalModifierPassthrough) {
+	Result := TapHoldOwnImmediateModifier("right_shift", "SC036",
+		_RShiftHoldModKey(), TapHoldDuration(TapHold, "right_shift"),
+		,,,,,, PhysicalModifierPassthrough)
+	if (Result["tap"] and Result["elapsed_ms"] >= TapMinDurationMs() and TapHoldPriorKeyIsSelf("right_shift"))
+		_RShiftDispatch()
+}
+
+#HotIf _RShiftHoldModKey() == "RShift" and not LayerEnabled
+~*$SC036:: _RShiftHandleHold(true)
+#HotIf TapHoldHoldModifier(TapHold, "right_shift") != "" and _RShiftHoldModKey() != "RShift" and not LayerEnabled
+*$SC036:: _RShiftHandleHold(false)
+#HotIf
+
+; Gate: any configured tap action activates the handler.
+; The hold behaviour (Shift staying Shift) is provided by the OS passthrough
+; via the ~ prefix — no explicit hold logic is needed here.
+#HotIf TapHoldTapAction(TapHold, "right_shift") != "" and TapHoldHoldModifier(TapHold, "right_shift") == "" and TapHoldHoldLayer(TapHold, "right_shift") == "" and not LayerEnabled
+~*$SC036::
+{
+	; Bounded (unlike a bare KeyWait): a lost SC036 key-up can never wedge
+	; this hotkey's tap/hold discrimination forever (hold-keywait-whole-class).
+	TimeBefore := A_TickCount
+	Released := KeyWait("SC036", "T" . TapHoldDuration(TapHold, "right_shift"))
+	TimeAfter := A_TickCount
+	ElapsedMs := TickElapsed(TimeBefore, TimeAfter)
+	tap := Released and (ElapsedMs <= TapHoldDuration(TapHold, "right_shift") * 1000)
+	if (
+		tap
+		and ElapsedMs >= TapMinDurationMs()
+		and TapHoldPriorKeyIsSelf("right_shift")
+	) { ; A_PriorKey allows fast shortcuts under the tap threshold without triggering the tap action mid-combo
+		_RShiftDispatch()
+	}
+}
+#HotIf
+
+; Dispatch the configured tap action for RShift.
+_RShiftDispatch() {
+	_TapHoldFireAction("right_shift")
+}
+
+
+
+
+
+
+
+; =====================================
+; =====================================
+; ======= 14.1) Own auto-repeat =======
+; =====================================
+; =====================================
+
+; The key's own auto-repeat while an owner holds its suppressed press. Under
+; a layer hold no variant above is eligible any more, and the navigation layer
+; would map the repeat (CapsLock repeated its layer Backspace) or let it reach
+; the system. Declared before nav_layer.ahk, so this variant wins there
+; (see TapHoldPressIsOwned).
+#HotIf TapHoldPressIsOwned("right_shift")
+*SC036:: return
+#HotIf

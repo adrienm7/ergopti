@@ -1,0 +1,65 @@
+{
+	"version": 1,
+	"providers": [
+		{
+			"id": "shell",
+			"mode": "script",
+			"extensions": ["sh"],
+			"commands": {
+				"linux": ["sh"],
+				"hs": ["sh"]
+			},
+			"prefix": []
+		},
+		{
+			"id": "bash",
+			"mode": "script",
+			"extensions": ["bash"],
+			"commands": {
+				"linux": ["bash"],
+				"hs": ["bash"]
+			},
+			"prefix": []
+		},
+		{
+			"id": "python",
+			"mode": "script",
+			"extensions": ["py"],
+			"commands": {
+				"linux": ["python3"],
+				"hs": ["python3"],
+				"ahk": ["python3.exe", "python.exe"]
+			},
+			"prefix": []
+		},
+		{
+			"id": "powershell",
+			"mode": "script",
+			"extensions": ["ps1"],
+			"commands": {
+				"ahk": ["pwsh.exe", "powershell.exe"]
+			},
+			"prefix": ["-NoProfile", "-NonInteractive", "-File"]
+		},
+		{
+			"id": "autohotkey",
+			"mode": "script",
+			"extensions": ["ahk"],
+			"commands": {
+				"ahk": ["AutoHotkey64.exe", "AutoHotkey.exe"]
+			},
+			"prefix": ["/ErrorStdOut=UTF-8"]
+		},
+		{
+			"id": "executable",
+			"mode": "executable",
+			"extensions": [],
+			"commands": {
+				"linux": [],
+				"hs": [],
+				"ahk": []
+			},
+			"prefix": []
+		}
+	]
+}

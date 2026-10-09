@@ -1,0 +1,8 @@
+# Independent handoff input.
+[hotstrings.editor]
+shortcut = { mods = ["cmd", "shift"], key = "space" }
+keep = "neighbor" # unchanged
+
+[shortcuts.keyboard]
+cmd_shift_space = "none"
+magic_editor = "none"

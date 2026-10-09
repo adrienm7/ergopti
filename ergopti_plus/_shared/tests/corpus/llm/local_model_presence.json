@@ -1,0 +1,90 @@
+{
+	"normalization": [
+		{
+			"name": "QWEN2.5",
+			"expected": "qwen2.5:latest"
+		},
+		{
+			"name": "Qwen2.5:7B",
+			"expected": "qwen2.5:7b"
+		},
+		{
+			"name": "registry.example:5000/team/Qwen",
+			"expected": "registry.example:5000/team/qwen:latest"
+		},
+		{
+			"name": "registry.example:5000/team/Qwen:7B",
+			"expected": "registry.example:5000/team/qwen:7b"
+		},
+		{
+			"name": "",
+			"expected": null
+		}
+	],
+	"missing_responses": [
+		{
+			"status": 404,
+			"error": "model 'qwen2.5:7b' not found",
+			"expected": "qwen2.5:7b"
+		},
+		{
+			"status": 404,
+			"error": "model \"qwen2.5vl:3b\" not found, try pulling it first",
+			"expected": "qwen2.5vl:3b"
+		},
+		{
+			"status": 404,
+			"error": "endpoint not found",
+			"expected": null
+		},
+		{
+			"status": 503,
+			"error": "model 'qwen2.5:7b' not found",
+			"expected": null
+		}
+	],
+	"lists": [
+		{
+			"status": 200,
+			"ok": true,
+			"body": "{\"models\":[]}",
+			"names": []
+		},
+		{
+			"status": 200,
+			"ok": true,
+			"body": "{\"models\":[{\"name\":\"QWEN2.5\",\"model\":\"alias:7B\"}]}",
+			"names": ["qwen2.5:latest", "alias:7b"]
+		},
+		{
+			"status": 200,
+			"ok": true,
+			"body": "{\"models\":{}}",
+			"reason": "unreadable_model_list"
+		},
+		{
+			"status": 200,
+			"ok": true,
+			"body": "not JSON",
+			"reason": "unreadable_model_list"
+		},
+		{
+			"status": 200,
+			"ok": true,
+			"body": "{\"models\":[{}]}",
+			"reason": "unreadable_model_list"
+		},
+		{
+			"status": 404,
+			"ok": false,
+			"body": "{\"models\":[]}",
+			"reason": "model_list_unavailable"
+		},
+		{
+			"status": 0,
+			"ok": false,
+			"body": "",
+			"reason": "model_list_unavailable"
+		}
+	]
+}

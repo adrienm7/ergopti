@@ -1,0 +1,685 @@
+﻿; tests/unit/test_keylogger_reader_sql_fail_loud.ahk
+
+; ==============================================================================
+; MODULE: Keylogger Reader SQL Failure Tests
+; DESCRIPTION:
+; The metrics reader materialises append-only SQL into a cached in-memory DB.
+; A prepare/step/read failure must invalidate only the unpublished candidate.
+; The last-good DB and byte offset stay visible while bounded per-ledger metadata
+; triggers an exact reread after the writer changes the incomplete source file.
+; These tests exercise the real vendored SQLite DLL and the real loader.
+; ==============================================================================
+
+_KLRSQL_OpenMemory() {
+	static ModuleHandle := 0
+	if !ModuleHandle
+		ModuleHandle := DllCall("kernel32\LoadLibraryW", "WStr", SQLiteConst.DLL, "Ptr")
+	AssertTrue(ModuleHandle != 0,
+		"the real SQLite DLL must stay loaded for the lifetime of its DB handle")
+	db := SQLite_Open(":memory:")
+	AssertTrue(db != 0, "the vendored SQLite DLL must open an in-memory database")
+	return db
+}
+
+_KLRSQL_StepFailureReturnsFalse() {
+	db := _KLRSQL_OpenMemory()
+	try {
+		AssertTrue(SQLite_Exec(db,
+			"CREATE TABLE exec_guard (id INTEGER PRIMARY KEY);"),
+			"the constraint fixture table must be created")
+		AssertFalse(SQLite_Exec(db,
+			"INSERT INTO exec_guard VALUES (1); INSERT INTO exec_guard VALUES (1);"),
+			"a non-DONE sqlite3_step result must fail the whole exec call")
+	} finally {
+		try SQLite_Close(db)
+	}
+}
+Test("SQLite exec: step errors return false (reader-sql-fail-loud)",
+	_KLRSQL_StepFailureReturnsFalse)
+
+_KLRSQL_CarryDistinguishesIncompleteFromInvalid() {
+	db := _KLRSQL_OpenMemory()
+	try {
+		AssertTrue(SQLite_Exec(db,
+			"CREATE TABLE carry_guard (id INTEGER PRIMARY KEY);"),
+			"the carry fixture table must be created")
+		Incomplete := SQLite_ExecReturnCarry(db,
+			"INSERT INTO carry_guard VALUES (")
+		AssertTrue(Incomplete is Map,
+			"the chunk parser must return a typed result, not overload a String carry")
+		AssertTrue(Incomplete.Get("ok", false),
+			"a non-final incomplete statement is valid carry, not a hard error")
+		AssertTrue(Incomplete.Get("carry", "") != "",
+			"the incomplete bytes must be preserved for the next chunk")
+
+		Invalid := SQLite_ExecReturnCarry(db, "BROKEN SQL;")
+		AssertTrue(Invalid is Map, "a syntax failure must use the same typed result")
+		AssertFalse(Invalid.Get("ok", true),
+			"complete invalid SQL must fail now instead of masquerading as carry")
+	} finally {
+		try SQLite_Close(db)
+	}
+}
+Test("SQLite chunks: incomplete and invalid tails differ (reader-sql-fail-loud)",
+	_KLRSQL_CarryDistinguishesIncompleteFromInvalid)
+
+_KLRSQL_DebugDoesNotExposeLedgerText() {
+	global _ConfigDir, _AhkSubDir, _LogsDir, _LOGGER_DEBUG_ENABLED
+	SavedConfig := _ConfigDir
+	SavedSubDir := _AhkSubDir
+	SavedLogsDir := _LogsDir
+	SavedDebug := _LOGGER_DEBUG_ENABLED
+	Root := _FSWL_Path() . ".reader-debug"
+	Db := _KLRSQL_OpenMemory()
+	try {
+		DirCreate(Root . "\logs")
+		_ConfigDir := Root . "\"
+		_AhkSubDir := ""
+		; The prefetch trace goes to the logs folder the logger resolves.
+		_LogsDir := Root . "\logs\"
+		_LOGGER_DEBUG_ENABLED := true
+		Marker := "SYNTHETIC_PRIVATE_SQL_TOKEN"
+		Sql := Marker . ";"
+		Result := SQLite_ExecReturnCarry(Db, Sql)
+		AssertFalse(Result["ok"])
+		NativeMessage := StrGet(DllCall(SQLiteConst.DLL . "\sqlite3_errmsg", "Ptr", Db, "Cdecl Ptr"), "UTF-8")
+		AssertContains(NativeMessage, Marker, "positive control: native SQL errors contain ledger text")
+		AssertFalse(InStr(Result["error"], Marker), "the wrapper must neutralize native ledger text")
+		Path := Root . "\data.sql"
+		FileAppend(Sql, Path, "UTF-8-RAW")
+		Offset := -1
+		AssertFalse(KLR_ExecLargeFile(Db, Path, &Offset))
+		AssertEqual(0, Offset, "failed load must not publish consumed bytes")
+		LogPath := Root . "\logs\prefetch.log"
+		AssertTrue(FileExist(LogPath) != "", "the real DEBUG sink must receive the failure")
+		Diagnostic := FileRead(LogPath, "UTF-8")
+		AssertContains(Diagnostic, "KLR chunk exec FAILED", "a private-safe failure must still be diagnosable")
+		AssertContains(Diagnostic, "carry_len=", "retain bounded structural context")
+		AssertFalse(InStr(Diagnostic, Marker), "ledger content must never enter debug diagnostics")
+	} finally {
+		SQLite_Close(Db)
+		_ConfigDir := SavedConfig
+		_AhkSubDir := SavedSubDir
+		_LogsDir := SavedLogsDir
+		_LOGGER_DEBUG_ENABLED := SavedDebug
+		if DirExist(Root)
+			DirDelete(Root, true)
+	}
+}
+Test("KLR reader: DEBUG SQL failure hides ledger content (reader-sql-private-diagnostic)",
+	_KLRSQL_DebugDoesNotExposeLedgerText)
+
+global _KLRSQL_CloneStages := []
+global _KLRSQL_CloneCloseCount := 0
+
+_KLRSQL_ThrowDuringCloneStep(stage) {
+	global _KLRSQL_CloneStages
+	_KLRSQL_CloneStages.Push(stage)
+	if (stage = "backup_step")
+		throw Error("injected sqlite3_backup_step failure")
+}
+
+_KLRSQL_CloseFailedClone(db) {
+	global _KLRSQL_CloneCloseCount
+	_KLRSQL_CloneCloseCount += 1
+	SQLite_Close(db)
+}
+
+_KLRSQL_CloneFailureReleasesEveryOwnedHandle() {
+	global _KLRSQL_CloneStages, _KLRSQL_CloneCloseCount
+	source := _KLRSQL_OpenMemory()
+	_KLRSQL_CloneStages := []
+	_KLRSQL_CloneCloseCount := 0
+	try {
+		AssertTrue(SQLite_Exec(source,
+			"CREATE TABLE clone_guard (id INTEGER PRIMARY KEY); "
+			. "INSERT INTO clone_guard VALUES (1);"),
+			"the clone ownership fixture must populate its source database")
+		clone := SQLite_CloneMemory(source,
+			_KLRSQL_ThrowDuringCloneStep, _KLRSQL_CloseFailedClone)
+		AssertEqual(0, clone,
+			"a thrown backup call must fail closed instead of escaping the wrapper")
+		AssertEqual(3, _KLRSQL_CloneStages.Length,
+			"the exceptional path must reach backup cleanup after the injected throw")
+		AssertEqual("backup_init", _KLRSQL_CloneStages[1])
+		AssertEqual("backup_step", _KLRSQL_CloneStages[2])
+		AssertEqual("cleanup_finish", _KLRSQL_CloneStages[3],
+			"the owned sqlite3_backup object must be finished from finally")
+		AssertEqual(1, _KLRSQL_CloneCloseCount,
+			"the unpublished candidate handle must be closed exactly once")
+		Rows := SQLite_Query(source, "SELECT id FROM clone_guard;")
+		AssertEqual(1, Rows.Length,
+			"exceptional clone cleanup must not close or mutate the source handle")
+	} finally {
+		try SQLite_Close(source)
+	}
+}
+Test("SQLite clone: a thrown backup call releases every owned handle (reader-sql-fail-loud)",
+	_KLRSQL_CloneFailureReleasesEveryOwnedHandle)
+
+_KLRSQL_ObservePublishedClose(State, EventKind, Context, Db, Unused) {
+	try {
+		State["calls"] += 1
+		State["event"] := EventKind
+		State["closed"] := Db
+		State["published"] := KLRCache.db
+		State["offset"] := KLRCache.last_sizes.Get("new-ledger", -1)
+		State["old_offset"] := KLRCache.last_sizes.Has("old-ledger")
+		State["identity"] := KLRCache.ledger_snapshots == State["expected_snapshots"]
+		State["pending"] := KLRCache.pending_snapshots.Count
+		State["critical"] := A_IsCritical
+	} catch {
+		State["failed"] := true
+	}
+	return 0
+}
+
+_KLRSQL_PublishCandidateSwapsCompleteTuple(CriticalInterval) {
+	KLR_ResetCache()
+	oldDb := _KLRSQL_OpenMemory()
+	candidate := _KLRSQL_OpenMemory()
+	KLRCache.db := oldDb
+	KLRCache.last_sizes := Map("old-ledger", 17)
+	KLRCache.pending_snapshots := Map("old-ledger",
+		Map("snapshot", Map("ok", true), "end_offset", 24))
+	nextSizes := Map("new-ledger", 42)
+	nextSnapshots := Map("new-ledger", Map("ok", true, "size", 42))
+	State := Map("calls", 0, "failed", false, "expected_snapshots", nextSnapshots)
+	; SQLITE_TRACE_CLOSE observes retirement synchronously. Fast mode keeps the
+	; caller's AHK thread so its Critical interval remains directly observable.
+	Callback := CallbackCreate(_KLRSQL_ObservePublishedClose.Bind(State), "CF", 4)
+	published := false
+	try {
+		AssertEqual(0, DllCall(SQLiteConst.DLL . "\sqlite3_trace_v2", "Ptr", oldDb,
+			"UInt", 8, "Ptr", Callback, "Ptr", 0, "Int"))
+		Critical(CriticalInterval ? CriticalInterval : "Off")
+		try {
+			KLR_PublishCandidate(candidate, nextSizes, nextSnapshots)
+			published := (KLRCache.db = candidate)
+			AssertEqual(CriticalInterval, A_IsCritical,
+				"publication must restore a caller's existing Critical interval")
+		} finally {
+			Critical("Off")
+		}
+		AssertEqual(candidate, KLRCache.db,
+			"the complete tuple must expose the candidate handle")
+		AssertFalse(KLRCache.last_sizes.Has("old-ledger"),
+			"the complete tuple must not retain offsets from the old handle")
+		AssertEqual(42, KLRCache.last_sizes["new-ledger"],
+			"the complete tuple must expose the candidate's offsets")
+		AssertEqual(nextSnapshots, KLRCache.ledger_snapshots,
+			"the complete tuple must expose the candidate's consumed identities")
+		AssertEqual(0, KLRCache.pending_snapshots.Count,
+			"the complete tuple must consume all unpublished carry")
+		AssertEqual(0, A_IsCritical,
+			"the test's non-critical caller state must remain restored")
+		AssertFalse(State["failed"], "the native close observer must not swallow a fixture error")
+		AssertEqual(1, State["calls"], "publication must retire exactly one old connection")
+		AssertEqual(8, State["event"])
+		AssertEqual(oldDb, State["closed"], "the retired handle must be the previous publication")
+		AssertEqual(candidate, State["published"], "the new handle must be visible before old-handle retirement")
+		AssertEqual(42, State["offset"])
+		AssertFalse(State["old_offset"])
+		AssertTrue(State["identity"], "consumed identities must be published before retirement")
+		AssertEqual(0, State["pending"], "pending tails must be retired with the same publication")
+		AssertEqual(CriticalInterval, State["critical"], "native close must run after restoring caller Critical state")
+	} finally {
+		Critical("Off")
+		; On success candidate is owned by KLRCache and oldDb was closed. If
+		; publication threw, KLRCache still owns oldDb and candidate needs closing.
+		KLR_ResetCache()
+		if !published
+			try SQLite_Close(candidate)
+		CallbackFree(Callback)
+	}
+}
+for CriticalInterval in [0, 37]
+	Test("Keylogger reader: candidate publication swaps one complete tuple critical=" . CriticalInterval
+		. " (reader-sql-fail-loud) (reader-publication-close)", _KLRSQL_PublishCandidateSwapsCompleteTuple.Bind(CriticalInterval))
+
+_KLRSQL_WriteFixture(path, sql) {
+	try FileDelete(path)
+	FileAppend(sql, path, "UTF-8")
+	loop files, path, "F"
+		return path
+	throw Error("SQL fixture was not enumerable after creation: " . path)
+}
+
+_KLRSQL_FixtureRetainsStoreSpelling(UpperCase) {
+	_KLRDC_Reset()
+	try {
+		Root := UpperCase ? StrUpper(_KLRDC_Root()) : StrLower(_KLRDC_Root())
+		Path := Root . "by_device\dev-one\data.sql"
+		Sql := "SELECT 1;"
+		WrittenPath := _KLRSQL_WriteFixture(Path, Sql)
+		AssertTrue(WrittenPath == Path, "the fixture must not change its owner's store prefix")
+		AssertEqual(Sql, FileRead(WrittenPath, "UTF-8"))
+		Canonical := ""
+		loop files Path
+			Canonical := A_LoopFileFullPath
+		AssertTrue(Canonical != "" && !(Canonical == Path),
+			"positive control: native enumeration must use a different spelling")
+		AssertTrue(KLR_LedgerFileIsSame(KLR_LedgerSnapshot(WrittenPath), KLR_LedgerSnapshot(Canonical)))
+	} finally {
+		_KLRDC_Cleanup()
+	}
+}
+for UpperCase in [true, false]
+	Test("SQL fixture: preserve " . (UpperCase ? "uppercase" : "lowercase") . " root (reader-sql-fixture-path)",
+		_KLRDC_CheckTeardown.Bind(_KLRSQL_FixtureRetainsStoreSpelling.Bind(UpperCase)))
+
+_KLRSQL_CorruptColdLoadPublishesNothingAndRetries() {
+	global _ConfigDir, _AhkSubDir
+	root := A_Temp . "\ergopti_klr_sql_fail_loud_" . A_TickCount
+	deviceDir := root . "\by_device\test-device"
+	path := deviceDir . "\data.sql"
+	HadSubDir := IsSet(_AhkSubDir)
+	PreviousSubDir := HadSubDir ? _AhkSubDir : ""
+	_AhkSubDir := ""
+	KLR_ResetCache()
+	try {
+		DirCreate(deviceDir)
+		path := _KLRSQL_WriteFixture(path,
+			"CREATE TABLE audit_ingest (id INTEGER PRIMARY KEY); "
+			. "INSERT INTO audit_ingest VALUES (1); "
+			. "BROKEN SQL; "
+			. "INSERT INTO audit_ingest VALUES (2);")
+
+		FailedDb := KLR_BuildDatabase(root)
+		AssertEqual(0, FailedDb,
+			"a complete syntax error in data.sql must fail the cold materialisation")
+		AssertEqual(0, KLRCache.db,
+			"a partially mutated in-memory DB must never become the published cache")
+		AssertEqual(0, KLRCache.last_sizes.Count,
+			"a failed load must not record offsets that make a retry skip unread SQL")
+
+		_KLRSQL_WriteFixture(path,
+			"CREATE TABLE audit_ingest (id INTEGER PRIMARY KEY); "
+			. "INSERT INTO audit_ingest VALUES (1); "
+			. "INSERT INTO audit_ingest VALUES (2);")
+		db := KLR_BuildDatabase(root)
+		AssertTrue(db != 0, "repairing the tail must make the next cold retry succeed")
+		Rows := SQLite_Query(db, "SELECT id FROM audit_ingest ORDER BY id;")
+		AssertEqual(2, Rows.Length,
+			"the successful retry must include both rows instead of skipping past the old failure")
+		AssertEqual(1, Rows[1]["id"])
+		AssertEqual(2, Rows[2]["id"])
+		AssertTrue(KLRCache.last_sizes.Has(path),
+			"only a fully successful load may publish the device offset")
+		AssertEqual(FileGetSize(path), KLRCache.last_sizes[path])
+	} finally {
+		KLR_ResetCache()
+		try DirDelete(root, true)
+		_AhkSubDir := HadSubDir ? PreviousSubDir : ""
+	}
+}
+Test("Keylogger reader: corrupt SQL publishes no cache or offset (reader-sql-fail-loud)",
+	_KLRSQL_CorruptColdLoadPublishesNothingAndRetries)
+
+_KLRSQL_ReplayTypingInsert(Id, Timestamp, Character, Delay := 0) {
+	Events := KL_JsonEncode([[Character, Delay, Map()]])
+	return "INSERT INTO events_typing "
+		. "(device_id,id,ts,date,app,title,url,field_role,layout,document_path,"
+		. "is_fullscreen,in_meeting,mouse_clicks,mouse_scrolls,mouse_distance_px,"
+		. "pause_before_ms,battery_level,audio_volume,wpm,text,rich_text,events_json) VALUES ("
+		. "'poison-device'," . Id . "," . SQLite_Q(Timestamp)
+		. ",'2026-08-24','editor.exe','fixture','','','fr','',"
+		. "0,0,0,0,0,0,NULL,NULL,0,'',''," . SQLite_Q(Events) . ");"
+}
+
+_KLRSQL_CaptureReplayDiagnostic(State, Failure) {
+	State.Push(Failure.Clone())
+}
+
+_KLRSQL_ConsumerFailureRetainsOwnedDiagnostic() {
+	global KLRReplayDiagnosticFn
+	ProbeDb := _KLRSQL_OpenMemory()
+	SQLite_Close(ProbeDb)
+	root := A_Temp . "\ergopti_klr_consumer_failure_" . A_TickCount
+	deviceDir := root . "\by_device\poison-device"
+	path := deviceDir . "\data.sql"
+	HadDiagnosticFn := IsSet(KLRReplayDiagnosticFn)
+	PreviousDiagnosticFn := HadDiagnosticFn ? KLRReplayDiagnosticFn : 0
+	Diagnostics := []
+	KLRReplayDiagnosticFn := _KLRSQL_CaptureReplayDiagnostic.Bind(Diagnostics)
+	try {
+		DirCreate(deviceDir)
+		ValidSql := _KLRSQL_ReplayTypingInsert(
+			1, "2026-08-24 12:34:00.000", "a")
+		PoisonSql := _KLRSQL_ReplayTypingInsert(
+			2, "2026-08-24 12:35:00.000", "b", "xx")
+		_KLRSQL_WriteFixture(path, ValidSql . PoisonSql)
+
+		Failed := KLR_BuildColdCandidate(root . "\", "")
+		AssertFalse(Failed.Get("ok", true),
+			"a throwing walker row must reject the unpublished cold candidate")
+		AssertEqual(0, Failed.Get("db", 0),
+			"the partially replayed database handle must be closed, never published")
+		AssertEqual(1, Diagnostics.Length,
+			"one poison row must emit exactly one owned replay diagnostic")
+		Failure := Failed.Get("failure", 0)
+		AssertTrue(Failure is Map,
+			"the cold-builder receipt must retain the replay failure context")
+		AssertEqual("logical", Failure.Get("sweep", ""),
+			"the diagnostic must name the failing replay statement family")
+		AssertEqual("poison-device", Failure.Get("device_id", ""),
+			"the diagnostic must retain the exact durable device owner")
+		AssertEqual(2, Failure.Get("row_index", 0),
+			"the diagnostic must identify the second delivered logical row")
+		AssertEqual(2, Failure.Get("row_id", 0),
+			"the diagnostic must retain the durable row id without logging its text")
+		AssertEqual("2026-08-24 12:35:00.000", Failure.Get("timestamp", ""),
+			"the diagnostic must retain the malformed row timestamp identity")
+		AssertTrue(InStr(Failure.Get("message", ""), "Number") > 0,
+			"the original invalid-delay cause must survive every replay layer")
+		AssertTrue(Failure.Get("root_error", 0) is Error,
+			"the replay receipt must retain the original Error object, not reconstruct one")
+		AssertEqual(Failure.Get("message", ""), Failure["root_error"].Message,
+			"the published diagnostic message must come from the retained root exception")
+
+		_KLRSQL_WriteFixture(path, ValidSql)
+		Control := KLR_BuildColdCandidate(root . "\", "")
+		AssertTrue(Control.Get("ok", false),
+			"a valid-only cold replay must still build a publishable candidate")
+		AssertEqual(1, Diagnostics.Length,
+			"the valid control must not emit a stale or duplicate diagnostic")
+		try SQLite_Close(Control.Get("db", 0))
+	} finally {
+		KLRReplayDiagnosticFn := HadDiagnosticFn ? PreviousDiagnosticFn : 0
+		try DirDelete(root, true)
+	}
+}
+
+Test("(ahk4-01-walker-replay-diagnostic) consumer failure keeps root context",
+	_KLRSQL_ConsumerFailureRetainsOwnedDiagnostic)
+
+_KLRSQL_BadDeltaPreservesLastGoodAndRetries() {
+	global _AhkSubDir
+	root := A_Temp . "\ergopti_klr_delta_invalid_" . A_TickCount
+	deviceDir := root . "\by_device\test-device"
+	path := deviceDir . "\data.sql"
+	HadSubDir := IsSet(_AhkSubDir)
+	PreviousSubDir := HadSubDir ? _AhkSubDir : ""
+	_AhkSubDir := ""
+	KLR_ResetCache()
+	try {
+		DirCreate(deviceDir)
+		InitialSql := "CREATE TABLE audit_invalid_delta (id INTEGER PRIMARY KEY); "
+			. "INSERT INTO audit_invalid_delta VALUES (1);"
+		path := _KLRSQL_WriteFixture(path, InitialSql)
+		db := KLR_BuildDatabase(root)
+		AssertTrue(db != 0, "the initial invalid-delta fixture must build")
+		PublishedDb := db
+		LoadedSize := KLRCache.last_sizes[path]
+
+		FileAppend(" BROKEN SQL;", path, "UTF-8")
+		LastGoodDb := KLR_BuildDatabase(root)
+		AssertEqual(PublishedDb, LastGoodDb,
+			"hard-invalid warm SQL must return the last-good database")
+		AssertEqual(PublishedDb, KLRCache.db,
+			"hard-invalid SQL must not replace the live cache with its partial candidate")
+		AssertEqual(LoadedSize, KLRCache.last_sizes[path],
+			"hard-invalid SQL must not advance the published byte offset")
+		Rows := SQLite_Query(KLRCache.db,
+			"SELECT id FROM audit_invalid_delta ORDER BY id;")
+		AssertEqual(1, Rows.Length,
+			"the last-good row must remain queryable after a hard SQL failure")
+
+		_KLRSQL_WriteFixture(path, InitialSql
+			. " INSERT INTO audit_invalid_delta VALUES (2);")
+		db := KLR_BuildDatabase(root)
+		AssertTrue(db != 0 && db != PublishedDb,
+			"repairing the invalid bytes must publish a fresh candidate")
+		Rows := SQLite_Query(db, "SELECT id FROM audit_invalid_delta ORDER BY id;")
+		AssertEqual(2, Rows.Length,
+			"the repaired retry must expose both the old and new rows")
+		AssertEqual(1, Rows[1]["id"])
+		AssertEqual(2, Rows[2]["id"])
+		AssertEqual(FileGetSize(path), KLRCache.last_sizes[path],
+			"only the repaired tail may advance the published offset")
+	} finally {
+		KLR_ResetCache()
+		try DirDelete(root, true)
+		_AhkSubDir := HadSubDir ? PreviousSubDir : ""
+	}
+}
+Test("Keylogger reader: invalid warm delta preserves last good state before repair (reader-sql-fail-loud)",
+	_KLRSQL_BadDeltaPreservesLastGoodAndRetries)
+
+_KLRSQL_BrokenDeltaPreservesLastGoodAndRetries() {
+	global _AhkSubDir
+	root := A_Temp . "\ergopti_klr_delta_fail_loud_" . A_TickCount
+	deviceDir := root . "\by_device\test-device"
+	path := deviceDir . "\data.sql"
+	HadSubDir := IsSet(_AhkSubDir)
+	PreviousSubDir := HadSubDir ? _AhkSubDir : ""
+	_AhkSubDir := ""
+	KLR_ResetCache()
+	try {
+		DirCreate(deviceDir)
+		path := _KLRSQL_WriteFixture(path,
+			"CREATE TABLE audit_delta (id INTEGER PRIMARY KEY); "
+			. "INSERT INTO audit_delta VALUES (1);")
+		db := KLR_BuildDatabase(root)
+		AssertTrue(db != 0, "the initial cache build must succeed")
+		PublishedDb := db
+		LoadedSize := KLRCache.last_sizes[path]
+		AssertEqual(PublishedDb, KLR_BuildDatabase(root),
+			"an unchanged ledger must keep the same handle instead of cloning the full database")
+
+		FileAppend(" BEGIN TRANSACTION; INSERT INTO audit_delta VALUES (", path, "UTF-8")
+		AssertTrue(FileGetSize(path) > LoadedSize,
+			"the fixture must append bytes beyond the published offset")
+		LastGoodDb := KLR_BuildDatabase(root)
+		AssertEqual(PublishedDb, LastGoodDb,
+			"an incomplete warm delta must return the last-good published database")
+		AssertEqual(PublishedDb, KLRCache.db,
+			"a failed candidate must not replace or close the last-good cache")
+		AssertTrue(KLRCache.last_sizes.Has(path),
+			"the published offset must remain observable while the tail is incomplete")
+		AssertEqual(LoadedSize, KLRCache.last_sizes[path],
+			"the reader must not advance beyond bytes that were fully executed")
+		Rows := SQLite_Query(KLRCache.db, "SELECT id FROM audit_delta ORDER BY id;")
+		AssertEqual(1, Rows.Length,
+			"the live projection must retain row A without exposing partial row B")
+		AssertEqual(1, Rows[1]["id"])
+		AssertTrue(KLRCache.pending_snapshots.Has(path),
+			"the incomplete SQL must retain retry metadata under its ledger path")
+		AssertFalse(KLRCache.pending_snapshots[path].Has("sql"),
+			"an incomplete transaction must never retain its unbounded SQL text")
+		AssertTrue(KLRCache.pending_snapshots[path].Get("snapshot", 0) is Map,
+			"the bounded retry metadata must retain the ledger snapshot")
+
+		FileAppend("2);", path, "UTF-8")
+		StillLastGoodDb := KLR_BuildDatabase(root)
+		AssertEqual(PublishedDb, StillLastGoodDb,
+			"a complete statement without COMMIT is still an unpublished writer transaction")
+		AssertEqual(LoadedSize, KLRCache.last_sizes[path],
+			"the offset must remain pinned until SQLite returns to autocommit mode")
+		Rows := SQLite_Query(KLRCache.db, "SELECT id FROM audit_delta ORDER BY id;")
+		AssertEqual(1, Rows.Length,
+			"row B must remain invisible while its source transaction is open")
+
+		FileAppend(" COMMIT;", path, "UTF-8")
+		db := KLR_BuildDatabase(root)
+		AssertTrue(db != 0, "completing the interrupted append must let the retry succeed")
+		AssertTrue(db != PublishedDb,
+			"only the completed candidate may replace the last-good database")
+		Rows := SQLite_Query(db, "SELECT id FROM audit_delta ORDER BY id;")
+		AssertEqual(2, Rows.Length,
+			"the retry must replay the formerly incomplete bytes and load the second row")
+		AssertEqual(1, Rows[1]["id"])
+		AssertEqual(2, Rows[2]["id"])
+		AssertEqual(FileGetSize(path), KLRCache.last_sizes[path],
+			"the byte offset may advance only with the successful candidate publication")
+		AssertFalse(KLRCache.pending_snapshots.Has(path),
+			"publishing the completed tail must consume its per-ledger carry")
+	} finally {
+		KLR_ResetCache()
+		try DirDelete(root, true)
+		_AhkSubDir := HadSubDir ? PreviousSubDir : ""
+	}
+}
+Test("Keylogger reader: failed delta preserves last good state before retry (reader-sql-fail-loud)",
+	_KLRSQL_BrokenDeltaPreservesLastGoodAndRetries)
+
+_KLRSQL_MultiLedgerCarryReplaysEveryDiscardedTail() {
+	global _AhkSubDir
+	root := A_Temp . "\ergopti_klr_multi_ledger_" . A_TickCount
+	deviceADir := root . "\by_device\device-a"
+	deviceBDir := root . "\by_device\device-b"
+	pathA := deviceADir . "\data.sql"
+	pathB := deviceBDir . "\data.sql"
+	HadSubDir := IsSet(_AhkSubDir)
+	PreviousSubDir := HadSubDir ? _AhkSubDir : ""
+	_AhkSubDir := ""
+	KLR_ResetCache()
+	try {
+		DirCreate(deviceADir)
+		DirCreate(deviceBDir)
+		pathA := _KLRSQL_WriteFixture(pathA,
+			"CREATE TABLE audit_multi_a (id INTEGER PRIMARY KEY); "
+			. "INSERT INTO audit_multi_a VALUES (1);")
+		pathB := _KLRSQL_WriteFixture(pathB,
+			"CREATE TABLE audit_multi_b (id INTEGER PRIMARY KEY); "
+			. "INSERT INTO audit_multi_b VALUES (10);")
+		PublishedDb := KLR_BuildDatabase(root)
+		AssertTrue(PublishedDb != 0, "the initial two-ledger fixture must build")
+		LoadedSizeA := KLRCache.last_sizes[pathA]
+		LoadedSizeB := KLRCache.last_sizes[pathB]
+
+		; Ledger A is already complete, but its candidate mutation must remain
+		; unpublished when ledger B is caught between BEGIN and COMMIT.
+		FileAppend(" INSERT INTO audit_multi_a VALUES (2);", pathA, "UTF-8")
+		FileAppend(" BEGIN TRANSACTION; INSERT INTO audit_multi_b VALUES (", pathB, "UTF-8")
+		AssertEqual(PublishedDb, KLR_BuildDatabase(root),
+			"one incomplete ledger must retain the complete last-good projection")
+		AssertEqual(LoadedSizeA, KLRCache.last_sizes[pathA],
+			"a complete sibling tail must not advance while another ledger is incomplete")
+		AssertEqual(LoadedSizeB, KLRCache.last_sizes[pathB],
+			"the incomplete ledger must retain its exact published offset")
+		AssertTrue(KLRCache.pending_snapshots.Has(pathA)
+				&& KLRCache.pending_snapshots.Has(pathB),
+			"every participating ledger must retain its own retry snapshot")
+		AssertEqual(2, KLRCache.pending_snapshots.Count,
+			"per-path metadata must not collapse two ledgers into one ambiguous boundary")
+		AssertFalse(KLRCache.pending_snapshots[pathA].Has("sql")
+				|| KLRCache.pending_snapshots[pathB].Has("sql"),
+			"discarding a multi-ledger candidate must release every SQL string")
+		RowsA := SQLite_Query(KLRCache.db,
+			"SELECT id FROM audit_multi_a ORDER BY id;")
+		RowsB := SQLite_Query(KLRCache.db,
+			"SELECT id FROM audit_multi_b ORDER BY id;")
+		AssertEqual(1, RowsA.Length,
+			"the completed sibling row must remain invisible on the discarded candidate")
+		AssertEqual(1, RowsB.Length,
+			"the incomplete transaction must remain invisible on the discarded candidate")
+
+		FileAppend("20); COMMIT;", pathB, "UTF-8")
+		PublishedAfterRetry := KLR_BuildDatabase(root)
+		AssertTrue(PublishedAfterRetry != 0 && PublishedAfterRetry != PublishedDb,
+			"completing ledger B must publish one fresh all-ledger candidate")
+		RowsA := SQLite_Query(PublishedAfterRetry,
+			"SELECT id FROM audit_multi_a ORDER BY id;")
+		RowsB := SQLite_Query(PublishedAfterRetry,
+			"SELECT id FROM audit_multi_b ORDER BY id;")
+		AssertEqual(2, RowsA.Length,
+			"retry must replay ledger A bytes executed only on the discarded candidate")
+		AssertEqual(2, RowsA[2]["id"])
+		AssertEqual(2, RowsB.Length,
+			"retry must append and commit ledger B's path-specific carry")
+		AssertEqual(20, RowsB[2]["id"])
+		AssertEqual(FileGetSize(pathA), KLRCache.last_sizes[pathA],
+			"ledger A may advance only with the joint successful publication")
+		AssertEqual(FileGetSize(pathB), KLRCache.last_sizes[pathB],
+			"ledger B may advance only with the joint successful publication")
+		AssertEqual(0, KLRCache.pending_snapshots.Count,
+			"joint publication must consume every per-ledger pending tail")
+	} finally {
+		KLR_ResetCache()
+		try DirDelete(root, true)
+		_AhkSubDir := HadSubDir ? PreviousSubDir : ""
+	}
+}
+Test("Keylogger reader: multi-ledger retry replays every discarded tail (reader-sql-fail-loud)",
+	_KLRSQL_MultiLedgerCarryReplaysEveryDiscardedTail)
+
+_KLRSQL_SameLengthRepairInvalidatesPendingSnapshot() {
+	global _AhkSubDir
+	root := A_Temp . "\ergopti_klr_same_length_repair_" . A_TickCount
+	deviceDir := root . "\by_device\test-device"
+	path := deviceDir . "\data.sql"
+	HadSubDir := IsSet(_AhkSubDir)
+	PreviousSubDir := HadSubDir ? _AhkSubDir : ""
+	_AhkSubDir := ""
+	KLR_ResetCache()
+	try {
+		DirCreate(deviceDir)
+		InitialSql := "CREATE TABLE audit_same_length (id INTEGER PRIMARY KEY); "
+			. "INSERT INTO audit_same_length VALUES (1);"
+		path := _KLRSQL_WriteFixture(path, InitialSql)
+		PublishedDb := KLR_BuildDatabase(root)
+		AssertTrue(PublishedDb != 0, "the same-length repair fixture must build")
+		LoadedSize := KLRCache.last_sizes[path]
+
+		IncompleteTail := " INSERT INTO audit_same_length VALUES ("
+		ValidTail := " INSERT INTO audit_same_length VALUES (2);"
+		TargetLength := Max(StrLen(IncompleteTail), StrLen(ValidTail))
+		while (StrLen(IncompleteTail) < TargetLength)
+				IncompleteTail .= " "
+		while (StrLen(ValidTail) < TargetLength)
+				ValidTail .= " "
+		AssertEqual(StrLen(IncompleteTail), StrLen(ValidTail),
+			"the broken and repaired tails must have identical byte length")
+
+		FileAppend(IncompleteTail, path, "UTF-8")
+		AssertEqual(PublishedDb, KLR_BuildDatabase(root),
+			"the initial incomplete tail must retain the last-good database")
+		AssertEqual(LoadedSize, KLRCache.last_sizes[path],
+			"the incomplete tail must retain the exact published offset")
+		AssertTrue(KLRCache.pending_snapshots.Has(path),
+			"the incomplete bytes must be retained for a snapshot-aware retry")
+		PendingSize := FileGetSize(path)
+		PendingSnapshot := KLRCache.pending_snapshots[path].Get("snapshot", 0)
+		AssertTrue(PendingSnapshot is Map && PendingSnapshot.Get("ok", false),
+			"pending carry must retain the file identity and high-resolution mtime")
+
+		; Rewrite through the same file object identity, with the same number of
+		; bytes, then force a distinct mtime. A size-only fast path used to call
+		; this snapshot stable forever and never retried the repaired SQL.
+		fh := FileOpen(path, "w", "UTF-8")
+		AssertTrue(IsObject(fh), "the repair fixture must reopen its ledger in place")
+		try {
+				fh.Write(InitialSql . ValidTail)
+		} finally {
+				try fh.Close()
+		}
+		FileSetTime("20301231235959", path, "M")
+		AssertEqual(PendingSize, FileGetSize(path),
+			"repair must not rely on file growth to become observable")
+		RepairedSnapshot := KLR_LedgerSnapshot(path)
+		AssertTrue(KLR_LedgerFileIsSame(PendingSnapshot, RepairedSnapshot),
+			"the repro must exercise an in-place rewrite, not replacement-file recovery")
+		AssertFalse(KLR_LedgerSnapshotIsSame(PendingSnapshot, RepairedSnapshot),
+			"same identity and size with a changed mtime must be a new snapshot")
+
+		RepairedDb := KLR_BuildDatabase(root)
+		AssertTrue(RepairedDb != 0 && RepairedDb != PublishedDb,
+			"a changed same-length snapshot must retry and publish immediately")
+		Rows := SQLite_Query(RepairedDb,
+			"SELECT id FROM audit_same_length ORDER BY id;")
+		AssertEqual(2, Rows.Length,
+			"the same-length repair must expose the formerly missing row")
+		AssertEqual(2, Rows[2]["id"])
+		AssertEqual(PendingSize, KLRCache.last_sizes[path],
+			"successful repair may publish the already-observed end offset")
+		AssertEqual(0, KLRCache.pending_snapshots.Count,
+			"successful same-length repair must consume its pending snapshot")
+	} finally {
+		KLR_ResetCache()
+		try DirDelete(root, true)
+		_AhkSubDir := HadSubDir ? PreviousSubDir : ""
+	}
+}
+Test("Keylogger reader: same-length repaired tail invalidates its pending snapshot (reader-sql-fail-loud)",
+	_KLRSQL_SameLengthRepairInvalidatesPendingSnapshot)

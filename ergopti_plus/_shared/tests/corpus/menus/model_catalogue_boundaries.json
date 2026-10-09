@@ -1,0 +1,70 @@
+{
+	"boundaries": {
+		"family": {
+			"section": "llm_model_family_boundary",
+			"rows": [
+				{
+					"type": "---",
+					"platforms": ["ahk", "hs"],
+					"unavailable": "hide"
+				}
+			],
+			"projections": {
+				"ahk": [
+					{
+						"separator": true
+					}
+				],
+				"hs": [
+					{
+						"separator": true
+					}
+				],
+				"linux": []
+			}
+		},
+		"origin": {
+			"section": "llm_model_origin_boundary",
+			"rows": [
+				{
+					"type": "---",
+					"platforms": ["ahk", "hs"],
+					"unavailable": "hide"
+				}
+			],
+			"projections": {
+				"ahk": [
+					{
+						"separator": true
+					}
+				],
+				"hs": [
+					{
+						"separator": true
+					}
+				],
+				"linux": []
+			}
+		}
+	},
+	"published_marker_key": "button.cancel",
+	"marker_english": "Cancel",
+	"provider_caption": "Alibaba Cloud (Qwen)",
+	"first_family_model": "Qwen3-Coder-30B-A3B-Instruct",
+	"second_family_model": "Qwen3-Coder-Next",
+	"family_order": ["Qwen3-Coder-30B-A3B-Instruct", "boundary", "Qwen3-Coder-Next"],
+	"uninstalled_origin_position": {
+		"ahk": 3,
+		"hs": 2
+	},
+	"caption_keys": [
+		"menu.llm.select_model",
+		"menu.llm.model_backend",
+		"menu.llm.model_source",
+		"menu.llm.download_model",
+		"menu.llm.delete_model_cache",
+		"button.cancel"
+	],
+	"native_counts_before": [62, 95, 73],
+	"native_counts_after": [60, 93, 73]
+}

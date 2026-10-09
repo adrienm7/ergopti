@@ -1,0 +1,200 @@
+{
+	"description": "Which index a layout catalogue shows after one refresh of the registry index, and why the network one is missing. Each case gives the response to the conditional GET of index.json (status 0 = no HTTP response), whether a cached index and an index shipped with the app exist, and the expected outcome: the index shown (network, cache, bundled or none), whether the fresh index is stored, the ETag kept and the error code. An empty string stands for none (no ETag, no index, no error). Bodies: 'fresh', 'cached' and 'shipped' are the indexes below serialised as JSON, 'not_json' an HTML proxy page, 'no_layouts' a JSON object without a layouts list, 'oversized' the fresh index padded past max_bytes. Replayed by _shared/lua/layouts/catalogue.lua (macOS and Linux) and windows/modules/keymap/keylayout/layout_catalogue.ahk.",
+	"max_bytes": 4096,
+	"indexes": {
+		"fresh": {
+			"schema_version": 1,
+			"layouts": [
+				{
+					"id": "sample",
+					"family": "sample",
+					"name": "Sample",
+					"version": "2.0.0",
+					"file": "sample/sample.keylayout",
+					"sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+					"size": 10
+				}
+			]
+		},
+		"cached": {
+			"schema_version": 1,
+			"layouts": [
+				{
+					"id": "sample",
+					"family": "sample",
+					"name": "Sample",
+					"version": "1.0.0",
+					"file": "sample/sample.keylayout",
+					"sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+					"size": 10
+				}
+			]
+		},
+		"shipped": {
+			"schema_version": 1,
+			"layouts": [
+				{
+					"id": "sample",
+					"family": "sample",
+					"name": "Sample",
+					"version": "0.9.0",
+					"file": "sample/sample.keylayout",
+					"sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+					"size": 10
+				}
+			]
+		}
+	},
+	"cases": [
+		{
+			"id": "fresh_index_is_shown_and_stored",
+			"response": { "status": 200, "body": "fresh", "etag": "\"v2\"" },
+			"cached_etag": "",
+			"cache": false,
+			"shipped": true,
+			"expect": {
+				"index": "fresh",
+				"source": "network",
+				"store": true,
+				"etag": "\"v2\"",
+				"error": ""
+			}
+		},
+		{
+			"id": "fresh_index_replaces_the_cache",
+			"response": { "status": 200, "body": "fresh", "etag": "\"v2\"" },
+			"cached_etag": "\"v1\"",
+			"cache": true,
+			"shipped": true,
+			"expect": {
+				"index": "fresh",
+				"source": "network",
+				"store": true,
+				"etag": "\"v2\"",
+				"error": ""
+			}
+		},
+		{
+			"id": "fresh_index_without_etag",
+			"response": { "status": 200, "body": "fresh", "etag": "" },
+			"cached_etag": "",
+			"cache": false,
+			"shipped": false,
+			"expect": { "index": "fresh", "source": "network", "store": true, "etag": "", "error": "" }
+		},
+		{
+			"id": "unchanged_index_keeps_the_cache",
+			"response": { "status": 304, "body": "", "etag": "\"v1\"" },
+			"cached_etag": "\"v1\"",
+			"cache": true,
+			"shipped": true,
+			"expect": {
+				"index": "cached",
+				"source": "cache",
+				"store": false,
+				"etag": "\"v1\"",
+				"error": ""
+			}
+		},
+		{
+			"id": "not_modified_without_a_cache_is_an_error",
+			"response": { "status": 304, "body": "", "etag": "" },
+			"cached_etag": "",
+			"cache": false,
+			"shipped": true,
+			"expect": {
+				"index": "shipped",
+				"source": "bundled",
+				"store": false,
+				"etag": "",
+				"error": "not_modified_without_cache"
+			}
+		},
+		{
+			"id": "offline_shows_the_cache",
+			"response": { "status": 0, "body": "", "etag": "" },
+			"cached_etag": "\"v1\"",
+			"cache": true,
+			"shipped": true,
+			"expect": {
+				"index": "cached",
+				"source": "cache",
+				"store": false,
+				"etag": "\"v1\"",
+				"error": "offline"
+			}
+		},
+		{
+			"id": "offline_without_cache_shows_the_shipped_index",
+			"response": { "status": 0, "body": "", "etag": "" },
+			"cached_etag": "",
+			"cache": false,
+			"shipped": true,
+			"expect": {
+				"index": "shipped",
+				"source": "bundled",
+				"store": false,
+				"etag": "",
+				"error": "offline"
+			}
+		},
+		{
+			"id": "offline_with_nothing_shows_nothing",
+			"response": { "status": 0, "body": "", "etag": "" },
+			"cached_etag": "",
+			"cache": false,
+			"shipped": false,
+			"expect": { "index": "", "source": "none", "store": false, "etag": "", "error": "offline" }
+		},
+		{
+			"id": "server_error_shows_the_cache",
+			"response": { "status": 503, "body": "", "etag": "" },
+			"cached_etag": "\"v1\"",
+			"cache": true,
+			"shipped": true,
+			"expect": {
+				"index": "cached",
+				"source": "cache",
+				"store": false,
+				"etag": "\"v1\"",
+				"error": "http"
+			}
+		},
+		{
+			"id": "proxy_page_is_not_an_index",
+			"response": { "status": 200, "body": "not_json", "etag": "\"p\"" },
+			"cached_etag": "\"v1\"",
+			"cache": true,
+			"shipped": true,
+			"expect": {
+				"index": "cached",
+				"source": "cache",
+				"store": false,
+				"etag": "\"v1\"",
+				"error": "invalid_index"
+			}
+		},
+		{
+			"id": "json_without_layouts_is_not_an_index",
+			"response": { "status": 200, "body": "no_layouts", "etag": "" },
+			"cached_etag": "",
+			"cache": false,
+			"shipped": true,
+			"expect": {
+				"index": "shipped",
+				"source": "bundled",
+				"store": false,
+				"etag": "",
+				"error": "invalid_index"
+			}
+		},
+		{
+			"id": "oversized_index_is_refused",
+			"response": { "status": 200, "body": "oversized", "etag": "" },
+			"cached_etag": "",
+			"cache": false,
+			"shipped": false,
+			"expect": { "index": "", "source": "none", "store": false, "etag": "", "error": "too_large" }
+		}
+	]
+}

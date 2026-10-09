@@ -1,0 +1,4 @@
+# Independent handoff input.
+[hotstrings.editor]
+shortcut = { mods = ["ctrl"], key = "d", future = "keep # bytes" } # tail
+keep = "neighbor" # unchanged

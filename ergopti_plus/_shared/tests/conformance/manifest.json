@@ -1,0 +1,67 @@
+{
+	"_comment": "Conformance ledger — every shared behaviour a driver suite does NOT exercise, and why. A skip that is only prose is indistinguishable from a skip nobody remembers; each entry below is referenced by id from the skip site itself, and tools/test/test-conformance-skips-declared.cjs fails on a skip with no entry, an entry no skip references, or an entry missing a field.",
+	"_status_values": {
+		"platform_gap": "The driver does not implement the behaviour at all. Closing the gap means writing the feature, not the test.",
+		"by_design": "The behaviour is deliberately somewhere else — another layer owns it, and replaying it here would test the wrong component.",
+		"environment": "The behaviour is implemented and tested, but this particular host lacks a tool the test needs. Skipped conditionally, not always."
+	},
+	"_tracked": "Where the work to remove the skip is recorded. \"none\" means there is nothing to remove — the skip is permanent by design.",
+	"entries": [
+		{
+			"id": "CONF-LINUX-LLM-PARSER",
+			"driver": "linux",
+			"subject": "_shared/tests/corpus/llm/parser_test_vectors.json",
+			"status": "platform_gap",
+			"reason": "The Linux daemon has no Lua reply parser; the LLM bridge is macOS-only today.",
+			"tracked": "TODO.md — Lot 5 (Linux driver parity)"
+		},
+		{
+			"id": "CONF-LINUX-PROMPT-BUILDER",
+			"driver": "linux",
+			"subject": "_shared/tests/corpus/prompt_builder/vectors.json",
+			"status": "platform_gap",
+			"reason": "The Linux daemon does not load the shared PromptBuilder, so no code path consumes these vectors.",
+			"tracked": "TODO.md — Lot 5 (Linux driver parity)"
+		},
+		{
+			"id": "CONF-LINUX-LOCALE-CASCADE",
+			"driver": "linux",
+			"subject": "_shared/tests/corpus/locale/resolution_vectors.json",
+			"status": "platform_gap",
+			"reason": "Linux resolves locales through lib/locale.lua rather than the shared cascade these vectors describe. Replaying the shared backbone here is a roadmap item, not a design decision.",
+			"tracked": "TODO.md — Lot 5 (Linux driver parity)"
+		},
+		{
+			"id": "CONF-LINUX-STAT-MTIME",
+			"driver": "linux",
+			"subject": "lib/file_watchers.lua — mtime detection",
+			"status": "environment",
+			"reason": "The watcher tests shell out to stat(1) to observe mtime changes. On a host without stat(1) the behaviour is untestable, not unimplemented — these skip conditionally and run everywhere stat(1) exists, including CI.",
+			"tracked": "none"
+		},
+		{
+			"id": "CONF-LINUX-POSIX-FILE-MODE",
+			"driver": "linux",
+			"subject": "modules/llm/api_entries.lua — the API key file created with mode 0600",
+			"status": "environment",
+			"reason": "The key file is created by open(2) with mode 0600 through LuaJIT's FFI, and the test reads the bits back with stat(1). A Windows checkout has no POSIX permission bits: only there is the mode test deferred, while every entry test runs on a primitive that creates the file without a mode. On Linux, CI included, a missing FFI or stat(1) fails the test.",
+			"tracked": "none"
+		},
+		{
+			"id": "CONF-LINUX-SETSID-RELAY",
+			"driver": "linux",
+			"subject": "modules/updater/restarter.lua — the detached relay that restarts the daemon",
+			"status": "environment",
+			"reason": "The live test detaches the relay with setsid(1), which Git for Windows does not ship, and waits on a real process through kill -0 and /proc/<pid>/stat. Only a Windows host defers it; the relay command itself is tested everywhere. On Linux, CI included, a missing setsid fails the test.",
+			"tracked": "none"
+		},
+		{
+			"id": "CONF-LINUX-PROC-SELF",
+			"driver": "linux",
+			"subject": "modules/updater/restarter.lua — own_pid() read from /proc/self/stat",
+			"status": "environment",
+			"reason": "The daemon reads its own process id from the kernel's /proc/self/stat, which a Windows process does not have. Only a Windows host defers the kernel read; the parsing of a stat line is tested everywhere. On Linux, CI included, an unreadable /proc/self/stat fails the test.",
+			"tracked": "none"
+		}
+	]
+}

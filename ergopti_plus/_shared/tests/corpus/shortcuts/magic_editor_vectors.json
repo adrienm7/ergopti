@@ -1,0 +1,331 @@
+{
+	"version": 1,
+	"vectors": [
+		{
+			"id": "absent_action_follows_direct_semicolon",
+			"changes": {},
+			"expected": {
+				"active": true,
+				"action": "open_hotstrings_editor",
+				"source_code": "Semicolon"
+			}
+		},
+		{
+			"id": "trigger_moves_to_direct_u_grave",
+			"changes": {
+				"trigger": "ù",
+				"candidates": [
+					{
+						"code": "Quote",
+						"native_code": 39,
+						"identity": "physical:Quote",
+						"text": "ù",
+						"direct": true,
+						"dead": false
+					}
+				]
+			},
+			"expected": {
+				"active": true,
+				"action": "open_hotstrings_editor",
+				"source_code": "Quote"
+			}
+		},
+		{
+			"id": "direct_star_comes_from_its_actual_key",
+			"changes": {
+				"trigger": "★",
+				"candidates": [
+					{
+						"code": "KeyC",
+						"native_code": 8,
+						"identity": "physical:KeyC",
+						"text": "★",
+						"direct": true,
+						"dead": false
+					}
+				]
+			},
+			"expected": {
+				"active": true,
+				"action": "open_hotstrings_editor",
+				"source_code": "KeyC"
+			}
+		},
+		{
+			"id": "case_sensitive_trigger_never_selects_lowercase",
+			"changes": {
+				"trigger": "A",
+				"candidates": [
+					{
+						"code": "KeyA",
+						"native_code": 0,
+						"identity": "physical:KeyA",
+						"text": "a",
+						"direct": true,
+						"dead": false
+					}
+				]
+			},
+			"expected": {
+				"active": false,
+				"action": "open_hotstrings_editor",
+				"reason": "source_missing",
+				"source_code": null
+			}
+		},
+		{
+			"id": "shift_required_trigger_stays_inactive",
+			"changes": {
+				"trigger": "*",
+				"candidates": [
+					{
+						"code": "Digit8",
+						"native_code": 28,
+						"identity": "physical:Digit8",
+						"text": "*",
+						"direct": false,
+						"dead": false
+					}
+				]
+			},
+			"expected": {
+				"active": false,
+				"action": "open_hotstrings_editor",
+				"reason": "source_requires_modifiers",
+				"source_code": null
+			}
+		},
+		{
+			"id": "altgr_required_trigger_stays_inactive",
+			"changes": {
+				"trigger": "™",
+				"candidates": [
+					{
+						"code": "Digit2",
+						"native_code": 19,
+						"identity": "physical:Digit2",
+						"text": "™",
+						"direct": false,
+						"dead": false
+					}
+				]
+			},
+			"expected": {
+				"active": false,
+				"action": "open_hotstrings_editor",
+				"reason": "source_requires_modifiers",
+				"source_code": null
+			}
+		},
+		{
+			"id": "dead_accent_is_not_a_direct_tap",
+			"changes": {
+				"trigger": "^",
+				"candidates": [
+					{
+						"code": "BracketLeft",
+						"native_code": 33,
+						"identity": "physical:BracketLeft",
+						"text": "^",
+						"direct": false,
+						"dead": true
+					}
+				]
+			},
+			"expected": {
+				"active": false,
+				"action": "open_hotstrings_editor",
+				"reason": "source_dead",
+				"source_code": null
+			}
+		},
+		{
+			"id": "multiple_physical_sources_are_ambiguous",
+			"changes": {
+				"candidates": [
+					{
+						"code": "Semicolon",
+						"native_code": 41,
+						"identity": "physical:Semicolon",
+						"text": ";",
+						"direct": true,
+						"dead": false
+					},
+					{
+						"code": "Quote",
+						"native_code": 39,
+						"identity": "physical:Quote",
+						"text": ";",
+						"direct": true,
+						"dead": false
+					}
+				]
+			},
+			"expected": {
+				"active": false,
+				"action": "open_hotstrings_editor",
+				"reason": "source_ambiguous",
+				"source_code": null
+			}
+		},
+		{
+			"id": "duplicate_evidence_of_one_physical_identity_is_one_source",
+			"changes": {
+				"candidates": [
+					{
+						"code": "Semicolon",
+						"native_code": 41,
+						"identity": "physical:Semicolon",
+						"text": ";",
+						"direct": true,
+						"dead": false
+					},
+					{
+						"code": "Semicolon",
+						"native_code": 41,
+						"identity": "physical:Semicolon",
+						"text": ";",
+						"direct": true,
+						"dead": false
+					}
+				]
+			},
+			"expected": {
+				"active": true,
+				"action": "open_hotstrings_editor",
+				"source_code": "Semicolon"
+			}
+		},
+		{
+			"id": "explicit_none_keeps_the_conditional_default_cleared",
+			"changes": {
+				"stored_action": "none"
+			},
+			"expected": {
+				"active": false,
+				"action": "none",
+				"reason": "shortcut_disabled",
+				"source_code": "Semicolon"
+			}
+		},
+		{
+			"id": "personal_action_is_preserved_at_the_contextual_slot",
+			"changes": {
+				"stored_action": "copy"
+			},
+			"expected": {
+				"active": true,
+				"action": "copy",
+				"source_code": "Semicolon"
+			}
+		},
+		{
+			"id": "closed_master_keeps_default_configured_without_capture",
+			"changes": {
+				"master": false
+			},
+			"expected": {
+				"active": false,
+				"action": "open_hotstrings_editor",
+				"reason": "shortcuts_disabled",
+				"source_code": "Semicolon"
+			}
+		},
+		{
+			"id": "paused_driver_takes_no_editor_input",
+			"changes": {
+				"paused": true
+			},
+			"expected": {
+				"active": false,
+				"action": "open_hotstrings_editor",
+				"reason": "paused",
+				"source_code": "Semicolon"
+			}
+		},
+		{
+			"id": "inhibited_capture_stays_inactive",
+			"changes": {
+				"inhibited": true
+			},
+			"expected": {
+				"active": false,
+				"action": "open_hotstrings_editor",
+				"reason": "inhibited",
+				"source_code": "Semicolon"
+			}
+		},
+		{
+			"id": "explicit_none_on_the_resolved_chord_wins",
+			"changes": {
+				"claim": "none"
+			},
+			"expected": {
+				"active": false,
+				"action": "open_hotstrings_editor",
+				"reason": "explicit_assignment",
+				"source_code": "Semicolon"
+			}
+		},
+		{
+			"id": "explicit_personal_action_on_the_resolved_chord_wins",
+			"changes": {
+				"claim": "copy"
+			},
+			"expected": {
+				"active": false,
+				"action": "open_hotstrings_editor",
+				"reason": "explicit_assignment",
+				"source_code": "Semicolon"
+			}
+		},
+		{
+			"id": "unavailable_native_source_stays_inactive",
+			"changes": {
+				"status": "unavailable"
+			},
+			"expected": {
+				"active": false,
+				"action": "open_hotstrings_editor",
+				"reason": "source_unavailable",
+				"source_code": null
+			}
+		},
+		{
+			"id": "no_direct_source_never_falls_back_to_ergopti",
+			"changes": {
+				"candidates": []
+			},
+			"expected": {
+				"active": false,
+				"action": "open_hotstrings_editor",
+				"reason": "source_missing",
+				"source_code": null
+			}
+		},
+		{
+			"id": "unrelated_explicit_assignment_does_not_block",
+			"changes": {
+				"unrelated_claim": "copy"
+			},
+			"expected": {
+				"active": true,
+				"action": "open_hotstrings_editor",
+				"source_code": "Semicolon"
+			}
+		},
+		{
+			"id": "changed_trigger_never_keeps_the_previous_key",
+			"changes": {
+				"trigger": "ù"
+			},
+			"expected": {
+				"active": false,
+				"action": "open_hotstrings_editor",
+				"reason": "source_missing",
+				"source_code": null
+			}
+		}
+	]
+}

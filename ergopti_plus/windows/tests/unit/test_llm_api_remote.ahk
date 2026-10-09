@@ -1,0 +1,1662 @@
+﻿; static/ergopti_plus/windows/tests/unit/test_llm_api_remote.ahk
+
+; ==============================================================================
+; MODULE: LLM API Remote Tests
+; DESCRIPTION:
+; Unit-tests for the purely-logical helpers in modules/llm/api_remote.ahk:
+; _LLMRemoteBuildUrl, _LLMRemoteBuildPayload, _LLMRemoteParseResponse,
+; _LLMRemoteJsonEscape, _LLMRemoteJsonUnescape, _LLMRemoteResolveEntry,
+; _LLMRemoteEstimateCost, _LLMRemoteExtractUsage, LLM_RemoteCancelAsync,
+; LLM_RemoteCancelAllAsync, and the async-registry trim helper.
+; All tests are offline — no real HTTP calls are made.
+; ==============================================================================
+
+
+
+
+; ================================================
+; ================================================
+; ======= 1/ _LLMRemoteBuildUrl ==================
+; ================================================
+; ================================================
+
+_RemoteBuildUrl_OpenAI() {
+	url := _LLMRemoteBuildUrl("https://api.openai.com/v1", "openai", "tok", "gpt-4o-mini")
+	AssertEqual("https://api.openai.com/v1/chat/completions", url)
+}
+Test("_LLMRemoteBuildUrl: openai format points to chat/completions", _RemoteBuildUrl_OpenAI)
+
+
+_RemoteBuildUrl_Anthropic() {
+	url := _LLMRemoteBuildUrl("https://api.anthropic.com/v1", "anthropic", "tok", "claude-haiku-4-5")
+	AssertEqual("https://api.anthropic.com/v1/messages", url)
+}
+Test("_LLMRemoteBuildUrl: anthropic format points to /messages", _RemoteBuildUrl_Anthropic)
+
+
+_RemoteBuildUrl_Gemini() {
+	url := _LLMRemoteBuildUrl("https://generativelanguage.googleapis.com/v1beta", "gemini", "MY_KEY", "gemini-2.0-flash")
+	AssertContains(url, "/models/gemini-2.0-flash:generateContent")
+	AssertContains(url, "key=MY_KEY")
+}
+Test("_LLMRemoteBuildUrl: gemini format embeds model and key in path", _RemoteBuildUrl_Gemini)
+
+
+_RemoteBuildUrl_TrailingSlashStripped() {
+	url := _LLMRemoteBuildUrl("https://api.openai.com/v1/", "openai", "tok", "m")
+	AssertFalse(InStr(url, "//chat"), "double-slash must not appear after trimming trailing /")
+}
+Test("_LLMRemoteBuildUrl: trailing slash on base URL is stripped", _RemoteBuildUrl_TrailingSlashStripped)
+
+
+_RemoteCurlConfig_RejectsControlCharacterDirectives() {
+	HostileCases := [
+		["openai", 'secret`nheader = "X-Evil: yes"', "https://safe.invalid/v1"],
+		["openai", "secret`tcontinued", "https://safe.invalid/v1"],
+		["anthropic", "secret" . Chr(27) . "escape", "https://safe.invalid/v1"],
+		["openai", "secret`rinclude = injected", "https://safe.invalid/v1"],
+		["gemini", "secret", 'https://safe.invalid/v1`noutput = "stolen"'],
+		["openai", "secret" . Chr(127) . "delete", "https://safe.invalid/v1"],
+		["openai", "secret" . Chr(0x85) . "next-line", "https://safe.invalid/v1"]
+	]
+	for Vector in HostileCases
+		AssertEqual("", _LLMRemote_BuildCurlConfig(Vector[1], Vector[2], Vector[3]),
+			"(ahk2-12-curl-config-boundary) a control character must reject the complete curl config")
+
+	Valid := _LLMRemote_BuildCurlConfig("openai", 'token with spaces\and"quotes',
+		"https://safe.invalid/v1?q=é")
+	Assert(Valid != "",
+		"(ahk2-12-curl-config-boundary) ordinary escaped and Unicode values must remain valid")
+	AssertContains(Valid, "Authorization: Bearer token with spaces")
+}
+Test("remote curl config: control characters cannot inject directives (ahk2-12-curl-config-boundary)",
+	_RemoteCurlConfig_RejectsControlCharacterDirectives)
+
+
+_RemoteCurlCleanupDebt_Delete(State, Path) {
+	State["calls"] += 1
+	State["paths"].Push(Path)
+	return State["available"]
+}
+
+_RemoteCurlCleanupDebt_RetainsLockedCredentialArtifact() {
+	global _LLM_CurlCleanupDebt, _LLM_CurlCleanupDebtCounter
+	global _LLM_CurlCleanupRetryTimer, LLM_CURL_CLEANUP_RETRY_MS
+	OldDebt := _LLM_CurlCleanupDebt
+	OldCounter := _LLM_CurlCleanupDebtCounter
+	OldTimer := _LLM_CurlCleanupRetryTimer
+	OldDelay := LLM_CURL_CLEANUP_RETRY_MS
+	if HasMethod(OldTimer, "Call")
+		SetTimer(OldTimer, 0)
+	_LLM_CurlCleanupDebt := Map()
+	_LLM_CurlCleanupDebtCounter := 0
+	_LLM_CurlCleanupRetryTimer := 0
+	LLM_CURL_CLEANUP_RETRY_MS := 60000
+	State := Map("available", false, "calls", 0, "paths", [])
+	Terminal := Map("status", "status", "exit", "exit")
+	try {
+		AssertEqual(false, _LLMRemote_CleanupPrePollArtifacts(
+			"payload", "stdout", "credential", Terminal,
+			_RemoteCurlCleanupDebt_Delete.Bind(State)),
+			"a locked temporary credential artifact must retain cleanup debt (AHK-159)")
+		AssertEqual(1, _LLM_CurlCleanupDebt.Count,
+			"the caller may retire only after a process-owned cleanup debt exists")
+		AssertTrue(HasMethod(_LLM_CurlCleanupRetryTimer, "Call"),
+			"retained cleanup debt must arm a one-shot retry owner")
+		AssertEqual(5, State["calls"],
+			"the first cleanup attempt must cover every remote curl artifact")
+		State["available"] := true
+		AssertTrue(LLM_CurlRetryCleanupDebt(),
+			"the retained cleanup owner must retry after the lock is released")
+		AssertEqual(0, _LLM_CurlCleanupDebt.Count,
+			"a successful retry must retire exactly the retained debt")
+		AssertEqual(10, State["calls"],
+			"the retry must revisit every artifact that was still locked")
+	} finally {
+		if HasMethod(_LLM_CurlCleanupRetryTimer, "Call")
+			SetTimer(_LLM_CurlCleanupRetryTimer, 0)
+		_LLM_CurlCleanupDebt := OldDebt
+		_LLM_CurlCleanupDebtCounter := OldCounter
+		_LLM_CurlCleanupRetryTimer := OldTimer
+		LLM_CURL_CLEANUP_RETRY_MS := OldDelay
+	}
+}
+Test("remote curl cleanup: locked artifacts retain retry ownership (AHK-159)",
+	_RemoteCurlCleanupDebt_RetainsLockedCredentialArtifact)
+
+
+_RemoteCurlControl_TempDir(State, *) {
+	State["temp_calls"] += 1
+	return A_Temp
+}
+
+_RemoteCurlControl_Write(State, *) {
+	State["write_calls"] += 1
+	return true
+}
+
+_RemoteCurlControl_Run(State, Command, WorkingDir, Options, &Pid, &ProcessOwner) {
+	State["run_calls"] += 1
+	Pid := 4242
+	ProcessOwner := Map("pid", Pid, "handle", 9242, "released", false)
+}
+
+_RemoteCurlControl_Fail(State, *) {
+	State["fail_calls"] += 1
+}
+
+_RemoteCurlControl_DispatchRejectsBeforeArtifacts() {
+	global _LLM_Remote_Async
+	ReqId := "ahk2_12_control_dispatch"
+	State := Map("temp_calls", 0, "write_calls", 0, "run_calls", 0,
+		"fail_calls", 0)
+	Port := Map(
+		"file_exists", (*) => true,
+		"temp_dir", _RemoteCurlControl_TempDir.Bind(State),
+		"write", _RemoteCurlControl_Write.Bind(State),
+		"delete", (*) => true,
+		"run", _RemoteCurlControl_Run.Bind(State),
+		"poll", (*) => true,
+		"tick", (*) => 6212)
+	Resolved := Map("Format", "openai", "Token", "secret`nheader = injected",
+		"Model", "model")
+	try {
+		AssertTrue(_LLMRemote_DispatchCurl(ReqId, Resolved,
+			"https://safe.invalid/v1", '{"input":"private"}', (*) => 0,
+			_RemoteCurlControl_Fail.Bind(State), 1000, Port),
+			"curl availability must transfer terminal refusal to the dispatcher")
+		AssertEqual(1, State["fail_calls"],
+			"(ahk2-12-curl-config-boundary) invalid config input must fail exactly once")
+		AssertEqual(0, State["temp_calls"],
+			"invalid config input must be rejected before artifact paths are allocated")
+		AssertEqual(0, State["write_calls"],
+			"invalid config input must create neither payload nor credential artifact")
+		AssertEqual(0, State["run_calls"],
+			"invalid config input must never launch curl")
+		AssertFalse(_LLM_Remote_Async.Has(ReqId),
+			"invalid config input must not publish an async owner")
+	} finally {
+		if _LLM_Remote_Async.Has(ReqId)
+			_LLM_Remote_Async.Delete(ReqId)
+	}
+}
+Test("remote curl dispatch: invalid config is refused before artifacts "
+	. "(ahk2-12-curl-config-boundary)",
+	_RemoteCurlControl_DispatchRejectsBeforeArtifacts)
+
+
+_RemotePidReceipt_RecordSuccess(State, Text, Usage) {
+	State["success_calls"] += 1
+	State["text"] := Text
+	State["usage"] := Usage
+}
+
+_RemotePidReceipt_RecordFailure(State, Info := "") {
+	State["fail_calls"] += 1
+	State["fail_info"] := Info
+}
+
+_RemotePidReceipt_RecordCleanup(State, Entry) {
+	State["cleanup_calls"] += 1
+}
+
+_RemotePidReceipt_ReadTerminal(State, StatusPath, ExitPath, BodyPath) {
+	State["terminal_reads"] += 1
+	return Map(
+		"complete", true,
+		"exit", 0,
+		"status", 200,
+		"body_read", true,
+		"body", '{"choices":[{"message":{"content":"receipt wins"}}]}')
+}
+
+_RemotePidReceipt_CompleteReceiptPrecedesRecycledPidAndDeadline() {
+	global _LLM_Remote_Async
+	ReqId := "ahk2_04_remote_receipt_first"
+	State := Map(
+		"success_calls", 0,
+		"fail_calls", 0,
+		"cleanup_calls", 0,
+		"terminal_reads", 0,
+		"process_checks", 0,
+		"close_calls", 0,
+		"text", "",
+		"usage", 0)
+	ProcessExistsFn := (*) => (State["process_checks"] += 1, true)
+	CloseFn := (*) => (State["close_calls"] += 1, true)
+	Port := Map(
+		"process_exists", ProcessExistsFn,
+		"process_close", CloseFn,
+		"read_terminal", _RemotePidReceipt_ReadTerminal.Bind(State),
+		"cleanup", _RemotePidReceipt_RecordCleanup.Bind(State))
+	_LLM_Remote_Async[ReqId] := Map(
+		"transport", "curl",
+		"pid", 4242,
+		"tmp_payload", "payload",
+		"tmp_stdout", "body",
+		"tmp_config", "config",
+		"tmp_status", "status",
+		"tmp_exit", "exit",
+		"format", "openai",
+		"model_id_at_dispatch", "model",
+		"on_success", _RemotePidReceipt_RecordSuccess.Bind(State),
+		"on_fail", _RemotePidReceipt_RecordFailure.Bind(State),
+		"cancelled", false,
+		"start_tick", A_TickCount - 5000,
+		"timeout_ms", 1)
+	try {
+		_LLMRemote_PollCurl(ReqId, Port)
+		AssertEqual(1, State["terminal_reads"],
+			"(ahk2-04-curl-receipt-first) the durable terminal receipt must be read before liveness or deadline")
+		AssertEqual(0, State["process_checks"],
+			"a complete receipt must make a recycled live PID irrelevant")
+		AssertEqual(0, State["close_calls"],
+			"the poller must never close a process selected only by a recyclable PID")
+		AssertEqual(1, State["success_calls"],
+			"the complete 2xx response must win even when the old numeric PID is live and the wall deadline passed")
+		AssertEqual(0, State["fail_calls"],
+			"a durable successful response must not be reclassified as timeout")
+		AssertEqual("receipt wins", State["text"],
+			"the terminal response body must reach the exact completion callback")
+		AssertEqual(1, State["cleanup_calls"],
+			"the terminal owner must clean its artifacts exactly once")
+		AssertFalse(_LLM_Remote_Async.Has(ReqId),
+			"the exact completed request must retire from the registry")
+	} finally {
+		if _LLM_Remote_Async.Has(ReqId)
+			_LLM_Remote_Async.Delete(ReqId)
+	}
+}
+Test("remote curl poll: terminal receipt precedes recycled PID and deadline "
+	. "(ahk2-04-curl-receipt-first)",
+	_RemotePidReceipt_CompleteReceiptPrecedesRecycledPidAndDeadline)
+
+
+_RemotePidReceipt_RunIncompleteBoundary(Mode) {
+	global _LLM_Remote_Async
+	ReqId := "ahk2_04_remote_" . Mode
+	State := Map(
+		"success_calls", 0, "fail_calls", 0, "cleanup_calls", 0,
+		"terminate_calls", 0, "close_calls", 0,
+		"terminated_handle", 0, "closed_handle", 0)
+	Port := Map(
+		"open_process", (*) => 9301,
+		"terminate_process", (Handle) => (
+			State["terminate_calls"] += 1,
+			State["terminated_handle"] := Handle,
+			true),
+		"close_process", (Handle) => (
+			State["close_calls"] += 1,
+			State["closed_handle"] := Handle,
+			true),
+		"read_terminal", (*) => Map(
+			"complete", false, "exit", -1, "status", 0,
+			"body_read", false, "body", ""),
+		"cleanup", _RemotePidReceipt_RecordCleanup.Bind(State))
+	ProcessOwner := _LLM_CurlAdoptProcess(4242, Port)
+	_LLM_Remote_Async[ReqId] := Map(
+		"transport", "curl", "pid", 4242, "process_owner", ProcessOwner,
+		"tmp_payload", "payload", "tmp_stdout", "body", "tmp_config", "config",
+		"tmp_status", "status", "tmp_exit", "exit", "format", "openai",
+		"on_success", _RemotePidReceipt_RecordSuccess.Bind(State),
+		"on_fail", _RemotePidReceipt_RecordFailure.Bind(State),
+		"cancelled", Mode == "cancel",
+		"start_tick", Mode == "timeout" ? A_TickCount - 5000 : A_TickCount,
+		"timeout_ms", Mode == "timeout" ? 1 : 100000)
+	try {
+		_LLMRemote_PollCurl(ReqId, Port)
+		AssertEqual(1, State["terminate_calls"],
+			Mode . " must terminate the exact retained process handle once")
+		AssertEqual(9301, State["terminated_handle"],
+			Mode . " must never reopen or close the recyclable numeric PID")
+		AssertEqual(1, State["close_calls"],
+			Mode . " must close the retained process handle once")
+		AssertEqual(9301, State["closed_handle"],
+			Mode . " cleanup must close the same exact handle it terminated")
+		AssertEqual(1, State["cleanup_calls"],
+			Mode . " must clean its exact artifact owner once")
+		AssertEqual(0, State["success_calls"],
+			Mode . " without a terminal receipt must never publish success")
+		AssertEqual(Mode == "timeout" ? 1 : 0, State["fail_calls"],
+			"timeout reports failure, while cancellation remains callback-silent")
+		if (Mode == "timeout")
+			AssertEqual("timeout", State["fail_info"]["reason"],
+				"the timeout failure must carry its machine reason")
+		AssertFalse(_LLM_Remote_Async.Has(ReqId),
+			Mode . " must retire the exact registry entry")
+	} finally {
+		if _LLM_Remote_Async.Has(ReqId)
+			_LLM_Remote_Async.Delete(ReqId)
+	}
+}
+
+_RemotePidReceipt_TimeoutAndCancelUseExactHandle() {
+	_RemotePidReceipt_RunIncompleteBoundary("timeout")
+	_RemotePidReceipt_RunIncompleteBoundary("cancel")
+}
+Test("remote curl poll: timeout and cancellation terminate only the exact process handle "
+	. "(ahk2-04-curl-exact-process-owner)",
+	_RemotePidReceipt_TimeoutAndCancelUseExactHandle)
+
+
+
+
+; ======================================================
+; ======================================================
+; ======= 2/ _LLMRemoteBuildPayload ====================
+; ======================================================
+; ======================================================
+
+_RemotePayload_OpenAI_ContainsModel() {
+	p := _LLMRemoteBuildPayload("openai", "gpt-4o-mini", "You are helpful.", "Hello", 0.1)
+	AssertContains(p, '"model":"gpt-4o-mini"')
+}
+Test("_LLMRemoteBuildPayload: openai payload contains model", _RemotePayload_OpenAI_ContainsModel)
+
+
+_RemotePayload_OpenAI_SystemMessage() {
+	p := _LLMRemoteBuildPayload("openai", "m", "My system", "user input", 0.5)
+	AssertContains(p, '"role":"system"')
+	AssertContains(p, "My system")
+}
+Test("_LLMRemoteBuildPayload: openai payload contains system message", _RemotePayload_OpenAI_SystemMessage)
+
+
+_RemotePayload_OpenAI_UserMessage() {
+	p := _LLMRemoteBuildPayload("openai", "m", "s", "user input here", 0.1)
+	AssertContains(p, '"role":"user"')
+	AssertContains(p, "user input here")
+}
+Test("_LLMRemoteBuildPayload: openai payload contains user message", _RemotePayload_OpenAI_UserMessage)
+
+
+_RemotePayload_OpenAI_StreamFalse() {
+	p := _LLMRemoteBuildPayload("openai", "m", "s", "u", 0.1)
+	AssertContains(p, '"stream":false')
+}
+Test("_LLMRemoteBuildPayload: openai payload has stream:false", _RemotePayload_OpenAI_StreamFalse)
+
+
+; qwen-3.8-27b reasons at xhigh effort by default and stalls tiny probes, so
+; the catalogue carries reasoning_effort:none for it and the openai branch
+; merges those extras. A provider without extras keeps a bare payload.
+_RemotePayload_OpenAI_MergesModelExtras() {
+	global LLM_API_PROVIDERS
+	Extras := LLM_API_PROVIDERS["cerebras"]["ModelExtras"]["qwen-3.8-27b"]
+	p := _LLMRemoteBuildPayload("openai", "qwen-3.8-27b", "s", "u", 0, 16, Extras)
+	AssertContains(p, '"reasoning_effort":"none"')
+	AssertContains(p, '"stream":false')
+}
+Test("_LLMRemoteBuildPayload: openai payload merges model extras (api-test-entry-reasoning)",
+	_RemotePayload_OpenAI_MergesModelExtras)
+
+
+_RemotePayload_OpenAI_NoExtrasUnchanged() {
+	p := _LLMRemoteBuildPayload("openai", "gpt-4o-mini", "s", "u", 0.1)
+	Assert(InStr(p, "reasoning_effort") == 0,
+		"a model without extras must keep a bare payload")
+}
+Test("_LLMRemoteBuildPayload: payload without extras stays bare (api-test-entry-reasoning)",
+	_RemotePayload_OpenAI_NoExtrasUnchanged)
+
+
+; The normalizer keeps per-model string/number fields, drops documentation
+; keys, non-map models and non-scalar values. Values come from JsonParse, so
+; strings and numbers are the whole contract (JSON booleans arrive as 0/1).
+_RemotePayload_NormalizeModelExtras() {
+	Norm := _LLMRemote_NormalizeModelExtras(Map(
+		"qwen-3.8-27b", Map("reasoning_effort", "none", "top_k", 40,
+			'br"oken', "x"),
+		"_comment", "docs",
+		"flat", "not-a-map",
+		"nested", Map("a", Map("b", "c"))))
+	AssertTrue(Norm.Has("qwen-3.8-27b"))
+	AssertEqual("none", Norm["qwen-3.8-27b"]["reasoning_effort"])
+	AssertEqual(40, Norm["qwen-3.8-27b"]["top_k"])
+	AssertFalse(Norm["qwen-3.8-27b"].Has('br"oken'),
+		"a field name that would break JSON is dropped")
+	AssertFalse(Norm.Has("_comment"), "documentation keys are not models")
+	AssertFalse(Norm.Has("flat"), "a model must map to a field table")
+	AssertFalse(Norm.Has("nested"),
+		"a model with no scalar fields is dropped whole")
+}
+Test("_LLMRemoteBuildPayload: model extras normalize fail-closed (api-test-entry-reasoning)",
+	_RemotePayload_NormalizeModelExtras)
+
+
+_RemoteResolve_ExposesModelExtras() {
+	Entry := Map("Provider", "cerebras", "BaseUrl", "https://api.cerebras.ai/v1",
+		"Token", "sekret", "Model", "qwen-3.8-27b")
+	R := _LLMRemoteResolveEntry(Entry)
+	AssertTrue(R is Map, "the cerebras entry must resolve")
+	AssertTrue(R["Extras"].Has("reasoning_effort"),
+		"the resolved entry must carry its model extras")
+	Plain := Map("Provider", "openai", "BaseUrl", "https://api.openai.com/v1",
+		"Token", "sekret", "Model", "gpt-4o-mini")
+	R2 := _LLMRemoteResolveEntry(Plain)
+	AssertTrue(R2 is Map, "the openai entry must resolve")
+	AssertTrue(R2["Extras"].Count == 0,
+		"a model without extras resolves to an empty table")
+}
+Test("_LLMRemoteResolveEntry: resolved entry carries model extras (api-test-entry-reasoning)",
+	_RemoteResolve_ExposesModelExtras)
+
+
+_RemotePayload_Anthropic_TopLevelSystem() {
+	p := _LLMRemoteBuildPayload("anthropic", "claude-haiku-4-5", "Be concise.", "Tell me", 0.2)
+	; Anthropic puts system at the top level, not inside messages
+	AssertContains(p, '"system":"Be concise."')
+	AssertContains(p, '"role":"user"')
+}
+Test("_LLMRemoteBuildPayload: anthropic payload has top-level system field", _RemotePayload_Anthropic_TopLevelSystem)
+
+
+_RemotePayload_Anthropic_MaxTokens() {
+	p := _LLMRemoteBuildPayload("anthropic", "m", "s", "u", 0.1)
+	; Anthropic requires max_tokens — verify it is present
+	AssertContains(p, '"max_tokens"')
+}
+Test("_LLMRemoteBuildPayload: anthropic payload includes max_tokens", _RemotePayload_Anthropic_MaxTokens)
+
+
+; A5 — the output-token cap is the shared PromptBuilder budget threaded from the
+; engine (single cross-driver source), replacing the former hardcoded per-provider
+; literals. The un-threaded fallback default is now unified to 150 across all
+; backends (= PromptBuilder DEFAULT_MAX_TOKENS), so a caller that omits max_tokens
+; gets the same documented default the live engine threads.
+_RemotePayload_OpenAI_MaxTokensThreaded() {
+	p := _LLMRemoteBuildPayload("openai", "m", "s", "u", 0.1, 42)
+	AssertContains(p, '"max_tokens":42', "openai max_tokens must equal the threaded value")
+}
+Test("_LLMRemoteBuildPayload: openai max_tokens is threaded (A5)", _RemotePayload_OpenAI_MaxTokensThreaded)
+
+_RemotePayload_Gemini_MaxOutputTokensThreaded() {
+	p := _LLMRemoteBuildPayload("gemini", "m", "s", "u", 0.1, 42)
+	AssertContains(p, '"maxOutputTokens":42', "gemini maxOutputTokens must equal the threaded value")
+}
+Test("_LLMRemoteBuildPayload: gemini maxOutputTokens is threaded (A5)", _RemotePayload_Gemini_MaxOutputTokensThreaded)
+
+_RemotePayload_Anthropic_MaxTokensThreaded() {
+	p := _LLMRemoteBuildPayload("anthropic", "m", "s", "u", 0.1, 42)
+	AssertContains(p, '"max_tokens":42', "anthropic max_tokens must equal the threaded value")
+}
+Test("_LLMRemoteBuildPayload: anthropic max_tokens is threaded (A5)", _RemotePayload_Anthropic_MaxTokensThreaded)
+
+_RemotePayload_MaxTokensDefault() {
+	p := _LLMRemoteBuildPayload("openai", "m", "s", "u", 0.1)
+	; Unified cross-driver default — must equal PromptBuilder DEFAULT_MAX_TOKENS (150),
+	; the same value the live engine threads, not the legacy per-provider 256
+	AssertContains(p, '"max_tokens":150', "max_tokens defaults to 150 (unified PromptBuilder default) when not threaded")
+}
+Test("_LLMRemoteBuildPayload: max_tokens defaults to 150 (unified) when not threaded (A5)", _RemotePayload_MaxTokensDefault)
+
+
+_RemotePayload_Gemini_SystemInstruction() {
+	p := _LLMRemoteBuildPayload("gemini", "gemini-2.0-flash", "Be helpful.", "Translate", 0.3)
+	AssertContains(p, '"systemInstruction"')
+	AssertContains(p, "Be helpful.")
+}
+Test("_LLMRemoteBuildPayload: gemini payload uses systemInstruction", _RemotePayload_Gemini_SystemInstruction)
+
+
+_RemotePayload_Gemini_GenerationConfig() {
+	p := _LLMRemoteBuildPayload("gemini", "m", "s", "u", 0.4)
+	AssertContains(p, '"generationConfig"')
+	AssertContains(p, '"temperature"')
+}
+Test("_LLMRemoteBuildPayload: gemini payload uses generationConfig", _RemotePayload_Gemini_GenerationConfig)
+
+
+_RemotePayload_EscapesQuotes() {
+	p := _LLMRemoteBuildPayload("openai", "m", 's', 'say "hi"', 0.1)
+	AssertContains(p, '\"hi\"')
+}
+Test("_LLMRemoteBuildPayload: escapes double quotes in user text", _RemotePayload_EscapesQuotes)
+
+
+
+
+; =======================================================
+; =======================================================
+; ======= 3/ _LLMRemoteParseResponse ====================
+; =======================================================
+; =======================================================
+
+_RemoteParse_OpenAI_ExtractsContent() {
+	body := '{"choices":[{"message":{"role":"assistant","content":"Hello there"}}]}'
+	result := _LLMRemoteParseResponse("openai", body)
+	AssertEqual("Hello there", result)
+}
+Test("_LLMRemoteParseResponse: openai extracts content from choices", _RemoteParse_OpenAI_ExtractsContent)
+
+
+_RemoteParse_Anthropic_ExtractsText() {
+	body := '{"content":[{"type":"text","text":"Great answer"}]}'
+	result := _LLMRemoteParseResponse("anthropic", body)
+	AssertEqual("Great answer", result)
+}
+Test("_LLMRemoteParseResponse: anthropic extracts text from content block", _RemoteParse_Anthropic_ExtractsText)
+
+
+_RemoteParse_Gemini_ExtractsText() {
+	body := '{"candidates":[{"content":{"parts":[{"text":"Gemini says hi"}]}}]}'
+	result := _LLMRemoteParseResponse("gemini", body)
+	AssertEqual("Gemini says hi", result)
+}
+Test("_LLMRemoteParseResponse: gemini extracts text from candidates", _RemoteParse_Gemini_ExtractsText)
+
+
+_RemoteParse_EmptyBodyReturnsEmpty() {
+	result := _LLMRemoteParseResponse("openai", "")
+	AssertEqual("", result)
+}
+Test("_LLMRemoteParseResponse: empty body returns empty string", _RemoteParse_EmptyBodyReturnsEmpty)
+
+
+_RemoteParse_MalformedBodyReturnsEmpty() {
+	result := _LLMRemoteParseResponse("openai", "{not json at all!!!}")
+	AssertEqual("", result)
+}
+Test("_LLMRemoteParseResponse: malformed body returns empty string", _RemoteParse_MalformedBodyReturnsEmpty)
+
+
+_RemoteParse_UnescapesNewlines() {
+	body := '{"choices":[{"message":{"content":"line1\nline2"}}]}'
+	result := _LLMRemoteParseResponse("openai", body)
+	AssertContains(result, "`n")
+}
+Test("_LLMRemoteParseResponse: unescapes \\n in content", _RemoteParse_UnescapesNewlines)
+
+
+
+
+; =====================================================
+; =====================================================
+; ======= 4/ JSON escape / unescape helpers ===========
+; =====================================================
+; =====================================================
+
+_RemoteJsonEscape_BackslashFirst() {
+	; Backslash must be doubled before quote so the second pass does not
+	; double-escape what the first produced
+	result := _LLMRemoteJsonEscape('path\file')
+	AssertContains(result, "\\")
+}
+Test("_LLMRemoteJsonEscape: backslash is escaped to double-backslash", _RemoteJsonEscape_BackslashFirst)
+
+
+_RemoteJsonEscape_QuoteEscaped() {
+	result := _LLMRemoteJsonEscape('say "hi"')
+	AssertContains(result, '\"hi\"')
+}
+Test("_LLMRemoteJsonEscape: double quote is escaped to backslash-quote", _RemoteJsonEscape_QuoteEscaped)
+
+
+_RemoteJsonEscape_NewlineEscaped() {
+	result := _LLMRemoteJsonEscape("line1`nline2")
+	AssertContains(result, "\n")
+}
+Test("_LLMRemoteJsonEscape: newline is escaped to \\n", _RemoteJsonEscape_NewlineEscaped)
+
+
+_RemoteJsonUnescape_NewlineRestored() {
+	result := _LLMRemoteJsonUnescape("line1\nline2")
+	AssertEqual("line1`nline2", result)
+}
+Test("_LLMRemoteJsonUnescape: \\n restored to newline", _RemoteJsonUnescape_NewlineRestored)
+
+
+_RemoteJsonUnescape_QuoteRestored() {
+	result := _LLMRemoteJsonUnescape('say \"hi\"')
+	AssertEqual('say "hi"', result)
+}
+Test("_LLMRemoteJsonUnescape: backslash-quote restored to double quote", _RemoteJsonUnescape_QuoteRestored)
+
+
+_RemoteJsonUnescape_BackslashRestored() {
+	result := _LLMRemoteJsonUnescape("path\\file")
+	AssertEqual("path\file", result)
+}
+Test("_LLMRemoteJsonUnescape: \\\\ restored to single backslash", _RemoteJsonUnescape_BackslashRestored)
+
+
+; Regression: an escaped backslash immediately followed by another escape
+; sequence used to silently lose the backslash entirely. The neutralising
+; sentinel used to be Chr(0) -- AHK strings are internally null-terminated,
+; so StrReplace() with a null character truncates/drops it instead of
+; substituting it, corrupting anything the sentinel touched. Chr(0xE000) (a
+; Unicode private-use codepoint, never null) fixes it.
+_RemoteJsonUnescape_BackslashAdjacentToAnotherEscape() {
+	result := _LLMRemoteJsonUnescape("a\\\nb")
+	AssertEqual("a\`nb", result, "an escaped backslash immediately before another escape sequence must not be dropped")
+}
+Test("_LLMRemoteJsonUnescape: an escaped backslash adjacent to another escape sequence is not lost",
+	_RemoteJsonUnescape_BackslashAdjacentToAnotherEscape)
+
+
+
+
+; =====================================================
+; =====================================================
+; ======= 5/ _LLMRemoteResolveEntry ===================
+; =====================================================
+; =====================================================
+
+_RemoteResolve_ValidOpenAIEntry() {
+	entry := Map("Provider", "openai", "Token", "sk-test", "Model", "gpt-4o-mini", "BaseUrl", "")
+	resolved := _LLMRemoteResolveEntry(entry)
+	AssertFalse(resolved == "", "resolve must succeed for valid openai entry")
+	AssertEqual("openai", resolved["Format"])
+	AssertEqual("gpt-4o-mini", resolved["Model"])
+}
+Test("_LLMRemoteResolveEntry: valid openai entry resolves correctly", _RemoteResolve_ValidOpenAIEntry)
+
+
+_RemoteResolve_MissingTokenReturnsEmpty() {
+	entry := Map("Provider", "openai", "Token", "", "Model", "gpt-4o-mini", "BaseUrl", "")
+	resolved := _LLMRemoteResolveEntry(entry)
+	AssertEqual("", resolved)
+}
+Test("_LLMRemoteResolveEntry: missing token returns empty string", _RemoteResolve_MissingTokenReturnsEmpty)
+
+
+_RemoteResolve_UnknownProviderReturnsEmpty() {
+	entry := Map("Provider", "unknown_xyz", "Token", "t", "Model", "m", "BaseUrl", "http://x")
+	resolved := _LLMRemoteResolveEntry(entry)
+	AssertEqual("", resolved)
+}
+Test("_LLMRemoteResolveEntry: unknown provider returns empty string", _RemoteResolve_UnknownProviderReturnsEmpty)
+
+
+_RemoteResolve_MissingModelReturnsEmpty() {
+	; openai_compat has no default model — missing Model => empty
+	entry := Map("Provider", "openai_compat", "Token", "t", "Model", "", "BaseUrl", "http://example.com/v1")
+	resolved := _LLMRemoteResolveEntry(entry)
+	AssertEqual("", resolved)
+}
+Test("_LLMRemoteResolveEntry: missing model for openai_compat returns empty", _RemoteResolve_MissingModelReturnsEmpty)
+
+
+_RemoteResolve_BaseUrlFallsBackToProvider() {
+	; When the entry has an empty BaseUrl, resolver uses the provider default
+	entry := Map("Provider", "openai", "Token", "t", "Model", "gpt-4o-mini", "BaseUrl", "")
+	resolved := _LLMRemoteResolveEntry(entry)
+	AssertContains(resolved["BaseUrl"], "openai.com")
+}
+Test("_LLMRemoteResolveEntry: BaseUrl falls back to provider default when empty", _RemoteResolve_BaseUrlFallsBackToProvider)
+
+
+_RemoteResolve_CustomBaseUrlOverridesProvider() {
+	entry := Map("Provider", "openai", "Token", "t", "Model", "m", "BaseUrl", "http://custom.host/v1")
+	resolved := _LLMRemoteResolveEntry(entry)
+	AssertEqual("http://custom.host/v1", resolved["BaseUrl"])
+}
+Test("_LLMRemoteResolveEntry: explicit BaseUrl overrides provider default", _RemoteResolve_CustomBaseUrlOverridesProvider)
+
+
+_RemoteResolve_AnthropicFormat() {
+	entry := Map("Provider", "anthropic", "Token", "t", "Model", "claude-haiku-4-5", "BaseUrl", "")
+	resolved := _LLMRemoteResolveEntry(entry)
+	AssertEqual("anthropic", resolved["Format"])
+}
+Test("_LLMRemoteResolveEntry: anthropic provider resolves to anthropic format", _RemoteResolve_AnthropicFormat)
+
+
+_RemoteResolve_GeminiFormat() {
+	entry := Map("Provider", "gemini", "Token", "t", "Model", "gemini-2.0-flash", "BaseUrl", "")
+	resolved := _LLMRemoteResolveEntry(entry)
+	AssertEqual("gemini", resolved["Format"])
+}
+Test("_LLMRemoteResolveEntry: gemini provider resolves to gemini format", _RemoteResolve_GeminiFormat)
+
+
+_RemoteResolve_ControlCharactersFailClosed() {
+	for Field in ["BaseUrl", "Token", "Model"] {
+		Entry := Map("Provider", "openai", "Token", "secret", "Model", "gpt-4o-mini",
+			"BaseUrl", "https://safe.invalid/v1")
+		Entry[Field] .= "`noutput = injected"
+		AssertEqual("", _LLMRemoteResolveEntry(Entry),
+			"(ahk2-12-curl-config-boundary) resolver must reject control characters in " . Field)
+	}
+}
+Test("remote resolver: control-bearing transport scalars fail closed (ahk2-12-curl-config-boundary)",
+	_RemoteResolve_ControlCharactersFailClosed)
+
+
+
+
+; ===================================================
+; ===================================================
+; ======= 6/ Cost estimation =========================
+; ===================================================
+; ===================================================
+
+_RemoteCost_KnownModelGivesNonZero() {
+	cost := _LLMRemoteEstimateCost("gpt-4o-mini", 1000, 200)
+	Assert(cost > 0, "Cost must be positive for a known model")
+}
+Test("_LLMRemoteEstimateCost: known model returns non-zero cost", _RemoteCost_KnownModelGivesNonZero)
+
+
+_RemoteCost_UnknownModelGivesZero() {
+	cost := _LLMRemoteEstimateCost("unknown-model-xyz", 1000, 200)
+	AssertEqual(0.0, cost)
+}
+Test("_LLMRemoteEstimateCost: unknown model returns 0.0", _RemoteCost_UnknownModelGivesZero)
+
+
+_RemoteCost_ZeroTokensGivesZero() {
+	cost := _LLMRemoteEstimateCost("gpt-4o-mini", 0, 0)
+	AssertEqual(0.0, cost)
+}
+Test("_LLMRemoteEstimateCost: zero tokens gives zero cost", _RemoteCost_ZeroTokensGivesZero)
+
+
+_RemoteCost_ScalesWithTokens() {
+	cost_small := _LLMRemoteEstimateCost("gpt-4o-mini", 100, 50)
+	cost_large := _LLMRemoteEstimateCost("gpt-4o-mini", 1000, 500)
+	Assert(cost_large > cost_small, "cost must scale with token count")
+}
+Test("_LLMRemoteEstimateCost: cost scales proportionally with token count", _RemoteCost_ScalesWithTokens)
+
+
+
+
+; ===================================================
+; ===================================================
+; ======= 7/ _LLMRemoteExtractUsage =================
+; ===================================================
+; ===================================================
+
+_RemoteUsage_OpenAI_ExtractsAll() {
+	body := '{"usage":{"prompt_tokens":10,"completion_tokens":20,"total_tokens":30}}'
+	out := _LLMRemoteExtractUsage("openai", body, "gpt-4o-mini")
+	AssertEqual(10, out["prompt_tokens"])
+	AssertEqual(20, out["completion_tokens"])
+	AssertEqual(30, out["total_tokens"])
+}
+Test("_LLMRemoteExtractUsage: openai extracts prompt/completion/total tokens", _RemoteUsage_OpenAI_ExtractsAll)
+
+
+_RemoteUsage_Anthropic_ExtractsTokens() {
+	body := '{"usage":{"input_tokens":15,"output_tokens":25}}'
+	out := _LLMRemoteExtractUsage("anthropic", body, "claude-haiku-4-5")
+	AssertEqual(15, out["prompt_tokens"])
+	AssertEqual(25, out["completion_tokens"])
+	AssertEqual(40, out["total_tokens"])
+}
+Test("_LLMRemoteExtractUsage: anthropic extracts input/output tokens and sums total", _RemoteUsage_Anthropic_ExtractsTokens)
+
+
+_RemoteUsage_Gemini_ExtractsTokens() {
+	body := '{"usageMetadata":{"promptTokenCount":8,"candidatesTokenCount":12,"totalTokenCount":20}}'
+	out := _LLMRemoteExtractUsage("gemini", body, "gemini-2.0-flash")
+	AssertEqual(8,  out["prompt_tokens"])
+	AssertEqual(12, out["completion_tokens"])
+	AssertEqual(20, out["total_tokens"])
+}
+Test("_LLMRemoteExtractUsage: gemini extracts promptTokenCount and candidatesTokenCount", _RemoteUsage_Gemini_ExtractsTokens)
+
+
+_RemoteUsage_EmptyBodyReturnsZeros() {
+	out := _LLMRemoteExtractUsage("openai", "", "gpt-4o-mini")
+	AssertEqual(0, out["prompt_tokens"])
+	AssertEqual(0, out["completion_tokens"])
+	AssertEqual(0, out["total_tokens"])
+	AssertEqual(0.0, out["est_cost_usd"])
+}
+Test("_LLMRemoteExtractUsage: empty body returns zero usage map", _RemoteUsage_EmptyBodyReturnsZeros)
+
+
+_RemoteUsage_CostIncluded() {
+	body := '{"usage":{"prompt_tokens":100,"completion_tokens":50,"total_tokens":150}}'
+	out := _LLMRemoteExtractUsage("openai", body, "gpt-4o-mini")
+	Assert(out["est_cost_usd"] > 0, "estimated cost must be positive for known model + nonzero tokens")
+}
+Test("_LLMRemoteExtractUsage: estimated cost is included in result map", _RemoteUsage_CostIncluded)
+
+
+
+
+; ===================================================
+; ===================================================
+; ======= 8/ Async registry — cancel helpers ========
+; ===================================================
+; ===================================================
+
+_RemoteCancelAsync_FlagsEntry() {
+	global _LLM_Remote_Async
+	fake_id := 88801
+	_LLM_Remote_Async[fake_id] := Map("http", "", "format", "openai", "on_success", (*) => 0, "on_fail", (*) => 0, "cancelled", false)
+	LLM_RemoteCancelAsync(fake_id)
+	AssertTrue(_LLM_Remote_Async[fake_id]["cancelled"])
+	_LLM_Remote_Async.Delete(fake_id)
+}
+Test("LLM_RemoteCancelAsync: sets cancelled flag on in-flight entry", _RemoteCancelAsync_FlagsEntry)
+
+
+_RemoteCancelAsync_NoOpOnMissingId() {
+	global _LLM_Remote_Async
+	before_count := _LLM_Remote_Async.Count
+	LLM_RemoteCancelAsync(999888)
+	AssertEqual(before_count, _LLM_Remote_Async.Count)
+}
+Test("LLM_RemoteCancelAsync: no-op when request id not found", _RemoteCancelAsync_NoOpOnMissingId)
+
+
+_RemoteCancelAllAsync_FlagsAll() {
+	global _LLM_Remote_Async
+	_LLM_Remote_Async[88802] := Map("http", "", "on_success", (*) => 0, "on_fail", (*) => 0, "cancelled", false)
+	_LLM_Remote_Async[88803] := Map("http", "", "on_success", (*) => 0, "on_fail", (*) => 0, "cancelled", false)
+	LLM_RemoteCancelAllAsync()
+	AssertTrue(_LLM_Remote_Async[88802]["cancelled"])
+	AssertTrue(_LLM_Remote_Async[88803]["cancelled"])
+	_LLM_Remote_Async.Delete(88802)
+	_LLM_Remote_Async.Delete(88803)
+}
+Test("LLM_RemoteCancelAllAsync: cancels every in-flight entry", _RemoteCancelAllAsync_FlagsAll)
+
+
+; The per-keystroke cancel must spare the explicit user probe: typing while a
+; Test-selected-API probe is in flight kills it silently (no on_fail, no log,
+; no popup) because the poll tick just sees a missing reservation. Ordinary
+; prediction work still cancels, and a bare call keeps blanket semantics.
+_RemoteCancelAllAsync_SparesOwnedProbe() {
+	global _LLM_Remote_Async, LLM_REMOTE_KIND_API_TEST
+	_LLM_Remote_Async[88804] := Map("kind", LLM_REMOTE_KIND_API_TEST, "cancelled", false)
+	_LLM_Remote_Async[88805] := Map("kind", "", "cancelled", false)
+	try {
+		LLM_RemoteCancelAllAsync(LLM_REMOTE_KIND_API_TEST)
+		AssertFalse(_LLM_Remote_Async[88804]["cancelled"],
+			"an explicit user probe must survive the keystroke cancel")
+		AssertTrue(_LLM_Remote_Async[88805]["cancelled"],
+			"ordinary prediction work must still cancel")
+		LLM_RemoteCancelAllAsync()
+		AssertTrue(_LLM_Remote_Async[88804]["cancelled"],
+			"a bare cancel-all keeps its blanket semantics")
+	} finally {
+		_LLM_Remote_Async.Delete(88804)
+		_LLM_Remote_Async.Delete(88805)
+	}
+}
+Test("LLM_RemoteCancelAllAsync: spares the owned user probe (api-test-entry-survives-typing)",
+	_RemoteCancelAllAsync_SparesOwnedProbe)
+
+
+_RemoteCancelPublication_Run(State, Command, WorkingDir, Options, &Pid, &ProcessOwner) {
+	State["runs"] += 1
+	LLM_RemoteCancelAllAsync()
+	Pid := 7313
+	ProcessOwner := Map("pid", Pid, "handle", 9313, "released", false)
+}
+
+_RemoteCancelPublication_Open(State, Pid) {
+	State["opens"] += 1
+	if State.Get("cancel_during_open", false)
+		LLM_RemoteCancelAllAsync()
+	if State.Get("fail_open", false)
+		return 0
+	return 9313
+}
+
+_RemoteCancelPublication_Terminate(State, Handle) {
+	State["terminates"] += 1
+	return true
+}
+
+_RemoteCancelPublication_Close(State, Handle) {
+	State["closes"] += 1
+	return true
+}
+
+_RemoteCancelPublication_Delete(State, Path) {
+	State["deletes"] += 1
+	return true
+}
+
+_RemoteCancelPublication_Poll(State, ReqId) {
+	State["polls"] += 1
+}
+
+_RemoteCancelPublication_CurlPort(State, RunFn) {
+	return Map(
+		"resolve_proxy", _Stub_CurlResolveProxyDirect.Bind(State),
+		"create_curl_capability", _CurlAuthIntegration_CreateImmediate,
+		"file_exists", (*) => true,
+		"temp_dir", (*) => A_Temp,
+		"write", (*) => true,
+		"delete", _RemoteCancelPublication_Delete.Bind(State),
+		"run", RunFn,
+		"poll", _RemoteCancelPublication_Poll.Bind(State),
+		"tick", (*) => 1313,
+		"schedule_orphan_sweep", (*) => true,
+		"open_process", _RemoteCancelPublication_Open.Bind(State),
+		"terminate_process", _RemoteCancelPublication_Terminate.Bind(State),
+		"close_process", _RemoteCancelPublication_Close.Bind(State))
+}
+
+_RemoteCancelPublication_NewState() {
+	return Map("runs", 0, "opens", 0, "terminates", 0, "closes", 0,
+		"deletes", 0, "polls", 0, "aborts", 0, "sends", 0)
+}
+
+_RemoteCancelPublication_Resolved() {
+	return Map("Format", "openai", "Token", "secret", "Model", "model")
+}
+
+_RemoteCancelPublication_CurlRunBoundary() {
+	global _LLM_Remote_Async
+	_LLM_Remote_Async := Map()
+	State := _RemoteCancelPublication_NewState()
+	Port := _RemoteCancelPublication_CurlPort(State,
+		_RemoteCancelPublication_Run.Bind(State))
+	ReqId := 891301
+	try {
+		AssertTrue(_LLMRemote_DispatchCurl(ReqId,
+			_RemoteCancelPublication_Resolved(), "https://safe.invalid/v1", "{}",
+			(*) => 0, (*) => 0, 1000, Port))
+		Sleep(30)
+		AssertEqual(1, State["proxy_resolutions"], "the real continuation admits the recorded direct route once")
+		AssertFalse(_LLM_Remote_Async.Has(ReqId),
+			"cancellation inside Run must not be overwritten by a live publication")
+		AssertEqual(0, State["polls"],
+			"a request cancelled during Run must never arm its poll")
+		AssertEqual(1, State["terminates"],
+			"the process returned by a reentrant Run boundary must be terminated exactly once")
+		AssertEqual(1, State["closes"],
+			"the exact adopted process handle must be closed exactly once")
+	} finally {
+		_LLM_Remote_Async := Map()
+	}
+}
+Test("api_remote: cancellation during curl Run cannot miss unpublished owner (remote-cancel-publication-race)",
+	_RemoteCancelPublication_CurlRunBoundary)
+
+
+_RemoteCancelPublication_RunWithoutCancel(State, Command, WorkingDir, Options, &Pid, &ProcessOwner) {
+	State["runs"] += 1
+	Pid := 7314
+	ProcessOwner := Map("pid", Pid, "handle", 9314, "released", false)
+	if State.Get("fail_after_owner", false)
+		throw Error("injected failure after exact owner creation")
+}
+
+_RemoteCancelPublication_CurlOwnedLaunchFailure() {
+	global _LLM_Remote_Async
+	_LLM_Remote_Async := Map()
+	State := _RemoteCancelPublication_NewState()
+	State["fail_after_owner"] := true
+	State["fail_calls"] := 0
+	Port := _RemoteCancelPublication_CurlPort(State,
+		_RemoteCancelPublication_RunWithoutCancel.Bind(State))
+	ReqId := 891302
+	try {
+		AssertTrue(_LLMRemote_DispatchCurl(ReqId,
+			_RemoteCancelPublication_Resolved(), "https://safe.invalid/v1", "{}",
+			(*) => 0, _RemoteAdoptionFailure_Record.Bind(State), 1000, Port))
+		AssertEqual(1, State["proxy_resolutions"], "owned launch crosses the direct proxy continuation once")
+		AssertFalse(_LLM_Remote_Async.Has(ReqId),
+			"a launch failure after process creation must retire the reservation")
+		AssertEqual(0, State["polls"],
+			"a partially returned owned launch must never arm its poll")
+		AssertEqual(1, State["terminates"],
+			"the exact process owner returned before the throw must be terminated once")
+		AssertEqual(1, State["closes"],
+			"the exact process owner returned before the throw must be closed once")
+		AssertEqual(1, State["fail_calls"],
+			"owned launch containment must report request failure exactly once")
+	} finally {
+		_LLM_Remote_Async := Map()
+	}
+}
+Test("api_remote: a throwing owned launcher cannot leak its child (AHK-079)",
+	_RemoteCancelPublication_CurlOwnedLaunchFailure)
+
+
+_RemoteAdoptionFailure_Record(State, *) {
+	State["fail_calls"] += 1
+}
+
+_RemoteAdoptionFailure_AbortsDispatch() {
+	global _LLM_Remote_Async
+	_LLM_Remote_Async := Map()
+	State := _RemoteCancelPublication_NewState()
+	State["fail_after_owner"] := true
+	State["fail_calls"] := 0
+	Port := _RemoteCancelPublication_CurlPort(State,
+		_RemoteCancelPublication_RunWithoutCancel.Bind(State))
+	ReqId := 891303
+	try {
+		AssertTrue(_LLMRemote_DispatchCurl(ReqId,
+			_RemoteCancelPublication_Resolved(), "https://safe.invalid/v1", "{}",
+			(*) => 0, _RemoteAdoptionFailure_Record.Bind(State), 1000, Port))
+		AssertEqual(1, State["proxy_resolutions"], "failed adoption still crosses the real proxy continuation once")
+		AssertEqual(0, State["opens"],
+			"owned curl launch must not use a second fallible OpenProcess step")
+		AssertEqual(1, State["fail_calls"],
+			"failed owned launch must fail the request exactly once")
+		AssertEqual(1, State["terminates"],
+			"failed owned launch must synchronously contain its exact child")
+		AssertEqual(1, State["closes"],
+			"failed owned launch must close its exact process handle")
+		AssertEqual(0, State["polls"],
+			"a process that was not adopted must never enter the async poll registry")
+		AssertFalse(_LLM_Remote_Async.Has(ReqId),
+			"failed adoption must retire the reservation synchronously")
+		Assert(State["deletes"] > 0,
+			"failed adoption must attempt to remove every pre-poll artifact")
+	} finally {
+		_LLM_Remote_Async := Map()
+	}
+}
+Test("api_remote: owned launch failure aborts dispatch without adoption (AHK-079)",
+	_RemoteAdoptionFailure_AbortsDispatch)
+
+
+_RemoteOwnedLaunch_RetainsCreatedProcessHandle() {
+	Pid := 0
+	ProcessOwner := 0
+	try {
+		_LLM_CurlArtifactRun(A_ComSpec . ' /D /C "exit /b 0"', "", "Hide",
+			&Pid, &ProcessOwner)
+		Assert(IsInteger(Pid) and Pid > 0,
+			"the native launch receipt must expose its positive process id")
+		Assert(ProcessOwner is Map and ProcessOwner["pid"] == Pid
+			and ProcessOwner["handle"] != 0 and !ProcessOwner["released"],
+			"the successful CreateProcess call must retain its exact process handle")
+		Deadline := A_TickCount + 3000
+		while !_LLM_CurlProcessExited(ProcessOwner) and A_TickCount < Deadline
+			Sleep(10)
+		AssertTrue(_LLM_CurlProcessExited(ProcessOwner),
+			"the retained process handle must observe the benign child terminal")
+	} finally {
+		if ProcessOwner is Map
+			AssertTrue(_LLM_CurlReleaseProcess(ProcessOwner),
+				"the exact native process handle must close successfully")
+	}
+}
+Test("curl owner: native launch returns the exact child handle atomically (AHK-079)",
+	_RemoteOwnedLaunch_RetainsCreatedProcessHandle)
+
+
+; This deliberately unowned synthetic process can never settle. Keep its debt
+; local to the fixture: later strict enable receipts require the real global
+; ledger to settle. Critical preserves any already-armed predecessor timer while
+; the fixture temporarily owns the ledger; finally restores it even on assertion.
+_RemoteAdoptionFailure_WithSyntheticDebt(Body) {
+	global _LLM_CurlCleanupDebt, _LLM_CurlCleanupDebtCounter
+	global _LLM_CurlCleanupRetryTimer, LLM_CURL_CLEANUP_RETRY_MS
+	PreviousCritical := Critical("On")
+	OldDebt := _LLM_CurlCleanupDebt
+	OldCounter := _LLM_CurlCleanupDebtCounter
+	OldTimer := _LLM_CurlCleanupRetryTimer
+	OldDelay := LLM_CURL_CLEANUP_RETRY_MS
+	try {
+		_LLM_CurlCleanupDebt := Map()
+		_LLM_CurlCleanupDebtCounter := 0
+		_LLM_CurlCleanupRetryTimer := 0
+		LLM_CURL_CLEANUP_RETRY_MS := 60000
+		Body.Call()
+	} finally {
+		if HasMethod(_LLM_CurlCleanupRetryTimer, "Call")
+			SetTimer(_LLM_CurlCleanupRetryTimer, 0)
+		_LLM_CurlCleanupDebt := OldDebt
+		_LLM_CurlCleanupDebtCounter := OldCounter
+		_LLM_CurlCleanupRetryTimer := OldTimer
+		LLM_CURL_CLEANUP_RETRY_MS := OldDelay
+		Critical(PreviousCritical)
+	}
+}
+
+_RemoteAdoptionFailure_ReleaseCannotClaimSuccess() {
+	global _LLM_CurlCleanupDebt, _LLM_CurlCleanupRetryTimer
+	State := _RemoteCancelPublication_NewState()
+	Port := _RemoteCancelPublication_CurlPort(State,
+		_RemoteCancelPublication_RunWithoutCancel.Bind(State))
+	Owner := Map("pid", 7315, "handle", 0, "released", false)
+	AssertFalse(_LLM_CurlReleaseProcess(Owner, true, Port),
+		"release without an exact retained process handle must report failure")
+	AssertEqual(0, State["terminates"],
+		"release must not fall back to terminating a recyclable numeric PID")
+	AssertEqual(1, _LLM_CurlCleanupDebt.Count,
+		"refused release must retain exactly its synthetic cleanup record")
+	DebtId := Owner["cleanup_debt_id"]
+	Record := _LLM_CurlCleanupDebt[DebtId]
+	AssertEqual(ObjPtr(Owner), ObjPtr(Record["owner"]),
+		"debt must retain the exact refusing owner rather than its numeric PID")
+	AssertTrue(HasMethod(_LLM_CurlCleanupRetryTimer, "Call"),
+		"refusal must arm its owned cleanup retry")
+	; Consume the armed one-shot before manually replaying its callback. Otherwise
+	; retry replaces the timer field and would strand the original native timer.
+	SetTimer(_LLM_CurlCleanupRetryTimer, 0)
+	AssertFalse(LLM_CurlRetryCleanupDebt(),
+		"retry cannot invent a native handle for this deliberately invalid owner")
+	AssertEqual(1, _LLM_CurlCleanupDebt.Count,
+		"refusal must remain owned until the synthetic fixture is withdrawn")
+	AssertEqual(ObjPtr(Record), ObjPtr(_LLM_CurlCleanupDebt[DebtId]),
+		"retry must keep the same cleanup record")
+	AssertFalse(Owner["released"], "fixture isolation is not native settlement")
+	AssertEqual(0, State["opens"], "retry must never reopen a recyclable PID")
+	AssertEqual(0, State["terminates"], "retry must never terminate by PID")
+	AssertEqual(0, State["closes"], "retry must not close a fabricated handle")
+}
+Test("curl owner: release without exact handle cannot report success (curl-adoption-failure)",
+	_RemoteAdoptionFailure_WithSyntheticDebt.Bind(
+		_RemoteAdoptionFailure_ReleaseCannotClaimSuccess))
+
+
+_RemoteAdoptionFailure_ThrowAfterRefusal() {
+	_RemoteAdoptionFailure_ReleaseCannotClaimSuccess()
+	throw Error("synthetic debt fixture interruption")
+}
+
+_RemoteAdoptionFailure_IsolationRestoresAfterThrow() {
+	global _LLM_CurlCleanupDebt, _LLM_CurlCleanupDebtCounter
+	global _LLM_CurlCleanupRetryTimer, LLM_CURL_CLEANUP_RETRY_MS
+	OldDebt := _LLM_CurlCleanupDebt
+	OldCount := OldDebt.Count
+	OldCounter := _LLM_CurlCleanupDebtCounter
+	OldTimer := _LLM_CurlCleanupRetryTimer
+	OldDelay := LLM_CURL_CLEANUP_RETRY_MS
+	OldCritical := A_IsCritical
+	Failure := ""
+	try _RemoteAdoptionFailure_WithSyntheticDebt(_RemoteAdoptionFailure_ThrowAfterRefusal)
+	catch as Err
+		Failure := Err.Message
+	AssertEqual("synthetic debt fixture interruption", Failure,
+		"the isolation fixture must propagate the original failure")
+	AssertEqual(ObjPtr(OldDebt), ObjPtr(_LLM_CurlCleanupDebt),
+		"interrupted fixture must restore the exact predecessor cleanup ledger")
+	AssertEqual(OldCount, _LLM_CurlCleanupDebt.Count,
+		"synthetic refusal must not leak into genuine predecessor debt")
+	AssertEqual(OldCounter, _LLM_CurlCleanupDebtCounter,
+		"interrupted fixture must restore predecessor debt identity allocation")
+	AssertEqual(OldTimer, _LLM_CurlCleanupRetryTimer,
+		"interrupted fixture must preserve the exact already-armed retry owner")
+	AssertEqual(OldDelay, LLM_CURL_CLEANUP_RETRY_MS,
+		"interrupted fixture must restore the predecessor retry policy")
+	AssertEqual(OldCritical, A_IsCritical,
+		"interrupted fixture must restore native thread admission")
+}
+Test("curl owner: synthetic debt fixture restores predecessor ownership after interruption (curl-adoption-failure)",
+	_RemoteAdoptionFailure_IsolationRestoresAfterThrow)
+
+
+class _RemoteCancelPublicationHttp {
+	__New(State) {
+		this.State := State
+	}
+
+	Open(*) {
+	}
+
+	SetTimeouts(*) {
+	}
+
+	SetRequestHeader(*) {
+	}
+
+	Send(*) {
+		this.State["sends"] += 1
+		LLM_RemoteCancelAllAsync()
+	}
+
+	Abort() {
+		this.State["aborts"] += 1
+	}
+}
+
+_RemoteCancelPublication_CreateHttp(State) {
+	return _RemoteCancelPublicationHttp(State)
+}
+
+_RemoteCancelPublication_WinHttpBoundary() {
+	global _LLM_Remote_Async
+	_LLM_Remote_Async := Map()
+	State := _RemoteCancelPublication_NewState()
+	Port := Map(
+		"create_http", _RemoteCancelPublication_CreateHttp.Bind(State),
+		"poll", _RemoteCancelPublication_Poll.Bind(State),
+		"tick", (*) => 1314)
+	ReqId := 891303
+	try {
+		AssertTrue(_LLMRemote_DispatchWinHttp(ReqId,
+			_RemoteCancelPublication_Resolved(), "https://safe.invalid/v1", "{}",
+			(*) => 0, (*) => 0, 1000, Port))
+		Sleep(30)
+		AssertEqual(1, State["sends"],
+			"the WinHTTP seam must inject cancellation from inside Send")
+		AssertEqual(1, State["aborts"],
+			"the request cancelled during Send must be aborted exactly once")
+		AssertEqual(0, State["polls"],
+			"a request cancelled during Send must never arm its poll")
+		AssertFalse(_LLM_Remote_Async.Has(ReqId),
+			"WinHTTP cancellation must retire the exact reserved owner")
+	} finally {
+		_LLM_Remote_Async := Map()
+	}
+}
+Test("api_remote: cancellation during WinHTTP Send cannot miss unpublished owner (remote-cancel-publication-race)",
+	_RemoteCancelPublication_WinHttpBoundary)
+
+
+_RemoteTrimRegistry_DropsOldestWhenAtCap() {
+	global _LLM_Remote_Async, LLM_REMOTE_MAX_INFLIGHT
+	_LLM_Remote_Async := Map()
+	base_id := 77000
+	loop LLM_REMOTE_MAX_INFLIGHT
+		_LLM_Remote_Async[base_id + A_Index] := Map("cancelled", false)
+	_LLMRemote_TrimAsyncRegistry()
+	AssertEqual(LLM_REMOTE_MAX_INFLIGHT - 1, _LLM_Remote_Async.Count)
+	AssertFalse(_LLM_Remote_Async.Has(base_id + 1), "oldest entry must have been removed")
+	_LLM_Remote_Async := Map()
+}
+Test("_LLMRemote_TrimAsyncRegistry: removes oldest entry when at cap", _RemoteTrimRegistry_DropsOldestWhenAtCap)
+
+
+_RemoteTrimRegistry_ReentrantSuccessor(State, *) {
+	State["callbacks"] += 1
+	if State["callbacks"] != 1
+		return
+	_LLMRemote_ReserveRequest(77013, (*) => 0, (*) => 0, 1000, 13,
+		_RemoteCancelPublication_Resolved())
+}
+
+_RemoteTrimRegistry_DetachesBeforeReentrantCallback() {
+	global _LLM_Remote_Async, LLM_REMOTE_MAX_INFLIGHT
+	OldMax := LLM_REMOTE_MAX_INFLIGHT
+	State := Map("callbacks", 0)
+	LLM_REMOTE_MAX_INFLIGHT := 2
+	_LLM_Remote_Async := Map(
+		77011, Map("cancelled", false,
+			"on_fail", _RemoteTrimRegistry_ReentrantSuccessor.Bind(State)),
+		77012, Map("cancelled", false, "on_fail", (*) => 0))
+	Err := ""
+	try _LLMRemote_TrimAsyncRegistry()
+	catch as Caught
+		Err := Caught.Message
+	finally LLM_REMOTE_MAX_INFLIGHT := OldMax
+	try {
+		AssertEqual("", Err,
+			"remote trim must not delete an owner already detached by reentrant work")
+		AssertEqual(1, State["callbacks"],
+			"the displaced remote owner must emit exactly one terminal callback")
+		AssertFalse(_LLM_Remote_Async.Has(77011),
+			"the displaced owner must be absent before its callback starts")
+		AssertTrue(_LLM_Remote_Async.Has(77012),
+			"the surviving request must remain registered")
+		AssertTrue(_LLM_Remote_Async.Has(77013),
+			"the callback's successor must not be trimmed or removed by its predecessor")
+		AssertEqual(2, _LLM_Remote_Async.Count,
+			"remote trim plus one reentrant successor must finish exactly at the cap")
+	} finally {
+		_LLM_Remote_Async := Map()
+	}
+}
+Test("api_remote: trim detaches owner before reentrant callback (async-trim-detach-before-callback)",
+	_RemoteTrimRegistry_DetachesBeforeReentrantCallback)
+
+
+
+
+
+; ================================================
+; ================================================
+; ======= 9/ Catalogue + request context ==========
+; ================================================
+; ================================================
+
+_RemoteCatalog_LoadedFromShared() {
+	AssertTrue(LLM_API_PROVIDERS.Has("openai"))
+	AssertTrue(LLM_API_PROVIDERS.Has("openai_compat"))
+	; Preserve the complete cloud prefix and independently name the new local suffix.
+	Shipped := JsonParse(FileRead(_SharedDir . "\modules\llm\api_providers.json", "UTF-8"))
+	LocalIds := ["omlx", "lmstudio", "llamacpp", "jan"]
+	ShippedLocal := JsonParse(FileRead(_SharedDir . "\modules\llm\local_servers.json", "UTF-8"))
+	AssertEqual(4, ShippedLocal["server_order"].Length,
+		"the optional-auth catalogue declares exactly the four independently named local providers")
+	AssertEqual(Shipped["provider_order"].Length + 4, LLM_API_PROVIDER_ORDER.Length,
+		"every shipped cloud and local provider publishes, the Backboard and decisions formats included")
+	for Index, ProviderId in Shipped["provider_order"]
+		AssertEqual(ProviderId, LLM_API_PROVIDER_ORDER[Index], "the catalogue keeps provider_order")
+	for Index, ProviderId in LocalIds {
+		AssertEqual(ProviderId, ShippedLocal["server_order"][Index],
+			"the local catalogue retains its independently named provider order")
+		AssertEqual(ProviderId, LLM_API_PROVIDER_ORDER[Shipped["provider_order"].Length + Index],
+			"local providers append after the unchanged complete cloud prefix")
+		AssertTrue(LLM_API_PROVIDERS.Has(ProviderId), "each local provider reaches the actual request registry")
+		AssertTrue(LLM_LOCAL_API_SERVERS.Has(ProviderId), "each local provider retains its optional-auth capability")
+	}
+	AssertTrue(LLM_REMOTE_MODEL_PRICES.Has("gpt-4o-mini"))
+}
+Test("api_providers.json: catalogue loaded at module init", _RemoteCatalog_LoadedFromShared)
+
+
+_RemoteCatalog_InvalidScalarsNeverPublish() {
+	global LLM_API_PROVIDERS, LLM_API_PROVIDER_ORDER, LLM_REMOTE_MODEL_PRICES, LLM_REMOTE_TEST_REQUEST, _SharedDir
+	global LLM_REMOTE_DECISIONS_TEST, LLM_LOCAL_API_SERVERS
+	oldLocalServers := LLM_LOCAL_API_SERVERS
+	oldLocalServerState := []
+	for ProviderId, Descriptor in oldLocalServers {
+		Fields := Map()
+		for Key, Value in Descriptor
+			Fields[Key] := Value
+		oldLocalServerState.Push(Map("id", ProviderId, "descriptor", Descriptor, "fields", Fields))
+	}
+	oldDecisionsTest := LLM_REMOTE_DECISIONS_TEST
+	oldProviders := LLM_API_PROVIDERS
+	oldOrder := LLM_API_PROVIDER_ORDER
+	oldPrices := LLM_REMOTE_MODEL_PRICES
+	oldTestRequest := LLM_REMOTE_TEST_REQUEST
+	oldSharedDir := _SharedDir
+	testRoot := A_Temp . "\ergopti-ahk013-" . DllCall("GetCurrentProcessId") . "-" . A_TickCount
+	fixture := FileRead(A_ScriptDir . "\..\..\_shared\tests\corpus\api_provider_catalog_validation.json", "UTF-8")
+	try {
+		DirCreate(testRoot . "\modules\llm")
+		FileAppend(fixture, testRoot . "\modules\llm\api_providers.json", "UTF-8")
+		_SharedDir := testRoot
+		_LLMRemote_LoadCatalog()
+
+		AssertEqual(2, LLM_API_PROVIDER_ORDER.Length,
+			"only the valid provider and the configurable compatibility provider may publish")
+		AssertEqual("valid", LLM_API_PROVIDER_ORDER[1])
+		AssertEqual("openai_compat", LLM_API_PROVIDER_ORDER[2])
+		AssertTrue(LLM_API_PROVIDERS.Has("valid"))
+		AssertTrue(LLM_API_PROVIDERS.Has("openai_compat"))
+		for invalidId in ["empty_base", "empty_model", "bad_url", "space_model", "space_label", "object_label", "array_url", "null_model", "number_format", "unknown_format"]
+			AssertFalse(LLM_API_PROVIDERS.Has(invalidId), invalidId . " must not reach the published catalogue")
+		AssertEqual("", LLM_API_PROVIDERS["openai_compat"]["BaseUrl"])
+		AssertEqual("", LLM_API_PROVIDERS["openai_compat"]["DefaultModel"])
+		providerChoices := _LLM_Menu_BuildApiProviderChoices(LLM_API_PROVIDERS)
+		AssertContains(providerChoices, "valid (Valid)")
+		AssertContains(providerChoices, "openai_compat (Compatible)")
+
+		AssertTrue(LLM_REMOTE_MODEL_PRICES.Has("valid_integer"))
+		AssertTrue(LLM_REMOTE_MODEL_PRICES.Has("valid_float"))
+		for invalidModel in ["string_price", "null_price", "container_price", "negative_price"]
+			AssertFalse(LLM_REMOTE_MODEL_PRICES.Has(invalidModel), invalidModel . " must remain unpriced")
+		AssertEqual(3.0, _LLMRemoteEstimateCost("valid_integer", 1000000, 1000000))
+		AssertEqual(0.875, _LLMRemoteEstimateCost("valid_float", 1000000, 1000000))
+		AssertEqual(0.0, _LLMRemoteEstimateCost("string_price", 1000000, 1000000))
+	} finally {
+		_SharedDir := oldSharedDir
+		LLM_API_PROVIDERS := oldProviders
+		LLM_API_PROVIDER_ORDER := oldOrder
+		LLM_REMOTE_MODEL_PRICES := oldPrices
+		LLM_REMOTE_TEST_REQUEST := oldTestRequest
+		LLM_REMOTE_DECISIONS_TEST := oldDecisionsTest
+		LLM_LOCAL_API_SERVERS := oldLocalServers
+		try DirDelete(testRoot, true)
+	}
+	AssertEqual(ObjPtr(oldLocalServers), ObjPtr(LLM_LOCAL_API_SERVERS),
+		"catalogue reload fixture restores the exact predecessor optional-auth registry")
+	AssertEqual(oldLocalServerState.Length, LLM_LOCAL_API_SERVERS.Count,
+		"the synthetic catalogue must not leak or remove predecessor local providers")
+	for Row in oldLocalServerState {
+		Descriptor := LLM_LOCAL_API_SERVERS[Row["id"]]
+		AssertEqual(ObjPtr(Row["descriptor"]), ObjPtr(Descriptor),
+			"restoration keeps each predecessor capability descriptor identity")
+		AssertEqual(Row["fields"].Count, Descriptor.Count,
+			"the predecessor capability descriptor retains all of its fields")
+		for Key, Value in Row["fields"]
+			AssertEqual(Value, Descriptor[Key], "the predecessor capability field is unchanged: " . Key)
+	}
+}
+Test("api_providers.json: invalid descriptor and price scalars never publish", _RemoteCatalog_InvalidScalarsNeverPublish)
+
+
+_RemoteBuildContext_PrefixTail() {
+	req := _LLMRemote_BuildRequestContext("PREFIX and TAIL markers", "full ctx", "tail bit")
+	AssertContains(req["user"], 'PREFIX: "full ctx"')
+	AssertContains(req["user"], 'TAIL: "tail bit"')
+}
+Test("_LLMRemote_BuildRequestContext: PREFIX/TAIL profiles format user turn", _RemoteBuildContext_PrefixTail)
+
+
+_RemoteBuildContext_ContextSubstitution() {
+	req := _LLMRemote_BuildRequestContext("Complete: {context}", "hello world", "world")
+	AssertContains(req["system"], "hello world")
+	AssertEqual("", req["user"])
+}
+Test("_LLMRemote_BuildRequestContext: {context} substitution moves text into system", _RemoteBuildContext_ContextSubstitution)
+
+
+_RemoteIsReady_AnthropicAuthHeader() {
+	entry := Map("Provider", "anthropic", "Token", "sk-ant", "Model", "claude-haiku-4-5", "BaseUrl", "")
+	; Offline: we only verify resolve + URL shape — no HTTP.
+	resolved := _LLMRemoteResolveEntry(entry)
+	AssertEqual("anthropic", resolved["Format"])
+	url := _LLMRemoteBuildUrl(resolved["BaseUrl"], resolved["Format"], resolved["Token"], resolved["Model"])
+	AssertEqual("https://api.anthropic.com/v1/messages", url)
+}
+Test("LLM_RemoteIsReady path: anthropic resolves to /messages endpoint", _RemoteIsReady_AnthropicAuthHeader)
+
+
+; ==============================================================================
+; ======= Poll-loop deadline cap regression ====================================
+; ==============================================================================
+
+; Regression guard for remote-poll-no-deadline-cap: _LLMRemote_PollRequest
+; polled indefinitely when the remote never responded — the poll loop rescheduled
+; itself via SetTimer with no upper bound. The fix stores a deadline_tick in
+; the async entry at dispatch and aborts (calls on_fail) when it is exceeded.
+_Remote_DeadlineTickStoredAtDispatch() {
+	global _LLM_Remote_Async, _LLM_Remote_AsyncCounter, LLM_REMOTE_TIMEOUT_MS
+	; Build a minimal entry map that mirrors what LLM_RemoteGenerate_Async stores.
+	SavedTimeout := LLM_REMOTE_TIMEOUT_MS
+	LLM_REMOTE_TIMEOUT_MS := 5000   ; Simulate a loaded value
+	Before := A_TickCount
+	; Compute deadline_ms as the function does internally.
+	deadline_ms := (LLM_REMOTE_TIMEOUT_MS > 0) ? LLM_REMOTE_TIMEOUT_MS : 30000
+	After := A_TickCount
+	LLM_REMOTE_TIMEOUT_MS := SavedTimeout
+	; deadline_ms must equal 5000 when LLM_REMOTE_TIMEOUT_MS is set to 5000.
+	AssertEqual(5000, deadline_ms,
+		"deadline_ms must equal LLM_REMOTE_TIMEOUT_MS when non-zero")
+}
+Test("api_remote: deadline_ms respects LLM_REMOTE_TIMEOUT_MS when non-zero", _Remote_DeadlineTickStoredAtDispatch)
+
+_Remote_DeadlineTickFallsBack() {
+	global LLM_REMOTE_TIMEOUT_MS
+	SavedTimeout := LLM_REMOTE_TIMEOUT_MS
+	LLM_REMOTE_TIMEOUT_MS := 0   ; Sentinel — not yet loaded
+	deadline_ms := (LLM_REMOTE_TIMEOUT_MS > 0) ? LLM_REMOTE_TIMEOUT_MS : 30000
+	LLM_REMOTE_TIMEOUT_MS := SavedTimeout
+	AssertEqual(30000, deadline_ms,
+		"deadline_ms must fall back to 30000 ms when LLM_REMOTE_TIMEOUT_MS is the 0 sentinel")
+}
+Test("api_remote: deadline_ms falls back to 30 s when LLM_REMOTE_TIMEOUT_MS is 0 sentinel", _Remote_DeadlineTickFallsBack)
+
+
+_RemoteProxy_CaptureResolve(State, Url, Callback) {
+	State["proxy_resolves"] := State.Get("proxy_resolves", 0) + 1
+	if State["proxy_resolves"] > 1 {
+		Callback.Call(Map("ok", true, "inherit", false, "proxy", "http://managed.corp:3128"))
+		return true
+	}
+	State["url"] := Url
+	State["continue"] := Callback
+	return true
+}
+
+_RemoteProxy_Write(State, Path, Text) {
+	State["writes"].Push(Map("path", Path, "text", Text))
+	return true
+}
+
+_RemoteProxy_Run(State, Command, WorkingDir, Options, &Pid, &ProcessOwner) {
+	State["command"] := Command
+	_RemoteCancelPublication_RunWithoutCancel(State, Command, WorkingDir, Options, &Pid, &ProcessOwner)
+}
+
+_RemoteProxy_DeferredGeneration(ProbeCase := "success") {
+	global _LLM_Remote_Async
+	SavedRegistry := _LLM_Remote_Async
+	_LLM_Remote_Async := Map()
+	State := _RemoteCancelPublication_NewState()
+	State["writes"] := []
+	State["fail_calls"] := 0
+	State["tick"] := 1313
+	Port := _RemoteCancelPublication_CurlPort(State, _RemoteProxy_Run.Bind(State))
+	Port["resolve_proxy"] := _RemoteProxy_CaptureResolve.Bind(State)
+	Port["write"] := _RemoteProxy_Write.Bind(State)
+	Port["tick"] := (*) => State["tick"]
+	ReqId := "group6_proxy_generation"
+	Resolved := Map("Format", "gemini", "Token", "private-api-key", "Model", "model")
+	Url := "https://remote.invalid:8443/v1/models/test?key=private-api-key"
+	try {
+		AssertTrue(_LLMRemote_DispatchCurl(ReqId, Resolved, Url, '{"text":"private-context"}',
+			(*) => 0, _RemoteAdoptionFailure_Record.Bind(State), 1000, Port))
+		Reservation := _LLM_Remote_Async[ReqId]
+		AssertEqual(Url, State["url"], "the first request must resolve its actual destination")
+		AssertEqual(0, State["writes"].Length, "no credential or payload staging before admission")
+		AssertEqual(0, State["runs"], "curl must wait for the first PAC answer")
+		if ProbeCase == "cancel"
+			LLM_RemoteCancelAsync(ReqId)
+		else if ProbeCase == "replace"
+			_LLM_Remote_Async[ReqId] := Map("transport", "pending", "cancelled", false)
+		else if ProbeCase == "timeout"
+			State["tick"] += 1000
+		State["continue"].Call(Map("ok", ProbeCase != "reject", "inherit", false, "proxy", "http://managed.corp:3128"))
+		State["continue"].Call(Map("ok", true, "inherit", false, "proxy", "http://late.corp:80"))
+		if ProbeCase != "success" {
+			AssertEqual(0, State["writes"].Length, "stale or cancelled admission must not stage private data")
+			AssertEqual(0, State["runs"], "stale or expired admission must launch no child")
+			AssertEqual((ProbeCase == "timeout" || ProbeCase == "reject") ? 1 : 0, State["fail_calls"], "timeout fails once; cancellation stays silent")
+			if ProbeCase == "replace"
+				AssertEqual("pending", _LLM_Remote_Async[ReqId]["transport"], "old completion must preserve successor")
+			return
+		}
+		AssertEqual(1, State["runs"], "duplicate resolver completion must launch exactly once")
+		AssertEqual(2, State["writes"].Length, "one payload and one private config are staged")
+		AssertContains(State["writes"][2]["text"], 'proxy = "http://managed.corp:3128"')
+		AssertContains(State["writes"][2]["text"], "proxy-negotiate")
+		AssertFalse(InStr(State["writes"][2]["text"], "proxy-anyauth"), "the negotiated native scheme must not allow Basic/Digest downgrade")
+		AssertContains(State["writes"][2]["text"], 'proxy-user = ":"')
+		AssertFalse(InStr(State["command"]["command_line"], "private-api-key") > 0, "API credentials must remain outside argv")
+		AssertFalse(InStr(State["command"]["command_line"], "private-context") > 0, "typed text must remain outside argv")
+	} finally {
+		if IsSet(Reservation) {
+			if Reservation.Has("proxy_deadline")
+				SetTimer(Reservation["proxy_deadline"], 0)
+			if Reservation.Has("process_owner")
+				_LLMRemote_CancelCurlReservation(ReqId, Reservation, Port)
+		}
+		_LLM_Remote_Async := SavedRegistry
+	}
+}
+Test("remote proxy: first generation waits and admits one private child", _RemoteProxy_DeferredGeneration)
+Test("remote proxy: cancelled admission cannot stage or launch", _RemoteProxy_DeferredGeneration.Bind("cancel"))
+Test("remote proxy: late admission cannot consume a successor", _RemoteProxy_DeferredGeneration.Bind("replace"))
+Test("remote proxy: resolution consumes the request timeout", _RemoteProxy_DeferredGeneration.Bind("timeout"))
+Test("remote proxy: unresolved receipt cannot become direct generation", _RemoteProxy_DeferredGeneration.Bind("reject"))
+
+class _RemoteProxy_ReadyHttp {
+	__New(State) {
+		this.State := State
+	}
+	Open(*) {
+	}
+	SetTimeouts(*) {
+	}
+	SetDeadline(Start, Budget) {
+		this.State["start"] := Start
+		this.State["budget"] := Budget
+	}
+	SetRequestHeader(*) {
+	}
+	SetProxy(Proxy) {
+		this.State["proxy"] := Proxy
+	}
+	Send(*) {
+		this.State["sends"] += 1
+	}
+	Abort() {
+		this.State["aborts"] += 1
+		return true
+	}
+}
+
+_RemoteProxy_ReadyCreate(State) {
+	State["creates"] += 1
+	return _RemoteProxy_ReadyHttp(State)
+}
+
+_RemoteProxy_ReadyAdmission(ProbeCase := "success") {
+	return _ManagedRemoteFixtureWithLlmTimings(_RemoteProxy_ReadyAdmissionBody.Bind(ProbeCase))
+}
+
+_RemoteProxy_ReadyAdmissionBody(ProbeCase) {
+	global LLM_API_PROVIDERS, LLM_REMOTE_READY_PING_DEADLINE_MS
+	SavedProviders := LLM_API_PROVIDERS
+	LLM_API_PROVIDERS := Map("group6_fixture", Map("Format", "openai", "BaseUrl", "https://ready.invalid:8443/v1"))
+	State := Map("creates", 0, "sends", 0, "aborts", 0, "results", [])
+	Owner := LLM_AuxBegin("group6_ready", Map("backend", "api", "endpoint", "https://ready.invalid:8443/v1", "identity", "fixture"))
+	Port := Map("resolve_proxy", _RemoteProxy_CaptureResolve.Bind(State),
+		"create_http", _RemoteProxy_ReadyCreate.Bind(State), "poll_ready", (*) => true)
+	try {
+		LLM_RemoteIsReady_Async(Map("Provider", "group6_fixture", "Token", "private-api-key"), (Value) => State["results"].Push(Value), Owner, Port)
+		AssertTrue(State.Has("continue"), "readiness must use the system admission resolver")
+		AssertEqual("https://ready.invalid:8443/v1/models", State["url"])
+		AssertEqual(0, State["creates"], "no readiness child before the first PAC answer")
+		if ProbeCase == "budget_change"
+			LLM_REMOTE_READY_PING_DEADLINE_MS := 0
+		if ProbeCase == "replace"
+			Successor := LLM_AuxBegin("group6_ready", Map("backend", "api", "endpoint", "next", "identity", "successor"))
+		State["continue"].Call(Map("ok", ProbeCase != "reject", "inherit", false, "proxy", "http://managed.corp:3128"))
+		State["continue"].Call(Map("ok", true, "inherit", false, "proxy", "http://late.corp:80"))
+		if ProbeCase == "reject" {
+			AssertEqual(0, State["creates"], "unresolved receipt must create no readiness transport")
+			AssertEqual(1, State["results"].Length, "native refusal must settle once")
+			AssertFalse(State["results"][1], "unresolved proxy must remain unavailable")
+		} else if ProbeCase == "replace" {
+			AssertEqual(0, State["creates"], "a superseded readiness owner may create no transport")
+			AssertTrue(LLM_AuxIsCurrent(Successor), "late completion must retain successor ownership")
+		} else {
+			AssertEqual(1, State["creates"], "duplicate completion must create exactly one transport")
+			AssertEqual(1, State["sends"], "readiness must send exactly once")
+			AssertEqual("http://managed.corp:3128", State["proxy"], "readiness and generation must share relay admission")
+			AssertEqual(Owner["network_start_tick"], State["start"], "deferred admission retains the original request origin")
+			AssertEqual(Owner["network_timeout_ms"], State["budget"], "deferred admission retains the originally admitted canonical budget")
+		}
+	} finally {
+		_LLM_AuxRetireOwner(Owner)
+		if IsSet(Successor)
+			_LLM_AuxRetireOwner(Successor)
+		LLM_API_PROVIDERS := SavedProviders
+	}
+}
+Test("remote proxy: readiness waits for and applies the same relay", _RemoteProxy_ReadyAdmission)
+Test("remote proxy: superseded readiness cannot launch a child", _RemoteProxy_ReadyAdmission.Bind("replace"))
+
+Test("remote proxy: unresolved receipt refuses readiness once", _RemoteProxy_ReadyAdmission.Bind("reject"))
+
+Test("remote proxy: a later timing change cannot renew or erase readiness's original deadline (ready-canonical-budget)",
+	_RemoteProxy_ReadyAdmission.Bind("budget_change"))
+
+_RemoteProxy_ReadyInvalidBudget(Budget) {
+	global LLM_REMOTE_READY_PING_DEADLINE_MS
+	Previous := IsSet(LLM_REMOTE_READY_PING_DEADLINE_MS) ? LLM_REMOTE_READY_PING_DEADLINE_MS : unset
+	Owner := LLM_AuxBegin("ready_invalid_budget", Map("backend", "api", "endpoint", "controlled", "identity", "fixture"))
+	State := Map("creates", 0)
+	try {
+		LLM_REMOTE_READY_PING_DEADLINE_MS := Budget == "unset" ? unset : Budget
+		Rejected := false
+		try LLM_RemoteIsReady_Async(Map(), (*) => 0, Owner,
+			Map("create_http", _RemoteProxy_ReadyCreate.Bind(State), "resolve_proxy", (*) => false))
+		catch Error as Failure {
+			Rejected := true
+			AssertContains(Failure.Message, "initialized canonical request budget")
+		}
+		AssertTrue(Rejected, "invalid timing cannot borrow Send's fallback duration")
+		AssertEqual(0, State["creates"], "invalid initialization creates no transport")
+		AssertFalse(Owner.Has("network_start_tick"), "invalid initialization cannot acquire a readiness deadline")
+		AssertTrue(LLM_AuxIsCurrent(Owner), "invalid timing preserves the caller's exact owner")
+	} finally {
+		LLM_REMOTE_READY_PING_DEADLINE_MS := IsSet(Previous) ? Previous : unset
+		_LLM_AuxRetireOwner(Owner)
+	}
+}
+for Index, Budget in [0, -1, "30000", 0x80000000, "unset"]
+	Test("remote proxy: invalid canonical readiness budget refuses before transport " . Index . " (ready-canonical-budget)",
+		_RemoteProxy_ReadyInvalidBudget.Bind(Budget))

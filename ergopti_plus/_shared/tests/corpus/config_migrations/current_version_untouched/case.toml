@@ -1,0 +1,6 @@
+# _shared/tests/corpus/config_migrations/current_version_untouched/case.toml
+
+[case]
+description = "A file already at the current version is never rewritten, even when an older step would change it."
+drivers = ["ahk", "hs", "linux"]
+outcome = "current"

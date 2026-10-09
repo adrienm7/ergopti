@@ -1,0 +1,62 @@
+<!-- _shared/ui/layer_editor/index.html -->
+<!doctype html>
+<html lang="fr">
+	<head>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1" />
+		<title data-i18n="layer_editor.window_title"></title>
+		<link rel="stylesheet" href="style.css" />
+		<script src="../i18n.js"></script>
+		<script src="../host_bridge.js"></script>
+		<script src="_generated/layer_data.js"></script>
+		<script src="layer_model.js"></script>
+	</head>
+	<body>
+		<header id="hdr">
+			<div class="hdr-text">
+				<h1 data-i18n="layer_editor.window_title"></h1>
+				<p class="subtitle" data-i18n="layer_editor.subtitle"></p>
+				<p class="note" data-i18n="layer_editor.scope_note"></p>
+				<p class="note" id="legend-source"></p>
+			</div>
+			<div class="hdr-tools">
+				<select id="form">
+					<option value="iso" data-i18n="layer_editor.form.iso"></option>
+					<option value="ansi" data-i18n="layer_editor.form.ansi"></option>
+				</select>
+				<label class="toggle"
+					><input type="checkbox" id="numpad" /><span data-i18n="layer_editor.numpad"></span
+				></label>
+				<div class="chips">
+					<span class="chip recommended" data-i18n="layer_editor.legend.recommended"></span>
+					<span class="chip custom" data-i18n="layer_editor.legend.custom"></span>
+					<span class="chip layer-key" data-i18n="layer_editor.layer_key"></span>
+					<span class="chip unavailable" data-i18n="layer_editor.legend.unavailable"></span>
+				</div>
+			</div>
+		</header>
+
+		<div id="banner" hidden></div>
+
+		<main id="main">
+			<section id="board" aria-live="off"></section>
+			<div class="lower">
+				<section id="mouse-pane">
+					<h2 data-i18n="layer_editor.pane.mouse"></h2>
+					<div id="mouse"></div>
+				</section>
+				<section id="panel"></section>
+			</div>
+		</main>
+
+		<footer id="ftr">
+			<button type="button" id="btn-restore" data-i18n="common.restore_recommended"></button>
+			<button type="button" id="btn-clear" data-i18n="common.clear_to_system"></button>
+			<span id="status"></span>
+			<button type="button" id="btn-close" data-i18n="common.close"></button>
+			<button type="button" id="btn-save" class="primary" data-i18n="common.save"></button>
+		</footer>
+
+		<script src="script.js"></script>
+	</body>
+</html>

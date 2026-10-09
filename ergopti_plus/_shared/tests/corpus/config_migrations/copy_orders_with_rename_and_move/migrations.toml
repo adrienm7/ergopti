@@ -1,0 +1,19 @@
+[registry]
+current_version = 2
+unstamped_version = 1
+
+[steps.v1_to_v2]
+from = 1
+to = 2
+drivers = ["ahk", "hs", "linux"]
+reason = "Corpus: conditional copies compose with existing migration operations."
+ops = [
+	{ op = "copy_if_absent", section = "source", key = "setting", to_section = "before" },
+	{ op = "rename", section = "source", key = "setting", to_section = "renamed" },
+	{ op = "copy_if_absent", section = "source", key = "setting", to_section = "missing" },
+	{ op = "copy_if_absent", section = "renamed", key = "setting", to_section = "after" },
+	{ op = "move_section", section = "before", to_section = "moved" },
+	{ op = "copy_if_absent", section = "moved", key = "setting", to_section = "final" },
+	{ op = "map_value", section = "renamed", key = "setting", map = [{ from = "legacy", to = "canonical" }] },
+	{ op = "copy_if_absent", section = "renamed", key = "setting", to_section = "mapped" },
+]

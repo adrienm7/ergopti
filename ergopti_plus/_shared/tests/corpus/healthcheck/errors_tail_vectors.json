@@ -1,0 +1,154 @@
+{
+	"description": "Golden vectors for parse_errors_tail: the parser turning the tail of today's ErgoptiPlus_errors_YYYY-MM-DD.log into the diagnostic window's recent warnings and errors. `chunk` is the text read from the end of the file; `prefix_hex` holds raw bytes read before it (a tail cut inside a UTF-8 sequence); `at_file_start` says whether the read began at byte 0. Expected entries are oldest first. Replayed by the macOS and Linux Lua suites and the AHK suite.",
+	"vectors": [
+		{
+			"id": "whole_file_lf",
+			"input": {
+				"chunk": "2026-09-23 10:00:00:001 [WARNING] [Layout] first warning\n2026-09-23 10:00:01:002 [ERROR] [Probe] an error\n2026-09-23 10:00:02:003 [WARNING] [HotPath] last warning\n",
+				"at_file_start": true,
+				"max_entries": 50
+			},
+			"expected": [
+				"2026-09-23 10:00:00:001 [WARNING] [Layout] first warning",
+				"2026-09-23 10:00:01:002 [ERROR] [Probe] an error",
+				"2026-09-23 10:00:02:003 [WARNING] [HotPath] last warning"
+			]
+		},
+		{
+			"id": "windows_crlf",
+			"input": {
+				"chunk": "2026-09-23 10:00:00:001 [WARNING] [Layout] first warning\r\n2026-09-23 10:00:01:002 [ERROR] [Probe] an error\r\n",
+				"at_file_start": true,
+				"max_entries": 50
+			},
+			"expected": [
+				"2026-09-23 10:00:00:001 [WARNING] [Layout] first warning",
+				"2026-09-23 10:00:01:002 [ERROR] [Probe] an error"
+			]
+		},
+		{
+			"id": "bom_at_file_start",
+			"input": {
+				"chunk": "﻿2026-09-23 10:00:00:001 [WARNING] [Layout] after the byte order mark\r\n",
+				"at_file_start": true,
+				"max_entries": 50
+			},
+			"expected": ["2026-09-23 10:00:00:001 [WARNING] [Layout] after the byte order mark"]
+		},
+		{
+			"id": "cut_inside_first_line",
+			"input": {
+				"chunk": "RNING] [Layout] the read began inside this line\n2026-09-23 10:00:01:002 [ERROR] [Probe] a whole line\n",
+				"at_file_start": false,
+				"max_entries": 50
+			},
+			"expected": ["2026-09-23 10:00:01:002 [ERROR] [Probe] a whole line"]
+		},
+		{
+			"id": "cut_inside_utf8_sequence",
+			"input": {
+				"prefix_hex": "a9",
+				"chunk": "chouée dans une séquence\n2026-09-23 10:00:01:002 [ERROR] [Probe] résumé café 😀\n",
+				"at_file_start": false,
+				"max_entries": 50
+			},
+			"expected": ["2026-09-23 10:00:01:002 [ERROR] [Probe] résumé café 😀"]
+		},
+		{
+			"id": "cut_exactly_on_a_line_start",
+			"input": {
+				"chunk": "2026-09-23 10:00:00:001 [WARNING] [Layout] cannot be told from a partial line\n2026-09-23 10:00:01:002 [ERROR] [Probe] kept\n",
+				"at_file_start": false,
+				"max_entries": 50
+			},
+			"expected": ["2026-09-23 10:00:01:002 [ERROR] [Probe] kept"]
+		},
+		{
+			"id": "partial_last_line_is_kept",
+			"input": {
+				"chunk": "2026-09-23 10:00:00:001 [WARNING] [Layout] complete\n2026-09-23 10:00:01:002 [ERROR] [Probe] still being writ",
+				"at_file_start": true,
+				"max_entries": 50
+			},
+			"expected": [
+				"2026-09-23 10:00:00:001 [WARNING] [Layout] complete",
+				"2026-09-23 10:00:01:002 [ERROR] [Probe] still being writ"
+			]
+		},
+		{
+			"id": "multi_line_message",
+			"input": {
+				"chunk": "2026-09-23 10:00:01:002 [ERROR] [Probe] callback failed: boom\nstack traceback:\n\tinit.lua:12: in function 'run'\n2026-09-23 10:00:02:003 [WARNING] [Layout] next\n",
+				"at_file_start": true,
+				"max_entries": 50
+			},
+			"expected": [
+				"2026-09-23 10:00:01:002 [ERROR] [Probe] callback failed: boom\nstack traceback:\n\tinit.lua:12: in function 'run'",
+				"2026-09-23 10:00:02:003 [WARNING] [Layout] next"
+			]
+		},
+		{
+			"id": "orphan_continuation_after_cut",
+			"input": {
+				"chunk": "in the middle of a line\n\tinit.lua:12: in function 'run'\n2026-09-23 10:00:02:003 [WARNING] [Layout] first whole entry\n",
+				"at_file_start": false,
+				"max_entries": 50
+			},
+			"expected": ["2026-09-23 10:00:02:003 [WARNING] [Layout] first whole entry"]
+		},
+		{
+			"id": "dedup_summary_is_an_entry",
+			"input": {
+				"chunk": "2026-09-23 10:00:01:002 [ERROR] [Probe] repeated\n2026-09-23 10:00:06:000 [ERROR] [logger] ↑ 3 identical lines suppressed\n",
+				"at_file_start": true,
+				"max_entries": 50
+			},
+			"expected": [
+				"2026-09-23 10:00:01:002 [ERROR] [Probe] repeated",
+				"2026-09-23 10:00:06:000 [ERROR] [logger] ↑ 3 identical lines suppressed"
+			]
+		},
+		{
+			"id": "other_levels_and_their_continuations_are_dropped",
+			"input": {
+				"chunk": "2026-09-23 10:00:00:001 [INFO] [Boot] not an issue\ncontinuation of the info line\n2026-09-23 10:00:01:002 [ERROR] [Probe] an issue\n",
+				"at_file_start": true,
+				"max_entries": 50
+			},
+			"expected": ["2026-09-23 10:00:01:002 [ERROR] [Probe] an issue"]
+		},
+		{
+			"id": "blank_lines_are_skipped",
+			"input": {
+				"chunk": "\n2026-09-23 10:00:00:001 [WARNING] [Layout] one\n\n\n2026-09-23 10:00:01:002 [ERROR] [Probe] two\n\n",
+				"at_file_start": true,
+				"max_entries": 50
+			},
+			"expected": [
+				"2026-09-23 10:00:00:001 [WARNING] [Layout] one",
+				"2026-09-23 10:00:01:002 [ERROR] [Probe] two"
+			]
+		},
+		{
+			"id": "keeps_the_newest_entries",
+			"input": {
+				"chunk": "2026-09-23 10:00:00:001 [WARNING] [A] one\n2026-09-23 10:00:01:002 [ERROR] [B] two\n2026-09-23 10:00:02:003 [WARNING] [C] three\n2026-09-23 10:00:03:004 [ERROR] [D] four\n",
+				"at_file_start": true,
+				"max_entries": 2
+			},
+			"expected": [
+				"2026-09-23 10:00:02:003 [WARNING] [C] three",
+				"2026-09-23 10:00:03:004 [ERROR] [D] four"
+			]
+		},
+		{
+			"id": "empty_file",
+			"input": {
+				"chunk": "",
+				"at_file_start": true,
+				"max_entries": 50
+			},
+			"expected": []
+		}
+	]
+}

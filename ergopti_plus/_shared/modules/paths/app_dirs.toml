@@ -1,0 +1,107 @@
+# _shared/modules/paths/app_dirs.toml
+#
+# ==============================================================================
+# SCHEMA: Application Folders and Log File Names
+# DESCRIPTION:
+# The one declaration of where every driver writes its logs, what the dated log
+# files are called and which artifacts share that folder. Each driver used to
+# spell these on its own: the log folder formula was re-derived in four places
+# on macOS and four on Windows, the file-name prefixes appeared as literals in
+# roughly twenty files, and the folder itself had four different names across
+# the three drivers.
+#
+# tools/codegen/codegen-app-dirs.cjs emits this file for the shared Lua tree
+# (macOS and Linux), for AutoHotkey and for the native macOS launcher; the
+# generated files are committed, so no driver parses this TOML at runtime.
+# tools/test/test-log-file-names-single-source.cjs fails when a driver spells
+# a log-name prefix itself.
+#
+# WHAT LIVES IN THE LOGS FOLDER:
+#   - the daily unified log     <files.unified_prefix>YYYY-MM-DD<files.extension>
+#   - the daily errors mirror   <files.errors_prefix>YYYY-MM-DD<files.extension>
+#                               (WARNING and ERROR lines only)
+#   - the topical sub-files     <files.topical_prefix><name><files.extension>,
+#                               names from _shared/modules/logger/sub_files.toml
+#   - crash reports             <logs>/<logs.crash_reports_dir>/
+#   - on macOS, the launcher's own launcher.log and fatal report
+# Metrics and keystroke data are user data, not logs: they stay in the
+# configuration folder.
+#
+# OVERRIDE:
+# The logs folder can be moved with LogsDirPath (paths.toml on macOS and
+# Windows, the bootstrap storage key below on Linux). Empty means the OS
+# default. A folder whose last component is not [app] folder_name gets that
+# subfolder appended, so retention and the owner-only permission change only
+# ever apply to a folder the application created for itself.
+# ==============================================================================
+
+# ===============================
+# ===============================
+# ======= 1/ Application ========
+# ===============================
+# ===============================
+
+[app]
+# The folder named after the application, identical on every OS.
+folder_name = "ergopti_plus"
+
+# ================================
+# ================================
+# ======= 2/ Logs folder =========
+# ================================
+# ================================
+
+[logs]
+# paths.toml key holding the optional logs-folder override (macOS, Windows).
+override_key = "LogsDirPath"
+# Linux bootstrap storage key holding the same override.
+linux_storage_key = "paths.logs_dir"
+# Subfolder of the logs folder that receives crash reports.
+crash_reports_dir = "crash_reports"
+
+[logs.files]
+unified_prefix = "ErgoptiPlus_"
+errors_prefix = "ErgoptiPlus_errors_"
+topical_prefix = "ErgoptiPlus_"
+extension = ".log"
+
+# ===================================
+# ===================================
+# ======= 3/ Per-OS defaults ========
+# ===================================
+# ===================================
+
+# Default logs folder: the driver resolves `base` (an environment variable),
+# then appends `segments`; "{app}" stands for [app] folder_name.
+
+[logs.macos]
+# ~/Library/Logs is where Console.app looks for per-application logs.
+base = "HOME"
+segments = ["Library", "Logs", "{app}"]
+# Written by the native launcher before any configuration is read, so they
+# always stay in this default folder, whatever LogsDirPath says.
+launcher_log = "launcher.log"
+fatal_report = "hammerspoon-fatal.txt"
+
+[logs.windows]
+# Local, not Roaming: logs are machine state and must not follow the profile.
+base = "LOCALAPPDATA"
+segments = ["{app}", "logs"]
+
+[logs.linux]
+# XDG Base Directory: logs are state, not data.
+base = "XDG_STATE_HOME"
+# Used under HOME when XDG_STATE_HOME is unset or empty.
+base_fallback = [".local", "state"]
+segments = ["{app}", "logs"]
+
+# =====================================
+# =====================================
+# ======= 4/ Managed runtime ==========
+# =====================================
+# =====================================
+
+[runtime.windows]
+# A separate direct child of LocalApplicationData owns the runtime-only ACL.
+# Existing logs and the native macOS/Linux runtime hierarchy are unchanged.
+managed_ollama_folder_name = "ergopti_plus_ollama"

@@ -1,0 +1,403 @@
+--- ui/menu/menu_apps.lua
+
+--- ==============================================================================
+--- MODULE: Menu Applications
+--- DESCRIPTION:
+--- Builds the "Applications" submenu listing the bundled utility apps located
+--- in the apps/ directory alongside the Hammerspoon driver.
+---
+--- FEATURES & RATIONALE:
+--- 1. Discovery: Scans the apps/ directory at build time so new bundles appear
+---    automatically without touching this file.
+--- 2. Style Parity: Mirrors the icon + styled-text row format used in
+---    infra/app_picker.lua for visual consistency across the menu.
+--- 3. Icon Loading: Loads icons directly from the .icns file in Resources/ to
+---    avoid relying on bundle ID registration (which may not be done on first
+---    install). Falls back to AppIcon.svg, then to no icon.
+--- 4. Launch: Each entry opens the app via hs.task with ERGOPTI_LOCALE set so
+---    AppleScript apps can read the active Hammerspoon locale. Falls back to
+---    the system locale, then to "en".
+--- ==============================================================================
+
+local M = {}
+local hs     = hs
+local Logger = require("infra.logger")
+local Paths  = require("infra.paths")
+local i18n   = require("infra.i18n")
+local ManifestMenu = require("infra.manifest_menu")
+local TaskLifecycle = require("adapters.task_lifecycle")
+local text_utils = require("infra.text_utils")
+
+local LOG = "menu_apps"
+
+-- GC-root table: every live hs.task is pinned here so Lua's garbage collector
+-- cannot SIGTERM it mid-run (hs.task held only in a local is collected on return).
+M._active_tasks = {}
+
+
+-- Session cache of discovered app bundles (names, descriptions, icons). The
+-- apps/ directory only changes on install, which requires an hs.reload() anyway,
+-- so we scan it once and reuse — keeping the `find` subprocess, the per-app
+-- Info.plist reads, and the icon loads off every menu open. Mirrors
+-- HotCounter._ext_meta_cache. Nil until the first discovery.
+local _apps_cache = nil
+local _scan_failures = {}
+
+--- Enumerates sorted paths only after the shell command commits successfully.
+--- @param directory string Directory to inspect.
+--- @param pattern string Internal filename pattern.
+--- @param category string Fixed diagnostic category.
+--- @return table|nil paths Nil on failure, including partial command output.
+local function scan_paths(directory, pattern, category)
+	local ok, output, succeeded, kind, code = pcall(hs.execute, string.format(
+		"find %s -maxdepth 1 -name %s 2>/dev/null",
+		text_utils.shell_quote(directory), text_utils.shell_quote(pattern)
+	))
+	if not ok or type(output) ~= "string" or succeeded ~= true or kind ~= "exit" or code ~= 0 then
+		if not _scan_failures[category] then
+			_scan_failures[category] = true
+			Logger.warn(LOG, "Bundled app %s scan failed (details withheld; repeats suppressed).", category)
+		end
+		return nil
+	end
+	_scan_failures[category] = nil
+	local paths = {}
+	for path in output:gmatch("[^\n]+") do paths[#paths + 1] = path end
+	table.sort(paths)
+	return paths
+end
+
+
+-- The locale KEY of the short description shown next to each app name. The
+-- text is resolved when the submenu is built: resolved here, at module load, it
+-- was frozen in the session cache and stayed in the old language after a
+-- language change until the next reload.
+local APP_DESCRIPTION_KEYS = {
+	["App Cloner"] = "menu.apps.clone_desc",
+	["Encryptor"]  = "menu.apps.encrypt_desc",
+}
+
+
+
+
+-- ==========================================
+-- ==========================================
+-- ======= 1/ Application Discovery =========
+-- ==========================================
+-- ==========================================
+
+--- Resolves the absolute path to the apps/ directory bundled with the driver.
+--- @param ctx table|nil Menu build context.
+--- @return string|nil The path, or nil if it cannot be determined.
+local function apps_dir(ctx)
+	-- Primary source: menu context base_dir points at .../static/ergopti_plus/macos/
+	-- in both repo and deployed setups where the apps bundles are colocated.
+	local base = ctx and type(ctx.base_dir) == "string" and ctx.base_dir or nil
+	if base and base ~= "" then
+		base = base:gsub("[/\\]+$", "")
+		local candidate = base .. "/apps"
+		local ok, attr = pcall(hs.fs.attributes, candidate)
+		if ok and type(attr) == "table" and attr.mode == "directory" then
+			return candidate
+		end
+	end
+
+	-- Fallback for legacy layouts where hs.configdir directly contains apps/.
+	if hs and hs.configdir and hs.configdir ~= "" then
+		return hs.configdir:gsub("[/\\]+$", "") .. "/apps"
+	end
+
+	return nil
+end
+
+--- Draws an image into a 16×16 canvas to guarantee pixel-accurate menu sizing.
+--- setSize() alone does not constrain high-res images when macOS renders menus.
+--- @param img userdata An hs.image object.
+--- @return userdata A new 16×16 hs.image.
+local function resize_to_menu_icon(img)
+	local c = hs.canvas.new({ x = 0, y = 0, w = 16, h = 16 })
+	c:appendElements({
+		type         = "image",
+		image        = img,
+		frame        = { x = 0, y = 0, w = 16, h = 16 },
+		imageScaling = "scaleToFit",
+	})
+	local out = c:imageFromCanvas()
+	c:delete()
+	return out
+end
+
+--- Loads the icon for a bundle, trying sources in priority order.
+--- Priority: AppIcon.svg (custom, always intentional) → declared .icns → any .icns.
+--- SVG is checked first because the system .icns in Automator-generated droplets
+--- is the generic Automator icon, whereas AppIcon.svg is our custom artwork.
+--- @param app_path string Absolute path to the .app bundle.
+--- @param info table|nil Parsed Info.plist table (may be nil).
+--- @return userdata|nil An hs.image sized to 16×16, or nil on failure.
+local function load_icon(app_path, info)
+	local resources = app_path .. "/Contents/Resources"
+
+	-- Custom SVG takes priority — it is always intentional artwork
+	local svg_path = resources .. "/AppIcon.svg"
+	local ok_svg, img_svg = pcall(hs.image.imageFromPath, svg_path)
+	if ok_svg and img_svg then
+		local ok_r, r = pcall(resize_to_menu_icon, img_svg)
+		return ok_r and r or img_svg
+	end
+
+	-- Try the .icns declared in Info.plist
+	local icon_file = type(info) == "table" and info.CFBundleIconFile or nil
+	if icon_file then
+		local candidates = {
+			resources .. "/" .. icon_file,
+			resources .. "/" .. icon_file .. ".icns",
+		}
+		for _, p in ipairs(candidates) do
+			local ok, img = pcall(hs.image.imageFromPath, p)
+			if ok and img then
+				local ok_r, r = pcall(resize_to_menu_icon, img)
+				return ok_r and r or img
+			end
+		end
+	end
+
+	-- Last resort: any .icns found in Resources/
+	local paths = scan_paths(resources, "*.icns", "icon")
+	if paths then
+		local icns_path = paths[1]
+		if icns_path then
+			local ok, img = pcall(hs.image.imageFromPath, icns_path)
+			if ok and img then
+				local ok_r, r = pcall(resize_to_menu_icon, img)
+				return ok_r and r or img
+			end
+		end
+	end
+
+	return nil
+end
+
+--- Scans the apps/ directory and returns a list of discovered bundles.
+--- @param ctx table|nil Menu build context.
+--- @return table List of {name, description, path, icon} entries.
+local function discover_bundled_apps(ctx)
+	if _apps_cache then return _apps_cache end
+	local dir = apps_dir(ctx)
+	if not dir then
+		Logger.warn(LOG, "Could not resolve apps/ directory path.")
+		return {}
+	end
+
+	Logger.trace(LOG, "Scanning bundled app directory…")
+	local paths = scan_paths(dir, "*.app", "directory")
+	if not paths then return {} end
+
+	local entries = {}
+	for _, app_path in ipairs(paths) do
+		local raw_name = app_path:match("([^/]+)%.app$")
+		if raw_name then
+			local info    = hs.application.infoForBundlePath(app_path)
+			local display = (type(info) == "table" and info.CFBundleDisplayName ~= "" and info.CFBundleDisplayName)
+			             or (type(info) == "table" and info.CFBundleName ~= "" and info.CFBundleName)
+			             or raw_name
+
+			table.insert(entries, {
+				name        = display,
+				description_key = APP_DESCRIPTION_KEYS[display],
+				path        = app_path,
+				icon        = load_icon(app_path, info),
+			})
+		end
+	end
+
+	Logger.done(LOG, "Found %d bundled app(s).", #entries)
+	_apps_cache = entries
+	return entries
+end
+
+
+
+
+
+-- =======================================
+-- =======================================
+-- ======= 2/ Submenu Construction =======
+-- =======================================
+-- =======================================
+
+--- Captures the actual plain declaration tables without calling source metamethods.
+--- @param value table Actual parsed source container.
+--- @param records table Accumulated raw field receipts.
+--- @param seen table Previously captured source identities.
+--- @return boolean Whether every captured container is plain.
+local function apps_capture(value, records, seen)
+	if type(value) ~= "table" or getmetatable(value) ~= nil then return false end
+	if seen[value] then return true end
+	seen[value] = true
+	local fields = {}
+	records[#records + 1] = { source = value, fields = fields }
+	for key, field in next, value do
+		if type(key) ~= "string" and type(key) ~= "number" then return false end
+		fields[key] = field
+		if type(field) == "table" and not apps_capture(field, records, seen) then return false end
+	end
+	return true
+end
+
+--- Admits the existing Apps declaration before discovery touches its native providers.
+--- @return table|nil Source receipt, or nil without discovery effects.
+local function apps_source()
+	local get_root, group_row, build = rawget(ManifestMenu, "get_root"),
+		rawget(ManifestMenu, "group_row"), rawget(ManifestMenu, "build")
+	if type(get_root) ~= "function" or type(group_row) ~= "function" or type(build) ~= "function" then return nil end
+	local root = get_root()
+	if type(root) ~= "table" or getmetatable(root) ~= nil then return nil end
+	local top, children, empty = rawget(root, "top_level"), rawget(root, "apps_menu"), rawget(root, "apps_empty_rows")
+	local records, seen = {}, {}
+	if not apps_capture(top, records, seen) or not apps_capture(children, records, seen)
+		or not apps_capture(empty, records, seen) then return nil end
+	local parent, matches = nil, 0
+	for _, row in next, top do
+		if type(row) == "table" and rawget(row, "id") == "apps" then parent, matches = row, matches + 1 end
+	end
+	if matches ~= 1 or rawget(parent, "type") ~= "group" or rawget(parent, "i18n") ~= "menu.apps.title" then return nil end
+	-- The existing pure parent API admits valid empty native trees. This preflight
+	-- supplies no discovered data and does not publish its temporary result.
+	if group_row("top_level", "apps", {}, {}) == nil then return nil end
+	return { root = root, top = top, children = children, empty = empty, records = records,
+		get_root = get_root, group_row = group_row, build = build }
+end
+
+--- Rechecks the exact captured source and API identities before parent publication.
+--- @param receipt table Captured source receipt.
+--- @return boolean Whether the admitted declaration is still current.
+local function apps_source_current(receipt)
+	if not rawequal(rawget(ManifestMenu, "get_root"), receipt.get_root)
+		or not rawequal(rawget(ManifestMenu, "group_row"), receipt.group_row)
+		or not rawequal(rawget(ManifestMenu, "build"), receipt.build) then return false end
+	local root = receipt.get_root()
+	if not rawequal(root, receipt.root) or getmetatable(root) ~= nil
+		or not rawequal(rawget(root, "top_level"), receipt.top)
+		or not rawequal(rawget(root, "apps_menu"), receipt.children)
+		or not rawequal(rawget(root, "apps_empty_rows"), receipt.empty) then return false end
+	for _, record in ipairs(receipt.records) do
+		if getmetatable(record.source) ~= nil then return false end
+		for key, value in next, record.source do
+			if not rawequal(value, rawget(record.fields, key)) then return false end
+		end
+		for key, value in next, record.fields do
+			if not rawequal(value, rawget(record.source, key)) then return false end
+		end
+	end
+	return true
+end
+
+
+--- Builds the Applications submenu for the Hammerspoon menubar.
+--- @param ctx table The global UI context.
+--- @return table The menu item representing the Applications submenu.
+function M.build(ctx)
+	local source = apps_source()
+	if source == nil then return nil end
+	Logger.trace(LOG, "Building applications submenu…")
+	local apps = discover_bundled_apps(ctx)
+	local rows = {}
+
+	for _, app in ipairs(apps) do
+		local label = app.name
+		if app.description_key then
+			label = label .. " — " .. i18n.get(app.description_key)
+		end
+
+		local app_path = app.path
+		local app_name = app.name
+		table.insert(rows, {
+			label    = label,
+			image    = app.icon,
+			action   = function()
+				Logger.info(LOG, "Opening bundled app '%s'…", app_name)
+				-- Resolve locale: Hammerspoon active locale → system locale → "en".
+				-- The two-letter ISO code is extracted from the system locale string
+				-- (e.g. "fr_FR@currency=EUR" → "fr") so AppleScript apps receive a
+				-- clean code they can use to load the matching locale JSON.
+				local locale_code = i18n.get_locale and i18n.get_locale()
+				if not locale_code or locale_code == "" then
+					local sys = hs.host and hs.host.locale and hs.host.locale.current()
+					if type(sys) == "string" then
+						locale_code = sys:match("^([a-z][a-z])") or "en"
+					else
+						locale_code = "en"
+					end
+				end
+				-- Resolve the shared locales directory through the single shared-tree
+				-- resolver (Paths.shared). AppleScript apps read this to load UI strings
+				-- for any locale without hardcoding translations; adding a new locale to
+				-- _shared/data/locales/ automatically works in the apps.
+				local locales_dir = Paths.shared("data/locales") or ""
+				-- Launch the .app bundle via `open --env` so the locale variables
+				-- are injected directly into the launched app's environment.
+				-- `setEnvironment` on the `open` process itself does not propagate
+				-- to the app it spawns; `--env KEY=VALUE` does.
+				local task
+				task = TaskLifecycle.native(
+					"Bundled app launch",
+					"/usr/bin/open",
+					function(code, _, stderr)
+						if task then M._active_tasks[task] = nil end  -- task captured by closure; clears the GC-root pin
+						if code ~= 0 then
+							Logger.error(LOG, "open '%s' exited %d: %s.", app_name, code, stderr)
+						end
+					end,
+					function() return false end,
+					{
+						"-n",
+						"--env", "ERGOPTI_LOCALE="     .. locale_code,
+						"--env", "ERGOPTI_LOCALES_DIR=" .. locales_dir,
+						app_path,
+					}
+				)
+				if not task then return end
+				M._active_tasks[task] = true
+				if not TaskLifecycle.start(task, "Bundled app launch") then
+					M._active_tasks[task] = nil
+				end
+			end,
+		})
+	end
+
+	if #rows == 0 then
+		rows = ManifestMenu.template_rows("apps_empty_rows")
+		if not rows then return nil end
+	end
+
+	-- The list the manifest declares for this driver. Its rows are the bundles
+	-- found on disk, which no static entry can enumerate — and Linux puts
+	-- something else entirely under the same title, which the declaration says
+	-- with its reason rather than leaving the two to be compared by hand.
+	--
+	-- Emitted as provider rows above rather than translated here: the adapter
+	-- carried the label, the tick and the greying and dropped the `image`, so
+	-- every application in this menu rendered without its icon. The renderer
+	-- carries the field now, the way the AutoHotkey one always has.
+	local rendered = ManifestMenu.build("apps_menu", "Apps", nil, nil, ctx, {
+		["apps_installed"] = function() return rows end,
+	})
+
+	if type(rendered) ~= "table" or not apps_source_current(source) then return nil end
+	local parent = source.group_row("top_level", "apps", rendered, {})
+	if parent == nil or not apps_source_current(source) then return nil end
+	Logger.done(LOG, "Applications submenu built (%d item(s)).", #rendered)
+	if not apps_source_current(source) then return nil end
+	return parent
+end
+
+--- Invalidates the discovered-apps cache. Exposed for unit tests.
+function M._invalidate_apps_cache() _apps_cache = nil end
+
+--- Warms the apps cache off the menu-open path. Called from ui.menu.init once
+--- boot settles so the first click renders instantly instead of paying the
+--- directory scan + icon loads synchronously.
+--- @param ctx table Menu context (provides base_dir).
+function M.prime(ctx) pcall(discover_bundled_apps, ctx) end
+
+return M

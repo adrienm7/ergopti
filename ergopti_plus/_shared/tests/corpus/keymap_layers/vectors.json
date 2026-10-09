@@ -1,0 +1,666 @@
+{
+	"description": "Cross-driver corpus for layer files (_shared/keymap/layers.recommended.toml and the user's layers.toml). Every vector is replayed by the JS reference loader (tools/lib/keymap-layers.cjs), the shared Lua loader (_shared/lua/keymap/layers.lua) under both the macOS and the Linux suite, and the AutoHotkey loader (windows/platform/remap/layers_loader.ahk). The expected answers are written by hand from the vocabulary (_shared/keymap/layer_actions.toml), not computed by any of the loaders. Files outside the layer-file format described there (valid TOML the AutoHotkey reader cannot read) are toml_invalid on every OS.",
+	"version": 1,
+	"field_semantics": {
+		"os": "The OS the file is resolved for: windows, macos or linux. Sections for the other OSes are still validated.",
+		"toml": "The layer file's text, or null for an absent file (which is no layer at all, not an error).",
+		"file": "Instead of toml: a file under _shared/keymap/ read as the layer file.",
+		"expected.errors": "Error signatures code|layer|section|key|reason_key, absent parts empty, compared as a sorted list. The human-readable detail is not compared.",
+		"expected.layers": "Layer id -> physical-key code -> canonical resolution: keystroke:<mods+Key>[,<chord>…] with modifiers in [_meta].modifier_order, call:<handler>, repeat_count:<N> or none, suffixed @repeat when the repeat count applies to the action. A file-level error (toml_invalid, schema_version_*, a non-table layers) leaves no layer at all."
+	},
+	"vectors": [
+		{
+			"id": "absent_file_is_no_layer",
+			"description": "No layers.toml: no layer and no error, the keyboard keeps its OS behaviour.",
+			"os": "windows",
+			"toml": null,
+			"expected": { "errors": [], "layers": {} }
+		},
+		{
+			"id": "empty_file_is_no_layer",
+			"description": "An empty file means the same as an absent one.",
+			"os": "macos",
+			"toml": "",
+			"expected": { "errors": [], "layers": {} }
+		},
+		{
+			"id": "comment_only_file_is_no_layer",
+			"description": "Comments and blank lines alone declare nothing.",
+			"os": "linux",
+			"toml": "# layers.toml\n\n# nothing imported yet\n",
+			"expected": { "errors": [], "layers": {} }
+		},
+		{
+			"id": "meta_only_file_is_no_layer",
+			"description": "A versioned file with no layer table is valid and empty.",
+			"os": "windows",
+			"toml": "[_meta]\nschema_version = 1\n",
+			"expected": { "errors": [], "layers": {} }
+		},
+		{
+			"id": "schema_version_is_required",
+			"description": "Bindings without [_meta].schema_version reject the whole file.",
+			"os": "windows",
+			"toml": "[layers.nav.all]\n\"KeyK\" = \"arrow_left\"\n",
+			"expected": { "errors": ["schema_version_missing||||"], "layers": {} }
+		},
+		{
+			"id": "meta_that_is_not_a_table_has_no_version",
+			"description": "A _meta value instead of a table carries no schema_version.",
+			"os": "linux",
+			"toml": "_meta = 1\n\n[layers.nav.all]\n\"KeyK\" = \"arrow_left\"\n",
+			"expected": { "errors": ["schema_version_missing||||"], "layers": {} }
+		},
+		{
+			"id": "unknown_schema_version_is_rejected",
+			"description": "A version this build does not know rejects the whole file instead of being read as version 1.",
+			"os": "macos",
+			"toml": "[_meta]\nschema_version = 2\n\n[layers.nav.all]\n\"KeyK\" = \"arrow_left\"\n",
+			"expected": { "errors": ["schema_version_unsupported||||"], "layers": {} }
+		},
+		{
+			"id": "schema_version_as_text_is_rejected",
+			"description": "\"1\" is text, not the version number 1.",
+			"os": "windows",
+			"toml": "[_meta]\nschema_version = \"1\"\n",
+			"expected": { "errors": ["schema_version_unsupported||||"], "layers": {} }
+		},
+		{
+			"id": "unterminated_string_is_invalid_toml",
+			"description": "A string that never closes makes the file unreadable as a whole.",
+			"os": "windows",
+			"toml": "[_meta]\nschema_version = 1\n\n[layers.nav.all]\n\"KeyK\" = \"arrow_left\n",
+			"expected": { "errors": ["toml_invalid||||"], "layers": {} }
+		},
+		{
+			"id": "duplicate_key_is_invalid_toml",
+			"description": "A key bound twice in one table is not TOML: neither binding may win silently.",
+			"os": "linux",
+			"toml": "[_meta]\nschema_version = 1\n\n[layers.nav.all]\n\"KeyK\" = \"arrow_left\"\n\"KeyK\" = \"arrow_right\"\n",
+			"expected": { "errors": ["toml_invalid||||"], "layers": {} }
+		},
+		{
+			"id": "duplicate_table_is_invalid_toml",
+			"description": "A table header written twice is not TOML either.",
+			"os": "macos",
+			"toml": "[_meta]\nschema_version = 1\n\n[layers.nav.all]\n\"KeyK\" = \"arrow_left\"\n\n[layers.nav.all]\n\"KeyL\" = \"arrow_right\"\n",
+			"expected": { "errors": ["toml_invalid||||"], "layers": {} }
+		},
+		{
+			"id": "invalid_escape_is_invalid_toml",
+			"description": "\\q is not a TOML escape.",
+			"os": "windows",
+			"toml": "[_meta]\nschema_version = 1\n\n[layers.nav.all]\n\"KeyK\" = \"arrow\\qleft\"\n",
+			"expected": { "errors": ["toml_invalid||||"], "layers": {} }
+		},
+		{
+			"id": "value_redefined_as_table_is_invalid_toml",
+			"description": "A key that is a value cannot later open as a table.",
+			"os": "linux",
+			"toml": "[_meta]\nschema_version = 1\n\n[layers.nav]\nall = \"arrow_left\"\n\n[layers.nav.all]\n\"KeyK\" = \"arrow_left\"\n",
+			"expected": { "errors": ["toml_invalid||||"], "layers": {} }
+		},
+		{
+			"id": "inline_table_is_outside_the_format",
+			"description": "An inline table is valid TOML but not the layer-file format: every loader rejects the file, instead of macOS and Linux binding the key while Windows rejects it.",
+			"os": "macos",
+			"toml": "[_meta]\nschema_version = 1\n\n[layers.nav]\nall = { KeyK = \"arrow_left\" }\n",
+			"expected": { "errors": ["toml_invalid||||"], "layers": {} }
+		},
+		{
+			"id": "array_value_is_outside_the_format",
+			"description": "An array is outside the format too, so the whole file is rejected on every OS rather than one entry on some and the file on others.",
+			"os": "windows",
+			"toml": "[_meta]\nschema_version = 1\n\n[layers.nav.all]\n\"KeyK\" = [\"arrow_left\"]\n\"KeyL\" = \"arrow_right\"\n",
+			"expected": { "errors": ["toml_invalid||||"], "layers": {} }
+		},
+		{
+			"id": "dotted_key_is_outside_the_format",
+			"description": "A dotted key is outside the format: one TOML parser nests it, another keeps the dots in one key.",
+			"os": "linux",
+			"toml": "[_meta]\nschema_version = 1\n\n[layers]\nnav.all.KeyK = \"arrow_left\"\n",
+			"expected": { "errors": ["toml_invalid||||"], "layers": {} }
+		},
+		{
+			"id": "quoted_header_segment_is_outside_the_format",
+			"description": "A table header names bare keys only.",
+			"os": "windows",
+			"toml": "[_meta]\nschema_version = 1\n\n[layers.\"nav\".all]\n\"KeyK\" = \"arrow_left\"\n",
+			"expected": { "errors": ["toml_invalid||||"], "layers": {} }
+		},
+		{
+			"id": "multiline_string_is_outside_the_format",
+			"description": "A value is a one-line string: a multi-line string is outside the format.",
+			"os": "macos",
+			"toml": "[_meta]\nschema_version = 1\n\n[layers.nav.all]\n\"KeyK\" = \"\"\"arrow_left\"\"\"\n",
+			"expected": { "errors": ["toml_invalid||||"], "layers": {} }
+		},
+		{
+			"id": "non_decimal_integer_is_outside_the_format",
+			"description": "Integers are decimal: 0x1 is outside the format, not the version 1.",
+			"os": "linux",
+			"toml": "[_meta]\nschema_version = 0x1\n",
+			"expected": { "errors": ["toml_invalid||||"], "layers": {} }
+		},
+		{
+			"id": "integer_too_large_to_hold_is_invalid_toml",
+			"description": "2^64 + 1 cannot be held exactly: it is rejected, never wrapped round to the version 1.",
+			"os": "windows",
+			"toml": "[_meta]\nschema_version = 18446744073709551617\n",
+			"expected": { "errors": ["toml_invalid||||"], "layers": {} }
+		},
+		{
+			"id": "integer_of_sixteen_digits_is_invalid_toml",
+			"description": "An integer has at most 15 digits, the most every loader holds exactly.",
+			"os": "macos",
+			"toml": "[_meta]\nschema_version = 1000000000000001\n",
+			"expected": { "errors": ["toml_invalid||||"], "layers": {} }
+		},
+		{
+			"id": "integer_of_fifteen_digits_is_read",
+			"description": "15 digits still read as a number: this one is simply not a version this build knows.",
+			"os": "linux",
+			"toml": "[_meta]\nschema_version = 100_000_000_000_001\n",
+			"expected": { "errors": ["schema_version_unsupported||||"], "layers": {} }
+		},
+		{
+			"id": "toml_1_1_escape_is_invalid_toml",
+			"description": "\\e is a TOML 1.1 escape, not a TOML 1.0 one: every loader rejects it.",
+			"os": "macos",
+			"toml": "[_meta]\nschema_version = 1\n\n[layers.nav.all]\n\"KeyK\" = \"arrow\\eleft\"\n",
+			"expected": { "errors": ["toml_invalid||||"], "layers": {} }
+		},
+		{
+			"id": "nul_escape_is_invalid_toml",
+			"description": "A layer file cannot hold U+0000, escaped or not.",
+			"os": "linux",
+			"toml": "[_meta]\nschema_version = 1\n\n[layers.nav.all]\n\"KeyK\" = \"arrow\\u0000left\"\n",
+			"expected": { "errors": ["toml_invalid||||"], "layers": {} }
+		},
+		{
+			"id": "surrogate_escape_is_invalid_toml",
+			"description": "\\uD800 names half of a UTF-16 pair, not a character.",
+			"os": "windows",
+			"toml": "[_meta]\nschema_version = 1\n\n[layers.nav.all]\n\"KeyK\" = \"arrow\\uD800left\"\n",
+			"expected": { "errors": ["toml_invalid||||"], "layers": {} }
+		},
+		{
+			"id": "control_character_is_invalid_toml",
+			"description": "A control character other than tab (here DEL) is not TOML, even inside a comment.",
+			"os": "linux",
+			"toml": "# hand-edited\u007f\n[_meta]\nschema_version = 1\n",
+			"expected": { "errors": ["toml_invalid||||"], "layers": {} }
+		},
+		{
+			"id": "bare_carriage_return_is_invalid_toml",
+			"description": "A carriage return ends a line only as part of CRLF.",
+			"os": "macos",
+			"toml": "[_meta]\rschema_version = 1\n",
+			"expected": { "errors": ["toml_invalid||||"], "layers": {} }
+		},
+		{
+			"id": "resolves_every_binding_form_on_windows",
+			"description": "Named actions, repeat_count, literal keystrokes with the primary modifier, a call handler and none, on Windows.",
+			"os": "windows",
+			"toml": "[_meta]\nschema_version = 1\n\n[layers.nav.all]\n\"KeyQ\" = \"sel_doc_start\"\n\"KeyK\" = \"arrow_left\"\n\"CapsLock\" = \"backspace\"\n\"KeyV\" = \"new_line_below\"\n\"KeyN\" = \"maximize\"\n\"Digit3\" = \"repeat_count:3\"\n\"KeyT\" = \"keystroke:F2\"\n\"KeyB\" = \"keystroke:primary+shift+KeyS\"\n\"KeyM\" = \"none\"\n\"KeyJ\" = \"word_prev\"\n",
+			"expected": {
+				"errors": [],
+				"layers": {
+					"nav": {
+						"CapsLock": "keystroke:Backspace@repeat",
+						"Digit3": "repeat_count:3",
+						"KeyB": "keystroke:ctrl+shift+KeyS",
+						"KeyJ": "keystroke:ctrl+ArrowLeft@repeat",
+						"KeyK": "keystroke:ArrowLeft@repeat",
+						"KeyM": "none",
+						"KeyN": "call:maximize_window",
+						"KeyQ": "keystroke:ctrl+shift+Home",
+						"KeyT": "keystroke:F2",
+						"KeyV": "keystroke:End,Enter@repeat"
+					}
+				}
+			}
+		},
+		{
+			"id": "resolves_every_binding_form_on_macos",
+			"description": "The same file on macOS: Command is the primary modifier, word and line moves use macOS chords, and a repeat count does not exist there.",
+			"os": "macos",
+			"toml": "[_meta]\nschema_version = 1\n\n[layers.nav.all]\n\"KeyQ\" = \"sel_doc_start\"\n\"KeyK\" = \"arrow_left\"\n\"CapsLock\" = \"backspace\"\n\"KeyV\" = \"new_line_below\"\n\"KeyN\" = \"maximize\"\n\"Digit3\" = \"repeat_count:3\"\n\"KeyT\" = \"keystroke:F2\"\n\"KeyB\" = \"keystroke:primary+shift+KeyS\"\n\"KeyM\" = \"none\"\n\"KeyJ\" = \"word_prev\"\n",
+			"expected": {
+				"errors": [
+					"unavailable_on_os|nav|all|Digit3|platform_reason.layer_repeat_count_is_windows_only"
+				],
+				"layers": {
+					"nav": {
+						"CapsLock": "keystroke:Backspace@repeat",
+						"KeyB": "keystroke:shift+meta+KeyS",
+						"KeyJ": "keystroke:alt+ArrowLeft@repeat",
+						"KeyK": "keystroke:ArrowLeft@repeat",
+						"KeyM": "none",
+						"KeyN": "keystroke:ctrl+meta+fn+KeyY",
+						"KeyQ": "keystroke:shift+meta+ArrowUp",
+						"KeyT": "keystroke:F2",
+						"KeyV": "keystroke:meta+ArrowRight,Enter@repeat"
+					}
+				}
+			}
+		},
+		{
+			"id": "resolves_every_binding_form_on_linux",
+			"description": "The same file on Linux: Ctrl is the primary modifier, the window actions go through the Super key, and a repeat count does not exist there.",
+			"os": "linux",
+			"toml": "[_meta]\nschema_version = 1\n\n[layers.nav.all]\n\"KeyQ\" = \"sel_doc_start\"\n\"KeyK\" = \"arrow_left\"\n\"CapsLock\" = \"backspace\"\n\"KeyV\" = \"new_line_below\"\n\"KeyN\" = \"maximize\"\n\"Digit3\" = \"repeat_count:3\"\n\"KeyT\" = \"keystroke:F2\"\n\"KeyB\" = \"keystroke:primary+shift+KeyS\"\n\"KeyM\" = \"none\"\n\"KeyJ\" = \"word_prev\"\n",
+			"expected": {
+				"errors": [
+					"unavailable_on_os|nav|all|Digit3|platform_reason.layer_repeat_count_is_windows_only"
+				],
+				"layers": {
+					"nav": {
+						"CapsLock": "keystroke:Backspace@repeat",
+						"KeyB": "keystroke:ctrl+shift+KeyS",
+						"KeyJ": "keystroke:ctrl+ArrowLeft@repeat",
+						"KeyK": "keystroke:ArrowLeft@repeat",
+						"KeyM": "none",
+						"KeyN": "keystroke:meta+ArrowUp",
+						"KeyQ": "keystroke:ctrl+shift+Home",
+						"KeyT": "keystroke:F2",
+						"KeyV": "keystroke:End,Enter@repeat"
+					}
+				}
+			}
+		},
+		{
+			"id": "modifiers_are_written_in_one_order",
+			"description": "However a chord names its modifiers, it resolves ctrl, alt, shift, meta, fn.",
+			"os": "windows",
+			"toml": "[_meta]\nschema_version = 1\n\n[layers.nav.all]\n\"KeyA\" = \"keystroke:meta+shift+alt+ctrl+ArrowUp\"\n",
+			"expected": {
+				"errors": [],
+				"layers": { "nav": { "KeyA": "keystroke:ctrl+alt+shift+meta+ArrowUp" } }
+			}
+		},
+		{
+			"id": "fn_resolves_on_macos",
+			"description": "Fn is a modifier a Mac can send.",
+			"os": "macos",
+			"toml": "[_meta]\nschema_version = 1\n\n[layers.nav.all]\n\"KeyA\" = \"keystroke:fn+F1\"\n",
+			"expected": { "errors": [], "layers": { "nav": { "KeyA": "keystroke:fn+F1" } } }
+		},
+		{
+			"id": "fn_is_unavailable_on_windows",
+			"description": "Windows cannot send Fn: the binding is dropped and the reason is named.",
+			"os": "windows",
+			"toml": "[_meta]\nschema_version = 1\n\n[layers.nav.all]\n\"KeyA\" = \"keystroke:fn+F1\"\n\"KeyS\" = \"arrow_up\"\n",
+			"expected": {
+				"errors": ["unavailable_on_os|nav|all|KeyA|platform_reason.layer_fn_modifier_is_macos"],
+				"layers": { "nav": { "KeyS": "keystroke:ArrowUp@repeat" } }
+			}
+		},
+		{
+			"id": "os_entry_replaces_the_all_entry",
+			"description": "On macOS the macos table wins for its key; the other keys keep the all entry.",
+			"os": "macos",
+			"toml": "[_meta]\nschema_version = 1\n\n[layers.nav.all]\n\"KeyJ\" = \"word_prev\"\n\"KeyK\" = \"arrow_left\"\n\n[layers.nav.macos]\n\"KeyJ\" = \"arrow_up\"\n",
+			"expected": {
+				"errors": [],
+				"layers": {
+					"nav": { "KeyJ": "keystroke:ArrowUp@repeat", "KeyK": "keystroke:ArrowLeft@repeat" }
+				}
+			}
+		},
+		{
+			"id": "other_os_entry_leaves_the_all_entry",
+			"description": "On Windows a macos entry changes nothing.",
+			"os": "windows",
+			"toml": "[_meta]\nschema_version = 1\n\n[layers.nav.all]\n\"KeyJ\" = \"word_prev\"\n\n[layers.nav.macos]\n\"KeyJ\" = \"arrow_up\"\n",
+			"expected": {
+				"errors": [],
+				"layers": { "nav": { "KeyJ": "keystroke:ctrl+ArrowLeft@repeat" } }
+			}
+		},
+		{
+			"id": "invalid_os_entry_does_not_fall_back",
+			"description": "A rejected Windows override drops the key on Windows instead of quietly using the all entry.",
+			"os": "windows",
+			"toml": "[_meta]\nschema_version = 1\n\n[layers.nav.all]\n\"KeyJ\" = \"word_prev\"\n\"KeyK\" = \"arrow_left\"\n\n[layers.nav.windows]\n\"KeyJ\" = \"no_such_action\"\n",
+			"expected": {
+				"errors": ["unknown_action|nav|windows|KeyJ|"],
+				"layers": { "nav": { "KeyK": "keystroke:ArrowLeft@repeat" } }
+			}
+		},
+		{
+			"id": "invalid_entry_for_another_os_is_still_reported",
+			"description": "On Linux the Windows override is not used, but its error is reported all the same.",
+			"os": "linux",
+			"toml": "[_meta]\nschema_version = 1\n\n[layers.nav.all]\n\"KeyJ\" = \"word_prev\"\n\n[layers.nav.windows]\n\"KeyJ\" = \"no_such_action\"\n",
+			"expected": {
+				"errors": ["unknown_action|nav|windows|KeyJ|"],
+				"layers": { "nav": { "KeyJ": "keystroke:ctrl+ArrowLeft@repeat" } }
+			}
+		},
+		{
+			"id": "entry_errors_drop_only_their_entry",
+			"description": "Every kind of entry error is reported and the valid entry beside them still loads.",
+			"os": "windows",
+			"toml": "[_meta]\nschema_version = 1\n\n[layers.nav.all]\n\"KeyZZ\" = \"arrow_up\"\n\"KeyQ\" = 3\n\"KeyW\" = true\n\"KeyE\" = \"repeat_count:0\"\n\"KeyR\" = \"repeat_count:100\"\n\"KeyT\" = \"repeat_count:x\"\n\"KeyY\" = \"keystroke:hyper+KeyA\"\n\"KeyU\" = \"keystroke:WheelUp\"\n\"KeyI\" = \"keystroke:ctrl+ctrl+KeyA\"\n\"KeyO\" = \"keystroke:\"\n\"KeyP\" = \"keystroke:KeyA,,KeyB\"\n\"KeyA\" = \"teleport:KeyB\"\n\"KeyS\" = \"Arrow_Up\"\n\"KeyD\" = \"arrow_down\"\n",
+			"expected": {
+				"errors": [
+					"invalid_keystroke|nav|all|KeyI|",
+					"invalid_keystroke|nav|all|KeyO|",
+					"invalid_keystroke|nav|all|KeyP|",
+					"invalid_keystroke|nav|all|KeyU|",
+					"invalid_keystroke|nav|all|KeyY|",
+					"invalid_parameter|nav|all|KeyE|",
+					"invalid_parameter|nav|all|KeyR|",
+					"invalid_parameter|nav|all|KeyT|",
+					"invalid_value_type|nav|all|KeyQ|",
+					"invalid_value_type|nav|all|KeyW|",
+					"unknown_action|nav|all|KeyA|",
+					"unknown_action|nav|all|KeyS|",
+					"unknown_key|nav|all|KeyZZ|"
+				],
+				"layers": { "nav": { "KeyD": "keystroke:ArrowDown@repeat" } }
+			}
+		},
+		{
+			"id": "structure_errors_are_reported",
+			"description": "Unknown fields, an unknown section, an invalid layer id and a layer that is not a table are each reported; the valid layer still loads.",
+			"os": "linux",
+			"toml": "note = \"hand-edited\"\n\n[_meta]\nschema_version = 1\nauthor = \"me\"\n\n[layers]\nbroken = \"arrow_up\"\n\n[layers.nav.all]\n\"KeyK\" = \"arrow_left\"\n\n[layers.nav.bsd]\n\"KeyK\" = \"arrow_right\"\n\n[layers.Nav.all]\n\"KeyK\" = \"arrow_right\"\n",
+			"expected": {
+				"errors": [
+					"invalid_layer_id|Nav|||",
+					"invalid_value_type|broken|||",
+					"unknown_field||_meta|author|",
+					"unknown_field|||note|",
+					"unknown_layer_section|nav|bsd||"
+				],
+				"layers": { "nav": { "KeyK": "keystroke:ArrowLeft@repeat" } }
+			}
+		},
+		{
+			"id": "layers_that_is_not_a_table_rejects_the_file",
+			"description": "A layers value instead of a table leaves nothing to load.",
+			"os": "macos",
+			"toml": "layers = \"nav\"\n\n[_meta]\nschema_version = 1\n",
+			"expected": { "errors": ["invalid_value_type|||layers|"], "layers": {} }
+		},
+		{
+			"id": "section_that_is_not_a_table_is_reported",
+			"description": "An OS section written as a value is reported; the all section still loads.",
+			"os": "windows",
+			"toml": "[_meta]\nschema_version = 1\n\n[layers.nav]\nwindows = \"arrow_up\"\n\n[layers.nav.all]\n\"KeyK\" = \"arrow_left\"\n",
+			"expected": {
+				"errors": ["invalid_value_type|nav|windows||"],
+				"layers": { "nav": { "KeyK": "keystroke:ArrowLeft@repeat" } }
+			}
+		},
+		{
+			"id": "mouse_and_wheel_are_bindable_sources",
+			"description": "Mouse buttons and wheel directions can be bound like keys; only a keyboard key can be sent.",
+			"os": "windows",
+			"toml": "[_meta]\nschema_version = 1\n\n[layers.nav.all]\n\"WheelUp\" = \"vol_up\"\n\"WheelDown\" = \"vol_down\"\n\"MouseBack\" = \"keystroke:alt+ArrowLeft\"\n",
+			"expected": {
+				"errors": [],
+				"layers": {
+					"nav": {
+						"MouseBack": "keystroke:alt+ArrowLeft",
+						"WheelDown": "keystroke:AudioVolumeDown@repeat",
+						"WheelUp": "keystroke:AudioVolumeUp@repeat"
+					}
+				}
+			}
+		},
+		{
+			"id": "wheel_is_a_macos_source",
+			"description": "Hammerspoon runs the macOS wheel bindings that Karabiner-Elements cannot take: a wheel direction binds on macOS like a mouse button, and the Linux entry is not macOS's.",
+			"os": "macos",
+			"toml": "[_meta]\nschema_version = 1\n\n[layers.nav.all]\n\"WheelUp\" = \"vol_up\"\n\"MouseMiddle\" = \"escape\"\n\n[layers.nav.linux]\n\"WheelDown\" = \"vol_down\"\n",
+			"expected": {
+				"errors": [],
+				"layers": {
+					"nav": {
+						"MouseMiddle": "keystroke:Escape@repeat",
+						"WheelUp": "keystroke:AudioVolumeUp@repeat"
+					}
+				}
+			}
+		},
+		{
+			"id": "pointer_is_not_a_linux_source",
+			"description": "The native daemon observes pointer activity without intercepting it, so buttons and wheel bindings are refused with localized reasons.",
+			"os": "linux",
+			"toml": "[_meta]\nschema_version = 1\n\n[layers.nav.all]\n\"WheelUp\" = \"vol_up\"\n\"MouseMiddle\" = \"escape\"\n\n[layers.nav.linux]\n\"WheelDown\" = \"vol_down\"\n",
+			"expected": {
+				"errors": [
+					"unavailable_on_os|nav|all|MouseMiddle|platform_reason.layer_pointer_source_is_not_linux",
+					"unavailable_on_os|nav|linux|WheelDown|platform_reason.layer_wheel_source_is_not_linux",
+					"unavailable_on_os|nav|all|WheelUp|platform_reason.layer_wheel_source_is_not_linux"
+				],
+				"layers": { "nav": {} }
+			}
+		},
+		{
+			"id": "several_layers_and_an_empty_one",
+			"description": "Each layer loads on its own; a layer whose table is empty is present and empty.",
+			"os": "linux",
+			"toml": "[_meta]\nschema_version = 1\n\n[layers.nav.all]\n\"KeyK\" = \"arrow_left\"\n\n[layers.numbers.all]\n\"KeyJ\" = \"keystroke:Numpad4\"\n\n[layers.spare.all]\n",
+			"expected": {
+				"errors": [],
+				"layers": {
+					"nav": { "KeyK": "keystroke:ArrowLeft@repeat" },
+					"numbers": { "KeyJ": "keystroke:Numpad4" },
+					"spare": {}
+				}
+			}
+		},
+		{
+			"id": "toml_spellings_the_format_allows",
+			"description": "Bare and literal keys, literal strings, escapes, comments after values and spaces in headers all read the same.",
+			"os": "windows",
+			"toml": "# layers.toml\n[ _meta ]\nschema_version = 1 # the file format\n\n[ layers . nav . all ]\nKeyK = 'arrow_left'\n'KeyL' = \"arrow_right\" # right\n\"Key\\u004A\" = \"word_prev\"\n",
+			"expected": {
+				"errors": [],
+				"layers": {
+					"nav": {
+						"KeyJ": "keystroke:ctrl+ArrowLeft@repeat",
+						"KeyK": "keystroke:ArrowLeft@repeat",
+						"KeyL": "keystroke:ArrowRight@repeat"
+					}
+				}
+			}
+		},
+		{
+			"id": "byte_order_mark_and_crlf_read_the_same",
+			"description": "A file saved with a UTF-8 byte order mark and CRLF line ends, as some Windows editors do, reads like any other.",
+			"os": "linux",
+			"toml": "﻿[_meta]\r\nschema_version = 1\r\n\r\n[layers.nav.all]\r\n\"KeyK\" = \"arrow_left\" # left\r\n\"KeyL\"=\"arrow_right\"#right\r\n",
+			"expected": {
+				"errors": [],
+				"layers": {
+					"nav": { "KeyK": "keystroke:ArrowLeft@repeat", "KeyL": "keystroke:ArrowRight@repeat" }
+				}
+			}
+		},
+		{
+			"id": "repeat_count_too_large_to_hold_is_invalid",
+			"description": "A repeat count beyond 64 bits is out of range, never wrapped round into it; leading zeros still read as the number.",
+			"os": "windows",
+			"toml": "[_meta]\nschema_version = 1\n\n[layers.nav.all]\n\"Digit1\" = \"repeat_count:18446744073709551621\"\n\"Digit2\" = \"repeat_count:0005\"\n",
+			"expected": {
+				"errors": ["invalid_parameter|nav|all|Digit1|"],
+				"layers": { "nav": { "Digit2": "repeat_count:5" } }
+			}
+		},
+		{
+			"id": "recommended_layer_on_windows",
+			"description": "Ergopti's recommended layer on Windows: the letters, the number row as repeat counts, the right Alt as Escape and the wheel as volume.",
+			"os": "windows",
+			"file": "layers.recommended.toml",
+			"expected": {
+				"errors": [],
+				"layers": {
+					"nav": {
+						"AltRight": "keystroke:Escape@repeat",
+						"BracketLeft": "keystroke:shift+End",
+						"CapsLock": "keystroke:Backspace@repeat",
+						"Comma": "keystroke:meta+ArrowLeft",
+						"Digit0": "repeat_count:10",
+						"Digit1": "repeat_count:1",
+						"Digit2": "repeat_count:2",
+						"Digit3": "repeat_count:3",
+						"Digit4": "repeat_count:4",
+						"Digit5": "repeat_count:5",
+						"Digit6": "repeat_count:6",
+						"Digit7": "repeat_count:7",
+						"Digit8": "repeat_count:8",
+						"Digit9": "repeat_count:9",
+						"IntlBackslash": "keystroke:alt+shift+ArrowUp@repeat",
+						"KeyA": "keystroke:ctrl+shift+ArrowUp@repeat",
+						"KeyC": "keystroke:alt+shift+ArrowDown@repeat",
+						"KeyD": "keystroke:ArrowDown@repeat",
+						"KeyE": "keystroke:ctrl+End",
+						"KeyF": "keystroke:ctrl+shift+ArrowDown@repeat",
+						"KeyG": "keystroke:F12",
+						"KeyH": "keystroke:shift+meta+ArrowLeft",
+						"KeyI": "keystroke:shift+ArrowLeft@repeat",
+						"KeyJ": "keystroke:ctrl+ArrowLeft@repeat",
+						"KeyK": "keystroke:ArrowLeft@repeat",
+						"KeyL": "keystroke:ArrowRight@repeat",
+						"KeyM": "keystroke:Home",
+						"KeyN": "call:maximize_window",
+						"KeyO": "keystroke:shift+ArrowRight@repeat",
+						"KeyP": "keystroke:ctrl+shift+ArrowRight@repeat",
+						"KeyQ": "keystroke:ctrl+shift+Home",
+						"KeyR": "keystroke:ctrl+shift+End",
+						"KeyS": "keystroke:ArrowUp@repeat",
+						"KeyT": "keystroke:F2",
+						"KeyU": "keystroke:ctrl+shift+ArrowLeft@repeat",
+						"KeyV": "keystroke:End,Enter@repeat",
+						"KeyW": "keystroke:ctrl+Home",
+						"KeyX": "keystroke:alt+ArrowDown@repeat",
+						"KeyY": "keystroke:shift+Home",
+						"KeyZ": "keystroke:alt+ArrowUp@repeat",
+						"Period": "keystroke:meta+ArrowRight",
+						"Quote": "keystroke:shift+meta+ArrowRight",
+						"Semicolon": "keystroke:ctrl+ArrowRight@repeat",
+						"Slash": "keystroke:End",
+						"WheelDown": "keystroke:AudioVolumeDown@repeat",
+						"WheelUp": "keystroke:AudioVolumeUp@repeat"
+					}
+				}
+			}
+		},
+		{
+			"id": "recommended_layer_on_macos",
+			"description": "The same preset on macOS: macOS chords for the same actions, F1-F12 on the number row, Spotlight on Space, window cycling on Tab, the right Command key as Escape on a tap and Option+Shift held (a macOS call handler), and the wheel as volume, which Hammerspoon runs.",
+			"os": "macos",
+			"file": "layers.recommended.toml",
+			"expected": {
+				"errors": [],
+				"layers": {
+					"nav": {
+						"AltRight": "keystroke:Escape@repeat",
+						"BracketLeft": "keystroke:shift+meta+ArrowRight",
+						"CapsLock": "keystroke:Backspace@repeat",
+						"Comma": "keystroke:ctrl+fn+ArrowLeft",
+						"Digit0": "keystroke:F10",
+						"Digit1": "keystroke:F1",
+						"Digit2": "keystroke:F2",
+						"Digit3": "keystroke:F3",
+						"Digit4": "keystroke:F4",
+						"Digit5": "keystroke:F5",
+						"Digit6": "keystroke:F6",
+						"Digit7": "keystroke:F7",
+						"Digit8": "keystroke:F8",
+						"Digit9": "keystroke:F9",
+						"Equal": "keystroke:F12",
+						"IntlBackslash": "keystroke:alt+shift+ArrowUp@repeat",
+						"KeyA": "keystroke:alt+shift+meta+ArrowUp@repeat",
+						"KeyC": "keystroke:alt+shift+ArrowDown@repeat",
+						"KeyD": "keystroke:ArrowDown@repeat",
+						"KeyE": "keystroke:meta+ArrowDown",
+						"KeyF": "keystroke:alt+shift+meta+ArrowDown@repeat",
+						"KeyG": "keystroke:F12",
+						"KeyH": "keystroke:ctrl+alt+meta+ArrowLeft",
+						"KeyI": "keystroke:shift+ArrowLeft@repeat",
+						"KeyJ": "keystroke:alt+ArrowLeft@repeat",
+						"KeyK": "keystroke:ArrowLeft@repeat",
+						"KeyL": "keystroke:ArrowRight@repeat",
+						"KeyM": "keystroke:meta+ArrowLeft",
+						"KeyN": "keystroke:ctrl+meta+fn+KeyY",
+						"KeyO": "keystroke:shift+ArrowRight@repeat",
+						"KeyP": "keystroke:alt+shift+ArrowRight@repeat",
+						"KeyQ": "keystroke:shift+meta+ArrowUp",
+						"KeyR": "keystroke:shift+meta+ArrowDown",
+						"KeyS": "keystroke:ArrowUp@repeat",
+						"KeyT": "keystroke:F2",
+						"KeyU": "keystroke:alt+shift+ArrowLeft@repeat",
+						"KeyV": "keystroke:meta+ArrowRight,Enter@repeat",
+						"KeyW": "keystroke:meta+ArrowUp",
+						"KeyX": "keystroke:alt+ArrowDown@repeat",
+						"KeyY": "keystroke:shift+meta+ArrowLeft",
+						"KeyZ": "keystroke:alt+ArrowUp@repeat",
+						"MetaRight": "call:tap_escape_hold_option_shift@repeat",
+						"Minus": "keystroke:F11",
+						"Period": "keystroke:ctrl+fn+ArrowRight",
+						"Quote": "keystroke:ctrl+alt+meta+ArrowRight",
+						"Semicolon": "keystroke:alt+ArrowRight@repeat",
+						"Slash": "keystroke:meta+ArrowRight",
+						"Space": "keystroke:meta+Space",
+						"Tab": "keystroke:meta+Backquote",
+						"WheelDown": "keystroke:AudioVolumeDown@repeat",
+						"WheelUp": "keystroke:AudioVolumeUp@repeat"
+					}
+				}
+			}
+		},
+		{
+			"id": "recommended_layer_on_linux",
+			"description": "The same preset on Linux: the Windows chords, the Super key for window placement, and no number-row entry.",
+			"os": "linux",
+			"file": "layers.recommended.toml",
+			"expected": {
+				"errors": [],
+				"layers": {
+					"nav": {
+						"AltRight": "keystroke:Escape@repeat",
+						"BracketLeft": "keystroke:shift+End",
+						"CapsLock": "keystroke:Backspace@repeat",
+						"Comma": "keystroke:meta+ArrowLeft",
+						"IntlBackslash": "keystroke:alt+shift+ArrowUp@repeat",
+						"KeyA": "keystroke:ctrl+shift+ArrowUp@repeat",
+						"KeyC": "keystroke:alt+shift+ArrowDown@repeat",
+						"KeyD": "keystroke:ArrowDown@repeat",
+						"KeyE": "keystroke:ctrl+End",
+						"KeyF": "keystroke:ctrl+shift+ArrowDown@repeat",
+						"KeyG": "keystroke:F12",
+						"KeyH": "keystroke:shift+meta+ArrowLeft",
+						"KeyI": "keystroke:shift+ArrowLeft@repeat",
+						"KeyJ": "keystroke:ctrl+ArrowLeft@repeat",
+						"KeyK": "keystroke:ArrowLeft@repeat",
+						"KeyL": "keystroke:ArrowRight@repeat",
+						"KeyM": "keystroke:Home",
+						"KeyN": "keystroke:meta+ArrowUp",
+						"KeyO": "keystroke:shift+ArrowRight@repeat",
+						"KeyP": "keystroke:ctrl+shift+ArrowRight@repeat",
+						"KeyQ": "keystroke:ctrl+shift+Home",
+						"KeyR": "keystroke:ctrl+shift+End",
+						"KeyS": "keystroke:ArrowUp@repeat",
+						"KeyT": "keystroke:F2",
+						"KeyU": "keystroke:ctrl+shift+ArrowLeft@repeat",
+						"KeyV": "keystroke:End,Enter@repeat",
+						"KeyW": "keystroke:ctrl+Home",
+						"KeyX": "keystroke:alt+ArrowDown@repeat",
+						"KeyY": "keystroke:shift+Home",
+						"KeyZ": "keystroke:alt+ArrowUp@repeat",
+						"Period": "keystroke:meta+ArrowRight",
+						"Quote": "keystroke:shift+meta+ArrowRight",
+						"Semicolon": "keystroke:ctrl+ArrowRight@repeat",
+						"Slash": "keystroke:End"
+					}
+				}
+			}
+		}
+	]
+}

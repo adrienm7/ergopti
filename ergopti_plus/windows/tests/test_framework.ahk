@@ -1,0 +1,1006 @@
+﻿; static/ergopti_plus/windows/tests/test_framework.ahk
+
+; ==============================================================================
+; MODULE: Test Framework
+; DESCRIPTION:
+; Minimal in-process test runner for ErgoptiPlus AHK code. Provides Assert /
+; AssertEqual / AssertTrue / AssertFalse helpers, a ``Test`` registration
+; function and a ``RunTests`` driver that prints a TAP-like report to stdout
+; and exits with code 0 on success or 1 on any failure.
+;
+; FEATURES & RATIONALE:
+; 1. Zero-dependency: pure AHK v2, no Hotkey/Hotstring registration so the
+;    process exits cleanly after RunTests returns. This is what makes the
+;    runner usable from CI (GitHub Actions) where AHK would otherwise stay
+;    resident waiting for hotkeys.
+; 2. Single global registry keeps tests cheap to author — wrap a closure
+;    in ``Test("name", () => assertion)`` and the runner discovers it.
+; 3. TAP-ish output (``ok N - name`` / ``not ok N - name``) is parseable by
+;    GitHub Actions matchers and humans alike.
+; 4. Assertions print the offending value alongside the expectation so a
+;    CI failure log immediately shows what the regression looks like.
+;
+; KNOWN GOTCHA — SILENT MID-FILE PARSE ABORT:
+; AHK v2's parser silently stops registering top-level statements partway
+; through a test file when the file's encoding is inconsistent (e.g. CRLF
+; line endings appended via a shell redirect into an LF/BOM source). The runner
+; then plans ``1..N`` for only the first batch of ``Test()`` calls and
+; reports green — passing tests are real, missing ones are silently
+; dropped. If a new test_*.ahk file shows fewer registrations than its
+; ``Test(...)`` count, run the repository encoding gate; the source must be
+; UTF-8 with BOM and LF-only line endings. Use a BOM-preserving editor, not
+; shell append redirects, to extend test files. The v2 config-refactor
+; suite (test_features_manifest.ahk) carries an ASCII-only convention
+; for the same reason.
+; ==============================================================================
+
+
+
+
+
+; =============================================
+; =============================================
+; ======= 1/ Constants and shared state =======
+; =============================================
+; =============================================
+
+; Registry of all Test() calls. Each entry is { name, callback, interactive }.
+global TEST_REGISTRY := []
+
+; Counters updated by RunTests.
+global TEST_PASS_COUNT := 0
+global TEST_FAIL_COUNT := 0
+
+; Results file for CI live tailing (same pattern as E2E to guarantee progress logs even
+; when stdout is buffered or the process has no console handle).
+global _TEST_RESULTS_FILE := A_ScriptDir . "\test_results.txt"
+; Including assertion helpers does not acquire or reset a runner receipt.
+
+; Default false when no runner pre-declares it (run_all sets true for --dry-run).
+if !IsSet(_AHK_DRY_RUN)
+	global _AHK_DRY_RUN := false
+
+; Optional case-insensitive substring filter on test names (run_all sets it from
+; ``--only <substr>``). Empty means "run every registered test". Lets a developer
+; replay one failing test by its distinctive slug instead of the whole suite.
+if !IsSet(_AHK_ONLY_FILTER)
+	global _AHK_ONLY_FILTER := ""
+
+if !IsSet(_AHK_QUALIFICATION_PROFILE)
+	global _AHK_QUALIFICATION_PROFILE := ""
+
+; Only the principal runner owns parser registration. Including assertion
+; helpers alone must not create an undeclared function dependency at load time.
+global _TEST_QUALIFICATION_PARSER := 0
+
+; Desktop-affecting callbacks require an explicit runner flag even when --only
+; selects them. Hidden process launch does not suppress GUI or keyboard effects.
+if !IsSet(_AHK_INTERACTIVE)
+	global _AHK_INTERACTIVE := false
+
+
+
+
+
+; =============================
+; =============================
+; ======= 2/ Assertions =======
+; =============================
+; =============================
+
+; Throw a TestFailure when ``Condition`` is falsy. The accompanying message
+; describes the property being checked, for use in the CI failure log.
+Assert(Condition, Message := "assertion failed") {
+	if !Condition {
+		throw Error(Message)
+	}
+}
+
+; Append a line to the results file (for CI tailing) and also to stdout when possible.
+_TestAppendProgress(line) {
+	try FileAppend(line . "`r`n", _TEST_RESULTS_FILE)
+	try FileAppend(line . "`r`n", "*")
+}
+
+; ``!==`` and not ``!=``: AHK v2's ``!=`` compares strings CASE-INSENSITIVELY, so
+; AssertEqual("BTW", "btw") passed — in a suite whose whole subject is case
+; propagation, hotstring triggers and layout keys, that is the one distinction it
+; most needed to make. ``!==`` narrows nothing else: numbers still compare
+; numerically (1 == "1", 1 == 1.0, 255 == "0xFF"), "" is still distinct from 0,
+; true is still 1, and object comparison is identity either way — the ONLY
+; behaviour that changes is string case, which is the behaviour we want back.
+AssertEqual(Expected, Actual, Message := "values differ") {
+	if (Expected !== Actual) {
+		throw Error(Message . " - expected: <" . _DescribeValue(Expected)
+			. ">, actual: <" . _DescribeValue(Actual) . ">")
+	}
+}
+
+AssertTrue(Value, Message := "expected true") {
+	Assert(Value, Message . " - actual: <" . _DescribeValue(Value) . ">")
+}
+
+AssertFalse(Value, Message := "expected false") {
+	if Value {
+		throw Error(Message . " - actual: <" . _DescribeValue(Value) . ">")
+	}
+}
+
+; CaseSense := true for the same reason AssertEqual uses ``!==``: InStr defaults
+; to a case-INSENSITIVE search, so AssertContains(output, "BTW") was satisfied by
+; an output containing "btw".
+AssertContains(Haystack, Needle, Message := "substring not found") {
+	if !InStr(Haystack, Needle, true) {
+		throw Error(Message . " — needle <" . Needle . "> not in <" . Haystack . ">")
+	}
+}
+
+AssertThrows(Callback, Message := "expected exception") {
+	Threw := false
+	try {
+		Callback()
+	} catch {
+		Threw := true
+	}
+	if !Threw {
+		throw Error(Message)
+	}
+}
+
+; Pretty-print a value for failure diagnostics. Shows the first few entries
+; of Map/Array so the failure log immediately shows what the collection
+; contains instead of just "Map(size=5)". Strings longer than 200 chars are
+; truncated. Nested Maps/Arrays are expanded one level deep.
+_DescribeValue(V, Depth := 0) {
+	try {
+		if (Depth > 1)
+			return "{…}"
+		if (V == "")
+			return '""'
+		if (V is Number or V is String) {
+			s := V . ""
+			if (StrLen(s) <= 200)
+				return s
+			return SubStr(s, 1, 197) . "..."
+		}
+		if (Type(V) == "Map") {
+			parts := []
+			cnt := 0
+			for k, val in V {
+				cnt++
+				if (cnt > 6) {
+					parts.Push("…")
+					break
+				}
+				parts.Push(k . "=" . _DescribeValue(val, Depth + 1))
+			}
+			return "Map{" . _JoinParts(parts) . "}"
+		}
+		if (Type(V) == "Array") {
+			parts := []
+			maxItems := Min(V.Length, 6)
+			for i in _Enumerate(V, maxItems) {
+				parts.Push(_DescribeValue(V[i], Depth + 1))
+			}
+			if (V.Length > 6)
+				parts.Push("…")
+			return "[" . _JoinParts(parts) . "]"
+		}
+		return Type(V)
+	} catch {
+		return "?"
+	}
+}
+
+_JoinParts(parts) {
+	s := ""
+	for i, p in parts {
+		if (i > 1)
+			s .= " "
+		s .= p
+	}
+	return s
+}
+
+_Enumerate(arr, n) {
+	enum := []
+	Loop Min(arr.Length, n)
+		enum.Push(A_Index)
+	return enum
+}
+
+; Reads the ENTIRE driver source — every .ahk under the windows/ root except the
+; tests/, vendor/, build/ and _generated/ trees — concatenated into one string, so
+; source-introspection tests find a function regardless of which infra/ or ui/ file
+; the entrypoint decomposition (the entry-point decomposition) moved it into. Function names are unique in
+; the driver's global namespace, so the column-0 anchor in _DriverFuncBody still
+; resolves to the single definition. Cache only after every selected file was
+; read successfully; a transient read failure must not poison later tests.
+; One ownership rule for source censuses and include-graph audits. Both path
+; separators are accepted so generated user code never changes their scope.
+_DriverIsProductionSource(Path) {
+	return !RegExMatch(StrReplace(Path, "\", "/"), "i)/(tests|vendor|build|_generated)/")
+}
+
+_DriverSourceConcat() {
+	static cache := ""
+	if (cache != "")
+		return cache
+	SplitPath(A_ScriptDir, , &Root)   ; A_ScriptDir = windows/tests  ->  Root = windows
+	Combined := ""
+	Loop Files, Root . "\*.ahk", "FR" {
+		if !_DriverIsProductionSource(A_LoopFileFullPath)
+			continue
+		Combined .= "`n" . FileRead(A_LoopFileFullPath, "UTF-8")
+	}
+	cache := Combined
+	return cache
+}
+
+; Strips every full-line ";"-comment (a line whose first non-whitespace
+; character is ";") from Src, preserving all other lines verbatim. Trailing/
+; inline comments (a `code ; comment` line) are left whole — full-line prose
+; blocks are the common case this guards against. Single source of truth for
+; every source-scan test that counts/matches tokens against driver source: a
+; naive raw-substring count is fragile against explanatory comments that
+; happen to contain the same token as the real code (see suspend-watchdog-
+; no-prefix-keywait, where "; native Suspend() never disarms..." comments
+; added by the Pattern-1 hardening campaign inflated a raw "Suspend(" count).
+_StripFullLineComments(Src) {
+	Out := ""
+	for Line in StrSplit(Src, "`n", "`r")
+		if !RegExMatch(Line, "^\s*;")
+			Out .= Line . "`n"
+	return Out
+}
+
+; How a refused exit looks in Ergopti_OnShutdown source.
+;
+; Five meta-tests assert the ORDER of work inside a refusal branch — release the
+; lease, re-arm the retries, and only then decline the exit — and each of them
+; needs a marker for "and here it declines". That used to be the literal
+; `return 1`, duplicated in five files, so bounding the veto behind
+; _LifecycleRefuseShutdown turned five order invariants red at once for a reason
+; that had nothing to do with the order they protect. One name, one edit
+; (lifecycle-shutdown-veto-unbounded).
+global _SHUTDOWN_REFUSAL_MARKER := "return _LifecycleRefuseShutdown("
+; Count both legitimate refusal wrappers: ordinary budget admission and the
+; stricter native-retirement delegate. The substring marker still identifies
+; ordinary refusal branches; the count excludes unrelated or lookalike names.
+global _SHUTDOWN_REFUSAL_PATTERN := "m)^\s*return\s+_LifecycleRefuse(?:Shutdown|NativeRetirement)\("
+
+; Returns the whole driver source (see _DriverSourceConcat) with every
+; full-line comment stripped. Use for source-scan invariants that count or
+; match a token across the ENTIRE driver tree (not just one function body) —
+; without this, an explanatory comment anywhere in infra/modules/adapters/ui
+; can silently trip a naive substring count. Cached after first use.
+_DriverSourceNoComments() {
+	static cache := ""
+	if (cache != "")
+		return cache
+	cache := _StripFullLineComments(_DriverSourceConcat())
+	return cache
+}
+
+; Returns the body (signature through the matching closing brace, full-line
+; comments stripped) of a top-level driver function, found across the whole
+; driver source. THROWS when no definition exists.
+;
+; Failing loudly is the whole point: the helper used to return "" for a missing
+; function, and `InStr("", Needle)` is 0, so every `Assert(InStr(Body, X) > 0)`
+; became `Assert(0 > 0)` — red — while every "must NOT contain" assertion passed
+; VACUOUSLY. A rename therefore disarmed hundreds of guarantees instead of
+; reporting them. Use _DriverFuncBodyOrEmpty when the absence itself is what the
+; test asserts.
+_DriverFuncBody(Name) {
+	Body := _DriverFuncBodyOrEmpty(Name)
+	if (Body == "")
+		throw Error("_DriverFuncBody: no definition of '" . Name . "()' anywhere in the driver source — it was renamed, deleted, or its file moved outside the scanned tree. Fix the test's symbol name, or use _DriverFuncBodyOrEmpty if the absence is the assertion.")
+	return Body
+}
+
+; Same scan as _DriverFuncBody but returns "" instead of throwing when the
+; function is absent. Reserved for the handful of tests whose assertion IS the
+; absence (e.g. "this dead helper must stay deleted").
+; Borrow the immutable snapshot: copying it per name dominates small-body scans.
+; Mask only block comments, preserving offsets, line boundaries and literals.
+; Native regex skips complete strings/line comments before considering an opener.
+_DriverMaskBlockComments(&Src) {
+	return _DriverMaskNonCode(&Src, true)
+}
+
+; Code-only consumers also exclude quoted data and single-line comments.
+_DriverMaskNonCode(&Src, BlockCommentsOnly := false) {
+	if BlockCommentsOnly && !InStr(Src, "/*")
+		return Src
+	Quote := Chr(34)
+	Pattern := "'(?:``[\s\S]|[^'``])*'|" . Quote
+		. "(?:``[\s\S]|[^" . Quote . "``])*" . Quote
+		. "|;[^`r`n]*|(?m:^[ `t]*/\*)"
+	Position := 1
+	CopiedThrough := 1
+	Out := ""
+	while RegExMatch(Src, Pattern, &Token, Position) {
+		Position := Token.Pos + Token.Len
+		if LTrim(Token[0], " `t") == "/*" {
+			EndPos := RegExMatch(Src, "m)(?:^[ `t]*\*/|\*/[ `t]*`r?$)", &Closing, Position)
+			Position := EndPos ? EndPos + Closing.Len : StrLen(Src) + 1
+		} else if BlockCommentsOnly {
+			continue
+		}
+		Out .= SubStr(Src, CopiedThrough, Token.Pos - CopiedThrough)
+		Out .= _DriverBlankNonNewlines(SubStr(Src, Token.Pos, Position - Token.Pos))
+		CopiedThrough := Position
+	}
+	return CopiedThrough == 1 ? Src : Out . SubStr(Src, CopiedThrough)
+}
+
+; PCRE replaces a supplementary character once, but source positions count its
+; two UTF-16 units. Blank spans by native string length to keep aligned offsets.
+_DriverBlankNonNewlines(Text) {
+	Out := ""
+	Position := 1
+	while RegExMatch(Text, "[`r`n]", &Boundary, Position) {
+		Width := Boundary.Pos - Position
+		if Width
+			Out .= Format("{:" . Width . "}", "")
+		Out .= Boundary[0]
+		Position := Boundary.Pos + Boundary.Len
+	}
+	Width := StrLen(Text) - Position + 1
+	if Width
+		Out .= Format("{:" . Width . "}", "")
+	return Out
+}
+
+_DriverFindFunctionDefinition(&Src, Name, SearchPos := 1, CodeMasked := false) {
+	if !RegExMatch(Name, "^[A-Za-z_][A-Za-z0-9_]*$")
+		throw ValueError("Invalid driver function name: " . Name)
+	if !SearchPos
+		return 0
+	if !CodeMasked {
+		Masked := _DriverMaskNonCode(&Src)
+		return _DriverFindFunctionDefinition(&Masked, Name, SearchPos, true)
+	}
+	Pattern := "im)^[ \t]*" . Name . "\("
+	SourceLen := StrLen(Src)
+	while RegExMatch(Src, Pattern, &Match, SearchPos) {
+		SignatureOpen := InStr(Src, "(", , Match.Pos)
+		Depth := 0
+		Quote := ""
+		Cursor := SignatureOpen
+		while Cursor <= SourceLen {
+			Ch := SubStr(Src, Cursor, 1)
+			if (Quote != "") {
+				if (Ch == Chr(96)) {
+					Cursor += 2
+					continue
+				}
+				if (Ch == Quote)
+					Quote := ""
+			} else if (Ch == Chr(34) or Ch == Chr(39)) {
+				Quote := Ch
+			} else if (Ch == ";") {
+				LineEnd := InStr(Src, "`n", , Cursor)
+				Cursor := LineEnd > 0 ? LineEnd : SourceLen + 1
+				continue
+			} else if (Ch == "(") {
+				Depth += 1
+			} else if (Ch == ")") {
+				Depth -= 1
+				if (Depth == 0)
+					break
+			}
+			Cursor += 1
+		}
+		if (Depth == 0) {
+			OpenPos := Cursor + 1
+			while (OpenPos <= SourceLen
+				and InStr(" `t`r`n", SubStr(Src, OpenPos, 1)) > 0)
+				OpenPos += 1
+			if (SubStr(Src, OpenPos, 1) == "{")
+				return { Idx: Match.Pos, OpenPos: OpenPos }
+		}
+		; A column-zero call is not a definition. Continue after this exact name
+		; instead of letting a multiline regex consume through a later function.
+		SearchPos := Match.Pos + Max(1, StrLen(Match[0]))
+	}
+	return 0
+}
+
+_DriverFuncBodyOrEmpty(Name) {
+	static Cache := _DriverFunctionBodyCache()
+	return Cache.Get(Name)
+}
+
+; Each instance reads one immutable driver snapshot. Empty source remains
+; retryable, matching the loader's first-nonempty snapshot ownership.
+class _DriverFunctionBodyCache {
+	__New(ReadSource := _DriverSourceConcat, Extract := unset) {
+		if !IsSet(Extract)
+			Extract := _DriverIndexedBodyExtractor()
+		if !HasMethod(ReadSource, "Call") || !HasMethod(Extract, "Call")
+			throw TypeError("Driver source cache ports must be callable")
+		this.ReadSource := ReadSource
+		this.Extract := Extract
+		this.Source := ""
+		this.Bodies := Map()
+		this.Bodies.CaseSense := "Off"
+	}
+
+	Get(Name) {
+		if this.Bodies.Has(Name)
+			return this.Bodies[Name]
+		if this.Source == "" {
+			Snapshot := this.ReadSource.Call()
+			this.Source := _DriverMaskBlockComments(&Snapshot)
+		}
+		Body := this.Extract.Call(this.Source, Name)
+		if this.Source != ""
+			this.Bodies[Name] := Body
+		return Body
+	}
+}
+
+; The owning body cache supplies one immutable nonempty source. Index candidate
+; starts only: a column-zero call still needs the existing signature validator.
+class _DriverIndexedBodyExtractor {
+	__New() {
+		this.Offsets := 0
+	}
+
+	Call(Src, Name) {
+		if Src == ""
+			return _DriverExtractFunctionBody(&Src, Name)
+		if !IsObject(this.Offsets) {
+			Code := _DriverMaskNonCode(&Src)
+			Offsets := Map()
+			Offsets.CaseSense := "Off"
+			Position := 1
+			while RegExMatch(Code, "m)^[ \t]*([A-Za-z_][A-Za-z0-9_]*)\(", &Found, Position) {
+				if !Offsets.Has(Found[1])
+					Offsets[Found[1]] := Found.Pos
+				Position := Found.Pos + Found.Len
+			}
+			; Capture and borrow one immutable code mask, without copying it per name.
+			this.Find := (Symbol, Start) => _DriverFindFunctionDefinition(&Code, Symbol, Start, true)
+			this.Offsets := Offsets
+		}
+		Definition := this.Find.Call(Name, this.Offsets.Get(Name, 0))
+		return _DriverExtractDefinedBody(&Src, Definition)
+	}
+}
+
+_DriverExtractFunctionBody(&Src, Name, SearchPos := 1, CommentsMasked := false) {
+	if !CommentsMasked {
+		Masked := _DriverMaskBlockComments(&Src)
+		return _DriverExtractFunctionBody(&Masked, Name, SearchPos, true)
+	}
+	; Match a definition, not a same-named column-zero call. The scanner balances
+	; nested parameter expressions and quoted parentheses before requiring the
+	; opening brace immediately after the real outer close.
+	Definition := _DriverFindFunctionDefinition(&Src, Name, SearchPos)
+	return _DriverExtractDefinedBody(&Src, Definition)
+}
+
+; Definition positions come from the code mask; returned text retains literals.
+_DriverExtractDefinedBody(&Src, Definition) {
+	if !IsObject(Definition)
+		return ""
+	Idx := Definition.Idx
+	OpenPos := Definition.OpenPos
+	if (!OpenPos)
+		return ""
+	depth := 0
+	i := OpenPos
+	Len := StrLen(Src)
+	BodyEnd := Len
+	Quote := ""
+	while (i <= Len) {
+		ch := SubStr(Src, i, 1)
+		if (Quote != "") {
+			; AHK uses the backtick escape inside both quote styles. The escaped
+			; byte cannot close the string or alter brace depth.
+			if (ch == Chr(96)) {
+				i += 2
+				continue
+			}
+			if (ch == Quote)
+				Quote := ""
+		} else if (ch == Chr(34) or ch == Chr(39)) {
+			Quote := ch
+		} else if (ch == ";") {
+			; Inline comments may document literal `{` / `}` examples. They are
+			; not syntax and must not make the extracted body absorb siblings.
+			LineEnd := InStr(Src, "`n", , i)
+			i := LineEnd > 0 ? LineEnd : Len + 1
+			continue
+		} else if (ch == "{")
+			depth++
+		else if (ch == "}") {
+			depth--
+			if (depth <= 0) {
+				BodyEnd := i
+				break
+			}
+		}
+		i++
+	}
+	Body := SubStr(Src, Idx, BodyEnd - Idx + 1)
+	return _StripFullLineComments(Body)
+}
+
+; Reads every .ahk under a windows/-relative directory (recursive), concatenated
+; into one string. Use for source-introspection tests that scan a specific
+; module's files (e.g. "ui/tooltip") regardless of how that module is internally
+; split into sub-files. RelDir uses forward slashes.
+;
+; THROWS when any selected file is unreadable or the directory holds no .ahk
+; file. The directory name is the one
+; thing this helper hardcodes, so a rename is exactly what it must catch: a
+; silent "" here turned every downstream "must NOT contain" assertion into a
+; vacuous pass, while test-no-pinned-source-reads.cjs certified the caller as
+; move-resilient precisely BECAUSE it used this helper.
+_DriverDirConcat(RelDir) {
+	SplitPath(A_ScriptDir, , &Root)   ; A_ScriptDir = windows/tests  ->  Root = windows
+	Dir := Root . "\" . StrReplace(RelDir, "/", "\")
+	Combined := ""
+	Loop Files, Dir . "\*.ahk", "FR"
+		Combined .= "`n" . FileRead(A_LoopFileFullPath, "UTF-8")
+	if (Combined == "")
+		throw Error("_DriverDirConcat: '" . RelDir . "' holds no readable .ahk file — the directory was renamed, moved or emptied. Update the test's directory name; do not let it scan nothing.")
+	return Combined
+}
+
+; Export a callable reference for fragment tests. AHK's isolated #Warn pass
+; cannot resolve a global function supplied by the runner's preceding include;
+; fragment functions can declare this variable global without suppressing an
+; actual missing-helper failure at runtime.
+global _DriverDirConcatFn := _DriverDirConcat
+
+
+
+
+
+; ==============================
+; ==============================
+; ======= 3/ Test runner =======
+; ==============================
+; ==============================
+
+; Register a test. ``Callback`` must be a 0-arg callable; it receives no
+; setup/teardown — tests should be self-contained.
+Test(Name, Callback, Interactive := false) {
+	global TEST_REGISTRY
+	TEST_REGISTRY.Push({ name: Name, callback: Callback, interactive: Interactive })
+}
+
+; Keep excluded cases outside the execution plan, with explicit diagnostics;
+; they must never contribute a fabricated successful result to the TAP footer.
+_SelectTests(Registry, Filter, AllowInteractive, &Excluded) {
+	Selected := []
+	Excluded := []
+	for Entry in Registry {
+		if !_FilterMatches(Entry.name, Filter)
+			continue
+		if Entry.interactive && !AllowInteractive
+			Excluded.Push(Entry)
+		else
+			Selected.Push(Entry)
+	}
+	return Selected
+}
+
+/**
+ * Registers the principal runner's parser once, after its implementation loads.
+ * @param {Func} Parser The actual parser retained by the principal runner.
+ * @returns {Integer} One after exact registration; invalid or repeated calls throw.
+ */
+TestQualificationRegisterParser(Parser) {
+	global _TEST_QUALIFICATION_PARSER
+	if _TEST_QUALIFICATION_PARSER is Func
+		throw Error("The qualification parser is already registered.")
+	if !(Parser is Func)
+		throw TypeError("Qualification parser registration requires a function.")
+	_TEST_QUALIFICATION_PARSER := Parser
+	return 1
+}
+
+; Qualification deferrals are execution metadata, never native permission.
+_TestDevQualificationName() {
+	global _AHK_DRY_RUN, _AHK_ONLY_FILTER, _AHK_QUALIFICATION_PROFILE
+	global _TEST_QUALIFICATION_PARSER
+	Profile := _AHK_QUALIFICATION_PROFILE
+	if Profile == "" || _AHK_DRY_RUN
+		return ""
+	if _AHK_ONLY_FILTER != ""
+		throw Error("Qualification deferral requires the complete eligible registry.")
+	Parser := _TEST_QUALIFICATION_PARSER
+	if !(Parser is Func)
+		throw Error("The principal runner has not registered its qualification parser.")
+	SplitPath(A_LineFile, , &TestsDir)
+	Policy := Parser.Call(FileRead(TestsDir . "\..\..\..\..\.github\ci\dev_release_qualification_exceptions.json", "UTF-8"))
+	if !(Policy is Map) || !(Profile == Policy["id"]) || !(EnvGet("GITHUB_ACTIONS") == "true")
+		throw Error("Qualification profile is not authorized.")
+	for Pair in [["GITHUB_REPOSITORY", "repository"], ["GITHUB_EVENT_NAME", "event_name"], ["GITHUB_REF", "ref"],
+		["ERGOPTI_DEV_RELEASE_PRERELEASE", "prerelease"], ["ERGOPTI_DEV_RELEASE_CHANNEL", "channel"],
+		["ERGOPTI_DEV_RELEASE_TAG", "tag"], ["ERGOPTI_DEV_RELEASE_VERSION", "version"]] {
+		if !(EnvGet(Pair[1]) == Policy[Pair[2]])
+			throw Error("Qualification context does not match its release boundary.")
+	}
+	Expiry := RegExReplace(Policy["expires_at"], "[-:TZ]", "")
+	if !(EnvGet("ERGOPTI_DEV_RELEASE_RELEASE") == "true") || Policy["release"] != true
+		|| !RegExMatch(Expiry, "^[0-9]{14}$") || A_NowUTC >= Expiry
+		throw Error("Qualification release profile expired or was refused.")
+	return Policy["scopes"]["windows-pac-full-url"]["name"]
+}
+
+; Preserve the full eligible snapshot and remove only one exact declared name.
+_SelectQualificationTests(Eligible, Name, &Deferred) {
+	Deferred := []
+	if Name == ""
+		return Eligible
+	Selected := []
+	for Entry in Eligible {
+		if Entry.name == Name
+			Deferred.Push(Entry)
+		else
+			Selected.Push(Entry)
+	}
+	if Deferred.Length != 1
+		throw Error("Qualification test must match the complete registry exactly once.")
+	return Selected
+}
+
+; True when ``Name`` should run under the active ``--only`` filter. An empty
+; filter matches every test; otherwise the match is a case-insensitive substring,
+; so a distinctive slug (e.g. a trailing "(my-slug)") selects a single test.
+_FilterMatches(Name, Filter) {
+	return (Filter == "" || InStr(Name, Filter) > 0)
+}
+
+; Returns "file:line" for the first stack frame OUTSIDE test_framework.ahk — the
+; failing test's own call site, rather than the assert helper that threw. AHK
+; stack lines look like ``C:\...\test_foo.ahk (123) : [Func] <source>``. Returns
+; "" when no such frame is found (the stack format varies by AHK build) so the
+; caller can fall back to the raw throw location.
+_TestCallSite(StackText) {
+	if (StackText == "")
+		return ""
+	for Line in StrSplit(StackText, "`n", "`r") {
+		if !RegExMatch(Line, "^\s*(.+?)\s+\((\d+)\)", &m)
+			continue
+		if (InStr(m[1], "test_framework.ahk") || m[1] == "")
+			continue
+		SplitPath(m[1], &FileName)
+		return FileName . ":" . m[2]
+	}
+	return ""
+}
+
+; Path of the TAP results file. CI/tooling can provide a unique destination so
+; parallel suites never validate another process's canonical result file.
+; One receipt selection policy serves ordinary and E2E runner owners.
+; @param DefaultPath Legacy destination when no explicit request is present.
+; @returns {String} Exact requested path or the owner's default destination.
+_TestResultsPath(DefaultPath) {
+	Requested := EnvGet("ERGOPTI_AHK_RESULTS_FILE")
+	return Requested != "" ? Requested : DefaultPath
+}
+
+global TEST_RESULTS_CANONICAL := _TestResultsPath(A_Temp . "\ergopti_test_results.txt")
+global TEST_RESULTS_FILE := TEST_RESULTS_CANONICAL
+global _TEST_RESULTS_INITIALIZED_PATH := ""
+
+
+; Entry owners select their receipt before bootstrap; library includes stay inert.
+; Standalone RunTests uses the same owner, preserving legacy PID publication.
+_TestResultsBeginRun() {
+	global TEST_RESULTS_FILE, TEST_RESULTS_CANONICAL
+	; An explicit launch path owns live progress as well as terminal results.
+	; Legacy ordinary runs still publish through their per-process sidecar.
+	if (TEST_RESULTS_FILE = TEST_RESULTS_CANONICAL && EnvGet("ERGOPTI_AHK_RESULTS_FILE") = "") {
+		TEST_RESULTS_FILE := A_Temp . "\ergopti_test_results_"
+			. DllCall("GetCurrentProcessId") . ".txt"
+	}
+	return _TestResultsInitializeOrExit(TEST_RESULTS_FILE)
+}
+
+; Entry-point initialization precedes the main runner's general error handler.
+; A failed receipt must terminate headlessly even if stderr is also refused.
+_TestResultsInitializeOrExit(Path, ErrorOutputFn := unset, ExitFn := unset) {
+	try {
+		_TestResultsInitialize(Path)
+		return true
+	} catch as Failure {
+		InitializationErrorCode := HasProp(Failure, "Number") ? Failure.Number : 0
+		Message := "not ok 0 - FATAL TAP INITIALIZATION ERROR: " . Type(Failure)
+			. "|" . InitializationErrorCode . ": " . Failure.Message . "`r`n"
+		try {
+			if IsSet(ErrorOutputFn)
+				ErrorOutputFn.Call(Message)
+			else
+				FileAppend(Message, "**")
+		} finally {
+			if IsSet(ExitFn)
+				ExitFn.Call(1)
+			else
+				ExitApp(1)
+		}
+		return false
+	}
+}
+; A selected destination is initialized before bootstrap progress, once only.
+; Keeping the same file prevents a retained CI reader from observing an old inode
+; or losing its consumed bootstrap cursor when the TAP plan starts.
+_TestResultsInitialize(Path, OpenFn := unset) {
+	global _TEST_RESULTS_INITIALIZED_PATH
+	if !(Path is String) || Path == ""
+		throw TypeError("Invalid TAP receipt destination.")
+	if (_TEST_RESULTS_INITIALIZED_PATH = Path)
+		return
+	_TestResultsWrite(Path, "", true, OpenFn?)
+	_TEST_RESULTS_INITIALIZED_PATH := Path
+}
+
+; FileAppend opens exclusively in AHK v2. A string FileOpen mode shares access
+; with the CI reader. Direct raw I/O checks actual completed bytes, including BOM.
+_TestResultsWrite(Path, Text, Reset := false, OpenFn := unset, WriteFn := unset) {
+	if !(Path is String) || Path == "" || !(Text is String)
+		throw TypeError("Invalid TAP receipt destination or text.")
+	Opened := IsSet(OpenFn) ? OpenFn.Call(Path, Reset ? "w" : "a", "UTF-8-RAW")
+		: FileOpen(Path, Reset ? "w" : "a", "UTF-8-RAW")
+	try {
+		Prefix := (Reset || Opened.Length == 0) ? 3 : 0
+		TextBytes := StrPut(Text, "UTF-8") - 1
+		Count := Prefix + TextBytes
+		Bytes := Buffer(Count + 1, 0)
+		if Prefix {
+			NumPut("UChar", 239, "UChar", 187, "UChar", 191, Bytes)
+		}
+		StrPut(Text, Bytes.Ptr + Prefix, TextBytes + 1, "UTF-8")
+		Written := IsSet(WriteFn) ? WriteFn.Call(Opened, Bytes, Count)
+			: _TestResultsNativeWrite(Opened, Bytes, Count)
+		if !(Written is Integer) || Written != Count
+			throw Error("The TAP receipt write was incomplete (" . Written . "/" . Count . " bytes).")
+	} finally {
+		Opened.Close()
+	}
+}
+
+
+; File.RawWrite can buffer data and report acceptance before the native write.
+; This unbuffered boundary keeps sharing failures and short writes observable.
+_TestResultsNativeWrite(Opened, Bytes, Count) {
+	Written := 0
+	Succeeded := DllCall("Kernel32\WriteFile", "Ptr", Opened.Handle, "Ptr", Bytes,
+		"UInt", Count, "UInt*", &Written, "Ptr", 0, "Int")
+	NativeError := A_LastError
+	if !Succeeded
+		throw OSError(NativeError, "The TAP receipt native write was refused")
+	return Written
+}
+
+; Persist each observation before optional console output. A refused disk write
+; must stop the runner instead of publishing a successful but incomplete receipt.
+_TestPrint(Line) {
+	global TEST_RESULTS_FILE
+	_TestResultsWrite(TEST_RESULTS_FILE, Line . "`r`n")
+	try FileAppend(Line . "`r`n", "*")
+}
+
+; Execute every registered test, print TAP-style results and exit with
+; code 0 (all green) or 1 (any failure). Designed to be called from the
+; bottom of ``run_all.ahk`` after every test file has been #Included.
+; When --dry-run is passed on the command line, exits immediately after
+; printing the plan line so the CI warning-check step stays fast.
+RunTests() {
+	global TEST_REGISTRY, TEST_PASS_COUNT, TEST_FAIL_COUNT, _AHK_DRY_RUN, _AHK_ONLY_FILTER
+	global TEST_RESULTS_FILE, TEST_RESULTS_CANONICAL
+	global _AHK_INTERACTIVE
+    if (A_IsCritical != 0) {
+        throw Error("RunTests started with A_IsCritical=" . A_IsCritical)
+    }
+	if !IsSet(_AHK_DRY_RUN)
+		_AHK_DRY_RUN := false
+	if !IsSet(_AHK_ONLY_FILTER)
+		_AHK_ONLY_FILTER := ""
+	_TestResultsBeginRun()
+	; Apply the optional --only <substr> filter. The plan line (1..N) and the run
+	; loop both operate on the selected subset so a filtered run is a valid, fast
+	; replay of a single failing test.
+	ActiveTests := _SelectTests(TEST_REGISTRY, _AHK_ONLY_FILTER, _AHK_INTERACTIVE, &Excluded)
+	DeferredName := _TestDevQualificationName()
+	if DeferredName != "" {
+		for Index, Entry in ActiveTests
+			_TestPrint("# QUALIFICATION_ELIGIBLE " . Index . " - " . Entry.name)
+	}
+	ActiveTests := _SelectQualificationTests(ActiveTests, DeferredName, &Deferred)
+	for Entry in Deferred
+		_TestPrint("# DEFERRED qualification - " . Entry.name)
+	_TestPrint("1.." . ActiveTests.Length)
+	for Entry in Excluded
+		_TestPrint("# excluded (requires --interactive): " . Entry.name)
+	if (_AHK_ONLY_FILTER != "")
+		_TestPrint("# --only " . _AHK_ONLY_FILTER . " - " . ActiveTests.Length
+			. " of " . TEST_REGISTRY.Length . " test(s) selected.")
+	if (_AHK_DRY_RUN) {
+		_TestPrint("# dry-run - skipping execution.")
+		_CopyTestResultsForCi()
+		ExitApp(0)
+	}
+	if (ActiveTests.Length == 0) {
+		_TestPrint("# no test matched --only " . _AHK_ONLY_FILTER . ".")
+		_CopyTestResultsForCi()
+		ExitApp(1)
+	}
+	Index := 0
+	for TestEntry in ActiveTests {
+		Index += 1
+		_TestPrint("RUNNING " . Index . "/" . ActiveTests.Length . " - " . TestEntry.name)
+		Status := "ok"
+		Detail := ""
+		StartedMs := _TestClockMs()
+		try {
+			try TestEntry.callback.Call()
+			finally {
+				; A throwing callback must release its thread-scoped Critical state
+				; before reporting failure or running any following test/timer.
+				LeakedCritical := A_IsCritical != 0
+				if LeakedCritical
+					Critical("Off")
+				DurationMs := _TestClockMs() - StartedMs
+			}
+			if LeakedCritical
+				throw Error("Test LEAKED Critical: " . TestEntry.name)
+		} catch as e {
+			Status := "not ok"
+			; Point [file:line] at the test's own call site, not the assert helper
+			; in test_framework.ahk where the throw physically happened.
+			Site := ""
+			try Site := _TestCallSite(e.Stack)
+			if (Site == "") {
+				SplitPath(e.File, &EFileName)
+				Site := EFileName . ":" . e.Line
+			}
+			Detail := " — " . e.Message . " [" . Site . "]"
+		}
+		if (Status == "ok") {
+			TEST_PASS_COUNT += 1
+		} else {
+			TEST_FAIL_COUNT += 1
+		}
+		_TestPrint(Status . " " . Index . " - " . TestEntry.name . Detail)
+		_TestPrint("# duration_ms " . Index . " " . Format("{:.3f}", DurationMs))
+		; Print the exact one-test replay command so a red test is reproducible
+		; without re-running the whole suite (the JS runner sets this bar).
+		if (Status == "not ok")
+			_TestPrint("#   replay: AutoHotkey64.exe tests\run_all.ahk"
+				. (TestEntry.interactive ? " --interactive" : "") . " --only "
+				. Chr(34) . TestEntry.name . Chr(34))
+	}
+	_TestPrint("# " . TEST_PASS_COUNT . " passed, " . TEST_FAIL_COUNT . " failed.")
+	_CopyTestResultsForCi()
+	ExitApp(TEST_FAIL_COUNT > 0 ? 1 : 0)
+}
+
+; Measure callback wall time without including TAP output or error formatting.
+; @returns {Float} Monotonic milliseconds from the native performance counter.
+_TestClockMs() {
+	static Frequency := 0
+	if !Frequency {
+		if !DllCall("Kernel32\QueryPerformanceFrequency", "Int64*", &Frequency)
+				|| Frequency <= 0
+			throw Error("Test timing frequency is unavailable.")
+	}
+	Counter := 0
+	if !DllCall("Kernel32\QueryPerformanceCounter", "Int64*", &Counter)
+		throw Error("Test performance counter is unavailable.")
+	return Counter * 1000.0 / Frequency
+}
+
+; CI and local tooling read %TEMP%\ergopti_test_results.txt (fixed name).
+_CopyTestResultsForCi() {
+	global TEST_RESULTS_FILE, TEST_RESULTS_CANONICAL
+	if (TEST_RESULTS_FILE = TEST_RESULTS_CANONICAL)
+		return
+	try {
+		if FileExist(TEST_RESULTS_FILE)
+			FileCopy(TEST_RESULTS_FILE, TEST_RESULTS_CANONICAL, true)
+	}
+}
+
+
+; ── Boot progress logging ──
+; Called from run_all.ahk between large #Include batches so CI can tail
+; the results file and see exactly which phase the runner is in. Writes
+; to both the CI-results file (for headless monitoring) and stdout.
+_LogBootProgress(msg) {
+	global TEST_RESULTS_FILE
+	_TestResultsWrite(TEST_RESULTS_FILE, "# [boot] " . msg . "`r`n")
+	try FileAppend("# [boot] " . msg . "`r`n", "*")
+}
+
+; --- Global UI mocks ---
+; Prevent tests from deadlocking or halting the CI runner on headless Windows.
+Notify(Title, Text, Icon := "", Options := "") {
+    return
+}
+TrayTip(Text, Title := "", Options := 0) {
+    return
+}
+MsgBox(Text := "", Title := "", Options := "") {
+	TestMsgBoxCount(true)
+	return
+}
+
+; Counts the dialogs the MsgBox stub above absorbed, so a test can prove that an
+; action showed none. The stub answers "" to every question, which reads as No,
+; so a question in front of an action would also have stopped it.
+; @param {Boolean} Record True to count one more dialog.
+; @returns {Integer} Dialogs absorbed so far.
+TestMsgBoxCount(Record := false) {
+	static Count := 0
+	if Record
+		Count += 1
+	return Count
+}
+
+; Resolve an exported top-level function to its unique authored source file.
+; Native child fixtures use this path in their actual #Include statements,
+; retaining production registration while following module moves by symbol.
+; A fresh complete census refuses missing, duplicate and unreadable sources;
+; no first match or cached path may hide a moved or newly duplicated export.
+; @param Name {String} Unqualified function name; AHK identity ignores case.
+; @param Root {String} Driver root; the suite's windows parent by default.
+; @returns {String} Absolute path of the unique production definition.
+_DriverProductionFileForSymbol(Name, Root := "") {
+	if !(Name is String) || !RegExMatch(Name, "^[A-Za-z_][A-Za-z0-9_]*$")
+		throw ValueError("Invalid production function symbol.")
+	if !(Root is String)
+		throw TypeError("The production source root must be a path string.")
+	if Root == ""
+		SplitPath(A_ScriptDir, , &Root)
+	if !InStr(FileExist(Root), "D")
+		throw ValueError("The production source root must be an existing directory.", -1, Root)
+	Matches := []
+	Loop Files, Root . "\*.ahk", "FR" {
+		Path := A_LoopFileFullPath
+		if !_DriverIsProductionSource(Path)
+			continue
+		Source := FileRead(Path, "UTF-8")
+		Code := _DriverMaskNonCode(&Source)
+		Count := _DriverTopLevelDefinitionCount(&Code, Name)
+		Loop Count
+			Matches.Push(Path)
+	}
+	if Matches.Length == 0
+		throw Error("No production definition for function '" . Name . "'.")
+	if Matches.Length != 1
+		throw Error("Multiple production definitions for function '" . Name . "': " . Matches.Length . ".")
+	return Matches[1]
+}
+
+; Definition syntax comes from the existing signature scanner. Prefix brace
+; depth excludes class methods and nested functions from exported global names;
+; literals and comments were already masked without changing native offsets.
+_DriverTopLevelDefinitionCount(&Code, Name) {
+	Count := 0
+	Depth := 0
+	ScannedThrough := 1
+	SearchFrom := 1
+	; Both declaration forms share one signature validator. This view preserves
+	; every native offset; only original masked code determines lexical depth.
+	Syntax := StrReplace(Code, "=>", "{ ")
+	while IsObject(Definition := _DriverFindFunctionDefinition(&Syntax, Name, SearchFrom, true)) {
+		Prefix := SubStr(Code, ScannedThrough, Definition.Idx - ScannedThrough)
+		StrReplace(Prefix, "{", , , &Opens)
+		StrReplace(Prefix, "}", , , &Closes)
+		Depth += Opens - Closes
+		if Depth == 0
+			Count += 1
+		ScannedThrough := Definition.Idx
+		SearchFrom := Definition.OpenPos + 1
+	}
+	return Count
+}

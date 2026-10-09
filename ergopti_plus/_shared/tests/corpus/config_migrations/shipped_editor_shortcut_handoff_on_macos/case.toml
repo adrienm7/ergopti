@@ -1,0 +1,6 @@
+[case]
+description = "An exact old macOS custom editor chord becomes an ordinary binding."
+drivers = ["hs"]
+outcome = "migrated"
+from_version = 8
+to_version = 12

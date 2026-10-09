@@ -1,0 +1,388 @@
+{
+	"_comment": "Pins _shared/lua/llm/remote_formats.lua and windows/modules/llm/remote_formats.ahk: Backboard's assistant/thread shapes and TypeSafe's decisions shapes. Generated from the Lua oracle. {\"absent\": true} means nothing. message_request jev carries agent.jev_questions(agent.json); decisions_body questions are the same. Request vectors are compared as decoded JSON.",
+	"headers": [
+		{
+			"expected": {
+				"backboard": "X-API-Key",
+				"bearer": "Bearer k",
+				"decisions": "Authorization"
+			},
+			"id": "names"
+		}
+	],
+	"split_model": [
+		{
+			"expected": {
+				"name": "gpt-4o-mini",
+				"provider": "openai"
+			},
+			"id": "provider_and_model",
+			"model": "openai/gpt-4o-mini"
+		},
+		{
+			"expected": {
+				"name": "jev-latest",
+				"provider": "typesafe"
+			},
+			"id": "jev",
+			"model": "typesafe/jev-latest"
+		},
+		{
+			"expected": {
+				"name": "meta-llama/llama-3.3-70b",
+				"provider": "openrouter"
+			},
+			"id": "nested_path",
+			"model": "openrouter/meta-llama/llama-3.3-70b"
+		},
+		{
+			"expected": {
+				"absent": true
+			},
+			"id": "no_provider",
+			"model": "gpt-4o-mini"
+		},
+		{
+			"expected": {
+				"absent": true
+			},
+			"id": "empty_provider",
+			"model": "/gpt"
+		},
+		{
+			"expected": {
+				"absent": true
+			},
+			"id": "empty_model",
+			"model": "openai/"
+		},
+		{
+			"expected": {
+				"absent": true
+			},
+			"id": "spaced_model",
+			"model": "openai/ gpt"
+		}
+	],
+	"assistant_request": [
+		{
+			"base_url": "https://app.backboard.io/api",
+			"expected": {
+				"body": {
+					"name": "Ergopti+",
+					"system_prompt": ""
+				},
+				"url": "https://app.backboard.io/api/assistants"
+			},
+			"id": "create"
+		}
+	],
+	"assistant_id": [
+		{
+			"expected": {
+				"id": "asst_123"
+			},
+			"id": "present",
+			"response": {
+				"assistant_id": "asst_123",
+				"name": "Ergopti+"
+			}
+		},
+		{
+			"expected": {
+				"absent": true
+			},
+			"id": "missing",
+			"response": {
+				"name": "x"
+			}
+		},
+		{
+			"expected": {
+				"absent": true
+			},
+			"id": "empty",
+			"response": {
+				"assistant_id": ""
+			}
+		}
+	],
+	"message_request": [
+		{
+			"base_url": "https://app.backboard.io/api",
+			"expected": {
+				"body": {
+					"assistant_id": "asst_123",
+					"content": "On se voit jeudi ?",
+					"llm_provider": "openai",
+					"memory": "off",
+					"model_name": "gpt-4o-mini",
+					"stream": false,
+					"system_prompt": "You triage."
+				},
+				"url": "https://app.backboard.io/api/threads/messages"
+			},
+			"id": "chat",
+			"spec": {
+				"assistant_id": "asst_123",
+				"model": "openai/gpt-4o-mini",
+				"system": "You triage.",
+				"text": "On se voit jeudi ?"
+			}
+		},
+		{
+			"base_url": "https://app.backboard.io/api",
+			"expected": {
+				"body": {
+					"assistant_id": "asst_123",
+					"content": "Envoyer un mail à Paul",
+					"llm_provider": "typesafe",
+					"memory": "off",
+					"model_name": "jev-latest",
+					"stream": false,
+					"system_one": {
+						"questions": {
+							"intent": {
+								"criteria": {
+									"calendar": "A meeting or an event at a given time",
+									"mail": "An email to write or to send",
+									"none": "Plain conversation or anything that needs no action",
+									"reminder": "Something to remember or to do later",
+									"shortcut": "Running one of the user's named shortcuts"
+								},
+								"instructions": "Which action does the user's text ask for, or clearly imply?",
+								"type": "choice"
+							}
+						}
+					},
+					"system_prompt": ""
+				},
+				"url": "https://app.backboard.io/api/threads/messages"
+			},
+			"id": "jev",
+			"spec": {
+				"assistant_id": "asst_123",
+				"model": "typesafe/jev-latest",
+				"questions": {
+					"intent": {
+						"criteria": {
+							"calendar": "A meeting or an event at a given time",
+							"mail": "An email to write or to send",
+							"none": "Plain conversation or anything that needs no action",
+							"reminder": "Something to remember or to do later",
+							"shortcut": "Running one of the user's named shortcuts"
+						},
+						"instructions": "Which action does the user's text ask for, or clearly imply?",
+						"type": "choice"
+					}
+				},
+				"system": "",
+				"text": "Envoyer un mail à Paul"
+			}
+		},
+		{
+			"base_url": "https://app.backboard.io/api",
+			"expected": {
+				"absent": true
+			},
+			"id": "no_provider",
+			"spec": {
+				"assistant_id": "asst_123",
+				"model": "gpt-4o-mini",
+				"system": "",
+				"text": "x"
+			}
+		}
+	],
+	"text": [
+		{
+			"expected": {
+				"text": "INTENT: mail\nPROBABILITY: 0.9"
+			},
+			"id": "content",
+			"response": {
+				"content": "INTENT: mail\nPROBABILITY: 0.9",
+				"status": "COMPLETED",
+				"thread_id": "t1"
+			}
+		},
+		{
+			"expected": {
+				"absent": true
+			},
+			"id": "null_content",
+			"response": {
+				"status": "FAILED",
+				"thread_id": "t1"
+			}
+		}
+	],
+	"decision_answers": [
+		{
+			"expected": {
+				"answers": {
+					"intent": {
+						"confidence": 0.8,
+						"probabilities": {
+							"mail": 0.9,
+							"none": 0.1
+						},
+						"type": "choice"
+					}
+				},
+				"where": "system_one"
+			},
+			"id": "system_one",
+			"response": {
+				"system_one": {
+					"answers": {
+						"intent": {
+							"confidence": 0.8,
+							"probabilities": {
+								"mail": 0.9,
+								"none": 0.1
+							},
+							"type": "choice"
+						}
+					}
+				},
+				"thread_id": "t"
+			}
+		},
+		{
+			"expected": {
+				"answers": {
+					"intent": {
+						"confidence": 0.8,
+						"probabilities": {
+							"mail": 0.9,
+							"none": 0.1
+						},
+						"type": "choice"
+					}
+				},
+				"where": "answers"
+			},
+			"id": "top_level",
+			"response": {
+				"answers": {
+					"intent": {
+						"confidence": 0.8,
+						"probabilities": {
+							"mail": 0.9,
+							"none": 0.1
+						},
+						"type": "choice"
+					}
+				},
+				"thread_id": "t"
+			}
+		},
+		{
+			"expected": {
+				"answers": {
+					"intent": {
+						"confidence": 0.8,
+						"probabilities": {
+							"mail": 0.9,
+							"none": 0.1
+						},
+						"type": "choice"
+					}
+				},
+				"where": "content"
+			},
+			"id": "in_content",
+			"response": {
+				"content": "{\"answers\":{\"intent\":{\"confidence\":0.80000000000000004,\"probabilities\":{\"mail\":0.90000000000000002,\"none\":0.10000000000000001},\"type\":\"choice\"}},\"model\":\"jev-latest\"}",
+				"thread_id": "t"
+			}
+		},
+		{
+			"expected": {
+				"absent": true
+			},
+			"id": "prose_content",
+			"response": {
+				"content": "I think mail.",
+				"thread_id": "t"
+			}
+		},
+		{
+			"expected": {
+				"absent": true
+			},
+			"id": "nothing",
+			"response": {
+				"thread_id": "t"
+			}
+		}
+	],
+	"decisions_body": [
+		{
+			"expected": {
+				"model": "jev-latest",
+				"questions": {
+					"intent": {
+						"criteria": {
+							"calendar": "A meeting or an event at a given time",
+							"mail": "An email to write or to send",
+							"none": "Plain conversation or anything that needs no action",
+							"reminder": "Something to remember or to do later",
+							"shortcut": "Running one of the user's named shortcuts"
+						},
+						"instructions": "Which action does the user's text ask for, or clearly imply?",
+						"type": "choice"
+					}
+				},
+				"state": "Envoyer un mail à Paul"
+			},
+			"id": "triage",
+			"model": "jev-latest",
+			"state": "Envoyer un mail à Paul"
+		}
+	],
+	"decisions_answers": [
+		{
+			"expected": {
+				"answers": {
+					"intent": {
+						"confidence": 0.8,
+						"probabilities": {
+							"mail": 0.9,
+							"none": 0.1
+						},
+						"type": "choice"
+					}
+				}
+			},
+			"id": "present",
+			"response": {
+				"answers": {
+					"intent": {
+						"confidence": 0.8,
+						"probabilities": {
+							"mail": 0.9,
+							"none": 0.1
+						},
+						"type": "choice"
+					}
+				},
+				"model": "jev-latest",
+				"usage": {
+					"input_tokens": 12,
+					"output_tokens": 1
+				}
+			}
+		},
+		{
+			"expected": {
+				"absent": true
+			},
+			"id": "missing",
+			"response": {
+				"model": "jev-latest"
+			}
+		}
+	]
+}

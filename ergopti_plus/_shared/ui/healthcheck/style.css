@@ -1,0 +1,284 @@
+/* _shared/ui/healthcheck/style.css */
+
+/* ===========================================================================
+ * MODULE: Diagnostics Page Styles
+ * DESCRIPTION:
+ * Single-source styles for the diagnostics window, consumed by all three
+ * hosts (Windows WebView2, macOS WKWebView, Linux WebKit2GTK): a fixed
+ * toolbar, the scrolling sections and the preview of what is shared. Colours
+ * are variables so the page follows the system's light or dark appearance.
+ * =========================================================================== */
+
+:root {
+	--text: #1a1a1a;
+	--muted: #666;
+	--label: #555;
+	--background: #fff;
+	--panel: #f6f6f6;
+	--border: #e0e0e0;
+	--code: #f3f3f3;
+	--pre-background: #1e1e1e;
+	--pre-text: #d4d4d4;
+	--accent: #0a66c2;
+	--accent-text: #fff;
+	--ok: #1a7f37;
+	--fail: #cf222e;
+	--pending: #9a6700;
+}
+
+@media (prefers-color-scheme: dark) {
+	:root {
+		--text: #e6e6e6;
+		--muted: #9a9a9a;
+		--label: #b0b0b0;
+		--background: #1f1f1f;
+		--panel: #2a2a2a;
+		--border: #3a3a3a;
+		--code: #2d2d2d;
+		--pre-background: #111;
+		--pre-text: #d4d4d4;
+		--ok: #3fb950;
+		--fail: #ff7b72;
+		--pending: #d29922;
+	}
+}
+
+html,
+body {
+	background: var(--background);
+	color: var(--text);
+	font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+	font-size: 13px;
+	height: 100%;
+	margin: 0;
+	padding: 0;
+}
+
+body {
+	display: flex;
+	flex-direction: column;
+}
+
+/* ── Toolbar ─────────────────────────────────────────────────────────────── */
+
+.toolbar {
+	background: var(--panel);
+	border-bottom: 1px solid var(--border);
+	flex: none;
+	padding: 10px 16px 6px;
+}
+
+.toolbar .buttons {
+	display: grid;
+	gap: 6px;
+	grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+}
+
+.toolbar-left,
+.toolbar-center,
+.toolbar-right {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 6px;
+}
+
+.toolbar-center {
+	justify-content: center;
+}
+
+.toolbar-right {
+	justify-content: flex-end;
+}
+
+@media (max-width: 800px) {
+	.toolbar .buttons {
+		grid-template-columns: 1fr 1fr;
+	}
+	.toolbar-center {
+		grid-column: 1 / -1;
+		grid-row: 2;
+	}
+}
+
+button {
+	background: var(--background);
+	border: 1px solid var(--border);
+	border-radius: 4px;
+	color: var(--text);
+	cursor: pointer;
+	font: inherit;
+	padding: 4px 12px;
+}
+
+button:disabled {
+	cursor: default;
+	opacity: 0.5;
+}
+
+/* White on blue in both appearances: the dark one declares no pair of its own. */
+button.primary {
+	background: var(--accent);
+	border-color: var(--accent);
+	color: var(--accent-text);
+}
+
+.toolbar .details {
+	align-items: center;
+	display: inline-flex;
+	gap: 6px;
+	margin-top: 8px;
+}
+
+.status {
+	margin: 6px 0 0;
+	min-height: 1.2em;
+}
+
+.status.ok {
+	color: var(--ok);
+}
+.status.fail {
+	color: var(--fail);
+}
+.status.info {
+	color: var(--muted);
+}
+
+/* ── Sections ────────────────────────────────────────────────────────────── */
+
+#content {
+	flex: 1 1 auto;
+	overflow-x: hidden;
+	overflow-y: auto;
+	padding: 4px 16px 16px;
+	word-break: break-word;
+}
+
+h2 {
+	border-bottom: 1px solid var(--border);
+	font-size: 1.05em;
+	margin: 1.1em 0 0.3em;
+	padding-bottom: 0.2em;
+}
+
+h3 {
+	font-size: 0.95em;
+	margin: 0.8em 0 0.3em;
+}
+
+details.section > summary {
+	cursor: pointer;
+	list-style-position: inside;
+}
+
+details.section > summary h2 {
+	border-bottom: none;
+	display: inline;
+}
+
+table {
+	border-collapse: collapse;
+	margin: 0.3em 0 0.6em;
+	width: 100%;
+}
+
+th,
+td {
+	border: 1px solid var(--border);
+	padding: 0.3em 0.65em;
+	text-align: left;
+	vertical-align: top;
+}
+
+table.fields th {
+	color: var(--label);
+	font-weight: 500;
+	width: 38%;
+}
+
+table.items thead th {
+	background: var(--panel);
+	font-weight: 600;
+}
+
+.row-action {
+	font-size: 0.9em;
+	margin-left: 6px;
+	padding: 1px 8px;
+}
+
+.fix {
+	color: var(--muted);
+	margin-top: 4px;
+}
+
+ul.problems {
+	margin: 0.3em 0 0.6em 1.2em;
+	padding: 0;
+}
+
+ul.problems li {
+	margin: 0.3em 0;
+}
+
+pre {
+	background: var(--pre-background);
+	border-radius: 4px;
+	color: var(--pre-text);
+	font-family: 'SF Mono', 'Cascadia Code', Consolas, 'Courier New', monospace;
+	font-size: 0.82em;
+	line-height: 1.45;
+	padding: 0.7em 1em;
+	white-space: pre-wrap;
+	word-break: break-all;
+}
+
+.loading,
+.empty {
+	color: var(--muted);
+	font-style: italic;
+}
+
+.ok {
+	color: var(--ok);
+}
+.fail {
+	color: var(--fail);
+}
+.pending {
+	color: var(--pending);
+	font-style: italic;
+}
+.muted {
+	color: var(--muted);
+}
+tr.ok td:first-child {
+	color: var(--ok);
+}
+tr.fail td:first-child {
+	color: var(--fail);
+}
+tr.muted td {
+	color: var(--muted);
+}
+
+/* ── Preview ─────────────────────────────────────────────────────────────── */
+
+#preview {
+	background: var(--panel);
+	border-top: 1px solid var(--border);
+	flex: none;
+	max-height: 40%;
+	overflow-y: auto;
+	padding: 6px 16px 10px;
+}
+
+#preview > summary {
+	cursor: pointer;
+	font-weight: 600;
+}
+
+#preview .hint {
+	color: var(--muted);
+	margin: 0.4em 0;
+}

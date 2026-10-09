@@ -1,0 +1,14 @@
+# _shared/tests/corpus/config_migrations/op_merge_into/migrations.toml
+
+[registry]
+current_version = 2
+unstamped_version = 1
+
+[steps.v1_to_v2]
+from = 1
+to = 2
+drivers = ["ahk", "hs", "linux"]
+reason = "Corpus: fold a section's keys into its parent."
+ops = [
+	{ op = "merge_into", section = "hotstrings.groups", to_section = "hotstrings" },
+]

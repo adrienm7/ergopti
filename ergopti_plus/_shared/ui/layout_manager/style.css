@@ -1,0 +1,281 @@
+/* _shared/ui/layout_manager/style.css */
+
+/* =========================================================================== */
+/* Layout Manager UI Styles.                                                   */
+/*                                                                             */
+/* The registry layouts as cards: name and status badges, author, licence and  */
+/* versions, then the actions each status offers. Matches the macOS system     */
+/* design language used across all Ergopti webview windows.                    */
+/* =========================================================================== */
+
+/* =============================== */
+/* =============================== */
+/* ======= 1/ Reset & Base ======= */
+/* =============================== */
+/* =============================== */
+
+* {
+	box-sizing: border-box;
+}
+
+html,
+body {
+	height: 100%;
+}
+
+body {
+	background: #f5f5f7;
+	color: #333;
+	display: flex;
+	flex-direction: column;
+	font-family: -apple-system, BlinkMacSystemFont, 'Helvetica Neue', sans-serif;
+	font-size: 13px;
+	margin: 0;
+	padding: 16px 20px 14px;
+}
+
+h1 {
+	color: #1d1d1f;
+	flex-shrink: 0;
+	font-size: 16px;
+	font-weight: 600;
+	margin: 0 0 2px;
+}
+
+.subtitle {
+	color: #888;
+	flex-shrink: 0;
+	font-size: 11px;
+	margin: 0 0 10px;
+}
+
+/* ================================ */
+/* ================================ */
+/* ======= 2/ Status lines ======== */
+/* ================================ */
+/* ================================ */
+
+.toolbar {
+	align-items: center;
+	display: flex;
+	flex-shrink: 0;
+	gap: 10px;
+	margin-bottom: 8px;
+}
+
+.catalogue-status {
+	color: #555;
+	flex-grow: 1;
+	font-size: 11px;
+	margin: 0;
+}
+
+.catalogue-status.is-error,
+.result.is-error {
+	color: #b3261e;
+}
+
+.result {
+	background: #eef6ee;
+	border-radius: 6px;
+	color: #1e5e22;
+	flex-shrink: 0;
+	font-size: 12px;
+	margin: 0 0 8px;
+	padding: 6px 10px;
+}
+
+.result.is-error {
+	background: #fbeceb;
+}
+
+/* ============================= */
+/* ============================= */
+/* ======= 3/ Layout list ====== */
+/* ============================= */
+/* ============================= */
+
+.layout-list {
+	display: flex;
+	flex-direction: column;
+	flex-grow: 1;
+	gap: 8px;
+	list-style: none;
+	margin: 0;
+	min-height: 0;
+	overflow-y: auto;
+	padding: 0;
+}
+
+.layout {
+	background: #fff;
+	border: 1px solid #e0e0e0;
+	border-radius: 8px;
+	flex-shrink: 0;
+	padding: 9px 12px;
+}
+
+.layout-header {
+	align-items: center;
+	display: flex;
+	gap: 8px;
+	justify-content: space-between;
+}
+
+.layout-name {
+	color: #1d1d1f;
+	font-size: 13px;
+	font-weight: 600;
+}
+
+.layout-badges {
+	display: flex;
+	gap: 4px;
+}
+
+.badge {
+	background: #ececf0;
+	border-radius: 10px;
+	color: #555;
+	font-size: 10px;
+	padding: 2px 8px;
+}
+
+.badge-installed,
+.badge-builtin,
+.badge-provided {
+	background: #e3f1e4;
+	color: #1e5e22;
+}
+
+.badge-update {
+	background: #fff1d6;
+	color: #7a4b00;
+}
+
+.badge-active {
+	background: #dceaff;
+	color: #0b4ea2;
+}
+
+.layout-meta {
+	color: #777;
+	display: flex;
+	flex-wrap: wrap;
+	font-size: 11px;
+	gap: 4px 14px;
+	margin: 4px 0 6px;
+}
+
+.layout-actions {
+	align-items: center;
+	display: flex;
+	gap: 6px;
+	justify-content: flex-end;
+}
+
+.layout-content {
+	font-size: 12px;
+	line-height: 1.5;
+	margin: 8px 0;
+}
+
+.layout-content-note {
+	font-size: 11px;
+	opacity: 0.8;
+}
+
+.busy {
+	color: #888;
+	flex-grow: 1;
+	font-size: 11px;
+	font-style: italic;
+}
+
+.empty {
+	color: #888;
+	font-size: 12px;
+	text-align: center;
+}
+
+/* ============================== */
+/* ============================== */
+/* ======= 4/ Buttons =========== */
+/* ============================== */
+/* ============================== */
+
+button {
+	background: #007aff;
+	border: none;
+	border-radius: 6px;
+	color: #fff;
+	cursor: pointer;
+	font-size: 12px;
+	padding: 5px 12px;
+}
+
+button:disabled {
+	cursor: default;
+	opacity: 0.45;
+}
+
+button.secondary,
+button.link {
+	background: #e5e5ea;
+	color: #1d1d1f;
+}
+
+button.link {
+	background: transparent;
+	color: #007aff;
+	padding: 5px 6px;
+}
+
+button.danger {
+	background: #e5e5ea;
+	color: #b3261e;
+}
+
+.btns {
+	display: flex;
+	flex-shrink: 0;
+	justify-content: flex-end;
+	margin-top: 10px;
+}
+
+/* =============================== */
+/* =============================== */
+/* ======= 5/ Dark Mode ========== */
+/* =============================== */
+/* =============================== */
+
+@media (prefers-color-scheme: dark) {
+	body {
+		background: #1e1e1e;
+		color: #ddd;
+	}
+
+	h1,
+	.layout-name {
+		color: #f5f5f7;
+	}
+
+	.layout {
+		background: #2a2a2c;
+		border-color: #3a3a3c;
+	}
+
+	.catalogue-status {
+		color: #aaa;
+	}
+
+	button.secondary,
+	button.danger {
+		background: #3a3a3c;
+		color: #f5f5f7;
+	}
+
+	button.danger {
+		color: #ff6b61;
+	}
+}

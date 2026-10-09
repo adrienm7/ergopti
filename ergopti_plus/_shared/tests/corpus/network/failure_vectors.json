@@ -1,0 +1,640 @@
+{
+	"schema_version": 1,
+	"description": "Independent manually authored native receipt expectations. Never regenerate these expectations from the classifier or policy.",
+	"vectors": [
+		{
+			"id": "curl_verification_failure",
+			"receipt": {
+				"backend": "curl",
+				"stage": "tls",
+				"failure_provenance": "verified",
+				"tls_verification": "enforced",
+				"curl_exit": 60
+			},
+			"cause": "certificate",
+			"actions": []
+		},
+		{
+			"id": "native_expired_certificate",
+			"receipt": {
+				"backend": "urlsession",
+				"stage": "tls",
+				"failure_provenance": "verified",
+				"tls_verification": "enforced",
+				"tls_status": "expired_certificate"
+			},
+			"cause": "certificate",
+			"actions": []
+		},
+		{
+			"id": "native_hostname_mismatch",
+			"receipt": {
+				"backend": "winhttp",
+				"stage": "tls",
+				"failure_provenance": "verified",
+				"tls_verification": "enforced",
+				"tls_status": "hostname_mismatch"
+			},
+			"cause": "certificate",
+			"actions": []
+		},
+		{
+			"id": "native_revoked_certificate",
+			"receipt": {
+				"backend": "wininet",
+				"stage": "tls",
+				"failure_provenance": "verified",
+				"tls_verification": "enforced",
+				"tls_status": "revoked_certificate"
+			},
+			"cause": "certificate",
+			"actions": []
+		},
+		{
+			"id": "dotnet_typed_trust_failure",
+			"receipt": {
+				"backend": "dotnet",
+				"stage": "tls",
+				"failure_provenance": "verified",
+				"tls_verification": "enforced",
+				"tls_status": "untrusted_certificate"
+			},
+			"cause": "certificate",
+			"actions": []
+		},
+		{
+			"id": "generic_tls_handshake_is_not_certificate",
+			"receipt": {
+				"backend": "curl",
+				"stage": "tls",
+				"failure_provenance": "verified",
+				"tls_verification": "enforced",
+				"curl_exit": 35
+			},
+			"cause": "unknown",
+			"actions": []
+		},
+		{
+			"id": "verification_disabled_is_not_trusted_evidence",
+			"receipt": {
+				"backend": "curl",
+				"stage": "tls",
+				"failure_provenance": "verified",
+				"tls_verification": "disabled",
+				"curl_exit": 60
+			},
+			"cause": "unknown",
+			"actions": []
+		},
+		{
+			"id": "unverified_certificate_claim",
+			"receipt": {
+				"stage": "tls",
+				"failure_provenance": "unavailable",
+				"tls_verification": "enforced",
+				"tls_status": "untrusted_certificate"
+			},
+			"cause": "unknown",
+			"actions": []
+		},
+		{
+			"id": "proxy_connect_authentication",
+			"receipt": {
+				"backend": "curl",
+				"stage": "proxy_connect",
+				"failure_provenance": "verified",
+				"proxy_connect_status": 407
+			},
+			"cause": "proxy",
+			"actions": []
+		},
+		{
+			"id": "native_proxy_target_authentication",
+			"receipt": {
+				"backend": "winhttp",
+				"stage": "http",
+				"failure_provenance": "verified",
+				"proxy_mode": "selected",
+				"http_response_source": "proxy",
+				"http_status": 407
+			},
+			"cause": "proxy",
+			"actions": []
+		},
+		{
+			"id": "selected_relay_does_not_prove_407_source",
+			"receipt": {
+				"backend": "curl",
+				"stage": "http",
+				"failure_provenance": "verified",
+				"proxy_mode": "selected",
+				"http_status": 407
+			},
+			"cause": "unknown",
+			"actions": []
+		},
+		{
+			"id": "selected_relay_origin_407_is_not_proxy_authentication",
+			"receipt": {
+				"backend": "curl",
+				"stage": "http",
+				"failure_provenance": "verified",
+				"proxy_mode": "selected",
+				"http_response_source": "origin",
+				"http_status": 407
+			},
+			"cause": "unknown",
+			"actions": []
+		},
+		{
+			"id": "origin_407_without_selected_proxy",
+			"receipt": {
+				"backend": "curl",
+				"stage": "http",
+				"failure_provenance": "verified",
+				"proxy_mode": "direct",
+				"http_status": 407
+			},
+			"cause": "unknown",
+			"actions": []
+		},
+		{
+			"id": "verified_pac_execution_failure",
+			"receipt": {
+				"backend": "winhttp",
+				"stage": "proxy_resolve",
+				"failure_provenance": "verified",
+				"proxy_resolution_status": "pac_failed"
+			},
+			"cause": "proxy",
+			"actions": []
+		},
+		{
+			"id": "verified_wpad_lookup_failure",
+			"receipt": {
+				"backend": "winhttp",
+				"stage": "proxy_resolve",
+				"failure_provenance": "verified",
+				"proxy_resolution_status": "wpad_failed"
+			},
+			"cause": "proxy",
+			"actions": []
+		},
+		{
+			"id": "gio_direct_lacks_pac_failure_proof",
+			"receipt": {
+				"backend": "gio",
+				"stage": "http",
+				"failure_provenance": "unavailable",
+				"proxy_mode": "direct",
+				"proxy_resolution_status": "unavailable",
+				"http_status": 403
+			},
+			"cause": "unknown",
+			"actions": []
+		},
+		{
+			"id": "unavailable_pac_does_not_become_failure",
+			"receipt": {
+				"backend": "gio",
+				"stage": "proxy_resolve",
+				"failure_provenance": "unavailable",
+				"proxy_resolution_status": "pac_failed"
+			},
+			"cause": "unknown",
+			"actions": []
+		},
+		{
+			"id": "curl_cannot_resolve_proxy",
+			"receipt": {
+				"backend": "curl",
+				"stage": "proxy_resolve",
+				"failure_provenance": "verified",
+				"curl_exit": 5
+			},
+			"cause": "proxy",
+			"actions": []
+		},
+		{
+			"id": "connect_policy_403",
+			"receipt": {
+				"backend": "curl",
+				"stage": "proxy_connect",
+				"failure_provenance": "verified",
+				"proxy_connect_status": 403
+			},
+			"cause": "host_blocked",
+			"actions": []
+		},
+		{
+			"id": "connect_policy_451",
+			"receipt": {
+				"backend": "winhttp",
+				"stage": "proxy_connect",
+				"failure_provenance": "verified",
+				"proxy_connect_status": 451
+			},
+			"cause": "host_blocked",
+			"actions": []
+		},
+		{
+			"id": "origin_403_is_not_network_policy_proof",
+			"receipt": {
+				"backend": "curl",
+				"stage": "http",
+				"failure_provenance": "verified",
+				"http_status": 403
+			},
+			"cause": "unknown",
+			"actions": []
+		},
+		{
+			"id": "origin_451_is_not_network_policy_proof",
+			"receipt": {
+				"backend": "curl",
+				"stage": "http",
+				"failure_provenance": "verified",
+				"http_status": 451
+			},
+			"cause": "unknown",
+			"actions": []
+		},
+		{
+			"id": "misplaced_connect_status_is_not_connect_proof",
+			"receipt": {
+				"backend": "curl",
+				"stage": "http",
+				"failure_provenance": "verified",
+				"proxy_connect_status": 403
+			},
+			"cause": "unknown",
+			"actions": []
+		},
+		{
+			"id": "native_firewall_denies_socket",
+			"receipt": {
+				"backend": "native_socket",
+				"stage": "connect",
+				"failure_provenance": "verified",
+				"native_errno_domain": "posix",
+				"native_errno": "EACCES"
+			},
+			"cause": "host_blocked",
+			"actions": []
+		},
+		{
+			"id": "posix_network_unreachable",
+			"receipt": {
+				"backend": "native_socket",
+				"stage": "connect",
+				"failure_provenance": "verified",
+				"native_errno_domain": "posix",
+				"native_errno": "ENETUNREACH"
+			},
+			"cause": "offline",
+			"actions": []
+		},
+		{
+			"id": "winsock_host_unreachable",
+			"receipt": {
+				"backend": "native_socket",
+				"stage": "connect",
+				"failure_provenance": "verified",
+				"native_errno_domain": "winsock",
+				"native_errno": "10065"
+			},
+			"cause": "offline",
+			"actions": []
+		},
+		{
+			"id": "verified_disconnected_network",
+			"receipt": {
+				"stage": "connect",
+				"failure_provenance": "verified",
+				"network_status": "disconnected"
+			},
+			"cause": "offline",
+			"actions": []
+		},
+		{
+			"id": "curl_host_dns_error_is_not_offline_proof",
+			"receipt": {
+				"backend": "curl",
+				"stage": "connect",
+				"failure_provenance": "verified",
+				"curl_exit": 6
+			},
+			"cause": "unknown",
+			"actions": []
+		},
+		{
+			"id": "curl_connection_refusal_is_not_offline_proof",
+			"receipt": {
+				"backend": "curl",
+				"stage": "connect",
+				"failure_provenance": "verified",
+				"curl_exit": 7
+			},
+			"cause": "unknown",
+			"actions": []
+		},
+		{
+			"id": "timeout_is_not_offline_proof",
+			"receipt": {
+				"backend": "curl",
+				"stage": "http",
+				"failure_provenance": "verified",
+				"curl_exit": 28
+			},
+			"cause": "unknown",
+			"actions": []
+		},
+		{
+			"id": "posix_no_disk_space",
+			"receipt": {
+				"backend": "native_fs",
+				"stage": "file_write",
+				"failure_provenance": "verified",
+				"native_errno_domain": "posix",
+				"native_errno": "ENOSPC"
+			},
+			"cause": "disk",
+			"actions": []
+		},
+		{
+			"id": "posix_quota_exhausted",
+			"receipt": {
+				"backend": "native_fs",
+				"stage": "file_create",
+				"failure_provenance": "verified",
+				"native_errno_domain": "posix",
+				"native_errno": "EDQUOT"
+			},
+			"cause": "disk",
+			"actions": []
+		},
+		{
+			"id": "windows_disk_full",
+			"receipt": {
+				"backend": "native_fs",
+				"stage": "file_write",
+				"failure_provenance": "verified",
+				"native_errno_domain": "win32",
+				"native_errno": "112"
+			},
+			"cause": "disk",
+			"actions": []
+		},
+		{
+			"id": "windows_handle_disk_full",
+			"receipt": {
+				"backend": "native_fs",
+				"stage": "file_write",
+				"failure_provenance": "verified",
+				"native_errno_domain": "win32",
+				"native_errno": "39"
+			},
+			"cause": "disk",
+			"actions": []
+		},
+		{
+			"id": "posix_file_access_denied",
+			"receipt": {
+				"backend": "native_fs",
+				"stage": "file_read",
+				"failure_provenance": "verified",
+				"native_errno_domain": "posix",
+				"native_errno": "EACCES"
+			},
+			"cause": "permission",
+			"actions": []
+		},
+		{
+			"id": "posix_readonly_filesystem",
+			"receipt": {
+				"backend": "native_fs",
+				"stage": "file_write",
+				"failure_provenance": "verified",
+				"native_errno_domain": "posix",
+				"native_errno": "EROFS"
+			},
+			"cause": "permission",
+			"actions": []
+		},
+		{
+			"id": "windows_file_access_denied",
+			"receipt": {
+				"backend": "native_fs",
+				"stage": "file_create",
+				"failure_provenance": "verified",
+				"native_errno_domain": "win32",
+				"native_errno": "5"
+			},
+			"cause": "permission",
+			"actions": []
+		},
+		{
+			"id": "curl_cannot_infer_disk_from_write_error",
+			"receipt": {
+				"backend": "curl",
+				"stage": "file_write",
+				"failure_provenance": "verified",
+				"curl_exit": 23
+			},
+			"cause": "unknown",
+			"actions": []
+		},
+		{
+			"id": "curl_cannot_infer_permission_from_read_error",
+			"receipt": {
+				"backend": "curl",
+				"stage": "file_read",
+				"failure_provenance": "verified",
+				"curl_exit": 26
+			},
+			"cause": "unknown",
+			"actions": []
+		},
+		{
+			"id": "file_errno_on_http_is_not_filesystem_failure",
+			"receipt": {
+				"backend": "curl",
+				"stage": "http",
+				"failure_provenance": "verified",
+				"native_errno_domain": "posix",
+				"native_errno": "ENOSPC"
+			},
+			"cause": "unknown",
+			"actions": []
+		},
+		{
+			"id": "foreign_errno_domain_cannot_reuse_windows_codes",
+			"receipt": {
+				"backend": "native_fs",
+				"stage": "file_write",
+				"failure_provenance": "verified",
+				"native_errno_domain": "posix",
+				"native_errno": "112"
+			},
+			"cause": "unknown",
+			"actions": []
+		},
+		{
+			"id": "stderr_is_not_cause_evidence",
+			"receipt": {
+				"stderr": "SSL certificate failed; disk full; proxy denied",
+				"url": "https://user:secret@example.test/private?token=secret"
+			},
+			"cause": "unknown",
+			"actions": []
+		},
+		{
+			"id": "numeric_string_status_is_invalid",
+			"receipt": {
+				"stage": "proxy_connect",
+				"failure_provenance": "verified",
+				"proxy_connect_status": "403"
+			},
+			"cause": "unknown",
+			"evidence": "invalid_receipt",
+			"actions": []
+		},
+		{
+			"id": "lowercase_stage_is_required",
+			"receipt": {
+				"stage": "TLS",
+				"backend": "curl",
+				"failure_provenance": "verified",
+				"tls_verification": "enforced",
+				"curl_exit": 60
+			},
+			"cause": "unknown",
+			"evidence": "invalid_receipt",
+			"actions": []
+		},
+		{
+			"id": "wrong_key_case_is_not_tls_evidence",
+			"receipt": {
+				"Stage": "tls",
+				"backend": "curl",
+				"failure_provenance": "verified",
+				"tls_verification": "enforced",
+				"curl_exit": 60
+			},
+			"cause": "unknown",
+			"actions": []
+		},
+		{
+			"id": "contradictory_disabled_verification_blocks_certificate",
+			"receipt": {
+				"stage": "tls",
+				"backend": "curl",
+				"failure_provenance": "verified",
+				"tls_verification": "disabled",
+				"tls_status": "untrusted_certificate",
+				"curl_exit": 60
+			},
+			"cause": "unknown",
+			"actions": []
+		},
+		{
+			"id": "missing_provenance_is_unknown",
+			"receipt": {
+				"backend": "curl",
+				"stage": "tls",
+				"tls_verification": "enforced",
+				"curl_exit": 60
+			},
+			"cause": "unknown",
+			"actions": []
+		},
+		{
+			"id": "live_proxy_failure_actions",
+			"receipt": {
+				"stage": "proxy_connect",
+				"failure_provenance": "verified",
+				"proxy_connect_status": 407
+			},
+			"capabilities": {
+				"owner_alive": true,
+				"retry_available": true,
+				"proxy_settings_available": true,
+				"diagnostics_available": true
+			},
+			"cause": "proxy",
+			"actions": ["retry", "proxy_settings", "diagnostics"]
+		},
+		{
+			"id": "retired_owner_removes_retry",
+			"receipt": {
+				"stage": "proxy_connect",
+				"failure_provenance": "verified",
+				"proxy_connect_status": 407
+			},
+			"capabilities": {
+				"owner_alive": false,
+				"retry_available": true,
+				"proxy_settings_available": true,
+				"diagnostics_available": true
+			},
+			"cause": "proxy",
+			"actions": ["proxy_settings", "diagnostics"]
+		},
+		{
+			"id": "owned_download_folder_action",
+			"receipt": {
+				"stage": "file_write",
+				"failure_provenance": "verified",
+				"native_errno_domain": "posix",
+				"native_errno": "ENOSPC"
+			},
+			"capabilities": {
+				"owner_alive": true,
+				"retry_available": true,
+				"download_folder_available": true,
+				"download_folder_owned": true,
+				"diagnostics_available": true
+			},
+			"cause": "disk",
+			"actions": ["retry", "download_folder", "diagnostics"]
+		},
+		{
+			"id": "foreign_folder_does_not_get_action",
+			"receipt": {
+				"stage": "file_write",
+				"failure_provenance": "verified",
+				"native_errno_domain": "posix",
+				"native_errno": "ENOSPC"
+			},
+			"capabilities": {
+				"download_folder_available": true,
+				"download_folder_owned": false,
+				"diagnostics_available": true
+			},
+			"cause": "disk",
+			"actions": ["diagnostics"]
+		},
+		{
+			"id": "unavailable_proxy_settings_is_not_action",
+			"receipt": {
+				"stage": "proxy_connect",
+				"failure_provenance": "verified",
+				"proxy_connect_status": 407
+			},
+			"capabilities": { "proxy_settings_available": false, "diagnostics_available": true },
+			"cause": "proxy",
+			"actions": ["diagnostics"]
+		},
+		{
+			"id": "strings_do_not_admit_actions",
+			"receipt": {},
+			"capabilities": {
+				"owner_alive": "true",
+				"retry_available": "true",
+				"diagnostics_available": "true"
+			},
+			"cause": "unknown",
+			"actions": []
+		}
+	]
+}

@@ -1,0 +1,204 @@
+--- adapters/mouse_control.lua
+
+--- ==============================================================================
+--- MODULE: MouseControl Adapter (Hammerspoon)
+--- DESCRIPTION:
+--- Hammerspoon implementation of the MouseControl port contract defined in
+--- static/ergopti_plus/_shared/core/ports/MouseControl.spec.js. Wraps hs.mouse and
+--- hs.screen to move the cursor and query monitor geometry without coupling
+--- domain modules to hs APIs.
+---
+--- FEATURES & RATIONALE:
+--- 1. Return-zero-object: getPos() and getMonitorBounds() always return a table
+---    with numeric fields so callers never need nil-guards.
+--- 2. Silent no-op: setPos() silently ignores errors per the port contract.
+--- 3. Defensive pcall: all hs calls are wrapped to prevent propagation.
+--- ==============================================================================
+
+local M = {}
+
+local hs     = hs
+local Logger = require("infra.logger")
+
+local LOG = "adapters.mouse_control"
+
+
+
+
+-- =========================================
+-- =========================================
+-- ======= 1/ Adapter Methods ==============
+-- =========================================
+-- =========================================
+
+--- Moves the mouse cursor to an absolute screen position.
+--- @param x number Horizontal coordinate in pixels.
+--- @param y number Vertical coordinate in pixels.
+--- @return boolean True when Hammerspoon accepted the position.
+function M.setPos(x, y)
+	local ok = pcall(function()
+		hs.mouse.absolutePosition({ x = tonumber(x) or 0, y = tonumber(y) or 0 })
+	end)
+	return ok
+end
+
+--- Returns the current absolute cursor position.
+--- @return table { x: number, y: number }
+function M.getPos()
+	local ok, result = pcall(function()
+		local pos = hs.mouse.absolutePosition()
+		if type(pos) == "table" then
+			return { x = tonumber(pos.x) or 0, y = tonumber(pos.y) or 0 }
+		end
+		return { x = 0, y = 0 }
+	end)
+	if not ok then
+		Logger.error(LOG, "getPos(): error — %s", tostring(result))
+		return { x = 0, y = 0 }
+	end
+	return type(result) == "table" and result or { x = 0, y = 0 }
+end
+
+--- Returns the total number of monitors attached to the system.
+--- @return number Monitor count (>= 1 on healthy system, 0 on error).
+function M.getMonitorCount()
+	local ok, result = pcall(function()
+		local screens = hs.screen.allScreens()
+		return type(screens) == "table" and #screens or 0
+	end)
+	if not ok then
+		Logger.error(LOG, "getMonitorCount(): error — %s", tostring(result))
+		return 0
+	end
+	return type(result) == "number" and result or 0
+end
+
+--- Returns the bounding rectangle of monitor n (1-indexed).
+--- @param n number Monitor index, starting at 1.
+--- @return table { left: number, top: number, right: number, bottom: number }
+function M.getMonitorBounds(n)
+	local empty = { left = 0, top = 0, right = 0, bottom = 0 }
+	local ok, result = pcall(function()
+		local screens = hs.screen.allScreens()
+		if type(screens) ~= "table" then return empty end
+		local screen = screens[tonumber(n) or 1]
+		if not screen then return empty end
+		local frame = screen:fullFrame()
+		if type(frame) ~= "table" then return empty end
+		return {
+			left   = tonumber(frame.x) or 0,
+			top    = tonumber(frame.y) or 0,
+			right  = (tonumber(frame.x) or 0) + (tonumber(frame.w) or 0),
+			bottom = (tonumber(frame.y) or 0) + (tonumber(frame.h) or 0),
+		}
+	end)
+	if not ok then
+		Logger.error(LOG, "getMonitorBounds(): error — %s", tostring(result))
+		return empty
+	end
+	return type(result) == "table" and result or empty
+end
+
+--- Returns the id of the screen the cursor currently sits on.
+---
+--- An ID rather than an hs.screen so callers stay free of Hammerspoon types:
+--- comparing `window:screen():id()` against this number is all a per-screen
+--- window cycler needs, and it keeps the OS object inside the adapter.
+---
+--- `hs.mouse.getCurrentScreen()` is the direct answer but is not present in
+--- every Hammerspoon build the driver runs against, so the geometric fallback
+--- reproduces it from the cursor position — the same computation the Windows
+--- twin (GetMonitorFromPoint) performs.
+---
+--- @return number|nil Screen id, or nil when the cursor is on no screen.
+function M.screen_id_under_cursor()
+	local ok, result = pcall(function()
+		if type(hs.mouse.getCurrentScreen) == "function" then
+			local screen = hs.mouse.getCurrentScreen()
+			if screen then return screen:id() end
+		end
+
+		local pos = hs.mouse.absolutePosition()
+		if type(pos) ~= "table" then return nil end
+		local screens = hs.screen.allScreens()
+		if type(screens) ~= "table" then return nil end
+
+		for _, screen in ipairs(screens) do
+			local frame = screen:fullFrame()
+			if type(frame) == "table"
+				and pos.x >= frame.x and pos.x < frame.x + frame.w
+				and pos.y >= frame.y and pos.y < frame.y + frame.h then
+				return screen:id()
+			end
+		end
+		return nil
+	end)
+	if not ok then
+		Logger.error(LOG, "screen_id_under_cursor(): error — %s", tostring(result))
+		return nil
+	end
+	return result
+end
+
+--- Returns the frame of the screen the cursor is on, in the global coordinates
+--- screencapture -R takes (points, origin at the top left of the main screen).
+--- Not part of the MouseControl port: the screen-reading actions capture the
+--- screen the user is looking at.
+--- @return table|nil frame { x, y, w, h }, or nil when no screen holds the cursor.
+function M.screen_frame_under_cursor()
+	local ok, result = pcall(function()
+		local screen = nil
+		if type(hs.mouse.getCurrentScreen) == "function" then screen = hs.mouse.getCurrentScreen() end
+		if not screen then
+			local pos = hs.mouse.absolutePosition()
+			for _, candidate in ipairs(hs.screen.allScreens() or {}) do
+				local frame = candidate:fullFrame()
+				if type(pos) == "table" and type(frame) == "table"
+					and pos.x >= frame.x and pos.x < frame.x + frame.w
+					and pos.y >= frame.y and pos.y < frame.y + frame.h then
+					screen = candidate
+					break
+				end
+			end
+		end
+		if not screen then return nil end
+		local frame = screen:fullFrame()
+		if type(frame) ~= "table" or not tonumber(frame.w) or not tonumber(frame.h)
+			or frame.w <= 0 or frame.h <= 0 then
+			return nil
+		end
+		return { x = tonumber(frame.x) or 0, y = tonumber(frame.y) or 0, w = frame.w, h = frame.h }
+	end)
+	if not ok then
+		Logger.error(LOG, "screen_frame_under_cursor(): error — %s", tostring(result))
+		return nil
+	end
+	return result
+end
+
+-- The button read runs on every trackpad frame: a failing read is reported
+-- once, not sixty times a second.
+local _button_read_failure_logged = false
+
+--- Tells whether any mouse button is physically held at this instant. Not part
+--- of the MouseControl port: the gesture engine reads it on every trackpad
+--- frame, because the contacts of a click-drag are never a gesture.
+--- @return boolean down True while at least one button is held.
+function M.any_button_down()
+	local ok, result = pcall(function()
+		for _, pressed in pairs(hs.eventtap.checkMouseButtons() or {}) do
+			if pressed == true then return true end
+		end
+		return false
+	end)
+	if not ok then
+		if not _button_read_failure_logged then
+			_button_read_failure_logged = true
+			Logger.error(LOG, "any_button_down(): the mouse buttons cannot be read — %s", tostring(result))
+		end
+		return false
+	end
+	return result
+end
+
+return M

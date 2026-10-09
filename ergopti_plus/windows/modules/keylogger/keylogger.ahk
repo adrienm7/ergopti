@@ -1,0 +1,1354 @@
+﻿; modules/keylogger/keylogger.ahk
+
+; ==============================================================================
+; MODULE: Keylogger (AHK)
+; DESCRIPTION:
+; Windows port of the Hammerspoon keylogger. Mirrors the on-disk format
+; specified in ../KEYLOGGER_SPEC.md byte-for-byte:
+;
+;   <config_dir>/metrics/by_device/<device_id>/device.json
+;   <config_dir>/metrics/by_device/<device_id>/data.sql      (append-only SQL)
+;   <config_dir>/metrics/by_device/<device_id>/today.log     (JSONL hot path)
+;   <config_dir>/metrics/by_device/<device_id>/state.json    (small offset/counter file)
+;
+; FEATURES & RATIONALE:
+; 1. SQLite-free hot path: this driver never opens db.sqlite. The launcher
+;    (re)builds the cache from every device's data.sql on demand.
+; 2. data.sql is the single source of truth on disk — Git-friendly,
+;    sync-safe, identical to the Hammerspoon side so a Mac and a PC sharing
+;    a cloud folder cumulate naturally.
+; 3. Per-device subdirectory: each machine writes to its own folder (keyed
+;    on a UUID derived from MachineGuid) so concurrent writers cannot
+;    corrupt each other's files.
+; 4. Crash-safe: today_log_offset is persisted in state.json on every
+;    successful ingest tick. Replay is idempotent thanks to per-device
+;    PRIMARY KEY (device_id, id) on every event table.
+;
+; SCOPE OF THIS PORT:
+; The current iteration covers raw event persistence (typing, app_switch,
+; window_switch, shortcut, hotstring, llm, system, session). The rich
+; aggregation walker (n-grams, bursts, sessions, ergonomic streaks) is NOT
+; yet ported; agg_* / ngram_* tables stay empty on Windows-only setups
+; until the dedicated walker port lands. Mac users sharing a synced
+; metrics folder cover this gap automatically: the HS walker on the Mac
+; ingests the PC's data.sql via foreign-sync and populates the agg_*/
+; ngram_* tables for every device's events.
+;
+; HOT PATH LATENCY (KL_AppendLog):
+; Every cost on the keystroke flush path was scrutinised:
+;   - Persistent FileObject handle for today.log (Section 3 KL_OpenTodayFh).
+;     A FileAppend()-per-keystroke would re-open + close the file every
+;     time, adding ~1 ms each on NTFS once an antivirus filter driver
+;     hooks the path. Caching the handle drops that to a memcpy.
+;   - Pre-encoded device_id SQL literal cached in Keylogger._device_id_lit.
+;     Every INSERT used to call KL_SqlStr() on the same UUID; we now read
+;     a static string instead.
+;   - No fh.Flush() per call — OS-level write buffering already provides
+;     sub-frame durability, and the ingest tick Flush()es before reading.
+;   - JSON encoder is iterative (single string accumulator) so a flush of
+;     50 events stays under one allocation per character.
+;   - The only AHK-level work on the per-keystroke append is: array push
+;     into Keylogger.buffer_events, two scalar increments. Real fsync
+;     happens at most every 5 s in the ingest tick, never inline.
+;
+; PASSWORD FIELD FILTER:
+; Marked TODO_UIA below. The proper Windows implementation uses UIA's
+; IsPasswordPattern in combination with the focused control type and class
+; name. See KEYLOGGER_SPEC §6 — to be done in a dedicated session.
+; ==============================================================================
+
+#Requires Autohotkey v2.0+
+
+
+
+
+
+; ============================
+; ============================
+; ======= 1/ Constants =======
+; ============================
+; ============================
+
+#Include keylogger_constants.ahk
+
+
+
+
+
+; ===============================
+; ===============================
+; ======= 2/ Module State =======
+; ===============================
+; ===============================
+
+class Keylogger {
+    static initialized      := false
+	static lifecycle_generation := 0
+    static device_id        := ""
+    static device_obj       := Map()
+    static metrics_dir      := ""
+    static by_device_dir    := ""
+    static device_json_path := ""
+    static data_sql_path    := ""
+    static today_log_path   := ""
+    static gitignore_path   := ""
+    static state_json_path  := ""
+
+    ; Persisted state (state.json).
+    static next_event_id    := 1
+    static today_log_offset := 0
+    static today_log_date   := ""
+    static rollover_pending := 0
+    ; Ownership latch for the multi-batch midnight transaction. It prevents
+    ; an ingest timer from starting a second rollover while the first one is
+    ; still draining/rotating yesterday's durable JSONL file.
+    static rollover_in_progress := false
+
+    ; Per-flush typing buffer.
+    static buffer_events    := []          ; Array of [char, delay_ms, meta_obj]
+    static buffer_text      := ""
+    static rich_chunks      := []
+    static last_time        := 0
+    static last_flush_time  := 0
+	; Serialises detached typing snapshots without holding Critical across focus
+	; classification or queue publication. A re-entrant fire must retry later;
+	; otherwise two rejected snapshots can restore in reverse screen order.
+	static _flush_in_progress := false
+	; Lifecycle-rejected detached snapshots retain their reserved event ids here
+	; instead of merging back into newer physical input. This preserves the true
+	; prefix -> completion -> following-input order across Suspend/retry.
+	static _retry_snapshots := []
+    static session_app      := "Unknown"
+    static session_title    := ""
+    static session_layout   := ""
+    static session_url      := ""
+    static session_field_role := ""
+    static session_clicks   := 0
+    static session_scrolls  := 0
+    static mouse_distance   := 0
+
+    ; Synthetic keystroke tagging. When the script auto-types (hotstring
+    ; expansion, LLM acceptance) the resulting keystrokes still flow through
+    ; the InputHook. KL_MarkSynthetic flags the hook so it stamps s=1 and
+    ; st=<source> into each captured keystroke's meta; the reader keeps that
+    ; output out of the manual `chars` count and the walker attributes the
+    ; n-gram source (esrc). Cleared shortly after the burst (KL_ClearSynthetic).
+    static synth_active     := 0
+    static synth_type       := "none"
+    ; Exact owners preserve both nesting order and source attribution. A scalar
+    ; depth cannot restore the outer source when an inner timer releases first.
+    static synth_owners     := []
+    ; True while ANY held level of the burst is expanding the user's own personal
+    ; data (an IBAN, a card number, an SSN). The hook records a placeholder per
+    ; character instead of the character itself — see KL_Hook_RecordedChar. It is
+    ; a latch, not a per-level value: with two fires overlapping, the cheapest
+    ; correct answer is the conservative one, because redacting a public
+    ; character costs an n-gram and leaking a private one costs the secret. It
+    ; is released with the LAST level (KL_ClearSynthetic), never before.
+    static synth_private    := false
+    ; Set to true by KL_Stop() before the final flush so the suspend guard in
+    ; KL_AppendLog and KL_IngestOnce is bypassed during shutdown (quit-while-paused
+    ; would otherwise silently discard the buffered metrics).
+    static _shutting_down   := false
+
+    ; Timers (lifecycle).
+    static _ingest_timer    := unset
+    static _midnight_timer  := unset
+	static _initial_ingest_timer := unset
+
+    ; In-RAM queue of entries awaiting ingest. Populated by KL_AppendLog
+    ; alongside the JSONL today.log write, drained by KL_IngestOnce.
+    ; This avoids the round-trip through KL_JsonDecode (COM ScriptControl
+    ; is x86-only and silently returns empty Maps on 64-bit AHK) which
+    ; would otherwise leave data.sql empty even when today.log fills.
+    static _pending_entries := []
+	; Privacy-safe session counters exposed only through KL_HealthSnapshot().
+	static health_events_session := 0
+	static health_privacy_hits := 0
+
+    ; ─── Hot-path latency caches ─────────────────────────────────────────
+    ; Keeping today.log open across calls eliminates the open+close cost
+    ; on every keystroke flush (NTFS + antivirus filter drivers turn that
+    ; into milliseconds otherwise). The handle is reopened on day rollover.
+    static _today_fh        := unset
+    static _today_fh_date   := ""
+    ; Pre-escaped device_id literal — avoids re-running KL_SqlStr on every
+    ; INSERT (the device_id never changes during a process lifetime).
+    static _device_id_lit   := ""
+}
+
+#Include keylogger_health.ahk
+
+
+
+; ============================================
+; ===== 2.1) Synthetic keystroke tagging =====
+; ============================================
+
+; Flag the hook so the keystrokes the script is about to auto-type (hotstring
+; expansion, LLM acceptance) are stamped synthetic in their per-keystroke meta.
+; `source` is "hotstring" or "llm". Always pair with a deferred KL_ClearSynthetic
+; so the flag can never leak onto subsequent manual typing.
+;
+; `is_private` is what stops the driver from dictating the user's IBAN to its own
+; keylogger. The expansion is typed by us but OBSERVED by our InputHook like any
+; other keystroke — that is the whole reason this function exists — so the
+; per-character typing row carries the replacement verbatim unless the fire says
+; otherwise. Linux takes the same argument through the same door
+; (`append_synthetic_events(…, is_private)`).
+; @param source {String} "hotstring", "llm" or "case-transform".
+; @param is_private {Boolean} True when the burst about to be typed is the user's
+;     personal data.
+KL_MarkSynthetic(source, is_private := false) {
+    Owner := Map("source", source, "private", is_private ? true : false)
+    local _c := Critical("On")
+    try {
+        Keylogger.synth_owners.Push(Owner)
+        Keylogger.synth_active := Keylogger.synth_owners.Length
+        Keylogger.synth_type := source
+        if is_private
+            Keylogger.synth_private := true
+    } finally {
+        Critical(_c)
+    }
+    return Owner
+}
+
+; Clear the synthetic flag once the auto-typed burst has been captured. Takes a
+; variadic param so it can be passed directly as a SetTimer callback.
+KL_ClearSynthetic(Owner, *) {
+    local _c := Critical("On")
+    try {
+        OwnerIndex := 0
+        if Owner is Map {
+            for Index, Candidate in Keylogger.synth_owners {
+                if ObjPtr(Candidate) == ObjPtr(Owner) {
+                    OwnerIndex := Index
+                    break
+                }
+            }
+        }
+        if !OwnerIndex
+            return false
+        Keylogger.synth_owners.RemoveAt(OwnerIndex)
+        Keylogger.synth_active := Keylogger.synth_owners.Length
+        ; Only reset the type label once every held level is released. The
+        ; privacy latch is released on the same condition and never earlier: an
+        ; outer public fire finishing first must not un-redact the inner private
+        ; one that is still typing.
+        if Keylogger.synth_active {
+            Keylogger.synth_type := Keylogger.synth_owners[-1]["source"]
+        } else {
+            Keylogger.synth_type := "none"
+            Keylogger.synth_private := false
+        }
+        return true
+    } finally {
+        Critical(_c)
+    }
+}
+
+
+
+
+
+; =====================================
+; =====================================
+; ======= 3/ Filesystem Helpers =======
+; =====================================
+; =====================================
+
+KL_MkdirP(path) {
+    ; AHK DirCreate is mkdir -p equivalent — no-op if directory exists.
+    try DirCreate(path)
+}
+
+; Delete scratch files left next to ``path`` by a previous run that was killed
+; between FileAppend and the rename. The old fixed ``.tmp`` name self-cleaned
+; because every write reused it; per-invocation names do not, so debris is
+; reaped here instead. Only files older than ``MaxAgeMs`` are touched, which
+; makes it safe against a concurrent live writer — its scratch file is
+; milliseconds old. Best-effort throughout: this runs on the save path, and a
+; failure to tidy up must never take the save down with it.
+; @param path {String} Final destination path whose siblings are scanned.
+; @param MaxAgeMs {Integer} Minimum age, in ms, before a scratch file is reaped.
+_KL_ReapStaleTemps(path, MaxAgeMs) {
+    SplitPath(path, &Name, &Dir)
+    if (Dir = "" or Name = "")
+        return
+    try {
+        Loop Files, Dir . "\" . Name . ".*.tmp" {
+            if (DateDiff(A_Now, A_LoopFileTimeModified, "Seconds") * 1000 >= MaxAgeMs)
+                && FSAtomicTempOwnerIsGone(A_LoopFileName, Name)
+                try FileDelete(A_LoopFileFullPath)
+        }
+    }
+}
+
+KL_WriteAtomic(path, content) {
+    ; Write via .tmp + atomic rename so a crash mid-write cannot corrupt the
+    ; final file. The previous implementation did FileDelete(path) + FileMove
+    ; which left a window where ``path`` did not exist; an antivirus scanner
+    ; or file indexer holding a transient handle on the freshly-deleted name
+    ; would then make FileMove fail with "Failed", taking the whole timer
+    ; tick down with it.
+    ;
+    ; MoveFileExW with MOVEFILE_REPLACE_EXISTING (1) | MOVEFILE_WRITE_THROUGH
+    ; (8) is the documented atomic-rename primitive on NTFS — kernel-level
+    ; rename that swaps the directory entry without an unlink-then-create
+    ; window. We retry once on transient failure (AV briefly holds the file)
+    ; before bubbling up; that is enough in practice to absorb scanner
+    ; flakiness without masking real I/O errors.
+    ; The scratch name must be unique per invocation. It used to be a fixed
+    ; ``path . ".tmp"``, which made it a shared resource between every writer
+    ; of the same target — and there are several, on threads that interrupt one
+    ; another. KL_SaveState is reached from the ingest timer, from
+    ; KL_DayRollover and from KL_Stop (OnExit, which pre-empts a running timer),
+    ; and the ``Sleep 50`` retry below is a yield point that hands control to
+    ; exactly those threads. The losing interleaving is:
+    ;
+    ;   A: FileAppend(tmp) → MoveFileExW fails (AV lock) → Sleep 50 …yields…
+    ;   B: FileDelete(tmp) → FileAppend(tmp) → MoveFileExW succeeds, tmp gone
+    ;   A: wakes, retries MoveFileExW on a tmp that no longer exists → ERROR 2
+    ;
+    ; which is exactly what the field logs show: ERROR_FILE_NOT_FOUND (2) and
+    ; ERROR_SHARING_VIOLATION (32) from KL_SaveState, only on days with many
+    ; restarts. Worse than the noise, A and B could both hold the same tmp open
+    ; and interleave their FileAppend, renaming spliced JSON onto state.json.
+    ; A per-invocation name removes the shared resource outright.
+    static MOVEFILE_REPLACE_EXISTING := 0x1
+    static MOVEFILE_WRITE_THROUGH    := 0x8
+    static FLAGS := MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH
+    ; Age delays orphan cleanup; the producer-window check protects slow writes.
+    static STALE_TEMP_MS := 60000
+    static WriteSeq := 0
+
+    WriteSeq += 1
+    ; A_ScriptHwnd keeps the name unique across processes too: #SingleInstance
+    ; Force replaces an instance only at the END of the successor's load, so two
+    ; drivers can briefly be alive and writing the same metrics directory. It is
+    ; a built-in rather than a GetCurrentProcessId DllCall on purpose — the
+    ; OS-call purity ratchet (tests/meta/test_ahk_os_purity_ratchet.ahk) counts
+    ; direct OS calls outside adapters/, and this needs none.
+    tmp := path . "." . A_ScriptHwnd . "-" . WriteSeq . ".tmp"
+    _KL_ReapStaleTemps(path, STALE_TEMP_MS)
+    ; A rename only makes the stage atomic; it cannot tell whether an out-of-
+    ; space write produced every byte. Publish only a flushed, byte-exact stage
+    ; so state.json/device.json can never be atomically replaced with valid-
+    ; prefix JSON after a short write.
+    if !FSWriteDurable(tmp, content)
+        throw Error("Atomic state stage write was incomplete.")
+    if !FSUtf8ExactMatches(tmp, content) {
+        try FileDelete(tmp)
+        throw Error("Atomic state stage bytes did not verify.")
+    }
+
+    if !DllCall("Kernel32\MoveFileExW", "Str", tmp, "Str", path,
+            "UInt", FLAGS, "Int") {
+        ; Retry once after a brief pause to ride out a transient AV / indexer
+        ; lock on ``path``. Sleep on the timer thread is acceptable here —
+        ; SaveState already runs off the hot keyboard path.
+        Sleep 50
+        if !DllCall("Kernel32\MoveFileExW", "Str", tmp, "Str", path,
+                "UInt", FLAGS, "Int") {
+            err := A_LastError
+            try FileDelete(tmp)
+            throw OSError(err, A_ThisFunc,
+                "MoveFileExW failed for '" . path . "'.")
+        }
+    }
+}
+
+KL_AppendLine(path, line) {
+    ; Append a single JSONL line with explicit newline. UTF-8 always.
+    ; Slow fallback path — AppendLog uses the cached file handle instead.
+    FileAppend(line . "`n", path, "UTF-8")
+}
+
+#Include keylogger_journal_io.ahk
+
+
+#Include keylogger_sql_append.ahk
+
+
+
+
+
+
+; ==================================
+; ==================================
+; ======= 4/ Path Resolution =======
+; ==================================
+; ==================================
+
+KL_ResolveTmpdir() {
+    tmp := EnvGet("TMP")
+    if (tmp = "")
+        tmp := EnvGet("TEMP")
+    if (tmp = "")
+        tmp := A_Temp
+    return RTrim(tmp, "\/") . "\"
+}
+
+KL_ResolvePaths(metrics_dir, device_id) {
+    md := metrics_dir
+    if !RegExMatch(md, "[\\/]$")
+        md .= "\"
+    by_dev := md . "by_device\" . device_id . "\"
+
+    Keylogger.metrics_dir      := md
+    Keylogger.by_device_dir    := by_dev
+    Keylogger.device_json_path := by_dev . "device.json"
+    Keylogger.data_sql_path    := by_dev . "data.sql"
+    Keylogger.today_log_path   := by_dev . "today.log"
+    Keylogger.state_json_path  := by_dev . "state.json"
+    Keylogger.gitignore_path   := md   . ".gitignore"
+}
+
+KL_EnsureGitignore() {
+    if FileExist(Keylogger.gitignore_path)
+        return
+    body := "# Local hot-path log — never commit, never sync.`n"
+         .  "# One writer per device; another machine appending here would`n"
+         .  "# corrupt the file. Ingested into data.sql by the keylogger.`n"
+         .  "today.log`n"
+    FileAppend(body, Keylogger.gitignore_path, "UTF-8")
+}
+
+
+
+
+
+#Include keylogger_device.ahk
+
+
+
+
+
+; ====================================
+; ====================================
+; ======= 6/ State persistence =======
+; ====================================
+; ====================================
+
+
+
+
+
+; =========================================
+; ===== 6.1) Event-id collision guard =====
+; =========================================
+; A Reload mid-burst can lose the final flush window, leaving the persisted
+; next_event_id in state.json LAGGING the true max id already written to
+; data.sql. On the next launch KL_AllocEventId would then re-mint ids that
+; already exist, and the schema's `INSERT OR IGNORE INTO events_* (device_id,
+; id, ...)` SILENTLY DROPS the colliding rows — permanent, invisible data
+; loss. The defence does not trust state.json alone: at startup it scans the
+; existing data.sql and the uncommitted today.log tail for the highest id
+; already published for THIS device, then starts after it. Parsing and resolve
+; helpers remain pure so the recovery arithmetic stays unit-testable.
+
+#Include keylogger_event_id.ahk
+
+
+
+
+
+#Include keylogger_json.ahk
+
+#Include keylogger_journal.ahk
+#Include keylogger_shutdown.ahk
+
+
+
+
+
+; ========================================
+; ========================================
+; ======= 8/ Hot path — append_log =======
+; ========================================
+; ========================================
+
+KL_AppendLog(entry, &RejectedBySuspend := false, PublishGuard := unset,
+	PublishCommit := unset, FrozenClose := unset) {
+	RejectedBySuspend := false
+    ; Hot path. Optimisations applied (see Section 2 latency caches):
+    ;  - persistent FileObject handle: avoids open/close ≈ 0.5-2 ms each
+    ;    that NTFS + AV filter drivers tax on every keystroke flush;
+    ;  - direct fh.Write() instead of FileAppend(): bypasses the PATH
+    ;    re-resolution and locale-encoding negotiation that FileAppend
+    ;    redoes on every call;
+    ;  - no FormatTime when timestamp is already set by the caller.
+    if !Keylogger.initialized
+        return false
+    if !(entry is Map) || !entry.Has("type")
+        return false
+    ; Pause must silence everything. Native Suspend only disarms hotkeys/hotstrings,
+    ; but the keylogger feeds on an InputHook + ~10 SetTimer / OnClipboardChange
+    ; sources that bypass it. KL_AppendLog is the single chokepoint every telemetry
+    ; source funnels through, so one guard here silences ALL keystroke / sensor /
+    ; clipboard capture while the driver is paused (nothing reaches today.log or the
+    ; _pending_entries data.sql queue). system_event lifecycle markers (e.g. the
+    ; "paused" marker itself) are exempt so the pause transition stays diagnosable.
+    ; See project_suspend_pause_invariant.
+	if A_IsSuspended && entry["type"] != "system_event" && !Keylogger._shutting_down {
+		; Callers that detached mutable state need to distinguish a lifecycle
+		; refusal (safe to retry) from a privacy/validation drop (must never be
+		; replayed in a later foreground context).
+		RejectedBySuspend := true
+		return false
+	}
+	; A stopped focus invalidator cannot classify new telemetry. Only an exact,
+	; content-free closing row can carry its previously accepted interval instead.
+	FrozenClosing := IsSet(FrozenClose)
+	if FrozenClosing && !_KL_IsFrozenSessionClose(entry, FrozenClose, PublishCommit?)
+		return false
+    ; Privacy filters — drop anything captured while the focused window is
+    ; on the user's exclusion list, in private browsing, or in a system-
+    ; auth dialog. The check is cached for ~250 ms so the per-keystroke
+    ; cost is negligible. Wrapped in try so an unloaded module degrades
+    ; gracefully (filters stay off rather than crashing the hot path).
+    filtered := false
+    try {
+        if !FrozenClosing
+            filtered := MF_ShouldFilter()
+    } catch {
+        ; Module not loaded or error — fail closed (treat as filtered) so sensitive
+        ; data is never logged when the privacy module is unavailable.
+        filtered := true
+        try LoggerWarn("Keylogger", "MF_ShouldFilter unavailable — defaulting to filtered.")
+    }
+    if filtered {
+		KL_RecordPrivacyHit()
+		if Keylogger._shutting_down
+			try LoggerWarn("Keylogger", Format("Shutdown event '{1}' refused by the current privacy predicate.", entry["type"]))
+        return false
+	}
+    ; MF_ShouldFilter() above evaluated MetricsFocusCache, which MF_RefreshFocus
+    ; repoints within MF_FOCUS_TTL_MS (50 ms). The PAYLOAD, however, describes
+    ; whatever window its producer saw, and every producer lags that cache:
+    ; app_switch / window_switch carry the OUTGOING prev_app / prev_title by
+    ; design, while every other type carries Keylogger.session_app /
+    ; session_title, which only KL_Hook_RefreshContext writes and only under its
+    ; own 1000 ms TTL on a 250 ms timer. So for up to ~1.25 s after switching
+    ; away from an excluded or private-browsing window the live check passed
+    ; while the row still stamped that window's process name and verbatim title
+    ; — precisely the identifiers the filter exists to suppress. Scoping the
+    ; re-check to the two switch types (F9) left the typing / shortcut /
+    ; hotstring / mouse / ergo siblings leaking the same stale pair, so it now
+    ; runs for every entry against whatever context that entry actually carries:
+    ; the verdict and the payload can no longer describe two different windows.
+    ctx_app   := ""
+    ctx_title := ""
+    if (entry["type"] = "app_switch") {
+        ctx_app := entry.Has("prev_app") ? entry["prev_app"] : ""
+    } else if (entry["type"] = "window_switch") {
+        ctx_app   := entry.Has("app") ? entry["app"] : ""
+        ctx_title := entry.Has("prev_title") ? entry["prev_title"] : ""
+    } else {
+        ctx_app   := entry.Has("app") ? entry["app"] : ""
+        ctx_title := entry.Has("title") ? entry["title"] : ""
+    }
+    if (ctx_app != "" || ctx_title != "") {
+        outgoing_filtered := false
+        try {
+            outgoing_filtered := MF_ShouldFilterFor(ctx_app, ctx_title)
+        } catch {
+            ; Module not loaded or error — fail closed, same contract as the
+            ; live-focus check above.
+            outgoing_filtered := true
+            try LoggerWarn("Keylogger", "MF_ShouldFilterFor unavailable — defaulting to filtered.")
+        }
+        if outgoing_filtered {
+			KL_RecordPrivacyHit()
+            return false
+		}
+    }
+	if !entry.Has("timestamp")
+		entry["timestamp"] := KL_NowTimestamp()
+	; Queue the live Map for the ingest tick — no JSON round-trip needed
+	; for entries originating in this process. The JSON stringification and disk
+	; append are deferred to KL_IngestOnce so we never block the keystroke thread.
+	; Privacy checks and timestamp formatting above can yield. Pair the final
+	; lifecycle recheck with the shared-queue mutation so Suspend cannot land in
+	; the one-statement gap and publish a row after the pause boundary.
+	AppendCritical := Critical("On")
+	try {
+		if A_IsSuspended && entry["type"] != "system_event" && !Keylogger._shutting_down {
+			RejectedBySuspend := true
+			return false
+		}
+		; Async producers may do privacy/context preparation above, then discover
+		; that their immutable UI owner was replaced. Recheck at the exact queue
+		; mutation; the optional commit is memory-only and shares that transaction.
+		if IsSet(PublishGuard) && !PublishGuard.Call()
+			return false
+		; A supplied guard may synchronously reenter, replace an owner, or alter
+		; the row. Check its immutable preimage after that call, before allocating.
+		if FrozenClosing && !_KL_IsFrozenSessionClose(entry, FrozenClose, PublishCommit?)
+			return false
+		KL_AssignStableEventId(entry)
+		if FrozenClosing && !_KL_IsFrozenSessionClose(entry, FrozenClose, PublishCommit?, true)
+			return false
+		Keylogger._pending_entries.Push(entry)
+		Keylogger.health_events_session += 1
+		if IsSet(PublishCommit)
+			PublishCommit.Call()
+	} finally {
+		Critical(AppendCritical)
+	}
+	return true
+}
+
+
+
+
+
+; ========================================
+; ========================================
+; ======= 9/ flush_buffer (typing) =======
+; ========================================
+; ========================================
+
+; Queue a detached typing snapshot when its lifecycle owner was invalidated.
+; It must stay separate from newer live input: merging would replay characters
+; typed after an accepted completion under the older snapshot's reserved id.
+_KL_RestoreBufferSnapshot(Snapshot, AttemptFlushTick) {
+    PreviousCritical := Critical("On")
+    try {
+		InsertAt := Keylogger._retry_snapshots.Length + 1
+		for Index, Queued in Keylogger._retry_snapshots {
+			if (Queued.EventId > Snapshot.EventId) {
+				InsertAt := Index
+				break
+			}
+		}
+		Keylogger._retry_snapshots.InsertAt(InsertAt, Snapshot)
+		if (Keylogger.last_flush_time == AttemptFlushTick)
+			Keylogger.last_flush_time := Snapshot.LastFlushTime
+    } finally {
+        Critical(PreviousCritical)
+    }
+}
+
+KL_FlushBuffer(PublishGuard := unset, &DeferredByActiveFlush := false) {
+	DeferredByActiveFlush := false
+	if !Keylogger.initialized
+		return false
+
+	; Claim one detached-snapshot owner in the same short transaction as the
+	; generation check and reference swap. The expensive classification below is
+	; deliberately outside Critical, but a sibling flush then leaves the live
+	; buffer untouched and tells its fire-log owner to retry.
+	previous_critical := Critical("On")
+	try {
+		if IsSet(PublishGuard) && !PublishGuard.Call()
+			return false
+		if Keylogger._flush_in_progress {
+			DeferredByActiveFlush := true
+			return false
+		}
+		RetryingSnapshot := Keylogger._retry_snapshots.Length > 0
+		if RetryingSnapshot {
+			Snapshot := Keylogger._retry_snapshots.RemoveAt(1)
+			AttemptFlushTick := A_TickCount
+			Keylogger._flush_in_progress := true
+		} else {
+		if (Keylogger.buffer_events.Length = 0
+			&& Keylogger.session_clicks = 0
+			&& Keylogger.session_scrolls = 0)
+			return true
+
+		Keylogger._flush_in_progress := true
+		AttemptFlushTick := A_TickCount
+		snap_events := Keylogger.buffer_events
+		snap_text := Keylogger.buffer_text
+		snap_rich := Keylogger.rich_chunks
+		snap_clicks := Keylogger.session_clicks
+		snap_scrolls := Keylogger.session_scrolls
+		snap_dist := Keylogger.mouse_distance
+		snap_last_time := Keylogger.last_time
+		snap_last_flush_time := Keylogger.last_flush_time
+		Snapshot := {
+			EventId: KL_AllocEventId(),
+			Events: snap_events,
+			Text: snap_text,
+			RichChunks: snap_rich,
+			Clicks: snap_clicks,
+			Scrolls: snap_scrolls,
+			Distance: snap_dist,
+			LastTime: snap_last_time,
+			LastFlushTime: snap_last_flush_time,
+			Pause: (snap_events.Length > 0) ? snap_events[1][2] : 0,
+			App: Keylogger.session_app,
+			Title: Keylogger.session_title,
+			Url: Keylogger.session_url,
+			FieldRole: Keylogger.session_field_role,
+			Layout: Keylogger.session_layout
+		}
+		Keylogger.buffer_events    := []
+		Keylogger.buffer_text := ""
+		Keylogger.rich_chunks := []
+		Keylogger.last_time := 0
+		Keylogger.session_clicks := 0
+		Keylogger.session_scrolls := 0
+		Keylogger.mouse_distance := 0
+		Keylogger.last_flush_time := AttemptFlushTick
+		}
+	} finally {
+		Critical(previous_critical)
+	}
+
+	Published := false
+	try {
+		Published := _KL_PublishBufferSnapshot(
+			Snapshot, AttemptFlushTick, PublishGuard?)
+	} finally {
+		ReleaseCritical := Critical("On")
+		try Keylogger._flush_in_progress := false
+		finally Critical(ReleaseCritical)
+	}
+	; A successful retry precedes the live buffer in screen order. Drain the
+	; latter now so a caller asking for a flush (notably output preparation and
+	; shutdown) still gets the historical all-buffer contract.
+	if (Published && RetryingSnapshot)
+		return KL_FlushBuffer(PublishGuard?)
+	return Published
+}
+
+; Builds and publishes one already-detached typing snapshot. The lifecycle
+; owner is checked after classification and immediately before publication; a
+; rejected owner restores the snapshot while the outer serialisation latch is
+; still held.
+_KL_PublishBufferSnapshot(Snapshot, AttemptFlushTick, PublishGuard := unset) {
+	if (Snapshot.Events.Length = 0 && Snapshot.Clicks = 0 && Snapshot.Scrolls = 0)
+		return true
+	total_time_ms := 0
+	total_chars := 0
+	for _, ev in Snapshot.Events {
+		meta := ev[3]
+		if !(meta is Map) || !meta.Has("s") || !meta["s"] {
+			d := ev[2]
+			if (d > KeylogConst.WPM_MAX_DELAY_MS)
+				d := KeylogConst.WPM_MAX_DELAY_MS
+			total_time_ms += d
+			total_chars += 1
+		}
+	}
+	wpm := (total_time_ms > 0)
+		? ((total_chars / 5) / (total_time_ms / 60000)) : 0
+	app_cat := "unknown"
+	try app_cat := KL_AppCat_Get(Snapshot.App)
+	entry := Map(
+		"_event_id", Snapshot.EventId,
+		"type", "typing",
+		"text", Snapshot.Text,
+		"rich_text", "",
+		"app", Snapshot.App,
+		"app_category", app_cat,
+		"title", Snapshot.Title,
+		"url", Snapshot.Url,
+		"field_role", Snapshot.FieldRole,
+		"layout", Snapshot.Layout,
+		"is_fullscreen", 0,
+		"in_meeting", 0,
+		"mouse_clicks", Snapshot.Clicks,
+		"mouse_scrolls", Snapshot.Scrolls,
+		"mouse_distance_px", Snapshot.Distance,
+		"pause_before_ms", Snapshot.Pause,
+		"wpm", Round(wpm, 1),
+		"events", Snapshot.Events
+	)
+	if IsSet(PublishGuard) && !PublishGuard.Call() {
+		_KL_RestoreBufferSnapshot(Snapshot, AttemptFlushTick)
+		return false
+	}
+	Accepted := KL_AppendLog(entry, &RejectedBySuspend)
+	; Only an explicit lifecycle refusal restores the buffer. A false return can
+	; also mean a privacy/validation drop; replaying that text after resume under a
+	; different foreground window would defeat the filter that rejected it.
+	if RejectedBySuspend {
+		_KL_RestoreBufferSnapshot(Snapshot, AttemptFlushTick)
+		return false
+	}
+	return Accepted
+}
+
+
+
+
+
+; ===================================================
+; ===================================================
+; ======= 10/ Public log_* event entry points =======
+; ===================================================
+; ===================================================
+
+KL_LogAppSwitch(prev_app, next_app, duration_ms := 0) {
+    KL_AppendLog(Map(
+        "type",        "app_switch",
+        "prev_app",    prev_app,
+        "next_app",    next_app,
+        "duration_ms", duration_ms
+    ))
+}
+
+KL_LogWindowSwitch(app_name, prev_title, next_title, duration_ms := 0) {
+    KL_AppendLog(Map(
+        "type",        "window_switch",
+        "app",         app_name,
+        "prev_title",  prev_title,
+        "next_title",  next_title,
+        "duration_ms", duration_ms
+    ))
+}
+
+
+KL_LogSystemEvent(action, metadata := unset) {
+    e := Map("type", "system_event", "action", action)
+    if IsSet(metadata) && (metadata is Map) {
+        for k, v in metadata
+            e[k] := v
+    }
+    KL_AppendLog(e)
+}
+
+; KL_LogHotstring — the FIRED-hotstring row — lives in
+; modules/keylogger/keylogger_hotstring_log.ahk. It was split out so the
+; headless test suite can drive it against a recording KL_AppendLog: it is the
+; one row that can carry the user's personal data, and this file installs OS
+; hooks at load, so nothing here is includable from a test.
+
+; Logs that a hotstring tooltip was shown to the user. Mirrors HS init.lua:1196.
+; The call site (prefix watcher) drives suggested/dismissed pairing — there
+; is at most one suggestion live at any time per device.
+KL_LogHotstringSuggested(trigger, replacement, h_type := "unknown", app_name := "") {
+    if !Keylogger.initialized
+        return
+    app := (app_name != "") ? app_name : Keylogger.session_app
+    KL_AppendLog(Map(
+        "type",        "hotstring_suggested",
+        "app",         app,
+        "trigger",     trigger,
+        "replacement", replacement,
+        "h_type",      h_type
+    ))
+}
+
+; Token-aware sibling for a tooltip post-present callback. All privacy/context
+; work in KL_AppendLog stays outside Critical; only the final owner guard,
+; in-memory queue push and state commit are atomic.
+KL_LogHotstringSuggestedGuarded(trigger, replacement, h_type, PublishGuard,
+	PublishCommit, app_name := "") {
+    if !Keylogger.initialized
+        return false
+    app := (app_name != "") ? app_name : Keylogger.session_app
+    RejectedBySuspend := false
+    return KL_AppendLog(Map(
+        "type",        "hotstring_suggested",
+        "app",         app,
+        "trigger",     trigger,
+        "replacement", replacement,
+        "h_type",      h_type
+    ), &RejectedBySuspend, PublishGuard, PublishCommit)
+}
+
+; Logs that a previously-suggested hotstring tooltip was dismissed without
+; firing. Mirrors HS init.lua:1214.
+KL_LogHotstringDismissed(trigger, replacement, h_type := "unknown", app_name := "") {
+    if !Keylogger.initialized
+        return
+    app := (app_name != "") ? app_name : Keylogger.session_app
+    KL_AppendLog(Map(
+        "type",        "hotstring_dismissed",
+        "app",         app,
+        "trigger",     trigger,
+        "replacement", replacement,
+        "h_type",      h_type
+    ))
+}
+
+KL_LogLlm(kind, payload) {
+    e := Map("type", "llm_" . kind)
+    if (payload is Map) {
+        for k, v in payload
+            e[k] := v
+    }
+    KL_AppendLog(e)
+}
+
+/**
+ * Logs a FAILED LLM prediction attempt — same envelope as KL_LogLlm but the
+ * predictions array is empty and ``failure_reason`` captures what went
+ * wrong. Without this event a tail of the log shows only successes and
+ * "are predictions silently dropping?" becomes impossible to answer.
+ *
+ * Mirrors keylogger.log_llm_failed on the HS side (modules/keylogger/init.lua).
+ *
+ * @param {Map} payload - Fields: app, context, backend, model, system_prompt,
+ *     user_prompt, failure_reason, elapsed_ms.
+ */
+KL_LogLlmFailed(payload) {
+    e := Map("type", "llm_generation_failed", "predictions", [])
+    if (payload is Map) {
+        for k, v in payload
+            e[k] := v
+    }
+    KL_AppendLog(e)
+}
+
+; ─── Acceptance-rate events ─────────────────────────────────────────────
+; Three matched events that let a tail of the log compute "what fraction
+; of suggestions did the user accept?". Mirrors keylogger.log_llm_suggested
+; / log_llm_dismissed / log_llm_accepted on the HS side.
+
+KL_LogLlmSuggested(app_name, count) {
+    KL_AppendLog(Map(
+        "type", "llm_suggested",
+        "app",  app_name,
+        "count", count
+    ))
+}
+
+KL_LogLlmDismissed(app_name, all_predictions) {
+    KL_AppendLog(Map(
+        "type", "llm_dismissed",
+        "app",  app_name,
+        "all_predictions", all_predictions
+    ))
+}
+
+KL_LogLlmAccepted(prediction_text, app_name, all_predictions, chosen_index) {
+    KL_AppendLog(Map(
+        "type", "llm_accepted",
+        "app",  app_name,
+        "prediction", prediction_text,
+        "all_predictions", all_predictions,
+        "chosen_index", chosen_index,
+        ; ``net_saved_chars`` matches the HS field — same accounting,
+        ; AHK side doesn't track backspaces, so ``deletes`` is 0 by
+        ; construction here.
+        "net_saved_chars", StrLen(prediction_text)
+    ))
+}
+
+#Include keylogger_llm_journal.ahk
+
+#Include keylogger_session_events.ahk
+
+
+
+
+
+#Include keylogger_text_cipher.ahk
+#Include keylogger_text_migration.ahk
+#Include keylogger_sql.ahk
+
+
+
+
+
+; ===============================
+; ===============================
+; ======= 12/ Ingest Tick =======
+; ===============================
+; ===============================
+
+#Include keylogger_ingest.ahk
+
+#Include keylogger_rollover.ahk
+
+KL_MidnightCheck() {
+    if A_IsSuspended
+        return
+    if (Keylogger.today_log_date != "" && Keylogger.today_log_date != KL_Today())
+        KL_DayRollover()
+}
+
+
+
+
+
+#Include keylogger_password.ahk
+
+
+
+
+
+; ======================================
+; ======================================
+; ======= 14/ Bootstrap data.sql =======
+; ======================================
+; ======================================
+
+KL_BootstrapDataSql() {
+    if FileExist(Keylogger.data_sql_path) {
+		try {
+			Probe := FileOpen(Keylogger.data_sql_path, "a", "UTF-8")
+			if !IsObject(Probe)
+				throw Error("append handle unavailable")
+			Probe.Close()
+			return true
+		} catch as Err {
+			try LoggerError("Keylogger", "data.sql is not writable: {1}.", Err.Message)
+			return false
+		}
+	}
+    header := "-- ergopti metrics — device " . Keylogger.device_id
+        .  " — schema_version " . KeylogConst.SCHEMA_VERSION . "`n"
+        .  "-- This file is APPEND-ONLY. Do not edit by hand.`n"
+        .  "-- The launcher rebuilds db.sqlite from this file on demand.`n"
+        .  "PRAGMA foreign_keys = OFF;`n"
+    try FileAppend(header, Keylogger.data_sql_path, "UTF-8")
+    catch as err {
+        try LoggerError("Keylogger", "Could not create data.sql: {1}", err.Message)
+        return false
+    }
+
+    ; A brand-new ledger contains no legacy/mixed rows: every later local row is
+    ; emitted under the cipher posture already in force. Commit that trustworthy
+    ; O(1) fact now so the deferred boot sync never proof-scans an empty ledger.
+    return KL_Mig_RecordNewLedgerPosture()
+}
+
+
+
+
+
+; =============================
+; =============================
+; ======= 15/ Lifecycle =======
+; =============================
+; =============================
+
+KL_Init(metrics_dir) {
+    if Keylogger.initialized
+		return true
+
+    KL_MkdirP(metrics_dir)
+
+    obj := KL_ResolveDevice(metrics_dir)
+    Keylogger.device_obj := obj
+    Keylogger.device_id  := obj["device_id"]
+
+    Keylogger._device_id_lit := KL_SqlStr(Keylogger.device_id)
+    KL_ResolvePaths(metrics_dir, Keylogger.device_id)
+    KL_MkdirP(Keylogger.by_device_dir)
+    KL_MkdirP(KL_ResolveTmpdir() . "ergopti_metrics\" . Keylogger.device_id)
+    KL_EnsureGitignore()
+    KL_WriteDeviceJson(obj)
+    state_loaded := KL_LoadState()
+	; A prepared rotation must finish before an old offset is read against the
+	; deleted journal. Admission also keeps new producers behind this recovery.
+	if _KL_RolloverPending() {
+		RecoveryScope := _KL_JournalEnter()
+		if !IsObject(RecoveryScope) {
+			try LoggerError("Keylogger", "Initialization refused: pending journal rotation could not finish.")
+			return false
+		}
+		_KL_JournalLeave(RecoveryScope)
+	}
+
+    ; Harden next_event_id against id reuse: never trust state.json alone. A
+    ; Reload mid-burst can leave the persisted counter lagging the true max id
+    ; already in data.sql; re-minting those ids would be silently dropped by
+    ; the schema's INSERT OR IGNORE. Resolve to one past the highest persisted
+    ; id so a new event can never collide with an existing one.
+    ; A valid persisted counter plus the unconsumed journal protects ordinary
+    ; recovery. Without that counter, out-of-order historical rows require a
+    ; bounded-memory scan of the complete SQL source, not just its last bytes.
+    try {
+        if state_loaded {
+            sql_text := _KL_ReadRecoveryText(Keylogger.data_sql_path, 0,
+                KeylogConst.DATA_SQL_SCAN_TAIL_BYTES)
+            sql_max_id := KL_ScanMaxEventId(sql_text, Keylogger._device_id_lit)
+        } else {
+            if FileExist(Keylogger.data_sql_path)
+                try LoggerWarn("Keylogger", "Allocation state unavailable; recovering identities from complete SQL history.")
+            sql_max_id := KL_RecoverSqlEventId(Keylogger.data_sql_path, Keylogger._device_id_lit)
+        }
+    ; Entries receive their id before JSONL publication. If the process died
+    ; before advancing the journal offset, reserve past those durable ids too;
+    ; otherwise a producer firing early in the next boot could collide with an
+    ; uncommitted line before the ingest timer replays it.
+        journal_max_id := _KL_RecoverJournalEventId(Keylogger.today_log_path, Keylogger.today_log_offset)
+    } catch as Err {
+        try LoggerError("Keylogger", "Initialization refused: event identity recovery failed ({1}).", Type(Err))
+        return false
+    }
+    max_id := Max(
+        sql_max_id,
+        journal_max_id)
+    Keylogger.next_event_id := KL_ResolveStartId(Keylogger.next_event_id, max_id)
+
+    if (Keylogger.today_log_date = "")
+        Keylogger.today_log_date := KL_Today()
+	if !KL_BootstrapDataSql() {
+		try LoggerError("Keylogger",
+			"Initialization refused because the durable ledger is unavailable.")
+		return false
+	}
+
+	InitCritical := Critical("On")
+	try {
+		Keylogger._shutting_down := false
+		Keylogger.health_events_session := 0
+		Keylogger.health_privacy_hits := 0
+		Keylogger.lifecycle_generation += 1
+		Keylogger.initialized := true
+	} finally {
+		Critical(InitCritical)
+	}
+	try {
+		if !KL_AppCat_Init(metrics_dir)
+			throw Error("application category initialization failed")
+
+		; Initialise the walker batch dicts. KL_LoadState() above already
+		; restored the per-app n-gram context (KLW.ctx) if state.json had one.
+		try KLW_ResetBatch()
+
+		; Publish every exact timer identity before native admission. This includes
+		; the initial one-shot so a later initialization failure can cancel it too.
+		if !KL_TimerGroupStart(Keylogger, [
+			Map("property", "_ingest_timer", "callback", KL_IngestOnce.Bind(),
+				"period", KeylogConst.INGEST_TICK_MS),
+			Map("property", "_midnight_timer", "callback", KL_MidnightCheck.Bind(),
+				"period", KeylogConst.MIDNIGHT_CHECK_TICK_MS),
+			Map("property", "_initial_ingest_timer",
+				"callback", KL_IngestOnce.Bind(), "period", -250)
+		], SetTimer, "core")
+			throw Error("keylogger timer cleanup debt blocks initialization")
+
+		; Bring data.sql in line with the at-rest posture the config just restored.
+		; A no-op unless they disagree, and deferred either way: the comparison is
+		; cheap but the rewrite it may start is not, and neither belongs on the boot
+		; critical path.
+		if !KL_Mig_RequestPostureSync(KL_MIG_BOOT_DELAY_MS)
+			throw Error("at-rest posture sync could not be scheduled")
+	} catch as Err {
+		try KL_TimerGroupStop(Keylogger,
+			["_initial_ingest_timer", "_ingest_timer", "_midnight_timer"],
+			SetTimer, "core")
+		RollbackCritical := Critical("On")
+		try Keylogger.initialized := false
+		finally Critical(RollbackCritical)
+		try LoggerError("Keylogger", "Initialization rolled back: {1}.", Err.Message)
+		return false
+	}
+	return true
+}
+
+; Publish the terminal ownership lease before any other subsystem drains into
+; the keylogger. The global shutdown handler calls this before the deferred
+; hotstring fire queue, and KL_Stop repeats it for direct callers.
+KL_BeginShutdown() {
+	ShutdownCritical := Critical("On")
+	try {
+		if !Keylogger.initialized
+			return false
+		if !Keylogger._shutting_down {
+			Keylogger._shutting_down := true
+			Keylogger.lifecycle_generation += 1
+		}
+		return true
+	} finally {
+		Critical(ShutdownCritical)
+	}
+}
+
+; Rolls back the reversible shutdown lease when an OnExit gate refuses before
+; any producer is stopped. Durable rows already drained remain consumed, while
+; future keylogger callbacks receive a fresh lifecycle generation.
+KL_CancelShutdown() {
+	ShutdownCritical := Critical("On")
+	try {
+		if !Keylogger.initialized
+			return false
+		if Keylogger._shutting_down {
+			Keylogger._shutting_down := false
+			Keylogger.lifecycle_generation += 1
+		}
+		return true
+	} finally {
+		Critical(ShutdownCritical)
+	}
+}
+
+/** Emits shutdown stage resources without including event contents or foreground context. */
+_KL_StopTimingMark(Phase, Timing) {
+	Wall := BootClockWallMs()
+	Cpu := BootClockCpuMs()
+	Elapsed := Wall - Timing.Wall
+	CpuText := (Cpu < 0 || Timing.Cpu < 0) ? "unknown" : Format("{:.3f}", Cpu - Timing.Cpu)
+	HotPath_RecordLatency("Shutdown." . Phase, Elapsed, 5)
+	try LoggerInfo("Keylogger", Format(
+		"Shutdown stage '{1}': wall={2:.3f} ms, process_cpu={3} ms.", Phase, Elapsed, CpuText))
+	Timing.Wall := Wall
+	Timing.Cpu := Cpu
+}
+
+KL_Stop(Token := 0) {
+	Timing := { Wall: BootClockWallMs(), Cpu: BootClockCpuMs() }
+	if !KL_DataSqlShutdownReady() {
+		try LoggerError("Keylogger", "Shutdown retained pending SQL append compensation.")
+		return false
+	}
+	if !Keylogger.initialized
+		return true
+	Scope := _KL_JournalEnter(Token)
+	if !IsObject(Scope)
+		return false
+	try {
+	    if !Keylogger.initialized
+			return true
+	    ; Raise the shutdown bypass BEFORE any teardown. Every *_Stop() below drains a
+	    ; CLOSING lifecycle event (session_end, idle_end, vpn_disconnected,
+	    ; screen_recording_end, the final roi_snapshot) through KL_AppendLog, whose
+	    ; pause guard would otherwise discard them on a quit or reload issued while the
+	    ; driver is paused — leaving events_session with a session_start and no
+	    ; session_end, which poisons every active-time aggregate downstream. Reload is
+	    ; the driver's standard apply-settings path, so this fired routinely. Setting
+	    ; the flag only just before the trailing KL_FlushBuffer() protected the two
+	    ; explicit flushes but none of the six module drains that carry most of the
+	    ; shutdown write traffic.
+		if !KL_BeginShutdown()
+			return false
+	    ; Drop any in-flight ledger rewrite before the shutdown drain: its staging
+	    ; file describes a data.sql that the flush below is about to extend, and the
+	    ; ingest guard bypasses on _shutting_down, so leaving it armed would publish a
+	    ; ledger missing the closing batch.
+	    try KL_Mig_Cancel()
+		PrefetchStopped := KLPF_CancelAll()
+		_KL_StopTimingMark("prepare", Timing)
+	    ; Release the keystroke hook FIRST so no late event lands in a
+	    ; buffer we are about to flush + serialise.
+	    try KL_Hook_Stop()
+		catch as Err
+			try LoggerError("Keylogger", "Shutdown hook teardown failed: {1}.", Err.Message)
+		_KL_StopTimingMark("hook", Timing)
+	    ; Drain idle / session state and unhook OnMessage handlers so the
+	    ; JSONL never ends with a dangling session_start / idle_start.
+		WatchersStopped := false
+		try WatchersStopped := KL_Watchers_Stop()
+		catch as Err
+			try LoggerError("Keylogger", "Shutdown watcher teardown failed: {1}.", Err.Message)
+		_KL_StopTimingMark("watchers", Timing)
+	    try KL_Mouse_Stop()
+		SensorsStopped := false
+		try SensorsStopped := KL_Sensors_Stop()
+		TopologyStopped := false
+		try TopologyStopped := KL_Topo_Stop()
+		AvStateStopped := false
+		try AvStateStopped := KL_AV_Stop()
+		NetworkStopped := false
+		try NetworkStopped := KL_Net_Stop()
+	    try KL_Clip_Stop()
+		RoiStopped := false
+		try RoiStopped := KL_Roi_Stop()
+		TimersStopped := KL_TimerGroupStop(Keylogger,
+			["_initial_ingest_timer", "_ingest_timer", "_midnight_timer"],
+			SetTimer, "core")
+		_KL_StopTimingMark("sensors_and_timers", Timing)
+	    ; _shutting_down was raised at the top of this function (see the comment
+	    ; there) so the module drains above could emit their closing events too.
+		FlushComplete := KL_FlushBuffer()
+		JournalResult := _KL_JournalPendingEntries(0, Scope.Token)
+		_KL_StopTimingMark("flush_and_journal", Timing)
+		if !FlushComplete or !JournalResult["ok"] {
+			try LoggerError("Keylogger",
+				"Shutdown retained durable debt (flush={1}, journal={2}).",
+				FlushComplete, JournalResult["ok"])
+			return false
+		}
+		if !KL_AppCat_PrepareShutdown() {
+			try LoggerError("Keylogger",
+				"Shutdown retained pending app-category persistence debt.")
+			return false
+		}
+		_KL_StopTimingMark("categories", Timing)
+	    ; force := true — the typing-idle guard would otherwise return before the
+	    ; pending drain, and there is no next tick left to defer to. Looped because
+	    ; each pass drains at most INGEST_BATCH_LINES and the RAM-only queue is only
+	    ; flushed once the reader reaches EOF, so a backlog has to be walked out.
+		IngestComplete := false
+	    loop KeylogConst.SHUTDOWN_INGEST_MAX_PASSES {
+	        ingest_result := KL_IngestOnce(true, false, Scope.Token)
+	        ; A rollover result carries no "eof" key — nothing left to walk either way.
+			if !ingest_result["ok"] {
+				try LoggerError("Keylogger", "Shutdown ingest failed ({1}).",
+					KL_GetMap(ingest_result, "reason", "unknown"))
+				break
+			}
+			if KL_GetMap(ingest_result, "eof", true) {
+				IngestComplete := true
+	            break
+			}
+	    }
+		StateSaved := KL_SaveState()
+		_KL_StopTimingMark("ingest_and_state", Timing)
+		HandleClosed := KL_CloseTodayFh(Scope.Token)
+		_KL_StopTimingMark("handle", Timing)
+		if !TimersStopped or !SensorsStopped or !TopologyStopped or !AvStateStopped
+			or !NetworkStopped or !RoiStopped or !PrefetchStopped or !WatchersStopped
+			or !IngestComplete or !StateSaved or !HandleClosed {
+			try LoggerError("Keylogger",
+				"Shutdown incomplete (core_timers={1}, sensors={2}, topology={3}, av={4}, network={5}, roi={6}, prefetch={7}, watchers={8}, ingest={9}, state={10}, close={11}).",
+				TimersStopped, SensorsStopped, TopologyStopped, AvStateStopped,
+				NetworkStopped, RoiStopped, PrefetchStopped, WatchersStopped,
+				IngestComplete, StateSaved, HandleClosed)
+			return false
+		}
+	    Keylogger.initialized := false
+		return true
+	} finally {
+		_KL_JournalLeave(Scope)
+	}
+}
+
+
+
+
+
+; ============================================
+; ============================================
+; ======= 16/ Convenience / Public API =======
+; ============================================
+; ============================================
+
+KL_GetSqlitePath() {
+    ; The launcher uses this path to (re)build db.sqlite from data.sql on
+    ; demand. The keylogger itself never opens the SQLite file.
+    return KL_ResolveTmpdir() . "ergopti_metrics\" . Keylogger.device_id . "\db.sqlite"
+}
+
+KL_GetDeviceShortId() {
+    if (Keylogger.device_id = "")
+        return ""
+    return SubStr(Keylogger.device_id, 1, 8) . "…"
+}
+
+; Setters mirroring HS CoreState — wire them from your event handlers.
+KL_SetSessionApp(name) {
+    Keylogger.session_app := name
+}
+KL_SetSessionTitle(title) {
+    Keylogger.session_title := title
+}
+KL_SetSessionLayout(layout) {
+    Keylogger.session_layout := layout
+}
+KL_SetSessionUrl(url) {
+    Keylogger.session_url := url
+}
+KL_SetSessionFieldRole(role) {
+    Keylogger.session_field_role := role
+}
+KL_BumpMouseClick() {
+    Keylogger.session_clicks += 1
+}
+KL_BumpMouseScroll() {
+    Keylogger.session_scrolls += 1
+}
+KL_BumpMouseDistance(px) {
+    Keylogger.mouse_distance += px
+}

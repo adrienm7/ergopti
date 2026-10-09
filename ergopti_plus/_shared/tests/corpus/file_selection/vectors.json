@@ -1,0 +1,79 @@
+{
+	"description": "Golden vectors for the file-manager selection parsers of _shared/lua/file_selection: the Finder selection as `osascript -ss` prints an AppleScript list of POSIX paths, and a Linux file manager's copied selection as text/uri-list (RFC 2483). Replayed by the macOS and Linux suites.",
+	"rule": "A Finder report is an AppleScript list literal of double-quoted strings separated by commas; \\\" \\\\ \\n \\r \\t are the only escapes. A text/uri-list report holds one URI per CRLF or LF line; blank lines and lines starting with # are ignored; every other line must be a file: URI with an empty or localhost authority, no query or fragment, and well-formed %XX escapes. Every path must be absolute. Any violation refuses the whole report (the vector is marked refused), never a subset.",
+	"applescript": [
+		{ "id": "empty_list", "text": "{}", "paths": [] },
+		{ "id": "empty_list_with_newline", "text": "{}\n", "paths": [] },
+		{
+			"id": "two_items_file_and_folder",
+			"text": "{\"/Users/ana/report.pdf\", \"/Users/ana/Downloads/\"}\n",
+			"paths": ["/Users/ana/report.pdf", "/Users/ana/Downloads/"]
+		},
+		{
+			"id": "spaces_and_unicode_are_kept",
+			"text": "{\"/Users/ana/Mes documents/été 2026.txt\"}",
+			"paths": ["/Users/ana/Mes documents/été 2026.txt"]
+		},
+		{
+			"id": "escaped_quote_and_backslash",
+			"text": "{\"/tmp/a \\\"quoted\\\" name\", \"/tmp/back\\\\slash\"}",
+			"paths": ["/tmp/a \"quoted\" name", "/tmp/back\\slash"]
+		},
+		{
+			"id": "line_break_inside_a_name_stays_one_path",
+			"text": "{\"/tmp/first\\nsecond.txt\"}",
+			"paths": ["/tmp/first\nsecond.txt"]
+		},
+		{
+			"id": "comma_inside_a_name_is_not_a_separator",
+			"text": "{\"/tmp/a, b.txt\"}",
+			"paths": ["/tmp/a, b.txt"]
+		},
+		{ "id": "not_a_list", "text": "/Users/ana/report.pdf", "refused": true },
+		{ "id": "unquoted_item", "text": "{/tmp/a}", "refused": true },
+		{ "id": "relative_path", "text": "{\"tmp/a\"}", "refused": true },
+		{ "id": "unterminated_string", "text": "{\"/tmp/a}", "refused": true },
+		{ "id": "missing_separator", "text": "{\"/tmp/a\" \"/tmp/b\"}", "refused": true },
+		{ "id": "unknown_escape", "text": "{\"/tmp/\\q\"}", "refused": true },
+		{ "id": "alias_record_is_refused", "text": "{alias \"Macintosh HD:tmp:a\"}", "refused": true }
+	],
+	"uri_list": [
+		{ "id": "empty", "text": "", "paths": [] },
+		{
+			"id": "two_files_crlf",
+			"text": "file:///home/ana/notes.txt\r\nfile:///home/ana/run.sh\r\n",
+			"paths": ["/home/ana/notes.txt", "/home/ana/run.sh"]
+		},
+		{
+			"id": "lf_without_final_newline",
+			"text": "file:///home/ana/notes.txt\nfile:///home/ana/run.sh",
+			"paths": ["/home/ana/notes.txt", "/home/ana/run.sh"]
+		},
+		{
+			"id": "percent_escapes_are_decoded",
+			"text": "file:///home/ana/Mes%20documents/%C3%A9t%C3%A9.txt\r\n",
+			"paths": ["/home/ana/Mes documents/été.txt"]
+		},
+		{
+			"id": "localhost_authority",
+			"text": "file://localhost/home/ana/run.sh\r\n",
+			"paths": ["/home/ana/run.sh"]
+		},
+		{
+			"id": "comments_and_blank_lines_are_ignored",
+			"text": "# copied by the file manager\r\n\r\nfile:///srv/tool\r\n",
+			"paths": ["/srv/tool"]
+		},
+		{ "id": "remote_host", "text": "file://server/share/a.txt\r\n", "refused": true },
+		{ "id": "http_uri", "text": "https://example.org/a.txt\r\n", "refused": true },
+		{ "id": "bare_path", "text": "/home/ana/run.sh\r\n", "refused": true },
+		{
+			"id": "one_foreign_line_refuses_all",
+			"text": "file:///home/ana/run.sh\r\nsftp://host/x\r\n",
+			"refused": true
+		},
+		{ "id": "malformed_escape", "text": "file:///home/ana/100%.txt\r\n", "refused": true },
+		{ "id": "encoded_nul", "text": "file:///home/ana/a%00b\r\n", "refused": true },
+		{ "id": "query_string", "text": "file:///home/ana/a.txt?x=1\r\n", "refused": true }
+	]
+}

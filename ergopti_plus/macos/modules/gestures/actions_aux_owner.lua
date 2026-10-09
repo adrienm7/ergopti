@@ -1,0 +1,661 @@
+--- modules/gestures/actions_aux_owner.lua
+
+--- ==============================================================================
+--- MODULE: Gesture Auxiliary Async Owner
+--- DESCRIPTION:
+--- Owns delayed gesture callbacks and ShellRunner open/AppleScript processes.
+--- Search/click/sticky and screenshots keep their specialised owners; this
+--- module covers every other asynchronous capability created by actions.lua.
+--- ==============================================================================
+
+local M = {}
+
+local Logger = require("infra.logger")
+local ShellRunner = require("adapters.shell_runner")
+local TimerScheduler = require("adapters.timer_scheduler")
+local Timings = require("infra.timings")
+
+local LOG = "gestures.actions.aux_owner"
+
+local DEFAULT_ACTION_PARENT = "gestures"
+local SHELL_DEADLINE_SEC = Timings.sec("gestures", "aux_shell_timeout_ms")
+local SHELL_CLEANUP_RETRY_SEC = Timings.sec(
+	"gestures", "aux_shell_cleanup_retry_ms")
+-- One deadline attempt plus two delayed retries bounds a child that ignores
+-- SIGTERM without turning a TCC prompt into an infinite script-control fence.
+local SHELL_TERMINATION_MAX_ATTEMPTS = 3
+local _scopes = {}
+local _next_id = 0
+local _timers = {}
+local _shells = {}
+local _degraded_shells = {}
+
+--- Resolves one parent-scoped admission generation.
+--- @param parent string|nil Stable action parent.
+--- @return table scope
+local function action_scope(parent)
+	local scope_id = type(parent) == "string" and parent ~= ""
+		and parent or DEFAULT_ACTION_PARENT
+	local scope = _scopes[scope_id]
+	if scope then return scope end
+	scope = {
+		id = scope_id,
+		paused = false,
+		generation = 0,
+		acquisitions = 0,
+		callback_depth = 0,
+	}
+	_scopes[scope_id] = scope
+	return scope
+end
+
+local function next_id()
+	_next_id = _next_id + 1
+	return _next_id
+end
+
+local function entry_is_current(entry)
+	if type(entry) ~= "table" or entry.released == true then return false end
+	if entry.kind == "timer" then return _timers[entry.id] == entry end
+	if entry.kind == "shell" then return _shells[entry.id] == entry end
+	return false
+end
+
+local function authorized(entry)
+	if entry.admit ~= nil then
+		local ok, receipt = pcall(entry.admit)
+		if not ok or receipt ~= true then return false end
+	end
+	local scope = entry.scope
+	return entry_is_current(entry)
+		and type(scope) == "table" and scope.paused ~= true
+		and entry.discard ~= true
+		and entry.generation == scope.generation
+end
+
+local function cleanup_debt(parent)
+	local scope = action_scope(parent)
+	if scope.acquisitions ~= 0 or scope.callback_depth ~= 0 then return true end
+	for _, entry in pairs(_timers) do
+		if entry.scope == scope
+			and (entry.discard == true or entry.committed ~= true) then return true end
+	end
+	for _, entry in pairs(_shells) do
+		if entry.scope == scope then
+			if entry.discard == true or entry.committed ~= true then return true end
+			if entry.strict == true then
+				if entry.checking_cleanup == true then return true end
+				entry.checking_cleanup = true
+				local ok, pending = pcall(function()
+					if type(entry.handle.hasCleanupDebt) ~= "function" then return nil end
+					return entry.handle.hasCleanupDebt()
+				end)
+				entry.checking_cleanup = false
+				if not ok or pending ~= false or entry.discard == true or entry.committed ~= true then return true end
+			end
+		end
+	end
+	return false
+end
+
+local function admission_open(parent)
+	local scope = action_scope(parent)
+	return scope.paused ~= true and not cleanup_debt(scope.id), scope
+end
+
+local function invoke(scope, label, callback, ...)
+	if type(callback) ~= "function" then return true end
+	local args = table.pack(...)
+	scope.callback_depth = scope.callback_depth + 1
+	local ok, err = xpcall(function()
+		return callback(table.unpack(args, 1, args.n))
+	end, debug.traceback)
+	scope.callback_depth = scope.callback_depth - 1
+	if not ok then
+		Logger.error(LOG, "%s callback failed: %s.", tostring(label), tostring(err))
+		return false
+	end
+	return true
+end
+
+local drain_timer
+
+local function release_timer(entry)
+	if _timers[entry.id] == entry then _timers[entry.id] = nil end
+	entry.released = true
+	entry.committed = false
+end
+
+local function observe_timer(entry)
+	if entry.observing == true or type(entry.handle) ~= "table" then return end
+	entry.observing = true
+	local ok, observed = pcall(TimerScheduler.onSettled, entry.handle, function()
+		if entry.due == true or entry.discard == true
+			or entry.generation ~= entry.scope.generation
+			or entry.scope.paused == true then
+			drain_timer(entry)
+		end
+	end)
+	if not ok or observed ~= true then
+		entry.observing = false
+		Logger.error(LOG, "%s timer observer refused: %s.",
+			tostring(entry.label), tostring(observed))
+	end
+end
+
+drain_timer = function(entry)
+	if not entry_is_current(entry) then return true end
+	if entry.acquiring == true then return false end
+	if type(entry.handle) == "table" and entry.handle.timer ~= nil then return false end
+	if entry.due == true and entry.delivery_committed ~= true
+		and entry.committed == true and authorized(entry) then
+		return false
+	end
+	local deliver = entry.due == true and entry.delivery_committed == true
+		and entry.committed == true and authorized(entry)
+	if deliver then
+		entry.callback_active = true
+		invoke(entry.scope, entry.label, entry.callback)
+		entry.callback_active = false
+	end
+	release_timer(entry)
+	return true
+end
+
+local function cancel_timer(entry)
+	if not entry_is_current(entry) then return true end
+	entry.discard = true
+	entry.committed = false
+	if entry.callback_active == true then return false end
+	if entry.acquiring == true then return false end
+	if type(entry.handle) ~= "table" then
+		release_timer(entry)
+		return true
+	end
+	local ok, cancelled = pcall(TimerScheduler.cancel, entry.handle)
+	if ok and cancelled == true then
+		if entry_is_current(entry) then drain_timer(entry) end
+		return not entry_is_current(entry)
+	end
+	observe_timer(entry)
+	Logger.error(LOG, "%s timer cleanup remains pending: %s.",
+		tostring(entry.label), tostring(ok and cancelled or cancelled))
+	return false
+end
+
+--- Reserves one exact deferred action without authorizing its business callback.
+--- @param delay number Seconds.
+--- @param label string Diagnostic label.
+--- @param callback function Deferred work.
+--- @return boolean committed
+--- @return table|nil token Exact timer token accepted by commit_after/rollback_after.
+function M.prepare_after(delay, label, callback, parent)
+	local admitted, scope = admission_open(parent)
+	if not admitted or type(callback) ~= "function" then return false, nil end
+	local entry = {
+		id = next_id(),
+		kind = "timer",
+		parent = scope.id,
+		scope = scope,
+		label = label,
+		callback = callback,
+		generation = scope.generation,
+		committed = false,
+		delivery_committed = false,
+		discard = false,
+		due = false,
+		acquiring = true,
+		released = false,
+	}
+	_timers[entry.id] = entry
+	scope.acquisitions = scope.acquisitions + 1
+	local ok, handle, committed = pcall(TimerScheduler.after, delay, function()
+		entry.due = true
+		drain_timer(entry)
+	end)
+	scope.acquisitions = scope.acquisitions - 1
+	entry.acquiring = false
+	if ok and type(handle) == "table" then
+		entry.handle = handle
+		observe_timer(entry)
+	end
+	if not ok or type(handle) ~= "table" or committed ~= true
+		or handle.timer == nil or not authorized(entry) then
+		entry.discard = true
+		cancel_timer(entry)
+		return false, nil
+	end
+	entry.committed = true
+	return true, entry
+end
+
+--- Commits business delivery for one prepared timer.
+--- @param token table Exact token returned by prepare_after().
+--- @return boolean committed
+function M.commit_after(token)
+	if not entry_is_current(token) or token.kind ~= "timer"
+		or token.committed ~= true or not authorized(token) then
+		M.rollback_after(token)
+		return false
+	end
+	token.delivery_committed = true
+	if token.due == true then return drain_timer(token) end
+	return true
+end
+
+--- Cancels one prepared or committed timer by exact identity.
+--- @param token table Exact token returned by prepare_after()/after().
+--- @return boolean settled
+function M.rollback_after(token)
+	if type(token) ~= "table" or token.kind ~= "timer" then return false end
+	if token.released == true then return true end
+	return cancel_timer(token)
+end
+
+--- Schedules and immediately authorizes one exact deferred action.
+--- @param delay number Seconds.
+--- @param label string Diagnostic label.
+--- @param callback function Deferred work.
+--- @return boolean committed
+--- @return table|nil token Exact timer token.
+function M.after(delay, label, callback, parent)
+	local prepared, token = M.prepare_after(delay, label, callback, parent)
+	if prepared ~= true then return false, nil end
+	if M.commit_after(token) ~= true then
+		M.rollback_after(token)
+		return false, nil
+	end
+	return true, token
+end
+
+local maybe_release_shell
+local request_shell_termination
+
+local function shell_entry_owned(entry)
+	return type(entry) == "table" and entry.released ~= true
+		and (_shells[entry.id] == entry or _degraded_shells[entry.id] == entry)
+end
+
+local function release_shell(entry)
+	if _shells[entry.id] == entry then _shells[entry.id] = nil end
+	if _degraded_shells[entry.id] == entry then _degraded_shells[entry.id] = nil end
+	entry.released = true
+	entry.committed = false
+end
+
+local function shell_task_is_settled(entry)
+	if type(entry.handle) ~= "table" or type(entry.handle.isSettled) ~= "function" then
+		return false
+	end
+	local ok, settled = xpcall(entry.handle.isSettled, debug.traceback)
+	return ok == true and settled == true
+end
+
+local function shell_error(entry, message, ...)
+	if entry.strict == true then
+		Logger.error(LOG, "Private user program cleanup or admission remains unacknowledged.")
+	else
+		Logger.error(LOG, message, ...)
+	end
+end
+
+local function observe_shell_timer(entry, field, handle, continuation)
+	local observer_field = field .. "_observer"
+	if entry[observer_field] == handle then return true end
+	entry[observer_field] = handle
+	local ok, observed = xpcall(TimerScheduler.onSettled, debug.traceback,
+		handle, function()
+			if entry[observer_field] == handle then entry[observer_field] = nil end
+			if entry[field] ~= handle then return end
+			entry[field] = nil
+			continuation()
+		end)
+	if not ok or observed ~= true then
+		if entry[observer_field] == handle then entry[observer_field] = nil end
+		shell_error(entry, "%s %s timer observer refused: %s.",
+			tostring(entry.label), field, tostring(observed))
+		return false
+	end
+	return true
+end
+
+local function cancel_shell_timer(entry, field)
+	local handle = entry[field]
+	if handle == nil then return true end
+	local observed = observe_shell_timer(entry, field, handle, function()
+		maybe_release_shell(entry)
+	end)
+	local ok, cancelled = xpcall(TimerScheduler.cancel, debug.traceback, handle)
+	if not ok or cancelled ~= true then
+		shell_error(entry, "%s %s timer cleanup remains pending: %s.",
+			tostring(entry.label), field, tostring(cancelled))
+	end
+	return observed and ok and cancelled == true and entry[field] == nil
+end
+
+local function arm_shell_timer(entry, field, delay, continuation)
+	if entry[field] ~= nil then return false end
+	local handle
+	local ok, candidate, committed = xpcall(TimerScheduler.after, debug.traceback,
+		delay, function()
+			if entry[field] ~= handle then return end
+			observe_shell_timer(entry, field, handle, continuation)
+		end)
+	handle = candidate
+	if type(handle) == "table" then entry[field] = handle end
+	if not ok or type(handle) ~= "table" or committed ~= true then
+		if type(handle) == "table" then
+			observe_shell_timer(entry, field, handle, function()
+				maybe_release_shell(entry)
+			end)
+			TimerScheduler.cancel(handle)
+		end
+		shell_error(entry, "%s %s timer acquisition failed: %s.",
+			tostring(entry.label), field, tostring(committed))
+		return false
+	end
+	return true
+end
+
+maybe_release_shell = function(entry)
+	if not shell_entry_owned(entry) then return true end
+	if entry.acquiring == true or entry.callback_active == true
+		or entry.deadline_handle ~= nil or entry.retry_handle ~= nil then
+		return false
+	end
+	if not shell_task_is_settled(entry) then return false end
+	release_shell(entry)
+	return true
+end
+
+local function shell_native_settled(entry)
+	cancel_shell_timer(entry, "deadline_handle")
+	cancel_shell_timer(entry, "retry_handle")
+	return maybe_release_shell(entry)
+end
+
+local function observe_shell(entry)
+	if entry.observing == true or type(entry.handle) ~= "table" then return end
+	entry.observing = true
+	local ok, observed = xpcall(entry.handle.onSettled, debug.traceback, function()
+		if shell_entry_owned(entry) and entry.callback_active ~= true then
+			shell_native_settled(entry)
+		end
+	end)
+	if not ok or observed ~= true then
+		entry.observing = false
+		shell_error(entry, "%s process observer refused: %s.",
+			tostring(entry.label), tostring(observed))
+	end
+end
+
+local function degrade_shell(entry, reason)
+	if entry.strict == true then return false end
+	if _shells[entry.id] ~= entry then return false end
+	_shells[entry.id] = nil
+	_degraded_shells[entry.id] = entry
+	entry.degraded = true
+	entry.discard = true
+	entry.committed = false
+	shell_error(entry,
+		"%s process remained live after bounded termination; action owner released in degraded mode: %s.",
+		tostring(entry.label), tostring(reason))
+	return true
+end
+
+request_shell_termination = function(entry, context)
+	if not entry_is_current(entry) then return true end
+	entry.discard = true
+	entry.committed = false
+	cancel_shell_timer(entry, "deadline_handle")
+	if entry.callback_active == true or entry.acquiring == true then return false end
+	if shell_task_is_settled(entry) then return shell_native_settled(entry) end
+	if entry.retry_handle ~= nil then return false end
+
+	entry.termination_attempts = entry.termination_attempts + 1
+	local terminate_ok, accepted, state = xpcall(entry.handle.terminate, debug.traceback)
+	if shell_task_is_settled(entry) then return shell_native_settled(entry) end
+	if entry.termination_attempts >= SHELL_TERMINATION_MAX_ATTEMPTS then
+		return degrade_shell(entry, context)
+	end
+	local armed = arm_shell_timer(entry, "retry_handle", SHELL_CLEANUP_RETRY_SEC,
+		function()
+			request_shell_termination(entry, "cleanup retry exhausted")
+		end)
+	if not armed then return degrade_shell(entry, "cleanup retry timer refused") end
+	shell_error(entry, "%s process cleanup remains pending: %s (%s).",
+		tostring(entry.label), tostring(terminate_ok and accepted or accepted), tostring(state))
+	return false
+end
+
+local function terminate_shell(entry)
+	return request_shell_termination(entry, "process cleanup deadline exhausted")
+end
+
+local function publish_shell_timeout(entry)
+	if not entry_is_current(entry) or entry.terminal_received == true then return false end
+	entry.terminal_received = true
+	entry.terminal_delivered = true
+	entry.callback_active = true
+	invoke(entry.scope, entry.label, entry.callback, false, nil)
+	entry.callback_active = false
+	shell_error(entry, "%s process exceeded its %.1f-second settlement deadline.",
+		tostring(entry.label), SHELL_DEADLINE_SEC)
+	request_shell_termination(entry, "settlement deadline exhausted")
+	return true
+end
+
+local function start_shell(method, payload, label, callback, parent, strict, admit)
+	local admitted, scope = admission_open(parent)
+	if not admitted then return false end
+	local entry = {
+		id = next_id(),
+		kind = "shell",
+		strict = strict == true,
+		admit = admit,
+		parent = scope.id,
+		scope = scope,
+		label = label,
+		callback = callback,
+		generation = scope.generation,
+		committed = false,
+		discard = false,
+		acquiring = true,
+		released = false,
+		dispatching = true,
+		terminal_received = false,
+		terminal_delivered = false,
+		termination_attempts = 0,
+		deadline_handle = nil,
+		retry_handle = nil,
+	}
+	_shells[entry.id] = entry
+	if not authorized(entry) then release_shell(entry); return false end
+	scope.acquisitions = scope.acquisitions + 1
+	local function terminal(...)
+		if entry.terminal_received == true then return end
+		entry.terminal_received = true
+		entry.terminal_args = table.pack(...)
+		if entry.dispatching ~= true and entry.committed == true and authorized(entry) then
+			entry.terminal_delivered = true
+			entry.callback_active = true
+			invoke(scope, label, callback,
+				table.unpack(entry.terminal_args, 1, entry.terminal_args.n))
+			entry.callback_active = false
+			shell_native_settled(entry)
+		end
+	end
+	local ok, started, handle = pcall(method, payload, terminal)
+	entry.dispatching = false
+	scope.acquisitions = scope.acquisitions - 1
+	entry.acquiring = false
+	if ok and type(handle) == "table" then
+		entry.handle = handle
+	end
+	if not ok or started ~= true or type(handle) ~= "table"
+		or type(handle.terminate) ~= "function"
+		or type(handle.isSettled) ~= "function"
+		or type(handle.onSettled) ~= "function" or not authorized(entry) then
+		entry.discard = true
+		if type(handle) == "table" then
+			observe_shell(entry)
+			terminate_shell(entry)
+		else
+			release_shell(entry)
+		end
+		return false
+	end
+	if not shell_task_is_settled(entry)
+		and not arm_shell_timer(entry, "deadline_handle", SHELL_DEADLINE_SEC,
+			function() publish_shell_timeout(entry) end) then
+		entry.discard = true
+		terminate_shell(entry)
+		return false
+	end
+	entry.committed = true
+	if entry.terminal_args ~= nil and entry.terminal_delivered ~= true and authorized(entry) then
+		entry.terminal_delivered = true
+		entry.callback_active = true
+		invoke(scope, label, callback,
+			table.unpack(entry.terminal_args, 1, entry.terminal_args.n))
+		entry.callback_active = false
+		shell_native_settled(entry)
+	end
+	observe_shell(entry)
+	return true
+end
+
+--- Starts an owned `/usr/bin/open` process.
+function M.open(target, label, callback, parent)
+	return start_shell(ShellRunner.open, target, label or "open", callback, parent)
+end
+
+--- Starts an owned osascript process.
+function M.applescript(script, label, callback, parent)
+	return start_shell(ShellRunner.applescript,
+		script, label or "AppleScript", callback, parent)
+end
+
+--- Runs one owned program with an argument vector (ShellRunner.run).
+--- @param executable string Absolute path of the program.
+--- @param args table Argument vector.
+--- @param label string Diagnostic label.
+--- @param callback function|nil fn(ok, stdout, stderr), delivered only while
+---   the parent scope that started the process is still admitted.
+--- @param parent string|nil Stable action parent.
+--- @return boolean started
+function M.run(executable, args, label, callback, parent)
+	return start_shell(function(payload, terminal)
+		return ShellRunner.run(payload.executable, payload.args, terminal)
+	end, { executable = executable, args = args }, label or "process", callback, parent)
+end
+
+--- Runs an explicitly owned user program without legacy degraded-debt release.
+function M.run_program(executable, arguments, admitted, parent, source)
+	if type(admitted) ~= "function" then return false end
+	local function completed(ok, status)
+		if ok == true then return end
+		local admission_ok, receipt = pcall(admitted)
+		if not admission_ok or receipt ~= true then return end
+		if type(status) == "number" and status % 1 == 0 and status ~= 0
+			and status >= -2147483648 and status <= 2147483647 then
+			Logger.error(LOG, "Private user program failed (native status %d).", status)
+		else
+			Logger.error(LOG, "Private user program completion status is unavailable.")
+		end
+	end
+	return start_shell(function(payload, terminal)
+		local handle = ShellRunner.spawn_private(payload.executable, payload.arguments, terminal, admitted, payload.source)
+		local ok, receipt = pcall(handle.start)
+		return ok and receipt == true, handle
+	end, { executable = executable, arguments = arguments, source = source }, "user program", completed, parent, true, admitted)
+end
+
+--- Revalidates a reserved automation descriptor without invoking its service.
+--- @param executable string Canonical chosen program route.
+--- @param arguments table Persisted literal arguments.
+--- @param admitted function Current binding/source admission predicate.
+--- @param parent string Stable action consumer identity.
+--- @return boolean started Readonly query accepted; automation remains unavailable.
+function M.revalidate_automation(executable, arguments, admitted, parent)
+	local Native = require("adapters.apple_shortcuts_native")
+	return start_shell(function(payload, terminal)
+		local handle = Native.revalidate_program(payload.executable, payload.arguments, terminal, admitted)
+		if type(handle) ~= "table" then return false, nil end
+		local ok, receipt = pcall(handle.start)
+		return ok and receipt == true, handle
+	end, { executable = executable, arguments = arguments }, "Apple Shortcut revalidation", function()
+		Logger.error(LOG, "Apple Shortcut invocation refused: remote service retirement is unacknowledged.")
+	end, parent, true, admitted)
+end
+
+function M.stop_programs(parent)
+	local scope = action_scope(parent)
+	local selected = {}
+	for _, entry in pairs(_shells) do
+		if entry.scope == scope and entry.strict == true then selected[#selected + 1] = entry end
+	end
+	local settled = true
+	for _, entry in ipairs(selected) do if terminate_shell(entry) ~= true then settled = false end end
+	return settled
+end
+
+function M.program_available()
+	if type(ShellRunner.private_program_available) ~= "function" then return false end
+	local ok, available = pcall(ShellRunner.private_program_available)
+	return ok and available == true and type(ShellRunner.spawn_private) == "function"
+end
+
+local function settle_all(parent)
+	local scope = action_scope(parent)
+	local timers, shells = {}, {}
+	for _, entry in pairs(_timers) do
+		if entry.scope == scope then timers[#timers + 1] = entry end
+	end
+	for _, entry in pairs(_shells) do
+		if entry.scope == scope then shells[#shells + 1] = entry end
+	end
+	local settled = scope.acquisitions == 0 and scope.callback_depth == 0
+	for _, entry in ipairs(timers) do
+		if cancel_timer(entry) ~= true then settled = false end
+	end
+	for _, entry in ipairs(shells) do
+		if terminate_shell(entry) ~= true then settled = false end
+	end
+	if settled ~= true or scope.acquisitions ~= 0 or scope.callback_depth ~= 0 then
+		return false
+	end
+	for _, entry in pairs(_timers) do if entry.scope == scope then return false end end
+	for _, entry in pairs(_shells) do if entry.scope == scope then return false end end
+	return true
+end
+
+function M.pause(parent)
+	local scope = action_scope(parent)
+	if scope.paused ~= true then
+		scope.generation = scope.generation + 1
+		scope.paused = true
+	end
+	return settle_all(scope.id)
+end
+
+function M.resume(parent)
+	local scope = action_scope(parent)
+	if scope.paused ~= true and not cleanup_debt(scope.id) then return true end
+	if settle_all(scope.id) ~= true then return false end
+	scope.generation = scope.generation + 1
+	scope.paused = false
+	return true
+end
+
+function M.stop(parent) return M.pause(parent) end
+function M.is_paused(parent) return action_scope(parent).paused == true end
+function M.has_pending(parent)
+	local scope = action_scope(parent)
+	if scope.acquisitions ~= 0 or scope.callback_depth ~= 0 then return true end
+	for _, entry in pairs(_timers) do if entry.scope == scope then return true end end
+	for _, entry in pairs(_shells) do if entry.scope == scope then return true end end
+	return false
+end
+
+return M

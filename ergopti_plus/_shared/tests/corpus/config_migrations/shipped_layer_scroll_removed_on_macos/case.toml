@@ -1,0 +1,8 @@
+# _shared/tests/corpus/config_migrations/shipped_layer_scroll_removed_on_macos/case.toml
+
+[case]
+description = "Shipped migrations preserve the retired macOS Layer + Scroll switch and its sibling keys until explicit cleanup."
+drivers = ["hs"]
+outcome = "migrated"
+from_version = 6
+to_version = 12

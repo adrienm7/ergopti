@@ -1,0 +1,715 @@
+﻿; modules/keylogger/keylogger_watchers.ahk
+
+; ==============================================================================
+; MODULE: Keylogger Watchers (session, idle, system events)
+; DESCRIPTION:
+; Producers for the event types HS emits but the AHK port had been silent
+; on. The on-disk schema (events_session, events_system) and the SQL
+; builders (KL_BuildInsertSession, KL_BuildInsertSystem) were already in
+; place — only the actual generators were missing. This module wires
+; them.
+;
+; FEATURES & RATIONALE:
+; 1. Session + idle state machine — HS init.lua emits four event types
+;    with strict pairing (session_start ↔ session_end, idle_start ↔
+;    idle_end). The pairing constraint demands we own a small state
+;    machine: a misfire is worse than no event because a dangling
+;    session_start poisons every "active time" aggregate downstream.
+;    The state lives in KLWatch; the InputHook calls KL_Watchers_OnKeystroke
+;    on every keystroke and a SetTimer drives the « close out idle/session
+;    after a quiet period » direction.
+;
+; 2. Shortcut detection — KL_Hook_DetectShortcut inspects modifier state
+;    when a non-modifier VK is pressed. AltGr is filtered out via the
+;    « RAlt held + Ctrl held but LAlt NOT held » heuristic: Windows
+;    synthesises an LCtrl press for RAlt-as-AltGr, so the LAlt slot lets
+;    us distinguish AltGr from a real Ctrl+Alt+key shortcut without an
+;    LL keyboard hook. False positives from this heuristic are limited
+;    to Ctrl+RAlt+key combinations explicitly typed with right-side
+;    modifiers — vanishingly rare on European layouts where RAlt is the
+;    AltGr key.
+;
+; 3. System events (lock / unlock / sleep / wake) — Win32 messages
+;    surfaced via OnMessage on the script's main window:
+;      - WM_WTSSESSION_CHANGE for lock/unlock (requires a one-time
+;        WTSRegisterSessionNotification with NOTIFY_FOR_THIS_SESSION),
+;      - WM_POWERBROADCAST for sleep/wake (broadcast by Windows to every
+;        top-level window without registration).
+;
+; SCOPE / LIMITATIONS:
+; - wifi_change / audio_change / power_change are NOT emitted yet —
+;   each requires a dedicated API path (WlanRegisterNotification,
+;   IMMNotificationClient, GetSystemPowerStatus polling). They are
+;   listed in KEYLOGGER_SPEC §3 but their UI consumers tolerate empty
+;   tables, so we ship without them and revisit when needed.
+; - space_change is macOS-only (Mission Control); intentionally not
+;   ported.
+; - system_load (periodic CPU/RAM snapshots) is also deferred.
+; ==============================================================================
+
+#Requires Autohotkey v2.0+
+#Include keylogger_system_events.ahk
+#Include keylogger_session_events.ahk
+
+
+
+
+
+; ============================
+; ============================
+; ======= 1/ Constants =======
+; ============================
+; ============================
+
+class KLWatchConst {
+		; Mirrors hammerspoon/modules/keylogger/init.lua HS constants. Keeping
+		; the same values guarantees that a keystroke pause classified as
+		; « micro-idle » on macOS is classified the same way on Windows when
+		; both devices share a metrics folder.
+		static MICRO_IDLE_TIMEOUT_MS    := 30000
+		static SESSION_TIMEOUT_MS       := 300000
+		static IDLE_CHECK_INTERVAL_MS   := 10000   ; HS IDLE_CHECK_INTERVAL_SEC * 1000
+		static WTS_REGISTER_RETRY_MS    := 30000
+
+		; WM_* / WTS_* / PBT_* numeric codes — these are Windows ABI
+		; constants, not magic numbers. Cited inline so a reviewer can
+		; cross-check against the Win32 docs without leaving the file.
+		static WM_WTSSESSION_CHANGE     := 0x02B1
+		static WM_POWERBROADCAST        := 0x0218
+		static NOTIFY_FOR_THIS_SESSION  := 0x0
+		static WTS_SESSION_LOCK         := 0x7
+		static WTS_SESSION_UNLOCK       := 0x8
+		static PBT_APMSUSPEND           := 0x0004
+		static PBT_APMRESUMESUSPEND     := 0x0007
+		static PBT_APMRESUMEAUTOMATIC   := 0x0012
+}
+
+; Modifier-only virtual keycodes. A keystroke whose VK is in this map
+; never produces a shortcut event on its own — chord detection waits for
+; the « payload » key (a letter, digit, function key, …) to fire.
+global KLHOOK_MODIFIER_VKS := Map(
+		0x10, true,  ; VK_SHIFT
+		0x11, true,  ; VK_CONTROL
+		0x12, true,  ; VK_MENU (Alt)
+		0xA0, true, 0xA1, true,  ; VK_L/RSHIFT
+		0xA2, true, 0xA3, true,  ; VK_L/RCONTROL
+		0xA4, true, 0xA5, true,  ; VK_L/RMENU
+		0x5B, true, 0x5C, true,  ; VK_L/RWIN
+		0x14, true,              ; VK_CAPITAL
+		0x90, true               ; VK_NUMLOCK
+)
+
+; VK_PACKET: a character a Send typed as text ({Text}), not a key the user
+; pressed, so never the payload of a shortcut.
+global KLHOOK_VK_PACKET := 0xE7
+
+
+
+
+
+; ===============================
+; ===============================
+; ======= 2/ Module state =======
+; ===============================
+; ===============================
+
+class KLWatch {
+		static system_events := false
+		static system_failure_reported := false
+		; Session machine. ``is_session_active`` flips to true the first time
+		; a keystroke arrives after a > SESSION_TIMEOUT_MS gap; flips back to
+		; false when the idle tick observes such a gap.
+		static is_session_active   := false
+		static session_started_at  := 0
+		static last_authorized_tick := 0
+		static privacy_interrupted := false
+		static privacy_started_at   := 0
+		static session_close := false
+		static session_close_draining := false
+		static session_generation := 0
+		static idle_generation := 0
+
+		; Idle machine. ``is_idle`` is independent of the session — a single
+		; session can contain many micro-idles without ending it.
+		static is_idle             := false
+		static idle_started_at     := 0
+		static idle_close := false
+
+		; Lifecycle handles.
+		static idle_check_timer    := unset
+		static wts_registered      := false
+		; Concrete idle sentinel: reading a static assigned ``unset`` throws in AHK
+		; v2, including immediately after the one-shot releases its ownership.
+		static wts_retry_timer     := false
+		static wts_retry_generation := 0
+		static wts_failure_reported := false
+		static session_msg_handler := unset
+		static power_msg_handler   := unset
+}
+
+
+
+
+
+; ==========================================
+; ==========================================
+; ======= 3/ Session / idle producer =======
+; ==========================================
+; ==========================================
+
+_KL_Watchers_CommitIdleStart(StartedAt) {
+	KLWatch.idle_generation += 1
+	KLWatch.is_idle := true
+	KLWatch.idle_started_at := StartedAt
+}
+
+_KL_Watchers_CommitIdleEnd() {
+	KLWatch.idle_generation += 1
+	KLWatch.is_idle := false
+	KLWatch.idle_close := false
+}
+
+_KL_Watchers_CommitIdleClose(Owner) {
+	if KLWatch.idle_close != Owner
+		throw Error("A superseded idle close cannot commit.")
+	_KL_Watchers_CommitIdleEnd()
+}
+
+; A short idle ends without ending its session. Retain its first resume time
+; until publication, including when a later full session close adopts it.
+_KL_Watchers_EndIdle(EndTick, AppendFn := 0, PublishGuard := unset) {
+	PreviousCritical := Critical("On")
+	try {
+		if KLWatch.session_close_draining
+			return false
+		KLWatch.session_close_draining := true
+	} finally Critical(PreviousCritical)
+	try {
+		if !IsObject(KLWatch.idle_close)
+			KLWatch.idle_close := Map("duration", TickElapsed64(KLWatch.idle_started_at, EndTick))
+		Owner := KLWatch.idle_close
+		return _KL_Watchers_Log(AppendFn, "idle_end", Owner["duration"],
+			_KL_Watchers_CommitIdleClose.Bind(Owner), PublishGuard?)
+	} finally KLWatch.session_close_draining := false
+}
+
+_KL_Watchers_CommitSessionStart(StartedAt) {
+	KLWatch.session_generation += 1
+	KLWatch.is_session_active := true
+	KLWatch.session_started_at := StartedAt
+	KLWatch.last_authorized_tick := StartedAt
+}
+
+_KL_Watchers_CommitSessionEnd() {
+	KLWatch.session_generation += 1
+	KLWatch.is_session_active := false
+}
+
+_KL_Watchers_Log(AppendFn, Kind, DurationMs := unset, CommitFn := 0, PublishGuard := unset, FrozenClose := unset) {
+	if IsSet(PublishGuard) && !PublishGuard.Call()
+		return false
+	if HasMethod(AppendFn, "Call") {
+		if IsSet(DurationMs)
+			return AppendFn.Call(Kind, DurationMs, CommitFn)
+		return AppendFn.Call(Kind, unset, CommitFn)
+	}
+	if IsSet(DurationMs)
+		return KL_LogSession(Kind, DurationMs, CommitFn, FrozenClose?, PublishGuard?)
+	return KL_LogSession(Kind, unset, CommitFn, FrozenClose?, PublishGuard?)
+}
+
+_KL_Watchers_CommitClose(Owner, Kind) {
+	if KLWatch.session_close != Owner
+		throw Error("A superseded session close cannot commit.")
+	Owner.Delete(Kind)
+	if Kind = "idle_end"
+		_KL_Watchers_CommitIdleEnd()
+	else
+		_KL_Watchers_CommitSessionEnd()
+}
+
+; Freeze both durations before the first append. Accepted records leave this
+; owner in their commit callback, so a partial close cannot restart idle time.
+_KL_Watchers_CloseSession(SessionEndTick, IdleEndTick, AppendFn := 0, PublishGuard := unset) {
+	PreviousCritical := Critical("On")
+	try {
+		if KLWatch.session_close_draining
+			return false
+		KLWatch.session_close_draining := true
+	} finally Critical(PreviousCritical)
+	try {
+		if !IsObject(KLWatch.session_close) {
+			Owner := Map()
+			if KLWatch.is_idle {
+				Owner["idle_end"] := TickElapsed64(KLWatch.idle_started_at, IdleEndTick)
+				if IsObject(KLWatch.idle_close)
+					Owner["idle_end"] := KLWatch.idle_close["duration"]
+			}
+			if KLWatch.is_session_active
+				Owner["session_end"] := TickElapsed64(KLWatch.session_started_at, SessionEndTick)
+			Owner.DefineProp("CloseAuthority", {Value: KLSessionCloseAuthority(Owner)})
+			KLWatch.session_close := Owner
+		}
+		Owner := KLWatch.session_close
+		for Kind in ["idle_end", "session_end"] {
+			if !Owner.Has(Kind)
+				continue
+			FrozenClose := unset
+			CommitFn := _KL_Watchers_CommitClose.Bind(Owner, Kind)
+			if Keylogger._shutting_down && !HasMethod(AppendFn, "Call") {
+				if !Owner.HasOwnProp("CloseAuthority")
+					return false
+				FrozenClose := KLSessionClosePublication(Owner.CloseAuthority, Kind)
+				CommitFn := FrozenClose.CommitFn
+			}
+			if !_KL_Watchers_Log(AppendFn, Kind, Owner[Kind], CommitFn, PublishGuard?, FrozenClose?) {
+				try LoggerWarn("Keylogger", Format(
+					"Session close '{1}' retained after publication refusal (shutdown={2}, privacy_interrupted={3}).",
+					Kind, Keylogger._shutting_down ? 1 : 0, KLWatch.privacy_interrupted ? 1 : 0))
+				return false
+			}
+		}
+		; Break the retained owner's authority cycle and retire its private receipt
+		; once every closing row has committed. Failed attempts keep one owner.
+		if Owner.HasOwnProp("CloseAuthority") {
+			_KL_SessionCloseAuthorityReceipt(Owner.CloseAuthority, , , , true)
+			Owner.DeleteProp("CloseAuthority")
+		}
+		KLWatch.session_close := false
+		return true
+	} finally KLWatch.session_close_draining := false
+}
+
+; A private key is physical activity, so the hook still advances KLHook.last_tick.
+; It cannot own session state. The next accepted key closes the previous safe
+; interval at its last authorized tick and starts a new one at the safe boundary.
+KL_Watchers_OnPrivateKeystroke(Now := unset, GuardFn := unset) {
+	PreviousCritical := Critical("On")
+	try {
+		if IsSet(GuardFn) && !GuardFn.Call()
+			return false
+		if !KLWatch.privacy_interrupted {
+			KLWatch.privacy_interrupted := true
+			KLWatch.privacy_started_at := IsSet(Now) ? Now : A_TickCount
+		}
+	} finally {
+		Critical(PreviousCritical)
+	}
+	return true
+}
+
+; Preserve the first collection boundary without appending while paused.
+KL_Watchers_OnSuspend() {
+	KL_Hook_InvalidateCapture()
+	KL_Watchers_OnPrivateKeystroke()
+	return KL_Watchers_ResetSystemIntervals()
+}
+
+; Active session/idle flags follow accepted appends. Authorized activity ticks
+; and pending transition boundaries survive publication refusal independently.
+KL_Watchers_OnKeystroke(AppendFn := 0, Now := unset, GuardFn := unset) {
+	if IsSet(GuardFn) && !GuardFn.Call()
+		return false
+	if KLWatch.session_close_draining
+		return false
+	if !Keylogger.initialized && !HasMethod(AppendFn, "Call")
+		return false
+	last := KLWatch.last_authorized_tick
+	now := IsSet(Now) ? Now : A_TickCount
+	if IsObject(KLWatch.session_close) && !_KL_Watchers_CloseSession(0, 0, AppendFn, GuardFn?)
+		return false
+
+	if IsSet(GuardFn) && !GuardFn.Call()
+		return false
+	if KLWatch.privacy_interrupted {
+		PrivacyBoundary := KLWatch.privacy_started_at
+		if !_KL_Watchers_CloseSession(PrivacyBoundary, PrivacyBoundary, AppendFn, GuardFn?)
+			return false
+		if IsSet(GuardFn) && !GuardFn.Call()
+			return false
+		PrivacyCritical := Critical("On")
+		try {
+			if IsSet(GuardFn) && !GuardFn.Call()
+				return false
+			KLWatch.privacy_interrupted := false
+			KLWatch.privacy_started_at := 0
+			last := 0
+		} finally Critical(PrivacyCritical)
+	}
+
+	; Accepted session ownership also initializes a valid zero-valued tick.
+	if (last > 0 || KLWatch.is_session_active) {
+		gap := TickElapsed64(last, now)
+		if (gap >= KLWatchConst.SESSION_TIMEOUT_MS)
+			KL_Hook_AdvanceContextWatermarks(gap)
+		if KLWatch.is_session_active && gap >= KLWatchConst.SESSION_TIMEOUT_MS {
+			if !_KL_Watchers_CloseSession(last, now, AppendFn, GuardFn?)
+				return false
+		} else if KLWatch.is_idle {
+			; The key is authorized activity even if its idle-close append fails.
+			ActivityCritical := Critical("On")
+			try {
+				if IsSet(GuardFn) && !GuardFn.Call()
+					return false
+				KLWatch.last_authorized_tick := now
+			} finally Critical(ActivityCritical)
+			if !_KL_Watchers_EndIdle(now, AppendFn, GuardFn?)
+				return false
+		}
+	}
+	if IsSet(GuardFn) && !GuardFn.Call()
+		return false
+	if !KLWatch.is_session_active {
+		if !_KL_Watchers_Log(AppendFn, "session_start", unset,
+			_KL_Watchers_CommitSessionStart.Bind(now), GuardFn?)
+			return false
+	}
+	PreviousCritical := Critical("On")
+	try {
+		if IsSet(GuardFn) && !GuardFn.Call()
+			return false
+		KLWatch.last_authorized_tick := now
+	}
+	finally Critical(PreviousCritical)
+	return true
+}
+
+; Periodic check (~10 s) for « user has been silent for a while ». The
+; only producer for idle_start and the in-time path for session_end —
+; the keystroke producer above only handles retroactive session_end.
+KL_Watchers_IdleTick(Now := unset) {
+		if A_IsSuspended {
+				KL_Watchers_OnSuspend()
+				return
+		}
+		if !Keylogger.initialized
+				return
+		if KLWatch.session_close_draining
+				return false
+		if KL_Hook_HasPendingInput()
+			return false
+		_KL_Watchers_SystemDrain()
+		if !KLHook.HasOwnProp("last_tick")
+				return
+		LastTick := KLHook.last_tick
+		if LastTick = 0
+				return
+		now := IsSet(Now) ? Now : A_TickCount
+		gap := TickElapsed64(LastTick, now)
+
+		if KLWatch.privacy_interrupted
+				return
+		if IsObject(KLWatch.session_close)
+				return _KL_Watchers_CloseSession(0, 0)
+		if IsObject(KLWatch.idle_close)
+				return _KL_Watchers_EndIdle(0)
+
+		if (!KLWatch.is_idle and KLWatch.is_session_active
+						and gap >= KLWatchConst.MICRO_IDLE_TIMEOUT_MS) {
+				KL_LogSession("idle_start", unset,
+						_KL_Watchers_CommitIdleStart.Bind(LastTick))
+		}
+
+		if (KLWatch.is_session_active and gap >= KLWatchConst.SESSION_TIMEOUT_MS) {
+				return _KL_Watchers_CloseSession(LastTick, now)
+		}
+}
+
+
+
+
+
+; =====================================
+; =====================================
+; ======= 4/ Shortcut detection =======
+; =====================================
+; =====================================
+
+; Build a HS-style shortcut label for a non-modifier keypress. Returns
+; "" when the chord is not a shortcut (no useful modifier held, or the
+; combo looks like AltGr typing a layered character). The AltGr key goes by
+; scan code and KS_AltGrKeyName: a Kana-style layout gives it a virtual key
+; other than VK_RMENU, and its RAlt is a plain Alt.
+; @param vk {Integer} Virtual key of the key-down.
+; @param sc {Integer} Scan code of the key-down, extended keys carrying 0x100.
+; @param KeyIsDownFn {Func} Test seam taking a key name, KS_IsDown (physical
+;        state) by default.
+; @return {String} The label, such as "Ctrl+Alt+V", or "".
+KL_Watchers_DetectShortcut(vk, sc, KeyIsDownFn := 0) {
+		if KLHOOK_MODIFIER_VKS.Has(vk) or sc == KS_AltGrScanCode()
+				return ""
+		; VK_PACKET is text a Send typed ({Text}), such as an AltGr-layer
+		; character, not a key the user pressed with a modifier.
+		if (vk == KLHOOK_VK_PACKET)
+				return ""
+		if !IsObject(KeyIsDownFn)
+				KeyIsDownFn := KS_IsDown
+		Ctrl  := KeyIsDownFn.Call("LControl") or KeyIsDownFn.Call("RControl")
+		LAlt  := KeyIsDownFn.Call("LAlt")
+		AltGr := KeyIsDownFn.Call(KS_AltGrKeyName())
+		Win   := KeyIsDownFn.Call("LWin") or KeyIsDownFn.Call("RWin")
+		Shift := KeyIsDownFn.Call("LShift") or KeyIsDownFn.Call("RShift")
+
+		; On a standard AltGr layout AltGr is RAlt + a synthetic LCtrl injected
+		; by Windows. When LAlt is NOT pressed, this Ctrl+Alt combo is the AltGr
+		; layer and the user is just typing a character — drop the « shortcut »
+		; framing. A Kana-style AltGr and QWERTY's plain right Alt inject no
+		; Ctrl, so a Ctrl held with them is the user's own shortcut.
+		if (AltGr and Ctrl and !LAlt and KS_AltGrAddsFakeLCtrl())
+				return ""
+		; Where the AltGr key is a plain right Alt (QWERTY: the layout probe found
+		; no AltGr level), a key the AltGr layer leaves alone reaches the
+		; application under that Alt: LCtrl+RAlt+V is Windows' Ctrl+Alt+V. Held
+		; as another modifier or a layer by its tap-hold (AltGrKeyIsAltGr), the
+		; key is suppressed and the application sees no Alt.
+		Alt := LAlt or (AltGr and !KS_LayoutHasAltGr() and AltGrKeyIsAltGr())
+		; Plain Shift+letter is capitalisation, never a shortcut.
+		if (!Ctrl and !Alt and !Win)
+				return ""
+
+		parts := []
+		if Ctrl
+				parts.Push("Ctrl")
+		if Alt
+				parts.Push("Alt")
+		if Win
+				parts.Push("Win")
+		if Shift
+				parts.Push("Shift")
+
+		KeyName := ""
+		try KeyName := GetKeyName(Format("vk{:X}", vk))
+		if (KeyName = "")
+				KeyName := Format("VK{:X}", vk)
+		if (StrLen(KeyName) = 1)
+				KeyName := StrUpper(KeyName)
+		parts.Push(KeyName)
+
+		out := ""
+		for i, p in parts
+				out .= (i = 1 ? "" : "+") . p
+		return out
+}
+
+
+
+
+
+; ================================
+; ================================
+; ======= 5/ System events =======
+; ================================
+; ================================
+
+; WM_WTSSESSION_CHANGE handler — wParam carries the session change code
+; (WTS_SESSION_LOCK / UNLOCK among others). lParam is the session id,
+; ignored here because we only registered for THIS session.
+KL_Watchers_OnSessionChange(wParam, lParam, msg, hwnd) {
+		if A_IsSuspended {
+				KL_Watchers_OnSuspend()
+				return
+		}
+		if (wParam = KLWatchConst.WTS_SESSION_LOCK) {
+				_KL_Watchers_SystemObserve("lock")
+		} else if (wParam = KLWatchConst.WTS_SESSION_UNLOCK) {
+				_KL_Watchers_SystemObserve("unlock")
+		}
+}
+
+; WM_POWERBROADCAST handler — emits sleep on PBT_APMSUSPEND and wake on
+; either resume code. PBT_APMRESUMEAUTOMATIC fires when the system
+; wakes for a scheduled task; PBT_APMRESUMESUSPEND fires when the user
+; explicitly wakes the machine. Both translate to "wake" for our
+; metrics purposes.
+KL_Watchers_OnPowerBroadcast(wParam, lParam, msg, hwnd) {
+		if A_IsSuspended {
+				KL_Watchers_OnSuspend()
+				return
+		}
+		if (wParam = KLWatchConst.PBT_APMSUSPEND) {
+				_KL_Watchers_SystemObserve("sleep")
+		} else if (wParam = KLWatchConst.PBT_APMRESUMESUSPEND
+						or wParam = KLWatchConst.PBT_APMRESUMEAUTOMATIC) {
+				_KL_Watchers_SystemObserve("wake")
+		}
+}
+
+
+
+
+
+; ============================
+; ============================
+; ======= 6/ Lifecycle =======
+; ============================
+; ============================
+
+; Registers the main script window for session-change broadcasts and owns one
+; bounded retry callback when Windows temporarily refuses the subscription. A
+; BOOL result must be type-checked: AHK considers the string "0" equal to false,
+; so a loose comparison could publish a false registration as live authority.
+_KL_Watchers_TryRegisterWts(RegisterFn := 0, ScheduleFn := 0) {
+		if KLWatch.wts_registered
+				return true
+		Registered := 0
+		RegisterError := ""
+		try Registered := HasMethod(RegisterFn, "Call")
+				? RegisterFn.Call(A_ScriptHwnd,
+						KLWatchConst.NOTIFY_FOR_THIS_SESSION)
+				: DllCall("Wtsapi32\WTSRegisterSessionNotification",
+						"Ptr", A_ScriptHwnd,
+						"UInt", KLWatchConst.NOTIFY_FOR_THIS_SESSION,
+						"Int")
+		catch as Err
+				RegisterError := Err.Message
+		if (Registered is Integer) && Registered != 0 {
+				KLWatch.wts_registered := true
+				KLWatch.wts_failure_reported := false
+				return true
+		}
+		if !KLWatch.wts_failure_reported {
+				KLWatch.wts_failure_reported := true
+				if (RegisterError != "") {
+						try LoggerWarn("Keylogger",
+								"WTS session notification registration failed: {1}; retrying.",
+								RegisterError)
+				} else {
+						try LoggerWarn("Keylogger",
+								"WTS session notification registration was refused; retrying.")
+				}
+		}
+		_KL_Watchers_ScheduleWtsRetry(RegisterFn, ScheduleFn)
+		return false
+}
+
+; Releases the WTS subscription only after Windows confirms the unregister.
+; Retaining the published flag on refusal preserves the exact live authority
+; so a later Stop can retry instead of admitting a duplicate registration.
+_KL_Watchers_TryUnregisterWts(UnregisterFn := 0) {
+		if !KLWatch.wts_registered
+				return true
+		Unregistered := 0
+		UnregisterError := ""
+		try Unregistered := HasMethod(UnregisterFn, "Call")
+				? UnregisterFn.Call(A_ScriptHwnd)
+				: DllCall("Wtsapi32\WTSUnRegisterSessionNotification",
+						"Ptr", A_ScriptHwnd,
+						"Int")
+		catch as Err
+				UnregisterError := Err.Message
+		if (Unregistered is Integer) && Unregistered != 0 {
+				KLWatch.wts_registered := false
+				return true
+		}
+		if (UnregisterError != "") {
+				try LoggerError("Keylogger",
+						"WTS session notification unregistration failed: {1}.",
+						UnregisterError)
+		} else {
+				try LoggerError("Keylogger",
+						"WTS session notification unregistration was refused.")
+		}
+		return false
+}
+
+_KL_Watchers_ScheduleWtsRetry(RegisterFn := 0, ScheduleFn := 0) {
+		if KLWatch.HasOwnProp("wts_retry_timer")
+				&& IsObject(KLWatch.wts_retry_timer)
+				return true
+		Generation := ++KLWatch.wts_retry_generation
+		RetryFn := _KL_Watchers_RetryWtsRegistration.Bind(Generation, RegisterFn, ScheduleFn)
+		KLWatch.wts_retry_timer := RetryFn
+		try {
+				if HasMethod(ScheduleFn, "Call") {
+						Scheduled := ScheduleFn.Call(RetryFn,
+								-KLWatchConst.WTS_REGISTER_RETRY_MS)
+						if !((Scheduled is Integer) && Scheduled == 1)
+								throw Error("the WTS retry scheduler refused the callback")
+				} else {
+						SetTimer(RetryFn, -KLWatchConst.WTS_REGISTER_RETRY_MS)
+				}
+				return true
+		} catch as Err {
+				if KLWatch.wts_retry_timer == RetryFn
+						KLWatch.wts_retry_timer := false
+				try LoggerError("Keylogger",
+						"Could not schedule WTS registration recovery: {1}.",
+						Err.Message)
+				return false
+		}
+}
+
+_KL_Watchers_RetryWtsRegistration(Generation, RegisterFn := 0, ScheduleFn := 0) {
+		; A canceled or consumed timer cannot erase a later Start's retry owner.
+		if Generation != KLWatch.wts_retry_generation || !IsObject(KLWatch.wts_retry_timer)
+				return false
+		KLWatch.wts_retry_timer := false
+		; SetTimer bypasses native Suspend. Do not touch session-notification state
+		; while paused, but retain one future attempt so resume cannot lose the
+		; feature for the rest of the process lifetime.
+		if A_IsSuspended {
+				_KL_Watchers_ScheduleWtsRetry(RegisterFn, ScheduleFn)
+				return false
+		}
+		return _KL_Watchers_TryRegisterWts(RegisterFn, ScheduleFn)
+}
+
+KL_Watchers_Start() {
+		; Idempotent — successive calls are no-ops once the timer is armed.
+		if KLWatch.HasOwnProp("idle_check_timer") && IsObject(KLWatch.idle_check_timer)
+				return
+		if !_KL_Watchers_SystemStart()
+				return false
+
+		KLWatch.idle_check_timer := KL_Watchers_IdleTick.Bind()
+		SetTimer(KLWatch.idle_check_timer, KLWatchConst.IDLE_CHECK_INTERVAL_MS)
+
+		; Register WTS notifications on the script's main window. The HWND
+		; comes from A_ScriptHwnd, which AHK v2 always exposes for the
+		; default script window (hidden by default but guaranteed to exist).
+		_KL_Watchers_TryRegisterWts()
+
+		; OnMessage pins the callback for the lifetime of the script. We
+		; keep the bound function reference around so KL_Watchers_Stop can
+		; pass MaxThreads=0 to detach it cleanly.
+		KLWatch.session_msg_handler := KL_Watchers_OnSessionChange
+		KLWatch.power_msg_handler   := KL_Watchers_OnPowerBroadcast
+		OnMessage(KLWatchConst.WM_WTSSESSION_CHANGE, KLWatch.session_msg_handler)
+		OnMessage(KLWatchConst.WM_POWERBROADCAST,   KLWatch.power_msg_handler)
+}
+
+KL_Watchers_Stop() {
+		Stopped := true
+		if KLWatch.HasOwnProp("idle_check_timer") && IsObject(KLWatch.idle_check_timer) {
+				try SetTimer(KLWatch.idle_check_timer, 0)
+				KLWatch.idle_check_timer := unset
+		}
+		if KLWatch.HasOwnProp("wts_retry_timer") && IsObject(KLWatch.wts_retry_timer) {
+				try SetTimer(KLWatch.wts_retry_timer, 0)
+				KLWatch.wts_retry_timer := false
+		}
+		if !_KL_Watchers_TryUnregisterWts()
+				Stopped := false
+		KLWatch.wts_failure_reported := false
+		if KLWatch.HasOwnProp("session_msg_handler") && IsObject(KLWatch.session_msg_handler) {
+				try OnMessage(KLWatchConst.WM_WTSSESSION_CHANGE, KLWatch.session_msg_handler, 0)
+				KLWatch.session_msg_handler := unset
+		}
+		if KLWatch.HasOwnProp("power_msg_handler") && IsObject(KLWatch.power_msg_handler) {
+				try OnMessage(KLWatchConst.WM_POWERBROADCAST, KLWatch.power_msg_handler, 0)
+				KLWatch.power_msg_handler := unset
+		}
+		if !_KL_Watchers_SystemDrain(true)
+				Stopped := false
+		; Drain any open session/idle state so the JSONL never ends with a
+		; dangling session_start. Pair every open lifecycle event with its
+		; closing counterpart.
+		; Shutdown has no later authorized key to close the pre-private interval.
+		EndTick := KLWatch.privacy_interrupted ? KLWatch.privacy_started_at : A_TickCount
+		if !_KL_Watchers_CloseSession(EndTick, EndTick)
+				return false
+		KLWatch.privacy_interrupted := false
+		KLWatch.privacy_started_at := 0
+		KLWatch.last_authorized_tick := 0
+		return Stopped
+}

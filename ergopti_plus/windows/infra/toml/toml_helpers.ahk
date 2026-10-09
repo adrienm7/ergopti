@@ -1,0 +1,1331 @@
+﻿; infra/toml/toml_helpers.ahk
+
+; ==============================================================================
+; MODULE: TOML Helpers
+; DESCRIPTION:
+; Single-source-of-truth configuration backend. The driver used to spread its
+; settings across an INI file (``ErgoptiPlus_Configuration.ini``) read via
+; Win32 ``IniRead``/``IniWrite`` plus a hand-rolled TOML parser for the
+; metrics-specific ``[shortcuts]`` section. Both files now live as one
+; ``config.toml`` with section-scoped reads, writes and a batched mutator
+; that mirrors the old ``IniBatchWrite`` semantics.
+;
+; FEATURES & RATIONALE:
+; 1. Drop-in for IniRead/IniWrite: ``TOML_Read``/``TOML_Write`` keep the same
+;    ``(value, path, section, key)`` argument order (with the path as second
+;    arg for write, identical to the Win32 API) so the migration was a
+;    near-mechanical search-and-replace.
+; 2. Dotted-key tolerant: keys carrying a literal dot (``Foo.Enabled``) are
+;    rendered as TOML quoted keys ("Foo.Enabled" = true) and unquoted
+;    on read. The driver historically uses ``Feature.Enabled`` /
+;    ``Feature.Letter`` strings that we keep untouched at call sites.
+; 3. Cached parser: ``TOML_Parse`` reads the full file once into a nested
+;    ``Map<Section, Map<Key, Value>>`` so that a startup with hundreds of
+;    lookups never reopens the file. Mirrors ``ParseIniFile``'s shape so the
+;    cache-aware accessor (``IniCacheGet``) keeps working.
+; 4. Section-scoped batch write: owned assignment rows retain canonical
+;    rendering while unmatched physical records and comments remain user data.
+;    Detached candidates and ordinary publication share one qualified image;
+;    changed unrepresentable namespaces refuse before any staging write.
+; ==============================================================================
+
+#Requires Autohotkey v2.0+
+
+#Include ../number.ahk
+#Include toml_inline_tables.ahk
+#Include toml_document.ahk
+#Include config_snapshot.ahk
+
+
+
+
+
+; ============================
+; ============================
+; ======= 1/ Utilities =======
+; ============================
+; ============================
+
+; Sentinel wrapper that carries boolean intent through TOML_RenderValue.
+; AHK v2 has no distinct boolean type: `true` IS integer 1 and `false` IS 0,
+; so IsNumber() matches both and the renderer would emit "1"/"0" instead of
+; the TOML literals "true"/"false". Wrapping a value in TOML_Bool() before
+; passing it to TOML_Write/TOML_BatchWrite marks it unambiguously as boolean.
+class TOML_Bool {
+	__New(v) {
+		this.Value := v ? true : false
+	}
+}
+
+; In-place alphabetical sort of a simple Array of strings via bubble sort.
+; The arrays are at most a few hundred entries; O(n²) is fine.
+SortArray(arr) {
+		n := arr.Length
+		loop n - 1 {
+				i := A_Index
+				loop n - i {
+						j := A_Index
+						if (StrCompare(arr[j], arr[j + 1]) > 0) {
+								tmp := arr[j]
+								arr[j] := arr[j + 1]
+								arr[j + 1] := tmp
+						}
+				}
+		}
+		return arr
+}
+
+
+
+
+
+; =========================
+; =========================
+; ======= 2/ Reader =======
+; =========================
+; =========================
+
+; Parse result cache: keyed by file path, invalidated by TOML_BatchWrite.
+global _ParseTomlCache := Map()
+
+; Paths whose last parse could not READ the file, as opposed to reading an
+; empty one. ParseTomlFile must stay non-throwing, and an empty Map cannot
+; carry that distinction — so writers ask here before rebuilding a file from a
+; parse that never saw its contents. Set and cleared on every parse attempt.
+global _TomlReadFailures := Map()
+
+; True when the last ParseTomlFile for this path failed to read it. Callers
+; that REWRITE a file must check this: serializing a parse that read nothing
+; turns an unreadable config into an empty one.
+TOML_ReadFailed(Path) {
+		global _TomlReadFailures
+		return _TomlReadFailures.Has(Path)
+}
+
+; Paths whose last ReadTomlFile could not open an EXISTING file. The sibling of
+; _TomlReadFailures above, and deliberately STICKY where that one is per-parse:
+; _TomlReadFailures is cleared at the top of every ParseTomlFile, which means a
+; lock that clears between a failed boot read and the deferred save is invisible
+; to the writer — the re-parse succeeds and the write looks perfectly safe while
+; the payload it was handed was already derived from nothing. Only a successful
+; read of the SAME path clears an entry here.
+global _TomlUnreadableFiles := Map()
+
+; True when the last ReadTomlFile for this path could not read an EXISTING file.
+; Callers that turn the returned content into in-memory state which is later
+; serialized back must consult this: treating "" as "the file said nothing" and
+; then persisting the resulting defaults destroys the real file.
+TOML_UnreadableFile(Path) {
+		global _TomlUnreadableFiles
+		return _TomlUnreadableFiles.Has(Path)
+}
+
+; Session latch: an EXISTING config.toml could not be read during the boot
+; apply, so the in-memory feature tree holds manifest DEFAULTS rather than the
+; user's settings. SaveFullConfig honours it and refuses to serialize. Never
+; cleared once set — nothing re-applies the config in-process, so the tree stays
+; untrustworthy until the driver is restarted.
+global _ConfigBootReadFailed := false
+global _ConfigBootRejectedOverrides := 0
+; "Section`nKey" -> reason, for each value the boot load ignored as outdated
+; configuration. Full saves leave these on disk for the configuration cleanup.
+global _ConfigBootOutdatedEntries := Map()
+
+; Parse a TOML file into Map<Section, Map<Key, Value>>. Values are coerced
+; to AHK booleans / integers / strings / arrays of strings — anything more
+; exotic falls through as a raw string. Returns an empty Map when the file
+; is missing so callers can rely on ``.Has`` checks without a prior
+; ``FileExist``.
+; Multi-line arrays ( key = [\n  "a",\n  "b"\n] ) are fully supported.
+ParseTomlFile(Path) {
+		return _ParseTomlFileImpl(Path, true, true)
+}
+
+; Transactional candidate rendering must observe bytes only after its terminal
+; owner is acquired. It therefore bypasses the boot/UI cache and deliberately
+; does not replace that cache object; a refused Reload continues on the exact
+; pre-transition in-memory state.
+TOML_ParseFreshFile(Path) {
+		return _ParseTomlFileImpl(Path, false, false)
+}
+
+; Fresh, uncached parse that keeps ``true``/``false`` literals as TOML_Bool so
+; a caller can render every value with its source type, exactly as the batch
+; writer sees it. DiscardedArrays counts unterminated arrays the parse dropped;
+; TOML_ReadFailed(Path) reports an unreadable file afterwards.
+TOML_ParseFreshFileTyped(Path, &DiscardedArrays := 0) {
+	return _ParseTomlFileImpl(Path, false, false, , true, &DiscardedArrays)
+}
+
+_ParseTomlFileImpl(Path, UseCache, StoreCache, ProvidedContent := unset,
+		PreserveBooleanLiterals := false, &DiscardedArrays := 0) {
+		global _ParseTomlCache, _TomlReadFailures, _TomlUnreadableFiles
+		; Writers request this local diagnostic on fresh, uncached parses.
+		DiscardedArrays := 0
+		if PreserveBooleanLiterals && (UseCache || StoreCache)
+				throw ValueError("Writer Boolean sentinels cannot use the reader cache")
+		if UseCache && _ParseTomlCache.Has(Path)
+				return _ParseTomlCache[Path]
+		Sections := Map()
+		; Map.Delete raises on a missing key, so this must be guarded.
+		if _TomlReadFailures.Has(Path)
+				_TomlReadFailures.Delete(Path)
+		if !IsSet(ProvidedContent) && !FileExist(Path)
+				return Sections
+		Content := ""
+		if IsSet(ProvidedContent) {
+				if !(ProvidedContent is String)
+						return Sections
+				Content := ProvidedContent
+		} else try {
+				Content := FileRead(Path, "UTF-8")
+		} catch as Err {
+				; Record the failure instead of throwing: the fuzz corpus requires this
+				; function never to raise, and every preference read would otherwise be
+				; able to abort startup. But an empty Map here is indistinguishable from
+				; a genuinely empty file, and TOML_BatchWrite SEEDS ITS REWRITE from it
+				; — so without this flag "I could not read your config" silently became
+				; "your config was empty" and the next write persisted that as truth.
+				_TomlReadFailures[Path] := true
+				; Raise the STICKY sentinel too, exactly as ReadTomlFile does for the
+				; same file. _TomlReadFailures is deleted at the top of the very next
+				; parse of this path, so a lock that clears between the boot snapshot
+				; and a deferred save is invisible to every writer that asks later —
+				; and _IniCache, the widest reader of config.toml, is taken through
+				; here. Only for an existing file: a missing one legitimately parses
+				; empty, and flagging it would block the first save of a fresh install.
+				if FileExist(Path)
+						_TomlUnreadableFiles[Path] := true
+				try LoggerError("TomlParse", "Cannot read '{1}': {2}. Reported as unreadable so writers refuse to rebuild from it.", Path, Err.Message)
+				return Sections
+		}
+		; A successful read clears the sticky flag: what follows is the real file,
+		; so anything derived from it is safe to persist again.
+		if _TomlUnreadableFiles.Has(Path)
+				_TomlUnreadableFiles.Delete(Path)
+		if SubStr(Content, 1, 1) == Chr(0xFEFF)
+				Content := SubStr(Content, 2)
+		if (Content = "")
+				return Sections
+
+		Section     := ""
+		PendingKey  := ""   ; key whose value spans multiple lines
+		HasPendingValue := false ; an empty quoted key is still a valid owner
+		PendingVal  := ""   ; accumulated raw characters of the multi-line value
+		PendingDepth := 0
+		PendingQuote := ""
+		PendingEscaped := false
+
+		loop parse, Content, "`n", "`r" {
+				Line := Trim(A_LoopField)
+
+				; --- Continuation of a multi-line array ---
+				if HasPendingValue {
+						; Drop any comment on this line before it is accumulated. Skipping
+						; only whole-comment lines let a TRAILING comment on an element line
+						; become part of the value, and it was then persisted as a real
+						; array element on the next write.
+						Line := TOML_StripInlineComment(Line)
+						Stripped := Trim(Line)
+						if (Stripped == "") {
+								continue
+						}
+						; A section header while the array is still open means its closing ] was lost
+						; (hand-edited file). Abort the array and re-process this line as a header, else
+						; the parser swallows it and every following section into one PendingVal and
+						; drops them all at EOF - silent whole-file-tail config loss
+						; (toml-unterminated-array-recovery).
+						if TOML_ArrayRecoveryHeader(Stripped) {
+								DiscardedArrays += 1
+								try LoggerWarn("TomlParse", "Unterminated multi-line array for key '{1}' in [{2}] - aborting array, resuming section parse.", PendingKey, Section)
+								PendingKey := ""
+								HasPendingValue := false
+								PendingVal := ""
+								Section := Trim(RegExReplace(Line, "^\[+|\]+$", ""))
+								if !Sections.Has(Section)
+										Sections[Section] := Map()
+								continue
+						}
+						PendingVal .= " " . Line
+						; Count only unquoted brackets to detect the real terminator.
+						PendingDepth := _TOML_ArrayScanFragment(" " . Line, PendingDepth,
+								&PendingQuote, &PendingEscaped)
+						if (PendingDepth <= 0) {
+								if !Sections.Has(Section)
+										Sections[Section] := Map()
+								Sections[Section][PendingKey] := TOML_CoerceValue(Trim(PendingVal),
+										PreserveBooleanLiterals)
+								PendingKey := ""
+								HasPendingValue := false
+								PendingVal := ""
+						}
+						continue
+				}
+
+				if (Line = "" || SubStr(Line, 1, 1) = "#")
+						continue
+
+				; Section header [name] — skip [[table-array]] headers (hotstrings TOML)
+				if (SubStr(Line, 1, 1) = "[") {
+						; Cut any trailing comment FIRST: the closing-bracket anchor below
+						; cannot match once a comment follows, so the comment would become
+						; part of the section name and every later read of that section
+						; would miss — then the next write re-wraps the garbage in brackets.
+						Header := TOML_StripInlineComment(Line)
+						inner := RegExReplace(Header, "^\[+|\]+$", "")
+						Section := Trim(inner)
+						if !Sections.Has(Section)
+								Sections[Section] := Map()
+						continue
+				}
+
+				eq := _TOML_AssignmentDelimiter(Line)
+				if !eq
+						continue
+				key := TOML_DecodeKey(Trim(SubStr(Line, 1, eq - 1)))
+				val := Trim(SubStr(Line, eq + 1))
+				if (Section = "")
+						continue
+
+				; Strip an inline comment, quote-aware so a hash inside the string
+				; stays data and a hash after the closing quote is still a comment.
+				val := TOML_StripInlineComment(val)
+
+				; A quoted ] on the opening line is data, not the array terminator.
+				PendingQuote := ""
+				PendingEscaped := false
+				PendingDepth := (SubStr(val, 1, 1) = "[")
+						? _TOML_ArrayScanFragment(val, 0, &PendingQuote, &PendingEscaped) : 0
+				if (PendingDepth > 0) {
+						PendingKey := key
+						HasPendingValue := true
+						PendingVal := val
+						continue
+				}
+
+				; Whole-file writers must retain source Boolean intent before AHK
+				; erases it into integer 0/1. Ordinary readers keep native values.
+				Sections[Section][key] := TOML_CoerceValue(val, PreserveBooleanLiterals)
+		}
+		if HasPendingValue {
+				DiscardedArrays += 1
+				try LoggerWarn("TomlParse", "Unterminated multi-line array for key '{1}' reached EOF in [{2}] - the value is lost.", PendingKey, Section)
+		}
+		if StoreCache
+			_ParseTomlCache[Path] := Sections
+		return Sections
+}
+
+; The assignment separator belongs outside quoted keys. A value may itself
+; contain equals signs, so stop at the first unquoted separator rather than
+; splitting the entire line into a presumed pair.
+_TOML_AssignmentDelimiter(Line) {
+	KeyQuote := ""
+	KeyEscaped := false
+	Loop Parse Line {
+		KeyChar := A_LoopField
+		if KeyEscaped {
+			KeyEscaped := false
+		} else if KeyQuote == '"' && KeyChar == "\" {
+			KeyEscaped := true
+		} else if KeyQuote != "" {
+			if KeyChar == KeyQuote
+				KeyQuote := ""
+		} else if KeyChar == '"' || (KeyChar == "'" && _TOML_IsLiteralStart(Line, A_Index)) {
+			KeyQuote := KeyChar
+		} else if KeyChar == "=" {
+			return A_Index
+		} else if KeyChar == "#" {
+			return 0
+		}
+	}
+	return 0
+}
+
+; Split only at the current array level. All three decoders consume these raw
+; tokens and retain ownership of their distinct scalar coercion contracts.
+TOML_SplitArrayElements(Body, Separator := ",", Strict := false) {
+	Parts := []
+	Current := ""
+	Closers := []
+	Quote := ""
+	Escaped := false
+	Loop Parse Body {
+		Char := A_LoopField
+		if Escaped {
+			Escaped := false
+		} else if Quote == '"' && Char == "\" {
+			Escaped := true
+		} else if Quote != "" {
+			if Char == Quote
+				Quote := ""
+		} else if Char == '"' || (Char == "'" && _TOML_IsLiteralStart(Body, A_Index)) {
+			Quote := Char
+		} else {
+			if Char == "[" || Char == "{"
+				Closers.Push(Char == "[" ? "]" : "}")
+			else if Char == "]" || Char == "}" {
+				if Strict && (Closers.Length == 0 || Closers[Closers.Length] != Char)
+					throw ValueError("Unbalanced TOML inline table member")
+				if Closers.Length
+					Closers.Pop()
+			} else if Char == Separator && Closers.Length == 0 {
+				Parts.Push(Trim(Current))
+				Current := ""
+				continue
+			}
+		}
+		Current .= Char
+	}
+	if Strict && (Quote != "" || Escaped || Closers.Length)
+		throw ValueError("Unterminated TOML inline table member")
+	if Trim(Current) != ""
+		Parts.Push(Trim(Current))
+	else if Strict && Parts.Length
+		throw ValueError("Empty TOML inline table member")
+	return Parts
+}
+
+; Within an open array, value syntax wins over an ambiguous header such as
+; [1], [true] or ["a"]. Recover only a complete section-shaped non-value.
+TOML_ArrayRecoveryHeader(Line) {
+	if !RegExMatch(Line, "^(\[{1,2})(.*?)(\]{1,2})$", &Match)
+			|| StrLen(Match[1]) != StrLen(Match[3])
+		return false
+	Inner := Trim(Match[2])
+	Quoted := '"(?:[^"\\]|\\.)*"'
+	Kind := TOML_LiteralKind(Inner)
+	if RegExMatch(Inner, "^" . Quoted . "$") || (Kind != "unknown" && Kind != "string")
+		return false
+	; Preserve numeric/date value forms even where scalar coercion still returns
+	; their raw text. Recovering them as headers would also lose array structure.
+	if RegExMatch(Inner, "^(?:[+-]?(?:inf|nan)|[+-]?\d(?:_?\d)*(?:\.\d(?:_?\d)*)?(?:[eE][+-]?\d(?:_?\d)*)?|0x[0-9A-Fa-f](?:_?[0-9A-Fa-f])*|0o[0-7](?:_?[0-7])*|0b[01](?:_?[01])*|\d{4}-\d{2}-\d{2})$")
+		return false
+	Segment := "(?:[A-Za-z0-9_-]+|" . Quoted . ")"
+	return !!RegExMatch(Inner, "^" . Segment . "(?:\s*\.\s*" . Segment . ")*$")
+}
+
+; Return the net bracket depth outside TOML strings. Backslash
+; escapes are consumed only inside a basic string so an escaped quote cannot expose a
+; data bracket to the structural scanner.
+_TOML_ArrayBracketDepth(Value) {
+		Quote := ""
+		Escaped := false
+		return _TOML_ArrayScanFragment(Value, 0, &Quote, &Escaped)
+}
+
+/**
+ * Scans only the newly appended array fragment, retaining string state.
+ * @param {String} Value The opening value or the space-prefixed continuation.
+ * @param {Integer} Depth Bracket depth before this fragment.
+ * @param {String} Quote Active string delimiter, updated by the scan.
+ * @param {Integer} Escaped Whether a basic-string escape is pending.
+ * @returns {Integer} Bracket depth after this fragment.
+ */
+_TOML_ArrayScanFragment(Value, Depth, &Quote, &Escaped) {
+		Loop Parse Value {
+				Char := A_LoopField
+				if Escaped {
+						Escaped := false
+						continue
+				}
+				if (Quote == '"' and Char == "\") {
+						Escaped := true
+						continue
+				}
+				if Quote != "" {
+						if Char == Quote
+								Quote := ""
+						continue
+				}
+				if Char == '"' || (Char == "'" && _TOML_IsLiteralStart(Value, A_Index)) {
+						Quote := Char
+						continue
+				}
+				if Quote == "" {
+						if (Char == "[")
+								Depth++
+						else if (Char == "]")
+								Depth--
+				}
+		}
+		return Depth
+}
+
+; Cut a line at its first UNQUOTED ``#`` and trim what remains. This is the
+; character-by-character scan the parser's comment always promised and never
+; had: the old code skipped stripping entirely whenever a value began with a
+; quote, so a trailing comment on a quoted value survived into the value — and
+; because TOML_CoerceValue needs the LAST character to be a quote too, the
+; whole line tail then fell through as raw text and was persisted on the next
+; write. Both the header and the key/value paths route through here so the
+; three parsers cannot drift apart again.
+;
+; Literal quotes open only at token boundaries, preserving apostrophes in legacy
+; bare values. Backslashes escape characters only inside basic strings.
+TOML_StripInlineComment(Line) {
+		; With no comment marker, quoting cannot change the returned bytes
+		if !InStr(Line, "#")
+				return Trim(Line)
+		Quote := ""
+		Escaped := false
+		Loop Parse Line {
+				if (Escaped) {
+						Escaped := false
+						continue
+				}
+				if (A_LoopField == "\" && Quote == '"') {
+						Escaped := true
+						continue
+				}
+				if Quote != "" {
+						if A_LoopField == Quote
+								Quote := ""
+						continue
+				}
+				if A_LoopField == '"' || (A_LoopField == "'" && _TOML_IsLiteralStart(Line, A_Index)) {
+						Quote := A_LoopField
+						continue
+				}
+				if A_LoopField == "#"
+						return Trim(SubStr(Line, 1, A_Index - 1))
+		}
+		return Trim(Line)
+}
+
+/** Returns the source type of one TOML literal before AHK scalar coercion. */
+TOML_LiteralKind(RawValue) {
+		Literal := Trim(TOML_StripInlineComment(RawValue), " `t")
+		Lower := StrLower(Literal)
+		if (Lower == "true" || Lower == "false")
+				return "boolean"
+		if TOML_TryParseNumber(Literal, &NumberValue)
+				return "number"
+		if (StrLen(Literal) >= 2
+		and SubStr(Literal, 1, 1) == '"'
+		and SubStr(Literal, -1) == '"')
+				return "string"
+		if (StrLen(Literal) >= 2
+		and SubStr(Literal, 1, 1) == "["
+		and SubStr(Literal, -1) == "]")
+				return "array"
+		return "unknown"
+}
+
+/**
+ * Parses one decimal integer only when its magnitude fits TOML's signed
+ * 64-bit domain. AutoHotkey's Integer(String) wraps overflow modulo 2^64, so
+ * conversion itself cannot be used as the range check.
+ */
+TOML_TryParseInteger(Raw, &Value) {
+		return NumberTryParseSignedInteger(Raw, &Value)
+}
+
+/**
+ * Parses one decimal or exponential float only when AutoHotkey represents a
+ * finite IEEE-754 binary64 value. Float(String) otherwise returns +/-infinity,
+ * which still passes AHK's numeric type checks and corrupts later arithmetic.
+ */
+TOML_TryParseFloat(Raw, &Value) {
+		Value := ""
+		if !RegExMatch(Raw, "^[+-]?\d+(?:\.\d+(?:[eE][+-]?\d+)?|[eE][+-]?\d+)$")
+				return false
+		return NumberTryParseFiniteFloat(Raw, &Value)
+}
+
+/** Parses one bounded TOML integer or finite decimal/exponential float. */
+TOML_TryParseNumber(Raw, &Value) {
+		if TOML_TryParseInteger(Raw, &Value)
+				return true
+		return TOML_TryParseFloat(Raw, &Value)
+}
+
+TOML_CoerceValue(raw, PreserveBooleanLiterals := false) {
+		raw := Trim(raw)
+		if StrLen(raw) >= 2 && SubStr(raw, 1, 1) == "'" && SubStr(raw, -1) == "'"
+				return SubStr(raw, 2, StrLen(raw) - 2)
+		if SubStr(raw, 1, 1) == "{"
+				return TOML_ParseInlineTable(raw, (Value) => TOML_CoerceValue(Value, PreserveBooleanLiterals))
+		if (raw = "")
+				return ""
+		if (StrLower(raw) = "true")
+				return PreserveBooleanLiterals ? TOML_Bool(true) : true
+		if (StrLower(raw) = "false")
+				return PreserveBooleanLiterals ? TOML_Bool(false) : false
+		; Quoted string.
+		if (SubStr(raw, 1, 1) = '"' && SubStr(raw, -1) = '"')
+				return TOML_Unescape(SubStr(raw, 2, StrLen(raw) - 2))
+		; Array of strings: [ "a", "b", ... ]
+		if (SubStr(raw, 1, 1) = "[" && SubStr(raw, -1) = "]") {
+				body := Trim(SubStr(raw, 2, StrLen(raw) - 2))
+				out := []
+				if (body = "")
+						return out
+				for Token in TOML_SplitArrayElements(body)
+						out.Push(TOML_CoerceValue(Token, PreserveBooleanLiterals))
+				return out
+		}
+		if TOML_TryParseInteger(raw, &IntegerValue)
+				return IntegerValue
+		; Float literals: 0.25, -1.5, 3.14, etc.
+		if TOML_TryParseFloat(raw, &FloatValue)
+				return FloatValue
+		return raw
+}
+
+/** Encodes contents for a TOML basic string without surrounding quotes. */
+TOML_EscapeBasicStringContents(s) {
+	Result := ""
+	Loop Parse, String(s) {
+		Char := A_LoopField
+		Code := Ord(Char)
+		switch Code {
+			case 0x08: Result .= "\b"
+			case 0x09: Result .= "\t"
+			case 0x0A: Result .= "\n"
+			case 0x0C: Result .= "\f"
+			case 0x0D: Result .= "\r"
+			case 0x22: Result .= '\"'
+			case 0x5C: Result .= "\\"
+			default:
+				if (Code < 0x20 || Code == 0x7F)
+					Result .= Format("\u{:04x}", Code)
+				else
+					Result .= Char
+		}
+	}
+	return Result
+}
+
+/** Decodes contents from a TOML basic string without surrounding quotes. */
+TOML_UnescapeBasicStringContents(s) {
+	s := String(s)
+	if !InStr(s, "\")
+		return s
+	Result := "", i := 1, n := StrLen(s)
+	while (i <= n) {
+		Char := SubStr(s, i, 1)
+		if (Char != "\" || i == n) {
+			Result .= Char
+			i += 1
+			continue
+		}
+		NextChar := SubStr(s, i + 1, 1)
+		switch NextChar {
+			case "b": Result .= Chr(8)
+			case "t": Result .= "`t"
+			case "n": Result .= "`n"
+			case "f": Result .= Chr(12)
+			case "r": Result .= "`r"
+			case '"': Result .= '"'
+			case "\": Result .= "\"
+			case "u", "U":
+				Digits := NextChar == "u" ? 4 : 8
+				Hex := SubStr(s, i + 2, Digits)
+				if (StrLen(Hex) == Digits && RegExMatch(Hex, "^[0-9A-Fa-f]+$")) {
+					Code := Integer("0x" . Hex)
+					if (Code == 0 || Code > 0x10FFFF
+							|| (Code >= 0xD800 && Code <= 0xDFFF))
+						throw ValueError("TOML string contains an unsupported Unicode scalar.")
+					Result .= Chr(Code)
+					i += 2 + Digits
+					continue
+				}
+				; Preserve the legacy unknown-escape behavior for malformed input.
+				Result .= NextChar
+			default: Result .= NextChar
+		}
+		i += 2
+	}
+	return Result
+}
+
+TOML_Unescape(s) {
+	return TOML_UnescapeBasicStringContents(s)
+}
+
+
+
+
+
+; =================================
+; =================================
+; ======= 3/ Single-key API =======
+; =================================
+; =================================
+
+; Read a single key. Returns ``Default`` when the file, the section, or the
+; key is missing. Coerces back to the closest AHK type — booleans become
+; integers (1 / 0) so legacy callers that compare against ``true`` / ``1``
+; keep working without changes.
+TOML_Read(Path, Section, Key, Default := "") {
+		Sections := ParseTomlFile(Path)
+		if !Sections.Has(Section) || !Sections[Section].Has(Key)
+				return Default
+		v := Sections[Section][Key]
+		if (v = true)
+				return 1
+		if (v = false)
+				return 0
+		return v
+}
+
+; Write a single (Section, Key, Value) triple. Atomic via .tmp + rename.
+; Order matches Win32 ``IniWrite(Value, Path, Section, Key)`` so existing
+; call sites stay symmetrical.
+TOML_Write(Value, Path, Section, Key) {
+		updates := [{ Section: Section, Key: Key, Value: Value }]
+		return TOML_BatchWrite(Path, updates)
+}
+
+
+
+
+
+; ===============================
+; ===============================
+; ======= 4/ Batch writer =======
+; ===============================
+; ===============================
+
+; Paths this session must not write, with the reason. The config migration
+; registers a config.toml it could not version (a newer schema, a failed
+; migration): the batch writer then refuses it in both modes, so neither a
+; targeted save, a full save nor a transactional candidate can replace a file
+; this build does not understand. Deliberately never lifted: a restart
+; re-evaluates the file.
+_TOML_WriteRefusals() {
+	static Refusals := Map()
+	return Refusals
+}
+
+_TOML_WriteRefusalKey(Path) {
+	return StrLower(StrReplace(String(Path), "/", "\"))
+}
+
+TOML_RefuseWrites(Path, Reason) {
+	if !(Path is String) || Path == "" || !(Reason is String) || Reason == ""
+		throw ValueError("TOML_RefuseWrites needs a path and a reason")
+	_TOML_WriteRefusals()[_TOML_WriteRefusalKey(Path)] := Reason
+}
+
+; Why writes to Path are refused this session, or "".
+TOML_WriteRefusal(Path) {
+	Refusals := _TOML_WriteRefusals()
+	Key := _TOML_WriteRefusalKey(Path)
+	return Refusals.Has(Key) ? Refusals[Key] : ""
+}
+
+; Apply every (Section, Key, Value) update in one read-modify-write cycle.
+; Renders explicitly owned rows canonically and retains foreign physical records
+; and comments before the one atomic replace. A wholly owned, uncommented source
+; keeps the existing complete canonical serializer and stable spacing.
+; It must not call SaveFullConfig afterward: targeted writers persist before
+; publishing their candidate globals, so a nested full save would serialize
+; the stale live state back over the just-committed values.
+; Delete scratch files left next to Path by a hard kill. Per-invocation names
+; no longer overwrite each other. Require both age and a recognized dead owner;
+; a slow active writer or an unrelated temporary file must never be targeted.
+_TOML_ReapStaleTemps(Path, MaxAgeMs) {
+		SplitPath(Path, &Name, &Dir)
+		if (Dir = "" or Name = "")
+				return
+		try {
+				Loop Files, Dir . "\" . Name . ".*.tmp" {
+						if (DateDiff(A_Now, A_LoopFileTimeModified, "Seconds") * 1000 >= MaxAgeMs)
+								&& FSAtomicTempOwnerIsGone(A_LoopFileName, Name)
+								try FileDelete(A_LoopFileFullPath)
+				}
+		}
+}
+
+; Retire only a stage owned and abandoned by the current save operation.
+; A refusal must remain visible without replacing the primary save failure.
+_TOML_RemoveOwnedStage(Path) {
+	if FSDelete(Path)
+		return true
+	try LoggerError("TomlWrite", "Owned staging file cleanup failed for '{1}'.", Path)
+	return false
+}
+
+; A successful Write call is not proof that the complete qualified image
+; reached the stage. Read it back exactly before any rename can make it live.
+_TOML_StageMatches(Path, Expected, ReadFn := 0) {
+	try {
+		Actual := HasMethod(ReadFn, "Call")
+			? ReadFn.Call(Path) : FileRead(Path, "UTF-8")
+	} catch {
+		return false
+	}
+	return (Actual is String) && StrCompare(Actual, Expected, true) == 0
+}
+
+; Builds the same qualified image used by TOML_BatchWrite without publishing a
+; target. Multi-file transactions need the complete new bytes before their WAL
+; can capture the old image; routing both modes through one renderer prevents a
+; subtly different onboarding serializer from drifting from ordinary saves.
+TOML_BuildUpdatedContent(Path, Updates, ExactSectionPrefixes := []) {
+	SourcePresent := FileExist(Path) ? 1 : 0
+	SourceBytes := SourcePresent ? FSReadUtf8Exact(Path) : ""
+	if SourcePresent && !(SourceBytes is String)
+		return Map("status", "error", "kind", "source_unreadable",
+			"content", "")
+	Result := _TOML_BatchWriteImpl(Path, Updates, ExactSectionPrefixes, "build",
+		SourceBytes, SourcePresent)
+	return _TOML_FinalizeBuildResult(Result, SourcePresent, SourceBytes)
+}
+
+_TOML_FinalizeBuildResult(Result, SourcePresent, SourceBytes) {
+	if (Result is Map) && Result.Has("status") && Result.Has("kind")
+			&& Result.Has("content") && (Result["status"] is String)
+			&& (Result["kind"] is String) && (Result["status"] == "ok")
+			&& (Result["kind"] == "rendered")
+			&& (Result["content"] is String) {
+		Result["source_present"] := SourcePresent
+		Result["source_content"] := SourceBytes
+		return Result
+	}
+	return Map("status", "error", "kind", "render_failed", "content", "")
+}
+
+TOML_BatchWrite(Path, Updates, ExactSectionPrefixes := []) {
+		return _TOML_BatchWriteImpl(Path, Updates, ExactSectionPrefixes, "write")
+}
+
+/** Builds a complete configuration-only semantic candidate without publication. */
+TOML_BuildConfigUpdatedContent(Path, Updates, ExactSectionPrefixes := []) {
+	SourcePresent := FileExist(Path) ? 1 : 0
+	SourceBytes := SourcePresent ? FSReadUtf8Exact(Path) : ""
+	if SourcePresent && !(SourceBytes is String)
+		return Map("status", "error", "kind", "source_unreadable", "content", "")
+	Result := _TOML_BatchWriteImpl(Path, Updates, ExactSectionPrefixes, "build",
+		SourceBytes, SourcePresent, true)
+	return _TOML_FinalizeBuildResult(Result, SourcePresent, SourceBytes)
+}
+
+/** Publishes semantic configuration effects through the existing guarded stage. */
+TOML_ConfigBatchWrite(Path, Updates, ExactSectionPrefixes := []) {
+	return _TOML_BatchWriteImpl(Path, Updates, ExactSectionPrefixes, "write", , , true)
+}
+
+; Fresh source authority is checked independently of candidate equality. A
+; concurrent writer cannot turn a stale candidate into an acknowledged no-op.
+_TOML_WriteSourceMatches(Path, SourcePresent, SourceBytes) {
+	return SourcePresent ? FSUtf8ExactMatches(Path, SourceBytes) : !FileExist(Path)
+}
+
+_TOML_BatchWriteImpl(Path, Updates, ExactSectionPrefixes, Mode,
+		ProvidedContent := unset, ProvidedPresence := unset, DocumentMode := false) {
+		if !(Mode is String) || (Mode != "write" && Mode != "build")
+				throw ValueError("TOML_BatchWrite mode must be 'write' or 'build'")
+		BuildOnly := Mode == "build"
+		Refusal := TOML_WriteRefusal(Path)
+		if (Refusal != "") {
+				try LoggerError("TomlWrite", "Refusing TOML {1} for '{2}': writes to it are refused for this session ({3}). No file was changed.",
+					Mode, Path, Refusal)
+				return false
+		}
+		if !(ExactSectionPrefixes is Array)
+				throw TypeError("ExactSectionPrefixes must be an Array")
+		for _, Prefix in ExactSectionPrefixes {
+				if !(Prefix is String) or Prefix = ""
+						throw ValueError("ExactSectionPrefixes must contain non-empty strings")
+		}
+		if (!DocumentMode && !BuildOnly && Updates.Length = 0 and ExactSectionPrefixes.Length = 0)
+				return true
+
+		; A config save is a full read-modify-write plus a canonicalisation pass, and
+		; it runs from menu callbacks — so a slow one blocks the tray menu while the
+		; user watches. It had no segment at all; the cost showed up only as a menu
+		; that felt stuck. Two QPC reads, gated by the profiler floor.
+		_hpTomlWrite := HotPath_Now()
+
+		if IsSet(ProvidedPresence) && (!(ProvidedPresence is Integer)
+				|| (ProvidedPresence != 0 && ProvidedPresence != 1))
+				throw TypeError("Provided source presence must be Integer 0 or 1")
+		SourcePresent := IsSet(ProvidedPresence) ? ProvidedPresence : (FileExist(Path) ? 1 : 0)
+		SourceBytes := IsSet(ProvidedContent) ? ProvidedContent
+			: (SourcePresent ? FSReadUtf8Exact(Path) : "")
+		if !(SourceBytes is String) {
+				global _TomlReadFailures, _TomlUnreadableFiles
+				_TomlReadFailures[Path] := true
+				if SourcePresent
+						_TomlUnreadableFiles[Path] := true
+				try LoggerError("TomlWrite", "Refusing TOML {1} for '{2}': its exact source image could not be read. No file was changed.", Mode, Path)
+				return false
+		}
+		if DocumentMode {
+			try Admitted := TOML_BuildConfigDocumentCandidate(SourceBytes, Updates, ExactSectionPrefixes)
+			catch as Err {
+				try LoggerError("TomlWrite", "Refusing semantic configuration {1} for '{2}': {3}. No file was changed.", Mode, Path, Err.Message)
+				return false
+			}
+		} else {
+			Parsed := _ParseTomlFileImpl(Path, false, false, SourceBytes, true, &DiscardedArrays)
+			; Refuse to rebuild a file we could not read. Everything below serializes
+			; ONLY what this parse returned and then moves the result over the original,
+			; so proceeding on a failed read would replace the user's whole config with
+			; the handful of keys in Updates. "I could not read it" must never be
+			; allowed to mean "it was empty".
+			if TOML_ReadFailed(Path) {
+					try LoggerError("TomlWrite", "Refusing to write '{1}': the current contents could not be read, and rewriting from an unread file would discard every setting it holds.", Path)
+					return false
+			}
+			if DiscardedArrays {
+					try LoggerError("TomlWrite", "Refusing TOML {1} for '{2}': parsing discarded {3} unterminated array(s). Repair the source before saving; no file was changed.", Mode, Path, DiscardedArrays)
+					return false
+			}
+			; Deep-copy the parsed Map before mutating so candidate rendering and
+			; publication share the same side-effect-free transformation.
+			Sections := Parsed.Clone()
+			for sec in Sections
+					Sections[sec] := Sections[sec].Clone()
+			; Track section order so the on-disk layout stays stable across writes.
+			; ``ParseTomlFile`` already iterates the file in declaration order, so
+			; ``for`` over the resulting Map preserves it; we rebuild the order
+			; explicitly to make new sections deterministic.
+			order := []
+			for sec in Sections
+					order.Push(sec)
+
+			; Dynamic record namespaces need replace semantics: a merge-only write
+			; retains records omitted by the caller and resurrects deleted profiles on
+			; the next boot. Match only the exact section or a dot-delimited child so a
+			; sibling such as ``user_profiles_backup`` remains untouched.
+			if (ExactSectionPrefixes.Length > 0) {
+					KeptOrder := []
+					for _, SecName in order {
+							DropSection := false
+							for _, Prefix in ExactSectionPrefixes {
+									if (SecName = Prefix or InStr(SecName, Prefix . ".") = 1) {
+											DropSection := true
+											break
+									}
+							}
+							if DropSection
+									Sections.Delete(SecName)
+							else
+									KeptOrder.Push(SecName)
+					}
+					order := KeptOrder
+			}
+
+			for _, U in Updates {
+					Sec := U.Section
+					K := U.Key
+					DeleteRequested := U.HasOwnProp("Delete")
+						&& (U.Delete is Integer) && U.Delete == 1
+					if U.HasOwnProp("Delete")
+							&& (!(U.Delete is Integer)
+								|| (U.Delete != 0 && U.Delete != 1))
+							throw TypeError("Delete must be the Integer 0 or 1")
+					; A neutral-value deletion must not create the missing section it
+					; was meant to leave absent, especially in the boot full-save batch.
+					if DeleteRequested && !Sections.Has(Sec)
+							continue
+					if !Sections.Has(Sec) {
+							Sections[Sec] := Map()
+							order.Push(Sec)
+					}
+					if DeleteRequested {
+							if Sections[Sec].Has(K)
+									Sections[Sec].Delete(K)
+					} else {
+							Sections[Sec][K] := U.Value
+					}
+			}
+
+			body := ""
+
+			EnsureTrailingBlankLines(count) {
+					newline_run := 0
+					i := StrLen(body)
+					while (i > 0 && SubStr(body, i, 1) = "`n") {
+							newline_run += 1
+							i -= 1
+					}
+					current := newline_run > 0 ? (newline_run - 1) : 0
+					while (current < count) {
+							body .= "`n"
+							newline_run += 1
+							current += 1
+					}
+					while (current > count) {
+							body := SubStr(body, 1, StrLen(body) - 1)
+							newline_run -= 1
+							current -= 1
+					}
+			}
+
+			; Foreign table-array generations are not flat rendering destinations.
+			; Admission below independently verifies their complete typed subtrees.
+			try RenderingSections := _TOML_ForeignArrayRenderingSections(SourceBytes, Sections)
+			catch as Err {
+					try LoggerError("TomlWrite", "Refusing TOML {1}: source rendering admission failed. No file was changed.", Mode)
+					return false
+			}
+			; Sort sections alphabetically for stable, readable output
+			SortedSections := []
+			for sec in RenderingSections
+					SortedSections.Push(sec)
+			SortedSections := SortArray(SortedSections)
+			FirstSection := true
+			for _, sec in SortedSections {
+					if !FirstSection {
+							EnsureTrailingBlankLines(5)
+					}
+					FirstSection := false
+					body .= "[" . sec . "]`n"
+					; Sort keys alphabetically within each section
+					SortedKeys := []
+					for k, v in RenderingSections[sec]
+							SortedKeys.Push(k)
+					SortedKeys := SortArray(SortedKeys)
+					for _, k in SortedKeys
+							body .= TOML_RenderKey(k) . " = " . TOML_RenderValue(RenderingSections[sec][k]) . "`n"
+			}
+			try Admitted := TOML_AdmitWriterCandidate(SourceBytes, Parsed, Sections, Chr(0xFEFF) . body,
+				Updates, ExactSectionPrefixes)
+			catch as Err {
+					try LoggerError("TomlWrite", "Refusing TOML {1} for '{2}': {3}. No file was changed.", Mode, Path, Err.Message)
+					return false
+			}
+		}
+		if !_TOML_WriteSourceMatches(Path, SourcePresent, SourceBytes) {
+				; Detached builds never own the live reader cache. An ordinary
+				; write must retire its now-stale snapshot after actual source drift.
+				if !BuildOnly {
+						global _ParseTomlCache
+						if _ParseTomlCache.Has(Path)
+								_ParseTomlCache.Delete(Path)
+				}
+				try LoggerError("TomlWrite", "Refusing TOML {1} for '{2}': the source changed during candidate preparation. No file was changed.", Mode, Path)
+				return false
+		}
+		if BuildOnly {
+				HotPath_LogIfSlow("Config.TomlBuild", _hpTomlWrite,
+					Updates.Length . " update(s)")
+				; Ordinary write mode opens its stage as UTF-8 (with BOM). Return the
+				; identical byte image so the transition does not silently change the
+				; repository's canonical encoding policy.
+				return Map("status", "ok", "kind", "rendered",
+					"content", Admitted["content"])
+		}
+
+		; Admission may retain foreign physical records around canonical owned rows.
+		; Both detached and ordinary modes publish this one qualified image.
+		body := SubStr(Admitted["content"], 2)
+
+		if Admitted["preserve_source"] {
+				global _ParseTomlCache
+				if _ParseTomlCache.Has(Path)
+						_ParseTomlCache.Delete(Path)
+				HotPath_LogIfSlow("Config.TomlBuild", _hpTomlWrite,
+					"unchanged source namespaces; " . Updates.Length . " operation(s)")
+				return true
+		}
+
+		; A qualified image already on disk needs no stage or atomic replacement.
+		; Keep the generation acknowledgement while preserving its existing inode.
+		if FileExist(Path) && FSUtf8ExactMatches(Path, Chr(0xFEFF) . body) {
+				global _ParseTomlCache
+				if _ParseTomlCache.Has(Path)
+						_ParseTomlCache.Delete(Path)
+				HotPath_LogIfSlow("Config.TomlBuild", _hpTomlWrite,
+					"unchanged image; " . Updates.Length . " operation(s)")
+				return true
+		}
+
+		; Per-invocation scratch name. A fixed ``Path . ".tmp"`` made the staging
+		; file a shared resource between every writer of the same target, and the
+		; delete below is unconditional — so a save that interrupted another one
+		; destroyed its live staging file, and whichever writer landed last decided
+		; what the config ended up as. config.toml is written both from menu actions
+		; and from timer-driven saves, so the two really can overlap. A_ScriptHwnd
+		; rather than a GetCurrentProcessId DllCall: unique per process all the
+		; same, and it keeps the OS-call purity ratchet at its baseline.
+		static STALE_TEMP_MS := 60000  ; Minimum age; the reaper also checks producer ownership
+		static WriteSeq := 0
+		WriteSeq += 1
+		tmp := Path . "." . A_ScriptHwnd . "-" . WriteSeq . ".tmp"
+		_TOML_ReapStaleTemps(Path, STALE_TEMP_MS)
+		try FileDelete(tmp)
+		f := 0
+		StageOwned := false
+		StageWritten := false
+		try {
+				f := FileOpen(tmp, "w", "UTF-8")
+				if !f {
+						global _ParseTomlCache
+						if _ParseTomlCache.Has(Path)
+								_ParseTomlCache.Delete(Path)
+						; Logged, not merely returned. This branch fails without throwing, and
+						; every caller that discarded the boolean turned it into a silent
+						; no-op: the menu and the engine went on showing a state that never
+						; reached disk, with nothing in the log to explain the next restart.
+						try LoggerError("TomlWrite", "Cannot open the staging file for '{1}' — nothing was written and the change is NOT persisted.", Path)
+						return false
+				}
+				StageOwned := true
+				f.Write(body)
+				if !FSFlushFileBuffers(f)
+						throw Error("FlushFileBuffers refused the staging handle")
+				f.Close()
+				f := 0
+				StageWritten := true
+		} catch as Err {
+				global _ParseTomlCache
+				if _ParseTomlCache.Has(Path)
+						_ParseTomlCache.Delete(Path)
+				try LoggerError("TomlWrite", "Writing the staging file for '{1}' failed: {2}. The change is NOT persisted.", Path, Err.Message)
+				return false
+		} finally {
+				if IsObject(f)
+						try f.Close()
+				if StageOwned && !StageWritten
+						_TOML_RemoveOwnedStage(tmp)
+		}
+		if !_TOML_StageMatches(tmp, body) {
+				global _ParseTomlCache
+				if _ParseTomlCache.Has(Path)
+						_ParseTomlCache.Delete(Path)
+				try LoggerError("TomlWrite", "The staging file for '{1}' did not match the complete canonical image. The previous contents are intact, so the change is NOT persisted.", Path)
+				_TOML_RemoveOwnedStage(tmp)
+				return false
+		}
+	if !_TOML_WriteSourceMatches(Path, SourcePresent, SourceBytes) {
+		global _ParseTomlCache
+		if _ParseTomlCache.Has(Path)
+			_ParseTomlCache.Delete(Path)
+		try LoggerError("TomlWrite", "Refusing TOML publication for '{1}': the exact source changed after staging. No file was replaced.", Path)
+		_TOML_RemoveOwnedStage(tmp)
+		return false
+	}
+
+	; Publish only through the same-volume write-through adapter. The WAL may
+	; promote immediately after this return, so a merely visible rename is not a
+	; sufficient durability boundary.
+	Moved := FSAtomicMoveReplace(tmp, Path, &MoveError)
+	if !((Moved is Integer) && Moved == 1) {
+		global _ParseTomlCache
+		if _ParseTomlCache.Has(Path)
+			_ParseTomlCache.Delete(Path)
+		try LoggerError("TomlWrite", "Write-through atomic replace of '{1}' was refused. The previous contents are intact, so the change is NOT persisted (native error {2}).", Path, MoveError)
+		_TOML_RemoveOwnedStage(tmp)
+		return false
+	}
+
+		; Invalidate the parse cache so the next ParseTomlFile call re-reads
+		; the updated file rather than returning a stale snapshot.
+		global _ParseTomlCache
+		if _ParseTomlCache.Has(Path)
+				_ParseTomlCache.Delete(Path)
+
+		HotPath_LogIfSlow("Config.TomlWrite", _hpTomlWrite, Updates.Length . " update(s)")
+		return true
+}
+
+TOML_RenderKey(k) {
+		; Bare key: only A-Z / a-z / 0-9 / _ / -. Otherwise quote.
+		if RegExMatch(k, "^[A-Za-z0-9_\-]+$")
+				return k
+		esc := TOML_EscapeBasicStringContents(k)
+		return '"' . esc . '"'
+}
+
+TOML_RenderValue(v, Ancestors := unset) {
+		; TOML_Bool sentinel: boolean intent carried explicitly from the call site.
+		; Must be checked before IsNumber() — TOML_Bool wraps true/false as integers
+		; so IsNumber() would match them and emit "1"/"0" otherwise.
+		if (v is TOML_Bool)
+				return v.Value ? "true" : "false"
+		; Numeric-looking strings are still text. IsNumber and Boolean equality
+		; accept digit strings and would otherwise discard their TOML type.
+		if (v is String)
+				return TOML_RenderString(v)
+		; Arrays before numbers so nested array items iterate correctly.
+		if (v is Array || v is Map) {
+				if !IsSet(Ancestors)
+						Ancestors := Map()
+				if Ancestors.Has(v)
+						throw ValueError("TOML collections cannot contain a reference cycle")
+				Ancestors[v] := true
+				try {
+						parts := []
+						if v is Map {
+								for k, s in v {
+										if !(k is String)
+												throw TypeError("TOML inline table keys must be strings")
+										parts.Push(TOML_RenderKey(k) . " = " . TOML_RenderValue(s, Ancestors))
+								}
+						} else {
+								for s in v
+										parts.Push(TOML_RenderValue(s, Ancestors))
+						}
+						out := v is Map ? "{" : "["
+						for i, p in parts
+								out .= (i = 1 ? "" : ", ") . p
+						out .= v is Map ? "}" : "]"
+						return out
+				} finally Ancestors.Delete(v)
+		}
+		if IsNumber(v) {
+				if v is Float {
+						if !NumberTryParseFiniteFloat(v, &FiniteValue)
+								throw ValueError("TOML serialization requires a finite Float")
+						; Seventeen significant digits retain every binary64 value. A
+						; whole-valued Float still needs a float-shaped TOML literal.
+						Rendered := Format("{:.17g}", FiniteValue)
+						return InStr(Rendered, ".") || InStr(Rendered, "e") ? Rendered : Rendered . ".0"
+				}
+				return String(v)
+		}
+		if (v = true)
+				return "true"
+		if (v = false)
+				return "false"
+		return TOML_RenderString(String(v))
+}
+
+TOML_RenderString(s) {
+		return '"' . TOML_EscapeBasicStringContents(s) . '"'
+}
+
+
+
+
+
+; =================================
+; =================================
+; ======= 5/ Cache accessor =======
+; =================================
+; =================================
+
+; Look up Section/Key in a parsed cache (the Map produced by
+; ``ParseTomlFile``). Returns ``Default`` (defaulting to the underscore
+; sentinel) when the cache, section, or key is absent or malformed. A config
+; file may temporarily contain a scalar where a section Map is expected after
+; a failed hand edit or migration; treat that exactly like a missing section so
+; a preference read can never abort application startup. Callers compare
+; against "_" to detect missing entries cheaply.
+IniCacheGet(Cache, Section, Key, Default := "_") {
+		if !(Cache is Map) or !Cache.Has(Section)
+				return Default
+		SectionCache := Cache[Section]
+		if !(SectionCache is Map) or !SectionCache.Has(Key)
+				return Default
+		return SectionCache[Key]
+}
+
+; Read a Section/Key from a parsed cache as a boolean. This exists because
+; ``IniCacheGet`` returns the stored value verbatim, and ``ParseTomlFile`` has
+; already run it through ``TOML_CoerceValue`` — so a TOML ``true`` arrives as a
+; real AHK boolean, NOT as the string "true". Comparing it with
+; ``StrLower(v) == "true"`` is a legal, non-throwing, always-false expression,
+; which is exactly how the onboarding wizard silently read every enabled
+; setting as disabled. Every caller that wants a boolean out of a cache must
+; come through here rather than rolling its own test.
+;
+; Accepts every shape the value can legitimately have on disk: a real boolean
+; from the parser, the 1/0 the driver's own writers have emitted, and the
+; literal strings from a hand-edited file. A missing key reads as false.
+TomlCacheBool(Cache, Section, Key) {
+		Value := IniCacheGet(Cache, Section, Key)
+		if (Value == true or Value == 1)
+				return true
+		return (Type(Value) == "String" and StrLower(Trim(Value)) == "true")
+}
+
+; Resolve a configured path: trim whitespace, treat empty / underscore as
+; "use the default", otherwise return the trimmed value.
+ResolveConfigPath(RawValue, DefaultPath) {
+		Trimmed := Trim(RawValue)
+		if (Trimmed == "" or Trimmed == "_") {
+				return DefaultPath
+		}
+		return Trimmed
+}
+
+
+
+
+
+; ====================================
+; ====================================
+; ======= 6/ paths.toml reader =======
+; ====================================
+; ====================================
+
+; Reads a simple flat TOML file (Key = "value" pairs, ignores comments).
+; Auto-generates the file with a header comment if it does not exist.
+; Returns a Map of all parsed key-value pairs.
+ReadPathsToml(FilePath) {
+		Result := Map()
+
+		if !FileExist(FilePath) {
+				; Ensure the parent directory exists — in compiled mode FilePath lives in
+				; %APPDATA%\Ergopti\ which may not exist yet on a fresh install.
+				try DirCreate(SubStr(FilePath, 1, InStr(FilePath, "\", , -1) - 1))
+
+				; Migration: the previous compiled location was inside the bundle dir
+				; (%LocalAppData%\Ergopti\bundle\paths.toml) which is wiped on every update.
+				; If the new stable location is empty but the old bundle-dir copy is still
+				; present (race window before the next bundle wipe), carry it over so the
+				; user's ConfigDirPath is not silently lost.
+				LegacyPath := A_AppData . "\..\Local\Ergopti\bundle\paths.toml"
+				if (A_IsCompiled and FileExist(LegacyPath)) {
+						try FileCopy(LegacyPath, FilePath)
+						; Fall through — if the copy succeeded FilePath now exists and we read it below
+				}
+
+				if !FileExist(FilePath) {
+						try {
+								f := FileOpen(FilePath, "w", "UTF-8")
+								if f {
+										DefaultDir := StrReplace(EnvGet("USERPROFILE"), "\", "/") . "/.config/ergopti_plus/"
+										f.Write("# Custom paths — auto-generated by ErgoptiPlus.`r`n")
+										f.Write("# Edit this file to point to your personal configuration folder.`r`n")
+										f.Write("# If absent or commented out, files are looked up in: " . DefaultDir . "`r`n")
+										f.Write("`r`n")
+										f.Write('# ConfigDirPath = "' . DefaultDir . '"`r`n')
+										f.Close()
+								}
+						}
+						return Result
+				}
+		}
+
+		; Read as UTF-8 to match the writer (FileOpen(..., "UTF-8")) and every other
+		; reader in this unit. A BOM-less paths.toml hand-saved as UTF-8 would otherwise
+		; be decoded with the system codepage, turning a non-ASCII ConfigDirPath
+		; (accented Windows home dir) into mojibake and silently losing the user's config.
+		; Guarded. This runs during the auto-execute section, BEFORE the logger is
+		; initialised and while hotkeys registered at parse time are already armed —
+		; so an unguarded throw here aborts the boot mid-way and leaves a resident
+		; half-driver with a subset of hotkeys live. A locked paths.toml (a sync
+		; client, an AV scan) is exactly the transient condition that triggers it.
+		;
+		; Returning the empty Map falls back to the default config directory, which
+		; is the same behaviour as a paths.toml that exists but sets nothing. That is
+		; safe here BECAUSE this file only ever redirects where config is READ from:
+		; nothing serializes back through it, so there is no defaults-over-real-file
+		; hazard of the kind the config readers have.
+		Content := ""
+		try {
+				Content := FileRead(FilePath, "UTF-8")
+		} catch as Err {
+				try LoggerError("TomlPaths", "Cannot read '{1}': {2}. Falling back to the default configuration directory for this session.", FilePath, Err.Message)
+				return Result
+		}
+		loop parse, Content, "`n", "`r" {
+				Line := Trim(A_LoopField, " `t")
+				if (Line == "" or SubStr(Line, 1, 1) == "#") {
+						continue
+				}
+				Line := TOML_StripInlineComment(Line)
+				if RegExMatch(Line, '^(\S+)\s*=\s*"(.*)"$', &Match) {
+						Result[Match[1]] := StrReplace(Match[2], "/", "\")
+				}
+		}
+		return Result
+}

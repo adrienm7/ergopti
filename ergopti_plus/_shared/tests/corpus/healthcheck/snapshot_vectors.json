@@ -1,0 +1,260 @@
+{
+	"description": "Golden vectors for the diagnostics snapshot helpers. format_uptime: the page's duration format (model.js formatValue, type seconds), replayed by tools/test/test-healthcheck-model.cjs. extract_recent_issues: the ring fallback of the recent warnings and errors (_shared/lua/healthcheck/snapshot.lua), replayed by the macOS and Linux suites. check_fields: which produced fields a schema does not declare for the snapshot's driver and which declared synchronous fields are absent, replayed by healthcheck.snapshot.check_fields (macOS, Linux) and HealthCheck_CheckFields (Windows); lists are sorted. Booleans are left out of the snapshots because the AHK JSON reader turns them into 1 and 0.",
+	"check_fields_schema": {
+		"schema_version": 2,
+		"sections": [
+			{
+				"id": "summary",
+				"kind": "summary"
+			},
+			{
+				"id": "system",
+				"fields": [
+					{
+						"id": "os",
+						"type": "text"
+					},
+					{
+						"id": "kernel",
+						"type": "text",
+						"platforms": ["linux"]
+					},
+					{
+						"id": "disk_free",
+						"type": "bytes",
+						"probe": {
+							"macos": "system_details"
+						}
+					},
+					{
+						"id": "running_apps",
+						"type": "list",
+						"opt_in": true
+					}
+				]
+			},
+			{
+				"id": "network",
+				"fields": [
+					{
+						"id": "github_api",
+						"type": "text",
+						"probe": "github_api"
+					}
+				]
+			},
+			{
+				"id": "permissions",
+				"kind": "items",
+				"columns": ["id", "state"],
+				"platforms": ["macos", "linux"]
+			}
+		]
+	},
+	"vectors": [
+		{
+			"id": "uptime_seconds",
+			"category": "format_uptime",
+			"input": {
+				"sec": 45
+			},
+			"expected": "45s"
+		},
+		{
+			"id": "uptime_minutes",
+			"category": "format_uptime",
+			"input": {
+				"sec": 125
+			},
+			"expected": "2m 05s"
+		},
+		{
+			"id": "uptime_hours",
+			"category": "format_uptime",
+			"input": {
+				"sec": 3605
+			},
+			"expected": "1h 00m 05s"
+		},
+		{
+			"id": "uptime_large",
+			"category": "format_uptime",
+			"input": {
+				"sec": 90061
+			},
+			"expected": "25h 01m 01s"
+		},
+		{
+			"id": "uptime_zero",
+			"category": "format_uptime",
+			"input": {
+				"sec": 0
+			},
+			"expected": "0s"
+		},
+		{
+			"id": "issues_empty",
+			"category": "extract_recent_issues",
+			"input": {
+				"lines": [],
+				"max_lines": 100
+			},
+			"expected": []
+		},
+		{
+			"id": "issues_no_match",
+			"category": "extract_recent_issues",
+			"input": {
+				"lines": [
+					"2026-09-24 10:00:00:000 [INFO] [a] started",
+					"2026-09-24 10:00:01:000 [DEBUG] [a] tick"
+				],
+				"max_lines": 100
+			},
+			"expected": []
+		},
+		{
+			"id": "issues_all_match",
+			"category": "extract_recent_issues",
+			"input": {
+				"lines": [
+					"2026-09-24 10:00:00:000 [WARNING] [a] slow",
+					"2026-09-24 10:00:01:000 [ERROR] [b] boom"
+				],
+				"max_lines": 100
+			},
+			"expected": [
+				"2026-09-24 10:00:00:000 [WARNING] [a] slow",
+				"2026-09-24 10:00:01:000 [ERROR] [b] boom"
+			],
+			"expected_count": 2
+		},
+		{
+			"id": "issues_trimmed",
+			"category": "extract_recent_issues",
+			"input": {
+				"lines": [
+					"2026-09-24 10:00:00:000 [ERROR] [a] one",
+					"2026-09-24 10:00:01:000 [INFO] [a] noise",
+					"2026-09-24 10:00:02:000 [ERROR] [a] two",
+					"2026-09-24 10:00:03:000 [WARNING] [a] three"
+				],
+				"max_lines": 2
+			},
+			"expected": [
+				"2026-09-24 10:00:02:000 [ERROR] [a] two",
+				"2026-09-24 10:00:03:000 [WARNING] [a] three"
+			],
+			"expected_count": 2
+		},
+		{
+			"id": "check_fields_complete_windows",
+			"category": "check_fields",
+			"snapshot": {
+				"driver": "windows",
+				"sections": {
+					"system": {
+						"os": "Windows 11 Home 26100.4652",
+						"disk_free": 1024
+					},
+					"network": {}
+				}
+			},
+			"expected_undeclared": [],
+			"expected_missing": []
+		},
+		{
+			"id": "check_fields_platform_field_on_another_driver",
+			"category": "check_fields",
+			"snapshot": {
+				"driver": "windows",
+				"sections": {
+					"system": {
+						"os": "Windows 11",
+						"kernel": "10.0",
+						"disk_free": 1024
+					},
+					"network": {},
+					"permissions": {
+						"items": []
+					}
+				}
+			},
+			"expected_undeclared": ["permissions", "system.kernel"],
+			"expected_missing": []
+		},
+		{
+			"id": "check_fields_linux_needs_its_platform_field",
+			"category": "check_fields",
+			"snapshot": {
+				"driver": "linux",
+				"sections": {
+					"system": {
+						"os": "Fedora Linux 41",
+						"disk_free": 1024
+					},
+					"network": {},
+					"permissions": {
+						"items": []
+					}
+				}
+			},
+			"expected_undeclared": [],
+			"expected_missing": ["system.kernel"]
+		},
+		{
+			"id": "check_fields_probe_and_opt_in_fields_may_be_absent",
+			"category": "check_fields",
+			"snapshot": {
+				"driver": "macos",
+				"sections": {
+					"system": {
+						"os": "macOS 15.1"
+					},
+					"network": {},
+					"permissions": {
+						"items": []
+					}
+				}
+			},
+			"expected_undeclared": [],
+			"expected_missing": []
+		},
+		{
+			"id": "check_fields_missing_section",
+			"category": "check_fields",
+			"snapshot": {
+				"driver": "macos",
+				"sections": {
+					"system": {
+						"os": "macOS 15.1"
+					}
+				}
+			},
+			"expected_undeclared": [],
+			"expected_missing": ["network", "permissions"]
+		},
+		{
+			"id": "check_fields_unknown_section_and_field",
+			"category": "check_fields",
+			"snapshot": {
+				"driver": "linux",
+				"sections": {
+					"system": {
+						"os": "Ubuntu",
+						"kernel": "6.8",
+						"disk_free": 1024,
+						"wifi_ssid": "home"
+					},
+					"network": {},
+					"permissions": {
+						"items": []
+					},
+					"sys": {}
+				}
+			},
+			"expected_undeclared": ["sys", "system.wifi_ssid"],
+			"expected_missing": []
+		}
+	]
+}

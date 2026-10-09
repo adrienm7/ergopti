@@ -1,0 +1,72 @@
+{
+	"description": "The physical magic key a layout extension declares ([extension.magic_key] key = <KeyboardEvent.code>). Each case gives one manifest, whether the extension scanners accept its shape (valid), the key they must report (an empty string when none is declared) and whether the registry index builder, which also checks that the code names a key of _shared/data/keycodes/physical_keys.json that a keyboard layout defines (_shared/modules/layouts/mac_keycodes.json), accepts it for a published layout (published). Replayed by _shared/lua/hotstrings/extensions.lua (macOS and Linux), windows/infra/hotstrings/extension_packs.ahk and tools/build/build-layouts-index.cjs.",
+	"cases": [
+		{
+			"name": "a declared key is reported",
+			"manifest": "[extension]\nname = \"Geometry\"\n\n[extension.magic_key]\nkey = \"KeyC\"\n",
+			"valid": true,
+			"magic_key": "KeyC",
+			"published": true
+		},
+		{
+			"name": "the inline spelling is read like the table",
+			"manifest": "[extension]\nname = \"Geometry\"\nmagic_key = { key = \"Semicolon\" }\n",
+			"valid": true,
+			"magic_key": "Semicolon",
+			"published": true
+		},
+		{
+			"name": "no declaration leaves the choice to the user",
+			"manifest": "[extension]\nname = \"Geometry\"\n",
+			"valid": true,
+			"magic_key": "",
+			"published": true
+		},
+		{
+			"name": "a code the physical-key registry does not know is refused at publication",
+			"manifest": "[extension.magic_key]\nkey = \"KeyUnknown\"\n",
+			"valid": true,
+			"magic_key": "KeyUnknown",
+			"published": false
+		},
+		{
+			"name": "a key no keyboard layout defines is refused at publication",
+			"manifest": "[extension.magic_key]\nkey = \"F5\"\n",
+			"valid": true,
+			"magic_key": "F5",
+			"published": false
+		},
+		{
+			"name": "a mouse button is not a key",
+			"manifest": "[extension.magic_key]\nkey = \"MouseLeft\"\n",
+			"valid": true,
+			"magic_key": "MouseLeft",
+			"published": false
+		},
+		{
+			"name": "an unknown field is refused",
+			"manifest": "[extension.magic_key]\nkey = \"KeyC\"\nchar = \"j\"\n",
+			"valid": false
+		},
+		{
+			"name": "a code that is not a KeyboardEvent.code spelling is refused",
+			"manifest": "[extension.magic_key]\nkey = \"keyc\"\n",
+			"valid": false
+		},
+		{
+			"name": "a numeric code is refused",
+			"manifest": "[extension.magic_key]\nkey = 46\n",
+			"valid": false
+		},
+		{
+			"name": "a declaration without a key is refused",
+			"manifest": "[extension.magic_key]\n",
+			"valid": false
+		},
+		{
+			"name": "a bare string is refused",
+			"manifest": "[extension]\nmagic_key = \"KeyC\"\n",
+			"valid": false
+		}
+	]
+}

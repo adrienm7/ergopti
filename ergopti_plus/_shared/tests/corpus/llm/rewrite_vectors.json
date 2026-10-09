@@ -1,0 +1,115 @@
+{
+	"description": "Golden vectors for rewrite requests: the sentence a rewrite prompt rewrites (the exact suffix of the typed buffer) and the completion token budget for it. Replayed by the shared Lua module (_shared/lua/llm/rewrite.lua, used by macOS and Linux) and its AutoHotkey port.",
+	"rule": "Skip trailing spacing, then the sentence's own final terminators (. ! ? …). Scan back to the last line break, or the last terminator followed by spacing; the span starts after it, without leading spacing, and runs to the end of the buffer. max_tokens = max(64, codepoints(span) * 2 + 16). A system prompt is a rewrite prompt when it contains REWRITE:.",
+	"sentence_vectors": [
+		{
+			"id": "whole_buffer",
+			"buffer": "ok pr jd 14h",
+			"span": "ok pr jd 14h"
+		},
+		{
+			"id": "after_previous_sentence",
+			"buffer": "Bonjour Marc. ok pr jd 14h, jenv le doc av",
+			"span": "ok pr jd 14h, jenv le doc av"
+		},
+		{
+			"id": "just_finished_sentence",
+			"buffer": "Salut. ok pr jd 14h. ",
+			"span": "ok pr jd 14h. "
+		},
+		{
+			"id": "after_line_break",
+			"buffer": "Hello\nthx 4 ur help",
+			"span": "thx 4 ur help"
+		},
+		{
+			"id": "question_mark",
+			"buffer": "Tu viens ? jsp encore",
+			"span": "jsp encore"
+		},
+		{
+			"id": "ellipsis",
+			"buffer": "Bon… on verra dm",
+			"span": "on verra dm"
+		},
+		{
+			"id": "decimal_is_not_a_boundary",
+			"buffer": "il fait 14.5 dg",
+			"span": "il fait 14.5 dg"
+		},
+		{
+			"id": "several_terminators",
+			"buffer": "Quoi ?! c pas possible!!",
+			"span": "c pas possible!!"
+		},
+		{
+			"id": "trailing_spaces_kept",
+			"buffer": "Ok. je vs appelle  ",
+			"span": "je vs appelle  "
+		},
+		{
+			"id": "blank",
+			"buffer": "   ",
+			"span": ""
+		},
+		{
+			"id": "empty",
+			"buffer": "",
+			"span": ""
+		},
+		{
+			"id": "only_terminator",
+			"buffer": "Fini. ",
+			"span": "Fini. "
+		},
+		{
+			"id": "nbsp_after_terminator",
+			"buffer": "Oui ! merci bcp",
+			"span": "merci bcp"
+		}
+	],
+	"max_tokens_vectors": [
+		{
+			"id": "empty_span_floor",
+			"span": "",
+			"max_tokens": 64
+		},
+		{
+			"id": "short_span_floor",
+			"span": "ok pr jd",
+			"max_tokens": 64
+		},
+		{
+			"id": "long_span",
+			"span": "ok pr jd 14h, jenv le doc av",
+			"max_tokens": 72
+		},
+		{
+			"id": "counts_codepoints",
+			"span": "éééééééééééééééééééééééééé",
+			"max_tokens": 68
+		}
+	],
+	"prompt_vectors": [
+		{
+			"id": "rewrite_tag",
+			"prompt": "Reply with:\nREWRITE: <text>",
+			"is_rewrite": true
+		},
+		{
+			"id": "advanced_prompt",
+			"prompt": "TAIL_CORRECTED: <tail>\nNEXT_WORDS: <next>",
+			"is_rewrite": false
+		},
+		{
+			"id": "lowercase_tag_is_not_the_tag",
+			"prompt": "rewrite: <text>",
+			"is_rewrite": false
+		},
+		{
+			"id": "empty",
+			"prompt": "",
+			"is_rewrite": false
+		}
+	]
+}

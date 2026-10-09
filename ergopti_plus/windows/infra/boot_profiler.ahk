@@ -1,0 +1,294 @@
+﻿; infra/boot_profiler.ahk
+
+; ==============================================================================
+; MODULE: Boot Profiler
+; DESCRIPTION:
+; Coarse phase marks plus precise QPC/CPU stage timing for startup diagnosis. The driver
+; loads ~228 source files, registers thousands of hotstrings and builds a large
+; tray menu at boot; when a user reports a slow start there was previously no
+; way to see WHICH phase dominated. BootProfile_Mark emits one INFO line per
+; phase with the delta since the previous mark and the running total, so the
+; log alone tells you where boot time goes — no profiler attach, no rebuild.
+;
+; FEATURES & RATIONALE:
+; 1. Timing reads only: each named stage also records wall and process CPU time.
+; 2. Fail-safe: every log call is wrapped so a profiler glitch can never abort
+;    or delay boot — if the logger is not ready yet the mark is simply silent.
+; ==============================================================================
+
+#Include ../adapters/boot_clock.ahk
+
+global _BOOT_PROFILE_LAST  := 0  ; A_TickCount captured at the previous mark
+global _BOOT_PROFILE_START  := 0  ; A_TickCount captured at BootProfile_Begin
+
+
+
+
+; ============================================
+; ============================================
+; ======= 1/ Boot phase profiler API =========
+; ============================================
+; ============================================
+
+; Start (or restart) the boot timer. Call once, as early as the logger is
+; ready, so subsequent marks measure deltas from a known origin.
+BootProfile_Begin() {
+	global _BOOT_PROFILE_LAST, _BOOT_PROFILE_START
+	_BOOT_PROFILE_START := A_TickCount
+	_BOOT_PROFILE_LAST  := _BOOT_PROFILE_START
+	try LoggerInfo("BootProfile", "Boot timing started.")
+	; This aggregate includes parsing AND every initializer before LoggerInit.
+	; The first retroactive stamp isolates process-load time; later stamps split
+	; mutex acquisition, includes, onboarding and configuration work. Calling the
+	; whole interval parser time falsely attributed executable work to #Include.
+	try {
+		Uptime := BootProfile_ProcessUptimeMs()
+		if (Uptime >= 0)
+			LoggerInfo("BootProfile",
+				"Pre-logger initialization (including script parse + load): ~{1} ms.", Uptime)
+		_BootProfileReplayStamps((Uptime >= 0) ? (_BOOT_PROFILE_START - Uptime) : 0)
+	}
+}
+
+; Record a phase boundary that happens BEFORE the logger is usable.
+;
+; Everything up to LoggerInit() — bundle extraction, the whole #Include graph's
+; top-level code, the config parse, HotstringEngineInit — used to arrive at
+; BootProfile_Begin as a single opaque "script parse + load: ~N ms" number, so a
+; user reporting a slow start could be told how much was pre-boot but never
+; which part of it. Stamps retain clocks without logging or file I/O;
+; BootProfile_Begin replays them all as
+; normal marks once the logger exists.
+; @param PhaseName {String} Human-readable label for the phase that just ended.
+BootProfile_Stamp(PhaseName) {
+	_BootProfileStampStore("push", PhaseName)
+}
+
+; Storage for the retroactive stamps.
+;
+; The buffer and its cap are function statics, NOT file-level globals, and that
+; is load-bearing rather than a style choice: a top-level ``global X := []`` is
+; an ordinary statement executed at this file's #Include position, whereas the
+; earliest stamp is taken in the pre-pump block far above it. A global would
+; therefore be unset when the first stamp is pushed and — worse — would be reset
+; to an empty array when this file's include position was finally reached,
+; silently discarding every stamp taken before it. Function statics are
+; initialised before the auto-execute thread starts, so they are valid from the
+; very first executable line. Verified against AutoHotkey64 v2 before use.
+; @param Op {String} "push" to record, "drain" to take and clear.
+; @param PhaseName {String} Label, for "push".
+; @returns {Array} For "drain", the recorded stamps; an empty array otherwise.
+_BootProfileStampStore(Op, PhaseName := "") {
+	; Upper bound on retroactive stamps. The pre-logger window has a handful of
+	; meaningful boundaries; a caller wanting more is measuring the wrong thing,
+	; and the cap keeps a runaway loop from growing this array unbounded.
+	static CAP := 64
+	static Stamps := []
+	if (Op == "push") {
+		if (Stamps.Length < CAP)
+			Stamps.Push({ Name: PhaseName, Tick: A_TickCount,
+				WallMs: BootClockWallMs(), CpuMs: BootClockCpuMs() })
+		return []
+	}
+	Drained := Stamps
+	Stamps := []
+	return Drained
+}
+
+; Emit one line per retroactive stamp, then clear them.
+;
+; Deliberately does NOT touch _BOOT_PROFILE_START / _BOOT_PROFILE_LAST: the marks
+; that follow keep measuring from BootProfile_Begin exactly as before, so the
+; existing phase lines stay comparable with logs collected before this existed.
+; The replayed lines carry their own "since process start" total instead.
+; @param ProcessStartTick {Integer} A_TickCount at process creation, 0 if unknown.
+_BootProfileReplayStamps(ProcessStartTick) {
+	Stamps := _BootProfileStampStore("drain")
+	if (Stamps.Length == 0)
+		return
+	; Anchor on the first stamp when the process creation time is unavailable —
+	; the deltas between stamps stay correct, only the absolute total is lost.
+	Origin := (ProcessStartTick > 0) ? ProcessStartTick : Stamps[1].Tick
+	Prev := Origin
+	PrevStamp := 0
+	for , Stamp in Stamps {
+		try LoggerInfo("BootProfile", Format("(pre-logger) {1}: +{2} ms (at {3} ms since process start).",
+			Stamp.Name, TickElapsed(Prev, Stamp.Tick), TickElapsed(Origin, Stamp.Tick)))
+		Prev := Stamp.Tick
+		if PrevStamp {
+			CpuText := (Stamp.CpuMs < 0 || PrevStamp.CpuMs < 0)
+				? "unknown" : Format("{:.3f}", Stamp.CpuMs - PrevStamp.CpuMs)
+			; Format first so distinct phases survive template-based repeat collapsing.
+			try LoggerInfo("BootProfile", Format(
+				"Pre-logger phase '{1}' resources: wall={2:.3f} ms, process_cpu={3} ms.",
+				Stamp.Name, Stamp.WallMs - PrevStamp.WallMs, CpuText))
+		} else {
+			CpuText := Stamp.CpuMs < 0 ? "unknown" : Format("{:.3f}", Stamp.CpuMs)
+			try LoggerInfo("BootProfile", "Process CPU at first boot stamp: {1} ms.", CpuText)
+		}
+		PrevStamp := Stamp
+	}
+}
+
+; Log the time since the previous mark and since BootProfile_Begin.
+; @param PhaseName {String} Human-readable label for the phase that just ended.
+BootProfile_Mark(PhaseName) {
+	global _BOOT_PROFILE_LAST, _BOOT_PROFILE_START
+	Now := A_TickCount
+	; Tolerate a mark that fires before Begin — anchor the origin on first use
+	; so the profiler never logs a nonsensical negative or huge total.
+	if (_BOOT_PROFILE_START == 0) {
+		_BOOT_PROFILE_START := Now
+		_BOOT_PROFILE_LAST  := Now
+	}
+	Delta := TickElapsed(_BOOT_PROFILE_LAST, Now)
+	Total := TickElapsed(_BOOT_PROFILE_START, Now)
+	_BOOT_PROFILE_LAST := Now
+	try LoggerInfo("BootProfile", Format("{1}: +{2} ms (total {3} ms).", PhaseName, Delta, Total))
+}
+
+; Opens a named boot stage: one START line now, and a SUCCESS line with the
+; stage's own duration when BootProfile_StageEnd closes it. The marks above say
+; how long each slice took; a stage says which step a boot that stopped logging
+; was inside — a START with no SUCCESS names it.
+; @param Name {String} Stage label, reused verbatim by BootProfile_StageEnd.
+BootProfile_StageBegin(Name) {
+	_BootStagesInFlight()[Name] := { Tick: A_TickCount,
+		WallMs: BootClockWallMs(), CpuMs: BootClockCpuMs(), MenuWaitMs: BootProfile_MenuWaitMs() }
+	try LoggerStart("BootProfile", "Boot stage '{1}'…", Name)
+}
+
+; Closes a stage opened by BootProfile_StageBegin with its duration and an
+; optional one-line detail of what it produced.
+; @param Name {String}
+; @param Detail {String} Optional summary, e.g. "42 feature(s) enabled".
+BootProfile_StageEnd(Name, Detail := "") {
+	Open := _BootStagesInFlight()
+	if !Open.Has(Name) {
+		try LoggerError("BootProfile", "Boot stage '{1}' closed without being opened.", Name)
+		return
+	}
+	Started := Open.Delete(Name)
+	try LoggerSuccess("BootProfile", "Boot stage '{1}' done in {2} ms{3}.",
+		Name, TickElapsed(Started.Tick, A_TickCount), Detail != "" ? ": " . Detail : "")
+	_BootProfileStageResources(Name, Started)
+}
+
+; Closes a stage that did not complete, as a WARNING rather than a SUCCESS.
+; @param Name {String}
+; @param Reason {String}
+BootProfile_StageAbort(Name, Reason) {
+	Open := _BootStagesInFlight()
+	Started := Open.Has(Name) ? Open.Delete(Name) : { Tick: A_TickCount }
+	try LoggerWarn("BootProfile", "Boot stage '{1}' did not complete after {2} ms: {3}.",
+		Name, TickElapsed(Started.Tick, A_TickCount), Reason)
+}
+
+; Milliseconds from process creation to now: the figure a user perceives as the
+; boot, including the parse window before the first executable line.
+; @returns {Integer}
+BootProfile_TotalBootMs() {
+	global _BOOT_PROFILE_START
+	Uptime := BootProfile_ProcessUptimeMs()
+	return (Uptime >= 0) ? Uptime : TickElapsed(_BOOT_PROFILE_START, A_TickCount)
+}
+
+; Names of the stages still open, for the boot-complete line.
+; @returns {String} Comma-separated names, or "" when every stage closed.
+BootProfile_OpenStageNames() {
+	Names := ""
+	for Name, _ in _BootStagesInFlight()
+		Names .= (Names == "" ? "" : ", ") . Name
+	return Names
+}
+
+; Open-stage registry. A function static for the same include-order reason as
+; _BootProfileStampStore: a stage can open above this file's include position.
+; @returns {Map}
+_BootStagesInFlight() {
+	static Open := Map()
+	return Open
+}
+
+; Milliseconds elapsed since the OS spawned this process, measured against the
+; process creation FILETIME from GetProcessTimes. Unlike A_TickCount (which we can
+; only read once our own code runs), this captures the entire pre-script window —
+; AHK parsing every #Include and creating the tray icon — that precedes the first
+; executable line. A large value here pinpoints the parse phase as the slow start.
+; @returns {Integer} Elapsed milliseconds since process creation, or -1 on failure.
+BootProfile_ProcessUptimeMs() {
+	static FILETIME_TICKS_PER_MS := 10000  ; FILETIME is in 100-ns ticks → 10000 per ms
+	HProc    := DllCall("GetCurrentProcess", "Ptr")
+	Creation := Buffer(8, 0)
+	ExitT    := Buffer(8, 0)
+	KernelT  := Buffer(8, 0)
+	UserT    := Buffer(8, 0)
+	; GetProcessTimes returns each time as a FILETIME (UTC, 100-ns ticks since 1601),
+	; directly comparable to GetSystemTimeAsFileTime — their difference is wall-clock.
+	if !DllCall("GetProcessTimes", "Ptr", HProc,
+		"Ptr", Creation, "Ptr", ExitT, "Ptr", KernelT, "Ptr", UserT)
+		return -1
+	NowFt := Buffer(8, 0)
+	DllCall("GetSystemTimeAsFileTime", "Ptr", NowFt)
+	Created := NumGet(Creation, 0, "Int64")
+	Now     := NumGet(NowFt, 0, "Int64")
+	return (Now - Created) // FILETIME_TICKS_PER_MS
+}
+
+; CPU versus precise wall time separates actual work from scheduler/I/O stalls.
+; These are stage-local differences; nested stages overlap and must not be summed.
+_BootProfileStageResources(Name, Started) {
+	WallMs := BootClockWallMs() - Started.WallMs
+	MenuWaitMs := Max(0, BootProfile_MenuWaitMs() - Started.MenuWaitMs)
+	CpuMs := BootClockCpuMs()
+	CpuText := (CpuMs < 0 || Started.CpuMs < 0)
+		? "unknown" : Format("{:.3f}", CpuMs - Started.CpuMs)
+	try LoggerInfo("BootProfile", Format(
+		"Boot stage '{1}' resources: wall={2:.3f} ms, process_cpu={3} ms, native_menu_wait={4:.3f} ms, wall_without_menu={5:.3f} ms.",
+		Name, WallMs, CpuText, MenuWaitMs, Max(0, WallMs - MenuWaitMs)))
+}
+
+/** Tracks native menu time separately because its modal loop interrupts boot. */
+class BootMenuWaitClock {
+	Waiting := false
+	StartedMs := 0
+	CompletedMs := 0
+
+	Enter(NowMs) {
+		if this.Waiting
+			throw Error("Native menu wait already active")
+		this.StartedMs := NowMs
+		this.Waiting := true
+	}
+
+	Leave(NowMs) {
+		if !this.Waiting
+			throw Error("Native menu wait is not active")
+		this.CompletedMs += NowMs - this.StartedMs
+		this.Waiting := false
+	}
+
+	Elapsed(NowMs) {
+		return this.CompletedMs + (this.Waiting ? NowMs - this.StartedMs : 0)
+	}
+}
+
+/** One clock belongs to the process, including menus entered before LoggerInit. */
+_BootProfileMenuClock() {
+	static Clock := BootMenuWaitClock()
+	return Clock
+}
+
+/** Records a matched native menu enter/leave notification. */
+BootProfile_MenuNavigation(Active) {
+	Clock := _BootProfileMenuClock()
+	if Active
+		Clock.Enter(BootClockWallMs())
+	else
+		Clock.Leave(BootClockWallMs())
+}
+
+/** Returns cumulative blocked menu time, including an active navigation. */
+BootProfile_MenuWaitMs() {
+	return _BootProfileMenuClock().Elapsed(BootClockWallMs())
+}

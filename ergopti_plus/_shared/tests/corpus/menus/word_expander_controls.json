@@ -1,0 +1,44 @@
+{
+	"schema_version": 1,
+	"rows": [
+		{
+			"id": "word_expanders_enable_all",
+			"i18n": "menu.hotstrings.check_all"
+		},
+		{
+			"id": "word_expanders_disable_all",
+			"i18n": "menu.hotstrings.uncheck_all"
+		},
+		{
+			"id": "word_expanders_restore",
+			"i18n": "common.restore_recommended"
+		}
+	],
+	"reordered_ids": [
+		"word_expanders_restore",
+		"word_expanders_disable_all",
+		"word_expanders_enable_all"
+	],
+	"delimiter_states": {
+		"initial": {
+			"space": false,
+			"slash": true,
+			"custom_x": false
+		},
+		"enable_all": {
+			"space": true,
+			"slash": true,
+			"custom_x": false
+		},
+		"disable_all": {
+			"space": false,
+			"slash": false,
+			"custom_x": false
+		},
+		"restore": {
+			"space": true,
+			"slash": false,
+			"custom_x": false
+		}
+	}
+}

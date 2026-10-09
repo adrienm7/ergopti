@@ -1,0 +1,17 @@
+[_meta]
+schema_version = 2
+
+[renamed]
+setting = "canonical"
+
+[after]
+setting = "legacy"
+
+[moved]
+setting = "legacy"
+
+[final]
+setting = "legacy"
+
+[mapped]
+setting = "canonical"

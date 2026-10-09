@@ -1,0 +1,7 @@
+# static/layouts/registry/ergol/manifest.toml
+
+[extension]
+id = "ergol"
+name = "Ergo-L"
+version = "1.0.2"
+author = "Léo Cazenave (NuclearSquid)"

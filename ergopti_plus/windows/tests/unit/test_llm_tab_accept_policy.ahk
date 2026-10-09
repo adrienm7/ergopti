@@ -1,0 +1,742 @@
+﻿; tests/unit/test_llm_tab_accept_policy.ahk
+
+; ==============================================================================
+; MODULE: Canonical LLM Tab-Accept Policy Unit Tests
+; DESCRIPTION:
+; Behavioural regression coverage for AHK-05. Every LLM acceptance path now
+; delegates to LLM_Tooltip_TryAcceptTab, which accepts exactly one visible
+; prediction only for an unmodified physical Tab in the HWND/control that owns
+; the rendered tooltip. The rendered source is intentionally distinct from the
+; mutable source of the newest pending keystroke.
+; ==============================================================================
+
+#Requires AutoHotkey v2.0
+
+
+
+
+
+; ======================================
+; ======================================
+; ======= 1/ Deterministic seams =======
+; ======================================
+; ======================================
+
+global _LTAP_AcceptCount := 0
+global _LTAP_LastAcceptedText := ""
+global _LTAP_ReentrySnapshot := ""
+global _LTAP_ReentryResult := false
+global _LTAP_ReentryRemapResult := true
+global _LTAP_ReentryCtrlResult := true
+
+_LTAP_Input(TabDown := true, CtrlDown := false, AltDown := false,
+		ShiftDown := false, WinDown := false, Hwnd := 100, Control := 1001,
+		Known := true) {
+	return Map(
+		"known", Known,
+		"tab_down", TabDown,
+		"ctrl_down", CtrlDown,
+		"alt_down", AltDown,
+		"shift_down", ShiftDown,
+		"win_down", WinDown,
+		"current_hwnd", Hwnd,
+		"current_control", Control
+	)
+}
+
+_LTAP_Setup(SourceHwnd := 100, SourceControl := 1001) {
+	global _LLM_Engine, _LLM_AcceptInProgress
+	global _Stub_LlmTooltipVisible, _Stub_LlmTooltipText
+	global _Stub_LlmPresentedRecord
+	global _LTAP_AcceptCount, _LTAP_LastAcceptedText, _LTAP_ReentryResult
+	global _LTAP_ReentryRemapResult, _LTAP_ReentryCtrlResult
+	_Stub_LlmTooltipVisible := true
+	_Stub_LlmTooltipText := "predicted text"
+	_LLM_AcceptInProgress := false
+	_LTAP_AcceptCount := 0
+	_LTAP_LastAcceptedText := ""
+	_LTAP_ReentryResult := false
+	_LTAP_ReentryRemapResult := true
+	_LTAP_ReentryCtrlResult := true
+	_LLM_Engine["request_id"] := 41
+	Source := Map(
+		"hwnd", SourceHwnd,
+		"control", SourceControl,
+		"request_id", 41
+	)
+	_LLM_Engine["request_accept_source"] := Source.Clone()
+	Lifecycle := {
+		OfferId: 41, AcceptSource: Source.Clone(), AppName: "source.exe",
+		Slots: ["predicted text"], Suggested: true, Outcome: ""
+	}
+	_Stub_LlmPresentedRecord := {
+		Kind: "prediction", Slots: ["predicted text"], ActiveIdx: 1,
+		Lifecycle: Lifecycle, IsFinal: true, Generation: 1,
+		ShownAt: A_TickCount
+	}
+}
+
+_LTAP_Teardown() {
+	global _LLM_Engine, _LLM_AcceptInProgress
+	global _Stub_LlmTooltipVisible, _Stub_LlmTooltipText
+	global _Stub_LlmPresentedRecord
+	_Stub_LlmTooltipVisible := false
+	_Stub_LlmTooltipText := ""
+	_LLM_AcceptInProgress := false
+	_LLM_Engine["request_accept_source"] := ""
+	_Stub_LlmPresentedRecord := 0
+}
+
+_LTAP_RecordAccept(Text) {
+	global _LTAP_AcceptCount, _LTAP_LastAcceptedText
+	_LTAP_AcceptCount += 1
+	_LTAP_LastAcceptedText := Text
+}
+
+_LTAP_RecordAcceptAndReenter(Text) {
+	global _LTAP_ReentrySnapshot, _LTAP_ReentryResult
+	global _LTAP_ReentryRemapResult, _LTAP_ReentryCtrlResult
+	_LTAP_RecordAccept(Text)
+	_LTAP_ReentryRemapResult := LLM_Tooltip_TryAcceptTab(
+		false, [], _LTAP_ReentrySnapshot, _LTAP_RecordAccept)
+	_LTAP_ReentryCtrlResult := LLM_Tooltip_TryAcceptTab(
+		true, [], _LTAP_Input(true, true), _LTAP_RecordAccept)
+	_LTAP_ReentryResult := LLM_Tooltip_TryAcceptTab(
+		true, [], _LTAP_ReentrySnapshot, _LTAP_RecordAccept)
+}
+
+
+
+
+
+; ===========================================
+; ===========================================
+; ======= 2/ Modifier and focus table =======
+; ===========================================
+; ===========================================
+
+_LTAP_BareTabModifierAndFocusTable() {
+	global _LTAP_AcceptCount, _LTAP_LastAcceptedText
+	Vectors := [
+		Map("label", "bare Tab, originating control", "input", _LTAP_Input(), "accept", true),
+		Map("label", "Ctrl+Tab", "input", _LTAP_Input(true, true), "accept", false),
+		Map("label", "Alt+Tab", "input", _LTAP_Input(true, false, true), "accept", false),
+		Map("label", "Shift+Tab", "input", _LTAP_Input(true, false, false, true), "accept", false),
+		Map("label", "Win+Tab", "input", _LTAP_Input(true, false, false, false, true), "accept", false),
+		Map("label", "remap while physical Tab is also down", "input", _LTAP_Input(),
+			"physical_event", false, "accept", false),
+		Map("label", "declared physical event with Tab up", "input", _LTAP_Input(false), "accept", false),
+		Map("label", "declared remap modifier", "input", _LTAP_Input(),
+			"modifiers", ["Ctrl"], "accept", false),
+		Map("label", "stale top-level HWND", "input", _LTAP_Input(true, false, false, false, false, 200, 1001), "accept", false),
+		Map("label", "stale control in same HWND", "input", _LTAP_Input(true, false, false, false, false, 100, 1002), "accept", false),
+		Map("label", "unverifiable focus", "input", _LTAP_Input(true, false, false, false, false, 0, 0, false), "accept", false)
+	]
+	for TestVector in Vectors {
+		_LTAP_Setup()
+		try {
+			IsPhysicalTabEvent := TestVector.Get("physical_event", true)
+			Modifiers := TestVector.Get("modifiers", [])
+			Accepted := LLM_Tooltip_TryAcceptTab(
+				IsPhysicalTabEvent, Modifiers, TestVector["input"], _LTAP_RecordAccept)
+			ExpectedCount := TestVector["accept"] ? 1 : 0
+			AssertEqual(TestVector["accept"], Accepted,
+				TestVector["label"] . ": acceptance result must follow the canonical bare-physical-Tab policy")
+			AssertEqual(ExpectedCount, _LTAP_AcceptCount,
+				TestVector["label"] . ": prediction injection callback count must be exactly " . ExpectedCount)
+			if TestVector["accept"]
+				AssertEqual("predicted text", _LTAP_LastAcceptedText,
+					"the accepted callback must receive the active tooltip text exactly once")
+		} finally {
+			_LTAP_Teardown()
+		}
+	}
+}
+
+Test("LLM accept: only bare physical Tab in the rendered HWND/control injects once (AHK-05)",
+	_LTAP_BareTabModifierAndFocusTable)
+
+
+
+
+
+; ======================================================
+; ======================================================
+; ======= 3/ Rendered generation owns acceptance =======
+; ======================================================
+; ======================================================
+
+_LTAP_VisibleAIsNotReattributedToNewEngineStateB() {
+	global _LLM_Engine, _LTAP_AcceptCount, _Stub_LlmPresentedRecord
+	_LTAP_Setup(100, 1001)
+	try {
+		; Tooltip A remains visible during its grace window. A physical character in
+		; control B updates the pending engine source, but it must not mutate the
+		; source already published by A's render.
+		_LLM_Engine["request_id"] := 42
+		_LLM_Engine["request_accept_source"] := Map(
+			"hwnd", 200, "control", 2001, "request_id", 42)
+		Accepted := LLM_Tooltip_TryAcceptTab(
+			true, [], _LTAP_Input(true, false, false, false, false, 200, 2001),
+			_LTAP_RecordAccept)
+		AssertFalse(Accepted,
+			"a still-visible tooltip rendered for control A must never inject into newly focused control B")
+		AssertEqual(0, _LTAP_AcceptCount,
+			"rewriting pending engine focus to B must not re-attribute A's visible prediction")
+		Rendered := _Stub_LlmPresentedRecord.Lifecycle.AcceptSource
+		AssertEqual(100, Rendered["hwnd"], "A's rendered HWND must remain immutable")
+		AssertEqual(1001, Rendered["control"], "A's rendered control token must remain immutable")
+	} finally {
+		_LTAP_Teardown()
+	}
+}
+
+Test("LLM accept: a visible A tooltip is not re-attributed when pending input moves to B (AHK-05)",
+	_LTAP_VisibleAIsNotReattributedToNewEngineStateB)
+
+_LTAP_RenderSourceRequiresExactRequestIdentity() {
+	global _LLM_Engine
+	_LTAP_Setup()
+	try {
+		Source := _LLM_Engine_RequestAcceptSourceForRender(41)
+		AssertTrue(Source is Map,
+			"the request that owns the render must resolve a detached accept source")
+		AssertEqual(100, Source["hwnd"], "the matching request must preserve its HWND")
+		AssertEqual(1001, Source["control"],
+			"the matching request must preserve its focused-control token")
+		AssertEqual("", _LLM_Engine_RequestAcceptSourceForRender(42),
+			"a superseded request id must not borrow the current request's focus")
+		AssertEqual("", _LLM_Engine_RequestAcceptSourceForRender(),
+			"a render with no request identity must fail closed")
+		Source["hwnd"] := 999
+		AssertEqual(100, _LLM_Engine["request_accept_source"]["hwnd"],
+			"the render-owned source must be detached from mutable request state")
+	} finally {
+		_LTAP_Teardown()
+	}
+}
+
+Test("LLM accept: rendered focus source requires an exact request identity (AHK-05)",
+	_LTAP_RenderSourceRequiresExactRequestIdentity)
+
+_LTAP_ReentrantRawCallerInjectsOnce() {
+	global _LLM_AcceptInProgress
+	global _LTAP_AcceptCount, _LTAP_ReentrySnapshot, _LTAP_ReentryResult
+	global _LTAP_ReentryRemapResult, _LTAP_ReentryCtrlResult
+	_LTAP_Setup()
+	try {
+		_LTAP_ReentrySnapshot := _LTAP_Input()
+		Accepted := LLM_Tooltip_TryAcceptTab(
+			true, [], _LTAP_ReentrySnapshot, _LTAP_RecordAcceptAndReenter)
+		AssertTrue(Accepted, "the outer bare-Tab acceptance must succeed")
+		AssertTrue(_LTAP_ReentryResult,
+			"a sibling callback for the same physical Tab must consume the existing acceptance claim")
+		AssertFalse(_LTAP_ReentryRemapResult,
+			"a remap must not join an unrelated physical-Tab acceptance claim")
+		AssertFalse(_LTAP_ReentryCtrlResult,
+			"Ctrl+Tab must not join a bare-Tab acceptance claim")
+		AssertEqual(1, _LTAP_AcceptCount,
+			"HotIf/InputHook re-entry must dispatch exactly one injection callback")
+		AssertFalse(_LLM_AcceptInProgress,
+			"the deterministic callback seam must release its acceptance claim on return")
+	} finally {
+		_LTAP_Teardown()
+	}
+}
+
+Test("LLM accept: concurrent raw caller joins one claim without double-injecting (AHK-05)",
+	_LTAP_ReentrantRawCallerInjectsOnce)
+
+
+
+
+
+; ======================================================
+; ======================================================
+; ======= 4/ Deferred output admission epochs ==========
+; ======================================================
+; ======================================================
+
+_LTAP_AdmissionState(Hwnd := 100, Control := 1001, Physical := 500,
+		Content := 20, Context := 30, Request := 40, Suspended := false) {
+	return Map(
+		"hwnd", Hwnd,
+		"control", Control,
+		"physical_generation", Physical,
+		"content_generation", Content,
+		"context_generation", Context,
+		"request_id", Request,
+		"suspended", Suspended
+	)
+}
+
+_LTAP_DeferredAdmissionRejectsEveryStaleDimension() {
+	Expected := _LTAP_AdmissionState()
+	Vectors := [
+		Map("label", "exact state", "live", _LTAP_AdmissionState(), "allowed", true),
+		Map("label", "new HWND", "live", _LTAP_AdmissionState(101), "allowed", false),
+		Map("label", "new control", "live", _LTAP_AdmissionState(100, 1002), "allowed", false),
+		Map("label", "new physical input", "live", _LTAP_AdmissionState(100, 1001, 501), "allowed", false),
+		Map("label", "content ABA", "live", _LTAP_AdmissionState(100, 1001, 500, 21), "allowed", false),
+		Map("label", "caret/navigation reset", "live", _LTAP_AdmissionState(100, 1001, 500, 20, 31), "allowed", false),
+		Map("label", "new engine request", "live", _LTAP_AdmissionState(100, 1001, 500, 20, 30, 41), "allowed", false),
+		Map("label", "driver suspended", "live", _LTAP_AdmissionState(100, 1001, 500, 20, 30, 40, true), "allowed", false),
+		Map("label", "zero target", "live", _LTAP_AdmissionState(0, 0), "allowed", false)
+	]
+	for Vector in Vectors {
+		AssertEqual(Vector["allowed"],
+			_LLM_Bridge_TextAdmissionMatches(Expected, Vector["live"]),
+			Vector["label"] . ": deferred output admission verdict")
+	}
+	Malformed := Expected.Clone()
+	Malformed.Delete("content_generation")
+	AssertFalse(_LLM_Bridge_TextAdmissionMatches(Expected, Malformed),
+		"a missing admission dimension must fail closed")
+	StringZero := _LTAP_AdmissionState()
+	StringZero["request_id"] := "40"
+	AssertFalse(_LLM_Bridge_TextAdmissionMatches(Expected, StringZero),
+		"numeric-looking strings must not pass the strictly typed admission contract")
+}
+
+Test("LLM accept: deferred output rechecks target and every ABA epoch (llm-output-atomicity)",
+	_LTAP_DeferredAdmissionRejectsEveryStaleDimension)
+
+
+
+
+
+; ===========================================================
+; ===========================================================
+; ======= 6/ Validation chord inserts its chosen slot =======
+; ===========================================================
+; ===========================================================
+
+; The slot primitive runs after the chord's modifiers were released: it must
+; demand the exact presented record/surface, the chosen slot still active, no
+; modifier held and the rendering control focused (llm-val-chord-inserts).
+_LTAP_SlotAcceptPolicyTable() {
+	global _Stub_LlmPresentedRecord, _LTAP_AcceptCount, _LTAP_LastAcceptedText
+	Vectors := [
+		Map("label", "released chord, same record and control", "accept", true),
+		Map("label", "Alt still held", "accept", false,
+			"input", _LTAP_Input(false, false, true)),
+		Map("label", "Ctrl+Shift still held", "accept", false,
+			"input", _LTAP_Input(false, true, false, true)),
+		Map("label", "focus moved to another control", "accept", false,
+			"input", _LTAP_Input(false, false, false, false, false, 100, 1002)),
+		Map("label", "unverifiable focus", "accept", false,
+			"input", _LTAP_Input(false, false, false, false, false, 0, 0, false)),
+		Map("label", "slot beyond the prediction", "accept", false, "slot", 2),
+		Map("label", "prediction replaced", "accept", false, "replaced", true)
+	]
+	for TestVector in Vectors {
+		_LTAP_Setup()
+		try {
+			Record := _Stub_LlmPresentedRecord
+			if TestVector.Get("replaced", false)
+				Record := {Kind: "prediction"}
+			Accepted := LLM_Tooltip_TryAcceptSlot(Record, Record,
+				TestVector.Get("slot", 1),
+				TestVector.Get("input", _LTAP_Input(false)),
+				_LTAP_RecordAccept)
+			AssertEqual(TestVector["accept"], Accepted,
+				TestVector["label"] . ": slot acceptance must follow its canonical policy")
+			AssertEqual(TestVector["accept"] ? 1 : 0, _LTAP_AcceptCount,
+				TestVector["label"] . ": injection count")
+			if TestVector["accept"]
+				AssertEqual("predicted text", _LTAP_LastAcceptedText,
+					"the chosen slot text must be injected exactly once")
+		} finally {
+			_LTAP_Teardown()
+		}
+	}
+}
+
+Test("LLM accept: released validation chord inserts only its exact slot (llm-val-chord-inserts)",
+	_LTAP_SlotAcceptPolicyTable)
+
+; An external program's request (the registered accept message) is not a key:
+; it needs no physical Tab, yet keeps the focus and modifier gates, and the
+; bridge ignores it while inactive.
+_LTAP_AutomationAcceptPolicyTable() {
+	global _Stub_LlmTooltipVisible, _Stub_LlmPresentedRecord
+	global _LTAP_AcceptCount, _LTAP_LastAcceptedText
+	Vectors := [
+		Map("label", "request in the originating control, no key down", "accept", true),
+		Map("label", "Ctrl still held", "accept", false,
+			"input", _LTAP_Input(false, true)),
+		Map("label", "Win still held", "accept", false,
+			"input", _LTAP_Input(false, false, false, false, true)),
+		Map("label", "focus moved to another window", "accept", false,
+			"input", _LTAP_Input(false, false, false, false, false, 200, 1001)),
+		Map("label", "focus moved to another control", "accept", false,
+			"input", _LTAP_Input(false, false, false, false, false, 100, 1002)),
+		Map("label", "unverifiable focus", "accept", false,
+			"input", _LTAP_Input(false, false, false, false, false, 0, 0, false)),
+		Map("label", "no prediction shown", "accept", false, "hidden", true)
+	]
+	for TestVector in Vectors {
+		_LTAP_Setup()
+		try {
+			if TestVector.Get("hidden", false) {
+				_Stub_LlmTooltipVisible := false
+				_Stub_LlmPresentedRecord := 0
+			}
+			Accepted := LLM_Tooltip_TryAcceptAutomation(
+				TestVector.Get("input", _LTAP_Input(false)), _LTAP_RecordAccept)
+			AssertEqual(TestVector["accept"], Accepted,
+				TestVector["label"] . ": automation acceptance must follow its canonical policy")
+			AssertEqual(TestVector["accept"] ? 1 : 0, _LTAP_AcceptCount,
+				TestVector["label"] . ": injection count")
+			if TestVector["accept"]
+				AssertEqual("predicted text", _LTAP_LastAcceptedText,
+					"the active slot text must be injected exactly once")
+		} finally {
+			_LTAP_Teardown()
+		}
+	}
+}
+
+Test("LLM accept: an automation request inserts only in the owning control (llm-automation-accepts)",
+	_LTAP_AutomationAcceptPolicyTable)
+
+_LTAP_AutomationRequestIgnoredWhileBridgeInactive() {
+	global _LLM_Bridge_Active
+	Previous := _LLM_Bridge_Active
+	_LLM_Bridge_Active := false
+	try {
+		AssertEqual(0, _LLM_Automation_OnAcceptMessage(0, 0,
+				LLM_Automation_AcceptMessage(), 0),
+			"an inactive bridge must refuse, not acknowledge, the request")
+	} finally {
+		_LLM_Bridge_Active := Previous
+	}
+	Assert(LLM_Automation_AcceptMessage() >= 0xC000,
+		"the request must use a registered message, never a fixed WM_APP number another program could reuse")
+}
+
+Test("LLM accept: an inactive bridge refuses automation requests (llm-automation-accepts)",
+	_LTAP_AutomationRequestIgnoredWhileBridgeInactive)
+
+
+
+
+
+; =========================================================
+; =========================================================
+; ======= 7/ A tap-hold's Tab tap is the user's Tab =======
+; =========================================================
+; =========================================================
+
+; The recommended preset taps Tab with AltGr (tap_hold defaults: alt_gr
+; tap_action "tab"). Its tap sent the Tab with no provenance, which the policy
+; refused as synthetic, so it typed a Tab over every prediction instead of
+; inserting it (llm-accept-inserts). The dispatcher now names the key it taps,
+; and the policy trusts that Tab only while the very tap is being dispatched.
+
+; Runs Fn inside one real dispatch of KeyId's tap, with KeyId configured.
+_LTAP_InTapDispatch(KeyId, Fn) {
+	global TapHold, _TH_TapHoldTrackState
+	PreviousTapHold := TapHold
+	TapHold := Map("keys", Map(KeyId, Map(
+		"tap_action", "tab",
+		"time_activation_seconds", 0.2)), "layers", Map())
+	_TH_TapHoldTrackState := Map()
+	try return TapHoldDispatchTap(KeyId, Fn)
+	finally {
+		TapHold := PreviousTapHold
+		_TH_TapHoldTrackState := Map()
+	}
+}
+
+_LTAP_TapHoldTabTapAccepts() {
+	_LTAP_Setup()
+	try {
+		; The tap runs on the key's release: Tab itself is never down.
+		Released := _LTAP_Input(false)
+		Probe := { Provenance: 0, Accepted: -1 }
+		Dispatched := _LTAP_InTapDispatch("alt_gr", (*) => (
+			Probe.Provenance := TapHoldTapProvenance(),
+			Probe.Accepted := LLM_Tooltip_TryAcceptTab(Probe.Provenance, [],
+				Released, _LTAP_RecordAccept)))
+		AssertTrue(Dispatched, "the AltGr tap must be dispatched")
+		AssertTrue((Probe.Provenance is Map)
+				&& Probe.Provenance["kind"] == "tap_hold_tap"
+				&& Probe.Provenance["key_id"] == "alt_gr",
+			"a Tab tapped inside the dispatch must carry the key the user tapped")
+		AssertTrue(Probe.Accepted,
+			"the tap-hold's Tab must accept the shown prediction like the physical Tab")
+		AssertEqual(1, _LTAP_AcceptCount, "the prediction must be injected exactly once")
+		AssertEqual("predicted text", _LTAP_LastAcceptedText)
+		AssertEqual(false, TapHoldTapProvenance(),
+			"no tap provenance may outlive its dispatch")
+	} finally {
+		_LTAP_Teardown()
+	}
+}
+
+Test("LLM accept: a tap-hold tap emitting Tab inserts the shown prediction (llm-accept-inserts)",
+	_LTAP_TapHoldTabTapAccepts)
+
+_LTAP_OnlyTheDispatchedTapHoldTabAccepts() {
+	_LTAP_Setup()
+	try {
+		Released := _LTAP_Input(false)
+		Source := Map("hwnd", 100, "control", 1001)
+		Stale := Map("kind", "tap_hold_tap", "key_id", "alt_gr")
+		AssertFalse(LLM_Tooltip_TryAcceptTab(Stale, [], Released, _LTAP_RecordAccept),
+			"a tap provenance replayed outside its dispatch must not accept")
+		AssertEqual("the tap of alt_gr is no longer being dispatched",
+			_LLM_Accept_RefusalGate(Stale, [], Released, Source),
+			"the stale provenance must be named")
+		AssertFalse(LLM_Tooltip_TryAcceptTab(false, [], Released, _LTAP_RecordAccept),
+			"a gesture's Tab carries no provenance and must never accept")
+		AssertEqual("the Tab is neither the physical Tab nor a tap-hold's tap",
+			_LLM_Accept_RefusalGate(false, [], Released, Source))
+		Probe := { Chord: -1, Other: -1, Elsewhere: -1 }
+		_LTAP_InTapDispatch("alt_gr", (*) => (
+			Probe.Chord := LLM_Tooltip_TryAcceptTab(TapHoldTapProvenance(), "Blind",
+				Released, _LTAP_RecordAccept),
+			Probe.Other := LLM_Tooltip_TryAcceptTab(
+				Map("kind", "tap_hold_tap", "key_id", "left_alt"), [],
+				Released, _LTAP_RecordAccept),
+			Probe.Elsewhere := LLM_Tooltip_TryAcceptTab(TapHoldTapProvenance(), [],
+				_LTAP_Input(false, false, false, false, false, 200),
+				_LTAP_RecordAccept)))
+		AssertFalse(Probe.Chord, "a tap under a held modifier is a chord, never an acceptance")
+		AssertFalse(Probe.Other, "only the key being tapped may accept")
+		AssertFalse(Probe.Elsewhere, "the tap must be typed in the control the prediction belongs to")
+		AssertEqual(0, _LTAP_AcceptCount, "no refused Tab may inject")
+	} finally {
+		_LTAP_Teardown()
+	}
+}
+
+Test("LLM accept: only the tap being dispatched, bare and in its control, accepts (llm-accept-inserts)",
+	_LTAP_OnlyTheDispatchedTapHoldTabAccepts)
+
+; The real AltGr tap, through _TapHoldInvokeConfiguredAction and
+; TapHoldEmitKeyTap, reaches the policy as the user's Tab. The test process is
+; not the control the prediction was rendered for, so the policy refuses on
+; focus: the Tab is typed, and the refusal is one WARNING naming that gate.
+; Before the fix the tap reached the policy as a synthetic Tab, refused silently.
+_LTAP_RealAltGrTapReachesThePolicyAsTheUsersTab() {
+	global _AHK_SendInput, _TapHoldModifierIsHeld, _Stub_LlmTooltipLoading
+	_LTAP_Setup()
+	PreviousSend := _AHK_SendInput
+	PreviousHeld := _TapHoldModifierIsHeld
+	Sent := []
+	Captured := []
+	_AHK_SendInput := (Keys) => (Sent.Push(Keys), Keys)
+	_TapHoldModifierIsHeld := (Name) => false
+	_Stub_LlmTooltipLoading := false
+	LoggerSetTestSink((Line) => Captured.Push(Line))
+	try {
+		_LTAP_InTapDispatch("alt_gr", (*) => _TapHoldInvokeConfiguredAction("alt_gr"))
+		AssertEqual(1, Sent.Length, "the refused tap must still type its Tab")
+		AssertEqual("{Tab}", Sent.Length ? Sent[1] : "")
+		Traced := 0
+		for Line in Captured {
+			if InStr(Line, "[WARNING]")
+					&& InStr(Line, "Tab not accepted over a shown prediction")
+					&& InStr(Line, "focus")
+				Traced++
+		}
+		AssertEqual(1, Traced,
+			"the AltGr tap must reach the policy as the user's Tab and be refused on focus only")
+		AssertEqual(0, _LTAP_AcceptCount)
+	} finally {
+		LoggerClearTestSink()
+		_AHK_SendInput := PreviousSend
+		_TapHoldModifierIsHeld := PreviousHeld
+		_LTAP_Teardown()
+	}
+}
+
+Test("LLM accept: the real AltGr Tab tap reaches the policy as the user's Tab (llm-accept-inserts)",
+	_LTAP_RealAltGrTapReachesThePolicyAsTheUsersTab)
+
+
+; Deferred external requests retain one render and one bridge lifecycle.
+_LTAP_WithAutomationOwner(Fn) {
+	global _LLM_Bridge_Active, _LLM_Automation_Generation
+	global _LLM_Automation_Pending, _LLM_Automation_Listening
+	global _LLM_Engine, _LLM_AcceptInProgress, _Stub_LlmPresentedRecord
+	global _Stub_LlmTooltipVisible, _Stub_LlmTooltipText
+	global _LTAP_AcceptCount, _LTAP_LastAcceptedText, _LTAP_ReentryResult
+	global _LTAP_ReentryRemapResult, _LTAP_ReentryCtrlResult
+	Saved := {
+		Active: _LLM_Bridge_Active, Generation: _LLM_Automation_Generation,
+		Pending: _LLM_Automation_Pending, Listening: _LLM_Automation_Listening,
+		Request: _LLM_Engine["request_id"], Source: _LLM_Engine["request_accept_source"],
+		Progress: _LLM_AcceptInProgress, Record: _Stub_LlmPresentedRecord,
+		Visible: _Stub_LlmTooltipVisible, Text: _Stub_LlmTooltipText,
+		Count: _LTAP_AcceptCount, Accepted: _LTAP_LastAcceptedText,
+		Reentry: _LTAP_ReentryResult, Remap: _LTAP_ReentryRemapResult,
+		Ctrl: _LTAP_ReentryCtrlResult
+	}
+	_LLM_Bridge_Active := true
+	_LLM_Automation_Pending := 0
+	_LLM_Automation_Listening := false
+	_LTAP_Setup()
+	try Fn.Call()
+	finally {
+		; The timer port never starts a native timer. Break any retained test cycle.
+		if IsObject(_LLM_Automation_Pending)
+			_LLM_Automation_Pending.Callback := 0
+		_LLM_Bridge_Active := Saved.Active
+		_LLM_Automation_Generation := Saved.Generation
+		_LLM_Automation_Pending := Saved.Pending
+		_LLM_Automation_Listening := Saved.Listening
+		_LLM_Engine["request_id"] := Saved.Request
+		_LLM_Engine["request_accept_source"] := Saved.Source
+		_LLM_AcceptInProgress := Saved.Progress
+		_Stub_LlmPresentedRecord := Saved.Record
+		_Stub_LlmTooltipVisible := Saved.Visible
+		_Stub_LlmTooltipText := Saved.Text
+		_LTAP_AcceptCount := Saved.Count
+		_LTAP_LastAcceptedText := Saved.Accepted
+		_LTAP_ReentryResult := Saved.Reentry
+		_LTAP_ReentryRemapResult := Saved.Remap
+		_LTAP_ReentryCtrlResult := Saved.Ctrl
+	}
+}
+
+_LTAP_AutomationTimer(Owner, Callback, Period) {
+	Owner.Periods.Push(Period)
+	Owner.Callback := Callback
+	if Period == 0 && Owner.FailDisarm
+		throw Owner.Error
+}
+
+_LTAP_AutomationOwnerCase(Kind) {
+	global _LLM_Bridge_Active, _LLM_Automation_Generation
+	global _LLM_Automation_Pending, _Stub_LlmPresentedRecord, _LTAP_AcceptCount
+	Timer := {Periods: [], Callback: 0, FailDisarm: false, Error: Error("owned disarm failed")}
+	State := _LLM_Automation_Queue(LLM_Tooltip_GetAcceptSnapshot(),
+		_LTAP_AutomationTimer.Bind(Timer))
+	Callback := Timer.Callback
+	if Kind == "replacement"
+		_LTAP_Setup()
+	else if Kind == "slot"
+		_Stub_LlmPresentedRecord.Slots[1] := "new slot text"
+	else if Kind == "generation"
+		_LLM_Automation_Generation += 1
+	else if Kind == "supersede" {
+		Timer.FailDisarm := true
+		Caught := 0
+		try _LLM_Automation_Queue(LLM_Tooltip_GetAcceptSnapshot(),
+			_LTAP_AutomationTimer.Bind(Timer))
+		catch as Err
+			Caught := Err
+		AssertEqual(ObjPtr(Timer.Error), ObjPtr(Caught), "failed replacement must remain explicit")
+	}
+	else if Kind == "restart" {
+		Timer.FailDisarm := true
+		_LLM_Bridge_Active := false
+		Caught := 0
+		try _LLM_Automation_Listen(false)
+		catch as Err
+			Caught := Err
+		AssertEqual(ObjPtr(Timer.Error), ObjPtr(Caught), "disarm failure must remain explicit")
+		AssertEqual(ObjPtr(State), ObjPtr(_LLM_Automation_Pending),
+			"failed disarm must retain its exact callback owner")
+		_LLM_Bridge_Active := true
+	} else if Kind == "stop" {
+		_LLM_Bridge_Active := false
+		_LLM_Automation_Listen(false)
+		_LLM_Bridge_Active := true
+		AssertEqual(0, _LLM_Automation_Pending, "stop must retire the queued owner")
+	}
+	Accepted := Callback.Call(_LTAP_Input(false), _LTAP_RecordAccept)
+	AssertEqual(Kind == "same", Accepted, Kind . ": deferred request admission")
+	AssertEqual(Kind == "same" ? 1 : 0, _LTAP_AcceptCount,
+		Kind . ": only the admitted original render may inject")
+	AssertFalse(Callback.Call(_LTAP_Input(false), _LTAP_RecordAccept),
+		"a completed callback must never replay")
+	if Kind != "same"
+		AssertEqual("", _Stub_LlmPresentedRecord.Lifecycle.Outcome,
+			"a refused stale request must not claim the live render")
+}
+
+_LTAP_AutomationOwnsRenderAndLifecycle() {
+	for Kind in ["same", "replacement", "slot", "generation", "supersede", "stop", "restart"]
+		_LTAP_WithAutomationOwner(_LTAP_AutomationOwnerCase.Bind(Kind))
+}
+
+Test("LLM automation owner: deferred requests cannot accept a replacement or restarted bridge",
+	_LTAP_AutomationOwnsRenderAndLifecycle)
+
+_LTAP_AutomationListenerPort(Owner, Message, Callback, Threads) {
+	Owner.Calls.Push(Threads)
+	if Threads == 1 || Owner.FailClose
+		throw Threads == 1 ? Owner.Primary : Owner.Secondary
+}
+
+_LTAP_AutomationStopPort(Owner, Port) {
+	global _LLM_Bridge_Active
+	Owner.Stops += 1
+	_LLM_Bridge_Active := false
+	_LLM_Automation_Listen(false, Port)
+}
+
+_LTAP_AutomationListenerFailureCase(FailClose) {
+	global _LLM_Bridge_Active, _LLM_Automation_Listening
+	Owner := {Calls: [], Stops: 0, FailClose: FailClose,
+		Primary: Error("registration failed"), Secondary: Error("retirement failed")}
+	Port := Map("message", () => 0xC123, "listen", _LTAP_AutomationListenerPort.Bind(Owner))
+	Caught := 0
+	try _LLM_Automation_StartListener(Port, _LTAP_AutomationStopPort.Bind(Owner, Port))
+	catch as Err
+		Caught := Err
+	AssertEqual(ObjPtr(Owner.Primary), ObjPtr(Caught), "cleanup must preserve the first failure")
+	AssertFalse(_LLM_Bridge_Active, "registration failure must fence the bridge")
+	AssertEqual(1, Owner.Stops, "started bridge cleanup must be attempted exactly once")
+	AssertEqual(2, Owner.Calls.Length, "registration and exact listener retirement must both be attempted")
+	AssertEqual(FailClose, _LLM_Automation_Listening,
+		"failed retirement remains owned; successful retirement is acknowledged")
+	Owner.FailClose := false
+	_LLM_Automation_Listen(false, Port)
+	AssertFalse(_LLM_Automation_Listening, "late retirement may close only the retained listener")
+}
+
+_LTAP_AutomationListenerFailure() {
+	for FailClose in [false, true]
+		_LTAP_WithAutomationOwner(_LTAP_AutomationListenerFailureCase.Bind(FailClose))
+}
+
+Test("LLM automation owner: listener failures fence the bridge and preserve the first exception",
+	_LTAP_AutomationListenerFailure)
+
+_LTAP_AutomationSchedulingPort(Owner, Callback, Period) {
+	if Period == -1
+		throw Owner.Primary
+	if Owner.FailClose
+		throw Owner.Secondary
+}
+
+_LTAP_AutomationSchedulingFailureCase() {
+	global _LLM_Automation_Pending
+	Owner := {Primary: Error("scheduling failed"), Secondary: Error("disarm failed"), FailClose: true}
+	Caught := 0
+	try _LLM_Automation_Queue(LLM_Tooltip_GetAcceptSnapshot(),
+		_LTAP_AutomationSchedulingPort.Bind(Owner))
+	catch as Err
+		Caught := Err
+	AssertEqual(ObjPtr(Owner.Primary), ObjPtr(Caught), "failed scheduling keeps its original exception")
+	AssertTrue(IsObject(_LLM_Automation_Pending), "failed disarm retains the exact callback")
+	State := _LLM_Automation_Pending
+	Callback := State.Callback
+	Owner.FailClose := false
+	_LLM_Automation_CancelPending()
+	AssertEqual(0, _LLM_Automation_Pending, "a late disarm acknowledgement retires the owner")
+	AssertFalse(Callback.Call(_LTAP_Input(false), _LTAP_RecordAccept),
+		"a failed scheduling transaction must never accept if its callback later arrives")
+}
+
+_LTAP_AutomationSchedulingFailure() {
+	_LTAP_WithAutomationOwner(_LTAP_AutomationSchedulingFailureCase)
+}
+
+Test("LLM automation owner: timer failures retain debt without masking the first exception",
+	_LTAP_AutomationSchedulingFailure)

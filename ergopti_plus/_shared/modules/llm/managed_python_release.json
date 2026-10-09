@@ -1,0 +1,45 @@
+{
+	"schema_version": 1,
+	"uv_release": "0.12.21",
+	"source": {
+		"url": "https://raw.githubusercontent.com/astral-sh/uv/0.12.21/crates/uv-python/download-metadata.json",
+		"sha256": "6167f194053b58a461b6b440bbfff121f0971bd6757fce95cfec90b19ee080df",
+		"bytes": 3176495
+	},
+	"downloads": {
+		"cpython-3.11.16-darwin-aarch64-none": {
+			"name": "cpython",
+			"arch": {
+				"family": "aarch64",
+				"variant": null
+			},
+			"os": "darwin",
+			"libc": "none",
+			"major": 3,
+			"minor": 11,
+			"patch": 16,
+			"prerelease": "",
+			"url": "https://github.com/astral-sh/python-build-standalone/releases/download/20260929/cpython-3.11.16%2B20260929-aarch64-apple-darwin-install_only_stripped.tar.gz",
+			"sha256": "53141f31b7cfb2bccf89c2a877827128657dbb8650db06a9a08c7886c28a45ed",
+			"variant": null,
+			"build": "20260929"
+		},
+		"cpython-3.11.16-darwin-x86_64-none": {
+			"name": "cpython",
+			"arch": {
+				"family": "x86_64",
+				"variant": null
+			},
+			"os": "darwin",
+			"libc": "none",
+			"major": 3,
+			"minor": 11,
+			"patch": 16,
+			"prerelease": "",
+			"url": "https://github.com/astral-sh/python-build-standalone/releases/download/20260929/cpython-3.11.16%2B20260929-x86_64-apple-darwin-install_only_stripped.tar.gz",
+			"sha256": "d1143a947050fbbd17edc0d66ff3f7a63205c8364ef108bddfeece5f360096f8",
+			"variant": null,
+			"build": "20260929"
+		}
+	}
+}

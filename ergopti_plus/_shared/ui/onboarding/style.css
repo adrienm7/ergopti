@@ -1,0 +1,522 @@
+/* ui/onboarding/style.css */
+
+/* =========================================================================== */
+/* Onboarding Wizard Styles.                                                   */
+/*                                                                             */
+/* Multi-step first-run wizard, matching the system design language used by   */
+/* every Ergopti webview window: a fixed step bar, one scrollable content      */
+/* region and a permanently visible action footer.                             */
+/* =========================================================================== */
+
+/* =============================== */
+/* =============================== */
+/* ======= 1/ Reset & Base ======= */
+/* =============================== */
+/* =============================== */
+
+* {
+	box-sizing: border-box;
+}
+
+html,
+body {
+	height: 100%;
+	margin: 0;
+}
+
+body {
+	background: #f5f5f7;
+	color: #333;
+	font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Helvetica Neue', sans-serif;
+	font-size: 14px;
+	/* The outer page never scrolls: the step region does, so the footer
+	   buttons stay reachable on every page whatever its length. */
+	overflow: hidden;
+}
+
+/* ====================================== */
+/* ====================================== */
+/* ======= 2/ Layout & Structure ======= */
+/* ====================================== */
+/* ====================================== */
+
+#wizard {
+	display: flex;
+	flex-direction: column;
+	height: 100%;
+	/* A larger bottom padding keeps the buttons off the window's edge. */
+	padding: 20px 24px 22px;
+}
+
+/* The only scrollable region. The negative right margin moves the overlay
+   scrollbar next to the window edge while the padding keeps text clear of it. */
+.step-scroll {
+	flex: 1 1 auto;
+	margin-right: -14px;
+	min-height: 0;
+	overflow-y: auto;
+	padding-right: 12px;
+}
+
+.step {
+	display: flex;
+	flex-direction: column;
+}
+
+.hidden,
+.step.hidden {
+	display: none;
+}
+
+/* =============================== */
+/* =============================== */
+/* ======= 3/ Step Indicator ===== */
+/* =============================== */
+/* =============================== */
+
+.step-bar {
+	align-items: center;
+	display: flex;
+	flex-shrink: 0;
+	gap: 6px;
+	justify-content: center;
+	margin-bottom: 18px;
+}
+
+.step-dot {
+	background: #d0d0d5;
+	border-radius: 50%;
+	height: 7px;
+	transition:
+		background 0.2s,
+		transform 0.2s;
+	width: 7px;
+}
+
+.step-dot.active {
+	background: #007aff;
+	transform: scale(1.25);
+}
+
+.step-dot.done {
+	background: #34c759;
+}
+
+/* =============================== */
+/* =============================== */
+/* ======= 4/ Typography ========= */
+/* =============================== */
+/* =============================== */
+
+h1 {
+	color: #1d1d1f;
+	font-size: 17px;
+	font-weight: 600;
+	margin: 0 0 6px;
+}
+
+.desc {
+	color: #555;
+	font-size: 12.5px;
+	line-height: 1.55;
+	margin: 0 0 14px;
+	white-space: pre-line;
+}
+
+.hint {
+	color: #888;
+	font-size: 11px;
+	font-style: italic;
+	line-height: 1.5;
+	margin: 8px 0 0;
+}
+
+.warning {
+	background: #fff8e1;
+	border: 1px solid #f0c040;
+	border-radius: 6px;
+	color: #7a5500;
+	font-size: 11px;
+	line-height: 1.5;
+	margin: 0 0 12px;
+	padding: 8px 10px;
+	white-space: pre-line;
+}
+
+.note {
+	background: #eef4ff;
+	border: 1px solid #c6d8f5;
+	border-radius: 6px;
+	color: #2a4a7a;
+	font-size: 12px;
+	line-height: 1.5;
+	margin: 0 0 12px;
+	padding: 8px 10px;
+	white-space: pre-line;
+}
+
+/* ====================================== */
+/* ====================================== */
+/* ======= 5/ Language List ============= */
+/* ====================================== */
+/* ====================================== */
+
+.lang-list {
+	border: 1px solid #e0e0e0;
+	border-radius: 8px;
+}
+
+.lang-item {
+	align-items: center;
+	background: #fff;
+	border-bottom: 1px solid #f0f0f0;
+	cursor: pointer;
+	display: flex;
+	gap: 10px;
+	padding: 9px 12px;
+	transition: background 0.1s;
+	user-select: none;
+}
+
+.lang-item:first-child {
+	border-radius: 8px 8px 0 0;
+}
+
+.lang-item:last-child {
+	border-bottom: none;
+	border-radius: 0 0 8px 8px;
+}
+
+.lang-item:hover {
+	background: #f0f4ff;
+}
+
+.lang-item.selected {
+	background: #e8f0ff;
+}
+
+.lang-item.selected .lang-name {
+	color: #007aff;
+	font-weight: 600;
+}
+
+.lang-flag {
+	align-items: center;
+	display: flex;
+	flex-shrink: 0;
+	font-size: 18px;
+	justify-content: center;
+	line-height: 1;
+	width: 24px;
+}
+
+/* PNG flag (Windows path) sized to sit on the emoji baseline. */
+.lang-flag-img {
+	display: block;
+	height: auto;
+	max-height: 16px;
+	width: 22px;
+}
+
+.lang-name {
+	color: #1d1d1f;
+	font-size: 13px;
+}
+
+/* ====================================== */
+/* ====================================== */
+/* ======= 6/ Folder Field ============== */
+/* ====================================== */
+/* ====================================== */
+
+.field-group {
+	display: flex;
+	margin-bottom: 4px;
+	width: 100%;
+}
+
+#config-input {
+	background: #fff;
+	border: 1.5px solid #d0d0d0;
+	border-radius: 7px 0 0 7px;
+	border-right: none;
+	color: #1d1d1f;
+	flex: 1;
+	font-family: inherit;
+	font-size: 12.5px;
+	min-width: 0;
+	outline: none;
+	padding: 7px 10px;
+	transition:
+		border-color 0.15s,
+		box-shadow 0.15s;
+}
+
+#config-input:focus {
+	border-color: #007aff;
+	box-shadow: 0 0 0 3px rgba(0, 122, 255, 0.15);
+	z-index: 1;
+}
+
+#config-browse {
+	border-radius: 0 7px 7px 0;
+	flex-shrink: 0;
+	padding: 7px 12px;
+	white-space: nowrap;
+}
+
+/* ====================================== */
+/* ====================================== */
+/* ======= 7/ Question & Radio Cards ==== */
+/* ====================================== */
+/* ====================================== */
+
+.question {
+	margin: 0 0 12px;
+}
+
+.question-label {
+	color: #1d1d1f;
+	font-size: 13px;
+	font-weight: 600;
+	margin: 0 0 8px;
+}
+
+.radio-row {
+	display: flex;
+	gap: 8px;
+}
+
+.radio-row .radio-card {
+	flex: 1 1 0;
+}
+
+.magic-options {
+	display: flex;
+	flex-direction: column;
+	gap: 6px;
+}
+
+.radio-card {
+	align-items: center;
+	background: #fff;
+	border: 1.5px solid #e0e0e0;
+	border-radius: 8px;
+	cursor: pointer;
+	display: flex;
+	gap: 10px;
+	padding: 10px 14px;
+	transition:
+		border-color 0.15s,
+		background 0.1s;
+}
+
+.radio-card:hover {
+	background: #f5f8ff;
+	border-color: #a0bfff;
+}
+
+.radio-card input[type='radio'] {
+	accent-color: #007aff;
+	flex-shrink: 0;
+	height: 16px;
+	margin: 0;
+	width: 16px;
+}
+
+.radio-card input[type='radio']:checked + .radio-label {
+	color: #007aff;
+	font-weight: 500;
+}
+
+.radio-label {
+	color: #333;
+	flex: 1 1 auto;
+	font-size: 13px;
+	line-height: 1.4;
+}
+
+.magic-key {
+	margin: 0 0 12px;
+}
+
+.magic-input {
+	background: #fff;
+	border: 1.5px solid #d0d0d0;
+	border-radius: 7px;
+	color: #1d1d1f;
+	font-family: 'SF Mono', Monaco, Consolas, monospace;
+	font-size: 13px;
+	outline: none;
+	padding: 5px 10px;
+	text-align: center;
+	width: 70px;
+}
+
+.magic-input:focus {
+	border-color: #007aff;
+	box-shadow: 0 0 0 3px rgba(0, 122, 255, 0.15);
+}
+
+.magic-input.invalid {
+	border-color: #d11;
+	box-shadow: 0 0 0 3px rgba(221, 17, 17, 0.15);
+}
+
+/* ====================================== */
+/* ====================================== */
+/* ======= 8/ Checklist ================= */
+/* ====================================== */
+/* ====================================== */
+
+.checklist {
+	background: #fff;
+	border: 1px solid #e0e0e0;
+	border-radius: 8px;
+	margin: 0 0 12px;
+	padding: 8px 12px;
+}
+
+.checklist summary {
+	color: #1d1d1f;
+	cursor: pointer;
+	font-size: 12.5px;
+	font-weight: 600;
+	padding: 2px 0;
+	user-select: none;
+}
+
+.checklist-body {
+	margin-top: 6px;
+}
+
+.checklist-group.depth-1,
+.checklist-group.depth-2 {
+	margin-left: 18px;
+}
+
+.checklist-group-header .check-label {
+	font-weight: 600;
+}
+
+.check-row {
+	align-items: flex-start;
+	cursor: pointer;
+	display: flex;
+	gap: 8px;
+	padding: 3px 0;
+}
+
+.check-row input[type='checkbox'] {
+	accent-color: #007aff;
+	flex-shrink: 0;
+	margin: 2px 0 0;
+}
+
+.check-row input[type='checkbox']:disabled + .check-label {
+	color: #999;
+}
+
+.check-label {
+	color: #333;
+	font-size: 12.5px;
+	line-height: 1.4;
+}
+
+/* The separator between a trigger and its action: the arrows inside gesture
+   and action labels must never read as it. */
+.value-separator {
+	color: #007aff;
+	font-weight: 700;
+}
+
+.check-row input[type='checkbox']:disabled + .check-label .value-separator {
+	opacity: 0.6;
+}
+
+/* ===================================== */
+/* ===================================== */
+/* ======= 9/ Buttons ================= */
+/* ===================================== */
+/* ===================================== */
+
+.btns {
+	align-items: center;
+	display: flex;
+	flex-shrink: 0;
+	gap: 8px;
+	justify-content: flex-end;
+	margin-top: 14px;
+}
+
+button {
+	border: none;
+	border-radius: 7px;
+	cursor: pointer;
+	font-size: 12.5px;
+	font-weight: 500;
+	padding: 7px 18px;
+	transition: filter 0.1s;
+}
+
+button:hover {
+	filter: brightness(0.92);
+}
+
+.primary {
+	background: #007aff;
+	color: #fff;
+}
+
+.secondary {
+	background: #e0e0e0;
+	color: #333;
+}
+
+/* The Back button sits on the left, Next / Finish on the right. */
+#btn-back {
+	margin-right: auto;
+}
+
+/* ============================================== */
+/* ============================================== */
+/* ======= 10/ Gesture Registration (Win) ====== */
+/* ============================================== */
+/* ============================================== */
+
+/* Windows touchpad registration panel of the gestures page. */
+.gesture-register {
+	border-top: 1px solid #e8e8e8;
+	margin: 0 0 12px;
+	padding-top: 12px;
+}
+
+.register-section {
+	color: #1d1d1f;
+	font-size: 12px;
+	font-weight: 600;
+	margin: 0 0 10px;
+}
+
+.register-btn {
+	display: block;
+	width: 100%;
+}
+
+.register-btn + .hint {
+	margin-bottom: 10px;
+}
+
+.register-status {
+	font-size: 12px;
+	font-weight: 600;
+	margin: 12px 0 0;
+}
+
+.register-status.register-ok {
+	color: #1a8c3a;
+}
+
+.register-status.register-err {
+	color: #d11;
+}

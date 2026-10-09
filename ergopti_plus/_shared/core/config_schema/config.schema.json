@@ -1,0 +1,389 @@
+{
+	"$schema": "https://json-schema.org/draft/2020-12/schema",
+	"$id": "https://ergopti.com/schema/config.schema.json",
+	"title": "Ergopti+ user configuration (v2)",
+	"description": "JSON Schema strict for the unified config.toml consumed by both the AHK and Hammerspoon drivers. Validated at boot — strict in dev (ERGOPTI_DEV=1), warn-only in prod.",
+	"type": "object",
+	"additionalProperties": false,
+	"_comment_required": "Deliberately absent. Which top-level sections a config.toml must carry is per-driver, and the feature manifest's `platforms` list already says so — [sections.script] is [\"ahk\", \"hs\"] because Linux keeps its locale in its own XDG store. A hardcoded `required` here restated that in a second place, disagreed with the first, and the disagreement had to be pinned as a known gap. test-config-schema.cjs derives the presence rule from the manifest instead, per driver.",
+
+	"properties": {
+		"_meta": { "$ref": "#/$defs/meta" },
+		"script": { "$ref": "#/$defs/script" },
+		"hotstrings": { "$ref": "#/$defs/hotstrings" },
+		"llm": { "$ref": "#/$defs/llm" },
+		"metrics": { "$ref": "#/$defs/metrics" },
+		"shortcuts": { "$ref": "#/$defs/shortcuts" },
+		"gestures": { "$ref": "#/$defs/gestures" },
+		"layout": { "$ref": "#/$defs/layout" },
+		"tap_holds": {
+			"type": "object",
+			"additionalProperties": false,
+			"properties": { "enabled": { "type": "boolean" } }
+		},
+		"mod_combos": {
+			"description": "Linux simultaneous settings and known pair combo leaves; native source/output admission remains separately owned.",
+			"type": "object",
+			"additionalProperties": true,
+			"properties": {
+				"enabled": { "type": "boolean" },
+				"simultaneous_threshold_ms": { "type": "number", "exclusiveMinimum": 0 },
+				"symmetric": { "type": "boolean" },
+				"config": {
+					"type": "object",
+					"additionalProperties": {
+						"type": "object",
+						"additionalProperties": true,
+						"properties": { "combo": { "type": "string", "pattern": "^[a-z][a-z0-9_]*$" } }
+					}
+				}
+			}
+		},
+		"category_enabled": { "$ref": "#/$defs/category_enabled" },
+		"ui": { "$ref": "#/$defs/ui" }
+	},
+
+	"$defs": {
+		"meta": {
+			"description": "File metadata. schema_version is the config version the drivers migrate from at boot (_shared/core/config_schema/migrations.toml; docs/adr/009-config-versioning.md). A file without it is the registry's unstamped_version.",
+			"type": "object",
+			"additionalProperties": false,
+			"properties": {
+				"schema_version": { "type": "integer", "minimum": 1 }
+			}
+		},
+
+		"feature_toggle": {
+			"description": "Universal feature toggle. ``enabled`` is required; ``time_activation_seconds`` is optional (omission = instant activation).",
+			"type": "object",
+			"additionalProperties": false,
+			"required": ["enabled"],
+			"properties": {
+				"enabled": { "type": "boolean" },
+				"time_activation_seconds": { "type": "number", "minimum": 0 }
+			}
+		},
+
+		"feature_group": {
+			"description": "A named group of feature toggles (e.g. hotstrings.autocorrection).",
+			"type": "object",
+			"additionalProperties": { "$ref": "#/$defs/feature_toggle" }
+		},
+
+		"script": {
+			"type": "object",
+			"additionalProperties": false,
+			"required": ["locale", "log_level"],
+			"properties": {
+				"locale": {
+					"type": "string",
+					"pattern": "^[a-z]{2}$",
+					"description": "ISO 639-1 two-letter language code."
+				},
+				"log_level": {
+					"enum": ["DEBUG", "TRACE", "DONE", "INFO", "START", "SUCCESS", "WARNING", "ERROR"]
+				},
+				"show_error_dialog": {
+					"type": "boolean",
+					"description": "Whether a logged error may open the error window (Debug menu)."
+				},
+				"alt_gr_is_kana_remap": {
+					"oneOf": [{ "type": "boolean" }, { "const": "auto" }]
+				}
+			}
+		},
+
+		"hotstrings": {
+			"type": "object",
+			"additionalProperties": false,
+			"_comment_patternProperties": "Language-pack groups (_shared/modules/hotstrings/<language>/<stem>.toml) are keyed '<language>_<stem>'. Matched by pattern so adding a language needs no schema edit.",
+			"patternProperties": {
+				"^[a-z]+_(distancesreduction|sfbsreduction|rolls|autocorrection|magickey)$": {
+					"$ref": "#/$defs/feature_group"
+				}
+			},
+			"properties": {
+				"enabled": { "type": "boolean" },
+				"trigger_char": { "type": "string", "minLength": 1, "maxLength": 1 },
+				"magic_key_source": {
+					"_comment": "The physical magic key: \"auto\" or a KeyboardEvent.code. The accepted codes are the feature manifest's enum_values for hotstrings.magic_key_source, not restated here.",
+					"type": "string",
+					"pattern": "^(auto|[A-Z][A-Za-z0-9]+)$"
+				},
+				"magic_key_source_char": { "type": "string", "minLength": 1, "maxLength": 1 },
+				"repeat_key_enabled": { "type": "boolean" },
+				"expansion_delay": { "type": "number", "minimum": 0 },
+				"preview_ai_enabled": { "type": "boolean" },
+				"preview_autocorrect_enabled": { "type": "boolean" },
+				"preview_colored_tooltips": { "type": "boolean" },
+				"preview_star_enabled": { "type": "boolean" },
+				"order_overrides": {
+					"type": "object",
+					"propertyNames": { "minLength": 1 },
+					"additionalProperties": {
+						"type": "array",
+						"items": { "type": "string" }
+					}
+				},
+
+				"autocorrection": { "$ref": "#/$defs/feature_group" },
+				"distances_reduction": { "$ref": "#/$defs/feature_group" },
+				"sfbs_reduction": { "$ref": "#/$defs/feature_group" },
+				"rolls": { "$ref": "#/$defs/feature_group" },
+				"magic_key": { "$ref": "#/$defs/feature_group" },
+				"personal": { "$ref": "#/$defs/feature_group" },
+
+				"dynamic": {
+					"type": "object",
+					"additionalProperties": false,
+					"properties": {
+						"enabled": { "type": "boolean" },
+						"date": { "$ref": "#/$defs/feature_toggle" },
+						"date_fr": { "$ref": "#/$defs/feature_toggle" },
+						"date_long_fr": { "$ref": "#/$defs/feature_toggle" },
+						"iban_prefixes": { "$ref": "#/$defs/feature_toggle" },
+						"phone_prefixes": { "$ref": "#/$defs/feature_toggle" },
+						"ssn_prefixes": { "$ref": "#/$defs/feature_toggle" },
+						"user_code": { "$ref": "#/$defs/feature_toggle" },
+						"text_expansion_personal_information": {
+							"description": "feature_toggle plus an optional pattern_max_length. Spelled out (not allOf with feature_toggle) because that strict toggle sets additionalProperties:false, which would otherwise reject pattern_max_length.",
+							"type": "object",
+							"additionalProperties": false,
+							"required": ["enabled"],
+							"properties": {
+								"enabled": { "type": "boolean" },
+								"time_activation_seconds": { "type": "number", "minimum": 0 },
+								"pattern_max_length": { "type": "integer", "minimum": 1, "maximum": 16 }
+							}
+						}
+					}
+				}
+			}
+		},
+
+		"llm": {
+			"type": "object",
+			"additionalProperties": false,
+			"required": ["enabled"],
+			"properties": {
+				"enabled": { "type": "boolean" },
+				"onboarding_seen": { "type": "boolean" },
+				"app_profile_overrides": { "type": ["string", "object"] },
+				"user_profiles": { "type": "string" },
+				"agent_system1": {
+					"type": "string",
+					"pattern": "^$|^[a-z][a-z0-9_]*(\\|[^|\\u0000-\\u001f]{1,200})?$"
+				},
+				"agent_system2": {
+					"type": "string",
+					"pattern": "^$|^[a-z][a-z0-9_]*(\\|[^|\\u0000-\\u001f]{1,200})?$"
+				},
+				"agent_mode": { "type": "string", "enum": ["off", "action", "auto"] },
+				"agent_disabled_apps": { "type": "array", "items": { "type": "string" } },
+				"display": {
+					"type": "object",
+					"additionalProperties": false,
+					"properties": {
+						"pred_indent": { "type": "integer" },
+						"show_info_bar": { "type": "boolean" },
+						"streaming": { "type": "boolean" },
+						"streaming_multi": { "type": "boolean" }
+					}
+				},
+				"generation": {
+					"type": "object",
+					"additionalProperties": false,
+					"properties": {
+						"context_length": { "type": "integer", "minimum": 1 },
+						"min_words": { "type": "integer", "minimum": 1 },
+						"max_words": { "type": "integer", "minimum": 1 },
+						"temperature": { "type": "number", "minimum": 0, "maximum": 2 },
+						"auto_raise_temp": { "type": "boolean" },
+						"reset_on_nav": { "type": "boolean" },
+						"sequential_mode": { "type": "boolean" }
+					}
+				},
+				"models": {
+					"type": "object",
+					"additionalProperties": true,
+					"required": ["selected"],
+					"properties": {
+						"selected": { "type": "string", "minLength": 1 },
+						"ollama": { "type": "string" },
+						"mlx": { "type": "string" },
+						"user_models": { "type": "array", "items": { "type": "object" } }
+					}
+				},
+				"profiles": {
+					"type": "object",
+					"additionalProperties": false,
+					"properties": {
+						"active": { "type": "string", "minLength": 1 },
+						"num_predictions": { "type": "integer", "minimum": 1, "maximum": 32 },
+						"auto_profile_for_model": { "type": "boolean" },
+						"shortcuts": { "type": "object" },
+						"user_profiles": { "type": "array", "items": { "type": "object" } }
+					}
+				},
+				"trigger": {
+					"type": "object",
+					"additionalProperties": false,
+					"properties": {
+						"debounce_ms": { "type": "integer", "minimum": 0 },
+						"instant_on_word_end": { "type": "boolean" },
+						"after_hotstring": { "type": "boolean" },
+						"inline_autotype": { "type": "boolean" },
+						"secure_filter_enabled": { "type": "boolean" },
+						"url_bar_filter_enabled": { "type": "boolean" },
+						"shortcut": { "type": "boolean" },
+						"disabled_apps": { "type": "array", "items": { "type": "string" } }
+					}
+				},
+				"navigation": {
+					"type": "object",
+					"additionalProperties": false,
+					"properties": {
+						"arrow_nav_enabled": { "type": "boolean" },
+						"val_modifiers": {
+							"type": "array",
+							"items": { "enum": ["alt", "ctrl", "shift", "cmd"] }
+						},
+						"nav_modifiers": {
+							"type": "array",
+							"items": { "enum": ["alt", "ctrl", "shift", "cmd"] }
+						}
+					}
+				}
+			}
+		},
+
+		"metrics": {
+			"type": "object",
+			"additionalProperties": true,
+			"required": ["enabled"],
+			"properties": {
+				"enabled": { "type": "boolean" },
+				"private_filter_enabled": { "type": "boolean" },
+				"secure_filter_enabled": { "type": "boolean" },
+				"system_auth_filter_enabled": { "type": "boolean" },
+				"encrypt": { "type": "boolean" },
+				"show_wpm_menubar": { "type": "boolean" },
+				"wpm_menubar_colors": { "type": "boolean" },
+
+				"menubar": { "type": "object" },
+				"float": { "type": "object" },
+				"shortcuts": {
+					"type": "object",
+					"additionalProperties": false,
+					"properties": {
+						"apps": { "type": ["boolean", "string"] },
+						"typing": { "type": ["boolean", "string"] }
+					}
+				},
+				"disabled_apps": {
+					"type": ["object", "array"],
+					"items": { "type": "string" },
+					"properties": {
+						"list": { "type": "array", "items": { "type": "string" } }
+					}
+				}
+			}
+		},
+
+		"shortcuts": {
+			"type": "object",
+			"additionalProperties": true,
+			"properties": {
+				"enabled": { "type": "boolean" },
+				"chatgpt_url": { "type": "string", "format": "uri" },
+				"keys": { "type": "object" },
+				"wrap_symbols": {
+					"type": "object",
+					"additionalProperties": true,
+					"properties": {
+						"states": {
+							"type": "object",
+							"propertyNames": {
+								"minLength": 1
+							},
+							"additionalProperties": {
+								"type": "boolean"
+							}
+						},
+						"custom": {
+							"type": "array",
+							"items": {
+								"type": "object",
+								"required": ["left", "right"],
+								"properties": {
+									"left": {
+										"type": "string",
+										"minLength": 1,
+										"maxLength": 1
+									},
+									"right": {
+										"type": "string",
+										"minLength": 1,
+										"maxLength": 1
+									}
+								},
+								"additionalProperties": true
+							}
+						}
+					}
+				},
+				"script_control": {
+					"type": "object",
+					"additionalProperties": true,
+					"properties": {
+						"enabled": { "type": "boolean" },
+						"backspace": { "type": "string" },
+						"escape": { "type": "string" },
+						"return_key": { "type": "string" }
+					}
+				}
+			}
+		},
+
+		"gestures": {
+			"description": "Trackpad gestures. Which drivers implement them is the manifest's \"platforms\" field, not a namespace here — a driver that does not support gestures simply never writes the section.",
+			"type": "object",
+			"additionalProperties": true,
+			"properties": {
+				"enabled": { "type": "boolean" },
+				"modes": { "type": "object" },
+				"sensitivities": { "type": "object" }
+			}
+		},
+
+		"layout": {
+			"type": "object",
+			"additionalProperties": false,
+			"properties": {
+				"pause_switch_enabled": { "type": "boolean" },
+				"on_pause": { "type": ["boolean", "string"] },
+				"on_resume": { "type": ["boolean", "string"] },
+				"ergopti_base": { "type": "boolean" },
+				"direct_access_digits": { "type": "string", "enum": ["native", "digits", "symbols"] },
+				"ergopti_alt_gr": { "type": "boolean" },
+				"ergopti_variant": { "type": "string", "enum": ["none", "ergopti", "ergopti_plus"] },
+				"ctrl_magic_save": { "type": "boolean" },
+				"emulated_layout": { "type": "string", "pattern": "^([a-z][a-z0-9_]*)?$" }
+			}
+		},
+
+		"category_enabled": {
+			"type": "object",
+			"additionalProperties": { "type": "boolean" }
+		},
+
+		"ui": {
+			"description": "The tray's own appearance. menubar_icon is the macOS menubar icon variant; its values are the manifest's ui.menubar_icon enum.",
+			"type": "object",
+			"additionalProperties": false,
+			"properties": {
+				"menubar_icon": { "type": "string", "enum": ["v1", "v2"] }
+			}
+		}
+	}
+}

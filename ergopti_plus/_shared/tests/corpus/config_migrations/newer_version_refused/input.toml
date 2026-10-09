@@ -1,0 +1,8 @@
+# _shared/tests/corpus/config_migrations/newer_version_refused/input.toml
+
+[_meta]
+schema_version = 999
+
+[gestures]
+enabled = true
+future_key = "kept"

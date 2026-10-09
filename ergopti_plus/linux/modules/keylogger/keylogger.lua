@@ -1,0 +1,1798 @@
+--- modules/keylogger/keylogger.lua
+
+--- ==============================================================================
+--- MODULE: Full Keylogger (Linux)
+--- DESCRIPTION:
+--- Extends metrics_collector with app-level grouping, password-field detection,
+--- JSON export, and SQLite-based persistence. Wraps the existing metrics_collector
+--- so the daemon has a single keylogger surface. Equivalent to the macOS/Windows
+--- keylogger modules (keylogger.lua / keylogger.ahk).
+---
+--- FEATURES & RATIONALE:
+--- 1. App-level grouping: tracks keystroke counts and WPM per application
+---    (identified by the window_info adapter's appId). Enables per-app metrics
+---    dashboards and app-specific typing profiles.
+--- 2. Password detection: when the focused app is a known password manager or
+---    secure field, keystroke logging is suppressed (counts excluded from stats).
+--- 3. JSON export: export_session() returns a JSON-serializable snapshot of
+---    all accumulated metrics — suitable for the shared healthcheck or WPM widget.
+--- 4. SQLite persistence: flush() writes the current session into the
+---    canonical SQLite schema (_shared/data/db/schema.sql) via the sqlite_writer
+---    module (sqlite3 CLI wrapper). The shared metrics dashboard reads the same
+---    schema across macOS, Windows, and Linux.
+--- 5. Graceful degradation: when the sqlite3 binary is absent, flush() writes a
+---    JSON log file instead (~/.config/ergopti/logs/keystrokes_YYYY-MM-DD.json).
+--- ==============================================================================
+
+local M = {}
+
+local Logger   = require("logger.shim")
+local Monotonic = require("infra.monotonic")
+local Timings   = require("infra.timings")
+-- Hard requires: the privacy posture must come from the shared manifest, and a
+-- missing filter must fail loudly rather than degrade into "record everything".
+local Manifest      = require("infra.manifest_reader")
+local PrivateWindow = require("keylogger.private_window")
+-- WPM ring cap single-sourced from the shared keylogger metrics module so the
+-- per-app rings below never drift from the collector's global ring cap.
+local SharedMetrics    = require("keylogger.metrics")
+local Utils            = require("keylogger.utils")
+local WPM_RING_CAPACITY = SharedMetrics.DEFAULT_WPM_RING_CAPACITY
+local MAX_TYPING_INTERVAL_MS = Timings.ms("keylogger", "max_keystroke_delay_ms")
+-- The WPM readouts' live speed and last source, the same tracker macOS reads.
+-- Counted here because every character that reaches the page passes here —
+-- typed, expanded or generated — and only here is it known which it was.
+local LiveWpm = require("keylogger.live_wpm")
+local function new_live_tracker()
+	return LiveWpm.new({
+		window_ms = Timings.ms("keylogger", "wpm_window_ms"),
+		min_duration_ms = Timings.ms("keylogger", "wpm_min_duration_ms"),
+		idle_reset_ms = Timings.ms("keylogger", "wpm_idle_reset_ms"),
+	})
+end
+local _live = new_live_tracker()
+
+-- For converting os.time()'s seconds to the millisecond scale the monotonic
+-- clock reports in, so the two can be subtracted.
+local MS_PER_SECOND = 1000
+
+-- Past this, a press was a HOLD rather than a tap. Read from the tap-hold
+-- configuration this daemon runs, so the metrics call something a hold exactly
+-- when the engine does — a number of its own here would let the dashboard call
+-- a tap what the keyboard treated as a hold. Asked each time: a change from the
+-- tray reloads the engine live.
+--
+-- nil when the keys disagree or nothing is configured, and the split is then
+-- declined rather than made on a number nobody chose. The duration, the count
+-- and the maximum are still recorded: those need no threshold.
+local TapHold = require("platform.remap.tap_hold_manager")
+
+--- @return number|nil
+local function tap_hold_threshold_ms()
+	return TapHold.threshold_ms()
+end
+-- Metrics collector is optional — keylogger falls back gracefully without it.
+local Metrics  = nil
+local ok_mc, mc_mod = pcall(require, "modules.keylogger.metrics_collector")
+if ok_mc then Metrics = mc_mod end
+
+-- SQLite writer — optional (falls back to JSON when sqlite3 CLI is absent).
+local SqliteWriter = nil
+local ok_sw, sw_mod = pcall(require, "modules.keylogger.sqlite_writer")
+if ok_sw then SqliteWriter = sw_mod end
+
+local SqliteReader = nil
+local ok_sr, sr_mod = pcall(require, "modules.keylogger.sqlite_reader")
+if ok_sr then SqliteReader = sr_mod end
+
+-- At-rest encryption of the typed-text columns. Hard require: the setting must
+-- never silently degrade into "stored in clear".
+local TextCipher = require("modules.keylogger.text_cipher")
+-- Bulk conversion of rows written BEFORE the setting changed. Without it the
+-- toggle only ever protects the future, which is not what a user with a year of
+-- logs is asking for when they tick it.
+local TextMigration = require("modules.keylogger.text_migration")
+local MigrationPlan = require("keylogger.text_migration")
+-- Battery, network, lock and suspend. Optional: a machine with none of the
+-- tools it reads simply reports nothing, and the typing path must not care.
+local SystemMetrics = nil
+local ok_sysmetrics, sysmetrics_mod = pcall(require, "modules.keylogger.system_metrics")
+if ok_sysmetrics then SystemMetrics = sysmetrics_mod end
+
+-- The nine n-gram families, over the shared driver-agnostic accumulators.
+local AggregateWalker = require("modules.keylogger.aggregate_walker")
+
+local LOG = "modules.keylogger.keylogger"
+
+-- What a private expansion's characters are persisted as. U+2022 BULLET, the
+-- same character macOS substitutes (keylogger/init.lua), so a database merged
+-- across a user's two machines redacts identically on both.
+local PRIVATE_PLACEHOLDER_CHAR = "\226\128\162"
+
+
+-- =========================================
+-- =========================================
+-- ======= 1/ State ========================
+-- =========================================
+-- =========================================
+
+-- Per-app accumulators: { [appId] = { keystroke_count, wpm_ring, char_window, ngrams } }
+local _app_stats = {}
+
+-- Foreground application accounting is independent of keystroke collection so
+-- the apps dashboard can represent focused reading, video calls, and coding
+-- pauses as well as text entry.
+local _focused_app_id         = nil
+local _focused_app_started_at = nil
+
+-- Last persisted cumulative values by app. SQLite app-day rows are additive;
+-- flushing cumulative counters again would duplicate every earlier keypress.
+local _flushed_app_totals = {}
+
+-- Raw events remain the audit source of truth. They are buffered per app until
+-- flush, then written in the exact events_* tables used by macOS and Windows.
+local _pending_typing_events = {}
+local _pending_hotstring_events = {}
+-- Shortcut firings, buffered like their hotstring siblings. macOS has recorded
+-- these since its keylogger existed; this driver recorded nothing, so every
+-- action that types no text — CapsWord, the selection transforms, the wrapping
+-- pairs, everything an extension registers — was absent from the metrics.
+local _pending_shortcut_events = {}
+local _pending_app_switch_events = {}
+-- The window title currently focused, and when it became so. Held rather than
+-- asked for at flush, because a flush lands between keystrokes and the title by
+-- then may already be the next one.
+--
+-- Declared HERE, in the state section, and not beside the setter three hundred
+-- lines below: a `local` written after a function that reads it is not captured
+-- — the function binds the nil GLOBAL instead, and the read silently does
+-- nothing. record_app_key reads this, and the first version of it declared the
+-- variable next to its setter. Three bugs of exactly that shape have already
+-- been fixed in this driver.
+local _current_title = nil
+local _title_since = nil
+-- Which application owned _current_title when it was reported. The title is
+-- global while applications are not: closing the interval against the
+-- incoming application credits nothing (its titles table has no such row)
+-- and every later keystroke misses its count the same way. Declared here in
+-- the state section, beside the two locals it belongs with.
+
+local _flushed_app_titles = {}
+local _flushed_app_holds = {}
+local _flushed_app_ngrams = {}
+local _flushed_app_scancodes = {}
+local _flushed_app_sources = {}
+
+-- Persisted manifest cache keyed by SQLite's monotonic revision. The live
+-- delta is layered on a shallow copy, so an open dashboard avoids a CLI query
+-- every two seconds without ever serving stale keystrokes.
+local _manifest_cache = { revision = nil, manifest = nil }
+
+-- Whether password-field suppression is active.
+local _suppressed = false
+
+-- Cross-driver privacy posture, read from the shared features manifest so the
+-- three drivers cannot drift. Linux had none of these: it recorded
+-- unconditionally, because the metrics section of the manifest did not list
+-- "linux" and the codegen emitted no manifest for this driver to read.
+--
+-- Where each toggle's user choice is kept, and the shape of that keeping: only a
+-- CHANGE from the shipped default is stored. Persisting the default too would
+-- freeze today's default for anyone who had already run the driver, which is the
+-- same reasoning the dynamic-hotstring families are stored under.
+--
+-- Until 2026-08-06 nothing was stored at all. Every one of these reverted to the
+-- manifest default at the next start, so a user who switched metrics off found
+-- them back on after a reboot — and the two filters they had deliberately
+-- relaxed silently tightened again, which is the harmless direction. The master
+-- switch is the other direction: off means off, and it did not stay off.
+local PREF_PREFIX = "metrics."
+local Preferences = require("infra.metrics_preferences")
+
+--- Persists a boolean, or clears it when it matches the shipped default.
+--- @param key string
+--- @param value boolean
+--- @return boolean
+local function store_bool(key, value)
+	return Preferences.set(PREF_PREFIX .. key, value)
+end
+
+local _DEFAULTS = {
+	enabled                    = Manifest.default_for("metrics.enabled"),
+	private_filter_enabled     = Manifest.default_for("metrics.private_filter_enabled"),
+	secure_filter_enabled      = Manifest.default_for("metrics.secure_filter_enabled"),
+	system_auth_filter_enabled = Manifest.default_for("metrics.system_auth_filter_enabled"),
+	encrypt                    = Manifest.default_for("metrics.encrypt"),
+}
+
+-- Seeded from the manifest at LOAD, and re-seeded from config.toml inside M.init().
+--
+-- Reading the store here was the first version and it was wrong twice over. It
+-- gave this module a file-system dependency at require time that it never had —
+-- so requiring it began touching $HOME, and any consumer that had only ever
+-- needed the type suddenly needed a working config directory. And it made the
+-- module's state depend on load ORDER, which differs between the machine this is
+-- developed on and the one it is gated on: `dir /b /s` and `find` do not return
+-- the suite in the same sequence, and four password-suppression tests failed on
+-- one and not the other for reasons that had nothing to do with passwords.
+--
+-- init() is where a driver decides what it is; that is where the user's stored
+-- choice belongs. Anything that reads a flag before init gets the shipped
+-- default, which is exactly what it got before any of this existed.
+local _enabled                    = _DEFAULTS.enabled
+local _private_filter_enabled     = _DEFAULTS.private_filter_enabled
+local _secure_filter_enabled      = _DEFAULTS.secure_filter_enabled
+local _system_auth_filter_enabled = _DEFAULTS.system_auth_filter_enabled
+local _encrypt_enabled            = _DEFAULTS.encrypt
+
+-- Whether the focused window is a private/incognito browser session. Set from
+-- the focus-change callback, never computed on the keystroke path.
+local _private_window = false
+
+-- Whether the AT-SPI adapter reported a secure field on the focused window.
+-- Also set from the focus-change callback: the probe spawns a subprocess and
+-- has no business running once per keystroke.
+local _secure_field = false
+
+-- Password managers and credential UIs (case-insensitive substring match on
+-- appId). Gated by metrics.secure_filter_enabled.
+--
+-- NOTE: intentionally distinct from the AT-SPI adapter's
+-- secure_field_detector.SECURE_APP_IDS (exact WM_CLASS match, smaller list e.g.
+-- keepassxc). The adapter is consulted IN ADDITION to this list, never instead
+-- of it: it matches exactly, so delegating would NARROW coverage and leak
+-- keystrokes. The broad coverage is locked by the "coverage must never narrow"
+-- guard in tests/unit/meta/test_keylogger.lua.
+local _SECURE_APPS = {
+	"1password", "bitwarden", "keepass", "lastpass",
+}
+
+-- OS-level authentication prompts. Gated by metrics.system_auth_filter_enabled,
+-- matching the "system_auth" category of the shared no-persist corpus.
+local _SYSTEM_AUTH_APPS = {
+	"gpg", "ssh-agent", "polkit", "sudo",
+}
+
+-- The union both flags cover when enabled — which is the default, so the eight
+-- entries that were previously one flat list still all match.
+local _DEFAULT_PASSWORD_APPS = {}
+for _, app in ipairs(_SECURE_APPS) do _DEFAULT_PASSWORD_APPS[#_DEFAULT_PASSWORD_APPS + 1] = app end
+for _, app in ipairs(_SYSTEM_AUTH_APPS) do _DEFAULT_PASSWORD_APPS[#_DEFAULT_PASSWORD_APPS + 1] = app end
+
+-- Returns a fresh shallow copy so per-init appends never mutate the base list.
+local function _default_password_apps()
+	local out = {}
+	for i = 1, #_DEFAULT_PASSWORD_APPS do out[i] = _DEFAULT_PASSWORD_APPS[i] end
+	return out
+end
+
+-- Returns a fresh shallow copy of the secure-app base list.
+local function _default_secure_apps()
+	local out = {}
+	for i = 1, #_SECURE_APPS do out[i] = _SECURE_APPS[i] end
+	return out
+end
+
+-- Active secure-app list (base + any custom apps supplied to init). Custom
+-- entries join this list rather than the system-auth one: a user-supplied app is
+-- a credential UI, not an OS authentication prompt.
+local _secure_apps = _default_secure_apps()
+
+-- Active full list, kept for diagnostics and the stats snapshot.
+local _password_apps = _default_password_apps()
+
+--- The single decision point for "may this keystroke be recorded?".
+--- Every recording entry point asks this and nothing else, so a new filter is
+--- added in one place and cannot be forgotten on one of the five paths.
+--- @return boolean
+local function may_record()
+	if not _enabled then return false end
+	if _suppressed then return false end
+	if _secure_filter_enabled and _secure_field then return false end
+	if _private_filter_enabled and _private_window then return false end
+	return true
+end
+
+-- Base directory for log file persistence (JSON fallback).
+local _log_dir = nil
+
+-- SQLite database path (primary persistence).
+local _sqlite_path = nil
+
+-- Device identifier for SQLite registration (derived from hostname).
+local _device_id = "linux-unknown"
+
+-- Session start timestamp for export.
+local _session_started_at = nil
+
+-- Forward-declaration: _to_json is defined in section 8 but called from section 6.
+local _to_json
+
+local function char_count(text)
+	if type(text) ~= "string" then return 0 end
+	local ok, count = pcall(utf8.len, text)
+	return ok and count or #text
+end
+
+--- Returns the per-app accumulator, creating an empty one when required.
+--- @param app_id string Focused application identifier.
+--- @param timestamp_ms number Timestamp used to seed the first-seen value.
+--- @return table Mutable per-app accumulator.
+local function ensure_app_stats(app_id, timestamp_ms)
+	local app = _app_stats[app_id]
+	if app then return app end
+	app = {
+		keystroke_count = 0,
+		wpm_ring         = {},
+		char_window      = {},
+		ngrams           = {},
+		first_seen       = timestamp_ms,
+		typing_time_ms   = 0,
+		last_key_at      = nil,
+		focus_time_ms    = 0,
+		hs_chars         = 0,
+		hs_triggers      = 0,
+		hs_input_chars   = 0,
+		hs_suggested     = 0,
+		llm_suggested    = 0,
+		llm_chars        = 0,
+		llm_triggers     = 0,
+		llm_input_chars  = 0,
+		physical_scancodes = {},
+		ngram_sources      = {},
+		-- evdev code → { sum_ms, count, max_ms, tap_count, hold_count }. On a
+		-- keyboard whose whole design is tap-hold, how long a key was held is the
+		-- difference between the two things it can mean.
+		kc_hold            = {},
+		-- title → { c, ms }. The dashboard's apps panel groups a day's work by
+		-- window, which is the difference between "four hours in the editor" and
+		-- "four hours in three files"; this driver had nothing to group by.
+		titles             = {},
+	}
+	_app_stats[app_id] = app
+	return app
+end
+
+--- Returns a stable display name without collapsing dotted desktop identifiers.
+--- @param app_id string Application identifier reported by the focus adapter.
+--- @return string Application name suitable for the shared metrics manifest.
+local function dashboard_app_name(app_id)
+	return tostring(app_id)
+end
+
+
+-- =========================================
+-- =========================================
+-- ======= 2/ Initialisation ===============
+-- =========================================
+-- =========================================
+
+--- Initialises the keylogger.
+--- @param opts table { log_dir?, password_apps? }
+function M.init(opts)
+	if not Preferences.admit() then return false end
+	local options = type(opts) == "table" and opts or {}
+	-- Validate canonical consent before initializing collectors or persistent data.
+	local preferences = Preferences.snapshot()
+
+	-- Initialise the underlying metrics collector if available.
+	if Metrics then Metrics.init({}) end
+
+	-- Set up log / SQLite directories for persistence.
+	-- Through the resolver. The old "~" fallback was not expanded by io.open —
+	-- Lua does no tilde expansion — so with HOME unset the keylogger wrote its
+	-- database into a literal directory named "~" beside the process.
+	local ConfigPaths = require("infra.config_paths")
+	_log_dir = options.log_dir or ConfigPaths.config("logs")
+	_sqlite_path = options.sqlite_path or ConfigPaths.metrics_path()
+
+	-- Derive device ID from hostname.
+	local hostname = "linux"
+	local fh_host = io.popen("hostname 2>/dev/null", "r")
+	if fh_host then
+		hostname = fh_host:read("*l") or "linux"
+		fh_host:close()
+	end
+	hostname = hostname:gsub("%s+", "")
+	_device_id = "linux-" .. hostname
+
+	-- Open the SQLite database (bootstraps schema on first run).
+	if SqliteWriter and SqliteWriter.open_db(_sqlite_path) then
+		SqliteWriter.register_device(_device_id, hostname, "linux", "", hostname)
+		if SystemMetrics then
+			local database, device = _sqlite_path, _device_id
+			SystemMetrics.bind(database, device, function(date)
+				if SqliteWriter.get_db_path() ~= database then return nil, false end
+				return SqliteWriter.read_system_day(device, date)
+			end)
+		end
+		Logger.info(LOG, "SQLite persistence active: %s", _sqlite_path)
+	else
+		Logger.info(LOG, "SQLite unavailable — JSON fallback active.")
+	end
+
+	-- The stored encryption choice, read before the cipher is configured below:
+	-- the migration this block launches depends on which posture is in force, so
+	-- reading it afterwards would resume the wrong direction on the first start
+	-- after the user changed it.
+	_encrypt_enabled = preferences["metrics.encrypt"]
+
+	-- Push the configured posture into the cipher. Without this the cipher stayed
+	-- off while get_privacy_state() reported the manifest's value, which is the
+	-- "the box is ticked and nothing is encrypted" defect this feature replaced.
+	if _encrypt_enabled and not TextCipher.is_available() then
+		Logger.error(LOG, "At-rest encryption is configured on but no key can be derived — staying off.")
+		_encrypt_enabled = false
+	end
+	TextCipher.set_enabled(_encrypt_enabled)
+	-- Resume only a pass a previous run left unfinished. Starting one
+	-- unconditionally would re-read every stored row at every daemon start, on
+	-- machines that may never have enabled the setting at all.
+	TextMigration.resume(
+		_encrypt_enabled and MigrationPlan.MODE_ENCRYPT or MigrationPlan.MODE_DECRYPT,
+		_device_id)
+
+	-- The user's stored choices, applied over the manifest defaults. Here rather
+	-- than at module load: see the note beside the declarations.
+	_enabled                    = preferences["metrics.enabled"]
+	_private_filter_enabled     = preferences["metrics.private_filter_enabled"]
+	_secure_filter_enabled      = preferences["metrics.secure_filter_enabled"]
+	_system_auth_filter_enabled = preferences["metrics.system_auth_filter_enabled"]
+
+	-- Custom password apps (reset then rebuild to avoid duplicates on re-init).
+	if type(options.password_apps) == "table" then
+		_secure_apps   = _default_secure_apps()
+		_password_apps = _default_password_apps()
+		for _, app in ipairs(options.password_apps) do
+			_secure_apps[#_secure_apps + 1]     = app:lower()
+			_password_apps[#_password_apps + 1] = app:lower()
+		end
+	end
+
+	-- Track session start in milliseconds for unit consistency.
+	_session_started_at = os.time() * 1000
+
+	Logger.success(LOG, "Keylogger initialised (log_dir=%s, password_apps=%d).",
+		_log_dir, #_password_apps)
+end
+
+
+-- =========================================
+-- =========================================
+-- ======= 3/ Keystroke Recording ==========
+-- =========================================
+-- =========================================
+
+--- Records a single keypress event with app context.
+--- @param ch           string  The character typed.
+--- @param timestamp_ms number  Wall-clock timestamp in ms.
+--- @param app_id       string|nil  The focused app identifier (from window_info).
+--- @param scancode     number|nil  Physical evdev code captured at keydown.
+function M.on_keydown(ch, timestamp_ms, app_id, scancode)
+	if not may_record() then return end
+
+	-- Forward to the base metrics collector if available.
+	if Metrics then
+		Metrics.on_keydown(ch, timestamp_ms)
+	end
+	if type(ch) == "string" and ch ~= "" and type(timestamp_ms) == "number" then
+		LiveWpm.record(_live, 1, timestamp_ms)
+	end
+
+	-- Per-app tracking. Focus polling is asynchronous; use an explicit Unknown
+	-- bucket for the small startup/focus race rather than silently dropping a
+	-- real physical character and breaking the raw-event audit trail.
+	local resolved_app = (type(app_id) == "string" and app_id ~= "") and app_id or "Unknown"
+	if type(ch) == "string" and ch ~= "" then
+		M.record_app_key(resolved_app, ch, timestamp_ms)
+		local pending = _pending_typing_events[resolved_app]
+		if not pending then
+			pending = { text = {}, events = {}, times = {}, last_key_at = nil }
+			_pending_typing_events[resolved_app] = pending
+		end
+		local delay = 0
+		if type(pending.last_key_at) == "number" then
+			delay = math.max(0, math.min(timestamp_ms - pending.last_key_at, MAX_TYPING_INTERVAL_MS))
+		end
+		pending.last_key_at = timestamp_ms
+		pending.text[#pending.text + 1] = ch
+		-- [text, inter-key delay, metadata] is the portable events_json shape
+		-- consumed by the macOS/Windows projectors. `sk` deliberately identifies
+		-- the physical source key; synthetic output never receives one.
+		-- Omit `s` for manual input. Lua treats numeric 0 as truthy, so emitting
+		-- { s = 0 } would be read as synthetic by the macOS portable-event walker.
+		-- This matches Windows/macOS: only synthetic entries carry s=1/true.
+		local meta = {}
+		if type(scancode) == "number" and scancode > 0 then meta.sk = math.floor(scancode) end
+		pending.events[#pending.events + 1] = { ch, delay, meta }
+		-- Kept alongside the event rather than inside it: the three-element shape
+		-- is the portable events_json contract the macOS and Windows projectors
+		-- parse, and a fourth element would have to be understood by both. The
+		-- hour a keystroke belongs to is only derivable from an absolute stamp —
+		-- the delays are capped, so summing them drifts across every real pause.
+		pending.times[#pending.events] = timestamp_ms
+	end
+end
+
+
+-- =========================================
+-- =========================================
+-- ======= 4/ Per-App Tracking =============
+-- =========================================
+-- =========================================
+
+--- Records a keystroke for a specific application.
+--- @param app_id       string  Application identifier.
+--- @param ch           string  Character typed.
+--- @param timestamp_ms number  Wall-clock timestamp.
+function M.record_app_key(app_id, ch, timestamp_ms)
+	if not may_record() then return end
+
+	local app = ensure_app_stats(app_id, timestamp_ms)
+	if type(app.last_key_at) == "number" then
+		local elapsed = timestamp_ms - app.last_key_at
+		if elapsed > 0 then
+			app.typing_time_ms = app.typing_time_ms + math.min(elapsed, MAX_TYPING_INTERVAL_MS)
+		end
+	end
+	app.last_key_at = timestamp_ms
+
+	-- A correction remains an input event, but contributes no typed character.
+	if ch ~= "[BS]" then app.keystroke_count = app.keystroke_count + 1 end
+	-- Against the window it was typed into, not the application. Both are useful
+	-- and only one of them was recorded.
+	if _current_title then
+		local title_row = app.titles[_current_title]
+		if title_row then title_row.c = title_row.c + 1 end
+	end
+	if type(ch) == "string" and ch ~= "" then
+		app.ngrams[ch] = (app.ngrams[ch] or 0) + 1
+	end
+	app.wpm_ring[#app.wpm_ring + 1] = timestamp_ms
+
+	-- Prune ring (keep last WPM_RING_CAPACITY entries).
+	while #app.wpm_ring > WPM_RING_CAPACITY do
+		table.remove(app.wpm_ring, 1)
+	end
+end
+
+--- Records one physical evdev keydown for the layout-independent heatmap.
+--- This is intentionally separate from on_keydown(): control/modifier keys do
+--- not produce text output but are still genuine user presses. Callers must
+--- invoke it exactly once per device keydown, before printable output handling.
+--- @param app_id string|nil Focused application identifier.
+--- @param scancode number Linux evdev key code.
+--- @param timestamp_ms number Event time in ms.
+function M.record_physical_key(app_id, scancode, timestamp_ms)
+	if not may_record() then return end
+	if type(scancode) ~= "number" or scancode <= 0 then return end
+	local resolved_app = (type(app_id) == "string" and app_id ~= "") and app_id or "Unknown"
+	local app = ensure_app_stats(resolved_app, timestamp_ms)
+	local code = math.floor(scancode)
+	app.physical_scancodes[code] = (app.physical_scancodes[code] or 0) + 1
+end
+
+local function ensure_pending(app_id)
+	local pending = _pending_typing_events[app_id]
+	if pending then return pending end
+	pending = { text = {}, events = {}, times = {}, last_key_at = nil }
+	_pending_typing_events[app_id] = pending
+	return pending
+end
+
+local function add_synthetic_ngram(app, char, source)
+	app.ngrams[char] = (app.ngrams[char] or 0) + 1
+	app.ngram_sources[char] = app.ngram_sources[char] or {}
+	app.ngram_sources[char][source] = (app.ngram_sources[char][source] or 0) + 1
+end
+
+--- What actually gets persisted for one synthetic character.
+---
+--- For a private expansion the SHAPE is preserved — one entry per character, so
+--- counts, timings and the net-gain arithmetic stay correct — while the
+--- character itself is replaced. Dropping the entries instead would be worse
+--- than the leak: the per-character record is what tells the daemon these
+--- characters were synthetic, and without it the physical echoes fall through as
+--- ordinary human keystrokes and the secret lands in the metrics anyway, in a
+--- different column. macOS reached the same conclusion; the comment above its
+--- `notify_synthetic` says so at length.
+---
+--- Backspace markers are never redacted: they carry no content, and rewriting
+--- them would desynchronise the deletion count.
+--- @param char string
+--- @param is_private boolean|nil
+--- @return string
+local function recorded_char(char, is_private)
+	if is_private and char ~= "[BS]" then return PRIVATE_PLACEHOLDER_CHAR end
+	return char
+end
+
+--- @param is_private boolean|nil True when `text` is PII and must be redacted.
+local function append_synthetic_events(app_id, text, source, deletes, is_private)
+	local pending = ensure_pending(app_id)
+	-- An expansion fires within a keystroke of its trigger, so it belongs in the
+	-- same minute. Taking the trigger's stamp keeps the two together without
+	-- reading a clock from a function that has never needed one.
+	local at = pending.last_key_at
+	for _ = 1, math.max(0, math.floor(tonumber(deletes) or 0)) do
+		pending.events[#pending.events + 1] = { "[BS]", 0, { s = 1, st = source } }
+		pending.times[#pending.events] = at
+		add_synthetic_ngram(_app_stats[app_id], "[BS]", source)
+	end
+	if type(text) ~= "string" or text == "" then return end
+	local ok, len = pcall(utf8.len, text)
+	if not ok or not len then
+		-- A malformed sequence has no codepoints to walk, so the whole string is
+		-- recorded as one entry. Redacting it to a single placeholder loses the
+		-- length, which is the price of not being able to count the characters —
+		-- and losing the length is the right way round.
+		local blob = recorded_char(text, is_private)
+		pending.events[#pending.events + 1] = { blob, 0, { s = 1, st = source } }
+		pending.times[#pending.events] = at
+		add_synthetic_ngram(_app_stats[app_id], blob, source)
+		return
+	end
+	for _, codepoint in utf8.codes(text) do
+		local char = recorded_char(utf8.char(codepoint), is_private)
+		pending.events[#pending.events + 1] = { char, 0, { s = 1, st = source } }
+		pending.times[#pending.events] = at
+		add_synthetic_ngram(_app_stats[app_id], char, source)
+	end
+end
+
+--- Records a completed static-hotstring expansion for metrics parity.
+--- The physical trigger remains part of manual input; the dashboard subtracts
+--- hs_input_chars from the generated output to calculate the net gain.
+--- @param app_id string Focused application identifier.
+--- @param trigger string Typed hotstring trigger.
+--- @param replacement string Generated replacement text.
+--- @param timestamp_ms number Event timestamp.
+--- @param h_type string|nil Expansion kind, as the dashboard groups them.
+--- @param deletes number|nil Characters erased before the replacement was typed.
+--- @param is_private boolean|nil True when the payload is PII.
+---   Two sinks are affected, and only one of them is skipped. The per-character
+---   synthetic record is REDACTED, never dropped — see `recorded_char`. The
+---   events_hotstring row is dropped outright, because BOTH its columns are
+---   secret: the replacement is the IBAN, and the trigger is its first six
+---   characters. Redacting only the replacement would still leak. macOS makes
+---   the same split — `expander.lua` skips `log_hotstring` and forwards the flag
+---   to `notify_synthetic`.
+--- Records that a suggestion was OFFERED to the user.
+---
+--- The counterpart of the trigger counters, which record the ones TAKEN. The
+--- acceptance rate is the ratio of the two, so with this never recorded the
+--- dashboard divided by nothing and reported 0% on a driver whose suggestions
+--- were being accepted all day — indistinguishable from a feature nobody uses,
+--- which is exactly the conclusion it invites.
+---
+--- Only the count is kept. What was offered is not: a suggestion the user did
+--- not take is the strongest signal in the database about what they were about
+--- to type, and it has none of the justification the accepted ones have.
+--- @param app_id string Application identifier.
+--- @param kind string "hotstring" or "llm".
+--- @param timestamp_ms number|nil
+function M.record_suggestion(app_id, kind, timestamp_ms)
+	if not may_record() or type(app_id) ~= "string" or app_id == "" then return end
+	local field = (kind == "llm") and "llm_suggested" or "hs_suggested"
+	local app = ensure_app_stats(app_id, timestamp_ms)
+	app[field] = (app[field] or 0) + 1
+	Logger.debug(LOG, "Suggestion offered (%s).", field)
+end
+
+function M.record_hotstring(app_id, trigger, replacement, timestamp_ms, h_type, deletes, is_private)
+	if not may_record() or type(app_id) ~= "string" or app_id == "" then return end
+	if type(replacement) ~= "string" or replacement == "" then return end
+	local app = ensure_app_stats(app_id, timestamp_ms)
+	app.hs_chars       = app.hs_chars + char_count(replacement)
+	app.hs_triggers    = app.hs_triggers + 1
+	app.hs_input_chars = app.hs_input_chars + char_count(type(trigger) == "string" and trigger or "")
+	append_synthetic_events(app_id, replacement, "hotstring",
+		deletes ~= nil and deletes or char_count(type(trigger) == "string" and trigger or ""),
+		is_private)
+	if type(timestamp_ms) == "number" then
+		-- The group names the colour the readouts take; a private expansion
+		-- still colours them — the colour says a hotstring fired, not what it typed.
+		LiveWpm.record(_live, char_count(replacement), timestamp_ms)
+		LiveWpm.mark_source(_live, "hotstring", h_type, timestamp_ms)
+	end
+	if is_private then
+		Logger.debug(LOG, "Private expansion fired (content withheld).")
+		return
+	end
+	_pending_hotstring_events[#_pending_hotstring_events + 1] = {
+		ts = os.date("!%Y-%m-%d %H:%M:%S"),
+		date = os.date("%Y-%m-%d"),
+		app = dashboard_app_name(app_id),
+		kind = "fired",
+		trigger = trigger or "",
+		replacement = replacement,
+		h_type = h_type or "static",
+		net_saved_chars = char_count(replacement) - char_count(trigger),
+	}
+end
+
+--- Records a shortcut firing — an action the user triggered that types no text.
+---
+--- CapsWord, the selection transforms, the wrapping pairs and every action an
+--- extension registers all end here. They produced nothing measurable before, so
+--- "what did I actually use" — the question the dashboard exists to answer —
+--- could only be answered about hotstrings on this driver.
+---
+--- Deliberately NOT counted as synthetic output: these actions type nothing of
+--- their own. Adding them to the character totals would inflate the saved-
+--- keystrokes figure with keystrokes nobody saved.
+--- @param app_id string Focused application identifier.
+--- @param key string What fired, e.g. "caps_word" or "wrap_selection".
+--- @param timestamp_ms number|nil Event timestamp; unused today, taken for
+---   symmetry with its siblings and so a caller need not know which of them
+---   stamps its own time.
+function M.record_shortcut(app_id, key, timestamp_ms)  -- luacheck: ignore 212
+	if not may_record() then return end
+	if type(key) ~= "string" or key == "" then
+		Logger.warn(LOG, "record_shortcut(): no key name — the event would say only that "
+			.. "something fired, so it is dropped.")
+		return
+	end
+	_pending_shortcut_events[#_pending_shortcut_events + 1] = {
+		ts   = os.date("!%Y-%m-%d %H:%M:%S"),
+		date = os.date("%Y-%m-%d"),
+		app  = dashboard_app_name(type(app_id) == "string" and app_id or "unknown"),
+		key  = key,
+	}
+end
+
+--- Records successful automated output that is not a static hotstring (LLM,
+--- clipboard expansion, etc.) in the same portable event format. It is called
+--- only after the producer confirms success, so cancelled streamed output never
+--- appears as a false logical keystroke.
+function M.record_synthetic_output(app_id, text, source, timestamp_ms, deletes, input_chars)
+	if not may_record() or type(app_id) ~= "string" or app_id == "" then return end
+	if type(text) ~= "string" or text == "" then return end
+	local kind = type(source) == "string" and source or "other"
+	local app = ensure_app_stats(app_id, timestamp_ms)
+	if kind == "llm" then
+		app.llm_chars = app.llm_chars + char_count(text)
+		app.llm_triggers = app.llm_triggers + 1
+		app.llm_input_chars = app.llm_input_chars + math.max(0, math.floor(tonumber(input_chars) or 0))
+	end
+	append_synthetic_events(app_id, text, kind, deletes)
+	if type(timestamp_ms) == "number" then
+		LiveWpm.record(_live, char_count(text), timestamp_ms)
+		LiveWpm.mark_source(_live, kind, kind, timestamp_ms)
+	end
+end
+
+--- Records a foreground application transition from the process lifecycle port.
+--- @param app_id string|nil New focused application identifier.
+--- @param timestamp_ms number|nil Monotonic transition timestamp in milliseconds.
+function M.on_app_focus(app_id, timestamp_ms)
+	if type(app_id) ~= "string" or app_id == "" then return end
+	-- Gated like every other recording entry point: focus time and app
+	-- switches are records too, and tracking them while recording is
+	-- forbidden would persist them on the next flush. The in-flight interval
+	-- is forgotten rather than closed — time that must not be recorded
+	-- cannot be credited later without backfilling the forbidden gap.
+	if not may_record() then
+		_focused_app_id, _focused_app_started_at = nil, nil
+		_current_title, _title_since, _current_title_app = nil, nil, nil
+		return
+	end
+	local now = type(timestamp_ms) == "number" and timestamp_ms or math.floor(Monotonic.now_ms())
+	if _focused_app_id == app_id then return end
+	-- A switch orphans the previous window: close its interval under the
+	-- application that owned it. Left open, the next title change would
+	-- close it against the incoming application and credit nothing — and
+	-- every keystroke until then would miss its count the same way. Kept
+	-- when the title was just reported for this same application: the daemon
+	-- always sends title-then-focus together, and clearing there would
+	-- orphan the window it just named.
+	if _current_title and type(_title_since) == "number"
+		and _current_title_app ~= nil and _current_title_app ~= app_id then
+		local owner = _app_stats[_current_title_app]
+		if owner then
+			local row = owner.titles[_current_title]
+			if row then row.ms = row.ms + math.max(0, now - _title_since) end
+		end
+		_current_title, _title_since, _current_title_app = nil, nil, nil
+	end
+	if _focused_app_id and type(_focused_app_started_at) == "number" then
+		local elapsed = math.max(0, now - _focused_app_started_at)
+		local previous = ensure_app_stats(_focused_app_id, _focused_app_started_at)
+		previous.focus_time_ms = previous.focus_time_ms + elapsed
+		_pending_app_switch_events[#_pending_app_switch_events + 1] = {
+			-- The instant is UTC and the day is local, which is the convention every
+			-- other table here follows: a timestamp has to be comparable across
+			-- machines, and a "day" is the user's day. Both were UTC until
+			-- 2026-08-06, so for anyone east of Greenwich an evening application
+			-- switch was filed under tomorrow while the keystrokes either side of it
+			-- were filed under today.
+			ts = os.date("!%Y-%m-%d %H:%M:%S"),
+			date = os.date("%Y-%m-%d"),
+			prev_app = dashboard_app_name(_focused_app_id),
+			next_app = dashboard_app_name(app_id),
+			duration_ms = elapsed,
+		}
+	end
+	ensure_app_stats(app_id, now)
+	_focused_app_id         = app_id
+	_focused_app_started_at = now
+	Logger.debug(LOG, "Foreground application: %s.", app_id)
+end
+
+--- Returns per-app statistics.
+--- @return table { [appId] = { keystrokes, first_seen } }
+function M.get_app_stats()
+	local result = {}
+	local now = math.floor(Monotonic.now_ms())
+	for app_id, stats in pairs(_app_stats) do
+		local focus_time_ms = stats.focus_time_ms or 0
+		local physical_scancodes = {}
+		for code, count in pairs(stats.physical_scancodes or {}) do physical_scancodes[code] = count end
+		if app_id == _focused_app_id and type(_focused_app_started_at) == "number" then
+			focus_time_ms = focus_time_ms + math.max(0, now - _focused_app_started_at)
+		end
+		result[app_id] = {
+			keystrokes = stats.keystroke_count,
+			first_seen = stats.first_seen,
+			typing_time_ms = stats.typing_time_ms or 0,
+			focus_time_ms  = focus_time_ms,
+			hs_chars       = stats.hs_chars or 0,
+			hs_triggers    = stats.hs_triggers or 0,
+			hs_input_chars = stats.hs_input_chars or 0,
+			llm_chars = stats.llm_chars or 0,
+			llm_triggers = stats.llm_triggers or 0,
+			llm_input_chars = stats.llm_input_chars or 0,
+			-- Named here as well as in the accumulator and the flush. This
+			-- projection is the boundary the flush reads, and a field the
+			-- accumulator increments but this does not copy is lost between the
+			-- two with nothing to show for it — which is precisely how the three
+			-- LLM counters above spent their existence.
+			hs_suggested = stats.hs_suggested or 0,
+			llm_suggested = stats.llm_suggested or 0,
+			physical_scancodes = physical_scancodes,
+		}
+	end
+	return result
+end
+
+--- Adds current, not-yet-flushed counters to a persisted manifest entry.
+local function shallow_copy(source)
+	local result = {}
+	for key, value in pairs(source or {}) do result[key] = value end
+	return result
+end
+
+local function add_live_manifest_delta(manifest)
+	local today = os.date("%Y-%m-%d")
+	local result = shallow_copy(manifest)
+	result[today] = shallow_copy(manifest[today])
+	for app_id, stats in pairs(M.get_app_stats()) do
+		local previous = _flushed_app_totals[app_id] or {}
+		local app_name = dashboard_app_name(app_id)
+		local entry = shallow_copy(result[today][app_name] or { category = "Unknown" })
+		local current = {
+			chars = stats.keystrokes or 0,
+			time = stats.typing_time_ms or 0,
+			app_time_ms = stats.focus_time_ms or 0,
+			hs_chars = stats.hs_chars or 0,
+			hs_triggers = stats.hs_triggers or 0,
+			hs_input_chars = stats.hs_input_chars or 0,
+			llm_chars = stats.llm_chars or 0,
+			llm_triggers = stats.llm_triggers or 0,
+			llm_input_chars = stats.llm_input_chars or 0,
+		}
+		for field, value in pairs(current) do
+			local persisted_field = field == "time" and "time_ms" or field
+			entry[field] = (entry[field] or 0) + math.max(0, value - (previous[persisted_field] or 0))
+		end
+		entry.category = entry.category or "Unknown"
+		result[today][app_name] = entry
+	end
+	return result
+end
+
+local function persisted_manifest()
+	if not (SqliteWriter and SqliteWriter.is_available() and SqliteReader) then return {} end
+	local revision = SqliteWriter.get_revision and SqliteWriter.get_revision() or nil
+	if _manifest_cache.manifest and revision ~= nil and _manifest_cache.revision == revision then
+		return _manifest_cache.manifest
+	end
+	local fresh, complete = SqliteReader.read_manifest(_sqlite_path)
+	if complete then
+		_manifest_cache = { revision = revision, manifest = fresh }
+	end
+	return fresh
+end
+
+--- Drops the cached projection so the next read rebuilds from the database.
+---
+--- The dashboard's reset control asks for exactly this: it clears the filters
+--- and expects the next payload to be a clean rebuild. Linux answered nothing
+--- at all, so the button reset the page and left the backend serving the same
+--- cached manifest it had before — the one visible symptom being that a reset
+--- changed nothing.
+function M.clear_cache()
+	_manifest_cache = { revision = nil, manifest = nil }
+	Logger.info(LOG, "Dashboard cache cleared at the user's request.")
+	return true
+end
+
+--- Records the category and score a user assigned to an application.
+---
+--- The category is a column on agg_app_day and the dashboard groups by it, so
+--- an unhandled edit is a control that appears to work and silently discards
+--- what the user typed into it.
+--- @param app_name string
+--- @param category string
+--- @param score number|nil Productivity score, as the shared page defines it.
+--- @return boolean Whether it was persisted.
+function M.set_app_category(app_name, category, score)
+	if type(app_name) ~= "string" or app_name == "" then
+		Logger.error(LOG, "set_app_category(): an application name is required.")
+		return false
+	end
+	if type(category) ~= "string" or category == "" then
+		Logger.error(LOG, "set_app_category(): a category is required for '%s'.", app_name)
+		return false
+	end
+	if not (SqliteWriter and SqliteWriter.is_available()) then
+		Logger.warn(LOG, "set_app_category(): no database — '%s' stays uncategorised.", app_name)
+		return false
+	end
+	local ok = SqliteWriter.set_app_category(_device_id, app_name, category, tonumber(score) or 0)
+	-- The cached manifest still holds the old category, and the page re-reads
+	-- immediately after the edit. Without this the user sees their change
+	-- reverted and tries again.
+	if ok then M.clear_cache() end
+	Logger.debug(LOG, "Category for '%s': %s (score %s).", app_name, category, tostring(score))
+	return ok == true
+end
+
+local function empty_ngrams()
+	return { c = {}, bg = {}, tg = {}, qg = {}, pg = {}, hx = {}, hp = {}, w = {}, sc = {}, sc_bg = {}, w_bg = {}, kc = {}, sc_kb = {} }
+end
+
+--- Adds only unflushed character n-grams to the per-app today projection.
+local function add_live_ngram_delta(today_payload)
+	for app_id, stats in pairs(_app_stats) do
+		local previous = _flushed_app_ngrams[app_id] or {}
+		local app_name = dashboard_app_name(app_id)
+		local target = today_payload[app_name] or empty_ngrams()
+		for token, count in pairs(stats.ngrams or {}) do
+			local delta = math.max(0, count - (previous[token] or 0))
+			if delta > 0 then
+				local item = target.c[token] or { c = 0, t = 0, e = 0, hs = 0, llm = 0, o = 0 }
+				item.c = item.c + delta
+				local source_delta = math.max(0,
+					((stats.ngram_sources[token] or {}).hotstring or 0)
+					- (((_flushed_app_sources[app_id] or {})[token] or {}).hotstring or 0))
+				local llm_delta = math.max(0,
+					((stats.ngram_sources[token] or {}).llm or 0)
+					- (((_flushed_app_sources[app_id] or {})[token] or {}).llm or 0))
+				local other_delta = 0
+				local flushed_sources = (_flushed_app_sources[app_id] or {})[token] or {}
+				for label, source_count in pairs(stats.ngram_sources[token] or {}) do
+					if Utils.is_other_synthetic_source(label) then
+						other_delta = other_delta + math.max(0, source_count - (flushed_sources[label] or 0))
+					end
+				end
+				item.hs = (item.hs or 0) + source_delta
+				item.llm = (item.llm or 0) + llm_delta
+				item.o = (item.o or 0) + other_delta
+				target.c[token] = item
+			end
+		end
+		local flushed_scancodes = _flushed_app_scancodes[app_id] or {}
+		for scancode, count in pairs(stats.physical_scancodes or {}) do
+			local delta = math.max(0, count - (flushed_scancodes[scancode] or 0))
+			if delta > 0 then
+				local item = target.sc_kb[tostring(scancode)] or { c = 0, t = 0, e = 0, hs = 0, llm = 0, o = 0 }
+				item.c = item.c + delta
+				target.sc_kb[tostring(scancode)] = item
+			end
+		end
+		today_payload[app_name] = target
+	end
+	return today_payload
+end
+
+--- Builds the shared manifest/prefetch contract consumed by both metrics UIs.
+--- Historical rows come from SQLite; only the unflushed in-memory delta is
+--- layered on top, so refreshing a dashboard never double-counts a session.
+--- @return table Metrics prefetch payload matching the macOS/Windows schema.
+function M.get_dashboard_payload(opts)
+	local options = type(opts) == "table" and opts or {}
+	local manifest = add_live_manifest_delta(persisted_manifest())
+	local prefetch = nil
+	if options.include_prefetch ~= false then
+		prefetch = M.get_range_payload(nil, nil, nil)
+	end
+	return {
+		metrics_manifest = manifest,
+		app_icons        = {},
+		_prefetch_data   = prefetch,
+		driver_meta      = { os = "linux", heatmap_id = "sc_kb" },
+	}
+end
+
+--- Returns n-grams for one UI-selected range without rebuilding the manifest.
+--- @param start_date string|nil Inclusive range start.
+--- @param end_date string|nil Inclusive range end.
+--- @param apps table|nil Selected application IDs.
+function M.get_range_payload(start_date, end_date, apps)
+	local payload = { historical = empty_ngrams(), today = {} }
+	if SqliteWriter and SqliteWriter.is_available() and SqliteReader then
+		payload = SqliteReader.read_range_split_today(_sqlite_path, start_date, end_date, apps)
+	end
+	payload.historical = payload.historical or empty_ngrams()
+	payload.today = payload.today or {}
+	payload.today = add_live_ngram_delta(payload.today)
+	return payload
+end
+
+
+-- =========================================
+-- =========================================
+-- ======= 5/ Password Detection ===========
+-- =========================================
+-- =========================================
+
+--- Checks whether an app ID indicates a password/secure field.
+--- @param app_id string|nil
+--- @return boolean
+function M.is_password_app(app_id)
+	if type(app_id) ~= "string" then return false end
+	local lower = app_id:lower()
+
+	-- Two lists, two flags, matching the "secure_field" and "system_auth"
+	-- categories of the shared no-persist corpus. With both flags at their
+	-- manifest default (true) the union is exactly the flat list this replaced,
+	-- so coverage is unchanged unless the user deliberately turns a filter off.
+	if _secure_filter_enabled then
+		for _, pattern in ipairs(_secure_apps) do
+			if lower:find(pattern, 1, true) then return true end
+		end
+	end
+	if _system_auth_filter_enabled then
+		for _, pattern in ipairs(_SYSTEM_AUTH_APPS) do
+			if lower:find(pattern, 1, true) then return true end
+		end
+	end
+	return false
+end
+
+--- Records how long one key was held.
+---
+--- The threshold between a tap and a hold is the shared tap-hold activation
+--- time, so this driver's idea of the difference is the same one the tap-hold
+--- engine acts on. A second number here would let the dashboard call something a tap that
+--- the keyboard treated as a hold.
+--- @param app_id string|nil
+--- @param scancode number evdev code.
+--- @param held_ms number
+function M.record_hold(app_id, scancode, held_ms)
+	if not may_record() then return end
+	if type(app_id) ~= "string" or app_id == "" then return end
+	local code = tonumber(scancode)
+	local duration = tonumber(held_ms)
+	if not code or not duration or code <= 0 or duration < 0 then return end
+
+	local app = ensure_app_stats(app_id, nil)
+	local row = app.kc_hold[code]
+	if not row then
+		row = { sum_ms = 0, count = 0, max_ms = 0, tap_count = 0, hold_count = 0 }
+		app.kc_hold[code] = row
+	end
+	row.sum_ms = row.sum_ms + duration
+	row.count = row.count + 1
+	if duration > row.max_ms then row.max_ms = duration end
+	local threshold = tap_hold_threshold_ms()
+	if threshold then
+		if duration >= threshold then
+			row.hold_count = row.hold_count + 1
+		else
+			row.tap_count = row.tap_count + 1
+		end
+	end
+end
+
+--- Records that the focused window's title changed.
+---
+--- Gated by exactly the filters a keystroke is: a private window, a secure
+--- field, a disabled application or metrics being off all mean this title is
+--- not recorded. A title is often MORE revealing than the keystrokes — a browser
+--- tab names the page — so a weaker gate here would leak past every filter the
+--- user set on the text itself.
+--- @param app_id string|nil
+--- @param title string|nil
+--- @param timestamp_ms number|nil
+function M.set_window_title(app_id, title, timestamp_ms)
+	local now = type(timestamp_ms) == "number" and timestamp_ms or math.floor(Monotonic.now_ms())
+
+	if not may_record() or type(app_id) ~= "string" or app_id == "" then
+		_current_title, _title_since, _current_title_app = nil, nil, nil
+		return
+	end
+
+	-- Close the previous title's interval under the application that owned
+	-- it, never the incoming one: the time already spent under it was earned
+	-- while recording was allowed, and the incoming application's titles
+	-- table has no such row, so closing there credits nothing. It used to
+	-- run before the gate above, crediting forbidden time on flush.
+	if _current_title and type(_title_since) == "number" then
+		local owner = _app_stats[_current_title_app or app_id]
+		if owner then
+			local row = owner.titles[_current_title]
+			if row then row.ms = row.ms + math.max(0, now - _title_since) end
+		end
+	end
+
+	if type(title) ~= "string" or title == "" then
+		_current_title, _title_since, _current_title_app = nil, nil, nil
+		return
+	end
+
+	local app = ensure_app_stats(app_id, now)
+	app.titles[title] = app.titles[title] or { c = 0, ms = 0 }
+	_current_title = title
+	_title_since = now
+	_current_title_app = app_id
+end
+
+--- Reports whether a window title marks a private/incognito browser session.
+--- @param title string|nil Focused window title.
+--- @return boolean
+function M.is_private_window(title)
+	return PrivateWindow.matches(title)
+end
+
+--- Enables password suppression for the current focused app.
+--- Call this when the window_info adapter detects a secure field.
+function M.suppress()
+	if not _suppressed then
+		_suppressed = true
+		Logger.debug(LOG, "Keystroke logging suppressed (password field detected).")
+	end
+end
+
+--- Disables password suppression.
+function M.unsuppress()
+	if _suppressed then
+		_suppressed = false
+		Logger.debug(LOG, "Keystroke logging resumed.")
+	end
+end
+
+--- Returns whether logging is currently suppressed.
+--- @return boolean
+function M.is_suppressed()
+	return _suppressed
+end
+
+--- Turns keystroke collection on or off. The Linux driver had no off switch at
+--- all; the other two drivers have had one since they shipped.
+--- @param enabled boolean
+function M.set_enabled(enabled)
+	if not Preferences.admit() then return false end
+	local wanted = (enabled == true)
+	if not store_bool("enabled", wanted) then
+		Logger.error(LOG, "Metrics collection state was not persisted — it was not changed.")
+		return false
+	end
+	_enabled = wanted
+	Logger.debug(LOG, "Metrics collection: %s.", tostring(_enabled))
+	return true
+end
+
+--- Returns whether keystroke collection is enabled.
+--- @return boolean
+function M.is_enabled()
+	return _enabled
+end
+
+--- Records whether the focused window is a private/incognito browser session.
+--- @param is_private boolean
+function M.set_private_window(is_private)
+	_private_window = (is_private == true)
+	Logger.debug(LOG, "Private browsing window: %s.", tostring(_private_window))
+end
+
+--- Records the AT-SPI adapter's secure-field verdict for the focused window.
+--- Consulted IN ADDITION to the app-name list, never instead of it.
+--- @param is_secure boolean
+function M.set_secure_field(is_secure)
+	_secure_field = (is_secure == true)
+	Logger.debug(LOG, "Secure field focused: %s.", tostring(_secure_field))
+end
+
+--- Toggles the private-browsing filter.
+--- @param enabled boolean
+function M.set_private_filter_enabled(enabled)
+	if not Preferences.admit() then return false end
+	local wanted = (enabled == true)
+	if not store_bool("private_filter_enabled", wanted) then
+		Logger.error(LOG, "Private-browsing filter state was not persisted — it was not changed.")
+		return false
+	end
+	_private_filter_enabled = wanted
+	Logger.debug(LOG, "Private-browsing filter: %s.", tostring(_private_filter_enabled))
+	return true
+end
+
+--- Toggles the secure-field / password-manager filter.
+--- @param enabled boolean
+function M.set_secure_filter_enabled(enabled)
+	if not Preferences.admit() then return false end
+	local wanted = (enabled == true)
+	if not store_bool("secure_filter_enabled", wanted) then
+		Logger.error(LOG, "Secure-field filter state was not persisted — it was not changed.")
+		return false
+	end
+	_secure_filter_enabled = wanted
+	Logger.debug(LOG, "Secure-field filter: %s.", tostring(_secure_filter_enabled))
+	return true
+end
+
+--- Toggles the OS authentication-prompt filter.
+--- @param enabled boolean
+function M.set_system_auth_filter_enabled(enabled)
+	if not Preferences.admit() then return false end
+	local wanted = (enabled == true)
+	if not store_bool("system_auth_filter_enabled", wanted) then
+		Logger.error(LOG, "System-auth filter state was not persisted — it was not changed.")
+		return false
+	end
+	_system_auth_filter_enabled = wanted
+	Logger.debug(LOG, "System-auth filter: %s.", tostring(_system_auth_filter_enabled))
+	return true
+end
+
+--- Toggles at-rest encryption of the typed-text columns.
+--- Refuses to report success when no key can be derived on this machine: a
+--- setting that claims to encrypt and does not is the defect this replaced.
+--- @param enabled boolean
+--- @return boolean The posture actually in force after the call.
+function M.set_encrypt_enabled(enabled)
+	if not Preferences.admit() then return false end
+	local want = (enabled == true)
+	if want and not TextCipher.is_available() then
+		Logger.error(LOG, "At-rest encryption requested but no key can be derived — keeping the current posture.")
+		return false
+	end
+	if not store_bool("encrypt", want) then
+		Logger.error(LOG, "At-rest encryption state was not persisted — it was not changed.")
+		return false
+	end
+	local changed = (want ~= _encrypt_enabled)
+	_encrypt_enabled = want
+	-- The cipher is flipped BEFORE the migration starts: encrypt() returns the
+	-- plaintext untouched while the toggle is off, so an encrypting pass launched
+	-- first would convert nothing and report success.
+	TextCipher.set_enabled(want)
+	-- Persisted like its siblings. This one matters most of the three: a user who
+	-- turned encryption ON and found it off after a reboot would have a database
+	-- half encrypted and half not, with nothing saying when the posture changed.
+	Logger.debug(LOG, "At-rest encryption: %s.", tostring(_encrypt_enabled))
+	if changed then M.migrate_stored_text() end
+	return _encrypt_enabled
+end
+
+--- Starts (or resumes) the conversion of rows written before the current
+--- posture. Idempotent: a pass over an already-converted table skips every row.
+--- @return boolean True when a pass is in flight.
+function M.migrate_stored_text()
+	if not Preferences.admit() then return false end
+	TextMigration.cancel()
+	return TextMigration.start(
+		_encrypt_enabled and MigrationPlan.MODE_ENCRYPT or MigrationPlan.MODE_DECRYPT,
+		_device_id)
+end
+
+--- Advances the at-rest migration by one bounded batch.
+--- Driven from the daemon's periodic tick rather than from flush(): the work is
+--- one openssl spawn per value, and the flush path runs on the keystroke side of
+--- the daemon where that cost would be felt as input lag.
+function M.pump_migration()
+	TextMigration.pump()
+end
+
+--- Snapshot of the at-rest migration, for the menu and for diagnostics.
+--- @return table
+function M.get_migration_progress()
+	return TextMigration.get_progress()
+end
+
+--- Stops the at-rest migration. Converted rows stay converted and the stored
+--- cursor lets a later run pick up from there, so this is a pause, not a revert.
+function M.cancel_migration()
+	TextMigration.cancel()
+end
+
+--- Returns whether at-rest encryption is active.
+--- @return boolean
+function M.is_encrypt_enabled()
+	return _encrypt_enabled
+end
+
+--- Captures configuration without transient focus state or historical data.
+--- @return table|nil Detached native and desired posture; nil during conversion.
+function M.configuration_snapshot()
+	if TextMigration.is_running() then
+		Logger.error(LOG, "Collector configuration is owned by an active historical conversion.")
+		return nil
+	end
+	return {
+		enabled = _enabled,
+		private_filter_enabled = _private_filter_enabled,
+		secure_filter_enabled = _secure_filter_enabled,
+		system_auth_filter_enabled = _system_auth_filter_enabled,
+		encrypt = _encrypt_enabled,
+		cipher_enabled = TextCipher.is_enabled(),
+	}
+end
+
+--- Applies future capture policy without persistence or historical conversion.
+--- The scope owner retains the inverse if a cipher call mutates before refusal.
+--- @param candidate table Configuration snapshot to apply or restore.
+--- @return boolean acknowledged
+function M.apply_configuration(candidate)
+	if type(candidate) ~= "table" or TextMigration.is_running() then return false end
+	for _, key in ipairs({ "enabled", "private_filter_enabled", "secure_filter_enabled",
+		"system_auth_filter_enabled", "encrypt", "cipher_enabled" }) do
+		if type(candidate[key]) ~= "boolean" then return false end
+	end
+	if TextCipher.is_enabled() ~= candidate.cipher_enabled then
+		if candidate.cipher_enabled and not TextCipher.is_available() then
+			Logger.error(LOG, "Collector configuration requires an unavailable cipher.")
+			return false
+		end
+		local called, acknowledged = pcall(TextCipher.set_enabled, candidate.cipher_enabled)
+		if not called or acknowledged ~= true or TextCipher.is_enabled() ~= candidate.cipher_enabled then
+			Logger.error(LOG, "Collector configuration cipher transition was not acknowledged.")
+			return false
+		end
+	end
+	_enabled = candidate.enabled
+	_private_filter_enabled = candidate.private_filter_enabled
+	_secure_filter_enabled = candidate.secure_filter_enabled
+	_system_auth_filter_enabled = candidate.system_auth_filter_enabled
+	_encrypt_enabled = candidate.encrypt
+	Logger.debug(LOG, "Collector configuration applied without historical conversion.")
+	return true
+end
+
+--- Snapshot of the active privacy posture, for the menu and for diagnostics.
+--- @return table
+function M.get_privacy_state()
+	return {
+		enabled                    = _enabled,
+		private_filter_enabled     = _private_filter_enabled,
+		secure_filter_enabled      = _secure_filter_enabled,
+		system_auth_filter_enabled = _system_auth_filter_enabled,
+		encrypt                    = _encrypt_enabled,
+		private_window             = _private_window,
+		secure_field               = _secure_field,
+		suppressed                 = _suppressed,
+	}
+end
+
+
+-- =========================================
+-- =========================================
+-- ======= 6/ JSON Export ==================
+-- =========================================
+-- =========================================
+
+--- Exports the current session as a JSON-serializable table.
+--- All timestamps in milliseconds for unit consistency.
+--- @return table
+function M.export_session()
+	local stats = { keystrokes = 0, words = 0, start_time = 0, duration_ms = 0 }
+	local wpm = 0.0
+	if Metrics then
+		stats = Metrics.get_session_stats()
+		wpm   = Metrics.get_wpm()
+	end
+	local apps  = M.get_app_stats()
+
+	return {
+		session_started_ms = _session_started_at,
+		exported_at_ms     = os.time() * 1000,
+		keystrokes         = stats.keystrokes,
+		words              = stats.words,
+		duration_ms        = stats.duration_ms,
+		wpm                = wpm,
+		apps               = apps,
+		suppressed         = _suppressed,
+	}
+end
+
+--- Serialises the session to a JSON string.
+--- @return string
+function M.export_json()
+	local data = M.export_session()
+	return _to_json(data)
+end
+
+--- Writes the current session stats to persistent storage.
+---
+--- Primary path: SQLite — inserts session summary into the canonical
+--- events_typing table and upserts per-app aggregates + n-grams.
+---
+--- Fallback path: JSON log file (~/.config/ergopti/logs/keystrokes_YYYY-MM-DD.json)
+--- when the sqlite3 CLI is absent.
+function M.flush()
+	local date = os.date("%Y-%m-%d")
+	local now_iso = os.date("!%Y-%m-%d %H:%M:%S")
+	local stats = M.get_session_stats()
+	local wpm = M.get_wpm()
+
+	-- PRIMARY: SQLite persistence.
+	if SqliteWriter and SqliteWriter.is_available() then
+		-- 1. Persist buffered physical key events before any aggregate. This is
+		-- the canonical, replayable source shared with the macOS/AHK drivers.
+		local typing_batch = {}
+		-- The nine n-gram families, walked from the SAME buffered stream the raw
+		-- events are built from. Built here rather than accumulated per keystroke
+		-- because a sequence is only knowable in context — a bigram needs the
+		-- character before it, and a long pause has to be able to un-make one.
+		local ngram_batch = nil
+		-- Keystrokes are stamped on the monotonic clock, which says nothing about
+		-- the time of day; the activity histogram is entirely about the time of
+		-- day. Taking both readings at the same instant gives the offset between
+		-- them, and the offset is what makes an uptime figure into an hour.
+		local wall_offset_ms = os.time() * MS_PER_SECOND - math.floor(Monotonic.now_ms())
+		for app_id, pending in pairs(_pending_typing_events) do
+			if #pending.events > 0 then
+				local total_time_ms = 0
+				for _, event in ipairs(pending.events) do total_time_ms = total_time_ms + (event[2] or 0) end
+				typing_batch[#typing_batch + 1] = {
+					ts = now_iso, date = date, app = dashboard_app_name(app_id),
+					text = table.concat(pending.text),
+					wpm = SharedMetrics.compute_wpm_from_events(#pending.events, total_time_ms),
+					events_json = _to_json(pending.events),
+				}
+				local ok_walk, walked = pcall(AggregateWalker.walk,
+					pending.events, date, dashboard_app_name(app_id), ngram_batch,
+					{ times = pending.times, wall_offset_ms = wall_offset_ms })
+				if ok_walk then
+					ngram_batch = walked
+				else
+					-- Loudly, and without taking the raw events down with it: the
+					-- replayable stream is the source of truth and the aggregates are
+					-- derived from it, so losing the derivation must never lose the source.
+					Logger.error(LOG, "N-gram walk failed for '%s' — aggregates skipped: %s.",
+						tostring(app_id), tostring(walked))
+				end
+			end
+		end
+		if #typing_batch > 0 then
+			if not SqliteWriter.insert_typing_events(_device_id, typing_batch) then return end
+			_pending_typing_events = {}
+		end
+		if #_pending_hotstring_events > 0 then
+			if not SqliteWriter.insert_hotstring_events(_device_id, _pending_hotstring_events) then return end
+			_pending_hotstring_events = {}
+		end
+		if #_pending_shortcut_events > 0 then
+			if not SqliteWriter.insert_shortcut_events(_device_id, _pending_shortcut_events) then return end
+			_pending_shortcut_events = {}
+		end
+		if ngram_batch then
+			for _, group in ipairs(AggregateWalker.batches_for_writer(ngram_batch)) do
+				SqliteWriter.upsert_ngrams(_device_id, group.date, group.app,
+					group.ngrams, group.table_name)
+			end
+			local daily = AggregateWalker.daily_rows(ngram_batch)
+			for _, row in ipairs(daily.chars_class) do SqliteWriter.upsert_chars_class(_device_id, row) end
+			for _, row in ipairs(daily.errors) do SqliteWriter.upsert_errors(_device_id, row) end
+			for _, row in ipairs(daily.hourly) do SqliteWriter.upsert_hourly(_device_id, row) end
+			for _, row in ipairs(daily.hourly_min5) do SqliteWriter.upsert_hourly_min5(_device_id, row) end
+			for _, row in ipairs(daily.app_buckets) do SqliteWriter.upsert_app_bucket(_device_id, row) end
+			for _, row in ipairs(daily.bursts) do SqliteWriter.upsert_burst(_device_id, row) end
+			for _, row in ipairs(daily.sessions) do SqliteWriter.upsert_session(_device_id, row) end
+			for _, row in ipairs(daily.ergo) do SqliteWriter.upsert_ergo(_device_id, row) end
+			for _, row in ipairs(daily.layouts) do SqliteWriter.upsert_layout(_device_id, row) end
+		end
+		-- The machine's own state, which the dashboard puts beside the typing to
+		-- explain a quiet afternoon. Sampled on the daemon's tick, written here.
+		if SystemMetrics then
+			local day = SystemMetrics.current()
+			if day then SqliteWriter.upsert_system_day(_device_id, day) end
+		end
+
+		if #_pending_app_switch_events > 0 then
+			-- Counted BEFORE the raw events are handed over, because that call
+			-- clears the buffer. The aggregate is derived from the same rows and
+			-- deriving it afterwards would count an empty list every time.
+			local transitions = {}
+			for _, event in ipairs(_pending_app_switch_events) do
+				local key = event.date .. "\1" .. event.prev_app .. "\1" .. event.next_app
+				local row = transitions[key]
+				if not row then
+					row = { date = event.date, app_from = event.prev_app, app_to = event.next_app, count = 0 }
+					transitions[key] = row
+				end
+				row.count = row.count + 1
+			end
+			if not SqliteWriter.insert_app_switch_events(_device_id, _pending_app_switch_events) then return end
+			_pending_app_switch_events = {}
+			for _, row in pairs(transitions) do SqliteWriter.upsert_switch_to(_device_id, row) end
+		end
+
+		-- 2. Upsert only new per-app daily aggregate values.
+		local apps = M.get_app_stats()
+		for app_id, app_stats in pairs(apps) do
+			-- The dashboard and both other drivers retain the complete desktop
+			-- identifier (for example org.mozilla.firefox). Truncating at the first
+			-- dot silently merged unrelated applications in the persisted database.
+			local app_name = dashboard_app_name(app_id)
+			local current = {
+				chars       = app_stats.keystrokes or 0,
+				time_ms     = app_stats.typing_time_ms or 0,
+				app_time_ms = app_stats.focus_time_ms or 0,
+				hs_chars    = app_stats.hs_chars or 0,
+				hs_triggers = app_stats.hs_triggers or 0,
+				hs_input_chars = app_stats.hs_input_chars or 0,
+				-- The three LLM counters, missing from this table until 2026-08-06.
+				-- record_synthetic_output has always incremented them in memory and
+				-- upsert_app_day has always accepted them — they were simply never
+				-- named here, so every accepted completion was counted for the life of
+				-- the process and forgotten at the next start. The dashboard's
+				-- LLM-gain figure read zero on a machine that had been using it all
+				-- day, which looks exactly like a feature nobody uses.
+				llm_chars       = app_stats.llm_chars or 0,
+				llm_triggers    = app_stats.llm_triggers or 0,
+				llm_input_chars = app_stats.llm_input_chars or 0,
+				-- The denominators of the acceptance rate. Recorded in memory since
+				-- record_suggestion existed and never persisted, which is the same
+				-- shape the three LLM counters above had: a number the process knew
+				-- and forgot at every restart.
+				hs_suggested    = app_stats.hs_suggested or 0,
+				llm_suggested   = app_stats.llm_suggested or 0,
+			}
+			local previous = _flushed_app_totals[app_id] or {}
+			local delta = {}
+			local changed = false
+			for field, value in pairs(current) do
+				local increment = math.max(0, value - (previous[field] or 0))
+				delta[field] = increment
+				changed = changed or increment > 0
+			end
+			if changed then SqliteWriter.upsert_app_day(_device_id, date, app_name, delta) end
+			_flushed_app_totals[app_id] = current
+
+			-- Hold durations, as deltas: the row sums on conflict.
+			local flushed_holds = _flushed_app_holds[app_id] or {}
+			for code, row in pairs((_app_stats[app_id] or {}).kc_hold or {}) do
+				local before = flushed_holds[code]
+					or { sum_ms = 0, count = 0, max_ms = 0, tap_count = 0, hold_count = 0 }
+				local delta_count = math.max(0, row.count - before.count)
+				if delta_count > 0 then
+					SqliteWriter.upsert_kc_hold(_device_id, {
+						date = date, app = app_name, keycode = code,
+						sum_ms = math.max(0, row.sum_ms - before.sum_ms),
+						count = delta_count,
+						-- The longest hold is a record, not a delta: sending the running
+						-- maximum is right because the column takes a MAX on conflict.
+						max_ms = row.max_ms,
+						tap_count = math.max(0, row.tap_count - before.tap_count),
+						hold_count = math.max(0, row.hold_count - before.hold_count),
+					})
+				end
+				flushed_holds[code] = {
+					sum_ms = row.sum_ms, count = row.count, max_ms = row.max_ms,
+					tap_count = row.tap_count, hold_count = row.hold_count,
+				}
+			end
+			_flushed_app_holds[app_id] = flushed_holds
+
+			-- Window titles, as deltas like everything else on this table: the rows
+			-- add on conflict, so writing the cumulative counters again would count
+			-- every earlier keystroke once more per flush.
+			local flushed_titles = _flushed_app_titles[app_id] or {}
+			for title, row in pairs((_app_stats[app_id] or {}).titles or {}) do
+				local before = flushed_titles[title] or { c = 0, ms = 0 }
+				local delta_c = math.max(0, (row.c or 0) - before.c)
+				local delta_ms = math.max(0, (row.ms or 0) - before.ms)
+				if delta_c > 0 or delta_ms > 0 then
+					SqliteWriter.upsert_title(_device_id, {
+						date = date, app = app_name, title = title,
+						c = delta_c, ms = delta_ms,
+					})
+				end
+				flushed_titles[title] = { c = row.c or 0, ms = row.ms or 0 }
+			end
+			_flushed_app_titles[app_id] = flushed_titles
+		end
+
+		-- 3. Record which per-app character counts are now persisted, so the
+		-- live view adds only what came after. They were also written here, as a
+		-- delta, on top of the aggregate walker's rows for the same characters:
+		-- both upserts add, so every stored character count was doubled. The
+		-- walker's rows, which carry the sources too, are the only write.
+		for app_id, app_stats in pairs(_app_stats) do
+			_flushed_app_ngrams[app_id] = {}
+			for token, count in pairs(app_stats.ngrams or {}) do _flushed_app_ngrams[app_id][token] = count end
+			_flushed_app_sources[app_id] = {}
+			for token, sources in pairs(app_stats.ngram_sources or {}) do
+				_flushed_app_sources[app_id][token] = {}
+				for source, count in pairs(sources) do _flushed_app_sources[app_id][token][source] = count end
+			end
+
+			local previous_scancodes = _flushed_app_scancodes[app_id] or {}
+			local scancode_delta = {}
+			for scancode, count in pairs(app_stats.physical_scancodes or {}) do
+				local increment = math.max(0, count - (previous_scancodes[scancode] or 0))
+				if increment > 0 then scancode_delta[scancode] = increment end
+			end
+			if next(scancode_delta) ~= nil then
+				if not SqliteWriter.upsert_scancodes(_device_id, date, dashboard_app_name(app_id), scancode_delta) then return end
+			end
+			_flushed_app_scancodes[app_id] = {}
+			for scancode, count in pairs(app_stats.physical_scancodes or {}) do
+				_flushed_app_scancodes[app_id][scancode] = count
+			end
+		end
+
+		-- 4. Bump the revision counter so dashboards know new data exists.
+		SqliteWriter.bump_rev()
+		_manifest_cache = { revision = nil, manifest = nil }
+
+		Logger.info(LOG, "Session flushed to SQLite: %s.", _sqlite_path)
+		return
+	end
+
+	-- FALLBACK: JSON log file. It holds the session summary only, so the
+	-- buffered raw events are dropped here: kept, they grew for the whole
+	-- session, since only the SQLite branch ever emptied them.
+	_pending_typing_events = {}
+	_pending_hotstring_events = {}
+	_pending_shortcut_events = {}
+	_pending_app_switch_events = {}
+
+	if not _log_dir then
+		Logger.warn(LOG, "flush(): no log directory configured.")
+		return
+	end
+
+	os.execute(string.format("mkdir -p '%s' 2>/dev/null", _log_dir:gsub("'", "'\\''")))
+
+	local path = _log_dir .. "/keystrokes_" .. date .. ".json"
+
+	local fh = io.open(path, "w")
+	if not fh then
+		Logger.error(LOG, "flush(): cannot write to '%s'.", path)
+		return
+	end
+	fh:write(M.export_json(), "\n")
+	fh:close()
+
+	Logger.info(LOG, "Session flushed to JSON: %s.", path)
+end
+
+
+-- =========================================
+-- =========================================
+-- ======= 7/ Delegate Methods =============
+-- =========================================
+-- =========================================
+
+--- Returns the rolling WPM (delegates to metrics_collector).
+--- Returns 0 when metrics_collector is unavailable.
+--- @return number
+function M.get_wpm()
+	if not Metrics then return 0.0 end
+	return Metrics.get_wpm()
+end
+
+--- The readouts' live numbers: { wpm, source, source_variant, source_time (s) }.
+--- @param now_ms number|nil Monotonic milliseconds; now when nil.
+--- @return table
+function M.get_live_stats(now_ms)
+	return LiveWpm.stats(_live, now_ms or Monotonic.now_ms())
+end
+
+--- Returns session statistics.
+--- Returns a safe empty table when metrics_collector is unavailable.
+--- @return table
+function M.get_session_stats()
+	if not Metrics then return { keystrokes = 0, words = 0, start_time = 0, duration_ms = 0 } end
+	return Metrics.get_session_stats()
+end
+
+--- Returns top N n-grams.
+--- Returns empty table when metrics_collector is unavailable.
+--- @param n number
+--- @return table
+function M.get_ngrams(n)
+	if not Metrics then return {} end
+	return Metrics.get_ngrams(n)
+end
+
+--- Resets all session data.
+function M.reset_session()
+	if Metrics then Metrics.reset_session() end
+	_app_stats = {}
+	_focused_app_id         = nil
+	_focused_app_started_at = nil
+	_current_title      = nil
+	_title_since        = nil
+	_current_title_app  = nil
+	_flushed_app_totals     = {}
+	_flushed_app_titles     = {}
+	_flushed_app_holds      = {}
+	_flushed_app_ngrams     = {}
+	_flushed_app_scancodes  = {}
+	_flushed_app_sources    = {}
+	_manifest_cache         = { revision = nil, manifest = nil }
+	_pending_typing_events  = {}
+	_pending_hotstring_events = {}
+	_pending_shortcut_events = {}
+	_pending_app_switch_events = {}
+	_live = new_live_tracker()
+	_session_started_at = os.time() * 1000
+end
+
+
+-- =========================================
+-- =========================================
+-- ======= 8/ JSON Serialiser ==============
+-- =========================================
+-- =========================================
+
+--- Minimal JSON encoder for export (no external dependency).
+--- NOTE: assigned (not "local function") so it writes to the forward-declared
+--- upvalue.  Using "local function" would create a shadow local and leave the
+--- upvalue nil for closures defined between the forward-decl and this point.
+_to_json = function(val)
+	if type(val) == "nil" then return "null" end
+	if type(val) == "boolean" then return val and "true" or "false" end
+	if type(val) == "number" then
+		-- Handle NaN/Inf gracefully.
+		if val ~= val then return "0" end  -- NaN
+		if val == math.huge or val == -math.huge then return "0" end
+		return tostring(val)
+	end
+	if type(val) == "string" then
+		-- Every U+0000-U+001F byte must travel escaped: a raw control inside
+		-- the quotes is not JSON, and a strict decoder on another driver
+		-- rejects the whole events_json row carrying it.
+		return '"' .. val:gsub('[%z\1-\31\\"]', function(ch)
+			if ch == '\\' then return '\\\\' end
+			if ch == '"' then return '\\"' end
+			if ch == '\n' then return '\\n' end
+			if ch == '\r' then return '\\r' end
+			if ch == '\t' then return '\\t' end
+			if ch == '\b' then return '\\b' end
+			if ch == '\f' then return '\\f' end
+			return string.format('\\u%04x', string.byte(ch))
+		end) .. '"'
+	end
+	if type(val) == "table" then
+		local is_array = #val > 0 or next(val) == nil
+		if is_array then
+			local parts = {}
+			for _, v in ipairs(val) do parts[#parts + 1] = _to_json(v) end
+			return "[" .. table.concat(parts, ",") .. "]"
+		else
+			local parts = {}
+			for k, v in pairs(val) do
+				parts[#parts + 1] = _to_json(tostring(k)) .. ":" .. _to_json(v)
+			end
+			return "{" .. table.concat(parts, ",") .. "}"
+		end
+	end
+	return "null"
+end
+
+
+--- How many raw-event buffers are waiting for a flush (tests).
+--- @return integer
+function M._pending_buffer_count_for_test()
+	local count = #_pending_hotstring_events + #_pending_shortcut_events + #_pending_app_switch_events
+	for _, pending in pairs(_pending_typing_events) do count = count + #pending.events end
+	return count
+end
+
+return M

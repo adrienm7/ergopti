@@ -1,0 +1,136 @@
+{
+	"description": "What typing on a registry layout produces, read by hand from the layout's .keylayout (static/layouts/registry/<layout>/<layout>.keylayout): the keyMap its modifierMap selects, the <key> element, the <action> <when> for the dead-key state and the <terminators>. Keys are named by AutoHotkey scan code, the Windows emulation's input, and mapped to macOS codes through _shared/modules/layouts/mac_keycodes.json and the layout's keycode_convention. Each press is a space-separated list of modifiers (shift, caps, altgr) ending with the scan code. 'shortcut' vectors give the character a Ctrl/Alt/Win chord sends: the layout's Command level, or nothing on a dead key. Consumed by Windows emulation and Linux conversion tests. dead_reset_seeds lists real pending-dead-key inputs, replayed by the Windows reset tests and checked against Linux dead-state triggers.",
+	"dead_reset_seeds": [
+		{ "layout": "ergol", "press": "SC018" },
+		{ "layout": "ergopti", "press": "SC02B" },
+		{ "layout": "ergopti", "press": "SC01B" },
+		{ "layout": "ergopti_plus", "press": "SC02B" },
+		{ "layout": "ergopti_plus", "press": "altgr shift SC01B" }
+	],
+	"vectors": [
+		{ "id": "ergol_base_letter", "layout": "ergol", "press": ["SC010"], "types": "q" },
+		{ "id": "ergol_shift_letter", "layout": "ergol", "press": ["shift SC010"], "types": "Q" },
+		{ "id": "ergol_caps_letter", "layout": "ergol", "press": ["caps SC010"], "types": "Q" },
+		{
+			"id": "ergol_caps_shift_is_shift",
+			"layout": "ergol",
+			"press": ["caps shift SC010"],
+			"types": "Q"
+		},
+		{ "id": "ergol_altgr_symbol", "layout": "ergol", "press": ["altgr SC010"], "types": "^" },
+		{
+			"id": "ergol_altgr_shift_dead_circumflex",
+			"layout": "ergol",
+			"press": ["altgr shift SC010", "SC020"],
+			"types": "ê"
+		},
+		{ "id": "ergol_one_dead_key", "layout": "ergol", "press": ["SC018", "SC020"], "types": "è" },
+		{
+			"id": "ergol_one_dead_key_twice_is_diaeresis",
+			"layout": "ergol",
+			"press": ["SC018", "SC018", "SC020"],
+			"types": "ë"
+		},
+		{
+			"id": "ergol_one_dead_key_letter",
+			"layout": "ergol",
+			"press": ["SC018", "SC010"],
+			"types": "â"
+		},
+		{
+			"id": "ergol_one_dead_key_space",
+			"layout": "ergol",
+			"press": ["SC018", "SC039"],
+			"types": "’"
+		},
+		{
+			"id": "ergol_one_dead_key_terminator",
+			"layout": "ergol",
+			"press": ["SC018", "SC029"],
+			"types": "’`"
+		},
+		{ "id": "ergol_ansi_backquote", "layout": "ergol", "press": ["SC029"], "types": "`" },
+		{
+			"id": "ergol_ansi_backquote_shift",
+			"layout": "ergol",
+			"press": ["shift SC029"],
+			"types": "~"
+		},
+		{ "id": "ergol_ansi_intl_backslash", "layout": "ergol", "press": ["SC056"], "types": "<" },
+		{
+			"id": "ergol_control_character_types_nothing",
+			"layout": "ergol",
+			"press": ["altgr SC029"],
+			"types": ""
+		},
+		{
+			"id": "ergol_shift_space_narrow_nbsp",
+			"layout": "ergol",
+			"press": ["shift SC039"],
+			"types": " "
+		},
+		{ "id": "ergol_digit", "layout": "ergol", "press": ["SC002"], "types": "1" },
+		{ "id": "ergol_shift_digit", "layout": "ergol", "press": ["shift SC002"], "types": "€" },
+		{ "id": "ergol_altgr_digit", "layout": "ergol", "press": ["altgr SC002"], "types": "₁" },
+		{
+			"id": "ergol_altgr_shift_digit",
+			"layout": "ergol",
+			"press": ["altgr shift SC002"],
+			"types": "¹"
+		},
+		{ "id": "ergopti_base_letter", "layout": "ergopti", "press": ["SC010"], "types": "è" },
+		{ "id": "ergopti_iso_backquote", "layout": "ergopti", "press": ["SC029"], "types": "$" },
+		{ "id": "ergopti_iso_intl_backslash", "layout": "ergopti", "press": ["SC056"], "types": "ê" },
+		{
+			"id": "ergopti_dead_circumflex",
+			"layout": "ergopti",
+			"press": ["SC02B", "SC020"],
+			"types": "ê"
+		},
+		{
+			"id": "ergopti_dead_circumflex_twice",
+			"layout": "ergopti",
+			"press": ["SC02B", "SC02B"],
+			"types": "^"
+		},
+		{
+			"id": "ergopti_dead_diaeresis",
+			"layout": "ergopti",
+			"press": ["SC01B", "SC020"],
+			"types": "ë"
+		},
+		{
+			"id": "ergopti_chained_dead_keys",
+			"layout": "ergopti",
+			"press": ["SC02B", "SC01B"],
+			"types": "/"
+		},
+		{
+			"id": "ergopti_shift_multi_character",
+			"layout": "ergopti",
+			"press": ["shift SC02B"],
+			"types": " !"
+		},
+		{
+			"id": "ergopti_altgr_shift_magic_key",
+			"layout": "ergopti",
+			"press": ["altgr shift SC01B"],
+			"types": "★"
+		},
+		{
+			"id": "ergopti_altgr_shift_space",
+			"layout": "ergopti",
+			"press": ["altgr shift SC039"],
+			"types": " - "
+		},
+		{ "id": "ergol_shortcut_base_level", "layout": "ergol", "shortcut": "SC010", "sends": "q" },
+		{ "id": "ergol_shortcut_dead_key", "layout": "ergol", "shortcut": "SC018", "sends": "" },
+		{
+			"id": "ergopti_shortcut_command_level",
+			"layout": "ergopti",
+			"shortcut": "SC010",
+			"sends": "z"
+		},
+		{ "id": "ergopti_shortcut_letter", "layout": "ergopti", "shortcut": "SC018", "sends": "c" }
+	]
+}

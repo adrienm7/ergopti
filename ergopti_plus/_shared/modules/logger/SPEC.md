@@ -1,0 +1,475 @@
+# Ergopti+ — Logger Specification (cross-driver)
+
+This document is the **single source of truth** for the logger contract shared by
+**all three** drivers. `windows/lib/logger.ahk`, `macos/lib/logger.lua` and
+`_shared/lua/logger/init.lua` MUST conform to every behaviour described here.
+Divergences are listed explicitly in
+[§ Driver-specific extensions](#driver-specific-extensions) and are intentional.
+
+> Note on the third implementation: `_shared/lua/logger/init.lua` is the
+> platform-neutral core (levels, formatter, ring buffer, level filter,
+> suppression) and is designed to be extended by injecting an output sink via
+> `M.set_sink()`. The **Linux** driver runs it via `logger/shim.lua` and the
+> **macOS** driver via `infra/logger.lua`; Windows mirrors the same contract in
+> `windows/infra/logger.ahk`.
+
+---
+
+## 1. The 8 Variants
+
+The logger exposes exactly **8 variants** organised on two axes:
+_importance_ (DEBUG vs INFO vs WARNING vs ERROR) and
+_lifecycle role_ (misc, start, end).
+
+| Variant   | Axis    | Role            | Severity | Colour (guidance) |
+| --------- | ------- | --------------- | -------- | ----------------- |
+| `debug`   | DEBUG   | misc            | 10       | grey              |
+| `trace`   | DEBUG   | lifecycle start | 10       | dim cyan          |
+| `done`    | DEBUG   | lifecycle end   | 10       | dim green         |
+| `info`    | INFO    | misc            | 20       | near-black        |
+| `start`   | INFO    | lifecycle start | 20       | bright cyan       |
+| `success` | INFO    | lifecycle end   | 20       | bright green      |
+| `warn`    | WARNING | misc            | 30       | orange            |
+| `error`   | ERROR   | misc            | 40       | red               |
+
+### 1.1 When to use each
+
+- **`debug`** — verbose detail: setter calls, state snapshots, per-keystroke events,
+  anything fired at high frequency.
+- **`trace`** — start of a **routine internal operation** at debug granularity
+  (e.g. arming a debounce timer). Always paired with `done`.
+- **`done`** — successful end of a routine internal operation. Always paired with `trace`.
+- **`info`** — general status worth knowing: config loaded, feature toggled, model changed.
+- **`start`** — start of a **significant action** at INFO level (e.g. init, HTTP request,
+  user-triggered operation). Always paired with `success`.
+- **`success`** — successful completion of a significant action. Always paired with `start`.
+- **`warn`** — unexpected condition the code can recover from; must be investigated.
+- **`error`** — unrecoverable failure; execution should stop or degrade gracefully.
+
+### 1.2 Lifecycle pairing rule
+
+Lifecycle variants MUST come in pairs. A `start` without a following `success` in the
+logs immediately signals a silent failure. Same for `trace`/`done`.
+
+```
+# Correct — matched pair at INFO level
+start  "Initialising LLM bridge…"
+success "LLM bridge initialised (4 mappings)."
+
+# Correct — matched pair at DEBUG level
+trace  "Inactivity timer started (0.300s)."
+done   "Inactivity timer stopped."
+```
+
+---
+
+## 2. Calling Convention
+
+### 2.1 AHK
+
+```ahk
+LoggerDebug(Tag,   Msg, Args*)
+LoggerTrace(Tag,   Msg, Args*)
+LoggerDone(Tag,    Msg, Args*)
+LoggerInfo(Tag,    Msg, Args*)
+LoggerStart(Tag,   Msg, Args*)
+LoggerSuccess(Tag, Msg, Args*)
+LoggerWarn(Tag,    Msg, Args*)
+LoggerError(Tag,   Msg, Args*)
+```
+
+- `Tag` — caller-supplied module tag string, e.g. `"TapHoldLoader"`.
+- `Msg` — format string using AHK `{N}` placeholders (e.g. `"Loaded {1} key(s)."`).
+- `Args` — variadic arguments substituted into `Msg`.
+
+### 2.2 Hammerspoon / Lua
+
+```lua
+Logger.debug(module_name,   msg, ...)
+Logger.trace(module_name,   msg, ...)
+Logger.done(module_name,    msg, ...)
+Logger.info(module_name,    msg, ...)
+Logger.start(module_name,   msg, ...)
+Logger.success(module_name, msg, ...)
+Logger.warn(module_name,    msg, ...)
+Logger.error(module_name,   msg, ...)
+```
+
+- `module_name` — caller-supplied module tag string, e.g. `"menu_llm"`.
+- `msg` — format string using Lua `string.format` `%` syntax
+  (e.g. `"Loaded %d key(s)."` ).
+- `...` — variadic arguments substituted into `msg`.
+
+---
+
+## 3. Log Line Format
+
+Every emitted line MUST follow this structure:
+
+```
+TIMESTAMP [LEVEL] [MODULE] message_body
+```
+
+### 3.1 Timestamp
+
+```
+YYYY-MM-DD HH:MM:SS:mmm
+```
+
+- ISO 8601 date, 24-hour time, **milliseconds zero-padded to 3 digits**.
+- Separator between seconds and milliseconds is `:` (colon), not `.` (dot).
+
+Examples:
+
+```
+2026-05-26 14:32:15:042
+2026-05-26 08:00:00:000
+```
+
+### 3.2 Level label
+
+The level label is the variant name in **UPPER CASE**, enclosed in square brackets.
+
+```
+[DEBUG] [TRACE] [DONE] [INFO] [START] [SUCCESS] [WARNING] [ERROR]
+```
+
+Note: the `warn` variant emits `[WARNING]` (not `[WARN]`).
+
+### 3.3 Module tag
+
+The caller-supplied tag is wrapped in square brackets verbatim.
+
+```
+[TapHoldLoader]
+[menu_llm]
+```
+
+### 3.4 Full example lines
+
+```
+2026-05-26 14:32:15:042 [INFO] [TapHoldLoader] Tap-hold config loaded (8 key(s), 2 layer(s)).
+2026-05-26 14:32:15:043 [START] [menu_llm] Initialising LLM bridge…
+2026-05-26 14:32:15:044 [SUCCESS] [menu_llm] LLM bridge initialised (4 mappings).
+2026-05-26 14:32:15:045 [WARNING] [gestures] Probe timed out — retry 1/3.
+2026-05-26 14:32:15:046 [ERROR] [karabiner] Config write failed: permission denied.
+```
+
+---
+
+## 4. Severity Filtering
+
+The logger MUST expose a configurable minimum severity level. Lines below the
+active level are discarded and never written to any output.
+
+| Numeric level | Covers variants                                          |
+| ------------- | -------------------------------------------------------- |
+| 10            | DEBUG, TRACE, DONE, INFO, START, SUCCESS, WARNING, ERROR |
+| 20            | INFO, START, SUCCESS, WARNING, ERROR                     |
+| 30            | WARNING, ERROR                                           |
+| 40            | ERROR only                                               |
+
+String aliases accepted by `set_level()`:
+`"debug"` → 10, `"info"` → 20, `"warning"` → 30, `"error"` → 40.
+
+Default level: **10** (all variants active).
+
+A line that passes the filter can still be withheld by one of the two
+suppression layers below. Both are implemented once in the shared Lua core
+(macOS and Linux) and mirrored in `windows/infra/logger.ahk`, and both are
+pinned by `_shared/tests/corpus/logger/behaviour_vectors.json`, whose `dedup`
+and `repeat` sections all three driver suites replay.
+
+### 4.1 Consecutive-line deduplication
+
+- Always on. The key is everything after the timestamp:
+  `[LEVEL] [MODULE] body`.
+- A line whose key equals the previous accepted line's, within
+  `dedup_window_ms` (5000, `_shared/modules/timings/constants.toml [logger]`)
+  of that line, is not emitted; it is counted.
+- The next accepted line first emits
+  `[LEVEL] [logger] ↑ N identical line(s) suppressed` at the suppressed variant.
+- A terminal flush (exit, reload) emits that summary for a streak still open.
+
+### 4.2 Repeat collapsing
+
+The consecutive dedup cannot see a line that recurs every 30 s with other lines
+in between, or one whose arguments change. Repeat collapsing does.
+
+- **Arming.** Disarmed until the driver's logger boot arms it, exactly once; a
+  second arming is refused. A test process that never boots a driver therefore
+  sees no collapsing. The owners are listed at the end of this section.
+- **Key.** Variant + module + text. The text is the **unformatted template** for
+  `debug` and `info`, so a counter in the arguments cannot defeat the key, and
+  the **formatted body** for `warn` and `error`, so every distinct failure is
+  still recorded once. `trace`, `done`, `start` and `success` are never
+  collapsed: both halves of a lifecycle pair (§ 1.2) always stay visible.
+- **Transitions.** Lines sharing a template share one streak whatever their
+  arguments. A `debug` or `info` line whose arguments are the news (a state
+  change, a recovery) is therefore passed already formatted, so its text is its
+  key and each distinct change is written when it happens.
+- **Order.** Only lines that § 4.1 let through reach this layer, so a burst is
+  reported once, by the dedup summary.
+- **Streaks.** The first occurrence is emitted and opens a streak. Later
+  occurrences within `repeat_window_ms` (600000) of that first one are withheld:
+  counted, with the first and last withheld timestamps and the last formatted
+  body recorded. A withheld line reaches no sink and no ring buffer.
+- **Closing.** A streak closes when its window has elapsed (checked on every
+  emission and on the driver's periodic flush tick), when the calendar date of
+  the current timestamp differs from the streak's (every streak closes), when it
+  is the least recently used of `repeat_streak_capacity` (64) live streaks and a
+  new one needs room, or on a terminal flush, which closes the § 4.1 streak
+  first. The next occurrence after a close is emitted and opens a new streak.
+- **Summary.** A closed streak that withheld at least one line emits one line at
+  its own variant and under its own module, so a collapsed warning still reaches
+  the errors-only file and a topical file still receives it:
+
+  ```
+  TIMESTAMP [LEVEL] [module] ↑ "<text>" repeated N more time(s) between <first> and <last>[ (last: <body>)].
+  ```
+
+  The `(last: …)` clause appears only when the last formatted body differs from
+  the key text. Streaks closed together are summarised in the order they opened.
+
+- **Owners.** Each driver arms the layer once, runs the periodic flush on a
+  timer that is never the input path, and runs the terminal flush at exit and
+  reload:
+  - AHK: armed in `LoggerInit`'s one-time block; periodic flush in
+    `_LoggerFlush` on its `LOGGER_FLUSH_INTERVAL_MS` timer; terminal flush in
+    `_LoggerOnExitFlush`.
+  - macOS: armed by `Logger.enable_repeat_collapsing(TimerScheduler)` in
+    `init.lua` once the native sink is committed, with a TimerScheduler tick at
+    `[logger] flush_interval_ms`; terminal flush in
+    `Logger.begin_async_sink_shutdown()`.
+  - Linux: armed by `infra/logger_sink.install()`; periodic flush in the
+    daemon's periodic callback; terminal flush on the daemon's exit and crash
+    paths.
+
+---
+
+## 5. Ring Buffer
+
+- Fixed capacity: **200 entries**.
+- Implemented as a circular array (head pointer, O(1) push, O(n) snapshot).
+- Each entry stores the complete formatted line (string, post-substitution).
+- On overflow, the oldest entry is silently overwritten.
+- A `ring_buffer_snapshot()` / `LoggerRingBufferSnapshot()` function returns
+  the entries in chronological order as a flat list.
+
+### 5.1 Session issue counters
+
+Every driver counts the `WARNING` and `ERROR` lines it emits for the whole
+session and keeps the last `ERROR` line (the complete formatted line), apart
+from the ring: DEBUG output evicts the ring within minutes, and the diagnostic
+window's counters and "Last recorded error" must not forget a problem that
+early. A line swallowed by the dedup window is not counted. The Lua core
+exposes `session_issues()` → `{ warn_count, err_count, last_error }`; the AHK
+logger feeds `HealthCheck_RecordWarn()` / `HealthCheck_RecordError(Line)`.
+
+### 5.2 Error window hook
+
+Every emitted `ERROR` line is also handed to the driver's error window with its
+module, its formatted message and its **unformatted template** (the message
+before its arguments): the window keys an error by module and template, so
+arguments cannot make one fault look like many
+(`_shared/modules/diagnostics/error_policy.json`). A line swallowed by the dedup
+window is not handed over. The hook may run inside the keyboard hook, so it
+only decides and arms a timer; it never logs. AHK: `_LoggerEmit` calls
+`ErrorDialog_OnError(Tag, Template, Body, Stamp)`. Hammerspoon: the handler of
+`set_error_notification_handler()` receives `(module, message, template)`
+after the line's native ACK. Linux: the daemon installs the shared core's
+`set_error_observer(fn(module, template, body))`.
+
+---
+
+## 6. Log Files
+
+### 6.1 Main log
+
+| Property       | Value                                                         |
+| -------------- | ------------------------------------------------------------- |
+| Filename       | `ErgoptiPlus_YYYY-MM-DD.log`                                  |
+| Encoding       | UTF-8                                                         |
+| Line endings   | Platform-native (CRLF on Windows / LF on macOS)               |
+| Rotation       | Daily — a new file is created when the calendar day changes   |
+| Retention      | Files older than **14 days** are deleted on the next rotation |
+| Purge strategy | Based on date in filename, not file modification time         |
+
+The logs folder, the file-name prefixes and the crash-reports subfolder are
+declared once in [`paths/app_dirs.toml`](../paths/app_dirs.toml) and generated
+for every driver; each driver has one resolver that consumers ask at call time
+(`Logger.logs_dir()` / `today_log_path()` / `today_errors_path()` /
+`crash_reports_dir()` on macOS, `LoggerLogsDir()` and its siblings on Windows,
+`logger_sink.log_dir()` and its siblings on Linux).
+
+Default logs folder:
+
+- macOS: `~/Library/Logs/ergopti_plus/` (also holds the launcher's `launcher.log`)
+- Windows: `%LOCALAPPDATA%\ergopti_plus\logs\`
+- Linux: `${XDG_STATE_HOME:-~/.local/state}/ergopti_plus/logs/`
+
+`LogsDirPath` (paths.toml on macOS and Windows, bootstrap storage on Linux)
+moves the folder; a folder that is neither the default nor named
+`ergopti_plus` gets an `ergopti_plus` subfolder, so retention never deletes in
+a folder the user merely picked. Every resolver names the folder the lines
+actually reach, never a saved override the sink has not moved to yet: a new
+`LogsDirPath` takes effect with the next session on macOS (the native worker
+refuses a folder change inside a session) and on Windows (the paths editor
+reloads), and at once on Linux, whose paths editor moves the running sink
+because its reload does not restart the daemon. Crash reports go to
+`<logs>/crash_reports/`; metrics stay in the configuration folder. What is
+written before paths.toml is read stays in the default folder whatever
+`LogsDirPath` says: the macOS boot fallback log, `launcher.log` and the fatal
+report, and on Windows `bootstrap.log` (a yielding second instance, a refused
+configuration transition).
+
+### 6.2 Fan-out sub-files
+
+In addition to the main log, the logger routes each line to one or more
+topical sub-files when the line matches the sub-file's routing rule.
+
+Routing rules are defined in [`sub_files.toml`](./sub_files.toml) (see § 7).
+
+Every sub-file uses the same UTF-8 encoding, CRLF/LF line endings, and
+daily rotation as the main log. The retention policy (14 days) also applies.
+
+### 6.3 Write strategy
+
+- Lines are buffered and flushed on a timer interval (≤ 500 ms).
+- Lines at `WARNING` or `ERROR` severity trigger an immediate forced flush
+  to prevent data loss on crash.
+- The file handle is kept open for the process lifetime to minimise I/O overhead.
+
+---
+
+## 7. Sub-file Routing (`sub_files.toml`)
+
+Each entry in [`sub_files.toml`](./sub_files.toml) defines one topical sub-file:
+
+```toml
+[[sub_files]]
+name     = "gestures"                  # suffix of ErgoptiPlus_<name>.log
+patterns = ["[gestures", "gesture"]    # substring patterns matched against the full log line
+platforms = ["ahk", "hs"]             # which drivers write this sub-file
+```
+
+A log line is routed to a sub-file if **any** of its `patterns` is found as a
+substring of the full formatted line (case-sensitive). The match is against the
+complete line including timestamp, level, and module tag.
+
+---
+
+## 8. Message Punctuation Rules
+
+Log messages MUST follow these punctuation conventions:
+
+- **In-progress / starting:** end with `…` (ellipsis) — `"Loading model…"`
+- **Completed / asserted:** end with `.` (full stop) — `"Model loaded successfully."`
+- **Lifecycle `start`/`trace`:** always end with `…`
+- **Lifecycle `success`/`done`:** always end with `.`
+- **Inline comments in code:** MUST NOT end with a full stop.
+
+---
+
+## 9. Initialisation
+
+### 9.1 AHK
+
+```ahk
+LoggerInit()
+```
+
+Called once at driver startup. Reads the configured log directory from the
+global path variables, sets up the flush timer, and purges old log files.
+
+### 9.2 Hammerspoon / Lua
+
+```lua
+Logger.init_log_path(config_dir, max_age_days)
+Logger.set_level(level)                         -- optional, default = 10
+Logger.set_error_notification_handler(fn)       -- optional, fn(module, message, template)
+```
+
+Called during the `init.lua` boot sequence.
+
+---
+
+## 10. Driver-specific Extensions
+
+These features exist in one driver only and are **not** part of the shared
+contract. Both drivers are free to keep or remove them independently.
+
+| Feature                      | AHK | HS  | Notes                                                               |
+| ---------------------------- | --- | --- | ------------------------------------------------------------------- |
+| Coloured console output      | ✗   | ✓   | `hs.console.printStyledText()` with per-variant RGB colour          |
+| DEBUG-axis indentation       | ✗   | ✓   | 10-space prefix on DEBUG / TRACE / DONE lines in console            |
+| Error notification callback  | ✗   | ✓   | Optional handler passed to `set_error_notification_handler()`       |
+| Stall-tolerant ACK transport | ✗   | ✓   | Fatal after `stall_fatal_ms` without ACK; sheds DEBUG while stalled |
+| Error window hook            | ✓   | ✓   | Every emitted ERROR reaches the error window (§ 5.2)                |
+| `pcall` wrapper              | ✗   | ✓   | `Logger.pcall(module, fn, ...)` — wraps pcall with error logging    |
+| `build` wrapper              | ✗   | ✓   | `Logger.build(module, label, fn, ctx)` — builder with error logging |
+
+---
+
+## 11. Test Vectors
+
+[`test_vectors.json`](./test_vectors.json) contains pairs of
+`(variant, module_name, raw_message, format_args)` → `expected_rendered_line`
+that validate the line format produced by **both** loggers. The timestamp field
+is replaced with the sentinel `"TIMESTAMP"` in expected lines so vectors are
+time-independent.
+
+Test-runner integration:
+
+- **AHK**: `windows/tests/unit/test_logger.ahk` includes a section that loads
+  `test_vectors.json` via `JsonParse()` and asserts each expected line (with timestamp
+  replaced).
+- **HS**: `macos/tests/unit/lib/test_logger.lua` does the same via `require("lib.json")`.
+- **Linux**: no vector replay today. The shared core it runs is therefore unpinned by
+  this spec.
+
+---
+
+## 12. Boot Diagnostics and Runtime Events
+
+### 12.1 Diagnostic snapshot
+
+Once boot completes, every driver logs exactly one `INFO` line tagged
+`[Diagnostics]` that summarises its environment. The field list, its order and
+the rendering rules are data in
+[`diagnostic_snapshot.json`](./diagnostic_snapshot.json), replayed by each
+driver suite and pinned by `tools/test/test-diagnostic-snapshot-parity.cjs`:
+
+```
+… [INFO] [Diagnostics] Diagnostic snapshot (driver=windows version=local commit=3b924cd46 os="Windows 11 Home" … boot_ms=812).
+```
+
+- A missing value renders as `unknown`; a field is never dropped.
+- Paths under the user's home render relative to `~`.
+- The snapshot carries environment facts only: no typed text, trigger,
+  replacement, clipboard content, window title, token or personal field.
+
+### 12.2 Boot stages
+
+Each driver splits its boot into named stages logged as a `start`/`success`
+pair with the stage duration, then logs `Boot complete in N ms`. A stage whose
+`success` never appears names the step a silent boot death stopped in.
+
+### 12.3 Runtime events
+
+State changes that used to be invisible are logged at `info` unless they recur
+per keystroke: feature toggles (identifier and new state), reload requests
+(requester), suspend/resume, configuration-file reloads (file base names),
+update-check results, webview open/close/load with durations. External process
+exits are logged at `debug` with program name, status and duration, throttled
+per program; the command line is never logged because it can carry user text.
+Errors caught by `try`/`pcall` on non-hot paths are logged, never discarded.
+
+---
+
+## References
+
+- AHK implementation: [`static/ergopti_plus/windows/lib/logger.ahk`](../../windows/lib/logger.ahk)
+- HS implementation: [`static/ergopti_plus/macos/lib/logger.lua`](../../macos/lib/logger.lua)
+- Sub-file routing: [`sub_files.toml`](./sub_files.toml)
+- Test vectors: [`test_vectors.json`](./test_vectors.json)

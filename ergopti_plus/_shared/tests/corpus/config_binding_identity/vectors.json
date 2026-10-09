@@ -1,0 +1,219 @@
+{
+	"_comment": "Complete native catalogue publication is explicit; only proven gesture identities are judged. Unknown owners and unpublished catalogues retain their source.",
+	"vectors": [
+		{
+			"id": "bare-current",
+			"prefix": "",
+			"slots": ["tap_3", "swipe_3_horiz"],
+			"binding": "tap_3",
+			"status": "current"
+		},
+		{
+			"id": "bare-retired",
+			"prefix": "",
+			"slots": ["tap_3", "swipe_3_horiz"],
+			"binding": "removed_gesture_slot",
+			"status": "retired"
+		},
+		{
+			"id": "bare-empty",
+			"prefix": "",
+			"slots": ["tap_3", "swipe_3_horiz"],
+			"binding": "",
+			"status": "retired"
+		},
+		{
+			"id": "bare-keyboard",
+			"prefix": "",
+			"slots": ["tap_3", "swipe_3_horiz"],
+			"binding": "keyboard__cmd_k",
+			"status": "unjudged"
+		},
+		{
+			"id": "bare-tap-key",
+			"prefix": "",
+			"slots": ["tap_3", "swipe_3_horiz"],
+			"binding": "tap_key__a",
+			"status": "unjudged"
+		},
+		{
+			"id": "bare-script",
+			"prefix": "",
+			"slots": ["tap_3", "swipe_3_horiz"],
+			"binding": "script__reload",
+			"status": "unjudged"
+		},
+		{
+			"id": "bare-tap-hold",
+			"prefix": "",
+			"slots": ["tap_3", "swipe_3_horiz"],
+			"binding": "tap_hold__caps_lock",
+			"status": "unjudged"
+		},
+		{
+			"id": "bare-combination",
+			"prefix": "",
+			"slots": ["tap_3", "swipe_3_horiz"],
+			"binding": "combination__caps_lock_then_space",
+			"status": "unjudged"
+		},
+		{
+			"id": "windows-current",
+			"prefix": "gesture__",
+			"slots": ["tap_3", "swipe_3_horiz"],
+			"binding": "gesture__tap_3",
+			"status": "current"
+		},
+		{
+			"id": "windows-retired",
+			"prefix": "gesture__",
+			"slots": ["tap_3", "swipe_3_horiz"],
+			"binding": "gesture__removed_gesture_slot",
+			"status": "retired"
+		},
+		{
+			"id": "windows-empty",
+			"prefix": "gesture__",
+			"slots": ["tap_3", "swipe_3_horiz"],
+			"binding": "gesture__",
+			"status": "retired"
+		},
+		{
+			"id": "windows-keyboard",
+			"prefix": "gesture__",
+			"slots": ["tap_3", "swipe_3_horiz"],
+			"binding": "keyboard__cmd_k",
+			"status": "unjudged"
+		},
+		{
+			"id": "windows-tap-key",
+			"prefix": "gesture__",
+			"slots": ["tap_3", "swipe_3_horiz"],
+			"binding": "tap_key__a",
+			"status": "unjudged"
+		},
+		{
+			"id": "windows-script",
+			"prefix": "gesture__",
+			"slots": ["tap_3", "swipe_3_horiz"],
+			"binding": "script__reload",
+			"status": "unjudged"
+		},
+		{
+			"id": "windows-tap-hold",
+			"prefix": "gesture__",
+			"slots": ["tap_3", "swipe_3_horiz"],
+			"binding": "tap_hold__caps_lock",
+			"status": "unjudged"
+		},
+		{
+			"id": "windows-combination",
+			"prefix": "gesture__",
+			"slots": ["tap_3", "swipe_3_horiz"],
+			"binding": "combination__caps_lock_then_space",
+			"status": "unjudged"
+		},
+		{
+			"id": "unpublished-retired",
+			"published": false,
+			"binding": "removed_gesture_slot",
+			"status": "unjudged"
+		},
+		{
+			"id": "published-empty",
+			"prefix": "",
+			"slots": [],
+			"binding": "tap_3",
+			"status": "retired"
+		},
+		{
+			"id": "current-axis",
+			"prefix": "",
+			"slots": ["swipe_3_horiz"],
+			"binding": "swipe_3_horiz",
+			"status": "current"
+		},
+		{
+			"id": "native-integer",
+			"prefix": "",
+			"slots": ["tap_3"],
+			"binding": 7,
+			"status": "unjudged"
+		},
+		{
+			"id": "malformed-published-value",
+			"catalogue": false,
+			"binding": "tap_3",
+			"expects_error": true
+		},
+		{
+			"id": "malformed-published-shape",
+			"catalogue": {},
+			"binding": "tap_3",
+			"expects_error": true
+		},
+		{
+			"id": "malformed-native-prefix",
+			"catalogue": {
+				"prefix": 7,
+				"slots": {
+					"tap_3": true
+				}
+			},
+			"binding": "tap_3",
+			"expects_error": true
+		},
+		{
+			"id": "malformed-native-slots",
+			"catalogue": {
+				"prefix": "",
+				"slots": false
+			},
+			"binding": "tap_3",
+			"expects_error": true
+		},
+		{
+			"id": "malformed-native-slot-membership",
+			"catalogue": {
+				"prefix": "",
+				"slots": {
+					"tap_3": false
+				}
+			},
+			"binding": "tap_3",
+			"expects_error": true
+		},
+		{
+			"id": "malformed-native-slot-name",
+			"catalogue": {
+				"prefix": "",
+				"slots": {
+					"keyboard__cmd_k": true
+				}
+			},
+			"binding": "tap_3",
+			"expects_error": true
+		},
+		{
+			"id": "case-sensitive-slot",
+			"prefix": "",
+			"slots": ["tap_3"],
+			"binding": "TAP_3",
+			"status": "retired"
+		},
+		{
+			"id": "case-sensitive-windows-slot",
+			"prefix": "gesture__",
+			"slots": ["tap_3"],
+			"binding": "gesture__TAP_3",
+			"status": "retired"
+		},
+		{
+			"id": "case-sensitive-windows-prefix",
+			"prefix": "gesture__",
+			"slots": ["tap_3"],
+			"binding": "Gesture__tap_3",
+			"status": "unjudged"
+		}
+	]
+}

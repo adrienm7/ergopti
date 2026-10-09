@@ -1,0 +1,8 @@
+# _shared/tests/corpus/config_migrations/chain_runs_every_step_in_order/case.toml
+
+[case]
+description = "An unstamped file runs every step in order; a later step sees what an earlier one wrote."
+drivers = ["ahk", "hs", "linux"]
+outcome = "migrated"
+from_version = 1
+to_version = 4

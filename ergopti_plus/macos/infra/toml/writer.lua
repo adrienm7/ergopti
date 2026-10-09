@@ -1,0 +1,38 @@
+--- infra/toml/writer.lua
+
+--- ==============================================================================
+--- MODULE: TOML Writer — macOS shim
+--- DESCRIPTION:
+--- Re-exports the canonical TOML writer from the shared Lua library.
+--- Callers: require("infra.toml.writer"). The real implementation lives at:
+---   static/ergopti_plus/_shared/lua/toml_codec/writer.lua
+---
+--- RATIONALE:
+--- The writer was extracted to _shared/ so all Lua-based drivers (Hammerspoon,
+--- future Linux driver) share one implementation. The test runner (tests/run.lua)
+--- and the Hammerspoon runtime both inject _shared/lua into package.path before
+--- any module is required, so this shim can delegate with a plain require().
+--- ==============================================================================
+
+local SharedWriter = require("toml_codec.writer")
+local FileSystem   = require("adapters.file_system")
+
+local M = {}
+
+function M.write(path, data)
+	return SharedWriter.write(path, data, FileSystem)
+end
+
+function M.write_if_unchanged(path, data, expected_source)
+	return SharedWriter.write(path, data, FileSystem, false, expected_source)
+end
+
+function M.create_if_absent(path, data)
+	return SharedWriter.write(path, data, FileSystem, true)
+end
+
+function M.batch_write(path, updates)
+	return SharedWriter.batch_write(path, updates, FileSystem)
+end
+
+return M

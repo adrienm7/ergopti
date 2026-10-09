@@ -1,0 +1,8 @@
+[_meta]
+schema_version = 12
+[layout]
+ergopti_plus = true
+ergopti_base = false
+ergopti_alt_gr = false
+emulated_layout = ""
+future_owner = "retain"

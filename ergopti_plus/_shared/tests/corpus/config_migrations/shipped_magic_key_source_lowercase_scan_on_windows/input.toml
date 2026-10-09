@@ -1,0 +1,7 @@
+# _shared/tests/corpus/config_migrations/shipped_magic_key_source_lowercase_scan_on_windows/input.toml
+
+[_meta]
+schema_version = 4
+
+[hotstrings]
+magic_key_source_scan = "sc02e"

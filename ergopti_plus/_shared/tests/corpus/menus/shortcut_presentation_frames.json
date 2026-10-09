@@ -1,0 +1,71 @@
+{
+	"source_snapshot": "Agent8 exact cumulative original Shortcut native sources, BEFORE native edits",
+	"native_order": {
+		"windows": {
+			"wrap_parent": "menu.shortcuts.wrap_symbols_title",
+			"wrap_children": "existing complete wrap_symbol_controls hand corpus, actual catalogue/group/tick/native mutation untouched",
+			"personal": [
+				"separator",
+				"menu.shortcuts.personal -> ordered genuine registered name switches"
+			],
+			"extension": {
+				"absent": [],
+				"missing_builder": ["menu.extensions.empty"],
+				"throw_or_empty_builder": ["common.error_prefix + exact ExtId"],
+				"nonempty": "exact supplied native Menu retained"
+			}
+		},
+		"macos": {
+			"ctrl_g": ["actual native Ctrl+G action", "menu.shortcuts.chatgpt_url_item command"],
+			"wrap": [
+				"actual wrap feature row if returned by live owner",
+				"menu.shortcuts.wrap_symbols group; disabled only shortcuts-off or paused"
+			],
+			"extension": [
+				"shortcut_extension_boundary",
+				"one exact pack-name group per nonempty actual collected subtree; empty omitted"
+			]
+		},
+		"linux": {
+			"wrap": [
+				"existing wrap feature with live checked/readiness and unchanged strict native setter",
+				"menu.shortcuts.wrap_symbols group containing lexically sorted unique live pairs"
+			],
+			"extension": "genuine existing scanner/sandbox rows; error caption packname + emdash +common.error_title, no synthesized Mac personal registry"
+		}
+	},
+	"states": {
+		"paused": "same per-platform greying and callback absence/readiness",
+		"withdrawn_decl": "no invented fixed caption/parent/fallback before drawing",
+		"empty_native_children": "actual valid empty array stays valid",
+		"external_payload": "canonical proof string and native callback/image identities retained; arrays/row containers detached"
+	},
+	"en": {
+		"windows_wrap": "  ↳ Symbols that wrap the selection",
+		"lua_wrap": "Wrapping symbols",
+		"mac_url": "   ↳ Edit ChatGPT URL…",
+		"personal": "Personal shortcuts",
+		"error_prefix": "Error — ",
+		"error_title": "Error",
+		"empty": "No extension installed",
+		"linux_wrap_feature": "Typing a symbol wraps the selection"
+	},
+	"fr": {
+		"windows_wrap": "  ↳ Symboles encadrant la sélection",
+		"lua_wrap": "Symboles encadrants",
+		"mac_url": "   ↳ Modifier l'URL ChatGPT…",
+		"personal": "Raccourcis personnels",
+		"error_prefix": "Erreur — ",
+		"error_title": "Erreur",
+		"empty": "Aucune extension installée",
+		"linux_wrap_feature": "Taper un symbole encadre la sélection"
+	},
+	"original_sources_sha256": {
+		"static/ergopti_plus/windows/ui/menu/menu_shortcuts.ahk": "a0ac942b32b38614290d4a2870bbdf03a0af76463f9984fd7e958975cbc6b8cb",
+		"static/ergopti_plus/windows/ui/menu/menu_init.ahk": "1c50cf79c1ab2dc6ec743a3fa857394f10a168ba2ac4d8561f5eee8870cfc644",
+		"static/ergopti_plus/windows/infra/manifest_menu.ahk": "0b7dcaf61cf2aa387d9b8c634995fbfa87b055b5c73805ad161beb97204fd496",
+		"static/ergopti_plus/macos/ui/menu/menu_shortcuts.lua": "d4de8942a5d5bc7421d93661e90c3f3ef894b4331616a4dfca57252d635cb426",
+		"static/ergopti_plus/macos/ui/menu/menu_utils.lua": "9b337e605e1064e0129c3723280d0e316ad7c0953166de80a52f6d49e7fe1ef2",
+		"static/ergopti_plus/linux/ui/menu/menu_builder.lua": "2c4ba7955c1965164e68e111b357a1bf9184f8c01816165ff3726bb258e9cec7"
+	}
+}

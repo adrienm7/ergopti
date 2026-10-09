@@ -1,0 +1,434 @@
+{
+	"$schema": "./app_categories_vectors.schema.json",
+	"description": "Stored app_categories.json snapshots in every shipped locale, with the category id each stored spelling must resolve to. The metrics dashboard persists a LOCALISED default, so a user who switches language has an older spelling on disk; these vectors pin that none of them is orphaned.",
+	"version": 1,
+	"vectors": [
+		{
+			"id": "general_default_ar",
+			"description": "app_categories.json written while the UI was in ar; the default category is stored as \"عام\".",
+			"locale": "ar",
+			"stored": {
+				"Safari": {
+					"type": "عام",
+					"score": 0
+				},
+				"Xcode": {
+					"type": "Developer tools",
+					"score": 2
+				}
+			},
+			"expected_ids": {
+				"Safari": "Unknown",
+				"Xcode": "Developer tools"
+			}
+		},
+		{
+			"id": "general_default_cs",
+			"description": "app_categories.json written while the UI was in cs; the default category is stored as \"Obecné\".",
+			"locale": "cs",
+			"stored": {
+				"Safari": {
+					"type": "Obecné",
+					"score": 0
+				},
+				"Xcode": {
+					"type": "Developer tools",
+					"score": 2
+				}
+			},
+			"expected_ids": {
+				"Safari": "Unknown",
+				"Xcode": "Developer tools"
+			}
+		},
+		{
+			"id": "general_default_da",
+			"description": "app_categories.json written while the UI was in da; the default category is stored as \"Generelt\".",
+			"locale": "da",
+			"stored": {
+				"Safari": {
+					"type": "Generelt",
+					"score": 0
+				},
+				"Xcode": {
+					"type": "Developer tools",
+					"score": 2
+				}
+			},
+			"expected_ids": {
+				"Safari": "Unknown",
+				"Xcode": "Developer tools"
+			}
+		},
+		{
+			"id": "general_default_de",
+			"description": "app_categories.json written while the UI was in de; the default category is stored as \"Allgemein\".",
+			"locale": "de",
+			"stored": {
+				"Safari": {
+					"type": "Allgemein",
+					"score": 0
+				},
+				"Xcode": {
+					"type": "Developer tools",
+					"score": 2
+				}
+			},
+			"expected_ids": {
+				"Safari": "Unknown",
+				"Xcode": "Developer tools"
+			}
+		},
+		{
+			"id": "general_default_en",
+			"description": "app_categories.json written while the UI was in en; the default category is stored as \"General\".",
+			"locale": "en",
+			"stored": {
+				"Safari": {
+					"type": "General",
+					"score": 0
+				},
+				"Xcode": {
+					"type": "Developer tools",
+					"score": 2
+				}
+			},
+			"expected_ids": {
+				"Safari": "Unknown",
+				"Xcode": "Developer tools"
+			}
+		},
+		{
+			"id": "general_default_es",
+			"description": "app_categories.json written while the UI was in es; the default category is stored as \"General\".",
+			"locale": "es",
+			"stored": {
+				"Safari": {
+					"type": "General",
+					"score": 0
+				},
+				"Xcode": {
+					"type": "Developer tools",
+					"score": 2
+				}
+			},
+			"expected_ids": {
+				"Safari": "Unknown",
+				"Xcode": "Developer tools"
+			}
+		},
+		{
+			"id": "general_default_fr",
+			"description": "app_categories.json written while the UI was in fr; the default category is stored as \"Général\".",
+			"locale": "fr",
+			"stored": {
+				"Safari": {
+					"type": "Général",
+					"score": 0
+				},
+				"Xcode": {
+					"type": "Developer tools",
+					"score": 2
+				}
+			},
+			"expected_ids": {
+				"Safari": "Unknown",
+				"Xcode": "Developer tools"
+			}
+		},
+		{
+			"id": "general_default_he",
+			"description": "app_categories.json written while the UI was in he; the default category is stored as \"כללי\".",
+			"locale": "he",
+			"stored": {
+				"Safari": {
+					"type": "כללי",
+					"score": 0
+				},
+				"Xcode": {
+					"type": "Developer tools",
+					"score": 2
+				}
+			},
+			"expected_ids": {
+				"Safari": "Unknown",
+				"Xcode": "Developer tools"
+			}
+		},
+		{
+			"id": "general_default_hi",
+			"description": "app_categories.json written while the UI was in hi; the default category is stored as \"सामान्य\".",
+			"locale": "hi",
+			"stored": {
+				"Safari": {
+					"type": "सामान्य",
+					"score": 0
+				},
+				"Xcode": {
+					"type": "Developer tools",
+					"score": 2
+				}
+			},
+			"expected_ids": {
+				"Safari": "Unknown",
+				"Xcode": "Developer tools"
+			}
+		},
+		{
+			"id": "general_default_it",
+			"description": "app_categories.json written while the UI was in it; the default category is stored as \"Generale\".",
+			"locale": "it",
+			"stored": {
+				"Safari": {
+					"type": "Generale",
+					"score": 0
+				},
+				"Xcode": {
+					"type": "Developer tools",
+					"score": 2
+				}
+			},
+			"expected_ids": {
+				"Safari": "Unknown",
+				"Xcode": "Developer tools"
+			}
+		},
+		{
+			"id": "general_default_ja",
+			"description": "app_categories.json written while the UI was in ja; the default category is stored as \"一般\".",
+			"locale": "ja",
+			"stored": {
+				"Safari": {
+					"type": "一般",
+					"score": 0
+				},
+				"Xcode": {
+					"type": "Developer tools",
+					"score": 2
+				}
+			},
+			"expected_ids": {
+				"Safari": "Unknown",
+				"Xcode": "Developer tools"
+			}
+		},
+		{
+			"id": "general_default_ko",
+			"description": "app_categories.json written while the UI was in ko; the default category is stored as \"일반\".",
+			"locale": "ko",
+			"stored": {
+				"Safari": {
+					"type": "일반",
+					"score": 0
+				},
+				"Xcode": {
+					"type": "Developer tools",
+					"score": 2
+				}
+			},
+			"expected_ids": {
+				"Safari": "Unknown",
+				"Xcode": "Developer tools"
+			}
+		},
+		{
+			"id": "general_default_nl",
+			"description": "app_categories.json written while the UI was in nl; the default category is stored as \"Algemeen\".",
+			"locale": "nl",
+			"stored": {
+				"Safari": {
+					"type": "Algemeen",
+					"score": 0
+				},
+				"Xcode": {
+					"type": "Developer tools",
+					"score": 2
+				}
+			},
+			"expected_ids": {
+				"Safari": "Unknown",
+				"Xcode": "Developer tools"
+			}
+		},
+		{
+			"id": "general_default_no",
+			"description": "app_categories.json written while the UI was in no; the default category is stored as \"Generelt\".",
+			"locale": "no",
+			"stored": {
+				"Safari": {
+					"type": "Generelt",
+					"score": 0
+				},
+				"Xcode": {
+					"type": "Developer tools",
+					"score": 2
+				}
+			},
+			"expected_ids": {
+				"Safari": "Unknown",
+				"Xcode": "Developer tools"
+			}
+		},
+		{
+			"id": "general_default_pl",
+			"description": "app_categories.json written while the UI was in pl; the default category is stored as \"Ogólne\".",
+			"locale": "pl",
+			"stored": {
+				"Safari": {
+					"type": "Ogólne",
+					"score": 0
+				},
+				"Xcode": {
+					"type": "Developer tools",
+					"score": 2
+				}
+			},
+			"expected_ids": {
+				"Safari": "Unknown",
+				"Xcode": "Developer tools"
+			}
+		},
+		{
+			"id": "general_default_pt",
+			"description": "app_categories.json written while the UI was in pt; the default category is stored as \"Geral\".",
+			"locale": "pt",
+			"stored": {
+				"Safari": {
+					"type": "Geral",
+					"score": 0
+				},
+				"Xcode": {
+					"type": "Developer tools",
+					"score": 2
+				}
+			},
+			"expected_ids": {
+				"Safari": "Unknown",
+				"Xcode": "Developer tools"
+			}
+		},
+		{
+			"id": "general_default_ru",
+			"description": "app_categories.json written while the UI was in ru; the default category is stored as \"Общее\".",
+			"locale": "ru",
+			"stored": {
+				"Safari": {
+					"type": "Общее",
+					"score": 0
+				},
+				"Xcode": {
+					"type": "Developer tools",
+					"score": 2
+				}
+			},
+			"expected_ids": {
+				"Safari": "Unknown",
+				"Xcode": "Developer tools"
+			}
+		},
+		{
+			"id": "general_default_sv",
+			"description": "app_categories.json written while the UI was in sv; the default category is stored as \"Allmänt\".",
+			"locale": "sv",
+			"stored": {
+				"Safari": {
+					"type": "Allmänt",
+					"score": 0
+				},
+				"Xcode": {
+					"type": "Developer tools",
+					"score": 2
+				}
+			},
+			"expected_ids": {
+				"Safari": "Unknown",
+				"Xcode": "Developer tools"
+			}
+		},
+		{
+			"id": "general_default_tr",
+			"description": "app_categories.json written while the UI was in tr; the default category is stored as \"Genel\".",
+			"locale": "tr",
+			"stored": {
+				"Safari": {
+					"type": "Genel",
+					"score": 0
+				},
+				"Xcode": {
+					"type": "Developer tools",
+					"score": 2
+				}
+			},
+			"expected_ids": {
+				"Safari": "Unknown",
+				"Xcode": "Developer tools"
+			}
+		},
+		{
+			"id": "general_default_uk",
+			"description": "app_categories.json written while the UI was in uk; the default category is stored as \"Загальне\".",
+			"locale": "uk",
+			"stored": {
+				"Safari": {
+					"type": "Загальне",
+					"score": 0
+				},
+				"Xcode": {
+					"type": "Developer tools",
+					"score": 2
+				}
+			},
+			"expected_ids": {
+				"Safari": "Unknown",
+				"Xcode": "Developer tools"
+			}
+		},
+		{
+			"id": "general_default_zh",
+			"description": "app_categories.json written while the UI was in zh; the default category is stored as \"常规\".",
+			"locale": "zh",
+			"stored": {
+				"Safari": {
+					"type": "常规",
+					"score": 0
+				},
+				"Xcode": {
+					"type": "Developer tools",
+					"score": 2
+				}
+			},
+			"expected_ids": {
+				"Safari": "Unknown",
+				"Xcode": "Developer tools"
+			}
+		},
+		{
+			"id": "user_invented_category",
+			"description": "A category the user typed themselves must pass through unchanged and keep its own colour.",
+			"locale": "fr",
+			"stored": {
+				"Blender": {
+					"type": "Mes trucs 3D",
+					"score": 1
+				}
+			},
+			"expected_ids": {
+				"Blender": "Mes trucs 3D"
+			}
+		},
+		{
+			"id": "historical_design_spelling",
+			"description": "The old \"Design\" colour key may be on disk from before the id migration.",
+			"locale": "fr",
+			"stored": {
+				"Figma": {
+					"type": "Design",
+					"score": 0
+				}
+			},
+			"expected_ids": {
+				"Figma": "Graphics design"
+			}
+		}
+	]
+}

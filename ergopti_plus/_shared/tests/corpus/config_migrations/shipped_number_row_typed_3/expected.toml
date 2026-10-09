@@ -1,0 +1,6 @@
+[_meta]
+schema_version = 12
+
+[layout]
+future = "kept" # independently retained
+direct_access_digits = "digits"

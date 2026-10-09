@@ -1,0 +1,114 @@
+{
+	"_comment": "The AI agent (_shared/lua/llm/agent.lua, windows/modules/llm/agent.ahk). System 1 is fast and cheap: it only tells whether what the user types implies one of `intents`, with a probability (an LLM with system1.prompt, or Jev through its choice question). System 2 is slow and smart: it turns a text into at most system2.max_actions actions of the closed `actions` schema, as a JSON array after system2.tag. Nothing the model writes is ever executed as is: every action is validated field by field, and a shortcut must name one of the user's own tools. Dates are local wall-clock times written YYYY-MM-DDTHH:MM. learning bounds how accepting or dismissing a suggestion moves the per-app threshold of its intent. system1 and system2 settings (llm.agent_system1 / llm.agent_system2) name a backend like the vision actions: \"local\" (Ollama) or a provider of api_providers.json, optionally followed by |model; without a model, the local backend uses default_models.local and a provider its default_model in api_providers.json (the one source of provider defaults); a backend with neither needs the model.",
+	"intents": ["none", "calendar", "reminder", "mail", "shortcut"],
+	"default_models": {
+		"local": "qwen2.5:7b"
+	},
+	"system1": {
+		"pause_ms": 900,
+		"min_chars": 12,
+		"max_tokens": 24,
+		"threshold": 0.7,
+		"prompt": "You triage what a user is typing for a keyboard assistant. TEXT is the sentence being typed in {app}.\nDecide whether it asks for, or clearly implies, one action the assistant could prepare:\n- calendar: a meeting or an event at a given time\n- reminder: something to remember or to do later\n- mail: an email to write or to send\n- shortcut: one of the user's shortcuts: {tools}\n- none: anything else, including plain conversation\nReply with exactly two lines — nothing else:\nINTENT: <none|calendar|reminder|mail|shortcut>\nPROBABILITY: <a number from 0 to 1>",
+		"jev": {
+			"question_id": "intent",
+			"instructions": "Which action does the user's text ask for, or clearly imply?",
+			"criteria": {
+				"none": "Plain conversation or anything that needs no action",
+				"calendar": "A meeting or an event at a given time",
+				"reminder": "Something to remember or to do later",
+				"mail": "An email to write or to send",
+				"shortcut": "Running one of the user's named shortcuts"
+			}
+		}
+	},
+	"system2": {
+		"max_actions": 3,
+		"max_tokens": 700,
+		"tag": "ACTIONS:",
+		"user_prefix": "SOURCE:\n",
+		"prompt": "You prepare actions for a keyboard assistant. SOURCE is text the user {source_kind} in {app} (window: {window}).\nNow is {now}, a {weekday}, time zone {timezone}. Write titles, subjects and bodies in the language of SOURCE; if it is ambiguous, in {language}.\nPropose at most {max_actions} actions the user most likely wants, the most likely first, using only these JSON objects:\n- {\"type\":\"calendar\",\"title\":\"…\",\"start\":\"YYYY-MM-DDTHH:MM\",\"end\":\"YYYY-MM-DDTHH:MM\",\"location\":\"…\",\"attendees\":[\"email\"],\"notes\":\"…\"}\n- {\"type\":\"reminder\",\"title\":\"…\",\"due\":\"YYYY-MM-DDTHH:MM\",\"notes\":\"…\"}\n- {\"type\":\"mail\",\"to\":[\"email\"],\"subject\":\"…\",\"body\":\"…\"}\n- {\"type\":\"shortcut\",\"name\":\"one of: {tools}\",\"input\":\"…\"}\nOnly title, start (calendar), body (mail) and name (shortcut) are required; omit any other field you do not know. Resolve relative dates such as \"thursday\" or \"tomorrow 9am\" against Now. Never invent an email address. If nothing fits, return [].\nReply with one block — nothing else:\nACTIONS: <JSON array>"
+	},
+	"actions": {
+		"calendar": {
+			"title": {
+				"type": "text",
+				"required": true,
+				"max": 200
+			},
+			"start": {
+				"type": "datetime",
+				"required": true
+			},
+			"end": {
+				"type": "datetime"
+			},
+			"location": {
+				"type": "text",
+				"max": 200
+			},
+			"attendees": {
+				"type": "emails",
+				"max": 20
+			},
+			"notes": {
+				"type": "text",
+				"max": 2000
+			}
+		},
+		"reminder": {
+			"title": {
+				"type": "text",
+				"required": true,
+				"max": 200
+			},
+			"due": {
+				"type": "datetime"
+			},
+			"notes": {
+				"type": "text",
+				"max": 2000
+			}
+		},
+		"mail": {
+			"to": {
+				"type": "emails",
+				"max": 20
+			},
+			"subject": {
+				"type": "text",
+				"max": 300
+			},
+			"body": {
+				"type": "text",
+				"required": true,
+				"max": 20000
+			}
+		},
+		"shortcut": {
+			"name": {
+				"type": "tool",
+				"required": true
+			},
+			"input": {
+				"type": "text",
+				"max": 2000
+			}
+		}
+	},
+	"source_kinds": {
+		"selection": "selected",
+		"command": "typed as a command",
+		"typing": "is typing"
+	},
+	"default_duration_minutes": 60,
+	"max_tools": 40,
+	"learning": {
+		"step": 0.05,
+		"min_threshold": 0.5,
+		"max_threshold": 0.95
+	},
+	"ics": {
+		"prodid": "-//Ergopti+//Agent//EN"
+	}
+}

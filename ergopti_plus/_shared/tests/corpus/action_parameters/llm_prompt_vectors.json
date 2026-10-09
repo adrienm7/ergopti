@@ -1,0 +1,144 @@
+{
+	"description": "Golden vectors for the llm_prompt parameter of the llm_prompt_prediction action: which prompt profile a binding runs and how many predictions it asks for. Replayed by the macOS, Linux and Windows suites and by the action picker page.",
+	"rule": "The value is \"<profile_id>\" (the AI menu's prediction count) or \"<profile_id>|<count>\" (a count of its own). The id is 1 to 128 letters, digits, _ or -. The count is a decimal integer from 1 to 10. Anything else, including spacing, is invalid. Whether the profile exists is checked when the action runs, not here. A vector without num_predictions expects none (the menu count); a vector with valid false expects a refusal. Only the translate profile may append |language; runtime admission validates the shared language byte bound and Unicode.",
+	"vectors": [
+		{
+			"id": "builtin_default_count",
+			"value": "rewrite",
+			"profile_id": "rewrite"
+		},
+		{
+			"id": "builtin_own_count",
+			"value": "rewrite|3",
+			"profile_id": "rewrite",
+			"num_predictions": 3
+		},
+		{
+			"id": "min_count",
+			"value": "basic|1",
+			"profile_id": "basic",
+			"num_predictions": 1
+		},
+		{
+			"id": "max_count",
+			"value": "batch_advanced|10",
+			"profile_id": "batch_advanced",
+			"num_predictions": 10
+		},
+		{
+			"id": "custom_macos_id",
+			"value": "custom_1727_42|2",
+			"profile_id": "custom_1727_42",
+			"num_predictions": 2
+		},
+		{
+			"id": "custom_windows_id",
+			"value": "user_mon-prompt_123456",
+			"profile_id": "user_mon-prompt_123456"
+		},
+		{
+			"id": "empty",
+			"value": "",
+			"valid": false
+		},
+		{
+			"id": "empty_id",
+			"value": "|3",
+			"valid": false
+		},
+		{
+			"id": "empty_count",
+			"value": "rewrite|",
+			"valid": false
+		},
+		{
+			"id": "zero_count",
+			"value": "rewrite|0",
+			"valid": false
+		},
+		{
+			"id": "count_too_high",
+			"value": "rewrite|11",
+			"valid": false
+		},
+		{
+			"id": "negative_count",
+			"value": "rewrite|-1",
+			"valid": false
+		},
+		{
+			"id": "decimal_count",
+			"value": "rewrite|2.5",
+			"valid": false
+		},
+		{
+			"id": "two_separators",
+			"value": "rewrite|2|3",
+			"valid": false
+		},
+		{
+			"id": "space_in_id",
+			"value": "my prompt",
+			"valid": false
+		},
+		{
+			"id": "padded_value",
+			"value": " rewrite",
+			"valid": false
+		},
+		{
+			"id": "accented_id",
+			"value": "réécrire",
+			"valid": false
+		},
+		{
+			"id": "id_too_long",
+			"value": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+			"valid": false
+		},
+		{
+			"id": "longest_id",
+			"value": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+			"profile_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+		},
+		{
+			"id": "free_translation_target",
+			"value": "translate|1|Esperanto",
+			"profile_id": "translate",
+			"num_predictions": 1,
+			"translation_target": "Esperanto"
+		},
+		{
+			"id": "unicode_translation_target",
+			"value": "translate|2|ქართული",
+			"profile_id": "translate",
+			"num_predictions": 2,
+			"translation_target": "ქართული"
+		},
+		{
+			"id": "target_on_other_profile",
+			"value": "rewrite|1|Esperanto",
+			"valid": false
+		},
+		{
+			"id": "empty_translation_target",
+			"value": "translate|1|",
+			"valid": false
+		},
+		{
+			"id": "target_syntax_separator",
+			"value": "translate|1|a|b",
+			"valid": false
+		},
+		{
+			"id": "target_control",
+			"value": "translate|1|a\nb",
+			"valid": false
+		},
+		{
+			"id": "template_in_translation_target",
+			"value": "translate|1|English{language}",
+			"valid": false
+		}
+	]
+}
