@@ -710,6 +710,241 @@ check(
 	'macos-launch-gate.yml was inlined as the launch job; a second copy of the gate must not come back'
 );
 
+// The independent observation runs even when the preceding archive cohort is red.
+// Constructed transcripts exercise admission only; real SDK execution remains macOS-only.
+{
+	const assert = require('node:assert/strict');
+	const os = require('node:os');
+	const { execFileSync } = require('node:child_process');
+	const sdk = require('../diagnostics/sdk_permission_xctest_evidence.cjs');
+	const mac = pipeline.file(MACOS_BOX);
+	const stepName = 'Observe the actual no-prompt SDK permission API independently';
+	const method = 'testActualNoPromptPermissionAPIOnlyPublishesRetiredMetadata';
+	const name = `-[ErgoptiPlusTests.OwnedAutomationQueryWorkerTests ${method}]`;
+	const marker =
+		'SDK_PERMISSION_OBSERVATION caller=native-test-product target=shortcuts-events' +
+		' event_class=core event_id=getd ask_user=0 nonce=19 osstatus=';
+	function admitted(text) {
+		const jobs = [
+			...text.matchAll(/^  item36-native:\n[\s\S]*?(?=^  [A-Za-z][\w-]*:|(?![\s\S]))/gm)
+		];
+		if (jobs.length !== 1) return false;
+		const steps = [
+			...jobs[0][0].matchAll(
+				/^      - name: Observe the actual no-prompt SDK permission API independently\n[\s\S]*?(?=^      - |(?![\s\S]))/gm
+			)
+		];
+		if (steps.length !== 1) return false;
+		const step = steps[0][0],
+			job = jobs[0][0];
+		const required = [
+			'        if: ${{ !cancelled() }}',
+			'        shell: bash',
+			'          set -euo pipefail',
+			'          node tools/test/test-macos-swift-launcher-ci.cjs',
+			'          transcript="$evidence/sdk-permission-xctest.log"',
+			'          source_receipt="$evidence/sdk-permission-source.json"',
+			'          node tools/diagnostics/sdk_permission_xctest_evidence.cjs begin "$GITHUB_SHA" "$source_receipt"',
+			'          script -q /dev/null swift test --package-path static/ergopti_plus/macos/launcher \\',
+			'            --scratch-path "$RUNNER_TEMP/swift-launcher-ci" \\',
+			'            --filter \'OwnedAutomationQueryWorkerTests.testActualNoPromptPermissionAPIOnlyPublishesRetiredMetadata\' 2>&1 | tee "$transcript"',
+			'          sdk_statuses=("${PIPESTATUS[@]}")',
+			'          node tools/diagnostics/sdk_permission_xctest_evidence.cjs judge "$transcript" "${sdk_statuses[0]}" "${sdk_statuses[1]}" "$GITHUB_SHA" "$source_receipt" "$evidence/sdk-permission-verdict.json"',
+			'        timeout-minutes: 3'
+		];
+		if (required.some((line) => step.split('\n').filter((actual) => actual === line).length !== 1))
+			return false;
+		if (
+			/continue-on-error|XCTSkip|--skip|\|\| true|ERGOPTI_BREW_ALLOW|--permission-observation-only/.test(
+				step
+			)
+		)
+			return false;
+		const prior = job.indexOf(
+			'      - name: Qualify scoped item 36 native archive XCTest controls\n'
+		);
+		const capture = job.indexOf('      - name: Retain scoped item 36 native diagnostics\n');
+		return (
+			prior >= 0 &&
+			prior < steps[0].index &&
+			capture > steps[0].index &&
+			job.includes('${{ runner.temp }}/swift-launcher-evidence/sdk-permission-*.json') &&
+			job.includes('${{ runner.temp }}/swift-launcher-evidence/sdk-permission-xctest.log')
+		);
+	}
+	check(
+		admitted(mac),
+		'the fixed SDK case needs independent !cancelled() enrollment, owned statuses and retained source/verdict/log'
+	);
+	for (const [before, after] of [
+		['if: ${{ !cancelled() }}', 'if: success()'],
+		['sdk_permission_xctest_evidence.cjs begin', 'sdk_permission_xctest_evidence.cjs omitted'],
+		['sdk_permission_xctest_evidence.cjs judge', 'sdk_permission_xctest_evidence.cjs omitted'],
+		['sdk_statuses=("${PIPESTATUS[@]}")', 'sdk_statuses=(0 0)'],
+		[
+			"--filter 'OwnedAutomationQueryWorkerTests.testActualNoPromptPermissionAPIOnlyPublishesRetiredMetadata'",
+			"--filter 'OwnedAutomationQueryWorkerTests'"
+		],
+		['sdk-permission-*.json', 'omitted.json']
+	]) {
+		const start = mac.indexOf(`      - name: ${stepName}\n`);
+		const end = mac.indexOf('      - name: Retain scoped item 36 native diagnostics\n', start);
+		const owned = mac.slice(start, end);
+		const mutated =
+			before === 'sdk-permission-*.json'
+				? mac.replace(before, after)
+				: mac.slice(0, start) + owned.replace(before, after) + mac.slice(end);
+		check(!admitted(mutated), `SDK independent enrollment omission must refuse: ${before}`);
+	}
+	const summary = ' Executed 1 test, with 0 failures (0 unexpected) in 0.001 seconds';
+	const transcript = (code) =>
+		[
+			"Test Suite 'Selected tests' started at 2026-10-09 00:00:00.",
+			"Test Suite 'ErgoptiPlusPackageTests.xctest' started at 2026-10-09 00:00:00.",
+			"Test Suite 'OwnedAutomationQueryWorkerTests' started at 2026-10-09 00:00:00.",
+			`Test Case '${name}' started.`,
+			marker + code,
+			`Test Case '${name}' passed (0.001 seconds).`,
+			"Test Suite 'OwnedAutomationQueryWorkerTests' passed at 2026-10-09 00:00:01.",
+			summary,
+			"Test Suite 'ErgoptiPlusPackageTests.xctest' passed at 2026-10-09 00:00:01.",
+			summary,
+			"Test Suite 'Selected tests' passed at 2026-10-09 00:00:01.",
+			summary
+		].join('\n') + '\n';
+	const valid = transcript('-1744');
+	for (const code of ['0', '-600', '-1743', '-1744', '-2147483648', '2147483647']) {
+		const observed = sdk.evaluate(transcript(code), 0, 0);
+		assert.equal(observed.complete, true);
+		assert.equal(observed.osstatus, Number(code));
+		assert.equal(observed.catalogue_qualified, false);
+		assert.equal(observed.signed_application_qualified, false);
+		assert.equal(observed.osascript_principal_qualified, false);
+	}
+	const badTranscripts = [
+		'',
+		valid.replace(marker + '-1744\n', ''),
+		valid.replace(marker + '-1744', marker + '-1744\n' + marker + '-1744'),
+		marker + '-1744\n' + valid.replace(marker + '-1744\n', ''),
+		valid.replace('caller=native-test-product', 'caller=signed-application'),
+		valid.replace('ask_user=0', 'ask_user=1'),
+		valid.replace(`Test Case '${name}' passed`, `Test Case '${name}' skipped`),
+		valid.replace(`Test Case '${name}' passed`, `Test Case '${name}' failed`),
+		valid.replaceAll('Executed 1 test', 'Executed 0 tests'),
+		valid.replaceAll(method, 'testConstructedPacket'),
+		valid.replace("Test Suite 'Selected tests' passed at 2026-10-09 00:00:01.\n" + summary, ''),
+		valid + marker + '-1744\n'
+	];
+	for (const code of ['-0', '01', '+1', '1.0', 'true', '2147483648', '-2147483649', '-1744 extra'])
+		badTranscripts.push(transcript(code));
+	for (const bad of badTranscripts) assert.equal(sdk.evaluate(bad, 0, 0).complete, false);
+	assert.equal(sdk.evaluate(valid, 1, 0).complete, false);
+	assert.equal(sdk.evaluate(valid, 0, 1).complete, false);
+	for (const invalid of ['-1', '256', '00', 'SIGTERM'])
+		assert.throws(() => sdk.evaluate(valid, invalid, 0));
+	const testRelative =
+		'static/ergopti_plus/macos/launcher/Tests/ErgoptiPlusTests/OwnedAutomationQueryWorkerTests.swift';
+	const workerRelative =
+		'static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/OwnedAutomationQueryWorker.swift';
+	const test = fs.readFileSync(path.join(ROOT, testRelative), 'utf8');
+	const worker = fs.readFileSync(path.join(ROOT, workerRelative), 'utf8');
+	sdk.validateNativeSources(test, worker);
+	for (const [before, after] of [
+		['session.markers == ["Q1 HELD", data, "Q1 RETIRED 0"]', 'true'],
+		['session.process.terminationReason == .exit', 'true'],
+		['session.stderr.isEmpty, session.decoder.buffered.isEmpty', 'true'],
+		[
+			'operation: OwnedAutomationQueryWorker.permissionObservationOperation',
+			'operation: "fixture"'
+		],
+		['guard packet["observation"] as? String == "native-returned"', 'guard true'],
+		['let code = try XCTUnwrap(Int32(exactly: status.int64Value))', 'let code: Int32 = -1744']
+	])
+		assert.throws(() => sdk.validateNativeSources(test.replace(before, after), worker));
+	assert.throws(() =>
+		sdk.validateNativeSources(
+			test,
+			worker.replace(
+				'AEDeterminePermissionToAutomateTarget(&target, kAECoreSuite, kAEGetData, false)',
+				'OSStatus(-1744)'
+			)
+		)
+	);
+	assert.throws(() =>
+		sdk.validateNativeSources(
+			test,
+			worker.replace(
+				'AEDeterminePermissionToAutomateTarget(&target, kAECoreSuite, kAEGetData, false)',
+				'AEDeterminePermissionToAutomateTarget(&target, kAECoreSuite, kAEGetData, true)'
+			)
+		)
+	);
+	const temporary = fs.mkdtempSync(path.join(os.tmpdir(), 'ergopti-sdk-evidence-'));
+	try {
+		const git = (args) =>
+			execFileSync('git', args, {
+				cwd: temporary,
+				encoding: 'utf8',
+				stdio: ['ignore', 'pipe', 'pipe']
+			});
+		const paths = [
+			testRelative,
+			workerRelative,
+			'.github/workflows/ci-macos.yml',
+			'tools/test/test-macos-swift-launcher-ci.cjs',
+			'tools/test/test-macos-dev-qualification-deferral.cjs',
+			'tools/diagnostics/sdk_permission_xctest_evidence.cjs',
+			...[
+				'ReleaseArchiveStagingTests',
+				'SparkleArchiveUpdateAcceptanceTests',
+				'HomebrewArchiveAcceptanceTests',
+				'HomebrewAutomationConsentTests'
+			].map((suite) => `static/ergopti_plus/macos/launcher/Tests/ErgoptiPlusTests/${suite}.swift`)
+		];
+		for (const relative of paths) {
+			const destination = path.join(temporary, relative);
+			fs.mkdirSync(path.dirname(destination), { recursive: true });
+			fs.copyFileSync(path.join(ROOT, relative), destination);
+		}
+		git(['init', '-q']);
+		git(['add', '--', ...paths]);
+		git([
+			'-c',
+			'user.name=SDK evidence fixture',
+			'-c',
+			'user.email=sdk-fixture@example.invalid',
+			'commit',
+			'-qm',
+			'Independent source receipt fixture'
+		]);
+		const candidate = git(['rev-parse', 'HEAD']).trim();
+		const receipt = sdk.sourceReceipt(temporary, candidate);
+		assert.equal(sdk.judge(temporary, candidate, receipt, valid, 0, 0).complete, true);
+		const forged = JSON.parse(JSON.stringify(receipt));
+		forged.scope = 'signed-application';
+		assert.throws(() => sdk.judge(temporary, candidate, forged, valid, 0, 0));
+		forged.scope = receipt.scope;
+		forged.run = { id: '0', attempt: '0' };
+		assert.throws(() => sdk.judge(temporary, candidate, forged, valid, 0, 0));
+		assert.throws(() => sdk.judge(temporary, candidate, {}, valid, 0, 0));
+		fs.appendFileSync(path.join(temporary, workerRelative), '\n// changed after begin\n');
+		assert.throws(() => sdk.judge(temporary, candidate, receipt, valid, 0, 0));
+		fs.writeFileSync(path.join(temporary, workerRelative), worker);
+		const alias = path.join(temporary, 'capture-alias');
+		fs.writeFileSync(path.join(temporary, 'capture'), valid);
+		fs.symlinkSync('capture', alias);
+		assert.throws(() => sdk.readBoundedRegular(alias, 16777216));
+		assert.throws(() => sdk.readBoundedRegular(path.join(temporary, 'capture'), 1));
+		fs.writeFileSync(path.join(temporary, 'bad-utf8'), Buffer.from([0xff]));
+		assert.throws(() => sdk.readBoundedRegular(path.join(temporary, 'bad-utf8'), 1));
+	} finally {
+		fs.rmSync(temporary, { recursive: true, force: true });
+	}
+	console.log(
+		'[OK] Independent SDK enrollment, fixed metadata grammar, native-retirement source inverses and clean source receipts; no native API execution in portable controls.'
+	);
+}
+
 if (failures.length > 0) {
 	console.error('[FAIL] macOS Swift launcher CI coverage:');
 	for (const failure of failures) console.error(`  - ${failure}`);

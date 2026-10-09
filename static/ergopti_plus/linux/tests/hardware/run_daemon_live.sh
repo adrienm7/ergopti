@@ -49,6 +49,12 @@ if [ "${CUSTODY}" = "0" ]; then
 	python3 tests/hardware/run_native_subreaper.py luajit tests/hardware/run_input_owner_real.lua
 	CUSTODY=$?
 fi
+# Saved simultaneous configuration crosses the original Manager and publisher.
+# Its distinct kernel supplement retains the existing subreaper deadline.
+if [ "${CUSTODY}" = "0" ]; then
+	python3 tests/hardware/run_native_subreaper.py luajit tests/hardware/run_simultaneous_configuration_real.lua
+	CUSTODY=$?
+fi
 if [ "${CUSTODY}" != "0" ]; then
 	# shellcheck disable=SC2086
 	kill ${PIDS} 2>/dev/null

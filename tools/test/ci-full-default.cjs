@@ -56,6 +56,12 @@ const JOBS = [
 const FULL_STEPS = [
 	[
 		'.github/workflows/ci-macos.yml',
+		'item36-native',
+		'Observe the actual no-prompt SDK permission API independently',
+		'${{ !cancelled() }}'
+	],
+	[
+		'.github/workflows/ci-macos.yml',
 		'managed-ollama-native',
 		'Prepare locked native HTTP receiving clients',
 		null

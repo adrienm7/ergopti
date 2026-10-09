@@ -150,6 +150,7 @@ for (const lane of ['macos', 'windows', 'linux']) {
 		});
 }
 for (const [rel, id, name] of [
+	[MAC, 'item36-native', 'Observe the actual no-prompt SDK permission API independently'],
 	[MAC, 'managed-ollama-native', 'Qualify actual SDK accepted-owner and deadline XCTest controls'],
 	[MAC, 'managed-ollama-native', 'Qualify actual native PAC and WPAD XCTest controls'],
 	[MAC, 'macos-ok', 'Verify mandatory jobs and launch scenarios'],
@@ -178,6 +179,27 @@ for (const [rel, id, name] of [
 		assert.throws(() => Full.fromFiles(changed(rel, step, body)), /failure must remain fatal/);
 	});
 }
+check(
+	'actual no-prompt SDK observation keeps its full default condition and cannot disappear',
+	() => {
+		const name = 'Observe the actual no-prompt SDK permission API independently';
+		const job = Raw.jobsOfText(source.find((entry) => entry.rel === MAC).text, MAC).find(
+			(entry) => entry.id === 'item36-native'
+		);
+		const body = Raw.step(job.body, name);
+		assert.equal(
+			Full.stepField(Full.step(Full.job('item36-native'), name), 'if'),
+			'${{ !cancelled() }}'
+		);
+		assert.ok(
+			body.includes('sdk_permission_xctest_evidence.cjs judge'),
+			'actual SDK observation is judged'
+		);
+		assert.throws(() => Full.fromFiles(changed(MAC, body, '')), {
+			message: `[ci-pipeline] no step named '${name}' in this job`
+		});
+	}
+);
 check('unknown step conditions stay visible to existing mandatory guards', () => {
 	const view = Full.fromFiles(
 		changed(

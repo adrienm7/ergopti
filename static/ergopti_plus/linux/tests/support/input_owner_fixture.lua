@@ -12,8 +12,9 @@ function M.with_session(options, body)
 	options = options or {}
 	local names = { "ffi", "adapters.evdev_reader", "adapters.uinput_writer", "adapters.keyboard_hook",
 		"adapters.xkb_capture", "modules.hotstrings.device_finder", "platform.remap.tap_hold_engine",
-		"platform.remap.key_combination_engine", "modules.shortcuts.key_combinations" }
+		"platform.remap.key_combination_engine", "modules.shortcuts.key_combinations", "infra.manifest_reader" }
 	local saved = {}; for _, name in ipairs(names) do saved[name] = { package.loaded[name] } end
+	if options.public_chords ~= true then require("tests.support.key_combination_declaration_fixture").install_unavailable() end
 	local previous_preload = package.preload.ffi
 	local Input = require("infra.input_event")
 	local queues, paths, descriptors, serial, released_fds = {}, {}, {}, 100, {}
@@ -119,6 +120,8 @@ function M.with_session(options, body)
 	}
 	local called, err = pcall(function()
 		local Engine = h.load_module("platform.remap.tap_hold_engine")
+		-- Preserve the actual source issuer through Pair construction and Manager.
+		local Owner = h.load_module("modules.shortcuts.key_combinations")
 		local Native = h.load_module("platform.remap.key_combination_engine")
 		if options.late_reader then
 			s.reader = h.load_module("adapters.evdev_reader")
@@ -179,7 +182,6 @@ function M.with_session(options, body)
 				return text == "A" and { { keycode = 30, mods = { "shift" } } } or nil
 			end,
 			one_shot_result = function() return nil end })
-		local Owner = h.load_module("modules.shortcuts.key_combinations")
 		s.bytes = '[shortcuts.key_combination_taps]\ncaps_lock_then_tab = "one_shot_shift"\n'
 		s.owner = Owner.new({ keys = { { id = "caps_lock", key = "caps_lock" }, { id = "tab", key = "tab" } },
 			hold_picker = { modifiers = { "ctrl", "shift" }, layers = { "nav" } },
@@ -208,6 +210,12 @@ function M.with_session(options, body)
 		s.broker = require("adapters.modifier_broker").for_channel(s.writer)
 		function s.edge(id, code, value, at_ms)
 			queues[paths[id]][#queues[paths[id]] + 1] = Input.encode(Input.EV_KEY, code, value, nil, at_ms * 1000)
+			s.hook.pump()
+		end
+		-- Encodes a fresh controlled event into the original Reader queue. This
+		-- test-only port grants no native descriptor or physical qualification.
+		function s.event(id,kind,code,value,at_ms)
+			queues[paths[id]][#queues[paths[id]]+1]=Input.encode(kind,code,value,nil,at_ms*1000)
 			s.hook.pump()
 		end
 		function s.pair()

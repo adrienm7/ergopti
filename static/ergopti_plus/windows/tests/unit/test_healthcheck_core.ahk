@@ -547,13 +547,21 @@ _TestHC_CancelRefreshExportHistory(Refresh := true) {
 	global _HC_Session, _HC_ResetDone, _HC_ProbeRun
 	if _HC_ProbeRun
 		throw Error("A foreign diagnostic probe run is active.")
-	SavedSession := _HC_Session, SavedReset := _HC_ResetDone
+	SavedSession := _HC_Session, SavedReset := _HC_ResetDone, SavedProbeRun := _HC_ProbeRun
 	try {
 		_HC_ResetDone := true
+		; This Windows-host fixture supplies the identity required by typed sharing.
 		_HC_Session := Map("snapshot", Map("driver", "windows", "probes", Map(
 			"github_api", Map("state", "timeout", "cleanup", "unknown", "ms", 23),
 			"ai_health", Map("state", "pending"))), "extensive", false, "detailed", false)
 		Config := HealthCheck_Config()
+		AssertEqual("windows", _HC_Session["snapshot"]["driver"], "the native Windows fixture has its host identity before cancel/export")
+		AssertEqual("windows", HealthCheck_ShareSnapshot(_HC_Session["snapshot"], Config["schema"])["driver"],
+			"the genuine sharing owner admits the fixture's known host identity")
+		AssertThrows(() => HealthCheck_ShareSnapshot(Map("probes", Map()), Config["schema"]),
+			"the genuine sharing owner still refuses a missing host identity")
+		AssertThrows(() => HealthCheck_ShareSnapshot(Map("driver", "unknown", "probes", Map()), Config["schema"]),
+			"the genuine sharing owner still refuses an invalid host identity")
 		_HC_PerformPageAction(0, Map("action", "cancel"), Config)
 		if Refresh {
 			_HC_PerformPageAction(0, Map("action", "refresh", "detailed", false, "extensive", false), Config)
@@ -573,6 +581,7 @@ _TestHC_CancelRefreshExportHistory(Refresh := true) {
 	} finally {
 		_HC_Session := SavedSession
 		_HC_ResetDone := SavedReset
+		AssertEqual(SavedProbeRun, _HC_ProbeRun, "the fixture retains the exact idle probe owner after session/reset restoration")
 	}
 }
 Test("HealthCheck cleanup-history: cancel then refresh then export preserves unknown cleanup", _TestHC_CancelRefreshExportHistory)
