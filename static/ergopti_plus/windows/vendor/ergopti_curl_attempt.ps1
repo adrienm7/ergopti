@@ -18,6 +18,9 @@ function New-ErgoptiCurlAttemptEngine {
         $script:Child = $null
         $script:Stdout = $null
         $script:Stderr = $null
+        $script:Discovery = $null
+        $script:DiscoveryIssued = [Collections.Hashtable]::new([StringComparer]::Ordinal)
+        $script:DiscoveryPairs = [Collections.Hashtable]::new([StringComparer]::Ordinal)
         function Get-RemainingBudget {
             $Remaining = Get-NativeRemainingBudget
             if ($Remaining -le 0) { throw 'The original request budget expired.' }
@@ -168,7 +171,11 @@ public static class ErgoptiBoundedCurlPipe {
         }
 
         function Invoke-CurlRoute {
-            param([Uri]$Destination, $Route, [string]$Authentication, [string]$Method, [bool]$SendBody, [bool]$SendHeaders)
+            param([Uri]$Destination, $Route, [string]$Authentication, [string]$Method, [bool]$SendBody, [bool]$SendHeaders, [bool]$DiscoveryAdmitted = $false)
+            $Pair = $Destination.AbsoluteUri + "`n" + $Route.Endpoint
+            if (-not $DiscoveryAdmitted -and $script:DiscoveryPairs.ContainsKey($Pair)) {
+                throw 'A discovered pair cannot start a legacy or third transport.'
+            }
             $Budget = Get-RemainingBudget
             $Lines = @(('url = ' + (ConvertTo-CurlLiteral $Destination.AbsoluteUri)),
                 ('request = ' + (ConvertTo-CurlLiteral $Method)), 'silent', 'show-error',
@@ -184,9 +191,14 @@ public static class ErgoptiBoundedCurlPipe {
             }
             if ($InputValue.revocation_best_effort) { $Lines += 'ssl-revoke-best-effort' }
             if ($Route.Kind -ceq 'proxy') {
-                if ($Authentication -cnotin @('negotiate', 'ntlm')) { throw 'The proxy authentication scheme was refused.' }
-                $Lines += 'proxy-' + $Authentication
-                $Lines += 'proxy-user = ":"'
+                if ($Authentication -cnotin @('negotiate', 'ntlm') -and
+                    -not ($DiscoveryAdmitted -and $Authentication -ceq 'none')) {
+                    throw 'The proxy authentication scheme was refused.'
+                }
+                if ($Authentication -cne 'none') {
+                    $Lines += 'proxy-' + $Authentication
+                    $Lines += 'proxy-user = ":"'
+                }
             }
             if ($SendHeaders) {
                 foreach ($Header in $InputValue.headers) {
@@ -233,6 +245,207 @@ public static class ErgoptiBoundedCurlPipe {
             return $Ntlm
         }
 
+
+        function Get-SelectionWitness {
+            param($Selection)
+            if ($null -eq $Selection -or $Selection.Ok -isnot [bool] -or -not $Selection.Ok -or
+                $Selection.CleanupDebt -eq $true -or
+                ($null -ne $Selection.CleanupDebt -and $Selection.CleanupDebt -isnot [bool]) -or $Selection.Routes -isnot [array] -or
+                ($Selection.MaxRoutes -isnot [int] -and $Selection.MaxRoutes -isnot [long]) -or $Selection.MaxRoutes -lt 1 -or $Selection.MaxRoutes -gt [int]::MaxValue -or
+                ($Selection.MaxRedirects -isnot [int] -and $Selection.MaxRedirects -isnot [long]) -or $Selection.MaxRedirects -lt 0 -or $Selection.MaxRedirects -gt [int]::MaxValue -or
+                $Selection.Routes.Count -lt 1 -or $Selection.Routes.Count -gt $Selection.MaxRoutes) {
+                throw 'Fresh canonical route retirement or bounds were refused.'
+            }
+            $Routes = @()
+            foreach ($Item in $Selection.Routes) {
+                if ($Item.Kind -cnotin @('direct', 'proxy') -or $Item.Endpoint -isnot [string] -or
+                    ($Item.Kind -ceq 'direct' -and ($Item.Endpoint -cne '' -or $Item.Authentication -cne 'none')) -or
+                    ($Item.Kind -ceq 'proxy' -and $Item.Authentication -cne 'current_user_proxy_only')) {
+                    throw 'Fresh canonical route semantics were refused.'
+                }
+                $Routes += [ordered]@{ kind = $Item.Kind; endpoint = $Item.Endpoint; authentication = $Item.Authentication }
+            }
+            return ([ordered]@{ routes = $Routes; max_routes = $Selection.MaxRoutes;
+                max_redirects = $Selection.MaxRedirects } | ConvertTo-Json -Compress -Depth 5)
+        }
+
+        function Invoke-AnonymousProxyDiscovery {
+            param([Uri]$Destination, $Route, $Capability, $Selection, [int]$Ordinal = 0)
+            if ($null -ne $script:Discovery -or -not (ChildQuiesced) -or
+                $Destination.Scheme -cne 'https' -or $Destination.UserInfo -ne '' -or
+                $Route.Kind -cne 'proxy' -or $Route.Authentication -cne 'current_user_proxy_only' -or
+                $Route.Endpoint -isnot [string] -or
+                $Capability.sspi -isnot [bool] -or -not $Capability.sspi -or
+                $Capability.spnego -isnot [bool] -or -not $Capability.spnego -or
+                [version]$Capability.version -lt [version]'8.7.0') {
+                throw 'Anonymous proxy discovery admission was refused.'
+            }
+            [Uri]$Relay = $null
+            if (-not [Uri]::TryCreate($Route.Endpoint, [UriKind]::Absolute, [ref]$Relay) -or
+                $Relay.Scheme -cne 'http' -or $Relay.UserInfo -ne '' -or $Relay.Host -eq '' -or
+                $Relay.Port -lt 1 -or $Relay.Port -gt 65535 -or $Relay.Query -ne '' -or
+                $Relay.Fragment -ne '' -or $Relay.AbsolutePath -ne '/' -or
+                $Relay.AbsoluteUri -cne $Route.Endpoint) { throw 'The exact discovery relay was refused.' }
+            $Pair = $Destination.AbsoluteUri + "`n" + $Route.Endpoint
+            $Key = $Pair + "`n" + $Ordinal
+            if ($script:DiscoveryIssued.ContainsKey($Key)) { throw 'A discovery ordinal is single use.' }
+            $Witness = Get-SelectionWitness $Selection
+            if ($Ordinal -lt 0 -or $Ordinal -ge $Selection.Routes.Count) { throw 'The canonical discovery ordinal was refused.' }
+            $Indexed = $Selection.Routes[$Ordinal]
+            if ($Indexed.Kind -cne $Route.Kind -or $Indexed.Endpoint -cne $Route.Endpoint -or
+                $Indexed.Authentication -cne $Route.Authentication) { throw 'The exact discovery ordinal disagrees.' }
+            $HostName = $Destination.IdnHost.Trim('[', ']')
+            if ($HostName.Contains(':')) { $HostName = '[' + $HostName + ']' }
+            $Authority = $HostName + ':' + $Destination.Port
+            $Descriptor = @{ version = 1; kind = 'anonymous_connect_only';
+                original_url = $Destination.AbsoluteUri; relay = $Route.Endpoint; authority = $Authority }
+            $Budget = Get-RemainingBudget
+            # This URI constructs an HTTP proxy CONNECT frame; it is not a new
+            # destination or redirect. HEAD stops after its headers even on 200.
+            # Only the selected transport later receives the original HTTPS URL,
+            # caller method, headers and body. No credential option enters this phase.
+            $Lines = @(('url = ' + (ConvertTo-CurlLiteral ('http://' + $Authority + '/'))),
+                'head', 'no-include', 'http1.1', 'no-location', 'request = "CONNECT"',
+                ('request-target = ' + (ConvertTo-CurlLiteral $Descriptor.authority)),
+                'silent', 'show-error',
+                ('max-time = ' + ($Budget / 1000.0).ToString('F3', [Globalization.CultureInfo]::InvariantCulture)),
+                ('connect-timeout = ' + ([Math]::Min($InputValue.connect_timeout_ms, $Budget) / 1000.0).ToString('F3', [Globalization.CultureInfo]::InvariantCulture)),
+                'dump-header = "-"',
+                ('output = ' + (ConvertTo-CurlLiteral $InputValue.response_path)),
+                ('write-out = ' + (ConvertTo-CurlLiteral '%{http_code}|%{http_connect}|%{size_download}|%{proxy_used}')),
+                ('proxy = ' + (ConvertTo-CurlLiteral $Descriptor.relay)), 'noproxy = ""')
+            [IO.File]::WriteAllText($CurlConfig, ($Lines -join "`n") + "`n", [Text.UTF8Encoding]::new($false))
+            [IO.File]::WriteAllBytes($InputValue.response_path, [byte[]]@())
+            [IO.File]::WriteAllBytes($InputValue.header_path, [byte[]]@())
+            $Executable = Join-Path ([Environment]::GetFolderPath('System')) 'curl.exe'
+            $script:DiscoveryIssued[$Key] = $true
+            $script:DiscoveryPairs[$Pair] = $true
+            $Observed = Invoke-OwnedProcess $Executable ('--disable --config "' + $CurlConfig + '"') ($InputValue.max_header_bytes + 1024)
+            if (-not $Observed.child_quiesced -or -not (ChildQuiesced) -or
+                ([IO.FileInfo]::new($InputValue.response_path)).Length -ne 0) {
+                throw 'Anonymous discovery has unresolved output or retirement.'
+            }
+            $HeaderEnd = $Observed.stdout.IndexOf("`r`n`r`n")
+            $RawHeaders = ''
+            $MetricText = $Observed.stdout
+            if ($HeaderEnd -ge 0) {
+                $RawHeaders = $Observed.stdout.Substring(0, $HeaderEnd + 4)
+                $MetricText = $Observed.stdout.Substring($HeaderEnd + 4)
+            }
+            if ($MetricText -cnotmatch '^([0-9]{3})\|([0-9]{3})\|([0-9]+)\|([01])$') {
+                throw 'Anonymous discovery metrics were malformed.'
+            }
+            $Metrics = @{ exit = $Observed.exit; status = [int]$Matches[1]; connect = [int]$Matches[2];
+                delivered = [int64]$Matches[3]; proxy_used = ($Matches[4] -ceq '1');
+                child_quiesced = $Observed.child_quiesced;
+                headers = @{ status = 0; headers = @{}; connect_challenges = @() } }
+            if ($Metrics.connect -ne 0 -or $Metrics.delivered -ne 0 -or -not $Metrics.proxy_used) {
+                throw 'Discovery cannot claim an ordinary tunnel or transfer.'
+            }
+            # Preserve literal actual curl5/7 and zero statuses for canonical
+            # route failover. Never translate discovery407 into tunnel407.
+            if ($RawHeaders -ceq '' -and $Metrics.status -eq 0 -and $Metrics.exit -in @(5, 7)) {
+                return @{ ready = $false; metrics = $Metrics }
+            }
+            if ($Metrics.exit -ne 0 -or -not $Observed.stderr_empty -or $RawHeaders.Length -gt $InputValue.max_header_bytes -or
+                $RawHeaders -match '[^\x09\x0a\x0d\x20-\x7e]') { throw 'Discovery header admission was refused.' }
+            $HeaderLines = $RawHeaders.Substring(0, $RawHeaders.Length - 4).Split(@("`r`n"), [StringSplitOptions]::None)
+            if ($HeaderLines[0] -cnotmatch '^HTTP/1\.[01] ([0-9]{3})(?: [\x20-\x7e]*)?$' -or
+                [int]$Matches[1] -ne $Metrics.status -or $Metrics.status -notin @(200, 407)) {
+                throw 'Discovery status and literal receipt disagree.'
+            }
+            $Challenges = @()
+            for ($HeaderIndex = 1; $HeaderIndex -lt $HeaderLines.Length; $HeaderIndex++) {
+                if (($HeaderIndex % 128) -eq 0) { $null = Get-RemainingBudget }
+                $Line = $HeaderLines[$HeaderIndex]
+                if ($Line -cnotmatch '^([!#$%&''*+.^_`|~0-9A-Za-z-]+):([\x09\x20-\x7e]*)$') {
+                    throw 'Discovery header syntax was refused.'
+                }
+                if ($Matches[1].ToLowerInvariant() -ceq 'proxy-authenticate') { $Challenges += $Matches[2].Trim() }
+            }
+            $Authentication = 'none'
+            if ($Metrics.status -eq 200) {
+                if ($Challenges.Count -ne 0) { throw 'Unsolicited discovery credentials were refused.' }
+            } else {
+                if ($Challenges.Count -eq 0) { throw 'A bare proxy challenge was required.' }
+                $HasNegotiate = $false
+                $HasNtlm = $false
+                $IgnoredParameter = '^[!#$%&''*+.^_`|~0-9A-Za-z-]+[\x09\x20]*=[\x09\x20]*(?:[!#$%&''*+.^_`|~0-9A-Za-z-]+|"(?:\\[\x09\x20-\x7e]|[^"\\\x00-\x08\x0a-\x1f\x7f])*")$'
+                foreach ($HeaderChallenge in $Challenges) {
+                    # Split bounded HTTP challenge members without treating a
+                    # comma inside a quoted Basic/Digest parameter as a scheme.
+                    # These known unselected offers cannot mint credentials.
+                    $Parts = [Collections.Generic.List[string]]::new()
+                    $Start = 0
+                    $Quoted = $false
+                    $Escaped = $false
+                    for ($Index = 0; $Index -lt $HeaderChallenge.Length; $Index++) {
+                        if (($Index % 1024) -eq 0) { $null = Get-RemainingBudget }
+                        $Character = $HeaderChallenge[$Index]
+                        if ($Escaped) { $Escaped = $false; continue }
+                        if ($Quoted -and $Character -ceq '\') { $Escaped = $true; continue }
+                        if ($Character -ceq '"') { $Quoted = -not $Quoted; continue }
+                        if (-not $Quoted -and $Character -ceq ',') {
+                            $Parts.Add($HeaderChallenge.Substring($Start, $Index - $Start).Trim())
+                            $Start = $Index + 1
+                        }
+                    }
+                    if ($Quoted -or $Escaped) { throw 'An unterminated proxy challenge was refused.' }
+                    $Parts.Add($HeaderChallenge.Substring($Start).Trim())
+                    $IgnoringKnown = $false
+                    foreach ($Challenge in $Parts) {
+                        if ($Challenge -imatch '^Negotiate$') { $HasNegotiate = $true; $IgnoringKnown = $false }
+                        elseif ($Challenge -imatch '^NTLM$') { $HasNtlm = $true; $IgnoringKnown = $false }
+                        elseif ($Challenge -match '^(?i:Basic|Digest)(?:[\x09\x20]+(.*))?$') {
+                            $IgnoringKnown = $true
+                            $Parameter = $Matches[1]
+                            if ($null -ne $Parameter -and $Parameter -ne '' -and $Parameter -cnotmatch $IgnoredParameter) {
+                                throw 'An unselected known challenge parameter was malformed.'
+                            }
+                        }
+                        elseif ($IgnoringKnown -and $Challenge -cmatch $IgnoredParameter) { continue }
+                        else { throw 'A foreign or unsolicited challenge was refused.' }
+                    }
+                }
+                if ($HasNegotiate) { $Authentication = 'negotiate' }
+                elseif ($HasNtlm -and $Capability.ntlm -is [bool] -and $Capability.ntlm) { $Authentication = 'ntlm' }
+                else { throw 'The observed proxy authentication feature is unavailable.' }
+            }
+            $null = Get-RemainingBudget
+            $script:Discovery = @{ descriptor = $Descriptor; authentication = $Authentication; witness = $Witness; ordinal = $Ordinal }
+            return @{ ready = $true; metrics = $Metrics; authentication = $Authentication }
+        }
+
+        function InvokeDiscoveredRoute {
+            param([Uri]$Destination, $Route, [string]$Method, [bool]$SendBody, [bool]$SendHeaders, $FreshSelection)
+            $Lease = $script:Discovery
+            # Consume before any successor work. Discovery plus this one selected
+            # transport is finite; an advertised Negotiate never becomes NTLM.
+            $script:Discovery = $null
+            if ($null -eq $Lease -or -not (ChildQuiesced) -or
+                $Lease.descriptor.original_url -cne $Destination.AbsoluteUri -or
+                $Lease.descriptor.relay -cne $Route.Endpoint -or $Route.Kind -cne 'proxy' -or
+                $Route.Authentication -cne 'current_user_proxy_only') {
+                throw 'The exact discovered route was not requalified.'
+            }
+            if ((Get-SelectionWitness $FreshSelection) -cne $Lease.witness) {
+                throw 'The canonical full-URL route list changed after anonymous discovery.'
+            }
+            if ($Lease.ordinal -ge $FreshSelection.Routes.Count -or
+                $FreshSelection.Routes[$Lease.ordinal].Kind -cne $Route.Kind -or
+                $FreshSelection.Routes[$Lease.ordinal].Endpoint -cne $Route.Endpoint -or
+                $FreshSelection.Routes[$Lease.ordinal].Authentication -cne $Route.Authentication) {
+                throw 'The fresh selected ordinal was refused.'
+            }
+            $null = Get-RemainingBudget
+            return (Invoke-CurlRoute $Destination $Route $Lease.authentication $Method $SendBody $SendHeaders $true)
+        }
+
+        function DiscoverProxy {
+            param([Uri]$Destination, $Route, $Capability, $Selection, [int]$Ordinal = 0)
+            return (Invoke-AnonymousProxyDiscovery $Destination $Route $Capability $Selection $Ordinal)
+        }
+
         function GetRemainingBudget { return (Get-RemainingBudget) }
         function GetNativeRemainingBudget { return (Get-NativeRemainingBudget) }
         function ObserveCapability { return (Get-OwnedCurlCapability) }
@@ -247,7 +460,7 @@ public static class ErgoptiBoundedCurlPipe {
         }
         function ChildQuiesced { return ($null -eq $script:Child -and $null -eq $script:Stdout -and $null -eq $script:Stderr) }
         Export-ModuleMember -Function GetRemainingBudget, GetNativeRemainingBudget,
-            ObserveCapability, InvokeRoute, TestNtlmChallenge, ChildQuiesced
+            ObserveCapability, InvokeRoute, TestNtlmChallenge, ChildQuiesced, DiscoverProxy, InvokeDiscoveredRoute
     }
     return $Module
 }

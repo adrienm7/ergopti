@@ -400,12 +400,8 @@ function Invoke-ErgoptiUpdaterCurlDownload {
         $Engine = New-ErgoptiCurlAttemptEngine $Parameters $Answer (Join-Path $Directory 'capability.json') `
             (Join-Path $Directory 'payload.bin') (Join-Path $Directory 'transport.conf')
         $Capability = $null
-        $MaximumHops = $null
-        $Hop = 0
-        while ($true) {
-            Assert-ErgoptiUpdaterDestination $Destination
-            $State.Stage = 'proxy_resolve'
-            $State.Receipt = @{}
+        function Resolve-ErgoptiArtifactFreshSelection {
+            param([Uri]$Destination)
             $Selection = & $ResolveRoutes $Destination.AbsoluteUri $Engine.GetRemainingBudget()
             if ($null -ne $Selection -and $Selection.CleanupDebt -is [bool] -and $Selection.CleanupDebt) {
                 $State.NativeCleanupDebt = $true
@@ -419,8 +415,6 @@ function Invoke-ErgoptiUpdaterCurlDownload {
                 if ($null -ne $Selection -and $Selection.Receipt -is [hashtable]) { $State.Receipt = $Selection.Receipt }
                 throw [InvalidOperationException]::new('Canonical artifact routing was refused.')
             }
-            if ($null -eq $MaximumHops) { $MaximumHops = $Selection.MaxRedirects }
-            elseif ($MaximumHops -ne $Selection.MaxRedirects) { throw 'Artifact routing policy changed.' }
             # Admit the whole list before preparing credentials for any route.
             foreach ($Route in $Selection.Routes) {
                 if ($Route.Kind -cnotin @('direct', 'proxy') -or $Route.Endpoint -isnot [string]) {
@@ -441,6 +435,17 @@ function Invoke-ErgoptiUpdaterCurlDownload {
             if (Test-ErgoptiEnvironmentBypass $Destination $Bypass $Policy) {
                 $Selection.Routes = @(@{ Kind = 'direct'; Endpoint = ''; Authentication = 'none' })
             }
+            return $Selection
+        }
+        $MaximumHops = $null
+        $Hop = 0
+        while ($true) {
+            Assert-ErgoptiUpdaterDestination $Destination
+            $State.Stage = 'proxy_resolve'
+            $State.Receipt = @{}
+            $Selection = Resolve-ErgoptiArtifactFreshSelection $Destination
+            if ($null -eq $MaximumHops) { $MaximumHops = $Selection.MaxRedirects }
+            elseif ($MaximumHops -ne $Selection.MaxRedirects) { throw 'Artifact routing policy changed.' }
             if ($null -eq $Capability) {
                 $State.Stage = 'connect'
                 $Capability = $Engine.ObserveCapability()
@@ -450,15 +455,24 @@ function Invoke-ErgoptiUpdaterCurlDownload {
                 continue
             }
             $Metrics = $null
-            foreach ($Route in $Selection.Routes) {
+            for ($DiscoveryOrdinal = 0; $DiscoveryOrdinal -lt $Selection.Routes.Count; $DiscoveryOrdinal++) {
+                $Route = $Selection.Routes[$DiscoveryOrdinal]
                 if ($Route.Kind -ceq 'proxy' -and (-not $Capability.sspi -or -not $Capability.spnego)) {
                     throw 'The actual native proxy authentication features are unavailable.'
                 }
                 $State.Stage = 'connect'
                 $State.Receipt = @{ backend = 'curl'; stage = 'connect'; failure_provenance = 'unknown'; tls_verification = 'enforced' }
-                $Metrics = $Engine.InvokeRoute($Destination, $Route, 'negotiate', 'GET', $false, $false)
-                if ($Engine.TestNtlmChallenge($Destination, $Route, $Metrics, $Capability)) {
-                    $Metrics = $Engine.InvokeRoute($Destination, $Route, 'ntlm', 'GET', $false, $false)
+                if ($Route.Kind -ceq 'proxy' -and $Destination.Scheme -ceq 'https') {
+                    $Discovery = $Engine.DiscoverProxy($Destination, $Route, $Capability, $Selection, $DiscoveryOrdinal)
+                    if ($Discovery.ready) {
+                        $FreshSelection = Resolve-ErgoptiArtifactFreshSelection $Destination
+                        $Metrics = $Engine.InvokeDiscoveredRoute($Destination, $Route, 'GET', $false, $false, $FreshSelection)
+                    } else { $Metrics = $Discovery.metrics }
+                } else {
+                    $Metrics = $Engine.InvokeRoute($Destination, $Route, 'negotiate', 'GET', $false, $false)
+                    if ($Engine.TestNtlmChallenge($Destination, $Route, $Metrics, $Capability)) {
+                        $Metrics = $Engine.InvokeRoute($Destination, $Route, 'ntlm', 'GET', $false, $false)
+                    }
                 }
                 $State.Receipt.failure_provenance = 'verified'
                 if ($Metrics.exit -eq 0) { break }

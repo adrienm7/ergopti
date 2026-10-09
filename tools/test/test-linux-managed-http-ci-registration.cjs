@@ -13,7 +13,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const crypto = require('node:crypto');
-const Pipeline = require('./ci-pipeline.cjs');
+const Pipeline = require('./ci-full-default.cjs');
 const Evidence = require('./linux-managed-http-evidence.cjs');
 const Planner = require('./verify-change.cjs');
 const ROOT = path.resolve(__dirname, '../..');
@@ -218,8 +218,8 @@ function validateWorkflow(text, entry) {
 		"github.event_name == 'push' && needs.validate.outputs.release == 'true'"
 	);
 }
-const workflow = read('.github/workflows/ci-linux.yml');
-const entry = read('.github/workflows/ci.yml');
+const workflow = Pipeline.file('.github/workflows/ci-linux.yml');
+const entry = Pipeline.file('.github/workflows/ci.yml');
 validateWorkflow(workflow, entry);
 passed++;
 function uniqueReplace(text, needle, replacement) {
