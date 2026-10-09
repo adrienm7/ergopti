@@ -4,22 +4,60 @@
 --- MODULE: Genuine Linux AI Outer Parents
 --- DESCRIPTION:
 --- Exercises the actual prediction engine, AgentSettings, shared renderer and
---- completed native children. Source withdrawal never retains a literal parent.
+--- completed native children under the published available Agent declaration.
+--- Separately checks the current disabled public Agent policy; the component
+--- fixture never represents current public availability. Source withdrawal
+--- never retains a literal parent.
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
 local Preferences = require("tests.support.llm_preferences_fixture")
 
---- Isolates the genuine native owners and restores every intercepted seam.
+--- Isolates genuine owners with the independently published available Agent source.
+--- The public-policy cases retain the current top declaration without replacement.
 --- @param body function Test body accepting the actual context and renderer.
-local function with_world(body)
+--- @param public_policy boolean|nil Keep the current public declaration when true.
+local function with_world(body, public_policy)
 	local names = { "modules.llm.prediction_engine", "modules.llm.agent_settings",
 		"ui.menu.menu_builder", "ui.menu.agent_rows", "ui.menu.ai_parent" }
 	local previous = {}
-	for _, name in ipairs(names) do previous[name] = package.loaded[name]; package.loaded[name] = nil end
-	local renderer = require("infra.manifest_menu")
-	local build, group_row = renderer.build, renderer.group_row
+	for _, name in ipairs(names) do previous[name] = package.loaded[name] end
+	local renderer, build, group_row, top, agent_index, public_agent
 	local ok, err = xpcall(function()
+		for _, name in ipairs(names) do package.loaded[name] = nil end
+		renderer = require("infra.manifest_menu")
+		build, group_row = renderer.build, renderer.group_row
+		local root = renderer.get_root()
+		top = root and root.top_level
+		helpers.assert_type(top, "table", "the genuine top-level source must exist")
+		for index, row in ipairs(top) do
+			if row.id == "agent" then
+				helpers.assert_nil(agent_index, "the genuine public Agent declaration must be unique")
+				agent_index, public_agent = index, row
+			end
+		end
+		helpers.assert_type(public_agent, "table", "the actual Agent declaration must be present")
+		if not public_policy then
+			-- Exact source input from published 1028f6bd, before public unavailability.
+			-- Only the declaration is historical; renderer, engine, child and callbacks
+			-- are the genuine current owners exercised by every original assertion.
+			local file = assert(io.open(helpers.driver_root()
+				.. "/tests/support/fixtures/agent_available_top_level_published_1028.json", "r"))
+			local contents = file:read("*a")
+			assert(file:close())
+			local available = require("json").decode(contents)
+			helpers.assert_type(available, "table", "the recorded published declaration must decode")
+			helpers.assert_eq(available.id, "agent", "the historical source owns only Agent")
+			helpers.assert_eq(available.greyed_when_paused, true, "the historical pause policy is retained")
+			local fields = 0
+			for key in pairs(available) do
+				helpers.assert_true(key == "id" or key == "greyed_when_paused",
+					"no invented readiness, owner or availability fields enter the fixture")
+				fields = fields + 1
+			end
+			helpers.assert_eq(fields, 2, "the exact published declaration has two fields")
+			top[agent_index] = available
+		end
 		Preferences.with(function()
 			local engine = require("modules.llm.prediction_engine")
 			local ctx = { llm = engine, paused = false, on_quit = function() end,
@@ -29,7 +67,8 @@ local function with_world(body)
 			body(ctx, renderer)
 		end)
 	end, debug.traceback)
-	renderer.build, renderer.group_row = build, group_row
+	if top and agent_index and public_agent then top[agent_index] = public_agent end
+	if renderer then renderer.build, renderer.group_row = build, group_row end
 	for _, name in ipairs(names) do package.loaded[name] = previous[name] end
 	if not ok then error(err, 0) end
 end
@@ -50,7 +89,7 @@ local function parent(ctx, kind)
 	return found
 end
 
-helpers.describe("Linux shared AI outer parents", function()
+helpers.describe("Linux shared AI outer parents with published available component source", function()
 	for _, kind in ipairs({ "llm", "agent" }) do
 		helpers.it("retains the genuine completed " .. kind .. " child and its callbacks", function()
 			with_world(function(ctx, renderer)
@@ -261,4 +300,96 @@ helpers.describe("Linux shared AI outer parents", function()
 			end)
 		end
 	end
+	for _, state in ipairs({ "present", "paused", "absent" }) do
+		helpers.it("keeps the current public Agent unavailable with its engine " .. state, function()
+			with_world(function(ctx, renderer)
+				if state == "paused" then ctx.paused = true
+				elseif state == "absent" then ctx.llm = nil end
+				local root = renderer.get_root()
+				local declaration, position
+				for index, row in ipairs(root.top_level) do if row.id == "agent" then declaration, position = row, index end end
+				helpers.assert_type(declaration, "table", "the current public source remains genuine")
+				helpers.assert_eq(declaration.disabled, true, "the public policy declares Agent unavailable")
+				helpers.assert_eq(declaration.i18n, "menu.agent.title")
+				helpers.assert_eq(declaration.reason_key, "menu.agent.not_ready")
+				local native_build, native_group = renderer.build, renderer.group_row
+				local child_calls, group_calls = 0, 0
+				renderer.build = function(key, ...)
+					if key == "agent_menu" then child_calls = child_calls + 1 end
+					return native_build(key, ...)
+				end
+				renderer.group_row = function(frame, id, ...)
+					if id == "agent_parent_linux" then group_calls = group_calls + 1 end
+					return native_group(frame, id, ...)
+				end
+				local row = parent(ctx, "agent")
+				helpers.assert_type(row, "table", "the current reasoned unavailable parent reaches the public tray")
+				local i18n = require("infra.i18n")
+				helpers.assert_eq(row.title, i18n.get("menu.agent.title") .. " — " .. i18n.get("menu.agent.not_ready"),
+					"the public title retains the exact current translated reason")
+				helpers.assert_eq(row.disabled, true)
+				helpers.assert_nil(row.menu, "public unavailability exposes no native child")
+				helpers.assert_nil(row.fn, "public unavailability has no command")
+				helpers.assert_eq(child_calls, 0, "the public policy never constructs the unavailable Agent child")
+				helpers.assert_eq(group_calls, 0, "the public policy never publishes an available native Agent group")
+				helpers.assert_true(rawequal(declaration, root.top_level[position]),
+					"the current public declaration retains its original identity")
+			end, true)
+		end)
+	end
+
+	helpers.it("restores the exact current Agent source after published component coverage", function()
+		local renderer = require("infra.manifest_menu")
+		local root = renderer.get_root()
+		local original, position
+		for index, row in ipairs(root.top_level) do
+			if row.id == "agent" then original, position = row, index end
+		end
+		helpers.assert_type(original, "table")
+		helpers.assert_eq(original.disabled, true)
+		with_world(function(_, component_renderer)
+			helpers.assert_true(rawequal(component_renderer, renderer), "the fixture retains the genuine renderer owner")
+			local recorded = component_renderer.get_root().top_level[position]
+			helpers.assert_true(not rawequal(recorded, original), "the component case uses the recorded source object")
+			helpers.assert_nil(recorded.disabled, "the historical source is explicitly available")
+			helpers.assert_eq(recorded.id, original.id)
+		end)
+		helpers.assert_true(rawequal(root.top_level[position], original), "the exact current declaration is restored")
+		helpers.assert_eq(original.disabled, true, "component coverage cannot change public availability")
+	end)
+
+	helpers.it("restores every actual fixture owner when the component body refuses", function()
+		local renderer = require("infra.manifest_menu")
+		local root, original, position = renderer.get_root()
+		for index, row in ipairs(root.top_level) do if row.id == "agent" then original, position = row, index end end
+		local build, group_row = renderer.build, renderer.group_row
+		local names = { "modules.llm.prediction_engine", "modules.llm.agent_settings",
+			"ui.menu.menu_builder", "ui.menu.agent_rows", "ui.menu.ai_parent" }
+		local previous = {}
+		for _, name in ipairs(names) do previous[name] = package.loaded[name] end
+		local replaced = false
+		local refusal = "owned published component body refusal"
+		local ok, err = pcall(function()
+			with_world(function(_, actual_renderer)
+				helpers.assert_true(rawequal(actual_renderer, renderer), "the throwing case retains the real renderer")
+				local recorded = actual_renderer.get_root().top_level[position]
+				helpers.assert_true(not rawequal(recorded, original), "the refusal follows real historical replacement")
+				helpers.assert_nil(recorded.disabled)
+				replaced = true
+				renderer.build = function(...) return build(...) end
+				renderer.group_row = function(...) return group_row(...) end
+				error(refusal, 0)
+			end)
+		end)
+		helpers.assert_true(replaced, "the body must execute after genuine fixture replacement")
+		helpers.assert_eq(ok, false, "the deliberate component refusal must propagate")
+		helpers.assert_true(tostring(err):find(refusal, 1, true) ~= nil, "the original refusal is retained")
+		helpers.assert_true(rawequal(root.top_level[position], original), "the exact current source is restored after refusal")
+		helpers.assert_true(rawequal(renderer.build, build), "the real build owner is restored after refusal")
+		helpers.assert_true(rawequal(renderer.group_row, group_row), "the real group owner is restored after refusal")
+		for _, name in ipairs(names) do
+			helpers.assert_true(rawequal(package.loaded[name], previous[name]), "the original module identity or absence is restored: " .. name)
+		end
+	end)
+
 end)

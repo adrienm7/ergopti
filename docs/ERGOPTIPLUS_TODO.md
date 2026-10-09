@@ -5916,6 +5916,16 @@ network failures remain with their owner; native desktop, engine E2E, packaging
 and installation are skipped after the main refusal. This does not close the
 remaining menu migration or installed-device acceptance.
 
+Current Linux menu qualification distinguishes the disabled public Agent policy
+from component coverage using the independently published 1028 available
+source declaration. Actual current renderers, engines, settings and retained
+callbacks remain exercised; every original assertion and independent corpus
+is preserved. Complete focused modules pass 27 outer-parent, 278 manifest-menu
+and 100 Agent-settings cases on each Lua runtime, with zero failures or skips.
+Current public cases retain the exact unavailable reason and expose no child
+or command; throwing scopes restore the original declaration and module owners.
+These focused receipts do not qualify the full suite or installed devices.
+
 - [ ] **62.** Downloads on managed company networks: system trust and
       system proxy for every download child (Ollama installation/server/pull,
       updater/rollback and remote AI), with translated certificate/proxy/blocked/
@@ -7781,6 +7791,16 @@ The shared per-model Specifications and Capabilities frames retire four genuine 
 The completed macOS image/download root now consumes shared typed slot order and conditional boundary policy while preserving the native finished objects, resources and callbacks. The composer re-admits the exact canonical owner and validates every finished tree before mutating its existing target; prefix submenus that alias that target refuse without writes. Independent actual-source controls pass the original60 historical and74 LIVE obligations with genuine positives. Focused shared native controls pass29/0 on each Lua runtime versus the identical29 original composer27/2; the real image producer passes49/0 and the real download producer10/0. Original menu assertions and independently frozen order/caption corpora remain intact. Selected portable gates pass382 JS, 17,325 macOS and11,731 Linux units, plus101 macOS and189 Linux E2E scenarios with one macOS host skip. Windows units remain unexecuted locally; hosted native packaging/installation and item38 device acceptance remain separate. Items54/81 stay partial.
 
 The complete macOS Layout presentation family now consumes 17 canonical shared sections, including switching/pause/resume, genuine native record choices, bundle install/update/status/variant frames and the finished parent. Exactly 3 additive caption keys are translated in all 21 actual catalogues. Existing native TIS, install/consent, Guardian, async and callback owners remain unchanged. The bounded shared caption ABI adds ordered format values, strict native-record captions and an explicit numbered scalar mode while retaining the prior percent-scalar bodies and completed-root composer. Actual private source qualification passes 97 tray,6 async and 17 version subjects, plus 51 Layout and 21 numbered contract subjects on each Lua runtime. New Windows Layout 28 and numbered 22 subjects, plus five genuine throwing-reader/full-group Win32 controls, remain unexecuted locally. Typed group captions retain literal ampersand transport without false empty-key translation warnings; a throwing vector reader refuses before native writes. The complete tray fixture now constructs and restores its renderer inside the same scoped boundary. Registered source controls pass after exact adoption; actual dynamic callback and inert-caption ownership controls retain zero gaps. Seven actual macOS fixture modules pass 40/0 after supplying their required canonical renderer inputs; every original fixture assertion remains, and the provider-label meta subject now proves actual DATA-to-native delivery rather than a withdrawn literal assignment. The owning generator lowers macOS 27 to 22 native sites while Windows 27/Linux 31 remain. These bounded receipts do not replace full-source three-driver CI, packaging/installation or item 38 device acceptance; items 54/81 remain partial.
+
+Current Linux menu qualification distinguishes the disabled public Agent policy
+from component coverage using the independently published 1028 available
+source declaration. Actual current renderers, engines, settings and retained
+callbacks remain exercised; every original assertion and independent corpus
+is preserved. Complete focused modules pass 27 outer-parent, 278 manifest-menu
+and 100 Agent-settings cases on each Lua runtime, with zero failures or skips.
+Current public cases retain the exact unavailable reason and expose no child
+or command; throwing scopes restore the original declaration and module owners.
+These focused receipts do not qualify the full suite or installed devices.
 
 - [~] **88.** **Partial: native prediction tooltip appearance.** Shared
   llm-line-style policy and the unchanged independent line corpus retain grey
