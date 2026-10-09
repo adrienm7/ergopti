@@ -50,6 +50,98 @@ permissions:
   contents: read
 
 jobs:
+  # Manual item 36 diagnosis is independent of managed HTTP/runtime acceptance.
+  # Its scoped result never replaces Package, installed launch or physical checks.
+  item36-native:
+    name: 'Item 36 native archive qualification'
+    if: ${{ github.event_name == 'workflow_dispatch' && !inputs.release }}
+    runs-on: macos-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: '.node-version'
+      - name: Run scoped item 36 evidence controls
+        run: node tools/test/test-macos-dev-qualification-deferral.cjs
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Admit scoped item 36 native prerequisites
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PYTHON'
+          import json
+          import os
+          import sys
+          names = ("waitid", "P_PID", "WEXITED", "WNOHANG", "WNOWAIT", "CLD_EXITED", "CLD_KILLED", "CLD_DUMPED")
+          if sys.platform != "darwin" or sys.version_info < (3, 13) or any(not hasattr(os, name) for name in names):
+              raise RuntimeError("Item 36 requires native nonreaping Python APIs")
+          print(json.dumps({"python": sys.executable, "version": list(sys.version_info[:3]), "nonreaping_apis": list(names)}, sort_keys=True))
+          PYTHON
+          launchctl print "gui/$(id -u)" > /dev/null
+          xcodebuild -version
+          sw_vers
+          swift --version
+          command -v brew
+          mkdir -m 700 "$RUNNER_TEMP/swift-launcher-evidence"
+      - name: Cache scoped SwiftPM dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ${{ runner.temp }}/swift-launcher-ci/artifacts
+            ${{ runner.temp }}/swift-launcher-ci/checkouts
+            ${{ runner.temp }}/swift-launcher-ci/repositories
+          key: swiftpm-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('static/ergopti_plus/macos/launcher/Package.swift') }}
+          restore-keys: |
+            swiftpm-${{ runner.os }}-${{ runner.arch }}-
+      - name: Install scoped Sparkle signing tool
+        shell: bash
+        env:
+          SPARKLE_VERSION: '2.9.2'
+        run: |
+          set -euo pipefail
+          curl -fsSLo "$RUNNER_TEMP/Sparkle.tar.xz" \
+              "https://github.com/sparkle-project/Sparkle/releases/download/${SPARKLE_VERSION}/Sparkle-${SPARKLE_VERSION}.tar.xz"
+          mkdir -m 700 "$RUNNER_TEMP/sparkle-dist"
+          tar -xJf "$RUNNER_TEMP/Sparkle.tar.xz" -C "$RUNNER_TEMP/sparkle-dist"
+          echo "SIGN_UPDATE=$RUNNER_TEMP/sparkle-dist/bin/sign_update" >> "$GITHUB_ENV"
+      - name: Qualify scoped item 36 native archive XCTest controls
+        shell: bash
+        env:
+          SWIFT_BACKTRACE: enable=yes
+          ERGOPTI_BREW_ALLOW_AUTOMATION_CONSENT: '1'
+          ERGOPTI_BREW_ALLOW_OWNED_CONSENT_UI: '1'
+        run: |
+          set -euo pipefail
+          test -z "${ERGOPTI_DEV_QUALIFICATION_PROFILE:-}"
+          evidence="$RUNNER_TEMP/swift-launcher-evidence"
+          export ERGOPTI_ARCHIVE_EVIDENCE_DIR="$(mktemp -d "$evidence/archive-session.XXXXXX")"
+          transcript="$evidence/item36-xctest.log"
+          source_receipt="$evidence/item36-source.json"
+          node tools/diagnostics/item36_xctest_evidence.cjs begin "$GITHUB_SHA" "$source_receipt"
+          set +e
+          script -q /dev/null swift test --package-path static/ergopti_plus/macos/launcher \
+            --scratch-path "$RUNNER_TEMP/swift-launcher-ci" \
+            --filter 'ReleaseArchiveStagingTests|SparkleArchiveUpdateAcceptanceTests|HomebrewArchiveAcceptanceTests|HomebrewAutomationConsentTests' 2>&1 | tee "$transcript"
+          item36_statuses=("${PIPESTATUS[@]}")
+          set -e
+          node tools/diagnostics/item36_xctest_evidence.cjs judge "$transcript" "${item36_statuses[0]}" "${item36_statuses[1]}" "$GITHUB_SHA" "$source_receipt" "$evidence/item36-verdict.json"
+        timeout-minutes: 20
+      - name: Retain scoped item 36 native diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: item36-native-diagnostics-${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}
+          retention-days: 7
+          if-no-files-found: warn
+          path: |
+            ${{ runner.temp }}/swift-launcher-evidence/item36-*.json
+            ${{ runner.temp }}/swift-launcher-evidence/item36-xctest.log
+            ${{ runner.temp }}/swift-launcher-evidence/archive-session.*/*/*.json
+            ${{ runner.temp }}/swift-launcher-evidence/archive-session.*/*/helper/*.json
+
   # Native producer and receiving run independently of the Brew/package branch.
   # Both advertised architectures are mandatory even for unpublished manual CI.
   managed-ollama-native:

@@ -3728,6 +3728,16 @@ the complete three-OS checkpoint remain pending.
 - [ ] **36.** Packaging remainder (the former item 21): macOS release archive as
       `.tar.xz` (verify Sparkle, the Homebrew cask and CI install first).
 
+Manual macOS qualification now has an independent archive cohort: the existing
+eight archive, fourteen Sparkle, one six-scenario Homebrew and one consent
+XCTest methods run without waiting for the managed HTTP job. Its closed selected
+case census refuses missing, duplicate, foreign, failed or skipped results;
+source receipts reject untracked or ignored implicit compiler inputs. Original
+full Package, installation and transversal16/38 gates remain unchanged. Portable
+source and receiving controls pass; the exact24 native tests, six Homebrew
+scenarios and final packaging/install qualification remain unexecuted until
+the new manual runner completes. Item36 stays open.
+
 The native ownership helper positively identifies only its exact held privileged terminal leader through public SHORTBSDINFO after an actual fullBSD EPERM refusal, bracketed by repeated real nonreaping child observations. Every foreign or live member retains the existing strict fullBSD census. All eighteen original portable methods remain unchanged and twenty-nine controls pass. Both macOS native receiving entries now require two actual SDK and sudo/security tests alongside the original independent HTTP receivers; any failed receiver keeps the step red. Actual Darwin qualification remains pending.
 
 The latest upstream prerelease qualification policy is composed with the Group 6 producer without duplicate YAML inputs or callers. Its single native Brew-file exclusion keeps the original consent controls in a separate always-included Swift file; both original test method bodies remain byte-identical. The actual release limitations publisher stays inside the footer section markers, with unchanged ordinary-release sections and independent exception-body receiving. Portable selector/consent guards pass; full native Swift and archive receiving remain required, and manual validation never activates the expiring release-only exception.

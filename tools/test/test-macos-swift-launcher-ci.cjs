@@ -487,7 +487,7 @@ check(
 // The lane result is the aggregate gate. A job-level `if:` or `continue-on-error`
 // is how a job becomes skipped or ignored while its lane still reports success,
 // which is what the old aggregate's "skipped counts as green" bug did. Only
-// exact verdict conditions and the Linux manual packaging extension are allowed.
+// exact verdict conditions and scoped manual qualification jobs are allowed.
 // The latter retains ordinary admission and adds diagnostic receiving after a
 // manual E2E failure; every mandatory failure still rejects the lane verdict.
 const BOX_FILES = {
@@ -505,8 +505,12 @@ const ALLOWED_JOB_IFS = {
 for (const rel of Object.values(BOX_FILES)) {
 	for (const boxJob of pipeline.jobs(rel)) {
 		const condition = pipeline.field(boxJob.body, 'if');
+		const manualArchiveQualification =
+			rel === MACOS_BOX &&
+			boxJob.id === 'item36-native' &&
+			condition === "${{ github.event_name == 'workflow_dispatch' && !inputs.release }}";
 		check(
-			condition === null || ALLOWED_JOB_IFS[boxJob.id] === condition,
+			condition === null || ALLOWED_JOB_IFS[boxJob.id] === condition || manualArchiveQualification,
 			`${rel}: job \`${boxJob.id}\` has job-level \`if: ${condition}\`; only ` +
 				`${Object.entries(ALLOWED_JOB_IFS)
 					.map(([id, value]) => `${id} (${value})`)
