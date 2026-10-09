@@ -270,6 +270,7 @@
 		"test:corpus-fields-are-read": "node ./tools/test/test-corpus-fields-are-read.cjs",
 		"test:packaging-paths-exist": "node ./tools/test/test-packaging-paths-exist.cjs",
 		"test:app-windows-keep-their-frame": "node ./tools/test/test-app-windows-keep-their-frame.cjs",
+		"test:site-github-release": "node ./tools/test/test-site-github-release.cjs",
 		"test:release-notes-assets-are-uploaded": "node ./tools/test/test-release-notes-assets-are-uploaded.cjs",
 		"test:package-builds-stamp-commit": "node ./tools/test/test-package-builds-stamp-commit.cjs",
 		"test:action-labels-have-locale-keys": "node ./tools/test/test-action-labels-have-locale-keys.cjs",
