@@ -173,9 +173,7 @@ _LLM_Menu_EmitCapturedRow(Id, Disabled, Operational, HealthDot, WarningRows, Tar
 	global _LLM_Menu_Handle
 	if !(TargetMenu is Menu) || TargetMenu != _LLM_Menu_Handle
 		throw Error("An LLM row cannot leave its detached native menu owner.")
-	if Id == "llm_backend" && WarningRows.Length > 0
-		MenuRenderer_AppendRows(TargetMenu, "llm_menu", "install_warning", WarningRows)
-	_LLM_Menu_EmitRow(Id, Disabled, Operational, HealthDot)
+	_LLM_Menu_EmitRow(Id, Disabled, Operational, HealthDot, WarningRows)
 }
 
 ; Child builders retain genuine native Menu identities; the manifest owns the parents.
@@ -183,7 +181,6 @@ _LLM_Menu_GroupBuilders() {
 	return Map("llm_trigger", LLM_Menu_BuildTriggerMenu,
 		"llm_display", LLM_Menu_BuildDisplayMenu,
 		"llm_navigation", LLM_Menu_BuildNavMenu,
-		"llm_live_mode", LLM_Menu_BuildLiveModeMenu,
 		"llm_generation_settings", LLM_Menu_BuildGenerationMenu)
 }
 
@@ -327,7 +324,6 @@ _LLM_MenuLayout_Fallback() {
 		Map("id", "llm_model",               "disabled_when_off", false, "health_dot", true),
 		Map("id", "llm_profile",             "disabled_when_off", true,  "health_dot", false),
 		Map("id", "llm_trigger",             "disabled_when_off", true,  "health_dot", false),
-		Map("id", "llm_live_mode",           "disabled_when_off", true,  "health_dot", false),
 		Map("id", "llm_generation_settings", "disabled_when_off", true,  "health_dot", false),
 		Map("id", "llm_display",             "disabled_when_off", true,  "health_dot", false),
 		Map("id", "llm_navigation",          "disabled_when_off", true,  "health_dot", false)
@@ -348,11 +344,37 @@ _LLM_MenuLayout_Fallback() {
  *                                      carries the dot is the manifest's call, not this
  *                                      file's, so macOS cannot end up dotting another row.
  */
-_LLM_Menu_EmitRow(id, disabled, llm_is_operational, has_health_dot := false) {
+_LLM_Menu_EmitRow(id, disabled, llm_is_operational, has_health_dot := false, CapturedWarningRows := unset) {
 	global _LLM_Menu, _LLM_Menu_Handle
 	switch id {
 	case "llm_backend":
-		_LLM_Menu_AddRow(_LLM_Menu_BackendRowLabel(), LLM_Menu_BuildBackendMenu(), disabled)
+		WarningRows := IsSet(CapturedWarningRows) ? CapturedWarningRows : []
+		; This nonpublished structural witness admits the genuine native-caption contract.
+		; It is never a selected backend datum and never reaches the actual native UI.
+		AdmissionChild := Menu()
+		try ParentAdmission := MenuRenderer_GroupRow("llm_backend_parent_ahk", "llm_backend_parent", AdmissionChild,
+			Map("llm_backend_parent_caption", (*) => "structural admission", "llm_backend_parent_ready", (*) => !disabled))
+		finally {
+			try AdmissionChild.Delete()
+			finally MenuDispatcher_PruneMenu(AdmissionChild)
+		}
+		if !(ParentAdmission is Map) || ParentAdmission.Get("submenu", false) != AdmissionChild
+			throw Error("Declared backend parent frame was refused.")
+		Admission := _LLM_Menu_BackendFrameAdmission(WarningRows)
+		if !(Admission is Map)
+			throw Error("Declared backend parent frame was refused.")
+		BackendCaption := _LLM_Menu_BackendRowLabel()
+		BackendMenu := LLM_Menu_BuildBackendMenu()
+		try {
+			BackendRows := _LLM_Menu_BackendParentRows(BackendMenu, BackendCaption, disabled, WarningRows)
+			if !(BackendRows is Array)
+				throw Error("Declared backend parent frame was withdrawn.")
+			MenuRenderer_AppendRows(_LLM_Menu_Handle, "llm_menu", "llm_backend_parent_frame_ahk", BackendRows)
+		} catch as Err {
+			BackendMenu.Delete()
+			MenuDispatcher_PruneMenu(BackendMenu)
+			throw Err
+		}
 	case "llm_model":
 		; Build the submenu, fire the async probes (backend health + installed-tags
 		; list), then prefix the label with the cached backend-health dot (🟢
@@ -388,21 +410,40 @@ _LLM_Menu_EmitRow(id, disabled, llm_is_operational, has_health_dot := false) {
 			MenuRenderer_AppendRows(_LLM_Menu_Handle, "llm_menu", "llm_thinking_info", InfoRows)
 		}
 	case "llm_profile":
-		_LLM_Menu_AddRow(StrReplace(t("menu.profiles.profile_label_prefix"), "%s", LLM_Menu_GetProfileLabel(_LLM_Menu["profile_id"])), LLM_Menu_BuildProfileMenu(), disabled)
-		; The separator before the trigger block. The suggestion count that sat
-		; between them is the first row of the generation submenu.
+		; Admit the actual boundary and whole frame before building the native child.
 		BoundaryRows := MenuRenderer_TemplateRows("llm_after_profile_boundary", Map(), Map(), Map())
-		if !(BoundaryRows is Array)
-			throw Error("Declared profile boundary was refused.")
-		MenuRenderer_AppendRows(_LLM_Menu_Handle, "llm_menu", "llm_after_profile_boundary", BoundaryRows)
+		Admission := MenuRenderer_TemplateRows("llm_profile_parent_frame_ahk", Map(), Map(),
+			Map("llm_profile_parent_rows", (*) => []))
+		if !(BoundaryRows is Array) || BoundaryRows.Length != 1 || !BoundaryRows[1].Get("separator", false)
+			|| !(Admission is Array) || Admission.Length != 1 || !Admission[1].Get("separator", false)
+			throw Error("Declared profile parent frame was refused.")
+		; Admit the separate genuine parent before profile data or child construction.
+		; An empty scalar is valid for the existing translated prefix contract.
+		AdmissionChild := Menu()
+		try ParentAdmission := MenuRenderer_GroupRow("llm_profile_parent_ahk", "llm_profile_parent", AdmissionChild,
+			Map("llm_profile_parent_caption", (*) => "", "llm_profile_parent_ready", (*) => !disabled))
+		finally {
+			try AdmissionChild.Delete()
+			finally MenuDispatcher_PruneMenu(AdmissionChild)
+		}
+		if !(ParentAdmission is Map) || ParentAdmission.Get("submenu", false) != AdmissionChild
+			throw Error("Declared profile parent frame was refused.")
+		ProfileCaption := LLM_Menu_GetProfileLabel(_LLM_Menu["profile_id"])
+		ProfileMenu := LLM_Menu_BuildProfileMenu()
+		try {
+			ProfileRows := _LLM_Menu_ProfileParentRows(ProfileMenu, ProfileCaption, disabled)
+			if !(ProfileRows is Array) || ProfileRows.Length != 2
+				throw Error("Declared profile parent frame was withdrawn.")
+			MenuRenderer_AppendRows(_LLM_Menu_Handle, "llm_menu", "llm_profile_parent_frame_ahk", ProfileRows)
+		} catch as Err {
+			ProfileMenu.Delete()
+			MenuDispatcher_PruneMenu(ProfileMenu)
+			throw Err
+		}
 	case "llm_trigger":
 		if !MenuRenderer_AppendGroup(_LLM_Menu_Handle, "llm_menu", "llm_trigger",
 			Map("llm_trigger", LLM_Menu_BuildTriggerMenu), disabled)
 			throw Error("Declared LLM group 'llm_trigger' was refused.")
-	case "llm_live_mode":
-		if !MenuRenderer_AppendGroup(_LLM_Menu_Handle, "llm_menu", "llm_live_mode",
-			Map("llm_live_mode", LLM_Menu_BuildLiveModeMenu), disabled)
-			throw Error("Declared LLM group 'llm_live_mode' was refused.")
 	case "llm_generation_settings":
 		if !MenuRenderer_AppendGroup(_LLM_Menu_Handle, "llm_menu", "llm_generation_settings",
 			Map("llm_generation_settings", LLM_Menu_BuildGenerationMenu), disabled)
@@ -431,4 +472,84 @@ _LLM_ApplyScope(Mode, Options) {
 	CandidateOptions := Options.Clone()
 	CandidateOptions["supplement"] := _LLM_Menu_ScopeResetOperations
 	return ConfigScopeApply("llm", Mode, Map(), CandidateOptions)
+}
+
+; Keeps native profile contents and handle identity while the shared frame owns placement.
+_LLM_Menu_ProfileParentRows(NativeChild, Caption, Disabled) {
+	Root := _MR_GetManifestRoot()
+	ParentDefinition := Root.Get("llm_profile_parent_ahk", false)
+	FrameDefinition := Root.Get("llm_profile_parent_frame_ahk", false)
+	BoundaryDefinition := Root.Get("llm_after_profile_boundary", false)
+	Getters := Map("llm_profile_parent_caption", (*) => Caption,
+		"llm_profile_parent_ready", (*) => !Disabled)
+	Parent := MenuRenderer_GroupRow("llm_profile_parent_ahk", "llm_profile_parent", NativeChild, Getters)
+	if !(Parent is Map)
+		return false
+	ParentRows := [Parent]
+	Rows := MenuRenderer_TemplateRows("llm_profile_parent_frame_ahk", Map(), Map(),
+		Map("llm_profile_parent_rows", (*) => ParentRows))
+	if !(Rows is Array) || Rows.Length != 2 || _MR_GetManifestRoot() != Root
+		|| Root.Get("llm_profile_parent_ahk", false) != ParentDefinition
+		|| Root.Get("llm_profile_parent_frame_ahk", false) != FrameDefinition
+		|| Root.Get("llm_after_profile_boundary", false) != BoundaryDefinition
+		return false
+	return Rows
+}
+
+; Captured warning state is native data; its actual callback and shared caption stay paired.
+_LLM_Menu_BackendFrameAdmission(WarningRows) {
+	if !(WarningRows is Array) || WarningRows.Length > 1 || (WarningRows.Length == 1 && !WarningRows.Has(1))
+		return false
+	Present := WarningRows.Length == 1
+	if Present && (!(WarningRows[1] is Map) || !WarningRows[1].Has("label")
+		|| !WarningRows[1].Has("action") || !HasMethod(WarningRows[1]["action"], "Call")
+		|| WarningRows[1].Has("submenu") || WarningRows[1].Get("separator", false))
+		return false
+	Root := _MR_GetManifestRoot(), Definitions := Map()
+	for Key in ["llm_backend_parent_frame_ahk", "llm_backend_warning_rows_ahk", "llm_install_warning_frame"]
+		Definitions[Key] := Root.Get(Key, false)
+	; A nonpublished current-declaration witness validates caption/readiness even when absent.
+	; Captured guarded records, not this new witness action, reach the typed list.
+	Witness := MenuRenderer_CommandRow("llm_install_warning_frame", "llm_install_warning",
+		Map("llm_install_warning", _LLM_Menu_OnWarningInstallClick), Map())
+	if !(Witness is Map) || (Present && WarningRows[1]["label"] != Witness["label"])
+		return false
+	Rows := MenuRenderer_TemplateRows("llm_backend_parent_frame_ahk", Map(), Map(),
+		Map("llm_backend_parent_rows", (*) => [], "llm_backend_warning_rows", (*) => WarningRows))
+	if !(Rows is Array) || Rows.Length != WarningRows.Length || _MR_GetManifestRoot() != Root
+		|| (Present && Rows[1] != WarningRows[1])
+		return false
+	for Key, Definition in Definitions
+		if Root.Get(Key, false) != Definition
+			return false
+	return Map("warning_rows", WarningRows, "present", Present)
+}
+
+; The complete declared frame owns warning placement and the finished native parent.
+_LLM_Menu_BackendParentRows(NativeChild, Caption, Disabled, WarningRows) {
+	Root := _MR_GetManifestRoot()
+	ParentDefinition := Root.Get("llm_backend_parent_ahk", false)
+	FrameDefinition := Root.Get("llm_backend_parent_frame_ahk", false)
+	WarningDefinition := Root.Get("llm_install_warning_frame", false)
+	WarningRowsDefinition := Root.Get("llm_backend_warning_rows_ahk", false)
+	Admission := _LLM_Menu_BackendFrameAdmission(WarningRows)
+	if !(Admission is Map)
+		return false
+	Getters := Map("llm_backend_parent_caption", (*) => Caption,
+		"llm_backend_parent_ready", (*) => !Disabled,
+		"llm_backend_warning_present", (*) => Admission["present"])
+	Parent := MenuRenderer_GroupRow("llm_backend_parent_ahk", "llm_backend_parent", NativeChild, Getters)
+	if !(Parent is Map)
+		return false
+	ParentRows := [Parent]
+	Rows := MenuRenderer_TemplateRows("llm_backend_parent_frame_ahk", Map(), Getters,
+		Map("llm_backend_parent_rows", (*) => ParentRows,
+			"llm_backend_warning_rows", (*) => Admission["warning_rows"]))
+	if !(Rows is Array) || Rows.Length != (Admission["present"] ? 2 : 1) || _MR_GetManifestRoot() != Root
+		|| Root.Get("llm_backend_parent_ahk", false) != ParentDefinition
+		|| Root.Get("llm_backend_parent_frame_ahk", false) != FrameDefinition
+		|| Root.Get("llm_install_warning_frame", false) != WarningDefinition
+		|| Root.Get("llm_backend_warning_rows_ahk", false) != WarningRowsDefinition
+		return false
+	return Rows
 }

@@ -6,7 +6,7 @@ local Codec = require("toml_codec")
 
 local function with_fixture(source, body)
 	local names = { "adapters.file_system", "adapters.storage", "infra.preferences",
-		"infra.config_paths", "infra.paths", "modules.shortcuts.tap_keys" }
+		"infra.config_paths", "infra.paths", "modules.shortcuts.tap_keys", "adapters.keyboard_geometry" }
 	local saved = {}
 	for _, name in ipairs(names) do saved[name] = package.loaded[name] end
 	local control = { content = source, writes = 0 }
@@ -35,6 +35,8 @@ local function with_fixture(source, body)
 		package.loaded["infra.preferences"], package.loaded["modules.shortcuts.tap_keys"] = nil, nil
 		local preferences = require("infra.preferences")
 		preferences.load("config")
+		package.loaded["adapters.keyboard_geometry"] = nil
+		require("tests.support.keyboard_geometry").initialize(require("adapters.keyboard_geometry"))
 		local taps = require("modules.shortcuts.tap_keys")
 		local assignable = function(action) return action == "send_text" or action == "screen_capture" end
 		body(taps, preferences, control, assignable)
@@ -47,7 +49,7 @@ helpers.describe("canonical macOS tap-key assignments", function()
 	helpers.it("loads canonical choices and never activates legacy storage on absent config", function()
 		with_fixture('[shortcuts.tap_keys]\nnumber_row_left = "send_text"\nforeign = "screen_capture"\n', function(taps, _, control, valid)
 			taps.load(valid)
-			helpers.assert_eq(taps.decide(50), "send_text")
+			helpers.assert_eq(taps.decide(50, 40), "send_text")
 			local marks = {}
 			taps.mark_config_reads(Codec.decode(control.content), function(...) marks[table.concat({ ... }, ".")] = true end)
 			helpers.assert_eq(marks["shortcuts.tap_keys.number_row_left"], true)
@@ -59,7 +61,7 @@ helpers.describe("canonical macOS tap-key assignments", function()
 			helpers.assert_eq(scan.keys[1].key, "foreign")
 			control.content = nil
 			taps._reset(); taps.load(valid)
-			helpers.assert_nil(taps.decide(50))
+			helpers.assert_nil(taps.decide(50, 40))
 			helpers.assert_eq(control.writes, 0)
 		end)
 	end)
@@ -84,7 +86,7 @@ helpers.describe("canonical macOS tap-key assignments", function()
 			local before = control.content
 			control.refuse = true
 			helpers.assert_eq(taps.set_action("number_row_left", "screen_capture", valid), false)
-			helpers.assert_eq(taps.decide(50), "send_text")
+			helpers.assert_eq(taps.decide(50, 40), "send_text")
 			helpers.assert_eq(control.content, before)
 			control.refuse = false
 			helpers.assert_eq(taps.set_action("number_row_left", "none", valid), true)
@@ -107,7 +109,7 @@ helpers.describe("canonical macOS tap-key assignments", function()
 			helpers.assert_eq(taps.set_action("number_row_left", "screen_capture", valid), false)
 			helpers.assert_eq(control.content, before)
 			helpers.assert_eq(control.writes, 0)
-			helpers.assert_eq(taps.decide(50), "send_text")
+			helpers.assert_eq(taps.decide(50, 40), "send_text")
 			helpers.assert_eq(preferences.source_snapshot("config"), baseline)
 			control.refuse = false
 			helpers.assert_eq(taps.set_action("number_row_left", "screen_capture", valid), true)
@@ -115,7 +117,7 @@ helpers.describe("canonical macOS tap-key assignments", function()
 			helpers.assert_eq(control.writes, 1)
 			helpers.assert_eq(preferences.source_snapshot("config").content, changed)
 			for _, code in ipairs({ 50, 10 }) do
-				local action, binding = taps.decide(code)
+				local action, binding = taps.decide(code, code == 50 and 40 or 41)
 				helpers.assert_eq(action, "screen_capture")
 				helpers.assert_eq(binding, "tap_key__number_row_left")
 			end
@@ -123,7 +125,7 @@ helpers.describe("canonical macOS tap-key assignments", function()
 			local fresh = require("modules.shortcuts.tap_keys")
 			fresh.load(valid)
 			helpers.assert_eq(fresh.get_action("number_row_left"), "screen_capture")
-			helpers.assert_eq(fresh.decide(50), "screen_capture")
+			helpers.assert_eq(fresh.decide(50, 40), "screen_capture")
 			helpers.assert_eq(fresh.set_action("number_row_left", "none", valid), true)
 			helpers.assert_eq(control.content, removed)
 			helpers.assert_eq(control.writes, 2)
@@ -133,7 +135,7 @@ helpers.describe("canonical macOS tap-key assignments", function()
 			restarted.load(valid)
 			helpers.assert_eq(restarted.get_action("number_row_left"), "none")
 			for _, code in ipairs({ 50, 10 }) do
-				local action, binding = restarted.decide(code)
+				local action, binding = restarted.decide(code, code == 50 and 40 or 41)
 				helpers.assert_nil(action); helpers.assert_nil(binding)
 			end
 		end)
@@ -149,10 +151,10 @@ helpers.describe("canonical macOS tap-key assignments", function()
 				else control.content = control.content .. "foreign = 42\n" end
 				helpers.assert_eq(taps.set_action("number_row_left", "none", valid), false)
 				helpers.assert_eq(control.writes, 0)
-				helpers.assert_eq(taps.decide(50), "send_text")
+				helpers.assert_eq(taps.decide(50, 40), "send_text")
 				helpers.assert_eq(preferences.source_snapshot("config").content, baseline.content)
 				if failure ~= "external" then helpers.assert_throws(function() taps.load(valid) end) end
-				helpers.assert_eq(taps.decide(50), "send_text")
+				helpers.assert_eq(taps.decide(50, 40), "send_text")
 			end)
 		end
 	end)
@@ -171,7 +173,7 @@ helpers.describe("canonical macOS tap-key assignments", function()
 			end
 			helpers.assert_eq(taps.set_action("number_row_left", "screen_capture", valid), true)
 			helpers.assert_eq(control.writes, 1)
-			helpers.assert_eq(taps.decide(50), "screen_capture")
+			helpers.assert_eq(taps.decide(50, 40), "screen_capture")
 			helpers.assert_eq(preferences.source_snapshot("config").content, control.content)
 		end)
 	end)

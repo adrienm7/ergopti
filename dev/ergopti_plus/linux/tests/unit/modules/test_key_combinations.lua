@@ -555,3 +555,1291 @@ helpers.describe("pair source receipt after final native pause callback",functio
 		end)
 	end
 end)
+
+-- These controls use actual Hook/Reader/Writer/native pair consumers through the
+-- explicitly controlled constructor. They provide no kernel or physical proof.
+local InputOwnerFixture = require("tests.support.input_owner_fixture")
+local function input_rows(session)
+	local result = {}; for _, row in ipairs(session.rows) do result[#result + 1] = row[1] .. ":" .. row[2] end
+	return table.concat(result, " ")
+end
+local prefix = "29:1 29:0 29:1 29:0"
+local function arm_input(session)
+	session.pair(); helpers.assert_true(session.armed)
+	session.edge("a", 58, 0, 150)
+end
+helpers.describe("installed input-owner OneShot prerequisite (controlled ports)", function()
+	helpers.it("arms only the acknowledged frame without reserving or writing output", function()
+		InputOwnerFixture.with_session(nil, function(s)
+			s.pair(); helpers.assert_eq(s.action, "one_shot_shift")
+			helpers.assert_true(s.armed); helpers.assert_eq(s.before_arm_acquisitions, s.after_arm_acquisitions)
+			helpers.assert_eq(input_rows(s), "29:1 29:0 29:1", "Only original frame lift/restore writes occur")
+			helpers.assert_true(s.hook.input_owner_current(s.lease))
+			helpers.assert_eq(s.hook.capture_input_owner(), nil, "No frame authority outside its callback")
+			assert_false(s.hook.arm_one_shot(s.lease), "A used frame cannot arm twice")
+		end)
+	end)
+	helpers.it("consumes exact Shift and key custody through DOWN repeat and final UP", function()
+		InputOwnerFixture.with_session(nil, function(s)
+			arm_input(s); s.edge("a", 30, 1, 200); s.edge("a", 30, 2, 210); s.edge("a", 30, 0, 250)
+			helpers.assert_eq(input_rows(s), prefix .. " 42:1 30:1 30:2 30:0 42:0")
+			helpers.assert_eq(#s.writer.output_view(s.output).down, 0); helpers.assert_eq(s.base:input_arm_state(), nil)
+			assert_false(s.hook.input_owner_current(s.lease)); helpers.assert_true(s.hook.isRunning())
+			s.edge("a", 30, 1, 300); s.edge("a", 30, 0, 350)
+			helpers.assert_eq(input_rows(s), prefix .. " 42:1 30:1 30:2 30:0 42:0 30:1 30:0")
+		end)
+	end)
+	helpers.it("rejects copied scalar Writer and ordinary Recorder authority", function()
+		InputOwnerFixture.with_session(nil, function(s)
+			for _, foreign in ipairs({ {}, { ready = true, source = s.paths.a, generation = 1 }, s.output, s.engine }) do
+				assert_false(s.hook.arm_one_shot(foreign)); assert_false(s.hook.input_owner_current(foreign))
+			end
+			helpers.assert_eq(s.base.one_shot_until, nil)
+			s.pair(); helpers.assert_true(s.armed)
+			assert_false(s.hook.input_owner_current({})); s.lease.ready = true
+			assert_false(s.hook.input_owner_current(s.lease))
+		end)
+		local broker = require("adapters.modifier_broker").controlled(); assert_false(broker.output_current())
+	end)
+	helpers.it("leaves ordinary custom Reader callbacks usable without issuing an input lease", function()
+		InputOwnerFixture.with_session({ custom_reader = true }, function(s)
+			s.pair(); helpers.assert_eq(s.action, "one_shot_shift"); helpers.assert_eq(s.lease, nil)
+			assert_false(s.armed); helpers.assert_eq(s.base.one_shot_until, nil)
+			s.edge("a", 58, 0, 150); s.edge("a", 30, 1, 200); s.edge("a", 30, 0, 250)
+			helpers.assert_eq(input_rows(s), prefix .. " 30:1 30:0")
+		end)
+	end)
+	helpers.it("expires on the original input clock and does not shift the later key", function()
+		InputOwnerFixture.with_session(nil, function(s)
+			arm_input(s); s.edge("a", 30, 1, 1200); s.edge("a", 30, 0, 1250)
+			helpers.assert_eq(input_rows(s), prefix .. " 30:1 30:0"); helpers.assert_eq(s.base:input_arm_state(), nil)
+		end)
+	end)
+	helpers.it("cancels cross-device consumption without admitting a pair or shifting its key", function()
+		InputOwnerFixture.with_session(nil, function(s)
+			arm_input(s); s.edge("b", 30, 1, 200); s.edge("b", 30, 0, 250)
+			helpers.assert_eq(input_rows(s), prefix .. " 30:1 30:0"); helpers.assert_eq(s.base.one_shot_until, nil)
+		end)
+	end)
+	for _, phase in ipairs({ "configuration", "output", "text", "plan" }) do
+		helpers.it("joins actual Reader retirement after the final " .. phase .. " callback", function()
+			local options, triggered = {}, false
+			local function revoke(s)
+				if s.revoke and not triggered then triggered = true; assert(s.reader.ungrab("keyboard:" .. s.paths.a)) end
+			end
+			options[({ configuration = "on_guard", output = "on_output_view", text = "on_text", plan = "on_plan" })[phase]] = revoke
+			InputOwnerFixture.with_session(options, function(s)
+				if phase == "configuration" or phase == "output" then
+					options.on_action = function() s.revoke = true end
+					s.pair(); helpers.assert_true(triggered); assert_false(s.armed); helpers.assert_eq(s.base.one_shot_until, nil)
+				else
+					arm_input(s); s.revoke = true; s.edge("a", 30, 1, 200)
+					helpers.assert_true(triggered); helpers.assert_eq(input_rows(s), prefix, "No new DOWN from the retired source")
+				end
+			end)
+		end)
+	end
+	helpers.it("blocks reentrant publication of the same frame while its guard is running", function()
+		local options = {}; local observed
+		options.on_guard = function(s)
+			if s.reenter and s.lease and not observed then observed = { s.hook.arm_one_shot(s.lease) } end
+		end
+		options.on_action = function(s) s.reenter = true end
+		InputOwnerFixture.with_session(options, function(s)
+			s.pair(); helpers.assert_true(s.armed); helpers.assert_true(observed ~= nil); assert_false(observed[1])
+			helpers.assert_eq(s.before_arm_acquisitions, s.after_arm_acquisitions)
+		end)
+	end)
+	helpers.it("withdraws after acknowledged Shift DOWN and releases only its original holder", function()
+		local options = {}; options.after_sync = function(s, code, value)
+			if code == 42 and value == 1 then options.after_sync = nil; assert(s.reader.ungrab("keyboard:" .. s.paths.a)) end
+		end
+		InputOwnerFixture.with_session(options, function(s)
+			arm_input(s); s.edge("a", 30, 1, 200)
+			helpers.assert_eq(input_rows(s), prefix .. " 42:1 42:0")
+			assert_false(s.hook.isRunning()); helpers.assert_eq(#s.writer.output_view(s.output).down, 0)
+		end)
+	end)
+	helpers.it("retains debt and retires the original channel when inverse SYN is refused", function()
+		local options = {}
+		options.after_sync = function(s, code, value)
+			if code == 42 and value == 1 then options.after_sync = nil; s.revoke = true; assert(s.reader.ungrab("keyboard:" .. s.paths.a)) end
+		end
+		options.fail_sync = function(s, code, value) return s.revoke and code == 42 and value == 0 end
+		InputOwnerFixture.with_session(options, function(s)
+			arm_input(s); s.edge("a", 30, 1, 200)
+			helpers.assert_eq(input_rows(s), prefix .. " 42:1 42:0"); assert_false(s.hook.isRunning())
+			helpers.assert_eq(s.writer.output_view(s.output), nil); helpers.assert_true(s.broker.has_debt())
+		end)
+	end)
+	helpers.it("refuses the old broker after the actual Writer closes and reopens", function()
+		InputOwnerFixture.with_session(nil, function(s)
+			helpers.assert_true(s.broker.output_current()); helpers.assert_true(s.writer.close_owned(s.output))
+			helpers.assert_true(s.writer.open()); local successor = assert(s.writer.capture_output())
+			assert_false(s.broker.output_current()); s.pair(); helpers.assert_eq(s.armed, nil, "Stale output cannot acknowledge the action frame")
+			helpers.assert_eq(s.base.one_shot_until, nil); helpers.assert_true(s.writer.output_view(successor) ~= nil)
+			helpers.assert_true(s.writer.close_owned(successor))
+		end)
+	end)
+	for _, replacement in ipairs({ "reader", "writer", "engine", "issuer", "lease", "configuration", "tap_hold_epoch", "classification", "hook" }) do
+		helpers.it("refuses observed " .. replacement .. " replacement before a new DOWN", function()
+			InputOwnerFixture.with_session(nil, function(s)
+				arm_input(s)
+				if replacement == "reader" then s.reader.source_current = function() return true end
+				elseif replacement == "writer" then s.writer.output_view = function() return { down = {}, write_epoch = 4 } end
+				elseif replacement == "engine" then s.base.plan_text = function() return { { keycode = 30, mods = { "shift" } } } end
+				elseif replacement == "issuer" then require("platform.remap.key_combination_engine").input_owner_current = function() return true end
+				elseif replacement == "lease" then setmetatable(s.lease, {})
+				elseif replacement == "configuration" then s.paused = true
+				elseif replacement == "classification" then require("modules.hotstrings.device_finder").physical_sources = function() return {} end
+				elseif replacement == "hook" then s.hook.arm_one_shot = function() return true end
+				else helpers.assert_true(s.engine:set_tap_holds_enabled(false)); helpers.assert_true(s.engine:set_tap_holds_enabled(true)) end
+				assert_false(s.hook.input_owner_current(s.lease))
+				s.edge("a", 30, 1, 200); s.edge("a", 30, 0, 250)
+				for _, row in ipairs(s.rows) do helpers.assert_true(row[1] ~= 42, "Revoked input ownership cannot deliver a new synthetic Shift") end
+			end)
+		end)
+	end
+	helpers.it("keeps the consumed key's original output retirement after remapper withdrawal", function()
+		local options = {}; options.after_sync = function(s, code, value)
+			if code == 42 and value == 1 then options.after_sync = nil; s.hook.set_remapper(nil) end
+		end
+		InputOwnerFixture.with_session(options, function(s)
+			arm_input(s); s.edge("a", 30, 1, 200)
+			helpers.assert_eq(input_rows(s), prefix .. " 42:1 42:0")
+			local view = s.writer.output_view(s.output)
+			helpers.assert_true(view == nil or #view.down == 0, "Exact original output is settled or retired")
+			assert_false(s.hook.input_owner_current(s.lease))
+		end)
+	end)
+	helpers.it("an original observer refuses closed capability copies busy sessions and export rebinding", function()
+		InputOwnerFixture.with_session(nil, function(s)
+			local Custody = require("input.modifier_custody")
+			local exact = Custody.new(s.writer, s.output); helpers.assert_true(exact.output_current())
+			local copied = {}; local view = s.writer.output_view(s.output)
+			helpers.assert_eq(Custody.new(s.writer, copied), nil)
+			local session = assert(exact.begin()); assert_false(exact.output_current()); helpers.assert_true(session.finish())
+			helpers.assert_true(exact.output_current()); local old = s.writer.output_view
+			s.writer.output_view = function() return view end; assert_false(exact.output_current()); s.writer.output_view = old
+			helpers.assert_true(exact.output_current())
+		end)
+	end)
+	helpers.it("the original observer refuses a getter that reenters then returns its old view", function()
+		InputOwnerFixture.with_session(nil, function(s)
+			local Custody = require("input.modifier_custody"); local exact, reenter
+			local original = s.writer.output_view
+			local ports = { capture_output_observer = s.writer.capture_output_observer, output_view = function(cap)
+				local view = original(cap)
+				if reenter then reenter = false; local session = assert(exact.begin()); assert(session.finish()) end
+				return view
+			end }
+			for _, name in ipairs({ "acquire_transaction", "transaction_view", "commit_transaction" }) do ports[name] = s.writer[name] end
+			exact = assert(Custody.new(ports, s.output)); helpers.assert_true(exact.output_current())
+			reenter = true; assert_false(exact.output_current(), "A prior successful observation cannot survive a new custody cycle")
+			helpers.assert_true(exact.output_current())
+		end)
+	end)
+end)
+
+helpers.describe("original Reader source lifetime (controlled constructor)", function()
+	helpers.it("spends an unchanged title without inventing a synthetic delivery debt", function()
+		InputOwnerFixture.with_session(nil, function(s)
+			package.loaded["adapters.xkb_capture"].peek_text = function(code) return code == 30 and "1" or nil end
+			arm_input(s); s.edge("a", 30, 1, 200); s.edge("a", 30, 0, 250)
+			helpers.assert_eq(s.base:input_arm_state(), nil); helpers.assert_eq(input_rows(s), prefix .. " 30:1 30:0")
+			s.edge("a", 58, 1, 400); s.edge("a", 15, 1, 410); s.edge("a", 15, 0, 500)
+			helpers.assert_true(s.armed, "A new acknowledged frame may arm after a logical-only spend")
+		end)
+	end)
+	helpers.it("keeps scripted Reader source lifetime explicitly unavailable", function()
+		local fake = require("tests.fakes").evdev_reader()
+		helpers.assert_eq(fake.capture_source_owner(), nil); assert_false(fake.source_owner_current({})); assert_false(fake.retire_source({}))
+	end)
+	helpers.it("rejects copied input source leases and keeps mutation authority in the acknowledged Hook frame", function()
+		InputOwnerFixture.with_session(nil, function(s)
+			local source = assert(s.reader.capture_source_owner("keyboard:" .. s.paths.a))
+			helpers.assert_true(s.reader.source_owner_current(source)); assert_false(s.reader.source_owner_current({}))
+			assert_false(s.reader.retire_source({})); assert_false(s.hook.arm_one_shot(source)); helpers.assert_eq(s.base.one_shot_until, nil)
+		end)
+	end)
+	helpers.it("can retire its original ungrabbed descriptor without reviving input currency", function()
+		InputOwnerFixture.with_session(nil, function(s)
+			local source = assert(s.reader.capture_source_owner("keyboard:" .. s.paths.a))
+			helpers.assert_true(s.reader.ungrab("keyboard:" .. s.paths.a)); assert_false(s.reader.source_owner_current(source))
+			helpers.assert_true(s.reader.retire_source(source)); assert_false(s.reader.is_open("keyboard:" .. s.paths.a))
+			helpers.assert_true(s.reader.retire_source(source), "A prior exact close ACK stays settled")
+		end)
+	end)
+	helpers.it("does not retry unresolved original close debt", function()
+		InputOwnerFixture.with_session({ fail_reader_close = true }, function(s)
+			local source = assert(s.reader.capture_source_owner("keyboard:" .. s.paths.a))
+			assert_false(s.reader.retire_source(source)); assert_false(s.reader.retire_source(source))
+			helpers.assert_true(s.reader.has_native_origin_debt()); assert_false(s.reader.source_owner_current(source))
+		end)
+	end)
+	for _, id in ipairs({ "a", "b" }) do
+		helpers.it("preserves the reopened " .. id .. " source even when the same numeric FD is reused", function()
+			local options = { recycle_descriptor = true }
+			options.after_sync = function(s, code, value)
+				if code == 42 and value == 1 then
+					options.after_sync = nil
+					local slot, previous = "keyboard:" .. s.paths[id], s.descriptor(id)
+					s.old_source = assert(s.reader.capture_source_owner(slot))
+					helpers.assert_true(s.reader.close(slot)); helpers.assert_true(s.reader.open(s.paths[id], slot)); helpers.assert_true(s.reader.grab(slot))
+					s.new_source = assert(s.reader.capture_source_owner(slot))
+					helpers.assert_eq(s.descriptor(id), previous, "Controlled constructor must actually recycle the numeric FD")
+				end
+			end
+			InputOwnerFixture.with_session(options, function(s)
+				arm_input(s); s.edge("a", 30, 1, 200)
+				helpers.assert_eq(input_rows(s), prefix .. " 42:1 42:0"); assert_false(s.hook.isRunning())
+				helpers.assert_true(s.reader.is_open("keyboard:" .. s.paths[id])); helpers.assert_true(s.reader.source_owner_current(s.new_source))
+				assert_false(s.reader.source_owner_current(s.old_source)); helpers.assert_true(s.reader.retire_source(s.old_source))
+				helpers.assert_true(s.reader.source_owner_current(s.new_source), "Old original retirement never acquires successor rights")
+				helpers.assert_eq(#s.writer.output_view(s.output).down, 0)
+				helpers.assert_true(s.reader.retire_source(s.new_source))
+			end)
+		end)
+	end
+	helpers.it("source retirement never invokes a rebound public slot closer", function()
+		InputOwnerFixture.with_session(nil, function(s)
+			local source = assert(s.reader.capture_source_owner("keyboard:" .. s.paths.a))
+			local called = false; s.reader.close = function() called = true; return true end
+			helpers.assert_true(s.reader.retire_source(source)); assert_false(called); assert_false(s.reader.is_open("keyboard:" .. s.paths.a))
+		end)
+	end)
+end)
+
+helpers.describe("original input issuer export fences (controlled ports)", function()
+	for _, name in ipairs({ "capture_input_owner", "input_owner_current", "arm_one_shot", "set_remapper", "stop", "emergency_stop" }) do
+		for _, mode in ipairs({ "missing", "replaced" }) do
+			helpers.it("refuses a " .. mode .. " original Hook " .. name .. " before frame capture", function()
+				InputOwnerFixture.with_session(nil, function(s)
+					local original = s.hook[name]
+					s.hook[name] = mode == "replaced" and function() return true end or nil
+					local ok, err = pcall(function()
+						s.pair(); helpers.assert_true(not s.armed); helpers.assert_eq(s.base.one_shot_until, nil)
+						helpers.assert_eq(input_rows(s), "29:1 29:0 29:1")
+					end)
+					s.hook[name] = original; helpers.assert_true(ok, err)
+				end)
+			end)
+		end
+	end
+	for _, name in ipairs({ "process", "tick", "activity", "handles", "release_all", "take_custody", "output_holder",
+		"combination_hold", "combination_release", "combination_lift", "combination_restore", "arm_one_shot", "input_arm_state", "clear_input_arm" }) do
+		helpers.it("refuses rebound base export " .. name .. " after arm", function()
+			InputOwnerFixture.with_session(nil, function(s)
+				arm_input(s); local actual = require("platform.remap.tap_hold_engine"); local original = actual[name]
+				actual[name] = function() return { { code = 99, value = 1 } } end
+				local current = s.hook.input_owner_current(s.lease)
+				actual[name] = original; assert_false(current)
+			end)
+		end)
+	end
+	for _, target in ipairs({ "instance", "base_metatable", "owner_metatable" }) do
+		helpers.it("refuses replaced " .. target .. " dispatch identity", function()
+			InputOwnerFixture.with_session(nil, function(s)
+				arm_input(s)
+				local object = target == "instance" and s.base or getmetatable(target == "base_metatable" and s.base or s.engine)
+				local name = target == "instance" and "process" or "__index"; local original = rawget(object, name)
+				object[name] = function() return { { code = 99, value = 1 } } end
+				local current = s.hook.input_owner_current(s.lease)
+				object[name] = original; assert_false(current)
+			end)
+		end)
+	end
+	for _, target in ipairs({ "process", "release_all", "native_release_all", "hook_cleanup" }) do
+		helpers.it("withdraws exact acknowledged Shift after " .. target .. " changes during SYN callback", function()
+			local options, restore = {}, nil
+			options.after_sync = function(s, code, value)
+				if code ~= 42 or value ~= 1 then return end
+				options.after_sync = nil
+				local object = target == "hook_cleanup" and s.hook or target == "native_release_all" and s.engine
+					or require("platform.remap.tap_hold_engine")
+				local name = target == "hook_cleanup" and "emergency_stop" or target == "native_release_all" and "release_all" or target
+				local original = object[name]; local calls = 0
+				object[name] = function() calls = calls + 1; return { { code = 99, value = 1 } } end
+				restore = function() object[name] = original; helpers.assert_eq(calls, 0, "Cleanup must retain original dispatch and inverse") end
+			end
+			InputOwnerFixture.with_session(options, function(s)
+				arm_input(s); s.edge("a", 30, 1, 200)
+				if restore then restore() end
+				helpers.assert_eq(input_rows(s), prefix .. " 42:1 42:0")
+				assert_false(s.hook.isRunning()); helpers.assert_eq(#s.writer.output_view(s.output).down, 0)
+				assert_false(s.reader.is_grabbed("keyboard:" .. s.paths.a)); assert_false(s.reader.is_grabbed("keyboard:" .. s.paths.b))
+			end)
+		end)
+	end
+end)
+
+helpers.describe("original output lifetime terminal settlement (controlled ports)", function()
+	helpers.it("settles only the old consumed retirement after exact destroy and close ACK", function()
+		InputOwnerFixture.with_session(nil, function(s)
+			arm_input(s); s.edge("a", 30, 1, 200)
+			local current, terminal = s.writer.capture_output_observer(s.output)
+			helpers.assert_eq(type(current), "function"); helpers.assert_eq(type(terminal), "function")
+			assert_false(terminal(s.output)); assert_false(s.broker.output_retired())
+			helpers.assert_true(s.writer.close_owned(s.output)); helpers.assert_true(terminal(s.output))
+			helpers.assert_true(s.broker.output_retired()); helpers.assert_true(s.writer.open()); s.successor = assert(s.writer.capture_output())
+			assert_false(terminal(s.successor)); assert_false(terminal({})); assert_false(current(s.output, 6, { 30, 42 }))
+			s.edge("a", 30, 2, 210); assert_false(s.hook.isRunning())
+			helpers.assert_true(s.hook.set_remapper(nil)); helpers.assert_true(s.writer.output_current(s.successor))
+			helpers.assert_eq(#s.writer.output_view(s.successor).down, 0)
+			helpers.assert_eq(input_rows(s), prefix .. " 42:1 30:1", "Destroyed old channel cannot emit repeat or inverse through successor")
+			helpers.assert_true(s.writer.emit_owned(s.successor, 45, 1)); helpers.assert_true(s.writer.emit_owned(s.successor, 45, 0))
+			helpers.assert_eq(input_rows(s), prefix .. " 42:1 30:1 45:1 45:0")
+		end)
+	end)
+	for _, phase in ipairs({ "destroy", "close" }) do
+		helpers.it("does not report terminal ACK inside the pending " .. phase .. " callback", function()
+			local options = {}; local terminal, observed = nil, false
+			options["output_" .. phase] = function(s)
+				if terminal then observed = true; assert_false(terminal(s.output)); assert_false(s.broker.output_retired()) end
+				return true
+			end
+			InputOwnerFixture.with_session(options, function(s)
+				local ignored; ignored, terminal = s.writer.capture_output_observer(s.output)
+				helpers.assert_true(s.writer.close_owned(s.output)); helpers.assert_true(observed); helpers.assert_true(terminal(s.output))
+			end)
+		end)
+	end
+	for _, verdict in ipairs({ "destroy_only", "close_only", "close_unknown", "close_EINTR", "destroy_throw" }) do
+		helpers.it("retains exact retirement refusal for " .. verdict .. " without retry", function()
+			local options = {}
+			options.output_destroy = function()
+				if verdict == "destroy_throw" then error("controlled ioctl uncertainty") end
+				return verdict ~= "close_only"
+			end
+			options.output_close = function()
+				if verdict == "close_unknown" then return nil end
+				if verdict == "close_EINTR" then error("controlled EINTR") end
+				return verdict ~= "destroy_only"
+			end
+			InputOwnerFixture.with_session(options, function(s)
+				arm_input(s); s.edge("a", 30, 1, 200)
+				local ignored, terminal = s.writer.capture_output_observer(s.output)
+				assert_false(s.writer.close_owned(s.output)); assert_false(terminal(s.output)); assert_false(s.broker.output_retired())
+				assert_false(s.writer.close_owned(s.output)); helpers.assert_eq(s.output_closes, 1); helpers.assert_eq(s.output_destroys, 1)
+				s.edge("a", 30, 2, 210); assert_false(s.hook.isRunning())
+				assert_false(s.hook.set_remapper(nil)); helpers.assert_true(s.writer.has_output_debt())
+				helpers.assert_eq(s.output_closes, 1); helpers.assert_eq(s.output_destroys, 1)
+			end)
+		end)
+	end
+	helpers.it("old captured terminal proof survives export replacement without borrowing it", function()
+		InputOwnerFixture.with_session(nil, function(s)
+			arm_input(s); s.edge("a", 30, 1, 200)
+			local factory = s.writer.capture_output_observer; local ignored, terminal = factory(s.output)
+			local positive_current, positive_terminal = function() return true end, function() return true end
+					s.writer.capture_output_observer = function() return positive_current, positive_terminal end
+			assert_false(s.broker.output_current()); assert_false(s.broker.output_retired())
+			helpers.assert_true(s.writer.close_owned(s.output)); helpers.assert_true(terminal(s.output)); helpers.assert_true(s.broker.output_retired())
+			s.writer.capture_output_observer = factory
+			helpers.assert_true(s.writer.open()); s.successor = assert(s.writer.capture_output())
+			s.edge("a", 30, 2, 210); helpers.assert_true(s.hook.set_remapper(nil)); helpers.assert_true(s.writer.output_current(s.successor))
+		end)
+	end)
+	helpers.it("a destroyed successor cannot settle the still-open original issuer", function()
+		InputOwnerFixture.with_session(nil, function(s)
+			local ignored, terminal = s.writer.capture_output_observer(s.output)
+			assert_false(terminal({})); assert_false(s.broker.output_retired())
+			-- A separately issued Writer has its own real private terminal record.
+			local old = package.loaded["adapters.uinput_writer"]; package.loaded["adapters.uinput_writer"] = nil
+			local other = require("adapters.uinput_writer"); other._set_backend({ open = function() return 7 end,
+				close = function() return true end, ioctl = function() return true end, write = function() return true end })
+			helpers.assert_true(other.open()); local cap = assert(other.capture_output()); local current, foreign = other.capture_output_observer(cap)
+			helpers.assert_true(other.close_owned(cap)); helpers.assert_true(foreign(cap)); assert_false(foreign(s.output)); assert_false(terminal(cap))
+			package.loaded["adapters.uinput_writer"] = old
+			assert_false(s.broker.output_retired()); helpers.assert_true(s.writer.output_current(s.output))
+		end)
+	end)
+	helpers.it("settlement uses original issuer ACK when the owner export is replaced", function()
+		InputOwnerFixture.with_session(nil, function(s)
+			arm_input(s); s.edge("a", 30, 1, 200)
+			local original = s.engine.ack_retirement; local called = false
+			s.engine.ack_retirement = function() called = true; return true end
+			helpers.assert_true(s.writer.close_owned(s.output)); helpers.assert_true(s.writer.open()); s.successor = assert(s.writer.capture_output())
+			s.edge("a", 30, 2, 210); assert_false(called)
+			s.engine.ack_retirement = original; helpers.assert_true(s.hook.set_remapper(nil))
+			helpers.assert_true(s.writer.output_current(s.successor))
+		end)
+	end)
+end)
+
+helpers.describe("original output observer constructor provenance (controlled ports)", function()
+	for _, mode in ipairs({ "positive_factory", "missing_issuer", "borrowed_factory", "rebound_capture", "borrowed_fresh_capture" }) do
+		helpers.it("ordinary controlled output cannot mint input proof through " .. mode, function()
+			local options = {}
+			options.before_hook = function(s)
+				local capture, factory = s.writer.capture_output, s.writer.capture_output_observer
+				if mode == "positive_factory" then
+					s.writer.capture_output_observer = function() return function() return true end, function() return true end end
+				elseif mode == "missing_issuer" then s.writer.capture_output = function() local cap = capture(); return cap end
+				elseif mode == "rebound_capture" then s.writer.capture_output = function() return capture() end
+				elseif mode == "borrowed_fresh_capture" then
+					helpers.assert_true(s.writer.close_owned(s.output)); helpers.assert_true(s.writer.open())
+					s.output = assert(capture()); s.writer.capture_output = function() return s.output, factory end
+				else
+					local other = assert(loadfile("adapters/uinput_writer.lua"))()
+					s.writer.capture_output_observer = other.capture_output_observer
+				end
+				s.restore_factory = function() s.writer.capture_output, s.writer.capture_output_observer = capture, factory end
+			end
+			InputOwnerFixture.with_session(options, function(s)
+				assert_false(s.broker.output_current()); assert_false(s.broker.output_retired())
+				s.pair(); helpers.assert_true(not s.armed); helpers.assert_eq(s.base.one_shot_until, nil)
+				helpers.assert_eq(input_rows(s), "29:1 29:0 29:1")
+				s.restore_factory()
+			end)
+		end)
+	end
+	helpers.it("cannot redeem a captured terminal closure using a successor factory result", function()
+		InputOwnerFixture.with_session(nil, function(s)
+			local cap, factory = s.writer.capture_output(); helpers.assert_eq(cap, s.output); helpers.assert_eq(factory, s.writer.capture_output_observer)
+			local ignored, original = factory(cap); assert_false(original({})); assert_false(s.broker.output_retired())
+			helpers.assert_true(s.writer.close_owned(s.output)); helpers.assert_true(s.writer.open()); s.successor = assert(s.writer.capture_output())
+			local current, fresh = factory(s.successor); assert_false(fresh(s.output)); assert_false(original(s.successor))
+			helpers.assert_true(original(s.output)); helpers.assert_true(s.broker.output_retired()); assert_false(fresh(s.successor))
+		end)
+	end)
+end)
+
+helpers.describe("original installed broker observer binding (controlled ports)", function()
+	for _, name in ipairs({ "view", "has_debt", "output_current", "output_retired", "retire" }) do
+		helpers.it("refuses pre-frame replacement of original broker " .. name, function()
+			InputOwnerFixture.with_session(nil, function(s)
+				local original = s.broker[name]; s.broker[name] = function() return true end
+				local ok, err = pcall(function() s.pair(); helpers.assert_true(not s.armed); helpers.assert_eq(s.base.one_shot_until, nil) end)
+				s.broker[name] = original; helpers.assert_true(ok, err)
+			end)
+		end)
+	end
+	helpers.it("retains original terminal proof when its public method changes after consumption", function()
+		InputOwnerFixture.with_session(nil, function(s)
+			arm_input(s); s.edge("a", 30, 1, 200)
+			local original = s.broker.output_retired; s.broker.output_retired = function() return true end
+			helpers.assert_true(s.writer.close_owned(s.output)); helpers.assert_true(s.writer.open()); s.successor = assert(s.writer.capture_output())
+			s.edge("a", 30, 2, 210); s.broker.output_retired = original
+			helpers.assert_true(s.hook.set_remapper(nil)); helpers.assert_true(s.writer.output_current(s.successor))
+		end)
+	end)
+end)
+
+helpers.describe("terminal proof refusal after consumed broker export retirement", function()
+ helpers.it("a public positive terminal lambda cannot settle a failed original destroy", function()
+  local options={output_destroy=function()return false end}
+  InputOwnerFixture.with_session(options,function(s)
+   arm_input(s);s.edge("a",30,1,200)
+   assert_false(s.writer.close_owned(s.output))
+   local original=s.broker.output_retired;s.broker.output_retired=function()return true end
+   s.edge("a",30,2,210);s.broker.output_retired=original
+   assert_false(s.hook.isRunning());assert_false(s.hook.set_remapper(nil))
+   helpers.assert_true(s.writer.has_output_debt());helpers.assert_eq(s.output_closes,1);helpers.assert_eq(s.output_destroys,1)
+  end)
+ end)
+end)
+
+helpers.describe("original Reader issuer lineage before Hook construction (controlled ports)", function()
+ for _,name in ipairs({"capture_source_owner","source_owner_current","retire_source"}) do
+  helpers.it("a replaced original "..name.." cannot become input or cleanup authority",function()
+   local options={before_hook=function(s)
+    local original=s.reader[name];s.restore_reader=function()s.reader[name]=original end
+    s.reader[name]=name=="capture_source_owner" and function(...)return original(...)end or function()return true end
+   end}
+   InputOwnerFixture.with_session(options,function(s)
+    s.pair();helpers.assert_true(not s.armed);helpers.assert_eq(s.base.one_shot_until,nil)
+    helpers.assert_eq(input_rows(s),"29:1 29:0 29:1");s.restore_reader()
+   end)
+  end)
+ end
+ helpers.it("a source receipt without its original observer retains only ordinary event compatibility",function()
+  local options={before_hook=function(s)
+   local original=s.reader.capture_source_owner;s.restore_reader=function()s.reader.capture_source_owner=original end
+   s.reader.capture_source_owner=function(...)local lease=original(...);return lease end
+  end}
+  InputOwnerFixture.with_session(options,function(s)
+   s.pair();helpers.assert_true(not s.armed);s.edge("a",58,0,150);s.edge("a",30,1,200);s.edge("a",30,0,250)
+   helpers.assert_eq(input_rows(s),prefix.." 30:1 30:0");s.restore_reader()
+  end)
+ end)
+ helpers.it("the source issuer rejects copied receipts functions and a borrowed source observer",function()
+  InputOwnerFixture.with_session(nil,function(s)
+   local lease,observer=s.reader.capture_source_owner("keyboard:"..s.paths.a)
+   local foreign,other=s.reader.capture_source_owner("keyboard:"..s.paths.b)
+   local capture,current,retire=s.reader.capture_source_owner,s.reader.source_owner_current,s.reader.retire_source
+   helpers.assert_true(observer(lease,capture,current,retire));assert_false(observer({},capture,current,retire))
+   assert_false(observer(foreign,capture,current,retire));assert_false(other(lease,capture,current,retire))
+   assert_false(observer(lease,function(...)return capture(...)end,current,retire))
+   assert_false(observer(lease,capture,function()return true end,retire));assert_false(observer(lease,capture,current,function()return true end))
+  end)
+ end)
+ helpers.it("source lineage is not revived by a successor with a recycled descriptor",function()
+  InputOwnerFixture.with_session({recycle_descriptor=true},function(s)
+   local slot="keyboard:"..s.paths.a;local fd=s.descriptor("a");local lease,observer=s.reader.capture_source_owner(slot)
+   helpers.assert_true(s.reader.retire_source(lease));helpers.assert_true(s.reader.open(s.paths.a,slot));helpers.assert_true(s.reader.grab(slot))
+   helpers.assert_eq(s.descriptor("a"),fd);local fresh,other=s.reader.capture_source_owner(slot)
+   assert_false(observer(lease,s.reader.capture_source_owner,s.reader.source_owner_current,s.reader.retire_source))
+   helpers.assert_true(other(fresh,s.reader.capture_source_owner,s.reader.source_owner_current,s.reader.retire_source))
+   assert_false(other(lease,s.reader.capture_source_owner,s.reader.source_owner_current,s.reader.retire_source))
+   helpers.assert_true(s.reader.retire_source(lease));helpers.assert_true(s.reader.source_owner_current(fresh))
+  end)
+ end)
+ helpers.it("passive event receipt collection cannot mint authority and keeps genuine receipts compatible",function()
+  local options={before_hook=function(s)
+   local original=s.reader.capture_event;s.observed=0
+   s.reader.capture_event=function(...)s.observed=s.observed+1;return original(...)end
+  end}
+  InputOwnerFixture.with_session(options,function(s)
+   arm_input(s);s.edge("a",30,1,200);s.edge("a",30,0,250)
+   helpers.assert_true(s.observed>0);helpers.assert_eq(input_rows(s),prefix.." 42:1 30:1 30:0 42:0")
+  end)
+ end)
+ helpers.it("postframe public retirement replacement cannot steal captured original source cleanup",function()
+  InputOwnerFixture.with_session(nil,function(s)
+   arm_input(s);s.edge("a",30,1,200)
+   local original=s.reader.retire_source;local called=false;s.reader.retire_source=function()called=true;return true end
+   s.edge("a",30,2,210);s.reader.retire_source=original
+   assert_false(called);assert_false(s.hook.isRunning());assert_false(s.reader.is_grabbed("keyboard:"..s.paths.a))
+   assert_false(s.reader.is_grabbed("keyboard:"..s.paths.b));helpers.assert_eq(#s.writer.output_view(s.output).down,0)
+  end)
+ end)
+end)
+
+helpers.describe("actual event issuer joins original source observer (controlled ports)", function()
+ for _,mode in ipairs({"positive_observer","positive_current_and_observer"}) do
+  helpers.it("a rebound getter cannot issue "..mode.." as original input authority",function()
+   local options={before_hook=function(s)
+    local capture,current=s.reader.capture_source_owner,s.reader.source_owner_current
+    s.restore_reader=function()s.reader.capture_source_owner,s.reader.source_owner_current=capture,current end
+    s.reader.capture_source_owner=function(...)local lease=capture(...);return lease,function()return true end end
+    if mode=="positive_current_and_observer" then s.reader.source_owner_current=function()return true end end
+   end}
+   InputOwnerFixture.with_session(options,function(s)
+    s.pair();helpers.assert_true(not s.armed);helpers.assert_eq(s.base.one_shot_until,nil)
+    helpers.assert_eq(input_rows(s),"29:1 29:0 29:1");s.restore_reader()
+   end)
+  end)
+ end
+ helpers.it("actual event origin authenticates only its exact registered source observer",function()
+  local options={before_hook=function(s)
+   local original=s.reader.capture_event
+   s.reader.capture_event=function(...)local origin=original(...);s.last_origin=origin;return origin end
+  end}
+  InputOwnerFixture.with_session(options,function(s)
+   s.pair();helpers.assert_true(s.armed)
+   local lease,observer=s.reader.capture_source_owner("keyboard:"..s.paths.a)
+   local foreign,other=s.reader.capture_source_owner("keyboard:"..s.paths.b)
+   local capture,current,retire=s.reader.capture_source_owner,s.reader.source_owner_current,s.reader.retire_source
+   helpers.assert_true(s.reader.source_current(s.last_origin))
+   helpers.assert_true(s.reader.source_current(s.last_origin,lease,observer,capture,current,retire))
+   assert_false(s.reader.source_current({},lease,observer,capture,current,retire))
+   assert_false(s.reader.source_current(s.last_origin,{},observer,capture,current,retire))
+   assert_false(s.reader.source_current(s.last_origin,foreign,other,capture,current,retire))
+   assert_false(s.reader.source_current(s.last_origin,lease,other,capture,current,retire))
+   assert_false(s.reader.source_current(s.last_origin,lease,function()return true end,capture,current,retire))
+   assert_false(s.reader.source_current(s.last_origin,lease,observer,function(...)return capture(...)end,current,retire))
+   assert_false(s.reader.source_current(s.last_origin,lease,observer,capture,function()return true end,retire))
+   assert_false(s.reader.source_current(s.last_origin,lease,observer,capture,current,function()return true end))
+  end)
+ end)
+end)
+
+helpers.describe("cold installed input authority bootstrap (controlled ports)", function()
+ helpers.it("the genuine Hook and Reader load before programmable backend callbacks",function()
+  InputOwnerFixture.with_session({before_hook=function(s)
+   helpers.assert_eq(package.loaded["adapters.keyboard_hook"],s.hook)
+   helpers.assert_eq(s.bootstrap,"cold-hook-before-backend")
+  end},function(s)
+   arm_input(s);helpers.assert_eq(s.before_arm_acquisitions,s.after_arm_acquisitions)
+   s.edge("a",30,1,200);s.edge("a",30,0,250)
+   helpers.assert_eq(input_rows(s),prefix.." 42:1 30:1 30:0 42:0")
+  end)
+ end)
+ for _,mode in ipairs({"genuine_preloaded","all_positive_preloaded","all_positive_after_cold_load"}) do
+  helpers.it("cannot certify "..mode.." through mutable public authority ports",function()
+   local options={late_reader=mode~="all_positive_after_cold_load"}
+   if mode~="genuine_preloaded" then options.before_hook=function(s)
+    local capture,source,view=s.reader.capture_source_owner,s.reader.source_current,s.reader.event_view
+    s.restore_reader=function()s.reader.capture_source_owner,s.reader.source_current,s.reader.event_view=capture,source,view end
+    s.reader.capture_source_owner=function(...)local cap=capture(...);return cap,function()return true end end
+    s.reader.source_current=function()return true end
+    s.reader.event_view=function(...)return view(...),function()return true end end
+   end end
+   InputOwnerFixture.with_session(options,function(s)
+    s.pair();helpers.assert_true(not s.armed);helpers.assert_eq(s.base.one_shot_until,nil)
+    s.edge("a",58,0,150);s.edge("a",30,1,200);s.edge("a",30,0,250)
+    helpers.assert_eq(input_rows(s),prefix.." 30:1 30:0")
+    helpers.assert_true(s.hook.isRunning());if s.restore_reader then s.restore_reader()end
+   end)
+  end)
+ end
+end)
+
+helpers.describe("consumed source withdrawal exact native inverse settlement (controlled transport)", function()
+	local Fixture = require("tests.support.input_owner_fixture")
+	local function arm(s)
+		s.pair(); helpers.assert_true(s.armed); s.edge("a", 58, 0, 110)
+	end
+	local function wire(s)
+		local out = {}; for _, row in ipairs(s.rows) do out[#out + 1] = row[1] .. ":" .. row[2] end
+		return table.concat(out, " ")
+	end
+	local function replace(options, id)
+		options.after_sync = function(s, code, value)
+			if code == 42 and value == 1 then
+				local slot, descriptor = "keyboard:" .. s.paths[id], s.descriptor(id)
+				s.old_source = assert(s.reader.capture_source_owner(slot))
+				helpers.assert_true(s.reader.close(slot)); helpers.assert_true(s.reader.open(s.paths[id], slot))
+				helpers.assert_true(s.reader.grab(slot)); s.new_source = assert(s.reader.capture_source_owner(slot))
+				helpers.assert_eq(s.descriptor(id), descriptor)
+			end
+			if options.inverse_callback and code == 42 and value == 0 then options.inverse_callback(s) end
+		end
+	end
+	for _, id in ipairs({ "a", "b" }) do
+		helpers.it("settles acknowledged Shift inverse and cancelled character after actual " .. id .. " FD reuse", function()
+			local options = { recycle_descriptor = true }; replace(options, id)
+			Fixture.with_session(options, function(s)
+				arm(s); s.edge("a", 30, 1, 200)
+				helpers.assert_eq(wire(s), "29:1 29:0 29:1 29:0 42:1 42:0")
+				helpers.assert_eq(s.hook.isRunning(), false); helpers.assert_true(s.broker.output_current())
+				helpers.assert_eq(#s.writer.output_view(s.output).down, 0)
+				helpers.assert_eq(s.reader.source_owner_current(s.old_source), false)
+				helpers.assert_true(s.reader.retire_source(s.old_source)); helpers.assert_true(s.reader.source_owner_current(s.new_source))
+				s.hook.stop(); helpers.assert_true(s.hook.set_remapper(nil))
+				helpers.assert_true(s.reader.source_owner_current(s.new_source), "Original remapper cleanup cannot close successor")
+				helpers.assert_true(s.writer.output_current(s.output), "Healthy original output remains admitted")
+				helpers.assert_eq(wire(s), "29:1 29:0 29:1 29:0 42:1 42:0", "Settlement emits no duplicate inverse or cancelled character")
+				helpers.assert_true(s.reader.retire_source(s.new_source))
+			end)
+		end)
+	end
+	helpers.it("does not acknowledge a queued inverse before original native commit", function()
+		local options = { recycle_descriptor = true }; replace(options, "a")
+		options.inverse_callback = function(s)
+			helpers.assert_eq(s.hook.set_remapper(nil), false, "Native inverse callback remains inside busy commit")
+		end
+		Fixture.with_session(options, function(s)
+			arm(s); s.edge("a", 30, 1, 200)
+			helpers.assert_true(s.hook.set_remapper(nil)); helpers.assert_true(s.reader.source_owner_current(s.new_source))
+			helpers.assert_true(s.reader.retire_source(s.new_source))
+		end)
+	end)
+	helpers.it("retains retirement debt after failed inverse SYN and refused original destroy", function()
+		local options = { recycle_descriptor = true, output_destroy = function() return false end }
+		replace(options, "a"); options.fail_sync = function(_, code, value) return code == 42 and value == 0 end
+		Fixture.with_session(options, function(s)
+			arm(s); s.edge("a", 30, 1, 200)
+			helpers.assert_eq(s.hook.set_remapper(nil), false); local destroys = s.output_destroys
+			helpers.assert_eq(s.hook.set_remapper(nil), false); helpers.assert_eq(s.output_destroys, destroys, "Unknown retirement is not retried")
+			helpers.assert_true(s.broker.has_debt()); helpers.assert_true(s.reader.source_owner_current(s.new_source))
+			helpers.assert_eq(wire(s), "29:1 29:0 29:1 29:0 42:1 42:0")
+			helpers.assert_true(s.reader.retire_source(s.new_source))
+		end)
+	end)
+	helpers.it("refuses a rebound producer ACK while preserving original healthy output", function()
+		local options = { recycle_descriptor = true }; replace(options, "a")
+		options.inverse_callback = function(s)
+			s.original_ack = s.engine.ack_retirement; s.fake_ack_called = false
+			s.engine.ack_retirement = function() s.fake_ack_called = true; return true end
+		end
+		Fixture.with_session(options, function(s)
+			arm(s); s.edge("a", 30, 1, 200)
+			helpers.assert_eq(s.hook.set_remapper(nil), false); helpers.assert_eq(s.fake_ack_called, false)
+			helpers.assert_true(s.writer.output_current(s.output)); s.engine.ack_retirement = s.original_ack
+			helpers.assert_true(s.hook.set_remapper(nil)); helpers.assert_true(s.reader.source_owner_current(s.new_source))
+			helpers.assert_true(s.reader.retire_source(s.new_source))
+		end)
+	end)
+	helpers.it("settles its old opaque holders while preserving an unrelated native Shift owner", function()
+		local options = { recycle_descriptor = true }
+		options.after_sync = function(s, code, value)
+			if code == 30 and value == 1 then
+				local slot = "keyboard:" .. s.paths.a
+				s.old_source = assert(s.reader.capture_source_owner(slot)); helpers.assert_true(s.reader.close(slot))
+				helpers.assert_true(s.reader.open(s.paths.a, slot)); helpers.assert_true(s.reader.grab(slot))
+				s.new_source = assert(s.reader.capture_source_owner(slot))
+			end
+		end
+		Fixture.with_session(options, function(s)
+			arm(s); local other = {}
+			helpers.assert_true(s.broker.edge(other, 42, 1, s.writer.emit).ok)
+			s.edge("a", 30, 1, 200)
+			helpers.assert_eq(wire(s), "29:1 29:0 29:1 29:0 42:1 30:1 30:0")
+			helpers.assert_true(s.hook.set_remapper(nil)); helpers.assert_true(s.broker.output_current())
+			helpers.assert_eq(s.broker.view().owners[other].code, 42)
+			helpers.assert_eq(s.writer.output_view(s.output).down[1], 42, "Unrelated native Shift must remain held")
+			helpers.assert_true(s.reader.source_owner_current(s.new_source)); helpers.assert_true(s.reader.retire_source(s.new_source))
+			helpers.assert_true(s.broker.edge(other, 42, 0, s.writer.emit).ok)
+			helpers.assert_eq(wire(s), "29:1 29:0 29:1 29:0 42:1 30:1 30:0 42:0")
+		end)
+	end)
+
+end)
+
+
+helpers.describe("same-device third slot through original production consumers (controlled transport)",function()
+	local Fixture = require("tests.support.input_owner_fixture")
+	local function source(extra)
+		return '[mod_combos]\nsimultaneous_threshold_ms = 100\nsymmetric = true\n[mod_combos.config.tab_then_caps_lock]\ncombo = "copy"\n' .. (extra or "")
+	end
+	local function with_chord(options,body)
+		options=options or {}
+		local before=options.before_manager
+		options.before_manager=function(s) s.bytes=source(); if before then before(s) end end
+		Fixture.with_manager_session(options,function(s) s.rows={}; body(s) end)
+	end
+	local function native_rows(s)
+		local out={}; for _, row in ipairs(s.rows) do out[#out+1]=row[1]..":"..row[2] end
+		return table.concat(out," ")
+	end
+	for _,order in ipairs({{58,15},{15,58}}) do
+		helpers.it("consumes both original presses symmetrically "..order[1],function()
+			with_chord({},function(s)
+				s.edge("a",order[1],1,1000)
+				helpers.assert_eq(native_rows(s),"","first owns no premature standalone output")
+				s.edge("a",order[2],1,1010)
+				helpers.assert_eq(s.actions,{{"copy","combination__tab_then_caps_lock"}})
+				s.edge("a",order[1],2,1011); s.edge("a",order[2],2,1012)
+				s.edge("a",order[1],0,1020); s.edge("a",order[2],0,1021)
+				helpers.assert_eq(native_rows(s),""); helpers.assert_eq(#s.actions,1)
+			end)
+		end)
+	end
+	helpers.it("admits equality at the positive delay without an early tick",function()
+		with_chord({},function(s)
+			s.edge("a",58,1,1000); s.edge("a",15,1,1100)
+			helpers.assert_eq(s.actions,{{"copy","combination__tab_then_caps_lock"}})
+			s.edge("a",58,0,1101);s.edge("a",15,0,1102)
+			helpers.assert_eq(native_rows(s),"")
+		end)
+	end)
+	helpers.it("replays the original first hold before an expired native second",function()
+		with_chord({},function(s)
+			s.edge("a",58,1,1000);s.edge("a",15,1,1101)
+			helpers.assert_eq(s.actions,{})
+			helpers.assert_eq(native_rows(s),"29:1 15:1")
+			s.edge("a",15,0,1102);s.edge("a",58,0,1103)
+			helpers.assert_eq(native_rows(s),"29:1 15:1 15:0 29:0")
+		end)
+	end)
+	helpers.it("resolves a foreign keyboard in original native output order",function()
+		with_chord({},function(s)
+			s.edge("a",58,1,1000);s.edge("b",30,1,1010)
+			helpers.assert_eq(s.actions,{});helpers.assert_eq(native_rows(s),"29:1 30:1")
+			s.edge("b",30,0,1011);s.edge("a",58,0,1012)
+			helpers.assert_eq(native_rows(s),"29:1 30:1 30:0 29:0")
+		end)
+	end)
+	helpers.it("withdraws a pending original press on canonical third-slot change",function()
+		with_chord({},function(s)
+			s.edge("a",58,1,1000);helpers.assert_eq(native_rows(s),"")
+			s.bytes=source():gsub('combo = "copy"','combo = "paste"')
+			s.edge("a",15,1,1010)
+			helpers.assert_eq(s.actions,{})
+			helpers.assert_eq(native_rows(s):find("29:1",1,true),nil,"revoked first never reacquires standalone Ctrl")
+			s.edge("a",58,0,1011);s.edge("a",15,0,1012)
+		end)
+	end)
+	helpers.it("cannot mint pending rights outside original dispatch or from a caller table",function()
+		with_chord({},function(s)
+			helpers.assert_eq(s.hook.capture_buffered_input(s.engine,58,1000),nil)
+			helpers.assert_eq(s.hook.buffered_input_current({},true),false)
+			s.edge("a",58,1,1000);helpers.assert_eq(native_rows(s),"")
+			s.edge("a",15,1,1010);helpers.assert_eq(#s.actions,1)
+			s.edge("a",15,0,1011);s.edge("a",58,0,1012)
+		end)
+	end)
+	for _,change in ipairs({
+		{ name="missing delay", apply=function(text) return text:gsub("simultaneous_threshold_ms = 100\n","") end },
+		{ name="missing symmetry", apply=function(text) return text:gsub("symmetric = true\n","") end },
+		{ name="zero delay", apply=function(text) return text:gsub("simultaneous_threshold_ms = 100","simultaneous_threshold_ms = 0") end },
+		{ name="mistyped symmetry", apply=function(text) return text:gsub("symmetric = true",'symmetric = "true"') end },
+		{ name="unissued leaf", apply=function(text) return text:gsub('combo = "copy"','unknown = "copy"') end },
+		{ name="disabled third slots", apply=function(text) return text:gsub("%[mod_combos%]","[mod_combos]\nenabled = false") end },
+	}) do
+		helpers.it("preserves immediate ordered behavior for "..change.name,function()
+			with_chord({before_manager=function(s) s.bytes=change.apply(s.bytes) end},function(s)
+				s.edge("a",58,1,1000)
+				helpers.assert_eq(native_rows(s),"29:1","unissued third slot never delays original hold")
+				s.edge("a",58,0,1200); helpers.assert_eq(s.actions,{})
+			end)
+		end)
+	end
+	for _,order in ipairs({{15,58},{58,15}}) do
+		helpers.it("retains explicit asymmetric order "..order[1],function()
+			with_chord({before_manager=function(s) s.bytes=s.bytes:gsub("symmetric = true","symmetric = false") end},function(s)
+				s.edge("a",order[1],1,1000);s.edge("a",order[2],1,1010)
+				helpers.assert_eq(#s.actions,order[1]==15 and 1 or 0)
+				s.edge("a",order[2],0,1011);s.edge("a",order[1],0,1012)
+			end)
+		end)
+	end
+	helpers.it("replays a quick original release after its standalone first hold",function()
+		with_chord({},function(s)
+			s.edge("a",58,1,1000);s.edge("a",58,0,1050)
+			helpers.assert_eq(s.actions,{})
+			helpers.assert_eq(native_rows(s),"29:1 29:0 28:1 28:0")
+		end)
+	end)
+	helpers.it("does not steal a matching second from a different original device",function()
+		with_chord({},function(s)
+			s.edge("a",58,1,1000);s.edge("b",15,1,1010)
+			helpers.assert_eq(s.actions,{});helpers.assert_eq(native_rows(s),"29:1 15:1")
+			s.edge("b",15,0,1011);s.edge("a",58,0,1200)
+			helpers.assert_eq(native_rows(s),"29:1 15:1 15:0 29:0")
+		end)
+	end)
+	for _,field in ipairs({"symmetric", "simultaneous_threshold_ms"}) do
+		helpers.it("revokes the retained third-slot source when "..field.." changes",function()
+			with_chord({},function(s)
+				s.edge("a",58,1,1000)
+				s.bytes=field=="symmetric" and s.bytes:gsub("symmetric = true","symmetric = false")
+					or s.bytes:gsub("simultaneous_threshold_ms = 100","simultaneous_threshold_ms = 101")
+				s.edge("a",15,1,1010);helpers.assert_eq(s.actions,{})
+				helpers.assert_eq(native_rows(s):find("29:1",1,true),nil)
+				s.edge("a",15,0,1011);s.edge("a",58,0,1012)
+			end)
+		end)
+	end
+	helpers.it("retains pending physical lifetimes across acknowledged pause",function()
+		with_chord({},function(s)
+			s.edge("a",58,1,1000);helpers.assert_true(s.manager.set_paused(true))
+			s.edge("a",58,0,1010);helpers.assert_eq(native_rows(s),"")
+			helpers.assert_eq(s.actions,{})
+		end)
+	end)
+	helpers.it("never matches after original evdev backlog loss",function()
+		with_chord({},function(s)
+			s.edge("a",58,1,1000);s.event("a",0,3,0,1001)
+			s.edge("a",15,1,1010);helpers.assert_eq(s.actions,{})
+			helpers.assert_eq(native_rows(s):find("29:1",1,true),nil)
+			s.hook.stop();helpers.assert_true(s.hook.set_remapper(nil))
+		end)
+	end)
+	helpers.it("prevents a source callback from borrowing the live capture role",function()
+		local options={}
+		options.on_guard=function(s)
+			if s.engine then
+				s.borrowed=s.hook.capture_buffered_input(s.engine,58,1000) or s.borrowed
+			end
+		end
+		with_chord(options,function(s)
+			s.edge("a",58,1,1000);helpers.assert_eq(s.borrowed,nil)
+			s.edge("a",15,1,1010);helpers.assert_eq(#s.actions,1)
+			s.edge("a",15,0,1011);s.edge("a",58,0,1012)
+		end)
+	end)
+
+	helpers.it("refuses a caller-normalized table even on an original installed Pair issuer",function()
+		with_chord({},function(s)
+			local Engine=require("platform.remap.tap_hold_engine")
+			local Pair=require("platform.remap.key_combination_engine")
+			local config={keys={"tab","caps_lock"},taps={},holds={},thresholds={tab=100,caps_lock=100},enabled=true,revision=0,
+				chords={tab_then_caps_lock="copy"},chord_settings={simultaneous_threshold_ms=100,combo_symmetric=true},
+				capture=function()return function()return true end end,capture_action=function()return function()return true end end,
+				capture_chord=function()return function()return true end end}
+			helpers.assert_eq(require("modules.shortcuts.key_combinations").buffered_settings_current(config),false)
+			local base=Engine.new({keys={caps_lock={tap_action="enter",hold_modifier="ctrl",time_activation_seconds=.3}},tap_min_ms=0,one_shot_timeout_ms=1000})
+			local extra=Pair.new(base,config,{capture_buffered_input=s.hook.capture_buffered_input,
+				buffered_input_current=s.hook.buffered_input_current,buffered_input_view=s.hook.buffered_input_view})
+			helpers.assert_true(s.hook.set_remapper(extra,function(action)s.actions[#s.actions+1]={action}end))
+			s.edge("a",58,1,1000)
+			helpers.assert_eq(native_rows(s),"29:1","caller timing/source booleans confer no delayed physical intake")
+			s.edge("a",58,0,1200);helpers.assert_eq(s.actions,{})
+		end)
+	end)
+	helpers.it("retires a source-callback reentrant process without a stale pending owner",function()
+		local options={}
+		options.on_guard=function(s)
+			if s.engine and s.revoking then
+				s.revoking=false
+				s.reentrant=s.engine:process(30,1,1001,{source="foreign",physical=true,ready=true,generation=1})
+			end
+		end
+		with_chord(options,function(s)
+			s.revoking=true;s.edge("a",58,1,1000)
+			helpers.assert_eq(s.actions,{});helpers.assert_eq(native_rows(s),"")
+			s.edge("a",15,1,1010);helpers.assert_eq(s.actions,{})
+			s.edge("a",15,0,1011);s.edge("a",58,0,1012)
+		end)
+	end)
+	helpers.it("does not replay a foreign key after an acknowledged first-row callback revokes source",function()
+		local options={}
+		options.after_sync=function(s,code,value)
+			if code==29 and value==1 then options.after_sync=nil;s.bytes=source():gsub('combo = "copy"','combo = "paste"') end
+		end
+		with_chord(options,function(s)
+			s.edge("a",58,1,1000);s.edge("b",30,1,1010)
+			helpers.assert_eq(s.actions,{})
+			helpers.assert_eq(native_rows(s):find("30:1",1,true),nil,"unacknowledged buffered frame cannot release incoming replay")
+			s.hook.stop();helpers.assert_true(s.hook.set_remapper(nil))
+			helpers.assert_eq(native_rows(s),"29:1 29:0","same original holder retires its acknowledged DOWN")
+		end)
+	end)
+	helpers.it("retains original retirement when first-row native SYN refuses",function()
+		local options={fail_sync=function(_,code,value)return code==29 and value==1 end}
+		with_chord(options,function(s)
+			s.edge("a",58,1,1000);s.edge("b",30,1,1010)
+			helpers.assert_eq(s.actions,{})
+			helpers.assert_eq(native_rows(s):find("30:1",1,true),nil)
+			options.fail_sync=nil
+			s.hook.stop();helpers.assert_true(s.hook.set_remapper(nil))
+			helpers.assert_true(s.broker.output_retired(),"Only original native output retirement can settle the refused SYN")
+			helpers.assert_true(s.broker.has_debt(),"Retirement does not erase the recorded failed commit")
+		end)
+	end)
+	helpers.it("does not retire a replacement original Reader lease after pending source reuse",function()
+		with_chord({recycle_descriptor=true},function(s)
+			s.edge("a",58,1,1000)
+			local slot="keyboard:"..s.paths.a
+			local old=assert(s.reader.capture_source_owner(slot));helpers.assert_true(s.reader.close(slot))
+			helpers.assert_true(s.reader.open(s.paths.a,slot));helpers.assert_true(s.reader.grab(slot))
+			local fresh=assert(s.reader.capture_source_owner(slot))
+			s.edge("a",15,1,1010);helpers.assert_eq(s.actions,{})
+			helpers.assert_eq(native_rows(s):find("29:1",1,true),nil)
+			s.hook.stop();helpers.assert_true(s.hook.set_remapper(nil))
+			helpers.assert_true(s.reader.source_owner_current(fresh))
+			helpers.assert_true(s.reader.retire_source(old));helpers.assert_true(s.reader.source_owner_current(fresh))
+			helpers.assert_true(s.reader.retire_source(fresh))
+		end)
+	end)
+
+end)
+
+helpers.describe("acknowledged buffered Reader cohort replacement (controlled transport)",function()
+	helpers.it("closes newly Hook-owned readers after remove and successful re-add",function()
+		local Fixture=require("tests.support.input_owner_fixture")
+		Fixture.with_manager_session({before_manager=function(s)
+			s.bytes='[mod_combos]\nsimultaneous_threshold_ms = 100\nsymmetric = true\n[mod_combos.config.tab_then_caps_lock]\ncombo = "copy"\n'
+		end},function(s)
+			s.edge("a",58,1,1000);s.edge("a",15,1,1010)
+			s.edge("a",58,0,1020);s.edge("a",15,0,1021)
+			local finder=require("modules.hotstrings.device_finder")
+			local slot="keyboard:"..s.paths.a
+			local first=assert(s.reader.capture_source_owner(slot))
+			local function reconcile()
+				local result
+				for _=1,s.hook.DEVICE_CHECK_TICKS do result=s.hook.check_device() end
+				return result
+			end
+			finder.find_devices=function()return {s.paths.b},{} end
+			helpers.assert_true(reconcile(),"legitimate removal publishes")
+			helpers.assert_eq(s.reader.source_owner_current(first),false)
+			finder.find_devices=function()return {s.paths.a,s.paths.b},{} end
+			helpers.assert_true(reconcile(),"legitimate re-add publishes")
+			local fresh=assert(s.reader.capture_source_owner(slot))
+			helpers.assert_true(s.reader.source_owner_current(fresh))
+			helpers.assert_true(s.hook.isRunning())
+			s.hook.stop()
+			local current,opened=s.reader.source_owner_current(fresh),s.reader.is_open(slot)
+			-- Cleanup only this controlled probe's captured original lease after
+			-- observing the product Stop; it cannot make those observations pass.
+			s.reader.retire_source(fresh)
+			helpers.assert_eq(current,false,"Stop retires newly Hook-owned published reader")
+			helpers.assert_eq(opened,false,"No reconciled reader remains open")
+		end)
+	end)
+end)
+
+helpers.describe("generated Linux defaults received by original native combination constructors (controlled transport)",function()
+ local Fixture=require("tests.support.input_owner_fixture")
+ local function with_public(options,body)
+  options=options or {};options.public_chords=true
+  local before=options.before_manager
+  options.before_manager=function(s)
+   s.bytes='[mod_combos.config.tab_then_caps_lock]\ncombo="copy"\n'
+   if before then before(s) end
+  end
+  Fixture.with_manager_session(options,function(s) s.rows={};body(s) end)
+ end
+ helpers.it("receives the declared sparse100ms/asymmetric source at the inclusive boundary",function()
+  with_public({},function(s)
+   helpers.assert_eq(s.owner.chord_settings(),{simultaneous_threshold_ms=100,combo_symmetric=false})
+   s.edge("a",15,1,1000);helpers.assert_eq(s.rows,{})
+   s.edge("a",58,1,1100)
+   helpers.assert_eq(s.actions,{{"copy","combination__tab_then_caps_lock"}})
+   s.edge("a",15,0,1101);s.edge("a",58,0,1102)
+   helpers.assert_eq(s.rows,{});helpers.assert_eq(#s.actions,1)
+  end)
+ end)
+ helpers.it("does not borrow symmetric behavior from the Mac timing defaults",function()
+  with_public({},function(s)
+   s.edge("a",58,1,1000);s.edge("a",15,1,1010)
+   helpers.assert_eq(s.actions,{})
+   s.edge("a",15,0,1100);s.edge("a",58,0,1101)
+  end)
+ end)
+ helpers.it("declaration alone and allNone slots create no pending first-press custody",function()
+  with_public({before_manager=function(s) s.bytes="" end},function(s)
+   helpers.assert_eq(s.owner.get_chord("tab_then_caps_lock"),"none")
+   s.edge("a",58,1,1000)
+   helpers.assert_eq(s.rows[1],{29,1},"ordinary first hold remains immediate without an assigned chord")
+   helpers.assert_eq(s.actions,{})
+   s.edge("a",58,0,1100)
+  end)
+ end)
+ for _,field in ipairs({"default_for","find_entry_by_path"}) do
+  helpers.it("retires pending input after replaced declared getter "..field,function()
+   with_public({},function(s)
+    local features=require("infra.manifest_reader");local original=features[field]
+    s.edge("a",15,1,1000);helpers.assert_eq(s.rows,{})
+    features[field]=function(...) return original(...) end
+    local called,detail=pcall(function()
+     s.edge("a",58,1,1010);helpers.assert_eq(s.actions,{})
+     helpers.assert_eq(s.owner.capture_runtime(),nil,"a replacement public getter is not declaration currency")
+     s.edge("a",58,0,1100);s.edge("a",15,0,1101)
+    end)
+    features[field]=original
+    if not called then error(detail,0) end
+   end)
+  end)
+ end
+ helpers.it("retires pending input after mutation of the original declared default map",function()
+  with_public({},function(s)
+   local features=require("infra.manifest_reader")
+   local entry=features.find_entry_by_path("mod_combos.simultaneous_threshold_ms");local previous=entry.default
+   s.edge("a",15,1,1000);helpers.assert_eq(s.rows,{})
+   entry.default=101
+   local called,detail=pcall(function()
+    s.edge("a",58,1,1010);helpers.assert_eq(s.actions,{})
+    helpers.assert_eq(s.owner.capture_runtime(),nil)
+    s.edge("a",58,0,1100);s.edge("a",15,0,1101)
+   end)
+   entry.default=previous
+   if not called then error(detail,0) end
+  end)
+ end)
+ for _,text in ipairs({'[mod_combos]\nsymmetric="false"\n[mod_combos.config.tab_then_caps_lock]\ncombo="copy"\n',
+  '[mod_combos]\nconfig=[]\n','mod_combos="occupied"\n','[mod_combos]\nsimultaneous_threshold_ms=0\n[mod_combos.config.tab_then_caps_lock]\ncombo="copy"\n'}) do
+  helpers.it("never normalizes a malformed namespace or setting into delayed authority",function()
+   with_public({before_manager=function(s) s.bytes=text end},function(s)
+    s.edge("a",58,1,1000);helpers.assert_eq(s.rows[1],{29,1})
+    helpers.assert_eq(s.actions,{})
+    s.edge("a",58,0,1100)
+   end)
+  end)
+ end
+end)
+
+
+helpers.describe("original managed saved configuration enrollment (controlled transport)",function()
+ local Fixture=require("tests.support.input_owner_fixture")
+ local function public(body,options)
+  options=options or {};options.public_chords=true
+  options.before_manager=function(s)
+   s.bytes='[mod_combos.config.tab_then_caps_lock]\ncombo="copy"\n'
+  end
+  Fixture.with_manager_session(options,function(s) s.rows={};body(s) end)
+ end
+ local function detach(s,configured)
+  local Base=require("platform.remap.tap_hold_engine")
+  local Pair=require("platform.remap.key_combination_engine")
+  local base=Base.new({keys={tab={tap_action="enter",hold_modifier="ctrl",time_activation_seconds=.3}},
+   tap_min_ms=0,one_shot_timeout_ms=1000})
+  local received={}
+  local pair=Pair.new(base,configured,{capture_buffered_input=s.hook.capture_buffered_input,
+   buffered_input_current=s.hook.buffered_input_current,buffered_input_view=s.hook.buffered_input_view,
+   retire_buffered_input=s.hook.retire_buffered_input})
+  helpers.assert_true(s.hook.set_remapper(pair,function(action) received[#received+1]=action;return true end))
+  s.rows={};s.edge("a",15,1,1000)
+  local pending=#s.rows==0
+  s.edge("a",58,1,1010)
+  s.edge("a",58,0,1011);s.edge("a",15,0,1012)
+  helpers.assert_true(s.hook.set_remapper(nil))
+  helpers.assert_true(s.broker.output_current())
+  helpers.assert_eq(next(s.broker.view().owners),nil,"exact original output holders retired")
+  helpers.assert_eq(pending,false,"detached options have no first-press custody")
+  helpers.assert_eq(received,{},"caller selected action policy cannot dispatch a saved chord")
+ end
+ helpers.it("rejects an invented catalogue through the real saved route and original Hook",function()
+  public(function(s)
+   s.bytes='[mod_combos.config.tab_then_caps_lock]\ncombo="private_unlisted"\n'
+   local Source=require("modules.shortcuts.key_combinations")
+   local Catalogue=require("_generated.action_catalogue")
+   helpers.assert_eq(Catalogue.actions.private_unlisted,nil)
+   local caller=Source.new({keys={{id="tab",key="tab"},{id="caps_lock",key="caps_lock"}},
+    hold_picker={modifiers={"ctrl"},layers={}},is_paused=function()return false end,
+    changed=function()return true end,actions={is_assignable=function()return true end}})
+   helpers.assert_eq(caller.get_chord("tab_then_caps_lock"),"private_unlisted")
+   local configured=caller.engine_options({tab=300,caps_lock=300})
+   helpers.assert_eq(Source.buffered_settings_current(configured),false)
+   detach(s,configured)
+  end)
+ end)
+ helpers.it("rejects invented physical key identifiers with an otherwise real catalogue action",function()
+  public(function(s)
+   s.bytes='[mod_combos.config.foreign_a_then_foreign_b]\ncombo="copy"\n'
+   local Source=require("modules.shortcuts.key_combinations")
+   local caller=Source.new({keys={{id="foreign_a",key="foreign_a"},{id="foreign_b",key="foreign_b"}},
+    hold_picker={modifiers={"ctrl"},layers={}},is_paused=function()return false end,
+    changed=function()return true end,actions={is_assignable=function(action)return action=="copy" end}})
+   helpers.assert_eq(caller.get_chord("foreign_a_then_foreign_b"),"copy")
+   helpers.assert_eq(Source.buffered_settings_current(caller.engine_options({foreign_a=300,foreign_b=300})),false)
+  end)
+ end)
+ helpers.it("does not enroll a fresh options object requested directly from the actual installed owner",function()
+  public(function(s)
+   local Source=require("modules.shortcuts.key_combinations")
+   local thresholds={}
+   for _,row in ipairs(s.manager.configuration_snapshot().loaded.catalog) do thresholds[row.id]=300 end
+   local configured=s.owner.engine_options(thresholds)
+   helpers.assert_eq(s.manager.managed_pair_options_current(s.owner,configured),false)
+   helpers.assert_eq(Source.buffered_settings_current(configured),false)
+   detach(s,configured)
+  end)
+ end)
+ local function mutate_during_pending(s,change,restore)
+  s.edge("a",15,1,1000);helpers.assert_eq(s.rows,{})
+  change()
+  local ok,err=pcall(function()
+   s.edge("a",58,1,1010)
+   helpers.assert_eq(s.actions,{},"changed constructor/catalogue has no late action authority")
+   s.edge("a",58,0,1011);s.edge("a",15,0,1012)
+   helpers.assert_true(s.hook.set_remapper(nil))
+   helpers.assert_true(s.broker.output_current())
+   helpers.assert_eq(next(s.broker.view().owners),nil)
+  end)
+  restore()
+  if not ok then error(err,0) end
+ end
+ for _,spec in ipairs({{"modules.shortcuts.key_combinations","new"},
+  {"platform.remap.tap_hold_engine","new"},{"platform.remap.key_combination_engine","new"},
+  {"platform.remap.tap_hold_loader","load"},{"platform.remap.tap_hold_loader","load_document"}}) do
+  helpers.it("retires pending custody after original constructor replacement "..spec[1].."."..spec[2],function()
+   public(function(s)
+    local module=require(spec[1]);local original=module[spec[2]]
+    mutate_during_pending(s,function()module[spec[2]]=function(...)return original(...)end end,
+     function()module[spec[2]]=original end)
+   end)
+  end)
+ end
+ helpers.it("retires pending custody after the live generated catalogue is changed",function()
+  public(function(s)
+   local catalogue=require("_generated.action_catalogue");local previous=catalogue.actions.copy
+   mutate_during_pending(s,function()catalogue.actions.copy=nil end,function()catalogue.actions.copy=previous end)
+  end)
+ end)
+ helpers.it("retires pending custody after the original source getter is replaced",function()
+  public(function(s)
+   local original=s.owner.engine_options
+   mutate_during_pending(s,function()s.owner.engine_options=function(...)return original(...)end end,
+    function()s.owner.engine_options=original end)
+  end)
+ end)
+ helpers.it("refuses a replaced Manager observer even when it returns a positive Boolean",function()
+  public(function(s)
+   local original=s.manager.managed_pair_options_current
+   mutate_during_pending(s,function()s.manager.managed_pair_options_current=function()return true end end,
+    function()s.manager.managed_pair_options_current=original end)
+  end)
+ end)
+ helpers.it("rechecks the exact installed generation after the canonical source callback pauses the owner",function()
+  local options={}
+  options.on_guard=function(s)
+   if s.revoke then s.revoke=false;helpers.assert_true(s.manager.set_paused(true)) end
+  end
+  public(function(s)
+   s.edge("a",15,1,1000);helpers.assert_eq(s.rows,{})
+   s.revoke=true;s.edge("a",58,1,1010)
+   helpers.assert_eq(s.actions,{})
+   helpers.assert_true(s.broker.output_current())
+   helpers.assert_eq(next(s.broker.view().owners),nil)
+   helpers.assert_eq(s.manager.is_active(),false,"callback-revoked installation remains paused")
+   s.edge("a",58,0,1011);s.edge("a",15,0,1012)
+   helpers.assert_true(s.hook.set_remapper(nil))
+  end,options)
+ end)
+ helpers.it("checks the original loaded physical catalogue after external source callbacks",function()
+  local options={}
+  options.on_guard=function(s)
+   if s.revoke then s.revoke=false;s.snapshot.loaded.catalog[1].id="foreign_key" end
+  end
+  public(function(s)
+   s.snapshot=s.manager.configuration_snapshot()
+   local original=s.snapshot.loaded.catalog[1].id
+   s.edge("a",15,1,1000);helpers.assert_eq(s.rows,{})
+   s.revoke=true
+   local ok,err=pcall(function()
+    s.edge("a",58,1,1010);helpers.assert_eq(s.actions,{})
+    s.edge("a",58,0,1011);s.edge("a",15,0,1012)
+    helpers.assert_true(s.hook.set_remapper(nil))
+    helpers.assert_true(s.broker.output_current())
+    helpers.assert_eq(next(s.broker.view().owners),nil)
+   end)
+   s.snapshot.loaded.catalog[1].id=original
+   if not ok then error(err,0) end
+  end,options)
+ end)
+
+ helpers.it("refuses a future first-read Manager pretender returning positive currency",function()
+  public(function(s)
+   local Source=require("modules.shortcuts.key_combinations")
+   local actual=package.loaded["platform.remap.tap_hold_manager"]
+   package.loaded["platform.remap.tap_hold_manager"]={managed_pair_options_current=function()return true end}
+   local ok,err=pcall(function()
+    local caller=Source.new({keys={{id="tab",key="tab"},{id="caps_lock",key="caps_lock"}},
+     hold_picker={modifiers={"ctrl"},layers={}},is_paused=function()return false end,
+     changed=function()return true end,actions={is_assignable=function(action)return action=="copy" end}})
+    helpers.assert_eq(Source.buffered_settings_current(caller.engine_options({tab=300,caps_lock=300})),false)
+   end)
+   package.loaded["platform.remap.tap_hold_manager"]=actual
+   if not ok then error(err,0) end
+  end)
+ end)
+ helpers.it("does not reissue original loaded physical keys mutated through a public snapshot",function()
+  public(function(s)
+   local snapshot=s.manager.configuration_snapshot()
+   local previous=snapshot.loaded.keys.tab.time_activation_seconds
+   snapshot.loaded.keys.tab.time_activation_seconds=.9
+   local ok,err=pcall(function()
+    helpers.assert_eq(s.manager.restore_configuration(snapshot),false,"a source snapshot cannot mint changed original constructor metadata")
+    helpers.assert_true(s.hook.set_remapper(nil))
+    helpers.assert_true(s.broker.output_current())
+    helpers.assert_eq(next(s.broker.view().owners),nil)
+   end)
+   snapshot.loaded.keys.tab.time_activation_seconds=previous
+   if not ok then error(err,0) end
+  end)
+ end)
+
+ helpers.it("receives saved defaults only through the original installed Manager owner",function()
+  public(function(s)
+   local snapshot=s.manager.configuration_snapshot()
+   helpers.assert_eq(snapshot.combinations,s.owner)
+   helpers.assert_eq(snapshot.engine,s.engine)
+   helpers.assert_eq(package.loaded["platform.remap.tap_hold_manager"],s.manager)
+   helpers.assert_true(require("_generated.action_catalogue").actions.copy~=nil)
+   s.edge("a",15,1,1000);helpers.assert_eq(s.rows,{})
+   s.edge("a",58,1,1100)
+   helpers.assert_eq(s.actions,{{"copy","combination__tab_then_caps_lock"}})
+   s.edge("a",58,0,1101);s.edge("a",15,0,1102)
+   helpers.assert_true(s.hook.set_remapper(nil))
+   helpers.assert_true(s.broker.output_current())
+   helpers.assert_eq(next(s.broker.view().owners),nil)
+  end)
+ end)
+
+ helpers.it("rejects a borrowed genuine observer placed in a future Manager alias",function()
+  public(function(s)
+   local actual=s.manager
+   local alias={managed_pair_options_current=actual.managed_pair_options_current}
+   package.loaded["platform.remap.tap_hold_manager"]=alias
+   local ok,err=pcall(function()
+    helpers.assert_true(actual.set_enabled(false),"independent pair master remains installed")
+    s.rows={};s.edge("a",15,1,1000)
+    local pending=#s.rows==0
+    s.edge("a",58,1,1010)
+    s.edge("a",58,0,1011);s.edge("a",15,0,1012)
+    helpers.assert_true(s.hook.set_remapper(nil))
+    helpers.assert_true(s.broker.output_current())
+    helpers.assert_eq(next(s.broker.view().owners),nil)
+    helpers.assert_eq(pending,false,"only the exact original loaded Manager observes managed custody")
+    helpers.assert_eq(s.actions,{})
+   end)
+   package.loaded["platform.remap.tap_hold_manager"]=actual
+   if not ok then error(err,0) end
+  end)
+ end)
+end)

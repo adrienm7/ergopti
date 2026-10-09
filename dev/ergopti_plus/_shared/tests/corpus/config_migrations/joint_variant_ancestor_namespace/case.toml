@@ -1,0 +1,4 @@
+[case]
+description = "joint variant ancestor namespace preserves exact typed joint ownership."
+drivers = ["ahk", "hs", "linux"]
+outcome = "invalid"

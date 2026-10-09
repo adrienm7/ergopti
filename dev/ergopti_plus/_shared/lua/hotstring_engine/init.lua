@@ -872,6 +872,12 @@ function M.new()
 		return table.concat(_buf_cps)
 	end
 
+	--- Returns this exact input owner's rolling-buffer start boundary.
+	--- @return boolean known_boundary
+	function engine:buffer_starts_at_word_boundary()
+		return _start_is_boundary == true
+	end
+
 	--- Captures timing for an exact tail from this engine's physical input owner.
 	--- @param count number Positive integer of retained codepoints.
 	--- @return table|nil Detached timing summary, or nil for an invalid tail.

@@ -211,7 +211,7 @@ local function assign_parameterized_action(ctx, gestures, binding, action, assig
 		-- Escaped: a wrap-pair sample such as <…> would be read as Pango markup.
 		value = prompt_text(title, zenity_plain(gestures.get_action_parameter_prompt(action)), prior)
 	end
-	if value == nil then return false end
+	if value == nil or (spec == "llm_language" and value == "") then return false end
 	if type(gestures.validate_action_parameter) ~= "function"
 		or not gestures.validate_action_parameter(action, value)
 	then
@@ -278,18 +278,18 @@ end
 --- @param assign function(option, picked) Transactional assignment; true on commit.
 --- @return table Provider rows.
 local function slot_binding_rows(slot_label, bound, binding, assign)
-	local rows = {
-		{
-			label = i18n_safe("dialog.action_picker.label") .. "…",
-			action = function() open_action_picker(slot_label, bound, binding, assign) end,
-		},
-	}
-	if bound ~= "none" then
-		rows[#rows + 1] = {
-			label = i18n_safe("dialog.action_picker.disabled"),
-			action = function() assign("none") end,
-		}
-	end
+	if not ManifestMenu then return {} end
+	local function pick() open_action_picker(slot_label, bound, binding, assign) end
+	local function clear() assign("none") end
+	local rows = ManifestMenu.template_rows("slot_binding_frame", {
+		["slot_binding_pick"] = pick,
+		["slot_binding_clear"] = clear,
+	}, {
+		["slot_binding_has_action"] = function() return bound ~= "none" end,
+	}, {})
+	-- A missing late declaration must withdraw the entire slot submenu. The
+	-- renderer may already have translated earlier rows; no picker or write runs.
+	if type(rows) ~= "table" or #rows ~= (bound ~= "none" and 2 or 1) then return {} end
 	return rows
 end
 
@@ -820,20 +820,19 @@ local function _manifest_hotstring_rows(ctx, config)
 	--- @return table Provider row.
 	local function all_sections_row(ids)
 		local all_on = sections_all_on(ids)
-		return {
-			label   = i18n_safe("menu.hotstrings.enable_all_sections"),
-			checked = all_on,
-			action  = function()
-				local called, committed = false, false
-				if type(config.set_categories_sections) == "function" then
-					called, committed = pcall(config.set_categories_sections, ids, not all_on)
-				end
-				if called and committed == true then return true end
-				Logger.error(LOG, "The aggregate hotstrings switch did not acknowledge durable publication.")
-				show_error(i18n_safe("dialog.bulk_toggle.save_failed"), i18n_safe("common.error_title"))
-				return false
-			end,
-		}
+		local action = function()
+			local called, committed = false, false
+			if type(config.set_categories_sections) == "function" then
+				called, committed = pcall(config.set_categories_sections, ids, not all_on)
+			end
+			if called and committed == true then return true end
+			Logger.error(LOG, "The aggregate hotstrings switch did not acknowledge durable publication.")
+			show_error(i18n_safe("dialog.bulk_toggle.save_failed"), i18n_safe("common.error_title"))
+			return false
+		end
+		return ManifestMenu.check_row("hotstring_scope_checkbox", "hotstring_scope_all_sections",
+			{ hotstring_scope_all_sections = action },
+			{ hotstring_scope_all_on = function() return all_on end })
 	end
 
 	--- One category, as a submenu rather than a single toggle.
@@ -987,9 +986,11 @@ local function _manifest_hotstring_rows(ctx, config)
 			end
 		end
 		if added == 0 then
-			items[#items + 1] = {
-				label = i18n_safe("menu.hotstrings.no_group_loaded"), disabled = true,
-			}
+			if type(ManifestMenu.status_rows) ~= "function" then return end
+			local status = ManifestMenu.status_rows("hotstrings_menu", "hotstring_categories_standard", "no_groups")
+			for _, row in ipairs(type(status) == "table" and status or {}) do
+				items[#items + 1] = row
+			end
 		end
 	end
 
@@ -1013,19 +1014,26 @@ local function _manifest_hotstring_rows(ctx, config)
 		for _, pack in ipairs(language_packs) do
 			local ids = {}
 			for _, stem in ipairs(pack.categories) do ids[#ids + 1] = Languages.group_id(pack.id, stem) end
-			local items = { all_sections_row(ids), { separator = true } }
+			local switch, categories = all_sections_row(ids), {}
 			local total = 0
 			for _, id in ipairs(ids) do
 				local category = type(config.get_category) == "function" and config.get_category(id) or nil
 				if category then
-					items[#items + 1] = group_row(id)
+					categories[#categories + 1] = group_row(id)
 					total = total + active_count(id, category)
 				end
 			end
-			rows[#rows + 1] = {
-				label = string.format("%s (%d)", language_label(pack.locale), total),
-				items = items,
-			}
+			local items = switch and ManifestMenu.template_rows("hotstring_language_frame", {}, {}, {
+				hotstring_language_switch = function() return { switch } end,
+				hotstring_language_categories = function() return categories end,
+			})
+			if items then
+				local parents = ManifestMenu.template_rows("hotstring_language_parent_lua", {}, {
+					hotstring_language_name = function() return language_label(pack.locale) end,
+					hotstring_language_count = function() return string.format("%d", total) end,
+				}, { hotstring_language_children = items })
+				for _, row in ipairs(parents or {}) do rows[#rows + 1] = row end
+			end
 		end
 		return rows
 	end
@@ -1999,7 +2007,7 @@ local function _manifest_hotstring_rows(ctx, config)
 	hs_ctx.commands = {
 		["scope_restore"] = function() return apply_hotstrings_scope("recommended") end,
 		["scope_clear"] = function() return apply_hotstrings_scope("clear") end,
-		["hotstrings_all_sections"] = whole_tree.action,
+		["hotstrings_all_sections"] = whole_tree and whole_tree.action or nil,
 		-- The category switch, the submenu's first row. Every driver registers it:
 		-- no tray can switch a category from the row that opens its submenu.
 		["hotstrings_toggle"]      = function()
@@ -2031,7 +2039,7 @@ local function _manifest_hotstring_rows(ctx, config)
 	hs_ctx.state_getters = {}
 	for key, value in pairs(ctx.state_getters or {}) do hs_ctx.state_getters[key] = value end
 	hs_ctx.state_getters["hotstrings_enabled"] = hotstrings_on
-	hs_ctx.state_getters["hotstrings_all_sections_enabled"] = function() return whole_tree.checked end
+	hs_ctx.state_getters["hotstrings_all_sections_enabled"] = function() return whole_tree ~= nil and whole_tree.checked end
 
 	return ManifestMenu.build("hotstrings_menu", "Hotstrings", nil, group_builders, hs_ctx, providers)
 end
@@ -2083,15 +2091,18 @@ end
 
 --- Builds the AI / LLM submenu.
 local function _build_llm(ctx)
+	local NativeParent = require("ui.menu.ai_parent")
+	local parent = NativeParent.begin(ManifestMenu, "llm", ctx)
+	if not parent then return nil end
 	local llm = ctx.llm
 	if not llm then
 		local status_rows = ManifestMenu and ManifestMenu.template_rows("linux_llm_absent_rows", {}, {}, {})
 		if not status_rows then return {} end
-		return { label = i18n_safe("menu.llm.title"), items = status_rows }
+		return NativeParent.finish(parent, ManifestMenu.render_rows(status_rows, "linux_llm_absent_rows"))
 	end
 
 	local items = {}
-	local enabled = llm.is_enabled and llm.is_enabled() or false
+	local enabled = parent.enabled
 
 	-- The master gate is the manifest's first row and the shared renderer draws
 	-- it, from the command and the getter registered below. It also gets its OWN
@@ -2248,44 +2259,6 @@ local function _build_llm(ctx)
 		return { items = child_rows, disabled = not enabled or nil }
 	end
 
-	-- Live mode: Off, then every rewrite-format prompt (the built-ins in menu
-	-- order, then the user's own), labelled as in the prompt list. The engine
-	-- owns the state the llm_live_prompt_toggle action shares; a prompt chosen
-	-- here runs with the menu's count.
-	group_builders["llm_live_mode"] = function()
-		local ok_profiles, ProfileSettings = pcall(require, "modules.llm.profile_settings")
-		if not ok_profiles or type(llm.get_live) ~= "function" then
-			Logger.error(LOG, "LLM live mode unavailable; live submenu omitted.")
-			return
-		end
-		local Rewrite = require("llm.rewrite")
-		local live = llm.get_live()
-		local count = ProfileSettings.get("num_predictions") or 1
-		local function choose(profile_id)
-			local committed = llm.set_live(profile_id) == true
-			if committed and type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
-			return committed
-		end
-		local rows = { ManifestMenu.check_row("llm_live_controls", "llm_live_mode_off",
-			{ llm_live_mode_off = function() return choose(nil) end },
-			{ llm_live_is_off = function() return llm.get_live() == nil end,
-				llm_live_off_ready = function() return true end }) }
-		local prompts = {}
-		for _, profile in ipairs(ProfileSettings.list_built_in()) do prompts[#prompts + 1] = profile end
-		for _, profile in ipairs(ProfileSettings.list_user()) do prompts[#prompts + 1] = profile end
-		for _, profile in ipairs(prompts) do
-			if Rewrite.is_rewrite_profile(profile) then
-				local profile_id = profile.id
-				rows[#rows + 1] = {
-					label = ProfileSettings.menu_label(profile, count),
-					checked = live ~= nil and live.profile_id == profile_id,
-					action = function() choose(profile_id) end,
-				}
-			end
-		end
-		return { items = rows, disabled = not enabled or nil }
-	end
-
 	dynamic_handlers["llm_profile"] = function(target)
 		local ok_profiles, ProfileSettings = pcall(require, "modules.llm.profile_settings")
 		if not ok_profiles then return end
@@ -2297,6 +2270,21 @@ local function _build_llm(ctx)
 			if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
 		end
 		local function select_profile(profile_id)
+			if type(profile_id) ~= "string" or profile_id == "" then return false end
+			if type(llm.get_live) ~= "function" or type(llm.set_live) ~= "function" then
+				Logger.error(LOG, "Manual profile selection refused: its live override owner is unavailable.")
+				return false
+			end
+			local observed, live = xpcall(llm.get_live, debug.traceback)
+			if not observed then return false end
+			if live ~= nil then
+				local stopped, accepted = xpcall(llm.set_live, debug.traceback, nil)
+				local checked, current = xpcall(llm.get_live, debug.traceback)
+				if stopped ~= true or accepted ~= true or checked ~= true or current ~= nil then
+					Logger.error(LOG, "Manual profile selection refused: its temporary override did not retire.")
+					return false
+				end
+			end
 			local saved = ProfileSettings.set("active", profile_id, current_model)
 			if saved then refresh() end
 			return saved
@@ -2839,6 +2827,7 @@ local function _build_llm(ctx)
 		return committed
 	end
 	llm_ctx.commands["llm_toggle"] = function()
+		if type(llm.toggle) ~= "function" then return false end
 		if llm.toggle then llm.toggle(ctx.on_menu_changed) end
 		if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
 	end
@@ -2847,7 +2836,7 @@ local function _build_llm(ctx)
 	llm_ctx.state_getters["llm_enabled"] = function() return enabled end
 	-- The switch has no precondition here beyond the pause, which greys the whole
 	-- IA row from the top level anyway.
-	llm_ctx.state_getters["llm_toggle_ready"] = function() return ctx.paused ~= true end
+	llm_ctx.state_getters["llm_toggle_ready"] = function() return type(llm.toggle) == "function" and ctx.paused ~= true end
 
 	local rendered = ManifestMenu
 		and ManifestMenu.build("llm_menu", "LLM", dynamic_handlers, group_builders, llm_ctx, providers)
@@ -2856,7 +2845,7 @@ local function _build_llm(ctx)
 
 	-- The parent carries the same tick as the switch inside, for a user scanning
 	-- the top level; it cannot be clicked, which is why the switch is a row.
-	return { label = i18n_safe("menu.llm.title"), checked = enabled, submenu = items }
+	return NativeParent.finish(parent, items)
 end
 
 --- Builds the AI agent submenu (ui/menu/agent_rows.lua).
@@ -2865,7 +2854,7 @@ end
 local function _build_agent(ctx)
 	if not ManifestMenu then
 		Logger.error(LOG, "Manifest renderer unavailable — the AI agent submenu cannot be built.")
-		return { label = i18n_safe("menu.agent.title"), disabled = true }
+		return nil
 	end
 	return require("ui.menu.agent_rows").build(ctx, {
 		prompt = function(title, text, initial, hidden, choices)
@@ -3612,6 +3601,10 @@ local function _build_shortcuts(ctx)
 			end,
 			action_label = function(action, gestures) return gestures.get_action_label(action) end,
 			open_picker = open_action_picker, error = show_error,
+			prompt_delay = function(current, declared)
+				return TextPrompt.ask(i18n_safe("menu.tapholds.simultaneous_dialog_title"),
+					zenity_plain(string.format(i18n_safe("menu.tapholds.simultaneous_dialog_prompt"), declared)), tostring(current))
+			end,
 			prompt_hold = function(label, current, choices)
 				return TextPrompt.ask(label, zenity_plain(string.format(i18n_safe("menu.shortcuts.key_combinations_hold_hold"), current)), current, false, choices)
 			end,
@@ -4604,10 +4597,78 @@ local function _uninstall_command(ctx)
 	end
 end
 
+--- Checks raw dense arrays without triggering source metamethods.
+--- @param value table Source array.
+--- @param records boolean Whether its values must be plain records.
+--- @return boolean
+local function about_dense(value, records)
+	if type(value) ~= "table" or getmetatable(value) ~= nil then return false end
+	local count, maximum = 0, 0
+	for index, row in next, value do
+		if type(index) ~= "number" or index % 1 ~= 0 or index < 1 then return false end
+		if records and (type(row) ~= "table" or getmetatable(row) ~= nil) then return false end
+		count, maximum = count + 1, math.max(maximum, index)
+	end
+	return count == maximum
+end
+
+--- Admits the actual About source structure without interpreting choice grammar.
+--- @param renderer table|nil Actual manifest renderer.
+--- @param platform string Native platform token.
+--- @return table|nil root, table|nil top, table|nil children, table|nil parent, table|nil fields
+local function about_source(renderer, platform)
+	if type(renderer) ~= "table" or type(rawget(renderer, "get_root")) ~= "function"
+		or type(rawget(renderer, "build")) ~= "function" or type(rawget(renderer, "group_row")) ~= "function" then return nil end
+
+	local root = renderer.get_root()
+	if type(root) ~= "table" or getmetatable(root) ~= nil then return nil end
+	local top, children = rawget(root, "top_level"), rawget(root, "about_menu")
+	if not about_dense(top, true) or not about_dense(children, true) or #children == 0 then return nil end
+	local parent
+	for _, row in next, top do
+		if rawget(row, "id") == "about" then
+			if parent then return nil end
+			parent = row
+		end
+	end
+	if parent == nil or rawget(parent, "type") ~= "group" or rawget(parent, "label_prefix") ~= nil
+		or type(rawget(parent, "i18n")) ~= "string" or rawget(parent, "i18n") == ""
+		or not about_dense(rawget(parent, "rows"), true) then return nil end
+	local platforms = rawget(parent, "platforms")
+	if platforms ~= nil then
+		if not about_dense(platforms, false) then return nil end
+		local visible = false
+		for _, token in next, platforms do
+			if type(token) ~= "string" then return nil end
+			if token == platform then visible = true end
+		end
+		if not visible then return nil end
+	end
+	local fields = {}
+	for key, value in next, parent do fields[key] = value end
+	return root, top, children, parent, fields
+end
+
+--- Rechecks the captured direct parent fields without source metamethods.
+--- @param parent table Actual direct source row.
+--- @param fields table Captured raw field references and scalar values.
+--- @return boolean
+local function about_parent_unchanged(parent, fields)
+	for key, value in next, parent do
+		if not rawequal(value, rawget(fields, key)) then return false end
+	end
+	for key, value in next, fields do
+		if not rawequal(value, rawget(parent, key)) then return false end
+	end
+	return true
+end
+
 --- Builds the about item: the updater block, Versions and its GitHub page, then
 --- startup and Uninstall after a separator. Uninstall sat at the bottom of
 --- Configuration until 2026-09, where it read as one more setting.
 local function _build_about(ctx)
+	local root, top, section, parent, fields = about_source(ManifestMenu, "linux")
+	if root == nil then return nil end
 	local render_ctx = {}
 	for key, value in pairs(ctx) do render_ctx[key] = value end
 	render_ctx.commands = {
@@ -4647,6 +4708,9 @@ local function _build_about(ctx)
 		getters[key] = getter
 	end
 	getters["installed_build"] = function() return not Installation.is_source_run() end
+	getters["startup_command_available"] = function()
+		return require("ui.menu.start_at_login").command_available() ~= false
+	end
 	getters["start_at_login_enabled"] = function()
 		return require("ui.menu.start_at_login").enabled() == true
 	end
@@ -4657,7 +4721,12 @@ local function _build_about(ctx)
 			["about_updates"] = function() return _about_update_rows(ctx) end,
 		})
 		or {}
-	return { label = i18n_safe("menu.about.title"), submenu = rows }
+	if not about_dense(rows, true) then return nil end
+	local current_root, current_top, current_section, current_parent = about_source(ManifestMenu, "linux")
+	if not rawequal(root, current_root) or not rawequal(top, current_top)
+		or not rawequal(section, current_section) or not rawequal(parent, current_parent)
+		or not about_parent_unchanged(parent, fields) then return nil end
+	return ManifestMenu.group_row("top_level", "about", rows, render_ctx.state_getters)
 end
 
 --- Builds the reload item.
@@ -4950,6 +5019,9 @@ function M.build(ctx)
 					-- was promised and will not see. The bijection gate cannot catch it
 					-- here, because top_level rows carry no behaviour type.
 					Logger.error(LOG, "No builder for top-level row '%s' — the entry is missing.", tostring(id))
+				elseif row.disabled == true then
+					rows[#rows + 1] = { label = i18n_safe(row.i18n), disabled = true,
+						disabled_reason_key = row.reason_key }
 				elseif id == "quit" then
 					quit_row = build(ctx)
 				elseif ctx.paused == true and row.greyed_when_paused == true then

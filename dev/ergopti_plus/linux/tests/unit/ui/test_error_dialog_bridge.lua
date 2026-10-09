@@ -27,6 +27,12 @@ local ERRORS_FILE = HOME .. "/.local/state/ergopti_plus/logs/ErgoptiPlus_errors_
 --- @return table bridge, table context
 local function load_bridge(controls)
 	controls = controls or {}
+	local Json = require("json")
+	local function document(name)
+		local file = assert(io.open(helpers.driver_root() .. "/../_shared/modules/diagnostics/" .. name .. ".json", "rb"))
+		local value = Json.decode(file:read("*a")); assert(file:close()); return value
+	end
+	local sharing_schema = document("schema")
 	local context = {
 		deferred = {}, shown = 0, hidden = 0, pushed = {}, performed = {}, stored = {}, warnings = {},
 		notified = {}, epoch = nil, now = 0,
@@ -51,13 +57,15 @@ local function load_bridge(controls)
 		["ui.healthcheck.bridge"] = {
 			DRIVER = "linux",
 			config = function()
-				return { redaction = context.redaction, templates = {}, repository = {} }
+				return { redaction = context.redaction, templates = document("issue_templates"), repository = document("../updater/defaults").github, schema = sharing_schema }
 			end,
 			build_snapshot = function()
 				return {
+					driver = "linux",
 					generated_at = "2026-09-24T08:15:02Z",
+					probes = { appleevent_transport = { state = "error", native_status = -1744, ms = 12, cleanup = "settled" } },
 					sections = {
-						versions = { ergopti_version = "2.1.0", commit = "abc1234 (git)" },
+						versions = { ergopti_version = context.version or "2.1.0", commit = "abc1234 (git)" },
 						system = { os = "Fedora Linux 41" },
 						issues = { warn_count = 0, err_count = 1, recent = {} },
 						paths = { errors_today = ERRORS_FILE, diagnostics_dir = HOME .. "/diagnostics" },
@@ -95,6 +103,24 @@ local function load_bridge(controls)
 	local fh = io.open(helpers.driver_root() .. "/../_shared/modules/diagnostics/redaction.json", "rb")
 	context.redaction = require("json").decode(fh:read("*a"))
 	fh:close()
+
+
+	if controls.real_report then
+		package.loaded["ui.healthcheck.report"] = nil
+		local actual = require("ui.healthcheck.report")
+		package.loaded["ui.healthcheck.report"] = {
+			redaction_context = function() return actual.redaction_context({ identity = function() return { home = HOME, user = "synthetic" } end }) end,
+			perform = function(action, paths, documents, context_value, _, snapshot)
+				return actual.perform(action, paths, documents, context_value, {
+					copy = function(text)
+						context.copied = text
+						return controls.copy ~= false
+					end,
+					open_url = function(url) context.opened = url; return true end,
+				}, snapshot)
+			end,
+		}
+	end
 
 	local bridge = helpers.load_module("ui.error_dialog.bridge")
 	bridge.defer = function(fn, delay_ms)
@@ -253,7 +279,7 @@ helpers.describe("error window bridge (linux): page and actions (error-dialog-li
 			helpers.assert_eq(copy.action, "copy")
 			helpers.assert_eq(report.action, "report")
 			helpers.assert_eq(report.text, copy.text, "report sends the report copy sends")
-			helpers.assert_eq(report.fields.title, "keylogger: Flush failed: disk full")
+			helpers.assert_eq(report.fields.title, nil, "a shared title never contains free error text")
 			-- The host prefills the report itself and saves no file (report-focus)
 			helpers.assert_eq(report.name, nil, "a report names no file to save")
 			helpers.assert_eq(report.fields.diagnostics, nil, "the report field is filled from the text, not a summary")
@@ -336,6 +362,43 @@ helpers.describe("error window bridge (linux): crash notice (error-dialog-linux)
 			os.remove(dir .. "/.last_crash_notice")
 			os.remove(dir)
 			if not ok then error(err, 0) end
+		end)
+	end)
+end)
+
+
+helpers.describe("error window sharing uses the real report sink", function()
+	helpers.it("retains the host snapshot and excludes the local error from the issue (error-sharing-owner)", function()
+		with_bridge({ real_report = true }, function(bridge, context)
+			helpers.assert_true(bridge.report({ kind = "error", module = "synthetic", message = "CANARY-private.invalid/notes", time = "local" }))
+			helpers.assert_type(context.copied, "string")
+			helpers.assert_type(context.opened, "string")
+			helpers.assert_true(context.copied:find("CANARY", 1, true) == nil)
+			helpers.assert_true(context.opened:find("CANARY", 1, true) == nil)
+		end)
+		with_bridge({ real_report = true, copy = false }, function(bridge, context)
+			helpers.assert_eq(bridge.report({ kind = "error", module = "synthetic", message = "CANARY", time = "local" }), false)
+			helpers.assert_nil(context.opened, "clipboard refusal must prevent the browser")
+		end)
+	end)
+end)
+
+
+helpers.describe("error window retains its captured sharing identity", function()
+	helpers.it("keeps local details and shares its own snapshot after another collection (error-sharing-owner)", function()
+		with_bridge({ real_report = true }, function(bridge, context)
+			bridge.init()
+			bridge.on_error("synthetic", "Private sentinel", "CANARY-private.invalid/notes")
+			run_deferred(context)
+			local initial = bridge.on_message("ready", {}, page(context))
+			helpers.assert_true(initial.text:find("CANARY", 1, true) ~= nil, "local detail remains visible")
+			context.version = "9.9.9"
+			helpers.assert_true(bridge.on_message({ action = "copy", text = "forged" }, {}, page(context)).ok)
+			helpers.assert_type(context.copied, "string")
+			helpers.assert_true(context.copied:find("CANARY", 1, true) == nil)
+			helpers.assert_true(context.copied:find("2.1.0", 1, true) ~= nil)
+			helpers.assert_true(context.copied:find("9.9.9", 1, true) == nil)
+			helpers.assert_true(context.copied:find("-1744", 1, true) ~= nil, "admitted technical status remains useful")
 		end)
 	end)
 end)

@@ -38,6 +38,50 @@ python3 tests/hardware/atspi_fixture_app.py editor >/dev/null 2>&1 &
 PIDS="${PIDS} $!"
 sleep 2
 
+# Native virtual-keyboard custody runs before the timed tray/daemon host. Its
+# two explicit sources and output use real production FFI ports, then retire.
+luajit tests/hardware/run_modifier_custody.lua
+CUSTODY=$?
+# The input-owner prerequisite must cross real evdev/uinput descriptors too.
+# The existing subreaper retains its exact 40-second deadline and owned cleanup;
+# unavailable devices, missing bootstrap admission and any native failure refuse.
+if [ "${CUSTODY}" = "0" ]; then
+	python3 tests/hardware/run_native_subreaper.py luajit tests/hardware/run_input_owner_real.lua
+	CUSTODY=$?
+fi
+# Saved simultaneous configuration crosses the original Manager and publisher.
+# Its distinct kernel supplement retains the existing subreaper deadline.
+if [ "${CUSTODY}" = "0" ]; then
+	if [ "${GITHUB_ACTIONS:-}" = true ]; then
+		mode=full
+		if [ -z "${RUNNER_TEMP:-}" ]; then CUSTODY=2; fi
+		receipt="${RUNNER_TEMP:-}/stable-linux-simultaneous-native.json"
+		if [ "$CUSTODY" = "0" ]; then
+			node ../../../tools/ci/dev-release-qualification.cjs --scope linux-simultaneous-native --receipt "$receipt" || CUSTODY=$?
+		fi
+		if [ "$CUSTODY" = "0" ]; then
+			mode="$(node ../../../tools/ci/dev-release-qualification.cjs --scope linux-simultaneous-native --validate-scope-receipt "$receipt")" || CUSTODY=$?
+		fi
+	else
+		mode=full
+	fi
+	if [ "$CUSTODY" != "0" ]; then
+		: # The existing owned-host failure enclosure below performs cleanup.
+	elif [ "$mode" = deferred ]; then
+		echo '[DEFERRED] linux-simultaneous-native: qualified=false; saved-configuration supplement not executed.'
+	elif [ "$mode" = full ]; then
+		python3 tests/hardware/run_native_subreaper.py luajit tests/hardware/run_simultaneous_configuration_real.lua
+		CUSTODY=$?
+	else
+		CUSTODY=2
+	fi
+fi
+if [ "${CUSTODY}" != "0" ]; then
+	# shellcheck disable=SC2086
+	kill ${PIDS} 2>/dev/null
+	exit "${CUSTODY}"
+fi
+
 # A Cerebras-style API on loopback for the AI phase, answering with ASCII-escaped
 # JSON as Python servers do.
 LLM_READY="$(mktemp -u)"

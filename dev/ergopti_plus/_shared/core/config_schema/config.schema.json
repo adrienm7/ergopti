@@ -21,6 +21,24 @@
 			"additionalProperties": false,
 			"properties": { "enabled": { "type": "boolean" } }
 		},
+		"mod_combos": {
+			"description": "Linux simultaneous settings and known pair combo leaves; native source/output admission remains separately owned.",
+			"type": "object",
+			"additionalProperties": true,
+			"properties": {
+				"enabled": { "type": "boolean" },
+				"simultaneous_threshold_ms": { "type": "number", "exclusiveMinimum": 0 },
+				"symmetric": { "type": "boolean" },
+				"config": {
+					"type": "object",
+					"additionalProperties": {
+						"type": "object",
+						"additionalProperties": true,
+						"properties": { "combo": { "type": "string", "pattern": "^[a-z][a-z0-9_]*$" } }
+					}
+				}
+			}
+		},
 		"category_enabled": { "$ref": "#/$defs/category_enabled" },
 		"ui": { "$ref": "#/$defs/ui" }
 	},
@@ -348,7 +366,7 @@
 				"ergopti_base": { "type": "boolean" },
 				"direct_access_digits": { "type": "string", "enum": ["native", "digits", "symbols"] },
 				"ergopti_alt_gr": { "type": "boolean" },
-				"ergopti_plus": { "type": "boolean" },
+				"ergopti_variant": { "type": "string", "enum": ["none", "ergopti", "ergopti_plus"] },
 				"ctrl_magic_save": { "type": "boolean" },
 				"emulated_layout": { "type": "string", "pattern": "^([a-z][a-z0-9_]*)?$" }
 			}

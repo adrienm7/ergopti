@@ -174,7 +174,10 @@ _MI_StageTopLevel(TopLevel, Builders, IncludeFn := 0, StatusLabel := "") {
 		}
 		BootProfile_StageBegin("menu row " . Id)
 		try {
-			Builders[Id].Call()
+			if Entry.Get("disabled", false)
+				MenuRenderer_StageDisabledTopLevel(Entry)
+			else
+				Builders[Id].Call()
 			BootProfile_StageEnd("menu row " . Id)
 		} catch as Err {
 			BootProfile_StageAbort("menu row " . Id, Err.Message)
@@ -486,7 +489,8 @@ _MI_BuildAboutMenu(StartupCommand := 0, StartupState := 0) {
 	; A local version run from source has nothing to uninstall: the row stays,
 	; greyed, and says why (the manifest's disabled_reason_key).
 	StateGetters := Map("installed_build", () => !Updater_IsLocalSource(),
-		"start_at_login_enabled", StartupState)
+		"start_at_login_enabled", StartupState,
+		"startup_command_available", StartAtLoginCommandAvailable)
 	return MenuRenderer_Build("about_menu", "About", "", "", Providers, Commands, StateGetters)
 }
 

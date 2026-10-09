@@ -794,7 +794,7 @@ local function main()
 		-- which the engine never sees: its buffer no longer describes the line.
 		on_text_injected = function()
 			_undoable = nil
-			engine:reset()
+			engine:reset(false)
 		end,
 		defaults_path = require("infra.paths").shared("tap_hold/defaults.toml"),
 		user_path = require("infra.config_paths").config(require("platform.remap.tap_hold_writer").FILE_NAME),
@@ -858,7 +858,7 @@ local function main()
 			_last_offered = nil
 			if tooltip_preview then tooltip_preview.hide() end
 			if llm_overlay then llm_overlay.hide() end
-			engine:reset()
+			engine:reset(false)
 		end,
 	})
 	-- Close the input path before the hook starts, then publish a conclusive
@@ -869,7 +869,7 @@ local function main()
 		on_block = function()
 			_undoable = nil
 			_last_offered = nil
-			engine:reset()
+			engine:reset(false)
 			secure_focus_guard.invalidate()
 			if tooltip_preview then tooltip_preview.hide() end
 			if llm_overlay then llm_overlay.hide() end
@@ -1132,7 +1132,8 @@ local function main()
 				-- actually deliver (the static matcher has nothing for "@…"), and the
 				-- bubble renders the first row undimmed.
 				if dyn_hotstrings and type(dyn_hotstrings.preview_candidates) == "function" then
-					local extra = dyn_hotstrings.preview_candidates(engine:current_buffer())
+					local extra = dyn_hotstrings.preview_candidates(engine:current_buffer(),
+						engine:buffer_starts_at_word_boundary())
 					for index = #extra, 1, -1 do
 						table.insert(candidates, 1, extra[index])
 					end
@@ -1176,6 +1177,7 @@ local function main()
 		-- heap allocation, and the buffer does not change between the two calls.
 		if prediction_engine or (dyn_hotstrings and dyn_hotstrings.is_enabled()) then
 			local buf = engine:current_buffer()
+			local start_is_boundary = engine:buffer_starts_at_word_boundary()
 			if prediction_engine then
 				pcall(function()
 					prediction_engine.on_char(ch, buf, {
@@ -1191,7 +1193,7 @@ local function main()
 			-- take precedence over dynamic expansions.
 			if dyn_hotstrings and dyn_hotstrings.is_enabled() and not result then
 				local ok_dh2, expanded, dynamic_event = pcall(function()
-					return dyn_hotstrings.on_trigger(buf, ch)
+					return dyn_hotstrings.on_trigger(buf, ch, start_is_boundary)
 				end)
 				if ok_dh2 and expanded then
 					if dynamic_event and not dynamic_event.pending_user then
@@ -1645,7 +1647,23 @@ local function main()
 		capture_owned_scancodes[scancode] = nil
 	end)
 
+	-- Retain the selected inverse publisher before any source-acquisition callback.
+	local capture_layout = keyboard_layout
+	local capture_publish, capture_ready = keyboard_layout.publish_current_capture, keyboard_layout.is_ready
+	local capture_override = opts.keymap
+	local function publish_reacquired_capture()
+		local function current()
+			return package.loaded["adapters.keyboard_layout"] == capture_layout
+				and capture_layout.publish_current_capture == capture_publish
+				and capture_layout.is_ready == capture_ready and opts.keymap == capture_override
+		end
+		if not current() or type(capture_publish) ~= "function" or type(capture_ready) ~= "function" then return false end
+		if capture_publish(capture_override) ~= true or not current() then return false end
+		return capture_ready() == true and current()
+	end
+
 	keyboard_hook.start({
+		onCaptureReacquired = publish_reacquired_capture,
 		device = device,
 		pinned = opts.device ~= nil,
 		layout = opts.layout,
@@ -1666,6 +1684,8 @@ local function main()
 		-- which is why the measurement lives there and the accounting here.
 		onHold = on_hold,
 		onEmitRaw  = injector.emit_key,
+		outputBroker = injector.output_broker(),
+		requireOutputBroker = opts.grab == true,
 	})
 	Logger.info(LOG, "Keyboard hook started in %s mode.",
 		opts.grab and "INTERCEPT (device grabbed)" or "OBSERVE (--no-grab)")
@@ -1674,6 +1694,29 @@ local function main()
 		Logger.error(LOG, "Keyboard hook failed to start — exiting.")
 		print("Error: could not start the keyboard hook.")
 		os.exit(1)
+	end
+	-- start() recreates capture and seeds CapsLock from the acquired keyboard.
+	-- Publish the selected inverse on that exact state before any input is pumped.
+	do
+		local await_retirement = event_loop.run
+		local publication, ready, running = keyboard_layout.publish_current_capture,
+			keyboard_layout.is_ready, keyboard_hook.isRunning
+		local ok, published = pcall(function()
+			return type(publication) == "function" and publication(opts.keymap) == true
+				and running() == true and ready() == true
+		end)
+		if not ok or published ~= true or keyboard_layout.publish_current_capture ~= publication
+			or keyboard_layout.is_ready ~= ready or keyboard_hook.isRunning ~= running
+			or event_loop.run ~= await_retirement
+			or running() ~= true then
+			shutdown.request("startup layout publication refused", "startup layout publication refused")
+			if shutdown.is_pending() then
+				await_retirement({ onIdle = shutdown.poll, onPeriodic = shutdown.poll, periodSec = 0.25 })
+			end
+			if shutdown.is_pending() then error("Startup native cleanup remains unacknowledged", 0) end
+			if injector.close_fast_channel() ~= true then error("Startup output retirement remains unacknowledged", 0) end
+			error("Current capture inverse publication refused at startup", 0)
+		end
 	end
 	BootProfiler.stage_done("input hooks", string.format("mode %s, layout %s",
 		tostring(keyboard_hook.get_mode and keyboard_hook.get_mode() or "unknown"),
@@ -2214,7 +2257,7 @@ local function main()
 			_undoable = nil
 			if tooltip_preview then tooltip_preview.hide() end
 			if llm_overlay then llm_overlay.hide() end
-			engine:reset()
+			engine:reset(false)
 			_cached_app_id = (type(appName) == "string" and appName ~= "" and appName) or nil
 			-- The private-browsing verdict is computed HERE, off the input path.
 			-- The title was previously received and discarded, which is why the

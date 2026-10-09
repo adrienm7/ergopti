@@ -242,14 +242,19 @@ local function perform(session, name)
 	if name == "close" then return close(session) end
 	local Report = require("ui.healthcheck.report")
 	local action
+	local shared
+	if name == "copy" or name == "report" then
+		shared = require("healthcheck.share").document(session.snapshot, session.documents.schema,
+			require("infra.i18n").get(session.documents.schema.share_policy.notice_key))
+	end
 	if name == "copy" then
-		action = { action = "copy", text = session.report.text }
+		action = { action = "copy", text = shared.text }
 	elseif name == "report" then
-		action = { action = "report", text = session.report.text, fields = session.report.fields }
+		action = { action = "report", text = shared.text, fields = shared.fields }
 	else
 		action = { action = "open_path", id = session.open_id }
 	end
-	local result = Report.perform(action, session.paths, session.documents, session.redaction.context)
+	local result = Report.perform(action, session.paths, session.documents, session.redaction.context, nil, session.snapshot)
 	send(session, { type = "action", action = name, ok = result.ok == true, missing = result.missing == true })
 end
 
@@ -278,7 +283,7 @@ end
 
 --- The report of one error, from the diagnostics snapshot.
 --- @param record table { kind, module, message, time, log_path?, open_id? }
---- @return table session fields { report, paths, documents, redaction, log_path, open_id }
+--- @return table session fields { report, snapshot, paths, documents, redaction, log_path, open_id }
 local function build_report(record)
 	local Core = require("ui.healthcheck.core")
 	local HealthReport = require("ui.healthcheck.report")
@@ -314,6 +319,7 @@ local function build_report(record)
 	if type(log_path) ~= "string" or log_path == "" then error("the file this error is logged in is unknown") end
 	return {
 		report    = report,
+		snapshot  = snapshot,
 		paths     = paths,
 		documents = documents,
 		redaction = { rules = documents.redaction, context = HealthReport.redaction_context() },
@@ -504,9 +510,11 @@ function M.report(record)
 			tostring(fields))
 		return false
 	end
+	local shared = require("healthcheck.share").document(fields.snapshot, fields.documents.schema,
+		require("infra.i18n").get(fields.documents.schema.share_policy.notice_key))
 	local result = require("ui.healthcheck.report").perform(
-		{ action = "report", text = fields.report.text, fields = fields.report.fields },
-		fields.paths, fields.documents, fields.redaction.context)
+		{ action = "report", text = shared.text, fields = shared.fields },
+		fields.paths, fields.documents, fields.redaction.context, nil, fields.snapshot)
 	return result.ok == true
 end
 

@@ -15,10 +15,11 @@
 
 local helpers = require("tests.helpers")
 local Json = require("json")
+local Share = require("healthcheck.share")
 
 local HOME = "/Users/jdoe"
 local LOGS = HOME .. "/Library/Logs/ergopti_plus"
-local NAME = "ergopti-diagnostics-macos-2.4.0-20260924T100000Z.md"
+local NAME = "ergopti-diagnostics-macos-2026-09-24T10_00_00Z.md"
 local REPORT = "# ErgoptiPlus diagnostics\n\nconfig_dir: /Users/jdoe/.config/ergopti_plus (jdoe)\n"
 
 --- Reads a shared JSON document.
@@ -97,6 +98,25 @@ local function paths()
 	}
 end
 
+local function host_snapshot(long)
+	local snapshot = { schema_version = 2, driver = "macos", generated_at = "2026-09-24T10:00:00Z",
+		sections = { versions = { ergopti_version = "2.4.0" }, issues = { recent = REPORT } },
+		probes = { github_api = { state = "error", cleanup = "pending", ms = 1 } } }
+	if long then
+		snapshot.retired_probes = {}
+		for index = 1, 300 do
+			snapshot.retired_probes[index] = { probes = { github_api = { state = "timeout", cleanup = "unknown", ms = index } } }
+		end
+	end
+	return snapshot
+end
+
+local function approved_text(long)
+	local config = documents()
+	return Share.document(host_snapshot(long), config.schema,
+		require("infra.i18n").get(config.schema.share_policy.notice_key)).text
+end
+
 --- Performs one action as the bridge does.
 --- @param action table
 --- @return table result, table calls
@@ -104,7 +124,14 @@ local function perform(action, adjust)
 	local Report, calls, overrides = load_report()
 	if adjust then adjust(overrides) end
 	local context = Report.redaction_context(overrides)
-	return Report.perform(action, paths(), documents(), context, overrides), calls
+	local snapshot = host_snapshot(type(action.text) == "string" and #action.text > documents().templates.max_url_bytes)
+	if action.action == "copy" or action.action == "save" or action.action == "report" then
+		local request = {}
+		for key, value in pairs(action) do request[key] = value end
+		request.text = approved_text(type(action.text) == "string" and #action.text > documents().templates.max_url_bytes)
+		action = request
+	end
+	return Report.perform(action, paths(), documents(), context, overrides, snapshot), calls
 end
 
 helpers.describe("healthcheck page actions (report-bug-flow)", function()
@@ -114,13 +141,13 @@ helpers.describe("healthcheck page actions (report-bug-flow)", function()
 		} })
 		helpers.assert_eq(result.ok, true)
 		helpers.assert_eq(#calls.copy, 1)
-		helpers.assert_eq(calls.copy[1], "# ErgoptiPlus diagnostics\n\nconfig_dir: ~/.config/ergopti_plus (<user>)\n")
+		helpers.assert_eq(calls.copy[1], approved_text(false))
 		helpers.assert_eq(result.path, nil, "a report names no file")
 
 		local url = calls.open_url[1]
 		helpers.assert_eq(query_value(url, "diagnostics"), calls.copy[1],
 			"the form's diagnostics field is the report the clipboard holds")
-		helpers.assert_eq(query_value(url, "os"), "macOS 15.1 (~)")
+		helpers.assert_eq(query_value(url, "os"), "macos")
 		local repo = documents().repository
 		local prefix = "https://github.com/" .. repo.owner .. "/" .. repo.repo .. "/issues/new?template=bug_report.yml&"
 		helpers.assert_eq(url:sub(1, #prefix), prefix)
@@ -241,7 +268,7 @@ helpers.describe("healthcheck debug menu reports (report-bug-flow)", function()
 			DRIVER = "macos",
 			config = documents,
 			run = function()
-				return { sections = { versions = { ergopti_version = "2.4.0" }, system = { os = "macOS 15.1" } } }
+				return { driver = "macos", sections = { versions = { ergopti_version = "2.4.0" }, system = { os = "macOS 15.1" } } }
 			end,
 		}
 		helpers.assert_eq(Report.suggest_feature(overrides), true)
@@ -251,8 +278,33 @@ helpers.describe("healthcheck debug menu reports (report-bug-flow)", function()
 			.. "/issues/new?template=feature_request.yml&"
 		helpers.assert_eq(calls.open_url[1]:sub(1, #prefix), prefix)
 		helpers.assert_contains(calls.open_url[1], "version=2.4.0")
-		helpers.assert_contains(calls.open_url[1], "os=macOS%2015.1")
+		helpers.assert_contains(calls.open_url[1], "os=macos")
 		helpers.assert_contains(calls.open_url[1], "driver=macos")
 		helpers.assert_eq(#calls.copy, 0, "a feature request copies nothing")
+	end)
+end)
+
+
+helpers.describe("closed diagnostic sharing corpus", function()
+	helpers.it("excludes synthetic private fields on all driver snapshots", function()
+		local corpus = shared_json("tests/corpus/healthcheck/share_vectors.json")
+		local config = documents()
+		for _, vector in ipairs(corpus.vectors) do
+			local document = Share.document(vector.snapshot, config.schema,
+				require("infra.i18n").get(config.schema.share_policy.notice_key))
+			for _, canary in ipairs(vector.canaries) do
+				helpers.assert_true(not document.text:find(canary, 1, true), vector.name)
+			end
+			local readable = document.text:match("^(.-)```json")
+			for _, id in ipairs({ "versions", "hardware", "system", "input", "ai", "permissions", "issues" }) do
+				assert(readable:find("## " .. require("infra.i18n").get("healthcheck.section." .. id), 1, true), "readable section omitted")
+			end
+			assert(readable:find("| probes.appleevent_transport.native_status | -1744 |", 1, true))
+			assert(readable:find("| probes.appleevent_transport.cleanup | pending |", 1, true))
+			assert(readable:find("| retired_probes.1.probes.appleevent_transport.cleanup | unknown |", 1, true))
+			helpers.assert_eq(document.snapshot.probes.appleevent_transport.state, "timeout")
+			helpers.assert_eq(document.snapshot.probes.appleevent_transport.cleanup, "pending")
+			helpers.assert_eq(document.snapshot.probes.appleevent_transport.native_status, -1744)
+		end
 	end)
 end)

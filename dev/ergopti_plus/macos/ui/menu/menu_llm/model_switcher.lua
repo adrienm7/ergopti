@@ -482,9 +482,11 @@ function M.new(ctx)
 		req_token = req_token + 1
 		local my_token = req_token
 		local request_backend = state.llm_backend
+		local configuration_only = type(opts) == "table" and opts.configuration_only == true
 		local request_pause_epoch = pause_epoch()
 		local terminal_sent = false
 		local function stale_reason()
+			if configuration_only and state.llm_enabled ~= false then return "enabled" end
 			if state.llm_backend ~= request_backend then return "backend" end
 			if my_token ~= req_token then return "request" end
 			if pause_epoch() ~= request_pause_epoch then return "pause_epoch" end
@@ -544,6 +546,9 @@ function M.new(ctx)
 			return settle_requirements(on_fail,
 				"Model requirements failure continuation", ...)
 		end
+		-- Configuration while off commits the same identity transaction without
+		-- provisioning a runtime. Enabling later owns its readiness checks.
+		if configuration_only then return deliver_ok() end
 		local check_ok, accepted = Logger.callback(LOG, "Model requirements dispatch",
 			models_mgr.check_requirements, model_name,
 			function(...)
@@ -1484,7 +1489,7 @@ function M.new(ctx)
 			-- Requirements failed — restore predictions so the user is not left stranded
 			Logger.warn(LOG, string.format("switch_model('%s') failed — restoring predictions.", tostring(new_model)))
 			return restore_prediction_lock(false)
-		end, nil, function(reason)
+		end, { configuration_only = state.llm_enabled == false }, function(reason)
 			-- A superseding model request owns the existing prediction lock. A
 			-- backend change does not necessarily launch another model request, so
 			-- it must release the lock captured by this abandoned MLX switch.

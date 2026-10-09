@@ -171,41 +171,96 @@ _CBRF_ApplyStillWorksWhenReadable() {
 ; covered ("it bailed for some unrelated reason") is closed instead by asserting
 ; the refusal's own distinct return value — the only other early exit,
 ; !_DriverReady, returns nothing — and by the positional assertion below.
-_CBRF_SaveDeclinesWhileFlagged() {
+_CBRF_CaptureSaveRuntime() {
+	global ConfigurationFile, _DriverReady, _ConfigBootReadFailed
+	return Map("path_set", IsSet(ConfigurationFile),
+		"path", IsSet(ConfigurationFile) ? ConfigurationFile : "",
+		"ready_set", IsSet(_DriverReady), "ready", IsSet(_DriverReady) ? _DriverReady : false,
+		"flag_set", IsSet(_ConfigBootReadFailed),
+		"flag", IsSet(_ConfigBootReadFailed) ? _ConfigBootReadFailed : false)
+}
+
+_CBRF_RestoreSaveRuntime(Runtime) {
+	global ConfigurationFile, _DriverReady, _ConfigBootReadFailed
+	if Runtime["path_set"]
+		ConfigurationFile := Runtime["path"]
+	else
+		ConfigurationFile := unset
+	if Runtime["ready_set"]
+		_DriverReady := Runtime["ready"]
+	else
+		_DriverReady := unset
+	if Runtime["flag_set"]
+		_ConfigBootReadFailed := Runtime["flag"]
+	else
+		_ConfigBootReadFailed := unset
+}
+
+_CBRF_SaveDeclinesWhileFlagged(FailAfterRefusal := false) {
 	global _ConfigBootReadFailed, ConfigurationFile, _DriverReady
 	Target := A_Temp . "\ergopti_test_cbrf_save_" . A_TickCount . ".toml"
-	try FileDelete(Target)
-	; Content that is unmistakably the user's, so any rewrite is visible.
-	FileAppend("[layout]`nenabled = false`n", Target, "UTF-8")
-	Before := FileRead(Target, "UTF-8")
+	Runtime := _CBRF_CaptureSaveRuntime()
+	Coordinator := _ConfigFullSaveCoordinator()
+	BeforeProperties := Map()
+	for Name, Value in ObjOwnProps(Coordinator)
+		BeforeProperties[Name] := Value
+	try {
+		try FileDelete(Target)
+		; Content that is unmistakably the user's, so any rewrite is visible.
+		FileAppend("[layout]`nenabled = false`n", Target, "UTF-8")
+		Before := FileRead(Target, "UTF-8")
+		; The explicit refusal records intent in this fixture's own coordinator.
+		; Restore the caller's exact obligation instead of draining or clearing it.
+		_ConfigFullSaveCoordinator({
+			requested_generation: 0, committed_generation: 0, settled_generation: 0,
+			terminal_required_generation: 0, bound_path: "", bound_path_key: "",
+			reload_required: false, timer_armed: false, reported_failure_generation: 0
+		})
+		ConfigurationFile     := Target
+		_DriverReady          := true
+		_ConfigBootReadFailed := true
+		Threw   := ""
+		Refused := ""
+		try Refused := SaveFullConfig()
+		catch as e
+			Threw := e.Message
+		After := FileRead(Target, "UTF-8")
+		Assert(Threw == "",
+			"SaveFullConfig must DECLINE cleanly, not throw: it runs from a boot timer where an exception is invisible. Got: " . Threw)
+		Assert(Refused == false,
+			"SaveFullConfig must return false when it refuses, so the refusal is distinguishable from the !_DriverReady deferral (which returns nothing) and from a save that ran")
+		Assert(After == Before,
+			"SaveFullConfig must not rewrite config.toml while _ConfigBootReadFailed is set — the tree it would serialize is manifest defaults, and writing it destroys every setting the user had")
 
-	PrevFile  := IsSet(ConfigurationFile) ? ConfigurationFile : ""
-	PrevReady := IsSet(_DriverReady) ? _DriverReady : false
-	PrevFlag  := IsSet(_ConfigBootReadFailed) ? _ConfigBootReadFailed : false
-
-	ConfigurationFile     := Target
-	_DriverReady          := true
-	_ConfigBootReadFailed := true
-	Threw   := ""
-	Refused := ""
-	try Refused := SaveFullConfig()
-	catch as e
-		Threw := e.Message
-
-	ConfigurationFile     := PrevFile
-	_DriverReady          := PrevReady
-	_ConfigBootReadFailed := PrevFlag
-
-	After := FileRead(Target, "UTF-8")
-	try FileDelete(Target)
-
-	Assert(Threw == "",
-		"SaveFullConfig must DECLINE cleanly, not throw: it runs from a boot timer where an exception is invisible. Got: " . Threw)
-	Assert(Refused == false,
-		"SaveFullConfig must return false when it refuses, so the refusal is distinguishable from the !_DriverReady deferral (which returns nothing) and from a save that ran")
-	Assert(After == Before,
-		"SaveFullConfig must not rewrite config.toml while _ConfigBootReadFailed is set — the tree it would serialize is manifest defaults, and writing it destroys every setting the user had")
+		State := _ConfigFullSaveCoordinator()
+		AssertEqual(1, State.requested_generation, "the real refused explicit save still owns one accepted intent")
+		AssertEqual(1, State.terminal_required_generation, "refusing serialization does not abandon mandatory intent")
+		AssertEqual(0, State.committed_generation, "the refused fixture has no disk ACK")
+		AssertEqual(0, State.settled_generation, "the refused fixture has not settled its intent")
+		AssertTrue(_ConfigFullSaveHasPending(), "accepted intent stays pending within its own fixture")
+		AssertEqual(Target, State.bound_path, "the accepted intent belongs to the physical fixture source")
+		AssertEqual(_ConfigWriteLeaseKey(Target), State.bound_path_key)
+		AssertFalse(State.timer_armed, "boot refusal must not arm a retry timer")
+		AssertFalse(State.reload_required)
+		AssertEqual(0, State.reported_failure_generation)
+		if FailAfterRefusal
+			throw Error("CBRF fixture cleanup control after genuine refusal")
+	} finally {
+		_ConfigFullSaveCoordinator(Coordinator)
+		_CBRF_RestoreSaveRuntime(Runtime)
+		try FileDelete(Target)
+	}
+	AssertTrue(_ConfigFullSaveCoordinator() == Coordinator, "normal cleanup restores the exact caller coordinator")
+	AfterProperties := Map()
+	for Name, Value in ObjOwnProps(Coordinator)
+		AfterProperties[Name] := Value
+	AssertEqual(BeforeProperties.Count, AfterProperties.Count)
+	for Name, Value in BeforeProperties {
+		AssertTrue(AfterProperties.Has(Name), "cleanup preserves every caller coordinator field")
+		AssertEqual(Value, AfterProperties[Name], "cleanup leaves caller coordinator fields unchanged")
+	}
 }
+
 
 ; Positional guard: the refusal is only worth anything if it happens BEFORE the
 ; file is replaced. A guard that drifts below the write (or below the Updates
@@ -381,3 +436,47 @@ _CBRF_CurrentSourceReceiptGuardMutations() {
 }
 Test("meta config-boot-read-failed: actual captured-source receipt rejects nonexecutable authority",
 	_CBRF_CurrentSourceReceiptGuardMutations)
+
+; Preserve an existing caller obligation through both successful assertions and
+; a deliberately thrown assertion-path error after the same real refusal.
+_CBRF_SaveFixtureRestoresPendingCaller() {
+	Runtime := _CBRF_CaptureSaveRuntime()
+	Coordinator := _ConfigFullSaveCoordinator()
+	Caller := {
+		requested_generation: 7, committed_generation: 3, settled_generation: 3,
+		terminal_required_generation: 7, bound_path: A_Temp . "\ergopti_cbrf_caller.toml",
+		bound_path_key: _ConfigWriteLeaseKey(A_Temp . "\ergopti_cbrf_caller.toml"),
+		reload_required: true, timer_armed: true, reported_failure_generation: 2
+	}
+	BeforeProperties := Map()
+	for Name, Value in ObjOwnProps(Caller)
+		BeforeProperties[Name] := Value
+	try {
+		_ConfigFullSaveCoordinator(Caller)
+		for FailAfterRefusal in [false, true] {
+			Threw := ""
+			try _CBRF_SaveDeclinesWhileFlagged(FailAfterRefusal)
+			catch as Err
+				Threw := Err.Message
+			AssertEqual(FailAfterRefusal ? "CBRF fixture cleanup control after genuine refusal" : "", Threw)
+			AssertTrue(_ConfigFullSaveCoordinator() == Caller, "cleanup must restore the original caller object after either exit")
+			AfterProperties := Map()
+			for Name, Value in ObjOwnProps(Caller)
+				AfterProperties[Name] := Value
+			AssertEqual(BeforeProperties.Count, AfterProperties.Count)
+			for Name, Value in BeforeProperties {
+				AssertTrue(AfterProperties.Has(Name))
+				AssertEqual(Value, AfterProperties[Name], "foreign pending intent must not be cleared, acknowledged or rebound")
+			}
+			AssertTrue(_ConfigFullSaveHasPending(), "cleanup retains the caller's own preexisting pending obligation")
+			RestoredRuntime := _CBRF_CaptureSaveRuntime()
+			for Name, Value in Runtime
+				AssertEqual(Value, RestoredRuntime[Name], "cleanup restores runtime values and definedness after either exit")
+		}
+	} finally {
+		_ConfigFullSaveCoordinator(Coordinator)
+		_CBRF_RestoreSaveRuntime(Runtime)
+	}
+}
+Test("meta config-boot-read-failed: refused save fixture preserves caller intent on normal and throwing exits",
+	_CBRF_SaveFixtureRestoresPendingCaller)

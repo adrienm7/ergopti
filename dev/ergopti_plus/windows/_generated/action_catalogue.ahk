@@ -126,6 +126,7 @@ GestureActionCatalogueData() {
 	Items.Push({ Kind: "action", Id: "llm_screen_region" })
 	Items.Push({ Kind: "action", Id: "llm_screen_full" })
 	Items.Push({ Kind: "action", Id: "llm_screen_error" })
+	Items.Push({ Kind: "action", Id: "llm_translate_context" })
 	Items.Push({ Kind: "action", Id: "llm_translate_selection" })
 	Items.Push({ Kind: "action", Id: "llm_agent_selection" })
 	Items.Push({ Kind: "action", Id: "llm_agent_command" })
@@ -286,6 +287,7 @@ GestureActionCatalogueData() {
 	Actions["llm_tone_more_familiar_cycle"] := { Family: "sg", LabelKey: "sg_actions.llm_tone_more_familiar_cycle", Parameter: "", Confirm: false }
 	Actions["llm_tone_more_formal"] := { Family: "sg", LabelKey: "sg_actions.llm_tone_more_formal", Parameter: "", Confirm: false }
 	Actions["llm_tone_more_formal_cycle"] := { Family: "sg", LabelKey: "sg_actions.llm_tone_more_formal_cycle", Parameter: "", Confirm: false }
+	Actions["llm_translate_context"] := { Family: "sg", LabelKey: "sg_actions.llm_translate_context", Parameter: "llm_language", Confirm: false }
 	Actions["llm_translate_selection"] := { Family: "sg", LabelKey: "sg_actions.llm_translate_selection", Parameter: "llm_language", Confirm: false }
 	Actions["lock_screen"] := { Family: "sg", LabelKey: "sg_actions.lock_screen", Parameter: "", Confirm: false }
 	Actions["maximize"] := { Family: "sg", LabelKey: "sg_actions.maximize", Parameter: "", Confirm: false }

@@ -6,6 +6,8 @@ local Transaction = require("config_scope_transaction")
 local Shared = require("tap_hold.key_combinations")
 local Writer = require("toml_codec.writer")
 local Codec = require("toml_codec")
+local KeyPath = require("toml_codec.key_path")
+local Updates = require("shortcuts.physical_availability")
 local M = {}
 local retained, sequence, session_busy = nil, 0, false
 --- Creates one exact ordered-pair publication owner. Native and source
@@ -26,6 +28,14 @@ function M.new(options)
 		return type(entry) == "table" and entry.type == "boolean" and entry.default == true
 	end
 	local gate_value, frame, published_frame, publication_acked
+	local chord_operations, no_op_frame
+	local function chord_declared()
+		if type(manifest.find_entry_by_path) ~= "function" or type(manifest.sparse_operation) ~= "function" then return false end
+		local delay = manifest.find_entry_by_path("mod_combos.simultaneous_threshold_ms")
+		local symmetry = manifest.find_entry_by_path("mod_combos.symmetric")
+		return type(delay) == "table" and delay.type == "number"
+			and type(symmetry) == "table" and symmetry.type == "boolean"
+	end
 	local owner, pair_held, parameter_held, busy, acquisition_debt, retiring = {}, false, false, false, false, false
 	local function identify_parameters()
 		local called, snapshot = pcall(parameters.parameter_configuration_snapshot, owner)
@@ -133,9 +143,36 @@ function M.new(options)
 				assert(mode == "configured" and type(gate_value) == "boolean")
 				return { presets = {}, operations = {manifest.sparse_operation("category_enabled.key_combinations",gate_value)} }
 			end
+			if scope == "key_combinations_chord" then
+				assert(mode == "configured" and type(chord_operations) == "table")
+				return {presets={},operations=chord_operations}
+			end
 			return manifest.scope_plan(scope,mode,...)
 		end},
-		owned_paths=function() return {} end,capture=capture,restore=install,
+		owned_paths=function()
+			if type(combinations.configuration_entries) ~= "function" then return {} end
+			local paths = {}
+			local function dynamic(path)
+				-- Declared scalar features are already planned by the manifest; only
+				-- its dynamic leaves belong in the runtime-owned path inventory.
+				if type(manifest.find_entry_by_path)~="function" or manifest.find_entry_by_path(path)==nil then
+					paths[#paths+1]=path
+				end
+			end
+			for _,entry in ipairs(combinations.configuration_entries()) do
+				dynamic(Shared.TAP_SECTION.."."..entry.id)
+				dynamic(Shared.HOLD_SECTION.."."..entry.id)
+				dynamic(KeyPath.render({"mod_combos","config",entry.id,"combo"}))
+			end
+			local params = parameters.parameter_configuration_snapshot(owner)
+			for key in pairs(params or {}) do
+				if parameter_row(key) then paths[#paths+1] = KeyPath.render({"gesture_parameters",key}) end
+			end
+			return paths
+		end,owners={action_parameter_domain=function(path)
+			local parts=KeyPath.parse(path,true)
+			return parts and #parts==2 and parts[1]=="gesture_parameters" and parameter_row(parts[2]) and "combination" or nil
+		end},capture=capture,restore=install,
 		prepare_batch=function(target,rows,files)
 			local prepared, detail, candidate, source = Writer.prepare_batch(target,rows,files)
 			local expected = options.expected_source
@@ -151,6 +188,11 @@ function M.new(options)
 				if combinations.configuration_domain(Shared.BINDING_SCOPE.."__"..row.key) ~= "combination" then return false end
 				local kind = row.section == Shared.TAP_SECTION and "tap" or "hold"
 				return row.delete == true or combinations.validate_slot(kind,row.key,row.value) == true
+			end
+			local parts=KeyPath.parse(row.section,true)
+			if parts and #parts==3 and parts[1]=="mod_combos" and parts[2]=="config" and row.key=="combo" then
+				return chord_declared() and combinations.configuration_domain(Shared.BINDING_SCOPE.."__"..parts[3]) == "combination"
+					and (row.delete == true or combinations.validate_slot("combo",parts[3],row.value) == true)
 			end
 			if row.section == "gesture_parameters" then
 				local owned,action = parameter_row(row.key)
@@ -186,6 +228,7 @@ function M.new(options)
 	local function perform(operation)
 		if owner.pending() then return false end
 		busy = true
+		no_op_frame = nil
 		local observed, paused = pcall(options.is_paused)
 		if not observed or paused ~= false then busy = false; return false end
 		if options.expected_source then
@@ -200,7 +243,7 @@ function M.new(options)
 		end
 		local called, committed = pcall(operation)
 		if not transaction.pending() and (pair_held or parameter_held or fence_held) then
-			local released, settled = pcall(release)
+			local released, settled = pcall(release,called and committed==true and no_op_frame or nil)
 			if not released or settled ~= true then acquisition_debt = true end
 		end
 		busy = false
@@ -208,7 +251,8 @@ function M.new(options)
 		return false,"Combination configuration publication refused."
 	end
 	function owner.edit(rows)
-		if type(rows) ~= "table" then return false end
+		rows=Updates.capture_updates(rows)
+		if rows==nil then return false end
 		return perform(function() return transaction.apply_updates("shortcuts",rows) end)
 	end
 	function owner.set_enabled(enabled)
@@ -217,6 +261,55 @@ function M.new(options)
 			gate_value = enabled
 			return transaction.apply("key_combinations_gate","configured")
 		end)
+	end
+	--- Publishes typed Linux settings through the same retained native/file inverse.
+	--- Neutral defaults remain sparse; no operation changes either master switch.
+	function owner.set_chord_settings(values)
+		if not chord_declared() or type(values) ~= "table" or getmetatable(values) ~= nil then return false end
+		for key in pairs(values) do if key ~= "simultaneous_threshold_ms" and key ~= "combo_symmetric" then return false end end
+		local called, settings = pcall(Shared.chord_settings,values)
+		if not called then return false end
+		return perform(function()
+			chord_operations = {
+				manifest.sparse_operation("mod_combos.simultaneous_threshold_ms",settings.simultaneous_threshold_ms),
+				manifest.sparse_operation("mod_combos.symmetric",settings.combo_symmetric),
+			}
+			return transaction.apply("key_combinations_chord","configured")
+		end)
+	end
+	--- Plans from the currently held canonical file, never cached menu slots.
+	function owner.copy_taps_to_chords()
+		if not chord_declared() or type(combinations.configuration_entries) ~= "function"
+			or type(combinations.chord_settings) ~= "function" then return false end
+		return perform(function()
+			local captured = combinations.configuration_source(owner)
+			if type(captured) ~= "table" then return false end
+			local plan = Shared.plan_chord_copy(captured.status=="ok" and captured.content or "",{
+				entries=combinations.configuration_entries(),settings=combinations.chord_settings(),tap_section=Shared.TAP_SECTION,
+				is_action=function(action)
+					-- Every known participant must be admitted by the actual source owner.
+					for _,entry in ipairs(combinations.configuration_entries()) do
+						if combinations.validate_slot("combo",entry.id,action) ~= true then return false end
+					end
+					return true
+				end,
+			})
+			if combinations.configuration_source_matches(owner,captured) ~= true then return false end
+			if plan.changes == 0 then
+				local doc=captured.status=="ok" and Codec.decode(captured.content) or {}
+				if parameters.parameter_configuration_matches(owner,doc,function() return true end)~=true
+					or combinations.configuration_source_matches(owner,captured)~=true then return false end
+				no_op_frame=captured
+				return true
+			end
+			chord_operations=plan.rows
+			return transaction.apply("key_combinations_chord","configured")
+		end)
+	end
+	--- Clears/restores only declared known pair leaves; unknown records stay intact.
+	function owner.apply(mode)
+		if (mode ~= "clear" and mode ~= "recommended") or not chord_declared() then return false end
+		return perform(function() return transaction.apply("key_combinations",mode) end)
 	end
 	--- Settles the original exact tokens; no successor may replace their debt.
 	--- @return boolean settled
@@ -297,9 +390,23 @@ function M.retry_restore()
 	return called and settled == true
 end
 function M.edit(rows,is_paused,expected_source)
+	rows=Updates.capture_updates(rows);if rows==nil then return false end
 	return operate(is_paused,expected_source,function(owner) return owner.edit(rows) end)
 end
 function M.set_enabled(enabled,is_paused,expected_source)
 	return operate(is_paused,expected_source,function(owner) return owner.set_enabled(enabled) end)
+end
+function M.set_chord_settings(values,is_paused,expected_source)
+	if type(values)~="table" or getmetatable(values)~=nil then return false end
+	for key in pairs(values) do if key~="simultaneous_threshold_ms" and key~="combo_symmetric" then return false end end
+	local called,detached=pcall(Shared.chord_settings,values);if not called then return false end
+	values=detached
+	return operate(is_paused,expected_source,function(owner) return owner.set_chord_settings(values) end)
+end
+function M.copy_taps_to_chords(is_paused,expected_source)
+	return operate(is_paused,expected_source,function(owner) return owner.copy_taps_to_chords() end)
+end
+function M.apply(mode,is_paused,expected_source)
+	return operate(is_paused,expected_source,function(owner) return owner.apply(mode) end)
 end
 return M

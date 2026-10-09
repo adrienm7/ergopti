@@ -13,6 +13,7 @@ local helpers = require("tests.helpers")
 local MODULES = {
 	"infra.i18n",
 	"infra.logger",
+	"infra.fs_dir",
 	"infra.notifications",
 	"infra.text_utils",
 	"modules.llm.ollama_binary",
@@ -37,6 +38,7 @@ local function with_fixture(options, callback)
 	local saved_hs = _G.hs
 	local saved = {}
 	for _, name in ipairs(MODULES) do saved[name] = package.loaded[name] end
+	package.loaded["infra.fs_dir"] = nil
 
 	local pulls = {}
 	local progress = { shows = 0, completes = 0, aborts = 0, retry_starts = 0 }

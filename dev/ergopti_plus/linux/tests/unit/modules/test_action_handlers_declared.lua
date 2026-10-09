@@ -86,6 +86,7 @@ local function run_every_action(Gestures, ids, configure)
 	local saved = {
 		debug = Logger.debug, warn = Logger.warn,
 		emitter = package.loaded["modules.gestures.combo_emitter"],
+		manager = package.loaded["modules.gestures.manager"],
 		shortcuts = package.loaded["modules.shortcuts.manager"],
 		webview = package.loaded["ui.webview_manager"], popen = io.popen,
 	}
@@ -105,7 +106,8 @@ local function run_every_action(Gestures, ids, configure)
 		return { read = function() return "selection" end, close = function() return true end }
 	end
 	local ok, err = pcall(with_recorded_shell, function()
-		if configure then configure() end
+		Gestures = helpers.load_module("modules.gestures.manager")
+		if configure then configure(Gestures) end
 		for _, id in ipairs(ids) do
 			current = id
 			Gestures.execute_action(id, "test__slot")
@@ -113,6 +115,7 @@ local function run_every_action(Gestures, ids, configure)
 	end)
 	Logger.debug, Logger.warn = saved.debug, saved.warn
 	package.loaded["modules.gestures.combo_emitter"] = saved.emitter
+	package.loaded["modules.gestures.manager"] = saved.manager
 	package.loaded["modules.shortcuts.manager"] = saved.shortcuts
 	package.loaded["ui.webview_manager"] = saved.webview
 	io.popen = saved.popen
@@ -128,7 +131,7 @@ helpers.describe("linux actions: every action this driver declares runs", functi
 		helpers.assert_true(#Gestures.LINUX_DECLARED_ACTIONS > 70,
 			"the shared catalogue must be read, or this loop proves nothing")
 		helpers.assert_true(#ids >= #Gestures.LINUX_DECLARED_ACTIONS)
-		local unknown = run_every_action(Gestures, ids, function()
+		local unknown = run_every_action(Gestures, ids, function(Gestures)
 			local noop = function() end
 			local script = require("modules.shortcuts.script_actions").new({ reset = noop, reload = noop, quit = noop })
 			local handlers = require("modules.shortcuts.action_handlers").compose(script.handlers,
@@ -470,7 +473,8 @@ helpers.describe("linux actions: modifier chords", function()
 	--- Runs `body` with a fake open uinput device, a hook holding nothing and
 	--- a layout answering `shortcut_keycode`, and restores all three.
 	local function with_fake_device(shortcut_keycode, body)
-		local names = { "adapters.uinput_writer", "adapters.keyboard_hook", "adapters.keyboard_layout" }
+		local names = { "adapters.uinput_writer", "adapters.keyboard_hook", "adapters.keyboard_layout",
+			"modules.gestures.combo_emitter", "modules.gestures.manager" }
 		local saved = {}
 		for _, name in ipairs(names) do saved[name] = package.loaded[name] end
 		local writer = helpers.load_module("tests.fakes").uinput_writer()
@@ -481,7 +485,9 @@ helpers.describe("linux actions: modifier chords", function()
 			held_shortcut_modifier_codes = function() return {} end,
 		}
 		package.loaded["adapters.keyboard_layout"] = { shortcut_keycode = shortcut_keycode }
-		local ok, err = pcall(body, writer)
+		helpers.load_module("modules.gestures.combo_emitter")
+		local Gestures = helpers.load_module("modules.gestures.manager")
+		local ok, err = pcall(body, writer, Gestures)
 		for _, name in ipairs(names) do package.loaded[name] = saved[name] end
 		if not ok then error(err, 0) end
 	end
@@ -500,7 +506,7 @@ helpers.describe("linux actions: modifier chords", function()
 			"only %d chord(s) read from the catalogue; this check would prove nothing", #chords))
 		local Gestures = helpers.load_module("modules.gestures.manager")
 		for _, chord in ipairs(chords) do
-			with_fake_device(us_position, function(writer)
+			with_fake_device(us_position, function(writer, Gestures)
 				with_recorded_shell(function(commands)
 					Gestures.execute_action(chord.id, "tap_hold")
 					helpers.assert_eq(#commands, 0, chord.id .. " must not shell out: `xdotool key` "
@@ -530,8 +536,14 @@ helpers.describe("linux actions: modifier chords", function()
 				local writer = helpers.load_module("tests.fakes").uinput_writer()
 				local saved = package.loaded["adapters.uinput_writer"]
 				package.loaded["adapters.uinput_writer"] = writer
+				local saved_emitter = package.loaded["modules.gestures.combo_emitter"]
+				local saved_manager = package.loaded["modules.gestures.manager"]
+				helpers.load_module("modules.gestures.combo_emitter")
+				local Gestures = helpers.load_module("modules.gestures.manager")
 				with_recorded_shell(function(commands)
 					Gestures.execute_action(chord.id, "tap_hold")
+					package.loaded["modules.gestures.combo_emitter"] = saved_emitter
+					package.loaded["modules.gestures.manager"] = saved_manager
 					package.loaded["adapters.uinput_writer"] = saved
 					helpers.assert_eq(#commands, 1, chord.id .. " with no uinput device runs xdotool once")
 					local keys = commands[1]:match("^xdotool key (%S+)")
@@ -556,7 +568,7 @@ helpers.describe("linux actions: modifier chords", function()
 		local LIVE = { a = 101, ["1"] = 102, ["."] = 103, [","] = 104 }
 		local Gestures = helpers.load_module("modules.gestures.manager")
 		for _, case in ipairs({ { "ctrl_a", "a" }, { "ctrl_1", "1" }, { "ctrl_period", "." }, { "ctrl_comma", "," } }) do
-			with_fake_device(function(char, us_code) return LIVE[char] or us_code end, function(writer)
+			with_fake_device(function(char, us_code) return LIVE[char] or us_code end, function(writer, Gestures)
 				Gestures.execute_action(case[1], "tap_hold")
 				helpers.assert_eq(trail(writer.events), string.format("29:1 %d:1 %d:0 29:0", LIVE[case[2]],
 					LIVE[case[2]]), case[1] .. " must press the key the layout types " .. case[2] .. " on")
@@ -594,9 +606,21 @@ helpers.describe("linux actions: workspace switch", function()
 		local Display = require("infra.display_server")
 		local Shell = require("adapters.shell_runner")
 		local saved = package.loaded["modules.gestures.combo_emitter"]
+		local saved_writer = package.loaded["adapters.uinput_writer"]
+		if not uinput_ok then
+			-- The false branch means a genuinely closed controlled Writer, not a
+			-- failed native send. Admit the issuer only after that actual owner.
+			package.loaded["adapters.uinput_writer"] = require("tests.fakes").uinput_writer()
+		end
+		local unavailable_emitter = helpers.load_module("modules.gestures.combo_emitter")
 		local pressed, switched, commands = {}, {}, {}
 		package.loaded["modules.gestures.combo_emitter"] = {
-			press = function(combo) pressed[#pressed + 1] = combo; return uinput_ok end,
+			press = function(combo)
+				pressed[#pressed + 1] = combo
+				if uinput_ok then return true end
+				return unavailable_emitter.press(combo)
+			end,
+			can_fallback = unavailable_emitter.can_fallback,
 		}
 		Display._set_for_test(Display.X11, "xfce")
 		Shell._set_runner(function(cmd)
@@ -615,6 +639,7 @@ helpers.describe("linux actions: workspace switch", function()
 		Shell._reset_runner()
 		Display._set_for_test(nil, nil)
 		package.loaded["modules.gestures.combo_emitter"] = saved
+		package.loaded["adapters.uinput_writer"] = saved_writer
 		if not ok then error(err, 0) end
 		return switched, pressed, commands
 	end
@@ -710,9 +735,17 @@ helpers.describe("linux actions: media and brightness keys", function()
 	--- @return table pressed The combos pressed on the virtual keyboard.
 	local function run(action, tool_ok, uinput_ok)
 		local saved = package.loaded["modules.gestures.combo_emitter"]
+		local saved_writer = package.loaded["adapters.uinput_writer"]
+		if not uinput_ok then package.loaded["adapters.uinput_writer"] = require("tests.fakes").uinput_writer() end
+		local unavailable_emitter = helpers.load_module("modules.gestures.combo_emitter")
 		local pressed, commands = {}, {}
 		package.loaded["modules.gestures.combo_emitter"] = {
-			press = function(combo) pressed[#pressed + 1] = combo; return uinput_ok end,
+			press = function(combo)
+				pressed[#pressed + 1] = combo
+				if uinput_ok then return true end
+				return unavailable_emitter.press(combo)
+			end,
+			can_fallback = unavailable_emitter.can_fallback,
 		}
 		local real = os.execute
 		os.execute = function(cmd)
@@ -725,6 +758,7 @@ helpers.describe("linux actions: media and brightness keys", function()
 		end)
 		os.execute = real
 		package.loaded["modules.gestures.combo_emitter"] = saved
+		package.loaded["adapters.uinput_writer"] = saved_writer
 		if not ok then error(err, 0) end
 		return commands, pressed
 	end

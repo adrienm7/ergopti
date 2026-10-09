@@ -112,7 +112,9 @@ helpers.describe("keymap: one clock read and no wasted allocation per keystroke"
 		local at = code:find("local function onKeyDownRaw", 1, true)
 		helpers.assert_true(at ~= nil, "onKeyDownRaw must exist")
 
-		local body = code:sub(at, at + 1600)
+		local finish_at = code:find("\nlocal function merge_returned_events", at, true)
+		helpers.assert_true(finish_at ~= nil, "the next top-level function must bound the complete keydown handler")
+		local body = code:sub(at, finish_at - 1)
 		local reads = 0
 		for _ in body:gmatch("hs%.timer%.secondsSinceEpoch%(%)") do reads = reads + 1 end
 		helpers.assert_eq(reads, 1,

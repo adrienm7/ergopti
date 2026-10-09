@@ -772,7 +772,7 @@ local function ensure_ollama_running(options)
 					-- Funnel Ollama stdout/stderr into the unified Ergopti log behind an
 					-- [OLLAMA-SERVER] prefix. The shared builder captures only the stable
 					-- directory; its shell loop derives the dated filename for every line.
-					local ollama_bin, binary_err = OllamaBinary.resolve()
+					local ollama_bin, binary_err, source_kind = OllamaBinary.resolve()
 					if my_generation ~= _ollama_start_generation or not _ollama_starting then return end
 					if not ollama_bin then
 						fail_start("server executable resolution", binary_err)
@@ -783,7 +783,7 @@ local function ensure_ollama_running(options)
 						return
 					end
 					local launch_cmd, command_err = OllamaServerCommand.build(
-						ollama_bin, Logger.today_log_path(), resolve_ollama_port())
+						ollama_bin, Logger.today_log_path(), resolve_ollama_port(), source_kind)
 					if my_generation ~= _ollama_start_generation or not _ollama_starting then return end
 					if not launch_cmd then
 						fail_start("server command creation", command_err)

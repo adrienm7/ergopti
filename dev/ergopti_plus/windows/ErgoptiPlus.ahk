@@ -385,6 +385,7 @@ BootProfile_Stamp("Diagnostics and core state initialised")
 #Include adapters/network_info.ahk
 #Include adapters/keyboard_hook.ahk
 #Include adapters/llm_nav_event_owner.ahk
+#Include adapters/llm_automation.ahk
 #Include adapters/mouse_control.ahk
 #Include adapters/window_manager.ahk
 #Include adapters/system_control.ahk
@@ -1469,6 +1470,11 @@ if (_DriverStartupSmokeDir != "") {
 		; deliberately bypasses production teardown and OnExit callbacks.
 		if IsSet(_DriverStartupSmokeInspect)
 				_DriverStartupSmokeInspect.Call()
+		; The compiled save observer uses the accepted boot obligation itself;
+		; neither resident teardown nor a source-only wrapper proves this boundary.
+		if EnvGet("ERGOPTI_STARTUP_SMOKE_FULL_SAVE") == "1"
+				StartupSmokePublishFullSave(_DriverStartupSmokeDir,
+						EnvGet("ERGOPTI_STARTUP_SMOKE_NONCE"))
 		if !LoggerPrepareShutdown(&_StartupSmokeLoggerRefusal) {
 				; The smoke already retains stdout on failure; never enqueue more debt.
 				try FileAppend("startup-smoke-logger-refusal: phase="

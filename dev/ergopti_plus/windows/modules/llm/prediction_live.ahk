@@ -90,8 +90,11 @@ LLM_Engine_LiveOverride() {
 	global _LLM_Live
 	if !_LLM_Live["active"]
 		return 0
-	return Map("profile_id", _LLM_Live["profile_id"],
+	Override := Map("profile_id", _LLM_Live["profile_id"],
 		"num_predictions", _LLM_Live["num_predictions"], "live", true)
+	if _LLM_Live.Has("translation_target")
+		Override["translation_target"] := _LLM_Live["translation_target"]
+	return Override
 }
 
 /**
@@ -111,17 +114,23 @@ LLM_Engine_LiveDebounceMs() {
  * @param {String} ProfileId The prompt to run.
  * @param {Integer} NumPredictions A count of its own, 0 for the menu's.
  */
-LLM_Engine_LiveStart(ProfileId, NumPredictions := 0) {
+LLM_Engine_LiveStart(ProfileId, NumPredictions := 0, TranslationTarget := "") {
 	global _LLM_Live
 	; Throws on a caller bug before anything changes
-	Checked := _LLM_Engine_NormalizePromptOverride(Map("profile_id", ProfileId,
-		"num_predictions", NumPredictions))
+	Override := Map("profile_id", ProfileId, "num_predictions", NumPredictions)
+	if (TranslationTarget != "")
+		Override["translation_target"] := TranslationTarget
+	Checked := _LLM_Engine_NormalizePromptOverride(Override)
 	Config := LLM_Live_Config()
 	WasActive := _LLM_Live["active"]
 	; A debounce armed by the last keystroke holds the previous prompt
 	LLM_Engine_CancelTimer()
 	_LLM_Live["profile_id"] := Checked["profile_id"]
 	_LLM_Live["num_predictions"] := Checked["num_predictions"]
+	if _LLM_Live.Has("translation_target")
+		_LLM_Live.Delete("translation_target")
+	if Checked.Has("translation_target")
+		_LLM_Live["translation_target"] := Checked["translation_target"]
 	_LLM_Live["active"] := true
 	LoggerInfo("LLM", "Live mode {1} with '{2}' ({3} prediction(s), {4} ms debounce, {5} minimum word(s)).",
 		WasActive ? "moved" : "on", Checked["profile_id"],
@@ -138,6 +147,8 @@ LLM_Engine_LiveStop(Reason) {
 	global _LLM_Live
 	if !_LLM_Live["active"]
 		return false
+	if _LLM_Live.Has("translation_target")
+		_LLM_Live.Delete("translation_target")
 	_LLM_Live["active"] := false
 	_LLM_Live["profile_id"] := ""
 	_LLM_Live["num_predictions"] := 0

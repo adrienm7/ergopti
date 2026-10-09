@@ -247,3 +247,35 @@ _CMR_TargetAdmissionAllowsOwnedRemoval() {
 }
 Test("config migrate records: target proof permits owned removal and refuses conflicting additions (config-migrate-record-target-deltas)",
 	_CMR_TargetAdmissionAllowsOwnedRemoval)
+
+
+_CMR_VariantJointRecordsCase() {
+	Registry := _CMG_VariantRegistry()
+	Inputs := [
+		'[[layout]]`nergopti_plus = true`nergopti_base = false`nergopti_alt_gr = false`nemulated_layout = ""`n',
+		'[layout]`nergopti_plus = true`n"ergopti_base" = false`nergopti_alt_gr = false`nemulated_layout = ""`n',
+		'layout = { ergopti_plus = true, ergopti_base = false, ergopti_alt_gr = false, emulated_layout = "" }`n',
+		'[layout]`nergopti_plus = true`nergopti_base = false`nergopti_alt_gr = false`n[layout.emulated_layout]`nfuture = "retained"`n',
+		'[layout]`nergopti_plus = true`nergopti_base = false`nergopti_alt_gr = false`n[layout.ergopti_variant]`nfuture = "retained"`n'
+	]
+	for Source in Inputs {
+		Plan := ConfigMigratePlan(Source, Registry, "ahk")
+		AssertFalse(Plan.Has("candidate"), "non-addressable joint participants cannot produce a publication candidate")
+		AssertTrue(Plan["outcome"] != "migrated")
+		AssertContains(Plan["detail"], "refused", "the actual source/record owner explains its refusal")
+	}
+	Source := '; private header remains byte-exact`n[layout]`nergopti_plus = true # recognized old overlay`n'
+		. 'ergopti_base = false`nergopti_alt_gr = false`nemulated_layout = ""`n'
+		. '[private]`nopaque = "retain exactly" # unrelated owner`n'
+	Plan := ConfigMigratePlan(Source, Registry, "ahk")
+	AssertEqual("migrated", Plan["outcome"], Plan["detail"])
+	AssertEqual("ergopti_plus", Plan["model"]["layout"]["ergopti_variant"])
+	AssertFalse(Plan["model"]["layout"]["ergopti_base"].Value)
+	AssertFalse(Plan["model"]["layout"]["ergopti_alt_gr"].Value)
+	AssertEqual("", Plan["model"]["layout"]["emulated_layout"])
+	AssertContains(Plan["candidate"], '; private header remains byte-exact`n')
+	AssertContains(Plan["candidate"], '[private]`nopaque = "retain exactly" # unrelated owner`n')
+	AssertFalse(InStr(Plan["candidate"], "ergopti_plus ="), "only the recognized historical source is consumed")
+}
+Test("config migrate records: every joint variant participant retains its semantic and physical owner (todo96-helper-variant)",
+	_CMR_VariantJointRecordsCase)

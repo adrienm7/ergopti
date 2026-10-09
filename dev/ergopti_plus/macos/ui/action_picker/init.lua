@@ -274,6 +274,15 @@ function M.open(opts, on_confirm)
 	end
 	session.webview = webview
 	_webview = webview
+	local automation_ok, automation = pcall(require, "adapters.apple_shortcuts_native")
+	ProgramProviderPicker.capture_automation(session.providers, automation_ok and automation or nil, function(packet)
+		if _active_session ~= session or session.closing or not session.webview then return end
+		payload.automationProviders = packet
+		local encoded, data = pcall(hs.json.encode, packet)
+		if encoded and type(data) == "string" then
+			pcall(function() session.webview:evaluateJavaScript("updateAutomationProviders(" .. data .. ")") end)
+		end
+	end)
 	Logger.info(LOG, "Action picker opened (%d item(s)).", #payload.items)
 	return true
 end

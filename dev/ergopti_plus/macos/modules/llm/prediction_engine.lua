@@ -816,6 +816,7 @@ end
 function M.set_llm_backend_name(label)
 	llm_backend_label = label
 	Logger.debug(LOG, "Backend label: '%s'.", tostring(label))
+	return true
 end
 
 function M.set_llm_context_length(l)
@@ -1637,7 +1638,14 @@ function M.perform_check(force_trigger, profile_name, continuation_guard, reques
 			return
 		end
 		-- Looked up again at every request: the prompt may have been edited or deleted
-		local lookup_ok, live_profile = xpcall(core_llm.find_profile, debug.traceback, live.profile_id)
+		local lookup_ok, live_profile = xpcall(function()
+			if live.translation_target ~= nil then
+				local translation = require("modules.llm.selection_translation")
+				return require("llm.translate").prediction_profile(live.translation_target,
+					translation.config(), translation.locale_names(), i18n.get_locale())
+			end
+			return core_llm.find_profile(live.profile_id)
+		end, debug.traceback)
 		if not lookup_ok then
 			Logger.error(LOG, "Live prompt lookup raised — request aborted: %s", tostring(live_profile))
 			return
@@ -2136,7 +2144,14 @@ function M.request_prompt_prediction(value)
 		show_refusal_notice(reason, MANUAL_REFUSAL_KEYS[reason])
 		return false
 	end
-	local lookup_ok, profile = xpcall(core_llm.find_profile, debug.traceback, parsed.profile_id)
+	local lookup_ok, profile = xpcall(function()
+		if parsed.translation_target ~= nil then
+			local translation = require("modules.llm.selection_translation")
+			return require("llm.translate").prediction_profile(parsed.translation_target,
+				translation.config(), translation.locale_names(), i18n.get_locale())
+		end
+		return core_llm.find_profile(parsed.profile_id)
+	end, debug.traceback)
 	if not lookup_ok then
 		Logger.error(LOG, "Prompt profile lookup raised: %s.", tostring(profile))
 		return false
@@ -2411,7 +2426,14 @@ function M.start_live_prompt(value)
 		show_refusal_notice(reason, MANUAL_REFUSAL_KEYS[reason])
 		return false
 	end
-	local lookup_ok, profile = xpcall(core_llm.find_profile, debug.traceback, parsed.profile_id)
+	local lookup_ok, profile = xpcall(function()
+		if parsed.translation_target ~= nil then
+			local translation = require("modules.llm.selection_translation")
+			return require("llm.translate").prediction_profile(parsed.translation_target,
+				translation.config(), translation.locale_names(), i18n.get_locale())
+		end
+		return core_llm.find_profile(parsed.profile_id)
+	end, debug.traceback)
 	if not lookup_ok then
 		Logger.error(LOG, "Live prompt lookup raised: %s.", tostring(profile))
 		return false
@@ -2426,7 +2448,8 @@ function M.start_live_prompt(value)
 		Logger.error(LOG, "Live mode not started: the visible predictions could not be cleared.")
 		return false
 	end
-	_live = { profile_id = parsed.profile_id, num_predictions = parsed.num_predictions }
+	_live = { profile_id = parsed.profile_id, num_predictions = parsed.num_predictions,
+		translation_target = parsed.translation_target }
 	local count = parsed.num_predictions or num_predictions
 	Logger.info(LOG, "Live mode on with '%s' (%d prediction(s), debounce %dms).",
 		parsed.profile_id, count, math.floor(LIVE_CONFIG.debounce_sec * 1000 + 0.5))
@@ -2465,7 +2488,8 @@ end
 --- @return table|nil live { profile_id, num_predictions } (nil count = the menu's), or nil when off.
 function M.get_live_prompt()
 	if not _live then return nil end
-	return { profile_id = _live.profile_id, num_predictions = _live.num_predictions }
+	return { profile_id = _live.profile_id, num_predictions = _live.num_predictions,
+		translation_target = _live.translation_target }
 end
 
 --- Clears all active predictions and fully resets the prediction pipeline state.

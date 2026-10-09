@@ -3,7 +3,7 @@
 --- ==============================================================================
 --- MODULE: Live Mode (Linux)
 --- DESCRIPTION:
---- The llm_live_prompt_toggle action and the AI menu's live submenu redirect
+--- The retained llm_live_prompt_toggle action redirects
 --- the automatic typing trigger to a chosen prompt: with translate_en the
 --- tooltip shows the sentence being typed in English, and Tab replaces it.
 ---
@@ -213,11 +213,13 @@ end
 
 --- Asserts the menu's profile, count and trigger were left exactly as they were.
 --- @param world table
-local function assert_menu_untouched(world)
-	helpers.assert_eq(world.preferences.values["llm.profiles.active"], "basic", "the stored menu profile")
+--- @param expected_profile string|nil Explicit manual selection, or the original profile.
+local function assert_menu_untouched(world, expected_profile)
+	expected_profile = expected_profile or "basic"
+	helpers.assert_eq(world.preferences.values["llm.profiles.active"], expected_profile, "the stored menu profile")
 	helpers.assert_eq(world.preferences.values["llm.profiles.num_predictions"], 3, "the stored menu count")
 	helpers.assert_eq(world.preferences.values["llm.trigger.debounce_ms"], nil, "the menu's debounce")
-	helpers.assert_eq(require("modules.llm.profile_settings").get("active"), "basic", "the live menu profile")
+	helpers.assert_eq(require("modules.llm.profile_settings").get("active"), expected_profile, "the live menu profile")
 end
 
 --- The notice live mode shows when it starts with a built-in.
@@ -600,7 +602,7 @@ end)
 -- ==============================
 -- ==============================
 
-helpers.describe("live mode: the AI menu's submenu", function()
+helpers.describe("live mode: one normal profile chooser and retained prompt actions", function()
 
 	--- Finds the first rendered row with this title.
 	local function find(rows, title)
@@ -611,50 +613,45 @@ helpers.describe("live mode: the AI menu's submenu", function()
 		end
 	end
 
-	helpers.it("lists Off then every rewrite prompt, checks the live one, and drives the same state", function()
+	helpers.it("has one profile chooser, keeps prompt actions and retires their override on explicit selection", function()
 		scenario({ stored = {
 			["llm.user_profiles"] = require("modules.llm.profile_registry_codec").encode({
 				{ id = "user_pirate", label = "Pirate", system_single = "Rewrite as a pirate.\nREWRITE: <text>", batch = false },
 				{ id = "user_plain", label = "Plain", system_single = "Continue.", batch = false },
 			}),
 		} }, function(world)
-			local menu_builder = helpers.load_module("ui.menu.menu_builder")
+			local builder = helpers.load_module("ui.menu.menu_builder")
 			local rebuilt = 0
 			local ctx = { llm = world.engine, on_menu_changed = function() rebuilt = rebuilt + 1 end }
 			local i18n = require("infra.i18n")
-			local ProfileSettings = require("modules.llm.profile_settings")
-			local submenu = find(menu_builder.build(ctx), i18n.get("menu.llm.live_mode_title"))
-			helpers.assert_not_nil(submenu, "the AI menu has the live submenu")
-			local titles = {}
-			for index, row in ipairs(submenu.menu) do titles[index] = row.title end
-			local expected = { i18n.get("menu.llm.live_mode_off") }
+			local settings = require("modules.llm.profile_settings")
+			local rows = builder.build(ctx)
+			helpers.assert_nil(find(rows, i18n.get("menu.llm.live_mode_title")), "the retired second profile chooser stays absent")
 			for _, id in ipairs({ "rewrite", "tone_familiar", "tone_neutral", "tone_formal", "tone_very_formal",
-				"translate_en", "translate_ja" }) do
-				expected[#expected + 1] = ProfileSettings.menu_label(ProfileSettings.resolve_id(id), 3)
+				"translate_en", "translate_ja", "basic" }) do
+				helpers.assert_not_nil(find(rows, settings.menu_label(settings.resolve_id(id), 3)), "the normal chooser retains " .. id)
 			end
-			expected[#expected + 1] = "Pirate"
-			helpers.assert_eq(table.concat(titles, "|"), table.concat(expected, "|"),
-				"Off, the rewrite built-ins in menu order, then the user's rewrite prompts only")
-			helpers.assert_eq(submenu.menu[1].checked, true, "Off is checked")
-
-			find(submenu.menu, expected[7]).fn()
-			helpers.assert_eq(world.engine.get_live().profile_id, "translate_en", "choosing a prompt turns it on")
-			helpers.assert_eq(world.engine.get_live().num_predictions, nil, "with the menu's count")
-			helpers.assert_eq(rebuilt, 1, "the menu redraws")
-			submenu = find(menu_builder.build(ctx), i18n.get("menu.llm.live_mode_title"))
-			helpers.assert_eq(submenu.menu[7].checked, true, "the live prompt is checked")
-			helpers.assert_true(submenu.menu[1].checked ~= true, "Off is not")
-
-			helpers.assert_eq(world.handlers.llm_live_prompt_toggle("tap_3", "translate_en"), true,
-				"the action shares the menu's state")
-			helpers.assert_eq(world.engine.get_live(), nil, "and turned it off")
-			find(submenu.menu, "Pirate").fn()
-			helpers.assert_eq(world.engine.get_live().profile_id, "user_pirate", "a custom rewrite prompt runs too")
-			find(submenu.menu, i18n.get("menu.llm.live_mode_off")).fn()
-			helpers.assert_eq(world.engine.get_live(), nil, "Off turns it off")
+			helpers.assert_not_nil(find(rows, "Pirate")); helpers.assert_not_nil(find(rows, "Plain"))
+			helpers.assert_eq(world.handlers.llm_live_prompt_toggle("tap_3", "translate_en"), true)
+			helpers.assert_eq(world.engine.get_live().profile_id, "translate_en")
+			helpers.assert_eq(world.engine.get_live().num_predictions, nil, "the retained shortcut uses the normal count")
 			assert_menu_untouched(world)
+			helpers.assert_eq(world.handlers.llm_live_prompt_toggle("tap_3", "translate_en"), true)
+			helpers.assert_nil(world.engine.get_live(), "the retained action stops its own override")
+			helpers.assert_eq(world.handlers.llm_live_prompt_toggle("tap_3", "user_pirate"), true)
+			helpers.assert_eq(world.engine.get_live().profile_id, "user_pirate", "custom rewrite prompts still run")
+			local use = find(find(builder.build(ctx), "Pirate").menu, i18n.get("menu.profiles.use_profile"))
+			helpers.assert_not_nil(use, "the real custom profile command is retained")
+			helpers.assert_eq(use.fn(), true, "the exact manual command confirms selection")
+			helpers.assert_nil(world.engine.get_live(), "manual selection cannot remain hidden by the shortcut override")
+			helpers.assert_eq(rebuilt, 1)
+			rows = builder.build(ctx)
+			helpers.assert_eq(find(find(rows, "Pirate").menu, i18n.get("menu.profiles.use_profile")).checked, true)
+			helpers.assert_nil(find(rows, i18n.get("menu.llm.live_mode_title")))
+			assert_menu_untouched(world, "user_pirate")
 		end)
 	end)
+
 end)
 
 
@@ -691,7 +688,7 @@ helpers.describe("live mode: the daemon tells the engine", function()
 end)
 
 
-helpers.describe("declared Linux live Off choice", function()
+helpers.describe("manual profile selection retires retained Linux live actions", function()
 	local function find_off(menu, label)
 		for _, row in ipairs(menu or {}) do
 			if row.title == label then return row end
@@ -700,8 +697,12 @@ helpers.describe("declared Linux live Off choice", function()
 		end
 	end
 
-	helpers.it("returns exact native ACK and never redraws a refused cancellation", function()
-		scenario({}, function(world)
+	helpers.it("requires exact stop ACK before profile persistence and never redraws a refused cancellation", function()
+		scenario({ stored = {
+			["llm.user_profiles"] = require("modules.llm.profile_registry_codec").encode({
+				{ id = "user_pirate", label = "Pirate", system_single = "Rewrite. REWRITE: <text>", batch = false },
+			}),
+		} }, function(world)
 			local builder = helpers.load_module("ui.menu.menu_builder")
 			local i18n = require("infra.i18n")
 			local file = assert(io.open(helpers.driver_root() .. "/../_shared/tests/corpus/menus/llm_live_off.json", "r"))
@@ -711,56 +712,80 @@ helpers.describe("declared Linux live Off choice", function()
 			helpers.assert_true(world.engine.set_live("translate_en"))
 			local before = world.engine.get_live()
 			local setter = world.engine.set_live
+			local function selected_row()
+				local rows = builder.build(ctx)
+				helpers.assert_nil(find_off(rows, i18n.get("menu.llm.live_mode_title")))
+				local parent = find_off(rows, "Pirate")
+				helpers.assert_not_nil(parent)
+				return find_off(parent.menu, i18n.get("menu.profiles.use_profile"))
+			end
 			for _, refusal in ipairs(spec.refusals) do
-				world.engine.set_live = function()
+				world.engine.set_live = function(value)
+					helpers.assert_nil(value, "manual selection asks the exact existing owner to stop")
 					calls = calls + 1
 					if refusal == "throw" then error("owned live refusal") end
 					if refusal == "number" then return 2 end
 					if refusal == "nil" then return nil end
 					return false
 				end
-				local row = find_off(builder.build(ctx), i18n.get(spec.label_key))
-				helpers.assert_not_nil(row)
+				local row = selected_row(); helpers.assert_not_nil(row)
 				local invoked, receipt = pcall(row.fn)
-				observed[#observed + 1] = { refusal = refusal, invoked = invoked, receipt = receipt,
-					state = world.engine.get_live() }
+				observed[#observed + 1] = { refusal = refusal, invoked = invoked, receipt = receipt, state = world.engine.get_live() }
+				assert_menu_untouched(world)
 			end
-			helpers.assert_eq(redraws, 0, "refusal must not claim an applied change, including a truthy non-ACK")
+			helpers.assert_eq(redraws, 0, "a truthy non-ACK cannot claim an applied profile change")
 			for _, outcome in ipairs(observed) do
-				if outcome.refusal == "throw" then helpers.assert_eq(outcome.invoked, false)
-				else helpers.assert_eq(outcome.invoked, true); helpers.assert_eq(outcome.receipt, false) end
+				helpers.assert_eq(outcome.invoked, true, "the menu owner reports each owned stop refusal")
+				helpers.assert_eq(outcome.receipt, false)
 				helpers.assert_eq(outcome.state, before)
 			end
 			world.engine.set_live = setter
-			local row = find_off(builder.build(ctx), i18n.get(spec.label_key))
-			helpers.assert_eq(row.fn(), true)
+			local row = selected_row(); helpers.assert_eq(row.fn(), true)
 			helpers.assert_nil(world.engine.get_live())
-			helpers.assert_eq(redraws, 1)
-			helpers.assert_eq(calls, 4)
-			helpers.assert_eq(find_off(builder.build(ctx), i18n.get(spec.label_key)).checked, true)
-			assert_menu_untouched(world)
+			helpers.assert_eq(redraws, 1); helpers.assert_eq(calls, #spec.refusals)
+			helpers.assert_eq(selected_row().checked, true)
+			assert_menu_untouched(world, "user_pirate")
 		end)
 	end)
 
-	helpers.it("projects all existing actual locale labels without changing rewrite prompts", function()
+	helpers.it("retains the real shortcut stop notice in all locales while the second chooser stays absent", function()
 		scenario({}, function(world)
 			local builder = helpers.load_module("ui.menu.menu_builder")
 			local i18n = require("infra.i18n")
 			local saved_get = i18n.get
 			local file = assert(io.open(helpers.driver_root() .. "/../_shared/tests/corpus/menus/llm_live_off.json", "r"))
 			local spec = Json.decode(file:read("*a")); file:close()
+			local count = 0
 			local ok, err = xpcall(function()
 				for _, code in ipairs(spec.locales) do
 					local locale = assert(io.open(helpers.driver_root() .. "/../_shared/data/locales/" .. code .. ".json", "r"))
 					local catalog = Json.decode(locale:read("*a")); locale:close()
 					i18n.get = function(key) return catalog[key] or key end
-					local row = find_off(builder.build({ llm = world.engine }), catalog[spec.label_key])
-					helpers.assert_not_nil(row, code)
-					helpers.assert_eq(row.checked, true)
+					helpers.assert_true(world.engine.set_live("translate_en"))
+					helpers.assert_eq(world.engine.get_live().profile_id, "translate_en")
+					helpers.assert_nil(find_off(builder.build({ llm = world.engine }), catalog["menu.llm.live_mode_title"]), code)
+					helpers.assert_eq(world.handlers.llm_live_prompt_toggle("tap_3", "translate_en"), true)
+					helpers.assert_nil(world.engine.get_live())
+					helpers.assert_eq(world.notices[#world.notices], catalog["llm.live.off"], code .. " retains its actual stop notice")
+					assert_menu_untouched(world)
+					count = count + 1
 				end
 			end, debug.traceback)
 			i18n.get = saved_get
-			helpers.assert_true(ok, err)
+			helpers.assert_true(ok, err); helpers.assert_eq(count, #spec.locales)
 		end)
+	end)
+
+end)
+
+helpers.it("retains a free-language live receipt through the actual typing timer", function()
+	scenario({}, function(world)
+		helpers.assert_eq(world.engine.toggle_live("translate|1|Esperanto"), true)
+		helpers.assert_eq(#world.posts, 0)
+		world.type(SENTENCE)
+		world.scheduler.test.advance(live_json().debounce_ms / 1000)
+		helpers.assert_eq(#world.posts, 1)
+		helpers.assert_true(world.posts[1].body.messages[1].content:find("Translate TAIL into Esperanto", 1, true) ~= nil)
+		helpers.assert_eq(world.engine.get_live().translation_target, "Esperanto")
 	end)
 end)

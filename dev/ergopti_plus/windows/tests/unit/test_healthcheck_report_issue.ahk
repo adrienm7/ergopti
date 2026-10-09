@@ -77,18 +77,45 @@ _THPA_Join(Calls) {
 ; ============================
 ; ============================
 
+_THPA_Snapshot(Long := false) {
+	Snapshot := Map("schema_version", 2, "driver", "windows", "generated_at", "2026-09-24T10:00:00Z",
+		"sections", Map("versions", Map("ergopti_version", "2.1.0"), "issues", Map("recent", "private fixture text")),
+		"probes", Map("github_api", Map("state", "error", "cleanup", "pending", "ms", 1)))
+	if Long {
+		Cohorts := []
+		Loop 300
+			Cohorts.Push(Map("probes", Map("github_api", Map("state", "timeout", "cleanup", "unknown", "ms", A_Index))))
+		Snapshot["retired_probes"] := Cohorts
+	}
+	return Snapshot
+}
+
+_THPA_Approved(Long := false) {
+	return HealthCheck_ShareDocument(_THPA_Snapshot(Long), HealthCheck_Config()["schema"])
+}
+
+_THPA_Perform(Action, Paths, Config, Effects) {
+	Snapshot := _THPA_Snapshot(StrLen(Action.Get("text", "")) > Config["templates"]["max_url_bytes"])
+	if Action["action"] == "copy" || Action["action"] == "save" || Action["action"] == "report" {
+		Action := Action.Clone()
+		Action["text"] := HealthCheck_ShareDocument(Snapshot, Config["schema"])["text"]
+	}
+	return HealthCheck_PerformAction(Action, Paths, Config, Effects, Snapshot)
+}
+
 _THPA_CopyIsRedacted() {
 	Calls := []
-	Outcome := HealthCheck_PerformAction(Map("action", "copy", "text", "log at c:\users\jdoe\x by JDoe"),
+	Outcome := _THPA_Perform(Map("action", "copy", "text", "log at c:\users\jdoe\x by JDoe"),
 		_THPA_Paths(), HealthCheck_Config(), _THPA_Effects(Calls))
 	AssertTrue(Outcome["ok"])
-	AssertEqual("copy:log at ~\x by <user>", _THPA_Join(Calls))
+	AssertEqual("copy:" . _THPA_Approved()["text"], _THPA_Join(Calls))
+	AssertFalse(InStr(Calls[1], "~\x"), "even redacted paths must be excluded")
 }
 Test("Diagnostics page: copy writes the redacted report (page-actions)", _THPA_CopyIsRedacted)
 
 _THPA_RefusedCopyFails() {
 	Calls := []
-	Outcome := HealthCheck_PerformAction(Map("action", "copy", "text", "report"), _THPA_Paths(), HealthCheck_Config(),
+	Outcome := _THPA_Perform(Map("action", "copy", "text", "report"), _THPA_Paths(), HealthCheck_Config(),
 		_THPA_Effects(Calls, Map("clipboard", false)))
 	AssertFalse(Outcome["ok"], "a refused clipboard must be reported to the page as a failure")
 }
@@ -96,13 +123,13 @@ Test("Diagnostics page: a refused clipboard is a failure (healthcheck-copy-recei
 
 _THPA_SaveUnderDiagnostics() {
 	Calls := []
-	Name := "ergopti-diagnostics-windows-2.1.0-20260924T100000Z.md"
-	Outcome := HealthCheck_PerformAction(Map("action", "save", "text", "C:\Users\JDoe\file", "name", Name),
+	Name := _THPA_Approved()["name"]
+	Outcome := _THPA_Perform(Map("action", "save", "text", "C:\Users\JDoe\file", "name", Name),
 		_THPA_Paths(), HealthCheck_Config(), _THPA_Effects(Calls))
 	Expected := _THPA_Paths()["diagnostics_dir"] . "\" . Name
 	AssertTrue(Outcome["ok"])
 	AssertEqual(Expected, Outcome["path"])
-	AssertEqual("save:" . Expected . ":~\file | reveal:" . Expected, _THPA_Join(Calls))
+	AssertEqual("save:" . Expected . ":" . _THPA_Approved()["text"] . " | reveal:" . Expected, _THPA_Join(Calls))
 }
 Test("Diagnostics page: save writes under the diagnostics folder and selects it (page-actions)",
 	_THPA_SaveUnderDiagnostics)
@@ -115,16 +142,16 @@ _THPA_QueryValue(Url, Key) {
 _THPA_ReportPrefillsTheReport() {
 	Calls := []
 	Fields := Map("version", "2.1.0", "os", "Windows 11 (C:\Users\JDoe)", "driver", "windows")
-	Outcome := HealthCheck_PerformAction(Map("action", "report", "text", "report at C:\Users\JDoe\boom",
+	Outcome := _THPA_Perform(Map("action", "report", "text", "report at C:\Users\JDoe\boom",
 		"fields", Fields), _THPA_Paths(), HealthCheck_Config(), _THPA_Effects(Calls))
 	AssertTrue(Outcome["ok"])
 	AssertEqual(2, Calls.Length, _THPA_Join(Calls))
-	AssertEqual("copy:report at ~\boom", Calls[1])
+	AssertEqual("copy:" . _THPA_Approved()["text"], Calls[1])
 	AssertTrue(InStr(Calls[2], "open_url:https://github.com/") = 1, Calls[2])
 	AssertTrue(InStr(Calls[2], "template=bug_report.yml") > 0, Calls[2])
-	AssertEqual(IssueLink_PercentEncode("report at ~\boom"), _THPA_QueryValue(Calls[2], "diagnostics"),
+	AssertEqual(IssueLink_PercentEncode(_THPA_Approved()["text"]), _THPA_QueryValue(Calls[2], "diagnostics"),
 		"the form's diagnostics field is the report the clipboard holds")
-	AssertEqual(IssueLink_PercentEncode("Windows 11 (~)"), _THPA_QueryValue(Calls[2], "os"))
+	AssertEqual(IssueLink_PercentEncode("windows"), _THPA_QueryValue(Calls[2], "os"))
 	AssertTrue(InStr(Calls[2], "JDoe") = 0, "the prefilled fields must be redacted: " . Calls[2])
 	AssertFalse(Outcome.Has("path"), "a report names no file")
 }
@@ -135,7 +162,7 @@ Test("Diagnostics page: report copies, then opens the bug form with the whole re
 ; after the browser and took the focus from the form (report-focus).
 _THPA_ReportSavesNothing() {
 	Calls := []
-	Outcome := HealthCheck_PerformAction(Map("action", "report", "text", "report", "fields",
+	Outcome := _THPA_Perform(Map("action", "report", "text", "report", "fields",
 		Map("driver", "windows")), _THPA_Paths(), HealthCheck_Config(), _THPA_Effects(Calls))
 	AssertTrue(Outcome["ok"])
 	for Call in Calls
@@ -154,10 +181,11 @@ _THPA_ReportCutsALongReport() {
 		Long .= "line of diagnostics é`n"
 	Config := HealthCheck_Config()
 	Templates := Config["templates"]
-	Outcome := HealthCheck_PerformAction(Map("action", "report", "text", Long, "fields",
+	Outcome := _THPA_Perform(Map("action", "report", "text", Long, "fields",
 		Map("version", "2.1.0", "driver", "windows")), _THPA_Paths(), Config, _THPA_Effects(Calls))
 	AssertTrue(Outcome["ok"])
-	AssertEqual("copy:" . Long, Calls[1], "the clipboard keeps the whole report")
+	Long := _THPA_Approved(true)["text"]
+	AssertEqual("copy:" . Long, Calls[1], "the clipboard keeps the whole approved report")
 	Url := SubStr(Calls[2], StrLen("open_url:") + 1)
 	AssertTrue(StrLen(Url) <= Templates["max_url_bytes"], "the URL fits its budget: " . StrLen(Url))
 	AssertEqual("2.1.0", _THPA_QueryValue(Url, "version"), "the identity fields survive the cut")
@@ -174,7 +202,7 @@ Test("Diagnostics page: report cuts a long report in the URL, whole in the clipb
 
 _THPA_ReportStopsOnRefusedClipboard() {
 	Calls := []
-	Outcome := HealthCheck_PerformAction(Map("action", "report", "text", "report", "fields", Map()),
+	Outcome := _THPA_Perform(Map("action", "report", "text", "report", "fields", Map()),
 		_THPA_Paths(), HealthCheck_Config(), _THPA_Effects(Calls, Map("clipboard", false)))
 	AssertFalse(Outcome["ok"])
 	for Call in Calls
@@ -185,14 +213,14 @@ Test("Diagnostics page: report stops before the browser when the clipboard refus
 
 _THPA_OpenPath() {
 	Calls := []
-	Outcome := HealthCheck_PerformAction(Map("action", "open_path", "id", "diagnostics_dir"), _THPA_Paths(),
+	Outcome := _THPA_Perform(Map("action", "open_path", "id", "diagnostics_dir"), _THPA_Paths(),
 		HealthCheck_Config(), _THPA_Effects(Calls))
 	Dir := _THPA_Paths()["diagnostics_dir"]
 	AssertTrue(Outcome["ok"])
 	AssertEqual("make_dir:" . Dir . " | exists:" . Dir . " | open:" . Dir, _THPA_Join(Calls))
 
 	Calls := []
-	Outcome := HealthCheck_PerformAction(Map("action", "open_path", "id", "errors_today"), _THPA_Paths(),
+	Outcome := _THPA_Perform(Map("action", "open_path", "id", "errors_today"), _THPA_Paths(),
 		HealthCheck_Config(), _THPA_Effects(Calls, Map("exists", false)))
 	AssertFalse(Outcome["ok"], "a missing errors file must not be reported as opened")
 	for Call in Calls
@@ -210,7 +238,7 @@ _THPA_OpenMissingFile() {
 	Calls := []
 	Errors := _HealthCheckErrCount
 	Warnings := _HealthCheckWarnCount
-	Outcome := HealthCheck_PerformAction(Map("action", "open_path", "id", "errors_today"), _THPA_Paths(),
+	Outcome := _THPA_Perform(Map("action", "open_path", "id", "errors_today"), _THPA_Paths(),
 		HealthCheck_Config(), _THPA_Effects(Calls, Map("exists", false)))
 	AssertFalse(Outcome["ok"], "a missing file is not reported as opened")
 	AssertTrue(Outcome.Get("missing", false), "the page is told the file does not exist yet")
@@ -224,7 +252,7 @@ _THPA_UnknownHomeRefuses() {
 	Calls := []
 	Effects := _THPA_Effects(Calls)
 	Effects["identity"] := () => Map("home", "", "user", "JDoe")
-	Outcome := HealthCheck_PerformAction(Map("action", "copy", "text", "C:\Users\JDoe"), _THPA_Paths(),
+	Outcome := _THPA_Perform(Map("action", "copy", "text", "C:\Users\JDoe"), _THPA_Paths(),
 		HealthCheck_Config(), Effects)
 	AssertFalse(Outcome["ok"])
 	AssertEqual(0, Calls.Length, "nothing may leave the machine unredacted: " . _THPA_Join(Calls))
@@ -245,3 +273,42 @@ _THPA_SuggestFeature() {
 }
 Test("Suggest a feature: opens the feature form with the version and the system (report-bug-flow)",
 	_THPA_SuggestFeature)
+
+
+/** Replays the same synthetic sharing corpus as the JavaScript and Lua ports. */
+_THPA_SharingVectors() {
+	global _SharedDir
+	Corpus := JsonParse(FileRead(_SharedDir . "\tests\corpus\healthcheck\share_vectors.json", "UTF-8"))
+	Config := HealthCheck_Config()
+	for Vector in Corpus["vectors"] {
+		Snapshot := Vector["snapshot"]
+		Document := HealthCheck_ShareDocument(Snapshot, Config["schema"])
+		for Canary in Vector["canaries"]
+			AssertFalse(InStr(Document["text"], Canary), "sharing corpus leaked " . Vector["name"])
+		Readable := StrSplit(Document["text"], Chr(96) . Chr(96) . Chr(96) . "json")[1]
+		for Id in ["versions", "hardware", "system", "input", "ai", "permissions", "issues"]
+			AssertContains(Readable, "## " . t("healthcheck.section." . Id))
+		AssertContains(Readable, "| probes.appleevent_transport.native_status | -1744 |")
+		AssertContains(Readable, "| probes.appleevent_transport.cleanup | pending |")
+		AssertContains(Readable, "| retired_probes.1.probes.appleevent_transport.cleanup | unknown |")
+		AssertEqual("timeout", Document["snapshot"]["probes"]["appleevent_transport"]["state"])
+		AssertEqual("pending", Document["snapshot"]["probes"]["appleevent_transport"]["cleanup"])
+		AssertEqual(-1744, Document["snapshot"]["probes"]["appleevent_transport"]["native_status"])
+		for ActionName in ["copy", "save", "report"] {
+			Calls := []
+			Outcome := HealthCheck_PerformAction(Map("action", ActionName, "text", Document["text"],
+				"name", "ergopti-diagnostics-PRIVATE_USER_ZEBRA.md", "fields", Map("os", "PRIVATE_ORG_SEQUOIA")),
+				_THPA_Paths(), Config, _THPA_Effects(Calls), Snapshot)
+			AssertTrue(Outcome["ok"], "the approved sharing sink remains usable")
+			for Call in Calls
+				for Canary in Vector["canaries"]
+					AssertFalse(InStr(Call, Canary), "sharing sink leaked " . Vector["name"])
+		}
+		Calls := []
+		Outcome := HealthCheck_PerformAction(Map("action", "copy", "text", Vector["canaries"][1]),
+			_THPA_Paths(), Config, _THPA_Effects(Calls), Snapshot)
+		AssertFalse(Outcome["ok"], "arbitrary page text cannot become a shared document")
+		AssertEqual(0, Calls.Length, "the refused preview must not publish")
+	}
+}
+Test("Diagnostics sharing: synthetic three-driver corpus excludes private fields", _THPA_SharingVectors)

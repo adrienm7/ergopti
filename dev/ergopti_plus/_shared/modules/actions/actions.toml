@@ -225,14 +225,19 @@ platform = "hs"
 
 # --- Navigation applications ---
 
-# The operating system's own Alt+Tab keystroke. macOS no longer offers it: a
-# posted Cmd+Tab never switched there, and app_previous is what it meant
-# (config migration step v5_to_v6 maps a stored one).
+# The operating system's switcher. macOS explicitly presses and releases Command,
+# observes each tagged edge, and requires independent combined-session release.
+# Historical v5-to-v6 migration remains unchanged; macOS uses a distinct ID.
 [sg_actions.app_switcher]
 platform = "ahk,linux"
 emit_ahk_key = "Tab"
 emit_ahk_mods = ["alt"]
 emit_linux = "alt+Tab"
+
+# The distinct macOS native product keeps the retired v5 identifier absent.
+# Its observed private Command/Tab edges and retirement are separate from focus.
+[sg_actions.system_app_switcher]
+platform = "hs"
 
 # The two previous-application scopes: every screen, and only the screen under
 # the cursor. macOS activates the application directly
@@ -1187,12 +1192,18 @@ parameter = "llm_vision"
 platform = "all"
 parameter = "llm_vision"
 
+[sg_actions.llm_translate_context]
+# Translates the current sentence through the existing rewrite prediction owner.
+# The target is stored per binding; selecting this action changes no active profile.
+platform = "all"
+parameter = "llm_language"
+
 [sg_actions.llm_translate_selection]
 # Translates the SELECTION with the AI menu's current text backend
 # (_shared/modules/llm/translate.json) and shows the translation in the
 # prediction tooltip; accepting it replaces the selection, Escape leaves the
 # text untouched. The parameter is "ui" (the interface language, the default)
-# or a locale code. Nothing selected: a notice. It refuses like
+# or a free language name. Nothing selected: a notice. It refuses like
 # llm_generate_prediction (paused, AI off, backend not ready).
 platform = "all"
 parameter = "llm_language"
@@ -1513,6 +1524,7 @@ items = [
     "right_click_toggle",
     "lookup",
     "app_switcher",
+    "system_app_switcher",
     "app_previous",
     "app_previous_screen",
     "app_window_previous",
@@ -1645,6 +1657,7 @@ items = [
     "llm_screen_region",
     "llm_screen_full",
     "llm_screen_error",
+    "llm_translate_context",
     "llm_translate_selection",
     "llm_agent_selection",
     "llm_agent_command",

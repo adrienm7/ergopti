@@ -13,14 +13,8 @@
 --- 1. The shared rules (_shared/lua/keymap/magic_key_source.lua) decide which
 ---    values are keys and which keycode a value names, from the manifest entry
 ---    and the physical-key registry.
---- 2. Two keycodes for the two keys ISO boards swap. The event tap sees the
----    key left of 1 as kVK_ANSI_Grave (50) behind Karabiner's ANSI virtual
----    keyboard (platform/remap/generator.lua) and on an ANSI board, but as
----    kVK_ISO_Section (10) on a bare ISO board, and the key left of Z the other
----    way round; nothing on the tap says which is in play. Backquote and
----    IntlBackslash therefore each answer to both keycodes, as the number-row
----    tap keys do (modules/shortcuts/tap_keys.lua): the key chosen always types
----    the magic key, and on an ISO board its swapped twin does too.
+--- 2. The event's keyboard model determines which of the ISO-swapped virtual
+---    codes denotes the chosen physical key. The other key stays untouched.
 --- 3. Nothing on the typing path. The keycodes are resolved when the value is
 ---    set; the tap looks one integer up and asks nothing more of any other key.
 --- 4. An outdated stored value is automatic here; infra/preferences.lua reports
@@ -35,6 +29,7 @@ local Paths      = require("infra.paths")
 local FileSystem = require("adapters.file_system")
 local Json       = require("json")
 local Shared     = require("keymap.magic_key_source")
+local Geometry   = require("adapters.keyboard_geometry")
 
 local LOG = "keymap.magic_key_source"
 
@@ -52,8 +47,8 @@ local _registry = nil
 local _resolver = nil
 local _value = AUTOMATIC
 local _keycode = nil
--- Every keycode the chosen key can arrive as (keycode -> true), nil while automatic.
-local _keycodes = nil
+-- The chosen key's ISO identity, nil while automatic.
+local _iso_keycode = nil
 
 
 
@@ -78,9 +73,8 @@ local function registry()
 	return _registry
 end
 
---- The shared resolver for macOS keycodes, built once. Its keycodes are the
---- ones the event tap sees behind Karabiner's ANSI virtual keyboard, the
---- driver's own setup, so a captured key names the key it is there.
+--- The shared resolver's ANSI identities define canonical physical positions.
+--- Event dispatch and capture project those positions through their model.
 --- @return table resolver
 function M.resolver()
 	if _resolver then return _resolver end
@@ -88,19 +82,21 @@ function M.resolver()
 		entry    = Manifest.find_entry_by_path(M.PATH),
 		registry = registry(),
 		field    = "hs",
-		aliases  = { ISO_FORM },
 	})
 	return _resolver
 end
 
---- Every keycode a candidate can arrive as: its own, and on a bare ISO board
---- the keycode of the key it swaps with.
---- @param value string A candidate code.
---- @return table keycodes keycode -> true.
-local function keycodes_of(value)
-	local keycodes = {}
-	for _, code in ipairs(M.resolver().native_codes(value)) do keycodes[code] = true end
-	return keycodes
+--- Resolves a captured virtual code using that event's keyboard geometry.
+--- Call resolver() before acquiring capture so this lookup performs no IO.
+--- @param keycode integer Captured virtual keycode.
+--- @param keyboard_type integer|nil Captured keyboard model.
+--- @return string|nil candidate Canonical physical-key identity.
+function M.code_for(keycode, keyboard_type)
+	if type(keycode) ~= "number" then return nil end
+	for _, candidate in ipairs(M.resolver().candidates()) do
+		if Geometry.physical_code(registry().keys[candidate], keyboard_type) == keycode then return candidate end
+	end
+	return nil
 end
 
 
@@ -120,7 +116,7 @@ function M.set(value)
 	-- Every boot applies the stored value: the automatic one, by far the most
 	-- common, remaps nothing and needs no registry.
 	if value == nil or value == AUTOMATIC then
-		_value, _keycode, _keycodes = AUTOMATIC, nil, nil
+		_value, _keycode, _iso_keycode = AUTOMATIC, nil, nil
 		Logger.info(LOG, "Physical magic key: %s.", AUTOMATIC)
 		return AUTOMATIC
 	end
@@ -133,7 +129,8 @@ function M.set(value)
 	end
 	_value = applied
 	_keycode = resolver.native(applied)
-	_keycodes = _keycode and keycodes_of(applied) or nil
+	local record = _keycode and registry().keys[applied] or nil
+	_iso_keycode = record and type(record[ISO_FORM]) == "table" and record[ISO_FORM].hs or _keycode
 	Logger.info(LOG, "Physical magic key: %s.", _keycode and (applied .. " (keycode " .. _keycode .. ")") or applied)
 	return applied
 end
@@ -160,7 +157,11 @@ function M.choice_reason(value)
 	if not resolver.is_candidate(value) then return "dialog.magic_key_source.not_a_candidate" end
 	local TapKeys = require("modules.shortcuts.tap_keys")
 	TapKeys.ensure_loaded(require("modules.gestures.actions").is_assignable)
-	if Shared.tap_conflict(resolver, value, TapKeys.keys(), "hs", TapKeys.get_action) then
+	-- Both inputs to the shared policy name canonical physical positions. ISO
+	-- arrival aliases cannot reserve a different key in the stored settings.
+	local positions = {}
+	for _, key in ipairs(TapKeys.keys()) do positions[#positions + 1] = { id = key.id, hs = key.hs[1] } end
+	if Shared.tap_conflict(resolver, value, positions, "hs", TapKeys.get_action) then
 		return Shared.TAP_CONFLICT_REASON
 	end
 	return nil
@@ -168,9 +169,18 @@ end
 
 --- Whether a keycode can be the chosen key: the tap's one cheap question.
 --- @param key_code number Virtual keycode of the press.
+--- @param keyboard_type integer|nil Originating keyboard model.
 --- @return boolean
-function M.owns(key_code)
-	return _keycodes ~= nil and _keycodes[key_code] == true
+function M.owns(key_code, keyboard_type)
+	return _keycode ~= nil and type(key_code) == "number"
+		and Geometry.native_code(_keycode, _iso_keycode, keyboard_type) == key_code
+end
+
+--- Whether this candidate press requires its originating keyboard model.
+--- @param key_code integer Virtual keycode.
+--- @return boolean required
+function M.needs_geometry(key_code)
+	return _keycode ~= _iso_keycode and (key_code == _keycode or key_code == _iso_keycode)
 end
 
 --- Whether a key press must type the magic key: the chosen key, pressed with no
@@ -178,15 +188,16 @@ end
 --- @param key_code number Virtual keycode of the press.
 --- @param flags table Event flags (cmd, alt, ctrl, shift…).
 --- @param replace_on function Returns whether the replace section is on.
+--- @param keyboard_type integer|nil Originating keyboard model.
 --- @return boolean
-function M.remaps(key_code, flags, replace_on)
-	if not M.owns(key_code) then return false end
+function M.remaps(key_code, flags, replace_on, keyboard_type)
+	if not M.owns(key_code, keyboard_type) then return false end
 	if not Shared.unmodified(flags) or replace_on() ~= true then return false end
 	-- Only the already-loaded, acknowledged dispatcher can own this press.
 	-- No native module, file or layout probe is loaded from the keyDown path.
 	local System = package.loaded["modules.shortcuts.actions.system"]
 	if type(System) == "table" and type(System.has_tap_key_claim) == "function" then
-		return System.has_tap_key_claim(key_code, flags) == false
+		return System.has_tap_key_claim(key_code, flags, keyboard_type) == false
 	end
 	return true
 end
