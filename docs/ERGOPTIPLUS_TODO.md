@@ -8663,9 +8663,11 @@ Final joined-source gates and remote Shortcut retirement remain required.
 The maintainer requested a release before 2026-10-09 09:00 Europe/Paris and
 explicitly authorized temporary test-execution deferrals when necessary.
 The closed policy in `.github/ci/dev_release_qualification_exceptions.json`
-now applies only to the dev push prerelease `v0.0.0-dev.156` before
-2026-10-10 07:00 UTC, following the renewed publication request after the
-hosted consent diagnosis. The original October 9 deadline was missed.
+now applies only to the dev push prerelease `v0.0.0-dev.157` before
+2026-10-10 07:00 UTC. The maintainer requested this diagnostic prerelease
+with the urgent fixes and temporarily deferred tests, and will return a
+private-safe report from a real Mac. The five scopes and expiry are unchanged;
+dev.158 must execute all assertions. The original October 9 deadline was missed.
 Main, pull requests, local runs and the next dev tag retain full execution.
 Every deferred qualification remains open and must never count as a pass:
 
@@ -8709,7 +8711,7 @@ test precondition failure, not a Lua defect or a successful permission grant.
       Karabiner and ScriptScope assertions on both architectures. The renewed
       single-release profile records the four clean/Karabiner launch legs as
       DEFERRED with `qualified:false`; lifecycle, other scenarios, packaging,
-      signing and installation remain required. Default, Main, PR and dev.157
+      signing and installation remain required. Default, Main, PR and dev.158
       runs must execute the complete assertions.
 
 - [~] **116.** Provide a guided third-party prerelease validation report.

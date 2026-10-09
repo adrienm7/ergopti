@@ -38,8 +38,10 @@ for (const [key, value] of [
 	['release', 'true'],
 	['prerelease', 'false'],
 	['channel', 'main'],
-	['version', '0.0.0-dev.157'],
-	['tag', 'v0.0.0-dev.157']
+	['version', '0.0.0-dev.156'],
+	['tag', 'v0.0.0-dev.156'],
+	['version', '0.0.0-dev.158'],
+	['tag', 'v0.0.0-dev.158']
 ]) {
 	const bad = { ...ctx, [key]: value };
 	assert.equal(q.resolveQualificationProfile(bad, now), null);
@@ -358,7 +360,7 @@ async function simulate(context, status = 0, entries = fixtures, afterFamilySign
 	const prior = process.env.GITHUB_SHA;
 	process.env.GITHUB_SHA = sha;
 	try {
-		const full = await simulate({ ...ctx, tag: 'v0.0.0-dev.157', version: '0.0.0-dev.157' });
+		const full = await simulate({ ...ctx, tag: 'v0.0.0-dev.158', version: '0.0.0-dev.158' });
 		assert.equal(full.result, 0);
 		assert.equal(full.spawned.length, 2);
 		assert.equal(full.receipts.length, 0);
@@ -385,7 +387,7 @@ async function simulate(context, status = 0, entries = fixtures, afterFamilySign
 				{},
 				{ GITHUB_REF: 'refs/heads/main' },
 				{ GITHUB_EVENT_NAME: 'pull_request' },
-				{ ERGOPTI_DEV_RELEASE_TAG: 'v0.0.0-dev.157', ERGOPTI_DEV_RELEASE_VERSION: '0.0.0-dev.157' }
+				{ ERGOPTI_DEV_RELEASE_TAG: 'v0.0.0-dev.158', ERGOPTI_DEV_RELEASE_VERSION: '0.0.0-dev.158' }
 			]) {
 				Object.assign(process.env, releaseEnvironment, override);
 				const embedded = await simulate(undefined, 0, embeddedFixtures);
