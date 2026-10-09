@@ -585,7 +585,10 @@ local function with_source_command(alternative, callback)
 			return {kind = "local", version = "", commit = "known"}
 		end }
 		package.loaded["infra.installation"] = { is_source_run = function() return true end }
-		package.loaded["ui.menu.start_at_login"] = { enabled = function() return false end }
+		package.loaded["ui.menu.start_at_login"] = {
+			command_available = function() return true end,
+			enabled = function() return false end,
+		}
 		package.loaded["infra.manifest_menu"] = nil
 		local renderer = require("infra.manifest_menu")
 		local root, parent = renderer.get_root(), nil
