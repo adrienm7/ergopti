@@ -5799,6 +5799,19 @@ original assertion, authorization guard and watchdog is retained. BOM/LF and
 source-preservation checks pass; candidate Windows replay remains required.
 These corrections do not close item62 or transversal items16/38.
 
+The Windows updater's authenticated curl child now receives only the four
+private paths allocated by its parent-owned capture ledger. Hard Job cancellation
+cannot bypass that parent's namespace retirement. Observation and deletion hold
+the verified original directory lease throughout each file operation; foreign
+replacements, junctions, transplanted originals and refused handle closure retain
+debt and block a successor. Only actual Job retirement permits file/directory
+disposition, and the original publication still requires the complete authenticated
+body. The five prepared native cases retain their exact assertion prefix; three
+additional namespace/partial-retry cases make eight. Source controls, PowerShell
+parsing and C# compilation pass portably; all eight genuine Windows cases remain
+unexecuted until targeted native CI. The original legacy slow receiving vector,
+authorization, publication and retirement clocks remain unchanged.
+
 The actual cold receiver now transports device/inode identities as canonical uint64 decimal strings, preserving the observed APFS inode1152921500312523020 without JavaScript rounding. The first official-installer correction set COPYFILE_DISABLE for its exact tar child; native37853243814 showed that this alone did not disable the separate BSD archive reader's AppleDouble consumption. The successor also sets the documented child-only TAR_READER_OPTIONS=tar:!mac-ext, preserving the literal pinned members without changing GNU tar arguments or the archive oracle. Genuine libarchive receiving passes four cases, including retained AppleDouble bytes/modes and inherited-parent override; the original enabled reader fails the causal control. Original physical sandbox, mode, whole-archive and retirement assertions remain. Successor Darwin cold receiving remains required.
 
 The native listener worker now records bounded debug-only lexical/physical path and inode-match scalars for its known fixture PID, from the same native snapshot. This evidence does not authorize listener admission, and all twelve original API methods remain byte-identical. Sixteen portable C controls and independent privacy/refusal controls pass; actual ARM and Intel SDK observation must establish the remaining listener refusal before changing any production path predicate.

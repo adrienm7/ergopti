@@ -845,6 +845,319 @@ global UPDATER_SWAP_WAIT_OBJECT_0 := 0x00000000
 global UPDATER_SWAP_WAIT_TIMEOUT := 0x00000102
 global UPDATER_SWAP_WAIT_FAILED := 0xFFFFFFFF
 global UPDATER_SWAP_RESUME_FAILED := 0xFFFFFFFF
+; A capture is allocated by the parent before a native curl child can exist.
+; Retained metadata handles keep original identities allocated while allowing
+; curl and the completed reader their existing sharing modes.
+class _UpdaterCurlCaptureLedger {
+	__New() {
+		this.Path := ""
+		this.Directory := 0
+		this.Files := Map()
+		this.Worker := 0
+		this.NativeState := 0
+		this.Acquiring := false
+		this.ProbeCloseDebt := []
+		this.Running := false
+		this.Retired := false
+	}
+	Acquire(Parent) {
+		if this.Path != "" || this.Retired || this.Acquiring
+			throw Error("Curl capture has already been initialized.")
+		; Cancellation may interrupt any native allocation. Publish the latch
+		; first; the immutable object key retains debt before a path exists.
+		this.Acquiring := true
+		try {
+			Parent := RTrim(Parent, "\")
+			DirCreate(Parent)
+			Guid := Buffer(16, 0)
+			if DllCall("ole32\CoCreateGuid", "Ptr", Guid, "Int") != 0
+				throw Error("Curl capture identity allocation refused.")
+			Nonce := ""
+			loop 16
+				Nonce .= Format("{:02x}", NumGet(Guid, A_Index - 1, "UChar"))
+			Candidate := Parent . "\curl." . Nonce
+			if !DllCall("kernel32\CreateDirectoryW", "Str", Candidate, "Ptr", 0, "Int")
+				throw OSError(A_LastError, "Curl capture directory allocation refused.")
+			this.Path := Candidate
+			this.Directory := Map("path", Candidate, "handle", 0, "directory", true)
+			this.Directory["handle"] := this.Open(Candidate, 0, 3, true)
+			if !this.Directory["handle"]
+				throw OSError(A_LastError, "Curl capture directory identity refused.")
+			for Name in ["artifact.bin", "headers.bin", "capability.json", "transport.conf"] {
+				Path := Candidate . "\" . Name
+				Handle := this.Open(Path, 0, 1, false)
+				if !Handle
+					throw OSError(A_LastError, "Curl capture exclusive file allocation refused.")
+				this.Files[Name] := Map("path", Path, "handle", Handle, "directory", false)
+				if !this.Snapshot(Handle).Get("ok", false)
+					throw Error("Curl capture file identity refused.")
+			}
+			return this
+		} catch {
+			_Updater_RetireCurlCapture(this)
+			throw
+		} finally this.Acquiring := false
+	}
+	Attach(Worker) {
+		if this.Retired || IsObject(this.Worker) || !IsObject(Worker)
+			throw Error("Curl capture worker ownership refused.")
+		this.Worker := Worker
+	}
+	AcquireDirectoryLease(DeleteAccess := false) {
+		if !(this.Directory is Map) || !this.Directory.Get("handle", 0) || this.ProbeCloseDebt.Length
+			return 0
+		Original := this.Snapshot(this.Directory["handle"])
+		if !Original.Get("ok", false) || !Original["directory"] || Original["delete_pending"]
+			return 0
+		; Excluding FILE_SHARE_DELETE fences directory rename for the whole
+		; observation/removal, rather than relying on a closed identity probe.
+		Lease := this.Open(this.Directory["path"], DeleteAccess ? 0x10000 : 0, 3, true, 3)
+		if !Lease
+			return 0
+		Admitted := false
+		try {
+			Actual := this.Snapshot(Lease)
+			Admitted := this.Same(Original, Actual) && Actual["directory"] && !Actual["delete_pending"]
+			return Admitted ? Lease : 0
+		} finally {
+			if !Admitted
+				this.CloseProbe(Lease)
+		}
+	}
+	ValidatePaths() {
+		if this.Retired || this.Acquiring || this.Files.Count != 4
+			return false
+		Lease := this.AcquireDirectoryLease()
+		if !Lease
+			return false
+		try {
+			for Name, Entry in this.Files {
+				Original := this.Snapshot(Entry["handle"])
+				Probe := this.Open(Entry["path"], 0, 3, false, 3)
+				if !Probe
+					return false
+				try {
+					Actual := this.Snapshot(Probe)
+					if !this.Same(Original, Actual) || Actual["directory"] || Actual["delete_pending"] || Actual["links"] != 1
+						return false
+				} finally this.CloseProbe(Probe)
+				if this.ProbeCloseDebt.Length
+					return false
+			}
+			return true
+		} finally {
+			if !this.CloseProbe(Lease)
+				throw Error("Curl capture namespace lease closure was refused.")
+		}
+	}
+	OnNativeAdopt(State, Native) {
+		if !(State is Map) || !(Native is Map) || !(Native.Get("Assigned", false))
+			throw Error("Curl capture native owner was refused.")
+		this.NativeState := State
+	}
+	ObserveBody(Worker, ExpectedSize) {
+		if this.Retired || this.Worker != Worker || !IsObject(Worker)
+			|| !HasMethod(Worker, "processId") || Worker.processId() <= 0
+			|| !this.Files.Has("artifact.bin") || !(ExpectedSize is Integer) || ExpectedSize <= 0
+			return 0
+		State := this.NativeState
+		if !(State is Map) || State.Get("TerminalClaimed", true) || State.Get("TreeQuiesced", true)
+			|| !State.Get("ProcessHandle", 0) || !State.Get("JobHandle", 0)
+			return 0
+		ErrorText := ""
+		if _SR_TreeProcessHasExited(State["ProcessHandle"], &ErrorText) || ErrorText != ""
+			|| _SR_TreeActiveProcessCount(State["JobHandle"], &ErrorText) <= 0 || ErrorText != ""
+			return 0
+		Lease := this.AcquireDirectoryLease()
+		if !Lease
+			return 0
+		try {
+			Entry := this.Files["artifact.bin"]
+			Original := this.Snapshot(Entry["handle"])
+			Probe := this.Open(Entry["path"], 0, 3, false, 3)
+			if !Probe
+				return 0
+			try {
+				Actual := this.Snapshot(Probe)
+				if !this.Same(Original, Actual) || Actual["directory"] || Actual["delete_pending"] || Actual["links"] != 1
+					|| Actual["size"] <= 0 || Actual["size"] >= ExpectedSize
+					return 0
+				return Actual["size"]
+			} finally {
+				if !this.CloseProbe(Probe)
+					throw Error("Curl capture observer handle closure was refused.")
+			}
+		} finally {
+			if !this.CloseProbe(Lease)
+				throw Error("Curl capture namespace lease closure was refused.")
+		}
+	}
+
+	Retire() {
+		if this.Retired
+			return true
+		if this.Running || this.Acquiring || this.ProbeCloseDebt.Length
+			return false
+		this.Running := true
+		try {
+			; This is the actual tree-owned handle, retained even after the public
+			; transaction retires. A refusal cannot authorize any file deletion.
+			if IsObject(this.Worker) && !this.Worker.terminate()
+				return false
+			if this.Directory is Map {
+				Lease := this.AcquireDirectoryLease(true)
+				if !Lease
+					return false
+				try {
+					Complete := true
+					for Name, Entry in this.Files
+						if !this.RetireEntry(Entry)
+							Complete := false
+					if !Complete || this.ProbeCloseDebt.Length
+						return false
+					; Remove the exact admitted directory through the still-held
+					; DELETE-capable lease; never release and re-resolve its name.
+					Disposition := Buffer(1, 1)
+					if !DllCall("kernel32\SetFileInformationByHandle", "Ptr", Lease,
+						"Int", 4, "Ptr", Disposition, "UInt", 1, "Int")
+						return false
+					if !DllCall("kernel32\CloseHandle", "Ptr", this.Directory["handle"], "Int")
+						return false
+					this.Directory["handle"] := 0
+					this.Directory["retired"] := true
+				} finally this.CloseProbe(Lease)
+			} else if this.Files.Count != 0
+				return false
+			if this.ProbeCloseDebt.Length
+				return false
+			this.Worker := 0
+			this.Retired := true
+			return true
+		} finally this.Running := false
+	}
+	Open(Path, Access, Disposition, Directory, Sharing := 7) {
+		Handle := DllCall("kernel32\CreateFileW", "Str", Path, "UInt", Access,
+			"UInt", Sharing, "Ptr", 0, "UInt", Disposition,
+			"UInt", 0x00200000 | (Directory ? 0x02000000 : 0x80), "Ptr", 0, "Ptr")
+		return Handle == -1 ? 0 : Handle
+	}
+	Snapshot(Handle) {
+		Info := Buffer(52, 0)
+		if !Handle || !DllCall("kernel32\GetFileInformationByHandle", "Ptr", Handle, "Ptr", Info, "Int")
+			return Map("ok", false)
+		Standard := Buffer(24, 0)
+		if !DllCall("kernel32\GetFileInformationByHandleEx", "Ptr", Handle, "Int", 1, "Ptr", Standard, "UInt", 24, "Int")
+			return Map("ok", false)
+		Attributes := NumGet(Info, 0, "UInt")
+		if Attributes & 0x400
+			return Map("ok", false)
+		return Map("ok", true, "directory", (Attributes & 0x10) != 0,
+			"delete_pending", NumGet(Standard, 20, "UChar") != 0,
+			"volume", NumGet(Info, 28, "UInt"), "index_high", NumGet(Info, 44, "UInt"),
+			"index_low", NumGet(Info, 48, "UInt"),
+			"links", NumGet(Info, 40, "UInt"),
+			"size", (NumGet(Info, 32, "UInt") << 32) | NumGet(Info, 36, "UInt"))
+	}
+	Same(Original, Actual) {
+		if !Original.Get("ok", false) || !Actual.Get("ok", false)
+			return false
+		for Key in ["directory", "volume", "index_high", "index_low"]
+			if Original[Key] != Actual[Key]
+				return false
+		return true
+	}
+	CloseProbe(Handle) {
+		if DllCall("kernel32\CloseHandle", "Ptr", Handle, "Int")
+			return true
+		; Keep the exact failed native reference as debt; an unknown close cannot
+		; authorize removal or a later transaction. Never guess handle reuse.
+		this.ProbeCloseDebt.Push(Handle)
+		return false
+	}
+	RetireEntry(Entry) {
+		if Entry.Get("retired", false)
+			return true
+		if !Entry["handle"]
+			return false
+		Original := this.Snapshot(Entry["handle"])
+		if !Original.Get("ok", false) || Original["directory"] != Entry["directory"]
+			|| (!Original["directory"] && Original["links"] != 1)
+			return false
+		Probe := this.Open(Entry["path"], 0x10000, 3, Entry["directory"], 3)
+		NativeError := A_LastError
+		if !Probe {
+			if (NativeError != 2 && NativeError != 3) || !Original["delete_pending"]
+				return false
+		} else {
+			try {
+				if !this.Same(Original, this.Snapshot(Probe))
+					return false
+				Disposition := Buffer(1, 1)
+				if !DllCall("kernel32\SetFileInformationByHandle", "Ptr", Probe,
+					"Int", 4, "Ptr", Disposition, "UInt", 1, "Int")
+					return false
+			} finally this.CloseProbe(Probe)
+			if this.ProbeCloseDebt.Length
+				return false
+		}
+		if !DllCall("kernel32\CloseHandle", "Ptr", Entry["handle"], "Int")
+			return false
+		Entry["handle"] := 0
+		Entry["retired"] := true
+		return true
+	}
+}
+
+global _UpdaterCurlCaptureDebt := Map()
+global _UpdaterCurlCaptureRetry := 0
+
+_Updater_RetireCurlCapture(Capture) {
+	global _UpdaterCurlCaptureDebt, _UpdaterCurlCaptureRetry, UPDATER_SWAP_CLEANUP_RETRY_MS
+	if !(Capture is _UpdaterCurlCaptureLedger)
+		return true
+	_UpdaterCurlCaptureDebt[ObjPtr(Capture)] := Capture
+	try Closed := Capture.Retire()
+	catch
+		Closed := false
+	if Closed {
+		if _UpdaterCurlCaptureDebt.Has(ObjPtr(Capture))
+			_UpdaterCurlCaptureDebt.Delete(ObjPtr(Capture))
+		return true
+	}
+	_UpdaterCurlCaptureDebt[ObjPtr(Capture)] := Capture
+	if !HasMethod(_UpdaterCurlCaptureRetry, "Call") {
+		Retry := _Updater_RetryCurlCaptureDebt
+		_UpdaterCurlCaptureRetry := Retry
+		Armed := false
+		try Armed := TimerArmOneShotMs(Retry, UPDATER_SWAP_CLEANUP_RETRY_MS)
+		catch
+			Armed := false
+		if !Armed && _UpdaterCurlCaptureRetry == Retry {
+			_UpdaterCurlCaptureRetry := 0
+			try LoggerWarn("Updater", "Curl capture retirement retry scheduling was refused; ownership debt is retained.")
+		}
+	}
+	return false
+}
+
+_Updater_RetryCurlCaptureDebt(*) {
+	global _UpdaterCurlCaptureDebt, _UpdaterCurlCaptureRetry
+	_UpdaterCurlCaptureRetry := 0
+	Pending := []
+	for OwnerKey, Capture in _UpdaterCurlCaptureDebt
+		Pending.Push(Capture)
+	for Capture in Pending
+		_Updater_RetireCurlCapture(Capture)
+	return _UpdaterCurlCaptureDebt.Count == 0
+}
+
+_Updater_RetireCurlCaptureArtifacts(Artifacts) {
+	if IsObject(Artifacts) && Artifacts.HasOwnProp("CurlCapture")
+		return _Updater_RetireCurlCapture(Artifacts.CurlCapture)
+	return true
+}
+
+
 global _UpdaterSwapCleanupDebt := Map()
 global _UpdaterSwapCleanupDebtCounter := 0
 global _UpdaterSwapCleanupRetryTimer := 0
@@ -1845,7 +2158,7 @@ _Updater_PublishManagedFailure(Failure, Owner, StagingEpoch) {
 _Updater_TryReserveDownloadTransaction(Request, BoundarySuspended, ExpectedFailureOwner := 0) {
 	global _UpdaterDownloadInProgress, _UpdaterSelfUpdateEpoch
 	global _UpdaterDownloadRequest, _UpdaterRecoveryPublishTarget
-	global _UpdaterDownloadStartedTick
+	global _UpdaterDownloadStartedTick, _UpdaterCurlCaptureDebt
 	global UPDATER_REQUEST_POLICY_ALLOW
 	Outcome := {
 		Reserved: false,
@@ -1863,7 +2176,7 @@ _Updater_TryReserveDownloadTransaction(Request, BoundarySuspended, ExpectedFailu
 		} else if (_Updater_RequestPolicy(Request, BoundarySuspended)
 			!= UPDATER_REQUEST_POLICY_ALLOW) {
 			Outcome.ShouldDrop := true
-		} else if (_UpdaterRecoveryPublishTarget != "") {
+		} else if (_UpdaterRecoveryPublishTarget != "" || _UpdaterCurlCaptureDebt.Count != 0) {
 			Outcome.RecoveryBusy := true
 		} else if _UpdaterDownloadInProgress {
 			Outcome.DuplicateDownload := true
@@ -2207,6 +2520,31 @@ _Updater_BuildStagingTransport(Script, SwapScript, AssetUrl, ExpectedSha256, New
 	}
 }
 
+; Bind only the parent's exact owned capture through the existing private transport.
+_Updater_BindCurlCaptureTransport(Transport, Capture) {
+	global UPDATER_STAGING_ENV_MAX_CHARS
+	if !(Capture is _UpdaterCurlCaptureLedger) || Capture.Retired || Capture.Acquiring
+		|| Type(Transport) != "Object" || !Transport.HasOwnProp("Environment")
+		|| !(Transport.Environment is Array) || Transport.Environment.Length == 0
+		|| !Capture.ValidatePaths()
+		throw Error("Parent-owned curl capture transport was refused.")
+	if StrLen(Capture.Path) > UPDATER_STAGING_ENV_MAX_CHARS
+		throw ValueError("Curl capture exceeds the private inheritance budget.")
+	First := Transport.Environment[1].Name
+	if !RegExMatch(First, "\A(ERGOPTI_UPDATER_[0-9]+_[0-9]+_[0-9]+)_SCRIPT\z", &Prefix)
+		throw Error("Curl capture requires the original staging environment owner.")
+	Name := Prefix[1] . "_CURL_CAPTURE"
+	for Pair in Transport.Environment
+		if Pair.Name == Name
+			throw Error("Curl capture transport has already been initialized.")
+	Transport.Environment.Push({Name: Name, Value: Capture.Path})
+	EnvSet(Name, Capture.Path)
+	Transport.Bootstrap .= ' -OwnedCaptureDirectory $env:' . Name
+	Transport.Args := ["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass",
+		"-EncodedCommand", _Updater_EncodePowerShellCommand(Transport.Bootstrap)]
+}
+
+
 _Updater_ClearStagingTransport(Transport) {
 	if (Type(Transport) != "Object" or !Transport.HasOwnProp("Environment"))
 		return
@@ -2217,7 +2555,7 @@ _Updater_ClearStagingTransport(Transport) {
 _Updater_StartStagingWorker(AssetUrl, ExpectedSha256, NewExe, SwapScriptPath, CurrentExe, Tag, StagingEpoch, Release := 0, Request := 0, InstallObserver := unset, AuthenticatedSize := 0) {
 	global _UpdaterDownloadWorker, UPDATER_HTTP_DOWNLOAD_RECEIVE_TIMEOUT_MS, UPDATER_MIN_EXE_SIZE_BYTES
 	global _VendorDir, _SharedDir, UPDATER_HTTP_DOWNLOAD_DEADLINE_MS, _UpdaterDownloadStartedTick
-	global _UpdaterDownloadInProgress, _UpdaterSelfUpdateEpoch
+	global _UpdaterDownloadInProgress, _UpdaterSelfUpdateEpoch, _UpdaterDownloadArtifacts
 	StagingScript := _Updater_BuildStagingWorkerScript()
 	SwapScript := _Updater_BuildSwapWorkerScript()
 	FailureOwner := IsSet(InstallObserver)
@@ -2233,7 +2571,21 @@ _Updater_StartStagingWorker(AssetUrl, ExpectedSha256, NewExe, SwapScriptPath, Cu
 	Started := false
 	Published := false
 	StartError := ""
+	Capture := 0
 	try {
+		if AuthenticatedSize > 0 {
+			Capture := _UpdaterCurlCaptureLedger()
+			PreviousCritical := Critical("On")
+			try {
+				if !_Updater_SelfUpdateEpochIsCurrent(StagingEpoch) || !IsObject(_UpdaterDownloadArtifacts)
+					throw Error("Curl capture transaction is no longer current.")
+				_UpdaterDownloadArtifacts.CurlCapture := Capture
+			} finally Critical(PreviousCritical)
+			SplitPath(NewExe, , &CaptureParent)
+			Capture.Acquire(CaptureParent)
+			if !_Updater_SelfUpdateEpochIsCurrent(StagingEpoch)
+				throw Error("Curl capture allocation crossed transaction retirement.")
+		}
 		Transport := _Updater_BuildStagingTransport(
 			StagingScript, SwapScript, AssetUrl, ExpectedSha256, NewExe, SwapScriptPath, CurrentExe,
 			UPDATER_MIN_EXE_SIZE_BYTES, UPDATER_HTTP_DOWNLOAD_RECEIVE_TIMEOUT_MS,
@@ -2241,9 +2593,14 @@ _Updater_StartStagingWorker(AssetUrl, ExpectedSha256, NewExe, SwapScriptPath, Cu
 			_UpdaterDownloadStartedTick,
 			_SharedDir . "\modules\network\proxy_policy.json",
 			_SharedDir . "\modules\updater\defaults.json", AuthenticatedSize)
+		if IsObject(Capture)
+			_Updater_BindCurlCaptureTransport(Transport, Capture)
 		if _Updater_SelfUpdateEpochIsCurrent(StagingEpoch) {
+			NativeAdopt := IsObject(Capture) ? ObjBindMethod(Capture, "OnNativeAdopt") : 0
 			Worker := ShellRunner_SpawnTreeOwned(
-				_Updater_PowerShellPath(), Transport.Args, _OnDone)
+				_Updater_PowerShellPath(), Transport.Args, _OnDone, , NativeAdopt)
+			if IsObject(Capture)
+				Capture.Attach(Worker)
 			PreviousCritical := Critical("On")
 			try {
 				if (_UpdaterDownloadInProgress
@@ -2267,6 +2624,8 @@ _Updater_StartStagingWorker(AssetUrl, ExpectedSha256, NewExe, SwapScriptPath, Cu
 		_Updater_ClearStagingTransport(Transport)
 	}
 	if !Started {
+		if IsObject(Capture)
+			_Updater_RetireCurlCapture(Capture)
 		PreviousCritical := Critical("On")
 		try {
 			if (IsObject(Worker) and IsObject(_UpdaterDownloadWorker)
@@ -2340,7 +2699,9 @@ _Updater_CancelSelfUpdateForSuspend() {
 
 _Updater_QuiesceSelfUpdateForSuspend() {
 	_Updater_CancelSelfUpdateForSuspend()
-	return _Updater_RetrySwapCleanupDebt()
+	SwapClosed := _Updater_RetrySwapCleanupDebt()
+	CaptureClosed := _Updater_RetryCurlCaptureDebt()
+	return SwapClosed && CaptureClosed
 }
 
 _Updater_CancelSelfUpdateTransaction(LogMessage, RebuildMenu := true, SurfacePausedRequest := false, ExpectedEpoch := 0) {
@@ -2383,7 +2744,8 @@ _Updater_CancelSelfUpdateTransaction(LogMessage, RebuildMenu := true, SurfacePau
 		try Worker.terminate()
 	if (Owner is Map)
 		_Updater_CloseSwapOwner(Owner, true)
-	if IsObject(Artifacts) {
+	CaptureClosed := _Updater_RetireCurlCaptureArtifacts(Artifacts)
+	if IsObject(Artifacts) && CaptureClosed {
 		for Name in ["NewExe", "SwapScript"] {
 			Path := Artifacts.HasOwnProp(Name) ? Artifacts.%Name% : ""
 			if (Path != "" and FSExists(Path) and !FSDelete(Path))
@@ -2467,6 +2829,12 @@ _Updater_PollDownloadAsync(ExitCode, Stdout, Stderr, SwapScriptPath, NewExe, Cur
 		return
 	if !_Updater_AdmitStagingCompletion(StagingEpoch)
 		return
+	global _UpdaterDownloadArtifacts
+	if !_Updater_RetireCurlCaptureArtifacts(_UpdaterDownloadArtifacts) {
+		_Updater_ReportInstallFailure("updater.install_error_download", "changelog_window.install_error_download")
+		_Updater_EndDownloadTransaction(StagingEpoch)
+		return
+	}
 	if A_IsSuspended {
 		try LoggerWarn("Updater", "Update staging completion discarded while suspended.")
 		_Updater_NotifyInstallPhase("failed", "changelog_window.install_error_download")
@@ -2496,9 +2864,9 @@ _Updater_PollDownloadAsync(ExitCode, Stdout, Stderr, SwapScriptPath, NewExe, Cur
 ; Returns the compact staging orchestrator. Trusted helper paths and release
 ; data use the private inherited environment, never PowerShell interpolation.
 _Updater_BuildStagingWorkerScript() {
-	return 'param([string]$Url, [string]$ExpectedSha256, [string]$NewExe, [string]$SwapScriptPath, [string]$CurrentExe, [int64]$MinimumSize, [int]$TimeoutMs, [string]$SwapScriptPayload, [string]$DownloadModulePath, [int]$DeadlineMs, [int64]$StartedTick, [string]$ProxyPolicyPath, [string]$UpdaterDefaultsPath, [scriptblock]$ReadConfig=$null, [scriptblock]$ReadEnvironment=$null, [int64]$AuthenticatedSize=0)' . "`n"
+	return 'param([string]$Url, [string]$ExpectedSha256, [string]$NewExe, [string]$SwapScriptPath, [string]$CurrentExe, [int64]$MinimumSize, [int]$TimeoutMs, [string]$SwapScriptPayload, [string]$DownloadModulePath, [int]$DeadlineMs, [int64]$StartedTick, [string]$ProxyPolicyPath, [string]$UpdaterDefaultsPath, [scriptblock]$ReadConfig=$null, [scriptblock]$ReadEnvironment=$null, [int64]$AuthenticatedSize=0, [string]$OwnedCaptureDirectory="")' . "`n"
 		. '$ErrorActionPreference = "Stop"' . "`n"
-		. '$State=@{Stage="proxy_resolve";Reason="download";Receipt=@{};CleanupDebt=@()}' . "`n"
+		. '$State=@{Stage="proxy_resolve";Reason="download";Receipt=@{};CleanupDebt=@()};if ($OwnedCaptureDirectory -ne "") {$State.OwnedCaptureDirectory=$OwnedCaptureDirectory}' . "`n"
 		. 'function CleanWorker($Path,$Name){try{[IO.File]::Delete($Path)}catch{if(Get-Command Add-ErgoptiUpdaterCleanupDebt -ErrorAction SilentlyContinue){Add-ErgoptiUpdaterCleanupDebt $State $Name "file_remove" $_.Exception}else{$State.CleanupDebt+=@{resource=$Name;receipt=@{backend="dotnet";stage="file_remove";failure_provenance="unknown"}}}}}' . "`n"
 		. 'try {' . "`n"
 		. '  . $DownloadModulePath' . "`n"
@@ -3610,10 +3978,12 @@ _Updater_TransferExitIntentAfterShutdownGates() {
 _Updater_EndDownloadTransaction(StagingEpoch := 0) {
 	global _UpdaterDownloadInProgress, _UpdaterDownloadRequest, _UpdaterSelfUpdateEpoch
 	global _UpdaterDownloadArtifacts, _UpdaterDownloadStartedTick
+	Artifacts := 0
 	PreviousCritical := Critical("On")
 	try {
 		if (StagingEpoch and _UpdaterSelfUpdateEpoch != StagingEpoch)
 			return false
+		Artifacts := _UpdaterDownloadArtifacts
 		_UpdaterDownloadInProgress := false
 		_UpdaterDownloadRequest := 0
 		_UpdaterDownloadArtifacts := 0
@@ -3621,6 +3991,7 @@ _Updater_EndDownloadTransaction(StagingEpoch := 0) {
 	} finally {
 		Critical(PreviousCritical)
 	}
+	_Updater_RetireCurlCaptureArtifacts(Artifacts)
 	try SetTimer((*) => _Updater_RebuildMenu(), -50)
 	return true
 }

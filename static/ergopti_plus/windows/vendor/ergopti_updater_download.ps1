@@ -357,6 +357,7 @@ function Invoke-ErgoptiUpdaterCurlDownload {
         $ReadEnvironment = { param($Name) [Environment]::GetEnvironmentVariable($Name, 'Process') }
     }
     $Directory = $null
+    $ParentOwnedCapture = $false
     $Engine = $null
     $Input = $null
     $Output = $null
@@ -366,9 +367,25 @@ function Invoke-ErgoptiUpdaterCurlDownload {
         $State.Stage = 'file_create'
         $Parent = [IO.Path]::GetDirectoryName($NewExe)
         [IO.Directory]::CreateDirectory($Parent) | Out-Null
-        $CaptureCandidate = Join-Path $Parent ('curl.' + [Guid]::NewGuid().ToString('N'))
-        if (-not [ErgoptiUpdaterMonotonicClock]::CreateDirectoryW($CaptureCandidate, [IntPtr]::Zero)) {
-            throw [ComponentModel.Win32Exception]::new([Runtime.InteropServices.Marshal]::GetLastWin32Error())
+        if ($State.ContainsKey('OwnedCaptureDirectory')) {
+            $CaptureCandidate = $State.OwnedCaptureDirectory
+            if ($CaptureCandidate -isnot [string] -or $CaptureCandidate -eq '' -or
+                [IO.Path]::GetDirectoryName($CaptureCandidate) -cne $Parent -or
+                [IO.Path]::GetFileName($CaptureCandidate) -cnotmatch '^curl\.[0-9a-f]{32}$' -or
+                -not [IO.Directory]::Exists($CaptureCandidate)) {
+                throw [ArgumentException]::new('Parent-owned artifact capture was refused.')
+            }
+            foreach ($Name in @('artifact.bin', 'headers.bin', 'capability.json', 'transport.conf')) {
+                if (-not [IO.File]::Exists((Join-Path $CaptureCandidate $Name))) {
+                    throw [ArgumentException]::new('Parent-owned artifact capture file was absent.')
+                }
+            }
+            $ParentOwnedCapture = $true
+        } else {
+            $CaptureCandidate = Join-Path $Parent ('curl.' + [Guid]::NewGuid().ToString('N'))
+            if (-not [ErgoptiUpdaterMonotonicClock]::CreateDirectoryW($CaptureCandidate, [IntPtr]::Zero)) {
+                throw [ComponentModel.Win32Exception]::new([Runtime.InteropServices.Marshal]::GetLastWin32Error())
+            }
         }
         $Directory = $CaptureCandidate
         $Parameters = [pscustomobject]@{
@@ -517,7 +534,7 @@ function Invoke-ErgoptiUpdaterCurlDownload {
     } finally {
         Close-ErgoptiUpdaterResource $Output 'output' 'file_write' $State
         Close-ErgoptiUpdaterResource $Input 'input' 'file_read' $State
-        if ($null -ne $Directory) {
+        if ($null -ne $Directory -and -not $ParentOwnedCapture) {
             if ($null -ne $Engine -and -not $Engine.ChildQuiesced()) {
                 $State.NativeCleanupDebt = $true
             } else {
