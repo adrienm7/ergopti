@@ -3140,6 +3140,11 @@ Windows PC acceptance, delegated to the maintainer:
   cuts reject aliases and changed records; seventeen additive native filesystem
   controls require exact-source macOS execution. This diagnostic does not fix
   the first tap-hold exit73 or complete item24.
+  Native release compilation passed, but two filesystem fixture callbacks failed
+  test compilation when Swift inferred throwing closures. Explicit error capture
+  now retains the replacement and refusal assertions without allowing an error
+  to escape the nonthrowing read hook. Fresh native test compilation and all
+  filesystem executions remain required.
   Native permission UI qualification is now registered in the Swift target:
   ten frozen cases require actual WebKit DOM/bridge callbacks, visible native
   window identities, retirement, deferred log purge and scheduler cleanup.
