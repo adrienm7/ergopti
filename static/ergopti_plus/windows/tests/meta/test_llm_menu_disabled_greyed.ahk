@@ -81,8 +81,8 @@ Test("menu_main: LLM_Menu_Build greys the settings rows when the feature is off 
 _LMDG_EmitRowAppliesGreying() {
 	Seg := _DriverFuncBody("_LLM_Menu_EmitRow")
 	Assert(Seg != "", "_LLM_Menu_EmitRow() must exist in menu_main.ahk")
-	Assert(InStr(Seg, "_LLM_Menu_AddRow(_LLM_Menu_BackendRowLabel(), LLM_Menu_BuildBackendMenu(), disabled)") > 0,
-		"_LLM_Menu_EmitRow must emit the backend row via _LLM_Menu_AddRow so its greying follows the spec-resolved flag")
+	Assert(_LMDG_BackendFrameGreyingRoute(Seg, _DriverFuncBody("_LLM_Menu_BackendParentRows")),
+		"_LLM_Menu_EmitRow must emit the actual backend frame so its greying follows the spec-resolved flag")
 	Assert(InStr(Seg, "model_menu, disabled)") > 0,
 		"_LLM_Menu_EmitRow must emit the model row with the resolved 'disabled' flag (not a hardcoded value) so the spec policy drives greying")
 }
@@ -208,3 +208,61 @@ _LMDG_ToggleRouteRefusesDecoy(Kind) {
 for Kind in ["missing-command", "wrong-reader", "conditional-command", "outer-conditional", "unbraced-command", "comment-command",
 	"string-command", "string-renderer", "wrong-target", "missing-renderer", "early-return", "comment-renderer"]
 	Test("shared IA toggle route refuses " . Kind, _LMDG_ToggleRouteRefusesDecoy.Bind(Kind))
+
+; Actual backend data/GroupRow/template publication transports the same resolved greying flag.
+_LMDG_BackendFrameGreyingRoute(Emit, Helper) {
+	if Emit == "" || Helper == ""
+		return false
+	Call := _LMDG_Statement(Emit,
+		'm)^[ \t]*(BackendRows) := _LLM_Menu_BackendParentRows\(BackendMenu, BackendCaption, disabled, WarningRows\)', 3)
+	Consumer := _LMDG_Statement(Emit,
+		'm)^[ \t]*(MenuRenderer_AppendRows)\(_LLM_Menu_Handle, "llm_menu", "llm_backend_parent_frame_ahk", BackendRows\)', 3)
+	Getter := _LMDG_Statement(Helper,
+		'm)^[ \t]*(Getters) := Map\("llm_backend_parent_caption", \(\*\) => Caption,[ \t]*\n[ \t]*"llm_backend_parent_ready", \(\*\) => !Disabled,', 1)
+	Parent := _LMDG_Statement(Helper,
+		'm)^[ \t]*(Parent) := MenuRenderer_GroupRow\("llm_backend_parent_ahk", "llm_backend_parent", NativeChild, Getters\)', 1)
+	Handoff := _LMDG_Statement(Helper,
+		'm)^[ \t]*(ParentRows) := \[Parent\][ \t]*$', 1)
+	ListConsumer := _LMDG_Statement(Helper,
+		'm)^[ \t]*(Map)\("llm_backend_parent_rows", \(\*\) => ParentRows,[ \t]*$', 1)
+	Frame := _LMDG_Statement(Helper,
+		'm)^[ \t]*(Rows) := MenuRenderer_TemplateRows\("llm_backend_parent_frame_ahk", Map\(\), Getters,[ \t]*\n'
+		. '[ \t]*Map\("llm_backend_parent_rows", \(\*\) => ParentRows,[ \t]*\n'
+		. '[ \t]*"llm_backend_warning_rows", \(\*\) => Admission\["warning_rows"\]\)\)', 1)
+	ResultReturn := _LMDG_Statement(Helper, 'm)^[ \t]*(return) Rows[ \t]*$', 1)
+	return Call && Consumer && Call < Consumer && Getter && Parent && Handoff && ListConsumer && Frame && ResultReturn
+		&& Getter < Parent && Parent < Handoff && Handoff < Frame && Frame < ListConsumer && ListConsumer < ResultReturn
+}
+
+_LMDG_BackendFrameGreyingDecoy(Kind) {
+	Emit := _DriverFuncBody("_LLM_Menu_EmitRow"), Helper := _DriverFuncBody("_LLM_Menu_BackendParentRows")
+	Assert(_LMDG_BackendFrameGreyingRoute(Emit, Helper), "the genuine current backend parent consumes resolved off-state policy")
+	if Kind == "wrong-flag"
+		Emit := StrReplace(Emit, 'BackendMenu, BackendCaption, disabled, WarningRows)', 'BackendMenu, BackendCaption, false, WarningRows)')
+	else if Kind == "wrong-reader"
+		Helper := StrReplace(Helper, '"llm_backend_parent_ready", (*) => !Disabled,', '"llm_backend_parent_ready", (*) => true,')
+	else if Kind == "commented-call"
+		Emit := StrReplace(Emit, 'BackendRows := _LLM_Menu_BackendParentRows(', '; BackendRows := _LLM_Menu_BackendParentRows(')
+	else if Kind == "foreign-group"
+		Helper := StrReplace(Helper, 'Parent := MenuRenderer_GroupRow(', 'Parent := Foreign.MenuRenderer_GroupRow(')
+	else if Kind == "wrong-consumer"
+		Emit := StrReplace(Emit, '"llm_backend_parent_frame_ahk", BackendRows)', '"llm_backend_parent_frame_ahk", ForeignRows)')
+	else if Kind == "discarded-parent"
+		Helper := StrReplace(Helper, 'ParentRows := [Parent]', 'ParentRows := [Map("label", Caption, "submenu", NativeChild)]')
+	else if Kind == "foreign-parent"
+		Helper := StrReplace(Helper, 'ParentRows := [Parent]', 'ParentRows := [ForeignParent]')
+	else if Kind == "wrong-list-consumer"
+		Helper := StrReplace(Helper, '"llm_backend_parent_rows", (*) => ParentRows,', '"llm_backend_parent_rows", (*) => [],')
+	else if Kind == "commented-handoff"
+		Helper := StrReplace(Helper, 'ParentRows := [Parent]', '; ParentRows := [Parent]')
+	else if Kind == "commented-list-consumer"
+		Helper := StrReplace(Helper, 'Map("llm_backend_parent_rows", (*) => ParentRows,', '; Map("llm_backend_parent_rows", (*) => ParentRows,')
+	else if Kind == "wrong-return"
+		Helper := StrReplace(Helper, 'return Rows', 'return ForeignRows')
+	else
+		throw Error("Unknown backend parent off-state counterexample")
+	Assert(!_LMDG_BackendFrameGreyingRoute(Emit, Helper), "foreign or fixed-flag source cannot supply actual backend greying: " . Kind)
+}
+for Kind in ["wrong-flag", "wrong-reader", "commented-call", "foreign-group", "wrong-consumer", "wrong-return",
+	"discarded-parent", "foreign-parent", "wrong-list-consumer", "commented-handoff", "commented-list-consumer"]
+	Test("shared backend parent off-state route refuses " . Kind, _LMDG_BackendFrameGreyingDecoy.Bind(Kind))
