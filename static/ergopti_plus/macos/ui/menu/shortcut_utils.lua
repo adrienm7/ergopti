@@ -272,6 +272,7 @@ function M.ask_parameter_value(gestures, action, spec, title, prior)
 	local prompt_ok, button, typed = pcall(dialog.text_prompt,
 		title, prompt, prior, save_btn, i18n.get("button.cancel"))
 	if not prompt_ok or button ~= save_btn then return nil end
+	if spec == "llm_language" and (type(typed) ~= "string" or typed:match("^%s*$")) then return nil end
 	return typed
 end
 

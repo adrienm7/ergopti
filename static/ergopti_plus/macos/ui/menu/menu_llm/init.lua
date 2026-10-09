@@ -27,7 +27,6 @@ local StreamPanel      = require("ui.menu.menu_llm.streaming_panel")
 local WarmupCtrl       = require("ui.menu.menu_llm.warmup_controller")
 local BackendPanel     = require("ui.menu.menu_llm.backend_panel")
 local TriggerPanel     = require("ui.menu.menu_llm.trigger_panel")
-local LiveModePanel    = require("ui.menu.menu_llm.live_mode_panel")
 local AgentPanel       = require("ui.menu.menu_llm.agent_panel")
 local ApiPanel         = require("ui.menu.menu_llm.api_panel")
 local LocalServerPanel = require("ui.menu.menu_llm.local_server_panel")
@@ -710,7 +709,27 @@ local function create_menu(deps)
 		local apply_recommended_prompt_profile = switcher.apply_recommended_prompt_profile
 		local guarded_check_requirements       = switcher.guarded_check_requirements
 
-		deps.set_llm_profile = switcher.set_llm_profile
+		-- A manual profile choice replaces the temporary shortcut override before
+		-- acquiring any deferred profile intent. Generic rollback stays unchanged.
+		deps.set_llm_profile = function(profile_id, opts)
+			if type(profile_id) ~= "string" or profile_id == "" then return false end
+			if not keymap or type(keymap.get_live_prompt) ~= "function"
+				or type(keymap.set_live_prompt) ~= "function" then
+				Logger.error(LOG, "Manual profile selection refused: its live override owner is unavailable.")
+				return false
+			end
+			local observed, live = xpcall(keymap.get_live_prompt, debug.traceback)
+			if not observed then return false end
+			if live ~= nil then
+				local stopped, accepted = xpcall(keymap.set_live_prompt, debug.traceback, nil)
+				local checked, current = xpcall(keymap.get_live_prompt, debug.traceback)
+				if stopped ~= true or accepted ~= true or checked ~= true or current ~= nil then
+					Logger.error(LOG, "Manual profile selection refused: its temporary override did not retire.")
+					return false
+				end
+			end
+			return switcher.set_llm_profile(profile_id, opts)
+		end
 		deps.settle_llm_switcher_recovery = switcher.settle_recovery_debts
 		deps.apply_recommended_prompt_profile = function(opts)
 				return apply_recommended_prompt_profile(state.llm_model, opts)
@@ -1238,17 +1257,6 @@ local function create_menu(deps)
 				})
 
 				child_group_for("llm_trigger", trigger_menu, MenuLayout.row_disabled("llm_trigger", is_disabled, paused))
-
-
-				-- ===== Live mode submenu =====
-
-				child_group_for("llm_live_mode", LiveModePanel.build({
-								llm_mod     = llm_mod,
-								keymap      = keymap,
-								count       = state.llm_num_predictions or llm_mod.DEFAULT_STATE.llm_num_predictions,
-								is_disabled = is_disabled,
-								update_menu = update_menu,
-						}), MenuLayout.row_disabled("llm_live_mode", is_disabled, paused))
 
 
 				-- ===== Generation settings submenu =====

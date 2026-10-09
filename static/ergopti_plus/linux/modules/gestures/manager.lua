@@ -1218,11 +1218,15 @@ function M.validate_action_parameter(action_name, value)
 	end
 	-- Syntax only: whether the named prompt still exists is checked when the
 	-- action runs, so deleting a custom prompt does not drop its bindings.
-	if spec == "llm_prompt" then return PromptAction.is_valid(value) end
+	if spec == "llm_prompt" then
+		local parsed = PromptAction.parse(value)
+		return parsed ~= nil and (parsed.translation_target == nil
+			or require("modules.llm.translation").is_valid(parsed.translation_target))
+	end
 	-- Syntax only as well: whether the provider exists, has a key and a
 	-- default model is checked when the action runs.
 	if spec == "llm_vision" then return Vision.is_valid(value) end
-	-- A closed list: "ui" or a shipped locale code (translate.lua).
+	-- An admitted per-binding language name or retained locale code (translate.lua).
 	if spec == "llm_language" then return require("modules.llm.translation").is_valid(value) end
 	-- Syntax only: whether the desktop entry exists is gtk-launch's to say.
 	if spec == "app" then return AppParameter.is_valid(value) end
@@ -1277,11 +1281,9 @@ function M.get_action_parameter_prompt(action_name)
 		return fill_placeholder(i18n.get("dialog.gestures.param_llm_vision"), table.concat(lines, "\n"))
 	end
 	if spec == "llm_language" then
-		local lines = {}
-		for _, choice in ipairs(require("modules.llm.translation").choices()) do
-			lines[#lines + 1] = choice.value .. " — " .. choice.label
-		end
-		return fill_placeholder(i18n.get("dialog.gestures.param_llm_language"), table.concat(lines, "\n"))
+		local data = require("modules.llm.translation").data()
+		if not data then error("the translation parameter is unavailable") end
+		return fill_placeholder(i18n.get("dialog.gestures.param_llm_language"), tostring(data.config.max_language_bytes))
 	end
 	error("no prompt for parameter kind '" .. tostring(spec) .. "'")
 end

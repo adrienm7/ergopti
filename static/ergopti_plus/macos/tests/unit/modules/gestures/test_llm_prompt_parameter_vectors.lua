@@ -53,6 +53,7 @@ helpers.describe("llm_prompt_prediction parameter replays the shared llm_prompt 
 			if valid then
 				helpers.assert_eq(parsed.profile_id, vector.profile_id, vector.id .. ": profile id")
 				helpers.assert_eq(parsed.num_predictions, vector.num_predictions, vector.id .. ": count")
+				helpers.assert_eq(parsed.translation_target, vector.translation_target, vector.id .. ": target")
 			else
 				helpers.assert_nil(parsed, vector.id .. ": an invalid value names no prompt")
 			end

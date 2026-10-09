@@ -36,6 +36,119 @@
 	// The host's configuration (schema, redaction rules and context, mode) and
 	// the snapshot on screen; both null until the host's init message
 	var state = { config: null, snapshot: null };
+	var Checks = window.ErgoptiDiagnosticChecks;
+	var checkRun = null;
+	var exportSequence = 0;
+	var pendingExport = null;
+	var sharedText = null;
+
+	function requestExport(action) {
+		if (pendingExport) return;
+		if (exportSequence >= state.config.schema.report.export_sequence_max)
+			throw new Error('The export sequence is exhausted');
+		pendingExport = { action: action, sequence: ++exportSequence, snapshot: state.snapshot };
+		post({ action: 'export_snapshot', export_sequence: exportSequence });
+	}
+
+	function completeExport(message) {
+		var request = pendingExport;
+		if (!request || message.export_sequence !== request.sequence) return;
+		pendingExport = null;
+		if (
+			!isTrue(message.ok) ||
+			!message.snapshot ||
+			typeof message.share_text !== 'string' ||
+			state.snapshot !== request.snapshot ||
+			message.snapshot.driver !== request.snapshot.driver ||
+			message.snapshot.generated_at !== request.snapshot.generated_at
+		)
+			return;
+		message.snapshot.diagnostic_checks = state.snapshot.diagnostic_checks;
+		state.snapshot = message.snapshot;
+		sharedText = message.share_text;
+		render();
+		if (request.action === 'copy') post({ action: 'copy', text: exportText() });
+		else if (request.action === 'save')
+			post({ action: 'save', text: exportText(), name: reportName() });
+		else post({ action: 'report', text: exportText(), fields: issueFields() });
+	}
+
+	function cancelChecks() {
+		if (checkRun) checkRun.cancel();
+		checkRun = null;
+	}
+
+	function startChecks() {
+		cancelChecks();
+		var captured = state.snapshot;
+		checkRun = Checks.start(
+			captured,
+			state.config.schema,
+			state.config.redaction,
+			Redact.apply,
+			function (id, result) {
+				if (state.snapshot !== captured) return;
+				captured.diagnostic_checks[id] = result;
+				sharedText = null;
+				render();
+			},
+			function (fn) {
+				return window.setTimeout(fn, 0);
+			},
+			function (id) {
+				window.clearTimeout(id);
+			}
+		);
+		captured.diagnostic_checks = checkRun.results;
+	}
+
+	function refreshRequest() {
+		pendingExport = null;
+		post({
+			action: 'refresh',
+			detailed: document.getElementById('chk-details').checked,
+			extensive: document.getElementById('chk-extensive').checked
+		});
+	}
+
+	function cancelRequestedChecks() {
+		cancelChecks();
+		Object.keys(state.snapshot.probes || {}).forEach(function (id) {
+			if (state.snapshot.probes[id].state === 'pending')
+				state.snapshot.probes[id] = { state: 'cancelled', cleanup: 'pending' };
+		});
+		render();
+		post({ action: 'cancel' });
+	}
+
+	/** Keeps cleanup cancellation requestable after the business result is terminal. */
+	function hasUnsettledCleanup(snapshot) {
+		var groups = [snapshot.probes, snapshot.diagnostic_checks];
+		(snapshot.retired_probes || []).forEach(function (cohort) {
+			if (cohort) groups.push(cohort.probes);
+		});
+		return groups.some(function (results) {
+			return Object.keys(results || {}).some(function (id) {
+				var result = results[id];
+				return result && result.cleanup !== undefined && result.cleanup !== 'settled';
+			});
+		});
+	}
+
+	function showCheckProgress() {
+		var count = Checks.progress(state.snapshot);
+		document.getElementById('deep-progress').textContent = isTrue(state.snapshot.extensive)
+			? t('healthcheck.deep_tests.progress', count.completed, count.total)
+			: '';
+		document.getElementById('btn-cancel').disabled =
+			count.completed === count.total && !hasUnsettledCleanup(state.snapshot);
+		document.getElementById('chk-extensive').checked = isTrue(state.snapshot.extensive);
+		document.getElementById('deep-results').textContent = Checks.report(
+			state.snapshot,
+			state.config.schema,
+			t
+		);
+	}
 
 	/**
 	 * True for a boolean true, or the 1 the AutoHotkey JSON writer sends for it.
@@ -80,8 +193,9 @@
 	 * @returns {string}
 	 */
 	function exportText() {
-		var markdown = Model.formatMarkdown(state.snapshot, state.config.schema, t);
-		return Redact.apply(markdown, state.config.redaction, state.config.context);
+		return sharedText !== null
+			? sharedText
+			: Model.formatShareable(state.snapshot, state.config.schema, t);
 	}
 
 	/**
@@ -93,6 +207,7 @@
 			button.disabled = !enabled;
 		});
 		document.getElementById('chk-details').disabled = !enabled;
+		document.getElementById('chk-extensive').disabled = !enabled;
 	}
 
 	/**
@@ -119,6 +234,7 @@
 		document.getElementById('preview-text').textContent = exportText();
 		document.getElementById('chk-details').checked = isTrue(state.snapshot.detailed);
 		setToolbarEnabled(true);
+		showCheckProgress();
 	}
 
 	// ===============================
@@ -150,6 +266,15 @@
 	 * @param {object} message { action, ok, path, missing }
 	 */
 	function onActionResult(message) {
+		if (message.action === 'export_snapshot') {
+			completeExport(message);
+			return;
+		}
+		if (message.action === 'cancel' && message.snapshot && state.snapshot) {
+			message.snapshot.diagnostic_checks = state.snapshot.diagnostic_checks;
+			state.snapshot = message.snapshot;
+			render();
+		}
 		// A file not created yet, such as today's errors file before the day's
 		// first warning, is nothing to open rather than a failure
 		if (isTrue(message.missing)) {
@@ -189,16 +314,19 @@
 	 */
 	window.receiveDiagnostics = function (message) {
 		if (!message || typeof message !== 'object') return;
+		if (message.type !== 'action' || message.action === 'cancel') sharedText = null;
 		switch (message.type) {
 			case 'init':
 				state.config = message.config;
 				state.snapshot = message.snapshot;
+				startChecks();
 				render();
 				applyMode();
 				break;
 			case 'snapshot':
 				if (!state.config) return;
 				state.snapshot = message.snapshot;
+				startChecks();
 				setStatus('', 'info');
 				render();
 				break;
@@ -233,7 +361,9 @@
 	 * @returns {string}
 	 */
 	function reportName() {
-		return Model.fileName(Model.reportInfo(state.snapshot));
+		return Model.fileName(
+			Model.reportInfo(Model.shareSnapshot(state.snapshot, state.config.schema))
+		);
 	}
 
 	/**
@@ -242,7 +372,9 @@
 	 * @returns {object}
 	 */
 	function issueFields() {
-		var fields = Model.issueFields(Model.reportInfo(state.snapshot));
+		var fields = Model.issueFields(
+			Model.reportInfo(Model.shareSnapshot(state.snapshot, state.config.schema))
+		);
 		Object.keys(fields).forEach(function (id) {
 			fields[id] = Redact.apply(String(fields[id]), state.config.redaction, state.config.context);
 		});
@@ -251,25 +383,34 @@
 
 	var TOOLBAR = {
 		'btn-copy': function () {
-			post({ action: 'copy', text: exportText() });
+			requestExport('copy');
 		},
 		'btn-save': function () {
-			post({ action: 'save', text: exportText(), name: reportName() });
+			requestExport('save');
 		},
 		'btn-report': function () {
-			post({ action: 'report', text: exportText(), fields: issueFields() });
+			requestExport('report');
 		},
 		'btn-open-logs': function () {
 			post({ action: 'open_path', id: 'logs_dir' });
 		},
+		'btn-cancel': cancelRequestedChecks,
 		'btn-refresh': function () {
 			setStatus(t('healthcheck.status.loading'), 'info');
-			post({ action: 'refresh', detailed: document.getElementById('chk-details').checked });
+			refreshRequest();
 		}
 	};
 
 	Object.keys(TOOLBAR).forEach(function (id) {
 		document.getElementById(id).addEventListener('click', TOOLBAR[id]);
+	});
+
+	document.getElementById('chk-extensive').addEventListener('change', function (event) {
+		if (!event.target.checked && state.snapshot) {
+			cancelChecks();
+			state.snapshot.extensive = false;
+		}
+		refreshRequest();
 	});
 
 	document.getElementById('chk-details').addEventListener('change', function (event) {
@@ -281,7 +422,7 @@
 			render();
 		}
 		setStatus(t('healthcheck.status.loading'), 'info');
-		post({ action: 'refresh', detailed: detailed });
+		refreshRequest();
 	});
 
 	// Row buttons (Open, Open settings) carry an action and an id, nothing else

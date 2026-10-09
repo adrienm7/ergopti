@@ -767,6 +767,7 @@ M.eventtap = {
 			scrollWheelEventDeltaAxis1 = 4,
 			mouseEventButtonNumber = 5,
 			keyboardEventAutorepeat = 6,
+			keyboardEventKeyboardType = 8,
 			scrollWheelEventDeltaAxis2 = 7,
 		},
 		-- Every type the driver actually names. It used to carry five, and the
