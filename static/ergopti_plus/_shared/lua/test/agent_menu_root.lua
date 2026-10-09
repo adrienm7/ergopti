@@ -1,4 +1,4 @@
---- test/agent_menu_root.lua
+--- _shared/lua/test/agent_menu_root.lua
 
 --- ==============================================================================
 --- MODULE: Agent-Only Root Presentation Behavior Contract
