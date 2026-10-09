@@ -188,7 +188,9 @@ def owned_inventory_runtime(source):
         "source<4096, 64, ergoptiplus::remap::native_interface_capacity>",
     )
     return replace_once(
-        source, "  source_type source_;", "  source_type source_;\n  inventory_type inventory_;"
+        source,
+        "  source_type source_;",
+        "  source_type source_;\n  inventory_type inventory_;",
     )
 
 
@@ -268,7 +270,9 @@ def owned_inventory_service_monitor(source):
     // Setup scan timer""",
     )
     source = replace_once(
-        source, "  void stop() {\n", "  void stop() {\n    ergopti_inventory_live_.reset();\n"
+        source,
+        "  void stop() {\n",
+        "  void stop() {\n    ergopti_inventory_live_.reset();\n",
     )
     source = replace_once(
         source,
@@ -425,4 +429,23 @@ def owned_inventory_hid_manager(source):
   std::size_t ergopti_watcher_count_ = 0;
   bool ergopti_failed_ = false;
   pqrs::not_null_shared_ptr_t<cf::run_loop_thread> run_loop_thread_;""",
+    )
+
+
+def owned_input_values_queue_acquisition(source):
+    """Refuse a missing native queue before device open or started publication."""
+    source = replace_once(
+        source,
+        "    if (observe_input_values_) {\n      start_input_values_queue();\n    }\n",
+        '    if (observe_input_values_ && !start_input_values_queue()) {\n      enqueue_to_dispatcher([this] {\n        // A null create has no native IOReturn; report only the observed failure.\n        error_occurred("IOHIDQueueCreate returned null.", kIOReturnError);\n      });\n      // Preserve the existing open timer\'s retry and requested-options ownership.\n      return;\n    }\n',
+    )
+    source = replace_once(
+        source,
+        "  void start_input_values_queue() {",
+        "  bool start_input_values_queue() {",
+    )
+    return replace_once(
+        source,
+        "        IOHIDQueueStart(*input_values_queue_);\n      }\n    }\n  }\n",
+        "        IOHIDQueueStart(*input_values_queue_);\n      }\n    }\n    return static_cast<bool>(input_values_queue_);\n  }\n",
     )

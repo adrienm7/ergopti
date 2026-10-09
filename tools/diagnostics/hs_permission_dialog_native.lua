@@ -118,6 +118,50 @@ return function(config)
 		end)
 	end
 
+	-- Stage-4 facts only: capture original operand results without extra queries.
+	local stage4_pending, stage4_seen, stage4_sequence = nil, {}, 0
+	local function stage4_value(name, value)
+		if stage4_pending ~= nil then stage4_pending[name] = value end
+		return value
+	end
+	local function stage4_window(value)
+		if stage4_pending ~= nil then stage4_pending.native_window = value == nil and "nil" or "non_nil" end
+		return value
+	end
+	local function stage4_observation()
+		local saved = stage4_pending
+		stage4_pending = nil
+		if not progress_enabled or saved == nil then return end
+		local later = saved.later
+		local views, login_items = saved.views, saved.login_items
+		local visible, native_window = saved.visible, saved.native_window
+		if type(later) ~= "boolean"
+			or (views ~= "not_read" and (math.type(views) ~= "integer" or views < 0 or views > 4))
+			or (login_items ~= "not_read" and type(login_items) ~= "boolean")
+			or (visible ~= "not_read" and type(visible) ~= "boolean")
+			or (native_window ~= "not_read" and native_window ~= "nil" and native_window ~= "non_nil") then return end
+		if math.type(progress_pid) ~= "integer" or progress_pid <= 0 or progress_pid > 2147483647
+			or type(progress_nonce) ~= "string" or #progress_nonce ~= 32 or not progress_nonce:match("^[a-f0-9]+$")
+			or type(progress_version) ~= "string" or #progress_version > 32
+			or not progress_version:match("^[A-Za-z0-9][A-Za-z0-9._+%-]*$") then return end
+		local later_json = later and '"accepted"' or '"not_observed"'
+		local views_json = views == "not_read" and '"not_read"' or tostring(views)
+		local login_json = login_items == "not_read" and '"not_read"' or tostring(login_items)
+		local visible_json = visible == "not_read" and '"not_read"' or tostring(visible)
+		local key = table.concat({ later_json, views_json, login_json, visible_json, native_window }, "/")
+		if stage4_seen[key] or stage4_sequence >= 32 then return end
+		stage4_seen[key] = true
+		stage4_sequence = stage4_sequence + 1
+		local saved_sequence = stage4_sequence
+		pcall(function()
+			local encoded = string.format(
+				'ERGOPTI_PERMISSION_UI_STAGE4 {"schema":1,"kind":"permission_ui_stage4_branch_observation","authority":false,"native_verdict":"unchanged","pid":%d,"nonce":"%s","version":"%s","sequence":%d,"later":%s,"views":%s,"login_items":%s,"visible":%s,"native_window":"%s"}\n',
+				progress_pid, progress_nonce, progress_version, saved_sequence,
+				later_json, views_json, login_json, visible_json, native_window)
+			if #encoded <= 512 then io.stderr:write(encoded) end
+		end)
+	end
+
 	local function stage_failure(boundary, saved_stage, saved_checkpoint, saved_count, saved_busy)
 		if not stage_failure_enabled then return end
 		-- Plain saved state is diagnostic only; captured stderr is best effort.
@@ -183,8 +227,8 @@ return function(config)
 	UI.show_webview = forwarder
 	local function remember_window(view)
 		check(type(view) == "userdata", "Actual native view missing")
-		if view:isVisible() ~= true then return nil end
-		local window = view:hswindow()
+		if stage4_value("visible", view:isVisible()) ~= true then return nil end
+		local window = stage4_window(view:hswindow())
 		if window == nil then return nil end -- Bounded readiness only; no substituted AX handle.
 		local id = window:id()
 		check(math.type(id) == "integer" and id > 0, "Actual native window ID unavailable")
@@ -285,7 +329,10 @@ return function(config)
 				check(value == true, "Accessibility DOM action refused"); later_done = true
 			end)
 		elseif stage == 4 then
-			if not later_done or #observations < 2 or not Dialog.is_open("login_items") then return end
+			stage4_pending = { later = false, views = "not_read", login_items = "not_read",
+				visible = "not_read", native_window = "not_read" }
+			if not stage4_value("later", later_done) or stage4_value("views", #observations) < 2
+				or not stage4_value("login_items", Dialog.is_open("login_items")) then return end
 			check(#observations == 2 and not Dialog.is_open("accessibility"), "Queued Login Items duplicated views")
 			check(no_window(observations[1], ids[1]), "Accessibility native window survived Later")
 			current = observations[2]
@@ -377,6 +424,7 @@ return function(config)
 			end
 			if not finished then Logger.error("permission_fixture", "%s", tostring(err)) end
 		end
+		stage4_observation()
 	end)
 	assert(observer:start())
 end

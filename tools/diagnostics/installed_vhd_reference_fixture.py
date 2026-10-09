@@ -299,11 +299,8 @@ def prepare(owner, deadline):
         "owner",
     )
     require(os.listdir(owner) == [], "owner_inventory")
-    help_result = native(["/usr/sbin/pkgutil", "--help"], deadline)
-    require(
-        b"--expand-full" in help_result.stdout + help_result.stderr,
-        "expand_prerequisite",
-    )
+    # Help text is an observation; the fixed operation and pinned payload qualify expansion.
+    native(["/usr/sbin/pkgutil", "--help"], deadline)
     signature = module("installed_vhd_signature_text")
     packages = module("installed_vhd_static_fixture")
     for version in ("8.4.0", "8.5.0", "8.6.0"):

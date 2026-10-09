@@ -2048,7 +2048,7 @@ def owned_output(status, stdout, stderr):
 
 CURRENT_OWNED_SOURCE_PROFILE = "owned_vhd_broker_source_v1"
 CURRENT_OWNED_SOURCE_FACTORY_SHA256 = (
-    "5c20758ef6c377eafbb7724e1b6d561645e1d72a786b4470e18f7e5313ba5eda"
+    "50fb679becd85980354858e38a4231488839bedfbf013b203505b7a5912c66bc"
 )
 _HISTORICAL_OWNED_RECORD_PROFILE = object()
 _CURRENT_OWNED_RECORD_PROFILE = object()
@@ -2135,7 +2135,7 @@ def _validate_owned_record(record, profile):
     else:
         counts = (
             ("source_inventory_entries", 4505),
-            ("owned_replacements", 63),
+            ("owned_replacements", 64),
             ("staged_files", 4528),
             ("staged_links", 4),
         )
@@ -2339,7 +2339,7 @@ def observe_products(source, owner, *, repository=None):
     return validate_products(result)
 
 
-SOURCE_FACTORY_SHA256 = "5c20758ef6c377eafbb7724e1b6d561645e1d72a786b4470e18f7e5313ba5eda"
+SOURCE_FACTORY_SHA256 = "50fb679becd85980354858e38a4231488839bedfbf013b203505b7a5912c66bc"
 _SOURCE_FACTORY = None
 
 

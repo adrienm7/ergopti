@@ -147,5 +147,200 @@ class FixtureCustodyTests(unittest.TestCase):
         self.temporary.cleanup()
 
 
+class ExpansionRouteTests(unittest.TestCase):
+    """Modeled tool ports prove routing/refusal, never Darwin option or package authority."""
+
+    package_fixture = b"disclosed routing fixture; not a pinned package"
+    verify_real_package = False
+
+    def run_prepare(self, mode, advertised=False):
+        from types import SimpleNamespace
+        from unittest.mock import patch
+        import subprocess
+
+        calls, package_checks, payload_checks = [], [], []
+        clock = [100.0]
+        original_module = SUBJECT.module
+        original_verify_package = SUBJECT.verify_package
+        original_verify_payload = SUBJECT.verify_payload
+        original_lstat = Path.lstat
+        tool_fields = list(Path("/usr/bin/true").stat())
+        tool_fields[4] = (
+            0  # Explicitly modeled root-owned tool metadata, not actual Darwin custody.
+        )
+        tool_stat = os.stat_result(tool_fields)
+        packages = original_module("installed_vhd_static_fixture")
+        native_tools = {"/usr/sbin/pkgutil", "/usr/bin/curl", "/usr/bin/codesign"}
+
+        def metadata(path, *args, **kwargs):
+            if str(path) in native_tools:
+                return tool_stat
+            return original_lstat(path, *args, **kwargs)
+
+        def providers(name):
+            if name == "installed_vhd_signature_text":
+                # Signature acquisition is a captured port, not a trust verdict.
+                return SimpleNamespace(observe_signature_text=lambda *args: None)
+            if name == "installed_vhd_static_fixture":
+                return packages
+            return original_module(name)
+
+        def verify_package(version, body):
+            package_checks.append((version, body))
+            if self.verify_real_package or mode == "wrong_package":
+                return original_verify_package(version, body)
+            # Only operation routing uses this captured verifier boundary.
+            self.assertEqual(version, "8.4.0")
+            self.assertEqual(body, self.package_fixture)
+
+        def verify_payload(version, payload):
+            payload_checks.append((version, str(payload)))
+            if mode == "changed_package":
+                # Sole bypass isolates the existing final package-currentness fence.
+                return
+            return original_verify_payload(version, payload)
+
+        def execute(argv, **kwargs):
+            calls.append(list(argv))
+            self.assertFalse(kwargs["check"])
+            self.assertIs(kwargs["stdin"], subprocess.DEVNULL)
+            self.assertIs(kwargs["stdout"], subprocess.PIPE)
+            self.assertIs(kwargs["stderr"], subprocess.PIPE)
+            self.assertGreater(kwargs["timeout"], 0)
+            stdout, stderr, status = b"", b"", 0
+            if argv[:2] == ["/usr/sbin/pkgutil", "--help"]:
+                stderr = (
+                    b"pkgutil help --expand-full"
+                    if advertised
+                    else b"pkgutil help; fixed text without option"
+                )
+                if mode == "help_failure":
+                    status = 2
+            elif argv[0] == "/usr/bin/curl":
+                package = Path(argv[argv.index("--output") + 1])
+                package.write_bytes(
+                    b"wrong fixed bytes" if mode == "wrong_package" else self.package_fixture
+                )
+                self.assertEqual(argv[-1], packages.package_url("8.4.0"))
+            elif argv[:2] == ["/usr/sbin/pkgutil", "--check-signature"]:
+                pass
+            elif argv[:2] == ["/usr/sbin/pkgutil", "--expand-full"]:
+                payload = Path(argv[3]) / "Payload"
+                payload.mkdir(parents=True)
+                if mode == "wrong_payload":
+                    (payload / "foreign").write_bytes(b"fixed unexpected payload bytes")
+                if mode == "operation_failure":
+                    status = 2
+                elif mode == "stdout":
+                    stdout = b"unexpected"
+                elif mode == "stderr":
+                    stderr = b"unexpected"
+                elif mode == "late":
+                    clock[0] = 1001.0
+                elif mode == "changed_package":
+                    Path(argv[2]).write_bytes(b"changed after expansion")
+            elif argv[0] == "/usr/bin/codesign":
+                pass
+            else:
+                self.fail("Unexpected controlled native operation")
+            return subprocess.CompletedProcess(argv, status, stdout, stderr)
+
+        with tempfile.TemporaryDirectory() as temporary:
+            owner = Path(temporary).resolve()
+            os.chmod(owner, 0o700)
+            with (
+                patch.object(SUBJECT.sys, "platform", "darwin"),
+                patch.object(SUBJECT.time, "monotonic", lambda: clock[0]),
+                patch.object(Path, "lstat", metadata),
+                patch.object(SUBJECT, "module", providers),
+                patch.object(SUBJECT, "verify_package", verify_package),
+                patch.object(SUBJECT, "verify_payload", verify_payload),
+                patch.object(SUBJECT.subprocess, "run", execute),
+            ):
+                try:
+                    SUBJECT.prepare(owner, 1000.0)
+                except SUBJECT.Refusal as error:
+                    reason = str(error)
+                else:
+                    self.fail("Routing fixture must never prepare a qualified native reference")
+            expansion = [row for row in calls if row[:2] == ["/usr/sbin/pkgutil", "--expand-full"]]
+            for row in expansion:
+                self.assertEqual(
+                    row,
+                    [
+                        "/usr/sbin/pkgutil",
+                        "--expand-full",
+                        str(owner / packages.package_name("8.4.0")),
+                        str(owner / "expanded-8.4.0"),
+                    ],
+                )
+            self.assertEqual(calls[0], ["/usr/sbin/pkgutil", "--help"])
+            return reason, calls, expansion, package_checks, payload_checks
+
+    def test_help_without_advertisement_reaches_fixed_expansion_and_real_payload_refusal(self):
+        reason, _, expansion, package_checks, payload_checks = self.run_prepare("missing_payload")
+        self.assertEqual(reason, "payload_inventory")
+        self.assertEqual(len(expansion), 1)
+        self.assertEqual(len(package_checks), 1)
+        self.assertEqual(len(payload_checks), 1)
+
+    def test_advertised_but_invalid_operation_refuses_status(self):
+        reason, _, expansion, _, payload_checks = self.run_prepare("operation_failure", True)
+        self.assertEqual(reason, "native_status")
+        self.assertEqual(len(expansion), 1)
+        self.assertEqual(payload_checks, [])
+
+    def test_unadvertised_invalid_operation_also_refuses_status(self):
+        reason, _, expansion, _, payload_checks = self.run_prepare("operation_failure")
+        self.assertEqual(reason, "native_status")
+        self.assertEqual(len(expansion), 1)
+        self.assertEqual(payload_checks, [])
+
+    def test_expansion_requires_both_streams_empty(self):
+        for mode in ("stdout", "stderr"):
+            with self.subTest(mode=mode):
+                reason, _, expansion, _, payload_checks = self.run_prepare(mode, True)
+                self.assertEqual(reason, "expand_output")
+                self.assertEqual(len(expansion), 1)
+                self.assertEqual(payload_checks, [])
+
+    def test_successful_operation_cannot_admit_wrong_real_payload(self):
+        reason, _, expansion, _, payload_checks = self.run_prepare("wrong_payload", True)
+        self.assertEqual(reason, "payload_inventory")
+        self.assertEqual(len(expansion), 1)
+        self.assertEqual(len(payload_checks), 1)
+
+    def test_actual_package_pin_refuses_before_expansion(self):
+        reason, _, expansion, package_checks, payload_checks = self.run_prepare(
+            "wrong_package", True
+        )
+        self.assertEqual(reason, "package_pin")
+        self.assertEqual(len(package_checks), 1)
+        self.assertEqual(expansion, [])
+        self.assertEqual(payload_checks, [])
+
+    def test_help_operation_status_still_refuses_before_download(self):
+        reason, calls, expansion, package_checks, payload_checks = self.run_prepare(
+            "help_failure", True
+        )
+        self.assertEqual(reason, "native_status")
+        self.assertEqual(len(calls), 1)
+        self.assertEqual(expansion, [])
+        self.assertEqual(package_checks, [])
+        self.assertEqual(payload_checks, [])
+
+    def test_late_expansion_cannot_admit_payload(self):
+        reason, _, expansion, _, payload_checks = self.run_prepare("late", True)
+        self.assertEqual(reason, "deadline")
+        self.assertEqual(len(expansion), 1)
+        self.assertEqual(payload_checks, [])
+
+    def test_existing_package_currentness_fence_survives_expansion(self):
+        reason, _, expansion, _, payload_checks = self.run_prepare("changed_package", True)
+        self.assertEqual(reason, "package_changed")
+        self.assertEqual(len(expansion), 1)
+        self.assertEqual(len(payload_checks), 1)
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -344,5 +344,174 @@ class FailureDiagnosticControls(unittest.TestCase):
                 self.refusal(self.invoke(body), reason)
 
 
+class AppleToolOwnerObservationControls(unittest.TestCase):
+    """Actual entrypoint and modeled lstat only; no tool/SDK/root execution."""
+
+    receipts = []
+    invoke = FailureDiagnosticControls.invoke
+    refusal = FailureDiagnosticControls.refusal
+
+    @staticmethod
+    def owner_body(path, role, uid):
+        return (
+            "reads=[]\n"
+            "class Named:\n"
+            " @property\n"
+            " def st_uid(self):\n"
+            "  reads.append('uid');return " + repr(uid) + "\n"
+            " @property\n"
+            " def st_mode(self):\n"
+            "  raise RuntimeError('OWNER_REFUSAL_MUST_PRECEDE_MODE_GETTER')\n"
+            "subject.Path.resolve=lambda self,**unused:self\n"
+            "subject.Path.lstat=lambda self:Named()\n"
+            "def forbidden_open(*args,**kwargs):\n"
+            " raise RuntimeError('OWNER_REFUSAL_MUST_PRECEDE_OPEN')\n"
+            "subject.os.open=forbidden_open\n"
+            "def failing(*args):\n"
+            " try:\n"
+            "  subject.PreflightTool(" + repr(path) + "," + repr(role) + ")\n"
+            " except subject.Refusal:\n"
+            "  if reads!=['uid']:raise RuntimeError('OWNER_UID_MUST_BE_READ_ONCE')\n"
+            "  raise\n"
+            "subject.run=failing\n"
+        )
+
+    def test_actual_owner_refusal_projects_only_same_read_uid_and_closed_role_location(self):
+        import json
+
+        vectors = (
+            (
+                "/Applications/Xcode_26.0.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/clang",
+                "compiler",
+                "xcode",
+                501,
+            ),
+            (
+                "/Library/Developer/CommandLineTools/usr/bin/clang",
+                "compiler",
+                "command_line_tools",
+                777,
+            ),
+            (
+                "/Applications/Xcode_26.0.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.0.sdk",
+                "sdk",
+                "xcode",
+                1001,
+            ),
+            (
+                "/Library/Developer/CommandLineTools/SDKs/MacOSX26.0.sdk",
+                "sdk",
+                "command_line_tools",
+                4294967295,
+            ),
+        )
+        for path, role, location, uid in vectors:
+            with self.subTest(role=role, location=location):
+                result = self.invoke(self.owner_body(path, role, uid))
+                self.assertEqual(result.returncode, 69)
+                self.assertEqual(result.stdout, b"")
+                lines = result.stderr.splitlines()
+                self.assertEqual(len(lines), 3)
+                original = subprocess.CompletedProcess(
+                    result.args, result.returncode, result.stdout, b"\n".join(lines[:2]) + b"\n"
+                )
+                self.refusal(original, f"preflight_{role}_owner")
+                prefix = b"ERGOPTI_ROOT_APPLE_TOOL_OWNER_DIAGNOSTIC "
+                self.assertTrue(lines[2].startswith(prefix))
+                self.assertLessEqual(len(lines[2]), 256)
+                self.assertEqual(
+                    json.loads(lines[2][len(prefix) :]),
+                    {
+                        "schema": 1,
+                        "kind": "root_apple_tool_owner_observation",
+                        "role": role,
+                        "location": location,
+                        "leaf_uid": uid,
+                        "authority": False,
+                        "native_verdict": "unchanged",
+                    },
+                )
+                self.assertNotIn(path.encode(), result.stderr)
+
+    def test_foreign_or_malformed_owner_metadata_is_silent_without_callbacks(self):
+        expressions = (
+            "None",
+            "[]",
+            "{}",
+            "['compiler','xcode',501]",
+            "('compiler','xcode')",
+            "('compiler','xcode',501,'PRIVATE_PATH')",
+            "('compiler','xcode',True)",
+            "('compiler','xcode',0)",
+            "('compiler','xcode',-1)",
+            "('compiler','xcode',4294967296)",
+            "('compiler','xcode','PRIVATE_UID')",
+            "('compiler','PRIVATE_PATH',501)",
+            "('PRIVATE_ROLE','xcode',501)",
+            "('sdk','xcode',501)",
+            "ForeignTuple(('compiler','xcode',501))",
+            "('compiler','xcode',ForeignInt(501))",
+            "(ForeignStr('compiler'),'xcode',501)",
+            "Foreign()",
+        )
+        prefix = (
+            "class Foreign:\n"
+            " def __repr__(self):raise RuntimeError('PRIVATE_METADATA_CALLBACK')\n"
+            " def __iter__(self):raise RuntimeError('PRIVATE_METADATA_CALLBACK')\n"
+            "class ForeignTuple(tuple):pass\n"
+            "class ForeignInt(int):pass\n"
+            "class ForeignStr(str):pass\n"
+        )
+        for expression in expressions:
+            result = self.invoke(
+                prefix
+                + "def failing(*args):\n error=subject.Refusal('preflight_compiler_owner')\n error._apple_tool_owner="
+                + expression
+                + "\n raise error\nsubject.run=failing"
+            )
+            self.refusal(result, "preflight_compiler_owner")
+            self.assertNotIn(b"PRIVATE_", result.stderr)
+        result = self.invoke(
+            prefix
+            + "class ForeignRefusal(subject.Refusal):pass\ndef failing(*args):\n error=ForeignRefusal('preflight_compiler_owner')\n error._apple_tool_owner=('compiler','xcode',501)\n raise error\nsubject.run=failing"
+        )
+        self.refusal(result, "unclassified")
+
+    def test_owner_metadata_cannot_change_other_refusal_or_success_output(self):
+        for reason in (
+            "preflight_compiler_writable",
+            "preflight_compiler_kind",
+            "preflight_sdk_owner",
+            "preflight_sdk_role",
+        ):
+            result = self.invoke(
+                "def failing(*args):\n error=subject.Refusal("
+                + repr(reason)
+                + ")\n error._apple_tool_owner=('compiler','xcode',501)\n raise error\nsubject.run=failing"
+            )
+            self.refusal(result, reason)
+        result = self.invoke("subject.run=lambda *args:{'schema':1,'ordinary_only':True}")
+        self.assertEqual(result.returncode, 0)
+        self.assertEqual(result.stderr, b"")
+
+    def test_owner_diagnostic_writer_refusal_keeps_primary_69_and_no_extra_getter_or_open(self):
+        body = self.owner_body("/Library/Developer/CommandLineTools/usr/bin/clang", "compiler", 501)
+        body += (
+            "attempts=[]\noriginal_stderr=sys.stderr\n"
+            "class FailureSink:\n"
+            " def write(self,value):\n"
+            "  if value.startswith('ERGOPTI_ROOT_APPLE_TOOL_OWNER_DIAGNOSTIC '):\n"
+            "   attempts.append(True);raise OSError('PRIVATE_SINK_FAILURE')\n"
+            "  return original_stderr.write(value)\n"
+            " def flush(self):return original_stderr.flush()\n"
+            "sys.stderr=FailureSink()\noriginal_main=subject.main\n"
+            "def checked_main():\n"
+            " result=original_main()\n"
+            " if attempts!=[True]:raise RuntimeError('OWNER_DIAGNOSTIC_WRITE_MUST_BE_ATTEMPTED_ONCE')\n"
+            " return result\nsubject.main=checked_main\n"
+        )
+        self.refusal(self.invoke(body), "preflight_compiler_owner")
+
+
 if __name__ == "__main__":
     unittest.main()

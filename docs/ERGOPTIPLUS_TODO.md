@@ -3197,6 +3197,14 @@ Earlier Python control drafts remain private evidence, not SDK registration.
 Native execution of this new diagnostic remains UNEXECUTED; it grants no UI,
 permission, retirement or ready authority. Item 24 remains partial.
 
+The native stage-four UI probe now records only a closed, bounded tuple of
+already observed timer, view and window state before reporting its unchanged
+refusal. Twenty-eight portable Lua controls pass; six before/after endpoint
+traces preserve the original calls and return values. The original ten native
+cases and all deadlines remain unchanged. A required source-path comment was
+added without changing the test body. Exact-source macOS execution and physical
+guardian/Login Items/tap-hold acceptance remain pending; item24 stays partial.
+
 - [~] **30.** Physical magic-key setting on all three OSes: one
   `hotstrings.magic_key_source` (a KeyboardEvent.code, `auto` by default),
   config schema v5 migrating every spelling of the Windows
@@ -3380,6 +3388,33 @@ and restoration/debt assertions remain mandatory.
   assumption and fn/globe), WP10 enable and retire. Media metrics identities
   now exist for play/pause, track skips and brightness; production capture and
   native UI/physical acceptance remain unfinished.
+  Protected VHD qualification now runs the actual checked `pkgutil --expand-full`
+  command without requiring its option to appear in help output. The command's
+  status, output, deadline, package identity, payload, signatures and ownership
+  fences remain mandatory. Thirty portable controls pass and retain all21
+  original cases; a new ordinary XCTest method registers the full30 under the
+  unchanged30/35/10 budgets. Actual Darwin expansion and protected native
+  qualification remain pending.
+  Compiler-owner refusal now preserves the UID from the same original lstat
+  read in a closed role/route diagnostic, while retaining the original UID-zero
+  guard, refusal and status. All19 original and four new portable controls pass
+  normally and with inherited optimization; the new controls reject the actual
+  predecessor. This identifies no native owner until exact-source macOS runs,
+  grants no root or runtime authority, and does not complete item31.
+  Native input queue creation now refuses a null queue before opening the
+  device or publishing started. The original retry owner, stop behavior and
+  queue-free path remain intact. Six frozen acquisition scenarios and the
+  unknown-case refusal pass using the actual vendor class with modeled native
+  ports; the genuine predecessor passes two and fails four, and restoring the
+  correction passes all six. Ordinary XCTest registration retains30/35/10.
+  The owning generator now produces64 leaves while preserving all63 previous
+  products. Only current source pins/counts change; independent historical
+  oracles, native inputs34, dependencies36 and builder size134324 remain fixed.
+  Portable consumer controls pass. The original nine-case worker first timed
+  out at30.012 seconds, then passed once in a fresh owner at26.623 under the
+  same30-second limit; both results are retained. Actual Darwin queue delivery,
+  drain, retirement, kernel cutover and physical capture remain unqualified.
+  This prerequisite does not complete WP4, item31 or transverse items16/38.
   Selector regressions now pass the actual absolute shared source directory
   to each Lua child. This preserves canonical constructor identity without
   requiring an optional native cwd provider. All three migration vectors,

@@ -192,9 +192,9 @@ extension HS274NativePolicyQualificationTests {
 				XCTAssertEqual(partial?["qualification"] as? String,
 					"unsigned_actual_core_constructor_compilation_only")
 				XCTAssertEqual(partial?["producer_sha256"] as? String,
-					"7b52011dcd9c86b18ea445dc8fc152665627ae1e5d278861be3367af782344ee")
+					"1a49ed91cfe1a45be436c4756135bb3c3b0035af26c1cf09908009dcdbf3a789")
 				XCTAssertEqual(partial?["source_factory_sha256"] as? String,
-					"5c20758ef6c377eafbb7724e1b6d561645e1d72a786b4470e18f7e5313ba5eda")
+					"50fb679becd85980354858e38a4231488839bedfbf013b203505b7a5912c66bc")
 				XCTAssertEqual(partial?["architectures"] as? [String], ["arm64", "x86_64"])
 				XCTAssertEqual(partial?["core_relative_path"] as? String,
 					"upstream/src/apps/CoreService/build/Release/ErgoptiPlus-Remap-Core.app")

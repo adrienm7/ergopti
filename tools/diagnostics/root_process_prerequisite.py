@@ -277,10 +277,16 @@ class PreflightTool:
             raise Refusal("preflight_tool_role")
         named = self.path.lstat()
         # Name only the refused role and predicate; keep the original admission guard.
-        require(
-            named.st_uid == 0,
-            "preflight_compiler_owner" if role == "compiler" else "preflight_sdk_owner",
-        )
+        try:
+            require(
+                (observed_uid := named.st_uid) == 0,
+                "preflight_compiler_owner" if role == "compiler" else "preflight_sdk_owner",
+            )
+        except Refusal as error:
+            # Reuse only this refused lstat value and the already admitted public role.
+            location = "xcode" if text.startswith("/Applications/") else "command_line_tools"
+            error._apple_tool_owner = (role, location, observed_uid)
+            raise
         require(
             not named.st_mode & 0o022,
             "preflight_compiler_writable" if role == "compiler" else "preflight_sdk_writable",
@@ -890,6 +896,35 @@ def run(repository, output):
             item.close()
 
 
+def _apple_tool_owner_observation(error, reason):
+    """Project only a closed same-lstat owner refusal; never grant native authority."""
+    if type(error) is not Refusal or type(error.__dict__) is not dict:
+        return None
+    captured = error.__dict__.get("_apple_tool_owner")
+    if type(captured) is not tuple or len(captured) != 3:
+        return None
+    role, location, uid = captured
+    if (
+        type(role) is not str
+        or role not in ("compiler", "sdk")
+        or type(location) is not str
+        or location not in ("xcode", "command_line_tools")
+        or type(uid) is not int
+        or not 0 < uid <= 4294967295
+        or reason != "preflight_" + role + "_owner"
+    ):
+        return None
+    return {
+        "schema": 1,
+        "kind": "root_apple_tool_owner_observation",
+        "role": role,
+        "location": location,
+        "leaf_uid": uid,
+        "authority": False,
+        "native_verdict": "unchanged",
+    }
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("repository")
@@ -989,6 +1024,16 @@ def main():
         except OSError:
             # The original UNAVAILABLE prefix and69 already refuse qualification.
             pass
+        owner_observation = _apple_tool_owner_observation(error, reason)
+        if owner_observation is not None:
+            owner_line = "ERGOPTI_ROOT_APPLE_TOOL_OWNER_DIAGNOSTIC " + json.dumps(
+                owner_observation, sort_keys=True, separators=(",", ":")
+            )
+            if len(owner_line) <= 256:
+                try:
+                    print(owner_line, file=sys.stderr)
+                except OSError:
+                    pass
         return 69
     import json
 
