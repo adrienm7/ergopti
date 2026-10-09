@@ -8968,6 +8968,19 @@ test precondition failure, not a Lua defect or a successful permission grant.
   installed startup on the affected Mac is still required after publication.
   Windows and Linux have no corresponding startup bridge prerequisite.
 
+- [ ] **128.** Restore full qualification after the accelerated dev.157 preview.
+
+  The maintainer explicitly authorized deferring all test suites to deliver
+  the urgent diagnostic prerelease. This exception is limited to dev.157 and
+  expires on October 10 at 07:00 UTC. Build, signing, source verification and
+  artifact integrity remain mandatory. Public notes and source-bound lane
+  receipts state UNQUALIFIED, DEFERRED and qualified:false before publication.
+
+  Do not turn skipped Core, unit, E2E, installation, launch or native checks
+  into passes. Default, Main, pull requests and dev.158 retain full execution.
+  Collect private-safe real-Mac evidence, correct actual failures and qualify
+  the complete source/package before claiming a fully green tested release.
+
 ## Time estimate
 
 Order-of-magnitude estimate: 40–70 agent-days for the current remaining

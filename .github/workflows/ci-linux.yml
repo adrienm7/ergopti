@@ -33,6 +33,11 @@ name: Linux
 on:
   workflow_call:
     inputs:
+      fast_prerelease:
+        description: Temporary unqualified dev157 test deferral; defaults remain full
+        required: false
+        default: false
+        type: boolean
       release:
         description: True when this run publishes a release; only sets artifact retention
         required: true
@@ -61,12 +66,21 @@ on:
 permissions:
   contents: read
 
+env:
+  ERGOPTI_DEV_RELEASE_RELEASE: ${{ inputs.release }}
+  ERGOPTI_DEV_RELEASE_PRERELEASE: ${{ inputs.prerelease }}
+  ERGOPTI_DEV_RELEASE_CHANNEL: ${{ inputs.channel }}
+  ERGOPTI_DEV_RELEASE_TAG: ${{ inputs.tag }}
+  ERGOPTI_DEV_RELEASE_VERSION: ${{ inputs.version }}
+  ERGOPTI_FAST_PRERELEASE: ${{ inputs.fast_prerelease }}
+
 jobs:
   # ─────────────────────────────────────────────────
   # 1) Linux Lua driver unit and native contract tests
   # ─────────────────────────────────────────────────
   # The lane's entry job: the only one of this file that needs nothing.
   test-linux:
+    if: ${{ !inputs.fast_prerelease }}
     name: 'Unit tests'
     runs-on: ubuntu-latest
 
@@ -164,6 +178,7 @@ jobs:
           if-no-files-found: error
 
   e2e-linux:
+    if: ${{ !inputs.fast_prerelease }}
     name: 'E2E tests'
     needs: [test-linux]
     runs-on: ubuntu-latest
@@ -1868,13 +1883,21 @@ jobs:
     name: 'Package'
     runs-on: ubuntu-latest
     needs: [e2e-linux]
-    if: ${{ !cancelled() && (needs.e2e-linux.result == 'success' || (github.event_name == 'workflow_dispatch' && needs.e2e-linux.result == 'failure')) }}
+    if: ${{ !cancelled() && ((inputs.fast_prerelease && needs.e2e-linux.result == 'skipped') || (!inputs.fast_prerelease && (needs.e2e-linux.result == 'success' || (github.event_name == 'workflow_dispatch' && needs.e2e-linux.result == 'failure')))) }}
     env:
       ERGOPTI_BUILD_VERSION: ${{ inputs.version }}
       LINUX_BUNDLE_ASSET: ${{ inputs.linux_bundle }}
 
     steps:
       - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: '.node-version'
+
+      - name: Recheck temporary fast prerelease authorization
+        shell: bash
+        run: node tools/ci/dev-release-qualification.cjs --fast-action admit
 
       - name: Install LuaJIT
         # Three readers: the assembly smoke below boots the driver with it,
@@ -1890,7 +1913,12 @@ jobs:
         shell: bash
         env:
           ERGOPTI_BUILD_COMMIT: ${{ github.sha }}
-        run: bash tools/build/build-linux-driver.sh
+        run: |
+          if [[ "$ERGOPTI_FAST_PRERELEASE" == true ]]; then
+            bash tools/build/build-linux-driver.sh --skip-smoke
+          else
+            bash tools/build/build-linux-driver.sh
+          fi
 
       - name: Package latest XKB files
         shell: bash
@@ -2025,6 +2053,7 @@ jobs:
       # the manifest forgot shows up here rather than on a user's machine. Flathub
       # and the runtime are already installed by the toolchain step above.
       - name: Install the Flatpak the way a user would
+        if: ${{ !inputs.fast_prerelease }}
         run: |
           set -euo pipefail
           bundle=build/linux/ErgoptiPlus-linux-x86_64.flatpak
@@ -2036,9 +2065,11 @@ jobs:
           flatpak list --user --app
 
       - name: Launch the Flatpak
+        if: ${{ !inputs.fast_prerelease }}
         run: flatpak run --user org.ergopti.Ergopti --help
 
       - name: The sandboxed shared data tree resolves and opens
+        if: ${{ !inputs.fast_prerelease }}
         # Run INSIDE the sandbox with --command, so this reads /app exactly as
         # the daemon does. The check script is bound in read-only from the
         # checkout because the package deliberately ships no tests.
@@ -2058,6 +2089,7 @@ jobs:
       # and the dependency install is the distro matrix's job, not this one's.
       # The archive installed is the very file uploaded below, not a twin.
       - name: Unpack and install the tarball the way a user would
+        if: ${{ !inputs.fast_prerelease }}
         # --no-deps because package installs are the distro matrix's job, and
         # --no-service because a runner has no user session bus for a
         # systemd --user unit to register with. The permission setup DOES run:
@@ -2075,6 +2107,7 @@ jobs:
           }
 
       - name: Launch what the tarball installed
+        if: ${{ !inputs.fast_prerelease }}
         run: |
           set -euo pipefail
           launcher="$HOME/.local/bin/ergopti-hotstrings"
@@ -2086,6 +2119,7 @@ jobs:
           "$launcher" --help
 
       - name: The installed shared data tree resolves and opens
+        if: ${{ !inputs.fast_prerelease }}
         run: |
           set -euo pipefail
           root="$HOME/.local/lib/ergopti"
@@ -2119,6 +2153,7 @@ jobs:
             build/linux/ErgoptiPlus-linux-x86_64.flatpak
 
       - name: Record mandatory package evidence
+        if: ${{ !inputs.fast_prerelease }}
         # One record for the six subjects this job proves. It is written only
         # when every step above passed, so no subject can be claimed by a
         # packaging run that stopped halfway.
@@ -2136,6 +2171,7 @@ jobs:
               --subject smoke-tarball-install=1
 
       - name: Upload mandatory package evidence
+        if: ${{ !inputs.fast_prerelease }}
         uses: actions/upload-artifact@v4
         with:
           overwrite: true
@@ -2155,6 +2191,7 @@ jobs:
   # LuaJIT, so dependency resolution and the bundled interpreter remain tested.
   # An empty scalar container means a host job in the GitHub runner.
   install-linux:
+    if: ${{ !inputs.fast_prerelease }}
     name: 'Install and launch · ${{ matrix.label }}'
     runs-on: ubuntu-latest
     needs: [package-linux]
@@ -2813,6 +2850,7 @@ jobs:
           node-version-file: '.node-version'
 
       - name: Download assertion evidence
+        if: ${{ !inputs.fast_prerelease }}
         uses: actions/download-artifact@v4
         with:
           pattern: linux-ci-evidence-*
@@ -2820,6 +2858,7 @@ jobs:
           merge-multiple: true
 
       - name: Assert all mandatory subjects ran and passed
+        if: ${{ !inputs.fast_prerelease }}
         env:
           NEEDS: ${{ toJSON(needs) }}
           ERGOPTI_DEV_RELEASE_RELEASE: ${{ inputs.release }}
@@ -2835,3 +2874,16 @@ jobs:
               --evidence-dir "$RUNNER_TEMP/linux-ci-evidence" \
               --sha "$GITHUB_SHA"
           echo "Linux mandatory evidence verified; deferred qualifications, if any, remain unqualified."
+      - name: Record UNQUALIFIED temporary test deferral
+        if: ${{ inputs.fast_prerelease }}
+        env:
+          NEEDS: ${{ toJSON(needs) }}
+        run: node tools/ci/dev-release-qualification.cjs --fast-action receipt --lane linux
+
+      - name: Retain the explicit unqualified test receipt
+        if: ${{ inputs.fast_prerelease }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: fast-prerelease-unqualified-linux
+          path: fast-prerelease-linux.json
+          if-no-files-found: error

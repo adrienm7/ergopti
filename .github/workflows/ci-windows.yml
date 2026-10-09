@@ -13,6 +13,11 @@ name: Windows
 on:
   workflow_call:
     inputs:
+      fast_prerelease:
+        description: Temporary unqualified dev157 test deferral; defaults remain full
+        required: false
+        default: false
+        type: boolean
       release:
         description: True when ci.yml's plan resolved a free release tag
         required: true
@@ -47,11 +52,20 @@ on:
 permissions:
   contents: read
 
+env:
+  ERGOPTI_DEV_RELEASE_RELEASE: ${{ inputs.release }}
+  ERGOPTI_DEV_RELEASE_PRERELEASE: ${{ inputs.prerelease }}
+  ERGOPTI_DEV_RELEASE_CHANNEL: ${{ inputs.channel }}
+  ERGOPTI_DEV_RELEASE_TAG: ${{ inputs.tag }}
+  ERGOPTI_DEV_RELEASE_VERSION: ${{ inputs.version }}
+  ERGOPTI_FAST_PRERELEASE: ${{ inputs.fast_prerelease }}
+
 jobs:
   # ─────────────────────────────────────────────────
   # 1) AHK unit, native and contract tests
   # ─────────────────────────────────────────────────
   test-ahk:
+    if: ${{ !inputs.fast_prerelease }}
     name: 'Unit tests'
     runs-on: windows-latest
 
@@ -397,6 +411,7 @@ jobs:
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
   e2e-ahk:
+    if: ${{ !inputs.fast_prerelease }}
     name: 'E2E tests (engine)'
     needs: [test-ahk]
     runs-on: windows-latest
@@ -504,12 +519,21 @@ jobs:
   # alters; nothing here disables or restores Defender.
   package-windows:
     name: 'Package'
+    if: ${{ !cancelled() && ((inputs.fast_prerelease && needs.e2e-ahk.result == 'skipped') || (!inputs.fast_prerelease && needs.e2e-ahk.result == 'success')) }}
     needs: [e2e-ahk]
     runs-on: windows-latest
 
     steps:
       # A shallow clone: no step of this job reads git history.
       - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: '.node-version'
+
+      - name: Recheck temporary fast prerelease authorization
+        shell: bash
+        run: node tools/ci/dev-release-qualification.cjs --fast-action admit
 
       - name: Build and test native navigation event owner
         shell: pwsh
@@ -725,6 +749,7 @@ jobs:
             static/ergopti/windows/Ergopti_windows.exe
 
   launch-windows:
+    if: ${{ !inputs.fast_prerelease }}
     name: 'Install and launch'
     needs: [package-windows]
     runs-on: windows-latest
@@ -1248,16 +1273,32 @@ jobs:
           node-version-file: '.node-version'
 
       - name: Download launch evidence
+        if: ${{ !inputs.fast_prerelease }}
         uses: actions/download-artifact@v4
         with:
           pattern: windows-launch-evidence
           path: ${{ runner.temp }}/launch-evidence
 
       - name: Install locked evidence validation dependencies
+        if: ${{ !inputs.fast_prerelease }}
         run: npm ci --ignore-scripts
 
       - name: Verify mandatory jobs and launch scenarios
+        if: ${{ !inputs.fast_prerelease }}
         env:
           NEEDS: ${{ toJSON(needs) }}
           RELEASE: ${{ inputs.release }}
         run: node tools/test/desktop-ci-evidence.cjs verify windows "$RUNNER_TEMP/launch-evidence"
+      - name: Record UNQUALIFIED temporary test deferral
+        if: ${{ inputs.fast_prerelease }}
+        env:
+          NEEDS: ${{ toJSON(needs) }}
+        run: node tools/ci/dev-release-qualification.cjs --fast-action receipt --lane windows
+
+      - name: Retain the explicit unqualified test receipt
+        if: ${{ inputs.fast_prerelease }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: fast-prerelease-unqualified-windows
+          path: fast-prerelease-windows.json
+          if-no-files-found: error
