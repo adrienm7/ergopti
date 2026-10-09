@@ -30,6 +30,30 @@ class FixtureFailure(RuntimeError):
     pass
 
 
+class CommandInputOwner:
+    """Observe exact parent close even when communicate suppresses its error."""
+
+    def __init__(self, owner):
+        self.owner = owner
+        self.close_failure = None
+        self.close_uncertain = False
+
+    def __getattr__(self, name):
+        return getattr(self.owner, name)
+
+    def close(self):
+        if self.close_uncertain:
+            raise FixtureFailure("Native fixture input close uncertainty remains")
+        try:
+            self.owner.close()
+            if not self.owner.closed:
+                raise FixtureFailure("Native fixture input close did not retire its owner")
+        except BaseException as failure:
+            self.close_failure = self.close_failure or failure
+            self.close_uncertain = self.owner.closed
+            raise
+
+
 class WireFixture:
     def __init__(self, native=True):
         self.native = native
@@ -40,6 +64,8 @@ class WireFixture:
         self.keychain = self.root / "owned.keychain-db"
         self.ca = self.root / "ca.pem"
         self.trust_attempted = False
+        self.trust_query_executable = None
+        self.command_file_debt = []
         self.keychain_created = False
         self.servers = []
         self.started_servers = []
@@ -108,67 +134,178 @@ class WireFixture:
             self.close()
             raise
 
-    def _command(self, arguments, input_bytes=b"", tolerate=False, timeout=15):
+    def _command(self, arguments, input_bytes=b"", tolerate=False, timeout=15, deadline=None):
         phase = "setup"
         status = None
         self.command_fact = None
+        output = errors = owned = child = input_owner = input_observer = None
+        failure = None
+        result = None
+        closure_refused = False
         try:
-            with tempfile.TemporaryFile() as output, tempfile.TemporaryFile() as errors:
-                if self.groups:
-                    owned = None
+            if self.command_file_debt:
+                phase = "settle"
+                raise FixtureFailure("Native fixture command file closure debt remains")
+            if deadline is not None and time.monotonic() >= deadline:
+                raise subprocess.TimeoutExpired(arguments, timeout)
+            output = tempfile.TemporaryFile()
+            errors = tempfile.TemporaryFile()
+            if self.groups:
 
-                    def register(value):
-                        nonlocal owned
-                        owned = value
+                def register(value):
+                    nonlocal owned
+                    owned = value
 
-                    try:
-                        phase = "acquire"
-                        self.groups.acquire_owned(
-                            arguments,
-                            self.native_groups,
-                            register,
-                            stdin=subprocess.PIPE,
-                            stdout=output,
-                            stderr=errors,
-                        )
-                        phase = "input"
-                        owned.process.stdin.write(input_bytes)
-                        owned.process.stdin.close()
-                        phase = "wait"
-                        owned.wait_for_exit(timeout)
-                    finally:
-                        try:
-                            if owned is not None and not owned.settle():
-                                raise FixtureFailure("Native fixture child closure refused")
-                        except BaseException:
-                            phase = "settle"
-                            raise
-                    status = owned.process.returncode
-                else:
+                try:
                     phase = "acquire"
-                    child = subprocess.Popen(
-                        arguments, stdin=subprocess.PIPE, stdout=output, stderr=errors
+                    self.groups.acquire_owned(
+                        arguments,
+                        self.native_groups,
+                        register,
+                        stdin=subprocess.PIPE,
+                        stdout=output,
+                        stderr=errors,
                     )
+                    phase = "input"
+                    owned.process.stdin.write(input_bytes)
                     try:
-                        phase = "wait"
-                        child.communicate(input_bytes, timeout=timeout)
-                    finally:
+                        owned.process.stdin.close()
+                    except BaseException:
+                        closure_refused = True
+                        if owned.process.stdin.closed:
+                            self.command_file_debt.append(
+                                {
+                                    "stream": owned.process.stdin,
+                                    "uncertain": True,
+                                }
+                            )
+                        raise
+                    phase = "wait"
+                    owned.wait_for_exit(
+                        timeout if deadline is None else max(0, deadline - time.monotonic())
+                    )
+                except BaseException as primary:
+                    failure = primary
+                finally:
+                    try:
+                        if owned is not None and not owned.settle():
+                            raise FixtureFailure("Native fixture child closure refused")
+                    except BaseException as refused:
+                        phase = "settle"
+                        closure_refused = True
+                        if failure is None:
+                            failure = refused
+                if failure is not None:
+                    raise failure
+                status = owned.process.returncode
+            else:
+                phase = "acquire"
+                child = subprocess.Popen(
+                    arguments, stdin=subprocess.PIPE, stdout=output, stderr=errors
+                )
+                input_owner = child.stdin
+                input_observer = CommandInputOwner(input_owner)
+                child.stdin = input_observer
+                try:
+                    phase = "wait"
+                    child.communicate(
+                        input_bytes,
+                        timeout=timeout
+                        if deadline is None
+                        else max(0, deadline - time.monotonic()),
+                    )
+                except BaseException as primary:
+                    failure = primary
+                finally:
+                    if input_observer.close_failure is not None:
+                        closure_refused = True
+                        if failure is None:
+                            failure = input_observer.close_failure
+                    try:
                         if child.poll() is None:
                             child.kill()
                         child.wait()
-                    status = child.returncode
-                phase = "exit"
-                if status != 0 and not tolerate:
-                    raise FixtureFailure("Native fixture command refused")
-                self.command_fact = {"phase": "complete", "status": status}
-                output.seek(0)
-                return status, output.read(65536)
-        except BaseException as failure:
-            self.command_fact = {
-                "phase": "deadline" if isinstance(failure, subprocess.TimeoutExpired) else phase,
-                "status": status if type(status) is int and -65535 <= status <= 65535 else None,
-            }
-            raise
+                    except BaseException as refused:
+                        phase = "settle"
+                        closure_refused = True
+                        if failure is None:
+                            failure = refused
+                if failure is not None:
+                    raise failure
+                status = child.returncode
+            phase = "exit"
+            if status != 0 and not tolerate:
+                raise FixtureFailure("Native fixture command refused")
+            output.seek(0)
+            result = status, output.read(65536)
+        except BaseException as refused:
+            if failure is None:
+                failure = refused
+        finally:
+            process = owned.process if owned is not None else child
+            if input_observer is not None and input_observer.close_uncertain:
+                self.command_file_debt.append({"stream": input_owner, "uncertain": True})
+            streams = (
+                input_owner if input_owner is not None else getattr(process, "stdin", None),
+                errors,
+                output,
+            )
+            for stream in streams:
+                if stream is None or any(
+                    debt["stream"] is stream and debt["uncertain"]
+                    for debt in self.command_file_debt
+                ):
+                    continue
+                try:
+                    if not stream.closed:
+                        stream.close()
+                except BaseException as refused:
+                    closure_refused = True
+                    if failure is None:
+                        failure = refused
+                    if stream.closed and not any(
+                        value["stream"] is stream for value in self.command_file_debt
+                    ):
+                        self.command_file_debt.append({"stream": stream, "uncertain": True})
+                if not stream.closed:
+                    closure_refused = True
+                    if not any(value["stream"] is stream for value in self.command_file_debt):
+                        self.command_file_debt.append({"stream": stream, "uncertain": False})
+            if closure_refused and failure is None:
+                failure = FixtureFailure("Native fixture command file closure refused")
+        self.command_fact = {
+            "phase": "settle"
+            if closure_refused
+            else "deadline"
+            if isinstance(failure, subprocess.TimeoutExpired)
+            else phase
+            if failure is not None
+            else "complete",
+            "status": status if type(status) is int and -65535 <= status <= 65535 else None,
+        }
+        if failure is not None:
+            raise failure
+        return result
+
+    def _retire_command_files(self):
+        retained = []
+        for debt in self.command_file_debt:
+            stream = debt["stream"]
+            # CPython may retire its descriptor before a native close error.
+            # A closed marker cannot settle that uncertainty or authorize retry.
+            if debt["uncertain"]:
+                retained.append(debt)
+                continue
+            try:
+                if not stream.closed:
+                    stream.close()
+            except BaseException:
+                if stream.closed:
+                    debt["uncertain"] = True
+            if not stream.closed or debt["uncertain"]:
+                retained.append(debt)
+        self.command_file_debt = retained
+        return not retained
 
     def _certificates(self):
         config = self.root / "cert.conf"
@@ -260,17 +397,100 @@ class WireFixture:
                 ]
             )
         elif self.trust_attempted:
-            self._command(
-                [
-                    "/usr/bin/sudo",
-                    "-n",
-                    "/usr/bin/security",
-                    "remove-trusted-cert",
-                    "-d",
-                    str(self.ca),
-                ]
-            )
+            # Observation, acquisition and physical query settlement all consume
+            # the original removal budget. Neither refusal nor retry renews it.
+            deadline = time.monotonic() + 15
+            self._observe_admin_trust(deadline)
+            arguments = [
+                "/usr/bin/sudo",
+                "-n",
+                "/usr/bin/security",
+                "remove-trusted-cert",
+                "-d",
+                str(self.ca),
+            ]
+            if time.monotonic() >= deadline:
+                self.command_fact = {"phase": "deadline", "status": None}
+                raise subprocess.TimeoutExpired(arguments, 15)
+            self._command(arguments, deadline=deadline)
             self.trust_attempted = False
+
+    @staticmethod
+    def _admin_trust_fact(raw):
+        if not isinstance(raw, bytes) or len(raw) > 1024:
+            raise FixtureFailure("Native admin trust observation refused")
+
+        def unique_fields(pairs):
+            if len({key for key, _ in pairs}) != len(pairs):
+                raise FixtureFailure("Native admin trust observation refused")
+            return dict(pairs)
+
+        try:
+            fields = json.loads(raw, object_pairs_hook=unique_fields)
+        except (ValueError, UnicodeError) as failure:
+            raise FixtureFailure("Native admin trust observation refused") from failure
+        if not isinstance(fields, dict) or set(fields) != {
+            "version",
+            "export_status",
+            "entry_count",
+            "owned_status",
+            "owned_present",
+        }:
+            raise FixtureFailure("Native admin trust observation refused")
+        if type(fields["version"]) is not int or fields["version"] != 1:
+            raise FixtureFailure("Native admin trust observation refused")
+        for key in ("export_status", "owned_status"):
+            if type(fields[key]) is not int or not -(2**31) <= fields[key] < 2**31:
+                raise FixtureFailure("Native admin trust observation refused")
+        count, present = fields["entry_count"], fields["owned_present"]
+        if count is not None and (type(count) is not int or not 0 <= count <= 65535):
+            raise FixtureFailure("Native admin trust observation refused")
+        if present is not None and (type(present) is not int or present not in (0, 1)):
+            raise FixtureFailure("Native admin trust observation refused")
+        expected_presence = (
+            1
+            if fields["owned_status"] == 0
+            else 0
+            if fields["owned_status"] in (-25300, -25263)
+            else None
+        )
+        if present != expected_presence:
+            raise FixtureFailure("Native admin trust observation refused")
+        if fields["export_status"] == -25263:
+            if count != 0:
+                raise FixtureFailure("Native admin trust observation refused")
+        elif fields["export_status"] != 0 and count is not None:
+            raise FixtureFailure("Native admin trust observation refused")
+        if present == 1 and count == 0:
+            raise FixtureFailure("Native admin trust observation refused")
+        return fields
+
+    def _observe_admin_trust(self, deadline):
+        if self.trust_query_executable is None:
+            return
+        fact = {"version": 1, "observed": 0}
+        try:
+            with self.ca.open("rb") as certificate:
+                pem = certificate.read(16385)
+            if len(pem) > 16384:
+                raise FixtureFailure("Owned native CA observation refused")
+            der = ssl.PEM_cert_to_DER_cert(pem.decode("ascii"))
+            # The signed fixture worker is already owned and source-bound by the
+            # receiving setup; this mode never changes trust or keychain state.
+            _, output = self._command(
+                [str(self.trust_query_executable), "--fixture-admin-trust-query"],
+                input_bytes=der,
+                deadline=min(deadline, time.monotonic() + 2),
+            )
+            fact = {"observed": 1, **self._admin_trust_fact(output)}
+        except Exception:
+            if self.command_fact and self.command_fact["phase"] == "settle":
+                # Unknown output cannot retire an unsettled query's authority.
+                raise
+        try:
+            print("# native_http_admin_trust " + json.dumps(fact, sort_keys=True), flush=True)
+        except (OSError, ValueError):
+            pass
 
     def _track(self, connection, enabled):
         with self.lock:
@@ -669,6 +889,8 @@ class WireFixture:
         if self.closed:
             return
         failures = []
+        if not self._retire_command_files():
+            failures.append("command")
         for server in self.servers:
             if server in self.started_servers:
                 server.shutdown()

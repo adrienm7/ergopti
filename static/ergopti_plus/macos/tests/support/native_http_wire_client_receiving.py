@@ -64,6 +64,29 @@ WORKER_STAGES = (
 )
 
 
+# Internal callback/source construction can interleave. These observations do
+# not grant a route or impose an invented order on native callback delivery.
+INNER_STAGES = (
+    "proxy_copy",
+    "proxy_copied",
+    "pac_url",
+    "pac_script",
+    "pac_source",
+    "pac_wait",
+    "pac_callback",
+    "pac_done",
+    "routes_done",
+    "session_resume",
+    "session_wait",
+    "session_invalid",
+    "session_done",
+)
+ALL_STAGES = WORKER_STAGES + INNER_STAGES
+# All unique closed labels, including mutually exclusive branches, fit the
+# existing 256-byte envelope. No transport clock or byte limit is increased.
+assert sum(len(stage) + 1 for stage in ALL_STAGES) <= 256
+
+
 class WorkerStageReceipt:
     """Retain one exact private regular FD through its real child retirement."""
 
@@ -100,7 +123,9 @@ class WorkerStageReceipt:
             return {"state": "refused", "stages": []}
         try:
             stages = raw.decode("ascii").splitlines()
-            indices = [WORKER_STAGES.index(stage) for stage in stages]
+            if any(stage not in ALL_STAGES for stage in stages) or len(stages) != len(set(stages)):
+                return {"state": "refused", "stages": []}
+            indices = [WORKER_STAGES.index(stage) for stage in stages if stage in WORKER_STAGES]
         except (UnicodeError, ValueError):
             return {"state": "refused", "stages": []}
         if indices != sorted(set(indices)):
@@ -126,7 +151,10 @@ class WorkerStageReceipt:
             raise RuntimeError("Native fixture stage FD close outcome is uncertain")
         if self.descriptor is not None:
             current = os.fstat(self.descriptor)
-            if (current.st_dev, current.st_ino) != (self.identity.st_dev, self.identity.st_ino):
+            if (current.st_dev, current.st_ino) != (
+                self.identity.st_dev,
+                self.identity.st_ino,
+            ):
                 raise RuntimeError("Native fixture stage FD identity diverged")
             # Preserve the exact FD on a refused close; the pathname cannot be
             # retired before its physical descriptor closure succeeds.
@@ -142,7 +170,10 @@ class WorkerStageReceipt:
             except FileNotFoundError:
                 self.name_pending = False
                 return
-            if (current.st_dev, current.st_ino) == (self.identity.st_dev, self.identity.st_ino):
+            if (current.st_dev, current.st_ino) == (
+                self.identity.st_dev,
+                self.identity.st_ino,
+            ):
                 os.unlink(self.target)
             # A foreign replacement remains untouched. A refused unlink keeps
             # the original name debt available to the same owner's next close.
@@ -180,10 +211,12 @@ class RealNativeClientReceiving(unittest.TestCase):
             contract = payload / "_shared/modules/network/proxy_policy.json"
             contract.parent.mkdir(parents=True)
             shutil.copy2(
-                ROOT / "static/ergopti_plus/_shared/modules/network/proxy_policy.json", contract
+                ROOT / "static/ergopti_plus/_shared/modules/network/proxy_policy.json",
+                contract,
             )
             shutil.copy2(
-                ROOT / "static/ergopti_plus/_shared/python/network_proxy_policy.py", shared
+                ROOT / "static/ergopti_plus/_shared/python/network_proxy_policy.py",
+                shared,
             )
             for name in ("native_http.py", "managed_http.py"):
                 shutil.copy2(MAC / "platform/network" / name, native)
@@ -259,6 +292,8 @@ class RealNativeClientReceiving(unittest.TestCase):
                     "/usr/bin/xcrun",
                     "swiftc",
                     "-parse-as-library",
+                    "-D",
+                    "ERGOPTI_MANAGED_HTTP_FIXTURE_DIAGNOSTICS",
                     "-I",
                     str(compatibility_module),
                     "-framework",
@@ -283,6 +318,7 @@ class RealNativeClientReceiving(unittest.TestCase):
                     raise RuntimeError("Native receiving source changed during compilation")
             cls.fixture._command(["/usr/bin/codesign", "--force", "--sign", "-", str(executable)])
             cls.fixture._command(["/usr/bin/codesign", "--verify", "--strict", str(executable)])
+            cls.fixture.trust_query_executable = executable
             identity = executable.stat()
             (cls.root / "source-receipt.json").write_text(
                 json.dumps(
@@ -421,11 +457,17 @@ class RealNativeClientReceiving(unittest.TestCase):
                     "peer": self.fixture.receiving_facts(),
                     "entry_stages": {
                         stage: min(65535, sum(stage in row["stages"] for row in stages))
-                        for stage in WORKER_STAGES
+                        for stage in ALL_STAGES
                     },
                     "stage_receipts": {
                         state: min(65535, sum(row["state"] == state for row in stages))
-                        for state in ("observed", "empty", "unavailable", "refused", "unsettled")
+                        for state in (
+                            "observed",
+                            "empty",
+                            "unavailable",
+                            "refused",
+                            "unsettled",
+                        )
                     },
                     "stage_closure_unsettled": min(
                         65535,
@@ -498,13 +540,20 @@ class RealNativeClientReceiving(unittest.TestCase):
                 self.assertEqual(response.status_code, 200)
                 self.assertEqual(response.content, b"owned\x00native\xffwire")
                 self.assertEqual(
-                    transport.active, set(), "Every completed actual native child was reaped"
+                    transport.active,
+                    set(),
+                    "Every completed actual native child was reaped",
                 )
                 self.assertEqual(self.fixture.stats()["active"], 0)
         origins = [row for row in self.fixture.stats()["records"] if row["event"] == "origin"]
         self.assertEqual(
             [row["path"] for row in origins],
-            ["/alpha?case=one", "/beta?case=two", "/fallback?case=three", "/socks?case=ten"],
+            [
+                "/alpha?case=one",
+                "/beta?case=two",
+                "/fallback?case=three",
+                "/socks?case=ten",
+            ],
         )
         self.assertEqual([row["route"] for row in origins], ["first", "second", "first", "socks"])
         socks = [row for row in self.fixture.stats()["records"] if row["event"] == "socks_connect"]
@@ -546,7 +595,8 @@ class RealNativeClientReceiving(unittest.TestCase):
         response = client.get(self.url("/redirect?case=five"))
         self.assertEqual(response.content, b"owned\x00native\xffwire")
         self.assertEqual(
-            [str(item.url) for item in response.history], [self.url("/redirect?case=five")]
+            [str(item.url) for item in response.history],
+            [self.url("/redirect?case=five")],
         )
         with self.assertRaises(self.httpx.HTTPError):
             client.get(self.url("/auth?case=four"))
@@ -577,14 +627,23 @@ class RealNativeClientReceiving(unittest.TestCase):
             ],
         )
         self.assertEqual(
-            [row["route"] for row in origins], ["first", "second", "first", "first", "first"]
+            [row["route"] for row in origins],
+            ["first", "second", "first", "first", "first"],
         )
         closed = [row for row in records if row["event"] == "redirect_closed"]
         self.assertEqual(
             closed,
             [
-                {"event": "redirect_closed", "path": "/redirect?case=five", "eof": True},
-                {"event": "redirect_closed", "path": "/downgrade?case=six", "eof": True},
+                {
+                    "event": "redirect_closed",
+                    "path": "/redirect?case=five",
+                    "eof": True,
+                },
+                {
+                    "event": "redirect_closed",
+                    "path": "/downgrade?case=six",
+                    "eof": True,
+                },
             ],
         )
         self.assertEqual(

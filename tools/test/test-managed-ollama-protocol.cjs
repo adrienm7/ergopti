@@ -14,7 +14,7 @@ const cases = [
 ];
 if (process.platform !== 'win32') {
 	cases.push(['tools/test/macos_native_ollama_api_test.py', 8]);
-	cases.push(['tools/test/macos_native_http_receiving_facts_test.py', 15]);
+	cases.push(['tools/test/macos_native_http_receiving_facts_test.py', 28]);
 	cases.push(['tools/test/macos_managed_ollama_explicit_stream_test.py', 6]);
 	cases.push(['tools/diagnostics/macos_managed_ollama_receiving_test.py', 16]);
 	cases.push(['tools/test/managed_ollama_sessions_test.py', 11]);
@@ -30,7 +30,7 @@ if (process.platform !== 'win32') {
 	cases.push(['tools/diagnostics/macos_source_alias_owner_test.py', 19]);
 	cases.push(['tools/diagnostics/macos_listener_path_identity_test.py', 12]);
 	cases.push(['tools/diagnostics/macos_owned_private_session_test.py', 5]);
-	cases.push(['tools/test/macos_bootstrap_tls_numeric_binding_test.py', 6]);
+	cases.push(['tools/test/macos_bootstrap_tls_numeric_binding_test.py', 8]);
 	cases.push(['tools/test/owned_suspended_image_portable_test.py', 3]);
 	cases.push(['tools/diagnostics/macos_suspended_image_owner_test.py', 22]);
 	cases.push(['tools/diagnostics/macos_ollama_bootstrap_owner_test.py', 22]);
