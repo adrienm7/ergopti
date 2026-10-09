@@ -348,6 +348,13 @@ helpers.describe("closed diagnostic sharing corpus", function()
 			for _, canary in ipairs(vector.canaries) do
 				helpers.assert_true(not document.text:find(canary, 1, true), vector.name)
 			end
+			local readable = document.text:match("^(.-)```json")
+			for _, id in ipairs({ "versions", "hardware", "system", "input", "ai", "permissions", "issues" }) do
+				assert(readable:find("## " .. require("infra.i18n").get("healthcheck.section." .. id), 1, true), "readable section omitted")
+			end
+			assert(readable:find("| probes.appleevent_transport.native_status | -1744 |", 1, true))
+			assert(readable:find("| probes.appleevent_transport.cleanup | pending |", 1, true))
+			assert(readable:find("| retired_probes.1.probes.appleevent_transport.cleanup | unknown |", 1, true))
 			helpers.assert_eq(document.snapshot.probes.appleevent_transport.state, "timeout")
 			helpers.assert_eq(document.snapshot.probes.appleevent_transport.cleanup, "pending")
 			helpers.assert_eq(document.snapshot.probes.appleevent_transport.native_status, -1744)

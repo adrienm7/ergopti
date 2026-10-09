@@ -105,13 +105,88 @@ HealthCheck_ShareSnapshot(Snapshot, Schema) {
 	return _HCShare_Project(Snapshot, Policy["projection"], &Present)
 }
 
+
+/** Renders only the detached projection; no local message or path reaches a row. */
+_HCShare_Rows(Value, Rule, Prefix, Rows) {
+	if Rule["kind"] == "object" {
+		Keys := ""
+		for Key in Value
+			Keys .= Key . "`n"
+		for Key in StrSplit(RTrim(Sort(Keys, "C"), "`n"), "`n") {
+			if Key != ""
+				_HCShare_Rows(Value[Key], Rule["fields"][Key], Prefix == "" ? Key : Prefix . "." . Key, Rows)
+		}
+	} else if Rule["kind"] == "array" {
+		for Index, Item in Value
+			_HCShare_Rows(Item, Rule["item"], Prefix . "." . Index, Rows)
+	} else {
+		Text := Rule["kind"] == "boolean" ? (Value ? "true" : "false") : Value
+		Rows.Push("| " . _HCShare_Cell(Prefix) . " | " . _HCShare_Cell(Text) . " |")
+	}
+}
+
+_HCShare_Cell(Value) {
+	return StrReplace(RegExReplace(Value . "", "[\r\n]+", " "), "|", "\|")
+}
+
+_HCShare_Table(Rows, Title := "") {
+	if !Rows.Length
+		return ""
+	Text := (Title == "" ? "" : "## " . t(Title) . "`n`n") . "| | |`n| --- | --- |`n"
+	for Row in Rows
+		Text .= Row . "`n"
+	return Text
+}
+
+/** Canonical section labels describe only values admitted by the sharing policy. */
+_HCShare_Readable(Safe, Schema) {
+	Policy := Schema["share_policy"]["projection"]["fields"]
+	Rows := [], Keys := ""
+	for Key in Safe
+		if Key != "sections" && Key != "probes" && Key != "retired_probes"
+			Keys .= Key . "`n"
+	for Key in StrSplit(RTrim(Sort(Keys, "C"), "`n"), "`n")
+		if Key != ""
+			_HCShare_Rows(Safe[Key], Policy[Key], Key, Rows)
+	Text := _HCShare_Table(Rows)
+	for Section in Schema["sections"] {
+		Id := Section["id"]
+		if !Safe.Get("sections", Map()).Has(Id)
+			continue
+		Data := Safe["sections"][Id], Rows := [], Keys := ""
+		for Key in Data
+			Keys .= Key . "`n"
+		for Key in StrSplit(RTrim(Sort(Keys, "C"), "`n"), "`n") {
+			if Key == ""
+				continue
+			Label := Key
+			for Field in Section.Get("fields", [])
+				if Field["id"] == Key {
+					Label := t("healthcheck.field." . Key)
+					break
+				}
+			_HCShare_Rows(Data[Key], Policy["sections"]["fields"][Id]["fields"][Key], Label, Rows)
+		}
+		TableText := _HCShare_Table(Rows, "healthcheck.section." . Id)
+		if TableText != ""
+			Text .= "`n" . TableText
+	}
+	Rows := []
+	for Key in ["probes", "retired_probes"]
+		if Safe.Has(Key)
+			_HCShare_Rows(Safe[Key], Policy[Key], Key, Rows)
+	TableText := _HCShare_Table(Rows, "healthcheck.deep_tests.probe_inventory")
+	return Text . (TableText == "" ? "" : "`n" . TableText)
+}
+
 /** Builds file and issue-form content only from the host-retained snapshot. */
 HealthCheck_ShareDocument(Snapshot, Schema) {
 	Safe := HealthCheck_ShareSnapshot(Snapshot, Schema)
 	Versions := Safe.Get("sections", Map()).Get("versions", Map())
 	Fence := Chr(96) . Chr(96) . Chr(96)
 	Text := "# ErgoptiPlus diagnostics`n`n" . t(Schema["share_policy"]["notice_key"])
-		. "`n`ndriver-suites: not_run`npage-model-checks: not_collected`n`n" . Fence . "json`n" . _HC_ValueToJson(Safe) . "`n" . Fence . "`n"
+		. "`n`ndriver-suites: not_run`npage-model-checks: not_collected`n`n" . _HCShare_Readable(Safe, Schema)
+		. "`n" . Fence . "json`n" . _HC_ValueToJson(Safe) . "`n" . Fence . "`n"
 	Name := Schema["report"]["name_prefix"] . Safe["driver"] . "-"
 		. RegExReplace(Safe.Get("generated_at", "unknown"), "[^A-Za-z0-9_.-]", "_") . Schema["report"]["name_suffix"]
 	return Map("snapshot", Safe, "text", Text, "name", Name,
