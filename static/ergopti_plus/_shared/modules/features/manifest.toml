@@ -2436,7 +2436,7 @@ description_key = "menu.gestures.tap_4"
 id = "swipe_2_left"
 platforms = ["hs", "linux"]
 default = "none"
-recommended_per_platform = { hs = "arrow_up", linux = "none" }
+recommended = "none"
 input_altering = true
 type = "action"
 description_key = "menu.gestures.swipe_2_left"

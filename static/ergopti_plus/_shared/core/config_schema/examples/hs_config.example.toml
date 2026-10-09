@@ -280,7 +280,7 @@ return_key = "open_metrics_typing"
 
 [gestures]
 enabled = true
-swipe_2_left = "arrow_up"
+swipe_2_left = "none"
 swipe_2_right = "none"
 swipe_2_up = "none"
 swipe_2_down = "none"

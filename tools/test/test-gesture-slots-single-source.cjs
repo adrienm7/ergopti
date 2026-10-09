@@ -57,6 +57,52 @@ try {
 		errors.push('actions.toml [slots] single/axis overlap or contain duplicates');
 	}
 
+	// Native two-finger OS gestures remain unassigned until the user explicitly binds one.
+	{
+		const parse = require('smol-toml').parse;
+		const source = read('_shared/modules/features/manifest.toml');
+		const manifest = parse(
+			source.replace(
+				/^\[\[features\.([^\]]+)\]\]\r?$/gm,
+				(_, section) => `[[entries]]\npath_prefix = "${section}"`
+			)
+		);
+		const expected = [
+			'tap_2',
+			'swipe_2_left',
+			'swipe_2_right',
+			'swipe_2_up',
+			'swipe_2_down',
+			'swipe_2_left_up',
+			'swipe_2_right_up',
+			'swipe_2_left_down',
+			'swipe_2_right_down',
+			'swipe_2_diag'
+		];
+		const rows = manifest.entries.filter(
+			(row) =>
+				row.path_prefix === 'gestures' &&
+				row.type === 'action' &&
+				(row.id === 'tap_2' || row.id.startsWith('swipe_2_'))
+		);
+		if (
+			rows.length !== expected.length ||
+			expected.some((id) => rows.filter((row) => row.id === id).length !== 1)
+		)
+			errors.push('canonical two-finger action inventory must be complete and unique');
+		for (const row of rows) {
+			if (row.default !== 'none')
+				errors.push(`${row.id}: startup must leave two-finger actions unassigned`);
+			for (const platform of row.platforms) {
+				const value = row.recommended_per_platform?.[platform] ?? row.recommended;
+				if (value !== 'none')
+					errors.push(
+						`${row.id}: ${platform} recommendation must preserve native two-finger gestures`
+					);
+			}
+		}
+	}
+
 	// macOS still hardcodes the slot arrays (deriving them would need an
 	// unverifiable Hammerspoon reload), so its literals are pinned to the TOML.
 	{
