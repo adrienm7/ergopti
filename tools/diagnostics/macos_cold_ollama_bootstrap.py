@@ -3,6 +3,7 @@
 """Receive a real Hammerspoon -> native PTY -> pinned official Ollama installation without Python."""
 
 import argparse
+import errno
 import hashlib
 import json
 import os
@@ -151,7 +152,58 @@ def digest(path):
     return hashlib.sha256(Path(path).read_bytes()).hexdigest()
 
 
-def probe_installed_client_version(binary, profile, environment):
+def qualify_version_probe_route(address):
+    """Require actual kernel refusal on our retained route before running the CLI."""
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as witness:
+        witness.settimeout(0.25)
+        result = witness.connect_ex(address)
+    if result != errno.ECONNREFUSED:
+        raise RuntimeError(
+            "Reserved local version route did not refuse the native connection: " + str(result)
+        )
+    return {"kind": "actual kernel loopback connection", "result": "ECONNREFUSED"}
+
+
+def version_timeout_observation(error):
+    """Fingerprint bounded captured fields; disclose no arbitrary process output."""
+    expected = (
+        "Warning: could not connect to a running Ollama instance\n"
+        "Warning: client version is " + OFFICIAL_VERSION + "\n"
+    ).encode("utf-8")
+    fields = {}
+    collected = []
+    for name in ("stdout", "stderr"):
+        value = getattr(error, name, None)
+        if value is None:
+            payload, size, unit, truncated = b"", 0, "bytes", False
+        elif isinstance(value, str):
+            encoded = value[:4096].encode("utf-8", errors="surrogatepass")
+            payload, size, unit = encoded[:4096], len(value), "characters"
+            truncated = len(value) > 4096 or len(encoded) > 4096
+        elif isinstance(value, bytes):
+            payload, size, unit = value[:4096], len(value), "bytes"
+            truncated = len(value) > 4096
+        else:
+            return {"kind": "timeout", "output_shape": "refused"}
+        # Only the bounded prefix is fingerprinted. The receipt never holds
+        # arbitrary captured text or claims the prefix hash names the whole output.
+        fields[name] = {
+            "captured_size": size,
+            "captured_unit": unit,
+            "sample_bytes": len(payload),
+            "sample_sha256": hashlib.sha256(payload).hexdigest(),
+            "sample_truncated": truncated,
+        }
+        collected.append(payload if not truncated and len(payload) <= len(expected) else None)
+    complete = all(item is not None for item in collected)
+    return {
+        "kind": "timeout",
+        "output": fields,
+        "expected_version_lines_complete": complete and b"".join(collected) == expected,
+    }
+
+
+def probe_installed_client_version(binary, profile, environment, diagnostics=None):
     """Hold an unserved loopback port until the exact version child is reaped."""
     # The pinned upstream versionHandler prints the daemon version when it
     # answers. Reserve a non-listening socket so an unrelated daemon can never
@@ -161,16 +213,24 @@ def probe_installed_client_version(binary, profile, environment):
     try:
         lease.bind(("127.0.0.1", 0))
         address = lease.getsockname()
+        route = qualify_version_probe_route(address)
+        if diagnostics is not None:
+            diagnostics["route"] = route
         child_environment = environment.copy()
         child_environment["OLLAMA_HOST"] = "http://127.0.0.1:" + str(address[1])
-        probe = subprocess.run(
-            ["/usr/bin/sandbox-exec", "-f", str(profile), str(binary), "--version"],
-            capture_output=True,
-            text=True,
-            timeout=30,
-            env=child_environment,
-            check=True,
-        )
+        try:
+            probe = subprocess.run(
+                ["/usr/bin/sandbox-exec", "-f", str(profile), str(binary), "--version"],
+                capture_output=True,
+                text=True,
+                timeout=30,
+                env=child_environment,
+                check=True,
+            )
+        except subprocess.TimeoutExpired as error:
+            if diagnostics is not None:
+                diagnostics["failure"] = version_timeout_observation(error)
+            raise
         # subprocess.run waits/reaps on success or refusal and kills/waits on
         # timeout. Only then does finally release our exclusive bound socket.
         expected = [
@@ -181,6 +241,8 @@ def probe_installed_client_version(binary, profile, environment):
             raise RuntimeError("Installed official client does not report the pinned local version")
     finally:
         lease.close()
+        if diagnostics is not None:
+            diagnostics["lease_closed"] = lease.fileno() == -1
     if lease.fileno() != -1:
         raise RuntimeError("Native version probe socket lease remains open")
     return {
@@ -467,7 +529,10 @@ def receive(app, archive, output, repository):
                 timeout=60,
                 env=environment,
             )
-            report["version_probe"] = probe_installed_client_version(binary, profile, environment)
+            report["version_probe_diagnostics"] = {}
+            report["version_probe"] = probe_installed_client_version(
+                binary, profile, environment, report["version_probe_diagnostics"]
+            )
             if digest(archive) != OFFICIAL_SHA256:
                 raise RuntimeError("Independent receiving archive changed during installation")
             if any(

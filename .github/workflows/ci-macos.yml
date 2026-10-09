@@ -150,6 +150,49 @@ jobs:
           python3 tools/test/export-macos-managed-http-test-deps.py static/ergopti_plus/macos/uv.lock > "$ERGOPTI_OLLAMA_BUILD_ROOT/native-clients.requirements"
           "$ERGOPTI_OLLAMA_BUILD_ROOT/native-clients/bin/python" -m pip install --require-hashes --only-binary=:all: -r "$ERGOPTI_OLLAMA_BUILD_ROOT/native-clients.requirements"
           echo "ERGOPTI_NATIVE_HTTP_PYTHON=$ERGOPTI_OLLAMA_BUILD_ROOT/native-clients/bin/python" >> "$GITHUB_ENV"
+      - name: Receive actual private-session and numeric TLS peer controls
+        shell: bash
+        run: |
+          set -euo pipefail
+          receive_controls() {
+            local script="$1" expected="$2" transcript="$3"
+            local -a receiving_statuses
+            set +e
+            python3 "$script" -v 2>&1 | tee "$transcript"
+            receiving_statuses=("${PIPESTATUS[@]}")
+            set -e
+            test "${receiving_statuses[0]}" -eq 0
+            test "${receiving_statuses[1]}" -eq 0
+            python3 - "$transcript" "$expected" <<'PY'
+          import re
+          import sys
+          from pathlib import Path
+          path = Path(sys.argv[1])
+          assert path.stat().st_size <= 1048576
+          transcript = path.read_text(encoding='utf-8')
+          expected = int(sys.argv[2])
+          assert expected in (5, 6)
+          summaries = re.findall(r'^Ran ([0-9]+) tests? in [0-9]+(?:\.[0-9]+)?s$', transcript, re.MULTILINE)
+          assert summaries == [str(expected)]
+          assert len(re.findall(r'^Ran .*$', transcript, re.MULTILINE)) == 1
+          assert len(re.findall(r'^OK$', transcript, re.MULTILINE)) == 1
+          assert not re.search(r'skipped|expected failure|unexpected success|^FAILED', transcript, re.MULTILINE)
+          PY
+          }
+          receive_controls tools/diagnostics/macos_owned_private_session_test.py 5 "$ERGOPTI_OLLAMA_BUILD_ROOT/private-session-controls.log"
+          receive_controls tools/test/macos_bootstrap_tls_numeric_binding_test.py 6 "$ERGOPTI_OLLAMA_BUILD_ROOT/numeric-tls-controls.log"
+        timeout-minutes: 5
+      - name: Retain actual private-session and numeric TLS peer diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          overwrite: true
+          name: managed-ollama-native-python-${{ matrix.architecture }}-${{ github.run_id }}
+          if-no-files-found: warn
+          retention-days: 7
+          path: |
+            ${{ env.ERGOPTI_OLLAMA_BUILD_ROOT }}/private-session-controls.log
+            ${{ env.ERGOPTI_OLLAMA_BUILD_ROOT }}/numeric-tls-controls.log
       - name: Qualify actual SDK accepted-owner and deadline XCTest controls
         shell: bash
         run: |

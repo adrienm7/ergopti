@@ -826,6 +826,21 @@ _CNR_NativePacDiagnostic(Observation) {
 	Fact := _CNR_NativePacDiagnosticFact(Observation.Get("stdout", ""))
 	if Fact != ""
 		_TestPrint("::notice title=Windows canonical PAC entrypoint::" . Fact)
+	Entry := _CNR_NativePacEntryDiagnosticFact(Observation.Get("stdout", ""))
+	if Entry != ""
+		_TestPrint("::notice title=Windows canonical PAC entrypoint input::" . Entry)
+}
+
+_CNR_NativePacEntryDiagnosticFact(Out) {
+	if !(Out is String) || StrLen(Out) > 8192
+		return ""
+	Pattern := "m)^PROXY_ENTRY_DIAG site=(paths|defaults_read|budget_guard|native_ex_load|private_input|input_write|launch_setup|unknown) line=(0|[1-9][0-9]{0,3}) error=(budget_refused|compiler|type_exists|type_missing|method_missing|method_overload|property_missing|command_missing|method_invocation|other) budget=(int32|int64|double|absent|other) helper=([01]) tick=([01])`r?$"
+	if !RegExMatch(Out, Pattern, &Fact) || Integer(Fact[2]) > 8192 || (Fact[5] == "0" && Fact[6] != "0")
+		return ""
+	Prefix := "m)^PROXY_ENTRY_DIAG "
+	if !RegExMatch(Out, Prefix, &First) || First.Pos != Fact.Pos || RegExMatch(Out, Prefix, , Fact.Pos + Fact.Len)
+		return ""
+	return SubStr(RTrim(Fact[0], "`r"), StrLen("PROXY_ENTRY_DIAG ")+1)
 }
 
 _CNR_NativePacDiagnosticFact(Out) {
@@ -857,5 +872,13 @@ _CNR_NativePacDiagnosticProtocol() {
 		Early . " secret=fixture-secret", Early . StrReplace(Format("{:8192}", ""), " ", "x")] {
 		AssertEqual("", _CNR_NativePacDiagnosticFact(Refused), "unadmitted diagnostic data must remain private")
 	}
+	Entry := "PROXY_ENTRY_DIAG site=native_ex_load line=213 error=compiler budget=int64 helper=0 tick=0"
+	AssertEqual("site=native_ex_load line=213 error=compiler budget=int64 helper=0 tick=0", _CNR_NativePacEntryDiagnosticFact(Entry))
+	for Refused in [StrReplace(Entry, "native_ex_load", "PRIVATE_URL"), StrReplace(Entry, "line=213", "line=8193"),
+		StrReplace(Entry, "line=213", "line=0213"), StrReplace(Entry, "error=compiler", "error=PRIVATE_TEXT"),
+		StrReplace(Entry, "budget=int64", "budget=PRIVATE"), StrReplace(Entry, "helper=0", "helper=2"),
+		StrReplace(Entry, "tick=0", "tick=1"), Entry . "`n" . Entry, "PROXY_ENTRY_DIAG private=1`n" . Entry,
+		Entry . " private=token"]
+		AssertEqual("", _CNR_NativePacEntryDiagnosticFact(Refused), "entrypoint observations refuse private or inconsistent fields")
 }
 Test("system proxy native: early failure diagnostic admits only one closed scalar frame", _CNR_NativePacDiagnosticProtocol)

@@ -134,7 +134,7 @@ function Write-ErgoptiStagingRouteShape {
 function New-ErgoptiObservedDownloadFunction {
     param([string]$Source)
     $Before = '            $Selection = & $ResolveRoutes $Destination.AbsoluteUri $Remaining'
-    $After = $Before + "`n" + '            try { $State.FixtureRouteShape = Get-ErgoptiStagingRouteShape $Selection } catch { $script:StagingRouteShapeHealth = "unavailable" }'
+    $After = '$script:FixtureStagingSetupSite="route_call"' + "`n" + $Before + "`n" + '            try { $State.FixtureRouteShape = Get-ErgoptiStagingRouteShape $Selection } catch { $script:StagingRouteShapeHealth = "unavailable" }'
     if (($Source.Split([string[]]@($Before), [StringSplitOptions]::None)).Length -ne 2) {
         throw 'Legacy route observation seam drifted.'
     }
@@ -144,9 +144,9 @@ function New-ErgoptiObservedDownloadFunction {
 function New-ErgoptiObservedStagingScript {
     param([string]$Source, [string]$DiagnosticPath)
     # The unique fixture environment supplies the path; it never comes from user data.
-    $Initialization = '$StagingDiagnosticExpected=$null;$StagingDiagnosticActual=$null;$StagingDiagnosticOperation="not_file_read"'
+    $Initialization = '$StagingDiagnosticExpected=$null;$StagingDiagnosticActual=$null;$StagingDiagnosticOperation="not_file_read";$script:FixtureStagingSetupSite="download_module_load"'
     $Seams = @(
-        @{ before = '  . $DownloadModulePath'; after = '  . $DownloadModulePath' + "`n" + '  $ObservedDownload=New-ErgoptiObservedDownloadFunction ((Get-Command Invoke-ErgoptiUpdaterDownload).Definition);${function:Invoke-ErgoptiUpdaterDownload}=[scriptblock]::Create($ObservedDownload.Source)' },
+        @{ before = '  . $DownloadModulePath'; after = '  . $DownloadModulePath' + "`n" + '$script:FixtureStagingSetupSite="download_module_reconstruct"' + "`n" + '  $ObservedDownload=New-ErgoptiObservedDownloadFunction ((Get-Command Invoke-ErgoptiUpdaterDownload).Definition);${function:Invoke-ErgoptiUpdaterDownload}=[scriptblock]::Create($ObservedDownload.Source)' + "`n" + '$script:FixtureStagingSetupSite="native_routes_load"' },
         @{ before = '$ErrorActionPreference = "Stop"'; after = ('$ErrorActionPreference = "Stop"' + "`n" + $Initialization) },
         @{ before = '  $State.Stage="file_read"'; after = '  $State.Stage="file_read";$StagingDiagnosticExpected=$ExpectedSize;$StagingDiagnosticOperation="metadata"' },
         @{ before = '  if ($ExpectedSize -gt 0'; after = '  $StagingDiagnosticActual=$ActualSize;$StagingDiagnosticOperation="content_length"' + "`n" + '  if ($ExpectedSize -gt 0' },
@@ -154,11 +154,48 @@ function New-ErgoptiObservedStagingScript {
         @{ before = '  if ($ExpectedSha256 -cnotmatch'; after = '  $StagingDiagnosticOperation="digest_format"' + "`n" + '  if ($ExpectedSha256 -cnotmatch' },
         @{ before = '  $ActualDigest='; after = '  $StagingDiagnosticOperation="digest_read"' + "`n" + '  $ActualDigest=' },
         @{ before = '  $null=Get-ErgoptiUpdaterRemainingMilliseconds $StartedTick $DeadlineMs $State' + "`n" + '  if ($ActualDigest'; after = '  $StagingDiagnosticOperation="budget"' + "`n" + '  $null=Get-ErgoptiUpdaterRemainingMilliseconds $StartedTick $DeadlineMs $State' + "`n" + '  $StagingDiagnosticOperation="digest_compare"' + "`n" + '  if ($ActualDigest' },
-        @{ before = '} catch {'; after = '} catch {' + "`n" + '  Write-ErgoptiStagingDiagnostic $env:ERGOPTI_FIXTURE_STAGING_DIAGNOSTIC $StagingDiagnosticOperation $StagingDiagnosticExpected $StagingDiagnosticActual $_.Exception $State.Stage' + "`n" + '  Write-ErgoptiStagingRouteShape $env:ERGOPTI_FIXTURE_STAGING_ROUTE_SHAPE $State'  }
+        @{ before = '} catch {'; after = '} catch {' + "`n" + '  Write-ErgoptiStagingDiagnostic $env:ERGOPTI_FIXTURE_STAGING_DIAGNOSTIC $StagingDiagnosticOperation $StagingDiagnosticExpected $StagingDiagnosticActual $_.Exception $State.Stage' + "`n" + '  Write-ErgoptiStagingRouteShape $env:ERGOPTI_FIXTURE_STAGING_ROUTE_SHAPE $State' + "`n" + '  Write-ErgoptiStagingSetupDiagnostic ($env:ERGOPTI_FIXTURE_STAGING_DIAGNOSTIC+".setup") $_'  }
     )
     foreach ($Seam in $Seams) {
         if (($Source.Split([string[]]@($Seam.before), [StringSplitOptions]::None)).Length -ne 2) { throw 'Staging observation seam drifted.' }
         $Source = $Source.Replace($Seam.before, $Seam.after)
     }
     return [pscustomobject]@{ Source = $Source; Seams = $Seams }
+}
+
+function Write-ErgoptiStagingSetupDiagnostic {
+    param([string]$Path,[System.Management.Automation.ErrorRecord]$Failure)
+    $Stream=$null
+    try {
+        if ([string]::IsNullOrEmpty($env:ERGOPTI_FIXTURE_STAGING_DIAGNOSTIC) -or $null -eq $Failure) {return}
+        $Site=if ($script:FixtureStagingSetupSite -cin @('download_module_load','download_module_reconstruct','native_routes_load','route_call')) {$script:FixtureStagingSetupSite} else {'unknown'}
+        $Line=0
+        if ($null -ne $Failure.InvocationInfo -and $Failure.InvocationInfo.ScriptLineNumber -is [int] -and
+            $Failure.InvocationInfo.ScriptLineNumber -ge 1 -and $Failure.InvocationInfo.ScriptLineNumber -le 8192) {$Line=$Failure.InvocationInfo.ScriptLineNumber}
+        $Exception=$Failure.Exception
+        for ($Depth=0;$Depth -lt 8 -and $null -ne $Exception.InnerException;$Depth++) {$Exception=$Exception.InnerException}
+        $Family=if ($Exception -is [InvalidOperationException]) {'invalid_operation'} elseif ($Exception -is [System.Management.Automation.RuntimeException]) {'runtime'}
+            elseif ($Exception -is [ArgumentException]) {'argument'} elseif ($Exception -is [IO.IOException]) {'io'} else {'other'}
+        $Error='other';$Id=[string]$Failure.FullyQualifiedErrorId
+        if ($Id.Length -le 256) {
+            switch -CaseSensitive (($Id -split ',')[0]) {
+                'COMPILER_ERRORS' {$Error='compiler'}
+                'TYPE_ALREADY_EXISTS' {$Error='type_exists'}
+                'TypeNotFound' {$Error='type_missing'}
+                'MethodNotFound' {$Error='method_missing'}
+                'CommandNotFoundException' {$Error='command_missing'}
+                'PropertyNotFoundStrict' {$Error='property_missing'}
+                'MethodInvocationException' {$Error='method_invocation'}
+                'VariableNotWritable' {$Error='variable_refused'}
+                'Canonical updater route was refused.' {$Error='route_refused'}
+                'Legacy route observation seam drifted.' {$Error='observation_seam'}
+            }
+        }
+        $Fact=@{schema_version=1;site=$Site;line=[int]$Line;exception=$Family;error=$Error;hresult=[int]$Exception.HResult}
+        $Bytes=[Text.UTF8Encoding]::new($false).GetBytes(($Fact|ConvertTo-Json -Compress))
+        if ($Bytes.Length -gt 2048) {return}
+        $Stream=[IO.File]::Open($Path,[IO.FileMode]::CreateNew,[IO.FileAccess]::Write,[IO.FileShare]::None)
+        $Stream.Write($Bytes,0,$Bytes.Length);$Stream.Flush($true)
+    } catch {$script:StagingSetupDiagnosticHealth='unavailable'}
+    finally {if ($null -ne $Stream) {try {$Stream.Dispose()} catch {$script:StagingSetupDiagnosticHealth='unavailable'}}}
 }

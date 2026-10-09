@@ -27,6 +27,44 @@ function Write-ProxyNativeFailure([System.Management.Automation.ErrorRecord]$Fai
     [Console]::Out.WriteLine('PROXY_NATIVE_DIAG stage='+$script:ProxyNativeDiagnosticStage+' passed='+$script:Passed+' family='+$Family+' code='+$Code.ToString([Globalization.CultureInfo]::InvariantCulture))
     [Console]::Out.Flush()
 }
+function Write-ProxyEntryFailure([System.Management.Automation.ErrorRecord]$Failure) {
+    if ($script:ProxyNativeDiagnosticStage -cne 'entrypoint_input') { return }
+    $Sites=@('paths','defaults_read','budget_guard','native_ex_load','private_input','input_write','launch_setup')
+    $Site=if ($script:ProxyEntrySite -cin $Sites) {$script:ProxyEntrySite} else {'unknown'}
+    $Line=0
+    if ($null -ne $Failure.InvocationInfo -and $Failure.InvocationInfo.ScriptLineNumber -is [int] -and
+        $Failure.InvocationInfo.ScriptLineNumber -ge 1 -and $Failure.InvocationInfo.ScriptLineNumber -le 8192) {
+        $Line=$Failure.InvocationInfo.ScriptLineNumber
+    }
+    $Error='other'
+    $ErrorId=[string]$Failure.FullyQualifiedErrorId
+    if ($ErrorId.Length -le 256) {
+        switch -CaseSensitive (($ErrorId -split ',')[0]) {
+            'Canonical native entrypoint deadline was refused.' {$Error='budget_refused'}
+            'COMPILER_ERRORS' {$Error='compiler'}
+            'TYPE_ALREADY_EXISTS' {$Error='type_exists'}
+            'TypeNotFound' {$Error='type_missing'}
+            'MethodNotFound' {$Error='method_missing'}
+            'MethodCountCouldNotFindBest' {$Error='method_overload'}
+            'PropertyNotFoundStrict' {$Error='property_missing'}
+            'CommandNotFoundException' {$Error='command_missing'}
+            'MethodInvocationException' {$Error='method_invocation'}
+        }
+    }
+    $Budget=if ($script:LookupSeconds -is [int]) {'int32'} elseif ($script:LookupSeconds -is [long]) {'int64'}
+        elseif ($script:LookupSeconds -is [double]) {'double'} elseif ($null -eq $script:LookupSeconds) {'absent'} else {'other'}
+    $Helper=0;$Tick=0
+    $Type='ErgoptiNativeProxyEx' -as [type]
+    if ($null -ne $Type) {
+        $Helper=1
+        $Method=$Type.GetMethod('CurrentTick',[Reflection.BindingFlags]::Public -bor [Reflection.BindingFlags]::Static)
+        if ($null -ne $Method -and $Method.GetParameters().Length -eq 0 -and $Method.ReturnType -eq [long]) {$Tick=1}
+    }
+    [Console]::Out.WriteLine('PROXY_ENTRY_DIAG site='+$Site+' line='+$Line+' error='+$Error+' budget='+$Budget+' helper='+$Helper+' tick='+$Tick)
+    [Console]::Out.Flush()
+}
+$ProxyEntrySite='unknown'
+$LookupSeconds=$null
 try {
 $NativePath = Join-Path (Split-Path -Parent $WorkerPath) 'ergopti_native_proxy.ps1'
 $Source = Get-Content -LiteralPath $NativePath -Raw -Encoding UTF8
@@ -202,20 +240,27 @@ try {
     # The AHK fixture owner retains and removes this private input after its
     # entire Job-owned tree has acknowledged retirement.
     $ProxyNativeDiagnosticStage='entrypoint_input'
+    $ProxyEntrySite='paths'
     $VendorRoot=Split-Path -Parent $WorkerPath
     $SharedRoot=Join-Path (Split-Path -Parent (Split-Path -Parent $VendorRoot)) '_shared'
     $PolicyPath=Join-Path $SharedRoot 'modules/network/proxy_policy.json'
     $DefaultsPath=Join-Path $SharedRoot 'modules/updater/defaults.json'
+    $ProxyEntrySite='defaults_read'
     $Defaults=Get-Content -LiteralPath $DefaultsPath -Raw -Encoding UTF8|ConvertFrom-Json
     $LookupSeconds=$Defaults.release_sources.proxy_resolve_timeout_sec
+    $ProxyEntrySite='budget_guard'
     Require (($LookupSeconds -is [int] -or $LookupSeconds -is [long]) -and
         $LookupSeconds -ge 1 -and $LookupSeconds -le [int]::MaxValue / 1000) 'Canonical native entrypoint deadline was refused.'
+    $ProxyEntrySite='native_ex_load'
     . (Join-Path $VendorRoot 'ergopti_native_proxy_ex.ps1')
+    $ProxyEntrySite='private_input'
     $EntryInput = @{ version = 1; auto_detect = $false; pac_url = $Server.Url
         urls = @('https://destination.invalid:8443/private?key=fixture-secret')
         policy_path=$PolicyPath;updater_defaults_path=$DefaultsPath
         deadline_tick=([ErgoptiNativeProxyEx]::CurrentTick()+$LookupSeconds*1000) }
+    $ProxyEntrySite='input_write'
     [IO.File]::WriteAllText($EntryInputPath, ($EntryInput | ConvertTo-Json -Compress), [Text.UTF8Encoding]::new($false))
+    $ProxyEntrySite='launch_setup'
     $Launch = [Diagnostics.ProcessStartInfo]::new()
     $Launch.FileName = Join-Path $env:WINDIR 'System32\WindowsPowerShell\v1.0\powershell.exe'
     $Launch.Arguments = '-NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "' + $WorkerPath + '" -InputPath "' + $EntryInputPath + '"'
@@ -262,5 +307,6 @@ try {
 } catch {
     # Keep the actual exception/refusal while exposing no private input or text.
     try { Write-ProxyNativeFailure $_ } catch { }
+    try { Write-ProxyEntryFailure $_ } catch { }
     throw
 }

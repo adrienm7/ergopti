@@ -217,6 +217,12 @@ const MACOS_NATIVE_STEP_CONDITIONS = [
 	[
 		MACOS_BOX,
 		'managed-ollama-native',
+		'Retain actual private-session and numeric TLS peer diagnostics',
+		'always()'
+	],
+	[
+		MACOS_BOX,
+		'managed-ollama-native',
 		'Retain actual native producer, catalogue and receiving evidence',
 		'always()'
 	],

@@ -47,6 +47,23 @@ class WireFixture:
         self.records = []
         self.routes = {}
         self.lock = threading.Lock()
+        # Fixed, bounded receiving counters never include targets or payloads.
+        self.receiving_counts = dict.fromkeys(
+            (
+                "accept_origin",
+                "accept_proxy",
+                "accept_socks",
+                "accept_pac",
+                "handshake_started",
+                "handshake_complete",
+                "handshake_refused",
+                "request_origin",
+                "request_pac",
+                "connect_complete",
+                "connect_refused",
+            ),
+            0,
+        )
         self.groups = None
         try:
             if native:
@@ -241,6 +258,20 @@ class WireFixture:
             else:
                 self.connections.discard(connection)
 
+    def _receive(self, name):
+        with self.lock:
+            if name not in self.receiving_counts:
+                raise FixtureFailure("Unknown native receiving counter")
+            self.receiving_counts[name] = min(65535, self.receiving_counts[name] + 1)
+
+    def receiving_facts(self):
+        with self.lock:
+            return {
+                "version": 1,
+                "active": min(65535, len(self.connections)),
+                **self.receiving_counts,
+            }
+
     def _servers(self):
         owner = self
 
@@ -248,6 +279,12 @@ class WireFixture:
             allow_reuse_address = True
             daemon_threads = True
             block_on_close = False
+            receiving_kind = "proxy"
+
+            def get_request(self):
+                connection, address = super().get_request()
+                owner._receive("accept_" + self.receiving_kind)
+                return connection, address
 
         class Origin(http.server.BaseHTTPRequestHandler):
             protocol_version = "HTTP/1.1"
@@ -267,6 +304,7 @@ class WireFixture:
                 pass
 
             def do_GET(self):
+                owner._receive("request_origin")
                 with owner.lock:
                     route = owner.routes.get(self.client_address[1], "direct")
                     owner.records.append({"event": "origin", "route": route, "path": self.path})
@@ -328,12 +366,18 @@ class WireFixture:
                 self.close_connection = True
 
         class TLSOrigin(Server):
+            receiving_kind = "origin"
+
             def get_request(self):
                 raw, address = super().get_request()
                 try:
                     raw.settimeout(10)
-                    return owner.context.wrap_socket(raw, server_side=True), address
+                    owner._receive("handshake_started")
+                    connection = owner.context.wrap_socket(raw, server_side=True)
+                    owner._receive("handshake_complete")
+                    return connection, address
                 except BaseException:
+                    owner._receive("handshake_refused")
                     raw.close()
                     raise
 
@@ -361,6 +405,7 @@ class WireFixture:
                         first = bytes(request).split(b"\r\n", 1)[0]
                         expected = f"CONNECT {owner.host}:{owner.origin_port} HTTP/1.1".encode()
                         if first != expected:
+                            owner._receive("connect_refused")
                             raise FixtureFailure("Proxy received a different target or method")
                         with owner.lock:
                             owner.records.append({"event": "connect", "route": label})
@@ -368,6 +413,7 @@ class WireFixture:
                             incoming.sendall(
                                 b'HTTP/1.1 407 Proxy Authentication Required\r\nProxy-Authenticate: Basic realm="owned"\r\nContent-Length: 0\r\nConnection: close\r\n\r\n'
                             )
+                            owner._receive("connect_refused")
                             return
                         outgoing = socket.create_connection(
                             ("127.0.0.1", owner.origin_port), timeout=10
@@ -376,6 +422,7 @@ class WireFixture:
                         with owner.lock:
                             owner.routes[outgoing.getsockname()[1]] = label
                         incoming.sendall(b"HTTP/1.1 200 Connection Established\r\n\r\n")
+                        owner._receive("connect_complete")
                         while True:
                             ready, _, _ = select.select([incoming, outgoing], [], [], 10)
                             if not ready:
@@ -495,6 +542,7 @@ class WireFixture:
                     owner._track(incoming, False)
 
         socks = Server(("127.0.0.1", 0), SOCKS5)
+        socks.receiving_kind = "socks"
         self.servers.append(socks)
         self.ports["socks"] = socks.server_address[1]
         # An owned bound non-listening socket proves ECONNREFUSED while keeping
@@ -546,6 +594,7 @@ class WireFixture:
                 pass
 
             def do_GET(self):
+                owner._receive("request_pac")
                 if self.path != "/wpad.dat":
                     self.send_error(404)
                     return
@@ -557,6 +606,7 @@ class WireFixture:
                 self.wfile.write(body)
 
         pac_server = Server(("127.0.0.1", 0), PAC)
+        pac_server.receiving_kind = "pac"
         self.servers.append(pac_server)
         self.pac_url = f"http://127.0.0.1:{pac_server.server_address[1]}/wpad.dat"
         for server in self.servers:

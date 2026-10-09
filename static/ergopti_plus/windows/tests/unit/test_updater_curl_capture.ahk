@@ -836,3 +836,165 @@ _CurlCaptureNativeMovePreconditionProbe() {
 }
 Test("updater curl capture: additive native move precondition facts preserve original attack requirements",
 	_CurlCaptureNativeMovePreconditionProbe)
+
+
+; Public SDK receiving only. POSIX flag2 does not promise that an absent-target
+; source directory with retained descendants can move. The original attacks
+; keep their strict assertions until a genuine setup is independently received.
+_CurlCaptureHandleRenameBuffer(Path, Parent, InformationClass, Flags) {
+	AssertTrue(A_PtrSize == 4 || A_PtrSize == 8)
+	AssertTrue(InformationClass == 3 || InformationClass == 22)
+	AssertTrue(Flags == 0 || (InformationClass == 22 && Flags == 2), "replacement is never authorized")
+	; RootDirectory=NULL requires an absolute destination, independent of CWD.
+	AssertTrue(StrLen(Path) <= 4096 && RegExMatch(Parent, "^[A-Za-z]:\\")
+		&& !InStr(Parent, "/") && !RegExMatch(Parent, "(?:^|\\)\.{1,2}(?:\\|$)")
+		&& !RegExMatch(Parent, "[\x00-\x1F]"), "the captured original parent is a bounded absolute Windows path")
+	AssertTrue(SubStr(Path, 1, StrLen(Parent) + 1) == Parent . "\"
+		&& RegExMatch(SubStr(Path, StrLen(Parent) + 2), "^[A-Za-z0-9.-]{1,80}$")
+		&& SubStr(Path, StrLen(Parent) + 2) != "." && SubStr(Path, StrLen(Parent) + 2) != "..",
+		"the absolute destination remains one bounded leaf in the exact original private parent")
+	NameBytes := (StrPut(Path, "UTF-16") - 1) * 2
+	; Public FILE_RENAME_INFO: union DWORD/BOOLEAN, aligned HANDLE root=NULL,
+	; DWORD name byte length, then WCHAR name. Preserve full SDK structure size.
+	Data := Buffer((A_PtrSize == 8 ? 24 : 16) + NameBytes, 0)
+	NumPut("UInt", Flags, Data, 0)
+	NumPut("UInt", NameBytes, Data, 2 * A_PtrSize)
+	StrPut(Path, Data.Ptr + 2 * A_PtrSize + 4, NameBytes // 2 + 1, "UTF-16")
+	return Data
+}
+
+_CurlCaptureHandleRenameFacts(Capture, DirectoryBefore, FilesBefore) {
+	DirectorySame := Capture.Same(DirectoryBefore, Capture.Snapshot(Capture.Directory["handle"]))
+	FilesSame := true
+	for Name, Entry in Capture.Files {
+		Actual := Capture.Snapshot(Entry["handle"])
+		FilesSame := Capture.Same(FilesBefore[Name], Actual) && FilesSame
+	}
+	return Map("directory_same", DirectorySame, "files_same", FilesSame)
+}
+
+_CurlCaptureHandleRenameFinish(Context, Failed, Primary) {
+	global _CurlCaptureMoveProbeFixtureDebt
+	Capture := Context["capture"]
+	Key := ObjPtr(Capture)
+	if !_CurlCaptureMoveProbeFixtureDebt.Has(Key) || _CurlCaptureMoveProbeFixtureDebt[Key] != Context
+		throw Error("Native handle-rename receiving fixture owner was replaced.")
+	if Context["moved"] != "" {
+		if Failed
+			throw Primary
+		throw Error("Native handle-rename receiving retained unpaid exact restoration.")
+	}
+	if Context["rename_handle"] {
+		if Capture.ProbeCloseDebt.Length {
+			if Failed
+				throw Primary
+			throw Error("Native handle-rename receiving retained unknown close debt.")
+		}
+		if Capture.CloseProbe(Context["rename_handle"])
+			Context["rename_handle"] := 0
+		else if !Failed {
+			Failed := true
+			Primary := Error("Native handle-rename receiving closure was refused.")
+		}
+	}
+	_CurlCaptureMoveProbeFinishOwnedContext(Context, Failed, Primary)
+}
+
+_CurlCaptureHandleRenameCase(InformationClass, Flags, FourFiles) {
+	global _CurlCaptureMoveProbeFixtureDebt
+	Parent := RTrim(_SR_AcquireCaptureDirectory(), "\")
+	Capture := _UpdaterCurlCaptureLedger()
+	Context := Map("capture", Capture, "parent", Parent, "lease", 0, "moved", "", "rename_handle", 0)
+	_CurlCaptureMoveProbeFixtureDebt[ObjPtr(Capture)] := Context
+	Failed := false
+	Primary := 0
+	Kind := FourFiles ? "four" : "empty"
+	try {
+		if FourFiles {
+			Capture.Acquire(Parent)
+			AssertEqual(4, Capture.Files.Count)
+			AssertTrue(Capture.ValidatePaths(), "the exact original four-file ledger precedes handle-based receiving")
+		} else {
+			; Independent empty positive control; it never stands in for four files.
+			Path := Parent . "\empty-handle-original"
+			AssertTrue(DllCall("kernel32\CreateDirectoryW", "Str", Path, "Ptr", 0, "Int"))
+			Capture.Path := Path
+			Capture.Directory := Map("path", Path, "handle", Capture.Open(Path, 0, 3, true), "directory", true)
+			AssertTrue(Capture.Directory["handle"] != 0)
+			AssertEqual(0, Capture.Files.Count)
+		}
+		DirectoryBefore := Capture.Snapshot(Capture.Directory["handle"])
+		AssertTrue(DirectoryBefore.Get("ok", false) && DirectoryBefore["directory"] && !DirectoryBefore["delete_pending"])
+		FilesBefore := Map()
+		for Name, Entry in Capture.Files {
+			FilesBefore[Name] := Capture.Snapshot(Entry["handle"])
+			AssertTrue(FilesBefore[Name].Get("ok", false) && !FilesBefore[Name]["directory"]
+				&& !FilesBefore[Name]["delete_pending"] && FilesBefore[Name]["links"] == 1)
+		}
+		TargetName := "handle-receiving-target"
+		Target := Parent . "\" . TargetName
+		AssertTrue(DirExist(Capture.Path) && !FileExist(Target), "no replacement or foreign destination is permitted")
+		Data := _CurlCaptureHandleRenameBuffer(Target, Parent, InformationClass, Flags)
+		DllCall("kernel32\SetLastError", "UInt", 0)
+		Context["rename_handle"] := Capture.Open(Capture.Path, 0x10000, 3, true)
+		OpenError := A_LastError
+		Facts := _CurlCaptureHandleRenameFacts(Capture, DirectoryBefore, FilesBefore)
+		_TestAppendProgress("# curl_handle_rename kind=" . Kind . " stage=open api=" . InformationClass
+			. " flags=" . Flags . " acquired=" . (Context["rename_handle"] ? 1 : 0)
+			. " errno=" . OpenError . " errno_valid=" . (Context["rename_handle"] ? 0 : 1)
+			. " directory_same=" . (Facts["directory_same"] ? 1 : 0) . " files_same=" . (Facts["files_same"] ? 1 : 0))
+		AssertTrue(Facts["directory_same"] && Facts["files_same"])
+		if !Context["rename_handle"] {
+			AssertTrue(FourFiles && OpenError != 0, "the empty-directory positive control must acquire DELETE access")
+			return
+		}
+		AssertTrue(Capture.Same(DirectoryBefore, Capture.Snapshot(Context["rename_handle"])),
+			"the DELETE handle is the exact original directory, never a new admission authority")
+		DllCall("kernel32\SetLastError", "UInt", 0)
+		Renamed := DllCall("kernel32\SetFileInformationByHandle", "Ptr", Context["rename_handle"],
+			"Int", InformationClass, "Ptr", Data, "UInt", Data.Size, "Int")
+		RenameError := A_LastError
+		if Renamed
+			Context["moved"] := Target
+		Facts := _CurlCaptureHandleRenameFacts(Capture, DirectoryBefore, FilesBefore)
+		SourceAfter := DirExist(Capture.Path) != ""
+		TargetAfter := DirExist(Target) != ""
+		_TestAppendProgress("# curl_handle_rename kind=" . Kind . " stage=rename api=" . InformationClass
+			. " flags=" . Flags . " moved=" . (Renamed ? 1 : 0) . " errno=" . RenameError
+			. " errno_valid=" . (Renamed ? 0 : 1) . " source_after=" . (SourceAfter ? 1 : 0)
+			. " target_after=" . (TargetAfter ? 1 : 0) . " directory_same=" . (Facts["directory_same"] ? 1 : 0)
+			. " files_same=" . (Facts["files_same"] ? 1 : 0))
+		AssertTrue(Facts["directory_same"] && Facts["files_same"], "all original metadata handles remain held and identical")
+		if !FourFiles
+			AssertTrue(Renamed, "the actual same-parent empty-directory handle-rename positive control must succeed")
+		if !Renamed {
+			AssertTrue(RenameError != 0 && SourceAfter && !TargetAfter, "a reported denial preserves the original namespace")
+			return
+		}
+		AssertTrue(!SourceAfter && TargetAfter, "a successful API must physically reach the target namespace")
+		RestoreData := _CurlCaptureHandleRenameBuffer(Capture.Path, Parent, InformationClass, Flags)
+		AssertTrue(Capture.Same(DirectoryBefore, Capture.Snapshot(Context["rename_handle"]))
+			&& !FileExist(Capture.Path), "restoration retains exact identity and cannot replace a foreign path")
+		DllCall("kernel32\SetLastError", "UInt", 0)
+		Restored := DllCall("kernel32\SetFileInformationByHandle", "Ptr", Context["rename_handle"],
+			"Int", InformationClass, "Ptr", RestoreData, "UInt", RestoreData.Size, "Int")
+		RestoreError := A_LastError
+		if Restored
+			Context["moved"] := ""
+		_TestAppendProgress("# curl_handle_rename kind=" . Kind . " stage=restore api=" . InformationClass
+			. " flags=" . Flags . " moved=" . (Restored ? 1 : 0) . " errno=" . RestoreError . " errno_valid=" . (Restored ? 0 : 1))
+		AssertTrue(Restored && DirExist(Capture.Path) && !DirExist(Target), "the same exact native API must restore before retirement")
+	} catch Any as Failure {
+		Failed := true
+		Primary := Failure
+	} finally _CurlCaptureHandleRenameFinish(Context, Failed, Primary)
+}
+
+_CurlCaptureNativeHandleRenameReceiving() {
+	for NativeAPI in [[3, 0], [22, 0], [22, 2]] {
+		_CurlCaptureHandleRenameCase(NativeAPI[1], NativeAPI[2], false)
+		_CurlCaptureHandleRenameCase(NativeAPI[1], NativeAPI[2], true)
+	}
+}
+Test("updater curl capture: public handle-rename receiving distinguishes empty controls from held descendants",
+	_CurlCaptureNativeHandleRenameReceiving)

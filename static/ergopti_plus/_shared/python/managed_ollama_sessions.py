@@ -43,7 +43,9 @@ def read_session(directory, name):
     directory_fd = directory_descriptor(directory)
     descriptor = None
     try:
-        descriptor = os.open(name, os.O_RDONLY | os.O_NOFOLLOW | os.O_CLOEXEC, dir_fd=directory_fd)
+        descriptor = os.open(
+            name, os.O_RDONLY | os.O_NOFOLLOW | os.O_CLOEXEC | os.O_NONBLOCK, dir_fd=directory_fd
+        )
         before = os.fstat(descriptor)
         if (
             not stat.S_ISREG(before.st_mode)
@@ -71,7 +73,7 @@ def read_session(directory, name):
         os.close(directory_fd)
 
 
-def select(directory, port, expected, authenticate, timeout):
+def select(directory, port, expected, authenticate, timeout, *, read_candidate=None):
     """Only an SDK-bound authenticated live listener may select a private lease.
 
     Stale files are neither admitted nor deleted. There is one original finite
@@ -81,12 +83,15 @@ def select(directory, port, expected, authenticate, timeout):
         type(port) is not int
         or not 1024 <= port <= 65535
         or not callable(authenticate)
+        or (read_candidate is not None and not callable(read_candidate))
         or type(timeout) not in (float, int)
         or not math.isfinite(timeout)
         or timeout <= 0
         or set(expected) != {"source_commit", "binary_sha256", "asset_sha256", "device", "inode"}
     ):
         raise POLICY.RuntimeRefusal("session")
+    if read_candidate is None:
+        read_candidate = read_session
     deadline = time.monotonic() + timeout
     descriptor = directory_descriptor(directory)
     try:
@@ -103,7 +108,7 @@ def select(directory, port, expected, authenticate, timeout):
         if remaining <= 0:
             raise POLICY.RuntimeRefusal("deadline")
         try:
-            session = read_session(directory, name)
+            session = read_candidate(directory, name)
         except (OSError, POLICY.RuntimeRefusal):
             continue
         if session["port"] != str(port) or any(

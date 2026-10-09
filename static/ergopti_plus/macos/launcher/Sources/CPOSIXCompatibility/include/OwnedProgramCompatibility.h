@@ -7,6 +7,10 @@
 #include <stdint.h>
 #include <sys/types.h>
 
+// Establishes a new private native session before any child or secret exists.
+// Nonzero returns refuse isolation, including an unprovable parent-group binding.
+int ergopti_owned_program_create_private_session(void);
+
 typedef struct ergopti_owned_program ergopti_owned_program;
 
 // Observation is not ownership; callers compare start identity before using it.

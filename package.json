@@ -468,6 +468,7 @@
 		"test:linux:fd-sha256-native": "node ./tools/test/run-linux-fd-sha256-native.cjs",
 		"test:linux-fd-sha256-native-gate": "node ./tools/test/test-linux-fd-sha256-native-gate.cjs",
 		"test:managed-bootstrap-policy": "node ./tools/test/test-managed-bootstrap-policy.cjs",
+		"test:bootstrap-retry-projection": "node ./tools/test/test-bootstrap-retry-projection.cjs",
 		"test:macos-guardian-signature-flags": "node ./tools/test/test-macos-guardian-signature-flags.cjs",
 		"test:managed-ollama-protocol": "node ./tools/test/test-managed-ollama-protocol.cjs",
 		"test:macos-managed-ollama-catalogue": "node ./tools/test/test-macos-managed-ollama-catalogue.cjs",

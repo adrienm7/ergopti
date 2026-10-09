@@ -164,7 +164,7 @@ enum OwnedSuspendedImageGuardian {
 		// ordinary retirement; a caller must not SIGKILL a guardian with live debt.
 		_ = Darwin.signal(SIGTERM, SIG_IGN)
 		_ = Darwin.signal(SIGINT, SIG_IGN)
-		guard setsid() == getpid() else { return 70 }
+		guard ergopti_owned_program_create_private_session() == 0 else { return 70 }
 		prepareLeaseChildReaping()
 		for descriptor in [STDIN_FILENO, STDOUT_FILENO] {
 			let flags = fcntl(descriptor, F_GETFL)

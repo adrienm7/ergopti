@@ -1854,6 +1854,12 @@ const CHECKS = [
 		repro: 'node tools/test/test-macos-guardian-signature-flags.cjs'
 	},
 	{
+		name: 'bootstrap retry canonical data preserves original shell and generated Lua',
+		cmd: process.execPath,
+		args: ['tools/test/test-bootstrap-retry-projection.cjs'],
+		repro: 'node tools/test/test-bootstrap-retry-projection.cjs'
+	},
+	{
 		name: 'managed Ollama portable admission and operation retirement',
 		cmd: process.execPath,
 		args: ['tools/test/test-managed-ollama-protocol.cjs'],
