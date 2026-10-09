@@ -55,7 +55,7 @@ Test("managed caller: Versions owns proxy admission before transport under its o
 Test("managed caller: Versions replacement revokes a queued native admission", _ManagedCallerChangelog.Bind("replaced"))
 Test("managed caller: Versions source expiry revokes a queued native admission", _ManagedCallerChangelog.Bind("expired"))
 
-_ManagedCallerHealthcheck() {
+_ManagedCallerHealthcheck(YieldAfterAck := false) {
 	global _HC_ProbeRun
 	Saved := _HC_ProbeRun
 	State := _ManagedCurlControlState()
@@ -72,7 +72,23 @@ _ManagedCallerHealthcheck() {
 		AssertEqual(Started, State["input"]["started_tick"], "probe dispatch cannot reset its pre-discovery clock")
 		AssertEqual(20000, State["input"]["deadline_ms"], "the exact original probe budget reaches native discovery")
 		AssertEqual(ObjPtr(Request), ObjPtr(Run.Requests[1]), "the exact run publishes its request before native effects")
+		; This control delivers the poll only after exact run replacement. Hold
+		; its real callback before the complete ACK can make admission due.
+		AssertTrue(IsObject(Request.ManagedAdmissionFn), "manual diagnostics replacement must own the actual admission callback")
+		if YieldAfterAck {
+			AssertEqual(0, A_IsCritical, "the diagnostics interleave must allow actual timer dispatch")
+			SetTimer(Request.ManagedAdmissionFn, -1)
+		}
+		SetTimer(Request.ManagedAdmissionFn, 0)
 		_ManagedCurlControlAck(State)
+		if YieldAfterAck {
+			Sleep(30)
+			AssertTrue(IsObject(Request.ManagedAdmissionFn), "holding admission retains the exact callback until run replacement")
+			AssertFalse(Request.ManagedPayloadPublished, "a yielded complete ACK cannot preempt controlled diagnostics replacement")
+			AssertFalse(Request.Aborted, "holding admission preserves the original live diagnostics request until replacement")
+			AssertEqual(Started, Request.DeadlineStart, "the diagnostics interleave cannot restart the source clock")
+			AssertEqual(20000, Request.DeadlineTimeout, "the diagnostics interleave cannot extend its original duration")
+		}
 		_HC_ProbeRun := { Epoch: 9043, Cancelled: false, Requests: [], Publish: (*) => 0 }
 		Request._PollManagedAdmission()
 		AssertTrue(Request.Aborted, "replacement of a diagnostics run revokes the old facade")
@@ -84,6 +100,7 @@ _ManagedCallerHealthcheck() {
 	}
 }
 Test("managed caller: diagnostics binds the original clock and exact run before native admission", _ManagedCallerHealthcheck)
+Test("managed caller: queued diagnostics admission cannot preempt replacement after a yielded ACK", _ManagedCallerHealthcheck.Bind(true))
 
 _ManagedCallerAiFailure(State) {
 	global _LLM_Remote_Async

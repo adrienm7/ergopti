@@ -154,10 +154,57 @@ public static class QueuedTlsShutdownControls {
             Require(freed==1&&owner.OwnedStreams==0,"actual_native_and_network_retirement");
             stream.Dispose();Require(freed==1&&owner.ReadClosedStream().Sequence==1,"no_duplicate_shutdown_owner");
             NetworkStream received=peer.GetStream();Require(received.ReadByte()==9&&received.ReadByte()==0&&received.ReadByte()==255&&received.ReadByte()==-1,"actual_output_and_eof");
+        } catch(Exception failure) {
+            QueuedTlsShutdownObservation.Report(choice,stream,failure,calls,errors,inputBytes);
+            throw;
         } finally {if(stream!=null)stream.Dispose();if(origin!=null)origin.Close();peer.Close();listener.Stop();}
     }
     public static int Run(){Case(0,false,false,2,0);Case(1,true,false,3,1);Case(2,false,true,2,1);Case(3,false,false,2,1);Case(4,false,false,2,1);Case(5,true,true,3,2);Case(6,true,false,3,2);return 7;}
 }
+
+// Optional facts bind this exact controlled Case stream; they cannot replace its failure.
+public static class QueuedTlsShutdownObservation {
+    static string I(int value) { return value.ToString(System.Globalization.CultureInfo.InvariantCulture); }
+    public static void Report(int choice,Stream stream,Exception failure,int calls,int errors,int input) {
+        try {
+            if(choice<0 || choice>6 || failure==null)return;
+            ErgoptiFixtureOpenSsl.ClosedStreamFact fact=null;
+            if(stream!=null) {
+                FieldInfo field=stream.GetType().GetField("Owner",BindingFlags.Public|BindingFlags.Instance);
+                var owner=field==null?null:field.GetValue(stream) as ErgoptiFixtureOpenSsl;
+                if(owner!=null)fact=owner.ReadClosedStream();
+            }
+            string phase=fact==null?"unavailable":"closed";
+            if(failure is InvalidDataException) {
+                switch(failure.Message) {
+                    case "actual_input_queued":phase="assert_queued";break;
+                    case "original_tls_error_not_waived":phase="assert_tls";break;
+                    case "exact_calls_zero_never_get_error":phase="assert_calls";break;
+                    case "actual_final_shutdown_fact":phase="assert_fact";break;
+                    case "actual_input_length":case "actual_input_bytes":case "only_already_readable_input":phase="assert_input";break;
+                    case "retained_exact_byte_accounting":phase="assert_bytes";break;
+                    case "actual_native_and_network_retirement":phase="assert_retired";break;
+                    case "no_duplicate_shutdown_owner":phase="assert_duplicate";break;
+                    case "actual_output_and_eof":phase="assert_output";break;
+                }
+            }
+            string family=failure is InvalidDataException?"invalid_data":failure is InvalidOperationException?"invalid_operation":failure is IOException?"io":"other";
+            int code=-1;
+            Exception current=failure;
+            for(int depth=0;current!=null && depth<8;depth++,current=current.InnerException) {
+                var socket=current as SocketException;
+                if(socket!=null){family="socket";code=socket.NativeErrorCode;break;}
+            }
+            if(family=="socket" && code<0)return;
+            string fields=" case="+I(choice)+" phase="+phase+" family="+family+" code="+I(code)+" hresult="+I(failure.HResult)+" fact="+(fact==null?"0":"1");
+            fields+=" sequence="+I(fact==null?-1:fact.Sequence)+" called="+I(fact==null?-1:fact.ShutdownCalled)+" result="+I(fact==null?-1:fact.ShutdownResult)+" error="+I(fact==null?-1:fact.ShutdownError);
+            fields+=" received="+I(fact==null?-1:fact.Received)+" written="+I(fact==null?-1:fact.Written)+" close_written="+I(fact==null?-1:fact.CloseWritten)+" pending="+I(fact==null?-1:fact.Pending)+" network_closed="+I(fact==null?-1:fact.NetworkClosed);
+            fields+=" calls="+I(fact==null?-1:calls)+" errors="+I(fact==null?-1:errors)+" input="+I(fact==null?-1:input);
+            Console.Out.WriteLine("OWNED_QUEUED_TLS_SHUTDOWN_FAILURE"+fields);
+        } catch(Exception) { /* Optional publication never replaces the original Case exception. */ }
+    }
+}
+
 
 '@
 $Definitions+=$Control

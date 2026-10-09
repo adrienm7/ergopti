@@ -12,6 +12,7 @@ import importlib.util
 import json
 import os
 from pathlib import Path
+import re
 import select
 import shlex
 import signal
@@ -65,10 +66,14 @@ class WireFixture:
         self.ca = self.root / "ca.pem"
         self.trust_attempted = False
         self.trust_query_executable = None
+        self.authorization_observation = False
         self.command_file_debt = []
         self.keychain_created = False
         self.servers = []
         self.started_servers = []
+        self.server_threads = []
+        self.server_starts = []
+        self.server_shutdowns = []
         self.connections = set()
         self.records = []
         self.routes = {}
@@ -134,7 +139,15 @@ class WireFixture:
             self.close()
             raise
 
-    def _command(self, arguments, input_bytes=b"", tolerate=False, timeout=15, deadline=None):
+    def _command(
+        self,
+        arguments,
+        input_bytes=b"",
+        tolerate=False,
+        timeout=15,
+        deadline=None,
+        merge_errors=False,
+    ):
         phase = "setup"
         status = None
         self.command_fact = None
@@ -164,7 +177,7 @@ class WireFixture:
                         register,
                         stdin=subprocess.PIPE,
                         stdout=output,
-                        stderr=errors,
+                        stderr=output if merge_errors else errors,
                     )
                     phase = "input"
                     owned.process.stdin.write(input_bytes)
@@ -201,7 +214,10 @@ class WireFixture:
             else:
                 phase = "acquire"
                 child = subprocess.Popen(
-                    arguments, stdin=subprocess.PIPE, stdout=output, stderr=errors
+                    arguments,
+                    stdin=subprocess.PIPE,
+                    stdout=output,
+                    stderr=output if merge_errors else errors,
                 )
                 input_owner = child.stdin
                 input_observer = CommandInputOwner(input_owner)
@@ -401,6 +417,8 @@ class WireFixture:
             # the original removal budget. Neither refusal nor retry renews it.
             deadline = time.monotonic() + 15
             self._observe_admin_trust(deadline)
+            if self.authorization_observation:
+                self._observe_admin_authorization(deadline)
             arguments = [
                 "/usr/bin/sudo",
                 "-n",
@@ -489,6 +507,56 @@ class WireFixture:
                 raise
         try:
             print("# native_http_admin_trust " + json.dumps(fact, sort_keys=True), flush=True)
+        except (OSError, ValueError):
+            pass
+
+    @staticmethod
+    def _admin_authorization_fact(status, raw):
+        if type(status) is not int or not isinstance(raw, bytes) or len(raw) > 1024:
+            raise FixtureFailure("Native admin authorization observation refused")
+        # The public CLI defaults to noninteractive authorization. Its fixed
+        # NO line carries the OSStatus that a mere shell exit code would lose.
+        failed = re.fullmatch(rb"NO \((-?[0-9]+)\) \n", raw)
+        if failed is not None:
+            value = int(failed[1])
+            if status != 255 or value == 0 or not -(2**31) <= value < 2**31:
+                raise FixtureFailure("Native admin authorization observation refused")
+        elif status == 0 and raw == b'YES (0) { 1: "com.apple.trust-settings.admin" } \n':
+            value = 0
+        else:
+            raise FixtureFailure("Native admin authorization observation refused")
+        return {
+            "version": 1,
+            "observed": 1,
+            "command_status": status,
+            "authorization_status": value,
+            "interaction_allowed": 0,
+        }
+
+    def _observe_admin_authorization(self, deadline):
+        fact = {"version": 1, "observed": 0, "interaction_allowed": 0}
+        try:
+            status, output = self._command(
+                [
+                    "/usr/bin/sudo",
+                    "-n",
+                    "/usr/bin/security",
+                    "authorize",
+                    "-P",
+                    "com.apple.trust-settings.admin",
+                ],
+                tolerate=True,
+                deadline=min(deadline, time.monotonic() + 2),
+                merge_errors=True,
+            )
+            fact = self._admin_authorization_fact(status, output)
+        except Exception:
+            if self.command_fact and self.command_fact["phase"] == "settle":
+                raise
+        try:
+            print(
+                "# native_http_admin_authorization " + json.dumps(fact, sort_keys=True), flush=True
+            )
         except (OSError, ValueError):
             pass
 
@@ -851,7 +919,16 @@ class WireFixture:
         self.servers.append(pac_server)
         self.pac_url = f"http://127.0.0.1:{pac_server.server_address[1]}/wpad.dat"
         for server in self.servers:
-            threading.Thread(target=server.serve_forever, daemon=True).start()
+            worker = threading.Thread(target=server.serve_forever, daemon=True)
+            self.server_threads.append((server, worker))
+            state = {"server": server, "worker": worker, "started": False, "failure": None}
+            self.server_starts.append(state)
+            try:
+                worker.start()
+                state["started"] = True
+            except BaseException as failure:
+                state["failure"] = failure
+                raise
             self.started_servers.append(server)
 
     def profile(self):
@@ -885,16 +962,67 @@ class WireFixture:
         except (OSError, ValueError):
             pass
 
+    def _retire_servers(self):
+        # Public shutdown waits for the serving loop's acknowledgement. Start
+        # all independent requests before waiting, so six idle poll intervals
+        # do not accumulate; retain every exact worker across an interrupted
+        # join or refusal. No socket is closed before both threads have retired.
+        for state in self.server_shutdowns:
+            if not state["started"]:
+                if state["failure"] is not None:
+                    raise state["failure"]
+                raise FixtureFailure("Native fixture shutdown start closure refused")
+        for state in self.server_starts:
+            if not state["started"]:
+                if state["failure"] is not None:
+                    raise state["failure"]
+                raise FixtureFailure("Native fixture server start closure refused")
+        for server in self.started_servers:
+            if any(state["server"] is server for state in self.server_shutdowns):
+                continue
+            state = {"server": server, "started": False, "returned": False, "failure": None}
+
+            def shutdown(owned=state):
+                try:
+                    owned["server"].shutdown()
+                    owned["returned"] = True
+                except BaseException as failure:
+                    owned["failure"] = failure
+
+            worker = threading.Thread(target=shutdown, daemon=True)
+            state["worker"] = worker
+            self.server_shutdowns.append(state)
+            try:
+                worker.start()
+                state["started"] = True
+            except BaseException as failure:
+                state["failure"] = failure
+                raise
+        for state in self.server_shutdowns:
+            if not state["started"]:
+                if state["failure"] is not None:
+                    raise state["failure"]
+                raise FixtureFailure("Native fixture shutdown start closure refused")
+            state["worker"].join()
+            if state["failure"] is not None:
+                raise state["failure"]
+            if not state["returned"] or state["worker"].is_alive():
+                raise FixtureFailure("Native fixture shutdown closure refused")
+        for server, worker in self.server_threads:
+            if server in self.started_servers:
+                worker.join()
+                if worker.is_alive():
+                    raise FixtureFailure("Native fixture serving thread closure refused")
+        for server in self.servers:
+            server.server_close()
+
     def close(self):
         if self.closed:
             return
         failures = []
         if not self._retire_command_files():
             failures.append("command")
-        for server in self.servers:
-            if server in self.started_servers:
-                server.shutdown()
-            server.server_close()
+        self._retire_servers()
         with self.lock:
             connections = list(self.connections)
         for connection in connections:

@@ -836,8 +836,9 @@ _CurlCaptureReportJunctionProbe(Handle, Target, Child, OpenError) {
 ; it created; no global privilege, symlink setting or foreign path is modified.
 _CurlCaptureSetNativeJunction(Handle, Target) {
 	Substitute := "\??\" . Target
-	SubstituteBytes := (StrPut(Substitute, "UTF-16") - 1) * 2
-	PrintBytes := (StrPut(Target, "UTF-16") - 1) * 2
+	; StrPut measures bytes, including the two-byte UTF-16 terminator.
+	SubstituteBytes := StrPut(Substitute, "UTF-16") - 2
+	PrintBytes := StrPut(Target, "UTF-16") - 2
 	Paths := SubstituteBytes + 2 + PrintBytes + 2
 	Data := Buffer(16 + Paths, 0)
 	NumPut("UInt", 0xA0000003, "UShort", 8 + Paths, Data, 0)
@@ -1205,7 +1206,7 @@ _CurlCaptureHandleRenameBuffer(Path, Parent, InformationClass, Flags) {
 		&& RegExMatch(SubStr(Path, StrLen(Parent) + 2), "^[A-Za-z0-9.-]{1,80}$")
 		&& SubStr(Path, StrLen(Parent) + 2) != "." && SubStr(Path, StrLen(Parent) + 2) != "..",
 		"the absolute destination remains one bounded leaf in the exact original private parent")
-	NameBytes := (StrPut(Path, "UTF-16") - 1) * 2
+	NameBytes := StrPut(Path, "UTF-16") - 2
 	; Public FILE_RENAME_INFO: union DWORD/BOOLEAN, aligned HANDLE root=NULL,
 	; DWORD name byte length, then WCHAR name. Preserve full SDK structure size.
 	Data := Buffer((A_PtrSize == 8 ? 24 : 16) + NameBytes, 0)
@@ -1602,9 +1603,9 @@ Test("updater curl capture: graph mutation reentry cannot resume the same runnin
 ; Real in-memory mount-point ABI vectors. No filesystem/handle port is faked.
 _CurlCaptureJunctionTargetVector(Target, SubstituteSuffix := false, PrintSuffix := false) {
 	Substitute := "\??\" . Target
-	SubstitutePlainBytes := (StrPut(Substitute, "UTF-16") - 1) * 2
-	PrintPlainBytes := (StrPut(Target, "UTF-16") - 1) * 2
-	SuffixBytes := (StrPut("suffix", "UTF-16") - 1) * 2
+	SubstitutePlainBytes := StrPut(Substitute, "UTF-16") - 2
+	PrintPlainBytes := StrPut(Target, "UTF-16") - 2
+	SuffixBytes := StrPut("suffix", "UTF-16") - 2
 	SubstituteBytes := SubstitutePlainBytes + (SubstituteSuffix ? 2 + SuffixBytes : 0)
 	PrintBytes := PrintPlainBytes + (PrintSuffix ? 2 + SuffixBytes : 0)
 	Paths := SubstituteBytes + 2 + PrintBytes + 2

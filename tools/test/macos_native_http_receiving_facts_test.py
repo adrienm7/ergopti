@@ -13,6 +13,7 @@ import ssl
 import subprocess
 import sys
 import tempfile
+import threading
 import time
 from types import SimpleNamespace
 import unittest
@@ -1146,6 +1147,508 @@ class NativeAdminTrustObservationTests(unittest.TestCase):
         held[0].owner.close()
         self.assertTrue(held[0].owner.closed)
         self.fixture.command_file_debt = []
+
+
+class NativeSelectedRouteObservationTests(unittest.TestCase):
+    def owner(self, body):
+        temporary = tempfile.TemporaryDirectory(prefix="ergopti-selected-route-")
+        self.addCleanup(temporary.cleanup)
+        target = Path(temporary.name) / "stages"
+        receipt = CLIENT.WorkerStageReceipt(target)
+        self.addCleanup(receipt.close)
+        process = subprocess.Popen(
+            [
+                sys.executable,
+                "-c",
+                "import os,sys;fd=os.open(sys.argv[1],os.O_WRONLY|os.O_APPEND);os.write(fd,sys.stdin.buffer.read());os.close(fd)",
+                str(target),
+            ],
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+        )
+        receiver = SimpleNamespace(_process=process, _closed=False, _fixture_stage_receipt=receipt)
+        self.assertEqual(receipt.facts(receiver), {"state": "unsettled", "stages": []})
+        process.communicate(body, timeout=3)
+        self.assertEqual(process.returncode, 0)
+        receiver._closed = True
+        return receipt, receiver
+
+    def report(self, receiver):
+        owner = SimpleNamespace(
+            receiving_workers=[receiver],
+            receiving_start=0,
+            fixture=SimpleNamespace(receiving_facts=lambda: {"version": 1, "active": 0}),
+        )
+        with contextlib.redirect_stdout(io.StringIO()) as output:
+            CLIENT.RealNativeClientReceiving.report_receiving_facts(owner)
+        return json.loads(output.getvalue().removeprefix("# native_http_receiving "))
+
+    def test29ActualClosedChildReportsOneCompactRoutePlanWithinOriginal256(self):
+        expected = {
+            b"r0": "sole_direct",
+            b"r1": "sole_default_refused",
+            b"r2": "default_refused_with_successor",
+            b"r3": "other_http_first",
+            b"r4": "socks_first",
+            b"r5": "unknown",
+        }
+        for token, kind in expected.items():
+            with self.subTest(kind=kind):
+                body = ("\n".join(CLIENT.ALL_STAGES) + "\n").encode() + token + b"\n"
+                self.assertEqual(len(body), 254)
+                receipt, receiver = self.owner(body)
+                self.assertEqual(receipt.facts(receiver)["state"], "observed")
+                facts = self.report(receiver)
+                self.assertEqual(
+                    facts["selected_route"],
+                    {
+                        label: int(label == kind)
+                        for label in (
+                            "sole_direct",
+                            "sole_default_refused",
+                            "default_refused_with_successor",
+                            "other_http_first",
+                            "socks_first",
+                            "unknown",
+                        )
+                    },
+                )
+                self.assertEqual(facts["settled"], 1)
+                self.assertTrue(receipt.closed)
+
+    def test30MultiplePlansAndPrivatePayloadRefuseWhileAbsentPlanStaysUnknown(self):
+        for body in (
+            b"entry\nr1\nr2\n",
+            b"entry\nr6\n",
+            b"entry\nroute=http://private-secret\n",
+            b"x" * 257,
+        ):
+            with self.subTest(body=body):
+                receipt, receiver = self.owner(body)
+                self.assertEqual(receipt.facts(receiver), {"state": "refused", "stages": []})
+                facts = self.report(receiver)
+                self.assertEqual(facts["selected_route"]["unknown"], 1)
+                self.assertEqual(sum(facts["selected_route"].values()), 1)
+                self.assertNotIn("private-secret", json.dumps(facts))
+        receipt, receiver = self.owner(b"entry\narguments\n")
+        facts = self.report(receiver)
+        self.assertEqual(facts["selected_route"]["unknown"], 1)
+        self.assertEqual(facts["selected_route"]["sole_default_refused"], 0)
+
+    def test31RealAuthoredPACDistinguishesFullURLAndAuthorityOnlyDefault(self):
+        fixture = WIRE.WireFixture(native=False)
+        self.addCleanup(fixture.close)
+        full = f"https://{fixture.host}:{fixture.origin_port}/certificate?case=seven"
+        authority = f"https://{fixture.host}:{fixture.origin_port}/"
+        request = {
+            "script": fixture.pac,
+            "full": full,
+            "authority": authority,
+            "host": fixture.host,
+        }
+        program = "const vm=require('node:vm');const value=JSON.parse(process.argv[1]);const context=vm.createContext({});vm.runInContext(value.script,context,{timeout:1000});process.stdout.write(JSON.stringify([context.FindProxyForURL(value.full,value.host),context.FindProxyForURL(value.authority,value.host)]));"
+        result = subprocess.run(
+            ["node", "-e", program, json.dumps(request)],
+            check=True,
+            capture_output=True,
+            text=True,
+            timeout=3,
+        )
+        routes = json.loads(result.stdout)
+        self.assertEqual(
+            routes[0],
+            f"PROXY 127.0.0.1:{fixture.ports['first']}; PROXY 127.0.0.1:{fixture.ports['second']}",
+        )
+        self.assertEqual(routes[1], f"PROXY 127.0.0.1:{fixture.ports['refused']}")
+        self.assertTrue(
+            fixture.pac.endswith(f'return "PROXY 127.0.0.1:{fixture.ports["refused"]}"; }}')
+        )
+        self.assertEqual(fixture.receiving_facts()["accept_proxy"], 0)
+        self.assertEqual(fixture.receiving_facts()["accept_origin"], 0)
+        # This proves the authored script distinction. CFNetwork URL delivery
+        # is unexecuted here and cannot be inferred from the JavaScript result.
+
+    def test32ActualRouteArrayObservationKeepsReleaseOperationsAndNonblockingOwner(self):
+        worker = (
+            SUPPORT.parents[1] / "launcher/Sources/ErgoptiPlus/ManagedHTTPWorker.swift"
+        ).read_text()
+        fixture = (SUPPORT / "native_http_fixture_main.swift").read_text()
+        self.assertIn(
+            'managedHTTPFixtureStage("routes_done")\n\t\tmanagedHTTPFixtureRoutes(routes)\n\t\t#endif',
+            worker,
+        )
+        release = re.sub(
+            r"^[ \t]*#if ERGOPTI_MANAGED_HTTP_FIXTURE_DIAGNOSTICS\n.*?^[ \t]*#endif\n",
+            "",
+            worker,
+            flags=re.MULTILINE | re.DOTALL,
+        )
+        self.assertEqual(
+            hashlib.sha256(release.encode()).hexdigest(),
+            "68659ddec98c9a427244b315b69c17750b743eab2cdd3688308690a66d1c6e98",
+        )
+        observer = fixture[fixture.index("\tfunc routes(_ routes:") : fixture.index("\n\tdeinit")]
+        self.assertIn("guard lock.try() else { return }", observer)
+        self.assertIn('seen.insert("route_plan").inserted', observer)
+        self.assertIn('token = routes.count == 1 ? "r1" : "r2"', observer)
+        self.assertIn("port.intValue == expected", observer)
+        self.assertIn('host == "127.0.0.1"', observer)
+        self.assertIn('var token = "r5"', observer)
+        self.assertNotIn("lock.lock()", observer)
+        self.assertNotIn("Darwin.open", observer)
+        self.assertNotIn("session", observer)
+        self.assertEqual(observer.count("Darwin.write"), 1)
+        binding = fixture[
+            fixture.index("\tfunc bindDefaultRoute") : fixture.index("\n\tfunc routes")
+        ]
+        self.assertIn('settings["ProxyAutoConfigJavaScript"]', binding)
+        self.assertIn("script.utf8.prefix(65_537).count <= 65_536", binding)
+        self.assertIn("script.hasSuffix(suffix)", binding)
+        self.assertIn("options: .backwards", binding)
+        self.assertIn("digits.utf8.allSatisfy({ (48...57).contains($0) })", binding)
+        self.assertNotIn("Data(contentsOf:", binding)
+        self.assertLess(
+            fixture.index("stages.bindDefaultRoute(settings: settings)"),
+            fixture.index("let status = ManagedHTTPWorker.execute"),
+        )
+
+
+class NativeAdminAuthorizationObservationTests(unittest.TestCase):
+    # Literal public-CLI receipts qualify receiving only. The actual Apple
+    # authorization operation must execute in the native macOS lane.
+    def setUp(self):
+        self.fixture = WIRE.WireFixture(native=False)
+        self.addCleanup(self.fixture.close)
+
+    def test33StrictPublicAuthorizationGrammarRejectsUnknownOutputAndFalseStatuses(self):
+        fact = WIRE.WireFixture._admin_authorization_fact(255, b"NO (-60007) \n")
+        self.assertEqual(
+            fact,
+            {
+                "version": 1,
+                "observed": 1,
+                "command_status": 255,
+                "authorization_status": -60007,
+                "interaction_allowed": 0,
+            },
+        )
+        self.assertEqual(
+            WIRE.WireFixture._admin_authorization_fact(
+                0, b'YES (0) { 1: "com.apple.trust-settings.admin" } \n'
+            )["authorization_status"],
+            0,
+        )
+        for status, raw in (
+            (0, b"NO (-60007) \n"),
+            (255, b"NO (0) \n"),
+            (255, b"NO (2147483648) \n"),
+            (True, b"NO (-60007) \n"),
+            (255, b"NO (-60007)"),
+            (255, b"NO (-60007) \nprivate diagnostic"),
+            (255, b"x" * 1025),
+            (0, b'YES (0) { 1: "another-right" } \n'),
+            (0, b'YES (0) { 2: "com.apple.trust-settings.admin" } \n'),
+            (0, b'YES (0) { 1: "com.apple.trust-settings.admin" (cannot-preauthorize) } \n'),
+        ):
+            with self.subTest(status=status, length=len(raw)):
+                with self.assertRaises(WIRE.FixtureFailure):
+                    WIRE.WireFixture._admin_authorization_fact(status, raw)
+
+    def controller(self, body, removal_failure=None):
+        original = self.fixture._command
+        commands, removals, children = [], [], []
+        real_popen = subprocess.Popen
+
+        def acquire(*arguments, **options):
+            child = real_popen(*arguments, **options)
+            child.controlled_output = options["stdout"]
+            child.controlled_errors = options["stderr"]
+            children.append(child)
+            return child
+
+        def command(arguments, **options):
+            if arguments[3] == "authorize":
+                commands.append((arguments, options))
+                return original([sys.executable, "-B", "-c", body], **options)
+            removals.append((arguments, options, time.monotonic()))
+            if removal_failure is not None:
+                raise removal_failure
+            return 0, b""
+
+        return command, acquire, commands, removals, children
+
+    def test34ActualMergedOutputAndClosedChildReceiveFixedNoninteractiveStatus(self):
+        body = "import sys;sys.stdin.buffer.read();sys.stdout.write('NO (');sys.stdout.flush();sys.stderr.write('-60007) ');sys.stderr.flush();sys.stdout.write('\\n');sys.stdout.flush();sys.exit(255)"
+        command, acquire, commands, _, children = self.controller(body)
+        output = io.StringIO()
+        started = time.monotonic()
+        with mock.patch.object(self.fixture, "_command", side_effect=command):
+            with mock.patch.object(WIRE.subprocess, "Popen", side_effect=acquire):
+                with contextlib.redirect_stdout(output):
+                    self.fixture._observe_admin_authorization(started + 15)
+        self.assertEqual(
+            commands[0][0],
+            [
+                "/usr/bin/sudo",
+                "-n",
+                "/usr/bin/security",
+                "authorize",
+                "-P",
+                "com.apple.trust-settings.admin",
+            ],
+        )
+        self.assertEqual(len(commands), 1)
+        self.assertTrue(commands[0][1]["tolerate"])
+        self.assertTrue(commands[0][1]["merge_errors"])
+        self.assertLessEqual(commands[0][1]["deadline"], time.monotonic() + 2)
+        self.assertEqual(children[0].returncode, 255)
+        self.assertTrue(children[0].stdin.closed)
+        self.assertTrue(children[0].controlled_output.closed)
+        self.assertTrue(children[0].controlled_errors.closed)
+        self.assertIs(children[0].controlled_output, children[0].controlled_errors)
+        fact = json.loads(output.getvalue().split(" ", 2)[2])
+        self.assertEqual(fact["observed"], 1)
+        self.assertEqual(fact["authorization_status"], -60007)
+        self.assertEqual(fact["interaction_allowed"], 0)
+
+    def test35PublicAuthorizationConsumesSameRemovalBudgetWithoutChangingMandatoryVerdict(self):
+        body = "import sys,time;sys.stdin.buffer.read();time.sleep(.08);sys.stderr.write('NO (-60007) \\n');sys.exit(255)"
+        primary = RuntimeError("original controlled trust removal refusal")
+        command, acquire, _, removals, children = self.controller(body, primary)
+        self.fixture.native = True
+        self.fixture.trust_attempted = True
+        self.fixture.authorization_observation = True
+        started = time.monotonic()
+        with mock.patch.object(self.fixture, "_command", side_effect=command):
+            with mock.patch.object(WIRE.subprocess, "Popen", side_effect=acquire):
+                with contextlib.redirect_stdout(io.StringIO()):
+                    with self.assertRaises(RuntimeError) as refusal:
+                        self.fixture.trust(False)
+        self.assertIs(refusal.exception, primary)
+        self.assertTrue(self.fixture.trust_attempted)
+        self.assertEqual(len(removals), 1)
+        self.assertEqual(removals[0][0][3:5], ["remove-trusted-cert", "-d"])
+        self.assertGreaterEqual(removals[0][1]["deadline"], started + 15)
+        self.assertLess(removals[0][1]["deadline"] - removals[0][2], 14.95)
+        self.assertNotIn("tolerate", removals[0][1])
+        self.assertIsNotNone(children[0].returncode)
+        self.fixture.native = False
+        self.fixture.trust_attempted = False
+
+    def test36UnknownReceiptAndClosedOutputCannotEraseExactClosureFailure(self):
+        output = io.StringIO()
+        with mock.patch.object(
+            self.fixture, "_command", return_value=(255, b"private unknown output")
+        ):
+            with contextlib.redirect_stdout(output):
+                self.fixture._observe_admin_authorization(time.monotonic() + 15)
+        self.assertEqual(
+            json.loads(output.getvalue().split(" ", 2)[2]),
+            {"version": 1, "observed": 0, "interaction_allowed": 0},
+        )
+        self.assertNotIn("private", output.getvalue())
+        primary = RuntimeError("original controlled authorization child closure refusal")
+
+        def refused(*arguments, **options):
+            self.fixture.command_fact = {"phase": "settle", "status": None}
+            raise primary
+
+        with mock.patch.object(self.fixture, "_command", side_effect=refused):
+            with mock.patch("builtins.print") as printing:
+                with self.assertRaises(RuntimeError) as refusal:
+                    self.fixture._observe_admin_authorization(time.monotonic() + 15)
+        self.assertIs(refusal.exception, primary)
+        printing.assert_not_called()
+        for failure in (
+            OSError("closed controlled output"),
+            ValueError("closed controlled output"),
+        ):
+            with mock.patch.object(self.fixture, "_command", return_value=(255, b"NO (-60007) \n")):
+                with mock.patch("builtins.print", side_effect=failure):
+                    self.fixture._observe_admin_authorization(time.monotonic() + 15)
+
+
+class NativeServerRetirementTests(unittest.TestCase):
+    def setUp(self):
+        self.fixture = WIRE.WireFixture(native=False)
+        self.addCleanup(self.cleanup_owned_control)
+
+    def cleanup_owned_control(self):
+        if self.fixture.closed:
+            return
+        # Only this test owns the deliberately refused operation's original
+        # sockets and threads. This direct teardown does not pay production debt.
+        for server in self.fixture.started_servers:
+            server.shutdown()
+        for state in getattr(self.fixture, "server_shutdowns", ()):
+            if state["worker"].ident is not None:
+                state["worker"].join()
+        for _, worker in getattr(self.fixture, "server_threads", ()):
+            worker.join()
+        for server in self.fixture.servers:
+            server.server_close()
+        self.fixture.refused.close()
+        import shutil
+
+        shutil.rmtree(self.fixture.root)
+
+    def test37ActualIndependentShutdownRequestsMeetBeforeAnyListenerClosure(self):
+        servers = tuple(self.fixture.started_servers)
+        self.assertEqual(len(servers), 6)
+        barrier = threading.Barrier(len(servers))
+        shutdowns = []
+        closers = []
+        with contextlib.ExitStack() as stack:
+            for server in servers:
+                original_shutdown = server.shutdown
+                original_close = server.server_close
+
+                def shutdown(owned=server, original=original_shutdown):
+                    barrier.wait(timeout=2)
+                    original()
+                    shutdowns.append(owned)
+
+                def close(owned=server, original=original_close):
+                    self.assertEqual(len(shutdowns), len(servers))
+                    self.assertTrue(
+                        all(not row["worker"].is_alive() for row in self.fixture.server_shutdowns)
+                    )
+                    self.assertTrue(
+                        all(not worker.is_alive() for _, worker in self.fixture.server_threads)
+                    )
+                    original()
+                    closers.append(owned)
+
+                stack.enter_context(mock.patch.object(server, "shutdown", side_effect=shutdown))
+                stack.enter_context(mock.patch.object(server, "server_close", side_effect=close))
+            self.fixture.close()
+        self.assertTrue(self.fixture.closed)
+        self.assertEqual(set(shutdowns), set(servers))
+        self.assertEqual(closers, list(servers))
+        self.assertTrue(all(server.socket.fileno() == -1 for server in servers))
+        self.assertFalse(self.fixture.root.exists())
+
+    def test38FailedExactShutdownKeepsItsWorkerAndNamespaceWithoutSuccess(self):
+        primary = RuntimeError("controlled public shutdown refusal")
+        original = self.fixture.started_servers[0].shutdown
+        with mock.patch.object(self.fixture.started_servers[0], "shutdown", side_effect=primary):
+            with self.assertRaises(RuntimeError) as refusal:
+                self.fixture.close()
+        self.assertIs(refusal.exception, primary)
+        retained = tuple(self.fixture.server_shutdowns)
+        workers = tuple(state["worker"] for state in retained)
+        self.assertFalse(self.fixture.closed)
+        self.assertTrue(self.fixture.root.exists())
+        self.assertIs(retained[0]["failure"], primary)
+        with mock.patch.object(WIRE.threading.Thread, "start") as acquire:
+            with self.assertRaises(RuntimeError) as refusal:
+                self.fixture.close()
+        acquire.assert_not_called()
+        self.assertIs(refusal.exception, primary)
+        self.assertEqual(tuple(state["worker"] for state in self.fixture.server_shutdowns), workers)
+        self.assertTrue(all(server.socket.fileno() >= 0 for server in self.fixture.servers))
+        original()
+
+    def test39InterruptedJoinCanOnlyRetryTheSamePhysicalShutdownWorkers(self):
+        original_join = threading.Thread.join
+        primary = KeyboardInterrupt()
+        interrupted = []
+
+        def join(worker, *arguments, **options):
+            if not interrupted:
+                interrupted.append(worker)
+                raise primary
+            return original_join(worker, *arguments, **options)
+
+        with mock.patch.object(WIRE.threading.Thread, "join", side_effect=join, autospec=True):
+            with self.assertRaises(KeyboardInterrupt) as refusal:
+                self.fixture.close()
+        self.assertIs(refusal.exception, primary)
+        workers = tuple(state["worker"] for state in self.fixture.server_shutdowns)
+        self.assertEqual(len(workers), 6)
+        self.assertFalse(self.fixture.closed)
+        self.assertTrue(self.fixture.root.exists())
+        with mock.patch.object(WIRE.threading.Thread, "start") as acquire:
+            self.fixture.close()
+        acquire.assert_not_called()
+        self.assertEqual(tuple(state["worker"] for state in self.fixture.server_shutdowns), workers)
+        self.assertTrue(all(not worker.is_alive() for worker in workers))
+        self.assertTrue(self.fixture.closed)
+
+    def test40StartRefusalRetainsExactWorkerAndCannotAcquireAfterDebt(self):
+        primary = RuntimeError("controlled shutdown worker start refusal")
+        with mock.patch.object(WIRE.threading.Thread, "start", side_effect=primary):
+            with self.assertRaises(RuntimeError) as refusal:
+                self.fixture.close()
+        self.assertIs(refusal.exception, primary)
+        retained = self.fixture.server_shutdowns[0]
+        self.assertFalse(retained["started"])
+        self.assertIsNone(retained["worker"].ident)
+        self.assertFalse(self.fixture.closed)
+        self.assertTrue(self.fixture.root.exists())
+        with mock.patch.object(WIRE.threading.Thread, "start") as acquire:
+            with self.assertRaises(RuntimeError) as refusal:
+                self.fixture.close()
+        acquire.assert_not_called()
+        self.assertIs(refusal.exception, primary)
+        self.assertIs(retained["failure"], primary)
+        self.assertEqual(self.fixture.server_shutdowns, [retained])
+        self.assertTrue(all(server.socket.fileno() >= 0 for server in self.fixture.servers))
+        self.cleanup_owned_control()
+
+        # A real native thread may exist while public start acknowledgement and
+        # ident are absent. Only this control releases its bootstrap gate.
+        original_thread = threading.Thread
+        entered = threading.Event()
+        release = threading.Event()
+        target_entered = threading.Event()
+        held = []
+        acknowledgement_failure = KeyboardInterrupt("controlled serving start acknowledgement")
+
+        class HeldBootstrap(original_thread):
+            def __init__(self, *arguments, **options):
+                super().__init__(*arguments, **options)
+                held.append(self)
+
+            def _bootstrap(self):
+                entered.set()
+                release.wait()
+                super()._bootstrap()
+
+            def start(self):
+                with mock.patch.object(self._started, "wait", side_effect=acknowledgement_failure):
+                    super().start()
+
+            def run(self):
+                target_entered.set()
+                super().run()
+
+        self.fixture = WIRE.WireFixture.__new__(WIRE.WireFixture)
+        try:
+            with mock.patch.object(WIRE.threading, "Thread", HeldBootstrap):
+                with self.assertRaises(KeyboardInterrupt) as refusal:
+                    self.fixture.__init__(native=False)
+            self.assertIs(refusal.exception, acknowledgement_failure)
+            self.assertTrue(entered.wait(2))
+            self.assertIsNone(held[0].ident)
+            self.assertFalse(held[0]._started.is_set())
+            self.assertIs(self.fixture.server_starts[0]["worker"], held[0])
+            self.assertIs(self.fixture.server_starts[0]["failure"], acknowledgement_failure)
+            self.assertFalse(self.fixture.closed)
+            self.assertTrue(self.fixture.root.exists())
+            self.assertTrue(all(server.socket.fileno() >= 0 for server in self.fixture.servers))
+            with mock.patch.object(WIRE.threading.Thread, "start") as acquire:
+                with self.assertRaises(KeyboardInterrupt) as refusal:
+                    self.fixture.close()
+            acquire.assert_not_called()
+            self.assertIs(refusal.exception, acknowledgement_failure)
+        finally:
+            release.set()
+            self.assertTrue(held[0]._started.wait(2))
+            self.assertTrue(target_entered.wait(2))
+            self.fixture.servers[0].shutdown()
+            held[0].join(2)
+            self.assertFalse(held[0].is_alive())
 
 
 if __name__ == "__main__":

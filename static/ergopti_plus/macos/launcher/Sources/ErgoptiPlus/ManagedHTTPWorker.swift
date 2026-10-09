@@ -148,6 +148,7 @@ enum ManagedProxyLookup {
 		}
 		#if ERGOPTI_MANAGED_HTTP_FIXTURE_DIAGNOSTICS
 		managedHTTPFixtureStage("routes_done")
+		managedHTTPFixtureRoutes(routes)
 		#endif
 		return routes.isEmpty ? nil : routes
 	}
