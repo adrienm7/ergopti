@@ -7671,9 +7671,12 @@ and installation qualification are still required.
   prompting disabled. It starts no target and executes no shortcut. Optional
   bounded observations preserve all four catalogue checkpoints, the existing
   20-second capture budget, 65,536-byte caps and exact native retirement.
-  Existing Python/JXA/picker controls are already registered. Native
-  qualification of this composed extension remains UNRUN; an unavailable
-  bridge, target-not-running (-600), unreturned call or status zero does not
+  Existing Python/JXA/picker controls are already registered. Manual run
+  [37903854378](https://github.com/adrienm7/ergopti/actions/runs/37903854378)
+  at `8803f4535` observes unavailable JXA constants, checkpoint1 and the
+  unchanged 20-second discovery deadline with exact native retirement. This
+  does not identify the stall cause. An unavailable bridge, target-not-running
+  (-600), unreturned call or status zero does not
   establish the historical catalogue-stall cause, a consent grant or
   catalogue/invocation success.
 
@@ -7684,8 +7687,14 @@ and installation qualification are still required.
   Probe admission authenticates the exact tracked observer bytes before
   loading them and restores the previous module binding after refusal or
   success. Independent source review and portable observer/publisher controls
-  pass. Native SDK compilation, signed-helper execution, Darwin retirement
-  and final CI provenance remain UNRUN on this composed source.
+  pass. The same run fails XCTest compilation before any test executes: the
+  new retirement test compares the returned String wire line with JSON Data.
+  Its expected value now matches the complete Q1 DATA line containing the same
+  original base64 bytes; all seven retirement/cancellation/deadline assertions
+  remain intact. Fresh native compilation is required. The default workflow
+  does not execute the signed SDK observer: authenticated app publication,
+  actual permission observation, Darwin retirement and final CI provenance
+  remain UNRUN. Controlled metadata tests do not qualify the native SDK call.
 
   Remaining software: inventory supported automation/application providers and
   implement their real availability/invocation contracts. Add bounded Apple
