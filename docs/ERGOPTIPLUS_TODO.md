@@ -8954,6 +8954,20 @@ test precondition failure, not a Lua defect or a successful permission grant.
   Restoring recommendations and checking unconsumed gestures on the physical
   built-in trackpad remain acceptance work for the next prerelease.
 
+- [~] **127.** Retire the obsolete VS Code bridge startup prerequisite.
+
+  A user of dev.156 reported a fatal startup refusal at the VS Code caret
+  bridge step. The retired integration was still installed and started
+  unconditionally after menu initialization. Remove that activation and the
+  renderer dependency; retain standard Accessibility/window positioning and
+  cleanup of an already loaded legacy owner. Do not alter personal editor
+  extensions or infer an unobserved port conflict.
+
+  Current-source receiving passes four bounded startup/renderer controls;
+  the original source fails three. A refused menubar remains fatal. Actual
+  installed startup on the affected Mac is still required after publication.
+  Windows and Linux have no corresponding startup bridge prerequisite.
+
 ## Time estimate
 
 Order-of-magnitude estimate: 40–70 agent-days for the current remaining
