@@ -97,7 +97,7 @@ $ProxyNativeDiagnosticStage='abi'
 $Passed=0
 function Require([bool]$Condition, [string]$Message) {
     if (-not $Condition) {
-        try {[Console]::Error.WriteLine('PROXY_NATIVE_DIAG stage='+$script:ProxyNativeDiagnosticStage+' passed='+$script:Passed)} catch { }
+        try {[Console]::Out.WriteLine('PROXY_NATIVE_DIAG stage='+$script:ProxyNativeDiagnosticStage+' passed='+$script:Passed)} catch { }
         throw $Message
     }
 }

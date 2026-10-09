@@ -117,6 +117,13 @@ class _ArtifactNtlmProxyOwner {
 					&& Type(Code) == "Integer" && Code >= -2147483648 && Code <= 2147483647
 					_TestPrint("::notice title=Windows native SSPI fixture::stage=" . Stage . " status=" . Code)
 			}
+			try {
+				ClosureFact := _ArtifactNtlmClosureDiagnostic(this.State)
+				if ClosureFact != ""
+					_TestPrint("::notice title=Windows native SSPI closure counters::" . ClosureFact)
+			} catch Any {
+				; Closed scalar observation cannot replace physical retirement assertions.
+			}
 			AssertTrue(this.NativeState is Map && this.NativeState.Get("TreeQuiesced", false), "SSPI service process and Job handles close")
 			AssertEqual(1, this.Results.Length)
 			AssertEqual(0, this.Results[1]["exit"], "SSPI service closes with no retained thread or security-context debt")
@@ -343,3 +350,37 @@ _ArtifactNtlmProxySpawnArgumentControls() {
 	}
 }
 Test("artifact curl: actual SSPI caller serializes its native TLS port before strict spawn admission", _ArtifactNtlmProxySpawnArgumentControls)
+
+_ArtifactNtlmClosureDiagnostic(State) {
+	if !(State is Map)
+		return ""
+	Fact := ""
+	for Name in ["active", "failures", "bare", "type_one", "type_three", "authenticated", "negotiate", "pac_requests"] {
+		Value := State.Get(Name, "")
+		if Type(Value) != "Integer" || Value < 0 || Value > 65535
+			return ""
+		Fact .= (Fact == "" ? "" : " ") . Name . "=" . Format("{:d}", Value)
+	}
+	Identity := State.Get("identity_matched", "")
+	if Type(Identity) != "Integer" || (Identity != 0 && Identity != 1)
+		return ""
+	return Fact . " identity_matched=" . (Identity ? "true" : "false")
+}
+
+_ArtifactNtlmClosureDiagnosticControls() {
+	State := Map("active", 0, "failures", 1, "bare", 2, "type_one", 1, "type_three", 1,
+		"authenticated", 1, "negotiate", 0, "pac_requests", 1, "identity_matched", true, "private", "PRIVATE_URL")
+	AssertEqual("active=0 failures=1 bare=2 type_one=1 type_three=1 authenticated=1 negotiate=0 pac_requests=1 identity_matched=true", _ArtifactNtlmClosureDiagnostic(State))
+	for Name in ["active", "failures", "bare", "type_one", "type_three", "authenticated", "negotiate", "pac_requests", "identity_matched"] {
+		Saved := State[Name]
+		for Value in ["1", "PRIVATE", -1, 65536, 1.5] {
+			State[Name] := Value
+			AssertEqual("", _ArtifactNtlmClosureDiagnostic(State))
+		}
+		State[Name] := Saved
+	}
+	State["identity_matched"] := 2
+	AssertEqual("", _ArtifactNtlmClosureDiagnostic(State))
+	AssertEqual("", _ArtifactNtlmClosureDiagnostic(0))
+}
+Test("artifact curl: closure counters remain bounded and exclude private state", _ArtifactNtlmClosureDiagnosticControls)

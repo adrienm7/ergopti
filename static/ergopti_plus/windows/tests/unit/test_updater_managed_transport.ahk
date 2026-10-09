@@ -291,6 +291,19 @@ class _UpdaterNativeDownloadRun {
 			; Reporting refusal cannot replace the original native acceptance assertions.
 			this.RefusalDiagnosticStatus := "unavailable"
 		}
+		this.StagingDiagnosticStatus := "unavailable"
+		try {
+			if this.HasOwnProp("StagingDiagnosticPath") {
+				StagingFact := _UpdaterNativeReadStagingDiagnostic(this.StagingDiagnosticPath)
+				if StagingFact != "" {
+					this.RefusalDiagnosticPrinter.Call("::notice title=Windows staging suboperation diagnostic::" . StagingFact)
+					this.StagingDiagnosticStatus := "reported"
+				}
+			}
+		} catch Any {
+			; Optional observation cannot replace the original refusal assertion.
+			this.StagingDiagnosticStatus := "unavailable"
+		}
 		AssertEqual(Reason, Failure["reason"])
 		if Stage != ""
 			AssertEqual(Stage, Failure["receipt"].Get("stage", ""))
@@ -822,3 +835,39 @@ _UpdaterNativeEarlyStagingFactControls() {
 }
 Test("updater fixture: early staging diagnostics retain actual bounded operation provenance",
 	_UpdaterNativeEarlyStagingFactControls)
+
+_UpdaterNativeRefusedSidecarControls(Contract) {
+	Directory := _SR_AcquireCaptureDirectory()
+	Path := Directory . "sidecar.json"
+	try {
+		for Mode in ["valid", "invalid", "sink_refused"] {
+			if FileExist(Path)
+				FileDelete(Path)
+			Text := Mode == "invalid" ? "PRIVATE_CONTENT" : '{"schema_version":2,"operation":"not_file_read","exception":"unauthorized","observed_stage":"file_remove","exception_family":"unauthorized","hresult":-2147024891,"expected":{"type":"absent","arity":0,"size_available":"unavailable"},"actual":{"type":"absent","arity":0,"size_available":"unavailable"}}'
+			FileAppend(Text, Path, "UTF-8-RAW")
+			Observed := []
+			Printer := Mode == "sink_refused" ? _ManagedRemoteStateWaitPrinterRefused.Bind(Map("calls", 0)) : (Fact) => Observed.Push(Fact)
+			Run := _UpdaterNativeRefusalDiagnosticControl(Printer)
+			Run.StagingDiagnosticPath := Path
+			Run.FixtureResult := Map("exit", 1, "stdout", '{"schema_version":1,"state":"failed","operation":"download","reason":"download","receipt":{}}')
+			Caught := false
+			try Run.Refused("download", "file_remove")
+			catch as Failure {
+				Caught := true
+				AssertContains(Failure.Message, "expected: <file_remove>", "observation preserves the exact primary stage assertion")
+			}
+			AssertTrue(Caught)
+			AssertEqual(Mode == "valid" ? "reported" : "unavailable", Run.StagingDiagnosticStatus)
+			AssertEqual(Mode == "valid" ? 2 : Mode == "invalid" ? 1 : 0, Observed.Length)
+			if Mode == "valid" {
+				AssertContains(Observed[2], "observed_stage=file_remove exception_family=unauthorized hresult=-2147024891")
+				AssertFalse(InStr(Observed[2], "PRIVATE"))
+			}
+		}
+	} finally {
+		if FileExist(Path)
+			FileDelete(Path)
+		DirDelete(Directory, false)
+	}
+}
+Test("updater native: refusal sidecar observation preserves the original stage assertion", _UpdaterNative_WithContract.Bind(_UpdaterNativeRefusedSidecarControls))
