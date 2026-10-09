@@ -355,6 +355,69 @@ _LTAP_SlotAcceptPolicyTable() {
 Test("LLM accept: released validation chord inserts only its exact slot (llm-val-chord-inserts)",
 	_LTAP_SlotAcceptPolicyTable)
 
+; An external program's request (the registered accept message) is not a key:
+; it needs no physical Tab, yet keeps the focus and modifier gates, and the
+; bridge ignores it while inactive.
+_LTAP_AutomationAcceptPolicyTable() {
+	global _Stub_LlmTooltipVisible, _Stub_LlmPresentedRecord
+	global _LTAP_AcceptCount, _LTAP_LastAcceptedText
+	Vectors := [
+		Map("label", "request in the originating control, no key down", "accept", true),
+		Map("label", "Ctrl still held", "accept", false,
+			"input", _LTAP_Input(false, true)),
+		Map("label", "Win still held", "accept", false,
+			"input", _LTAP_Input(false, false, false, false, true)),
+		Map("label", "focus moved to another window", "accept", false,
+			"input", _LTAP_Input(false, false, false, false, false, 200, 1001)),
+		Map("label", "focus moved to another control", "accept", false,
+			"input", _LTAP_Input(false, false, false, false, false, 100, 1002)),
+		Map("label", "unverifiable focus", "accept", false,
+			"input", _LTAP_Input(false, false, false, false, false, 0, 0, false)),
+		Map("label", "no prediction shown", "accept", false, "hidden", true)
+	]
+	for TestVector in Vectors {
+		_LTAP_Setup()
+		try {
+			if TestVector.Get("hidden", false) {
+				_Stub_LlmTooltipVisible := false
+				_Stub_LlmPresentedRecord := 0
+			}
+			Accepted := LLM_Tooltip_TryAcceptAutomation(
+				TestVector.Get("input", _LTAP_Input(false)), _LTAP_RecordAccept)
+			AssertEqual(TestVector["accept"], Accepted,
+				TestVector["label"] . ": automation acceptance must follow its canonical policy")
+			AssertEqual(TestVector["accept"] ? 1 : 0, _LTAP_AcceptCount,
+				TestVector["label"] . ": injection count")
+			if TestVector["accept"]
+				AssertEqual("predicted text", _LTAP_LastAcceptedText,
+					"the active slot text must be injected exactly once")
+		} finally {
+			_LTAP_Teardown()
+		}
+	}
+}
+
+Test("LLM accept: an automation request inserts only in the owning control (llm-automation-accepts)",
+	_LTAP_AutomationAcceptPolicyTable)
+
+_LTAP_AutomationRequestIgnoredWhileBridgeInactive() {
+	global _LLM_Bridge_Active
+	Previous := _LLM_Bridge_Active
+	_LLM_Bridge_Active := false
+	try {
+		AssertEqual(0, _LLM_Automation_OnAcceptMessage(0, 0,
+				LLM_Automation_AcceptMessage(), 0),
+			"an inactive bridge must refuse, not acknowledge, the request")
+	} finally {
+		_LLM_Bridge_Active := Previous
+	}
+	Assert(LLM_Automation_AcceptMessage() >= 0xC000,
+		"the request must use a registered message, never a fixed WM_APP number another program could reuse")
+}
+
+Test("LLM accept: an inactive bridge refuses automation requests (llm-automation-accepts)",
+	_LTAP_AutomationRequestIgnoredWhileBridgeInactive)
+
 
 
 
