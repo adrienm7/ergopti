@@ -1294,6 +1294,60 @@ helpers.describe("same-device third slot through original production consumers (
 		local out={}; for _, row in ipairs(s.rows) do out[#out+1]=row[1]..":"..row[2] end
 		return table.concat(out," ")
 	end
+	local function with_adversarial_clock(body)
+		local previous = package.loaded["infra.monotonic"]
+		local reads, now = 0, 0
+		local external = {
+			now_ms = function() reads = reads + 1; now = now + 150; return now end,
+			now_sec = function() return now / 1000 end,
+			resolution_ms = function() return 0 end,
+			has_hires = function() return true end,
+			backend = function() return "adversarial-fixture-clock" end,
+		}
+		package.loaded["infra.monotonic"] = external
+		local ok, failure = pcall(body)
+		local restored = package.loaded["infra.monotonic"] == external
+		package.loaded["infra.monotonic"] = previous
+		if not ok then error(failure, 0) end
+		helpers.assert_true(restored, "fixture restores the exact inherited clock owner")
+		helpers.assert_eq(reads, 0, "controlled input never borrows host elapsed time")
+	end
+	helpers.it("(input-owner-clock) keeps original third-slot capture under expensive host reads", function()
+		with_adversarial_clock(function()
+			with_chord({}, function(s)
+				s.edge("a", 58, 1, 1000)
+				helpers.assert_eq(native_rows(s), "", "first press cannot expire on host wall time")
+				s.edge("a", 15, 1, 1010)
+				helpers.assert_eq(s.actions, {{ "copy", "combination__tab_then_caps_lock" }})
+				s.edge("a", 15, 0, 1011); s.edge("a", 58, 0, 1012)
+				helpers.assert_eq(native_rows(s), "")
+			end)
+		end)
+	end)
+	helpers.it("(input-owner-clock) retains exact guard revocation before any standalone output", function()
+		with_adversarial_clock(function()
+			with_chord({}, function(s)
+				s.edge("a", 58, 1, 1000)
+				s.bytes = s.bytes:gsub("simultaneous_threshold_ms = 100", "simultaneous_threshold_ms = 101")
+				s.edge("a", 15, 1, 1010)
+				helpers.assert_eq(s.actions, {})
+				helpers.assert_eq(native_rows(s):find("29:1", 1, true), nil)
+				s.edge("a", 15, 0, 1011); s.edge("a", 58, 0, 1012)
+			end)
+		end)
+	end)
+	helpers.it("(input-owner-clock) expires only when owned idle time passes the third-slot deadline", function()
+		with_chord({}, function(s)
+			s.edge("a", 58, 1, 1000)
+			s.pump_at(1100)
+			helpers.assert_eq(native_rows(s), "", "equality remains inside the positive delay")
+			s.pump_at(1101)
+			helpers.assert_eq(native_rows(s), "29:1", "the genuine idle pump expires after the deadline")
+			s.edge("a", 58, 0, 1401)
+			helpers.assert_eq(native_rows(s), "29:1 29:0")
+			helpers.assert_eq(s.actions, {})
+		end)
+	end)
 	for _,order in ipairs({{58,15},{15,58}}) do
 		helpers.it("consumes both original presses symmetrically "..order[1],function()
 			with_chord({},function(s)
