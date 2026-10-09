@@ -3232,6 +3232,17 @@ Exact-source native execution of this successor, the actual late-window cause
 and physical guardian/Login Items/tap-hold acceptance remain open. This is
 prepared source, not feature adoption or completion of item24.
 
+Lease timer constructors now reject candidates superseded by STOP, replacement,
+failure or a matching ACK before publishing an owned handle. The ACK admission
+preserves a newer STOP watchdog and the exact retiring generation; negative
+heartbeat retry admission also rejects a clean mode recovery. Rejected handles
+use the existing inert cleanup backlog, and timer cleanup does not establish
+STOPPED or guardian removal. Thirteen additive real-controller controls and
+the 102 unchanged lease ownership controls pass on Lua 5.4 with modeled native
+ports. Exact-source macOS execution remains required. The first tap-hold exit
+73 cause remains unknown; this ownership correction does not qualify incident recovery or complete item 24. The separate
+heartbeat cadence proposal remains on hold, and fallback policy is unchanged.
+
 - [~] **30.** Physical magic-key setting on all three OSes: one
   `hotstrings.magic_key_source` (a KeyboardEvent.code, `auto` by default),
   config schema v5 migrating every spelling of the Windows
