@@ -8369,6 +8369,17 @@ Final joined-source gates and remote Shortcut retirement remain required.
   tests pass 22/0 on LuaJIT and Lua 5.4, and the previous source fails all seven
   added cases. Native TIS/GUI and final installed qualification remain pending.
 
+  The macOS consumer also captures its original plain probe module and exact
+  getter/request before external construction reads. Every observation,
+  asynchronous projection, native registration and delivery rejoins that
+  issuer; replaced exports refuse before allocation or action. Original
+  query/handle cancellation and retry debts remain owned after revocation.
+  All 22 prior cases and 109 assertions remain byte-exact; 40 focused cases
+  pass on both Lua ABIs, the former producer fails all 18 additions, and
+  nine independent omissions fail on both ABIs. These observed identity
+  barriers do not establish a native source epoch or unseen ABA transition.
+  Actual TIS/GUI, packaging and installed qualification remain pending.
+
   Remaining software: finish live effective-source retargeting, collisions
   against every owner and current modifier/output custody without overriding
   None/personal records or weakening compensation. Native qualification:

@@ -445,3 +445,343 @@ helpers.describe("conditional editor shortcut: native source and ordinary owners
 		end)
 	end)
 end)
+
+helpers.describe("conditional editor shortcut: original signed-source issuer", function()
+	for _, field in ipairs({ "current_source_id", "request" }) do
+		helpers.it("refuses a replaced original " .. field .. " before constructor allocation", function()
+			with_fixture(function(subject, registrar, _, state, spec)
+				local probe = package.loaded["adapters.keyboard_source_probe"]
+				local original, foreign_calls = probe[field], 0
+				probe[field] = function(...)
+					foreign_calls = foreign_calls + 1
+					return original(...)
+				end
+				local started = subject.start(spec)
+				local requests = #state.requests
+				local subscribed = state.source_changed ~= nil
+				probe[field] = original
+				helpers.assert_eq(subject.stop(), true)
+				helpers.assert_eq(started, false, "a replacement function is not the original signed-source issuer")
+				helpers.assert_eq(foreign_calls, 0, "unknown source functions must not run")
+				helpers.assert_eq(requests, 0, "unknown source ownership must allocate no query")
+				helpers.assert_eq(subscribed, false, "unknown source ownership must allocate no native subscription")
+				helpers.assert_eq(registrar.live_count(), 0)
+			end)
+		end)
+	end
+
+	helpers.it("rejoins the original request issuer after the native source read", function()
+		with_fixture(function(subject, registrar, _, state, spec)
+			local probe = package.loaded["adapters.keyboard_source_probe"]
+			local request, reads, foreign_calls = probe.request, 0, 0
+			local source = state.source_id
+			state.source_id = nil
+			setmetatable(state, { __index = function(_, key)
+				if key ~= "source_id" then return nil end
+				reads = reads + 1
+				probe.request = function(...)
+					foreign_calls = foreign_calls + 1
+					return request(...)
+				end
+				return source
+			end })
+			local started = subject.start(spec)
+			local requests = #state.requests
+			probe.request = request
+			setmetatable(state, nil)
+			state.source_id = source
+			helpers.assert_eq(subject.stop(), true)
+			helpers.assert_eq(reads, 1, "the original source read executes the actual reentry")
+			helpers.assert_eq(started, false)
+			helpers.assert_eq(foreign_calls, 0)
+			helpers.assert_eq(requests, 0, "the replaced request must not allocate after the original source read")
+			helpers.assert_eq(registrar.live_count(), 0)
+		end)
+	end)
+
+	helpers.it("rejoins the original request issuer after the final constructor context read", function()
+		with_fixture(function(subject, registrar, _, state, spec)
+			local probe = package.loaded["adapters.keyboard_source_probe"]
+			local request, reads, foreign_calls = probe.request, 0, 0
+			spec.context.replace_active = function()
+				reads = reads + 1
+				probe.request = function(...)
+					foreign_calls = foreign_calls + 1
+					return request(...)
+				end
+				return state.replace_active
+			end
+			local started = subject.start(spec)
+			local requests = #state.requests
+			probe.request = request
+			helpers.assert_eq(subject.stop(), true)
+			helpers.assert_eq(reads, 1, "the original late context read actually executes")
+			helpers.assert_eq(started, false)
+			helpers.assert_eq(foreign_calls, 0)
+			helpers.assert_eq(requests, 0)
+			helpers.assert_eq(registrar.live_count(), 0)
+		end)
+	end)
+
+	helpers.it("retires the exact original query when request construction substitutes its issuer", function()
+		with_fixture(function(subject, registrar, _, state, spec)
+			local probe = package.loaded["adapters.keyboard_source_probe"]
+			local request, entered = probe.request, 0
+			setmetatable(state.requests, { __newindex = function(rows, index, retained)
+				rawset(rows, index, retained)
+				entered = entered + 1
+				probe.request = function(...) return request(...) end
+			end })
+			local started = subject.start(spec)
+			local retired = state.requests[1] and state.requests[1].settled
+			probe.request = request
+			setmetatable(state.requests, nil)
+			helpers.assert_eq(subject.stop(), true)
+			helpers.assert_eq(entered, 1, "the original query construction must execute the replacement premise")
+			helpers.assert_eq(#state.requests, 1, "only the originally admitted query may exist")
+			helpers.assert_eq(started, false)
+			helpers.assert_eq(retired, true, "the same original operation must cancel before constructor refusal")
+			helpers.assert_eq(registrar.live_count(), 0)
+		end)
+	end)
+
+	for _, boundary in ipairs({ "request", "module", "metatable" }) do
+		helpers.it("refuses an original asynchronous source reply after " .. boundary .. " substitution", function()
+			with_fixture(function(subject, registrar, _, state, spec, respond)
+				local probe = package.loaded["adapters.keyboard_source_probe"]
+				local request = probe.request
+				helpers.assert_eq(subject.start(spec), true)
+				if boundary == "request" then probe.request = function(...) return request(...) end
+				elseif boundary == "module" then
+					package.loaded["adapters.keyboard_source_probe"] = { current_source_id = probe.current_source_id, request = request }
+				else setmetatable(probe, {}) end
+				respond()
+				local live = registrar.live_count()
+				package.loaded["adapters.keyboard_source_probe"] = probe
+				probe.request = request
+				setmetatable(probe, nil)
+				helpers.assert_eq(subject.stop(), true)
+				helpers.assert_eq(#state.requests, 1)
+				helpers.assert_eq(live, 0, "an old callback cannot acquire through a replaced source issuer")
+				helpers.assert_eq(registrar.live_count(), 0)
+				helpers.assert_eq(state.actions, {})
+			end)
+		end)
+	end
+
+	helpers.it("retires the exact late native handle when registration changes the original source issuer", function()
+		with_fixture(function(subject, registrar, native, state, spec, respond)
+			local probe = package.loaded["adapters.keyboard_source_probe"]
+			local request, native_bind, late_handle, binds = probe.request, native.hotkey.bind, nil, 0
+			native.hotkey.bind = function(...)
+				binds = binds + 1
+				late_handle = native_bind(...)
+				probe.request = function(...) return request(...) end
+				return late_handle
+			end
+			helpers.assert_eq(subject.start(spec), true)
+			respond()
+			local live = registrar.live_count()
+			local late_retired = { enabled = late_handle and late_handle.enabled, deleted = late_handle and late_handle.deleted }
+			probe.request = request
+			native.hotkey.bind = native_bind
+			helpers.assert_eq(subject.stop(), true)
+			helpers.assert_eq(binds, 1, "the original registrar actually acquired the late native handle")
+			helpers.assert_eq(live, 0, "late acquisition must retire rather than publish source authority")
+			helpers.assert_eq(late_retired, { enabled = false, deleted = true }, "the same original native handle must really retire")
+			helpers.assert_eq(registrar.live_count(), 0)
+			helpers.assert_eq(state.actions, {})
+		end)
+	end)
+
+	for _, field in ipairs({ "current_source_id", "request" }) do
+		helpers.it("executes no action after live delivery substitutes original " .. field, function()
+			with_fixture(function(subject, registrar, native, state, spec, respond)
+				local probe = package.loaded["adapters.keyboard_source_probe"]
+				local original = probe[field]
+				helpers.assert_eq(subject.start(spec), true)
+				respond()
+				local native_handle = native.hotkey._bound[1]
+				helpers.assert_not_nil(native_handle)
+				probe[field] = function(...) return original(...) end
+				native_handle.pressed_fn()
+				local actions = #state.actions
+				probe[field] = original
+				helpers.assert_eq(subject.stop(), true)
+				helpers.assert_eq(actions, 0, "a replacement source function must not admit the original action")
+				helpers.assert_eq(registrar.live_count(), 0)
+				helpers.assert_eq({ enabled = native_handle.enabled, deleted = native_handle.deleted },
+					{ enabled = false, deleted = true }, "the original delivery handle must retain exact cleanup")
+			end)
+		end)
+	end
+
+	helpers.it("rejects a revoked issuer before refresh reads the native source", function()
+		with_fixture(function(subject, registrar, native, state, spec, respond)
+			local probe = package.loaded["adapters.keyboard_source_probe"]
+			local request, source, reads = probe.request, state.source_id, 0
+			helpers.assert_eq(subject.start(spec), true)
+			respond()
+			local original_handle = native.hotkey._bound[1]
+			probe.request = function(...) return request(...) end
+			state.source_id = nil
+			setmetatable(state, { __index = function(_, key)
+				if key ~= "source_id" then return nil end
+				reads = reads + 1
+				return source
+			end })
+			local refreshed = subject.refresh()
+			local requests = #state.requests
+			probe.request = request
+			setmetatable(state, nil)
+			state.source_id = source
+			helpers.assert_eq(subject.stop(), true)
+			helpers.assert_eq(refreshed, false)
+			helpers.assert_eq(reads, 0, "a revoked source issuer must not enter the original native getter")
+			helpers.assert_eq(requests, 1)
+			helpers.assert_eq(registrar.live_count(), 0)
+			helpers.assert_eq({ enabled = original_handle.enabled, deleted = original_handle.deleted },
+				{ enabled = false, deleted = true }, "refresh still retires the exact previous native handle")
+		end)
+	end)
+
+	helpers.it("rejoins the source issuer after the actual asynchronous projection callback", function()
+		with_fixture(function(subject, registrar, _, state, spec, respond)
+			local probe = package.loaded["adapters.keyboard_source_probe"]
+			local request, reads = probe.request, 0
+			spec.context.paused = function()
+				reads = reads + 1
+				probe.request = function(...) return request(...) end
+				return false
+			end
+			helpers.assert_eq(subject.start(spec), true)
+			respond()
+			local live = registrar.live_count()
+			probe.request = request
+			helpers.assert_eq(subject.stop(), true)
+			helpers.assert_eq(reads, 1, "the original asynchronous projection callback must execute")
+			helpers.assert_eq(live, 0, "the projection callback cannot replace source authority before acquisition")
+			helpers.assert_eq(registrar.live_count(), 0)
+			helpers.assert_eq(state.actions, {})
+		end)
+	end)
+
+	helpers.it("retains the exact refused query cancellation after issuer revocation", function()
+		with_fixture(function(subject, registrar, _, state, spec)
+			local probe = package.loaded["adapters.keyboard_source_probe"]
+			local request, entered = probe.request, 0
+			state.cancel_refuses = true
+			setmetatable(state.requests, { __newindex = function(rows, index, retained)
+				rawset(rows, index, retained)
+				entered = entered + 1
+				probe.request = function(...) return request(...) end
+			end })
+			local started = subject.start(spec)
+			local refused = subject.stop()
+			local original_query = state.requests[1]
+			local still_pending = not original_query.settled
+			state.cancel_refuses = false
+			helpers.assert_eq(subject.stop(), true, "cleanup retries the exact original query despite revoked exports")
+			probe.request = request
+			setmetatable(state.requests, nil)
+			helpers.assert_eq(started, false)
+			helpers.assert_eq(entered, 1)
+			helpers.assert_eq(refused, false, "a refused original cancellation remains cleanup debt")
+			helpers.assert_eq(still_pending, true)
+			helpers.assert_eq(original_query.settled, true)
+			helpers.assert_eq(#state.requests, 1)
+			helpers.assert_eq(registrar.live_count(), 0)
+		end)
+	end)
+
+	helpers.it("retains a failed late native delete under revoked source authority", function()
+		with_fixture(function(subject, registrar, native, state, spec, respond)
+			local probe = package.loaded["adapters.keyboard_source_probe"]
+			local request, native_bind, late_handle, original_delete = probe.request, native.hotkey.bind
+			native.hotkey.bind = function(...)
+				late_handle = native_bind(...)
+				original_delete = late_handle.delete
+				late_handle.delete = function() error("original native deletion refused") end
+				probe.request = function(...) return request(...) end
+				return late_handle
+			end
+			helpers.assert_eq(subject.start(spec), true)
+			respond()
+			late_handle.pressed_fn()
+			local actions = #state.actions
+			local refused = subject.stop()
+			local not_deleted = late_handle.deleted ~= true
+			late_handle.delete = original_delete
+			helpers.assert_eq(subject.stop(), true, "cleanup retries the exact retained native handle with revoked exports")
+			probe.request = request
+			native.hotkey.bind = native_bind
+			helpers.assert_eq(actions, 0)
+			helpers.assert_eq(refused, false, "failed deletion must remain cleanup debt")
+			helpers.assert_eq(not_deleted, true)
+			helpers.assert_eq(registrar.live_count(), 0)
+			helpers.assert_eq({ enabled = late_handle.enabled, deleted = late_handle.deleted },
+				{ enabled = false, deleted = true })
+		end)
+	end)
+
+	for _, boundary in ipairs({ "reply", "delivery" }) do
+		helpers.it("rejoins the request issuer after the original native getter during " .. boundary, function()
+			with_fixture(function(subject, registrar, native, state, spec, respond)
+				local probe = package.loaded["adapters.keyboard_source_probe"]
+				local request, source, reads = probe.request, state.source_id, 0
+				helpers.assert_eq(subject.start(spec), true)
+				if boundary == "delivery" then respond() end
+				local original_handle = native.hotkey._bound[1]
+				state.source_id = nil
+				setmetatable(state, { __index = function(_, key)
+					if key ~= "source_id" then return nil end
+					reads = reads + 1
+					probe.request = function(...) return request(...) end
+					return source
+				end })
+				if boundary == "reply" then respond() else original_handle.pressed_fn() end
+				local live, actions = registrar.live_count(), #state.actions
+				probe.request = request
+				setmetatable(state, nil)
+				state.source_id = source
+				helpers.assert_eq(subject.stop(), true)
+				helpers.assert_eq(reads, 1, "the original native getter must execute the substitution premise")
+				helpers.assert_eq(actions, 0)
+				if boundary == "reply" then helpers.assert_eq(live, 0, "source read reentry cannot acquire a native handle")
+				else
+					helpers.assert_eq({ enabled = original_handle.enabled, deleted = original_handle.deleted },
+						{ enabled = false, deleted = true })
+				end
+				helpers.assert_eq(registrar.live_count(), 0)
+			end)
+		end)
+	end
+
+	helpers.it("retires the original query after settlement observer registration substitutes its issuer", function()
+		with_fixture(function(subject, registrar, _, state, spec)
+			local probe = package.loaded["adapters.keyboard_source_probe"]
+			local request, registered = probe.request, 0
+			setmetatable(state.requests, { __newindex = function(rows, index, retained)
+				rawset(rows, index, retained)
+				local original_registration = retained.operation.on_settled
+				retained.operation.on_settled = function(observer)
+					registered = registered + 1
+					local admitted = original_registration(observer)
+					probe.request = function(...) return request(...) end
+					return admitted
+				end
+			end })
+			local started = subject.start(spec)
+			local original_query = state.requests[1]
+			local retired = original_query.settled
+			probe.request = request
+			setmetatable(state.requests, nil)
+			helpers.assert_eq(subject.stop(), true)
+			helpers.assert_eq(registered, 1, "the same original query registers its actual settlement callback")
+			helpers.assert_eq(started, false)
+			helpers.assert_eq(retired, true, "that original query must cancel before startup returns")
+			helpers.assert_eq(#state.requests, 1)
+			helpers.assert_eq(registrar.live_count(), 0)
+		end)
+	end)
+end)
