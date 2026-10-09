@@ -12,12 +12,14 @@ const REPO = 'adrienm7/ergopti';
 const API_BASE = `https://api.github.com/repos/${REPO}`;
 const DL_BASE = `https://github.com/${REPO}/releases/download`;
 
+/** @typedef {{tag_name: string, prerelease: boolean, assets: Array<{name: string, browser_download_url: string}>}} GitHubRelease */
+
 // In-memory cache so a single page load only hits the API once per channel.
 /** @type {Record<string, {tag: string, assets: Record<string, string>} | null>} */
 const _cache = {};
 
 /**
- * Fetch all releases and return the most appropriate one for the current
+ * Fetch the appropriate GitHub endpoint for the current
  * channel (stable = latest non-prerelease, dev = latest prerelease).
  *
  * @param {'main'|'dev'} channel
@@ -27,20 +29,23 @@ async function fetchRelease(channel) {
 	if (channel in _cache) return _cache[channel];
 
 	try {
-		// /releases/latest only returns stable releases; fetching the list
-		// lets us pick the newest pre-release for the dev channel.
-		const res = await fetch(`${API_BASE}/releases?per_page=10`);
+		// Stable releases can be buried beyond the dev list's first page.
+		// GitHub's latest endpoint selects stable independently of that page.
+		const endpoint = channel === 'dev' ? '/releases?per_page=10' : '/releases/latest';
+		const res = await fetch(`${API_BASE}${endpoint}`);
 		if (!res.ok) {
 			_cache[channel] = null;
 			return null;
 		}
-		/** @type {Array<{tag_name: string, prerelease: boolean, assets: Array<{name: string, browser_download_url: string}>}>} */
-		const releases = await res.json();
+		/** @type {GitHubRelease | GitHubRelease[]} */
+		const payload = await res.json();
 
 		const release =
-			channel === 'dev' ? releases.find((r) => r.prerelease) : releases.find((r) => !r.prerelease);
+			channel === 'dev'
+				? /** @type {GitHubRelease[]} */ (payload).find((r) => r.prerelease)
+				: /** @type {GitHubRelease} */ (payload);
 
-		if (!release) {
+		if (!release || (channel === 'main' && release.prerelease)) {
 			_cache[channel] = null;
 			return null;
 		}
