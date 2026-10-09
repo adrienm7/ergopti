@@ -17,6 +17,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const crypto = require('node:crypto');
 const { execFileSync } = require('node:child_process');
+const qualification = require('../ci/dev-release-qualification.cjs');
 const timerContract = require('../diagnostics/hs_delayed_timer_contract.json');
 const karabinerContract = require('../diagnostics/hs_karabiner_config_contract.json');
 
@@ -436,7 +437,17 @@ function readColdBootstrapEvidence(directory) {
 }
 
 /** Checks mandatory job results and the exact set of successful launch records. */
-function verify({ platform, needs, evidence, sha, scenarios, release, coldBootstrap }) {
+function verify({
+	platform,
+	needs,
+	evidence,
+	sha,
+	scenarios,
+	release,
+	coldBootstrap,
+	qualificationContext = null,
+	qualificationNow = new Date()
+}) {
 	assert.ok(['windows', 'macos'].includes(platform), 'Unknown desktop platform');
 	const jobs =
 		platform === 'windows'
@@ -477,6 +488,29 @@ function verify({ platform, needs, evidence, sha, scenarios, release, coldBootst
 			assert.equal(record.marker_seen, true, 'Bundle was not extracted');
 			assert.equal(record.crashed_early, false, 'Application exited early');
 			verifyWindowsStartup(record.native_startup, sha, record.package_sha256);
+		} else if (record.qualification) {
+			assert.ok(qualificationContext, 'Explicit launch qualification context required');
+			assert.equal(record.native_qualified, false, 'Deferred native proof cannot become qualified');
+			assert.ok(
+				qualification.validateLaunchQualificationReceipt(
+					record.qualification,
+					record.scenario,
+					record.runner,
+					sha,
+					qualificationContext,
+					qualificationNow
+				)
+			);
+			assert.equal(
+				record.native_delayed_timer,
+				undefined,
+				'Deferred record cannot publish native timer proof'
+			);
+			assert.equal(
+				record.native_karabiner_config,
+				undefined,
+				'Deferred record cannot publish native Karabiner proof'
+			);
 		} else if (record.scenario === 'clean') {
 			verifyNativeTimer(record.native_delayed_timer);
 		} else if (record.scenario === 'karabiner_config') {
@@ -528,12 +562,43 @@ function readEvidence(directory) {
 }
 
 /** Writes the macOS observation with its commit, runner and downloaded archive. */
-function recordMac(resultFile, archive, output) {
+function recordMac(
+	resultFile,
+	archive,
+	output,
+	{ qualificationContext = null, qualificationNow = new Date() } = {}
+) {
 	const result = JSON.parse(fs.readFileSync(resultFile, 'utf8'));
 	assert.deepEqual(result.failures, [], 'Launch reported failures');
 	assert.equal(typeof result.scenario, 'string', 'Missing scenario');
-	if (result.scenario === 'clean') verifyNativeTimer(result.native_delayed_timer);
-	if (result.scenario === 'karabiner_config') verifyNativeKarabiner(result.native_karabiner_config);
+	if (result.qualification) {
+		assert.ok(qualificationContext, 'Explicit launch qualification context required');
+		assert.equal(result.native_qualified, false, 'Deferred native proof cannot become qualified');
+		assert.ok(
+			qualification.validateLaunchQualificationReceipt(
+				result.qualification,
+				result.scenario,
+				process.env.MATRIX_RUNNER,
+				process.env.GITHUB_SHA,
+				qualificationContext,
+				qualificationNow
+			)
+		);
+		assert.equal(
+			result.native_delayed_timer,
+			undefined,
+			'Deferred result cannot publish native timer proof'
+		);
+		assert.equal(
+			result.native_karabiner_config,
+			undefined,
+			'Deferred result cannot publish native Karabiner proof'
+		);
+	} else {
+		if (result.scenario === 'clean') verifyNativeTimer(result.native_delayed_timer);
+		if (result.scenario === 'karabiner_config')
+			verifyNativeKarabiner(result.native_karabiner_config);
+	}
 	fs.writeFileSync(
 		output,
 		JSON.stringify({
@@ -544,8 +609,13 @@ function recordMac(resultFile, archive, output) {
 			scenario: result.scenario,
 			package_sha256: crypto.createHash('sha256').update(fs.readFileSync(archive)).digest('hex'),
 			failures: result.failures,
-			...(result.scenario === 'clean' ? { native_delayed_timer: result.native_delayed_timer } : {}),
-			...(result.scenario === 'karabiner_config'
+			...(result.qualification
+				? { qualification: result.qualification, native_qualified: false }
+				: {}),
+			...(!result.qualification && result.scenario === 'clean'
+				? { native_delayed_timer: result.native_delayed_timer }
+				: {}),
+			...(!result.qualification && result.scenario === 'karabiner_config'
 				? { native_karabiner_config: result.native_karabiner_config }
 				: {})
 		}) + '\n'
@@ -559,7 +629,9 @@ if (require.main === module) {
 		recordColdMac(...args);
 	} else if (command === 'record-macos' || command === 'record-windows') {
 		assert.equal(args.length, 3);
-		(command === 'record-macos' ? recordMac : recordWindows)(...args);
+		if (command === 'record-macos')
+			recordMac(...args, { qualificationContext: qualification.environmentContext() });
+		else recordWindows(...args);
 	} else {
 		assert.equal(command, 'verify');
 		const [platform, directory] = args;
@@ -589,9 +661,15 @@ if (require.main === module) {
 			coldBootstrap: platform === 'macos' ? readColdBootstrapEvidence(directory) : [],
 			sha: process.env.GITHUB_SHA,
 			scenarios,
-			release
+			release,
+			qualificationContext: qualification.environmentContext()
 		});
-		console.log(`${platform}: all mandatory jobs and packaged launch scenarios passed.`);
+		const deferred = readEvidence(directory).filter((record) => record.qualification).length;
+		console.log(
+			deferred
+				? `${platform}: all mandatory lifecycle checks completed; ${deferred} native/feature qualifications DEFERRED, qualified=false.`
+				: `${platform}: all mandatory jobs and packaged launch scenarios passed.`
+		);
 	}
 }
 

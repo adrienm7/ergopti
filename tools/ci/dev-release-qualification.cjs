@@ -11,7 +11,8 @@ const SCOPE_IDS = Object.freeze([
 	'windows-pac-full-url',
 	'linux-window-receipts',
 	'macos-brew-archive',
-	'macos-shortcuts-discovery'
+	'macos-shortcuts-discovery',
+	'macos-launch-appleevents'
 ]);
 const CONTEXT_KEYS = [
 	'github_actions',
@@ -101,7 +102,7 @@ function validatePolicy(value) {
 	)
 		refuse('Invalid qualification release boundary.');
 	keys(value.scopes, SCOPE_IDS);
-	const kinds = ['ahk_test', 'linux_fixture', 'swift_test_file', 'command'];
+	const kinds = ['ahk_test', 'linux_fixture', 'swift_test_file', 'command', 'macos_launch'];
 	const names = new Set();
 	for (let i = 0; i < SCOPE_IDS.length; i++) {
 		const row = value.scopes[SCOPE_IDS[i]];
@@ -110,8 +111,16 @@ function validatePolicy(value) {
 				? ['kind', 'name', 'reason']
 				: i === 2
 					? ['kind', 'path', 'name', 'reason']
-					: ['kind', 'path', 'args', 'reason'];
+					: i === 4
+						? ['kind', 'path', 'scenarios', 'runners', 'reason']
+						: ['kind', 'path', 'args', 'reason'];
 		keys(row, expected);
+		if (
+			i === 4 &&
+			(JSON.stringify(row.scenarios) !== '["clean","karabiner_config"]' ||
+				JSON.stringify(row.runners) !== '["macos-15","macos-15-intel"]')
+		)
+			refuse('Invalid closed Mac launch qualification matrix.');
 		if (
 			row.kind !== kinds[i] ||
 			typeof row.reason !== 'string' ||
@@ -209,6 +218,51 @@ function validateQualificationReceipt(receipt, scope, sha, context, now = new Da
 		refuse('Qualification receipt is not the exact closed source-bound record.');
 	return receipt;
 }
+/** Binds missing native proof to one retained lifecycle matrix row. */
+function launchQualificationReceipt(profile, scenario, runner, details) {
+	const scope = 'macos-launch-appleevents';
+	const row = POLICY.scopes[scope];
+	keys(details, ['source_sha']);
+	if (
+		typeof scenario !== 'string' ||
+		!scenario ||
+		/[\r\n]/.test(scenario) ||
+		!row.runners.includes(runner)
+	)
+		refuse('Invalid Mac launch qualification row.');
+	if (profile !== null) deferredScopes(profile);
+	if (profile && row.scenarios.includes(scenario))
+		return { ...qualificationReceipt(profile, scope, details), scenario, runner };
+	return {
+		schema: 1,
+		profile_id: null,
+		scope,
+		status: 'full',
+		qualified: false,
+		source_sha: sourceSha(details.source_sha),
+		scenario,
+		runner
+	};
+}
+/** Rechecks current policy, source and exact row before any omission or publication. */
+function validateLaunchQualificationReceipt(
+	receipt,
+	scenario,
+	runner,
+	sha,
+	context,
+	now = new Date()
+) {
+	const expected = launchQualificationReceipt(
+		resolveQualificationProfile(context, now),
+		scenario,
+		runner,
+		{ source_sha: sha }
+	);
+	if (JSON.stringify(receipt) !== JSON.stringify(expected))
+		refuse('Mac launch qualification is not the exact closed source-bound record.');
+	return receipt.status === 'deferred' ? receipt : null;
+}
 function environmentContext(env = process.env) {
 	return {
 		github_actions: env.GITHUB_ACTIONS || '',
@@ -286,9 +340,16 @@ function main(argv) {
 	const options = {};
 	for (let i = 0; i < argv.length; i += 2) {
 		if (
-			!['--scope', '--github-env', '--receipt', '--ahk-tap', '--execution-manifest'].includes(
-				argv[i]
-			) ||
+			![
+				'--scope',
+				'--github-env',
+				'--receipt',
+				'--ahk-tap',
+				'--execution-manifest',
+				'--scenario',
+				'--runner',
+				'--validate-launch-receipt'
+			].includes(argv[i]) ||
 			!argv[i + 1] ||
 			options[argv[i]]
 		)
@@ -299,6 +360,41 @@ function main(argv) {
 	if (!SCOPE_IDS.includes(scope)) refuse('Unknown qualification scope.');
 	const context = environmentContext(),
 		profile = resolveQualificationProfile(context);
+	if (scope === 'macos-launch-appleevents') {
+		const receipt = options['--validate-launch-receipt']
+			? parseClosedJson(fs.readFileSync(options['--validate-launch-receipt'], 'utf8'))
+			: launchQualificationReceipt(profile, options['--scenario'], options['--runner'], {
+					source_sha: process.env.GITHUB_SHA
+				});
+		const deferred = validateLaunchQualificationReceipt(
+			receipt,
+			options['--scenario'],
+			options['--runner'],
+			process.env.GITHUB_SHA,
+			context
+		);
+		if (options['--validate-launch-receipt']) {
+			console.log(JSON.stringify(deferred));
+			return;
+		}
+		if (!options['--receipt'] || options['--ahk-tap'] || options['--execution-manifest'])
+			refuse('Mac launch qualification needs its exact receipt destination.');
+		fs.writeFileSync(options['--receipt'], JSON.stringify(receipt, null, 2) + '\n');
+		console.log(
+			deferred
+				? '[DEFERRED] ' +
+						scope +
+						': ' +
+						receipt.scenario +
+						'/' +
+						receipt.runner +
+						' native/feature qualified=false.'
+				: 'Qualification profile inactive for this row; full execution is required.'
+		);
+		return;
+	}
+	if (options['--scenario'] || options['--runner'] || options['--validate-launch-receipt'])
+		refuse('Unexpected launch qualification arguments.');
 	if (options['--github-env'])
 		fs.appendFileSync(
 			options['--github-env'],
@@ -354,6 +450,8 @@ module.exports = {
 	deferredScopes,
 	qualificationReceipt,
 	validateQualificationReceipt,
+	launchQualificationReceipt,
+	validateLaunchQualificationReceipt,
 	environmentContext,
 	selectRegistry,
 	ahkQualificationManifest,
