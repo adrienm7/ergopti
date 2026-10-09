@@ -5781,6 +5781,14 @@ The complete macOS Layout presentation family now consumes 17 canonical shared s
       open. macOS system trust and explicit proxy relays are integrated, while
       opaque-client full-URL PAC/WPAD/fallback/redirect routing remains CODE.
 
+The Windows updater capture ledger's native implementation now lives in its
+native adapter, included through the original updater owner. The complete class
+bytes and all transaction/retirement policies are unchanged. This restores the
+shared module OS-call census from260 to250 under the unchanged252 baseline.
+Portable source, include-graph and encoding checks pass; genuine AHK parsing,
+E2E and package/install receiving remain required. This structural correction
+does not qualify the outstanding capture namespace or network failures.
+
 The early native updater sidecar now retains its exact closed stage,
 exception family and signed HRESULT before file-read admission; v1 remains
 exactly five fields and v2 requires all eight. No message, stack or destination
