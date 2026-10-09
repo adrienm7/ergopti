@@ -1259,16 +1259,17 @@ SaveFullConfig(WriterFn := 0, TimerFn := 0, RegisterRequest := true,
 		; so the write looks perfectly safe while the payload is already wrong.
 		; Returns false — not a bare return — so a caller (and the regression test)
 		; can tell "refused" from "deferred until ready" and from a completed save.
-		if !ConfigFullStateCanPersist() {
-			return CONFIG_SAVE_FAILED
-		}
 		RequestedGeneration := 0
 		if RegisterRequest {
-			RequestedGeneration := _ConfigFullSaveRequest(true, ConfigurationFile)
+			RequestedGeneration := _ConfigFullSaveRequest(true)
 			if !RequestedGeneration {
 				try LoggerError("ConfigIO", "Refusing a new full save after terminal or disk-reload authority was sealed.")
 				return CONFIG_SAVE_FAILED
 			}
+		}
+		; Accepted explicit intent survives refusal; it grants no serializer authority.
+		if !ConfigFullStateCanPersist() {
+			return CONFIG_SAVE_FAILED
 		}
 		if !_ConfigFullSaveHasPending()
 			return CONFIG_SAVE_OK

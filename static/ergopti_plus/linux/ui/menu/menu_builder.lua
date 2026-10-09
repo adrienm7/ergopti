@@ -986,9 +986,11 @@ local function _manifest_hotstring_rows(ctx, config)
 			end
 		end
 		if added == 0 then
-			items[#items + 1] = {
-				label = i18n_safe("menu.hotstrings.no_group_loaded"), disabled = true,
-			}
+			if type(ManifestMenu.status_rows) ~= "function" then return end
+			local status = ManifestMenu.status_rows("hotstrings_menu", "hotstring_categories_standard", "no_groups")
+			for _, row in ipairs(type(status) == "table" and status or {}) do
+				items[#items + 1] = row
+			end
 		end
 	end
 
@@ -3599,6 +3601,10 @@ local function _build_shortcuts(ctx)
 			end,
 			action_label = function(action, gestures) return gestures.get_action_label(action) end,
 			open_picker = open_action_picker, error = show_error,
+			prompt_delay = function(current, declared)
+				return TextPrompt.ask(i18n_safe("menu.tapholds.simultaneous_dialog_title"),
+					zenity_plain(string.format(i18n_safe("menu.tapholds.simultaneous_dialog_prompt"), declared)), tostring(current))
+			end,
 			prompt_hold = function(label, current, choices)
 				return TextPrompt.ask(label, zenity_plain(string.format(i18n_safe("menu.shortcuts.key_combinations_hold_hold"), current)), current, false, choices)
 			end,

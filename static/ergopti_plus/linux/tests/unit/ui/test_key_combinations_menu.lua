@@ -12,6 +12,7 @@ local HoldOptions = require("tap_hold.hold_options")
 local function with_menu(body)
 	local saved = {}; for name,value in pairs(package.loaded) do saved[name]=value end
 	local ok,err=pcall(function()
+		require("tests.support.key_combination_declaration_fixture").install_unavailable()
 		local Paths=require("infra.paths")
 		local file=assert(io.open(Paths.shared("tap_hold/defaults.toml"),"rb"));local defaults=assert(Codec.decode(file:read("*a")));assert(file:close())
 		file=assert(io.open(Paths.shared("data/locales/en.json"),"rb"));local locale=require("json").decode(file:read("*a"));assert(file:close())

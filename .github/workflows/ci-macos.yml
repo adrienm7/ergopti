@@ -142,6 +142,26 @@ jobs:
           set -e
           node tools/diagnostics/item36_xctest_evidence.cjs judge "$transcript" "${item36_statuses[0]}" "${item36_statuses[1]}" "$GITHUB_SHA" "$source_receipt" "$evidence/item36-verdict.json"
         timeout-minutes: 20
+      - name: Observe the actual no-prompt SDK permission API independently
+        if: ${{ !inputs.fast_prerelease && (!cancelled()) }}
+        shell: bash
+        env:
+          SWIFT_BACKTRACE: enable=yes
+        run: |
+          set -euo pipefail
+          node tools/test/test-macos-swift-launcher-ci.cjs
+          evidence="$RUNNER_TEMP/swift-launcher-evidence"
+          transcript="$evidence/sdk-permission-xctest.log"
+          source_receipt="$evidence/sdk-permission-source.json"
+          node tools/diagnostics/sdk_permission_xctest_evidence.cjs begin "$GITHUB_SHA" "$source_receipt"
+          set +e
+          script -q /dev/null swift test --package-path static/ergopti_plus/macos/launcher \
+            --scratch-path "$RUNNER_TEMP/swift-launcher-ci" \
+            --filter 'OwnedAutomationQueryWorkerTests.testActualNoPromptPermissionAPIOnlyPublishesRetiredMetadata' 2>&1 | tee "$transcript"
+          sdk_statuses=("${PIPESTATUS[@]}")
+          set -e
+          node tools/diagnostics/sdk_permission_xctest_evidence.cjs judge "$transcript" "${sdk_statuses[0]}" "${sdk_statuses[1]}" "$GITHUB_SHA" "$source_receipt" "$evidence/sdk-permission-verdict.json"
+        timeout-minutes: 3
       - name: Retain scoped item 36 native diagnostics
         if: always()
         uses: actions/upload-artifact@v4
@@ -152,6 +172,8 @@ jobs:
           path: |
             ${{ runner.temp }}/swift-launcher-evidence/item36-*.json
             ${{ runner.temp }}/swift-launcher-evidence/item36-xctest.log
+            ${{ runner.temp }}/swift-launcher-evidence/sdk-permission-*.json
+            ${{ runner.temp }}/swift-launcher-evidence/sdk-permission-xctest.log
             ${{ runner.temp }}/swift-launcher-evidence/archive-session.*/*/*.json
             ${{ runner.temp }}/swift-launcher-evidence/archive-session.*/*/helper/*.json
 

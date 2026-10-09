@@ -4,21 +4,25 @@
 --- tap-hold engine retains modifier reference counts and live layer ownership.
 local Policy = require("tap_hold.key_combinations")
 local Engine = require("platform.remap.tap_hold_engine")
+local ConfigOwner = require("modules.shortcuts.key_combinations")
+local settings_current = ConfigOwner.buffered_settings_current
 local M = {}
 local input_issuers = setmetatable({}, { __mode = "k" })
 local input_receipts = setmetatable({}, { __mode = "k" })
 local engine_input_ports = { arm = Engine.arm_one_shot, state = Engine.input_arm_state, clear = Engine.clear_input_arm, caps = Engine.arm_caps_word, caps_ack = Engine.ack_caps_word }
 local BASE_INPUT_PORT_NAMES = { "process", "tick", "activity", "handles", "release_all", "take_custody", "output_holder",
-	"combination_hold", "combination_release", "combination_lift", "combination_restore", "arm_one_shot", "input_arm_state", "clear_input_arm", "arm_caps_word", "ack_caps_word" }
+	"combination_hold", "combination_release", "combination_first_available", "combination_lift", "combination_restore", "arm_one_shot", "input_arm_state", "clear_input_arm", "arm_caps_word", "ack_caps_word" }
 local OWNER_INPUT_PORT_NAMES = { "process", "tick", "activity", "activate", "configure", "set_tap_holds_enabled",
 	"begin_delivery", "end_delivery", "release_all", "ack_retirement", "take_custody", "output_holder" }
 local original_engine_ports = {}
 for _, name in ipairs(BASE_INPUT_PORT_NAMES) do original_engine_ports[name] = rawget(Engine, name) end
 local function append(out, rows) for _, row in ipairs(rows) do out[#out + 1] = row end end
-function M.new(base, options)
+function M.new(base, options, buffered_ports)
 	assert(type(base) == "table" and type(options.capture) == "function" and type(options.capture_action) == "function")
 	local owner, policy, generation, pending, retirement, acting = {}, nil, nil, nil, nil, false
 	local presses, blocked, holds, serial = {}, {}, {}, 0
+	local waiting, chords, chord_policy = nil, {}, nil
+	local processing, buffer_request = nil, nil
 	local original_by_code, acknowledged, runtime_guard = base.by_code, false, nil
 	-- Retain this producer's dispatch and inverse functions before any callback.
 	-- An input lease observes export changes; cleanup still uses its original issuer.
@@ -54,6 +58,10 @@ function M.new(base, options)
 		local exact = { rows = rows, serial = serial, action = action, lifted = lifted, epoch = epoch }
 		pending = exact
 		local result = { owned = true }
+		function result.delivery_current()
+			if not guard or guard() ~= true then return false end
+			return pending == exact and not retirement and not disabled and not acting and epoch == exact.epoch and serial == exact.serial
+		end
 		function result.ack(accepted)
 			if pending ~= exact or accepted ~= true or retirement or delivery then return false end
 			pending = nil; return true
@@ -85,7 +93,7 @@ function M.new(base, options)
 	end
 	local function retired_frame(replay)
 		local exact = retirement
-		return { owned = true, replay = replay == true, ack = function(accepted) return owner:ack_retirement(accepted, exact.rows) end,
+		return { owned = true, orphans = exact.orphans, replay = replay == true, ack = function(accepted) return owner:ack_retirement(accepted, exact.rows) end,
 			restore = function() return {}, nil end }
 	end
 local function revoke_event(code, source)
@@ -98,21 +106,22 @@ local function revoke_event(code, source)
 	function owner.take_custody() return base_ports.take_custody(base) end
 	function owner.output_holder(_, row) return base_ports.output_holder(base, row) end
 	function owner.activate()
-		if retirement or acting or pending or delivery or next(base.key_refs) or next(base.held) then return false end
+		if retirement or acting or pending or delivery or processing or next(base.key_refs) or next(base.held) then return false end
 		policy, generation, retirement, acknowledged, runtime_guard, disabled, epoch = nil, nil, nil, false, nil, false, epoch + 1
+		waiting, chords, chord_policy = nil, {}, nil
 		return true
 	end
-	function owner.configure(_, selected)
-		if retirement or acting or pending or delivery or next(base.key_refs) or next(base.held) then return false end
+	function owner.configure(_, selected, receivers)
+		if retirement or acting or pending or delivery or processing or next(base.key_refs) or next(base.held) then return false end
 		if type(selected) ~= "table" or type(selected.capture) ~= "function" or type(selected.capture_action) ~= "function" then return false end
-		options = selected; epoch = epoch + 1; return true
+		options, buffered_ports, chord_policy = selected, receivers, nil; epoch = epoch + 1; return true
 	end
 	function owner.set_tap_holds_enabled(_, enabled)
 		if next(base.held) or next(base.key_refs) or acting or pending then return false end
 		base.by_code = enabled and original_by_code or {}; input_revision = input_revision + 1; return true
 	end
 	function owner.begin_delivery(_, rows)
-		if delivery or acting or retirement and retirement.rows ~= rows then return nil end
+		if delivery or acting or processing or retirement and retirement.rows ~= rows then return nil end
 		local token = {}; delivery = { token = token, retirement = retirement, epoch = epoch }; return token
 	end
 	function owner.end_delivery(_, token)
@@ -121,7 +130,7 @@ local function revoke_event(code, source)
 		return retirement == previous.retirement and epoch == previous.epoch
 	end
 	function owner.handles(_, code) return base:handles(code) or ids[code] ~= nil end
-	function owner.process(_, code, value, at_ms, receipt)
+	local function process_ordered(code, value, at_ms, receipt)
 		if acting or delivery or pending then return owner:release_all(), nil, nil, retired_frame() end
 		if retirement then return {} end
 		if disabled then return base_ports.process(base, code, value, at_ms, receipt) end
@@ -183,18 +192,157 @@ local function revoke_event(code, source)
 		end
 		return rows, action, binding, frame(rows, action, binding, lifted, action_guard, receipt)
 	end
+
+	local function receiver_current(token, held)
+		if type(buffered_ports) ~= "table" or type(buffered_ports.buffered_input_current) ~= "function" then return false end
+		local called, current = pcall(buffered_ports.buffered_input_current,token,held)
+		return called and current == true
+	end
+	local function source_settings_current()
+		return package.loaded["modules.shortcuts.key_combinations"]==ConfigOwner
+			and rawget(ConfigOwner,"buffered_settings_current")==settings_current
+			and type(settings_current)=="function" and settings_current(options)==true
+	end
+	local function capture_original(code, at_ms)
+		if type(buffered_ports) ~= "table" or type(buffered_ports.capture_buffered_input) ~= "function" then return nil end
+		local request={code=code,at_ms=at_ms,processing=processing}
+		buffer_request=request
+		local called, token = pcall(buffered_ports.capture_buffered_input,owner,code,at_ms)
+		buffer_request=nil
+		if request.processing ~= processing then return nil end
+		return called and type(token)=="table" and receiver_current(token,true) and token or nil
+	end
+	local function choose(first, second, elapsed)
+		if not chord_policy and options.chords and options.chord_settings then
+			local pairs = {}
+			for _,a in ipairs(options.keys) do for _,b in ipairs(options.keys) do
+				if a~=b then pairs[#pairs+1]={id=Policy.pair(a,b),first=a,second=b} end
+			end end
+			chord_policy = Policy.chord_policy({pairs=pairs,chords=options.chords,settings=options.chord_settings})
+		end
+		return chord_policy and chord_policy.choose(first,second,elapsed) or nil
+	end
+	local function candidate(code)
+		if not ids[code] or not options.chords or not options.chord_settings or next(presses) or next(chords)
+			or not source_settings_current()
+			or base_ports.combination_first_available(base,code) ~= true then return false end
+		for _, second in ipairs(options.keys) do if choose(ids[code],second,0) then return true end end
+		return false
+	end
+	local function pending_current(first, held)
+		return receiver_current(first.token,held) and first.guard() == true and source_settings_current()
+			and receiver_current(first.token,held) and not retirement and not disabled and epoch==first.epoch
+	end
+	local function withdraw(code, source)
+		local consumed = waiting and waiting.code == code and waiting.receipt.source == source or chords[source.."\0"..code] ~= nil
+		local rows = owner:release_all()
+		return rows,nil,nil,retired_frame(not consumed)
+	end
+	local function fallback(first, now_ms)
+		waiting = nil
+		local rows,action,binding = process_ordered(first.code,1,first.at_ms,first.receipt)
+		rows = rows or {{code=first.code,value=1,physical=true}}
+		if first.cancelled and base.held[first.code] then base.held[first.code].cancelled=true end
+		local due = base_ports.tick(base,now_ms)
+		for _, row in ipairs(due) do
+			if row.tap ~= nil then action,binding=row.tap,row.binding else rows[#rows+1]=row end
+		end
+		if not pending_current(first,false) then return owner:release_all(),nil,nil,retired_frame() end
+		local guard=function() return pending_current(first,false) end
+		local owned=frame(rows or {},action,binding,nil,guard,first.receipt)
+		owned.buffered=first.token
+		return rows or {},action,binding,owned
+	end
+	local function process_buffered(code,value,at_ms,receipt)
+		if retirement or disabled or acting or delivery or pending then return process_ordered(code,value,at_ms,receipt) end
+		local taken = physical(receipt) and chords[receipt.source.."\0"..code]
+		if taken then
+			if not receiver_current(taken.first.token,false) or taken.first.guard()~=true then return withdraw(code,receipt.source) end
+			if value==0 then
+				chords[receipt.source.."\0"..code]=nil
+				taken.down[code]=nil
+			end
+			return {}
+		end
+		if waiting then
+			local first=waiting
+			if not physical(receipt) or receipt.generation~=first.receipt.generation or not pending_current(first,false) then
+				return withdraw(code,type(receipt)=="table" and receipt.source or "")
+			end
+			local selection = value==1 and receipt.source==first.receipt.source and receiver_current(first.token,true)
+				and choose(ids[first.code],ids[code],at_ms-first.at_ms) or nil
+			if selection then
+				local second=capture_original(code,at_ms)
+				local guard=capture(options.capture_chord,selection.binding,selection.action)
+				if second and guard and guard()==true and pending_current(first,true) and receiver_current(second,true) then
+					waiting=nil
+					local state={first=first,second=second,down={[first.code]=true,[code]=true}}
+					chords[receipt.source.."\0"..first.code],chords[receipt.source.."\0"..code]=state,state
+					local owned_guard=function()
+						return guard()==true and pending_current(first,false) and receiver_current(second,false)
+					end
+					local owned=frame({},selection.action,selection.binding,nil,owned_guard,first.receipt)
+					owned.buffered=first.token
+					return {},selection.action,selection.binding,owned
+				end
+			end
+			local rows,action,binding,owned=fallback(first,at_ms)
+			if owned and owned.buffered then owned.replay=true end
+			return rows,action,binding,owned
+		end
+		if physical(receipt) and value==1 and candidate(code) then
+			local guard=capture(options.capture)
+			local token=capture_original(code,at_ms)
+			if token and guard and guard()==true and source_settings_current() and receiver_current(token,true) and not retirement and not disabled then
+				generation, runtime_guard = receipt.generation, guard
+				waiting={code=code,at_ms=at_ms,receipt=receipt,token=token,guard=guard,epoch=epoch,
+					deadline=at_ms+options.chord_settings.simultaneous_threshold_ms}
+				return {}
+			end
+		end
+		return process_ordered(code,value,at_ms,receipt)
+	end
+	function owner.process(_,code,value,at_ms,receipt)
+		if processing then return owner:release_all(),nil,nil,retired_frame() end
+		local exact={}; processing=exact
+		local called,rows,action,binding,owned=pcall(process_buffered,code,value,at_ms,receipt)
+		processing,buffer_request=nil,nil
+		if not called then error(rows,0) end
+		if retirement and not owned then return retirement.rows,nil,nil,retired_frame() end
+		return rows,action,binding,owned
+	end
 	function owner.tick(_, at_ms)
-		if retirement or pending or acting or delivery then return {} end
+		if retirement or pending or acting or delivery or processing then return {} end
 		if disabled then return base_ports.tick(base, at_ms) end
+		if waiting then
+			local first=waiting
+			if not pending_current(first,false) then return {{owned_rows=owner:release_all(),frame=retired_frame()}} end
+			if at_ms>first.deadline then
+				local rows,action,binding,owned=fallback(first,at_ms)
+				return {{owned_rows=rows,tap=action,binding=binding,frame=owned}}
+			end
+			return {}
+		end
 		if policy then
 			local guard = runtime_guard
 			if not guard or guard() ~= true then return { { owned_rows = owner:release_all(), frame = retired_frame() } } end
 		end
 		return base_ports.tick(base, at_ms)
 	end
-	function owner.activity() if policy then policy.activity() end; base_ports.activity(base) end
+	function owner.activity()
+		-- Pointer activity cannot positively match a pending keyboard chord.
+		if waiting then waiting.cancelled=true; waiting.deadline=waiting.at_ms-1 end
+		if policy then policy.activity() end; base_ports.activity(base)
+	end
 	function owner.release_all()
 		if retirement then return retirement.rows end
+		local orphaned, unique = {}, {}
+		if waiting then orphaned[#orphaned+1]=waiting.token; unique[waiting.token]=true end
+		for _,state in pairs(chords) do
+			for _,token in ipairs({state.first.token,state.second}) do
+				if not unique[token] then unique[token]=true; orphaned[#orphaned+1]=token end
+			end
+		end
 		local seen, rows = {}, base_ports.release_all(base)
 		for _, row in ipairs(rows) do seen[row.code] = true end
 		-- A failed lift/release still owns its physical UP obligation even after
@@ -204,13 +352,14 @@ local function revoke_event(code, source)
 		end end
 		local policy_token
 		if policy then local ignored; ignored, policy_token = policy.retire() end
-		retirement = { rows = rows, token = {}, policy_token = policy_token }
+		retirement = { rows = rows, token = {}, policy_token = policy_token, orphans=orphaned }
 		return rows
 	end
 	function owner.ack_retirement(_, accepted, exact_rows)
-		if not retirement or accepted ~= true or acting or delivery or exact_rows and exact_rows ~= retirement.rows then return false end
+		if not retirement or accepted ~= true or acting or delivery or processing or exact_rows and exact_rows ~= retirement.rows then return false end
 		if policy and not policy.ack_retirement(retirement.policy_token, true) then return false end
 		pending, holds, presses, blocked, acknowledged = nil, {}, {}, {}, true
+		waiting, chords, chord_policy = nil, {}, nil
 		policy, generation, runtime_guard, retirement, disabled, epoch = nil, nil, nil, nil, true, epoch + 1
 		return true
 	end
@@ -223,6 +372,10 @@ local function revoke_event(code, source)
 		base_ports = base_ports, base_raw_ports = base_raw_ports, owner_ports = original_owner_ports,
 		epoch = function() return epoch end, input_revision = function() return input_revision end,
 		available = function() return not retirement and not disabled end,
+		buffer_request = function(code,at_ms)
+			return processing~=nil and buffer_request~=nil and buffer_request.processing==processing
+				and buffer_request.code==code and buffer_request.at_ms==at_ms and not retirement and not disabled
+		end,
 		guard = function(selected, action)
 			local exact = input_frames[selected]
 			if not exact or exact.action ~= action or (action ~= "one_shot_shift" and action ~= "caps_word") or not acting
@@ -358,5 +511,14 @@ function M.clear_input_arm(receipt)
 	local owned = input_receipts[receipt]
 	if not owned or owned.epoch ~= owned.issuer.epoch() then return false end
 	return engine_input_ports.clear(owned.issuer.base)
+end
+--- Observes only the original owner's live first-press acquisition role.
+--- @param owner table Original installed producer.
+--- @param code number Original event code.
+--- @param at_ms number Original event clock.
+--- @return boolean current
+function M.buffered_request_current(owner,code,at_ms)
+	local record=input_issuers[owner]
+	return input_issuer_current(record) and record.buffer_request(code,at_ms)==true or false
 end
 return M
