@@ -2,6 +2,10 @@
 
 # Group 3 partial stable-release delivery
 
+The [latest integrated tranche and qualification](latest-delivery.md) extends
+this historical delivery; its exact-source evidence and inactive preparations
+are recorded separately.
+
 The maintainer requested immediate partial integration before the first stable
 release. The reviewed action and input commits are integrated without squash
 in `dev` at `a5f6300d872a9741bbd566492185727a738b2a79` (merge parents
