@@ -25,6 +25,7 @@ private final class AutomationQueryErrors: NSObject, SBApplicationDelegate {
 
 /// Static roles run only from the shipped signed launcher, never a user script.
 enum OwnedAutomationQueryWorker {
+	static let permissionObservationOperation = "permission-observation"
 	static func handles(arguments: [String]) -> Bool {
 		return arguments.count > 1 && [automationQueryFlag, automationRoleFlag, automationGuardianFlag].contains(arguments[1])
 	}
@@ -41,6 +42,7 @@ enum OwnedAutomationQueryWorker {
 			return arguments.count == 4
 		}
 		#endif
+		if arguments[2] == permissionObservationOperation { return arguments.count == 4 }
 		return arguments[2] == "discover" && arguments.count == 4
 			|| arguments[2] == "revalidate" && arguments.count == 5 && validIdentifier(arguments[4])
 	}
@@ -429,6 +431,9 @@ enum OwnedAutomationQueryWorker {
 		#if ERGOPTI_GUARDIAN_TEST_SUPPORT
 		if arguments[2] == "fixture" { return operation == "discover" }
 		#endif
+		if arguments[2] == permissionObservationOperation {
+			return operation == permissionObservationOperation && permissionObservationMatches(packet)
+		}
 		return ["discover", "revalidate"].contains(arguments[2]) && operation == arguments[2]
 	}
 
@@ -609,6 +614,7 @@ enum OwnedAutomationQueryWorker {
 	/// Read-only AppleEvents stay isolated from the interactive Hammerspoon runloop.
 	private static func queryRole(arguments: [String]) -> Int32 {
 		let operation = arguments[2], nonce = Int64(arguments[3])!
+		if operation == permissionObservationOperation { return permissionObservationRole(nonce: nonce) }
 		#if ERGOPTI_GUARDIAN_TEST_SUPPORT
 		// Fixed owned native fixtures never issue AppleEvents or run user input.
 		if operation == "fixture-overflow" { return write(Data(repeating: 65, count: 65537)) ? 0 : 74 }
@@ -691,5 +697,50 @@ enum OwnedAutomationQueryWorker {
 		}
 		return publish(["version": 1, "operation": operation, "nonce": nonce,
 			"status": "observed", "rows": rows, "truncated": truncated])
+	}
+
+	/// A permission observation is metadata, never catalogue or invocation admission.
+	static func permissionObservationPacket(nonce: Int64, addressStatus: OSStatus, permissionStatus: OSStatus?) -> [String: Any]? {
+		guard nonce > 0, nonce <= 9007199254740991 else { return nil }
+		let observation: String, status: OSStatus
+		if addressStatus != noErr && permissionStatus == nil {
+			observation = "address-refused"; status = addressStatus
+		} else if addressStatus == noErr, let permissionStatus = permissionStatus {
+			observation = "native-returned"; status = permissionStatus
+		} else { return nil }
+		return ["version": 1, "nonce": nonce, "operation": permissionObservationOperation,
+			"observation": observation, "target": "shortcuts-events", "event_class": "core",
+			"event_id": "getd", "ask_user": false, "osstatus": status]
+	}
+
+	/// Refuse business envelopes and all values outside the fixed diagnostic grammar.
+	private static func permissionObservationMatches(_ packet: [String: Any]) -> Bool {
+		guard Set(packet.keys) == Set(["version", "nonce", "operation", "observation", "target",
+			"event_class", "event_id", "ask_user", "osstatus"]),
+			packet["target"] as? String == "shortcuts-events", packet["event_class"] as? String == "core",
+			packet["event_id"] as? String == "getd",
+			let askUser = packet["ask_user"] as? NSNumber, CFGetTypeID(askUser) == CFBooleanGetTypeID(), !askUser.boolValue,
+			let status = packet["osstatus"] as? NSNumber, CFGetTypeID(status) != CFBooleanGetTypeID(),
+			let code = Int32(status.stringValue), String(code) == status.stringValue,
+			let observation = packet["observation"] as? String else { return false }
+		return observation == "native-returned" || observation == "address-refused" && code != 0
+	}
+
+	/// The SDK call belongs to this signed worker; it says nothing about osascript's principal.
+	private static func permissionObservationRole(nonce: Int64) -> Int32 {
+		func publish(addressStatus: OSStatus, permissionStatus: OSStatus?) -> Int32 {
+			guard let packet = permissionObservationPacket(nonce: nonce, addressStatus: addressStatus, permissionStatus: permissionStatus),
+				let bytes = try? JSONSerialization.data(withJSONObject: packet), bytes.count <= automationMaximumBytes else { return 74 }
+			return write(bytes) ? 0 : 74
+		}
+		var target = AEAddressDesc()
+		let address = Array("com.apple.shortcuts.events".utf8)
+		let addressStatus = address.withUnsafeBytes { bytes in
+			AECreateDesc(typeApplicationBundleID, bytes.baseAddress, address.count, &target)
+		}
+		guard addressStatus == noErr else { return publish(addressStatus: OSStatus(addressStatus), permissionStatus: nil) }
+		defer { AEDisposeDesc(&target) }
+		let permissionStatus = AEDeterminePermissionToAutomateTarget(&target, kAECoreSuite, kAEGetData, false)
+		return publish(addressStatus: OSStatus(addressStatus), permissionStatus: permissionStatus)
 	}
 }

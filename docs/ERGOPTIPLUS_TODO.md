@@ -7666,6 +7666,16 @@ and installation qualification are still required.
   establish the historical catalogue-stall cause, a consent grant or
   catalogue/invocation success.
 
+  The signed Swift worker additionally exposes a fixed SDK permission
+  observation for the Shortcuts read event with prompting disabled. Its
+  OSStatus is diagnostic metadata, separate from catalogue and invocation
+  envelopes; it cannot establish osascript's principal or the stall's cause.
+  Probe admission authenticates the exact tracked observer bytes before
+  loading them and restores the previous module binding after refusal or
+  success. Independent source review and portable observer/publisher controls
+  pass. Native SDK compilation, signed-helper execution, Darwin retirement
+  and final CI provenance remain UNRUN on this composed source.
+
   Remaining software: inventory supported automation/application providers and
   implement their real availability/invocation contracts. Add bounded Apple
   Shortcuts catalogue ownership, chosen-ID revalidation, safe native invocation,

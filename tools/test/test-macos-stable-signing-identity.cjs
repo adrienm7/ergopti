@@ -668,6 +668,37 @@ try {
 	fs.rmSync(createTmp, { recursive: true, force: true });
 }
 
+// The SDK diagnostic must enter only after the existing helper signature and
+// signed build receipt admission; its metadata never admits business success.
+const queryObserver = fs.readFileSync(
+	path.join(ROOT, 'tools/diagnostics/program_actions/run_signed_query_probe.py'),
+	'utf8'
+);
+const diagnosticLoad = queryObserver.indexOf(
+	'permission_query = load_permission_query(root, args.source_sha, hashes)'
+);
+check(
+	diagnosticLoad > queryObserver.indexOf('result["app_signature_verified"] = True'),
+	'SDK decoder loads only after real app signature and sealed provenance admission'
+);
+check(
+	queryObserver
+		.slice(queryObserver.indexOf('if not args.cancel_held:'), diagnosticLoad)
+		.includes('if not args.cancel_held:'),
+	'original cancel-held path does not run extra native diagnostic'
+);
+check(
+	queryObserver.includes('identity(helper) == captured and backend.group is None'),
+	'SDK metadata requires original helper identity and exact native retirement'
+);
+check(
+	queryObserver.indexOf(
+		'backend = SignedQuery(helper, ownership, ownership.NativeProcessGroups())',
+		diagnosticLoad
+	) > diagnosticLoad,
+	'original business query follows the metadata-only role'
+);
+
 if (errors.length > 0) {
 	console.error('[FAIL] macOS stable signing identity:');
 	for (const error of errors) console.error(`  - ${error}`);
