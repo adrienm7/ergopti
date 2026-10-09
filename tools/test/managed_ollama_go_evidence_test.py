@@ -1,6 +1,7 @@
 # tools/test/managed_ollama_go_evidence_test.py
 """Receive frozen genuine Go output; no macOS SDK or Darwin execution credit."""
 
+import ast
 import importlib.util
 import json
 import os
@@ -11,6 +12,7 @@ import time
 from pathlib import Path
 import tempfile
 import unittest
+from types import SimpleNamespace
 
 ROOT = Path(__file__).resolve().parents[2]
 SPEC = importlib.util.spec_from_file_location(
@@ -143,6 +145,54 @@ class NativeGoEvidenceTests(unittest.TestCase):
                 (owned / "source").write_text("retained\n", encoding="utf-8")
                 raise PRODUCER.NativeGoRetirementDebt("independent closure refusal")
         self.assertEqual((owned / "source").read_text(encoding="utf-8"), "retained\n")
+
+    def native_go_argv(self, operation):
+        tree = ast.parse(Path(PRODUCER.__file__).read_text(encoding="utf-8"))
+        function = next(
+            node
+            for node in tree.body
+            if isinstance(node, ast.FunctionDef)
+            and node.name == ("build" if operation == "build" else "_run_native_go_tests")
+        )
+        commands = [
+            node
+            for node in ast.walk(function)
+            if isinstance(node, ast.List)
+            and len(node.elts) >= 2
+            and isinstance(node.elts[1], ast.Constant)
+            and node.elts[1].value == operation
+        ]
+        self.assertEqual(len(commands), 1, "the actual native command must be unique")
+        expression = ast.Expression(body=commands[0])
+        return eval(
+            compile(expression, "actual-native-go-argv", "eval"),
+            {
+                "options": SimpleNamespace(go="owned-go"),
+                "contract": CONTRACT,
+                "timeout": POLICY["timeout_seconds"],
+                "cli": self.root / "owned-ollama",
+            },
+        )
+
+    def testActualGoTestCreatesWritableOwnedModuleCache(self):
+        argv = self.native_go_argv("test")
+        self.assertEqual(argv.count("-modcacherw"), 1)
+        self.assertEqual(argv.count("-mod=readonly"), 1)
+        self.assertEqual(argv[0:2], ["owned-go", "test"])
+        self.assertIn("-json", argv)
+        self.assertIn("-count=1", argv)
+        self.assertIn("-timeout=" + str(POLICY["timeout_seconds"]) + "s", argv)
+        self.assertEqual(argv[-1], "./internal/ergoptinativehttp")
+
+    def testActualGoBuildCreatesWritableOwnedModuleCache(self):
+        argv = self.native_go_argv("build")
+        self.assertEqual(argv.count("-modcacherw"), 1)
+        self.assertEqual(argv.count("-mod=readonly"), 1)
+        self.assertEqual(argv[0:2], ["owned-go", "build"])
+        self.assertIn("-trimpath", argv)
+        self.assertIn("-buildvcs=false", argv)
+        self.assertEqual(argv[-1], ".")
+        self.assertEqual(argv[argv.index("-o") + 1], str(self.root / "owned-ollama"))
 
     def testNormalBuildDirectoryIsRetired(self):
         with PRODUCER.native_build_directory(self.root) as owned:

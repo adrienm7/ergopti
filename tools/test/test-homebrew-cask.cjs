@@ -278,7 +278,7 @@ check('portable Brew ownership controls remain registered and mandatory', () => 
 	assert.ifError(result.error);
 	assert.strictEqual(result.signal, null, result.stderr);
 	assert.strictEqual(result.status, 0, result.stderr);
-	assert.match(result.stderr, /Ran 144 tests in /);
+	assert.match(result.stderr, /Ran 146 tests in /);
 	assert.match(result.stderr, /\nOK\s*$/);
 	assert.doesNotMatch(result.stderr, /skipped=/);
 });
@@ -723,7 +723,7 @@ check('native XCTest invokes actual Brew acceptance and requires its complete re
 });
 
 check('native macOS CI admits the pinned Python nonreaping prerequisites', () => {
-	const pipeline = require('./ci-pipeline.cjs');
+	const pipeline = require('./ci-full-default.cjs');
 	const job = pipeline.job('package-macos');
 	const setupName = 'Prepare Python for native nonreaping waits';
 	const admissionName = 'Admit native nonreaping Python prerequisites';
@@ -774,7 +774,7 @@ check('native macOS CI admits the pinned Python nonreaping prerequisites', () =>
 });
 
 check('archive artifacts bind only this step session independently of TIS', () => {
-	const pipeline = require('./ci-pipeline.cjs');
+	const pipeline = require('./ci-full-default.cjs');
 	const job = pipeline.job('package-macos');
 	const step = pipeline.step(job, 'Run Swift launcher tests');
 	const lines = pipeline.runOf(step).join('\n');
