@@ -1,0 +1,18 @@
+{
+	"schema": 1,
+	"id": "stable-v1-20261009-windows-unsigned",
+	"authorized": true,
+	"authorization_date": "2026-10-09",
+	"authorization_quote": "ok pour release pour le moment pas de signature. et mets en todo de faire avec signpath foundation",
+	"expires_at": "2026-10-09T22:00:00Z",
+	"repository": "adrienm7/ergopti",
+	"event_name": "push",
+	"ref": "refs/heads/main",
+	"release": true,
+	"prerelease": "false",
+	"channel": "main",
+	"tag": "v1.0.0",
+	"version": "1.0.0",
+	"purpose": "windows-authenticode-only",
+	"qualified": false
+}

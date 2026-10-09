@@ -1,0 +1,35 @@
+{
+	"schema": 1,
+	"id": "stable-v1-20261009-macos-native-deferred",
+	"expires_at": "2026-10-09T22:00:00Z",
+	"repository": "adrienm7/ergopti",
+	"event_name": "push",
+	"ref": "refs/heads/main",
+	"release": true,
+	"prerelease": "false",
+	"channel": "main",
+	"tag": "v1.0.0",
+	"version": "1.0.0",
+	"authorization_note": "Explicit human approval received on 2026-10-09: \"Oui, publier avec ces trois limites explicites\". Only stable v1.0.0 before 2026-10-09T22:00:00Z is admitted. Native macOS Brew archive, Shortcuts discovery and external AppleEvent qualification are DEFERRED and qualified:false. All other tests, builds, macOS signing, source and asset integrity, installation and launch lifecycle checks remain mandatory. A separate explicit maintainer authorization admits an unsigned Windows v1.0.0 artifact with source/artifact-bound public disclosure; no Windows test is deferred. No TCC grant, database mutation or sender substitution is authorized. Other tags and later runs retain full default qualification.",
+	"scopes": {
+		"macos-brew-archive": {
+			"kind": "swift_test_file",
+			"path": "Tests/ErgoptiPlusTests/HomebrewArchiveAcceptanceTests.swift",
+			"name": "testRealBrewZIPInstallXZUpgradeAndRefusalsPreserveInstalledState",
+			"reason": "Unconfined-positive AppleEvent returned consent-required -1744; complete native ZIP/XZ/refusal boundary qualification remains missing."
+		},
+		"macos-shortcuts-discovery": {
+			"kind": "command",
+			"path": "tools/diagnostics/apple_shortcuts_probe/run_probe.py",
+			"args": [],
+			"reason": "First app.shortcuts() native catalogue fetch exceeded twenty seconds; native discovery remains missing."
+		},
+		"macos-launch-appleevents": {
+			"kind": "macos_launch",
+			"path": "tools/diagnostics/macos_launch_gate.py",
+			"scenarios": ["clean", "karabiner_config"],
+			"runners": ["macos-15", "macos-15-intel"],
+			"reason": "Both hosted architectures show an unanswered Automation consent dialog for hosted-compute-agent to control ErgoptiPlus. External AppleEvent transport and its dependent timer, Karabiner and ScriptScope feature proofs are DEFERRED and qualified:false. All launch lifecycle checks remain mandatory."
+		}
+	}
+}

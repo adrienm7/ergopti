@@ -219,6 +219,11 @@ function repository(name, branch) {
 	// The extracted workflow calls the real channel resolver and its registry.
 	for (const relative of [
 		'tools/build/release-channel.cjs',
+		'tools/ci/dev-release-qualification.cjs',
+		'tools/ci/windows-stable-signing.cjs',
+		'.github/ci/stable_windows_signing_exception.json',
+		'.github/ci/dev_release_qualification_exceptions.json',
+		'.github/ci/stable_release_qualification_exception.json',
 		'tools/build/publish-verified-release.cjs',
 		'tools/build/macos-release-publication.cjs',
 		'tools/build/macos-release-archives.cjs',
@@ -797,6 +802,11 @@ function preflight(
 	copyManagedPublicationSources(cwd);
 	for (const relative of [
 		'tools/build/release-channel.cjs',
+		'tools/ci/dev-release-qualification.cjs',
+		'tools/ci/windows-stable-signing.cjs',
+		'.github/ci/stable_windows_signing_exception.json',
+		'.github/ci/dev_release_qualification_exceptions.json',
+		'.github/ci/stable_release_qualification_exception.json',
 		'static/ergopti_plus/_shared/ui/update_channels.js',
 		'static/ergopti_plus/_shared/modules/updater/defaults.json',
 		'static/ergopti_plus/_shared/modules/updater/channels.json'
@@ -1638,6 +1648,86 @@ check("each script's env carries the plan output or preflight decision it reads"
 		'the release job must give the preflight and the notes the bundle name plan resolved'
 	);
 });
+
+check(
+	'real qualification helper closes publication on foreign context and preserves full defaults',
+	() => {
+		const work = repository('qualification-publication', 'main');
+		const marker = path.join(work, 'publication-marker');
+		const script =
+			'set -euo pipefail\nnode tools/ci/dev-release-qualification.cjs --publication-admit >/dev/null\nprintf published > publication-marker';
+		const foreign = {
+			ERGOPTI_NATIVE_QUALIFICATION_PROFILE: 'stable-v1-20261009-macos-native-deferred',
+			GITHUB_ACTIONS: 'true',
+			GITHUB_REPOSITORY: 'adrienm7/ergopti',
+			GITHUB_EVENT_NAME: 'push',
+			GITHUB_REF: 'refs/heads/main',
+			GITHUB_SHA: 'a'.repeat(40),
+			ERGOPTI_DEV_RELEASE_RELEASE: 'true',
+			ERGOPTI_DEV_RELEASE_PRERELEASE: 'false',
+			ERGOPTI_DEV_RELEASE_CHANNEL: 'main',
+			ERGOPTI_DEV_RELEASE_TAG: 'v1.0.1',
+			ERGOPTI_DEV_RELEASE_VERSION: '1.0.1'
+		};
+		const refused = runScript(script, work, foreign);
+		assert.notEqual(refused.status, 0);
+		assert.match(refused.stderr, /not authorized/);
+		assert.equal(
+			fs.existsSync(marker),
+			false,
+			'refused admission cannot reach the publication port'
+		);
+		const ordinary = runScript(script, work, {
+			...foreign,
+			ERGOPTI_NATIVE_QUALIFICATION_PROFILE: ''
+		});
+		assert.equal(ordinary.status, 0, ordinary.stdout + ordinary.stderr);
+		assert.equal(
+			fs.readFileSync(marker, 'utf8'),
+			'published',
+			'full default must execute the real copied helper'
+		);
+	}
+);
+
+check(
+	'real unsigned publication helper refuses a missing receipt before its publication port',
+	() => {
+		const work = repository('unsigned-publication', 'main');
+		const sha = commit(work, 'independent unsigned boundary fixture');
+		const marker = path.join(work, 'unsigned-marker');
+		const script =
+			'set -euo pipefail\nnode tools/ci/windows-stable-signing.cjs --publication-admit >/dev/null\nprintf published > unsigned-marker';
+		const env = {
+			GITHUB_ACTIONS: 'true',
+			GITHUB_REPOSITORY: REPOSITORY,
+			GITHUB_EVENT_NAME: 'push',
+			GITHUB_REF: 'refs/heads/main',
+			GITHUB_SHA: sha,
+			ERGOPTI_DEV_RELEASE_RELEASE: 'true',
+			ERGOPTI_DEV_RELEASE_PRERELEASE: 'false',
+			ERGOPTI_DEV_RELEASE_CHANNEL: 'main',
+			ERGOPTI_DEV_RELEASE_TAG: 'v1.0.0',
+			ERGOPTI_DEV_RELEASE_VERSION: '1.0.0',
+			ERGOPTI_WINDOWS_SIGNING_CONFIGURED: 'false'
+		};
+		const refused = runScript(script, work, env);
+		assert.notEqual(refused.status, 0);
+		assert.match(refused.stderr, /not admitted/);
+		assert.equal(
+			fs.existsSync(marker),
+			false,
+			'missing evidence must not reach the publication port'
+		);
+		const full = runScript(script, work, { ...env, ERGOPTI_WINDOWS_SIGNING_CONFIGURED: 'true' });
+		assert.equal(full.status, 0, full.stdout + full.stderr);
+		assert.equal(
+			fs.readFileSync(marker, 'utf8'),
+			'published',
+			'complete signed configuration retains full defaults'
+		);
+	}
+);
 
 if (failures.length > 0) {
 	console.error('[FAIL] a release re-run can republish old code or cannot finish a release:');
