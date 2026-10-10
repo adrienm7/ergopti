@@ -144,7 +144,7 @@ helpers.describe("logs folder resolution (logs-dir-resolver)", function()
 			remove_day_files(first)
 			remove_day_files(second)
 			local ok, err = pcall(function()
-				helpers.assert_true(Sink.install(Logger, { log_dir = first }), "the first folder is writable")
+				helpers.assert_true(Sink.install(Logger, { log_dir = first, redaction_context = { home = "/home/fixture-user", user = "fixture-user" } }), "the first folder is writable")
 				values["paths.logs_dir"] = second
 				helpers.assert_eq(Sink.log_dir(), first,
 					"a saved override the sink has not moved to yet must not be named")
