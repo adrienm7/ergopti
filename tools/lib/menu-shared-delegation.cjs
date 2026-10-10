@@ -316,6 +316,375 @@ function publishesMenuTemplate(source, extension, section) {
 	});
 }
 
+/** Follows the real model receiver into its returned parent and native consumer. */
+function retainedModelGroupPublication(source, section, definition, proof, executable) {
+	const row = {
+		type: 'group',
+		id: 'llm_model',
+		i18n: 'menu.llm.model_parent_with_health',
+		caption_getters: ['llm_model_health_prefix', 'llm_model_current_caption'],
+		disabled_when: ['llm_model_parent_ready'],
+		platforms: ['ahk'],
+		unavailable: 'hide'
+	};
+	if (
+		section !== 'llm_model_parent_ahk' ||
+		proof.transport !== 'retained_model_receiver' ||
+		!require('node:util').isDeepStrictEqual(definition, [row])
+	)
+		return false;
+	try {
+		const tokens = executable(source);
+		const sameToken = (actual, wanted) =>
+			actual?.kind === wanted.kind && actual.value === wanted.value;
+		const symbol = (token, value) => token?.kind === 'symbol' && token.value === value;
+		const identifier = (token, value) =>
+			token?.kind === 'identifier' &&
+			(value === undefined || token.value.toLowerCase() === value.toLowerCase());
+		const levels = [],
+			stack = [];
+		for (let i = 0; i < tokens.length; i++) {
+			levels.push(stack.length);
+			if (symbol(tokens[i], '{')) stack.push(i);
+			if (symbol(tokens[i], '}')) {
+				if (!stack.length) return false;
+				stack.pop();
+			}
+		}
+		if (stack.length) return false;
+		const close = (at, open, end) => {
+			let count = 0;
+			for (let i = at; i < tokens.length; i++) {
+				if (symbol(tokens[i], open)) count++;
+				if (symbol(tokens[i], end) && !--count) return i;
+			}
+			throw Error('Incomplete physical model owner');
+		};
+		const owner = (name) => {
+			const found = [];
+			for (let i = 0; i < tokens.length; i++) {
+				if (levels[i] !== 0 || !identifier(tokens[i], name) || !symbol(tokens[i + 1], '('))
+					continue;
+				const end = close(i + 1, '(', ')');
+				if (!symbol(tokens[end + 1], '{')) continue;
+				if (source.slice(source.lastIndexOf('\n', tokens[i].start - 1) + 1, tokens[i].start).trim())
+					continue;
+				const finish = close(end + 1, '{', '}');
+				found.push({
+					index: i,
+					parameters: tokens.slice(i + 2, end),
+					body: tokens.slice(end + 2, finish)
+				});
+			}
+			if (found.length !== 1) throw Error('One physical model owner required');
+			return found[0];
+		};
+		const emit = owner('_LLM_Menu_EmitRow'),
+			helper = owner('_LLM_Menu_ModelParentRows');
+		const callableNames = new Set([
+			'menurenderer_groupreceiver',
+			'menurenderer_appendrows',
+			'_mr_declaredparentcallable',
+			'_llm_menu_emitrow',
+			'_llm_menu_modelparentrows',
+			'menurenderer_grouprow',
+			'llm_menu_buildmodelmenu',
+			'_llm_menu_firehealthprobe',
+			'_llm_menu_fireinstalledtagsprobe',
+			'_llm_menu_modeldisplaytext',
+			'map',
+			'error'
+		]);
+		const arrayLiteralOpen = (at) =>
+			symbol(tokens[at], '[') &&
+			((identifier(tokens[at - 1], 'return') && !['.', ':', '['].includes(tokens[at - 2]?.value)) ||
+				(tokens[at - 1]?.kind === 'symbol' &&
+					[':=', '(', ',', '[', '?', ':'].includes(tokens[at - 1].value)));
+		const brackets = [];
+		// Canonical callables cannot become aliases, parameters, fields or assigned values.
+		for (let i = 0; i < tokens.length; i++) {
+			if (symbol(tokens[i], '[')) brackets.push(i);
+			if (symbol(tokens[i], ']')) brackets.pop();
+			if (!identifier(tokens[i]) || !callableNames.has(tokens[i].value.toLowerCase())) continue;
+			if (
+				i === helper.index ||
+				i === emit.index ||
+				(identifier(tokens[i], 'Map') && identifier(tokens[i - 1], 'is'))
+			)
+				continue;
+			// The native fallback Array and ternary values construct Maps directly.
+			const arrayValue = arrayLiteralOpen(i - 1);
+			const ternaryValue =
+				symbol(tokens[i - 1], ':') && identifier(tokens[i - 2]) && symbol(tokens[i - 3], '?');
+			// Enclosing postfix lookup cannot acquire the direct-constructor exception.
+			const directMapValue =
+				identifier(tokens[i], 'Map') &&
+				symbol(tokens[i + 1], '(') &&
+				(arrayValue || ternaryValue) &&
+				brackets.every(arrayLiteralOpen);
+			if (
+				!symbol(tokens[i + 1], '(') ||
+				(['.', ':', '['].includes(tokens[i - 1]?.value) && !directMapValue)
+			)
+				return false;
+			const end = close(i + 1, '(', ')');
+			if (symbol(tokens[end + 1], '{')) return false;
+		}
+		const reader = (list) => {
+			let at = 0;
+			return {
+				peek: () => list[at],
+				done: () => at === list.length,
+				take: (fragment) => {
+					const wanted = scriptTokens(fragment, '.ahk');
+					if (!wanted.every((t, i) => sameToken(list[at + i], t)))
+						throw Error('Unsupported model authority grammar');
+					at += wanted.length;
+				},
+				name: () => {
+					if (!identifier(list[at])) throw Error('Model binding identifier required');
+					return list[at++].value;
+				},
+				line: () => {
+					const t = list[at];
+					if (!t || source.slice(source.lastIndexOf('\n', t.start - 1) + 1, t.start).trim())
+						throw Error('Physical model statement required');
+				},
+				error: () => {
+					if (list[at]?.kind !== 'string' || !list[at].value)
+						throw Error('Actual refusal required');
+					at++;
+				}
+			};
+		};
+		const h = reader(helper.parameters),
+			params = [];
+		for (let i = 0; i < 5; i++) {
+			params.push(h.name());
+			if (i < 4) h.take(',');
+		}
+		if (!h.done() || new Set(params.map((n) => n.toLowerCase())).size !== 5) return false;
+		const [receive, child, health, caption, disabled] = params;
+		const reserved = new Set([
+			...callableNames,
+			'map',
+			'error',
+			'global',
+			'local',
+			'static',
+			'return',
+			'if',
+			'true',
+			'false',
+			'_llm_menu',
+			'_llm_menu_handle',
+			'class',
+			'try',
+			'catch',
+			'finally',
+			'else',
+			'switch',
+			'case',
+			'default',
+			'loop',
+			'for',
+			'while',
+			'until',
+			'break',
+			'continue',
+			'throw',
+			'this',
+			'super',
+			'unset',
+			'is',
+			'not',
+			'and',
+			'or',
+			'extends'
+		]);
+		if (params.some((n) => reserved.has(n.toLowerCase()))) return false;
+		const body = reader(helper.body);
+		const refusal = (condition) => {
+			body.line();
+			body.take('if ' + condition);
+			body.line();
+			body.take('throw Error(');
+			body.error();
+			body.take(')');
+		};
+		refusal('!_MR_DeclaredParentCallable(' + receive + ')');
+		body.line();
+		const getters = body.name();
+		if (
+			reserved.has(getters.toLowerCase()) ||
+			params.some((n) => n.toLowerCase() === getters.toLowerCase())
+		)
+			return false;
+		body.take(':= Map(');
+		const wantedGetters = new Map([
+			['llm_model_health_prefix', health],
+			['llm_model_current_caption', caption],
+			['llm_model_parent_ready', '!' + disabled]
+		]);
+		for (let i = 0; i < 3; i++) {
+			const key = body.peek();
+			if (key?.kind !== 'string' || !wantedGetters.has(key.value)) return false;
+			body.take(JSON.stringify(key.value) + ', (*) => ' + wantedGetters.get(key.value));
+			wantedGetters.delete(key.value);
+			if (i < 2) body.take(',');
+		}
+		body.take(')');
+		body.line();
+		const parent = body.name();
+		if (
+			reserved.has(parent.toLowerCase()) ||
+			[getters, ...params].some((n) => n.toLowerCase() === parent.toLowerCase())
+		)
+			return false;
+		body.take(':= ' + receive + '.Call(' + child + ', ' + getters + ')');
+		refusal('!(' + parent + ' is Map) || ' + parent + '.Get("submenu", false) != ' + child);
+		body.line();
+		body.take('return [' + parent + ']');
+		if (!body.done()) return false;
+		const signature = scriptTokens(
+			'id, disabled, llm_is_operational, has_health_dot := false, CapturedWarningRows := unset',
+			'.ahk'
+		);
+		if (
+			emit.parameters.length !== signature.length ||
+			!signature.every((t, i) => sameToken(emit.parameters[i], t))
+		)
+			return false;
+		const e = reader(emit.body);
+		e.line();
+		e.take('global _LLM_Menu, _LLM_Menu_Handle');
+		e.line();
+		e.take('switch id {');
+		let depth = 0;
+		const branches = [],
+			claims = [];
+		for (let i = 0; i < emit.body.length; i++) {
+			const t = emit.body[i];
+			if (symbol(t, '{')) depth++;
+			if (symbol(t, '}')) depth--;
+			if (depth !== 1 || !identifier(t) || !['case', 'default'].includes(t.value.toLowerCase()))
+				continue;
+			if (source.slice(source.lastIndexOf('\n', t.start - 1) + 1, t.start).trim()) return false;
+			let end = i + 1;
+			const selectors = [];
+			if (identifier(t, 'case')) {
+				// AHK switch matches strings without case sensitivity unless requested otherwise.
+				// Unknown expressions could claim this id or mutate authority before its case.
+				for (;;) {
+					if (emit.body[end]?.kind !== 'string' || !emit.body[end].value) return false;
+					selectors.push(emit.body[end++].value);
+					if (!symbol(emit.body[end], ',')) break;
+					end++;
+				}
+			}
+			if (!symbol(emit.body[end], ':')) return false;
+			const branch = { index: i, body: end + 1, selectors, default: identifier(t, 'default') };
+			branches.push(branch);
+			for (const selector of selectors)
+				if (selector.toLowerCase() === 'llm_model') claims.push(branch);
+		}
+		if (
+			branches.filter((b) => b.default).length !== 1 ||
+			claims.length !== 1 ||
+			claims[0].selectors.length !== 1 ||
+			claims[0].selectors[0] !== 'llm_model'
+		)
+			return false;
+		const selected = claims[0].body,
+			end = branches[branches.indexOf(claims[0]) + 1]?.index;
+		if (end === undefined) return false;
+		// The case grammar is finite; unexpected statements cannot hide a binding write.
+		const stage = reader(emit.body.slice(selected, end));
+		const stageNames = [];
+		const binding = () => {
+			stage.line();
+			const name = stage.name();
+			if (
+				reserved.has(name.toLowerCase()) ||
+				stageNames.some((n) => n.toLowerCase() === name.toLowerCase()) ||
+				['id', 'disabled', 'llm_is_operational', 'has_health_dot', 'capturedwarningrows'].includes(
+					name.toLowerCase()
+				)
+			)
+				throw Error('Fresh model stage binding required');
+			stageNames.push(name);
+			stage.take(':=');
+			return name;
+		};
+		const capturedReceiver = binding();
+		stage.take('MenuRenderer_GroupReceiver("llm_model_parent_ahk", "llm_model")');
+		stage.line();
+		stage.take('if !' + capturedReceiver);
+		stage.line();
+		stage.take('throw Error(');
+		stage.error();
+		stage.take(')');
+		const completedChild = binding();
+		stage.take('LLM_Menu_BuildModelMenu()');
+		stage.line();
+		stage.take('try {');
+		stage.line();
+		stage.take('_LLM_Menu_FireHealthProbe(true)');
+		stage.line();
+		stage.take('_LLM_Menu_FireInstalledTagsProbe()');
+		const status = binding();
+		stage.take('_LLM_Menu.Has("last_health_status") ? _LLM_Menu["last_health_status"] : ""');
+		const prefix = binding();
+		stage.take(
+			'(has_health_dot && llm_is_operational) ? ((' +
+				status +
+				' == "ok") ? "🟢 " : (' +
+				status +
+				' == "ko") ? "🔴 " : "") : ""'
+		);
+		const shown = binding();
+		stage.take('_LLM_Menu_ModelDisplayText()');
+		const returnedRows = binding();
+		stage.take(
+			'_LLM_Menu_ModelParentRows(' +
+				capturedReceiver +
+				', ' +
+				completedChild +
+				', ' +
+				prefix +
+				', ' +
+				shown +
+				', disabled)'
+		);
+		stage.line();
+		stage.take(
+			'MenuRenderer_AppendRows(_LLM_Menu_Handle, "llm_menu", "llm_model_parent_ahk", ' +
+				returnedRows +
+				')'
+		);
+		stage.take('} catch as Err {');
+		const localNames = new Set([getters, parent, ...stageNames].map((n) => n.toLowerCase()));
+		for (let i = 0; i < tokens.length; i++) {
+			if (levels[i] !== 0 || !identifier(tokens[i])) continue;
+			if (localNames.has(tokens[i].value.toLowerCase()) && symbol(tokens[i + 1], ':='))
+				return false;
+			if (!identifier(tokens[i], 'global')) continue;
+			for (let j = i + 1; j < tokens.length; j++) {
+				if (
+					j > i + 1 &&
+					source.slice(tokens[j - 1].end, tokens[j].start).includes('\n') &&
+					!symbol(tokens[j - 1], ',')
+				)
+					break;
+				if (identifier(tokens[j]) && localNames.has(tokens[j].value.toLowerCase())) return false;
+			}
+		}
+		return true;
+	} catch {
+		return false;
+	}
+}
+
 /** Credits only one independently pinned selected group in its real native owner. */
 function publishesSelectedMenuGroup(source, extension, section, definition, proof) {
 	if (
@@ -349,6 +718,8 @@ function publishesSelectedMenuGroup(source, extension, section, definition, proo
 			return lines[line]?.slice(column, column + token.value.length) === token.value;
 		});
 	};
+	if (proof.transport !== undefined)
+		return retainedModelGroupPublication(source, section, definition, proof, executable);
 	const matches = (tokens, at, wanted) =>
 		wanted.every(
 			(token, offset) =>
