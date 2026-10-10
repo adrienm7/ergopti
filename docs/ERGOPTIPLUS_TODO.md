@@ -2494,6 +2494,12 @@ These are software implementations; final hardware verification remains below.
   not a current recommendation target. Do not assume deletion implements the
   recommendation.
 
+The original 34-store Windows capacity case now reports its actual fixture,
+apply, inspection, rollback and cleanup durations through the native test
+clock and TAP reporter. Original assertions, transaction ownership and
+deadlines remain; cleanup still runs if reporting or clock acquisition fails.
+Native profiling and complete-suite qualification remain pending.
+
 Windows scope and metrics fixtures now boot their actual intended source
 before invoking admitted writes. Original durable writes and assertions remain.
 The resulting native scope, global and metrics qualification is pending.
