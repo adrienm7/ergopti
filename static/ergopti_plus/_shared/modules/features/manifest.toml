@@ -4388,6 +4388,17 @@ type = "---"
 type = "dynamic"
 id = "agent_disabled_apps"
 i18n = "menu.agent.disabled_apps"
+platforms = ["hs", "linux"]
+unavailable = "hide"
+
+[[menu.agent_menu]]
+type = "command"
+id = "agent_disabled_apps"
+i18n = "menu.agent.disabled_apps"
+caption_getter = "agent_disabled_apps_count"
+caption_format = "numbered"
+platforms = ["ahk"]
+unavailable = "hide"
 
 # Both native system providers use this fixed Off row; backend choices remain data.
 [[menu.agent_system_controls]]
@@ -4813,7 +4824,7 @@ i18n = "menu.shortcuts.script_shortcuts"
 checked_when = ["script_control_enabled"]
 
 [[menu.shortcuts_menu]]
-type = "dynamic"
+type = "list"
 id = "personal_shortcuts"
 # AHK-only (mirrors wrap_symbols_menu above): the Windows driver maintains a
 # structured personal_shortcuts.ahk registry it can walk to list each
@@ -9552,16 +9563,6 @@ caption_getter = "linux_tray_version"
 caption_layout = "prefix"
 caption_joiner = " — "
 platforms = ["linux"]
-unavailable = "hide"
-
-# The Windows Agent picker remains native; its fixed count caption is declared.
-[[menu.agent_windows_disabled_apps_command]]
-type = "command"
-id = "agent_disabled_apps"
-i18n = "menu.agent.disabled_apps"
-caption_getter = "agent_disabled_apps_count"
-caption_format = "numbered"
-platforms = ["ahk"]
 unavailable = "hide"
 
 # Windows model parent: native cached health precedes the translated model label.
