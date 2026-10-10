@@ -16,8 +16,8 @@ requires original physical retirement and namespace/source-descriptor closure.
 All 14 prior cases remain; 23 actual POSIX controls pass. Native signature,
 catalogue and daemon status remain controlled fixture ports.
 
-Readiness source `f1d889427` is published on `feat/release-network`; merge
-`9d5016143` preserves the current Group 1 Dev `1e0556e8`. The optional
+Readiness source `f1d889427` is integrated in Dev by no-squash merge
+`fe980a298`; prerequisite merge `9d5016143` preserves Group 1 Dev `1e0556e8`. The optional
 `--acquire-readiness` path authenticates the original listener and same session,
 retains each helper before acquisition and preserves the original absolute
 deadline. Callback reentry and partial child construction cannot grant READY
@@ -35,8 +35,10 @@ after the original exact-peer termination/wait and projects only complete fixed
 native receipts. All eighteen methods and assertions in that file stay intact;
 SDK41 is the surrounding cohort. Diagnostic refusal preserves the original
 deadline error. Post-termination stage/errno/exit can describe induced cleanup,
-and pipe EOF/close is not descendant or namespace retirement authority. Native
-compilation and this diagnostic branch's actual receiving remain pending.
+and pipe EOF/close is not descendant or namespace retirement authority. Both
+native architectures compile on integrated `fe980a298`; SDK41 passes there.
+The diagnostic branch remains unexercised on that passing admission, and the
+earlier Intel deadline cause remains unresolved.
 
 Selected verification on that source executes format, JS and macOS Lua in
 sequence. Formatting and 17,971 Lua assertions across 1,562 modules pass. The
@@ -86,6 +88,36 @@ The original Mac receiving step does not yet directly invoke wire20/serve35;
 the normal Core JS collector executes them on Linux. Do not grant Mac55 credit
 from the older native jobs or from a portable/source review.
 
+The final integrated manual
+[38050086210](https://github.com/adrienm7/ergopti/actions/runs/38050086210)
+tests exact Dev `fe980a29840b788e51135e9e4c69a84dc70e3f74`, macOS only. It is
+terminal failure: six successful, six failed and five skipped jobs. Both SDK41
+and source10 cohorts pass; the earlier Intel deadline does not recur, which does
+not establish its cause. Lua passes18,158; stubbed E2E passes101 with one original
+skip. Core JS passes406/407, retaining the Windows evidence-condition failure
+subsequently corrected by Group3's reception of Root's published guard. PAC14
+remains12 passing methods/two failing methods per architecture. Independent HTTP
+has three errors per architecture and retained trust-restoration debt. Archive25
+remains24PASS/1Homebrew-prerequisiteFAIL; six Brew profiles, package and installation
+are unreached or skipped. Release publication is skipped. Group6 released only
+its own lock after the whole result and deleted the fully integrated feature
+under the maintainer's explicit partial-delivery instruction.
+
+A fresh continuation from Dev `9c556ce7f` recreates `feat/release-network` and
+adds direct wire20/serve35 receiving to the existing Group6 Mac step. Three exact
+body spans add the calls, strict count allowlist and always-retained logs;
+reversing them recovers the whole current workflow. Original5/8, status/noSKIP/
+oneOK/1MiB checks, five-minute clock and all current guard additions stay intact.
+Manual [38057381328](https://github.com/adrienm7/ergopti/actions/runs/38057381328)
+tests exact `011ea9a50` and passes original5/8 plus wire20/serve35 on both ARM
+and Intel. Its whole terminal result is7SUCCESS/5FAIL/5SKIP; Core JS passes407.
+Native jobs still fail PAC/WPAD and independent HTTP; archive qualification
+still fails its Homebrew prerequisite. Package/install and release are skipped.
+Actual signed listener/model qualification remains pending.
+Bounded ownership notification is
+[6098076531](https://github.com/adrienm7/ergopti/issues/86#issuecomment-6098076531);
+no Root acknowledgement or native credit is inferred from that notification.
+
 ## Preserved inactive preparations
 
 The generated [source archive](source-recovery.tar.gz) and
@@ -99,18 +131,30 @@ authority. The archive is source recovery, not an installed/native qualification
 The Darwin50 wrapper retains the original corpus, contexts, signal owner and
 clock. Its formatted controlled receiver actually passes25 Linux POSIX controls:
 one explicitly synthetic50-row envelope and24 refusal controls. Actual Darwin50,
-SIGTERM/SIGINT retirement and native negatives remain unexecuted. The workflow,
-full-default/wiring guards, package alias and Linux-only normal enrollment
-proposal remain inactive pending shared custody. Compose only exact reviewed
-hunks onto fresh preimages after Root/G7 Windows retention rows; never overwrite
-current guards with a stale full-file postimage. G1/G5 clear only their bounded
-scopes; their responses do not grant Root/G7 custody.
+SIGTERM/SIGINT retirement and native negatives remain unexecuted. The fresh continuation receives the workflow, mandatory full-default/wiring
+guards, direct package alias and Linux-only normal enrollment after the published
+Root Windows retention prerequisite lands in Dev. Whole-current inverses preserve
+all157 Root additions, the PowerShell prerequisite and Mac55. Fourteen independent
+omission controls remain additive. The original407 registry entries are intact;
+Linux adds one controlled receiver while Windows/Darwin keep407. Fresh actual25
+pass; formatting passes and407/408 full JS checks pass. The sole failure is the
+unchanged uninstall fixture beneath the protected temporary-root Git ancestor;
+its exact non-Git temporary-root replay passes. Actual Darwin50 and original
+SIGTERM/SIGINT outcomes still need receiving. Pinned Prettier preserves the
+wrapper AST, all tokens, comments and embedded worker; independent review allows
+only its one strict implementation-digest literal refresh. The original50
+corpus and all25 expected outcomes/assertions remain unchanged.
+The exact bounded ownership notice is
+[6098196683](https://github.com/adrienm7/ergopti/issues/86#issuecomment-6098196683).
+G1/G3/G5 clear only their bounded scopes; no Root acknowledgement or native credit
+is inferred, and a concrete active overlapping hunk must be serialized.
 
 The separately reviewed three-span Mac proposal adds direct wire20/serve35
 calls and two retained logs inside the existing Group 6 receiving step. It keeps
 original5/8, strict status/count/oneOK/no-skip checks,1MiB transcript bound and
-the five-minute clock. It remains inactive pending bounded custody; G3 clears
-only its own spans. Relevant coordination is in
+the five-minute clock. The fresh continuation now receives
+only those three spans after bounded ownership notification; actual Mac55
+passes on both architectures in exact-source manual38057381328. G3/G5 clear only their own spans. Earlier coordination is in
 [6095992820](https://github.com/adrienm7/ergopti/issues/86#issuecomment-6095992820),
 [6096471835](https://github.com/adrienm7/ergopti/issues/86#issuecomment-6096471835)
 and [6096571216](https://github.com/adrienm7/ergopti/issues/86#issuecomment-6096571216).

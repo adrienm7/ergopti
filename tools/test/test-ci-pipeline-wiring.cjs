@@ -194,6 +194,12 @@ const MACOS_NATIVE_STEP_CONDITIONS = [
 	[
 		MACOS_BOX,
 		'managed-ollama-native',
+		'Retain selected-release native ownership receiving',
+		'always()'
+	],
+	[
+		MACOS_BOX,
+		'managed-ollama-native',
 		'Qualify actual native PAC source ownership XCTest controls',
 		NOT_CANCELLED
 	],
@@ -4558,6 +4564,90 @@ assert.ok(
 );
 assert.match(siteWorkflow, /cp -r build\/\. "\$GHP"\//, 'main deploy retains built static assets');
 assert.match(siteWorkflow, /cp -r build\/\. "\$GHP\/\$DEPLOY_DIR\/"/, 'dev deploy remains scoped');
+
+// The Darwin receiver is mandatory raw work, never a deferred qualification alias.
+{
+	const files = require('./ci-pipeline.cjs').files();
+	const name = 'Receive selected-release shell corpus and native guardian cancellation';
+	const head = `      - name: ${name}\n`;
+	const body = pipeline.step(pipeline.job('managed-ollama-native'), name);
+	assert.equal(pipeline.stepField(body, 'if'), null);
+	assert.doesNotThrow(() => pipeline.validateRaw(files));
+	const mutants = [
+		['deleted receiver', '', /no step named/],
+		['renamed receiver', body.replace(name, 'Omitted selected-release receiving'), /no step named/],
+		['duplicate receiver', body + body, /appears 2 times/],
+		[
+			'forgiven receiver',
+			body.replace(head, head + '        continue-on-error: true\n'),
+			/failure must remain fatal/
+		],
+		[
+			'missing receiver command',
+			body.replace('node tools/diagnostics/macos_release_stage_native_receiving.cjs', 'echo'),
+			/receiver exact command/
+		],
+		[
+			'foreign receiver command',
+			body.replace('macos_release_stage_native_receiving.cjs', 'foreign_receiving.cjs'),
+			/receiver exact command/
+		],
+		[
+			'modified receiver output',
+			body.replace('native-selected-release-', 'foreign-output-'),
+			/receiver exact command/
+		],
+		[
+			'forgiven command',
+			body.replace('        run: |', '        run: |\n          true'),
+			/receiver exact command/
+		],
+		[
+			'foreign shell',
+			body.replace('        shell: bash', '        shell: sh'),
+			/receiver exact shell/
+		]
+	];
+	for (const condition of [
+		'false',
+		'success()',
+		'always()',
+		'${{ !cancelled() }}',
+		'${{ env.ERGOPTI_DEV_QUALIFICATION_PROFILE }}'
+	])
+		mutants.push([
+			`conditional receiver ${condition}`,
+			body.replace(head, head + `        if: ${condition}\n`),
+			/full step condition/
+		]);
+	for (const [label, replacement, error] of mutants) {
+		const changed = files.map((file) => {
+			if (file.rel !== MACOS_BOX) return file;
+			assert.equal(file.text.split(body).length, 2, label + ': genuine mutation seam');
+			return { ...file, text: file.text.replace(body, () => replacement) };
+		});
+		assert.notDeepEqual(changed, files, label);
+		assert.throws(() => pipeline.fromFiles(changed), error, label);
+	}
+	assert.equal(mutants.length, 14);
+	mustCatch(
+		'selected-release artifact condition spelling remains exact',
+		MACOS_BOX,
+		'      - name: Retain selected-release native ownership receiving\n        if: always()\n',
+		'      - name: Retain selected-release native ownership receiving\n        if: ${{ always() }}\n',
+		stepProblems
+	);
+	mustCatch(
+		'unknown conditional receiver alias remains refused',
+		MACOS_BOX,
+		head,
+		'      - name: Invented selected-release deferred alias\n        if: always()\n',
+		stepProblems
+	);
+	console.log(
+		'PASS: selected-release exact raw receiver controls=14; Darwin native receiving UNRUN by source models.'
+	);
+}
 
 if (errors.length > 0) {
 	console.error(
