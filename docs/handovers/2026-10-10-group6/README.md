@@ -595,7 +595,8 @@ TODO block. These local outcomes do not qualify native packaging, installation,
 trust/PAC or managed model operation.
 
 The reviewed native enrollment is SDK 49 plus seven daily cases and 42 original
-logger cases. None of these native extension cohorts has executed. The new
+logger cases. They were unrun at local qualification; both ARM64 and Intel now
+pass all three cohorts. The new
 seven-case source includes a mapped-shell/original-guardian/stdio/sink
 composition; source enrollment cannot qualify that composition or packaged
 Ollama logging. Group 5 released the bounded product source window in
@@ -606,10 +607,32 @@ clarifies continuation on the existing G6-owned SDK spans under the user's
 independent-branch authorization and independently proved published non-overlap.
 It supersedes our conservative wait-for-release wording without inferring any
 Group 5 grant from silence. No foreign checkout or active workflow changes.
-The exact five reviewed and formatted CI/tool paths are now applied on our
-branch; their selected format/JS gate remains pending. Preserve Group 5's
-lease165 and all original SDK/logger assertions, fatal checks and budgets.
-Append native outcomes only after the future exact-source manual receiving.
+The exact five reviewed and formatted CI/tool paths are published in
+`3fc321209`. Their same-source replay passes formatting and all 409 JS checks,
+with exact source, HEAD and index bindings. Preserve the first 83 failures:
+82 explicit `EROFS` refusals on the original validation temporary root and one
+generic protocol refusal. Restoring required access to that same owned root
+allows the unchanged checks to pass; no source, assertion or budget changes.
+The terminal selected receipt SHA-256 is
+`5b4bc06fd082c737104c89484af04e2542b199b09aa6b558c967769c91d32f34`.
+
+Exact manual
+[38090476827](https://github.com/adrienm7/ergopti/actions/runs/38090476827)
+is active on `3fc321209`, with macOS selected and `release=false`. Its validation
+job succeeds. Actual native receiving on 2026-10-10 passes SDK 49, all seven
+daily cases and all 42 original logger cases on both ARM64 and Intel, with zero
+failures or skips in each cohort. Jobs 114325831362 and 114325831396 bind these
+receipts to exact `3fc321209`, run 38090476827, attempt 1. Swift, capture and
+exit statuses are zero; before/after source bindings match. The paired receipt
+SHA-256 is
+`e1924b9939e621a82734defb5a73462f4ff71bcfcb07be752c6963e4eef4b62f`.
+The complete manual verdict remains pending. These scoped controls do not
+qualify packaged Ollama logging or native model/package/install operation.
+No whole-CI verdict is claimed. Runtime `49b4e7c29` and normal Dev merge `08eaabf29` are already received
+on the feature; integration into Dev remains pending until final sources and
+the complete owned manual result are qualified. Preserve Group 5's lease 165
+and all original SDK/logger assertions, fatal checks and budgets. Append actual
+native results independently of these local source checks.
 
 The current packaged bootstrap and HuggingFace routes already consume their
 native per-request adapters. Launcher/device/inode authority is inherited by

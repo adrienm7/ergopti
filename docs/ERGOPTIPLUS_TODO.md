@@ -6773,13 +6773,25 @@ Runtime commit `49b4e7c29` is published; normal merge `08eaabf29` receives
 current Dev `c4180d8d` while retaining all nine runtime bytes, the complete
 owned TODO62 block and every other current Dev TODO block.
 
-The reviewed native enrollment adds separately judged seven daily cases and
-42 unchanged logger cases after SDK49, within its original ten-minute step.
-Native execution of these extension cohorts remains unrun; selected CI/tools
-validation and exact-SHA manual macOS receiving follow. Coordination notice
-6102523619 clarifies the existing own-branch SDK ownership and proved published
-non-overlap; it does not infer a Group 5 grant from silence. Preserve Group 5's
-lease165, live workflow and checkout, and every original assertion and budget.
+The published native enrollment `3fc321209` adds seven independently judged
+daily cases and 42 unchanged logger cases after SDK 49, within its original
+ten-minute step. The same-source selected CI/tool replay passes formatting and
+all 409 JS checks with exact source, HEAD and index bindings. Its first
+sandboxed attempt retains 83 failures, including 82 explicit `EROFS` temporary-
+root refusals and one generic protocol refusal. Required access to the same
+original owned validation root allows the unchanged checks to pass; no
+assertion, source or budget changes. The terminal receipt SHA-256 is
+`5b4bc06fd082c737104c89484af04e2542b199b09aa6b558c967769c91d32f34`.
+Exact manual 38090476827 is active on `3fc321209` with macOS selected and
+`release=false`; its validation job succeeds. Actual native receiving on
+2026-10-10 passes SDK 49, all seven daily cases and all 42 original logger cases
+on both ARM64 and Intel, with zero failures or skips in each cohort. The
+complete manual verdict remains pending. These cohorts do not qualify packaged
+Ollama logging, model operation or final package/install. Integration into Dev remains pending until
+qualified sources and the complete owned manual result are received.
+Coordination notice 6102523619 preserves independent-branch ownership and
+published non-overlap without inferring a Group 5 grant from silence. Preserve
+Group 5's lease 165, live workflow/checkout and every original assertion/budget.
 The production qualification guard stays false; items 36/62 and transverse
 16/38 remain open.
 
