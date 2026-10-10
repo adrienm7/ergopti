@@ -1250,7 +1250,7 @@ function M.check_and_install_deps(on_complete, replay_token)
 	local network_prelude
 	if native_pty == nil then
 		local network_error
-		network_prelude, network_error = NetworkEnv.opaque_prelude("MLX-DEPS")
+		network_prelude, network_error = NetworkEnv.bootstrap_prelude("MLX-DEPS", python_bin)
 		if type(network_prelude) ~= "string" or network_prelude == "" then
 			Logger.error(LOG, "MLX network admission could not be prepared: %s.", tostring(network_error))
 			return settle_preflight_failure(i18n.get("mlx.deps_failed"))

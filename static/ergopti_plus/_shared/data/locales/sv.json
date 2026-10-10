@@ -3281,5 +3281,6 @@
 	"healthcheck.summary.scope": "Resultaten gäller endast de registrerade kontrollerna. Isolerade testsviter kördes inte.",
 	"healthcheck.problem.diagnostic_check": "Diagnostisk kontroll misslyckades: %s.",
 	"healthcheck.export.privacy_notice": "Den här rapporten delar bara tillåtna tekniska uppgifter. Loggar, fritext, sökvägar och identifierande uppgifter utesluts även när detaljer är aktiverade. Lokala sidtester ingår inte.",
-	"sg_actions.llm_translate_context": "🌐 Översätt den aktuella meningen [konfigurerbar]"
+	"sg_actions.llm_translate_context": "🌐 Översätt den aktuella meningen [konfigurerbar]",
+	"menu.about.startup_other_command_reason": "Annat startkommando: Uppstart är inställd för ett annat kommando eller en annan installation. Den befintliga inställningen bevaras."
 }

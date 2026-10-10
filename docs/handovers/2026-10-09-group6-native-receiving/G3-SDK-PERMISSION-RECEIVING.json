@@ -1,0 +1,82 @@
+{
+	"schema": 1,
+	"scope": "Read-only original Group3 SDK artifact receiving; not Group6 qualification",
+	"run": 37981239358,
+	"head": "bc04003886aecb1e049217fa45a629ea243b01ee",
+	"attempt": 1,
+	"event": "workflow_dispatch",
+	"job": 113992330868,
+	"job_conclusion": "failure",
+	"artifact": 11641560078,
+	"sha256": {
+		"artifact_metadata": "5382c8e5d5c572cc6a0b54b84eaf744b68a0760de4361bf9c2ee66a1bf468ec3",
+		"artifact_zip": "4bc69199e03d01c2afc82bc85fffc3f4f124c8672e9b3465c182c456dbb11089",
+		"sdk_sources": "5a3ee487c415b7e02487b92e723aa0d15d0df2983494b751b6fac21813fb88bb",
+		"sdk_verdict": "11cce80a6535ea9523746365d90885e327096a1dbc61b0ecd4d7fcfb2682a0bd",
+		"sdk_transcript": "78a9076fe5027af404fd369f3c2ff5b2c0f44b64c386ed98a0d0eab8c1894aa5",
+		"original_job_log": "205c68bc934705dc1ddc6f8646c4942c0becfe3b8924321b10910ea1c20320c4",
+		"private_receiving_receipt": "aadf64333b2329e3957a01225225e36e462b79f1c99704d4be4b791841a39f12"
+	},
+	"artifact_zip_bytes": 140101,
+	"actual_native": {
+		"compiler": "Build complete, native method ran",
+		"passed": 1,
+		"failed": 0,
+		"skipped": 0,
+		"method": "-[ErgoptiPlusTests.OwnedAutomationQueryWorkerTests testActualNoPromptPermissionAPIOnlyPublishesRetiredMetadata]",
+		"script_status": 0,
+		"capture_status": 0,
+		"literal_observation": "SDK_PERMISSION_OBSERVATION caller=native-test-product target=shortcuts-events event_class=core event_id=getd ask_user=0 nonce=19 osstatus=-600",
+		"OSStatus_actual": -600,
+		"permission_grant_or_signed_application_credit": false
+	},
+	"strict_receiver": {
+		"complete": false,
+		"osstatus_in_verdict": null,
+		"errors": ["unadmitted-sdk-marker", "incomplete"],
+		"helper_source_sha256": "9c44d51f60425c22a55b8ff3d476cd5b973a1f9c249e8dcaf58015499865b8a9",
+		"helper_path": "tools/diagnostics/sdk_permission_xctest_evidence.cjs",
+		"helper_line": 59,
+		"guard": "next !== 4 requires marker after started frame and before passed frame",
+		"actual_test_passed_line": 47,
+		"actual_selected_suite_passed_line": 52,
+		"actual_marker_line": 54,
+		"test_source_sha256": "04eb9bb09b4978f94768de600bf1dc25e2dbedf056f282b6c1b0a4d13a8fecf1",
+		"test_path": "static/ergopti_plus/macos/launcher/Tests/ErgoptiPlusTests/OwnedAutomationQueryWorkerTests.swift",
+		"test_print_line": 405,
+		"boundary_cause": "Captured marker arrives after all expected XCTest frames; exact receiver rejects its position.",
+		"source_buffering_or_async_order_cause": "UNKNOWN. Native transcript order established; no producer buffering or async mechanism inferred.",
+		"collector_relaxation_recommended": false
+	},
+	"filtered_original_sdk_frames": [
+		{
+			"original_line": 43,
+			"text": "Test Suite 'Selected tests' started at 2026-10-09 19:39:46.802."
+		},
+		{
+			"original_line": 46,
+			"text": "Test Case '-[ErgoptiPlusTests.OwnedAutomationQueryWorkerTests testActualNoPromptPermissionAPIOnlyPublishesRetiredMetadata]' started."
+		},
+		{
+			"original_line": 47,
+			"text": "Test Case '-[ErgoptiPlusTests.OwnedAutomationQueryWorkerTests testActualNoPromptPermissionAPIOnlyPublishesRetiredMetadata]' passed (0.210 seconds)."
+		},
+		{
+			"original_line": 52,
+			"text": "Test Suite 'Selected tests' passed at 2026-10-09 19:39:47.016."
+		},
+		{
+			"original_line": 54,
+			"text": "SDK_PERMISSION_OBSERVATION caller=native-test-product target=shortcuts-events event_class=core event_id=getd ask_user=0 nonce=19 osstatus=-600"
+		}
+	],
+	"interpretation": {
+		"native_method_passed": true,
+		"strict_receiving_complete": false,
+		"captured_marker_after_selected_terminal": true,
+		"producer_buffering_or_async_order_cause": "UNKNOWN",
+		"collector_relaxation_recommended": false,
+		"permission_or_signed_application_credit": false,
+		"foreign_run_borrowed_as_group6_qualification": false
+	}
+}

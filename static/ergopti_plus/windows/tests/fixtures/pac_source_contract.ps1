@@ -2,6 +2,56 @@
 # Executes the actual source fetcher; portable mode qualifies only pure URI scope.
 param([Parameter(Mandatory=$true)][string]$WorkerPath, [Parameter(Mandatory=$true)][string]$PolicyPath, [switch]$Portable)
 $ErrorActionPreference = 'Stop'
+# The original terminating error remains the failure owner; formatting cannot hide its line.
+trap {
+    $SourceErrorRecord = $_
+    try {
+        $SourceErrorLine = 0
+        if ($null -ne $SourceErrorRecord.InvocationInfo -and
+            $SourceErrorRecord.InvocationInfo.ScriptName -ceq $PSCommandPath) {
+            $CandidateLine = [int]$SourceErrorRecord.InvocationInfo.ScriptLineNumber
+            if ($CandidateLine -ge 1 -and $CandidateLine -le 4095) { $SourceErrorLine = $CandidateLine }
+        }
+        $SourceErrorClasses = @(
+            'MethodException',
+            'MethodInvocationException',
+            'RuntimeException',
+            'TargetInvocationException',
+            'TargetParameterCountException',
+            'MissingMethodException',
+            'ArgumentException',
+            'ArgumentNullException',
+            'ArgumentOutOfRangeException',
+            'InvalidOperationException',
+            'InvalidDataException',
+            'DecoderFallbackException',
+            'FileNotFoundException',
+            'DirectoryNotFoundException',
+            'IOException',
+            'UnauthorizedAccessException',
+            'TimeoutException',
+            'WebException',
+            'ObjectDisposedException',
+            'PacOwnerDebtException',
+            'TypeInitializationException',
+            'NotSupportedException',
+            'PlatformNotSupportedException',
+            'Win32Exception'
+        )
+        $SourceErrorClass = 'unknown'
+        $SourceErrorException = $SourceErrorRecord.Exception
+        for ($Depth = 0; $Depth -lt 4 -and $null -ne $SourceErrorException; $Depth++) {
+            $CandidateClass = $SourceErrorException.GetType().Name
+            $SourceErrorClass = if ($SourceErrorClasses -ccontains $CandidateClass) { $CandidateClass } else { 'unknown' }
+            $SourceErrorException = $SourceErrorException.InnerException
+        }
+        if ($null -ne $SourceErrorException) { $SourceErrorClass = 'unknown' }
+        [Console]::Error.WriteLine(('PAC_SOURCE_ERROR exception={0} line={1}' -f $SourceErrorClass, $SourceErrorLine))
+    } catch {
+        # A diagnostic writer refusal cannot replace the original terminating error.
+    }
+    break
+}
 $Definition = [IO.File]::ReadAllText($WorkerPath, [Text.UTF8Encoding]::new($false, $true))
 $Match = [regex]::Match($Definition, "Add-Type -TypeDefinition @'\n([\s\S]*?)\n'@")
 if (-not $Match.Success) { throw 'Production PAC executor definition was refused.' }
@@ -177,7 +227,7 @@ try {
     $First.ForeignPort = $Second.Port
     foreach ($Path in @('utf8','utf16','redirect','foreign')) {
         $Deadline = [ErgoptiNetworkPac]::CurrentTick() + 5000
-        $Bytes = $Fetch.Invoke($null, @('http://127.0.0.1:' + $First.Port + '/' + $Path,
+        $Bytes = $Fetch.Invoke($null, @(('http://127.0.0.1:' + $First.Port + '/' + $Path),
             [long]$Deadline, [long]($Deadline + 1000), [int]1048576, [int]50))
         if ([Text.UTF8Encoding]::new($false,$true).GetString($Bytes) -cne "function FindProxyForURL(u,h){return 'DIRECT';}") {
             throw 'Real source fetch did not preserve the complete script.'
@@ -188,9 +238,19 @@ try {
         $Refused = $false
         $Deadline = [ErgoptiNetworkPac]::CurrentTick() + 5000
         try {
-            $null = $Fetch.Invoke($null, @('http://127.0.0.1:' + $First.Port + '/' + $Path,
+            $null = $Fetch.Invoke($null, @(('http://127.0.0.1:' + $First.Port + '/' + $Path),
                 [long]$Deadline, [long]($Deadline + 1000), [int]1048576, [int]50))
-        } catch [Reflection.TargetInvocationException] { $Refused = $true }
+        } catch [Text.DecoderFallbackException] {
+            $Refused = $Path -ceq 'invalid'
+        } catch [Net.WebException] {
+            $Failure = $_.Exception.GetBaseException()
+            $Refused = $Path -ceq 'unavailable' -and $Failure -is [Net.WebException] -and
+                $Failure.Status -eq [Net.WebExceptionStatus]::ProtocolError -and
+                $Failure.Response -is [Net.HttpWebResponse] -and
+                [int]$Failure.Response.StatusCode -eq 503
+        } catch [InvalidOperationException] {
+            $Refused = $Path -ceq 'oversized'
+        }
         if (-not $Refused) { throw 'Real malformed/non200/oversized source was admitted.' }
         $Controls++
     }

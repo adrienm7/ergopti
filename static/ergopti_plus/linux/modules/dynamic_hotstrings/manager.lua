@@ -452,9 +452,10 @@ end
 --- @param buffer string The current typing buffer (engine:current_buffer()).
 --- @param trigger string The character that just triggered the check (the
 ---   magic key, typically "★" or "\\").
+--- @param start_is_boundary boolean|nil Input owner state captured with the complete buffer.
 --- @return boolean True if a dynamic expansion was performed.
 --- @return table|nil Canonical event details for a successful expansion.
-function M.on_trigger(buffer, trigger)
+function M.on_trigger(buffer, trigger, start_is_boundary)
 	if not _enabled then return false end
 	if type(buffer) ~= "string" or buffer == "" then return false end
 
@@ -474,7 +475,7 @@ function M.on_trigger(buffer, trigger)
 	local prefix = buffer:sub(1, -(#t + 1))
 	if prefix == "" then return false end
 
-	local match = Engine.match_buffer(prefix, DYNAMIC_GROUP, M.is_rule_enabled)
+	local match = Engine.match_buffer(prefix, DYNAMIC_GROUP, M.is_rule_enabled, start_is_boundary)
 	if not match then
 		-- Nothing registered claimed the sequence. Only now try the multi-letter
 		-- @-combo, so a registered tag always wins: "@dt" spells two valid alias
@@ -556,11 +557,12 @@ end
 --- while the phone number beside it is not. Joining first would force one verdict
 --- on the whole row.
 --- @param buffer string The typing buffer, WITHOUT the trigger character.
+--- @param start_is_boundary boolean|nil Input owner state captured with this buffer.
 --- @return table Array of candidate records; empty when nothing is offered.
-function M.preview_candidates(buffer)
+function M.preview_candidates(buffer, start_is_boundary)
 	local rows = {}
 	if not _enabled then return rows end
-	if not require("dynamic_hotstrings").match_buffer(buffer, DYNAMIC_GROUP, M.is_rule_enabled) then
+	if not require("dynamic_hotstrings").match_buffer(buffer, DYNAMIC_GROUP, M.is_rule_enabled, start_is_boundary) then
 		local user = UserCode.preview(buffer)
 		if user then
 			rows[#rows + 1] = { trigger = user.suffix .. _trigger_char, replacement = user.preview,
@@ -602,8 +604,9 @@ end
 
 --- Returns the preview string for the current buffer (tooltip display).
 --- @param buffer string The current typing buffer.
+--- @param start_is_boundary boolean|nil Input owner state captured with the complete buffer.
 --- @return string|nil Preview text, or nil.
-function M.preview(buffer)
+function M.preview(buffer, start_is_boundary)
 	if not _enabled then return nil end
 	if type(buffer) ~= "string" or buffer == "" then return nil end
 
@@ -616,7 +619,7 @@ function M.preview(buffer)
 	if strict_codepoint_length(_trigger_char) ~= 1 or buffer:sub(-#_trigger_char) ~= _trigger_char then
 		return nil
 	end
-	return Engine.preview(buffer:sub(1, -(#_trigger_char + 1)), DYNAMIC_GROUP, M.is_rule_enabled)
+	return Engine.preview(buffer:sub(1, -(#_trigger_char + 1)), DYNAMIC_GROUP, M.is_rule_enabled, start_is_boundary)
 end
 
 

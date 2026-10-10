@@ -515,7 +515,16 @@ function M.build_groups(ctx, only, counts)
 				if type(sec) == "table" then
 					if sec.name == "-" then
 						if not prev_was_sep then
-							sec_menu[#sec_menu + 1] = { separator = true }
+							local boundary = ManifestMenu.template_rows("hotstrings_parameter_boundary", {}, {}, {})
+							if type(boundary) ~= "table" or getmetatable(boundary) ~= nil or #boundary ~= 1
+								or type(boundary[1]) ~= "table" or getmetatable(boundary[1]) ~= nil
+								or boundary[1].separator ~= true then
+								Logger.error(LOG, "Declared hotstring section boundary unavailable.")
+								return {}
+							end
+							for index in next, boundary do if index ~= 1 then return {} end end
+							for key in next, boundary[1] do if key ~= "separator" then return {} end end
+							sec_menu[#sec_menu + 1] = boundary[1]
 							prev_was_sep = true
 						end
 					elseif bound_by_group[name] and bound_by_group[name][sec.name] then

@@ -1,0 +1,7 @@
+# Original Group3 SDK permission artifact receiving
+
+Manual run [37981239358](https://github.com/adrienm7/ergopti/actions/runs/37981239358), attempt 1, tested `bc04003886aecb1e049217fa45a629ea243b01ee`. The original item36 job `113992330868` failed overall; artifact `11641560078` contains a successfully compiled SDK test product and one actual SDK method that passed (1 passed, 0 failed, 0 skipped; script and capture status 0). This foreign run is not Group6 qualification.
+
+The unchanged strict SDK receiver remains incomplete. In the original SDK transcript, the method passes at line 47 and the Selected tests suite passes at line 52. The exact `SDK_PERMISSION_OBSERVATION` marker appears at line 54, after those terminal frames. `tools/diagnostics/sdk_permission_xctest_evidence.cjs:59` admits this marker only between the started and passed method frames; it therefore reports `unadmitted-sdk-marker` and `incomplete`, with no admitted OSStatus. The original test prints the marker inside its body at `OwnedAutomationQueryWorkerTests.swift:405`. The captured ordering is established; buffering or asynchronous producer ordering is not established. No collector relaxation is proposed.
+
+The marker contains `ask_user=0`, `nonce=19` and actual OSStatus `-600`. These facts do not establish permission grant, a signed application principal, or canonical catalogue attribution. The bound JSON preserves only the original selected technical frames and fixed marker, with source, original log and artifact digests. Private full receipts and raw artifacts remain separate.

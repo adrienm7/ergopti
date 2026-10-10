@@ -84,6 +84,70 @@ function M.snapshot(snapshot, schema)
 	return project(snapshot, schema.share_policy.projection)
 end
 
+
+local function cell(value)
+	return (tostring(value):gsub("[\r\n]+", " "):gsub("|", "\\|"))
+end
+
+local function rows_for(value, rule, prefix, rows)
+	if rule.kind == "object" then
+		local keys = {}
+		for key in pairs(value) do keys[#keys + 1] = key end
+		table.sort(keys)
+		for _, key in ipairs(keys) do
+			rows_for(value[key], rule.fields[key], prefix == "" and key or prefix .. "." .. key, rows)
+		end
+	elseif rule.kind == "array" then
+		for index, item in ipairs(value) do rows_for(item, rule.item, prefix .. "." .. index, rows) end
+	else
+		local text = rule.kind == "boolean" and (value and "true" or "false")
+			or type(value) == "number" and Json.encode(value) or value
+		rows[#rows + 1] = "| " .. cell(prefix) .. " | " .. cell(text) .. " |"
+	end
+end
+
+--- Formats only detached approved leaves, using the driver's existing catalogue.
+local function readable(safe, schema)
+	local translate = require("infra.i18n").get
+	local policy, lines, rows = schema.share_policy.projection.fields, {}, {}
+	local keys = {}
+	for key in pairs(safe) do
+		if key ~= "sections" and key ~= "probes" and key ~= "retired_probes" then keys[#keys + 1] = key end
+	end
+	table.sort(keys)
+	for _, key in ipairs(keys) do rows_for(safe[key], policy[key], key, rows) end
+	local function append(title)
+		if #rows == 0 then return end
+		if title then lines[#lines + 1] = "## " .. translate(title); lines[#lines + 1] = "" end
+		lines[#lines + 1] = "| | |"; lines[#lines + 1] = "| --- | --- |"
+		for _, row in ipairs(rows) do lines[#lines + 1] = row end
+		lines[#lines + 1] = ""
+	end
+	append()
+	for _, section in ipairs(schema.sections) do
+		local data = safe.sections and safe.sections[section.id]
+		if data then
+			rows, keys = {}, {}
+			for key in pairs(data) do keys[#keys + 1] = key end
+			table.sort(keys)
+			for _, key in ipairs(keys) do
+				local label = key
+				for _, field in ipairs(section.fields or {}) do
+					if field.id == key then label = translate("healthcheck.field." .. key); break end
+				end
+				rows_for(data[key], policy.sections.fields[section.id].fields[key], label, rows)
+			end
+			append("healthcheck.section." .. section.id)
+		end
+	end
+	rows = {}
+	for _, key in ipairs({ "probes", "retired_probes" }) do
+		if safe[key] then rows_for(safe[key], policy[key], key, rows) end
+	end
+	append("healthcheck.deep_tests.probe_inventory")
+	return table.concat(lines, "\n")
+end
+
 --- Builds clipboard, file and issue-form content exclusively from the host snapshot.
 --- @param snapshot table Host-retained snapshot.
 --- @param schema table Canonical diagnostics schema.
@@ -96,7 +160,8 @@ function M.document(snapshot, schema, notice)
 	return {
 		snapshot = safe,
 		text = "# ErgoptiPlus diagnostics\n\n" .. notice
-			.. "\n\ndriver-suites: not_run\npage-model-checks: not_collected\n\n```json\n" .. Json.encode(safe) .. "\n```\n",
+			.. "\n\ndriver-suites: not_run\npage-model-checks: not_collected\n\n" .. readable(safe, schema)
+			.. "\n```json\n" .. Json.encode(safe) .. "\n```\n",
 		fields = { driver = safe.driver, version = versions.ergopti_version or "unknown", os = safe.driver },
 		name = schema.report.name_prefix .. safe.driver .. "-" .. stamp:gsub("[^%w.-]", "_") .. schema.report.name_suffix,
 	}

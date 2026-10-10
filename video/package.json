@@ -1,0 +1,31 @@
+{
+	"name": "ergoptiplus-video",
+	"version": "1.0.0",
+	"private": true,
+	"description": "Remotion promo film and README feature GIFs for Ergopti+, rendered from the driver's own UI and data",
+	"type": "module",
+	"scripts": {
+		"prepare-data": "node scripts/prepare.mjs && node scripts/make-audio.mjs",
+		"studio": "npm run prepare-data && remotion studio src/index.ts",
+		"render": "npm run prepare-data && remotion render src/index.ts Promo out/ergoptiplus-promo.draft.mp4 && node scripts/check-flicker.mjs out/ergoptiplus-promo.draft.mp4 && node -e \"require('fs').renameSync('out/ergoptiplus-promo.draft.mp4', 'out/ergoptiplus-promo.mp4')\"",
+		"check-flicker": "node scripts/check-flicker.mjs",
+		"gifs": "npm run prepare-data && node scripts/render-gifs.mjs",
+		"capture:screen": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/record-screen.ps1",
+		"typecheck": "tsc --noEmit",
+		"stills": "npm run prepare-data && node scripts/stills.mjs"
+	},
+	"dependencies": {
+		"@remotion/bundler": "4.0.527",
+		"@remotion/cli": "4.0.527",
+		"@remotion/google-fonts": "4.0.527",
+		"@remotion/renderer": "4.0.527",
+		"@remotion/transitions": "4.0.527",
+		"react": "19.1.1",
+		"react-dom": "19.1.1",
+		"remotion": "4.0.527"
+	},
+	"devDependencies": {
+		"@types/react": "19.1.12",
+		"typescript": "5.9.2"
+	}
+}

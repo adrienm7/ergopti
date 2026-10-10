@@ -71,9 +71,9 @@ function rowErrors(where, row) {
 	if (row.disabled_reason_key !== undefined) {
 		if (typeof row.disabled_reason_key !== 'string' || row.disabled_reason_key === '')
 			errors.push(`${where}: disabled_reason_key must name a locale key.`);
-		if (row.type !== 'command' && row.type !== 'group')
+		if (row.type !== 'command' && row.type !== 'check' && row.type !== 'group')
 			errors.push(
-				`${where}: disabled_reason_key is read on command rows only, or identified labelled groups.`
+				`${where}: disabled_reason_key is read on command/check rows or identified labelled groups.`
 			);
 		if (
 			row.type === 'group' &&
@@ -126,7 +126,7 @@ function rowErrors(where, row) {
 	const drawn = { type: 'command', id: 'y', i18n: 'menu.y', disabled_when: ['installed_build'] };
 	assert.deepEqual(rowErrors('f', { ...drawn, disabled_reason_key: 'r' }), []);
 	assert.equal(rowErrors('f', { ...drawn, disabled_reason_key: '' }).length, 1);
-	assert.equal(rowErrors('f', { ...drawn, type: 'check', disabled_reason_key: 'r' }).length, 1);
+	assert.equal(rowErrors('f', { ...drawn, type: 'toggle', disabled_reason_key: 'r' }).length, 1);
 	assert.equal(
 		rowErrors('f', { ...drawn, disabled_when: undefined, disabled_reason_key: 'r' }).length,
 		1
@@ -135,6 +135,30 @@ function rowErrors(where, row) {
 	assert.equal(reasonHead('Not on macOS yet: its key combinations…'), 'Not on macOS yet');
 	assert.equal(reasonHead('暂不适用于 macOS：在'), '暂不适用于 macOS');
 	assert.equal(reasonHead('Catalogue reload — Linux only'), 'Catalogue reload — Linux only');
+}
+
+// The existing native check owner already supports inert reason rows.
+// Validate the compiler boundary itself, including refusal of malformed guards.
+{
+	const { classifyMenuRow } = require('../lib/menu-row-availability.cjs');
+	const check = {
+		type: 'check',
+		id: 'start_at_login',
+		i18n: 'menu.global.start_at_login',
+		checked_when: ['start_at_login_enabled'],
+		disabled_when: ['startup_command_available'],
+		disabled_reason_key: 'menu.about.startup_other_command_reason'
+	};
+	assert.equal(classifyMenuRow(check, 'startup'), 'unclassified');
+	assert.deepEqual(rowErrors('startup', check), []);
+	for (const bad of [
+		{ ...check, disabled_when: undefined },
+		{ ...check, i18n: undefined },
+		{ ...check, type: 'toggle' },
+		{ ...check, disabled_reason_key: '' }
+	]) {
+		assert.throws(() => classifyMenuRow(bad, 'startup'));
+	}
 }
 
 const errors = [];
@@ -345,7 +369,7 @@ console.log(
 		[{ unavailable: 'grey', reason_key: '' }, /greyed row needs its reason_key/],
 		[{ unavailable: 'grey', reason_key: 'r', i18n: '' }, /greyed row needs an i18n label/],
 		[{ disabled_reason_key: 'r', disabled_when: [] }, /needs the disabled_when/],
-		[{ disabled_reason_key: 'r', disabled_when: ['ready'], type: 'check' }, /command rows only/]
+		[{ disabled_reason_key: 'r', disabled_when: ['ready'], type: 'toggle' }, /command\/check rows/]
 	])
 		assert.throws(() => availability.classifyMenuRow({ ...base, ...patch }, 'hand'), message);
 

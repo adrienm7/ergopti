@@ -589,3 +589,64 @@ helpers.describe("dynamic family menu acknowledges its actual owner", function()
 		end)
 	end)
 end)
+
+
+--- Retains the actual engine and installs a fresh genuine renderer cohort.
+local function with_dynamic_section_frame(body)
+	with_dynamic_family_owners(function(owner)
+		local names = { "infra.manifest_menu", "ui.menu.menu_builder" }
+		local saved = {}; for _, name in ipairs(names) do saved[name] = package.loaded[name] end
+		local called, detail = xpcall(function()
+			local translator = require("infra.i18n")
+			local renderer = assert(require("menu.renderer").new({ platform = "linux",
+				manifest_path = function() return require("infra.paths").shared("modules/menu/menu_manifest.json") end,
+				json_decode = require("json").decode, i18n = translator, logger = require("logger.shim"),
+			}))
+			package.loaded["infra.manifest_menu"] = renderer
+			local root = renderer.get_root()
+			assert(type(root) == "table" and type(root.hotstrings_parameter_boundary) == "table")
+			body({ root = root, owner = owner, build = function()
+				local rows = hotstrings_menu(fake_config(false, false), owner.dynamic)
+				return row_for(rows, "category.dynamic_hotstrings")
+			end })
+		end, debug.traceback)
+		for _, name in ipairs(names) do package.loaded[name] = saved[name] end
+		if not called then error(detail, 0) end
+	end)
+end
+
+helpers.describe("dynamic families consume the genuine shared boundaries", function()
+	helpers.it("retains both old boundary positions and inert native delivery", function()
+		with_dynamic_section_frame(function(f)
+			local category = assert(f.build())
+			local children = assert(category.menu)
+			helpers.assert_eq(children[4].title, require("infra.i18n").get("menu.shortcuts.edit_personal_info"))
+			for _, index in ipairs({ 5, 12 }) do
+				helpers.assert_eq(children[index].title, "-", "the independent old family order fixes this boundary")
+				helpers.assert_nil(children[index].fn); helpers.assert_nil(children[index].menu)
+			end
+			helpers.assert_type(children[6].fn, "function", "the date owner remains actionable")
+			helpers.assert_type(children[13].fn, "function", "the personal-info family retains its native owner")
+			helpers.assert_eq(f.owner.read(f.owner.path), f.owner.source, "rendering preserves exact preferences")
+		end)
+	end)
+	for _, damage in ipairs({ "absent", "empty", "duplicate", "label" }) do
+		helpers.it("withdraws only dynamic construction after " .. damage .. " boundary and recovers", function()
+			with_dynamic_section_frame(function(f)
+				assert(f.build(), "the genuine category must exist before withdrawal")
+				local saved = f.root.hotstrings_parameter_boundary
+				local called, detail = xpcall(function()
+					if damage == "absent" then f.root.hotstrings_parameter_boundary = nil
+					elseif damage == "empty" then f.root.hotstrings_parameter_boundary = {}
+					elseif damage == "duplicate" then f.root.hotstrings_parameter_boundary = { { type = "---" }, { type = "---" } }
+					else f.root.hotstrings_parameter_boundary = { { type = "label", i18n = "common.cancel" } } end
+					helpers.assert_nil(f.build(), "a malformed shared boundary cannot be replaced by native separators")
+					helpers.assert_eq(f.owner.read(f.owner.path), f.owner.source, "refused presentation cannot write preferences")
+				end, debug.traceback)
+				f.root.hotstrings_parameter_boundary = saved
+				if not called then error(detail, 0) end
+				helpers.assert_type(f.build(), "table", "restoring the genuine shared declaration recovers construction")
+			end)
+		end)
+	end
+end)

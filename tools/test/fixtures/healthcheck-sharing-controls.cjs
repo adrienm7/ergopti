@@ -29,6 +29,23 @@ exports.run = function run(root) {
 		const text = model.formatShareable(vector.snapshot, schema, (key) => key);
 		for (const canary of vector.canaries)
 			assert.ok(!text.includes(canary), vector.name + ': ' + canary);
+
+		const readable = text.split('```json')[0];
+		for (const id of ['versions', 'hardware', 'system', 'input', 'ai', 'permissions', 'issues'])
+			assert.ok(
+				readable.includes('## healthcheck.section.' + id),
+				'readable section omitted: ' + id
+			);
+		assert.ok(readable.includes('| probes.appleevent_transport.native_status | -1744 |'));
+		assert.ok(readable.includes('| probes.appleevent_transport.cleanup | pending |'));
+		assert.ok(
+			readable.includes('| retired_probes.1.probes.appleevent_transport.cleanup | unknown |')
+		);
+		assert.deepEqual(
+			JSON.parse(text.split('```json\n')[1].split('\n```')[0]),
+			JSON.parse(JSON.stringify(safe))
+		);
+
 		assert.equal(safe.driver, vector.snapshot.driver);
 		assert.equal(safe.sections.versions.commit, 'a'.repeat(40));
 		assert.equal(safe.sections.versions.ergopti_version, '0.0.0-dev.156');

@@ -816,6 +816,7 @@ end
 function M.set_llm_backend_name(label)
 	llm_backend_label = label
 	Logger.debug(LOG, "Backend label: '%s'.", tostring(label))
+	return true
 end
 
 function M.set_llm_context_length(l)
