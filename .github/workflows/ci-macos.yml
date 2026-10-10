@@ -292,7 +292,7 @@ jobs:
           assert path.stat().st_size <= 1048576
           transcript = path.read_text(encoding='utf-8')
           expected = int(sys.argv[2])
-          assert expected in (5, 6, 8)
+          assert expected in (5, 6, 8, 20, 35)
           summaries = re.findall(r'^Ran ([0-9]+) tests? in [0-9]+(?:\.[0-9]+)?s$', transcript, re.MULTILINE)
           assert summaries == [str(expected)]
           assert len(re.findall(r'^Ran .*$', transcript, re.MULTILINE)) == 1
@@ -302,6 +302,9 @@ jobs:
           }
           receive_controls tools/diagnostics/macos_owned_private_session_test.py 5 "$ERGOPTI_OLLAMA_BUILD_ROOT/private-session-controls.log"
           receive_controls tools/test/macos_bootstrap_tls_numeric_binding_test.py 8 "$ERGOPTI_OLLAMA_BUILD_ROOT/numeric-tls-controls.log"
+          # Portable process peers; actual native listener qualification is separate.
+          receive_controls tools/test/macos_native_ollama_api_test.py 20 "$ERGOPTI_OLLAMA_BUILD_ROOT/api-wire-controls.log"
+          receive_controls tools/diagnostics/macos_managed_ollama_serve_test.py 35 "$ERGOPTI_OLLAMA_BUILD_ROOT/serve-lifecycle-controls.log"
         timeout-minutes: 5
       - name: Retain actual private-session and numeric TLS peer diagnostics
         if: always()
@@ -314,6 +317,8 @@ jobs:
           path: |
             ${{ env.ERGOPTI_OLLAMA_BUILD_ROOT }}/private-session-controls.log
             ${{ env.ERGOPTI_OLLAMA_BUILD_ROOT }}/numeric-tls-controls.log
+            ${{ env.ERGOPTI_OLLAMA_BUILD_ROOT }}/api-wire-controls.log
+            ${{ env.ERGOPTI_OLLAMA_BUILD_ROOT }}/serve-lifecycle-controls.log
       - name: Qualify actual SDK accepted-owner and deadline XCTest controls
         shell: bash
         run: |

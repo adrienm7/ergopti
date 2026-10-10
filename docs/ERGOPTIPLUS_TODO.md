@@ -6479,6 +6479,17 @@ this neutral cleanup completes no parent item.
       open. macOS system trust and explicit proxy relays are integrated, while
       opaque-client full-URL PAC/WPAD/fallback/redirect routing remains CODE.
 
+2026-10-10 direct Mac helper receiving enrollment. The existing Group6 native
+receiving step now adds APIwire20 and serve35 beside its unchanged private-session5
+and numeric-TLS8. Exactly three body spans add the calls, strict count allowlist
+and two always-retained logs; reversing those spans recovers the entire current
+Dev workflow. Original five-minute clock, PIPESTATUS, oneOK/noSKIP/1MiB guards,
+job topology and Root Windows evidence guards remain unchanged. This enrolls
+portable process/pipe/EOF/reap controls on both Mac architectures; it does not
+qualify a genuine signed listener, model generation or enterprise routing.
+Actual hosted55 and complete native/package/install acceptance remain pending;
+item62, item36 and transversal16/38 stay open.
+
 2026-10-10 native TLS fixture receiving at fe3da8332. Exact manual38032632804
 is terminal failure:3 successful,7 failed and7 skipped jobs. Both native
 architectures compile and passSDK41/PAC-source10/producer6. The original14
