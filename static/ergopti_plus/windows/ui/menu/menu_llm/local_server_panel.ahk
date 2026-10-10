@@ -218,59 +218,58 @@ class LLM_LocalServerPanel {
 				return this.LastSnapshot is Map ? this._Render(this.LastSnapshot, true, 0) : this._UnavailableRows()
 			if !this.Source.Admit()
 				return this._UnavailableRows()
-			if this.Native.IsStale()
-				this.Native.Rescan()
 			Source := this.Source.Capture()
 			if !IsObject(Source)
 				return this._UnavailableRows()
-			Owner := Map("source", Source, "receipts", Map())
+			Projection := this.Native.CaptureView(Source)
+			if !(Projection is Map)
+				return this._UnavailableRows()
+			if Projection["stale"] {
+				this.Native.Rescan()
+				Source := this.Source.Capture()
+				if !IsObject(Source)
+					return this._UnavailableRows()
+				Projection := this.Native.CaptureView(Source)
+				if !(Projection is Map) || Projection["stale"]
+					return this._UnavailableRows()
+			}
+			Entries := Projection["entries"]
+			Owner := Map("source", Source, "receipts", Projection["receipts"],
+				"native_view", Projection["view"], "native_models", Projection["models"],
+				"native_configuration", Projection["configuration"], "native_cache", Projection["cache"],
+				"native_rescan", Projection["rescan"], "native_controller", Projection["controller"],
+				"authority", Entries["authority"])
+			Snapshot := Map("results", Projection["results"], "detected", Projection["detected"],
+				"active", 0, "backend", Entries["backend"], "sweeping", Projection["sweeping"],
+				"authority", Entries["authority"],
+				"menu_owner", Entries["menu_owner"], "active_id", Entries["active_id"])
+			for Id in this.Order {
+				Entry := Entries["entries"][Id]
+				if Entry is Map && Entry["Id"] == Snapshot["active_id"] {
+					Snapshot["active"] := Map("provider", Id, "model", Entry["Model"])
+					break
+				}
+			}
 			ClaimCritical := Critical("On")
 			try {
 				Ready := !A_IsSuspended && !this.Writing
 				if Ready {
 					Owner["generation"] := ++this.Generation
-					this.Native.BeginView()
-					Owner["native_view"] := this.Native.ViewGeneration
-					Owner["native_models"] := this.Native.ModelGeneration
-					Owner["native_configuration"] := this.Native.ConfigurationGeneration
-					Owner["native_cache"] := this.Native.Cache
-					Owner["native_rescan"] := this.Native.RescanGeneration
-					Owner["native_controller"] := this.Native.Controller.Generation
-					Owner["authority"] := _LLM_Menu_ApiPrivateAuthorityGeneration
 					this.View := Owner
 				}
 			} finally Critical(ClaimCritical)
 			if !Ready
 				return this._UnavailableRows()
-			Snapshot := Map("results", Map(), "detected", [], "active", 0,
-				"backend", "", "sweeping", this.Native.Controller.IsSweeping())
-			for Id in this.Order {
-				Receipt := this.Native.Capture(Id)
-				if !IsObject(Receipt)
-					return this._UnavailableRows()
-				Owner["receipts"][Id] := Receipt
-				Verdict := this.Native.Result(Id)
-				if Verdict is Map {
-					Snapshot["results"][Id] := Verdict
-					if !(Verdict["status"] == "down")
-						Snapshot["detected"].Push(Id)
-				}
-			}
-			if !this._ActiveSnapshot(Snapshot) || !this._Current(Owner)
+			Rows := this._Render(Snapshot, false, Owner)
+			if !this.Source.Current(Source)
 				return this._UnavailableRows()
-			for Id, Receipt in Owner["receipts"]
-				if !this.Native.IsCurrent(Receipt)
-					return this._UnavailableRows()
-			if !this._Current(Owner)
-				return this._UnavailableRows()
-			Snapshot["authority"] := Owner["authority"]
 			ClaimCritical := Critical("On")
 			try {
 				Ready := this._HeldCurrent(Owner)
 				if Ready
 					this.LastSnapshot := Snapshot
 			} finally Critical(ClaimCritical)
-			return Ready ? this._Render(Snapshot, false, Owner) : this._UnavailableRows()
+			return Ready ? Rows : this._UnavailableRows()
 		} catch as Err {
 			this._Error("view", Err)
 			return this._UnavailableRows()

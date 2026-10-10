@@ -533,3 +533,158 @@ Test("local server panel: cold canonical status creates no runtime source or cal
 Test("local server panel: unavailable canonical status creates no HTTP source or callbacks", _LSPN_InertStatusRows.Bind("unavailable"))
 Test("local server panel: cold status reads actual shared caption and order mutations", _LSPN_InertStatusRows.Bind("cold", true))
 Test("local server panel: unavailable status reads actual shared caption and order mutations", _LSPN_InertStatusRows.Bind("unavailable", true))
+
+
+
+
+
+; ===================================================
+; ===================================================
+; ======= 4/ Fenced Read-Only View Projection =======
+; ===================================================
+; ===================================================
+
+_LSPB_Stamp(World) {
+	World.ConfigImage .= "[_meta]`nschema_version = " ConfigMigrateCurrentVersion() "`n"
+	AssertTrue(FSWriteDurable(World.ConfigPath, World.ConfigImage))
+	AssertTrue(ConfigSchemaCanPrepareWrite(World.ConfigPath))
+}
+
+_LSPB_Current(Observation, Owner, Receipt) {
+	Observation["checks"] += 1
+	if Observation.Get("ids", 0) is Array && !Observation.Get("changed", false) {
+		Observation["changed"] := true
+		Observation["ids"].Push("outside-native-catalogue")
+	}
+	return LLM_Menu_ApiPrivateSourceOwner.Prototype.Current.Call(Owner, Receipt)
+}
+
+_LSPB_SourceBatch() {
+	AssertTrue(HasMethod(LLM_Menu_ApiPrivateSourceOwner.Prototype, "EntriesBound"))
+	Fixture := _LSJ_Fixture()
+	World := Fixture.World
+	try {
+		_LSPB_Stamp(World)
+		Source := World.Owner.Capture()
+		AssertTrue(Source is LLM_Menu_ApiPrivateSourceReceipt)
+		Ids := []
+		global LLM_API_PROVIDER_ORDER, LLM_LOCAL_API_SERVERS
+		for Id in LLM_API_PROVIDER_ORDER
+			if LLM_LOCAL_API_SERVERS.Has(Id)
+				Ids.Push(Id)
+		Length := Ids.Length
+		Observation := Map("checks", 0, "ids", Ids)
+		World.Owner.DefineProp("Current", {Call: _LSPB_Current.Bind(Observation)})
+		Batch := World.Owner.EntriesBound(Ids, Source)
+		AssertTrue(Batch is Map)
+		AssertTrue(Observation["changed"], "the provider list must actually mutate during source validation")
+		AssertEqual(Length + 1, Ids.Length)
+		AssertEqual(Length, Batch["entries"].Count, "projection must use the admitted private list snapshot")
+		AssertFalse(Batch["entries"].Has("outside-native-catalogue"))
+		AssertEqual(2, Observation["checks"], "all providers share both full source fences")
+		AssertFalse(World.Owner.EntriesBound([Ids[1]], LLM_Menu_ApiPrivateSourceReceipt()),
+			"a fabricated receipt cannot project private entries")
+		AssertThrows(() => World.Owner.EntriesBound([Ids[1], Ids[1]], Source))
+		AssertThrows(() => World.Owner.EntriesBound(["outside-native-catalogue"], Source))
+	} finally {
+		if World.Owner.HasOwnProp("Current")
+			World.Owner.DeleteProp("Current")
+		Fixture.Dispose()
+	}
+}
+Test("local readonly batch: real source fences snapshot provider arguments", _LSPB_SourceBatch)
+
+_LSPB_CopyMutation(Fixture, Original, Kind, Native, Results) {
+	if !Fixture.BatchMutated {
+		Fixture.BatchMutated := true
+		if Kind == "source" {
+			AssertTrue(FSWriteDurable(Fixture.World.ApiPath, Fixture.World.ApiImage "`n"))
+		} else {
+			Native.BeginView()
+			Fixture.ReentrantViews := Native.Views
+			Fixture.ReentrantView := Native.ViewGeneration
+		}
+	}
+	return Original.Call(Native, Results)
+}
+
+class _LSPB_CompletedChild extends _LSM_ChildReceipt {
+	__New(Fixture, OnDone) {
+		this.Fixture := Fixture
+		this.OnDone := OnDone
+		super.__New()
+	}
+
+	start() {
+		super.start()
+		Fixture := this.Fixture
+		Request := Fixture.Requests[Fixture.Requests.Length]
+		Id := Fixture.Order[Fixture.Children.Length]
+		Body := Id == "lmstudio" ? '{"data":[{"id":"independent-joined"},{"id":"other-joined"}]}' : '{"data":[]}'
+		AssertTrue(FSWrite(Request.HeaderPath, "HTTP/1.1 200 Fixture`r`n`r`n"))
+		this.OnDone.Call(0, Body, "")
+		return true
+	}
+}
+
+_LSPB_CompletedChildFactory(Fixture, OnDone) {
+	return _LSPB_CompletedChild(Fixture, OnDone)
+}
+
+_LSPB_JoinedView() {
+	AssertTrue(HasMethod(LocalServersOwner.Prototype, "CaptureView"))
+	Fixture := _LSPN_Fixture()
+	try {
+		_LSPB_Stamp(Fixture.World)
+		; Complete the controlled child at its owned start, before another slow
+		; provider factory can exhaust the real curl deadline against fixture clock0.
+		Fixture.NativeSpawn := _LSPB_CompletedChildFactory.Bind(Fixture)
+		AssertTrue(Fixture.Native.Rescan())
+		AssertEqual(Fixture.Order.Length, Fixture.Requests.Length)
+		AssertFalse(Fixture.Native.Controller.IsSweeping())
+		AssertEqual(1, Fixture.Publications.Length)
+		AssertEqual(0, Fixture.Native.Jobs.Count)
+		Observation := Map("checks", 0)
+		Fixture.World.Owner.DefineProp("Current", {Call: _LSPB_Current.Bind(Observation)})
+		Rows := Fixture.Panel.Rows()
+		AssertTrue(Rows is Array && Rows.Length > 0)
+		AssertTrue(Fixture.Panel.LastSnapshot is Map)
+		AssertTrue(Observation["checks"] <= 8,
+			"one display projection must bound full source validation independently of provider/model rows")
+		AssertEqual(Fixture.Order.Length, Fixture.Panel.View["receipts"].Count)
+		AssertEqual("independent-joined", Fixture.Panel.LastSnapshot["results"]["lmstudio"]["models"][1])
+		AssertEqual("other-joined", Fixture.Panel.LastSnapshot["results"]["lmstudio"]["models"][2])
+		for Id, Receipt in Fixture.Panel.View["receipts"]
+			AssertTrue(Fixture.Native.IsCurrent(Receipt), "normal strict callback receipts must remain valid")
+		Source := Fixture.World.Owner.Capture()
+		Original := LocalServersOwner.Prototype.GetOwnPropDesc("_CopyResults").Call
+		for Kind in ["source", "view"] {
+			Fixture.BatchMutated := false
+			OldViews := Fixture.Native.Views
+			Fixture.Native.DefineProp("_CopyResults", {Call: _LSPB_CopyMutation.Bind(Fixture, Original, Kind)})
+			try {
+				Projection := Fixture.Native.CaptureView(Source)
+				AssertFalse(Projection is Map, "a mutation during detached copy must refuse the whole view")
+				AssertTrue(Fixture.BatchMutated, "the actual yielding copy boundary must be reached")
+				if Kind == "source"
+					AssertTrue(Fixture.Native.Views == OldViews, "source refusal cannot emit partial action receipts")
+				else {
+					AssertTrue(Fixture.Native.Views == Fixture.ReentrantViews,
+						"refused predecessor cannot overwrite a reentrant view")
+					AssertEqual(Fixture.ReentrantView, Fixture.Native.ViewGeneration)
+				}
+			} finally {
+				Fixture.Native.DeleteProp("_CopyResults")
+				AssertTrue(FSWriteDurable(Fixture.World.ApiPath, Fixture.World.ApiImage))
+			}
+		}
+	} finally {
+		if Fixture.Native.HasOwnProp("_CopyResults")
+			Fixture.Native.DeleteProp("_CopyResults")
+		if Fixture.World.Owner.HasOwnProp("Current")
+			Fixture.World.Owner.DeleteProp("Current")
+		Fixture.Dispose()
+	}
+}
+Test("local readonly batch: actual joined rows bound reads and reject copy reentry", _LSPB_JoinedView)
+
