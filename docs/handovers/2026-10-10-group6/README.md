@@ -363,3 +363,14 @@ controls pass with exact copied-header and retained-source assertions. Native
 compilation and model receiving on the corrected recipe remain pending; the
 compiler exception from the preceding failed prepare was not recovered. No
 native success or item62 completion is inferred from portable receiving.
+
+## PAC fixture accepted-worker ownership
+
+2026-10-10 PAC fixture accepted-worker ownership. The original connection
+could acquire its request worker before the controlled thread patch. Acquisition
+now occurs inside that original scope, with conditional connection cleanup.
+Identical genuine admission scheduling fails the original entered.wait assertion
+and passes the correction, with original physical owners closed in both rows.
+All14 original cases and66 portable contract controls pass. Assertions, original
+two-second clocks and native source implementation remain unchanged; this
+fixture repair does not qualify native Swift/SSPI or finish item62.
