@@ -367,3 +367,115 @@ helpers.describe("off-state current backend reselect", function()
 		end)
 	end)
 end)
+
+
+helpers.describe("provider checkmark owns its publication (backend-checkmark)", function()
+	local modules = {}
+	for _, name in ipairs(OWNED_MODULES) do modules[#modules + 1] = name end
+	for _, name in ipairs({ "ui.menu.menu_llm.model_switcher", "ui.menu.menu_llm.prediction_lock_registry",
+		"ui.menu.menu_llm.profile_label", "adapters.timer_scheduler", "llm.tone" }) do
+		modules[#modules + 1] = name
+	end
+	local function fixture(target, rejects_menu, scenario)
+		helpers.with_fresh_modules(modules, function()
+			local source = target == "ollama" and "mlx" or "ollama"
+			local state = { llm_backend = source, llm_enabled = true, llm_active_profile = "basic",
+				llm_num_predictions = 1, llm_model = "old", llm_model_mlx = "candidate",
+				llm_model_ollama = "candidate" }
+			local observed = { backend = source, menus = {}, model_setters = 0 }
+			package.loaded["infra.logger"] = helpers.make_logger_stub()
+			package.loaded["infra.i18n"] = { get = function(key) return key end }
+			package.loaded["infra.dialog_util"] = { block_alert = function() error("dialog forbidden") end }
+			package.loaded["infra.notifications"] = { notify = function() return true end }
+			package.loaded["infra.manifest_menu"] = { render_rows = function(rows) return rows end }
+			package.loaded["modules.llm"] = {
+				DEFAULT_STATE = { llm_num_predictions = 1, llm_model_mlx = "candidate", llm_model_ollama = "candidate" },
+				get_backend = function() return observed.backend end,
+				set_backend = function(value) observed.backend = value; return true end,
+				load_api_entries = function() return true end,
+			}
+			package.loaded["modules.llm.mlx_deps_checker"] = new_checker(true)
+			package.loaded["modules.llm.ollama_deps_checker"] = new_checker(true, true)
+			local pending
+			local models = {
+				stop_mlx_server_if_needed = function(done) return done() end,
+				check_requirements = function(_, success, failure)
+					pending = { success = success, failure = failure }; return true
+				end,
+				get_presets = function() return {} end,
+				get_model_info = function() return {} end,
+				get_actual_model_name = function(name) return name end,
+			}
+			local keymap = {
+				set_llm_backend_name = function() return true end,
+				set_llm_model = function() observed.model_setters = observed.model_setters + 1; return true end,
+				set_llm_display_model_name = function() return true end,
+				set_llm_enabled = function() return true end,
+			}
+			local panel, context
+			local function refresh()
+				local _, rows = panel.build(context)
+				local checks = {}
+				for id, index in pairs(ROW) do checks[id] = rows[index].checked end
+				observed.menus[#observed.menus + 1] = checks
+				if rejects_menu and state.llm_backend == target then return false end
+				return true
+			end
+			local switcher = require("ui.menu.menu_llm.model_switcher").new({
+				state = state, models_mgr = models, keymap = keymap,
+				save_prefs = function() return true end, update_menu = refresh,
+			})
+			panel = require("ui.menu.menu_llm.backend_panel")
+			context = { state = state, keymap = keymap, models_mgr = models, paused = false,
+				get_display_model_name = switcher.get_display_model_name,
+				switch_model = switcher.switch_model, disable_model = switcher.disable_model,
+				save_prefs = function() return true end, update_menu = refresh,
+				WarmupCtrl = { warmup = function() return true end },
+				reset_llm_health_status = function() return true end }
+			local old_execute, old_hs_execute = os.execute, hs.execute
+			os.execute = function() error("process forbidden") end
+			hs.execute = function() return "arm64" end
+			local ok, err = xpcall(function()
+				refresh()
+				local _, rows = panel.build(context)
+				local accepted = rows[ROW[target]].action()
+				scenario(accepted, observed, state, pending, source)
+			end, debug.traceback)
+			os.execute, hs.execute = old_execute, old_hs_execute
+			if not ok then error(err, 0) end
+		end)
+	end
+	helpers.it("(backend-checkmark) local backend renders while real model requirements are pending", function()
+		for _, target in ipairs({ "ollama", "mlx" }) do
+			fixture(target, false, function(accepted, observed, state, pending)
+				helpers.assert_eq(accepted, true)
+				helpers.assert_type(pending, "table", "the real model owner must retain its async completion")
+				helpers.assert_eq(state.llm_backend, target)
+				helpers.assert_eq(observed.backend, target)
+				helpers.assert_eq(observed.model_setters, 0, "menu refresh cannot pretend the model completed")
+				helpers.assert_eq(observed.menus[#observed.menus][target], true,
+					"the real rebuilt row must show the committed provider before model success")
+			end)
+		end
+	end)
+	helpers.it("(backend-checkmark) failed real model requirements keep the committed provider visible", function()
+		fixture("ollama", false, function(accepted, observed, state, pending)
+			helpers.assert_eq(accepted, true)
+			helpers.assert_type(pending, "table")
+			pending.failure()
+			helpers.assert_eq(state.llm_backend, "ollama")
+			helpers.assert_eq(observed.model_setters, 0)
+			helpers.assert_eq(observed.menus[#observed.menus].ollama, true)
+		end)
+	end)
+	helpers.it("(backend-checkmark) refused menu ACK restores the prior provider and checkmark", function()
+		fixture("ollama", true, function(accepted, observed, state, pending, source)
+			helpers.assert_eq(accepted, false)
+			helpers.assert_eq(state.llm_backend, source)
+			helpers.assert_eq(observed.backend, source)
+			helpers.assert_eq(observed.menus[#observed.menus][source], true)
+			pending.failure()
+			helpers.assert_eq(state.llm_backend, source)
+		end)
+	end)
+end)
