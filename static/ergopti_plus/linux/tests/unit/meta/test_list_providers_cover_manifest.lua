@@ -671,6 +671,17 @@ local function genuine_language_providers(damage, exercise)
 			end
 			return result
 		end
+		-- Import the actual native owner after its real observers are installed.
+		-- The public native loop pins raw facade methods at import, so a later
+		-- wrapper must not masquerade as the already retained render owner.
+		package.loaded["ui.menu.menu_builder"] = nil
+		builder = require("ui.menu.menu_builder")
+		closure, slot = upvalue(builder.build, "_build_hotstrings")
+		body, body_slot = upvalue(closure, "_manifest_hotstring_rows")
+		notification, notification_slot = upvalue(body, "show_error")
+		assert(type(closure) == "function" and slot, "the observed actual Hotstrings closure is required")
+		assert(type(body) == "function" and body_slot, "the observed actual native Hotstrings body is required")
+		assert(type(notification) == "function" and notification_slot, "the observed actual refusal port is required")
 		if damage then damage(builder, slot, closure, body_slot, manifest, root) end
 		local active, active_body = select(2, debug.getupvalue(builder.build, slot)), select(2, debug.getupvalue(closure, body_slot))
 		local found = {}

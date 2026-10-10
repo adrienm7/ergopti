@@ -91,7 +91,7 @@ Test("script-control submenu: switch, restore, clear, then the slots, and the ti
 ; the default and leaves no key.
 _SCSM_SwitchCase(StartOn) {
 	global ConfigurationFile
-	Fixture := _ScopeOwnerFixture()
+	Fixture := _ScopeOwnerFixture(StartOn ? "" : '[shortcuts.script_control]`nchords_enabled = false`n')
 	OldConfig := IsSet(ConfigurationFile) ? ConfigurationFile : unset
 	Reloads := 0
 	CountReload() {
@@ -109,7 +109,7 @@ _SCSM_SwitchCase(StartOn) {
 	}
 	try {
 		ConfigurationFile := Fixture.path
-		Assert(FSWriteDurable(Fixture.path, StartOn ? "" : '[shortcuts.script_control]`nchords_enabled = false`n'))
+		Assert(FSWriteDurable(Fixture.path, Fixture.source))
 		_SCSM_WithState(StartOn, ClickSwitch)
 		AssertEqual(1, Reloads, "the switch reloads so every chord reads it")
 		Parsed := TOML_ParseFreshFile(Fixture.path)
@@ -150,10 +150,11 @@ Test("script-control submenu: refused persistence never reloads the driver",
 ; the switch; both drop the parameters of script bindings only.
 _SCSM_ScopeCase(Mode) {
 	global GestureActionParameters, _SCSM_SLOTS
-	Fixture := _ScopeOwnerFixture()
 	Source := '[shortcuts.script_control]`nchords_enabled = false`nscript_altgr_enter = "none"`nscript_altgr_delete = "open_url"`n'
 		. '[action_parameters]`nscript__script_altgr_delete__open_url = "https://script.test"`n'
 		. 'keyboard__win_b__open_url = "https://keyboard.test"`n'
+	Fixture := _ScopeOwnerFixture(Source)
+	Source := Fixture.source
 	Assert(FSWriteDurable(Fixture.path, Source))
 	Bundle := 0, Refusal := 0, Receipt := 0
 	Launch(_Success, Borrowed, Refused) {

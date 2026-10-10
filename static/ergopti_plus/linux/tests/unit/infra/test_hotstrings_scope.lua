@@ -11,6 +11,22 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
+
+--- Filters this positive scenario to the actual canonical parent, retaining every field.
+--- A copied id-only row no longer declares the parent that receives native children.
+local function declared_parent(top, id)
+	local selected
+	for _, row in ipairs(top) do
+		if row.id == id then
+			assert(selected == nil, "canonical fixture parent must be unique")
+			selected = row
+		end
+	end
+	assert(type(selected) == "table" and selected.type == "group"
+		and type(selected.i18n) == "string", "actual canonical fixture parent unavailable")
+	return { selected }
+end
+
 local Writer = require("toml_codec.writer")
 local Codec = require("toml_codec")
 
@@ -370,7 +386,7 @@ helpers.describe("hotstrings scope: refusals", function()
 				local changed, questions = 0, 0
 				local passed, err = pcall(function()
 					-- The real hotstrings_menu declaration: the rows are the manifest's.
-					root.top_level = { { id = "hotstrings" } }
+					root.top_level = declared_parent(top, "hotstrings")
 					os.execute = function(command)
 						if command:find("zenity", 1, true) then
 							questions = questions + 1

@@ -1,0 +1,1418 @@
+{
+	"archive": "reviewed-preparations-and-native-evidence.tar.gz",
+	"archive_sha256": "15b5843064c31646dbbf1d9ccc65ee763cd282f154cc0d1625760d9c5c7588df",
+	"archive_bytes": 8535344,
+	"members": [
+		{
+			"path": "LINUX-HEADER-ACTUAL-PARITY-SUCCESSOR-20261010.log",
+			"bytes": 814,
+			"sha256": "35fe701af6cf0533d296d64b1aef63cd86a0b834ce85c95f70bd6a9dc4578f9a"
+		},
+		{
+			"path": "LINUX-HEADER-ACTUAL-RECEIVING-20261010.json",
+			"bytes": 544,
+			"sha256": "072ba36c2e2a671ab32f5ed536e23fd067d7f84e60be42ea486cf588c4fb13f3"
+		},
+		{
+			"path": "LINUX-HEADER-HISTORICAL-ABSENCE-ACTUAL-RECEIVING-20261010.json",
+			"bytes": 365,
+			"sha256": "5d9ffd52ce21d7dee02b1d52478e4ff39675e699fed2e9eaabf57ede10e64e8c"
+		},
+		{
+			"path": "LINUX-HEADER-PHYSICAL-PROVENANCE-V3-ACTUAL-RECEIVING-20261010.json",
+			"bytes": 965,
+			"sha256": "131cfcb574bc4871175a22585cf2ad97420825a2a72d1950c8cbb4ffb1daec9c"
+		},
+		{
+			"path": "LINUX-HEADER-THREE-CJS-FORMATTING-INDEPENDENT-SOURCE-REVIEW-20261010.json",
+			"bytes": 2804,
+			"sha256": "bc0b7083d6799fbc312c9eac9f5f79b9f1ca3b3c7b27686596650353c1207b98"
+		},
+		{
+			"path": "MAC-DEAD-BOUNDARY-ACTUAL-RECEIVING-20261010.json",
+			"bytes": 1048,
+			"sha256": "426de77b0afe3fc4d9ea7c619bbdef7e48e5052f8ff8b5504c2aa4d1ccf5d09e"
+		},
+		{
+			"path": "MAC-ORIGINAL-PROJECTION-FORMAT-RECEIPT-20261010.json",
+			"bytes": 413,
+			"sha256": "18d191082157af7eab1bb79587628f99f8022e1fe43d6052740d3e5f82d70b5f"
+		},
+		{
+			"path": "MENU-CURRENT-UPSTREAM-RANGE-ACTUAL-SELECTED-20261010.json",
+			"bytes": 663,
+			"sha256": "58fd08e84743019796de54ca39ed75a3a78edaff5e827778d9a56067c4faad35"
+		},
+		{
+			"path": "WINDOWS-TWO-MENU-FIXTURES-ACTUAL-RECEIVING-20261010.json",
+			"bytes": 1537,
+			"sha256": "00bc2c1a9d3ac9de5e93c33e6b9711f8ccf89e0516c258b9069131871cf5427c"
+		},
+		{
+			"path": "linux-empty-extension-current-root-native-receipt-20261010/ROOT-PINS-AFTER.json",
+			"bytes": 1082755,
+			"sha256": "eae64fa85cd207d73c0f719e90593ced8313a6d1e9af71c1a6cd004fc56031ac"
+		},
+		{
+			"path": "linux-empty-extension-current-root-native-receipt-20261010/ROOT-PINS-BEFORE.json",
+			"bytes": 1082755,
+			"sha256": "eae64fa85cd207d73c0f719e90593ced8313a6d1e9af71c1a6cd004fc56031ac"
+		},
+		{
+			"path": "linux-empty-extension-current-root-native-receipt-20261010/TERMINAL-RECEIPT.json",
+			"bytes": 9362,
+			"sha256": "4e745ef50f4b2f22fc16ed8068564a8c86bf044daee5d35cc7bc2dfadc484539"
+		},
+		{
+			"path": "linux-empty-extension-current-root-native-receipt-20261010/lua5.4-candidate-ATTEMPT-RECEIPT.json",
+			"bytes": 677,
+			"sha256": "d572793f8279886f8ff70c40c2e9d3e18ba748d042dc9940cbe061214ffa2c3e"
+		},
+		{
+			"path": "linux-empty-extension-current-root-native-receipt-20261010/lua5.4-candidate-RAW.log",
+			"bytes": 15407,
+			"sha256": "fc52bda6fd9dd0fed75d298d32409159513884a1e437349f2c8f333185db2281"
+		},
+		{
+			"path": "linux-empty-extension-current-root-native-receipt-20261010/lua5.4-original-ATTEMPT-RECEIPT.json",
+			"bytes": 3123,
+			"sha256": "7c6d143009613f9ed50962d36b1bfe9eba2f2749a56ed46a8b47414b1648bf99"
+		},
+		{
+			"path": "linux-empty-extension-current-root-native-receipt-20261010/lua5.4-original-RAW.log",
+			"bytes": 126696,
+			"sha256": "73d6231f4aef70855de9c5363459f649abe11a72a8857e2b413c8f014a18bfd8"
+		},
+		{
+			"path": "linux-empty-extension-current-root-native-receipt-20261010/luajit-candidate-ATTEMPT-RECEIPT.json",
+			"bytes": 677,
+			"sha256": "7dbd7c4d3eb6f6a254dee9dc815244b568bd812a6b29fd0958534db4a7101445"
+		},
+		{
+			"path": "linux-empty-extension-current-root-native-receipt-20261010/luajit-candidate-RAW.log",
+			"bytes": 15407,
+			"sha256": "ebdd2193fa148c837ae2a3ed7828e6001b5004999f2ac575e018e299c87af1ee"
+		},
+		{
+			"path": "linux-empty-extension-current-root-native-receipt-20261010/luajit-original-ATTEMPT-RECEIPT.json",
+			"bytes": 3123,
+			"sha256": "7cc25c482af619b929d1f71cfe3b866200c2c1c723f0a57e08ee56a899737ac7"
+		},
+		{
+			"path": "linux-empty-extension-current-root-native-receipt-20261010/luajit-original-RAW.log",
+			"bytes": 124344,
+			"sha256": "89b402456a8890c3a8947f94048bb99ae59cefc09163aa6b58abcbb741e60875"
+		},
+		{
+			"path": "linux-guarded-header-historical-disabled-absence-source-correction-20261010/INDEPENDENT-LINUX-HEADER-HISTORICAL-ABSENCE-SOURCE-PEER-REVIEW-20261010.json",
+			"bytes": 2383,
+			"sha256": "ff89fe09495392c48b94ecab769a9d0f71f2f107796b3892c88409dca9499494"
+		},
+		{
+			"path": "linux-guarded-header-historical-disabled-absence-source-correction-20261010/README.md",
+			"bytes": 794,
+			"sha256": "d404d70133fa5acdc2591097d28b1324d195a4336ce88d4dbade1910ce248b97"
+		},
+		{
+			"path": "linux-guarded-header-historical-disabled-absence-source-correction-20261010/SOURCE-PROPOSAL.json",
+			"bytes": 4629,
+			"sha256": "d3942fc8ca8599b526b2a6643d098fe25096a3f64911ca93654c3863593646a7"
+		},
+		{
+			"path": "linux-guarded-header-historical-disabled-absence-source-correction-20261010/postimages/tools/lib/menu-native-llm-parent-binding.cjs",
+			"bytes": 123114,
+			"sha256": "aa10a59277801d36b559b647374c38823ad50121c6c1294c6bbc63805282e512"
+		},
+		{
+			"path": "linux-guarded-header-historical-disabled-absence-source-correction-20261010/preimages/tools/lib/menu-native-llm-parent-binding.cjs",
+			"bytes": 122830,
+			"sha256": "d04a4932e85045c1225a595e8316e6975f654cc1115da239d8ed0c9315a3b9ed"
+		},
+		{
+			"path": "linux-guarded-header-historical-disabled-absence-source-correction-20261010/references/static/ergopti_plus/_shared/tests/corpus/menus/linux_tray_header_original.json",
+			"bytes": 4072,
+			"sha256": "77a93d85936a39222879f991d0f7318a1e16ce0ef49dbe69a0852c5ef1e1aa23"
+		},
+		{
+			"path": "linux-guarded-header-historical-disabled-absence-source-correction-20261010/references/static/ergopti_plus/linux/ui/menu/agent_rows.lua",
+			"bytes": 11988,
+			"sha256": "1aead2d1ec4e3fb42c50f7ae76a355a7dd9698221a18c6f3651c730fc615314b"
+		},
+		{
+			"path": "linux-guarded-header-historical-disabled-absence-source-correction-20261010/references/static/ergopti_plus/linux/ui/menu/ai_parent.lua",
+			"bytes": 11743,
+			"sha256": "225ef2d958b71051dc12723cc1b1b6c41c0a46e30571d18326815c252eb1db5b"
+		},
+		{
+			"path": "linux-guarded-header-historical-disabled-absence-source-correction-20261010/references/static/ergopti_plus/linux/ui/menu/menu_builder.lua",
+			"bytes": 239686,
+			"sha256": "600b72a3c7f18c409dd5769e1c3c237af5bcfba0d2484f04a2537575a2978eab"
+		},
+		{
+			"path": "linux-guarded-header-historical-disabled-absence-source-correction-20261010/references/tools/lib/menu-hotstring-language-binding.cjs",
+			"bytes": 59341,
+			"sha256": "4d18e8b08df8dda3ed5aa38894d3edb9b04f8cb97e8c9a2d5130e7ce4f351ed0"
+		},
+		{
+			"path": "linux-guarded-header-historical-disabled-absence-source-correction-20261010/references/tools/test/test-menu-manifest.cjs",
+			"bytes": 452629,
+			"sha256": "ec92fd7dbca708e4a0fd68b85f48d7215c44531432ee7113d9e014184f3b66d3"
+		},
+		{
+			"path": "linux-guarded-header-historical-disabled-absence-source-correction-20261010/references/tools/test/test-menu-parity.cjs",
+			"bytes": 231308,
+			"sha256": "f9e9796b29b8c491c30e4cc775a9772abe8fc26bd1756861b9bd4387cccf3b95"
+		},
+		{
+			"path": "linux-guarded-header-historical-disabled-absence-source-correction-20261010/source-only.patch",
+			"bytes": 857,
+			"sha256": "061a6d258a0bdd7b80e8771bf6f3d4d716f7ae174a5bebb51e7f6a22012e62e2"
+		},
+		{
+			"path": "linux-header-actual-complete-native-receiving-20261010/ROOT-PINS-AFTER.json",
+			"bytes": 1088863,
+			"sha256": "72f5b7c653f7834d3c42e4bfbedc7f32fb091d17512111672e859f635f1ef3ef"
+		},
+		{
+			"path": "linux-header-actual-complete-native-receiving-20261010/ROOT-PINS-BEFORE.json",
+			"bytes": 1088863,
+			"sha256": "72f5b7c653f7834d3c42e4bfbedc7f32fb091d17512111672e859f635f1ef3ef"
+		},
+		{
+			"path": "linux-header-actual-complete-native-receiving-20261010/TERMINAL-RECEIPT.json",
+			"bytes": 29818,
+			"sha256": "d45e56a385fe5047a3c3c4e20af65a57c8d3ec1008f3033ed42b1023f1839495"
+		},
+		{
+			"path": "linux-header-actual-complete-native-receiving-20261010/lua5.4-candidate-ATTEMPT-RECEIPT.json",
+			"bytes": 4534,
+			"sha256": "262224dfa07a8d9bdf1bb49f66145049c91f4ac6c1292a79f9673795571d209b"
+		},
+		{
+			"path": "linux-header-actual-complete-native-receiving-20261010/lua5.4-candidate-RAW.log",
+			"bytes": 7896,
+			"sha256": "698a00da5de7c31cbcb9be1cb57c281a4be95b38df52aadeaece183519973bd0"
+		},
+		{
+			"path": "linux-header-actual-complete-native-receiving-20261010/lua5.4-original-ATTEMPT-RECEIPT.json",
+			"bytes": 8577,
+			"sha256": "f5a24baa8dab1afaac7a6866d03caa75d0128fd22d78b6d33d0eb8053e921d8e"
+		},
+		{
+			"path": "linux-header-actual-complete-native-receiving-20261010/lua5.4-original-RAW.log",
+			"bytes": 215373,
+			"sha256": "0cbbf6aa9e74651a5666b41facf297e47ef4bb8fa30a3dbfc444be9a07c250e0"
+		},
+		{
+			"path": "linux-header-actual-complete-native-receiving-20261010/luajit-candidate-ATTEMPT-RECEIPT.json",
+			"bytes": 4534,
+			"sha256": "8cc58a61ad8668b966feabcbeb204dc5ca092e25ee850a4f5da08c231bf46ef4"
+		},
+		{
+			"path": "linux-header-actual-complete-native-receiving-20261010/luajit-candidate-RAW.log",
+			"bytes": 7896,
+			"sha256": "698a00da5de7c31cbcb9be1cb57c281a4be95b38df52aadeaece183519973bd0"
+		},
+		{
+			"path": "linux-header-actual-complete-native-receiving-20261010/luajit-original-ATTEMPT-RECEIPT.json",
+			"bytes": 8577,
+			"sha256": "ef0f108a03702e1f71c0933f22638d9b077c720fc5df7396315febd82fc5275d"
+		},
+		{
+			"path": "linux-header-actual-complete-native-receiving-20261010/luajit-original-RAW.log",
+			"bytes": 212833,
+			"sha256": "f3b6617ce2f02635a4e55e4c11898ab75374b00316e6c6db826cf611d219d61d"
+		},
+		{
+			"path": "linux-header-actual-record-physical-root-provenance-enrollment-v3-source-only-20261010/INDEPENDENT-LINUX-HEADER-ACTUAL-ROOT-V3-SOURCE-PEER-REVIEW-20261010.json",
+			"bytes": 3840,
+			"sha256": "1096aba4c85407b3c214b2e3fdcdbdd4827591763110a4532f4e543531c825d1"
+		},
+		{
+			"path": "linux-header-actual-record-physical-root-provenance-enrollment-v3-source-only-20261010/INDEPENDENT-LINUX-HEADER-V3-CANONICAL-GUARDS-QUALIFICATION-ADDENDUM-20261010.json",
+			"bytes": 825,
+			"sha256": "80db2c79c08438a850a180d90663e2e4fa8cd8c88a90d74e657a38dca7ddc49b"
+		},
+		{
+			"path": "linux-header-actual-record-physical-root-provenance-enrollment-v3-source-only-20261010/README.md",
+			"bytes": 917,
+			"sha256": "8ea4382d8884e8ddf7b27b9c146a89e5ec79bdace117ae2701844ec954b18769"
+		},
+		{
+			"path": "linux-header-actual-record-physical-root-provenance-enrollment-v3-source-only-20261010/SOURCE-PROPOSAL.json",
+			"bytes": 5905,
+			"sha256": "33babf195655158c65e918489572fce3d902d5f6e8dd428d6efab942a1d25bca"
+		},
+		{
+			"path": "linux-header-actual-record-physical-root-provenance-enrollment-v3-source-only-20261010/postimages/tools/lib/menu-native-llm-parent-binding.cjs",
+			"bytes": 125861,
+			"sha256": "7814fcb2fc4a62a2a91be54b53e19554dbfe5fc60738425f20765c5a34ea98b5"
+		},
+		{
+			"path": "linux-header-actual-record-physical-root-provenance-enrollment-v3-source-only-20261010/postimages/tools/test/test-menu-parity.cjs",
+			"bytes": 237514,
+			"sha256": "8bd1dfd6a682ac7013d0e1dc8c2726367343e393593b42f5f6d011c6444a92ac"
+		},
+		{
+			"path": "linux-header-actual-record-physical-root-provenance-enrollment-v3-source-only-20261010/preimages/tools/lib/menu-native-llm-parent-binding.cjs",
+			"bytes": 123114,
+			"sha256": "aa10a59277801d36b559b647374c38823ad50121c6c1294c6bbc63805282e512"
+		},
+		{
+			"path": "linux-header-actual-record-physical-root-provenance-enrollment-v3-source-only-20261010/preimages/tools/test/test-menu-parity.cjs",
+			"bytes": 231308,
+			"sha256": "f9e9796b29b8c491c30e4cc775a9772abe8fc26bd1756861b9bd4387cccf3b95"
+		},
+		{
+			"path": "linux-header-actual-record-physical-root-provenance-enrollment-v3-source-only-20261010/references/LINUX-HEADER-ACTUAL-PARITY-SUCCESSOR-20261010.log",
+			"bytes": 814,
+			"sha256": "35fe701af6cf0533d296d64b1aef63cd86a0b834ce85c95f70bd6a9dc4578f9a"
+		},
+		{
+			"path": "linux-header-actual-record-physical-root-provenance-enrollment-v3-source-only-20261010/references/static/ergopti_plus/_shared/data/locales/en.json",
+			"bytes": 224183,
+			"sha256": "56e632734a3180c97314b001e38e71bcad47640772d0afcda6f82380296f492b"
+		},
+		{
+			"path": "linux-header-actual-record-physical-root-provenance-enrollment-v3-source-only-20261010/references/static/ergopti_plus/_shared/lua/menu/renderer.lua",
+			"bytes": 103918,
+			"sha256": "54a993a045c45bd4cfde534ef7d4bde0479a0eff1efaf269521465962f3d0e93"
+		},
+		{
+			"path": "linux-header-actual-record-physical-root-provenance-enrollment-v3-source-only-20261010/references/static/ergopti_plus/_shared/modules/features/manifest.toml",
+			"bytes": 286710,
+			"sha256": "9cdb75480a1129516d6a14b71b8b91e7c478952e71db8aaf1beee1a880d07efd"
+		},
+		{
+			"path": "linux-header-actual-record-physical-root-provenance-enrollment-v3-source-only-20261010/references/static/ergopti_plus/_shared/tests/corpus/menus/linux_tray_header_original.json",
+			"bytes": 4072,
+			"sha256": "77a93d85936a39222879f991d0f7318a1e16ce0ef49dbe69a0852c5ef1e1aa23"
+		},
+		{
+			"path": "linux-header-actual-record-physical-root-provenance-enrollment-v3-source-only-20261010/references/static/ergopti_plus/linux/ui/menu/menu_builder.lua",
+			"bytes": 239686,
+			"sha256": "600b72a3c7f18c409dd5769e1c3c237af5bcfba0d2484f04a2537575a2978eab"
+		},
+		{
+			"path": "linux-header-actual-record-physical-root-provenance-enrollment-v3-source-only-20261010/references/tools/lib/script-source.cjs",
+			"bytes": 2832,
+			"sha256": "72e918f94f2f023320b2fa670f53f154c2c0024733f3c9794181b618215a5478"
+		},
+		{
+			"path": "linux-header-actual-record-physical-root-provenance-enrollment-v3-source-only-20261010/source-only.patch",
+			"bytes": 10027,
+			"sha256": "49e44433e605afca4051db203b21e66e55d8d0b7be03a4e9a0b0ce5465de6d59"
+		},
+		{
+			"path": "linux-header-ordinary-physical-root-provenance-enrollment-v2-source-only-20261010/INDEPENDENT-LINUX-HEADER-ORDINARY-ROOT-V2-SOURCE-PEER-REVIEW-20261010.json",
+			"bytes": 1934,
+			"sha256": "86cd4ccc91c7b4eba6b62fda2049fa571d3222680c71493efb5231c6b73e9fc8"
+		},
+		{
+			"path": "linux-header-ordinary-physical-root-provenance-enrollment-v2-source-only-20261010/README.md",
+			"bytes": 871,
+			"sha256": "08447b366e3314093fc2e2d824e7ad566f84fef49c0c3373df2bc00b004a5dd8"
+		},
+		{
+			"path": "linux-header-ordinary-physical-root-provenance-enrollment-v2-source-only-20261010/SOURCE-PROPOSAL.json",
+			"bytes": 5259,
+			"sha256": "f8c7351d9b8ac6c5c2d381cdcceb73d7e75011c74d6ce3bede3a872f30a5595c"
+		},
+		{
+			"path": "linux-header-ordinary-physical-root-provenance-enrollment-v2-source-only-20261010/postimages/tools/lib/menu-native-llm-parent-binding.cjs",
+			"bytes": 125706,
+			"sha256": "d1a663e4320d77ed1905fd0b19266feceef00703f9a7ac87e13ddca32cdcdc2b"
+		},
+		{
+			"path": "linux-header-ordinary-physical-root-provenance-enrollment-v2-source-only-20261010/postimages/tools/test/test-menu-parity.cjs",
+			"bytes": 237259,
+			"sha256": "1ad589b4842955d3196d667f0c147885ff621273ddc3655f6c99b2d792732d59"
+		},
+		{
+			"path": "linux-header-ordinary-physical-root-provenance-enrollment-v2-source-only-20261010/preimages/tools/lib/menu-native-llm-parent-binding.cjs",
+			"bytes": 123114,
+			"sha256": "aa10a59277801d36b559b647374c38823ad50121c6c1294c6bbc63805282e512"
+		},
+		{
+			"path": "linux-header-ordinary-physical-root-provenance-enrollment-v2-source-only-20261010/preimages/tools/test/test-menu-parity.cjs",
+			"bytes": 231308,
+			"sha256": "f9e9796b29b8c491c30e4cc775a9772abe8fc26bd1756861b9bd4387cccf3b95"
+		},
+		{
+			"path": "linux-header-ordinary-physical-root-provenance-enrollment-v2-source-only-20261010/references/LINUX-HEADER-ACTUAL-PARITY-SUCCESSOR-20261010.log",
+			"bytes": 814,
+			"sha256": "35fe701af6cf0533d296d64b1aef63cd86a0b834ce85c95f70bd6a9dc4578f9a"
+		},
+		{
+			"path": "linux-header-ordinary-physical-root-provenance-enrollment-v2-source-only-20261010/references/static/ergopti_plus/_shared/data/locales/en.json",
+			"bytes": 224183,
+			"sha256": "56e632734a3180c97314b001e38e71bcad47640772d0afcda6f82380296f492b"
+		},
+		{
+			"path": "linux-header-ordinary-physical-root-provenance-enrollment-v2-source-only-20261010/references/static/ergopti_plus/_shared/modules/features/manifest.toml",
+			"bytes": 286710,
+			"sha256": "9cdb75480a1129516d6a14b71b8b91e7c478952e71db8aaf1beee1a880d07efd"
+		},
+		{
+			"path": "linux-header-ordinary-physical-root-provenance-enrollment-v2-source-only-20261010/references/static/ergopti_plus/_shared/tests/corpus/menus/linux_tray_header_original.json",
+			"bytes": 4072,
+			"sha256": "77a93d85936a39222879f991d0f7318a1e16ce0ef49dbe69a0852c5ef1e1aa23"
+		},
+		{
+			"path": "linux-header-ordinary-physical-root-provenance-enrollment-v2-source-only-20261010/references/static/ergopti_plus/linux/ui/menu/menu_builder.lua",
+			"bytes": 239686,
+			"sha256": "600b72a3c7f18c409dd5769e1c3c237af5bcfba0d2484f04a2537575a2978eab"
+		},
+		{
+			"path": "linux-header-ordinary-physical-root-provenance-enrollment-v2-source-only-20261010/references/tools/lib/script-source.cjs",
+			"bytes": 2832,
+			"sha256": "72e918f94f2f023320b2fa670f53f154c2c0024733f3c9794181b618215a5478"
+		},
+		{
+			"path": "linux-header-ordinary-physical-root-provenance-enrollment-v2-source-only-20261010/source-only.patch",
+			"bytes": 9601,
+			"sha256": "d555b556cdf5c120ef4804fbdbbfb2af803c6b129e7fca122312d775a6e32fb1"
+		},
+		{
+			"path": "linux-header-physical-root-provenance-enrollment-source-only-20261010/INDEPENDENT-LINUX-HEADER-PHYSICAL-ENROLLMENT-SOURCE-PEER-REVIEW-20261010.json",
+			"bytes": 2637,
+			"sha256": "031619ef07bc827b3439ed65443fbd829291a406c68836f3d1f9836be53ec6e0"
+		},
+		{
+			"path": "linux-header-physical-root-provenance-enrollment-source-only-20261010/README.md",
+			"bytes": 861,
+			"sha256": "f83653fd4e07e3d42ccbc0e5c69902eba71a76dd1fd983f7af2891f6a1adb7c2"
+		},
+		{
+			"path": "linux-header-physical-root-provenance-enrollment-source-only-20261010/SOURCE-PROPOSAL.json",
+			"bytes": 4217,
+			"sha256": "b07f41c9fef84fbfba50b349b4037a0ed522cfc22548b1d51b69594af85947f1"
+		},
+		{
+			"path": "linux-header-physical-root-provenance-enrollment-source-only-20261010/postimages/tools/lib/menu-native-llm-parent-binding.cjs",
+			"bytes": 124247,
+			"sha256": "527f838c2e76be3b0d95c651751396c40206a8234abfcb9943cab736bcea1a7e"
+		},
+		{
+			"path": "linux-header-physical-root-provenance-enrollment-source-only-20261010/postimages/tools/test/test-menu-parity.cjs",
+			"bytes": 235237,
+			"sha256": "bf453a18b5fa0724ca733ca4f794187632905fa1706335593c7bd83f32c0c070"
+		},
+		{
+			"path": "linux-header-physical-root-provenance-enrollment-source-only-20261010/preimages/tools/lib/menu-native-llm-parent-binding.cjs",
+			"bytes": 123114,
+			"sha256": "aa10a59277801d36b559b647374c38823ad50121c6c1294c6bbc63805282e512"
+		},
+		{
+			"path": "linux-header-physical-root-provenance-enrollment-source-only-20261010/preimages/tools/test/test-menu-parity.cjs",
+			"bytes": 231308,
+			"sha256": "f9e9796b29b8c491c30e4cc775a9772abe8fc26bd1756861b9bd4387cccf3b95"
+		},
+		{
+			"path": "linux-header-physical-root-provenance-enrollment-source-only-20261010/references/LINUX-HEADER-ACTUAL-PARITY-SUCCESSOR-20261010.log",
+			"bytes": 814,
+			"sha256": "35fe701af6cf0533d296d64b1aef63cd86a0b834ce85c95f70bd6a9dc4578f9a"
+		},
+		{
+			"path": "linux-header-physical-root-provenance-enrollment-source-only-20261010/references/static/ergopti_plus/_shared/data/locales/en.json",
+			"bytes": 224183,
+			"sha256": "56e632734a3180c97314b001e38e71bcad47640772d0afcda6f82380296f492b"
+		},
+		{
+			"path": "linux-header-physical-root-provenance-enrollment-source-only-20261010/references/static/ergopti_plus/_shared/modules/features/manifest.toml",
+			"bytes": 286710,
+			"sha256": "9cdb75480a1129516d6a14b71b8b91e7c478952e71db8aaf1beee1a880d07efd"
+		},
+		{
+			"path": "linux-header-physical-root-provenance-enrollment-source-only-20261010/references/static/ergopti_plus/_shared/tests/corpus/menus/linux_tray_header_original.json",
+			"bytes": 4072,
+			"sha256": "77a93d85936a39222879f991d0f7318a1e16ce0ef49dbe69a0852c5ef1e1aa23"
+		},
+		{
+			"path": "linux-header-physical-root-provenance-enrollment-source-only-20261010/references/static/ergopti_plus/linux/ui/menu/menu_builder.lua",
+			"bytes": 239686,
+			"sha256": "600b72a3c7f18c409dd5769e1c3c237af5bcfba0d2484f04a2537575a2978eab"
+		},
+		{
+			"path": "linux-header-physical-root-provenance-enrollment-source-only-20261010/references/tools/lib/script-source.cjs",
+			"bytes": 2832,
+			"sha256": "72e918f94f2f023320b2fa670f53f154c2c0024733f3c9794181b618215a5478"
+		},
+		{
+			"path": "linux-header-physical-root-provenance-enrollment-source-only-20261010/source-only.patch",
+			"bytes": 6004,
+			"sha256": "03c44c197f860e03ae5ddad5297a405dc464cf3d10e66d9424de28c1a7dc75fa"
+		},
+		{
+			"path": "macos-dead-boundary-actual-complete-receiving-20261010/ROOT-PINS-AFTER.json",
+			"bytes": 1089032,
+			"sha256": "ec45bd2052ebafefea0651c3fb5e608736d1cbe1f119128f4517101b706fdbc3"
+		},
+		{
+			"path": "macos-dead-boundary-actual-complete-receiving-20261010/ROOT-PINS-BEFORE.json",
+			"bytes": 1089032,
+			"sha256": "ec45bd2052ebafefea0651c3fb5e608736d1cbe1f119128f4517101b706fdbc3"
+		},
+		{
+			"path": "macos-dead-boundary-actual-complete-receiving-20261010/TERMINAL-RECEIPT.json",
+			"bytes": 5734,
+			"sha256": "72f6a04047c2c239409ad5bcef2c6a0dd486aff3ce50e9cbc67eeb895c01f72a"
+		},
+		{
+			"path": "macos-dead-boundary-actual-complete-receiving-20261010/candidate-ATTEMPT-RECEIPT.json",
+			"bytes": 2274,
+			"sha256": "21df4b406deb79e259896a483969380919fb9ac55b65bb55a5b51ecb754feb9a"
+		},
+		{
+			"path": "macos-dead-boundary-actual-complete-receiving-20261010/candidate-RAW.log",
+			"bytes": 1988,
+			"sha256": "5afaae3b092e8a4bdcb5433e77269a48a1502ee1a5dc7fc5c9b2452a7c6e2239"
+		},
+		{
+			"path": "macos-dead-boundary-actual-complete-receiving-20261010/original-ATTEMPT-RECEIPT.json",
+			"bytes": 2272,
+			"sha256": "0b8b3f8a30b907c5849d76beebd5b47de8acb81b8bfa42fc461add631c508546"
+		},
+		{
+			"path": "macos-dead-boundary-actual-complete-receiving-20261010/original-RAW.log",
+			"bytes": 1988,
+			"sha256": "5afaae3b092e8a4bdcb5433e77269a48a1502ee1a5dc7fc5c9b2452a7c6e2239"
+		},
+		{
+			"path": "menu-private-peer-oct10/linux-active-paused-header-complete-outcomes-pinned-harness-source-successor-20261010/EXPECTED-ACTUAL-SUBJECT-NAMES.json",
+			"bytes": 7581,
+			"sha256": "7cf9c45503a102caafcfb72f48f991a873e8c609bdc6a9113d58cddb6faf3f63"
+		},
+		{
+			"path": "menu-private-peer-oct10/linux-active-paused-header-complete-outcomes-pinned-harness-source-successor-20261010/INDEPENDENT-LINUX-HEADER-COMPLETE-OUTCOMES-HARNESS-SOURCE-PEER-REVIEW-20261010.json",
+			"bytes": 3096,
+			"sha256": "dc72508364588b566a39bb3cbcd9ca8f34138454e729b0d0368acd733ab450b9"
+		},
+		{
+			"path": "menu-private-peer-oct10/linux-active-paused-header-complete-outcomes-pinned-harness-source-successor-20261010/PREPARATION-DEPENDENCY-PINS.json",
+			"bytes": 984,
+			"sha256": "87f05dabd670f9fd06fc7baf5c3578f98ff19784ac7f771c447e609a699a0961"
+		},
+		{
+			"path": "menu-private-peer-oct10/linux-active-paused-header-complete-outcomes-pinned-harness-source-successor-20261010/RUN-COMPLETE-REGISTERED-HEADER-HOST.lua",
+			"bytes": 1759,
+			"sha256": "f623312edad4b2b0485ad924b790717ef6d5372564018f75a323a767b3a434f2"
+		},
+		{
+			"path": "menu-private-peer-oct10/linux-active-paused-header-complete-outcomes-pinned-harness-source-successor-20261010/RUN-PINNED-COMPLETE-HOST-PREDECESSOR.py",
+			"bytes": 8306,
+			"sha256": "bba0b9ed76d9b413fb0c097b19638b83cfa6386a87db381af603d5468a4d6330"
+		},
+		{
+			"path": "menu-private-peer-oct10/linux-active-paused-header-complete-outcomes-pinned-harness-source-successor-20261010/SOURCE-HARNESS-PROPOSAL.json",
+			"bytes": 3089,
+			"sha256": "a342e82c548005eefcb7a4d475dcdf70f331af02b3eb0edff47a0b019e81ee87"
+		},
+		{
+			"path": "menu-private-peer-oct10/linux-active-paused-header-existing-template-source-only-20261010/INDEPENDENT-LINUX-ACTIVE-PAUSED-HEADER-SOURCE-PEER-REVIEW-20261010.json",
+			"bytes": 4696,
+			"sha256": "e629523182e0ed854de98d869b20438f0127769a08a20163fec739d31302ac81"
+		},
+		{
+			"path": "menu-private-peer-oct10/linux-active-paused-header-existing-template-source-only-20261010/SOURCE-PROPOSAL.json",
+			"bytes": 11078,
+			"sha256": "d30031c20bc1c72fddec2fd57924a17886fb89a5a62dfc9162981c541c856927"
+		},
+		{
+			"path": "menu-private-peer-oct10/linux-active-paused-header-existing-template-source-only-20261010/postimages/static/ergopti_plus/_shared/data/locales/ar.json",
+			"bytes": 280931,
+			"sha256": "fe571a55ecb339ba73a4a295ce8f73d2d3d61c61f3fc6470f70576d458bf7165"
+		},
+		{
+			"path": "menu-private-peer-oct10/linux-active-paused-header-existing-template-source-only-20261010/postimages/static/ergopti_plus/_shared/data/locales/cs.json",
+			"bytes": 237922,
+			"sha256": "b3cf8c1a949b285ea31ebce9830b2423f2763c9c70a3e542ddd7f46a002f048b"
+		},
+		{
+			"path": "menu-private-peer-oct10/linux-active-paused-header-existing-template-source-only-20261010/postimages/static/ergopti_plus/_shared/data/locales/da.json",
+			"bytes": 230329,
+			"sha256": "8f4240971e38f9b74a3e284edf954c9461b0779c249031f7ba8c79f044f7e5c6"
+		},
+		{
+			"path": "menu-private-peer-oct10/linux-active-paused-header-existing-template-source-only-20261010/postimages/static/ergopti_plus/_shared/data/locales/de.json",
+			"bytes": 242195,
+			"sha256": "2cfb160f8a0c5282f643b9f6cef3db54b3c31d1b1ccb254ace5f66c1412f19fc"
+		},
+		{
+			"path": "menu-private-peer-oct10/linux-active-paused-header-existing-template-source-only-20261010/postimages/static/ergopti_plus/_shared/data/locales/en.json",
+			"bytes": 224183,
+			"sha256": "56e632734a3180c97314b001e38e71bcad47640772d0afcda6f82380296f492b"
+		},
+		{
+			"path": "menu-private-peer-oct10/linux-active-paused-header-existing-template-source-only-20261010/postimages/static/ergopti_plus/_shared/data/locales/es.json",
+			"bytes": 239818,
+			"sha256": "9644d094fe4e64c4a9ddb8a775cc9b5114004a5b0732c56a5e36b55cf6ecbe05"
+		},
+		{
+			"path": "menu-private-peer-oct10/linux-active-paused-header-existing-template-source-only-20261010/postimages/static/ergopti_plus/_shared/data/locales/fr.json",
+			"bytes": 245929,
+			"sha256": "184317bed5b9e9f1eb18d5a17d2b5944bf42ab664a0ba75041132aaac56d9e64"
+		},
+		{
+			"path": "menu-private-peer-oct10/linux-active-paused-header-existing-template-source-only-20261010/postimages/static/ergopti_plus/_shared/data/locales/he.json",
+			"bytes": 261910,
+			"sha256": "86fbc4d0d7bdcbaf4c2b5fd4dc78b8067a4c4e7bfcd0883dad9ce4d5b612aadd"
+		},
+		{
+			"path": "menu-private-peer-oct10/linux-active-paused-header-existing-template-source-only-20261010/postimages/static/ergopti_plus/_shared/data/locales/hi.json",
+			"bytes": 361315,
+			"sha256": "809706ba6db13f3c46d281e70023730dfe672017be81fb085da5d68a88262100"
+		},
+		{
+			"path": "menu-private-peer-oct10/linux-active-paused-header-existing-template-source-only-20261010/postimages/static/ergopti_plus/_shared/data/locales/it.json",
+			"bytes": 239158,
+			"sha256": "1c076f54452bc97ed4a07983e4e3ced9d6d4b2c631fe5b2c9ba81b6ce51c489a"
+		},
+		{
+			"path": "menu-private-peer-oct10/linux-active-paused-header-existing-template-source-only-20261010/postimages/static/ergopti_plus/_shared/data/locales/ja.json",
+			"bytes": 268332,
+			"sha256": "d0cef33d7a558b21862c446cef0a6b09679733573d4a6ca12e0f114ac535e30c"
+		},
+		{
+			"path": "menu-private-peer-oct10/linux-active-paused-header-existing-template-source-only-20261010/postimages/static/ergopti_plus/_shared/data/locales/ko.json",
+			"bytes": 245498,
+			"sha256": "d7842962f4195ca78bf144b197410c428b39d116a39ae03a1d5220073daea1d1"
+		},
+		{
+			"path": "menu-private-peer-oct10/linux-active-paused-header-existing-template-source-only-20261010/postimages/static/ergopti_plus/_shared/data/locales/nl.json",
+			"bytes": 236424,
+			"sha256": "d74e21d9698e435dbb21e5791e0a818e551893800c1d05a493a885caddb9cec0"
+		},
+		{
+			"path": "menu-private-peer-oct10/linux-active-paused-header-existing-template-source-only-20261010/postimages/static/ergopti_plus/_shared/data/locales/no.json",
+			"bytes": 230278,
+			"sha256": "8b71d8dd65215d74e0e8529953342ba0e2b5ae550f09064c1d76ff75457d65a0"
+		},
+		{
+			"path": "menu-private-peer-oct10/linux-active-paused-header-existing-template-source-only-20261010/postimages/static/ergopti_plus/_shared/data/locales/pl.json",
+			"bytes": 239478,
+			"sha256": "cdc9d3e034d093031ee12e8862b303152ae99110f09611a8e4975da9be30b9b4"
+		},
+		{
+			"path": "menu-private-peer-oct10/linux-active-paused-header-existing-template-source-only-20261010/postimages/static/ergopti_plus/_shared/data/locales/pt.json",
+			"bytes": 239699,
+			"sha256": "d71613700f06e9eb4a3734cbcc62f7dbc12a542499398271d45085aa43e9d100"
+		},
+		{
+			"path": "menu-private-peer-oct10/linux-active-paused-header-existing-template-source-only-20261010/postimages/static/ergopti_plus/_shared/data/locales/ru.json",
+			"bytes": 312437,
+			"sha256": "1cf9dbdd495cce3c2bbe2f0ffddd09ca3062f3bfa113a2ed35d621a282a3dd2e"
+		},
+		{
+			"path": "menu-private-peer-oct10/linux-active-paused-header-existing-template-source-only-20261010/postimages/static/ergopti_plus/_shared/data/locales/sv.json",
+			"bytes": 234141,
+			"sha256": "f940f543e2085aab6b69250efac2bb35449bccc95dea058cba810b30907ab401"
+		},
+		{
+			"path": "menu-private-peer-oct10/linux-active-paused-header-existing-template-source-only-20261010/postimages/static/ergopti_plus/_shared/data/locales/tr.json",
+			"bytes": 238596,
+			"sha256": "8f9ab7b044c1758fc6fd26a7bb27ea2cbf43f4c3bec1346e96f97645fd6c58a9"
+		},
+		{
+			"path": "menu-private-peer-oct10/linux-active-paused-header-existing-template-source-only-20261010/postimages/static/ergopti_plus/_shared/data/locales/uk.json",
+			"bytes": 309321,
+			"sha256": "b61ae60f8e65a6a0f63da2dbd5c4375b2d3ca0424848f2f369716c0471a9d3d9"
+		},
+		{
+			"path": "menu-private-peer-oct10/linux-active-paused-header-existing-template-source-only-20261010/postimages/static/ergopti_plus/_shared/data/locales/zh.json",
+			"bytes": 219891,
+			"sha256": "356eb058ca1f6bc3a392b43a4b87b919c0c3f1c6c122a33c40e76b312828dd85"
+		},
+		{
+			"path": "menu-private-peer-oct10/linux-active-paused-header-existing-template-source-only-20261010/postimages/static/ergopti_plus/_shared/modules/features/manifest.toml",
+			"bytes": 286710,
+			"sha256": "9cdb75480a1129516d6a14b71b8b91e7c478952e71db8aaf1beee1a880d07efd"
+		},
+		{
+			"path": "menu-private-peer-oct10/linux-active-paused-header-existing-template-source-only-20261010/postimages/static/ergopti_plus/_shared/tests/corpus/menus/linux_tray_header_original.json",
+			"bytes": 4072,
+			"sha256": "77a93d85936a39222879f991d0f7318a1e16ce0ef49dbe69a0852c5ef1e1aa23"
+		},
+		{
+			"path": "menu-private-peer-oct10/linux-active-paused-header-existing-template-source-only-20261010/postimages/static/ergopti_plus/linux/tests/unit/ui/test_menu_pause_greys_features.lua",
+			"bytes": 15744,
+			"sha256": "00a0ace097e8ec00c3835267a998535938f5597b9df1c762c1f5f32331c6ee54"
+		},
+		{
+			"path": "menu-private-peer-oct10/linux-active-paused-header-existing-template-source-only-20261010/postimages/static/ergopti_plus/linux/ui/menu/menu_builder.lua",
+			"bytes": 239686,
+			"sha256": "600b72a3c7f18c409dd5769e1c3c237af5bcfba0d2484f04a2537575a2978eab"
+		},
+		{
+			"path": "menu-private-peer-oct10/linux-active-paused-header-existing-template-source-only-20261010/postimages/tools/lib/menu-hotstring-language-binding.cjs",
+			"bytes": 59329,
+			"sha256": "7963ae249f2122669edaf3c1546209cdb0bdf05873ca4557ace3d70a8abafa61"
+		},
+		{
+			"path": "menu-private-peer-oct10/linux-active-paused-header-existing-template-source-only-20261010/postimages/tools/lib/menu-native-llm-parent-binding.cjs",
+			"bytes": 122865,
+			"sha256": "f8373e2e6aaac107cc963c1a88b6c399ab3a489293d57f4fe77315f6918eb122"
+		},
+		{
+			"path": "menu-private-peer-oct10/linux-active-paused-header-existing-template-source-only-20261010/postimages/tools/test/test-menu-parity.cjs",
+			"bytes": 231189,
+			"sha256": "c4e99a854fb8f4b3a3a39dc0f593cf438f6098a559c095a8aee3328a36b92d93"
+		},
+		{
+			"path": "menu-private-peer-oct10/linux-active-paused-header-existing-template-source-only-20261010/preimages/static/ergopti_plus/_shared/data/locales/ar.json",
+			"bytes": 280890,
+			"sha256": "49a43a4e5e8bc9a4dd86cab35765c3d51ebb9f9d50e15e726adf5a2750104239"
+		},
+		{
+			"path": "menu-private-peer-oct10/linux-active-paused-header-existing-template-source-only-20261010/preimages/static/ergopti_plus/_shared/data/locales/cs.json",
+			"bytes": 237881,
+			"sha256": "ae69e378764d682f98a7e12e368baf4f23a12516978f5008995f4af408261b8e"
+		},
+		{
+			"path": "menu-private-peer-oct10/linux-active-paused-header-existing-template-source-only-20261010/preimages/static/ergopti_plus/_shared/data/locales/da.json",
+			"bytes": 230288,
+			"sha256": "2c1f8afed5c42eec5c7bb21c9ffd103faa4aa4484df6e29aeed14df554816cd5"
+		},
+		{
+			"path": "menu-private-peer-oct10/linux-active-paused-header-existing-template-source-only-20261010/preimages/static/ergopti_plus/_shared/data/locales/de.json",
+			"bytes": 242154,
+			"sha256": "80d10af23e567a5a95a9504c4535217297f1ea0241d21fb0fed92860c1343ae2"
+		},
+		{
+			"path": "menu-private-peer-oct10/linux-active-paused-header-existing-template-source-only-20261010/preimages/static/ergopti_plus/_shared/data/locales/en.json",
+			"bytes": 224142,
+			"sha256": "f0524e01b6d67090d41f692e76cecc755c9d671db9141464a1f024d2c5e55c66"
+		},
+		{
+			"path": "menu-private-peer-oct10/linux-active-paused-header-existing-template-source-only-20261010/preimages/static/ergopti_plus/_shared/data/locales/es.json",
+			"bytes": 239777,
+			"sha256": "d11e4c8f606cb8762121f6c62998c6dd24bdb69cd01f8cfc9934b3d58a6a9c98"
+		},
+		{
+			"path": "menu-private-peer-oct10/linux-active-paused-header-existing-template-source-only-20261010/preimages/static/ergopti_plus/_shared/data/locales/fr.json",
+			"bytes": 245888,
+			"sha256": "fd9c20cb55564549bc1a2b77df461cdfe96b19a20c9a243922068a722d72b5e8"
+		},
+		{
+			"path": "menu-private-peer-oct10/linux-active-paused-header-existing-template-source-only-20261010/preimages/static/ergopti_plus/_shared/data/locales/he.json",
+			"bytes": 261869,
+			"sha256": "3423e4a81bdfbc89f3a369905e4fc1ef5c2bb6a5bc2f2f4142f8ec250b635955"
+		},
+		{
+			"path": "menu-private-peer-oct10/linux-active-paused-header-existing-template-source-only-20261010/preimages/static/ergopti_plus/_shared/data/locales/hi.json",
+			"bytes": 361274,
+			"sha256": "0d2d956c80c6abfd99c6bfe998eae1a6556511364b4582a886351dc9c65bca5e"
+		},
+		{
+			"path": "menu-private-peer-oct10/linux-active-paused-header-existing-template-source-only-20261010/preimages/static/ergopti_plus/_shared/data/locales/it.json",
+			"bytes": 239117,
+			"sha256": "6abad2961ed3160903bdcab39a3625d20d5f09efaee965c5d7d4e8720b08854b"
+		},
+		{
+			"path": "menu-private-peer-oct10/linux-active-paused-header-existing-template-source-only-20261010/preimages/static/ergopti_plus/_shared/data/locales/ja.json",
+			"bytes": 268291,
+			"sha256": "5f8930b51a7e3471deeee2423631085f8e233cf04edf856f1217eaf407e69b9a"
+		},
+		{
+			"path": "menu-private-peer-oct10/linux-active-paused-header-existing-template-source-only-20261010/preimages/static/ergopti_plus/_shared/data/locales/ko.json",
+			"bytes": 245457,
+			"sha256": "6c781b26090c10c27357f1eb29ae9ae53778ff2a5480c4e7214f997e10f78ee3"
+		},
+		{
+			"path": "menu-private-peer-oct10/linux-active-paused-header-existing-template-source-only-20261010/preimages/static/ergopti_plus/_shared/data/locales/nl.json",
+			"bytes": 236383,
+			"sha256": "d5deebcba5c9487ed2fb4ddbffe4b7b8c2337621d07f54df660efdd0f814068a"
+		},
+		{
+			"path": "menu-private-peer-oct10/linux-active-paused-header-existing-template-source-only-20261010/preimages/static/ergopti_plus/_shared/data/locales/no.json",
+			"bytes": 230237,
+			"sha256": "45f37d9496ce168172898556b5a56870c59fd07700936e84bd9ce33e413e4d1e"
+		},
+		{
+			"path": "menu-private-peer-oct10/linux-active-paused-header-existing-template-source-only-20261010/preimages/static/ergopti_plus/_shared/data/locales/pl.json",
+			"bytes": 239437,
+			"sha256": "da89d3a827ea4cc92a643c32126bdde42f7b9c09cbca2dddb5f4edb758ffe5db"
+		},
+		{
+			"path": "menu-private-peer-oct10/linux-active-paused-header-existing-template-source-only-20261010/preimages/static/ergopti_plus/_shared/data/locales/pt.json",
+			"bytes": 239658,
+			"sha256": "46618563bd3bf1070c470d7ecec9dc6160ee46fb29f7d059c72e0091f02f5b6f"
+		},
+		{
+			"path": "menu-private-peer-oct10/linux-active-paused-header-existing-template-source-only-20261010/preimages/static/ergopti_plus/_shared/data/locales/ru.json",
+			"bytes": 312396,
+			"sha256": "0e86f7fd5576f6f32be349982f5b71e9fb217b2a05bdc23419a1319b4125a95c"
+		},
+		{
+			"path": "menu-private-peer-oct10/linux-active-paused-header-existing-template-source-only-20261010/preimages/static/ergopti_plus/_shared/data/locales/sv.json",
+			"bytes": 234100,
+			"sha256": "bc4e4d5a3d141bc1292c1fd50cc2d60835ad18d7a02f84578d9657f80f69095e"
+		},
+		{
+			"path": "menu-private-peer-oct10/linux-active-paused-header-existing-template-source-only-20261010/preimages/static/ergopti_plus/_shared/data/locales/tr.json",
+			"bytes": 238555,
+			"sha256": "ce3d7340cec81c44c6895e0cb2e53ae22917b76e2d60ef01503331d1af45463c"
+		},
+		{
+			"path": "menu-private-peer-oct10/linux-active-paused-header-existing-template-source-only-20261010/preimages/static/ergopti_plus/_shared/data/locales/uk.json",
+			"bytes": 309280,
+			"sha256": "de15cbeb291e7dc601c62c6b10c9639eb51b79f75fb01883ef6aecca9d24dd89"
+		},
+		{
+			"path": "menu-private-peer-oct10/linux-active-paused-header-existing-template-source-only-20261010/preimages/static/ergopti_plus/_shared/data/locales/zh.json",
+			"bytes": 219850,
+			"sha256": "669630fd03a19e54287fa380baa7f39d411f71486698c2ff92c517852378eaf1"
+		},
+		{
+			"path": "menu-private-peer-oct10/linux-active-paused-header-existing-template-source-only-20261010/preimages/static/ergopti_plus/_shared/modules/features/manifest.toml",
+			"bytes": 286122,
+			"sha256": "da9104587d55bef21ee0c564d46ccb85966bb03c0b61be70855576b9c044350e"
+		},
+		{
+			"path": "menu-private-peer-oct10/linux-active-paused-header-existing-template-source-only-20261010/preimages/static/ergopti_plus/linux/tests/unit/ui/test_menu_pause_greys_features.lua",
+			"bytes": 6824,
+			"sha256": "92a1df0ca53e19dbe3ef6ac18aeb031f15f2b13aac200ee41f6b02bd9720f21d"
+		},
+		{
+			"path": "menu-private-peer-oct10/linux-active-paused-header-existing-template-source-only-20261010/preimages/static/ergopti_plus/linux/ui/menu/menu_builder.lua",
+			"bytes": 234363,
+			"sha256": "bcfca2fb0dcffd153d9e8c247fc13bebff57f4bec09bea18ad42370fabe86731"
+		},
+		{
+			"path": "menu-private-peer-oct10/linux-active-paused-header-existing-template-source-only-20261010/preimages/tools/lib/menu-hotstring-language-binding.cjs",
+			"bytes": 58912,
+			"sha256": "895e75cc97e682211fa5e22b89b1a7ff74aae94e3475b27a9954a3da71154d6a"
+		},
+		{
+			"path": "menu-private-peer-oct10/linux-active-paused-header-existing-template-source-only-20261010/preimages/tools/lib/menu-native-llm-parent-binding.cjs",
+			"bytes": 112914,
+			"sha256": "96a09aa41e80a70cdef34a33e55d8f0b92f867000ee04e54b8b514e3e7c366c3"
+		},
+		{
+			"path": "menu-private-peer-oct10/linux-active-paused-header-existing-template-source-only-20261010/preimages/tools/test/test-menu-parity.cjs",
+			"bytes": 229084,
+			"sha256": "9f0b0d2d619215618586dd2890c6e9494c30358d5283701d9483696d2ebf694e"
+		},
+		{
+			"path": "menu-private-peer-oct10/linux-active-paused-header-existing-template-source-only-20261010/source-only.patch",
+			"bytes": 51773,
+			"sha256": "5ead6c219fa440ecb60adbce18312ce0d8b42cb6bc04bd4f48c20b14114a7fce"
+		},
+		{
+			"path": "menu-private-peer-oct10/macos-script-action-boundary-genuine-catalogue-source-hold-20261010/INDEPENDENT-SCRIPT-ACTION-BOUNDARY-GENUINE-CATALOGUE-SOURCE-HOLD-REVIEW-20261010.json",
+			"bytes": 5495,
+			"sha256": "39a49076f873caa426c2dd04959fabd302a97ce80652ca597a66d2a1e1789143"
+		},
+		{
+			"path": "menu-private-peer-oct10/macos-script-action-boundary-genuine-catalogue-source-hold-20261010/ORIGINAL-CATALOGUE-SEQUENCE.json",
+			"bytes": 18379,
+			"sha256": "346879bc00802415388dd3149f528f432513a54639098a0e66e2753b41bce66c"
+		},
+		{
+			"path": "menu-private-peer-oct10/macos-script-action-boundary-genuine-catalogue-source-hold-20261010/SOURCE-HOLD.json",
+			"bytes": 5302,
+			"sha256": "4c39770ca4556e4ac81b5a8aa72971d1bb90a58cf865f9544784f355766a3275"
+		},
+		{
+			"path": "menu-private-peer-oct10/macos-script-action-dead-boundary-frame-pinned-neutral-harness-source-successor-20261010/EXPECTED-ACTUAL-SUBJECT-NAMES.json",
+			"bytes": 3067,
+			"sha256": "92f05b1927a4d89c4f5a2c5f236423284f8d21f095df3a0958b99c8fd6097c08"
+		},
+		{
+			"path": "menu-private-peer-oct10/macos-script-action-dead-boundary-frame-pinned-neutral-harness-source-successor-20261010/INDEPENDENT-MAC-DEAD-BOUNDARY-COMPLETE-NEUTRAL-HARNESS-SOURCE-PEER-REVIEW-20261010.json",
+			"bytes": 3732,
+			"sha256": "95ab2e46424dc77ed5e02ee5b2e44bf44e0321f89b852be39831e0077ddd5d97"
+		},
+		{
+			"path": "menu-private-peer-oct10/macos-script-action-dead-boundary-frame-pinned-neutral-harness-source-successor-20261010/ORIGINAL-SCRIPT-CONTROL-DECLARATION.toml.txt",
+			"bytes": 659,
+			"sha256": "02484ee76cfd8e719efa34edb0163c61816ee0b45f7102037fbb2ebf4d2c82fd"
+		},
+		{
+			"path": "menu-private-peer-oct10/macos-script-action-dead-boundary-frame-pinned-neutral-harness-source-successor-20261010/RUN-COMPLETE-REGISTERED-MAC-HOST.lua",
+			"bytes": 853,
+			"sha256": "8bfebfcb7ecb95ab88d7c3f935e1d16b3202c2adc6c70abc4359f11097adf7de"
+		},
+		{
+			"path": "menu-private-peer-oct10/macos-script-action-dead-boundary-frame-pinned-neutral-harness-source-successor-20261010/RUN-PINNED-COMPLETE-NEUTRAL-HOST.py",
+			"bytes": 7276,
+			"sha256": "4b6b152edb29fd05ad8af62c6b15e51f047f0f1a1afba2986686411a72e4934f"
+		},
+		{
+			"path": "menu-private-peer-oct10/macos-script-action-dead-boundary-frame-pinned-neutral-harness-source-successor-20261010/SOURCE-HARNESS-PROPOSAL.json",
+			"bytes": 1915,
+			"sha256": "0dacf992142322d717ef4f11faed3580e2eb87d83a6d97f669c572884feb9e75"
+		},
+		{
+			"path": "menu-private-peer-oct10/macos-script-action-dead-boundary-frame-pinned-neutral-harness-source-successor-20261010/UNCHANGED-HOST-DEPENDENCY-PINS.json",
+			"bytes": 1022,
+			"sha256": "b619cf6578cd087add15ad997cdf9e7ace301d2afcc853d6da34027d74bd3e8c"
+		},
+		{
+			"path": "menu-private-peer-oct10/macos-script-action-dead-boundary-genuine-export-source-successor-20261010/INDEPENDENT-MAC-SCRIPT-ACTION-DEAD-BOUNDARY-SOURCE-PEER-REVIEW-20261010.json",
+			"bytes": 3409,
+			"sha256": "b594ca0f1089a8244fa10e9a77ff002ff9968e711e90d5ad9e646ca1bb9979bb"
+		},
+		{
+			"path": "menu-private-peer-oct10/macos-script-action-dead-boundary-genuine-export-source-successor-20261010/SOURCE-PROPOSAL.json",
+			"bytes": 8248,
+			"sha256": "5e944ced52465ee3a5ff38cf91d3c32f3199c7a536e0c1c5be380f392576f293"
+		},
+		{
+			"path": "menu-private-peer-oct10/macos-script-action-dead-boundary-genuine-export-source-successor-20261010/postimages/static/ergopti_plus/_shared/tests/corpus/menus/script_action_original_catalogue_projection.json",
+			"bytes": 895793,
+			"sha256": "58f93d5c2855b69ae0a5fde8235b8cea4d9b376fe4bc57323b78446a24eaae38"
+		},
+		{
+			"path": "menu-private-peer-oct10/macos-script-action-dead-boundary-genuine-export-source-successor-20261010/postimages/static/ergopti_plus/macos/tests/unit/ui/menu/test_configured_shortcut_labels.lua",
+			"bytes": 10913,
+			"sha256": "dd1ee2c571a575876d4a13fb6bddb4861b02a9720d879ab92aaf6d91a2c2427a"
+		},
+		{
+			"path": "menu-private-peer-oct10/macos-script-action-dead-boundary-genuine-export-source-successor-20261010/postimages/static/ergopti_plus/macos/ui/menu/menu_shortcuts.lua",
+			"bytes": 38969,
+			"sha256": "d8f39094d9ec89f48c94cf5a0596e6c53f79b440900d1a56ec3af2ef937b87dd"
+		},
+		{
+			"path": "menu-private-peer-oct10/macos-script-action-dead-boundary-genuine-export-source-successor-20261010/preimages/static/ergopti_plus/macos/tests/unit/ui/menu/test_configured_shortcut_labels.lua",
+			"bytes": 5398,
+			"sha256": "239b3c4ea626476db938fd91faff31b4252215d8f77c9ba2eadf90a222e945a2"
+		},
+		{
+			"path": "menu-private-peer-oct10/macos-script-action-dead-boundary-genuine-export-source-successor-20261010/preimages/static/ergopti_plus/macos/ui/menu/menu_shortcuts.lua",
+			"bytes": 39072,
+			"sha256": "0211941b07060d1f34c4cf22da3fca2b64777fafaf5aa4926722779e44c2f6fd"
+		},
+		{
+			"path": "menu-private-peer-oct10/macos-script-action-dead-boundary-genuine-export-source-successor-20261010/source-only.patch",
+			"bytes": 903171,
+			"sha256": "6fb7c7b229d66225fe581c009e6b91ce9ba221becc6aac89722a54b6dfead237"
+		},
+		{
+			"path": "menu-private-peer-oct10/remaining34-native-menu-sites-source-triage-20261010/SOURCE-TRIAGE.json",
+			"bytes": 29136,
+			"sha256": "a81a96d0fa753eb04c77bdec511290f8ee74dfd696169e0c413f09eb0b953761"
+		},
+		{
+			"path": "native-menu-run38033725841/TERMINAL-JOBS.json",
+			"bytes": 46695,
+			"sha256": "77147c1da166547b2ef92e69b8c6d1660d351591ccc3e1bd0fd132585c6af256"
+		},
+		{
+			"path": "native-menu-run38033725841/WHOLE-RUN-DOWNLOAD-RECEIPT.json",
+			"bytes": 146,
+			"sha256": "1449a515a1b934b0d84b1c1464dfcd61d2080cfed1c168de9f8961866455f3a6"
+		},
+		{
+			"path": "windows-config-journal/plain-container-own-property-count-independent-source-proposal-20261010/INDEPENDENT-OWN-PROPERTY-COUNT-SOURCE-PROPOSAL-REVIEW-20261010.json",
+			"bytes": 3909,
+			"sha256": "bf326481ad765dbb52e5d39bb79390d1e685289526c092abff05e4520d9fad2e"
+		},
+		{
+			"path": "windows-config-journal/plain-container-own-property-count-independent-source-proposal-20261010/Object.htm",
+			"bytes": 16719,
+			"sha256": "86127c643b835f7edfc31cd873f07907497f1241fb314a114590aa9eecae6e10"
+		},
+		{
+			"path": "windows-config-journal/plain-container-own-property-count-independent-source-proposal-20261010/script_expression.cpp",
+			"bytes": 127642,
+			"sha256": "0473b1289753d187942763b9b7987942fa2f895ded116dc578f7e72321297d75"
+		},
+		{
+			"path": "windows-config-journal/plain-container-own-property-count-independent-source-proposal-20261010/script_object.cpp",
+			"bytes": 97529,
+			"sha256": "fabc07a1fe2fa916e908a461711d80ee0e2d5a354ee1a45aa001a65d943999dd"
+		},
+		{
+			"path": "windows-config-journal/source43-actual34store-guard-and-terminal-query-readonly-diagnosis-v2-20261010/INACTIVE-SOURCE-SEAM-LEDGER-V2.md",
+			"bytes": 5635,
+			"sha256": "65dab579e14caca1c0e057cc1edbd05769e558726d1ce9d8784bb9d5e7822b05"
+		},
+		{
+			"path": "windows-config-journal/source43-actual34store-guard-and-terminal-query-readonly-diagnosis-v2-20261010/READ-ONLY-PHASE-AND-SOURCE-DIAGNOSIS-V2.json",
+			"bytes": 6889,
+			"sha256": "818ceed6dfd706782067f71d6fe2b6d29f3662bbf2db497438ced8859ceb8ea3"
+		},
+		{
+			"path": "windows-config-journal/source43-actual34store-guard-and-terminal-query-readonly-diagnosis-v2-20261010/reference-inputs/config_migrate.ahk",
+			"bytes": 66107,
+			"sha256": "134b98ac68d4fcca994c3e07649e28d3c56a34ea786fb7ca73924d45dbfc5b26"
+		},
+		{
+			"path": "windows-config-journal/source43-actual34store-guard-and-terminal-query-readonly-diagnosis-v2-20261010/reference-inputs/config_scope.ahk",
+			"bytes": 15394,
+			"sha256": "cdce159f7de0c0bdc47b8e9231e9af477f3a2d92d51b86b5f1bb70d776a1f203"
+		},
+		{
+			"path": "windows-config-journal/source43-actual34store-guard-and-terminal-query-readonly-diagnosis-v2-20261010/reference-inputs/config_transition.ahk",
+			"bytes": 62390,
+			"sha256": "aaa7d771fd89051d00fc092d9209597d20a7cb89573c78c4f5dbd51a59e0402c"
+		},
+		{
+			"path": "windows-config-journal/source43-actual34store-guard-and-terminal-query-readonly-diagnosis-v2-20261010/reference-inputs/config_transition_runtime.ahk",
+			"bytes": 40685,
+			"sha256": "4891105e29131a5b45d1909f073293751e4295f9805d7b3dba638bac18d7bc00"
+		},
+		{
+			"path": "windows-config-journal/source43-actual34store-guard-and-terminal-query-readonly-diagnosis-v2-20261010/reference-inputs/config_write_lease.ahk",
+			"bytes": 17011,
+			"sha256": "e52ac1cd68145dbc85275c5615438090b75d0bbe89cf15bd3688873efd52499a"
+		},
+		{
+			"path": "windows-config-journal/source43-actual34store-guard-and-terminal-query-readonly-diagnosis-v2-20261010/reference-inputs/file_system.ahk",
+			"bytes": 38039,
+			"sha256": "288b5af216785e59d66be59b206df86d68158ee00894435f3e96b57981dcbece"
+		},
+		{
+			"path": "windows-config-journal/source43-actual34store-guard-and-terminal-query-readonly-diagnosis-v2-20261010/reference-inputs/test_hotstrings_scope.ahk",
+			"bytes": 22004,
+			"sha256": "095304e36ff9f6b0b6704a50a272b9b4630e8c4ce81aa269aa9fb587fc9ae3bb"
+		},
+		{
+			"path": "windows-config-journal/source43-count-first-capture-and-pure-traversal-hold-source-only-20261010/INDEPENDENT-COUNT-FIRST-CAPTURE-PURE-TRAVERSAL-HOLD-SOURCE-PEER-REVIEW-20261010.json",
+			"bytes": 4086,
+			"sha256": "28eb7392fa363792f696e3325c186569c485a01a782d12d595fdabb0110c0c73"
+		},
+		{
+			"path": "windows-config-journal/source43-count-first-capture-and-pure-traversal-hold-source-only-20261010/README.md",
+			"bytes": 4378,
+			"sha256": "6d2c876d6513b844a21b45597bf7606189f38e2e536208a43ee8bc2e9745673b"
+		},
+		{
+			"path": "windows-config-journal/source43-count-first-capture-and-pure-traversal-hold-source-only-20261010/SOURCE-HOLD-PROOF.json",
+			"bytes": 4266,
+			"sha256": "273621bc6edb8893b82dd90ed165f812c4ba529d3249f8a4b87f54d67e73e10f"
+		},
+		{
+			"path": "windows-config-journal/source43-count-first-capture-and-pure-traversal-hold-source-only-20261010/checksums.json",
+			"bytes": 860,
+			"sha256": "cc8d42859c13386c84b3f7e04f87ae397f00f3d0738f3c82a75b22ba98d00c40"
+		},
+		{
+			"path": "windows-config-journal/source43-count-first-capture-and-pure-traversal-hold-source-only-20261010/reference-inputs/config_migrate.ahk",
+			"bytes": 66107,
+			"sha256": "134b98ac68d4fcca994c3e07649e28d3c56a34ea786fb7ca73924d45dbfc5b26"
+		},
+		{
+			"path": "windows-config-journal/source43-count-first-capture-and-pure-traversal-hold-source-only-20261010/reference-inputs/config_transition_runtime.ahk",
+			"bytes": 40685,
+			"sha256": "4891105e29131a5b45d1909f073293751e4295f9805d7b3dba638bac18d7bc00"
+		},
+		{
+			"path": "windows-config-journal/source43-count-first-capture-and-pure-traversal-hold-source-only-20261010/reference-inputs/script_expression.cpp",
+			"bytes": 127642,
+			"sha256": "0473b1289753d187942763b9b7987942fa2f895ded116dc578f7e72321297d75"
+		},
+		{
+			"path": "windows-config-journal/source43-count-first-capture-and-pure-traversal-hold-source-only-20261010/reference-inputs/script_object.cpp",
+			"bytes": 97529,
+			"sha256": "fabc07a1fe2fa916e908a461711d80ee0e2d5a354ee1a45aa001a65d943999dd"
+		},
+		{
+			"path": "windows-config-journal/source43-count-first-capture-and-pure-traversal-hold-source-only-20261010/reference-inputs/toml_document.ahk",
+			"bytes": 45361,
+			"sha256": "73a8d8959ed2666a4b119c253781e456f4da0ed155a85db5b89c213c57a59374"
+		},
+		{
+			"path": "windows-config-journal/source43-count-first-capture-and-pure-traversal-hold-source-only-20261010/reference-inputs/windows_release_toolchain.json",
+			"bytes": 536,
+			"sha256": "9356384a74c7a55d1403fb7c280e31546ca3c0ab2be4c16de7e0306329e71f4f"
+		},
+		{
+			"path": "windows-config-journal/source43-current-native-38033725841-source-decision-20261010/CURRENT-SOURCE-DECISION.json",
+			"bytes": 8361,
+			"sha256": "764444b796ab11f94395ec0aa503da71d0c3693021cebcc1fb81795ec0904d0f"
+		},
+		{
+			"path": "windows-config-journal/source43-current-native-38033725841-source-decision-20261010/README.md",
+			"bytes": 3344,
+			"sha256": "e6cba9afd5f2640f75fdb180229c88c47ad2bc731feb8c0de262199291b451e8"
+		},
+		{
+			"path": "windows-config-journal/source43-current-native-38033725841-source-decision-20261010/actual-raw/ACTUAL-PHYSICAL-FILE-REPLAY-VALIDATION.json",
+			"bytes": 868,
+			"sha256": "3327b04472adfdd3e76e9c96b0724590f67caf518703ebfd0559658de03f4703"
+		},
+		{
+			"path": "windows-config-journal/source43-current-native-38033725841-source-decision-20261010/actual-raw/ACTUAL-PHYSICAL-TAP-FILE-REPLAY.txt",
+			"bytes": 394235,
+			"sha256": "a3a9afd8a083cd6851ca26c4221ea8933c46f6f32abb67e0353233064a66125b"
+		},
+		{
+			"path": "windows-config-journal/source43-current-native-38033725841-source-decision-20261010/actual-raw/ACTUAL-TERMINAL-NATIVE-SUMMARY.json",
+			"bytes": 11929,
+			"sha256": "9eca1695d0dc2d84e7a8a83e2ec4f0a8eaea8214ef397ee1e8e372ac5177cb2c"
+		},
+		{
+			"path": "windows-config-journal/source43-current-native-38033725841-source-decision-20261010/actual-raw/ACTUAL-TERMINAL-NATIVE-SUMMARY.md",
+			"bytes": 5056,
+			"sha256": "f274c9b6783ed0e164f7c0d973d74af21f90b49b4c4d437e5bb483627f564571"
+		},
+		{
+			"path": "windows-config-journal/source43-current-native-38033725841-source-decision-20261010/actual-raw/CANONICAL-VALIDATOR-STDERR.log",
+			"bytes": 963,
+			"sha256": "2e8cb5e891a3db8f89b22e1f5744dfb35ddf836ef4bbd1bf026a653102a998e7"
+		},
+		{
+			"path": "windows-config-journal/source43-current-native-38033725841-source-decision-20261010/actual-raw/CANONICAL-VALIDATOR-STDOUT.log",
+			"bytes": 0,
+			"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+		},
+		{
+			"path": "windows-config-journal/source43-current-native-38033725841-source-decision-20261010/actual-raw/EXACT-SUBJECT-AND-PHASE-RESULTS.json",
+			"bytes": 8184,
+			"sha256": "c31e71621335ec27b5d894fda0a8861c3a3a58fa05dbb1684130cd6833327ff2"
+		},
+		{
+			"path": "windows-config-journal/source43-current-native-38033725841-source-decision-20261010/actual-raw/PARSER-DIAGNOSTICS.json",
+			"bytes": 715090,
+			"sha256": "fdb466ada520ab17cfac35feb598cbffc58c58172441145c394b9d7be2ac7fae"
+		},
+		{
+			"path": "windows-config-journal/source43-current-native-38033725841-source-decision-20261010/actual-raw/RECONSTRUCTED-ACTUAL-PARTIAL-MANIFEST.json",
+			"bytes": 1655665,
+			"sha256": "52f0aac39d409aa5b5c9fb8e003a03451ef3516b974863b472c0cb0ff1fc3913"
+		},
+		{
+			"path": "windows-config-journal/source43-current-native-38033725841-source-decision-20261010/actual-raw/SAFE-EXACT-ZIP-EXTRACTION.json",
+			"bytes": 616,
+			"sha256": "393c2e2cdbed1b69749726fc468ca774a9b78dfc6e2d1f71c418e4cbdaf43650"
+		},
+		{
+			"path": "windows-config-journal/source43-current-native-38033725841-source-decision-20261010/actual-raw/TESTED-CI-WINDOWS-WORKFLOW.yml",
+			"bytes": 67838,
+			"sha256": "37dd8aa41a53e380b196a80251f4343b679ad31dcfc83800e2b60f7f39eb9f92"
+		},
+		{
+			"path": "windows-config-journal/source43-current-native-38033725841-source-decision-20261010/actual-raw/TESTED-WORKFLOW-REPLAY-SOURCE-PROOF-V2.json",
+			"bytes": 1132,
+			"sha256": "9c60f9d684d0e6c046b2500b3b191919bb1891d84ee1ad9804260848a64d16a1"
+		},
+		{
+			"path": "windows-config-journal/source43-current-native-38033725841-source-decision-20261010/actual-raw/TESTED-WORKFLOW-REPLAY-SOURCE-PROOF.json",
+			"bytes": 1076,
+			"sha256": "1b7b8fe229c9156c9461ef0d6d7ed2bc67e0dcdf5959bd11946758d87b3b84ad"
+		},
+		{
+			"path": "windows-config-journal/source43-current-native-38033725841-source-decision-20261010/actual-raw/actual-unit-job-raw.log",
+			"bytes": 2876094,
+			"sha256": "d249a1592bfee1a510edf974749db9d1d8db8ff654c0624983295820cde1c782"
+		},
+		{
+			"path": "windows-config-journal/source43-current-native-38033725841-source-decision-20261010/actual-terminal-api/API-FETCH-RECEIPTS.json",
+			"bytes": 612,
+			"sha256": "7bea2da9d34606365f872ed269c4dc70758f341d2e257322b656b6e0aefc4e20"
+		},
+		{
+			"path": "windows-config-journal/source43-current-native-38033725841-source-decision-20261010/actual-terminal-api/TERMINAL-ANNOTATION-DECISION.json",
+			"bytes": 2423,
+			"sha256": "b520b8b0adbe2910392e9242c378edac75fedd2294b03b336ba05aa29ee95e70"
+		},
+		{
+			"path": "windows-config-journal/source43-current-native-38033725841-source-decision-20261010/actual-terminal-api/TERMINAL-ANNOTATION-DECISION.md",
+			"bytes": 3020,
+			"sha256": "548f5e027319c1d123e993fe4eb73914124c9e3e93601fd519d0c20ae9c3f142"
+		},
+		{
+			"path": "windows-config-journal/source43-current-native-38033725841-source-decision-20261010/actual-terminal-api/TERMINAL-API-SUMMARY.json",
+			"bytes": 12386,
+			"sha256": "a56847b1b55a37e3f72d8f72c1c08df6e4d5d9523b6518d86d066c58d1933cd6"
+		},
+		{
+			"path": "windows-config-journal/source43-current-native-38033725841-source-decision-20261010/actual-terminal-api/annotation-pages-supported.json",
+			"bytes": 6485,
+			"sha256": "0347c27eb1f273cae1c28c9e3c3a44197bf9a1cf301084a852a9bbbd3c2a742f"
+		},
+		{
+			"path": "windows-config-journal/source43-current-native-38033725841-source-decision-20261010/actual-terminal-api/annotation-pages-supported.stderr",
+			"bytes": 0,
+			"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+		},
+		{
+			"path": "windows-config-journal/source43-current-native-38033725841-source-decision-20261010/actual-terminal-api/annotation-pages.json",
+			"bytes": 0,
+			"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+		},
+		{
+			"path": "windows-config-journal/source43-current-native-38033725841-source-decision-20261010/actual-terminal-api/annotation-pages.json.stderr",
+			"bytes": 1249,
+			"sha256": "8fbdf01d7bfc79357ac4103cac53e183b4d56414792487feadb6ab4e69c935ae"
+		},
+		{
+			"path": "windows-config-journal/source43-current-native-38033725841-source-decision-20261010/actual-terminal-api/annotations.json",
+			"bytes": 7621,
+			"sha256": "6dcf8a445219ded0f321faeb2269afc970d78ea99acc04ffc827bfb6bd367d8e"
+		},
+		{
+			"path": "windows-config-journal/source43-current-native-38033725841-source-decision-20261010/actual-terminal-api/check-run.json",
+			"bytes": 3055,
+			"sha256": "4d83deb6cf3ac726b150d8fd9e9b0ccd2244b971f30c40cb4853c1354414cabc"
+		},
+		{
+			"path": "windows-config-journal/source43-current-native-38033725841-source-decision-20261010/actual-terminal-api/check-run.json.stderr",
+			"bytes": 0,
+			"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+		},
+		{
+			"path": "windows-config-journal/source43-current-native-38033725841-source-decision-20261010/actual-terminal-api/job.json",
+			"bytes": 6465,
+			"sha256": "3dd10e80a3ecb51d338545dd5a3fed1b01c2bc85e02a308a1e466e253c84dee6"
+		},
+		{
+			"path": "windows-config-journal/source43-current-native-38033725841-source-decision-20261010/actual-terminal-api/job.json.stderr",
+			"bytes": 0,
+			"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+		},
+		{
+			"path": "windows-config-journal/source43-current-native-38033725841-source-decision-20261010/actual-terminal-api/run.json",
+			"bytes": 12490,
+			"sha256": "95a716c20cd379c3eb0407ad9f5356dd28599affb662b9fe34f75de1be289717"
+		},
+		{
+			"path": "windows-config-journal/source43-current-native-38033725841-source-decision-20261010/actual-terminal-api/run.json.stderr",
+			"bytes": 0,
+			"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+		},
+		{
+			"path": "windows-config-journal/source43-current-native-38033725841-source-decision-20261010/parse-observed-native-evidence.py",
+			"bytes": 3573,
+			"sha256": "0598bbf8978e4b7bfe9d3bc707580196dd51aabe656e8b201b38f794649e1ea6"
+		},
+		{
+			"path": "windows-config-journal/source43-current-native-38033725841-source-decision-20261010/tested-source-inputs/static/ergopti_plus/windows/infra/config_migrate.ahk",
+			"bytes": 66107,
+			"sha256": "134b98ac68d4fcca994c3e07649e28d3c56a34ea786fb7ca73924d45dbfc5b26"
+		},
+		{
+			"path": "windows-config-journal/source43-current-native-38033725841-source-decision-20261010/tested-source-inputs/static/ergopti_plus/windows/infra/config_transition_runtime.ahk",
+			"bytes": 40685,
+			"sha256": "4891105e29131a5b45d1909f073293751e4295f9805d7b3dba638bac18d7bc00"
+		},
+		{
+			"path": "windows-config-journal/source43-current-native-38033725841-source-decision-20261010/tested-source-inputs/static/ergopti_plus/windows/tests/run_all.ahk",
+			"bytes": 109030,
+			"sha256": "ba5bd3fc4a2f733861e6db399de07c42ea9f53bbeb708c763e67ed564ad3f7ca"
+		},
+		{
+			"path": "windows-config-journal/source43-current-native-38033725841-source-decision-20261010/tested-source-inputs/static/ergopti_plus/windows/tests/unit/test_config_scope_manifest.ahk",
+			"bytes": 40021,
+			"sha256": "bd8da17011d8002692a51058cdcd47edf2d058c8ced967ad52c469f0698db928"
+		},
+		{
+			"path": "windows-config-journal/source43-current-native-38033725841-source-decision-20261010/tested-source-inputs/static/ergopti_plus/windows/tests/unit/test_config_transition_windows_port.ahk",
+			"bytes": 50543,
+			"sha256": "835ae07ea0015c9d76e3db9738a1973d262dde0ff5dc9bf84ac1d143abffc4af"
+		},
+		{
+			"path": "windows-config-journal/source43-current-native-38033725841-source-decision-20261010/tested-source-inputs/static/ergopti_plus/windows/tests/unit/test_hotstring_category_scope.ahk",
+			"bytes": 80099,
+			"sha256": "b4a97e8285c82653bf986732c2a2ee2985fea8704ab1fdb44d49a570911bdbf0"
+		},
+		{
+			"path": "windows-config-journal/source43-current-native-38033725841-source-decision-20261010/tested-source-inputs/static/ergopti_plus/windows/tests/unit/test_hotstrings_scope.ahk",
+			"bytes": 22004,
+			"sha256": "095304e36ff9f6b0b6704a50a272b9b4630e8c4ce81aa269aa9fb587fc9ae3bb"
+		},
+		{
+			"path": "windows-config-journal/source43-current-native-38033725841-source-decision-20261010/tested-source-inputs/static/ergopti_plus/windows/tests/unit/test_personal_file_controls.ahk",
+			"bytes": 26334,
+			"sha256": "53a384228bf42aed977013be47dc7f344c089483a7edc5c982fa3058cef5bc70"
+		},
+		{
+			"path": "windows-config-journal/source43-current-native-38033725841-source-decision-20261010/tested-source-inputs/static/ergopti_plus/windows/tests/unit/test_script_control_submenu.ahk",
+			"bytes": 10069,
+			"sha256": "37b6b99e4632e1b542f75fef194854547c5d7559f0b0f773792c273c170db42a"
+		},
+		{
+			"path": "windows-config-journal/source43-current-native-38033725841-source-decision-20261010/tested-source-inputs/tools/test/validate-ahk-suite-manifest.cjs",
+			"bytes": 6619,
+			"sha256": "ba8a3c26d6271e819fb3669e3e7ac95d30793d88c4a20e8173c636f7805da287"
+		},
+		{
+			"path": "windows-config-journal/source43-guarded-own-property-count-semantic-candidate-v2-source-only-20261010/INDEPENDENT-GUARDED-OWN-PROPERTY-COUNT-V2-INHERITED-CALL-BLOCKING-ADDENDUM-20261010.json",
+			"bytes": 2074,
+			"sha256": "045f2fa2dc7c324067559d05050b4181ca02d89609924e0e5c94f7034479d356"
+		},
+		{
+			"path": "windows-config-journal/source43-guarded-own-property-count-semantic-candidate-v2-source-only-20261010/INDEPENDENT-GUARDED-OWN-PROPERTY-COUNT-V2-SOURCE-PEER-REVIEW-20261010.json",
+			"bytes": 5078,
+			"sha256": "afb59ae2f5125fcf85afe9ca4aa6b1b94f1101d1c3ea652f83856e43be4d5c91"
+		},
+		{
+			"path": "windows-config-journal/source43-guarded-own-property-count-semantic-candidate-v2-source-only-20261010/READ-ONLY-BYTE-AND-APPLICATION-PROOF.json",
+			"bytes": 632,
+			"sha256": "14895c684ae7789344c6386fcb2b4706fae7de70a02004f9ff51e34537b2dba8"
+		},
+		{
+			"path": "windows-config-journal/source43-guarded-own-property-count-semantic-candidate-v2-source-only-20261010/README.md",
+			"bytes": 2228,
+			"sha256": "bcf5ea0f8e59b7ed6693bdbaecf86e493824078506bf517f3ca1d3d0f0e523b5"
+		},
+		{
+			"path": "windows-config-journal/source43-guarded-own-property-count-semantic-candidate-v2-source-only-20261010/exact-runtime-upstream-evidence/pins.json",
+			"bytes": 767,
+			"sha256": "dd5e9c978468a6ba7c763bc85881027d145431ca89215d5c44be30c5cde8d26f"
+		},
+		{
+			"path": "windows-config-journal/source43-guarded-own-property-count-semantic-candidate-v2-source-only-20261010/exact-runtime-upstream-evidence/script_expression.cpp",
+			"bytes": 127642,
+			"sha256": "0473b1289753d187942763b9b7987942fa2f895ded116dc578f7e72321297d75"
+		},
+		{
+			"path": "windows-config-journal/source43-guarded-own-property-count-semantic-candidate-v2-source-only-20261010/exact-runtime-upstream-evidence/script_object.cpp",
+			"bytes": 97529,
+			"sha256": "fabc07a1fe2fa916e908a461711d80ee0e2d5a354ee1a45aa001a65d943999dd"
+		},
+		{
+			"path": "windows-config-journal/source43-guarded-own-property-count-semantic-candidate-v2-source-only-20261010/exact-runtime-upstream-evidence/windows_release_toolchain.json",
+			"bytes": 536,
+			"sha256": "9356384a74c7a55d1403fb7c280e31546ca3c0ab2be4c16de7e0306329e71f4f"
+		},
+		{
+			"path": "windows-config-journal/source43-guarded-own-property-count-semantic-candidate-v2-source-only-20261010/paths.json",
+			"bytes": 129,
+			"sha256": "7eef4b76296596913d69bee7b7e731d3fd52b6c080ed3f788bb683d42dd30f3a"
+		},
+		{
+			"path": "windows-config-journal/source43-guarded-own-property-count-semantic-candidate-v2-source-only-20261010/postimages/static/ergopti_plus/windows/infra/config_migrate.ahk",
+			"bytes": 66624,
+			"sha256": "36a8cbc5b1549034f48010bdc69f637fa4ba8d0bcca475f44197083fb34fe175"
+		},
+		{
+			"path": "windows-config-journal/source43-guarded-own-property-count-semantic-candidate-v2-source-only-20261010/postimages/static/ergopti_plus/windows/tests/unit/test_config_migrate.ahk",
+			"bytes": 81826,
+			"sha256": "f7779fe1e3b3c2d9ccbc0fdf43d342d41b6f02b2e3c718fb79e69f2a30664c23"
+		},
+		{
+			"path": "windows-config-journal/source43-guarded-own-property-count-semantic-candidate-v2-source-only-20261010/preimages/static/ergopti_plus/windows/infra/config_migrate.ahk",
+			"bytes": 66107,
+			"sha256": "134b98ac68d4fcca994c3e07649e28d3c56a34ea786fb7ca73924d45dbfc5b26"
+		},
+		{
+			"path": "windows-config-journal/source43-guarded-own-property-count-semantic-candidate-v2-source-only-20261010/preimages/static/ergopti_plus/windows/tests/unit/test_config_migrate.ahk",
+			"bytes": 79901,
+			"sha256": "0ebbc25f09d579ef9e83c88aebd121964a3eb726ea9bff1d9ed8707e9222c39c"
+		},
+		{
+			"path": "windows-config-journal/source43-guarded-own-property-count-semantic-candidate-v2-source-only-20261010/source-composition.json",
+			"bytes": 1828,
+			"sha256": "3e427a64d26ba1de889259ec7f7432acb01c8fc2c8b8683b84bb76441b2392d9"
+		},
+		{
+			"path": "windows-config-journal/source43-guarded-own-property-count-semantic-candidate-v2-source-only-20261010/source.patch",
+			"bytes": 4936,
+			"sha256": "61cc9607fddf32ad0aceacb8db1976d61f581ca1a44276190ec41fd3fc83da79"
+		},
+		{
+			"path": "windows-managed-ollama-exact-evidence-step-conditions-source-only-20261010/INDEPENDENT-BOUNDED-SOURCE-REVIEW.json",
+			"bytes": 3404,
+			"sha256": "bacc2f7dc2bb62d3bd93700dae4aa56f9ff719b83565037cd612dfa274af25ed"
+		},
+		{
+			"path": "windows-managed-ollama-exact-evidence-step-conditions-source-only-20261010/README.md",
+			"bytes": 873,
+			"sha256": "3e5d588df1f49ff053c5680d45718d77ad8147f2f986cd051f2d8bd59bc1608e"
+		},
+		{
+			"path": "windows-managed-ollama-exact-evidence-step-conditions-source-only-20261010/SOURCE-PROPOSAL.json",
+			"bytes": 2505,
+			"sha256": "7b7ed9386d994970b0a513a07bc50b3b52a546885b062c0986d24d830aa52910"
+		},
+		{
+			"path": "windows-managed-ollama-exact-evidence-step-conditions-source-only-20261010/postimages/tools/test/test-ci-pipeline-wiring.cjs",
+			"bytes": 172843,
+			"sha256": "c6b370c751460257c6b6bbb989901ef0093529f3e05bc78c73bed41c4829bd26"
+		},
+		{
+			"path": "windows-managed-ollama-exact-evidence-step-conditions-source-only-20261010/preimages/tools/test/test-ci-pipeline-wiring.cjs",
+			"bytes": 167445,
+			"sha256": "d73377c2c33d72430437529c78b8f5f621b1cb6bf9ff16bec2f09891ae218982"
+		},
+		{
+			"path": "windows-managed-ollama-exact-evidence-step-conditions-source-only-20261010/source-only.patch",
+			"bytes": 6325,
+			"sha256": "066f5f06e4123b028454bbc1e69031789fc2b233ce4d3ef782bb7a810d0236f0"
+		},
+		{
+			"path": "windows-two-menu-fixture-native-refusal-source-successor-20261010/ACTUAL-FAILURE-EVIDENCE.json",
+			"bytes": 1892,
+			"sha256": "d837c5b5888ce4470432e4ace39fa551c6abbbc4b6b58abe412e84621b073994"
+		},
+		{
+			"path": "windows-two-menu-fixture-native-refusal-source-successor-20261010/CHECKSUMS.json",
+			"bytes": 1784,
+			"sha256": "97ce9cc5a771061146472c03f6b21db614465d8f174cb1a63995d1a03a301ac9"
+		},
+		{
+			"path": "windows-two-menu-fixture-native-refusal-source-successor-20261010/INDEPENDENT-BOUNDED-SOURCE-REVIEW.json",
+			"bytes": 4937,
+			"sha256": "f9fe1a272cbfea81c145831c0732bf48cc40f742fb98a89f4106e9cdf3b5f384"
+		},
+		{
+			"path": "windows-two-menu-fixture-native-refusal-source-successor-20261010/ORIGINAL-ASSERTION-INVENTORY.json",
+			"bytes": 8532,
+			"sha256": "ddf2f5c67d5e55f360bfd257e33b9dd7b5110fbc66642c4637b4358b3ac25aa5"
+		},
+		{
+			"path": "windows-two-menu-fixture-native-refusal-source-successor-20261010/README.md",
+			"bytes": 2197,
+			"sha256": "cc86c41f4ccacb955806e64fac162d0320c52ec54cf015f52e58e726d5f5d5c0"
+		},
+		{
+			"path": "windows-two-menu-fixture-native-refusal-source-successor-20261010/SOURCE-CHECKS.json",
+			"bytes": 341,
+			"sha256": "5ae0b3a2be91f94d653af462b85a8aa9766f1ba1a1ebf130c0c210e9dd27f2f4"
+		},
+		{
+			"path": "windows-two-menu-fixture-native-refusal-source-successor-20261010/SOURCE-MANIFEST.json",
+			"bytes": 4526,
+			"sha256": "ce99917aadafdb710a1694e7d834f295ca3b4de4d76e243e19ee44de51719ad6"
+		},
+		{
+			"path": "windows-two-menu-fixture-native-refusal-source-successor-20261010/postimages/static/ergopti_plus/windows/tests/unit/test_language_deferred_declared_parent.ahk",
+			"bytes": 14338,
+			"sha256": "d81420523cc5038b21fe493d2612e4d80fd4ef4ed6b69f88518cc5bf424d8619"
+		},
+		{
+			"path": "windows-two-menu-fixture-native-refusal-source-successor-20261010/postimages/static/ergopti_plus/windows/tests/unit/test_tray_pause_greys_features.ahk",
+			"bytes": 6799,
+			"sha256": "3cfb9dbe59ada75e4c6352e7e8acabac5a922c190061eb33986b20f7eae40715"
+		},
+		{
+			"path": "windows-two-menu-fixture-native-refusal-source-successor-20261010/preimages/static/ergopti_plus/windows/tests/unit/test_language_deferred_declared_parent.ahk",
+			"bytes": 14158,
+			"sha256": "0626f2fa090fc0c601bb4611985d7b4717ea44c32d2e52b51822deeaae6bdefb"
+		},
+		{
+			"path": "windows-two-menu-fixture-native-refusal-source-successor-20261010/preimages/static/ergopti_plus/windows/tests/unit/test_tray_pause_greys_features.ahk",
+			"bytes": 6060,
+			"sha256": "0c47016b6fbb2edc7df8debfd7efd1c5bce86868dafdcf2ce2ea4a8a3722b0fd"
+		},
+		{
+			"path": "windows-two-menu-fixture-native-refusal-source-successor-20261010/reference-inputs/static/ergopti_plus/windows/adapters/tray_menu.ahk",
+			"bytes": 7998,
+			"sha256": "7c2f168ed7c85f5c40a5de725c887205543cd21bce36953499978384fa826d28"
+		},
+		{
+			"path": "windows-two-menu-fixture-native-refusal-source-successor-20261010/reference-inputs/static/ergopti_plus/windows/infra/manifest_menu.ahk",
+			"bytes": 95506,
+			"sha256": "80a366a21099529a9a62f151a31efc7e24f65ab9f30517e694a3c5870e195778"
+		},
+		{
+			"path": "windows-two-menu-fixture-native-refusal-source-successor-20261010/reference-inputs/static/ergopti_plus/windows/tests/test_framework.ahk",
+			"bytes": 37612,
+			"sha256": "9e77b664c76e3632c6f4b019bd420ddcac76f86ea52ab1da3cbf81a1b5f745e9"
+		},
+		{
+			"path": "windows-two-menu-fixture-native-refusal-source-successor-20261010/reference-inputs/static/ergopti_plus/windows/ui/menu/menu_init.ahk",
+			"bytes": 27763,
+			"sha256": "746ee2b5492438713b1c1a914738f427c1d479ad3178e7fd6a81cfd563073468"
+		},
+		{
+			"path": "windows-two-menu-fixture-native-refusal-source-successor-20261010/source-only.patch",
+			"bytes": 2427,
+			"sha256": "74e92214e6736e476004fa24228c86bc2be7664a810726ce87d4b5c74e07748e"
+		}
+	],
+	"qualifications": "Mixed exact actual evidence and inactive reviewed/blocked Source preparations; packet statuses remain authoritative. Native candidate is incomplete/failed; no active cache proposal. Only selected compact evidence archived, not entire historical delivery workspace."
+}

@@ -13,6 +13,7 @@ _CRG_GatewayOwnsEveryRecoveryStage() {
 	Built := _DriverFuncBody("ConfigCommitBuilt")
 	Body := _DriverFuncBody("_ConfigCommitOwned")
 	Writer := _DriverFuncBody("_ConfigInvokeCommitWriter")
+	NativeWriter := _DriverFuncBody("TOML_ConfigBatchWrite")
 	Assert(Built != "", "ConfigCommitBuilt source must be discoverable")
 	Assert(Body != "", "_ConfigCommitOwned source must be discoverable")
 	Assert(Writer != "", "_ConfigInvokeCommitWriter source must be discoverable")
@@ -33,8 +34,15 @@ _CRG_GatewayOwnsEveryRecoveryStage() {
 		Assert(InStr(Built, '_ConfigPlanGet(Plan, "' . Field . '"') > 0,
 			"built plans must resolve " . Field . " while the lease is held")
 	Assert(InStr(Writer, "WriterFn.Call(Path, Updates)") > 0
-		&& InStr(Writer, "TOML_BatchWrite(Path, Updates)") > 0,
+		&& InStr(Writer, "TOML_ConfigBatchWrite(Path, Updates, [], NativeAdmission)") > 0,
 		"forward and reverse writes must share the strict writer gateway")
+	Assert(NativeWriter != "", "the actual configuration gateway must retain its shared writer")
+	Assert(InStr(NativeWriter,
+		'_TOML_BatchWriteImpl(Path, Updates, ExactSectionPrefixes, "write", , , true, NativeAdmission)') > 0,
+		"the forward and reverse default writer must reach the same canonical implementation with source admission")
+	Assert(InStr(NativeWriter, "_ConfigWriteLeaseOwns(Owner, Path)") > 0
+		&& InStr(NativeWriter, "_FSNativeAdmissionAccepted(AdmissionFn)") > 0,
+		"the strict shared writer must retain exact path ownership and supplied native admission")
 }
 Test("config recovery gateway owns every stage before lease release "
 	. "(config-recovery-gateway-order)", _CRG_GatewayOwnsEveryRecoveryStage)

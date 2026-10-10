@@ -269,6 +269,12 @@ function checkChoiceProjection() {
 	try {
 		for (const relativePath of [
 			'tools/build/build-menu-manifest.js',
+			'tools/lib/codegen-startup-tray.cjs',
+			'static/ergopti_plus/_shared/modules/menu/startup_tray.toml',
+			'static/ergopti_plus/_shared/data/locale_order.json',
+			...JSON.parse(readFileSync(resolve(SHARED, 'data/locale_order.json'), 'utf8')).order.map(
+				(code) => `static/ergopti_plus/_shared/data/locales/${code}.json`
+			),
 			'tools/lib/paths.cjs',
 			'tools/lib/menu-row-availability.cjs',
 			'static/ergopti_plus/_shared/data/locales/en.json',
@@ -7287,6 +7293,16 @@ console.log(
 		canonicalLoopSource.slice(maskStart, maskEnd) + '\ncodeLines'
 	);
 	function hasBareCall(source, extension, method, section) {
+		if (
+			extension === '.lua' &&
+			method === 'template_rows' &&
+			section === 'llm_download_shortcut_frame' &&
+			require('../lib/menu-native-download-binding.cjs').retainedNativeDownloadProjection(
+				source,
+				true
+			)
+		)
+			return true;
 		const tokens = scriptTokens(source, extension);
 		const nativeLines = extension === '.ahk' ? nativeCodeLines(source) : null;
 		return tokens.some((token, index) => {
@@ -7536,7 +7552,13 @@ console.log(
 				platform === 'ahk' && edge.signatures[platform] === frozenWarningLocator
 					? reviewedWarningLocator
 					: edge.signatures[platform];
-			const call = platform === 'ahk' ? method : 'ManifestMenu.' + method;
+			const retainedDownload = platform === 'hs' && edge.section === 'llm_download_shortcut_frame';
+			const call =
+				platform === 'ahk'
+					? method
+					: retainedDownload
+						? 'template_owner'
+						: 'ManifestMenu.' + method;
 			const literal = call + '("' + edge.section + '"';
 			const body = authenticBody(source, extension, signature);
 			assert(body.trim().length > 0, 'the actual native constructor has executable content');
@@ -9093,6 +9115,15 @@ console.log(
 	try {
 		for (const rel of [
 			'tools/build/build-menu-manifest.js',
+			'tools/lib/codegen-startup-tray.cjs',
+			'static/ergopti_plus/_shared/modules/menu/startup_tray.toml',
+			'static/ergopti_plus/_shared/data/locale_order.json',
+			...JSON.parse(readFileSync(resolve(SHARED, 'data/locale_order.json'), 'utf8')).order.map(
+				(code) => `static/ergopti_plus/_shared/data/locales/${code}.json`
+			),
+			'static/ergopti_plus/_shared/modules/updater/channels.json',
+			'static/ergopti_plus/_shared/modules/updater/defaults.json',
+			'static/ergopti_plus/_shared/ui/update_channels.js',
 			'tools/lib/paths.cjs',
 			'static/ergopti_plus/_shared/modules/updater/schedule.js',
 			'static/ergopti_plus/_shared/data/locales/en.json'
@@ -9139,8 +9170,10 @@ console.log(
 						'\n'
 				)
 				.join('');
+		// Both genuine outputs require their complete canonical startup source closure.
+		const canonical = readFileSync(MANIFEST_PATH, 'utf8');
 		const compile = (rows) => {
-			fs.writeFileSync(manifest, toml(rows));
+			fs.writeFileSync(manifest, canonical + toml(rows));
 			return spawnSync(process.execPath, ['tools/build/build-menu-manifest.js'], {
 				cwd: fixture,
 				encoding: 'utf8',
@@ -10486,6 +10519,118 @@ console.log(
 	);
 }
 
+// Exercise the actual startup compiler through the included menu-manifest gate.
+// Drift equality uses the real generator. The caption oracle is independently
+// frozen and never derived from the generator output.
+{
+	const assert = require('node:assert/strict');
+	const startup = require('../lib/codegen-startup-tray.cjs');
+	const policy = parseToml(readFileSync(resolve(SHARED, 'modules/menu/startup_tray.toml'), 'utf8'));
+	const root = JSON.parse(readFileSync(MENU_PATH, 'utf8'));
+	const codes = JSON.parse(readFileSync(resolve(SHARED, 'data/locale_order.json'), 'utf8')).order;
+	const locales = Object.fromEntries(
+		codes.map((code) => [
+			code,
+			JSON.parse(readFileSync(resolve(LOCALES_DIR, `${code}.json`), 'utf8'))
+		])
+	);
+	const frozen = JSON.parse(
+		readFileSync(resolve(SHARED, 'tests/corpus/menus/startup_bootstrap_captions.json'), 'utf8')
+	);
+	assert.equal(codes.length, 21);
+	assert.deepEqual(policy.commands.rows, [
+		{ section: 'tray_startup_suspend', id: 'suspend' },
+		{ section: 'top_level', id: 'reload' },
+		{ section: 'top_level', id: 'quit' }
+	]);
+	assert.deepEqual(policy.inert.rows, [
+		{ section: 'tray_startup_inert_frame', id: 'startup_inert_status' }
+	]);
+	assert.deepEqual(policy.captions, { fallback_locale: 'en' });
+	for (const code of codes) {
+		assert.deepEqual(
+			[
+				locales[code]['menu.global.suspend'],
+				locales[code]['menu.global.reload'],
+				locales[code]['menu.global.quit']
+			],
+			frozen.expected[code].commands,
+			'independent OLD emergency command captions'
+		);
+		assert.equal(locales[code]['menu.global.startup_bootstrap'], frozen.expected[code].inert);
+	}
+	assert.equal(
+		readFileSync(resolve(SHARED, 'modules/menu/startup_tray_projection.ahk'), 'utf8'),
+		startup.render(root, policy, locales),
+		'genuine shared compiled projection drift'
+	);
+	const clone = (value) => JSON.parse(JSON.stringify(value));
+	const parsedPolicy = parseTomlSource(
+		readFileSync(resolve(SHARED, 'modules/menu/startup_tray.toml'), 'utf8')
+	);
+	const parsedMenu = parseTomlSource(readFileSync(MANIFEST_PATH, 'utf8')).menu;
+	assert.equal(Object.getPrototypeOf(parsedPolicy), null, 'exercise genuine parser-owned records');
+	assert.equal(
+		startup.render(parsedMenu, parsedPolicy, locales),
+		startup.render(root, policy, locales),
+		'genuine TOML inputs preserve the same canonical startup projection'
+	);
+	for (const select of [
+		(candidate) => candidate,
+		(candidate) => candidate.captions,
+		(candidate) => candidate.commands,
+		(candidate) => candidate.commands.rows[0]
+	]) {
+		const candidate = clone(policy);
+		Object.setPrototypeOf(select(candidate), { foreign: true });
+		assert.throws(
+			() => startup.render(root, candidate, locales),
+			/Canonical startup projection refused/,
+			'parser-owned records do not admit foreign inherited structure'
+		);
+	}
+	for (const change of [
+		(menu) => {
+			menu.top_level = menu.top_level.filter(
+				(row) => !(row.id === 'reload' && row.platforms.includes('ahk'))
+			);
+		},
+		(menu) => {
+			menu.top_level.find((row) => row.id === 'quit' && row.platforms.includes('ahk')).type =
+				'group';
+		},
+		(menu) => {
+			menu.top_level.find(
+				(row) => row.id === 'reload' && row.platforms.includes('ahk')
+			).disabled_when = ['invented_readiness'];
+		},
+		(menu) => {
+			menu.top_level.find((row) => row.id === 'reload' && row.platforms.includes('ahk')).command =
+				'foreign';
+		},
+		(menu) => {
+			menu.top_level.find((row) => row.id === 'reload' && row.platforms.includes('ahk')).command =
+				'suspend';
+		},
+		(menu) => {
+			menu.tray_startup_suspend = [];
+		},
+		(menu) => {
+			menu.tray_startup_inert_frame[0].command = 'quit';
+		}
+	]) {
+		const changed = clone(root);
+		change(changed);
+		assert.throws(() => startup.render(changed, policy, locales));
+	}
+	const changedPolicy = clone(policy);
+	changedPolicy.commands.rows.push(changedPolicy.commands.rows[0]);
+	assert.throws(() => startup.render(root, changedPolicy, locales));
+	const changedLocales = clone(locales);
+	delete changedLocales.en['menu.global.reload'];
+	assert.throws(() => startup.render(root, policy, changedLocales));
+}
+
 // Complete Windows profile parent placement uses the original native profile child.
 {
 	const assert = require('node:assert/strict');
@@ -11131,6 +11276,313 @@ console.log(
 		);
 	}
 
+	// Reuse the existing executable token/scoping parser for finite lexical custody.
+	function rootPositions(text, statement) {
+		const tokens = scriptTokens(text, '.lua'),
+			wanted = scriptTokens(statement, '.lua');
+		const depths = tokenDepths(tokens),
+			found = [];
+		for (let at = 0; at < tokens.length; at++) {
+			if (depths[at] !== 0 || ['.', ':', 'function'].includes(tokens[at - 1]?.value)) continue;
+			if (
+				wanted.every((token, offset) => {
+					const actual = tokens[at + offset];
+					return (
+						actual?.kind === token.kind &&
+						actual.value === token.value &&
+						(token.kind !== 'string' ||
+							text.slice(actual.start, actual.end) === statement.slice(token.start, token.end))
+					);
+				})
+			)
+				found.push(at);
+		}
+		return found;
+	}
+
+	// Count actual bindings, including uninitialized locals and Lua assignment lists.
+	// A local function, parameter or iterator can shadow an outer retained owner too.
+	function bindingEvents(tokens, name) {
+		const depths = tokenDepths(tokens),
+			tables = [],
+			fields = new Set();
+		for (let at = 0; at < tokens.length; at++) {
+			if (tokens[at].kind === 'symbol' && tokens[at].value === '{') tables.push(depths[at]);
+			else if (tokens[at].kind === 'symbol' && tokens[at].value === '}') tables.pop();
+			// All immediate constructor identifiers are data expression reads,
+			// including values before another field's comma/key/equals. Nested
+			// function bodies have a deeper scope and retain binding admission.
+			else if (tables.length && tables.at(-1) === depths[at] && tokens[at].kind === 'identifier')
+				fields.add(at);
+		}
+		// After a tracked bare variable, parse the remaining Lua assignment lvalues.
+		// Arguments, comparisons and data references cannot finish this grammar.
+		const symbol = (at, value) => tokens[at]?.kind === 'symbol' && tokens[at].value === value;
+		const balancedEnd = (start) => {
+			const closing = { '(': ')', '[': ']', '{': '}' },
+				stack = [];
+			for (let at = start; at < tokens.length; at++) {
+				if (tokens[at].kind !== 'symbol') continue;
+				if (closing[tokens[at].value]) stack.push(closing[tokens[at].value]);
+				else if ([')', ']', '}'].includes(tokens[at].value)) {
+					if (stack.pop() !== tokens[at].value) return null;
+					if (stack.length === 0) return at + 1;
+				}
+			}
+			return null;
+		};
+		const lvalueEnd = (start) => {
+			let at = start,
+				assignable = false;
+			const keywords = new Set([
+				'and',
+				'break',
+				'do',
+				'else',
+				'elseif',
+				'end',
+				'false',
+				'for',
+				'function',
+				'goto',
+				'if',
+				'in',
+				'local',
+				'nil',
+				'not',
+				'or',
+				'repeat',
+				'return',
+				'then',
+				'true',
+				'until',
+				'while'
+			]);
+			if (tokens[at]?.kind === 'identifier' && !keywords.has(tokens[at].value)) {
+				at++;
+				assignable = true;
+			} else if (symbol(at, '(')) at = balancedEnd(at);
+			else return null;
+			if (at === null) return null;
+			while (at < tokens.length) {
+				if (symbol(at, '.')) {
+					if (tokens[at + 1]?.kind !== 'identifier' || keywords.has(tokens[at + 1].value))
+						return null;
+					at += 2;
+					assignable = true;
+				} else if (symbol(at, '[')) {
+					at = balancedEnd(at);
+					if (at === null) return null;
+					assignable = true;
+				} else if (symbol(at, '(') || symbol(at, '{')) {
+					at = balancedEnd(at);
+					if (at === null) return null;
+					assignable = false;
+				} else if (tokens[at]?.kind === 'string') {
+					at++;
+					assignable = false;
+				} else if (symbol(at, ':')) {
+					if (tokens[at + 1]?.kind !== 'identifier' || keywords.has(tokens[at + 1].value))
+						return null;
+					at += 2;
+					if (symbol(at, '(') || symbol(at, '{')) at = balancedEnd(at);
+					else if (tokens[at]?.kind === 'string') at++;
+					else return null;
+					if (at === null) return null;
+					assignable = false;
+				} else break;
+			}
+			return assignable ? at : null;
+		};
+		const assignmentAfter = (start) => {
+			let after = start + 1;
+			while (symbol(after, ',')) {
+				after = lvalueEnd(after + 1);
+				if (after === null) return false;
+			}
+			return symbol(after, '=') && !symbol(after + 1, '=');
+		};
+		const events = new Map();
+		const add = (at, kind) => {
+			const event = events.get(at) || new Set();
+			event.add(kind);
+			events.set(at, event);
+		};
+		for (let at = 0; at < tokens.length; at++) {
+			if (
+				tokens[at].kind !== 'identifier' ||
+				tokens[at].value !== name ||
+				fields.has(at) ||
+				['.', ':', '['].includes(tokens[at - 1]?.value)
+			)
+				continue;
+			if (assignmentAfter(at)) add(at, 'assignment');
+			let before = at - 1;
+			while (tokens[before]?.value === ',' && tokens[before - 1]?.kind === 'identifier')
+				before -= 2;
+			if (tokens[before]?.value === 'local') add(at, 'local');
+			if (tokens[at - 1]?.value === 'function' && tokens[at + 1]?.value === '(')
+				add(at, 'function');
+		}
+		for (let at = 0; at < tokens.length; at++) {
+			if (tokens[at].kind !== 'identifier' || ['.', ':'].includes(tokens[at - 1]?.value)) continue;
+			if (tokens[at].value === 'function') {
+				let opening = at + 1;
+				while (tokens[opening] && tokens[opening].value !== '(') opening++;
+				for (
+					let parameter = opening + 1;
+					tokens[parameter] && tokens[parameter].value !== ')';
+					parameter++
+				) {
+					if (tokens[parameter].kind === 'identifier' && tokens[parameter].value === name)
+						add(parameter, 'parameter');
+				}
+			} else if (tokens[at].value === 'for') {
+				for (
+					let variable = at + 1;
+					tokens[variable] && !['=', 'in', 'do'].includes(tokens[variable].value);
+					variable++
+				) {
+					if (tokens[variable].kind === 'identifier' && tokens[variable].value === name)
+						add(variable, 'iterator');
+				}
+			}
+		}
+		return events;
+	}
+
+	// Admit only this actual imported owner and its complete guarded terminal rendering.
+	// A same-named alias, inherited facade or replacement function earns no credit.
+	function declaredPublicProjection(source, publicOwner) {
+		const captures = [
+			'local separator_modules = package.loaded',
+			'local separator_factory = type(ManifestMenu) == "table" and rawget(ManifestMenu, "top_level_separator_receiver")',
+			'local separator_render = type(ManifestMenu) == "table" and rawget(ManifestMenu, "render_rows")',
+			'local separator_array = type(ManifestMenu) == "table" and rawget(ManifestMenu, "get_array")',
+			'local separator_root = type(ManifestMenu) == "table" and rawget(ManifestMenu, "get_root")'
+		];
+		const importStatement = 'local ok_mm, ManifestMenu = pcall(require, "infra.manifest_menu")';
+		const failureStatement =
+			'if not ok_mm or type(ManifestMenu) ~= "table" then ManifestMenu = nil end';
+		const imports = rootPositions(source, importStatement),
+			failures = rootPositions(source, failureStatement);
+		if (
+			imports.length !== 1 ||
+			failures.length !== 1 ||
+			imports[0] >= failures[0] ||
+			!captures.every((statement) => rootPositions(source, statement).length === 1)
+		)
+			return false;
+		const sourceTokens = scriptTokens(source, '.lua'),
+			sourceDepths = tokenDepths(sourceTokens);
+		for (const name of [
+			'require',
+			'pcall',
+			'rawget',
+			'getmetatable',
+			'type',
+			'rawequal',
+			'_ENV',
+			'package'
+		]) {
+			if (bindingEvents(sourceTokens, name).size !== 0) return false;
+		}
+		for (const [index, name] of [
+			'separator_modules',
+			'separator_factory',
+			'separator_render',
+			'separator_array',
+			'separator_root'
+		].entries()) {
+			const at = rootPositions(source, captures[index])[0];
+			const events = bindingEvents(sourceTokens, name);
+			if (events.size !== 1 || !events.has(at + 1) || failures[0] >= at) return false;
+		}
+		const failureTokens = scriptTokens(failureStatement, '.lua');
+		const failureWrite =
+			failures[0] +
+			failureTokens.findIndex(
+				(token, at) => token.value === 'ManifestMenu' && failureTokens[at + 1]?.value === '='
+			);
+		for (const [at, kinds] of bindingEvents(sourceTokens, 'ManifestMenu')) {
+			if (at === imports[0] + 3 || at === failureWrite) continue;
+			// Existing unrelated native producers may have their own scoped import.
+			// They cannot replace the module owner, and the public owner cannot shadow it.
+			if (sourceDepths[at] === 0 || !kinds.has('local')) return false;
+		}
+		if (bindingEvents(scriptTokens(publicOwner, '.lua'), 'ManifestMenu').size !== 0) return false;
+		const shape = (text) =>
+			scriptTokens(text, '.lua').map((token) => [
+				token.kind,
+				token.kind === 'string' ? text.slice(token.start, token.end) : token.value
+			]);
+		const guard = ownerBody(source, 'local function separator_facade_current()');
+		const expected = `return type(ManifestMenu) == "table" and getmetatable(ManifestMenu) == nil
+			and rawget(package, "loaded") == separator_modules
+			and rawget(separator_modules, "infra.manifest_menu") == ManifestMenu
+			and type(separator_factory) == "function" and rawget(ManifestMenu, "top_level_separator_receiver") == separator_factory
+			and type(separator_render) == "function" and rawget(ManifestMenu, "render_rows") == separator_render
+			and type(separator_array) == "function" and rawget(ManifestMenu, "get_array") == separator_array
+			and type(separator_root) == "function" and rawget(ManifestMenu, "get_root") == separator_root`;
+		if (JSON.stringify(shape(guard)) !== JSON.stringify(shape(expected))) return false;
+		const guardAt = rootPositions(source, 'local function separator_facade_current()');
+		const guardBindings = bindingEvents(sourceTokens, 'separator_facade_current');
+		if (
+			guardAt.length !== 1 ||
+			guardBindings.size !== 1 ||
+			!guardBindings.has(guardAt[0] + 2) ||
+			rootPositions(source, captures[4])[0] >= guardAt[0]
+		)
+			return false;
+		if (
+			!hasStatement(
+				publicOwner,
+				`if not separator_facade_current() then return {} end
+			local declared = ManifestMenu.get_array("top_level")
+			if not separator_facade_current() then return {} end
+			local receive_separator, source_rows = separator_factory()
+			if not separator_facade_current() or type(receive_separator) ~= "function"
+				or type(declared) ~= "table" or not rawequal(declared, source_rows) then
+				Logger.error(LOG, "The canonical top-level boundary source is unavailable.")
+				return {}
+			end`
+			)
+		)
+			return false;
+		const tokens = scriptTokens(publicOwner, '.lua');
+		for (const [name, statement, offset] of [
+			['declared', 'local declared = ManifestMenu.get_array("top_level")', 1],
+			['receive_separator', 'local receive_separator, source_rows = separator_factory()', 1],
+			['source_rows', 'local receive_separator, source_rows = separator_factory()', 3],
+			['rendered', 'local rendered = separator_render(rows, "top_level")', 1]
+		]) {
+			const captured = rootPositions(publicOwner, statement),
+				events = bindingEvents(tokens, name);
+			if (captured.length !== 1 || events.size !== 1 || !events.has(captured[0] + offset))
+				return false;
+		}
+		const terminal = `if not separator_facade_current() or not receive_separator("current") then return {} end
+			local rendered = separator_render(rows, "top_level")
+			if not separator_facade_current() or not receive_separator("current") then return {} end
+			return rendered`;
+		const wanted = shape(terminal),
+			actual = shape(publicOwner);
+		const legacyTerminal =
+			actual.length >= wanted.length &&
+			JSON.stringify(actual.slice(-wanted.length)) === JSON.stringify(wanted);
+		if (legacyTerminal) return true;
+		const guardedTerminal = terminal.replaceAll(
+			'or not receive_separator("current") then return {} end',
+			'or not receive_separator("current") or not header_current() then return {} end'
+		);
+		const guarded = shape(guardedTerminal);
+		return (
+			actual.length >= guarded.length &&
+			JSON.stringify(actual.slice(-guarded.length)) === JSON.stringify(guarded) &&
+			require('../lib/menu-native-llm-parent-binding.cjs').declaredLinuxTopLevelPublication(source)
+		);
+	}
+
 	function admits(source) {
 		try {
 			const native = ownerBody(source, 'local function _build_about(ctx)');
@@ -11178,8 +11630,7 @@ console.log(
 				)
 			)
 				return false;
-			if (!hasStatement(publicOwner, 'return ManifestMenu.render_rows(rows, "top_level")'))
-				return false;
+			if (!declaredPublicProjection(source, publicOwner)) return false;
 			const tokens = scriptTokens(publicOwner, '.lua');
 			const binding = scriptTokens('["about"] = _build_about', '.lua');
 			return tokens.some((_, index) =>
@@ -11236,13 +11687,297 @@ console.log(
 			'missing actual source identity refusal'
 		],
 		[
-			'return ManifestMenu.render_rows(rows, "top_level")',
-			'return rows',
+			'local rendered = separator_render(rows, "top_level")',
+			'local rendered = rows',
 			'missing actual native rendering boundary'
 		]
 	]) {
 		assert.equal(source.split(before).length - 1, 1, reason + ': exact source preimage');
 		assert.equal(admits(source.replace(before, after)), false, reason);
+	}
+	for (const [before, after, reason] of [
+		[
+			'local separator_render = type(ManifestMenu) == "table" and rawget(ManifestMenu, "render_rows")',
+			'local separator_render = Foreign.render_rows',
+			'foreign captured render owner'
+		],
+		[
+			'and rawget(separator_modules, "infra.manifest_menu") == ManifestMenu',
+			'and true',
+			'missing imported facade custody'
+		],
+		[
+			'and type(separator_render) == "function" and rawget(ManifestMenu, "render_rows") == separator_render',
+			'and type(separator_render) == "function"',
+			'missing actual render function custody'
+		],
+		[
+			'or type(declared) ~= "table" or not rawequal(declared, source_rows) then',
+			'or type(declared) ~= "table" then',
+			'foreign equal-looking source array'
+		],
+		[
+			'local rendered = separator_render(rows, "top_level")',
+			'local rendered = Foreign.render_rows(rows, "top_level")',
+			'foreign actual native publication'
+		],
+		[
+			'local rendered = separator_render(rows, "top_level")\n\tif not separator_facade_current() or not receive_separator("current") then return {} end',
+			'local rendered = separator_render(rows, "top_level")\n\tif false then return {} end',
+			'missing post-render source custody'
+		],
+		[
+			'return rendered\nend\n\nreturn M',
+			'return {}\nend\n\nreturn M',
+			'disconnected terminal native result'
+		]
+	]) {
+		let liveBefore = before;
+		if (
+			reason === 'missing post-render source custody' &&
+			!source.includes(before) &&
+			require('../lib/menu-native-llm-parent-binding.cjs').declaredLinuxTopLevelPublication(source)
+		) {
+			liveBefore = before.replace(
+				'or not receive_separator("current") then return {} end',
+				'or not receive_separator("current") or not header_current() then return {} end'
+			);
+		}
+		assert.equal(
+			source.split(liveBefore).length - 1,
+			1,
+			reason + ': exact genuine producer preimage'
+		);
+		const candidate = source.replace(liveBefore, after);
+		assert.notEqual(candidate, source, reason + ': actual producer changed');
+		assert.equal(candidate.replace(after, liveBefore), source, reason + ': exact source inverse');
+		assert.equal(admits(candidate), false, reason);
+	}
+	for (const [before, after, reason] of [
+		[
+			'local header, header_current = _build_header(ctx)',
+			'local header, header_current = Foreign.header(ctx)',
+			'About root loses its actual guarded header producer'
+		],
+		[
+			'if not header or type(header_current) ~= "function" or not header_current() then return {} end',
+			'if false then return {} end',
+			'About root loses its initial header receipt'
+		],
+		[
+			'or not header_current() then return {} end\n\tlocal rendered',
+			'then return {} end\n\tlocal rendered',
+			'About root loses its pre-render header receipt'
+		],
+		[
+			'or not header_current() then return {} end\n\treturn rendered',
+			'then return {} end\n\treturn rendered',
+			'About root loses its post-render header receipt'
+		]
+	]) {
+		assert.equal(source.split(before).length - 1, 1, reason + ': exact current source coordinate');
+		const candidate = source.replace(before, after);
+		assert.notEqual(candidate, source, reason + ': actual source changed');
+		assert.equal(candidate.replace(after, before), source, reason + ': exact source inverse');
+		assert.equal(admits(candidate), false, reason);
+		assert.equal(admits(source), true, reason + ': genuine source inverse retained');
+	}
+	for (const [before, after, reason] of [
+		[
+			'function M.build(ctx)',
+			'function M.build(ctx)\n\tlocal separator_render',
+			'uninitialized captured render shadow'
+		],
+		[
+			'function M.build(ctx)',
+			'function M.build(ctx)\n\tlocal separator_render, ignored = Foreign.render_rows, nil',
+			'comma-list captured render shadow'
+		],
+		[
+			'function M.build(ctx)',
+			'function M.build(ctx)\n\tlocal function separator_render(...) return {} end',
+			'named local render shadow'
+		],
+		[
+			'function M.build(ctx)',
+			'function M.build(ctx)\n\tlocal function separator_facade_current() return true end',
+			'named local custody guard shadow'
+		],
+		[
+			'function M.build(ctx)',
+			'function M.build(ctx)\n\tlocal ManifestMenu, ignored = Foreign, nil',
+			'public renderer facade shadow'
+		],
+		[
+			'local separator_modules = package.loaded',
+			'ManifestMenu = Foreign\nlocal separator_modules = package.loaded',
+			'module imported facade replacement'
+		],
+		[
+			'local separator_modules = package.loaded',
+			'local ManifestMenu\nlocal separator_modules = package.loaded',
+			'module imported facade local shadow'
+		],
+		[
+			'local separator_modules = package.loaded',
+			'local function foreign_scope(separator_render) return separator_render end\nlocal separator_modules = package.loaded',
+			'captured owner parameter binding'
+		],
+		[
+			'function M.build(ctx)',
+			'function M.build(ctx)\n\tfor separator_render in pairs({}) do end',
+			'captured owner iterator binding'
+		],
+		[
+			'local ok_mm, ManifestMenu = pcall(require, "infra.manifest_menu")',
+			'local require = Foreign.require\nlocal ok_mm, ManifestMenu = pcall(require, "infra.manifest_menu")',
+			'shadowed canonical require'
+		],
+		[
+			'local ok_mm, ManifestMenu = pcall(require, "infra.manifest_menu")',
+			'local function pcall(...) return true, Foreign end\nlocal ok_mm, ManifestMenu = pcall(require, "infra.manifest_menu")',
+			'shadowed canonical protected import'
+		],
+		[
+			'local ok_mm, ManifestMenu = pcall(require, "infra.manifest_menu")',
+			'local _ENV = Foreign\nlocal ok_mm, ManifestMenu = pcall(require, "infra.manifest_menu")',
+			'shadowed canonical import environment'
+		],
+		[
+			'local separator_modules = package.loaded',
+			'local package = Foreign\nlocal separator_modules = package.loaded',
+			'shadowed actual module-cache namespace'
+		],
+		[
+			'function M.build(ctx)',
+			'function M.build(ctx)\n\tseparator_render, Foreign.slot = Foreign.render_rows, nil',
+			'captured owner assignment before member lvalue'
+		],
+		[
+			'function M.build(ctx)',
+			'function M.build(ctx)\n\tseparator_render, Foreign[1] = Foreign.render_rows, nil',
+			'captured owner assignment before indexed lvalue'
+		],
+		[
+			'function M.build(ctx)',
+			'function M.build(ctx)\n\tseparator_render, (Foreign).slot = Foreign.render_rows, nil',
+			'captured owner assignment before parenthesized member lvalue'
+		],
+		[
+			'function M.build(ctx)',
+			'function M.build(ctx)\n\tseparator_render, Foreign()[1] = Foreign.render_rows, nil',
+			'captured owner assignment before indexed call lvalue'
+		],
+		[
+			'if #declared == 0 then',
+			'local function receive_separator(...) return true end\n\tif #declared == 0 then',
+			'forged public separator receiver local function'
+		],
+		[
+			'if #declared == 0 then',
+			'declared, Foreign.slot = Foreign.rows, nil\n\tif #declared == 0 then',
+			'public canonical source assignment before member lvalue'
+		],
+		[
+			'if #declared == 0 then',
+			'local source_rows\n\tif #declared == 0 then',
+			'uninitialized public canonical source shadow'
+		],
+		[
+			'if #declared == 0 then',
+			'local function unrelated_scope(rendered) return rendered end\n\tif #declared == 0 then',
+			'public retained result parameter binding'
+		]
+	]) {
+		assert.equal(source.split(before).length - 1, 1, reason + ': exact genuine lexical preimage');
+		assert.equal(admits(source.replace(before, after)), false, reason);
+	}
+	const constructorDataRead = source.replace(
+		'function M.build(ctx)',
+		'function M.build(ctx)\n\tlocal observer = { separator_render, manifest = ManifestMenu, current = ctx }'
+	);
+	assert.equal(
+		source.split('function M.build(ctx)').length - 1,
+		1,
+		'actual public table-data control preimage'
+	);
+	assert.equal(
+		admits(constructorDataRead),
+		true,
+		'genuine table value reads retain canonical imported owners'
+	);
+	// Only an unused plain table of existing local values is inert. Any real
+	// invocation, escape, shadow or callback remains under the native protocol.
+	assert.equal(
+		admits(
+			source.replace(
+				'function M.build(ctx)',
+				'function M.build(ctx)\n\tlocal unused_values = { context = ctx; ManifestMenu, renderer = separator_render }'
+			)
+		),
+		true,
+		'unused constructor reads do not depend on a fixture variable or field name'
+	);
+	for (const [insertion, reason] of [
+		[
+			'local observer = { manifest = ManifestMenu, value = Foreign() }',
+			'a constructor call is executable'
+		],
+		['local observer = { ctx "," }', 'a string comma argument invokes the context value'],
+		[
+			'local observer = { ManifestMenu ";" }',
+			'a string semicolon argument invokes the retained table value'
+		],
+		[
+			'local observer = { render = ManifestMenu.render_rows }',
+			'a constructor member lookup is executable'
+		],
+		[
+			'local observer = { manifest = ManifestMenu }; observer.manifest.render_rows = Foreign.render_rows',
+			'a retained constructor alias can mutate its owner'
+		],
+		[
+			'local observer = { separator_render }; observer[1]({}, "top_level")',
+			'a retained constructor alias can invoke its owner'
+		],
+		[
+			'local _ENV = { ManifestMenu }',
+			'a constructor cannot replace implicit Lua global resolution'
+		],
+		[
+			'local separator_render = { ManifestMenu }',
+			'a constructor cannot shadow its captured render owner'
+		],
+		[
+			'local observer = { manifest = ManifestMenu, mutate = function() separator_render = Foreign.render_rows end }',
+			'a nested constructor callback is executable'
+		],
+		[
+			'local observer = { "}" }; separator_render = Foreign.render_rows',
+			'a quoted closing brace cannot erase a real owner write'
+		]
+	]) {
+		assert.equal(
+			admits(source.replace('function M.build(ctx)', 'function M.build(ctx)\n\t' + insertion)),
+			false,
+			reason
+		);
+	}
+	for (const [insertion, reason] of [
+		[
+			'local observer = { callback = function() separator_render = Foreign.render_rows end }; observer.callback()',
+			'a nested constructor callback still writes the captured render owner'
+		],
+		[
+			'local quoted_open = "{"; separator_render = Foreign.render_rows',
+			'a quoted brace cannot exempt a real captured owner assignment'
+		]
+	]) {
+		assert.equal(
+			admits(source.replace('function M.build(ctx)', 'function M.build(ctx)\n\t' + insertion)),
+			false,
+			reason
+		);
 	}
 	assert.equal(admits(JSON.stringify(source)), false, 'quoted native source is data');
 	assert.equal(admits('--[=[\n' + source + '\n]=]'), false, 'comment-only native source is data');
@@ -11330,4 +12065,699 @@ console.log(
 			platform + ' cannot bind the retired visible selector'
 		);
 	}
+}
+
+// Actual declaration validation reads canonical source; independent bad receipts never rewrite an oracle.
+{
+	const assert = require('node:assert/strict');
+	const { validateChildTemplates } = require('../lib/menu-row-availability.cjs');
+	const canonical = parseToml(readFileSync(MANIFEST_PATH, 'utf8')).menu;
+	const row = canonical.top_level.find((item) => item.id === 'hotstrings');
+	assert.equal(row.type, 'group');
+	assert.equal(row.i18n, 'menu.hotstrings.title');
+	assert.deepEqual(row.caption_count_policy, {
+		value_getter: 'hotstrings_parent_total',
+		present_getter: 'hotstrings_parent_count_present',
+		visibility: { ahk: 'always', hs: 'available', linux: 'positive' },
+		style: { ahk: 'space', hs: 'space', linux: 'decimal' },
+		format: '%s (%s)',
+		maximum: 9007199254740991
+	});
+	assert.doesNotThrow(() => validateChildTemplates({ parent: [row] }, () => '⚡ Hotstrings'));
+	for (const change of [
+		{ type: 'command' },
+		{ id: '' },
+		{ i18n: '' },
+		{ caption_source: 'native' },
+		{ caption_getter: 'foreign' },
+		{ caption_getters: ['foreign'] },
+		{ caption_format: 'numbered' },
+		{ caption_layout: 'suffix' },
+		{ caption_joiner: ' ' },
+		{ caption_count_getter: 'native_string' },
+		{ caption_count_format: '%s (%s)' },
+		{ label_prefix: '' }
+	])
+		assert.throws(
+			() => validateChildTemplates({ parent: [{ ...row, ...change }] }, () => '⚡ Hotstrings'),
+			/translated count/
+		);
+	for (const change of [
+		{ value_getter: '' },
+		{ present_getter: '' },
+		{ maximum: -1 },
+		{ maximum: 0.5 },
+		{ maximum: Infinity },
+		{ maximum: NaN },
+		{ maximum: 2 ** 53 },
+		{ maximum: '9007199254740991' },
+		{ format: '%s' },
+		{ format: '%s %d' },
+		{ format: '%s %s %s' },
+		{ format: '%s\n%s' },
+		{ format: '\ud800%s%s' },
+		{ visibility: { ahk: 'always', hs: 'available' } },
+		{ visibility: { ahk: 'always', hs: 'available', linux: 'foreign' } },
+		{ style: { ahk: 'space', hs: 'space', linux: 'decimal', foreign: 'decimal' } },
+		{ style: { ahk: 'foreign', hs: 'space', linux: 'decimal' } },
+		{ foreign: 'sidecar' }
+	])
+		assert.throws(
+			() =>
+				validateChildTemplates(
+					{
+						parent: [{ ...row, caption_count_policy: { ...row.caption_count_policy, ...change } }]
+					},
+					() => '⚡ Hotstrings'
+				),
+			/translated count/
+		);
+	for (const altered of [
+		Object.assign(Object.create({ foreign: true }), row.caption_count_policy),
+		Object.defineProperty({ ...row.caption_count_policy }, 'value_getter', {
+			enumerable: true,
+			get() {
+				throw Error('accessor must not execute');
+			}
+		}),
+		Object.defineProperty({ ...row.caption_count_policy }, Symbol('foreign'), { value: true })
+	])
+		assert.throws(
+			() =>
+				validateChildTemplates(
+					{ parent: [{ ...row, caption_count_policy: altered }] },
+					() => '⚡ Hotstrings'
+				),
+			/translated count/
+		);
+	assert.doesNotThrow(() =>
+		validateChildTemplates(
+			{ parent: [{ ...row, caption_count_policy: { ...row.caption_count_policy, maximum: 0 } }] },
+			() => '⚡ Hotstrings'
+		)
+	);
+}
+
+// Captured download factory/native renderer proof keeps original constructor refusals meaningful.
+{
+	const assert = require('node:assert/strict');
+	const { retainedNativeDownloadProjection } = require('../lib/menu-native-download-binding.cjs');
+	const { publishesMenuTemplate } = require('../lib/menu-shared-delegation.cjs');
+	const { nativeTemplateBinding } = require('../lib/menu-template-binding.cjs');
+	const owner = readFileSync(resolve(SHARED, '..', 'macos/ui/menu/menu_llm/init.lua'), 'utf8');
+	const section = 'llm_download_shortcut_frame';
+	const admits = (source) =>
+		retainedNativeDownloadProjection(source) &&
+		publishesMenuTemplate(source, '.lua', section) &&
+		nativeTemplateBinding(source, '.lua', section, 'llm_download_shortcut', 1);
+	assert.equal(
+		admits(owner),
+		true,
+		'actual captured template/native object chain retains its typed command owner'
+	);
+	assert.equal(
+		nativeTemplateBinding(owner, '.lua', section, 'llm_download_shortcut', 3),
+		false,
+		'a command cannot borrow child-provider evidence'
+	);
+	assert.equal(publishesMenuTemplate(owner, '.lua', 'removed_complete_frame'), false);
+	for (const [from, to] of [
+		['rawget(package.loaded, "infra.manifest_menu")', 'rawget(package.loaded, "foreign.renderer")'],
+		['rawget(renderer, "template_rows")', 'rawget(Foreign, "template_rows")'],
+		['rawget(renderer, "render_rows")', 'rawget(Foreign, "render_rows")'],
+		['local rows = template_owner(', 'template_owner = nil\nlocal rows = template_owner('],
+		[
+			'local rows = template_owner(',
+			'local template_owner = function() return {} end\nlocal rows = template_owner('
+		],
+		['local rows = template_owner(', 'local rows = Foreign.template_owner('],
+		['local rendered = render_owner(', 'local rendered = Foreign.render_owner('],
+		['local rendered = render_owner(', 'render_owner = nil\nlocal rendered = render_owner('],
+		[
+			'local rendered = render_owner(rows, "llm_download_shortcut_frame")',
+			'local rendered = { { title = label, fn = action } }'
+		],
+		['if not source_live() or type(rows)', 'if false or type(rows)'],
+		['if not source_live() or type(rendered)', 'if false or type(rendered)'],
+		['not rawequal(rawget(item, "fn"), action)', 'false'],
+		['local item = rawget(rendered, 1)', 'local item = { title = label, fn = action }'],
+		[
+			'local item = rawget(rendered, 1)',
+			'rawset(rendered, 1, { title = label, fn = action, disabled = disabled })\nlocal item = rawget(rendered, 1)'
+		],
+		[
+			'local item = rawget(rendered, 1)',
+			'table.insert(rendered, 1, { title = label, fn = action })\nlocal item = rawget(rendered, 1)'
+		],
+		[
+			'local item = rawget(rendered, 1)',
+			'setmetatable(rendered, {})\nlocal item = rawget(rendered, 1)'
+		],
+		[
+			'local item = rawget(rendered, 1)',
+			'if chosen then return nil or { title = "foreign", fn = function() end } end\nlocal item = rawget(rendered, 1)'
+		],
+		[
+			'if not is_active then return nil end',
+			'if chosen then return nil or { title = "foreign", fn = function() end } end\nif not is_active then return nil end'
+		],
+		[
+			'field ~= "title" and field ~= "fn" and field ~= "disabled"',
+			'field ~= "title" and field ~= "fn" and field ~= "disabled" and field ~= "checked"'
+		],
+		[
+			'return rawequal(rawget(package.loaded, "infra.manifest_menu"), renderer)',
+			'return true or rawequal(rawget(package.loaded, "infra.manifest_menu"), renderer)'
+		],
+		[
+			'for field in next, declaration do if rawget(fields, field) == nil then return false end end',
+			''
+		],
+		[
+			'local root = root_owner()',
+			'local rawget = function() return {} end\nlocal root = root_owner()'
+		],
+		[
+			'local root = root_owner()',
+			'package.loaded["infra.manifest_menu"] = Foreign\nlocal root = root_owner()'
+		],
+		['["llm_download_shortcut"] = function()', '["foreign_download_command"] = function()']
+	]) {
+		assert(owner.includes(from), 'each refusal mutates an actual receiving-chain input');
+		assert.equal(
+			admits(owner.replace(from, to)),
+			false,
+			'foreign, withdrawn, shadowed, reallocated or unbound download evidence is refused'
+		);
+	}
+	const unusedFactory =
+		'local function unused_download_binding()\n return template_owner("llm_download_shortcut_frame", { ["foreign_unused_download"] = function() end }, {}, {})\nend\n';
+	assert(
+		owner.endsWith('\nreturn M\n'),
+		'the unused-call control inserts before the actual module terminal return'
+	);
+	const unusedOwner = owner.slice(0, -'return M\n'.length) + unusedFactory + 'return M\n';
+	assert.equal(
+		admits(unusedOwner),
+		true,
+		'the genuine constructor still owns its original command'
+	);
+	assert.equal(
+		nativeTemplateBinding(unusedOwner, '.lua', section, 'foreign_unused_download', 1),
+		false,
+		'an unrelated unused captured-alias call cannot lend its typed key to the actual constructor'
+	);
+	console.log(
+		'[OK] retained download source: actual typed factory/native-object chain and twenty-five genuine withdrawal/refusal controls.'
+	);
+}
+
+// The finite personal-information leaf uses the genuine retained helper, not a guessed alias.
+{
+	const assert = require('node:assert/strict');
+	const proof = require('../lib/menu-native-personal-info-binding.cjs');
+	const { publishesMenuTemplate } = require('../lib/menu-shared-delegation.cjs');
+	const { nativeTemplateBinding } = require('../lib/menu-template-binding.cjs');
+	const declarations = JSON.parse(readFileSync(MENU_PATH, 'utf8'));
+	const section = 'personal_info_editor_frame',
+		key = 'personal_info_editor_open';
+	assert.deepEqual(
+		declarations[section],
+		[
+			{
+				type: 'command',
+				id: key,
+				i18n: 'menu.shortcuts.edit_personal_info',
+				platforms: ['hs', 'linux'],
+				unavailable: 'hide'
+			}
+		],
+		'the genuine shared frame retains the existing caption and two leaf owners'
+	);
+	for (const [platform, file] of [
+		['hs', 'macos/ui/menu/menu_hotstrings.lua'],
+		['linux', 'linux/ui/menu/menu_builder.lua']
+	]) {
+		const source = readFileSync(resolve(SHARED, '..', file), 'utf8');
+		const admits = (candidate) => publishesMenuTemplate(candidate, '.lua', section);
+		const typed = (candidate, candidateKey = key, port = 1) =>
+			nativeTemplateBinding(
+				candidate,
+				'.lua',
+				section,
+				candidateKey,
+				port,
+				[{ src: candidate }],
+				declarations,
+				platform
+			);
+		assert.equal(
+			proof.retainedPersonalInfoProjection(source),
+			true,
+			file + ': actual guarded receiving chain'
+		);
+		assert.equal(admits(source), true, file + ': actual source publication');
+		assert.equal(typed(source), true, file + ': exact owned command offset');
+		assert.equal(
+			typed(source, 'foreign_command'),
+			false,
+			'foreign command key gets no source credit'
+		);
+		assert.equal(
+			nativeTemplateBinding(
+				source,
+				'.lua',
+				section,
+				key,
+				1,
+				[{ src: source }],
+				declarations,
+				platform === 'hs' ? 'linux' : 'hs'
+			),
+			false,
+			'another driver cannot borrow this actual leaf owner'
+		);
+		assert.equal(typed(source, key, 3), false, 'command cannot borrow a child-provider port');
+		const tableData = source.replace(
+			'local function personal_info_editor_source()',
+			'local observer = { manifest = ManifestMenu, t = type }\nlocal function personal_info_editor_source()'
+		);
+		assert.equal(
+			source.split('local function personal_info_editor_source()').length - 1,
+			1,
+			'genuine constructor data control has one original source preimage'
+		);
+		assert.equal(
+			proof.retainedPersonalInfoProjection(tableData),
+			true,
+			'constructor value reads retain canonical leaf source'
+		);
+		assert.equal(admits(tableData), true, 'constructor value reads retain publication evidence');
+		assert.equal(typed(tableData), true, 'constructor value reads retain exact typed leaf offset');
+		const quotedCloseData = source.replace(
+			'local function personal_info_editor_source()',
+			'local observer = { note = "}", manifest = ManifestMenu, t = type }\nlocal function personal_info_editor_source()'
+		);
+		assert.equal(
+			proof.retainedPersonalInfoProjection(quotedCloseData),
+			true,
+			'quoted close brace remains genuine constructor data'
+		);
+		assert.equal(admits(quotedCloseData), true, 'quoted close brace retains publication evidence');
+		assert.equal(
+			typed(quotedCloseData),
+			true,
+			'quoted close brace retains exact typed leaf offset'
+		);
+		const controls = [
+			['local renderer = ManifestMenu', 'local renderer = Foreign', 'foreign helper renderer'],
+			[
+				'rawget(modules, "infra.manifest_menu") ~= renderer',
+				'false',
+				'canonical module custody withdrawn'
+			],
+			[
+				'rawget(renderer, "template_rows") == template',
+				'true',
+				'retained factory custody withdrawn'
+			],
+			[
+				'or getmetatable(root) ~= nil or rawget(root, "personal_info_editor_frame") ~= source',
+				'or false',
+				'canonical array source withdrawn'
+			],
+			['rawget(source, 1) ~= declaration', 'false', 'retained declaration identity withdrawn'],
+			[
+				'if fields[key] ~= value then return false end',
+				'if false then return false end',
+				'declaration field custody withdrawn'
+			],
+			[
+				'rawget(platforms, 1) == "hs" and rawget(platforms, 2) == "linux"',
+				'true',
+				'actual platform custody withdrawn'
+			],
+			[
+				'if not current() then return nil end\n\treturn current, template',
+				'if not current() then return nil or { foreign = true } end\n\treturn current, template',
+				'successful alternative inside nil refusal'
+			],
+			[
+				'return current, template',
+				'return current, Foreign.template_rows',
+				'foreign returned factory'
+			],
+			[
+				'local current, template = personal_info_editor_source()',
+				'local current, template = Foreign.source()',
+				'foreign receiver helper'
+			],
+			[
+				'local editor = template("personal_info_editor_frame", {',
+				'local editor = Foreign.template("personal_info_editor_frame", {',
+				'foreign receiving namespace'
+			],
+			[
+				'personal_info_editor_open = function()',
+				'foreign_command = function()',
+				'actual command disconnected'
+			],
+			[
+				platform === 'hs'
+					? 'or rawget(row, "disabled") ~= nil then return items end'
+					: 'and type(rawget(row, "action")) == "function" and rawget(row, "disabled") == nil',
+				platform === 'hs'
+					? 'or rawget(row, "foreign_disabled") ~= nil then return items end'
+					: 'and type(rawget(row, "action")) == "function" and rawget(row, "foreign_disabled") == nil',
+				'actual output field refusal withdrawn'
+			],
+			[
+				'rawget(package, "loaded") == modules',
+				'true',
+				'actual package namespace custody withdrawn'
+			],
+			[
+				'local function personal_info_editor_source()',
+				'local rawget = function() return nil end\nlocal function personal_info_editor_source()',
+				'raw primitive shadowed'
+			],
+			[
+				'local function personal_info_editor_source()',
+				'rawget, ignored = function() return nil end, nil\nlocal function personal_info_editor_source()',
+				'namespace first-target multiassignment'
+			],
+			[
+				'local function personal_info_editor_source()',
+				'ignored, rawget = nil, function() return nil end\nlocal function personal_info_editor_source()',
+				'namespace second-target multiassignment'
+			],
+			[
+				'local function personal_info_editor_source()',
+				'function rawget() return nil end\nlocal function personal_info_editor_source()',
+				'global primitive function replaced'
+			],
+			[
+				'local function personal_info_editor_source()',
+				'local observer = { callback = function() rawget = Foreign end }; observer.callback()\nlocal function personal_info_editor_source()',
+				'nested constructor callback still writes canonical namespace'
+			],
+			[
+				'local function personal_info_editor_source()',
+				'local observer = { manifest = (function() ManifestMenu = Foreign return ManifestMenu end)(), t = type }\nlocal function personal_info_editor_source()',
+				'invoked constructor value still writes canonical owner'
+			],
+			[
+				'local function personal_info_editor_source()',
+				'local quoted_open = "{"; rawget = Foreign\nlocal function personal_info_editor_source()',
+				'quoted brace cannot hide real namespace assignment'
+			],
+			[
+				'local function personal_info_editor_source()',
+				'local ignored = true\n(_G).rawget = Foreign\nlocal function personal_info_editor_source()',
+				'literal keyword boundary cannot hide grouped global mutation'
+			],
+			[
+				'local function personal_info_editor_source()',
+				'local observer = { manifest = rawset((_G or nil), "rawget", Foreign) }\nlocal function personal_info_editor_source()',
+				'unproved namespace expression cannot acquire mutating primitive credit'
+			],
+			[
+				'local function personal_info_editor_source()',
+				'(_G or nil).rawget = Foreign\nlocal function personal_info_editor_source()',
+				'unproved outer namespace expression cannot hide global mutation'
+			],
+			[
+				'local function personal_info_editor_source()',
+				'(_G).rawget = Foreign\nlocal function personal_info_editor_source()',
+				'grouped canonical global root member assignment'
+			],
+			[
+				'local function personal_info_editor_source()',
+				'((ManifestMenu)).template_rows = Foreign\nlocal function personal_info_editor_source()',
+				'nested grouped canonical renderer root member assignment'
+			],
+			[
+				'local function personal_info_editor_source()',
+				'((_ENV))["rawget"] = Foreign\nlocal function personal_info_editor_source()',
+				'nested grouped environment root index assignment'
+			],
+			[
+				'local function personal_info_editor_source()',
+				'local observer = { manifest = rawset((_G), "rawget", Foreign) }\nlocal function personal_info_editor_source()',
+				'grouped canonical global root mutation within constructor data'
+			],
+			[
+				'local function personal_info_editor_source()',
+				'local observer = { manifest = setmetatable((ManifestMenu), Foreign) }\nlocal function personal_info_editor_source()',
+				'grouped canonical renderer metatable mutation within constructor data'
+			],
+			[
+				'local function personal_info_editor_source()',
+				'rawget, Foreign.slot, ignored = Foreign, nil, nil\nlocal function personal_info_editor_source()',
+				'protected first target before member and third target'
+			],
+			[
+				'local function personal_info_editor_source()',
+				'rawget, Foreign["slot"], ignored = Foreign, nil, nil\nlocal function personal_info_editor_source()',
+				'protected first target before index and third target'
+			],
+			[
+				'local function personal_info_editor_source()',
+				'rawget, (Foreign).slot, ignored = Foreign, nil, nil\nlocal function personal_info_editor_source()',
+				'protected first target before parenthesized member and third target'
+			],
+			[
+				'local function personal_info_editor_source()',
+				'Foreign.slot, rawget, ignored = nil, Foreign, nil\nlocal function personal_info_editor_source()',
+				'protected middle target after member assignment'
+			],
+			[
+				'local function personal_info_editor_source()',
+				'rawget, Foreign["]"] = Foreign, nil\nlocal function personal_info_editor_source()',
+				'quoted close bracket cannot end an indexed target'
+			],
+			[
+				'local function personal_info_editor_source()',
+				'rawget, Foreign.slot = Foreign, nil\nlocal function personal_info_editor_source()',
+				'protected first target before member assignment'
+			],
+			[
+				'local function personal_info_editor_source()',
+				'rawget, Foreign["slot"] = Foreign, nil\nlocal function personal_info_editor_source()',
+				'protected first target before indexed assignment'
+			],
+			[
+				'local function personal_info_editor_source()',
+				'Foreign["slot"], rawget = nil, Foreign\nlocal function personal_info_editor_source()',
+				'protected second target after indexed assignment'
+			],
+			[
+				'local function personal_info_editor_source()',
+				'local observer = { manifest = rawset(package, "loaded", {}) }\nlocal function personal_info_editor_source()',
+				'constructor value cannot mutate canonical package namespace'
+			],
+			[
+				'local function personal_info_editor_source()',
+				'local ipairs = Foreign\nlocal function personal_info_editor_source()',
+				'actual direct receiving iterator shadowed'
+			],
+			[
+				'local function personal_info_editor_source()',
+				'local pairs = Foreign\nlocal function personal_info_editor_source()',
+				'actual direct namespace iterator shadowed'
+			],
+			[
+				'local function personal_info_editor_source()',
+				'local _ENV = Foreign\nlocal function personal_info_editor_source()',
+				'actual lexical environment shadowed'
+			],
+			[
+				'local function personal_info_editor_source()',
+				'_ENV = Foreign\nlocal function personal_info_editor_source()',
+				'actual environment binding replaced'
+			],
+			[
+				'local function personal_info_editor_source()',
+				'_ENV[\"rawget\"] = Foreign\nlocal function personal_info_editor_source()',
+				'actual indexed environment namespace replaced'
+			],
+			[
+				'local function personal_info_editor_source()',
+				'rawset(_ENV, \"rawget\", Foreign)\nlocal function personal_info_editor_source()',
+				'direct environment namespace mutation'
+			],
+			[
+				'local function personal_info_editor_source()',
+				'local function personal_info_editor_source(_ENV)',
+				'actual helper environment parameter'
+			],
+			[
+				'local function personal_info_editor_source()',
+				'setfenv(1, Foreign)\nlocal function personal_info_editor_source()',
+				'direct alternate-interpreter environment mutation'
+			],
+			[
+				'local function personal_info_editor_source()',
+				'_G.rawget = function() return nil end\nlocal function personal_info_editor_source()',
+				'explicit global namespace replaced'
+			],
+			[
+				'local function personal_info_editor_source()',
+				'rawset(package, "loaded", {})\nlocal function personal_info_editor_source()',
+				'direct namespace mutation'
+			],
+			[
+				platform === 'hs'
+					? 'local pi_items = buildPersonalInfoItems(ctx, desc)'
+					: 'local items = _manifest_hotstring_rows(ctx, config)',
+				platform === 'hs'
+					? 'local pi_items = Foreign.buildPersonalInfoItems(ctx, desc)'
+					: 'local items = Foreign._manifest_hotstring_rows(ctx, config)',
+				'actual producer caller disconnected'
+			],
+			[
+				platform === 'hs'
+					? 'if not current() or type(editor)'
+					: 'local valid = current() and type(editor)',
+				platform === 'hs'
+					? 'rawset(editor, 1, {})\nif not current() or type(editor)'
+					: 'rawset(editor, 1, {})\nlocal valid = current() and type(editor)',
+				'manual receiving object replacement'
+			],
+			[
+				platform === 'hs' ? 'items[#items + 1] = row' : 'if valid then sub[1] = row end',
+				platform === 'hs' ? 'items[#items + 1] = {}' : 'if valid then sub[1] = {} end',
+				'received native row discarded'
+			],
+			[
+				platform === 'hs'
+					? 'if not current() then return false end\n\t\t\treturn DeferredWork.after'
+					: 'if not current() then return false end\n\t\t\t\t\t\tif type(ctx.webview)',
+				platform === 'hs'
+					? 'if false then return false end\n\t\t\treturn DeferredWork.after'
+					: 'if false then return false end\n\t\t\t\t\t\tif type(ctx.webview)',
+				'held callback source guard withdrawn'
+			],
+			[
+				platform === 'hs'
+					? 'if not current() then return false end\n\t\t\t\t\tpcall(ctx.personal_info.open_editor)'
+					: 'ctx.webview.show("personal_info_editor")',
+				platform === 'hs'
+					? 'if false then return false end\n\t\t\t\t\tpcall(ctx.personal_info.open_editor)'
+					: 'ctx.webview.show("foreign_editor")',
+				'original queued/opener contract disconnected'
+			]
+		];
+		if (platform === 'linux')
+			controls.push(
+				[
+					'if setfenv then setfenv(chunk, sandbox) end',
+					'if setfenv then setfenv(1, sandbox) end',
+					'separate chunk replaced by receiving environment'
+				],
+				[
+					'local chunk = loadfile(menu_path)',
+					'local chunk = Foreign',
+					'genuine extension chunk load disconnected'
+				],
+				['sandbox._G = sandbox', 'sandbox._G = _G', 'separate extension sandbox custody withdrawn'],
+				[
+					'local function _extension_shortcut_rows()',
+					'local function foreign_extension_shortcut_rows()',
+					'separate chunk call moved to unowned helper'
+				],
+				[
+					'local function _extension_shortcut_rows()',
+					'local function unused_environment() setfenv(1, Foreign) end\nlocal function _extension_shortcut_rows()',
+					'extra unrelated environment call cannot borrow owned offset'
+				],
+				[
+					'local function personal_info_editor_source()',
+					'local setfenv = Foreign\nlocal function personal_info_editor_source()',
+					'canonical environment primitive shadowed'
+				],
+				[
+					'local function personal_info_editor_source()',
+					'local loadfile = Foreign\nlocal function personal_info_editor_source()',
+					'canonical separate chunk loader shadowed'
+				]
+			);
+		for (const [before, after, reason] of controls) {
+			assert.equal(source.split(before).length - 1, 1, reason + ': actual unique preimage');
+			const changed = source.replace(before, after);
+			assert.equal(admits(changed), false, reason + ': no publication credit');
+			assert.equal(typed(changed), false, reason + ': no typed command credit');
+			assert.equal(admits(source), true, reason + ': exact source inverse');
+			assert.equal(typed(source), true, reason + ': exact typed inverse');
+		}
+		const unused =
+			source +
+			'\nlocal function unused() local template = Foreign.template_rows\n' +
+			'template("personal_info_editor_frame", { foreign_command = function() return true end }, {}, {}) end\n';
+		assert.equal(
+			typed(unused, 'foreign_command'),
+			false,
+			'unused foreign alias cannot borrow the owned helper call'
+		);
+		const removed = source.replace(
+			'template("personal_info_editor_frame", {',
+			'template("removed_leaf", {'
+		);
+		assert.equal(
+			admits(removed + unused.slice(source.length)),
+			false,
+			'unused genuine-looking call cannot replace the actual receiver'
+		);
+		assert.equal(
+			typed(removed + unused.slice(source.length)),
+			false,
+			'unused call offset gets no typed credit'
+		);
+		const callerLiteral =
+			platform === 'hs'
+				? 'local pi_items = buildPersonalInfoItems(ctx, desc)'
+				: 'local items = _manifest_hotstring_rows(ctx, config)';
+		const detached =
+			source.replace(
+				callerLiteral,
+				platform === 'hs' ? 'local pi_items = nil' : 'local items = {}'
+			) +
+			'\nlocal function unused() ' +
+			callerLiteral +
+			' end\n';
+		assert.equal(
+			admits(detached),
+			false,
+			'unused call cannot replace the actual original native construction site'
+		);
+		assert.equal(typed(detached), false, 'unused caller retains no typed leaf credit');
+		if (platform === 'hs') {
+			const receiving =
+				'local pi_items = buildPersonalInfoItems(ctx, desc)\n' +
+				'\t\t\t\t\t\t\tif pi_items then\n\t\t\t\t\t\t\t\tfor _, pi in ipairs(pi_items) do\n' +
+				'\t\t\t\t\t\t\t\t\tsec_menu[#sec_menu + 1] = pi\n\t\t\t\t\t\t\t\tend\n' +
+				'\t\t\t\t\t\t\t\tprev_was_sep = false\n\t\t\t\t\t\t\tend';
+			assert.equal(
+				source.split(receiving).length - 1,
+				1,
+				'actual Mac parent row transport preimage'
+			);
+			const nested = source.replace(receiving, 'local function unused()\n' + receiving + '\nend');
+			assert.equal(
+				admits(nested),
+				false,
+				'nested unused transport cannot borrow the original native call site'
+			);
+			assert.equal(typed(nested), false, 'nested unused transport retains no typed leaf credit');
+		}
+		assert.equal(
+			admits('-- ' + source.split('\n').join('\n-- ')),
+			false,
+			'commented source cannot own the leaf'
+		);
+		assert.equal(admits(JSON.stringify(source)), false, 'source as data cannot own the leaf');
+	}
+	console.log(
+		'[OK] personal-info leaf: genuine guarded helper, exact native callback/result and owned template offset.'
+	);
 }

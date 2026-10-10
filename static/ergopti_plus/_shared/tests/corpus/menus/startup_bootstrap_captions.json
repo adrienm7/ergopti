@@ -1,0 +1,120 @@
+{
+	"_comment": "Independent prior native suspend/reload/quit ordering and exact actual OLD locale captions frozen before candidate rendering. New inert values are handwritten 21-language expected policy, not output of a formatter/generator. Never regenerate from candidate.",
+	"command_ids": ["suspend", "reload", "quit"],
+	"expected": {
+		"ar": {
+			"commands": ["⏸︎ تعليق", "🔄 إعادة تحميل", "⏹ إنهاء"],
+			"inert": "ErgoptiPlus — جارٍ بدء التشغيل…"
+		},
+		"cs": {
+			"commands": ["⏸︎ Pozastavit", "🔄 Znovu načíst", "⏹ Ukončit"],
+			"inert": "ErgoptiPlus — Spouštění…"
+		},
+		"da": {
+			"commands": ["⏸︎ Suspendér", "🔄 Genindlæs", "⏹ Afslut"],
+			"inert": "ErgoptiPlus — Starter…"
+		},
+		"de": {
+			"commands": ["⏸︎ Pausieren", "🔄 Neu laden", "⏹ Beenden"],
+			"inert": "ErgoptiPlus — Wird gestartet…"
+		},
+		"en": {
+			"commands": ["⏸︎ Suspend", "🔄 Reload", "⏹ Quit"],
+			"inert": "ErgoptiPlus — Starting…"
+		},
+		"es": {
+			"commands": ["⏸︎ Suspender", "🔄 Recargar", "⏹ Salir"],
+			"inert": "ErgoptiPlus — Iniciando…"
+		},
+		"fr": {
+			"commands": ["⏸︎ Suspendre", "🔄 Recharger", "⏹ Quitter"],
+			"inert": "ErgoptiPlus — Démarrage…"
+		},
+		"he": {
+			"commands": ["⏸︎ השהה", "🔄 טען מחדש", "⏹ צא"],
+			"inert": "ErgoptiPlus — מתחיל…"
+		},
+		"hi": {
+			"commands": ["⏸︎ निलंबित करें", "🔄 पुनः लोड करें", "⏹ बंद करें"],
+			"inert": "ErgoptiPlus — शुरू हो रहा है…"
+		},
+		"it": {
+			"commands": ["⏸︎ Sospendi", "🔄 Ricarica", "⏹ Esci"],
+			"inert": "ErgoptiPlus — Avvio…"
+		},
+		"ja": {
+			"commands": ["⏸︎ 一時停止", "🔄 リロード", "⏹ 終了"],
+			"inert": "ErgoptiPlus — 起動中…"
+		},
+		"ko": {
+			"commands": ["⏸︎ 일시 정지", "🔄 다시 로드", "⏹ 종료"],
+			"inert": "ErgoptiPlus — 시작 중…"
+		},
+		"nl": {
+			"commands": ["⏸︎ Onderbreken", "🔄 Herladen", "⏹ Afsluiten"],
+			"inert": "ErgoptiPlus — Opstarten…"
+		},
+		"no": {
+			"commands": ["⏸︎ Pause", "🔄 Oppdater", "⏹ Avslutt"],
+			"inert": "ErgoptiPlus — Starter…"
+		},
+		"pl": {
+			"commands": ["⏸︎ Wstrzymaj", "🔄 Przeładuj", "⏹ Zakończ"],
+			"inert": "ErgoptiPlus — Uruchamianie…"
+		},
+		"pt": {
+			"commands": ["⏸︎ Suspender", "🔄 Recarregar", "⏹ Sair"],
+			"inert": "ErgoptiPlus — A iniciar…"
+		},
+		"ru": {
+			"commands": ["⏸︎ Приостановить", "🔄 Перезагрузить", "⏹ Выйти"],
+			"inert": "ErgoptiPlus — Запуск…"
+		},
+		"sv": {
+			"commands": ["⏸︎ Pausa", "🔄 Läs in på nytt", "⏹ Avsluta"],
+			"inert": "ErgoptiPlus — Startar…"
+		},
+		"tr": {
+			"commands": ["⏸︎ Askıya al", "🔄 Yeniden yükle", "⏹ Çıkış"],
+			"inert": "ErgoptiPlus — Başlatılıyor…"
+		},
+		"uk": {
+			"commands": ["⏸︎ Призупинити", "🔄 Перезавантажити", "⏹ Вийти"],
+			"inert": "ErgoptiPlus — Запуск…"
+		},
+		"zh": {
+			"commands": ["⏸︎ 暂停", "🔄 重新加载", "⏹ 退出"],
+			"inert": "ErgoptiPlus — 正在启动…"
+		}
+	},
+	"old_locale_source_sha256": {
+		"static/ergopti_plus/_shared/data/locales/ar.json": "a1669afbc1ebd21db88bf90aeca7f2cc455b4072d879ef6d5b18cfe809b88630",
+		"static/ergopti_plus/_shared/data/locales/cs.json": "f2255d91da513ae4a077ecbb8ab296d3168113e8743c3945136a29f27b923aca",
+		"static/ergopti_plus/_shared/data/locales/da.json": "298d4ca0d827b27a92cf3a9f3b0760d2e8885a4a31de41d58b56bdec21aaeaa3",
+		"static/ergopti_plus/_shared/data/locales/de.json": "4cef2f0c83a6a3a9b1a8377cde721309b1ca77be029aa8a9720236d10bc57488",
+		"static/ergopti_plus/_shared/data/locales/en.json": "e740ee35d6c879394821fd658dfa1e0f67be97a41b0bb0cf06adc072fc604417",
+		"static/ergopti_plus/_shared/data/locales/es.json": "b4299d76b88935e3642426776001ae415454bd68c65539fec7f0ca96db202aba",
+		"static/ergopti_plus/_shared/data/locales/fr.json": "c8e94e0d67d63da9729dcc33c282a2ce6b34884e0833dc0ec882b24982cfb01b",
+		"static/ergopti_plus/_shared/data/locales/he.json": "32bd44775bd88fbbabf4851c81943deb1b92b26edda8c1393bb4989bb11e527d",
+		"static/ergopti_plus/_shared/data/locales/hi.json": "a61c1272d272046ad53fffe55fb8a51a728a90f9499108971613209c5a5cf598",
+		"static/ergopti_plus/_shared/data/locales/it.json": "e2a0951cd6e2d6100c2bb72b6e5347b999c58ec2b9267edb029fe77f1fb778ce",
+		"static/ergopti_plus/_shared/data/locales/ja.json": "84efcfe2ebe6110005b01b21b112b0186e9d35a7184cafb93f8b177e53cb3743",
+		"static/ergopti_plus/_shared/data/locales/ko.json": "f9487c83b8ee324754880e8024ed65b3323aea78009057fe256b853efb68f312",
+		"static/ergopti_plus/_shared/data/locales/nl.json": "a5b0baccf7fa7d1d70f245ec2f7d778eef4cfe34d90edeff7a8450382540d293",
+		"static/ergopti_plus/_shared/data/locales/no.json": "07b975b5e03e60a4777d4cce54ebd91d46fd71cc229b9c448caad5c2b9f13dd2",
+		"static/ergopti_plus/_shared/data/locales/pl.json": "7eaae4c9d3782e6d779be52f57b48e939883159a0a28de19c13b186455d90581",
+		"static/ergopti_plus/_shared/data/locales/pt.json": "7a3baaa9fef12992a672390cc2def512122892481ff537f445db3ba2d7c72d02",
+		"static/ergopti_plus/_shared/data/locales/ru.json": "524e86c95a8b8a608a722d607667e9ed01b0c38c282ba475aebc13b7a2a12468",
+		"static/ergopti_plus/_shared/data/locales/sv.json": "023ff9b10340d5280801809d31e90aef7f7281af24283a939664bdf1f80580e3",
+		"static/ergopti_plus/_shared/data/locales/tr.json": "c27b62792acf8f15694704d7a57cf638a52e01ff0ba770c225dc0b1a29d862f9",
+		"static/ergopti_plus/_shared/data/locales/uk.json": "d98d37b6693e8288236179b556db8fbf3b28e722c87bac58276db0fedfc19f74",
+		"static/ergopti_plus/_shared/data/locales/zh.json": "71fabbdeb68f12c2aa0119b96ba29601b1e1c9bfd39907bc3123caff935e12cc"
+	},
+	"independent_control": {
+		"locale": "en",
+		"caption_key": "common.cancel",
+		"caption": "Cancel",
+		"reverse_command_ids": ["quit", "reload", "suspend"],
+		"reverse_captions": ["⏹ Quit", "🔄 Reload", "⏸︎ Suspend"]
+	}
+}

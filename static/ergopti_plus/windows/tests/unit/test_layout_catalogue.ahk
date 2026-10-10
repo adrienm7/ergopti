@@ -291,6 +291,7 @@ _LCT_ExtensionConfigCase() {
 			{ Section: Section, Key: "comma", Value: TOML_Bool(true) }
 		]))
 		Target := Map("hotstrings", Map("groups", Map(Group, false), "modules", Map(Group, Map("comma", false))))
+		_CMJFixtureReadonly(Path)
 		AssertEqual(2, ApplyConfigToml(Target, Path, &Rejected), "both desired leaves must survive reload")
 		AssertEqual(0, Rejected)
 		AssertTrue(Target["hotstrings"]["groups"][Group])
@@ -308,6 +309,7 @@ _LCT_ExtensionQuotedSegmentCase() {
 		Header := '[ "hotstrings" . ' . Chr(39) . "modules" . Chr(39) . ' . "pack.with.dot" ]'
 		_LCT_WriteRaw(Path, Header . "`ncomma = true`n")
 		Target := Map("hotstrings", Map("modules", Map("pack.with.dot", Map("comma", false))))
+		_CMJFixtureReadonly(Path)
 		AssertEqual(1, ApplyConfigToml(Target, Path, &Rejected))
 		AssertEqual(0, Rejected)
 		AssertTrue(Target["hotstrings"]["modules"]["pack.with.dot"]["comma"])

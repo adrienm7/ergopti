@@ -1,0 +1,16 @@
+# _shared/modules/menu/startup_tray.toml
+
+# Shared cold/recovery surface policy. The generator resolves actual command
+# source records; native capability map iteration never decides presentation.
+[commands]
+rows = [
+  { section = "tray_startup_suspend", id = "suspend" },
+  { section = "top_level", id = "reload" },
+  { section = "top_level", id = "quit" },
+]
+
+[inert]
+rows = [{ section = "tray_startup_inert_frame", id = "startup_inert_status" }]
+
+[captions]
+fallback_locale = "en"

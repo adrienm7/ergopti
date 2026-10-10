@@ -452,3 +452,120 @@ helpers.describe("actual outer IA parent reaches real tray transport", function(
 		end)
 	end)
 end)
+-- These subjects retain actual template/native renderer results. They supply
+-- no hand-authored native row and restore the exact captured owner descriptors.
+local function with_download_projection(calls, callback)
+	local facade = package.loaded["infra.manifest_menu"]
+	local template, render = facade.template_rows, facade.render_rows
+	local root = facade.get_root()
+	local source = root.llm_download_shortcut_frame
+	local declaration, platforms = source[1], source[1].platforms
+	local old_id, old_i18n, old_platform = declaration.id, declaration.i18n, platforms[1]
+	local window_before = package.loaded["ui.download_window"]
+	local task_before = calls.root_deps.active_tasks.download
+	local focused, successor_focused = 0, 0
+	local captured = { template = template, render = render, root = root, source = source,
+		declaration = declaration, platforms = platforms }
+	local ok, detail = xpcall(function()
+		package.loaded["ui.download_window"] = { focus = function() focused = focused + 1 end }
+		calls.root_deps.active_tasks.download = true
+		callback(facade, captured, function() return focused, successor_focused end,
+			{ focus = function() successor_focused = successor_focused + 1 end })
+	end, debug.traceback)
+	package.loaded["infra.manifest_menu"] = facade
+	facade.template_rows, facade.render_rows = template, render
+	root.llm_download_shortcut_frame = source
+	source[1] = declaration
+	declaration.id, declaration.i18n, platforms[1] = old_id, old_i18n, old_platform
+	package.loaded["ui.download_window"] = window_before
+	calls.root_deps.active_tasks.download = task_before
+	if not ok then error(detail, 0) end
+end
+
+helpers.describe("Actual download native projection custody", function()
+	helpers.it("returns the actual completed command and retains the pre-projection focus owner", function()
+		with_activation("ollama", { true }, nil, function(_, _, calls)
+			with_download_projection(calls, function(facade, captured, counts, successor)
+				local rows, native
+				facade.template_rows = function(...)
+					rows = captured.template(...)
+					return rows
+				end
+				facade.render_rows = function(...)
+					native = captured.render(...)
+					package.loaded["ui.download_window"] = successor
+					return native
+				end
+				local item = calls.handler.build_download_item()
+				helpers.assert_type(native, "table")
+				helpers.assert_true(rawequal(item, native[1]), "return the actual renderer object, without native reallocation")
+				helpers.assert_true(rawequal(item.fn, rows[1].action), "retain the actual command callback identity")
+				helpers.assert_eq(item.title, "menu.llm.show_download_window")
+				helpers.assert_nil(item.disabled)
+				helpers.assert_nil(item.checked)
+				helpers.assert_nil(item.menu)
+				helpers.assert_eq(counts(), 0)
+				item.fn()
+				local focused, successor_focused = counts()
+				helpers.assert_eq(focused, 1)
+				helpers.assert_eq(successor_focused, 0)
+				helpers.assert_eq(calls.saves, 0)
+				helpers.assert_eq(calls.updates, 0)
+			end)
+		end)
+	end)
+
+	helpers.it("refuses a renderer withdrawn by the actual template before invoking its replacement", function()
+		with_activation("ollama", { true }, nil, function(_, _, calls)
+			with_download_projection(calls, function(facade, captured, counts)
+				local observed = 0
+				facade.template_rows = function(...)
+					local rows = captured.template(...)
+					facade.render_rows = function() observed = observed + 1 end
+					return rows
+				end
+				helpers.assert_nil(calls.handler.build_download_item())
+				helpers.assert_eq(observed, 0)
+				helpers.assert_eq(counts(), 0)
+				helpers.assert_eq(calls.root_deps.active_tasks.download, true)
+				helpers.assert_eq(calls.saves, 0)
+				helpers.assert_eq(calls.updates, 0)
+				helpers.assert_eq(calls.notifications, 0)
+				facade.template_rows, facade.render_rows = captured.template, captured.render
+				helpers.assert_type(calls.handler.build_download_item().fn, "function", "exact descriptor repair accepts genuine projection")
+			end)
+		end)
+	end)
+
+	for _, scenario in ipairs({ "facade", "array", "record", "platform" }) do
+		helpers.it("refuses custody withdrawal during the actual native projection: " .. scenario, function()
+			with_activation("ollama", { true }, nil, function(_, _, calls)
+				with_download_projection(calls, function(facade, captured, counts)
+					local native
+					local old_id, old_platform = captured.declaration.id, captured.platforms[1]
+					facade.render_rows = function(...)
+						native = captured.render(...)
+						if scenario == "facade" then package.loaded["infra.manifest_menu"] = nil
+						elseif scenario == "array" then captured.root.llm_download_shortcut_frame = nil
+						elseif scenario == "record" then captured.declaration.id = "missing_download_owner"
+						else captured.platforms[1] = "linux" end
+						return native
+					end
+					helpers.assert_nil(calls.handler.build_download_item())
+					helpers.assert_type(native, "table", "withdrawal follows actual native construction")
+					helpers.assert_type(native[1].fn, "function")
+					helpers.assert_eq(counts(), 0)
+					helpers.assert_eq(calls.root_deps.active_tasks.download, true)
+					helpers.assert_eq(calls.saves, 0)
+					helpers.assert_eq(calls.updates, 0)
+					helpers.assert_eq(calls.notifications, 0)
+					package.loaded["infra.manifest_menu"] = facade
+					captured.root.llm_download_shortcut_frame = captured.source
+					captured.declaration.id, captured.platforms[1] = old_id, old_platform
+					facade.render_rows = captured.render
+					helpers.assert_type(calls.handler.build_download_item().fn, "function", "source repair accepts the genuine native result")
+				end)
+			end)
+		end)
+	end
+end)

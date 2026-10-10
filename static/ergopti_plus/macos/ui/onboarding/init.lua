@@ -68,6 +68,24 @@ local _config_path  = nil
 -- The generated catalogue of this driver, loaded by the first run.
 local _catalogue = nil
 
+-- Publication custody survives native view disposal and wizard reruns.
+local _publication = nil
+
+local function publication_owner()
+	if not _publication then
+		local native_write, native_read = toml_writer.batch_write, FileSystem.read_with_status
+		_publication = require("onboarding_publication").new({
+			files = FileSystem, write = native_write, current = function()
+				return rawequal(package.loaded["ui.onboarding"], M)
+					and rawequal(package.loaded["infra.toml.writer"], toml_writer)
+					and rawequal(package.loaded["adapters.file_system"], FileSystem)
+					and toml_writer.batch_write == native_write and FileSystem.read_with_status == native_read
+			end,
+		})
+	end
+	return _publication
+end
+
 -- Keeps each tap-hold import's backup of config_karabiner.toml unique.
 local _backup_sequence = 0
 
@@ -590,7 +608,7 @@ end
 --- answer to config.toml in one batch, imports the checked tap-hold keys and
 --- reloads Hammerspoon.
 --- @param answers table The answers object from the JS "finish" message.
-local function commit(answers)
+local function commit_owned(answers, publication)
 	Logger.start(LOG, "Committing the onboarding answers…")
 
 	-- Validate the whole payload before any side effect: a refused answer must
@@ -654,7 +672,7 @@ local function commit(answers)
 		manifest   = ManifestReader,
 		path       = _config_path,
 		prepare    = prepare_destination,
-		write      = function(path, batch) return toml_writer.batch_write(path, batch) end,
+		write      = publication.write,
 	})
 	if not committed then
 		Logger.error(LOG, "commit: the configuration batch failed — %s.", tostring(err))
@@ -729,6 +747,23 @@ end
 
 --- Dispatches incoming usercontent messages from the JS wizard.
 --- @param body table The decoded message body.
+--- Keeps synchronous native callbacks from borrowing another Finish stack.
+local function commit(answers)
+	local publication = publication_owner()
+	local claim = publication.begin()
+	if claim == nil then
+		Logger.error(LOG, "Onboarding finish refused while publication compensation remains pending.")
+		fail_commit("onboarding.error.title", i18n.get("onboarding.error.write_failed"))
+		return
+	end
+	local called, detail = xpcall(function() return commit_owned(answers, publication) end, debug.traceback)
+	publication.finish(claim)
+	if not called then
+		Logger.error(LOG, "Onboarding commit refused after a native callback failure: %s.", tostring(detail))
+		fail_commit("onboarding.error.title", i18n.get("onboarding.error.write_failed"))
+	end
+end
+
 local function handle_message(body)
 	if type(body) ~= "table" then return end
 	local owner, view = _focus_owner, _webview
@@ -888,6 +923,10 @@ end
 --- @param config_path string Absolute path where config.toml should be written.
 --- @return boolean opened True only when the wizard window is active.
 function M.run(config_path)
+	if _publication and _publication.ready() ~= true then
+		Logger.error(LOG, "Cannot reopen onboarding while native publication compensation remains pending.")
+		return false
+	end
 	if type(config_path) ~= "string" or config_path == "" then
 		Logger.error(LOG, "M.run() called with missing config_path.")
 		return false
