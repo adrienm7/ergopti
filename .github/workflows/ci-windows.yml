@@ -207,13 +207,13 @@ jobs:
           $modelsExit = $LASTEXITCODE
           Get-Content -LiteralPath $modelsOut
           if ($modelsExit -ne 0) { throw "File component source models refused (exit $modelsExit)." }
-          $psHome = Join-Path $env:SystemRoot 'System32/WindowsPowerShell/v1.0'
+          $windowsPowerShellDirectory = Join-Path $env:SystemRoot 'System32/WindowsPowerShell/v1.0'
           $oldModulePath = $env:PSModulePath
           try {
-              $env:PSModulePath = (Join-Path $psHome 'Modules') + ';' + $oldModulePath
+              $env:PSModulePath = (Join-Path $windowsPowerShellDirectory 'Modules') + ';' + $oldModulePath
               $out = Join-Path $evidence 'native.stdout'
               $err = Join-Path $evidence 'native.stderr'
-              & "$psHome/powershell.exe" -NoLogo -NoProfile -NonInteractive -File "$root/static/ergopti_plus/windows/tests/unit/test_ollama_install_files.ps1" 1> $out 2> $err
+              & "$windowsPowerShellDirectory/powershell.exe" -NoLogo -NoProfile -NonInteractive -File "$root/static/ergopti_plus/windows/tests/unit/test_ollama_install_files.ps1" 1> $out 2> $err
               $nativeExit = $LASTEXITCODE
               $stdout = [IO.File]::ReadAllText($out)
               $stderr = [IO.File]::ReadAllText($err)
