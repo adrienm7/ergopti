@@ -2,6 +2,7 @@
 """Actual private serve composition over POSIX peers; native SDK/signing unrun."""
 
 import hashlib
+import io
 import importlib.util
 import json
 import os
@@ -344,6 +345,234 @@ class ProductionServeControls(unittest.TestCase):
         with self.assertRaisesRegex(self.subject.ServeRefusal, "unavailable"):
             self.subject.serve(11434, 5, 60, 5)
         self.assertEqual(self.native_calls, [])
+        self.assertEqual(self.binary.stat().st_nlink, 1)
+
+    def run_lifecycle(self, stream, *, nonce="0123456789abcdef0123456789abcdef", prepare=None):
+        original = self.subject.ServeOwner
+        original_wait = original.wait
+
+        def acquire(*args, register, **kwargs):
+            def capture(owner):
+                self.owner = owner
+                register(owner)
+
+            return original(*args, register=capture, **kwargs)
+
+        def cancelled_wait(owner, retirement_timeout):
+            owner.cancelled = True
+            return original_wait(owner, retirement_timeout)
+
+        with (
+            patch.object(self.subject, "NATIVE_PRODUCTION_QUALIFIED", True),
+            patch.object(self.subject, "ServeOwner", side_effect=acquire),
+            patch.object(original, "wait", autospec=True, side_effect=cancelled_wait),
+            patch.object(sys, "stdout", stream),
+        ):
+            if prepare is None:
+                return self.subject.serve(11434, 5, 60, 5, caller_nonce=nonce)
+            with patch.object(original, "prepare", autospec=True, side_effect=prepare):
+                return self.subject.serve(11434, 5, 60, 5, caller_nonce=nonce)
+
+    def test_unqualified_lifecycle_acknowledges_only_no_acquisition_refusal(self):
+        stream = io.StringIO()
+        with patch.object(sys, "stdout", stream):
+            with self.assertRaisesRegex(self.subject.ServeRefusal, "unavailable"):
+                self.subject.serve(11434, 5, 60, 5, caller_nonce="ab" * 16)
+        self.assertEqual(
+            stream.getvalue(), "ERGOPTI_MANAGED_DAEMON_V1 " + "ab" * 16 + " RETIRED 78\n"
+        )
+        self.assertIsNone(self.owner)
+        self.assertEqual(self.native_calls, [])
+
+    def test_malformed_caller_binding_refuses_before_native_acquisition(self):
+        for nonce in (True, 7, "", "A" * 32, "a" * 31, "a" * 33, "a" * 31 + "\n"):
+            with self.subTest(nonce=nonce), patch.object(sys, "stdout", io.StringIO()) as stream:
+                with self.assertRaisesRegex(self.subject.ServeRefusal, "protocol"):
+                    self.subject.serve(11434, 5, 60, 5, caller_nonce=nonce)
+                self.assertEqual(stream.getvalue(), "")
+                self.assertIsNone(self.owner)
+                self.assertEqual(self.native_calls, [])
+
+    def test_active_precedes_only_original_native_and_namespace_retirement_ack(self):
+        observed = []
+        fixture = self
+
+        class RecordingStream(io.StringIO):
+            def write(self, value):
+                if " ACTIVE" in value:
+                    observed.append("active")
+                    fixture.assertTrue(fixture.owner.operation.image_ready)
+                    fixture.assertTrue(fixture.owner.operation.active)
+                    fixture.assertTrue(fixture.owner.authority._written)
+                    fixture.assertFalse(fixture.owner.operation.physically_retired)
+                    fixture.assertIsNotNone(fixture.owner.source_fd)
+                elif " RETIRED" in value:
+                    observed.append("retired")
+                    fixture.assertTrue(fixture.owner.operation.physically_retired)
+                    fixture.assertIsNone(fixture.owner.source_fd)
+                    fixture.assertFalse(fixture.owner.session._created)
+                    fixture.assertFalse(fixture.owner.authority._created)
+                    fixture.assertFalse(fixture.owner.bootstrap._created)
+                    fixture.assertFalse(fixture.owner.alias._created)
+                return super().write(value)
+
+        stream = RecordingStream()
+        self.assertEqual(self.run_lifecycle(stream), 78)
+        self.assertEqual(observed, ["active", "retired"])
+        self.assertEqual(
+            stream.getvalue(),
+            "ERGOPTI_MANAGED_DAEMON_V1 0123456789abcdef0123456789abcdef ACTIVE\n"
+            "ERGOPTI_MANAGED_DAEMON_V1 0123456789abcdef0123456789abcdef RETIRED 78\n",
+        )
+        self.assertEqual(self.binary.stat().st_nlink, 1)
+
+    def test_active_publication_reentry_cancels_before_wait_without_false_success(self):
+        fixture = self
+
+        class CancelStream(io.StringIO):
+            def write(self, value):
+                if " ACTIVE" in value:
+                    fixture.owner.cancelled = True
+                return super().write(value)
+
+        stream = CancelStream()
+        with self.assertRaisesRegex(self.subject.ServeRefusal, "cancelled"):
+            self.run_lifecycle(stream)
+        self.assertEqual(stream.getvalue().count(" ACTIVE\n"), 1)
+        self.assertEqual(stream.getvalue().count(" RETIRED 78\n"), 1)
+        self.assertTrue(self.owner.operation.physically_retired)
+        self.assertIsNone(self.owner.source_fd)
+
+    def test_publication_failure_preserves_primary_and_exact_physical_cleanup(self):
+        primary = OSError("independent private sink refusal")
+
+        class RefusedStream(io.StringIO):
+            def write(self, value):
+                raise primary
+
+        with self.assertRaises(self.subject.ServeRefusal) as caught:
+            self.run_lifecycle(RefusedStream())
+        self.assertIs(caught.exception.primary, primary)
+        self.assertIs(caught.exception.cleanup, primary)
+        self.assertTrue(self.owner.operation.physically_retired)
+        self.assertIsNone(self.owner.source_fd)
+        self.assertEqual(self.binary.stat().st_nlink, 1)
+
+    def test_pending_native_cleanup_never_emits_retired_or_releases_source(self):
+        stream = io.StringIO()
+        original = self.subject.ServeOwner
+        with patch.object(original, "retire", return_value=False):
+            with self.assertRaisesRegex(self.subject.ServeRefusal, "cleanup"):
+                self.run_lifecycle(stream)
+        self.assertEqual(stream.getvalue().count(" ACTIVE\n"), 1)
+        self.assertNotIn("RETIRED", stream.getvalue())
+        self.assertFalse(self.owner.operation.physically_retired)
+        self.assertIsNotNone(self.owner.source_fd)
+        self.assertTrue(self.owner.session._created)
+        self.owner.cancelled = False
+        self.assertTrue(self.owner.retire(5))
+
+    def test_partial_preparation_failure_keeps_primary_after_real_retirement(self):
+        original_prepare = self.subject.ServeOwner.prepare
+        primary = RuntimeError("independent post-prepare refusal")
+
+        def fail_after_prepare(owner):
+            original_prepare(owner)
+            raise primary
+
+        stream = io.StringIO()
+        with self.assertRaises(RuntimeError) as caught:
+            self.run_lifecycle(stream, prepare=fail_after_prepare)
+        self.assertIs(caught.exception, primary)
+        self.assertNotIn("ACTIVE", stream.getvalue())
+        self.assertEqual(stream.getvalue().count(" RETIRED 78\n"), 1)
+        self.assertTrue(self.owner.operation.physically_retired)
+        self.assertIsNone(self.owner.source_fd)
+        self.assertEqual(self.binary.stat().st_nlink, 1)
+
+    def test_legacy_serve_without_binding_emits_no_new_protocol_bytes(self):
+        stream = io.StringIO()
+        self.assertEqual(self.run_lifecycle(stream, nonce=None), 78)
+        self.assertEqual(stream.getvalue(), "")
+        self.assertTrue(self.owner.operation.physically_retired)
+        self.assertIsNone(self.owner.source_fd)
+
+    def test_actual_peer_terminal_zero_uses_original_wait_and_all_cleanup_acks(self):
+        source = self.launcher.read_text()
+        active = "            print('V1 ACTIVE', flush=True)\n"
+        self.assertEqual(source.count(active), 1)
+        acknowledgment = self.app / "lifecycle-active-ack"
+        self.assertFalse(acknowledgment.exists())
+        terminal = (
+            active
+            + "            import select\n"
+            + "            ack = pathlib.Path(__file__).parents[2] / 'lifecycle-active-ack'\n"
+            + "            while not ack.exists():\n"
+            + "                if select.select([sys.stdin], [], [], 0.01)[0]:\n"
+            + "                    command = sys.stdin.readline()\n"
+            + "                    if command in ('CANCEL\\n', ''): break\n"
+            + "                    raise RuntimeError('unexpected private control')\n"
+            + "            child.terminate(); child.wait()\n"
+            + "            print('V1 OUTGOING_CLOSED 0', flush=True)\n"
+            + "            print('V1 BOOTSTRAP_CLOSED 0', flush=True)\n"
+            + "            print('V1 RETIRED 0 1 1 0 0 0 0', flush=True)\n"
+            + "            break\n"
+        )
+        # Only this independent actual POSIX peer completes its real child.
+        # Production wait(), guardian EOF/reap and native closure stay unchanged.
+        self.launcher.write_text(source.replace(active, terminal))
+        original = self.subject.ServeOwner
+
+        def acquire(*args, register, **kwargs):
+            def capture(owner):
+                self.owner = owner
+                register(owner)
+
+            return original(*args, register=capture, **kwargs)
+
+        fixture = self
+
+        class ActiveAcknowledgmentStream(io.StringIO):
+            def write(self, value):
+                count = super().write(value)
+                expected = "ERGOPTI_MANAGED_DAEMON_V1 " + "cd" * 16 + " ACTIVE\n"
+                if self.getvalue() == expected:
+                    fixture.assertTrue(fixture.owner.authority._written)
+                    fixture.assertFalse(acknowledgment.exists())
+                    # print() writes the payload and newline separately. Only
+                    # the complete outer frame may release private peer exit.
+                    acknowledgment.write_text("ACTIVE")
+                return count
+
+        stream = ActiveAcknowledgmentStream()
+        with (
+            patch.object(self.subject, "NATIVE_PRODUCTION_QUALIFIED", True),
+            patch.object(self.subject, "ServeOwner", side_effect=acquire),
+            patch.object(sys, "stdout", stream),
+        ):
+            self.assertEqual(self.subject.serve(11434, 5, 60, 5, caller_nonce="cd" * 16), 0)
+        self.assertEqual(
+            stream.getvalue(),
+            "ERGOPTI_MANAGED_DAEMON_V1 " + "cd" * 16 + " ACTIVE\n"
+            "ERGOPTI_MANAGED_DAEMON_V1 " + "cd" * 16 + " RETIRED 0\n",
+        )
+        self.assertEqual(acknowledgment.read_text(), "ACTIVE")
+        self.assertEqual(self.owner.operation._retired, (0, (0, 0, 0)))
+        self.assertEqual(self.owner.operation._outgoing_closed, 0)
+        self.assertEqual(self.owner.operation._bootstrap_closed, 0)
+        self.assertEqual(self.owner.operation.process.returncode, 0)
+        self.assertEqual(self.owner.operation._eof, {"stdout", "stderr"})
+        self.assertTrue(self.owner.operation.physically_retired)
+        self.assertIsNone(self.owner.operation.process.stdin)
+        self.assertIsNone(self.owner.operation.process.stdout)
+        self.assertIsNone(self.owner.operation.process.stderr)
+        self.assertIsNone(self.owner.source_fd)
+        for owner in (self.owner.authority, self.owner.bootstrap, self.owner.session):
+            self.assertFalse(owner._created)
+            self.assertIsNone(owner._file_fd)
+            self.assertIsNone(owner._directory_fd)
+        self.assertFalse(self.owner.alias._created)
+        self.assertFalse(self.owner.alias._fds)
         self.assertEqual(self.binary.stat().st_nlink, 1)
 
 
