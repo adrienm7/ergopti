@@ -1005,6 +1005,17 @@ _SMB_FrameNativePortLifecycle() {
 	Corpus := JsonParse(FileRead(_SharedDir . "\tests\corpus\menus\personal_shortcuts_frame.json", "UTF-8"))
 	PreviousCritical := Critical("On")
 	try {
+		; Native names are observed before and after the actual retained nested guards.
+		NameGetter := Object.Prototype.GetOwnPropDesc.Call(Func.Prototype, "Name").Get
+		Factory := Object.Prototype.GetOwnPropDesc.Call(Menu, "Call").Call
+		AssertTrue(NameGetter is Func && ObjGetBase(NameGetter) == Func.Prototype)
+		AssertEqual("DllCall", NameGetter.Call(DllCall), "the genuine DLL intrinsic has its interpreter-created name")
+		AssertEqual("Menu.Call", NameGetter.Call(Factory), "the genuine factory has its interpreter-created name")
+		AssertTrue(TrayMenuFrameNative("current"), "the actual adapter retains its native cohort without clobbering the observed DLL name")
+		AssertTrue(TrayMenuFrameNative("current"), "repeated actual guard evaluation preserves DLL result custody")
+		AssertTrue(_MR_FrameNativeConstructorCurrent(Menu), "the actual constructor preserves its observed intrinsic name")
+		AssertEqual("DllCall", NameGetter.Call(DllCall))
+		AssertEqual("Menu.Call", NameGetter.Call(Factory))
 		for Fault in ["before dll Call", "before handle intrinsic Call", "before delete intrinsic Call",
 			"before adapter Call", "before metadata intrinsic Call", "after adapter Call", "after dll Call",
 			"after constructor Call", "after provider Call", "after child Handle", "after child Delete",

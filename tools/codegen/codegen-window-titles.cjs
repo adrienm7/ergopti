@@ -31,8 +31,52 @@ function ahkString(value) {
 	return '"' + value.replaceAll('`', '``').replaceAll('"', '`"').replaceAll(';', '`;') + '"';
 }
 
+/** Validate explicit app contexts without substituting a generic title. */
+function validatePresentations(presentations) {
+	if (!presentations || typeof presentations !== 'object' || Array.isArray(presentations))
+		throw new TypeError('Window presentations require an app-keyed object.');
+	for (const [app, variants] of Object.entries(presentations)) {
+		if (
+			!/^[a-z][a-z0-9_]*$/.test(app) ||
+			!variants ||
+			typeof variants !== 'object' ||
+			Array.isArray(variants)
+		)
+			throw new TypeError('Window presentations require canonical app contexts.');
+		for (const [id, entry] of Object.entries(variants)) {
+			if (
+				!/^[a-z][a-z0-9_]*$/.test(id) ||
+				!entry ||
+				typeof entry !== 'object' ||
+				Array.isArray(entry) ||
+				Object.keys(entry).sort().join(',') !== 'label_key,platforms,title_key' ||
+				!['title_key', 'label_key'].every(
+					(key) => typeof entry[key] === 'string' && /^[a-z][a-z0-9_.]*$/.test(entry[key])
+				) ||
+				!Array.isArray(entry.platforms) ||
+				entry.platforms.length === 0 ||
+				Object.keys(entry.platforms).length !== entry.platforms.length ||
+				Object.keys(entry.platforms).some((key, index) => key !== String(index)) ||
+				new Set(entry.platforms).size !== entry.platforms.length ||
+				!entry.platforms.every((platform) => ['ahk', 'hs', 'linux'].includes(platform))
+			)
+				throw new TypeError('Window presentation fields and platforms must be explicit.');
+		}
+	}
+	return presentations;
+}
+
+/** Project only declared contexts from the same canonical app registry. */
+function projectPresentations(apps) {
+	const result = Object.create(null);
+	for (const [app, entry] of Object.entries(apps))
+		if (Object.hasOwn(entry, 'presentations')) result[app] = entry.presentations;
+	return validatePresentations(result);
+}
+
 /** Build equivalent native host composers from one validated policy. */
-function render(policy, titleKeys = {}) {
+function render(policy, titleKeys = {}, presentations = {}) {
+	validatePresentations(presentations);
 	validate(policy);
 	for (const [app, key] of Object.entries(titleKeys)) {
 		if (
@@ -57,6 +101,21 @@ ${Object.entries(titleKeys)
 	.map(([app, key]) => `\t[${JSON.stringify(app)}] = ${JSON.stringify(key)},`)
 	.join('\n')}
 }
+local PRESENTATIONS = {
+${Object.entries(presentations)
+	.sort(([a], [b]) => a.localeCompare(b))
+	.map(
+		([app, variants]) =>
+			`\t[${JSON.stringify(app)}] = {\n${Object.entries(variants)
+				.sort(([a], [b]) => a.localeCompare(b))
+				.map(
+					([id, entry]) =>
+						`\t\t[${JSON.stringify(id)}] = { title_key = ${JSON.stringify(entry.title_key)}, label_key = ${JSON.stringify(entry.label_key)}, platforms = {${entry.platforms.map((platform) => JSON.stringify(platform)).join(', ')}} },`
+				)
+				.join('\n')}\n\t},`
+	)
+	.join('\n')}
+}
 
 --- Compose a native caption from an already-translated, brandless label.
 --- @param label string|nil
@@ -72,6 +131,29 @@ end
 --- @return string|nil
 function M.key_for_app(app_id)
 	return TITLE_KEYS[app_id]
+end
+
+--- Returns a bounded projection from the private compiled declaration.
+--- @param app_id string Existing UI app identity.
+--- @param presentation_id string Explicit contextual identity.
+--- @param platform string Native platform id.
+--- @return table|nil
+function M.presentation_for_app(app_id, presentation_id, platform)
+	if type(app_id) ~= "string" or type(presentation_id) ~= "string" or type(platform) ~= "string" then return nil end
+	local app = rawget(PRESENTATIONS, app_id)
+	if type(app) ~= "table" or getmetatable(app) ~= nil then return nil end
+	local entry = rawget(app, presentation_id)
+	if type(entry) ~= "table" or getmetatable(entry) ~= nil then return nil end
+	local platforms = rawget(entry, "platforms")
+	if type(platforms) ~= "table" or getmetatable(platforms) ~= nil then return nil end
+	for _, native in ipairs(platforms) do
+		if native == platform then
+			local declared_platforms = {}
+			for index, value in ipairs(platforms) do declared_platforms[index] = value end
+			return { title_key = rawget(entry, "title_key"), label_key = rawget(entry, "label_key"), platforms = declared_platforms }
+		end
+	end
+	return nil
 end
 
 return M
@@ -126,7 +208,40 @@ function main(root = ROOT) {
 			throw new TypeError(`apps.manifest.json ${app} requires a non-empty title_key.`);
 		titleKeys[app] = entry.title_key;
 	}
-	const outputs = render(manifest.window_title, titleKeys);
+	const presentations = projectPresentations(manifest.apps);
+	if (Object.keys(presentations).length > 0) {
+		const localeRoot = path.join(root, 'static/ergopti_plus/_shared/data');
+		const order = JSON.parse(
+			fs.readFileSync(path.join(localeRoot, 'locale_order.json'), 'utf8')
+		).order;
+		if (
+			!Array.isArray(order) ||
+			order.length === 0 ||
+			new Set(order).size !== order.length ||
+			!order.every((code) => typeof code === 'string' && /^[a-z]{2}$/.test(code))
+		)
+			throw new TypeError('Window presentations require the canonical locale inventory.');
+		for (const code of order) {
+			const strings = JSON.parse(
+				fs.readFileSync(path.join(localeRoot, 'locales', code + '.json'), 'utf8')
+			);
+			for (const variants of Object.values(presentations))
+				for (const entry of Object.values(variants))
+					for (const field of ['title_key', 'label_key']) {
+						const value = strings[entry[field]];
+						if (
+							typeof value !== 'string' ||
+							value === '' ||
+							!value.isWellFormed() ||
+							/[\x00-\x1F\x7F\u2028\u2029]/.test(value)
+						)
+							throw new TypeError(
+								`Window presentation ${code}:${entry[field]} requires its original plain caption.`
+							);
+					}
+		}
+	}
+	const outputs = render(manifest.window_title, titleKeys, presentations);
 	for (const [file, content] of [
 		[LUA_OUTPUT, outputs.lua],
 		[AHK_OUTPUT, '\uFEFF' + outputs.ahk],
@@ -137,5 +252,14 @@ function main(root = ROOT) {
 		fs.writeFileSync(target, content, 'utf8');
 	}
 }
-module.exports = { render, main, SOURCE, LUA_OUTPUT, AHK_OUTPUT, SWIFT_OUTPUT };
+module.exports = {
+	render,
+	main,
+	validatePresentations,
+	projectPresentations,
+	SOURCE,
+	LUA_OUTPUT,
+	AHK_OUTPUT,
+	SWIFT_OUTPUT
+};
 if (require.main === module) main();
