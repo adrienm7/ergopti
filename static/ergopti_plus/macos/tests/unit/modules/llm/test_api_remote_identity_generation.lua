@@ -159,6 +159,7 @@ local function with_publication_sources(cloud, local_source, callback, close_ref
 		local paths = require("infra.paths")
 		local original_path = paths.shared_llm_path
 		local logger = require("infra.logger")
+		helpers.admit_logger_privacy(logger)
 		local original_warn, original_error = logger.warn, logger.error
 		local original_open = io.open
 		local cloud_path, local_path = os.tmpname(), os.tmpname()

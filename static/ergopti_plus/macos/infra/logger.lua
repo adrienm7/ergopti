@@ -51,6 +51,54 @@
 --- ==============================================================================
 
 local M = {}
+
+local Redact = require("diagnostics.redact")
+local Json = require("json")
+local _redact_message = nil
+
+--- Captures canonical privacy rules before bootstrap permits any log output.
+--- The entry point owns the shared path; this constructor does not resolve paths
+--- through infra.paths, whose diagnostics depend on this logger.
+--- @param raw_policy string Immutable canonical redaction JSON.
+--- @param supplied table|nil Explicit account identity for portable fixtures.
+function M.initialize_privacy(raw_policy, supplied)
+	assert(_redact_message == nil, "logger: privacy already initialized")
+	assert(type(raw_policy) == "string", "logger: canonical privacy policy unavailable")
+	local context = supplied or { home = os.getenv("HOME"), user = os.getenv("USER") or os.getenv("LOGNAME") }
+	assert(type(context) == "table" and type(context.home) == "string" and context.home ~= ""
+		and type(context.user) == "string" and context.user ~= "", "logger: privacy identity unavailable")
+	local captured = { home = context.home, user = context.user, case_insensitive = true }
+	local decoded, rules = pcall(Json.decode, raw_policy)
+	assert(decoded and type(rules) == "table", "logger: canonical privacy policy invalid")
+	for _, key in ipairs({ "home_placeholder", "account_placeholder", "secret_placeholder" }) do
+		assert(type(rules[key]) == "string" and rules[key] ~= "", "logger: canonical privacy placeholder invalid")
+	end
+	for _, key in ipairs({ "min_account_name_length", "bearer_min_length" }) do
+		assert(type(rules[key]) == "number" and rules[key] >= 1 and rules[key] == math.floor(rules[key]),
+			"logger: canonical privacy bound invalid")
+	end
+	assert(type(rules.token_prefixes) == "table" and type(rules.secret_keys) == "table",
+		"logger: canonical privacy inventory invalid")
+	assert(pcall(Redact.apply, "", rules, captured), "logger: canonical privacy rules invalid")
+	_redact_message = function(text) return Redact.apply(text, rules, captured) end
+end
+
+--- Redacts unformatted free text for the owned log sinks and boot journal.
+--- @param text string Message body, including multiline errors.
+--- @return string Redacted text under the captured canonical policy.
+function M.redact_message(text)
+	assert(_redact_message ~= nil, "logger: privacy not initialized")
+	assert(type(text) == "string", "logger: privacy requires message text")
+	return _redact_message(text)
+end
+
+--- Preserves only the actual core-owned timestamp, severity and module prefix.
+--- @param line string Formatted record or unformatted legacy text.
+--- @return string Redacted record.
+local function private_line(line)
+	local prefix, message = line:match("^(%d%d%d%d%-%d%d%-%d%d %d%d:%d%d:%d%d:%d%d%d %[[A-Z]+%] %[[^%]]*%] )(.*)$")
+	return prefix and (prefix .. M.redact_message(message)) or M.redact_message(line)
+end
 local _scope_busy = false
 local _scope_owner, _scope_generation, _scope_receipts = nil, 0, setmetatable({}, { __mode = "k" })
 
@@ -1093,6 +1141,7 @@ _driver_sink = function(line, variant)
 		return
 	end
 
+	line = private_line(line)
 	local level = Core.level_of(variant) or Core.LEVELS.INFO
 
 	-- Routed through _console_out so the print() tee (Section 7) does not
@@ -1132,7 +1181,8 @@ local function _deliver_async_record(record)
 	if type(record) ~= "table" or type(record.line) ~= "string" then
 		return false, "asynchronous log record is malformed"
 	end
-	_console_out(record.line)
+	local line = record.rejected == true and private_line(record.line) or record.line
+	_console_out(line)
 	local notification = record.notification
 	if type(notification) == "table" and _error_notification_handler then
 		local notified, delivered_or_err, notification_err = xpcall(
@@ -1196,6 +1246,7 @@ function M.start_async_sink(scheduler, transport_overrides)
 		scheduler = scheduler,
 		log_dir = _log_dir,
 		retention_days = _log_retention_days or DEFAULT_LOG_RETENTION_DAYS,
+		prepare_line = private_line,
 		route_line = _route_line,
 		route_overlap_bytes = ROUTE_OVERLAP_BYTES,
 		on_delivered = _deliver_async_record,
@@ -1732,7 +1783,7 @@ function M.install_runtime_error_capture()
 							_async_sink_state.last_error = tostring(queued and enqueue_err or record_or_err)
 						end
 					else
-						pcall(_write_to_file, line)
+						pcall(_write_to_file, private_line(line))
 					end
 				end
 			end

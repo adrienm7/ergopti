@@ -118,6 +118,9 @@ local function run_isolated(options, assertions)
 		for _, name in ipairs({ "debug", "trace", "done", "info", "start", "success", "warn", "error" }) do
 			Logger[name] = log
 		end
+		function Logger.initialize_privacy(raw)
+			helpers.assert_type(raw, "string", "The root owns a complete canonical policy read before logging")
+		end
 		function Logger.set_level() return true end
 		function Logger.init_log_path() return true end
 		function Logger.logs_dir() return "/virtual/logs/" end

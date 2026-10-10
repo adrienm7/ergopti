@@ -104,6 +104,23 @@ function M.shared(rel)
 end
 
 
+-- Read canonical data before individual fixtures replace file and environment ports.
+local logger_privacy_policy = SourceFile.read(M.shared("modules/diagnostics/redaction.json"))
+local logger_privacy_owners = setmetatable({}, { __mode = "k" })
+
+--- Gives a real logger instance the same explicit privacy boot as production.
+--- Existing injected logger doubles do not own persisted sinks.
+--- @param logger table Logger instance or fixture double.
+--- @return table The same instance.
+function M.admit_logger_privacy(logger)
+	if type(logger.initialize_privacy) == "function" and not logger_privacy_owners[logger] then
+		logger.initialize_privacy(logger_privacy_policy, { home = "/Users/PrivateUser", user = "PrivateUser" })
+		logger_privacy_owners[logger] = true
+	end
+	return logger
+end
+
+
 
 
 
@@ -479,7 +496,9 @@ function M.load_with_stubs(module_name, hs_overrides)
 		end
 	end
 
-	return require(module_name)
+	local result = require(module_name)
+	if module_name == "infra.logger" then M.admit_logger_privacy(result) end
+	return result
 end
 
 --- Restores native stub state and every cache entry written by load_with_stubs.
@@ -740,6 +759,7 @@ function M.make_logger_stub()
 		pcall   = function(_, fn, ...) return pcall(fn, ...) end,
 		callback = function(_, _, fn, ...) return xpcall(fn, debug.traceback, ...) end,
 		build   = function() return noop end,
+		redact_message = function(text) return text end,
 		install_runtime_error_capture = noop,
 		init_log_path = noop,
 		-- The logs-folder resolver every consumer asks; a stub without it would
