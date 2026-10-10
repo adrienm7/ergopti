@@ -3498,6 +3498,26 @@ Hosted Lua owner tests do not qualify physical input.
 
 WP3 prerequisite: the actual macOS physical accounting owner now requires exact held-modifier settlement before accepting source transitions. The keylogger retires each crossing physical release without emitting an orphan hold or a new press, including pause and secure-context crossings; ordinary legacy and collision behavior remains unchanged. Existing native fixture parents restore their settlement child through the scoped cache owner, while normal production stop/restart retains the same CoreState. Portable focused tests pass (32 held-key cases, 24 policy cases, 3 legacy collision cases, 23 existing cache-scope cases, and 9 unchanged alias configuration/privacy cases); the original real gap-release source fails all eight side-key cases. This does not enable a producer or headless mode, alter transport/baseline versions, or complete WP3/WP4/native acceptance. Full root and hosted macOS qualification remain required.
 
+WP3 bounded system-authentication setter receiving now cancels a complete
+held-modifier interval when its effective policy becomes excluded. Disabled
+filtering preserves included durations. A refused settlement retains a private
+admission debt until the exact public setter retry succeeds; it does not admit
+physical or synthetic accounting meanwhile. The genuine Root three-argument
+context tracker and all 32 original accounting cases remain unchanged. Nine
+independent controls give original 35 passes / 6 assertion failures and corrected
+41 / 0; settlement omission restores those six failures, and admission-gate
+omission gives 39 / 2. That last omission stops at admission assertions before
+later synthetic checks; the corrected cases execute their complete sink and
+retry assertions. Broader secure/private/configuration writers, native
+authentication, physical acceptance and lease exit73 remain unqualified. Selected formatting and E2E pass (364 files, 101 cases and one original
+host skip). The complete selected run remains RED: JS 404 / 3 and Lua
+18,197 / 9. Exact unmodified Root replays reproduce two JS failures and all
+nine boot-fixture failures. A test-only recovery measurement correction passes
+all 41 focused cases and removes the third JS false-green ratchet occurrence;
+the complete suites were not rerun afterward. These local baseline outcomes
+do not establish source defects; isolated context or environment causes remain
+possible, and hosted qualification is still required. TODO31 stays partial.
+
 ## Remaining work after the 2026-09-30 releases
 
 - [~] **33.** Config policy for the files other than config.toml (the former
