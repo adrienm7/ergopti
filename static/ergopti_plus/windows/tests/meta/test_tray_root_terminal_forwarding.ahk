@@ -50,8 +50,13 @@ _TRF_ProductionChainForwardsExactTerminalAuthorization() {
 	LlmProjection := _DriverFuncBody("_LLM_Menu_PublishRoot")
 	Assert(LlmProjection != "", "_LLM_Menu_PublishRoot() must exist")
 	Assert(InStr(LlmProjection,
-		"initMenu(PublishAuthorizeFn)") > 0,
+		"initMenu(_LLM_Menu_PreparedRootCurrent.Bind(Submenu, PublishAuthorizeFn), false, Submenu)") > 0,
 		"the narrow LLM projection must pass its terminal authorizer to initMenu")
+
+	CandidateTicket := _DriverFuncBody("_LLM_Menu_PreparedRootCurrent")
+	Assert(InStr(CandidateTicket, "Authorized := PublishAuthorizeFn.Call()") > 0
+		&& InStr(CandidateTicket, "Authorized == 1 && _LLM_Menu_Handle == Submenu") > 0,
+		"the candidate fence must retain the original strict terminal ticket and its post-call identity check")
 
 	Shell := _DriverFuncBody("_TrayRootBuildShell")
 	Assert(Shell != "", "the early global-command worker must exist")

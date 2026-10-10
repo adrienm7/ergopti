@@ -299,7 +299,8 @@ const DRIVER_ROOTS = {
 	ahk: {
 		file: path.join(SP, 'windows', 'ui', 'menu', 'menu_init.ahk'),
 		label: 'windows/ui/menu/menu_init.ahk',
-		loop: '_MI_StageTopLevel(MenuManifest_LoadTopLevel(), _MI_TopLevelBuilders())',
+		loop: '_MI_StageTopLevel(MenuManifest_LoadTopLevel(), Builders)',
+		factory: 'Builders := _MI_TopLevelBuilders()',
 		// The Map _MI_TopLevelBuilders returns: one "id", builder pair per line.
 		table: /\n_MI_TopLevelBuilders\(\) \{\n\treturn Map\(\n([\s\S]*?)\n\t\)\n\}/,
 		key: /^\t\t"(\w+)",\s*_MI_Stage\w+/gm
@@ -318,6 +319,12 @@ const MIN_ROOT_IDS = 8;
  * @returns {string[]|null} Ids, or null when the scan found no anchor.
  */
 function builtIds(spec, src) {
+	if (spec.factory && !src.includes(spec.factory)) {
+		errors.push(
+			`${spec.label}: the per-invocation map must retain the canonical complete builder factory.`
+		);
+		return null;
+	}
 	if (!src.includes(spec.loop)) {
 		errors.push(
 			`${spec.label}: could not find "${spec.loop}" — the root no longer loops over the whole ` +

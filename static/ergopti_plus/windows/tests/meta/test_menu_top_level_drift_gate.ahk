@@ -229,8 +229,11 @@ _DG_EveryBuilderStagesItsOwnRow() {
 ; and stages nothing of its own around it.
 _DG_InitMenuDispatchesTheWholeRoot() {
 	Body := _StripFullLineComments(_DriverFuncBody("initMenu"))
-	Assert(InStr(Body, "_MI_StageTopLevel(MenuManifest_LoadTopLevel(), _MI_TopLevelBuilders())") > 0,
+	Assert(InStr(Body, "_MI_StageTopLevel(MenuManifest_LoadTopLevel(), Builders)") > 0,
 		"initMenu must stage its root through _MI_StageTopLevel over the manifest's top_level")
+	Assert(InStr(Body, "Builders := _MI_TopLevelBuilders()") > 0
+		&& InStr(Body, 'Builders["llm"] := _MI_StagePrebuiltLlm.Bind(PrebuiltLlm)') > 0,
+		"the invocation must retain every declared builder and replace only its caller-owned AI slot")
 	Assert(!RegExMatch(Body, "TrayMenuStage_Add\w*\("),
 		"initMenu must not stage a top-level row outside the dispatcher")
 }
