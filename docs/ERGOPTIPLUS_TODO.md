@@ -9026,6 +9026,14 @@ mandatory.
   acknowledgement instead of nil, retaining every original assertion. Final
   joined-source and native GUI delivery qualification remain required.
 
+  Publication refresh now rejoins the captured source and generation after
+  action-label callbacks. A saved assignment remains committed when source
+  revocation or session closure refuses its refreshed display; stale entries
+  are not returned. The actual Editor and Window contracts pass all 27 cases
+  on both Lua ABIs through the Linux and macOS wrappers, preserving all 24
+  original cases. The original source fails both new refusal cases. These are
+  controlled software checks; native GUI and physical delivery remain open.
+
 - [~] **98.** Replace fixed make-J-the-star-key with a user-chosen
   physical position and arbitrary output, including explicit None, through
   item 97's model rather than another layout switch. Implemented: the shared
