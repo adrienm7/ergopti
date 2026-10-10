@@ -3115,3 +3115,147 @@ _LMT_ApiPhysicalFaultWithdrawalAllowsBothTargets() {
 }
 Test("LLM API entries: physical second-target fault withdrawal preserves native publication",
 	_LMT_ApiPhysicalFaultWithdrawalAllowsBothTargets)
+
+
+
+
+
+_LMT_ObservationLine(Lines, Line) {
+	if InStr(Line, "[LLMObservation.")
+		Lines.Push(Line)
+}
+
+_LMT_RealTransactionObservation() {
+	global _LOGGER_TEST_SINK, _LOGGER_INFO_ENABLED, _LOGGER_FLUSH_ACTIVE
+	global _LOGGER_FORCE_FLUSH_PENDING, _LOGGER_PENDING, _LOGGER_PENDING_ERRORS
+	Saved := [_LOGGER_TEST_SINK, _LOGGER_INFO_ENABLED, _LOGGER_FLUSH_ACTIVE,
+		_LOGGER_FORCE_FLUSH_PENDING, _LOGGER_PENDING, _LOGGER_PENDING_ERRORS]
+	Previous := _LMT_InstallFixture()
+	Lines := []
+	try {
+		_LOGGER_TEST_SINK := _LMT_ObservationLine.Bind(Lines)
+		_LOGGER_INFO_ENABLED := true
+		; Observe the real logger without admitting an external file append.
+		_LOGGER_FLUSH_ACTIVE := true
+		_LOGGER_PENDING := [], _LOGGER_PENDING_ERRORS := []
+		AssertTrue(LLM_Menu_CommitMutation("private-observation-context-sentinel",
+			_LMT_MutateNested, _LMT_Apply, _LMT_Writer, _LMT_Notify,
+			_LMT_Acquire, _LMT_Settle, _LMT_Collect))
+		Text := ""
+		for Line in Lines
+			Text .= Line "`n"
+		for Stage in ["schema-admission", "bundle-admission", "pending-settlement",
+			"candidate-clone", "candidate-collector", "durable-writer",
+			"live-publication", "live-application", "mutation-return"] {
+			AssertContains(Text, "[LLMObservation." Stage ".enter]")
+			AssertContains(Text, "[LLMObservation." Stage ".returned]")
+		}
+		AssertContains(Text, "status=confirmed")
+		AssertFalse(InStr(Text, "private-observation-context-sentinel"), "operation context must not enter observation metadata")
+		AssertFalse(InStr(Text, "Candidate label"), "candidate content must not enter observation metadata")
+		AssertFalse(InStr(Text, "Live prompt"), "prompt content must not enter observation metadata")
+		AssertFalse(InStr(Text, "[SUCCESS]"), "observations never claim a successful operation from an unknown result")
+	} finally {
+		_LMT_RestoreFixture(Previous)
+		_LOGGER_TEST_SINK := Saved[1], _LOGGER_INFO_ENABLED := Saved[2]
+		_LOGGER_FLUSH_ACTIVE := Saved[3], _LOGGER_FORCE_FLUSH_PENDING := Saved[4]
+		_LOGGER_PENDING := Saved[5], _LOGGER_PENDING_ERRORS := Saved[6]
+	}
+}
+Test("LLM menu: actual transaction emits closed observation milestones (llm-transaction-observation)",
+	_LMT_RealTransactionObservation)
+
+
+
+
+
+_LMT_ObservationReentry() {
+	static Retained := []
+	Directory := A_Temp "\ergopti-toggle-observation-" A_ScriptHwnd "-" A_TickCount "-" Random(100000, 999999)
+	AssertTrue(DllCall("Kernel32\CreateDirectoryW", "Str", Directory, "Ptr", 0, "Int"))
+	State := {done: false, exit: -1, errors: "", output: ""}
+	Done(ExitCode, Output, Errors) {
+		State.done := true, State.exit := ExitCode, State.output := Output, State.errors := Errors
+	}
+	Task := 0, Quiesced := true
+	try {
+		Subject := ""
+		for Name in ["LLM_Menu_OnToggle", "_LLM_Menu_ObservationBegin", "_LLM_Menu_ObservationEnd"] {
+			Body := _DriverFuncBody(Name)
+			AssertTrue(Body != "", "the observation reentry subject must be actual production code")
+			Subject .= Body "`n"
+		}
+		Program := '
+(
+#Requires AutoHotkey v2.0
+#Warn All, StdOut
+#NoTrayIcon
+#SingleInstance Off
+global _LLM_Menu := Map("enabled", true, "backend", "ollama")
+global Mode := "", Triggered := false, Nested := 1, Commits := 0, FlushCalls := 0
+LoggerInfo(Tag, Message, Values*) {
+ global Mode, Triggered, Nested
+ if !Triggered && ((Mode == "enter" && Tag == "LLMObservation.toggle-entry.enter")
+  || (Mode == "returned" && Tag == "LLMObservation.toggle-entry.returned"
+   && Values.Length > 0 && Values[1] == "confirmed")) {
+  Triggered := true
+  Nested := LLM_Menu_OnToggle()
+ }
+}
+_LoggerFlush(*) {
+ global FlushCalls
+ FlushCalls += 1
+ return true
+}
+TickElapsed(Started) => (A_TickCount - Started) & 0xFFFFFFFF
+LLM_EnableRequiresProbe(*) => false
+LLM_Menu_RequestEnableAdmission(*) => false
+LLM_Menu_CancelEnableAdmission() => true
+_LLM_Menu_ToggleCandidateBool(*) => true
+_LLM_Menu_ApplyToggleCommitted(*) => true
+LLM_Menu_CommitMutation(*) {
+ global Commits
+ Commits += 1
+ return true
+}
+SUBJECT
+for SelectedMode in ["enter", "returned"] {
+ Mode := SelectedMode, Triggered := false, Nested := 1, Commits := 0
+ if !LLM_Menu_OnToggle() || !Triggered || Nested != 0 || Commits != 1
+  ExitApp(1)
+ if !LLM_Menu_OnToggle() || Commits != 2
+  ExitApp(2)
+}
+if FlushCalls != 0
+ ExitApp(3)
+FileAppend("observation-reentry: enter and returned refused; next call admitted; informational events stay buffered", "*", "UTF-8-RAW")
+ExitApp(0)
+)'
+		Script := Directory "\observer.ahk"
+		AssertTrue(FSWriteCreateDurable(Script, StrReplace(Program, "SUBJECT", Subject)))
+		Task := ShellRunner_SpawnTreeOwned(A_AhkPath, ["/ErrorStdOut", Script], Done, , , 65536)
+		Quiesced := false
+		AssertTrue(Task.start())
+		Started := A_TickCount
+		while !State.done && TickElapsed(Started) < 5000
+			Sleep(10)
+		AssertTrue(State.done, "the exact inert observation child must exit naturally")
+		AssertEqual(0, State.exit, State.output)
+		AssertEqual("", State.errors)
+		AssertContains(State.output, "observation-reentry: enter and returned refused; next call admitted")
+	} finally {
+		if IsObject(Task) {
+			try Quiesced := Task.requestTerminate() == true
+			catch
+				Quiesced := false
+		}
+		if Quiesced
+			DirDelete(Directory, true)
+		else {
+			Retained.Push({task: Task, directory: Directory, state: State})
+			throw Error("The exact observation child retains retirement debt.")
+		}
+	}
+}
+Test("LLM menu: actual toggle refuses observer reentry until return and releases its guard (llm-observation-reentry)",
+	_LMT_ObservationReentry)

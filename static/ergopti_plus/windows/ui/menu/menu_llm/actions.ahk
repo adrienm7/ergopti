@@ -88,19 +88,32 @@ _LLM_Menu_OnWarningInstallClick(ItemName := "", ItemPos := 0, MenuObj := 0) {
 LLM_Menu_OnToggle(EnablePort := 0, *) {
 	global _LLM_Menu
 	static _Toggling := false
-	if _Toggling
+	if _Toggling {
+		_LLM_Menu_ObservationEnd("toggle-entry", A_TickCount, "reentrant-refusal")
 		return false
+	}
 	_Toggling := true
+	ToggleResult := "not-confirmed"
+	ToggleStarted := A_TickCount
 	try {
+		ToggleStarted := _LLM_Menu_ObservationBegin("toggle-entry")
+		try LoggerInfo("LLMObservation.toggle-entry.state", "Toggle state observed (enabled={1}).", _LLM_Menu.Get("enabled", false) ? 1 : 0)
 		if !_LLM_Menu.Get("enabled", false)
 				&& LLM_EnableRequiresProbe(_LLM_Menu.Get("backend", ""))
-			return LLM_Menu_RequestEnableAdmission(EnablePort)
-		LLM_Menu_CancelEnableAdmission()
-		return LLM_Menu_CommitMutation("the LLM enabled-state change",
+		{
+			ToggleResult := LLM_Menu_RequestEnableAdmission(EnablePort)
+			return ToggleResult
+		}
+		CancelStarted := _LLM_Menu_ObservationBegin("toggle-cancel-admission")
+		Canceled := LLM_Menu_CancelEnableAdmission()
+		_LLM_Menu_ObservationEnd("toggle-cancel-admission", CancelStarted, Canceled)
+		ToggleResult := LLM_Menu_CommitMutation("the LLM enabled-state change",
 			(Candidate) => _LLM_Menu_ToggleCandidateBool(Candidate, "enabled"),
 			_LLM_Menu_ApplyToggleCommitted)
+		return ToggleResult
 	} finally {
-		_Toggling := false
+		try _LLM_Menu_ObservationEnd("toggle-entry", ToggleStarted, ToggleResult)
+		finally _Toggling := false
 	}
 }
 
