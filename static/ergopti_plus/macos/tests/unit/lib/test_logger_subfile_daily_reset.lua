@@ -100,7 +100,7 @@ end
 local function sub_file_modes(opens)
 	local modes = {}
 	for _, o in ipairs(opens) do
-		if o.path:find("ErgoptiPlus_karabiner%.log$") then modes[#modes + 1] = o.mode end
+		if o.path == "/tmp/ergopti_subfile_reset/ErgoptiPlus_karabiner.log" then modes[#modes + 1] = o.mode end
 	end
 	return modes
 end
@@ -168,5 +168,22 @@ helpers.describe("logger — topical sub-files reset on the first write of a new
 		helpers.assert_eq(modes[1], "a",
 			"a sub-file whose mtime is already today holds this same day's lines — a restart "
 			.. "mid-day must not wipe what earlier runs logged")
+	end)
+end)
+
+helpers.describe("logger — captured sub-file observation stays with its owned folder", function()
+	helpers.it("ignores a legitimate foreign-folder append before the owned sub-file truncation", function()
+		local opens = capture_opens(STALE_DAYS, function()
+			local foreign = assert(io.open("/tmp/ergopti_subfile_foreign/ErgoptiPlus_karabiner.log", "a"))
+			foreign:close()
+			Logger.init_log_path("/tmp/ergopti_subfile_reset/", 14)
+			Logger.info("karabiner", ROUTED_LINE_TAG .. " first owned line of the day")
+		end)
+
+		helpers.assert_eq(opens[1].path, "/tmp/ergopti_subfile_foreign/ErgoptiPlus_karabiner.log")
+		helpers.assert_eq(opens[1].mode, "a", "the foreign folder's append must actually be captured first")
+		local modes = sub_file_modes(opens)
+		helpers.assert_eq(#modes, 1, "only the exact owned sub-file may contribute to this observation")
+		helpers.assert_eq(modes[1], "w", "a foreign append must not hide the owned stale-file truncation")
 	end)
 end)

@@ -3989,13 +3989,17 @@ function M.set_enabled(value, on_done, onboarding_gate)
 			end
 			_state.enabled = false
 			clear_managed_output_set()
-			stop_lease_bound_inputs()
+			local local_inputs_stopped = stop_lease_bound_inputs()
 			_enabled_transition = nil
 			replay_pending_layout_refresh()
 			Logger.info(LOG, "Karabiner integration disabled after exact fencing and guardian removal.")
 			local removed, removal_detail, removed_count = remove_managed_rules("Karabiner integration disable")
 			if not removed then
 				settle_enabled_callbacks(transaction, false, "rules-not-removed: " .. removal_detail)
+				return
+			end
+			if local_inputs_stopped ~= true then
+				settle_enabled_callbacks(transaction, false, "local-input-cleanup-pending", removed_count)
 				return
 			end
 			settle_enabled_callbacks(transaction, true, was_enabled and (reason or "stopped") or removal_detail, removed_count)
