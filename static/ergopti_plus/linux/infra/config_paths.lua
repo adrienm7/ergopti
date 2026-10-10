@@ -54,6 +54,16 @@ local LOGS_DIR_STORAGE_KEY = AppDirs.linux_storage_key
 -- =========================================
 -- =========================================
 
+--- Returns the configured account home without a temporary-directory fallback.
+--- Privacy identity needs the real account root, while file placement can use
+--- home()'s existing temporary-directory policy when HOME is absent.
+--- @return string|nil Account home, or nil when unavailable.
+function M.account_home()
+	local home = os.getenv("HOME")
+	if type(home) ~= "string" or home == "" then return nil end
+	return (home:gsub("/+$", ""))
+end
+
 --- The user's home directory.
 ---
 --- When HOME is unset — a bare systemd unit, a container without a passwd entry
@@ -61,10 +71,8 @@ local LOGS_DIR_STORAGE_KEY = AppDirs.linux_storage_key
 --- literally by io.open, and `"/home/user"` is somebody else's path.
 --- @return string Absolute path, no trailing slash.
 function M.home()
-	local home = os.getenv("HOME")
-	if type(home) == "string" and home ~= "" then
-		return (home:gsub("/+$", ""))
-	end
+	local home = M.account_home()
+	if home ~= nil then return home end
 	local tmp = os.getenv("TMPDIR")
 	if type(tmp) == "string" and tmp ~= "" then
 		return (tmp:gsub("/+$", ""))
