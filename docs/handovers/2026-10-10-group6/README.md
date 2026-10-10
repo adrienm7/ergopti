@@ -353,3 +353,13 @@ The next exact manual
 `39424e21e1eefda70430d76a704553304bd75cda` on macOS, with model receiving now
 bound to successful native build. It still carries the historical stderr helper;
 its whole result and any model qualifications must be reported separately.
+
+## Complete standalone native header closure
+
+2026-10-10 standalone native compiler header closure. Both actual receiver
+recipes now copy all six headers imported by the native umbrella, including
+OwnedListenerEventCompatibility.h. All26 original portable compiler/registry
+controls pass with exact copied-header and retained-source assertions. Native
+compilation and model receiving on the corrected recipe remain pending; the
+compiler exception from the preceding failed prepare was not recovered. No
+native success or item62 completion is inferred from portable receiving.
