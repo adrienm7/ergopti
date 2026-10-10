@@ -619,3 +619,177 @@ require("test.menu_native_composition").register(helpers, "hs")
 require("test.menu_layout_caption_values_contract").register(helpers, "macos")
 
 require("test.menu_numbered_caption_contract").register(helpers, "macos")
+
+require("test.menu_fixed_feature_parent_contract").register(helpers, "macos")
+
+
+-- Actual component factories consume genuine existing fixture-owned data modules.
+local function fixed_parent_native_cohort(body)
+	local names = {"infra.i18n", "infra.locale", "locale.core", "infra.manifest_menu", "infra.logger",
+		"ui.menu.menu_shortcuts", "ui.menu.menu_gestures", "ui.menu.menu_tap_holds",
+		"ui.menu.menu_utils", "ui.menu.shortcut_utils", "ui.menu.menu_keyboard_slots", "ui.menu.menu_tap_keys"}
+	local previous = {}; for name, value in pairs(package.loaded) do previous[name] = value end
+	local ok, detail = xpcall(function()
+		return helpers.with_stub_scope(names, function()
+			helpers.load_with_stubs("infra.logger")
+			-- The native loader installs an i18n baseline double; reload the genuine
+			-- native locale owner after that setup, as existing presentation fixtures do.
+			package.loaded["infra.i18n"] = nil
+			local locale = require("infra.locale")
+			local translator = require("infra.i18n")
+			translator.set_locale_injector(function(code) locale.set_locale(code) end)
+			translator.init()
+			local owner = {pending = function() return false end}
+			assert(translator.scope_acquire(owner))
+			local receipt = assert(translator.scope_capture(owner))
+			local invoked, result = xpcall(function()
+				assert(translator.scope_apply(owner, receipt, "en"))
+				local renderer = assert(require("menu.renderer").new({platform = "hs",
+					manifest_path = function() return require("infra.paths").shared("modules/menu/menu_manifest.json") end,
+					json_decode = require("json").decode, i18n = translator, logger = require("infra.logger")}))
+				package.loaded["infra.manifest_menu"] = renderer
+				return body(renderer, translator)
+			end, debug.traceback)
+			assert(translator.scope_restore(owner, receipt)); assert(translator.scope_release(owner))
+			assert(translator.scope_forget(owner, receipt))
+			if not invoked then error(result, 0) end
+			return result
+		end)
+	end, debug.traceback)
+	for name in pairs(package.loaded) do if previous[name] == nil then package.loaded[name] = nil end end
+	for name, value in pairs(previous) do package.loaded[name] = value end
+	if not ok then error(detail, 0) end
+	return detail
+end
+
+local function observe_actual_fixed_parent(id, module, context, manifest, translator, expected)
+	local actual_build, completed = manifest.build, nil
+	local section = id == "tap_holds" and "tap_holds_menu" or id .. "_menu"
+	local caption = id == "tap_holds" and "menu.tapholds.title" or "menu." .. id .. ".title"
+	manifest.build = function(key, ...)
+		local rows = actual_build(key, ...)
+		if key == section then completed = rows end
+		return rows
+	end
+	local kind, parent
+	for _, row in ipairs(manifest.get_array("top_level")) do if row.id == id then assert(not parent); parent = row end end
+	assert(parent); kind = parent.type
+	local ok, detail = xpcall(function()
+		local row = assert(module.build(context))
+		helpers.assert_eq(row.label, translator.get(caption)); helpers.assert_nil(row.action)
+		helpers.assert_true(rawequal(row.submenu, completed), "the exact genuine completed child must reach its declared parent")
+		helpers.assert_true(#completed > 0, "a positive factory must build actual child rows")
+		if expected then helpers.assert_eq(row.checked, true) else helpers.assert_nil(row.checked) end
+		if id ~= "tap_holds" then helpers.assert_eq(row.disabled, context.paused or nil) end
+		local before = {}
+		for index, child in ipairs(completed) do before[index] = {title = child.title, fn = child.fn, menu = child.menu, checked = child.checked, disabled = child.disabled} end
+		helpers.assert_eq(#before, #row.submenu)
+		for index, child in ipairs(row.submenu) do
+			helpers.assert_eq(child.title, before[index].title)
+			helpers.assert_true(rawequal(child.fn, before[index].fn)); helpers.assert_true(rawequal(child.menu, before[index].menu))
+			helpers.assert_eq(child.checked, before[index].checked); helpers.assert_eq(child.disabled, before[index].disabled)
+		end
+		parent.type = "command"; completed = nil
+		helpers.assert_nil(module.build(context), "wrong canonical kind keeps its actual dispatch id but refuses native construction")
+		helpers.assert_nil(completed, "the genuine shared child builder must not run after parent admission refusal")
+		parent.type = kind
+		local restored = assert(module.build(context))
+		helpers.assert_eq(restored.label, row.label); helpers.assert_eq(restored.checked, row.checked)
+		helpers.assert_eq(#restored.submenu, #before)
+	end, debug.traceback)
+	parent.type, manifest.build = kind, actual_build
+	if not ok then error(detail, 0) end
+end
+
+helpers.describe("fixed feature parents: actual Mac component owners (fixed-feature-parent-native)", function()
+	for _, paused in ipairs({true, false}) do
+		local posture = paused
+		for _, enabled in ipairs({true, false}) do
+			local preference = enabled
+		helpers.it("retains actual Shortcuts child order, callbacks, check " .. tostring(preference) .. " and pause " .. tostring(posture) .. " (fixed-feature-parent-native)", function()
+			require("tests.support.shortcut_bindings_fixture").with_bindings(function(bindings)
+				fixed_parent_native_cohort(function(renderer, translator)
+					local module = require("ui.menu.menu_shortcuts")
+					local context = {shortcuts = bindings, state = {shortcuts = preference, wrap_symbol_states = {}, custom_wrap_symbols = {}},
+						paused = posture, commands = {}, state_getters = {}, applyTriggerChar = function(value) return value end,
+						save_prefs = function() error("construction must not publish") end,
+						updateMenu = function() error("construction must not redraw") end,
+						notify_feature = function() error("construction must not notify") end}
+					observe_actual_fixed_parent("shortcuts", module, context, renderer, translator, preference)
+				end)
+			end)
+		end)
+		helpers.it("retains actual Gestures child order, callbacks, check " .. tostring(preference) .. " and pause " .. tostring(posture) .. " (fixed-feature-parent-native)", function()
+			require("tests.support.gesture_runtime_fixture").with_fixture({}, function(gestures)
+				fixed_parent_native_cohort(function(renderer, translator)
+					local module = require("ui.menu.menu_gestures")
+					local context = {gestures = gestures, state = {gestures = preference}, paused = posture,
+						save_prefs = function() error("construction must not publish") end,
+						updateMenu = function() error("construction must not redraw") end,
+						notify_feature = function() error("construction must not notify") end}
+					observe_actual_fixed_parent("gestures", module, context, renderer, translator, preference)
+				end)
+			end)
+		end)
+		end
+	end
+	helpers.it("retains actual remap TapHold child order, callbacks and current check (fixed-feature-parent-native)", function()
+		require("tests.support.remap_transaction_fixture")(function(fixture)
+			local remap = fixture.load_enabled_remap()
+			fixed_parent_native_cohort(function(renderer, translator)
+				local module = require("ui.menu.menu_tap_holds")
+				local context = {karabiner = remap, state_getters = {}, updateMenu = function() error("construction must not redraw") end}
+				observe_actual_fixed_parent("tap_holds", module, context, renderer, translator, remap.get_tap_holds_enabled() == true)
+			end)
+		end)
+	end)
+end)
+
+require("test.menu_top_level_separator_contract").register(helpers, "macos")
+
+
+helpers.describe("reasoned toggle presentation", function()
+	helpers.it("reasoned-toggle: disabled state names the reason and removes the command", function()
+		local document = [[{"reasoned_toggle":[{"type":"toggle","id":"power","category":"LLM","i18n":"contract.toggle","checked_when":["on"],"disabled_when":["ready"],"disabled_reason_key":"contract.reason"}]}]]
+		fixture.with_manifest(document, nil, function(Menu, manifest_path)
+			local translated = package.loaded["infra.i18n"]
+			local old_get = translated.get
+			translated.get = function(key)
+				if key == "contract.toggle" then return "AI suggestions" end
+				if key == "contract.reason" then return "Saving is unavailable: Keep this configuration." end
+				return old_get(key)
+			end
+			local ok, failure = xpcall(function()
+				local ready, calls = false, 0
+				local action = function() calls = calls + 1 end
+				local context = { commands = { power = action }, state_getters = {
+					on = function() return true end, ready = function() return ready end,
+				} }
+				local linux = assert(require("menu.renderer").new({ platform = "linux",
+					manifest_path = function() return manifest_path end,
+					json_decode = require("adapters.json_codec").decode, i18n = translated,
+					logger = helpers.make_logger_stub() }))
+				for _, renderer in ipairs({ Menu, linux }) do
+					ready = false
+					local before_calls = calls
+					local disabled = renderer.build("reasoned_toggle", "LLM", nil, nil, context)
+					helpers.assert_eq(#disabled, 1)
+					helpers.assert_eq(disabled[1].title, "AI suggestions — Saving is unavailable")
+					helpers.assert_eq(disabled[1].disabled, true)
+					helpers.assert_eq(disabled[1].checked, true)
+					helpers.assert_nil(disabled[1].fn, "a reasoned disabled switch has no delivery callback")
+					ready = true
+					local enabled = renderer.build("reasoned_toggle", "LLM", nil, nil, context)
+					helpers.assert_eq(enabled[1].title, "AI suggestions")
+					helpers.assert_nil(enabled[1].disabled)
+					helpers.assert_eq(enabled[1].checked, true)
+					helpers.assert_true(rawequal(enabled[1].fn, action))
+					enabled[1].fn()
+					helpers.assert_eq(calls, before_calls + 1)
+				end
+			end, debug.traceback)
+			translated.get = old_get
+			if not ok then error(failure, 0) end
+		end)
+	end)
+end)

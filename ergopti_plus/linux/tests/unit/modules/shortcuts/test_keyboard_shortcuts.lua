@@ -742,3 +742,355 @@ helpers.describe("keyboard shortcuts: ordinary physical magic editor slot", func
 end)
 
 require("test.keyboard_native_publication_contract").register(helpers, "linux")
+
+
+helpers.describe("keyboard shortcuts: late contextual delivery custody", function()
+	local function with_editor(initial, body, writes_fail)
+		local saved_source = package.loaded["modules.hotstrings.magic_key_source"]
+		local saved_magic = package.loaded["modules.hotstrings.magic_key"]
+		local saved_builder = package.loaded["ui.menu.menu_builder"]
+		local gestures = require("modules.gestures.manager")
+		local saved_execute = gestures.execute_action
+		local state = { trigger = "★", generation = 1, master = true, paused = false, inhibited = false,
+			rows = { { code = "KeyJ", native_code = 36, identity = "evdev:36", text = "★", native_text = "j", direct = true, dead = false } },
+			queue = {}, fired = {} }
+		package.loaded["modules.hotstrings.magic_key_source"] = {
+			editor_source = function() return { generation = state.generation, status = "ready", candidates = state.rows } end,
+			known_codes = function() return { KeyJ = true, KeyC = true, Quote = true, Semicolon = true } end,
+		}
+		package.loaded["modules.hotstrings.magic_key"] = { get = function() return state.trigger end, is_customised = function() return false end }
+		gestures.execute_action = function(action, binding) state.fired[#state.fired + 1] = { action, binding } return true end
+		local ok, err = pcall(function()
+			local shortcuts, config = load_over_config(initial, writes_fail)
+			state.options = {
+				defer = function(callback) state.queue[#state.queue + 1] = callback return true end,
+				admission = function() return { master = state.master, paused = state.paused, inhibited = state.inhibited } end,
+			}
+			state.detail = { key = "j", code = 36, physical = true, mods = { meta = true } }
+			body(shortcuts, config, state)
+		end)
+		gestures.execute_action = saved_execute
+		package.loaded["modules.hotstrings.magic_key_source"] = saved_source
+		package.loaded["modules.hotstrings.magic_key"] = saved_magic
+		package.loaded["ui.menu.menu_builder"] = saved_builder
+		drop_config()
+		if not ok then error(err, 0) end
+	end
+
+	local function with_actual_logger(body)
+		local saved_core, saved_shim = package.loaded["logger"], package.loaded["logger.shim"]
+		package.loaded["logger"], package.loaded["logger.shim"] = nil, nil
+		local logger = require("logger.shim")
+		local ok, err = pcall(function()
+			logger.set_level("debug")
+			body(logger)
+		end)
+		logger.set_sink(nil)
+		package.loaded["logger"], package.loaded["logger.shim"] = saved_core, saved_shim
+		if not ok then error(err, 0) end
+	end
+
+	helpers.it("(contextual-late-custody) preserves actual logger callback and unchanged editor action", function()
+		with_actual_logger(function(logger)
+			with_editor(nil, function(shortcuts, _, state)
+				local observed = 0
+				logger.set_sink(function(line)
+					if line:find("Keyboard shortcut fired:", 1, true) then observed = observed + 1 end
+				end)
+				helpers.assert_true(shortcuts.consume(state.detail, state.options))
+				state.queue[1]()
+				helpers.assert_eq(observed, 1, "The real configured logger sink must run before the executor")
+				helpers.assert_eq(state.fired, { { "open_hotstrings_editor", "keyboard__magic_editor" } })
+			end)
+		end)
+	end)
+
+	for _, gate in ipairs({ "master", "paused", "inhibited", "source", "rebind", "owner" }) do
+		helpers.it("(contextual-late-custody) refuses original queued action after logger changes " .. gate, function()
+			with_actual_logger(function(logger)
+				with_editor(nil, function(shortcuts, _, state)
+					local observed = 0
+					logger.set_sink(function(line)
+						if not line:find("Keyboard shortcut fired:", 1, true) then return end
+						observed = observed + 1
+						if gate == "master" then state.master = false
+						elseif gate == "paused" then state.paused = true
+						elseif gate == "inhibited" then state.inhibited = true
+						elseif gate == "source" then state.generation = state.generation + 1
+						elseif gate == "rebind" then helpers.assert_true(shortcuts.set_action("magic_editor", "enter"))
+						else
+							local token = {}
+							helpers.assert_true(shortcuts.acquire_configuration(token))
+							helpers.assert_true(shortcuts.release_configuration(token))
+						end
+					end)
+					helpers.assert_true(shortcuts.consume(state.detail, state.options))
+					helpers.assert_eq(state.fired, {}, "The original physical-source decision has not executed inside capture")
+					state.queue[1]()
+					helpers.assert_eq(observed, 1, "Cancellation must observe the real logger callback, not remove logging")
+					helpers.assert_eq(state.fired, {}, "An action captured before a changed live owner must not escape after logging")
+				end)
+			end)
+		end)
+	end
+
+	for _, gate in ipairs({ "master", "paused", "inhibited" }) do
+		helpers.it("(contextual-late-custody) rereads live " .. gate .. " after source callback reentry", function()
+			with_actual_logger(function(logger)
+				with_editor(nil, function(shortcuts, _, state)
+					local source = require("modules.hotstrings.magic_key_source")
+					local original = source.editor_source
+					local armed, observed = false, 0
+					logger.set_sink(function(line)
+						if line:find("Keyboard shortcut fired:", 1, true) then armed = true end
+					end)
+					source.editor_source = function()
+						local facts = original()
+						if armed then
+							armed, observed = false, observed + 1
+							if gate == "master" then state.master = false
+							elseif gate == "paused" then state.paused = true
+							else state.inhibited = true end
+						end
+						return facts
+					end
+					helpers.assert_true(shortcuts.consume(state.detail, state.options))
+					state.queue[1]()
+					helpers.assert_eq(observed, 1, "The same source getter callback runs after the logger boundary")
+					helpers.assert_eq(state.generation, 1, "Changing admission alone does not change the native layout epoch")
+					helpers.assert_eq(state.fired, {}, "The earlier admission snapshot cannot survive a live source callback")
+				end)
+			end)
+		end)
+	end
+
+	for _, boundary in ipairs({ "admission", "source", "final admission" }) do
+		helpers.it("(contextual-late-custody) closes configuration owner reentry in late " .. boundary, function()
+			with_actual_logger(function(logger)
+				with_editor(nil, function(shortcuts, _, state)
+					local source = require("modules.hotstrings.magic_key_source")
+					local original_admission, original_source = state.options.admission, source.editor_source
+					local armed, observed, reads = false, 0, 0
+					logger.set_sink(function(line)
+						if line:find("Keyboard shortcut fired:", 1, true) then armed = true end
+					end)
+					local function retire()
+						observed, armed = observed + 1, false
+						local token = {}
+						helpers.assert_true(shortcuts.acquire_configuration(token))
+						helpers.assert_true(shortcuts.release_configuration(token))
+					end
+					state.options.admission = function()
+						local facts = original_admission()
+						if armed then
+							reads = reads + 1
+							if boundary == "admission" or (boundary == "final admission" and reads == 2) then retire() end
+						end
+						return facts
+					end
+					source.editor_source = function()
+						local facts = original_source()
+						if armed and boundary == "source" then retire() end
+						return facts
+					end
+					helpers.assert_true(shortcuts.consume(state.detail, state.options))
+					state.queue[1]()
+					helpers.assert_eq(observed, 1, "The real original getter phase must observe one owner transition")
+					helpers.assert_eq(state.fired, {}, "Closing and releasing ownership does not revive the queued decision")
+				end)
+			end)
+		end)
+	end
+
+	helpers.it("(contextual-late-custody) refuses failed source callback after logging without invoking executor", function()
+		with_actual_logger(function(logger)
+			with_editor(nil, function(shortcuts, _, state)
+				local source = require("modules.hotstrings.magic_key_source")
+				local original = source.editor_source
+				local armed, observed = false, 0
+				logger.set_sink(function(line)
+					if line:find("Keyboard shortcut fired:", 1, true) then armed = true end
+				end)
+				source.editor_source = function()
+					if armed then observed = observed + 1; error("original selected-source callback unavailable") end
+					return original()
+				end
+				helpers.assert_true(shortcuts.consume(state.detail, state.options))
+				local completed, observed_failures, executed_actions = pcall(function()
+					state.queue[1]()
+					return observed, #state.fired
+				end)
+				helpers.assert_true(completed, "Unavailable source must close delivery rather than escape")
+				helpers.assert_eq(observed_failures, 1, "The protected result must observe the actual failed source callback")
+				helpers.assert_eq(executed_actions, 0, "The protected result must observe no executor call")
+				helpers.assert_eq(observed, 1)
+				helpers.assert_eq(state.fired, {})
+			end)
+		end)
+	end)
+
+	helpers.it("(contextual-late-custody) refuses source read after original admission retires configuration owner", function()
+		with_actual_logger(function(logger)
+			with_editor(nil, function(shortcuts, _, state)
+				local source = require("modules.hotstrings.magic_key_source")
+				local admission, original = state.options.admission, source.editor_source
+				local armed, retired, observed, source_after_loss = false, false, 0, 0
+				logger.set_sink(function(line)
+					if line:find("Keyboard shortcut fired:", 1, true) then armed = true end
+				end)
+				state.options.admission = function()
+					local facts = admission()
+					if armed then
+						armed, retired, observed = false, true, observed + 1
+						local token = {}
+						helpers.assert_true(shortcuts.acquire_configuration(token))
+						helpers.assert_true(shortcuts.release_configuration(token))
+					end
+					return facts
+				end
+				source.editor_source = function()
+					if retired then source_after_loss = source_after_loss + 1 end
+					return original()
+				end
+				helpers.assert_true(shortcuts.consume(state.detail, state.options))
+				state.queue[1]()
+				helpers.assert_eq(observed, 1)
+				helpers.assert_eq(source_after_loss, 0, "Known lost dispatch ownership closes before another source query")
+				helpers.assert_eq(state.fired, {})
+			end)
+		end)
+	end)
+
+	for _, owner in ipairs({ "admission", "decision" }) do
+		helpers.it("(contextual-late-custody) refuses a replacement " .. owner .. " owner after logger without invoking it", function()
+			with_actual_logger(function(logger)
+				with_editor(nil, function(shortcuts, _, state)
+					local original = shortcuts.magic_editor_decision
+					local captured = original(state.options.admission())
+					local foreign_calls, observed = 0, 0
+					logger.set_sink(function(line)
+						if not line:find("Keyboard shortcut fired:", 1, true) then return end
+						observed = observed + 1
+						if owner == "admission" then
+							state.options.admission = function()
+								foreign_calls = foreign_calls + 1
+								return { master = true, paused = false, inhibited = false }
+							end
+						else
+							shortcuts.magic_editor_decision = function()
+								foreign_calls = foreign_calls + 1
+								return captured
+							end
+						end
+					end)
+					local ok, err = pcall(function()
+						helpers.assert_true(shortcuts.consume(state.detail, state.options))
+						state.queue[1]()
+						helpers.assert_eq(observed, 1)
+						helpers.assert_eq(foreign_calls, 0, "Replacement functions cannot issue the original queued decision")
+						helpers.assert_eq(state.fired, {})
+					end)
+					shortcuts.magic_editor_decision = original
+					if not ok then error(err, 0) end
+				end)
+			end)
+		end)
+	end
+
+	helpers.it("(contextual-late-custody) refuses admission issuer replacement during original getter before source callback", function()
+		with_actual_logger(function(logger)
+			with_editor(nil, function(shortcuts, _, state)
+				local source = require("modules.hotstrings.magic_key_source")
+				local admission, original = state.options.admission, source.editor_source
+				local armed, replaced, observed, source_after_loss, foreign_calls = false, false, 0, 0, 0
+				logger.set_sink(function(line)
+					if line:find("Keyboard shortcut fired:", 1, true) then armed = true end
+				end)
+				state.options.admission = function()
+					local facts = admission()
+					if armed then
+						armed, replaced, observed = false, true, observed + 1
+						state.options.admission = function()
+							foreign_calls = foreign_calls + 1
+							return { master = true, paused = false, inhibited = false }
+						end
+					end
+					return facts
+				end
+				source.editor_source = function()
+					if replaced then source_after_loss = source_after_loss + 1 end
+					return original()
+				end
+				helpers.assert_true(shortcuts.consume(state.detail, state.options))
+				state.queue[1]()
+				helpers.assert_eq(observed, 1)
+				helpers.assert_eq(source_after_loss, 0)
+				helpers.assert_eq(foreign_calls, 0)
+				helpers.assert_eq(state.fired, {})
+			end)
+		end)
+	end)
+
+	helpers.it("(contextual-late-custody) refuses final admission read after source retires dispatch owner", function()
+		with_actual_logger(function(logger)
+			with_editor(nil, function(shortcuts, _, state)
+				local source = require("modules.hotstrings.magic_key_source")
+				local admission, original = state.options.admission, source.editor_source
+				local armed, retired, observed, admission_after_loss = false, false, 0, 0
+				logger.set_sink(function(line)
+					if line:find("Keyboard shortcut fired:", 1, true) then armed = true end
+				end)
+				state.options.admission = function()
+					if retired then admission_after_loss = admission_after_loss + 1 end
+					return admission()
+				end
+				source.editor_source = function()
+					local facts = original()
+					if armed then
+						armed, retired, observed = false, true, observed + 1
+						local token = {}
+						helpers.assert_true(shortcuts.acquire_configuration(token))
+						helpers.assert_true(shortcuts.release_configuration(token))
+					end
+					return facts
+				end
+				helpers.assert_true(shortcuts.consume(state.detail, state.options))
+				state.queue[1]()
+				helpers.assert_eq(observed, 1)
+				helpers.assert_eq(admission_after_loss, 0, "A known retired source decision closes before querying another owner")
+				helpers.assert_eq(state.fired, {})
+			end)
+		end)
+	end)
+
+	helpers.it("(contextual-late-custody) closes issuer replacement inside final original admission read", function()
+		with_actual_logger(function(logger)
+			with_editor(nil, function(shortcuts, _, state)
+				local admission = state.options.admission
+				local armed, reads, observed, foreign_calls = false, 0, 0, 0
+				logger.set_sink(function(line)
+					if line:find("Keyboard shortcut fired:", 1, true) then armed = true end
+				end)
+				state.options.admission = function()
+					local facts = admission()
+					if armed then
+						reads = reads + 1
+						if reads == 2 then
+							observed, armed = observed + 1, false
+							state.options.admission = function()
+								foreign_calls = foreign_calls + 1
+								return facts
+							end
+						end
+					end
+					return facts
+				end
+				helpers.assert_true(shortcuts.consume(state.detail, state.options))
+				state.queue[1]()
+				helpers.assert_eq(observed, 1)
+				helpers.assert_eq(foreign_calls, 0)
+				helpers.assert_eq(state.fired, {}, "Last callback owner loss cannot be hidden by its returned old gate snapshot")
+			end)
+		end)
+	end)
+end)

@@ -87,6 +87,7 @@ helpers.describe("logger: native asynchronous sink ownership", function()
 				package.loaded["hs"] = hs_stub
 
 				local Logger = require("infra.logger")
+				helpers.admit_logger_privacy(Logger)
 				Logger.set_level("DEBUG")
 				Logger.init_log_path("/tmp/ergopti_async_logger_close_refusal/", 14)
 				io.open = function()
@@ -355,5 +356,89 @@ helpers.describe("logger: native asynchronous sink ownership", function()
 			helpers.assert_nil(fixture.Logger.async_sink_status().pending_failure)
 			helpers.assert_true(fixture.Logger.stop_async_sink())
 		end)
+	end)
+end)
+
+
+helpers.describe("logger asynchronous privacy", function()
+	helpers.it("mac-logger-privacy: queue bytes are redacted before owned native ACK", function()
+		local saved_open = io.open
+		local ok, err = xpcall(function()
+			io.open = function()
+				return { write = function() return true end, flush = function() return true end,
+					close = function() return true end, read = function() return "" end }
+			end
+			Fixture.with_fixture(function(fixture)
+				fixture.Logger.error("privacy", "PrivateUser /Users/PrivateUser/cache; password=secret12345")
+				helpers.assert_eq(#fixture.sent, 0, "Emission must not perform native transport IO")
+				local record = fixture.deliver_next()
+				helpers.assert_contains(record.line, "[ERROR] [privacy] <user> ~/cache; password=<secret>")
+				helpers.assert_true(not record.line:find("secret12345", 1, true))
+			end)
+		end, debug.traceback)
+		io.open = saved_open
+		if not ok then error(err, 0) end
+	end)
+end)
+
+
+helpers.describe("logger privacy refusal", function()
+	helpers.it("mac-logger-privacy: failed pump preparation retains ownership without publishing raw bytes", function()
+		local saved_open = io.open
+		local ok, err = xpcall(function()
+			io.open = function() return { write = function() return true end, flush = function() return true end,
+				close = function() return true end, read = function() return "" end } end
+			Fixture.with_fixture(function(fixture)
+				fixture.Logger.redact_message = function() error("PRIVATE_PREPARATION_EXCEPTION") end
+				fixture.Logger.error("privacy", "PrivateUser /Users/PrivateUser/cache")
+				fixture.pump()
+				helpers.assert_eq(#fixture.sent, 0)
+				local state = fixture.Logger.async_sink_status()
+				helpers.assert_eq(state.queued, 1, "Refusal is not a native ACK")
+				helpers.assert_eq(state.active, true, "Existing cleanup owner stays retained")
+				helpers.assert_contains(state.last_error, "privacy preparation refused")
+				helpers.assert_true(not state.last_error:find("PRIVATE_PREPARATION_EXCEPTION", 1, true))
+			end)
+		end, debug.traceback)
+		io.open = saved_open
+		if not ok then error(err, 0) end
+	end)
+end)
+
+
+helpers.describe("logger privacy preparation budget", function()
+	helpers.it("mac-logger-privacy: second full-sized record waits for a fresh timer budget", function()
+		local saved_open = io.open
+		local ok, err = xpcall(function()
+			io.open = function() return { write = function() return true end, flush = function() return true end,
+				close = function() return true end, read = function() return "" end } end
+			Fixture.with_fixture(function(fixture)
+				local Logger = fixture.Logger
+				Logger.timestamp_fn = function() return "2026-10-10 12:00:00:000" end
+				local raw_sizes, prepared_sizes = {}, {}
+				Logger.set_sink(function(line) raw_sizes[#raw_sizes + 1] = #line end)
+				local redact = Logger.redact_message
+				Logger.redact_message = function(body)
+					prepared_sizes[#prepared_sizes + 1] = #body
+					return redact(body)
+				end
+				local prefix = "2026-10-10 12:00:00:000 [ERROR] [privacy] "
+				local ceiling = Logger.async_sink_status().max_record_bytes
+				Logger.error("privacy", string.rep("x", 20 * 1024))
+				Logger.error("privacy", string.rep("y", ceiling - #prefix))
+				helpers.assert_eq(raw_sizes, { 20 * 1024 + #prefix, ceiling })
+				fixture.pump()
+				helpers.assert_eq(prepared_sizes, { 20 * 1024 }, "The next whole record must not scan past this tick's remaining budget")
+				helpers.assert_eq(Logger.async_sink_status().queued, 2, "No record is retired before its actual ACK")
+				local batch = fixture.hs.json.decode(fixture.sent[#fixture.sent])
+				helpers.assert_not_nil(batch.records[#batch.records], "The ready head still publishes before the deferred tail")
+				fixture.receive(fixture.hs.json.encode({ v = 1, kind = "ack", token = batch.token,
+					session = batch.session, ack = batch.records[#batch.records].sequence }))
+				fixture.pump()
+				helpers.assert_eq(prepared_sizes, { 20 * 1024, ceiling - #prefix }, "The retained second record resumes exactly once under a fresh budget")
+			end, { max_batch_records = 64 })
+		end, debug.traceback)
+		io.open = saved_open
+		if not ok then error(err, 0) end
 	end)
 end)

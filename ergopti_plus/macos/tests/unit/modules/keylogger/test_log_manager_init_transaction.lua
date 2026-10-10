@@ -54,6 +54,10 @@ helpers.describe("log_manager — initialization transaction", function()
 
 		local ok, err = xpcall(function()
 			local logger = helpers.make_logger_stub()
+			local success_messages = {}
+			logger.success = function(_, message, ...)
+				success_messages[#success_messages + 1] = string.format(message, ...)
+			end
 			package.loaded["infra.logger"] = logger
 			package.loaded["adapters.file_system"] = {
 				read_with_status = function()
@@ -195,6 +199,16 @@ helpers.describe("log_manager — initialization transaction", function()
 
 			helpers.assert_eq(true, lm.init(state),
 				"a later call must retry and commit the complete initialization")
+			local initialized_message = false
+			for _, message in ipairs(success_messages) do
+				if message == "Log manager initialized." then initialized_message = true end
+				helpers.assert_true(not message:find("device-s", 1, true),
+					"daily logs must not publish even a device identity prefix")
+				helpers.assert_true(not message:find("Test Mac", 1, true),
+					"daily logs must not publish the personal computer name")
+			end
+			helpers.assert_true(initialized_message,
+				"initialization must retain its observable success event after identity removal")
 			helpers.assert_eq(2, timer_stop_calls,
 				"retry must settle the exact timer whose first stop was refused")
 			helpers.assert_eq(2, sqlite_init_calls,

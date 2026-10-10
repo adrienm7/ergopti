@@ -89,6 +89,7 @@ helpers.describe("menu_shortcuts: extension sandbox uses the Lua 5.4 load contra
 					logger = package.loaded["infra.logger"],
 				}))
 				package.loaded["infra.manifest_menu"] = {
+					group_receiver = extension_renderer.group_receiver,
 					template_rows = extension_renderer.template_rows,
 					build = function(_, _, _, _, _, providers)
 						return providers.extensions_shortcuts()
@@ -240,6 +241,7 @@ local function with_extension_boundary(callback)
 			local raw = file:read("*a"); file:close()
 			local expected = assert(require("adapters.json_codec").decode(raw))
 			package.loaded["infra.manifest_menu"] = {
+				group_receiver = renderer.group_receiver,
 				template_rows = renderer.template_rows,
 				build = function(_, _, _, _, _, providers) return providers.extensions_shortcuts() end,
 			}

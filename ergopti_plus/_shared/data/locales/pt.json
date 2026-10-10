@@ -1016,6 +1016,7 @@
 	"menu.apps.encrypt_desc": "Criptografar arquivos e pastas",
 	"menu.apps.no_apps": "Nenhum aplicativo encontrado",
 	"menu.apps.title": "🛠️ Aplicativos",
+	"menu.builder.active_brand": "Ergopti",
 	"menu.builder.title": "Ergopti+",
 	"menu.builder.title_paused": "Ergopti+ ⏸",
 	"menu.debug.console": "Console",
@@ -1131,6 +1132,7 @@
 	"menu.global.clean_unused_keys": "Limpar config.toml",
 	"menu.global.starting": "A iniciar…",
 	"menu.global.setup_wizard": "Assistente de configuração…",
+	"menu.global.startup_bootstrap": "ErgoptiPlus — A iniciar…",
 	"menu.global.suspend": "⏸︎ Suspender",
 	"menu.configuration.title": "Configuração",
 	"menu.hotstrings.add_custom": "+ Adicionar um expansor personalizado…",
@@ -3282,5 +3284,8 @@
 	"healthcheck.problem.diagnostic_check": "Falha na verificação de diagnóstico: %s.",
 	"healthcheck.export.privacy_notice": "Este relatório partilha apenas dados técnicos permitidos. Registos, texto livre, caminhos e dados identificativos são excluídos mesmo com os detalhes ativados. Os testes locais da página não estão incluídos.",
 	"sg_actions.llm_translate_context": "🌐 Traduzir a frase atual [configurável]",
-	"menu.about.startup_other_command_reason": "Outro comando de arranque: O arranque está configurado para outro comando ou instalação. A configuração existente é mantida."
+	"menu.about.startup_other_command_reason": "Outro comando de arranque: O arranque está configurado para outro comando ou instalação. A configuração existente é mantida.",
+	"menu.llm.model_parent_with_health": "%sModelo selecionado: %s",
+	"config.read_only.newer_schema": "Esta configuração foi guardada por uma versão mais recente do ErgoptiPlus. As suas definições foram preservadas. Atualize o ErgoptiPlus e recarregue-o antes de alterar as definições.",
+	"menu.llm.save_unavailable": "Indisponível: retome o ErgoptiPlus se estiver em pausa ou abra o Diagnóstico para verificar por que não é possível guardar as definições."
 }

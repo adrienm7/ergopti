@@ -55,30 +55,52 @@ _AppendPersonalShortcutsSubmenuIfAny(ShortcutsMenu) {
 ; one-shot SetTimer from ErgoptiPlus.ahk; the live-rebuild path populates inline.
 ; Wrapped in try so a transient failure can never crash the timer thread.
 BuildLanguageMenuDeferred() {
-	global A_TrayMenu, _LangMenuRef, _LangMenuBuildPending
+	global A_TrayMenu, _LangMenuRef, _LangMenuBuildPending, _I18nLocale
+	static ReplacementOwner := MenuRenderer_GroupReplacement, BuilderOwner := I18nBuildLanguageMenu
+	OwnersLive() {
+		return ReplacementOwner == MenuRenderer_GroupReplacement && BuilderOwner == I18nBuildLanguageMenu
+			&& !Object.Prototype.HasOwnProp.Call(ReplacementOwner, "Call")
+			&& !Object.Prototype.HasOwnProp.Call(BuilderOwner, "Call")
+	}
 	try {
-		; The placeholder submenu is disabled until this detached tree is ready.
-		; Filling the published Menu in place left a brief but real empty-menu
-		; click window during boot and language refreshes.
+		if !OwnersLive() || !_LangMenuBuildPending
+			return false
+		Destination := A_TrayMenu, PreviousChild := _LangMenuRef, Locale := _I18nLocale
+		Publish := ReplacementOwner.Call(Destination, "top_level", "language", PreviousChild)
+		if !OwnersLive() || !HasMethod(Publish, "Call") || Object.Prototype.HasOwnProp.Call(Publish, "Call")
+			throw Error("Declared deferred language parent was refused.")
+		; Capture the current parent before the actual locale builder can yield.
 		StagedMenu := Menu()
-		I18nBuildLanguageMenu(StagedMenu)
+		BuilderOwner.Call(StagedMenu)
 		_PublishCritical := Critical("On")
 		try {
-			A_TrayMenu.Add(t("menu.global.language"), StagedMenu)
-			A_TrayMenu.Enable(t("menu.global.language"))
+			if !OwnersLive() || A_TrayMenu != Destination || _LangMenuRef != PreviousChild
+				|| !_LangMenuBuildPending || _I18nLocale != Locale || Object.Prototype.HasOwnProp.Call(Publish, "Call")
+				|| !Publish.Call(StagedMenu)
+				throw Error("Declared deferred language parent was withdrawn.")
 			_LangMenuRef := StagedMenu
 			_LangMenuBuildPending := false
 		} finally {
 			Critical(_PublishCritical)
 		}
+		return true
 	} catch as e {
 		try LoggerError("TrayMenu", "Deferred language-menu build failed: {1}", e.Message)
+		return false
 	}
 }
 
 
-initMenu(PublishAuthorizeFn := 0, GlobalsOnly := false) {
-	global _TrayTitleCache, _FmtCountCache, _I18nSortedLocalesCache
+initMenu(PublishAuthorizeFn := 0, GlobalsOnly := false, PrebuiltLlm := unset) {
+	global _TrayTitleCache, _FmtCountCache, _I18nSortedLocalesCache, _LLM_Menu_Handle
+	Builders := _MI_TopLevelBuilders()
+	if IsSet(PrebuiltLlm) {
+		if GlobalsOnly || !(PrebuiltLlm is Menu) || _LLM_Menu_Handle != PrebuiltLlm
+			throw Error("The caller-owned AI submenu cannot enter this root projection.")
+		; This invocation owns the detached child; default boot/root builders
+		; retain their original initialization and construction path.
+		Builders["llm"] := _MI_StagePrebuiltLlm.Bind(PrebuiltLlm)
+	}
 	TrayMenuStage_Begin()
 	try {
 	_TrayTitleCache := Map()
@@ -95,10 +117,10 @@ initMenu(PublishAuthorizeFn := 0, GlobalsOnly := false) {
 	; of a tail read from the manifest — so the declared order reached half of
 	; the tray, and a reordered top level changed the other two drivers alone.
 	if GlobalsOnly {
-		_MI_StageTopLevel(MenuManifest_LoadTopLevel(), _MI_TopLevelBuilders(),
+		_MI_StageTopLevel(MenuManifest_LoadTopLevel(), Builders,
 			(Entry) => !Entry.Get("greyed_when_paused", false))
 	} else
-		_MI_StageTopLevel(MenuManifest_LoadTopLevel(), _MI_TopLevelBuilders())
+		_MI_StageTopLevel(MenuManifest_LoadTopLevel(), Builders)
 	BootProfile_Mark("MENU/initMenu: top level staged")
 	Published := TrayMenuStage_Publish(PublishAuthorizeFn)
 	return Published
@@ -142,14 +164,8 @@ _MI_TopLevelBuilders() {
 ; @param TopLevel {Array} The manifest's top_level rows.
 ; @param Builders {Map} Id → builder that stages the row.
 ; @param IncludeFn {Func} Optional projection filter for manifest rows.
-; @param StatusLabel {String} Optional inert status for a partial boot projection.
 ; @returns {Integer} How many rows were dispatched.
-_MI_StageTopLevel(TopLevel, Builders, IncludeFn := 0, StatusLabel := "") {
-	if (StatusLabel != "") {
-		TrayMenuStage_Add(StatusLabel, _TrayBootstrapNoOp)
-		TrayMenuStage_Disable(StatusLabel)
-		TrayMenuStage_Add()
-	}
+_MI_StageTopLevel(TopLevel, Builders, IncludeFn := 0) {
 	Dispatched := 0
 	SeparatorPending := false
 	for _, Entry in TopLevel {
@@ -194,6 +210,9 @@ _MI_StageTopLevel(TopLevel, Builders, IncludeFn := 0, StatusLabel := "") {
 ; entries and return one row per feature, which the renderer materialises.
 ; ``active_layouts`` is macOS-only and skipped by the AHK platform filter.
 _MI_StageLayout() {
+	Receiver := MenuRenderer_GroupReceiver("top_level", "keyboard_layout")
+	if !Receiver
+		throw Error("The declared keyboard_layout feature parent was refused before native construction.")
 	LayoutListProviders := Map(
 		"number_row_policy",      (*) => _LAY_NumberRowRows(),
 		"custom_layouts",         (*) => _LAY_CustomLayoutRows(),
@@ -206,11 +225,7 @@ _MI_StageLayout() {
 	LayoutMenu  := MenuRenderer_Build("layout_menu", "Layout", "", "", LayoutListProviders,
 		_LAY_ScopeCommands(),
 		Map("layout_enabled", () => IsCategoryGated("Layout")))
-	LayoutMenuTitle := t("menu.layout.title")
-	TrayMenuStage_AddFeature(LayoutMenuTitle, LayoutMenu)
-	if IsCategoryGated("Layout") {
-		TrayMenuStage_Check(LayoutMenuTitle)
-	}
+	_MI_StageDeclaredFeature(Receiver, LayoutMenu, Map("layout_enabled", () => IsCategoryGated("Layout")), true)
 	BootProfile_Mark("MENU/initMenu: layout built+added")
 }
 
@@ -220,6 +235,9 @@ _MI_StageLayout() {
 ; personal tree, extensions). The switch is the manifest's hotstrings_toggle
 ; row: the Hotstrings master gate, which leaves every category as it is.
 _MI_StageHotstrings() {
+	Receiver := MenuRenderer_GroupReceiver("top_level", "hotstrings")
+	if !Receiver
+		throw Error("The declared hotstrings feature parent was refused before native construction.")
 	HotstringsAllEnabled := IsCategoryGated("Hotstrings")
 
 	; Empty since 2026-08-07: every row of the hotstrings tree is declarative or a
@@ -281,11 +299,9 @@ _MI_StageHotstrings() {
 	HotstringsMenu := MenuRenderer_Build("hotstrings_menu", "Hotstrings", _HotDynHandlers, _HotGroupBuilders, _HotListProviders, _HotCommands, _HotGetters)
 	BootProfile_Mark("MENU/initMenu: hotstrings menu rendered")
 
-	HotstringsMenuTitle := t("menu.hotstrings.title") . " (" . FmtCount(_HS_ComputeGrandTotal()) . ")"
-	TrayMenuStage_AddFeature(HotstringsMenuTitle, HotstringsMenu)
-	if HotstringsAllEnabled {
-		TrayMenuStage_Check(HotstringsMenuTitle)
-	}
+	HotstringsTotal := _HS_ComputeGrandTotal()
+	_MI_StageDeclaredFeature(Receiver, HotstringsMenu, Map("hotstrings_enabled", () => HotstringsAllEnabled,
+		"hotstrings_parent_total", () => HotstringsTotal, "hotstrings_parent_count_present", () => true), true)
 	BootProfile_Mark("MENU/initMenu: hotstrings grandtotal+added")
 }
 
@@ -304,6 +320,18 @@ _MI_StageLlm() {
 	BootProfile_Mark("MENU/initMenu: LLM tray init")
 }
 
+
+
+/** Attaches only the exact detached child already constructed by this caller. */
+_MI_StagePrebuiltLlm(Submenu) {
+	global _LLM_Menu_Handle, _LLM_Menu
+	if !(Submenu is Menu) || _LLM_Menu_Handle != Submenu || !(_LLM_Menu is Map)
+		throw Error("The caller-owned AI submenu was withdrawn before root staging.")
+	TrayMenuStage_AddFeature(t("menu.llm.title"), Submenu)
+	if _LLM_Menu["enabled"]
+		TrayMenuStage_Check(t("menu.llm.title"))
+	BootProfile_Mark("MENU/initMenu: caller-owned LLM tray projection")
+}
 
 ; ── 🤖 AI agent — its own top-level submenu (ui/menu/menu_llm/menu_agent.ahk),
 ; ticked while the agent is not off.
@@ -336,39 +364,59 @@ _MI_StageMetrics() {
 ; unbounded, because _Updater_RebuildMenu calls initMenu() ALONE — the
 ; submenu is never rebuilt, and Menu.Insert appends rather than merging.
 _MI_StageShortcuts() {
+	Receiver := MenuRenderer_GroupReceiver("top_level", "shortcuts")
+	if !Receiver
+		throw Error("The declared shortcuts feature parent was refused before native construction.")
 	global SubMenus
 	if !SubMenus.Has("Shortcuts") {
 		try LoggerError("Menu", "The Shortcuts submenu was not built — its tray row is missing.")
 		return
 	}
-	TrayMenuStage_AddFeature(GetCategoryTitle("Shortcuts"), SubMenus["Shortcuts"])
-	if IsCategoryGated("Shortcuts") {
-		TrayMenuStage_Check(GetCategoryTitle("Shortcuts"))
-	}
+	_MI_StageDeclaredFeature(Receiver, SubMenus["Shortcuts"], Map("shortcuts_enabled", () => IsCategoryGated("Shortcuts")))
 }
 
 
 _MI_StageTapHolds() {
+	Receiver := MenuRenderer_GroupReceiver("top_level", "tap_holds")
+	if !Receiver
+		throw Error("The declared tap_holds feature parent was refused before native construction.")
 	global SubMenus
 	if !SubMenus.Has("TapHolds") {
 		try LoggerError("Menu", "The Tap-Holds submenu was not built — its tray row is missing.")
 		return
 	}
-	TrayMenuStage_AddFeature(GetCategoryTitle("TapHolds"), SubMenus["TapHolds"])
-	if IsCategoryGated("TapHolds") {
-		TrayMenuStage_Check(GetCategoryTitle("TapHolds"))
-	}
+	_MI_StageDeclaredFeature(Receiver, SubMenus["TapHolds"], Map("tapholds_enabled", () => IsCategoryGated("TapHolds")))
 }
 
 
 _MI_StageGestures() {
+	Receiver := MenuRenderer_GroupReceiver("top_level", "gestures")
+	if !Receiver
+		throw Error("The declared gestures feature parent was refused before native construction.")
 	GesturesMenu := BuildGesturesMenu()
-	TrayMenuStage_AddFeature(GetCategoryTitle("Gestures"), GesturesMenu)
-	if Features["gestures"]["enabled"] {
-		TrayMenuStage_Check(GetCategoryTitle("Gestures"))
-	}
+	_MI_StageDeclaredFeature(Receiver, GesturesMenu, Map("gestures_enabled", () => Features["gestures"]["enabled"]), true)
 }
 
+
+; Publication consumes only the declared parent and its captured genuine native child.
+_MI_StageDeclaredFeature(Receiver, Child, Getters, DisposeOnRefusal := false) {
+	Published := false
+	try {
+		Row := Receiver.Call(Child, Getters)
+		if !(Row is Map) || Row.Get("submenu", false) != Child
+			throw Error("The canonical feature parent changed during native construction.")
+		TrayMenuStage_AddFeature(Row["label"], Child)
+		Published := true
+		if Row.Get("checked", false)
+			TrayMenuStage_Check(Row["label"])
+		return true
+	} finally {
+		if DisposeOnRefusal && !Published {
+			try Child.Delete()
+			finally MenuDispatcher_PruneMenu(Child)
+		}
+	}
+}
 
 _MI_StageConfiguration() {
 	TrayMenuStage_Add(t("menu.configuration.title"), _MI_BuildConfigurationMenu())

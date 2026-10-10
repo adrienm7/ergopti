@@ -311,7 +311,7 @@ _HS_CommitDelayOverride(Cat, Value, SetterFn := 0, RebuildFn := 0) {
 ; row API; the manifest declares it `type = "list"` now and each one answers with
 ; the same {label, action, checked, items} shape.
 _HS_WordExpanderRows(Commands := unset) {
-	global HSE_Terminators
+	global HSE_Terminators, _HotstringsTerminatorRecords
 	Current      := HotstringsGetWordDelimiters()
 	Consumed     := HotstringsGetConsumedDelimiters()
 	Defs         := HSE_Terminators.all()
@@ -347,9 +347,24 @@ _HS_WordExpanderRows(Commands := unset) {
 
 	; ── Custom delimiters: chars in the active string that no catalogue entry
 	;    owns. Structural CR/LF belong to the "enter" entry. ──
+	RecordChars := ""
+	if _HotstringsTerminatorRecords is Object {
+		for Record in _HotstringsTerminatorRecords.Records {
+			Admission := HotstringsTerminatorRecordCapture(Record)
+			RecordChars .= Record.Char
+			Rows.Push(Map("label", Record.Label
+				. (Record.Consume ? " " . t("menu.hotstrings.consumed_suffix") : ""),
+				"checked", Record.Enabled,
+				"items", [Map("label", Record.Label, "checked", Record.Enabled,
+					"action", ((Captured, Enabled) => (*) => _HS_DelimRecordState(Captured, !Enabled))(Admission, Record.Enabled)),
+					MenuRenderer_CommandRow("word_expander_custom_menu", "word_expander_delete",
+					Map("word_expander_delete", ((Captured) => (*) => _HS_DelimRemoveRecord(Captured))(Admission)),
+					Map("word_expanders_ready", (*) => !A_IsSuspended))]))
+		}
+	}
 	Loop Parse, Current {
 		Ch := A_LoopField
-		if (Ch == "`r" or Ch == "`n" or InStr(BuiltinChars, Ch))
+		if (Ch == "`r" or Ch == "`n" or InStr(BuiltinChars, Ch) or InStr(RecordChars, Ch))
 			continue
 		ConsumedSfx := (InStr(Consumed, Ch) > 0) ? (" " . t("menu.hotstrings.consumed_suffix")) : ""
 		Rows.Push(Map(
@@ -488,7 +503,7 @@ _HS_DelimAddCustom() {
 	G := Gui_Create("", t("dialog.hotstrings.new_delimiter_title"))
 	G.SetFont("s10", "Segoe UI")
 	G.Add("Text", "xm y10 w300", t("dialog.hotstrings.new_delimiter_prompt"))
-	EditCtrl := G.Add("Edit", "xm y+6 w60 Limit1")
+	EditCtrl := G.Add("Edit", "xm y+6 w60 Limit2")
 	ChkCtrl  := G.Add("Checkbox", "xm y+10 w300", t("dialog.hotstrings.consume_checkbox"))
 	G.Add("Text", "xm y+14 w300 h1 0x10")  ; horizontal rule
 	BtnOK := G.Add("Button", "xm y+10 w80 Default", t("button.ok"))
@@ -512,7 +527,7 @@ _HS_DelimAddCustom() {
 	if (!Result.OK or Result.Char == "") {
 		return false
 	}
-	return _HS_DelimAddCustomCommit(Result.Char, Result.Consume)
+	return _HS_DelimAddRecordCommit(Result.Char, Result.Consume)
 }
 
 ; Add the word and optional consumed membership in ONE transaction. The previous
@@ -531,7 +546,7 @@ _HS_DelimAddCustomCommit(Char, Consume, WriterFn := 0, ReplaceFn := 0,
 ; Called by the OK button of the add-delimiter GUI.
 _HS_DelimGuiSubmit(G, EditCtrl, ChkCtrl, Result) {
 	Ch := EditCtrl.Value
-	if (StrLen(Ch) != 1) {
+	if !HotstringsTerminatorRecordCharacter(Ch) {
 		Ui_MsgBox(t("dialog.hotstrings.invalid_body"), t("dialog.hotstrings.invalid_title"), "Icon!")
 		return
 	}
@@ -1461,4 +1476,39 @@ _HS_ProgrammableHotstringRows() {
 
 _HS_ExtensionToggle(Path, Options, *) {
 	return HotstringExtensions_SetEnabled(Path, !ReadFeatureStateV2(Path)["enabled"], Options)
+}
+
+; New records join the conditional config.toml/reload owner; legacy string
+; controls remain separate and cannot silently substitute for refused records.
+_HS_DelimAddRecordCommit(Char, Consume, Options := unset) {
+	if !HotstringsTerminatorRecordCharacter(Char) || !(Consume is Integer)
+			|| (Consume != 0 && Consume != 1) || A_IsSuspended
+		return false
+	Record := Map("key", "custom_" . Format("{:X}", Ord(Char)), "char", Char,
+		"label", Char . " : " . t("menu.hotstrings.custom_label"), "consume", TOML_Bool(Consume))
+	return HotstringsTerminatorRecordsEdit(Map("mode", "add", "record", Record), Options?)
+}
+
+_HS_DelimRemoveRecord(Admission, Options := unset) {
+	if A_IsSuspended || !HotstringsTerminatorRecordCurrent(Admission)
+		return false
+	if IsSet(Options) && !(Options is Map)
+		throw TypeError("Removing a terminator requires explicit owner options.")
+	Confirm := IsSet(Options) ? Options.Get("confirm", Ui_MsgBox) : Ui_MsgBox
+	if !HasMethod(Confirm, "Call")
+		throw TypeError("Removing a terminator requires a callable confirmation owner.")
+	if Confirm.Call(t("dialog.hotstrings.delete_delimiter_body"),
+			t("dialog.hotstrings.delete_delimiter_title"), "YesNo") != "Yes"
+		return false
+	if A_IsSuspended || !HotstringsTerminatorRecordCurrent(Admission)
+		return false
+	return HotstringsTerminatorRecordsEdit(
+		Map("mode", "remove", "key", Admission.Key, "admission", Admission), Options?)
+}
+
+_HS_DelimRecordState(Admission, Enabled, Options := unset) {
+	if A_IsSuspended || !HotstringsTerminatorRecordCurrent(Admission)
+		return false
+	return HotstringsTerminatorRecordsEdit(
+		Map("mode", "state", "key", Admission.Key, "enabled", Enabled, "admission", Admission), Options?)
 }

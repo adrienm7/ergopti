@@ -213,6 +213,7 @@ helpers.describe("infra/personal_hotstrings — load contract", function()
 		-- tests/meta/test_healthcheck_api_contract.lua).
 		package.loaded["infra.personal_hotstrings"] = nil
 		local Logger = require("infra.logger")
+		helpers.admit_logger_privacy(Logger)
 		local warnings = {}
 		local orig_warn = Logger.warn
 		Logger.warn = function(log_obj, fmt, ...)

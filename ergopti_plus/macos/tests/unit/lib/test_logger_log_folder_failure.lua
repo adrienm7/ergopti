@@ -21,6 +21,7 @@ local _real_logger_loaded = package.loaded["infra.logger"]
 package.loaded["infra.logger"] = nil
 local Logger = require("infra.logger")
 
+helpers.admit_logger_privacy(Logger)
 local CONFIG_DIR = "/tmp/ergopti_test_log_folder/"
 local LOG_DIR = CONFIG_DIR .. "hammerspoon/logs/"
 

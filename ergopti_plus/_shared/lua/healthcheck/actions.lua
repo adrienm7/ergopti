@@ -147,7 +147,17 @@ function VALIDATORS.export_snapshot(message, context)
 	local sequence = message.export_sequence
 	if type(sequence) ~= "number" or sequence ~= math.floor(sequence) or sequence <= 0
 		or sequence > context.schema.report.export_sequence_max then return nil, "bad_export_sequence" end
-	return { action = "export_snapshot", export_sequence = sequence }
+	local action = { action = "export_snapshot", export_sequence = sequence }
+	if message.page_checks ~= nil then
+		local observations = require("healthcheck.share").page_checks(message.page_checks, context.schema)
+		if not observations then return nil, "bad_page_checks" end
+		if not bounded_text(message.generated_at, 40) or type(message.snapshot_revision) ~= "number"
+			or message.snapshot_revision <= 0 or message.snapshot_revision ~= math.floor(message.snapshot_revision)
+			or message.snapshot_revision > context.schema.report.export_sequence_max then return nil, "bad_snapshot_identity" end
+		action.generated_at, action.snapshot_revision = message.generated_at, message.snapshot_revision
+		action.page_check_observations = observations
+	end
+	return action
 end
 
 function VALIDATORS.cancel()

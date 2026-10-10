@@ -51,10 +51,11 @@ local function build_paused()
 	}
 	package.loaded["infra.i18n"] = {
 		get = function(key) return key end,
+		section = function(key) return key end,
 		decorate_section = function(value) return value end,
 	}
 	package.loaded["ui.menu.menu_utils"] = {}
-	package.loaded["infra.manifest_menu"] = { build = function(_, _, _, _, ctx)
+	package.loaded["infra.manifest_menu"] = { group_receiver = require("tests.support.declared_menu_parent_fixture").new().group_receiver, build = function(_, _, _, _, ctx)
 		render_ctx = ctx
 		return {}
 	end }

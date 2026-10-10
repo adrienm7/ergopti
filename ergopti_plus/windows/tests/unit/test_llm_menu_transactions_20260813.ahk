@@ -22,6 +22,7 @@ global _LMT_LiveAtWrite := ""
 global _LMT_ConfigPath := ""
 global _LMT_ApiPath := ""
 global _LMT_ApiRefused := false
+global _LMT_ApiFault := 0
 global _LMT_PrepareResult := 1
 global _LMT_PrepareCalls := 0
 global _LMT_PublishCalls := 0
@@ -120,6 +121,7 @@ _LMT_Notify(Message, Options) {
 }
 
 _LMT_InstallFixture() {
+	static Sequence := 0
 	global Features, _LLM_Menu, ConfigurationFile, LLM_PROFILE_HOTKEY_LIMIT
 	global _LMT_WriterResult, _LMT_WriterCalls, _LMT_ApplyCalls
 	global _LMT_WriterCritical, _LMT_ApplyCritical, _LMT_LiveAtWrite
@@ -132,8 +134,9 @@ _LMT_InstallFixture() {
 		Previous["profile_limit"] := LLM_PROFILE_HOTKEY_LIMIT
 	; The actual profile provider needs the number-row protocol even in a cold fixture.
 	LLM_PROFILE_HOTKEY_LIMIT := 9
-	_LMT_ConfigPath := A_Temp . "\ergopti_llm_menu_transaction.toml"
+	_LMT_ConfigPath := A_Temp . "\ergopti_llm_menu_transaction_" . A_ScriptHwnd . "_" . ++Sequence . ".toml"
 	ConfigurationFile := _LMT_ConfigPath
+	AssertEqual("absent", ConfigMigrateBoot(ConfigurationFile)["status"], "the genuine native transaction fixture constructs strict fresh absence")
 	Features := _LMT_Features()
 	_LLM_Menu := _LMT_Menu()
 	_LMT_WriterResult := 1
@@ -424,7 +427,8 @@ _LMT_ApiBuildConfig(Path, Updates) {
 		return Map("status", "error", "kind", "source_unreadable",
 			"content", "")
 	return Map("status", "ok", "kind", "rendered",
-		"content", '[llm]`nenabled = true`napi_entry_id = "api_new"`n',
+		"content", _CMJFixtureCurrentSource(
+			'[llm]`nenabled = true`napi_entry_id = "api_new"`n'),
 		"source_present", 1, "source_content", OldContent)
 }
 
@@ -447,31 +451,130 @@ _LMT_ApiMutate(Candidate) {
 			"Model", "model"), "")
 }
 
-_LMT_ApiMoveReplace(Source, Destination) {
-	global _LMT_ApiPath, _LMT_ApiRefused
-	if !_LMT_ApiRefused
-			&& _ConfigWriteLeaseKey(Destination)
-				== _ConfigWriteLeaseKey(_LMT_ApiPath) {
-		_LMT_ApiRefused := true
-		return 0
+; This fixture keeps the genuine sealed production port unchanged. The original
+; target:new:1 seam has already verified real first-target publication; an open
+; read-shared handle then denies only replacement of the actual second target.
+class _LMT_ApiPhysicalPublicationFault {
+	__New(CloseAtPause := false) {
+		global ConfigurationFile, _PathsFile, _LMT_ApiPath
+		this.Port := ConfigTransitionProductionPort()
+		this.ConfigPath := ConfigurationFile
+		this.ApiPath := _LMT_ApiPath
+		this.PathsFile := _PathsFile
+		this.OldConfig := FSReadUtf8Exact(this.ConfigPath)
+		this.OldApi := FSReadUtf8Exact(this.ApiPath)
+		this.CloseAtPause := CloseAtPause
+		this.Handle := 0
+		this.Bundle := 0
+		this.Published := 0
+		this.Notified := 0
+		this.NativeRefusals := 0
+		this.Closed := 0
 	}
-	return FSAtomicMoveReplace(Source, Destination) ? 1 : 0
+
+	Acquire(Paths) {
+		this.Bundle := _LMT_Acquire(Paths)
+		return this.Bundle
+	}
+
+	Pause(Point) {
+		if Point != "target:new:1"
+			return
+		AssertTrue(ConfigTransitionProductionPort(this.Port),
+			"physical faults must not revoke the genuine native port")
+		AssertTrue(this.Port == ConfigTransitionProductionPort())
+		AssertContains(FSReadUtf8Exact(this.ConfigPath), 'api_entry_id = "api_new"',
+			"the genuine first publication must precede the second-target obstruction")
+		AssertEqual(this.OldApi, FSReadUtf8Exact(this.ApiPath))
+		this.Published += 1
+		AssertEqual(1, this.Published)
+		; GENERIC_READ, FILE_SHARE_READ, OPEN_EXISTING. All genuine rollback
+		; reads remain possible; replacement/deletion of this file is denied.
+		this.Handle := DllCall("kernel32\CreateFileW", "Str", this.ApiPath,
+			"UInt", 0x80000000, "UInt", 1, "Ptr", 0, "UInt", 3,
+			"UInt", 0x80, "Ptr", 0, "Ptr")
+		NativeError := A_LastError
+		if this.Handle == -1 {
+			this.Handle := 0
+			throw OSError(NativeError, A_ThisFunc, "Cannot acquire the physical API fault handle.")
+		}
+		AssertTrue(this.Handle != 0)
+		AssertEqual(this.OldApi, FSReadUtf8Exact(this.ApiPath),
+			"the real obstruction must allow unchanged API rollback verification")
+		this.ObserveNativeRefusal()
+		if this.CloseAtPause
+			this.Close()
+	}
+
+	Notify(Message, Options) {
+		global _LMT_ApiRefused
+		this.Notified += 1
+		try {
+			AssertEqual(1, this.Published)
+			AssertFalse(this.CloseAtPause)
+			AssertTrue(this.Handle != 0)
+			AssertTrue(ConfigTransitionProductionPort(this.Port))
+			AssertTrue(this.Port == ConfigTransitionProductionPort())
+			AssertTrue(_ConfigWriteTerminalTryAcquire([], this.Bundle),
+				"the original failure callback must retain the genuine issuing bundle")
+			AssertEqual(this.OldConfig, FSReadUtf8Exact(this.ConfigPath),
+				"original automatic rollback must restore the exact first-target bytes")
+			AssertEqual(this.OldApi, FSReadUtf8Exact(this.ApiPath))
+			AssertFalse(FSStrictExists(ConfigTransitionWalPath(this.PathsFile)) == 1,
+				"automatic rollback must settle its real WAL before failure notification")
+			; The original notification carries UI text rather than CommitResult.
+			; Require physical refusal both at the publication seam and after
+			; actual automatic rollback. An armed handle alone is not a witness.
+			AssertEqual(1, this.NativeRefusals)
+			this.ObserveNativeRefusal()
+			_LMT_ApiRefused := this.Published == 1 && this.NativeRefusals == 2
+		} finally this.Close()
+		return _LMT_Notify(Message, Options)
+	}
+
+	ObserveNativeRefusal() {
+		static Sequence := 0
+		AssertTrue(this.Handle != 0)
+		ProbePath := this.ApiPath . ".physical-fault-" . A_ScriptHwnd . "-" . ++Sequence
+		if FSWriteCreateDurable(ProbePath, '[{"Id":"api_probe"}]') != 1
+			throw Error("Cannot acquire the owned native replacement probe stage.")
+		try {
+			Moved := FSAtomicMoveReplace(ProbePath, this.ApiPath, &MoveError)
+			AssertFalse(Moved)
+			AssertEqual(32, MoveError,
+				"the real second target must refuse native replacement with a sharing violation")
+			AssertEqual(this.OldApi, FSReadUtf8Exact(this.ApiPath))
+			this.NativeRefusals += 1
+		} finally {
+			if FSStrictExists(ProbePath) == 1 && !FSDeleteStrict(ProbePath)
+				throw Error("Cannot delete the owned physical-fault probe stage.")
+		}
+	}
+
+	Close() {
+		if this.Handle == 0
+			return
+		if !DllCall("kernel32\CloseHandle", "Ptr", this.Handle, "Int")
+			throw OSError(A_LastError, A_ThisFunc, "The physical API fault handle did not close.")
+		this.Handle := 0
+		this.Closed += 1
+	}
 }
 
-_LMT_ApiFailingPort() {
-	Port := ConfigTransitionProductionPort()
-	Port["move_replace"] := _LMT_ApiMoveReplace
-	return Port
+_LMT_ApiFailingPort(CloseAtPause := false) {
+	global _LMT_ApiFault
+	_LMT_ApiFault := _LMT_ApiPhysicalPublicationFault(CloseAtPause)
+	return _LMT_ApiFault.Port
 }
 
 _LMT_InstallApiFixture(Dir := "", WriteFn := FSWriteCreateDurable) {
 	static Sequence := 0
 	global Features, _LLM_Menu, ConfigurationFile, _PathsFile
 	global _LMT_ApiPath, _LMT_ApiRefused, _LMT_ApplyCalls
-	global _LMT_ApplyCritical, _LMT_Events
+	global _LMT_ApplyCritical, _LMT_Events, _LMT_ApiFault
 	Previous := Map("features", Features, "menu", _LLM_Menu,
 		"config", ConfigurationFile, "paths", _PathsFile,
-		"test_state", _LMT_CaptureFixtureState())
+		"api_fault", _LMT_ApiFault, "test_state", _LMT_CaptureFixtureState())
 	if Dir == ""
 		Dir := A_Temp . "\ergopti-llm-api-transaction-"
 			. A_ScriptHwnd . "-" . A_TickCount . "-" . ++Sequence
@@ -485,8 +588,9 @@ _LMT_InstallApiFixture(Dir := "", WriteFn := FSWriteCreateDurable) {
 		ConfigPath := Dir . "\config.toml"
 		ApiPath := Dir . "\api_entries.json"
 		if WriteFn.Call(ConfigPath,
-				'[llm]`nenabled = false`napi_entry_id = "api_old"`n') != 1
+				_CMJFixtureCurrentSource('[llm]`nenabled = false`napi_entry_id = "api_old"`n')) != 1
 			throw Error("Cannot create initial LLM fixture file: " . ConfigPath)
+		ConfigMigrateBoot(ConfigPath)
 		if WriteFn.Call(ApiPath, _LMT_ApiOldImage()) != 1
 			throw Error("Cannot create initial LLM fixture file: " . ApiPath)
 		CandidateFeatures := _LMT_Features()
@@ -507,6 +611,7 @@ _LMT_InstallApiFixture(Dir := "", WriteFn := FSWriteCreateDurable) {
 	Features := CandidateFeatures
 	_LLM_Menu := CandidateMenu
 	_LMT_ApiRefused := false
+	_LMT_ApiFault := 0
 	_LMT_ApplyCalls := 0
 	_LMT_ApplyCritical := -1
 	_LMT_Events := []
@@ -515,7 +620,10 @@ _LMT_InstallApiFixture(Dir := "", WriteFn := FSWriteCreateDurable) {
 }
 
 _LMT_RestoreApiFixture(Previous) {
-	global Features, _LLM_Menu, ConfigurationFile, _PathsFile
+	global Features, _LLM_Menu, ConfigurationFile, _PathsFile, _LMT_ApiFault
+	if _LMT_ApiFault is _LMT_ApiPhysicalPublicationFault
+		_LMT_ApiFault.Close()
+	_LMT_ApiFault := Previous["api_fault"]
 	Features := Previous["features"]
 	_LLM_Menu := Previous["menu"]
 	ConfigurationFile := Previous["config"]
@@ -525,6 +633,14 @@ _LMT_RestoreApiFixture(Previous) {
 }
 
 _LMT_ApiCommit(Port := 0) {
+	global _LMT_ApiFault
+	if _LMT_ApiFault is _LMT_ApiPhysicalPublicationFault {
+		AssertTrue(Port == _LMT_ApiFault.Port)
+		return LLM_Menu_CommitApiEntriesMutation("the test API entry",
+			_LMT_ApiMutate, _LMT_Apply, Port, ObjBindMethod(_LMT_ApiFault, "Notify"),
+			ObjBindMethod(_LMT_ApiFault, "Acquire"), _LMT_Settle, _LMT_Collect,
+			_LMT_ApiBuildConfig, _LMT_ApiSerialize, ObjBindMethod(_LMT_ApiFault, "Pause"))
+	}
 	return LLM_Menu_CommitApiEntriesMutation("the test API entry",
 		_LMT_ApiMutate, _LMT_Apply, Port, _LMT_Notify, _LMT_Acquire,
 		_LMT_Settle, _LMT_Collect, _LMT_ApiBuildConfig,
@@ -561,7 +677,7 @@ Test("LLM API entries: both durable targets precede live publication "
 
 _LMT_ApiSecondTargetFailureRollsEverythingOld() {
 	global _LLM_Menu, ConfigurationFile, _PathsFile, _LMT_ApiPath
-	global _LMT_ApiRefused, _LMT_ApplyCalls
+	global _LMT_ApiRefused, _LMT_ApplyCalls, _LMT_ApiFault
 	Previous := _LMT_InstallApiFixture()
 	try {
 		AssertFalse(_LMT_ApiCommit(_LMT_ApiFailingPort()))
@@ -578,6 +694,14 @@ _LMT_ApiSecondTargetFailureRollsEverythingOld() {
 		AssertFalse(FSStrictExists(ConfigTransitionWalPath(_PathsFile)) == 1,
 			"verified all-old rollback must remove its WAL")
 		AssertFalse(_ConfigWriteTerminalIsActive())
+		AssertEqual(1, _LMT_ApiFault.Published)
+		AssertEqual(1, _LMT_ApiFault.Notified)
+		AssertEqual(2, _LMT_ApiFault.NativeRefusals)
+		AssertEqual(1, _LMT_ApiFault.Closed)
+		AssertEqual(0, _LMT_ApiFault.Handle)
+		AssertTrue(ConfigTransitionProductionPort(_LMT_ApiFault.Port))
+		AssertTrue(_LMT_ApiFault.Port == ConfigTransitionProductionPort())
+		AssertEqual(_LMT_ApiFault.OldConfig, FSReadUtf8Exact(ConfigurationFile))
 	} finally _LMT_RestoreApiFixture(Previous)
 }
 Test("LLM API entries: second-target refusal restores both old authorities "
@@ -2262,12 +2386,13 @@ _LMT_PrivacyFixture(States, Body) {
 		Features["llm"]["trigger"]["secure_filter_enabled"] := States[2]
 		_LLM_Engine := Map("enabled", true, "backend", "ollama",
 			"disable_url_bars", States[1], "disable_password_fields", States[2])
-		Image := "# independent native privacy fixture`n[llm]`nenabled = true`n[llm.models]`n"
+		Image := "_meta.schema_version = " . ConfigMigrateCurrentVersion() . "`n# independent native privacy fixture`n[llm]`nenabled = true`n[llm.models]`n"
 			. 'selected = "ollama"' . "`n[llm.trigger]`nurl_bar_filter_enabled = "
 			. (States[1] ? "true" : "false") . "`nsecure_filter_enabled = "
 			. (States[2] ? "true" : "false") . "`n[foreign]`n"
 			. 'future = "keep exact" # retained neighbour' . "`n"
 		FileAppend(Image, ConfigurationFile, "UTF-8-RAW")
+		AssertEqual("current", ConfigMigrateBoot(ConfigurationFile)["status"], "the actual current privacy fixture constructs before native writes")
 		Body.Call()
 	} finally {
 		Suspend(SavedSuspend)
@@ -2657,8 +2782,8 @@ _LMT_ApiSemanticDetachedBuilder() {
 	Previous := _LMT_InstallApiFixture()
 	OldRead := _ConfigBootReadFailed, OldRejected := _ConfigBootRejectedOverrides
 	OldOutdated := _ConfigBootOutdatedEntries
-	Source := 'llm = {enabled = false, api_entry_id = "api_old", future = "retain"}`n[future]`nold = "retain" # user data`n'
-	Expected := Chr(0xFEFF) . 'llm = {enabled = true, api_entry_id = "api_new", future = "retain"}`n[future]`nold = "retain" # user data`n'
+	Source := '_meta.schema_version = ' . ConfigMigrateCurrentVersion() . '`nllm = {enabled = false, api_entry_id = "api_old", future = "retain"}`n[future]`nold = "retain" # user data`n'
+	Expected := Chr(0xFEFF) . '_meta.schema_version = ' . ConfigMigrateCurrentVersion() . '`nllm = {enabled = true, api_entry_id = "api_new", future = "retain"}`n[future]`nold = "retain" # user data`n'
 	try {
 		_ConfigBootReadFailed := false
 		_ConfigBootRejectedOverrides := 0
@@ -2962,3 +3087,175 @@ _LMT_ProfileFrameHeldDeclaration(Command) {
 }
 for Command in ["create", "clone", "auto_detect"]
 	Test("complete profile frame: held native owner declaration withdrawal " . Command, _LMT_ProfileFrameHeldDeclaration.Bind(Command))
+
+; Causal withdrawal: the same real port and first-target seam succeed when the
+; acquired native handle is physically closed before second-target publication.
+_LMT_ApiPhysicalFaultWithdrawalAllowsBothTargets() {
+	global _LMT_ApiFault, _LMT_ApiPath, _LMT_ApiRefused, _LMT_ApplyCalls
+	global _LLM_Menu, ConfigurationFile, _PathsFile
+	Previous := _LMT_InstallApiFixture()
+	try {
+		AssertTrue(_LMT_ApiCommit(_LMT_ApiFailingPort(true)))
+		AssertEqual(1, _LMT_ApiFault.Published)
+		AssertEqual(1, _LMT_ApiFault.Closed)
+		AssertEqual(0, _LMT_ApiFault.Handle)
+		AssertEqual(0, _LMT_ApiFault.Notified)
+		AssertEqual(1, _LMT_ApiFault.NativeRefusals)
+		AssertFalse(_LMT_ApiRefused)
+		AssertTrue(ConfigTransitionProductionPort(_LMT_ApiFault.Port))
+		AssertTrue(_LMT_ApiFault.Port == ConfigTransitionProductionPort())
+		AssertContains(FSReadUtf8Exact(ConfigurationFile), 'api_entry_id = "api_new"')
+		AssertEqual('[{"Id":"api_new"}]', FSReadUtf8Exact(_LMT_ApiPath))
+		AssertEqual("api_new", _LLM_Menu["api_entry_id"])
+		AssertTrue(_LLM_Menu["enabled"])
+		AssertEqual(1, _LMT_ApplyCalls)
+		AssertFalse(FSStrictExists(ConfigTransitionWalPath(_PathsFile)) == 1)
+		AssertFalse(_ConfigWriteTerminalIsActive())
+	} finally _LMT_RestoreApiFixture(Previous)
+}
+Test("LLM API entries: physical second-target fault withdrawal preserves native publication",
+	_LMT_ApiPhysicalFaultWithdrawalAllowsBothTargets)
+
+
+
+
+
+_LMT_ObservationLine(Lines, Line) {
+	if InStr(Line, "[LLMObservation.")
+		Lines.Push(Line)
+}
+
+_LMT_RealTransactionObservation() {
+	global _LOGGER_TEST_SINK, _LOGGER_INFO_ENABLED, _LOGGER_FLUSH_ACTIVE
+	global _LOGGER_FORCE_FLUSH_PENDING, _LOGGER_PENDING, _LOGGER_PENDING_ERRORS
+	Saved := [_LOGGER_TEST_SINK, _LOGGER_INFO_ENABLED, _LOGGER_FLUSH_ACTIVE,
+		_LOGGER_FORCE_FLUSH_PENDING, _LOGGER_PENDING, _LOGGER_PENDING_ERRORS]
+	Previous := _LMT_InstallFixture()
+	Lines := []
+	try {
+		_LOGGER_TEST_SINK := _LMT_ObservationLine.Bind(Lines)
+		_LOGGER_INFO_ENABLED := true
+		; Observe the real logger without admitting an external file append.
+		_LOGGER_FLUSH_ACTIVE := true
+		_LOGGER_PENDING := [], _LOGGER_PENDING_ERRORS := []
+		AssertTrue(LLM_Menu_CommitMutation("private-observation-context-sentinel",
+			_LMT_MutateNested, _LMT_Apply, _LMT_Writer, _LMT_Notify,
+			_LMT_Acquire, _LMT_Settle, _LMT_Collect))
+		Text := ""
+		for Line in Lines
+			Text .= Line "`n"
+		for Stage in ["schema-admission", "bundle-admission", "pending-settlement",
+			"candidate-clone", "candidate-collector", "durable-writer",
+			"live-publication", "live-application", "mutation-return"] {
+			AssertContains(Text, "[LLMObservation." Stage ".enter]")
+			AssertContains(Text, "[LLMObservation." Stage ".returned]")
+		}
+		AssertContains(Text, "status=confirmed")
+		AssertFalse(InStr(Text, "private-observation-context-sentinel"), "operation context must not enter observation metadata")
+		AssertFalse(InStr(Text, "Candidate label"), "candidate content must not enter observation metadata")
+		AssertFalse(InStr(Text, "Live prompt"), "prompt content must not enter observation metadata")
+		AssertFalse(InStr(Text, "[SUCCESS]"), "observations never claim a successful operation from an unknown result")
+	} finally {
+		_LMT_RestoreFixture(Previous)
+		_LOGGER_TEST_SINK := Saved[1], _LOGGER_INFO_ENABLED := Saved[2]
+		_LOGGER_FLUSH_ACTIVE := Saved[3], _LOGGER_FORCE_FLUSH_PENDING := Saved[4]
+		_LOGGER_PENDING := Saved[5], _LOGGER_PENDING_ERRORS := Saved[6]
+	}
+}
+Test("LLM menu: actual transaction emits closed observation milestones (llm-transaction-observation)",
+	_LMT_RealTransactionObservation)
+
+
+
+
+
+_LMT_ObservationReentry() {
+	static Retained := []
+	Directory := A_Temp "\ergopti-toggle-observation-" A_ScriptHwnd "-" A_TickCount "-" Random(100000, 999999)
+	AssertTrue(DllCall("Kernel32\CreateDirectoryW", "Str", Directory, "Ptr", 0, "Int"))
+	State := {done: false, exit: -1, errors: "", output: ""}
+	Done(ExitCode, Output, Errors) {
+		State.done := true, State.exit := ExitCode, State.output := Output, State.errors := Errors
+	}
+	Task := 0, Quiesced := true
+	try {
+		Subject := ""
+		for Name in ["LLM_Menu_OnToggle", "_LLM_Menu_ObservationBegin", "_LLM_Menu_ObservationEnd"] {
+			Body := _DriverFuncBody(Name)
+			AssertTrue(Body != "", "the observation reentry subject must be actual production code")
+			Subject .= Body "`n"
+		}
+		Program := '
+(
+#Requires AutoHotkey v2.0
+#Warn All, StdOut
+#NoTrayIcon
+#SingleInstance Off
+global _LLM_Menu := Map("enabled", true, "backend", "ollama")
+global Mode := "", Triggered := false, Nested := 1, Commits := 0, FlushCalls := 0
+LoggerInfo(Tag, Message, Values*) {
+ global Mode, Triggered, Nested
+ if !Triggered && ((Mode == "enter" && Tag == "LLMObservation.toggle-entry.enter")
+  || (Mode == "returned" && Tag == "LLMObservation.toggle-entry.returned"
+   && Values.Length > 0 && Values[1] == "confirmed")) {
+  Triggered := true
+  Nested := LLM_Menu_OnToggle()
+ }
+}
+_LoggerFlush(*) {
+ global FlushCalls
+ FlushCalls += 1
+ return true
+}
+TickElapsed(Started) => (A_TickCount - Started) & 0xFFFFFFFF
+LLM_EnableRequiresProbe(*) => false
+LLM_Menu_RequestEnableAdmission(*) => false
+LLM_Menu_CancelEnableAdmission() => true
+_LLM_Menu_ToggleCandidateBool(*) => true
+_LLM_Menu_ApplyToggleCommitted(*) => true
+LLM_Menu_CommitMutation(*) {
+ global Commits
+ Commits += 1
+ return true
+}
+SUBJECT
+for SelectedMode in ["enter", "returned"] {
+ Mode := SelectedMode, Triggered := false, Nested := 1, Commits := 0
+ if !LLM_Menu_OnToggle() || !Triggered || Nested != 0 || Commits != 1
+  ExitApp(1)
+ if !LLM_Menu_OnToggle() || Commits != 2
+  ExitApp(2)
+}
+if FlushCalls != 0
+ ExitApp(3)
+FileAppend("observation-reentry: enter and returned refused; next call admitted; informational events stay buffered", "*", "UTF-8-RAW")
+ExitApp(0)
+)'
+		Script := Directory "\observer.ahk"
+		AssertTrue(FSWriteCreateDurable(Script, StrReplace(Program, "SUBJECT", Subject)))
+		Task := ShellRunner_SpawnTreeOwned(A_AhkPath, ["/ErrorStdOut", Script], Done, , , 65536)
+		Quiesced := false
+		AssertTrue(Task.start())
+		Started := A_TickCount
+		while !State.done && TickElapsed(Started) < 5000
+			Sleep(10)
+		AssertTrue(State.done, "the exact inert observation child must exit naturally")
+		AssertEqual(0, State.exit, State.output)
+		AssertEqual("", State.errors)
+		AssertContains(State.output, "observation-reentry: enter and returned refused; next call admitted")
+	} finally {
+		if IsObject(Task) {
+			try Quiesced := Task.requestTerminate() == true
+			catch
+				Quiesced := false
+		}
+		if Quiesced
+			DirDelete(Directory, true)
+		else {
+			Retained.Push({task: Task, directory: Directory, state: State})
+			throw Error("The exact observation child retains retirement debt.")
+		}
+	}
+}
+Test("LLM menu: actual toggle refuses observer reentry until return and releases its guard (llm-observation-reentry)",
+	_LMT_ObservationReentry)

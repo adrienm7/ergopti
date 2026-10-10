@@ -48,7 +48,7 @@ _CPL_FullSavePreservesRejectedPreferenceBody(Invalid, Literal, Logs) {
 	Runtime := _CFGFS_CaptureRuntime()
 	Coordinator := _ConfigFullSaveCoordinator()
 	Path := _CTU_NewPath()
-	Original := "[shortcuts]`nscreen = " . (Invalid ? Literal : "false")
+	Original := "[_meta]`nschema_version = " . ConfigMigrateCurrentVersion() . "`n[shortcuts]`nscreen = " . (Invalid ? Literal : "false")
 		. "`n[layout]`nergopti_base = false`n"
 	Target := ManifestBuildFeaturesMap()
 	DefaultScreen := Target["shortcuts"]["screen"]
@@ -63,6 +63,7 @@ _CPL_FullSavePreservesRejectedPreferenceBody(Invalid, Literal, Logs) {
 		_ConfigBootRejectedOverrides := 0
 		_ConfigBootOutdatedEntries := Map()
 		AssertTrue(FSWrite(Path, Original))
+		AssertTrue(ConfigSchemaCanPrepareWrite(Path), "the genuine fresh native fixture now has an independently current source before full persistence")
 		AssertEqual(Invalid ? 1 : 2, ApplyBootConfigToml(Target, Path))
 		Errors := 0
 		ErrorNamespaces := "", ErrorNamespaceCount := 0
@@ -124,6 +125,7 @@ _CPL_LocalDiagnosticsCannotChangeBootAuthority() {
 		_ConfigBootRejectedOverrides := 0
 		_ConfigBootOutdatedEntries := Map()
 		AssertTrue(FSWrite(Path, "[shortcuts]`nscreen = 2`n"))
+		ConfigSchemaPrepareSource(Path)
 		AssertEqual(0, ApplyConfigToml(ManifestBuildFeaturesMap(), Path, &Rejected, , &Outdated))
 		AssertEqual(0, Rejected, "an outdated value is not a rejected override")
 		AssertTrue(Outdated.Has("shortcuts`nscreen"), "the load reports the outdated entry")
@@ -133,6 +135,7 @@ _CPL_LocalDiagnosticsCannotChangeBootAuthority() {
 		AssertTrue(_ConfigBootOutdatedEntries.Has("shortcuts`nscreen"))
 		AssertEqual(0, _ConfigBootRejectedOverrides)
 		AssertTrue(FSWrite(ValidPath, "[shortcuts]`nscreen = false`n[ahk.layout]`nergopti_base = 0`n"))
+		ConfigSchemaPrepareSource(ValidPath)
 		AssertEqual(1, ApplyConfigToml(ManifestBuildFeaturesMap(), ValidPath, &Rejected, , &Outdated))
 		AssertEqual(0, Rejected, "each diagnostic starts fresh; obsolete silos do not block migration")
 		AssertEqual(0, Outdated.Count, "each diagnostic starts fresh")

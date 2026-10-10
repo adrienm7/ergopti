@@ -509,3 +509,34 @@ _MMC_SelectedMalformedPresentation() {
 	}
 }
 Test("selected inert presentation: malformed sibling omits heading and retains actual native row", _MMC_SelectedMalformedPresentation)
+
+
+_MMC_ReasonedToggleData() {
+	Root := _MR_GetManifestRoot(), Key := "__reasoned_toggle_behavior_fixture"
+	AssertFalse(Root.Has(Key), "the fixture requires an unoccupied declaration")
+	Item := Map("type", "toggle", "id", "power", "category", "LLM", "i18n", "menu.llm.enable",
+		"checked_when", ["on"], "disabled_when", ["ready"], "disabled_reason_key", "menu.llm.save_unavailable")
+	Root[Key] := [Item]
+	Ready := false, Calls := 0
+	Action(*) => Calls += 1
+	Commands := Map("power", Action), Getters := Map("on", () => true, "ready", () => Ready)
+	try {
+		Disabled := _MR_ToggleRowData(Item, Key, Commands, Getters)
+		Assert(Disabled is Map)
+		AssertEqual(t("menu.llm.enable"), Disabled["label"])
+		AssertTrue(Disabled["checked"])
+		AssertTrue(Disabled["disabled"])
+		AssertEqual("menu.llm.save_unavailable", Disabled["disabled_reason_key"])
+		AssertFalse(Disabled.Has("action"), "a reasoned disabled switch has no delivery callback")
+		Ready := true
+		Enabled := _MR_ToggleRowData(Item, Key, Commands, Getters)
+		AssertEqual(t("menu.llm.enable"), Enabled["label"])
+		AssertTrue(Enabled["checked"])
+		AssertFalse(Enabled.Has("disabled_reason_key"))
+		AssertFalse(Enabled.Has("disabled"))
+		Assert(Enabled["action"] == Action, "the enabled switch retains its exact callback")
+		Enabled["action"].Call()
+		AssertEqual(1, Calls)
+	} finally Root.Delete(Key)
+}
+Test("reasoned-toggle: actual Windows row data removes disabled delivery and preserves enabled identity", _MMC_ReasonedToggleData)

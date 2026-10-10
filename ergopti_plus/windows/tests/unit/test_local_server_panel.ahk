@@ -23,6 +23,13 @@
 class _LSPN_Fixture extends _LSJ_Fixture {
 	__New() {
 		super.__New()
+		; The World replaces the admitted boot image with its independent source.
+		; Admit this panel-owned image before testing runtime authority.
+		try _LSPB_Stamp(this.World)
+		catch as Err {
+			_LSJ_Fixture.Prototype.Dispose.Call(this)
+			throw Err
+		}
 		global _LLM_LocalServerPanel, _LLM_Menu_RuntimeActivated, _LifecycleTransitionsByPhase
 		this.SavedPanel := _LLM_LocalServerPanel
 		this.HadActivated := IsSet(_LLM_Menu_RuntimeActivated)
@@ -46,6 +53,50 @@ class _LSPN_Fixture extends _LSJ_Fixture {
 		_LLM_Menu_RuntimeActivated := true
 	}
 
+	Prepare() {
+		SavedSpawn := this.NativeSpawn
+		this.NativeSpawn := _LSPN_ReadyChildFactory.Bind(this)
+		try super.Prepare()
+		finally this.NativeSpawn := SavedSpawn
+	}
+
+	RescanReady() {
+		SavedSpawn := this.NativeSpawn
+		this.NativeSpawn := _LSPN_ReadyChildFactory.Bind(this)
+		try return this.Native.Rescan()
+		finally this.NativeSpawn := SavedSpawn
+	}
+
+	RescanWithCancellationDebt() {
+		Index := this.Children.Length + 1
+		SavedSpawn := this.NativeSpawn
+		; Arm the exact child at acquisition: the real curl deadline may expire
+		; while the remaining catalogue entries perform their authority checks.
+		this.NativeSpawn := _LSPN_CancellationDebtChildFactory.Bind(this, Index)
+		try {
+			AssertTrue(this.Native.Rescan())
+			Child := this.Children[Index]
+			AssertEqual(1, Child.Starts)
+			AssertFalse(Child.TerminateAllowed)
+			AssertTrue(this.Owner.Records.Count > 0, "the exact refused child must retain cancellation debt")
+			return Child
+		} finally this.NativeSpawn := SavedSpawn
+	}
+
+	Complete(Index, Status, Body) {
+		Child := this.Children[Index]
+		if Child is _LSPN_ReadyChild {
+			; The response already traversed the real request/controller callbacks.
+			; Validate that observation instead of rewriting retired curl artifacts.
+			AssertTrue(Child.ResponseDelivered)
+			AssertEqual(Status, Child.ResponseStatus)
+			AssertEqual(Body, Child.ResponseBody)
+			AssertTrue(this.Requests[Index].Completed)
+			return
+		}
+		super.Complete(Index, Status, Body)
+	}
+
 	FormatReport(Key, Values*) {
 		this.ObserveCritical.Push(A_IsCritical)
 		if !this.FormatMutated && this.PanelControl != "" {
@@ -57,7 +108,7 @@ class _LSPN_Fixture extends _LSJ_Fixture {
 					if !FSWriteDurable(this.World.ApiPath, _LLM_Menu_SerializeApiEntries(Map("api_entries", Records), (Value) => Value))
 						throw Error("The fixture-owned format-time source replacement failed.")
 				case "cache":
-					this.Native.Rescan()
+					this.RescanReady()
 					for Index, Id in this.Order {
 						Body := Id == "lmstudio" ? '{"data":[{"id":"independent-joined"},{"id":"other-joined"}]}' : '{"data":[]}'
 						this.Complete(this.Order.Length + Index, 200, Body)
@@ -240,10 +291,8 @@ _LSPN_ShutdownRepair(PendingDebt := false) {
 	Fixture := _LSPN_Fixture()
 	try {
 		Fixture.Prepare()
-		if PendingDebt {
-			AssertTrue(Fixture.Native.Rescan())
-			Fixture.Children[Fixture.Order.Length + 1].TerminateAllowed := false
-		}
+		if PendingDebt
+			Fixture.RescanWithCancellationDebt()
 		Attempt := Fixture.BeginShutdown()
 		AssertEqual(!PendingDebt, LLM_Menu_LocalServersPrepareShutdown())
 		AssertFalse(Fixture.World.Owner.Admit())
@@ -416,9 +465,7 @@ _LSPN_FailedResumeRetainsExactIntent() {
 	Fixture := _LSPN_Fixture()
 	try {
 		Fixture.Prepare()
-		AssertTrue(Fixture.Native.Rescan())
-		Child := Fixture.Children[Fixture.Order.Length + 1]
-		Child.TerminateAllowed := false
+		Child := Fixture.RescanWithCancellationDebt()
 		AssertFalse(Fixture.Panel.Retire(false))
 		Transition := Fixture.Transition("resume")
 		AssertTrue(LLM_Menu_LocalServersOnResume())
@@ -533,3 +580,619 @@ Test("local server panel: cold canonical status creates no runtime source or cal
 Test("local server panel: unavailable canonical status creates no HTTP source or callbacks", _LSPN_InertStatusRows.Bind("unavailable"))
 Test("local server panel: cold status reads actual shared caption and order mutations", _LSPN_InertStatusRows.Bind("cold", true))
 Test("local server panel: unavailable status reads actual shared caption and order mutations", _LSPN_InertStatusRows.Bind("unavailable", true))
+
+
+
+
+
+; ===================================================
+; ===================================================
+; ======= 4/ Fenced Read-Only View Projection =======
+; ===================================================
+; ===================================================
+
+_LSPB_Stamp(World) {
+	World.ConfigImage .= "[_meta]`nschema_version = " ConfigMigrateCurrentVersion() "`n"
+	AssertTrue(FSWriteDurable(World.ConfigPath, World.ConfigImage))
+	AssertTrue(ConfigSchemaCanPrepareWrite(World.ConfigPath))
+}
+
+_LSPB_Current(Observation, Owner, Receipt) {
+	Observation["checks"] += 1
+	if Observation.Get("ids", 0) is Array && !Observation.Get("changed", false) {
+		Observation["changed"] := true
+		Observation["ids"].Push("outside-native-catalogue")
+	}
+	return LLM_Menu_ApiPrivateSourceOwner.Prototype.Current.Call(Owner, Receipt)
+}
+
+_LSPB_SourceBatch() {
+	AssertTrue(HasMethod(LLM_Menu_ApiPrivateSourceOwner.Prototype, "EntriesBound"))
+	Fixture := _LSJ_Fixture()
+	World := Fixture.World
+	try {
+		_LSPB_Stamp(World)
+		Source := World.Owner.Capture()
+		AssertTrue(Source is LLM_Menu_ApiPrivateSourceReceipt)
+		Ids := []
+		global LLM_API_PROVIDER_ORDER, LLM_LOCAL_API_SERVERS
+		for Id in LLM_API_PROVIDER_ORDER
+			if LLM_LOCAL_API_SERVERS.Has(Id)
+				Ids.Push(Id)
+		Length := Ids.Length
+		Observation := Map("checks", 0, "ids", Ids)
+		World.Owner.DefineProp("Current", {Call: _LSPB_Current.Bind(Observation)})
+		Batch := World.Owner.EntriesBound(Ids, Source)
+		AssertTrue(Batch is Map)
+		AssertTrue(Observation["changed"], "the provider list must actually mutate during source validation")
+		AssertEqual(Length + 1, Ids.Length)
+		AssertEqual(Length, Batch["entries"].Count, "projection must use the admitted private list snapshot")
+		AssertFalse(Batch["entries"].Has("outside-native-catalogue"))
+		AssertEqual(2, Observation["checks"], "all providers share both full source fences")
+		AssertFalse(World.Owner.EntriesBound([Ids[1]], LLM_Menu_ApiPrivateSourceReceipt()),
+			"a fabricated receipt cannot project private entries")
+		AssertThrows(() => World.Owner.EntriesBound([Ids[1], Ids[1]], Source))
+		AssertThrows(() => World.Owner.EntriesBound(["outside-native-catalogue"], Source))
+	} finally {
+		if World.Owner.HasOwnProp("Current")
+			World.Owner.DeleteProp("Current")
+		Fixture.Dispose()
+	}
+}
+Test("local readonly batch: real source fences snapshot provider arguments", _LSPB_SourceBatch)
+
+_LSPB_CopyMutation(Fixture, Original, Kind, Native, Results) {
+	if !Fixture.BatchMutated {
+		Fixture.BatchMutated := true
+		if Kind == "source" {
+			AssertTrue(FSWriteDurable(Fixture.World.ApiPath, Fixture.World.ApiImage "`n"))
+		} else {
+			Native.BeginView()
+			Fixture.ReentrantViews := Native.Views
+			Fixture.ReentrantView := Native.ViewGeneration
+		}
+	}
+	return Original.Call(Native, Results)
+}
+
+class _LSPB_CompletedChild extends _LSM_ChildReceipt {
+	__New(Fixture, OnDone) {
+		this.Fixture := Fixture
+		this.OnDone := OnDone
+		super.__New()
+	}
+
+	start() {
+		super.start()
+		Fixture := this.Fixture
+		Request := Fixture.Requests[Fixture.Requests.Length]
+		Id := Fixture.Order[Fixture.Children.Length]
+		Body := Id == "lmstudio" ? '{"data":[{"id":"independent-joined"},{"id":"other-joined"}]}' : '{"data":[]}'
+		AssertTrue(FSWrite(Request.HeaderPath, "HTTP/1.1 200 Fixture`r`n`r`n"))
+		this.OnDone.Call(0, Body, "")
+		return true
+	}
+}
+
+_LSPB_CompletedChildFactory(Fixture, OnDone) {
+	return _LSPB_CompletedChild(Fixture, OnDone)
+}
+
+_LSPB_JoinedView() {
+	AssertTrue(HasMethod(LocalServersOwner.Prototype, "CaptureView"))
+	Fixture := _LSPN_Fixture()
+	try {
+		; Complete the controlled child at its owned start, before another slow
+		; provider factory can exhaust the real curl deadline against fixture clock0.
+		Fixture.NativeSpawn := _LSPB_CompletedChildFactory.Bind(Fixture)
+		AssertTrue(Fixture.Native.Rescan())
+		AssertEqual(Fixture.Order.Length, Fixture.Requests.Length)
+		AssertFalse(Fixture.Native.Controller.IsSweeping())
+		AssertEqual(1, Fixture.Publications.Length)
+		AssertEqual(0, Fixture.Native.Jobs.Count)
+		Observation := Map("checks", 0)
+		Fixture.World.Owner.DefineProp("Current", {Call: _LSPB_Current.Bind(Observation)})
+		Rows := _LSPV_PreparedRows(Fixture)
+		AssertTrue(Rows is Array && Rows.Length > 0)
+		AssertTrue(Fixture.Panel.LastSnapshot is Map)
+		AssertTrue(Observation["checks"] <= 8,
+			"one display projection must bound full source validation independently of provider/model rows")
+		AssertEqual(Fixture.Order.Length, Fixture.Panel.View["receipts"].Count)
+		AssertEqual("independent-joined", Fixture.Panel.LastSnapshot["results"]["lmstudio"]["models"][1])
+		AssertEqual("other-joined", Fixture.Panel.LastSnapshot["results"]["lmstudio"]["models"][2])
+		for Id, Receipt in Fixture.Panel.View["receipts"]
+			AssertTrue(Fixture.Native.IsCurrent(Receipt), "normal strict callback receipts must remain valid")
+		Source := Fixture.World.Owner.Capture()
+		Original := LocalServersOwner.Prototype.GetOwnPropDesc("_CopyResults").Call
+		for Kind in ["source", "view"] {
+			Fixture.BatchMutated := false
+			OldViews := Fixture.Native.Views
+			Fixture.Native.DefineProp("_CopyResults", {Call: _LSPB_CopyMutation.Bind(Fixture, Original, Kind)})
+			try {
+				Projection := Fixture.Native.CaptureView(Source)
+				AssertFalse(Projection is Map, "a mutation during detached copy must refuse the whole view")
+				AssertTrue(Fixture.BatchMutated, "the actual yielding copy boundary must be reached")
+				if Kind == "source"
+					AssertTrue(Fixture.Native.Views == OldViews, "source refusal cannot emit partial action receipts")
+				else {
+					AssertTrue(Fixture.Native.Views == Fixture.ReentrantViews,
+						"refused predecessor cannot overwrite a reentrant view")
+					AssertEqual(Fixture.ReentrantView, Fixture.Native.ViewGeneration)
+				}
+			} finally {
+				Fixture.Native.DeleteProp("_CopyResults")
+				AssertTrue(FSWriteDurable(Fixture.World.ApiPath, Fixture.World.ApiImage))
+			}
+		}
+	} finally {
+		if Fixture.Native.HasOwnProp("_CopyResults")
+			Fixture.Native.DeleteProp("_CopyResults")
+		if Fixture.World.Owner.HasOwnProp("Current")
+			Fixture.World.Owner.DeleteProp("Current")
+		Fixture.Dispose()
+	}
+}
+Test("local readonly batch: actual joined rows bound reads and reject copy reentry", _LSPB_JoinedView)
+
+
+
+
+
+
+; ==================================================
+; ==================================================
+; ======= 5/ Deferred Automatic Discovery ===========
+; ==================================================
+; ==================================================
+
+class _LSPD_Fixture extends _LSPN_Fixture {
+	__New() {
+		super.__New()
+		global _DriverReady, _LLM_MenuBuildCoordinator
+		this.HadReady := IsSet(_DriverReady)
+		this.OldReady := this.HadReady ? _DriverReady : false
+		this.HadCoordinator := IsSet(_LLM_MenuBuildCoordinator)
+		this.OldCoordinator := this.HadCoordinator ? _LLM_MenuBuildCoordinator : 0
+		_DriverReady := false
+		_LLM_MenuBuildCoordinator := LLMMenuBuildCoordinator(() => true, () => false)
+		this.RescanCalls := 0
+		this.ThrowRescan := false
+		this.ArmRetirement := false
+		this.ArmCalls := 0
+		this.NativeSpawn := _LSPB_CompletedChildFactory.Bind(this)
+		this.Native.DefineProp("Rescan", {Call: ObjBindMethod(this, "ObserveRescan")})
+	}
+
+	ObserveRescan(Native, Args*) {
+		this.RescanCalls += 1
+		if this.ThrowRescan
+			throw Error("Independent deferred rescan refusal.")
+		return LocalServersOwner.Prototype.Rescan.Call(Native, Args*)
+	}
+
+	RepairTimer(Callback, Period) {
+		if Period < 0
+			this.ArmCalls += 1
+		Accepted := super.RepairTimer(Callback, Period)
+		if Period < 0 && this.ArmRetirement {
+			this.ArmRetirement := false
+			this.Panel.Retire(false)
+		}
+		return Accepted
+	}
+
+	Dispose() {
+		global _DriverReady, _LLM_MenuBuildCoordinator
+		try {
+			this.ArmRetirement := false
+			if this.Native.HasOwnProp("Rescan")
+				this.Native.DeleteProp("Rescan")
+			super.Dispose()
+		} finally {
+			_DriverReady := this.HadReady ? this.OldReady : unset
+			_LLM_MenuBuildCoordinator := this.HadCoordinator ? this.OldCoordinator : unset
+		}
+	}
+}
+
+_LSPD_Nominal() {
+	Fixture := _LSPD_Fixture()
+	try {
+		RowsStarted := DllCall("Kernel32\GetTickCount64", "UInt64")
+		Rows := _LSPV_DiscoveryRows(Fixture)
+		FileAppend("# DEFERRED_DISCOVERY_SETUP elapsed_ms=" .
+			(DllCall("Kernel32\GetTickCount64", "UInt64") - RowsStarted) . "`n", "*")
+		AssertTrue(Rows is Array && Rows.Length > 0)
+		AssertEqual(0, Fixture.RescanCalls, "row construction cannot enter managed discovery")
+		AssertEqual(0, Fixture.Requests.Length, "no child acquisition occurs on the menu build stack")
+		AssertEqual(0, Fixture.Publications.Length, "a queued timer is not a probe result")
+		AssertFalse(Fixture.Panel.LastSnapshot is Map)
+		Record := Fixture.Panel.Discovery
+		AssertTrue(Record is Map)
+		DiscoveryStarted := DllCall("Kernel32\GetTickCount64", "UInt64")
+		Fixture.Panel._RepairTick(Record)
+		FileAppend("# DEFERRED_DISCOVERY_WAIT elapsed_ms=" .
+			(DllCall("Kernel32\GetTickCount64", "UInt64") - DiscoveryStarted) . "`n", "*")
+		AssertEqual(0, Fixture.RescanCalls, "startup readiness must precede discovery")
+		global _DriverReady, _LLM_MenuBuildCoordinator
+		_DriverReady := true
+		_LLM_MenuBuildCoordinator.Active := true
+		Fixture.Panel._RepairTick(Record)
+		AssertEqual(0, Fixture.RescanCalls, "an active menu build must not be preempted by discovery")
+		_LLM_MenuBuildCoordinator.Active := false
+		Fixture.Panel._RepairTick(Record)
+		AssertEqual(1, Fixture.RescanCalls)
+		AssertEqual(Fixture.Order.Length, Fixture.Requests.Length)
+		AssertEqual(1, Fixture.Publications.Length, "the original controller must publish the controlled replies")
+		AssertEqual(0, Fixture.Panel.RepairRecords.Count)
+		AssertEqual(0, Fixture.RepairTimers.Count)
+		AssertTrue(_LSPV_PreparedRows(Fixture) is Array)
+		AssertTrue(Fixture.Panel.LastSnapshot is Map)
+		AssertEqual(2, Fixture.Panel.LastSnapshot["results"]["lmstudio"]["models"].Length)
+	} finally Fixture.Dispose()
+}
+Test("local nonblocking discovery: rows return before ready and inactive original rescan", _LSPD_Nominal)
+
+_LSPD_Refusal(Kind) {
+	AssertTrue(HasMethod(LLM_LocalServerPanel.Prototype, "_QueueDiscovery"))
+	Fixture := _LSPD_Fixture()
+	WasSuspended := A_IsSuspended
+	try {
+		_LSPV_DiscoveryRows(Fixture)
+		Record := Fixture.Panel.Discovery
+		AssertTrue(Record is Map)
+		global _DriverReady
+		_DriverReady := true
+		switch Kind {
+			case "source": AssertTrue(FSWriteDurable(Fixture.World.ApiPath, Fixture.World.ApiImage "`n"))
+			case "pause": Suspend(true)
+			case "transition": Fixture.Transition("resume")
+			case "cancel": AssertTrue(Fixture.Panel.Retire(false))
+			case "error": Fixture.ThrowRescan := true
+		}
+		Fixture.Panel._RepairTick(Record)
+		AssertEqual(Kind == "error" ? 1 : 0, Fixture.RescanCalls)
+		AssertEqual(0, Fixture.Requests.Length)
+		AssertEqual(0, Fixture.Publications.Length)
+		AssertEqual(0, Fixture.Panel.RepairRecords.Count)
+		AssertEqual(0, Fixture.RepairTimers.Count)
+	} finally {
+		Suspend(WasSuspended)
+		AssertTrue(FSWriteDurable(Fixture.World.ApiPath, Fixture.World.ApiImage))
+		Fixture.Dispose()
+	}
+}
+
+_LSPD_RegisterRefusals() {
+	local Kind
+	for Kind in ["source", "pause", "transition", "cancel", "error"]
+		Test("local nonblocking discovery: " Kind " refuses exact queued acquisition", _LSPD_Refusal.Bind(Kind))
+}
+_LSPD_RegisterRefusals()
+
+_LSPD_TimerReentry() {
+	AssertTrue(HasMethod(LLM_LocalServerPanel.Prototype, "_QueueDiscovery"))
+	Fixture := _LSPD_Fixture()
+	try {
+		Fixture.ArmRetirement := true
+		AssertTrue(Fixture.Panel._QueueDiscovery(Fixture.World.Owner.Capture()))
+		AssertFalse(Fixture.ArmRetirement, "the actual timer arm port must reenter retirement")
+		AssertEqual(0, Fixture.RescanCalls)
+		AssertEqual(0, Fixture.Requests.Length)
+		AssertEqual(0, Fixture.Panel.RepairRecords.Count)
+		AssertEqual(0, Fixture.RepairTimers.Count)
+		AssertTrue(Fixture.Panel._QueueDiscovery(Fixture.World.Owner.Capture()))
+		Record := Fixture.Panel.Discovery
+		AssertTrue(Record is Map)
+		Fixture.RefuseRepairStop := true
+		AssertThrows(() => Fixture.Panel.Retire(false))
+		AssertTrue(Fixture.Panel.RepairRecords.Get(ObjPtr(Record), 0) == Record,
+			"timer0 refusal must retain the exact callback debt")
+		Arms := Fixture.ArmCalls
+		AssertThrows(() => Fixture.Panel._RepairTick(Record))
+		AssertEqual(Arms, Fixture.ArmCalls, "retired ownership cannot arm an unowned retry")
+		AssertEqual(0, Fixture.RescanCalls)
+		Fixture.RefuseRepairStop := false
+		AssertTrue(Fixture.Panel.Retire(false))
+		AssertEqual(0, Fixture.Panel.RepairRecords.Count)
+		AssertEqual(0, Fixture.RepairTimers.Count)
+	} finally Fixture.Dispose()
+}
+Test("local nonblocking discovery: arm reentry and stop refusal retain exact timer debt", _LSPD_TimerReentry)
+
+_LSPD_ArmRefusal() {
+	AssertTrue(HasMethod(LLM_LocalServerPanel.Prototype, "_QueueDiscovery"))
+	Fixture := _LSPD_Fixture()
+	try {
+		Fixture.ArmFailure := "refuse"
+		AssertThrows(() => Fixture.Panel._QueueDiscovery(Fixture.World.Owner.Capture()))
+		AssertEqual(0, Fixture.RescanCalls)
+		AssertEqual(0, Fixture.Requests.Length)
+		AssertEqual(0, Fixture.Publications.Length)
+		AssertEqual(0, Fixture.RepairTimers.Count)
+		AssertTrue(Fixture.Panel.Discovery is Map)
+		AssertEqual(1, Fixture.Panel.RepairRecords.Count, "failed acquisition retains its exact cleanup owner")
+		Fixture.ArmFailure := ""
+		AssertTrue(Fixture.Panel.Retire(false))
+		AssertEqual(0, Fixture.Panel.RepairRecords.Count)
+	} finally Fixture.Dispose()
+}
+Test("local nonblocking discovery: timer arm refusal cannot publish queued success", _LSPD_ArmRefusal)
+
+
+_LSPD_CoalescenceSource() {
+	Fixture := _LSPD_Fixture()
+	try {
+		_LSPV_DiscoveryRows(Fixture)
+		Prior := Fixture.Panel.Discovery
+		AssertTrue(Prior is Map)
+		AssertTrue(Fixture.Panel._QueueDiscovery(Prior["source"]))
+		AssertTrue(Fixture.Panel.Discovery == Prior, "unchanged source coalesces the exact retained callback")
+		AssertTrue(FSWriteDurable(Fixture.World.ApiPath, Fixture.World.ApiImage "`n"))
+		Fresh := Fixture.World.Owner.Capture()
+		AssertTrue(IsObject(Fresh) && Fixture.World.Owner.Current(Fresh))
+		AssertTrue(Fixture.Panel._QueueDiscovery(Fresh))
+		Next := Fixture.Panel.Discovery
+		AssertTrue(Next is Map && Next != Prior, "new admitted image replaces an obsolete source intent")
+		AssertTrue(Next["source"] == Fresh)
+		AssertFalse(Fixture.Panel.RepairRecords.Has(ObjPtr(Prior)))
+		AssertFalse(Fixture.RepairTimers.Has(ObjPtr(Prior["timer"])))
+		Fixture.Panel._RepairTick(Prior)
+		AssertTrue(Fixture.Panel.Discovery == Next, "old callback cannot retire its replacement")
+		AssertEqual(0, Fixture.RescanCalls)
+		global _DriverReady
+		_DriverReady := true
+		Fixture.Panel._RepairTick(Next)
+		AssertEqual(1, Fixture.RescanCalls)
+		AssertEqual(1, Fixture.Publications.Length)
+		AssertEqual(0, Fixture.Panel.RepairRecords.Count)
+	} finally {
+		AssertTrue(FSWriteDurable(Fixture.World.ApiPath, Fixture.World.ApiImage))
+		Fixture.Dispose()
+	}
+}
+Test("local nonblocking discovery: coalescence retains the admitted source image", _LSPD_CoalescenceSource)
+
+
+
+
+
+; ===============================================
+; ===============================================
+; ======= 6/ Deferred View Preparation ===========
+; ===============================================
+; ===============================================
+
+/** Delivers only an actually armed private preparation with genuine ready owner. */
+_LSPV_DrivePreparation(Fixture) {
+	Record := Fixture.Panel.Preparation
+	if !(Record is Map) || !Fixture.RepairTimers.Has(ObjPtr(Record["timer"]))
+		return false
+	global _DriverReady, _LLM_MenuBuildCoordinator
+	HadReady := IsSet(_DriverReady), HadCoordinator := IsSet(_LLM_MenuBuildCoordinator)
+	Ready := HadReady ? _DriverReady : false
+	Coordinator := HadCoordinator ? _LLM_MenuBuildCoordinator : 0
+	try {
+		_DriverReady := true
+		_LLM_MenuBuildCoordinator := LLMMenuBuildCoordinator(() => true, () => false)
+		Fixture.Panel._RepairTick(Record)
+		return true
+	} finally {
+		_DriverReady := HadReady ? Ready : unset
+		_LLM_MenuBuildCoordinator := HadCoordinator ? Coordinator : unset
+	}
+}
+
+_LSPV_DiscoveryRows(Fixture) {
+	Rows := Fixture.Panel.Rows()
+	_LSPV_DrivePreparation(Fixture)
+	return Rows
+}
+
+_LSPV_PreparedRows(Fixture) {
+	Fixture.Panel.Rows()
+	_LSPV_DrivePreparation(Fixture)
+	return Fixture.Panel.Rows()
+}
+
+class _LSPV_Fixture extends _LSPD_Fixture {
+	__New() {
+		super.__New()
+		this.CaptureCalls := 0
+		this.World.Owner.DefineProp("Capture", {Call: ObjBindMethod(this, "ObserveCapture")})
+	}
+
+	ObserveCapture(Owner, Args*) {
+		this.CaptureCalls += 1
+		return LLM_Menu_ApiPrivateSourceOwner.Prototype.Capture.Call(Owner, Args*)
+	}
+
+	Dispose() {
+		if this.World.Owner.HasOwnProp("Capture")
+			this.World.Owner.DeleteProp("Capture")
+		super.Dispose()
+	}
+}
+
+_LSPV_Nominal() {
+	Fixture := _LSPV_Fixture()
+	try {
+		Started := DllCall("Kernel32\GetTickCount64", "UInt64")
+		Rows := Fixture.Panel.Rows()
+		FileAppend("# DEFERRED_VIEW_ROWS elapsed_ms=" .
+			(DllCall("Kernel32\GetTickCount64", "UInt64") - Started) . "`n", "*")
+		AssertTrue(Rows is Array && Rows.Length > 0)
+		AssertEqual(0, Fixture.CaptureCalls, "Rows must not read or classify the private source")
+		AssertEqual(0, Fixture.RescanCalls)
+		AssertEqual(0, Fixture.Requests.Length)
+		AssertFalse(Fixture.Panel.LastSnapshot is Map)
+		Record := Fixture.Panel.Preparation
+		AssertTrue(Record is Map)
+		Fixture.Panel.Rows()
+		AssertTrue(Fixture.Panel.Preparation == Record)
+		AssertEqual(1, Fixture.ArmCalls, "repeated builds must not reset an owned pending one-shot")
+		Fixture.Panel._RepairTick(Record)
+		AssertEqual(0, Fixture.CaptureCalls, "startup false cannot enter preparation")
+		global _DriverReady, _LLM_MenuBuildCoordinator
+		_DriverReady := true
+		_LLM_MenuBuildCoordinator.Active := true
+		Fixture.Panel._RepairTick(Record)
+		AssertEqual(0, Fixture.CaptureCalls, "active build cannot enter preparation")
+		_LLM_MenuBuildCoordinator.Active := false
+		Fixture.Panel._RepairTick(Record)
+		AssertTrue(Fixture.CaptureCalls > 0)
+		AssertEqual(0, Fixture.RescanCalls, "preparation cannot confuse queued discovery with a result")
+		AssertTrue(Fixture.Panel.Discovery is Map)
+		Fixture.Panel._RepairTick(Fixture.Panel.Discovery)
+		AssertEqual(1, Fixture.Publications.Length)
+		_LSPV_PreparedRows(Fixture)
+		AssertTrue(Fixture.Panel.LastSnapshot is Map)
+		AssertTrue(Fixture.Panel.View is Map)
+		AssertEqual(Fixture.Order.Length, Fixture.Panel.View["receipts"].Count)
+		for Id, Receipt in Fixture.Panel.View["receipts"]
+			AssertTrue(Fixture.Native.IsCurrent(Receipt))
+		AssertEqual(0, Fixture.Panel.RepairRecords.Count)
+	} finally Fixture.Dispose()
+}
+Test("local deferred view: Rows is I/O free and exact ready tick prepares original receipts", _LSPV_Nominal)
+
+_LSPV_Refusal(Kind) {
+	Fixture := _LSPV_Fixture()
+	WasSuspended := A_IsSuspended
+	try {
+		Fixture.Panel.Rows()
+		Record := Fixture.Panel.Preparation
+		AssertTrue(Record is Map)
+		global _DriverReady
+		_DriverReady := true
+		switch Kind {
+			case "pause": Suspend(true)
+			case "transition": Fixture.Transition("resume")
+			case "cancel": AssertTrue(Fixture.Panel.Retire(false))
+		}
+		Fixture.Panel._RepairTick(Record)
+		AssertEqual(0, Fixture.CaptureCalls)
+		AssertEqual(0, Fixture.Requests.Length)
+		AssertFalse(Fixture.Panel.PreparedRows is Array)
+		AssertEqual(0, Fixture.Panel.RepairRecords.Count)
+	} finally {
+		Suspend(WasSuspended)
+		Fixture.Dispose()
+	}
+}
+
+_LSPV_RegisterRefusals() {
+	local Kind
+	for Kind in ["pause", "transition", "cancel"]
+		Test("local deferred view: " Kind " refuses exact pending preparation", _LSPV_Refusal.Bind(Kind))
+}
+_LSPV_RegisterRefusals()
+
+_LSPV_StopRefusal() {
+	Fixture := _LSPV_Fixture()
+	try {
+		Fixture.Panel.Rows()
+		Record := Fixture.Panel.Preparation
+		Fixture.RefuseRepairStop := true
+		AssertThrows(() => Fixture.Panel.Retire(false))
+		Arms := Fixture.ArmCalls
+		AssertThrows(() => Fixture.Panel._RepairTick(Record))
+		AssertEqual(Arms, Fixture.ArmCalls)
+		AssertEqual(0, Fixture.CaptureCalls)
+		AssertTrue(Fixture.Panel.RepairRecords.Get(ObjPtr(Record), 0) == Record)
+		Fixture.RefuseRepairStop := false
+		AssertTrue(Fixture.Panel.Retire(false))
+		AssertEqual(0, Fixture.Panel.RepairRecords.Count)
+	} finally Fixture.Dispose()
+}
+Test("local deferred view: refused timer retirement retains debt without retry", _LSPV_StopRefusal)
+
+_LSPV_ConsumptionFence() {
+	Fixture := _LSPV_Fixture()
+	try {
+		_LSPV_DiscoveryRows(Fixture)
+		global _DriverReady
+		_DriverReady := true
+		Fixture.Panel._RepairTick(Fixture.Panel.Discovery)
+		Fixture.Panel.Rows()
+		_LSPV_DrivePreparation(Fixture)
+		Prepared := Fixture.Panel.PreparedRows
+		AssertTrue(Prepared is Array && Fixture.Panel.PreparedOwner is Map)
+		Captures := Fixture.CaptureCalls
+		Fixture.Transition("resume")
+		Rows := Fixture.Panel.Rows()
+		AssertTrue(Rows is Array && Rows != Prepared,
+			"a changed lifecycle cannot consume the old actionable prepared array")
+		AssertEqual(Captures, Fixture.CaptureCalls, "refused consumption cannot move source work back to Rows")
+		AssertFalse(Fixture.Panel.PreparedOwner is Map)
+	} finally Fixture.Dispose()
+}
+Test("local deferred view: lifecycle replacement refuses prepared row consumption", _LSPV_ConsumptionFence)
+
+
+
+
+
+_LSPN_FixtureSchemaAdmission() {
+	Fixture := _LSPN_Fixture()
+	try {
+		AssertTrue(ConfigSchemaCanPrepareWrite(Fixture.World.ConfigPath))
+		Document := TOML_ParseDocument(Fixture.World.ConfigImage)
+		AssertEqual(ConfigMigrateCurrentVersion(), Document["_meta"]["schema_version"])
+		AssertEqual(Fixture.World.ConfigImage, FSReadUtf8Exact(Fixture.World.ConfigPath))
+		Receipt := Fixture.World.Owner.Capture()
+		AssertTrue(Receipt is LLM_Menu_ApiPrivateSourceReceipt)
+		AssertTrue(Fixture.World.Owner.Current(Receipt))
+		Future := StrReplace(Fixture.World.ConfigImage,
+			"schema_version = " ConfigMigrateCurrentVersion(),
+			"schema_version = " (ConfigMigrateCurrentVersion() + 1))
+		AssertTrue(Future != Fixture.World.ConfigImage)
+		AssertTrue(FSWriteDurable(Fixture.World.ConfigPath, Future))
+		AssertFalse(ConfigSchemaCanPrepareWrite(Fixture.World.ConfigPath))
+		AssertFalse(Fixture.World.Owner.Admit(), "a supported fixture does not weaken the real future-schema fence")
+		AssertFalse(Fixture.World.Owner.Current(Receipt), "the old receipt cannot borrow a future image")
+		AssertTrue(FSWriteDurable(Fixture.World.ConfigPath, Fixture.World.ConfigImage))
+		AssertTrue(Fixture.World.Owner.Admit())
+	} finally Fixture.Dispose()
+}
+Test("local server panel: fixture admits its exact supported image but refuses a future replacement", _LSPN_FixtureSchemaAdmission)
+
+
+
+
+
+class _LSPN_ReadyChild extends _LSM_ChildReceipt {
+	__New(Fixture, OnDone) {
+		super.__New()
+		this.Fixture := Fixture
+		this.OnDone := OnDone
+		this.ResponseDelivered := false
+		this.ResponseStatus := 0
+		this.ResponseBody := ""
+	}
+
+	start() {
+		super.start()
+		Fixture := this.Fixture
+		Request := Fixture.Requests[Fixture.Requests.Length]
+		Id := Fixture.Order[Mod(Fixture.Children.Length - 1, Fixture.Order.Length) + 1]
+		this.ResponseStatus := 200
+		this.ResponseBody := Id == "lmstudio"
+			? '{"data":[{"id":"independent-joined"},{"id":"other-joined"}]}' : '{"data":[]}'
+		AssertTrue(FSWrite(Request.HeaderPath, "HTTP/1.1 200 Fixture`r`n`r`n"))
+		this.OnDone.Call(0, this.ResponseBody, "")
+		this.ResponseDelivered := true
+		return true
+	}
+}
+
+_LSPN_ReadyChildFactory(Fixture, OnDone) {
+	return _LSPN_ReadyChild(Fixture, OnDone)
+}
+
+_LSPN_CancellationDebtChildFactory(Fixture, Index, OnDone) {
+	Child := _LSM_ChildReceipt()
+	if Fixture.Children.Length + 1 == Index
+		Child.TerminateAllowed := false
+	return Child
+}

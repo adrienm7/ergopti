@@ -710,7 +710,8 @@ function M.build_management(ctx)
 		end,
 	})
 
-	return { title = i18n.get("menu.hotstrings.params"), menu = rows }
+	-- The caller renders the declared hotstrings_params parent around these native children.
+	return { menu = rows }
 end
 
 return M

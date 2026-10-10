@@ -152,6 +152,13 @@ HealthCheck_Config() {
 	Schema := JsonParse(RawSchema)
 	if !(Schema is Map) || (Schema.Get("schema_version", 0) != 2)
 		throw ValueError("The diagnostics schema is not a version 2 schema.")
+	; Export labels come from canonical English, independently of UI locale.
+	Schema["export_strings"] := Map()
+	English := JsonParse(FileRead(_SharedDir . "\data\locales\en.json", "UTF-8"))
+	for Key, Value in English
+		if SubStr(Key, 1, 12) == "healthcheck."
+			Schema["export_strings"][Key] := Value
+	RawSchema := _HC_ValueToJson(Schema)
 	_HC_Config := Map(
 		"schema",        Schema,
 		"raw_schema",    RawSchema,
@@ -604,6 +611,7 @@ HealthCheck_ShowWindow(Mode := "") {
 				_HC_WindowEpoch += 1
 				WindowEpoch := _HC_WindowEpoch
 				PageUrl := "https://" . HC_VHOST . "/ui/healthcheck/index.html?cb=" . A_TickCount . "&epoch=" . WindowEpoch
+				Snapshot["export_revision"] := 1
 				_HC_Session := Map("epoch", WindowEpoch, "snapshot", Snapshot, "detailed", false, "extensive", false, "mode", Mode,
 					"page_url", PageUrl)
 
@@ -871,6 +879,11 @@ _HC_PerformPageAction(WindowEpoch, Action, Config) {
 			global _HC_Gui
 			_HealthCheck_CloseGui(_HC_Gui)
 		case "export_snapshot":
+			if !HealthCheck_CapturePageChecks(_HC_Session["snapshot"], Action) {
+				_HC_Send(WindowEpoch, _HC_ValueToJson(Map("type", "action", "action", "export_snapshot", "ok", false,
+					"export_sequence", Action["export_sequence"])))
+				return
+			}
 			_HC_Send(WindowEpoch, _HC_ValueToJson(Map("type", "action", "action", "export_snapshot",
 				"ok", true, "export_sequence", Action["export_sequence"], "snapshot", _HC_Session["snapshot"],
 				"share_text", HealthCheck_ShareDocument(_HC_Session["snapshot"], Config["schema"])["text"])))
@@ -887,7 +900,9 @@ _HC_PerformPageAction(WindowEpoch, Action, Config) {
 			_HC_ArchiveCleanupMetadata(_HC_Session)
 			_HC_Session["extensive"] := Action["extensive"]
 			_HC_Session["detailed"] := Action["detailed"]
+			Revision := _HC_Session["snapshot"].Get("export_revision", 1) + 1
 			_HC_Session["snapshot"] := HealthCheck_Run(Action["detailed"], Action["extensive"])
+			_HC_Session["snapshot"]["export_revision"] := Revision
 			_HC_Session["snapshot"]["retired_probes"] := _HC_Session.Get("cleanup_history", [])
 			_HC_Send(WindowEpoch, '{"type":"snapshot","snapshot":' . _HC_ValueToJson(_HC_Session["snapshot"]) . '}')
 			_HC_RestartProbes(WindowEpoch)

@@ -52,8 +52,9 @@ _CUK_NewDir() {
 _CUK_WriteFixture(Dir) {
 	global _CUK_FIXTURE
 	Path := Dir . "\config.toml"
-	AssertTrue(FSWriteDurable(Path, StrReplace(_CUK_FIXTURE, "`r`n", "`n")),
+	AssertTrue(FSWriteDurable(Path, _CMJFixtureCurrentSource(StrReplace(_CUK_FIXTURE, "`r`n", "`n"))),
 		"the fixture config must be written")
+	ConfigMigrateBoot(Path)
 	return Path
 }
 
@@ -194,6 +195,7 @@ _CUK_UnknownKeysWarnOnceWithoutErrors() {
 	try {
 		Path := Dir . "\config.toml"
 		AssertTrue(FSWriteDurable(Path, "[metrics]`nenabled = true`nobsolete_metric = true`n[old.section]`nenabled = true`n"))
+		_CMJFixtureReadonly(Path)
 		ApplyConfigToml(ManifestBuildFeaturesMap(), Path)
 		Errors := 0, Warnings := 0
 		for Line in Lines {
@@ -229,6 +231,7 @@ _CUK_OutdatedValuesWarnAndAreOffered() {
 			. "`nlog_level = " . '"VERBOSE"' . "`nalt_gr_is_kana_remap = " . '"yes"' . "`n"
 			. "[layout]`nergopti_base = false`n"))
 		Target := ManifestBuildFeaturesMap()
+		_CMJFixtureReadonly(Path)
 		Applied := ApplyConfigToml(Target, Path, &Rejected, , &Outdated)
 		AssertEqual(2, Applied, "the accepted neighbours still apply")
 		AssertEqual(0, Rejected, "an outdated value never blocks full saves")
@@ -881,6 +884,7 @@ _CUK_RetiredWarningAndRuntimeNeutrality() {
 	try {
 		AssertEqual(1, FSWriteCreateDurable(Path, Source))
 		Target := ManifestBuildFeaturesMap()
+		_CMJFixtureReadonly(Path)
 		AssertEqual(0, ApplyConfigToml(Target, Path, &Rejected))
 		AssertEqual(0, Rejected)
 		AssertEqual(false, Target["layout"]["ergopti_base"])
@@ -1302,7 +1306,7 @@ _CUK_RetiredGestureBindingsPreserveWholeSource() {
 		. Known . ' = "https://known.example"' . "`n"
 		. Twin . ' = "https://unjudged.example"' . "`n"
 		. 'keyboard__ctrl_k__open_url = "https://keyboard.example"' . "`n"
-	Source := "# independent user comment`n" . ParameterSource
+	Source := "_meta.schema_version = " . ConfigMigrateCurrentVersion() . "`n# independent user comment`n" . ParameterSource
 		. "`n[future]`nkeep = " . Chr(34) . "independent" . Chr(34) . "`n"
 		. "`n[layout]`nergopti_base = true`n"
 	try {
@@ -1311,6 +1315,7 @@ _CUK_RetiredGestureBindingsPreserveWholeSource() {
 		_ConfigBootRejectedOverrides := 0
 		AssertTrue(FSWriteDurable(Path, Source))
 		Target := ManifestBuildFeaturesMap()
+		_CMJFixtureReadonly(Path)
 		ApplyConfigToml(Target, Path, &Rejected)
 		AssertEqual(0, Rejected, "known retirement is never a schema/native rejection")
 		_IniCache := ParseConfigTomlFile(Path)
@@ -1334,6 +1339,7 @@ _CUK_RetiredGestureBindingsPreserveWholeSource() {
 		OtherPath := Dir . "\unjudged-only.toml"
 		UpperOnlySource := StrReplace(Source, Known . ' = "https://known.example"' . "`n", "", true)
 		AssertTrue(FSWriteDurable(OtherPath, UpperOnlySource))
+		_CMJFixtureReadonly(OtherPath)
 		ConfigurationFile := OtherPath
 		_IniCache := ParseConfigTomlFile(OtherPath)
 		GesturesReadConfig()
@@ -1434,7 +1440,7 @@ _CUK_RetiredScriptBindingsPreserveWholeSourceBody() {
 		. Known . ' = "https://known.example"' . "`n"
 		. Twin . ' = "https://unjudged.example"' . "`n"
 		. 'keyboard__ctrl_k__open_url = "https://keyboard.example"' . "`n"
-	Source := "# independent user comment`n" . ParameterSource
+	Source := "_meta.schema_version = " . ConfigMigrateCurrentVersion() . "`n# independent user comment`n" . ParameterSource
 		. "`n[future]`nkeep = " . Chr(34) . "independent" . Chr(34) . "`n"
 		. "`n[layout]`nergopti_base = true`n"
 	try {
@@ -1443,6 +1449,7 @@ _CUK_RetiredScriptBindingsPreserveWholeSourceBody() {
 		_ConfigBootRejectedOverrides := 0
 		AssertTrue(FSWriteDurable(Path, Source))
 		Target := ManifestBuildFeaturesMap()
+		_CMJFixtureReadonly(Path)
 		ApplyConfigToml(Target, Path, &Rejected)
 		AssertEqual(0, Rejected, "known retirement is never a schema/native rejection")
 		_IniCache := ParseConfigTomlFile(Path)
@@ -1467,6 +1474,7 @@ _CUK_RetiredScriptBindingsPreserveWholeSourceBody() {
 		OtherPath := Dir . "\unjudged-only.toml"
 		UpperOnlySource := StrReplace(Source, Known . ' = "https://known.example"' . "`n", "", true)
 		AssertTrue(FSWriteDurable(OtherPath, UpperOnlySource))
+		_CMJFixtureReadonly(OtherPath)
 		ConfigurationFile := OtherPath
 		_IniCache := ParseConfigTomlFile(OtherPath)
 		GesturesReadConfig()
@@ -1561,7 +1569,7 @@ _CUK_RetiredTapBindingsPreserveWholeSourceBody() {
 		. Known . ' = "https://known.example"' . "`n"
 		. Twin . ' = "https://unjudged.example"' . "`n"
 		. 'keyboard__ctrl_k__open_url = "https://keyboard.example"' . "`n"
-	Source := "# independent user comment`n" . ParameterSource
+	Source := "_meta.schema_version = " . ConfigMigrateCurrentVersion() . "`n# independent user comment`n" . ParameterSource
 		. "`n[future]`nkeep = " . Chr(34) . "independent" . Chr(34) . "`n"
 		. "`n[layout]`nergopti_base = true`n"
 	try {
@@ -1570,6 +1578,7 @@ _CUK_RetiredTapBindingsPreserveWholeSourceBody() {
 		_ConfigBootRejectedOverrides := 0
 		AssertTrue(FSWriteDurable(Path, Source))
 		Target := ManifestBuildFeaturesMap()
+		_CMJFixtureReadonly(Path)
 		ApplyConfigToml(Target, Path, &Rejected)
 		AssertEqual(0, Rejected, "known retirement is never a schema/native rejection")
 		_IniCache := ParseConfigTomlFile(Path)
@@ -1594,6 +1603,7 @@ _CUK_RetiredTapBindingsPreserveWholeSourceBody() {
 		OtherPath := Dir . "\unjudged-only.toml"
 		UpperOnlySource := StrReplace(Source, Known . ' = "https://known.example"' . "`n", "", true)
 		AssertTrue(FSWriteDurable(OtherPath, UpperOnlySource))
+		_CMJFixtureReadonly(OtherPath)
 		ConfigurationFile := OtherPath
 		_IniCache := ParseConfigTomlFile(OtherPath)
 		GesturesReadConfig()
@@ -1701,3 +1711,35 @@ _CUK_RetiredTapWarningReason() {
 }
 Test("config: retired tap warnings name the actual number-row domain (tap-binding-identity-warning)",
 	_CUK_RetiredTapWarningReason)
+
+
+
+
+
+; ===================================================
+; ===================================================
+; ======= 4/ Session Protected Source Preview =======
+; ===================================================
+; ===================================================
+
+_CUK_ProtectedSourceHasNoCleanupOffer() {
+	Dir := _CUK_NewDir()
+	Path := Dir . "\protected-config.toml"
+	Source := '[_meta]`nschema_version = ' . (ConfigMigrateCurrentVersion() + 1)
+		. '`n[layout]`nfuture_layout_owner = "retain exactly"`n'
+	Reason := "Controlled newer schema refusal."
+	Offers := []
+	try {
+		AssertTrue(FSWriteDurable(Path, Source))
+		TOML_RefuseWrites(Path, Reason)
+		Scan := ConfigUnusedKeysFind(Path, Map("layout", Map()))
+		AssertEqual("unsupported", Scan["status"], "a protected schema has no admitted cleanup ownership")
+		AssertEqual(0, Scan["keys"].Length, "future-owned keys are never disposable rows")
+		AssertFalse(ConfigUnusedKeysOffer(Path, ConfigUnusedKeysFind, (Target) => Offers.Push(Target)))
+		AssertEqual(0, Offers.Length, "startup cannot offer an unsafe protected-source cleanup")
+		AssertEqual(Source, FSReadUtf8Exact(Path), "preview preserves the exact newer source")
+		AssertEqual(Reason, TOML_WriteRefusal(Path), "preview never lifts session protection")
+	} finally DirDelete(Dir, true)
+}
+Test("config unused keys: protected schema refuses preview and startup offer (protected-schema-cleanup)",
+	_CUK_ProtectedSourceHasNoCleanupOffer)

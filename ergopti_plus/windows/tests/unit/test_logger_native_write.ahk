@@ -488,3 +488,161 @@ _LNW_ReplacementCannotStealDebt() {
 }
 Test("Logger: replacement cannot steal retained append debt (logger-replacement-owner)",
 	_LNW_ReplacementCannotStealDebt)
+
+
+class _LNWPrivacyFile {
+	Encoding := "UTF-8"
+	Handle := 731
+	Pos := 0
+	Closed := 0
+	Close() {
+		this.Closed += 1
+	}
+}
+
+_LNWPrivacyWrite(State, Handle, Bytes, ByteCount, &Written) {
+	AssertEqual(731, Handle)
+	State["text"] := StrGet(Bytes, ByteCount, "UTF-8")
+	Written := ByteCount
+	return true
+}
+
+_LNWPrivacyContext(User) {
+	global _SharedDir
+	Rules := JsonParse(FileRead(_SharedDir . "\modules\diagnostics\redaction.json", "UTF-8"))
+	return Map("rules", Rules, "context", Map("home", "C:\Users\" . User, "user", User, "case_insensitive", true))
+}
+
+_LNWPrivacyAppend(User) {
+	global _SharedDir, _LOGGER_APPEND_OWNERS, _LOGGER_APPEND_DEBTS, _LOGGER_APPEND_DEBT_REPAIRS
+	if _LOGGER_APPEND_OWNERS.Count || _LOGGER_APPEND_DEBTS.Count || _LOGGER_APPEND_DEBT_REPAIRS.Count
+		throw Error("A foreign logger writer or debt is retained.")
+	State := _LoggerPrivacyState(), Saved := [State["config"], State["root"]]
+	FileObject := _LNWPrivacyFile(), Receipt := Map("text", "")
+	try {
+		State["root"] := _SharedDir, State["config"] := _LNWPrivacyContext(User)
+		Prefix := "2026-10-10 09:00:00:123 [ERROR] [logger] "
+		Body := "account " . User . " path C:\Users\" . User . "\cache token=private_synthetic_secret"
+		Blob := Prefix . Body . "`r`ncontinued account " . User . "`r`n"
+		AssertTrue(_LoggerAppendComplete("C:\private-recording-log.txt", Blob, false,
+			(*) => FileObject, (*) => true, (*) => true, _LNWPrivacyWrite.Bind(Receipt),
+			[Prefix . Body . "`r`ncontinued account " . User]))
+		Expected := Chr(0xFEFF) . Prefix . Redact_Apply(Body, State["config"]["rules"], State["config"]["context"])
+			. "`r`ncontinued account <user>`r`n"
+		AssertEqual(Expected, Receipt["text"], "The actual native write boundary receives only redacted bodies")
+		AssertEqual(1, FileObject.Closed)
+		AssertEqual(0, _LOGGER_APPEND_OWNERS.Count)
+		AssertEqual(0, _LOGGER_APPEND_DEBTS.Count)
+		AssertContains(Blob, "private_synthetic_secret", "The source batch is unchanged")
+	} finally {
+		State["config"] := Saved[1], State["root"] := Saved[2]
+	}
+}
+_LNWPrivacyRegister() {
+	local PrivacyUser
+	for PrivacyUser in ["privacy-user", "2026", "ERROR", "logger"]
+		Test("Logger privacy: append preserves metadata user=" . PrivacyUser, _LNWPrivacyAppend.Bind(PrivacyUser))
+}
+_LNWPrivacyRegister()
+
+_LNWPrivacyRefuseBeforeEffects() {
+	global _SharedDir, _LOGGER_APPEND_OWNERS
+	State := _LoggerPrivacyState(), Saved := [State["config"], State["root"]]
+	Opened := []
+	try {
+		State["root"] := _SharedDir . "-foreign", State["config"] := _LNWPrivacyContext("privacy-user")
+		AssertFalse(_LoggerAppendComplete("C:\private-recording-refusal.txt", "private raw text", false,
+			(*) => (Opened.Push(true), _LNWPrivacyFile()), (*) => true, (*) => true,
+			_LNWPrivacyWrite.Bind(Map("text", ""))))
+		AssertEqual(0, Opened.Length, "Refused policy ownership never opens the sink")
+		AssertEqual(0, _LOGGER_APPEND_OWNERS.Count)
+	} finally {
+		State["config"] := Saved[1], State["root"] := Saved[2]
+	}
+}
+Test("Logger privacy: source mismatch refuses before native effects", _LNWPrivacyRefuseBeforeEffects)
+
+_LNWPrivacyEarlyBootstrap() {
+	global _SharedDir
+	State := _LoggerPrivacyState(), Saved := [State["config"], State["root"], _SharedDir]
+	try {
+		_SharedDir := "", State["config"] := 0, State["root"] := ""
+		Message := "Another instance owns the single-owner mutex after 3000 ms; terminating without registering any hook."
+		AssertEqual(Message, _LoggerBootstrapMessage("WARNING", "ErgoptiPlus", Message))
+		Message := "Single-owner mutex acquisition failed (wait=0xFFFFFFFF, error=5); terminating without registering any hook."
+		AssertEqual(Message, _LoggerBootstrapMessage("ERROR", "ErgoptiPlus", Message))
+		AssertEqual("Bootstrap detail withheld: log privacy policy is not initialized.",
+			_LoggerBootstrapMessage("ERROR", "ConfigTransition", "C:\Users\PRIVATE_ACCOUNT token=PRIVATE_SECRET"))
+		AssertEqual(0, State["config"], "Early logging never initializes an absent policy")
+		AssertThrows(() => _LoggerBootstrapMessage("ERROR", "PRIVATE_ACCOUNT", "private details"),
+			"Unowned bootstrap metadata must not become a raw prefix")
+	} finally {
+		State["config"] := Saved[1], State["root"] := Saved[2], _SharedDir := Saved[3]
+	}
+}
+Test("Logger privacy: early bootstrap retains closed mutex facts and withholds untrusted detail", _LNWPrivacyEarlyBootstrap)
+
+
+_LNWPrivacyBootstrapWrite() {
+	global _SharedDir, _DefaultLogsDir
+	State := _LoggerPrivacyState()
+	Saved := [State["config"], State["root"], _SharedDir, IsSet(_DefaultLogsDir), IsSet(_DefaultLogsDir) ? _DefaultLogsDir : ""]
+	Dir := A_Temp . "\logger-privacy-" . DllCall("GetCurrentProcessId", "UInt") . "-" . A_TickCount . "-" . Random(100000, 999999)
+	if FileExist(Dir)
+		throw Error("Private bootstrap namespace already exists.")
+	DirCreate(Dir)
+	Path := Dir . "\bootstrap.log"
+	try {
+		_SharedDir := "", State["config"] := 0, State["root"] := "", _DefaultLogsDir := Dir . "\"
+		Mutex := "Another instance owns the single-owner mutex after 3000 ms; terminating without registering any hook."
+		AssertEqual(Path, LoggerAppendBootstrapLine("WARNING", "ErgoptiPlus", Mutex))
+		AssertEqual(Path, LoggerAppendBootstrapLine("ERROR", "ConfigTransition", "C:\Users\PRIVATE_ACCOUNT token=PRIVATE_SECRET"))
+		Text := FileRead(Path, "UTF-8")
+		AssertContains(Text, "[WARNING] [ErgoptiPlus] " . Mutex)
+		AssertContains(Text, "[ERROR] [ConfigTransition] Bootstrap detail withheld: log privacy policy is not initialized.")
+		AssertFalse(InStr(Text, "PRIVATE_ACCOUNT") || InStr(Text, "PRIVATE_SECRET"), "The actual bootstrap file receives no untrusted early detail")
+		AssertEqual(2, StrSplit(RTrim(Text, "`r`n"), "`n").Length, "Both native appends retain their original line count")
+		AssertEqual(0, State["config"])
+	} finally {
+		State["config"] := Saved[1], State["root"] := Saved[2], _SharedDir := Saved[3]
+		if Saved[4]
+			_DefaultLogsDir := Saved[5]
+		else
+			_DefaultLogsDir := unset
+		if FileExist(Path)
+			FileDelete(Path)
+		DirDelete(Dir)
+	}
+}
+Test("Logger privacy: actual bootstrap append retains closed facts without raw detail", _LNWPrivacyBootstrapWrite)
+
+
+_LNWPrivacyMultilineRecord() {
+	global _SharedDir
+	State := _LoggerPrivacyState(), Saved := [State["config"], State["root"]]
+	try {
+		State["root"] := _SharedDir, State["config"] := _LNWPrivacyContext("privacy-user")
+		Prefix := "2026-10-10 09:00:00:123 [ERROR] [logger] "
+		Body := "first`r`n2026-10-10 09:00:00:123 [ERROR] [C:\Users\privacy-user] tail token=PRIVATE_SECRET"
+		Records := [Prefix . Body, Prefix . "second account privacy-user"]
+		Blob := Records[1] . "`r`n" . Records[2] . "`r`n"
+		Expected := Chr(0xFEFF) . Prefix . Redact_Apply(Body, State["config"]["rules"], State["config"]["context"])
+			. "`r`n" . Prefix . "second account <user>`r`n"
+		Receipt := Map("text", ""), FileObject := _LNWPrivacyFile()
+		AssertTrue(_LoggerAppendComplete("C:\private-recorded-multiline.txt", Blob, false,
+			(*) => FileObject, (*) => true, (*) => true, _LNWPrivacyWrite.Bind(Receipt), Records))
+		AssertEqual(Expected, Receipt["text"], "A forged prefix inside one record remains entirely body data")
+		AssertFalse(InStr(Receipt["text"], "privacy-user") || InStr(Receipt["text"], "PRIVATE_SECRET"))
+		AssertEqual(1, FileObject.Closed)
+		Opened := [], Written := Map("text", "")
+		AssertFalse(_LoggerAppendComplete("C:\private-recorded-mismatch.txt", Blob, false,
+			(*) => (Opened.Push(true), _LNWPrivacyFile()), (*) => true, (*) => true,
+			_LNWPrivacyWrite.Bind(Written), [Records[1]]))
+		AssertEqual(0, Opened.Length, "Mismatched source custody refuses before opening")
+		AssertEqual(Redact_Apply(Blob, State["config"]["rules"], State["config"]["context"]),
+			_LoggerPrivacyBlob(Blob, State["config"]), "Unknown raw blobs receive no metadata exemption")
+	} finally {
+		State["config"] := Saved[1], State["root"] := Saved[2]
+	}
+}
+Test("Logger privacy: multiline bodies cannot impersonate separate source records", _LNWPrivacyMultilineRecord)

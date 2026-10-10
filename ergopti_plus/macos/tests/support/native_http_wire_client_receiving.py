@@ -240,6 +240,7 @@ class RealNativeClientReceiving(unittest.TestCase):
             for name in ("native_http.py", "managed_http.py"):
                 shutil.copy2(MAC / "platform/network" / name, native)
             source = MAC / "launcher/Sources/ErgoptiPlus/ManagedHTTPWorker.swift"
+            pac_source = source.with_name("ManagedPACSource.swift")
             certificate_source = source.with_name("ManagedCertificateAuthorities.swift")
             bootstrap_source = source.with_name("ManagedBootstrapPolicy.generated.swift")
             fixture_source = Path(__file__).with_name("native_http_fixture_main.swift")
@@ -260,6 +261,7 @@ class RealNativeClientReceiving(unittest.TestCase):
                 str(path.relative_to(ROOT)): hashlib.sha256(path.read_bytes()).hexdigest()
                 for path in (
                     source,
+                    pac_source,
                     certificate_source,
                     bootstrap_source,
                     fixture_source,
@@ -271,11 +273,13 @@ class RealNativeClientReceiving(unittest.TestCase):
                 )
             }
             worker_copy = cls.root / source.name
+            pac_copy = cls.root / pac_source.name
             certificate_copy = cls.root / certificate_source.name
             bootstrap_copy = cls.root / bootstrap_source.name
             main_copy = cls.root / fixture_source.name
             swift_inputs = (
                 (source, worker_copy),
+                (pac_source, pac_copy),
                 (certificate_source, certificate_copy),
                 (bootstrap_source, bootstrap_copy),
                 (fixture_source, main_copy),
@@ -318,6 +322,7 @@ class RealNativeClientReceiving(unittest.TestCase):
                     "-framework",
                     "SystemConfiguration",
                     str(worker_copy),
+                    str(pac_copy),
                     str(certificate_copy),
                     str(bootstrap_copy),
                     str(main_copy),

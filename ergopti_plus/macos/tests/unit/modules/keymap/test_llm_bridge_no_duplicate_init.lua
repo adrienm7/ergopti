@@ -53,6 +53,7 @@ local _ = helpers.load_with_stubs("infra.logger")
 -- Load a fresh Logger instance that we can attach a capture sink to.
 package.loaded["infra.logger"] = nil
 local Logger = require("infra.logger")
+helpers.admit_logger_privacy(Logger)
 Logger.set_level(Logger.LEVELS.DEBUG)
 
 -- Minimal stub for modules.keymap.utils — only the functions referenced at

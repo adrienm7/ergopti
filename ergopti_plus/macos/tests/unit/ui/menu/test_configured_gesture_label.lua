@@ -41,6 +41,7 @@ helpers.describe("configured gesture menu label", function()
 				i18n = package.loaded["infra.i18n"], logger = helpers.make_logger_stub(),
 			}))
 			package.loaded["infra.manifest_menu"] = {
+				group_receiver = renderer.group_receiver,
 				template_rows = renderer.template_rows,
 				get_root = function() return { gesture_slots = { ["4"] = { "tap_4" } } } end,
 				build = function(_, _, _, _, _, providers) return providers.gesture_slots_4() end,

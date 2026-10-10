@@ -453,6 +453,8 @@ end
 function M.build(ctx)
 	local shortcuts = ctx.shortcuts
 	if not shortcuts then return nil end
+	local receive = ManifestMenu.group_receiver("top_level", "shortcuts")
+	if not receive then return nil end
 
 	local state  = ctx.state
 	local paused = ctx.paused
@@ -537,11 +539,6 @@ function M.build(ctx)
 
 	-- The parent carries the stored preference as its tick and is greyed while
 	-- paused; it has no action, since a row that opens a submenu is never clicked.
-	local item = {
-		label    = i18n.get("menu.shortcuts.title"),
-		checked  = state.shortcuts or nil,
-		disabled = paused or nil,
-	}
 
 
 	-- ==============================================
@@ -622,7 +619,7 @@ function M.build(ctx)
 		local prefix = script_control.SCRIPT_BINDING_PREFIX
 
 		local function get_label(act, slot_id)
-			if not act or act == "-" or act == "--" then return "-" end
+			if not act then return "-" end
 			if act:match("^#") then return act:sub(2) end
 			if ctx.gestures and type(ctx.gestures.get_action_label) == "function" then
 				local binding = slot_id and act ~= "none" and type(prefix) == "string"
@@ -640,9 +637,7 @@ function M.build(ctx)
 			local sub = {}
 			for _, act in ipairs(actions) do
 				local label = get_label(act, slot_id)
-				if label == "-" then
-					table.insert(sub, { separator = true })
-				elseif act:match("^#") then
+				if act:match("^#") then
 					table.insert(sub, { label = i18n.decorate_section(label), disabled = true })
 				else
 					table.insert(sub, {
@@ -932,7 +927,8 @@ function M.build(ctx)
 
 	local s_menu = ManifestMenu.build("shortcuts_menu", "Shortcuts", dyn_handlers, group_builders, sc_ctx, list_providers)
 
-	item.submenu = s_menu
+	local item = receive(s_menu, { shortcuts_enabled = function() return state.shortcuts or nil end })
+	if item then item.disabled = paused or nil end
 	return item
 end
 

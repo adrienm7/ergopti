@@ -6,7 +6,7 @@
 --- What the diagnostics page's buttons do on this machine once
 --- healthcheck.actions accepted them: copy the report, save it as a Markdown
 --- file under the logs folder and reveal it, report it on GitHub (copy it,
---- then open the bug form with the report prefilled), open a folder or a
+--- then save a reviewed local attachment and open the short bug form), open a folder or a
 --- settings page. Also the Debug menu's "Report a bug", which opens the
 --- diagnostics window at its preview, and "Suggest a feature".
 ---
@@ -14,9 +14,9 @@
 --- 1. Shared output is rebuilt from the host snapshot through a closed typed
 ---    policy. Free text, paths and unknown fields are excluded regardless of
 ---    the page or details checkbox. Only approved technical content leaves.
---- 2. GitHub answers 414 a little above 8 KB, so the issue link cuts a long
----    report to its budget; the clipboard holds it whole. A report saves no
----    file and reveals nothing: Finder would take the focus from the form.
+--- 2. The clipboard and local attachment hold the complete approved report.
+---    Only stable host version, OS and driver metadata are prefilled. The browser opens
+---    after attachment completion and reveal, without an automatic upload.
 --- 3. Paths come from the snapshot the host collected, by field id; a folder
 ---    that does not exist yet is created before it is opened; a file that does
 ---    not exist yet (today's errors file before the day's first warning) is
@@ -81,8 +81,9 @@ local DEFAULT_EFFECTS = {
 		local fh, err = io.open(path, "wb")
 		if not fh then return nil, tostring(err) end
 		local ok, write_err = fh:write(text)
-		fh:close()
+		local closed, close_err = fh:close()
 		if not ok then return nil, tostring(write_err) end
+		if not closed then return nil, tostring(close_err) end
 		return path
 	end,
 	make_dir = make_dir,
@@ -145,26 +146,31 @@ local function save_and_reveal(effects, paths, name, text)
 	return path
 end
 
---- Reports on GitHub: copies the full report, then opens the bug form with
---- that same report prefilled. Nothing is saved and nothing is revealed: the
---- browser opening is the last side effect, so the form keeps the focus.
+--- Reports on GitHub: copies and saves the complete approved report, then
+--- reveals its local attachment before opening the bug form with stable host
+--- version, OS and driver fields. Editable fields stay outside the URL; the
+--- browser opens last and no attachment is uploaded automatically.
 --- @param effects table
 --- @param documents table { templates, repository, redaction }
---- @param action table { text, fields } The page's text and identity fields.
+--- @param action table Host-approved text and technical identity fields.
 --- @param redact function
+--- @param paths table Host-retained attachment directory.
 --- @return table
-local function report(effects, documents, action, redact)
+local function report(effects, documents, action, redact, paths)
 	local text = redact(action.text)
-	-- First, and whole: the link may cut the report to fit GitHub's budget
+	-- Copy the complete reviewed report independently of its short metadata URL
 	if not effects.copy(text) then error("the clipboard refused the report") end
+	-- Complete the local attachment before opening the metadata-only issue form.
+	local path, err = save_and_reveal(effects, paths, action.name, text)
+	if not path then error(err) end
 	local fields = {}
-	for id, value in pairs(action.fields) do fields[id] = redact(value) end
+	-- Only the host-derived technical identity is stable enough to prefill.
+	for _, id in ipairs({ "version", "os", "driver" }) do fields[id] = action.fields[id] end
 	local report_field = documents.templates.templates.bug.report_field
 	if type(report_field) ~= "string" then error("the bug template names no report field") end
-	fields[report_field] = text
 	local url = IssueLink.build_url(documents.templates, documents.repository, "bug", fields)
 	if not effects.open_url(url) then error("the browser could not be opened") end
-	return {}
+	return { path = path }
 end
 
 --- Performs one action of the diagnostics page, already validated.
@@ -184,7 +190,7 @@ function M.perform(action, paths, documents, context, overrides, snapshot)
 			local document = Share.document(snapshot, documents.schema,
 				require("infra.i18n").get(documents.schema.share_policy.notice_key))
 			assert(action.text == document.text, "Diagnostic sharing preview is stale or invalid")
-			action = { action = action.action, text = document.text, fields = document.fields, name = document.name }
+			action = { action = action.action, text = document.text, fields = document.fields, name = document.name, summary = document.summary }
 		end
 		if action.action == "copy" then
 			if not effects.copy(redact(action.text)) then error("the clipboard refused the report") end
@@ -194,7 +200,7 @@ function M.perform(action, paths, documents, context, overrides, snapshot)
 			if not path then error(err) end
 			return { path = path }
 		elseif action.action == "report" then
-			return report(effects, documents, action, redact)
+			return report(effects, documents, action, redact, paths)
 		elseif action.action == "open_path" then
 			local path = paths[action.id]
 			if type(path) ~= "string" or path == "" then error("the path " .. action.id .. " is unknown") end

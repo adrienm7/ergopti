@@ -637,6 +637,62 @@
 								},
 								"err_count": {
 									"kind": "number"
+								},
+								"recent_error_facts": {
+									"kind": "object",
+									"fields": {
+										"observed": {
+											"kind": "boolean"
+										},
+										"source": {
+											"kind": "enum",
+											"values": ["errors_file", "ring", "unavailable"]
+										},
+										"qualification": {
+											"kind": "enum",
+											"values": ["log_observation_only"]
+										},
+										"examined_entries": {
+											"kind": "integer",
+											"minimum": 0
+										},
+										"excluded_entries": {
+											"kind": "integer",
+											"minimum": 0
+										},
+										"events": {
+											"kind": "array",
+											"item": {
+												"kind": "object",
+												"fields": {
+													"entry_index": {
+														"kind": "integer",
+														"minimum": 1
+													},
+													"code": {
+														"kind": "enum",
+														"values": [
+															"lease_watchdog_exit",
+															"lease_pong_timeout",
+															"lease_ready_timeout",
+															"mlx_import_failed",
+															"mlx_server_unreachable"
+														]
+													},
+													"exit_code": {
+														"kind": "integer",
+														"minimum": -2147483648,
+														"maximum": 2147483647
+													},
+													"sequence": {
+														"kind": "integer",
+														"minimum": 1,
+														"maximum": 2147483647
+													}
+												}
+											}
+										}
+									}
 								}
 							}
 						},
@@ -1628,8 +1684,164 @@
 							}
 						}
 					}
+				},
+				"page_check_observations": {
+					"kind": "object",
+					"fields": {
+						"source": {
+							"kind": "enum",
+							"values": ["installed_page_reported"]
+						},
+						"qualification": {
+							"kind": "enum",
+							"values": ["unqualified"]
+						},
+						"results": {
+							"kind": "object",
+							"fields": {
+								"schema_fields": {
+									"kind": "object",
+									"fields": {
+										"scope": {
+											"kind": "enum",
+											"values": ["diagnostics-model"]
+										},
+										"state": {
+											"kind": "enum",
+											"values": ["pending", "ok", "error", "not_run", "cancelled"]
+										},
+										"reason": {
+											"kind": "enum",
+											"values": ["opt_in_required", "invalid_diagnostic_model"]
+										},
+										"ms": {
+											"kind": "integer",
+											"minimum": 0
+										}
+									}
+								},
+								"probe_inventory": {
+									"kind": "object",
+									"fields": {
+										"scope": {
+											"kind": "enum",
+											"values": ["diagnostics-model"]
+										},
+										"state": {
+											"kind": "enum",
+											"values": ["pending", "ok", "error", "not_run", "cancelled"]
+										},
+										"reason": {
+											"kind": "enum",
+											"values": ["opt_in_required", "invalid_diagnostic_model"]
+										},
+										"ms": {
+											"kind": "integer",
+											"minimum": 0
+										}
+									}
+								},
+								"redaction": {
+									"kind": "object",
+									"fields": {
+										"scope": {
+											"kind": "enum",
+											"values": ["synthetic-export"]
+										},
+										"state": {
+											"kind": "enum",
+											"values": ["pending", "ok", "error", "not_run", "cancelled"]
+										},
+										"reason": {
+											"kind": "enum",
+											"values": ["opt_in_required", "invalid_diagnostic_model"]
+										},
+										"ms": {
+											"kind": "integer",
+											"minimum": 0
+										}
+									}
+								},
+								"driver_suites": {
+									"kind": "object",
+									"fields": {
+										"scope": {
+											"kind": "enum",
+											"values": ["isolated-suite"]
+										},
+										"state": {
+											"kind": "enum",
+											"values": ["not_run"]
+										},
+										"reason": {
+											"kind": "enum",
+											"values": ["not_embedded"]
+										}
+									}
+								},
+								"install_reload_profile": {
+									"kind": "object",
+									"fields": {
+										"scope": {
+											"kind": "enum",
+											"values": ["isolated-suite"]
+										},
+										"state": {
+											"kind": "enum",
+											"values": ["not_run"]
+										},
+										"reason": {
+											"kind": "enum",
+											"values": ["isolated_environment_required"]
+										}
+									}
+								}
+							}
+						}
+					}
 				}
 			}
 		}
+	},
+	"recent_error_facts": {
+		"owner_prefix": "Karabiner lease ",
+		"failure_marker": " failed; fencing before publishing failure: ",
+		"rules": [
+			{
+				"code": "lease_watchdog_exit",
+				"prefix": "watchdog exited unexpectedly (exit ",
+				"suffix": "):",
+				"field": "exit_code",
+				"minimum": -2147483648,
+				"maximum": 2147483647
+			},
+			{
+				"code": "lease_pong_timeout",
+				"prefix": "timeout waiting for PONG ",
+				"suffix": "",
+				"field": "sequence",
+				"minimum": 1,
+				"maximum": 2147483647
+			},
+			{
+				"code": "lease_ready_timeout",
+				"literal": "timeout waiting for READY"
+			},
+			{
+				"code": "mlx_import_failed",
+				"message_prefix": "MLX packages are not importable from the installed runtime ",
+				"number_marker": "(exit=",
+				"prefix": "(exit=",
+				"suffix": ", cause=",
+				"field": "exit_code",
+				"minimum": -2147483648,
+				"maximum": 2147483647
+			},
+			{
+				"code": "mlx_server_unreachable",
+				"message_prefix": "MLX server is missing or unreachable.",
+				"literal": "MLX server is missing or unreachable."
+			}
+		]
 	}
 }

@@ -1039,6 +1039,66 @@
 		throw new Error('Unknown diagnostic sharing rule');
 	}
 
+	/** Closed log facts contain no raw message, path, generation token or inferred cause. */
+	function recentErrorFacts(entries, source, schema) {
+		var observed = Array.isArray(entries),
+			events = [],
+			count = 0,
+			specs = schema.recent_error_facts;
+		(observed ? entries : []).forEach(function (entry, index) {
+			count += 1;
+			var first = typeof entry === 'string' ? entry.split(/[\r\n]/, 1)[0] : '';
+			var start = first.indexOf(specs.owner_prefix);
+			var marker =
+				start < 0 ? -1 : first.indexOf(specs.failure_marker, start + specs.owner_prefix.length);
+			var reason = marker < 0 ? '' : first.slice(marker + specs.failure_marker.length);
+			for (var rule of specs.rules) {
+				var event,
+					candidate = reason;
+				if (rule.message_prefix) {
+					var position = first.indexOf(rule.message_prefix);
+					candidate = position < 0 ? '' : first.slice(position);
+					if (rule.number_marker) {
+						var numberAt = candidate.indexOf(rule.number_marker, rule.message_prefix.length);
+						candidate = numberAt < 0 ? '' : candidate.slice(numberAt);
+					}
+				}
+				if (rule.literal && candidate === rule.literal)
+					event = { entry_index: index + 1, code: rule.code };
+				else if (rule.prefix && candidate.startsWith(rule.prefix)) {
+					var value = candidate.slice(rule.prefix.length);
+					if (rule.suffix) {
+						var finish = value.indexOf(rule.suffix);
+						value = finish < 0 ? '' : value.slice(0, finish);
+					}
+					if (/^-?\d+$/.test(value)) {
+						var number = projectShare(Number(value), {
+							kind: 'integer',
+							minimum: rule.minimum,
+							maximum: rule.maximum
+						});
+						if (number !== undefined && String(number) === value) {
+							event = { entry_index: index + 1, code: rule.code };
+							event[rule.field] = number;
+						}
+					}
+				}
+				if (event) {
+					events.push(event);
+					break;
+				}
+			}
+		});
+		return {
+			observed: observed,
+			source: ['errors_file', 'ring'].indexOf(source) >= 0 ? source : 'unavailable',
+			qualification: 'log_observation_only',
+			examined_entries: count,
+			excluded_entries: count - events.length,
+			events: events
+		};
+	}
+
 	/** Technical sharing never exports free text, local details or page-only model verdicts. */
 	function shareSnapshot(snapshot, schema) {
 		if (
@@ -1048,7 +1108,70 @@
 			['windows', 'macos', 'linux'].indexOf(snapshot.driver) < 0
 		)
 			throw new Error('Diagnostic sharing policy or identity unavailable');
-		return projectShare(snapshot, schema.share_policy.projection);
+		var safe = projectShare(snapshot, schema.share_policy.projection);
+		var issues = snapshot.sections && snapshot.sections.issues;
+		if (issues && typeof issues === 'object' && !Array.isArray(issues))
+			safe.sections.issues.recent_error_facts = recentErrorFacts(
+				issues.recent,
+				issues.recent_source,
+				schema
+			);
+		return safe;
+	}
+
+	/** Rebuilds closed installed-page records; they never qualify driver suites. */
+	function pageCheckObservations(results, schema) {
+		if (!results || typeof results !== 'object' || Array.isArray(results))
+			throw new Error('Invalid page check records');
+		var accepted = {},
+			expected = {};
+		schema.diagnostic_checks.items.forEach(function (spec) {
+			expected[spec.id] = true;
+			var row = results[spec.id];
+			if (
+				!row ||
+				typeof row !== 'object' ||
+				Array.isArray(row) ||
+				row.scope !== spec.scope ||
+				Object.keys(row).some(function (key) {
+					return ['state', 'scope', 'reason', 'ms'].indexOf(key) < 0;
+				})
+			)
+				throw new Error('Invalid page check record');
+			var rule =
+				schema.share_policy.projection.fields.page_check_observations.fields.results.fields[
+					spec.id
+				];
+			var clean = projectShare(row, rule);
+			if (
+				clean.state === undefined ||
+				clean.state !== row.state ||
+				clean.scope !== row.scope ||
+				clean.reason !== row.reason ||
+				clean.ms !== row.ms
+			)
+				throw new Error('Invalid page check value');
+			if (
+				spec.reason
+					? row.state !== 'not_run' || row.reason !== spec.reason || row.ms !== undefined
+					: row.state === 'ok' || row.state === 'error'
+						? row.ms === undefined ||
+							(row.reason !== undefined && row.reason !== 'invalid_diagnostic_model')
+						: row.ms !== undefined ||
+							(row.state === 'cancelled'
+								? row.reason !== undefined
+								: row.reason !== 'opt_in_required')
+			)
+				throw new Error('Invalid page check outcome');
+			accepted[spec.id] = clean;
+		});
+		if (
+			Object.keys(results).some(function (id) {
+				return !expected[id];
+			})
+		)
+			throw new Error('Unknown page check');
+		return { source: 'installed_page_reported', qualification: 'unqualified', results: accepted };
 	}
 
 	/** Renders only detached, policy-approved leaves; local free text never enters these rows. */
@@ -1123,10 +1246,19 @@
 	/** The local preview uses the same closed projection as the host's output. */
 	function formatShareable(snapshot, schema, t) {
 		var safe = shareSnapshot(snapshot, schema);
+		// Export translation never consults or changes the active page locale.
+		t = function (key) {
+			var value = schema.export_strings && schema.export_strings[key];
+			if (typeof value !== 'string' || !value)
+				throw new Error('English export label unavailable: ' + key);
+			return value;
+		};
 		return (
 			'# ErgoptiPlus diagnostics\n\n' +
 			t(schema.share_policy.notice_key) +
-			'\n\ndriver-suites: not_run\npage-model-checks: not_collected\n\n' +
+			'\n\ndriver-suites: not_run\npage-model-checks: ' +
+			(safe.page_check_observations ? 'installed_page_reported (unqualified)' : 'not_collected') +
+			'\n\n' +
 			shareReadable(safe, schema, t) +
 			'\n```json\n' +
 			JSON.stringify(safe) +
@@ -1136,6 +1268,7 @@
 
 	global.ErgoptiDiagnostics = {
 		shareSnapshot: shareSnapshot,
+		pageCheckObservations: pageCheckObservations,
 		formatShareable: formatShareable,
 		sectionsFor: sectionsFor,
 		probeFor: probeFor,

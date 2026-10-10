@@ -1016,6 +1016,7 @@
 	"menu.apps.encrypt_desc": "Krypter filer og mapper",
 	"menu.apps.no_apps": "Ingen applikasjoner funnet",
 	"menu.apps.title": "🛠️ Programmer",
+	"menu.builder.active_brand": "Ergopti",
 	"menu.builder.title": "Ergopti+",
 	"menu.builder.title_paused": "Ergopti+ ⏸",
 	"menu.debug.console": "Konsoll",
@@ -1131,6 +1132,7 @@
 	"menu.global.clean_unused_keys": "Rydd opp i config.toml",
 	"menu.global.starting": "Starter…",
 	"menu.global.setup_wizard": "Oppsettprogrammet…",
+	"menu.global.startup_bootstrap": "ErgoptiPlus — Starter…",
 	"menu.global.suspend": "⏸︎ Pause",
 	"menu.configuration.title": "Konfigurasjon",
 	"menu.hotstrings.add_custom": "+ Legg til en egendefinert stutsing…",
@@ -3282,5 +3284,8 @@
 	"healthcheck.problem.diagnostic_check": "Diagnostisk kontroll mislyktes: %s.",
 	"healthcheck.export.privacy_notice": "Denne rapporten deler bare tillatte tekniske opplysninger. Logger, fritekst, stier og identifiserende opplysninger utelates også når detaljer er aktivert. Lokale sidetester er ikke inkludert.",
 	"sg_actions.llm_translate_context": "🌐 Oversett gjeldende setning [kan tilpasses]",
-	"menu.about.startup_other_command_reason": "Annen oppstartskommando: Oppstart er konfigurert for en annen kommando eller installasjon. Den eksisterende innstillingen beholdes."
+	"menu.about.startup_other_command_reason": "Annen oppstartskommando: Oppstart er konfigurert for en annen kommando eller installasjon. Den eksisterende innstillingen beholdes.",
+	"menu.llm.model_parent_with_health": "%sValgt modell: %s",
+	"config.read_only.newer_schema": "Denne konfigurasjonen ble lagret med en nyere versjon av ErgoptiPlus. Innstillingene dine er bevart. Oppdater ErgoptiPlus og last det inn på nytt før du endrer innstillinger.",
+	"menu.llm.save_unavailable": "Utilgjengelig: gjenoppta ErgoptiPlus hvis det er satt på pause, eller åpne Diagnostikk for å se hvorfor innstillingene ikke kan lagres."
 }

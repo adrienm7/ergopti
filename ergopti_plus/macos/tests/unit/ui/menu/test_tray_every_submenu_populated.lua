@@ -18,6 +18,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
+local CaptionFixture = require("tests.support.hotstrings_parent_caption_fixture")
 local LayoutFixture = require("tests.support.layout_legacy_caption_fixture")
 
 -- The menu modules ui/menu/init.lua loads, under the keys Builder.generate reads.
@@ -32,9 +33,9 @@ local MENU_MODULES = {
 	about           = "ui.menu.menu_about",
 }
 
--- The top-level submenus the macOS tray must carry, by title key.
+-- The Hotstrings parent uses its independent English caption; other legacy labels remain key oracles.
 local EXPECTED_SUBMENUS = {
-	"menu.layout.title", "menu.hotstrings.title", "menu.metrics.title",
+	"menu.layout.title", "⚡ Hotstrings", "menu.metrics.title",
 	"menu.shortcuts.title", "menu.tapholds.title", "menu.gestures.title",
 	"menu.apps.title", "menu.llm.title", "menu.configuration.title", "menu.global.language",
 	"menu.about.title", "menu.debug.title",
@@ -110,7 +111,7 @@ end
 
 --- Builds the real tray and records every WARNING/ERROR the build logs.
 --- @return table|nil menu, table lines, string|nil err
-local function build_tray()
+local function build_tray(observe_layout)
 	-- The real LLM row, built by its own module over the doubles its suite uses.
 	local llm_item = nil
 	require("tests.support.llm_count_menu_fixture")(function(llm_menu)
@@ -120,6 +121,7 @@ local function build_tray()
 	local lines = {}
 	package.loaded["infra.logger"] = nil
 	local real_logger = require("infra.logger")
+	helpers.admit_logger_privacy(real_logger)
 	local spy = setmetatable({}, { __index = real_logger })
 	for _, level in ipairs({ "warn", "error" }) do
 		spy[level] = function(module_name, fmt, ...)
@@ -130,9 +132,12 @@ local function build_tray()
 	end
 	package.loaded["infra.logger"] = spy
 
-	local builder = helpers.load_with_stubs("ui.menu.builder")
+	helpers.load_with_stubs("ui.menu.builder")
 	local i18n = require("infra.i18n")
+	CaptionFixture.install(i18n)
 	LayoutFixture.install(i18n)
+	package.loaded["ui.menu.builder"] = nil
+	local builder = require("ui.menu.builder")
 	-- Every key resolves to text, the way the real catalogue does: a stub that
 	-- echoes keys would make the renderer hide rows a real tray shows.
 	local echo = i18n.get
@@ -165,7 +170,9 @@ local function build_tray()
 		llm_handler = { build_item = function() return llm_item end },
 	}
 	local actions = setmetatable({}, { __index = function() return function() end end })
+	local cleanup = observe_layout and observe_layout(require("infra.manifest_menu"), mods, ctx)
 	local ok, menu = pcall(builder.generate, ctx, mods, actions)
+	if cleanup then cleanup() end
 	package.loaded["infra.logger"] = nil
 	if not ok then return nil, lines, tostring(menu) end
 	return menu, lines, nil
@@ -368,5 +375,59 @@ helpers.describe("the real macOS tray: every submenu reaches the menu bar popula
 		helpers.assert_eq(rows[#rows - 1].title, i18n.get("menu.global.start_at_login"),
 			"startup immediately precedes Uninstall")
 		helpers.assert_eq(rows[#rows - 2].title, "-", "a separator sets the installation group apart")
+	end)
+end))
+
+
+helpers.describe("actual canonical Layout parent receives its completed module (fixed-layout-parent-native)", LayoutFixture.scoped(function()
+	local function layout_row(rows, title)
+		for _, row in ipairs(rows or {}) do if row.title == title then return row end end
+	end
+	helpers.it("reads canonical parent caption and retains absent check and original child callbacks (fixed-layout-parent-native)", function()
+		local completed, snapshots, count = nil, {}, 0
+		local menu, _, err = build_tray(function(renderer, mods)
+			local parent
+			for _, row in ipairs(renderer.get_array("top_level")) do if row.id == "keyboard_layout" then parent = row end end
+			assert(parent)
+			local caption, original_build = parent.i18n, mods.keyboard_layout.build
+			parent.i18n = "button.ok"
+			mods.keyboard_layout.build = function(ctx)
+				count = count + 1
+				local original = original_build(ctx)
+				assert(type(original) == "table" and type(original.submenu) == "table")
+				completed = original.submenu
+				for index, child in ipairs(completed) do
+					snapshots[index] = {title = child.title, fn = child.fn, menu = child.menu,
+						checked = child.checked, disabled = child.disabled}
+				end
+				return original
+			end
+			return function() parent.i18n = caption; mods.keyboard_layout.build = original_build end
+		end)
+		helpers.assert_nil(err); helpers.assert_eq(count, 1)
+		local parent = assert(layout_row(menu, "button.ok"), "canonical receiving caption must reach the native tray")
+		helpers.assert_nil(parent.checked, "the original Mac parent has no enable tick")
+		helpers.assert_nil(parent.fn); helpers.assert_eq(#parent.menu, #completed)
+		for index, child in ipairs(parent.menu) do
+			helpers.assert_eq(child.title, snapshots[index].title)
+			helpers.assert_true(rawequal(child.fn, snapshots[index].fn))
+			helpers.assert_true(rawequal(child.menu, snapshots[index].menu))
+			helpers.assert_eq(child.checked, snapshots[index].checked)
+			helpers.assert_eq(child.disabled, snapshots[index].disabled)
+		end
+	end)
+	helpers.it("refuses before actual module construction when canonical parent kind is withdrawn (fixed-layout-parent-native)", function()
+		local calls = 0
+		local menu, _, err = build_tray(function(renderer, mods)
+			local parent
+			for _, row in ipairs(renderer.get_array("top_level")) do if row.id == "keyboard_layout" then parent = row end end
+			assert(parent)
+			local kind, original_build = parent.type, mods.keyboard_layout.build
+			parent.type = "command"
+			mods.keyboard_layout.build = function(ctx) calls = calls + 1; return original_build(ctx) end
+			return function() parent.type = kind; mods.keyboard_layout.build = original_build end
+		end)
+		helpers.assert_nil(err); helpers.assert_eq(calls, 0, "refusal precedes the real Layout module")
+		helpers.assert_nil(layout_row(menu, "menu.layout.title"))
 	end)
 end))

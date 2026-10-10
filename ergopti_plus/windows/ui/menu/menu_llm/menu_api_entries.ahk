@@ -1343,6 +1343,7 @@ class LLM_Menu_ApiPrivateSourceOwner {
 			"source_current", ObjBindMethod(this, "Current"),
 			"entry", ObjBindMethod(this, "Entry"),
 			"entry_bound", ObjBindMethod(this, "EntryBound"),
+			"entries_bound", ObjBindMethod(this, "EntriesBound"),
 			"admit", ObjBindMethod(this, "Admit"),
 			"apply", ObjBindMethod(this, "Apply"))
 	}
@@ -1355,9 +1356,15 @@ class LLM_Menu_ApiPrivateSourceOwner {
 	}
 
 	_AdmitNonCritical() {
-		global _LLM_Menu_Loaded, _LifecycleLatestTransition
 		if A_IsSuspended || !ConfigFullStateCanPersist()
-				|| !IsSet(_LLM_Menu_Loaded) || !_LLM_Menu_Loaded
+			return false
+		return this._AdmitContextNonCritical()
+	}
+
+	; This context fence grants no schema or source permission by itself.
+	_AdmitContextNonCritical() {
+		global _LLM_Menu_Loaded, _LifecycleLatestTransition
+		if A_IsSuspended || !IsSet(_LLM_Menu_Loaded) || !_LLM_Menu_Loaded
 				|| ReloadTerminalHandoffActive()
 				|| _LLM_Menu_ApiPrivateLifecycleState()["attempt"] != 0
 			return false
@@ -1409,10 +1416,10 @@ class LLM_Menu_ApiPrivateSourceOwner {
 			return false
 		try {
 			ConfigImage := this._Snapshot(Held["config_path"])
-			if !(ConfigImage is Map) || !this._NativeCurrent(Held)
+			if !(ConfigImage is Map) || !this._NativeContextCurrent(Held)
 				return false
 			ApiImage := this._Snapshot(Held["api_path"])
-			if !(ApiImage is Map) || !this._NativeCurrent(Held)
+			if !(ApiImage is Map) || !this._NativeContextCurrent(Held)
 				return false
 			if ApiImage["present"] {
 				if !_LLM_Menu_ApiSourceOwned(ApiImage["content"])
@@ -1503,6 +1510,40 @@ class LLM_Menu_ApiPrivateSourceOwner {
 		if !this.Current(Receipt)
 			throw Error("The private API source authority changed during resolution.")
 		return Detached
+	}
+
+	/** Returns one detached provider batch fenced by the same originating source. */
+	EntriesBound(ProviderIds, Receipt) {
+		PreviousCritical := Critical("Off")
+		try {
+			global _LLM_Menu_ApiPrivateAuthorityGeneration
+			Held := this._Held(Receipt)
+			if !(Held is Map)
+				return false
+			if !(ProviderIds is Array) || ProviderIds.Length == 0
+				throw TypeError("Private API entry projection requires a provider batch.")
+			CapturedIds := ProviderIds.Clone()
+			Seen := Map()
+			for Id in CapturedIds {
+				if !(Id is String) || !Held["servers"].Has(Id) || Seen.Has(Id)
+					throw ValueError("Private API entry projection refuses an unknown or duplicate provider.")
+				Seen[Id] := true
+			}
+			Authority := _LLM_Menu_ApiPrivateAuthorityGeneration
+			if !this.Current(Receipt)
+				return false
+			Entries := Map()
+			for Id in CapturedIds {
+				Entry := this._EntryFrom(Held, Id)
+				Entries[Id] := Entry is Map ? LLM_Menu_DeepClone(Entry) : 0
+			}
+			Projection := Map("source", Receipt, "entries", Entries, "backend", Held["backend"],
+				"active_id", Held["active_id"], "menu_owner", Held["menu"], "authority", Authority)
+			if !this.Current(Receipt) || this._Held(Receipt) != Held
+					|| _LLM_Menu_ApiPrivateAuthorityGeneration != Authority
+				return false
+			return Projection
+		} finally Critical(PreviousCritical)
 	}
 
 	/** Applies exact configured fields through the existing joint WAL and native lifecycle. */
@@ -1803,7 +1844,17 @@ class LLM_Menu_ApiPrivateSourceOwner {
 		if !(Llm is Map) || !(Llm.Get("models", 0) is Map)
 				|| !(Llm["models"].Get("selected", 0) == Held["backend"])
 			return false
-		return this.Admit() && Features == Held["features"] && _LLM_Menu == Held["menu"]
+		return this.Admit() && this._NativeContextCurrent(Held)
+	}
+
+	_NativeContextCurrent(Held) {
+		global ConfigurationFile, _PathsFile, Features, _LLM_Menu
+		global LLM_API_PROVIDERS, LLM_LOCAL_API_SERVERS, LLM_Defaults
+		Llm := Features.Get("llm", 0)
+		if !(Llm is Map) || !(Llm.Get("models", 0) is Map)
+				|| !(Llm["models"].Get("selected", 0) == Held["backend"])
+			return false
+		return this._AdmitContextNonCritical() && Features == Held["features"] && _LLM_Menu == Held["menu"]
 			&& ConfigurationFile == Held["config_path"] && _PathsFile == Held["locator"]
 			&& _LLM_Menu_ApiEntriesPath() == Held["api_path"]
 			&& LLM_API_PROVIDERS == Held["providers"] && LLM_LOCAL_API_SERVERS == Held["servers"]
@@ -1824,12 +1875,14 @@ class LLM_Menu_ApiPrivateSourceOwner {
 		; Classified second reads fence mutations during snapshot/hash/decrypt. This
 		; is current-at-check authority; the WAL owns the final expected-image claim.
 		Images := IsSet(Expected) ? Expected : Held
+		if !this._NativeCurrent(Held)
+			return false
 		loop 2 {
-			if !this._NativeCurrent(Held)
+			if !this._NativeContextCurrent(Held)
 				return false
 			for Key in ["config", "api"] {
 				Observed := this._Snapshot(Held[Key . "_path"])
-				if !(Observed is Map) || !this._NativeCurrent(Held)
+				if !(Observed is Map) || !this._NativeContextCurrent(Held)
 						|| !_ConfigTransitionSnapshotMatches(Observed, Images[Key]["present"], Images[Key]["hash"])
 					return false
 			}

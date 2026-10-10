@@ -3826,27 +3826,48 @@ french_magickey = "FrenchMagicKey"
 # Every driver presents the same Tap-Holds row. Linux runs them inside its
 # daemon; the native engine is an implementation detail of each driver.
 [[menu.top_level]]
+type = "group"
 id = "tap_holds"
+i18n = "menu.tapholds.title"
+rows = []
+checked_when = ["tapholds_enabled"]
 greyed_when_paused = true
 
 [[menu.top_level]]
+type = "group"
 id = "shortcuts"
+i18n = "menu.shortcuts.title"
+rows = []
+checked_when = ["shortcuts_enabled"]
 greyed_when_paused = true
 
 [[menu.top_level]]
+type = "group"
 id = "gestures"
+i18n = "menu.gestures.title"
+rows = []
+checked_when = ["gestures_enabled"]
 greyed_when_paused = true
 
 [[menu.top_level]]
 id = "---"
 
 [[menu.top_level]]
+type = "group"
 id = "keyboard_layout"
+i18n = "menu.layout.title"
+rows = []
+checked_when = ["layout_enabled"]
 greyed_when_paused = true
 
 [[menu.top_level]]
+type = "group"
 id = "hotstrings"
+i18n = "menu.hotstrings.title"
+rows = []
+checked_when = ["hotstrings_enabled"]
 greyed_when_paused = true
+caption_count_policy = { value_getter = "hotstrings_parent_total", present_getter = "hotstrings_parent_count_present", visibility = { ahk = "always", hs = "available", linux = "positive" }, style = { ahk = "space", hs = "space", linux = "decimal" }, format = "%s (%s)", maximum = 9007199254740991 }
 
 [[menu.top_level]]
 type = "group"
@@ -4016,9 +4037,10 @@ id = "llm_toggle"
 i18n = "menu.llm.enable"
 checked_when = ["llm_enabled"]
 # Greyed, never absent, while the switch cannot run its activation transaction:
-# during a pause on every driver, and on macOS before the activation owner exists.
+# during a pause, a protected configuration, or before activation is ready.
 # The row used to vanish in those states, leaving the IA submenu without a switch.
 disabled_when = ["llm_toggle_ready"]
+disabled_reason_key = "menu.llm.save_unavailable"
 category = "LLM"
 
 # The restore alone: the maintainer retired the AI menu's « Tout effacer » on
@@ -5682,6 +5704,8 @@ i18n = "menu.extensions.header"
 [[menu.hotstrings_menu]]
 type = "list"
 id = "hotstring_extensions"
+# Linux publishes this inert marker when no extension owns categories or sections.
+status_rows.none_installed = [{ type = "label", i18n = "menu.extensions.none_installed" }]
 
 
 # Reloading the catalogue from disk, and Linux's alone: it is the only driver
@@ -9178,6 +9202,14 @@ i18n = "menu.layout.title"
 platforms = ["hs"]
 unavailable = "hide"
 
+# A missing Tap-Holds engine retains its visible disabled leaf, without a fictitious child.
+[[menu.linux_tap_holds_absent_parent]]
+type = "label"
+id = "tap_holds_absent_parent"
+i18n = "menu.tapholds.title"
+platforms = ["linux"]
+unavailable = "hide"
+
 # Linux Agent excluded-app data retains its actual settings and dialog owners.
 [[menu.agent_linux_disabled_apps_frame]]
 type = "group"
@@ -9272,7 +9304,7 @@ id = "agent_system1"
 i18n = "menu.agent.system1"
 caption_getter = "agent_system_backend_current_caption"
 caption_format = "numbered"
-platforms = ["linux"]
+platforms = ["linux", "ahk"]
 unavailable = "hide"
 
 [[menu.agent_linux_system2_frame]]
@@ -9281,7 +9313,7 @@ id = "agent_system2"
 i18n = "menu.agent.system2"
 caption_getter = "agent_system_backend_current_caption"
 caption_format = "numbered"
-platforms = ["linux"]
+platforms = ["linux", "ahk"]
 unavailable = "hide"
 
 # The actual Windows dynamic profile row retains its finished native Menu child.
@@ -9475,4 +9507,70 @@ caption_getter = "hotstring_language_name"
 caption_count_getter = "hotstring_language_count"
 caption_count_format = "%s (%s)"
 platforms = ["hs", "linux"]
+unavailable = "hide"
+
+# Only the previously native suspend caption and inert cold status need new
+# declarations. Existing top_level Reload/Quit are reused by source identity.
+[[menu.tray_startup_suspend]]
+type = "command"
+id = "suspend"
+i18n = "menu.global.suspend"
+platforms = ["ahk"]
+unavailable = "hide"
+
+[[menu.tray_startup_inert_frame]]
+type = "label"
+id = "startup_inert_status"
+i18n = "menu.global.startup_bootstrap"
+platforms = ["ahk"]
+unavailable = "hide"
+
+# The two Lua dynamic-category providers retain their native editor callbacks.
+# Windows retains its separate boot-order injection; this owns only these leaves.
+[[menu.personal_info_editor_frame]]
+type = "command"
+id = "personal_info_editor_open"
+i18n = "menu.shortcuts.edit_personal_info"
+platforms = ["hs", "linux"]
+unavailable = "hide"
+
+# Linux keeps the version value and resume callback native; this frame owns both header kinds.
+[[menu.linux_tray_active_header]]
+type = "label"
+id = "linux_tray_active_header"
+i18n = "menu.builder.active_brand"
+caption_getter = "linux_tray_version"
+caption_layout = "prefix"
+caption_joiner = " — "
+platforms = ["linux"]
+unavailable = "hide"
+
+[[menu.linux_tray_paused_header]]
+type = "command"
+id = "linux_tray_resume"
+i18n = "menu.builder.title_paused"
+caption_getter = "linux_tray_version"
+caption_layout = "prefix"
+caption_joiner = " — "
+platforms = ["linux"]
+unavailable = "hide"
+
+# The Windows Agent picker remains native; its fixed count caption is declared.
+[[menu.agent_windows_disabled_apps_command]]
+type = "command"
+id = "agent_disabled_apps"
+i18n = "menu.agent.disabled_apps"
+caption_getter = "agent_disabled_apps_count"
+caption_format = "numbered"
+platforms = ["ahk"]
+unavailable = "hide"
+
+# Windows model parent: native cached health precedes the translated model label.
+[[menu.llm_model_parent_ahk]]
+type = "group"
+id = "llm_model"
+i18n = "menu.llm.model_parent_with_health"
+caption_getters = ["llm_model_health_prefix", "llm_model_current_caption"]
+disabled_when = ["llm_model_parent_ready"]
+platforms = ["ahk"]
 unavailable = "hide"

@@ -482,12 +482,79 @@ _NDT_FileFilterObserverSource(UiaOwner) {
 		. '}' . "`n"
 		. '}' . "`n"
 		. '_NFO_Error(ObserverFailure, *) {' . "`n"
-		. 'FileAppend(ObserverFailure.Message, A_Args[1] . ".failure", "UTF-8-RAW")' . "`n"
+		. 'ObserverErrorText := ObserverFailure.Message' . "`n"
+		. 'if ObserverFailure is OSError {' . "`n"
+		. 'ObserverErrorPhase := "not-started"' . "`n"
+		. 'try {' . "`n"
+		. 'if FileExist(A_Args[1] . ".phase")' . "`n"
+		. 'ObserverErrorPhase := SubStr(FileRead(A_Args[1] . ".phase", "UTF-8"), 1, 128)' . "`n"
+		. '} catch as PhaseFailure {' . "`n"
+		. 'ObserverErrorPhase := "read-error:" . (PhaseFailure is OSError ? PhaseFailure.Number : Type(PhaseFailure))' . "`n"
+		. '}' . "`n"
+		. 'ObserverErrorText .= " | phase=" . ObserverErrorPhase . " | what=" . SubStr(ObserverFailure.What, 1, 128) . " | line=" . ObserverFailure.Line' . "`n"
+		. '}' . "`n"
+		. 'FileAppend(ObserverErrorText, A_Args[1] . ".failure", "UTF-8-RAW")' . "`n"
 		. 'ExitApp(2)' . "`n"
 		. '}' . "`n"
 		. '#Include ' . UiaOwner . "`n"
 }
 
+
+
+/**
+ * Executes the generated error callback without querying a desktop provider.
+ * Numeric native failures keep their last phase and exact call site; semantic
+ * refusal strings remain unchanged so the real no-filter mutation stays causal.
+ */
+_NDT_FileFilterFailureDiagnostics() {
+	Root := A_Temp . "\ergopti_filter_error_" . A_ScriptHwnd . "_" . A_TickCount
+	AssertFalse(DirExist(Root), "the observer error fixture has one private root")
+	DirCreate(Root)
+	Ownership := {CanRetire: true}
+	try {
+		ObserverSource := _NDT_FileFilterObserverSource("unused-observer-library.ahk")
+		Start := InStr(ObserverSource, "`n_NFO_Error(")
+		Finish := InStr(ObserverSource, "`n#Include ", , Start)
+		AssertTrue(Start > 0 && Finish > Start, "the actual generated error callback must exist")
+		CallbackSource := SubStr(ObserverSource, Start + 1, Finish - Start)
+		for CaseName in ["native", "no-phase", "unreadable-phase", "semantic"] {
+			Receipt := Root . "\" . CaseName
+			if CaseName == "unreadable-phase"
+				DirCreate(Receipt . ".phase")
+			else if CaseName != "no-phase"
+				FileAppend("restricted-txt|elapsed_ms=501", Receipt . ".phase", "UTF-8-RAW")
+			Harness := Receipt . ".ahk"
+			FailureSource := CaseName == "semantic"
+				? 'Error("Owned BIN visible under the restricted file filter")'
+				: 'OSError(0x80131505, "_NFO_Visible")'
+			FileAppend('#Requires AutoHotkey v2.0' . "`n#SingleInstance Off`n#NoTrayIcon`n#Warn All, StdOut`n"
+				. 'try _NFO_Error(' . FailureSource . ')' . "`n"
+				. 'catch' . "`n" . 'ExitApp(3)' . "`n" . CallbackSource,
+				Harness, "UTF-8")
+			AssertEqual("", _NDT_RunChild(A_AhkPath, ["/ErrorStdOut", Harness, Receipt], Ownership, 2),
+				"a native error remains a failing child with no fabricated success output")
+			Detail := FileRead(Receipt . ".failure", "UTF-8")
+			if CaseName == "semantic" {
+				AssertEqual("Owned BIN visible under the restricted file filter", Detail,
+					"semantic mutation refusals retain their exact independent expected message")
+			} else {
+				Assert(InStr(Detail, "0x80131505") > 0, "the native HRESULT remains visible")
+				if CaseName == "unreadable-phase" {
+					Assert(RegExMatch(Detail, " \| phase=read-error:-?[0-9]+ \| what=_NFO_Visible \| line=[0-9]+") > 0,
+						"an unreadable phase retains both the primary native failure and the numeric read refusal")
+				} else {
+					ExpectedPhase := CaseName == "native" ? "restricted-txt|elapsed_ms=501" : "not-started"
+					Assert(InStr(Detail, " | phase=" . ExpectedPhase . " | what=_NFO_Visible | line=") > 0,
+						"the error retains its native phase, call site and generated line")
+				}
+			}
+		}
+	} finally {
+		if Ownership.CanRetire
+			DirDelete(Root, true)
+	}
+}
+Test("native file filter: generated failure receipts retain phase and call site", _NDT_FileFilterFailureDiagnostics)
 
 /**
  * Pumps the modal provider while the distinct owned observer captures both streams.
@@ -580,7 +647,7 @@ _NDT_FileFilterBehaviorProbeSource(Artifact, Owner, Observer) {
 	AssertEqual(1, CallbackBoundaries, "the capture owns its exact file and observer state")
 	ObserverBoundary := 'SetTimer(_NFPCapture, 0)' . "`n" . 'if _NFPMode == "selected" {'
 	BehaviorSource := StrReplace(BehaviorSource, ObserverBoundary,
-		'if _NFPMode != "baseline" {' . "`n" . _NDT_FileFilterCaptureSource() . '}' . "`n" . ObserverBoundary, , &ObserverBoundaries)
+		'if _NFPMode != "baseline" {' . "`n" . _NDT_FileFilterCaptureSource() . _NDT_FileFilterActionSource() . '}' . "`n" . ObserverBoundary, , &ObserverBoundaries)
 	AssertEqual(1, ObserverBoundaries, "the real view is queried once before either native action")
 	for ResultMode in ["Selected", "Cancelled"] {
 		RetirementBoundary := 'FileAppend(_NFPSelected, _NFPRoot . "\selected.result", "UTF-8-RAW")'
@@ -621,6 +688,23 @@ _NDT_CheckFileFilterBehaviorPolicy(Index, Spec, Fixture, Artifact, Owner, Owners
 			"the exact shell-view file items prove both restricted and native All Files behavior")
 		AssertEqual("retired", FileRead(FilterRoot . "\" . FilterKind . ".retirement", "UTF-8"),
 			"each exact observed native picker retires before persistence")
+	}
+	ExpectedSelection := FileRead(FilterRoot . "\owned.path", "UTF-8")
+	ActualSelection := FileRead(FilterRoot . "\selected.result", "UTF-8")
+	if !(ActualSelection == ExpectedSelection) {
+		try {
+			for FilterAction in ["selected", "cancelled"]
+				if FileGetSize(FilterRoot . "\" . FilterAction . ".action") > 128
+					throw Error("The owned action diagnostic exceeds its closed bound")
+			FilterFacts := _NDT_FileFilterFailureFacts(Index,
+				FileRead(FilterRoot . "\selected.action", "UTF-8"),
+				FileRead(FilterRoot . "\cancelled.action", "UTF-8"), ActualSelection, ExpectedSelection,
+				FileRead(FilterRoot . "\cancelled.result", "UTF-8"))
+			FileAppend("::notice title=Windows native file filter diagnostic::" . FilterFacts
+				. " caption_match=1 selected_retired=1 cancelled_retired=1`n", "*")
+		} catch {
+			FileAppend("::notice title=Windows native file filter diagnostic::diagnostic_refused=1`n", "*")
+		}
 	}
 	AssertEqual(FileRead(FilterRoot . "\owned.path", "UTF-8"),
 		FileRead(FilterRoot . "\selected.result", "UTF-8"), "genuine filtering preserves the exact selected TXT path")
@@ -1192,3 +1276,81 @@ _NDF_CallbackOwnership() {
 	AssertEqual(Before, Port.Events.Length, "late callbacks cannot resurrect a retired owner")
 }
 Test("native folder: callback cookies and HWND leases reject foreign ownership", _NDF_CallbackOwnership)
+
+
+/** Records only closed action/focus facts from the exact owned picker. */
+_NDT_FileFilterActionSource() {
+	return 'PickerFocus := DllCall("GetFocus", "Ptr")' . "`n"
+		. 'PickerFocusOwner := !PickerFocus ? "none" : DllCall("IsChild", "Ptr", Hwnd, "Ptr", PickerFocus) ? "owned" : "foreign"' . "`n"
+		. 'PickerFocusKind := "none"' . "`n"
+		. 'if PickerFocusOwner == "owned" {' . "`n"
+		. 'PickerFocusClass := WinGetClass("ahk_id " . PickerFocus)' . "`n"
+		. 'PickerFocusKind := PickerFocusClass == "Edit" ? "edit" : PickerFocusClass == "ComboBox" ? "combo" : PickerFocusClass == "Button" ? "button" : "other"' . "`n"
+		. '}' . "`n"
+		. 'PickerForegroundOwned := DllCall("GetForegroundWindow", "Ptr") == Hwnd ? 1 : 0' . "`n"
+		. 'PickerAction := _NFPMode == "selected" ? "open" : "cancel"' . "`n"
+		. 'FileAppend(PickerAction . "|foreground=" . PickerForegroundOwned . "|focus=" . PickerFocusOwner . "|kind=" . PickerFocusKind . "|filter=" . ControlGetIndex(PickerTypeCombo), _NFPRoot . "\" . _NFPMode . ".action", "UTF-8-RAW")' . "`n"
+}
+
+/** Projects retained owned receipts without exposing a path, caption or item name. */
+_NDT_FileFilterFailureFacts(Index, SelectedAction, CancelledAction, Selected, Expected, Cancelled) {
+	if !(Index is Integer) || Index < 1 || Index > 5
+		throw Error("The owned policy index is invalid")
+	Facts := "policy_index=" . Index
+	for Mode, Action in Map("selected", SelectedAction, "cancelled", CancelledAction) {
+		Pattern := "^" . (Mode == "selected" ? "open" : "cancel")
+			. "\|foreground=([01])\|focus=(none|owned|foreign)\|kind=(none|edit|combo|button|other)\|filter=([12])\z"
+		if !(Action is String) || StrLen(Action) > 128 || !RegExMatch(Action, Pattern, &Fields)
+			throw Error("The owned action receipt is outside its closed schema")
+		if Fields[2] != "owned" && Fields[3] != "none"
+			throw Error("Foreign focus cannot publish a control kind")
+		Facts .= " " . Mode . "_action=" . (Mode == "selected" ? "open" : "cancel")
+			. " " . Mode . "_foreground_owned=" . Fields[1] . " " . Mode . "_focus=" . Fields[2]
+			. " " . Mode . "_focus_kind=" . Fields[3] . " " . Mode . "_filter_index=" . Fields[4]
+	}
+	Outcome := Selected == "" ? "empty" : Selected == Expected ? "owned" : "other"
+	return Facts . " selected_outcome=" . Outcome
+		. " cancelled_outcome=" . (Cancelled == "Array|0" ? "empty_array" : "other")
+}
+
+/** Exercises the real closed formatter without a native desktop or process. */
+_NDT_FilterFailureFactsProjection() {
+	Open := "open|foreground=1|focus=owned|kind=edit|filter=1"
+	Cancel := "cancel|foreground=0|focus=foreign|kind=none|filter=1"
+	for Result in ["", "C:\owned\selected.txt", "PRIVATE-PATH-CANARY"] {
+		Text := _NDT_FileFilterFailureFacts(4, Open, Cancel, Result, "C:\owned\selected.txt", "Array|0")
+		AssertContains(Text, "selected_outcome=" . (Result == "" ? "empty" : Result == "C:\owned\selected.txt" ? "owned" : "other"))
+		AssertContains(Text, "selected_foreground_owned=1 selected_focus=owned selected_focus_kind=edit selected_filter_index=1")
+		AssertContains(Text, "cancelled_foreground_owned=0 cancelled_focus=foreign cancelled_focus_kind=none cancelled_filter_index=1")
+		AssertContains(Text, "cancelled_outcome=empty_array")
+		AssertFalse(InStr(Text, "PRIVATE") || InStr(Text, "C:\"), "paths and unexpected results are classified, never exported")
+	}
+}
+Test("native file filter: failure evidence classifies owned action focus and outcome", _NDT_FilterFailureFactsProjection)
+
+/** Invalid receipt values refuse rather than enter the technical notice. */
+_NDT_FilterFailureFactsRefusal() {
+	Cancel := "cancel|foreground=0|focus=none|kind=none|filter=1"
+	for Bad in ["open|foreground=1|focus=owned|kind=PRIVATE-TEXT|filter=1",
+		"open|foreground=1|focus=foreign|kind=edit|filter=1", "cancel|foreground=1|focus=none|kind=none|filter=1",
+		"open|foreground=1|focus=owned|kind=edit|filter=3", "open|foreground=1|focus=owned|kind=edit|filter=1`nPRIVATE", "open|foreground=1|focus=owned|kind=edit|filter=1`n"] {
+		Refused := false
+		try _NDT_FileFilterFailureFacts(4, Bad, Cancel, "", "owned", "Array|0")
+		catch
+			Refused := true
+		AssertTrue(Refused, "a malformed receipt cannot publish a diagnostic")
+	}
+}
+Test("native file filter: malformed action evidence remains a refusal", _NDT_FilterFailureFactsRefusal)
+
+/** The generated action writer observes only its exact existing owned controls. */
+_NDT_FilterFailureFactsSource() {
+	Source := _NDT_FileFilterActionSource()
+	AssertContains(Source, 'DllCall("IsChild", "Ptr", Hwnd, "Ptr", PickerFocus)')
+	AssertContains(Source, 'DllCall("GetForegroundWindow", "Ptr") == Hwnd')
+	AssertContains(Source, 'ControlGetIndex(PickerTypeCombo)')
+	AssertContains(Source, '_NFPRoot . "\" . _NFPMode . ".action"')
+	AssertFalse(InStr(Source, "WinGetTitle") || InStr(Source, "ControlGetText"), "the action receipt reads no user text")
+	AssertFalse(InStr(Source, "SetActiveWindow") || InStr(Source, "WinActivate"), "the diagnostic never changes focus")
+}
+Test("native file filter: action diagnostics retain observation-only owned source", _NDT_FilterFailureFactsSource)

@@ -507,6 +507,7 @@ local function with_fixture(plan, callback)
 				policy_path = function() return "/fixture/modules/llm/network-retry.sh" end,
 				prelude = function() return "", nil end,
 				opaque_prelude = function() return "", nil end,
+				managed_http_prelude = function() return "", nil end,
 			}
 			package.loaded["modules.llm"] = {
 				DEFAULT_STATE = {llm_num_predictions = 1},
