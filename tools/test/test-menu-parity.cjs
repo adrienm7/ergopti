@@ -2049,7 +2049,26 @@ const {
 		['for _, row in ipairs(builders[id]() or {}) do', 'for _, row in ipairs({}) do'],
 		['local rendered = ManifestMenu.render_rows(items, "top_level")', 'local rendered = {}']
 	];
-	assert.equal(callerControls.length, 8, 'all actual tray transport withdrawals remain registered');
+	callerControls.push(
+		[
+			'local projected = { id = entry.id, greyed_when_paused = entry.greyed_when_paused == true }',
+			'local projected = { id = "foreign", greyed_when_paused = entry.greyed_when_paused == true }'
+		],
+		['table.insert(result, projected)', 'table.insert(result, {})'],
+		[
+			'local projected = { id = entry.id, greyed_when_paused = entry.greyed_when_paused == true }\n\t\tif entry.disabled == true then',
+			'local projected = { id = entry.id, greyed_when_paused = entry.greyed_when_paused == true }\n\t\tif false then'
+		],
+		[
+			'projected.disabled, projected.i18n, projected.reason_key = true, entry.i18n, entry.reason_key',
+			'projected.disabled, projected.i18n, projected.reason_key = true, entry.i18n, "foreign"'
+		]
+	);
+	assert.equal(
+		callerControls.length,
+		12,
+		'all original eight and four current projection withdrawals remain registered'
+	);
 	for (const [before, after] of callerControls) {
 		assert.equal(builder.split(before).length - 1, 1, 'exact current caller preimage');
 		assert.equal(
@@ -2858,8 +2877,8 @@ function publishesIncludedCommands(source, extension, section, declarations, pla
 	}
 	assert.equal(
 		controls.length,
-		74,
-		'all 60 LIVE successor obligations and 14 new handoff controls execute'
+		78,
+		'all original 74 completed-root obligations and four current projection controls execute'
 	);
 	assert.equal(
 		admits(sources),
@@ -3242,6 +3261,25 @@ const { nativeLinuxAiParentPublication } = require('../lib/menu-native-llm-paren
 			['linux/ui/menu/ai_parent.lua', 'api_method(renderer, method)', 'renderer[method]'],
 			['linux/ui/menu/ai_parent.lua', 'return row\nend', 'return { label = "synthetic" }\nend']
 		];
+		const disabledRow =
+			'elseif row.disabled == true then\n\t\t\t\t\trows[#rows + 1] = { label = i18n_safe(row.i18n), disabled = true,\n\t\t\t\t\t\tdisabled_reason_key = row.reason_key }';
+		for (const [before, after] of [
+			['elseif row.disabled == true then', 'elseif false then'],
+			['disabled = true,', 'disabled = false,'],
+			['disabled_reason_key = row.reason_key', 'disabled_reason_key = "foreign"'],
+			['label = i18n_safe(row.i18n)', 'label = "synthetic"']
+		]) {
+			assert.equal(
+				disabledRow.split(before).length - 1,
+				1,
+				'closed disabled branch mutation exists'
+			);
+			replacements.push([
+				'linux/ui/menu/menu_builder.lua',
+				disabledRow,
+				disabledRow.replace(before, after)
+			]);
+		}
 		if (kind === 'agent')
 			replacements.push(
 				[producerFile, 'llm.set_agent_mode(id)', 'true'],
@@ -5455,11 +5493,31 @@ function languageParentSource(source, driver) {
 		[{ type: 'group', id: 'about', i18n: 'menu.about.title', rows: [] }]
 	);
 	assert.deepEqual(hand.prior_top_level_record, { id: 'about' });
-	assert.deepEqual(
-		menu.about_menu,
-		hand.about_child_declarations,
-		'all original child identities and behavior metadata remain unchanged'
-	);
+	function requireAboutMetadata(rows) {
+		assert.deepEqual(
+			rows,
+			hand.about_child_declarations,
+			'all child identities and metadata include the intended startup command guard'
+		);
+	}
+	requireAboutMetadata(menu.about_menu);
+	for (const patch of [
+		{ disabled_when: undefined },
+		{ disabled_when: ['start_at_login_enabled'] },
+		{ disabled_reason_key: undefined },
+		{ disabled_reason_key: 'menu.about.source_run_reason' }
+	]) {
+		const rows = structuredClone(menu.about_menu);
+		Object.assign(
+			rows.find((row) => row.id === 'start_at_login'),
+			patch
+		);
+		assert.throws(
+			() => requireAboutMetadata(rows),
+			{ code: 'ERR_ASSERTION' },
+			'absent or wrong startup availability/reason must refuse the genuine metadata oracle'
+		);
+	}
 	assert.equal(
 		Object.keys(hand.locales).length,
 		21,

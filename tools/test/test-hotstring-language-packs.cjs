@@ -44,7 +44,8 @@ const LOCALE_NAMES = path.join(SHARED, 'data', 'locale_names.json');
 const NOT_A_HOTSTRING = new Set(['hotstrings.magic_key.replace']);
 
 const errors = [];
-const readToml = (p) => parse(fs.readFileSync(p, 'utf8'));
+const tomlOwnData = require('./fixtures/toml-own-data.cjs');
+const readToml = (p) => tomlOwnData(parse(fs.readFileSync(p, 'utf8')));
 
 const index = readToml(path.join(HS, '_index.toml'));
 const manifest = readToml(MANIFEST);
@@ -229,7 +230,7 @@ try {
 		const header = line.match(/^\[\[([a-z_]+)\]\]$/);
 		if (header) section = header[1];
 		if (/^".*" = \{ output = /.test(line)) {
-			const [trigger, fields] = Object.entries(parse(line))[0];
+			const [trigger, fields] = Object.entries(tomlOwnData(parse(line)))[0];
 			currentEntries.push({ ordinal: currentEntries.length + 1, section, trigger, ...fields });
 		}
 	}
@@ -320,3 +321,56 @@ if (errors.length) {
 console.log(
 	`\x1b[32m[OK] ${languages.length} hotstring language pack(s) are complete data and every section ships disabled.\x1b[0m`
 );
+
+// Prototype-neutral equality still refuses every changed own field.
+{
+	const source =
+		'[_meta]\ncolor = "blue"\ndelay = 0.5\nshow_tooltip = false\nitems = ["first", "second"]\n[_meta.sections.caps]\nname = "Original"\n';
+	const expected = {
+		_meta: {
+			color: 'blue',
+			delay: 0.5,
+			show_tooltip: false,
+			items: ['first', 'second'],
+			sections: { caps: { name: 'Original' } }
+		}
+	};
+	assert.deepStrictEqual(tomlOwnData(parse(source)), expected);
+	for (const changed of [
+		source.replace('color = "blue"', 'colour = "blue"'),
+		source.replace('"blue"', '"red"'),
+		source.replace('show_tooltip = false\n', ''),
+		source.replace('delay = 0.5', 'delay = 0.5\nextra = true')
+	])
+		assert.throws(
+			() => assert.deepStrictEqual(tomlOwnData(parse(changed)), expected),
+			assert.AssertionError
+		);
+	const prototypeFree = Object.assign(Object.create(null), {
+		['__proto__']: 'literal',
+		constructor: 'literal'
+	});
+	assert.deepStrictEqual(tomlOwnData(prototypeFree), {
+		['__proto__']: 'literal',
+		constructor: 'literal'
+	});
+	for (const invalid of [
+		undefined,
+		NaN,
+		Infinity,
+		new Date(0),
+		[, 'hole'],
+		Object.assign([], { extra: true }),
+		{
+			get secret() {
+				throw Error('accessor must not run');
+			}
+		},
+		Object.defineProperty({}, 'hidden', { value: 1 }),
+		{ [Symbol('hidden')]: true }
+	])
+		assert.throws(() => tomlOwnData(invalid), assert.AssertionError);
+	console.log(
+		'[OK] exact own TOML reference data controls: equality, four data mutations and nine invalid shapes.'
+	);
+}

@@ -77,7 +77,9 @@ def main():
         Path("../_shared/modules/diagnostics/schema.json").read_text(encoding="utf-8")
     )
     name = (
-        schema["report"]["name_prefix"] + "linux-20261004T000000Z" + schema["report"]["name_suffix"]
+        schema["report"]["name_prefix"]
+        + "linux-2026-10-04T00_00_00Z"
+        + schema["report"]["name_suffix"]
     )
     failures = 0
     with tempfile.TemporaryDirectory(prefix="ergopti-diagnostics-native-save-") as owned:

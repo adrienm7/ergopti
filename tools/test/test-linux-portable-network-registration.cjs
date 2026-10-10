@@ -16,6 +16,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const Pipeline = require('./ci-pipeline.cjs');
+const { assertLinuxQualifiedRun } = require('./ci-linux-qualified-run.cjs');
 const { selectGates, GATE_COMMANDS } = require('./verify-change.cjs');
 const { run } = require('./run-linux-portable-network-native.cjs');
 
@@ -102,7 +103,25 @@ const step = Pipeline.step(
 );
 assert.equal(Pipeline.stepField(step, 'if'), '${{ !cancelled() }}');
 assert.equal(Pipeline.stepField(step, 'continue-on-error'), null);
-assert.equal(Pipeline.runOf(step).join('\n'), 'npm run test:linux:portable-network-native');
+const nativeCommand = ['npm run test:linux:portable-network-native'];
+const rawRun = Pipeline.runOf(step);
+assertLinuxQualifiedRun(rawRun, nativeCommand);
+// Each refused raw mutation must retain the original command's independent oracle.
+for (const [before, after] of [
+	['--scope linux-e2e-suite --receipt', '--scope core-js-suite --receipt'],
+	['--validate-scope-receipt "$receipt"', '--validate-scope-receipt "foreign"'],
+	['qualified=false; no suite assertion count is claimed.', 'qualified=true; suite passed.'],
+	['elif [ "$mode" = full ]; then', 'else'],
+	['    exit 1', '    exit 0'],
+	['npm run test:linux:portable-network-native', 'echo native-passed']
+]) {
+	const original = rawRun.join('\n');
+	assert.equal(original.split(before).length - 1, 1);
+	assert.throws(() =>
+		assertLinuxQualifiedRun(original.replace(before, after).split('\n'), nativeCommand)
+	);
+}
+assert.throws(() => assertLinuxQualifiedRun(nativeCommand, nativeCommand));
 console.log(
 	`Portable network native gate: ${passed} admission controls passed; native proof separate.`
 );

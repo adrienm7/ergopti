@@ -396,6 +396,15 @@ def rescue():
 """
 
 
+def publish_signal_control_result(root, data):
+    """Expose the controlled receipt only after its complete file is closed."""
+    pending = root / "result.json.pending"
+    # Exclusive creation keeps an existing sibling outside this publication.
+    with pending.open("x", encoding="utf-8") as output:
+        output.write(data)
+    os.replace(pending, root / "result.json")
+
+
 def signal_control_caller(root, mode):
     """Keep a refused controlled child owned until the observer permits rescue."""
     from types import SimpleNamespace
@@ -436,7 +445,8 @@ def signal_control_caller(root, mode):
                 alive = True
             except ProcessLookupError:
                 pass
-        (root / "result.json").write_text(
+        publish_signal_control_result(
+            root,
             json.dumps(
                 {
                     "outcome": outcome,
@@ -446,7 +456,6 @@ def signal_control_caller(root, mode):
                     "proof_published": (root / "fixed.tgz.go-tests.receipt.json").exists(),
                 }
             ),
-            encoding="utf-8",
         )
         deadline = time.monotonic() + 5
         while not (root / "rescue").exists():
@@ -548,6 +557,183 @@ class NativeGoSignalOwnershipTests(unittest.TestCase):
 
     def testFailedRetirementObservationPreservesDebtWithoutProof(self):
         self.run_control(signal.SIGTERM, "raise")
+
+
+# Seven additive receiving controls preserve the original 37-case cohort above.
+ATOMIC_PUBLICATION_SCHEDULE = 'import json\nimport os\nimport sys\nimport time\nfrom pathlib import Path\n\n_original_open = Path.open\nif "--signal-caller" in sys.argv:\n    class ScheduledWriter:\n        def __init__(self, stream, path):\n            self.stream = stream\n            self.path = path\n\n        def __enter__(self):\n            self.stream.__enter__()\n            return self\n\n        def __exit__(self, *args):\n            return self.stream.__exit__(*args)\n\n        def write(self, data):\n            mode = os.environ["SIGNAL_PUBLICATION_SCHEDULE"]\n            if mode == "partial":\n                self.stream.write("{")\n                self.stream.flush()\n            destination = self.path.parent / "result.json"\n            assert not destination.exists()\n            # The original parent runs during this finite controlled write pause.\n            time.sleep(0.05)\n            assert not destination.exists()\n            with _original_open(Path(os.environ["SIGNAL_PUBLICATION_FACT"]), "x") as fact:\n                json.dump({"mode": mode, "destination_absent_before_and_after_pause": True}, fact)\n            if mode == "partial":\n                self.stream.seek(0)\n                self.stream.truncate()\n            return self.stream.write(data)\n\n    def open_path(self, *args, **kwargs):\n        stream = _original_open(self, *args, **kwargs)\n        if self.name == "result.json.pending":\n            return ScheduledWriter(stream, self)\n        return stream\n\n    Path.open = open_path\n'
+
+
+class AtomicPublicationReceivingTests(unittest.TestCase):
+    def scheduled_original_control(self, mode):
+        with tempfile.TemporaryDirectory(prefix="signal-publication-receiving-") as temporary:
+            root = Path(temporary)
+            hooks = root / "hooks"
+            hooks.mkdir()
+            (hooks / "sitecustomize.py").write_text(ATOMIC_PUBLICATION_SCHEDULE, encoding="utf-8")
+            fact = root / "publication.json"
+            env = dict(
+                os.environ,
+                PYTHONPATH=str(hooks),
+                SIGNAL_PUBLICATION_SCHEDULE=mode,
+                SIGNAL_PUBLICATION_FACT=str(fact),
+            )
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    "-B",
+                    str(Path(__file__).resolve()),
+                    "NativeGoSignalOwnershipTests.testActualSigtermSettlesAndRestoresHandlers",
+                    "-v",
+                ],
+                env=env,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+            )
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertIn(b"Ran 1 test", result.stderr)
+            self.assertIn(b"\nOK\n", result.stderr)
+            self.assertEqual(
+                json.loads(fact.read_text()),
+                {"mode": mode, "destination_absent_before_and_after_pause": True},
+            )
+
+    def testEmptyPendingFileCannotReachOriginalReader(self):
+        self.scheduled_original_control("empty")
+
+    def testPartialPendingFileCannotReachOriginalReader(self):
+        self.scheduled_original_control("partial")
+
+    def testCompleteClosedFileIsRenamedWithinSameOwnedDirectory(self):
+        with tempfile.TemporaryDirectory(prefix="signal-publication-closed-") as temporary:
+            root = Path(temporary)
+            actual_replace = os.replace
+            received = []
+            streams = []
+            actual_open = Path.open
+
+            def tracked_open(path, *args, **kwargs):
+                stream = actual_open(path, *args, **kwargs)
+                if args and args[0] == "x":
+                    streams.append(stream)
+                return stream
+
+            def replace(source, destination):
+                self.assertEqual(len(streams), 1)
+                self.assertTrue(streams[0].closed)
+                self.assertEqual(source, root / "result.json.pending")
+                self.assertEqual(destination, root / "result.json")
+                self.assertEqual(source.read_bytes(), b'{"answer":42}')
+                self.assertFalse(destination.exists())
+                actual_replace(source, destination)
+                received.append(True)
+
+            with (
+                unittest.mock.patch.object(Path, "open", tracked_open),
+                unittest.mock.patch.object(os, "replace", replace),
+            ):
+                publish_signal_control_result(root, '{"answer":42}')
+            self.assertEqual(received, [True])
+            self.assertEqual((root / "result.json").read_bytes(), b'{"answer":42}')
+            self.assertFalse((root / "result.json.pending").exists())
+
+    def testWriteErrorClosesActualFileAndNeverPublishes(self):
+        with tempfile.TemporaryDirectory(prefix="signal-publication-write-error-") as temporary:
+            root = Path(temporary)
+            actual_open = Path.open
+            primary = OSError("controlled-write-refusal")
+            streams = []
+
+            class RefusedWriter:
+                def __init__(self, stream):
+                    self.stream = stream
+
+                def __enter__(self):
+                    self.stream.__enter__()
+                    return self
+
+                def __exit__(self, *args):
+                    return self.stream.__exit__(*args)
+
+                def write(self, data):
+                    self.stream.write("{")
+                    self.stream.flush()
+                    raise primary
+
+            def open_path(path, *args, **kwargs):
+                stream = actual_open(path, *args, **kwargs)
+                streams.append(stream)
+                return RefusedWriter(stream)
+
+            with (
+                unittest.mock.patch.object(Path, "open", open_path),
+                unittest.mock.patch.object(os, "replace") as replacement,
+            ):
+                with self.assertRaises(OSError) as raised:
+                    publish_signal_control_result(root, '{"answer":42}')
+                self.assertIs(raised.exception, primary)
+                replacement.assert_not_called()
+            self.assertTrue(all(stream.closed for stream in streams))
+            self.assertFalse((root / "result.json").exists())
+            self.assertEqual((root / "result.json.pending").read_bytes(), b"{")
+
+    def testCloseErrorCannotPublishAndPreservesPrimary(self):
+        with tempfile.TemporaryDirectory(prefix="signal-publication-close-error-") as temporary:
+            root = Path(temporary)
+            actual_open = Path.open
+            primary = OSError("controlled-close-refusal")
+            streams = []
+
+            class RefusedClose:
+                def __init__(self, stream):
+                    self.stream = stream
+
+                def __enter__(self):
+                    self.stream.__enter__()
+                    return self
+
+                def __exit__(self, *args):
+                    self.stream.__exit__(*args)
+                    raise primary
+
+                def write(self, data):
+                    return self.stream.write(data)
+
+            def open_path(path, *args, **kwargs):
+                stream = actual_open(path, *args, **kwargs)
+                streams.append(stream)
+                return RefusedClose(stream)
+
+            with (
+                unittest.mock.patch.object(Path, "open", open_path),
+                unittest.mock.patch.object(os, "replace") as replacement,
+            ):
+                with self.assertRaises(OSError) as raised:
+                    publish_signal_control_result(root, '{"answer":42}')
+                self.assertIs(raised.exception, primary)
+                replacement.assert_not_called()
+            self.assertTrue(all(stream.closed for stream in streams))
+            self.assertFalse((root / "result.json").exists())
+
+    def testReplaceRefusalKeepsPreviousCompleteReceiptAndPrimary(self):
+        with tempfile.TemporaryDirectory(prefix="signal-publication-replace-error-") as temporary:
+            root = Path(temporary)
+            (root / "result.json").write_bytes(b'{"answer":7}')
+            primary = OSError("controlled-replace-refusal")
+            with unittest.mock.patch.object(os, "replace", side_effect=primary):
+                with self.assertRaises(OSError) as raised:
+                    publish_signal_control_result(root, '{"answer":42}')
+            self.assertIs(raised.exception, primary)
+            self.assertEqual((root / "result.json").read_bytes(), b'{"answer":7}')
+            self.assertEqual((root / "result.json.pending").read_bytes(), b'{"answer":42}')
+
+    def testExistingSiblingIsRefusedWithoutTruncatingItsBytes(self):
+        with tempfile.TemporaryDirectory(prefix="signal-publication-foreign-") as temporary:
+            root = Path(temporary)
+            (root / "result.json.pending").write_bytes(b"foreign-sentinel")
+            with self.assertRaises(FileExistsError):
+                publish_signal_control_result(root, '{"answer":42}')
+            self.assertEqual((root / "result.json.pending").read_bytes(), b"foreign-sentinel")
+            self.assertFalse((root / "result.json").exists())
 
 
 if __name__ == "__main__":

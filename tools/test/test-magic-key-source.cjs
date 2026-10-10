@@ -32,6 +32,7 @@
 const assert = require('assert');
 const fs = require('fs');
 const TOML = require('smol-toml');
+const tomlOwnData = require('./fixtures/toml-own-data.cjs');
 const { shared, REPO_ROOT } = require('../lib/paths.cjs');
 const path = require('path');
 
@@ -88,7 +89,7 @@ const maps = step.ops.filter((op) => op.op === 'map_value');
 const renames = step.ops.filter((op) => op.op === 'rename');
 assert.strictEqual(step.ops.at(-1), renames[0], 'the rename runs after every value is mapped');
 assert.deepStrictEqual(
-	renames,
+	tomlOwnData(renames),
 	[{ op: 'rename', section: 'hotstrings', key: RETIRED_KEY, to_key: 'magic_key_source' }],
 	'the retired key becomes the shared one'
 );

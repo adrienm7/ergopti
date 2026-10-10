@@ -39,7 +39,7 @@ helpers.describe("Gesture actions fixture ownership", function()
 					for _, name in ipairs({ "modules.gestures.actions", "infra.notifications",
 						"adapters.timer_scheduler", "_generated.gesture_emit_actions",
 						"_generated.action_catalogue", "config_binding_identity", "config_binding_publication", "config_keyboard_publication", "hs", "hs.timer",
-						"ui.menu.gesture_fixture_unrelated" }) do
+						"llm.translate", "ui.menu.gesture_fixture_unrelated" }) do
 						package.loaded[name] = sentinel
 					end
 					_G.hs = sentinel
@@ -49,6 +49,11 @@ helpers.describe("Gesture actions fixture ownership", function()
 					local constructions = 0
 					helpers.load_with_stubs = function(...)
 						local result = loader(...)
+						local translation = package.loaded["llm.translate"]
+						helpers.assert_type(translation, "table", "construction loads the real transitive translation owner")
+						helpers.assert_type(translation.is_language_text, "function")
+						helpers.assert_eq(translation.is_language_text("English"), true)
+						helpers.assert_eq(translation.is_language_text(" "), false)
 						local identity = package.loaded["config_binding_identity"]
 						local publication = package.loaded["config_binding_publication"]
 						helpers.assert_type(publication, "table", "construction loads the real accessor authority")

@@ -11,3 +11,8 @@ node_modules
 pnpm-lock.yaml
 package-lock.json
 yarn.lock
+
+# Promo video: public/ is a hard-link mirror of static/ (formatting it would
+# rewrite the originals through the links) and out/ holds renders.
+/video/public
+/video/out

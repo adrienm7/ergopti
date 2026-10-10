@@ -9,6 +9,7 @@ const os = require('node:os');
 const path = require('node:path');
 const {
 	verifyUpgrade,
+	inspectNativePriorProfile,
 	inspectSavedProfile,
 	prepareInstalledUserProfile
 } = require('./compiled-upgrade-contract.cjs');
@@ -529,4 +530,30 @@ if (require.main === module) {
 	console.log(
 		`Installed-user boundary: ${runBoundaryCases(verifyWindowsStartup)} refusals and actual byte-preserving file edits passed (Win32 unexecuted).`
 	);
+	const owned = fs.mkdtempSync(path.join(os.tmpdir(), 'ergopti-prior-dashboard-data-'));
+	try {
+		const file = path.join(owned, 'config.toml');
+		const prefix =
+			'[_meta]\nschema_version = 6\n[metrics]\nmetrics_enabled = false\nmetrics_shortcut_typing = "Ctrl+Alt+M"\nmetrics_shortcut_apps = "Ctrl+Alt+A"\n';
+		const valid = 'future_dashboard = { keep = 9, enabled = false }\n';
+		fs.writeFileSync(file, prefix + valid);
+		assert.deepEqual(inspectNativePriorProfile(file, 6).future_dashboard, {
+			keep: 9,
+			enabled: false
+		});
+		for (const changed of [
+			valid.replace('keep', 'kept'),
+			valid.replace('9', '8'),
+			valid.replace(', enabled = false', ''),
+			valid.replace(' }', ', extra = true }')
+		]) {
+			fs.writeFileSync(file, prefix + changed);
+			assert.throws(() => inspectNativePriorProfile(file, 6), assert.AssertionError);
+		}
+		console.log(
+			'Native prior dashboard own-data equality and four TOML mutations passed (Win32 unexecuted).'
+		);
+	} finally {
+		fs.rmSync(owned, { recursive: true });
+	}
 }

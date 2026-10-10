@@ -22,6 +22,7 @@ const { spawnSync } = require('node:child_process');
 
 const ROOT = path.resolve(__dirname, '..', '..');
 const DRIVERS = ['windows', 'macos', 'linux'];
+const RETIRED = 'macos/ui/menu/menu_llm/live_mode_panel.lua';
 const TOOL = 'tools/test/test-native-menu-rows.cjs';
 const CORPUS = 'tools/test/fixtures/native-menu-census-legacy.json';
 const BASELINE = 'tools/test/native-menu-rows-baseline.json';
@@ -53,6 +54,7 @@ function reset() {
 	fs.rmSync(sourceRoot, { recursive: true, force: true });
 	for (const driver of DRIVERS) {
 		for (const rel of legacy.drivers[driver].sourceFiles) {
+			if (rel === RETIRED) continue;
 			// Independent path coverage metadata supplies stand-ins only for the
 			// traversal precondition; the real child still reads every actual file.
 			write(`static/ergopti_plus/${rel}`, driver === 'windows' ? 'Anchor() {\n}\n' : 'return {}\n');
@@ -61,11 +63,39 @@ function reset() {
 	write(TOOL, tool);
 	write(CORPUS, corpusBytes);
 	write(BASELINE, JSON.stringify(legacy.baseline, null, '\t') + '\n');
+	// Current retirement needs real declaration and lexer inputs on every reset.
+	write(
+		'static/ergopti_plus/_shared/modules/features/manifest.toml',
+		'[menu]\nowner = "retained"\n'
+	);
+	write(
+		'static/ergopti_plus/_shared/modules/menu/menu_manifest.json',
+		JSON.stringify({
+			top_level: [{ id: 'llm' }],
+			llm_menu: [{ id: 'llm_toggle' }]
+		})
+	);
+	write(
+		'tools/lib/script-source.cjs',
+		fs.readFileSync(path.join(ROOT, 'tools/lib/script-source.cjs'))
+	);
 }
 
 function rows(driver, count) {
-	const known = legacy.drivers[driver].excerpts.flatMap((excerpt) =>
-		excerpt.lines.map((entry) => ({ rel: excerpt.path, source: entry.source }))
+	const known = legacy.drivers[driver].excerpts
+		.flatMap((excerpt) =>
+			excerpt.lines.map((entry) => ({ rel: excerpt.path, source: entry.source }))
+		)
+		.filter((entry) => {
+			// The immutable legacy classifier still receives every original excerpt.
+			// Current fixture actors cannot resurrect retired menu identities.
+			const retired =
+				/\b(?:live_mode_panel|LiveModePanel|llm_live_mode(?:_off)?|llm_live_controls|llm_live_is_off|llm_live_off_ready|llm_live_off_boundary|LLM_Menu_BuildLiveModeMenu|_LLM_Menu_LiveModeRows|_LLM_Menu_MakeLiveModeHandler)\b/i;
+			return entry.rel !== RETIRED && !retired.test(entry.source);
+		});
+	assert.ok(
+		known.length > 0,
+		'current native count fixtures have actual retained classifier inputs'
 	);
 	for (let i = 0; i < count; i++) {
 		const entry = known[i % known.length];
@@ -246,7 +276,6 @@ try {
 	const lexer = 'tools/lib/script-source.cjs';
 	const retiredFixture = () => {
 		reset();
-		fs.rmSync(path.join(sourceRoot, retired));
 		write(features, '[menu]\nowner = "retained"\n');
 		write(
 			generated,
@@ -371,6 +400,13 @@ try {
 	reset();
 	write(CORPUS, Buffer.concat([corpusBytes, Buffer.from(' ')]));
 	refusesBoth(/independent b06 legacy oracle must remain unchanged/);
+
+	reset();
+	write('static/ergopti_plus/' + RETIRED, 'return {}\n');
+	refusesBoth(/retired production source must remain absent/);
+	reset();
+	fs.rmSync(path.join(sourceRoot, 'macos/ui/menu/menu_llm/init.lua'));
+	refusesBoth(/source coverage .* is incomplete/);
 
 	reset();
 	fs.rmSync(baselinePath);

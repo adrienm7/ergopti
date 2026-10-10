@@ -385,6 +385,209 @@ for (const [swift, capture] of [
 		assert.equal(reader.evaluate(valid, swift, capture).complete, false)
 	);
 
+const windowsSourceFixture = fs.readFileSync(
+	path.join(root, 'static/ergopti_plus/windows/tests/fixtures/pac_source_contract.ps1'),
+	'utf8'
+);
+/** Mask PowerShell comments and string data while preserving source offsets. */
+function powerShellExecutablePositions(definition) {
+	const masked = definition.split('').map((value) => (value === '\n' ? '\n' : ' '));
+	let quote = '';
+	let here = '';
+	let blockDepth = 0;
+	let lineComment = false;
+	for (let index = 0; index < definition.length; index++) {
+		const value = definition[index];
+		const next = definition[index + 1];
+		if (lineComment) {
+			if (value === '\n') lineComment = false;
+			continue;
+		}
+		if (blockDepth) {
+			if (value === '<' && next === '#') {
+				blockDepth++;
+				index++;
+			} else if (value === '#' && next === '>') {
+				blockDepth--;
+				index++;
+			}
+			continue;
+		}
+		if (here) {
+			if ((index === 0 || definition[index - 1] === '\n') && value === here && next === '@') {
+				here = '';
+				index++;
+			}
+			continue;
+		}
+		if (quote) {
+			if (quote === '"' && value === '`') index++;
+			else if (value === quote && next === quote) index++;
+			else if (value === quote) quote = '';
+			continue;
+		}
+		if (value === '`') {
+			index++;
+			continue;
+		}
+		if (value === '<' && next === '#') {
+			blockDepth = 1;
+			index++;
+			continue;
+		}
+		if (value === '#') {
+			lineComment = true;
+			continue;
+		}
+		if (
+			value === '@' &&
+			(next === "'" || next === '"') &&
+			/^[^\S\r\n]*\r?\n/.test(definition.slice(index + 2))
+		) {
+			here = next;
+			index++;
+			continue;
+		}
+		if (value === "'" || value === '"') {
+			quote = value;
+			continue;
+		}
+		masked[index] = value;
+	}
+	assert.equal(blockDepth, 0, 'PowerShell block comment must terminate.');
+	assert.equal(quote, '', 'PowerShell quoted string must terminate.');
+	assert.equal(here, '', 'PowerShell here string must terminate.');
+	return masked.join('');
+}
+
+/** Observe only the two executable native Fetch calls, retaining their raw data. */
+function windowsFetchArgumentExpressions(definition) {
+	const executable = powerShellExecutablePositions(definition);
+	const head = '$Fetch.Invoke($null, ';
+	const expressions = [
+		...definition.matchAll(/\$Fetch\.Invoke\(\$null, (@\([\s\S]*?\[int\]50\))\)/g)
+	]
+		.filter((match) => executable.slice(match.index, match.index + head.length) === head)
+		.map((match) => match[1]);
+	assert.equal(expressions.length, 2, 'Exactly two executable native Fetch families are required.');
+	return expressions;
+}
+
+const fetchArgumentExpressions = windowsFetchArgumentExpressions(windowsSourceFixture);
+check('both-native-source-fetch-families-retain-five-reflection-arguments', () => {
+	assert.equal(fetchArgumentExpressions.length, 2);
+	for (const expression of fetchArgumentExpressions)
+		assert.match(
+			expression,
+			/^@\(\('http:\/\/127\.0\.0\.1:' \+ \$First\.Port \+ '\/' \+ \$Path\),/
+		);
+});
+
+const literalFetchCalls = [
+	...windowsSourceFixture.matchAll(/\$Fetch\.Invoke\(\$null, (@\([\s\S]*?\[int\]50\))\)/g)
+].map((match) => match[0]);
+check('comment-only-source-fetch-lookalikes-never-meet-the-executable-floor', () => {
+	assert.equal(literalFetchCalls.length, 2);
+	for (const definition of [
+		literalFetchCalls.map((call) => '<#' + call + '#>').join('\n'),
+		literalFetchCalls
+			.map((call) =>
+				call
+					.split('\n')
+					.map((line) => '# ' + line)
+					.join('\n')
+			)
+			.join('\n'),
+		'<# outer <# nested #>\n' + literalFetchCalls.join('\n') + '\n#>'
+	])
+		assert.throws(
+			() => windowsFetchArgumentExpressions(definition),
+			/Exactly two executable native Fetch/
+		);
+});
+check('quoted-and-here-string-source-fetch-lookalikes-never-meet-the-executable-floor', () => {
+	for (const definition of [
+		literalFetchCalls.map((call) => "'" + call.replaceAll("'", "''") + "'").join('\n'),
+		literalFetchCalls.map((call) => '"' + call + '"').join('\n'),
+		"@'\n" + literalFetchCalls.join('\n') + "\n'@",
+		'@"\n' + literalFetchCalls.join('\n') + '\n"@',
+		"@'  \t\r\nodd' literal\n" + literalFetchCalls.join('\n') + "\n'@\n# close ' token\n",
+		'@"  \t\r\nodd" literal\n' + literalFetchCalls.join('\n') + '\n"@\n# close " token\n'
+	])
+		assert.throws(
+			() => windowsFetchArgumentExpressions(definition),
+			/Exactly two executable native Fetch/
+		);
+});
+check('real-source-fetch-data-preserves-comment-markers-escapes-and-unicode-offsets', () => {
+	const prefix = '$Data = \'# <# literal 😀\'; $Quoted = "`"# <#"; $Escaped = `#\n';
+	assert.deepEqual(
+		windowsFetchArgumentExpressions(prefix + windowsSourceFixture),
+		fetchArgumentExpressions
+	);
+	const withLiteralMarker = windowsSourceFixture.replaceAll(
+		"'http://127.0.0.1:'",
+		"'http://127.0.0.1:#<#'"
+	);
+	const expressions = windowsFetchArgumentExpressions(withLiteralMarker);
+	assert.equal(expressions.length, 2);
+	for (const expression of expressions) assert.ok(expression.includes("'http://127.0.0.1:#<#'"));
+});
+check('unterminated-source-comment-and-string-data-refuses-instead-of-changing-the-floor', () => {
+	for (const definition of ['<#', "'", '"', "@'\n", '@"\n'])
+		assert.throws(() => windowsFetchArgumentExpressions(definition), /must terminate/);
+});
+
+if (process.platform === 'win32') {
+	check('actual-powershell-source-fetch-arguments-preserve-types-and-values', () => {
+		const quote = (value) => "'" + value.replaceAll("'", "''") + "'";
+		const command = [
+			"$ErrorActionPreference = 'Stop'",
+			"Add-Type -TypeDefinition @'",
+			'public static class PacSourceArgumentProbe {',
+			' public static string Observe(string location, long deadline, long retirement, int maximum, int redirects) {',
+			'  return location + "|" + deadline + "|" + retirement + "|" + maximum + "|" + redirects;',
+			' }',
+			'}',
+			"'@",
+			"$Method = [PacSourceArgumentProbe].GetMethod('Observe')",
+			"if ($Method.GetParameters().Length -ne 5) { throw 'Reflection parameter inventory differs.' }",
+			'$First = [PSCustomObject]@{Port=54321}',
+			'$Deadline = [long]6000',
+			'$Types = @([string],[long],[long],[int],[int])',
+			'$Controls = 0',
+			'foreach ($Expression in @(' + fetchArgumentExpressions.map(quote).join(',') + ')) {',
+			" foreach ($Path in @('utf8','utf16','redirect','foreign','invalid','oversized','unavailable')) {",
+			'  $Arguments = & ([ScriptBlock]::Create($Expression))',
+			"  if ($Arguments.Count -ne 5) { throw 'Source fetch argument arity differs.' }",
+			'  for ($Index = 0; $Index -lt 5; $Index++) {',
+			"   if ($Arguments[$Index].GetType() -ne $Types[$Index]) { throw 'Source fetch argument type differs.' }",
+			'  }',
+			'  $Actual = $Method.Invoke($null, $Arguments)',
+			"  $Expected = 'http://127.0.0.1:54321/' + $Path + '|6000|7000|1048576|50'",
+			"  if ($Actual -cne $Expected) { throw 'Source fetch argument value differs.' }",
+			'  $Controls++',
+			' }',
+			'}',
+			"if ($Controls -ne 14) { throw 'Source argument control inventory differs.' }",
+			"Write-Output 'PAC_SOURCE_ARGUMENTS vectors=14 reflection=true native_fetch=false'"
+		].join('\n');
+		const result = spawnSync(
+			path.join(process.env.SystemRoot, 'System32/WindowsPowerShell/v1.0/powershell.exe'),
+			['-NoProfile', '-NonInteractive', '-Command', command],
+			{ encoding: 'utf8', timeout: 10000 }
+		);
+		assert.equal(result.error, undefined);
+		assert.equal(result.signal, null);
+		assert.equal(result.status, 0, result.stderr || result.stdout);
+		assert.equal(result.stderr, '');
+		assert.equal(
+			result.stdout.trim(),
+			'PAC_SOURCE_ARGUMENTS vectors=14 reflection=true native_fetch=false'
+		);
+	});
+}
+
 if (process.platform !== 'win32') {
 	const result = spawnSync(pythonExecutable(), ['tools/test/native_pac_source_fixture_test.py'], {
 		cwd: root,

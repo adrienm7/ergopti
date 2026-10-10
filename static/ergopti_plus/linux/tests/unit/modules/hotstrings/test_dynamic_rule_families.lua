@@ -128,7 +128,7 @@ helpers.describe("dynamic rule families: the switch reaches the engine", functio
 		with_storage()
 		local dh = manager(true)
 		for section, trigger in pairs(TRIGGER_FOR) do
-			helpers.assert_not_nil(dh.preview(trigger .. "\\"),
+			helpers.assert_not_nil(dh.preview(trigger .. "\\", true),
 				section .. " expands before anything is switched off")
 		end
 		drop_storage()
@@ -139,10 +139,10 @@ helpers.describe("dynamic rule families: the switch reaches the engine", functio
 		local dh = manager(true)
 		dh.set_rule_enabled("datefr", false)
 
-		helpers.assert_nil(dh.preview("dt\\"),
+		helpers.assert_nil(dh.preview("dt\\", true),
 			"the bubble must not offer a family the engine will refuse: a user who "
 				.. "sees the expansion they just disabled concludes the switch is broken")
-		helpers.assert_not_nil(dh.preview("td\\"),
+		helpers.assert_not_nil(dh.preview("td\\", true),
 			"and only that family — switching one off must not take its siblings with it")
 		drop_storage()
 	end)
@@ -161,8 +161,8 @@ helpers.describe("dynamic rule families: the switch reaches the engine", functio
 			end,
 		}
 
-		local fired_off = dh.on_trigger("td\\", "\\")
-		local fired_on  = dh.on_trigger("dt\\", "\\")
+		local fired_off = dh.on_trigger("td\\", "\\", true)
+		local fired_on  = dh.on_trigger("dt\\", "\\", true)
 
 		package.loaded["modules.hotstrings.injector"] = previous
 		drop_storage()
@@ -178,10 +178,10 @@ helpers.describe("dynamic rule families: the switch reaches the engine", functio
 	helpers.it("brings a family back when it is switched on again", function()
 		with_storage({ ["hotstrings.dynamic.date_long_fr.enabled"] = false })
 		local dh = manager()
-		helpers.assert_nil(dh.preview("date\\"), "off is read back from storage on boot")
+		helpers.assert_nil(dh.preview("date\\", true), "off is read back from storage on boot")
 
 		dh.set_rule_enabled("datelongfr", true)
-		helpers.assert_not_nil(dh.preview("date\\"), "and on brings it back")
+		helpers.assert_not_nil(dh.preview("date\\", true), "and on brings it back")
 		drop_storage()
 	end)
 

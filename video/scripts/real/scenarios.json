@@ -1,0 +1,74 @@
+{
+	"_comment": "What each real-capture clip types into a fresh Notepad, and the screen region recorded (x, y, width, height in physical pixels; Notepad is maximised). Steps are plain typing: whatever appears beyond the typed characters (expansions, tooltips, AI predictions) is the installed driver's own doing. Step kinds: text (delay in ms between keys), key (Enter, Tab...), wait (ms), accept (waits until the driver shows a prediction, leaves it on screen briefly, then asks the driver to insert it).",
+	"region": [0, 0, 1280, 720],
+	"scenarios": [
+		{
+			"name": "hotstrings",
+			"caption": "Autocorrection and ★ abbreviations, typed live",
+			"steps": [
+				{
+					"text": "I asked chatgpt about it on youtube, then pushed it to github.",
+					"delay": 80
+				},
+				{
+					"key": "Enter"
+				},
+				{
+					"key": "Enter"
+				},
+				{
+					"wait": 300
+				},
+				{
+					"text": "Salut, ecq★ tu viens ce soir ? La dernière fois ct★ génial, pcq★ tout le monde était là.",
+					"delay": 85
+				},
+				{
+					"wait": 1200
+				}
+			]
+		},
+		{
+			"name": "ai",
+			"caption": "Real AI predictions, accepted in one key (API backend on this machine)",
+			"steps": [
+				{
+					"text": "Bonjour à tous,",
+					"delay": 80
+				},
+				{
+					"key": "Enter"
+				},
+				{
+					"key": "Enter"
+				},
+				{
+					"text": "Merci pour votre retour, je reviens vers vous ",
+					"delay": 80
+				},
+				{
+					"accept": true
+				},
+				{
+					"wait": 800
+				},
+				{
+					"key": "Enter"
+				},
+				{
+					"key": "Enter"
+				},
+				{
+					"text": "Bonne ",
+					"delay": 80
+				},
+				{
+					"accept": true
+				},
+				{
+					"wait": 1500
+				}
+			]
+		}
+	]
+}

@@ -57,9 +57,96 @@ function loadPagePort() {
 	return sandbox.__port;
 }
 
+/**
+ * Builds the actual download-version owner against private literal binary assets.
+ * Vite must resolve them as URLs rather than parse archive bytes as JavaScript.
+ * @returns {Promise<void>} Resolves only after build and version assertions pass.
+ */
+async function assertDownloadAssetGlobs() {
+	const assert = require('node:assert/strict');
+	const os = require('node:os');
+	const { build } = await import('vite');
+	const fixture = fs.mkdtempSync(path.join(os.tmpdir(), 'ergopti-version-assets-'));
+	try {
+		const source = fs.readFileSync(path.join(ROOT, 'src/lib/js/getVersions.js'), 'utf8');
+		const entry = path.join(fixture, 'getVersions.js');
+		fs.writeFileSync(entry, source);
+		const samples = [
+			['ergopti/windows/Ergopti_v2.2.0.exe', Buffer.from([0x4d, 0x5a, 0xff])],
+			['ergopti/windows/Ergopti_v2.2.0.kbe', Buffer.from([0xff, 0x00])],
+			[
+				'ergopti/macos/bundles/zipped_bundles/Ergopti_v2.2.0.bundle.zip',
+				Buffer.from([0x50, 0x4b, 0xff])
+			],
+			[
+				'ergopti/macos/bundles/zipped_bundles/Ergopti_v2.2.2.bundle.zip',
+				Buffer.from([0x50, 0x4b, 0xfe])
+			],
+			['ergopti_plus/windows/Ergopti_v2.2.0.ahk', Buffer.from('; fixture')],
+			['ergopti_plus/windows/compiled/Ergopti_v2.2.0.exe', Buffer.from([0x4d, 0x5a, 0xfe])],
+			['ergopti_plus/old/kalamine/standard/Ergopti_v2.2.0.toml', Buffer.from('name="fixture"')],
+			[
+				'ergopti_plus/old/kalamine/standard/Ergopti_v9.0.0_analyse.toml',
+				Buffer.from('name="analysis"')
+			]
+		];
+		for (const [relative, bytes] of samples) {
+			const file = path.join(fixture, 'static', relative);
+			fs.mkdirSync(path.dirname(file), { recursive: true });
+			fs.writeFileSync(file, bytes);
+		}
+		const outputs = await build({
+			root: fixture,
+			configFile: false,
+			publicDir: false,
+			base: '/dev/',
+			logLevel: 'silent',
+			assetsInclude: ['**/*.toml', '**/*.keylayout', '**/*.kbe', '**/*.exe', '**/*.ahk'],
+			build: { write: false, minify: false, assetsInlineLimit: 0, ssr: entry }
+		});
+		const chunks = (Array.isArray(outputs) ? outputs : [outputs]).flatMap(
+			(result) => result.output
+		);
+		const owner = chunks.find((chunk) => chunk.type === 'chunk' && chunk.isEntry);
+		assert(owner && owner.code, 'the real version owner must be built');
+		const loaded = await import(
+			'data:text/javascript;base64,' + Buffer.from(owner.code).toString('base64')
+		);
+		assert.deepEqual(loaded.getFilteredFileVersions('macos_keylayout'), ['2.2.0', '2.2.2']);
+		assert.equal(loaded.getLatestVersion('macos_keylayout'), '2.2.2');
+		assert.equal(loaded.getLatestVersion('macos_keylayout', '2.2.0'), '2.2.0');
+		for (const name of [
+			'kbdedit_exe',
+			'kbdedit_kbe',
+			'autohotkey',
+			'autohotkey_exe',
+			'kalamine_standard'
+		]) {
+			assert.deepEqual(loaded.getFilteredFileVersions(name), ['2.2.0'], name);
+		}
+		const urls = chunks.filter((chunk) => chunk.type === 'chunk' && chunk.code.includes('.zip'));
+		assert(urls.length > 0, 'archive URL chunks must survive the actual build');
+		assert(
+			urls.some((chunk) => chunk.code.includes('/dev/')),
+			'asset URLs retain the configured base'
+		);
+		for (const [relative, bytes] of samples) {
+			assert.deepEqual(fs.readFileSync(path.join(fixture, 'static', relative)), bytes);
+		}
+		console.log(
+			'[OK] Vite builds binary download assets with URL queries and preserves version selection.'
+		);
+	} finally {
+		assert.equal(path.dirname(fixture), path.resolve(os.tmpdir()));
+		assert(path.basename(fixture).startsWith('ergopti-version-assets-'));
+		fs.rmSync(fixture, { recursive: true, force: true });
+	}
+}
+
 // version.js is an ESM module (the repo is type:module); load it via dynamic
 // import so this CommonJS runner can read its compareVersions export.
 (async () => {
+	await assertDownloadAssetGlobs();
 	const { compareVersions } = await import(versionUrl);
 	const data = JSON.parse(fs.readFileSync(vectorsPath, 'utf8'));
 	const vectors = Array.isArray(data.vectors) ? data.vectors : [];

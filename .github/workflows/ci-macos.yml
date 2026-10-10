@@ -12,11 +12,6 @@ name: macOS
 on:
   workflow_call:
     inputs:
-      fast_prerelease:
-        description: Temporary unqualified dev157 test deferral; defaults remain full
-        required: false
-        default: false
-        type: boolean
       release:
         description: True when ci.yml's plan resolved a free release tag
         required: true
@@ -60,7 +55,6 @@ env:
   ERGOPTI_DEV_RELEASE_CHANNEL: ${{ inputs.channel }}
   ERGOPTI_DEV_RELEASE_TAG: ${{ inputs.tag }}
   ERGOPTI_DEV_RELEASE_VERSION: ${{ inputs.version }}
-  ERGOPTI_FAST_PRERELEASE: ${{ inputs.fast_prerelease }}
 
 jobs:
   # Manual item 36 diagnosis is independent of managed HTTP/runtime acceptance.
@@ -142,6 +136,26 @@ jobs:
           set -e
           node tools/diagnostics/item36_xctest_evidence.cjs judge "$transcript" "${item36_statuses[0]}" "${item36_statuses[1]}" "$GITHUB_SHA" "$source_receipt" "$evidence/item36-verdict.json"
         timeout-minutes: 20
+      - name: Observe the actual no-prompt SDK permission API independently
+        if: ${{ !cancelled() }}
+        shell: bash
+        env:
+          SWIFT_BACKTRACE: enable=yes
+        run: |
+          set -euo pipefail
+          node tools/test/test-macos-swift-launcher-ci.cjs
+          evidence="$RUNNER_TEMP/swift-launcher-evidence"
+          transcript="$evidence/sdk-permission-xctest.log"
+          source_receipt="$evidence/sdk-permission-source.json"
+          node tools/diagnostics/sdk_permission_xctest_evidence.cjs begin "$GITHUB_SHA" "$source_receipt"
+          set +e
+          script -q /dev/null swift test --package-path static/ergopti_plus/macos/launcher \
+            --scratch-path "$RUNNER_TEMP/swift-launcher-ci" \
+            --filter 'OwnedAutomationQueryWorkerTests.testActualNoPromptPermissionAPIOnlyPublishesRetiredMetadata' 2>&1 | tee "$transcript"
+          sdk_statuses=("${PIPESTATUS[@]}")
+          set -e
+          node tools/diagnostics/sdk_permission_xctest_evidence.cjs judge "$transcript" "${sdk_statuses[0]}" "${sdk_statuses[1]}" "$GITHUB_SHA" "$source_receipt" "$evidence/sdk-permission-verdict.json"
+        timeout-minutes: 3
       - name: Retain scoped item 36 native diagnostics
         if: always()
         uses: actions/upload-artifact@v4
@@ -152,6 +166,8 @@ jobs:
           path: |
             ${{ runner.temp }}/swift-launcher-evidence/item36-*.json
             ${{ runner.temp }}/swift-launcher-evidence/item36-xctest.log
+            ${{ runner.temp }}/swift-launcher-evidence/sdk-permission-*.json
+            ${{ runner.temp }}/swift-launcher-evidence/sdk-permission-xctest.log
             ${{ runner.temp }}/swift-launcher-evidence/archive-session.*/*/*.json
             ${{ runner.temp }}/swift-launcher-evidence/archive-session.*/*/helper/*.json
 
@@ -248,7 +264,6 @@ jobs:
           retention-days: 7
           path: ${{ runner.temp }}/managed-ollama-launcher-build.log
       - name: Prepare locked native HTTP receiving clients
-        if: ${{ !inputs.fast_prerelease }}
         shell: bash
         run: |
           set -euo pipefail
@@ -257,7 +272,6 @@ jobs:
           "$ERGOPTI_OLLAMA_BUILD_ROOT/native-clients/bin/python" -m pip install --require-hashes --only-binary=:all: -r "$ERGOPTI_OLLAMA_BUILD_ROOT/native-clients.requirements"
           echo "ERGOPTI_NATIVE_HTTP_PYTHON=$ERGOPTI_OLLAMA_BUILD_ROOT/native-clients/bin/python" >> "$GITHUB_ENV"
       - name: Receive actual private-session and numeric TLS peer controls
-        if: ${{ !inputs.fast_prerelease }}
         shell: bash
         run: |
           set -euo pipefail
@@ -290,7 +304,7 @@ jobs:
           receive_controls tools/test/macos_bootstrap_tls_numeric_binding_test.py 8 "$ERGOPTI_OLLAMA_BUILD_ROOT/numeric-tls-controls.log"
         timeout-minutes: 5
       - name: Retain actual private-session and numeric TLS peer diagnostics
-        if: ${{ !inputs.fast_prerelease && (always()) }}
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           overwrite: true
@@ -301,7 +315,6 @@ jobs:
             ${{ env.ERGOPTI_OLLAMA_BUILD_ROOT }}/private-session-controls.log
             ${{ env.ERGOPTI_OLLAMA_BUILD_ROOT }}/numeric-tls-controls.log
       - name: Qualify actual SDK accepted-owner and deadline XCTest controls
-        if: ${{ !inputs.fast_prerelease }}
         shell: bash
         run: |
           set -euo pipefail
@@ -333,7 +346,7 @@ jobs:
           grep -Fq 'Executed 41 tests, with 0 failures' "$transcript"
         timeout-minutes: 10
       - name: Retain independent native SDK XCTest diagnostics
-        if: ${{ !inputs.fast_prerelease && (always()) }}
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           overwrite: true
@@ -342,7 +355,7 @@ jobs:
           retention-days: 7
           path: ${{ env.ERGOPTI_OLLAMA_BUILD_ROOT }}/listener-xctest.log
       - name: Qualify actual native PAC source ownership XCTest controls
-        if: ${{ !inputs.fast_prerelease && (!cancelled()) }}
+        if: ${{ !cancelled() }}
         shell: bash
         run: |
           set -euo pipefail
@@ -362,23 +375,36 @@ jobs:
           node tools/diagnostics/native_pac_source_evidence.cjs judge "$transcript" "${source_statuses[0]}" "${source_statuses[1]}" "$GITHUB_SHA" "$GITHUB_RUN_ID" "$GITHUB_RUN_ATTEMPT" "$ERGOPTI_OLLAMA_EXPECTED_ARCHITECTURE" "$source_receipt" "$ERGOPTI_OLLAMA_BUILD_ROOT/native-pac-source-verdict.json"
         timeout-minutes: 10
       - name: Qualify actual native PAC and WPAD XCTest controls
-        if: ${{ !inputs.fast_prerelease && (!cancelled()) }}
+        if: ${{ !cancelled() }}
         shell: bash
         run: |
           set -euo pipefail
-          test -n "$ERGOPTI_NATIVE_HTTP_PYTHON"
-          test -x "$ERGOPTI_NATIVE_HTTP_PYTHON"
-          transcript="$ERGOPTI_OLLAMA_BUILD_ROOT/native-pac-xctest.log"
-          set +e
-          swift test --package-path static/ergopti_plus/macos/launcher \
-            --scratch-path "$ERGOPTI_OLLAMA_BUILD_ROOT/swift" \
-            --filter 'ManagedHTTPWorkerTests|ManagedHTTPWireTests|ManagedHTTPWPADWireTests' 2>&1 | tee "$transcript"
-          pac_statuses=("${PIPESTATUS[@]}")
-          set -e
-          node tools/diagnostics/managed_http_pac_xctest_evidence.cjs "$transcript" "${pac_statuses[0]}" "${pac_statuses[1]}" "$ERGOPTI_OLLAMA_BUILD_ROOT/native-pac-verdict.json"
+          receipt="$RUNNER_TEMP/stable-macos-native-pac-${{ matrix.architecture }}.json"
+          mkdir -p "$(dirname "$receipt")"
+          node tools/ci/dev-release-qualification.cjs --scope macos-native-pac --receipt "$receipt"
+          mode="$(node tools/ci/dev-release-qualification.cjs --scope macos-native-pac --validate-scope-receipt "$receipt")"
+          if [ "$mode" = deferred ]; then
+              echo "[DEFERRED] macos-native-pac: qualified=false; original command not executed."
+          elif [ "$mode" = full ]; then
+              set -euo pipefail
+              test -n "$ERGOPTI_NATIVE_HTTP_PYTHON"
+              test -x "$ERGOPTI_NATIVE_HTTP_PYTHON"
+              transcript="$ERGOPTI_OLLAMA_BUILD_ROOT/native-pac-xctest.log"
+              set +e
+              swift test --package-path static/ergopti_plus/macos/launcher \
+                --scratch-path "$ERGOPTI_OLLAMA_BUILD_ROOT/swift" \
+                --filter 'ManagedHTTPWorkerTests|ManagedHTTPWireTests|ManagedHTTPWPADWireTests' 2>&1 | tee "$transcript"
+              pac_statuses=("${PIPESTATUS[@]}")
+              set -e
+              node tools/diagnostics/managed_http_pac_xctest_evidence.cjs "$transcript" "${pac_statuses[0]}" "${pac_statuses[1]}" "$ERGOPTI_OLLAMA_BUILD_ROOT/native-pac-verdict.json"
+          else
+              echo "Invalid command qualification disposition" >&2
+              exit 1
+          fi
         timeout-minutes: 10
+
       - name: Retain independent native PAC XCTest diagnostics
-        if: ${{ !inputs.fast_prerelease && (always()) }}
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           overwrite: true
@@ -392,18 +418,31 @@ jobs:
             ${{ env.ERGOPTI_OLLAMA_BUILD_ROOT }}/native-pac-source-inputs.json
             ${{ env.ERGOPTI_OLLAMA_BUILD_ROOT }}/native-pac-source-verdict.json
       - name: Receive actual independent managed HTTP native clients
-        if: ${{ !inputs.fast_prerelease && (!cancelled()) }}
+        if: ${{ !cancelled() }}
         shell: bash
         run: |
           set -euo pipefail
-          status=0
-          "$ERGOPTI_NATIVE_HTTP_PYTHON" tools/diagnostics/macos_owned_process_native_test.py || status=1
-          "$ERGOPTI_NATIVE_HTTP_PYTHON" static/ergopti_plus/macos/tests/support/native_http_receiving_test.py --client-only || status=1
-          "$ERGOPTI_NATIVE_HTTP_PYTHON" static/ergopti_plus/macos/tests/support/native_http_wire_client_receiving.py || status=1
-          exit "$status"
+          receipt="$RUNNER_TEMP/stable-macos-native-http-${{ matrix.architecture }}.json"
+          mkdir -p "$(dirname "$receipt")"
+          node tools/ci/dev-release-qualification.cjs --scope macos-native-http --receipt "$receipt"
+          mode="$(node tools/ci/dev-release-qualification.cjs --scope macos-native-http --validate-scope-receipt "$receipt")"
+          if [ "$mode" = deferred ]; then
+              echo "[DEFERRED] macos-native-http: qualified=false; original command not executed."
+          elif [ "$mode" = full ]; then
+              set -euo pipefail
+              status=0
+              "$ERGOPTI_NATIVE_HTTP_PYTHON" tools/diagnostics/macos_owned_process_native_test.py || status=1
+              "$ERGOPTI_NATIVE_HTTP_PYTHON" static/ergopti_plus/macos/tests/support/native_http_receiving_test.py --client-only || status=1
+              "$ERGOPTI_NATIVE_HTTP_PYTHON" static/ergopti_plus/macos/tests/support/native_http_wire_client_receiving.py || status=1
+              exit "$status"
+          else
+              echo "Invalid command qualification disposition" >&2
+              exit 1
+          fi
         timeout-minutes: 5
+
       - name: Qualify actual explicit curl stream ownership
-        if: ${{ !inputs.fast_prerelease && (!cancelled()) }}
+        if: ${{ !cancelled() }}
         shell: bash
         run: |
           set -euo pipefail
@@ -469,9 +508,15 @@ jobs:
               --output "$ERGOPTI_OLLAMA_CATALOGUE"
           } 2>&1 | tee "$RUNNER_TEMP/managed-ollama-producer-build.log"
       - name: Receive actual native model create, pull, inference and retirement
-        if: ${{ !inputs.fast_prerelease }}
         shell: bash
         run: |
+          set -euo pipefail
+          receipt="$RUNNER_TEMP/stable-macos-native-model-receiving-${{ matrix.architecture }}.json"
+          node tools/ci/dev-release-qualification.cjs --scope macos-native-model-receiving --receipt "$receipt"
+          mode="$(node tools/ci/dev-release-qualification.cjs --scope macos-native-model-receiving --validate-scope-receipt "$receipt")"
+          if [ "$mode" = deferred ]; then
+              echo '[DEFERRED] macos-native-model-receiving: qualified=false; producer/catalogue/assets still mandatory.'
+          elif [ "$mode" = full ]; then
           set -euo pipefail
           test -f tools/diagnostics/macos_managed_ollama_receiving.py
           mkdir "$ERGOPTI_OLLAMA_BUILD_ROOT/receiving"
@@ -481,6 +526,9 @@ jobs:
               --launcher "$ERGOPTI_OLLAMA_LAUNCHER" --framework "$ERGOPTI_OLLAMA_FRAMEWORK" \
               --output "$ERGOPTI_OLLAMA_BUILD_ROOT/receiving/$profile" --profile "$profile"
           done
+          else
+              exit 1
+          fi
       - name: Upload qualified native inputs for the application catalogue
         uses: actions/upload-artifact@v4
         with:
@@ -501,14 +549,6 @@ jobs:
           retention-days: 7
           path: ${{ env.ERGOPTI_OLLAMA_ASSET }}
 
-      - uses: actions/setup-node@v4
-        with:
-          node-version-file: '.node-version'
-
-      - name: Recheck temporary fast prerelease authorization
-        shell: bash
-        run: node tools/ci/dev-release-qualification.cjs --fast-action admit
-
       - name: Retain actual native producer, catalogue and receiving evidence
         if: always()
         uses: actions/upload-artifact@v4
@@ -526,6 +566,14 @@ jobs:
             ${{ runner.temp }}/managed-ollama-launcher-build.log
             ${{ runner.temp }}/managed-ollama-producer-build.log
 
+      - name: Retain source-bound managed-ollama-native qualification receipts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: assets-qualification-managed-ollama-native-${{ matrix.architecture || 'stubbed' }}
+          path: ${{ runner.temp }}/stable-macos-*.json
+          if-no-files-found: warn
+
   # ─────────────────────────────────────────────────
   # 1) Hammerspoon unit and contract tests
   # ─────────────────────────────────────────────────
@@ -533,7 +581,6 @@ jobs:
   # reviewer reads: this Ubuntu entry uses the Hammerspoon stub. The packaged
   # clean launch additionally qualifies the real native delayed-timer API.
   test-hs:
-    if: ${{ !inputs.fast_prerelease }}
     name: 'Unit tests (stubbed)'
     runs-on: ubuntu-latest
 
@@ -573,10 +620,30 @@ jobs:
         # cannot change semantics under us.
         env:
           LUA: lua5.4
-        run: node ../../../tools/test/report.cjs --name macos-lua --json "${{ runner.temp }}/macos-lua.json" -- lua5.4 tests/run.lua
+        run: |
+          set -euo pipefail
+          receipt="$RUNNER_TEMP/stable-macos-stubbed-unit.json"
+          mkdir -p "$(dirname "$receipt")"
+          node ../../../tools/ci/dev-release-qualification.cjs --scope macos-stubbed-unit --receipt "$receipt"
+          mode="$(node ../../../tools/ci/dev-release-qualification.cjs --scope macos-stubbed-unit --validate-scope-receipt "$receipt")"
+          if [ "$mode" = deferred ]; then
+              echo "[DEFERRED] macos-stubbed-unit: qualified=false; original command not executed."
+          elif [ "$mode" = full ]; then
+              node ../../../tools/test/report.cjs --name macos-lua --json "${{ runner.temp }}/macos-lua.json" -- lua5.4 tests/run.lua
+          else
+              echo "Invalid command qualification disposition" >&2
+              exit 1
+          fi
+
+      - name: Retain source-bound test-hs qualification receipts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: assets-qualification-test-hs-${{ matrix.architecture || 'stubbed' }}
+          path: ${{ runner.temp }}/stable-macos-*.json
+          if-no-files-found: warn
 
   e2e-hs:
-    if: ${{ !inputs.fast_prerelease }}
     name: 'E2E tests (stubbed)'
     needs: test-hs
     runs-on: ubuntu-latest
@@ -603,11 +670,31 @@ jobs:
         # hardcoded scenarios and all corpus vectors.
         # Exit 0 = all pass, 1 = at least one failure.
         working-directory: static/ergopti_plus/macos
-        run: lua5.4 tests/e2e/run_e2e.lua
+        run: |
+          set -euo pipefail
+          receipt="$RUNNER_TEMP/stable-macos-stubbed-e2e.json"
+          mkdir -p "$(dirname "$receipt")"
+          node ../../../tools/ci/dev-release-qualification.cjs --scope macos-stubbed-e2e --receipt "$receipt"
+          mode="$(node ../../../tools/ci/dev-release-qualification.cjs --scope macos-stubbed-e2e --validate-scope-receipt "$receipt")"
+          if [ "$mode" = deferred ]; then
+              echo "[DEFERRED] macos-stubbed-e2e: qualified=false; original command not executed."
+          elif [ "$mode" = full ]; then
+              lua5.4 tests/e2e/run_e2e.lua
+          else
+              echo "Invalid command qualification disposition" >&2
+              exit 1
+          fi
         timeout-minutes: 5
 
+      - name: Retain source-bound e2e-hs qualification receipts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: assets-qualification-e2e-hs-${{ matrix.architecture || 'stubbed' }}
+          path: ${{ runner.temp }}/stable-macos-*.json
+          if-no-files-found: warn
+
   tooltip-canvas:
-    if: ${{ !inputs.fast_prerelease }}
     name: 'Native tooltip canvas · 12 captures'
     needs: e2e-hs
     runs-on: macos-15
@@ -681,7 +768,6 @@ jobs:
   # never in a tree restored from an earlier run.
   package-macos:
     name: 'Package'
-    if: ${{ !cancelled() && needs.managed-ollama-native.result == 'success' && ((inputs.fast_prerelease && needs.e2e-hs.result == 'skipped') || (!inputs.fast_prerelease && needs.e2e-hs.result == 'success')) }}
     needs: [e2e-hs, managed-ollama-native]
     runs-on: macos-latest
     timeout-minutes: 45
@@ -698,25 +784,15 @@ jobs:
       # A depth-1 clone: the build reads tracked files and HEAD, never history.
       - uses: actions/checkout@v4
 
-      - uses: actions/setup-node@v4
-        with:
-          node-version-file: '.node-version'
-
-      - name: Recheck temporary fast prerelease authorization
-        shell: bash
-        run: node tools/ci/dev-release-qualification.cjs --fast-action admit
-
       - name: Prepare Node for native policy fixtures and XCTest evidence
         uses: actions/setup-node@v4
         with:
           node-version-file: '.node-version'
 
       - name: Run reporter lifecycle self-tests
-        if: ${{ !inputs.fast_prerelease }}
         run: node tools/test/test-report.cjs
 
       - name: Run owned program XCTest notice constructed-policy controls
-        if: ${{ !inputs.fast_prerelease }}
         run: node tools/test/test-owned-program-xctest-notice.cjs
 
       # CPython intentionally omitted Darwin os.waitid until Python 3.13.
@@ -726,7 +802,6 @@ jobs:
           python-version: '3.13'
 
       - name: Admit native nonreaping Python prerequisites
-        if: ${{ !inputs.fast_prerelease }}
         run: |
           python3 - <<'PY'
           import json
@@ -742,7 +817,6 @@ jobs:
           PY
 
       - name: Prepare locked managed HTTP native clients
-        if: ${{ !inputs.fast_prerelease }}
         run: |
           set -euo pipefail
           python3 -m venv "$RUNNER_TEMP/managed-http-native-clients"
@@ -769,7 +843,6 @@ jobs:
 
       # The helper refuses foreign contexts; inactive policy retains full tests.
       - name: Prepare scoped native qualification profile
-        if: ${{ !inputs.fast_prerelease }}
         shell: bash
         run: |
           set -euo pipefail
@@ -779,12 +852,10 @@ jobs:
             --receipt "$RUNNER_TEMP/dev-release-qualification/macos-brew-archive.json"
 
       - name: Run portable Brew ownership and refusal controls
-        if: ${{ !inputs.fast_prerelease }}
         run: python3 -m unittest discover -s tools/diagnostics -p macos_brew_archive_acceptance_test.py -v
 
       # Verify the real manifest output before any test source can be excluded.
       - name: Verify scoped Swift test target exclusion
-        if: ${{ !inputs.fast_prerelease }}
         shell: bash
         run: |
           set -euo pipefail
@@ -826,7 +897,6 @@ jobs:
       # Keep XCTest serial: the lease tests install process-wide signal handlers
       # and fork/reap real children, so parallel workers would race each other.
       - name: Receive actual managed HTTP native clients
-        if: ${{ !inputs.fast_prerelease }}
         run: |
           set -euo pipefail
           status=0
@@ -837,7 +907,6 @@ jobs:
         timeout-minutes: 5
 
       - name: Run Swift launcher tests
-        if: ${{ !inputs.fast_prerelease }}
         id: swift-launcher-tests
         env:
           SWIFT_BACKTRACE: enable=yes
@@ -889,7 +958,7 @@ jobs:
         timeout-minutes: 10
 
       - name: Retain scoped native Brew qualification receipt
-        if: ${{ !inputs.fast_prerelease && (always()) }}
+        if: ${{ always() }}
         uses: actions/upload-artifact@v4
         with:
           name: native-brew-qualification-${{ github.run_id }}-${{ github.run_attempt }}
@@ -897,7 +966,7 @@ jobs:
           if-no-files-found: error
 
       - name: Upload Swift launcher failure transcript
-        if: ${{ !inputs.fast_prerelease && (failure() && steps.swift-launcher-tests.outcome == 'failure') }}
+        if: ${{ failure() && steps.swift-launcher-tests.outcome == 'failure' }}
         uses: actions/upload-artifact@v4
         with:
           name: swift-launcher-failure-${{ github.run_id }}-${{ github.run_attempt }}
@@ -907,7 +976,7 @@ jobs:
       # Export only constructed bounded JSON from this step's owned archive session.
       # Its availability is independent of TIS setup and native ownership closure.
       - name: Retain archive diagnostic session
-        if: ${{ !inputs.fast_prerelease && (always() && steps.swift-launcher-tests.outputs.archive_session_dir != '') }}
+        if: ${{ always() && steps.swift-launcher-tests.outputs.archive_session_dir != '' }}
         uses: actions/upload-artifact@v4
         with:
           name: swift-archive-session-${{ github.run_id }}-${{ github.run_attempt }}
@@ -918,7 +987,7 @@ jobs:
 
       # Preserve only the fresh session acquired by this exact Swift step.
       - name: Retain closed TIS diagnostic session
-        if: ${{ !inputs.fast_prerelease && (always() && steps.swift-launcher-tests.outcome != 'skipped' && steps.swift-launcher-tests.outputs.tis_session_dir != '') }}
+        if: ${{ always() && steps.swift-launcher-tests.outcome != 'skipped' && steps.swift-launcher-tests.outputs.tis_session_dir != '' }}
         uses: actions/upload-artifact@v4
         with:
           name: swift-tis-session-${{ github.run_id }}-${{ github.run_attempt }}
@@ -931,7 +1000,7 @@ jobs:
 
       # Native inventory remains observable even when the separate XCTest suite fails.
       - name: Run signed Hammerspoon program provider inventory
-        if: ${{ !inputs.fast_prerelease && (always()) }}
+        if: ${{ always() }}
         env:
           ERGOPTI_NATIVE_HS_METADATA_TOKEN: ${{ github.token }}
         run: |
@@ -944,7 +1013,7 @@ jobs:
         timeout-minutes: 5
 
       - name: Retain native Hammerspoon provider inventory
-        if: ${{ !inputs.fast_prerelease && (always()) }}
+        if: ${{ always() }}
         uses: actions/upload-artifact@v4
         with:
           name: native-hs-program-providers-${{ github.run_id }}-${{ github.run_attempt }}
@@ -958,7 +1027,7 @@ jobs:
 
       # Observe genuine constructor userdata without delivering notifications.
       - name: Observe native notification constructors
-        if: ${{ !inputs.fast_prerelease && (always()) }}
+        if: ${{ always() }}
         env:
           ERGOPTI_NATIVE_HS_METADATA_TOKEN: ${{ github.token }}
         run: |
@@ -971,7 +1040,7 @@ jobs:
         timeout-minutes: 5
 
       - name: Retain native notification constructor observations
-        if: ${{ !inputs.fast_prerelease && (always()) }}
+        if: ${{ always() }}
         uses: actions/upload-artifact@v4
         with:
           name: native-notification-constructors-${{ github.run_id }}-${{ github.run_attempt }}
@@ -985,7 +1054,7 @@ jobs:
 
       # Qualify the isolated OS switcher; prerequisite refusal remains a failure.
       - name: Observe native global application switcher
-        if: ${{ !inputs.fast_prerelease && (always()) }}
+        if: ${{ always() }}
         env:
           ERGOPTI_NATIVE_HS_METADATA_TOKEN: ${{ github.token }}
         shell: bash
@@ -1003,7 +1072,7 @@ jobs:
         timeout-minutes: 5
 
       - name: Retain native global application switcher observations
-        if: ${{ !inputs.fast_prerelease && (always()) }}
+        if: ${{ always() }}
         uses: actions/upload-artifact@v4
         with:
           name: native-global-switcher-${{ github.run_id }}-${{ github.run_attempt }}
@@ -1015,7 +1084,7 @@ jobs:
 
       # Observe the native structured API without invoking or importing automations.
       - name: Observe native Apple Shortcuts discovery
-        if: ${{ !inputs.fast_prerelease && (always()) }}
+        if: ${{ always() }}
         run: |
           set -euo pipefail
           python3 -m unittest discover -s tools/diagnostics/apple_shortcuts_probe -p test_probe.py -v
@@ -1051,7 +1120,7 @@ jobs:
         timeout-minutes: 2
 
       - name: Retain native Apple Shortcuts observation
-        if: ${{ !inputs.fast_prerelease && (always()) }}
+        if: ${{ always() }}
         uses: actions/upload-artifact@v4
         with:
           name: native-apple-shortcuts-${{ github.run_id }}-${{ github.run_attempt }}
@@ -1066,13 +1135,11 @@ jobs:
       # On a runner of its own that log never existed; here the tests leave it
       # behind, so it goes before the app is built.
       - name: Remove the launcher log the Swift tests wrote
-        if: ${{ !inputs.fast_prerelease }}
         run: rm -rf -- "$HOME/Library/Logs/ergopti_plus"
 
       # Once per run instead of once per launch leg: the verdict and the
       # scenario profiles are plain Python, identical on every runner.
       - name: Self-test the launch verdict
-        if: ${{ !inputs.fast_prerelease }}
         env:
           HOMEBREW_NO_AUTO_UPDATE: '1'
         run: |
@@ -1239,7 +1306,6 @@ jobs:
           "$PWD/build/macos/ErgoptiPlus.app" "$PWD/build/macos"
 
       - name: Receive actual cold native MLX bootstrap
-        if: ${{ !inputs.fast_prerelease }}
         run: |
           set -euo pipefail
           python3 tools/diagnostics/macos_cold_bootstrap.py --app "$PWD/build/macos/ErgoptiPlus.app" --output "$RUNNER_TEMP/native-cold-bootstrap"
@@ -1250,7 +1316,7 @@ jobs:
       - name: Smoke test built ErgoptiPlus.app (crash-on-launch guard)
         # Test the extracted release archive through the same Launch Services
         # path as an installation. Early log creation is not startup readiness.
-        if: ${{ !inputs.fast_prerelease && (inputs.release) }}
+        if: inputs.release
         shell: bash
         timeout-minutes: 3
         run: |
@@ -1261,7 +1327,7 @@ jobs:
           python3 tools/diagnostics/macos-release-launch.py /Applications/ErgoptiPlus.app "$RUNNER_TEMP/release-launch"
 
       - name: Retain packaged application startup evidence
-        if: ${{ !inputs.fast_prerelease && (always() && inputs.release) }}
+        if: always() && inputs.release
         uses: actions/upload-artifact@v4
         with:
           overwrite: true
@@ -1358,7 +1424,6 @@ jobs:
   # See tools/diagnostics/macos_launch_gate.py for the scenarios, the two
   # profiles and each scenario verdict. The final aggregate checks completeness.
   launch:
-    if: ${{ !inputs.fast_prerelease }}
     name: 'Install and launch · ${{ matrix.scenario }} · ${{ matrix.runner }}'
     needs: package-macos
     runs-on: ${{ matrix.runner }}
@@ -1454,7 +1519,6 @@ jobs:
   # A fresh signed app receives the cold runtime even when unrelated package
   # or Homebrew tests fail. This job never publishes a release.
   cold-bootstrap-native:
-    if: ${{ !inputs.fast_prerelease }}
     name: 'Native cold MLX bootstrap · macos-15 arm64'
     runs-on: macos-15
     timeout-minutes: 90
@@ -1642,35 +1706,19 @@ jobs:
           node-version-file: '.node-version'
 
       - name: Download launch evidence
-        if: ${{ !inputs.fast_prerelease }}
         uses: actions/download-artifact@v4
         with:
           pattern: launch-gate-${{ inputs.release && 'release' || 'ci' }}-*
           path: ${{ runner.temp }}/launch-evidence
 
       - name: Download native cold bootstrap evidence
-        if: ${{ !inputs.fast_prerelease }}
         uses: actions/download-artifact@v4
         with:
           name: cold-bootstrap-native-${{ inputs.release && 'release' || 'ci' }}-macos-15
           path: ${{ runner.temp }}/launch-evidence/cold-bootstrap-native
 
       - name: Verify mandatory jobs and launch scenarios
-        if: ${{ !inputs.fast_prerelease }}
         env:
           NEEDS: ${{ toJSON(needs) }}
           RELEASE: ${{ inputs.release }}
         run: node tools/test/desktop-ci-evidence.cjs verify macos "$RUNNER_TEMP/launch-evidence"
-      - name: Record UNQUALIFIED temporary test deferral
-        if: ${{ inputs.fast_prerelease }}
-        env:
-          NEEDS: ${{ toJSON(needs) }}
-        run: node tools/ci/dev-release-qualification.cjs --fast-action receipt --lane macos
-
-      - name: Retain the explicit unqualified test receipt
-        if: ${{ inputs.fast_prerelease }}
-        uses: actions/upload-artifact@v4
-        with:
-          name: fast-prerelease-unqualified-macos
-          path: fast-prerelease-macos.json
-          if-no-files-found: error

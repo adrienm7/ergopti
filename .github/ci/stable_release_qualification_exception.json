@@ -1,0 +1,103 @@
+{
+	"schema": 1,
+	"id": "stable-v1-20261009-macos-native-deferred",
+	"expires_at": "2026-10-10T00:00:00Z",
+	"repository": "adrienm7/ergopti",
+	"event_name": "push",
+	"ref": "refs/heads/main",
+	"release": true,
+	"prerelease": "false",
+	"channel": "main",
+	"tag": "v1.0.0",
+	"version": "1.0.0",
+	"authorization_note": "Explicit human approvals received on 2026-10-09: \"Oui, publier avec ces trois limites explicites\", followed by approval of the additional blocking test suites. Only main push, stable v1.0.0 before 2026-10-10T00:00:00Z is admitted. All thirteen exact listed native/harness scopes are DEFERRED and qualified:false: the original three macOS scopes, six additional PAC/HTTP/stubbed harness/Windows desktop/Linux simultaneous scopes, and Linux unit/meta, Linux E2E/live fixture chain, Core JavaScript and native macOS model receiving. Compilation, native producer catalogue checks, packaging, source and asset integrity, installation, all unlisted tests and launch lifecycle checks remain mandatory. Windows unsigned v1.0.0 is separately authorized with source/artifact-bound public disclosure; macOS signing remains mandatory. No TCC grant, database mutation, sender substitution or permission workaround is authorized. After midnight Paris on October 10, the maintainer renewed the instruction to publish a minimum stable release immediately to restore the website download buttons, followed by ten hours of v1.0.1 fixes with full tests if possible. This renewal keeps the same thirteen scopes and unsigned Windows permission, with a new bounded expiry of 02:00 Paris (00:00 UTC). Other tags/events and later runs retain full default qualification; no additional scope is granted.",
+	"scopes": {
+		"macos-brew-archive": {
+			"kind": "swift_test_file",
+			"path": "Tests/ErgoptiPlusTests/HomebrewArchiveAcceptanceTests.swift",
+			"name": "testRealBrewZIPInstallXZUpgradeAndRefusalsPreserveInstalledState",
+			"reason": "Unconfined-positive AppleEvent returned consent-required -1744; complete native ZIP/XZ/refusal boundary qualification remains missing."
+		},
+		"macos-shortcuts-discovery": {
+			"kind": "command",
+			"path": "tools/diagnostics/apple_shortcuts_probe/run_probe.py",
+			"args": [],
+			"reason": "First app.shortcuts() native catalogue fetch exceeded twenty seconds; native discovery remains missing."
+		},
+		"macos-launch-appleevents": {
+			"kind": "macos_launch",
+			"path": "tools/diagnostics/macos_launch_gate.py",
+			"scenarios": ["clean", "karabiner_config"],
+			"runners": ["macos-15", "macos-15-intel"],
+			"reason": "Both hosted architectures show an unanswered Automation consent dialog for hosted-compute-agent to control ErgoptiPlus. External AppleEvent transport and its dependent timer, Karabiner and ScriptScope feature proofs are DEFERRED and qualified:false. All launch lifecycle checks remain mandatory."
+		},
+		"macos-native-pac": {
+			"kind": "command",
+			"path": ".github/workflows/ci-macos.yml",
+			"args": ["managed-ollama-native", "Qualify actual native PAC and WPAD XCTest controls"],
+			"reason": "Native PAC/WPAD wire tests remain failing or incomplete; native PAC/network qualification is deferred, never inferred from packaging."
+		},
+		"macos-native-http": {
+			"kind": "command",
+			"path": ".github/workflows/ci-macos.yml",
+			"args": ["managed-ollama-native", "Receive actual independent managed HTTP native clients"],
+			"reason": "Independent native HTTP client receiving remains failing or incomplete; transport qualification is deferred."
+		},
+		"macos-stubbed-unit": {
+			"kind": "command",
+			"path": ".github/workflows/ci-macos.yml",
+			"args": ["test-hs", "Run unit + meta tests"],
+			"reason": "The stubbed macOS Lua unit/meta harness has known failures and is not qualified for this release."
+		},
+		"macos-stubbed-e2e": {
+			"kind": "command",
+			"path": ".github/workflows/ci-macos.yml",
+			"args": ["e2e-hs", "Run virtual-keyboard harness (stubbed hs.* — no real Hammerspoon)"],
+			"reason": "The stubbed macOS virtual-keyboard harness has known failures and is not qualified for this release."
+		},
+		"windows-native-desktop": {
+			"kind": "command",
+			"path": ".github/workflows/ci-windows.yml",
+			"args": ["test-ahk", "Run native desktop AHK cohorts"],
+			"reason": "Native desktop wrapper receiving remains failing or incomplete; desktop harness qualification is deferred. Main AHK and compiled startup remain mandatory."
+		},
+		"linux-simultaneous-native": {
+			"kind": "command",
+			"path": "static/ergopti_plus/linux/tests/hardware/run_daemon_live.sh",
+			"args": [
+				"python3",
+				"tests/hardware/run_native_subreaper.py",
+				"luajit",
+				"tests/hardware/run_simultaneous_configuration_real.lua"
+			],
+			"reason": "The simultaneous-configuration native supplement remains unqualified. The separately authorized Linux E2E suite deferral also covers its surrounding live fixture chain in this bounded window."
+		},
+		"linux-unit-suite": {
+			"kind": "command",
+			"path": ".github/workflows/ci-linux.yml",
+			"args": ["test-linux", "Run the driver unit test suite"],
+			"reason": "Explicitly approved temporary suite deferral: hosted failures remain unresolved; no executed assertion count or native acceptance is claimed. Compile, package, integrity and installed-package checks remain mandatory."
+		},
+		"linux-e2e-suite": {
+			"kind": "command",
+			"path": ".github/workflows/ci-linux.yml",
+			"args": ["e2e-linux", "Linux E2E test suite bodies including live fixture chain"],
+			"reason": "Explicitly approved temporary suite deferral: hosted failures remain unresolved; no executed assertion count or native acceptance is claimed. Compile, package, integrity and installed-package checks remain mandatory."
+		},
+		"core-js-suite": {
+			"kind": "command",
+			"path": ".github/workflows/ci.yml",
+			"args": ["core", "npm run test:js"],
+			"reason": "Six hosted JavaScript guards fail on the approved wrapper shapes; the JS suite is explicitly unqualified, not inferred passed. Properties, mutation, build/package/integrity and install remain mandatory."
+		},
+		"macos-native-model-receiving": {
+			"kind": "command",
+			"path": ".github/workflows/ci-macos.yml",
+			"args": [
+				"managed-ollama-native",
+				"Receive actual native model create, pull, inference and retirement"
+			],
+			"reason": "Hosted native model receiving timed out restoring trust after actual producer build and catalogue checks passed. Model receiving remains unqualified; no TLS, trust or permission workaround is authorized."
+		}
+	}
+}

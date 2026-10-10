@@ -516,6 +516,7 @@ InstallSendNoOps()
 #Include unit/test_uninstall.ahk
 #Include unit/test_uninstall_source_run.ahk
 #Include unit/test_start_at_login.ahk
+#Include unit/test_start_at_login_other_source.ahk
 #Include meta/test_uninstall_shutdown_gate.ahk
 #Include unit/test_updater_channel_registry.ahk
 #Include unit/test_updater_schedule_vectors.ahk
@@ -702,6 +703,7 @@ global _LLM_Menu_Loaded := false
 ; Definitions-only chord translation and hotkey identities; registers no hotkey.
 #Include ../ui/menu/menu_llm/hotkey_identity.ahk
 #Include ../adapters/llm_nav_event_owner.ahk
+#Include ../adapters/llm_automation.ahk
 #Include ../ui/menu/menu_llm/tab_accept.ahk
 ; Definitions-only boot restore helper. LLM_Menu_Init is never invoked by the
 ; harness; the regression suite calls only its one-shot saved-options seam.

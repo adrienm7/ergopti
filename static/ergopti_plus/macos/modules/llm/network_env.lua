@@ -100,6 +100,26 @@ function M.opaque_prelude(tag)
 	return build_prelude(tag, true)
 end
 
+--- Emits the existing native receiver admission without observing a route.
+--- @param tag string Child log prefix.
+--- @param root string Canonical bundled driver root.
+--- @return string prelude
+local function managed_receiver_prelude(tag, root)
+	local directory = root .. "/platform/network"
+	-- The canonical receiver validates the exact bundle path and executable
+	-- device/inode. This probe performs no network lookup or request and keeps
+	-- inherited environment selectors intact, including no_proxy precedence.
+	local probe = "import importlib.util,sys; s=importlib.util.spec_from_file_location('ergopti_native_admission',sys.argv[1]); "
+		.. "m=importlib.util.module_from_spec(s); s.loader.exec_module(m); m._resolve_worker()"
+	local prefix = text_utils.shell_quote("[" .. tostring(tag) .. "] %s\n")
+	local accepted = text_utils.shell_quote(Admission.accepted_line)
+	local refused = text_utils.shell_quote(Admission.refusal_prefix .. "unavailable:unavailable")
+	return "if \"$PYTHON_BIN\" -c " .. text_utils.shell_quote(probe) .. " " .. text_utils.shell_quote(directory .. "/native_http.py")
+		.. " >/dev/null 2>&1; then printf '%s\\n' " .. accepted .. " >&2; else printf " .. prefix
+		.. " 'The bundled native network receiver is unavailable. No download was started.' >&2; "
+		.. "printf '%s\\n' " .. refused .. " >&2; exit " .. tostring(Admission.refusal_exit_code) .. "; fi; ", nil
+end
+
 --- Admits the bundled managed HTTP receiver without materializing system aliases.
 --- The caller sets PYTHON_BIN to its pinned runtime before this prelude. The
 --- native transport subsequently resolves each exact request and redirect URL.
@@ -113,18 +133,31 @@ function M.managed_http_prelude(tag)
 	if not FileSystem.exists(directory .. "/native_http.py") then
 		return nil, "the bundled managed network receiver is missing"
 	end
-	-- The canonical receiver validates the exact bundle path and executable
-	-- device/inode. This probe performs no network lookup or request and keeps
-	-- inherited environment selectors intact, including no_proxy precedence.
-	local probe = "import importlib.util,sys; s=importlib.util.spec_from_file_location('ergopti_native_admission',sys.argv[1]); "
-		.. "m=importlib.util.module_from_spec(s); s.loader.exec_module(m); m._resolve_worker()"
-	local prefix = text_utils.shell_quote("[" .. tostring(tag) .. "] %s\n")
-	local accepted = text_utils.shell_quote(Admission.accepted_line)
-	local refused = text_utils.shell_quote(Admission.refusal_prefix .. "unavailable:unavailable")
-	return "if \"$PYTHON_BIN\" -c " .. text_utils.shell_quote(probe) .. " " .. text_utils.shell_quote(directory .. "/native_http.py")
-		.. " >/dev/null 2>&1; then printf '%s\\n' " .. accepted .. " >&2; else printf " .. prefix
-		.. " 'The bundled native network receiver is unavailable. No download was started.' >&2; "
-		.. "printf '%s\\n' " .. refused .. " >&2; exit " .. tostring(Admission.refusal_exit_code) .. "; fi; ", nil
+	return managed_receiver_prelude(tag, root)
+end
+
+--- Admits the transport selected by the installer without changing route provenance.
+--- Native wheel staging uses the existing authenticated receiver; explicit routes
+--- and manual checkouts retain opaque admission. A native refusal never retries
+--- the opaque client. The shell observes the same environment as the installer.
+--- @param tag string Child log prefix.
+--- @param python string Exact interpreter already admitted by the runtime owner.
+--- @return string|nil prelude
+--- @return string|nil err
+function M.bootstrap_prelude(tag, python)
+	if type(python) ~= "string" or python == "" or python:find("%z") then
+		return nil, "the admitted bootstrap interpreter is missing"
+	end
+	local root = driver_root()
+	if not root then return nil, "the bundled bootstrap owner is missing" end
+	local managed = managed_receiver_prelude(tag, root)
+	local opaque, opaque_error = M.opaque_prelude(tag)
+	if not opaque then return nil, opaque_error end
+	local helper = text_utils.shell_quote(root .. "/modules/llm/managed_bootstrap_http.py")
+	return "if [ -n \"${ERGOPTI_LAUNCHER_EXECUTABLE:-}\" ] "
+		.. "&& [ -z \"${https_proxy:-${HTTPS_PROXY:-${all_proxy:-${ALL_PROXY:-}}}}\" ] "
+		.. "&& [ -f " .. helper .. " ]; then PYTHON_BIN=" .. text_utils.shell_quote(python) .. "; "
+		.. managed .. "else " .. opaque .. "fi; ", nil
 end
 
 return M

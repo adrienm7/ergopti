@@ -128,3 +128,39 @@ module.exports.push(
 		}
 	]
 );
+
+module.exports = module.exports.concat([
+	{
+		path: 'macos/ui/menu/builder.lua',
+		before:
+			'local projected = { id = entry.id, greyed_when_paused = entry.greyed_when_paused == true }',
+		after:
+			'local projected = { id = "foreign", greyed_when_paused = entry.greyed_when_paused == true }',
+		reason: 'current projected top-level identity replaced',
+		expected: false
+	},
+	{
+		path: 'macos/ui/menu/builder.lua',
+		before: 'table.insert(result, projected)',
+		after: 'table.insert(result, {})',
+		reason: 'current projected top-level record disconnected',
+		expected: false
+	},
+	{
+		path: 'macos/ui/menu/builder.lua',
+		before:
+			'local projected = { id = entry.id, greyed_when_paused = entry.greyed_when_paused == true }\n\t\tif entry.disabled == true then',
+		after:
+			'local projected = { id = entry.id, greyed_when_paused = entry.greyed_when_paused == true }\n\t\tif false then',
+		reason: 'current projected disabled declaration ignored',
+		expected: false
+	},
+	{
+		path: 'macos/ui/menu/builder.lua',
+		before:
+			'projected.disabled, projected.i18n, projected.reason_key = true, entry.i18n, entry.reason_key',
+		after: 'projected.disabled, projected.i18n, projected.reason_key = true, entry.i18n, "foreign"',
+		reason: 'current projected unavailable reason replaced',
+		expected: false
+	}
+]);

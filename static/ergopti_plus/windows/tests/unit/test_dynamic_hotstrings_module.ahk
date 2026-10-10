@@ -28,9 +28,9 @@
 ;   3. The module still declares the ordering contract, since the call site's
 ;      position feeds the engine's collision tiebreak.
 ;
-; SCOPE: pure functions only. Registration needs the full Features /
-;   PersonalInformation globals and the hotstring engine, which the headless
-;   suite does not stand up; that path is covered by the corpus prefix vectors.
+; SCOPE: pure functions and actual in-memory registration/matching. Synthetic
+;   Features/personal values exercise the HSE word boundary without input hooks,
+;   GUI, personal configuration, or a positive keyboard/output dispatch.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
@@ -181,3 +181,176 @@ _DynHSTest_OrderingContractIsStated() {
 }
 Test("dynamic hotstrings: the registration call keeps its position in the boot order",
 	_DynHSTest_OrderingContractIsStated)
+
+
+
+
+
+; ==================================================
+; ==================================================
+; ======= 4/ Actual registration word boundaries ====
+; ==================================================
+; ==================================================
+
+; Synthetic personal values and a cached configuration receipt keep registration
+; on its real in-memory path. Matching never invokes a keyboard/output owner.
+_DynHSTest_WithWordRegistry(Body) {
+	global Features, ScriptInformation, PersonalInformation, _HotstringRegistrar
+	global _HSResolveCache, _HSResolveGen
+	Saved := [IsSet(Features) ? Features : unset,
+		IsSet(ScriptInformation) ? ScriptInformation : unset,
+		IsSet(PersonalInformation) ? PersonalInformation : unset,
+		IsSet(_HotstringRegistrar) ? _HotstringRegistrar : unset,
+		IsSet(_HSResolveCache) ? _HSResolveCache : unset]
+	global HSE_RegistryByLastChar, HSE_StarSpecs, HSE_StarPrefixSetCI
+	global HSE_StarPrefixSetCS, HSE_RegistryByGroup, HSE_DisabledGroups
+	global HSE_SeqCounter, HSE_StarByTriggerCI, HSE_StarByTriggerCS
+	global HSE_MaxStarTriggerLen, HSE_EndByTriggerCI, HSE_EndByTriggerCS
+	global HSE_MaxEndTriggerLen, HSE_RegistryGeneration, HSE_Buffer
+	global HSE_StartIsWordBoundary, HSE_LastMatch, HSE_LastEndChar
+	global HSE_Suppressed, HSE_TypoNbspStripped, _PrefixWatcherSuppressed
+	SavedRegistry := [IsSet(HSE_RegistryByLastChar) ? HSE_RegistryByLastChar : unset,
+		IsSet(HSE_StarSpecs) ? HSE_StarSpecs : unset,
+		IsSet(HSE_StarPrefixSetCI) ? HSE_StarPrefixSetCI : unset,
+		IsSet(HSE_StarPrefixSetCS) ? HSE_StarPrefixSetCS : unset,
+		IsSet(HSE_RegistryByGroup) ? HSE_RegistryByGroup : unset,
+		IsSet(HSE_DisabledGroups) ? HSE_DisabledGroups : unset,
+		IsSet(HSE_SeqCounter) ? HSE_SeqCounter : unset,
+		IsSet(HSE_StarByTriggerCI) ? HSE_StarByTriggerCI : unset,
+		IsSet(HSE_StarByTriggerCS) ? HSE_StarByTriggerCS : unset,
+		IsSet(HSE_MaxStarTriggerLen) ? HSE_MaxStarTriggerLen : unset,
+		IsSet(HSE_EndByTriggerCI) ? HSE_EndByTriggerCI : unset,
+		IsSet(HSE_EndByTriggerCS) ? HSE_EndByTriggerCS : unset,
+		IsSet(HSE_MaxEndTriggerLen) ? HSE_MaxEndTriggerLen : unset,
+		IsSet(HSE_RegistryGeneration) ? HSE_RegistryGeneration : unset,
+		IsSet(HSE_Buffer) ? HSE_Buffer : unset,
+		IsSet(HSE_StartIsWordBoundary) ? HSE_StartIsWordBoundary : unset,
+		IsSet(HSE_LastMatch) ? HSE_LastMatch : unset,
+		IsSet(HSE_LastEndChar) ? HSE_LastEndChar : unset,
+		IsSet(HSE_Suppressed) ? HSE_Suppressed : unset,
+		IsSet(HSE_TypoNbspStripped) ? HSE_TypoNbspStripped : unset,
+		IsSet(_PrefixWatcherSuppressed) ? _PrefixWatcherSuppressed : unset]
+	try {
+		Features := Map("hotstrings", Map("dynamic", Map()))
+		for Name in ["date_fr", "date_long_fr", "date", "phone_prefixes", "ssn_prefixes", "iban_prefixes"]
+			Features["hotstrings"]["dynamic"][Name] := Map("enabled", true)
+		ScriptInformation := Map("MagicKey", Chr(0x2605))
+		PersonalInformation := Map("phone_number", "0612345678", "phone_number_clean", "06 12 34 56 78",
+			"social_security_number", "1 99 99 99 999 999 99", "iban", "FR76 1234 5678 9012 3456 789")
+		_HotstringRegistrar := 0
+		_HSResolveCache := Map("dynamichotstrings|", { gen: _HSResolveGen,
+			val: { Delay: 0, HasOverride: true, Priority: 10 } })
+		HSE_TestReset()
+		_DynHS_RegisterAll()
+		Body.Call()
+	} finally {
+		HSE_TestReset()
+		Features := Saved.Has(1) ? Saved[1] : unset
+		ScriptInformation := Saved.Has(2) ? Saved[2] : unset
+		PersonalInformation := Saved.Has(3) ? Saved[3] : unset
+		_HotstringRegistrar := Saved.Has(4) ? Saved[4] : unset
+		_HSResolveCache := Saved.Has(5) ? Saved[5] : unset
+		HSE_RegistryByLastChar := SavedRegistry.Has(1) ? SavedRegistry[1] : unset
+		HSE_StarSpecs := SavedRegistry.Has(2) ? SavedRegistry[2] : unset
+		HSE_StarPrefixSetCI := SavedRegistry.Has(3) ? SavedRegistry[3] : unset
+		HSE_StarPrefixSetCS := SavedRegistry.Has(4) ? SavedRegistry[4] : unset
+		HSE_RegistryByGroup := SavedRegistry.Has(5) ? SavedRegistry[5] : unset
+		HSE_DisabledGroups := SavedRegistry.Has(6) ? SavedRegistry[6] : unset
+		HSE_SeqCounter := SavedRegistry.Has(7) ? SavedRegistry[7] : unset
+		HSE_StarByTriggerCI := SavedRegistry.Has(8) ? SavedRegistry[8] : unset
+		HSE_StarByTriggerCS := SavedRegistry.Has(9) ? SavedRegistry[9] : unset
+		HSE_MaxStarTriggerLen := SavedRegistry.Has(10) ? SavedRegistry[10] : unset
+		HSE_EndByTriggerCI := SavedRegistry.Has(11) ? SavedRegistry[11] : unset
+		HSE_EndByTriggerCS := SavedRegistry.Has(12) ? SavedRegistry[12] : unset
+		HSE_MaxEndTriggerLen := SavedRegistry.Has(13) ? SavedRegistry[13] : unset
+		HSE_RegistryGeneration := SavedRegistry.Has(14) ? SavedRegistry[14] : unset
+		HSE_Buffer := SavedRegistry.Has(15) ? SavedRegistry[15] : unset
+		HSE_StartIsWordBoundary := SavedRegistry.Has(16) ? SavedRegistry[16] : unset
+		HSE_LastMatch := SavedRegistry.Has(17) ? SavedRegistry[17] : unset
+		HSE_LastEndChar := SavedRegistry.Has(18) ? SavedRegistry[18] : unset
+		HSE_Suppressed := SavedRegistry.Has(19) ? SavedRegistry[19] : unset
+		HSE_TypoNbspStripped := SavedRegistry.Has(20) ? SavedRegistry[20] : unset
+		_PrefixWatcherSuppressed := SavedRegistry.Has(21) ? SavedRegistry[21] : unset
+	}
+}
+
+_DynHSTest_WordFeed(Text, KnownBoundary := true) {
+	HSE_HardReset()
+	HSE_FeedReset(KnownBoundary)
+	Match := ""
+	for Char in StrSplit(Text)
+		Match := HSE_FeedChar(Char)
+	return Match
+}
+
+_DynHSTest_RejectDateWordsBody() {
+	for Word in ["update", "updates", "date", "td", "dt", "xtd", "xdt", "1date", "_date", "édate"] {
+		for Suffix in ["", Chr(0x2605)] {
+			Match := _DynHSTest_WordFeed(Word . Suffix)
+			AssertFalse(IsObject(Match), "ordinary words do not acquire a Windows @-date candidate")
+			AssertFalse(HSE_DispatchMatch(Match, ""), "a missing dynamic candidate cannot dispatch output")
+		}
+	}
+}
+Test("dynamic hotstrings: ordinary date words never acquire or dispatch @-date candidates (dynamic-word-boundary)",
+	(*) => _DynHSTest_WithWordRegistry(_DynHSTest_RejectDateWordsBody))
+
+_DynHSTest_PrivatePrefixes() {
+	return ["06" . Chr(0x2605), "+3306", "0612", "+33612", "6123", "06 12",
+		"19999", "1 99 99", "FR7612", "FR76 12"]
+}
+
+_DynHSTest_RejectPersonalInsideWordsBody() {
+	for Trigger in _DynHSTest_PrivatePrefixes() {
+		for Left in ["update", "x", "1", "_", "é", "@"] {
+			Match := _DynHSTest_WordFeed(Left . Trigger)
+			AssertFalse(IsObject(Match), "personal numeric prefixes must not acquire a candidate inside a larger word")
+			AssertFalse(HSE_DispatchMatch(Match, ""), "rejected personal prefixes cannot dispatch output")
+		}
+	}
+}
+Test("dynamic hotstrings: personal numeric prefixes reject every larger-word predecessor (dynamic-word-boundary)",
+	(*) => _DynHSTest_WithWordRegistry(_DynHSTest_RejectPersonalInsideWordsBody))
+
+_DynHSTest_ExplicitDatesKeepContinuationBody() {
+	for Trigger in ["@dt" . Chr(0x2605), "@date" . Chr(0x2605), "@td" . Chr(0x2605)] {
+		for Left in ["", "2026", "expandedword"] {
+			Match := _DynHSTest_WordFeed(Left . Trigger, Left == "")
+			AssertTrue(IsObject(Match), "explicit @ dates remain available after prior expansion text")
+			AssertEqual(Trigger, Match.Trigger, "the actual date registration owns its explicit spelling")
+			AssertTrue(Match.InWord, "the intentional *? date continuation contract is retained")
+			AssertTrue(HasMethod(Match.Replacement), "date output remains resolved at fire time")
+		}
+	}
+}
+Test("dynamic hotstrings: explicit @ dates preserve back-to-back continuation and dynamic callbacks (dynamic-word-boundary)",
+	(*) => _DynHSTest_WithWordRegistry(_DynHSTest_ExplicitDatesKeepContinuationBody))
+
+_DynHSTest_PersonalAtBoundaryBody() {
+	for Trigger in _DynHSTest_PrivatePrefixes() {
+		for Left in ["", " ", Chr(0x27), "!"] {
+			Match := _DynHSTest_WordFeed(Left . Trigger)
+			AssertTrue(IsObject(Match), "personal prefixes remain available at a genuine word boundary")
+			AssertEqual(Trigger, Match.Trigger)
+			AssertFalse(Match.InWord, "ordinary numeric registration never uses the in-word flag")
+			AssertTrue(Match.IsPrivate, "personal registration retains its privacy marker")
+		}
+	}
+	for Trigger in ["fr7612", "fr76 12"] {
+		Match := _DynHSTest_WordFeed(Trigger)
+		AssertTrue(IsObject(Match), "IBAN prefixes preserve their original case-insensitive admission")
+		AssertFalse(Match.CaseSensitive)
+	}
+}
+Test("dynamic hotstrings: personal prefixes keep genuine boundary positives and IBAN case behavior (dynamic-word-boundary)",
+	(*) => _DynHSTest_WithWordRegistry(_DynHSTest_PersonalAtBoundaryBody))
+
+_DynHSTest_PersonalUnknownBoundaryBody() {
+	for Trigger in _DynHSTest_PrivatePrefixes() {
+		Match := _DynHSTest_WordFeed(Trigger, false)
+		AssertFalse(IsObject(Match), "a fresh buffer with unknown left context cannot authorize an ordinary personal prefix")
+		AssertFalse(HSE_DispatchMatch(Match, ""))
+	}
+}
+Test("dynamic hotstrings: unknown left context refuses ordinary personal prefixes (dynamic-word-boundary)",
+	(*) => _DynHSTest_WithWordRegistry(_DynHSTest_PersonalUnknownBoundaryBody))

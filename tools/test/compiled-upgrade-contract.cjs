@@ -8,6 +8,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const crypto = require('node:crypto');
 const { parse } = require('smol-toml');
+const tomlOwnData = require('./fixtures/toml-own-data.cjs');
 const prior = require('./fixtures/windows-upgrade-prior.json');
 
 const retainedRecords = [
@@ -29,7 +30,8 @@ function inspectNativePriorProfile(file, schemaVersion) {
 	assert.equal(model.metrics?.metrics_enabled, false, 'Native prior Metrics enabled value differs');
 	assert.equal(model.metrics?.metrics_shortcut_typing, 'Ctrl+Alt+M');
 	assert.equal(model.metrics?.metrics_shortcut_apps, 'Ctrl+Alt+A');
-	assert.deepEqual(model.metrics?.future_dashboard, { keep: 9, enabled: false });
+	const dashboard = tomlOwnData(model.metrics?.future_dashboard);
+	assert.deepEqual(dashboard, { keep: 9, enabled: false });
 	const rows = source.replace(/^\uFEFF/, '').split(/\r?\n/);
 	return {
 		sha256: hash(bytes),
@@ -37,7 +39,7 @@ function inspectNativePriorProfile(file, schemaVersion) {
 		metrics_enabled: model.metrics.metrics_enabled,
 		metrics_shortcut_typing: model.metrics.metrics_shortcut_typing,
 		metrics_shortcut_apps: model.metrics.metrics_shortcut_apps,
-		future_dashboard: model.metrics.future_dashboard,
+		future_dashboard: dashboard,
 		source_records_observed: retainedRecords.filter((record) => rows.includes(record)).length
 	};
 }

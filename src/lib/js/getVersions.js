@@ -25,19 +25,34 @@ export function getFilteredFileVersions(name, versionPrefix = null) {
 
 	switch (name) {
 		case 'kbdedit_exe':
-			files = import.meta.glob('/static/ergopti/windows/*.exe', { as: 'url' });
+			files = import.meta.glob('/static/ergopti/windows/*.exe', {
+				query: '?url',
+				import: 'default'
+			});
 			break;
 		case 'kbdedit_kbe':
-			files = import.meta.glob('/static/ergopti/windows/*.kbe', { as: 'url' });
+			files = import.meta.glob('/static/ergopti/windows/*.kbe', {
+				query: '?url',
+				import: 'default'
+			});
 			break;
 		case 'macos_keylayout':
-			files = import.meta.glob('/static/ergopti/macos/bundles/zipped_bundles/*.zip', { as: 'url' });
+			files = import.meta.glob('/static/ergopti/macos/bundles/zipped_bundles/*.zip', {
+				query: '?url',
+				import: 'default'
+			});
 			break;
 		case 'autohotkey':
-			files = import.meta.glob('/static/ergopti_plus/windows/*.ahk', { as: 'url' });
+			files = import.meta.glob('/static/ergopti_plus/windows/*.ahk', {
+				query: '?url',
+				import: 'default'
+			});
 			break;
 		case 'autohotkey_exe':
-			files = import.meta.glob('/static/ergopti_plus/windows/compiled/*.exe', { as: 'url' });
+			files = import.meta.glob('/static/ergopti_plus/windows/compiled/*.exe', {
+				query: '?url',
+				import: 'default'
+			});
 			break;
 		case 'kla_iso':
 			files = import.meta.glob('/static/layouts/kla_iso/*.json');
@@ -55,7 +70,10 @@ export function getFilteredFileVersions(name, versionPrefix = null) {
 			files = import.meta.glob('/static/ergopti_plus/old/kalamine/standard/*_analyse.toml');
 			break;
 		case 'kalamine_standard':
-			files = import.meta.glob('/static/ergopti_plus/old/kalamine/standard/*.toml', { as: 'url' });
+			files = import.meta.glob('/static/ergopti_plus/old/kalamine/standard/*.toml', {
+				query: '?url',
+				import: 'default'
+			});
 			files = Object.fromEntries(
 				Object.entries(files).filter(([key]) => !key.endsWith('_analyse.toml'))
 			);

@@ -784,7 +784,7 @@ function M.update_preview(buf)
 		-- side-effectful provider bind the successfully rendered row to the exact
 		-- result its interceptor must later consume without changing the long-lived
 		-- provider API's first (string) return value.
-		local ok, res, provider_action_token = pcall(provider, buf)
+		local ok, res, provider_action_token = pcall(provider, buf, _state.start_is_word_boundary)
 		if not ok then
 			report_preview_provider_failure(provider, provider_index)
 			goto continue_provider
