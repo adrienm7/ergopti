@@ -5921,7 +5921,7 @@ console.log(
 	const assert = require('node:assert/strict');
 	const { scriptTokens } = require('../lib/script-source.cjs');
 	const {
-		personalFrameDataPublication
+		personalFrameDataPublication: physicalPersonalFrameDataPublication
 	} = require('../lib/menu-native-personal-shortcuts-binding.cjs');
 	const expected = JSON.parse(
 		readFileSync(resolve(SHARED, 'tests/corpus/menus/personal_shortcuts_frame.json'), 'utf8')
@@ -5938,10 +5938,189 @@ console.log(
 	assert.equal(expected.absent_registry_count, 0);
 	assert.equal(expected.empty_registry_count, 0);
 	assert.equal(expected.populated_frame_count, 2);
-	const source = ['ui/menu/menu_shortcuts.ahk', 'ui/menu/menu_init.ahk', 'infra/manifest_menu.ahk']
-		.map((file) => readFileSync(resolve(SHARED, '../windows', file), 'utf8'))
-		.join('\n');
+	const personalFiles = [
+		'ui/menu/menu_shortcuts.ahk',
+		'ui/menu/menu_init.ahk',
+		'infra/manifest_menu.ahk',
+		'adapters/tray_menu.ahk'
+	];
+	const physicalPersonalSources = Object.fromEntries(
+		personalFiles.map((file) => [
+			'windows/' + file,
+			readFileSync(resolve(SHARED, '../windows', file), 'utf8')
+		])
+	);
+	const source = personalFiles.map((file) => physicalPersonalSources['windows/' + file]).join('\n');
+	// Apply each genuine flat-source mutant only to its original physical file.
+	function personalFrameDataPublication(text, definition, owningEntry) {
+		if (typeof text !== 'string') return false;
+		if (text === source)
+			return physicalPersonalFrameDataPublication(physicalPersonalSources, definition, owningEntry);
+		let prefix = 0,
+			suffix = 0;
+		while (prefix < source.length && prefix < text.length && source[prefix] === text[prefix])
+			prefix++;
+		while (
+			suffix < source.length - prefix &&
+			suffix < text.length - prefix &&
+			source[source.length - 1 - suffix] === text[text.length - 1 - suffix]
+		)
+			suffix++;
+		const end = source.length - suffix;
+		let start = 0;
+		for (const file of personalFiles) {
+			const key = 'windows/' + file,
+				original = physicalPersonalSources[key];
+			const stop = start + original.length;
+			if (prefix >= start && end <= stop) {
+				const changed =
+					original.slice(0, prefix - start) +
+					text.slice(prefix, text.length - suffix) +
+					original.slice(end - start);
+				const candidate = { ...physicalPersonalSources, [key]: changed };
+				assert.equal(
+					personalFiles.map((name) => candidate['windows/' + name]).join('\n'),
+					text,
+					'actual physical source projection is byte exact'
+				);
+				return physicalPersonalFrameDataPublication(candidate, definition, owningEntry);
+			}
+			start = stop + 1;
+		}
+		return false;
+	}
 	const entry = menu.shortcuts_menu.find((row) => row.id === 'personal_shortcuts');
+	// Native port mutations preserve every original personal corpus assertion.
+	{
+		const nativeFile = 'windows/adapters/tray_menu.ahk';
+		const original = physicalPersonalSources[nativeFile];
+		assert.equal(
+			physicalPersonalFrameDataPublication(
+				physicalPersonalSources,
+				menu.personal_shortcuts_frame,
+				entry
+			),
+			true
+		);
+		for (const [label, before, after] of [
+			[
+				'native bootstrap dead',
+				'if !TrayMenuFrameNative("current")',
+				'if false\nif !TrayMenuFrameNative("current")'
+			],
+			['native admission withdrawn', 'if NativeDll != DllCall', 'if false'],
+			[
+				'native own observer admitted',
+				'for Name in ObjOwnProps(Callable)\n\t\t\t\treturn false',
+				'for Name in []\n\t\t\t\treturn false'
+			],
+			[
+				'native reader descriptor lost',
+				'if !Object.Prototype.HasOwnProp.Call(Descriptor, "Get") || Descriptor.Get != Getter',
+				'if !Object.Prototype.HasOwnProp.Call(Descriptor, "Get") || false'
+			],
+			[
+				'native receipt from inert sibling',
+				'if Operation == "capture" {',
+				'if false && Operation == "capture" {'
+			],
+			['native state changed', '"uint", 0x400, "uint")', '"uint", 0, "uint")'],
+			[
+				'native command identity changed',
+				'Id := NativeDll.Call("GetMenuItemID"',
+				'Id := NativeDll.Call("GetSubMenu"'
+			],
+			[
+				'native child identity changed',
+				'Child := NativeDll.Call("GetSubMenu"',
+				'Child := NativeDll.Call("GetMenuItemID"'
+			],
+			['native caption observer', '\t\t\tif Read != Length', '\t\t\tif false'],
+			[
+				'native final coherence lost',
+				'|| HandleGetter.Call(Target) != Handle\n\t\t\treturn false',
+				'|| false\n\t\t\treturn false'
+			],
+			[
+				'native dispatch ID cohort lost',
+				'Ids.Push(NativeDll.Call("GetMenuItemID"',
+				'Ids.Push(NativeDll.Call("GetSubMenu"'
+			],
+			[
+				'native cleanup withheld',
+				'DeleteMethod.Call(Target)',
+				'if false\n\t\tDeleteMethod.Call(Target)'
+			],
+			['native cleanup foreign', 'DeleteMethod.Call(Target)', 'Target.Delete()'],
+			['native cleanup redirected', 'if Operation == "release" {', 'if Operation == "foreign" {'],
+			[
+				'native reflective port assigned',
+				'throw ValueError("Unknown owned native menu operation")',
+				'throw ValueError("Unknown owned native menu operation")\n\tTrayMenuFrameNative := Foreign.Native'
+			]
+		]) {
+			assert.equal(original.split(before).length - 1, 1, label + ': actual native preimage');
+			const changed = original.replace(before, after);
+			assert.notEqual(changed, original, label + ': actual source changed');
+			assert.equal(
+				changed.split(after).length - 1,
+				1,
+				label + ': unique actual native inverse anchor'
+			);
+			assert.equal(
+				physicalPersonalFrameDataPublication(
+					{ ...physicalPersonalSources, [nativeFile]: changed },
+					menu.personal_shortcuts_frame,
+					entry
+				),
+				false,
+				label
+			);
+			const repaired = changed.replace(after, before);
+			assert.equal(repaired, original, label + ': exact native inverse');
+			assert.equal(
+				physicalPersonalFrameDataPublication(
+					{ ...physicalPersonalSources, [nativeFile]: repaired },
+					menu.personal_shortcuts_frame,
+					entry
+				),
+				true,
+				label + ': genuine repair'
+			);
+		}
+		const missing = { ...physicalPersonalSources };
+		delete missing[nativeFile];
+		assert.equal(
+			physicalPersonalFrameDataPublication(missing, menu.personal_shortcuts_frame, entry),
+			false,
+			'missing actual native adapter'
+		);
+		assert.equal(
+			physicalPersonalFrameDataPublication(
+				{ ...physicalPersonalSources, [nativeFile]: '; native adapter source is unavailable\n' },
+				menu.personal_shortcuts_frame,
+				entry
+			),
+			false,
+			'inert actual native adapter'
+		);
+		assert.equal(
+			physicalPersonalFrameDataPublication(
+				{ ...physicalPersonalSources, [nativeFile]: original + original },
+				menu.personal_shortcuts_frame,
+				entry
+			),
+			false,
+			'duplicate native adapter cannot borrow authority'
+		);
+		const foreign = { ...physicalPersonalSources, 'windows/adapters/foreign_native.ahk': original };
+		delete foreign[nativeFile];
+		assert.equal(
+			physicalPersonalFrameDataPublication(foreign, menu.personal_shortcuts_frame, entry),
+			false,
+			'foreign native path cannot borrow authority'
+		);
+	}
 	function publishedPersonalFrame(text) {
 		const tokens = scriptTokens(text, '.ahk');
 		let level = 0;
@@ -6108,6 +6287,91 @@ console.log(
 		);
 	}
 	for (const [before, after, reason] of [
+		[
+			'if !_MR_FrameNativeConstructorCurrent(Menu)\n\tthrow Error(',
+			'if false\n\tthrow Error(',
+			'constructor intrinsic ownership is established by the actual module bootstrap'
+		],
+		[
+			'if !ConstructorOwner.Call(NativeConstructor)',
+			'if false',
+			'the actual receiver validates the held native constructor authority'
+		],
+		[
+			'static NativeFactory := Object.Prototype.GetOwnPropDesc.Call(Menu, "Call").Call',
+			'static NativeFactory := ForeignFactory',
+			'the constructor owner captures the actual native class method descriptor'
+		],
+		[
+			'for Name, Getter in Map("Name", NameGetter, "IsBuiltIn", BuiltInGetter) {',
+			'for Name, Getter in Map("Name", ForeignGetter, "IsBuiltIn", BuiltInGetter) {',
+			'the admitted Map loop keeps the actual retained intrinsic metadata readers'
+		],
+		[
+			'_MR_FrameNativeConstructorCurrent(Constructor) {',
+			'Map(Name, Getter) {\n\treturn 0\n}\n\n_MR_FrameNativeConstructorCurrent(Constructor) {',
+			'the one admitted intrinsic reader loop cannot authorize a real top-level Map function rebinding'
+		],
+		[
+			'Descriptor.Call != NativeFactory',
+			'Descriptor.Call != ForeignFactory',
+			'late constructor replacement cannot borrow the original class identity'
+		],
+		[
+			'for Name in ObjOwnProps(NativeFactory)\n\t\t\treturn false',
+			'for Name in []\n\t\t\treturn false',
+			'constructor own observers cannot run as intrinsic metadata authority'
+		],
+		[
+			'ReaderDescriptor.Get != Getter',
+			'ReaderDescriptor.Get != ForeignGetter',
+			'constructor metadata readers retain their original intrinsic descriptor methods'
+		],
+		[
+			'BuiltIn := BuiltInGetter.Call(NativeFactory)',
+			'BuiltIn := true',
+			'the actual factory retains its interpreter-owned built-in status'
+		],
+		[
+			'Name := NameGetter.Call(NativeFactory)',
+			'Name := "Menu.Call"',
+			'a literal name cannot impersonate the original native constructor'
+		],
+		[
+			'if !SourceLive() || !BuiltIn',
+			'if !BuiltIn',
+			'native factory reads retain source identity immediately after intrinsic observations'
+		],
+		[
+			'if !_MR_FrameNativeConstructorCurrent(Menu)\n\tthrow Error("The native Menu constructor lost its interpreter-owned authority")',
+			'if false\nif !_MR_FrameNativeConstructorCurrent(Menu)\n\tthrow Error("The native Menu constructor lost its interpreter-owned authority")',
+			'an unbraced dormant bootstrap cannot defer trusted metadata capture until first receiver use'
+		],
+		[
+			'if !_MR_FrameNativeConstructorCurrent(Menu)\n\tthrow Error("The native Menu constructor lost its interpreter-owned authority")',
+			'return\nif !_MR_FrameNativeConstructorCurrent(Menu)\n\tthrow Error("The native Menu constructor lost its interpreter-owned authority")',
+			'a module-entry return cannot make constructor initialization a dead witness'
+		],
+		[
+			'if !_MR_FrameNativeConstructorCurrent(Menu)\n\tthrow Error("The native Menu constructor lost its interpreter-owned authority")',
+			'throw Error("early constructor refusal")\nif !_MR_FrameNativeConstructorCurrent(Menu)\n\tthrow Error("The native Menu constructor lost its interpreter-owned authority")',
+			'an early module throw cannot borrow the later constructor bootstrap'
+		],
+		[
+			'if !_MR_FrameNativeConstructorCurrent(Menu)\n\tthrow Error("The native Menu constructor lost its interpreter-owned authority")',
+			'try\nif !_MR_FrameNativeConstructorCurrent(Menu)\n\tthrow Error("The native Menu constructor lost its interpreter-owned authority")',
+			'a swallowed module bootstrap failure cannot claim constructor authority'
+		],
+		[
+			'if !_MR_FrameNativeConstructorCurrent(Menu)\n\tthrow Error("The native Menu constructor lost its interpreter-owned authority")',
+			'try {\nif !_MR_FrameNativeConstructorCurrent(Menu)\n\tthrow Error("The native Menu constructor lost its interpreter-owned authority")\n}',
+			'a nested exception-swallowing bootstrap cannot own module initialization'
+		],
+		[
+			'#Include menu_population.ahk\n\n; Capture only built-in metadata at include, before DATA/user callbacks can run.',
+			'return\n\ufeff; infra/manifest_menu.ahk\n#Include menu_population.ahk\n\n; Capture only built-in metadata at include, before DATA/user callbacks can run.',
+			'a moved documentary heading cannot hide a real pre-bootstrap module return'
+		],
 		...actualBooleanCalls.flatMap((call) =>
 			['& ', '& & ', '&&& ', '&& &'].map((operator) => [
 				call,

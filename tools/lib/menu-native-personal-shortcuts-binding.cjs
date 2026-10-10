@@ -266,7 +266,8 @@ function personalOwnerGuard(unit, receiver) {
 			FieldOwner: '_MR_Get',
 			TranslationOwner: 't',
 			NativeConstructor: 'Menu',
-			DllOwner: 'DllCall',
+			ConstructorOwner: '_MR_FrameNativeConstructorCurrent',
+			NativePortOwner: 'TrayMenuFrameNative',
 			CaptionOwner: 'TrayMenuItemCaption',
 			CountOwner: 'TrayMenuItemCount',
 			LookupOwner: '_MR_FindItemById',
@@ -335,7 +336,7 @@ function personalOwnerGuard(unit, receiver) {
 	if (seen.size !== obligations.size)
 		throw Error('All actual current-source callable owners required');
 	r.take(
-		'for Pair in Pairs if Pair[1] != Pair[2] || Object.Prototype.HasOwnProp.Call(Pair[1], "Call") return false'
+		'for Pair in Pairs { if Pair[1] != Pair[2] return false if Pair[1] != NativeConstructor && Object.Prototype.HasOwnProp.Call(Pair[1], "Call") return false } if !ConstructorOwner.Call(NativeConstructor) || !NativePortOwner.Call("current") return false'
 	);
 	r.take(
 		'CurrentRegistries := [_MenuDispatchCallbacks, _MenuDispatchTokens, _MenuDispatchOwnerHandles, _MenuDispatchLastFire, _MenuDispatchClickSequences]'
@@ -552,7 +553,11 @@ function personalCentral(unit) {
 		receiver,
 		1
 	);
-	unit.unique('static NativeConstructor := Menu, DllOwner := DllCall', receiver, 1);
+	unit.unique(
+		'static NativeConstructor := Menu, NativePortOwner := TrayMenuFrameNative',
+		receiver,
+		1
+	);
 	unit.unique(
 		'FrameKey := Binding["manifest_key"], ChildId := Binding["children_id"], Provider := Binding["provider"]',
 		main,
@@ -813,6 +818,72 @@ function personalOperation(unit) {
 		);
 }
 
+/** Closed native operation grammar and actual retained infra policy, not a helper witness. */
+function personalNativeAdapter(adapter, renderer) {
+	const native = adapter.owner('TrayMenuFrameNative');
+	const signature = reader(native.parameters);
+	signature.take('Operation, Target := false, Handle := 0');
+	if (!signature.done()) throw Error('Finite native operation arguments required');
+	const entry = adapter.owner('TrayMenuSetIcon');
+	const bootstrap = reader(adapter.tokens.slice(0, entry.index));
+	bootstrap.take('if !TrayMenuFrameNative("current") throw Error(');
+	bootstrap.refusal();
+	bootstrap.take(')');
+	if (!bootstrap.done())
+		throw Error('Actual adapter bootstrap required before its first declaration');
+	const actual = reader(adapter.tokens.slice(native.first, native.end));
+	actual.take(
+		'\n\tstatic NativeClass := Menu, NativeDll := DllCall\n\tstatic HandleGetter := Object.Prototype.GetOwnPropDesc.Call(Menu.Prototype, "Handle").Get\n\tstatic DeleteMethod := Object.Prototype.GetOwnPropDesc.Call(Menu.Prototype, "Delete").Call\n\tstatic NameGetter := Object.Prototype.GetOwnPropDesc.Call(Func.Prototype, "Name").Get\n\tstatic BuiltInGetter := Object.Prototype.GetOwnPropDesc.Call(Func.Prototype, "IsBuiltIn").Get\n\tHeldLive() {\n\t\tif NativeDll != DllCall\n\t\t\treturn false\n\t\tfor Callable in [NativeDll, HandleGetter, DeleteMethod, NameGetter, BuiltInGetter] {\n\t\t\tif !(Callable is Func) || ObjGetBase(Callable) != Func.Prototype\n\t\t\t\treturn false\n\t\t\tfor Name in ObjOwnProps(Callable)\n\t\t\t\treturn false\n\t\t}\n\t\tfor Pair in [["Name", NameGetter], ["IsBuiltIn", BuiltInGetter]] {\n\t\t\tName := Pair[1], Getter := Pair[2]\n\t\t\tif !Object.Prototype.HasOwnProp.Call(Func.Prototype, Name)\n\t\t\t\treturn false\n\t\t\tDescriptor := Object.Prototype.GetOwnPropDesc.Call(Func.Prototype, Name)\n\t\t\tif !Object.Prototype.HasOwnProp.Call(Descriptor, "Get") || Descriptor.Get != Getter\n\t\t\t\treturn false\n\t\t\tfor Field in ObjOwnProps(Descriptor)\n\t\t\t\tif Field != "Get"\n\t\t\t\t\treturn false\n\t\t}\n\t\treturn true\n\t}\n\tif !HeldLive() {\n\t\tif Operation == "current" || Operation == "capture"\n\t\t\treturn false\n\t\tthrow Error("Owned native menu operation lost its retained intrinsics")\n\t}\n\tif Operation == "current" {\n\t\tif NativeClass != Menu || !Object.Prototype.HasOwnProp.Call(NativeClass.Prototype, "Handle")\n\t\t\t|| !Object.Prototype.HasOwnProp.Call(NativeClass.Prototype, "Delete")\n\t\t\treturn false\n\t\tHandleDescriptor := Object.Prototype.GetOwnPropDesc.Call(NativeClass.Prototype, "Handle")\n\t\tDeleteDescriptor := Object.Prototype.GetOwnPropDesc.Call(NativeClass.Prototype, "Delete")\n\t\tif !Object.Prototype.HasOwnProp.Call(HandleDescriptor, "Get") || HandleDescriptor.Get != HandleGetter\n\t\t\t|| !Object.Prototype.HasOwnProp.Call(DeleteDescriptor, "Call") || DeleteDescriptor.Call != DeleteMethod\n\t\t\treturn false\n\t\tfor Field in ObjOwnProps(HandleDescriptor)\n\t\t\tif Field != "Get"\n\t\t\t\treturn false\n\t\tfor Field in ObjOwnProps(DeleteDescriptor)\n\t\t\tif Field != "Call"\n\t\t\t\treturn false\n\t\tBuiltIn := BuiltInGetter.Call(NativeDll)\n\t\tif !HeldLive() || !BuiltIn\n\t\t\treturn false\n\t\tName := NameGetter.Call(NativeDll)\n\t\treturn HeldLive() && Name == "DllCall" && NativeClass == Menu\n\t}\n\tif Operation == "capture" {\n\t\tif NativeClass != Menu || !(Target is NativeClass) || ObjGetBase(Target) != NativeClass.Prototype\n\t\t\t|| Object.Prototype.HasOwnProp.Call(Target, "Handle")\n\t\t\treturn false\n\t\tHandle := HandleGetter.Call(Target)\n\t\tif !HeldLive() || !NativeDll.Call("IsMenu", "ptr", Handle, "int")\n\t\t\treturn false\n\t\tCount := NativeDll.Call("GetMenuItemCount", "ptr", Handle, "int")\n\t\tif Count < 0\n\t\t\treturn false\n\t\tRows := []\n\t\tloop Count {\n\t\t\tif !HeldLive()\n\t\t\t\treturn false\n\t\t\tPosition := A_Index - 1\n\t\t\tState := NativeDll.Call("GetMenuState", "ptr", Handle, "uint", Position, "uint", 0x400, "uint")\n\t\t\tif State == 0xFFFFFFFF\n\t\t\t\treturn false\n\t\t\tLength := NativeDll.Call("GetMenuStringW", "ptr", Handle, "uint", Position,\n\t\t\t\t"ptr", 0, "int", 0, "uint", 0x400, "int")\n\t\t\tTextBuffer := Buffer((Length + 1) * 2, 0)\n\t\t\tRead := NativeDll.Call("GetMenuStringW", "ptr", Handle, "uint", Position,\n\t\t\t\t"ptr", TextBuffer, "int", Length + 1, "uint", 0x400, "int")\n\t\t\tif Read != Length\n\t\t\t\treturn false\n\t\t\tId := NativeDll.Call("GetMenuItemID", "ptr", Handle, "int", Position, "uint")\n\t\t\tChild := NativeDll.Call("GetSubMenu", "ptr", Handle, "int", Position, "ptr")\n\t\t\tRows.Push([StrGet(TextBuffer, "UTF-16"), Id, State, Child])\n\t\t}\n\t\tif !HeldLive() || Object.Prototype.HasOwnProp.Call(Target, "Handle")\n\t\t\t|| HandleGetter.Call(Target) != Handle\n\t\t\treturn false\n\t\treturn HeldLive() && NativeDll.Call("GetMenuItemCount", "ptr", Handle, "int") == Count ? [Handle, Rows] : false\n\t}\n\tif Type(Handle) != "Integer" || Handle <= 0\n\t\tthrow ValueError("Owned native menu operation requires its captured handle")\n\tif Operation == "count"\n\t\treturn NativeDll.Call("GetMenuItemCount", "ptr", Handle, "int")\n\tif !(Target is NativeClass) || ObjGetBase(Target) != NativeClass.Prototype\n\t\t|| HandleGetter.Call(Target) != Handle || !HeldLive()\n\t\tthrow Error("Owned native menu retirement lost its captured handle")\n\tif Operation == "ids" {\n\t\tIds := [], Count := NativeDll.Call("GetMenuItemCount", "ptr", Handle, "int")\n\t\tif Count >= 0 {\n\t\t\tloop Count {\n\t\t\t\tif !HeldLive()\n\t\t\t\t\tthrow Error("Owned native menu enumeration lost its retained intrinsics")\n\t\t\t\tIds.Push(NativeDll.Call("GetMenuItemID", "ptr", Handle, "int", A_Index - 1, "uint"))\n\t\t\t}\n\t\t}\n\t\tif !HeldLive()\n\t\t\tthrow Error("Owned native menu enumeration lost its retained intrinsics")\n\t\treturn Ids\n\t}\n\tif Operation == "release" {\n\t\tDeleteMethod.Call(Target)\n\t\treturn true\n\t}\n\tthrow ValueError("Unknown owned native menu operation")\n'
+	);
+	if (!actual.done()) throw Error('Closed genuine retained native operations required');
+	{
+		const owner = renderer.owner('_MR_FrameDestinationSnapshot');
+		const parameters = reader(owner.parameters);
+		parameters.take('TargetMenu');
+		if (!parameters.done()) throw Error('Actual infra policy signature required');
+		const policy = reader(renderer.tokens.slice(owner.first, owner.end));
+		policy.take(
+			'\n\tglobal _MenuDispatchCallbacks, _MenuDispatchTokens\n\tstatic NativePortOwner := TrayMenuFrameNative\n\tif NativePortOwner != TrayMenuFrameNative || Object.Prototype.HasOwnProp.Call(NativePortOwner, "Call")\n\t\treturn false\n\tNative := NativePortOwner.Call("capture", TargetMenu)\n\tif !Native || NativePortOwner != TrayMenuFrameNative || Object.Prototype.HasOwnProp.Call(NativePortOwner, "Call")\n\t\treturn false\n\tRows := []\n\tfor Row in Native[2] {\n\t\tId := Row[2]\n\t\tRows.Push([Row[1], Id, Row[3], Row[4],\n\t\t\t_MenuDispatchCallbacks.Get(Id, false), _MenuDispatchTokens.Get(Id, false)])\n\t}\n\treturn Rows\n'
+		);
+		if (!policy.done()) throw Error('Actual retained infra policy must consume native evidence');
+	}
+	{
+		const owner = renderer.owner('_MR_FrameReleaseChild');
+		const parameters = reader(owner.parameters);
+		parameters.take('Child, Handle, Registries, ExpectedCallbacks, NativePortOwner, PruneOwner');
+		if (!parameters.done()) throw Error('Actual infra policy signature required');
+		const policy = reader(renderer.tokens.slice(owner.first, owner.end));
+		policy.take(
+			'\n\tglobal _MenuDispatchCallbacks, _MenuDispatchTokens, _MenuDispatchOwnerHandles\n\tglobal _MenuDispatchLastFire, _MenuDispatchClickSequences\n\tif Object.Prototype.HasOwnProp.Call(NativePortOwner, "Call")\n\t\tthrow Error("Owned DATA stage cleanup lost its native cohort")\n\tfor Registry in Registries {\n\t\tif !(Registry is Map) || ObjGetBase(Registry) != Map.Prototype\n\t\t\tthrow Error("Owned DATA stage cleanup lost a retained dispatch registry")\n\t\tfor Name in ObjOwnProps(Registry)\n\t\t\tthrow Error("Owned DATA stage cleanup registry is no longer plain")\n\t}\n\tOwned := [], Ids := NativePortOwner.Call("ids", Child, Handle)\n\tfor Id in Ids {\n\t\tif !Map.Prototype.Has.Call(Registries[1], Id) || !Map.Prototype.Has.Call(Registries[2], Id)\n\t\t\tcontinue\n\t\tCallback := Map.Prototype.Get.Call(Registries[1], Id), Matches := false\n\t\tfor Expected in ExpectedCallbacks\n\t\t\tif Callback == Expected {\n\t\t\t\tMatches := true\n\t\t\t\tbreak\n\t\t\t}\n\t\tif Matches\n\t\t\tOwned.Push([Id, Callback, Map.Prototype.Get.Call(Registries[2], Id)])\n\t}\n\ttry NativePortOwner.Call("release", Child, Handle)\n\tfinally {\n\t\tif !Object.Prototype.HasOwnProp.Call(NativePortOwner, "Call")\n\t\t\t&& NativePortOwner.Call("count", Child, Handle) <= 0 {\n\t\t\tfor Registration in Owned {\n\t\t\t\tId := Registration[1]\n\t\t\t\tif !Map.Prototype.Has.Call(Registries[1], Id) || !Map.Prototype.Has.Call(Registries[2], Id)\n\t\t\t\t\t|| Map.Prototype.Get.Call(Registries[1], Id) != Registration[2]\n\t\t\t\t\t|| Map.Prototype.Get.Call(Registries[2], Id) != Registration[3]\n\t\t\t\t\tcontinue\n\t\t\t\tfor Index in [1, 2, 4, 5]\n\t\t\t\t\tif Map.Prototype.Has.Call(Registries[Index], Id)\n\t\t\t\t\t\tMap.Prototype.Delete.Call(Registries[Index], Id)\n\t\t\t}\n\t\t\tif Map.Prototype.Has.Call(Registries[3], Handle)\n\t\t\t\t&& Map.Prototype.Get.Call(Registries[3], Handle) == true\n\t\t\t\tMap.Prototype.Delete.Call(Registries[3], Handle)\n\t\t}\n\t\tif _MenuDispatchCallbacks == Registries[1] && _MenuDispatchTokens == Registries[2]\n\t\t\t&& _MenuDispatchOwnerHandles == Registries[3] && _MenuDispatchLastFire == Registries[4]\n\t\t\t&& _MenuDispatchClickSequences == Registries[5]\n\t\t\t&& PruneOwner == MenuDispatcher_PruneMenu && !Object.Prototype.HasOwnProp.Call(PruneOwner, "Call")\n\t\t\t&& !Object.Prototype.HasOwnProp.Call(Child, "Handle")\n\t\t\tPruneOwner.Call(Child)\n\t}\n'
+		);
+		if (!policy.done()) throw Error('Actual retained infra policy must consume native evidence');
+	}
+}
+
+/** Proves the actual include bootstrap and closed intrinsic constructor authority. */
+function personalConstructorAuthority(unit) {
+	const body = unit.owner('_MR_FrameNativeConstructorCurrent');
+	const signature = reader(body.parameters);
+	signature.take('Constructor');
+	if (!signature.done()) throw Error('One actual constructor authority argument required');
+	const entry = unit.owner('_MR_GetManifestRoot');
+	if (entry.index >= body.index)
+		throw Error('Actual constructor bootstrap must precede renderer declarations');
+	const initializer = reader(unit.tokens.slice(0, entry.index));
+	initializer.take(
+		'#Include menu_population.ahk if !_MR_FrameNativeConstructorCurrent(Menu) throw Error('
+	);
+	initializer.refusal();
+	initializer.take(')');
+	if (!initializer.done())
+		throw Error('The actual module entry must initialize before any receiver invocation');
+	const r = reader(unit.tokens.slice(body.first, body.end));
+	r.take(
+		'static NativeClass := Menu static NativeFactory := Object.Prototype.GetOwnPropDesc.Call(Menu, "Call").Call static NameGetter := Object.Prototype.GetOwnPropDesc.Call(Func.Prototype, "Name").Get static BuiltInGetter := Object.Prototype.GetOwnPropDesc.Call(Func.Prototype, "IsBuiltIn").Get SourceLive() { if Constructor != NativeClass || NativeClass != Menu || !Object.Prototype.HasOwnProp.Call(NativeClass, "Call") return false Descriptor := Object.Prototype.GetOwnPropDesc.Call(NativeClass, "Call") if !Object.Prototype.HasOwnProp.Call(Descriptor, "Call") || Descriptor.Call != NativeFactory return false for Name in ObjOwnProps(Descriptor) if Name != "Call" return false if !(NativeFactory is Func) || ObjGetBase(NativeFactory) != Func.Prototype return false for Name in ObjOwnProps(NativeFactory) return false for Name, Getter in Map("Name", NameGetter, "IsBuiltIn", BuiltInGetter) { if !Object.Prototype.HasOwnProp.Call(Func.Prototype, Name) return false ReaderDescriptor := Object.Prototype.GetOwnPropDesc.Call(Func.Prototype, Name) if !Object.Prototype.HasOwnProp.Call(ReaderDescriptor, "Get") || ReaderDescriptor.Get != Getter return false for Field in ObjOwnProps(ReaderDescriptor) if Field != "Get" return false if !(Getter is Func) || ObjGetBase(Getter) != Func.Prototype return false for Field in ObjOwnProps(Getter) return false } return true } if !SourceLive() return false BuiltIn := BuiltInGetter.Call(NativeFactory) if !SourceLive() || !BuiltIn return false Name := NameGetter.Call(NativeFactory) return SourceLive() && Name == "Menu.Call"'
+	);
+	if (!r.done()) throw Error('Actual retained constructor and intrinsic metadata grammar required');
+}
+
 /** Refuses reflective or assigned callable authority; no generic alias transport. */
 function personalAuthority(unit) {
 	const receiver = unit.owner('MenuRenderer_AppendFrameData'),
@@ -821,12 +892,23 @@ function personalAuthority(unit) {
 		caller = unit.owner('_BuildShortcutsSubmenu');
 	const template = unit.owner('MenuRenderer_TemplateRows'),
 		operation = unit.owner('_MR_FramePublish'),
-		stage = unit.owner('_MR_FrameStageAdmitted');
+		stage = unit.owner('_MR_FrameStageAdmitted'),
+		constructor = unit.owner('_MR_FrameNativeConstructorCurrent'),
+		native = unit.owner('TrayMenuFrameNative');
+	// The closed constructor grammar authenticates this actual metadata reader loop.
+	const intrinsicReaderMap =
+		unit.unique(
+			'for Name, Getter in Map("Name", NameGetter, "IsBuiltIn", BuiltInGetter) {',
+			constructor,
+			constructor.depth + 1
+		) + scriptTokens('for Name, Getter in', '.ahk').length;
 	for (let at = 0; at < unit.tokens.length; at++) {
 		if (!unit.id(at, 'Menu') && !unit.id(at, 'Map')) continue;
 		if (
 			unit.sym(at + 1, ':=') ||
-			(unit.sym(at + 1, '(') && unit.sym(unit.pairs.get(at + 1) + 1, '{')) ||
+			(at !== intrinsicReaderMap &&
+				unit.sym(at + 1, '(') &&
+				unit.sym(unit.pairs.get(at + 1) + 1, '{')) ||
 			(unit.sym(at + 1, '.') && unit.sym(at + 3, ':='))
 		)
 			throw Error('Native constructor identity cannot be rebound');
@@ -839,13 +921,17 @@ function personalAuthority(unit) {
 		'menurenderer_templaterows',
 		'menurowwithlabel',
 		'_mr_framepublish',
-		'_mr_framestageadmitted'
+		'_mr_framestageadmitted',
+		'_mr_framenativeconstructorcurrent',
+		'traymenuframenative'
 	]);
 	const retained = new Map([
 		['menurenderer_appendframedata', ['FrameDataOwner', 'EntryOwner']],
 		['menurenderer_templaterows', ['TemplateOwner']],
 		['_mr_framepublish', ['PublishOwner']],
-		['_mr_framestageadmitted', ['StageOwner']]
+		['_mr_framestageadmitted', ['StageOwner']],
+		['_mr_framenativeconstructorcurrent', ['ConstructorOwner']],
+		['traymenuframenative', ['NativePortOwner']]
 	]);
 	for (let at = 0; at < unit.tokens.length; at++) {
 		const token = unit.tokens[at];
@@ -859,7 +945,9 @@ function personalAuthority(unit) {
 				caller.index,
 				template.index,
 				operation.index,
-				stage.index
+				stage.index,
+				constructor.index,
+				native.index
 			].includes(at)
 		)
 			continue;
@@ -904,6 +992,7 @@ function personalAuthority(unit) {
 		'BindingReceipt',
 		'RegistrationsReceipt',
 		'NativeConstructor',
+		'NativePortOwner',
 		'TemplateOwner',
 		'SnapshotOwner',
 		'CurrentOwner',
@@ -965,8 +1054,32 @@ function personalAuthority(unit) {
 }
 
 /** Dedicated opt-in proof; generic template publication never gains this mode. */
-function personalFrameDataPublication(source, definition, owningEntry) {
+function personalFrameDataPublication(sources, definition, owningEntry) {
 	try {
+		const files = [
+			'windows/ui/menu/menu_shortcuts.ahk',
+			'windows/ui/menu/menu_init.ahk',
+			'windows/infra/manifest_menu.ahk',
+			'windows/adapters/tray_menu.ahk'
+		];
+		if (
+			!sources ||
+			Object.getPrototypeOf(sources) !== Object.prototype ||
+			!require('node:util').isDeepStrictEqual(Object.keys(sources).sort(), files.slice().sort())
+		)
+			return false;
+		const physical = {};
+		for (const file of files) {
+			const descriptor = Object.getOwnPropertyDescriptor(sources, file);
+			if (
+				!descriptor ||
+				!Object.hasOwn(descriptor, 'value') ||
+				typeof descriptor.value !== 'string'
+			)
+				return false;
+			physical[file] = descriptor.value;
+		}
+		const source = files.map((file) => physical[file]).join('\n');
 		if (
 			typeof source !== 'string' ||
 			!require('node:util').isDeepStrictEqual(definition, [
@@ -988,6 +1101,11 @@ function personalFrameDataPublication(source, definition, owningEntry) {
 		personalProvider(unit);
 		personalRegistration(unit);
 		personalCentral(unit);
+		personalConstructorAuthority(lexical(physical['windows/infra/manifest_menu.ahk']));
+		personalNativeAdapter(
+			lexical(physical['windows/adapters/tray_menu.ahk']),
+			lexical(physical['windows/infra/manifest_menu.ahk'])
+		);
 		personalAuthority(unit);
 		return true;
 	} catch {

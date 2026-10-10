@@ -2098,8 +2098,9 @@ _LAG_OriginalAppsNativeFlags(HostState) {
 		_LAG_WithModelCaptionLocale("fr", _Read.Bind(HostState, Corpus, Fx))
 		_Read(HostState, Corpus, Fx) {
 			global _LLM_Menu, _MenuDispatchCallbacks, _MenuDispatchTokens, _MenuDispatchOwnerHandles
-			global AppPicker_Show
 			SavedSuspend := A_IsSuspended, PickerOwner := AppPicker_Show
+			HadPickerCall := Object.Prototype.HasOwnProp.Call(PickerOwner, "Call")
+			PickerDescriptor := HadPickerCall ? Object.Prototype.GetOwnPropDesc.Call(PickerOwner, "Call") : false
 			Owned := [], PickerCalls := []
 			try {
 				Suspend(HostState == "paused")
@@ -2120,7 +2121,10 @@ _LAG_OriginalAppsNativeFlags(HostState) {
 				AssertEqual(0, Fx.Ollama.Length, "the original menu observation starts no local Agent request")
 				AssertEqual(0, Fx.Predictions.Length, "native readiness is read without a prediction request")
 			} finally {
-				AppPicker_Show := PickerOwner
+				if HadPickerCall
+					Object.Prototype.DefineProp.Call(PickerOwner, "Call", PickerDescriptor)
+				else if Object.Prototype.HasOwnProp.Call(PickerOwner, "Call")
+					Object.Prototype.DeleteProp.Call(PickerOwner, "Call")
 				for Built in Owned
 					_CTC_ReleaseMenu(Built)
 				Suspend(SavedSuspend)
@@ -2132,7 +2136,6 @@ _LAG_OriginalAppsNativeFlags(HostState) {
 ; Count is a helper parameter: no assertion captures an AHK loop variable.
 _LAG_ObserveOriginalAppsNativeFlags(HostState, Count, Corpus, Owned, PickerCalls) {
 	global _LLM_Menu, _MenuDispatchCallbacks, _MenuDispatchTokens, _MenuDispatchOwnerHandles
-	global AppPicker_Show
 	Apps := []
 	Loop Count
 		Apps.Push("app" . A_Index . ".exe")
@@ -2169,8 +2172,11 @@ _LAG_ObserveOriginalAppsNativeFlags(HostState, Count, Corpus, Owned, PickerCalls
 	; All flags above came from the unchanged native builder. Only the GUI boundary
 	; is observed below, through the actual callback and LLM_Agent_OpenAppPicker.
 	PickerOwner := AppPicker_Show, Before := PickerCalls.Length
+	HadPickerCall := Object.Prototype.HasOwnProp.Call(PickerOwner, "Call")
+	PickerDescriptor := HadPickerCall ? Object.Prototype.GetOwnPropDesc.Call(PickerOwner, "Call") : false
 	try {
-		AppPicker_Show := (Options) => PickerCalls.Push(Options)
+		Object.Prototype.DefineProp.Call(PickerOwner, "Call", {Call: (ThisPicker, Options) =>
+			(AssertTrue(ThisPicker == PickerOwner, "the actual immutable picker entry owns the GUI observer"), PickerCalls.Push(Options))})
 		_MenuDispatchCallbacks[CommandId].Call()
 		AssertEqual(Before + 1, PickerCalls.Length, "one actual apps callback opens its original picker boundary")
 		Options := PickerCalls[PickerCalls.Length]
@@ -2181,7 +2187,12 @@ _LAG_ObserveOriginalAppsNativeFlags(HostState, Count, Corpus, Owned, PickerCalls
 		AssertTrue(Options["initial"] == Apps, "the real picker entry receives the actual native settings list")
 		AssertTrue(Options["on_save"] == LLM_Agent_OnAppPickerSave,
 			"the original dispatcher callback reaches the genuine Agent save callback")
-	} finally AppPicker_Show := PickerOwner
+	} finally {
+		if HadPickerCall
+			Object.Prototype.DefineProp.Call(PickerOwner, "Call", PickerDescriptor)
+		else if Object.Prototype.HasOwnProp.Call(PickerOwner, "Call")
+			Object.Prototype.DeleteProp.Call(PickerOwner, "Call")
+	}
 }
 
 Test("LLM agent: original native apps flags while paused (agent-apps-original-native-flags)",

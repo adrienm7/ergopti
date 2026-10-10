@@ -20,6 +20,11 @@
 
 #Include menu_population.ahk
 
+; Capture only built-in metadata at include, before DATA/user callbacks can run.
+if !_MR_FrameNativeConstructorCurrent(Menu)
+	throw Error("The native Menu constructor lost its interpreter-owned authority")
+
+
 
 
 
@@ -2375,7 +2380,8 @@ MenuRenderer_AppendFrameData(TargetMenu, ManifestKey, EntryId, Binding,
 	static FrameOwner := _MR_FrameDefinitionAdmitted, PlatformOwner := _MR_IsForAhk
 	static PublishOwner := _MR_FramePublish, StageOwner := _MR_FrameStageAdmitted
 	static FieldOwner := _MR_Get, TranslationOwner := t
-	static NativeConstructor := Menu, DllOwner := DllCall
+	static NativeConstructor := Menu, NativePortOwner := TrayMenuFrameNative
+	static ConstructorOwner := _MR_FrameNativeConstructorCurrent
 	static CaptionOwner := TrayMenuItemCaption, CountOwner := TrayMenuItemCount
 	static LookupOwner := _MR_FindItemById, AliasOwner := MenuFromHandle
 	static ImageOwner := _MR_FrameNativeImageEqual, PendingOwner := _MR_FramePendingOwnEntry
@@ -2408,7 +2414,7 @@ MenuRenderer_AppendFrameData(TargetMenu, ManifestKey, EntryId, Binding,
 			[PruneOwner, MenuDispatcher_PruneMenu], [DestinationOwner, _MR_FrameDestinationSnapshot],
 			[ReleaseOwner, _MR_FrameReleaseChild], [FrameOwner, _MR_FrameDefinitionAdmitted],
 			[PlatformOwner, _MR_IsForAhk], [FieldOwner, _MR_Get], [TranslationOwner, t],
-			[NativeConstructor, Menu], [DllOwner, DllCall], [CaptionOwner, TrayMenuItemCaption],
+			[NativeConstructor, Menu], [ConstructorOwner, _MR_FrameNativeConstructorCurrent], [NativePortOwner, TrayMenuFrameNative], [CaptionOwner, TrayMenuItemCaption],
 			[CountOwner, TrayMenuItemCount], [LookupOwner, _MR_FindItemById],
 			[AliasOwner, MenuFromHandle], [ImageOwner, _MR_FrameNativeImageEqual],
 			[PendingOwner, _MR_FramePendingOwnEntry], [HandleCountOwner, TrayMenuHandleItemCount],
@@ -2418,9 +2424,14 @@ MenuRenderer_AppendFrameData(TargetMenu, ManifestKey, EntryId, Binding,
 			[PendingCaptureOwner, _MR_FramePendingSnapshot], [PendingCurrentOwner, _MR_FramePendingCurrent],
 			[ReceiptCallbacksOwner, _MR_FrameReceiptCallablesCurrent], [ReceiptAdmissionOwner, _MR_FrameReceiptAdmitted],
 			[PublishOwner, _MR_FramePublish], [StageOwner, _MR_FrameStageAdmitted]]
-		for Pair in Pairs
-			if Pair[1] != Pair[2] || Object.Prototype.HasOwnProp.Call(Pair[1], "Call")
+		for Pair in Pairs {
+			if Pair[1] != Pair[2]
 				return false
+			if Pair[1] != NativeConstructor && Object.Prototype.HasOwnProp.Call(Pair[1], "Call")
+				return false
+		}
+		if !ConstructorOwner.Call(NativeConstructor) || !NativePortOwner.Call("current")
+			return false
 		CurrentRegistries := [_MenuDispatchCallbacks, _MenuDispatchTokens, _MenuDispatchOwnerHandles,
 			_MenuDispatchLastFire, _MenuDispatchClickSequences]
 		if _MenuDispatcherEpoch != DispatcherEpoch
@@ -2656,7 +2667,7 @@ MenuRenderer_AppendFrameData(TargetMenu, ManifestKey, EntryId, Binding,
 				try {
 					if Object.Prototype.HasOwnProp.Call(ReleaseOwner, "Call")
 						throw Error("Owned DATA stage cleanup owner was withdrawn")
-					ReleaseOwner.Call(Child, ChildHandle, RegistryOwners, LeafCallbacks, NativeMethods["Delete"], DllOwner, PruneOwner, NativeHandleGetter)
+					ReleaseOwner.Call(Child, ChildHandle, RegistryOwners, LeafCallbacks, NativePortOwner, PruneOwner)
 				}
 				catch as ChildFailure {
 					if !CleanupError
@@ -2728,22 +2739,19 @@ _MR_FrameDefinitionAdmitted(Frame, ChildId) {
 ; The receipt covers native identity/order/flags/children and existing command ids.
 _MR_FrameDestinationSnapshot(TargetMenu) {
 	global _MenuDispatchCallbacks, _MenuDispatchTokens
-	Handle := TargetMenu.Handle
-	if !DllCall("IsMenu", "ptr", Handle, "int")
+	static NativePortOwner := TrayMenuFrameNative
+	if NativePortOwner != TrayMenuFrameNative || Object.Prototype.HasOwnProp.Call(NativePortOwner, "Call")
 		return false
-	Rows := [], Count := TrayMenuItemCount(TargetMenu)
-	loop Count {
-		Position := A_Index - 1
-		State := DllCall("GetMenuState", "ptr", Handle, "uint", Position, "uint", 0x400, "uint")
-		if State == 0xFFFFFFFF
-			return false
-		Rows.Push([TrayMenuItemCaption(TargetMenu, Position),
-			DllCall("GetMenuItemID", "ptr", Handle, "int", Position, "uint"), State,
-			DllCall("GetSubMenu", "ptr", Handle, "int", Position, "ptr"),
-			_MenuDispatchCallbacks.Get(DllCall("GetMenuItemID", "ptr", Handle, "int", Position, "uint"), false),
-			_MenuDispatchTokens.Get(DllCall("GetMenuItemID", "ptr", Handle, "int", Position, "uint"), false)])
+	Native := NativePortOwner.Call("capture", TargetMenu)
+	if !Native || NativePortOwner != TrayMenuFrameNative || Object.Prototype.HasOwnProp.Call(NativePortOwner, "Call")
+		return false
+	Rows := []
+	for Row in Native[2] {
+		Id := Row[2]
+		Rows.Push([Row[1], Id, Row[3], Row[4],
+			_MenuDispatchCallbacks.Get(Id, false), _MenuDispatchTokens.Get(Id, false)])
 	}
-	return TargetMenu.Handle == Handle && TrayMenuItemCount(TargetMenu) == Count ? Rows : false
+	return Rows
 }
 
 _MR_FrameNativeImageEqual(Before, After) {
@@ -2758,13 +2766,10 @@ _MR_FrameNativeImageEqual(Before, After) {
 
 ; Retire only commands actually staged in this exact owned leaf and held registries.
 ; A replacement global registry remains foreign; it is never globally reset/pruned.
-_MR_FrameReleaseChild(Child, Handle, Registries, ExpectedCallbacks, DeleteOwner, NativeDllOwner, PruneOwner, HandleGetter) {
+_MR_FrameReleaseChild(Child, Handle, Registries, ExpectedCallbacks, NativePortOwner, PruneOwner) {
 	global _MenuDispatchCallbacks, _MenuDispatchTokens, _MenuDispatchOwnerHandles
 	global _MenuDispatchLastFire, _MenuDispatchClickSequences
-	if !(Child is Menu) || ObjGetBase(Child) != Menu.Prototype
-		|| Object.Prototype.HasOwnProp.Call(HandleGetter, "Call") || HandleGetter.Call(Child) != Handle
-		|| Object.Prototype.HasOwnProp.Call(DeleteOwner, "Call")
-		|| Object.Prototype.HasOwnProp.Call(NativeDllOwner, "Call")
+	if Object.Prototype.HasOwnProp.Call(NativePortOwner, "Call")
 		throw Error("Owned DATA stage cleanup lost its native cohort")
 	for Registry in Registries {
 		if !(Registry is Map) || ObjGetBase(Registry) != Map.Prototype
@@ -2772,25 +2777,23 @@ _MR_FrameReleaseChild(Child, Handle, Registries, ExpectedCallbacks, DeleteOwner,
 		for Name in ObjOwnProps(Registry)
 			throw Error("Owned DATA stage cleanup registry is no longer plain")
 	}
-	Owned := [], Count := NativeDllOwner.Call("GetMenuItemCount", "ptr", Handle, "int")
-	if Count >= 0 {
-		loop Count {
-			Id := NativeDllOwner.Call("GetMenuItemID", "ptr", Handle, "int", A_Index - 1, "uint")
-			if !Map.Prototype.Has.Call(Registries[1], Id) || !Map.Prototype.Has.Call(Registries[2], Id)
-				continue
-			Callback := Map.Prototype.Get.Call(Registries[1], Id), Matches := false
-			for Expected in ExpectedCallbacks
-				if Callback == Expected {
-					Matches := true
-					break
-				}
-			if Matches
-				Owned.Push([Id, Callback, Map.Prototype.Get.Call(Registries[2], Id)])
-		}
+	Owned := [], Ids := NativePortOwner.Call("ids", Child, Handle)
+	for Id in Ids {
+		if !Map.Prototype.Has.Call(Registries[1], Id) || !Map.Prototype.Has.Call(Registries[2], Id)
+			continue
+		Callback := Map.Prototype.Get.Call(Registries[1], Id), Matches := false
+		for Expected in ExpectedCallbacks
+			if Callback == Expected {
+				Matches := true
+				break
+			}
+		if Matches
+			Owned.Push([Id, Callback, Map.Prototype.Get.Call(Registries[2], Id)])
 	}
-	try DeleteOwner.Call(Child)
+	try NativePortOwner.Call("release", Child, Handle)
 	finally {
-		if NativeDllOwner.Call("GetMenuItemCount", "ptr", Handle, "int") <= 0 {
+		if !Object.Prototype.HasOwnProp.Call(NativePortOwner, "Call")
+			&& NativePortOwner.Call("count", Child, Handle) <= 0 {
 			for Registration in Owned {
 				Id := Registration[1]
 				if !Map.Prototype.Has.Call(Registries[1], Id) || !Map.Prototype.Has.Call(Registries[2], Id)
@@ -3010,4 +3013,50 @@ _MR_FramePublish(Target, Child, Rows, Label, Before, NativeMethods, OldChild, Ol
 		}
 		throw NativeError
 	}
+}
+
+
+/** Holds interpreter-created constructor metadata before any external DATA callback. */
+_MR_FrameNativeConstructorCurrent(Constructor) {
+	static NativeClass := Menu
+	static NativeFactory := Object.Prototype.GetOwnPropDesc.Call(Menu, "Call").Call
+	static NameGetter := Object.Prototype.GetOwnPropDesc.Call(Func.Prototype, "Name").Get
+	static BuiltInGetter := Object.Prototype.GetOwnPropDesc.Call(Func.Prototype, "IsBuiltIn").Get
+	SourceLive() {
+		if Constructor != NativeClass || NativeClass != Menu
+			|| !Object.Prototype.HasOwnProp.Call(NativeClass, "Call")
+			return false
+		Descriptor := Object.Prototype.GetOwnPropDesc.Call(NativeClass, "Call")
+		if !Object.Prototype.HasOwnProp.Call(Descriptor, "Call") || Descriptor.Call != NativeFactory
+			return false
+		for Name in ObjOwnProps(Descriptor)
+			if Name != "Call"
+				return false
+		if !(NativeFactory is Func) || ObjGetBase(NativeFactory) != Func.Prototype
+			return false
+		for Name in ObjOwnProps(NativeFactory)
+			return false
+		for Name, Getter in Map("Name", NameGetter, "IsBuiltIn", BuiltInGetter) {
+			if !Object.Prototype.HasOwnProp.Call(Func.Prototype, Name)
+				return false
+			ReaderDescriptor := Object.Prototype.GetOwnPropDesc.Call(Func.Prototype, Name)
+			if !Object.Prototype.HasOwnProp.Call(ReaderDescriptor, "Get") || ReaderDescriptor.Get != Getter
+				return false
+			for Field in ObjOwnProps(ReaderDescriptor)
+				if Field != "Get"
+					return false
+			if !(Getter is Func) || ObjGetBase(Getter) != Func.Prototype
+				return false
+			for Field in ObjOwnProps(Getter)
+				return false
+		}
+		return true
+	}
+	if !SourceLive()
+		return false
+	BuiltIn := BuiltInGetter.Call(NativeFactory)
+	if !SourceLive() || !BuiltIn
+		return false
+	Name := NameGetter.Call(NativeFactory)
+	return SourceLive() && Name == "Menu.Call"
 }

@@ -28,6 +28,9 @@ _SMB_SeparatorBeforeModifierGroups() {
 	Assert(!Before.Has("platforms"),
 		"that separator must apply on every platform, not on Linux only")
 }
+Test("personal DATA frame: real native factory admission, hostile metadata refusal and exact repair",
+	_SMB_FrameNativeConstructorRefusal)
+
 Test("shortcuts menu: a separator splits text rows from modifier groups (shortcuts-menu-blocks)",
 	_SMB_SeparatorBeforeModifierGroups)
 
@@ -723,9 +726,20 @@ Test("personal DATA frame: real native publication effects, owned rollback and p
 ; The complete production Shortcuts builder uses the shipped declarations/providers.
 ; Expectations for this added frame come from the immutable original registry corpus.
 _SMB_FrameProductionBuildSequence() {
+	; The unit runner intentionally omits boot-owned feature_state globals.
+	; Reuse the real script submenu fixture owner; its complete slots, labels,
+	; assignments and switch are restored with their original presence.
+	_SCSM_WithState(ManifestDefaultFor("shortcuts.script_control.chords_enabled"),
+		_SMB_FrameProductionBuildSequenceWithBootState)
+}
+
+_SMB_FrameProductionBuildSequenceWithBootState() {
 	global _PersonalShortcutsRegistry, Features, CategoryEnabled, _SharedDir
+	global KeyboardShortcutAssignments
 	global _MenuPopulationBuilding, _MenuPopulationPublished
 	SavedRegistry := IsSet(_PersonalShortcutsRegistry) ? _PersonalShortcutsRegistry : unset, SavedFeatures := Features, SavedCategories := CategoryEnabled
+	HadKeyboard := IsSet(KeyboardShortcutAssignments)
+	SavedKeyboard := HadKeyboard ? KeyboardShortcutAssignments : false
 	SavedBuilding := _MenuPopulationBuilding, SavedPublished := _MenuPopulationPublished
 	State := MasterGateState(), SavedState := State.Clone()
 	Corpus := JsonParse(FileRead(_SharedDir . "\tests\corpus\menus\personal_shortcuts_frame.json", "UTF-8"))
@@ -733,6 +747,11 @@ _SMB_FrameProductionBuildSequence() {
 	try {
 		Features := ManifestBuildFeaturesMap()
 		Features["shortcuts"]["personal"] := Map()
+		; Populate the actual native keyboard inventory from the same canonical
+		; defaults as ReadKeyboardShortcutsConfig, keeping every real provider.
+		KeyboardShortcutAssignments := Map()
+		for Entry in ManifestFeaturesForSection("shortcuts.keyboard")
+			KeyboardShortcutAssignments[Entry["id"]] := ManifestDefaultFor(Entry["path"])
 		CategoryEnabled := SavedCategories.Clone(), CategoryEnabled["Shortcuts"] := true
 		State["initialized"] := false
 		_MenuPopulationBuilding := false, _MenuPopulationPublished := false
@@ -767,6 +786,10 @@ _SMB_FrameProductionBuildSequence() {
 			_CTC_ReleaseMenu(Native)
 		_PersonalShortcutsRegistry := IsSet(SavedRegistry) ? SavedRegistry : unset
 		Features := SavedFeatures, CategoryEnabled := SavedCategories
+		if HadKeyboard
+			KeyboardShortcutAssignments := SavedKeyboard
+		else
+			KeyboardShortcutAssignments := unset
 		State.Clear()
 		for Key, Value in SavedState
 			State[Key] := Value
@@ -868,3 +891,326 @@ _SMB_FrameBuildPreflushAndRefusal() {
 	}
 }
 Test("personal DATA frame: actual full Build intercepts before separator flush on skip/refusal", _SMB_FrameBuildPreflushAndRefusal)
+
+
+; The module bootstrap owns the interpreter-created constructor before this subject.
+; Its first own receiver call is hostile; preceding run_all modules may call it too.
+_SMB_FrameNativeConstructorRefusal() {
+	global _SharedDir, _MenuPopulationBuilding
+	Corpus := JsonParse(FileRead(_SharedDir . "\tests\corpus\menus\personal_shortcuts_frame.json", "UTF-8"))
+	SavedBuilding := _MenuPopulationBuilding
+	OriginalCall := Object.Prototype.GetOwnPropDesc.Call(Menu, "Call")
+	Factory := OriginalCall.Call
+	AssertTrue(Factory is Func, "the real Menu class has its interpreter-created factory")
+	OriginalName := Object.Prototype.GetOwnPropDesc.Call(Func.Prototype, "Name").Get
+	OriginalBuiltIn := Object.Prototype.GetOwnPropDesc.Call(Func.Prototype, "IsBuiltIn").Get
+	AssertTrue(OriginalBuiltIn.Call(Factory), "the untouched factory is genuinely interpreter-created")
+	AssertEqual("Menu.Call", OriginalName.Call(Factory), "the genuine Menu constructor retains its intrinsic name")
+	AssertTrue(OriginalBuiltIn.Call(DllCall), "the different-constructor control uses a real alternative builtin")
+	PreviousCritical := Critical("On")
+	try {
+		_MenuPopulationBuilding := false
+		for Fault in ["class lambda", "class other builtin", "class accessor", "factory Call",
+			"factory Name", "factory IsBuiltIn", "intrinsic Name getter", "intrinsic IsBuiltIn getter"]
+			_SMB_FrameNativeConstructorFault(Fault, Corpus, Factory)
+	} finally {
+		Object.Prototype.DefineProp.Call(Menu, "Call", OriginalCall)
+		_MenuPopulationBuilding := SavedBuilding
+		Critical(PreviousCritical)
+	}
+}
+
+; Every observer closes over this fresh case parameter, never an AHK loop variable.
+_SMB_FrameNativeConstructorFault(Fault, Corpus, Factory) {
+	global _MenuDispatchCallbacks
+	Calls := Map("provider", 0, "foreign", 0, "actions", 0)
+	Callback := (*) => Calls["actions"] += 1
+	Data := []
+	for Label in Corpus["registered_labels"]
+		Data.Push(Map("label", Label, "action", Callback))
+	Provider := () => (Calls["provider"] += 1, Data)
+	Binding := Map("manifest_key", "personal_shortcuts_frame", "children_id", "personal_shortcuts_registered",
+		"provider", Provider)
+	Native := Menu()
+	RegisterMenuItem(Native, "Original constructor destination", Callback)
+	Before := _MR_FrameDestinationSnapshot(Native)
+	if InStr(Fault, "class ", true) == 1 {
+		Owner := Menu, Name := "Call"
+		if Fault == "class other builtin"
+			Replacement := {Call: DllCall}
+		else if Fault == "class accessor"
+			Replacement := {Get: (*) => (Calls["foreign"] += 1, Factory)}
+		else
+			Replacement := {Call: (*) => (Calls["foreign"] += 1, false)}
+	} else if InStr(Fault, "factory ", true) == 1 {
+		Owner := Factory, Name := SubStr(Fault, 9)
+		if Name == "Call"
+			Replacement := {Call: (*) => (Calls["foreign"] += 1, false)}
+		else
+			Replacement := {Get: (*) => (Calls["foreign"] += 1, Name == "Name" ? "Menu.Call" : true)}
+	} else {
+		Owner := Func.Prototype, Name := Fault == "intrinsic Name getter" ? "Name" : "IsBuiltIn"
+		Replacement := {Get: (*) => (Calls["foreign"] += 1, Name == "Name" ? "Menu.Call" : true)}
+	}
+	HadProperty := Object.Prototype.HasOwnProp.Call(Owner, Name)
+	SavedDescriptor := HadProperty ? Object.Prototype.GetOwnPropDesc.Call(Owner, Name) : false
+	try {
+		Object.Prototype.DefineProp.Call(Owner, Name, Replacement)
+		try Refused := MenuRenderer_AppendFrameData(Native, "shortcuts_menu", "personal_shortcuts", Binding, , , &Admitted)
+		finally {
+			if HadProperty
+				Object.Prototype.DefineProp.Call(Owner, Name, SavedDescriptor)
+			else if Object.Prototype.HasOwnProp.Call(Owner, Name)
+				Object.Prototype.DeleteProp.Call(Owner, Name)
+		}
+		AssertEqual(0, Refused, Fault . ": the real receiver refuses the withdrawn native factory cohort")
+		AssertFalse(Admitted, Fault . ": constructor withdrawal cannot be acknowledged as an intentional skip")
+		AssertEqual(0, Calls["provider"], Fault . ": refusal precedes actual DATA provider execution")
+		AssertEqual(0, Calls["foreign"], Fault . ": foreign factory and metadata observers never execute")
+		AssertTrue(_MR_FrameNativeImageEqual(Before, _MR_FrameDestinationSnapshot(Native)),
+			Fault . ": actual retained destination flags, callbacks and child handles remain unchanged")
+		AssertEqual(1, TrayMenuItemCount(Native))
+		AssertEqual(1, MenuRenderer_AppendFrameData(Native, "shortcuts_menu", "personal_shortcuts", Binding, , , &Admitted),
+			Fault . ": exact original descriptor/presence repair restores the real native constructor")
+		AssertTrue(Admitted)
+		AssertEqual(1, Calls["provider"], "the repaired original factory receives the same genuine DATA provider once")
+		AssertEqual(0, Calls["foreign"], "repair does not run a withdrawn observer")
+		AssertEqual(3, TrayMenuItemCount(Native))
+		AssertTrue(TrayMenuIsSeparatorAt(Native, 1))
+		ChildHandle := TrayMenuSubmenuHandle(Native.Handle, 2)
+		AssertTrue(ChildHandle != 0, "the repaired interpreter-created factory publishes an actual native child")
+		Child := MenuFromHandle(ChildHandle)
+		AssertEqual(Corpus["registered_labels"].Length, TrayMenuItemCount(Child))
+		for Index, Label in Corpus["registered_labels"] {
+			AssertEqual(Label, TrayMenuItemCaption(Child, Index - 1), "the untouched independent original labels reach the native child")
+			Id := DllCall("GetMenuItemID", "ptr", Child.Handle, "int", Index - 1, "uint")
+			AssertTrue(_MenuDispatchCallbacks.Has(Id) && _MenuDispatchCallbacks[Id] == Callback,
+				"the repaired real child retains the original actual callback")
+		}
+		AssertEqual(0, Calls["actions"], "refusal, actual constructor repair and publication never invoke DATA actions")
+	} finally {
+		if HadProperty
+			Object.Prototype.DefineProp.Call(Owner, Name, SavedDescriptor)
+		else if Object.Prototype.HasOwnProp.Call(Owner, Name)
+			Object.Prototype.DeleteProp.Call(Owner, Name)
+		_CTC_ReleaseMenu(Native)
+	}
+}
+
+; Each case enters the genuine native receipt and the original production DATA receiver.
+; A poisoned cleanup callable has bounded residue until exact repair; it is not retired.
+_SMB_FrameNativePortLifecycle() {
+	global _MenuPopulationBuilding
+	SavedBuilding := _MenuPopulationBuilding
+	Corpus := JsonParse(FileRead(_SharedDir . "\tests\corpus\menus\personal_shortcuts_frame.json", "UTF-8"))
+	PreviousCritical := Critical("On")
+	try {
+		for Fault in ["before dll Call", "before handle intrinsic Call", "before delete intrinsic Call",
+			"before adapter Call", "before metadata intrinsic Call", "after adapter Call", "after dll Call",
+			"after constructor Call", "after provider Call", "after child Handle", "after child Delete",
+			"after registry", "after primary"]
+			_SMB_FrameNativePortFault(Fault, Corpus)
+	} finally {
+		_MenuPopulationBuilding := SavedBuilding
+		Critical(PreviousCritical)
+	}
+}
+Test("personal DATA native port: genuine intrinsics, temporal custody, refusal and exact recovery", _SMB_FrameNativePortLifecycle)
+
+; Fresh parameter ownership prevents the observer from reading a mutable loop variable.
+_SMB_FrameNativePortFault(Fault, Corpus) {
+	global _MenuPopulationBuilding, _MenuDispatchCallbacks, _MenuDispatchTokens, _MenuDispatchOwnerHandles
+	global _MenuDispatchLastFire, _MenuDispatchClickSequences
+	SavedBuilding := _MenuPopulationBuilding
+	HeldRegistries := [_MenuDispatchCallbacks, _MenuDispatchTokens, _MenuDispatchOwnerHandles,
+		_MenuDispatchLastFire, _MenuDispatchClickSequences]
+	OriginalPort := TrayMenuFrameNative
+	HandleGetter := Object.Prototype.GetOwnPropDesc.Call(Menu.Prototype, "Handle").Get
+	DeleteMethod := Object.Prototype.GetOwnPropDesc.Call(Menu.Prototype, "Delete").Call
+	NameGetter := Object.Prototype.GetOwnPropDesc.Call(Func.Prototype, "Name").Get
+	FillDescriptor := Object.Prototype.GetOwnPropDesc.Call(MenuPopulation.Prototype, "Fill")
+	OriginalFill := FillDescriptor.Call
+	Population := MenuPopulation(), Native := Menu(), Foreign := Menu(), Stage := Map()
+	Calls := Map("provider", 0, "fill", 0, "foreign", 0, "actions", 0)
+	Callback := (*) => Calls["actions"] += 1
+	Rows := []
+	for Label in Corpus["registered_labels"]
+		Rows.Push(Map("label", Label, "action", Callback))
+	Provider := () => (Calls["provider"] += 1, Rows)
+	Binding := Map("manifest_key", "personal_shortcuts_frame", "children_id", "personal_shortcuts_registered",
+		"provider", Provider)
+	DescriptorOwner := false, DescriptorName := "", HadDescriptor := false, SavedDescriptor := false
+	Primary := Error("Real post-Fill native port fault")
+	Primary.DefineProp("Extra", {Get: (*) => (Calls["foreign"] += 1, _SMB_FrameForbiddenExtraRead()),
+		Set: (*) => (Calls["foreign"] += 1, _SMB_FrameForbiddenExtraRead())})
+	RestoreFault() {
+		if !DescriptorOwner
+			return
+		if HadDescriptor
+			Object.Prototype.DefineProp.Call(DescriptorOwner, DescriptorName, SavedDescriptor)
+		else if Object.Prototype.HasOwnProp.Call(DescriptorOwner, DescriptorName)
+			Object.Prototype.DeleteProp.Call(DescriptorOwner, DescriptorName)
+	}
+	Withdraw(CurrentFault, Child := false) {
+		if CurrentFault == "after registry" {
+			_MenuDispatchCallbacks := Map(Stage["foreign_id"], Callback)
+			return
+		}
+		if CurrentFault == "after primary"
+			throw Primary
+		if InStr(CurrentFault, "dll Call", true)
+			DescriptorOwner := DllCall, DescriptorName := "Call"
+		else if CurrentFault == "before handle intrinsic Call"
+			DescriptorOwner := HandleGetter, DescriptorName := "Call"
+		else if CurrentFault == "before delete intrinsic Call"
+			DescriptorOwner := DeleteMethod, DescriptorName := "Call"
+		else if CurrentFault == "before metadata intrinsic Call"
+			DescriptorOwner := NameGetter, DescriptorName := "Call"
+		else if InStr(CurrentFault, "adapter Call", true)
+			DescriptorOwner := OriginalPort, DescriptorName := "Call"
+		else if CurrentFault == "after constructor Call"
+			DescriptorOwner := Menu, DescriptorName := "Call"
+		else if CurrentFault == "after provider Call"
+			DescriptorOwner := Provider, DescriptorName := "Call"
+		else if CurrentFault == "after child Handle"
+			DescriptorOwner := Child, DescriptorName := "Handle"
+		else if CurrentFault == "after child Delete"
+			DescriptorOwner := Child, DescriptorName := "Delete"
+		else
+			throw Error("Unknown finite native port fault")
+		HadDescriptor := Object.Prototype.HasOwnProp.Call(DescriptorOwner, DescriptorName)
+		SavedDescriptor := HadDescriptor ? Object.Prototype.GetOwnPropDesc.Call(DescriptorOwner, DescriptorName) : false
+		Replacement := DescriptorName == "Handle" ? {Get: (*) => (Calls["foreign"] += 1, 0)}
+			: {Call: (*) => (Calls["foreign"] += 1, false)}
+		Object.Prototype.DefineProp.Call(DescriptorOwner, DescriptorName, Replacement)
+	}
+	ObserveFill(CurrentFault, Owner, Child, Data, ListId, Depth) {
+		Result := OriginalFill.Call(Owner, Child, Data, ListId, Depth)
+		Calls["fill"] += 1
+		Stage["child"] := Child, Stage["handle"] := Child.Handle
+		Stage["id"] := DllCall("GetMenuItemID", "ptr", Stage["handle"], "int", 0, "uint")
+		Stage["token"] := Map.Prototype.Get.Call(HeldRegistries[2], Stage["id"])
+		Stage["entry"] := Population.Pending[Stage["handle"]]
+		AssertTrue(Map.Prototype.Get.Call(HeldRegistries[1], Stage["id"]) == Callback,
+			"the observer sees the actual first native seed and original dispatch authority")
+		Withdraw(CurrentFault, Child)
+		return Result
+	}
+	try {
+		_MenuPopulationBuilding := Population
+		OriginalFill.Call(Population, Foreign, Rows, "personal_shortcuts_frame", 2)
+		Stage["foreign_entry"] := Population.Pending[Foreign.Handle]
+		Stage["foreign_id"] := DllCall("GetMenuItemID", "ptr", Foreign.Handle, "int", 0, "uint")
+		RegisterMenuItem(Native, "Retained native port destination", Callback)
+		Native.Check("Retained native port destination")
+		Native.Disable("Retained native port destination")
+		Before := _MR_FrameDestinationSnapshot(Native)
+		Captured := OriginalPort.Call("capture", Native)
+		AssertEqual(Native.Handle, Captured[1], "the native port retains the actual HMENU")
+		AssertEqual(1, Captured[2].Length)
+		for Field in [1, 2, 3, 4]
+			AssertEqual(Before[1][Field], Captured[2][1][Field], "caption, command id, native flags and child handle are genuine")
+		Ids := OriginalPort.Call("ids", Native, Native.Handle)
+		AssertEqual(1, Ids.Length)
+		AssertEqual(Before[1][2], Ids[1], "retirement enumerates the exact receiving command id")
+		AssertEqual(1, OriginalPort.Call("count", Native, Native.Handle))
+		BeforeProvider := InStr(Fault, "before ", true) == 1
+		if BeforeProvider {
+			Withdraw(Fault)
+			if Fault != "before adapter Call" {
+				AssertFalse(OriginalPort.Call("current"), Fault . ": actual native authority is unavailable")
+				AssertFalse(OriginalPort.Call("capture", Native), Fault . ": no native receipt from withdrawn intrinsics")
+			}
+		} else
+			MenuPopulation.Prototype.DefineProp("Fill", {Call: _SMB_FrameBindCaseObserver(ObserveFill, Fault)})
+		Caught := false, Added := -1
+		try Added := MenuRenderer_AppendFrameData(Native, "shortcuts_menu", "personal_shortcuts", Binding, , , &Admitted)
+		catch as Failure
+			Caught := Failure
+		; Restore before observing native state so no test assertion invokes a poisoned DLL.
+		RestoreFault()
+		MenuPopulation.Prototype.DefineProp("Fill", FillDescriptor)
+		Residue := Fault == "after adapter Call" || Fault == "after dll Call"
+		if Fault == "after primary"
+			Assert(Caught == Primary, "the actual primary failure object survives native retirement unchanged")
+		else if Residue {
+			ExpectedMessage := Fault == "after adapter Call" ? "Owned DATA stage cleanup lost its native cohort"
+				: "Owned native menu operation lost its retained intrinsics"
+			AssertEqual("Error", Type(Caught), "withdrawing genuine cleanup authority throws its actual Error")
+			AssertEqual(ExpectedMessage, Caught.Message, "the exact production cleanup failure propagates without a fallback")
+			AssertEqual(-1, Added, "failed cleanup never returns a fabricated success or refusal receipt")
+			AssertFalse(Admitted, "native residue cannot be acknowledged as admitted publication")
+		} else {
+			AssertFalse(Caught, Fault . ": source withdrawal remains a refusal")
+			AssertEqual(0, Added)
+			AssertFalse(Admitted)
+		}
+		AssertEqual(BeforeProvider ? 0 : 1, Calls["provider"], "native refusal has the required provider boundary")
+		AssertEqual(BeforeProvider ? 0 : 1, Calls["fill"], "post-effect faults follow the actual production Fill")
+		AssertEqual(0, Calls["foreign"], "no native callable, metadata, child or provider observer executes")
+		AssertEqual(0, Calls["actions"], "receipt, retirement and repair do not execute actions")
+		if !BeforeProvider {
+			AssertFalse(Population.Pending.Has(Stage["handle"]), "the exact owned pending entry retires independently of native authority")
+			if Residue {
+				AssertEqual(1, DllCall("GetMenuItemCount", "ptr", Stage["handle"], "int"),
+					"withdrawing the cleanup callable leaves honest native residue until exact repair")
+				AssertTrue(Map.Prototype.Get.Call(HeldRegistries[1], Stage["id"]) == Callback)
+				AssertTrue(Map.Prototype.Get.Call(HeldRegistries[2], Stage["id"]) == Stage["token"],
+					"unsafe cleanup does not pretend that the staged registration is retired")
+				_MR_FrameReleaseChild(Stage["child"], Stage["handle"], HeldRegistries, [Callback], OriginalPort, MenuDispatcher_PruneMenu)
+			}
+			AssertEqual(0, DllCall("GetMenuItemCount", "ptr", Stage["handle"], "int"),
+				Residue ? "exact repair permits genuine native retirement" : "held native intrinsics automatically retire the unpublished child")
+			AssertFalse(Map.Prototype.Has.Call(HeldRegistries[1], Stage["id"]))
+			AssertFalse(Map.Prototype.Has.Call(HeldRegistries[2], Stage["id"]))
+			AssertFalse(Map.Prototype.Has.Call(HeldRegistries[3], Stage["handle"]))
+			if Fault == "after registry" {
+				Assert(_MenuDispatchCallbacks != HeldRegistries[1])
+				AssertEqual(1, _MenuDispatchCallbacks.Count, "the replacement global registry remains foreign and untouched")
+				Assert(_MenuDispatchCallbacks[Stage["foreign_id"]] == Callback)
+			}
+		}
+		_MenuDispatchCallbacks := HeldRegistries[1]
+		AssertTrue(_MR_FrameNativeImageEqual(Before, _MR_FrameDestinationSnapshot(Native)),
+			"native destination flags, caption, callback and token remain unchanged across real refusal")
+		Assert(Population.Pending[Foreign.Handle] == Stage["foreign_entry"], "the previous detached picker retains its exact entry")
+		AssertTrue(Map.Prototype.Get.Call(HeldRegistries[1], Stage["foreign_id"]) == Callback)
+		AssertTrue(Map.Prototype.Has.Call(HeldRegistries[2], Stage["foreign_id"]))
+		AssertEqual(1, TrayMenuItemCount(Foreign))
+		AssertTrue(OriginalPort.Call("current"), "exact descriptor repair restores the actual native port")
+		AssertEqual(1, MenuRenderer_AppendFrameData(Native, "shortcuts_menu", "personal_shortcuts", Binding, , , &Admitted))
+		AssertTrue(Admitted)
+		AssertEqual(3, TrayMenuItemCount(Native))
+		AssertTrue(TrayMenuIsSeparatorAt(Native, 1))
+		Child := MenuFromHandle(TrayMenuSubmenuHandle(Native.Handle, 2))
+		AssertEqual(1, TrayMenuItemCount(Child), "repair publishes the original native seed")
+		AssertTrue(Population.Complete(Child.Handle))
+		AssertEqual(Corpus["registered_labels"].Length, TrayMenuItemCount(Child))
+		CompletedReceipt := OriginalPort.Call("capture", Native)
+		AssertEqual(3, CompletedReceipt[2].Length)
+		AssertEqual(Child.Handle, CompletedReceipt[2][3][4], "the actual native submenu handle belongs to the published repaired child")
+		ChildIds := OriginalPort.Call("ids", Child, Child.Handle)
+		AssertEqual(Corpus["registered_labels"].Length, ChildIds.Length)
+		AssertEqual(Corpus["registered_labels"].Length, OriginalPort.Call("count", Child, Child.Handle))
+		for Index, Label in Corpus["registered_labels"] {
+			AssertEqual(Label, TrayMenuItemCaption(Child, Index - 1), "the unchanged independent corpus reaches the repaired native child")
+			Id := DllCall("GetMenuItemID", "ptr", Child.Handle, "int", Index - 1, "uint")
+			AssertEqual(Id, ChildIds[Index], "the adapter command ID is independently received from Win32")
+			Assert(_MenuDispatchCallbacks[Id] == Callback)
+			AssertTrue(_MenuDispatchTokens.Has(Id))
+		}
+		AssertEqual(0, Calls["foreign"])
+		AssertEqual(0, Calls["actions"])
+	} finally {
+		RestoreFault()
+		MenuPopulation.Prototype.DefineProp("Fill", FillDescriptor)
+		_MenuDispatchCallbacks := HeldRegistries[1]
+		Population.Stop()
+		Population.Pending.Clear()
+		_MenuPopulationBuilding := SavedBuilding
+		if Stage.Has("child")
+			_CTC_ReleaseMenu(Stage["child"])
+		_CTC_ReleaseMenu(Native)
+		_CTC_ReleaseMenu(Foreign)
+	}
+}
