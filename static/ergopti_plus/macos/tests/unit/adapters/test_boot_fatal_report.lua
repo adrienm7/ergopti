@@ -22,6 +22,7 @@
 
 local helpers = require("tests.helpers")
 
+helpers.admit_logger_privacy(require("infra.logger"))
 package.loaded["adapters.boot_fatal"] = nil
 local BootFatal = require("adapters.boot_fatal")
 
@@ -187,5 +188,75 @@ helpers.describe("boot fatal reporter (silent-boot-abort)", function()
 			end,
 		})
 		helpers.assert_eq(opened[1], Logger.FALLBACK_BOOT_LOG_FILE)
+	end)
+end)
+
+
+--- Keeps all durable destination and retirement effects inside recording ports.
+--- @param body function Receives an actual reporter, captured bytes and counters.
+local function with_private_fatal_report(body)
+	local files, closes, opens = {}, {}, {}
+	local deps = { fallback_path = "/owned/boot", clock = function() return "T" end,
+		getenv = function(name)
+			if name == BootFatal.LAUNCHER_LOG_ENV then return "/owned/launcher" end
+			if name == BootFatal.REPORT_FILE_ENV then return "/owned/report" end
+		end,
+		open = function(path, mode)
+			opens[#opens + 1] = { path, mode }
+			return { write = function(_, text) files[path] = (files[path] or "") .. text; return true end,
+				flush = function() return true end,
+				close = function() closes[path] = (closes[path] or 0) + 1; return true end }
+		end }
+	return body(BootFatal, deps, files, closes, opens)
+end
+
+helpers.describe("fatal report canonical privacy", function()
+	helpers.it("mac-fatal-privacy: persisted boot cause and localized message use the admitted redactor", function()
+		with_private_fatal_report(function(Fatal, deps, files, closes)
+			local notified = Fatal.report("configuration", "PrivateUser failed\n/Users/PrivateUser/cache; password=secret12345",
+				"PrivateUser /Users/PrivateUser/logs", deps)
+			helpers.assert_eq(notified, true)
+			helpers.assert_eq(files["/owned/boot"], "T [ERROR] [init] FATAL at boot stage 'configuration': <user> failed | ~/cache; password=<secret>\n")
+			helpers.assert_eq(files["/owned/launcher"], "[T] embedded Hammerspoon FATAL at boot stage 'configuration': <user> failed | ~/cache; password=<secret>\n")
+			helpers.assert_eq(files["/owned/report"], "kind=boot\nstage=configuration\nmessage=<user> ~/logs\ndetail=<user> failed | ~/cache; password=<secret>\n")
+			helpers.assert_eq(closes, { ["/owned/boot"] = 1, ["/owned/launcher"] = 1, ["/owned/report"] = 1 })
+		end)
+	end)
+
+	helpers.it("mac-fatal-privacy: runtime text is redacted while native log-link paths remain exact", function()
+		with_private_fatal_report(function(Fatal, deps, files)
+			local links = { "/Users/PrivateUser/logs/ErgoptiPlus_day.log", "/Users/PrivateUser/logs/ErgoptiPlus_errors.log" }
+			helpers.assert_eq(Fatal.report_runtime("native_logger", "PrivateUser /Users/PrivateUser/cache; password=secret12345",
+				"PrivateUser stopped", links, deps), true)
+			helpers.assert_eq(files["/owned/report"], "kind=runtime\nstage=native_logger\nmessage=<user> stopped\ndetail=<user> ~/cache; password=<secret>\n"
+				.. "log=" .. links[1] .. "\nlog=" .. links[2] .. "\n")
+			helpers.assert_contains(files["/owned/boot"], "FATAL in runtime component 'native_logger': <user> ~/cache; password=<secret>")
+			helpers.assert_eq(links, { "/Users/PrivateUser/logs/ErgoptiPlus_day.log", "/Users/PrivateUser/logs/ErgoptiPlus_errors.log" })
+		end)
+	end)
+
+	helpers.it("mac-fatal-privacy: only the exact closed admission failure is writable before privacy initialization", function()
+		helpers.with_stub_scope({ "infra.logger", "logger", "adapters.boot_journal", "adapters.boot_fatal" }, function()
+			local Fresh = require("adapters.boot_fatal")
+			local opens = 0
+			local deps = { fallback_path = "/owned/boot", getenv = function() return "/owned/report" end,
+				open = function()
+					opens = opens + 1
+					return { write = function() return true end, flush = function() return true end, close = function() return true end }
+				end }
+			helpers.assert_eq(Fresh.report("logger_privacy", "Canonical log privacy admission refused.", nil, deps), true)
+			helpers.assert_eq(opens, 3)
+			for _, case in ipairs({ { "logger_privacy", "PrivateUser /Users/PrivateUser" },
+				{ "configuration", "Canonical log privacy admission refused." },
+				{ "logger_privacy", "Canonical log privacy admission refused.", "PrivateUser" } }) do
+				local ok, refusal = pcall(Fresh.report, case[1], case[2], case[3], deps)
+				helpers.assert_eq(ok, false)
+				helpers.assert_contains(refusal, "privacy not initialized")
+				helpers.assert_eq(opens, 3, "Unknown text refuses before every writable acquisition")
+			end
+			local ok = pcall(Fresh.report_runtime, "logger_privacy", "Canonical log privacy admission refused.", nil, {}, deps)
+			helpers.assert_eq(ok, false)
+			helpers.assert_eq(opens, 3, "A runtime failure never acquires the bootstrap exception")
+		end)
 	end)
 end)
