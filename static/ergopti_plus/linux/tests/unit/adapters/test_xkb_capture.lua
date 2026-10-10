@@ -782,3 +782,198 @@ helpers.describe("xkb_capture: startup-capture-publication", function()
 		end)
 	end)
 end)
+
+local function with_original_direct_producer(body)
+ local prior = package.loaded['adapters.xkb_capture']
+ package.loaded['adapters.xkb_capture'] = nil
+ local capture = require('adapters.xkb_capture')
+ local state = { calls = 0, generation = 7, group = 0, enumerations = 0, updates = 0 }
+ local session
+ local backend = {
+  create = function() session = { identity = 'controlled-direct-map', groups = 2 }; return session end,
+  destroy = function() end,
+  source_group = function()
+   state.calls = state.calls + 1
+   if state.on_source then state.on_source(state.calls) end
+   return state.group, state.generation, function() return true end
+  end,
+  direct_sources = function(_, requested, group)
+   state.enumerations = state.enumerations + 1
+   state.requested = requested
+   local rows = {}
+   for _, code in ipairs(requested) do
+    rows[#rows + 1] = { code = code, text = group == 0 and ';' or 'ù',
+     mods = {}, plain = true, direct = true, dead = false }
+   end
+   if state.on_rows then state.on_rows(requested, rows) end
+   return rows
+  end,
+  update_key = function() state.updates = state.updates + 1 end,
+ }
+ capture._set_backend(backend)
+ local called, reason = pcall(function()
+  helpers.assert_true(capture.load('controlled-direct-map', 'C'))
+  body(capture, state, backend, session)
+ end)
+ capture._reset_backend()
+ package.loaded['adapters.xkb_capture'] = prior
+ if not called then error(reason, 0) end
+end
+
+helpers.describe('xkb_capture: direct sources retain original native callback owners', function()
+ helpers.it('retains duplicate readonly facts and detaches the original validated request', function()
+  with_original_direct_producer(function(capture, state)
+   local requested = { 36, 40 }
+   local rows = assert(capture.direct_sources(requested))
+   helpers.assert_eq(#rows, 2)
+   helpers.assert_eq(rows[1].code, 36)
+   helpers.assert_eq(rows[2].code, 40)
+   helpers.assert_eq(rows[1].text, ';')
+   helpers.assert_eq(rows[2].text, ';')
+   helpers.assert_true(state.requested ~= requested)
+   helpers.assert_eq(state.updates, 0)
+   helpers.assert_nil(capture.capture_chord_output(rows))
+  end)
+ end)
+ helpers.it('preserves validated intent when a source callback changes the caller array', function()
+  with_original_direct_producer(function(capture, state)
+   local requested = { 36 }
+   state.on_source = function() requested[1] = 40 end
+   local rows = assert(capture.direct_sources(requested))
+   helpers.assert_eq(rows[1].code, 36)
+   helpers.assert_eq(requested[1], 40)
+  end)
+ end)
+ helpers.it('refuses a foreign enumerator installed by the first native observation', function()
+  with_original_direct_producer(function(capture, state, backend)
+   local foreign_calls = 0
+   state.on_source = function(call)
+    if call == 1 then backend.direct_sources = function(_, requested)
+     foreign_calls = foreign_calls + 1
+     return { { code = requested[1], text = ';', mods = {}, plain = true, direct = true, dead = false } }
+    end end
+   end
+   local rows = capture.direct_sources({ 36 })
+   helpers.assert_nil(rows, 'foreign direct issuer calls=' .. foreign_calls)
+   helpers.assert_eq(foreign_calls, 0)
+   helpers.assert_eq(state.enumerations, 0)
+  end)
+ end)
+ helpers.it('refuses a foreign fact issuer even while original source currency remains current', function()
+  with_original_direct_producer(function(capture, state, backend)
+   local generation, _, original_current = capture.source_generation()
+   helpers.assert_true(type(original_current) == 'function')
+   local foreign_calls = 0
+   state.on_source = function(call)
+    if call == 2 then backend.direct_sources = function(_, requested)
+     foreign_calls = foreign_calls + 1
+     return { { code = requested[1], text = ';', mods = {}, plain = true, direct = true, dead = false } }
+    end end
+   end
+   local rows = capture.direct_sources({ 36 })
+   helpers.assert_eq(capture.source_generation(), generation)
+   helpers.assert_true(original_current())
+   helpers.assert_nil(rows, 'foreign facts survive genuine source currency; issuer calls=' .. foreign_calls)
+   helpers.assert_eq(foreign_calls, 0)
+  end)
+ end)
+ helpers.it('refuses original enumerator loss within its own callback', function()
+  with_original_direct_producer(function(capture, state, backend)
+   local original = backend.direct_sources
+   state.on_rows = function() backend.direct_sources = function(...) return original(...) end end
+   helpers.assert_nil(capture.direct_sources({ 36 }))
+  end)
+ end)
+ helpers.it('refuses original enumerator loss during the final native observation', function()
+  with_original_direct_producer(function(capture, state, backend)
+   local original = backend.direct_sources
+   state.on_rows = function()
+    state.on_source = function() backend.direct_sources = function(...) return original(...) end end
+   end
+   helpers.assert_nil(capture.direct_sources({ 36 }))
+  end)
+ end)
+ helpers.it('refuses a replaced native getter before invoking it after enumeration', function()
+  with_original_direct_producer(function(capture, state, backend)
+   local foreign_calls = 0
+   state.on_rows = function() backend.source_group = function()
+    foreign_calls = foreign_calls + 1; return 0, 7
+   end end
+   helpers.assert_nil(capture.direct_sources({ 36 }))
+   helpers.assert_eq(foreign_calls, 0)
+  end)
+ end)
+ helpers.it('refuses getter replacement within the initial native observation', function()
+  with_original_direct_producer(function(capture, state, backend)
+   local foreign_calls = 0
+   state.on_source = function(call)
+    if call == 1 then backend.source_group = function() foreign_calls = foreign_calls + 1; return 0, 7 end end
+   end
+   helpers.assert_nil(capture.direct_sources({ 36 }))
+   helpers.assert_eq(foreign_calls, 0)
+   helpers.assert_eq(state.enumerations, 0)
+  end)
+ end)
+ helpers.it('refuses source identity changed by the initial native observation', function()
+  with_original_direct_producer(function(capture, state, _, session)
+   state.on_source = function(call) if call == 1 then session.identity = 'foreign-map' end end
+   helpers.assert_nil(capture.direct_sources({ 36 }))
+   helpers.assert_eq(state.enumerations, 0)
+  end)
+ end)
+ helpers.it('refuses native group-count changes even when the observed group stays equal', function()
+  with_original_direct_producer(function(capture, state, _, session)
+   state.on_rows = function() session.groups = 3 end
+   helpers.assert_nil(capture.direct_sources({ 36 }))
+  end)
+ end)
+ helpers.it('refuses metatable requests before position or native callbacks', function()
+  with_original_direct_producer(function(capture, state)
+   local callbacks = 0
+   local requested = setmetatable({ 36 }, {
+    __len = function() callbacks = callbacks + 1; return 1 end,
+    __pairs = function(value) callbacks = callbacks + 1; return next, value, nil end,
+   })
+   helpers.assert_nil(capture.direct_sources(requested))
+   helpers.assert_eq(callbacks, 0)
+   helpers.assert_eq(state.calls, 0)
+   helpers.assert_eq(state.enumerations, 0)
+  end)
+ end)
+ helpers.it('refuses backend-installed request metatables without calling foreign readers', function()
+  with_original_direct_producer(function(capture, state)
+   local callbacks = 0
+   state.on_rows = function(requested)
+    setmetatable(requested, { __pairs = function(value) callbacks = callbacks + 1; return next, value, nil end })
+   end
+   helpers.assert_nil(capture.direct_sources({ 36 }))
+   helpers.assert_eq(callbacks, 0)
+  end)
+ end)
+ helpers.it('refuses request mutation during the final native observation', function()
+  with_original_direct_producer(function(capture, state)
+   state.on_rows = function(requested)
+    state.on_source = function() requested[1] = 40 end
+   end
+   helpers.assert_nil(capture.direct_sources({ 36 }))
+  end)
+ end)
+ helpers.it('retains native exceptions and refused rows as existing closed failures', function()
+  with_original_direct_producer(function(capture, _, backend)
+   backend.direct_sources = function() error('controlled native enumeration failure') end
+   local rows, reason = capture.direct_sources({ 36 })
+   helpers.assert_nil(rows)
+   helpers.assert_true(reason:find('controlled native enumeration failure', 1, true) ~= nil)
+   backend.direct_sources = function() return nil, 'controlled source unavailable' end
+   rows, reason = capture.direct_sources({ 36 })
+   helpers.assert_nil(rows)
+   helpers.assert_eq(reason, 'controlled source unavailable')
+  end)
+ end)
+ helpers.it('restores the prior module identity after a raised controlled scenario', function()
+  local prior = package.loaded['adapters.xkb_capture']
+  local called = pcall(function() with_original_direct_producer(function() error('controlled fixture failure') end) end)
+  helpers.assert_eq(called, false)
+  helpers.assert_eq(package.loaded['adapters.xkb_capture'], prior)
+ end)
+end)
