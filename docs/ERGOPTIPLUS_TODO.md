@@ -6479,6 +6479,19 @@ this neutral cleanup completes no parent item.
       open. macOS system trust and explicit proxy relays are integrated, while
       opaque-client full-URL PAC/WPAD/fallback/redirect routing remains CODE.
 
+2026-10-10 exact streaming-task retirement correction. Cancellation preserves
+the original ShellRunner slot and input while termination is pending. Cleanup
+requires that same handle's physical settlement receipt, including after a
+refused or ambiguous start; stale business generations may still retire their
+own resources. Original38 cases and127 assertion calls are conserved. Portable
+controlled receiving passes38 original and7 new cases; the predecessor fails6
+of the7 new cases, and six causal mutants remain red. These controlled task
+ports do not qualify physical Hammerspoon/POSIX closure. Canonical selected
+format passes; Hammerspoon18165 and E2E101 pass with one original skip. JS has
+407 passes/1 protected-temporary-root failure; the unchanged uninstall fixture
+passes its exact non-Git-root replay. Hosted macOS receiving remains pending.
+This is a bounded TODO62 retirement prerequisite, not complete daemon migration.
+
 2026-10-10 selected-release native receiving enrollment. A bounded new Mac
 matrix step now runs the frozen50 shell-corpus vectors and original guardian
 SIGTERM/SIGINT controls independently of the failing archive prerequisite. Its

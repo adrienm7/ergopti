@@ -1102,6 +1102,14 @@ function M.resume_warmup()
 	return begin_warmup_resume_activation(epoch, true)
 end
 
+--- Returns true only when the original ShellRunner handle has physically settled.
+--- @param task table Exact streaming task handle.
+--- @return boolean settled
+local function stream_task_is_settled(task)
+	local ok, settled = xpcall(function() return task.isSettled() end, debug.traceback)
+	return ok == true and settled == true
+end
+
 --- Terminates the in-flight streaming task if one is active.
 --- Called when a newer request supersedes the current one.
 function M.cancel_streaming()
@@ -1109,9 +1117,13 @@ function M.cancel_streaming()
 	_stream_generation = _stream_generation + 1
 	if _active_stream_task then
 		local task = _active_stream_task
-		local ok, result = xpcall(function() return task.terminate() end, debug.traceback)
-		if not ok or result ~= true then
-			Logger.error(LOG, "Active Ollama stream cancellation failed; retained for retry: %s", tostring(result))
+		local ok, result, state = xpcall(function() return task.terminate() end, debug.traceback)
+		-- An exact completion may revoke the slot inside terminate(), even when
+		-- the native call subsequently throws. An accepted signal alone cannot.
+		if _active_stream_task ~= task then return _active_stream_task == nil end
+		if not ok or result ~= true or state ~= "settled" or not stream_task_is_settled(task) then
+			Logger.error(LOG, "Active Ollama stream cancellation remains unsettled; retained for retry: %s",
+				tostring(state or result))
 			return false
 		end
 		_active_stream_task = nil
@@ -1668,10 +1680,14 @@ local function post_and_parse_streaming(model_name, system_prompt, full_text, ta
 
 	-- Completion callback: fired when curl exits
 	local function on_done(exit_code, remaining, stderr_out)
+		if not stream_task_is_settled(task) then
+			Logger.error(LOG, "STREAM completion arrived before exact task settlement; ownership retained.")
+			return
+		end
 		task_completed = true
 		-- Relinquish the exact native capability before any parser/file/logger call
 		-- can raise. A callback throw must never leave a completed task published.
-		if my_generation == _stream_generation and _active_stream_task == task then
+		if _active_stream_task == task then
 			_active_stream_task = nil
 		end
 		-- Remove the payload temp file as soon as curl exits so it doesn't linger
@@ -1757,22 +1773,33 @@ local function post_and_parse_streaming(model_name, system_prompt, full_text, ta
 	_active_stream_task = task
 	local start_ok, start_result = xpcall(function() return task.start() end, debug.traceback)
 	if not start_ok or start_result ~= true then
-		if not start_ok then
-			local stop_ok, stop_result = xpcall(function() return task.terminate() end, debug.traceback)
-			if stop_ok and stop_result == true then
-				if _active_stream_task == task then _active_stream_task = nil end
-			else
-				Logger.error(LOG, "[%s] #%d STREAM ambiguous task retained for cancellation retry: %s",
-					tostring(model_name), req_id, tostring(stop_result))
+		-- A refused start can still retain a native task. Revoke business effects,
+		-- but preserve its exact slot and input until physical settlement.
+		if my_generation == _stream_generation then _stream_generation = _stream_generation + 1 end
+		local payload_retirement_attempted = false
+		local function retire_payload()
+			if payload_retirement_attempted then return true end
+			if not stream_task_is_settled(task) then return false end
+			payload_retirement_attempted = true
+			if _active_stream_task == task then _active_stream_task = nil end
+			local removed, remove_err = pcall(os.remove, tmp_path)
+			if not removed then
+				Logger.error(LOG, "[%s] #%d STREAM payload cleanup failed: %s",
+					tostring(model_name), req_id, tostring(remove_err))
 			end
-		elseif _active_stream_task == task then
-			-- ShellRunner's false result proves hs.task never launched.
-			_active_stream_task = nil
+			return true
 		end
-		local removed, remove_err = pcall(os.remove, tmp_path)
-		if not removed then
-			Logger.error(LOG, "[%s] #%d STREAM payload cleanup failed: %s",
-				tostring(model_name), req_id, tostring(remove_err))
+		if not retire_payload() then
+			-- ShellRunner suppresses business completion after an uncommitted
+			-- start; its exact settlement observer still owns cleanup.
+			local observed, registered = xpcall(function()
+				return task.onSettled(retire_payload)
+			end, debug.traceback)
+			if not observed or registered ~= true then
+				Logger.error(LOG, "STREAM settlement observer refused; task and payload retained.")
+			end
+			M.cancel_streaming()
+			retire_payload()
 		end
 		Logger.error(LOG, "[%s] #%d STREAM task start did not commit (result: %s).",
 			tostring(model_name), req_id, tostring(start_result))
@@ -1786,7 +1813,7 @@ local function post_and_parse_streaming(model_name, system_prompt, full_text, ta
 	-- at all. Delay must be > STREAM_MAX_TIME_SEC so curl has finished reading.
 	local cleanup_ok, cleanup_handle, cleanup_committed = xpcall(function()
 		return TimerScheduler.after(STREAM_TMPFILE_CLEANUP_SEC, function()
-			os.remove(tmp_path)
+			if stream_task_is_settled(task) then os.remove(tmp_path) end
 		end)
 	end, debug.traceback)
 	if not cleanup_ok or cleanup_committed ~= true then
