@@ -4,8 +4,10 @@ _TapHoldScopeCase(Mode, RefuseBackup := false, ExternalEdit := false) {
 	global TapHold, GestureActionParameters, _SharedDir, _MenuDispatchCallbacks
 	OldTapHold := IsSet(TapHold) ? TapHold : unset
 	OldParameters := GestureActionParameters
-	Fixture := _ScopeOwnerFixture()
-	ConfigSource := '[category_enabled]`ntap_holds = true`nshortcuts = true`n[action_parameters]`ntap_hold__space__open_url = "https://hold.test"`ngesture__tap_4__open_url = "https://gesture.test"`n'
+	; Author the intended current-source subject before the genuine native boot.
+	OriginalConfigBody := '[category_enabled]`ntap_holds = true`nshortcuts = true`n[action_parameters]`ntap_hold__space__open_url = "https://hold.test"`ngesture__tap_4__open_url = "https://gesture.test"`n'
+	Fixture := _ScopeOwnerFixture(OriginalConfigBody)
+	ConfigSource := Fixture.source
 	TapPath := Fixture.path . ".tap.toml"
 	TapSource := '[tap_hold]`ninherit_defaults = true`n[tap_hold.keys.space]`ntap_action = "open_url"`nhold_modifier = "shift"`ntime_activation_seconds = 0.9`n[private]`ncredential = "keep"`n'
 	Assert(FSWriteDurable(Fixture.path, ConfigSource))
@@ -29,6 +31,8 @@ _TapHoldScopeCase(Mode, RefuseBackup := false, ExternalEdit := false) {
 	Fixture.options["reload"] := Launch, Fixture.options["backup"] := Backup
 	Rendered := Menu()
 	try {
+		AssertEqual(OriginalConfigBody, SubStr(ConfigSource, InStr(ConfigSource, "`n") + 1),
+			"current positive boot retains every independently authored original config byte")
 		TapHold := LoadTapHoldToml(TapPath)
 		RuntimeBefore := TapHold
 		GestureActionParameters := TOML_ParseFreshFile(Fixture.path)["action_parameters"]

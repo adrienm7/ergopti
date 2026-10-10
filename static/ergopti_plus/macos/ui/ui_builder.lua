@@ -34,6 +34,19 @@ local LOG = "ui_builder"
 local WindowTitles = require("window_titles")
 local WindowTitleKeyOwner = rawget(WindowTitles, "key_for_app")
 local WindowTitleComposeOwner = rawget(WindowTitles, "compose")
+local WindowPresentationOwner = rawget(WindowTitles, "presentation_for_app")
+local Presentation = require("webview.presentation")
+local PresentationPrepareOwner = rawget(Presentation, "prepare")
+local PresentationI18n = require("infra.i18n")
+local PresentationLocale = require("infra.locale")
+local PresentationTranslateOwner = rawget(PresentationI18n, "get")
+local PresentationLocaleGetOwner = rawget(PresentationLocale, "get")
+local PresentationLocaleCurrentOwner = rawget(PresentationLocale, "current_locale")
+local PresentationLocaleCore = require("locale.core")
+local PresentationCoreGetOwner = rawget(PresentationLocaleCore, "get")
+local PresentationCoreCurrentOwner = rawget(PresentationLocaleCore, "current_locale")
+local _presentation_receipts = setmetatable({}, { __mode = "k" })
+local PresentationPrepareApi, PresentationFieldsApi, PresentationCurrentApi, PresentationShowApi
 
 -- Per-process cache of assembled HTML strings.  Avoids re-reading the local
 -- CSS/JS files (and re-running the gsub inlining pass) on every UI open —
@@ -634,6 +647,79 @@ function M.can_create_webview()
 		and type(hs.webview.new) == "function"
 end
 
+--- Authenticates the actual contextual declaration and translation dependencies.
+--- @return boolean current
+local function presentation_owners_current()
+	return getmetatable(WindowTitles) == nil and getmetatable(Presentation) == nil
+		and getmetatable(PresentationI18n) == nil and getmetatable(PresentationLocale) == nil
+		and getmetatable(PresentationLocaleCore) == nil
+		and rawget(package.loaded, "ui.ui_builder") == M
+		and rawget(package.loaded, "window_titles") == WindowTitles
+		and rawget(package.loaded, "webview.presentation") == Presentation
+		and rawget(package.loaded, "infra.i18n") == PresentationI18n
+		and rawget(package.loaded, "infra.locale") == PresentationLocale
+		and rawget(package.loaded, "locale.core") == PresentationLocaleCore
+		and rawget(PresentationLocaleCore, "get") == PresentationCoreGetOwner
+		and rawget(PresentationLocaleCore, "current_locale") == PresentationCoreCurrentOwner
+		and rawget(WindowTitles, "presentation_for_app") == WindowPresentationOwner
+		and rawget(WindowTitles, "compose") == WindowTitleComposeOwner
+		and rawget(Presentation, "prepare") == PresentationPrepareOwner
+		and rawget(PresentationI18n, "get") == PresentationTranslateOwner
+		and rawget(PresentationLocale, "get") == PresentationLocaleGetOwner
+		and rawget(PresentationLocale, "current_locale") == PresentationLocaleCurrentOwner
+		and rawget(M, "prepare_app_presentation") == PresentationPrepareApi
+		and rawget(M, "presentation_fields") == PresentationFieldsApi
+		and rawget(M, "presentation_current") == PresentationCurrentApi
+		and rawget(M, "show_webview") == PresentationShowApi
+end
+
+--- Prepares one genuine context before its caller replaces an existing window.
+--- @param app_id string Canonical app identity.
+--- @param presentation_id string Canonical context identity.
+--- @return table|nil Opaque factory-owned receiving receipt.
+function M.prepare_app_presentation(app_id, presentation_id)
+	if type(WindowPresentationOwner) ~= "function" or type(PresentationPrepareOwner) ~= "function"
+		or not presentation_owners_current() then return nil end
+	local ok, prepared = pcall(PresentationPrepareOwner, WindowTitles, PresentationI18n,
+		PresentationLocale, app_id, presentation_id, "hs", presentation_owners_current)
+	if not ok or type(prepared) ~= "table" or getmetatable(prepared) ~= nil
+		or type(rawget(prepared, "current")) ~= "function" or not presentation_owners_current()
+		or prepared.current() ~= true then return nil end
+	local receipt = {}
+	_presentation_receipts[receipt] = {
+		app_id = app_id, presentation_id = presentation_id,
+		title = prepared.title, label = prepared.label, caption = prepared.caption,
+		current = prepared.current,
+	}
+	return receipt
+end
+
+--- Checks only this factory's exact receipt and its retained Source cohort.
+--- @param receipt table Opaque context receipt.
+--- @return boolean current
+function M.presentation_current(receipt)
+	if type(receipt) ~= "table" or getmetatable(receipt) ~= nil or next(receipt) ~= nil
+		or not presentation_owners_current() then return false end
+	local retained = _presentation_receipts[receipt]
+	if retained == nil then return false end
+	local ok, current = pcall(retained.current)
+	return ok and current == true and presentation_owners_current()
+end
+
+--- Reads the two immutable page strings from the actual factory-owned context.
+--- @param receipt table Opaque context receipt.
+--- @return string|nil title
+--- @return string|nil label
+function M.presentation_fields(receipt)
+	if not PresentationCurrentApi(receipt) then return nil end
+	local retained = _presentation_receipts[receipt]
+	return retained.title, retained.label
+end
+
+PresentationPrepareApi = M.prepare_app_presentation
+PresentationFieldsApi = M.presentation_fields
+PresentationCurrentApi = M.presentation_current
+
 --- Resolves an explicit app identity through the actual shared title policy.
 --- Caller text remains supported only when no declared app identity is supplied.
 --- @param opts table Native factory request.
@@ -643,6 +729,22 @@ end
 local function declared_window_title(opts)
 	if getmetatable(opts) ~= nil then return nil end
 	local app_id = rawget(opts, "app_id")
+	local presentation_id, receipt = rawget(opts, "presentation_id"), rawget(opts, "presentation_receipt")
+	if presentation_id ~= nil or receipt ~= nil then
+		if rawget(opts, "title") ~= nil or rawget(opts, "label") ~= nil
+			or not PresentationCurrentApi(receipt) then return nil end
+		local retained = _presentation_receipts[receipt]
+		if app_id ~= retained.app_id or presentation_id ~= retained.presentation_id then return nil end
+		local function live()
+			return getmetatable(opts) == nil and rawget(opts, "app_id") == app_id
+				and rawget(opts, "presentation_id") == presentation_id
+				and rawget(opts, "presentation_receipt") == receipt
+				and rawget(opts, "title") == nil and rawget(opts, "label") == nil
+				and PresentationCurrentApi(receipt)
+		end
+		if not live() then return nil end
+		return retained.title, retained.caption, live
+	end
 	if type(app_id) ~= "string" or not app_id:match("^[a-z][a-z0-9_]*$")
 		or rawget(opts, "title") ~= nil then return nil end
 	local ok_i18n, i18n = pcall(require, "infra.i18n")
@@ -684,7 +786,8 @@ end
 function M.show_webview(opts)
 	if type(opts) ~= "table" then return nil end
 	local title_label, declared_caption, title_live
-	if opts.app_id ~= nil then
+	if rawget(opts, "presentation_id") ~= nil or rawget(opts, "presentation_receipt") ~= nil
+		or opts.app_id ~= nil then
 		title_label, declared_caption, title_live = declared_window_title(opts)
 		if title_label == nil then
 			Logger.error(LOG, "WebView factory refused its declared app title.")
@@ -751,12 +854,14 @@ function M.show_webview(opts)
 		-- caller has installed its close contract.
 		if acquired ~= true then return nil end
 	end
+	local contextual_title = rawget(opts, "presentation_id") ~= nil or rawget(opts, "presentation_receipt") ~= nil
 	local function webview_current()
+		if contextual_title and (not title_live or not title_live()) then return false end
 		if type(opts.is_current) ~= "function" then return true end
 		local ok, result = xpcall(opts.is_current, debug.traceback)
 		return ok == true and result == true
 	end
-	local strict_lifecycle = type(opts.is_current) == "function"
+	local strict_lifecycle = type(opts.is_current) == "function" or contextual_title
 	local function abandon_required_mutation()
 		if caller_owns_webview ~= true then
 			abandon_factory_candidate(wv, "required mutation")
@@ -973,5 +1078,7 @@ function M.window_chrome_steps(wv, opts)
 		{ name = "level",       apply = function() wv:level(level) end },
 	}
 end
+
+PresentationShowApi = M.show_webview
 
 return M

@@ -633,8 +633,11 @@ _HTR_Operation() {
 }
 
 _HTR_WalLifecycle(Refuse) {
-	Fixture := _ScopeOwnerFixture()
-	Assert(FSWriteDurable(Fixture.path, _HTR_Source()))
+	; The actual journal classifies the same intended current source before boot.
+	OriginalBody := _HTR_Source()
+	Fixture := _ScopeOwnerFixture(OriginalBody)
+	Source := Fixture.source
+	Assert(FSWriteDurable(Fixture.path, Source))
 	Bundle := 0, OnSuccess := 0, OnRefused := 0, Calls := 0
 	Launch(Success, Borrowed, Refused) {
 		Bundle := Borrowed, OnSuccess := Success, OnRefused := Refused
@@ -643,6 +646,8 @@ _HTR_WalLifecycle(Refuse) {
 	}
 	Fixture.options["reload"] := Launch
 	try {
+		AssertEqual(OriginalBody, SubStr(Source, InStr(Source, "`n") + 1),
+			"current positive fixture metadata preserves every original record/foreign byte")
 		Receipt := HotstringsTerminatorRecordsEdit(_HTR_Operation(), Fixture.options)
 		AssertEqual(1, Calls, "actual durable publication must reach the reload admission")
 		AssertEqual("pending", Receipt["status"], "durable write is not a runtime acknowledgement")
@@ -651,11 +656,11 @@ _HTR_WalLifecycle(Refuse) {
 		if Refuse {
 			OnRefused.Call("controlled refusal")
 			AssertEqual("refused", Receipt["status"])
-			AssertEqual(_HTR_Source(), FSReadUtf8Exact(Fixture.path), "the genuine rollback must restore all original bytes")
+			AssertEqual(Source, FSReadUtf8Exact(Fixture.path), "the genuine rollback must restore all original bytes")
 			Receipt := HotstringsTerminatorRecordsEdit(_HTR_Operation(), Fixture.options)
 			AssertEqual("pending", Receipt["status"], "settled refusal permits one new admitted retry")
 			OnRefused.Call("controlled second refusal")
-			AssertEqual(_HTR_Source(), FSReadUtf8Exact(Fixture.path))
+			AssertEqual(Source, FSReadUtf8Exact(Fixture.path))
 		} else {
 			OnSuccess.Call()
 			AssertEqual("committed", Receipt["status"], "only the actual replacement callback acknowledges runtime completion")
@@ -682,26 +687,39 @@ _HTR_ForeignSource() {
 		}
 		return Digest
 	}
-	Port["hash"] := Hash
-	Fixture.options["port"] := Port
 	Bundle := 0, OnRefused := 0, Launches := 0
 	Launch(Success, Borrowed, Refused) {
 		Launches += 1, Bundle := Borrowed, OnRefused := Refused
 		return true
 	}
-	Fixture.options["reload"] := Launch
+	TeardownPrimary := false
 	try {
+		Port["hash"] := Hash
+		Fixture.options["port"] := Port
+		Fixture.options["reload"] := Launch
 		Receipt := HotstringsTerminatorRecordsEdit(_HTR_Operation(), Fixture.options)
 		AssertEqual(0, Launches, "a stale exact-source intent must refuse before reload admission")
 		Assert(Changed, "the actual native hash boundary must exercise the source race")
 		AssertEqual("refused", Receipt["status"])
 		AssertEqual(Foreign, FSReadUtf8Exact(Fixture.path), "a foreign source wins before any replacement")
+	} catch as Failure {
+		TeardownPrimary := Failure
+		throw Failure
 	} finally {
-		if HasMethod(OnRefused, "Call")
-			OnRefused.Call("controlled cleanup")
-		if Bundle is Object
-			_ConfigWriteTerminalRelease(Bundle)
-		_ScopeOwnerCleanup(Fixture)
+		; The canonical callback is restored before any later cleanup can throw.
+		CleanupFailure := false
+		for Operation in [() => (Port["hash"] := NativeHash),
+			() => HasMethod(OnRefused, "Call") ? OnRefused.Call("controlled cleanup") : 0,
+			() => Bundle is Object ? _ConfigWriteTerminalRelease(Bundle) : 0,
+			() => _ScopeOwnerCleanup(Fixture)] {
+			try Operation.Call()
+			catch as Failure {
+				if !CleanupFailure
+					CleanupFailure := Failure
+			}
+		}
+		if !TeardownPrimary && CleanupFailure
+			throw CleanupFailure
 	}
 }
 Test("terminator-records: an independently changed source refuses the actual conditional WAL candidate", _HTR_ForeignSource)
