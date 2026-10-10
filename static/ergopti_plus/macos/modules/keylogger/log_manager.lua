@@ -1791,8 +1791,7 @@ local function _init(core_state)
 		if not _start_ingest_timer() then error("ingest timer acquisition failed") end
 	end
 
-	Logger.success(LOG, "Log manager initialized (device %s, name %s).",
-		_device_id:sub(1, 8) .. "…", _device_obj.name)
+	Logger.success(LOG, "Log manager initialized.")
 	return true
 end
 
