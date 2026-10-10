@@ -9211,19 +9211,33 @@ Carbon classification, physical keys or installed release qualification.
   Edit/Thread local rename preserves strict warnings, eight closed facts,
   process/HWND retirement and deadlines. The old full-suite desktop wrapper
   still rejects stdout/canonical inequality; its six AltGr cases are unrun.
-  The nine-path canonical runner remains unadopted: trial37634747571 at
+  The historical nine-path proposal was not adopted at trial37634747571 at
   CI224ddc787f26e318c10033a6f808822e6ae3263d passes Core but fails two new
   native controls (three clean-graph warnings; entry-owner census). Its
   parse-only child reset the inherited parent TAP file. Stdout records
   10,225 passes/2 failures, but the strict canonical manifest refuses. The
-  eleven desktop cases and downstream delivery gates are unrun. Repair this
-  fixture ownership and diagnose warnings without filtering or suppression.
+  eleven desktop cases and downstream delivery gates were unrun in that trial.
+  Current source at7299783b already enrolls the five console and six AltGr cases
+  in serialized desktop cohorts, retaining strict warnings, exact canonical
+  stdout, empty stderr, native exit and child retirement. This source enrollment
+  does not establish current native success; qualify their exact receiving
+  receipts and diagnose any remaining warnings without filtering or suppression.
   Remaining software/native qualification: prove supported fresh invisible
   capture before an identity-safe separate debug GUI/title owner, qualify
   interpreted and compiled duplicate-start/Reload/retirement and final native
   panel/filter/notification delivery through three-OS package/install gates.
   Device work: actual key history, notification clicks and desktop focus only
   where hosted automation cannot observe the user's session.
+
+  Current source assessment confirms a software boundary before device work:
+  stock AutoHotkey2.0.26 ListVars and no-argument KeyHistory refresh through
+  ShowMainWindow and foreground activation; capacity-only KeyHistory and cached
+  Edit reads do not supply fresh hidden snapshots. DBGp can read current variables
+  in supported debugger builds, but supplies neither formatted ListVars nor
+  KeyHistory snapshots; attaching also interrupts execution. Compiled debugger
+  availability depends on the exact build. No supported fresh hidden acquisition
+  has been qualified. Keep A_ScriptHwnd's Reload/SingleInstance identity intact
+  and establish that acquisition before adding a separate branded debug GUI.
 
   The Linux HealthCheck copy fixture now uses the genuine exported snapshot
   document before entering the clipboard port. All14 original cases remain;
