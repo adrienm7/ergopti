@@ -354,6 +354,93 @@ jobs:
           if-no-files-found: warn
           retention-days: 7
           path: ${{ env.ERGOPTI_OLLAMA_BUILD_ROOT }}/listener-xctest.log
+      - name: Qualify actual selected number-row Carbon XCTest controls
+        if: ${{ !cancelled() }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          evidence="$RUNNER_TEMP/number-row-source-evidence"
+          mkdir "$evidence"
+          transcript="$evidence/number-row-xctest.log"
+          source="static/ergopti_plus/macos/launcher/Tests/ErgoptiPlusTests/NumberRowSourceProbeTests.swift"
+          producer="static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/NumberRowSourceProbe.swift"
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          git show "$GITHUB_SHA:$source" | cmp - "$source"
+          git show "$GITHUB_SHA:$producer" | cmp - "$producer"
+          cp "$source" "$evidence/NumberRowSourceProbeTests.swift"
+          cp "$producer" "$evidence/NumberRowSourceProbe.swift"
+          printf '%s\n' "$GITHUB_SHA" > "$evidence/tested-sha.txt"
+          export ERGOPTI_TIS_EVIDENCE_DIR="$(mktemp -d "$evidence/tis-session.XXXXXX")"
+          export ERGOPTI_TIS_EVIDENCE_SESSION="$(node -e 'process.stdout.write(require("node:crypto").randomBytes(32).toString("hex"))')"
+          set +e
+          script -q /dev/null swift test --package-path static/ergopti_plus/macos/launcher \
+            --scratch-path "$ERGOPTI_OLLAMA_BUILD_ROOT/swift" \
+            --filter '(^|[.])NumberRowSourceProbeTests([/.]|$)' 2>&1 | tee "$transcript"
+          number_row_statuses=("${PIPESTATUS[@]}")
+          set -e
+          test "${#number_row_statuses[@]}" -eq 2
+          set +e
+          python3 tools/diagnostics/keyboard_geometry_xctest_receipt.py \
+            --class NumberRowSourceProbeTests --source "$evidence/NumberRowSourceProbeTests.swift" \
+            --log "$transcript" --receipt "$evidence/number-row-verdict.json" \
+            --test-exit "${number_row_statuses[0]}" --capture-exit "${number_row_statuses[1]}"
+          number_row_receipt_status=$?
+          node - "$evidence/number-row-verdict.json" "$ERGOPTI_TIS_EVIDENCE_DIR" "$ERGOPTI_TIS_EVIDENCE_SESSION" <<'NODE'
+          const fs = require('node:fs');
+          const transport = require('./tools/diagnostics/tis_evidence_transport.cjs');
+          const receipt = JSON.parse(fs.readFileSync(process.argv[2], 'utf8'));
+          if (!receipt.passed || receipt.scope !== 'NumberRowSourceProbeTests' || receipt.expected_count !== 12 || receipt.received_count !== 12) throw new Error('exact twelve-case number-row receiving refused');
+          const session = transport.validate(process.argv[3], process.argv[4]);
+          const expectedSources = {
+            testActualSelectedUSPlainAndShiftUseUnchangedIndependentExpectations: 'com.apple.keylayout.US',
+            testActualFrenchDeadStateDoesNotLeakIntoNextPositionOrSuccessor: 'com.apple.keylayout.French',
+            testFrozenNativeLayoutIsAlignedDetachedFromControlledMutableStorage: 'com.apple.keylayout.US',
+            testActualUSCapsMaskChangesAnIndependentLetterExpectation: 'com.apple.keylayout.US',
+            testActualCarbonCapsDomainsPreserveNativeModifierAndDeadStateABI: 'com.apple.keylayout.French',
+            testActualLayoutRefusesChangedSourceTypeDataOrUnavailableFinalRead: 'com.apple.keylayout.US',
+            testActualFrozenProbeRefusesChangedFinalBytesOnSamePrivateDataObject: 'com.apple.keylayout.US'
+          };
+          const expected = Object.keys(expectedSources).sort();
+          const observed = session.receipts.map((row) => {
+            if (row.test.state !== 'present' || row.omittedEvents !== 0) throw new Error('native diagnostic identity refused');
+            const match = /^(?:(?:\w+\.)?NumberRowSourceProbeTests\.|-\[(?:\w+\.)?NumberRowSourceProbeTests )(test\w+)(?:\])?:(com\.apple\.keylayout\.(?:US|French))$/.exec(row.test.value);
+            if (!match || !Object.hasOwn(expectedSources, match[1]) || match[2] !== expectedSources[match[1]]) throw new Error('foreign native method fixture');
+            const captures = row.events.filter((event) => event.phase === 'original.capture');
+            if (captures.length !== 1 || captures[0].original?.id?.state !== 'present' || typeof captures[0].original.id.value !== 'string' || captures[0].original.id.value.length === 0) throw new Error('captured original source unavailable');
+            const originalID = captures[0].original.id.value;
+            for (const phase of ['restore.inner.after', 'restore.outer.after']) {
+              const events = row.events.filter((event) => event.phase === phase);
+              if (events.length !== 1 || events[0].status !== 0) throw new Error('native source restoration refused');
+              if (events[0].original?.id?.state !== 'present' || events[0].original.id.value !== originalID || events[0].current?.id?.state !== 'present' || events[0].current.id.value !== originalID) throw new Error('sampled selected source restoration refused');
+            }
+            return match[1];
+          }).sort();
+          if (!session.complete || JSON.stringify(observed) !== JSON.stringify(expected)) throw new Error('exact seven native diagnostic closures refused');
+          NODE
+          number_row_tis_status=$?
+          set -e
+          cmp "$source" "$evidence/NumberRowSourceProbeTests.swift"
+          cmp "$producer" "$evidence/NumberRowSourceProbe.swift"
+          test "$number_row_receipt_status" -eq 0
+          test "$number_row_tis_status" -eq 0
+        timeout-minutes: 10
+      - name: Retain selected number-row Carbon XCTest diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: number-row-carbon-${{ matrix.architecture }}-${{ github.run_id }}-${{ github.run_attempt }}
+          if-no-files-found: error
+          retention-days: 7
+          path: |
+            ${{ runner.temp }}/number-row-source-evidence/number-row-xctest.log
+            ${{ runner.temp }}/number-row-source-evidence/number-row-verdict.json
+            ${{ runner.temp }}/number-row-source-evidence/tested-sha.txt
+            ${{ runner.temp }}/number-row-source-evidence/NumberRowSourceProbe.swift
+            ${{ runner.temp }}/number-row-source-evidence/NumberRowSourceProbeTests.swift
+            ${{ runner.temp }}/number-row-source-evidence/tis-session.*/start.json
+            ${{ runner.temp }}/number-row-source-evidence/tis-session.*/manifest.json
+            ${{ runner.temp }}/number-row-source-evidence/tis-session.*/record-*.dat
+            ${{ runner.temp }}/number-row-source-evidence/tis-session.*/refusal.json
       - name: Qualify actual native PAC source ownership XCTest controls
         if: ${{ !cancelled() }}
         shell: bash

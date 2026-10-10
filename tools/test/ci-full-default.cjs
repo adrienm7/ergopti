@@ -58,6 +58,18 @@ const JOBS = [
 const FULL_STEPS = [
 	[
 		'.github/workflows/ci-macos.yml',
+		'managed-ollama-native',
+		'Qualify actual selected number-row Carbon XCTest controls',
+		'${{ !cancelled() }}'
+	],
+	[
+		'.github/workflows/ci-macos.yml',
+		'managed-ollama-native',
+		'Retain selected number-row Carbon XCTest diagnostics',
+		'always()'
+	],
+	[
+		'.github/workflows/ci-macos.yml',
 		'item36-native',
 		'Observe the actual no-prompt SDK permission API independently',
 		'${{ !cancelled() }}'

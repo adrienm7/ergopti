@@ -9518,9 +9518,20 @@ Carbon classification, physical keys or installed release qualification.
   The corrected fixture uses an owned representable directory and keeps the
   parser, C source and every expectation unchanged. Darwin and home-domain
   lookup are controlled in this replay; actual macOS SDK/C/CLI execution remains
-  unrun. The four-line launcher dispatch and shared workflow enrollment remain
-  inactive pending their current owners' custody. These preparations and both
-  failed/successful receipts are recoverable from the native-preparations handover.
+  unrun. The four-line launcher dispatch and shared workflow enrollment were
+  inactive in that archived preparation. Its sources and failed/successful
+  receipts remain recoverable from the native-preparations handover.
+
+  Current launcher sources now route the read-only number-row role before
+  preferences or AppKit initialization. CI requires all twelve native methods
+  and seven exact US/French source/restoration receipts, with actual process
+  and capture status, original source copies and mandatory retained diagnostics.
+  A real guard-enrollment failure was corrected through the existing explicit
+  selector chain: all 79 prior controls and blanket foreign-exclusion checks
+  remain, with 30 additional controls. The three serial portable targets pass
+  (193 default controls, the complete wiring guard and 15 focused controls).
+  Actual SDK, launcher CLI and installed receiving are still unrun; these
+  read-only prerequisites do not enable forced digits/symbols or input delivery.
 
   Remaining software: implement native-HKL forced-symbol and Linux/macOS forced
   digit/symbol owners with joint current input/source/modifier/output provenance;
