@@ -27,6 +27,24 @@
 			"sha256": "691e966ea11fcbc07cb19acaf5599f8e3dfd9eb34244794deef2f95ae441efdb",
 			"bytes": 207330,
 			"regular_members": 101
+		},
+		"tls-code-inverse-receiving.tar.gz": {
+			"sha256": "8bea7e0664946d76abee7a8b1f280f05c286a8ee36b8836eb8d1a85796935e63",
+			"bytes": 99768,
+			"regular_members": 71,
+			"directories": 34
+		},
+		"tls-code-full52-receiving.tar.gz": {
+			"sha256": "0e42c6eab3d3f77a85447bd37f7cfbb9db50e08766e8abc1616fd1a62a41f27a",
+			"bytes": 131536,
+			"regular_members": 33,
+			"directories": 32
+		},
+		"tls-leaf-live3-receiving.tar.gz": {
+			"sha256": "3cdc81fbcceae7a5908e114848b23adc3092a2ff5721a28b833f5f946fe35cd8",
+			"bytes": 78842,
+			"regular_members": 32,
+			"directories": 35
 		}
 	},
 	"source_execution_during_snapshot": 0,
@@ -36,5 +54,22 @@
 		"Never apply a saved patch before checking actual preimages and ownership",
 		"Superseded revisions are preserved as evidence only",
 		"An archived patch is not integrated or native-qualified functionality"
-	]
+	],
+	"native_tls_continuation": {
+		"dev_base": "01955e89affc3674ff44e72b78db936a2a48d4fd",
+		"sources": {
+			"static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/ManagedHTTPWorker.swift": "761b1a636bfc69d987545a30502db5a7c549e76c9b674630fc27bb4b157febc7",
+			"static/ergopti_plus/macos/tests/support/native_http_wire_fixture.py": "b75587753ccaea788cbc82e4e3b7bf2d27fd0eb699353ea9f71fb98ec65a08e0",
+			"tools/test/macos_native_http_receiving_facts_test.py": "7122e745d7ca4ad815ab9107dfaa4f59299934c761502c7d166f9b23ed7874c7"
+		},
+		"native_compilation_and_tls_cause": "UNQUALIFIED; next candidate CI required",
+		"original_receipt_sha256": {
+			"tls-inverse-source-review.json": "b9eaa5623ff3497e2968f388388a048fc675951e494214a62f2eb3e4e28ab38d",
+			"tls-full52-source-review.json": "aebb6133710199864e448de1ebbf51b2b67dc2e70fed46b09a879a8af43d33b5",
+			"tls-leaf-source-review.json": "1c4b4ab5682c362268e0378192ac45ee3a49a65448324f93ecf252857d0ccd36",
+			"integrated-01955-ci-terminal.json": "f89e6bfeea44e87465bb5cc82a1773b34bfa6f62162ef15e7daba18bd2df57ac"
+		},
+		"original_five_archive_source_review": "Historical source-review.json binds the preceding manifest, not this continuation",
+		"source_execution_during_snapshot": 0
+	}
 }

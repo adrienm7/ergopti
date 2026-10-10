@@ -1,0 +1,130 @@
+{
+	"schema": 1,
+	"result": "ACK_BOUNDED_SOURCE_AND_SAVED_ORIGINAL_GUARD_RECEIVING",
+	"packet": "/tmp/group6-http-debug-inverse-enrollment-ahpgiiv8",
+	"source_packet_sha256": "ceec79b1d92e163d868a7b4e37c5679dc98a720700288f64ef1d93b8751cba68",
+	"enrollment_patch_sha256": "5252d09178ae1d5d4075a19d595c1422394a1b6b59a6652434ac3824731add12",
+	"enrollment_inverse_sha256": "fb05b7d8dc15eca924106dd226da5ead3ef2caf9f9047f4f1c92e2733ae3d68c",
+	"candidate_test_sha256": "7122e745d7ca4ad815ab9107dfaa4f59299934c761502c7d166f9b23ed7874c7",
+	"original_diagnostic_source_ACK": "/tmp/group6-review-resume-20261010/HTTP-DEBUG-CERTIFICATE-CODE-PREPARATORY-SOURCE-ACK.json",
+	"source_identity_bindings_verified": 56,
+	"actual_receipt_hash_size_refs_verified": 53,
+	"actual_receipt_sha256": "3fac14b88988c6ad33995ad0d19174ab16869953ad4b4f8214464124c9830f2c",
+	"actual_results_sha256": "ba8dc60ff4bb290e1d3234b703d8c852e05bcb7de47f9895f618f9722bd0d063",
+	"all_397_assertion_lines_original_cases_and_whole_inverse_exact": true,
+	"historical_sha_unchanged": "68659ddec98c9a427244b315b69c17750b743eab2cdd3688308690a66d1c6e98",
+	"complete_literal_function_pair_native_exact": true,
+	"saved_original_nine_controls": [
+		{
+			"label": "before",
+			"pid": 679703,
+			"status": 0,
+			"pass": 9,
+			"fail": 0,
+			"errors": 0,
+			"skip": 0,
+			"cancelled": false,
+			"retained": false,
+			"closed_sha256": "836b5b91128815c7a66d668f9dda3284aaae6ee90fa1e207371ba5e3506537a1"
+		},
+		{
+			"label": "unadmitted",
+			"pid": 679713,
+			"status": 1,
+			"pass": 5,
+			"fail": 0,
+			"errors": 4,
+			"skip": 0,
+			"cancelled": false,
+			"retained": false,
+			"closed_sha256": "0944bc7badc0af6ec4f451a61af7eaf8b79522872627c7bb7e73b479a72b38f1"
+		},
+		{
+			"label": "admitted",
+			"pid": 679723,
+			"status": 0,
+			"pass": 9,
+			"fail": 0,
+			"errors": 0,
+			"skip": 0,
+			"cancelled": false,
+			"retained": false,
+			"closed_sha256": "f7a1c9dadc56e68f9536e0d977c69e867412ee4f53be4facb2fdc97cd6f884e1"
+		},
+		{
+			"label": "inverse",
+			"pid": 679729,
+			"status": 0,
+			"pass": 9,
+			"fail": 0,
+			"errors": 0,
+			"skip": 0,
+			"cancelled": false,
+			"retained": false,
+			"closed_sha256": "956abee03ea3b6a72709b397f6d12c72e90d3383f7cee70284aa3ffc38f465f6"
+		},
+		{
+			"label": "altered-return",
+			"pid": 679748,
+			"status": 1,
+			"pass": 5,
+			"fail": 0,
+			"errors": 4,
+			"skip": 0,
+			"cancelled": false,
+			"retained": false,
+			"closed_sha256": "186865db0bd4538e50ca00b426287fef9ad006879a0c2ca3df54d512e742354d"
+		},
+		{
+			"label": "raw-error-echo",
+			"pid": 679786,
+			"status": 1,
+			"pass": 5,
+			"fail": 0,
+			"errors": 4,
+			"skip": 0,
+			"cancelled": false,
+			"retained": false,
+			"closed_sha256": "a55193eaaa2c2188f72630f69f4409979b99808f6e6e3ffb7b020caabe41e1a4"
+		},
+		{
+			"label": "duplicate-function",
+			"pid": 679804,
+			"status": 1,
+			"pass": 5,
+			"fail": 0,
+			"errors": 4,
+			"skip": 0,
+			"cancelled": false,
+			"retained": false,
+			"closed_sha256": "9e4aed0b9ff70394d10f1c9b34827592cf2fd596ab0985816c201dec61410e62"
+		},
+		{
+			"label": "partial-diagnostic",
+			"pid": 679829,
+			"status": 1,
+			"pass": 5,
+			"fail": 0,
+			"errors": 4,
+			"skip": 0,
+			"cancelled": false,
+			"retained": false,
+			"closed_sha256": "21897d950a9f05bab70e261c642183ac6dc23d505a1a827cf2180ce6a68ec5b3"
+		}
+	],
+	"blocking_source_defects": [],
+	"adoption_disposition": "Source-safe paired native diagnostic and exact inverse enrollment after root formatting rebind and selected verification. No native cause or compiled release qualification.",
+	"findings": [
+		"New helper accepts only one exact original or complete reviewed diagnostic managedHTTPFailure function; duplicate/partial/hybrid/raw-error/changed-return refuse. Complete exact inverse precedes original PAC acquisition/ownership inverse and unchanged whole historical SHA.",
+		"Removing literal/helper block and one projection call reconstructs whole original test bytes. All397 assertion lines and original method signatures retained; no expected SHA or assertion weakening. Complete literal original/diagnostic functions independently match native source images.",
+		"Saved before/admitted/inverse9PASS; unadmitted and four causal mutants5PASS/4ERROR in exactly original tests10/41/44/45. ERROR means explicit source-guard refusal, not assertion/native failure. All8 unique command phase PID/state/status closures hold no cancellation/debt.",
+		"run-receiving sorts summary.error_names in memory for exact expected inventory classification; raw summary files preserve unittest order. All other fields are identical and error identity/multiplicity are exact. No results/counts/failure suppression."
+	],
+	"limits": [
+		"Reviewer target imports/parsers/tests/native/JS/formatter executions and main/index/ref/CI mutations0.",
+		"Preliminary attempt refused initial source identity before phase acquisition; not test credit. BigInt.asUintN(64,s.ino) corrects signed Node stat versus unsigned Python/kernel inode representation only. Every dev/ino/uid/mode/size/SHA remains fenced; no ABA guarantee or ignored source replacement.",
+		"Frozen SOURCE-PACKET pending fields describe pre-execution provenance; additive actual receipt records the later execution.",
+		"Root formatting/source rebind/full selected verification required before delivery. Actual Swift DEBUG compile/native14/SDK41 and compiled release no-emission verification remain UNRUN; textual release equivalence is not binary proof.",
+		"Negative certificate cases also emit; positive attribution needs exact original test envelope. Direct custom-anchor evaluator may bypass classifier, so no code is not evidence against certificate failure. No trust fix/native serving/full migration or whole-suite green credit."
+	]
+}
