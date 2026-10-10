@@ -6044,6 +6044,18 @@ cancellation owners are unchanged. Items 54 and 81 remain partial.
       open. macOS system trust and explicit proxy relays are integrated, while
       opaque-client full-URL PAC/WPAD/fallback/redirect routing remains CODE.
 
+2026-10-10 native-wire diagnostic framing continuation. The fixture now writes
+its fixed restoration-failure diagnostic to stderr, preserving the single
+structured stdout result. All52 portable receiving tests pass; the new actual
+producer test fails on the original method in both subcases. Every391 original
+assertion line remains intact. This repairs the secondary malformed JSON seen
+in manual38016257870; it does not settle native trust-restoration debt or fix
+the primary trust setup/routing failure. In that exact d8dbcea2 run, both Python
+trust-positive tests timed out in the original fifteen-second trust command;
+the Swift WPAD positives acknowledged trust setup but returned74 without HTTP
+headers/body/origin. Their causes are not equated. Genuine native trust, PAC,
+WPAD and redirect qualification remains required; item62 is incomplete.
+
 2026-10-10 selected-release network continuation. The actual Lua caller now
 binds its selected archive to a typed native download request. Without an
 explicit HTTPS/all-proxy route, the staging shell uses the admitted bundled
