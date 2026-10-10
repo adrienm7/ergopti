@@ -6449,6 +6449,17 @@ assertion remains; the shared boundary caller passes its complete 28-case
 Mac module. Original parity assertions and hosted qualification remain
 mandatory. This does not close 54 or 16/38.
 
+The actual Windows candidate 38033725841 executes 1,954 of 10,962 assertions:
+1,952 pass, two menu fixture failures and 9,008 unexecuted before the
+unchanged 22-minute watchdog. All eleven former configuration failures now
+pass. The two fixture repairs retain 75 original assertions and 11
+registrations: source traversal follows the real feature-only staging helper,
+and the refused language publication restores its observer before querying the
+retained native child. Encoding passes for all 1,894 AHK sources. Corrected
+native execution, all nine acquired-read temporal controls and the complete
+startup/E2E/package/install lanes remain pending; this does not close item 54
+or 16/38.
+
 - [ ] **62.** Downloads on managed company networks: system trust and
       system proxy for every download child (Ollama installation/server/pull,
       updater/rollback and remote AI), with translated certificate/proxy/blocked/
@@ -8574,6 +8585,13 @@ caption corpus and complete 62-case host preserve original behavior on both
 Lua ABIs; the predecessor fails 28 genuine new declaration/custody controls.
 The residual sites still require source ownership assessment and native
 acceptance; physical tests alone cannot close 81.
+
+The two Windows menu fixture corrections retain every original assertion and
+native owner. The preceding actual 1,954/10,962 execution remains deliberately
+partial: two failures and 9,008 unexecuted, with unchanged watchdog. Native
+validation of the corrected source and installed menu delivery remain
+required; these fixture repairs do not reduce or waive the genuine menu-source
+census.
 
 - [~] **88.** **Partial: native prediction tooltip appearance.** Shared
   llm-line-style policy and the unchanged independent line corpus retain grey
