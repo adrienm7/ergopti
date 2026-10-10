@@ -396,7 +396,15 @@ function assertNativeFileFilterBehavior(source) {
 		'ControlChooseIndex(1, ObserverType)',
 		'((A_TickCount - ObserverStarted) & 0xFFFFFFFF) >= ObserverWaitMs',
 		'txt-visible|bin-hidden|all-files-bin-visible|restored-txt-visible|restored-bin-hidden|separate-client|owner-fenced',
-		'FileAppend(ObserverFailure.Message, A_Args[1] . ".failure", "UTF-8-RAW")'
+		'ObserverErrorText := ObserverFailure.Message',
+		'if ObserverFailure is OSError {',
+		'ObserverErrorPhase := "not-started"',
+		'SubStr(FileRead(A_Args[1] . ".phase", "UTF-8"), 1, 128)',
+		'} catch as PhaseFailure {',
+		'PhaseFailure is OSError ? PhaseFailure.Number : Type(PhaseFailure)',
+		'SubStr(ObserverFailure.What, 1, 128)',
+		'ObserverFailure.Line',
+		'FileAppend(ObserverErrorText, A_Args[1] . ".failure", "UTF-8-RAW")'
 	])
 		assert.ok(observer.includes(invariant), `the separate native client retains ${invariant}`);
 	for (const phase of [
@@ -527,7 +535,10 @@ const nativeBehaviorMutations = [
 		'ObserverWaitMs := Integer(ObserverArgs[9])',
 		'ObserverWaitMs := 8000'
 	),
-	nativePolicySource.replace('Test("native file filter:', 'DisabledCase("native file filter:'),
+	nativePolicySource.replace(
+		/^Test\("native file filter:[^"\n]+\(shared-window-titles\)"[,]\s*_NDT_ActualNativeFileFilterBehavior\)/m,
+		(registration) => registration.replace(/^Test\(/, 'DisabledCase(')
+	),
 	nativePolicySource.replace('Name: OwnerName}', 'Name: OwnerName, mm: "SubString"}'),
 	nativePolicySource.replace(
 		'ControlChooseIndex(2, ObserverType)',
@@ -608,6 +619,30 @@ for (const [before, after, guard] of [
 	);
 }
 console.log('Native independent file baseline mutations: 7/7 passed.');
+
+// Each diagnostic withdrawal must refuse the actual generated observer source;
+// the original semantic message is retained before optional native facts.
+const nativeFailureDiagnosticMutations = [
+	['ObserverErrorText := ObserverFailure.Message', 'ObserverErrorText := ""'],
+	['if ObserverFailure is OSError {', 'if false {'],
+	['SubStr(FileRead(A_Args[1] . ".phase", "UTF-8"), 1, 128)', '"phase omitted"'],
+	['} catch as PhaseFailure {', '} catch {'],
+	['PhaseFailure is OSError ? PhaseFailure.Number : Type(PhaseFailure)', '0'],
+	['SubStr(ObserverFailure.What, 1, 128)', '"what omitted"'],
+	['ObserverFailure.Line', '0'],
+	[
+		'FileAppend(ObserverErrorText, A_Args[1] . ".failure", "UTF-8-RAW")',
+		'FileAppend(ObserverFailure.Message, A_Args[1] . ".failure", "UTF-8-RAW")'
+	]
+];
+for (const [before, after] of nativeFailureDiagnosticMutations) {
+	const mutant = nativePolicySource.replace(before, after);
+	assert.notEqual(mutant, nativePolicySource, 'Each diagnostic withdrawal targets actual source.');
+	assert.throws(() => assertNativeFileFilterBehavior(mutant), assert.AssertionError);
+}
+console.log(
+	`Native failure diagnostic mutations: ${nativeFailureDiagnosticMutations.length}/${nativeFailureDiagnosticMutations.length} passed.`
+);
 
 const nativePolicyMutations = [
 	nativePolicySource.replace(
