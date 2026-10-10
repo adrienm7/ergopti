@@ -10795,6 +10795,31 @@ repository, event, ref, channel or expired context. Its exact authorized
 boundary is recorded in
 `.github/ci/stable_v101_macos_native_qualification_exception.json`.
 
+[CI 38080535633](https://github.com/adrienm7/ergopti/actions/runs/38080535633)
+receives `fbc70b60da7ec545cdfc28c88f90216dc6050829`, including `dev` through
+`9e370a3926f23ff09e0a272fae8fa841afdb4d0b`. Linux units and the native Apple
+Silicon MLX installation pass. Core completes 408 of 409 checks; its remaining
+release fixture inherits the hosted main release's environment. Native Ollama
+preparation separately refuses a planned-release catalogue paired with a local
+fixture URL. Its trust restoration also times out, and that native cause remains
+unproved. Neither failure is covered by the three approved scopes. No v1.0.1
+release has been published at this checkpoint.
+
+- [ ] Measure and reduce repeated source-authority validation in the Windows
+      menu transaction without weakening ownership checks. The current capacity
+      fixture took 111,742 ms for apply and 96,690 ms for refusal, while its 32
+      direct guard calls took 386 ms. Source review finds full-cohort validation
+      repeated around each callback; it does not establish an exclusive I/O or
+      CPU cause. The finite suite watchdog now budgets the complete 11,197-case
+      corpus, with a 55-minute cap and a 60-minute job bound. Canonical watchdog
+      receiving passes two cases; this harness change does not improve product
+      latency or qualify the full Windows suite.
+
+The maintainer has since confirmed that one enable click and one disable click
+both update the live Windows AI checkmark after five-second waits. This is useful
+manual evidence for the resident driver; it does not establish an instantaneous
+response or replace the exact release-source checks.
+
 An earlier source gate completed with formatting and encoding passing and 395 of 407
 JavaScript checks passing. The twelve remaining host/fixture failures remain
 open. The following canonical Windows run reached its existing 1,320,000 ms
