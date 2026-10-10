@@ -22,7 +22,7 @@ private final class SuspendedImageNativeSession {
 	var decoder = OwnedProgramLineDecoder(maximumBytes: 1024)
 	var inputClosed = false
 
-	init(launcher: URL, inodeDelta: UInt64 = 0, prefillSession: Bool = false) throws {
+	init(launcher: URL, inodeDelta: UInt64 = 0, prefillSession: Bool = false, listenerEvent: Bool = false) throws {
 		let temporary = FileManager.default.temporaryDirectory.resolvingSymlinksInPath()
 		directory = temporary.appendingPathComponent("ergopti-image-\(UUID().uuidString)")
 		try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: false,
@@ -66,7 +66,7 @@ private final class SuspendedImageNativeSession {
 			throw NSError(domain: NSPOSIXErrorDomain, code: Int(errno))
 		}
 		let outgoingSHA = SHA256.hash(data: try Data(contentsOf: worker)).map { String(format: "%02x", $0) }.joined()
-		let request: [String: Any] = [
+		var request: [String: Any] = [
 			"version": 1, "executable": alias.path, "arguments": ["serve"],
 			"device": String(UInt64(UInt32(bitPattern: image.st_dev))), "inode": String(UInt64(image.st_ino) + inodeDelta),
 			"session_path": session.path, "remaining_ms": 10_000, "home": directory.path,
@@ -75,6 +75,7 @@ private final class SuspendedImageNativeSession {
 			"outgoing_worker": worker.path, "outgoing_device": String(UInt64(UInt32(bitPattern: outgoing.st_dev))),
 			"outgoing_inode": String(UInt64(outgoing.st_ino)), "outgoing_sha256": outgoingSHA,
 		]
+		if listenerEvent { request["listener_event"] = true }
 		process.executableURL = launcher
 		process.arguments = [OwnedSuspendedImageGuardian.flag]
 		process.standardInput = input; process.standardOutput = output; process.standardError = error
@@ -210,4 +211,43 @@ final class OwnedSuspendedImageTests: XCTestCase {
 		try fixture.finish()
 		XCTAssertEqual(fixture.markers, ["V1 REFUSED \(ESTALE)"])
 	}
+
+	func testOptionalListenerEventMissingConnectionNeverClaimsBoundOrReady() throws {
+		let fixture = try SuspendedImageNativeSession(launcher: launcher(), listenerEvent: true); defer { fixture.cleanup() }
+		try fixture.wait { fixture.markers.contains(where: { $0.hasPrefix("V1 IMAGE_READY ") }) }
+		try fixture.sessionWriter.write(contentsOf: Data("POST_IMAGE_PROOF_FIXTURE_KEY".utf8)); try fixture.sessionWriter.synchronize()
+		try fixture.send("ACTIVATE"); try fixture.finish()
+		XCTAssertTrue(fixture.markers.contains("V1 ACTIVE"))
+		XCTAssertFalse(fixture.markers.contains(where: { $0.hasPrefix("V1 LISTENER_BOUND ") || $0.hasPrefix("V1 READY") }))
+		XCTAssertEqual(fixture.markers.last, "V1 RETIRED 0 1 1 0 0 0 0")
+	}
+	func testOptionalListenerEventCancelledBeforeActivationClosesAllOriginalOwners() throws {
+		let fixture = try SuspendedImageNativeSession(launcher: launcher(), listenerEvent: true); defer { fixture.cleanup() }
+		try fixture.wait { fixture.markers.contains(where: { $0.hasPrefix("V1 IMAGE_READY ") }) }
+		try fixture.send("CANCEL"); try fixture.finish()
+		XCTAssertFalse(fixture.markers.contains("V1 ACTIVE"))
+		XCTAssertFalse(fixture.markers.contains(where: { $0.hasPrefix("V1 LISTENER_BOUND ") }))
+		XCTAssertEqual(fixture.markers.last, "V1 RETIRED 137 1 1 0 0 0 0")
+	}
+ private func receiveNativeListenerEvent(_ mode: String) throws {
+  let process = Process(); let output = Pipe(); let error = Pipe()
+  process.executableURL = try launcher()
+  process.arguments = [OwnedListenerEventFixture.flag, mode]
+  process.environment = ["PATH": "/usr/bin:/bin", "LANG": "C", "LC_ALL": "C"]
+  process.standardInput = FileHandle.nullDevice
+  process.standardOutput = output; process.standardError = error
+  try process.run(); process.waitUntilExit()
+  XCTAssertEqual(process.terminationReason, .exit)
+  XCTAssertEqual(process.terminationStatus, 0, mode)
+  XCTAssertEqual(try output.fileHandleForReading.readToEnd(), Data("ERGOPTI_LISTENER_EVENT_CONTROL pass=1\n".utf8))
+  XCTAssertEqual(try error.fileHandleForReading.readToEnd(), Data())
+  try output.fileHandleForReading.close(); try error.fileHandleForReading.close()
+ }
+ func testActualUnixOriginalMappedPeerFrameAndEOFAdmitted() throws { try receiveNativeListenerEvent("positive") }
+ func testActualUnixForkedDescendantCannotImpersonateOriginalMappedPeer() throws { try receiveNativeListenerEvent("descendant") }
+ func testActualUnixMissingWriterEOFNeverGrantsListenerEvent() throws { try receiveNativeListenerEvent("missing-eof") }
+ func testActualUnixCancellationBeforeAcquisitionRetiresExactNativeOwner() throws { try receiveNativeListenerEvent("cancel-acquisition") }
+ func testActualUnixForeignReplacementSurvivesConditionalNamespaceCleanup() throws { try receiveNativeListenerEvent("namespace-replacement") }
+ func testActualUnixCloseEBADFRemainsRetainedAfterEveryAttempt() throws { try receiveNativeListenerEvent("uncertain-close") }
+
 }

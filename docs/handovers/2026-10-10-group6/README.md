@@ -148,8 +148,81 @@ Canonical selected format passes; the Hammerspoon stub executes18165 passes
 across1563 modules and E2E101 passes/one original skip. JS executes407 passes and
 one failure caused by the container's protected `/tmp/.git` ancestor; the exact
 unchanged uninstall fixture passes under the owned non-Git temporary root.
-The full selected gate exits1 and is not reported wholly green. Hosted macOS
-receiving of this source remains pending.
+The full selected gate exits1 and is not reported wholly green. Exact hosted
+manual38063990952 onf103568f7 is whole terminal FAIL:7 successful,5 failed and
+5 skipped jobs. Core JS408 and portable Mac18165 pass. PAC/WPAD and independent
+HTTP remain red on both architectures, and Homebrew admission remains red.
+Packaging, installation and Release are skipped. These portable outcomes do
+not establish physical task closure or finish either item.
+
+## Listener-bound event and independent native qualification
+
+The reviewed listener-event source packet has31 targets. Its manifest SHA256 is
+`e26ec763e07851c84a8bfe198db761c804260efdd382aa6edfd92a164b5ca5ae` and
+independent source ACK is
+`9bf8091c9923521d007c684095619f4abf58fdbef8f4d7c268966ba5dbf196fa`.
+Canonical preimages remain exact after the streaming correction. The late
+pinned Go hook opens a private Unix connection immediately before HTTP Serve;
+the original guardian admits the mapped peer, nonce frame and physical write
+EOF within its existing startup budget. This event does not replace accepted
+TCP/session/HMAC readiness. Peer-accessor provenance remains conditional on the
+pinned admitted program's ForkLock/CLOEXEC behavior; namespace removal remains
+conditional pathname ownership, not atomic compare-and-unlink.
+
+Actual pinned Go1.26.8 Linux receiving passes6/0 with no skips and all source
+fences exact. It does not qualify Darwin mapping or a genuine daemon. Original
+Python22/35 bodies are retained; canonical receiving passes28/37 without skips,
+with physically closed command owners and no retained phases. The original
+nonce-refusal fixture first yielded27 passes/one error when its correct refusal
+arrived during start. Source-reviewed correction retains its no-observation and
+protocol-debt assertions while covering either original start/wait boundary.
+Its source ACK is
+`fcc9218d719b68c137505a4dfabfa5da32f6e7948039a0cb73f2dcb3c14c71cd`.
+Native SDK49,
+including six genuine Darwin event controls, remains UNRUN at this source
+checkpoint. `NATIVE_PRODUCTION_QUALIFIED` remains false.
+
+The three-step native-producer diagnostic continuation has source ACK
+`78c61b4c37c8f1ab7bd2cd07ea0099d0065025d7a978a82da47c1f818a7efca9`.
+Only setup-go, genuine input acquisition and native build/admission acquire
+`!cancelled()` conditions; two strict existing wiring guards require them.
+Original command bodies, clocks, order and qualification/staging remain exact.
+Earlier PAC/HTTP failures remain fatal. Model receiving, qualified uploads and
+release admission retain their original conditions. Twenty-four added causal
+controls are enrolled in the strict wiring guards. The first selected local
+gate completed: formatting passes, portable Mac18165 passes with zero failures,
+and native Swift is explicitly deferred off macOS. JS initially passes404 of408;
+three fixture failures are diagnosed, alongside the known protected-temporary-
+root uninstall refusal. Exact reviewed fixture corrections preserve the original
+assertions, mutation identities and independent receiving vectors. The portable
+C correction passes all3 cases and20 original vectors; active native observations
+remain fail-closed test doubles. Focused remap and release-input guards pass.
+A subsequent protocol replay exposes an additional frozen44-test Go corpus
+policy mismatch; its original journal and expectations must remain independent.
+Final corrected whole JS receiving passes407/408; only the unchanged
+protected-temporary-root uninstall refusal remains. Its exact non-Git-root
+replay passes without changing the fixture or assertions. The Go journal reader
+passes45/45: all44 historical cases remain byte-exact, and one added case proves
+the historical44-pass journal cannot qualify the six added native event identities.
+The strict collector now requires45; the original independent journal is unchanged.
+Native/driver postimages remain identical to the selected18165-pass Mac gate.
+Native Swift/SDK49 and genuine pinned-daemon receiving remain unrun locally.
+
+Explicit caller-owned stdin cancellation is composed with the event source in
+this serving tranche. EOF wakes the original selector/guardian retirement;
+borrowed FD0 is never closed. Unknown unregister/selector-close outcomes retain
+debt. Default untagged serving is unchanged. Frozen source ACK is
+`af14bf909cf0c65577982854476804f93ed1431c3595c2711770f1fdc9e02dc0`;
+independent saved-receiving ACK is
+`ce8ce633d4945d571ae312559a5c0cf82773a7e6b39f30cb334776049e241eae`.
+The private original-owner executions pass7/7 and44/44 without skips, preserving
+the original37 bodies/assertions. Both physical owners close with no retained
+phase and exact source fences. The first revision's negative fixture-cleanup
+error remains recorded; the correction releases only known fixture capabilities
+and never retries an uncertain descriptor or certifies production retirement.
+CI and the protocol collector now require44, while native SDK49 remains UNRUN.
+The workflow is the exact commuting composition of the event, diagnostic
+conditions and owned44-count changes. Caller integration is still CODE.
 
 ## Remaining implementation and qualification
 
@@ -179,9 +252,9 @@ receiving of this source remains pending.
   acceptance on all three OS remain independent device qualifications.
 
 Full migration still needs coordinated changes to six group4 macOS consumers
-and genuine21-language labels/catalogue publication. Shared CI ownership was
-requested in coordination issue86, comments6093978605 and6094059827; no grant is
-assumed from silence. Preserve other groups' workflow and generated ownership.
+and genuine21-language labels/catalogue publication. Exact source spans are coordinated in issue86, including caller/checker
+notices6098836591,6099485637 and6099655173. Preserve concrete overlapping
+hunks and the other groups' workflow and generated ownership.
 Group1 owns the Linux audio dependency addition `language-pack-fr` and
 `language-pack-de`; this checkpoint does not modify that workflow.
 

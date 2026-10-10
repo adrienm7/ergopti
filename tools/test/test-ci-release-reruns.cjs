@@ -99,7 +99,12 @@ const MANAGED_PUBLICATION_SOURCES = [
 	'static/ergopti_plus/_shared/go/native_http/network_bootstrap_darwin_test.go',
 	'static/ergopti_plus/_shared/modules/llm/managed_ollama_bootstrap.json',
 	'static/ergopti_plus/_shared/modules/network/proxy_policy.json',
-	'tools/diagnostics/macos_owned_process.py'
+	'tools/diagnostics/macos_owned_process.py',
+	'static/ergopti_plus/_shared/go/native_http/listener_event_posix.go',
+	'static/ergopti_plus/_shared/go/native_http/listener_event_darwin.go',
+	'static/ergopti_plus/_shared/go/native_http/listener_event_linux.go',
+	'static/ergopti_plus/_shared/go/native_http/listener_event_unsupported.go',
+	'static/ergopti_plus/_shared/go/native_http/listener_event_test.go'
 ];
 function copyManagedPublicationSources(work) {
 	for (const relative of MANAGED_PUBLICATION_SOURCES) {

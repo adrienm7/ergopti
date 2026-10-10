@@ -1135,6 +1135,9 @@ if ManagedOllamaAPIWorker.handles(arguments: CommandLine.arguments) {
 }
 
 #if ERGOPTI_GUARDIAN_TEST_SUPPORT
+if OwnedListenerEventFixture.handles(arguments: CommandLine.arguments) {
+	Darwin.exit(OwnedListenerEventFixture.run(arguments: CommandLine.arguments))
+}
 if ManagedOllamaListenerFixture.handles(arguments: CommandLine.arguments) {
 	Darwin.exit(ManagedOllamaListenerFixture.run(arguments: CommandLine.arguments))
 }
