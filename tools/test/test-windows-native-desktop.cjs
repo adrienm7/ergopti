@@ -57,19 +57,44 @@ function checkRunner(source) {
 function checkWorkflow(body) {
 	const main = pipeline.step(body, 'Run AHK test suite');
 	const native = pipeline.step(body, 'Run native desktop AHK cohorts');
+	const receipt = pipeline.step(body, 'Retain the source-bound Windows qualification receipt');
 	const upload = pipeline.step(body, 'Publish native desktop AHK evidence');
-	assert.equal(pipeline.stepField(native, 'run'), './tools/test/run-windows-native-desktop.ps1');
+	// Keep selection, receipt revalidation and the full runner in one closed
+	// protocol. A deferred receipt reports missing proof, never native success.
+	assert.deepEqual(pipeline.runOf(native), [
+		"$receipt = Join-Path $env:RUNNER_TEMP 'stable-windows-native-desktop.json'",
+		'node tools/ci/dev-release-qualification.cjs --scope windows-native-desktop --receipt $receipt',
+		"if ($LASTEXITCODE -ne 0) { throw 'Native desktop qualification selection refused.' }",
+		'$mode = node tools/ci/dev-release-qualification.cjs --scope windows-native-desktop --validate-scope-receipt $receipt',
+		"if ($LASTEXITCODE -ne 0) { throw 'Native desktop qualification receipt refused.' }",
+		"if ($mode -ceq 'deferred') {",
+		"    Write-Host '[DEFERRED] windows-native-desktop: qualified=false; no desktop cohort executed.'",
+		"} elseif ($mode -ceq 'full') {",
+		'    ./tools/test/run-windows-native-desktop.ps1',
+		'} else {',
+		"    throw 'Invalid native desktop qualification disposition.'",
+		'}'
+	]);
 	assert.equal(pipeline.stepField(native, 'shell'), 'pwsh');
 	assert.equal(pipeline.stepField(native, 'timeout-minutes'), '25');
 	assert.equal(pipeline.stepField(native, 'if'), null);
 	assert.equal(pipeline.stepField(native, 'continue-on-error'), null);
 	assert.ok(body.indexOf(main) < body.indexOf(native));
-	assert.ok(body.indexOf(native) < body.indexOf(upload));
+	assert.ok(body.indexOf(native) < body.indexOf(receipt));
+	assert.ok(body.indexOf(receipt) < body.indexOf(upload));
+	assert.equal(pipeline.stepField(receipt, 'if'), 'always()');
+	assert.equal(pipeline.stepField(receipt, 'uses'), 'actions/upload-artifact@v4');
+	assert.equal(pipeline.stepField(receipt, 'continue-on-error'), null);
+	assert.match(receipt, /name: assets-qualification-windows\n/);
+	assert.match(receipt, /path: \$\{\{ runner\.temp \}\}\/stable-windows-native-desktop\.json\n/);
 	assert.equal(pipeline.stepField(upload, 'if'), 'always()');
 	assert.equal(pipeline.stepField(upload, 'uses'), 'actions/upload-artifact@v4');
 	assert.equal(pipeline.stepField(upload, 'continue-on-error'), null);
 	assert.match(upload, /name: windows-ahk-native-desktop\n/);
-	assert.match(upload, /path: \$\{\{ runner\.temp \}\}\/windows-ahk-native-desktop\/\n/);
+	assert.match(
+		upload,
+		/^          path: \|\n            \$\{\{ runner\.temp \}\}\/windows-ahk-native-desktop\/\n            \$\{\{ runner\.temp \}\}\/stable-windows-native-desktop\.json\n          if-no-files-found: error$/m
+	);
 	assert.match(upload, /if-no-files-found: error/);
 	assert.match(upload, /overwrite: true/);
 }
@@ -114,29 +139,88 @@ for (const [before, after] of [
 	assert.throws(() => checkRunner(changed));
 	refused += 1;
 }
-for (const [before, after] of [
-	['run: ./tools/test/run-windows-native-desktop.ps1', 'run: echo skipped'],
+for (const [stepName, before, after] of [
+	['Run native desktop AHK cohorts', './tools/test/run-windows-native-desktop.ps1', 'echo skipped'],
+	['Run native desktop AHK cohorts', 'run: |', 'if: false\n        run: |'],
+	['Run native desktop AHK cohorts', 'run: |', 'continue-on-error: true\n        run: |'],
 	[
-		'run: ./tools/test/run-windows-native-desktop.ps1',
-		'if: false\n        run: ./tools/test/run-windows-native-desktop.ps1'
-	],
-	[
-		'run: ./tools/test/run-windows-native-desktop.ps1',
-		'continue-on-error: true\n        run: ./tools/test/run-windows-native-desktop.ps1'
-	],
-	[
+		'Publish native desktop AHK evidence',
 		'name: Publish native desktop AHK evidence\n        if: always()',
 		'name: Publish native desktop AHK evidence\n        if: success()'
 	],
-	['path: ${{ runner.temp }}/windows-ahk-native-desktop/', 'path: unrelated/'],
-	['if-no-files-found: error', 'if-no-files-found: warn']
+	[
+		'Publish native desktop AHK evidence',
+		'${{ runner.temp }}/windows-ahk-native-desktop/',
+		'unrelated/'
+	],
+	['Publish native desktop AHK evidence', 'if-no-files-found: error', 'if-no-files-found: warn'],
+	['Run native desktop AHK cohorts', 'timeout-minutes: 25', 'timeout-minutes: 30'],
+	[
+		'Run native desktop AHK cohorts',
+		"$receipt = Join-Path $env:RUNNER_TEMP 'stable-windows-native-desktop.json'",
+		"$receipt = Join-Path $env:RUNNER_TEMP 'unrelated.json'"
+	],
+	[
+		'Run native desktop AHK cohorts',
+		'--scope windows-native-desktop --receipt $receipt',
+		'--scope windows-pac-full-url --receipt $receipt'
+	],
+	[
+		'Run native desktop AHK cohorts',
+		"if ($LASTEXITCODE -ne 0) { throw 'Native desktop qualification selection refused.' }",
+		"if ($false) { throw 'Native desktop qualification selection refused.' }"
+	],
+	[
+		'Run native desktop AHK cohorts',
+		'$mode = node tools/ci/dev-release-qualification.cjs --scope windows-native-desktop --validate-scope-receipt $receipt',
+		"$mode = 'deferred'"
+	],
+	[
+		'Run native desktop AHK cohorts',
+		'--scope windows-native-desktop --validate-scope-receipt $receipt',
+		'--scope windows-pac-full-url --validate-scope-receipt $receipt'
+	],
+	[
+		'Run native desktop AHK cohorts',
+		'--validate-scope-receipt $receipt',
+		'--validate-scope-receipt "$env:RUNNER_TEMP/stale.json"'
+	],
+	[
+		'Run native desktop AHK cohorts',
+		"if ($LASTEXITCODE -ne 0) { throw 'Native desktop qualification receipt refused.' }",
+		"if ($false) { throw 'Native desktop qualification receipt refused.' }"
+	],
+	['Run native desktop AHK cohorts', "$mode -ceq 'deferred'", "$mode -ceq 'full'"],
+	['Run native desktop AHK cohorts', 'qualified=false', 'qualified=true'],
+	['Run native desktop AHK cohorts', "$mode -ceq 'full'", '$true'],
+	[
+		'Run native desktop AHK cohorts',
+		"throw 'Invalid native desktop qualification disposition.'",
+		"Write-Host 'Invalid native desktop qualification disposition.'"
+	],
+	[
+		'Run native desktop AHK cohorts',
+		'    ./tools/test/run-windows-native-desktop.ps1',
+		'    # ./tools/test/run-windows-native-desktop.ps1'
+	],
+	[
+		'Publish native desktop AHK evidence',
+		'${{ runner.temp }}/stable-windows-native-desktop.json',
+		'${{ runner.temp }}/stale.json'
+	],
+	['Retain the source-bound Windows qualification receipt', 'if: always()', 'if: success()'],
+	[
+		'Retain the source-bound Windows qualification receipt',
+		'${{ runner.temp }}/stable-windows-native-desktop.json',
+		'${{ runner.temp }}/stale.json'
+	]
 ]) {
 	// Bind every mutation to its own step; earlier diagnostics share upload fields.
-	const target = pipeline.step(
-		body,
-		before.startsWith('run:')
-			? 'Run native desktop AHK cohorts'
-			: 'Publish native desktop AHK evidence'
+	const target = pipeline.step(body, stepName);
+	assert.equal(
+		target.split(before).length,
+		2,
+		'the mutation must have one exact step-local target'
 	);
 	const changedTarget = target.replace(before, after);
 	assert.notEqual(changedTarget, target, 'the mutation must alter the native desktop step');
