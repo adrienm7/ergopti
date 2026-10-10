@@ -16,7 +16,10 @@ $loader = @($ast.EndBlock.Statements | Where-Object {
 })
 if ($loader.Count -ne 1) { throw 'The native fixture has one exact active helper-loading boundary.' }
 $prefix = $source.Substring(0, $loader[0].Extent.StartOffset)
-$prefix += "[ordered]@{ candidate = `$CandidateRoot; fixtures = `$FixtureRoot; script_root = `$PSScriptRoot } | ConvertTo-Json -Compress`n"
+# Native stdout follows the console code page; ASCII transport keeps the actual
+# Unicode argument observation independent of a hosted runner's OEM encoding.
+$prefix += "`$record = [ordered]@{ candidate = `$CandidateRoot; fixtures = `$FixtureRoot; script_root = `$PSScriptRoot } | ConvertTo-Json -Compress`n"
+$prefix += "[Convert]::ToBase64String([Text.UTF8Encoding]::new(`$false, `$true).GetBytes(`$record))`n"
 [void][Management.Automation.Language.Parser]::ParseInput($prefix, $FixtureTest, [ref]$tokens, [ref]$errors)
 if ($errors.Count -ne 0) { throw 'The actual fixture entry prefix must parse.' }
 $owned = [IO.Path]::Combine([IO.Path]::GetTempPath(), 'ergopti-file-path-entry-' + [Guid]::NewGuid().ToString('N'))
@@ -30,41 +33,47 @@ $expectedCandidate = [IO.Path]::GetFullPath([IO.Path]::Combine($directory, '..\.
 $expectedFixture = [IO.Path]::GetFullPath([IO.Path]::Combine($directory, '..\fixtures\ollama-install-files'))
 $oldLocation = (Get-Location).Path
 $oldDirectory = [Environment]::CurrentDirectory
+$oldOutputEncoding = [Console]::OutputEncoding
+$unicodeSuffix = [string][char]0x03A9 + [char]0x6771
 $foreign = @([IO.Path]::GetTempPath(), [Environment]::GetFolderPath('Windows'))
 if ($ScratchRoot -ne '') { $foreign[0] = $ScratchRoot }
 $passed = 0; $failed = 0
 try {
-	foreach ($case in @('default-first-cwd', 'default-second-cwd', 'candidate-override', 'fixture-override')) {
-		try {
-			$cwd = if ($case -ceq 'default-second-cwd') { $foreign[1] } else { $foreign[0] }
-			Set-Location -LiteralPath $cwd
-			[Environment]::CurrentDirectory = $cwd
-			if ($case -ceq 'candidate-override') {
-				$override = [IO.Path]::Combine($cwd, 'synthetic candidate Ω')
-				$raw = & $powershell -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -File $entry -CandidateRoot $override 2>&1
-				$childExit = $LASTEXITCODE
-				if ($childExit -ne 0) { throw 'The actual file entry child must exit successfully.' }
-				$observed = ($raw -join "`n") | ConvertFrom-Json
-				if ($observed.candidate -cne $override -or $observed.fixtures -cne $expectedFixture) { throw 'Explicit candidate override lost its exact owner.' }
-			} elseif ($case -ceq 'fixture-override') {
-				$override = [IO.Path]::Combine($cwd, 'synthetic fixtures Ω')
-				$raw = & $powershell -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -File $entry -FixtureRoot $override 2>&1
-				$childExit = $LASTEXITCODE
-				if ($childExit -ne 0) { throw 'The actual file entry child must exit successfully.' }
-				$observed = ($raw -join "`n") | ConvertFrom-Json
-				if ($observed.fixtures -cne $override -or $observed.candidate -cne $expectedCandidate) { throw 'Explicit fixture override lost its exact owner.' }
-			} else {
-				$raw = & $powershell -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -File $entry 2>&1
-				$childExit = $LASTEXITCODE
-				if ($childExit -ne 0) { throw 'The actual file entry child must exit successfully.' }
-				$observed = ($raw -join "`n") | ConvertFrom-Json
-				if ($observed.candidate -cne $expectedCandidate -or $observed.fixtures -cne $expectedFixture) { throw 'Omitted paths must resolve against the actual script, never the foreign CWD.' }
-			}
-			if ($observed.script_root -cne $directory) { throw 'The actual script entry identity was not retained.' }
-			$passed++; Write-Output ('PASS ' + $case)
-		} catch { $failed++; Write-Output ('FAIL ' + $case + ': ' + $_.Exception.Message) }
+	foreach ($codePage in @(437, 65001)) {
+		[Console]::OutputEncoding = [Text.Encoding]::GetEncoding($codePage)
+		foreach ($case in @('default-first-cwd', 'default-second-cwd', 'candidate-override', 'fixture-override')) {
+			try {
+				$cwd = if ($case -ceq 'default-second-cwd') { $foreign[1] } else { $foreign[0] }
+				Set-Location -LiteralPath $cwd
+				[Environment]::CurrentDirectory = $cwd
+				if ($case -ceq 'candidate-override') {
+					$override = [IO.Path]::Combine($cwd, ('synthetic candidate ' + $unicodeSuffix))
+					$raw = & $powershell -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -File $entry -CandidateRoot $override 2>&1
+					$childExit = $LASTEXITCODE
+					if ($childExit -ne 0) { throw 'The actual file entry child must exit successfully.' }
+					$observed = [Text.UTF8Encoding]::new($false, $true).GetString([Convert]::FromBase64String(($raw -join "`n"))) | ConvertFrom-Json
+					if ($observed.candidate -cne $override -or $observed.fixtures -cne $expectedFixture) { throw 'Explicit candidate override lost its exact owner.' }
+				} elseif ($case -ceq 'fixture-override') {
+					$override = [IO.Path]::Combine($cwd, ('synthetic fixtures ' + $unicodeSuffix))
+					$raw = & $powershell -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -File $entry -FixtureRoot $override 2>&1
+					$childExit = $LASTEXITCODE
+					if ($childExit -ne 0) { throw 'The actual file entry child must exit successfully.' }
+					$observed = [Text.UTF8Encoding]::new($false, $true).GetString([Convert]::FromBase64String(($raw -join "`n"))) | ConvertFrom-Json
+					if ($observed.fixtures -cne $override -or $observed.candidate -cne $expectedCandidate) { throw 'Explicit fixture override lost its exact owner.' }
+				} else {
+					$raw = & $powershell -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -File $entry 2>&1
+					$childExit = $LASTEXITCODE
+					if ($childExit -ne 0) { throw 'The actual file entry child must exit successfully.' }
+					$observed = [Text.UTF8Encoding]::new($false, $true).GetString([Convert]::FromBase64String(($raw -join "`n"))) | ConvertFrom-Json
+					if ($observed.candidate -cne $expectedCandidate -or $observed.fixtures -cne $expectedFixture) { throw 'Omitted paths must resolve against the actual script, never the foreign CWD.' }
+				}
+				if ($observed.script_root -cne $directory) { throw 'The actual script entry identity was not retained.' }
+				$passed++; Write-Output ('PASS cp' + $codePage + '/' + $case)
+			} catch { $failed++; Write-Output ('FAIL cp' + $codePage + '/' + $case + ': ' + $_.Exception.Message) }
+		}
 	}
 } finally {
+	[Console]::OutputEncoding = $oldOutputEncoding
 	Set-Location -LiteralPath $oldLocation
 	[Environment]::CurrentDirectory = $oldDirectory
 	[IO.File]::Delete($entry)

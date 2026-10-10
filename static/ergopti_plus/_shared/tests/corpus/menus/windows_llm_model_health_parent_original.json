@@ -1,0 +1,529 @@
+{
+	"provenance": {
+		"git_commit": "1e0556e8020e265dfc20da806657281ac05ef7a6",
+		"original_native_path": "static/ergopti_plus/windows/ui/menu/menu_llm/menu_main.ahk",
+		"original_native_sha256": "450ec872400b6d58e85ea4c316b6341cacb7f618ad1b211dce49ea0710645fe6",
+		"policy": "Original health-dot literal prefix plus original StrReplace(%s, active-backend model text), projected from old native source/physical21locale values before candidate authoring."
+	},
+	"health": [
+		{
+			"id": "none",
+			"prefix": ""
+		},
+		{
+			"id": "ok",
+			"prefix": "🟢 "
+		},
+		{
+			"id": "ko",
+			"prefix": "🔴 "
+		}
+	],
+	"models": ["", "qwen2.5:7b", "cerebras/qwen-3.8-27b", "Native% && {1}"],
+	"locales": {
+		"da": {
+			"locale_blob_sha256": "8f4240971e38f9b74a3e284edf954c9461b0779c249031f7ba8c79f044f7e5c6",
+			"format": "Valgt model: %s",
+			"titles": {
+				"none": [
+					"Valgt model: ",
+					"Valgt model: qwen2.5:7b",
+					"Valgt model: cerebras/qwen-3.8-27b",
+					"Valgt model: Native% && {1}"
+				],
+				"ok": [
+					"🟢 Valgt model: ",
+					"🟢 Valgt model: qwen2.5:7b",
+					"🟢 Valgt model: cerebras/qwen-3.8-27b",
+					"🟢 Valgt model: Native% && {1}"
+				],
+				"ko": [
+					"🔴 Valgt model: ",
+					"🔴 Valgt model: qwen2.5:7b",
+					"🔴 Valgt model: cerebras/qwen-3.8-27b",
+					"🔴 Valgt model: Native% && {1}"
+				]
+			}
+		},
+		"de": {
+			"locale_blob_sha256": "2cfb160f8a0c5282f643b9f6cef3db54b3c31d1b1ccb254ace5f66c1412f19fc",
+			"format": "Ausgewähltes Modell: %s",
+			"titles": {
+				"none": [
+					"Ausgewähltes Modell: ",
+					"Ausgewähltes Modell: qwen2.5:7b",
+					"Ausgewähltes Modell: cerebras/qwen-3.8-27b",
+					"Ausgewähltes Modell: Native% && {1}"
+				],
+				"ok": [
+					"🟢 Ausgewähltes Modell: ",
+					"🟢 Ausgewähltes Modell: qwen2.5:7b",
+					"🟢 Ausgewähltes Modell: cerebras/qwen-3.8-27b",
+					"🟢 Ausgewähltes Modell: Native% && {1}"
+				],
+				"ko": [
+					"🔴 Ausgewähltes Modell: ",
+					"🔴 Ausgewähltes Modell: qwen2.5:7b",
+					"🔴 Ausgewähltes Modell: cerebras/qwen-3.8-27b",
+					"🔴 Ausgewähltes Modell: Native% && {1}"
+				]
+			}
+		},
+		"en": {
+			"locale_blob_sha256": "56e632734a3180c97314b001e38e71bcad47640772d0afcda6f82380296f492b",
+			"format": "Selected model: %s",
+			"titles": {
+				"none": [
+					"Selected model: ",
+					"Selected model: qwen2.5:7b",
+					"Selected model: cerebras/qwen-3.8-27b",
+					"Selected model: Native% && {1}"
+				],
+				"ok": [
+					"🟢 Selected model: ",
+					"🟢 Selected model: qwen2.5:7b",
+					"🟢 Selected model: cerebras/qwen-3.8-27b",
+					"🟢 Selected model: Native% && {1}"
+				],
+				"ko": [
+					"🔴 Selected model: ",
+					"🔴 Selected model: qwen2.5:7b",
+					"🔴 Selected model: cerebras/qwen-3.8-27b",
+					"🔴 Selected model: Native% && {1}"
+				]
+			}
+		},
+		"es": {
+			"locale_blob_sha256": "9644d094fe4e64c4a9ddb8a775cc9b5114004a5b0732c56a5e36b55cf6ecbe05",
+			"format": "Modelo seleccionado: %s",
+			"titles": {
+				"none": [
+					"Modelo seleccionado: ",
+					"Modelo seleccionado: qwen2.5:7b",
+					"Modelo seleccionado: cerebras/qwen-3.8-27b",
+					"Modelo seleccionado: Native% && {1}"
+				],
+				"ok": [
+					"🟢 Modelo seleccionado: ",
+					"🟢 Modelo seleccionado: qwen2.5:7b",
+					"🟢 Modelo seleccionado: cerebras/qwen-3.8-27b",
+					"🟢 Modelo seleccionado: Native% && {1}"
+				],
+				"ko": [
+					"🔴 Modelo seleccionado: ",
+					"🔴 Modelo seleccionado: qwen2.5:7b",
+					"🔴 Modelo seleccionado: cerebras/qwen-3.8-27b",
+					"🔴 Modelo seleccionado: Native% && {1}"
+				]
+			}
+		},
+		"fr": {
+			"locale_blob_sha256": "184317bed5b9e9f1eb18d5a17d2b5944bf42ab664a0ba75041132aaac56d9e64",
+			"format": "Modèle sélectionné : %s",
+			"titles": {
+				"none": [
+					"Modèle sélectionné : ",
+					"Modèle sélectionné : qwen2.5:7b",
+					"Modèle sélectionné : cerebras/qwen-3.8-27b",
+					"Modèle sélectionné : Native% && {1}"
+				],
+				"ok": [
+					"🟢 Modèle sélectionné : ",
+					"🟢 Modèle sélectionné : qwen2.5:7b",
+					"🟢 Modèle sélectionné : cerebras/qwen-3.8-27b",
+					"🟢 Modèle sélectionné : Native% && {1}"
+				],
+				"ko": [
+					"🔴 Modèle sélectionné : ",
+					"🔴 Modèle sélectionné : qwen2.5:7b",
+					"🔴 Modèle sélectionné : cerebras/qwen-3.8-27b",
+					"🔴 Modèle sélectionné : Native% && {1}"
+				]
+			}
+		},
+		"it": {
+			"locale_blob_sha256": "1c076f54452bc97ed4a07983e4e3ced9d6d4b2c631fe5b2c9ba81b6ce51c489a",
+			"format": "Modello selezionato: %s",
+			"titles": {
+				"none": [
+					"Modello selezionato: ",
+					"Modello selezionato: qwen2.5:7b",
+					"Modello selezionato: cerebras/qwen-3.8-27b",
+					"Modello selezionato: Native% && {1}"
+				],
+				"ok": [
+					"🟢 Modello selezionato: ",
+					"🟢 Modello selezionato: qwen2.5:7b",
+					"🟢 Modello selezionato: cerebras/qwen-3.8-27b",
+					"🟢 Modello selezionato: Native% && {1}"
+				],
+				"ko": [
+					"🔴 Modello selezionato: ",
+					"🔴 Modello selezionato: qwen2.5:7b",
+					"🔴 Modello selezionato: cerebras/qwen-3.8-27b",
+					"🔴 Modello selezionato: Native% && {1}"
+				]
+			}
+		},
+		"nl": {
+			"locale_blob_sha256": "d74e21d9698e435dbb21e5791e0a818e551893800c1d05a493a885caddb9cec0",
+			"format": "Geselecteerd model: %s",
+			"titles": {
+				"none": [
+					"Geselecteerd model: ",
+					"Geselecteerd model: qwen2.5:7b",
+					"Geselecteerd model: cerebras/qwen-3.8-27b",
+					"Geselecteerd model: Native% && {1}"
+				],
+				"ok": [
+					"🟢 Geselecteerd model: ",
+					"🟢 Geselecteerd model: qwen2.5:7b",
+					"🟢 Geselecteerd model: cerebras/qwen-3.8-27b",
+					"🟢 Geselecteerd model: Native% && {1}"
+				],
+				"ko": [
+					"🔴 Geselecteerd model: ",
+					"🔴 Geselecteerd model: qwen2.5:7b",
+					"🔴 Geselecteerd model: cerebras/qwen-3.8-27b",
+					"🔴 Geselecteerd model: Native% && {1}"
+				]
+			}
+		},
+		"no": {
+			"locale_blob_sha256": "8b71d8dd65215d74e0e8529953342ba0e2b5ae550f09064c1d76ff75457d65a0",
+			"format": "Valgt modell: %s",
+			"titles": {
+				"none": [
+					"Valgt modell: ",
+					"Valgt modell: qwen2.5:7b",
+					"Valgt modell: cerebras/qwen-3.8-27b",
+					"Valgt modell: Native% && {1}"
+				],
+				"ok": [
+					"🟢 Valgt modell: ",
+					"🟢 Valgt modell: qwen2.5:7b",
+					"🟢 Valgt modell: cerebras/qwen-3.8-27b",
+					"🟢 Valgt modell: Native% && {1}"
+				],
+				"ko": [
+					"🔴 Valgt modell: ",
+					"🔴 Valgt modell: qwen2.5:7b",
+					"🔴 Valgt modell: cerebras/qwen-3.8-27b",
+					"🔴 Valgt modell: Native% && {1}"
+				]
+			}
+		},
+		"pl": {
+			"locale_blob_sha256": "cdc9d3e034d093031ee12e8862b303152ae99110f09611a8e4975da9be30b9b4",
+			"format": "Wybrany model: %s",
+			"titles": {
+				"none": [
+					"Wybrany model: ",
+					"Wybrany model: qwen2.5:7b",
+					"Wybrany model: cerebras/qwen-3.8-27b",
+					"Wybrany model: Native% && {1}"
+				],
+				"ok": [
+					"🟢 Wybrany model: ",
+					"🟢 Wybrany model: qwen2.5:7b",
+					"🟢 Wybrany model: cerebras/qwen-3.8-27b",
+					"🟢 Wybrany model: Native% && {1}"
+				],
+				"ko": [
+					"🔴 Wybrany model: ",
+					"🔴 Wybrany model: qwen2.5:7b",
+					"🔴 Wybrany model: cerebras/qwen-3.8-27b",
+					"🔴 Wybrany model: Native% && {1}"
+				]
+			}
+		},
+		"pt": {
+			"locale_blob_sha256": "d71613700f06e9eb4a3734cbcc62f7dbc12a542499398271d45085aa43e9d100",
+			"format": "Modelo selecionado: %s",
+			"titles": {
+				"none": [
+					"Modelo selecionado: ",
+					"Modelo selecionado: qwen2.5:7b",
+					"Modelo selecionado: cerebras/qwen-3.8-27b",
+					"Modelo selecionado: Native% && {1}"
+				],
+				"ok": [
+					"🟢 Modelo selecionado: ",
+					"🟢 Modelo selecionado: qwen2.5:7b",
+					"🟢 Modelo selecionado: cerebras/qwen-3.8-27b",
+					"🟢 Modelo selecionado: Native% && {1}"
+				],
+				"ko": [
+					"🔴 Modelo selecionado: ",
+					"🔴 Modelo selecionado: qwen2.5:7b",
+					"🔴 Modelo selecionado: cerebras/qwen-3.8-27b",
+					"🔴 Modelo selecionado: Native% && {1}"
+				]
+			}
+		},
+		"sv": {
+			"locale_blob_sha256": "f940f543e2085aab6b69250efac2bb35449bccc95dea058cba810b30907ab401",
+			"format": "Vald modell: %s",
+			"titles": {
+				"none": [
+					"Vald modell: ",
+					"Vald modell: qwen2.5:7b",
+					"Vald modell: cerebras/qwen-3.8-27b",
+					"Vald modell: Native% && {1}"
+				],
+				"ok": [
+					"🟢 Vald modell: ",
+					"🟢 Vald modell: qwen2.5:7b",
+					"🟢 Vald modell: cerebras/qwen-3.8-27b",
+					"🟢 Vald modell: Native% && {1}"
+				],
+				"ko": [
+					"🔴 Vald modell: ",
+					"🔴 Vald modell: qwen2.5:7b",
+					"🔴 Vald modell: cerebras/qwen-3.8-27b",
+					"🔴 Vald modell: Native% && {1}"
+				]
+			}
+		},
+		"tr": {
+			"locale_blob_sha256": "8f9ab7b044c1758fc6fd26a7bb27ea2cbf43f4c3bec1346e96f97645fd6c58a9",
+			"format": "Seçili model: %s",
+			"titles": {
+				"none": [
+					"Seçili model: ",
+					"Seçili model: qwen2.5:7b",
+					"Seçili model: cerebras/qwen-3.8-27b",
+					"Seçili model: Native% && {1}"
+				],
+				"ok": [
+					"🟢 Seçili model: ",
+					"🟢 Seçili model: qwen2.5:7b",
+					"🟢 Seçili model: cerebras/qwen-3.8-27b",
+					"🟢 Seçili model: Native% && {1}"
+				],
+				"ko": [
+					"🔴 Seçili model: ",
+					"🔴 Seçili model: qwen2.5:7b",
+					"🔴 Seçili model: cerebras/qwen-3.8-27b",
+					"🔴 Seçili model: Native% && {1}"
+				]
+			}
+		},
+		"cs": {
+			"locale_blob_sha256": "b3cf8c1a949b285ea31ebce9830b2423f2763c9c70a3e542ddd7f46a002f048b",
+			"format": "Vybraný model: %s",
+			"titles": {
+				"none": [
+					"Vybraný model: ",
+					"Vybraný model: qwen2.5:7b",
+					"Vybraný model: cerebras/qwen-3.8-27b",
+					"Vybraný model: Native% && {1}"
+				],
+				"ok": [
+					"🟢 Vybraný model: ",
+					"🟢 Vybraný model: qwen2.5:7b",
+					"🟢 Vybraný model: cerebras/qwen-3.8-27b",
+					"🟢 Vybraný model: Native% && {1}"
+				],
+				"ko": [
+					"🔴 Vybraný model: ",
+					"🔴 Vybraný model: qwen2.5:7b",
+					"🔴 Vybraný model: cerebras/qwen-3.8-27b",
+					"🔴 Vybraný model: Native% && {1}"
+				]
+			}
+		},
+		"ru": {
+			"locale_blob_sha256": "1cf9dbdd495cce3c2bbe2f0ffddd09ca3062f3bfa113a2ed35d621a282a3dd2e",
+			"format": "Выбранная модель: %s",
+			"titles": {
+				"none": [
+					"Выбранная модель: ",
+					"Выбранная модель: qwen2.5:7b",
+					"Выбранная модель: cerebras/qwen-3.8-27b",
+					"Выбранная модель: Native% && {1}"
+				],
+				"ok": [
+					"🟢 Выбранная модель: ",
+					"🟢 Выбранная модель: qwen2.5:7b",
+					"🟢 Выбранная модель: cerebras/qwen-3.8-27b",
+					"🟢 Выбранная модель: Native% && {1}"
+				],
+				"ko": [
+					"🔴 Выбранная модель: ",
+					"🔴 Выбранная модель: qwen2.5:7b",
+					"🔴 Выбранная модель: cerebras/qwen-3.8-27b",
+					"🔴 Выбранная модель: Native% && {1}"
+				]
+			}
+		},
+		"uk": {
+			"locale_blob_sha256": "b61ae60f8e65a6a0f63da2dbd5c4375b2d3ca0424848f2f369716c0471a9d3d9",
+			"format": "Вибрана модель: %s",
+			"titles": {
+				"none": [
+					"Вибрана модель: ",
+					"Вибрана модель: qwen2.5:7b",
+					"Вибрана модель: cerebras/qwen-3.8-27b",
+					"Вибрана модель: Native% && {1}"
+				],
+				"ok": [
+					"🟢 Вибрана модель: ",
+					"🟢 Вибрана модель: qwen2.5:7b",
+					"🟢 Вибрана модель: cerebras/qwen-3.8-27b",
+					"🟢 Вибрана модель: Native% && {1}"
+				],
+				"ko": [
+					"🔴 Вибрана модель: ",
+					"🔴 Вибрана модель: qwen2.5:7b",
+					"🔴 Вибрана модель: cerebras/qwen-3.8-27b",
+					"🔴 Вибрана модель: Native% && {1}"
+				]
+			}
+		},
+		"he": {
+			"locale_blob_sha256": "86fbc4d0d7bdcbaf4c2b5fd4dc78b8067a4c4e7bfcd0883dad9ce4d5b612aadd",
+			"format": "מודל נבחר: %s",
+			"titles": {
+				"none": [
+					"מודל נבחר: ",
+					"מודל נבחר: qwen2.5:7b",
+					"מודל נבחר: cerebras/qwen-3.8-27b",
+					"מודל נבחר: Native% && {1}"
+				],
+				"ok": [
+					"🟢 מודל נבחר: ",
+					"🟢 מודל נבחר: qwen2.5:7b",
+					"🟢 מודל נבחר: cerebras/qwen-3.8-27b",
+					"🟢 מודל נבחר: Native% && {1}"
+				],
+				"ko": [
+					"🔴 מודל נבחר: ",
+					"🔴 מודל נבחר: qwen2.5:7b",
+					"🔴 מודל נבחר: cerebras/qwen-3.8-27b",
+					"🔴 מודל נבחר: Native% && {1}"
+				]
+			}
+		},
+		"ar": {
+			"locale_blob_sha256": "fe571a55ecb339ba73a4a295ce8f73d2d3d61c61f3fc6470f70576d458bf7165",
+			"format": "النموذج المحدد: %s",
+			"titles": {
+				"none": [
+					"النموذج المحدد: ",
+					"النموذج المحدد: qwen2.5:7b",
+					"النموذج المحدد: cerebras/qwen-3.8-27b",
+					"النموذج المحدد: Native% && {1}"
+				],
+				"ok": [
+					"🟢 النموذج المحدد: ",
+					"🟢 النموذج المحدد: qwen2.5:7b",
+					"🟢 النموذج المحدد: cerebras/qwen-3.8-27b",
+					"🟢 النموذج المحدد: Native% && {1}"
+				],
+				"ko": [
+					"🔴 النموذج المحدد: ",
+					"🔴 النموذج المحدد: qwen2.5:7b",
+					"🔴 النموذج المحدد: cerebras/qwen-3.8-27b",
+					"🔴 النموذج المحدد: Native% && {1}"
+				]
+			}
+		},
+		"hi": {
+			"locale_blob_sha256": "809706ba6db13f3c46d281e70023730dfe672017be81fb085da5d68a88262100",
+			"format": "चयनित मॉडल: %s",
+			"titles": {
+				"none": [
+					"चयनित मॉडल: ",
+					"चयनित मॉडल: qwen2.5:7b",
+					"चयनित मॉडल: cerebras/qwen-3.8-27b",
+					"चयनित मॉडल: Native% && {1}"
+				],
+				"ok": [
+					"🟢 चयनित मॉडल: ",
+					"🟢 चयनित मॉडल: qwen2.5:7b",
+					"🟢 चयनित मॉडल: cerebras/qwen-3.8-27b",
+					"🟢 चयनित मॉडल: Native% && {1}"
+				],
+				"ko": [
+					"🔴 चयनित मॉडल: ",
+					"🔴 चयनित मॉडल: qwen2.5:7b",
+					"🔴 चयनित मॉडल: cerebras/qwen-3.8-27b",
+					"🔴 चयनित मॉडल: Native% && {1}"
+				]
+			}
+		},
+		"zh": {
+			"locale_blob_sha256": "356eb058ca1f6bc3a392b43a4b87b919c0c3f1c6c122a33c40e76b312828dd85",
+			"format": "已选模型：%s",
+			"titles": {
+				"none": [
+					"已选模型：",
+					"已选模型：qwen2.5:7b",
+					"已选模型：cerebras/qwen-3.8-27b",
+					"已选模型：Native% && {1}"
+				],
+				"ok": [
+					"🟢 已选模型：",
+					"🟢 已选模型：qwen2.5:7b",
+					"🟢 已选模型：cerebras/qwen-3.8-27b",
+					"🟢 已选模型：Native% && {1}"
+				],
+				"ko": [
+					"🔴 已选模型：",
+					"🔴 已选模型：qwen2.5:7b",
+					"🔴 已选模型：cerebras/qwen-3.8-27b",
+					"🔴 已选模型：Native% && {1}"
+				]
+			}
+		},
+		"ja": {
+			"locale_blob_sha256": "d0cef33d7a558b21862c446cef0a6b09679733573d4a6ca12e0f114ac535e30c",
+			"format": "選択中のモデル：%s",
+			"titles": {
+				"none": [
+					"選択中のモデル：",
+					"選択中のモデル：qwen2.5:7b",
+					"選択中のモデル：cerebras/qwen-3.8-27b",
+					"選択中のモデル：Native% && {1}"
+				],
+				"ok": [
+					"🟢 選択中のモデル：",
+					"🟢 選択中のモデル：qwen2.5:7b",
+					"🟢 選択中のモデル：cerebras/qwen-3.8-27b",
+					"🟢 選択中のモデル：Native% && {1}"
+				],
+				"ko": [
+					"🔴 選択中のモデル：",
+					"🔴 選択中のモデル：qwen2.5:7b",
+					"🔴 選択中のモデル：cerebras/qwen-3.8-27b",
+					"🔴 選択中のモデル：Native% && {1}"
+				]
+			}
+		},
+		"ko": {
+			"locale_blob_sha256": "d7842962f4195ca78bf144b197410c428b39d116a39ae03a1d5220073daea1d1",
+			"format": "선택된 모델: %s",
+			"titles": {
+				"none": [
+					"선택된 모델: ",
+					"선택된 모델: qwen2.5:7b",
+					"선택된 모델: cerebras/qwen-3.8-27b",
+					"선택된 모델: Native% && {1}"
+				],
+				"ok": [
+					"🟢 선택된 모델: ",
+					"🟢 선택된 모델: qwen2.5:7b",
+					"🟢 선택된 모델: cerebras/qwen-3.8-27b",
+					"🟢 선택된 모델: Native% && {1}"
+				],
+				"ko": [
+					"🔴 선택된 모델: ",
+					"🔴 선택된 모델: qwen2.5:7b",
+					"🔴 선택된 모델: cerebras/qwen-3.8-27b",
+					"🔴 선택된 모델: Native% && {1}"
+				]
+			}
+		}
+	}
+}

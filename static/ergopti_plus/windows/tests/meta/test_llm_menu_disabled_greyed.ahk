@@ -74,7 +74,7 @@ _LMDG_BuildGreysRowsWhenOff() {
 Test("menu_main: LLM_Menu_Build greys the settings rows when the feature is off (llm-menu-disabled-greyed)", _LMDG_BuildGreysRowsWhenOff)
 
 ; Guard 2b — every row emitted by _LLM_Menu_EmitRow honours the resolved greying
-; flag (passes `disabled` through to _LLM_Menu_AddRow), so the shared spec's policy
+; flag through the actual declared model parent, so the shared spec's policy
 ; actually takes effect at render. The backend/model "stay enabled while off"
 ; guarantee itself is the spec's disabled_when_off=false, pinned by
 ; test_llm_menu_layout_shared — this guard just proves the renderer applies it.
@@ -83,21 +83,24 @@ _LMDG_EmitRowAppliesGreying() {
 	Assert(Seg != "", "_LLM_Menu_EmitRow() must exist in menu_main.ahk")
 	Assert(_LMDG_BackendFrameGreyingRoute(Seg, _DriverFuncBody("_LLM_Menu_BackendParentRows")),
 		"_LLM_Menu_EmitRow must emit the actual backend frame so its greying follows the spec-resolved flag")
-	Assert(InStr(Seg, "model_menu, disabled)") > 0,
-		"_LLM_Menu_EmitRow must emit the model row with the resolved 'disabled' flag (not a hardcoded value) so the spec policy drives greying")
+	Assert(_LMDG_ModelParentGreyingRoute(Seg, _DriverFuncBody("_LLM_Menu_ModelParentRows")),
+		"the actual captured model receiver must receive and publish the spec-resolved greying flag")
 }
 Test("menu_main: _LLM_Menu_EmitRow applies the spec-resolved greying flag (llm-menu-disabled-greyed)", _LMDG_EmitRowAppliesGreying)
 
-; Guard 3 — the row helper greys a row when its disabled flag is set.
-_LMDG_AddRowHelperDisables() {
-	Seg := _DriverFuncBody("_LLM_Menu_AddRow")
-	Assert(Seg != "", "_LLM_Menu_AddRow(label, target, disabled) helper must exist in menu_main.ahk")
-	Assert(InStr(Seg, ".Add(label, target)") > 0,
-		"_LLM_Menu_AddRow must always Add the row so it is present at a stable position")
-	Assert(InStr(Seg, "if disabled") > 0 and InStr(Seg, ".Disable(label)") > 0,
-		"_LLM_Menu_AddRow must Disable() the row when disabled is true (grey it — macOS is_disabled parity)")
+; Guard 3 — the live declared model parent preserves native presence and greying.
+_LMDG_ModelParentHelperDisables() {
+	Seg := _DriverFuncBody("_LLM_Menu_ModelParentRows")
+	Assert(Seg != "", "the actual model parent helper must exist in menu_main.ahk")
+	Assert(_LMDG_ModelParentGreyingRoute(_DriverFuncBody("_LLM_Menu_EmitRow"), Seg),
+		"the retained actual parent must reach native AppendRows with the completed model picker")
+	Rows := _MR_GetMenuDef("llm_model_parent_ahk")
+	Assert(Rows.Length == 1 && Rows[1]["disabled_when"].Length == 1
+		&& Rows[1]["disabled_when"][1] == "llm_model_parent_ready"
+		&& InStr(Seg, '"llm_model_parent_ready", (*) => !Disabled') > 0,
+		"the live shared parent must grey the actual native row exactly when its resolved flag is true")
 }
-Test("menu_main: _LLM_Menu_AddRow greys a row when disabled (llm-menu-disabled-greyed)", _LMDG_AddRowHelperDisables)
+Test("menu_main: the declared model parent greys the actual native row (llm-menu-disabled-greyed)", _LMDG_ModelParentHelperDisables)
 
 ; Guard 4 — the parent IA tray check follows user intent alone. Backend
 ; readiness already owns the health dot and the install warning row; folding
@@ -266,3 +269,44 @@ _LMDG_BackendFrameGreyingDecoy(Kind) {
 for Kind in ["wrong-flag", "wrong-reader", "commented-call", "foreign-group", "wrong-consumer", "wrong-return",
 	"discarded-parent", "foreign-parent", "wrong-list-consumer", "commented-handoff", "commented-list-consumer"]
 	Test("shared backend parent off-state route refuses " . Kind, _LMDG_BackendFrameGreyingDecoy.Bind(Kind))
+
+; Capture admission precedes actual construction; the same receiver and completed row reach native publication.
+_LMDG_ModelParentGreyingRoute(Emit, Helper) {
+	Capture := _LMDG_Statement(Emit,
+		'm)^[ \t]*(ReceiveModel) := MenuRenderer_GroupReceiver\("llm_model_parent_ahk", "llm_model"\)', 2)
+	Child := _LMDG_Statement(Emit, 'm)^[ \t]*(model_menu) := LLM_Menu_BuildModelMenu\(\)', 2)
+	Call := _LMDG_Statement(Emit,
+		'm)^[ \t]*(ModelRows) := _LLM_Menu_ModelParentRows\(ReceiveModel, model_menu, health_dot, model_shown, disabled\)', 3)
+	Consumer := _LMDG_Statement(Emit,
+		'm)^[ \t]*(MenuRenderer_AppendRows)\(_LLM_Menu_Handle, "llm_menu", "llm_model_parent_ahk", ModelRows\)', 3)
+	Getters := _LMDG_Statement(Helper,
+		'm)^[ \t]*(Getters) := Map\("llm_model_health_prefix", \(\*\) => HealthPrefix,[ \t]*\n'
+		. '[ \t]*"llm_model_current_caption", \(\*\) => ModelCaption,[ \t]*\n'
+		. '[ \t]*"llm_model_parent_ready", \(\*\) => !Disabled\)', 1)
+	Receive := _LMDG_Statement(Helper, 'm)^[ \t]*(Parent) := Receive\.Call\(NativeChild, Getters\)', 1)
+	ResultReturn := _LMDG_Statement(Helper, 'm)^[ \t]*(return) \[Parent\][ \t]*$', 1)
+	return Capture && Child && Call && Consumer && Capture < Child && Child < Call && Call < Consumer
+		&& Getters && Receive && ResultReturn && Getters < Receive && Receive < ResultReturn
+}
+
+_LMDG_ModelParentGreyingDecoy(Kind) {
+	Emit := _DriverFuncBody("_LLM_Menu_EmitRow"), Helper := _DriverFuncBody("_LLM_Menu_ModelParentRows")
+	Assert(_LMDG_ModelParentGreyingRoute(Emit, Helper), "the actual live model publication transports the resolved greying flag")
+	if Kind == "wrong-flag"
+		Emit := StrReplace(Emit, 'health_dot, model_shown, disabled)', 'health_dot, model_shown, false)')
+	else if Kind == "wrong-reader"
+		Helper := StrReplace(Helper, '"llm_model_parent_ready", (*) => !Disabled)', '"llm_model_parent_ready", (*) => true)')
+	else if Kind == "wrong-receiver"
+		Emit := StrReplace(Emit, '_LLM_Menu_ModelParentRows(ReceiveModel, model_menu,', '_LLM_Menu_ModelParentRows(Foreign, model_menu,')
+	else if Kind == "wrong-consumer"
+		Emit := StrReplace(Emit, '"llm_model_parent_ahk", ModelRows)', '"llm_model_parent_ahk", ForeignRows)')
+	else if Kind == "discarded-parent"
+		Helper := StrReplace(Helper, 'return [Parent]', 'return [Map("label", ModelCaption, "submenu", NativeChild)]')
+	else if Kind == "commented-capture"
+		Emit := StrReplace(Emit, 'ReceiveModel := MenuRenderer_GroupReceiver(', '; ReceiveModel := MenuRenderer_GroupReceiver(')
+	else
+		throw Error("Unknown model parent greying source counterexample")
+	Assert(!_LMDG_ModelParentGreyingRoute(Emit, Helper), "foreign or fixed-flag source cannot supply actual model greying: " . Kind)
+}
+for Kind in ["wrong-flag", "wrong-reader", "wrong-receiver", "wrong-consumer", "discarded-parent", "commented-capture"]
+	Test("shared model parent off-state route refuses " . Kind, _LMDG_ModelParentGreyingDecoy.Bind(Kind))
