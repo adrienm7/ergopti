@@ -12897,3 +12897,63 @@ console.log(
 		'Windows Agent: declared fixed provider captions retain 21 original locale projections and native ports.'
 	);
 }
+
+// Original Windows model captions are independent of the new two-scalar declaration.
+{
+	const assert = require('node:assert/strict');
+	const corpus = JSON.parse(
+		readFileSync(
+			resolve(SHARED, 'tests/corpus/menus/windows_llm_model_health_parent_original.json'),
+			'utf8'
+		)
+	);
+	const manifest = JSON.parse(readFileSync(MENU_PATH, 'utf8'));
+	assert.equal(Object.keys(corpus.locales).length, 21);
+	assert.deepEqual(corpus.health, [
+		{ id: 'none', prefix: '' },
+		{ id: 'ok', prefix: '🟢 ' },
+		{ id: 'ko', prefix: '🔴 ' }
+	]);
+	assert.deepEqual(corpus.models, ['', 'qwen2.5:7b', 'cerebras/qwen-3.8-27b', 'Native% && {1}']);
+	assert.deepEqual(manifest.llm_model_parent_ahk, [
+		{
+			type: 'group',
+			id: 'llm_model',
+			i18n: 'menu.llm.model_parent_with_health',
+			caption_getters: ['llm_model_health_prefix', 'llm_model_current_caption'],
+			disabled_when: ['llm_model_parent_ready'],
+			platforms: ['ahk'],
+			unavailable: 'hide'
+		}
+	]);
+	for (const [code, old] of Object.entries(corpus.locales)) {
+		const values = JSON.parse(
+			readFileSync(resolve(SHARED, 'data/locales/' + code + '.json'), 'utf8')
+		);
+		assert.match(old.locale_blob_sha256, /^[a-f0-9]{64}$/);
+		assert.equal(
+			values['menu.llm.model_label'],
+			old.format,
+			'the original localized model format is retained'
+		);
+		assert.equal(
+			values['menu.llm.model_parent_with_health'],
+			'%s' + old.format,
+			'health stays before the complete original label'
+		);
+		assert.equal(old.format.split('%s').length - 1, 1);
+		for (const health of corpus.health)
+			for (const [index, model] of corpus.models.entries()) {
+				assert.equal(health.prefix + old.format.replace('%s', model), old.titles[health.id][index]);
+				assert.equal(
+					values['menu.llm.model_parent_with_health']
+						.replace('%s', health.prefix)
+						.replace('%s', model),
+					old.titles[health.id][index]
+				);
+			}
+	}
+	console.log(
+		'Windows model parent: compiled two-scalar caption declaration preserves the independent 21-locale health projections; native receiving remains separately required.'
+	);
+}
