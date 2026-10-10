@@ -9678,17 +9678,19 @@ and installation qualification are still required.
   cases without breaking the original 26. These are software-owner controls,
   not native catalogue, TCC, invocation or process-retirement qualification.
 
-  A separate prepared installed-target metadata diagnostic has independently
+  A separate installed-target metadata diagnostic now has independently
   reviewed source and 34 successful portable filesystem controls
-  (19 reader + 15 retained-source/output cases). It uses fixed LaunchServices
-  bundle resolution, bounded retained Info.plist and explicitly declared raw
-  dictionary bytes, preserving the original 20-second capture, 65,536-byte
-  caps and native process owner. It starts no application, sends no AppleEvent
-  and grants no catalogue, TCC or invocation authority. Native Swift build,
-  installed-target resolution and metadata receiving remain UNRUN. Its guard
-  enrollment and native CI hunks await the shared-source writer window; the
-  exact preparation is retained separately and is not integrated. The planned
-  manual-only native matrix step follows all original job steps; it must not
+  (19 reader + 15 retained-source/output cases), enrolled in the normal JS
+  suite with a dedicated npm command. It uses fixed LaunchServices bundle
+  resolution, bounded retained
+  Info.plist and explicitly declared raw dictionary bytes, preserving the
+  original 20-second capture, 65,536-byte caps and native process owner. It
+  starts no application, sends no AppleEvent and grants no catalogue, TCC or
+  invocation authority. Native Swift build, installed-target resolution and
+  metadata receiving remain UNRUN. The end-only native CI and pipeline
+  enrollment hunks await the shared-source writer window; their exact
+  preparation is retained separately and is not integrated. The planned
+  manual-only native matrix step follows all original job steps and cannot
   suppress or waive their failures. Raw dictionary artifacts remain private.
   Unresolved-target refusals and requested dictionary-key semantics cannot
   identify the existing discovery stall or establish consent. Item106 remains
