@@ -2,14 +2,36 @@
 
 # ErgoptiPlus continuation checklist
 
-Updated: 2026-10-09. Latest release: [v0.0.0-dev.157](https://github.com/adrienm7/ergopti/releases/tag/v0.0.0-dev.157)
-at `9652afc3d121b19851e02d93446d91e4c1fcc877`, published at 16:19:50 UTC.
+Updated: 2026-10-10. Latest stable: [v1.0.0](https://github.com/adrienm7/ergopti/releases/tag/v1.0.0)
+at `5ef675e08d9f75b0902026a21f36782e999b3ac2`, published at 01:31:54 UTC.
 This checklist is the current handoff; older workflow task-status files are
 historical evidence.
 Item numbers are stable identifiers: a finished item is removed (its durable
 facts go to docs/memory), and the numbers of the others never change.
 
 ## Delivery checkpoint
+
+Stable publication is complete. [CI 38011314333](https://github.com/adrienm7/ergopti/actions/runs/38011314333)
+finished successfully with 65 successful jobs, the explicitly deferred native
+archive job and the inapplicable selected-OS verdict skipped. The thirteen
+approved qualification scopes remain DEFERRED and qualified:false; the Windows
+executable remains unsigned. Neither this verdict nor publication certifies
+the deferred tests or unfinished features.
+
+The actual tag matches the source above. All 33 release assets are published:
+19 product and updater assets, 13 retained command receipts and the Windows
+signature receipt. Public API sizes and digests, downloaded small metadata,
+canonical receipt admission and the complete public qualification notice agree.
+This verification did not reinstall every published binary. The rendered
+production download links now select v1.0.0, while `/dev/` selects dev.157.
+
+Work now resumes from the latest `dev`, integrating all other groups and the
+stable corrections without discarding published history. Prioritize the
+maintainer's ten-hour v1.0.1 follow-up: maximum verified fixes and restoration
+of full CI. The v1.0.0 qualification and unsigned exceptions do not authorize
+either exception for v1.0.1. Groups 2, 4 and 7 and item 133 remain open.
+
+### Stable preparation history
 
 The original October 9 publication deadline was missed. After midnight Paris,
 the maintainer renewed the immediate v1.0.0 publication request because the
@@ -3820,7 +3842,7 @@ the complete three-OS checkpoint remain pending.
 - [ ] **36.** Packaging remainder (the former item 21): macOS release archive as
       `.tar.xz` (verify Sparkle, the Homebrew cask and CI install first).
 
-2026-10-09 release qualification composition. The bounded diagnostic dev.157 policy and all production workflows remain unchanged. An independently reviewed full-default source view retains every original mandatory guard and mutation, validates the exact raw policy/topology, and rejects failed receipt retention. All44 new controls and nine old guard suites pass privately; the new controls are enrolled directly in the normal JS suite. Release fixtures retain the real policy dependencies and fixed independent dev.158 refusal vectors. The original144 Brew controls are preserved with two new foreground-requester controls: only the admitted Accessory singleton requests activation, and a fresh isActive acknowledgement is required before the existing Automation request. All146 portable Python controls and36 owning JS controls pass. Native AppKit/TCC behavior and all six Brew positive scenarios remain unexecuted for this source; activation may refuse asynchronously, and unknown UI controls remain denied. Latest prior Mac37940744064 still reports archive24/25 and skipped package/install. Final source CI is required; item36 and transversal16/38 remain open.
+2026-10-09 release qualification composition. The bounded diagnostic dev.157 policy and all production workflows remain unchanged. An independently reviewed full-default source view retains every original mandatory guard and mutation, validates the exact raw policy/topology, and rejects failed receipt retention. All44 new controls and nine old guard suites pass privately; the new controls are enrolled directly in the normal JS suite. Release fixtures retain the real policy dependencies and fixed independent dev.158 refusal vectors. The original144 Brew controls are preserved with two new foreground-requester controls: only the admitted Accessory singleton requests activation, and a fresh isActive acknowledgement is required before the existing Automation request. All146 portable Python controls and36 owning JS controls pass. Native AppKit/TCC behavior and all six Brew positive scenarios remain unexecuted for this source; activation may refuse asynchronously, and unknown UI controls remain denied. Latest prior Mac37940744064 still reports archive24/25 and skipped package/install. The exact integratede896 manual37960022603 executed all25 archive cases:24 passed and the Brew prerequisite refused inactive after requesting foreground activation, before its six profile scenarios. Archive8/Sparkle15 and consent opt-in passed; package/install skipped. An independently reviewed exact fast-header parser repair now preserves the four original stub-harness assertions, adds five refusal controls and remains explicit about missing WindowServer/physical proof. The three added refusal families also require the exact nonempty name-field error; wrong-error, nonstring and nil mutations are refused, with no scanner or baseline change. The reviewed same-deadline AppKit activation correction is now adopted: the existing request captures one original30-second public monotonic deadline before its checkpoint, passes it only to its owned child, and retains that deadline through UI observation and physical completion. The same Accessory application pumps only its own AppKit events and requires fresh actual activity before the unchanged Automation request. All146 old portable method bodies remain exact and154 owning controls,36 Homebrew checks and17 compiled explicit API-model cases pass; six causal mutants refuse. Hosted manual37968407062 on479d6f68 reaches a bounded UI observation instead of the prior inactive refusal: archive24/25 pass, while Brew refuses the first unsupported-title button and its six profiles remain unreached. The actual retained window has four observed nodes; its identity remains unknown. A reviewed passive diagnostic now traverses only that same retained window, within the original three-second child/original30-second request caps, without changing the original NO/refusal or any button action. All154 old Python methods remain byte-identical;158 portable controls and37 owning checks pass, including executable-only guards that reject commented or quoted lookalikes. The actual frozen699-byte packet plus maximal new scalars fits827 bytes inside the unchanged1024-byte capture. Actual manual37975640734 on13e981637 preserves native archive24/25, both SDK41/Source10 and HTTP worker12 cohorts, but the new passive diagnostic fails native Clang compilation because its children receiver is declared id before reading NSArray.count. The independently reviewed correction changes only that receiver declaration to NSArray\*, preserving its runtime class refusal, both256 bounds, original clocks and consent rules; Fresh manual37978092202 onaa925760 confirms actual native compilation and passive-reader execution, while archive24/25 remains partial. Its child-list query returns nil with documented AXNoValue(-25212) after two nodes; identity remains unknown and all six Brew profiles remain unreached. The reviewed one-line passive-only correction treats that absent child value as an empty leaf, like the existing nil/success or unsupported cases, preserving the entire original inspector, NO/action guards, budgets, bounds and cleanup. Exact manual37984497921 on5d839b13 now confirms native compilation and complete seven-node passive traversal (refusal none/error0), with neither owned sender nor receiver observed. The original unsupported button/refusal, unknown window identity, candidates0/matches0 and NO/action guards remain unchanged. Archive25 executes24PASS/1BrewFAIL/0SKIP (archive8/Sparkle15/consent1PASS); all six Brew profiles remain unreached, and original cleanup receipts are accepted. Complete Brew and final package/installed qualification remain open; absence of owned text does not authorize an unknown window or permission grant. Native AX compilation/execution on this diagnostic, complete native25/Brew6, final package and installed upgrade/relaunch qualification remain required; no consent guard, unknown-control refusal or cleanup assertion is waived. Item36 and transversal16/38 remain open.
 
 Owned manual37934910035 on880424ae again executes24PASS/1FAIL/0SKIP in the original25 archive cohort. Qualified requester, trusted observer and successful AXWindow observation remain; the exact window close/minimize/zoom attributes all return NoValue(-25212), so their typed identity stays unobserved and the classifier preserves refusal. The same first button has unsupported title/subrole. A reviewed diagnostic now queries only that retained button's public AXDescription and AXValue, exporting fixed label-family/type/error tokens without raw text or new action authority. All original141 portable methods and the native whole-source inverse remain exact;144 Python cases and36 JS controls pass, with the original source failing the three new controls. Actual label families and six Brew acceptance scenarios on this successor remain unexecuted. Both macOS SDK41 cohorts and fresh signed cold MLX/bootstrap closure pass on880; full package/install are skipped. Item36 and transverse16/38 remain open.
 
@@ -6036,7 +6058,13 @@ cancellation owners are unchanged. Items 54 and 81 remain partial.
       open. macOS system trust and explicit proxy relays are integrated, while
       opaque-client full-URL PAC/WPAD/fallback/redirect routing remains CODE.
 
-2026-10-09 current-source network receiving. The full native Windows suite37936720478 passed10617 cases with0 failures, including queued TLS, current-user SSPI and finite proxy authentication; its later desktop collector refused warning text, so E2E/package/install were skipped. Current Dev Go SDK/cache fixes, fresh native CLI publication and physical catalogue roots are preserved with all37 evidence controls. Retained authentic curl binaries were separately re-admitted against current unchanged artifact commitments: seven real version/loader/signature commands and17 receiver controls passed under the physically closed original owner; this does not qualify the current driver cohort. Local native gates still require a clean published SHA and scoped tool/SDK inputs. This kernel lacks the required proc-children interface; canonical Nix/store prerequisites are also absent, so compatible hosted CI is required for those targets. The reviewed PAC source24/Source10 successor and the closed ConfigBundle updater interoperability remain code/CI work, with source/device acceptance distinct. Item62 and transversal16/38 remain open.
+2026-10-09 final upstream refresh. Explicit refspec receiving now includes actualDev20f66968 (including the approved thirteen-scope publication policy and renewed window), without changing that policy or the other groups' code. Raw full-default124, Mac source/typed78, item36 constructed65, PAC portable82, approved-policy controls and normal formatting pass on this composed source. Native corrected Windows44 and final cross-platform acceptance remain pending; inherited whole-gate failures remain reported above.
+
+2026-10-09 upstream receiving. The latest actual Dev253fe1ab is preserved. The Source10 CI step retains its strict original command, source/run/attempt receipt and ten-minute budget while adopting the mandatory non-cancellation condition after upstream retired the fast input. The raw full-default guard preserves124 controls; the Mac source/typed-receipt guard preserves all58 upstream and12 Source10 bodies, plus eight negative controls for the approved explicit PAC qualification wrapper (78/0). Item36 constructed65 and PAC selected-cohort portable82 controls pass; this is not native Mac qualification. Windows manual37995346703 ataa6d73f3 has10657 passes and one original Source44 failure: the genuine ErrorRecord identifies DecoderFallbackException atFetch.Invoke line241, outside the original TargetInvocationException catch. Its new closed diagnostic case passes; E2E/package/install are skipped, and the corrected catch now requires the path-specific decoder/oversize class or an actual HTTP503 WebException; unrelated failures and owner debt are not admitted. Seven actual PS7 controls pass, including two real HTTP503 exchanges and physical peer retirement; corrected Windows44 execution remains pending. Release is skipped. No TODO identifier is removed. Normal formatting passes; the full local JS run has401 passes/five failures. The unchanged source-toolchain test is requalified successfully with scoped TMPDIR=/tmp after the retained ENOSPC failure, and the Homebrew guard passes after exact qualification-wrapper binding. Source10 raw-condition5 and constructed source-receipt22 controls pass. The same whole pipeline test then reaches an incoming Linux live-harness causal-preimage failure; it is not a whole-gate pass. The incoming Linux evidence and Windows desktop guards also remain red and are byte-identical toDev253fe1ab. Their owners have been notified; no assertion or original native command is removed.
+
+2026-10-09 current-source network receiving. The full native Windows suite37936720478 passed10617 cases with0 failures, including queued TLS, current-user SSPI and finite proxy authentication; its later desktop collector refused warning text, so E2E/package/install were skipped. Current Dev Go SDK/cache fixes, fresh native CLI publication and physical catalogue roots are preserved with all37 evidence controls. The controlled signal-result fixture now publishes its complete closed JSON by an exclusive same-directory pending file and atomic replacement. All37 original methods, their assertions and five-second clocks remain exact; seven enrolled receiving controls bring the normal cohort to44. The actual original empty/partial publication counterexamples fail, while all44 corrected controls pass under a physically closed owner with no retained debt. The historical Source43 failure cause remains unknown; this test-only correction provides no native Go or Darwin acceptance. Retained authentic curl binaries were separately re-admitted against current unchanged artifact commitments: seven real version/loader/signature commands and17 receiver controls passed under the physically closed original owner; this does not qualify the current driver cohort. The real retained-output18/public30 Linux gate subsequently passed48/48 with0 skips on clean integratede896 under the original physically closed owners; this qualifies that cohort only. New source changes still require fresh native qualification with scoped tool/SDK inputs. This kernel lacks the required proc-children interface; canonical Nix/store prerequisites are also absent, so compatible hosted CI is required for those targets. The reviewed shared PAC source24 contract and its exact Source10 CI enrollment are now adopted: initial-authority-only native credentials, direct fresh bounded PAC retrieval, physically owned redirect sessions, strict UTF/BOM decoding and original full-URL argument binding remain guarded. All51 portable HTTP receiving methods,61 source controls and14 real HTTP/TLS peer cases pass; Source10 enrollment preserves the raw bounded fast policy and full/manual obligations. The incoming37 Go evidence controls, FullDefault44 alias/registry and original source assertions are preserved. Exact manual37968407062 on479d6f68 is terminal failure with Release skipped: both macOS SDK41, Source10 and original HTTPWorker12 cohorts pass, while the two real PAC/WPAD wire methods retain trust-removal refusal and restoration debt. Windows executes10639 passes/four failures out of10643 unique timed rows; the new Source44 child exits1 early, while the original27 selected network controls pass. The source fixture now groups its URL expression before the five-element reflection argument array at both real Fetch call sites. Actual PowerShell7 reproduces14 original arity errors and14 corrected typed invocations;66 normal portable checks and14 real peer cases pass. Executable-only guards reject comments, strings and valid spaced here-string lookalikes. Original44 native assertions, clocks, credential policy and physical retirement remain unchanged. Fresh exact Windows manual37975640734 on13e981637 executes10640 passes/three failures: the unchanged held-response heartbeat passes in2898.396ms, while Source44 still exits1 after885.107ms before observing its complete marker. Its cause remains unknown. The reviewed first-failure diagnostic appends only closed error category, unique bounded script line and fixed compiler-code scalars from the existing settled capture; it never exports raw stderr, paths, URLs, credentials or environment. Three registered native literal/ambiguity/privacy controls are added without changing the original exit assertion, all44 PS bodies, capture8192, caller55seconds, Fetch5seconds or physical finalizer. All three literal diagnostic controls actually pass in exact manual37984497921 on5d839b13 (10655PASS/1FAIL/10656 unique timed rows). Source44 alone still exits1 in682.195ms with unknown/line0 because the original tree owner publishes settled combined stdout and fixed empty stderr. The reviewed correction uses that actual capture through one shared selector and adds one genuine owned PowerShell5 failure child; the new runtime control remains unexecuted until the next Windows manual. Original44 bodies, exit assertion,8192 cap,55s caller,5s Fetch,+1s retirement and physical finalizers remain unchanged. No underlying exception cause is inferred. The existing private byte-exact portable fixture also genuinely passes36 pre-Fetch URI/PowerShell controls on Linux PS7 under a closed owner; this is not Windows/Fetch44 acceptance. Actual Windows PowerShell5/Fetch44 receiving with this diagnostic, independent held-response failure diagnosis, final all-three-OS E2E/package/install and genuine managed-network acceptance remain required; no historical native cause, activation or restoration success is inferred. The reviewed Windows updater now stores its retention and release receipt outside the exact five-field native ConfigBundle, retains only one exact bundle graph, expires a predecessor acknowledgment on genuine successor admission, and refuses copied identity or foreign operation case. All existing native assertions remain; all eight additive registered AHK cases pass in the genuine10643-row Windows manifest on479d6f68. This cohort result does not qualify the whole lane. Portable source-derived controls pass; the separate closed-issuer schema composition and actual Windows E2E/package/install acceptance remain unrun. Item62 and transversal16/38 remain open.
+
+Exact candidate37984497921 is whole terminal failure (four successful, ten failed, eleven skipped jobs, zero cancelled; Release skipped). Its Windows manifest matches every unique timed row. All Framework compiler/staging TLS/file-denial/cancellation, capture/identity/junction/rename graph25, callbacks13, caller/Versions9, exact seven-mode queued-TLS and close11 controls pass; genuine current-user bare NTLM artifact and fixed-proxy/ordered-PAC POST exchanges pass. All24 selected production/test/fixture blobs are conserved from13e to5d. These completed hosted component substeps are retired below; they do not qualify enterprise Kerberos/Negotiate or the skipped Windows E2E/package/install. The original held-response heartbeat passes2533.139ms and updater8 passes; historical failure causes are not invented. Both Mac architectures pass SDK41, source10 and HTTPWorker12; PAC14 retains12PASS/2wireFAIL. Real wire methods time out in the original owned add-trusted-cert child at15seconds; removalexit1/restorationdebt remains red despite empty-owned trust queries. Its cause remains unknown; no trust bypass or cleanup waiver is adopted. Linux runs12728PASS/1FAIL in the unchanged key-combination owner; two isolated original getter cases pass under physical closure but do not exonerate the failing full suite. Final-source native/E2E/package/install and managed-network/device acceptance remain required.
 
 Owned manual37928730575 on662fc0a passes all41 native SDK cases on both macOS architectures. All14 PAC cases execute, with9 passes/5 failures: the repaired PAC choice ownership passes, including no-DIRECT and duplicate-order controls. HTTP argument observation20010 shows origin plus slash and plain host; HTTPS remains unknown because the new diagnostic refused the proxy type before printing. Public CFProxySupport documents HTTP and HTTPS tunneling proxy types, both already accepted by production. The reviewed diagnostic helper now admits exactly those two types and records a closed type token alongside its existing48-port codebook; the strict14 reader preserves every old test and refuses missing, failed, skipped, duplicate or malformed facts. Portable52/65/82 and independent malformed controls pass, without new Darwin credit. The first HTTP worker is physically reaped with closed pipes; trust restoration remains unsettled and no second-route identity is inferred. Windows executes10,613 passes/2 failures out of10,615: the NUL diagnostic parser now genuinely passes, while bare Negotiate and queued TLS close remain. Its admitted queued-case6 frame records socket10054 after network closure; a cause correction is separately pending. Packaging/install are skipped; production activation and remaining CODE/device requirements stay open.
 
@@ -6074,10 +6102,11 @@ receiving and remaining software/device work stay open.
 
 The reviewed diagnostic parser correction scans stored UTF16 units instead of using a NUL-terminated InStr needle, preserving all136 assertions,15 registrations, regex/ranges and the original131072-unit limit. Fifteen controls compiled from pinned upstream AHK bodies reproduce the old valid-frame refusal and pass the new guard; actual AHK receiving remains unexecuted and queued TLS cause remains unknown. The source-only PAC ownership migration also retains both immutable historical release hashes: only five exact, uniquely enrolled spans invert the four approved production changes before the unchanged checks. All original40 controls remain and44 pass under the original60-second registration; all30 partial enrollments refuse. No independent oracle is regenerated.
 
+Current follow-up manual37988808023 on96a53f4a is whole terminal failure: three successful, three failed and six skipped jobs, zero cancelled; Release skipped. Its genuine manifest matches all10657 unique timed Windows rows:10656PASS/1Source44FAIL. All four closed diagnostic controls pass, including the new real owned PowerShell error child; the original Source44 failure now reports method_binding/line0 rather than reading the empty stderr slot. The specific native method and underlying exception remain unknown. An independent actual PowerShell7 reflection control proves the original TargetInvocationException catch can leave a genuine InvalidDataException unhandled; baseline and diagnostic variants retain failure and both nested finalizers. A matching leaf catch is preserved without an error frame. This is a bounded exception-wrapper premise, not the native Windows cause or a reason to change the mandatory refusals. The next minimal diagnostic observes only the original terminating ErrorRecord: one fixture-bound line and an allowlisted leaf exception, within four links. It preserves every original44 control, both caller/Fetch clocks and peer finalizers; the AHK receiver admits only one bounded closed frame and keeps all five original cases. Actual PowerShell7 error/writer-refusal and matching/nonmatching typed-catch controls preserve exits and finalizers. PowerShell5/native receiving on this diagnostic remains unexecuted. Its unchanged portable prefix passes36 controls on actual Linux PowerShell7 without a Windows tick stub; that does not qualify PowerShell5/native fetch. Current retained-output18 and public GIO/curl30 controls also pass physically on96a53f4a with0FAIL/0SKIP, using the authenticated tools and original source-snapshot/cleanup owners. The earlier missing-environment prerequisite refusal is retained separately and gets no test credit. These Linux controls do not qualify physical input, enterprise networks or skipped E2E/package/install.
+
 Remaining hosted/software steps, distinct from personal-device acceptance:
 
-- [ ] Windows: qualify the real Framework compiler and staging TLS/file-denial/live-body cases after consumed-fragment retirement, genuine junction/rename receiving, queued callback revocation, artifact receiving and all seven queued TLS modes. Diagnose any remaining failures through exact native receipts; preserve all original assertions and deadlines.
-- [ ] Windows: reach and qualify both authenticated current-user proxy scenarios and the strict NTLM-only bare challenge. Negotiate success does not qualify bare NTLM; implement any missing bounded scheme discovery only after native receiving and shared capability review, without silent downgrade.
+- [ ] Windows: receive the actual PowerShell5 Source44 exception through the settled combined capture, correct its proven cause, and qualify the unchanged44 mandatory controls plus the genuine new diagnostic child. Keep native desktop/startup/E2E/package/install and enterprise Negotiate/Kerberos acceptance separate; NTLM fixtures do not qualify those paths.
 - [ ] macOS: qualify the independent25 archive/Sparkle/Brew/consent XCTest cases and all six Homebrew scenarios, the full native suite, final package and actual installed upgrade/relaunch. Preserve both Brew positives and policy denial; no supported consent-grant path is established yet.
 - [ ] macOS: qualify actual CFNetwork full-URL PAC/WPAD/fallback/redirect routing and owned trust restoration. The41 SDK cases passed on both architectures atfa330029, but final-source HTTP/model receiving and production activation remain unqualified. Keep the existing activation guard until these receipts pass.
 - [ ] All three drivers: complete final-source unit/E2E/package/install/launch and managed-network acceptance, including system trust, proxy authentication and distinct safe translated failure recovery. Official cold runtime/version probes do not qualify an unexecuted daemon/model installation.
@@ -7578,6 +7607,43 @@ Independent reviews approve these sources; exact-source Windows qualification
 and E2E/package/install remain required. No item or transversal requirement is
 removed.
 
+The latest partial delivery is integrated without squash at `1046dda11`.
+Its actual Linux GIO/curl48 controls pass with all original seven phases
+physically closed. The final three-OS manual37999625086 is terminal in failure, with Release
+skipped. Its genuine Windows manifest admits10725 passes/one unrelated timer
+inventory failure; corrected native source44, the closed diagnostic, updater8
+and selected component27 pass. Current Mac trust restoration and Brew
+Automation prerequisites still refuse. A narrow follow-up binds the approved
+linux-e2e-suite disposition wrapper around each independently fixed native
+command in the package/network/archive/digest/temporary-file registration
+guards. Deferred branches explicitly grant no qualification; unknown modes
+fail. Original native bodies, clocks, receipt/cleanup assertions and refusal
+controls remain mandatory. This guard correction does not qualify any
+deferred or unexecuted native component, finish62 or remove16/38.
+
+Container requalification on the same integrated production source now passes
+all six selected Linux native/source gates: temporary updater63 product checks
+(including48 original ownership/allocation checks across both ABIs), archive
+pipeline3 cases/15 checks with install/rollback, source archive26 controls,
+actual runtime4 groups, retained FD digest12 checks, and staged AppDir7 groups
+plus2 actual kernel-census controls. Each successful native owner closes its
+original physical phases; no product skip receives credit. The pinned Lua54
+vendor has22 passes/one independently declared optional union skip. Earlier
+missing-prerequisite and ENOSPC launches remain failed/unqualified, including
+retained metadata/closure debt; their namespaces are preserved. Private dconf
+cache, authentic tool/SDK activation and explicit native luv paths are saved
+additively for the next container. Full selected verification still has
+incoming CI wrapper/evidence guard failures and must not be called green.
+
+The final canonical-TMPDIR JS body reports400/406 passes: four incoming
+CI wrapper/evidence guards fail, plus source-toolchain and drift-copy ENOSPC
+failures. Both unchanged ENOSPC subjects pass in fresh scoped /tmp runs after
+storage recovery, including the genuine clone/C/header/ELF control and all four
+original drift mutations with exact edited-byte preservation. Reconnection
+interrupted the JS guardian; its missing final closure receipt remains
+unqualified. These separate passes do not turn the whole selected suite green.
+No assertion, original command or independent expected corpus is weakened.
+
 - [~] **63.** Provide shared screen-brightness up/down actions on all three
   drivers, including supported keyboard and wheel layers. Implemented: the
   translated catalogue, Windows bounded Job-owned WMI worker with complete
@@ -7991,6 +8057,15 @@ cancellation owners are unchanged. Items 54 and 81 remain partial.
   Device work: real held-alone-then-joined ordering and actual AltGr generation;
   injected Ctrl/RAlt priority does not prove physical hook ordering.
 
+  Current-Dev receiving binds the original Windows eleven-case desktop runner
+  to its source-bound qualification receipt and exact full/deferred/refusal
+  wrapper. All original fourteen causal refusals remain; sixteen additional
+  controls require selection/revalidation errors to fail, preserve the full
+  runner and 25-minute budget, and reject false qualification or missing evidence.
+  The pinned-Node source guard passes thirty refusals. Deferred execution grants
+  no native cohort proof; Windows PowerShell and actual desktop requalification
+  of this receiving successor remain unrun.
+
 - [~] **93.** Implement Linux combinations using item 91's shared pair
   IDs, slots and configuration sections. Implemented: ordered tap/hold delivery
   on one exact keyboard through the real Hook/tap-hold engine, bounded menus,
@@ -8082,6 +8157,16 @@ cancellation owners are unchanged. Items 54 and 81 remain partial.
   This container lacks /dev/uinput and /dev/input: the real wrapper refuses
   with exit 2 and zero scenarios/resources. Native execution is UNRUN;
   hosted kernel CI and physical receiving remain required.
+
+  Current-Dev CI receiving preserves both original real-kernel prerequisites,
+  their exact status/retirement enclosure and the saved-configuration subreaper
+  inside the source-bound full/deferred/refusal protocol. Eleven explicit sudo
+  context bindings preserve the qualification source; the six-minute deadline
+  is unchanged. Eighteen workflow and twenty-three custody-envelope mutations
+  are refused, including every original inverse. These portable controls grant
+  no new kernel execution or physical proof. The broader incoming pipeline
+  still has separate qualification/upload contract failures; the original Linux
+  cancellation assertions remain intact pending workflow-owner resolution.
 
 - [ ] **96.** Remove the separate Ergopti+ AltGr-adjustments option:
       selecting Ergopti+ in the existing emulation picker must suffice. Implemented:
@@ -8675,6 +8760,18 @@ cases. Whole XCTest343 is341 passed/two failed (Brew/Sparkle), six assertions;
 installed package acceptance remains failed. Private diagnostic workflows,
 Census3 and G6 test-policy overlays are excluded from canonical product source.
 Final joined-source gates and remote Shortcut retirement remain required.
+
+Native SDK receiving on bc0400388/manual37981239358 observed the real
+no-prompt method passing (one test, zero failures; process/capture exits zero)
+and OSStatus -600. The sole marker arrived after the selected-suite terminal,
+so the unchanged strict collector refused it. The buffering or forwarding
+cause remains unknown; this is no catalogue, consent or other-caller proof.
+The prepared successor writes one newline-terminated UTF-8 observation through
+a synchronous throwing parent stderr write before the test returns. Source
+controls refuse buffered print, stdout, a missing newline and the original
+late-marker order; native Mac capture ordering remains unqualified. CI notices
+retain closed process/capture statuses and refusal codes without changing
+observation admission, worker retirement or deadlines.
 
 - [~] **107.** Expose native, digits-direct and symbols-direct number-row
   policy, with acknowledged legacy Windows-Boolean migration and unrelated data

@@ -89,6 +89,12 @@ const FULL_STEPS = [
 	[
 		'.github/workflows/ci-macos.yml',
 		'managed-ollama-native',
+		'Qualify actual native PAC source ownership XCTest controls',
+		'${{ !cancelled() }}'
+	],
+	[
+		'.github/workflows/ci-macos.yml',
+		'managed-ollama-native',
 		'Retain independent native SDK XCTest diagnostics',
 		'always()'
 	],

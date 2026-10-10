@@ -194,6 +194,12 @@ const MACOS_NATIVE_STEP_CONDITIONS = [
 	[
 		MACOS_BOX,
 		'managed-ollama-native',
+		'Qualify actual native PAC source ownership XCTest controls',
+		NOT_CANCELLED
+	],
+	[
+		MACOS_BOX,
+		'managed-ollama-native',
 		'Qualify actual native PAC and WPAD XCTest controls',
 		NOT_CANCELLED
 	],
@@ -3751,6 +3757,245 @@ for (const [what, from, to] of [
 	mustCatch(what, LINUX_BOX, from, to, linuxAudioPrerequisiteProblems);
 }
 
+// A disjoint mandatory cohort; literal ownership is narrower than a generic Swift filter.
+const PAC_SOURCE_STEP =
+	'      - name: Qualify actual native PAC source ownership XCTest controls\n        if: ${{ !cancelled() }}\n        shell: bash\n        run: |\n          set -euo pipefail\n          test -n "$ERGOPTI_NATIVE_HTTP_PYTHON"\n          test -x "$ERGOPTI_NATIVE_HTTP_PYTHON"\n          test -z "${ERGOPTI_DEV_QUALIFICATION_PROFILE:-}"\n          transcript="$ERGOPTI_OLLAMA_BUILD_ROOT/native-pac-source-xctest.log"\n          source_receipt="$ERGOPTI_OLLAMA_BUILD_ROOT/native-pac-source-inputs.json"\n          node tools/diagnostics/native_pac_source_evidence.cjs begin "$GITHUB_SHA" "$GITHUB_RUN_ID" "$GITHUB_RUN_ATTEMPT" "$ERGOPTI_OLLAMA_EXPECTED_ARCHITECTURE" "$source_receipt"\n          set +e\n          swift test --package-path static/ergopti_plus/macos/launcher \\\n            --scratch-path "$ERGOPTI_OLLAMA_BUILD_ROOT/swift" \\\n            --filter \'(^|[.])ManagedPACSourceTests([/.]|$)\' 2>&1 | tee "$transcript"\n          source_statuses=("${PIPESTATUS[@]}")\n          set -e\n          test "${#source_statuses[@]}" -eq 2\n          node tools/diagnostics/native_pac_source_evidence.cjs judge "$transcript" "${source_statuses[0]}" "${source_statuses[1]}" "$GITHUB_SHA" "$GITHUB_RUN_ID" "$GITHUB_RUN_ATTEMPT" "$ERGOPTI_OLLAMA_EXPECTED_ARCHITECTURE" "$source_receipt" "$ERGOPTI_OLLAMA_BUILD_ROOT/native-pac-source-verdict.json"\n        timeout-minutes: 10\n';
+function nativePacSourceProblems(files) {
+	const mac = files.find((file) => file.rel === MACOS_BOX)?.text ?? '';
+	const jobs = [
+		...mac.matchAll(/^  managed-ollama-native:\n[\s\S]*?(?=^  [A-Za-z][\w-]*:|(?![\s\S]))/gm)
+	];
+	const problems = [];
+	if (jobs.length !== 1) return ['native-source-job'];
+	const job = jobs[0][0];
+	if (mac.split(PAC_SOURCE_STEP).length !== 2 || job.split(PAC_SOURCE_STEP).length !== 2)
+		problems.push('native-source-exact-step');
+	const sdk = job.indexOf(
+		'      - name: Qualify actual SDK accepted-owner and deadline XCTest controls\n'
+	);
+	const source = job.indexOf(PAC_SOURCE_STEP);
+	const pac = job.indexOf('      - name: Qualify actual native PAC and WPAD XCTest controls\n');
+	if (sdk < 0 || source <= sdk || pac <= source) problems.push('native-source-order');
+	for (const name of [
+		'native-pac-source-xctest.log',
+		'native-pac-source-inputs.json',
+		'native-pac-source-verdict.json'
+	]) {
+		const line = `            \${{ env.ERGOPTI_OLLAMA_BUILD_ROOT }}/${name}`;
+		if (job.split('\n').filter((actual) => actual === line).length !== 1)
+			problems.push('native-source-retained-' + name);
+	}
+	return problems;
+}
+errors.push(...nativePacSourceProblems(pipeline.files()));
+// The actual raw Source10 condition remains mandatory after the retired fast route.
+const rawSourceFiles = require('./ci-pipeline.cjs').files();
+const rawSourceStep = PAC_SOURCE_STEP;
+assert.doesNotThrow(() => pipeline.validateRaw(rawSourceFiles));
+for (const [replacement, error] of [
+	[
+		'',
+		/\[ci-pipeline\] no step named 'Qualify actual native PAC source ownership XCTest controls'/
+	],
+	[
+		rawSourceStep + rawSourceStep,
+		/\[ci-pipeline\] step 'Qualify actual native PAC source ownership XCTest controls' appears 2 times in one job/
+	],
+	[
+		rawSourceStep.replace('if: ${{ !cancelled() }}', 'if: false'),
+		/\[ci-full-default\].*full step condition/
+	],
+	[
+		rawSourceStep.replace('if: ${{ !cancelled() }}', 'if: ${{ success() }}'),
+		/\[ci-full-default\].*full step condition/
+	]
+]) {
+	const changed = rawSourceFiles.map((file) =>
+		file.rel === MACOS_BOX ? { ...file, text: file.text.replace(rawSourceStep, replacement) } : file
+	);
+	assert.notDeepEqual(changed, rawSourceFiles);
+	assert.throws(() => pipeline.fromFiles(changed), error);
+}
+console.log('PASS: exact Source10 raw condition controls=5; native execution unqualified.');
+for (const [name, changed] of [
+	['missing source step', ''],
+	['duplicate source step', PAC_SOURCE_STEP + PAC_SOURCE_STEP],
+	['skipped source step', PAC_SOURCE_STEP.replace('if: ${{ !cancelled() }}', 'if: false')],
+	['ignored source child status', PAC_SOURCE_STEP.replace('"${source_statuses[0]}"', '"0"')],
+	['ignored source capture status', PAC_SOURCE_STEP.replace('"${source_statuses[1]}"', '"0"')],
+	['foreign source run', PAC_SOURCE_STEP.replace('"$GITHUB_RUN_ID"', '"foreign"')],
+	['foreign source attempt', PAC_SOURCE_STEP.replace('"$GITHUB_RUN_ATTEMPT"', '"1"')],
+	[
+		'source verdict before capture closure',
+		PAC_SOURCE_STEP.replace('source_statuses=("${PIPESTATUS[@]}")', 'source_statuses=(0 0)')
+	]
+])
+	mustCatch(name, MACOS_BOX, PAC_SOURCE_STEP, changed, nativePacSourceProblems);
+for (const name of [
+	'native-pac-source-xctest.log',
+	'native-pac-source-inputs.json',
+	'native-pac-source-verdict.json'
+]) {
+	const line = `            \${{ env.ERGOPTI_OLLAMA_BUILD_ROOT }}/${name}\n`;
+	mustCatch('missing retained ' + name, MACOS_BOX, line, '', nativePacSourceProblems);
+}
+
+// Actual begin/judge over a private tracked checkout. These are constructed
+// XCTest frames, not an execution or a qualification of native Swift controls.
+function checkNativePacSourceReceipts() {
+	const os = require('node:os');
+	const reader = require('../diagnostics/native_pac_source_evidence.cjs');
+	const repository = fs.mkdtempSync(path.join(os.tmpdir(), 'ergopti-source-receipt-'));
+	const root = path.resolve(__dirname, '../..');
+	const git = (args) => {
+		const result = spawnSync('git', args, { cwd: repository, encoding: 'utf8' });
+		assert.equal(result.status, 0, result.stderr);
+		return result.stdout.trim();
+	};
+	const write = (relative, bytes) => {
+		const file = path.join(repository, relative);
+		fs.mkdirSync(path.dirname(file), { recursive: true });
+		fs.writeFileSync(file, bytes);
+	};
+	const methods = [
+		'testStrictUTF8AndBOMAdmission',
+		'testStrictUTF16RejectsMalformedSurrogatesAndNUL',
+		'testAuthorityScopeIncludesCanonicalSchemeHostEffectivePort',
+		'testBindingEscapesRequestDataAndRefusesInvalidSource',
+		'testRealPACSourceDecodersRetireEverySession',
+		'testRealPACSourceStatusSizeAndEncodingRefusalsRetire',
+		'testRealPACSourceRedirectsHaveFreshCredentialFreeOwners',
+		'testRealPACSourceTrustAnchorsPreserveHostnameAndDowngradeRefusal',
+		'testRealPACSourceDeadlineRefusesAndRetiresBeforeReplacement',
+		'testOriginalLookupBudgetIncludesSettingsPreparation'
+	];
+	let count = 0;
+	try {
+		const tests = 'static/ergopti_plus/macos/launcher/Tests/ErgoptiPlusTests/';
+		for (const suite of [
+			'ManagedPACSourceTests',
+			'ReleaseArchiveStagingTests',
+			'SparkleArchiveUpdateAcceptanceTests',
+			'HomebrewArchiveAcceptanceTests',
+			'HomebrewAutomationConsentTests'
+		]) {
+			const relative = tests + suite + '.swift';
+			write(relative, fs.readFileSync(path.join(root, relative)));
+		}
+		for (const relative of [
+			'static/ergopti_plus/_shared/modules/network/proxy_policy.json',
+			'static/ergopti_plus/macos/tests/support/native_pac_source_fixture.py',
+			'tools/diagnostics/native_pac_source_evidence.cjs',
+			'tools/diagnostics/swift_xctest_evidence.cjs'
+		])
+			write(relative, fs.readFileSync(path.join(root, relative)));
+		git(['init', '-q']);
+		git(['add', '--', '.']);
+		git([
+			'-c',
+			'user.name=Source receipt control',
+			'-c',
+			'user.email=source-control@example.invalid',
+			'commit',
+			'-qm',
+			'Private source-receipt control'
+		]);
+		const candidate = git(['rev-parse', 'HEAD']);
+		const epoch = [candidate, '123', '2', 'arm64'];
+		const before = path.join(repository, 'before.json'),
+			capture = path.join(repository, 'capture.log');
+		assert.equal(reader.main(['begin', ...epoch, before], repository), 0);
+		count++;
+		const lines = [
+			"Test Suite 'Selected tests' started at 2026-10-09",
+			"Test Suite 'ErgoptiPlusPackageTests.xctest' started at 2026-10-09",
+			"Test Suite 'ManagedPACSourceTests' started at 2026-10-09"
+		];
+		for (const method of methods) {
+			lines.push(
+				`Test Case '-[ErgoptiPlusTests.ManagedPACSourceTests ${method}]' started.`,
+				`Test Case '-[ErgoptiPlusTests.ManagedPACSourceTests ${method}]' passed (0.1 seconds).`
+			);
+		}
+		for (const suite of [
+			'ManagedPACSourceTests',
+			'ErgoptiPlusPackageTests.xctest',
+			'Selected tests'
+		])
+			lines.push(
+				`Test Suite '${suite}' passed at 2026-10-09`,
+				'Executed 10 tests, with 0 failures (0 unexpected) in 1 seconds'
+			);
+		const transcript = lines.join('\n') + '\n';
+		write('capture.log', transcript);
+		let serial = 0;
+		const judge = (fields = epoch, statuses = ['0', '0']) =>
+			reader.main(
+				[
+					'judge',
+					capture,
+					...statuses,
+					...fields,
+					before,
+					path.join(repository, `verdict-${serial++}.json`)
+				],
+				repository
+			);
+		assert.equal(judge(), 0);
+		count++;
+		for (const [index, value] of [
+			[0, '0'.repeat(40)],
+			[1, '124'],
+			[2, '3'],
+			[3, 'amd64']
+		]) {
+			const changed = [...epoch];
+			changed[index] = value;
+			assert.notEqual(judge(changed), 0);
+			count++;
+		}
+		for (const statuses of [
+			['1', '0'],
+			['0', '1']
+		]) {
+			assert.notEqual(judge(epoch, statuses), 0);
+			count++;
+		}
+		for (const method of methods) {
+			write('capture.log', transcript.replace(` ${method}]' passed`, ` ${method}]' skipped`));
+			assert.notEqual(judge(), 0);
+			count++;
+		}
+		write('capture.log', transcript);
+		const policy = 'static/ergopti_plus/_shared/modules/network/proxy_policy.json';
+		const original = fs.readFileSync(path.join(repository, policy));
+		write(policy, Buffer.concat([original, Buffer.from('\n')]));
+		assert.notEqual(judge(), 0);
+		count++;
+		write(policy, original);
+		const unbound = 'static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/Unbound.swift';
+		write(unbound, '// unbound\n');
+		assert.notEqual(judge(), 0);
+		count++;
+		fs.unlinkSync(path.join(repository, unbound));
+		fs.unlinkSync(capture);
+		fs.symlinkSync(before, capture);
+		assert.notEqual(judge(), 0);
+		count++;
+		fs.unlinkSync(capture);
+		write('capture.log', Buffer.from([0xff]));
+		assert.notEqual(judge(), 0);
+		count++;
+		assert.equal(count, 22);
+		console.log(
+			'PASS: native PAC source receipt controls=22; constructed transcripts/native execution unqualified.'
+		);
+	} finally {
+		fs.rmSync(repository, { recursive: true, force: true });
+	}
+}
+checkNativePacSourceReceipts();
+
 // Saved simultaneous actions must follow both unchanged kernel prerequisites.
 const LINUX_SIMULTANEOUS_HARNESS = 'static/ergopti_plus/linux/tests/hardware/run_daemon_live.sh';
 const LINUX_SIMULTANEOUS_COMMAND =
@@ -3763,8 +4008,29 @@ const LINUX_SIMULTANEOUS_ENVELOPE = [
 	'CUSTODY=$?',
 	'fi',
 	'if [ "${CUSTODY}" = "0" ]; then',
+	'if [ "${GITHUB_ACTIONS:-}" = true ]; then',
+	'mode=full',
+	'if [ -z "${RUNNER_TEMP:-}" ]; then CUSTODY=2; fi',
+	'receipt="${RUNNER_TEMP:-}/stable-linux-simultaneous-native.json"',
+	'if [ "$CUSTODY" = "0" ]; then',
+	'node ../../../tools/ci/dev-release-qualification.cjs --scope linux-simultaneous-native --receipt "$receipt" || CUSTODY=$?',
+	'fi',
+	'if [ "$CUSTODY" = "0" ]; then',
+	'mode="$(node ../../../tools/ci/dev-release-qualification.cjs --scope linux-simultaneous-native --validate-scope-receipt "$receipt")" || CUSTODY=$?',
+	'fi',
+	'else',
+	'mode=full',
+	'fi',
+	'if [ "$CUSTODY" != "0" ]; then',
+	': # The existing owned-host failure enclosure below performs cleanup.',
+	'elif [ "$mode" = deferred ]; then',
+	"echo '[DEFERRED] linux-simultaneous-native: qualified=false; saved-configuration supplement not executed.'",
+	'elif [ "$mode" = full ]; then',
 	LINUX_SIMULTANEOUS_COMMAND,
 	'CUSTODY=$?',
+	'else',
+	'CUSTODY=2',
+	'fi',
 	'fi',
 	'if [ "${CUSTODY}" != "0" ]; then',
 	'kill ${PIDS} 2>/dev/null',
@@ -3786,17 +4052,37 @@ const LINUX_SIMULTANEOUS_ENV = [
 	'ERGOPTI_DEV_RELEASE_TAG',
 	'ERGOPTI_DEV_RELEASE_VERSION'
 ];
-const LINUX_SIMULTANEOUS_ENTRY =
-	'sudo env ' +
-	LINUX_SIMULTANEOUS_ENV.map((key) => key + '="$' + key + '"').join(' ') +
-	` bash ${LINUX_SIMULTANEOUS_HARNESS}`;
 const LINUX_SIMULTANEOUS_SOURCE_ENTRY =
 	'sudo env \\\n' +
 	LINUX_SIMULTANEOUS_ENV.map((key) => '            ' + key + '="$' + key + '" \\\n').join('') +
 	`            bash ${LINUX_SIMULTANEOUS_HARNESS}`;
+const LINUX_SIMULTANEOUS_ENTRY = `bash ${LINUX_SIMULTANEOUS_HARNESS}`;
+const LINUX_SIMULTANEOUS_NATIVE_WORKFLOW = [
+	'sudo modprobe uinput',
+	'sudo python3 "$GITHUB_WORKSPACE/tools/ci/ubuntu_apt.py" -y --no-install-recommends at-spi2-core openbox python3-gi gir1.2-gtk-3.0 \\',
+	'  dbus-x11 xvfb x11-xkb-utils libayatana-appindicator3-1 lua-luv',
+	'sudo env \\',
+	'  GITHUB_ACTIONS="$GITHUB_ACTIONS" \\',
+	'  GITHUB_REPOSITORY="$GITHUB_REPOSITORY" \\',
+	'  GITHUB_EVENT_NAME="$GITHUB_EVENT_NAME" \\',
+	'  GITHUB_REF="$GITHUB_REF" \\',
+	'  GITHUB_SHA="$GITHUB_SHA" \\',
+	'  RUNNER_TEMP="$RUNNER_TEMP" \\',
+	'  ERGOPTI_DEV_RELEASE_RELEASE="$ERGOPTI_DEV_RELEASE_RELEASE" \\',
+	'  ERGOPTI_DEV_RELEASE_PRERELEASE="$ERGOPTI_DEV_RELEASE_PRERELEASE" \\',
+	'  ERGOPTI_DEV_RELEASE_CHANNEL="$ERGOPTI_DEV_RELEASE_CHANNEL" \\',
+	'  ERGOPTI_DEV_RELEASE_TAG="$ERGOPTI_DEV_RELEASE_TAG" \\',
+	'  ERGOPTI_DEV_RELEASE_VERSION="$ERGOPTI_DEV_RELEASE_VERSION" \\',
+	`  ${LINUX_SIMULTANEOUS_ENTRY}`
+];
 
 /** Binds the inspected harness to its mandatory existing native workflow call. */
 function linuxSimultaneousWorkflowProblems(files) {
+	try {
+		pipeline.fromFiles(files);
+	} catch {
+		return ['Linux raw workflow admission refused'];
+	}
 	const steps = files
 		.filter((entry) => entry.rel === LINUX_BOX)
 		.flatMap((entry) => pipeline.jobsOfText(entry.text, entry.rel))
@@ -3805,18 +4091,20 @@ function linuxSimultaneousWorkflowProblems(files) {
 		.filter((step) => step.name === LINUX_SIMULTANEOUS_STEP);
 	if (steps.length !== 1) return ['Linux needs exactly one whole-daemon native step'];
 	const step = steps[0];
-	const commands = logicalLines(step.body).filter((line) => line !== '');
-	const aptPrefix =
-		'sudo python3 "$GITHUB_WORKSPACE/tools/ci/ubuntu_apt.py" -y --no-install-recommends ';
+	let wrapperFits = true;
+	try {
+		require('./ci-linux-qualified-run.cjs').assertLinuxQualifiedRun(
+			(pipeline.runOf(step.body) ?? []).filter((line) => !line.trimStart().startsWith('#')),
+			LINUX_SIMULTANEOUS_NATIVE_WORKFLOW
+		);
+	} catch {
+		wrapperFits = false;
+	}
 	if (
 		pipeline.stepField(step.body, 'if') !== NOT_CANCELLED ||
 		pipeline.stepField(step.body, 'timeout-minutes') !== '6' ||
 		pipeline.stepField(step.body, 'continue-on-error') !== null ||
-		commands.length !== 3 ||
-		commands[0] !== 'sudo modprobe uinput' ||
-		!commands[1].startsWith(aptPrefix) ||
-		!/^[a-z0-9.+-]+(?:\s+[a-z0-9.+-]+)*$/.test(commands[1].slice(aptPrefix.length)) ||
-		commands[2].replace(/\s+/g, ' ') !== LINUX_SIMULTANEOUS_ENTRY
+		!wrapperFits
 	) {
 		return [
 			'Linux whole-daemon enrollment must retain its prerequisites, exact call and failure budget'
@@ -3825,8 +4113,17 @@ function linuxSimultaneousWorkflowProblems(files) {
 	return [];
 }
 
-errors.push(...linuxSimultaneousWorkflowProblems(pipeline.files()));
-const linuxSimultaneousStepBody = pipeline.step(pipeline.job('e2e-linux'), LINUX_SIMULTANEOUS_STEP);
+// Inspect the raw wrapper only after the strict full graph admits it.
+const linuxSimultaneousRawFiles = pipeline.rawFiles();
+errors.push(...linuxSimultaneousWorkflowProblems(linuxSimultaneousRawFiles));
+const linuxSimultaneousRawJob = pipeline
+	.jobsOfText(linuxSimultaneousRawFiles.find((file) => file.rel === LINUX_BOX).text, LINUX_BOX)
+	.find((job) => job.id === 'e2e-linux');
+const linuxSimultaneousStepBody = pipeline.step(
+	linuxSimultaneousRawJob.body,
+	LINUX_SIMULTANEOUS_STEP
+);
+let linuxSimultaneousWorkflowRefusals = 0;
 for (const [what, from, to] of [
 	['omitted live harness', LINUX_SIMULTANEOUS_SOURCE_ENTRY, 'true'],
 	[
@@ -3845,10 +4142,39 @@ for (const [what, from, to] of [
 		'forgiven live step',
 		'timeout-minutes: 6',
 		'timeout-minutes: 6\n        continue-on-error: true'
-	]
+	],
+	['missing native uinput prerequisite', 'sudo modprobe uinput', 'true'],
+	[
+		'missing native dependencies',
+		'--no-install-recommends at-spi2-core',
+		'--no-install-recommends'
+	],
+	['missing strict wrapper status', 'set -euo pipefail', 'set +e'],
+	[
+		'wrong workflow selection scope',
+		'--scope linux-e2e-suite --receipt',
+		'--scope linux-simultaneous-native --receipt'
+	],
+	[
+		'fabricated workflow disposition',
+		'mode="$(node tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --validate-scope-receipt "$receipt")"',
+		'mode=deferred'
+	],
+	['false workflow native credit', 'qualified=false', 'qualified=true'],
+	['workflow full branch disabled', 'elif [ "$mode" = full ]; then', 'elif false; then'],
+	['unknown workflow mode forgiven', 'exit 1', 'exit 0'],
+	['sudo environment omitted', 'sudo env \\', 'sudo \\'],
+	['sudo current source omitted', 'GITHUB_SHA="$GITHUB_SHA"', 'GITHUB_SHA=unbound'],
+	[
+		'sudo policy context omitted',
+		'ERGOPTI_DEV_RELEASE_VERSION="$ERGOPTI_DEV_RELEASE_VERSION"',
+		'ERGOPTI_DEV_RELEASE_VERSION=unbound'
+	],
+	['sudo receipt root omitted', 'RUNNER_TEMP="$RUNNER_TEMP"', 'RUNNER_TEMP=/unrelated']
 ]) {
 	assert.ok(linuxSimultaneousStepBody.includes(from), `${what}: causal preimage must exist`);
-	const changed = pipeline.files().map((entry) => ({
+	assert.equal(linuxSimultaneousStepBody.split(from).length, 2, `${what}: one step-local target`);
+	const changed = linuxSimultaneousRawFiles.map((entry) => ({
 		...entry,
 		text:
 			entry.rel === LINUX_BOX
@@ -3859,7 +4185,9 @@ for (const [what, from, to] of [
 		linuxSimultaneousWorkflowProblems(changed).length > 0,
 		`${what} must refuse enrollment`
 	);
+	linuxSimultaneousWorkflowRefusals++;
 }
+assert.equal(linuxSimultaneousWorkflowRefusals, 18);
 
 /** Retains exact ordered native calls, status admission and failing teardown. */
 function linuxSimultaneousEnrollmentProblems(source) {
@@ -3903,7 +4231,7 @@ const linuxSimultaneousHarness =
 		fs.readFileSync(path.resolve(__dirname, '../..', LINUX_SIMULTANEOUS_HARNESS), 'utf8')
 	);
 errors.push(...linuxSimultaneousEnrollmentProblems(linuxSimultaneousHarness));
-const linuxSimultaneousBlock = LINUX_SIMULTANEOUS_ENVELOPE.slice(6, 10).join('\n');
+const linuxSimultaneousBlock = LINUX_SIMULTANEOUS_ENVELOPE.slice(6, -4).join('\n');
 const linuxSimultaneousNormalized = linuxSimultaneousHarness
 	.split('\n')
 	.map((line) => line.trim())
@@ -3915,6 +4243,7 @@ assert.equal(
 	0,
 	'additive owner work outside the executable native envelope must remain permitted'
 );
+let linuxSimultaneousEnvelopeRefusals = 0;
 for (const [what, from, to] of [
 	['old harness omits the supplement', linuxSimultaneousBlock, ''],
 	[
@@ -3933,7 +4262,10 @@ for (const [what, from, to] of [
 	[
 		'uncaptured supplement status',
 		linuxSimultaneousBlock,
-		linuxSimultaneousBlock.replace('CUSTODY=$?', 'CUSTODY=0')
+		linuxSimultaneousBlock.replace(
+			`${LINUX_SIMULTANEOUS_COMMAND}\nCUSTODY=$?`,
+			`${LINUX_SIMULTANEOUS_COMMAND}\nCUSTODY=0`
+		)
 	],
 	['missing old input owner', LINUX_SIMULTANEOUS_ENVELOPE[3], 'true'],
 	[
@@ -3952,14 +4284,44 @@ for (const [what, from, to] of [
 		LINUX_SIMULTANEOUS_ENVELOPE[0],
 		`if false; then\n${LINUX_SIMULTANEOUS_ENVELOPE[0]}`
 	],
-	['only a commented supplement', LINUX_SIMULTANEOUS_COMMAND, `# ${LINUX_SIMULTANEOUS_COMMAND}`]
+	['only a commented supplement', LINUX_SIMULTANEOUS_COMMAND, `# ${LINUX_SIMULTANEOUS_COMMAND}`],
+	['missing CI identity gate', '${GITHUB_ACTIONS:-}', '${UNBOUND_ACTIONS:-}'],
+	['missing receipt root refusal', 'if [ -z "${RUNNER_TEMP:-}" ]; then CUSTODY=2; fi', 'true'],
+	[
+		'wrong saved selection scope',
+		'--scope linux-simultaneous-native --receipt',
+		'--scope linux-e2e-suite --receipt'
+	],
+	[
+		'forgiven saved selection failure',
+		'--receipt "$receipt" || CUSTODY=$?',
+		'--receipt "$receipt" || true'
+	],
+	[
+		'fabricated saved disposition',
+		'mode="$(node ../../../tools/ci/dev-release-qualification.cjs --scope linux-simultaneous-native --validate-scope-receipt "$receipt")" || CUSTODY=$?',
+		'mode=deferred'
+	],
+	[
+		'forgiven saved receipt failure',
+		'--validate-scope-receipt "$receipt")" || CUSTODY=$?',
+		'--validate-scope-receipt "$receipt")" || true'
+	],
+	['false saved native credit', 'qualified=false', 'qualified=true'],
+	['saved full branch disabled', 'elif [ "$mode" = full ]; then', 'elif false; then'],
+	['unknown saved mode forgiven', 'else\nCUSTODY=2\nfi', 'else\nCUSTODY=0\nfi']
 ]) {
 	assert.ok(linuxSimultaneousNormalized.includes(from), `${what}: causal preimage must exist`);
 	assert.ok(
 		linuxSimultaneousEnrollmentProblems(linuxSimultaneousNormalized.replace(from, to)).length > 0,
 		`${what} must refuse native qualification`
 	);
+	linuxSimultaneousEnvelopeRefusals++;
 }
+assert.equal(linuxSimultaneousEnvelopeRefusals, 23);
+console.log(
+	`PASS: Linux simultaneous wiring ${linuxSimultaneousWorkflowRefusals} workflow and ${linuxSimultaneousEnvelopeRefusals} custody-envelope refusals; native execution unqualified.`
+);
 
 // The temporary Mac exception still requires closed context and retained gates.
 require('./test-macos-dev-qualification-deferral.cjs');
