@@ -398,3 +398,106 @@ helpers.describe("GNU timeout capability admission", function()
 		end)
 	end
 end)
+
+helpers.describe("Unsigned X11 window identity transport", function()
+	local HIGH = { root = "2147483748", first = "2147483749", target = "2147483750", third = "2147483751",
+		hex = { first = "0x80000065", target = "0x80000066", third = "0x80000067" }, expected = 2147483750 }
+	local MAXIMUM = { root = "4294967292", first = "4294967293", target = "4294967295", third = "4294967294",
+		hex = { first = "0xfffffffd", target = "0xffffffff", third = "0xfffffffe" }, expected = 4294967295 }
+	-- Fixed native spelling vectors: xprop emits hex while xdotool/xwininfo emit decimal.
+	local function frame(ids, hex, final)
+		local named = hex and ids.hex or ids
+		local active = final and named.target or named.first
+		local lines = { "source", "ROOT=" .. ids.root, "pointer", "X=1500", "Y=200", "SCREEN=0",
+			"WINDOW=" .. ids.first, "monitors", "Monitors: 2",
+			" 0: +*LEFT 1000/300x800/240+0+0 LEFT", " 1: +RIGHT 1000/300x800/240+1000+0 RIGHT",
+			"active", active, "focus", active, ids.root, "end_focus", "desktop", "0", "stacking",
+			ids.hex.first .. ", " .. ids.hex.target .. ", " .. ids.hex.third }
+		for _, entry in ipairs({ { "first", "100" }, { "target", "1100" }, { "third", "100" } }) do
+			local key, x = entry[1], entry[2]
+			for _, line in ipairs({ "window " .. named[key], "WINDOW=" .. ids[key], "X=" .. x, "Y=100",
+				"WIDTH=500", "HEIGHT=400", "SCREEN=0", "DESKTOP=0", "ELIGIBLE=1", "end_window" }) do
+				lines[#lines + 1] = line
+			end
+		end
+		lines[#lines + 1] = "end_snapshot"
+		return table.concat(lines, "\n") .. "\n"
+	end
+	for _, hex in ipairs({ false, true }) do
+		helpers.it("accepts high-bit XIDs with " .. (hex and "hex" or "decimal") .. " native identifiers", function()
+			local snapshot = Policy.parse_snapshot(frame(HIGH, hex, false))
+			helpers.assert_not_nil(snapshot)
+			helpers.assert_eq(snapshot.root, 2147483748); helpers.assert_eq(snapshot.active, 2147483749)
+			helpers.assert_eq(snapshot.focus_chain, { 2147483749, 2147483748 })
+			helpers.assert_eq(snapshot.order, { 2147483749, 2147483750, 2147483751 })
+			helpers.assert_eq(Policy.candidate(snapshot), 2147483750)
+		end)
+		helpers.it("revalidates high-bit identity across " .. (hex and "hex to decimal" or "decimal to hex"), function()
+			local first = Policy.parse_snapshot(frame(HIGH, hex, false))
+			local current = Policy.parse_snapshot(frame(HIGH, not hex, false))
+			helpers.assert_not_nil(first); helpers.assert_not_nil(current)
+			helpers.assert_true(Policy.revalidated(first, current, 2147483750))
+			helpers.assert_eq(Policy.revalidated(first, current, 2147483751), false)
+		end)
+		helpers.it("acknowledges high-bit target across " .. (hex and "hex to decimal" or "decimal to hex"), function()
+			local first = Policy.parse_snapshot(frame(HIGH, hex, false))
+			local current = Policy.parse_snapshot(frame(HIGH, not hex, true))
+			helpers.assert_not_nil(first); helpers.assert_not_nil(current)
+			helpers.assert_true(Policy.acknowledged(first, current, 2147483750))
+			helpers.assert_eq(Policy.acknowledged(first, current, 2147483751), false)
+		end)
+		helpers.it("accepts uint32 maximum through " .. (hex and "hex" or "decimal") .. " target readback", function()
+			local first = Policy.parse_snapshot(frame(MAXIMUM, not hex, false))
+			local current = Policy.parse_snapshot(frame(MAXIMUM, hex, true))
+			helpers.assert_not_nil(first); helpers.assert_not_nil(current)
+			helpers.assert_eq(Policy.candidate(first), 4294967295)
+			helpers.assert_eq(current.active, 4294967295)
+			helpers.assert_true(Policy.acknowledged(first, current, 4294967295))
+		end)
+	end
+	for _, invalid in ipairs({
+		{ "zero", "0" }, { "hex zero", "0x0" }, { "negative", "-1" },
+		{ "decimal overflow", "4294967296" }, { "hex overflow", "0x100000000" },
+		{ "fraction", "2147483749.0" }, { "exponent", "2.147483749e9" },
+		{ "decimal suffix", "2147483749x" }, { "hex suffix", "0x80000065z" },
+	}) do
+		helpers.it("refuses unsigned identity " .. invalid[1], function()
+			local packet = frame(HIGH, false, false):gsub("active\n2147483749\n", "active\n" .. invalid[2] .. "\n", 1)
+			helpers.assert_nil(Policy.parse_snapshot(packet))
+		end)
+	end
+	helpers.it("refuses mismatched high-bit geometry identity", function()
+		local packet = frame(HIGH, true, false):gsub("WINDOW=2147483750", "WINDOW=2147483751", 1)
+		helpers.assert_nil(Policy.parse_snapshot(packet))
+	end)
+	helpers.it("requires the acknowledged high-bit target in native focus ancestry", function()
+		local first = Policy.parse_snapshot(frame(HIGH, false, false))
+		local current = Policy.parse_snapshot(frame(HIGH, true, true):gsub("focus\n0x80000066", "focus\n0x80000065", 1))
+		helpers.assert_not_nil(first); helpers.assert_not_nil(current)
+		helpers.assert_eq(Policy.acknowledged(first, current, 2147483750), false)
+	end)
+	for _, bounds in ipairs({
+		{ "minimum", "-2147483647", "-2147483000", "-2147483300" },
+		{ "maximum", "2147482647", "2147483147", "2147482747" },
+	}) do
+		helpers.it("preserves signed coordinate " .. bounds[1] .. " with unsigned identities", function()
+			local packet = frame(HIGH, false, false):gsub("X=1500", "X=" .. bounds[3], 1)
+				:gsub("%+RIGHT 1000/300x800/240%+1000%+0 RIGHT",
+					"+RIGHT 1000/300x800/240" .. (bounds[2]:sub(1, 1) == "-" and "" or "+") .. bounds[2] .. "+0 RIGHT", 1)
+				:gsub("X=1100", "X=" .. bounds[4], 1)
+			local snapshot = Policy.parse_snapshot(packet)
+			helpers.assert_not_nil(snapshot); helpers.assert_eq(Policy.candidate(snapshot), 2147483750)
+		end)
+	end
+	for _, invalid in ipairs({
+		{ "coordinate upper overflow", "X=1500", "X=2147483648" },
+		{ "coordinate lower overflow", "X=1500", "X=-2147483648" },
+		{ "screen upper overflow", "SCREEN=0", "SCREEN=2147483648" },
+		{ "negative screen", "SCREEN=0", "SCREEN=-1" },
+	}) do
+		helpers.it("retains signed field refusal: " .. invalid[1], function()
+			local packet = frame(HIGH, false, false):gsub(invalid[2], invalid[3], 1)
+			helpers.assert_nil(Policy.parse_snapshot(packet))
+		end)
+	end
+end)

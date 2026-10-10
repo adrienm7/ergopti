@@ -9859,6 +9859,15 @@ Carbon classification, physical keys or installed release qualification.
   retains an explicit translated reason. Native Mac global product switching is
   not admitted by the isolated signed-Hammerspoon probe.
 
+  The Linux shared window policy now accepts decimal XIDs over the complete
+  unsigned 32-bit range already accepted in hexadecimal. This preserves
+  identity across xprop stacking and xdotool active/geometry/focus readbacks.
+  Three original pure policy cases plus 25 independent transport cases give
+  17 PASS/11 FAIL before and 28 PASS/0 FAIL after on both Lua runtimes.
+  Original adapter tests and signed coordinate/screen bounds remain intact;
+  overflow, malformed and mismatched IDs still refuse. Native high-bit XID
+  and final installed-driver acceptance remain UNRUN.
+
   The reviewed normal Mac79 product, shared switcher owner, input broker,
   native helper and bounded observer are now on this branch. All79 whole-source
   pre/postimages, five ordered suppliers,21 literal locale additions and640
