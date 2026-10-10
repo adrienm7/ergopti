@@ -33,7 +33,7 @@ local function load_dialog(controls)
 		local file = assert(io.open(helpers.driver_root() .. "/../_shared/modules/diagnostics/" .. name .. ".json", "rb"))
 		local value = Json.decode(file:read("*a")); assert(file:close()); return value
 	end
-	local sharing_schema = document("schema")
+	local sharing_schema = require("healthcheck.snapshot").load_config(helpers.shared).schema
 	for _, name in ipairs({
 		"ui.error_dialog", "ui.healthcheck.core", "ui.healthcheck.report", "infra.logger", "infra.i18n",
 		"infra.locale", "ui.ui_builder", "adapters.timer_scheduler", "adapters.storage", "infra.manifest_reader",
@@ -123,6 +123,11 @@ local function load_dialog(controls)
 						context.copied = text
 						return controls.copy ~= false
 					end,
+					save = function(dir, name, text)
+						context.saved = { dir = dir, name = name, text = text }
+						return dir .. "/" .. name
+					end,
+					reveal = function(path) context.revealed = path; return true end,
 					open_url = function(url) context.opened = url; return true end,
 				}, snapshot)
 			end,
@@ -320,7 +325,7 @@ helpers.describe("error window (macOS): page and actions (error-dialog-macos)", 
 		helpers.assert_eq(report.action, "report")
 		helpers.assert_eq(report.text, copy.text, "report sends the same report")
 		helpers.assert_eq(report.fields.title, nil, "a shared title never contains free error text")
-		-- The host prefills the report itself and saves no file (report-focus)
+		-- The report owner derives the attachment name from its retained snapshot.
 		helpers.assert_eq(report.name, nil, "a report names no file to save")
 		helpers.assert_eq(report.fields.diagnostics, nil, "the report field is filled from the text, not a summary")
 		helpers.assert_eq(report.fields.driver, "macos")
@@ -369,9 +374,14 @@ helpers.describe("error window sharing uses the real report sink", function()
 		helpers.assert_type(context.opened, "string")
 		helpers.assert_true(context.copied:find("CANARY", 1, true) == nil)
 		helpers.assert_true(context.opened:find("CANARY", 1, true) == nil)
+		helpers.assert_type(context.saved, "table", "the issue owns a complete local attachment")
+		helpers.assert_eq(context.saved.text, context.copied)
+		helpers.assert_eq(context.revealed, context.saved.dir .. "/" .. context.saved.name)
+		helpers.assert_contains(context.saved.text, "# ErgoptiPlus diagnostics")
 		local refusing, refusal = load_dialog({ real_report = true, copy = false })
 		helpers.assert_eq(refusing.report({ kind = "error", module = "synthetic", message = "CANARY", time = "local" }), false)
 		helpers.assert_nil(refusal.opened, "clipboard refusal must prevent the browser")
+		helpers.assert_nil(refusal.saved, "clipboard refusal must prevent attachment publication")
 	end)
 end)
 
