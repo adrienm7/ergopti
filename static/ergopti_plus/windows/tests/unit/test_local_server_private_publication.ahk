@@ -49,6 +49,7 @@ class _LSP_World {
 		this.OwnedBundle := 0
 		this.CleanupArmed := false
 		this.CleanupRefused := false
+		this.PhysicalFault := 0
 		this.WrongCandidate := true
 		try {
 			; This source fixture owns the canonical boot dependency even when filtered.
@@ -80,16 +81,16 @@ class _LSP_World {
 			this.Port["delete"] := ObjBindMethod(this, "Delete")
 			_LSP_AssertOriginalNativePort(NativePort)
 			Owned := IsSet(Options) ? Options.Clone() : Map()
-			Owned["port"] := this.Port
+			Owned["port"] := NativePort
 			Owned["acquire"] := _LMT_Acquire
 			Owned["settle"] := _LMT_Settle
 			Owned["collect"] := ObjBindMethod(this, "Collect")
 			Owned["build_config"] := ObjBindMethod(this, "Build")
 			Owned["serialize"] := ObjBindMethod(this, "Serialize")
 			Owned["apply"] := ObjBindMethod(this, "ApplyCommitted")
-			Owned["notify"] := _LMT_Notify
+			Owned["notify"] := ObjBindMethod(this, "Notify")
 			Owned["pause"] := ObjBindMethod(this, "Pause")
-			this.Owner := LLM_Menu_ApiPrivateSourceOwner(Owned)
+			this.Owner := _LSP_NativeWriteSourceOwner(Owned, this)
 			_LSP_NativeFacts(this, "fixture_acquired")
 		} catch as Err {
 			this.Restore()
@@ -100,21 +101,37 @@ class _LSP_World {
 	Restore() {
 		global LLM_Defaults
 		try {
+			if this.HasOwnProp("PhysicalFault") && this.PhysicalFault is Object
+				this.PhysicalFault.Close()
 			global _LLM_Menu_Loaded, _LifecycleLatestTransition, _LifecycleShutdownReason
 			global _ConfigTransitionRetainedBarrier, _PathsFile
 			; Only this fixture's exclusively created files and exact bundle may be repaired
 			; after the assertions. Real production code never gains this cleanup authority.
 			if (this.OwnedBundle is Object) && _ConfigWriteLeaseState().terminal == this.OwnedBundle {
+				CleanupSettled := false
 				try {
 					if this.HasOwnProp("ConfigCandidate") {
 						FSWriteDurable(this.ConfigPath, this.ConfigCandidate)
 						FSWriteDurable(this.ApiPath, this.ApiCandidate)
 					}
-					ConfigTransitionRollbackOwned(_PathsFile, this.OwnedBundle, ConfigTransitionProductionPort())
+					Rollback := ConfigTransitionRollbackOwned(_PathsFile, this.OwnedBundle, ConfigTransitionProductionPort())
+					if this.CleanupArmed {
+						AssertEqual(0, this.PhysicalFault.Handle, "the exact owned obstruction must be closed before cleanup")
+						AssertTrue(ConfigTransitionResultIs(Rollback, "recovered_old"),
+							"post-close cleanup must acknowledge actual durable rollback")
+						AssertEqual(this.ConfigImage, FSReadUtf8Exact(this.ConfigPath))
+						AssertEqual(this.ApiImage, FSReadUtf8Exact(this.ApiPath))
+						AssertTrue(ConfigTransitionResultIs(ConfigTransitionInspect(_PathsFile, ConfigTransitionProductionPort()), "absent"),
+							"post-close cleanup must retire the real WAL")
+					}
+					CleanupSettled := true
 				} finally {
-					_ConfigWriteTerminalRelease(this.OwnedBundle)
-					if _ConfigTransitionRetainedBarrier == this.OwnedBundle
-						_ConfigTransitionRetainedBarrier := this.PriorRetained
+					; A refused cleanup preserves the exact owner, debt and private files.
+					if !this.CleanupArmed || CleanupSettled {
+						_ConfigWriteTerminalRelease(this.OwnedBundle)
+						if _ConfigTransitionRetainedBarrier == this.OwnedBundle
+							_ConfigTransitionRetainedBarrier := this.PriorRetained
+					}
 				}
 			}
 			_LLM_Menu_Loaded := this.Loaded
@@ -206,6 +223,12 @@ class _LSP_World {
 
 	Pause(Point) {
 		global _LLM_Menu, _PathsFile
+		if Point == "target:new:1" && this.FailApiMove {
+			AssertTrue(FSReadUtf8Exact(this.ConfigPath) != this.ConfigImage,
+				"the genuine first target must be published before second-target obstruction")
+			this.PhysicalFault := _LSP_PhysicalSourceFault(this, this.ApiPath, this.ApiImage)
+			this.PhysicalFault.Arm()
+		}
 		if Point != "phase:committed_new"
 			return
 		this.OwnedBundle := _ConfigWriteLeaseState().terminal
@@ -226,11 +249,44 @@ class _LSP_World {
 			if !FSWriteDurable(this.ApiPath, this.Replacement)
 				throw Error("The owned durable-stage source replacement was refused.")
 		}
-		if this.Mutation == "cleanup"
+		if this.Mutation == "cleanup" {
 			this.CleanupArmed := true
+			Inspected := ConfigTransitionInspect(_PathsFile, ConfigTransitionProductionPort())
+			AssertTrue(ConfigTransitionResultIs(Inspected, "ready"))
+			OldArtifact := _ConfigTransitionArtifactPaths(this.ConfigPath, Inspected["record"]["tx_id"])["old"]
+			AssertEqual(this.ConfigImage, FSReadUtf8Exact(OldArtifact),
+				"the actual immutable old artifact must belong to this published transaction")
+			this.PhysicalFault := _LSP_PhysicalSourceFault(this, OldArtifact, this.ConfigImage)
+			this.PhysicalFault.Arm()
+		}
 		if this.Mutation == "wrong_source"
 			this.WrongCandidate := this.Owner.CaptureCandidate(this.OtherReceipt,
 				this.OwnedBundle, this.ConfigCandidate, this.ApiCandidate)
+	}
+
+	Notify(Message, Options) {
+		global _PathsFile
+		if this.FailApiMove && this.PhysicalFault is Object {
+			Result := this.PhysicalFault.Notify(Message, Options)
+			this.MoveRefused := this.PhysicalFault.NativeRefusals == 2
+			return Result
+		}
+		if this.CleanupArmed && this.PhysicalFault is Object {
+			AssertEqual(1, this.ApplyCalls, "cleanup refusal follows real application of durable files")
+			AssertTrue(ConfigTransitionResultIs(ConfigTransitionInspect(_PathsFile, ConfigTransitionProductionPort()), "ready"))
+			this.PhysicalFault.ObserveNativeRefusal()
+			DeleteRefused := false
+			try FSDeleteStrict(this.PhysicalFault.ApiPath)
+			catch OSError as DeleteError {
+				AssertEqual(32, DeleteError.Number, "the exact held old artifact reports native sharing violation")
+				DeleteRefused := true
+			}
+			AssertTrue(DeleteRefused, "the owned native artifact genuinely refuses deletion")
+			AssertEqual(this.ConfigImage, FSReadUtf8Exact(this.PhysicalFault.ApiPath),
+				"native deletion refusal preserves the exact locked old bytes")
+			this.CleanupRefused := true
+		}
+		return _LMT_Notify(Message, Options)
 	}
 
 	DecryptAndReplace(Token) {
@@ -380,9 +436,13 @@ Test("Local server source: native owner replacement revokes prior receipts (loca
 	(*) => _LSP_WithWorld(_LSP_OwnerReplacement))
 
 _LSP_AbsentAndUnreadable(World) {
-	global _LLM_Menu
+	global _LLM_Menu, ConfigurationFile
 	AssertTrue(FSDeleteStrict(World.ConfigPath))
 	AssertTrue(FSDeleteStrict(World.ApiPath))
+	World.ConfigPath .= ".absent"
+	ConfigurationFile := World.ConfigPath
+	AssertEqual("absent", ConfigMigrateBoot(World.ConfigPath)["status"],
+		"honest empty authority requires its own genuine fresh-missing boot")
 	_LLM_Menu["api_entries"] := []
 	_LLM_Menu["api_entry_id"] := ""
 	Receipt := World.Owner.Capture()
@@ -1511,3 +1571,46 @@ _LSP_AuthoredSchemaAdmission(World) {
 }
 Test("Local server source: authored current stamp and unstamped refusal (local-server-current-schema-fixture)",
 	(*) => _LSP_WithWorld(_LSP_AuthoredSchemaAdmission))
+
+
+; Read interleaving belongs to this test object; it never emits native write authority.
+class _LSP_NativeWriteSourceOwner extends LLM_Menu_ApiPrivateSourceOwner {
+	__New(Options, World) {
+		super.__New(Options)
+		this.World := World
+	}
+
+	_Snapshot(Path) {
+		Result := _ConfigTransitionReadSnapshot(this.World.Port, Path)
+		return ConfigTransitionResultIs(Result, "snapshot") ? Result["snapshot"] : false
+	}
+}
+
+
+; The existing physical publication fixture supplies exact close/probe/rollback evidence.
+class _LSP_PhysicalSourceFault extends _LMT_ApiPhysicalPublicationFault {
+	__New(World, TargetPath, ExpectedImage) {
+		super.__New(false)
+		this.ApiPath := TargetPath
+		this.OldApi := ExpectedImage
+		this.OldConfig := World.ConfigImage
+		this.Bundle := _ConfigWriteLeaseState().terminal
+		this.Published := 1
+	}
+
+	Arm() {
+		AssertTrue(ConfigTransitionProductionPort(this.Port))
+		AssertEqual(this.OldApi, FSReadUtf8Exact(this.ApiPath))
+		; The exact owned file remains readable while native replacement/delete refuses.
+		this.Handle := DllCall("kernel32\CreateFileW", "Str", this.ApiPath,
+			"UInt", 0x80000000, "UInt", 1, "Ptr", 0, "UInt", 3,
+			"UInt", 0x80, "Ptr", 0, "Ptr")
+		NativeError := A_LastError
+		if this.Handle == -1 {
+			this.Handle := 0
+			throw OSError(NativeError, A_ThisFunc, "Cannot acquire the owned publication fault handle.")
+		}
+		AssertTrue(this.Handle != 0)
+		this.ObserveNativeRefusal()
+	}
+}
