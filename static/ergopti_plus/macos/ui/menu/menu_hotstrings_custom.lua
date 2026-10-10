@@ -482,10 +482,9 @@ function M.build_custom(ctx, counts)
 						and sec.description or tostring(sec.name):gsub("_", " ")
 					lbl = ctx.applyTriggerChar(lbl)
 					local sname = sec.name
-					table.insert(cat_choices, {
-						label   = lbl,
-						checked = (state.custom_default_section == sname) or nil,
-						action      = function()
+					local selected = (state.custom_default_section == sname) or nil
+					local choice = ManifestMenu.check_row("hotstring_personal_default_choice", "personal_default_section", {
+						["personal_default_section"] = function()
 							state.custom_default_section = sname
 							if ctx.hotstring_editor and type(ctx.hotstring_editor.set_default_section) == "function" then
 								pcall(ctx.hotstring_editor.set_default_section, sname)
@@ -493,7 +492,12 @@ function M.build_custom(ctx, counts)
 							if ctx.save_prefs() ~= true then return false end
 							ctx.updateMenu()
 						end,
+					}, {
+						personal_default_section_label = function() return lbl end,
+						personal_default_section_selected = function() return selected end,
 					})
+					if type(choice) ~= "table" then return nil end
+					table.insert(cat_choices, choice)
 				end
 			end
 		end

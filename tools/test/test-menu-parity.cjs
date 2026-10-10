@@ -1625,6 +1625,19 @@ OPENS_SUBMENU.llm_backend_parent = [
 	}
 ];
 
+// The real default-frame list receives per-section shared check rows, never a submenu.
+OPENS_SUBMENU.personal_default_choices = {
+	menu: 'hotstring_personal_default_choice',
+	platforms: ['ahk', 'hs', 'linux'],
+	kind: 'compose',
+	personal_default_choice: true,
+	native_sources: {
+		ahk: 'windows/ui/menu/menu_hotstrings.ahk',
+		hs: 'macos/ui/menu/menu_hotstrings_custom.lua',
+		linux: 'linux/ui/menu/menu_builder.lua'
+	}
+};
+
 const PERSONAL_DEFAULT_GROUP_PROOF = OPENS_SUBMENU.hotstring_personal[0].selected_group.ahk;
 
 /**
@@ -2400,6 +2413,303 @@ const {
 		false,
 		'the original whole-template predicate does not silently credit selected projections'
 	);
+}
+
+// Dynamic check leaves owe the actual command, caption/check getters and default-list transport.
+{
+	const assert = require('node:assert/strict');
+	const {
+		personalDefaultChoicePublication
+	} = require('../lib/menu-hotstring-language-binding.cjs');
+	const files = {
+		ahk: 'windows/ui/menu/menu_hotstrings.ahk',
+		hs: 'macos/ui/menu/menu_hotstrings_custom.lua',
+		linux: 'linux/ui/menu/menu_builder.lua'
+	};
+	const coordinates = {
+		ahk: [
+			[
+				'MenuRenderer_CheckRow("hotstring_personal_default_choice", "personal_default_section"',
+				'Foreign_CheckRow("hotstring_personal_default_choice", "personal_default_section"'
+			],
+			['DefaultRows.Push(DefaultChoice)', 'DefaultRows.Push(Map())'],
+			[
+				'DefaultProviders := Map("personal_default_choices", (*) => DefaultRows)',
+				'DefaultProviders := Map("personal_default_choices", (*) => [])'
+			],
+			[
+				'_MakeSetDefaultSectionFn(SecName, PersonalMenu, TomlData, DefaultSectionMenu, DisambiguatedLabels)',
+				'((*) => false)'
+			]
+		],
+		hs: [
+			[
+				'ManifestMenu.check_row("hotstring_personal_default_choice", "personal_default_section"',
+				'Foreign.check_row("hotstring_personal_default_choice", "personal_default_section"'
+			],
+			['table.insert(cat_choices, choice)', 'table.insert(cat_choices, {})'],
+			[
+				'{ ["personal_default_choices"] = function() return cat_choices end }',
+				'{ ["personal_default_choices"] = function() return {} end }'
+			],
+			['state.custom_default_section = sname', 'state.custom_default_section = "foreign"']
+		],
+		linux: [
+			[
+				'ManifestMenu.check_row("hotstring_personal_default_choice", "personal_default_section"',
+				'Foreign.check_row("hotstring_personal_default_choice", "personal_default_section"'
+			],
+			['choices[#choices + 1] = choice', 'choices[#choices + 1] = {}'],
+			[
+				'{ ["personal_default_choices"] = function() return choices end }',
+				'{ ["personal_default_choices"] = function() return {} end }'
+			],
+			['Editor.set_pref("default_section", name)', 'Editor.set_pref("default_section", "foreign")']
+		]
+	};
+	const retainedCoordinates = {
+		ahk: [
+			['if !(DefaultChoice is Map)\n\t\t\t\treturn []', '; removed actual row refusal'],
+			[
+				'DefaultRows.Push(DefaultChoice)',
+				'DefaultChoice := Map()\n\t\t\tDefaultRows.Push(DefaultChoice)'
+			],
+			[
+				'DefaultProviders := Map("personal_default_choices", (*) => DefaultRows)',
+				'DefaultRows := []\n\t\tDefaultProviders := Map("personal_default_choices", (*) => DefaultRows)'
+			],
+			[
+				'DefaultChoice := MenuRenderer_CheckRow(',
+				'return []\n\t\t\tDefaultChoice := MenuRenderer_CheckRow('
+			],
+			[
+				'DefaultChoice := MenuRenderer_CheckRow(',
+				'MenuRenderer_CheckRow := Foreign\n\t\t\tDefaultChoice := MenuRenderer_CheckRow('
+			]
+		],
+		hs: [
+			['if type(choice) ~= "table" then return nil end', '-- removed actual row refusal'],
+			[
+				'table.insert(cat_choices, choice)',
+				'choice = {}\n\t\t\t\t\ttable.insert(cat_choices, choice)'
+			],
+			[
+				'local cat_menu = ManifestMenu.template_rows("hotstring_personal_default_frame"',
+				'cat_choices = {}\n\tlocal cat_menu = ManifestMenu.template_rows("hotstring_personal_default_frame"'
+			],
+			[
+				'local choice = ManifestMenu.check_row("hotstring_personal_default_choice"',
+				'return nil\n\t\t\t\t\tlocal choice = ManifestMenu.check_row("hotstring_personal_default_choice"'
+			],
+			[
+				'local choice = ManifestMenu.check_row("hotstring_personal_default_choice"',
+				'local ManifestMenu = Foreign\n\t\t\t\t\tlocal choice = ManifestMenu.check_row("hotstring_personal_default_choice"'
+			],
+			[
+				'local choice = ManifestMenu.check_row("hotstring_personal_default_choice"',
+				'local _ENV = Foreign\n\t\t\t\t\tlocal choice = ManifestMenu.check_row("hotstring_personal_default_choice"'
+			],
+			[
+				'local choice = ManifestMenu.check_row("hotstring_personal_default_choice"',
+				'ManifestMenu.check_row = Foreign\n\t\t\t\t\tlocal choice = ManifestMenu.check_row("hotstring_personal_default_choice"'
+			]
+		],
+		linux: [
+			[
+				'if type(choice) ~= "table" then\n\t\t\t\t\t\tpersonal_choices_admitted = false\n\t\t\t\t\t\treturn {}\n\t\t\t\t\tend',
+				'-- removed actual row refusal'
+			],
+			['choices[#choices + 1] = choice', 'choice = {}\n\t\t\t\t\tchoices[#choices + 1] = choice'],
+			[
+				'local sub = ManifestMenu.template_rows("hotstring_personal_default_frame"',
+				'choices = {}\n\t\t\t\tlocal sub = ManifestMenu.template_rows("hotstring_personal_default_frame"'
+			],
+			[
+				'local choice = ManifestMenu.check_row("hotstring_personal_default_choice"',
+				'return {}\n\t\t\t\t\tlocal choice = ManifestMenu.check_row("hotstring_personal_default_choice"'
+			],
+			[
+				'local choice = ManifestMenu.check_row("hotstring_personal_default_choice"',
+				'local ManifestMenu = Foreign\n\t\t\t\t\tlocal choice = ManifestMenu.check_row("hotstring_personal_default_choice"'
+			],
+			[
+				'local choice = ManifestMenu.check_row("hotstring_personal_default_choice"',
+				'local _ENV = Foreign\n\t\t\t\t\tlocal choice = ManifestMenu.check_row("hotstring_personal_default_choice"'
+			],
+			[
+				'local choice = ManifestMenu.check_row("hotstring_personal_default_choice"',
+				'ManifestMenu.check_row = Foreign\n\t\t\t\t\tlocal choice = ManifestMenu.check_row("hotstring_personal_default_choice"'
+			]
+		]
+	};
+	const boundaryCoordinates = {
+		ahk: [
+			['if !(DefaultChoice is Map)\n\t\t\t\treturn []', 'return []'],
+			['if !(DefaultChoice is Map)\n\t\t\t\treturn []', 'if false\n\t\t\t\treturn []'],
+			[
+				'if !(DefaultChoice is Map)\n\t\t\t\treturn []',
+				'if (DefaultChoice is Map)\n\t\t\t\treturn []'
+			],
+			['if !(DefaultFrame is Array)\n\t\t\treturn []', 'return []'],
+			['if !(DefaultFrame is Array)\n\t\t\treturn []', 'if false\n\t\t\treturn []'],
+			[
+				'if !(DefaultFrame is Array)\n\t\t\treturn []',
+				'if (DefaultFrame is Array)\n\t\t\treturn []'
+			],
+			['DefaultRows.Push(DefaultChoice)', 'return []\n\t\t\tDefaultRows.Push(DefaultChoice)'],
+			['if (PersonalTomlData != false) {', 'if false {'],
+			[
+				'DefaultRows := []\n\t\tfor _, SecName in TomlData["sections_order"] {',
+				'DefaultRows := []\n\t\tfor _, SecName in [] {'
+			],
+			[
+				'if MenuRenderer_AppendTemplate(DefaultSectionMenu, "hotstring_personal_default_frame", DefaultCommands, DefaultGetters, DefaultProviders, &WholeTreeAdmitted) != DefaultRows.Length + 1 || !WholeTreeAdmitted\n\t\t\treturn []',
+				'if false\n\t\t\treturn []'
+			],
+			[
+				'if MenuRenderer_AppendTemplate(DefaultSectionMenu, "hotstring_personal_default_frame",',
+				'DefaultRows := []\n\t\tif MenuRenderer_AppendTemplate(DefaultSectionMenu, "hotstring_personal_default_frame",'
+			],
+			[
+				'if MenuRenderer_AppendTemplate(DefaultSectionMenu, "hotstring_personal_default_frame",',
+				'DefaultProviders := Map()\n\t\tif MenuRenderer_AppendTemplate(DefaultSectionMenu, "hotstring_personal_default_frame",'
+			],
+			['!= DefaultRows.Length + 1 || !WholeTreeAdmitted', '!= DefaultRows.Length + 1 || false']
+		],
+		hs: [
+			['if has_real then', 'if false then'],
+			[
+				'for _, sec in ipairs(personal_secs) do\n\t\t\t\tif type(sec) == "table" and sec.name ~= "-" and not sec.is_module_placeholder then\n\t\t\t\t\tlocal lbl',
+				'for _, sec in ipairs({}) do\n\t\t\t\tif type(sec) == "table" and sec.name ~= "-" and not sec.is_module_placeholder then\n\t\t\t\t\tlocal lbl'
+			],
+			['\nreturn M\n', '\nManifestMenu.check_row = Foreign\nreturn M\n'],
+			[
+				'\nreturn M\n',
+				'\nlocal foreign_alias = ManifestMenu\nforeign_alias.check_row = Foreign\nreturn M\n'
+			]
+		],
+		linux: [
+			['local personal_choices_admitted = true', 'local personal_choices_admitted = false'],
+			['personal_choices_admitted = false', 'personal_choices_admitted = true'],
+			['personal_choices_admitted = false', 'local personal_choices_admitted = false'],
+			['if not personal_choices_admitted then return nil end', 'if false then return nil end'],
+			[
+				'if not personal_choices_admitted then return nil end',
+				'if personal_choices_admitted then return nil end'
+			],
+			[
+				'if not personal_choices_admitted then return nil end',
+				'if not personal_choices_admitted then return {} end'
+			],
+			[
+				'if not personal_choices_admitted then return nil end',
+				'personal_choices_admitted = true\n\tif not personal_choices_admitted then return nil end'
+			],
+			[
+				'local rows = ManifestMenu.build("hotstrings_menu", "Hotstrings", nil, group_builders, hs_ctx, providers)',
+				'local rows = {}'
+			],
+			[
+				'return rows\nend\n\n--- Builds the hotstrings submenu',
+				'return {}\nend\n\n--- Builds the hotstrings submenu'
+			],
+			['local items = _manifest_hotstring_rows(ctx, config)', 'local items = {}'],
+			[
+				'local items = _manifest_hotstring_rows(ctx, config)',
+				'local _manifest_hotstring_rows = function() return {} end\n\tlocal items = _manifest_hotstring_rows(ctx, config)'
+			],
+			[
+				'return receive(items, { hotstrings_enabled = function() return _hotstrings_on(ctx) end,',
+				'return receive({}, { hotstrings_enabled = function() return _hotstrings_on(ctx) end,'
+			],
+			['if ok_editor and type(Editor.get_pref) == "function" then', 'if false then'],
+			[
+				'for _, name in ipairs(personal and personal.sections_order or {}) do',
+				'for _, name in ipairs({}) do'
+			],
+			['\nreturn M\n', '\nManifestMenu.check_row = Foreign\nreturn M\n'],
+			[
+				'\nreturn M\n',
+				'\nlocal foreign_alias = ManifestMenu\nforeign_alias.check_row = Foreign\nreturn M\n'
+			]
+		]
+	};
+	for (const [platform, file] of Object.entries(files)) {
+		const source = fs.readFileSync(path.join(SP, file), 'utf8');
+		const admits = (candidate = source, declarations = manifest, target = platform) =>
+			personalDefaultChoicePublication(candidate, target, declarations);
+		assert.equal(admits(), true, platform + ': genuine default-list typed check receiving');
+		for (const candidate of [
+			'',
+			JSON.stringify(source),
+			platform === 'ahk' ? '/*\n' + source + '\n*/' : '--[=[\n' + source + '\n]=]'
+		])
+			assert.equal(admits(candidate), false, 'absent, quoted or comment-only native source');
+		for (const target of Object.keys(files).filter((other) => other !== platform))
+			assert.equal(
+				admits(source, manifest, target),
+				false,
+				'another native producer cannot borrow the check leaf'
+			);
+		for (const [before, after] of [
+			...coordinates[platform],
+			...retainedCoordinates[platform],
+			...boundaryCoordinates[platform]
+		]) {
+			assert.equal(source.split(before).length - 1, 1, 'one genuine mutation coordinate');
+			assert.equal(
+				admits(source.replace(before, after)),
+				false,
+				'actual typed effect or receiving withdrawal refuses'
+			);
+		}
+		for (const [before, after] of [
+			[
+				'"hotstring_personal_default_choice", "personal_default_section"',
+				'"foreign_choice", "personal_default_section"'
+			],
+			['"personal_default_section"', '"foreign_section"'],
+			['personal_default_section_label', 'foreign_section_label'],
+			['personal_default_section_selected', 'foreign_section_selected']
+		]) {
+			assert(source.includes(before), 'the actual native identity exists before mutation');
+			assert.equal(
+				admits(source.replaceAll(before, after)),
+				false,
+				'actual check/caption/getter identity is mandatory'
+			);
+		}
+		const declarations = structuredClone(manifest);
+		for (const mutate of [
+			(data) => delete data.hotstring_personal_default_choice,
+			(data) =>
+				data.hotstring_personal_default_choice.push(data.hotstring_personal_default_choice[0]),
+			(data) => {
+				data.hotstring_personal_default_choice.find((row) =>
+					row.platforms.includes(platform)
+				).type = 'command';
+			},
+			(data) => {
+				data.hotstring_personal_default_choice.find((row) =>
+					row.platforms.includes(platform)
+				).caption_getter = 'foreign_label';
+			},
+			(data) => {
+				data.hotstring_personal_default_frame.find(
+					(row) => row.id === 'personal_default_choices'
+				).type = 'group';
+			}
+		]) {
+			const changed = structuredClone(declarations);
+			mutate(changed);
+			assert.equal(
+				admits(source, changed),
+				false,
+				'withdrawn, ambiguous or mistyped actual declaration refuses'
+			);
+		}
+		assert.equal(admits(), true, 'exact source/declaration repair restores check-list ownership');
+	}
 }
 
 // A captured parent receiver earns credit only for the real returned native parent.
@@ -5269,26 +5579,32 @@ for (let pass = 0; pass < MENU_KEYS.length + 1; pass += 1) {
 													target,
 													manifest[target]
 												)
-											: opened.selected_group?.[platform]
-												? publishesSelectedMenuGroup(
+											: opened.personal_default_choice === true
+												? require('../lib/menu-hotstring-language-binding.cjs').personalDefaultChoicePublication(
 														fs.readFileSync(path.join(SP, file), 'utf8'),
-														path.extname(file),
-														target,
-														manifest[target],
-														opened.selected_group[platform]
+														platform,
+														manifest
 													)
-												: publishesTemplate(
-														fs.readFileSync(path.join(SP, file), 'utf8'),
-														path.extname(file),
-														target
-													) ||
-													publishesIncludedCommands(
-														fs.readFileSync(path.join(SP, file), 'utf8'),
-														path.extname(file),
-														target,
-														manifest,
-														platform
-													))
+												: opened.selected_group?.[platform]
+													? publishesSelectedMenuGroup(
+															fs.readFileSync(path.join(SP, file), 'utf8'),
+															path.extname(file),
+															target,
+															manifest[target],
+															opened.selected_group[platform]
+														)
+													: publishesTemplate(
+															fs.readFileSync(path.join(SP, file), 'utf8'),
+															path.extname(file),
+															target
+														) ||
+														publishesIncludedCommands(
+															fs.readFileSync(path.join(SP, file), 'utf8'),
+															path.extname(file),
+															target,
+															manifest,
+															platform
+														))
 					)
 						errors.push(
 							`${menuKey}/${row.id}: ${kind} ${target} has no native template publication on ${platform}`

@@ -5555,6 +5555,30 @@ integrated, then publish one grouped release.
   27/29/31. Exact-source native, package and installed qualification remain
   pending. This family does not complete the item.
 
+The live personal default-category choices now share a typed check-leaf
+declaration through the existing caption, checked-state and native-visible owner
+policy. Disjoint platform rows preserve the existing strict generator and runtime
+rules. Only the three real choice constructors change; original business
+callbacks, ordering, captions and preference writers remain intact. Original
+assertions and the independent corpus stay exact. The Linux fixture's existing
+receiving helper now observes the actual parent once and accepts its explicit
+nil refusal; its entire old prefix is not byte-identical. The actual owning menu
+generator passes; its native allocator census remains 19/3/4 with updated source
+coordinates and no leaf allocator retirement. Independent bounded source review
+passes. The current macOS focused module passes 9/9. Actual old-producer
+controls report 5 passed/4 failed on macOS and 13,039 passed/4 failed on Linux,
+at the four new refusal assertions; all tracked sources, index and HEAD restore
+exactly. Independent Linux raw accounting reconciles diagnostic and interleaved
+output with the authoritative runner; the original control-helper exit remains
+failed. The initial full selected run reports 408 JS checks passed/1 failed and
+13,040 Linux assertions passed/3 failed. It passes 18,384 portable macOS units,
+101 macOS E2E checks with one original skip, and 193 portable Linux E2E checks.
+The Linux successor propagates the genuine failed-choice refusal after the real
+enclosing build. The repaired selected-gate outcome is recorded separately.
+macOS unselected checked fields explicitly contain false through the existing
+renderer; native, installed and physical presentation remain unqualified. This slice does not
+close items 54/81 or transversal items 16/38.
+
 The Windows Agent Apps leaf is now a canonical shared command with the existing
 count formatter, original captions and disabled native flags. Its native append
 and Windows-only composer frame are retired; the genuine generators report
@@ -8825,6 +8849,30 @@ is committed; one request is one commit with its regression test.
   Both generators retire one Windows and one macOS native site, giving
   27/29/31. Exact-source native, package and installed qualification remain
   pending. This family does not complete the item.
+
+The live personal default-category choices now share a typed check-leaf
+declaration through the existing caption, checked-state and native-visible owner
+policy. Disjoint platform rows preserve the existing strict generator and runtime
+rules. Only the three real choice constructors change; original business
+callbacks, ordering, captions and preference writers remain intact. Original
+assertions and the independent corpus stay exact. The Linux fixture's existing
+receiving helper now observes the actual parent once and accepts its explicit
+nil refusal; its entire old prefix is not byte-identical. The actual owning menu
+generator passes; its native allocator census remains 19/3/4 with updated source
+coordinates and no leaf allocator retirement. Independent bounded source review
+passes. The current macOS focused module passes 9/9. Actual old-producer
+controls report 5 passed/4 failed on macOS and 13,039 passed/4 failed on Linux,
+at the four new refusal assertions; all tracked sources, index and HEAD restore
+exactly. Independent Linux raw accounting reconciles diagnostic and interleaved
+output with the authoritative runner; the original control-helper exit remains
+failed. The initial full selected run reports 408 JS checks passed/1 failed and
+13,040 Linux assertions passed/3 failed. It passes 18,384 portable macOS units,
+101 macOS E2E checks with one original skip, and 193 portable Linux E2E checks.
+The Linux successor propagates the genuine failed-choice refusal after the real
+enclosing build. The repaired selected-gate outcome is recorded separately.
+macOS unselected checked fields explicitly contain false through the existing
+renderer; native, installed and physical presentation remain unqualified. This slice does not
+close items 54/81 or transversal items 16/38.
 
 The genuine menu owner now lowers the remaining native census to 20 Windows,
 3 macOS and 4 Linux sites by declaring the Windows Agent Apps command. Original

@@ -1564,3 +1564,161 @@ _HSCS_PersonalOwnedTreeRelease(ThrowCleanup) {
 for _HSCS_ThrowCleanup in [false, true]
 	Test("shared-personal-frame: owned deep tree cleanup preserves foreign native owner " . _HSCS_ThrowCleanup,
 		_HSCS_PersonalOwnedTreeRelease.Bind(_HSCS_ThrowCleanup))
+
+
+; Actual native leaf receiving retains the original source writer and menu owners.
+_HSCS_DefaultChoiceSourceReceiving(Kind) {
+	global ScriptInformation, Features, CategoryEnabled, ConfigurationFile
+	global _ReadPersonalTomlCache, _PersonalExtTree, _FmtCountCache, _PrevDefaultLabel, _TomlUnreadableFiles
+	global _MenuDispatchCallbacks, _MenuDispatchLastFire, _MenuDispatchTokens
+	global _MenuDispatchClickSequences, _MenuDispatchOwnerHandles
+	Fixture := _ScopeOwnerFixture(), PersonalPath := Fixture.path . ".personal.toml"
+	Source := Chr(0xFEFF) . '[personal_editor]`nDefaultSection = "beta"`nclose_on_add = "1"`n[private]`nkeep = "personal-frame-source"`n'
+	PersonalSource := '[[alpha]]`n[[beta]]`n'
+	SavedInfo := ScriptInformation, SavedFeatures := Features, SavedCategories := CategoryEnabled
+	SavedConfig := IsSet(ConfigurationFile) ? ConfigurationFile : unset
+	SavedCache := _ReadPersonalTomlCache, SavedUnreadable := _TomlUnreadableFiles
+	SavedTree := IsSet(_PersonalExtTree) ? _PersonalExtTree : unset
+	SavedCounts := IsSet(_FmtCountCache) ? _FmtCountCache : unset
+	SavedDefaultLabel := IsSet(_PrevDefaultLabel) ? _PrevDefaultLabel : unset
+	State := MasterGateState(), SavedState := State.Clone()
+	Root := _MR_GetManifestRoot(), Owned := [], Originals := Map()
+	for Key in ["hotstring_personal_default_frame", "hotstring_personal_controls_frame",
+		"hotstring_personal_content_frame", "hotstring_personal_directory_frame", "hotstring_personal_default_parent"]
+		Originals[Key] := Root[Key]
+	ReadRows() {
+		Rows := _HS_PersonalRows(Fixture.options)
+		if Rows is Array {
+			for Row in Rows
+				if Row is Map && Row.Has("submenu") && Row["submenu"] is Menu
+					Owned.Push(Row["submenu"])
+		}
+		return Rows
+	}
+	ReleaseRows() {
+		Failure := 0
+		for Child in Owned {
+			try _HS_PersonalReleaseMenus([Child])
+			catch as ErrorInfo {
+				if !Failure
+					Failure := ErrorInfo
+			}
+		}
+		Owned := []
+		if Failure
+			throw Failure
+	}
+	try {
+		Source := _CMJFixtureCurrentSource(Source)
+		Assert(FSWriteDurable(Fixture.path, Source))
+		Assert(FSWriteDurable(PersonalPath, PersonalSource))
+		ConfigurationFile := Fixture.path
+		ScriptInformation := ScriptInformation.Clone()
+		ScriptInformation["PersonalTomlPath"] := PersonalPath
+		_ReadPersonalTomlCache := false, _TomlUnreadableFiles := Map()
+		_PersonalExtTree := Map(), _FmtCountCache := Map()
+		Features := ManifestBuildFeaturesMap()
+		for Name in ["alpha", "beta"]
+			_ConfigSeedPersonalHotstring(Features, Name)
+		CategoryEnabled := Map("Hotstrings", false)
+		State["initialized"] := false
+		MasterGateInitialize(Features, Map("keys", Map()), (*) => false)
+		Cleaner := Menu()
+		try Cleaner.Delete()
+		finally MenuDispatcher_PruneMenu(Cleaner)
+		Tables := [_MenuDispatchCallbacks, _MenuDispatchLastFire, _MenuDispatchTokens,
+			_MenuDispatchClickSequences, _MenuDispatchOwnerHandles], Before := []
+		for Table in Tables
+			Before.Push(Table.Clone())
+		LeafKey := "hotstring_personal_default_choice"
+		Assert(Root.Has(LeafKey), "the genuine generated leaf declaration exists")
+		Originals[LeafKey] := Root[LeafKey]
+		NativeChoice := _MR_FindItemById(LeafKey, "personal_default_section")
+		Assert(NativeChoice is Map, "the genuine leaf has its unique native-visible owner")
+		Rows := ReadRows()
+		Assert(Rows is Array && Rows.Length == 1 && Owned.Length == 1)
+		LivePersonal := Owned[1], DefaultCaption := t("menu.hotstrings.default_category_prefix") . "beta"
+		LiveDefault := false
+		loop TrayMenuItemCount(LivePersonal) {
+			if _MUR_LabelAt(LivePersonal, A_Index - 1) == DefaultCaption {
+				ChildHandle := DllCall("GetSubMenu", "ptr", LivePersonal.Handle, "int", A_Index - 1, "ptr")
+				Assert(ChildHandle != 0)
+				LiveDefault := MenuFromHandle(ChildHandle)
+				break
+			}
+		}
+		Assert(LiveDefault is Menu)
+		Labels := _HS_BuildDisambiguatedSectionLabels(ReadPersonalToml())
+		AlphaId := 0, AlphaCallback := false, LiveFlags := []
+		loop TrayMenuItemCount(LiveDefault) {
+			Flags := DllCall("GetMenuState", "ptr", LiveDefault.Handle, "uint", A_Index - 1, "uint", 0x400, "uint")
+			Assert(Flags != 0xFFFFFFFF)
+			LiveFlags.Push(Flags)
+			if _MUR_LabelAt(LiveDefault, A_Index - 1) == Labels["alpha"] {
+				AlphaId := DllCall("GetMenuItemID", "ptr", LiveDefault.Handle, "int", A_Index - 1, "uint")
+				Assert(_MenuDispatchCallbacks.Has(AlphaId))
+				AlphaCallback := _MenuDispatchCallbacks[AlphaId]
+			}
+		}
+		Assert(HasMethod(AlphaCallback, "Call"))
+		LiveTables := []
+		for Table in Tables
+			LiveTables.Push(Table.Clone())
+		BeforeSource := FSReadUtf8Exact(Fixture.path), BeforeCaption := _PrevDefaultLabel
+		Changed := []
+		if Kind != "missing" {
+			ChangedRow := NativeChoice.Clone()
+			if Kind == "kind"
+				ChangedRow["type"] := "label"
+			else
+				ChangedRow["caption_getter"] := "unavailable_default_caption"
+			for OriginalChoice in Originals[LeafKey]
+				Changed.Push(OriginalChoice == NativeChoice ? ChangedRow : OriginalChoice)
+		}
+		Root[LeafKey] := Changed
+		Refused := ReadRows()
+		Assert(Refused is Array && Refused.Length == 0, "a refused choice source cannot hand off a partial personal menu")
+		AssertEqual(1, Owned.Length, "only the earlier complete caller-owned parent survives")
+		for Index, Table in Tables {
+			AssertEqual(LiveTables[Index].Count, Table.Count, "all newly refused menus are disposed and pruned")
+			for Id, Callback in LiveTables[Index]
+				Assert(Table.Has(Id) && Table[Id] == Callback, "earlier actual native dispatcher owners remain exact")
+		}
+		AssertEqual(BeforeSource, FSReadUtf8Exact(Fixture.path))
+		AssertEqual(BeforeCaption, _PrevDefaultLabel)
+		if Kind == "missing" {
+			AssertFalse(AlphaCallback.Call(), "a retained actual choice refuses before the original writer when its declaration is absent")
+			AssertEqual(BeforeSource, FSReadUtf8Exact(Fixture.path))
+			AssertEqual("beta", _EditorPrefGet("DefaultSection", ""))
+			loop TrayMenuItemCount(LiveDefault)
+				AssertEqual(LiveFlags[A_Index], DllCall("GetMenuState", "ptr", LiveDefault.Handle, "uint", A_Index - 1, "uint", 0x400, "uint"))
+		}
+		Root[LeafKey] := Originals[LeafKey]
+		AssertEqual(1, ReadRows().Length, "exact declaration repair restores the actual native provider")
+		AlphaCallback.Call()
+		AssertEqual("alpha", _EditorPrefGet("DefaultSection", ""), "the retained original writer publishes through genuine native preference IO")
+		Assert(InStr(FSReadUtf8Exact(Fixture.path), 'keep = "personal-frame-source"'))
+		AssertTrue(_MenuDispatchCallbacks.Has(AlphaId) && _MenuDispatchCallbacks[AlphaId] == AlphaCallback)
+
+	} finally {
+		try ReleaseRows()
+		finally {
+			for Key, Original in Originals
+				Root[Key] := Original
+			ScriptInformation := SavedInfo, Features := SavedFeatures, CategoryEnabled := SavedCategories
+			ConfigurationFile := IsSet(SavedConfig) ? SavedConfig : unset
+			_ReadPersonalTomlCache := SavedCache, _TomlUnreadableFiles := SavedUnreadable
+			_PersonalExtTree := IsSet(SavedTree) ? SavedTree : unset
+			_FmtCountCache := IsSet(SavedCounts) ? SavedCounts : unset
+			_PrevDefaultLabel := IsSet(SavedDefaultLabel) ? SavedDefaultLabel : unset
+			State.Clear()
+			for Key, Value in SavedState
+				State[Key] := Value
+			try FileDelete(PersonalPath)
+			_ScopeOwnerCleanup(Fixture)
+		}
+	}
+}
+for _HSCS_DefaultChoiceKind in ["missing", "kind", "caption"]
+	Test("shared-personal-default-choice: native source refusal and exact repair " . _HSCS_DefaultChoiceKind,
+		_HSCS_DefaultChoiceSourceReceiving.Bind(_HSCS_DefaultChoiceKind))
