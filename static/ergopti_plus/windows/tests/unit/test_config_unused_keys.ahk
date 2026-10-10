@@ -1711,3 +1711,35 @@ _CUK_RetiredTapWarningReason() {
 }
 Test("config: retired tap warnings name the actual number-row domain (tap-binding-identity-warning)",
 	_CUK_RetiredTapWarningReason)
+
+
+
+
+
+; ===================================================
+; ===================================================
+; ======= 4/ Session Protected Source Preview =======
+; ===================================================
+; ===================================================
+
+_CUK_ProtectedSourceHasNoCleanupOffer() {
+	Dir := _CUK_NewDir()
+	Path := Dir . "\protected-config.toml"
+	Source := '[_meta]`nschema_version = ' . (ConfigMigrateCurrentVersion() + 1)
+		. '`n[layout]`nfuture_layout_owner = "retain exactly"`n'
+	Reason := "Controlled newer schema refusal."
+	Offers := []
+	try {
+		AssertTrue(FSWriteDurable(Path, Source))
+		TOML_RefuseWrites(Path, Reason)
+		Scan := ConfigUnusedKeysFind(Path, Map("layout", Map()))
+		AssertEqual("unsupported", Scan["status"], "a protected schema has no admitted cleanup ownership")
+		AssertEqual(0, Scan["keys"].Length, "future-owned keys are never disposable rows")
+		AssertFalse(ConfigUnusedKeysOffer(Path, ConfigUnusedKeysFind, (Target) => Offers.Push(Target)))
+		AssertEqual(0, Offers.Length, "startup cannot offer an unsafe protected-source cleanup")
+		AssertEqual(Source, FSReadUtf8Exact(Path), "preview preserves the exact newer source")
+		AssertEqual(Reason, TOML_WriteRefusal(Path), "preview never lifts session protection")
+	} finally DirDelete(Dir, true)
+}
+Test("config unused keys: protected schema refuses preview and startup offer (protected-schema-cleanup)",
+	_CUK_ProtectedSourceHasNoCleanupOffer)
