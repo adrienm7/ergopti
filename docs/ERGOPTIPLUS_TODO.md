@@ -9516,6 +9516,26 @@ Carbon classification, physical keys or installed release qualification.
   406/1 result from the two missing Windows retention workflow conditions.
   Native Linux CI and physical editor-key delivery remain unqualified here.
 
+  The Linux deferred contextual action now retains its original admission and
+  decision issuers and rechecks live gates, source and configuration custody
+  after the actual logger callback and immediately before executor entry.
+  Source/admission exceptions refuse delivery. Fresh serial component replay
+  passes all 20 additive cases on both LuaJIT and Lua 5.4; the original source
+  fails 19 of them. Seven independent one-span inverses fail their exact causal
+  cases on both ABIs. All 14 original editor and three configuration-owner
+  controls remain green on both source images, and five negative enrollment
+  controls refuse. The recovered source, raw receipts and independent reviews
+  are retained in `handovers/2026-10-10-group3-contextual-custody/`.
+  This closes the synchronous callback gap; it grants no native input/output
+  authority or installed/physical editor-key qualification.
+  Broader Linux qualification remains red: units pass 13,015/13,017 with
+  two shipped-source identity refusals, and E2E passes 171/193 with 22 magic
+  output failures. The exact original shortcut source reproduces the same
+  E2E failure lines; native Lua stat exposes a negative rounded inode for the
+  genuine shipped catalogue and the unchanged loader refuses it. Actual
+  read-only X11 qualification passes 53/53. JS remains 406/407 on the
+  unchanged Windows retention guard. None of these failures is waived.
+
   Remaining software: finish live effective-source retargeting, collisions
   against every owner and current modifier/output custody without overriding
   None/personal records or weakening compensation. Native qualification:
