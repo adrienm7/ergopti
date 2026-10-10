@@ -1455,6 +1455,13 @@ MenuRenderer_AppendCommand(TargetMenu, ManifestKey, CommandId, Commands, StateGe
 ; generic category flip would hide a builder that forgot the switch.
 ; @returns {Integer} 1 when the row was drawn, 0 otherwise.
 _MR_RenderToggle(ResultMenu, Item, ManifestKey, Commands, StateGetters) {
+	Row := _MR_ToggleRowData(Item, ManifestKey, Commands, StateGetters)
+	return Row is Map ? _MR_RenderRows(ResultMenu, [Row], _MR_Get(Item, "id"), 1) : 0
+}
+
+; Projects the category switch through its declared state and static reason.
+; @returns {Map|Integer} Row data, or false when the declaration is refused.
+_MR_ToggleRowData(Item, ManifestKey, Commands, StateGetters) {
 	Id := _MR_Get(Item, "id")
 	I18nKey := _MR_Get(Item, "i18n")
 	CmdId := _MR_Get(Item, "command")
@@ -1463,11 +1470,16 @@ _MR_RenderToggle(ResultMenu, Item, ManifestKey, Commands, StateGetters) {
 	}
 	if (Id == "" or I18nKey == "") {
 		try LoggerWarn("MenuRenderer", "toggle item in '{1}' missing id or i18n — skipped.", ManifestKey)
-		return 0
+		return false
 	}
 	if !(Commands is Map and Commands.Has(CmdId)) {
 		try LoggerError("MenuRenderer", "No command '{1}' for the '{2}' category switch — its submenu has no way to turn it on or off.", CmdId, ManifestKey)
-		return 0
+		return false
+	}
+	ReasonKey := _MR_Get(Item, "disabled_reason_key")
+	if Item.Has("disabled_reason_key") && (Type(ReasonKey) != "String" || ReasonKey == "") {
+		try LoggerError("MenuRenderer", "Invalid disabled reason for toggle '{1}' — skipped.", Id)
+		return false
 	}
 	Row := Map(
 		"label",   t(I18nKey),
@@ -1475,8 +1487,12 @@ _MR_RenderToggle(ResultMenu, Item, ManifestKey, Commands, StateGetters) {
 		"checked", MenuRenderer_ResolveCheckedWhen(ManifestKey, Id, StateGetters))
 	if MenuRenderer_ResolveDisabledWhen(ManifestKey, Id, StateGetters) {
 		Row["disabled"] := true
+		if ReasonKey != "" {
+			Row["disabled_reason_key"] := ReasonKey
+			Row.Delete("action")
+		}
 	}
-	return _MR_RenderRows(ResultMenu, [Row], Id, 1)
+	return Row
 }
 
 ; Renders a ``choice`` row: one setting with a fixed set of values, drawn as ONE

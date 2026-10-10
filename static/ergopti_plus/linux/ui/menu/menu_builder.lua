@@ -3008,17 +3008,20 @@ local function _build_llm(ctx)
 		if committed and type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
 		return committed
 	end
+	local Preferences = require("infra.llm_preferences")
+	local function toggle_ready()
+		return type(llm.toggle) == "function" and ctx.paused ~= true and Preferences.admit() == true
+	end
 	llm_ctx.commands["llm_toggle"] = function()
-		if type(llm.toggle) ~= "function" then return false end
+		if not toggle_ready() then return false end
 		if llm.toggle then llm.toggle(ctx.on_menu_changed) end
 		if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
 	end
 	llm_ctx.state_getters = {}
 	for key, value in pairs(ctx.state_getters or {}) do llm_ctx.state_getters[key] = value end
 	llm_ctx.state_getters["llm_enabled"] = function() return enabled end
-	-- The switch has no precondition here beyond the pause, which greys the whole
-	-- IA row from the top level anyway.
-	llm_ctx.state_getters["llm_toggle_ready"] = function() return type(llm.toggle) == "function" and ctx.paused ~= true end
+	-- The same source/scope admission greys the row and fences retained clicks.
+	llm_ctx.state_getters["llm_toggle_ready"] = toggle_ready
 
 	local rendered = ManifestMenu
 		and ManifestMenu.build("llm_menu", "LLM", dynamic_handlers, group_builders, llm_ctx, providers)

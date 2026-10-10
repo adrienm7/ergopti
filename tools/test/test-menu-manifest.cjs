@@ -12761,3 +12761,33 @@ console.log(
 		'[OK] personal-info leaf: genuine guarded helper, exact native callback/result and owned template offset.'
 	);
 }
+
+// The canonical availability validator admits only a reasoned toggle with its original disabled predicate.
+{
+	const assert = require('node:assert/strict');
+	const { validateMenuAvailability } = require('../lib/menu-row-availability.cjs');
+	const row = {
+		type: 'toggle',
+		id: 'power',
+		category: 'LLM',
+		i18n: 'contract.toggle',
+		disabled_when: ['ready'],
+		disabled_reason_key: 'contract.reason'
+	};
+	assert.doesNotThrow(() => validateMenuAvailability({ frame: [row] }));
+	for (const change of [
+		{ disabled_reason_key: '' },
+		{ disabled_reason_key: false },
+		{ disabled_reason_key: 17 },
+		{ disabled_when: [] },
+		{ disabled_when: undefined },
+		{ i18n: '' },
+		{ type: 'label' }
+	]) {
+		assert.throws(
+			() => validateMenuAvailability({ frame: [{ ...row, ...change }] }),
+			/disabled_reason_key|greyed row/,
+			'malformed reasoned toggle must refuse'
+		);
+	}
+}

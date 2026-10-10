@@ -3284,5 +3284,7 @@
 	"healthcheck.problem.diagnostic_check": "Controllo diagnostico non riuscito: %s.",
 	"healthcheck.export.privacy_notice": "Questo rapporto condivide solo dati tecnici consentiti. Registri, testo libero, percorsi e dati identificativi sono esclusi anche con i dettagli attivati. I test locali della pagina non sono inclusi.",
 	"sg_actions.llm_translate_context": "🌐 Traduci la frase corrente [configurabile]",
-	"menu.about.startup_other_command_reason": "Altro comando di avvio: L’avvio è configurato per un altro comando o un’altra installazione. L’impostazione esistente viene mantenuta."
+	"menu.about.startup_other_command_reason": "Altro comando di avvio: L’avvio è configurato per un altro comando o un’altra installazione. L’impostazione esistente viene mantenuta.",
+	"config.read_only.newer_schema": "Questa configurazione è stata salvata da una versione più recente di ErgoptiPlus. Le impostazioni sono state conservate. Aggiorna ErgoptiPlus e ricaricalo prima di modificare le impostazioni.",
+	"menu.llm.save_unavailable": "Non disponibile: riprendi ErgoptiPlus se è in pausa oppure apri Diagnostica per verificare perché non è possibile salvare le impostazioni."
 }
