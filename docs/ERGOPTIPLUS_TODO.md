@@ -8227,6 +8227,20 @@ stays false. Eventual listener readiness, shared migration consent, G4 lifecycle
 consumption and retained serve cleanup authority remain CODE; items 62, 16 and
 38 remain open.
 
+The exact composed source `9d5016143` is received by macOS-only manual CI
+38046195371, which ends in failure with six successful, six failed and five
+skipped jobs. Core JS passes 406/407; the remaining Windows retention-condition
+guard is independently reproduced on Dev. ARM64 SDK41 passes, while AMD64 has
+40 passing methods and one unexpected retained-image profile deadline; its
+cause remains unresolved. Both source10 cohorts pass. PAC14 retains two failing
+methods per architecture, independent HTTP retains three errors per architecture,
+and archive25 retains one Homebrew prerequisite failure. Package and installation
+are skipped. The new wire20/serve35 controls are not yet directly enrolled in the
+Mac native step. Reviewed workflow preparations and exact source recovery are in
+[the current Group 6 handover](handovers/2026-10-10-group6-release-network/README.md);
+shared custody, original-clock event/caller/cleanup CODE and genuine native
+acceptance remain required. No item is removed or qualified by these receipts.
+
 - [~] **63.** Provide shared screen-brightness up/down actions on all three
   drivers, including supported keyboard and wheel layers. Implemented: the
   translated catalogue, Windows bounded Job-owned WMI worker with complete
