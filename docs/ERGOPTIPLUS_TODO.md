@@ -8902,6 +8902,25 @@ mandatory.
   joined-source delivery qualification remain required; this grants no physical
   capture, assignment or output authority and does not complete item 97.
 
+  Shared capture-session admission now requires a callable position-emission
+  port after advertisement/current/cancellation callbacks and before native
+  enrollment or delivery. Both Lua ABIs pass all eleven controlled additions;
+  the exact original fails eight and the two omission variants fail five/eight.
+  All four original contract cases remain unchanged and pass for every image.
+  The existing Window already supplies this port, so this closes an optional
+  session-API gap without claiming a published-host regression or enabling
+  physical delivery. Native GUI/input/source/output qualification remains open.
+
+  Shared picker drafts are now admitted only after the selection channel
+  returns true and the original source/generation remains current through
+  label and delivery callbacks. Refused/throwing channels and callback-driven
+  closure/source changes leave no savable draft. All 15 previous contract
+  cases and nine new cases pass on both Lua ABIs; the original fails seven
+  new cases and three bounded inverses fail two/two/six. Two existing scope
+  fixtures per Lua driver now model the independently observed Window boolean
+  acknowledgement instead of nil, retaining every original assertion. Final
+  joined-source and native GUI delivery qualification remain required.
+
 - [~] **98.** Replace fixed make-J-the-star-key with a user-chosen
   physical position and arbitrary output, including explicit None, through
   item 97's model rather than another layout switch. Implemented: the shared
@@ -8914,6 +8933,8 @@ mandatory.
   not infer a physical J position from a saved character. Late cancelled or
   superseded request callbacks cannot alter the draft. This adds no output or
   star-migration authority; native capture and the software work below remain.
+  The same acknowledged-draft boundary from item 97 also protects this
+  editor; it adds no position, collision, migration or output authority.
 
   Remaining software: complete item 97's native capture/source/collision/output
   owners and prove acknowledged star-setting migration while preserving occupied
@@ -8923,6 +8944,12 @@ mandatory.
   delivery/refusal through final affected-driver gates. Device work: chosen
   physical position/output across real layout changes, modifiers and repeats;
   None must create no mapping. Text emission is not dead-key composition.
+
+  Item 97's shared optional capture-session correction also protects this
+  editor: absent or callback-removed emission ports refuse native enrollment
+  and delivery. Eleven controlled cases pass on both Lua ABIs, with genuine
+  original/omission failures; no star migration or new output owner is admitted.
+  Callable replacement/ABA and actual physical delivery remain unqualified.
 
 - [~] **101.** Investigate the supplied Windows diagnostic's retained keylogger
   shutdown debt (watchers=0). Keep privacy filtering fail-closed;

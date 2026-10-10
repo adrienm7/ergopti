@@ -351,7 +351,7 @@ helpers.describe('Actual shared physical editor to Linux native scope',function(
   with_scope(function(scope,owners,controls,path)
    local Json=require('json');local file=assert(io.open(helpers.driver_root() .. "/../_shared/data/keycodes/physical_keys.json"));local model=require('shortcuts.physical_slots').new(Json.decode(file:read('*a')));file:close()
    local callback,selected
-   local editor=require('shortcuts.physical_editor').new({model=model,catalogue=owners.gestures,parameter_section='gesture_parameters',positions={},capture=scope.capture_editor_inventory,current=scope.editor_source_current,commit=scope.edit,label=owners.gestures.get_action_label,picker=function(_,_,confirm)callback=confirm;return true end,emit=function(value)selected=value end})
+   local editor=require('shortcuts.physical_editor').new({model=model,catalogue=owners.gestures,parameter_section='gesture_parameters',positions={},capture=scope.capture_editor_inventory,current=scope.editor_source_current,commit=scope.edit,label=owners.gestures.get_action_label,picker=function(_,_,confirm)callback=confirm;return true end,emit=function(value)selected=value;return true end})
    helpers.assert_eq(#editor.open().entries,0)
    helpers.assert_eq(editor.choose({code='KeyJ',mods={ctrl=true},request_id=1}),true);helpers.assert_eq(callback('send_text','★'),true)
    helpers.assert_eq(#controls.backups,0,'Draft never publishes scalar/assignment')
@@ -364,7 +364,7 @@ helpers.describe('Actual shared physical editor to Linux native scope',function(
   with_scope(function(scope,owners,controls,path)
    local Json=require('json');local file=assert(io.open(helpers.driver_root() .. "/../_shared/data/keycodes/physical_keys.json"));local model=require('shortcuts.physical_slots').new(Json.decode(file:read('*a')));file:close()
    local callback,selected
-   local editor=require('shortcuts.physical_editor').new({model=model,catalogue=owners.gestures,parameter_section='gesture_parameters',positions={},capture=scope.capture_editor_inventory,current=scope.editor_source_current,commit=scope.edit,label=owners.gestures.get_action_label,picker=function(_,_,confirm)callback=confirm;return true end,emit=function(value)selected=value end})
+   local editor=require('shortcuts.physical_editor').new({model=model,catalogue=owners.gestures,parameter_section='gesture_parameters',positions={},capture=scope.capture_editor_inventory,current=scope.editor_source_current,commit=scope.edit,label=owners.gestures.get_action_label,picker=function(_,_,confirm)callback=confirm;return true end,emit=function(value)selected=value;return true end})
    editor.open();editor.choose({code='KeyJ',mods={},request_id=1});helpers.assert_eq(callback('send_text','★'),true)
    local foreign=SOURCE..'# foreign editor\n';helpers.assert_true(Writer.publish_if_unchanged(path,foreign,nil,{status='ok',content=SOURCE}))
    helpers.assert_eq(editor.save(selected.token).committed,false);helpers.assert_eq(#controls.backups,0);helpers.assert_eq(Writer.read_classified(path),foreign)
