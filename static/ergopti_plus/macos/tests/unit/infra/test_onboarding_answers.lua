@@ -12,3 +12,5 @@
 local helpers = require("tests.helpers")
 
 require("test.onboarding_answers_contract").register(helpers, { driver = "macos" })
+
+require("test.onboarding_publication_contract").register(helpers)

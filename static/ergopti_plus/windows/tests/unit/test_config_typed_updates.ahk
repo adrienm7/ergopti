@@ -37,6 +37,7 @@ _CTU_Roundtrip(BooleanValue, EnumValue, Duration) {
 	Path := _CTU_NewPath()
 	try {
 		ConfigurationFile := Path
+		ConfigMigrateBoot(Path)
 		Source := Map("layout", Map("ergopti_base", BooleanValue),
 			"script", Map("alt_gr_is_kana_remap", EnumValue),
 			"hotstrings", Map("french_autocorrection", Map("accents",
@@ -109,6 +110,7 @@ _CTU_GatewayScopesSchemaAndRejectsInvalidValues() {
 	Writer := (Target, Updates) => (Seen.Push(Updates), TOML_BatchWrite(Target, Updates))
 	try {
 		ConfigurationFile := Path
+		ConfigMigrateBoot(Path)
 		Update := [{ Section: "layout", Key: "ergopti_base", Value: 1 }]
 		AssertTrue(ConfigCommitUpdates(GenericPath, Update, "generic TOML", Writer, (*) => 0))
 		AssertTrue(Seen[1][1].Value is Integer,

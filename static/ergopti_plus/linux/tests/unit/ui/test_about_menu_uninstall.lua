@@ -228,16 +228,23 @@ local function with_about_parent(code, options, body)
 			section = function(key) return labels[key] or key end,
 		}
 		local renderer = require("infra.manifest_menu")
-		local root, parent, quit = renderer.get_root()
+		local root, parent, quit, boundary = renderer.get_root()
 		for _, row in ipairs(root.top_level) do
 			if row.id == "about" then helpers.assert_nil(parent); parent = row end
+			local applicable = row.platforms == nil
+			for _, platform in ipairs(row.platforms or {}) do
+				if platform == "linux" then applicable = true end
+			end
+			if row.id == "---" and applicable then boundary = row end
 			if row.id == "quit" and type(row.platforms) == "table" then
-				for _, platform in ipairs(row.platforms) do if platform == "linux" then quit = row end end
+				for _, platform in ipairs(row.platforms) do if platform == "linux" then quit = row; break end end
+				if quit then break end
 			end
 		end
 		helpers.assert_type(parent, "table", "the actual canonical About owner exists")
 		helpers.assert_type(quit, "table", "the actual native Quit owner exists")
-		root.top_level = { parent, quit }
+		helpers.assert_type(boundary, "table", "the actual declared boundary precedes native Quit")
+		root.top_level = { parent, boundary, quit }
 		local state = { versions = 0, startup_reads = 0, toggles = 0, changed = 0,
 			quits = 0, pages = {}, removals = {}, enabled = true }
 		package.loaded["infra.version"] = { VERSION = "local", LOCAL = "local", identity = function()

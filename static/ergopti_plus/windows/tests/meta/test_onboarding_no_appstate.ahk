@@ -132,13 +132,38 @@ _ONA_CommitErrorsUseSelectedLocale() {
 		"every onboarding commit failure must pass a literal i18n key the wizard's language resolves")
 	AssertEqual("onboarding.error.commit_invalid_config_dir`n"
 		. "onboarding.error.commit_transaction_busy`n"
+		. "onboarding.error.commit_source_verification`n"
 		. "onboarding.error.commit_candidate_render`n"
+		. "onboarding.error.commit_source_verification`n"
 		. "onboarding.error.commit_source_verification`n"
 		. "onboarding.error.commit_redirect_render`n"
 		. "onboarding.error.commit_transition`n"
 		. "onboarding.error.commit_unexpected`n"
 		. "onboarding.error.commit_rollback`n",
 		Listed, "the complete onboarding commit failure class must remain enumerated, branch by branch")
+	; The complete census above additionally names source preparation before
+	; rendering and detached candidate admission before WAL construction. Keep
+	; the original eight branches as an explicit ordered lineage as well.
+	OriginalFailureKeys := ["onboarding.error.commit_invalid_config_dir",
+		"onboarding.error.commit_transaction_busy",
+		"onboarding.error.commit_candidate_render",
+		"onboarding.error.commit_source_verification",
+		"onboarding.error.commit_redirect_render",
+		"onboarding.error.commit_transition",
+		"onboarding.error.commit_unexpected",
+		"onboarding.error.commit_rollback"]
+	OriginalKeyIndex := 1
+	for Index, Key in StrSplit(Listed, "`n") {
+		; Source preparation and candidate admission are the added third/fifth
+		; branches; the sixth entry is the original expected-old refusal.
+		if Index == 3 || Index == 5
+			continue
+		if OriginalKeyIndex <= OriginalFailureKeys.Length
+				&& Key == OriginalFailureKeys[OriginalKeyIndex]
+			OriginalKeyIndex += 1
+	}
+	Assert(OriginalKeyIndex == OriginalFailureKeys.Length + 1,
+		"all eight original commit failures must retain their source order")
 	; A tap_hold.toml that cannot take the import, or a navigation layer that
 	; cannot be written beside it, is no commit failure: the other answers are
 	; saved, then one notice in the same language says which import failed.

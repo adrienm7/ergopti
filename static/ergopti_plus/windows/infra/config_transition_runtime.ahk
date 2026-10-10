@@ -32,22 +32,70 @@ global _ConfigTransitionRetainedBarrier := false
 ; Constructs the exact eight-method production port. Windows-only primitives
 ; deliberately remain outside ADAPTER_FILE_SYSTEM, whose portable five-method
 ; contract is consumed by cross-driver compliance tests.
-ConfigTransitionProductionPort() {
-	return Map(
-		"exists", FSStrictExists,
-		"read", FSReadUtf8Exact,
-		"read_bounded", FSReadUtf8ExactBounded,
-		"write_create_durable", FSWriteCreateDurable,
-		"move_create", FSAtomicMoveCreate,
-		"move_replace", FSAtomicMoveReplace,
-		"delete", FSDeleteStrict,
-		"hash", CryptoSha256)
+ConfigTransitionProductionPort(InspectPort := unset, Request := "owns") {
+	static Issued := Map(), HistoricalIssued := Map(), CanonicalPort := false
+	static Native := Map(
+		"exists", FSStrictExists, "read", FSReadUtf8Exact,
+		"read_bounded", FSReadUtf8ExactBounded, "write_create_durable", FSWriteCreateDurable,
+		"move_create", FSAtomicMoveCreate, "move_replace", FSAtomicMoveReplace,
+		"delete", FSDeleteStrict, "hash", CryptoSha256)
+	Live() {
+		for Name, Owner in Native
+			if Object.Prototype.HasOwnProp.Call(Owner, "Call")
+				return false
+		return Native["exists"] == FSStrictExists && Native["read"] == FSReadUtf8Exact
+			&& Native["read_bounded"] == FSReadUtf8ExactBounded && Native["write_create_durable"] == FSWriteCreateDurable
+			&& Native["move_create"] == FSAtomicMoveCreate && Native["move_replace"] == FSAtomicMoveReplace
+			&& Native["delete"] == FSDeleteStrict && Native["hash"] == CryptoSha256
+	}
+	if IsSet(InspectPort) {
+		; Identity history is refusal-only: it never grants native admission.
+		; Preserve deliberate retired identities so none falls back to custom IO.
+		if Request == "known"
+			return HistoricalIssued.Has(InspectPort)
+		if !(InspectPort is Map) || ObjGetBase(InspectPort) != Map.Prototype || !Issued.Has(InspectPort)
+			return false
+		for Name in ObjOwnProps(InspectPort)
+			return false
+		if Request == "retire" {
+			Issued.Delete(InspectPort)
+			if CanonicalPort == InspectPort
+				CanonicalPort := false
+			return 1
+		}
+		if Request != "owns" || !Live() || InspectPort.Count != Native.Count || InspectPort.CaseSense != Native.CaseSense
+			return false
+		for Name, Callback in Native {
+			if !InspectPort.Has(Name) || InspectPort[Name] != Callback
+				return false
+		}
+		return 1
+	}
+	if Request != "owns" || !Live()
+		throw Error("The native transition port owner is unavailable")
+	; The native functions are one driver-lifetime owner, not one certificate
+	; per read/hash helper. Reuse its exact checked map so the private issuer
+	; does not retain an unbounded sequence of otherwise unreachable ports.
+	if CanonicalPort is Map {
+		if !ConfigTransitionProductionPort(CanonicalPort)
+			throw Error("The canonical native transition port data image changed")
+		return CanonicalPort
+	}
+	CanonicalPort := Native.Clone()
+	Issued[CanonicalPort] := true
+	HistoricalIssued[CanonicalPort] := true
+	return CanonicalPort
 }
 
 ; Resolves the optional injected port without accepting arbitrary falsey values.
 _ConfigTransitionRuntimePort(Port) {
+	static PortOwner := ConfigTransitionProductionPort
+	if PortOwner != ConfigTransitionProductionPort
+		throw Error("The original native transition port owner was withdrawn")
 	if (Port is Integer) && Port == 0
-		return ConfigTransitionProductionPort()
+		return PortOwner.Call()
+	if PortOwner.Call(Port, "known") && !PortOwner.Call(Port)
+		throw Error("A revoked genuine native transition port cannot dispatch as a custom port")
 	return Port
 }
 
@@ -218,17 +266,21 @@ _ConfigTransitionRuntimeOwns(Bundle, Path) {
 ; borrows it instead of deadlocking on a second acquisition.
 ConfigTransitionRetainBarrier(Bundle) {
 	global _ConfigTransitionRetainedBarrier
-	if !(Bundle is Object) || !Bundle.HasOwnProp("kind")
-			|| Bundle.kind != "terminal_bundle"
-			|| !Bundle.HasOwnProp("tokens") || !(Bundle.tokens is Array)
-			|| !_ConfigWriteTerminalIsActive()
-		return false
-	for Token in Bundle.tokens {
-		if !_ConfigWriteLeaseOwns(Token)
-			return false
-	}
 	PreviousCritical := Critical("On")
 	try {
+		; Shape is intrinsic; only the actual closed issuer grants custody.
+		if !_ConfigWriteLeaseDataObject(Bundle, ["kind", "id", "tokens", "authorized", "shutdown_claimed"])
+				|| !_ConfigWriteTerminalTryAcquire([], Bundle)
+			return false
+		if !(Bundle is Object) || !Bundle.HasOwnProp("kind")
+				|| Bundle.kind != "terminal_bundle"
+				|| !Bundle.HasOwnProp("tokens") || !(Bundle.tokens is Array)
+				|| !_ConfigWriteTerminalIsActive()
+			return false
+		for Token in Bundle.tokens {
+			if !_ConfigWriteLeaseOwns(Token)
+				return false
+		}
 		if (_ConfigTransitionRetainedBarrier is Object)
 			return _ConfigTransitionRetainedBarrier == Bundle
 		_ConfigTransitionRetainedBarrier := Bundle
@@ -293,6 +345,7 @@ ConfigTransitionAcquireLifecycleBundle(PathsFile, IntendedPaths, Port := 0,
 
 _ConfigTransitionAcquireLifecycleBundleNonCritical(PathsFile, IntendedPaths,
 		Port, AcquireFn, SettleFn) {
+	UseNative := ((Port is Integer) && Port == 0) || ConfigTransitionProductionPort(Port)
 	Port := _ConfigTransitionRuntimePort(Port)
 	NormalizedLocator := _ConfigTransitionNormalizePath(PathsFile)
 	if !(NormalizedLocator is String) || !(IntendedPaths is Array)
@@ -343,7 +396,7 @@ _ConfigTransitionAcquireLifecycleBundleNonCritical(PathsFile, IntendedPaths,
 	; caller can parse candidate config bytes. Building from a prepared/applying
 	; mixed image and only recovering inside Commit would canonize crash debris.
 	Recovered := _ConfigTransitionRecoverOwnedNonCritical(NormalizedLocator,
-		Bundle, Port, 0)
+		Bundle, UseNative ? 0 : Port, 0)
 	if !ConfigTransitionResultIs(Recovered, "absent")
 			&& !ConfigTransitionResultIs(Recovered, "recovered_old")
 			&& !ConfigTransitionResultIs(Recovered, "recovered_new") {
@@ -368,6 +421,7 @@ ConfigTransitionRecoverOwned(PathsFile, Bundle, Port := 0, PauseFn := 0) {
 }
 
 _ConfigTransitionRecoverOwnedNonCritical(PathsFile, Bundle, Port, PauseFn) {
+	UseNative := ((Port is Integer) && Port == 0) || ConfigTransitionProductionPort(Port)
 	Port := _ConfigTransitionRuntimePort(Port)
 	NormalizedLocator := _ConfigTransitionNormalizePath(PathsFile)
 	if !(NormalizedLocator is String)
@@ -388,7 +442,21 @@ _ConfigTransitionRecoverOwnedNonCritical(PathsFile, Bundle, Port, PauseFn) {
 				. Target["path"] . "'.", Inspected["record"])
 		}
 	}
-	return ConfigTransitionRecover(NormalizedLocator, Port, PauseFn)
+	NoopFn := 0
+	if UseNative {
+		try NativeOwner := _ConfigTransitionGuardedProductionPort(NormalizedLocator, Bundle, [], true)
+		catch as Err
+			return _ConfigTransitionResult("retry", "recovery_source_schema_refused", Err.Message, Inspected["record"])
+		Port := NativeOwner.port
+		NoopFn := NativeOwner.noop
+	} else {
+		for Target in Inspected["record"]["targets"] {
+			SplitPath(Target["path"], &Name)
+			if StrLower(Name) == "config.toml" || ConfigMigrateBoot(Target["path"], "known")
+				return _ConfigTransitionResult("fatal", "guarded_custom_recovery_port_unqualified")
+		}
+	}
+	return ConfigTransitionRecover(NormalizedLocator, Port, PauseFn, NoopFn)
 }
 
 ; Prepares and applies one ordered transition while the caller retains the
@@ -405,6 +473,7 @@ ConfigTransitionCommitOwned(PathsFile, TargetSpecs, Bundle, Port := 0,
 
 _ConfigTransitionCommitOwnedNonCritical(PathsFile, TargetSpecs, Bundle, Port,
 		PauseFn) {
+	UseNative := ((Port is Integer) && Port == 0) || ConfigTransitionProductionPort(Port)
 	Port := _ConfigTransitionRuntimePort(Port)
 	NormalizedLocator := _ConfigTransitionNormalizePath(PathsFile)
 	if !(NormalizedLocator is String) || !(TargetSpecs is Array)
@@ -420,24 +489,38 @@ _ConfigTransitionCommitOwnedNonCritical(PathsFile, TargetSpecs, Bundle, Port,
 			return _ConfigTransitionResult("fatal", "target_owner_missing")
 	}
 	Recovered := _ConfigTransitionRecoverOwnedNonCritical(NormalizedLocator,
-		Bundle, Port, 0)
+		Bundle, UseNative ? 0 : Port, 0)
 	if !ConfigTransitionResultIs(Recovered, "absent")
 			&& !ConfigTransitionResultIs(Recovered, "recovered_old")
 			&& !ConfigTransitionResultIs(Recovered, "recovered_new")
 		return _ConfigTransitionProtectFailedResolution(Recovered,
 			Recovered.Clone(), Bundle)
+	NoopFn := 0
+	if UseNative {
+		try NativeOwner := _ConfigTransitionGuardedProductionPort(NormalizedLocator, Bundle, TargetSpecs)
+		catch as Err
+			return _ConfigTransitionResult("retry", "source_schema_admission_refused", Err.Message)
+		Port := NativeOwner.port
+		NoopFn := NativeOwner.noop
+	} else {
+		for Spec in TargetSpecs {
+			SplitPath(Spec["path"], &Name)
+			if StrLower(Name) == "config.toml" || ConfigMigrateBoot(Spec["path"], "known")
+				return _ConfigTransitionResult("fatal", "guarded_custom_port_unqualified")
+		}
+	}
 	Prepared := ConfigTransitionPrepare(NormalizedLocator, TargetSpecs, Port,
 		"", PauseFn)
 	if !ConfigTransitionResultIs(Prepared, "prepared") {
 		Rollback := _ConfigTransitionRecoverOwnedNonCritical(
-			NormalizedLocator, Bundle, Port, 0)
+			NormalizedLocator, Bundle, UseNative ? 0 : Port, 0)
 		return _ConfigTransitionProtectFailedResolution(Prepared, Rollback,
 			Bundle)
 	}
-	Applied := ConfigTransitionApply(NormalizedLocator, Port, PauseFn)
+	Applied := ConfigTransitionApply(NormalizedLocator, Port, PauseFn, NoopFn)
 	if !ConfigTransitionResultIs(Applied, "committed_new") {
 		Rollback := _ConfigTransitionRecoverOwnedNonCritical(
-			NormalizedLocator, Bundle, Port, 0)
+			NormalizedLocator, Bundle, UseNative ? 0 : Port, 0)
 		return _ConfigTransitionProtectFailedResolution(Applied, Rollback,
 			Bundle)
 	}
@@ -459,6 +542,7 @@ ConfigTransitionRollbackOwned(PathsFile, Bundle, Port := 0, PauseFn := 0) {
 _ConfigTransitionRollbackOwnedNonCritical(PathsFile, Bundle, Port, PauseFn) {
 	global CONFIG_TRANSITION_PHASE_COMMITTED_NEW
 	global CONFIG_TRANSITION_PHASE_APPLYING
+	UseNative := ((Port is Integer) && Port == 0) || ConfigTransitionProductionPort(Port)
 	Port := _ConfigTransitionRuntimePort(Port)
 	NormalizedLocator := _ConfigTransitionNormalizePath(PathsFile)
 	if !(NormalizedLocator is String)
@@ -476,6 +560,12 @@ _ConfigTransitionRollbackOwnedNonCritical(PathsFile, Bundle, Port, PauseFn) {
 			return _ConfigTransitionResult("fatal", "target_owner_missing", "",
 				Record)
 	}
+	if UseNative {
+		try NativeOwner := _ConfigTransitionGuardedProductionPort(NormalizedLocator, Bundle, [], true)
+		catch as Err
+			return _ConfigTransitionResult("retry", "rollback_source_schema_refused", Err.Message, Record)
+		Port := NativeOwner.port
+	}
 	if Record["phase"] == CONFIG_TRANSITION_PHASE_COMMITTED_NEW {
 		RollbackRecord := _ConfigTransitionWithPhase(Record,
 			CONFIG_TRANSITION_PHASE_APPLYING)
@@ -486,7 +576,7 @@ _ConfigTransitionRollbackOwnedNonCritical(PathsFile, Bundle, Port, PauseFn) {
 		_ConfigTransitionPause(PauseFn, "phase:rollback_applying")
 	}
 	return _ConfigTransitionRecoverOwnedNonCritical(NormalizedLocator, Bundle,
-		Port, PauseFn)
+		UseNative ? 0 : Port, PauseFn)
 }
 
 ; Emits one English developer diagnostic. UI callers add their existing
@@ -528,6 +618,7 @@ ConfigTransitionRecoverAtBoot(PathsFile, Port := 0, PauseFn := 0) {
 }
 
 _ConfigTransitionRecoverAtBootNonCritical(PathsFile, Port, PauseFn) {
+	UseNative := ((Port is Integer) && Port == 0) || ConfigTransitionProductionPort(Port)
 	Port := _ConfigTransitionRuntimePort(Port)
 	NormalizedLocator := _ConfigTransitionNormalizePath(PathsFile)
 	if !(NormalizedLocator is String)
@@ -547,7 +638,7 @@ _ConfigTransitionRecoverAtBootNonCritical(PathsFile, Port, PauseFn) {
 			Inspected["record"])
 	}
 	try return _ConfigTransitionRecoverOwnedNonCritical(NormalizedLocator,
-		Bundle, Port, PauseFn)
+		Bundle, UseNative ? 0 : Port, PauseFn)
 	finally _ConfigWriteTerminalRelease(Bundle)
 }
 
@@ -578,4 +669,290 @@ _ConfigTransitionRecoverAtBootOrThrowNonCritical(PathsFile, Port) {
 	; to bootstrap.log in the default logs folder.
 	try LoggerAppendBootstrapLine("ERROR", "ConfigTransition", Message)
 	throw Error(Message)
+}
+
+
+; This constructor owns its eight-method native port and private target guards.
+; Public intent/cache objects never register a journal phase or native issuer.
+_ConfigTransitionGuardedProductionPort(PathsFile, Bundle, TargetSpecs, Recovery := false) {
+	static PortOwner := ConfigTransitionProductionPort
+	static ReplaceOwner := FSConfigAtomicMoveReplace, CreateOwner := FSConfigAtomicMoveCreate
+	static DeleteOwner := FSConfigDeleteStrict, NoopOwner := FSNativeAcknowledge
+	for Owner in [PortOwner, ReplaceOwner, CreateOwner, DeleteOwner, NoopOwner]
+		if Object.Prototype.HasOwnProp.Call(Owner, "Call")
+			throw Error("The original configuration native producer was modified")
+	if PortOwner != ConfigTransitionProductionPort || ReplaceOwner != FSConfigAtomicMoveReplace
+			|| CreateOwner != FSConfigAtomicMoveCreate || DeleteOwner != FSConfigDeleteStrict
+			|| NoopOwner != FSNativeAcknowledge
+		throw Error("The original configuration native producer was withdrawn")
+	Native := PortOwner.Call()
+	Guards := Map()
+	Guards.CaseSense := "On"
+	; Keep canonical Native as authority. This private callback adapter forwards
+	; the captured real native class without registering itself as a native port.
+	Callbacks := Map()
+	for Method, Callback in Native
+		Callbacks[Method] := Dispatch.Bind(Callback)
+	if Recovery {
+		Inspected := ConfigTransitionInspect(PathsFile, Callbacks)
+		if !ConfigTransitionResultIs(Inspected, "ready")
+			throw Error("The actual native recovery WAL is unavailable")
+		TargetSpecs := Inspected["record"]["targets"]
+	}
+	if !(TargetSpecs is Array) || !_ConfigWriteTerminalOwnsExact(Bundle, PathsFile)
+		throw Error("The actual transition lacks its native locator owner")
+	for Spec in TargetSpecs {
+		Path := Spec["path"]
+		SplitPath(Path, &Name)
+		if StrLower(Name) != "config.toml" && !ConfigMigrateBoot(Path, "known")
+			continue
+		if !Recovery && !ConfigSchemaPrepareOwnedSource(Path, Bundle)
+			throw Error("The genuine transition target source/schema could not be constructed")
+		if !NativeLive()
+			throw Error("The actual native transition port owner was withdrawn before source read")
+		Present := Callbacks["exists"].Call(Path)
+		if !NativeLive()
+			throw Error("The actual native transition port owner was withdrawn during source read")
+		Content := Present ? Callbacks["read"].Call(Path) : ""
+		Candidate := Recovery ? Map("present", Present, "content", Content)
+			: Map("present", Spec["new_present"], "content", Spec["new_content"])
+		Guard := Recovery ? ConfigMigrateBoot(Path, "capture_recovery", PathsFile, Bundle)
+			: ConfigMigrateBoot(Path, "capture_transition", Candidate, Bundle)
+		if !HasMethod(Guard, "Call") || !Guard.Call(Content, Present, Candidate["content"], Candidate["present"])
+			throw Error("The complete configuration transition candidate was refused")
+		Guards[_ConfigWriteLeaseKey(Path)] := { check: Guard, old_present: Present, old_content: Content,
+			new_present: Candidate["present"], new_content: Candidate["content"] }
+	}
+	NativeLive() {
+		for Owner in [PortOwner, ReplaceOwner, CreateOwner, DeleteOwner, NoopOwner]
+			if Object.Prototype.HasOwnProp.Call(Owner, "Call")
+				return false
+		return ReplaceOwner == FSConfigAtomicMoveReplace && CreateOwner == FSConfigAtomicMoveCreate
+			&& DeleteOwner == FSConfigDeleteStrict && NoopOwner == FSNativeAcknowledge
+			&& PortOwner == ConfigTransitionProductionPort && PortOwner.Call(Native)
+			&& Native["exists"] == FSStrictExists && Native["read"] == FSReadUtf8Exact
+			&& Native["read_bounded"] == FSReadUtf8ExactBounded && Native["write_create_durable"] == FSWriteCreateDurable
+			&& Native["move_create"] == FSAtomicMoveCreate && Native["move_replace"] == FSAtomicMoveReplace
+			&& Native["delete"] == FSDeleteStrict && Native["hash"] == CryptoSha256
+	}
+	AllLive() {
+		if !NativeLive() || !_ConfigWriteTerminalOwnsExact(Bundle, PathsFile)
+			return false
+		for Key, Row in Guards {
+			if !Row.check.Call(Row.old_content, Row.old_present, Row.new_content, Row.new_present)
+				return false
+		}
+		; Source comparisons may be long; their accepted result cannot retain
+		; callback authority withdrawn while the real guards were evaluating.
+		return NativeLive() && _ConfigWriteTerminalOwnsExact(Bundle, PathsFile)
+	}
+	Dispatch(Callback, Args*) {
+		if !AllLive()
+			throw Error("The actual guarded native callback owner was withdrawn before dispatch")
+		Result := Callback.Call(Args*)
+		if !AllLive()
+			throw Error("The actual guarded native callback owner was withdrawn during dispatch")
+		return Result
+	}
+	Read(Path) {
+		if !AllLive()
+			throw Error("The native transition source owner was withdrawn")
+		Content := Callbacks["read"].Call(Path)
+		if !AllLive()
+			throw Error("The actual guarded native read owner was withdrawn before source admission")
+		Key := _ConfigWriteLeaseKey(Path)
+		if Guards.Has(Key) && !Guards[Key].check.Call(Content, 1, Content, 1)
+			throw Error("The actual transition target source changed outside its admitted images")
+		return Content
+	}
+	MoveReplace(Source, Destination) {
+		if !AllLive()
+			return 0
+		Key := _ConfigWriteLeaseKey(Destination)
+		if Guards.Has(Key) {
+			Candidate := Callbacks["read"].Call(Source)
+			Present := Callbacks["exists"].Call(Destination)
+			Content := Present ? Callbacks["read"].Call(Destination) : ""
+			Check := Guards[Key].check
+			Admission := () => AllLive() && Check.Call(Content, Present, Candidate, 1)
+		} else
+			Admission := AllLive
+		return ReplaceOwner.Call(Source, Destination, &MoveError, Admission)
+	}
+	MoveCreate(Source, Destination) {
+		if !AllLive()
+			return 0
+		return CreateOwner.Call(Source, Destination, AllLive)
+	}
+	Delete(Path) {
+		if !AllLive()
+			return 0
+		Key := _ConfigWriteLeaseKey(Path)
+		if Guards.Has(Key) {
+			Present := Callbacks["exists"].Call(Path)
+			Content := Present ? Callbacks["read"].Call(Path) : ""
+			Check := Guards[Key].check
+			Admission := () => AllLive() && Check.Call(Content, Present, "", 0)
+		} else
+			Admission := AllLive
+		return DeleteOwner.Call(Path, Admission)
+	}
+	Noop(Path, Content, Present) {
+		if !AllLive()
+			return 0
+		ActualPresent := Callbacks["exists"].Call(Path)
+		ActualContent := ActualPresent ? Callbacks["read"].Call(Path) : ""
+		if ActualPresent != Present || StrCompare(ActualContent, Content, true) != 0
+			return 0
+		Key := _ConfigWriteLeaseKey(Path)
+		if Guards.Has(Key) {
+			Check := Guards[Key].check
+			Admission := () => AllLive() && Check.Call(Content, Present, Content, Present)
+		} else
+			Admission := AllLive
+		return NoopOwner.Call(Admission)
+	}
+	Port := Callbacks.Clone()
+	Port["read"] := Read
+	Port["move_create"] := MoveCreate
+	Port["move_replace"] := MoveReplace
+	Port["delete"] := Delete
+	return { port: Port, noop: Noop }
+}
+
+
+; Reads genuine validated WAL material through fixed native functions. Returned
+; objects are detached facts; the private schema issuer invokes this owner
+; itself and never accepts a caller's copy as a registration capability.
+_ConfigTransitionNativeRecoveryImages(PathsFile, Path, Bundle) {
+	static PortOwner := ConfigTransitionProductionPort, InspectOwner := ConfigTransitionInspect
+	static NamespaceOwner := _ConfigTransitionPreflightOwnedNamespace, ArtifactOwner := _ConfigTransitionReadArtifact
+	static ArtifactPathsOwner := _ConfigTransitionArtifactPaths, SnapshotOwner := _ConfigTransitionReadSnapshot
+	static TerminalOwner := _ConfigWriteTerminalOwnsExact, KeyOwner := _ConfigWriteLeaseKey
+	static ResultOwner := ConfigTransitionResultIs
+	NativeLive() {
+		for Owner in [PortOwner, InspectOwner, NamespaceOwner, ArtifactOwner, ArtifactPathsOwner,
+			SnapshotOwner, TerminalOwner, KeyOwner, ResultOwner]
+			if Object.Prototype.HasOwnProp.Call(Owner, "Call")
+				return false
+		return PortOwner == ConfigTransitionProductionPort && InspectOwner == ConfigTransitionInspect
+			&& NamespaceOwner == _ConfigTransitionPreflightOwnedNamespace && ArtifactOwner == _ConfigTransitionReadArtifact
+			&& ArtifactPathsOwner == _ConfigTransitionArtifactPaths && SnapshotOwner == _ConfigTransitionReadSnapshot
+			&& TerminalOwner == _ConfigWriteTerminalOwnsExact && KeyOwner == _ConfigWriteLeaseKey
+			&& ResultOwner == ConfigTransitionResultIs
+	}
+	PortLive() {
+		if !NativeLive()
+			return false
+		if !IsSet(Port)
+			return true
+		try Accepted := PortOwner.Call(Port)
+		catch {
+			return false
+		}
+		return NativeLive() && (Accepted is Integer) && Accepted == 1
+	}
+	OwnerLive() {
+		if !PortLive()
+			return false
+		LocatorOwned := TerminalOwner.Call(Bundle, PathsFile)
+		if !PortLive() || !(LocatorOwned is Integer) || LocatorOwned != 1
+			return false
+		TargetOwned := TerminalOwner.Call(Bundle, Path)
+		return PortLive() && (TargetOwned is Integer) && TargetOwned == 1
+	}
+	; This private adapter is data for the original recovery producers, never
+	; an issued native port or a schema registration capability. The captured
+	; canonical port remains the only native authority checked by OwnerLive.
+	Dispatch(Callback, Args*) {
+		if !OwnerLive()
+			throw Error("The actual recovery native owner was withdrawn before callback dispatch")
+		Result := Callback.Call(Args*)
+		if !OwnerLive()
+			throw Error("The actual recovery native owner was withdrawn during callback dispatch")
+		return Result
+	}
+	ActualResultIs(Result, Kind) {
+		if !OwnerLive()
+			return false
+		Accepted := ResultOwner.Call(Result, Kind)
+		return OwnerLive() && (Accepted is Integer) && Accepted == 1
+	}
+	if !OwnerLive()
+		return false
+	try Port := PortOwner.Call()
+	catch {
+		return false
+	}
+	if !OwnerLive()
+		return false
+	; Capture real admitted callbacks before any producer can enter native IO.
+	; A descriptor withdrawal during read must refuse before the same producer
+	; resumes its nested hash or subsequent filesystem callback.
+	RecoveryPort := Map()
+	for Method, Callback in Port
+		RecoveryPort[Method] := Dispatch.Bind(Callback)
+	if !OwnerLive()
+		return false
+	Inspected := InspectOwner.Call(PathsFile, RecoveryPort)
+	if !ActualResultIs(Inspected, "ready")
+		return false
+	Record := Inspected["record"]
+	if !OwnerLive()
+		return false
+	Namespace := NamespaceOwner.Call(PathsFile, Record, RecoveryPort)
+	if !ActualResultIs(Namespace, "cleanup_preflight")
+		return false
+	if !OwnerLive()
+		return false
+	TargetKey := KeyOwner.Call(Path)
+	if !OwnerLive() || !(TargetKey is String)
+		return false
+	Selected := false
+	for Target in Record["targets"] {
+		if !OwnerLive()
+			return false
+		CandidateKey := KeyOwner.Call(Target["path"])
+		if !OwnerLive() || !(CandidateKey is String)
+			return false
+		if StrCompare(CandidateKey, TargetKey, true) == 0 {
+			Selected := Target
+			break
+		}
+	}
+	if !(Selected is Map) || !OwnerLive()
+		return false
+	Actual := SnapshotOwner.Call(RecoveryPort, Path)
+	if !ActualResultIs(Actual, "snapshot")
+		return false
+	Snapshot := Actual["snapshot"]
+	if !OwnerLive()
+		return false
+	Artifacts := ArtifactPathsOwner.Call(Path, Record["tx_id"])
+	if !OwnerLive()
+		return false
+	Images := Map("old", false, "new", false)
+	for Side in ["old", "new"] {
+		if !OwnerLive()
+			return false
+		if !Selected[Side . "_present"] {
+			Images[Side] := { present: 0, source: "" }
+			continue
+		}
+		if Snapshot["present"] == 1 && Snapshot["hash"] == Selected[Side . "_hash"] {
+			Images[Side] := { present: 1, source: Snapshot["content"] }
+			continue
+		}
+		Artifact := ArtifactOwner.Call(RecoveryPort, Artifacts[Side], Selected[Side . "_hash"])
+		if !OwnerLive()
+			return false
+		if ActualResultIs(Artifact, "artifact")
+			Images[Side] := { present: 1, source: Artifact["content"] }
+	}
+	if !OwnerLive()
+		return false
+	Desired := Record["phase"] == CONFIG_TRANSITION_PHASE_COMMITTED_NEW ? "new" : "old"
+	if !(Images[Desired] is Object) || !OwnerLive()
+		return false
+	return { old: Images["old"], new: Images["new"] }
 }

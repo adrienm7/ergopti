@@ -17,6 +17,25 @@ function nativeTemplateBinding(
 ) {
 	const ahk = extension === '.ahk',
 		tokens = scriptTokens(source, extension);
+	const retainedPersonalInfo =
+		!ahk && section === 'personal_info_editor_frame'
+			? require('./menu-native-personal-info-binding.cjs').retainedPersonalInfoTemplateCallOffset(
+					source,
+					platform
+				)
+			: -1;
+	if (
+		!ahk &&
+		section === 'personal_info_editor_frame' &&
+		(retainedPersonalInfo < 0 || key !== 'personal_info_editor_open' || port !== 1)
+	)
+		return false;
+	const retainedDownload =
+		!ahk && section === 'llm_download_shortcut_frame'
+			? require('./menu-native-download-binding.cjs').retainedNativeDownloadTemplateCallOffset(
+					source
+				)
+			: -1;
 	const sameName = (a, b) => (ahk ? a.toLowerCase() === b.toLowerCase() : a === b);
 	const id = (i, v) =>
 		tokens[i]?.kind === 'identifier' && (v === undefined || sameName(tokens[i].value, v));
@@ -312,6 +331,7 @@ function nativeTemplateBinding(
 		let open;
 		if (
 			!ahk &&
+			section !== 'personal_info_editor_frame' &&
 			id(i, 'ManifestMenu') &&
 			bare(i) &&
 			sym(i + 1, '.') &&
@@ -319,6 +339,22 @@ function nativeTemplateBinding(
 			sym(i + 3, '(')
 		)
 			open = i + 3;
+		if (
+			retainedPersonalInfo >= 0 &&
+			tokens[i]?.start === retainedPersonalInfo &&
+			id(i, 'template') &&
+			bare(i) &&
+			sym(i + 1, '(')
+		)
+			open = i + 1;
+		if (
+			retainedDownload >= 0 &&
+			tokens[i]?.start === retainedDownload &&
+			id(i, 'template_owner') &&
+			bare(i) &&
+			sym(i + 1, '(')
+		)
+			open = i + 1;
 		if (ahk && id(i, 'MenuRenderer_TemplateRows') && bare(i) && sym(i + 1, '(')) open = i + 1;
 		if (open === undefined || tokens[i - 1]?.value === 'function') continue;
 		const end = close(open);
