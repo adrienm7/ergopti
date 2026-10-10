@@ -818,9 +818,14 @@ _LBMD_CompleteModelFrameCurrent(Section) {
 	Assert(_LLM_Menu_PerModelRows(Name, Model, Url, Name, false).Length > 0,
 		"the repaired declaration consumes the same genuine physical model")
 }
-for Section in ["llm_model_action_rows", "llm_model_identity_rows", "llm_model_spec_rows",
-	"llm_model_capability_rows", "llm_model_hardware_rows"]
-	Test("complete model sheet: actual frame " . Section, _LBMD_CompleteModelFrame.Bind(Section))
+/** Registers complete frames without publishing a global loop variable. */
+_LBMD_RegisterCompleteModelFrames() {
+	local Section
+	for Section in ["llm_model_action_rows", "llm_model_identity_rows", "llm_model_spec_rows",
+		"llm_model_capability_rows", "llm_model_hardware_rows"]
+		Test("complete model sheet: actual frame " . Section, _LBMD_CompleteModelFrame.Bind(Section))
+}
+_LBMD_RegisterCompleteModelFrames()
 
 
 /** The per-app frame retains lazy native commands and its true empty predicate. */
