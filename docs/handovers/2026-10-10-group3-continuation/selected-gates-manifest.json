@@ -1,0 +1,50 @@
+{
+	"schema": 1,
+	"status": "ACTUAL COMPLETE CANONICAL GEOMETRY SELECTED GATES; WHOLE RESULT FAILED",
+	"source_head": "c3464499e9e597a4e5b0fdc281e82229e392a7fb",
+	"committed_fixture": "cc246925c",
+	"counts": {
+		"hs": {
+			"passed": 17953,
+			"failed": 11,
+			"exit": 1
+		},
+		"js": {
+			"passed": 403,
+			"failed": 3,
+			"exit": 1
+		},
+		"format": {
+			"exit": 1,
+			"reason": "Two new handover files require formatting; no source formatter failure"
+		},
+		"mandatory_e2e_corpus": "PASS"
+	},
+	"qualification": "Portable Lua5.4 only; native proof remains separately bound to a81ded37. Formatting/JS on the final handover are rerun separately. All remaining original assertions retained.",
+	"capsule": {
+		"files": 2,
+		"bytes": 3588104,
+		"entries": [
+			{
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-10/geometry-selected-gates.log",
+				"proposed_member": "evidence/geometry-selected-gates.log.txt",
+				"bytes": 3585440,
+				"sha256": "ace9115ef92d77df8e5d4ecfd4ca40f0043e65424c1b93a8b6c07a911b941ddf",
+				"meaning": "Genuine complete selected-gate raw log"
+			},
+			{
+				"source_path": "/workspace/.ergopti-cloud/continuation-2026-10-10/geometry-selected-gates-terminal.json",
+				"proposed_member": "evidence/geometry-selected-gates-terminal.json.txt",
+				"bytes": 2664,
+				"sha256": "e77c0259345402cb586f7f60cf4e1a5b4f263fb9e4ddcd51791a6f6b9d693842",
+				"meaning": "Exact source hashes and terminal exit for the complete selected run"
+			}
+		],
+		"archive": {
+			"path": "selected-gates.tar.gz",
+			"bytes": 507238,
+			"sha256": "6a53c5dff3cf769fd249012002c23b8ac30a0268a3f87f787f95e3fa1d5b6003",
+			"generator": "generate_capsule.py"
+		}
+	}
+}
