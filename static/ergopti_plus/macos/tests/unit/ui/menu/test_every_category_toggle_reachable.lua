@@ -112,9 +112,21 @@ end
 --- @return table tray, table ctx, table observed, table errors
 local function build_tray(on, extra)
 	local llm_item = nil
-	require("tests.support.llm_count_menu_fixture")(function(llm_menu, state)
+	-- Reachability requires the real activation fixture to own a ready transaction.
+	require("tests.support.llm_activation_fixture")("ollama", { true }, nil, function(_action, state, calls)
 		state.llm_enabled = on
-		llm_item = llm_menu.build_item()
+		local ManifestMenu = package.loaded["infra.manifest_menu"]
+		local previous_build = ManifestMenu.build
+		ManifestMenu.build = function(...)
+			local args = table.pack(...)
+			previous_build(table.unpack(args, 1, args.n))
+			return helpers.with_fresh_modules({ "infra.manifest_menu", "menu.renderer" }, function()
+				return helpers.load_with_stubs("infra.manifest_menu").build(table.unpack(args, 1, args.n))
+			end)
+		end
+		local ok, detail = xpcall(function() llm_item = calls.handler.build_item() end, debug.traceback)
+		ManifestMenu.build = previous_build
+		if not ok then error(detail, 0) end
 	end)
 
 	local errors = {}
@@ -246,6 +258,7 @@ helpers.describe("the real macOS tray: every category switch is reachable", Capt
 				helpers.assert_eq(first.title, i18n.get(category.switch),
 					category.title .. " submenu must open with its category switch")
 				helpers.assert_eq(type(first.fn), "function", category.title .. " switch must be clickable")
+				helpers.assert_eq(first.disabled == true, false, category.title .. " ready switch cannot be greyed")
 				helpers.assert_eq(first.checked, posture, category.title .. " switch is a checkbox showing the state")
 				checked = checked + 1
 			end
