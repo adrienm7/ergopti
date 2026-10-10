@@ -162,7 +162,13 @@ helpers.describe("rules_engine: the interceptor injection reaches inject_dynamic
 		interceptor = interceptor or nil
 		helpers.assert_type(interceptor, "function", "rules_engine.start() must register an interceptor")
 
+		interceptor(fake_event("*"), "td", { start_is_word_boundary = false })
+		helpers.assert_nil(captured.n, "an unknown initial suffix must not reach private injection")
 		interceptor(fake_event("*"), "td")
+		helpers.assert_nil(captured.n, "missing word-start ownership must not reach private injection")
+		interceptor(fake_event("*"), "xtd", { start_is_word_boundary = true })
+		helpers.assert_nil(captured.n, "a larger word must not reach private injection")
+		interceptor(fake_event("*"), "td", { start_is_word_boundary = true })
 
 		helpers.assert_true(captured.n ~= nil, "the date rule must reach inject_dynamic at all")
 		helpers.assert_eq(captured.is_private, true,
