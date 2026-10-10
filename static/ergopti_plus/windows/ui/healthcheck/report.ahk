@@ -105,6 +105,52 @@ HealthCheck_ShareSnapshot(Snapshot, Schema) {
 	return _HCShare_Project(Snapshot, Policy["projection"], &Present)
 }
 
+/** Rebuilds only schema-owned installed-page records, without native authority. */
+HealthCheck_PageChecks(Results, Schema) {
+	if !(Results is Map)
+		return false
+	Accepted := Map(), Expected := Map()
+	for Spec in Schema["diagnostic_checks"]["items"] {
+		Id := Spec["id"], Expected[Id] := true, Row := Results.Get(Id, 0)
+		if !(Row is Map) || !(Row.Get("scope", "") == Spec["scope"])
+			return false
+		for Key in Row
+			if !(Key == "state" || Key == "scope" || Key == "reason" || Key == "ms")
+				return false
+		Rule := Schema["share_policy"]["projection"]["fields"]["page_check_observations"]["fields"]["results"]["fields"][Id]
+		Clean := _HCShare_Project(Row, Rule, &Present)
+		if !Clean.Has("state") || !Clean.Has("scope")
+			return false
+		for Key in ["state", "scope", "reason", "ms"]
+			if Clean.Has(Key) != Row.Has(Key) || (Row.Has(Key) && !(Clean[Key] == Row[Key]))
+				return false
+		State := Row.Get("state", "")
+		if Spec.Has("reason") {
+			if !(State == "not_run") || !(Row.Get("reason", "") == Spec["reason"]) || Row.Has("ms")
+				return false
+		} else if State == "ok" || State == "error" {
+			if !Row.Has("ms") || (Row.Has("reason") && !(Row["reason"] == "invalid_diagnostic_model"))
+				return false
+		} else if Row.Has("ms") || (State == "cancelled" ? Row.Has("reason") : !(Row.Get("reason", "") == "opt_in_required"))
+			return false
+		Accepted[Id] := Clean
+	}
+	for Id in Results
+		if !Expected.Has(Id)
+			return false
+	return Map("source", "installed_page_reported", "qualification", "unqualified", "results", Accepted)
+}
+
+/** Retains page observations only on the exact host report generation. */
+HealthCheck_CapturePageChecks(Snapshot, Action) {
+	if !Action.Has("page_check_observations")
+		return true
+	if !(Action["generated_at"] == Snapshot["generated_at"]) || Action["snapshot_revision"] != Snapshot.Get("export_revision", 0)
+		return false
+	Snapshot["page_check_observations"] := Action["page_check_observations"]
+	return true
+}
+
 
 /** Renders only the detached projection; no local message or path reaches a row. */
 _HCShare_Rows(Value, Rule, Prefix, Rows) {
@@ -193,7 +239,7 @@ HealthCheck_ShareDocument(Snapshot, Schema) {
 	Versions := Safe.Get("sections", Map()).Get("versions", Map())
 	Fence := Chr(96) . Chr(96) . Chr(96)
 	Text := "# ErgoptiPlus diagnostics`n`n" . _HCShare_English(Schema, Schema["share_policy"]["notice_key"])
-		. "`n`ndriver-suites: not_run`npage-model-checks: not_collected`n`n" . _HCShare_Readable(Safe, Schema)
+		. "`n`ndriver-suites: not_run`npage-model-checks: " . (Safe.Has("page_check_observations") ? "installed_page_reported (unqualified)" : "not_collected") . "`n`n" . _HCShare_Readable(Safe, Schema)
 		. "`n" . Fence . "json`n" . _HC_ValueToJson(Safe) . "`n" . Fence . "`n"
 	Name := Schema["report"]["name_prefix"] . Safe["driver"] . "-"
 		. RegExReplace(Safe.Get("generated_at", "unknown"), "[^A-Za-z0-9_.-]", "_") . Schema["report"]["name_suffix"]

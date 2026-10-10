@@ -378,3 +378,28 @@ helpers.describe("default attachment completion", function()
 		end
 	end)
 end)
+
+helpers.describe("retained installed-page observations", function()
+	helpers.it("keeps useful page outcomes without qualifying suites and refuses stale identity", function()
+		local config = documents()
+		local rows = {}
+		for _, spec in ipairs(config.schema.diagnostic_checks.items) do
+			rows[spec.id] = spec.reason and { state = "not_run", scope = spec.scope, reason = spec.reason }
+				or { state = "ok", scope = spec.scope, ms = 3 }
+		end
+		local observed = assert(Share.page_checks(rows, config.schema))
+		local snapshot = host_snapshot(false)
+		snapshot.export_revision = 1
+		local action = { page_check_observations = observed, generated_at = snapshot.generated_at, snapshot_revision = 2 }
+		helpers.assert_eq(Share.capture_page_checks(snapshot, action), false)
+		helpers.assert_eq(snapshot.page_check_observations, nil)
+		action.snapshot_revision = 1
+		helpers.assert_eq(Share.capture_page_checks(snapshot, action), true)
+		local doc = Share.document(snapshot, config.schema, "PRIVATE_LOCALE")
+		helpers.assert_contains(doc.text, "installed_page_reported (unqualified)")
+		helpers.assert_contains(doc.text, "page_check_observations.results.redaction.ms")
+		helpers.assert_eq(doc.snapshot.page_check_observations.results.driver_suites.state, "not_run")
+		rows.redaction.text = "PRIVATE_TEXT"
+		helpers.assert_eq(Share.page_checks(rows, config.schema), nil)
+	end)
+end)

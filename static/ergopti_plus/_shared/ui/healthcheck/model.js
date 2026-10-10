@@ -1051,6 +1051,61 @@
 		return projectShare(snapshot, schema.share_policy.projection);
 	}
 
+	/** Rebuilds closed installed-page records; they never qualify driver suites. */
+	function pageCheckObservations(results, schema) {
+		if (!results || typeof results !== 'object' || Array.isArray(results))
+			throw new Error('Invalid page check records');
+		var accepted = {},
+			expected = {};
+		schema.diagnostic_checks.items.forEach(function (spec) {
+			expected[spec.id] = true;
+			var row = results[spec.id];
+			if (
+				!row ||
+				typeof row !== 'object' ||
+				Array.isArray(row) ||
+				row.scope !== spec.scope ||
+				Object.keys(row).some(function (key) {
+					return ['state', 'scope', 'reason', 'ms'].indexOf(key) < 0;
+				})
+			)
+				throw new Error('Invalid page check record');
+			var rule =
+				schema.share_policy.projection.fields.page_check_observations.fields.results.fields[
+					spec.id
+				];
+			var clean = projectShare(row, rule);
+			if (
+				clean.state === undefined ||
+				clean.state !== row.state ||
+				clean.scope !== row.scope ||
+				clean.reason !== row.reason ||
+				clean.ms !== row.ms
+			)
+				throw new Error('Invalid page check value');
+			if (
+				spec.reason
+					? row.state !== 'not_run' || row.reason !== spec.reason || row.ms !== undefined
+					: row.state === 'ok' || row.state === 'error'
+						? row.ms === undefined ||
+							(row.reason !== undefined && row.reason !== 'invalid_diagnostic_model')
+						: row.ms !== undefined ||
+							(row.state === 'cancelled'
+								? row.reason !== undefined
+								: row.reason !== 'opt_in_required')
+			)
+				throw new Error('Invalid page check outcome');
+			accepted[spec.id] = clean;
+		});
+		if (
+			Object.keys(results).some(function (id) {
+				return !expected[id];
+			})
+		)
+			throw new Error('Unknown page check');
+		return { source: 'installed_page_reported', qualification: 'unqualified', results: accepted };
+	}
+
 	/** Renders only detached, policy-approved leaves; local free text never enters these rows. */
 	function shareRows(value, rule, prefix, rows) {
 		if (rule.kind === 'object') {
@@ -1133,7 +1188,9 @@
 		return (
 			'# ErgoptiPlus diagnostics\n\n' +
 			t(schema.share_policy.notice_key) +
-			'\n\ndriver-suites: not_run\npage-model-checks: not_collected\n\n' +
+			'\n\ndriver-suites: not_run\npage-model-checks: ' +
+			(safe.page_check_observations ? 'installed_page_reported (unqualified)' : 'not_collected') +
+			'\n\n' +
 			shareReadable(safe, schema, t) +
 			'\n```json\n' +
 			JSON.stringify(safe) +
@@ -1143,6 +1200,7 @@
 
 	global.ErgoptiDiagnostics = {
 		shareSnapshot: shareSnapshot,
+		pageCheckObservations: pageCheckObservations,
 		formatShareable: formatShareable,
 		sectionsFor: sectionsFor,
 		probeFor: probeFor,

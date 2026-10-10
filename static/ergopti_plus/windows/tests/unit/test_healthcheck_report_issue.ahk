@@ -330,3 +330,43 @@ _THPA_RefuseAttachmentWrite() {
 	throw Error("inert attachment write refusal")
 }
 Test("Diagnostics export: write refusal prevents issue form (english-attachment)", _THPA_AttachmentSaveRefuses)
+
+_THPA_PageObservations() {
+	global _HC_Session, _HC_ResetDone
+	Config := HealthCheck_Config(), Rows := Map()
+	for Spec in Config["schema"]["diagnostic_checks"]["items"]
+		Rows[Spec["id"]] := Spec.Has("reason") ? Map("state", "not_run", "scope", Spec["scope"], "reason", Spec["reason"])
+			: Map("state", "ok", "scope", Spec["scope"], "ms", 3)
+	Observed := HealthCheck_PageChecks(Rows, Config["schema"])
+	Assert(Observed is Map)
+	Snapshot := _THPA_Snapshot(false), Snapshot["export_revision"] := 1
+	Action := Map("page_check_observations", Observed, "generated_at", Snapshot["generated_at"], "snapshot_revision", 2)
+	AssertFalse(HealthCheck_CapturePageChecks(Snapshot, Action))
+	AssertFalse(Snapshot.Has("page_check_observations"))
+	Action["snapshot_revision"] := 1
+	AssertTrue(HealthCheck_CapturePageChecks(Snapshot, Action))
+	Doc := HealthCheck_ShareDocument(Snapshot, Config["schema"])
+	AssertContains(Doc["text"], "installed_page_reported (unqualified)")
+	AssertContains(Doc["text"], "page_check_observations.results.redaction.ms")
+	AssertEqual("not_run", Doc["snapshot"]["page_check_observations"]["results"]["driver_suites"]["state"])
+	SavedSession := _HC_Session, SavedReset := _HC_ResetDone
+	try {
+		_HC_ResetDone := true ; The actual sender refuses before any WebView operation.
+		Current := _THPA_Snapshot(false), Current["export_revision"] := 1
+		_HC_Session := Map("snapshot", Current)
+		Action["action"] := "export_snapshot", Action["export_sequence"] := 1
+		Action["snapshot_revision"] := 2
+		_HC_PerformPageAction(0, Action, Config)
+		AssertFalse(Current.Has("page_check_observations"), "The real host rejects a stale generation")
+		Action["snapshot_revision"] := 1
+		_HC_PerformPageAction(0, Action, Config)
+		AssertTrue(Current.Has("page_check_observations"), "The real host retains current observations before formatting")
+		AssertEqual(3, Current["page_check_observations"]["results"]["redaction"]["ms"])
+	} finally {
+		_HC_Session := SavedSession
+		_HC_ResetDone := SavedReset
+	}
+	Rows["redaction"]["text"] := "PRIVATE_TEXT"
+	AssertFalse(HealthCheck_PageChecks(Rows, Config["schema"]))
+}
+Test("Diagnostics export: retained page observations remain unqualified and current", _THPA_PageObservations)

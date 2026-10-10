@@ -154,9 +154,19 @@ const redaction = JSON.parse(
 );
 const context = { home: '/home/jdoe', user: 'jdoe', case_insensitive: false };
 
+/** Models the actual host's closed transfer, retaining the asserted probe observations. */
+function hostSnapshot(value, request, page) {
+	value.page_check_observations = page.sandbox.ErgoptiDiagnostics.pageCheckObservations(
+		request.page_checks,
+		schema
+	);
+	return value;
+}
+
 function snapshot(detailed) {
 	return {
 		schema_version: 2,
+		export_revision: 1,
 		driver: 'linux',
 		generated_at: '2026-09-24T10:00:00Z',
 		detailed,
@@ -271,9 +281,9 @@ function init(page, detailed, mode) {
 			action: 'export_snapshot',
 			ok: true,
 			export_sequence: request.export_sequence,
-			snapshot: snapshot(true),
+			snapshot: hostSnapshot(snapshot(true), request, page),
 			share_text: page.sandbox.ErgoptiDiagnostics.formatShareable(
-				snapshot(true),
+				hostSnapshot(snapshot(true), request, page),
 				schema,
 				(key) => page.sandbox._i18n_strings[key] || key
 			)
@@ -293,9 +303,9 @@ function init(page, detailed, mode) {
 			action: 'export_snapshot',
 			ok: true,
 			export_sequence: request.export_sequence,
-			snapshot: snapshot(true),
+			snapshot: hostSnapshot(snapshot(true), request, page),
 			share_text: page.sandbox.ErgoptiDiagnostics.formatShareable(
-				snapshot(true),
+				hostSnapshot(snapshot(true), request, page),
 				schema,
 				(key) => page.sandbox._i18n_strings[key] || key
 			)
@@ -329,9 +339,9 @@ function init(page, detailed, mode) {
 			action: 'export_snapshot',
 			ok: true,
 			export_sequence: request.export_sequence,
-			snapshot: snapshot(true),
+			snapshot: hostSnapshot(snapshot(true), request, page),
 			share_text: page.sandbox.ErgoptiDiagnostics.formatShareable(
-				snapshot(true),
+				hostSnapshot(snapshot(true), request, page),
 				schema,
 				(key) => page.sandbox._i18n_strings[key] || key
 			)
@@ -523,7 +533,7 @@ function init(page, detailed, mode) {
 	if (page.posted.at(-1).action !== 'cancel' || page.scheduled.size !== 0)
 		fail('Cancel did not stop the model queue and request actual host cancellation');
 	const text = page.elements['preview-text'].textContent;
-	if (!text.includes('cancelled') || !text.includes('not_collected'))
+	if (!text.includes('cancelled') || !text.includes('installed_page_reported (unqualified)'))
 		fail('cancelled partial exports lose their precise outcomes');
 }
 
@@ -546,6 +556,7 @@ function init(page, detailed, mode) {
 		fail('an export bypassed the pre-format cleanup snapshot receipt');
 	const fresh = snapshot(false);
 	fresh.extensive = false;
+	hostSnapshot(fresh, request, page);
 	fresh.probes.github_api = {
 		state: 'timeout',
 		cleanup: 'settled',
@@ -677,6 +688,169 @@ function init(page, detailed, mode) {
 	});
 	if (!idle.elements['btn-cancel'].disabled)
 		fail('a quick idle snapshot enabled cancellation without work or cleanup debt');
+}
+
+{
+	const page = loadPage();
+	const current = snapshot(false);
+	current.extensive = true;
+	page.sandbox.receiveDiagnostics({
+		type: 'init',
+		config: { schema, redaction, context },
+		snapshot: current
+	});
+	while (page.scheduled.size) {
+		const [id, fn] = page.scheduled.entries().next().value;
+		page.scheduled.delete(id);
+		fn();
+	}
+	page.elements['btn-copy'].dispatch('click');
+	const request = page.posted.at(-1);
+	if (
+		request.action !== 'export_snapshot' ||
+		request.snapshot_revision !== current.export_revision ||
+		request.page_checks.schema_fields.ms === undefined ||
+		request.page_checks.driver_suites.state !== 'not_run'
+	)
+		fail('Actual page results did not reach the closed export request');
+	const fresh = JSON.parse(JSON.stringify(current));
+	fresh.page_check_observations = page.sandbox.ErgoptiDiagnostics.pageCheckObservations(
+		request.page_checks,
+		schema
+	);
+	const document = page.sandbox.ErgoptiDiagnostics.formatShareable(
+		fresh,
+		schema,
+		() => 'PRIVATE_LOCALE'
+	);
+	page.sandbox.receiveDiagnostics({
+		type: 'action',
+		action: 'export_snapshot',
+		ok: true,
+		export_sequence: request.export_sequence,
+		snapshot: fresh,
+		share_text: document
+	});
+	if (
+		page.posted.at(-1).action !== 'copy' ||
+		page.posted.at(-1).text !== document ||
+		!document.includes('installed_page_reported (unqualified)') ||
+		!document.includes('page_check_observations.results.redaction.ms')
+	)
+		fail('The exact retained page observations did not reach English copy');
+}
+
+{
+	const page = loadPage();
+	const current = snapshot(false);
+	current.extensive = true;
+	page.sandbox.receiveDiagnostics({
+		type: 'init',
+		config: { schema, redaction, context },
+		snapshot: current
+	});
+	page.elements['btn-copy'].dispatch('click');
+	const request = page.posted.at(-1);
+	const fresh = hostSnapshot(JSON.parse(JSON.stringify(current)), request, page);
+	const [id, step] = page.scheduled.entries().next().value;
+	page.scheduled.delete(id);
+	step();
+	page.sandbox.receiveDiagnostics({
+		type: 'action',
+		action: 'export_snapshot',
+		ok: true,
+		export_sequence: request.export_sequence,
+		snapshot: fresh,
+		share_text: page.sandbox.ErgoptiDiagnostics.formatShareable(
+			fresh,
+			schema,
+			() => 'PRIVATE_LOCALE'
+		)
+	});
+	if (page.posted.some((row) => row.action === 'copy'))
+		fail('A changed page result survived its export capture');
+	page.elements['btn-copy'].dispatch('click');
+	const next = page.posted.at(-1),
+		ready = hostSnapshot(JSON.parse(JSON.stringify(current)), next, page);
+	const text = page.sandbox.ErgoptiDiagnostics.formatShareable(
+		ready,
+		schema,
+		() => 'PRIVATE_LOCALE'
+	);
+	page.sandbox.receiveDiagnostics({
+		type: 'action',
+		action: 'export_snapshot',
+		ok: true,
+		export_sequence: next.export_sequence,
+		snapshot: ready,
+		share_text: text
+	});
+	while (page.scheduled.size) {
+		const [pending, fn] = page.scheduled.entries().next().value;
+		page.scheduled.delete(pending);
+		fn();
+	}
+	page.elements['btn-copy'].dispatch('click');
+	if (page.posted.at(-1).page_checks.redaction.state === 'pending')
+		fail('Export replacement abandoned the actual remaining check callbacks');
+}
+
+/** Reproduces Lua encoder ordering without altering any record value. */
+function reversedObjectKeys(value) {
+	if (Array.isArray(value)) return value.map(reversedObjectKeys);
+	if (!value || typeof value !== 'object') return value;
+	const result = {};
+	for (const key of Object.keys(value).reverse()) result[key] = reversedObjectKeys(value[key]);
+	return result;
+}
+for (const mutation of [
+	'reordered',
+	'changed_value',
+	'forged_scope',
+	'forged_source',
+	'stale_revision'
+]) {
+	const page = loadPage(),
+		current = snapshot(false);
+	current.extensive = false;
+	page.sandbox.receiveDiagnostics({
+		type: 'init',
+		config: { schema, redaction, context },
+		snapshot: current
+	});
+	page.elements['btn-copy'].dispatch('click');
+	const request = page.posted.at(-1),
+		host = hostSnapshot(JSON.parse(JSON.stringify(current)), request, page);
+	const original = JSON.stringify(host.page_check_observations);
+	host.page_check_observations = reversedObjectKeys(host.page_check_observations);
+	if (JSON.stringify(host.page_check_observations) === original)
+		fail('The encoder-order regression did not reorder its real record');
+	if (mutation === 'changed_value') {
+		host.page_check_observations.results.schema_fields.state = 'cancelled';
+		delete host.page_check_observations.results.schema_fields.reason;
+	}
+	if (mutation === 'forged_scope')
+		host.page_check_observations.results.schema_fields.scope = 'native-driver';
+	if (mutation === 'forged_source') host.page_check_observations.source = 'native-qualified';
+	if (mutation === 'stale_revision') host.export_revision += 1;
+	const text = page.sandbox.ErgoptiDiagnostics.formatShareable(
+		host,
+		schema,
+		() => 'PRIVATE_LOCALE'
+	);
+	page.sandbox.receiveDiagnostics({
+		type: 'action',
+		action: 'export_snapshot',
+		ok: true,
+		export_sequence: request.export_sequence,
+		snapshot: host,
+		share_text: text
+	});
+	const copies = page.posted.filter((row) => row.action === 'copy');
+	if (mutation === 'reordered') {
+		if (copies.length !== 1 || copies[0].text !== text)
+			fail('Equivalent recursively reordered host results refused their exact document');
+	} else if (copies.length !== 0) fail('An altered host observation was accepted: ' + mutation);
 }
 
 if (failures.length > 0) {

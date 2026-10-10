@@ -85,6 +85,46 @@ function M.snapshot(snapshot, schema)
 end
 
 
+--- Rebuilds only schema-owned installed-page observations, without native authority.
+--- @param results table Untrusted page records.
+--- @param schema table Canonical diagnostic checks.
+--- @return table|nil observations
+function M.page_checks(results, schema)
+	if type(results) ~= "table" or type(schema.diagnostic_checks) ~= "table" then return nil end
+	local accepted, expected = {}, {}
+	for _, spec in ipairs(schema.diagnostic_checks.items) do
+		expected[spec.id] = true
+		local row = results[spec.id]
+		if type(row) ~= "table" or row.scope ~= spec.scope then return nil end
+		for key in pairs(row) do
+			if key ~= "state" and key ~= "scope" and key ~= "reason" and key ~= "ms" then return nil end
+		end
+		local rule = schema.share_policy.projection.fields.page_check_observations.fields.results.fields[spec.id]
+		local clean = project(row, rule)
+		if clean.state == nil or clean.state ~= row.state or clean.scope ~= row.scope or clean.reason ~= row.reason or clean.ms ~= row.ms then return nil end
+		if spec.reason then
+			if row.state ~= "not_run" or row.reason ~= spec.reason or row.ms ~= nil then return nil end
+		elseif row.state == "ok" or row.state == "error" then
+			if row.ms == nil or (row.reason ~= nil and row.reason ~= "invalid_diagnostic_model") then return nil end
+		elseif row.ms ~= nil or (row.state == "cancelled" and row.reason ~= nil)
+			or (row.state ~= "cancelled" and row.reason ~= "opt_in_required") then return nil end
+		accepted[spec.id] = clean
+	end
+	for id in pairs(results) do if not expected[id] then return nil end end
+	return { source = "installed_page_reported", qualification = "unqualified", results = accepted }
+end
+
+--- Admits page records only into the exact current host snapshot generation.
+--- @param snapshot table Host-retained report.
+--- @param action table Validated export action.
+--- @return boolean accepted
+function M.capture_page_checks(snapshot, action)
+	if action.page_check_observations == nil then return true end
+	if action.generated_at ~= snapshot.generated_at or action.snapshot_revision ~= snapshot.export_revision then return false end
+	snapshot.page_check_observations = action.page_check_observations
+	return true
+end
+
 local function cell(value)
 	return (tostring(value):gsub("[\r\n]+", " "):gsub("|", "\\|"))
 end
@@ -169,7 +209,7 @@ function M.document(snapshot, schema, notice)
 			.. "Driver: " .. safe.driver .. "\nVersion: " .. (versions.ergopti_version or "unknown")
 			.. "\nCommit: " .. (versions.commit or "unknown") .. "\nDriver suites: NOT_RUN",
 		text = "# ErgoptiPlus diagnostics\n\n" .. notice
-			.. "\n\ndriver-suites: not_run\npage-model-checks: not_collected\n\n" .. readable(safe, schema)
+			.. "\n\ndriver-suites: not_run\npage-model-checks: " .. (safe.page_check_observations and "installed_page_reported (unqualified)" or "not_collected") .. "\n\n" .. readable(safe, schema)
 			.. "\n```json\n" .. Json.encode(safe) .. "\n```\n",
 		fields = { driver = safe.driver, version = versions.ergopti_version or "unknown", os = safe.driver },
 		name = schema.report.name_prefix .. safe.driver .. "-" .. stamp:gsub("[^%w.-]", "_") .. schema.report.name_suffix,

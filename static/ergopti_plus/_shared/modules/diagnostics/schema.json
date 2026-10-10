@@ -1628,6 +1628,121 @@
 							}
 						}
 					}
+				},
+				"page_check_observations": {
+					"kind": "object",
+					"fields": {
+						"source": {
+							"kind": "enum",
+							"values": ["installed_page_reported"]
+						},
+						"qualification": {
+							"kind": "enum",
+							"values": ["unqualified"]
+						},
+						"results": {
+							"kind": "object",
+							"fields": {
+								"schema_fields": {
+									"kind": "object",
+									"fields": {
+										"scope": {
+											"kind": "enum",
+											"values": ["diagnostics-model"]
+										},
+										"state": {
+											"kind": "enum",
+											"values": ["pending", "ok", "error", "not_run", "cancelled"]
+										},
+										"reason": {
+											"kind": "enum",
+											"values": ["opt_in_required", "invalid_diagnostic_model"]
+										},
+										"ms": {
+											"kind": "integer",
+											"minimum": 0
+										}
+									}
+								},
+								"probe_inventory": {
+									"kind": "object",
+									"fields": {
+										"scope": {
+											"kind": "enum",
+											"values": ["diagnostics-model"]
+										},
+										"state": {
+											"kind": "enum",
+											"values": ["pending", "ok", "error", "not_run", "cancelled"]
+										},
+										"reason": {
+											"kind": "enum",
+											"values": ["opt_in_required", "invalid_diagnostic_model"]
+										},
+										"ms": {
+											"kind": "integer",
+											"minimum": 0
+										}
+									}
+								},
+								"redaction": {
+									"kind": "object",
+									"fields": {
+										"scope": {
+											"kind": "enum",
+											"values": ["synthetic-export"]
+										},
+										"state": {
+											"kind": "enum",
+											"values": ["pending", "ok", "error", "not_run", "cancelled"]
+										},
+										"reason": {
+											"kind": "enum",
+											"values": ["opt_in_required", "invalid_diagnostic_model"]
+										},
+										"ms": {
+											"kind": "integer",
+											"minimum": 0
+										}
+									}
+								},
+								"driver_suites": {
+									"kind": "object",
+									"fields": {
+										"scope": {
+											"kind": "enum",
+											"values": ["isolated-suite"]
+										},
+										"state": {
+											"kind": "enum",
+											"values": ["not_run"]
+										},
+										"reason": {
+											"kind": "enum",
+											"values": ["not_embedded"]
+										}
+									}
+								},
+								"install_reload_profile": {
+									"kind": "object",
+									"fields": {
+										"scope": {
+											"kind": "enum",
+											"values": ["isolated-suite"]
+										},
+										"state": {
+											"kind": "enum",
+											"values": ["not_run"]
+										},
+										"reason": {
+											"kind": "enum",
+											"values": ["isolated_environment_required"]
+										}
+									}
+								}
+							}
+						}
+					}
 				}
 			}
 		}
