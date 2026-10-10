@@ -74,6 +74,10 @@ local DEFAULT_ENV = {
 --- what stat answers, as on a real Mac without links.
 local function fake_fs(state)
 	local function attributes(path, attribute)
+		if state.bundled_files[path] then
+			if attribute == "mode" then return "file" end
+			return { mode = "file", permissions = "rw-r--r--" }
+		end
 		for file in pairs(state.files) do
 			if file:sub(1, #path + 1) == path .. "/" then
 				if attribute == "mode" then return "directory" end
@@ -99,6 +103,7 @@ local function new_state()
 	return {
 		executables = {},
 		files = {},
+		bundled_files = { [helpers.driver_root() .. "modules/llm/network-retry.sh"] = true },
 		absent = {
 			[MLX_VENV .. "/bin/python"] = true,
 			[MLX_VENV .. "/.last_sync_hash"] = true,
@@ -155,6 +160,10 @@ end
 
 --- Loads the real MLX checker over the fake filesystem.
 local function load_mlx_checker(state)
+	-- A fresh checker must consume this fixture's filesystem, not a cached
+	-- policy admission bound to the preceding fake native table.
+	package.loaded["modules.llm.network_env"] = nil
+	package.loaded["adapters.file_system"] = nil
 	package.loaded["ui.download_window"] = WINDOW_STUB
 	package.loaded["modules.llm.pty_process_group"] = {
 		create = function() return "/tmp/fixture-pty.py" end,
@@ -174,6 +183,7 @@ local STUBBED_MODULES = {
 	"adapters.timer_scheduler", "modules.llm.ollama_deps_checker",
 	"modules.llm.mlx_deps_checker", "infra.dialog_util", "infra.notifications",
 	"ui.menu.menu_llm.runtime_install_offer",
+	"modules.llm.network_env", "adapters.file_system",
 }
 
 local function scoped(callback)
@@ -511,6 +521,40 @@ helpers.describe("MLX bootstraps only on its selection (ai-runtime-mlx)", functi
 		helpers.assert_true(checker.install_for_selection())
 		helpers.assert_eq(#state.tasks, 1, "the next MLX selection rebuilds the runtime")
 	end))
+	helpers.it("retains the real bundled network policy when the runtime files are removed", scoped(function()
+		local policy_path = helpers.driver_root() .. "modules/llm/network-retry.sh"
+		local policy = assert(io.open(policy_path, "r"))
+		local policy_bytes = policy:read("*a")
+		policy:close()
+		helpers.assert_true(policy_bytes:find("apply_system_network", 1, true) ~= nil,
+			"the declared fixture dependency is the real shipped network policy")
+		local state = new_state()
+		state.files = {}
+		load_mlx_checker(state)
+		local NetworkEnv = require("modules.llm.network_env")
+		helpers.assert_eq(NetworkEnv.policy_path(), policy_path)
+		local prelude = assert(NetworkEnv.bootstrap_prelude("FIXTURE", helpers.HEALTHY_PYTHON))
+		helpers.assert_true(prelude:find(policy_path, 1, true) ~= nil)
+		helpers.assert_eq(#state.tasks, 0, "prelude construction itself cannot acquire a task")
+	end))
+
+	helpers.it("a fresh fixture refuses a genuinely absent bundled policy before any task", scoped(function()
+		local present = new_state()
+		load_mlx_checker(present)
+		helpers.assert_type(require("modules.llm.network_env").policy_path(), "string")
+		local missing = new_state()
+		missing.bundled_files = {}
+		local checker = load_mlx_checker(missing)
+		local NetworkEnv = require("modules.llm.network_env")
+		helpers.assert_nil(NetworkEnv.policy_path())
+		local prelude, why = NetworkEnv.bootstrap_prelude("FIXTURE", helpers.HEALTHY_PYTHON)
+		helpers.assert_nil(prelude)
+		helpers.assert_eq(why, "the shared network policy modules/llm/network-retry.sh is missing")
+		helpers.assert_eq(checker.install_for_selection(), false)
+		helpers.assert_eq(checker.get_state(), "failed")
+		helpers.assert_eq(#missing.tasks, 0, "missing policy must refuse before native task creation")
+	end))
+
 end)
 
 
