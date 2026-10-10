@@ -1346,7 +1346,9 @@ _LBMD_ModelParentActualEmission(Withdrawn) {
 
 _LBMD_ModelParentActualEmissionCurrent(Withdrawn, ExistingChild) {
 	global _LLM_Menu, _LLM_Menu_Handle, _DriverInputInitPending, _SharedDir
-	SavedHandle := _LLM_Menu_Handle
+	HadHandle := IsSet(_LLM_Menu_Handle)
+	if HadHandle
+		SavedHandle := _LLM_Menu_Handle
 	HadPending := IsSet(_DriverInputInitPending)
 	if HadPending
 		SavedPending := _DriverInputInitPending
@@ -1379,7 +1381,7 @@ _LBMD_ModelParentActualEmissionCurrent(Withdrawn, ExistingChild) {
 	} finally {
 		Root["llm_model_parent_ahk"] := Declaration
 		_CTC_ReleaseMenu(Target)
-		_LLM_Menu_Handle := SavedHandle
+		_LLM_Menu_Handle := HadHandle ? SavedHandle : unset
 		if HadPending
 			_DriverInputInitPending := SavedPending
 		else
@@ -1413,7 +1415,9 @@ _LBMD_ModelParentLateRefusal() {
 _LBMD_ModelParentLateRefusalCurrent(ExistingChild) {
 	global _LLM_Menu, _LLM_Menu_Handle, _DriverInputInitPending
 	global _MenuDispatchCallbacks, _MenuDispatchTokens, _MenuDispatchOwnerHandles
-	SavedHandle := _LLM_Menu_Handle
+	HadHandle := IsSet(_LLM_Menu_Handle)
+	if HadHandle
+		SavedHandle := _LLM_Menu_Handle
 	HadPending := IsSet(_DriverInputInitPending)
 	if HadPending
 		SavedPending := _DriverInputInitPending
@@ -1470,7 +1474,7 @@ _LBMD_ModelParentLateRefusalCurrent(ExistingChild) {
 		}
 		_CTC_ReleaseMenu(Target, Seen)
 		_CTC_ReleaseMenu(Foreign, Seen)
-		_LLM_Menu_Handle := SavedHandle
+		_LLM_Menu_Handle := HadHandle ? SavedHandle : unset
 		if HadPending
 			_DriverInputInitPending := SavedPending
 		else

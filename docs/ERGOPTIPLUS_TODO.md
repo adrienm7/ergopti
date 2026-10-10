@@ -5361,7 +5361,7 @@ integrated, then publish one grouped release.
 
 - [~] **54.** Every menu is declared in the shared menu manifest, never in
   driver code. The ratchet `npm run test:native-menu-rows` counts the rows
-  drivers still build (current baseline: Windows 22, macOS 6, Linux 4, each
+  drivers still build (current baseline: Windows 21, macOS 5, Linux 4, each
   site listed in tools/test/native-menu-rows-baseline.json); migrate them to
   zero. The current received menu slices declare five fixed feature parents,
   top-level separator placement, deferred Windows language children and
@@ -6496,6 +6496,45 @@ providers. The owning generator now records 22 Windows, 6 macOS and 4 Linux
 residual sites. Full composed, native and installed qualification remain open;
 this neutral cleanup completes no parent item.
 
+The Layout source proof also admits the authenticated Group5 configuration
+recovery route without changing its production code or the original complete
+dispatch. Both exact dispatch variants retain all 32 original refusal controls;
+six additional controls reject partial or foreign recovery ownership. The
+independent fixture comes from the immutable original Group5 source, before
+the proof change. This compatibility correction completes no parent item and
+does not provide native or installed-device acceptance.
+
+The actual Windows run for the model parent declaration executed all 30 new
+subjects: 27 passed and three failed during fixture setup, before the production
+emitter, because the previous native handle was absent. The two scoped fixtures
+now preserve the original handle presence as well as its reference. Production,
+all assertions and the independent caption corpus remain unchanged. The Agent
+provider subjects passed 22/22. The subsequent integrated Windows run on
+`b424af54464087f76084274cb19ec9fb7af09f6b` executed all 30 model subjects
+successfully, including both emitter cases and late descendant retirement;
+the Agent provider subjects again passed 22/22. Complete unit execution was
+10,604 passed and 490 failed out of 11,094, with no unrun subjects. Whole-suite,
+packaging, installation and device qualification remain incomplete.
+
+The actual Windows personal-shortcuts builder now registers pure DATA for its
+existing shared frame. The central renderer snapshots registrations and enters
+the strict frame receiver before its deferred separator flush. It retains actual
+lazy population, native child/callback/token ownership and real publication
+rollback; empty admitted DATA differs from an intentional zero-result skip.
+The original frame corpus and all 65 original native assertions remain intact.
+The existing native module retains eight original subjects and adds seven real
+subjects for 15 total, including post-Fill withdrawal, real publication faults,
+full production order and full Build preflush refusal. Fixture presence and five
+loop observers were reviewed before execution. The source proof retains all 28
+old semantic controls, all current parity assertions and the G5 recovery route,
+with 44 original source mutations and 11 added negative controls, exact inverses
+and two positive Boolean-AND controls. The direct manifest test passed after
+correcting the proof's ampersand and held-index read classification; native code
+was unchanged by that correction. Generic publication guards are unchanged.
+The owning generators produced one real census reduction to
+21/5/4. Selected local gates, corrected Windows execution, packaging, installation
+and device acceptance remain pending; no parent item is completed by this cut.
+
 - [ ] **62.** Downloads on managed company networks: system trust and
       system proxy for every download child (Ollama installation/server/pull,
       updater/rollback and remote AI), with translated certificate/proxy/blocked/
@@ -6506,6 +6545,34 @@ this neutral cleanup completes no parent item.
       Complete native, package, installation and enterprise acceptance remains
       open. macOS system trust and explicit proxy relays are integrated, while
       opaque-client full-URL PAC/WPAD/fallback/redirect routing remains CODE.
+
+2026-10-10 selected-release native receiving enrollment. A bounded new Mac
+matrix step now runs the frozen50 shell-corpus vectors and original guardian
+SIGTERM/SIGINT controls independently of the failing archive prerequisite. Its
+always-retained evidence and mandatory raw-command/condition guards are additive;
+fourteen independent omissions reject dropped or weakened enrollment. The two
+new receiving tools preserve the original50 corpus, native guardian and120-second
+clock. Twenty-five controlled Linux POSIX wrapper checks are separately enrolled
+in the normal JS registry; they are synthetic envelope/refusal controls, not
+Darwin50 or native network acceptance. All407 previous entries and481 scripts
+stay intact; the Linux registry adds one entry, with Windows/Darwin unchanged.
+Root Windows guards and direct Mac55 receiving are preserved. Actual25 pass
+in Linux; selected formatting passes and407/408 JS checks pass, with only the
+unchanged protected-temporary-root uninstall fixture failing. Its exact replay
+in a non-Git temporary root passes. Darwin50, native cancellation and final
+package/install outcomes remain pending. No
+production guard, original assertion or item36/62/16/38 closure changes.
+
+2026-10-10 direct Mac helper receiving enrollment. The existing Group6 native
+receiving step now adds APIwire20 and serve35 beside its unchanged private-session5
+and numeric-TLS8. Exactly three body spans add the calls, strict count allowlist
+and two always-retained logs; reversing those spans recovers the entire current
+Dev workflow. Original five-minute clock, PIPESTATUS, oneOK/noSKIP/1MiB guards,
+job topology and Root Windows evidence guards remain unchanged. This enrolls
+portable process/pipe/EOF/reap controls on both Mac architectures; it does not
+qualify a genuine signed listener, model generation or enterprise routing.
+Actual hosted55 and complete native/package/install acceptance remain pending;
+item62, item36 and transversal16/38 stay open.
 
 2026-10-10 native TLS fixture receiving at fe3da8332. Exact manual38032632804
 is terminal failure:3 successful,7 failed and7 skipped jobs. Both native
@@ -8356,7 +8423,7 @@ is committed; one request is one commit with its regression test.
 
 - [~] **81.** The maintainer asks to treat item 54 now (every menu row is
   declared in the shared manifest, none built in a driver's folder):
-  Windows 22, macOS 6 and Linux 4 rows are still built by the
+  Windows 21, macOS 5 and Linux 4 rows are still built by the
   drivers (`tools/test/native-menu-rows-baseline.json`). The current census
   was regenerated by its owning generator on 2026-10-10. The sites are of four kinds, and three need the
   manifest to say more than it can today:
@@ -8702,6 +8769,19 @@ callbacks and the existing declared separator. Both provider cohorts pass
 sites. This is observationally neutral source cleanup, not a fabricated
 separator migration; original native and physical acceptance remains
 mandatory.
+
+The personal-shortcuts native producer has been replaced by its actual pure
+DATA registration and central declared-frame receiver. Its canonical frame and
+independent corpus are preserved; the genuine census now reads Windows 21,
+macOS 5 and Linux 4. This is a source-reviewed implementation, not Windows
+qualification. Remaining work includes the complete 15-subject native module,
+actual full Build receiving/order/greying, genuine population and owned rollback,
+then whole-suite, packaging, installation and physical acceptance. Continue the
+other census sites rather than hiding their allocations or retaining unused
+native helpers as proof. The next small candidate is the Windows Agent excluded-
+apps command; observe its original native flags first and retain declaration,
+count-getter and callback ownership across actual reads. Its source remains
+unchanged here. Items 54, 81, 16 and 38 stay open.
 
 - [~] **88.** **Partial: native prediction tooltip appearance.** Shared
   llm-line-style policy and the unchanged independent line corpus retain grey
