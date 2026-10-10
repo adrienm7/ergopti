@@ -99,6 +99,8 @@ function replay(source, options) {
 	const entry = shellFunction(source, options.entry === 'main' ? 'main' : 'build_native_helper');
 	const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'ergopti-signing-'));
 	const posix = tmp.replaceAll('\\', '/');
+	const checksumNode =
+		"'" + process.execPath.replaceAll('\\', '/').replaceAll("'", "'\"'\"'") + "'";
 	try {
 		const script = `
 set -euo pipefail
@@ -118,6 +120,13 @@ codesign() {
 		printf 'Executable=%s\\n' "$target" >&2
 		printf '%s\\n' "$DR"
 	fi
+}
+# The replay's helper is real private data; compute its checksum rather than
+# depending on a platform Perl/shasum installation or fabricating a digest.
+shasum() {
+	[ "$#" -eq 3 ] && [ "$1" = "-a" ] && [ "$2" = "256" ] && [ "$3" = "$APP_PATH/Contents/MacOS/SystemSwitcherState" ] || fail "Unexpected checksum invocation."
+	record shasum "$@"
+	${checksumNode} -e 'const fs=require("node:fs"),crypto=require("node:crypto");process.stdout.write(crypto.createHash("sha256").update(fs.readFileSync(process.argv[1])).digest("hex")+"  "+process.argv[1]+"\\n");' "$3"
 }
 security() {
 	record security "$@"
@@ -195,6 +204,11 @@ ${options.entry === 'main' ? 'main' : 'build_native_helper'}
 					.map((line) => line.split('\x1f'))
 			: [];
 		const importedPath = path.join(tmp, 'imported.p12');
+		const checksumCall = calls.find((call) => call[0] === 'shasum');
+		const checksumTarget = checksumCall?.[3];
+		const checksumReceipt =
+			checksumTarget &&
+			path.join(path.dirname(checksumTarget), '../Resources/system-switcher-state.sha256');
 		return {
 			status: result.error ? null : result.status,
 			stderr: `${result.stderr ?? ''}${result.error ? String(result.error) : ''}`,
@@ -202,7 +216,13 @@ ${options.entry === 'main' ? 'main' : 'build_native_helper'}
 			leftovers: fs.existsSync(path.join(tmp, 'tmp'))
 				? fs.readdirSync(path.join(tmp, 'tmp'))
 				: ['<no TMPDIR>'],
-			imported: fs.existsSync(importedPath) ? fs.readFileSync(importedPath) : null
+			imported: fs.existsSync(importedPath) ? fs.readFileSync(importedPath) : null,
+			switcherBytes:
+				checksumTarget && fs.existsSync(checksumTarget) ? fs.readFileSync(checksumTarget) : null,
+			switcherDigest:
+				checksumReceipt && fs.existsSync(checksumReceipt)
+					? fs.readFileSync(checksumReceipt, 'utf8').trim()
+					: null
 		};
 	} finally {
 		fs.rmSync(tmp, { recursive: true, force: true });
@@ -667,6 +687,39 @@ try {
 } finally {
 	fs.rmSync(createTmp, { recursive: true, force: true });
 }
+
+// The replay preserves the actual sidecar producer instead of bypassing hashing.
+for (const [label, run] of [
+	['full app', full],
+	['native helper', helper]
+]) {
+	const hashes = run.calls.filter((call) => call[0] === 'shasum');
+	check(
+		hashes.length === 1 && hashes[0][1] === '-a' && hashes[0][2] === '256',
+		`${label}: exact helper checksum invocation stays enrolled`
+	);
+	check(
+		Buffer.isBuffer(run.switcherBytes) &&
+			run.switcherDigest === crypto.createHash('sha256').update(run.switcherBytes).digest('hex'),
+		`${label}: actual private helper bytes determine its checksum sidecar`
+	);
+}
+const checksumTargetWithdrawal = BUILD.replace(
+	'shasum -a 256 "$switcher"',
+	'shasum -a 256 "$APP_PATH/Contents/MacOS/ErgoptiPlus"'
+);
+check(checksumTargetWithdrawal !== BUILD, 'checksum target withdrawal must change the real source');
+const checksumRefused = replay(checksumTargetWithdrawal, {
+	entry: 'main',
+	base64: B64,
+	password: P12_PASSWORD,
+	dr: CERT_DR
+});
+check(
+	checksumRefused.status !== 0 &&
+		checksumRefused.stderr.includes('Unexpected checksum invocation.'),
+	'the checksum port cannot borrow a different private binary'
+);
 
 // The SDK diagnostic must enter only after the existing helper signature and
 // signed build receipt admission; its metadata never admits business success.
