@@ -334,6 +334,24 @@ local function settle_physical_modifiers()
 	return true
 end
 
+-- Effective denial cancels a whole hold, even without a physical transition.
+-- A refused swap remains debt; ordinary focus cannot restore its old duration.
+local _modifier_context_allowed, _modifier_context_pending = true, false
+
+--- Settles the exact shared modifier owner on effective exclusion or retry.
+--- @return boolean settled True only after the owned in-memory swap succeeds.
+local function settle_context_modifiers()
+	local allowed = PrivacyContext.allows_logging(CoreState)
+	if _modifier_context_pending or (_modifier_context_allowed and not allowed) then
+		_modifier_context_pending = true
+		local called, settled = pcall(settle_physical_modifiers)
+		if not called or settled ~= true then return false end
+		_modifier_context_pending = false
+	end
+	_modifier_context_allowed = allowed
+	return true
+end
+
 if AccountingMode.bind_settlement(CoreState, settle_physical_modifiers) ~= true then
 	error("Physical accounting refused its keylogger settlement owner")
 end
@@ -571,7 +589,7 @@ end
 --- second copy is how these four answers drift apart again.
 --- @return boolean True when the context is loggable.
 function M.context_allows_logging()
-	return PrivacyContext.allows_logging(CoreState)
+	return not _modifier_context_pending and PrivacyContext.allows_logging(CoreState)
 end
 
 --- Reports whether any public keylogger sink may persist data right now.
@@ -657,6 +675,9 @@ local function handle_key(event_obj)
 			return
 		end
 
+		-- Refused settlement retains malformed debt until its actual owner retries.
+		if _modifier_context_pending then return end
+
 		-- A known physical crossing release must retire its marker even while
 		-- pause/privacy excludes telemetry. It emits no press or hold and cannot
 		-- borrow a timestamp from the source that observed its original press.
@@ -700,7 +721,21 @@ local function handle_key(event_obj)
 		-- predicate so the physical path and the SYNTHETIC path cannot answer this
 		-- question differently — they used to, and notify_synthetic persisted
 		-- expansions this branch would have refused.
-		if not M.context_allows_logging() then return end
+		if not M.context_allows_logging() then
+			-- Retain observed per-key release state, never an excluded duration.
+			if evt_type == hs.eventtap.event.types.flagsChanged then
+				local keycode = event_obj:getKeyCode()
+				if MODIFIER_KEYCODES[keycode] then
+					if CoreState.modifier_down_at[keycode] ~= nil then
+						CoreState.modifier_down_at[keycode] = nil
+					else
+						CoreState.modifier_suppressed_releases[keycode] = true
+					end
+				end
+				CoreState.prev_flags = event_obj:getFlags() or {}
+			end
+			return
+		end
 
 		local now      = hs.timer.absoluteTime() / 1000000
 
@@ -1251,6 +1286,7 @@ end
 --- @param v boolean
 function M.set_secure_field_filter_enabled(v)
 	CoreState.secure_field_filter_enabled = (v ~= false)
+	assert(settle_context_modifiers(), "Secure filter modifier settlement remains pending")
 	publish_physical_configuration()
 	Logger.debug(LOG, "Secure field filter: %s.", CoreState.secure_field_filter_enabled and "on" or "off")
 end
@@ -2036,7 +2072,7 @@ function M.start(script_control)
 			end
 			-- The context tracker owns three OS watchers that pause does NOT tear down,
 			-- so it needs the same pause predicate as the watcher layer below.
-			if ContextTracker.init(CoreState, LogManager, _is_paused) ~= true then
+			if ContextTracker.init(CoreState, LogManager, _is_paused, settle_context_modifiers) ~= true then
 				error("keylogger context tracker initialization failed")
 			end
 			-- The watcher layer needs the shared state and the pause predicate; both

@@ -28,6 +28,7 @@ local M      = {}
 
 local _state       = nil
 local _log_manager = nil
+local _settle_modifiers = nil
 
 --- Pause predicate injected by M.init(). The tracker's writers are driven by
 --- OS watchers (hs.window.filter, the app watcher, the AX observer) that are
@@ -414,6 +415,16 @@ end
 -- ==========================================
 -- ==========================================
 
+--- Requires exact init-owned settlement before permitting included holds.
+--- Raw classification stays published if the pure shared owner refuses.
+local function require_modifier_settlement()
+	if not _settle_modifiers then return end
+	local called, settled = pcall(_settle_modifiers)
+	if not called or settled ~= true then
+		error("Secure context modifier settlement remains pending", 0)
+	end
+end
+
 --- Inspects a focused UI element and updates the secure-field flag on CoreState.
 --- Called whenever the focused element changes so the engine can stop logging
 --- immediately when a password field receives focus.
@@ -433,6 +444,7 @@ local function update_secure_field_state(element, app_pid)
 	if not element then
 		mark_context("secure", false)
 		_state.is_secure_field = in_secure_app
+		require_modifier_settlement()
 		return
 	end
 	local is_secure = SecureFieldDetector.isElementSecure(element, secure_element_observer(app_pid)) or in_secure_app
@@ -444,10 +456,14 @@ local function update_secure_field_state(element, app_pid)
 			_state.buffer_text   = ""
 			_state.rich_chunks   = {}
 			_state.buffer_started_epoch = nil
+			require_modifier_settlement()
 			Logger.debug(LOG, "Secure text field detected — buffer cleared, logging suppressed.")
 		else
+			require_modifier_settlement()
 			Logger.debug(LOG, "Focus moved away from secure field — logging resumed.")
 		end
+	else
+		require_modifier_settlement()
 	end
 end
 
@@ -946,6 +962,7 @@ function M.app_watcher_cb(app_name, event_type, app_object)
 	SecureFieldDetector.refresh(secure_refresh_observer())
 	_state.is_secure_field = SecureFieldDetector.isSecureField()
 		or SecureFieldDetector.isSecureApp(app_name)
+	require_modifier_settlement()
 
 	-- Reset per-switch window tracking
 	_last_win_title = nil
@@ -1006,6 +1023,7 @@ function M.resync_context()
 	SecureFieldDetector.refresh(secure_refresh_observer())
 	_state.is_secure_field = SecureFieldDetector.isSecureField()
 		or SecureFieldDetector.isSecureApp(app_name)
+	require_modifier_settlement()
 
 	_last_win_title = nil
 	_last_win_time  = now
@@ -1037,8 +1055,9 @@ end
 --- @param core_state table The shared state object from init.lua.
 --- @param log_manager_mod table The log manager module reference.
 --- @param is_paused_fn function Predicate returning true while the script is paused.
+--- @param settle_modifiers_fn function|nil Exact shared-owner pure settlement callback.
 --- @return boolean initialized True only when the exact dependency set is active.
-function M.init(core_state, log_manager_mod, is_paused_fn)
+function M.init(core_state, log_manager_mod, is_paused_fn, settle_modifiers_fn)
 	Logger.start(LOG, "Initializing context tracker…")
 	if type(core_state) ~= "table" then
 		Logger.error(LOG, "M.init(): core_state must be a table — context tracker non-functional.")
@@ -1052,10 +1071,15 @@ function M.init(core_state, log_manager_mod, is_paused_fn)
 		Logger.error(LOG, "M.init(): is_paused_fn must be a function — context tracker non-functional.")
 		return false
 	end
+	if settle_modifiers_fn ~= nil and type(settle_modifiers_fn) ~= "function" then
+		Logger.error(LOG, "M.init(): modifier settlement must be a function when supplied.")
+		return false
+	end
 	if _state then
 		if _state == core_state
 		and _log_manager == log_manager_mod
 		and _is_paused == is_paused_fn
+		and _settle_modifiers == settle_modifiers_fn
 		then
 			Logger.warn(LOG, "M.init() called more than once — exact dependencies already active.")
 			return true
@@ -1066,6 +1090,7 @@ function M.init(core_state, log_manager_mod, is_paused_fn)
 	_state       = core_state
 	_log_manager = log_manager_mod
 	_is_paused   = is_paused_fn
+	_settle_modifiers = settle_modifiers_fn
 	Logger.success(LOG, "Context tracker initialized.")
 	return true
 end

@@ -3962,6 +3962,37 @@ activate an owned producer, finish WP3/TODO31 or correct watchdog exit73.
 Native event taps, installed-source accounting and physical acceptance remain
 required; privacy-transition callback coverage is separate.
 
+WP3 secure-field interval receiving now cancels the whole held-modifier duration
+when the effective privacy policy becomes excluded, including a registered AX
+transition with no physical event and the public secure-filter enable operation.
+The actual keylogger startup supplies the retained settlement callback; disabled
+secure filtering preserves the complete included duration. Excluded modifier
+presses retain only release suppression, so a fresh allowed press is not inverted.
+Settlement refusal keeps accounting denied until an exact successful retry.
+Eleven independently frozen additive controls compose the real tracker, secure
+classifier, policy and event consumer with retained startup/native boundary
+doubles. Lua5.4 changes83PASS/7 assertionFAIL before to90PASS/0FAIL after;
+all79 preceding cases remain passed. Omitting the actual startup hook gives
+86PASS/4 assertionFAIL; omitting excluded-event bookkeeping gives89PASS/1
+assertionFAIL. Disabled-filter holds preserve6000ms and fresh1000ms durations.
+
+Selected verification passes formatting, 101 macOS E2E scenarios with no
+failures and one driver/host-specific skip, and 19,484 macOS unit assertions
+with no failures. The JS gate reports 408 passed and one failed: the existing
+Windows pipeline guard lacks the two managed Ollama artifact STEP_CONDITIONS
+entries. The overall selected gate remains failed; this is not an all-green
+qualification. The first sandboxed run retained 82 JS and 224 unit failures
+because the configured /var/tmp fixture root was read-only. An approved private
+fixture admission probe and serial replay with sandbox escalation eliminated
+those admission failures without changing sources, assertions or temp policy.
+Native macOS execution and hardware acceptance remain unrun for this tranche.
+
+Malformed-debt controls prove fail-closed accounting, not physical release
+bookkeeping while debt is malformed. Private-window transitions, secure/private
+overlap and other configuration writers remain separately unqualified. Native
+startup, installed capture, device acceptance and the watchdog exit73 cause
+remain open. This neither enables an owned producer nor completes WP3/TODO31.
+
 WP3 remains partial. An explicitly initialized, dormant physical-capture session
 owner now composes the real accounting policy, delivery receiver and transport.
 It verifies the caller's pinned executable requirement asynchronously, waits for
