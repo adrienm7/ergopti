@@ -72,6 +72,59 @@ local function project(value, rule)
 	return nil
 end
 
+--- Classifies only known technical failure shapes; all raw text remains local.
+--- These are log observations, never native state, revocation or incident-cause proof.
+--- @param entries table|string Host-retained recent errors, without page authority.
+--- @param source string Existing collector source.
+--- @param schema table Canonical closed rules.
+--- @return table
+function M.error_facts(entries, source, schema)
+	local observed = type(entries) == "table"
+	if observed then
+		local length = #entries
+		for key in pairs(entries) do
+			if type(key) ~= "number" or key < 1 or key % 1 ~= 0 or key > length then observed = false; break end
+		end
+	end
+	local events, count = {}, 0
+	local specs = schema.recent_error_facts
+	for index, entry in ipairs(observed and entries or {}) do
+		count = count + 1
+		local first = type(entry) == "string" and entry:match("^[^\r\n]*") or ""
+		local start = first:find(specs.owner_prefix, 1, true)
+		local marker = start and first:find(specs.failure_marker, start + #specs.owner_prefix, true)
+		local reason = marker and first:sub(marker + #specs.failure_marker) or ""
+		for _, rule in ipairs(specs.rules) do
+			local event, candidate = nil, reason
+			if rule.message_prefix then
+				local position = first:find(rule.message_prefix, 1, true)
+				candidate = position and first:sub(position) or ""
+				if rule.number_marker then
+					local number_at = candidate:find(rule.number_marker, #rule.message_prefix + 1, true)
+					candidate = number_at and candidate:sub(number_at) or ""
+				end
+			end
+			if rule.literal and candidate == rule.literal then
+				event = { entry_index = index, code = rule.code }
+			elseif rule.prefix and candidate:sub(1, #rule.prefix) == rule.prefix then
+				local value = candidate:sub(#rule.prefix + 1)
+				if rule.suffix ~= "" then
+					local finish = value:find(rule.suffix, 1, true)
+					value = finish and value:sub(1, finish - 1) or ""
+				end
+				if value:match("^%-?%d+$") then
+					local number = project(tonumber(value), { kind = "integer", minimum = rule.minimum, maximum = rule.maximum })
+					if number and tostring(number) == value then event = { entry_index = index, code = rule.code, [rule.field] = number } end
+				end
+			end
+			if event then events[#events + 1] = event; break end
+		end
+	end
+	return { observed = observed, source = (source == "errors_file" or source == "ring") and source or "unavailable",
+		qualification = "log_observation_only", examined_entries = count, excluded_entries = count - #events,
+		events = Json.array(events) }
+end
+
 --- Returns a detached technical projection; no callback or native authority is exported.
 --- @param snapshot table Host-retained snapshot.
 --- @param schema table Canonical diagnostics schema.
@@ -81,7 +134,13 @@ function M.snapshot(snapshot, schema)
 		"Diagnostic sharing policy unavailable")
 	assert(type(snapshot) == "table" and (snapshot.driver == "macos" or snapshot.driver == "linux"
 		or snapshot.driver == "windows"), "Diagnostic sharing identity unavailable")
-	return project(snapshot, schema.share_policy.projection)
+	local safe = project(snapshot, schema.share_policy.projection)
+	local sections = type(snapshot.sections) == "table" and snapshot.sections or {}
+	local issues = sections.issues
+	if type(issues) == "table" then
+		safe.sections.issues.recent_error_facts = M.error_facts(issues.recent, issues.recent_source, schema)
+	end
+	return safe
 end
 
 

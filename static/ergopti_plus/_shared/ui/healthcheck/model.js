@@ -1039,6 +1039,66 @@
 		throw new Error('Unknown diagnostic sharing rule');
 	}
 
+	/** Closed log facts contain no raw message, path, generation token or inferred cause. */
+	function recentErrorFacts(entries, source, schema) {
+		var observed = Array.isArray(entries),
+			events = [],
+			count = 0,
+			specs = schema.recent_error_facts;
+		(observed ? entries : []).forEach(function (entry, index) {
+			count += 1;
+			var first = typeof entry === 'string' ? entry.split(/[\r\n]/, 1)[0] : '';
+			var start = first.indexOf(specs.owner_prefix);
+			var marker =
+				start < 0 ? -1 : first.indexOf(specs.failure_marker, start + specs.owner_prefix.length);
+			var reason = marker < 0 ? '' : first.slice(marker + specs.failure_marker.length);
+			for (var rule of specs.rules) {
+				var event,
+					candidate = reason;
+				if (rule.message_prefix) {
+					var position = first.indexOf(rule.message_prefix);
+					candidate = position < 0 ? '' : first.slice(position);
+					if (rule.number_marker) {
+						var numberAt = candidate.indexOf(rule.number_marker, rule.message_prefix.length);
+						candidate = numberAt < 0 ? '' : candidate.slice(numberAt);
+					}
+				}
+				if (rule.literal && candidate === rule.literal)
+					event = { entry_index: index + 1, code: rule.code };
+				else if (rule.prefix && candidate.startsWith(rule.prefix)) {
+					var value = candidate.slice(rule.prefix.length);
+					if (rule.suffix) {
+						var finish = value.indexOf(rule.suffix);
+						value = finish < 0 ? '' : value.slice(0, finish);
+					}
+					if (/^-?\d+$/.test(value)) {
+						var number = projectShare(Number(value), {
+							kind: 'integer',
+							minimum: rule.minimum,
+							maximum: rule.maximum
+						});
+						if (number !== undefined && String(number) === value) {
+							event = { entry_index: index + 1, code: rule.code };
+							event[rule.field] = number;
+						}
+					}
+				}
+				if (event) {
+					events.push(event);
+					break;
+				}
+			}
+		});
+		return {
+			observed: observed,
+			source: ['errors_file', 'ring'].indexOf(source) >= 0 ? source : 'unavailable',
+			qualification: 'log_observation_only',
+			examined_entries: count,
+			excluded_entries: count - events.length,
+			events: events
+		};
+	}
+
 	/** Technical sharing never exports free text, local details or page-only model verdicts. */
 	function shareSnapshot(snapshot, schema) {
 		if (
@@ -1048,7 +1108,15 @@
 			['windows', 'macos', 'linux'].indexOf(snapshot.driver) < 0
 		)
 			throw new Error('Diagnostic sharing policy or identity unavailable');
-		return projectShare(snapshot, schema.share_policy.projection);
+		var safe = projectShare(snapshot, schema.share_policy.projection);
+		var issues = snapshot.sections && snapshot.sections.issues;
+		if (issues && typeof issues === 'object' && !Array.isArray(issues))
+			safe.sections.issues.recent_error_facts = recentErrorFacts(
+				issues.recent,
+				issues.recent_source,
+				schema
+			);
+		return safe;
 	}
 
 	/** Rebuilds closed installed-page records; they never qualify driver suites. */
