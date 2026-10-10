@@ -4034,6 +4034,23 @@ writers, malformed-debt physical release bookkeeping, native/installed/device
 acceptance and watchdog exit73 remain unqualified or open. No owned producer is
 activated; item31 and transverse16/38 remain open, and no TODO item is removed.
 
+WP3 system-authentication policy receiving now settles the same exact modifier
+owner after both directions of the public system-auth filter setter. Seven
+independent controls use the real registered app-activation callback, tracker,
+ordinary AX classification and public policy writer with composed native ports.
+Both SecurityAgent and CoreAuthUI crossings cancel the whole old hold; disabled
+filters and the ordinary reference preserve 6000ms and fresh 1000ms durations.
+The original 110 cases remain unchanged: actual receiving gives 113 passed and
+four genuine assertion failures before, then 117 passed after; omitting the
+single settlement assertion reproduces those four failures. Selected source
+verification passes formatting, 101 E2E cases with one original skip, and all
+19,515 Lua unit cases. The required JS gate stays RED at 408 passed and one
+known Windows STEP_CONDITIONS failure; the overall selected exit remains 1.
+Native authentication/physical acceptance, malformed system-setter refusal,
+whole configuration atomicity and
+other writers remain unqualified; no lease73 cause or complete privacy proof is
+claimed. No owned producer is enabled and no TODO item is removed.
+
 WP3 remains partial. An explicitly initialized, dormant physical-capture session
 owner now composes the real accounting policy, delivery receiver and transport.
 It verifies the caller's pinned executable requirement asynchronously, waits for

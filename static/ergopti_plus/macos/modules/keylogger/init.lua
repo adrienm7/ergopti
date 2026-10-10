@@ -1297,6 +1297,7 @@ end
 --- @param v boolean
 function M.set_system_auth_filter_enabled(v)
 	CoreState.system_auth_filter_enabled = (v ~= false)
+	assert(settle_context_modifiers(), "System auth filter modifier settlement remains pending")
 	publish_physical_configuration()
 	Logger.debug(LOG, "System auth filter: %s.", CoreState.system_auth_filter_enabled and "on" or "off")
 end

@@ -272,3 +272,38 @@ The Linux subreaper reaps 91 descendants with no pending child or rescue.
 Shared menu merge conflicts remain unresolved, and no Dev/main, shared workflow,
 native165 or CI reference is changed.
 Item24 and incident117 remain open; no TODO item is removed.
+
+## System-authentication modifier intervals
+
+The public system-authentication filter writer now requires the same init-owned
+modifier settlement after its boolean assignment and before existing publication
+and logging, in both policy directions. The unchanged effective privacy predicate
+keeps disabled authentication filters included and cancels the entire crossing
+hold when either fixed authentication bundle becomes excluded. No classifier,
+bundle inventory, dormant observer, producer or timeout is changed.
+
+Seven independently frozen controls drive the actual registered startup
+app-activation callback, real tracker and SecureDetector with ordinary raw AX
+classification. Actual receiving gives 113 passed and four genuine final-event
+assertion failures before, then 117 passed after. Omitting the one new assertion
+reproduces the same four failures; all original 110 cases pass each time. Disabled
+policy and ordinary context preserve full 6000ms holds and fresh 1000ms holds.
+The exact captured production startup closure is used; app/AX observer, timer
+and persistence ports are explicit doubles, not native authentication evidence.
+Approved source and test postimages are restored after each omission.
+
+Evidence is retained outside the checkout in
+`/workspace/ergopti-group5-work/wp3-system7-independent-dtmnd6g3`.
+Selected source verification passes formatting (464 files), all 101 E2E cases
+with one original driver/host skip, and 19,515 Lua unit cases with no failures
+across 1643 modules. All seven new controls pass in the complete suite. The
+required JS gate stays RED at 408 passed and one known Windows pipeline failure:
+the two managed Ollama retention steps are absent from STEP_CONDITIONS. The
+overall selected exit remains 1; this is not an all-green gate. The Linux
+subreaper physically reaps 91 descendants, with no pending child or rescue.
+Native authentication and physical acceptance, malformed system-policy
+settlement refusal, whole configuration transaction atomicity and other
+configuration writers remain unqualified.
+This does not fix watchdog exit73, activate an owned producer, or complete
+WP3/item31 or transversal16/38. No TODO item is removed; no shared merge, workflow
+or CI reference is changed by this tranche.
