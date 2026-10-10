@@ -2494,6 +2494,10 @@ These are software implementations; final hardware verification remains below.
   not a current recommendation target. Do not assume deletion implements the
   recommendation.
 
+Windows scope and metrics fixtures now boot their actual intended source
+before invoking admitted writes. Original durable writes and assertions remain.
+The resulting native scope, global and metrics qualification is pending.
+
 The current Windows configuration-journal source has been composed against
 current dev, preserving the native AI include and the unchanged generic file
 port signatures. Configuration-specific admitted operations retain exact
