@@ -21,13 +21,18 @@ _KJLO_Entry(Name, FirstEffect) {
 	AssertTrue(Effect > Admission, "ownership must precede the first lifecycle effect")
 }
 
-for Name, FirstEffect in Map("KL_OpenTodayFh", "today := KL_Today()",
-	"KL_CloseTodayFh", "Keylogger._today_fh.Close()",
-	"KL_ReadNewTodayLog", "KL_FlushTodayFh(Keylogger._today_fh)",
-	"KL_IngestOnce", "return KL_DayRollover(",
-	"KL_DayRollover", "Keylogger.rollover_in_progress := true",
-	"KL_Stop", "KL_BeginShutdown()")
-	Test("keylogger: journal ownership fences " . Name . " (keylogger-journal-lifecycle-owner)", _KJLO_Entry.Bind(Name, FirstEffect))
+/** Registers vectors without publishing global loop variables. */
+_KJLO_RegisterEntryCases() {
+	local Name, FirstEffect
+	for Name, FirstEffect in Map("KL_OpenTodayFh", "today := KL_Today()",
+		"KL_CloseTodayFh", "Keylogger._today_fh.Close()",
+		"KL_ReadNewTodayLog", "KL_FlushTodayFh(Keylogger._today_fh)",
+		"KL_IngestOnce", "return KL_DayRollover(",
+		"KL_DayRollover", "Keylogger.rollover_in_progress := true",
+		"KL_Stop", "KL_BeginShutdown()")
+		Test("keylogger: journal ownership fences " . Name . " (keylogger-journal-lifecycle-owner)", _KJLO_Entry.Bind(Name, FirstEffect))
+}
+_KJLO_RegisterEntryCases()
 
 _KJLO_PauseBeforeRepair(Name) {
 	Body := _StripFullLineComments(_DriverFuncBody(Name))
@@ -38,5 +43,10 @@ _KJLO_PauseBeforeRepair(Name) {
 		"a suspended timer must refuse before ownership acquisition can repair disk state")
 }
 
-for Name in ["KL_IngestOnce", "KL_DayRollover"]
-	Test("keylogger: pause precedes journal repair in " . Name . " (keylogger-journal-pause-repair)", _KJLO_PauseBeforeRepair.Bind(Name))
+/** Registers vectors without publishing global loop variables. */
+_KJLO_RegisterPauseCases() {
+	local Name
+	for Name in ["KL_IngestOnce", "KL_DayRollover"]
+		Test("keylogger: pause precedes journal repair in " . Name . " (keylogger-journal-pause-repair)", _KJLO_PauseBeforeRepair.Bind(Name))
+}
+_KJLO_RegisterPauseCases()

@@ -105,8 +105,12 @@ struct ManagedWPADMetadata {
 enum ManagedProxyLookup {
 	static func routes(url: URL, budget: TimeInterval, maximumSelections: Int,
 		settingsProvider: () -> CFDictionary? = { CFNetworkCopySystemProxySettings()?.takeRetainedValue() },
+		certificates: [SecCertificate] = [],
 		discoveryMetadataProvider: () -> ManagedWPADMetadata = { ManagedProxyLookup.discoveryMetadata() }) -> [[String: Any]]? {
-		guard let settings = settingsProvider() else { return nil }
+		guard budget.isFinite, budget > 0 else { return nil }
+		let deadline = ProcessInfo.processInfo.systemUptime + budget
+		guard !ManagedPACSource.hasDebt, let settings = settingsProvider(),
+			ProcessInfo.processInfo.systemUptime < deadline else { return nil }
 		let dictionary = (settings as AnyObject) as? [String: Any]
 		let discoveryEnabled = (dictionary?[kCFNetworkProxiesProxyAutoDiscoveryEnable as String] as? NSNumber)?.boolValue == true
 		#if ERGOPTI_MANAGED_HTTP_FIXTURE_DIAGNOSTICS
@@ -126,17 +130,16 @@ enum ManagedProxyLookup {
 				|| kind == kCFProxyTypeAutoConfigurationJavaScript as String
 		})
 		var routes: [[String: Any]] = []
-		let deadline = ProcessInfo.processInfo.systemUptime + budget
 		for candidate in candidates {
 			guard let kind = candidate[kCFProxyTypeKey as String] as? String else { return nil }
 			if kind == kCFProxyTypeAutoConfigurationURL as String {
 				guard let pacURL = candidate[kCFProxyAutoConfigurationURLKey as String] as? URL,
-					let expanded = evaluate(url: url, pacURL: pacURL, script: nil, deadline: deadline),
+					let expanded = evaluate(url: url, pacURL: pacURL, script: nil, deadline: deadline, certificates: certificates),
 					!expanded.isEmpty else { return nil }
 				routes.append(contentsOf: expanded)
 			} else if kind == kCFProxyTypeAutoConfigurationJavaScript as String {
 				guard let script = candidate[kCFProxyAutoConfigurationJavaScriptKey as String] as? String,
-					let expanded = evaluate(url: url, pacURL: nil, script: script, deadline: deadline),
+					let expanded = evaluate(url: url, pacURL: nil, script: script, deadline: deadline, certificates: certificates),
 					!expanded.isEmpty else { return nil }
 				routes.append(contentsOf: expanded)
 			} else if !hasNativePAC { routes.append(candidate) }
@@ -148,7 +151,7 @@ enum ManagedProxyLookup {
 		if discoveryEnabled,
 			!hasNativePAC {
 			guard let discovered = discover(url: url, deadline: deadline,
-				maximumSelections: maximumSelections, metadataProvider: discoveryMetadataProvider) else { return nil }
+				maximumSelections: maximumSelections, certificates: certificates, metadataProvider: discoveryMetadataProvider) else { return nil }
 			routes = discovered
 		}
 		#if ERGOPTI_MANAGED_HTTP_FIXTURE_DIAGNOSTICS
@@ -202,19 +205,38 @@ enum ManagedProxyLookup {
 	}
 
 	static func discover(url: URL, deadline: TimeInterval, maximumSelections: Int,
+		certificates: [SecCertificate] = [],
 		metadataProvider: () -> ManagedWPADMetadata = { ManagedProxyLookup.discoveryMetadata() }) -> [[String: Any]]? {
+		guard !ManagedPACSource.hasDebt, ProcessInfo.processInfo.systemUptime < deadline else { return nil }
 		let metadata = metadataProvider()
 		guard let endpoints = discoveryURLs(dhcpOption: metadata.dhcpOption, searchDomains: metadata.searchDomains),
 			!endpoints.isEmpty, endpoints.count <= maximumSelections else { return nil }
 		for endpoint in endpoints {
-			guard ProcessInfo.processInfo.systemUptime < deadline else { return nil }
-			if let result = evaluate(url: url, pacURL: endpoint, script: nil, deadline: deadline),
+			guard !ManagedPACSource.hasDebt, ProcessInfo.processInfo.systemUptime < deadline else { return nil }
+			if let result = evaluate(url: url, pacURL: endpoint, script: nil, deadline: deadline, certificates: certificates),
 				!result.isEmpty, result.count <= maximumSelections { return result }
 		}
 		return nil
 	}
 
-	static func evaluate(url: URL, pacURL: URL?, script: String?, deadline: TimeInterval) -> [[String: Any]]? {
+	static func evaluate(url: URL, pacURL: URL?, script: String?, deadline: TimeInterval,
+		certificates: [SecCertificate] = []) -> [[String: Any]]? {
+		guard !ManagedPACSource.hasDebt, ProcessInfo.processInfo.systemUptime < deadline else { return nil }
+		let source: String
+		if let pacURL, script == nil {
+			guard let acquired = ManagedPACSource.load(pacURL, deadline: deadline, certificates: certificates) else { return nil }
+			source = acquired
+		} else if pacURL == nil, let script { source = script }
+		else { return nil }
+		guard ProcessInfo.processInfo.systemUptime < deadline,
+			let bound = try? ManagedPACSource.bind(source, url: url) else { return nil }
+		return evaluateNative(url: url, pacURL: nil, script: bound, deadline: deadline)
+	}
+
+	/// Keep the raw public framework boundary observable independently of the
+	/// production binding. This does not acquire a PAC through an owned session.
+	static func evaluateNative(url: URL, pacURL: URL?, script: String?, deadline: TimeInterval) -> [[String: Any]]? {
+		guard ProcessInfo.processInfo.systemUptime < deadline else { return nil }
 		let result = ManagedPACResult()
 		var context = CFStreamClientContext(version: 0,
 			info: Unmanaged.passUnretained(result).toOpaque(), retain: nil, release: nil, copyDescription: nil)
@@ -574,7 +596,7 @@ enum ManagedHTTPWorker {
 			if let lookupRemaining, lookupRemaining <= 0 { return refuse(reason: "deadline", status: 75, output: output) }
 			guard let selected = ManagedProxyLookup.routes(url: request.url,
 				budget: min(lookupRemaining ?? request.idleTimeout, request.idleTimeout),
-				maximumSelections: maximumSelections, settingsProvider: settingsProvider,
+				maximumSelections: maximumSelections, settingsProvider: settingsProvider, certificates: certificates,
 				discoveryMetadataProvider: discoveryMetadataProvider)
 			else { return refuse(reason: "unavailable", status: 78, output: output) }
 			routes = selected

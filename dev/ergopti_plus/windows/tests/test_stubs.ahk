@@ -818,10 +818,6 @@ LLM_Tooltip_FinalizeAcceptance(Lifecycle, Accepted) {
     return true
 }
 
-LLM_Deps_IsReady() {
-    return true
-}
-
 KL_LogLlm(event_type, evt) {
     global _Stub_LlmLogCalls
     _Stub_LlmLogCalls.Push({ event_type: event_type, evt: evt })

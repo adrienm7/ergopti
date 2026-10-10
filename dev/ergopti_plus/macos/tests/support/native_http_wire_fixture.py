@@ -65,6 +65,7 @@ class WireFixture:
         self.keychain = self.root / "owned.keychain-db"
         self.ca = self.root / "ca.pem"
         self.trust_attempted = False
+        self.trust_removal_deadline = None
         self.trust_query_executable = None
         self.authorization_observation = False
         self.command_file_debt = []
@@ -147,6 +148,7 @@ class WireFixture:
         timeout=15,
         deadline=None,
         merge_errors=False,
+        security_failure_observation=False,
     ):
         phase = "setup"
         status = None
@@ -155,6 +157,7 @@ class WireFixture:
         failure = None
         result = None
         closure_refused = False
+        security_failure = None
         try:
             if self.command_file_debt:
                 phase = "settle"
@@ -251,6 +254,16 @@ class WireFixture:
                 status = child.returncode
             phase = "exit"
             if status != 0 and not tolerate:
+                if security_failure_observation:
+                    try:
+                        errors.seek(0)
+                        security_failure = self._security_failure_fact(errors.read(1025))
+                    except (OSError, ValueError):
+                        security_failure = {"version": 1, "observed": 0, "category": None}
+                    except BaseException as observation_failure:
+                        raise FixtureFailure(
+                            "Native fixture command refused"
+                        ) from observation_failure
                 raise FixtureFailure("Native fixture command refused")
             output.seek(0)
             result = status, output.read(65536)
@@ -299,9 +312,35 @@ class WireFixture:
             else "complete",
             "status": status if type(status) is int and -65535 <= status <= 65535 else None,
         }
+        if security_failure is not None:
+            # Closed categories are observations, never a command success or an
+            # API OSStatus. Publication follows exact child and file retirement.
+            if closure_refused:
+                security_failure = {"version": 1, "observed": 0, "category": None}
+            try:
+                print(
+                    "# native_http_security_failure "
+                    + json.dumps({**security_failure, **self.command_fact}, sort_keys=True),
+                    flush=True,
+                )
+            except BaseException as observation_failure:
+                if failure is not None:
+                    raise failure from observation_failure
+                raise
         if failure is not None:
             raise failure
         return result
+
+    @staticmethod
+    def _security_failure_fact(raw):
+        # Apple SecBase.cssmPerror prints exactly "callee: message\n". Keep
+        # only the public removal callee, never its localized message or path.
+        fact = {"version": 1, "observed": 0, "category": None}
+        if not isinstance(raw, bytes) or len(raw) > 1024:
+            return fact
+        if re.fullmatch(rb"SecTrustSettingsRemoveTrustSettings: [\x20-\x7e]+\n", raw):
+            fact.update(observed=1, category="trust_settings_remove")
+        return fact
 
     def _retire_command_files(self):
         retained = []
@@ -413,12 +452,6 @@ class WireFixture:
                 ]
             )
         elif self.trust_attempted:
-            # Observation, acquisition and physical query settlement all consume
-            # the original removal budget. Neither refusal nor retry renews it.
-            deadline = time.monotonic() + 15
-            self._observe_admin_trust(deadline)
-            if self.authorization_observation:
-                self._observe_admin_authorization(deadline)
             arguments = [
                 "/usr/bin/sudo",
                 "-n",
@@ -427,11 +460,40 @@ class WireFixture:
                 "-d",
                 str(self.ca),
             ]
+            # Observation, acquisition and physical query settlement all consume
+            # one retained removal budget. Exhaustion cannot acquire a retry or
+            # erase the original native failure observation and cleanup debt.
+            if self.trust_removal_deadline is None:
+                self.trust_removal_deadline = time.monotonic() + 15
+            else:
+                if time.monotonic() >= self.trust_removal_deadline:
+                    if self.command_fact is None:
+                        self.command_fact = {"phase": "deadline", "status": None}
+                    raise subprocess.TimeoutExpired(arguments, 15)
+            deadline = self.trust_removal_deadline
+            self._observe_admin_trust(deadline)
+            if self.authorization_observation:
+                self._observe_admin_authorization(deadline)
             if time.monotonic() >= deadline:
                 self.command_fact = {"phase": "deadline", "status": None}
                 raise subprocess.TimeoutExpired(arguments, 15)
-            self._command(arguments, deadline=deadline)
+            self.command_fact = None
+            try:
+                self._command(arguments, deadline=deadline, security_failure_observation=True)
+            except BaseException as primary:
+                removal_fact = self.command_fact
+                if removal_fact is not None and removal_fact["phase"] == "exit":
+                    # A fresh read-only query can observe state after this exact
+                    # retired CLI; it cannot erase the original failure/debt.
+                    try:
+                        self._observe_admin_trust(deadline, after=True)
+                    except BaseException as observation_failure:
+                        raise primary from observation_failure
+                    finally:
+                        self.command_fact = removal_fact
+                raise
             self.trust_attempted = False
+            self.trust_removal_deadline = None
 
     @staticmethod
     def _admin_trust_fact(raw):
@@ -483,7 +545,7 @@ class WireFixture:
             raise FixtureFailure("Native admin trust observation refused")
         return fields
 
-    def _observe_admin_trust(self, deadline):
+    def _observe_admin_trust(self, deadline, *, after=False):
         if self.trust_query_executable is None:
             return
         fact = {"version": 1, "observed": 0}
@@ -506,7 +568,8 @@ class WireFixture:
                 # Unknown output cannot retire an unsettled query's authority.
                 raise
         try:
-            print("# native_http_admin_trust " + json.dumps(fact, sort_keys=True), flush=True)
+            prefix = "# native_http_admin_trust_after " if after else "# native_http_admin_trust "
+            print(prefix + json.dumps(fact, sort_keys=True), flush=True)
         except (OSError, ValueError):
             pass
 
@@ -957,6 +1020,7 @@ class WireFixture:
             print(
                 "# native_http_restoration_failure "
                 + json.dumps({"version": 1, "operation": operation, **fact}, sort_keys=True),
+                file=sys.stderr,
                 flush=True,
             )
         except (OSError, ValueError):

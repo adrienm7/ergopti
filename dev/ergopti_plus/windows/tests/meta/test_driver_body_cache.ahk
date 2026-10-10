@@ -203,6 +203,11 @@ Test("driver body cache: snapshot ownership is exact (driver-body-cache)", _DFBC
 Test("driver body cache: invalid names still throw (driver-body-cache)", _DFBC_InvalidNameStillThrows)
 Test("driver body cache: invalid names on empty source still throw (driver-body-cache)", _DFBC_InvalidNameOnEmptySource)
 Test("driver body cache: strict wrapper still throws (driver-body-cache)", _DFBC_StrictWrapperStillThrows)
-for Index, Name in [0, 1.5, Map()]
-	Test("driver body cache: invalid typed name vector=" . Index . " (driver-body-cache)",
-		_DFBC_TypedInvalidName.Bind(Name))
+/** Registers vectors without publishing global loop variables. */
+_DFBC_RegisterTypedNameCases() {
+	local Index, Name
+	for Index, Name in [0, 1.5, Map()]
+		Test("driver body cache: invalid typed name vector=" . Index . " (driver-body-cache)",
+			_DFBC_TypedInvalidName.Bind(Name))
+}
+_DFBC_RegisterTypedNameCases()
