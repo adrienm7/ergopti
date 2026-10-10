@@ -6,6 +6,42 @@ local Toml = require("toml_codec")
 local Json = require("json")
 local Base64 = require("compat.base64")
 
+
+--- Binds the actual idle live owner without replacing the profile/save collaborators.
+--- Every native owner is fresh; all module identities/absence are journalled.
+local function with_idle_live_owner(settings, body)
+	local journal = {}
+	for name, value in pairs(package.loaded) do journal[name] = value end
+	local owner
+	local ok, err = xpcall(function()
+		for _, name in ipairs({ "modules.llm.prediction_engine", "modules.llm.profiles", "modules.llm.settings" }) do
+			package.loaded[name] = nil
+		end
+		owner = require("modules.llm.prediction_engine")
+		helpers.assert_true(rawequal(require("modules.llm.profile_settings"), settings),
+			"the native engine captures the actual fixture profile owner")
+		helpers.assert_nil(owner.init(), "fresh native initialization retains its original nil receipt")
+		helpers.assert_type(owner.get_live, "function")
+		helpers.assert_type(owner.set_live, "function")
+		helpers.assert_nil(owner.get_live(), "the genuine initialized fixture starts with no temporary override")
+		helpers.assert_eq(owner.set_live(nil), true, "the actual idle stop owner acknowledges exact nil")
+		helpers.assert_nil(owner.get_live(), "idle acknowledgement cannot introduce a temporary override")
+		body(owner)
+	end, debug.traceback)
+	local cleaned, cleanup_err = pcall(function()
+		if owner then
+			helpers.assert_eq(owner.stop_runtime(), true, "the fresh engine retains no native runtime debt")
+			helpers.assert_eq(owner.runtime_pending(), false)
+			helpers.assert_nil(owner.get_live(), "profile-only fixture actions cannot start live mode")
+		end
+	end)
+	-- This journal also removes dependencies introduced by the genuine engine.
+	for name in pairs(package.loaded) do if journal[name] == nil then package.loaded[name] = nil end end
+	for name, value in pairs(journal) do package.loaded[name] = value end
+	if not ok then error(err, 0) end
+	if not cleaned then error(cleanup_err, 0) end
+end
+
 local function with_config(source, body)
 	Sandbox.with_config(source, function(path)
 		local names = { "infra.config_paths", "infra.llm_preferences", "modules.llm.profile_settings", "adapters.storage" }
@@ -322,46 +358,49 @@ helpers.describe("shared custom profile child: canonical Linux native owner", fu
 		local initial = '[llm]\nfuture = "keep"\nuser_profiles = "v1:' .. Base64.encode(Json.encode({ profile() }))
 			.. '"\n[llm.profiles]\nactive = "basic"\nauto_profile_for_model = false\n'
 		with_config(initial, function(settings, path)
-			local names = { "infra.manifest_menu", "ui.menu.menu_builder", "ui.prompt_editor.bridge" }
-			local saved = {}; for _, name in ipairs(names) do saved[name] = package.loaded[name] end
-			local ok, err = pcall(function()
-				local document = read_json("modules/menu/menu_manifest.json")
-				local translator = { get = function(key) return key end }
-				local native_translator = require("infra.i18n")
-				translator.locale = native_translator.locale
-				translator.section = native_translator.section
-				local renderer = assert(require("menu.renderer").new({ platform = "linux",
-					manifest_path = function() return shared("modules/menu/menu_manifest.json") end,
-					json_decode = function() return document end, i18n = translator, logger = require("logger.shim"),
-				}))
-				package.loaded["infra.manifest_menu"] = renderer
-				local opened, editor_calls, rebuilds, confirmations = nil, 0, 0, 0
-				local accepted, confirmed = true, true
-				package.loaded["ui.prompt_editor.bridge"] = { open = function(existing, on_save, opts)
-					editor_calls = editor_calls + 1; opened = {existing=existing,on_save=on_save,opts=opts}; return accepted
-				end }
-				local ctx = { is_paused = function() return false end, llm = {
-					is_enabled = function() return true end, get_models = function() return {} end,
-					get_current_model = function() return "small" end, get_prediction_model = function() return "small" end,
-				}, on_menu_changed = function() rebuilds = rebuilds + 1 end,
-				confirm_profile_delete = function(id, label)
-					confirmations = confirmations + 1
-					helpers.assert_eq({id,label}, {"user_canonical","Canonical"}); return confirmed
-				end }
-				local builder = helpers.load_module("ui.menu.menu_builder")
-				local function find(rows)
-					for _, row in ipairs(rows or {}) do
-						if row.title == "Canonical" then return row.menu or {} end
-						local nested = find(row.menu); if nested then return nested end
+			with_idle_live_owner(settings, function(live_owner)
+				local names = { "infra.manifest_menu", "ui.menu.menu_builder", "ui.prompt_editor.bridge" }
+				local saved = {}; for _, name in ipairs(names) do saved[name] = package.loaded[name] end
+				local ok, err = pcall(function()
+					local document = read_json("modules/menu/menu_manifest.json")
+					local translator = { get = function(key) return key end }
+					local native_translator = require("infra.i18n")
+					translator.locale = native_translator.locale
+					translator.section = native_translator.section
+					local renderer = assert(require("menu.renderer").new({ platform = "linux",
+						manifest_path = function() return shared("modules/menu/menu_manifest.json") end,
+						json_decode = function() return document end, i18n = translator, logger = require("logger.shim"),
+					}))
+					package.loaded["infra.manifest_menu"] = renderer
+					local opened, editor_calls, rebuilds, confirmations = nil, 0, 0, 0
+					local accepted, confirmed = true, true
+					package.loaded["ui.prompt_editor.bridge"] = { open = function(existing, on_save, opts)
+						editor_calls = editor_calls + 1; opened = {existing=existing,on_save=on_save,opts=opts}; return accepted
+					end }
+					local ctx = { is_paused = function() return false end, llm = {
+						is_enabled = function() return true end, get_models = function() return {} end,
+						get_current_model = function() return "small" end, get_prediction_model = function() return "small" end,
+						get_live = live_owner.get_live, set_live = live_owner.set_live,
+					}, on_menu_changed = function() rebuilds = rebuilds + 1 end,
+					confirm_profile_delete = function(id, label)
+						confirmations = confirmations + 1
+						helpers.assert_eq({id,label}, {"user_canonical","Canonical"}); return confirmed
+					end }
+					local builder = helpers.load_module("ui.menu.menu_builder")
+					local function find(rows)
+						for _, row in ipairs(rows or {}) do
+							if row.title == "Canonical" then return row.menu or {} end
+							local nested = find(row.menu); if nested then return nested end
+						end
 					end
-				end
-				local function child() return assert(find(builder.build(ctx)), "actual native parent missing") end
-				body({settings=settings,path=path,initial=initial,document=document,child=child,ctx=ctx,i18n=translator,
-					opened=function() return opened end, counts=function() return {rebuilds,editor_calls,confirmations} end,
-					accept=function(value) accepted=value end, confirm=function(value) confirmed=value end})
+					local function child() return assert(find(builder.build(ctx)), "actual native parent missing") end
+					body({settings=settings,path=path,initial=initial,document=document,child=child,ctx=ctx,i18n=translator,
+						opened=function() return opened end, counts=function() return {rebuilds,editor_calls,confirmations} end,
+						accept=function(value) accepted=value end, confirm=function(value) confirmed=value end})
+				end)
+				for _, name in ipairs(names) do package.loaded[name] = saved[name] end
+				if not ok then error(err, 0) end
 			end)
-			for _, name in ipairs(names) do package.loaded[name] = saved[name] end
-			if not ok then error(err, 0) end
 		end)
 	end
 	local function captions(rows)
@@ -379,6 +418,31 @@ helpers.describe("shared custom profile child: canonical Linux native owner", fu
 			helpers.assert_eq(f.counts(), {1,0,0})
 		end)
 	end)
+	helpers.it("custom-profile-child: the real idle owner omits stop and preserves native save/rebuild counts", function()
+		with_child(function(f)
+			local read, stop = f.ctx.llm.get_live, f.ctx.llm.set_live
+			local stops = 0
+			helpers.assert_nil(read())
+			f.ctx.llm.set_live = function(value) stops = stops + 1; return stop(value) end
+			helpers.assert_eq(f.child()[1].fn(), true)
+			helpers.assert_eq(stops, 0, "an absent override never calls the genuine stop owner")
+			helpers.assert_nil(read())
+			helpers.assert_eq(f.settings.get("active"), "user_canonical")
+			helpers.assert_eq(f.counts(), {1,0,0})
+		end)
+	end)
+	for _, method in ipairs({ "get_live", "set_live" }) do
+		helpers.it("custom-profile-child: missing actual " .. method .. " refuses before canonical save", function()
+			with_child(function(f)
+				f.ctx.llm[method] = nil
+				helpers.assert_eq(f.child()[1].fn(), false)
+				helpers.assert_eq(f.settings.get("active"), "basic")
+				helpers.assert_eq(Sandbox.read_bytes(f.path), f.initial)
+				helpers.assert_eq(f.counts(), {0,0,0})
+			end)
+		end)
+	end
+
 	helpers.it("custom-profile-child: native Edit refuses and retries its real canonical save", function()
 		with_child(function(f)
 			f.accept(false); helpers.assert_eq(f.child()[2].fn(), false)
@@ -1018,39 +1082,42 @@ helpers.describe("complete ordered profile frame: actual Linux native owner", fu
 		local initial = '[llm]\nfuture = "keep"\nuser_profiles = "v1:' .. Base64.encode(Json.encode(registry))
 			.. '"\n[llm.profiles]\nactive = "' .. (options.active or "basic") .. '"\nauto_profile_for_model = false\n'
 		with_config(initial, function(settings, path)
-			local names = { "infra.manifest_menu", "infra.i18n", "ui.menu.menu_builder", "ui.prompt_editor.bridge" }
-			local saved = {}; for _, name in ipairs(names) do saved[name] = package.loaded[name] end
-			local ok, err = xpcall(function()
-				local document = read("modules/menu/menu_manifest.json")
-				local i18n = setmetatable({ get = function(key) return key end }, { __index = require("infra.i18n") })
-				package.loaded["infra.i18n"] = i18n
-				package.loaded["infra.manifest_menu"] = assert(require("menu.renderer").new({
-					platform = "linux", manifest_path = function() return shared("modules/menu/menu_manifest.json") end,
-					json_decode = function() return document end, i18n = i18n, logger = require("logger.shim"),
-				}))
-				local redraws, editors, opened = 0, 0, nil
-				package.loaded["ui.prompt_editor.bridge"] = { open = function(existing, on_save, opts)
-					editors = editors + 1; opened = { existing = existing, on_save = on_save, opts = opts }; return true
-				end }
-				local ctx = { paused = options.paused == true, is_paused = function() return options.paused == true end,
-					llm = { is_enabled = function() return true end, get_models = function() return {} end,
-						get_current_model = function() return "small" end, get_prediction_model = function() return "small" end },
-					on_menu_changed = function() redraws = redraws + 1 end }
-				local builder = helpers.load_module("ui.menu.menu_builder")
-				local function find(rows)
-					for _, row in ipairs(rows or {}) do
-						if row.menu then
-							for _, child in ipairs(row.menu) do if child.title == i18n.get(oracle.labels.auto_detect) then return row.menu end end
-							local result = find(row.menu); if result then return result end
+			with_idle_live_owner(settings, function(live_owner)
+				local names = { "infra.manifest_menu", "infra.i18n", "ui.menu.menu_builder", "ui.prompt_editor.bridge" }
+				local saved = {}; for _, name in ipairs(names) do saved[name] = package.loaded[name] end
+				local ok, err = xpcall(function()
+					local document = read("modules/menu/menu_manifest.json")
+					local i18n = setmetatable({ get = function(key) return key end }, { __index = require("infra.i18n") })
+					package.loaded["infra.i18n"] = i18n
+					package.loaded["infra.manifest_menu"] = assert(require("menu.renderer").new({
+						platform = "linux", manifest_path = function() return shared("modules/menu/menu_manifest.json") end,
+						json_decode = function() return document end, i18n = i18n, logger = require("logger.shim"),
+					}))
+					local redraws, editors, opened = 0, 0, nil
+					package.loaded["ui.prompt_editor.bridge"] = { open = function(existing, on_save, opts)
+						editors = editors + 1; opened = { existing = existing, on_save = on_save, opts = opts }; return true
+					end }
+					local ctx = { paused = options.paused == true, is_paused = function() return options.paused == true end,
+						llm = { is_enabled = function() return true end, get_models = function() return {} end,
+							get_current_model = function() return "small" end, get_prediction_model = function() return "small" end,
+							get_live = live_owner.get_live, set_live = live_owner.set_live },
+						on_menu_changed = function() redraws = redraws + 1 end }
+					local builder = helpers.load_module("ui.menu.menu_builder")
+					local function find(rows)
+						for _, row in ipairs(rows or {}) do
+							if row.menu then
+								for _, child in ipairs(row.menu) do if child.title == i18n.get(oracle.labels.auto_detect) then return row.menu end end
+								local result = find(row.menu); if result then return result end
+							end
 						end
 					end
-				end
-				body({ document = document, i18n = i18n, settings = settings, path = path, initial = initial, ctx = ctx,
-					rows = function() return find(builder.build(ctx)) end, opened = function() return opened end,
-					counts = function() return { redraws, editors } end })
-			end, debug.traceback)
-			for _, name in ipairs(names) do package.loaded[name] = saved[name] end
-			if not ok then error(err, 0) end
+					body({ document = document, i18n = i18n, settings = settings, path = path, initial = initial, ctx = ctx,
+						rows = function() return find(builder.build(ctx)) end, opened = function() return opened end,
+						counts = function() return { redraws, editors } end })
+				end, debug.traceback)
+				for _, name in ipairs(names) do package.loaded[name] = saved[name] end
+				if not ok then error(err, 0) end
+			end)
 		end)
 	end
 	local function at(rows, title)

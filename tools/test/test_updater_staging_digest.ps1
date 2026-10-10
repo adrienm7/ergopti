@@ -8,7 +8,7 @@ $Start = $Source.IndexOf('_Updater_BuildStagingWorkerScript() {', [StringCompari
 if ($Start -lt 0) { throw 'Actual staging generator is required.' }
 $Body = $Source.Substring($Start).Split([string[]]@("`n}"), [StringSplitOptions]::None)[0]
 $Parts = [regex]::Matches($Body, "(?:return |\. )'([^']*)'")
-if ($Parts.Count -ne 35) { throw 'The actual staging expression changed.' }
+if ($Parts.Count -ne 36) { throw 'The actual staging expression changed.' }
 $Worker = (@($Parts | ForEach-Object { $_.Groups[1].Value }) -join "`n") + "`n"
 $From = $Worker.IndexOf('  if ($ExpectedSha256 -cnotmatch ', [StringComparison]::Ordinal)
 $To = $Worker.IndexOf('  $SwapSource=', [StringComparison]::Ordinal)

@@ -31,6 +31,18 @@ const FULL = process.argv.includes('--full');
 // Each check mirrors a CI "Validate ·" step. command/args are run from ROOT.
 const CHECKS = [
 	{
+		name: 'macOS native PAC and WPAD qualification requires all twelve original cases',
+		cmd: process.execPath,
+		args: ['tools/test/test-macos-native-pac-qualification.cjs'],
+		repro: 'npm run test:macos-native-pac-qualification'
+	},
+	{
+		name: 'macOS archive qualification requires exact native cases and compiler inputs',
+		cmd: process.execPath,
+		args: ['tools/test/test-item36-native-qualification.cjs'],
+		repro: 'node tools/test/test-item36-native-qualification.cjs'
+	},
+	{
 		name: 'Signed native query CI publisher retains compiler and nested-signature provenance',
 		cmd: process.execPath,
 		args: ['tools/test/test-automation-query-ci-publisher.cjs'],
@@ -1195,6 +1207,12 @@ const CHECKS = [
 		repro: 'npm run test:ci-pipeline'
 	},
 	{
+		name: 'Full default CI source admission preserves mandatory gates and bounded diagnostic policy',
+		cmd: 'node',
+		args: ['tools/test/test-ci-full-default.cjs'],
+		repro: 'node tools/test/test-ci-full-default.cjs'
+	},
+	{
 		name: 'CI pipeline wiring (one root, plan outputs, lane callers, secrets and permissions, no skippable job or gate step, release preflight before any side effect)',
 		cmd: 'node',
 		args: ['tools/test/test-ci-pipeline-wiring.cjs'],
@@ -1870,6 +1888,66 @@ const CHECKS = [
 		cmd: process.execPath,
 		args: ['tools/test/test-mlx-download-trust-activation.cjs'],
 		repro: 'node tools/test/test-mlx-download-trust-activation.cjs'
+	},
+	{
+		name: 'managed native HTTP receives actual pipe closure and shared routing',
+		cmd: process.execPath,
+		args: ['tools/test/test-macos-native-http-receiving.cjs'],
+		repro: 'node tools/test/test-macos-native-http-receiving.cjs'
+	},
+	{
+		name: 'managed bootstrap admits pinned bytes before offline installation',
+		cmd: process.execPath,
+		args: ['tools/test/test-macos-managed-bootstrap-http.cjs'],
+		repro: 'node tools/test/test-macos-managed-bootstrap-http.cjs'
+	},
+	{
+		name: 'managed Python release projections retain the independent official pin',
+		cmd: process.execPath,
+		args: ['tools/test/test-managed-python-release.cjs'],
+		repro: 'node tools/test/test-managed-python-release.cjs'
+	},
+	{
+		name: 'managed bootstrap shared policy and generated Swift remain source-qualified',
+		cmd: process.execPath,
+		args: ['tools/test/test-managed-bootstrap-policy.cjs'],
+		repro: 'node tools/test/test-managed-bootstrap-policy.cjs'
+	},
+	{
+		name: 'macOS guardian preserves public strict and offline signature flags',
+		cmd: process.execPath,
+		args: ['tools/test/test-macos-guardian-signature-flags.cjs'],
+		repro: 'node tools/test/test-macos-guardian-signature-flags.cjs'
+	},
+	{
+		name: 'bootstrap retry canonical data preserves original shell and generated Lua',
+		cmd: process.execPath,
+		args: ['tools/test/test-bootstrap-retry-projection.cjs'],
+		repro: 'node tools/test/test-bootstrap-retry-projection.cjs'
+	},
+	{
+		name: 'managed Ollama portable admission and operation retirement',
+		cmd: process.execPath,
+		args: ['tools/test/test-managed-ollama-protocol.cjs'],
+		repro: 'node tools/test/test-managed-ollama-protocol.cjs'
+	},
+	{
+		name: 'managed Ollama catalogue preserves native source and publication admission',
+		cmd: process.execPath,
+		args: ['tools/test/test-macos-managed-ollama-catalogue.cjs'],
+		repro: 'node tools/test/test-macos-managed-ollama-catalogue.cjs'
+	},
+	{
+		name: 'native PAC source contract preserves ownership and exact full-URL binding',
+		cmd: process.execPath,
+		args: ['tools/test/test-native-pac-source-contract.cjs'],
+		repro: 'node tools/test/test-native-pac-source-contract.cjs'
+	},
+	{
+		name: 'native PAC helpers preserve independent standard function vectors',
+		cmd: process.execPath,
+		args: ['tools/test/test-network-pac-helpers.cjs'],
+		repro: 'node tools/test/test-network-pac-helpers.cjs'
 	},
 	{
 		name: 'macOS opaque clients refuse unsupported automatic proxy routing',

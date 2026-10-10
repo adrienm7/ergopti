@@ -16,7 +16,8 @@
 const assert = require('node:assert/strict');
 const path = require('node:path');
 const { verify } = require('./desktop-ci-evidence.cjs');
-const pipeline = require('./ci-pipeline.cjs');
+const { coldBootstrapRecord } = require('./fixtures/macos-cold-bootstrap-receipt.cjs');
+const pipeline = require('./ci-full-default.cjs');
 const { run } = require('./run-macos-tooltip-canvas-tests.cjs');
 const { selectGates, GATE_COMMANDS } = require('./verify-change.cjs');
 
@@ -28,26 +29,54 @@ function state(needs) {
 		sha: 'a'.repeat(40),
 		scenarios: ['clean', 'upgraded', 'karabiner_config'],
 		evidence: [],
+		coldBootstrap: [coldBootstrapRecord()],
 		needs
 	};
 }
 
 const oldJobs = ['test-hs', 'e2e-hs', 'package-macos', 'launch'];
 const oldNeeds = Object.fromEntries(oldJobs.map((job) => [job, { result: 'success' }]));
+// Independent transport/bootstrap jobs remain mandatory while this fixture
+// isolates canvas refusal ahead of missing launch/package observations.
+const independentNeeds = {
+	'managed-ollama-native': { result: 'success' },
+	'cold-bootstrap-native': { result: 'success' }
+};
 // This first control rejects the original four-job admission before artifact
 // checks, so missing-canvas refusal is causal rather than another missing PNG.
 assert.throws(() => verify(state(oldNeeds)), /Mandatory jobs differ/);
+assert.throws(() => verify(state({ ...oldNeeds, ...independentNeeds })), /Mandatory jobs differ/);
 for (const result of ['failure', 'cancelled', 'skipped', undefined]) {
 	assert.throws(
-		() => verify(state({ ...oldNeeds, 'tooltip-canvas': { result } })),
+		() => verify(state({ ...oldNeeds, ...independentNeeds, 'tooltip-canvas': { result } })),
 		/tooltip-canvas did not succeed/
 	);
 }
 assert.throws(
-	() => verify(state({ ...oldNeeds, 'tooltip-canvas': { result: 'success' } })),
+	() =>
+		verify(state({ ...oldNeeds, ...independentNeeds, 'tooltip-canvas': { result: 'success' } })),
 	/Missing, duplicate or unexpected launch evidence/,
 	'green canvas must not replace the original package/install observations'
 );
+
+// The supplementary native successes isolate this canvas fixture; they never
+// turn a failed supplementary job into desktop admission.
+for (const job of ['managed-ollama-native', 'cold-bootstrap-native']) {
+	for (const result of ['failure', 'cancelled', 'skipped', undefined]) {
+		assert.throws(
+			() =>
+				verify(
+					state({
+						...oldNeeds,
+						...independentNeeds,
+						'tooltip-canvas': { result: 'success' },
+						[job]: { result }
+					})
+				),
+			new RegExp(`${job} did not succeed`)
+		);
+	}
+}
 
 const canvas = pipeline.job('tooltip-canvas');
 assert.deepEqual(pipeline.needsOf(canvas), ['e2e-hs']);
@@ -55,7 +84,10 @@ assert.equal(pipeline.field(canvas, 'runs-on'), 'macos-15');
 assert.equal(pipeline.field(canvas, 'if'), null);
 assert.equal(pipeline.field(canvas, 'continue-on-error'), null);
 assert.equal(pipeline.field(canvas, 'timeout-minutes'), '10');
-assert.deepEqual(pipeline.needsOf(pipeline.job('macos-ok')), [...oldJobs, 'tooltip-canvas']);
+assert.deepEqual(
+	pipeline.needsOf(pipeline.job('macos-ok')).sort(),
+	[...oldJobs, 'tooltip-canvas', 'managed-ollama-native', 'cold-bootstrap-native'].sort()
+);
 assert.ok(canvas.includes("python-version: '3.13'"));
 const prepare = pipeline.step(canvas, 'Prepare independent pixel observer');
 const acquire = pipeline.step(canvas, 'Acquire the pinned official Hammerspoon runtime');

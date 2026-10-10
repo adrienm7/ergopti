@@ -69,7 +69,12 @@ const RULES = {
 		{ kind: 'append', re: /\bMenuRenderer_Append\w*\(/ },
 		{ kind: 'static', re: /\bMap\(\s*"label"\s*,\s*t\(\s*"/ },
 		{ kind: 'separator', re: /\bMap\(\s*"separator"\s*,\s*true\b/ },
-		{ kind: 'add', re: /\.Add\(/, unless: GUI_CONTROL, files: /(?:^windows\/ui\/menu\/|tray)/ }
+		{
+			kind: 'add',
+			re: /\.Add\(/,
+			unless: GUI_CONTROL,
+			files: /(?:^windows\/ui\/menu\/|tray)/
+		}
 	],
 	'.lua': [
 		{
@@ -78,7 +83,11 @@ const RULES = {
 			unless: /^\s*local\s/
 		},
 		{ kind: 'separator', re: /\btitle\s*=\s*"-"|\bseparator\s*=\s*true\b/ },
-		{ kind: 'native', re: /\btitle\s*=(?=.*\b(?:fn|menu)\s*=)/, unless: /^\s*local\s/ }
+		{
+			kind: 'native',
+			re: /\btitle\s*=(?=.*\b(?:fn|menu)\s*=)/,
+			unless: /^\s*local\s/
+		}
 	]
 };
 
@@ -134,6 +143,100 @@ function sitesOf(rel, text, ext) {
 	return sites;
 }
 
+/** One recorded orphan removal, never a count-based coverage exception.
+ * Historical fixtures with the path present retain the original coverage rule.
+ * Absence is admitted only after the actual remaining declaration/owner inputs
+ * are read, before either normal or update mode may touch the debt ledger.
+ */
+function admittedSourceRetirements(driver, traversed) {
+	const retired = 'macos/ui/menu/menu_llm/live_mode_panel.lua';
+	// 69d9506d24ff8d287eb10831033d9f46a36a89f4 removed original blob
+	// 78f8a92e37639bcd2eecc8abc3900bc7ff3aab18 and its orphan declarations.
+	if (driver !== 'macos' || traversed.has(retired)) return new Set();
+	// An incomplete remaining view receives no retirement exception. The
+	// unchanged coverage assertions below retain their original refusal path.
+	const remaining = LEGACY.drivers.macos.sourceFiles.filter((rel) => rel !== retired);
+	if (traversed.size < remaining.length || remaining.some((rel) => !traversed.has(rel)))
+		return new Set();
+	const symbols = new Set([
+		'live_mode_panel',
+		'ui.menu.menu_llm.live_mode_panel',
+		'LiveModePanel',
+		'llm_live_mode',
+		'llm_live_controls',
+		'llm_live_mode_off',
+		'llm_live_is_off',
+		'llm_live_off_ready',
+		'llm_live_off_boundary',
+		'LLM_Menu_BuildLiveModeMenu',
+		'_LLM_Menu_LiveModeRows',
+		'_LLM_Menu_MakeLiveModeHandler'
+	]);
+	const declarations = path.join(SP, '_shared/modules/features/manifest.toml');
+	const compiled = path.join(SP, '_shared/modules/menu/menu_manifest.json');
+	const toml = fs.readFileSync(declarations, 'utf8');
+	assert.ok(toml.trim(), 'retired live-menu admission requires nonempty source declarations');
+	const manifest = JSON.parse(fs.readFileSync(compiled, 'utf8'));
+	assert.ok(
+		manifest &&
+			!Array.isArray(manifest) &&
+			typeof manifest === 'object' &&
+			Array.isArray(manifest.top_level) &&
+			manifest.top_level.length &&
+			Array.isArray(manifest.llm_menu) &&
+			manifest.llm_menu.length,
+		'retired live-menu admission requires actual nonempty compiled declarations'
+	);
+	const activeToml = toml.replace(/^\s*#.*$/gm, '');
+	assert.match(
+		activeToml,
+		/^\s*\[\[?menu(?:\.|\])/m,
+		'retired live-menu admission requires executable menu declaration source'
+	);
+	for (const symbol of symbols)
+		assert.ok(
+			!new RegExp('\\b' + symbol.replace(/\./g, '\\.') + '\\b').test(activeToml),
+			`retired live-menu declaration reappeared: ${symbol}`
+		);
+	const checkManifest = (value) => {
+		if (typeof value === 'string')
+			assert.ok(!symbols.has(value), `retired live-menu compiled owner reappeared: ${value}`);
+		else if (value && typeof value === 'object')
+			for (const [key, child] of Object.entries(value)) {
+				assert.ok(!symbols.has(key), `retired live-menu compiled declaration reappeared: ${key}`);
+				checkManifest(child);
+			}
+	};
+	checkManifest(manifest);
+	const { scriptTokens } = require('../lib/script-source.cjs');
+	// AHK identifiers preserve their language's case-insensitive identity.
+	const windowsIdentifiers = new Set([...symbols].map((symbol) => symbol.toLowerCase()));
+	for (const [platform, ext] of [
+		['macos', '.lua'],
+		['windows', '.ahk'],
+		['linux', '.lua']
+	]) {
+		const menuRoot = path.join(SP, platform, 'ui/menu');
+		assert.ok(
+			fs.existsSync(menuRoot) && fs.statSync(menuRoot).isDirectory(),
+			`retired live-menu admission requires actual menu owner root: ${platform}`
+		);
+		for (const file of sourceFiles(menuRoot, ext))
+			for (const token of scriptTokens(fs.readFileSync(file, 'utf8'), ext))
+				assert.ok(
+					!symbols.has(token.value) &&
+						!(
+							platform === 'windows' &&
+							token.kind === 'identifier' &&
+							windowsIdentifiers.has(token.value.toLowerCase())
+						) &&
+						!(token.kind === 'string' && /(?:^|[./])live_mode_panel$/.test(token.value)),
+					`retired live-menu executable owner reappeared: ${path.relative(SP, file)}: ${token.value}`
+				);
+	}
+	return new Set([retired]);
+}
+
 /**
  * The inventory of one driver.
  * @param {string} driver 'windows', 'macos' or 'linux'.
@@ -169,7 +272,18 @@ function inventory(driver) {
 			sites.push(...sitesOf(rel, text, ext));
 		}
 	}
-	const required = LEGACY.drivers[driver].sourceFiles;
+	const retired = CURRENT_SOURCE_RETIREMENTS[driver] || [];
+	for (const rel of retired) {
+		assert.ok(
+			LEGACY.drivers[driver].sourceFiles.includes(rel),
+			'retirement must name an exact historical source'
+		);
+		assert.ok(
+			!fs.existsSync(path.join(SP, rel)),
+			`${driver}: retired production source must remain absent: ${rel}`
+		);
+	}
+	const required = LEGACY.drivers[driver].sourceFiles.filter((rel) => !retired.includes(rel));
 	assert.ok(
 		traversed.size >= required.length,
 		`${driver}: source coverage ${traversed.size}/${required.length} is incomplete`
@@ -179,6 +293,10 @@ function inventory(driver) {
 			traversed.has(rel),
 			`${driver}: mandatory production source was not traversed: ${rel}`
 		);
+	// Read declaration retirement only after exact remaining path coverage passed.
+	const admitted = admittedSourceRetirements(driver, traversed);
+	for (const rel of retired)
+		assert.ok(admitted.has(rel), `${driver}: current source retirement was not admitted: ${rel}`);
 	SOURCE_COUNTS[driver] = traversed.size;
 	return sites;
 }
@@ -232,6 +350,13 @@ assert.equal(
 	'the independent b06 legacy oracle must remain unchanged'
 );
 const LEGACY = JSON.parse(legacyBytes.toString('utf8'));
+
+// Explicit current retirement keeps every historical excerpt and floor intact.
+// Any other absent source, or resurrection of this removed provider, refuses.
+const CURRENT_SOURCE_RETIREMENTS = Object.freeze({
+	macos: Object.freeze(['macos/ui/menu/menu_llm/live_mode_panel.lua'])
+});
+
 const SOURCE_COUNTS = {};
 const errors = [];
 for (const driver of DRIVERS) {
@@ -255,6 +380,14 @@ for (const driver of DRIVERS) {
 }
 
 const current = {};
+// Cross-driver retirement inspection cannot replace a missing original root's refusal.
+for (const driver of DRIVERS) {
+	const sourceRoot = path.join(SP, driver === 'windows' ? 'windows' : `${driver}/ui/menu`);
+	assert.ok(
+		fs.existsSync(sourceRoot) && fs.statSync(sourceRoot).isDirectory(),
+		`${driver}: mandatory source root must exist: ${sourceRoot}`
+	);
+}
 for (const driver of DRIVERS) current[driver] = inventory(driver);
 
 // Read and validate the debt ledger in both modes, before any write. Updating

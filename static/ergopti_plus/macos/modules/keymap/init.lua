@@ -20,6 +20,7 @@ local hs         = hs
 local eventtap   = hs.eventtap
 local text_utils = require("infra.text_utils")
 local EventProvenance = require("adapters.event_provenance")
+local KeyboardGeometry = require("adapters.keyboard_geometry")
 local ControlSentinels = require("modules.keymap.control_sentinels")
 local SyntheticInput = require("adapters.synthetic_input")
 local TimerScheduler = require("adapters.timer_scheduler")
@@ -1395,8 +1396,9 @@ local function onKeyDownRaw(e, provenance, provenance_status)
 	-- the application all see the magic key, in ignored and secure windows too,
 	-- like a key of the layout. Every other key pays one table lookup: the flags
 	-- are read only for the chosen key (either keycode of an ISO-swapped key).
-	if MagicKeySource.owns(keyCode)
-		and MagicKeySource.remaps(keyCode, e:getFlags(), magic_key_replace_on) then
+	local keyboard_type = MagicKeySource.needs_geometry(keyCode) and KeyboardGeometry.event_type(e) or nil
+	if MagicKeySource.owns(keyCode, keyboard_type)
+		and MagicKeySource.remaps(keyCode, e:getFlags(), magic_key_replace_on, keyboard_type) then
 		e:setUnicodeString(CoreState.magic_key)
 	end
 	if _one_shot_shift and _one_shot_shift.key_down(e, keyCode) then return true end
@@ -1483,7 +1485,8 @@ local function onKeyDownRaw(e, provenance, provenance_status)
 	-- it without using it are those an interceptor suppresses, which are rare
 	-- next to the ones that fall through to step 8 and read it anyway.
 	local chars = e:getCharacters(false)
-	local _interceptor_ctx = { keyCode = keyCode, flags = flags, chars = chars }
+	local _interceptor_ctx = { keyCode = keyCode, flags = flags, chars = chars,
+		start_is_word_boundary = CoreState.start_is_word_boundary }
 	local suppress_triggers = false
 	for idx, interceptor in ipairs(CoreState.interceptors) do
 		-- The already-fetched event fields are handed over as a third argument.

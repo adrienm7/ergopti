@@ -316,3 +316,13 @@ helpers.describe("prompt prediction end to end (llm-prompt-prediction)", functio
 			"the tail is corrected in place and the next words appended")
 	end)
 end)
+
+helpers.it("the configurable translation shortcut carries its own target into the actual context pipeline", function()
+	local world = build_world("Bonjour Marc. On se voit demain ?")
+	helpers.assert_eq(world.actions.set_action_parameter("tap_3", "llm_translate_context", "Esperanto"), true)
+	helpers.assert_eq(world.actions.execute_single("llm_translate_context", "tap_3"), true)
+	helpers.assert_eq(#world.posts, 1)
+	helpers.assert_true(world.posts[1].body.messages[1].content:find("Translate TAIL into Esperanto", 1, true) ~= nil)
+	helpers.assert_eq(world.posts[1].body.messages[2].content, 'PREFIX: "Bonjour Marc. On se voit demain ?"\nTAIL: "On se voit demain ?"')
+	helpers.assert_eq(world.core.get_active_profile().id, "advanced")
+end)

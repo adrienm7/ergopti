@@ -526,6 +526,8 @@ def census(roots):
     """Read kernel executable paths, never process arguments or foreign secrets."""
     if sys.platform != "darwin":
         raise RuntimeError("Native Sparkle process observation requires macOS")
+    import errno
+
     stage = "private-root"
     try:
         admitted = [private_directory(root) for root in roots]
@@ -560,7 +562,16 @@ def census(roots):
                     os.kill(pid, 0)
                 except ProcessLookupError:
                     continue
-                raise NativeCensusRefusal(path_errno, bsd_diagnostic(library, pid, owner))
+                diagnostic = bsd_diagnostic(library, pid, owner)
+                if diagnostic["bsd_bytes"] == 0 and diagnostic["bsd_errno"] == errno.ESRCH:
+                    # ESRCH can follow a successful existence probe when the
+                    # process exits between native observations. Require a new
+                    # actual ESRCH probe, never infer retirement from BSD data.
+                    try:
+                        os.kill(pid, 0)
+                    except ProcessLookupError:
+                        continue
+                raise NativeCensusRefusal(path_errno, diagnostic)
             executable = os.fsdecode(buffer.value)
             if any(executable.startswith(str(root) + "/") for root in admitted):
                 result.append({"pid": pid, "executable": executable})

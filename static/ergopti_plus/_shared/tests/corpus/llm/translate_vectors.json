@@ -19,7 +19,7 @@
 		{
 			"id": "upper_case",
 			"value": "FR",
-			"valid": false
+			"valid": true
 		},
 		{
 			"id": "empty",
@@ -29,16 +29,61 @@
 		{
 			"id": "unknown_locale",
 			"value": "xx",
-			"valid": false
+			"valid": true
 		},
 		{
 			"id": "region_suffix",
 			"value": "en-US",
-			"valid": false
+			"valid": true
 		},
 		{
 			"id": "trailing_space",
 			"value": "ui ",
+			"valid": false
+		},
+		{
+			"id": "free_unicode_name",
+			"value": "Gaeilge",
+			"valid": true
+		},
+		{
+			"id": "free_non_latin",
+			"value": "ქართული",
+			"valid": true
+		},
+		{
+			"id": "action_separator",
+			"value": "English|2",
+			"valid": false
+		},
+		{
+			"id": "line_break",
+			"value": "English\nJapanese",
+			"valid": false
+		},
+		{
+			"id": "c1_control",
+			"value": "English",
+			"valid": false
+		},
+		{
+			"id": "leading_space",
+			"value": " Esperanto",
+			"valid": false
+		},
+		{
+			"id": "maximum_utf8_bytes",
+			"value": "éééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééé",
+			"valid": true
+		},
+		{
+			"id": "over_maximum_utf8_bytes",
+			"value": "ééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééa",
+			"valid": false
+		},
+		{
+			"id": "template_placeholder",
+			"value": "English{language}",
 			"valid": false
 		}
 	],

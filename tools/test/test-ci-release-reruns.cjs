@@ -57,6 +57,7 @@ const { spawnSync } = require('node:child_process');
 const pipeline = require('./ci-pipeline.cjs');
 // Throws without bash: this test must fail, never skip, without it.
 const { bashExecutable } = require('../lib/git-bash.cjs');
+const { pythonExecutable } = require('../lib/python.cjs');
 
 const ROOT = path.resolve(__dirname, '..', '..');
 const PREFLIGHT = 'Refuse to publish an incomplete or already-taken release';
@@ -70,6 +71,43 @@ const LINUX_BUNDLE = JSON.parse(
 		'utf8'
 	)
 ).release_assets.linux_bundle;
+
+const MANAGED_PUBLICATION_ASSETS = [
+	'ollama-ergopti-native-http-darwin-arm64.tgz',
+	'ollama-ergopti-native-http-darwin-amd64.tgz',
+	'managed_ollama_release.json'
+];
+// Source dependencies are real copied files. The fixture creator never imports
+// production admission or generation code to choose its expected metadata.
+const MANAGED_PUBLICATION_SOURCES = [
+	'tools/build/verify-macos-managed-ollama-publication.py',
+	'tools/build/stage-macos-managed-ollama-catalogue.py',
+	'tools/build/build-macos-managed-ollama.py',
+	'static/ergopti_plus/_shared/modules/llm/managed_ollama_runtime.json',
+	'static/ergopti_plus/_shared/modules/llm/ollama_release.json',
+	'static/ergopti_plus/_shared/python/managed_ollama_runtime.py',
+	'static/ergopti_plus/_shared/go/native_http/transport.go',
+	'static/ergopti_plus/_shared/go/native_http/worker_darwin.go',
+	'static/ergopti_plus/_shared/go/native_http/worker_other.go',
+	'static/ergopti_plus/_shared/go/native_http/admission.go',
+	'static/ergopti_plus/_shared/go/native_http/network_bootstrap.go',
+	'static/ergopti_plus/_shared/go/native_http/network_bootstrap_posix.go',
+	'static/ergopti_plus/_shared/go/native_http/network_bootstrap_unsupported.go',
+	'static/ergopti_plus/_shared/go/native_http/transport_test.go',
+	'static/ergopti_plus/_shared/go/native_http/admission_test.go',
+	'static/ergopti_plus/_shared/go/native_http/network_bootstrap_test.go',
+	'static/ergopti_plus/_shared/go/native_http/network_bootstrap_darwin_test.go',
+	'static/ergopti_plus/_shared/modules/llm/managed_ollama_bootstrap.json',
+	'static/ergopti_plus/_shared/modules/network/proxy_policy.json',
+	'tools/diagnostics/macos_owned_process.py'
+];
+function copyManagedPublicationSources(work) {
+	for (const relative of MANAGED_PUBLICATION_SOURCES) {
+		const target = path.join(work, relative);
+		fs.mkdirSync(path.dirname(target), { recursive: true });
+		fs.copyFileSync(path.join(ROOT, relative), target);
+	}
+}
 
 const failures = [];
 const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'ergopti-release-reruns-'));
@@ -181,6 +219,11 @@ function repository(name, branch) {
 	// The extracted workflow calls the real channel resolver and its registry.
 	for (const relative of [
 		'tools/build/release-channel.cjs',
+		'tools/ci/dev-release-qualification.cjs',
+		'tools/ci/windows-stable-signing.cjs',
+		'.github/ci/stable_windows_signing_exception.json',
+		'.github/ci/dev_release_qualification_exceptions.json',
+		'.github/ci/stable_release_qualification_exception.json',
 		'tools/build/publish-verified-release.cjs',
 		'tools/build/macos-release-publication.cjs',
 		'tools/build/macos-release-archives.cjs',
@@ -193,6 +236,7 @@ function repository(name, branch) {
 		fs.mkdirSync(path.dirname(target), { recursive: true });
 		fs.copyFileSync(path.join(ROOT, relative), target);
 	}
+	copyManagedPublicationSources(work);
 	return work;
 }
 
@@ -292,6 +336,19 @@ fs.writeFileSync(
 );
 fs.chmodSync(path.join(stubs, 'gh'), 0o755);
 fs.chmodSync(path.join(stubs, 'curl'), 0o755);
+// Git Bash must execute the same observed CPython as fixture generation; a
+// Windows Store python3 alias is not the workflow's real Python prerequisite.
+// Forward argv unchanged to the real interpreter, never simulate verification.
+if (process.platform === 'win32') {
+	const nativePython = bashPath(pythonExecutable());
+	const quotedPython = "'" + nativePython.replaceAll("'", "'\\''") + "'";
+	fs.writeFileSync(
+		path.join(stubs, 'python3'),
+		'#!/usr/bin/env bash\nexec ' + quotedPython + ' "$@"\n'
+	);
+	fs.chmodSync(path.join(stubs, 'python3'), 0o755);
+}
+
 const STUB_PATH = `export PATH="${bashPath(stubs)}:$PATH"\n`;
 
 // A Node child must cross the same fake gh boundary on Windows: Node cannot
@@ -662,7 +719,18 @@ function uploadedLayout(channel) {
 			for (const candidate of pipeline.steps(job.body)) {
 				if (!/uses:\s*actions\/upload-artifact/.test(candidate.body)) continue;
 				if (!/^ {10}name:\s*assets-/m.test(candidate.body)) continue;
-				const listed = uploadPaths(candidate.body);
+				const listed = uploadPaths(candidate.body).flatMap((listedPath) => {
+					if (listedPath !== '${{ env.ERGOPTI_OLLAMA_ASSET }}') return [listedPath];
+					assert.equal(
+						job.id,
+						'managed-ollama-native',
+						'the runtime asset has one native producer owner'
+					);
+					assert.equal(candidate.name, 'Upload the actual managed native release asset');
+					// The real matrix uploads each archive alone: both artifact roots are
+					// its filename. Independent filenames model these two actual legs.
+					return MANAGED_PUBLICATION_ASSETS.slice(0, 2);
+				});
 				const dirs = listed.map((listedPath) => listedPath.split('/').slice(0, -1));
 				const common = [];
 				for (
@@ -688,7 +756,7 @@ function uploadedLayout(channel) {
 					const pattern = new RegExp(
 						`^${leaf.replace(/[.+?^$(){}|[\]\\]/g, '\\$&').replace(/\*/g, '[^/]*')}$`
 					);
-					for (const name of requiredAssets(channel)) {
+					for (const name of [...requiredAssets(channel), ...MANAGED_PUBLICATION_ASSETS]) {
 						if (!pattern.test(name)) continue;
 						if (layout.has(name)) throw new Error(`two assets-* upload paths match ${name}`);
 						layout.set(name, [...below.slice(0, -1), name].join('/'));
@@ -714,7 +782,8 @@ function preflight(
 		cwd = runner,
 		channel = 'dev',
 		sha = head,
-		uploaded = false
+		uploaded = false,
+		managedMutation = null
 	} = {}
 ) {
 	const assets = path.join(cwd, 'release-assets');
@@ -727,6 +796,43 @@ function preflight(
 		fs.mkdirSync(path.dirname(target), { recursive: true });
 		fs.writeFileSync(target, `${name}\n`);
 	}
+	// Execute the real new preflight owner against independent, physically
+	// bound synthetic publication assets and actual valid ZIP/TAR files.
+	// These bytes deliberately cannot qualify native production or signing.
+	copyManagedPublicationSources(cwd);
+	for (const relative of [
+		'tools/build/release-channel.cjs',
+		'tools/ci/dev-release-qualification.cjs',
+		'tools/ci/windows-stable-signing.cjs',
+		'.github/ci/stable_windows_signing_exception.json',
+		'.github/ci/dev_release_qualification_exceptions.json',
+		'.github/ci/stable_release_qualification_exception.json',
+		'static/ergopti_plus/_shared/ui/update_channels.js',
+		'static/ergopti_plus/_shared/modules/updater/defaults.json',
+		'static/ergopti_plus/_shared/modules/updater/channels.json'
+	]) {
+		const target = path.join(cwd, relative);
+		fs.mkdirSync(path.dirname(target), { recursive: true });
+		fs.copyFileSync(path.join(ROOT, relative), target);
+	}
+	const managed = spawnSync(
+		pythonExecutable(),
+		[
+			path.join(ROOT, 'tools/test/fixtures/managed_native_publication.py'),
+			'--repository',
+			cwd,
+			'--assets',
+			assets,
+			'--tag',
+			tag,
+			'--channel',
+			channel
+		],
+		{ cwd, env: GIT_ENV, encoding: 'utf8', timeout: 60000 }
+	);
+	assert.equal(managed.error, undefined, 'independent publication fixture must start');
+	assert.equal(managed.signal, null, 'independent publication fixture must close');
+	assert.equal(managed.status, 0, managed.stderr || managed.stdout);
 	if (uploaded) {
 		const flattened = runScript(flattenScript, cwd, {});
 		if (flattened.status !== 0) return { ...flattened, ghCalls: [] };
@@ -749,6 +855,7 @@ function preflight(
 			stderr: ''
 		})
 	});
+	if (managedMutation) managedMutation(assets);
 	if (missingAsset && fs.existsSync(path.join(assets, missingAsset)))
 		fs.unlinkSync(path.join(assets, missingAsset));
 	const ghLog = stubLog('gh');
@@ -948,6 +1055,8 @@ check('a failed release lookup fails the preflight instead of being read as "no 
 check('an unreachable origin fails the preflight instead of reading as "tag free"', () => {
 	const offline = path.join(scratch, 'offline-work');
 	git(scratch, 'clone', '--quiet', path.join(scratch, 'runner-origin.git'), offline);
+	// A real candidate checkout is required before its source-bound catalogue.
+	git(offline, 'checkout', '--quiet', '--detach', head);
 	git(offline, 'remote', 'set-url', 'origin', path.join(scratch, 'no-such-origin.git'));
 	const result = preflight('v0.0.0-dev.10', { cwd: offline });
 	assert.notEqual(result.status, 0);
@@ -1028,7 +1137,10 @@ check('the stable channel compares stable tags only', () => {
 const createScript = scriptOf(pipeline.step(releaseJob, CREATE_RELEASE), CREATE_RELEASE);
 
 /** Runs the release creation with `prerelease`; returns the result and gh's arguments. */
-function createRelease(prerelease, { mode = '', missing = '', incomplete = '' } = {}) {
+function createRelease(
+	prerelease,
+	{ mode = '', missing = '', incomplete = '', fastPrerelease = 'false' } = {}
+) {
 	const assets = path.join(runner, 'release-assets');
 	fs.rmSync(assets, { recursive: true, force: true });
 	fs.mkdirSync(assets);
@@ -1055,6 +1167,7 @@ function createRelease(prerelease, { mode = '', missing = '', incomplete = '' } 
 		{
 			TAG: 'v0.0.0-dev.30',
 			PRERELEASE: prerelease,
+			ERGOPTI_FAST_PRERELEASE: fastPrerelease,
 			TITLE: 'Ergopti v0.0.0-dev.30',
 			GITHUB_SHA: head,
 			GITHUB_REPOSITORY: REPOSITORY,
@@ -1078,6 +1191,70 @@ function createRelease(prerelease, { mode = '', missing = '', incomplete = '' } 
 		state: JSON.parse(fs.readFileSync(stateFile, 'utf8'))
 	};
 }
+
+check(
+	'full release fixtures admit the real policy with explicit false (release-full-default-policy)',
+	() => {
+		const result = createRelease('true');
+		assert.equal(result.status, 0, result.stdout + result.stderr);
+		assert.ok(
+			!result.args.includes('--notes'),
+			'Full execution cannot borrow fast prerelease notes.'
+		);
+	}
+);
+
+// The temporary fast route is retired. Legacy flags are inert data, not an
+// alternative admission capability; mandatory asset verification still gates
+// every publication, including hostile or malformed former fast requests.
+check(
+	'retired fast request cannot change full release admission (release-fast-retired-full)',
+	() => {
+		const result = createRelease('true', { fastPrerelease: 'true' });
+		assert.equal(result.status, 0, result.stdout + result.stderr);
+		assert.ok(
+			!result.args.includes('--notes'),
+			'Retired fast flags cannot add unqualified bypass notes.'
+		);
+		assert.equal(
+			result.state.isDraft,
+			false,
+			'Only the fully verified ordinary release publishes.'
+		);
+	}
+);
+check(
+	'retired missing or malformed fast flags cannot bypass assets (release-fast-retired-input)',
+	() => {
+		for (const fastPrerelease of ['', 'TRUE', '1', 'true']) {
+			const valid = createRelease('true', { fastPrerelease });
+			assert.equal(valid.status, 0, valid.stdout + valid.stderr);
+			assert.ok(
+				!valid.args.includes('--notes'),
+				'Every legacy flag retains full release semantics.'
+			);
+			const refused = createRelease('true', {
+				fastPrerelease,
+				mode: 'permanent-loss',
+				missing: 'ErgoptiPlus.exe'
+			});
+			assert.notEqual(
+				refused.status,
+				0,
+				'Missing mandatory assets must refuse even with a retired fast flag.'
+			);
+			assert.equal(
+				refused.state.isDraft,
+				true,
+				'Refusal retains the draft instead of publishing incomplete assets.'
+			);
+			assert.ok(
+				!refused.calls.some((call) => call.includes('--draft=false')),
+				'No retired flag can reach the public publication port after failed asset verification.'
+			);
+		}
+	}
+);
 
 /** Splits `gh release create` arguments into the tag, its options and its files. */
 function parseCreate(args) {
@@ -1354,6 +1531,44 @@ check('published historical resume does not require rebuilt preferred archive', 
 	assert.equal(result.outputs.create_release, 'false');
 });
 
+// Actual preflight source remains unchanged: these corrupt only private bytes.
+for (const name of MANAGED_PUBLICATION_ASSETS) {
+	check('fresh publication refuses missing managed asset ' + name, () => {
+		const result = preflight('v0.0.0-dev.51', { missingAsset: name });
+		assert.notEqual(result.status, 0);
+		assert.deepEqual(result.outputs, {});
+		assert.deepEqual(result.ghCalls, [], 'refused bytes cause no publication lookup');
+	});
+}
+check('both actual native matrix uploads resolve to their exact archive filenames', () => {
+	const layout = uploadedLayout('dev');
+	for (const name of MANAGED_PUBLICATION_ASSETS) {
+		assert.equal(layout.get(name), name, 'single-file native/catalogue artifacts are flat');
+	}
+});
+check('fresh publication refuses changed managed asset bytes', () => {
+	const result = preflight('v0.0.0-dev.52', {
+		managedMutation: (assets) =>
+			fs.appendFileSync(path.join(assets, MANAGED_PUBLICATION_ASSETS[0]), 'foreign')
+	});
+	assert.notEqual(result.status, 0);
+	assert.deepEqual(result.outputs, {});
+	assert.deepEqual(result.ghCalls, []);
+});
+check('fresh publication refuses stale managed catalogue source', () => {
+	const result = preflight('v0.0.0-dev.53', {
+		managedMutation: (assets) => {
+			const file = path.join(assets, MANAGED_PUBLICATION_ASSETS[2]);
+			const catalogue = JSON.parse(fs.readFileSync(file, 'utf8'));
+			catalogue.repository_commit = '0'.repeat(40);
+			fs.writeFileSync(file, JSON.stringify(catalogue) + '\n');
+		}
+	});
+	assert.notEqual(result.status, 0);
+	assert.deepEqual(result.outputs, {});
+	assert.deepEqual(result.ghCalls, []);
+});
+
 // ==========================================
 // ==========================================
 // ======= 5/ The Resume Wiring =============
@@ -1433,6 +1648,86 @@ check("each script's env carries the plan output or preflight decision it reads"
 		'the release job must give the preflight and the notes the bundle name plan resolved'
 	);
 });
+
+check(
+	'real qualification helper closes publication on foreign context and preserves full defaults',
+	() => {
+		const work = repository('qualification-publication', 'main');
+		const marker = path.join(work, 'publication-marker');
+		const script =
+			'set -euo pipefail\nnode tools/ci/dev-release-qualification.cjs --publication-admit >/dev/null\nprintf published > publication-marker';
+		const foreign = {
+			ERGOPTI_NATIVE_QUALIFICATION_PROFILE: 'stable-v1-20261009-macos-native-deferred',
+			GITHUB_ACTIONS: 'true',
+			GITHUB_REPOSITORY: 'adrienm7/ergopti',
+			GITHUB_EVENT_NAME: 'push',
+			GITHUB_REF: 'refs/heads/main',
+			GITHUB_SHA: 'a'.repeat(40),
+			ERGOPTI_DEV_RELEASE_RELEASE: 'true',
+			ERGOPTI_DEV_RELEASE_PRERELEASE: 'false',
+			ERGOPTI_DEV_RELEASE_CHANNEL: 'main',
+			ERGOPTI_DEV_RELEASE_TAG: 'v1.0.1',
+			ERGOPTI_DEV_RELEASE_VERSION: '1.0.1'
+		};
+		const refused = runScript(script, work, foreign);
+		assert.notEqual(refused.status, 0);
+		assert.match(refused.stderr, /not authorized/);
+		assert.equal(
+			fs.existsSync(marker),
+			false,
+			'refused admission cannot reach the publication port'
+		);
+		const ordinary = runScript(script, work, {
+			...foreign,
+			ERGOPTI_NATIVE_QUALIFICATION_PROFILE: ''
+		});
+		assert.equal(ordinary.status, 0, ordinary.stdout + ordinary.stderr);
+		assert.equal(
+			fs.readFileSync(marker, 'utf8'),
+			'published',
+			'full default must execute the real copied helper'
+		);
+	}
+);
+
+check(
+	'real unsigned publication helper refuses a missing receipt before its publication port',
+	() => {
+		const work = repository('unsigned-publication', 'main');
+		const sha = commit(work, 'independent unsigned boundary fixture');
+		const marker = path.join(work, 'unsigned-marker');
+		const script =
+			'set -euo pipefail\nnode tools/ci/windows-stable-signing.cjs --publication-admit >/dev/null\nprintf published > unsigned-marker';
+		const env = {
+			GITHUB_ACTIONS: 'true',
+			GITHUB_REPOSITORY: REPOSITORY,
+			GITHUB_EVENT_NAME: 'push',
+			GITHUB_REF: 'refs/heads/main',
+			GITHUB_SHA: sha,
+			ERGOPTI_DEV_RELEASE_RELEASE: 'true',
+			ERGOPTI_DEV_RELEASE_PRERELEASE: 'false',
+			ERGOPTI_DEV_RELEASE_CHANNEL: 'main',
+			ERGOPTI_DEV_RELEASE_TAG: 'v1.0.0',
+			ERGOPTI_DEV_RELEASE_VERSION: '1.0.0',
+			ERGOPTI_WINDOWS_SIGNING_CONFIGURED: 'false'
+		};
+		const refused = runScript(script, work, env);
+		assert.notEqual(refused.status, 0);
+		assert.match(refused.stderr, /not admitted/);
+		assert.equal(
+			fs.existsSync(marker),
+			false,
+			'missing evidence must not reach the publication port'
+		);
+		const full = runScript(script, work, { ...env, ERGOPTI_WINDOWS_SIGNING_CONFIGURED: 'true' });
+		assert.equal(full.status, 0, full.stdout + full.stderr);
+		assert.equal(
+			fs.readFileSync(marker, 'utf8'),
+			'published',
+			'complete signed configuration retains full defaults'
+		);
+	}
+);
 
 if (failures.length > 0) {
 	console.error('[FAIL] a release re-run can republish old code or cannot finish a release:');

@@ -30,6 +30,7 @@ local Logger   = require("infra.logger")
 local H        = require("ui.healthcheck.helpers")
 local Paths    = require("infra.paths")
 local Snapshot = require("healthcheck.snapshot")
+local Cleanup = require("healthcheck.cleanup")
 local Actions  = require("healthcheck.actions")
 local TimerScheduler = require("adapters.timer_scheduler")
 
@@ -264,6 +265,22 @@ local ADAPTER_SPECS = {
 		wired    = true,
 	},
 	{
+		id       = "adapters.managed_ollama_hint",
+		contract = { "get", "cancel" },
+		-- Structural dispatch wiring; source and image admission stay independent.
+		wired    = true,
+	},
+	{
+		id       = "adapters.native_python_probe",
+		contract = { "get", "cancel", "onSettled" },
+		wired    = true,
+	},
+	{
+		id       = "adapters.native_bootstrap_pty",
+		contract = { "prepare" },
+		wired    = true,
+	},
+	{
 		id       = "adapters.physical_shortcut_hook",
 		contract = { "new" },
 		-- Structural require reachability; runtime native delivery stays unavailable.
@@ -333,6 +350,11 @@ local ADAPTER_SPECS = {
 	{
 		id       = "adapters.event_provenance",
 		contract = { "classify", "classify_with_fence", "is_owned" },
+		wired    = true,
+	},
+	{
+		id       = "adapters.keyboard_geometry",
+		contract = { "initialize", "event_type", "form", "native_code", "physical_code" },
 		wired    = true,
 	},
 	{
@@ -447,6 +469,14 @@ local ADAPTER_SPECS = {
 			"begin", "emit_key_stroke", "claim_tag", "claim_physical_fence",
 			"current_action_epoch", "register_action_listener", "enter_callback",
 			"leave_callback", "keyboard_characters",
+		},
+		wired    = true,
+	},
+	{
+		id       = "adapters.managed_ollama_pull",
+		contract = {
+			"handles", "prepare", "prepare_owned", "mark_start_attempted",
+			"rollback", "retire", "prepare_cleanup", "finish_cleanup",
 		},
 		wired    = true,
 	},
@@ -601,6 +631,7 @@ end
 function M.run(opts)
 	opts = type(opts) == "table" and opts or {}
 	local detailed = opts.detailed == true
+	local extensive = opts.extensive == true
 	Logger.start(LOG, "Collecting the diagnostics…")
 	-- The budget is the collection's: the shared documents load once per
 	-- session, before the clock starts
@@ -641,8 +672,9 @@ function M.run(opts)
 		driver         = M.DRIVER,
 		generated_at   = Snapshot.utc_now(),
 		detailed       = detailed,
+		extensive      = extensive,
 		sections       = sections,
-		probes         = Snapshot.pending_probes(schema, M.DRIVER),
+		probes         = Snapshot.pending_probes(schema, M.DRIVER, extensive),
 	}
 
 	local elapsed = (hs.timer.absoluteTime() - started) / 1e6
@@ -703,10 +735,13 @@ end
 --- snapshot and pushed into the page.
 --- @param session table
 local function start_probes(session)
-	if session.probes then session.probes.cancel() end
+	Cleanup.archive(session)
+	Cleanup.refresh(session)
+	if session.snapshot.extensive ~= true then return end
+	local captured = session.snapshot
 	session.probes = require("ui.healthcheck.probes").start(M.config().schema, session.snapshot,
 		function(id, result, sections)
-			if _session ~= session then return end
+			if _session ~= session or session.snapshot ~= captured then return end
 			session.snapshot.probes[id] = result
 			for section_id, values in pairs(sections or {}) do
 				local target = session.snapshot.sections[section_id]
@@ -738,16 +773,27 @@ end
 --- @param action table From healthcheck.actions.validate.
 --- @param documents table M.config().
 local function perform_action(session, action, documents)
-	if action.action == "close" then
+	Cleanup.refresh(session)
+	if action.action == "export_snapshot" then
+		send(session, { type = "action", action = "export_snapshot", ok = true,
+			export_sequence = action.export_sequence, snapshot = session.snapshot,
+			share_text = require("healthcheck.share").document(session.snapshot, documents.schema,
+				require("infra.i18n").get(documents.schema.share_policy.notice_key)).text })
+	elseif action.action == "close" then
 		close_owned_window(session.webview, "page close")
+	elseif action.action == "cancel" then
+		Cleanup.cancel(session)
+		send(session, { type = "action", action = "cancel", ok = true, snapshot = session.snapshot })
 	elseif action.action == "refresh" then
+		Cleanup.archive(session)
 		session.detailed = action.detailed
-		session.snapshot = M.run({ detailed = action.detailed })
+		session.snapshot = M.run({ detailed = action.detailed, extensive = action.extensive })
+		Cleanup.refresh(session)
 		send(session, { type = "snapshot", snapshot = session.snapshot })
 		start_probes(session)
 	else
 		local Report = require("ui.healthcheck.report")
-		local result = Report.perform(action, session.snapshot.sections.paths, documents, Report.redaction_context())
+		local result = Report.perform(action, session.snapshot.sections.paths, documents, Report.redaction_context(), nil, session.snapshot)
 		result.type = "action"
 		result.action = action.action
 		send(session, result)
@@ -941,9 +987,15 @@ function M.show_window(opts)
 
 	-- Raised and focused once, like every window: never given a level that
 	-- keeps it above the windows the user opens afterwards.
-	ui_builder.force_focus(wv, true, { is_current = function()
-		return _focus_owner == focus_owner and _window == wv and _window_generation == generation
-	end })
+	local focus_ok, focused = xpcall(function()
+		return ui_builder.force_focus(wv, true, { is_current = function()
+			return _focus_owner == focus_owner and _window == wv and _window_generation == generation
+		end })
+	end, debug.traceback)
+	if not focus_ok or focused ~= true then
+		Logger.error(LOG, "Diagnostics window presentation was refused; the current report remains open.")
+		return false
+	end
 
 	Logger.success(LOG, "Diagnostics window opened.")
 	return true

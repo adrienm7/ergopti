@@ -1037,6 +1037,9 @@ do
 end
 
 -- Now safe to load modules that depend on config_dir
+-- The native map is immutable for this VM; every key event supplies its own
+-- model identifier, including events from Karabiner's virtual keyboard.
+require("adapters.keyboard_geometry").initialize()
 local file_system        = require("adapters.file_system")
 -- Guarded: platform.remap reaches platform/remap/defaults.lua, whose
 -- top-level body calls load_sections() and require_section() and raises from both.
@@ -2010,40 +2013,16 @@ if menubar == nil then
 	error("menu.start did not commit")
 end
 Boot.mark("UI: menu.start (menubar + state sync + engines + LLM handler)")
-Boot.stage("UI: menu + vscode bridge ready")
+Boot.stage("UI: menu ready")
 
--- Wire the VS Code caret bridge now that the tooltip subsystem is up.
--- install_extension() is idempotent; start_server() is safe to call every boot.
--- The (ok, err) pair is captured and logged on failure (F-MED-7) — a bare pcall
--- here previously discarded both return values, so a setup() throw (e.g. a
--- failed extension install or a port bind failure) vanished with no trace.
-do
-	local ok_vscode, vscode_result = xpcall(function()
-		return require("infra.vscode_bridge").setup()
-	end, debug.traceback)
-	if not ok_vscode or vscode_result ~= true then
-		Logger.error(LOG, "VS Code caret bridge setup() failed: %s.", tostring(vscode_result))
-		local rollback_ok, rollback_result = xpcall(function()
-			local owned_bridge = package.loaded["infra.vscode_bridge"]
-			if owned_bridge == nil then return true end
-			if type(owned_bridge) ~= "table" or type(owned_bridge.stop_server) ~= "function" then
-				error("infra.vscode_bridge.stop_server is unavailable")
-			end
-			return owned_bridge.stop_server()
-		end, debug.traceback)
-		if not rollback_ok or rollback_result ~= true then
-			Logger.error(LOG, "VS Code caret bridge startup rollback failed: %s.",
-				tostring(rollback_result))
-		end
-		error("VS Code caret bridge setup did not commit")
-	end
-end
+-- The retired VS Code bridge is not a boot prerequisite. The standard caret
+-- locator remains in the tooltip renderer; loaded legacy owners still retire.
 
 -- Script control (the AltGr+Enter/Backspace/Escape panic-button tap) was moved
 -- to Section 1 (Module Pre-start) so the panic button exists for the entire
 -- boot, not only after the LLM/TOML/keymap steps have completed (F-MED-19).
 Logger.info(LOG, "User interface initialized successfully.")
-Boot.mark("UI: menu + vscode bridge ready")
+Boot.mark("UI: menu ready")
 Boot.stage("File watchers armed")
 
 

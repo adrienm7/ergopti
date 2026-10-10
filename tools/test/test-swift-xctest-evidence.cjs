@@ -24,7 +24,7 @@ const validateTIS = (root, session) =>
 	process.platform === 'win32'
 		? loadValidator(root).validate(root, session)
 		: nativeValidateTIS(root, session);
-const pipeline = require('./ci-pipeline.cjs');
+const pipeline = require('./ci-full-default.cjs');
 const { bashExecutable } = require('../lib/git-bash.cjs');
 
 const repository = path.resolve(__dirname, '../..');

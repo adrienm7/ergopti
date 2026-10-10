@@ -54,8 +54,9 @@
  * 4. One root, one lane per OS: ci.yml has exactly one job without needs, the
  *    root; each lane caller needs the root alone; release needs the root and
  *    core and the three lanes, nothing else. Each OS exposes the same five
- *    phases with exactly one entry and one final verdict. macOS also observes
- *    its native tooltip canvas independently after E2E and before the verdict.
+ *    phases and one final verdict. Windows/Linux keep one entry; macOS has
+ *    exactly three entries for unit tests and independent mandatory managed
+ *    Ollama/cold bootstrap jobs, and observes its native tooltip canvas after E2E.
  * 5. Only the steps in STEP_CONDITIONS set an `if`, each exactly its own, and
  *    e2e-linux's harnesses run under !cancelled(). No script swallows a test
  *    runner's failure with `|| true`, and every `| tee` runs under pipefail.
@@ -73,7 +74,7 @@
 
 'use strict';
 
-const pipeline = require('./ci-pipeline.cjs');
+const pipeline = require('./ci-full-default.cjs');
 const assert = require('node:assert/strict');
 const { spawnSync } = require('node:child_process');
 const fs = require('node:fs');
@@ -86,6 +87,16 @@ const MACOS_BOX = '.github/workflows/ci-macos.yml';
 const WINDOWS_BOX = '.github/workflows/ci-windows.yml';
 const LINUX_BOX = '.github/workflows/ci-linux.yml';
 const BOXES = [MACOS_BOX, WINDOWS_BOX, LINUX_BOX];
+const MACOS_NATIVE_ENTRIES = ['managed-ollama-native', 'cold-bootstrap-native'];
+const MACOS_VERDICT_NEEDS = [
+	'cold-bootstrap-native',
+	'test-hs',
+	'e2e-hs',
+	'package-macos',
+	'launch',
+	'tooltip-canvas',
+	'managed-ollama-native'
+];
 // The run graph's single root: the repository-wide checks, then the release
 // plan every lane and release read.
 const ROOT = 'validate';
@@ -217,7 +228,99 @@ const RAW_VHD_UPLOAD_TEXT = [
 	'          if-no-files-found: error'
 ].join('\n');
 
+const MACOS_NATIVE_STEP_CONDITIONS = [
+	[
+		MACOS_BOX,
+		'managed-ollama-native',
+		'Qualify actual native PAC source ownership XCTest controls',
+		NOT_CANCELLED
+	],
+	[
+		MACOS_BOX,
+		'managed-ollama-native',
+		'Qualify actual native PAC and WPAD XCTest controls',
+		NOT_CANCELLED
+	],
+	[
+		MACOS_BOX,
+		'managed-ollama-native',
+		'Retain independent native PAC XCTest diagnostics',
+		'always()'
+	],
+	[
+		MACOS_BOX,
+		'item36-native',
+		'Observe the actual no-prompt SDK permission API independently',
+		NOT_CANCELLED
+	],
+	[MACOS_BOX, 'item36-native', 'Retain scoped item 36 native diagnostics', 'always()'],
+	[
+		MACOS_BOX,
+		'managed-ollama-native',
+		'Qualify actual explicit curl stream ownership',
+		'${{ !cancelled() }}'
+	],
+	[
+		MACOS_BOX,
+		'managed-ollama-native',
+		'Receive actual independent managed HTTP native clients',
+		'${{ !cancelled() }}'
+	],
+	[
+		MACOS_BOX,
+		'managed-ollama-native',
+		'Upload the actual managed native release asset',
+		'inputs.release'
+	],
+	[
+		MACOS_BOX,
+		'package-macos',
+		'Upload the catalogue sealed into the signed application',
+		'inputs.release'
+	],
+	[
+		MACOS_BOX,
+		'managed-ollama-native',
+		'Retain independent native launcher compiler diagnostics',
+		'always()'
+	],
+	[
+		MACOS_BOX,
+		'managed-ollama-native',
+		'Retain independent native SDK XCTest diagnostics',
+		'always()'
+	],
+	[
+		MACOS_BOX,
+		'managed-ollama-native',
+		'Retain actual private-session and numeric TLS peer diagnostics',
+		'always()'
+	],
+	[
+		MACOS_BOX,
+		'managed-ollama-native',
+		'Retain actual native producer, catalogue and receiving evidence',
+		'always()'
+	],
+	[MACOS_BOX, 'package-macos', 'Retain launcher build diagnostics', 'always()'],
+	[MACOS_BOX, 'package-macos', 'Retain application build diagnostics', 'always()'],
+	[
+		MACOS_BOX,
+		'cold-bootstrap-native',
+		'Receive actual official cold Ollama without stock Python',
+		"${{ !cancelled() && steps.cold-app.outcome == 'success' }}"
+	],
+	[MACOS_BOX, 'cold-bootstrap-native', 'Retain official cold Ollama receipt only', 'always()'],
+	[MACOS_BOX, 'cold-bootstrap-native', 'Retain native cold bootstrap evidence', 'always()']
+];
 const STEP_CONDITIONS = [
+	...MACOS_NATIVE_STEP_CONDITIONS,
+	[
+		WINDOWS_BOX,
+		'test-ahk',
+		'Retain native PAC artifact and source identity',
+		"${{ always() && steps.native-pac-build.outcome == 'success' }}"
+	],
 	[
 		LINUX_BOX,
 		'test-linux',
@@ -989,10 +1092,18 @@ function graphProblems(files) {
 			[WINDOWS_BOX]: ['test-ahk', 'e2e-ahk', 'package-windows', 'launch-windows', 'windows-ok'],
 			[LINUX_BOX]: ['test-linux', 'e2e-linux', 'package-linux', 'install-linux', 'linux-ok']
 		}[rel];
-		// Preserve the five original phases and add exactly one independent native observation.
+		// Preserve the five original phases and require each independent native job.
 		const exposed =
 			rel === MACOS_BOX
-				? [...sequence.slice(0, 2), 'tooltip-canvas', ...sequence.slice(2)]
+				? [
+						'item36-native',
+						'managed-ollama-native',
+						...sequence.slice(0, 2),
+						'tooltip-canvas',
+						...sequence.slice(2, 4),
+						'cold-bootstrap-native',
+						sequence[4]
+					]
 				: sequence;
 		if (JSON.stringify(jobs.map((job) => job.id)) !== JSON.stringify(exposed)) {
 			problems.push(
@@ -1005,8 +1116,12 @@ function graphProblems(files) {
 				index === 0
 					? []
 					: index === 4
-						? [...sequence.slice(0, 4), ...(rel === MACOS_BOX ? ['tooltip-canvas'] : [])]
-						: [sequence[index - 1]];
+						? rel === MACOS_BOX
+							? MACOS_VERDICT_NEEDS
+							: sequence.slice(0, 4)
+						: rel === MACOS_BOX && id === 'package-macos'
+							? ['e2e-hs', 'managed-ollama-native']
+							: [sequence[index - 1]];
 			if (!job || JSON.stringify(pipeline.needsOf(job.body)) !== JSON.stringify(expected)) {
 				problems.push(`${rel} ${id} must need exactly ${expected.join(', ')}`);
 			}
@@ -1023,6 +1138,30 @@ function graphProblems(files) {
 			}
 		}
 		if (rel === MACOS_BOX) {
+			const scoped = jobs.find((candidate) => candidate.id === 'item36-native');
+			if (
+				!scoped ||
+				pipeline.needsOf(scoped.body).length !== 0 ||
+				pipeline.field(scoped.body, 'if') !==
+					"${{ github.event_name == 'workflow_dispatch' && !inputs.release }}" ||
+				pipeline.field(scoped.body, 'continue-on-error') !== null ||
+				pipeline.field(scoped.body, 'outputs') !== null ||
+				pipeline.field(scoped.body, 'secrets') !== null
+			)
+				problems.push(
+					'item36-native must retain its independent manual nonrelease diagnosis boundary'
+				);
+			for (const id of MACOS_NATIVE_ENTRIES) {
+				const native = jobs.find((candidate) => candidate.id === id);
+				if (!native || pipeline.needsOf(native.body).length !== 0) {
+					problems.push(`${rel} ${id} must remain an independent entry`);
+				}
+				for (const key of ['if', 'continue-on-error']) {
+					if (native && pipeline.field(native.body, key) !== null) {
+						problems.push(`${rel} ${id} must set no ${key}; native qualification is mandatory`);
+					}
+				}
+			}
 			const canvas = jobs.find((candidate) => candidate.id === 'tooltip-canvas');
 			if (!canvas || JSON.stringify(pipeline.needsOf(canvas.body)) !== JSON.stringify(['e2e-hs'])) {
 				problems.push(`${rel} tooltip-canvas must need exactly e2e-hs`);
@@ -1041,14 +1180,31 @@ function graphProblems(files) {
 		const exits = jobs
 			.filter((candidate) => !needed.has(candidate.id))
 			.map((candidate) => candidate.id);
-		if (entries.length !== 1) {
+		if (rel === MACOS_BOX) {
+			const expectedEntries = [
+				'item36-native',
+				'managed-ollama-native',
+				'test-hs',
+				'cold-bootstrap-native'
+			];
+			if (JSON.stringify(entries) !== JSON.stringify(expectedEntries)) {
+				problems.push(
+					`${rel} must have exactly the four declared entries [${expectedEntries.join(', ')}]; got [${entries.join(', ')}]`
+				);
+			}
+		} else if (entries.length !== 1) {
 			problems.push(
 				`${rel} must have exactly one entry job, which needs no job of its file; got [${entries.join(', ')}]`
 			);
 		}
-		if (exits.length !== 1) {
+		const expectedExits = rel === MACOS_BOX ? ['item36-native', 'macos-ok'] : [sequence[4]];
+		if (
+			rel === MACOS_BOX
+				? JSON.stringify(exits) !== JSON.stringify(expectedExits)
+				: exits.length !== 1
+		) {
 			problems.push(
-				`${rel} must have exactly one exit job, which no job of its file needs; got [${exits.join(', ')}]`
+				`${rel} must preserve exactly its declared verdict and scoped diagnostic exits; got [${exits.join(', ')}]`
 			);
 		}
 		for (const [id, needs] of needsOfJob) {
@@ -1063,11 +1219,7 @@ function graphProblems(files) {
 
 for (const [what, from, to] of [
 	['missing mandatory canvas graph node', '  tooltip-canvas:\n', '  omitted-tooltip-canvas:\n'],
-	[
-		'canvas bypassed by the macOS verdict',
-		'    needs: [test-hs, e2e-hs, package-macos, launch, tooltip-canvas]\n',
-		'    needs: [test-hs, e2e-hs, package-macos, launch]\n'
-	],
+	['canvas bypassed by the macOS verdict', '      - tooltip-canvas\n', ''],
 	[
 		'canvas depends on packaging instead of native E2E',
 		"  tooltip-canvas:\n    name: 'Native tooltip canvas · 12 captures'\n    needs: e2e-hs\n",
@@ -1078,6 +1230,50 @@ for (const [what, from, to] of [
 	mustCatch(what, MACOS_BOX, from, to, graphProblems);
 }
 
+mustCatch(
+	'native producer omitted from application packaging',
+	MACOS_BOX,
+	'    needs: [e2e-hs, managed-ollama-native]\n',
+	'    needs: e2e-hs\n',
+	graphProblems
+);
+
+// Both independent native entries must feed the verdict and must never become optional.
+for (const id of MACOS_NATIVE_ENTRIES) {
+	for (const [what, from, to] of [
+		['missing native graph node', `  ${id}:\n`, `  omitted-${id}:\n`],
+		['native job bypassed by verdict', `      - ${id}\n`, ''],
+		['conditional native job', `  ${id}:\n`, `  ${id}:\n    if: false\n`],
+		['forgiven native job', `  ${id}:\n`, `  ${id}:\n    continue-on-error: true\n`],
+		['native job coupled to packaging', `  ${id}:\n`, `  ${id}:\n    needs: package-macos\n`]
+	]) {
+		mustCatch(`${id}: ${what}`, MACOS_BOX, from, to, graphProblems);
+	}
+}
+for (const [what, from, to] of [
+	['missing scoped item36 node', '  item36-native:\n', '  omitted-item36-native:\n'],
+	[
+		'coupled scoped item36 entry',
+		'  item36-native:\n',
+		'  item36-native:\n    needs: package-macos\n'
+	],
+	[
+		'forgiven scoped item36 failure',
+		'  item36-native:\n',
+		'  item36-native:\n    continue-on-error: true\n'
+	],
+	[
+		'broad scoped item36 admission',
+		"    if: ${{ github.event_name == 'workflow_dispatch' && !inputs.release }}\n",
+		'    if: always()\n'
+	],
+	[
+		'unqualified scoped item36 release output',
+		'  item36-native:\n',
+		'  item36-native:\n    outputs:\n      assets: fake\n'
+	]
+])
+	mustCatch(what, MACOS_BOX, from, to, graphProblems);
 errors.push(...graphProblems(pipeline.files()));
 for (const [what, rel, from, to] of [
 	[
@@ -1409,6 +1605,26 @@ function stepProblems(files) {
 				const code = (pipeline.runOf(found.body) ?? []).filter(
 					(line) => !line.trimStart().startsWith('#')
 				);
+				// This condition admits one native SDK case, not a broader filtered cohort.
+				if (
+					where ===
+					conditionKey(
+						MACOS_BOX,
+						'item36-native',
+						'Observe the actual no-prompt SDK permission API independently'
+					)
+				) {
+					const commands = logicalLines(found.body).filter((line) => /\bswift test\b/.test(line));
+					const expectedCommand =
+						'script -q /dev/null swift test --package-path static/ergopti_plus/macos/launcher' +
+						' --scratch-path "$RUNNER_TEMP/swift-launcher-ci"' +
+						" --filter 'OwnedAutomationQueryWorkerTests.testActualNoPromptPermissionAPIOnlyPublishesRetiredMetadata'" +
+						' 2>&1 | tee "$transcript"';
+					if (commands.length !== 1 || commands[0].replace(/\s+/g, ' ') !== expectedCommand)
+						problems.push(
+							`${where} must select only the original production-process SDK observation case`
+						);
+				}
 				if (
 					code.some((line) => /\|\s*tee\b/.test(line)) &&
 					pipeline.stepField(found.body, 'shell') !== 'bash' &&
@@ -1497,6 +1713,109 @@ mustCatch(
 	'      - name: Omitted Configuration assertion diagnostic\n',
 	stepProblems
 );
+// Each new native evidence condition is exact, scoped to its job and source-owned step.
+for (const [rel, job, name, condition] of MACOS_NATIVE_STEP_CONDITIONS) {
+	const head = `      - name: ${name}\n`;
+	const from = head + `        if: ${condition}\n`;
+	for (const changed of ['', 'false', 'success()']) {
+		mustCatch(
+			`${job} ${name}: replaced native evidence condition ${changed || '(none)'}`,
+			rel,
+			from,
+			head + (changed ? `        if: ${changed}\n` : ''),
+			stepProblems
+		);
+	}
+	mustCatch(
+		`${job} ${name}: missing native evidence step`,
+		rel,
+		head,
+		`      - name: Omitted ${name}\n`,
+		stepProblems
+	);
+}
+// A narrowly admitted SDK condition must never migrate to another job or selector.
+{
+	const name = 'Observe the actual no-prompt SDK permission API independently';
+	const key = conditionKey(MACOS_BOX, 'item36-native', name);
+	assert.equal(CONDITIONS.get(key), '${{ !cancelled() }}');
+	for (const [rel, job, changed] of [
+		[MACOS_BOX, 'package-macos', name],
+		[MACOS_BOX, 'managed-ollama-native', name],
+		[MACOS_BOX, 'item36-unknown', name],
+		[WINDOWS_BOX, 'item36-native', name],
+		[MACOS_BOX, 'item36-native', 'Unknown SDK observation']
+	])
+		assert.equal(CONDITIONS.has(conditionKey(rel, job, changed)), false);
+	const head = `      - name: ${name}\n`;
+	for (const changed of ['always()', 'failure()', '${{ !cancelled() && false }}'])
+		mustCatch(
+			`SDK observation replaced condition ${changed}`,
+			MACOS_BOX,
+			head + '        if: ${{ !cancelled() }}\n',
+			head + `        if: ${changed}\n`,
+			stepProblems
+		);
+	mustCatch(
+		'unknown SDK observation name',
+		MACOS_BOX,
+		head,
+		'      - name: Unknown SDK observation\n',
+		stepProblems
+	);
+	const filter =
+		"--filter 'OwnedAutomationQueryWorkerTests.testActualNoPromptPermissionAPIOnlyPublishesRetiredMetadata'";
+	for (const changed of [
+		"--filter 'OwnedAutomationQueryWorkerTests'",
+		"--filter '.*'",
+		"--filter 'OwnedAutomationQueryWorkerTests.testConstructedPacket'",
+		'--skip-build ' + filter
+	])
+		mustCatch(
+			`SDK observation broadened or substituted selector ${changed}`,
+			MACOS_BOX,
+			filter,
+			changed,
+			stepProblems
+		);
+	const mac = pipeline.file(MACOS_BOX);
+	const start = mac.indexOf(head);
+	const end = mac.indexOf('      - name: Retain scoped item 36 native diagnostics\n', start);
+	assert.ok(start > 0 && end > start);
+	const step = mac.slice(start, end);
+	const moved = mac
+		.replace(step, '')
+		.replace(
+			'  managed-ollama-native:\n',
+			'  unknown-sdk-job:\n    runs-on: macos-latest\n    steps:\n' +
+				step +
+				'\n  managed-ollama-native:\n'
+		);
+	const problems = stepProblems(
+		pipeline
+			.files()
+			.map((entry) => (entry.rel === MACOS_BOX ? { rel: entry.rel, text: moved } : entry))
+	);
+	assert.ok(
+		problems.some((problem) => problem.includes('unknown-sdk-job') && problem.includes(name))
+	);
+	assert.ok(problems.some((problem) => problem.includes('STEP_CONDITIONS lists ' + key)));
+}
+
+const officialColdHead = '      - name: Receive actual official cold Ollama without stock Python\n';
+for (const condition of [
+	'always()',
+	'${{ !cancelled() }}',
+	"${{ !cancelled() && steps.cold-app.outcome != 'failure' }}"
+]) {
+	mustCatch(
+		'official cold runtime receiver broadened admission ' + condition,
+		MACOS_BOX,
+		officialColdHead + "        if: ${{ !cancelled() && steps.cold-app.outcome == 'success' }}\n",
+		officialColdHead + `        if: ${condition}\n`,
+		stepProblems
+	);
+}
 // Upload only closed receipts: the owned script corpus contains newline names,
 // and recursively uploading its private fixture tree also exposes unnecessary data.
 const NATIVE_INVENTORY_ARTIFACT = 'Retain native Hammerspoon provider inventory';
@@ -3414,13 +3733,14 @@ const directDistroUnitStep =
 	'        shell: bash\n        run: |\n          ' +
 	DISTRO_UNIT_COMMAND +
 	'\n';
-const directDistroFiles = pipeline
-	.files()
-	.map((entry) =>
-		entry.rel === LINUX_BOX
-			? { ...entry, text: entry.text.replace(distroUnitBody, directDistroUnitStep) }
-			: entry
-	);
+const directDistroFiles = pipeline.files().map((entry) =>
+	entry.rel === LINUX_BOX
+		? {
+				...entry,
+				text: entry.text.replace(distroUnitBody, directDistroUnitStep)
+			}
+		: entry
+);
 assert.deepEqual(
 	distroUnitProblems(directDistroFiles),
 	[],
@@ -3758,7 +4078,10 @@ assert.ok(
 	'physical renderer before layer renderer must refuse'
 );
 for (const changed of [undefined, 'node ./tools/test/browser/layer-editor.playwright.cjs']) {
-	const scripts = { ...PHYSICAL_BROWSER_SCRIPTS, [PHYSICAL_BROWSER_ALIAS]: changed };
+	const scripts = {
+		...PHYSICAL_BROWSER_SCRIPTS,
+		[PHYSICAL_BROWSER_ALIAS]: changed
+	};
 	assert.ok(
 		physicalBrowserProblems(pipeline.files(), scripts).length > 0,
 		'missing or redirected physical browser alias must refuse'
@@ -3877,8 +4200,450 @@ for (const [what, from, to] of [
 	mustCatch(what, LINUX_BOX, from, to, linuxAudioPrerequisiteProblems);
 }
 
+// A disjoint mandatory cohort; literal ownership is narrower than a generic Swift filter.
+const PAC_SOURCE_STEP =
+	'      - name: Qualify actual native PAC source ownership XCTest controls\n        if: ${{ !cancelled() }}\n        shell: bash\n        run: |\n          set -euo pipefail\n          test -n "$ERGOPTI_NATIVE_HTTP_PYTHON"\n          test -x "$ERGOPTI_NATIVE_HTTP_PYTHON"\n          test -z "${ERGOPTI_DEV_QUALIFICATION_PROFILE:-}"\n          transcript="$ERGOPTI_OLLAMA_BUILD_ROOT/native-pac-source-xctest.log"\n          source_receipt="$ERGOPTI_OLLAMA_BUILD_ROOT/native-pac-source-inputs.json"\n          node tools/diagnostics/native_pac_source_evidence.cjs begin "$GITHUB_SHA" "$GITHUB_RUN_ID" "$GITHUB_RUN_ATTEMPT" "$ERGOPTI_OLLAMA_EXPECTED_ARCHITECTURE" "$source_receipt"\n          set +e\n          swift test --package-path static/ergopti_plus/macos/launcher \\\n            --scratch-path "$ERGOPTI_OLLAMA_BUILD_ROOT/swift" \\\n            --filter \'(^|[.])ManagedPACSourceTests([/.]|$)\' 2>&1 | tee "$transcript"\n          source_statuses=("${PIPESTATUS[@]}")\n          set -e\n          test "${#source_statuses[@]}" -eq 2\n          node tools/diagnostics/native_pac_source_evidence.cjs judge "$transcript" "${source_statuses[0]}" "${source_statuses[1]}" "$GITHUB_SHA" "$GITHUB_RUN_ID" "$GITHUB_RUN_ATTEMPT" "$ERGOPTI_OLLAMA_EXPECTED_ARCHITECTURE" "$source_receipt" "$ERGOPTI_OLLAMA_BUILD_ROOT/native-pac-source-verdict.json"\n        timeout-minutes: 10\n';
+function nativePacSourceProblems(files) {
+	const mac = files.find((file) => file.rel === MACOS_BOX)?.text ?? '';
+	const jobs = [
+		...mac.matchAll(/^  managed-ollama-native:\n[\s\S]*?(?=^  [A-Za-z][\w-]*:|(?![\s\S]))/gm)
+	];
+	const problems = [];
+	if (jobs.length !== 1) return ['native-source-job'];
+	const job = jobs[0][0];
+	if (mac.split(PAC_SOURCE_STEP).length !== 2 || job.split(PAC_SOURCE_STEP).length !== 2)
+		problems.push('native-source-exact-step');
+	const sdk = job.indexOf(
+		'      - name: Qualify actual SDK accepted-owner and deadline XCTest controls\n'
+	);
+	const source = job.indexOf(PAC_SOURCE_STEP);
+	const pac = job.indexOf('      - name: Qualify actual native PAC and WPAD XCTest controls\n');
+	if (sdk < 0 || source <= sdk || pac <= source) problems.push('native-source-order');
+	for (const name of [
+		'native-pac-source-xctest.log',
+		'native-pac-source-inputs.json',
+		'native-pac-source-verdict.json'
+	]) {
+		const line = `            \${{ env.ERGOPTI_OLLAMA_BUILD_ROOT }}/${name}`;
+		if (job.split('\n').filter((actual) => actual === line).length !== 1)
+			problems.push('native-source-retained-' + name);
+	}
+	return problems;
+}
+errors.push(...nativePacSourceProblems(pipeline.files()));
+// The actual raw Source10 condition remains mandatory after the retired fast route.
+const rawSourceFiles = require('./ci-pipeline.cjs').files();
+const rawSourceStep = PAC_SOURCE_STEP;
+assert.doesNotThrow(() => pipeline.validateRaw(rawSourceFiles));
+for (const [replacement, error] of [
+	[
+		'',
+		/\[ci-pipeline\] no step named 'Qualify actual native PAC source ownership XCTest controls'/
+	],
+	[
+		rawSourceStep + rawSourceStep,
+		/\[ci-pipeline\] step 'Qualify actual native PAC source ownership XCTest controls' appears 2 times in one job/
+	],
+	[
+		rawSourceStep.replace('if: ${{ !cancelled() }}', 'if: false'),
+		/\[ci-full-default\].*full step condition/
+	],
+	[
+		rawSourceStep.replace('if: ${{ !cancelled() }}', 'if: ${{ success() }}'),
+		/\[ci-full-default\].*full step condition/
+	]
+]) {
+	const changed = rawSourceFiles.map((file) =>
+		file.rel === MACOS_BOX ? { ...file, text: file.text.replace(rawSourceStep, replacement) } : file
+	);
+	assert.notDeepEqual(changed, rawSourceFiles);
+	assert.throws(() => pipeline.fromFiles(changed), error);
+}
+console.log('PASS: exact Source10 raw condition controls=5; native execution unqualified.');
+for (const [name, changed] of [
+	['missing source step', ''],
+	['duplicate source step', PAC_SOURCE_STEP + PAC_SOURCE_STEP],
+	['skipped source step', PAC_SOURCE_STEP.replace('if: ${{ !cancelled() }}', 'if: false')],
+	['ignored source child status', PAC_SOURCE_STEP.replace('"${source_statuses[0]}"', '"0"')],
+	['ignored source capture status', PAC_SOURCE_STEP.replace('"${source_statuses[1]}"', '"0"')],
+	['foreign source run', PAC_SOURCE_STEP.replace('"$GITHUB_RUN_ID"', '"foreign"')],
+	['foreign source attempt', PAC_SOURCE_STEP.replace('"$GITHUB_RUN_ATTEMPT"', '"1"')],
+	[
+		'source verdict before capture closure',
+		PAC_SOURCE_STEP.replace('source_statuses=("${PIPESTATUS[@]}")', 'source_statuses=(0 0)')
+	]
+])
+	mustCatch(name, MACOS_BOX, PAC_SOURCE_STEP, changed, nativePacSourceProblems);
+for (const name of [
+	'native-pac-source-xctest.log',
+	'native-pac-source-inputs.json',
+	'native-pac-source-verdict.json'
+]) {
+	const line = `            \${{ env.ERGOPTI_OLLAMA_BUILD_ROOT }}/${name}\n`;
+	mustCatch('missing retained ' + name, MACOS_BOX, line, '', nativePacSourceProblems);
+}
+
+// Actual begin/judge over a private tracked checkout. These are constructed
+// XCTest frames, not an execution or a qualification of native Swift controls.
+function checkNativePacSourceReceipts() {
+	const os = require('node:os');
+	const reader = require('../diagnostics/native_pac_source_evidence.cjs');
+	const repository = fs.mkdtempSync(path.join(os.tmpdir(), 'ergopti-source-receipt-'));
+	const root = path.resolve(__dirname, '../..');
+	const git = (args) => {
+		const result = spawnSync('git', args, { cwd: repository, encoding: 'utf8' });
+		assert.equal(result.status, 0, result.stderr);
+		return result.stdout.trim();
+	};
+	const write = (relative, bytes) => {
+		const file = path.join(repository, relative);
+		fs.mkdirSync(path.dirname(file), { recursive: true });
+		fs.writeFileSync(file, bytes);
+	};
+	const methods = [
+		'testStrictUTF8AndBOMAdmission',
+		'testStrictUTF16RejectsMalformedSurrogatesAndNUL',
+		'testAuthorityScopeIncludesCanonicalSchemeHostEffectivePort',
+		'testBindingEscapesRequestDataAndRefusesInvalidSource',
+		'testRealPACSourceDecodersRetireEverySession',
+		'testRealPACSourceStatusSizeAndEncodingRefusalsRetire',
+		'testRealPACSourceRedirectsHaveFreshCredentialFreeOwners',
+		'testRealPACSourceTrustAnchorsPreserveHostnameAndDowngradeRefusal',
+		'testRealPACSourceDeadlineRefusesAndRetiresBeforeReplacement',
+		'testOriginalLookupBudgetIncludesSettingsPreparation'
+	];
+	let count = 0;
+	try {
+		const tests = 'static/ergopti_plus/macos/launcher/Tests/ErgoptiPlusTests/';
+		for (const suite of [
+			'ManagedPACSourceTests',
+			'ReleaseArchiveStagingTests',
+			'SparkleArchiveUpdateAcceptanceTests',
+			'HomebrewArchiveAcceptanceTests',
+			'HomebrewAutomationConsentTests'
+		]) {
+			const relative = tests + suite + '.swift';
+			write(relative, fs.readFileSync(path.join(root, relative)));
+		}
+		for (const relative of [
+			'static/ergopti_plus/_shared/modules/network/proxy_policy.json',
+			'static/ergopti_plus/macos/tests/support/native_pac_source_fixture.py',
+			'tools/diagnostics/native_pac_source_evidence.cjs',
+			'tools/diagnostics/swift_xctest_evidence.cjs'
+		])
+			write(relative, fs.readFileSync(path.join(root, relative)));
+		git(['init', '-q']);
+		git(['add', '--', '.']);
+		git([
+			'-c',
+			'user.name=Source receipt control',
+			'-c',
+			'user.email=source-control@example.invalid',
+			'commit',
+			'-qm',
+			'Private source-receipt control'
+		]);
+		const candidate = git(['rev-parse', 'HEAD']);
+		const epoch = [candidate, '123', '2', 'arm64'];
+		const before = path.join(repository, 'before.json'),
+			capture = path.join(repository, 'capture.log');
+		assert.equal(reader.main(['begin', ...epoch, before], repository), 0);
+		count++;
+		const lines = [
+			"Test Suite 'Selected tests' started at 2026-10-09",
+			"Test Suite 'ErgoptiPlusPackageTests.xctest' started at 2026-10-09",
+			"Test Suite 'ManagedPACSourceTests' started at 2026-10-09"
+		];
+		for (const method of methods) {
+			lines.push(
+				`Test Case '-[ErgoptiPlusTests.ManagedPACSourceTests ${method}]' started.`,
+				`Test Case '-[ErgoptiPlusTests.ManagedPACSourceTests ${method}]' passed (0.1 seconds).`
+			);
+		}
+		for (const suite of [
+			'ManagedPACSourceTests',
+			'ErgoptiPlusPackageTests.xctest',
+			'Selected tests'
+		])
+			lines.push(
+				`Test Suite '${suite}' passed at 2026-10-09`,
+				'Executed 10 tests, with 0 failures (0 unexpected) in 1 seconds'
+			);
+		const transcript = lines.join('\n') + '\n';
+		write('capture.log', transcript);
+		let serial = 0;
+		const judge = (fields = epoch, statuses = ['0', '0']) =>
+			reader.main(
+				[
+					'judge',
+					capture,
+					...statuses,
+					...fields,
+					before,
+					path.join(repository, `verdict-${serial++}.json`)
+				],
+				repository
+			);
+		assert.equal(judge(), 0);
+		count++;
+		for (const [index, value] of [
+			[0, '0'.repeat(40)],
+			[1, '124'],
+			[2, '3'],
+			[3, 'amd64']
+		]) {
+			const changed = [...epoch];
+			changed[index] = value;
+			assert.notEqual(judge(changed), 0);
+			count++;
+		}
+		for (const statuses of [
+			['1', '0'],
+			['0', '1']
+		]) {
+			assert.notEqual(judge(epoch, statuses), 0);
+			count++;
+		}
+		for (const method of methods) {
+			write('capture.log', transcript.replace(` ${method}]' passed`, ` ${method}]' skipped`));
+			assert.notEqual(judge(), 0);
+			count++;
+		}
+		write('capture.log', transcript);
+		const policy = 'static/ergopti_plus/_shared/modules/network/proxy_policy.json';
+		const original = fs.readFileSync(path.join(repository, policy));
+		write(policy, Buffer.concat([original, Buffer.from('\n')]));
+		assert.notEqual(judge(), 0);
+		count++;
+		write(policy, original);
+		const unbound = 'static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/Unbound.swift';
+		write(unbound, '// unbound\n');
+		assert.notEqual(judge(), 0);
+		count++;
+		fs.unlinkSync(path.join(repository, unbound));
+		fs.unlinkSync(capture);
+		fs.symlinkSync(before, capture);
+		assert.notEqual(judge(), 0);
+		count++;
+		fs.unlinkSync(capture);
+		write('capture.log', Buffer.from([0xff]));
+		assert.notEqual(judge(), 0);
+		count++;
+		assert.equal(count, 22);
+		console.log(
+			'PASS: native PAC source receipt controls=22; constructed transcripts/native execution unqualified.'
+		);
+	} finally {
+		fs.rmSync(repository, { recursive: true, force: true });
+	}
+}
+checkNativePacSourceReceipts();
+
+// Saved simultaneous actions must follow both unchanged kernel prerequisites.
+const LINUX_SIMULTANEOUS_HARNESS = 'static/ergopti_plus/linux/tests/hardware/run_daemon_live.sh';
+const LINUX_SIMULTANEOUS_COMMAND =
+	'python3 tests/hardware/run_native_subreaper.py luajit tests/hardware/run_simultaneous_configuration_real.lua';
+const LINUX_SIMULTANEOUS_ENVELOPE = [
+	'luajit tests/hardware/run_modifier_custody.lua',
+	'CUSTODY=$?',
+	'if [ "${CUSTODY}" = "0" ]; then',
+	'python3 tests/hardware/run_native_subreaper.py luajit tests/hardware/run_input_owner_real.lua',
+	'CUSTODY=$?',
+	'fi',
+	'if [ "${CUSTODY}" = "0" ]; then',
+	LINUX_SIMULTANEOUS_COMMAND,
+	'CUSTODY=$?',
+	'fi',
+	'if [ "${CUSTODY}" != "0" ]; then',
+	'kill ${PIDS} 2>/dev/null',
+	'exit "${CUSTODY}"',
+	'fi'
+];
+
+const LINUX_SIMULTANEOUS_STEP = 'The whole daemon, live — a trigger typed, a tray shown';
+const LINUX_SIMULTANEOUS_ENTRY = `sudo bash ${LINUX_SIMULTANEOUS_HARNESS}`;
+
+/** Binds the inspected harness to its mandatory existing native workflow call. */
+function linuxSimultaneousWorkflowProblems(files) {
+	const steps = files
+		.filter((entry) => entry.rel === LINUX_BOX)
+		.flatMap((entry) => pipeline.jobsOfText(entry.text, entry.rel))
+		.filter((job) => job.id === 'e2e-linux')
+		.flatMap((job) => pipeline.steps(job.body))
+		.filter((step) => step.name === LINUX_SIMULTANEOUS_STEP);
+	if (steps.length !== 1) return ['Linux needs exactly one whole-daemon native step'];
+	const step = steps[0];
+	const commands = logicalLines(step.body).filter((line) => line !== '');
+	const aptPrefix =
+		'sudo python3 "$GITHUB_WORKSPACE/tools/ci/ubuntu_apt.py" -y --no-install-recommends ';
+	if (
+		pipeline.stepField(step.body, 'if') !== NOT_CANCELLED ||
+		pipeline.stepField(step.body, 'timeout-minutes') !== '6' ||
+		pipeline.stepField(step.body, 'continue-on-error') !== null ||
+		commands.length !== 3 ||
+		commands[0] !== 'sudo modprobe uinput' ||
+		!commands[1].startsWith(aptPrefix) ||
+		!/^[a-z0-9.+-]+(?:\s+[a-z0-9.+-]+)*$/.test(commands[1].slice(aptPrefix.length)) ||
+		commands[2] !== LINUX_SIMULTANEOUS_ENTRY
+	) {
+		return [
+			'Linux whole-daemon enrollment must retain its prerequisites, exact call and failure budget'
+		];
+	}
+	return [];
+}
+
+errors.push(...linuxSimultaneousWorkflowProblems(pipeline.files()));
+const linuxSimultaneousStepBody = pipeline.step(pipeline.job('e2e-linux'), LINUX_SIMULTANEOUS_STEP);
+for (const [what, from, to] of [
+	['omitted live harness', LINUX_SIMULTANEOUS_ENTRY, 'true'],
+	['redirected live harness', LINUX_SIMULTANEOUS_ENTRY, `${LINUX_SIMULTANEOUS_ENTRY} --skip`],
+	['forgiven live harness', LINUX_SIMULTANEOUS_ENTRY, `${LINUX_SIMULTANEOUS_ENTRY} || true`],
+	['disabled live step', NOT_CANCELLED, '${{ false }}'],
+	['changed live budget', 'timeout-minutes: 6', 'timeout-minutes: 12'],
+	[
+		'forgiven live step',
+		'timeout-minutes: 6',
+		'timeout-minutes: 6\n        continue-on-error: true'
+	]
+]) {
+	assert.ok(linuxSimultaneousStepBody.includes(from), `${what}: causal preimage must exist`);
+	const changed = pipeline.files().map((entry) => ({
+		...entry,
+		text:
+			entry.rel === LINUX_BOX
+				? entry.text.replace(linuxSimultaneousStepBody, linuxSimultaneousStepBody.replace(from, to))
+				: entry.text
+	}));
+	assert.ok(
+		linuxSimultaneousWorkflowProblems(changed).length > 0,
+		`${what} must refuse enrollment`
+	);
+}
+
+/** Retains exact ordered native calls, status admission and failing teardown. */
+function linuxSimultaneousEnrollmentProblems(source) {
+	const body = `        run: |\n${source
+		.split('\n')
+		.map((line) => `          ${line}`)
+		.join('\n')}`;
+	const lines = logicalLines(body).filter((line) => line !== '');
+	const first = LINUX_SIMULTANEOUS_ENVELOPE[0];
+	const phase = 'LLM_READY="$(mktemp -u)"';
+	const at = lines.indexOf(first);
+	const end = lines.indexOf(phase);
+	if (
+		at < 0 ||
+		end <= at ||
+		lines.filter((line) => line === phase).length !== 1 ||
+		JSON.stringify(lines.slice(at, end)) !== JSON.stringify(LINUX_SIMULTANEOUS_ENVELOPE)
+	) {
+		return ['Linux simultaneous configuration needs the complete ordered native custody envelope'];
+	}
+	for (const command of [first, LINUX_SIMULTANEOUS_ENVELOPE[3], LINUX_SIMULTANEOUS_COMMAND]) {
+		if (lines.filter((line) => line === command).length !== 1) {
+			return ['each mandatory Linux native command must execute exactly once in its envelope'];
+		}
+	}
+	// A closed prefix prevents an enclosing function, false branch or quote from
+	// turning the otherwise exact sequence into unexecuted source text.
+	const raw = source.split('\n');
+	const start = raw.findIndex((line) => line.trim() === first);
+	for (const input of [source, `${raw.slice(0, start).join('\n')}\n`]) {
+		const syntax = spawnSync(bashExecutable(), ['-n'], { input, encoding: 'utf8' });
+		if (syntax.error || syntax.signal || syntax.status !== 0) {
+			return ['Linux native envelope needs valid shell syntax and a closed top-level prefix'];
+		}
+	}
+	return [];
+}
+
+const linuxSimultaneousHarness = fs.readFileSync(
+	path.resolve(__dirname, '../..', LINUX_SIMULTANEOUS_HARNESS),
+	'utf8'
+);
+errors.push(...linuxSimultaneousEnrollmentProblems(linuxSimultaneousHarness));
+const linuxSimultaneousBlock = LINUX_SIMULTANEOUS_ENVELOPE.slice(6, 10).join('\n');
+const linuxSimultaneousNormalized = linuxSimultaneousHarness
+	.split('\n')
+	.map((line) => line.trim())
+	.join('\n');
+assert.equal(
+	linuxSimultaneousEnrollmentProblems(
+		linuxSimultaneousHarness + '\n# A separate owner may add post-native setup here.\n'
+	).length,
+	0,
+	'additive owner work outside the executable native envelope must remain permitted'
+);
+for (const [what, from, to] of [
+	['old harness omits the supplement', linuxSimultaneousBlock, ''],
+	[
+		'duplicate supplement',
+		linuxSimultaneousBlock,
+		`${linuxSimultaneousBlock}\n${linuxSimultaneousBlock}`
+	],
+	['disabled supplement', linuxSimultaneousBlock, linuxSimultaneousBlock.replace('= "0"', '= "1"')],
+	[
+		'wrong native helper',
+		LINUX_SIMULTANEOUS_COMMAND,
+		LINUX_SIMULTANEOUS_COMMAND.replace('run_simultaneous_configuration_real', 'run_daemon_live')
+	],
+	['broadened native command', LINUX_SIMULTANEOUS_COMMAND, `${LINUX_SIMULTANEOUS_COMMAND} --skip`],
+	['forgiven native failure', LINUX_SIMULTANEOUS_COMMAND, `${LINUX_SIMULTANEOUS_COMMAND} || true`],
+	[
+		'uncaptured supplement status',
+		linuxSimultaneousBlock,
+		linuxSimultaneousBlock.replace('CUSTODY=$?', 'CUSTODY=0')
+	],
+	['missing old input owner', LINUX_SIMULTANEOUS_ENVELOPE[3], 'true'],
+	[
+		'changed native deadline wrapper',
+		LINUX_SIMULTANEOUS_COMMAND,
+		LINUX_SIMULTANEOUS_COMMAND.replace(
+			'run_native_subreaper.py',
+			'run_native_subreaper.py --timeout 80'
+		)
+	],
+	['supplement before old input owner', LINUX_SIMULTANEOUS_ENVELOPE[3], LINUX_SIMULTANEOUS_COMMAND],
+	['forgiven final failure', 'exit "${CUSTODY}"', 'exit 0'],
+	['missing failure cleanup', 'kill ${PIDS} 2>/dev/null', 'true'],
+	[
+		'hidden in a false branch',
+		LINUX_SIMULTANEOUS_ENVELOPE[0],
+		`if false; then\n${LINUX_SIMULTANEOUS_ENVELOPE[0]}`
+	],
+	['only a commented supplement', LINUX_SIMULTANEOUS_COMMAND, `# ${LINUX_SIMULTANEOUS_COMMAND}`]
+]) {
+	assert.ok(linuxSimultaneousNormalized.includes(from), `${what}: causal preimage must exist`);
+	assert.ok(
+		linuxSimultaneousEnrollmentProblems(linuxSimultaneousNormalized.replace(from, to)).length > 0,
+		`${what} must refuse native qualification`
+	);
+}
+
 // The temporary Mac exception still requires closed context and retained gates.
 require('./test-macos-dev-qualification-deferral.cjs');
+
+// GitHub Pages reads the domain from the deployed root after each replacement.
+const siteRoot = path.resolve(__dirname, '../..');
+assert.equal(fs.readFileSync(path.join(siteRoot, 'static/CNAME'), 'utf8'), 'ergopti.fr\n');
+const siteWorkflow = fs.readFileSync(
+	path.join(siteRoot, '.github/workflows/deploy-site.yml'),
+	'utf8'
+);
+assert.match(siteWorkflow, /^      - 'static\/CNAME'$/m, 'a domain-only change must deploy');
+assert.match(
+	siteWorkflow,
+	/        run: \|\n          npm run build\n          cmp -- static\/CNAME build\/CNAME\n/,
+	'the exact built domain must be verified before destructive deployment'
+);
+assert.ok(
+	siteWorkflow.indexOf('cmp -- static/CNAME build/CNAME') <
+		siteWorkflow.indexOf('- name: Deploy to GitHub Pages'),
+	'the domain guard precedes the deployment step'
+);
+assert.match(siteWorkflow, /cp -r build\/\. "\$GHP"\//, 'main deploy retains built static assets');
+assert.match(siteWorkflow, /cp -r build\/\. "\$GHP\/\$DEPLOY_DIR\/"/, 'dev deploy remains scoped');
 
 if (errors.length > 0) {
 	console.error(
@@ -3889,7 +4654,7 @@ if (errors.length > 0) {
 }
 
 console.log(
-	`[OK] one root (${ROOT}) with ${planOutputs.size} plan outputs, ${callers.length} lane callers with one ` +
-		`entry and one exit job each, and ${gatedSecrets} release-only secrets are wired as designed, ` +
+	`[OK] one root (${ROOT}) with ${planOutputs.size} plan outputs, ${callers.length} lane callers with ` +
+		`three mandatory macOS entries plus one manual diagnostic, one Windows/Linux entry and the declared exits, and ${gatedSecrets} release-only secrets are wired as designed, ` +
 		`${CONDITIONS.size} conditional steps are the only ones, and the release preflight runs before any side effect.`
 );

@@ -18,9 +18,10 @@ local edits = {
 	{ section = "shortcuts.key_combination_holds", key = pair, value = "alt" },
 	{ section = "gesture_parameters", key = parameter, value = "https://new.example" },
 }
-local function with_owner(body, managed)
+local function with_owner(body, managed, public_chords)
 	local saved = {}; for name, value in pairs(package.loaded) do saved[name] = value end
 	local ok, err = pcall(function()
+		if public_chords~=true then require("tests.support.key_combination_declaration_fixture").install_unavailable() end
 		package.loaded["modules.shortcuts.key_combinations"] = nil
 		local PairOwner = require("modules.shortcuts.key_combinations")
 		package.loaded["modules.gestures.manager"] = nil
@@ -65,7 +66,13 @@ local function with_owner(body, managed)
 			helpers.assert_true(state.manager.init({keyboard_hook=hook,execute_action=function(action,slot) state.executed={action,slot} end,action_names=function() return {"open_url","copy"} end,on_text_injected=function() end,defaults_path=defaults,user_path="/controlled/tap_hold.toml"}))
 			state.pairs=require("modules.shortcuts.key_combinations")
 		else
-		state.pairs = PairOwner.new({ keys = { {id="caps_lock",key="caps_lock"}, {id="tab",key="tab"} },
+		local keys = { {id="caps_lock",key="caps_lock"}, {id="tab",key="tab"} }
+		if public_chords==true then
+			local file=assert(io.open(require("infra.paths").shared("tap_hold/defaults.toml"),"rb"))
+			local defaults=assert(Codec.decode(file:read("*a")));assert(file:close())
+			keys=require("tap_hold.key_catalog").for_platform(defaults,"linux")
+		end
+		state.pairs = PairOwner.new({ keys = keys,
 			hold_picker = { modifiers = {"shift","alt"}, layers = {"nav"} }, files = files,
 			route = function() return path end, is_paused = function() return state.paused end,
 			actions = {is_assignable=function(action) return action == "open_url" or action == "copy" end},
@@ -81,7 +88,7 @@ local function with_owner(body, managed)
 		helpers.assert_true(gestures.release_parameter_configuration(initial))
 		state.gestures, state.files = gestures, files
 		state.scope = Scope.new({path=path,backup_path=backup,files=files,combinations=state.pairs,parameters=gestures,
-			manifest={scope_plan=function(scope, mode)
+			manifest=public_chords==true and require("infra.manifest_reader") or {scope_plan=function(scope, mode)
 				helpers.assert_eq(scope,"shortcuts");helpers.assert_eq(mode,"clear");return {presets={},operations={}}
 			end},is_paused=function() return state.paused end})
 		body(state)
@@ -376,7 +383,7 @@ helpers.describe("canonical parameter and native source frame",function()
 	end)
 end)
 
-local function with_menu(body)
+local function with_menu(body, public_chords)
 	with_owner(function(s)
 		package.loaded["adapters.file_system"]=s.files
 		package.loaded["infra.config_paths"]={config=function() return path end}
@@ -386,6 +393,11 @@ local function with_menu(body)
 		local i18n=require("infra.i18n")
 		local Holds=require("tap_hold.hold_options")
 		local keys={{id="caps_lock",key="caps_lock",hand="left"},{id="tab",key="tab",hand="left"}}
+		if public_chords==true then
+			local file=assert(io.open(require("infra.paths").shared("tap_hold/defaults.toml"),"rb"))
+			local defaults=assert(Codec.decode(file:read("*a")));assert(file:close())
+			keys=require("tap_hold.key_catalog").for_platform(defaults,"linux")
+		end
 		local holds=Holds.build({modifiers={"shift","alt"},layers={"nav"}})
 		local PairOwner=require("modules.shortcuts.key_combinations")
 		s.pairs=PairOwner.new({keys=keys,hold_picker={modifiers={"shift","alt"},layers={"nav"}},files=s.files,
@@ -397,13 +409,16 @@ local function with_menu(body)
 			action_label=function(action) return action end,error=function() s.errors=(s.errors or 0)+1 end,
 			parameter=function() error("Program parameter must come from the native picker") end,
 			prompt_hold=function(_,_,choices) s.hold_choices=choices;return s.hold_selection end,
+			prompt_delay=function(current,declared)
+				s.delay_prompt={current,declared};if s.on_delay then s.on_delay() end;return s.delay_selection
+			end,
 			open_picker=function(label,current,binding,confirm,items)
 				s.picker={label=label,current=current,binding=binding,confirm=confirm,items=items};return true
 			end}
 		s.build=function() return require("ui.menu.key_combinations").build(ctx,ui) end
 		s.translate=i18n.get;s.context=ctx
 		body(s)
-	end)
+	end,false,public_chords)
 end
 local function find_menu(rows,title,exact)
 	for _,row in ipairs(rows) do
@@ -766,4 +781,280 @@ helpers.describe("pair fixture native loop ownership", function()
 		helpers.assert_true(fired, "the actual native callback must execute")
 		helpers.assert_true(settled, "the exact acquired timer must physically close")
 	end)
+end)
+
+-- Public simultaneous source/publisher controls use the actual newly generated
+-- Linux declaration. They are separate from the unchanged predecessor fixtures.
+local function with_public_owner(body)
+ return with_owner(body,false,true)
+end
+local function seed_public(s,text)
+ local token={}
+ helpers.assert_true(s.pairs.acquire_configuration(token))
+ s.bytes[path]=text
+ helpers.assert_true(s.pairs.apply_configuration(token,s.pairs.configuration_candidate(Codec.decode(text),true)))
+ helpers.assert_true(s.pairs.release_configuration(token))
+end
+helpers.describe("declared Linux simultaneous publication through original owners",function()
+ helpers.it("uses declared Linux neutral values and all182 unassigned third slots",function()
+  with_public_owner(function(s)
+   local f=require("infra.manifest_reader")
+   helpers.assert_eq(f.default_for("mod_combos.simultaneous_threshold_ms"),100)
+   helpers.assert_eq(f.default_for("mod_combos.symmetric"),false)
+   helpers.assert_eq(s.pairs.chord_settings(),{simultaneous_threshold_ms=100,combo_symmetric=false})
+   local count=0;for _,entry in ipairs(s.pairs.configuration_entries()) do
+    count=count+1;helpers.assert_eq(s.pairs.get_chord(entry.id),"none")
+    helpers.assert_eq(f.default_for("mod_combos.config."..entry.id..".combo"),"none")
+    helpers.assert_eq(f.recommended_for("mod_combos.config."..entry.id..".combo"),"none")
+   end
+   helpers.assert_eq(count,182);helpers.assert_eq(s.publications,0)
+  end)
+ end)
+ helpers.it("publishes typed timing and symmetry and reverts exact source/runtime",function()
+  with_public_owner(function(s)
+   helpers.assert_true(s.scope.set_chord_settings({simultaneous_threshold_ms=75,combo_symmetric=true}))
+   local doc=Codec.decode(s.bytes[path]);helpers.assert_eq(doc.mod_combos.simultaneous_threshold_ms,75)
+   helpers.assert_eq(doc.mod_combos.symmetric,true);helpers.assert_eq(doc.unrelated.keep,42)
+   helpers.assert_eq(doc.shortcuts.key_combination_taps.future_then_tab,"future")
+   helpers.assert_eq(doc.category_enabled,nil);helpers.assert_eq(doc.mod_combos.enabled,nil)
+   helpers.assert_eq(s.pairs.chord_settings(),{simultaneous_threshold_ms=75,combo_symmetric=true})
+   helpers.assert_true(s.scope.revert());helpers.assert_eq(s.bytes[path],source)
+   helpers.assert_eq(s.pairs.chord_settings(),{simultaneous_threshold_ms=100,combo_symmetric=false})
+  end)
+ end)
+ helpers.it("removes explicit neutral settings sparsely without changing disabled switches",function()
+  with_public_owner(function(s)
+   local text=source..'[mod_combos]\nenabled=false\nsimultaneous_threshold_ms=75\nsymmetric=true\n[category_enabled]\nkey_combinations=false\n'
+   seed_public(s,text)
+   helpers.assert_true(s.scope.set_chord_settings({simultaneous_threshold_ms=100,combo_symmetric=false}))
+   local doc=Codec.decode(s.bytes[path]);helpers.assert_eq(doc.mod_combos.simultaneous_threshold_ms,nil)
+   helpers.assert_eq(doc.mod_combos.symmetric,nil);helpers.assert_eq(doc.mod_combos.enabled,false)
+   helpers.assert_eq(doc.category_enabled.key_combinations,false)
+   helpers.assert_eq(s.pairs.chord_settings(),{simultaneous_threshold_ms=100,combo_symmetric=false})
+   helpers.assert_true(s.scope.revert());helpers.assert_eq(s.bytes[path],text)
+  end)
+ end)
+ helpers.it("copies fresh Linux tap leaves and preserves disabled gate and foreign records",function()
+  with_public_owner(function(s)
+   local text=source:gsub('caps_lock_then_tab = "open_url"','caps_lock_then_tab = "copy"',1)
+    ..'[mod_combos]\nenabled=false\n[mod_combos.config.caps_lock_then_tab]\ncombo="none"\ntap="paste"\nfuture=17\n'
+    ..'[mod_combos.config.future_then_tab]\ncombo="foreign_action"\n'
+   seed_public(s,text)
+   helpers.assert_true(s.scope.copy_taps_to_chords())
+   local doc=Codec.decode(s.bytes[path]);helpers.assert_eq(doc.mod_combos.enabled,false)
+   helpers.assert_eq(doc.mod_combos.config[pair].combo,"copy")
+   helpers.assert_eq(doc.mod_combos.config[pair].tap,"paste");helpers.assert_eq(doc.mod_combos.config[pair].future,17)
+   helpers.assert_eq(doc.mod_combos.config.future_then_tab.combo,"foreign_action")
+   helpers.assert_eq(doc.shortcuts.key_combination_taps.future_then_tab,"future")
+   helpers.assert_eq(doc.gesture_parameters[parameter],"https://old.example")
+   helpers.assert_eq(doc.mod_combos.simultaneous_threshold_ms,nil);helpers.assert_eq(doc.mod_combos.symmetric,nil)
+   helpers.assert_true(s.scope.revert());helpers.assert_eq(s.bytes[path],text)
+  end)
+ end)
+ helpers.it("refuses stale cached taps before backup instead of publishing misaligned copy",function()
+  with_public_owner(function(s)
+   s.bytes[path]=source:gsub('caps_lock_then_tab = "open_url"','caps_lock_then_tab = "copy"',1)
+   local exact=s.bytes[path]
+   helpers.assert_eq(s.scope.copy_taps_to_chords(),false)
+   helpers.assert_eq(s.bytes[path],exact);helpers.assert_eq(s.bytes[backup],nil);helpers.assert_eq(s.publications,0)
+   helpers.assert_true(s.scope.retry_restore())
+  end)
+ end)
+ helpers.it("publishes only admitted known combo leaves and deletes None sparsely",function()
+  with_public_owner(function(s)
+   local row={section="mod_combos.config."..pair,key="combo",value="copy"}
+   helpers.assert_true(s.scope.edit({row}));helpers.assert_eq(s.pairs.get_chord(pair),"copy")
+   helpers.assert_eq(Codec.decode(s.bytes[path]).mod_combos.config[pair].combo,"copy")
+   helpers.assert_true(s.scope.revert());helpers.assert_eq(s.bytes[path],source)
+  end)
+  with_public_owner(function(s)
+   local text=source..'[mod_combos.config.caps_lock_then_tab]\ncombo="copy"\nfuture=17\n'
+   seed_public(s,text)
+   helpers.assert_true(s.scope.edit({{section="mod_combos.config."..pair,key="combo",delete=true}}))
+   local doc=Codec.decode(s.bytes[path]);helpers.assert_eq(doc.mod_combos.config[pair].combo,nil)
+   helpers.assert_eq(doc.mod_combos.config[pair].future,17);helpers.assert_eq(s.pairs.get_chord(pair),"none")
+  end)
+ end)
+ for _,action in ipairs({"one_shot_shift","caps_word","run_program","alt_tab_monitor","unknown_action"}) do
+  helpers.it("refuses unqualified simultaneous action "..action,function()
+   with_public_owner(function(s)
+    helpers.assert_eq(s.scope.edit({{section="mod_combos.config."..pair,key="combo",value=action}}),false)
+    helpers.assert_eq(s.bytes[path],source);helpers.assert_eq(s.publications,0)
+   end)
+  end)
+ end
+ for _,values in ipairs({{simultaneous_threshold_ms=0,combo_symmetric=false},{simultaneous_threshold_ms=100,combo_symmetric="false"},
+  {simultaneous_threshold_ms=100,combo_symmetric=false,extra=true}}) do
+  helpers.it("refuses malformed settings before any callback or publication",function()
+   with_public_owner(function(s)
+    helpers.assert_eq(s.scope.set_chord_settings(values),false);helpers.assert_eq(s.changes,0)
+    helpers.assert_eq(s.bytes[path],source);helpers.assert_eq(s.publications,0)
+   end)
+  end)
+ end
+ helpers.it("detaches settings and edit rows before acquisition callbacks",function()
+  with_public_owner(function(s)
+   local values={simultaneous_threshold_ms=75,combo_symmetric=true}
+   s.changed=function() values.simultaneous_threshold_ms=9;values.combo_symmetric=false;return true end
+   helpers.assert_true(s.scope.set_chord_settings(values))
+   helpers.assert_eq(s.pairs.chord_settings(),{simultaneous_threshold_ms=75,combo_symmetric=true})
+  end)
+  with_public_owner(function(s)
+   local row={section="mod_combos.config."..pair,key="combo",value="copy"}
+   s.changed=function() row.value="open_url";return true end
+   helpers.assert_true(s.scope.edit({row}));helpers.assert_eq(s.pairs.get_chord(pair),"copy")
+  end)
+ end)
+ helpers.it("retains genuine program-stop refusal without publication or foreign cleanup",function()
+  with_public_owner(function(s)
+   local stop=s.gestures.stop_programs;s.gestures.stop_programs=function() return false end
+   helpers.assert_eq(s.scope.copy_taps_to_chords(),false);helpers.assert_eq(s.bytes[path],source)
+   helpers.assert_eq(s.publications,0);helpers.assert_true(s.scope.pending())
+   helpers.assert_eq(s.pairs.capture_runtime(),nil)
+   s.gestures.stop_programs=stop;helpers.assert_true(s.scope.retry_restore())
+  end)
+ end)
+ helpers.it("retains a foreign parameter lease while refusing the whole copy",function()
+  with_public_owner(function(s)
+   local foreign={};helpers.assert_true(s.gestures.acquire_parameter_configuration(foreign))
+   helpers.assert_eq(s.scope.copy_taps_to_chords(),false)
+   helpers.assert_true(type(s.gestures.parameter_configuration_snapshot(foreign))=="table")
+   helpers.assert_eq(s.publications,0);helpers.assert_true(s.scope.pending())
+   helpers.assert_true(s.gestures.release_parameter_configuration(foreign));helpers.assert_true(s.scope.retry_restore())
+  end)
+ end)
+ helpers.it("rolls typed settings back on publication refusal and preserves exact snapshot",function()
+  with_public_owner(function(s)
+   s.refuse_path=path
+   helpers.assert_eq(s.scope.set_chord_settings({simultaneous_threshold_ms=75,combo_symmetric=true}),false)
+   helpers.assert_eq(s.bytes[path],source)
+   helpers.assert_eq(s.pairs.chord_settings(),{simultaneous_threshold_ms=100,combo_symmetric=false})
+   helpers.assert_eq(s.scope.pending(),false)
+  end)
+ end)
+ helpers.it("holds native delivery through final callbacks and retains refused release debt",function()
+  with_public_owner(function(s)
+   local release=s.gestures.release_parameter_configuration
+   s.gestures.release_parameter_configuration=function(token)
+    helpers.assert_eq(s.pairs.capture_runtime(),nil,"native release cannot open third-slot delivery before parameter ACK")
+    if token==s.scope then return false end
+    return release(token)
+   end
+   helpers.assert_eq(s.scope.set_chord_settings({simultaneous_threshold_ms=75,combo_symmetric=true}),false)
+   helpers.assert_true(s.scope.pending());helpers.assert_eq(s.pairs.capture_runtime(),nil)
+   s.gestures.release_parameter_configuration=release;helpers.assert_true(s.scope.retry_restore())
+   helpers.assert_eq(s.bytes[path],source)
+  end)
+ end)
+ helpers.it("requires an explicit Linux copy section and leaves original Mac policy distinct",function()
+  local Shared=require("tap_hold.key_combinations")
+  local text='[shortcuts.key_combination_taps]\ncaps_lock_then_tab="copy"\n[mod_combos.config.caps_lock_then_tab]\ntap="paste"\ncombo="none"\n'
+  local options={entries={{id=pair}},settings={simultaneous_threshold_ms=100,combo_symmetric=false},is_action=function(a) return a=="copy" or a=="paste" end}
+  helpers.assert_eq(Shared.plan_chord_copy(text,options).rows[1].value,"paste","original Mac source is unchanged")
+  options.tap_section=Shared.TAP_SECTION
+  helpers.assert_eq(Shared.plan_chord_copy(text,options).rows[1].value,"copy")
+  options.tap_section="shortcuts.keyboard"
+  local accepted,refusal=pcall(Shared.plan_chord_copy,text,options)
+  helpers.assert_eq(accepted,false,"an undeclared copy source is refused")
+  helpers.assert_true(type(refusal)=="string")
+  helpers.assert_true(refusal:find("copy source section must be explicitly declared",1,true)~=nil,
+   "the actual copy namespace guard supplies the refusal")
+ end)
+end)
+
+helpers.describe("public Linux simultaneous menu uses actual source and scope owners",function()
+ helpers.it("adds one lazy third slot per original182 pairs without eager action catalogues",function()
+  with_menu(function(s)
+   local rows=s.build();local count,total=0,0
+   local function walk(list) for _,row in ipairs(list or {}) do
+    total=total+1
+    if tostring(row.title or ''):find('  :  ',1,true) then
+     count=count+1;helpers.assert_eq(#row.menu,4)
+     helpers.assert_true(find_menu(row.menu,s.translate('menu.shortcuts.key_combinations_chord'):gsub('%%s',s.translate('tap_hold.tap.none')))~=nil)
+    end
+    if row.menu then walk(row.menu) end
+   end end
+   walk(rows);helpers.assert_eq(count,182);helpers.assert_true(total<1500)
+   helpers.assert_eq(s.picker,nil);helpers.assert_eq(s.publications,0)
+   helpers.assert_true(find_menu(rows,s.translate('menu.tapholds.symmetric'),true)~=nil)
+   helpers.assert_true(find_menu(rows,s.translate('menu.tapholds.copy_tap_to_combo'),true)~=nil)
+  end,true)
+ end)
+ helpers.it("the real combo picker publishes its exact slot and excludes undispatched native state actions",function()
+  with_menu(function(s)
+   local row=find_menu(s.build(),'caps_lock → tab')
+   local chord=find_menu(row.menu,s.translate('menu.shortcuts.key_combinations_chord'):gsub('%%s',s.translate('tap_hold.tap.none')))
+   helpers.assert_true(chord.fn());helpers.assert_eq(s.picker.binding,binding)
+   for _,item in ipairs(s.picker.items) do helpers.assert_true(item.id~='one_shot_shift' and item.id~='caps_word' and item.id~='run_program' and item.id~='alt_tab_monitor') end
+   helpers.assert_true(s.picker.confirm('copy'))
+   helpers.assert_eq(Codec.decode(s.bytes[path]).mod_combos.config[pair].combo,'copy')
+   helpers.assert_eq(s.pairs.get_chord(pair),'copy');helpers.assert_eq(s.refreshes,1)
+  end,true)
+ end)
+ helpers.it("symmetric UI routes reverse third choices to shared catalogue canonical IDs",function()
+  with_menu(function(s)
+   local rows=s.build();helpers.assert_true(find_menu(rows,s.translate('menu.tapholds.symmetric'),true).fn())
+   helpers.assert_eq(Codec.decode(s.bytes[path]).mod_combos.symmetric,true)
+   local row=find_menu(s.build(),'caps_lock → tab')
+   helpers.assert_true(find_menu(row.menu,s.translate('menu.shortcuts.key_combinations_chord'):gsub('%%s',s.translate('tap_hold.tap.none'))).fn())
+   helpers.assert_eq(s.picker.binding,'combination__tab_then_caps_lock')
+   helpers.assert_true(s.picker.confirm('copy'))
+   helpers.assert_eq(Codec.decode(s.bytes[path]).mod_combos.config.tab_then_caps_lock.combo,'copy')
+   helpers.assert_eq(s.pairs.get_chord(pair),'copy')
+  end,true)
+ end)
+ helpers.it("delay dialog persists typed values through original source receipt and sparse defaults",function()
+  with_menu(function(s)
+   local function delay_row() return find_menu(s.build(),s.translate('menu.tapholds.simultaneous_title'):gsub('%%s','')) end
+   s.delay_selection='75';helpers.assert_true(delay_row().fn())
+   helpers.assert_eq(s.delay_prompt,{100,100});helpers.assert_eq(Codec.decode(s.bytes[path]).mod_combos.simultaneous_threshold_ms,75)
+   s.delay_selection='100';helpers.assert_true(delay_row().fn())
+   helpers.assert_eq(s.delay_prompt,{75,100});helpers.assert_eq(Codec.decode(s.bytes[path]).mod_combos.simultaneous_threshold_ms,nil)
+   helpers.assert_eq(s.pairs.chord_settings(),{simultaneous_threshold_ms=100,combo_symmetric=false})
+  end,true)
+ end)
+ for _,kind in ipairs({'cancel','invalid','paused','source'}) do
+  helpers.it('refuses '..kind..' delay without publication',function()
+   with_menu(function(s)
+    s.delay_selection=kind=='invalid' and '0' or '75'
+    if kind=='cancel' then s.delay_selection=nil end
+    s.on_delay=function()
+     if kind=='paused' then s.paused=true end
+     if kind=='source' then s.bytes[path]=source..'[outside]\nchanged=true\n' end
+    end
+    local row=find_menu(s.build(),s.translate('menu.tapholds.simultaneous_title'):gsub('%%s',''))
+    helpers.assert_eq(row.fn(),false);helpers.assert_eq(s.publications,0)
+   end,true)
+  end)
+ end
+ helpers.it("copy command and clear command publish through actual guarded scope",function()
+  with_menu(function(s)
+   local rows=s.build();helpers.assert_true(find_menu(rows,s.translate('menu.tapholds.copy_tap_to_combo'),true).fn())
+   helpers.assert_eq(Codec.decode(s.bytes[path]).mod_combos.config[pair].combo,'open_url')
+   helpers.assert_eq(s.pairs.get_chord(pair),'open_url')
+   helpers.assert_true(find_menu(s.build(),s.translate('common.clear_to_system'),true).fn())
+   helpers.assert_eq(s.pairs.get_chord(pair),'none');helpers.assert_eq(s.pairs.get_action(pair),'none')
+   local doc=Codec.decode(s.bytes[path]);helpers.assert_eq(doc.shortcuts.key_combination_taps.future_then_tab,'future')
+   helpers.assert_eq(doc.gesture_parameters[parameter],nil);helpers.assert_eq(doc.unrelated.keep,42)
+  end,true)
+ end)
+end)
+
+helpers.describe("unjoined third-slot native receiving is unavailable",function()
+ for _,action in ipairs({"run_program","alt_tab_monitor"}) do
+  helpers.it("the actual generic catalogue cannot authorize third-slot "..action,function()
+   with_menu(function(s)
+    helpers.assert_true(s.gestures.is_assignable(action))
+    helpers.assert_true(s.pairs.validate_slot("tap",pair,action))
+    helpers.assert_eq(s.pairs.validate_slot("combo",pair,action),false)
+    helpers.assert_eq(s.pairs.capture_action(binding,action),nil)
+    local row=find_menu(s.build(),'caps_lock → tab')
+    local chord=find_menu(row.menu,s.translate('menu.shortcuts.key_combinations_chord'):gsub('%%s',s.translate('tap_hold.tap.none')))
+    helpers.assert_true(chord.fn())
+    for _,item in ipairs(s.picker.items) do helpers.assert_true(item.id~=action) end
+    helpers.assert_eq(s.picker.confirm(action),false)
+    helpers.assert_eq(s.bytes[path],source);helpers.assert_eq(s.publications,0)
+   end,true)
+  end)
+ end
 end)

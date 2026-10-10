@@ -516,6 +516,7 @@ InstallSendNoOps()
 #Include unit/test_uninstall.ahk
 #Include unit/test_uninstall_source_run.ahk
 #Include unit/test_start_at_login.ahk
+#Include unit/test_start_at_login_other_source.ahk
 #Include meta/test_uninstall_shutdown_gate.ahk
 #Include unit/test_updater_channel_registry.ahk
 #Include unit/test_updater_schedule_vectors.ahk
@@ -587,6 +588,7 @@ _LogBootProgress("loading LLM modules")
 #Include unit/test_llm_engine_read_guarded_in_timer.ahk
 #Include unit/test_llm_api_remote.ahk
 #Include unit/test_curl_proxy_auth_integration.ahk
+#Include unit/test_curl_proxy_discovery.ahk
 #Include unit/test_managed_curl_owner.ahk
 #Include unit/test_managed_curl_callers.ahk
 #Include unit/test_curl_proxy_auth_policy.ahk
@@ -701,6 +703,7 @@ global _LLM_Menu_Loaded := false
 ; Definitions-only chord translation and hotkey identities; registers no hotkey.
 #Include ../ui/menu/menu_llm/hotkey_identity.ahk
 #Include ../adapters/llm_nav_event_owner.ahk
+#Include ../adapters/llm_automation.ahk
 #Include ../ui/menu/menu_llm/tab_accept.ahk
 ; Definitions-only boot restore helper. LLM_Menu_Init is never invoked by the
 ; harness; the regression suite calls only its one-shot saved-options seam.
@@ -1098,9 +1101,14 @@ _LogBootProgress("keylogger modules + tests included")
 #Include unit/test_managed_network_failure.ahk
 #Include unit/test_managed_network_windows_actions.ahk
 #Include unit/test_managed_terminal_failure.ahk
+#Include unit/test_system_proxy_retirement.ahk
+#Include unit/test_network_pac_source_contract.ahk
 #Include unit/test_managed_routes_native.ahk
 #Include unit/test_managed_remote_transport.ahk
 #Include unit/test_updater_managed_transport.ahk
+#Include unit/test_updater_curl_artifact.ahk
+#Include unit/test_updater_curl_capture.ahk
+#Include unit/test_managed_remote_sspi.ahk
 #Include meta/test_remote_connect_timeout_bounded.ahk
 #Include meta/test_keylogger_json_64bit_decode.ahk
 #Include meta/test_crash_build_offthread.ahk

@@ -31,6 +31,18 @@ function M.enabled(run)
 	return nil
 end
 
+--- Returns false only when the native entry proves a different startup command.
+--- Unknown query failures remain unknown, never a claim of another installation.
+--- @param run function|nil
+--- @return boolean|nil
+function M.command_available(run)
+	local ok, output = invoke("status", run)
+	if not ok then return nil end
+	if output:match("^other%s*$") then return false end
+	if output:match("^enabled%s*$") or output:match("^disabled%s*$") then return true end
+	return nil
+end
+
 --- Toggles startup only after a successful query and confirms the final state.
 --- @param run function|nil
 --- @return boolean

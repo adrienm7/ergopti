@@ -81,7 +81,18 @@ BUNDLE_ID=com.ergoptiplus.app
 ERGOPTI_AUTOMATION_QUERY_CI_PUBLISH=1
 fail() { exit 1; }
 python3() { printf 'publisher:%s\n' "$2"; }
-sign_code() { for argument in "$@"; do :; done; printf 'sign:%s\n' "$argument"; }
+query_signed=0 switcher_signed=0
+sign_code() {
+ for argument in "$@"; do :; done
+ # Model the native host-signing precondition, not macOS signature validity.
+ case "$argument" in
+  "$APP_PATH/Contents/MacOS/ErgoptiAutomationQuery") query_signed=1 ;;
+  "$APP_PATH/Contents/MacOS/SystemSwitcherState") switcher_signed=1 ;;
+  "$APP_PATH/Contents/MacOS/ErgoptiPlus")
+   [ "$query_signed" = 1 ] && [ "$switcher_signed" = 1 ] || return 73 ;;
+ esac
+ printf 'sign:%s\n' "$argument"
+}
 shasum() { printf 'fixedsignedswitcher\n'; }
 ${sign}
 codesign_native_runtime
@@ -98,9 +109,9 @@ codesign_native_runtime
 	const events = replay.stdout.trim().split(/\r?\n/);
 	assert(events[0] === 'publisher:copied');
 	assert(events[1].endsWith('/Contents/Frameworks/Sparkle.framework'));
-	assert(events[2].endsWith('/Contents/MacOS/ErgoptiPlus'));
-	assert(events[3].endsWith('/Contents/MacOS/ErgoptiAutomationQuery'));
-	assert(events[4].endsWith('/Contents/MacOS/SystemSwitcherState'));
+	assert(events[2].endsWith('/Contents/MacOS/ErgoptiAutomationQuery'));
+	assert(events[3].endsWith('/Contents/MacOS/SystemSwitcherState'));
+	assert(events[4].endsWith('/Contents/MacOS/ErgoptiPlus'));
 	assert(events[5] === 'publisher:seal');
 	assert(events[6].endsWith('/app'));
 	assert(events[7] === 'publisher:verify' && events.length === 8);

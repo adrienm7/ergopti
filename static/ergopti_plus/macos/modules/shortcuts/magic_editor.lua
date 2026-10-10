@@ -14,11 +14,14 @@ local Policy = require("shortcuts.magic_editor")
 local Registrar = require("adapters.hotkey_registrar")
 local Broker = require("adapters.input_source_broker")
 local Probe = require("adapters.keyboard_source_probe")
+local original_source_id = rawget(Probe, "current_source_id")
+local original_request = rawget(Probe, "request")
 local FileSystem = require("adapters.file_system")
 local JsonCodec = require("adapters.json_codec")
 local Paths = require("infra.paths")
 local Manifest = require("infra.manifest_reader")
 local MagicKeySource = require("modules.keymap.magic_key_source")
+local Geometry = require("adapters.keyboard_geometry")
 local Logger = require("infra.logger")
 
 local LOG = "shortcuts.magic_editor"
@@ -33,6 +36,16 @@ local _registry = nil
 local _subscribed = false
 local _acquisition_depth = 0
 local _cancel_depth = 0
+
+--- Retains the exact source issuer loaded before any external constructor read.
+--- Replacement values cannot publish signed-source proof through this owner.
+local function probe_current()
+	return rawequal(package.loaded["adapters.keyboard_source_probe"], Probe)
+		and getmetatable(Probe) == nil and type(original_source_id) == "function"
+		and type(original_request) == "function"
+		and rawequal(rawget(Probe, "current_source_id"), original_source_id)
+		and rawequal(rawget(Probe, "request"), original_request)
+end
 
 local function registry()
 	if _registry then return _registry end
@@ -78,7 +91,7 @@ end
 --- inputs; a true callback result never authenticates a replacement frame.
 local function attempt_matches(attempt)
 	local spec, context, ports = attempt.spec, attempt.context, attempt.ports
-	if not _started or _spec ~= spec or attempt.generation ~= _generation
+	if not probe_current() or not _started or _spec ~= spec or attempt.generation ~= _generation
 		or spec.context ~= context or spec.action ~= attempt.action
 		or spec.configuration_generation ~= attempt.configuration
 		or spec.is_current ~= ports.is_current or spec.is_action ~= ports.is_action
@@ -114,10 +127,12 @@ local function project(receipt, attempt)
 	local context = attempt.context
 	local candidates, remapped_candidates, known = {}, {}, {}
 	local by_native = {}
+	local keyboard_type = receipt and receipt.keyboard_type or nil
 	for code, entry in pairs(registry()) do
 		if entry.kind == "key" and type(entry.hs) == "number" then
 			known[code] = true
-			by_native[entry.hs] = code
+			local native = Geometry.physical_code(entry, keyboard_type)
+			if native ~= nil then by_native[native] = code end
 		end
 	end
 	for _, level in ipairs(receipt and receipt.levels or {}) do
@@ -125,7 +140,7 @@ local function project(receipt, attempt)
 		if code then
 			local remapped = MagicKeySource.remaps(level.code, {}, function()
 				return attempt.replace_active
-			end)
+			end, keyboard_type)
 			local candidate = {
 				code = code,
 				native_code = level.code,
@@ -176,9 +191,9 @@ local function deliver()
 		paused = context.paused, inhibited = context.inhibited, trigger = context.trigger,
 		magic_source = context.magic_source, replace_active = context.replace_active,
 	}
-	local source_id = Probe.current_source_id
+	local source_id = original_source_id
 	local function owner_current()
-		if not _started or _spec ~= spec or _decision ~= decision or _handle ~= handle
+		if not probe_current() or not _started or _spec ~= spec or _decision ~= decision or _handle ~= handle
 			or _generation ~= epoch or _acquisition_depth ~= 0 or _cancel_depth ~= 0
 			or spec.context ~= context or spec.action ~= action or spec.configuration_generation ~= configuration
 			or context.legacy_present or context.assignment_unavailable
@@ -220,6 +235,7 @@ function M.refresh()
 	local cancelled = cancel_attempt()
 	local released = release_native()
 	if not cancelled or not released then return false end
+	if not probe_current() then return false end
 	if not _started or _spec.action == "none" or _spec.context.legacy_present
 		or _spec.context.assignment_unavailable then return true end
 	local spec, context = _spec, _spec.context
@@ -228,7 +244,7 @@ function M.refresh()
 		action = spec.action, configuration = spec.configuration_generation,
 		legacy_present = context.legacy_present, assignment_unavailable = context.assignment_unavailable,
 		ports = {
-			source_id = Probe.current_source_id, is_current = spec.is_current, is_action = spec.is_action,
+			source_id = original_source_id, is_current = spec.is_current, is_action = spec.is_action,
 			trigger = context.trigger, magic_source = context.magic_source, replace_active = context.replace_active,
 			paused = context.paused, inhibited = context.inhibited,
 		},
@@ -252,7 +268,7 @@ function M.refresh()
 		if not attempt_matches(attempt) or _attempt ~= nil then return false end
 	end
 	_attempt = attempt
-	local operation = Probe.request({ source_id = source_id, codes = codes }, function(receipt, reason)
+	local operation = original_request({ source_id = source_id, codes = codes }, function(receipt, reason)
 		if not current(attempt) then return end
 		local decision = project(receipt, attempt)
 		if not current(attempt) then return end
@@ -286,6 +302,11 @@ function M.refresh()
 			Logger.error(LOG, "Settled input-source proof retains native cleanup debt.")
 		end
 	end)
+	if not probe_current() then
+		attempt.fenced = true
+		cancel_attempt()
+		return false
+	end
 	if attempt.fenced then return cancel_attempt() end
 	return true
 end
@@ -294,6 +315,7 @@ end
 --- @param spec table Canonical assignment, live context and parent admission.
 --- @return boolean accepted
 function M.start(spec)
+	if not probe_current() then return false end
 	_spec = spec
 	_started = true
 	_subscribed = true

@@ -10,8 +10,8 @@
 --- FEATURES & RATIONALE:
 --- 1. The binding names the target language: "ui" (the interface language,
 ---    followed when the user changes it) or a locale code of
----    _shared/data/locale_names.json. Only shipped locales are accepted, so the
----    picker and the native prompt offer a closed list and a typo is refused.
+---    _shared/data/locale_names.json. A free language name is also accepted within the
+---    shared byte bound; native input preserves the per-binding receipt.
 --- 2. The prompt names the language by its native name ("Deutsch", "日本語"),
 ---    which models understand, so no second table of names is kept.
 --- 3. Prompt, tag and token budget live in _shared/modules/llm/translate.json.
@@ -21,6 +21,7 @@
 --- ==============================================================================
 
 local M = {}
+local Utf8 = require("compat.utf8")
 
 
 
@@ -32,16 +33,29 @@ local M = {}
 -- ====================================
 -- ====================================
 
+--- Checks Unicode text and the action delimiter boundary, independent of locale availability.
+--- @param value string Language name or legacy token.
+--- @return boolean valid
+function M.is_language_text(value)
+	if type(value) ~= "string" or value == "" or value:match("^%s") or value:match("%s$") then return false end
+	if value:find("[|{}]") or value:find("[%z\1-\31\127]") then return false end
+	if not Utf8.len(value) then return false end
+	for _, scalar in Utf8.codes(value) do
+		if scalar >= 0x80 and scalar <= 0x9F then return false end
+	end
+	return true
+end
+
 --- Parses a binding value.
 --- @param value string The stored parameter.
 --- @param config table Decoded translate.json.
 --- @param names table Decoded locale_names.json.
---- @return string|nil target "ui" or a locale code; nil when invalid.
+--- @return string|nil target Admitted language value; nil when invalid.
 function M.parse(value, config, names)
-	if type(value) ~= "string" then return nil end
-	if value == config.ui_value then return value end
-	if type(names.locales) == "table" and type(names.locales[value]) == "table" then return value end
-	return nil
+	if type(config.max_language_bytes) ~= "number" or config.max_language_bytes % 1 ~= 0
+		or config.max_language_bytes < 1 then error("translate: invalid language byte limit") end
+	if not M.is_language_text(value) or #value > config.max_language_bytes then return nil end
+	return value
 end
 
 --- Reports whether a binding value is valid.
@@ -126,6 +140,35 @@ function M.extract(config, block)
 	text = text:match("^%s*(.-)%s*$")
 	if text == "" then return nil end
 	return text
+end
+
+--- Resolves an admitted target without interpreting an unknown interface locale as a language name.
+--- @param value string Stored binding target.
+--- @param config table Decoded translate.json.
+--- @param names table Decoded locale_names.json.
+--- @param ui_locale string Current interface locale.
+--- @return string|nil language
+function M.resolve_language(value, config, names, ui_locale)
+	local target = M.parse(value, config, names)
+	if not target then return nil end
+	if target == config.ui_value then return M.language_name(ui_locale, names) end
+	return M.language_name(target, names) or target
+end
+
+--- Builds a detached contextual rewrite profile; never publishes an active profile.
+--- @param value string Stored binding target.
+--- @param config table Decoded translate.json.
+--- @param names table Decoded locale_names.json.
+--- @param ui_locale string Current interface locale.
+--- @return table|nil profile
+function M.prediction_profile(value, config, names, ui_locale)
+	local language = M.resolve_language(value, config, names, ui_locale)
+	if not language then return nil end
+	if type(config.prediction_prompt) ~= "string" or config.prediction_prompt == "" then
+		error("translate: missing contextual prompt")
+	end
+	return { id = "translate", label = language, batch = false,
+		system_single = (config.prediction_prompt:gsub("{language}", function() return language end)) }
 end
 
 return M

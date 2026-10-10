@@ -9,6 +9,8 @@
 #include <stdbool.h>
 #include <sys/stat.h>
 #include <limits.h>
+#include <stdint.h>
+#include <mach/mach_time.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -18,6 +20,9 @@
 static const AEEventClass probe_class = ERGOPTI_PROBE_EVENT_CLASS;
 static const AEEventID probe_event = ERGOPTI_PROBE_EVENT_ID;
 static const AEKeyword nonce_parameter = ERGOPTI_PROBE_NONCE_PARAMETER;
+
+int owned_appleevent_permission(const AEAddressDesc *target,
+    AEEventClass event_class, AEEventID event_id, bool ask);
 
 static int valid_nonce(const char *value) {
     if (strlen(value) != 36) return 0;
@@ -173,6 +178,63 @@ static int observe_sender_policy(NSApplication *application) {
     }
 }
 
+/* Python's macOS monotonic_ns clock is this same public mach clock. */
+static bool foreground_now_ns(uint64_t *value) {
+    mach_timebase_info_data_t base;
+    if (mach_timebase_info(&base) != KERN_SUCCESS || base.numer == 0 || base.denom == 0)
+        return false;
+    const unsigned __int128 ns = (unsigned __int128)mach_absolute_time() * base.numer / base.denom;
+    if (ns > UINT64_MAX) return false;
+    *value = (uint64_t)ns;
+    return true;
+}
+
+static bool foreground_deadline_ns(uint64_t *value) {
+    const char *encoded = getenv("ERGOPTI_OWNED_AUTOMATION_DEADLINE_NS");
+    if (encoded == NULL || encoded[0] < '1' || encoded[0] > '9') return false;
+    size_t count = 0;
+    while (count < 21 && encoded[count] != '\0') count++;
+    if (count > 20) return false;
+    for (size_t index = 0; index < count; index++)
+        if (encoded[index] < '0' || encoded[index] > '9') return false;
+    errno = 0;
+    char *end = NULL;
+    const unsigned long long parsed = strtoull(encoded, &end, 10);
+    if (errno != 0 || end == encoded || *end != '\0' || parsed == 0) return false;
+    *value = (uint64_t)parsed;
+    return true;
+}
+
+/* Normal activation can complete asynchronously. Only this explicitly opted-in
+ * same app pumps its own events; fresh activity before the original deadline is
+ * mandatory, and neither activation nor event processing grants permission. */
+static int admit_sender_foreground_request(NSApplication *application) {
+    if (application == nil) return 1;
+    uint64_t deadline, now, previous;
+    if (!foreground_deadline_ns(&deadline) || !foreground_now_ns(&now) || now >= deadline)
+        return 2;
+    previous = now;
+    if ([application isActive]) {
+        return foreground_now_ns(&now) && now >= previous && now < deadline ? 0 : 2;
+    }
+    [application finishLaunching];
+    if ([application activationPolicy] != NSApplicationActivationPolicyAccessory) return 2;
+    [application activateIgnoringOtherApps:YES];
+    while (true) {
+        if (!foreground_now_ns(&now) || now < previous || now >= deadline) return 2;
+        previous = now;
+        if ([application isActive]) {
+            return foreground_now_ns(&now) && now >= previous && now < deadline ? 0 : 2;
+        }
+        const double remaining = (double)(deadline - now) / 1000000000.0;
+        const double slice = remaining < 0.05 ? remaining : 0.05;
+        NSEvent *event = [application nextEventMatchingMask:NSEventMaskAny
+            untilDate:[NSDate dateWithTimeIntervalSinceNow:slice]
+            inMode:NSDefaultRunLoopMode dequeue:YES];
+        if (event != nil) [application sendEvent:event];
+    }
+}
+
 /* A separate closed metadata frame never changes nonce/reply admission. */
 static void emit_sender_identity(const struct SenderIdentityObservation *identity,
     int before_policy, int after_policy) {
@@ -237,7 +299,9 @@ finished:
 
 int main(int argc, char **argv) {
     if (argc != 4 || !valid_nonce(argv[2]) ||
-        (strcmp(argv[3], "success") != 0 && strcmp(argv[3], "denied") != 0)) return 64;
+        (strcmp(argv[3], "success") != 0 && strcmp(argv[3], "denied") != 0 &&
+         strcmp(argv[3], "permission-query") != 0 &&
+         strcmp(argv[3], "permission-request") != 0)) return 64;
     errno = 0;
     char *end = NULL;
     const long parsed = strtol(argv[1], &end, 10);
@@ -265,6 +329,28 @@ int main(int argc, char **argv) {
     AppleEvent event = {typeNull, NULL};
     AppleEvent reply = {typeNull, NULL};
     OSStatus status = AECreateDesc(typeKernelProcessID, &recipient, sizeof(recipient), &address);
+    if (strcmp(argv[3], "permission-query") == 0 ||
+        strcmp(argv[3], "permission-request") == 0) {
+        if (status != noErr) {
+            fputs("Owned Automation target construction failed\n", stderr);
+            AEDisposeDesc(&address);
+            return 65;
+        }
+        if (strcmp(argv[3], "permission-request") == 0) {
+            const int foreground = admit_sender_foreground_request(application);
+            if (foreground != 0) {
+                const char *state = foreground == 1 ? "unavailable" :
+                    foreground == 2 ? "inactive" : "unadmitted";
+                fprintf(stderr, "OWNED_APPLEEVENT_FOREGROUND/1 state=%s\n", state);
+                AEDisposeDesc(&address);
+                return 65;
+            }
+        }
+        const int outcome = owned_appleevent_permission(&address, probe_class, probe_event,
+            strcmp(argv[3], "permission-request") == 0);
+        AEDisposeDesc(&address);
+        return outcome;
+    }
     if (status == noErr) {
         status = AECreateAppleEvent(probe_class, probe_event, &address,
             kAutoGenerateReturnID, kAnyTransactionID, &event);

@@ -106,6 +106,7 @@ const needed = [
 	'../i18n.js',
 	'../redact.js',
 	'model.js',
+	'checks.js',
 	'script.js'
 ];
 report(

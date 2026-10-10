@@ -20,6 +20,7 @@ static/ergopti_plus/_shared/core/ports/contracts.json
 static/ergopti_plus/_shared/data/metrics_general_category_aliases.json
 static/ergopti_plus/_shared/data/owned_runtime_service_reference.generated.json
 static/ergopti_plus/_shared/modules/menu/menu_manifest.json
+static/ergopti_plus/macos/modules/llm/managed-python-downloads.json
 static/ergopti_plus/docs/architecture.md
 static/layouts/registry/index.json
 
@@ -28,3 +29,8 @@ static/layouts/registry/index.json
 
 # Third-party code kept byte-identical to its upstream release
 **/vendor/
+
+# Promo video: public/ is a hard-link mirror of static/ (formatting it would
+# rewrite the originals through the links) and out/ holds renders.
+/video/public
+/video/out

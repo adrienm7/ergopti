@@ -25,7 +25,7 @@ const path = require('node:path');
 const crypto = require('node:crypto');
 const timerContract = require('../diagnostics/hs_delayed_timer_contract.json');
 const karabinerContract = require('../diagnostics/hs_karabiner_config_contract.json');
-const pipeline = require('./ci-pipeline.cjs');
+const pipeline = require('./ci-full-default.cjs');
 const {
 	healthyUpgrade,
 	runContractCases,
@@ -95,12 +95,157 @@ function windowsStartup() {
 	};
 }
 
+/** An independently authored cold native receipt; this never executes macOS. */
+function coldBootstrapRecord() {
+	const hash = (relative) =>
+		crypto
+			.createHash('sha256')
+			.update(fs.readFileSync(path.resolve(__dirname, '../..', relative)))
+			.digest('hex');
+	const paths = [
+		'/Applications/Xcode.app/Contents/Developer/usr/bin/python3',
+		'/Library/Frameworks/Python.framework/Versions/Current/bin/python3',
+		'/opt/homebrew/bin/python3',
+		'/opt/homebrew/bin/uv',
+		'/usr/bin/python3',
+		'/usr/bin/uv',
+		'/usr/local/bin/python3',
+		'/usr/local/bin/uv'
+	];
+	const profile =
+		'(version 1)\n(allow default)\n(deny file-read* process-exec\n' +
+		'  (literal "/Applications/Xcode.app/Contents/Developer/usr/bin/python3")\n' +
+		'  (literal "/Library/Frameworks/Python.framework/Versions/Current/bin/python3")\n' +
+		'  (literal "/opt/homebrew/bin/python3")\n  (literal "/opt/homebrew/bin/uv")\n' +
+		'  (literal "/usr/bin/python3")\n  (literal "/usr/bin/uv")\n' +
+		'  (literal "/usr/local/bin/python3")\n  (literal "/usr/local/bin/uv")\n)\n';
+	const nonce = '01234567-89ab-cdef-0123-456789abcdef';
+	const sources = Object.fromEntries(
+		[
+			'macos/modules/llm/network-retry.sh',
+			'macos/modules/llm/ensure-mlx-deps.sh',
+			'macos/modules/llm/managed_bootstrap_http.py',
+			'macos/modules/llm/mlx_deps_checker.lua',
+			'macos/modules/llm/uv-release.sh',
+			'macos/modules/llm/managed-python-release.sh',
+			'macos/modules/llm/managed-python-downloads.json',
+			'macos/adapters/native_bootstrap_pty.lua',
+			'macos/adapters/python_interpreter.lua',
+			'macos/platform/network/native_http.py',
+			'_shared/python/network_proxy_policy.py',
+			'_shared/lua/core/llm/native_pty_receipt.lua',
+			'_shared/modules/network/proxy_policy.json',
+			'_shared/modules/llm/managed_python_release.json',
+			'macos/uv.lock',
+			'macos/pyproject.toml'
+		].map((relative) => [relative, hash('static/ergopti_plus/' + relative)])
+	);
+	return {
+		schema_version: 1,
+		contract: 'macos-native-cold-bootstrap-v1',
+		runner: 'macos-15',
+		sha: 'a'.repeat(40),
+		receipt: {
+			version: 1,
+			status: 'passed',
+			sha: 'a'.repeat(40),
+			build_commit: 'a'.repeat(40),
+			platform: 'darwin',
+			architecture: 'arm64',
+			runtime_environment: 'controlled isolated cold environment',
+			signature_verified: true,
+			uv: 'uv 0.12.21',
+			python: '3.11.16',
+			imports: 'passed',
+			helpers_retired: true,
+			cleanup: true,
+			managed_runtime_isolated_exec: true,
+			launcher_sha256: '1'.repeat(64),
+			hammerspoon_sha256: '2'.repeat(64),
+			official_hammerspoon: {
+				version: '1.1.1',
+				sha256: '11bb1c90faf5427f37c7bd4fe7eab9774ae43e1d5cb020c5b3088dac32849efa',
+				bytes: 9704557
+			},
+			sources,
+			diagnostics: {
+				'tools/diagnostics/macos_cold_bootstrap.lua': hash(
+					'tools/diagnostics/macos_cold_bootstrap.lua'
+				),
+				'tools/diagnostics/macos_cold_bootstrap.py': hash(
+					'tools/diagnostics/macos_cold_bootstrap.py'
+				)
+			},
+			fingerprint: sources['macos/pyproject.toml'] + ':' + sources['macos/uv.lock'],
+			isolation: {
+				profile_sha256: crypto.createHash('sha256').update(profile).digest('hex'),
+				paths,
+				host_files_preserved: true,
+				observations: [
+					{
+						path: '/usr/bin/python3',
+						sha256: '3'.repeat(64),
+						device: '27',
+						inode: '123',
+						bytes: 1234,
+						read_denied: true,
+						native: true,
+						exec_denied: true
+					}
+				]
+			},
+			caller: {
+				version: 1,
+				success: true,
+				state: 'ready',
+				runtime_installed: true,
+				runtime: 'native Hammerspoon',
+				tasks: 1,
+				absent_python_selected: true,
+				python_resolver: 'unmodified production resolver',
+				python_state: 'python_missing',
+				native_python_candidates_count: 0,
+				denied_runtime_paths: paths,
+				receipt_retired: true,
+				receipt_removed: true,
+				worker_status: 0,
+				source_sha256: sources['macos/modules/llm/ensure-mlx-deps.sh'],
+				native_cli: ['--managed-pty-worker', '1800000'],
+				worker_pid: 123,
+				receipt_path: '/private/owned/retired-receipt',
+				nonce,
+				physical_receipt: {
+					version: 1,
+					nonce,
+					state: 'retired',
+					group_retired: true,
+					guardian_reaped: true,
+					pty_eof: true,
+					handles_closed: true,
+					status_valid: true,
+					exit_status: 0,
+					worker_status: 0,
+					source_admitted: true
+				}
+			}
+		}
+	};
+}
+
 for (const platform of ['windows', 'macos']) {
 	for (const release of [false, true]) {
 		const jobs =
 			platform === 'windows'
 				? ['test-ahk', 'e2e-ahk', 'package-windows', 'launch-windows']
-				: ['test-hs', 'e2e-hs', 'package-macos', 'launch', 'tooltip-canvas'];
+				: [
+						'test-hs',
+						'e2e-hs',
+						'package-macos',
+						'launch',
+						'tooltip-canvas',
+						'managed-ollama-native',
+						'cold-bootstrap-native'
+					];
 		const runners =
 			platform === 'windows'
 				? ['windows-latest']
@@ -114,6 +259,7 @@ for (const platform of ['windows', 'macos']) {
 			release,
 			scenarios,
 			sha: 'a'.repeat(40),
+			coldBootstrap: platform === 'macos' ? [coldBootstrapRecord()] : [],
 			needs: Object.fromEntries(jobs.map((job) => [job, { result: 'success' }])),
 			evidence: runners.flatMap((runner) =>
 				scenarios.map((scenario) => ({
@@ -499,6 +645,103 @@ for (const [job, platform] of [
 		pipeline.job(job).includes(`node tools/test/desktop-ci-evidence.cjs verify ${platform}`)
 	);
 }
+/** Requires actual native Ollama inputs and receiving before Brew can fail. */
+function checkManagedOllamaNative(body) {
+	assert.equal(pipeline.field(body, 'needs'), null);
+	assert.equal(pipeline.field(body, 'if'), null);
+	assert.equal(pipeline.field(body, 'continue-on-error'), null);
+	assert.equal(pipeline.field(body, 'runs-on'), '${{ matrix.runner }}');
+	assert.match(body, /fail-fast: false/);
+	assert.match(body, /runner: macos-15\n\s+architecture: arm64/);
+	assert.match(body, /runner: macos-15-intel\n\s+architecture: amd64/);
+	assert.match(body, /ERGOPTI_RELEASE_TAG: \$\{\{ inputs\.tag \}\}/);
+	assert.match(body, /GOTOOLCHAIN: local/);
+	const acquire = pipeline.step(body, 'Acquire and verify genuine pinned upstream inputs');
+	assert.match(
+		acquire,
+		/git -C "\$ERGOPTI_OLLAMA_SOURCE" fetch --depth=1 --no-tags origin "\$ERGOPTI_OLLAMA_SOURCE_COMMIT"/
+	);
+	assert.match(acquire, /actual == identity\['sha256'\]/);
+	assert.match(acquire, /archive\.stat\(\)\.st_size == identity\['bytes'\]/);
+	const build = pipeline.step(body, 'Build and admit the actual native source asset');
+	for (const command of [
+		'tools/build/build-macos-managed-ollama.py',
+		'tools/test/macos_managed_ollama_catalogue_test.py --native',
+		'tools/build/stage-macos-managed-ollama-catalogue.py'
+	])
+		assert.ok(build.includes(command));
+	assert.match(build, /--release "\$ERGOPTI_RELEASE" --release-tag "\$ERGOPTI_RELEASE_TAG"/);
+	const listener = pipeline.step(
+		body,
+		'Qualify actual SDK accepted-owner and deadline XCTest controls'
+	);
+	assert.match(
+		listener,
+		/--filter 'ManagedOllamaAPIWorkerTests\|ManagedPTYWorkerTests\|ManagedImageAliasTests\|OwnedSuspendedImageTests\|ManagedListenerPathIdentityTests\|ManagedNetworkBootstrapTests'/
+	);
+	assert.match(listener, /Executed 12 tests, with 0 failures/);
+	assert.match(listener, /Executed 11 tests, with 0 failures/);
+	assert.match(listener, /ManagedPTYWorkerTests/);
+	assert.match(listener, /Executed 4 tests, with 0 failures/);
+	assert.match(listener, /Executed 6 tests, with 0 failures/);
+	assert.match(listener, /Executed 2 tests, with 0 failures/);
+	assert.match(listener, /ManagedNetworkBootstrapTests/);
+	assert.match(listener, /Executed 41 tests, with 0 failures/);
+	assert.equal(pipeline.stepField(listener, 'continue-on-error'), null);
+	const receive = pipeline.step(
+		body,
+		'Receive actual native model create, pull, inference and retirement'
+	);
+	assert.match(receive, /for profile in pac-inline pac-url explicit-proxy/);
+	assert.match(receive, /tools\/diagnostics\/macos_managed_ollama_receiving\.py/);
+	assert.match(
+		receive,
+		/--archive "\$ERGOPTI_OLLAMA_ASSET" --catalogue "\$ERGOPTI_OLLAMA_CATALOGUE"/
+	);
+	assert.equal(pipeline.stepField(receive, 'continue-on-error'), null);
+	assert.doesNotMatch(body, /gh release|softprops\/action-gh-release|createRelease|--cross/);
+}
+const managedOllamaNative = pipeline.job('managed-ollama-native');
+checkManagedOllamaNative(managedOllamaNative);
+assert.deepEqual(
+	pipeline.needsOf(pipeline.job('macos-ok')).sort(),
+	[
+		'test-hs',
+		'e2e-hs',
+		'package-macos',
+		'launch',
+		'tooltip-canvas',
+		'managed-ollama-native',
+		'cold-bootstrap-native'
+	].sort()
+);
+assert.ok(pipeline.job('macos').includes('tag: ${{ needs.validate.outputs.tag }}'));
+for (const [from, to] of [
+	['runs-on: ${{ matrix.runner }}', 'runs-on: ubuntu-latest'],
+	['fail-fast: false', 'fail-fast: true'],
+	['runner: macos-15-intel', 'runner: macos-15'],
+	['architecture: amd64', 'architecture: arm64'],
+	['GOTOOLCHAIN: local', 'GOTOOLCHAIN: auto'],
+	['fetch --depth=1 --no-tags origin', 'fetch --depth=1 --no-tags other'],
+	["actual == identity['sha256']", 'actual == actual'],
+	['macos_managed_ollama_catalogue_test.py --native', 'macos_managed_ollama_catalogue_test.py'],
+	['for profile in pac-inline pac-url explicit-proxy', 'for profile in pac-inline'],
+	['Executed 12 tests, with 0 failures', 'Executed 0 tests, with 0 failures'],
+	[
+		"    name: 'Managed Ollama native",
+		"    needs: package-macos\n    name: 'Managed Ollama native"
+	],
+	["    name: 'Managed Ollama native", "    if: inputs.release\n    name: 'Managed Ollama native"],
+	[
+		"    name: 'Managed Ollama native",
+		"    continue-on-error: true\n    name: 'Managed Ollama native"
+	]
+]) {
+	const changed = managedOllamaNative.replace(from, to);
+	assert.notEqual(changed, managedOllamaNative, from);
+	assert.throws(() => checkManagedOllamaNative(changed), from);
+}
+
 for (const [job, name] of [
 	['launch', 'Retain launch evidence'],
 	['launch-windows', 'Upload mandatory launch evidence']
@@ -1608,6 +1851,378 @@ require('./support/windows-startup-log-runtime.cjs')();
 }
 // CI_INSTALLED_ARCHIVE_EVIDENCE_END
 
+// The cold proof supplements all existing job/launch assertions.
+const {
+	verifyColdBootstrapRecords,
+	recordColdMac,
+	readColdBootstrapEvidence
+} = require('./desktop-ci-evidence.cjs');
+verifyColdBootstrapRecords([coldBootstrapRecord()], 'a'.repeat(40));
+let coldRejections = 0;
+function rejectCold(mutate) {
+	const records = [coldBootstrapRecord()];
+	mutate(records);
+	assert.throws(() => verifyColdBootstrapRecords(records, 'a'.repeat(40)));
+	coldRejections += 1;
+}
+rejectCold((records) => records.pop());
+rejectCold((records) => records.push(structuredClone(records[0])));
+for (const field of Object.keys(coldBootstrapRecord()))
+	rejectCold((records) => {
+		delete records[0][field];
+	});
+for (const [field, value] of [
+	['sha', 'b'.repeat(40)],
+	['build_commit', 'b'.repeat(40)],
+	['status', 'failed'],
+	['architecture', 'x86_64'],
+	['platform', 'linux'],
+	['runtime_environment', 'stock host physically missing Python'],
+	['signature_verified', false],
+	['cleanup', false],
+	['helpers_retired', false],
+	['managed_runtime_isolated_exec', false],
+	['imports', 'skipped'],
+	['uv', 'uv 0.12.20'],
+	['python', '3.11.15'],
+	['fingerprint', 'foreign']
+])
+	rejectCold((records) => {
+		records[0].receipt[field] = value;
+	});
+for (const field of Object.keys(coldBootstrapRecord().receipt))
+	rejectCold((records) => {
+		delete records[0].receipt[field];
+	});
+for (const field of [
+	'group_retired',
+	'guardian_reaped',
+	'pty_eof',
+	'handles_closed',
+	'status_valid',
+	'source_admitted'
+])
+	for (const value of [false, null, 1, 'true'])
+		rejectCold((records) => {
+			records[0].receipt.caller.physical_receipt[field] = value;
+		});
+for (const [field, value] of [
+	['tasks', true],
+	['tasks', 2],
+	['worker_status', false],
+	['worker_status', 74],
+	['worker_pid', 0],
+	['python_resolver', 'forced missing Python test adapter'],
+	['python_state', 'ready'],
+	['native_python_candidates_count', true],
+	['native_python_candidates_count', 1],
+	['receipt_removed', false],
+	['receipt_retired', false],
+	['nonce', 'foreign'],
+	['native_cli', ['--managed-pty-worker', '600000']],
+	['source_sha256', '0'.repeat(64)]
+])
+	rejectCold((records) => {
+		records[0].receipt.caller[field] = value;
+	});
+for (const field of Object.keys(coldBootstrapRecord().receipt.caller))
+	rejectCold((records) => {
+		delete records[0].receipt.caller[field];
+	});
+rejectCold((records) => {
+	records[0].receipt.sources['macos/modules/llm/ensure-mlx-deps.sh'] = '0'.repeat(64);
+});
+rejectCold((records) => {
+	delete records[0].receipt.sources['macos/adapters/python_interpreter.lua'];
+});
+rejectCold((records) => {
+	records[0].receipt.diagnostics['tools/diagnostics/macos_cold_bootstrap.lua'] = '0'.repeat(64);
+});
+rejectCold((records) => {
+	records[0].receipt.official_hammerspoon.sha256 = '0'.repeat(64);
+});
+rejectCold((records) => {
+	records[0].receipt.official_hammerspoon.bytes = 9704558;
+});
+for (const [field, value] of [
+	['read_denied', false],
+	['read_denied', 1],
+	['exec_denied', false],
+	['exec_denied', 1],
+	['native', 1],
+	['inode', 0],
+	['device', null],
+	['bytes', 0],
+	['sha256', ''],
+	['path', '/foreign/python']
+])
+	rejectCold((records) => {
+		records[0].receipt.isolation.observations[0][field] = value;
+	});
+rejectCold((records) => {
+	records[0].receipt.isolation.observations = [];
+});
+rejectCold((records) => {
+	records[0].receipt.isolation.observations.push(records[0].receipt.isolation.observations[0]);
+});
+rejectCold((records) => {
+	records[0].receipt.isolation.host_files_preserved = false;
+});
+rejectCold((records) => {
+	records[0].receipt.isolation.paths.pop();
+});
+rejectCold((records) => {
+	records[0].receipt.isolation.paths.push('/usr/bin/python3');
+});
+rejectCold((records) => {
+	records[0].receipt.isolation.profile_sha256 = '0'.repeat(64);
+});
+rejectCold((records) => {
+	records[0].receipt.caller.denied_runtime_paths = [];
+});
+
+// Exact uint64 transport is independently pinned to actual APFS and boundary literals.
+for (const field of ['device', 'inode']) {
+	for (const value of ['1', '9007199254740993', '1152921500312523020', '18446744073709551615']) {
+		const records = [coldBootstrapRecord()];
+		records[0].receipt.isolation.observations[0][field] = value;
+		verifyColdBootstrapRecords(records, 'a'.repeat(40));
+	}
+	for (const value of [
+		undefined,
+		null,
+		true,
+		false,
+		1,
+		27,
+		123,
+		Number('1152921500312523020'),
+		9007199254740992,
+		1.5,
+		NaN,
+		Infinity,
+		'',
+		'0',
+		'00',
+		'01',
+		'-1',
+		'+1',
+		'1.0',
+		'1e3',
+		' 1',
+		'1 ',
+		'1\n',
+		'1\r',
+		'1\r\n',
+		'1\u2028',
+		'1\u2029',
+		'18446744073709551616',
+		'99999999999999999999',
+		'100000000000000000000'
+	])
+		rejectCold((records) => {
+			records[0].receipt.isolation.observations[0][field] = value;
+		});
+}
+console.log('Cold exact uint64 identity controls: 8 admissions, 60 refusals');
+
+/** Pins a native arm64 full application job without unrelated dependencies or publication. */
+function checkColdJob(body) {
+	assert.equal(pipeline.field(body, 'needs'), null);
+	assert.equal(pipeline.field(body, 'runs-on'), 'macos-15');
+	assert.equal(pipeline.field(body, 'if'), null);
+	assert.equal(pipeline.field(body, 'continue-on-error'), null);
+	assert.ok(Number(pipeline.field(body, 'timeout-minutes')) >= 40);
+	const prerequisites = pipeline.step(body, 'Require actual arm64 cold runtime prerequisites');
+	assert.match(prerequisites, /test -x \/usr\/bin\/sandbox-exec/);
+	assert.match(prerequisites, /test \"\$\(uname -m\)\" = arm64/);
+	const build = pipeline.step(body, 'Build independent signed cold application');
+	const receive = pipeline.step(body, 'Receive actual isolated cold native MLX bootstrap');
+	for (const step of [prerequisites, build, receive]) {
+		assert.equal(pipeline.stepField(step, 'if'), null);
+		assert.equal(pipeline.stepField(step, 'continue-on-error'), null);
+		assert.equal(pipeline.stepField(step, 'shell'), 'bash');
+	}
+	assert.match(build, /ERGOPTI_BUILD_COMMIT: \$\{\{ github.sha \}\}/);
+	assert.match(build, /ERGOPTI_RELEASE: 'false'/);
+	assert.match(build, /HAMMERSPOON_VERSION: '1\.1\.1'/);
+	assert.match(build, /bash tools\/build\/build_macos_app.sh/);
+	assert.match(build, /codesign --verify --deep --strict build\/macos\/ErgoptiPlus.app/);
+	assert.doesNotMatch(
+		body,
+		/--native-helper-only|brew install|gh release|TCC\.db|tccutil|continue-on-error|sudo rm|rm -rf.*(?:uv|python)/
+	);
+	assert.match(receive, /python3 tools\/diagnostics\/macos_cold_bootstrap.py/);
+	assert.match(receive, /--app "\$PWD\/build\/macos\/ErgoptiPlus.app"/);
+	assert.match(receive, /record-cold-macos/);
+	const officialUpload = pipeline.step(body, 'Retain official cold Ollama receipt only');
+	assert.equal(pipeline.stepField(officialUpload, 'if'), 'always()');
+	assert.match(officialUpload, /if-no-files-found: error/);
+	assert.match(officialUpload, /overwrite: true/);
+	assert.match(
+		officialUpload,
+		/path: \$\{\{ runner.temp \}\}\/native-cold-ollama-bootstrap\/receipt.json$/m
+	);
+	const upload = pipeline.step(body, 'Retain native cold bootstrap evidence');
+	assert.equal(pipeline.stepField(upload, 'if'), 'always()');
+	assert.match(upload, /if-no-files-found: error/);
+	assert.match(upload, /overwrite: true/);
+	assert.match(upload, /cold-bootstrap-evidence\.json/);
+}
+const coldJob = pipeline.job('cold-bootstrap-native');
+checkColdJob(coldJob);
+for (const [from, to] of [
+	['runs-on: macos-15', 'runs-on: ubuntu-latest'],
+	['timeout-minutes: 90', 'timeout-minutes: 5'],
+	['runs-on: macos-15', 'needs: package-macos\n    runs-on: macos-15'],
+	["ERGOPTI_RELEASE: 'false'", "ERGOPTI_RELEASE: 'true'"],
+	[
+		'bash tools/build/build_macos_app.sh',
+		'bash tools/build/build_macos_app.sh --native-helper-only'
+	],
+	['python3 tools/diagnostics/macos_cold_bootstrap.py', 'echo skipped cold receiving'],
+	['record-cold-macos', 'record-macos'],
+	['if-no-files-found: error', 'if-no-files-found: warn'],
+	['if: always()', 'if: success()'],
+	['shell: bash', 'if: false\n        shell: bash']
+]) {
+	const changed = coldJob.replace(from, to);
+	assert.notEqual(changed, coldJob);
+	assert.throws(() => checkColdJob(changed), from);
+}
+assert.ok(pipeline.needsOf(pipeline.job('macos-ok')).includes('cold-bootstrap-native'));
+assert.match(
+	pipeline.step(pipeline.job('macos-ok'), 'Download native cold bootstrap evidence'),
+	/cold-bootstrap-native-/
+);
+console.log(
+	`[OK] Cold native verdict retained existing launch/job assertions and rejected ${coldRejections} independent receipt mutations plus 10 workflow mutations.`
+);
+
+// A compiler failure must retain its actual transcript before unrelated tests.
+for (const [job, buildName, uploadName, transcript] of [
+	[
+		'package-macos',
+		'Build release launcher',
+		'Retain launcher build diagnostics',
+		'macos-release-launcher-build.log'
+	],
+	[
+		'package-macos',
+		'Build ErgoptiPlus.app',
+		'Retain application build diagnostics',
+		'macos-application-build.log'
+	],
+	[
+		'cold-bootstrap-native',
+		'Build independent signed cold application',
+		'Retain native cold bootstrap evidence',
+		'cold-bootstrap-application-build.log'
+	],
+	[
+		'managed-ollama-native',
+		'Build the actual launcher native transport roles',
+		'Retain actual native producer, catalogue and receiving evidence',
+		'managed-ollama-launcher-build.log'
+	],
+	[
+		'managed-ollama-native',
+		'Build and admit the actual native source asset',
+		'Retain actual native producer, catalogue and receiving evidence',
+		'managed-ollama-producer-build.log'
+	]
+]) {
+	const body = pipeline.job(job);
+	const build = pipeline.step(body, buildName);
+	const upload = pipeline.step(body, uploadName);
+	const check = (step, artifact) => {
+		assert.match(step, /set -euo pipefail/);
+		assert.ok(step.includes('2>&1 | tee "$RUNNER_TEMP/' + transcript + '"'));
+		assert.equal(pipeline.stepField(artifact, 'if'), 'always()');
+		assert.ok(artifact.includes('${{ runner.temp }}/' + transcript));
+	};
+	check(build, upload);
+	assert.throws(() => check(build.replace('2>&1 | tee', '| tee'), upload));
+	assert.throws(() => check(build.replace('set -euo pipefail', 'set -eu'), upload));
+	assert.throws(() => check(build, upload.replace('if: always()', 'if: success()')));
+	assert.throws(() =>
+		check(
+			build,
+			upload.replace('${{ runner.temp }}/' + transcript, '${{ runner.temp }}/missing.log')
+		)
+	);
+}
+assert.ok(
+	pipeline
+		.step(managedOllamaNative, 'Retain actual native producer, catalogue and receiving evidence')
+		.includes('receiving/*/native-receiving.json')
+);
+assert.doesNotMatch(
+	pipeline.step(
+		managedOllamaNative,
+		'Retain actual native producer, catalogue and receiving evidence'
+	),
+	/include-hidden-files: true/
+);
+console.log(
+	'[OK] Five actual native compiler/build transcripts remain available on failure; 20 independent retention mutations rejected.'
+);
+
+// Exercise actual record/read admission functions with portable literal data.
+{
+	const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'ergopti-cold-verdict-'));
+	const previousSha = process.env.GITHUB_SHA;
+	try {
+		process.env.GITHUB_SHA = 'a'.repeat(40);
+		const source = path.join(directory, 'receipt.json');
+		const output = path.join(directory, 'cold-bootstrap-evidence.json');
+		const rejected = coldBootstrapRecord().receipt;
+		rejected.caller.python_resolver = 'forced missing Python adapter';
+		fs.writeFileSync(source, JSON.stringify(rejected));
+		assert.throws(() => recordColdMac(source, output));
+		assert.equal(
+			fs.existsSync(output),
+			false,
+			'A fake missing-Python selection must publish no evidence'
+		);
+		fs.writeFileSync(source, JSON.stringify(coldBootstrapRecord().receipt));
+		recordColdMac(source, output);
+		assert.deepEqual(readColdBootstrapEvidence(directory), [coldBootstrapRecord()]);
+		assert.deepEqual(require('./desktop-ci-evidence.cjs').readEvidence(directory), []);
+		const duplicate = path.join(directory, 'other-artifact');
+		fs.mkdirSync(duplicate);
+		fs.copyFileSync(output, path.join(duplicate, 'cold-bootstrap-evidence.json'));
+		assert.throws(() =>
+			verifyColdBootstrapRecords(readColdBootstrapEvidence(directory), 'a'.repeat(40))
+		);
+	} finally {
+		if (previousSha === undefined) delete process.env.GITHUB_SHA;
+		else process.env.GITHUB_SHA = previousSha;
+		fs.rmSync(directory, { recursive: true, force: true });
+	}
+}
+
+// Surface actual SDK compiler/test refusal before fetching and building Go.
+{
+	const body = pipeline.job('managed-ollama-native');
+	const compile = pipeline.step(body, 'Build the actual launcher native transport roles');
+	const listener = pipeline.step(
+		body,
+		'Qualify actual SDK accepted-owner and deadline XCTest controls'
+	);
+	const producer = pipeline.step(body, 'Build and admit the actual native source asset');
+	assert.ok(body.indexOf(compile) < body.indexOf(listener));
+	assert.ok(body.indexOf(listener) < body.indexOf(producer));
+	assert.match(listener, /tests\? skipped/);
+	for (const name of [
+		'Retain independent native launcher compiler diagnostics',
+		'Retain independent native SDK XCTest diagnostics'
+	]) {
+		const upload = pipeline.step(body, name);
+		assert.equal(pipeline.stepField(upload, 'if'), 'always()');
+		assert.ok(body.indexOf(upload) < body.indexOf(producer));
+	}
+}
 // The new producer reads actual package/evidence files and appends only its own
 // admitted observation. Every failed attempt must preserve the fresh record.
 {

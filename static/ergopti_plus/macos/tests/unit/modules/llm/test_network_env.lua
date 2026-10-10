@@ -75,4 +75,22 @@ helpers.describe("managed-network-children", function()
 		helpers.assert_eq(command:sub(1, #prelude), prelude,
 			"the service pulls the models itself and reads only its own relay variables")
 	end)
+
+	helpers.it("managed HTTP admission preserves inherited selectors before the native receiver", function()
+		local NetworkEnv = require("modules.llm.network_env")
+		local prelude = assert(NetworkEnv.managed_http_prelude("TEST"))
+		helpers.assert_true(prelude:find("s.loader.exec_module(m); m._resolve_worker()", 1, true) ~= nil,
+			"identity admission must use the canonical native receiver")
+		helpers.assert_true(not prelude:find("apply_system_network", 1, true), "no seed-URL system relay may become an explicit environment selector")
+		helpers.assert_true(not prelude:find("export ", 1, true), "inherited proxy and bypass provenance remains intact")
+		helpers.assert_true(prelude:find("__ERGOPTI_OPAQUE_ADMISSION_V1__:accepted", 1, true) ~= nil)
+		if POSIX then
+			local output = run("PYTHON_BIN=/bin/false HTTPS_PROXY=http://reserved.example:3129 NO_PROXY=reserved.example bash -c "
+				.. sh_quote(prelude .. 'printf "__CHILD_STARTED__"'))
+			helpers.assert_eq(output, "[TEST] The bundled native network receiver is unavailable. No download was started.\n"
+				.. "__ERGOPTI_OPAQUE_ADMISSION_V1__:refused:unavailable:unavailable\n")
+			helpers.assert_true(not output:find("__CHILD_STARTED__", 1, true), "native identity refusal precedes download dispatch")
+		end
+	end)
+
 end)

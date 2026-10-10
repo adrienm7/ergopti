@@ -302,7 +302,11 @@ local function load_top_level()
 			end
 			if not for_hs then goto continue end
 		end
-		table.insert(result, { id = entry.id, greyed_when_paused = entry.greyed_when_paused == true })
+		local projected = { id = entry.id, greyed_when_paused = entry.greyed_when_paused == true }
+		if entry.disabled == true then
+			projected.disabled, projected.i18n, projected.reason_key = true, entry.i18n, entry.reason_key
+		end
+		table.insert(result, projected)
 		::continue::
 	end
 	Logger.debug(LOG, "Top level loaded from manifest (%d item(s)).", #result)
@@ -445,20 +449,24 @@ local function build_hotstrings_rows(ctx, menu_mods)
 			only[name] = true
 			names[#names + 1] = name
 		end
-		local items = {}
 		local bulk = type(menu_mods.hotstrings.build_language_bulk_actions) == "function"
 			and menu_mods.hotstrings.build_language_bulk_actions(ctx, names) or {}
-		for _, row in ipairs(bulk) do items[#items + 1] = row end
-		items[#items + 1] = { separator = true }
+		local categories = collect_groups(only, counts)
+		local items = ManifestMenu.template_rows("hotstring_language_frame", {}, {}, {
+			hotstring_language_switch = function() return bulk end,
+			hotstring_language_categories = function() return categories end,
+		})
 		local total = 0
-		for _, row in ipairs(collect_groups(only, counts)) do items[#items + 1] = row end
 		for _, name in ipairs(names) do
 			total = total + ((counts and counts.group_counts and counts.group_counts[name]) or 0)
 		end
-		language_rows[#language_rows + 1] = {
-			label = language_label(pack.locale) .. " (" .. fmt_grand(total) .. ")",
-			items = items,
-		}
+		if items then
+			local parents = ManifestMenu.template_rows("hotstring_language_parent_lua", {}, {
+				hotstring_language_name = function() return language_label(pack.locale) end,
+				hotstring_language_count = function() return fmt_grand(total) end,
+			}, { hotstring_language_children = items })
+			for _, row in ipairs(parents or {}) do language_rows[#language_rows + 1] = row end
+		end
 	end
 	local custom_item = type(menu_mods.hotstrings.build_custom) == "function"
 		and Logger.build(LOG, "hotstrings.build_custom", function(c) return menu_mods.hotstrings.build_custom(c, counts) end, ctx)
@@ -879,6 +887,9 @@ function M.generate(ctx, menu_mods, actions)
 		local id = entry.id
 		if id == "---" then
 			table.insert(items, { separator = true })
+		elseif entry.disabled == true then
+			table.insert(items, { label = i18n.get(entry.i18n), disabled = true,
+				disabled_reason_key = entry.reason_key })
 		elseif type(builders[id]) ~= "function" then
 			-- A declared row this driver has no builder for is a row the user was
 			-- promised and will not see.

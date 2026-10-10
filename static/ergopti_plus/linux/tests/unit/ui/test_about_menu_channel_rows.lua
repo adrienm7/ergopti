@@ -568,7 +568,7 @@ local function with_source_command(alternative, callback)
 		"_generated.locale_table", "keymap.magic_key_source", "modules.hotstrings.magic_key",
 		"modules.hotstrings.preview_settings", "modules.hotstrings.repeat_key", "ui.modal", "ui.text_prompt",
 		"llm.trigger_policy", "infra.version", "infra.installation", "ui.menu.start_at_login" }
-	local saved = {}
+	local saved, restore_source = {}, nil
 	for _, name in ipairs(names) do saved[name] = package.loaded[name]; package.loaded[name] = {} end
 	local ok, err = xpcall(function()
 		local seen = { effects = 0 }
@@ -585,15 +585,29 @@ local function with_source_command(alternative, callback)
 			return {kind = "local", version = "", commit = "known"}
 		end }
 		package.loaded["infra.installation"] = { is_source_run = function() return true end }
-		package.loaded["ui.menu.start_at_login"] = { enabled = function() return false end }
+		package.loaded["ui.menu.start_at_login"] = {
+			command_available = function() return true end,
+			enabled = function() return false end,
+		}
 		package.loaded["infra.manifest_menu"] = nil
 		local renderer = require("infra.manifest_menu")
-		package.loaded["infra.manifest_menu"] = setmetatable({ get_array = function(key)
-			if key == "top_level" then return {{id = "about"}} end
-			return renderer.get_array(key)
-		end }, { __index = renderer })
+		local root, parent = renderer.get_root(), nil
+		for _, row in ipairs(root.top_level) do
+			if row.id == "about" then parent = row end
+		end
+		helpers.assert_type(parent, "table", "the fixture retains the actual canonical About owner")
+		helpers.assert_eq(parent.type, "group", "the completed native child belongs to the declared group")
 		local declaration = renderer.get_array("about_source_menu")
 		helpers.assert_eq(#declaration, 1)
+		local original_top = root.top_level
+		local original_label, original_reason = declaration[1].i18n, declaration[1].disabled_reason_key
+		restore_source = function()
+			root.top_level = original_top
+			declaration[1].i18n, declaration[1].disabled_reason_key = original_label, original_reason
+		end
+		-- Isolate unrelated tray surfaces through the original source record, never
+		-- a facade that hides the genuine renderer methods or invents a parent.
+		root.top_level = {parent}
 		if alternative then
 			declaration[1].i18n = "common.restore_recommended"
 			declaration[1].disabled_reason_key = "common.clear_to_system"
@@ -620,6 +634,7 @@ local function with_source_command(alternative, callback)
 		end
 		callback(find(rows), seen)
 	end, debug.traceback)
+	if restore_source then restore_source() end
 	for _, name in ipairs(names) do package.loaded[name] = saved[name] end
 	if not ok then error(err, 0) end
 end

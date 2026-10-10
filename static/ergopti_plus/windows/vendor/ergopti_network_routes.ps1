@@ -3,6 +3,7 @@
 # Shared inventories define portable policy; WinINet formats remain native inputs.
 . (Join-Path $PSScriptRoot 'ergopti_windows_proxy_config.ps1')
 . (Join-Path $PSScriptRoot 'ergopti_native_proxy_ex.ps1')
+. (Join-Path $PSScriptRoot 'ergopti_network_pac.ps1')
 
 function Test-ErgoptiNetworkInt32 {
     param($Value)
@@ -13,12 +14,12 @@ function Test-ErgoptiNetworkInt32 {
 
 function New-ErgoptiRouteRefusal {
     param([string]$Backend = 'winhttp', [string]$Status = 'unavailable',
-        [int]$NativeError = 0, [bool]$ObservedNative = $false)
+        [int]$NativeError = 0, [bool]$ObservedNative = $false, [ValidateSet('win32','winsock','posix')][string]$NativeErrorDomain = 'win32')
     $Receipt = @{ backend = $Backend; stage = 'proxy_resolve';
         failure_provenance = $(if ($ObservedNative) { 'verified' } else { 'unknown' });
         proxy_resolution_status = $Status }
     if ($ObservedNative -and $NativeError -ne 0) {
-        $Receipt.native_errno_domain = 'win32'
+        $Receipt.native_errno_domain = $NativeErrorDomain
         $Receipt.native_errno = [string]$NativeError
     }
     return @{ Ok = $false; Routes = @(); Receipt = $Receipt }
@@ -263,37 +264,22 @@ function Resolve-ErgoptiNativeNetworkRoutes {
                 if ($Config.PacUrl -ne '') { $null = Get-ErgoptiDestination $Config.PacUrl }
                 $Remaining = [int][Math]::Min($LookupBudget, $BudgetMs - $Clock.ElapsedMilliseconds)
                 if ($Remaining -lt 1500) { return New-ErgoptiRouteRefusal }
-                $Native = [ErgoptiNativeProxyEx]::Resolve($DestinationUrl, $Config.PacUrl, $Config.AutoDetect,
-                    $Remaining, $Policy.max_selections, $Policy.max_proxy_bytes)
-                if (-not $Native.CallbacksRetired) {
+                $Native = Resolve-ErgoptiFullUrlPac -DestinationUrl $DestinationUrl -PacUrl $Config.PacUrl -AutoDetect $Config.AutoDetect `
+                    -Deadline ([ErgoptiNetworkPac]::CurrentTick() + $Remaining) -Policy $Policy
+                if (-not $Native.OwnersRetired) {
                     $Status = if ($Config.PacUrl -ne '') { 'pac_failed' } else { 'wpad_failed' }
-                    $Refusal = New-ErgoptiRouteRefusal 'winhttp' $Status $Native.NativeError ($Native.FailureOrigin -ceq 'native')
+                    $Refusal = New-ErgoptiRouteRefusal $Native.Backend $Status $Native.NativeError ($Native.FailureOrigin -ceq 'native') $(if($Native.NativeErrorDomain -cin @('win32','winsock','posix')){$Native.NativeErrorDomain}else{'win32'})
                     $Refusal.CleanupDebt = $true
                     return $Refusal
                 }
                 if ($Native.Kind -ceq 'no_auto_proxy' -and $Native.NativeError -eq 12180 -and
                     $Config.PacUrl -eq '' -and $Config.AutoDetect) {
                     $Routes = Get-ErgoptiStaticRoutes $Destination $Config $Policy 'wpad_absent'
-                } elseif (-not $Native.Ok -or $Native.Kind -cne 'routes') {
+                } elseif (-not $Native.Ok -or $Native.Kind -cne 'pac_routes') {
                     $Status = if ($Config.PacUrl -ne '') { 'pac_failed' } else { 'wpad_failed' }
-                    return New-ErgoptiRouteRefusal 'winhttp' $Status $Native.NativeError ($Native.FailureOrigin -ceq 'native')
+                    return New-ErgoptiRouteRefusal $Native.Backend $Status $Native.NativeError ($Native.FailureOrigin -ceq 'native') $(if($Native.NativeErrorDomain -cin @('win32','winsock','posix')){$Native.NativeErrorDomain}else{'win32'})
                 } else {
-                    if ($Native.Entries.Count -eq 0 -or $Native.Entries.Count -gt $Policy.max_selections) { throw 'Native ordered routes were refused.' }
-                    $Routes = @()
-                    foreach ($Entry in $Native.Entries) {
-                        if ($Entry.IsProxy) {
-                            if ($Entry.ProxyScheme -ne 1 -or $Entry.ProxyHost -eq '' -or
-                                $Entry.ProxyPort -lt 1 -or $Entry.ProxyHost -match '[\x00-\x20\x7f/@?#;=\\]') {
-                                throw 'Native proxy scheme or endpoint capability was refused.'
-                            }
-                            $Builder = [UriBuilder]::new('http', $Entry.ProxyHost, $Entry.ProxyPort)
-                            $Relay = Get-ErgoptiHttpRelay $Builder.Uri.AbsoluteUri $Policy
-                            $Routes += @{ Kind = 'proxy'; Endpoint = $Relay; Source = 'native_proxy'; Authentication = 'current_user_proxy_only' }
-                        } else {
-                            if ($Entry.ProxyHost -ne '' -or $Entry.ProxyPort -ne 0) { throw 'Native DIRECT descriptor was refused.' }
-                            $Routes += @{ Kind = 'direct'; Endpoint = ''; Authentication = 'none'; Source = $(if ($Entry.IsBypass) { 'native_bypass' } else { 'native_direct' }) }
-                        }
-                    }
+                    $Routes = ConvertFrom-ErgoptiPacRoutes $Native.Proxy $Policy
                 }
             }
             $Current = & $ReadConfig $Policy.max_proxy_bytes

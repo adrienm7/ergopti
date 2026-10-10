@@ -87,11 +87,37 @@ const SEPARATOR = '---';
 // a whole submenu unreachable, which is one of the things being checked.
 
 const OPENS_SUBMENU = {
-	keyboard_slots: {
-		menu: 'keyboard_group_frame',
-		platforms: ['hs'],
+	keyboard_slots: [
+		{
+			menu: 'keyboard_group_frame',
+			platforms: ['hs'],
+			kind: 'compose',
+			native_sources: { hs: 'macos/ui/menu/menu_keyboard_slots.lua' }
+		},
+		{
+			menu: 'slot_binding_frame',
+			platforms: ['linux'],
+			kind: 'compose',
+			native_sources: { linux: 'linux/ui/menu/menu_builder.lua' }
+		}
+	],
+	tap_keys: {
+		menu: 'slot_binding_frame',
+		platforms: ['linux'],
 		kind: 'compose',
-		native_sources: { hs: 'macos/ui/menu/menu_keyboard_slots.lua' }
+		native_sources: { linux: 'linux/ui/menu/menu_builder.lua' }
+	},
+	script_control_shortcuts: {
+		menu: 'slot_binding_frame',
+		platforms: ['linux'],
+		kind: 'compose',
+		native_sources: { linux: 'linux/ui/menu/menu_builder.lua' }
+	},
+	gesture_slots_linux: {
+		menu: 'slot_binding_frame',
+		platforms: ['linux'],
+		kind: 'compose',
+		native_sources: { linux: 'linux/ui/menu/menu_builder.lua' }
 	},
 	magic_key_source: {
 		menu: 'magic_key_source_menu',
@@ -529,7 +555,10 @@ const OPENS_SUBMENU = {
 		{ menu: 'programmable_hotstring_entry', platforms: ['hs', 'linux'] },
 		{ menu: 'programmable_hotstrings', platforms: ['ahk'] }
 	],
-	programmable_hotstrings: { menu: 'programmable_hotstrings', platforms: ['hs', 'linux'] },
+	programmable_hotstrings: {
+		menu: 'programmable_hotstrings',
+		platforms: ['hs', 'linux']
+	},
 	// Each standard category provider opens the shared explicit command head.
 	hotstring_categories_standard: 'hotstring_category_menu',
 	gestures: [
@@ -625,7 +654,10 @@ const OPENS_SUBMENU = {
 			native_sources: { hs: 'macos/ui/menu/menu_gestures.lua' }
 		}
 	],
-	gesture_mode_options: { menu: 'gesture_slot_mode_commands', platforms: ['hs'] },
+	gesture_mode_options: {
+		menu: 'gesture_slot_mode_commands',
+		platforms: ['hs']
+	},
 	gesture_sensitivity_options: {
 		menu: 'gesture_sensitivity_head',
 		platforms: ['hs'],
@@ -686,8 +718,14 @@ const OPENS_SUBMENU = {
 	],
 	// Both drivers render each pair's declaration: Windows opens it at the
 	// pointer, while macOS hangs it under the cached pair row.
-	key_combination_rows_left: { menu: 'key_combination_pair_menu', platforms: ['ahk', 'hs'] },
-	key_combination_rows_right: { menu: 'key_combination_pair_menu', platforms: ['ahk', 'hs'] },
+	key_combination_rows_left: {
+		menu: 'key_combination_pair_menu',
+		platforms: ['ahk', 'hs']
+	},
+	key_combination_rows_right: {
+		menu: 'key_combination_pair_menu',
+		platforms: ['ahk', 'hs']
+	},
 	// « Raccourcis de gestion du script », the script chords of the three drivers.
 	script_control: 'script_control_group',
 	accented_letters: 'accented_letters_group',
@@ -1220,6 +1258,26 @@ OPENS_SUBMENU.llm_backend.push({
 	native_sources: { ahk: 'windows/ui/menu/menu_llm/menu_main.ahk' }
 });
 OPENS_SUBMENU.llm.push({
+	menu: 'llm_native_parent',
+	platforms: ['hs'],
+	kind: 'compose',
+	native_sources: { hs: 'macos/ui/menu/menu_llm/init.lua' },
+	completed_parent: { hs: 'llm' }
+});
+OPENS_SUBMENU.llm_parent_content = 'llm_menu';
+for (const kind of ['llm', 'agent']) {
+	OPENS_SUBMENU[kind].push({
+		menu: kind === 'llm' ? 'llm_native_parent_linux' : 'agent_native_parent',
+		platforms: ['linux'],
+		kind: 'compose',
+		native_sources: { linux: 'linux/ui/menu/ai_parent.lua' },
+		completed_linux_ai_parent: kind
+	});
+}
+OPENS_SUBMENU.llm_parent_linux = 'llm_menu';
+OPENS_SUBMENU.agent_parent_linux = 'agent_menu';
+
+OPENS_SUBMENU.llm.push({
 	menu: 'llm_download_shortcut_frame',
 	platforms: ['hs'],
 	kind: 'compose',
@@ -1447,6 +1505,100 @@ OPENS_SUBMENU.agent_system_model_rows = {
 };
 OPENS_SUBMENU.agent_system_off_rows = 'agent_system_controls';
 
+// Actual Windows dynamic profile emitter composes its finished native child and boundary.
+OPENS_SUBMENU.llm_profile.push({
+	menu: 'llm_profile_parent_frame_ahk',
+	platforms: ['ahk'],
+	kind: 'compose',
+	native_sources: { ahk: 'windows/ui/menu/menu_llm/menu_main.ahk' }
+});
+OPENS_SUBMENU.llm_profile.push({
+	menu: 'llm_profile_parent_ahk',
+	platforms: ['ahk'],
+	kind: 'compose',
+	selected_group: {
+		ahk: {
+			row: {
+				type: 'group',
+				id: 'llm_profile_parent',
+				i18n: 'menu.profiles.profile_label_prefix',
+				caption_getter: 'llm_profile_parent_caption',
+				disabled_when: ['llm_profile_parent_ready'],
+				platforms: ['ahk'],
+				unavailable: 'hide'
+			},
+			owner_signature: '_LLM_Menu_ProfileParentRows(NativeChild, Caption, Disabled) {',
+			call: 'Parent := MenuRenderer_GroupRow("llm_profile_parent_ahk", "llm_profile_parent", NativeChild, Getters)',
+			handoff: 'ParentRows := [Parent]',
+			consumer: 'Map("llm_profile_parent_rows", (*) => ParentRows)'
+		}
+	},
+	native_sources: { ahk: 'windows/ui/menu/menu_llm/menu_main.ahk' }
+});
+OPENS_SUBMENU.llm_profile_parent = [
+	'llm_profile_commands',
+	{
+		menu: 'llm_profile_windows_frame',
+		platforms: ['ahk'],
+		kind: 'compose',
+		native_sources: { ahk: 'windows/ui/menu/menu_llm/menu_profiles.ahk' }
+	}
+];
+
+// Existing native catalogue data owns brands and choices; the consumed shared frames own presentation.
+for (const menu of [
+	'llm_backend_option_caption_frame_ahk',
+	'llm_backend_ollama_port_frame_ahk',
+	'llm_backend_child_frame_ahk'
+]) {
+	OPENS_SUBMENU.llm_backend.push({
+		menu,
+		platforms: ['ahk'],
+		kind: 'compose',
+		native_sources: { ahk: 'windows/ui/menu/menu_llm/menu_models.ahk' }
+	});
+}
+
+// Actual native selected provider parent and its complete warning publication frame.
+OPENS_SUBMENU.llm_backend.push({
+	menu: 'llm_backend_parent_frame_ahk',
+	platforms: ['ahk'],
+	kind: 'compose',
+	native_sources: { ahk: 'windows/ui/menu/menu_llm/menu_main.ahk' }
+});
+OPENS_SUBMENU.llm_backend.push({
+	menu: 'llm_backend_parent_ahk',
+	platforms: ['ahk'],
+	kind: 'compose',
+	selected_group: {
+		ahk: {
+			row: {
+				type: 'group',
+				id: 'llm_backend_parent',
+				caption_source: 'native',
+				caption_getter: 'llm_backend_parent_caption',
+				disabled_when: ['llm_backend_parent_ready'],
+				platforms: ['ahk'],
+				unavailable: 'hide'
+			},
+			owner_signature: '_LLM_Menu_BackendParentRows(NativeChild, Caption, Disabled, WarningRows) {',
+			call: 'Parent := MenuRenderer_GroupRow("llm_backend_parent_ahk", "llm_backend_parent", NativeChild, Getters)',
+			handoff: 'ParentRows := [Parent]',
+			consumer:
+				'Map("llm_backend_parent_rows", (*) => ParentRows,\n\t\t\t"llm_backend_warning_rows", (*) => Admission["warning_rows"])'
+		}
+	},
+	native_sources: { ahk: 'windows/ui/menu/menu_llm/menu_main.ahk' }
+});
+OPENS_SUBMENU.llm_backend_parent = [
+	{
+		menu: 'llm_backend_choice_boundary',
+		platforms: ['ahk'],
+		kind: 'compose',
+		native_sources: { ahk: 'windows/ui/menu/menu_llm/menu_models.ahk' }
+	}
+];
+
 const PERSONAL_DEFAULT_GROUP_PROOF = OPENS_SUBMENU.hotstring_personal[0].selected_group.ahk;
 
 /**
@@ -1456,6 +1608,25 @@ const PERSONAL_DEFAULT_GROUP_PROOF = OPENS_SUBMENU.hotstring_personal[0].selecte
  * @param {string} driver Host source syntax.
  * @returns {boolean}
  */
+// The actual language provider composes the checkbox, completed frame and native parent.
+const {
+	hotstringLanguagePublication,
+	files: languageOwnerFiles
+} = require('../lib/menu-hotstring-language-binding.cjs');
+OPENS_SUBMENU.hotstring_languages = [
+	{ menu: 'hotstring_scope_checkbox', platforms: ['ahk', 'hs', 'linux'] },
+	{ menu: 'hotstring_language_frame', platforms: ['ahk', 'hs', 'linux'] },
+	{ menu: 'hotstring_language_parent_windows', platforms: ['ahk'] },
+	{ menu: 'hotstring_language_parent_lua', platforms: ['hs', 'linux'] }
+].map((edge) => ({
+	...edge,
+	kind: 'compose',
+	hotstring_language_owner: true,
+	native_sources: Object.fromEntries(
+		edge.platforms.map((platform) => [platform, languageOwnerFiles[platform][0]])
+	)
+}));
+
 function personalCommandReference(text, driver) {
 	const method = driver === 'windows' ? 'MenuRenderer_CommandRow' : 'ManifestMenu\\.command_row';
 	return new RegExp(
@@ -1607,9 +1778,15 @@ function project(menuKey, platform, visiting = new Set(), rowId) {
 			identities.length > new Set(identities).size,
 			'nested duplicate commands remain detectable'
 		);
-		root.splice(0, root.length, { type: 'include', section: 'tap_hold_key_rows' });
+		root.splice(0, root.length, {
+			type: 'include',
+			section: 'tap_hold_key_rows'
+		});
 		assert.throws(() => project('tap_hold_key_rows', 'ahk'), /cyclic menu include/);
-		root.splice(0, root.length, { type: 'include', section: 'absent_child_template' });
+		root.splice(0, root.length, {
+			type: 'include',
+			section: 'absent_child_template'
+		});
 		assert.throws(() => project('tap_hold_key_rows', 'ahk'), /missing menu include/);
 	} finally {
 		root.splice(0, root.length, ...original);
@@ -1750,6 +1927,292 @@ const {
 	publishesMenuTemplate: publishesTemplate,
 	publishesSelectedMenuGroup
 } = require('../lib/menu-shared-delegation.cjs');
+// The actual completed IA parent is admitted through its real caller and child.
+{
+	const assert = require('node:assert/strict');
+	const { nativeLlmParentPublication } = require('../lib/menu-native-llm-parent-binding.cjs');
+	const source = fs.readFileSync(path.join(SP, 'macos/ui/menu/menu_llm/init.lua'), 'utf8');
+	const builder = fs.readFileSync(path.join(SP, 'macos/ui/menu/builder.lua'), 'utf8');
+	const rows = manifest.llm_native_parent;
+	const credits = (
+		candidate = source,
+		caller = builder,
+		definition = rows,
+		top = manifest.top_level,
+		...platformArgs
+	) =>
+		nativeLlmParentPublication(
+			candidate,
+			caller,
+			definition,
+			top,
+			platformArgs.length === 0 ? 'hs' : platformArgs[0]
+		);
+	assert.equal(
+		credits(),
+		true,
+		'actual imported parent binds its completed child to the real top-level caller'
+	);
+	// Admission preserves the complete untrusted definition: only the exact
+	// reviewed Linux counterpart may accompany the unchanged HS declaration.
+	assert.equal(credits(source, builder, [rows[0]]), true);
+	assert.equal(
+		credits(source, builder, [...rows, { type: 'group', id: 'foreign', platforms: ['linux'] }]),
+		false
+	);
+	assert.equal(credits(source, builder, [...rows, rows[0]]), false);
+	if (rows.length === 2) {
+		for (const mutation of [
+			{ id: 'foreign' },
+			{ i18n: 'common.error_title' },
+			{ disabled_when: [] },
+			{ disabled_reason_key: undefined },
+			{ checked_when: ['foreign'] },
+			{ platforms: ['hs'] },
+			{ unavailable: 'disable' },
+			{ action: 'foreign' }
+		])
+			assert.equal(credits(source, builder, [rows[0], { ...rows[1], ...mutation }]), false);
+		assert.equal(credits(source, builder, [rows[1], rows[0]]), false);
+	}
+	const controls = [
+		[
+			'local ManifestMenu     = require("infra.manifest_menu")',
+			'local ManifestMenu     = require("foreign.renderer")',
+			'foreign parent import'
+		],
+		[
+			'return ManifestMenu.group_row("llm_native_parent", "llm_parent_content", main_menu, {',
+			'return Foreign.group_row("llm_native_parent", "llm_parent_content", main_menu, {',
+			'foreign caption owner'
+		],
+		[
+			'return ManifestMenu.group_row("llm_native_parent", "llm_parent_content", main_menu, {',
+			'return ManifestMenu.group_row("llm_native_parent", "foreign_parent", main_menu, {',
+			'foreign row identity'
+		],
+		[
+			'return ManifestMenu.group_row("llm_native_parent", "llm_parent_content", main_menu, {',
+			'return ManifestMenu.group_row("llm_native_parent", "llm_parent_content", {}, {',
+			'discarded native child'
+		],
+		[
+			'llm_parent_enabled = function() return state.llm_enabled or nil end,',
+			'llm_parent_enabled = function() return state.llm_enabled == true end,',
+			'lost original absent checked field'
+		],
+		[
+			'main_menu = ManifestMenu.build("llm_menu", "LLM", handlers, group_builders, render_ctx, list_providers) or {}',
+			'main_menu = {}',
+			'unused child producer'
+		],
+		[
+			'llm_toggle = toggle_action,',
+			'llm_toggle = function() return false end,',
+			'foreign switch callback'
+		],
+		[
+			'build_item          = build_item,',
+			'build_item          = function() return {} end,',
+			'unused parent exporter'
+		],
+		[
+			'local ok, result = xpcall(create_menu, debug.traceback, deps)',
+			'local ok, result = true, {}',
+			'unused real handler factory'
+		]
+	];
+	assert.equal(
+		controls.length,
+		9,
+		'all independently authored actual native-owner withdrawal controls remain registered'
+	);
+	for (const [before, after, reason] of controls) {
+		assert.equal(source.split(before).length - 1, 1, reason + ': exact actual source preimage');
+		const candidate = source.replace(before, after);
+		assert.notEqual(candidate, source, reason + ': actual source changes');
+		assert.equal(credits(candidate), false, reason);
+	}
+	const callerControls = [
+		[
+			'local ManifestMenu = require("infra.manifest_menu")',
+			'local ManifestMenu = require("foreign.renderer")'
+		],
+		['return ManifestMenu.get_root()', 'return {}'],
+		['for _, entry in ipairs(data.top_level) do', 'for _, entry in ipairs({}) do'],
+		['::continue::', '::foreign_continue::'],
+		[
+			'local ok_b, llm_item = pcall(ctx.llm_handler.build_item)',
+			'local ok_b, llm_item = true, nil'
+		],
+		['return llm_item and { llm_item } or {}', 'return {}'],
+		['for _, row in ipairs(builders[id]() or {}) do', 'for _, row in ipairs({}) do'],
+		['local rendered = ManifestMenu.render_rows(items, "top_level")', 'local rendered = {}']
+	];
+	callerControls.push(
+		[
+			'local projected = { id = entry.id, greyed_when_paused = entry.greyed_when_paused == true }',
+			'local projected = { id = "foreign", greyed_when_paused = entry.greyed_when_paused == true }'
+		],
+		['table.insert(result, projected)', 'table.insert(result, {})'],
+		[
+			'local projected = { id = entry.id, greyed_when_paused = entry.greyed_when_paused == true }\n\t\tif entry.disabled == true then',
+			'local projected = { id = entry.id, greyed_when_paused = entry.greyed_when_paused == true }\n\t\tif false then'
+		],
+		[
+			'projected.disabled, projected.i18n, projected.reason_key = true, entry.i18n, entry.reason_key',
+			'projected.disabled, projected.i18n, projected.reason_key = true, entry.i18n, "foreign"'
+		]
+	);
+	assert.equal(
+		callerControls.length,
+		12,
+		'all original eight and four current projection withdrawals remain registered'
+	);
+	for (const [before, after] of callerControls) {
+		assert.equal(builder.split(before).length - 1, 1, 'exact current caller preimage');
+		assert.equal(
+			credits(source, builder.replace(before, after)),
+			false,
+			'actual caller/result transport must remain live'
+		);
+	}
+	for (const candidate of ['', JSON.stringify(source), '--[=[\n' + source + '\n]=]'])
+		assert.equal(credits(candidate), false, 'no quoted/comment-only or absent parent source route');
+	for (const caller of ['', JSON.stringify(builder), '--[=[\n' + builder + '\n]=]'])
+		assert.equal(
+			credits(source, caller),
+			false,
+			'no quoted/comment-only or absent native caller route'
+		);
+	for (const definition of [
+		[],
+		[rows[0], rows[0]],
+		[{ ...rows[0], type: 'command' }],
+		[{ ...rows[0], checked_when: [] }],
+		[{ ...rows[0], platforms: ['linux'] }],
+		[{ ...rows[0], id: 'foreign_parent' }]
+	])
+		assert.equal(
+			credits(source, builder, definition),
+			false,
+			'missing, ambiguous or foreign canonical parent earns no credit'
+		);
+	assert.equal(
+		credits(
+			source,
+			builder,
+			rows,
+			manifest.top_level.filter((row) => row.id !== 'llm')
+		),
+		false,
+		'withdrawn real top-level owner earns no live credit'
+	);
+	for (const platform of ['ahk', 'linux', 'HS', '', undefined])
+		assert.equal(
+			credits(source, builder, rows, manifest.top_level, platform),
+			false,
+			'parent proof is native HS only'
+		);
+	assert.equal(
+		credits(
+			source +
+				'\n-- ManifestMenu.group_row("llm_native_parent", "llm_parent_content", fake, {})\n' +
+				'local inert_parent_text = "ManifestMenu.group_row(\\\"llm_native_parent\\\", \\\"llm_parent_content\\\", fake, {})"\n'
+		),
+		true,
+		'inert text neither supplies nor withdraws executable parent authority'
+	);
+	// The upstream disabled-row projection preserves the actual binding; the
+	// prior direct append remains a supported, independently recorded source form.
+	const projection = `		local projected = { id = entry.id, greyed_when_paused = entry.greyed_when_paused == true }
+		if entry.disabled == true then
+			projected.disabled, projected.i18n, projected.reason_key = true, entry.i18n, entry.reason_key
+		end
+		table.insert(result, projected)`;
+	const historicalProjection = `		table.insert(result, { id = entry.id, greyed_when_paused = entry.greyed_when_paused == true })`;
+	assert.equal(builder.split(projection).length - 1, 1, 'exact current projected-row preimage');
+	assert.equal(
+		credits(source, builder.replace(projection, historicalProjection)),
+		true,
+		'the historical executable top-level projection remains supported'
+	);
+	const projectionControls = [
+		[
+			projection,
+			projection.replace('id = entry.id', 'id = "foreign"'),
+			'foreign projected identity'
+		],
+		[
+			projection,
+			projection.replace('entry.greyed_when_paused == true', 'false'),
+			'lost pause metadata'
+		],
+		[
+			projection,
+			projection.replace('if entry.disabled == true then', 'if false then'),
+			'dead disabled forwarding'
+		],
+		[
+			projection,
+			projection.replace(
+				'true, entry.i18n, entry.reason_key',
+				'false, entry.i18n, entry.reason_key'
+			),
+			'lost disabled flag'
+		],
+		[
+			projection,
+			projection.replace('true, entry.i18n, entry.reason_key', 'true, "foreign", entry.reason_key'),
+			'foreign disabled label'
+		],
+		[
+			projection,
+			projection.replace('true, entry.i18n, entry.reason_key', 'true, entry.i18n, "foreign"'),
+			'foreign disabled reason'
+		],
+		['table.insert(result, projected)', 'table.insert(result, {})', 'discarded projected object'],
+		[
+			'table.insert(result, projected)',
+			'projected = {}\n\t\ttable.insert(result, projected)',
+			'rebound projected object'
+		],
+		[
+			'table.insert(result, projected)',
+			'do local projected = {}\n\t\ttable.insert(result, projected) end',
+			'shadowed projected object'
+		],
+		[projection, 'if false then\n' + projection + '\nend', 'unreachable projection'],
+		[
+			'table.insert(result, projected)',
+			'table.insert({}, projected)',
+			'foreign append destination'
+		],
+		['\n\treturn _top_level_cache\nend', '\n\treturn {}\nend', 'discarded completed projection']
+	];
+	assert.equal(
+		projectionControls.length,
+		12,
+		'all projected transport refusal controls registered'
+	);
+	for (const [before, after, reason] of projectionControls) {
+		assert.equal(builder.split(before).length - 1, 1, reason + ': exact source preimage');
+		const candidate = builder.replace(before, after);
+		assert.notEqual(candidate, builder, reason + ': actual source changes');
+		assert.equal(credits(source, candidate), false, reason);
+		assert.equal(credits(source, builder), true, reason + ': genuine source inverse restores');
+	}
+	assert.equal(
+		credits(
+			source,
+			builder.replace('local projected = {', '-- retained comment\n\t\tlocal projected = {')
+		),
+		true,
+		'comments and formatting do not replace executable authority'
+	);
+	assert.equal(credits(), true, 'exact source repair restores the genuine live parent');
+}
+
 // A selected row never grants authority to additional, unconsumed group siblings.
 {
 	const assert = require('node:assert/strict');
@@ -1828,7 +2291,11 @@ const {
 // including one sharing the same target, still owes a usable child on that OS.
 const readout = { type: 'label', id: 'readout', i18n: 'menu.metrics.status' };
 const separator = { type: SEPARATOR };
-const header = { type: 'section_header', id: 'readout_header', i18n: 'menu.metrics.status' };
+const header = {
+	type: 'section_header',
+	id: 'readout_header',
+	i18n: 'menu.metrics.status'
+};
 for (const rows of [
 	[readout],
 	[separator],
@@ -1858,7 +2325,10 @@ for (const rows of [
 	if (isComposedFragment(rows, new Set(['compose'])))
 		throw new Error('Accepted an undeclared composed readout shape.');
 }
-const platformKinds = { linux: new Set(['compose']), ahk: new Set(['submenu']) };
+const platformKinds = {
+	linux: new Set(['compose']),
+	ahk: new Set(['submenu'])
+};
 if (
 	!isComposedFragment([readout], platformKinds.linux) ||
 	isComposedFragment([readout], platformKinds.ahk)
@@ -1976,7 +2446,10 @@ function publishesIncludedCommands(source, extension, section, declarations, pla
 					(row) => (row.section === section ? { ...row, section: 'unowned_app_frame' } : row)
 				);
 			if (mutation === 'cycle')
-				changed[section].push({ type: 'include', section: 'agent_linux_disabled_apps_children' });
+				changed[section].push({
+					type: 'include',
+					section: 'agent_linux_disabled_apps_children'
+				});
 			if (mutation === 'wrong_type') changed[section][0].type = 'list';
 			assert.equal(
 				publishesIncludedCommands(native, '.lua', section, changed, 'linux'),
@@ -2404,14 +2877,98 @@ function publishesIncludedCommands(source, extension, section, declarations, pla
 	}
 	assert.equal(
 		controls.length,
-		74,
-		'all 60 LIVE successor obligations and 14 new handoff controls execute'
+		78,
+		'all original 74 completed-root obligations and four current projection controls execute'
 	);
 	assert.equal(
 		admits(sources),
 		true,
 		'the actual LIVE completed root must be admitted before negative controls'
 	);
+	// The live badge root uses the same exact owner projection policy as the IA parent.
+	const builder = sources['macos/ui/menu/builder.lua'];
+	const withBuilder = (candidate) => admits({ ...sources, 'macos/ui/menu/builder.lua': candidate });
+	const projection = `		local projected = { id = entry.id, greyed_when_paused = entry.greyed_when_paused == true }
+		if entry.disabled == true then
+			projected.disabled, projected.i18n, projected.reason_key = true, entry.i18n, entry.reason_key
+		end
+		table.insert(result, projected)`;
+	const historicalProjection = `		table.insert(result, { id = entry.id, greyed_when_paused = entry.greyed_when_paused == true })`;
+	assert.equal(
+		builder.split(projection).length - 1,
+		1,
+		'badge root: exact current projected-row preimage'
+	);
+	assert.equal(
+		withBuilder(builder.replace(projection, historicalProjection)),
+		true,
+		'badge root: the historical executable top-level projection remains supported'
+	);
+	const projectionControls = [
+		[
+			projection,
+			projection.replace('id = entry.id', 'id = "foreign"'),
+			'foreign projected identity'
+		],
+		[
+			projection,
+			projection.replace('entry.greyed_when_paused == true', 'false'),
+			'lost pause metadata'
+		],
+		[
+			projection,
+			projection.replace('if entry.disabled == true then', 'if false then'),
+			'dead disabled forwarding'
+		],
+		[
+			projection,
+			projection.replace(
+				'true, entry.i18n, entry.reason_key',
+				'false, entry.i18n, entry.reason_key'
+			),
+			'lost disabled flag'
+		],
+		[
+			projection,
+			projection.replace('true, entry.i18n, entry.reason_key', 'true, "foreign", entry.reason_key'),
+			'foreign disabled label'
+		],
+		[
+			projection,
+			projection.replace('true, entry.i18n, entry.reason_key', 'true, entry.i18n, "foreign"'),
+			'foreign disabled reason'
+		],
+		['table.insert(result, projected)', 'table.insert(result, {})', 'discarded projected object'],
+		[
+			'table.insert(result, projected)',
+			'projected = {}\n\t\ttable.insert(result, projected)',
+			'rebound projected object'
+		],
+		[
+			'table.insert(result, projected)',
+			'do local projected = {}\n\t\ttable.insert(result, projected) end',
+			'shadowed projected object'
+		],
+		[projection, 'if false then\n' + projection + '\nend', 'unreachable projection'],
+		[
+			'table.insert(result, projected)',
+			'table.insert({}, projected)',
+			'foreign append destination'
+		],
+		['\n\treturn _top_level_cache\nend', '\n\treturn {}\nend', 'discarded completed projection']
+	];
+	assert.equal(
+		projectionControls.length,
+		12,
+		'all 12 badge root projected transport refusals remain registered'
+	);
+	for (const [before, after, reason] of projectionControls) {
+		assert.equal(builder.split(before).length - 1, 1, reason + ': exact source preimage');
+		const candidate = builder.replace(before, after);
+		assert.notEqual(candidate, builder, reason + ': actual source changes');
+		assert.equal(withBuilder(candidate), false, reason);
+		assert.equal(withBuilder(builder), true, reason + ': genuine source inverse restores');
+	}
 	for (const control of controls) {
 		const source = sources[control.path];
 		assert.equal(
@@ -2498,6 +3055,568 @@ function publishesIncludedCommands(source, extension, section, declarations, pla
 	}
 }
 
+// Actual Linux parents require their reviewed algorithm AND native producer/caller.
+const linuxAiSources = Object.fromEntries(
+	[
+		'linux/ui/menu/ai_parent.lua',
+		'linux/ui/menu/agent_rows.lua',
+		'linux/ui/menu/menu_builder.lua'
+	].map((file) => [file, fs.readFileSync(path.join(SP, file), 'utf8')])
+);
+const { nativeLinuxAiParentPublication } = require('../lib/menu-native-llm-parent-binding.cjs');
+{
+	const assert = require('node:assert/strict');
+	for (const kind of ['llm', 'agent']) {
+		const parentFrame = kind === 'llm' ? 'llm_native_parent_linux' : 'agent_native_parent';
+		const admits = (sources = linuxAiSources, root = manifest, platform = 'linux') =>
+			nativeLinuxAiParentPublication(sources, root, kind, platform);
+		assert.equal(
+			admits(),
+			true,
+			'actual Linux completed ' + kind + ' producer reaches the genuine tray'
+		);
+
+		// The adopted unavailable top row is an inert declaration projection, before Quit.
+		const builderFile = 'linux/ui/menu/menu_builder.lua';
+		const builder = linuxAiSources[builderFile];
+		const disabledBranch = `				elseif row.disabled == true then
+					rows[#rows + 1] = { label = i18n_safe(row.i18n), disabled = true,
+						disabled_reason_key = row.reason_key }
+`;
+		assert.equal(
+			builder.split(disabledBranch).length - 1,
+			1,
+			'exact adopted disabled top-row branch'
+		);
+		const withBuilder = (source) => admits({ ...linuxAiSources, [builderFile]: source });
+		assert.equal(
+			withBuilder(builder.replace(disabledBranch, '')),
+			true,
+			'historical native top-row route remains supported'
+		);
+		const disabledControls = [
+			[
+				disabledBranch,
+				disabledBranch.replace('disabled = true', 'disabled = false'),
+				'lost disabled flag'
+			],
+			[
+				disabledBranch,
+				disabledBranch.replace('i18n_safe(row.i18n)', '"foreign"'),
+				'foreign caption'
+			],
+			[disabledBranch, disabledBranch.replace('row.reason_key', '"foreign"'), 'foreign reason'],
+			[
+				disabledBranch,
+				disabledBranch.replaceAll('row.', 'foreign_row.'),
+				'foreign declaration row'
+			],
+			[
+				disabledBranch,
+				disabledBranch.replace('rows[#rows + 1]', 'row = {}\n					rows[#rows + 1]'),
+				'rebound declaration row'
+			],
+			[
+				disabledBranch,
+				disabledBranch.replace('row.disabled == true', 'false and row.disabled == true'),
+				'dead disabled branch'
+			],
+			[
+				disabledBranch + '				elseif id == "quit" then\n					quit_row = build(ctx)\n',
+				'				elseif id == "quit" then\n					quit_row = build(ctx)\n' + disabledBranch,
+				'reordered native branch'
+			],
+			[disabledBranch, disabledBranch + disabledBranch, 'multiple disabled appends'],
+			[
+				disabledBranch,
+				disabledBranch.replace('i18n_safe(row.i18n)', 'i18n_safe(row.reason_key)'),
+				'wrong caption input'
+			],
+			[
+				disabledBranch,
+				disabledBranch.replace(
+					'disabled_reason_key = row.reason_key',
+					'disabled_reason_key = row.reason_key, action = function() return true end'
+				),
+				'disabled row gains action'
+			],
+			[
+				disabledBranch,
+				disabledBranch.replace('rows[#rows + 1]', 'foreign_rows[#foreign_rows + 1]'),
+				'foreign append destination'
+			],
+			[
+				'for _, row in ipairs(declared) do\n',
+				'for _, row in ipairs(declared) do\nlocal row = { id = "llm", disabled = true }\n',
+				'shadowed declared source row'
+			],
+			[
+				'\t\t\tlocal id = row.id\n',
+				'\t\t\tlocal id = row.id\nid = "llm"\n',
+				'rebound declared source identity'
+			],
+			[
+				'function M.build(ctx)\n',
+				'function M.build(ctx)\nlocal i18n_safe = function(key) return key end\n',
+				'shadowed native caption owner'
+			],
+			[
+				'local ok, i18n = pcall(require, "infra.i18n")',
+				'local ok, i18n = pcall(require, "foreign.i18n")',
+				'foreign caption import'
+			],
+			[
+				'function i18n_safe(key)\n',
+				'function i18n_safe(key)\ndo return "foreign" end\n',
+				'bypassed caption owner'
+			]
+		];
+		assert.equal(
+			disabledControls.length,
+			16,
+			'all bounded disabled top-row controls remain registered'
+		);
+		for (const [before, after, reason] of disabledControls) {
+			assert.equal(builder.split(before).length - 1, 1, reason + ': exact current preimage');
+			const changed = builder.replace(before, after);
+			assert.notEqual(changed, builder, reason + ': actual source changes');
+			assert.equal(withBuilder(changed), false, reason + ': no native parent credit');
+			assert.equal(withBuilder(builder), true, reason + ': actual inverse restores');
+		}
+
+		assert.equal(admits(linuxAiSources, manifest, 'hs'), false);
+		for (const file of Object.keys(linuxAiSources)) {
+			assert.equal(
+				admits({ ...linuxAiSources, [file]: '' }),
+				false,
+				'withdrawn whole executable body'
+			);
+		}
+		for (const section of [parentFrame, kind + '_menu', 'top_level']) {
+			const missing = { ...manifest };
+			delete missing[section];
+			assert.equal(admits(linuxAiSources, missing), false, 'withdrawn actual shared source');
+		}
+		const duplicate = {
+			...manifest,
+			[parentFrame]: [...manifest[parentFrame], manifest[parentFrame].at(-1)]
+		};
+		assert.equal(
+			admits(linuxAiSources, duplicate),
+			false,
+			'duplicate native group cannot own the parent'
+		);
+		const topDuplicate = {
+			...manifest,
+			top_level: [...manifest.top_level, manifest.top_level.find((row) => row.id === kind)]
+		};
+		assert.equal(admits(linuxAiSources, topDuplicate), false, 'duplicate genuine tray declaration');
+		const producerFile =
+			kind === 'agent' ? 'linux/ui/menu/agent_rows.lua' : 'linux/ui/menu/menu_builder.lua';
+		const replacements = [
+			[
+				producerFile,
+				'local NativeParent = require("ui.menu.ai_parent")',
+				'local NativeParent = require("foreign.owner")'
+			],
+			[
+				producerFile,
+				'local parent = NativeParent.begin(ManifestMenu, "' +
+					kind +
+					'", ctx' +
+					(kind === 'agent' ? ', AgentSettings)' : ')'),
+				'local parent = nil'
+			],
+			[
+				producerFile,
+				'return NativeParent.finish(parent, ' + (kind === 'agent' ? 'children' : 'items') + ')',
+				'return NativeParent.finish(parent, {})'
+			],
+			[
+				producerFile,
+				'return NativeParent.finish(parent, ' + (kind === 'agent' ? 'children' : 'items') + ')',
+				'if false then return NativeParent.finish(parent, ' +
+					(kind === 'agent' ? 'children' : 'items') +
+					') end return nil'
+			],
+			['linux/ui/menu/menu_builder.lua', '["' + kind + '"]', '["withdrawn_' + kind + '"]'],
+			['linux/ui/menu/menu_builder.lua', 'rows[#rows + 1] = build(ctx)', 'build(ctx)'],
+			[
+				'linux/ui/menu/menu_builder.lua',
+				'return ManifestMenu.render_rows(rows, "top_level")',
+				'return {}'
+			],
+			[
+				'linux/ui/menu/ai_parent.lua',
+				'local current_enabled = enabled(ticket)',
+				'local current_enabled = ticket.enabled'
+			],
+			[
+				'linux/ui/menu/ai_parent.lua',
+				'if not current(ticket) or not unchanged(native_children)',
+				'if not unchanged(native_children)'
+			],
+			['linux/ui/menu/ai_parent.lua', 'not unchanged(getter_snapshot)', 'false'],
+			['linux/ui/menu/ai_parent.lua', 'not rawequal(rawget(row, "submenu"), children)', 'false'],
+			['linux/ui/menu/ai_parent.lua', 'api_method(renderer, method)', 'renderer[method]'],
+			['linux/ui/menu/ai_parent.lua', 'return row\nend', 'return { label = "synthetic" }\nend']
+		];
+		const disabledRow =
+			'elseif row.disabled == true then\n\t\t\t\t\trows[#rows + 1] = { label = i18n_safe(row.i18n), disabled = true,\n\t\t\t\t\t\tdisabled_reason_key = row.reason_key }';
+		for (const [before, after] of [
+			['elseif row.disabled == true then', 'elseif false then'],
+			['disabled = true,', 'disabled = false,'],
+			['disabled_reason_key = row.reason_key', 'disabled_reason_key = "foreign"'],
+			['label = i18n_safe(row.i18n)', 'label = "synthetic"']
+		]) {
+			assert.equal(
+				disabledRow.split(before).length - 1,
+				1,
+				'closed disabled branch mutation exists'
+			);
+			replacements.push([
+				'linux/ui/menu/menu_builder.lua',
+				disabledRow,
+				disabledRow.replace(before, after)
+			]);
+		}
+		if (kind === 'agent')
+			replacements.push(
+				[producerFile, 'llm.set_agent_mode(id)', 'true'],
+				[
+					producerFile,
+					'local children = ManifestMenu.build("agent_menu", "Agent", handlers, nil, menu_ctx, {})',
+					'local children = {}'
+				],
+				[
+					producerFile,
+					'local NativeParent = require("ui.menu.ai_parent")',
+					'local NativeParent = require("ui.menu.ai_parent")\nlocal NativeParent = {}'
+				]
+			);
+
+		replacements.push(
+			[
+				'linux/ui/menu/menu_builder.lua',
+				'function M.build(ctx)\n',
+				'function M.build(ctx)\ndo return {} end\n'
+			],
+			[
+				'linux/ui/menu/menu_builder.lua',
+				'local build = builders[id]',
+				'local build = builders[id]\nlocal build = function() return nil end'
+			]
+		);
+		if (kind === 'agent')
+			replacements.push(
+				[
+					producerFile,
+					'function M.build(ctx, dialogs)\n',
+					'function M.build(ctx, dialogs)\ndo return nil end\n'
+				],
+				[
+					producerFile,
+					'local NativeParent = require("ui.menu.ai_parent")',
+					'local NativeParent = require("ui.menu.ai_parent")\nNativeParent.finish = function() return nil end'
+				],
+				[
+					producerFile,
+					'local NativeParent = require("ui.menu.ai_parent")',
+					'local NativeParent = require("ui.menu.ai_parent")\nNativeParent["finish"] = function() return { label = "synthetic" } end'
+				],
+				[
+					producerFile,
+					'local committed = llm.set_agent_mode(id) == true',
+					'do return false end\nlocal committed = llm.set_agent_mode(id) == true'
+				]
+			);
+		else
+			replacements.push(
+				[
+					producerFile,
+					'local function _build_llm(ctx)\n',
+					'local function _build_llm(ctx)\ndo return nil end\n'
+				],
+				[
+					producerFile,
+					'local NativeParent = require("ui.menu.ai_parent")',
+					'local NativeParent = require("ui.menu.ai_parent")\nNativeParent.finish = function() return nil end'
+				],
+				[
+					producerFile,
+					'if llm.toggle then llm.toggle(ctx.on_menu_changed) end',
+					'do return end\nif llm.toggle then llm.toggle(ctx.on_menu_changed) end'
+				]
+			);
+
+		replacements.push(
+			[
+				'linux/ui/menu/menu_builder.lua',
+				'local function _build_agent(ctx)\n',
+				'local function _build_agent(ctx)\ndo return nil end\n'
+			],
+			[
+				'linux/ui/menu/menu_builder.lua',
+				'\nreturn M\n',
+				'\nM.build = function() return {} end\nreturn M\n'
+			],
+			[
+				'linux/ui/menu/agent_rows.lua',
+				'\nreturn M\n',
+				'\nM.build = function() return nil end\nreturn M\n'
+			],
+			[
+				'linux/ui/menu/menu_builder.lua',
+				'\nreturn M\n',
+				'\nM["build"] = function() return {} end\nreturn M\n'
+			],
+			[
+				'linux/ui/menu/agent_rows.lua',
+				'\nreturn M\n',
+				'\nrawset(M, "build", function() return nil end)\nreturn M\n'
+			]
+		);
+		if (kind === 'agent')
+			replacements.push([
+				producerFile,
+				'local function changed()\n',
+				'local function changed()\ndo return nil end\n'
+			]);
+		replacements.push(
+			[
+				'linux/ui/menu/menu_builder.lua',
+				'local NumberRowPolicy = require("layout.number_row_policy")',
+				'local NumberRowPolicy = require("foreign.owner")'
+			],
+			[
+				'linux/ui/menu/menu_builder.lua',
+				'NumberRowPolicy.native_rows(ManifestMenu',
+				'foreign_native_rows(ManifestMenu'
+			],
+			[
+				'linux/ui/menu/menu_builder.lua',
+				'local function _grey_for_pause(row)\n',
+				'local function _grey_for_pause(row)\ndo return nil end\n'
+			],
+			[
+				'linux/ui/menu/menu_builder.lua',
+				'local function _row_is_for_linux(row)\n',
+				'local function _row_is_for_linux(row)\ndo return false end\n'
+			],
+			[
+				'linux/ui/menu/menu_builder.lua',
+				'\nreturn M\n',
+				'\nlocal unrelated = error("withdrawing real module")\nreturn M\n'
+			],
+			[producerFile, 'local llm = ctx.llm', 'local llm = ctx.llm\nctx.llm = nil']
+		);
+		replacements.push(
+			[
+				'linux/ui/menu/menu_builder.lua',
+				'["agent"]           = _build_agent,',
+				'["agent"]           = _build_agent,\n["agent"] = function() return nil end,'
+			],
+			[
+				'linux/ui/menu/menu_builder.lua',
+				'rows[#rows + 1] = build(ctx)',
+				'rows[#rows + 1] = build(ctx) and {}'
+			],
+			[
+				'linux/ui/menu/agent_rows.lua',
+				'local children = ManifestMenu.build("agent_menu", "Agent", handlers, nil, menu_ctx, {})',
+				'local children = ManifestMenu.build("agent_menu", "Agent", handlers, nil, menu_ctx, {}) and { { title = "synthetic" } }'
+			],
+			[
+				'linux/ui/menu/agent_rows.lua',
+				'\tend\n\tlocal handlers = {}',
+				'\tend\n\tlocal changed = function() return nil end\n\tlocal handlers = {}'
+			],
+			[
+				'linux/ui/menu/agent_rows.lua',
+				'local children = ManifestMenu.build(',
+				'menu_ctx.commands.agent_mode = function() return false end\nlocal children = ManifestMenu.build('
+			],
+			[
+				'linux/ui/menu/menu_builder.lua',
+				'local rendered = ManifestMenu\n\t\tand ManifestMenu.build("llm_menu"',
+				'llm_ctx.commands["llm_toggle"] = function() return false end\nlocal rendered = ManifestMenu\n\t\tand ManifestMenu.build("llm_menu"'
+			]
+		);
+		replacements.push([
+			'linux/ui/menu/menu_builder.lua',
+			'\nreturn M\n',
+			'\nlocal foreign = require("foreign.native_owner")\nreturn M\n'
+		]);
+		const nativeBeginRefusal =
+			'local parent = NativeParent.begin(ManifestMenu, "' +
+			kind +
+			'", ctx' +
+			(kind === 'agent' ? ', AgentSettings)' : ')') +
+			'\n\tif not parent then return nil end';
+		for (const statement of [
+			'error("owned native publication refused")',
+			'rawset(ctx, "llm", nil)',
+			'pcall(rawset, ctx, "llm", nil)',
+			'local mutate = rawset; mutate(ctx, "llm", nil)'
+		])
+			replacements.push([producerFile, nativeBeginRefusal, nativeBeginRefusal + '\n' + statement]);
+		for (const expression of [
+			'; (function() error("owned immediate producer refused") end)()',
+			'; (_G.error)("owned indirect producer refused")',
+			'; _G["error"]("owned computed producer refused")',
+			'; (_G.error) "owned literal-argument producer refused"'
+		])
+			replacements.push([producerFile, nativeBeginRefusal, nativeBeginRefusal + '\n' + expression]);
+
+		const completedFinish =
+			'return NativeParent.finish(parent, ' + (kind === 'agent' ? 'children' : 'items') + ')';
+		const childName = kind === 'agent' ? 'children' : 'items';
+		for (const statement of [
+			childName + '[1] = nil',
+			childName + ' = {}',
+			'local ' + childName + ' = {}',
+			'local retained_child_alias = ' + childName + '; retained_child_alias[1] = nil',
+			'local mutate_child = function() ' + childName + '[1] = nil end; mutate_child()',
+			childName + '[#' + childName + ' + 1] = {}'
+		])
+			replacements.push([producerFile, completedFinish, statement + '\n\t' + completedFinish]);
+		if (kind === 'llm') {
+			for (const statement of [
+				'rendered[1] = nil',
+				'rendered = {}',
+				'local rendered = {}',
+				'local retained_rendered_alias = rendered',
+				'local items = {}; items[1] = nil'
+			])
+				replacements.push([producerFile, completedFinish, statement + '\n\t' + completedFinish]);
+			replacements.push([
+				producerFile,
+				'return NativeParent.finish(parent, ManifestMenu.render_rows(status_rows, "linux_llm_absent_rows"))',
+				'status_rows[1] = nil\n\t\treturn NativeParent.finish(parent, ManifestMenu.render_rows(status_rows, "linux_llm_absent_rows"))'
+			]);
+		}
+
+		for (const statement of [
+			'local llm = nil',
+			'local shadow_marker, llm = nil, nil',
+			'local ctx = {}',
+			'local parent = {}',
+			'local native_alias = llm; native_alias.toggle = nil',
+			'local context_alias = ctx; context_alias.llm = nil',
+			'local ticket_alias = parent; ticket_alias.enabled = false',
+			'local shadowed = function(llm) return llm end',
+			'local nested = function() local llm = nil end'
+		])
+			replacements.push([
+				producerFile,
+				'local llm = ctx.llm',
+				'local llm = ctx.llm\n\t' + statement
+			]);
+
+		const rootRegistration =
+			kind === 'agent' ? 'local handlers = {}' : 'local dynamic_handlers = {}';
+		const rootName = kind === 'agent' ? 'handlers' : 'dynamic_handlers';
+		for (const statement of ['local ' + rootName + ' = {}', rootName + ' = {}'])
+			replacements.push([producerFile, rootRegistration, rootRegistration + '\n\t' + statement]);
+		if (kind === 'llm')
+			for (const statement of ['local enabled = false', 'enabled = false'])
+				replacements.push([
+					producerFile,
+					'local enabled = parent.enabled',
+					'local enabled = parent.enabled\n\t' + statement
+				]);
+
+		for (const statement of [
+			'local native_alias = ctx.llm; native_alias.toggle = nil',
+			'local NativeParent = require("foreign.native_owner")',
+			'local captured = function(NativeParent) return NativeParent end',
+			'local ManifestMenu = require("foreign.native_renderer")',
+			'local captured = function(ManifestMenu) return ManifestMenu end',
+			'local AgentSettings = require("foreign.native_settings")'
+		])
+			replacements.push([
+				producerFile,
+				'local llm = ctx.llm',
+				'local llm = ctx.llm\n\t' + statement
+			]);
+
+		const agentRegistrationFile = 'linux/ui/menu/agent_rows.lua';
+		const nativeCallbackEnd = '\t\t\t\treturn committed\n\t\t\tend,\n\t\t},';
+		for (const field of [
+			'agent_mode = false',
+			'["agent_mode"] = false',
+			'["agent_" .. "mode"] = false',
+			'[command_key] = false'
+		])
+			replacements.push([
+				agentRegistrationFile,
+				nativeCallbackEnd,
+				'\t\t\t\treturn committed\n\t\t\tend,\n\t\t\t' + field + ',\n\t\t},'
+			]);
+		replacements.push([
+			agentRegistrationFile,
+			'\tlocal menu_ctx = {\n\t\tcommands = {',
+			'\tlocal menu_ctx = {\n\t\tcommands = false and {'
+		]);
+		replacements.push([
+			agentRegistrationFile,
+			'\tlocal menu_ctx = {\n\t\tcommands = {',
+			'\tlocal menu_ctx = false and {\n\t\tcommands = {'
+		]);
+		replacements.push([
+			agentRegistrationFile,
+			'\t\tstate_getters = {',
+			'\t\tstate_getters = false and {'
+		]);
+		replacements.push([
+			agentRegistrationFile,
+			'["llm.agent_mode"] = AgentSettings.get_mode,',
+			'["llm.agent_mode"] = AgentSettings.get_mode, ["llm.agent_mode"] = false,'
+		]);
+		replacements.push([
+			agentRegistrationFile,
+			'\n\t}\n\tlocal children = ManifestMenu.build',
+			'\n\t\tcommands = {},\n\t}\n\tlocal children = ManifestMenu.build'
+		]);
+		replacements.push([
+			agentRegistrationFile,
+			'\n\t}\n\tlocal children = ManifestMenu.build',
+			'\n\t\t["state_getters"] = {},\n\t}\n\tlocal children = ManifestMenu.build'
+		]);
+		for (const [file, before, after] of replacements) {
+			assert.ok(
+				linuxAiSources[file].includes(before),
+				'mutation must change actual production: ' + before
+			);
+			assert.equal(
+				admits({
+					...linuxAiSources,
+					[file]: linuxAiSources[file].replace(before, after)
+				}),
+				false,
+				'actual producer/source mutation: ' + before
+			);
+		}
+		const quoted = {
+			...linuxAiSources,
+			'linux/ui/menu/ai_parent.lua':
+				linuxAiSources['linux/ui/menu/ai_parent.lua'] + '\n-- foreign owner comment\n'
+		};
+		assert.equal(
+			admits(quoted),
+			true,
+			'inert comments do not provide or withdraw an executable route'
+		);
+	}
+}
+
+// Physical withdrawal controls prevent graph entries from becoming decorative orphan exemptions.
+{
+	const assert = require('node:assert/strict');
+	const controls = require('./fixtures/hotstring-language-owner-counterexamples.cjs')(SP, manifest);
+	assert(controls > 100, 'actual source/declaration refusal controls must all execute');
+}
+
 // Iterated to a fixed point rather than walked once: the graph is shallow today
 // but a group nested inside a group would make a single pass depth-dependent,
 // and a check that silently depends on declaration order is a check that breaks
@@ -2516,6 +3635,15 @@ for (let pass = 0; pass < MENU_KEYS.length + 1; pass += 1) {
 				const target = typeof opened === 'string' ? opened : opened.menu;
 				const only = typeof opened === 'string' ? PLATFORMS : opened.platforms;
 				const kind = row.type === 'include' || opened.kind === 'compose' ? 'compose' : 'submenu';
+				if (
+					opened.completed_linux_ai_parent !== undefined &&
+					(opened.completed_linux_ai_parent !== row.id ||
+						!nativeLinuxAiParentPublication(linuxAiSources, manifest, row.id, 'linux'))
+				) {
+					errors.push(`${menuKey}/${row.id}: actual completed Linux AI publication refused`);
+					continue;
+				}
+
 				const effective = PLATFORMS.filter(
 					(p) =>
 						visibleOn(row, p) &&
@@ -2534,32 +3662,54 @@ for (let pass = 0; pass < MENU_KEYS.length + 1; pass += 1) {
 					if (
 						typeof file !== 'string' ||
 						!file.startsWith(driver + '/') ||
-						!(opened.forwarded_template?.[platform] === 'layout'
-							? require('../lib/menu-native-layout-binding.cjs').nativeLayoutTemplatePublication(
-									fs.readFileSync(path.join(SP, file), 'utf8'),
-									target,
-									manifest[target]
-								)
-							: opened.selected_group?.[platform]
-								? publishesSelectedMenuGroup(
-										fs.readFileSync(path.join(SP, file), 'utf8'),
-										path.extname(file),
-										target,
-										manifest[target],
-										opened.selected_group[platform]
-									)
-								: publishesTemplate(
-										fs.readFileSync(path.join(SP, file), 'utf8'),
-										path.extname(file),
-										target
-									) ||
-									publishesIncludedCommands(
-										fs.readFileSync(path.join(SP, file), 'utf8'),
-										path.extname(file),
-										target,
+						!(opened.completed_linux_ai_parent === row.id && platform === 'linux'
+							? nativeLinuxAiParentPublication(linuxAiSources, manifest, row.id, platform)
+							: opened.hotstring_language_owner
+								? hotstringLanguagePublication(
+										Object.fromEntries(
+											languageOwnerFiles[platform].map((file) => [
+												file,
+												fs.readFileSync(path.join(SP, file), 'utf8')
+											])
+										),
 										manifest,
-										platform
-									))
+										platform,
+										target
+									)
+								: opened.completed_parent?.[platform] === 'llm'
+									? require('../lib/menu-native-llm-parent-binding.cjs').nativeLlmParentPublication(
+											fs.readFileSync(path.join(SP, file), 'utf8'),
+											fs.readFileSync(path.join(SP, 'macos/ui/menu/builder.lua'), 'utf8'),
+											manifest[target],
+											manifest.top_level,
+											platform
+										)
+									: opened.forwarded_template?.[platform] === 'layout'
+										? require('../lib/menu-native-layout-binding.cjs').nativeLayoutTemplatePublication(
+												fs.readFileSync(path.join(SP, file), 'utf8'),
+												target,
+												manifest[target]
+											)
+										: opened.selected_group?.[platform]
+											? publishesSelectedMenuGroup(
+													fs.readFileSync(path.join(SP, file), 'utf8'),
+													path.extname(file),
+													target,
+													manifest[target],
+													opened.selected_group[platform]
+												)
+											: publishesTemplate(
+													fs.readFileSync(path.join(SP, file), 'utf8'),
+													path.extname(file),
+													target
+												) ||
+												publishesIncludedCommands(
+													fs.readFileSync(path.join(SP, file), 'utf8'),
+													path.extname(file),
+													target,
+													manifest,
+													platform
+												))
 					)
 						errors.push(
 							`${menuKey}/${row.id}: ${kind} ${target} has no native template publication on ${platform}`
@@ -2890,7 +4040,10 @@ if (unreasoned.length < UNREASONED_BASELINE) {
 // Linux 19 → 20: navigation and validation now use their declared list providers.
 const RENDERED_THROUGH_SHARED = { hs: 22, linux: 20 };
 
-const DRIVER_ROOTS = { hs: path.join(SP, 'macos'), linux: path.join(SP, 'linux') };
+const DRIVER_ROOTS = {
+	hs: path.join(SP, 'macos'),
+	linux: path.join(SP, 'linux')
+};
 
 /**
  * The whole Lua source of a driver, concatenated, tests excluded.
@@ -2914,7 +4067,10 @@ function driverSource(root) {
 		}
 	};
 	walk(root);
-	return { src: out, delegated: delegatedMenuSources(sources, path.join(SP, '_shared', 'lua')) };
+	return {
+		src: out,
+		delegated: delegatedMenuSources(sources, path.join(SP, '_shared', 'lua'))
+	};
 }
 
 /** Resolve only the actual read-only number-row provider's shared getter owner. */
@@ -3173,7 +4329,12 @@ console.log(
 	manifest[names[0]] = [{ type: 'include', section: names[1], row_id: 'clone' }];
 	manifest[names[1]] = [
 		{ type: 'command', id: 'create', i18n: 'menu.profiles.create_profile' },
-		{ type: 'command', id: 'clone', i18n: 'menu.profiles.clone_builtin', platforms: ['hs'] }
+		{
+			type: 'command',
+			id: 'clone',
+			i18n: 'menu.profiles.clone_builtin',
+			platforms: ['hs']
+		}
 	];
 	try {
 		assert.deepEqual(
@@ -3699,7 +4860,14 @@ function languageParentSource(source, driver) {
 	);
 	assert.deepEqual(
 		menu.top_level.filter((row) => row.id === 'configuration'),
-		[{ type: 'group', id: 'configuration', i18n: 'menu.configuration.title', rows: [] }]
+		[
+			{
+				type: 'group',
+				id: 'configuration',
+				i18n: 'menu.configuration.title',
+				rows: []
+			}
+		]
 	);
 	const hand = JSON.parse(
 		fs.readFileSync(path.join(base, '_shared/tests/corpus/menus/configuration_parent.json'), 'utf8')
@@ -4305,4 +5473,301 @@ function languageParentSource(source, driver) {
 	console.log(
 		'[OK] Metrics: lifecycle-preserving structural source fences, genuine completed children and singleton checked ABI.'
 	);
+})();
+
+// Linux About consumes the genuine top-level owner and preserves its completed native child.
+(function checkLinuxDeclaredAboutParent() {
+	const assert = require('node:assert/strict');
+	const { scriptTokens } = require('../lib/script-source.cjs');
+	const fs = require('node:fs');
+	const path = require('node:path');
+	const base = path.resolve(__dirname, '../..', 'static/ergopti_plus');
+	const menu = JSON.parse(
+		fs.readFileSync(path.join(base, '_shared/modules/menu/menu_manifest.json'), 'utf8')
+	);
+	const hand = JSON.parse(
+		fs.readFileSync(path.join(base, '_shared/tests/corpus/menus/linux_about_parent.json'), 'utf8')
+	);
+	assert.deepEqual(
+		menu.top_level.filter((row) => row.id === 'about'),
+		[{ type: 'group', id: 'about', i18n: 'menu.about.title', rows: [] }]
+	);
+	assert.deepEqual(hand.prior_top_level_record, { id: 'about' });
+	function requireAboutMetadata(rows) {
+		assert.deepEqual(
+			rows,
+			hand.about_child_declarations,
+			'all child identities and metadata include the intended startup command guard'
+		);
+	}
+	requireAboutMetadata(menu.about_menu);
+	for (const patch of [
+		{ disabled_when: undefined },
+		{ disabled_when: ['start_at_login_enabled'] },
+		{ disabled_reason_key: undefined },
+		{ disabled_reason_key: 'menu.about.source_run_reason' }
+	]) {
+		const rows = structuredClone(menu.about_menu);
+		Object.assign(
+			rows.find((row) => row.id === 'start_at_login'),
+			patch
+		);
+		assert.throws(
+			() => requireAboutMetadata(rows),
+			{ code: 'ERR_ASSERTION' },
+			'absent or wrong startup availability/reason must refuse the genuine metadata oracle'
+		);
+	}
+	assert.equal(
+		Object.keys(hand.locales).length,
+		21,
+		'all independently frozen caption sources execute'
+	);
+	for (const [code, prior] of Object.entries(hand.locales)) {
+		const labels = JSON.parse(
+			fs.readFileSync(path.join(base, '_shared/data/locales', code + '.json'), 'utf8')
+		);
+		assert.equal(labels['menu.about.title'], prior.about_parent);
+		assert.equal(labels['menu.about.changelog'], prior.changelog);
+		assert.equal(labels['menu.about.open_releases_page'], prior.releases_page);
+		assert.equal(labels['menu.global.start_at_login'], prior.startup);
+		assert.equal(labels['menu.global.uninstall'], prior.uninstall);
+	}
+	function tokenDepths(tokens) {
+		let depth = 0,
+			awaitingDo = 0;
+		return tokens.map((token, index) => {
+			const before = depth;
+			if (
+				token.kind !== 'identifier' ||
+				(['.', ':'].includes(tokens[index - 1]?.value) &&
+					!(tokens[index - 1]?.value === ':' && tokens[index - 2]?.value === ':'))
+			)
+				return before;
+			if (['function', 'if', 'for', 'while', 'repeat'].includes(token.value)) {
+				depth++;
+				if (['for', 'while'].includes(token.value)) awaitingDo++;
+			} else if (token.value === 'do') {
+				if (awaitingDo) awaitingDo--;
+				else depth++;
+			} else if (['end', 'until'].includes(token.value)) depth--;
+			return before;
+		});
+	}
+	function ownerBody(source, signature) {
+		const tokens = scriptTokens(source, '.lua');
+		const wanted = scriptTokens(signature, '.lua');
+		const sourceDepths = tokenDepths(tokens);
+		const bodies = [];
+		for (let start = 0; start < tokens.length; start++) {
+			if (sourceDepths[start] !== 0) continue;
+			if (
+				source
+					.slice(source.lastIndexOf('\n', tokens[start].start - 1) + 1, tokens[start].start)
+					.trim()
+			)
+				continue;
+			if (
+				!wanted.every(
+					(token, offset) =>
+						tokens[start + offset]?.kind === token.kind &&
+						tokens[start + offset]?.value === token.value
+				)
+			)
+				continue;
+			// String identity is the physical simple Lua spelling, not an undecoded alias.
+			if (
+				!wanted.every(
+					(token, offset) =>
+						token.kind !== 'string' ||
+						source.slice(tokens[start + offset].start, tokens[start + offset].end) ===
+							signature.slice(token.start, token.end)
+				)
+			)
+				continue;
+			const blocks = ['function'];
+			let awaitingDo = 0;
+			for (let index = start + wanted.length; index < tokens.length; index++) {
+				const token = tokens[index];
+				if (
+					token.kind !== 'identifier' ||
+					(['.', ':'].includes(tokens[index - 1]?.value) &&
+						!(tokens[index - 1]?.value === ':' && tokens[index - 2]?.value === ':'))
+				)
+					continue;
+				if (['function', 'if', 'for', 'while', 'repeat'].includes(token.value)) {
+					blocks.push(token.value);
+					if (['for', 'while'].includes(token.value)) awaitingDo++;
+				} else if (token.value === 'do') {
+					if (awaitingDo) awaitingDo--;
+					else blocks.push('do');
+				} else if (token.value === 'end' || token.value === 'until') {
+					if (token.value === 'until' && blocks.at(-1) !== 'repeat')
+						throw new Error('invalid actual Lua owner');
+					blocks.pop();
+					if (!blocks.length) {
+						bodies.push(source.slice(tokens[start + wanted.length - 1].end, token.start));
+						break;
+					}
+				}
+			}
+		}
+		assert.equal(bodies.length, 1, 'one complete physical native About owner');
+		return bodies[0];
+	}
+	function hasStatement(source, statement, requiredDepth = 0) {
+		const tokens = scriptTokens(source, '.lua');
+		const wanted = scriptTokens(statement, '.lua');
+		let depth = 0,
+			awaitingDo = 0;
+		const depths = tokens.map((token, index) => {
+			const before = depth;
+			if (
+				token.kind !== 'identifier' ||
+				(['.', ':'].includes(tokens[index - 1]?.value) &&
+					!(tokens[index - 1]?.value === ':' && tokens[index - 2]?.value === ':'))
+			)
+				return before;
+			if (['function', 'if', 'for', 'while', 'repeat'].includes(token.value)) {
+				depth++;
+				if (['for', 'while'].includes(token.value)) awaitingDo++;
+			} else if (token.value === 'do') {
+				if (awaitingDo) awaitingDo--;
+				else depth++;
+			} else if (['end', 'until'].includes(token.value)) depth--;
+			return before;
+		});
+		return tokens.some(
+			(first, index) =>
+				depths[index] === requiredDepth &&
+				!['.', ':', 'function'].includes(tokens[index - 1]?.value) &&
+				wanted.every((token, offset) => {
+					const actual = tokens[index + offset];
+					return (
+						actual?.kind === token.kind &&
+						actual.value === token.value &&
+						(token.kind !== 'string' ||
+							source.slice(actual.start, actual.end) === statement.slice(token.start, token.end))
+					);
+				})
+		);
+	}
+
+	function admits(source) {
+		try {
+			const native = ownerBody(source, 'local function _build_about(ctx)');
+			const publicOwner = ownerBody(source, 'function M.build(ctx)');
+			const chronology = [
+				'local root, top, section, parent, fields = about_source(ManifestMenu, "linux")',
+				'if root == nil then return nil end',
+				'local rows = ManifestMenu and ManifestMenu.build("about_menu", "About", nil, nil, render_ctx, { ["about_updates"] = function() return _about_update_rows(ctx) end, }) or {}',
+				'if not about_dense(rows, true) then return nil end',
+				'local current_root, current_top, current_section, current_parent = about_source(ManifestMenu, "linux")',
+				'if not rawequal(root, current_root) or not rawequal(top, current_top) or not rawequal(section, current_section) or not rawequal(parent, current_parent) or not about_parent_unchanged(parent, fields) then return nil end',
+				'return ManifestMenu.group_row("top_level", "about", rows, render_ctx.state_getters)'
+			];
+			if (!chronology.every((statement) => hasStatement(native, statement))) return false;
+			const nativeTokens = scriptTokens(native, '.lua'),
+				depths = tokenDepths(nativeTokens);
+			let previous = -1;
+			for (const statement of chronology) {
+				const wanted = scriptTokens(statement, '.lua');
+				const at = nativeTokens.findIndex(
+					(_, index) =>
+						index > previous &&
+						depths[index] === 0 &&
+						wanted.every(
+							(token, offset) =>
+								nativeTokens[index + offset]?.kind === token.kind &&
+								nativeTokens[index + offset]?.value === token.value
+						)
+				);
+				if (at < 0) return false;
+				previous = at;
+			}
+			const guard = ownerBody(source, 'local function about_source(renderer, platform)');
+			if (
+				!hasStatement(
+					guard,
+					'local top, children = rawget(root, "top_level"), rawget(root, "about_menu")'
+				)
+			)
+				return false;
+			if (
+				!hasStatement(
+					guard,
+					'if not about_dense(top, true) or not about_dense(children, true) or #children == 0 then return nil end'
+				)
+			)
+				return false;
+			if (!hasStatement(publicOwner, 'return ManifestMenu.render_rows(rows, "top_level")'))
+				return false;
+			const tokens = scriptTokens(publicOwner, '.lua');
+			const binding = scriptTokens('["about"] = _build_about', '.lua');
+			return tokens.some((_, index) =>
+				binding.every(
+					(token, offset) =>
+						tokens[index + offset]?.kind === token.kind &&
+						tokens[index + offset]?.value === token.value
+				)
+			);
+		} catch {
+			return false;
+		}
+	}
+	const source = fs.readFileSync(path.join(base, 'linux/ui/menu/menu_builder.lua'), 'utf8');
+	assert.equal(
+		admits(source),
+		true,
+		'the actual registered public native About route consumes its true canonical parent'
+	);
+	for (const [before, after, reason] of [
+		[
+			'return ManifestMenu.group_row("top_level", "about", rows, render_ctx.state_getters)',
+			'return Foreign.group_row("top_level", "about", rows, render_ctx.state_getters)',
+			'foreign renderer'
+		],
+		[
+			'return ManifestMenu.group_row("top_level", "about", rows, render_ctx.state_getters)',
+			'return ManifestMenu.group_row("top_level", "debug", rows, render_ctx.state_getters)',
+			'wrong actual parent'
+		],
+		[
+			'return ManifestMenu.group_row("top_level", "about", rows, render_ctx.state_getters)',
+			'return ManifestMenu.group_row("about_menu", "about", rows, render_ctx.state_getters)',
+			'wrong catalogue owner'
+		],
+		[
+			'return ManifestMenu.group_row("top_level", "about", rows, render_ctx.state_getters)',
+			'return ManifestMenu.group_row("top_level", "about", {}, render_ctx.state_getters)',
+			'disconnected finished child'
+		],
+		[
+			'local root, top, section, parent, fields = about_source(ManifestMenu, "linux")',
+			'local root, top, section, parent, fields = about_source(Foreign, "linux")',
+			'foreign source admission'
+		],
+		[
+			'["about"]           = _build_about,',
+			'["about"]           = _build_debug,',
+			'missing actual public producer'
+		],
+		[
+			'or not about_parent_unchanged(parent, fields) then return nil end',
+			'or false then return nil end',
+			'missing actual source identity refusal'
+		],
+		[
+			'return ManifestMenu.render_rows(rows, "top_level")',
+			'return rows',
+			'missing actual native rendering boundary'
+		]
+	]) {
+		assert.equal(source.split(before).length - 1, 1, reason + ': exact source preimage');
+		assert.equal(admits(source.replace(before, after)), false, reason);
+	}
+	assert.equal(admits(JSON.stringify(source)), false, 'quoted native source is data');
+	assert.equal(admits('--[=[\n' + source + '\n]=]'), false, 'comment-only native source is data');
+	assert.equal(admits(''), false, 'missing actual native owner');
+	assert.equal(admits(source), true, 'genuine source remains admitted after negative controls');
 })();

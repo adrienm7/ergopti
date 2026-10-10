@@ -21,6 +21,7 @@ FEATURES & RATIONALE:
 
 <script>
 	import { base } from '$app/paths';
+	import { driverWindowSrc, hostDriverWindow } from '$lib/js/driverWindowHost.js';
 	import WindowChrome from './WindowChrome.svelte';
 	import { reveal } from './reveal.js';
 	import { ui } from './state.svelte.js';
@@ -44,199 +45,7 @@ FEATURES & RATIONALE:
 	// Flips true on the iframe's load event so the skeleton shimmer can hide.
 	let loaded = $state(false);
 
-	// The two dashboards support a bridge-less bootstrap: a "#prefetch=<url>"
-	// hash makes them load a data blob instead of waiting for a native host.
-	// The site ships synthetic demo blobs under /demo/ (see
-	// tools/dev/gen-demo-metrics.cjs) so the dashboards render populated.
-	let frameSrc = $derived(
-		id.startsWith('metrics_')
-			? `${base}/ergopti_plus/_shared/ui/${id}/index.html#prefetch=${base}/demo/${id}_prefetch.json`
-			: `${base}/ergopti_plus/_shared/ui/${id}/index.html`
-	);
-
-	// One shared fetch of the French locale strings for every embedded frame.
-	// Injected through the driver's own i18n_apply() BEFORE initData, so the
-	// windows never render their English _t() fallbacks. When the site gains
-	// its 21 locales, this is the exact hook that will follow the visitor's
-	// language.
-	/** @type {Promise<Record<string, string>> | null} */
-	let frStringsPromise = null;
-
-	/**
-	 * Fetch (once) the driver's French locale strings.
-	 * @returns {Promise<Record<string, string>>}
-	 */
-	function frStrings() {
-		frStringsPromise ??= fetch(`${base}/ergopti_plus/_shared/data/locales/fr.json`)
-			.then((r) => r.json())
-			.catch(() => ({}));
-		return frStringsPromise;
-	}
-
-	/**
-	 * Parse a "30.53B" / "350M" parameter string into billions.
-	 * @param {unknown} raw
-	 * @returns {number}
-	 */
-	function parseParams(raw) {
-		if (typeof raw !== 'string' || raw === '') return 0;
-		const m = raw.match(/([\d.]+)\s*([BMK]?)/i);
-		if (!m) return 0;
-		const value = parseFloat(m[1]);
-		const unit = (m[2] || 'B').toUpperCase();
-		if (unit === 'B') return value;
-		if (unit === 'M') return value / 1000;
-		return value;
-	}
-
-	/**
-	 * Feed the model browser with the real catalog, exactly like the native
-	 * hosts do: flatten models.json into injectModels() rows.
-	 * @param {Window} win
-	 */
-	async function injectModelBrowser(win) {
-		win.i18n_apply?.(await frStrings());
-		const res = await fetch(`${base}/ergopti_plus/_shared/modules/llm/models.json`);
-		const catalog = await res.json();
-		const models = [];
-		for (const provider of catalog) {
-			for (const family of provider.families ?? []) {
-				for (const m of family.models ?? []) {
-					const total = parseParams(m.parameters?.total);
-					const activeB = parseParams(m.parameters?.active);
-					models.push({
-						name: m.name,
-						family: family.label,
-						provider: provider.label,
-						params_b: total,
-						active_b: activeB,
-						is_moe: activeB > 0 && activeB < total,
-						ram_gb:
-							m.hardware_requirements?.ollama?.ram_gb ?? m.hardware_requirements?.mlx?.ram_gb ?? 0,
-						speed_tok_s: m.capabilities?.speed_tok_s ?? 0,
-						type: m.type || 'chat',
-						installed: false,
-						url: m.urls?.hf || ''
-					});
-				}
-			}
-		}
-		const defaultModel = models.find((m) => /qwen/i.test(m.name)) ?? models[0];
-		if (defaultModel) defaultModel.installed = true;
-		win.injectModels?.({ backend: 'ollama', active: defaultModel?.name ?? '', models });
-	}
-
-	/**
-	 * Feed the hotstring editor with a small demo dataset through its real
-	 * initData() contract.
-	 * @param {Window} win
-	 */
-	async function injectHotstringEditor(win) {
-		win.i18n_apply?.(await frStrings());
-		const entry = (trigger, output) => ({
-			trigger,
-			output,
-			is_word: false,
-			auto_expand: false,
-			is_case_sensitive: false,
-			final_result: false
-		});
-		win.initData?.({
-			trigger_char: '★',
-			star: '★',
-			compact_view: false,
-			auto_close: false,
-			open_mode: 'menu',
-			sections: [
-				{
-					name: 'signatures',
-					description: 'Signatures',
-					_exp: true,
-					entries: [
-						entry('sig★', 'Cordialement,\nAdrien'),
-						entry('np★', 'Adrien Moyaux'),
-						entry('em★', 'adrien@exemple.fr')
-					]
-				},
-				{
-					name: 'travail',
-					description: 'Travail',
-					_exp: true,
-					entries: [
-						entry('adr★', '15 rue Lafayette, 75009 Paris'),
-						entry('iban★', 'FR76 1234 5678 9012 3456 789'),
-						entry('tel★', '+33 6 12 34 56 78')
-					]
-				}
-			]
-		});
-	}
-
-	/**
-	 * Feed the personal-info editor with demo fields + the real French locale
-	 * strings so its chrome labels render.
-	 * @param {Window} win
-	 */
-	async function injectPersonalInfo(win) {
-		const strings = await frStrings();
-		win.initData?.({
-			strings,
-			fields: [
-				{ key: 'first_name', label: 'Prénom', value: 'Adrien' },
-				{ key: 'last_name', label: 'Nom', value: 'Moyaux' },
-				{ key: 'email', label: 'E-mail', value: 'adrien@exemple.fr' },
-				{ key: 'phone', label: 'Téléphone', value: '+33 6 12 34 56 78' },
-				{ key: 'address', label: 'Adresse', value: '15 rue Lafayette, 75009 Paris' },
-				{ key: 'iban', label: 'IBAN', value: 'FR76 1234 5678 9012 3456 789' }
-			]
-		});
-
-		// Live wire: report every edit up to the page so the hotstring
-		// examples rebuild themselves in real time — the whole point of
-		// dynamic hotstrings, demonstrated with the real window.
-		if (oninfochange) {
-			const rows = win.document.getElementById('rows');
-			rows?.addEventListener('input', () => {
-				const values = {};
-				rows.querySelectorAll('input').forEach((inp) => {
-					values[inp.getAttribute('name')] = inp.value;
-				});
-				oninfochange(values);
-			});
-		}
-	}
-
-	/** Retry interval and cap for the dashboard chart nudge. */
-	const NUDGE_INTERVAL_MS = 600;
-	const NUDGE_MAX_TRIES = 20;
-
-	/**
-	 * Re-trigger the dashboard render once Chart.js is available. The
-	 * dashboards load Chart.js from a CDN with defer; when the prefetch JSON
-	 * (local, fast) resolves first, their render_charts() early-returns and
-	 * the charts stay empty until a filter interaction. apply_local_filters()
-	 * is a global, idempotent re-render — calling it after Chart.js lands
-	 * closes the race.
-	 * @param {Window} win
-	 */
-	function nudgeMetricsCharts(win) {
-		let tries = 0;
-		const timer = setInterval(() => {
-			tries++;
-			try {
-				const rerender = win.apply_local_filters ?? win.render_all ?? win.render_charts;
-				if (win.Chart && typeof rerender === 'function') {
-					rerender();
-					clearInterval(timer);
-					return;
-				}
-			} catch (_) {
-				clearInterval(timer);
-				return;
-			}
-			if (tries >= NUDGE_MAX_TRIES) clearInterval(timer);
-		}, NUDGE_INTERVAL_MS);
-	}
+	let frameSrc = $derived(driverWindowSrc(id, base));
 
 	/**
 	 * Play the native host: once the iframe loads, inject the data through
@@ -247,15 +56,9 @@ FEATURES & RATIONALE:
 		const win = ev.currentTarget?.contentWindow;
 		loaded = true;
 		if (!win) return;
-		try {
-			if (id === 'model_browser') injectModelBrowser(win);
-			else if (id === 'hotstring_editor') injectHotstringEditor(win);
-			else if (id === 'personal_info_editor') injectPersonalInfo(win);
-			else if (id.startsWith('metrics_')) nudgeMetricsCharts(win);
-			// changelog needs nothing — it self-bootstraps from GitHub.
-		} catch (e) {
-			console.error('Injection dans la fenêtre du driver impossible :', e);
-		}
+		hostDriverWindow(win, id, { base, locale: 'fr', onInfoChange: oninfochange }).catch((e) =>
+			console.error('Injection dans la fenêtre du driver impossible :', e)
+		);
 	}
 </script>
 

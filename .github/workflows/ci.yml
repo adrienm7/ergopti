@@ -66,6 +66,7 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       release: ${{ steps.meta.outputs.release }}
+      native_qualification_profile: ${{ steps.qualification.outputs.native_qualification_profile }}
       tag: ${{ steps.meta.outputs.tag }}
       version: ${{ steps.meta.outputs.version }}
       title: ${{ steps.meta.outputs.title }}
@@ -278,6 +279,16 @@ jobs:
           echo "Resolved: tag=$tag version=$version prerelease=$prerelease channel=$channel"
           echo "Title: $title"
 
+      - name: Select the proposed one-candidate native qualification
+        id: qualification
+        env:
+          ERGOPTI_DEV_RELEASE_RELEASE: ${{ steps.meta.outputs.release }}
+          ERGOPTI_DEV_RELEASE_PRERELEASE: ${{ steps.meta.outputs.prerelease }}
+          ERGOPTI_DEV_RELEASE_CHANNEL: ${{ steps.meta.outputs.channel }}
+          ERGOPTI_DEV_RELEASE_TAG: ${{ steps.meta.outputs.tag }}
+          ERGOPTI_DEV_RELEASE_VERSION: ${{ steps.meta.outputs.version }}
+        run: node tools/ci/dev-release-qualification.cjs --publication-select >> "$GITHUB_OUTPUT"
+
   # ========================================================
   # ========================================================
   # ======= 2/ One lane per OS: tests, package, gate =======
@@ -302,6 +313,12 @@ jobs:
       fail-fast: false
       matrix:
         suite: ${{ fromJSON(github.ref == 'refs/heads/main' && '["js","properties","mutation"]' || '["js","properties"]') }}
+    env:
+      ERGOPTI_DEV_RELEASE_RELEASE: ${{ needs.validate.outputs.release }}
+      ERGOPTI_DEV_RELEASE_PRERELEASE: ${{ needs.validate.outputs.prerelease }}
+      ERGOPTI_DEV_RELEASE_CHANNEL: ${{ needs.validate.outputs.channel }}
+      ERGOPTI_DEV_RELEASE_TAG: ${{ needs.validate.outputs.tag }}
+      ERGOPTI_DEV_RELEASE_VERSION: ${{ needs.validate.outputs.version }}
     steps:
       - uses: actions/checkout@v4
 
@@ -336,7 +353,21 @@ jobs:
           node tools/lint/format.cjs --check
 
       - name: Run shared validation suite
-        run: npm run test:${{ matrix.suite }}
+        run: |
+          set -euo pipefail
+          mode=full
+          if [ "${{ matrix.suite }}" = js ]; then
+              receipt="$RUNNER_TEMP/stable-core-js-suite.json"
+              node tools/ci/dev-release-qualification.cjs --scope core-js-suite --receipt "$receipt"
+              mode="$(node tools/ci/dev-release-qualification.cjs --scope core-js-suite --validate-scope-receipt "$receipt")"
+          fi
+          if [ "$mode" = deferred ]; then
+              echo '[DEFERRED] core-js-suite: qualified=false; properties and mutation unchanged.'
+          elif [ "$mode" = full ]; then
+              npm run test:${{ matrix.suite }}
+          else
+              exit 1
+          fi
 
       # Actual WebView rendering belongs to the shared JS lane. Native bridges
       # are recorded; Chromium and WebKit cover both renderer families.
@@ -355,6 +386,14 @@ jobs:
       - name: Test shared Versions installation rendering
         if: matrix.suite == 'js'
         run: npm run test:browser:changelog-install
+
+      - name: Retain the source-bound Core JavaScript qualification
+        if: always() && matrix.suite == 'js'
+        uses: actions/upload-artifact@v4
+        with:
+          name: assets-qualification-core-js
+          path: ${{ runner.temp }}/stable-core-js-suite.json
+          if-no-files-found: warn
 
   macos:
     name: 'macOS'
@@ -463,6 +502,13 @@ jobs:
       contents: write
     env:
       LINUX_BUNDLE_ASSET: ${{ needs.validate.outputs.linux_bundle }}
+      ERGOPTI_NATIVE_QUALIFICATION_PROFILE: ${{ needs.validate.outputs.native_qualification_profile }}
+      ERGOPTI_DEV_RELEASE_RELEASE: ${{ needs.validate.outputs.release }}
+      ERGOPTI_DEV_RELEASE_PRERELEASE: ${{ needs.validate.outputs.prerelease }}
+      ERGOPTI_DEV_RELEASE_CHANNEL: ${{ needs.validate.outputs.channel }}
+      ERGOPTI_DEV_RELEASE_TAG: ${{ needs.validate.outputs.tag }}
+      ERGOPTI_DEV_RELEASE_VERSION: ${{ needs.validate.outputs.version }}
+      ERGOPTI_WINDOWS_SIGNING_CONFIGURED: ${{ secrets.WINDOWS_SIGNING_CERTIFICATE_BASE64 != '' && secrets.WINDOWS_SIGNING_CERTIFICATE_PASSWORD != '' && secrets.WINDOWS_SIGNER_SUBJECT != '' && 'true' || 'false' }}
 
     steps:
       - uses: actions/checkout@v4
@@ -646,6 +692,9 @@ jobs:
           # set. Historical published releases retain their attached feed.
           if [ "$create_release" = true ]; then
               node tools/build/macos-release-publication.cjs validate release-assets
+              python3 tools/build/verify-macos-managed-ollama-publication.py \
+                  --assets release-assets --tag "$TAG" \
+                  --version "${TAG#v}" --channel "$CHANNEL"
           fi
           echo "create_tag=$create_tag" >> "$GITHUB_OUTPUT"
           echo "create_release=$create_release" >> "$GITHUB_OUTPUT"
@@ -654,6 +703,16 @@ jobs:
 
       # Skipped only when the preflight found this commit's tag from an earlier
       # attempt of this run.
+      - name: Recheck selected native qualification before publication
+        shell: bash
+        env:
+          ERGOPTI_WINDOWS_CREATE_RELEASE: ${{ steps.preflight.outputs.create_release }}
+        run: |
+          set -euo pipefail
+          node tools/ci/dev-release-qualification.cjs --publication-admit >> "$GITHUB_ENV"
+          node tools/ci/windows-stable-signing.cjs --publication-admit >> "$GITHUB_ENV"
+          echo "ERGOPTI_WINDOWS_CREATE_RELEASE=$ERGOPTI_WINDOWS_CREATE_RELEASE" >> "$GITHUB_ENV"
+
       - name: Create git tag
         if: steps.preflight.outputs.create_tag == 'true'
         shell: bash
@@ -661,6 +720,8 @@ jobs:
           GH_TOKEN: ${{ secrets.PAT_ERGOPTI }}
         run: |
           set -euo pipefail
+          node tools/ci/dev-release-qualification.cjs --publication-admit >/dev/null
+          node tools/ci/windows-stable-signing.cjs --publication-admit >/dev/null
           tag="${{ needs.validate.outputs.tag }}"
           sha="${{ github.sha }}"
           gh api repos/${{ github.repository }}/git/refs \
@@ -685,6 +746,11 @@ jobs:
           TITLE: ${{ needs.validate.outputs.title }}
         run: |
           set -euo pipefail
+          node tools/ci/dev-release-qualification.cjs --publication-admit >/dev/null
+          node tools/ci/windows-stable-signing.cjs --publication-admit >/dev/null
+          if [ -n "${ERGOPTI_WINDOWS_SIGNING_QUALIFICATION_NOTE:-}" ]; then
+              ERGOPTI_NATIVE_QUALIFICATION_NOTE="${ERGOPTI_NATIVE_QUALIFICATION_NOTE:-}"$'\n\n'"$ERGOPTI_WINDOWS_SIGNING_QUALIFICATION_NOTE"
+          fi
           mapfile -t assets < <(find release-assets -type f)
           echo "Assets to attach (${#assets[@]}):"
           printf '  %s\n' "${assets[@]}"
@@ -693,6 +759,9 @@ jobs:
           # published release the latest one, and the Windows and Linux stable
           # updaters install /releases/latest.
           flags=()
+          if [ -n "${ERGOPTI_NATIVE_QUALIFICATION_NOTE:-}" ]; then
+              flags+=("--notes" "$ERGOPTI_NATIVE_QUALIFICATION_NOTE")
+          fi
           case "$PRERELEASE" in
               true) flags+=("--prerelease") ;;
               false) ;;
@@ -707,6 +776,8 @@ jobs:
               "${flags[@]}" \
               "${assets[@]}"
 
+          node tools/ci/dev-release-qualification.cjs --publication-admit >/dev/null
+          node tools/ci/windows-stable-signing.cjs --publication-admit >/dev/null
           node tools/build/publish-verified-release.cjs \
               "$TAG" "$GITHUB_REPOSITORY" "${assets[@]}"
 
@@ -753,6 +824,8 @@ jobs:
           git -C "$worktree" add -- "appcast-${ERGOPTI_CHANNEL}.xml"
           if ! git -C "$worktree" diff --cached --quiet; then
               git -C "$worktree" commit -m "chore(release): update ${ERGOPTI_CHANNEL} appcast"
+              node tools/ci/dev-release-qualification.cjs --publication-admit >/dev/null
+              node tools/ci/windows-stable-signing.cjs --publication-admit >/dev/null
               git -C "$worktree" push origin "HEAD:refs/heads/${branch}"
           fi
 
@@ -810,6 +883,8 @@ jobs:
               echo "$cask already names $TAG."
           else
               git -C "$tap" commit -m "chore(release): $cask for $TAG"
+              node tools/ci/dev-release-qualification.cjs --publication-admit >/dev/null
+              node tools/ci/windows-stable-signing.cjs --publication-admit >/dev/null
               git -C "$tap" push origin HEAD
               echo "Published $cask for $TAG to $TAP_REPOSITORY."
           fi
@@ -994,5 +1069,13 @@ jobs:
 
           <!-- /ergopti:section -->
           EOF
+          if [ -n "${ERGOPTI_NATIVE_QUALIFICATION_NOTE:-}" ]; then
+              printf '\n## Native qualification limits\n\n%s\n' "$ERGOPTI_NATIVE_QUALIFICATION_NOTE" >> "$body_file"
+          fi
+          node tools/ci/dev-release-qualification.cjs --publication-admit >/dev/null
+          node tools/ci/windows-stable-signing.cjs --publication-admit >/dev/null
+          if [ -n "${ERGOPTI_WINDOWS_SIGNING_QUALIFICATION_NOTE:-}" ]; then
+              printf '\n## Windows signature qualification\n\n%s\n' "$ERGOPTI_WINDOWS_SIGNING_QUALIFICATION_NOTE" >> "$body_file"
+          fi
           gh release edit "$TAG" --repo "${GITHUB_REPOSITORY}" --notes-file "$body_file"
           echo "Release notes updated for $TAG"

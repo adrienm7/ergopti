@@ -49,6 +49,7 @@ local function build(quits, source_run, startup, paused)
 	startup = startup or { enabled = false, toggles = 0, changes = 0 }
 	local previous_startup = package.loaded["ui.menu.start_at_login"]
 	package.loaded["ui.menu.start_at_login"] = {
+		command_available = function() return true end,
 		enabled = function() return startup.enabled end,
 		toggle = function()
 			startup.toggles = startup.toggles + 1
@@ -199,4 +200,232 @@ helpers.describe("tray (linux): startup keeps its native owner", function()
 			end)
 		end
 	end
+end)
+
+
+--- The genuine About producer owns its actual finished child and shared parent.
+local function about_parent_corpus()
+	local file = assert(io.open(helpers.driver_root() .. "/../_shared/tests/corpus/menus/linux_about_parent.json", "rb"))
+	local result = assert(require("json").decode(assert(file:read("*a"))))
+	assert(file:close())
+	return result
+end
+
+--- Uses actual physical locale bytes and the actual registered menu/renderer owner.
+--- Native version, startup and transaction boundaries record effects only.
+local function with_about_parent(code, options, body)
+	options = options or {}
+	local names = { "ui.menu.menu_builder", "infra.manifest_menu", "infra.i18n", "infra.version",
+		"infra.installation", "ui.menu.start_at_login", "ui.menu.uninstall" }
+	local saved = {}
+	for _, name in ipairs(names) do saved[name] = package.loaded[name]; package.loaded[name] = nil end
+	local ok, detail = xpcall(function()
+		local file = assert(io.open(helpers.driver_root() .. "/../_shared/data/locales/" .. code .. ".json", "rb"))
+		local labels = assert(require("json").decode(assert(file:read("*a"))))
+		assert(file:close())
+		package.loaded["infra.i18n"] = {
+			get = function(key) return labels[key] or key end,
+			section = function(key) return labels[key] or key end,
+		}
+		local renderer = require("infra.manifest_menu")
+		local root, parent, quit = renderer.get_root()
+		for _, row in ipairs(root.top_level) do
+			if row.id == "about" then helpers.assert_nil(parent); parent = row end
+			if row.id == "quit" and type(row.platforms) == "table" then
+				for _, platform in ipairs(row.platforms) do if platform == "linux" then quit = row end end
+			end
+		end
+		helpers.assert_type(parent, "table", "the actual canonical About owner exists")
+		helpers.assert_type(quit, "table", "the actual native Quit owner exists")
+		root.top_level = { parent, quit }
+		local state = { versions = 0, startup_reads = 0, toggles = 0, changed = 0,
+			quits = 0, pages = {}, removals = {}, enabled = true }
+		package.loaded["infra.version"] = { VERSION = "local", LOCAL = "local", identity = function()
+			state.versions = state.versions + 1
+			if options.reenter then options.reenter(root, parent, state) end
+			return { kind = "release", version = "9.9.9", commit = "frozen123" }
+		end }
+		package.loaded["infra.installation"] = { is_source_run = function() return options.source_run == true end }
+		package.loaded["ui.menu.start_at_login"] = {
+			command_available = function() return options.startup_available ~= false end,
+			enabled = function() state.startup_reads = state.startup_reads + 1; return state.enabled end,
+			toggle = function() state.toggles = state.toggles + 1; state.enabled = not state.enabled; return true end,
+		}
+		package.loaded["ui.menu.uninstall"] = { run = function(opts)
+			state.removals[#state.removals + 1] = opts
+			return "native removal result"
+		end }
+		local actual_build = renderer.build
+		renderer.build = function(...)
+			local rows = actual_build(...)
+			if select(1, ...) == "about_menu" then state.finished_child = rows end
+			return rows
+		end
+		local builder = require("ui.menu.menu_builder")
+		local ctx = { _version = "9.9.9", paused = options.paused == true,
+			on_quit = function() state.quits = state.quits + 1; return "native quit result" end,
+			on_menu_changed = function() state.changed = state.changed + 1; return "native redraw result" end,
+			webview = { show = function(page) state.pages[#state.pages + 1] = page; return "native page result" end },
+		}
+		if options.before then options.before(root, parent, state) end
+		local function rebuild() return builder.build(ctx) end
+		body(rebuild(), state, labels, root, parent, rebuild)
+	end, debug.traceback)
+	for _, name in ipairs(names) do package.loaded[name] = saved[name] end
+	if not ok then error(detail, 0) end
+end
+
+local function about_parent_at(items, title)
+	for _, row in ipairs(items) do if row.title == title then return row end end
+	return nil
+end
+
+helpers.describe("Linux actual About whole parent", function()
+	for _, code in ipairs({ "ar", "cs", "da", "de", "en", "es", "fr", "he", "hi", "it", "ja", "ko",
+		"nl", "no", "pl", "pt", "ru", "sv", "tr", "uk", "zh" }) do
+		helpers.it("preserves independent parent captions and complete children " .. code .. " (linux-about-parent)", function()
+			local hand = about_parent_corpus().locales[code]
+			for _, paused in ipairs({ false, true }) do
+				with_about_parent(code, { paused = paused }, function(items, state)
+					local parent = about_parent_at(items, hand.about_parent)
+					helpers.assert_type(parent, "table")
+					helpers.assert_nil(parent.fn)
+					helpers.assert_nil(parent.disabled, "About remains available while keyboard features are paused")
+					helpers.assert_nil(parent.checked)
+					helpers.assert_eq(#parent.menu, 7, "complete prior About order without an updater")
+					helpers.assert_eq(parent.menu[2].title, "-")
+					helpers.assert_eq(parent.menu[3].title, hand.changelog)
+					helpers.assert_eq(parent.menu[4].title, hand.releases_page)
+					helpers.assert_eq(parent.menu[5].title, "-")
+					helpers.assert_eq(parent.menu[6].title, hand.startup)
+					helpers.assert_eq(parent.menu[7].title, hand.uninstall)
+					helpers.assert_eq(parent.menu[6].checked, true)
+					helpers.assert_eq(state.toggles, 0)
+					helpers.assert_eq(#state.pages, 0)
+					helpers.assert_eq(#state.removals, 0)
+					helpers.assert_eq(state.changed, 0)
+					helpers.assert_eq(state.quits, 0)
+				end)
+			end
+		end)
+	end
+
+	helpers.it("reads the actual parent caption instead of repeating the native key (linux-about-parent)", function()
+		with_about_parent("fr", { before = function(_, parent) parent.i18n = "menu.configuration.title" end },
+			function(items, _, labels)
+				helpers.assert_type(about_parent_at(items, labels["menu.configuration.title"]), "table")
+				helpers.assert_nil(about_parent_at(items, about_parent_corpus().locales.fr.about_parent))
+			end)
+	end)
+
+	helpers.it("retains the genuine completed child by identity (linux-about-parent)", function()
+		with_about_parent("en", nil, function(items, state)
+			local parent = about_parent_at(items, about_parent_corpus().locales.en.about_parent)
+			helpers.assert_true(rawequal(parent.menu, state.finished_child))
+		end)
+	end)
+
+	for name, mutate in pairs({
+		wrong_type = function(_, parent) parent.type = "command" end,
+		forbidden_prefix = function(_, parent) parent.label_prefix = "native decoration" end,
+		empty_caption = function(_, parent) parent.i18n = "" end,
+		duplicate_parent = function(root, parent) table.insert(root.top_level, 1, parent) end,
+		missing_children = function(root) root.about_menu = nil end,
+		empty_children = function(root) root.about_menu = {} end,
+	}) do
+		helpers.it("refuses incomplete actual source " .. name .. " before native readers (linux-about-parent)", function()
+			with_about_parent("en", { before = mutate }, function(items, state)
+				helpers.assert_nil(about_parent_at(items, about_parent_corpus().locales.en.about_parent))
+				helpers.assert_eq(state.versions, 0)
+				helpers.assert_eq(state.startup_reads, 0)
+				helpers.assert_eq(state.toggles, 0)
+				helpers.assert_eq(#state.removals, 0)
+			end)
+		end)
+	end
+
+	helpers.it("honors actual native platform hiding (linux-about-parent)", function()
+		with_about_parent("en", { before = function(_, parent)
+			parent.platforms = { "hs" }; parent.unavailable = "hide"
+		end }, function(items, state)
+			helpers.assert_nil(about_parent_at(items, about_parent_corpus().locales.en.about_parent))
+			helpers.assert_eq(state.versions, 0)
+		end)
+	end)
+
+	for name, mutate in pairs({
+		caption_changed = function(_, parent) parent.i18n = "menu.configuration.title" end,
+		parent_replaced = function(root, parent)
+			local replacement = {}; for key, value in pairs(parent) do replacement[key] = value end
+			root.top_level[1] = replacement
+		end,
+		top_replaced = function(root) root.top_level = { root.top_level[1], root.top_level[2] } end,
+		child_section_replaced = function(root)
+			local replacement = {}; for index, row in ipairs(root.about_menu) do replacement[index] = row end
+			root.about_menu = replacement
+		end,
+	}) do
+		helpers.it("refuses source reentry " .. name .. " after real version data read (linux-about-parent)", function()
+			with_about_parent("en", { reenter = mutate }, function(items, state, labels)
+				helpers.assert_nil(about_parent_at(items, about_parent_corpus().locales.en.about_parent))
+				helpers.assert_nil(about_parent_at(items, labels["menu.configuration.title"]))
+				helpers.assert_eq(state.versions, 1)
+				helpers.assert_eq(state.toggles, 0)
+				helpers.assert_eq(#state.removals, 0)
+			end)
+		end)
+	end
+
+	helpers.it("preserves native startup and changelog callbacks and their original results (linux-about-parent)", function()
+		with_about_parent("en", nil, function(items, state, _, _, _, rebuild)
+			local hand = about_parent_corpus().locales.en
+			local parent = assert(about_parent_at(items, hand.about_parent))
+			helpers.assert_nil(parent.menu[3].fn())
+			helpers.assert_eq(state.pages, { "changelog" })
+			helpers.assert_nil(parent.menu[6].fn())
+			helpers.assert_eq(state.toggles, 1)
+			helpers.assert_eq(state.changed, 1)
+			helpers.assert_eq(about_parent_at(rebuild(), hand.about_parent).menu[6].checked, false)
+		end)
+	end)
+
+	helpers.it("preserves the genuine uninstall option and daemon quit callback (linux-about-parent)", function()
+		with_about_parent("en", nil, function(items, state, labels)
+			local row = assert(about_parent_at(items, about_parent_corpus().locales.en.about_parent)).menu[7]
+			helpers.assert_nil(row.fn())
+			helpers.assert_eq(#state.removals, 1)
+			helpers.assert_eq(state.removals[1].title, labels["menu.global.uninstall"])
+			helpers.assert_type(state.removals[1].confirm, "function")
+			helpers.assert_type(state.removals[1].fail, "function")
+			helpers.assert_nil(state.removals[1].quit())
+			helpers.assert_eq(state.quits, 1)
+		end)
+	end)
+
+	helpers.it("preserves source-run uninstall refusal without native effects (linux-about-parent)", function()
+		with_about_parent("en", { source_run = true }, function(items, state)
+			local row = assert(about_parent_at(items, about_parent_corpus().locales.en.about_parent)).menu[7]
+			helpers.assert_eq(row.disabled, true)
+			helpers.assert_nil(row.fn)
+			helpers.assert_eq(#state.removals, 0)
+			helpers.assert_eq(state.quits, 0)
+		end)
+	end)
+end)
+
+helpers.describe("Linux About startup command ownership", function()
+	helpers.it("keeps a foreign startup command greyed without mutation (about-startup-command-owner)", function()
+		with_about_parent("en", { startup_available = false }, function(items, state, labels)
+			local parent = about_parent_at(items, labels["menu.about.title"])
+			helpers.assert_type(parent, "table")
+			local startup = parent.menu[#parent.menu - 1]
+			helpers.assert_eq(startup.disabled, true)
+			helpers.assert_nil(startup.fn)
+			helpers.assert_eq(startup.title, labels["menu.global.start_at_login"] .. " — "
+				.. reason_head(labels["menu.about.startup_other_command_reason"]))
+			helpers.assert_eq(state.toggles, 0)
+			helpers.assert_eq(state.changed, 0)
+			helpers.assert_eq(#state.removals, 0)
+		end)
+	end)
 end)

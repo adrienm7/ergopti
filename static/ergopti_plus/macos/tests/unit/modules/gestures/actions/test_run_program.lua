@@ -669,10 +669,17 @@ helpers.describe("private chosen-ID remaining native consumer assignments", func
 		with_program(function(actions, _, preferences, native, tasks, path, _, _, gesture_port)
 			native_query_fixture(native)
 			package.loaded["modules.shortcuts.tap_keys"] = nil
+			package.loaded["adapters.keyboard_geometry"] = nil
+			local geometry = require("adapters.keyboard_geometry")
+			require("tests.support.keyboard_geometry").initialize(geometry)
 			local tap = require("modules.shortcuts.tap_keys")
 			helpers.assert_eq(tap.set_action("number_row_left", "run_program", function() return true end), true)
 			persist_chosen(actions, preferences, path, gesture_port, "tap_key__number_row_left")
-			local action, binding = tap.decide(50)
+			helpers.assert_eq(tap.decide(50), nil, "A model-free event cannot claim the ambiguous physical key")
+			helpers.assert_eq(tap.decide(50, 43), nil, "An unknown keyboard form leaves the key native")
+			helpers.assert_eq(tap.decide(10, 40), nil, "The ISO extra key cannot claim the ANSI left-edge assignment")
+			helpers.assert_eq(tap.decide(50, 41), nil, "The ANSI extra key cannot claim the ISO left-edge assignment")
+			local action, binding = tap.decide(50, 40)
 			helpers.assert_eq(action, "run_program"); helpers.assert_eq(binding, "tap_key__number_row_left")
 			helpers.assert_eq(actions.execute_single(action, binding), true)
 			helpers.assert_eq(#tasks, 1)

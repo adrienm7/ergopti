@@ -386,11 +386,21 @@ end
 --- prompt by exact id, its count, and live.json's minimum word count. A prompt
 --- deleted while live mode ran turns live mode off, never falls back.
 --- @return table|nil override for predict(), nil when live mode is off.
+--- Resolves a binding profile at dispatch without mutating menu settings.
+--- @param prompt table Parsed binding receipt.
+--- @return table|nil profile
+local function binding_profile(prompt)
+	if prompt.translation_target == nil then return ProfileSettings.resolve_id(prompt.profile_id) end
+	local data = Translation.data()
+	if not data then return nil end
+	return Translate.prediction_profile(prompt.translation_target, data.config, data.names, require("infra.i18n").get_locale())
+end
+
 local function live_override()
 	if not _live then return nil end
 	-- Loaded when live mode started, which refuses without it: never nil here.
 	local config = live_config()
-	local profile = ProfileSettings.resolve_id(_live.profile_id)
+	local profile = binding_profile(_live)
 	if not profile then
 		Logger.warn(LOG, "Live mode stopped: the prompt '%s' no longer exists.", _live.profile_id)
 		M.stop_live("prompt deleted", false)
@@ -604,7 +614,7 @@ end
 --- @return string
 local function profile_display_name(profile)
 	-- User profile ids are "user_…" by construction (profile_settings).
-	if tostring(profile.id):match("^user_") and type(profile.label) == "string" and profile.label ~= "" then
+	if (profile.id == "translate" or tostring(profile.id):match("^user_")) and type(profile.label) == "string" and profile.label ~= "" then
 		return profile.label
 	end
 	local ok, I18n = pcall(require, "infra.i18n")
@@ -866,7 +876,7 @@ local function run_manual(output_context, prompt)
 	local override = nil
 	if prompt then
 		-- By exact id: a deleted prompt is refused, never replaced by another.
-		local profile = ProfileSettings.resolve_id(prompt.profile_id)
+		local profile = binding_profile(prompt)
 		if not profile then
 			Logger.warn(LOG, "Prompt prediction refused: the prompt '%s' no longer exists.", prompt.profile_id)
 			show_notice(UNKNOWN_PROMPT_KEY, "unknown_prompt")
@@ -936,7 +946,8 @@ end
 ---   count means the menu's, read at every request.
 function M.get_live()
 	if not _live then return nil end
-	return { profile_id = _live.profile_id, num_predictions = _live.num_predictions }
+	return { profile_id = _live.profile_id, num_predictions = _live.num_predictions,
+		translation_target = _live.translation_target }
 end
 
 --- Turns live mode off, withdrawing its request and its offer. The menu's
@@ -972,7 +983,7 @@ local function start_live(prompt, source)
 		return false
 	end
 	-- By exact id: a deleted prompt is refused, never replaced by another.
-	local profile = ProfileSettings.resolve_id(prompt.profile_id)
+	local profile = binding_profile(prompt)
 	if not profile then
 		Logger.warn(LOG, "Live mode refused: the prompt '%s' no longer exists.", prompt.profile_id)
 		show_notice(UNKNOWN_PROMPT_KEY, "unknown_prompt")
@@ -981,7 +992,8 @@ local function start_live(prompt, source)
 	if not live_config() then return false end
 	if _pending_trigger then _scheduler.cancel(_pending_trigger); _pending_trigger = nil end
 	if _predicting or #_suggestions > 0 then M.dismiss() end
-	_live = { profile_id = profile.id, num_predictions = prompt.num_predictions }
+	_live = { profile_id = profile.id, num_predictions = prompt.num_predictions,
+		translation_target = prompt.translation_target }
 	Logger.info(LOG, "Live mode on from %s (prompt %s, count %s).", source, profile.id,
 		prompt.num_predictions and tostring(prompt.num_predictions) or "from the menu")
 	local count = prompt.num_predictions or ProfileSettings.get("num_predictions") or 1
@@ -1040,6 +1052,10 @@ function M.action_handlers()
 	local handlers = {
 		llm_generate_prediction = function() return M.trigger_now() end,
 		llm_prompt_prediction = function(_, parameter) return M.trigger_prompt(parameter) end,
+		llm_translate_context = function(_, parameter)
+			if not Translation.is_valid(parameter) then return false end
+			return M.trigger_prompt(PromptAction.format("translate", 1, parameter))
+		end,
 		[LIVE_ACTION] = function(_, parameter) return M.toggle_live(parameter) end,
 	}
 	for _, profile in ipairs(ProfileSettings.list_built_in()) do
@@ -1749,7 +1765,7 @@ function M.translate_selection(value)
 		return false
 	end
 	local code = Translate.target_locale(target, config, prompt_language())
-	local language = Translate.language_name(code, data.names)
+	local language = Translate.resolve_language(target, config, data.names, prompt_language())
 	if not language then
 		Logger.error(LOG, "Translation refused: the locale '%s' has no native name.", tostring(code))
 		return false

@@ -77,7 +77,8 @@ func launcherChildEnvironment(
 	base: [String: String],
 	launcherPid: Int32,
 	launcherBundleId: String?,
-	loggerEndpoint: LoggerDatagramEndpoint? = nil
+	loggerEndpoint: LoggerDatagramEndpoint? = nil,
+	keyboardGeometry: KeyboardGeometryMap? = nil
 ) -> [String: String] {
 	var environment = base
 	// Launch Services injects the outer app identity into its environment.
@@ -92,12 +93,16 @@ func launcherChildEnvironment(
 	environment.removeValue(forKey: "ERGOPTI_LAUNCHER_BUNDLE_ID")
 	environment.removeValue(forKey: kLoggerDatagramPortEnvironment)
 	environment.removeValue(forKey: kLoggerDatagramTokenEnvironment)
+	environment.removeValue(forKey: kKeyboardGeometryEnvironment)
 	if let launcherBundleId, !launcherBundleId.isEmpty {
 		environment["ERGOPTI_LAUNCHER_BUNDLE_ID"] = launcherBundleId
 	}
 	if let loggerEndpoint {
 		environment[kLoggerDatagramPortEnvironment] = String(loggerEndpoint.port)
 		environment[kLoggerDatagramTokenEnvironment] = loggerEndpoint.token
+	}
+	if let keyboardGeometry {
+		environment[kKeyboardGeometryEnvironment] = keyboardGeometry.environmentValue
 	}
 	return environment
 }
@@ -822,11 +827,22 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
 		// Inherit our environment and add a marker the bundled Lua config can
 		// optionally read to know it is running under the Ergopti launcher.
+		let keyboardGeometry: KeyboardGeometryMap
+		do {
+			keyboardGeometry = try KeyboardGeometryMap.capture()
+		} catch {
+			loggerWorker?.stop()
+			loggerWorker = nil
+			childActivity.release()
+			fail("Native keyboard geometry could not be captured.")
+			return
+		}
 		var env = launcherChildEnvironment(
 			base: ProcessInfo.processInfo.environment,
 			launcherPid: ProcessInfo.processInfo.processIdentifier,
 			launcherBundleId: Bundle.main.bundleIdentifier,
-			loggerEndpoint: activeLoggerWorker.endpoint
+			loggerEndpoint: activeLoggerWorker.endpoint,
+			keyboardGeometry: keyboardGeometry
 		)
 		env["ERGOPTI_LAUNCHER_VERSION"]       = bundleVersionString()
 		env["ERGOPTI_CONFIG_DIR"]             = bundledConfigDir()
@@ -1109,6 +1125,32 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 // Branch before touching NSApplication, CFPreferences or Sparkle so a helper
 // spawned by Hammerspoon owns no GUI/application lifecycle.
 installPrivateProcessUmask()
+
+if OwnedSuspendedImageGuardian.handles(arguments: CommandLine.arguments) {
+	Darwin.exit(OwnedSuspendedImageGuardian.run(arguments: CommandLine.arguments))
+}
+
+if ManagedOllamaAPIWorker.handles(arguments: CommandLine.arguments) {
+	Darwin.exit(ManagedOllamaAPIWorker.run(arguments: CommandLine.arguments))
+}
+
+#if ERGOPTI_GUARDIAN_TEST_SUPPORT
+if ManagedOllamaListenerFixture.handles(arguments: CommandLine.arguments) {
+	Darwin.exit(ManagedOllamaListenerFixture.run(arguments: CommandLine.arguments))
+}
+#endif
+
+if ManagedPTYWorker.handles(arguments: CommandLine.arguments) {
+	Darwin.exit(ManagedPTYWorker.run(arguments: CommandLine.arguments))
+}
+
+if ManagedBootstrapDownload.handles(arguments: CommandLine.arguments) {
+	Darwin.exit(ManagedBootstrapDownload.run(arguments: CommandLine.arguments))
+}
+
+if ManagedHTTPWorker.handles(arguments: CommandLine.arguments) {
+	Darwin.exit(ManagedHTTPWorker.run(arguments: CommandLine.arguments))
+}
 
 if OwnedRuntimeServiceReferenceWorker.handles(arguments: CommandLine.arguments) {
 	Darwin.exit(OwnedRuntimeServiceReferenceWorker.run(arguments: CommandLine.arguments))
