@@ -132,7 +132,7 @@ def debug_certificate_failure_projection(source):
 # protects every unrelated release byte after both complete spans are inverted.
 TLS_FAILURE_DIAGNOSTIC_INVERSE = (
     (
-        '/// Projects only closed native status facts from the already completed request.\n/// No trust evaluation, certificate text or private NSError payload is acquired.\nfunc managedHTTPTLSDiagnostic(_ error: NSError, additionalAnchorCount: Int) -> [String: Any] {\n\tprecondition(additionalAnchorCount >= 0)\n\tlet cfNetworkDomain = kCFErrorDomainCFNetwork as String\n\tvar native = error\n\tvar seen = Set<ObjectIdentifier>()\n\tvar causes: [[String: Any]] = []\n\tvar termination = "complete"\n\twhile true {\n\t\tguard seen.insert(ObjectIdentifier(native)).inserted else { termination = "cycle"; break }\n\t\tguard causes.count < 8 else { termination = "depth"; break }\n\t\tlet domain: String\n\t\tswitch native.domain {\n\t\tcase NSURLErrorDomain: domain = "url"\n\t\tcase NSOSStatusErrorDomain: domain = "security"\n\t\tcase cfNetworkDomain: domain = "cfnetwork"\n\t\tcase NSPOSIXErrorDomain: domain = "posix"\n\t\tdefault: domain = "other"\n\t\t}\n\t\tlet code = domain == "other" ? nil : Int32(exactly: native.code)\n\t\tvar kind = "unknown"\n\t\tif domain == "security", let code {\n\t\t\tswitch code {\n\t\t\tcase errSSLHostNameMismatch: kind = "hostname_mismatch"\n\t\t\tcase errSSLCertExpired: kind = "certificate_expired"\n\t\t\tcase errSSLCertNotYetValid: kind = "certificate_not_yet_valid"\n\t\t\tcase errSSLUnknownRootCert: kind = "unknown_root"\n\t\t\tcase errSSLXCertChainInvalid: kind = "certificate_chain_invalid"\n\t\t\tdefault: break\n\t\t\t}\n\t\t} else if domain == "url", let code {\n\t\t\tswitch Int(code) {\n\t\t\tcase NSURLErrorServerCertificateUntrusted: kind = "certificate_untrusted"\n\t\t\tcase NSURLErrorServerCertificateHasBadDate: kind = "certificate_date_invalid"\n\t\t\tcase NSURLErrorServerCertificateNotYetValid: kind = "certificate_not_yet_valid"\n\t\t\tcase NSURLErrorServerCertificateHasUnknownRoot: kind = "unknown_root"\n\t\t\tdefault: break\n\t\t\t}\n\t\t}\n\t\tvar cause: [String: Any] = ["domain": domain, "code": NSNull(), "kind": kind]\n\t\tif let code { cause["code"] = Int(code) }\n\t\tcauses.append(cause)\n\t\tguard let underlying = native.userInfo[NSUnderlyingErrorKey] else { break }\n\t\tguard let next = underlying as? NSError else { termination = "unavailable"; break }\n\t\tnative = next\n\t}\n\treturn ["version": 1, "trust_mode": additionalAnchorCount == 0 ? "native_default" : "added_anchors",\n\t\t"additional_anchor_count": additionalAnchorCount, "causes": causes, "chain_termination": termination]\n}\n\n',
+        '/// Projects only closed native status facts from the already completed request.\n/// No trust evaluation, certificate text or private NSError payload is acquired.\nfunc managedHTTPTLSDiagnostic(_ error: NSError, additionalAnchorCount: Int) -> [String: Any] {\n\tprecondition(additionalAnchorCount >= 0)\n\tlet cfNetworkDomain = kCFErrorDomainCFNetwork as String\n\tvar native = error\n\tvar seen = Set<ObjectIdentifier>()\n\tvar causes: [[String: Any]] = []\n\tvar termination = "complete"\n\twhile true {\n\t\tguard seen.insert(ObjectIdentifier(native)).inserted else { termination = "cycle"; break }\n\t\tguard causes.count < 8 else { termination = "depth"; break }\n\t\tlet domain: String\n\t\tswitch native.domain {\n\t\tcase NSURLErrorDomain: domain = "url"\n\t\tcase NSOSStatusErrorDomain: domain = "security"\n\t\tcase cfNetworkDomain: domain = "cfnetwork"\n\t\tcase NSPOSIXErrorDomain: domain = "posix"\n\t\tdefault: domain = "other"\n\t\t}\n\t\tlet code = domain == "other" ? nil : Int32(exactly: native.code)\n\t\tvar kind = "unknown"\n\t\tif domain == "security", let code {\n\t\t\tswitch code {\n\t\t\tcase errSSLHostNameMismatch: kind = "hostname_mismatch"\n\t\t\tcase errSSLCertExpired: kind = "certificate_expired"\n\t\t\tcase errSSLCertNotYetValid: kind = "certificate_not_yet_valid"\n\t\t\tcase errSSLUnknownRootCert: kind = "unknown_root"\n\t\t\tcase errSSLXCertChainInvalid: kind = "certificate_chain_invalid"\n\t\t\tdefault: break\n\t\t\t}\n\t\t} else if domain == "url", let code {\n\t\t\tswitch Int(code) {\n\t\t\tcase NSURLErrorServerCertificateUntrusted: kind = "certificate_untrusted"\n\t\t\tcase NSURLErrorServerCertificateHasBadDate: kind = "certificate_date_invalid"\n\t\t\tcase NSURLErrorServerCertificateNotYetValid: kind = "certificate_not_yet_valid"\n\t\t\tcase NSURLErrorServerCertificateHasUnknownRoot: kind = "unknown_root"\n\t\t\tdefault: break\n\t\t\t}\n\t\t}\n\t\tvar cause: [String: Any] = ["domain": domain, "code": NSNull(), "kind": kind]\n\t\tif let code { cause["code"] = Int(code) }\n\t\t// These optional integers were delivered with the completed NSError.\n\t\t// No SecTrust getter may trigger a new evaluation for this observation.\n\t\tcause["stream_domain"] = NSNull()\n\t\tcause["stream_code"] = NSNull()\n\t\tif domain == "url" || domain == "cfnetwork" {\n\t\t\tfor (field, key) in [("stream_domain", "_kCFStreamErrorDomainKey"), ("stream_code", "_kCFStreamErrorCodeKey")] {\n\t\t\t\tif let value = native.userInfo[key] as? NSNumber,\n\t\t\t\t\tCFGetTypeID(value) != CFBooleanGetTypeID(),\n\t\t\t\t\tlet integer = Int32(exactly: value.doubleValue) { cause[field] = Int(integer) }\n\t\t\t}\n\t\t}\n\t\tcauses.append(cause)\n\t\tguard let underlying = native.userInfo[NSUnderlyingErrorKey] else { break }\n\t\tguard let next = underlying as? NSError else { termination = "unavailable"; break }\n\t\tnative = next\n\t}\n\treturn ["version": 1, "trust_mode": additionalAnchorCount == 0 ? "native_default" : "added_anchors",\n\t\t"additional_anchor_count": additionalAnchorCount, "causes": causes, "chain_termination": termination]\n}\n\n',
         "",
     ),
     (
@@ -2368,6 +2368,7 @@ class TrustInstallObservationControls(unittest.TestCase):
         fixture.keychain = Path("private-owner/owned.keychain-db")
         fixture.command_file_debt = []
         fixture.trust_attempted = False
+        fixture.trust_query_executable = None
         child = SimpleNamespace(pid=7729, returncode=None, stdin=io.BytesIO())
         primary = subprocess.TimeoutExpired("owned native child", 15)
         owner = SimpleNamespace(process=child, reaped=False, capture_read_attempts=0)
@@ -2543,6 +2544,40 @@ class TrustInstallObservationControls(unittest.TestCase):
         fact = json.loads(output.removeprefix("# native_http_trust_install "))
         self.assertEqual(fact["exit_status"], 0)
         self.assertTrue(fact["child_settled"])
+        # Reuse the existing exact-certificate observer only after a strict add ACK.
+        for available, refused in ((False, False), (True, False), (True, True)):
+            probe = WIRE.WireFixture.__new__(WIRE.WireFixture)
+            probe.native = True
+            probe.ca = Path("owned-fixture/ca.pem")
+            probe.keychain = Path("owned-fixture/owned.keychain-db")
+            probe.trust_query_executable = Path("owned-fixture/worker") if available else None
+            probe.trust_attempted = False
+            events = []
+
+            def add(arguments, **options):
+                self.assertEqual(arguments[-1], str(probe.ca))
+                self.assertTrue(options["trust_install_observation"])
+                events.append("add_ack")
+
+            def observe(deadline, **options):
+                self.assertEqual(deadline, 115.0)
+                self.assertEqual(options, {"after_install": True})
+                events.append("lookup")
+                if refused:
+                    raise RuntimeError("owned query remains unsettled")
+
+            with mock.patch.object(WIRE.time, "monotonic", return_value=100.0):
+                with mock.patch.object(probe, "_command", side_effect=add):
+                    with mock.patch.object(probe, "_observe_admin_trust", side_effect=observe):
+                        if refused:
+                            with self.assertRaisesRegex(
+                                RuntimeError, "owned query remains unsettled"
+                            ):
+                                probe.trust(True)
+                        else:
+                            probe.trust(True)
+            self.assertEqual(events, ["add_ack", "lookup"] if available else ["add_ack"])
+            self.assertTrue(probe.trust_attempted)
 
 
 if __name__ == "__main__":

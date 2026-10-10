@@ -530,6 +530,9 @@ class WireFixture:
             raise FixtureFailure("Portable fixture does not alter native trust")
         if enabled:
             self.trust_attempted = True
+            observation_deadline = (
+                time.monotonic() + 15 if self.trust_query_executable is not None else None
+            )
             self._command(
                 [
                     "/usr/bin/sudo",
@@ -545,6 +548,8 @@ class WireFixture:
                 ],
                 trust_install_observation=True,
             )
+            if observation_deadline is not None:
+                self._observe_admin_trust(observation_deadline, after_install=True)
         elif self.trust_attempted:
             arguments = [
                 "/usr/bin/sudo",
@@ -639,7 +644,7 @@ class WireFixture:
             raise FixtureFailure("Native admin trust observation refused")
         return fields
 
-    def _observe_admin_trust(self, deadline, *, after=False):
+    def _observe_admin_trust(self, deadline, *, after=False, after_install=False):
         if self.trust_query_executable is None:
             return
         fact = {"version": 1, "observed": 0}
@@ -662,7 +667,13 @@ class WireFixture:
                 # Unknown output cannot retire an unsettled query's authority.
                 raise
         try:
-            prefix = "# native_http_admin_trust_after " if after else "# native_http_admin_trust "
+            prefix = (
+                "# native_http_admin_trust_installed "
+                if after_install
+                else "# native_http_admin_trust_after "
+                if after
+                else "# native_http_admin_trust "
+            )
             print(prefix + json.dumps(fact, sort_keys=True), flush=True)
         except (OSError, ValueError):
             pass
