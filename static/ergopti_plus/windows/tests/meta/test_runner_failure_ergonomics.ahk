@@ -532,3 +532,56 @@ _TRFE_LibraryIncludeIsolation() {
 }
 Test("runner receipt sharing: helper-only child preserves receipts and clean stdout (receipt-sharing)",
 	_TRFE_LibraryIncludeIsolation)
+
+
+; Progress uses the same selected receipt and refusal semantics as RunTests.
+_TRFE_ProgressReceipt(Locked) {
+	global TEST_RESULTS_FILE, _TEST_RESULTS_FILE
+	Saved := TEST_RESULTS_FILE
+	HadLegacy := IsSet(_TEST_RESULTS_FILE)
+	if HadLegacy
+		SavedLegacy := _TEST_RESULTS_FILE
+	Directory := A_Temp . "\ergopti-progress-write-" . DllCall("GetCurrentProcessId", "UInt") . "-" . A_TickCount
+	if !DllCall("Kernel32\CreateDirectoryW", "Str", Directory, "Ptr", 0, "Int")
+		throw OSError(A_LastError, "Cannot acquire the owned progress fixture")
+	Receipt := Directory . "\receipt.tap"
+	Legacy := Directory . "\test_results.txt"
+	Handle := 0
+	try {
+		FileAppend("preserved legacy receipt", Legacy, "UTF-8")
+		_TEST_RESULTS_FILE := Legacy
+		TEST_RESULTS_FILE := Receipt
+		if Locked {
+			Handle := FileOpen(Receipt, "w-rwd", "UTF-8")
+			Thrown := false
+			try _TestAppendProgress("# owned progress refusal")
+			catch OSError
+				Thrown := true
+			AssertTrue(Thrown, "a progress write refusal must remain observable")
+			Handle.Close()
+			Handle := 0
+			AssertEqual("", FileRead(Receipt, "UTF-8"), "refused progress cannot fabricate a receipt")
+		} else {
+			Line := "# owned progress " . Chr(0xE9) . Chr(0x1F642)
+			_TestAppendProgress(Line)
+			AssertTrue(FileExist(Receipt), "progress must use the selected run receipt")
+			AssertEqual(Line . "`r`n", FileRead(Receipt, "UTF-8"), "progress preserves the complete Unicode line")
+		}
+		AssertEqual("preserved legacy receipt", FileRead(Legacy, "UTF-8"), "progress cannot append to an unrelated legacy receipt")
+	} finally {
+		TEST_RESULTS_FILE := Saved
+		if HadLegacy
+			_TEST_RESULTS_FILE := SavedLegacy
+		else
+			_TEST_RESULTS_FILE := unset
+		if IsObject(Handle)
+			Handle.Close()
+		for Leaf in [Receipt, Legacy] {
+			if FileExist(Leaf)
+				FileDelete(Leaf)
+		}
+		DirDelete(Directory)
+	}
+}
+Test("runner progress: selected receipt preserves legacy bytes (progress-receipt)", _TRFE_ProgressReceipt.Bind(false))
+Test("runner progress: refused selected receipt cannot report success (progress-receipt)", _TRFE_ProgressReceipt.Bind(true))
