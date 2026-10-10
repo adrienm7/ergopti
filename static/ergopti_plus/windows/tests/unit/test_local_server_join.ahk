@@ -85,7 +85,9 @@ class _LSJ_Fixture extends _LSM_Fixture {
 			Ports["on_error"] := ObjBindMethod(this, "Report")
 			this.Native := LocalServersOwner(Ports)
 		} catch as Err {
-			this.Dispose()
+			; A derived panel has not acquired its fields while this constructor runs.
+			; Retire only the established join/base owners before rethrowing its failure.
+			_LSJ_Fixture.Prototype.Dispose.Call(this)
 			throw Err
 		}
 	}
@@ -420,3 +422,84 @@ _LSJ_PhysicalCleanupDebt() {
 	} finally Fixture.Dispose()
 }
 Test("Local join: actual Windows WAL deletion lock keeps saved acknowledgment false", _LSJ_PhysicalCleanupDebt)
+
+
+
+
+
+; ====================================================
+; ====================================================
+; ======= 4/ Failed Constructor Owner Boundary =======
+; ====================================================
+; ====================================================
+
+/** Refuses before any private-world files, publication or native request exist. */
+class _LSJ_ConstructorRefusalWorld {
+	static Primary := 0
+}
+
+_LSJ_RefuseWorldConstructor(*) {
+	throw _LSJ_ConstructorRefusalWorld.Primary
+}
+
+/** Captures the partial actual join without constructing a derived panel. */
+class _LSJ_UnstartedPanelFixture extends _LSJ_Fixture {
+	static Probe := 0
+	static DerivedDisposals := 0
+
+	__New() {
+		_LSJ_UnstartedPanelFixture.Probe := this
+		super.__New()
+	}
+
+	Dispose() {
+		_LSJ_UnstartedPanelFixture.DerivedDisposals += 1
+		throw Error("The unstarted derived panel has no disposal authority.")
+	}
+}
+
+_LSJ_ConstructorOwnerRefusal() {
+	global _HTTP_CURL_ABORT_TIMER, _HTTP_CURL_CLEANUP_TIMER
+	local PriorWorld, AbortOwner, CleanupOwner, PrimaryRefusal, ReceivedRefusal, OwnedProbe
+	PriorWorld := _LSP_World.Prototype.GetOwnPropDesc("__New")
+	AbortOwner := _HTTP_CURL_ABORT_TIMER
+	CleanupOwner := _HTTP_CURL_CLEANUP_TIMER
+	PrimaryRefusal := Error("Controlled refusal before derived panel construction.")
+	_LSJ_ConstructorRefusalWorld.Primary := PrimaryRefusal
+	_LSJ_UnstartedPanelFixture.Probe := 0
+	_LSJ_UnstartedPanelFixture.DerivedDisposals := 0
+	_LSP_World.Prototype.DefineProp("__New", {Call: _LSJ_RefuseWorldConstructor})
+	try {
+		try _LSJ_UnstartedPanelFixture()
+		catch as Err
+			ReceivedRefusal := Err
+		AssertTrue(IsSet(ReceivedRefusal), "The actual join constructor must preserve refusal")
+		AssertTrue(ReceivedRefusal == PrimaryRefusal, "Unstarted derived cleanup cannot replace the originating error")
+		AssertEqual(0, _LSJ_UnstartedPanelFixture.DerivedDisposals)
+		OwnedProbe := _LSJ_UnstartedPanelFixture.Probe
+		AssertTrue(OwnedProbe is _LSJ_Fixture)
+		AssertFalse(OwnedProbe.HasOwnProp("SavedPanel"), "The subclass has not yet constructed any panel")
+		AssertEqual(0, OwnedProbe.World)
+		AssertEqual(0, OwnedProbe.Native)
+		AssertEqual(0, OwnedProbe.Requests.Length, "No HTTP request is acquired by the constructor control")
+		AssertEqual(0, OwnedProbe.Timers.Count)
+		AssertFalse(OwnedProbe.Owner.HasPending("lmstudio"))
+		AssertTrue(_HTTP_CURL_ABORT_TIMER == AbortOwner)
+		AssertTrue(_HTTP_CURL_CLEANUP_TIMER == CleanupOwner)
+	} finally {
+		; The original defective constructor leaves its base timer owner retained.
+		; This control owns that exact partial object and restores it even on RED.
+		OwnedProbe := _LSJ_UnstartedPanelFixture.Probe
+		try {
+			if OwnedProbe is _LSJ_Fixture
+				&& (_HTTP_CURL_ABORT_TIMER != AbortOwner || _HTTP_CURL_CLEANUP_TIMER != CleanupOwner)
+				_LSJ_Fixture.Prototype.Dispose.Call(OwnedProbe)
+		} finally {
+			_LSP_World.Prototype.DefineProp("__New", PriorWorld)
+			_LSJ_ConstructorRefusalWorld.Primary := 0
+			_LSJ_UnstartedPanelFixture.Probe := 0
+			_LSJ_UnstartedPanelFixture.DerivedDisposals := 0
+		}
+	}
+}
+Test("Local join: failed constructor retires only established base owners", _LSJ_ConstructorOwnerRefusal)
