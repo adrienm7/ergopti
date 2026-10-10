@@ -11,6 +11,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
+local CaptionFixture = require("tests.support.hotstrings_parent_caption_fixture")
 local ExtensionTranslator = require("infra.i18n")
 local shipped = require("toml_codec.codec").decode(require("tests.support.source_file").read(
 	helpers.driver_root() .. "../../layouts/registry/ergopti/manifest.toml")).extension
@@ -34,8 +35,11 @@ local function context(hotfiles, packs)
 end
 
 helpers.describe("Hotstrings menu: extension submenus", function()
-	helpers.it("renders the shipped Ergopti+ name in the actual tray tree", function()
-		local Builder = helpers.load_with_stubs("ui.menu.builder")
+	helpers.it("renders the shipped Ergopti+ name in the actual tray tree", CaptionFixture.scoped(function()
+		helpers.load_with_stubs("ui.menu.builder")
+		CaptionFixture.install(require("infra.i18n"))
+		package.loaded["ui.menu.builder"] = nil
+		local Builder = require("ui.menu.builder")
 		local Hotstrings = require("ui.menu.menu_hotstrings")
 		local ctx = context({ "sfbsreduction", "rolls" }, { ERGOPTI })
 		ctx.config, ctx.base_dir = { log_level = 2 }, helpers.driver_root()
@@ -57,7 +61,7 @@ helpers.describe("Hotstrings menu: extension submenus", function()
 			end
 		end
 		helpers.assert_true(find(tree) ~= nil, "the rendered extension name must retain its plus")
-	end)
+	end))
 
 	helpers.it("(ergopti-hotstrings-ext) lists SFB reduction and rolls under the Ergopti extension", function()
 		local Builder = helpers.load_with_stubs("ui.menu.builder")

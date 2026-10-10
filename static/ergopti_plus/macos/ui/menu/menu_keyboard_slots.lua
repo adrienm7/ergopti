@@ -150,7 +150,6 @@ local function choose_action_for(slot_id, ctx)
 		KbShortcuts.keyboard_binding_id(slot_id))
 	ActionPicker.open({
 		title   = i18n.get("dialog.keyboard_shortcut.title_prefix") .. KbShortcuts.get_keyboard_slot_label(slot_id),
-		label   = i18n.get("dialog.action_picker.label"),
 		current = KbShortcuts.get_keyboard_action(slot_id),
 		items   = items,
 		send_vocabulary   = editor.send_vocabulary,

@@ -56,7 +56,6 @@ local function choose_action_for(id, name, ctx)
 	local editor = ShortcutUtils.picker_parameter_fields(ctx.gestures, items, TapKeys.binding_id(id))
 	ActionPicker.open({
 		title   = name,
-		label   = i18n.get("dialog.action_picker.label"),
 		current = TapKeys.get_action(id),
 		items   = items,
 		send_vocabulary   = editor.send_vocabulary,

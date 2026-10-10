@@ -431,3 +431,171 @@ helpers.describe("common hotstring sections consume the genuine shared boundary"
 		end)
 	end
 end)
+
+
+--- Keeps actual native binding, TimerScheduler, DeferredWork and original opener.
+--- Only ordinary hs.timer primitives are controlled; adapter receipts are genuine.
+local function with_personal_info_leaf(body)
+	with_category_file(true, function()
+		local callbacks, native_timers = {}, {}
+		local previous_new = hs.timer.new
+		hs.timer.new = function(seconds, callback)
+			local running = false
+			local native = {
+				seconds = seconds,
+				start = function(self) running = true; return self end,
+				stop = function(self) running = false; return self end,
+				running = function() return running end,
+			}
+			callbacks[#callbacks + 1], native_timers[#native_timers + 1] = callback, native
+			return native
+		end
+		package.loaded["adapters.timer_scheduler"] = nil
+		package.loaded["infra.deferred_work"] = nil
+		package.loaded["infra.manifest_menu"] = nil
+		package.loaded["ui.menu.menu_hotstrings"] = nil
+		local timer
+		local called, detail = xpcall(function()
+			timer = require("adapters.timer_scheduler")
+			local renderer = assert(require("infra.manifest_menu"))
+			local hotstrings = require("ui.menu.menu_hotstrings")
+			local ctx = context(true, true)
+			local opened, saves, updates, notifications = 0, 0, 0, 0
+			ctx.applyTriggerChar = function(value) return "@ " .. value end
+			ctx.state.personal_info = false
+			ctx.personal_info = { open_editor = function() opened = opened + 1 end }
+			ctx.module_sections = { alpha = { personal_info = { mod_id = "personal_info",
+				description = "Independent personal info" } } }
+			ctx.keymap.get_sections = function() return { { name = "personal_info", is_module_placeholder = true } } end
+			ctx.save_prefs = function() saves = saves + 1; return true end
+			ctx.updateMenu = function() updates = updates + 1 end
+			ctx.notify_feature = function() notifications = notifications + 1 end
+			body({ renderer = renderer, root = renderer.get_root(), context = ctx, callbacks = callbacks,
+				timer = timer, native_timers = native_timers,
+				counts = function() return opened, saves, updates, notifications end,
+				build = function() return hotstrings.build_groups(ctx, nil, { group_counts = {} })[1].submenu end })
+		end, debug.traceback)
+		local settled = timer == nil or timer.cancelAll()
+		hs.timer.new = previous_new
+		if not called then error(detail, 0) end
+		assert(settled and timer.activeCount() == 0, "owned genuine timer registry must settle")
+	end)
+end
+
+local function personal_info_native(rows)
+	local title = require("infra.i18n").get("menu.shortcuts.edit_personal_info")
+	for _, row in ipairs(rows or {}) do if row.title == title then return row end end
+end
+
+helpers.describe("personal-info editor original declared leaf (Mac)", function()
+	helpers.it("personal-info Mac leaf: retains original checkbox, exact native callback and deferred protected opener", function()
+		with_personal_info_leaf(function(f)
+			local template, supplied = f.renderer.template_rows, nil
+			local timer = require("adapters.timer_scheduler")
+			local schedule, delay = timer.after, nil
+			local called, detail = xpcall(function()
+				f.renderer.template_rows = function(key, ...)
+					local rows = template(key, ...)
+					if key == "personal_info_editor_frame" then supplied = rows end
+					return rows
+				end
+				timer.after = function(seconds, ...) delay = seconds; return schedule(seconds, ...) end
+				local rows = f.build()
+				helpers.assert_eq(rows[3].title, "-", "original declared category boundary precedes the personal provider")
+				helpers.assert_nil(rows[3].fn); helpers.assert_nil(rows[3].menu)
+				helpers.assert_eq(rows[4].title, "@ Independent personal info")
+				helpers.assert_nil(rows[4].checked)
+				local command = assert(personal_info_native(rows))
+				helpers.assert_true(rawequal(command, rows[5]), "original checkbox/editor order remains")
+				helpers.assert_true(rawequal(command.fn, supplied[1].action), "actual provider callback reaches native delivery")
+				helpers.assert_nil(command.checked); helpers.assert_nil(command.disabled); helpers.assert_nil(command.menu)
+				helpers.assert_eq(f.counts(), 0); helpers.assert_eq(#f.callbacks, 0)
+				helpers.assert_eq(command.fn(), true)
+				helpers.assert_eq(delay, 0.1); helpers.assert_eq(#f.callbacks, 1)
+				helpers.assert_eq(f.counts(), 0, "opening waits for the retained native timer")
+				f.callbacks[1]()
+				local opened, saves, updates, notices = f.counts()
+				helpers.assert_eq({ opened, saves, updates, notices }, { 1, 0, 0, 0 })
+				f.context.personal_info.open_editor = function() error("original protected opener refuses") end
+				helpers.assert_eq(command.fn(), true)
+				local ok = pcall(f.callbacks[2]); helpers.assert_eq(ok, true, "original pcall still contains native opener throws")
+			end, debug.traceback)
+			f.renderer.template_rows, timer.after = template, schedule
+			if not called then error(detail, 0) end
+		end)
+	end)
+
+	helpers.it("personal-info Mac leaf: refuses a held callback after source withdrawal and accepts exact repair", function()
+		with_personal_info_leaf(function(f)
+			local command = assert(personal_info_native(f.build()))
+			local source = assert(f.root.personal_info_editor_frame)
+			local called, detail = xpcall(function()
+				f.root.personal_info_editor_frame = nil
+				helpers.assert_eq(command.fn(), false)
+				local rows = f.build()
+				helpers.assert_nil(personal_info_native(rows))
+				helpers.assert_eq(rows[4].title, "@ Independent personal info", "independent original checkbox survives leaf refusal")
+				helpers.assert_eq(#f.callbacks, 0); helpers.assert_eq(f.counts(), 0)
+			end, debug.traceback)
+			f.root.personal_info_editor_frame = source
+			if not called then error(detail, 0) end
+			helpers.assert_eq(command.fn(), true)
+			helpers.assert_eq(#f.callbacks, 1)
+		end)
+	end)
+
+	helpers.it("personal-info Mac leaf: retires queued native delivery after withdrawal and repairs through a fresh timer", function()
+		with_personal_info_leaf(function(f)
+			local command = assert(personal_info_native(f.build()))
+			local source = assert(f.root.personal_info_editor_frame)
+			local called, detail = xpcall(function()
+				helpers.assert_eq(command.fn(), true)
+				helpers.assert_eq(#f.callbacks, 1); helpers.assert_eq(f.timer.activeCount(), 1)
+				helpers.assert_eq(f.native_timers[1].seconds, 0.1)
+				f.root.personal_info_editor_frame = nil
+				f.callbacks[1]()
+				helpers.assert_eq(f.counts(), 0, "withdrawal before real queued delivery keeps the opener inert")
+				helpers.assert_eq(f.timer.activeCount(), 0)
+				helpers.assert_eq(f.native_timers[1]:running(), false, "real one-shot retirement stops its exact native timer")
+				f.root.personal_info_editor_frame = source
+				helpers.assert_eq(command.fn(), true)
+				helpers.assert_eq(#f.callbacks, 2); helpers.assert_eq(f.timer.activeCount(), 1)
+				f.callbacks[2]()
+				helpers.assert_eq(f.counts(), 1, "exact source repair admits a new genuine one-shot")
+				helpers.assert_eq(f.timer.activeCount(), 0)
+			end, debug.traceback)
+			f.root.personal_info_editor_frame = source
+			if not called then error(detail, 0) end
+		end)
+	end)
+
+	for _, damage in ipairs({ "array", "record", "platform", "template" }) do
+		helpers.it("personal-info Mac leaf: refuses actual-template withdrawal " .. damage .. " and repairs", function()
+			with_personal_info_leaf(function(f)
+				local template, source = f.renderer.template_rows, assert(f.root.personal_info_editor_frame)
+				local declaration, platforms = source[1], source[1].platforms
+				local caption, platform = declaration.i18n, platforms[1]
+				local called, detail = xpcall(function()
+					f.renderer.template_rows = function(key, ...)
+						local rows = template(key, ...)
+						if key == "personal_info_editor_frame" then
+							if damage == "array" then f.root.personal_info_editor_frame = nil
+							elseif damage == "record" then declaration.i18n = "common.cancel"
+							elseif damage == "platform" then platforms[1] = "ahk"
+							else f.renderer.template_rows = nil end
+						end
+						return rows
+					end
+					local rows = f.build()
+					helpers.assert_nil(personal_info_native(rows))
+					helpers.assert_eq(rows[4].title, "@ Independent personal info")
+					helpers.assert_eq(#f.callbacks, 0); helpers.assert_eq(f.counts(), 0)
+				end, debug.traceback)
+				f.renderer.template_rows, f.root.personal_info_editor_frame = template, source
+				declaration.i18n, platforms[1] = caption, platform
+				if not called then error(detail, 0) end
+				helpers.assert_type(personal_info_native(f.build()).fn, "function", "actual descriptor repair restores genuine projection")
+			end)
+		end)
+	end
+end)

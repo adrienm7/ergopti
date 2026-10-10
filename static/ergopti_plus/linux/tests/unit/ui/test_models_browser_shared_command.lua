@@ -38,15 +38,16 @@ local function with_browser(callback)
 		}
 		package.loaded["infra.manifest_menu"] = nil
 		local native = require("infra.manifest_menu")
-		package.loaded["infra.manifest_menu"] = setmetatable({
-			get_array = function(key)
-				if key == "top_level" then return { { id = "llm" } } end
-				return native.get_array(key)
-			end,
-			build = function(_, _, _, _, _, providers)
-				return native.render_rows(providers.llm_models(), "llm_models")
-			end,
-		}, { __index = native })
+		local root, selected = native.get_root(), {}
+		for _, row in ipairs(native.get_array("top_level")) do
+			if row.id == "llm" then selected[#selected + 1] = row end
+		end
+		root.top_level = selected
+		local facade = {}; for key, value in pairs(native) do facade[key] = value end
+		facade.build = function(_, _, _, _, _, providers)
+			return native.render_rows(providers.llm_models(), "llm_models")
+		end
+		package.loaded["infra.manifest_menu"] = facade
 		package.loaded["ui.menu.menu_builder"] = nil
 		local Builder = require("ui.menu.menu_builder")
 		local ctx = {

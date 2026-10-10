@@ -1249,8 +1249,10 @@ local function language_parent_native(language, scenario)
 		local file = assert(io.open(path, "rb")); local bytes = assert(file:read("*a")); assert(file:close())
 		local corpus = assert(require("json").decode(bytes))
 		assert(i18n.get("menu.global.language") == corpus.parent[language], "genuine locale file is initialized")
-		return with_api_source(function(builder)
-			return scenario(i18n, ManifestMenu, corpus, function(changed)
+		-- The controlled native renderer collaborators belong to this scenario's
+		-- import cohort; acquire the actual builder only after they are installed.
+		return scenario(i18n, ManifestMenu, corpus, function(changed)
+			return with_api_source(function(builder)
 				return builder.build({ _version = "9.9.9", on_menu_changed = changed })
 			end)
 		end)
@@ -1504,4 +1506,119 @@ helpers.describe("menu certification: current disabled public Agent policy", fun
 			helpers.assert_true(previous[name] ~= nil, "no component-only cache entry survives: " .. name)
 		end
 	end))
+end)
+
+
+-- Actual finished tray projections preserve old absence while canonical parent policy is withdrawn.
+helpers.describe("fixed feature-parent family: actual Linux builder (fixed-feature-parent-native)", function()
+	for _, vector in ipairs({
+		{id = "keyboard_layout", key = "menu.layout.title"},
+		{id = "hotstrings", key = "menu.hotstrings.title"},
+		{id = "shortcuts", key = "menu.shortcuts.title"},
+		{id = "tap_holds", key = "menu.tapholds.title"},
+		{id = "gestures", key = "menu.gestures.title"},
+	}) do
+		local contract = vector
+		helpers.it("refuses and explicitly repairs the actual " .. contract.id .. " parent before child construction (fixed-feature-parent-native)", function()
+			with_absent_english(function()
+				return with_api_source(function(builder, entries, path)
+					local root = ManifestMenu.get_root()
+					local parent
+					for _, row in ipairs(root.top_level) do if row.id == contract.id then assert(not parent); parent = row end end
+					assert(parent); local original_type, actual_template, actual_build = parent.type, ManifestMenu.template_rows, ManifestMenu.build
+					local child_reads = 0
+					ManifestMenu.template_rows = function(...) child_reads = child_reads + 1; return actual_template(...) end
+					ManifestMenu.build = function(...) child_reads = child_reads + 1; return actual_build(...) end
+					local source_file = assert(io.open(path, "rb")); local source = source_file:read("*a"); assert(source_file:close())
+					local function parent_at_tray()
+						return find_item(builder.build(absent_context()), i18n.get(contract.key))
+					end
+					local function actual_parent_builder()
+						local name = contract.id == "keyboard_layout" and "_build_layouts" or "_build_" .. contract.id
+						local found, matches, index = nil, 0, 1
+						while true do
+							local key, value = debug.getupvalue(builder.build, index)
+							if key == nil then break end
+							if key == name then found, matches = value, matches + 1 end
+							index = index + 1
+						end
+						assert(matches == 1 and type(found) == "function", "the sole actual registered feature builder is required")
+						return found
+					end
+					local owner = actual_parent_builder()
+					local ok, detail = xpcall(function()
+						local before = assert(parent_at_tray())
+						helpers.assert_eq(before.title, i18n.get(contract.key))
+						helpers.assert_nil(before.checked)
+						if contract.id == "tap_holds" then
+							helpers.assert_eq(before.disabled, true); helpers.assert_nil(before.menu); helpers.assert_nil(before.fn)
+						else helpers.assert_type(before.menu, "table") end
+						parent.type = "command"; child_reads = 0
+						helpers.assert_nil(owner(absent_context()), "actual dispatch identity remains registered; wrong native parent policy must refuse")
+						helpers.assert_eq(child_reads, 0, "actual child template/build owners are not called after structural parent refusal")
+						helpers.assert_nil(parent_at_tray())
+						parent.type = original_type
+						local repaired = assert(parent_at_tray())
+						helpers.assert_eq(repaired.title, before.title)
+						helpers.assert_eq(repaired.checked, before.checked)
+						if contract.id == "tap_holds" then helpers.assert_nil(repaired.menu); helpers.assert_eq(repaired.disabled, true)
+						else helpers.assert_eq(#repaired.menu, #before.menu) end
+					end, debug.traceback)
+					parent.type, ManifestMenu.template_rows, ManifestMenu.build = original_type, actual_template, actual_build
+					local current = assert(io.open(path, "rb")); helpers.assert_eq(current:read("*a"), source); assert(current:close())
+					helpers.assert_eq(entries.path(), path)
+					if not ok then error(detail, 0) end
+				end)
+			end)
+		end)
+	end
+end)
+
+
+helpers.describe("actual Linux top-level boundary facade custody (declared-top-level-separator-native)", function()
+	local mutations = {
+		["module withdrawn"] = function(_, hits) rawset(package.loaded, "infra.manifest_menu", nil) end,
+		["foreign module"] = function(_, hits)
+			rawset(package.loaded, "infra.manifest_menu", setmetatable({}, {__index = function() hits[1] = hits[1] + 1 end}))
+		end,
+		["factory withdrawn"] = function(renderer, hits)
+			rawset(renderer, "top_level_separator_receiver", function() hits[1] = hits[1] + 1; return {} end)
+		end,
+	}
+	for name, mutate in pairs(mutations) do
+		for _, before_admission in ipairs({false, true}) do
+			local subject, change, first = name, mutate, before_admission
+			helpers.it((first and "actual header before admission" or "actual Metrics producer") .. " refuses " .. subject .. " (declared-top-level-separator-native)", function()
+				local renderer, owner, modules = ManifestMenu, rawget(ManifestMenu, "top_level_separator_receiver"), package.loaded
+				local prior, hits, calls, reads = rawget(modules, "infra.manifest_menu"), {0}, 0, 0
+				local ctx = full_context()
+				local function withdraw()
+					calls = calls + 1; change(renderer, hits)
+				end
+				if first then
+					-- The real native header's existing tostring slot precedes admission.
+					ctx._version = setmetatable({}, {__tostring = function() withdraw(); return "9.9.9" end})
+				else
+					local native_read = ctx.keylogger.is_enabled
+					ctx.keylogger.is_enabled = function()
+						reads = reads + 1; local value = native_read()
+						if calls == 0 then withdraw() end
+						return value
+					end
+				end
+				local ok, detail = xpcall(function()
+					local rows = build_full_menu(ctx)
+					helpers.assert_eq(#rows, 0, "the actual native root refuses its completed rows")
+					helpers.assert_eq(calls, 1, "the controlled actual native owner withdrawal occurred exactly once")
+					if not first then helpers.assert_true(reads >= 1, "the real Metrics producer consumed its unchanged native state reader") end
+					helpers.assert_eq(hits[1], 0, "neither replacement facade nor retained factory dispatches")
+				end, debug.traceback)
+				rawset(renderer, "top_level_separator_receiver", owner); rawset(modules, "infra.manifest_menu", prior)
+				if not ok then error(detail, 0) end
+				helpers.assert_true(#build_full_menu(full_context()) > 2, "the original real native source builds after exact repair")
+				helpers.assert_eq(hits[1], 0); helpers.assert_true(rawequal(rawget(renderer, "top_level_separator_receiver"), owner))
+				helpers.assert_true(rawequal(rawget(modules, "infra.manifest_menu"), prior))
+			end)
+		end
+	end
 end)

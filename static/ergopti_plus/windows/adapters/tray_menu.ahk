@@ -178,3 +178,25 @@ global ADAPTER_TRAY_MENU := Map(
     "setTooltip", TrayMenuSetTooltip,
     "destroy",    TrayMenuDestroy,
 )
+
+
+/**
+ * Reads the exact caption at an existing native menu position.
+ * @param {Menu} TargetMenu Actual native destination.
+ * @param {Integer} Position Zero-based existing row position.
+ * @returns {String} Native UTF-16 caption, including an empty separator label.
+ */
+TrayMenuItemCaption(TargetMenu, Position) {
+	if !(TargetMenu is Menu) || Type(Position) != "Integer" || Position < 0
+		|| Position >= TrayMenuItemCount(TargetMenu)
+		throw ValueError("Native menu caption requires an existing row position")
+	Handle := TargetMenu.Handle
+	Length := DllCall("GetMenuStringW", "ptr", Handle, "uint", Position,
+		"ptr", 0, "int", 0, "uint", 0x400, "int")
+	TextBuffer := Buffer((Length + 1) * 2, 0)
+	Read := DllCall("GetMenuStringW", "ptr", Handle, "uint", Position,
+		"ptr", TextBuffer, "int", Length + 1, "uint", 0x400, "int")
+	if Read != Length
+		throw Error("Native menu caption changed while reading")
+	return StrGet(TextBuffer, "UTF-16")
+}

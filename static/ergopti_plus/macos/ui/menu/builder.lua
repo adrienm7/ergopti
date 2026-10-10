@@ -22,6 +22,25 @@ local i18n       = require("infra.i18n")
 -- module no longer has one of its own.
 local ManifestMenu = require("infra.manifest_menu")
 
+-- The imported facade and its actual functions own every later boundary read.
+local separator_modules = package.loaded
+local separator_factory = type(ManifestMenu) == "table" and rawget(ManifestMenu, "top_level_separator_receiver")
+local separator_render = type(ManifestMenu) == "table" and rawget(ManifestMenu, "render_rows")
+local separator_array = type(ManifestMenu) == "table" and rawget(ManifestMenu, "get_array")
+local separator_root = type(ManifestMenu) == "table" and rawget(ManifestMenu, "get_root")
+
+--- Refuses facade or function withdrawal without invoking its replacement.
+--- @return boolean
+local function separator_facade_current()
+	return type(ManifestMenu) == "table" and getmetatable(ManifestMenu) == nil
+		and rawget(package, "loaded") == separator_modules
+		and rawget(separator_modules, "infra.manifest_menu") == ManifestMenu
+		and type(separator_factory) == "function" and rawget(ManifestMenu, "top_level_separator_receiver") == separator_factory
+		and type(separator_render) == "function" and rawget(ManifestMenu, "render_rows") == separator_render
+		and type(separator_array) == "function" and rawget(ManifestMenu, "get_array") == separator_array
+		and type(separator_root) == "function" and rawget(ManifestMenu, "get_root") == separator_root
+end
+
 --- Checks raw dense arrays without triggering source metamethods.
 --- @param value table Source array.
 --- @param records boolean Whether its values must be plain records.
@@ -164,8 +183,9 @@ local Extensions  = require("hotstrings.extensions")
 local TomlCodec   = require("toml_codec.codec")
 local LocaleTable = require("_generated.locale_table")
 
+local _top_level_cache = nil
+local _top_level_separator_receiver = nil
 local _language_packs_cache    = nil
-local _top_level_cache         = nil
 
 --- Returns the parsed menu_manifest.json root.
 ---
@@ -284,16 +304,22 @@ end
 --- Each entry keeps the manifest's `greyed_when_paused` mark: the feature rows a
 --- pause greys, declared once for the three trays.
 --- Returns an empty array on failure and logs ERROR (fail-loud — no stale copy).
---- @return table Array of {id, greyed_when_paused} entries in display order.
+--- @return table Array of projected entries retaining their exact canonical source records.
 local function load_top_level()
-	if _top_level_cache then return _top_level_cache end
-	local data = load_manifest()
-	if not data or type(data.top_level) ~= "table" then
+	if not separator_facade_current() then return {} end
+	if _top_level_cache then
+		if type(_top_level_separator_receiver) ~= "function" or not _top_level_separator_receiver("current") then return {} end
+		return _top_level_cache
+	end
+	_top_level_separator_receiver = nil
+	local receive, declared = separator_factory()
+	if not separator_facade_current() then return {} end
+	if not receive or type(declared) ~= "table" then
 		Logger.error(LOG, "Failed to load top_level from manifest — the tray has no row.")
 		return {}
 	end
 	local result = {}
-	for _, entry in ipairs(data.top_level) do
+	for _, entry in ipairs(declared) do
 		if type(entry) ~= "table" or type(entry.id) ~= "string" then goto continue end
 		if type(entry.platforms) == "table" then
 			local for_hs = false
@@ -302,15 +328,16 @@ local function load_top_level()
 			end
 			if not for_hs then goto continue end
 		end
-		local projected = { id = entry.id, greyed_when_paused = entry.greyed_when_paused == true }
+		local projected = { id = entry.id, greyed_when_paused = entry.greyed_when_paused == true, declared_entry = entry }
 		if entry.disabled == true then
 			projected.disabled, projected.i18n, projected.reason_key = true, entry.i18n, entry.reason_key
 		end
 		table.insert(result, projected)
 		::continue::
 	end
+	if not separator_facade_current() or not receive("current") then return {} end
 	Logger.debug(LOG, "Top level loaded from manifest (%d item(s)).", #result)
-	_top_level_cache = result
+	_top_level_cache, _top_level_separator_receiver = result, receive
 	return _top_level_cache
 end
 
@@ -344,6 +371,8 @@ local function build_hotstrings_rows(ctx, menu_mods)
 		Logger.warn(LOG, "Hotstrings module missing — submenu ignored.")
 		return {}
 	end
+	local receive = ManifestMenu.group_receiver("top_level", "hotstrings")
+	if not receive then return {} end
 	Logger.debug(LOG, "Building hotstrings submenu…")
 
 	-- The categories an installed extension binds whole: counted apart from the
@@ -388,7 +417,6 @@ local function build_hotstrings_rows(ctx, menu_mods)
 		return true
 	end
 
-	local hotstrings_title = "⚡ Hotstrings (" .. fmt_grand(grand_total) .. ")"
 
 	-- Every row below is collected for the manifest slot that declares it, and
 	-- the SHARED renderer places them. This menu was assembled here by hand
@@ -629,10 +657,6 @@ local function build_hotstrings_rows(ctx, menu_mods)
 	-- `menu.hotstrings.title` for this same entry, and it is translated in all
 	-- twenty-one locales — « ⚡ ホットストリング » in Japanese — so the hardcoded
 	-- string was the one top-level menu this driver refused to translate.
-	local hotstrings_label = i18n.get("menu.hotstrings.title")
-	hotstrings_title = grand_has_count
-		and (hotstrings_label .. " (" .. fmt_grand(grand_total) .. ")")
-		or  hotstrings_label
 
 	if #hotstrings_menu == 0 then
 		Logger.warn(LOG, "Hotstrings submenu is empty — ignored.")
@@ -640,11 +664,9 @@ local function build_hotstrings_rows(ctx, menu_mods)
 	end
 	-- The tick mirrors the switch; the switch itself is the submenu's first
 	-- row, since a row that opens a submenu is never clicked.
-	return { {
-		label = hotstrings_title,
-		submenu = hotstrings_menu,
-		checked = master_on or nil,
-	} }
+	local parent = receive(hotstrings_menu, { hotstrings_enabled = function() return master_on or nil end,
+		hotstrings_parent_total = function() return grand_total end, hotstrings_parent_count_present = function() return grand_has_count end })
+	return parent and { parent } or {}
 end
 
 --- Generates the complete items list for the Hammerspoon menubar.
@@ -659,6 +681,7 @@ end
 --- @param actions table Callbacks for global system actions.
 --- @return table The assembled menu structure.
 function M.generate(ctx, menu_mods, actions)
+	if not separator_facade_current() then return {} end
 	--- Runs one component builder and returns what it built as a list of rows.
 	--- @param label string Component name for the log.
 	--- @param fn function Builder.
@@ -699,7 +722,18 @@ function M.generate(ctx, menu_mods, actions)
 	-- table's. tools/test/test-menu-top-level-parity.cjs holds these keys to the
 	-- ids the manifest declares for macOS, in both directions.
 	local builders = {
-		["keyboard_layout"] = function() return module_rows("keyboard_layout") end,
+		["keyboard_layout"] = function()
+			local receive = ManifestMenu.group_receiver("top_level", "keyboard_layout")
+			if not receive then return {} end
+			local rows = module_rows("keyboard_layout")
+			local original = #rows == 1 and rawget(rows, 1) or nil
+			local submenu = type(original) == "table" and getmetatable(original) == nil
+				and rawget(original, "submenu") or nil
+			if type(submenu) ~= "table" then return {} end
+			-- macOS owns a system input source, so the existing parent has no enable tick.
+			local parent = receive(submenu, { layout_enabled = function() return nil end })
+			return parent and { parent } or {}
+		end,
 		["hotstrings"]      = function() return build_hotstrings_rows(ctx, menu_mods) end,
 		["llm"]             = function()
 			if type(ctx.llm_handler) ~= "table" or type(ctx.llm_handler.build_item) ~= "function" then
@@ -879,9 +913,12 @@ function M.generate(ctx, menu_mods, actions)
 
 	local items = {}
 	for _, entry in ipairs(load_top_level()) do
+		if not separator_facade_current() or not _top_level_separator_receiver("current") then return {} end
 		local id = entry.id
 		if id == "---" then
-			table.insert(items, { separator = true })
+			local boundary = _top_level_separator_receiver(entry.declared_entry)
+			if not boundary then return {} end
+			table.insert(items, boundary)
 		elseif entry.disabled == true then
 			table.insert(items, { label = i18n.get(entry.i18n), disabled = true,
 				disabled_reason_key = entry.reason_key })
@@ -890,7 +927,9 @@ function M.generate(ctx, menu_mods, actions)
 			-- promised and will not see.
 			Logger.error(LOG, "No builder for top-level row '%s' — the entry is missing.", tostring(id))
 		else
-			for _, row in ipairs(builders[id]() or {}) do
+			local children = builders[id]() or {}
+			if not separator_facade_current() or not _top_level_separator_receiver("current") then return {} end
+			for _, row in ipairs(children) do
 				-- « Pause = tout éteint »: every row the manifest marks as a feature
 				-- is greyed and stripped of its handler in one place. Each builder
 				-- used to decide this for itself, so Shortcuts and Gestures greyed
@@ -912,7 +951,10 @@ function M.generate(ctx, menu_mods, actions)
 	-- Everything above collected row DATA; this is where the shared renderer turns
 	-- it into the table hs.menubar consumes, dropping any separator that would not
 	-- sit between two rows.
-	local rendered = ManifestMenu.render_rows(items, "top_level")
+	if not separator_facade_current() or type(_top_level_separator_receiver) ~= "function"
+		or not _top_level_separator_receiver("current") then return {} end
+	local rendered = separator_render(items, "top_level")
+	if not separator_facade_current() or not _top_level_separator_receiver("current") then return {} end
 
 	-- Collect the download item now so it participates in canvas width calculation below.
 	-- pcall-isolated like every component builder above — an exception here must
@@ -952,6 +994,7 @@ function M.generate(ctx, menu_mods, actions)
 		Logger.error(LOG, string.format("Error building canvas badge: %s.", tostring(badge_err)))
 	end
 
+	if not separator_facade_current() or not _top_level_separator_receiver("current") then return {} end
 	return rendered
 end
 

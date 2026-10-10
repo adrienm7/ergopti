@@ -1855,3 +1855,290 @@ _GDR_Withdraw(Mutation, Key, Root, Getters, Builders, Reads) {
 		Builders["parent"] := () => Menu()
 	return false
 }
+
+; Canonical fixed parents read immutable original locale/count expectations.
+Test("manifest_menu: fixed parents preserve original 21-language captions and native children", _FFP_CheckOriginalCaptions)
+Test("manifest_menu: translated count rejects untyped or unsafe native receipts", _FFP_CheckCountReceipts)
+Test("manifest_menu: captured fixed parent rejects changed canonical source", _FFP_CheckSourceCohort)
+
+_FFP_Corpus() {
+	global _SharedDir
+	return JsonParse(FileRead(_SharedDir . "\tests\corpus\menus\fixed_feature_parents.json", "UTF-8"))
+}
+
+_FFP_WithOriginalLocale(Code, Body) {
+	global _SharedDir, _I18nCache, _I18nCacheLoaded
+	HadCache := IsSet(_I18nCache), Cache := HadCache ? _I18nCache : false
+	HadLoaded := IsSet(_I18nCacheLoaded), Loaded := HadLoaded ? _I18nCacheLoaded : false
+	try {
+		_I18nCache := JsonParse(FileRead(_SharedDir . "\data\locales\" . Code . ".json", "UTF-8"))
+		_I18nCacheLoaded := true
+		return Body.Call()
+	} finally {
+		if HadCache
+			_I18nCache := Cache
+		else
+			_I18nCache := unset
+		if HadLoaded
+			_I18nCacheLoaded := Loaded
+		else
+			_I18nCacheLoaded := unset
+	}
+}
+
+_FFP_CheckedReceipt(Reads, Value) {
+	Reads["state"] += 1
+	return Value
+}
+_FFP_TotalReceipt(Reads, Value) {
+	Reads["total"] += 1
+	return Value
+}
+_FFP_PresentReceipt(Reads, Value) {
+	Reads["present"] += 1
+	return Value
+}
+_FFP_Receipts(Reads, Total, Present := true) {
+	return Map("hotstrings_enabled", _FFP_CheckedReceipt.Bind(Reads, false),
+		"hotstrings_parent_total", _FFP_TotalReceipt.Bind(Reads, Total),
+		"hotstrings_parent_count_present", _FFP_PresentReceipt.Bind(Reads, Present))
+}
+_FFP_CheckOriginalCaptions() {
+	Corpus := _FFP_Corpus(), Languages := 0
+	AssertEqual("98572fe1a57dde86c6e8591e79112fc5400ec819", Corpus["original_sha"])
+	for Code, Expected in Corpus["captions"] {
+		Languages += 1
+		_FFP_WithOriginalLocale(Code, _FFP_CheckOneLanguage.Bind(Expected, Corpus))
+	}
+	AssertEqual(21, Languages)
+}
+_FFP_CheckOneLanguage(Expected, Corpus) {
+	States := Map("keyboard_layout", "layout_enabled", "shortcuts", "shortcuts_enabled",
+		"tap_holds", "tapholds_enabled", "gestures", "gestures_enabled")
+	Child := Menu(), Calls := Map("value", 0)
+	Child.Add("Existing native child", (*) => Calls["value"] += 1)
+	try {
+		for Id, State in States {
+			Receiver := MenuRenderer_GroupReceiver("top_level", Id)
+			AssertTrue(HasMethod(Receiver, "Call"))
+			Reads := Map("state", 0)
+			Row := Receiver.Call(Child, Map(State, _FFP_CheckedReceipt.Bind(Reads, false)))
+			AssertTrue(Row is Map), AssertEqual(Expected[Id], Row["label"])
+			AssertTrue(Row["submenu"] == Child), AssertEqual(false, Row["checked"])
+			AssertEqual(1, Reads["state"]), AssertEqual(0, Calls["value"])
+		}
+		for Vector in Corpus["count_cases"] {
+			if Vector["driver"] != "ahk"
+				continue
+			Reads := Map("state", 0, "total", 0, "present", 0)
+			Receiver := MenuRenderer_GroupReceiver("top_level", "hotstrings")
+			Row := Receiver.Call(Child, _FFP_Receipts(Reads, Vector["total"], Vector["aggregate_available"]))
+			AssertTrue(Row is Map), AssertEqual(Expected["hotstrings"] . Vector["suffix"], Row["label"])
+			AssertTrue(Row["submenu"] == Child), AssertEqual(false, Row["checked"])
+			AssertEqual(1, Reads["state"]), AssertEqual(1, Reads["total"]), AssertEqual(1, Reads["present"])
+			AssertEqual(0, Calls["value"])
+		}
+	} finally {
+		try Child.Delete()
+		finally MenuDispatcher_PruneMenu(Child)
+	}
+}
+_FFP_CheckCountReceipts() {
+	Child := Menu()
+	try {
+		for Bad in ["1234", -1, 1.5, 9007199254740992, Map()] {
+			Reads := Map("state", 0, "total", 0, "present", 0)
+			Receiver := MenuRenderer_GroupReceiver("top_level", "hotstrings")
+			AssertTrue(!Receiver.Call(Child, _FFP_Receipts(Reads, Bad)))
+			AssertEqual(0, Reads["state"])
+		}
+		for Bad in ["true", 2, Map()] {
+			Reads := Map("state", 0, "total", 0, "present", 0)
+			Receiver := MenuRenderer_GroupReceiver("top_level", "hotstrings")
+			AssertTrue(!Receiver.Call(Child, _FFP_Receipts(Reads, 1234, Bad)))
+			AssertEqual(0, Reads["state"])
+		}
+		for Missing in ["hotstrings_parent_total", "hotstrings_parent_count_present"] {
+			Reads := Map("state", 0, "total", 0, "present", 0), Getters := _FFP_Receipts(Reads, 1234)
+			Getters.Delete(Missing)
+			AssertTrue(!MenuRenderer_GroupRow("top_level", "hotstrings", Child, Getters))
+			AssertEqual(0, Reads["state"])
+		}
+	} finally {
+		try Child.Delete()
+		finally MenuDispatcher_PruneMenu(Child)
+	}
+}
+_FFP_CheckSourceCohort() {
+	Root := _MR_GetManifestRoot(), Rows := Root["top_level"], Child := Menu()
+	for Row in Rows
+		if _MR_Get(Row, "id") == "hotstrings"
+			Selected := Row
+	OriginalId := Selected["id"]
+	try {
+		Reads := Map("state", 0, "total", 0, "present", 0)
+		Receiver := MenuRenderer_GroupReceiver("top_level", "hotstrings")
+		Selected["id"] := "unowned"
+		AssertTrue(!Receiver.Call(Child, _FFP_Receipts(Reads, 1234)))
+		AssertEqual(0, Reads["state"]), AssertEqual(0, Reads["total"]), AssertEqual(0, Reads["present"])
+	} finally {
+		Selected["id"] := OriginalId
+		try Child.Delete()
+		finally MenuDispatcher_PruneMenu(Child)
+	}
+}
+
+; Actual AHK function objects remain the admitted entry/getter owners after binding.
+Test("manifest_menu: captured original parent entry refuses own Call before dispatch", _FFPC_EntryBefore)
+Test("manifest_menu: captured original parent entry refuses withdrawal during native getters", _FFPC_EntryDuring)
+Test("manifest_menu: actual retained getter refuses same-object own Call before invocation", _FFPC_GetterBefore)
+Test("manifest_menu: native getter withdrawal blocks every later foreign callable", _FFPC_GetterDuring)
+Test("manifest_menu: actual declared entry rejects attempted global rebinding", _FFPC_ReadOnlyEntry)
+
+_FFPC_AddObserver(Owner, Hits) {
+	AssertTrue(!Object.Prototype.HasOwnProp.Call(Owner, "Call"), "the original callable has no own Call descriptor")
+	Object.Prototype.DefineProp.Call(Owner, "Call", { Call: (*) => (Hits["foreign"] += 1, false) })
+}
+_FFPC_RepairObserver(Owner) {
+	if Object.Prototype.HasOwnProp.Call(Owner, "Call")
+		Object.Prototype.DeleteProp.Call(Owner, "Call")
+	AssertTrue(!Object.Prototype.HasOwnProp.Call(Owner, "Call"), "exact absent original Call descriptor restored")
+}
+_FFPC_CheckRestored(Receiver, Child, Getters, Reads, Hits) {
+	Reads["state"] := 0, Reads["total"] := 0, Reads["present"] := 0
+	Row := Receiver.Call(Child, Getters)
+	AssertTrue(Row is Map), AssertTrue(Row["submenu"] == Child)
+	AssertEqual(1, Reads["state"]), AssertEqual(1, Reads["total"]), AssertEqual(1, Reads["present"])
+	AssertEqual(0, Hits["foreign"], "no altered callable gets observation credit")
+}
+_FFPC_DeleteChild(Child) {
+	try Child.Delete()
+	finally MenuDispatcher_PruneMenu(Child)
+}
+_FFPC_EntryBefore() {
+	Owner := MenuRenderer_GroupRow, Child := Menu(), Hits := Map("foreign", 0)
+	Reads := Map("state", 0, "total", 0, "present", 0), Getters := _FFP_Receipts(Reads, 1234)
+	Receiver := MenuRenderer_GroupReceiver("top_level", "hotstrings")
+	AssertTrue(HasMethod(Receiver, "Call"))
+	try {
+		_FFPC_AddObserver(Owner, Hits)
+		AssertTrue(!MenuRenderer_GroupReceiver("top_level", "hotstrings"), "altered actual entry cannot gain new admission")
+		AssertTrue(!Receiver.Call(Child, Getters), "captured original entry is checked before dispatch")
+		AssertEqual(0, Hits["foreign"])
+		AssertEqual(0, Reads["state"]), AssertEqual(0, Reads["total"]), AssertEqual(0, Reads["present"])
+		AssertTrue(MenuRenderer_GroupRow == Owner, "own Call withdrawal retains the same actual function identity")
+		_FFPC_RepairObserver(Owner)
+		_FFPC_CheckRestored(Receiver, Child, Getters, Reads, Hits)
+	} finally {
+		_FFPC_RepairObserver(Owner)
+		_FFPC_DeleteChild(Child)
+	}
+}
+_FFPC_WithdrawWhileReading(Context, Reads, Kind, Value) {
+	Reads[Kind] += 1
+	if Context["armed"]
+		_FFPC_AddObserver(Context["target"], Context["hits"])
+	return Value
+}
+_FFPC_EntryDuring() {
+	Keys := Map("total", "hotstrings_parent_total", "present", "hotstrings_parent_count_present", "state", "hotstrings_enabled")
+	for Kind, Key in Keys {
+		Owner := MenuRenderer_GroupRow, Child := Menu(), Hits := Map("foreign", 0)
+		Reads := Map("state", 0, "total", 0, "present", 0), Getters := _FFP_Receipts(Reads, 1234)
+		Context := Map("armed", true, "target", Owner, "hits", Hits)
+		Getters[Key] := _FFPC_WithdrawWhileReading.Bind(Context, Reads, Kind, Kind == "total" ? 1234 : false)
+		Receiver := MenuRenderer_GroupReceiver("top_level", "hotstrings")
+		try {
+			AssertTrue(!Receiver.Call(Child, Getters), "entry withdrawal from a retained real getter refuses the parent")
+			AssertEqual(1, Reads[Kind]), AssertEqual(0, Hits["foreign"])
+			AssertTrue(MenuRenderer_GroupRow == Owner), AssertTrue(Object.Prototype.HasOwnProp.Call(Owner, "Call"))
+			if Kind == "total"
+				AssertEqual(0, Reads["present"]), AssertEqual(0, Reads["state"])
+			if Kind == "present"
+				AssertEqual(0, Reads["state"])
+			Context["armed"] := false
+			_FFPC_RepairObserver(Owner)
+			_FFPC_CheckRestored(Receiver, Child, Getters, Reads, Hits)
+		} finally {
+			Context["armed"] := false
+			_FFPC_RepairObserver(Owner)
+			_FFPC_DeleteChild(Child)
+		}
+	}
+}
+_FFPC_GetterBefore() {
+	for Key in ["hotstrings_parent_total", "hotstrings_parent_count_present", "hotstrings_enabled"] {
+		Child := Menu(), Hits := Map("foreign", 0), Reads := Map("state", 0, "total", 0, "present", 0)
+		Getters := _FFP_Receipts(Reads, 1234), Owner := Getters[Key]
+		Receiver := MenuRenderer_GroupReceiver("top_level", "hotstrings")
+		try {
+			_FFPC_AddObserver(Owner, Hits)
+			AssertTrue(Getters[Key] == Owner)
+			AssertTrue(!Receiver.Call(Child, Getters), "scalar identity cannot acknowledge same-object Call mutation")
+			AssertEqual(0, Hits["foreign"])
+			AssertEqual(0, Reads["state"]), AssertEqual(0, Reads["total"]), AssertEqual(0, Reads["present"])
+			_FFPC_RepairObserver(Owner)
+			_FFPC_CheckRestored(Receiver, Child, Getters, Reads, Hits)
+		} finally {
+			_FFPC_RepairObserver(Owner)
+			_FFPC_DeleteChild(Child)
+		}
+	}
+}
+_FFPC_GetterDuring() {
+	Keys := Map("total", "hotstrings_parent_total", "present", "hotstrings_parent_count_present", "state", "hotstrings_enabled")
+	for Kind, Key in Keys {
+		for Target in [Key, Kind == "total" ? "hotstrings_parent_count_present" : Kind == "present" ? "hotstrings_enabled" : "hotstrings_parent_total"] {
+			Child := Menu(), Hits := Map("foreign", 0), Reads := Map("state", 0, "total", 0, "present", 0)
+			Getters := _FFP_Receipts(Reads, 1234), Context := Map("armed", true, "hits", Hits)
+			Getters[Key] := _FFPC_WithdrawWhileReading.Bind(Context, Reads, Kind, Kind == "total" ? 1234 : false)
+			Owner := Getters[Target], Context["target"] := Owner
+			Receiver := MenuRenderer_GroupReceiver("top_level", "hotstrings")
+			try {
+				AssertTrue(!Receiver.Call(Child, Getters), "mutation during an actual getter cannot publish a parent")
+				AssertTrue(Getters[Target] == Owner), AssertTrue(Object.Prototype.HasOwnProp.Call(Owner, "Call"))
+				AssertEqual(1, Reads[Kind]), AssertEqual(0, Hits["foreign"])
+				if Kind == "total"
+					AssertEqual(0, Reads["present"]), AssertEqual(0, Reads["state"])
+				if Kind == "present"
+					AssertEqual(0, Reads["state"])
+				Context["armed"] := false
+				_FFPC_RepairObserver(Owner)
+				_FFPC_CheckRestored(Receiver, Child, Getters, Reads, Hits)
+			} finally {
+				Context["armed"] := false
+				_FFPC_RepairObserver(Owner)
+				_FFPC_DeleteChild(Child)
+			}
+		}
+	}
+}
+; Function definitions create read-only global variables in AHK v2. A dynamic
+; attempt exercises that real restriction without an invalid literal assignment.
+_FFPC_AttemptEntryRebinding(Foreign) {
+	global
+	local Name := "MenuRenderer_GroupRow"
+	%Name% := Foreign
+}
+_FFPC_ReadOnlyAttemptWhileReading(Reads, Foreign) {
+	Reads["total"] += 1
+	AssertThrows(_FFPC_AttemptEntryRebinding.Bind(Foreign), "actual declared global entry is read-only")
+	return 1234
+}
+_FFPC_ReadOnlyEntry() {
+	Owner := MenuRenderer_GroupRow, Child := Menu(), Hits := Map("foreign", 0)
+	Foreign := (*) => (Hits["foreign"] += 1, false)
+	Reads := Map("state", 0, "total", 0, "present", 0), Getters := _FFP_Receipts(Reads, 1234)
+	Receiver := MenuRenderer_GroupReceiver("top_level", "hotstrings")
+	try {
+		AssertThrows(_FFPC_AttemptEntryRebinding.Bind(Foreign), "actual original entry cannot be rebound before dispatch")
+		AssertTrue(MenuRenderer_GroupRow == Owner)
+		_FFPC_CheckRestored(Receiver, Child, Getters, Reads, Hits)
+		Getters["hotstrings_parent_total"] := _FFPC_ReadOnlyAttemptWhileReading.Bind(Reads, Foreign)
+		_FFPC_CheckRestored(Receiver, Child, Getters, Reads, Hits)
+		AssertTrue(MenuRenderer_GroupRow == Owner)
+	} finally {
+		AssertTrue(MenuRenderer_GroupRow == Owner)
+		_FFPC_DeleteChild(Child)
+	}
+}

@@ -1131,6 +1131,7 @@
 	"menu.global.clean_unused_keys": "Wyczyść config.toml",
 	"menu.global.starting": "Uruchamianie…",
 	"menu.global.setup_wizard": "Kreator konfiguracji…",
+	"menu.global.startup_bootstrap": "ErgoptiPlus — Uruchamianie…",
 	"menu.global.suspend": "⏸︎ Wstrzymaj",
 	"menu.configuration.title": "Konfiguracja",
 	"menu.hotstrings.add_custom": "+ Dodaj niestandardowy rozszerzacz…",

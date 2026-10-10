@@ -2,6 +2,22 @@
 
 --- Exercises the actual shortcut readers, dispatchers and parameter owner.
 local helpers = require("tests.helpers")
+
+--- Filters this positive scenario to the actual canonical parent, retaining every field.
+--- A copied id-only row no longer declares the parent that receives native children.
+local function declared_parent(top, id)
+	local selected
+	for _, row in ipairs(top) do
+		if row.id == id then
+			assert(selected == nil, "canonical fixture parent must be unique")
+			selected = row
+		end
+	end
+	assert(type(selected) == "table" and selected.type == "group"
+		and type(selected.i18n) == "string", "actual canonical fixture parent unavailable")
+	return { selected }
+end
+
 local Sandbox = require("test.config_unused_keys_contract").sandbox
 local Writer = require("toml_codec.writer")
 local Codec = require("toml_codec")
@@ -417,7 +433,7 @@ helpers.describe("Linux terminal shortcut scope", function()
 				local i18n = require("infra.i18n")
 				local changed, questions = 0, 0
 				local passed, err = pcall(function()
-					root.top_level = {{ id = "shortcuts" }}
+					root.top_level = declared_parent(top, "shortcuts")
 					os.execute = function(command)
 						if command:find("zenity", 1, true) then
 							questions = questions + 1
@@ -463,7 +479,7 @@ helpers.describe("Linux Shortcuts restore row", function()
 			local top, execute = root.top_level, os.execute
 			local changed, questions = 0, 0
 			local passed, err = pcall(function()
-				root.top_level = {{ id = "shortcuts" }}
+				root.top_level = declared_parent(top, "shortcuts")
 				os.execute = function(command)
 					if command:find("command -v zenity", 1, true) then return 0 end
 					if command:find("zenity --question", 1, true) then questions = questions + 1; return 1 end
@@ -505,7 +521,7 @@ helpers.describe("Linux Shortcuts wrap group", function()
 			local root = renderer.get_root()
 			local top = root.top_level
 			local passed, err = pcall(function()
-				root.top_level = {{ id = "shortcuts" }}
+				root.top_level = declared_parent(top, "shortcuts")
 				local menu = require("ui.menu.menu_builder").build({ shortcuts = owners.manager, paused = false,
 					is_paused = function() return controls.paused end })
 				local i18n = require("infra.i18n")
@@ -621,7 +637,7 @@ helpers.describe("Linux script chords in the Shortcuts scope", function()
 			local top, execute = root.top_level, os.execute
 			local questions, changed = 0, 0
 			local passed, err = pcall(function()
-				root.top_level = {{ id = "shortcuts" }}
+				root.top_level = declared_parent(top, "shortcuts")
 				os.execute = function(command)
 					if command:find("command -v zenity", 1, true) then return 0 end
 					if command:find("zenity --question", 1, true) then questions = questions + 1; return 1 end
