@@ -301,7 +301,7 @@ if (process.platform !== 'win32') {
 	cases.push(['tools/test/macos_native_ollama_api_test.py', 20]);
 	cases.push(['tools/test/macos_native_http_receiving_facts_test.py', 55]);
 	cases.push(['tools/test/macos_managed_ollama_explicit_stream_test.py', 6]);
-	cases.push(['tools/diagnostics/macos_managed_ollama_receiving_test.py', 16]);
+	cases.push(['tools/diagnostics/macos_managed_ollama_receiving_test.py', 23]);
 	cases.push(['tools/test/managed_ollama_sessions_test.py', 11]);
 	cases.push(['tools/diagnostics/macos_ollama_alias_selector_test.py', 8]);
 	cases.push(['tools/diagnostics/macos_ollama_hint_metadata_test.py', 19]);
@@ -317,7 +317,7 @@ if (process.platform !== 'win32') {
 	cases.push(['tools/diagnostics/macos_owned_private_session_test.py', 5]);
 	cases.push(['tools/test/macos_bootstrap_tls_numeric_binding_test.py', 8]);
 	cases.push(['tools/test/owned_suspended_image_portable_test.py', 3]);
-	cases.push(['tools/diagnostics/macos_suspended_image_owner_test.py', 28]);
+	cases.push(['tools/diagnostics/macos_suspended_image_owner_test.py', 34]);
 	cases.push(['tools/diagnostics/macos_ollama_bootstrap_owner_test.py', 22]);
 	cases.push(['tools/diagnostics/macos_trusted_native_guardian_test.py', 10]);
 	cases.push(['tools/diagnostics/macos_guardian_retirement_order_test.py', 6]);

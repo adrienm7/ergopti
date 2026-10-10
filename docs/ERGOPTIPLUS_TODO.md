@@ -6702,8 +6702,98 @@ or physical-device acceptance.
       Windows/Linux transport, publication and receiving repairs; those changes
       must be preserved rather than rebuilt from the old interrupted worktree.
       Complete native, package, installation and enterprise acceptance remains
-      open. macOS system trust and explicit proxy relays are integrated, while
-      opaque-client full-URL PAC/WPAD/fallback/redirect routing remains CODE.
+      open. macOS system trust and explicit proxy relay code is integrated.
+      Packaged Python/uv/wheel bootstrap and HuggingFace downloads already use
+      native per-request adapters; system-trust/PAC and installed qualification
+      remains incomplete. A manual context without admitted native capabilities
+      refuses automatic proxy routing instead of bypassing it.
+
+2026-10-10 partial integration and native failure observations. Seven atomic
+commits are integrated without squash in Dev `d92a72d5`. The final selected
+local gates pass formatting, 409 JS controls, Mac 18347/0 across 1569 modules,
+Mac E2E 101 with one original skip, Linux 13037/0 across 520 modules and Linux
+E2E 193/0. Exact candidate manual 38079685751 on `f6318` finishes 6 successful,
+6 failed and 5 skipped jobs; Release is skipped. Both Darwin architectures
+pass SDK 49, Python 77, genuine Go 54, source PAC 10 and catalogue 27. PAC/WPAD
+passes 12 of 14 cases on each architecture; two fail. Independent HTTP fails
+before request dispatch at the original 15-second add-trust command deadline.
+The model receiver reaches trust addition after compilation/signing, but its
+initial exception is discarded and native trust cleanup remains unsettled.
+Model stages and package/install remain unqualified. Official integrated
+manual 38081991583 on exact `d92a72d5` finishes with 6 successful,
+6 failed, 5 skipped and 0 cancelled jobs. Release is skipped. Its exact native
+receiving retains the same case-level limitations; candidate passes do not
+substitute for this official result. The owned integration lock was released
+only after the complete terminal verdict.
+
+The model diagnostic now retains independent closed-code primary and cleanup
+facts and a fixed preparation checkpoint. Original fatal status, reason
+precedence, owner run/close order and all clocks remain unchanged. Raw exception
+messages, arguments, paths and foreign subclass properties are excluded.
+All 16 original portable controls remain and all 23 candidate controls pass.
+Exact diagnostic manual 38083455237 on `0f003a591` is wholly terminal with
+6 successful, 6 failed, 5 skipped and 0 cancelled jobs; Release is skipped.
+Both architectures retain `prepare_phase=trust_add`, a command/deadline primary
+failure and an unknown/unknown cleanup failure. Actual private children retire,
+while `native_trust_restored=false`. This proves the original trust-add command
+exceeded its deadline; the OS/authorization cause remains unknown, and the old
+`d92a72d5` exception remains unattributed. Native model operations and final
+packaging/install remain unqualified.
+
+Daily daemon logging R6 passes 34 actual portable Python controls. The same
+corpus against the old owner/serve passes all original 28 and totals 30 passes,
+one failure and three errors. The nine reviewed source paths are received on
+the owning feature from `0f003a591`; they are not Dev-qualified. Its initial
+private selected run passes formatting, 408 JS controls and Mac E2E 101 with
+one original skip. One JS subject fails with `EISDIR` on the known `node_modules`
+symlink, and the unit capture stops at `capture_bound` without a full-suite
+verdict. A separate verified real-dependency copy passes the unchanged targeted
+drift subject. Preserve the separate 600-second unit command refusal: its owner
+closes with exit 1/deadline and `retained=false`.
+
+The replay using the unchanged original 1,200-second budget passes all 1,569
+modules and 18,347 unit assertions, with zero failures. Its original command
+owner closes with exit 0, `cancelled=false`, no error and `retained=false`;
+captured source, index and original output identities remain exact. These
+separate receipts do not qualify a complete selected gate or claim all 409 JS
+controls green. Separate formatted R2 portable admission now passes 383
+controls, with zero failures, skips or unknown outcomes. Its original command
+owner physically closes with exit 0, no signal/error and `retained=false`;
+source, Node, specification and original capture identities remain exact. This
+is portable model/source and actual Git/CLI evidence, not native qualification.
+The complete canonical R6 selected run finishes on 2026-10-10 with exit 0.
+Formatting passes; all 409 JS checks pass; Mac Lua records 1,569 modules,
+18,347 passes and zero failures; Mac E2E records 101 passes, zero failures and
+one original skip. Swift compilation is deferred on Linux; Windows and Linux
+driver suites are not selected for this macOS runtime tranche. The original
+HEAD, index and all eleven preflight source bindings remain exact. The terminal
+receipt SHA-256 is
+`7d8f29a3ccaae6a4d08a1057a281f2212ddd21a4d07d72aca7433f83e3f6726c`.
+Runtime commit `49b4e7c29` is published; normal merge `08eaabf29` receives
+current Dev `c4180d8d` while retaining all nine runtime bytes, the complete
+owned TODO62 block and every other current Dev TODO block.
+
+The published native enrollment `3fc321209` adds seven independently judged
+daily cases and 42 unchanged logger cases after SDK 49, within its original
+ten-minute step. The same-source selected CI/tool replay passes formatting and
+all 409 JS checks with exact source, HEAD and index bindings. Its first
+sandboxed attempt retains 83 failures, including 82 explicit `EROFS` temporary-
+root refusals and one generic protocol refusal. Required access to the same
+original owned validation root allows the unchanged checks to pass; no
+assertion, source or budget changes. The terminal receipt SHA-256 is
+`5b4bc06fd082c737104c89484af04e2542b199b09aa6b558c967769c91d32f34`.
+Exact manual 38090476827 is active on `3fc321209` with macOS selected and
+`release=false`; its validation job succeeds. Actual native receiving on
+2026-10-10 passes SDK 49, all seven daily cases and all 42 original logger cases
+on both ARM64 and Intel, with zero failures or skips in each cohort. The
+complete manual verdict remains pending. These cohorts do not qualify packaged
+Ollama logging, model operation or final package/install. Integration into Dev remains pending until
+qualified sources and the complete owned manual result are received.
+Coordination notice 6102523619 preserves independent-branch ownership and
+published non-overlap without inferring a Group 5 grant from silence. Preserve
+Group 5's lease 165, live workflow/checkout and every original assertion/budget.
+The production qualification guard stays false; items 36/62 and transverse
+16/38 remain open.
 
 2026-10-10 final canonical caller receiving. Selected format366 passes;
 Mac controlled unit18327/0 across1569 modules, Mac E2E101 with one original
