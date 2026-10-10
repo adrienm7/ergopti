@@ -241,6 +241,73 @@ fi`
 		/^user1001 .*disable/m,
 		'package removal preserves a user-owned service override'
 	);
+	// The Fedora job is a nonlogin container: HOME is supplied, while USER and
+	// LOGNAME need the real account query before privacy admission in --help.
+	const pipeline = require('./ci-pipeline.cjs');
+	const workflow = fs.readFileSync(path.join(ROOT, '.github/workflows/ci-linux.yml'), 'utf8');
+	const installJob = pipeline
+		.jobsOfText(workflow, '.github/workflows/ci-linux.yml')
+		.filter((job) => job.id === 'install-linux');
+	assert.equal(installJob.length, 1);
+	const rpmStep = pipeline.step(installJob[0].body, 'Launch the installed binary (rpm)');
+	const rpmSource = pipeline.runOf(rpmStep).join('\n');
+	assert.equal(rpmSource.split('/usr/bin/ergopti --help').length, 2);
+	const installed = path.join(sandbox, 'record-installed');
+	const identityReceipt = path.join(sandbox, 'identity-receipt');
+	fs.writeFileSync(
+		installed,
+		'#!/bin/bash\n' +
+			'printf "%s\\n" "$HOME" "${USER-}" "${LOGNAME-}" "$#" "$*" > "$IDENTITY_RECEIPT"\n' +
+			'[[ "${USER-}|${LOGNAME-}|$#|$*" = "fixture-account|fixture-account|1|--help" ]] || exit 78\n',
+		{ mode: 0o755 }
+	);
+	stub(
+		'id',
+		'[[ "$*" = "-un" ]] || exit 64\n' +
+			'case "$TEST_CASE" in identity-failed) exit 73 ;; identity-empty) exit 0 ;; *) printf "fixture-account\\n" ;; esac'
+	);
+	const rpmProgram = path.join(sandbox, 'rpm-launch.sh');
+	fs.writeFileSync(
+		rpmProgram,
+		'unset USER LOGNAME\nexport PATH="$TEST_STUBS:/usr/bin:/bin"\n' +
+			rpmSource.replace('/usr/bin/ergopti --help', '"$RPM_INSTALLED" --help')
+	);
+	for (const scenario of ['identity-present', 'identity-empty', 'identity-failed']) {
+		if (fs.existsSync(identityReceipt)) fs.unlinkSync(identityReceipt);
+		const result = spawnSync(bashExecutable(), [bashPath(rpmProgram)], {
+			encoding: 'utf8',
+			timeout: 15000,
+			env: {
+				HOME: bashPath(sandbox),
+				TEST_STUBS: bashPath(stubs),
+				RPM_INSTALLED: bashPath(installed),
+				IDENTITY_RECEIPT: bashPath(identityReceipt),
+				TEST_CASE: scenario
+			}
+		});
+		assert.equal(result.error, undefined);
+		if (scenario === 'identity-present') {
+			assert.equal(result.status, 0, result.stderr);
+			assert.deepEqual(fs.readFileSync(identityReceipt, 'utf8').trimEnd().split('\n'), [
+				bashPath(sandbox),
+				'fixture-account',
+				'fixture-account',
+				'1',
+				'--help'
+			]);
+		} else {
+			assert.notEqual(
+				result.status,
+				0,
+				'Failed or empty identity cannot start the installed command.'
+			);
+			assert.equal(
+				fs.existsSync(identityReceipt),
+				false,
+				'No launch occurs after account refusal.'
+			);
+		}
+	}
 	console.log('[OK] Package setup provisions input access only for local graphical users.');
 } finally {
 	fs.rmSync(sandbox, { recursive: true, force: true });
