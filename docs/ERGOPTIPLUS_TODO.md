@@ -6558,6 +6558,39 @@ policy and native production remain unchanged. These six additions are source-
 reviewed, not locally AHK-executed; fresh Windows qualification is required.
 No parent item is completed by these cuts.
 
+The next exact-tree Windows run, 38070603144, stops at the prerequisite
+native personal-menu lifecycle contract before the full unit suite. Its
+annotation reports native child exit two; the new meta and original Agent
+flag subjects are therefore unqualified. The complete terminal
+log was subsequently recovered and confirms the named AppPicker_Show Func
+is used as an output variable at line 2123 of the new Agent fixture. The
+upstream AHK 2.0.26 source independently proves this assignment invalid. The received correction keeps the original readonly Func and observes its
+scoped own-Call descriptor, restoring exact descriptor presence on every exit.
+All original native flag/callback assertions remain; corrected native execution
+is pending, so no Agent command migration is admitted yet.
+
+The personal receiver's pre-provider refusal has a source-proven cause:
+Menu is a genuine class with its own intrinsic Menu.Call, so the ordinary
+Func own-Call guard cannot validate it. The reviewed correction captures
+private native constructor metadata during module initialization and checks
+its original descriptors around every intrinsic read; ordinary function
+refusals remain. The dedicated proof now consumes the three actual physical
+source files, with seventeen additive constructor/bootstrap counterfactuals
+and exact inverses. Its focused manifest gate and AHK encoding pass. The full
+production fixture now supplies genuine boot-owned keyboard and script state;
+all fifteen original subjects are retained, with one added native subject
+for eight hostile constructor-descriptor refusal/repair cases. These native
+corrections are unexecuted. The eight new renderer DLL references and its
+three held-DLL cleanup calls caused a genuine OS-purity regression. The received
+native adapter now owns those operations, with infrastructure retaining
+callback/token policy and the unchanged 252-line threshold and original corpus.
+The physical four-source proof adds fifteen operation counterfactuals with
+unique exact inverses. A seventeenth native subject exercises thirteen genuine
+port faults before and after production Fill. Withdrawing the adapter or DLL
+callable after Fill leaves explicitly tested native residue until exact repair;
+automatic retirement is not claimed for these two cases. Native qualification
+remains required for every corrected subject.
+
 - [ ] **62.** Downloads on managed company networks: system trust and
       system proxy for every download child (Ollama installation/server/pull,
       updater/rollback and remote AI), with translated certificate/proxy/blocked/
@@ -8816,6 +8849,27 @@ failing out of 15. The full unit run is complete at 10,603 passed / 498 failed,
 with Windows E2E/package/install skipped and Release skipped. Pre-provider
 refusal and full-production fixture dependencies require correction before
 this cut is qualified. Items 54, 81, 16 and 38 stay open.
+
+Run 38070603144 fails its native lifecycle prerequisite before the complete
+unit suite: the three new root-meta and three original Agent flag subjects
+remain unqualified. The terminal whole-log
+archive now confirms the named AppPicker_Show Func output-variable error at
+line 2123; independent upstream-source inspection proves that assignment
+invalid. The received readonly-Func correction preserves all original native
+observations and restores its exact scoped own-Call descriptor. Its corrected
+native execution remains pending. The personal constructor correction and complete-production boot
+fixture are source-reviewed and received, including a sixteenth actual
+personal subject for eight descriptor refusal/repair cases. The focused JS
+manifest gate and encoding pass, but native corrected receiving remains
+unexecuted. Real HMENU capture and intrinsic release now belong to the tray
+adapter; callback/token policy remains in infrastructure with the original
+purity threshold, corpus and temporal assertions. The seventeenth actual
+personal subject adds thirteen native-port refusal/repair cases. Two late
+callable-withdrawal cases require exact repair before owned residue can retire;
+the test preserves the actual cleanup errors and does not acknowledge residue
+as publication. The focused four-source JS manifest gate passes, including
+fifteen operation mutations with unique exact inverses; full selected gates
+and corrected native qualification remain pending.
 
 - [~] **88.** **Partial: native prediction tooltip appearance.** Shared
   llm-line-style policy and the unchanged independent line corpus retain grey
