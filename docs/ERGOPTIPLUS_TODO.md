@@ -8931,6 +8931,14 @@ providers. The owning generator now records 22 Windows, 6 macOS and 4 Linux
 residual sites. Full composed, native and installed qualification remain open;
 this neutral cleanup completes no parent item.
 
+The Layout source proof also admits the authenticated Group5 configuration
+recovery route without changing its production code or the original complete
+dispatch. Both exact dispatch variants retain all 32 original refusal controls;
+six additional controls reject partial or foreign recovery ownership. The
+independent fixture comes from the immutable original Group5 source, before
+the proof change. This compatibility correction completes no parent item and
+does not provide native or installed-device acceptance.
+
 - [ ] **62.** Downloads on managed company networks: system trust and
       system proxy for every download child (Ollama installation/server/pull,
       updater/rollback and remote AI), with translated certificate/proxy/blocked/

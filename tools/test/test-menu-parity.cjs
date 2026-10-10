@@ -6912,3 +6912,203 @@ function languageParentSource(source, driver) {
 	assert.equal(admits(''), false, 'missing actual native owner');
 	assert.equal(admits(source), true, 'genuine source remains admitted after negative controls');
 })();
+
+// Authenticated Group5 configuration recovery coexists with the genuine Layout receiver.
+{
+	const assert = require('node:assert/strict');
+	const proof = require('../lib/menu-native-llm-parent-binding.cjs');
+	const expected = JSON.parse(
+		fs.readFileSync(
+			path.join(__dirname, 'fixtures/menu-macos-configuration-recovery-dispatch.json'),
+			'utf8'
+		)
+	);
+	const source = fs.readFileSync(path.join(SP, 'macos/ui/menu/builder.lua'), 'utf8');
+	const layout = fs.readFileSync(path.join(SP, 'macos/ui/menu/menu_keyboard_layout.lua'), 'utf8');
+	const admits = (candidate) =>
+		proof.nativeMacLayoutTopLevelPublication(candidate, layout, manifest);
+	const count = (text, needle) => text.split(needle).length - 1;
+	assert.equal(
+		count(source, expected.original_configuration) + count(source, expected.configuration_recovery),
+		1,
+		'one genuine authenticated configuration dispatch'
+	);
+	const current = source.includes(expected.original_configuration)
+		? expected.original_configuration
+		: expected.configuration_recovery;
+	const historical = source.replace(current, expected.original_configuration);
+	const recovery = source.replace(current, expected.configuration_recovery);
+	assert.equal(
+		recovery.replace(expected.configuration_recovery, current),
+		source,
+		'recovery source exact inverse'
+	);
+	assert.equal(
+		historical.replace(expected.original_configuration, current),
+		source,
+		'historical source exact inverse'
+	);
+	assert.equal(admits(historical), true, 'complete original dispatch remains supported');
+	assert.equal(
+		admits(recovery),
+		true,
+		'authenticated recovery dispatch retains actual Layout receiver'
+	);
+	const historicalRefusals = [
+		[
+			'ManifestMenu.group_receiver("top_level", "keyboard_layout")',
+			'ManifestMenu.group_receiver("top_level", "shortcuts")'
+		],
+		[
+			'if not receive then return {} end\n\t\t\tlocal rows = module_rows("keyboard_layout")',
+			'if false then return {} end\n\t\t\tlocal rows = module_rows("keyboard_layout")'
+		],
+		['layout_enabled = function() return nil end', 'layout_enabled = function() return false end'],
+		[
+			'local parent = receive(submenu, { layout_enabled',
+			'local parent = receive({}, { layout_enabled'
+		],
+		['return collect(key .. ".build", mod.build, arg or ctx)', 'return {}'],
+		[
+			'local result = Logger.build(LOG, label, fn, arg)',
+			'local result = { label = "Foreign", submenu = {} }'
+		],
+		[
+			'local builders = {',
+			'local function module_rows(ignored) return { {submenu = {}} } end\nlocal builders = {'
+		],
+		[
+			'local builders = {',
+			'local function collect(ignored) return { {submenu = {}} } end\nlocal builders = {'
+		],
+		['local builders = {', 'local module_rows\nlocal builders = {'],
+		[
+			'for _, entry in ipairs(load_top_level()) do',
+			'builders.keyboard_layout = function() return {} end\nfor _, entry in ipairs(load_top_level()) do'
+		],
+		[
+			'for _, entry in ipairs(load_top_level()) do',
+			'builders["keyboard_layout"] = function() return {} end\nfor _, entry in ipairs(load_top_level()) do'
+		],
+		[
+			'for _, entry in ipairs(load_top_level()) do',
+			'local builders = {}\nfor _, entry in ipairs(load_top_level()) do'
+		],
+		[
+			'for _, entry in ipairs(load_top_level()) do',
+			'builders = {}\nfor _, entry in ipairs(load_top_level()) do'
+		],
+		[
+			'for _, entry in ipairs(load_top_level()) do',
+			'local unused = builders\nfor _, entry in ipairs(load_top_level()) do'
+		],
+		[
+			'local children = builders[id]() or {}',
+			'builders.keyboard_layout = function() return {} end\nlocal children = builders[id]() or {}'
+		],
+		[
+			'\n\t}\n\n\tlocal items = {}\n\tfor _, entry in ipairs(load_top_level()) do',
+			'\n\t\tkeyboard_layout = function(ignored) return {} end,\n\t}\n\n\tlocal items = {}\n\tfor _, entry in ipairs(load_top_level()) do'
+		],
+		['local builders = {', 'local ignored, module_rows\nlocal builders = {'],
+		[
+			'local builders = {',
+			'module_rows, Foreign.slot = function() return { {submenu = {}} } end, nil\nlocal builders = {'
+		],
+		[
+			'local builders = {',
+			'module_rows, Foreign[1] = function() return {} end, nil\nlocal builders = {'
+		],
+		[
+			'local builders = {',
+			'module_rows, (Foreign).slot = function() return {} end, nil\nlocal builders = {'
+		],
+		[
+			'local builders = {',
+			'module_rows, Factory().slot = function() return {} end, nil\nlocal builders = {'
+		],
+		[
+			'local builders = {',
+			'local function unrelated(module_rows) return {} end\nlocal builders = {'
+		],
+		[
+			'local builders = {',
+			'for ignored, module_rows in pairs({}) do break end\nlocal builders = {'
+		],
+		['local builders = {', 'local ignored, collect\nlocal builders = {'],
+		[
+			'local builders = {',
+			'collect, Foreign.slot = function() return { {submenu = {}} } end, nil\nlocal builders = {'
+		],
+		[
+			'local builders = {',
+			'collect, Foreign[1] = function() return {} end, nil\nlocal builders = {'
+		],
+		[
+			'local builders = {',
+			'collect, (Foreign).slot = function() return {} end, nil\nlocal builders = {'
+		],
+		[
+			'local builders = {',
+			'collect, Factory().slot = function() return {} end, nil\nlocal builders = {'
+		],
+		['local builders = {', 'local function unrelated(collect) return {} end\nlocal builders = {'],
+		['local builders = {', 'for ignored, collect in pairs({}) do break end\nlocal builders = {'],
+		[
+			'local builders = {',
+			'module_rows, ignored = function() return {} end, nil\nlocal builders = {'
+		],
+		[
+			'return parent and { parent } or {}\n\t\tend,\n\t\t["hotstrings"]',
+			'return {}\n\t\tend,\n\t\t["hotstrings"]'
+		]
+	];
+	for (const candidate of [historical, recovery]) {
+		for (const [before, after] of historicalRefusals) {
+			assert.equal(count(candidate, before), 1, 'same genuine historical refusal coordinate');
+			const withdrawn = candidate.replace(before, after);
+			assert.notEqual(withdrawn, candidate);
+			assert.equal(
+				admits(withdrawn),
+				false,
+				'historical refusal also binds authenticated dispatch'
+			);
+			const offset = candidate.indexOf(before);
+			assert.equal(withdrawn.slice(offset, offset + after.length), after);
+			assert.equal(
+				withdrawn.slice(0, offset) + before + withdrawn.slice(offset + after.length),
+				candidate,
+				'historical refusal exact inverse'
+			);
+		}
+	}
+	for (const [before, after] of [
+		['local switch_providers = {}', 'local switch_providers = { foreign = true }'],
+		[
+			'local switch_commands, switch_getters, providers = require("ui.menu.remap_switch")',
+			'local switch_commands, switch_getters, providers = require("foreign.remap_switch")'
+		],
+		[
+			'.rows(ctx.karabiner, ctx.updateMenu, ctx.recover_shared_runtime, ctx.can_recover_shared_runtime)',
+			'.rows(ctx.karabiner, ctx.updateMenu, ctx.recover_shared_runtime, nil)'
+		],
+		['\n\t\t\t\tswitch_providers = providers\n', '\n\t\t\t\tswitch_providers = {}\n'],
+		[
+			'local rows = ManifestMenu.build("configuration_menu", "Configuration", nil, nil, cfg_ctx, switch_providers)',
+			'local rows = ManifestMenu.build("configuration_menu", "Configuration", nil, nil, cfg_ctx, {})'
+		],
+		['if row.disabled == true then row.fn = nil end', 'if false then row.fn = nil end']
+	]) {
+		assert.equal(count(recovery, before), 1, 'authenticated recovery mutation unique source owner');
+		const withdrawn = recovery.replace(before, after);
+		assert.notEqual(withdrawn, recovery);
+		assert.equal(admits(withdrawn), false, 'partial or foreign recovery dispatch refuses');
+		const offset = recovery.indexOf(before);
+		assert.equal(withdrawn.slice(offset, offset + after.length), after);
+		assert.equal(
+			withdrawn.slice(0, offset) + before + withdrawn.slice(offset + after.length),
+			recovery,
+			'recovery refusal exact inverse'
+		);
+	}
+}
