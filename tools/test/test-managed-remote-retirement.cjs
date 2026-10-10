@@ -251,6 +251,94 @@ assert.deepEqual(ownedOutputResult.stdout.trim().split(/\r?\n/), [
 ]);
 // END owned-output inert controls
 
+// BEGIN Ollama acquisition inert controls
+// The registered models invoke actual source bodies with closed native/route ports.
+const ollamaModuleRoot = path.join(__dirname, '../../static/ergopti_plus/windows/modules/llm');
+const ollamaSourceFixture = fs.mkdtempSync(path.join(os.tmpdir(), 'ergopti-ollama-source-model-'));
+try {
+	for (const name of [
+		'ergopti_updater_download.ps1',
+		'ergopti_network_routes.ps1',
+		'ergopti_windows_proxy_config.ps1',
+		'ergopti_native_proxy_ex.ps1',
+		'ergopti_network_pac.ps1',
+		'ergopti_curl_attempt.ps1',
+		'ergopti_curl_capabilities_worker.ps1'
+	]) {
+		fs.writeFileSync(
+			path.join(ollamaSourceFixture, name),
+			'function Read-TestSourceRoot { return $PSScriptRoot }\n'
+		);
+	}
+	for (const [script, parameters, count, debt] of [
+		[
+			'test_ollama_managed_acquisition.ps1',
+			['-Library', path.join(ollamaModuleRoot, 'ollama_managed_acquisition.ps1')],
+			7,
+			''
+		],
+		[
+			'test_ollama_acquisition_source.ps1',
+			[
+				'-Source',
+				path.join(ollamaModuleRoot, 'ollama_download_archive.ps1'),
+				'-FixtureRoot',
+				ollamaSourceFixture
+			],
+			4,
+			''
+		],
+		[
+			'test_ollama_acquisition_owner.ps1',
+			[
+				'-Source',
+				path.join(ollamaModuleRoot, 'ollama_download_archive.ps1'),
+				'-ManagedSource',
+				path.join(ollamaModuleRoot, 'ollama_managed_files.ps1')
+			],
+			6,
+			[
+				'Archive entry retains exact final closure debt.',
+				'Archive entry original deadline expired after exact closure.'
+			].join('\n')
+		]
+	]) {
+		const observed = spawnSync(
+			powershell,
+			[
+				'-NoLogo',
+				'-NoProfile',
+				'-NonInteractive',
+				'-File',
+				path.join(__dirname, script),
+				...parameters
+			],
+			{ encoding: 'utf8', windowsHide: true, maxBuffer: 65536, timeout: 15000 }
+		);
+		assert.ifError(observed.error);
+		assert.equal(observed.status, 0, observed.stdout + observed.stderr);
+		assert.equal(
+			observed.stderr.trim().replace(/\r\n/g, '\n'),
+			debt,
+			'Only the injected exact closure refusal may emit its fixed diagnostic.'
+		);
+		const rows = observed.stdout.trim().split(/\r?\n/);
+		assert.equal(rows.length, count + 1, 'Every registered inert case must execute exactly once.');
+		assert.ok(rows.slice(0, -1).every((row) => row.startsWith('PASS ')));
+		assert.equal(
+			rows.at(-1),
+			`RESULT passed=${count} failed=0` +
+				(script === 'test_ollama_managed_acquisition.ps1' ? ' native=0 network=0 filesystem=0' : '')
+		);
+	}
+} finally {
+	const resolvedFixture = path.resolve(ollamaSourceFixture);
+	assert.equal(path.dirname(resolvedFixture), path.resolve(os.tmpdir()));
+	assert.ok(path.basename(resolvedFixture).startsWith('ergopti-ollama-source-model-'));
+	fs.rmSync(resolvedFixture, { recursive: true, force: true });
+}
+// END Ollama acquisition inert controls
+
 const stagingOwned = fs.mkdtempSync(path.join(os.tmpdir(), 'ergopti-staging-observation-'));
 const stagingResult = spawnSync(
 	powershell,

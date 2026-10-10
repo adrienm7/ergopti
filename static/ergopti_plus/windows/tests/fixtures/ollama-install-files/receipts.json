@@ -1,0 +1,66 @@
+{
+	"portable": {
+		"sha256": "6c4b7888c996d500ac51424f9f103e258bd1e476a2da76641b8d8464dd82b759",
+		"bytes": 665
+	},
+	"traversal": {
+		"sha256": "1fb0c2c41e460e31559bd37d7215eb466c026ea7060acb6ca21ddc21b6fb8967",
+		"bytes": 254
+	},
+	"ads": {
+		"sha256": "a7a0eecab5fb5524e23a9e49be3ff14ff0e79b89ce0b4d51da7b5746d4b18618",
+		"bytes": 258
+	},
+	"rooted": {
+		"sha256": "e5e1a574349e7c973eeff9ee531bc8d0a7defd0c14f7a010aade93ed152cc14c",
+		"bytes": 250
+	},
+	"device": {
+		"sha256": "6fc1fec55518b59ed5a4c3da8c74131e039c38907c85baa1459ebdc3f6c12372",
+		"bytes": 256
+	},
+	"collision": {
+		"sha256": "377ebdc0627fc2b1f081a0ff127b1a42da95b31c949aa80272bc22044e814cf8",
+		"bytes": 224
+	},
+	"trailing-dot": {
+		"sha256": "418c0a532b5f98437577122fb6341b1641d09c49e02aeabc4b49af7b988713c8",
+		"bytes": 252
+	},
+	"receipt-collision": {
+		"sha256": "ec8fb87534a4965eadb051b009be18b6649de56037eabe9fb214cd30ae83a09d",
+		"bytes": 234
+	},
+	"directory-cli": {
+		"sha256": "c9327074ea75d82fcb00da475c255026d3f6265a80af43810eba2917a218694c",
+		"bytes": 122
+	},
+	"symlink": {
+		"sha256": "0a987e90195775d04217c07851aa385b46a5a923f3242230b109f33298a4016b",
+		"bytes": 250
+	},
+	"file-ancestor-cli": {
+		"bytes": 234,
+		"sha256": "33adffeba0cea8e62f46c2595cf3fc7a028552ffde1b9c88d5b68189e8bee457"
+	},
+	"file-ancestor-library": {
+		"bytes": 308,
+		"sha256": "112e6209847fe57bd1ca317aa340b8caa9f3d2ad2ce580b3840d8deacc353061"
+	},
+	"file-ancestor-reverse": {
+		"bytes": 308,
+		"sha256": "a2412bb4690493cd3caebb6ed44e8b36e73e7b67143cf73fc2117e926b902019"
+	},
+	"file-ancestor-case": {
+		"bytes": 308,
+		"sha256": "d0da69ad957b55dba7adc9362b43f093740eb2ddca0556e091286549d2b57a68"
+	},
+	"prepared-receipt-descendant": {
+		"bytes": 240,
+		"sha256": "6241fd27626bbb757017797bd59e6853625e256cc72ebadac2ec28fb3ee06cd4"
+	},
+	"owner-receipt-descendant": {
+		"bytes": 246,
+		"sha256": "57ec85b401ab00226b727883ef36c43dcb48af33c8ead0f9a79e730951e124c3"
+	}
+}

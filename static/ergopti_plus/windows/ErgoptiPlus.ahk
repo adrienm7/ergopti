@@ -612,6 +612,7 @@ BootProfile_Stamp("LLM defaults loaded")
 #Include modules/llm/prediction_engine.ahk
 #Include modules/keymap/llm_bridge.ahk
 #Include modules/llm/ollama_webview.ahk
+#Include modules/llm/ollama_install_files_port.ahk
 #Include modules/llm/ollama_deps_checker.ahk
 #Include ui/tooltip/tooltip_llm.ahk
 #Include ui/menu/menu_llm/_index.ahk
