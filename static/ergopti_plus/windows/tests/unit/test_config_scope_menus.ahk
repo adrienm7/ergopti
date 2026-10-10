@@ -11,8 +11,9 @@ _ScopeTestRenderCommand(TargetMenu, MenuKey, Id, Commands) {
 
 _ScopeMenuCommandsCase(Scope, Factory, MenuKey, Modes := ["recommended", "clear"]) {
 	global _MenuDispatchCallbacks
-	Fixture := _ScopeOwnerFixture()
 	Source := '[layout]`nergopti_base = true`nemulated_layout = "ergol"`n[category_enabled]`nlayout = true`n[llm]`nenabled = true`nollama_port = 12345`napi_entry_id = "saved-api"`nunknown_user = "keep"`n[llm.navigation]`nnav_modifiers = ["Alt"]`n[llm.trigger]`ndisabled_apps = ["private-app"]`n[llm.generation]`nmin_words = 99`n[metrics]`nenabled = true`nmetrics_enabled = true`nwpm_widget_visible = true`n[private]`ncredential = "keep"`n[user]`nunknown = "keep"`n'
+	Fixture := _ScopeOwnerFixture(Source)
+	Source := Fixture.source
 	Assert(FSWriteDurable(Fixture.path, Source))
 	Refusal := 0, Bundle := 0
 	Launch(_Success, Borrowed, Refused) {
@@ -86,8 +87,9 @@ Test("config-scope-menu: metrics restore preserves consent, recovers refusal, an
 _ScopeMenuAbsentConsent() {
 	for Factory in ["_LLM_ScopeCommands", "_MET_ScopeCommands"] {
 		Scope := Factory == "_LLM_ScopeCommands" ? "llm" : "metrics"
-		Fixture := _ScopeOwnerFixture()
 		Source := '[private]`ncredential = "keep"`n'
+		Fixture := _ScopeOwnerFixture(Source)
+		Source := Fixture.source
 		Assert(FSWriteDurable(Fixture.path, Source))
 		Refusal := 0, Bundle := 0
 		Launch(_Success, Borrowed, Refused) {

@@ -2494,6 +2494,16 @@ These are software implementations; final hardware verification remains below.
   not a current recommendation target. Do not assume deletion implements the
   recommendation.
 
+The original 34-store Windows capacity case now reports its actual fixture,
+apply, inspection, rollback and cleanup durations through the native test
+clock and TAP reporter. Original assertions, transaction ownership and
+deadlines remain; cleanup still runs if reporting or clock acquisition fails.
+Native profiling and complete-suite qualification remain pending.
+
+Windows scope and metrics fixtures now boot their actual intended source
+before invoking admitted writes. Original durable writes and assertions remain.
+The resulting native scope, global and metrics qualification is pending.
+
 The current Windows configuration-journal source has been composed against
 current dev, preserving the native AI include and the unchanged generic file
 port signatures. Configuration-specific admitted operations retain exact
@@ -2805,6 +2815,23 @@ Selected final-source local gates pass formatting, 357 JS checks, 14,262
 portable macOS unit cases and 101 macOS E2E checks with one host-specific skip.
 Hosted native/package/install qualification and physical wizard re-runs remain
 open. TODO7 stays partial.
+
+The Lua Finish publication now retains the actual native cleanup callback and
+exact candidate/source through refused cleanup and compensation. Another Finish
+or reopen cannot replace the indebted owner; acknowledged phases do not replay,
+and an external successor refuses the retained conditional inverse. macOS forwards
+the original source precondition through its native writer. The shared file
+inverse binds a fresh receiver to its actual writer while keeping the single
+inverse algorithm and strict custody of already retained owners. Independent
+source and actual-receipt review pass. Existing Linux bridge cases pass64/0 and
+Answers controls pass44/0 on both Lua runtimes. macOS Lua5.4 window cases pass4/0
+and genuinely initialized physical-file Finish cases pass13/0; the same thirteen
+cases against the previous receiver and cached inverse give12/1. Native SDK locks
+are controlled in these host fixtures; actual Darwin/AppKit, installed Windows
+equivalence, packaging and physical wizard acceptance remain unrun. Full receiving
+checkout validation remains pending. Earlier fixture failures are preserved with
+unchanged functional assertions. This correction does not complete item7 or
+transversal items16/38.
 
 Windows workstation handoff (maintainer instruction, 2026-10-04):
 
@@ -3350,6 +3377,16 @@ WP3 prerequisite: the actual macOS physical accounting owner now requires exact 
   and session-write refusal (site 108); retired keys reported for explicit
   cleanup are exempt from automatic deletion migrations and remain on disk
   until that cleanup (site 112).
+
+The custom local-server publication fixture now clones the native callback
+table before installing its interceptors and asserts the genuine singleton
+remains unchanged. This dependency-isolation correction preserves every prior
+assertion; Windows execution is pending.
+
+The Windows journal now retains the actual eight native callback owners before
+and after each recovery and guarded I/O leg, including the final source guard.
+Genuine acquired-read timer controls are registered; their native execution
+remains pending. The prior incomplete run does not qualify this successor.
 
 The current Windows forward migration source uses the actual shared schema12
 registry and classified source witnesses. Invalid or unsupported schema versions
@@ -4630,6 +4667,21 @@ The signed native checkpoint 37116923472 reached the actual independent JSON cod
   identity accepts genuine relative and absolute loader spellings while
   retaining the original native-owner checks. Retired-Script consumers and
   final-source native/installed qualification remain separate follow-ups.
+
+Four ordinary Windows full-save fixture families now declare the shipped
+schema 12, rather than obsolete schema 11 that prevented their genuine boot.
+Only eight handwritten schema numbers change; all semantic byte/tree
+expectations, retired-key cleanup and refusal assertions remain intact.
+Native post-fix publication remains pending.
+
+The native writer reports closed schema-capture and unchanged-source admission
+refusals through the existing logger. The original full-save case retains its
+assertions and observes only its actual failed result; its first refusal cause
+is unresolved until genuine Windows execution.
+
+Windows source contracts now follow the actual configuration-writer gateway
+and its exclusive admitted atomic publication branch. Original assertions and
+negative controls remain; AHK execution of these contracts is pending.
 
 The Windows native configuration-journal successor is now composed against
 current dev with the newer AI include preserved. It uses configuration-specific
@@ -8160,6 +8212,15 @@ delivery remain unqualified. Neither TODO54 nor TODO81 is complete.
   Device work: real held-alone-then-joined ordering and actual AltGr generation;
   injected Ctrl/RAlt priority does not prove physical hook ordering.
 
+  Current-Dev receiving binds the original Windows eleven-case desktop runner
+  to its source-bound qualification receipt and exact full/deferred/refusal
+  wrapper. All original fourteen causal refusals remain; sixteen additional
+  controls require selection/revalidation errors to fail, preserve the full
+  runner and 25-minute budget, and reject false qualification or missing evidence.
+  The pinned-Node source guard passes thirty refusals. Deferred execution grants
+  no native cohort proof; Windows PowerShell and actual desktop requalification
+  of this receiving successor remain unrun.
+
 - [~] **93.** Implement Linux combinations using item 91's shared pair
   IDs, slots and configuration sections. Implemented: ordered tap/hold delivery
   on one exact keyboard through the real Hook/tap-hold engine, bounded menus,
@@ -8251,6 +8312,16 @@ delivery remain unqualified. Neither TODO54 nor TODO81 is complete.
   This container lacks /dev/uinput and /dev/input: the real wrapper refuses
   with exit 2 and zero scenarios/resources. Native execution is UNRUN;
   hosted kernel CI and physical receiving remain required.
+
+  Current-Dev CI receiving preserves both original real-kernel prerequisites,
+  their exact status/retirement enclosure and the saved-configuration subreaper
+  inside the source-bound full/deferred/refusal protocol. Eleven explicit sudo
+  context bindings preserve the qualification source; the six-minute deadline
+  is unchanged. Eighteen workflow and twenty-three custody-envelope mutations
+  are refused, including every original inverse. These portable controls grant
+  no new kernel execution or physical proof. The broader incoming pipeline
+  still has separate qualification/upload contract failures; the original Linux
+  cancellation assertions remain intact pending workflow-owner resolution.
 
 - [ ] **96.** Remove the separate Ergopti+ AltGr-adjustments option:
       selecting Ergopti+ in the existing emulation picker must suffice. Implemented:
@@ -8844,6 +8915,45 @@ cases. Whole XCTest343 is341 passed/two failed (Brew/Sparkle), six assertions;
 installed package acceptance remains failed. Private diagnostic workflows,
 Census3 and G6 test-policy overlays are excluded from canonical product source.
 Final joined-source gates and remote Shortcut retirement remain required.
+
+Native SDK receiving on bc0400388/manual37981239358 observed the real
+no-prompt method passing (one test, zero failures; process/capture exits zero)
+and OSStatus -600. The sole marker arrived after the selected-suite terminal,
+so the unchanged strict collector refused it. The buffering or forwarding
+cause remains unknown; this is no catalogue, consent or other-caller proof.
+The prepared successor writes one newline-terminated UTF-8 observation through
+a synchronous throwing parent stderr write before the test returns. Source
+controls refuse buffered print, stdout, a missing newline and the original
+late-marker order; native Mac capture ordering remains unqualified. CI notices
+retain closed process/capture statuses and refusal codes without changing
+observation admission, worker retirement or deadlines.
+
+The exact integrated successor a81ded37/manual38011048513 now qualifies that
+SDK transport: one real case passes, zero fail or skip, process/capture0 and
+OSStatus-600. Its only nonce19 marker is inside the case before completion;
+the unchanged strict collector reports complete=true/errors=[] and all367
+source hashes match the tested Git commit independently. Original transport
+cause remains unknown. This native-test-product result grants no catalogue,
+consent or signed-app/osascript principal qualification. Whole manual CI fails
+other portable/native archive/model gates; packaging/install and Release are
+skipped. Preserve those separate requirements and the original20-second
+Shortcuts discovery deadline.
+
+The original-clock HealthCheck fixture now binds the independently recorded
+pre-watchdog clock and advances it during registration, instead of comparing
+with a later wall-clock read. All thirteen original cases remain; the other
+twelve bodies are byte-exact. Controlled Lua5.4 reproduces old12/1 and new13/0;
+late-clock, zero and timeout forwarding refuse, and exact clock/scheduler
+restoration is observed on errors. The real probe source is unchanged; this
+adds no native AppleEvent, SDK transport or catalogue qualification.
+
+The installed-app virtual boot fixture now exports the same independently
+fixed geometry declaration already used by its unit fixture. Root remains the
+sole initialization owner; all range values, corpus expectations and original
+boot assertions stay unchanged. Fresh current-source receiving on c3464499e
+seals the product and staged inputs: old67/34 becomes new101/0, with the same
+one host-specific skip. This is modeled virtual E2E, not actual Hammerspoon,
+Carbon classification, physical keys or installed release qualification.
 
 - [~] **107.** Expose native, digits-direct and symbols-direct number-row
   policy, with acknowledged legacy Windows-Boolean migration and unrelated data

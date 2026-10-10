@@ -688,8 +688,13 @@ _ConfigTransitionGuardedProductionPort(PathsFile, Bundle, TargetSpecs, Recovery 
 	Native := PortOwner.Call()
 	Guards := Map()
 	Guards.CaseSense := "On"
+	; Keep canonical Native as authority. This private callback adapter forwards
+	; the captured real native class without registering itself as a native port.
+	Callbacks := Map()
+	for Method, Callback in Native
+		Callbacks[Method] := Dispatch.Bind(Callback)
 	if Recovery {
-		Inspected := ConfigTransitionInspect(PathsFile, Native)
+		Inspected := ConfigTransitionInspect(PathsFile, Callbacks)
 		if !ConfigTransitionResultIs(Inspected, "ready")
 			throw Error("The actual native recovery WAL is unavailable")
 		TargetSpecs := Inspected["record"]["targets"]
@@ -705,10 +710,10 @@ _ConfigTransitionGuardedProductionPort(PathsFile, Bundle, TargetSpecs, Recovery 
 			throw Error("The genuine transition target source/schema could not be constructed")
 		if !NativeLive()
 			throw Error("The actual native transition port owner was withdrawn before source read")
-		Present := Native["exists"].Call(Path)
+		Present := Callbacks["exists"].Call(Path)
 		if !NativeLive()
 			throw Error("The actual native transition port owner was withdrawn during source read")
-		Content := Present ? Native["read"].Call(Path) : ""
+		Content := Present ? Callbacks["read"].Call(Path) : ""
 		Candidate := Recovery ? Map("present", Present, "content", Content)
 			: Map("present", Spec["new_present"], "content", Spec["new_content"])
 		Guard := Recovery ? ConfigMigrateBoot(Path, "capture_recovery", PathsFile, Bundle)
@@ -737,12 +742,24 @@ _ConfigTransitionGuardedProductionPort(PathsFile, Bundle, TargetSpecs, Recovery 
 			if !Row.check.Call(Row.old_content, Row.old_present, Row.new_content, Row.new_present)
 				return false
 		}
-		return true
+		; Source comparisons may be long; their accepted result cannot retain
+		; callback authority withdrawn while the real guards were evaluating.
+		return NativeLive() && _ConfigWriteTerminalOwnsExact(Bundle, PathsFile)
+	}
+	Dispatch(Callback, Args*) {
+		if !AllLive()
+			throw Error("The actual guarded native callback owner was withdrawn before dispatch")
+		Result := Callback.Call(Args*)
+		if !AllLive()
+			throw Error("The actual guarded native callback owner was withdrawn during dispatch")
+		return Result
 	}
 	Read(Path) {
 		if !AllLive()
 			throw Error("The native transition source owner was withdrawn")
-		Content := Native["read"].Call(Path)
+		Content := Callbacks["read"].Call(Path)
+		if !AllLive()
+			throw Error("The actual guarded native read owner was withdrawn before source admission")
 		Key := _ConfigWriteLeaseKey(Path)
 		if Guards.Has(Key) && !Guards[Key].check.Call(Content, 1, Content, 1)
 			throw Error("The actual transition target source changed outside its admitted images")
@@ -753,9 +770,9 @@ _ConfigTransitionGuardedProductionPort(PathsFile, Bundle, TargetSpecs, Recovery 
 			return 0
 		Key := _ConfigWriteLeaseKey(Destination)
 		if Guards.Has(Key) {
-			Candidate := Native["read"].Call(Source)
-			Present := Native["exists"].Call(Destination)
-			Content := Present ? Native["read"].Call(Destination) : ""
+			Candidate := Callbacks["read"].Call(Source)
+			Present := Callbacks["exists"].Call(Destination)
+			Content := Present ? Callbacks["read"].Call(Destination) : ""
 			Check := Guards[Key].check
 			Admission := () => AllLive() && Check.Call(Content, Present, Candidate, 1)
 		} else
@@ -772,8 +789,8 @@ _ConfigTransitionGuardedProductionPort(PathsFile, Bundle, TargetSpecs, Recovery 
 			return 0
 		Key := _ConfigWriteLeaseKey(Path)
 		if Guards.Has(Key) {
-			Present := Native["exists"].Call(Path)
-			Content := Present ? Native["read"].Call(Path) : ""
+			Present := Callbacks["exists"].Call(Path)
+			Content := Present ? Callbacks["read"].Call(Path) : ""
 			Check := Guards[Key].check
 			Admission := () => AllLive() && Check.Call(Content, Present, "", 0)
 		} else
@@ -783,8 +800,8 @@ _ConfigTransitionGuardedProductionPort(PathsFile, Bundle, TargetSpecs, Recovery 
 	Noop(Path, Content, Present) {
 		if !AllLive()
 			return 0
-		ActualPresent := Native["exists"].Call(Path)
-		ActualContent := ActualPresent ? Native["read"].Call(Path) : ""
+		ActualPresent := Callbacks["exists"].Call(Path)
+		ActualContent := ActualPresent ? Callbacks["read"].Call(Path) : ""
 		if ActualPresent != Present || StrCompare(ActualContent, Content, true) != 0
 			return 0
 		Key := _ConfigWriteLeaseKey(Path)
@@ -795,7 +812,7 @@ _ConfigTransitionGuardedProductionPort(PathsFile, Bundle, TargetSpecs, Recovery 
 			Admission := AllLive
 		return NoopOwner.Call(Admission)
 	}
-	Port := Native.Clone()
+	Port := Callbacks.Clone()
 	Port["read"] := Read
 	Port["move_create"] := MoveCreate
 	Port["move_replace"] := MoveReplace
@@ -844,6 +861,17 @@ _ConfigTransitionNativeRecoveryImages(PathsFile, Path, Bundle) {
 		TargetOwned := TerminalOwner.Call(Bundle, Path)
 		return PortLive() && (TargetOwned is Integer) && TargetOwned == 1
 	}
+	; This private adapter is data for the original recovery producers, never
+	; an issued native port or a schema registration capability. The captured
+	; canonical port remains the only native authority checked by OwnerLive.
+	Dispatch(Callback, Args*) {
+		if !OwnerLive()
+			throw Error("The actual recovery native owner was withdrawn before callback dispatch")
+		Result := Callback.Call(Args*)
+		if !OwnerLive()
+			throw Error("The actual recovery native owner was withdrawn during callback dispatch")
+		return Result
+	}
 	ActualResultIs(Result, Kind) {
 		if !OwnerLive()
 			return false
@@ -858,13 +886,21 @@ _ConfigTransitionNativeRecoveryImages(PathsFile, Path, Bundle) {
 	}
 	if !OwnerLive()
 		return false
-	Inspected := InspectOwner.Call(PathsFile, Port)
+	; Capture real admitted callbacks before any producer can enter native IO.
+	; A descriptor withdrawal during read must refuse before the same producer
+	; resumes its nested hash or subsequent filesystem callback.
+	RecoveryPort := Map()
+	for Method, Callback in Port
+		RecoveryPort[Method] := Dispatch.Bind(Callback)
+	if !OwnerLive()
+		return false
+	Inspected := InspectOwner.Call(PathsFile, RecoveryPort)
 	if !ActualResultIs(Inspected, "ready")
 		return false
 	Record := Inspected["record"]
 	if !OwnerLive()
 		return false
-	Namespace := NamespaceOwner.Call(PathsFile, Record, Port)
+	Namespace := NamespaceOwner.Call(PathsFile, Record, RecoveryPort)
 	if !ActualResultIs(Namespace, "cleanup_preflight")
 		return false
 	if !OwnerLive()
@@ -886,7 +922,7 @@ _ConfigTransitionNativeRecoveryImages(PathsFile, Path, Bundle) {
 	}
 	if !(Selected is Map) || !OwnerLive()
 		return false
-	Actual := SnapshotOwner.Call(Port, Path)
+	Actual := SnapshotOwner.Call(RecoveryPort, Path)
 	if !ActualResultIs(Actual, "snapshot")
 		return false
 	Snapshot := Actual["snapshot"]
@@ -907,7 +943,7 @@ _ConfigTransitionNativeRecoveryImages(PathsFile, Path, Bundle) {
 			Images[Side] := { present: 1, source: Snapshot["content"] }
 			continue
 		}
-		Artifact := ArtifactOwner.Call(Port, Artifacts[Side], Selected[Side . "_hash"])
+		Artifact := ArtifactOwner.Call(RecoveryPort, Artifacts[Side], Selected[Side . "_hash"])
 		if !OwnerLive()
 			return false
 		if ActualResultIs(Artifact, "artifact")

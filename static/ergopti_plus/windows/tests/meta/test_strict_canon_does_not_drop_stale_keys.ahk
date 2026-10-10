@@ -21,7 +21,7 @@ _SCDD_BatchWriterIsCanonicalAndNonReentrant() {
 	Assert(Wrapper != "" && Body != "",
 		"TOML_BatchWrite and its shared renderer must exist in toml_helpers.ahk")
 	Assert(InStr(Wrapper,
-		'_TOML_BatchWriteImpl(Path, Updates, ExactSectionPrefixes, "write")') > 0,
+		'_TOML_BatchWriteImpl(Path, Updates, ExactSectionPrefixes, "write", , , false, AdmissionFn)') > 0,
 		"the public writer must route through the canonical implementation in write mode")
 	Assert(InStr(Body, "Sections := Parsed.Clone()") > 0,
 		"the writer must merge updates into a detached copy of the complete on-disk document")

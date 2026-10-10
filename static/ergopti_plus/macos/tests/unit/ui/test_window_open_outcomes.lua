@@ -70,7 +70,9 @@ local function with_onboarding(controls, callback)
 		}
 		package.loaded["infra.logger"] = logger_spy(state)
 		package.loaded["infra.i18n"] = { get = function(key) return key end }
-		package.loaded["infra.toml.writer"] = {}
+		package.loaded["infra.toml.writer"] = {
+			batch_write = function() error("invalid window-only answers cannot acquire publication") end,
+		}
 		package.loaded["infra.toml.codec"] = {}
 		package.loaded["infra.notifications"] = {}
 		package.loaded["infra.paths"] = { shared = function() return "/controlled/assets" end }

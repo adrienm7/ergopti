@@ -1047,8 +1047,10 @@ _TOML_BatchWriteImpl(Path, Updates, ExactSectionPrefixes, Mode,
 		NativeNoop := Admitted["preserve_source"]
 		SchemaAdmission := DocumentMode ? (NativeNoop ? ConfigMigrateBoot(Path, "capture_noop")
 			: ConfigMigrateBoot(Path, "capture_write", FinalCandidate)) : 0
-		if DocumentMode && !HasMethod(SchemaAdmission, "Call")
+		if DocumentMode && !HasMethod(SchemaAdmission, "Call") {
+			try LoggerError("TomlWrite", "Refusing configuration writer: genuine source schema admission was not captured.")
 			return false
+		}
 		; These scalars come from this native writer's actual source/candidate,
 		; not mutable public caches or a caller-provided registration receipt.
 		FinalAdmission() {
@@ -1058,8 +1060,10 @@ _TOML_BatchWriteImpl(Path, Updates, ExactSectionPrefixes, Mode,
 		}
 
 		if Admitted["preserve_source"] {
-				if !FSNativeAcknowledge(FinalAdmission)
+				if !FSNativeAcknowledge(FinalAdmission) {
+					try LoggerError("TomlWrite", "Refusing unchanged-source acknowledgment: genuine native admission was withdrawn.")
 					return false
+				}
 				global _ParseTomlCache
 				if _ParseTomlCache.Has(Path)
 						_ParseTomlCache.Delete(Path)
@@ -1071,8 +1075,10 @@ _TOML_BatchWriteImpl(Path, Updates, ExactSectionPrefixes, Mode,
 		; A qualified image already on disk needs no stage or atomic replacement.
 		; Keep the generation acknowledgement while preserving its existing inode.
 		if FileExist(Path) && FSUtf8ExactMatches(Path, Chr(0xFEFF) . body) {
-				if !FSNativeAcknowledge(FinalAdmission)
+				if !FSNativeAcknowledge(FinalAdmission) {
+					try LoggerError("TomlWrite", "Refusing unchanged-image acknowledgment: genuine native admission was withdrawn.")
 					return false
+				}
 				global _ParseTomlCache
 				if _ParseTomlCache.Has(Path)
 						_ParseTomlCache.Delete(Path)
