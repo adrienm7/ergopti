@@ -162,9 +162,26 @@ _DIPC_InstallerPortCall(State, Model, Epoch, OnReady?, OnFailed?) {
 _DIPC_WithInertInstaller(Body) {
 	global _LLM_Deps_InstallerOwner, _LLM_Deps_Checking, _LLM_Deps_State
 	global _LLM_Deps_Epoch, _LLM_Deps_FailureMessage, _LLM_Deps_PollTimer, _LLM_Deps_PollStartTick
-	Saved := Map("owner", _LLM_Deps_InstallerOwner, "checking", _LLM_Deps_Checking,
-		"state", _LLM_Deps_State, "epoch", _LLM_Deps_Epoch, "failure", _LLM_Deps_FailureMessage,
-		"poll_set", IsSet(_LLM_Deps_PollTimer), "poll_start", _LLM_Deps_PollStartTick)
+	Saved := Map()
+	Saved["owner_set"] := IsSet(_LLM_Deps_InstallerOwner)
+	if Saved["owner_set"]
+		Saved["owner"] := _LLM_Deps_InstallerOwner
+	Saved["checking_set"] := IsSet(_LLM_Deps_Checking)
+	if Saved["checking_set"]
+		Saved["checking"] := _LLM_Deps_Checking
+	Saved["state_set"] := IsSet(_LLM_Deps_State)
+	if Saved["state_set"]
+		Saved["state"] := _LLM_Deps_State
+	Saved["epoch_set"] := IsSet(_LLM_Deps_Epoch)
+	if Saved["epoch_set"]
+		Saved["epoch"] := _LLM_Deps_Epoch
+	Saved["failure_set"] := IsSet(_LLM_Deps_FailureMessage)
+	if Saved["failure_set"]
+		Saved["failure"] := _LLM_Deps_FailureMessage
+	Saved["poll_start_set"] := IsSet(_LLM_Deps_PollStartTick)
+	if Saved["poll_start_set"]
+		Saved["poll_start"] := _LLM_Deps_PollStartTick
+	Saved["poll_set"] := IsSet(_LLM_Deps_PollTimer)
 	if Saved["poll_set"]
 		Saved["poll"] := _LLM_Deps_PollTimer
 	State := Map("constructors", 0, "starts", 0, "cancels", 0, "run", 0,
@@ -188,12 +205,30 @@ _DIPC_WithInertInstaller(Body) {
 		Body.Call(State)
 	} finally {
 		; Every actor/timer above is an inert retained object, never a native task.
-		_LLM_Deps_InstallerOwner := Saved["owner"]
-		_LLM_Deps_Checking := Saved["checking"]
-		_LLM_Deps_State := Saved["state"]
-		_LLM_Deps_Epoch := Saved["epoch"]
-		_LLM_Deps_FailureMessage := Saved["failure"]
-		_LLM_Deps_PollStartTick := Saved["poll_start"]
+		if Saved["owner_set"]
+			_LLM_Deps_InstallerOwner := Saved["owner"]
+		else
+			_LLM_Deps_InstallerOwner := unset
+		if Saved["checking_set"]
+			_LLM_Deps_Checking := Saved["checking"]
+		else
+			_LLM_Deps_Checking := unset
+		if Saved["state_set"]
+			_LLM_Deps_State := Saved["state"]
+		else
+			_LLM_Deps_State := unset
+		if Saved["epoch_set"]
+			_LLM_Deps_Epoch := Saved["epoch"]
+		else
+			_LLM_Deps_Epoch := unset
+		if Saved["failure_set"]
+			_LLM_Deps_FailureMessage := Saved["failure"]
+		else
+			_LLM_Deps_FailureMessage := unset
+		if Saved["poll_start_set"]
+			_LLM_Deps_PollStartTick := Saved["poll_start"]
+		else
+			_LLM_Deps_PollStartTick := unset
 		if Saved["poll_set"]
 			_LLM_Deps_PollTimer := Saved["poll"]
 		else
