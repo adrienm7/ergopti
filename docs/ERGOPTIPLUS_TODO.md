@@ -8826,6 +8826,19 @@ mandatory.
   still has separate qualification/upload contract failures; the original Linux
   cancellation assertions remain intact pending workflow-owner resolution.
 
+  The separately prepared XI2 borrowed-cookie consumer passes all 43 controlled
+  cases on each Lua ABI, using the real probe and logger with modeled FFI ports.
+  Strict C compilation checks its three ABI declarations against installed
+  X11/XI2 headers; all 16 controlled C scalar/peer cases pass. Neither result
+  proves a genuine cookie or input/output delivery. The original full-family
+  native supervisor refuses before allocation because this container does not
+  expose `/proc/self/task/<pid>/children`, even with approved execution. Keep
+  that admission unchanged and qualify the three original native property
+  cookies in Linux CI. Runtime registry, actual FFI/cdata, installed provider
+  closure and shared enrollment remain held software/native work. Exact sources,
+  refusals and receiving reviews are saved in
+  `handovers/2026-10-10-group3-native-preparations/`.
+
 - [ ] **96.** Remove the separate Ergopti+ AltGr-adjustments option:
       selecting Ergopti+ in the existing emulation picker must suffice. Implemented:
       the old public checkbox is removed; an internal closed variant preserves
@@ -9483,6 +9496,32 @@ Carbon classification, physical keys or installed release qualification.
   two missing Windows workflow retention conditions, outside this change.
   Native Linux CI and physical number-row input remain unqualified here.
 
+  The separate macOS read-only Carbon producer is now prepared with twelve
+  XCTest methods. Forty Caps/Shift levels use one aligned frozen layout copy,
+  a fresh UInt32 dead state per row and a final rejoin of the original selected
+  TIS data, bytes and keyboard type. Seven methods use genuine Carbon/TIS and
+  five exercise controlled protocol behavior; existing independent corpus
+  expectations remain intact. The final-byte test changes only its private
+  clone after translation and verifies the native layout remains unchanged.
+  Source review is clear;
+  SDK compilation, actual discovery/execution and causal native variants remain
+  unrun. Existing keyboard-source roles and shared launcher dispatch are unchanged;
+  the new role is not yet reachable from the launcher. No forced-mode, input,
+  modifier, permission or output authority is added. Native receiving and the
+  separately coordinated dispatch/transport remain software work before hardware.
+
+  Private native receiving preparations retain the mandatory twelve-method
+  census, original source IDs, actual process exits and original restoration
+  observations. Fifteen Node receiving controls pass. The native CLI reader
+  passes all 21 independently fixed controls; its first replay failed because
+  the Linux host home inode exceeded the native signed-64-bit representation.
+  The corrected fixture uses an owned representable directory and keeps the
+  parser, C source and every expectation unchanged. Darwin and home-domain
+  lookup are controlled in this replay; actual macOS SDK/C/CLI execution remains
+  unrun. The four-line launcher dispatch and shared workflow enrollment remain
+  inactive pending their current owners' custody. These preparations and both
+  failed/successful receipts are recoverable from the native-preparations handover.
+
   Remaining software: implement native-HKL forced-symbol and Linux/macOS forced
   digit/symbol owners with joint current input/source/modifier/output provenance;
   reconstruct/review lost runtime preparation. Never fall back from a refused
@@ -9539,6 +9578,29 @@ Carbon classification, physical keys or installed release qualification.
   406/1 result from the two missing Windows retention workflow conditions.
   Native Linux CI and physical editor-key delivery remain unqualified here.
 
+  The Linux deferred contextual action now retains its original admission and
+  decision issuers and rechecks live gates, source and configuration custody
+  after the actual logger callback and immediately before executor entry.
+  Source/admission exceptions refuse delivery. Fresh serial component replay
+  passes all 20 additive cases on both LuaJIT and Lua 5.4; the original source
+  fails 19 of them. Seven independent one-span inverses fail their exact causal
+  cases on both ABIs. All 14 original editor and three configuration-owner
+  controls remain green on both source images, and five negative enrollment
+  controls refuse. The recovered source, raw receipts and independent reviews
+  are retained in `handovers/2026-10-10-group3-contextual-custody/`.
+  This closes the synchronous callback gap; it grants no native input/output
+  authority or installed/physical editor-key qualification.
+  Broader Linux qualification remains red: units pass 13,015/13,017 with
+  two shipped-source identity refusals, and E2E passes 171/193 with 22 magic
+  output failures. The exact original shortcut source reproduces the same
+  E2E failure lines; native Lua stat exposes a negative rounded inode for the
+  genuine shipped catalogue and the unchanged loader refuses it. Actual
+  read-only X11 qualification passes 53/53. The 597bae78 qualification passes
+  JS 406/407 on the then-unchanged Windows retention guard. The owner's published
+  guard and PowerShell corrections are now received atomically; the composed
+  guard passes its actual targeted run. Full current-source qualification remains
+  separate from that targeted result. None of the retained failures is waived.
+
   Remaining software: finish live effective-source retargeting, collisions
   against every owner and current modifier/output custody without overriding
   None/personal records or weakening compensation. Native qualification:
@@ -9572,19 +9634,33 @@ Carbon classification, physical keys or installed release qualification.
   Edit/Thread local rename preserves strict warnings, eight closed facts,
   process/HWND retirement and deadlines. The old full-suite desktop wrapper
   still rejects stdout/canonical inequality; its six AltGr cases are unrun.
-  The nine-path canonical runner remains unadopted: trial37634747571 at
+  The historical nine-path proposal was not adopted at trial37634747571 at
   CI224ddc787f26e318c10033a6f808822e6ae3263d passes Core but fails two new
   native controls (three clean-graph warnings; entry-owner census). Its
   parse-only child reset the inherited parent TAP file. Stdout records
   10,225 passes/2 failures, but the strict canonical manifest refuses. The
-  eleven desktop cases and downstream delivery gates are unrun. Repair this
-  fixture ownership and diagnose warnings without filtering or suppression.
+  eleven desktop cases and downstream delivery gates were unrun in that trial.
+  Current source at7299783b already enrolls the five console and six AltGr cases
+  in serialized desktop cohorts, retaining strict warnings, exact canonical
+  stdout, empty stderr, native exit and child retirement. This source enrollment
+  does not establish current native success; qualify their exact receiving
+  receipts and diagnose any remaining warnings without filtering or suppression.
   Remaining software/native qualification: prove supported fresh invisible
   capture before an identity-safe separate debug GUI/title owner, qualify
   interpreted and compiled duplicate-start/Reload/retirement and final native
   panel/filter/notification delivery through three-OS package/install gates.
   Device work: actual key history, notification clicks and desktop focus only
   where hosted automation cannot observe the user's session.
+
+  Current source assessment confirms a software boundary before device work:
+  stock AutoHotkey2.0.26 ListVars and no-argument KeyHistory refresh through
+  ShowMainWindow and foreground activation; capacity-only KeyHistory and cached
+  Edit reads do not supply fresh hidden snapshots. DBGp can read current variables
+  in supported debugger builds, but supplies neither formatted ListVars nor
+  KeyHistory snapshots; attaching also interrupts execution. Compiled debugger
+  availability depends on the exact build. No supported fresh hidden acquisition
+  has been qualified. Keep A_ScriptHwnd's Reload/SingleInstance identity intact
+  and establish that acquisition before adding a separate branded debug GUI.
 
   The Linux HealthCheck copy fixture now uses the genuine exported snapshot
   document before entering the clipboard port. All14 original cases remain;
