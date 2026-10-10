@@ -3376,6 +3376,16 @@ Windows PC acceptance, delegated to the maintainer:
   the native permission dialog (once per launch, after the Accessibility dialog,
   closed automatically on approval; not while Tap-Holds are off, where the
   banner stays). Integrated; verify on a Mac.
+  A partial background FIFO correction limits successful commits to 64 per
+  deferred or recurring callback. Healthy suffixes schedule a zero-delay
+  continuation; refused heads retain their prepared value and the existing
+  retry delay. Explicit ingest/stop retain complete drains and SQL progress.
+  Pending memory work refuses durable rollover before EOF/rotation authority.
+  Fresh modeled-port controls pass 12/0; the authentic baseline and whole
+  omission are 8/4, with four distinct causal inverses retained. All four old
+  assertions remain unchanged. This bounds record count, not one write/SQL
+  duration or actual Hammerspoon runloop fairness. Real scheduling, reentrant
+  stop callback qualification and the original lease73 cause remain unproved.
   Validation prerequisite: the macOS daily-reset logger fixture now observes
   only its owned complete sub-file path. A legitimate append from another
   folder cannot mask the owned stale-file truncation. The three original

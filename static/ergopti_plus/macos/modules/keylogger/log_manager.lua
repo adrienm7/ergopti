@@ -136,6 +136,10 @@ local _deferred_log_timer = nil
 --- retries the queue, so a one-shot scheduling failure cannot strand it.
 local DEFERRED_LOG_RETRY_SEC = 0.1
 
+--- Limit only background FIFO commits; explicit ingest and teardown remain full.
+local DEFERRED_LOG_BATCH_LIMIT = 64
+local BACKGROUND_INGEST_TOKEN = {}
+
 
 
 
@@ -418,19 +422,25 @@ local function _schedule_deferred_log_drain(delay)
 	-- would bind the callback to a nil global instead of the scheduler handle.
 	local scheduled_handle
 	local committed
+	local generation = _physical_sink_generation
 	scheduled_handle, committed = TimerScheduler.after(delay or 0, function()
+		if _physical_sink_generation ~= generation then return end
 		-- TimerScheduler fences repeat delivery before invoking us. Clear the
 		-- scheduling gate only when its exact native cleanup actually settled.
 		if _deferred_log_timer == scheduled_handle
 			and scheduled_handle.timer == nil then
 			_deferred_log_timer = nil
 		end
-		local drained_ok, drain_err = xpcall(_drain_deferred_logs, debug.traceback)
+		local drained_ok, drained_or_err, drain_status = xpcall(function()
+			return _drain_deferred_logs(DEFERRED_LOG_BATCH_LIMIT)
+		end, debug.traceback)
 		if not drained_ok then
-			Logger.error(LOG, "Deferred keylogger drain failed: %s.", tostring(drain_err))
+			Logger.error(LOG, "Deferred keylogger drain failed: %s.", tostring(drained_or_err))
 		end
-		if _has_deferred_logs() then
-			_schedule_deferred_log_drain(DEFERRED_LOG_RETRY_SEC)
+		if _has_deferred_logs() and _physical_sink_generation == generation then
+			local delay_next = drained_ok and drain_status == "yielded"
+				and 0 or DEFERRED_LOG_RETRY_SEC
+			_schedule_deferred_log_drain(delay_next)
 		end
 	end)
 
@@ -574,9 +584,13 @@ end
 --- Drains queued operations in strict insertion order.
 --- The head advances only after Rotation returns exact true, so either a thrown
 --- or non-throwing filesystem refusal leaves the exact item available for retry.
+--- @param limit number|nil Maximum successful commits; nil keeps a full drain.
 --- @return boolean drained Whether the queue is now empty.
-_drain_deferred_logs = function()
+--- @return string|nil status "yielded" only for a healthy retained suffix.
+_drain_deferred_logs = function(limit)
+	local committed = 0
 	while _has_deferred_logs() do
+		if limit ~= nil and committed >= limit then return false, "yielded" end
 		local operation = assert(_deferred_log_queue[_deferred_log_head],
 			"keylogger deferred-log queue is sparse")
 		local is_builder = operation.kind == "typing_builder"
@@ -616,6 +630,7 @@ _drain_deferred_logs = function()
 		end
 		_deferred_log_queue[_deferred_log_head] = nil
 		_deferred_log_head = _deferred_log_head + 1
+		committed = committed + 1
 	end
 	_deferred_log_head = 1
 	_deferred_log_tail = 0
@@ -1313,11 +1328,21 @@ end
 
 --- Run one ingest cycle: pull new today.log entries, append SQL batch to
 --- data.sql, apply it to db.sqlite, update aggregate tables.
-function M.ingest_once()
+function M.ingest_once(background)
 	-- A failed timer allocation still leaves the ordered outbox intact. The
 	-- recurring ingest tick is the independent retry path that guarantees an
 	-- action with no following key cannot strand its detached typing run.
-	if _has_deferred_logs() then _drain_deferred_logs() end
+	if _has_deferred_logs() then
+		local generation = _physical_sink_generation
+		local is_background = rawequal(background, BACKGROUND_INGEST_TOKEN)
+		local _, drain_status = _drain_deferred_logs(
+			is_background and DEFERRED_LOG_BATCH_LIMIT or nil)
+		if is_background and _has_deferred_logs()
+			and _physical_sink_generation == generation then
+			_schedule_deferred_log_drain(drain_status == "yielded"
+				and 0 or DEFERRED_LOG_RETRY_SEC)
+		end
+	end
 	local db = SqliteWriter.get_db()
 	if not db then return end
 
@@ -1537,7 +1562,7 @@ local function _start_ingest_timer()
 			if _ingest_timer ~= timer_candidate or _ingest_timer_committed ~= true then
 				return
 			end
-			Logger.pcall(LOG, M.ingest_once)
+			Logger.pcall(LOG, M.ingest_once, BACKGROUND_INGEST_TOKEN)
 		end)
 		return timer_candidate
 	end, debug.traceback)
@@ -1571,6 +1596,9 @@ end
 --- retry on the next midnight tick.
 function M.day_rollover()
 	if not _require_state("day_rollover") then return false end
+	-- Accepted old-day memory work must commit on its bounded background turns
+	-- before an EOF proof can authorize durable rotation or bookmark changes.
+	if _has_deferred_logs() then return false end
 
 	-- read_new_entries caps at INGEST_BATCH_LINES per call, so a single
 	-- ingest_once may leave data behind. Loop until empty or stalled to prevent

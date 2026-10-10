@@ -472,3 +472,30 @@ The five lease sources and their 146 worker plus 19 observer identities remain
 unchanged. Fresh selected gates and actual ARM/Intel execution are required on
 this combined closure; these declarations provide no native result, physical
 input acceptance or attribution of the original PONG/READY/exit-73 incident.
+
+## Background log FIFO batch admission
+
+The deferred drain and genuine recurring ingest callback now admit at most 64
+successful memory commits per turn. A healthy retained suffix schedules a
+zero-delay continuation. A refused builder/append preserves the exact head and
+prepared value, retaining the existing 0.1-second retry. The private recurring
+identity token is not exported; absent or foreign public arguments retain the
+original complete FIFO attempt and subsequent SQL boundary. Explicit stop keeps
+its full drain and exact failed timer cleanup debt. Pending memory work refuses
+durable day rollover before reads, SQL, bookmark resets or rotation.
+
+Fresh actual production-wrapper tests use modeled timer, sink and SQL ports:
+baseline 8/4, candidate 12/0, whole omission 8/4; all four original cases pass in
+every phase. Removing the deferred limit gives 8/4, recurring admission 10/2,
+rollover barrier 11/1, and adding the forbidden public early return 11/1. The
+last inverse fails the preserved SQL-progress assertion. Seven unchanged
+adjacent LogManager/rollover/stop modules also pass. Every raw failure and frozen
+129-record vector is retained; no assertion or independent expectation changed.
+
+This bounds successful record count per background callback. It does not bound
+one serialization, write or SQL call, prove native due-time ordering, or measure
+Hammerspoon timer starvation. Reentrant stop-generation guards have source
+proof only; these eight additive controls do not exercise their omission.
+Native/private lease liveness and the original PONG/READY/exit73 cause remain
+unqualified. Required final change-scoped gates run after this four-file freeze;
+their actual outcomes are recorded externally without rewriting these inputs.
