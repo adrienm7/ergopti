@@ -4268,7 +4268,14 @@ jobs:
       - name: Launch the installed binary (rpm)
         if: matrix.kind == 'rpm'
         shell: bash
-        run: /usr/bin/ergopti --help
+        run: |
+          set -euo pipefail
+          account="$(id -un)"
+          if [ -z "$account" ]; then
+              echo '::error::Native account identity was unavailable for installed RPM launch.' >&2
+              exit 1
+          fi
+          USER="$account" LOGNAME="$account" /usr/bin/ergopti --help
 
       - name: The installed shared data tree resolves and opens (rpm)
         if: matrix.kind == 'rpm'
