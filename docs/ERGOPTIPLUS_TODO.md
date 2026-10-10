@@ -3466,6 +3466,22 @@ Hosted Lua owner tests do not qualify physical input.
 
 WP3 prerequisite: the actual macOS physical accounting owner now requires exact held-modifier settlement before accepting source transitions. The keylogger retires each crossing physical release without emitting an orphan hold or a new press, including pause and secure-context crossings; ordinary legacy and collision behavior remains unchanged. Existing native fixture parents restore their settlement child through the scoped cache owner, while normal production stop/restart retains the same CoreState. Portable focused tests pass (32 held-key cases, 24 policy cases, 3 legacy collision cases, 23 existing cache-scope cases, and 9 unchanged alias configuration/privacy cases); the original real gap-release source fails all eight side-key cases. This does not enable a producer or headless mode, alter transport/baseline versions, or complete WP3/WP4/native acceptance. Full root and hosted macOS qualification remain required.
 
+WP3 bounded system-authentication setter cancellation is received independently
+on Dev9e with the published daily-reset fixture prerequisite. Disabled filtering
+preserves fully included holds; exclusion cancels the complete crossing interval.
+Refused pure settlement keeps physical and synthetic accounting admission closed
+until an exact public setter retry succeeds. The original three-argument tracker,
+classification, producer bindings and all 32 original accounting tests are intact.
+Fresh nine frozen controls give BEFORE 35 passes / 6 genuine assertion failures,
+AFTER 41 / 0, settlement omission 35 / 6 and admission-gate omission 39 / 2.
+The admission omission stops before later synthetic witnesses; AFTER executes
+complete no-enqueue and retry assertions. This is a minimal standalone source
+slice, independent of the retained-PAUSED and full feature chains. Historical
+Root51 full-gate failures are retained separately; fresh default scoped gates
+must pass before publication. Broader secure/private/configuration writers,
+native authentication, physical acceptance and the lease exit73 cause remain
+unqualified. Item31 stays partial; no TODO item was removed.
+
 ## Remaining work after the 2026-09-30 releases
 
 - [~] **33.** Config policy for the files other than config.toml (the former
