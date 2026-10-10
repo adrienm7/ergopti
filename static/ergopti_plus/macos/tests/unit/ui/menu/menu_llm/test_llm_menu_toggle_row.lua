@@ -64,10 +64,11 @@ helpers.describe("IA submenu on/off row", function()
 	helpers.it("keeps the switch drawn, greyed, while the script is paused", function()
 		local _, render_ctx = build_item(true, true)
 		local rows = render(render_ctx)
-		helpers.assert_eq(rows[1] and rows[1].title, "menu.llm.enable",
-			"the switch must stay in the IA submenu while paused rather than vanish")
+		helpers.assert_eq(rows[1] and rows[1].title, "menu.llm.enable — menu.llm.save_unavailable",
+			"the paused switch remains drawn with its declared unavailability reason")
 		helpers.assert_eq(rows[1].disabled, true, "and be greyed, since it cannot run its transaction")
-		helpers.assert_eq(rows[1].fn(), false, "a click that still reaches it is refused")
+		helpers.assert_nil(rows[1].fn, "the disabled native row carries no click callback")
+		helpers.assert_eq(render_ctx.commands.llm_toggle(), false, "a direct command that still reaches it is refused")
 	end)
 
 	helpers.it("ticks the same switch once the suggestions are on", function()
