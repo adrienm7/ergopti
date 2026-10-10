@@ -8028,6 +8028,15 @@ cancellation owners are unchanged. Items 54 and 81 remain partial.
   Device work: real held-alone-then-joined ordering and actual AltGr generation;
   injected Ctrl/RAlt priority does not prove physical hook ordering.
 
+  Current-Dev receiving binds the original Windows eleven-case desktop runner
+  to its source-bound qualification receipt and exact full/deferred/refusal
+  wrapper. All original fourteen causal refusals remain; sixteen additional
+  controls require selection/revalidation errors to fail, preserve the full
+  runner and 25-minute budget, and reject false qualification or missing evidence.
+  The pinned-Node source guard passes thirty refusals. Deferred execution grants
+  no native cohort proof; Windows PowerShell and actual desktop requalification
+  of this receiving successor remain unrun.
+
 - [~] **93.** Implement Linux combinations using item 91's shared pair
   IDs, slots and configuration sections. Implemented: ordered tap/hold delivery
   on one exact keyboard through the real Hook/tap-hold engine, bounded menus,
@@ -8119,6 +8128,16 @@ cancellation owners are unchanged. Items 54 and 81 remain partial.
   This container lacks /dev/uinput and /dev/input: the real wrapper refuses
   with exit 2 and zero scenarios/resources. Native execution is UNRUN;
   hosted kernel CI and physical receiving remain required.
+
+  Current-Dev CI receiving preserves both original real-kernel prerequisites,
+  their exact status/retirement enclosure and the saved-configuration subreaper
+  inside the source-bound full/deferred/refusal protocol. Eleven explicit sudo
+  context bindings preserve the qualification source; the six-minute deadline
+  is unchanged. Eighteen workflow and twenty-three custody-envelope mutations
+  are refused, including every original inverse. These portable controls grant
+  no new kernel execution or physical proof. The broader incoming pipeline
+  still has separate qualification/upload contract failures; the original Linux
+  cancellation assertions remain intact pending workflow-owner resolution.
 
 - [ ] **96.** Remove the separate Ergopti+ AltGr-adjustments option:
       selecting Ergopti+ in the existing emulation picker must suffice. Implemented:
