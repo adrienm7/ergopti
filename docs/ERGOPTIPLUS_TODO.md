@@ -8713,6 +8713,18 @@ installed package acceptance remains failed. Private diagnostic workflows,
 Census3 and G6 test-policy overlays are excluded from canonical product source.
 Final joined-source gates and remote Shortcut retirement remain required.
 
+Native SDK receiving on bc0400388/manual37981239358 observed the real
+no-prompt method passing (one test, zero failures; process/capture exits zero)
+and OSStatus -600. The sole marker arrived after the selected-suite terminal,
+so the unchanged strict collector refused it. The buffering or forwarding
+cause remains unknown; this is no catalogue, consent or other-caller proof.
+The prepared successor writes one newline-terminated UTF-8 observation through
+a synchronous throwing parent stderr write before the test returns. Source
+controls refuse buffered print, stdout, a missing newline and the original
+late-marker order; native Mac capture ordering remains unqualified. CI notices
+retain closed process/capture statuses and refusal codes without changing
+observation admission, worker retirement or deadlines.
+
 - [~] **107.** Expose native, digits-direct and symbols-direct number-row
   policy, with acknowledged legacy Windows-Boolean migration and unrelated data
   preservation. Implemented: shared choices and schema9-to-10 migration, current
