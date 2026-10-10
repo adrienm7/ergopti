@@ -1236,3 +1236,229 @@ console.log(
 		'[OK] Same-scope PAC package routing retains all other receipts and truthful partial qualification.'
 	);
 }
+
+/** Exact approved methods leave every Worker and neighboring package method mandatory. */
+function stableV101PackageCollectorControls(repository) {
+	const assert = require('node:assert/strict');
+	const fs = require('node:fs');
+	const path = require('node:path');
+	const evidence = require('../diagnostics/swift_xctest_evidence.cjs');
+	const notice = require('../diagnostics/owned_program_xctest_notice.cjs');
+	const q = require('../ci/dev-release-qualification.cjs');
+	const now = new Date('2026-10-10T20:00:00Z');
+	const source = '0123456789abcdef0123456789abcdef01234567';
+	const env = {
+		GITHUB_ACTIONS: 'true',
+		GITHUB_REPOSITORY: 'adrienm7/ergopti',
+		GITHUB_EVENT_NAME: 'push',
+		GITHUB_REF: 'refs/heads/main',
+		GITHUB_SHA: source,
+		ERGOPTI_DEV_RELEASE_RELEASE: 'true',
+		ERGOPTI_DEV_RELEASE_PRERELEASE: 'false',
+		ERGOPTI_DEV_RELEASE_CHANNEL: 'main',
+		ERGOPTI_DEV_RELEASE_TAG: 'v1.0.1',
+		ERGOPTI_DEV_RELEASE_VERSION: '1.0.1'
+	};
+	const expectedPac = {
+		ManagedHTTPWireTests: ['testRealNativeTLSFullURLPACOrderedFallbackAndOwnedClosure'],
+		ManagedHTTPWPADWireTests: [
+			'testDHCPMetadataOwnsRealPACURLRoutesAndRefusesInvalidDiscoveryBeforeNetwork'
+		],
+		ManagedBootstrapDownloadTests: ['testActualNativeBootstrapTLSFullURLPACAndArtifactPublication']
+	};
+	const expectedBrew = {
+		HomebrewArchiveAcceptanceTests: [
+			'testRealBrewZIPInstallXZUpgradeAndRefusalsPreserveInstalledState'
+		]
+	};
+	assert.deepEqual(q.STABLE_V101_PAC_METHODS, expectedPac);
+	assert.deepEqual(q.STABLE_V101_BREW_METHODS, expectedBrew);
+	const profile = q.authorizeQualificationProfile(
+		q.STABLE_V101_PROFILE_ID,
+		q.environmentContext(env),
+		now
+	);
+	const receipt = (scope) =>
+		JSON.parse(JSON.stringify(q.qualificationReceipt(profile, scope, { source_sha: source })));
+	const pacReceipt = receipt('macos-native-pac'),
+		brewReceipt = receipt('macos-brew-archive');
+	const pac = evidence.pacQualification(pacReceipt, env, now);
+	const brew = evidence.brewQualification(brewReceipt, env, now);
+	const definitions = {};
+	for (const suite of [
+		'OwnedProgramWorkerTests',
+		'ManagedHTTPWorkerTests',
+		...Object.keys(expectedPac),
+		...Object.keys(expectedBrew),
+		'SparkleArchiveUpdateAcceptanceTests'
+	]) {
+		const text = fs.readFileSync(
+			path.join(
+				repository,
+				'static/ergopti_plus/macos/launcher/Tests/ErgoptiPlusTests',
+				suite + '.swift'
+			),
+			'utf8'
+		);
+		definitions[suite] = [...text.matchAll(/\bfunc (test\w+)\(/g)].map((match) => match[1]);
+	}
+	assert.equal(definitions.ManagedHTTPWorkerTests.length, 12);
+	assert.equal(definitions.OwnedProgramWorkerTests.length, 14);
+	const omitted = { ...expectedPac, ...expectedBrew };
+	const selectedDefinitions = Object.fromEntries(
+		Object.entries(definitions).map(([suite, methods]) => [
+			suite,
+			methods.filter((method) => !(omitted[suite] || []).includes(method))
+		])
+	);
+	function transcript(groups, root) {
+		const lines = [`Test Suite '${root}' started at 2026-10-10 20:00:00.`];
+		let count = 0;
+		for (const [suite, methods] of Object.entries(groups)) {
+			for (const method of methods) {
+				const name = `-[ErgoptiPlusTests.${suite} ${method}]`;
+				lines.push(`Test Case '${name}' started.`, `Test Case '${name}' passed (0.001 seconds).`);
+				count++;
+			}
+		}
+		lines.push(
+			`Test Suite '${root}' passed at 2026-10-10 20:00:01.`,
+			`Executed ${count} tests, with 0 failures (0 unexpected) in 1 seconds`
+		);
+		return lines.join('\n');
+	}
+	const selected = transcript(selectedDefinitions, 'Selected tests');
+	const result = evidence.evaluate(selected, 0, 0, undefined, pac, brew);
+	assert.equal(result.exit_status, 0);
+	assert.equal(result.complete, true);
+	assert.equal(result.qualification.qualified, false);
+	assert.equal(result.brew_qualification.qualified, false);
+	assert.deepEqual(result.qualification.classes, []);
+	assert.deepEqual(result.qualification.methods, expectedPac);
+	assert.deepEqual(result.brew_qualification.methods, expectedBrew);
+	assert.equal(result.qualification.expires_at, '2026-10-11T07:00:00Z');
+	const pattern = new RegExp(evidence.pacSkipPattern(pac, brew));
+	for (const [suite, methods] of Object.entries(definitions)) {
+		for (const method of methods) {
+			const name = 'ErgoptiPlusTests.' + suite + '/' + method;
+			assert.equal(pattern.test(name), (omitted[suite] || []).includes(method));
+			assert.equal(pattern.test(name + 'Extra'), false);
+			assert.equal(pattern.test(name.replace('ErgoptiPlusTests.', 'OtherTarget.')), false);
+		}
+	}
+	for (const [suite, methods] of Object.entries(omitted)) {
+		for (const method of methods) {
+			const extra = { ...selectedDefinitions, [suite]: [...selectedDefinitions[suite], method] };
+			assert.equal(
+				evidence.evaluate(transcript(extra, 'Selected tests'), 0, 0, undefined, pac, brew)
+					.exit_status,
+				1
+			);
+		}
+	}
+	for (const method of definitions.ManagedHTTPWorkerTests) {
+		const missing = {
+			...selectedDefinitions,
+			ManagedHTTPWorkerTests: definitions.ManagedHTTPWorkerTests.filter((name) => name !== method)
+		};
+		assert.equal(
+			evidence.evaluate(transcript(missing, 'Selected tests'), 0, 0, undefined, pac, brew)
+				.exit_status,
+			1
+		);
+		assert.equal(
+			evidence.evaluate(
+				selected.replace(`${method}]' passed`, `${method}]' failed`),
+				0,
+				0,
+				undefined,
+				pac,
+				brew
+			).exit_status,
+			1
+		);
+	}
+	const full = transcript(definitions, 'All tests');
+	assert.equal(evidence.evaluate(full, 0, 0).exit_status, 0);
+	const local = { GITHUB_SHA: source };
+	const fullReceipt = (scope) => ({
+		schema: 1,
+		profile_id: null,
+		scope,
+		status: 'full',
+		qualified: false,
+		source_sha: source
+	});
+	const fullPac = evidence.pacQualification(fullReceipt('macos-native-pac'), local, now);
+	const fullBrew = evidence.brewQualification(fullReceipt('macos-brew-archive'), local, now);
+	assert.equal(evidence.evaluate(full, 0, 0, undefined, fullPac, fullBrew).exit_status, 0);
+	assert.equal(
+		evidence.archiveOutcomes(full, 0, 0, fullPac, fullBrew).find((row) => row.case === 'brew')
+			.outcome,
+		'PASS'
+	);
+	assert.throws(() => evidence.pacSkipPattern(fullPac, fullBrew));
+
+	assert.equal(evidence.evaluate(selected, 0, 0).exit_status, 1);
+	assert.equal(evidence.evaluate(selected, 73, 0, undefined, pac, brew).exit_status, 73);
+	assert.equal(evidence.evaluate(selected, 0, 19, undefined, pac, brew).exit_status, 19);
+	assert.throws(() => evidence.evaluate(selected, 0, 0, undefined, { mode: 'deferred' }, brew));
+	assert.throws(() =>
+		evidence.pacQualification(pacReceipt, { ...env, GITHUB_EVENT_NAME: 'pull_request' }, now)
+	);
+	assert.throws(() =>
+		evidence.pacQualification(pacReceipt, { ...env, ERGOPTI_DEV_RELEASE_TAG: 'v1.0.2' }, now)
+	);
+	assert.throws(() => evidence.pacQualification(pacReceipt, env, new Date('2026-10-11T07:00:00Z')));
+	assert.throws(() =>
+		evidence.pacQualification({ ...pacReceipt, source_sha: 'f'.repeat(40) }, env, now)
+	);
+	assert.throws(() =>
+		evidence.brewQualification(brewReceipt, env, new Date('2026-10-11T07:00:00Z'))
+	);
+	const otherSource = 'f'.repeat(40);
+	const otherBrew = evidence.brewQualification(
+		q.qualificationReceipt(profile, 'macos-brew-archive', { source_sha: otherSource }),
+		{ ...env, GITHUB_SHA: otherSource },
+		now
+	);
+	assert.throws(() => evidence.pacSkipPattern(pac, otherBrew));
+	const before = evidence.pacSkipPattern(pac, brew);
+	pacReceipt.artifact.methods.ManagedHTTPWireTests.push('testForeign');
+	brewReceipt.artifact.name = 'testForeign';
+	assert.equal(
+		evidence.pacSkipPattern(pac, brew),
+		before,
+		'receipt mutations cannot widen the captured admission'
+	);
+	const archives = evidence.archiveOutcomes(selected, 0, 0, pac, brew);
+	const brewOutcome = archives.find((item) => item.case === 'brew');
+	assert.equal(brewOutcome.outcome, 'DEFERRED');
+	assert.equal(brewOutcome.qualification.qualified, false);
+	assert.equal(archives.find((item) => item.case === 'sparkle').outcome, 'PASS');
+	assert.ok(evidence.archiveAnnotation(brewOutcome).includes('"qualified":false'));
+	assert.throws(() =>
+		evidence.archiveAnnotation({
+			...brewOutcome,
+			qualification: { ...brewOutcome.qualification, private: 'must-not-export' }
+		})
+	);
+	assert.throws(() =>
+		evidence.archiveAnnotation({
+			...brewOutcome,
+			qualification: { ...brewOutcome.qualification, expires_at: '2099-01-01T00:00:00Z' }
+		})
+	);
+	const judged = notice.judge(result, selected, pac, brew);
+	assert.equal(judged.own_qualified, true);
+	assert.equal(judged.root_qualified, false);
+	assert.equal(notice.judge(result, selected, pac).own_qualified, false);
+	assert.equal(
+		notice.judge({ ...result, brew_qualification: undefined }, selected, pac, brew).own_qualified,
+		false
+	);
+	console.log(
+		'[OK] Exact v1.0.1 package omissions retain Worker12, neighbors, source/expiry and truthful downstream notices.'
+	);
+}
+stableV101PackageCollectorControls(repository);

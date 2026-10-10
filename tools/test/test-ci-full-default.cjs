@@ -621,6 +621,249 @@ check('Swift PAC arguments preserve empty and selected arrays under nounset', ()
 	assert.notEqual(unsafe, code);
 	assert.throws(() => Full.fromFiles(changed(MAC, safe, '"${pac_skip_args[@]}"')), /binding/);
 });
+check(
+	'v101 scope admission is exact main push before expiry and all foreign contexts stay full',
+	() => {
+		const stable = JSON.parse(fs.readFileSync(Policy.STABLE_V101_POLICY_PATH, 'utf8'));
+		assert.equal(stable.id, 'stable-v1-0-1-20261010-three-macos-native-scopes');
+		assert.equal(stable.expires_at, '2026-10-11T07:00:00Z');
+		assert.deepEqual(Object.keys(stable.scopes), [
+			'macos-native-pac',
+			'macos-native-http',
+			'macos-brew-archive'
+		]);
+		const context = Object.fromEntries(
+			['repository', 'event_name', 'ref', 'release', 'prerelease', 'channel', 'tag', 'version'].map(
+				(key) => [key, stable[key]]
+			)
+		);
+		context.github_actions = 'true';
+		const clock = new Date('2026-10-11T06:59:59.999Z');
+		for (const scope of Object.keys(stable.scopes)) {
+			assert.equal(Policy.resolveQualificationProfile(context, clock, scope).id, stable.id);
+			assert.equal(
+				Policy.resolveQualificationProfile(context, new Date(stable.expires_at), scope),
+				null
+			);
+			for (const [key, value] of [
+				['github_actions', 'false'],
+				['repository', 'foreign/ergopti'],
+				['event_name', 'workflow_dispatch'],
+				['event_name', 'pull_request'],
+				['ref', 'refs/heads/dev'],
+				['release', false],
+				['prerelease', 'true'],
+				['channel', 'dev'],
+				['tag', 'v1.0.2'],
+				['version', '1.0.2']
+			])
+				assert.equal(
+					Policy.resolveQualificationProfile({ ...context, [key]: value }, clock, scope),
+					null
+				);
+		}
+		for (const scope of [
+			'macos-native-model-receiving',
+			'core-js-suite',
+			'linux-unit-suite',
+			'windows-native-desktop'
+		])
+			assert.equal(Policy.resolveQualificationProfile(context, clock, scope), null);
+	}
+);
+check('v101 retains the full dispatch-only Item36 cohort and public Brew receipt', () => {
+	const entry = source.find((file) => file.rel === MAC);
+	const item = Raw.jobsOfText(entry.text, MAC).find((job) => job.id === 'item36-native');
+	assert.equal(
+		Raw.field(item.body, 'if'),
+		"${{ github.event_name == 'workflow_dispatch' && !inputs.release }}"
+	);
+	const itemCode = Raw.runOf(
+		Raw.step(item.body, 'Qualify scoped item 36 native archive XCTest controls')
+	).join('\n');
+	assert.equal(itemCode.includes('--skip'), false);
+	assert.ok(itemCode.includes('HomebrewArchiveAcceptanceTests|HomebrewAutomationConsentTests'));
+	const job = Raw.jobsOfText(entry.text, MAC).find((row) => row.id === 'package-macos');
+	const prepare = Raw.runOf(Raw.step(job.body, 'Prepare scoped native qualification profile')).join(
+		'\n'
+	);
+	assert.ok(prepare.includes('--scope macos-brew-archive --github-env "$GITHUB_ENV"'));
+	assert.ok(
+		prepare.includes(
+			'cp "$RUNNER_TEMP/dev-release-qualification/macos-brew-archive.json" "$RUNNER_TEMP/stable-macos-brew-archive.json"'
+		)
+	);
+	const retain = Raw.step(job.body, 'Retain source-bound package native qualification receipt');
+	assert.equal(Raw.stepField(retain, 'if'), 'always()');
+	assert.ok(retain.includes('name: assets-qualification-package-macos'));
+	assert.ok(retain.includes('path: ${{ runner.temp }}/stable-macos-brew-archive.json'));
+	assert.match(retain, /^ {10}if-no-files-found: error$/m);
+});
+check('v101 managed PAC admission retains Worker filter and exact collector authority', () => {
+	const entry = source.find((file) => file.rel === MAC);
+	const job = Raw.jobsOfText(entry.text, MAC).find((row) => row.id === 'managed-ollama-native');
+	const step = Raw.step(job.body, 'Qualify actual native PAC and WPAD XCTest controls');
+	const code = Raw.runOf(step).join('\n');
+	assert.ok(code.includes('--validate-scope-receipt-profile "$receipt"'));
+	assert.ok(code.includes('test -z "$profile"'));
+	assert.ok(
+		code.includes("--filter 'ManagedHTTPWorkerTests|ManagedHTTPWireTests|ManagedHTTPWPADWireTests'")
+	);
+	assert.ok(code.includes('pac_evidence_args=(--pac-qualification-receipt "$receipt")'));
+	for (const token of [
+		'--validate-scope-receipt-profile',
+		'pac_evidence_args=(--pac-qualification-receipt',
+		'ManagedHTTPWorkerTests|'
+	]) {
+		const mutant = step.replace(token, token.slice(0, -1) + 'x');
+		assert.notEqual(mutant, step);
+		assert.throws(() => Full.fromFiles(changed(MAC, step, mutant)));
+	}
+	const marker = 'set -euo pipefail\ntest -n "$ERGOPTI_NATIVE_HTTP_PYTHON"';
+	assert.equal(code.split(marker).length, 2);
+	const admission = code
+		.slice(0, code.indexOf(marker))
+		.replaceAll('${{ matrix.architecture }}', 'arm64');
+	for (const mode of ['full', 'deferred']) {
+		const shell =
+			`set -euo pipefail
+RUNNER_TEMP="/owned path"
+mkdir() { :; }
+node() {
+    case "$*" in
+        *--validate-scope-receipt-profile*) printf '%s' "$PROFILE" ;;
+        *--validate-scope-receipt*) printf '%s' "$MODE" ;;
+        *--pac-skip-pattern*) printf '%s' '^exact-owned-pattern$' ;;
+        *) : ;;
+    esac
+}
+` +
+			admission +
+			'\nargv() { printf "%s\\0" "$#"; for arg in "$@"; do printf "%s\\0" "$arg"; done; }\nargv ${native_pac_skip_args[@]+"${native_pac_skip_args[@]}"} ${pac_evidence_args[@]+"${pac_evidence_args[@]}"}';
+		const result = spawnSync(bashExecutable(), ['--noprofile', '--norc', '-c', shell], {
+			encoding: 'utf8',
+			env: {
+				...process.env,
+				MODE: mode,
+				PROFILE: mode === 'full' ? '' : 'stable-v1-0-1-20261010-three-macos-native-scopes'
+			}
+		});
+		assert.equal(result.status, 0, result.stderr);
+		assert.equal(result.stderr, '');
+		if (mode === 'deferred') {
+			assert.ok(
+				result.stdout.endsWith(
+					'4\0--skip\0^exact-owned-pattern$\0--pac-qualification-receipt\0/owned path/stable-macos-native-pac-arm64.json\0'
+				)
+			);
+		} else assert.equal(result.stdout, '0\0');
+	}
+});
+check('v101 HTTP receiver defers only wire and preserves both mandatory statuses', () => {
+	const entry = source.find((file) => file.rel === MAC);
+	for (const [id, name] of [
+		['managed-ollama-native', 'Receive actual independent managed HTTP native clients'],
+		['package-macos', 'Receive actual managed HTTP native clients']
+	]) {
+		const job = Raw.jobsOfText(entry.text, MAC).find((row) => row.id === id);
+		const step = Raw.step(job.body, name);
+		const code = Raw.runOf(step).join('\n').replaceAll('${{ matrix.architecture }}', 'arm64');
+		for (const [mode, profile, refused, failedCommand, expected] of [
+			['full', '', false, '', 0],
+			['deferred', 'stable-v1-0-1-20261010-three-macos-native-scopes', false, '', 0],
+			['deferred', 'stable-v1-0-1-20261010-three-macos-native-scopes', false, 'owned', 1],
+			['deferred', 'stable-v1-0-1-20261010-three-macos-native-scopes', false, 'client', 1],
+			['full', '', true, '', 17]
+		]) {
+			const shell =
+				`
+set -euo pipefail
+RUNNER_TEMP="$1"
+ERGOPTI_NATIVE_HTTP_PYTHON=owned_python
+mkdir() { :; }
+node() {
+    case "$*" in
+        *--validate-scope-receipt-profile*) printf '%s' "$PROFILE" ;;
+        *--validate-scope-receipt*) if [ "$REFUSED" = true ]; then return 17; fi; printf '%s' "$MODE" ;;
+        *) : ;;
+    esac
+}
+owned_python() {
+    case "$*" in
+        *macos_owned_process_native_test.py*) printf 'owned\\n'; test "$FAILED" != owned ;;
+        *native_http_receiving_test.py*) printf 'client\\n'; test "$FAILED" != client ;;
+        *native_http_wire_client_receiving.py*) printf 'wire\\n' ;;
+        *) return 91 ;;
+    esac
+}
+` + code;
+			const result = spawnSync(
+				bashExecutable(),
+				['--noprofile', '--norc', '-c', shell, 'owned-http', '/owned path'],
+				{
+					encoding: 'utf8',
+					env: {
+						...process.env,
+						MODE: mode,
+						PROFILE: profile,
+						REFUSED: String(refused),
+						FAILED: failedCommand
+					}
+				}
+			);
+			assert.equal(result.error, undefined);
+			assert.equal(result.status, expected, result.stderr);
+			assert.equal(result.stderr, '');
+			const lines = result.stdout.split('\n');
+			assert.equal(
+				lines.filter((line) => line === 'owned').length,
+				refused && id === 'managed-ollama-native' ? 0 : 1
+			);
+			assert.equal(
+				lines.filter((line) => line === 'client').length,
+				refused && id === 'managed-ollama-native' ? 0 : 1
+			);
+			assert.equal(
+				lines.filter((line) => line === 'wire').length,
+				mode === 'full' && !refused ? 1 : 0
+			);
+		}
+		for (const token of [
+			'macos_owned_process_native_test.py || status=1',
+			'native_http_receiving_test.py --client-only || status=1'
+		]) {
+			const mutant = step.replace(token, token.replace('status=1', 'true'));
+			assert.notEqual(mutant, step);
+			assert.throws(() => Full.fromFiles(changed(MAC, step, mutant)));
+		}
+	}
+});
+check('v101 package joins only validated PAC and Brew identities', () => {
+	const entry = source.find((file) => file.rel === MAC);
+	const job = Raw.jobsOfText(entry.text, MAC).find((row) => row.id === 'package-macos');
+	const step = Raw.step(job.body, 'Run Swift launcher tests');
+	const code = Raw.runOf(step).join('\n');
+	for (const token of [
+		'test "$brew_mode" = deferred',
+		'test "$brew_profile" = "$profile"',
+		'test "$brew_mode" = full',
+		'test -z "$brew_profile"'
+	]) {
+		assert.ok(code.includes(token));
+		const mutant = step.replace(token, ': # removed');
+		assert.throws(() => Full.fromFiles(changed(MAC, step, mutant)));
+	}
+	assert.equal(code.split(' ${brew_evidence_args[@]+"${brew_evidence_args[@]}"}').length, 3);
+	assert.ok(
+		code.includes('--pac-skip-pattern "$pac_receipt" --brew-qualification-receipt "$brew_receipt"')
+	);
+	const full = Full.runOf(Full.step(Full.job('package-macos'), 'Run Swift launcher tests')).join(
+		'\n'
+	);
+	assert.equal(full.includes('brew_evidence_args'), false);
+	assert.equal(full.includes('--brew-qualification-receipt'), false);
+});
+
 console.log(
 	`PASS: raw full-default and retired-route source controls=${passed}; native execution UNRUN.`
 );

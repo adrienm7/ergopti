@@ -24,17 +24,37 @@
 		},
 		{
 			"scope": "macos-native-pac",
-			"prefix": "set -euo pipefail\nreceipt=\"$RUNNER_TEMP/stable-macos-native-pac-${{ matrix.architecture }}.json\"\nmkdir -p \"$(dirname \"$receipt\")\"\nnode tools/ci/dev-release-qualification.cjs --scope macos-native-pac --receipt \"$receipt\"\nmode=\"$(node tools/ci/dev-release-qualification.cjs --scope macos-native-pac --validate-scope-receipt \"$receipt\")\"\nif [ \"$mode\" = deferred ]; then\n    echo \"[DEFERRED] macos-native-pac: qualified=false; original command not executed.\"\nelif [ \"$mode\" = full ]; then\n",
-			"suffix": "\nelse\n    echo \"Invalid command qualification disposition\" >&2\n    exit 1\nfi",
-			"strip": 4,
-			"format": "bash"
+			"prefix": "set -euo pipefail\nreceipt=\"$RUNNER_TEMP/stable-macos-native-pac-${{ matrix.architecture }}.json\"\nmkdir -p \"$(dirname \"$receipt\")\"\nnode tools/ci/dev-release-qualification.cjs --scope macos-native-pac --receipt \"$receipt\"\nmode=\"$(node tools/ci/dev-release-qualification.cjs --scope macos-native-pac --validate-scope-receipt \"$receipt\")\"\nprofile=\"$(node tools/ci/dev-release-qualification.cjs --scope macos-native-pac --validate-scope-receipt-profile \"$receipt\")\"\nnative_pac_skip_args=()\npac_evidence_args=()\nif [ \"$mode\" = deferred ]; then\n    if [ \"$profile\" = stable-v1-0-1-20261010-three-macos-native-scopes ]; then\n        native_pac_skip_args=(--skip \"$(node tools/diagnostics/swift_xctest_evidence.cjs --pac-skip-pattern \"$receipt\")\")\n        pac_evidence_args=(--pac-qualification-receipt \"$receipt\")\n        echo \"[DEFERRED] macos-native-pac: only exact native wire methods omitted; Worker controls remain mandatory; qualified=false.\"\n    elif [ \"$profile\" = stable-v1-20261009-macos-native-deferred ]; then\n        echo \"[DEFERRED] macos-native-pac: legacy cohort not executed; qualified=false.\"\n        exit 0\n    else\n        exit 1\n    fi\nelif [ \"$mode\" = full ]; then\n    test -z \"$profile\"\nelse\n    exit 1\nfi\n",
+			"suffix": "",
+			"strip": 0,
+			"format": "bash",
+			"embedded": true,
+			"edits": [
+				{
+					"before": " ${native_pac_skip_args[@]+\"${native_pac_skip_args[@]}\"}",
+					"after": "",
+					"count": 1
+				},
+				{
+					"before": " ${pac_evidence_args[@]+\"${pac_evidence_args[@]}\"}",
+					"after": "",
+					"count": 1
+				},
+				{
+					"before": "--filter 'ManagedHTTPWorkerTests|ManagedHTTPWireTests|ManagedHTTPWPADWireTests'",
+					"after": "--filter 'ManagedHTTPWorkerTests|ManagedHTTPWireTests|ManagedHTTPWPADWireTests'",
+					"count": 1
+				}
+			]
 		},
 		{
 			"scope": "macos-native-http",
-			"prefix": "set -euo pipefail\nreceipt=\"$RUNNER_TEMP/stable-macos-native-http-${{ matrix.architecture }}.json\"\nmkdir -p \"$(dirname \"$receipt\")\"\nnode tools/ci/dev-release-qualification.cjs --scope macos-native-http --receipt \"$receipt\"\nmode=\"$(node tools/ci/dev-release-qualification.cjs --scope macos-native-http --validate-scope-receipt \"$receipt\")\"\nif [ \"$mode\" = deferred ]; then\n    echo \"[DEFERRED] macos-native-http: qualified=false; original command not executed.\"\nelif [ \"$mode\" = full ]; then\n",
-			"suffix": "\nelse\n    echo \"Invalid command qualification disposition\" >&2\n    exit 1\nfi",
+			"prefix": "set -euo pipefail\nreceipt=\"$RUNNER_TEMP/stable-macos-native-http-${{ matrix.architecture }}.json\"\nmkdir -p \"$(dirname \"$receipt\")\"\nnode tools/ci/dev-release-qualification.cjs --scope macos-native-http --receipt \"$receipt\"\nmode=\"$(node tools/ci/dev-release-qualification.cjs --scope macos-native-http --validate-scope-receipt \"$receipt\")\"\nprofile=\"$(node tools/ci/dev-release-qualification.cjs --scope macos-native-http --validate-scope-receipt-profile \"$receipt\")\"\nif [ \"$mode\" = deferred ] && [ \"$profile\" = stable-v1-20261009-macos-native-deferred ]; then\n    echo \"[DEFERRED] macos-native-http: legacy cohort not executed; qualified=false.\"\n    exit 0\nfi\nstatus=0\n\"$ERGOPTI_NATIVE_HTTP_PYTHON\" tools/diagnostics/macos_owned_process_native_test.py || status=1\n\"$ERGOPTI_NATIVE_HTTP_PYTHON\" static/ergopti_plus/macos/tests/support/native_http_receiving_test.py --client-only || status=1\nif [ \"$mode\" = deferred ]; then\n    test \"$profile\" = stable-v1-0-1-20261010-three-macos-native-scopes\n    echo \"[DEFERRED] macos-native-http: only wire receiver omitted; owned-process and client-only remain mandatory; qualified=false.\"\nelif [ \"$mode\" = full ]; then\n",
+			"suffix": "\nelse\n    echo \"Invalid command qualification disposition\" >&2\n    exit 1\nfi\nexit \"$status\"",
 			"strip": 4,
-			"format": "bash"
+			"format": "bash",
+			"retained_prefix": "set -euo pipefail\nstatus=0\n\"$ERGOPTI_NATIVE_HTTP_PYTHON\" tools/diagnostics/macos_owned_process_native_test.py || status=1\n\"$ERGOPTI_NATIVE_HTTP_PYTHON\" static/ergopti_plus/macos/tests/support/native_http_receiving_test.py --client-only || status=1",
+			"retained_suffix": "exit \"$status\""
 		},
 		{
 			"scope": "macos-native-model-receiving",
@@ -110,7 +130,7 @@
 		},
 		{
 			"scope": "macos-native-pac",
-			"prefix": "pac_receipt=\"$RUNNER_TEMP/swift-launcher-evidence/native-pac-package-qualification.json\"\nnode tools/ci/dev-release-qualification.cjs --scope macos-native-pac --receipt \"$pac_receipt\"\nmode=\"$(node tools/ci/dev-release-qualification.cjs --scope macos-native-pac --validate-scope-receipt \"$pac_receipt\")\"\npac_skip_args=()\nswift_root_suite=\"All tests\"\nif [ \"$mode\" = deferred ]; then\n    pac_skip_args=(--skip \"$(node tools/diagnostics/swift_xctest_evidence.cjs --pac-skip-pattern \"$pac_receipt\")\")\n    swift_root_suite=\"Selected tests\"\n    echo \"[DEFERRED] macos-native-pac: duplicate package cohort not executed; still compiled; qualified=false.\"\nelif [ \"$mode\" = full ]; then\n    :\nelse\n    echo \"Invalid package PAC qualification disposition\" >&2\n    exit 1\nfi\n",
+			"prefix": "pac_receipt=\"$RUNNER_TEMP/swift-launcher-evidence/native-pac-package-qualification.json\"\nbrew_receipt=\"$RUNNER_TEMP/dev-release-qualification/macos-brew-archive.json\"\nnode tools/ci/dev-release-qualification.cjs --scope macos-native-pac --receipt \"$pac_receipt\"\nmode=\"$(node tools/ci/dev-release-qualification.cjs --scope macos-native-pac --validate-scope-receipt \"$pac_receipt\")\"\nprofile=\"$(node tools/ci/dev-release-qualification.cjs --scope macos-native-pac --validate-scope-receipt-profile \"$pac_receipt\")\"\nbrew_mode=\"$(node tools/ci/dev-release-qualification.cjs --scope macos-brew-archive --validate-scope-receipt \"$brew_receipt\")\"\nbrew_profile=\"$(node tools/ci/dev-release-qualification.cjs --scope macos-brew-archive --validate-scope-receipt-profile \"$brew_receipt\")\"\npac_skip_args=()\nbrew_evidence_args=()\nswift_root_suite=\"All tests\"\nif [ \"$mode\" = deferred ]; then\n    if [ \"$profile\" = stable-v1-0-1-20261010-three-macos-native-scopes ]; then\n        test \"$brew_mode\" = deferred\n        test \"$brew_profile\" = \"$profile\"\n        pac_skip_args=(--skip \"$(node tools/diagnostics/swift_xctest_evidence.cjs --pac-skip-pattern \"$pac_receipt\" --brew-qualification-receipt \"$brew_receipt\")\")\n        brew_evidence_args=(--brew-qualification-receipt \"$brew_receipt\")\n    elif [ \"$profile\" = stable-v1-20261009-macos-native-deferred ]; then\n        pac_skip_args=(--skip \"$(node tools/diagnostics/swift_xctest_evidence.cjs --pac-skip-pattern \"$pac_receipt\")\")\n    else\n        exit 1\n    fi\n    swift_root_suite=\"Selected tests\"\n    echo \"[DEFERRED] native PAC/Brew scope: exact admitted methods not executed; still compiled; qualified=false.\"\nelif [ \"$mode\" = full ]; then\n    :\n    test -z \"$profile\"\n    test \"$brew_mode\" = full\n    test -z \"$brew_profile\"\nelse\n    echo \"Invalid package PAC qualification disposition\" >&2\n    exit 1\nfi\n",
 			"suffix": "",
 			"strip": 0,
 			"format": "bash",
@@ -130,6 +150,11 @@
 					"before": "Test Suite '$swift_root_suite' passed",
 					"after": "Test Suite 'All tests' passed",
 					"count": 1
+				},
+				{
+					"before": " ${brew_evidence_args[@]+\"${brew_evidence_args[@]}\"}",
+					"after": "",
+					"count": 2
 				}
 			]
 		}

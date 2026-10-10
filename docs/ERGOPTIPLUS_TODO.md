@@ -9993,6 +9993,7 @@ Carbon classification, physical keys or installed release qualification.
   and cover the actual menu/dashboard consumers on Windows, macOS and Linux
   with regression tests. Their local implementations are recorded above;
   publication, native acceptance and media regeneration remain open.
+  Rendered promo media does not qualify a driver correction.
 
 - [ ] **114.** Diagnose and fix recurring Windows prediction-key and script-chord stalls.
 
@@ -10766,12 +10767,35 @@ test precondition failure, not a Lua defect or a successful permission grant.
 The maintainer explicitly selected v1.0.1 despite two feature-labelled commits
 in the integrated history. An explicit publication-commit patch request must
 leave automatic defaults, breaking-change handling and published-tag guards
-intact. Only the unsigned Windows artifact is authorized for this candidate,
-until October 11, 2026 at 07:00 UTC, with a public signature notice. All tests,
-builds, integrity and installation checks remain mandatory. The prior thirteen
-v1.0.0 test deferrals are not extended.
+intact. The unsigned Windows artifact is separately authorized for this
+candidate until October 11, 2026 at 07:00 UTC, with a public signature notice.
+The maintainer also explicitly answered "oui" to three exact macOS scopes for
+the same v1.0.1 main-push candidate and expiry: native PAC/WPAD/TLS (including
+the exact bootstrap duplicate), independent native HTTP wire clients, and
+the single native Homebrew ZIP/XZ acceptance method. Their source-bound public
+receipts and release note must state DEFERRED / qualified:false. All other
+tests, builds, applicable signatures, integrity and ordinary verified archive
+installation/launch remain mandatory. The prior thirteen v1.0.0 test deferrals
+are not extended. Item36 workflow dispatch remains full.
 
-The source gate completed with formatting and encoding passing and 395 of 407
+- [ ] Diagnose certificate -1202 and trust-retirement debt, then receive the
+      original three PAC/WPAD/bootstrap methods on arm64 and amd64. All twelve
+      ManagedHTTPWorkerTests cases remain mandatory.
+- [ ] Diagnose the independent native wire clients' original 15-second trust
+      installation timeout and receive both clients with exact teardown. The
+      owned-process and client-only controls remain mandatory at both call sites.
+- [ ] Receive the original native Homebrew ZIP installation, XZ upgrade and
+      refusal-preservation method with its owned Automation consent. These native
+      acceptance claims remain unqualified; ordinary verified archive install and
+      launch remain required. Restore these three scopes only after their original
+      controls pass without a permissions, trust or sender workaround.
+
+The new profile automatically requires full execution for another version,
+repository, event, ref, channel or expired context. Its exact authorized
+boundary is recorded in
+`.github/ci/stable_v101_macos_native_qualification_exception.json`.
+
+An earlier source gate completed with formatting and encoding passing and 395 of 407
 JavaScript checks passing. The twelve remaining host/fixture failures remain
 open. The following canonical Windows run reached its existing 1,320,000 ms
 watchdog: 10,146 passed, eight failed and 648 had no completed result. Its transcript
@@ -10789,6 +10813,25 @@ The file-filter harness now retains bounded action/focus/outcome facts before
 its unchanged failing assertion and normal fixture cleanup. The exact native
 file-filter case passed, with a natural exit, an empty Job and unchanged source.
 This single success does not establish the old intermittent failure's cause.
+
+The later rebased source gate finished with 394 of 407 JavaScript checks passing.
+Its remaining Windows-host and fixture failures were retained as failures. The
+subsequent fixes passed their selected controls: generated Lua programs now use
+stdin, the Linux phase model retains its exact Windows receipt boundary, and the
+AHK source-reader ratchet remains at 380 literals. The full rebased Windows run
+reached its unchanged watchdog after 1,913 passes, with no completed failure;
+it was incomplete and does not qualify the release. Its E2E run passed 70 cases.
+
+The menu corrections have separate current regression receipts: 19 startup
+command cases, nine coordinator cases, two root-composition/source-owner cases,
+six deferred-view cases, and both transaction observation controls passed.
+The panel selection initially passed 19 cases and failed two because the fixture
+armed cancellation refusal after the real request deadline had already settled
+its first child. Acquiring that refusal with the child fixed both original
+cases without changing the production timeout or cleanup assertions. Encoding
+checks passed for 1,895 AHK files. The maintainer confirmed that both live AI
+checkbox changes now work; the measured toggle is still not instantaneous.
+These are bounded receipts. The final hosted release CI remains required.
 
 The generated stable and dev Homebrew casks were published in tap commit
 `ba0fadd9af349eca1b5d1887e034f8bebd6d0092` with only the supported
