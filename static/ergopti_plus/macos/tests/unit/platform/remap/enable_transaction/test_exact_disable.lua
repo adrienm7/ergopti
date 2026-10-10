@@ -370,3 +370,149 @@ helpers.describe("karabiner disable state is committed only after STOPPED", func
 		end)
 	end)
 end)
+
+-- The production manager is genuine. Healthy remote STOP/guardian outcomes in
+-- this transaction fixture are explicitly doubled, never native safety proof.
+-- Only the exhausted-fence case below connects retained actual controller ports.
+local function with_off_cleanup_observation(options, body)
+	with_fixture(function(fixture)
+		local remap, calls = fixture.load_enabled_remap(options)
+		local watchers = package.loaded["platform.remap.watchers"]
+		local original_stop = watchers.stop_gesture_watcher
+		local stopped_handles = {}
+		watchers.stop_gesture_watcher = function(watcher)
+			if watcher ~= nil then stopped_handles[#stopped_handles + 1] = watcher end
+			return original_stop(watcher)
+		end
+		local called, failure = xpcall(function()
+			helpers.assert_true(remap.set_enabled(true))
+			calls.deliver_ready()
+			calls.deliver_resumed()
+			helpers.assert_true(remap.get_enabled())
+			helpers.assert_true(calls.lease_bound_starts > 0)
+			body(remap, calls, stopped_handles)
+		end, debug.traceback)
+		watchers.stop_gesture_watcher = original_stop
+		if not called then error(failure, 0) end
+	end)
+end
+
+helpers.describe("OFF completion requires retained local consumer cleanup", function()
+	helpers.it("OFF-local: healthy consumer cleanup preserves exact completion ordering", function()
+		with_off_cleanup_observation({ initially_enabled = false }, function(remap, calls, handles)
+			local saved, removed = calls.save, #calls.rule_removals
+			local starts, paused_starts = calls.start, calls.start_paused
+			local outcome, reason
+			helpers.assert_true(remap.set_enabled(false, function(ok, detail) outcome, reason = ok, detail end))
+			helpers.assert_nil(outcome)
+			helpers.assert_true(remap.get_enabled())
+			helpers.assert_eq(calls.save, saved)
+			helpers.assert_eq(#calls.rule_removals, removed)
+			calls.finish_stop(true, "stopped") -- Explicit modeled remote proof only.
+			helpers.assert_eq(outcome, true)
+			helpers.assert_eq(reason, "stopped")
+			helpers.assert_eq(remap.get_enabled(), false)
+			helpers.assert_eq(calls.save, saved + 1)
+			helpers.assert_eq(calls.saved_enabled[#calls.saved_enabled], false)
+			helpers.assert_eq(calls.unregister_guardian, 1)
+			helpers.assert_eq(#calls.rule_removals, removed + 1)
+			helpers.assert_true(#handles > 0, "The actual manager must release a mounted local watcher")
+			helpers.assert_eq(calls.start, starts)
+			helpers.assert_eq(calls.start_paused, paused_starts)
+		end)
+	end)
+
+	helpers.it("OFF-local: refused watcher cleanup cannot publish success and retries the same handle", function()
+		local options = { initially_enabled = false, gesture_stop_failures = 100 }
+		with_off_cleanup_observation(options, function(remap, calls, handles)
+			local saved, removed = calls.save, #calls.rule_removals
+			local starts, paused_starts, mounts = calls.start, calls.start_paused, calls.lease_bound_starts
+			local first, first_reason
+			helpers.assert_true(remap.set_enabled(false, function(ok, detail) first, first_reason = ok, detail end))
+			helpers.assert_nil(first)
+			calls.finish_stop(true, "stopped") -- Never described as a native STOPPED observation.
+			helpers.assert_true(#handles > 0, "The actual retained watcher stop must be attempted")
+			local retained = handles[#handles]
+			for _, handle in ipairs(handles) do helpers.assert_eq(handle, retained) end
+			helpers.assert_eq(remap.get_enabled(), false, "Exact remote retirement still commits the OFF preference")
+			helpers.assert_eq(calls.save, saved + 1)
+			helpers.assert_eq(#calls.rule_removals, removed + 1, "Owned rules must still be removed on local refusal")
+			helpers.assert_eq(first, false, "A retained local watcher is not completed OFF cleanup")
+			helpers.assert_eq(first_reason, "local-input-cleanup-pending")
+			local attempts, count = calls.gesture_stop_attempts, #handles
+			options.gesture_stop_failures = 0
+			local second
+			helpers.assert_true(remap.set_enabled(false, function(ok) second = ok end))
+			helpers.assert_nil(second, "Already-OFF must still wait for exact cleanup admission")
+			calls.finish_stop(true, "already-stopped")
+			helpers.assert_eq(second, true)
+			helpers.assert_true(calls.gesture_stop_attempts > attempts)
+			helpers.assert_true(#handles > count)
+			helpers.assert_eq(handles[count + 1], retained, "Retry releases the original watcher, not a replacement")
+			helpers.assert_eq(remap.get_enabled(), false)
+			helpers.assert_eq(calls.save, saved + 1, "Retry must not duplicate OFF persistence")
+			helpers.assert_eq(calls.start, starts)
+			helpers.assert_eq(calls.start_paused, paused_starts)
+			helpers.assert_eq(calls.lease_bound_starts, mounts)
+		end)
+	end)
+
+	helpers.it("OFF-local: original owned-rule removal refusal remains visible alongside local debt", function()
+		with_off_cleanup_observation({ initially_enabled = false, gesture_stop_failures = 100,
+			rule_removal_succeeds = false }, function(remap, calls, handles)
+			local saved, removed = calls.save, #calls.rule_removals
+			local outcome, reason
+			helpers.assert_true(remap.set_enabled(false, function(ok, detail) outcome, reason = ok, detail end))
+			calls.finish_stop(true, "stopped")
+			helpers.assert_true(#handles > 0)
+			helpers.assert_eq(outcome, false)
+			helpers.assert_contains(reason, "rules-not-removed: ")
+			helpers.assert_eq(remap.get_enabled(), false)
+			helpers.assert_eq(calls.save, saved + 1)
+			helpers.assert_eq(#calls.rule_removals, removed + 1)
+		end)
+	end)
+
+	helpers.it("OFF-local: actual exhausted controller cannot admit OFF persistence or guardian removal", function()
+		with_fixture(function(fixture)
+			local remap, calls = fixture.load_enabled_remap()
+			local bridge = package.loaded["platform.remap.lease_controller"]
+			local previous = { stop = bridge.stop, status = bridge.status, token = bridge.token }
+			local lease_fixture = require("tests.support.lease_controller_fixture")
+			lease_fixture.with_fixture(function(load_controller)
+				local controller, ctx = load_controller()
+				controller.init()
+				controller.start()
+				ctx.helper_path = nil
+				ctx.helper_error = "fixed unavailable test helper"
+				ctx.complete(1, 9, "")
+				ctx.fire_latest_timer()
+				ctx.fire_latest_timer()
+				local phase, snapshot = controller.status()
+				helpers.assert_eq(phase, "fencing")
+				helpers.assert_eq(snapshot.fallback_exhausted, true)
+				helpers.assert_nil(controller.token())
+				-- This explicit bridge calls retained actual controller functions.
+				-- No successful STOPPED/native fence or synthetic idle is delivered.
+				bridge.stop, bridge.status, bridge.token = controller.stop, controller.status, controller.token
+				local called, failure = xpcall(function()
+					local saved, removed = calls.save, #calls.rule_removals
+					local outcome, reason
+					helpers.assert_true(remap.set_enabled(false, function(ok, detail) outcome, reason = ok, detail end))
+					helpers.assert_eq(outcome, false)
+					helpers.assert_eq(reason, "fallback-retry-exhausted")
+					helpers.assert_true(remap.get_enabled())
+					helpers.assert_eq(calls.save, saved)
+					helpers.assert_eq(#calls.rule_removals, removed)
+					helpers.assert_eq(calls.unregister_guardian or 0, 0)
+					local after, retained = controller.status()
+					helpers.assert_eq(after, "fencing")
+					helpers.assert_eq(retained.fallback_exhausted, true)
+					helpers.assert_nil(controller.token())
+				end, debug.traceback)
+				bridge.stop, bridge.status, bridge.token = previous.stop, previous.status, previous.token
+				if not called then error(failure, 0) end
+			end)
+		end)
+	end)
+end)

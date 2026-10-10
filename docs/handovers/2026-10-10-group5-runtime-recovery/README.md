@@ -238,3 +238,37 @@ Missing-window/native-read failure, reentrant classification, other configuratio
 writers, malformed-debt physical release bookkeeping, native/installed/device
 acceptance and watchdog exit73 remain unqualified or open. No owned producer is
 activated; item31 and transverse16/38 remain open, and no TODO item is removed.
+
+## Truthful OFF cleanup completion
+
+The public OFF completion now captures the strict result of the existing local
+input cleanup. Exact remote fencing, guardian removal, OFF persistence,
+transition clearing and owned-rule removal keep their original order. A rules
+removal refusal keeps precedence; successful removal with local debt reports
+`local-input-cleanup-pending` instead of success. A repeated OFF request retries
+the same retained watcher, without duplicate persistence, new mounts or a new
+lease.
+
+Independent Lua5.4 receiving preserves all 15 original controls and adds four
+frozen cases: before 18 pass and one genuine callback assertion fails; after all
+19 pass. The frozen omission restores that same failure. The healthy ordering,
+rules-error precedence and actual exhausted-controller negative all pass. The
+successful retry reaches its second callback and verifies retained handle
+identity and unchanged mount/persistence counts. The manager and exhausted
+controller functions are real; task, watcher and remote settlement endpoints
+are explicitly doubled. This does not prove native handle retirement, first-tap
+exit73 causality, installation or hardware acceptance.
+
+Evidence is retained outside the checkout in
+`/workspace/ergopti-group5-work/off-controls-independent-ndu3ls_p`.
+Selected serial verification gives 19,508 macOS Lua passes across 1643 modules
+and 101 E2E passes with one original driver/host skip. All four new OFF cases
+pass within the complete suite. The required JS gate remains RED: 408 passed
+and one failed, solely the existing Windows two retention-condition omissions.
+The original overall exit1 also retains a README-only formatting failure; its
+subsequent prose-only formatting, convention and diff checks are qualified
+separately. All four frozen inputs stay unchanged through the source gates.
+The Linux subreaper reaps 91 descendants with no pending child or rescue.
+Shared menu merge conflicts remain unresolved, and no Dev/main, shared workflow,
+native165 or CI reference is changed.
+Item24 and incident117 remain open; no TODO item is removed.

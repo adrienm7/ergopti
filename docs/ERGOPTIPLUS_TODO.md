@@ -3502,7 +3502,17 @@ assertions and investigate the native directory boundary before adoption.
 Minimal Dev-context qualification, Intel execution, final packaging, installation
 and real-Mac acceptance remain pending. The
 conditional OFF workaround loses remapping/tap-holds and must not hide cleanup
-debt.
+debt. A bounded software correction now preserves exact remote fencing, guardian
+removal and OFF persistence while refusing public success when retained local
+input cleanup is incomplete. Owned-rule removal errors retain precedence, and
+an already-OFF retry releases the same watcher without duplicate persistence or
+new mounts. The unchanged 15 controls plus four frozen regressions give 18 passed
+and one genuine assertion failure before, then 19 passed after; omitting the
+correction restores that exact failure. Task/controller/watcher endpoints remain
+modeled; this is not native retirement or an exit73 causal fix. Selected software verification passes 19,508 macOS Lua controls and 101 E2E
+scenarios with one original driver/host skip. Required global JS stays RED at
+408 passed/one failed because two existing Windows retention-condition rows
+are absent; no global or native completion is claimed.
 Item 24 stays partial and incident 117 remains open.
 
 - [~] **30.** Physical magic-key setting on all three OSes: one
