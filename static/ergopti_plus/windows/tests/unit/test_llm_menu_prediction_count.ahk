@@ -127,8 +127,13 @@ _LLMPC_GenerationBoundary(Key) {
 			_CTC_ReleaseMenu(Native)
 	}
 }
-for Key in ["count", "context", "words"]
-	Test("generation boundaries: authentic numeric owner " . Key, _LLMPC_GenerationBoundary.Bind(Key))
+/** Registers vectors without publishing a global loop variable. */
+_LLMPC_RegisterGenerationBoundaryCases() {
+	local Key
+	for Key in ["count", "context", "words"]
+		Test("generation boundaries: authentic numeric owner " . Key, _LLMPC_GenerationBoundary.Bind(Key))
+}
+_LLMPC_RegisterGenerationBoundaryCases()
 
 
 /** Retains the hand numeric order while each true complete frame is withdrawn. */

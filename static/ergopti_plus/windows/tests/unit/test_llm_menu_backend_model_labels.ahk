@@ -390,9 +390,14 @@ _LBMD_PerModelReadoutFrame(Key) {
 			_CTC_ReleaseMenu(Native)
 	}
 }
-for Key in ["specs", "caps"]
-	Test("per-model readout: authentic native sheet and shared frame " . Key,
-		_LBMD_PerModelReadoutFrame.Bind(Key))
+/** Registers vectors without publishing a global loop variable. */
+_LBMD_RegisterReadoutFrameCases() {
+	local Key
+	for Key in ["specs", "caps"]
+		Test("per-model readout: authentic native sheet and shared frame " . Key,
+			_LBMD_PerModelReadoutFrame.Bind(Key))
+}
+_LBMD_RegisterReadoutFrameCases()
 
 
 /** Exercises the actual catalogue allocator and current shared separator owners. */
@@ -461,8 +466,13 @@ _LBMD_CatalogueBoundary(Key) {
 			_CTC_ReleaseMenu(Native)
 	}
 }
-for Key in ["family", "origin"]
-	Test("model catalogue boundaries: actual native owner " . Key, _LBMD_CatalogueBoundary.Bind(Key))
+/** Registers vectors without publishing a global loop variable. */
+_LBMD_RegisterCatalogueBoundaryCases() {
+	local Key
+	for Key in ["family", "origin"]
+		Test("model catalogue boundaries: actual native owner " . Key, _LBMD_CatalogueBoundary.Bind(Key))
+}
+_LBMD_RegisterCatalogueBoundaryCases()
 
 
 /** Captures each genuine translation owner without cloning its cache identity. */
