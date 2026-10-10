@@ -3284,5 +3284,6 @@
 	"healthcheck.problem.diagnostic_check": "Falha na verificação de diagnóstico: %s.",
 	"healthcheck.export.privacy_notice": "Este relatório partilha apenas dados técnicos permitidos. Registos, texto livre, caminhos e dados identificativos são excluídos mesmo com os detalhes ativados. Os testes locais da página não estão incluídos.",
 	"sg_actions.llm_translate_context": "🌐 Traduzir a frase atual [configurável]",
-	"menu.about.startup_other_command_reason": "Outro comando de arranque: O arranque está configurado para outro comando ou instalação. A configuração existente é mantida."
+	"menu.about.startup_other_command_reason": "Outro comando de arranque: O arranque está configurado para outro comando ou instalação. A configuração existente é mantida.",
+	"menu.llm.model_parent_with_health": "%sModelo selecionado: %s"
 }

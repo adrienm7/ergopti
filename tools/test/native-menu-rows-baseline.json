@@ -9,16 +9,16 @@
 			"windows/ui/menu/menu_hotstrings.ahk:1266 append",
 			"windows/ui/menu/menu_hotstrings.ahk:1280 append",
 			"windows/ui/menu/menu_init.ahk:48 append",
-			"windows/ui/menu/menu_llm/menu_agent.ahk:50 append",
-			"windows/ui/menu/menu_llm/menu_agent.ahk:55 append",
-			"windows/ui/menu/menu_llm/menu_main.ahk:254 add",
-			"windows/ui/menu/menu_llm/menu_main.ahk:372 append",
-			"windows/ui/menu/menu_llm/menu_main.ahk:410 append",
-			"windows/ui/menu/menu_llm/menu_main.ahk:437 append",
-			"windows/ui/menu/menu_llm/menu_main.ahk:444 append",
-			"windows/ui/menu/menu_llm/menu_main.ahk:448 append",
-			"windows/ui/menu/menu_llm/menu_main.ahk:452 append",
-			"windows/ui/menu/menu_llm/menu_main.ahk:456 append",
+			"windows/ui/menu/menu_llm/menu_agent.ahk:52 append",
+			"windows/ui/menu/menu_llm/menu_agent.ahk:59 append",
+			"windows/ui/menu/menu_llm/menu_main.ahk:416 append",
+			"windows/ui/menu/menu_llm/menu_main.ahk:453 append",
+			"windows/ui/menu/menu_llm/menu_main.ahk:465 append",
+			"windows/ui/menu/menu_llm/menu_main.ahk:492 append",
+			"windows/ui/menu/menu_llm/menu_main.ahk:499 append",
+			"windows/ui/menu/menu_llm/menu_main.ahk:503 append",
+			"windows/ui/menu/menu_llm/menu_main.ahk:507 append",
+			"windows/ui/menu/menu_llm/menu_main.ahk:511 append",
 			"windows/ui/menu/menu_llm/menu_models.ahk:259 append",
 			"windows/ui/menu/menu_llm/menu_models.ahk:291 append",
 			"windows/ui/menu/menu_llm/menu_models.ahk:297 append",
@@ -28,14 +28,13 @@
 		]
 	},
 	"macos": {
-		"count": 6,
+		"count": 5,
 		"sites": [
 			"macos/ui/menu/menu_keyboard_slots.lua:152 static",
 			"macos/ui/menu/menu_keyboard_slots.lua:217 static",
 			"macos/ui/menu/menu_keyboard_slots.lua:218 static",
 			"macos/ui/menu/menu_llm/models_manager_mlx_hf.lua:830 static",
-			"macos/ui/menu/menu_llm/profiles_manager.lua:1068 static",
-			"macos/ui/menu/menu_paths.lua:537 static"
+			"macos/ui/menu/menu_llm/profiles_manager.lua:1068 static"
 		]
 	},
 	"linux": {
