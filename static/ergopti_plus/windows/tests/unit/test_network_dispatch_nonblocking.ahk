@@ -93,13 +93,14 @@ _NDB_ChildTransportPumpsHeartbeat() {
 		SetTimer(Beat, 10)
 		Req := CurlAsyncRequest()
 		Req.Open("GET", "http://127.0.0.1:" . Port . "/held", true)
-		Req.SetTimeouts(500, 500, 500, 2500)
+		; Managed admission and transfer share the constructor's original budget.
+		RequestTimeoutMs := Req.TotalTimeoutMs
 		DispatchStarted := A_TickCount
 		AssertTrue(Req.Send())
 		DispatchMs := (A_TickCount - DispatchStarted) & 0xFFFFFFFF
 		WaitStarted := A_TickCount
 		while !Req.WaitForResponse(0) {
-			if (((A_TickCount - WaitStarted) & 0xFFFFFFFF) >= 5000)
+			if (((A_TickCount - WaitStarted) & 0xFFFFFFFF) >= RequestTimeoutMs)
 				break
 			Sleep(10)
 		}
@@ -116,7 +117,12 @@ _NDB_ChildTransportPumpsHeartbeat() {
 		AssertTrue(Beats >= 20,
 			"AHK timers must keep advancing while the child waits (beats="
 			. Beats . ")")
-		AssertEqual(200, Req.Status)
+		AssertEqual(200, Req.Status,
+			"held loopback response: aborted=" . Req.Aborted
+			. ", admission_published=" . Req.ManagedPayloadPublished
+			. ", native_receipt_fields=" . Req.NativeReceipt.Count
+			. ", remaining_ms=" . Req._Remaining()
+			. ", dispatch_ms=" . DispatchMs . ", wait_ms=" . WaitMs)
 		AssertEqual("OK", Req.ResponseText)
 		for Path in [Req.ConfigPath, Req.BodyPath, Req.HeaderPath]
 			AssertFalse(FileExist(Path),
