@@ -181,20 +181,20 @@ _DG_ReorderedManifestReordersTheRoot() {
 		"a reordered manifest must reorder the tray root, separators included")
 }
 
-; The row each top-level id stands for, as its builder spells the title. The
+; The row each top-level id stages, through its declared group or direct title. The
 ; order cases above stage stubs, so they prove the dispatcher's order and not
 ; the table: two ids swapped in _MI_TopLevelBuilders would draw the wrong rows
 ; in the right slots and pass them. An id missing here fails the case below, so
 ; a new builder has to say which row it stages.
 global _DG_BUILDER_TITLES := Map(
-	"keyboard_layout", 't("menu.layout.title")',
-	"hotstrings",      't("menu.hotstrings.title")',
+	"keyboard_layout", 'MenuRenderer_GroupReceiver("top_level", "keyboard_layout")',
+	"hotstrings",      'MenuRenderer_GroupReceiver("top_level", "hotstrings")',
 	"llm",             't("menu.llm.title")',
 	"agent",           't("menu.agent.title")',
 	"metrics",         't("menu.metrics.title")',
-	"shortcuts",       'GetCategoryTitle("Shortcuts")',
-	"tap_holds",       'GetCategoryTitle("TapHolds")',
-	"gestures",        'GetCategoryTitle("Gestures")',
+	"shortcuts",       'MenuRenderer_GroupReceiver("top_level", "shortcuts")',
+	"tap_holds",       'MenuRenderer_GroupReceiver("top_level", "tap_holds")',
+	"gestures",        'MenuRenderer_GroupReceiver("top_level", "gestures")',
 	"configuration",   't("menu.configuration.title")',
 	"language",        't("menu.global.language")',
 	"about",           't("menu.about.title")',
@@ -213,11 +213,11 @@ _DG_EveryBuilderStagesItsOwnRow() {
 		if (Id == "llm")
 			Body .= _StripFullLineComments(_DriverFuncBody("LLM_Menu_Init"))
 		Assert(Body != "", "the '" . Id . "' builder " . Builder.Name . " must be readable")
-		Assert(InStr(Body, _DG_BUILDER_TITLES[Id]) > 0,
+		Assert(_DG_HasExecutableRowMarker(Body, _DG_BUILDER_TITLES[Id]),
 			"the '" . Id . "' builder " . Builder.Name . " must stage the row titled " . _DG_BUILDER_TITLES[Id])
 		for OtherId, Title in _DG_BUILDER_TITLES {
 			if (OtherId != Id)
-				Assert(!InStr(Body, Title), "the '" . Id . "' builder " . Builder.Name
+				Assert(!_DG_HasExecutableRowMarker(Body, Title), "the '" . Id . "' builder " . Builder.Name
 					. " stages the '" . OtherId . "' row (" . Title . ")")
 		}
 		Checked += 1
@@ -299,3 +299,47 @@ _DG_AgentUnreadyDoesNotDisableNeighbors() {
 
 Test("Agent IA unready: real root stages an inert localized header while neighboring AI stays available",
 	_DG_AgentUnreadyDoesNotDisableNeighbors)
+
+
+; Source markers must identify active calls, never comments, data or a suffix callee.
+_DG_HasExecutableRowMarker(Body, Marker) {
+	if !(Body is String) || !(Marker is String) || Body == "" || Marker == ""
+		return false
+	if !RegExMatch(Marker, "^([A-Za-z_][A-Za-z0-9_]*)\(", &Call)
+		return false
+	Code := _DriverMaskNonCode(&Body)
+	Anchor := Call[1] . "("
+	Position := 1
+	while Found := InStr(Body, Marker, true, Position) {
+		if SubStr(Code, Found, StrLen(Anchor)) == Anchor
+				&& (Found == 1 || !RegExMatch(SubStr(Code, Found - 1, 1), "[A-Za-z0-9_]"))
+			return true
+		Position := Found + StrLen(Marker)
+	}
+	return false
+}
+
+_DG_DeclaredFeatureRowsStayExecutable() {
+	Builders := _MI_TopLevelBuilders()
+	Children := Map("keyboard_layout", "LayoutMenu", "hotstrings", "HotstringsMenu",
+		"shortcuts", 'SubMenus["Shortcuts"]', "tap_holds", 'SubMenus["TapHolds"]',
+		"gestures", "GesturesMenu")
+	Checked := 0
+	for Id, Child in Children {
+		Checked += 1
+		Body := _DriverFuncBody(Builders[Id].Name)
+		Marker := 'MenuRenderer_GroupReceiver("top_level", "' . Id . '")'
+		AssertTrue(_DG_HasExecutableRowMarker(Body, Marker), "the real root requests its own declared group")
+		AssertFalse(_DG_HasExecutableRowMarker(Body, StrReplace(Marker, Id, "wrong_" . Id)), "a different declared group cannot stand for this row")
+		Stage := "_MI_StageDeclaredFeature(Receiver, " . Child . ","
+		AssertTrue(_DG_HasExecutableRowMarker(Body, Stage), "the same captured receiver stages its actual child")
+		AssertFalse(_DG_HasExecutableRowMarker(StrReplace(Body, Stage, "_MI_StageDeclaredFeature(OtherReceiver, " . Child . ","), Stage),
+			"withdrawing the captured receiver refuses the staging marker")
+		AssertFalse(_DG_HasExecutableRowMarker("; " . Marker, Marker), "commented calls are not row builders")
+		AssertFalse(_DG_HasExecutableRowMarker("Note := '" . Marker . "'", Marker), "source-looking data is not a row builder")
+		AssertFalse(_DG_HasExecutableRowMarker("Wrong" . Marker, Marker), "a suffix callee does not acquire the exact producer")
+	}
+	AssertEqual(5, Checked, "all five declared feature parents must exercise their negative controls")
+}
+Test("menu drift gate (AHK): declared feature rows preserve executable group and child identity (declared-root-row-oracle)",
+	_DG_DeclaredFeatureRowsStayExecutable)
