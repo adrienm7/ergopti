@@ -1502,10 +1502,12 @@ Test("configuration snapshot: an absent source still permits first-use settings 
 	_FMS_MissingSourceAllowsFirstUse)
 
 _FMS_FullSavePreservesOutdatedAndUnknown(Path) {
-	global _ConfigBootRejectedOverrides, _ConfigBootOutdatedEntries
+	global _ConfigBootRejectedOverrides, _ConfigBootOutdatedEntries, _LOGGER_TEST_SINK
 	Runtime := _CFGFS_CaptureRuntime(), Coordinator := _ConfigFullSaveCoordinator()
 	Original := FSRead(Path)
 	Target := ManifestBuildFeaturesMap()
+	PriorSink := _LOGGER_TEST_SINK
+	Observed := { collector_entered: 0, collector_completed: 0, phase: "unobserved" }
 	try {
 		_CFGFS_Prepare(Path)
 		_ConfigBootRejectedOverrides := 0
@@ -1515,16 +1517,46 @@ _FMS_FullSavePreservesOutdatedAndUnknown(Path) {
 		AssertEqual("@", IniCacheGet(Cache, "hotstrings", "trigger_char"))
 		AssertTrue(_ConfigBootOutdatedEntries.Has("shortcuts`nscreen"))
 		AssertEqual(0, _ConfigBootRejectedOverrides)
-		Collect := () => [
-			{ Section: "hotstrings", Key: "trigger_char", Value: IniCacheGet(Cache, "hotstrings", "trigger_char") },
-			{ Section: "shortcuts", Key: "screen", Value: Target["shortcuts"]["screen"] }]
-		AssertEqual(CONFIG_SAVE_OK, SaveFullConfig(0, (*) => true, true, 0, Collect),
+		Collect() {
+			Observed.collector_entered := 1
+			Updates := [
+				{ Section: "hotstrings", Key: "trigger_char", Value: IniCacheGet(Cache, "hotstrings", "trigger_char") },
+				{ Section: "shortcuts", Key: "screen", Value: Target["shortcuts"]["screen"] }]
+			Observed.collector_completed := 1
+			return Updates
+		}
+		ObservePhase(Line) {
+			; Classify fixed existing messages only; never emit paths, source,
+			; credentials or the original formatted logger line.
+			if !(Line is String)
+				return
+			for Phase in ["source", "collector", "writer"]
+				if InStr(Line, "The full configuration " . Phase . " raised an error:")
+					Observed.phase := Phase
+			if InStr(Line, "Refusing semantic configuration write for")
+				Observed.phase := "candidate"
+			if InStr(Line, "Write-through atomic replace of")
+				Observed.phase := "native_replace"
+			if InStr(Line, "Refusing configuration writer: genuine source schema admission was not captured.")
+				Observed.phase := "schema_capture"
+			if InStr(Line, "Refusing unchanged-source acknowledgment: genuine native admission was withdrawn.")
+				Observed.phase := "native_ack_noop"
+			if InStr(Line, "Refusing unchanged-image acknowledgment: genuine native admission was withdrawn.")
+				Observed.phase := "native_ack_image"
+		}
+		LoggerSetTestSink(ObservePhase)
+		SaveResult := SaveFullConfig(0, (*) => true, true, 0, Collect)
+		LoggerSetTestSink(PriorSink)
+		if SaveResult != CONFIG_SAVE_OK
+			_FMS_TraceClosedFullSaveRefusal(Path, SaveResult, Observed, Original)
+		AssertEqual(CONFIG_SAVE_OK, SaveResult,
 			"the actual full-save owner and writer must acknowledge the semantic no-op")
 		AssertEqual(Original, FSRead(Path), "full save must preserve obsolete scalar and unowned source bytes")
 		AssertEqual(_ConfigFullSaveCoordinator().requested_generation,
 			_ConfigFullSaveCoordinator().committed_generation,
 			"successful publication, not a deferred timer, owns this generation")
 	} finally {
+		LoggerSetTestSink(PriorSink)
 		_ConfigFullSaveCoordinator(Coordinator)
 		_CFGFS_RestoreRuntime(Runtime)
 	}
@@ -2775,3 +2807,29 @@ _FMS_LogicalRegistryRefusalDiagnostic() {
 		_FMS_LogicalRegistryRefusalHasNoPhysicalDiagnostic)
 }
 Test("configuration snapshot: genuine logical owner refusal never issues physical unreadability", _FMS_LogicalRegistryRefusalDiagnostic)
+
+
+; Observes only the completed actual result. No extra save, native ACK,
+; schema constructor, lease acquisition or owner repair runs for diagnosis.
+_FMS_TraceClosedFullSaveRefusal(Path, SaveResult, Observed, Original) {
+	global TEST_RESULTS_FILE
+	Status := (SaveResult is Integer) ? SaveResult : "noninteger"
+	Phase := Observed.phase
+	if !(Phase is String) || !InStr("|unobserved|source|collector|writer|candidate|native_replace|schema_capture|native_ack_noop|native_ack_image|", "|" . Phase . "|")
+		Phase := "noncanonical"
+	CollectorEntered := Observed.collector_entered == 1 ? 1 : 0
+	CollectorCompleted := Observed.collector_completed == 1 ? 1 : 0
+	SchemaAdmitted := ConfigSchemaCanPrepareWrite(Path) ? 1 : 0
+	ReadBusy := FileReadActivityBusy(Path) ? 1 : 0
+	TerminalActive := _ConfigWriteTerminalIsActive() ? 1 : 0
+	Unchanged := FSRead(Path) == Original ? 1 : 0
+	; Only a closed message emitted after the actual native ACK refused can
+	; establish refusal. Top-level result and source equality remain insufficient.
+	NativeAck := (Phase == "native_ack_noop" || Phase == "native_ack_image") ? "0" : "unobserved"
+	Line := "# group1-actual-fullsave-refusal: result=" . Status
+		. ";phase=" . Phase . ";collector_entered=" . CollectorEntered
+		. ";collector_completed=" . CollectorCompleted . ";schema_admitted=" . SchemaAdmitted
+		. ";read_busy=" . ReadBusy . ";terminal_active=" . TerminalActive
+		. ";source_text_unchanged=" . Unchanged . ";native_ack=" . NativeAck . "`r`n"
+	try _TestResultsWrite(TEST_RESULTS_FILE, Line)
+}

@@ -4657,6 +4657,11 @@ The signed native checkpoint 37116923472 reached the actual independent JSON cod
   retaining the original native-owner checks. Retired-Script consumers and
   final-source native/installed qualification remain separate follow-ups.
 
+The native writer reports closed schema-capture and unchanged-source admission
+refusals through the existing logger. The original full-save case retains its
+assertions and observes only its actual failed result; its first refusal cause
+is unresolved until genuine Windows execution.
+
 Windows source contracts now follow the actual configuration-writer gateway
 and its exclusive admitted atomic publication branch. Original assertions and
 negative controls remain; AHK execution of these contracts is pending.
