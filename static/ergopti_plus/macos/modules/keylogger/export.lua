@@ -358,7 +358,7 @@ function M.sync_foreign_data_sql(on_applied)
 
 				local sz = sql_attrs.size or 0
 				if not has_device_row then
-					Logger.warn(LOG, "Foreign sync: skipping %s because device.json is invalid.", entry:sub(1, 8))
+					Logger.warn(LOG, "Foreign sync: skipping invalid device.json.")
 				elseif sz > watermark then
 					local rfh = io.open(data_sql, "r")
 					if rfh then
@@ -377,8 +377,7 @@ function M.sync_foreign_data_sql(on_applied)
 							-- tick; advance the watermark only to that boundary (F-M3).
 							local last_commit = M._last_complete_batch_offset(chunk)
 							if last_commit == 0 then
-								Logger.debug(LOG, "Foreign sync: no complete batch yet for %s — deferring.",
-									entry:sub(1, 8))
+								Logger.debug(LOG, "Foreign sync: no complete batch yet — deferring.")
 							else
 								local applicable = chunk:sub(1, last_commit)
 								local applied_to = watermark + last_commit
@@ -394,8 +393,7 @@ function M.sync_foreign_data_sql(on_applied)
 									local callback_ok, callback_result = pcall(on_applied, entry)
 									derived_ok = callback_ok and callback_result ~= false
 									if not derived_ok then
-										Logger.warn(LOG, "Foreign sync: derived rebuild failed for %s; watermark deferred.",
-											entry:sub(1, 8))
+										Logger.warn(LOG, "Foreign sync: derived rebuild failed; watermark deferred.")
 									end
 								end
 								if derived_ok then
@@ -404,19 +402,16 @@ function M.sync_foreign_data_sql(on_applied)
 										applied_to, _now_ts():gsub("'", "''"), entry:gsub("'", "''")))
 									if watermark_rc == sqlite3.OK then
 										table.insert(synced_devices, entry)
-										Logger.debug(LOG, "Foreign sync: applied %d byte(s) from device %s.",
-											applied_to - watermark, entry:sub(1, 8))
+										Logger.debug(LOG, "Foreign sync: applied %d byte(s).", applied_to - watermark)
 									else
-										Logger.warn(LOG, "Foreign sync: cannot advance watermark for %s: %s.",
-											entry:sub(1, 8), db:errmsg() or "?")
+										Logger.warn(LOG, "Foreign sync: cannot advance watermark: %s.", db:errmsg() or "?")
 									end
 								end
 							else
 									-- Defensively roll back any partial transaction the failed
 									-- exec opened so it cannot poison the local ingest BEGIN.
 									pcall(function() db:exec("ROLLBACK;") end)
-									Logger.warn(LOG, "Foreign sync rolled back for %s: %s.",
-										entry:sub(1, 8), tostring(err))
+									Logger.warn(LOG, "Foreign sync rolled back: %s.", tostring(err))
 								end
 							end
 						end
