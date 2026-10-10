@@ -1,6 +1,8 @@
 """Receive pinned bootstrap inputs without claiming native PAC qualification."""
 
 import hashlib
+import ast
+import contextlib
 import importlib.util
 import io
 import json
@@ -12,6 +14,7 @@ import tempfile
 import time
 import unittest
 from unittest.mock import patch
+from types import SimpleNamespace
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -696,6 +699,193 @@ fi
                 "SUCCESSOR_STARTED",
             ):
                 self.assertNotIn(private_or_success, result.stdout + result.stderr)
+
+
+class BootstrapFailureObservationTests(unittest.TestCase):
+    """Actual transport/error producer with recording process/descriptor ports."""
+
+    def engine(self):
+        source = ROOT / "static/ergopti_plus/macos/platform/network/native_http.py"
+        spec = importlib.util.spec_from_file_location("bootstrap_recording_engine", source)
+        engine = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(engine)
+        return engine
+
+    def report(self, failure):
+        # Execute the actual CLI catch/exit body, never a test copy of its policy.
+        entry = ast.parse(SOURCE.read_text(encoding="utf-8")).body[-1]
+        self.assertIsInstance(entry, ast.If)
+
+        def main():
+            raise failure
+
+        output = io.StringIO()
+
+        def exit(code):
+            raise SystemExit(code)
+
+        reporter = getattr(BOOTSTRAP, "_report_failure", None)
+        with contextlib.redirect_stderr(output):
+            with self.assertRaises(SystemExit) as refused:
+                exec(
+                    compile(ast.Module(body=[entry], type_ignores=[]), str(SOURCE), "exec"),
+                    {
+                        "__name__": "__main__",
+                        "main": main,
+                        "_report_failure": reporter,
+                        "sys": SimpleNamespace(stderr=output, exit=exit),
+                    },
+                )
+        self.assertEqual(refused.exception.code, 74)
+        lines = output.getvalue().splitlines()
+        self.assertEqual(lines[-1], "Managed bootstrap request failed: unavailable.")
+        self.assertTrue(lines[0].startswith("# managed_bootstrap_failure "))
+        for secret in ("private", "token", "https://", "Password"):
+            self.assertNotIn(secret, output.getvalue())
+        return json.loads(lines[0].removeprefix("# managed_bootstrap_failure "))
+
+    def testRealIdentityAndSpawnRefusalsReportDifferentClosedStages(self):
+        for phase, expected in (("identity", "NativeHTTPError"), ("spawn", "OSError")):
+            with self.subTest(phase=phase):
+                engine = self.engine()
+                selector = SimpleNamespace(close=lambda: None)
+                resolver = (
+                    patch.object(
+                        engine, "_resolve_worker", side_effect=engine.NativeHTTPError("unavailable")
+                    )
+                    if phase == "identity"
+                    else patch.object(engine, "_resolve_worker", return_value="/owned/worker")
+                )
+                with patch.object(engine.selectors, "DefaultSelector", return_value=selector):
+                    with (
+                        resolver,
+                        patch.object(
+                            engine.subprocess,
+                            "Popen",
+                            side_effect=OSError("private token https://secret"),
+                        ) as acquire,
+                    ):
+                        with self.assertRaises(engine.NativeHTTPError) as refused:
+                            engine.open_request(
+                                "https://source.invalid/path", timeout=5, idle_timeout=2
+                            )
+                self.assertEqual(acquire.call_count, int(phase == "spawn"))
+                self.assertTrue(
+                    hasattr(refused.exception, "native_diagnostic"),
+                    "Actual unavailable failure must retain source provenance",
+                )
+                fact = self.report(refused.exception)
+                self.assertEqual(fact["stage"], "native_" + phase)
+                self.assertEqual(fact["exception_class"], expected)
+                self.assertEqual(fact["cleanup"], "confirmed")
+                self.assertIsNone(fact["native_child_status"])
+                self.assertIsNone(fact["native_receipt_reason"])
+
+    def testRealTerminalFailureReportsStatusOnlyAfterExactClosure(self):
+        class Stream(io.BytesIO):
+            def fileno(self):
+                return 91
+
+            def close(self):
+                if getattr(self, "refuse_close", False) and not self.closed:
+                    raise OSError("inert stream close refusal")
+                return super().close()
+
+        for refusal in ("none", "wait", "stream"):
+            refuse_wait = refusal == "wait"
+            failed_cleanup = refusal != "none"
+            with self.subTest(refusal=refusal):
+                engine = self.engine()
+                child = SimpleNamespace(
+                    pid=4711, returncode=None, stdin=Stream(), stdout=Stream(), poll=lambda: 78
+                )
+
+                child.stdout.refuse_close = refusal == "stream"
+                self.addCleanup(io.BytesIO.close, child.stdin)
+                self.addCleanup(io.BytesIO.close, child.stdout)
+
+                def wait(*args, **kwargs):
+                    if refuse_wait:
+                        raise OSError("private wait refusal")
+                    child.returncode = 78
+                    return 78
+
+                child.wait = wait
+                selector = SimpleNamespace(
+                    close=lambda: None,
+                    register=lambda *args: None,
+                    unregister=lambda *args: None,
+                    select=lambda *args: [True],
+                )
+                payload = json.dumps(
+                    {"version": 1, "success": False, "reason": "unavailable"}
+                ).encode()
+                with (
+                    patch.object(engine.selectors, "DefaultSelector", return_value=selector),
+                    patch.object(engine, "_resolve_worker", return_value="/owned/worker"),
+                    patch.object(engine.subprocess, "Popen", return_value=child),
+                    patch.object(engine.os, "set_blocking"),
+                    patch.object(
+                        engine.os, "write", side_effect=lambda descriptor, data: len(data)
+                    ),
+                    patch.object(engine.NativeHTTPResponse, "_frame", return_value=(b"C", payload)),
+                    patch.object(engine.NativeHTTPResponse, "_read_exact", return_value=b""),
+                ):
+                    with self.assertRaises((engine.NativeHTTPError, OSError)) as refused:
+                        engine.open_request(
+                            "https://source.invalid/path", timeout=5, idle_timeout=2
+                        )
+                self.assertTrue(
+                    hasattr(refused.exception, "native_diagnostic"),
+                    "Exact error must retain its native owner outcome",
+                )
+                fact = self.report(refused.exception)
+                self.assertTrue(child.stdin.closed)
+                self.assertEqual(child.stdout.closed, refusal != "stream")
+                self.assertEqual(fact["cleanup"], "unconfirmed" if failed_cleanup else "confirmed")
+                self.assertEqual(
+                    fact["stage"], "native_cleanup" if failed_cleanup else "native_terminal"
+                )
+                self.assertEqual(fact["native_child_pid"], None if failed_cleanup else 4711)
+                self.assertEqual(fact["native_child_status"], None if failed_cleanup else 78)
+                self.assertEqual(
+                    fact["native_receipt_reason"], None if failed_cleanup else "unavailable"
+                )
+                io.BytesIO.close(child.stdout)
+
+    def testActualImportAndMalformedFactsKeepFailurePrivateAndNonzero(self):
+        with (
+            patch.dict(sys.modules),
+            patch.object(BOOTSTRAP.importlib.util, "spec_from_file_location", return_value=None),
+        ):
+            sys.modules.pop("_ergopti_native_http", None)
+            with self.assertRaises(BOOTSTRAP.BootstrapFailure) as refused:
+                BOOTSTRAP._native_request("https://source.invalid/path")
+        self.assertTrue(
+            hasattr(refused.exception, "bootstrap_stage"),
+            "Actual native import refusal must preserve its stage",
+        )
+        fact = self.report(refused.exception)
+        self.assertEqual(
+            (fact["stage"], fact["exception_class"]), ("native_import", "BootstrapFailure")
+        )
+        failure = ValueError("private Password token")
+        failure.bootstrap_stage = ["private"]
+        failure.native_diagnostic = {
+            "stage": ["private"],
+            "exception_class": "private",
+            "native_child_pid": 1,
+            "native_child_status": 0,
+            "native_receipt_reason": "complete",
+            "cleanup": "confirmed",
+        }
+        fact = self.report(failure)
+        self.assertEqual(
+            (fact["stage"], fact["exception_class"], fact["cleanup"]),
+            ("bootstrap", "ValueError", "unconfirmed"),
+        )
+        self.assertIsNone(fact["native_child_status"])
+        self.assertIsNone(fact["native_receipt_reason"])
 
 
 if __name__ == "__main__":
