@@ -6230,6 +6230,14 @@ retained native child ownership and constructor-context refusal regressions.
 All previous native assertions remain. Complete native Windows, packaging and
 installed acceptance remain pending; items 54, 16 and 38 stay open.
 
+The macOS paths editor now gives its actual application identity to the native
+window factory, which consumes the existing shared application title declaration
+before allocating or retitling the window. All 21 original captions remain in an
+independent corpus. The actual producer/factory modeled host passes 34/0 and the
+existing asynchronous-owner module passes 5/0. Legacy callback title timing is
+preserved. Cocoa, Hammerspoon, packaging and installed acceptance are unexecuted.
+This bounded migration does not close items 54, 16 or 38.
+
 - [ ] Execute the existing native per-key command/caption/state/refusal cases and review the still-native Windows menu sites against the actual census (currently 82). Move remaining fixed policy/data to shared declarations without hiding rows or weakening the scanner.
 - [ ] Prepared shared menu packets in docs/handovers/2026-10-04-config-menus are unapplied. Verify their recorded dependencies/preimages, regenerate owner artifacts and qualify all affected drivers after any shared change.
 
@@ -8523,6 +8531,12 @@ The Windows model-parent caption now consumes shared declared policy while
 retaining actual child/probe/callback ownership. The canonical allocation census
 remains 22 Windows/6 macOS/4 Linux before the separate Mac title slice. Item 54
 records the independent corpus and qualification limits; item 81 stays open.
+
+The actual macOS paths-editor window factory now consumes its canonical app
+title identity. The unchanged owning generator retires one genuine title site,
+yielding 22 Windows/5 macOS/4 Linux. Original captions and legacy lifecycle
+behavior remain covered; native/installed qualification and other presentation
+sites remain open. Neither item 54 nor item 81 is complete.
 
 - [ ] Continue the remaining Windows menu families using shared templates and the item54 census. canonicalHoldOptions is already shared; do not cosmetically reimplement it.
 - [ ] After every Windows push, cancel automatic runs on its exact SHA. Use manual ci.yml with windows for Windows-only changes, or all affected OS lanes for shared changes; let manual runs finish and record native/E2E/package/install outcomes independently.

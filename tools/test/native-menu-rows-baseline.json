@@ -28,14 +28,13 @@
 		]
 	},
 	"macos": {
-		"count": 6,
+		"count": 5,
 		"sites": [
 			"macos/ui/menu/menu_keyboard_slots.lua:152 static",
 			"macos/ui/menu/menu_keyboard_slots.lua:217 static",
 			"macos/ui/menu/menu_keyboard_slots.lua:218 static",
 			"macos/ui/menu/menu_llm/models_manager_mlx_hf.lua:830 static",
-			"macos/ui/menu/menu_llm/profiles_manager.lua:1068 static",
-			"macos/ui/menu/menu_paths.lua:537 static"
+			"macos/ui/menu/menu_llm/profiles_manager.lua:1068 static"
 		]
 	},
 	"linux": {
