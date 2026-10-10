@@ -36,6 +36,7 @@ local Logger  = require("infra.logger")
 
 
 
+helpers.admit_logger_privacy(Logger)
 -- ==============================================
 -- ==============================================
 -- ======= 1/ Corpus Loading ====================

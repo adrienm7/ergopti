@@ -88,6 +88,7 @@ local function load_tooltip(faults)
 
 	package.loaded["infra.logger"] = nil
 	local real_logger = require("infra.logger")
+	helpers.admit_logger_privacy(real_logger)
 	local errors = {}
 	local logger_spy = setmetatable({
 		error = function(_log, format, ...)

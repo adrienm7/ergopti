@@ -120,6 +120,7 @@ local function build_tray(on, extra)
 	local errors = {}
 	package.loaded["infra.logger"] = nil
 	local real_logger = require("infra.logger")
+	helpers.admit_logger_privacy(real_logger)
 	local spy = setmetatable({}, { __index = real_logger })
 	spy.error = function(module_name, fmt, ...)
 		local ok, text = pcall(string.format, fmt, ...)

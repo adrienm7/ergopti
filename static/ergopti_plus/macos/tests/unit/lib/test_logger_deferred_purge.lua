@@ -47,6 +47,7 @@ package.loaded["adapters.shell_runner"] = {
 package.loaded["infra.logger"] = nil
 local Logger = require("infra.logger")
 
+helpers.admit_logger_privacy(Logger)
 -- Age (days) stamped on the fake topical sub-file so the ephemeral pass must drop it.
 local STALE_SUB_FILE_AGE_DAYS = 3
 
