@@ -222,6 +222,35 @@ function finishStagingObservation(
 	if (failed) throw primary;
 }
 
+// BEGIN owned-output inert controls
+// Run the actual authenticated copy owner with MemoryStream and closed route ports.
+const ownedOutputResult = spawnSync(
+	powershell,
+	[
+		'-NoLogo',
+		'-NoProfile',
+		'-NonInteractive',
+		'-File',
+		path.join(__dirname, 'test_updater_owned_output.ps1'),
+		'-Module',
+		path.join(__dirname, '../../static/ergopti_plus/windows/vendor/ergopti_updater_download.ps1')
+	],
+	{ encoding: 'utf8', windowsHide: true, maxBuffer: 65536, timeout: 15000 }
+);
+assert.ifError(ownedOutputResult.error);
+assert.equal(ownedOutputResult.status, 0, ownedOutputResult.stdout + ownedOutputResult.stderr);
+assert.equal(ownedOutputResult.stderr, '');
+assert.deepEqual(ownedOutputResult.stdout.trim().split(/\r?\n/), [
+	'PASS default',
+	'PASS owned',
+	'PASS bad-identity',
+	'PASS withdrawn',
+	'PASS withdraw-before-copy',
+	'PASS route-refused',
+	'RESULT passed=6 failed=0 native_requests=0 filesystem_operations=0'
+]);
+// END owned-output inert controls
+
 const stagingOwned = fs.mkdtempSync(path.join(os.tmpdir(), 'ergopti-staging-observation-'));
 const stagingResult = spawnSync(
 	powershell,
