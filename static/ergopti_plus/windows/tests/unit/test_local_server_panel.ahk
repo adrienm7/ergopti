@@ -688,3 +688,188 @@ _LSPB_JoinedView() {
 }
 Test("local readonly batch: actual joined rows bound reads and reject copy reentry", _LSPB_JoinedView)
 
+
+
+
+
+
+; ==================================================
+; ==================================================
+; ======= 5/ Deferred Automatic Discovery ===========
+; ==================================================
+; ==================================================
+
+class _LSPD_Fixture extends _LSPN_Fixture {
+	__New() {
+		super.__New()
+		global _DriverReady, _LLM_MenuBuildCoordinator
+		this.HadReady := IsSet(_DriverReady)
+		this.OldReady := this.HadReady ? _DriverReady : false
+		this.HadCoordinator := IsSet(_LLM_MenuBuildCoordinator)
+		this.OldCoordinator := this.HadCoordinator ? _LLM_MenuBuildCoordinator : 0
+		_DriverReady := false
+		_LLM_MenuBuildCoordinator := LLMMenuBuildCoordinator(() => true, () => false)
+		this.RescanCalls := 0
+		this.ThrowRescan := false
+		this.ArmRetirement := false
+		this.ArmCalls := 0
+		this.NativeSpawn := _LSPB_CompletedChildFactory.Bind(this)
+		this.Native.DefineProp("Rescan", {Call: ObjBindMethod(this, "ObserveRescan")})
+		_LSPB_Stamp(this.World)
+	}
+
+	ObserveRescan(Native, Args*) {
+		this.RescanCalls += 1
+		if this.ThrowRescan
+			throw Error("Independent deferred rescan refusal.")
+		return LocalServersOwner.Prototype.Rescan.Call(Native, Args*)
+	}
+
+	RepairTimer(Callback, Period) {
+		if Period < 0
+			this.ArmCalls += 1
+		Accepted := super.RepairTimer(Callback, Period)
+		if Period < 0 && this.ArmRetirement {
+			this.ArmRetirement := false
+			this.Panel.Retire(false)
+		}
+		return Accepted
+	}
+
+	Dispose() {
+		global _DriverReady, _LLM_MenuBuildCoordinator
+		try {
+			this.ArmRetirement := false
+			if this.Native.HasOwnProp("Rescan")
+				this.Native.DeleteProp("Rescan")
+			super.Dispose()
+		} finally {
+			_DriverReady := this.HadReady ? this.OldReady : unset
+			_LLM_MenuBuildCoordinator := this.HadCoordinator ? this.OldCoordinator : unset
+		}
+	}
+}
+
+_LSPD_Nominal() {
+	Fixture := _LSPD_Fixture()
+	try {
+		RowsStarted := DllCall("Kernel32\GetTickCount64", "UInt64")
+		Rows := Fixture.Panel.Rows()
+		FileAppend("# DEFERRED_DISCOVERY_ROWS elapsed_ms=" .
+			(DllCall("Kernel32\GetTickCount64", "UInt64") - RowsStarted) . "`n", "*")
+		AssertTrue(Rows is Array && Rows.Length > 0)
+		AssertEqual(0, Fixture.RescanCalls, "row construction cannot enter managed discovery")
+		AssertEqual(0, Fixture.Requests.Length, "no child acquisition occurs on the menu build stack")
+		AssertEqual(0, Fixture.Publications.Length, "a queued timer is not a probe result")
+		AssertFalse(Fixture.Panel.LastSnapshot is Map)
+		Record := Fixture.Panel.Discovery
+		AssertTrue(Record is Map)
+		DiscoveryStarted := DllCall("Kernel32\GetTickCount64", "UInt64")
+		Fixture.Panel._RepairTick(Record)
+		FileAppend("# DEFERRED_DISCOVERY_WAIT elapsed_ms=" .
+			(DllCall("Kernel32\GetTickCount64", "UInt64") - DiscoveryStarted) . "`n", "*")
+		AssertEqual(0, Fixture.RescanCalls, "startup readiness must precede discovery")
+		global _DriverReady, _LLM_MenuBuildCoordinator
+		_DriverReady := true
+		_LLM_MenuBuildCoordinator.Active := true
+		Fixture.Panel._RepairTick(Record)
+		AssertEqual(0, Fixture.RescanCalls, "an active menu build must not be preempted by discovery")
+		_LLM_MenuBuildCoordinator.Active := false
+		Fixture.Panel._RepairTick(Record)
+		AssertEqual(1, Fixture.RescanCalls)
+		AssertEqual(Fixture.Order.Length, Fixture.Requests.Length)
+		AssertEqual(1, Fixture.Publications.Length, "the original controller must publish the controlled replies")
+		AssertEqual(0, Fixture.Panel.RepairRecords.Count)
+		AssertEqual(0, Fixture.RepairTimers.Count)
+		AssertTrue(Fixture.Panel.Rows() is Array)
+		AssertTrue(Fixture.Panel.LastSnapshot is Map)
+		AssertEqual(2, Fixture.Panel.LastSnapshot["results"]["lmstudio"]["models"].Length)
+	} finally Fixture.Dispose()
+}
+Test("local nonblocking discovery: rows return before ready and inactive original rescan", _LSPD_Nominal)
+
+_LSPD_Refusal(Kind) {
+	AssertTrue(HasMethod(LLM_LocalServerPanel.Prototype, "_QueueDiscovery"))
+	Fixture := _LSPD_Fixture()
+	WasSuspended := A_IsSuspended
+	try {
+		Fixture.Panel.Rows()
+		Record := Fixture.Panel.Discovery
+		AssertTrue(Record is Map)
+		global _DriverReady
+		_DriverReady := true
+		switch Kind {
+			case "source": AssertTrue(FSWriteDurable(Fixture.World.ApiPath, Fixture.World.ApiImage "`n"))
+			case "pause": Suspend(true)
+			case "transition": Fixture.Transition("resume")
+			case "cancel": AssertTrue(Fixture.Panel.Retire(false))
+			case "error": Fixture.ThrowRescan := true
+		}
+		Fixture.Panel._RepairTick(Record)
+		AssertEqual(Kind == "error" ? 1 : 0, Fixture.RescanCalls)
+		AssertEqual(0, Fixture.Requests.Length)
+		AssertEqual(0, Fixture.Publications.Length)
+		AssertEqual(0, Fixture.Panel.RepairRecords.Count)
+		AssertEqual(0, Fixture.RepairTimers.Count)
+	} finally {
+		Suspend(WasSuspended)
+		AssertTrue(FSWriteDurable(Fixture.World.ApiPath, Fixture.World.ApiImage))
+		Fixture.Dispose()
+	}
+}
+
+_LSPD_RegisterRefusals() {
+	local Kind
+	for Kind in ["source", "pause", "transition", "cancel", "error"]
+		Test("local nonblocking discovery: " Kind " refuses exact queued acquisition", _LSPD_Refusal.Bind(Kind))
+}
+_LSPD_RegisterRefusals()
+
+_LSPD_TimerReentry() {
+	AssertTrue(HasMethod(LLM_LocalServerPanel.Prototype, "_QueueDiscovery"))
+	Fixture := _LSPD_Fixture()
+	try {
+		Fixture.ArmRetirement := true
+		Fixture.Panel.Rows()
+		AssertFalse(Fixture.ArmRetirement, "the actual timer arm port must reenter retirement")
+		AssertEqual(0, Fixture.RescanCalls)
+		AssertEqual(0, Fixture.Requests.Length)
+		AssertEqual(0, Fixture.Panel.RepairRecords.Count)
+		AssertEqual(0, Fixture.RepairTimers.Count)
+		Fixture.Panel.Rows()
+		Record := Fixture.Panel.Discovery
+		AssertTrue(Record is Map)
+		Fixture.RefuseRepairStop := true
+		AssertThrows(() => Fixture.Panel.Retire(false))
+		AssertTrue(Fixture.Panel.RepairRecords.Get(ObjPtr(Record), 0) == Record,
+			"timer0 refusal must retain the exact callback debt")
+		Arms := Fixture.ArmCalls
+		AssertThrows(() => Fixture.Panel._RepairTick(Record))
+		AssertEqual(Arms, Fixture.ArmCalls, "retired ownership cannot arm an unowned retry")
+		AssertEqual(0, Fixture.RescanCalls)
+		Fixture.RefuseRepairStop := false
+		AssertTrue(Fixture.Panel.Retire(false))
+		AssertEqual(0, Fixture.Panel.RepairRecords.Count)
+		AssertEqual(0, Fixture.RepairTimers.Count)
+	} finally Fixture.Dispose()
+}
+Test("local nonblocking discovery: arm reentry and stop refusal retain exact timer debt", _LSPD_TimerReentry)
+
+_LSPD_ArmRefusal() {
+	AssertTrue(HasMethod(LLM_LocalServerPanel.Prototype, "_QueueDiscovery"))
+	Fixture := _LSPD_Fixture()
+	try {
+		Fixture.ArmFailure := "refuse"
+		Fixture.Panel.Rows()
+		AssertEqual(0, Fixture.RescanCalls)
+		AssertEqual(0, Fixture.Requests.Length)
+		AssertEqual(0, Fixture.Publications.Length)
+		AssertEqual(0, Fixture.RepairTimers.Count)
+		AssertTrue(Fixture.Panel.Discovery is Map)
+		AssertEqual(1, Fixture.Panel.RepairRecords.Count, "failed acquisition retains its exact cleanup owner")
+		Fixture.ArmFailure := ""
+		AssertTrue(Fixture.Panel.Retire(false))
+		AssertEqual(0, Fixture.Panel.RepairRecords.Count)
+	} finally Fixture.Dispose()
+}
+Test("local nonblocking discovery: timer arm refusal cannot publish queued success", _LSPD_ArmRefusal)

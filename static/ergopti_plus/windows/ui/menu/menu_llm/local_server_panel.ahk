@@ -151,6 +151,8 @@ class LLM_LocalServerPanel {
 			throw TypeError("Local server panel requires the native private source owner.")
 		this.ResumeIntent := 0
 		this.Repair := 0
+		this.Discovery := 0
+		this.DiscoveryGeneration := 0
 		this.RepairRecords := Map()
 		this.RepairGeneration := 0
 		this.Generation := 0
@@ -225,13 +227,10 @@ class LLM_LocalServerPanel {
 			if !(Projection is Map)
 				return this._UnavailableRows()
 			if Projection["stale"] {
-				this.Native.Rescan()
-				Source := this.Source.Capture()
-				if !IsObject(Source)
-					return this._UnavailableRows()
-				Projection := this.Native.CaptureView(Source)
-				if !(Projection is Map) || Projection["stale"]
-					return this._UnavailableRows()
+				; Discovery is optional work: a menu build must not enter managed
+				; HTTP acquisition or hold the driver's startup readiness stack.
+				this._QueueDiscovery(Source)
+				return this._UnavailableRows()
 			}
 			Entries := Projection["entries"]
 			Owner := Map("source", Source, "receipts", Projection["receipts"],
@@ -543,6 +542,104 @@ class LLM_LocalServerPanel {
 			&& Stamp["epoch"] == State["generation"] && State["attempt"] == 0 && !this.Native.Closed
 	}
 
+
+	/** Retains automatic discovery in the existing exact panel timer ledger. */
+	_QueueDiscovery(Source) {
+		if !this.Source.Current(Source)
+			return false
+		Prior := this.Discovery
+		if Prior is Map && !this._DiscoveryCurrent(Prior) {
+			this._DropRepair(Prior)
+			if !this.Source.Current(Source)
+				return false
+		}
+		PreviousCritical := Critical("On")
+		try {
+			if this.Discovery is Map && this._DiscoveryCurrent(this.Discovery) {
+				Record := this.Discovery
+			} else {
+			global _LifecycleLatestTransition, _LLM_Menu_ApiPrivateAuthorityGeneration
+			State := _LLM_Menu_ApiPrivateLifecycleState()
+			if A_IsSuspended || this.Writing || this.Native.Closed || State["attempt"] != 0
+				return false
+			Record := Map("kind", "discovery", "source", Source, "generation", this.Generation,
+				"epoch", State["generation"], "intent", ++this.DiscoveryGeneration,
+				"transition", _LifecycleLatestTransition, "authority", _LLM_Menu_ApiPrivateAuthorityGeneration,
+				"configuration", this.Native.ConfigurationGeneration, "rescan", this.Native.RescanGeneration,
+				"built", false, "busy", false, "resume", 0)
+			Record["timer"] := ObjBindMethod(this, "_RepairTick", Record)
+			this.Discovery := Record
+			this.RepairRecords[ObjPtr(Record)] := Record
+			}
+		} finally Critical(PreviousCritical)
+		return this._ArmRepair(Record)
+	}
+
+	_DiscoveryCurrent(Record) {
+		global _LifecycleLatestTransition, _LLM_Menu_ApiPrivateAuthorityGeneration
+		State := _LLM_Menu_ApiPrivateLifecycleState()
+		return this.Discovery is Map && this.Discovery == Record
+			&& this.RepairRecords.Get(ObjPtr(Record), 0) == Record
+			&& !A_IsSuspended && !this.Writing && !this.Native.Closed
+			&& Record["generation"] == this.Generation && Record["epoch"] == State["generation"]
+			&& Record["intent"] == this.DiscoveryGeneration && State["attempt"] == 0
+			&& Record["transition"] == _LifecycleLatestTransition
+			&& Record["authority"] == _LLM_Menu_ApiPrivateAuthorityGeneration
+			&& Record["configuration"] == this.Native.ConfigurationGeneration
+			&& Record["rescan"] == this.Native.RescanGeneration
+	}
+
+	_DiscoveryReady() {
+		global _DriverReady, _LLM_MenuBuildCoordinator
+		return IsSet(_DriverReady) && (_DriverReady is Integer) && _DriverReady == 1
+			&& IsSet(_LLM_MenuBuildCoordinator) && _LLM_MenuBuildCoordinator is LLMMenuBuildCoordinator
+			&& !_LLM_MenuBuildCoordinator.Active
+	}
+
+	_DiscoveryTick(Record) {
+		PreviousCritical := Critical("Off")
+		try {
+			ClaimCritical := Critical("On")
+			try {
+				if Record["busy"] || this.RepairRecords.Get(ObjPtr(Record), 0) != Record
+					return
+				Record["busy"] := true
+			} finally Critical(ClaimCritical)
+			try {
+				if !this._DiscoveryCurrent(Record) {
+					this._DropRepair(Record)
+					return
+				}
+				if !this._DiscoveryReady() {
+					this._ArmRepair(Record)
+					return
+				}
+				if !this.Source.Current(Record["source"]) {
+					this._DropRepair(Record)
+					return
+				}
+				if !this._DiscoveryCurrent(Record)
+					return this._DropRepair(Record)
+				if !this._DiscoveryReady()
+					return this._ArmRepair(Record)
+				this._RepairTimer(Record["timer"], 0)
+				if !this._DiscoveryCurrent(Record)
+					return this._DropRepair(Record)
+				if !this._DiscoveryReady()
+					return this._ArmRepair(Record)
+				Accepted := this.Native.Rescan()
+				this._DropRepair(Record)
+				if (Accepted is Integer) && Accepted == 1
+					this._Build("local_servers_deferred_discovery")
+				else this._Error("rescan", Error("Deferred local discovery was refused."))
+			} catch as Err {
+				; A refused timer0 keeps the exact record in the ledger as debt.
+				this._DropRepair(Record)
+				this._Error("rescan", Err)
+			} finally Record["busy"] := false
+		} finally Critical(PreviousCritical)
+	}
+
 	/** Retains exact transition intent without publishing before Finish. */
 	ResumeRequested() {
 		global _LifecycleLatestTransition
@@ -624,6 +721,8 @@ class LLM_LocalServerPanel {
 	}
 
 	_RepairCurrent(Record) {
+		if Record.Get("kind", "") == "discovery"
+			return this._DiscoveryCurrent(Record)
 		global _LifecycleLatestTransition
 		State := _LLM_Menu_ApiPrivateLifecycleState()
 		return this.Repair is Map && this.Repair == Record && !A_IsSuspended && !this.Native.Closed
@@ -633,6 +732,8 @@ class LLM_LocalServerPanel {
 	}
 
 	_RepairTick(Record) {
+		if Record.Get("kind", "") == "discovery"
+			return this._DiscoveryTick(Record)
 		PreviousCritical := Critical("Off")
 		try {
 			ClaimCritical := Critical("On")
@@ -704,6 +805,8 @@ class LLM_LocalServerPanel {
 				this.RepairRecords.Delete(ObjPtr(Record))
 			if this.Repair is Map && this.Repair == Record
 				this.Repair := 0
+			if this.Discovery is Map && this.Discovery == Record
+				this.Discovery := 0
 			if Record["built"] && this.ResumeIntent is Map && this.ResumeIntent == Record["resume"]
 				this.ResumeIntent := 0
 		} finally Critical(ClaimCritical)
@@ -736,6 +839,7 @@ class LLM_LocalServerPanel {
 				this.View := 0
 				this.ResumeIntent := 0
 				this.RepairGeneration += 1
+				this.DiscoveryGeneration += 1
 			} finally Critical(ClaimCritical)
 			try RepairSettled := this._DropRepairs()
 			finally {
