@@ -252,3 +252,260 @@ for (const [name, workflow] of placements) {
 console.log(
 	'PASS native XI2 bounded workflow scope: unrelated-edit1/placement-refusals3; native UNRUN'
 );
+
+// Additive LuaJIT enrollment leaves every original C3 assertion and mutation intact.
+const { spawnSync } = require('node:child_process');
+const { pythonExecutable } = require('../lib/python.cjs');
+const LUAJIT_BLOCK =
+	'      # Real LuaJIT cdata is qualified separately from the unchanged C3 baseline.\n      # The child-local libXi projection grants no installed runtime or input epoch.\n      - name: Qualify actual LuaJIT XI2 ABI and property cookies\n        id: native_xi2_luajit\n        if: ${{ !cancelled() }}\n        shell: bash\n        run: |\n          set -euo pipefail\n          python3 -B static/ergopti_plus/linux/tests/hardware/test_xi2_luajit_diagnostic_portable.py\n          sudo python3 "$GITHUB_WORKSPACE/tools/ci/ubuntu_apt.py" -y --no-install-recommends gcc luajit libx11-dev libxi-dev libx11-xcb1 libxkbcommon-dev libxkbcommon-x11-dev xkb-data xvfb\n          python3 static/ergopti_plus/linux/tests/hardware/run_xi2_luajit_diagnostic.py "$RUNNER_TEMP/linux-xi2-luajit" "$GITHUB_WORKSPACE" "$GITHUB_WORKSPACE/static/ergopti_plus/linux/adapters/xkb_source_probe.lua"\n        timeout-minutes: 7\n\n      - name: Retain actual LuaJIT XI2 diagnostic evidence\n        if: always()\n        uses: actions/upload-artifact@v4\n        with:\n          name: linux-xi2-luajit-${{ github.sha }}-${{ github.run_attempt }}\n          retention-days: 7\n          path: |\n            ${{ runner.temp }}/linux-xi2-luajit/receiving.json\n            ${{ runner.temp }}/linux-xi2-luajit/original-c3/receiving.json\n            ${{ runner.temp }}/linux-xi2-luajit/lua-native/display.json\n            ${{ runner.temp }}/linux-xi2-luajit/abi-compile.family.json\n            ${{ runner.temp }}/linux-xi2-luajit/lua-native.family.json\n            ${{ runner.temp }}/linux-xi2-luajit/lua-native/luajit.stdout\n            ${{ runner.temp }}/linux-xi2-luajit/lua-native/luajit.stderr\n          if-no-files-found: error\n\n';
+function verifyLuaJitEnrollment(value) {
+	assert.strictEqual(
+		value.workflow.split(LUAJIT_BLOCK).length,
+		2,
+		'exact fatal LuaJIT native and always evidence steps'
+	);
+	const jobs = pipeline.jobsOfText(value.workflow, '.github/workflows/ci-linux.yml');
+	const owner = jobs.find((job) => job.id === 'test-linux');
+	assert(
+		owner && owner.body.endsWith(LUAJIT_BLOCK.trimEnd()),
+		'real independent unit-job native owner'
+	);
+	const steps = pipeline.steps(owner.body);
+	const index = (name) => {
+		assert.strictEqual(steps.filter((step) => step.name === name).length, 1, 'unique ' + name);
+		return steps.findIndex((step) => step.name === name);
+	};
+	const oldEvidence = index('Retain the source-bound linux-unit-suite qualification');
+	const native = index('Qualify actual LuaJIT XI2 ABI and property cookies');
+	const evidence = index('Retain actual LuaJIT XI2 diagnostic evidence');
+	assert(
+		oldEvidence < native && native < evidence && evidence === steps.length - 1,
+		'additive unit-retention/LuaJIT/retention END order'
+	);
+	assert.strictEqual(native, oldEvidence + 1, 'native observation follows all original unit steps');
+	assert.strictEqual(evidence, native + 1, 'native failure evidence is immediately retained');
+	assert.strictEqual(pipeline.field(owner.body, 'if'), null, 'unit owner admission is unchanged');
+	assert.strictEqual(
+		pipeline.field(owner.body, 'continue-on-error'),
+		null,
+		'unit failures remain fatal'
+	);
+	for (const at of [native, evidence])
+		assert.strictEqual(pipeline.stepField(steps[at].body, 'continue-on-error'), null);
+	assert.strictEqual(pipeline.stepField(steps[native].body, 'if'), '${{ !cancelled() }}');
+	assert.strictEqual(pipeline.stepField(steps[evidence].body, 'if'), 'always()');
+	for (const literal of [
+		'assert original.main() == 0, "original three C cases remain mandatory"',
+		'["git", "show", source_sha + ":" + relative]',
+		'candidate.is_file() and original.digest(candidate) == CANDIDATE_SHA',
+		'original.family_run(\n        directory,\n        "abi-compile",',
+		'original.family_run(\n        directory,\n        "lua-native",',
+		'static/ergopti_plus/_shared/lua/logger/init.lua',
+		'result["display_pidfd_closed"] is True and result["rescue"] == 0'
+	])
+		assert(value.luaRunner.includes(literal), 'real diagnostic custody: ' + literal);
+	assert(value.receiver.includes('local ffi = require("ffi")'), 'real FFI module');
+	assert(value.receiver.includes('runtime.xi = xi_path'), 'explicit controlled child projection');
+	assert(value.receiver.includes('comparisons == 29 and cases == 3'), 'nonzero ABI/cookie census');
+	assert(
+		value.receiver.includes('final_view.reason == "native-property-connection-retired"'),
+		'candidate retirement readback'
+	);
+	assert(
+		value.receiver.includes('cleanup_ok = W.ep_xvfb_peers(server_pid, uid) == 0 and cleanup_ok'),
+		'native peer FD retirement'
+	);
+	assert(
+		value.witness.includes('#include <X11/extensions/XInput2.h>'),
+		'independent official header'
+	);
+	assert(value.witness.includes('TYPE(0, XGenericEventCookie)'), 'independent type layout witness');
+}
+const luaJitSubject = {
+	workflow: subject.workflow,
+	luaRunner: fs.readFileSync(path.join(ROOT, HARDWARE + 'run_xi2_luajit_diagnostic.py'), 'utf8'),
+	receiver: fs.readFileSync(path.join(ROOT, HARDWARE + 'xi2_luajit_receiver.lua'), 'utf8'),
+	witness: fs.readFileSync(path.join(ROOT, HARDWARE + 'xi2_luajit_abi.c'), 'utf8')
+};
+verifyLuaJitEnrollment(luaJitSubject);
+const luaJitMutations = [
+	[
+		'native omission',
+		'workflow',
+		'      - name: Qualify actual LuaJIT XI2 ABI and property cookies',
+		'      - name: omitted'
+	],
+	[
+		'failure evidence omission',
+		'workflow',
+		'      - name: Retain actual LuaJIT XI2 diagnostic evidence',
+		'      - name: omitted'
+	],
+	[
+		'cancel fence weakened',
+		'workflow',
+		'        id: native_xi2_luajit\n        if: ${{ !cancelled() }}',
+		'        id: native_xi2_luajit\n        if: success()'
+	],
+	[
+		'masked native status',
+		'workflow',
+		'python3 static/ergopti_plus/linux/tests/hardware/run_xi2_luajit_diagnostic.py ',
+		'true # '
+	],
+	[
+		'unowned APT fallback',
+		'workflow',
+		'sudo python3 "$GITHUB_WORKSPACE/tools/ci/ubuntu_apt.py" -y --no-install-recommends gcc luajit',
+		'sudo apt-get install -y gcc luajit'
+	],
+	[
+		'portable controls omitted',
+		'workflow',
+		'python3 -B static/ergopti_plus/linux/tests/hardware/test_xi2_luajit_diagnostic_portable.py',
+		'true'
+	],
+	[
+		'whole-directory upload',
+		'workflow',
+		'${{ runner.temp }}/linux-xi2-luajit/receiving.json',
+		'${{ runner.temp }}/linux-xi2-luajit/'
+	],
+	[
+		'failure receipt omitted',
+		'workflow',
+		'            ${{ runner.temp }}/linux-xi2-luajit/lua-native/display.json\n',
+		''
+	],
+	[
+		'missing evidence allowed',
+		'workflow',
+		'            ${{ runner.temp }}/linux-xi2-luajit/lua-native/luajit.stderr\n          if-no-files-found: error',
+		'            ${{ runner.temp }}/linux-xi2-luajit/lua-native/luajit.stderr\n          if-no-files-found: ignore'
+	],
+	[
+		'original C3 bypass',
+		'luaRunner',
+		'assert original.main() == 0, "original three C cases remain mandatory"',
+		'assert True'
+	],
+	[
+		'Git source custody bypass',
+		'luaRunner',
+		'["git", "show", source_sha + ":" + relative]',
+		'["git", "rev-parse", "HEAD"]'
+	],
+	[
+		'ABI compiler family custody bypass',
+		'luaRunner',
+		'original.family_run(\n        directory,\n        "abi-compile",',
+		'unowned_run(\n        directory,\n        "abi-compile",'
+	],
+	[
+		'LuaJIT family custody bypass',
+		'luaRunner',
+		'original.family_run(\n        directory,\n        "lua-native",',
+		'unowned_run(\n        directory,\n        "lua-native",'
+	],
+	['modeled FFI substituted', 'receiver', 'local ffi = require("ffi")', 'local ffi = {}'],
+	[
+		'zero cookie census',
+		'receiver',
+		'comparisons == 29 and cases == 3',
+		'comparisons == 29 and cases == 0'
+	],
+	[
+		'pending candidate cleanup promoted',
+		'receiver',
+		'final_view.reason == "native-property-connection-retired"',
+		'true'
+	],
+	[
+		'peer FD readback omitted',
+		'receiver',
+		'cleanup_ok = W.ep_xvfb_peers(server_pid, uid) == 0 and cleanup_ok',
+		'cleanup_ok = true'
+	],
+	[
+		'header oracle substituted',
+		'witness',
+		'#include <X11/extensions/XInput2.h>',
+		'#include "candidate.h"'
+	]
+];
+for (const dependency of ['libx11-xcb1', 'libxkbcommon-dev', 'libxkbcommon-x11-dev', 'xkb-data']) {
+	luaJitMutations.push([
+		'missing native dependency ' + dependency,
+		'workflow',
+		' ' + dependency + ' ',
+		' '
+	]);
+}
+for (const [name, role, before, after] of luaJitMutations) {
+	assert(luaJitSubject[role].includes(before), 'nonvacuous actual mutation ' + name);
+	if (role === 'workflow')
+		assert(LUAJIT_BLOCK.includes(before), 'mutation stays in its owned region');
+	const changed =
+		role === 'workflow'
+			? luaJitSubject.workflow.replace(LUAJIT_BLOCK, LUAJIT_BLOCK.replace(before, after))
+			: luaJitSubject[role].replace(before, after);
+	const altered = { ...luaJitSubject, [role]: changed };
+	assert.throws(() => verifyLuaJitEnrollment(altered), undefined, name);
+}
+const unitTail = '      - name: Retain the source-bound linux-unit-suite qualification';
+const harmlessUnitStep = '      - name: LuaJIT guard harmless adjacent step\n        run: true\n\n';
+assert.strictEqual(luaJitSubject.workflow.split(unitTail).length, 2, 'unique original unit tail');
+verifyLuaJitEnrollment({
+	...luaJitSubject,
+	workflow: luaJitSubject.workflow.replace(unitTail, harmlessUnitStep + unitTail)
+});
+const omittedLuaJitBlock = luaJitSubject.workflow.replace(LUAJIT_BLOCK, '');
+assert.notStrictEqual(
+	omittedLuaJitBlock,
+	luaJitSubject.workflow,
+	'nonvacuous native block removal'
+);
+for (const [name, workflow] of [
+	['native block omitted', omittedLuaJitBlock],
+	[
+		'behind skipped E2E prerequisite',
+		omittedLuaJitBlock.replace(
+			'      # A real X server and WM qualify logical RandR placement and input focus.',
+			LUAJIT_BLOCK +
+				'      # A real X server and WM qualify logical RandR placement and input focus.'
+		)
+	],
+	[
+		'before original unit qualification',
+		omittedLuaJitBlock.replace(unitTail, LUAJIT_BLOCK + unitTail)
+	],
+	[
+		'foreign step after terminal evidence',
+		luaJitSubject.workflow.replace(LUAJIT_BLOCK, LUAJIT_BLOCK + harmlessUnitStep)
+	]
+]) {
+	assert.notStrictEqual(workflow, luaJitSubject.workflow, 'nonvacuous placement mutation ' + name);
+	assert.throws(() => verifyLuaJitEnrollment({ ...luaJitSubject, workflow }), undefined, name);
+}
+const portable = spawnSync(
+	pythonExecutable(),
+	['-B', path.join(ROOT, HARDWARE + 'test_xi2_luajit_diagnostic_portable.py')],
+	{
+		cwd: ROOT,
+		encoding: 'utf8',
+		timeout: 30000,
+		maxBuffer: 65536,
+		shell: false
+	}
+);
+assert.ifError(portable.error);
+assert.strictEqual(portable.signal, null, 'portable controls completed');
+assert.strictEqual(portable.status, 0, 'actual portable controls: ' + portable.stderr);
+assert.match(
+	portable.stderr,
+	/Ran 15 tests[\s\S]*\nOK(?:\r?\n|$)/,
+	'all 15 actual portable cases executed'
+);
+console.log(
+	'PASS additive LuaJIT XI2 enrollment: portable15/source refusals22/placement refusals4; ABI29/cookies3 native UNRUN'
+);

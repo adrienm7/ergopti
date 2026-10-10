@@ -421,4 +421,100 @@ return function(helpers, Editor, Window, Model)
 			eq(s.owner.save(s.packet.token).committed, true); eq(s.writes, 1)
 		end)
 	end)
+	helpers.describe("Shared physical editor publication refresh", function()
+		local function fixture()
+			local state = { receipt = {}, assignments = {}, writes = 0, messages = {}, refresh_labels = 0 }
+			local options = { model = Model, parameter_section = "gesture_parameters", positions = {},
+				catalogue = { is_assignable = function(action) return action == "copy" or action == "none" end,
+					get_action_parameter_spec = function() end, validate_action_parameter = function() return false end,
+					split_action_parameter_key = function(key) return key:match("^(keyboard__.+)__(.+)$") end },
+				capture = function()
+					local assignments = {}; for slot, action in pairs(state.assignments) do assignments[slot] = action end
+					return { assignments = assignments, parameters = { future = "preserved" } }, state.receipt
+				end,
+				current = function(receipt) return rawequal(receipt, state.receipt) end,
+				commit = function(rows, receipt)
+					eq(receipt, state.receipt, "publication carries the original current receipt")
+					for _, row in ipairs(rows) do
+						eq(row.section, "shortcuts.keyboard", "ordinary copy needs no parameter writes")
+						state.assignments[row.key] = row.delete and nil or row.value
+					end
+					state.writes = state.writes + 1; state.receipt = {}; return true
+				end,
+				picker = function(_, _, callback) state.callback = callback; return true end,
+				label = function(action)
+					if state.writes > 0 then
+						state.refresh_labels = state.refresh_labels + 1
+						if state.on_refresh_label then state.on_refresh_label() end
+					end
+					return "label:" .. action
+				end,
+				emit = function(packet) state.selected = packet; return true end,
+				page_current = function() return true end, translate = function(key) return key end,
+				send = function(name, packet)
+					state.messages[#state.messages + 1] = { name = name, packet = packet }
+					if name == "selected" then state.selected = packet end
+					return true
+				end,
+				close = function() return true end }
+			state.options, state.owner = options, Editor.new(options)
+			return state
+		end
+		local function choose(state, window)
+			if window then
+				eq(window.receive({ action = "ready" }), true)
+				eq(window.receive({ action = "choose", request = { code = "KeyJ", mods = {}, request_id = 1 } }), true)
+			else
+				eq(type(state.owner.open()), "table")
+				eq(state.owner.choose({ code = "KeyJ", mods = {}, request_id = 1 }), true)
+			end
+			eq(state.callback("copy"), true); eq(state.writes, 0); eq(state.refresh_labels, 0)
+		end
+		helpers.it("publication refresh rejects source revoked by its label callback", function()
+			local s = fixture(); choose(s)
+			s.on_refresh_label = function() s.receipt = {} end
+			local result = s.owner.save(s.selected.token)
+			eq(s.writes, 1); eq(s.refresh_labels, 1); eq(result.committed, true, "durable publication remains truthful")
+			eq(s.assignments.physical_none_KeyJ, "copy", "committed assignment is not rolled back")
+			s = fixture(); local window = Window.new(s.options); choose(s, window)
+			s.on_refresh_label = function() s.receipt = {} end
+			eq(window.receive({ action = "save", token = s.selected.token }), true)
+			local delivered = s.messages[#s.messages]
+			eq(delivered.name, "result"); eq(delivered.packet.committed, true)
+			eq({ editor = result.refreshed, window = delivered.packet.refreshed },
+				{ editor = false, window = false }, "both actual owners refuse stale refreshed entries")
+			eq(result.refreshed, false, "post-label source revocation refuses the refreshed inventory")
+			eq(result.entries, nil, "stale entries are never returned as refreshed")
+			eq(delivered.packet.refreshed, false); eq(delivered.packet.entries, nil)
+			eq(s.writes, 1); eq(s.refresh_labels, 1); eq(window.close(), true)
+		end)
+		helpers.it("publication refresh retains a genuine current labelled inventory", function()
+			for _, through_window in ipairs({ false, true }) do
+				local s = fixture(); local window = through_window and Window.new(s.options) or nil
+				choose(s, window)
+				local result
+				if window then
+					eq(window.receive({ action = "save", token = s.selected.token }), true)
+					result = s.messages[#s.messages].packet
+				else result = s.owner.save(s.selected.token) end
+				eq(result.committed, true); eq(result.refreshed, true); eq(#result.entries, 1)
+				eq(result.entries[1].slot, "physical_none_KeyJ"); eq(result.entries[1].action, "copy")
+				eq(result.entries[1].label, "label:copy"); eq(s.writes, 1); eq(s.refresh_labels, 1)
+				if window then eq(window.close(), true) else eq(s.owner.close(), true) end
+			end
+		end)
+		helpers.it("publication refresh rejects a session closed by its label callback", function()
+			local s = fixture(); choose(s); local closed
+			s.on_refresh_label = function() closed = s.owner.close() end
+			local result = s.owner.save(s.selected.token)
+			eq(closed, true); eq(s.writes, 1); eq(s.refresh_labels, 1); eq(result.committed, true)
+			eq(result.refreshed, false, "retired editor cannot attest a refreshed display")
+			eq(result.entries, nil); eq(s.owner.choose({ code = "KeyK", mods = {}, request_id = 2 }), false)
+			s = fixture(); local window = Window.new(s.options); choose(s, window)
+			local messages = #s.messages
+			s.on_refresh_label = function() window.retire() end
+			eq(window.receive({ action = "save", token = s.selected.token }), false)
+			eq(s.writes, 1); eq(s.refresh_labels, 1); eq(#s.messages, messages, "retired native page receives no result")
+		end)
+	end)
 end

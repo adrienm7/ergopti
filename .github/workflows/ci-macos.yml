@@ -727,6 +727,73 @@ jobs:
           path: ${{ runner.temp }}/stable-macos-*.json
           if-no-files-found: warn
 
+      # Read-only metadata grants no catalogue or invocation authority.
+      # Keep this observer after every original managed-native step.
+      - name: Observe installed Shortcuts Events metadata without launch
+        if: ${{ github.event_name == 'workflow_dispatch' && !inputs.release && !cancelled() }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          diagnostic="tools/diagnostics/apple_shortcuts_installed_target"
+          evidence="$RUNNER_TEMP/group3-shortcuts-installed-target-${{ matrix.architecture }}"
+          mkdir -m 700 "$evidence"
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          for name in resolve_installed_target.swift installed_target_reader.py collect_installed_target.py test_installed_target_reader.py test_collector_source_binding.py run_controls.py portable_cases.json; do
+            git show "$GITHUB_SHA:$diagnostic/$name" | cmp - "$diagnostic/$name"
+          done
+          python3 - <<'PYTHON'
+          import os
+          import platform
+          import sys
+          expected = os.environ["ERGOPTI_OLLAMA_EXPECTED_ARCHITECTURE"]
+          machine = platform.machine()
+          if sys.platform != "darwin" or sys.version_info < (3, 13):
+              raise RuntimeError("Native metadata requires Darwin Python3.13")
+          if (expected, machine) not in (("arm64", "arm64"), ("amd64", "x86_64")):
+              raise RuntimeError("Native metadata host architecture refused")
+          names = ("waitid", "P_PID", "WEXITED", "WNOHANG", "WNOWAIT", "CLD_EXITED", "CLD_KILLED", "CLD_DUMPED")
+          if any(not hasattr(os, name) for name in names):
+              raise RuntimeError("Native nonreaping API unavailable")
+          PYTHON
+          node tools/test/test-apple-shortcuts-installed-target.cjs
+          sdk="$(xcrun --sdk macosx --show-sdk-path)"
+          compiler="$(xcrun --find swiftc)"
+          xcodebuild -version > "$evidence/xcode-version.txt"
+          "$compiler" --version > "$evidence/swift-version.txt"
+          printf '%s\n' "$sdk" > "$evidence/sdk-path.txt"
+          printf '%s\n' "$GITHUB_SHA" > "$evidence/tested-sha.txt"
+          shasum -a 256 "$diagnostic/resolve_installed_target.swift" "$compiler" > "$evidence/build-inputs.sha256"
+          set +e
+          "$compiler" -O -sdk "$sdk" -framework Foundation -framework CoreServices \
+            "$diagnostic/resolve_installed_target.swift" -o "$evidence/resolver" 2>&1 | tee "$evidence/compiler.log"
+          compiler_statuses=("${PIPESTATUS[@]}")
+          set -e
+          printf '%s\n' "${compiler_statuses[@]}" > "$evidence/compiler-exits.txt"
+          test "${#compiler_statuses[@]}" -eq 2
+          test "${compiler_statuses[0]}" -eq 0
+          test "${compiler_statuses[1]}" -eq 0
+          resolver_sha="$(shasum -a 256 "$evidence/resolver" | cut -d ' ' -f 1)"
+          printf '%s\n' "$resolver_sha" > "$evidence/resolver.sha256"
+          set +e
+          python3 -B "$diagnostic/collect_installed_target.py" \
+            --source-root "$GITHUB_WORKSPACE" --resolver "$evidence/resolver" \
+            --resolver-sha256 "$resolver_sha" --output "$evidence/observation" 2>&1 | tee "$evidence/collector.log"
+          collector_statuses=("${PIPESTATUS[@]}")
+          set -e
+          printf '%s\n' "${collector_statuses[@]}" > "$evidence/collector-exits.txt"
+          test "${#collector_statuses[@]}" -eq 2
+          test "${collector_statuses[0]}" -eq 0
+          test "${collector_statuses[1]}" -eq 0
+        timeout-minutes: 2
+      - name: Retain installed Shortcuts Events metadata diagnostic
+        if: ${{ always() && github.event_name == 'workflow_dispatch' && !inputs.release }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: shortcuts-installed-target-${{ matrix.architecture }}-${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/group3-shortcuts-installed-target-${{ matrix.architecture }}
+          if-no-files-found: error
+          retention-days: 7
+
   # ─────────────────────────────────────────────────
   # 1) Hammerspoon unit and contract tests
   # ─────────────────────────────────────────────────

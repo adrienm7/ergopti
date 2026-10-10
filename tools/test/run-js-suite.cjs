@@ -2152,6 +2152,12 @@ const CHECKS = [
 		repro: 'npm run test:apple-shortcuts-cold-cli'
 	},
 	{
+		name: 'installed Shortcuts target keeps 34 filesystem controls separate from native admission',
+		cmd: process.execPath,
+		args: ['tools/test/test-apple-shortcuts-installed-target.cjs'],
+		repro: 'npm run test:apple-shortcuts-installed-target'
+	},
+	{
 		name: 'file-path headers (convention 3, every source file names itself)',
 		cmd: 'node',
 		args: ['tools/lint/audit-file-headers.cjs'],
