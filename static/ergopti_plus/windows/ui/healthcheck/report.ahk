@@ -6,7 +6,7 @@
 ; What the diagnostics page's buttons do on this machine once
 ; HealthCheck_ValidateAction accepted them: copy the report, save it as a
 ; Markdown file under the logs folder and select it in Explorer, report it on
-; GitHub (copy it, then open the bug form with the report prefilled) and open
+; GitHub (copy, save and reveal its attachment, then open the bug template) and open
 ; a folder. Also the Debug menu's "Report a bug", which opens the diagnostics
 ; window at its preview, and "Suggest a feature".
 ;
@@ -14,9 +14,9 @@
 ; 1. Shared output is rebuilt from the host snapshot through a closed typed
 ;    policy. Free text, paths and unknown fields are excluded regardless of
 ;    the page or details checkbox. Only approved technical content leaves.
-; 2. GitHub answers 414 a little above 8 KB, so the issue link cuts a long
-;    report to its budget; the clipboard holds it whole. A report saves no
-;    file and selects nothing: Explorer would take the focus from the form.
+; 2. The clipboard and attachment hold the complete approved report.
+;    GitHub receives only the template selection, without query defaults
+;    that could reset edits. The browser opens after attachment reveal.
 ; 3. Paths come from the snapshot the host collected, by field id; a folder
 ;    that does not exist yet is created before it is opened; a file that does
 ;    not exist yet (today's errors file before the day's first warning) is
@@ -376,9 +376,10 @@ _HCReport_Report(Effects, Config, Action, Rules, Context, Paths) {
 	; The complete reviewed document stays in a local attachment, never the URL.
 	Path := _HCReport_SaveAndReveal(Effects, Paths, Action["name"], Text)
 	Fields := Map()
-	for Id, Value in Action["fields"]
-		Fields[Id] := Value
-	Fields[Config["templates"]["templates"]["bug"]["report_field"]] := Action["summary"]
+	; Query defaults can reset edits in GitHub; only select the template.
+	ReportField := Config["templates"]["templates"]["bug"]["report_field"]
+	if !(ReportField is String) || ReportField == ""
+		throw Error("The bug template names no report field.")
 	Url := IssueLink_BuildUrl(Config["templates"], Config["repository"], "bug", Fields)
 	if !Effects["open_url"].Call(Url)
 		throw Error("The browser could not be opened.")

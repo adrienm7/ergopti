@@ -15,7 +15,7 @@
 ---    policy. Free text, paths and unknown fields are excluded regardless of
 ---    the page or details checkbox. Only approved technical content leaves.
 --- 2. The clipboard and local attachment hold the complete approved report.
----    GitHub receives a short editable English summary; the browser opens
+---    GitHub receives only the template selection; the browser opens
 ---    after attachment completion and reveal, without an automatic upload.
 --- 3. Paths come from the snapshot the host collected, by field id; a folder
 ---    that does not exist yet is created before it is opened; a file that does
@@ -162,10 +162,9 @@ local function report(effects, documents, action, redact, paths)
 	local path, err = save_and_reveal(effects, paths, action.name, text)
 	if not path then error(err) end
 	local fields = {}
-	for id, value in pairs(action.fields) do fields[id] = redact(value) end
+	-- Query defaults can reset edits in GitHub; only select the template.
 	local report_field = documents.templates.templates.bug.report_field
 	if type(report_field) ~= "string" then error("the bug template names no report field") end
-	fields[report_field] = action.summary
 	local url = IssueLink.build_url(documents.templates, documents.repository, "bug", fields)
 	if not effects.open_url(url) then error("the browser could not be opened") end
 	return { path = path }

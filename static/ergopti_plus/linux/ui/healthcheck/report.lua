@@ -6,7 +6,7 @@
 --- What the diagnostics page's buttons do on this machine once
 --- healthcheck.actions accepted them: copy the report, save it as a Markdown
 --- file under the logs folder and open that folder, report it on GitHub (copy
---- it, then open the bug form with the report prefilled) and open a folder or
+--- it, then save and reveal its attachment before opening the bug template) or
 --- a file. Also the Debug menu's "Report a bug", which opens the diagnostics
 --- window at its preview, and "Suggest a feature".
 ---
@@ -14,10 +14,9 @@
 --- 1. Shared output is rebuilt from the host snapshot through a closed typed
 ---    policy. Free text, paths and unknown fields are excluded regardless of
 ---    the page or details checkbox. Only approved technical content leaves.
---- 2. GitHub answers 414 a little above 8 KB, so the issue link cuts a long
----    report to its budget; the clipboard holds it whole. A report saves no
----    file and opens no folder: the file manager would take the focus from
----    the form.
+--- 2. The clipboard and attachment hold the complete approved report.
+---    GitHub receives only the template selection, without query defaults
+---    that could reset edits. The browser opens after attachment reveal.
 --- 3. Paths come from the snapshot the host collected, by field id; a folder
 ---    that does not exist yet is created before it is opened; a file that does
 ---    not exist yet (today's errors file before the day's first warning) is
@@ -164,10 +163,9 @@ local function report(effects, documents, action, redact, paths)
 	local path, err = save_and_reveal(effects, paths, action.name, text)
 	if not path then error(err) end
 	local fields = {}
-	for id, value in pairs(action.fields) do fields[id] = redact(value) end
+	-- Query defaults can reset edits in GitHub; only select the template.
 	local report_field = documents.templates.templates.bug.report_field
 	if type(report_field) ~= "string" then error("the bug template names no report field") end
-	fields[report_field] = action.summary
 	local url = IssueLink.build_url(documents.templates, documents.repository, "bug", fields)
 	if not effects.open_url(url) then error("the browser could not be opened") end
 	return { path = path }
