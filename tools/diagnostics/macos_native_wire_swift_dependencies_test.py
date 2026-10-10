@@ -79,6 +79,26 @@ class StandaloneSwiftDependencies(unittest.TestCase):
                     hashlib.sha256(copied.read_bytes()).digest(),
                     hashlib.sha256(original.read_bytes()).digest(),
                 )
+            self.assertIn("-I", arguments)
+            module = Path(arguments[arguments.index("-I") + 1])
+            self.assertEqual(module, private / "CPOSIXCompatibility")
+            self.assertEqual(module.stat().st_mode & 0o777, 0o700)
+            headers = (
+                "CPOSIXCompatibility.h",
+                "OwnedProgramCompatibility.h",
+                "LoopbackListenerCompatibility.h",
+                "OwnedImageAliasCompatibility.h",
+                "OwnedSuspendedImageCompatibility.h",
+                "OwnedListenerEventCompatibility.h",
+            )
+            self.assertEqual({path.name for path in module.glob("*.h")}, set(headers))
+            for name in headers:
+                original = self.module.MAC / "launcher/Sources/CPOSIXCompatibility/include" / name
+                self.assertEqual((module / name).read_bytes(), original.read_bytes())
+            self.assertIn(
+                '#include "OwnedListenerEventCompatibility.h"',
+                (module / "CPOSIXCompatibility.h").read_text(),
+            )
             raise CompilerBoundary()
 
         self.inspect = inspect

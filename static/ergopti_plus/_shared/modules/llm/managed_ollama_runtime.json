@@ -20,14 +20,16 @@
 		"go.sum": "27f221ed12b312246074ac797952d26151b1b10f0e2731e3a42445665b950568",
 		"auth/auth.go": "ac4c269cb812edc01e2386fce0a7753871851edf76ec46ad26329016dc6f7841",
 		"server/routes.go": "2621eef9e33b370d97a460eef80466654e4319ffea5ec0b94b3dbd79d5effd5e",
-		"server/download.go": "14ffbdd4c503e7c0fb314e221d6f430a90ad745e910fa601e6b543e4c6a00699"
+		"server/download.go": "14ffbdd4c503e7c0fb314e221d6f430a90ad745e910fa601e6b543e4c6a00699",
+		"cmd/cmd.go": "e6ac73dca45ec039b45c640f2b29dca5a31561e6df514c10e37fe0281bedf627"
 	},
 	"request_hook_paths": [
 		"server/images.go",
 		"server/internal/client/ollama/registry.go",
 		"x/transfer/download.go",
 		"server/routes.go",
-		"server/download.go"
+		"server/download.go",
+		"cmd/cmd.go"
 	],
 	"source_fingerprint_paths": [
 		"tools/build/build-macos-managed-ollama.py",
@@ -44,7 +46,12 @@
 		"static/ergopti_plus/_shared/go/native_http/network_bootstrap_darwin_test.go",
 		"static/ergopti_plus/_shared/modules/llm/managed_ollama_bootstrap.json",
 		"static/ergopti_plus/_shared/modules/network/proxy_policy.json",
-		"tools/diagnostics/macos_owned_process.py"
+		"tools/diagnostics/macos_owned_process.py",
+		"static/ergopti_plus/_shared/go/native_http/listener_event_posix.go",
+		"static/ergopti_plus/_shared/go/native_http/listener_event_darwin.go",
+		"static/ergopti_plus/_shared/go/native_http/listener_event_linux.go",
+		"static/ergopti_plus/_shared/go/native_http/listener_event_unsupported.go",
+		"static/ergopti_plus/_shared/go/native_http/listener_event_test.go"
 	],
 	"assets": {
 		"macos-arm64": {
@@ -111,7 +118,13 @@
 			"TestBootstrapDarwinAdmittedSnapshotSurvivesRemovedPublicPath",
 			"TestBootstrapDarwinAdmittedSnapshotSurvivesChangedPublicPath",
 			"TestBootstrapDarwinOriginalAbsenceCannotStartLaterLookup",
-			"TestBootstrapDarwinOriginalRefusalSurvivesRemovedPublicPath"
+			"TestBootstrapDarwinOriginalRefusalSurvivesRemovedPublicPath",
+			"TestListenerEventRealUnixFrameHalfCloseAndGuardianEOF",
+			"TestListenerEventForeignPortCannotAcquireUnixConnection",
+			"TestListenerEventMissingSessionCannotAcquireUnixConnection",
+			"TestListenerEventForeignGuardianCannotReceiveAnyFrame",
+			"TestListenerEventUnexpectedGuardianByteCannotPermitServe",
+			"TestListenerEventRepeatedPublicationCannotCreateSuccessor"
 		]
 	}
 }

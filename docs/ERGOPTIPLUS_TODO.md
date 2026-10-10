@@ -2901,6 +2901,14 @@ Windows scopes classify a freshly captured strict source through the existing ca
 
 The four Windows scope fixtures now author current-schema source before genuine boot or stamp their subsequent owned source once. They preserve semantic metadata, strict write permission, pending/refusal and exact rollback assertions; one existing durable-write assertion now uses the same intended payload from its genuine current fixture. These source corrections address fixture prerequisites implicated in the eleven failures of manual run 38019750684: 10,908 planned, 1,905 executed, 1,894 passed, 11 failed and 9,003 unexecuted before the unchanged 22-minute watchdog. All four repairs remain native UNRUN. The next exact-source Windows CI must qualify the existing scope cases and complete the original suite; item 5 remains partial.
 
+The corrected positive Windows WAL, gesture-marker and Tap-Hold fixtures now
+boot their intended current-schema source before exercising real publication.
+Original semantic, exact rollback, external-edit and backup assertions remain.
+The preceding native suite terminated at its unchanged 1,320,000 ms watchdog
+with 3,753 passes and 29 failures out of 3,782 completed tests; later subjects
+were unexecuted. Corrected native execution and complete-suite qualification
+remain required, separately from the local gates.
+
 - [~] **7.** Complete W2: seven-page first-run opt-in wizard, per-category
   recommended choices, consistent WebView behavior and genuine translations in
   21 locales. Current source implements the seven-page declaration, native
@@ -4034,6 +4042,20 @@ the complete three-OS checkpoint remain pending.
 - [ ] **36.** Packaging remainder (the former item 21): macOS release archive as
       `.tar.xz` (verify Sparkle, the Homebrew cask and CI install first).
 
+2026-10-10 exact integrated9e370 native archive receiving. Whole manual
+38075470794 finishes failed. The archive invocation executes25 cases:24 pass,
+one Homebrew case fails with two failure records, one unexpected; no cases skip.
+All15 Sparkle cases, eight archive cases and the consent parser pass, including
+actual wrong-key preservation, retry and relaunch. A separate SDK case passes.
+Homebrew stops at its original owned Automation window deadline, before any
+positive/denied nonce control or install/upgrade/refusal scenario. All73 typed UI
+observations lack a qualified matching window; signed trusted requester and AX
+admission alone do not grant consent. Exact helper and parent owners close.
+Those Brew scenarios remain unrun; packaging/install remain skipped. No source
+repair or general hosted-platform incapability is proved. Qualify the exact
+normal consent pair in the unchanged budget on a logged-in Mac if this session
+cannot supply it, then run the full strict Homebrew route. Item36 stays open.
+
 2026-10-10 first Homebrew timeout diagnostic continuation. The helper retains
 the first typed command timeout in subsequent checkpoints, including after the
 256-record history cap and final cleanup. Fixed command/stage enums distinguish
@@ -5111,6 +5133,14 @@ the independent joined-discovery assertion is unchanged. Native qualification
 of this isolation correction is still pending.
 
 Manual Windows run 38019750684 passed the four ordinary full-save families and the genuine 34-store publication/rollback case, but ended incomplete with 1,894 passes, 11 failures and 9,003 unexecuted subjects at the unchanged 22-minute watchdog. The capacity case measured 142,033.737 ms for publication and 123,130.867 ms for refusal; these phases locate cost without proving an optimization. The newly registered genuine captured-registry diagnostic requires 32 accepted calls, actual native timing, zero Count-getter observer effects, exact repair and unchanged target bytes in the next Windows CI. It remains native UNRUN and requires no physical device. The original 34-store assertions and all nine acquired-read temporal controls still require complete execution; full unit, E2E, fresh startup, packaging/install and separate installed-device acceptance remain open. Count, prototype and key-index proposals remain on HOLD; no production change, cached admission, timeout relaxation or fabricated acknowledgement is included. Item 42 and transversal items 16/38 remain partial.
+
+Positive native WAL, gesture-marker and Tap-Hold scenarios now obtain real
+current-source boot admission before writes; they retain the complete admitted
+source as the independent exact rollback baseline. Strict invalid-schema and
+retired-key policies are unchanged. Windows must still run the original WAL
+ACK/refusal subjects, all gesture-marker modes, Tap-Hold negative backup and
+external-edit cases, and the complete unchanged native suite. Source review
+and Linux-host encoding/JS checks do not complete that Windows validation.
 
 - [~] **43.** A Mac upgraded from a pre-lease release could not deploy (dev.149:
   « Merge aborted: 25 ambiguous legacy ErgoptiPlus rules … matches the
@@ -6674,6 +6704,157 @@ or physical-device acceptance.
       Complete native, package, installation and enterprise acceptance remains
       open. macOS system trust and explicit proxy relays are integrated, while
       opaque-client full-URL PAC/WPAD/fallback/redirect routing remains CODE.
+
+2026-10-10 final canonical caller receiving. Selected format366 passes;
+Mac controlled unit18327/0 across1569 modules, Mac E2E101 with one original
+skip, Linux unit13017/0 across520 modules and Linux E2E193/0 pass. The whole
+run initially fails JS406/408. The PAC test acquired its accepted worker before
+installing the controlled thread patch. Acquisition now occurs inside that
+original scope: identical real-admission scheduling fails the original entered
+assertion and passes the correction; all14 original cases and66 portable
+contract controls pass. Original clocks, assertions and physical cleanup remain
+intact. The unchanged source-toolchain test now passes a genuine Git clone,
+C/header/ELF control after storage recovery; the original discarded clone stderr
+cannot be reconstructed, so its historical exit128 remains unattributed.
+Complete final JS receiving passes all408 controls. Native launcher remains
+deferred on Linux.
+
+2026-10-10 native listener fixture EOF correction. Exact manual38068916521
+on544976fa5 is whole terminal7 successful/5 failed/5 skipped jobs. Both actual
+SDK49 cohorts execute43 passing and6 failing tests; every new failure is the
+same helper's initially-empty stderr optional read (nil versus Data()). Its
+nonoptional Foundation read now retains exact empty-Data equality, all original
+case bodies, status/frame checks, waits and closure order. Existing native API
+and bootstrap tests already use that API. This source-reviewed correction still
+requires actual corrected49-case receiving; no assertion or verdict is waived.
+Native Go54 (36 methods/18 subtests), including all six new Unix-peer controls,
+passes on both Darwin architectures with closed original process owners; native
+producer/catalogue27/staging also pass. Actual model receiving, packaging,
+installation and Release are skipped. PAC/HTTP and Homebrew remain failed
+independently. Items36/62 and the false production guard remain open.
+
+2026-10-10 corrected caller receiving. Eleven focused original modules now pass
+595 controlled cases in total: API38, pause31, runtime selection34, readiness30,
+bootstrap90, shared window5, daily caller4, adapter reachability123, backend99,
+configuration6 and requirement descendants35. The bootstrap90 includes six
+additive asynchronous window/refence cases: identical inputs against the prior
+checker produce86 pass/4 fail, while the corrected checker passes90. The same
+API38 corpus produces34 pass/4 fail before clearing an obsolete cleanup latch
+after proven-empty original owner slots, and38 pass afterward. No assertion is
+weakened. First failed invocation/fixture attempts remain separate from these
+actual outcomes. Native daily-sink, SDK49/model, packaging/install and company
+network qualification remain pending; complete selected gates follow.
+
+2026-10-10 foreground caller validation follow-up. The first canonical selected
+run is retained as FORMAT pass, JS401 pass/7 fail, controlled Mac unit18248
+pass/71 fail, Mac E2E101 pass with one original skip, Linux E2E189 pass,
+and Linux unit13014 pass/3 fail. Swift/native launcher is explicitly deferred
+on this Linux host. These initial red outcomes are not qualification. Old
+kill/detach/timer fixture assumptions are being rehomed to original foreground
+custody without waiving cancellation debt or physical retirement. Actual READY
+publication now refences local ownership after an external authorization query;
+asynchronous provisioning refences exact progress-window ownership before final
+writes. The six additive window/callback controls pass in the later90-case replay.
+
+The corrected standalone compiler recipes copy the complete six-header native
+umbrella closure, including OwnedListenerEventCompatibility.h. All26 existing
+portable compiler/registry controls pass with strengthened exact copied-header
+and retained-source checks. The restart/kind fixtures pass11 controlled cases
+and130 assertions; complete protocol receiving also passes. Historical run
+38071396989 on39424e21 is whole terminal7 successful/5 failed/5 skipped jobs:
+both genuine model receivers enter pac-inline but fail during prepare before
+create/pull/inference. The old stderr helper still gives43 pass/6 fail in SDK49;
+its corrected fixture and the new compiler recipes need exact hosted replay.
+No actual compiler exception is recovered from that older model failure.
+
+Native daily logging remains CODE, not a device-only validation step: the
+prepared native builder resolves but does not forward the configured log
+directory, and its ordinary image guardian redirects daemon stdout/stderr to
+/dev/null. The unchanged stock daily-rollover/quoting/date/EOF-tail regression
+remains enrolled. New native caller-context controls do not prove a daily sink.
+Keep the false native production qualification guard until model/native source,
+installation and logging integration are completed. Hosted PAC/HTTP and
+Homebrew failures, packaging/install acceptance and physical enterprise/device
+checks remain open. Neither item36 nor62 is complete.
+
+2026-10-10 actual caller and explicit migration delivery.
+
+The managed daemon receipt/lifecycle and one-use source choice policies now live
+in shared Lua. The Mac API, backend and model-manager callers consume the same
+foreground task owner and explicit READY/RETIRED receipts. Detached restart and
+broad process-name termination are removed. Installed foreign sources keep their
+manual service path; a missing client keeps the official stock installer. Native
+migration requires a fresh explicit choice, exact source/context currency and
+joint idle admission. Original HTTP, warmup, preflight and task cleanup debt
+cannot admit a successor. A stale context after deadline acquisition cancels that
+original timer before releasing task/PTY ownership. Ambiguous native task-start
+refusal retains its original owner until physical settlement. Seven new labels
+are translated in all21 locales, preserving every existing locale entry.
+
+Controlled receiving records125 unchanged passing cases plus84 checker cases
+rerun after the timer repair. The identical84-case corpus fails four causal timer
+controls against the preceding checker. These209 controlled passes do not qualify
+native Hammerspoon/task/installer behavior. Canonical selected gates and hosted
+native receiving are still pending for this delivery. The production native
+qualification guard remains false. Items36/62 and transverse16/38 remain open.
+
+2026-10-10 actual model receiving dependency. The original native build has
+one fixed step identity; model create/pull/inference/retirement runs only after
+that exact build succeeds and cancellation is absent. Earlier independent
+PAC/HTTP failures remain fatal. Original receiver profiles, clocks, catalogue
+admission, qualification scope, uploads and Release conditions are unchanged.
+Sixteen causal source mutations cover missing/foreign/duplicate producer,
+order, weakened dependency and forgiven receiving. Focused pipeline controls
+pass; complete selected local and exact hosted qualification are recorded in
+the group6 handover. This enrollment does not complete item62 or grant native
+production qualification.
+
+2026-10-10 listener-bound startup event preparation. The pinned native producer
+connects to its guardian's private Unix listener immediately before the original
+HTTP Serve call. The guardian requires the original mapped peer, exact nonce and
+write EOF; LISTENER_BOUND does not grant authenticated API READY. The original
+22 owner and35 serve controls are retained. Canonical POSIX receiving passes
+28 owner and37 serve tests without skips; a new nonce-refusal test now accepts
+that same refusal at either original start or wait boundary. Actual pinned
+Go1.26.8 Linux Unix-peer receiving passes all6 added tests; native
+Darwin peer mapping, SDK49 and genuine pinned-daemon qualification remain UNRUN.
+The production qualification guard stays false. CI attempts the original native
+producer independently of earlier PAC/HTTP failures while retaining all fatal
+verdicts, catalogue admission, packaging and release conditions.
+
+The same serving tranche adds explicit caller-owned stdin cancellation. EOF
+wakes the original guardian selector and retirement path; borrowed FD0 is never
+closed by the helper. Unknown unregister/selector-close outcomes retain debt.
+Default untagged serving is unchanged. The original37 tests and assertions are
+preserved, with seven additional controls: private POSIX receiving passes7/7
+and44/44 without skips. Its unchanged original missing-flag and watcher-mutant
+controls refuse as expected. CI and the strict protocol collector require44;
+physical Darwin and real caller activation remain independent qualifications. Selected local formatting and portable Mac18165 pass; native
+Swift is deferred off macOS. Initial JS404/408 diagnoses source-input, Debug
+target and portable-C fixture mismatches plus the protected temporary-root
+refusal. Reviewed corrections preserve existing assertions; portable C3/3 and
+its original20 vectors, remap and release-input guards pass. A further frozen44
+Go-log policy mismatch is repaired with44 literal historical identities and one
+added refusal case; all45 pass, the independent old journal stays unchanged,
+and the strict collector requires45. Final JS407/408 leaves only the unchanged
+protected-temporary-root refusal; exact non-Git-root replay passes. The same
+native/driver postimages retain the18165-pass portable Mac receipt.
+
+2026-10-10 exact streaming-task retirement correction. Cancellation preserves
+the original ShellRunner slot and input while termination is pending. Cleanup
+requires that same handle's physical settlement receipt, including after a
+refused or ambiguous start; stale business generations may still retire their
+own resources. Original38 cases and127 assertion calls are conserved. Portable
+controlled receiving passes38 original and7 new cases; the predecessor fails6
+of the7 new cases, and six causal mutants remain red. These controlled task
+ports do not qualify physical Hammerspoon/POSIX closure. Canonical selected
+format passes; Hammerspoon18165 and E2E101 pass with one original skip. JS has
+407 passes/1 protected-temporary-root failure; the unchanged uninstall fixture
+passes its exact non-Git-root replay. Exact hosted manual38063990952 onf103568f7
+is whole terminal FAIL:7 successful,5 failed and5 skipped jobs. Core JS408 and
+portable Mac18165 pass; PAC/WPAD, independent HTTP and Homebrew remain red.
+Packaging, installation and Release are skipped; physical closure is unqualified.
+This is a bounded TODO62 retirement prerequisite, not complete daemon migration.
 
 2026-10-10 selected-release native receiving enrollment. A bounded new Mac
 matrix step now runs the frozen50 shell-corpus vectors and original guardian
