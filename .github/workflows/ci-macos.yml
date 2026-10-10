@@ -200,6 +200,24 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.13'
+      # This independent Darwin job executes the frozen portable corpus through
+      # the original native guardian even when another archive/PAC step fails.
+      - name: Receive selected-release shell corpus and native guardian cancellation
+        shell: bash
+        run: |
+          set -euo pipefail
+          node tools/diagnostics/macos_release_stage_native_receiving.cjs \
+            --output "$RUNNER_TEMP/native-selected-release-$ERGOPTI_OLLAMA_EXPECTED_ARCHITECTURE"
+
+      - name: Retain selected-release native ownership receiving
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: selected-release-native-ownership-${{ matrix.architecture }}-${{ github.run_id }}-${{ github.run_attempt }}
+          retention-days: 7
+          if-no-files-found: error
+          path: ${{ runner.temp }}/native-selected-release-${{ matrix.architecture }}
+
       - name: Admit the canonical native toolchain and public inputs
         id: ollama-toolchain
         shell: bash
