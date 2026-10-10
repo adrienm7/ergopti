@@ -535,3 +535,65 @@ _LSO_ActivePendingCheapFence(Kind) {
 for Kind in ["closed", "configuration", "rescan", "ticket"]
 	Test("local active observer: pending tick retains " Kind " refusal", _LSO_ActivePendingCheapFence.Bind(Kind))
 
+
+
+
+
+; =========================================
+; =========================================
+; ======= 4/ Final Job Source Fence =======
+; =========================================
+; =========================================
+
+_LSCJ_MutatingTicket(Fixture, Original) {
+	Fixture.TicketReads += 1
+	if Fixture.TicketReads == 2
+		Fixture.Drift("old-key")
+	return Original.Call()
+}
+
+_LSCJ_LastTicketCannotReplaceSource() {
+	Fixture := _LSO_Fixture()
+	Job := 0, Original := 0
+	try {
+		AssertTrue(Fixture.Native.Rescan())
+		Job := Fixture.Native.Jobs["lmstudio"]
+		Original := Job["ticket"]
+		Fixture.TicketReads := 0
+		Job["ticket"] := _LSCJ_MutatingTicket.Bind(Fixture, Original)
+		AssertFalse(Fixture.Native._CurrentJob(Job), "the final callback cannot replace source after its last full check")
+		AssertEqual(2, Fixture.TicketReads, "the source mutation must occur at the real last ticket callback")
+		AssertTrue(Fixture.Transport.HasPending("lmstudio"), "a rejected query cannot infer physical retirement")
+		AssertEqual(0, Fixture.Published.Length)
+	} finally {
+		if Job is Map && HasMethod(Original, "Call")
+			Job["ticket"] := Original
+		Fixture.Dispose()
+	}
+}
+Test("local job final fence: last ticket source replacement is refused", _LSCJ_LastTicketCannotReplaceSource)
+
+_LSCJ_LastSourceInvalidatesLogicalTicket(Fixture, Source) {
+	Fixture.SourceChecks += 1
+	Accepted := _LSO_Fixture.Prototype.SourceCurrent.Call(Fixture, Source)
+	if Fixture.SourceChecks == 2
+		Fixture.Native.Controller.Invalidate()
+	return Accepted
+}
+
+_LSCJ_LastSourceCannotReplaceTicket() {
+	Fixture := _LSO_Fixture()
+	try {
+		AssertTrue(Fixture.Native.Rescan())
+		Job := Fixture.Native.Jobs["lmstudio"]
+		Fixture.SourceChecks := 0
+		Fixture.DefineProp("SourceCurrent", {Call: _LSCJ_LastSourceInvalidatesLogicalTicket})
+		AssertFalse(Fixture.Native._CurrentJob(Job), "a final source read cannot retain a replaced logical sweep")
+		AssertEqual(2, Fixture.SourceChecks, "the logical replacement must occur at the actual final source boundary")
+		AssertTrue(Fixture.Transport.HasPending("lmstudio"))
+		AssertEqual(0, Fixture.Published.Length)
+	} finally Fixture.Dispose()
+}
+Test("local job final fence: last source boundary preserves logical refusal", _LSCJ_LastSourceCannotReplaceTicket)
+
+
