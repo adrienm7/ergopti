@@ -1,0 +1,394 @@
+{
+	"schema": 1,
+	"run_id": 38030504308,
+	"url": "https://github.com/adrienm7/ergopti/actions/runs/38030504308",
+	"candidate": "01955e89affc3674ff44e72b78db936a2a48d4fd",
+	"branch": "codex/ci-validation",
+	"event": "workflow_dispatch",
+	"workflow": ".github/workflows/ci.yml",
+	"attempt": 1,
+	"os_lanes_actual": "macos",
+	"selection_proof": "actual Validate log CI_OS_SELECTION: macos",
+	"status": "completed",
+	"conclusion": "failure",
+	"observed_at": "2026-10-10T06:28:39Z",
+	"job_counts": {
+		"success": 3,
+		"failure": 7,
+		"skipped": 7
+	},
+	"jobs": [
+		{
+			"id": 114150251203,
+			"name": "Validate / Checks and plan",
+			"status": "completed",
+			"conclusion": "success"
+		},
+		{
+			"id": 114150397706,
+			"name": "Core / js",
+			"status": "completed",
+			"conclusion": "failure"
+		},
+		{
+			"id": 114150397711,
+			"name": "Core / properties",
+			"status": "completed",
+			"conclusion": "success"
+		},
+		{
+			"id": 114150397742,
+			"name": "macOS / Managed Ollama native \u00b7 amd64",
+			"status": "completed",
+			"conclusion": "failure"
+		},
+		{
+			"id": 114150397751,
+			"name": "macOS / Unit tests (stubbed)",
+			"status": "completed",
+			"conclusion": "failure"
+		},
+		{
+			"id": 114150397792,
+			"name": "macOS / Item 36 native archive qualification",
+			"status": "completed",
+			"conclusion": "failure"
+		},
+		{
+			"id": 114150397797,
+			"name": "macOS / Native cold MLX bootstrap \u00b7 macos-15 arm64",
+			"status": "completed",
+			"conclusion": "success"
+		},
+		{
+			"id": 114150397879,
+			"name": "macOS / Managed Ollama native \u00b7 arm64",
+			"status": "completed",
+			"conclusion": "failure"
+		},
+		{
+			"id": 114150398878,
+			"name": "Windows",
+			"status": "completed",
+			"conclusion": "skipped"
+		},
+		{
+			"id": 114150399033,
+			"name": "Linux",
+			"status": "completed",
+			"conclusion": "skipped"
+		},
+		{
+			"id": 114151750801,
+			"name": "macOS / E2E tests (stubbed)",
+			"status": "completed",
+			"conclusion": "skipped"
+		},
+		{
+			"id": 114151750990,
+			"name": "macOS / Native tooltip canvas \u00b7 12 captures",
+			"status": "completed",
+			"conclusion": "skipped"
+		},
+		{
+			"id": 114151813199,
+			"name": "macOS / Verdict",
+			"status": "completed",
+			"conclusion": "failure"
+		},
+		{
+			"id": 114151813654,
+			"name": "macOS / Install and launch \u00b7 ${{ matrix.scenario }} \u00b7 ${{ matrix.runner }}",
+			"status": "completed",
+			"conclusion": "skipped"
+		},
+		{
+			"id": 114151813703,
+			"name": "macOS / Package",
+			"status": "completed",
+			"conclusion": "skipped"
+		},
+		{
+			"id": 114151872321,
+			"name": "Validate / Selected OS verdict",
+			"status": "completed",
+			"conclusion": "failure"
+		},
+		{
+			"id": 114151872786,
+			"name": "Release / Publish",
+			"status": "completed",
+			"conclusion": "skipped"
+		}
+	],
+	"CoreJS406": {
+		"PASS": 403,
+		"FAIL": 3,
+		"failure_names": [
+			"Linux CI requires successful mandatory jobs and assertion evidence",
+			"Desktop verdicts and parallel shared-core gates",
+			"CI pipeline wiring (one root, plan outputs, lane callers, secrets and permissions, no skippable job or gate step, release preflight before any side effect)"
+		],
+		"baseline_execution": "not performed by monitor"
+	},
+	"macOS_stub17968": {
+		"PASS": 17957,
+		"FAIL": 11,
+		"modules": 1562,
+		"failure_names": [
+			"deactivates a preview registration that reports throw",
+			"deactivates a preview registration that reports false",
+			"rolls back registry writes when the final sort explicitly refuses",
+			"rolls back registry ownership when reporter installation returns throw",
+			"rolls back registry ownership when reporter installation returns false",
+			"hands is_private = true to keymap.inject_dynamic",
+			"passes the magic key through and does not log completion",
+			"installs once on the first selection and never on re-selection",
+			"reinstalls a runtime removed after it was ready",
+			"rebuilds a broken runtime on the next selection, never before",
+			"HS-034 rechecks the live factory gate at a real pending-model continuation"
+		],
+		"actual_Hammerspoon_native_credit": false
+	},
+	"managed_native_architectures": {
+		"amd64": {
+			"job_id": 114150397742,
+			"job_conclusion": "failure",
+			"PAC_artifact_id": 11661319920,
+			"PAC_artifact_sha256": "127b623fb7cbb4fd2d23e6f6b72a84a95ff4e2cf16ead5357ec945b095b860ce",
+			"source_binding_exact": true,
+			"Swift_compilation": "actual Build complete transcript",
+			"SDK41": {
+				"PASS": 41,
+				"FAIL": 0,
+				"SKIP": 0
+			},
+			"PACSource10": {
+				"PASS": 10,
+				"FAIL": 0,
+				"SKIP": 0
+			},
+			"original_PAC_WPAD_Wire14": {
+				"PASS_methods": 12,
+				"FAIL_methods": 2,
+				"SKIP_methods": 0,
+				"assertion_failures": 4,
+				"unexpected": 2,
+				"failed_methods": [
+					"ManagedHTTPWPADWireTests.testDHCPMetadataOwnsRealPACURLRoutesAndRefusesInvalidDiscoveryBeforeNetwork",
+					"ManagedHTTPWireTests.testRealNativeTLSFullURLPACOrderedFallbackAndOwnedClosure"
+				]
+			},
+			"WPAD_positive_failure_observations": [],
+			"WPAD_classification": "UNKNOWN: no positive-failure diagnostic observed; shared fixture read refused and cleanup failed",
+			"HTTP_receiving2": {
+				"PASS_methods": 0,
+				"ERROR_methods": 2,
+				"additional_tearDownClass_ERROR": 1,
+				"total_error_records": 3,
+				"original_add_trust_timeout_seconds": 15,
+				"restoration_exit_status": 1,
+				"qualified": false
+			},
+			"native_runtime_producer6": {
+				"PASS": 6,
+				"FAIL": 0,
+				"SKIP": 0,
+				"whole_runtime_release_qualification": false
+			},
+			"portable_client_suites": {
+				"suites": 2,
+				"cases_per_suite": 2,
+				"native_credit": false
+			}
+		},
+		"arm64": {
+			"job_id": 114150397879,
+			"job_conclusion": "failure",
+			"PAC_artifact_id": 11661563372,
+			"PAC_artifact_sha256": "399fe388921ffb658c5fa5e7922f41c0f65ee88adf7b096d671c96df9377be23",
+			"source_binding_exact": true,
+			"Swift_compilation": "actual Build complete transcript",
+			"SDK41": {
+				"PASS": 41,
+				"FAIL": 0,
+				"SKIP": 0
+			},
+			"PACSource10": {
+				"PASS": 10,
+				"FAIL": 0,
+				"SKIP": 0
+			},
+			"original_PAC_WPAD_Wire14": {
+				"PASS_methods": 12,
+				"FAIL_methods": 2,
+				"SKIP_methods": 0,
+				"assertion_failures": 14,
+				"unexpected": 2,
+				"failed_methods": [
+					"ManagedHTTPWPADWireTests.testDHCPMetadataOwnsRealPACURLRoutesAndRefusesInvalidDiscoveryBeforeNetwork",
+					"ManagedHTTPWireTests.testRealNativeTLSFullURLPACOrderedFallbackAndOwnedClosure"
+				]
+			},
+			"WPAD_positive_failure_observations": ["certificate", "certificate"],
+			"WPAD_classification": "certificate observed for both positive requests; no causal correction proved",
+			"HTTP_receiving2": {
+				"PASS_methods": 0,
+				"ERROR_methods": 2,
+				"additional_tearDownClass_ERROR": 1,
+				"total_error_records": 3,
+				"original_add_trust_timeout_seconds": 15,
+				"restoration_exit_status": 1,
+				"qualified": false
+			},
+			"native_runtime_producer6": {
+				"PASS": 6,
+				"FAIL": 0,
+				"SKIP": 0,
+				"whole_runtime_release_qualification": false
+			},
+			"portable_client_suites": {
+				"suites": 2,
+				"cases_per_suite": 2,
+				"native_credit": false
+			}
+		}
+	},
+	"WPAD_source_sha256": "1b4279cb8b02de2c17a60aee3610c1a3b1cc5155bc58d6ac37119190a4722a3b",
+	"WPAD_original14_preservation": "Exact diagnostic insertion source bound; all original methods/assertions preserved. No independent malformed parser-vector or primary functional fix credit.",
+	"archive25": {
+		"PASS_methods": 24,
+		"FAIL_methods": 1,
+		"failure_assertions": 2,
+		"staging8": "PASS8",
+		"Sparkle15": "PASS15",
+		"consent_arguments1": "PASS1",
+		"full_package_qualified": false
+	},
+	"Brew": {
+		"schema": 1,
+		"run_id": 38030504308,
+		"candidate": "01955e89affc3674ff44e72b78db936a2a48d4fd",
+		"job_id": 114150397792,
+		"artifact_id": 11661488431,
+		"artifact_sha256": "3c32de145ab15877b02386e4a7338c5ba597832de1f0a920e3a40ba537fe1fc9",
+		"native_XCTest25": {
+			"passed": 24,
+			"failed_methods": 1,
+			"failure_assertions": 2
+		},
+		"Brew6": "UNEXECUTED: owning Automation consent prerequisite refused",
+		"private_delivery3": "UNEXECUTED: same prerequisite",
+		"primary": {
+			"role": "permission-request",
+			"stage": "ui-observer",
+			"fixed_error": "Owned Automation prompt exceeded its deadline",
+			"original_request_budget_seconds": 30,
+			"cause": "UNKNOWN"
+		},
+		"first_timeout": {
+			"field_present": false,
+			"absence_reason": "Owning require predicate raises AdmissionError; optional subprocess.TimeoutExpired telemetry is not entered. No new deadline or global prompt absence inferred."
+		},
+		"checkpoint_receipts": [
+			{
+				"scope": "owned-native-groups",
+				"status": "refused",
+				"phase": "candidate.failed",
+				"ownership_closed": true,
+				"debt_kinds": [],
+				"elapsed_seconds": 62.069335,
+				"history_omitted": 136,
+				"cases": {}
+			},
+			{
+				"scope": "helper-and-native-groups",
+				"status": "accepted",
+				"phase": "cleanup.closed",
+				"ownership_closed": true,
+				"debt_kinds": null,
+				"elapsed_seconds": 63.29065966666667,
+				"history_omitted": 0,
+				"cases": {}
+			},
+			{
+				"scope": "application-installer-server-and-commands",
+				"status": "accepted",
+				"phase": "cleanup.closed",
+				"ownership_closed": true,
+				"debt_kinds": null,
+				"elapsed_seconds": 27.416174916666705,
+				"history_omitted": 0,
+				"cases": {}
+			}
+		],
+		"UI": {
+			"retained": 73,
+			"first_elapsed": 21.749889,
+			"last_elapsed": 40.806508,
+			"statuses": {
+				"pending": 73
+			},
+			"candidates": [0],
+			"matches": [0],
+			"requester_qualified": [true],
+			"ax_trusted": [true]
+		},
+		"sdk_no_prompt": {
+			"complete": true,
+			"osstatus": -600,
+			"caller": "native-test-product",
+			"catalogue_qualified": false,
+			"signed_application_qualified": false,
+			"osascript_principal_qualified": false,
+			"script_status": 0,
+			"capture_status": 0
+		},
+		"limits": "No owning grant/Brewscenario/nativecause correction established; closure and retained bounded observations are distinct from success."
+	},
+	"cold_MLX_native": {
+		"job_conclusion": "success",
+		"artifact_id": 11661973022,
+		"actual_receipt_status": "passed",
+		"limits": "Not package/install/Brew/network qualification"
+	},
+	"Darwin50": {
+		"actual_qualifying_invocation": false,
+		"status": "UNEXECUTED: proposed workflow cohort unapplied in this candidate",
+		"portable50_substitution": false
+	},
+	"package_install_E2E_tooltip": {
+		"macOS / E2E tests (stubbed)": "SKIP",
+		"macOS / Native tooltip canvas \u00b7 12 captures": "SKIP",
+		"macOS / Install and launch \u00b7 ${{ matrix.scenario }} \u00b7 ${{ matrix.runner }}": "SKIP",
+		"macOS / Package": "SKIP"
+	},
+	"release_publish": {
+		"job_id": 114151872786,
+		"actual_conclusion": "SKIP",
+		"release_created_by_monitor": false
+	},
+	"evidence": {
+		"run.latest.json": "8f8056bcc55bcf6aaba96cf0b36526db9ee85e74613bd5b0c7db137e765ceded",
+		"jobs.latest.json": "93f48b4a28cd70640f04bc4d9b80c677ed5411d8ee493955ae69073f3d5ba82f",
+		"validate.private.log": "c2994d1a00666c7d7d9282f1a0af749e6dfb6d566b1abed2d77653dd1496065e",
+		"corejs.private.log": "c0b31f361ae7a1f27da384692f5ccdd0ee5e83d5923b06a974afc34cf53266a3",
+		"stub.private.log": "62148d55e60b646fdf31a92b3a620553ee9bafabb76c7469f55ecb97f45cccc5",
+		"archive.private.log": "5f2afc19bd1c4b82a11a0ac114ab6d109ab75d7facfc4e65b12d9ba841757d8e",
+		"amd64.private.log": "0b51c0b4dc259b58017f3fed0a2add84f4be30f581c1059ab98d1eccbc711081",
+		"arm64.private.log": "a74a5c8362b99aaafb2597a56b02c1cac58a3dd9ad6e539f8ccea9922c124739",
+		"item36.zip": "3c32de145ab15877b02386e4a7338c5ba597832de1f0a920e3a40ba537fe1fc9",
+		"pac-amd64.zip": "127b623fb7cbb4fd2d23e6f6b72a84a95ff4e2cf16ead5357ec945b095b860ce",
+		"pac-arm64.zip": "399fe388921ffb658c5fa5e7922f41c0f65ee88adf7b096d671c96df9377be23",
+		"cold-mlx.zip": "47caf56c1f1da22878317cac6134e4378e2086ac0698c737a7963e795c7fc47b",
+		"wpad.source.swift": "1b4279cb8b02de2c17a60aee3610c1a3b1cc5155bc58d6ac37119190a4722a3b"
+	},
+	"actions": {
+		"manual_workflows_cancelled": false,
+		"main_index_refs_changed": false,
+		"local_JS_native_suites_run": false,
+		"task_only_artifacts_downloaded_to_tmp": true,
+		"monitor_process": "poll.py session90321 completed normally exit0 after terminal API result",
+		"scope": "Integrated01955 candidate only; prior4e9 certificate observations are not attributed to current AMD64."
+	}
+}

@@ -69,15 +69,20 @@ _SRAV_MetricsVector() {
 	return Values
 }
 
-for Name, SpawnFn in Map("legacy", ShellRunner_Spawn, "tree", ShellRunner_SpawnTreeOwned) {
-	Test("shell runner: native argv control " . Name . " (shell-native-argv)",
-		_SRAV_RoundTrip.Bind(SpawnFn, ["plain", "", "two words", "é😀", "after"]))
-	Test("shell runner: trailing slashes preserve successor arguments " . Name . " (shell-native-argv)",
-		_SRAV_RoundTrip.Bind(SpawnFn, ["C:\config\", "after-one", "\\server\share\\", "after-two",
-			"D:\folder with spaces\\\", "after-three"]))
-	Test("shell runner: metrics timings survive actual launch " . Name . " (shell-native-argv)",
-		_SRAV_RoundTrip.Bind(SpawnFn, _SRAV_MetricsVector()))
+/** Registers vectors without publishing global loop variables. */
+_SRAV_RegisterArgumentCases() {
+	local Name, SpawnFn
+	for Name, SpawnFn in Map("legacy", ShellRunner_Spawn, "tree", ShellRunner_SpawnTreeOwned) {
+		Test("shell runner: native argv control " . Name . " (shell-native-argv)",
+			_SRAV_RoundTrip.Bind(SpawnFn, ["plain", "", "two words", "é😀", "after"]))
+		Test("shell runner: trailing slashes preserve successor arguments " . Name . " (shell-native-argv)",
+			_SRAV_RoundTrip.Bind(SpawnFn, ["C:\config\", "after-one", "\\server\share\\", "after-two",
+				"D:\folder with spaces\\\", "after-three"]))
+		Test("shell runner: metrics timings survive actual launch " . Name . " (shell-native-argv)",
+			_SRAV_RoundTrip.Bind(SpawnFn, _SRAV_MetricsVector()))
+	}
 }
+_SRAV_RegisterArgumentCases()
 
 _SRAV_PreservesLiteralPercentArguments(SpawnFn) {
 	EnvName := "ERGOPTI_SHELLRUNNER_LITERAL_20260907"
@@ -91,7 +96,12 @@ _SRAV_PreservesLiteralPercentArguments(SpawnFn) {
 		EnvSet(EnvName, Previous)
 	}
 }
-for Name, SpawnFn in Map("legacy", ShellRunner_Spawn, "tree", ShellRunner_SpawnTreeOwned) {
-	Test("shell runner: " . Name . " argv preserves literal percent values (shell-native-literal-percent)",
-		_SRAV_PreservesLiteralPercentArguments.Bind(SpawnFn))
+/** Registers vectors without publishing global loop variables. */
+_SRAV_RegisterLiteralPercentCases() {
+	local Name, SpawnFn
+	for Name, SpawnFn in Map("legacy", ShellRunner_Spawn, "tree", ShellRunner_SpawnTreeOwned) {
+		Test("shell runner: " . Name . " argv preserves literal percent values (shell-native-literal-percent)",
+			_SRAV_PreservesLiteralPercentArguments.Bind(SpawnFn))
+	}
 }
+_SRAV_RegisterLiteralPercentCases()

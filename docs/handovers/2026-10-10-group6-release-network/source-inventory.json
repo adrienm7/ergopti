@@ -1,0 +1,531 @@
+{
+	"schema": 1,
+	"scope": "Frozen source-recovery inputs; no native qualification or restored authority",
+	"files": [
+		{
+			"path": "group6-native-ollama-api-readiness62/revision10-original-main-cli-receiving/HANDOVER.md",
+			"bytes": 7927,
+			"sha256": "b07f77dad3f650aef5b8568b8048165957a0aad8ce3e79e94bc66fbd7b6890db"
+		},
+		{
+			"path": "group6-native-ollama-api-readiness62/revision10-original-main-cli-receiving/MANIFEST.json",
+			"bytes": 11732,
+			"sha256": "46600b2035c8c3273f33a6ba87fbeaf258b5c28a7f76b5db2927e2379461b429"
+		},
+		{
+			"path": "group6-native-ollama-api-readiness62/revision10-original-main-cli-receiving/PRIOR-RECEIVING-BINDINGS.json",
+			"bytes": 1398,
+			"sha256": "5ed28eaa67cc284044a3822d29a8acec0461ad792fd151ff13b0d37d143d8d2f"
+		},
+		{
+			"path": "group6-native-ollama-api-readiness62/revision10-original-main-cli-receiving/SOURCE-PROOF.json",
+			"bytes": 4799,
+			"sha256": "9516955a4e6272d8693a109cef9da437591b1f727d1d18e9fd60fe33faa9e423"
+		},
+		{
+			"path": "group6-native-ollama-api-readiness62/revision10-original-main-cli-receiving/application.patch",
+			"bytes": 51419,
+			"sha256": "f8893b70e3ca2e22ec8087771801ac5de9149ae5e802b6e1d223fd92ae8f717f"
+		},
+		{
+			"path": "group6-native-ollama-api-readiness62/revision10-original-main-cli-receiving/candidate/static/ergopti_plus/macos/modules/llm/managed_ollama_serve.py",
+			"bytes": 22238,
+			"sha256": "ccc047596e3ab17e2a0fbce315ac75c8bc20024000b1382ecc29d43367eb8c61"
+		},
+		{
+			"path": "group6-native-ollama-api-readiness62/revision10-original-main-cli-receiving/candidate/static/ergopti_plus/macos/platform/network/native_http.py",
+			"bytes": 19415,
+			"sha256": "7cafdb2e316d97cb6db01e74ec12014eff36c7702fd12548f17ab80a772bc94a"
+		},
+		{
+			"path": "group6-native-ollama-api-readiness62/revision10-original-main-cli-receiving/candidate/static/ergopti_plus/macos/platform/network/native_ollama_api.py",
+			"bytes": 11041,
+			"sha256": "f664bb1d452c3ea05e23675d2d2d87ee13a00e3ac60c7a571d690a11301559df"
+		},
+		{
+			"path": "group6-native-ollama-api-readiness62/revision10-original-main-cli-receiving/candidate/tools/diagnostics/macos_managed_ollama_serve_test.py",
+			"bytes": 42534,
+			"sha256": "c90bae31c8582c24305f3dd7d4b1e64c5786b93d00faf7953316fb435671a947"
+		},
+		{
+			"path": "group6-native-ollama-api-readiness62/revision10-original-main-cli-receiving/candidate/tools/test/macos_native_ollama_api_test.py",
+			"bytes": 22684,
+			"sha256": "03cace55fb5a1b71227cf7b5673d4c5f1c40d33341ef1a7f55bc2946b43abf55"
+		},
+		{
+			"path": "group6-native-ollama-api-readiness62/revision10-original-main-cli-receiving/candidate/tools/test/test-managed-ollama-protocol.cjs",
+			"bytes": 16279,
+			"sha256": "1d3a26a168c0ee50cadbeabbc02a5f8d4a9f891605077a2dc8c8de3b5c092063"
+		},
+		{
+			"path": "group6-native-ollama-api-readiness62/revision10-original-main-cli-receiving/dependencies/static/ergopti_plus/_shared/modules/llm/managed_ollama_bootstrap.json",
+			"bytes": 251,
+			"sha256": "1ce4840c7946f12c41cc156fe589bed6957e837ec77edd3e24757d4423649f60"
+		},
+		{
+			"path": "group6-native-ollama-api-readiness62/revision10-original-main-cli-receiving/dependencies/static/ergopti_plus/_shared/python/managed_ollama_bootstrap.py",
+			"bytes": 8132,
+			"sha256": "4a49506497d9a4e50b10491aa58b66bb1798e0b02c5dd0b82359b3bfac7ca7f0"
+		},
+		{
+			"path": "group6-native-ollama-api-readiness62/revision10-original-main-cli-receiving/dependencies/static/ergopti_plus/_shared/python/managed_ollama_daemon_authority.py",
+			"bytes": 4009,
+			"sha256": "b2e513b8a37f23301d8746e89b981dffcdbe252cd34cb0a1cfca115b4d24d8ef"
+		},
+		{
+			"path": "group6-native-ollama-api-readiness62/revision10-original-main-cli-receiving/dependencies/static/ergopti_plus/_shared/python/managed_ollama_pull.py",
+			"bytes": 7821,
+			"sha256": "6b83441cbfd68b785ec8e4f04fdef315fd0168603dec990258516b3654c270d6"
+		},
+		{
+			"path": "group6-native-ollama-api-readiness62/revision10-original-main-cli-receiving/dependencies/static/ergopti_plus/_shared/python/managed_ollama_runtime.py",
+			"bytes": 14205,
+			"sha256": "4d0521db4b2055e1b7b494110e0faaa39722e73bcbf38263ebcac3f61dc94cff"
+		},
+		{
+			"path": "group6-native-ollama-api-readiness62/revision10-original-main-cli-receiving/dependencies/static/ergopti_plus/macos/platform/ollama_daemon_authority.py",
+			"bytes": 7494,
+			"sha256": "589dc85de005c55df85d696d0e5fea154ba292bdd0e661c752f25b987e452e8f"
+		},
+		{
+			"path": "group6-native-ollama-api-readiness62/revision10-original-main-cli-receiving/dependencies/static/ergopti_plus/macos/platform/source_alias_owner.py",
+			"bytes": 10088,
+			"sha256": "5358d7acd9ef28db84a87cd433c68a62ac110584932a84a2d37c34de9668d31d"
+		},
+		{
+			"path": "group6-native-ollama-api-readiness62/revision10-original-main-cli-receiving/dependencies/static/ergopti_plus/macos/platform/suspended_image_owner.py",
+			"bytes": 22440,
+			"sha256": "dd8e72c91fa13f11b9b091e7001148e1e29188878232d401820e71676811ac56"
+		},
+		{
+			"path": "group6-native-ollama-api-readiness62/revision10-original-main-cli-receiving/dependencies/static/ergopti_plus/macos/platform/trusted_native_guardian.py",
+			"bytes": 4662,
+			"sha256": "c72364ddfebaa6f4f3f5709aa0a367b1ffb7e0409f8aef079a0b65b34bedd5e6"
+		},
+		{
+			"path": "group6-native-ollama-api-readiness62/revision10-original-main-cli-receiving/preimages/static/ergopti_plus/macos/modules/llm/managed_ollama_serve.py",
+			"bytes": 16160,
+			"sha256": "e1d2e4bef77028dfd896a26d3e6885c096b0c0bb26199ce7294471e28884dfa3"
+		},
+		{
+			"path": "group6-native-ollama-api-readiness62/revision10-original-main-cli-receiving/preimages/static/ergopti_plus/macos/platform/network/native_http.py",
+			"bytes": 14637,
+			"sha256": "338cbff6b319a3b83766aa5557bbc2d751496eb4a760cc6751c7a60d8cb8dc01"
+		},
+		{
+			"path": "group6-native-ollama-api-readiness62/revision10-original-main-cli-receiving/preimages/static/ergopti_plus/macos/platform/network/native_ollama_api.py",
+			"bytes": 10274,
+			"sha256": "093f5601155394325f5268f014bba74bfbb51b2c9096c6cafd82a8f181ea3096"
+		},
+		{
+			"path": "group6-native-ollama-api-readiness62/revision10-original-main-cli-receiving/preimages/tools/diagnostics/macos_managed_ollama_serve_test.py",
+			"bytes": 27611,
+			"sha256": "2c1ad36e83bf7495ecc7bcf66789d4a78954ccec19a995017faa768bc594a92d"
+		},
+		{
+			"path": "group6-native-ollama-api-readiness62/revision10-original-main-cli-receiving/preimages/tools/test/macos_native_ollama_api_test.py",
+			"bytes": 9588,
+			"sha256": "38760ef02a722e6022aaa7da83bafb522940215548b6a9ee430206c154efd20c"
+		},
+		{
+			"path": "group6-native-ollama-api-readiness62/revision10-original-main-cli-receiving/preimages/tools/test/test-managed-ollama-protocol.cjs",
+			"bytes": 16278,
+			"sha256": "036e0ee76f151b1ecba7af52596efc5b03a371f57ff8ccaf672a1c70d634be68"
+		},
+		{
+			"path": "group6-native-ollama-api-readiness62/revision10-original-main-cli-receiving/prior-root-receiving/ACTUAL-RECEIVING.json",
+			"bytes": 5994,
+			"sha256": "be6948da7a74376aec6294fcdafe74641f383e337a02b6a5ac3da92ee441ae66"
+		},
+		{
+			"path": "group6-native-ollama-api-readiness62/revision10-original-main-cli-receiving/prior-root-receiving/candidate-serve.log",
+			"bytes": 7471,
+			"sha256": "3511bded74a3bbb6cb601aeea21e984e926f42076d06a05b1a7f11f527f268aa"
+		},
+		{
+			"path": "group6-native-ollama-api-readiness62/revision10-original-main-cli-receiving/prior-root-receiving/candidate-wire.log",
+			"bytes": 3345,
+			"sha256": "179077efc75dffd733f75028d3a8682302022f9f399b09156bc64b8f199bc48f"
+		},
+		{
+			"path": "group6-native-ollama-api-readiness62/revision10-original-main-cli-receiving/prior-root-receiving/predecessor-serve.log",
+			"bytes": 15024,
+			"sha256": "230995281e0820a0b2a8662c59a5ff2147cf4e5349a5b9afd71f58bce67f4496"
+		},
+		{
+			"path": "group6-native-ollama-api-readiness62/revision10-original-main-cli-receiving/prior-root-receiving/predecessor-wire.log",
+			"bytes": 27167,
+			"sha256": "85331720cf23ebbd4fc171b7db420b0a1e2a460990ce8dad6440cf4c6fcc886a"
+		},
+		{
+			"path": "group6-native-ollama-api-readiness62/revision10-original-main-cli-receiving/revision2-candidate/static/ergopti_plus/macos/modules/llm/managed_ollama_serve.py",
+			"bytes": 22184,
+			"sha256": "39115ef5ed1d8b8c2f3a2f72c9b92bc9641ece76e357268e8473d24a1f5927ef"
+		},
+		{
+			"path": "group6-native-ollama-api-readiness62/revision10-original-main-cli-receiving/revision2-candidate/static/ergopti_plus/macos/platform/network/native_http.py",
+			"bytes": 15953,
+			"sha256": "a5d6a88ce7534c52375c82e895e4e33c0a81b1a2db1562fb614c8a49575e57f1"
+		},
+		{
+			"path": "group6-native-ollama-api-readiness62/revision10-original-main-cli-receiving/revision2-candidate/static/ergopti_plus/macos/platform/network/native_ollama_api.py",
+			"bytes": 10873,
+			"sha256": "80d5af6c7dc095ea333a2087ae4993e25993b2284ab1f9749db7c252bcd554b8"
+		},
+		{
+			"path": "group6-native-ollama-api-readiness62/revision10-original-main-cli-receiving/revision2-candidate/tools/diagnostics/macos_managed_ollama_serve_test.py",
+			"bytes": 38394,
+			"sha256": "d015aa9363dd59d9cf0d9e9c918b87933aff7ecef38029c405156e37ceb2d53f"
+		},
+		{
+			"path": "group6-native-ollama-api-readiness62/revision10-original-main-cli-receiving/revision2-candidate/tools/test/macos_native_ollama_api_test.py",
+			"bytes": 14464,
+			"sha256": "ce278e4a47ca7d8e56bf9db6974d3ed7d294d0716174a9b77b8a6a4b6ae5594e"
+		},
+		{
+			"path": "group6-native-ollama-api-readiness62/revision10-original-main-cli-receiving/revision2-candidate/tools/test/test-managed-ollama-protocol.cjs",
+			"bytes": 16279,
+			"sha256": "184750ba27a0b350dfc2f0df6bcb5f67c1eff4b8ea8d32923961b4ec88fde9d2"
+		},
+		{
+			"path": "group6-native-ollama-api-readiness62/revision10-original-main-cli-receiving/revision2-to-revision3.patch",
+			"bytes": 2225,
+			"sha256": "dbcee0bb918d6a6119645c9ca8ef2a11f49c3f4d9f22ef398fb81a2b0e98cda8"
+		},
+		{
+			"path": "group6-native-ollama-api-readiness62/revision10-original-main-cli-receiving/revision3-to-revision4.patch",
+			"bytes": 716,
+			"sha256": "d9a209baded9022ecc1c0f35e822d938d5ac340eb902d38f647855ab1390317c"
+		},
+		{
+			"path": "group6-native-ollama-api-readiness62/revision10-original-main-cli-receiving/revision4-to-revision5.patch",
+			"bytes": 722,
+			"sha256": "a6079ab686a278c218a30e71e5dde28281b46e3af0bf805aec4d9c5d56a812f5"
+		},
+		{
+			"path": "group6-native-ollama-api-readiness62/revision10-original-main-cli-receiving/revision5-to-revision6.patch",
+			"bytes": 14171,
+			"sha256": "5264df7720b21854a258fe292098dace398e215f2d572ae2aac43c6ff45764b3"
+		},
+		{
+			"path": "group6-native-ollama-api-readiness62/revision10-original-main-cli-receiving/revision6-to-revision7.patch",
+			"bytes": 12455,
+			"sha256": "713e42449a12efbc2291a7a691c4f90f9ef77b8c5e5457f430abc907119025d3"
+		},
+		{
+			"path": "group6-native-ollama-api-readiness62/revision10-original-main-cli-receiving/revision7-to-revision8.patch",
+			"bytes": 1148,
+			"sha256": "bd021ee516e0fc8a489cbb6afbcc071260a33c10be36f3b731b33ef3f6197c41"
+		},
+		{
+			"path": "group6-native-ollama-api-readiness62/revision10-original-main-cli-receiving/revision8-to-revision9.patch",
+			"bytes": 502,
+			"sha256": "8e27f9357276a9ed19130875eecc369a2d7a337ac4e3ed327b66590d677aa3ee"
+		},
+		{
+			"path": "group6-native-ollama-api-readiness62/revision10-original-main-cli-receiving/revision9-to-revision10.patch",
+			"bytes": 1339,
+			"sha256": "0c949767579bba5653147b877d22a126eb48c715bb7dc7b6d350c1d26d3589cc"
+		},
+		{
+			"path": "group6-darwin50-controlled-refusal-r3-formatted-20261010/FROZEN-INPUTS.json",
+			"bytes": 1665,
+			"sha256": "2e7c046a8c26db28dae71780a3eca2109799ba483cbe6d59607f34a5bc00b23c"
+		},
+		{
+			"path": "group6-darwin50-controlled-refusal-r3-formatted-20261010/MANIFEST.json",
+			"bytes": 7605,
+			"sha256": "57198339ae333adf902a10bf998f92ed6ff471b041be66cae4657f56ec93ed13"
+		},
+		{
+			"path": "group6-darwin50-controlled-refusal-r3-formatted-20261010/PREPARATION-HEAD.json",
+			"bytes": 88,
+			"sha256": "83c676cf49fa23633b7d72c40c6d09efea0c3432f74fea2a0dcd74de456d0350"
+		},
+		{
+			"path": "group6-darwin50-controlled-refusal-r3-formatted-20261010/README.md",
+			"bytes": 3235,
+			"sha256": "32a8e63e502a7821becd21739d2759ef2623b40114928e81a05c57bb096e15a9"
+		},
+		{
+			"path": "group6-darwin50-controlled-refusal-r3-formatted-20261010/SOURCE-RECEIVING.json",
+			"bytes": 1826,
+			"sha256": "6d6d571ae342008a7bcbacff4ecb6c77e47a0cc959d1c51640d8d7ead214680a"
+		},
+		{
+			"path": "group6-darwin50-controlled-refusal-r3-formatted-20261010/candidate/.github/workflows/ci.yml",
+			"bytes": 57054,
+			"sha256": "826e8825083745bf92acc11802e410aad09487d4d60818d481f8d471e2369f35"
+		},
+		{
+			"path": "group6-darwin50-controlled-refusal-r3-formatted-20261010/candidate/package.json",
+			"bytes": 43023,
+			"sha256": "b42c3410ae31fa196eddf7a855dd8648c3897c88b06d2a418adff52f87dcb424"
+		},
+		{
+			"path": "group6-darwin50-controlled-refusal-r3-formatted-20261010/candidate/static/ergopti_plus/macos/adapters/release_stage.sh",
+			"bytes": 6223,
+			"sha256": "c701f6409b961a43ac6485841d054be809908adb679a612fc94b1094cbc91545"
+		},
+		{
+			"path": "group6-darwin50-controlled-refusal-r3-formatted-20261010/candidate/tools/diagnostics/macos_owned_process.py",
+			"bytes": 19070,
+			"sha256": "9b985af7e8bf549cb843b289885a2bea38a67ea3ce44defaf389dab1001fef98"
+		},
+		{
+			"path": "group6-darwin50-controlled-refusal-r3-formatted-20261010/candidate/tools/diagnostics/macos_release_stage_native_receiving.cjs",
+			"bytes": 11789,
+			"sha256": "e1b30fd473a4753d80cca00fa7ba622065ba17698f0c756869818a942669ff95"
+		},
+		{
+			"path": "group6-darwin50-controlled-refusal-r3-formatted-20261010/candidate/tools/diagnostics/macos_release_stage_route_test.py",
+			"bytes": 19788,
+			"sha256": "0b739b76604a464d86d8e94eb7e5fc37df1834633250f7aac6dd7a6a04e38fc9"
+		},
+		{
+			"path": "group6-darwin50-controlled-refusal-r3-formatted-20261010/candidate/tools/lib/python.cjs",
+			"bytes": 2106,
+			"sha256": "77b1c0f5a03ae23f58cd504b09567e6874a96852939a8fdf8d2e64347bfed1c2"
+		},
+		{
+			"path": "group6-darwin50-controlled-refusal-r3-formatted-20261010/candidate/tools/test/run-js-suite.cjs",
+			"bytes": 97982,
+			"sha256": "193280466991b6b0e7879a275d9aa48466e50d80a2d654c3f611980e8eab6497"
+		},
+		{
+			"path": "group6-darwin50-controlled-refusal-r3-formatted-20261010/candidate/tools/test/test-macos-opaque-network-admission.cjs",
+			"bytes": 53144,
+			"sha256": "ed559809de34a59cf58a9f8ded642125c30e0efb2d94d81fdb46a5dd91641778"
+		},
+		{
+			"path": "group6-darwin50-controlled-refusal-r3-formatted-20261010/candidate/tools/test/test-macos-release-stage-native-receiving.cjs",
+			"bytes": 14830,
+			"sha256": "7e55b19071b1e323a6d7dd6cd76c6795bbeadb0a4e5cb86958da40457101b573"
+		},
+		{
+			"path": "group6-darwin50-controlled-refusal-r3-formatted-20261010/enrollment-proposal.patch",
+			"bytes": 1411,
+			"sha256": "a10f6084ac46e9f0e51d9b016c2d22d7610bca288dbd267207266463f3cf03e2"
+		},
+		{
+			"path": "group6-darwin50-controlled-refusal-r3-formatted-20261010/format-followup.patch",
+			"bytes": 18249,
+			"sha256": "cf7c566638f984284bc33eda3f141f19da08ef9724271c485762d74887b595c0"
+		},
+		{
+			"path": "group6-darwin50-controlled-refusal-r3-formatted-20261010/new-receivers-proposal.patch",
+			"bytes": 27438,
+			"sha256": "14843ec6d65d8f62c2045552cca86b92ee0fdb13d14425855f799adeddb83b7c"
+		},
+		{
+			"path": "group6-darwin50-controlled-refusal-r3-formatted-20261010/preimage/package.json",
+			"bytes": 42900,
+			"sha256": "9c4bb558054fed19240395cdeee2e6e3577e5b9fb13e0fb65a8970c0e6e22bb0"
+		},
+		{
+			"path": "group6-darwin50-controlled-refusal-r3-formatted-20261010/preimage/tools/test/run-js-suite.cjs",
+			"bytes": 97649,
+			"sha256": "2e14ab42434f84366b3d9994030fcd3e2b7d705de13f89f7778c75890c21e579"
+		},
+		{
+			"path": "group6-darwin50-controlled-refusal-r3-formatted-20261010/source-receiving.cjs",
+			"bytes": 6538,
+			"sha256": "47d65ccbe4b3e4e72099afdc68ca67b46fdb99fc1fdcf2e418ec4161148e065a"
+		},
+		{
+			"path": "group6-macos-api-wire-serve-ci-enrollment62/revision1/HANDOVER.md",
+			"bytes": 937,
+			"sha256": "28c0a4d0151e1f05d9032fb20a3ddf9d7ff8ca19e4e325b33844286d4e3d7c79"
+		},
+		{
+			"path": "group6-macos-api-wire-serve-ci-enrollment62/revision1/MANIFEST.json",
+			"bytes": 3664,
+			"sha256": "9791d98494da87cc0465ebf8e1d380a4fb7b3d735fdd84c5caba16fd624d7701"
+		},
+		{
+			"path": "group6-macos-api-wire-serve-ci-enrollment62/revision1/SOURCE-PROOF.json",
+			"bytes": 3393,
+			"sha256": "0fafcfbf13bd10e03ea06538b803e6b9bd0612fe648d1ae6d54944cf048e2904"
+		},
+		{
+			"path": "group6-macos-api-wire-serve-ci-enrollment62/revision1/application.patch",
+			"bytes": 1817,
+			"sha256": "cb0361749cfa1deec6cbe3eefbe5675d4b9f8aedf7cf03db5a5747f39e831313"
+		},
+		{
+			"path": "group6-macos-api-wire-serve-ci-enrollment62/revision1/candidate/.github/workflows/ci-macos.yml",
+			"bytes": 91960,
+			"sha256": "b205461322c7cd1b2665ded280f79167c98c9538d9f90b67965ccfe4c9c65884"
+		},
+		{
+			"path": "group6-macos-api-wire-serve-ci-enrollment62/revision1/dependencies/static/ergopti_plus/macos/modules/llm/managed_ollama_serve.py",
+			"bytes": 22430,
+			"sha256": "98d5a7b6cc797104a3d9e3ffa6415a682afc9f6b7e129072dfe215a3b0030336"
+		},
+		{
+			"path": "group6-macos-api-wire-serve-ci-enrollment62/revision1/dependencies/static/ergopti_plus/macos/platform/network/native_http.py",
+			"bytes": 19959,
+			"sha256": "db1781c62d34aadc39fde55cc2a7a3fa10148747543fa62e1a8f0d3cc95590cf"
+		},
+		{
+			"path": "group6-macos-api-wire-serve-ci-enrollment62/revision1/dependencies/static/ergopti_plus/macos/platform/network/native_ollama_api.py",
+			"bytes": 11268,
+			"sha256": "9360c94c773c2cc89d397f5c0fa0f7522a3cdb5514ea9474e7f6da92078e7239"
+		},
+		{
+			"path": "group6-macos-api-wire-serve-ci-enrollment62/revision1/dependencies/tools/diagnostics/macos_managed_ollama_serve_test.py",
+			"bytes": 42748,
+			"sha256": "abd1a8795896c02370b4f43b2ad2dcb968a2b8bf17e928ba95b5a558a125c712"
+		},
+		{
+			"path": "group6-macos-api-wire-serve-ci-enrollment62/revision1/dependencies/tools/test/macos_native_ollama_api_test.py",
+			"bytes": 23684,
+			"sha256": "e817cc3153ad137f76eb812940659134138ac55309b75905656fb19d5897176e"
+		},
+		{
+			"path": "group6-macos-api-wire-serve-ci-enrollment62/revision1/dependencies/tools/test/test-managed-ollama-protocol.cjs",
+			"bytes": 16279,
+			"sha256": "1d3a26a168c0ee50cadbeabbc02a5f8d4a9f891605077a2dc8c8de3b5c092063"
+		},
+		{
+			"path": "group6-macos-api-wire-serve-ci-enrollment62/revision1/preimages/.github/workflows/ci-macos.yml",
+			"bytes": 91452,
+			"sha256": "88b4fb4c83609fd23aad2890aeb3b04873aac8d336aafe303f5f6f7589466cbd"
+		},
+		{
+			"path": "group6-native-ollama-startup-event-plan62/revision1/PLAN.md",
+			"bytes": 5450,
+			"sha256": "16e9e79b6cf39252d430a2b07301e76fd6c8c1592884411d7ecd830292bb9c62"
+		},
+		{
+			"path": "group6-native-ollama-startup-event-plan62/revision1/SOURCE-BINDINGS.json",
+			"bytes": 3966,
+			"sha256": "f18daac1b72b31f27cb6d0fed85aa07a03629dd4bb8980f6526366c9be265ac9"
+		},
+		{
+			"path": "group6-managed-ollama-startup-contract62/revision1/SOURCE-BINDINGS.json",
+			"bytes": 8746,
+			"sha256": "46ef01e390cd56abd823f51061050dba5a47ab804ca947643f209185b6a3d614"
+		},
+		{
+			"path": "group6-managed-ollama-startup-contract62/revision1/STATE-MACHINE.md",
+			"bytes": 9026,
+			"sha256": "63b3d3e1c498f4f8758a2cfbfd2925c034e252df5219138dc0c9a0f606f23b40"
+		},
+		{
+			"path": "group6-native-ollama-api-readiness62/R10-root-actual-receiving/ACTUAL-RECEIVING.json",
+			"bytes": 5276,
+			"sha256": "573b088f03df9d74e5e03159256d63734e854a28d287f8d09c046d888c5d4416"
+		},
+		{
+			"path": "group6-native-ollama-api-readiness62/R10-root-actual-receiving/CAUSAL-MUTANTS.json",
+			"bytes": 2538,
+			"sha256": "d57e28c9eb57a122a97c494fca228395ed2b78727edf520bbdc30c6b4570c390"
+		},
+		{
+			"path": "group6-native-ollama-api-readiness62/R10-root-actual-receiving/candidate-serve.log",
+			"bytes": 6249,
+			"sha256": "56683cd02ded88bd1a36c212c971a761fcb84b147a701ce4f621b1313c09d88e"
+		},
+		{
+			"path": "group6-native-ollama-api-readiness62/R10-root-actual-receiving/candidate-wire.log",
+			"bytes": 3345,
+			"sha256": "242927e0dd23b41c21fd47a1f40f5b04885981b3faf96f462d34a913ce60844a"
+		},
+		{
+			"path": "group6-native-ollama-api-readiness62/R10-root-actual-receiving/lost-partial-child.log",
+			"bytes": 1821,
+			"sha256": "5fafcd2ede44df2f3606e23bd2c33449cdaa3aa9ea19ac3d8e79c5b826cffcf9"
+		},
+		{
+			"path": "group6-native-ollama-api-readiness62/R10-root-actual-receiving/missing-progress-refence.log",
+			"bytes": 1064,
+			"sha256": "374efd8a1e7b548ed5de789396832c6644f71c693f6b1dd602411bd5bf4937d7"
+		},
+		{
+			"path": "group6-native-ollama-api-readiness62/R10-root-actual-receiving/predecessor-serve.log",
+			"bytes": 15389,
+			"sha256": "dc3a59ebddc0bec7b2769323772928e752e55a1117c761065d605d997a21cde1"
+		},
+		{
+			"path": "group6-native-ollama-api-readiness62/R10-root-actual-receiving/predecessor-wire.log",
+			"bytes": 14626,
+			"sha256": "e81cf2472047cafbe2e4a64b3e0aafabd77032b0840c445f97a60fb0f500939a"
+		},
+		{
+			"path": "group6-darwin50-controlled-refusal-r3-formatted-20261010-actual/ACTUAL-RECEIVING.json",
+			"bytes": 1060,
+			"sha256": "f5e9f67abb3361bfe7e7516294bab29c5e557df99e343f1595784ec8b46735f2"
+		},
+		{
+			"path": "group6-darwin50-controlled-refusal-r3-formatted-20261010-actual/RECEIVING.json",
+			"bytes": 4051,
+			"sha256": "01a8548f36d13703a4830b06815ee2cfdd2a5b2b53ab5462d7eb12637d0e0dc3"
+		},
+		{
+			"path": "group6-darwin50-controlled-refusal-r3-formatted-20261010-actual/command.log",
+			"bytes": 107,
+			"sha256": "f3159089fbcadeab6221a7ffd8890723fa63beeed19cb16b5089e6ef1c8a761a"
+		},
+		{
+			"path": "group6-darwin50-controlled-refusal-r3-formatted-20261010-actual/setup-refusal.log",
+			"bytes": 1217,
+			"sha256": "4fba56bcdbf8383af3c70fa5c944b7b3d72aa954ad0afba2692c91b328558fd5"
+		},
+		{
+			"path": "group6-native-ollama-api-readiness62/review-resume-revision10-original-main-cli-source-ack.json",
+			"bytes": 3924,
+			"sha256": "228904027da1e72e1febd3ba3da559e055a8dc7e2782608bd49d1bbbf564f61f"
+		},
+		{
+			"path": "group6-native-ollama-api-readiness62/review-resume-adopted-r10-format-todo-source-ack.json",
+			"bytes": 6257,
+			"sha256": "259e5f851e8895dfb2ef6fcae5fee4c0b27b9ff291f21b27bc6ac566abade97d"
+		},
+		{
+			"path": "group6-macos-api-wire-serve-ci-enrollment62/review-resume-revision1-workflow-source-ack.json",
+			"bytes": 2330,
+			"sha256": "c7090a7c90a52dd24404278814e5f8c70aafa6194e878a317ad0646770e08599"
+		},
+		{
+			"path": "group6-darwin50-controlled-refusal-r2-20261010-review-source-ack.json",
+			"bytes": 2528,
+			"sha256": "7cdea119cfdd0966506611a8e78b825edb4cea5fff1a8821a4b8f13476aab4fa"
+		},
+		{
+			"path": "group6-darwin50-restored-7299783-source-review.json",
+			"bytes": 8814,
+			"sha256": "6b8f9845d9a9078cfed96a22b3f2ab3d9b3c31e7df82e84745134fc4deecb223"
+		},
+		{
+			"path": "group6-darwin50-fba-source-only-preserved.tar.gz",
+			"bytes": 145885,
+			"sha256": "93a9b137c56524cbd1c227e993ae5cab608e297b55cf31f6a12ab52d49b9e373"
+		},
+		{
+			"path": "group6-pinned-ollama-startup-source62/revision1/RECEIVING-NOTES.md",
+			"bytes": 1603,
+			"sha256": "6713afa0d858d82b385a3813c541265ba2c7eb22c5c509ee9960775942007876"
+		},
+		{
+			"path": "group6-pinned-ollama-startup-source62/revision1/SOURCE.json",
+			"bytes": 579,
+			"sha256": "0248c2ce34a573049ddc0dd9eae158ecb17867730d8efc8069855367b9d17b39"
+		},
+		{
+			"path": "group6-pinned-ollama-startup-source62/revision1/cmd/cmd.go",
+			"bytes": 67594,
+			"sha256": "e6ac73dca45ec039b45c640f2b29dca5a31561e6df514c10e37fe0281bedf627"
+		},
+		{
+			"path": "group6-pinned-ollama-startup-source62/revision1/server/routes.go",
+			"bytes": 82868,
+			"sha256": "2621eef9e33b370d97a460eef80466654e4319ffea5ec0b94b3dbd79d5effd5e"
+		},
+		{
+			"path": "group6-readiness-native-ci-38046195371-terminal/TERMINAL.json",
+			"bytes": 1009,
+			"sha256": "b25f19d77be377c6de895af60d28160ad1bdc95410ac1bbf34b7600a2f44143f"
+		}
+	]
+}

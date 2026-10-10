@@ -1016,6 +1016,7 @@
 	"menu.apps.encrypt_desc": "Szyfruj pliki i foldery",
 	"menu.apps.no_apps": "Nie znaleziono aplikacji",
 	"menu.apps.title": "🛠️ Aplikacje",
+	"menu.builder.active_brand": "Ergopti",
 	"menu.builder.title": "Ergopti+",
 	"menu.builder.title_paused": "Ergopti+ ⏸",
 	"menu.debug.console": "Konsola",
@@ -3283,5 +3284,6 @@
 	"healthcheck.problem.diagnostic_check": "Kontrola diagnostyczna nie powiodła się: %s.",
 	"healthcheck.export.privacy_notice": "Ten raport udostępnia tylko dozwolone dane techniczne. Logi, dowolny tekst, ścieżki i dane identyfikujące są pomijane również przy włączonych szczegółach. Lokalne testy strony nie są uwzględnione.",
 	"sg_actions.llm_translate_context": "🌐 Przetłumacz bieżące zdanie [konfigurowalne]",
-	"menu.about.startup_other_command_reason": "Inne polecenie startowe: Uruchamianie skonfigurowano dla innego polecenia lub instalacji. Obecne ustawienie zostaje zachowane."
+	"menu.about.startup_other_command_reason": "Inne polecenie startowe: Uruchamianie skonfigurowano dla innego polecenia lub instalacji. Obecne ustawienie zostaje zachowane.",
+	"menu.llm.model_parent_with_health": "%sWybrany model: %s"
 }

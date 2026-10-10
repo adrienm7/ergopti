@@ -1016,6 +1016,7 @@
 	"menu.apps.encrypt_desc": "Krypter filer og mapper",
 	"menu.apps.no_apps": "Ingen applikationer fundet",
 	"menu.apps.title": "🛠️ Programmer",
+	"menu.builder.active_brand": "Ergopti",
 	"menu.builder.title": "Ergopti+",
 	"menu.builder.title_paused": "Ergopti+ ⏸",
 	"menu.debug.console": "Konsol",
@@ -3283,5 +3284,6 @@
 	"healthcheck.problem.diagnostic_check": "Diagnostisk kontrol mislykkedes: %s.",
 	"healthcheck.export.privacy_notice": "Denne rapport deler kun tilladte tekniske oplysninger. Logfiler, fri tekst, stier og identificerende oplysninger udelades, også med detaljer aktiveret. Lokale sidetest medtages ikke.",
 	"sg_actions.llm_translate_context": "🌐 Oversæt den aktuelle sætning [kan tilpasses]",
-	"menu.about.startup_other_command_reason": "Anden startkommando: Opstart er indstillet til en anden kommando eller installation. Den eksisterende indstilling bevares."
+	"menu.about.startup_other_command_reason": "Anden startkommando: Opstart er indstillet til en anden kommando eller installation. Den eksisterende indstilling bevares.",
+	"menu.llm.model_parent_with_health": "%sValgt model: %s"
 }

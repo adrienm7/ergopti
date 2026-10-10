@@ -95,6 +95,8 @@ local separator_factory = type(ManifestMenu) == "table" and rawget(ManifestMenu,
 local separator_render = type(ManifestMenu) == "table" and rawget(ManifestMenu, "render_rows")
 local separator_array = type(ManifestMenu) == "table" and rawget(ManifestMenu, "get_array")
 local separator_root = type(ManifestMenu) == "table" and rawget(ManifestMenu, "get_root")
+local header_template = type(ManifestMenu) == "table" and rawget(ManifestMenu, "template_rows")
+local header_command = type(ManifestMenu) == "table" and rawget(ManifestMenu, "command_row")
 
 --- Refuses facade or function withdrawal without invoking its replacement.
 --- @return boolean
@@ -106,6 +108,14 @@ local function separator_facade_current()
 		and type(separator_render) == "function" and rawget(ManifestMenu, "render_rows") == separator_render
 		and type(separator_array) == "function" and rawget(ManifestMenu, "get_array") == separator_array
 		and type(separator_root) == "function" and rawget(ManifestMenu, "get_root") == separator_root
+end
+
+--- Retains the imported template and command row owners across header readers.
+--- @return boolean current
+local function header_facade_current()
+	return separator_facade_current()
+		and type(header_template) == "function" and rawget(ManifestMenu, "template_rows") == header_template
+		and type(header_command) == "function" and rawget(ManifestMenu, "command_row") == header_command
 end
 
 --- Substitutes a single placeholder in a translated template.
@@ -375,26 +385,101 @@ local function _version_text(version)
 end
 
 --- Builds the top-level header with version.
---- Returns a single item (not an array) — callers insert it directly.
+--- Returns one provider row and its retained publication receipt.
 ---
 --- While the script is paused the header is the way back, as on macOS, where the
 --- title row resumes: it used to stay a disabled label, so a paused script could
 --- only be resumed by a gesture or a shortcut the user had to remember.
 local function _build_header(ctx)
+	if not header_facade_current() then return nil end
+	local root = separator_root()
+	if not header_facade_current() or type(root) ~= "table" or getmetatable(root) ~= nil then return nil end
+	local active = separator_array("linux_tray_active_header")
+	if not header_facade_current() or getmetatable(root) ~= nil then return nil end
+	local paused = separator_array("linux_tray_paused_header")
+	if not header_facade_current() or type(root) ~= "table" or getmetatable(root) ~= nil then return nil end
+	local captured = {}
+	local projected, projected_fields
+	for key, rows in next, { linux_tray_active_header = active, linux_tray_paused_header = paused } do
+		if type(rows) ~= "table" or getmetatable(rows) ~= nil or rawget(root, key) ~= rows then return nil end
+		for index in next, rows do if index ~= 1 then return nil end end
+		local record = rawget(rows, 1)
+		if type(record) ~= "table" or getmetatable(record) ~= nil then return nil end
+		local fields = {}
+		for name, value in next, record do
+			if name ~= "type" and name ~= "id" and name ~= "i18n" and name ~= "caption_getter"
+				and name ~= "caption_layout" and name ~= "caption_joiner" and name ~= "platforms"
+				and name ~= "unavailable" then return nil end
+			fields[name] = value
+		end
+		local expected_kind = key == "linux_tray_active_header" and "label" or "command"
+		local expected_id = key == "linux_tray_active_header" and "linux_tray_active_header" or "linux_tray_resume"
+		if rawget(record, "type") ~= expected_kind or rawget(record, "id") ~= expected_id
+			or type(rawget(record, "i18n")) ~= "string" or rawget(record, "i18n") == ""
+			or rawget(record, "caption_getter") ~= "linux_tray_version"
+			or rawget(record, "caption_layout") ~= "prefix" or rawget(record, "caption_joiner") ~= " — "
+			or rawget(record, "unavailable") ~= "hide" then return nil end
+		local platforms = rawget(record, "platforms")
+		if type(platforms) ~= "table" or getmetatable(platforms) ~= nil
+			or rawget(platforms, 1) ~= "linux" then return nil end
+		for index in next, platforms do if index ~= 1 then return nil end end
+		captured[key] = { rows = rows, record = record, fields = fields, platforms = platforms }
+	end
+	if captured.linux_tray_active_header == nil or captured.linux_tray_paused_header == nil then return nil end
+
+	local function current()
+		if not header_facade_current() or separator_root() ~= root or getmetatable(root) ~= nil then return false end
+		for key, snapshot in next, captured do
+			local rows, record, platforms = snapshot.rows, snapshot.record, snapshot.platforms
+			if not header_facade_current() or separator_array(key) ~= rows or rawget(root, key) ~= rows
+				or getmetatable(rows) ~= nil or rawget(rows, 1) ~= record or getmetatable(record) ~= nil
+				or rawget(record, "platforms") ~= platforms or getmetatable(platforms) ~= nil
+				or rawget(platforms, 1) ~= "linux" then return false end
+			for index in next, rows do if index ~= 1 then return false end end
+			for index in next, platforms do if index ~= 1 then return false end end
+			for name, value in next, snapshot.fields do if rawget(record, name) ~= value then return false end end
+			for name in next, record do if snapshot.fields[name] == nil then return false end end
+		end
+		if projected ~= nil then
+			if getmetatable(projected) ~= nil then return false end
+			for name, value in next, projected_fields do if rawget(projected, name) ~= value then return false end end
+			for name in next, projected do if projected_fields[name] == nil then return false end end
+		end
+		return header_facade_current()
+	end
+
 	local version = _version_text(ctx._version or Version.VERSION)
-	if ctx.paused == true then
-		return {
-			label = i18n_safe("menu.builder.title_paused") .. " — " .. version,
-			action = function()
+	local is_paused = ctx.paused == true
+	if not current() then return nil end
+	local ok, rows = pcall(function()
+		if is_paused then
+			return ManifestMenu.template_rows("linux_tray_paused_header", { ["linux_tray_resume"] = function()
 				if type(ctx.on_toggle_pause) ~= "function" then
 					Logger.error(LOG, "Paused title row: ctx.on_toggle_pause is absent — the script stays paused.")
 					return
 				end
 				ctx.on_toggle_pause()
-			end,
-		}
+			end },
+				{ ["linux_tray_version"] = function() return version end }, {})
+		end
+		return ManifestMenu.template_rows("linux_tray_active_header", {},
+			{ ["linux_tray_version"] = function() return version end }, {})
+	end)
+	if not ok or not current() or type(rows) ~= "table" or getmetatable(rows) ~= nil then return nil end
+	for index in next, rows do if index ~= 1 then return nil end end
+	local row = rawget(rows, 1)
+	if type(row) ~= "table" or getmetatable(row) ~= nil or type(rawget(row, "label")) ~= "string"
+		or rawget(row, "label") == "" then return nil end
+	for name in next, row do
+		if name ~= "label" and (is_paused and name ~= "action" or not is_paused and name ~= "disabled") then return nil end
 	end
-	return { label = "Ergopti — " .. version, disabled = true }
+	if is_paused then
+		if type(rawget(row, "action")) ~= "function" then return nil end
+	elseif rawget(row, "disabled") ~= true then return nil end
+	projected, projected_fields = row, {}
+	for name, value in next, row do projected_fields[name] = value end
+	if not current() then return nil end
+	return row, current
 end
 
 --- Greys one feature row for a pause, and strips what would let it act.
@@ -5068,9 +5153,10 @@ function M.build(ctx)
 	-- already deeper than that — would truncate it silently.
 	local rows = {}
 
-	-- Header (non-interactive). Not a manifest row: it is this driver's version
-	-- string, which no declaration can carry.
-	rows[#rows + 1] = _build_header(ctx)
+	-- The shared header owns inert/paused presentation; the version remains native data.
+	local header, header_current = _build_header(ctx)
+	if not header or type(header_current) ~= "function" or not header_current() then return {} end
+	rows[#rows + 1] = header
 
 	-- Every entry below, and the separators between them, in the order the
 	-- manifest declares — read rather than repeated here.
@@ -5168,9 +5254,9 @@ function M.build(ctx)
 		Logger.error(LOG, "The manifest declares no quit row for this driver — the tray cannot be closed.")
 	end
 
-	if not separator_facade_current() or not receive_separator("current") then return {} end
+	if not separator_facade_current() or not receive_separator("current") or not header_current() then return {} end
 	local rendered = separator_render(rows, "top_level")
-	if not separator_facade_current() or not receive_separator("current") then return {} end
+	if not separator_facade_current() or not receive_separator("current") or not header_current() then return {} end
 	return rendered
 end
 

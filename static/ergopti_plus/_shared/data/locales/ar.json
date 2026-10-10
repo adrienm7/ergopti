@@ -1016,6 +1016,7 @@
 	"menu.apps.encrypt_desc": "تشفير الملفات والمجلدات",
 	"menu.apps.no_apps": "لم يُعثر على تطبيقات",
 	"menu.apps.title": "🛠️ التطبيقات",
+	"menu.builder.active_brand": "Ergopti",
 	"menu.builder.title": "Ergopti+",
 	"menu.builder.title_paused": "Ergopti+ ⏸",
 	"menu.debug.console": "وحدة التحكم",
@@ -3283,5 +3284,6 @@
 	"healthcheck.problem.diagnostic_check": "فشل فحص التشخيص: %s.",
 	"healthcheck.export.privacy_notice": "يشارك هذا التقرير الحقائق التقنية المسموح بها فقط. تُستبعد السجلات والنصوص الحرة والمسارات وبيانات الهوية، حتى عند تفعيل التفاصيل. اختبارات الصفحة المحلية غير مضمنة.",
 	"sg_actions.llm_translate_context": "🌐 ترجمة الجملة الحالية [قابل للتخصيص]",
-	"menu.about.startup_other_command_reason": "أمر بدء آخر: تم إعداد بدء التشغيل لأمر أو تثبيت آخر. يبقى الإعداد الحالي محفوظًا."
+	"menu.about.startup_other_command_reason": "أمر بدء آخر: تم إعداد بدء التشغيل لأمر أو تثبيت آخر. يبقى الإعداد الحالي محفوظًا.",
+	"menu.llm.model_parent_with_health": "%sالنموذج المحدد: %s"
 }

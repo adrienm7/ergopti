@@ -1016,6 +1016,7 @@
 	"menu.apps.encrypt_desc": "ファイルとフォルダーを暗号化",
 	"menu.apps.no_apps": "アプリケーションが見つかりません",
 	"menu.apps.title": "🛠️ アプリケーション",
+	"menu.builder.active_brand": "Ergopti",
 	"menu.builder.title": "Ergopti+",
 	"menu.builder.title_paused": "Ergopti+ ⏸",
 	"menu.debug.console": "コンソール",
@@ -3283,5 +3284,6 @@
 	"healthcheck.problem.diagnostic_check": "診断チェックに失敗しました: %s。",
 	"healthcheck.export.privacy_notice": "このレポートは許可された技術情報のみを共有します。詳細を有効にしても、ログ、自由記述、パス、個人を特定する情報は含まれません。ページのローカルテストは含まれません。",
 	"sg_actions.llm_translate_context": "🌐 現在の文を翻訳 [設定可能]",
-	"menu.about.startup_other_command_reason": "別の起動コマンド：起動は別のコマンドまたはインストールに設定されています。既存の設定は保持されます。"
+	"menu.about.startup_other_command_reason": "別の起動コマンド：起動は別のコマンドまたはインストールに設定されています。既存の設定は保持されます。",
+	"menu.llm.model_parent_with_health": "%s選択中のモデル：%s"
 }

@@ -1016,6 +1016,7 @@
 	"menu.apps.encrypt_desc": "Dateien und Ordner verschlüsseln",
 	"menu.apps.no_apps": "Keine Anwendungen gefunden",
 	"menu.apps.title": "🛠️ Anwendungen",
+	"menu.builder.active_brand": "Ergopti",
 	"menu.builder.title": "Ergopti+",
 	"menu.builder.title_paused": "Ergopti+ ⏸",
 	"menu.debug.console": "Konsole",
@@ -3283,5 +3284,6 @@
 	"healthcheck.problem.diagnostic_check": "Diagnoseprüfung fehlgeschlagen: %s.",
 	"healthcheck.export.privacy_notice": "Dieser Bericht teilt nur freigegebene technische Angaben. Protokolle, Freitext, Pfade und identifizierende Angaben bleiben auch bei aktivierten Details ausgeschlossen. Lokale Seitentests sind nicht enthalten.",
 	"sg_actions.llm_translate_context": "🌐 Aktuellen Satz übersetzen [konfigurierbar]",
-	"menu.about.startup_other_command_reason": "Anderer Startbefehl: Der Autostart ist für einen anderen Befehl oder eine andere Installation eingerichtet. Die Einstellung bleibt erhalten."
+	"menu.about.startup_other_command_reason": "Anderer Startbefehl: Der Autostart ist für einen anderen Befehl oder eine andere Installation eingerichtet. Die Einstellung bleibt erhalten.",
+	"menu.llm.model_parent_with_health": "%sAusgewähltes Modell: %s"
 }

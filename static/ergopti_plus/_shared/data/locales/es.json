@@ -1016,6 +1016,7 @@
 	"menu.apps.encrypt_desc": "Cifrar archivos y carpetas",
 	"menu.apps.no_apps": "No se encontraron aplicaciones",
 	"menu.apps.title": "🛠️ Aplicaciones",
+	"menu.builder.active_brand": "Ergopti",
 	"menu.builder.title": "Ergopti+",
 	"menu.builder.title_paused": "Ergopti+ ⏸",
 	"menu.debug.console": "Consola",
@@ -3283,5 +3284,6 @@
 	"healthcheck.problem.diagnostic_check": "Falló la comprobación de diagnóstico: %s.",
 	"healthcheck.export.privacy_notice": "Este informe comparte solo datos técnicos permitidos. Se excluyen registros, texto libre, rutas y datos identificativos, incluso con los detalles activados. No incluye las pruebas locales de la página.",
 	"sg_actions.llm_translate_context": "🌐 Traducir la frase actual [configurable]",
-	"menu.about.startup_other_command_reason": "Otro comando de inicio: El inicio está configurado para otro comando o instalación. Se conserva su configuración."
+	"menu.about.startup_other_command_reason": "Otro comando de inicio: El inicio está configurado para otro comando o instalación. Se conserva su configuración.",
+	"menu.llm.model_parent_with_health": "%sModelo seleccionado: %s"
 }

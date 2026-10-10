@@ -361,9 +361,10 @@ local function with_file_command(body, change_label)
 				return document
 			end,
 			i18n = { get = function(key)
-				-- The counted canonical parent requires its genuine translated caption;
+				-- The counted parent and full-tray header require genuine translated captions;
 				-- the file-command assertions retain their independent key labels.
-				if key == "menu.hotstrings.title" then return native_captions.get(key) end
+				if key == "menu.hotstrings.title" or key == "menu.builder.active_brand"
+					or key == "menu.builder.title_paused" then return native_captions.get(key) end
 				return key
 			end, section = function(key) return key end },
 			logger = require("logger.shim"),

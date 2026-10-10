@@ -34,6 +34,8 @@ BOOT = load("ergopti_serve_bootstrap_owner", DRIVER / "platform/ollama_bootstrap
 AUTHORITY = load("ergopti_serve_daemon_authority", DRIVER / "platform/ollama_daemon_authority.py")
 PROXY = load("ergopti_serve_proxy_policy", SHARED / "python/network_proxy_policy.py")
 NATIVE = load("ergopti_serve_native_helper", DRIVER / "platform/network/native_http.py")
+API = load("ergopti_serve_native_api", DRIVER / "platform/network/native_ollama_api.py")
+PULL = load("ergopti_serve_admission_owner", SHARED / "python/managed_ollama_pull.py")
 
 
 class ServeRefusal(RuntimeError):
@@ -74,6 +76,11 @@ class ServeOwner:
         self._retirement_deadline = None
         self._cleanup_debt = None
         self.cancelled = False
+        self._api_responses = []
+        self._api_admission = None
+        self._api_ready = False
+        self._api_current = None
+        self._api_acquiring = False
         register(self)
 
     def progress(self):
@@ -239,12 +246,153 @@ class ServeOwner:
         self.authority.publish(self.operation, self.alias, self.policy.shared)
         return self
 
+    def _register_api_response(self, response):
+        if not self._api_acquiring or any(not value["closed"] for value in self._api_responses):
+            raise ServeRefusal("state")
+        original_close = response.close
+        record = {"response": response, "attempted": False, "closed": False, "error": None}
+        self._api_responses.append(record)
+
+        def close():
+            if record["attempted"]:
+                if record["error"] is not None:
+                    raise record["error"]
+                return
+            record["attempted"] = True
+            try:
+                original_close()
+                if response._closed is not True:
+                    raise ServeRefusal("cleanup")
+                record["closed"] = True
+            except BaseException as error:
+                record["error"] = error
+                raise
+
+        record["close"] = close
+        response.close = close
+        return True
+
+    def acquire_readiness(self):
+        """Authenticate this original daemon's accepted socket under the serve clock.
+
+        The shared pull owner contributes its listener/session admission only;
+        no model pull, operation retirement claim or extra deadline is created.
+        Every local helper is retained before selector or child acquisition.
+        """
+        if (
+            not self._started
+            or self._api_admission is not None
+            or self._api_ready
+            or self._api_acquiring
+            or self._retirement_deadline is not None
+        ):
+            raise ServeRefusal("state")
+        self.progress()
+        session_wire, authority_wire = self.session._written, self.authority._written
+        proof = AUTHORITY.POLICY.authenticate(
+            authority_wire, session_wire, self.policy.shared, os.geteuid()
+        )
+        if (
+            proof["listener"] != self.operation.listener
+            or proof["source_alias"] != self.alias.proof
+        ):
+            raise ServeRefusal("session")
+        owner = self
+
+        def live():
+            owner.progress()
+            if (
+                owner._retirement_deadline is not None
+                or owner.operation.active is not True
+                or owner.operation.physically_retired is True
+                or owner.operation._retirement_started
+                or owner.operation.listener != proof["listener"]
+                or owner.session._written != session_wire
+                or owner.authority._written != authority_wire
+            ):
+                raise ServeRefusal("state")
+
+        def current():
+            live()
+            owner.session.validate()
+            owner.authority.validate()
+            owner.operation.recheck_source()
+            live()
+
+        class RegisteredPorts:
+            def discover(self, *arguments, source_alias):
+                current()
+                result = API.discover(
+                    *arguments,
+                    source_alias=source_alias,
+                    register=owner._register_api_response,
+                    absolute_deadline=owner.deadline,
+                    progress=live,
+                    pre_acquire=current,
+                )
+                current()
+                return result
+
+            def open_request(self, *arguments, source_alias):
+                current()
+                result = API.open_request(
+                    *arguments,
+                    source_alias=source_alias,
+                    register=owner._register_api_response,
+                    absolute_deadline=owner.deadline,
+                    progress=live,
+                    pre_acquire=current,
+                )
+                current()
+                return result
+
+        current()
+        ports = AUTHORITY.POLICY.BoundAliasPorts(
+            RegisteredPorts(), proof, self.session.data, os.geteuid()
+        )
+        self._api_admission = PULL.PullOwner(
+            self.session.data,
+            str(self.alias.executable),
+            ports,
+            self.idle_timeout,
+            self.policy.shared.maximum_bytes,
+        )
+        self._api_acquiring = True
+        try:
+            current()
+            remaining = self.deadline - time.monotonic()
+            if remaining <= 0:
+                raise ServeRefusal("deadline")
+            self._api_admission.admit(remaining)
+            current()
+            if not self._api_responses or any(not value["closed"] for value in self._api_responses):
+                raise ServeRefusal("cleanup")
+            self._api_current = current
+            self._api_ready = True
+            return self
+        finally:
+            self._api_acquiring = False
+
     def retire(self, timeout):
         """Unknown native retirement keeps the exact names and original source FD."""
         if self._retirement_deadline is None:
             if type(timeout) not in (float, int) or not math.isfinite(timeout) or timeout <= 0:
                 raise ServeRefusal("protocol")
             self._retirement_deadline = time.monotonic() + timeout
+        self._api_ready = False
+        # Constructor/context closure uses the same captured one-shot method.
+        # An uncertain close is retained, never retried against reused descriptors.
+        for record in self._api_responses:
+            if not record["closed"]:
+                try:
+                    record["close"]()
+                except BaseException as error:
+                    if self._cleanup_debt is None:
+                        self._cleanup_debt = error
+                if not record["closed"]:
+                    return False
+        if self._api_acquiring:
+            return False
         if self.operation is not None:
             try:
                 settled = self.operation.settle(
@@ -295,8 +443,39 @@ class ServeOwner:
         return status if self.retire(retirement_timeout) else 78
 
 
-def serve(port, timeout, idle_timeout, retirement_timeout):
+def serve(
+    port, timeout, idle_timeout, retirement_timeout, *, caller_nonce=None, acquire_readiness=False
+):
+    # The caller binding is public randomness, never the daemon session token.
+    # Only this native owner may project its authenticated lifecycle to stdout.
+    if caller_nonce is not None and (
+        type(caller_nonce) is not str
+        or len(caller_nonce) != 32
+        or any(value not in "0123456789abcdef" for value in caller_nonce)
+    ):
+        raise ServeRefusal("protocol")
+
+    if type(acquire_readiness) is not bool or (acquire_readiness and caller_nonce is None):
+        raise ServeRefusal("protocol")
+
+    def publish(role, status=None):
+        if caller_nonce is None:
+            return
+        if role == "READY":
+            if not owner._api_ready or owner._api_current is None:
+                raise ServeRefusal("state")
+            owner._api_current()
+        if role in ("ACTIVE", "READY") and status is None:
+            line = "ERGOPTI_MANAGED_DAEMON_V1 " + caller_nonce + " " + role
+        elif role == "RETIRED" and type(status) is int and 0 <= status <= 255:
+            line = "ERGOPTI_MANAGED_DAEMON_V1 " + caller_nonce + " RETIRED " + str(status)
+        else:
+            raise ServeRefusal("protocol")
+        print(line, flush=True)
+
     if not NATIVE_PRODUCTION_QUALIFIED:
+        # This fixed refusal occurs before any source/session/daemon acquisition.
+        publish("RETIRED", 78)
         raise ServeRefusal("unavailable")
     owner = ServeOwner(port, timeout, idle_timeout, retirement_timeout, register=lambda value: None)
 
@@ -310,15 +489,35 @@ def serve(port, timeout, idle_timeout, retirement_timeout):
     try:
         try:
             owner.prepare().start()
+            # start() returns only after the mapped-image ACTIVE handshake and
+            # same-session authority publication. This is not socket/API readiness.
+            if caller_nonce is not None:
+                owner.progress()
+                publish("ACTIVE")
+                owner.progress()
+            if acquire_readiness:
+                owner.acquire_readiness()
+                owner.progress()
+                publish("READY")
+                owner.progress()
             result = owner.wait(retirement_timeout)
         except BaseException as primary:
             if not owner.retire(retirement_timeout):
                 raise ServeRefusal(
                     "operation", primary=primary, cleanup=owner._cleanup_debt
                 ) from primary
+            try:
+                publish("RETIRED", 78)
+            except BaseException as publication_error:
+                raise ServeRefusal(
+                    "publication", primary=primary, cleanup=publication_error
+                ) from primary
             raise
         if not owner.retire(retirement_timeout):
             raise ServeRefusal("cleanup", cleanup=owner._cleanup_debt)
+        # wait() and the original retire() join must both precede this marker.
+        # Exit status without this marker grants no native namespace closure.
+        publish("RETIRED", result)
         return result
     finally:
         for name, handler in previous.items():
@@ -331,6 +530,8 @@ def main():
     parser.add_argument("--timeout", type=float, required=True)
     parser.add_argument("--idle-timeout", type=float, required=True)
     parser.add_argument("--retirement-timeout", type=float, required=True)
+    parser.add_argument("--caller-nonce")
+    parser.add_argument("--acquire-readiness", action="store_true")
     arguments = parser.parse_args()
     if not 1024 <= arguments.port <= 65535 or any(
         not math.isfinite(value) or value <= 0
@@ -339,7 +540,12 @@ def main():
         return 64
     try:
         return serve(
-            arguments.port, arguments.timeout, arguments.idle_timeout, arguments.retirement_timeout
+            arguments.port,
+            arguments.timeout,
+            arguments.idle_timeout,
+            arguments.retirement_timeout,
+            caller_nonce=arguments.caller_nonce,
+            acquire_readiness=arguments.acquire_readiness,
         )
     except Exception:
         print("Managed Ollama daemon admission refused.", file=sys.stderr)

@@ -1016,6 +1016,7 @@
 	"menu.apps.encrypt_desc": "Kryptera filer och mappar",
 	"menu.apps.no_apps": "Inga applikationer hittades",
 	"menu.apps.title": "🛠️ Program",
+	"menu.builder.active_brand": "Ergopti",
 	"menu.builder.title": "Ergopti+",
 	"menu.builder.title_paused": "Ergopti+ ⏸",
 	"menu.debug.console": "Konsol",
@@ -3283,5 +3284,6 @@
 	"healthcheck.problem.diagnostic_check": "Diagnostisk kontroll misslyckades: %s.",
 	"healthcheck.export.privacy_notice": "Den här rapporten delar bara tillåtna tekniska uppgifter. Loggar, fritext, sökvägar och identifierande uppgifter utesluts även när detaljer är aktiverade. Lokala sidtester ingår inte.",
 	"sg_actions.llm_translate_context": "🌐 Översätt den aktuella meningen [konfigurerbar]",
-	"menu.about.startup_other_command_reason": "Annat startkommando: Uppstart är inställd för ett annat kommando eller en annan installation. Den befintliga inställningen bevaras."
+	"menu.about.startup_other_command_reason": "Annat startkommando: Uppstart är inställd för ett annat kommando eller en annan installation. Den befintliga inställningen bevaras.",
+	"menu.llm.model_parent_with_health": "%sVald modell: %s"
 }

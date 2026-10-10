@@ -9303,7 +9303,7 @@ id = "agent_system1"
 i18n = "menu.agent.system1"
 caption_getter = "agent_system_backend_current_caption"
 caption_format = "numbered"
-platforms = ["linux"]
+platforms = ["linux", "ahk"]
 unavailable = "hide"
 
 [[menu.agent_linux_system2_frame]]
@@ -9312,7 +9312,7 @@ id = "agent_system2"
 i18n = "menu.agent.system2"
 caption_getter = "agent_system_backend_current_caption"
 caption_format = "numbered"
-platforms = ["linux"]
+platforms = ["linux", "ahk"]
 unavailable = "hide"
 
 # The actual Windows dynamic profile row retains its finished native Menu child.
@@ -9531,4 +9531,45 @@ type = "command"
 id = "personal_info_editor_open"
 i18n = "menu.shortcuts.edit_personal_info"
 platforms = ["hs", "linux"]
+unavailable = "hide"
+
+# Linux keeps the version value and resume callback native; this frame owns both header kinds.
+[[menu.linux_tray_active_header]]
+type = "label"
+id = "linux_tray_active_header"
+i18n = "menu.builder.active_brand"
+caption_getter = "linux_tray_version"
+caption_layout = "prefix"
+caption_joiner = " — "
+platforms = ["linux"]
+unavailable = "hide"
+
+[[menu.linux_tray_paused_header]]
+type = "command"
+id = "linux_tray_resume"
+i18n = "menu.builder.title_paused"
+caption_getter = "linux_tray_version"
+caption_layout = "prefix"
+caption_joiner = " — "
+platforms = ["linux"]
+unavailable = "hide"
+
+# The Windows Agent picker remains native; its fixed count caption is declared.
+[[menu.agent_windows_disabled_apps_command]]
+type = "command"
+id = "agent_disabled_apps"
+i18n = "menu.agent.disabled_apps"
+caption_getter = "agent_disabled_apps_count"
+caption_format = "numbered"
+platforms = ["ahk"]
+unavailable = "hide"
+
+# Windows model parent: native cached health precedes the translated model label.
+[[menu.llm_model_parent_ahk]]
+type = "group"
+id = "llm_model"
+i18n = "menu.llm.model_parent_with_health"
+caption_getters = ["llm_model_health_prefix", "llm_model_current_caption"]
+disabled_when = ["llm_model_parent_ready"]
+platforms = ["ahk"]
 unavailable = "hide"

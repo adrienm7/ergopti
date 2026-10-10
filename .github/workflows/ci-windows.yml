@@ -193,6 +193,73 @@ jobs:
         timeout-minutes: 3
         run: ./tools/test/install-ci-kana-layout.ps1
 
+      - name: Receive managed Ollama file component
+        shell: pwsh
+        timeout-minutes: 5
+        run: |
+          $evidence = Join-Path $env:RUNNER_TEMP 'windows-ollama-file-component'
+          if (Test-Path -LiteralPath $evidence) { throw 'File component evidence already exists.' }
+          $null = New-Item -ItemType Directory -Path $evidence
+          $root = '${{ github.workspace }}'
+          $modelsOut = Join-Path $evidence 'models.stdout'
+          $modelsErr = Join-Path $evidence 'models.stderr'
+          node "$root/tools/test/test-managed-ollama-protocol.cjs" --windows-file-port 1> $modelsOut 2> $modelsErr
+          $modelsExit = $LASTEXITCODE
+          Get-Content -LiteralPath $modelsOut
+          if ($modelsExit -ne 0) { throw "File component source models refused (exit $modelsExit)." }
+          $windowsPowerShellDirectory = Join-Path $env:SystemRoot 'System32/WindowsPowerShell/v1.0'
+          $oldModulePath = $env:PSModulePath
+          try {
+              $env:PSModulePath = (Join-Path $windowsPowerShellDirectory 'Modules') + ';' + $oldModulePath
+              $out = Join-Path $evidence 'native.stdout'
+              $err = Join-Path $evidence 'native.stderr'
+              & "$windowsPowerShellDirectory/powershell.exe" -NoLogo -NoProfile -NonInteractive -File "$root/static/ergopti_plus/windows/tests/unit/test_ollama_install_files.ps1" 1> $out 2> $err
+              $nativeExit = $LASTEXITCODE
+              $stdout = [IO.File]::ReadAllText($out)
+              $stderr = [IO.File]::ReadAllText($err)
+              Write-Host $stdout
+              $testRoot = [regex]::Match($stdout, '(?m)^Evidence root: (.+)\r?$').Groups[1].Value.TrimEnd("`r")
+              $sourceRoot = [regex]::Match($stdout, '(?m)^Independent source receipts: (.+)\r?$').Groups[1].Value.TrimEnd("`r")
+              if ((Split-Path $testRoot -Parent) -cne [Environment]::GetFolderPath('LocalApplicationData') -or
+                  (Split-Path $testRoot -Leaf) -cnotmatch '^ergopti-ollama-test-[0-9a-f]{32}$' -or
+                  (Split-Path $sourceRoot -Parent).TrimEnd('\') -ine ([IO.Path]::GetTempPath()).TrimEnd('\') -or
+                  (Split-Path $sourceRoot -Leaf) -cne ('ergopti-ollama-source-' + (Split-Path $testRoot -Leaf).Substring(20)) -or
+                  -not (Test-Path -LiteralPath $testRoot -PathType Container) -or
+                  -not (Test-Path -LiteralPath $sourceRoot -PathType Container)) {
+                  throw 'Native file component evidence root binding refused.'
+              }
+              Add-Content -LiteralPath $env:GITHUB_ENV -Encoding utf8 -Value "ERGOPTI_FILE_COMPONENT_TEST_ROOT=$testRoot"
+              Add-Content -LiteralPath $env:GITHUB_ENV -Encoding utf8 -Value "ERGOPTI_FILE_COMPONENT_SOURCE_ROOT=$sourceRoot"
+              if ($nativeExit -ne 0 -or $stderr.Length -ne 0 -or
+                  @($stdout -split '\r?\n' | Where-Object { $_ -cmatch '^PASS ' }).Count -ne 31 -or
+                  $stdout -cnotmatch '(?m)^RESULT passed=31 failed=0 skipped=0\r?$') {
+                  throw 'Exact native file component acceptance refused; raw evidence retained.'
+              }
+              [ordered]@{ schema = 1; source_sha = '${{ github.sha }}'; native_exit = $nativeExit;
+                  passed = 31; failed = 0; skipped = 0; native_file_component = $true;
+                  acquisition_qualified = $false; runtime_executed = $false } |
+                  ConvertTo-Json | Set-Content -LiteralPath (Join-Path $evidence 'receipt.json') -Encoding utf8
+          } finally { $env:PSModulePath = $oldModulePath }
+
+      - name: Retain managed Ollama file component evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-ollama-file-component-${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            ${{ runner.temp }}/windows-ollama-file-component/
+          if-no-files-found: error
+
+      - name: Retain exact managed Ollama file roots
+        if: ${{ always() && env.ERGOPTI_FILE_COMPONENT_TEST_ROOT != '' && env.ERGOPTI_FILE_COMPONENT_SOURCE_ROOT != '' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-ollama-file-roots-${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            ${{ env.ERGOPTI_FILE_COMPONENT_TEST_ROOT }}/
+            ${{ env.ERGOPTI_FILE_COMPONENT_SOURCE_ROOT }}/
+          if-no-files-found: error
+
       - name: Run AHK test suite
         shell: pwsh
         timeout-minutes: 25

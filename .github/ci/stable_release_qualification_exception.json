@@ -1,7 +1,7 @@
 {
 	"schema": 1,
 	"id": "stable-v1-20261009-macos-native-deferred",
-	"expires_at": "2026-10-10T00:00:00Z",
+	"expires_at": "2026-10-10T02:00:00Z",
 	"repository": "adrienm7/ergopti",
 	"event_name": "push",
 	"ref": "refs/heads/main",
@@ -10,7 +10,7 @@
 	"channel": "main",
 	"tag": "v1.0.0",
 	"version": "1.0.0",
-	"authorization_note": "Explicit human approvals received on 2026-10-09: \"Oui, publier avec ces trois limites explicites\", followed by approval of the additional blocking test suites. Only main push, stable v1.0.0 before 2026-10-10T00:00:00Z is admitted. All thirteen exact listed native/harness scopes are DEFERRED and qualified:false: the original three macOS scopes, six additional PAC/HTTP/stubbed harness/Windows desktop/Linux simultaneous scopes, and Linux unit/meta, Linux E2E/live fixture chain, Core JavaScript and native macOS model receiving. Compilation, native producer catalogue checks, packaging, source and asset integrity, installation, all unlisted tests and launch lifecycle checks remain mandatory. Windows unsigned v1.0.0 is separately authorized with source/artifact-bound public disclosure; macOS signing remains mandatory. No TCC grant, database mutation, sender substitution or permission workaround is authorized. After midnight Paris on October 10, the maintainer renewed the instruction to publish a minimum stable release immediately to restore the website download buttons, followed by ten hours of v1.0.1 fixes with full tests if possible. This renewal keeps the same thirteen scopes and unsigned Windows permission, with a new bounded expiry of 02:00 Paris (00:00 UTC). Other tags/events and later runs retain full default qualification; no additional scope is granted.",
+	"authorization_note": "Explicit human approvals received on 2026-10-09: \"Oui, publier avec ces trois limites explicites\", followed by approval of the additional blocking test suites. Only main push, stable v1.0.0 before 2026-10-10T02:00:00Z is admitted. All thirteen exact listed native/harness scopes are DEFERRED and qualified:false: the original three macOS scopes, six additional PAC/HTTP/stubbed harness/Windows desktop/Linux simultaneous scopes, and Linux unit/meta, Linux E2E/live fixture chain, Core JavaScript and native macOS model receiving. Compilation, native producer catalogue checks, packaging, source and asset integrity, installation, all unlisted tests and launch lifecycle checks remain mandatory. Windows unsigned v1.0.0 is separately authorized with source/artifact-bound public disclosure; macOS signing remains mandatory. No TCC grant, database mutation, sender substitution or permission workaround is authorized. After midnight Paris on October 10, the maintainer renewed the instruction to publish a minimum stable release immediately to restore the website download buttons, followed by ten hours of v1.0.1 fixes with full tests if possible. This renewal keeps the same thirteen scopes and unsigned Windows permission, with a new bounded expiry of 04:00 Paris (02:00 UTC). Other tags/events and later runs retain full default qualification; no additional scope is granted. The maintainer explicitly approved this further bounded renewal: \"Oui, mêmes limites jusqu’à 04 h\". Only the expiry changes to October 10 at 02:00 UTC (04:00 Paris); all thirteen scope objects and the separate unsigned Windows v1.0.0 conditions remain unchanged. This is not qualification evidence or permission for another tag.",
 	"scopes": {
 		"macos-brew-archive": {
 			"kind": "swift_test_file",

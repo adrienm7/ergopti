@@ -1016,6 +1016,7 @@
 	"menu.apps.encrypt_desc": "הצפן קבצים ותיקיות",
 	"menu.apps.no_apps": "לא נמצאו יישומים",
 	"menu.apps.title": "🛠️ יישומים",
+	"menu.builder.active_brand": "Ergopti",
 	"menu.builder.title": "Ergopti+",
 	"menu.builder.title_paused": "Ergopti+ ⏸",
 	"menu.debug.console": "קונסולה",
@@ -3283,5 +3284,6 @@
 	"healthcheck.problem.diagnostic_check": "בדיקת האבחון נכשלה: %s.",
 	"healthcheck.export.privacy_notice": "הדוח משתף רק נתונים טכניים מותרים. יומנים, טקסט חופשי, נתיבים ופרטים מזהים אינם נכללים גם כשהפרטים מופעלים. בדיקות העמוד המקומיות אינן נכללות.",
 	"sg_actions.llm_translate_context": "🌐 תרגום המשפט הנוכחי [ניתן להגדרה]",
-	"menu.about.startup_other_command_reason": "פקודת הפעלה אחרת: ההפעלה מוגדרת עבור פקודה או התקנה אחרת. ההגדרה הקיימת נשמרת."
+	"menu.about.startup_other_command_reason": "פקודת הפעלה אחרת: ההפעלה מוגדרת עבור פקודה או התקנה אחרת. ההגדרה הקיימת נשמרת.",
+	"menu.llm.model_parent_with_health": "%sמודל נבחר: %s"
 }

@@ -1016,6 +1016,7 @@
 	"menu.apps.encrypt_desc": "Šifrovat soubory a složky",
 	"menu.apps.no_apps": "Žádné aplikace nenalezeny",
 	"menu.apps.title": "🛠️ Aplikace",
+	"menu.builder.active_brand": "Ergopti",
 	"menu.builder.title": "Ergopti+",
 	"menu.builder.title_paused": "Ergopti+ ⏸",
 	"menu.debug.console": "Konzole",
@@ -3283,5 +3284,6 @@
 	"healthcheck.problem.diagnostic_check": "Diagnostická kontrola selhala: %s.",
 	"healthcheck.export.privacy_notice": "Tato zpráva sdílí pouze povolené technické údaje. Protokoly, volný text, cesty a identifikační údaje jsou vynechány i při zapnutých podrobnostech. Místní testy stránky nejsou zahrnuty.",
 	"sg_actions.llm_translate_context": "🌐 Přeložit aktuální větu [nastavitelné]",
-	"menu.about.startup_other_command_reason": "Jiný příkaz při spuštění: Spouštění je nastaveno pro jiný příkaz nebo instalaci. Stávající nastavení zůstává zachováno."
+	"menu.about.startup_other_command_reason": "Jiný příkaz při spuštění: Spouštění je nastaveno pro jiný příkaz nebo instalaci. Stávající nastavení zůstává zachováno.",
+	"menu.llm.model_parent_with_health": "%sVybraný model: %s"
 }

@@ -60,8 +60,39 @@ private final class ManagedOllamaTestSession {
 			}
 			usleep(10_000)
 		}
-		guard let value else { peer.terminate(); peer.waitUntilExit(); throw Failure.deadline }
+		guard let value else {
+			peer.terminate(); peer.waitUntilExit()
+			// Preserve the original deadline failure after the exact peer's
+			// original retirement. Diagnostic collection never waits for EOF.
+			Self.retainProfileDeadlineDiagnostics(peer: peer, diagnostics: peerDiagnostics)
+			throw Failure.deadline
+		}
 		profile = value
+	}
+	private static func retainProfileDeadlineDiagnostics(peer: Process, diagnostics: Pipe) {
+		let handle = diagnostics.fileHandleForReading
+		var bytes = Data(), eof = false, drainAvailable = false, readRefused = false, closed = false
+		if ManagedPTYWorker.nonblocking(handle.fileDescriptor) {
+			// One finite read of the original pipe: no waiter, retry, clock,
+			// destructive signal or new retirement authority.
+			var buffer = [UInt8](repeating: 0, count: 4096)
+			let count = Darwin.read(handle.fileDescriptor, &buffer, buffer.count)
+			if count >= 0 { drainAvailable = true }
+			if count > 0 { bytes.append(contentsOf: buffer.prefix(count)) }
+			else if count == 0 { eof = true }
+			else if ![EINTR, EAGAIN, EWOULDBLOCK].contains(errno) { readRefused = true }
+		} else { readRefused = true }
+		do { try handle.close(); closed = true } catch { /* Preserve Failure.deadline. */ }
+		let text = String(decoding: bytes, as: UTF8.self)
+		print("ERGOPTI_PEER_PROFILE_DEADLINE_DIAGNOSTIC status=\(peer.terminationStatus) reason=\(peer.terminationReason.rawValue) eof=\(eof ? 1 : 0) drain_available=\(drainAvailable ? 1 : 0) read_refused=\(readRefused ? 1 : 0) descriptor_closed=\(closed ? 1 : 0) dyld_library_missing=\(text.contains("Library not loaded:") ? 1 : 0) code_signature_failure=\(text.contains("code signature") ? 1 : 0)")
+		// Only complete LF-terminated native fixed receipts are projected.
+		// Partial captures and arbitrary inherited child stderr are never text.
+		for line in text.components(separatedBy: "\n").dropLast().prefix(16) {
+			if line.range(of: #"\AERGOPTI_RETAINED_IMAGE_DIAGNOSTIC stage=[1-4] errno=[0-9]{1,5}\z"#, options: .regularExpression) != nil
+				|| line.range(of: #"\AERGOPTI_RETAINED_IMAGE_EXIT timeout=[01] status=[0-9]{1,3}\z"#, options: .regularExpression) != nil {
+				print(line)
+			}
+		}
 	}
 	deinit {
 		if !closed && peer.isRunning { peer.terminate(); peer.waitUntilExit() }

@@ -32,6 +32,8 @@ local LOG = "ui_builder"
 
 -- The generated shared policy owns branding for every native host.
 local WindowTitles = require("window_titles")
+local WindowTitleKeyOwner = rawget(WindowTitles, "key_for_app")
+local WindowTitleComposeOwner = rawget(WindowTitles, "compose")
 
 -- Per-process cache of assembled HTML strings.  Avoids re-reading the local
 -- CSS/JS files (and re-running the gsub inlining pass) on every UI open —
@@ -632,13 +634,63 @@ function M.can_create_webview()
 		and type(hs.webview.new) == "function"
 end
 
+--- Resolves an explicit app identity through the actual shared title policy.
+--- Caller text remains supported only when no declared app identity is supplied.
+--- @param opts table Native factory request.
+--- @return string|nil label
+--- @return string|nil caption
+--- @return function|nil live
+local function declared_window_title(opts)
+	if getmetatable(opts) ~= nil then return nil end
+	local app_id = rawget(opts, "app_id")
+	if type(app_id) ~= "string" or not app_id:match("^[a-z][a-z0-9_]*$")
+		or rawget(opts, "title") ~= nil then return nil end
+	local ok_i18n, i18n = pcall(require, "infra.i18n")
+	if not ok_i18n or type(i18n) ~= "table" then return nil end
+	local translate = rawget(i18n, "get")
+	local function live()
+		return getmetatable(opts) == nil and rawget(opts, "app_id") == app_id
+			and rawget(opts, "title") == nil
+			and getmetatable(WindowTitles) == nil and getmetatable(i18n) == nil
+			and rawget(package.loaded, "window_titles") == WindowTitles
+			and rawget(package.loaded, "infra.i18n") == i18n
+			and rawget(WindowTitles, "key_for_app") == WindowTitleKeyOwner
+			and rawget(WindowTitles, "compose") == WindowTitleComposeOwner
+			and rawget(i18n, "get") == translate
+			and type(WindowTitleKeyOwner) == "function"
+			and type(WindowTitleComposeOwner) == "function" and type(translate) == "function"
+	end
+	if not live() then return nil end
+	local ok, label, caption = pcall(function()
+		local key = WindowTitleKeyOwner(app_id)
+		if not live() or type(key) ~= "string" or key == "" then return nil end
+		local text = translate(key)
+		if not live() or type(text) ~= "string" or text == "" or text == key then return nil end
+		local composed = WindowTitleComposeOwner(text)
+		if not live() or type(composed) ~= "string" or composed == "" then return nil end
+		return text, composed
+	end)
+	if not ok or label == nil or not live() then return nil end
+	return label, caption, live
+end
+
 --- Centralized factory to create a webview window with consistent properties.
+--- An explicit app_id receives its canonical shared title; title is caller text
+--- only when no app identity is supplied. Unknown app identities refuse.
 --- @param opts table The configuration options for the webview; focus = false
 ---        shows the window without activating the app or changing its level;
 ---        chrome = M.PERMISSION_DIALOG_CHROME is the one floating exception.
 --- @return userdata|nil The configured webview instance.
 function M.show_webview(opts)
 	if type(opts) ~= "table" then return nil end
+	local title_label, declared_caption, title_live
+	if opts.app_id ~= nil then
+		title_label, declared_caption, title_live = declared_window_title(opts)
+		if title_label == nil then
+			Logger.error(LOG, "WebView factory refused its declared app title.")
+			return nil
+		end
+	end
 	if M.can_create_webview() ~= true then return nil end
 	if opts.level ~= nil then
 		-- Refused before the native window exists, so nothing is left to clean up.
@@ -661,10 +713,13 @@ function M.show_webview(opts)
 	if settle_factory_cleanup() ~= true then return nil end
 	-- Open, first load and close are timed: a blank or slow window is otherwise
 	-- indistinguishable in the log from a window that was never requested.
-	local view_label = (type(opts.title) == "string" and opts.title ~= "") and opts.title or "untitled"
+	local view_label = title_live and title_label
+		or ((type(opts.title) == "string" and opts.title ~= "") and opts.title or "untitled")
 	local opened_ms = now_ms()
 	local load_logged = false
 	Logger.debug(LOG, "Creating webview window '%s'…", view_label)
+
+	if title_live and not title_live() then return nil end
 
 	-- Prevent LuaSkin crash by not passing explicit nil for the third argument
 	local wv
@@ -741,10 +796,18 @@ function M.show_webview(opts)
 		return DeferredWork.after(delay, callback, label or "ui_builder.webview")
 	end
 
-	local win_title = M.window_title(opts.title)
-	if not apply_webview_mutation(function() wv:windowTitle(win_title) end) then
+	if title_live and not title_live() then return abandon_required_mutation() end
+	local win_title = declared_caption or M.window_title(opts.title)
+	local title_received = false
+	if not apply_webview_mutation(function()
+		-- Lifecycle observation may yield after the outer title admission.
+		if title_live and not title_live() then return end
+		wv:windowTitle(win_title)
+		title_received = true
+	end) then
 		return abandon_required_mutation()
 	end
+	if title_live and (not title_received or not title_live()) then return abandon_required_mutation() end
 	
 	-- The chrome every Ergopti window shares comes from one function, so no
 	-- window can be built with only part of it.

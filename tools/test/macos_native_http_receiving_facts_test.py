@@ -108,8 +108,29 @@ PAC_OWNERSHIP_INVERSE = (
 HISTORICAL_HTTP_RELEASE_SHA256 = "68659ddec98c9a427244b315b69c17750b743eab2cdd3688308690a66d1c6e98"
 
 
+# Admit only the complete reviewed DEBUG certificate-code observation. The
+# original whole-source hash still rejects every byte outside this exact inverse.
+DEBUG_CERTIFICATE_FAILURE_INVERSE = (
+    'func managedHTTPFailure(_ error: NSError) -> String {\n\tguard error.domain == NSURLErrorDomain else { return "unavailable" }\n\tlet code = error.code\n\tswitch code {\n\tcase NSURLErrorTimedOut: return "deadline"\n\tcase NSURLErrorCancelled: return "cancelled"\n\tcase NSURLErrorNotConnectedToInternet, NSURLErrorNetworkConnectionLost: return "offline"\n\tcase NSURLErrorCannotFindHost, NSURLErrorDNSLookupFailed: return "offline"\n\tcase NSURLErrorServerCertificateUntrusted, NSURLErrorServerCertificateHasBadDate,\n\t\tNSURLErrorServerCertificateHasUnknownRoot, NSURLErrorServerCertificateNotYetValid,\n\t\tNSURLErrorSecureConnectionFailed, NSURLErrorClientCertificateRejected,\n\t\tNSURLErrorClientCertificateRequired:\n\t\t#if DEBUG\n\t\t_ = fputs("# native_http_certificate_code domain=NSURLErrorDomain code=\\(code)\\n", stderr)\n\t\t#endif\n\t\treturn "certificate"\n\tcase NSURLErrorUserAuthenticationRequired: return "unavailable"\n\tcase NSURLErrorCannotConnectToHost: return "connect"\n\tdefault: return "unavailable"\n\t}\n}',
+    'func managedHTTPFailure(_ error: NSError) -> String {\n\tguard error.domain == NSURLErrorDomain else { return "unavailable" }\n\tswitch error.code {\n\tcase NSURLErrorTimedOut: return "deadline"\n\tcase NSURLErrorCancelled: return "cancelled"\n\tcase NSURLErrorNotConnectedToInternet, NSURLErrorNetworkConnectionLost: return "offline"\n\tcase NSURLErrorCannotFindHost, NSURLErrorDNSLookupFailed: return "offline"\n\tcase NSURLErrorServerCertificateUntrusted, NSURLErrorServerCertificateHasBadDate,\n\t\tNSURLErrorServerCertificateHasUnknownRoot, NSURLErrorServerCertificateNotYetValid,\n\t\tNSURLErrorSecureConnectionFailed, NSURLErrorClientCertificateRejected,\n\t\tNSURLErrorClientCertificateRequired: return "certificate"\n\tcase NSURLErrorUserAuthenticationRequired: return "unavailable"\n\tcase NSURLErrorCannotConnectToHost: return "connect"\n\tdefault: return "unavailable"\n\t}\n}',
+)
+
+
+def debug_certificate_failure_projection(source):
+    """Invert one exact diagnostic function or preserve one exact original."""
+    diagnostic, original = DEBUG_CERTIFICATE_FAILURE_INVERSE
+    if source.count("func managedHTTPFailure(") != 1:
+        raise ValueError("Certificate diagnostic function identity refused")
+    if source.count(original) == 1 and diagnostic not in source:
+        return source
+    if source.count(diagnostic) != 1 or original in source:
+        raise ValueError("Certificate diagnostic enrollment refused")
+    return source.replace(diagnostic, original, 1)
+
+
 def historical_pac_ownership_projection(source):
     """Accept the exact legacy source or the complete approved ownership repair."""
+    source = debug_certificate_failure_projection(source)
     source = pac_source_acquisition_projection(source)
     if hashlib.sha256(source.encode("utf-8")).hexdigest() == HISTORICAL_HTTP_RELEASE_SHA256:
         return source
@@ -566,6 +587,28 @@ class NativeHTTPStageReceiptTests(unittest.TestCase):
         self.assertIs(refusal.exception, primary)
 
     def test07bRestorationProducerPreservesActualJSONResponseStream(self):
+        # A separate producer channel is ineffective if the native parent discards it.
+        swift = (
+            ROOT
+            / "static/ergopti_plus/macos/launcher/Tests/ErgoptiPlusTests/ManagedHTTPWireTests.swift"
+        ).read_text(encoding="utf-8")
+        active = re.sub(r"//[^\n]*|/\*[\s\S]*?\*/", "", swift)
+        startup = re.search(
+            r"final class ManagedWireFixture \{([\s\S]*?)try process\.run\(\)", active
+        )
+        self.assertIsNotNone(startup, "The actual Swift fixture startup must be inspected")
+        assignments = re.findall(
+            r"process\.(standard(?:Input|Output|Error))\s*=\s*([^\n]+)", startup.group(1)
+        )
+        self.assertEqual(
+            assignments,
+            [
+                ("standardInput", "input"),
+                ("standardOutput", "output"),
+                ("standardError", "FileHandle.standardError"),
+            ],
+            "The XCTest parent must retain diagnostics separately from fixture JSON replies",
+        )
         owner = WIRE.WireFixture.__new__(WIRE.WireFixture)
         for operation, fact, expected in (
             (
@@ -2190,6 +2233,91 @@ class NativeTrustRemovalDiagnosticTests(unittest.TestCase):
                             value.close()
                     self.fixture.native = False
                     self.fixture.trust_attempted = False
+
+
+class NativeTrustRemovalOriginalDeadlineTests(unittest.TestCase):
+    """Actual trust method over explicit recording ports; no native store or child."""
+
+    def setUp(self):
+        self.fixture = WIRE.WireFixture.__new__(WIRE.WireFixture)
+        self.fixture.native = True
+        self.fixture.trust_attempted = True
+        self.fixture.trust_removal_deadline = None
+        self.fixture.authorization_observation = False
+        self.fixture.command_fact = None
+        self.fixture.ca = Path("owned-inert-certificate.pem")
+
+    def test52ExpiredRetryCannotAcquireOrRenewAndPreservesOriginalNativeFailure(self):
+        original = RuntimeError("owned native removal refused")
+        fact = {"phase": "exit", "status": 1}
+        ca = self.fixture.ca
+        deadlines = []
+
+        def refuse(arguments, **options):
+            deadlines.append(options["deadline"])
+            self.assertEqual(arguments[3:5], ["remove-trusted-cert", "-d"])
+            self.assertEqual(arguments[-1], str(ca))
+            self.fixture.command_fact = fact
+            raise original
+
+        with mock.patch.object(WIRE.time, "monotonic", return_value=100.0):
+            with mock.patch.object(self.fixture, "_observe_admin_trust"):
+                with mock.patch.object(self.fixture, "_command", side_effect=refuse):
+                    with self.assertRaises(RuntimeError) as error:
+                        self.fixture.trust(False)
+        self.assertIs(error.exception, original)
+        self.assertTrue(self.fixture.trust_attempted)
+        with mock.patch.object(WIRE.time, "monotonic", return_value=115.0):
+            with mock.patch.object(self.fixture, "_observe_admin_trust") as observe:
+                with mock.patch.object(self.fixture, "_command", side_effect=refuse) as command:
+                    with self.assertRaises((RuntimeError, subprocess.TimeoutExpired)) as retry:
+                        self.fixture.trust(False)
+        self.assertIsInstance(retry.exception, subprocess.TimeoutExpired)
+        observe.assert_not_called()
+        command.assert_not_called()
+        self.assertEqual(deadlines, [115.0])
+        self.assertIs(self.fixture.command_fact, fact)
+        self.assertIs(self.fixture.ca, ca)
+        self.assertTrue(self.fixture.trust_attempted)
+
+    def test53RetryWithinBudgetKeepsTheExactOriginalDeadline(self):
+        deadlines = []
+        original = RuntimeError("owned native removal refused")
+
+        def refuse(arguments, **options):
+            deadlines.append(options["deadline"])
+            self.fixture.command_fact = {"phase": "exit", "status": 1}
+            raise original
+
+        for tick in (100.0, 114.0):
+            with mock.patch.object(WIRE.time, "monotonic", return_value=tick):
+                with mock.patch.object(self.fixture, "_observe_admin_trust"):
+                    with mock.patch.object(self.fixture, "_command", side_effect=refuse):
+                        with self.assertRaises(RuntimeError) as error:
+                            self.fixture.trust(False)
+                        self.assertIs(error.exception, original)
+        self.assertEqual(deadlines, [115.0, 115.0])
+        self.assertTrue(self.fixture.trust_attempted)
+        self.assertEqual(self.fixture.trust_removal_deadline, 115.0)
+
+    def test54AcknowledgedRemovalAlonePermitsANewTrustCycleBudget(self):
+        deadlines = []
+
+        def acknowledge(arguments, **options):
+            deadlines.append(options["deadline"])
+            return 0, b""
+
+        for tick in (100.0, 200.0):
+            with mock.patch.object(WIRE.time, "monotonic", return_value=tick):
+                with mock.patch.object(self.fixture, "_observe_admin_trust"):
+                    with mock.patch.object(self.fixture, "_command", side_effect=acknowledge):
+                        self.fixture.trust(False)
+            self.assertFalse(self.fixture.trust_attempted)
+            self.assertIsNone(self.fixture.trust_removal_deadline)
+            # A separate recording acquisition is represented explicitly; no
+            # native grant is executed or inferred by this portable control.
+            self.fixture.trust_attempted = True
+        self.assertEqual(deadlines, [115.0, 215.0])
 
 
 if __name__ == "__main__":

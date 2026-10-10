@@ -1016,6 +1016,7 @@
 	"menu.apps.encrypt_desc": "Зашифровать файлы и папки",
 	"menu.apps.no_apps": "Приложения не найдены",
 	"menu.apps.title": "🛠️ Приложения",
+	"menu.builder.active_brand": "Ergopti",
 	"menu.builder.title": "Ergopti+",
 	"menu.builder.title_paused": "Ergopti+ ⏸",
 	"menu.debug.console": "Консоль",
@@ -3283,5 +3284,6 @@
 	"healthcheck.problem.diagnostic_check": "Диагностическая проверка завершилась ошибкой: %s.",
 	"healthcheck.export.privacy_notice": "Отчёт передаёт только разрешённые технические данные. Журналы, произвольный текст, пути и идентифицирующие сведения исключены даже при включённых подробностях. Локальные тесты страницы не включены.",
 	"sg_actions.llm_translate_context": "🌐 Перевести текущее предложение [настраивается]",
-	"menu.about.startup_other_command_reason": "Другая команда запуска: Автозапуск настроен для другой команды или установки. Существующая настройка сохраняется."
+	"menu.about.startup_other_command_reason": "Другая команда запуска: Автозапуск настроен для другой команды или установки. Существующая настройка сохраняется.",
+	"menu.llm.model_parent_with_health": "%sВыбранная модель: %s"
 }
