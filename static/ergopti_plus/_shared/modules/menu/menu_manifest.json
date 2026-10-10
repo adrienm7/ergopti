@@ -6577,7 +6577,8 @@
 			"caption_getter": "agent_system_backend_current_caption",
 			"caption_format": "numbered",
 			"platforms": [
-				"linux"
+				"linux",
+				"ahk"
 			],
 			"unavailable": "hide"
 		}
@@ -6590,7 +6591,8 @@
 			"caption_getter": "agent_system_backend_current_caption",
 			"caption_format": "numbered",
 			"platforms": [
-				"linux"
+				"linux",
+				"ahk"
 			],
 			"unavailable": "hide"
 		}
@@ -6912,6 +6914,19 @@
 			"caption_joiner": " — ",
 			"platforms": [
 				"linux"
+			],
+			"unavailable": "hide"
+		}
+	],
+	"agent_windows_disabled_apps_command": [
+		{
+			"type": "command",
+			"id": "agent_disabled_apps",
+			"i18n": "menu.agent.disabled_apps",
+			"caption_getter": "agent_disabled_apps_count",
+			"caption_format": "numbered",
+			"platforms": [
+				"ahk"
 			],
 			"unavailable": "hide"
 		}

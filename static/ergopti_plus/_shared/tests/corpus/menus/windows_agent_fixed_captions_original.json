@@ -1,0 +1,562 @@
+{
+	"provenance": {
+		"git_commit": "1e0556e8020e265dfc20da806657281ac05ef7a6",
+		"original_provider_path": "static/ergopti_plus/windows/ui/menu/menu_llm/menu_agent.ahk",
+		"original_provider_sha256": "7120ce73672ea0cba2b5be99ec59a464257c3beec400996613a555639b3855a4",
+		"provider_catalogue_path": "static/ergopti_plus/_shared/modules/llm/api_providers.json",
+		"provider_catalogue_sha256": "82e735399be97d00ed8a1843c9dddb4d9aaa483f120e7124704256b1f727008a",
+		"policy": "Original literal StrReplace({1}, native value) source projection captured before candidate source authoring; no candidate generator or renderer used."
+	},
+	"backend": "cerebras",
+	"backend_label": "Cerebras",
+	"literal_native": "Native% && {1}",
+	"counts": [0, 2, 1234],
+	"locales": {
+		"da": {
+			"locale_blob_sha256": "8f4240971e38f9b74a3e284edf954c9461b0779c249031f7ba8c79f044f7e5c6",
+			"formats": {
+				"menu.agent.system1": "⚡ System 1 (hurtigt): {1}",
+				"menu.agent.system2": "🧠 System 2 (grundigt): {1}",
+				"menu.agent.disabled_apps": "Apps udelukket fra automatisk tilstand ({1})"
+			},
+			"off": "Slået fra",
+			"systems": {
+				"system1": {
+					"off": "⚡ System 1 (hurtigt): Slået fra",
+					"cerebras": "⚡ System 1 (hurtigt): Cerebras",
+					"literal_native": "⚡ System 1 (hurtigt): Native% && {1}"
+				},
+				"system2": {
+					"off": "🧠 System 2 (grundigt): Slået fra",
+					"cerebras": "🧠 System 2 (grundigt): Cerebras",
+					"literal_native": "🧠 System 2 (grundigt): Native% && {1}"
+				}
+			},
+			"apps": {
+				"0": "Apps udelukket fra automatisk tilstand (0)",
+				"2": "Apps udelukket fra automatisk tilstand (2)",
+				"1234": "Apps udelukket fra automatisk tilstand (1234)"
+			}
+		},
+		"de": {
+			"locale_blob_sha256": "2cfb160f8a0c5282f643b9f6cef3db54b3c31d1b1ccb254ace5f66c1412f19fc",
+			"formats": {
+				"menu.agent.system1": "⚡ System 1 (schnell): {1}",
+				"menu.agent.system2": "🧠 System 2 (gründlich): {1}",
+				"menu.agent.disabled_apps": "Vom Automatikmodus ausgeschlossene Apps ({1})"
+			},
+			"off": "Aus",
+			"systems": {
+				"system1": {
+					"off": "⚡ System 1 (schnell): Aus",
+					"cerebras": "⚡ System 1 (schnell): Cerebras",
+					"literal_native": "⚡ System 1 (schnell): Native% && {1}"
+				},
+				"system2": {
+					"off": "🧠 System 2 (gründlich): Aus",
+					"cerebras": "🧠 System 2 (gründlich): Cerebras",
+					"literal_native": "🧠 System 2 (gründlich): Native% && {1}"
+				}
+			},
+			"apps": {
+				"0": "Vom Automatikmodus ausgeschlossene Apps (0)",
+				"2": "Vom Automatikmodus ausgeschlossene Apps (2)",
+				"1234": "Vom Automatikmodus ausgeschlossene Apps (1234)"
+			}
+		},
+		"en": {
+			"locale_blob_sha256": "56e632734a3180c97314b001e38e71bcad47640772d0afcda6f82380296f492b",
+			"formats": {
+				"menu.agent.system1": "⚡ System 1 (fast): {1}",
+				"menu.agent.system2": "🧠 System 2 (thorough): {1}",
+				"menu.agent.disabled_apps": "Apps excluded from the automatic mode ({1})"
+			},
+			"off": "Off",
+			"systems": {
+				"system1": {
+					"off": "⚡ System 1 (fast): Off",
+					"cerebras": "⚡ System 1 (fast): Cerebras",
+					"literal_native": "⚡ System 1 (fast): Native% && {1}"
+				},
+				"system2": {
+					"off": "🧠 System 2 (thorough): Off",
+					"cerebras": "🧠 System 2 (thorough): Cerebras",
+					"literal_native": "🧠 System 2 (thorough): Native% && {1}"
+				}
+			},
+			"apps": {
+				"0": "Apps excluded from the automatic mode (0)",
+				"2": "Apps excluded from the automatic mode (2)",
+				"1234": "Apps excluded from the automatic mode (1234)"
+			}
+		},
+		"es": {
+			"locale_blob_sha256": "9644d094fe4e64c4a9ddb8a775cc9b5114004a5b0732c56a5e36b55cf6ecbe05",
+			"formats": {
+				"menu.agent.system1": "⚡ Sistema 1 (rápido): {1}",
+				"menu.agent.system2": "🧠 Sistema 2 (reflexivo): {1}",
+				"menu.agent.disabled_apps": "Aplicaciones excluidas del modo automático ({1})"
+			},
+			"off": "Desactivado",
+			"systems": {
+				"system1": {
+					"off": "⚡ Sistema 1 (rápido): Desactivado",
+					"cerebras": "⚡ Sistema 1 (rápido): Cerebras",
+					"literal_native": "⚡ Sistema 1 (rápido): Native% && {1}"
+				},
+				"system2": {
+					"off": "🧠 Sistema 2 (reflexivo): Desactivado",
+					"cerebras": "🧠 Sistema 2 (reflexivo): Cerebras",
+					"literal_native": "🧠 Sistema 2 (reflexivo): Native% && {1}"
+				}
+			},
+			"apps": {
+				"0": "Aplicaciones excluidas del modo automático (0)",
+				"2": "Aplicaciones excluidas del modo automático (2)",
+				"1234": "Aplicaciones excluidas del modo automático (1234)"
+			}
+		},
+		"fr": {
+			"locale_blob_sha256": "184317bed5b9e9f1eb18d5a17d2b5944bf42ab664a0ba75041132aaac56d9e64",
+			"formats": {
+				"menu.agent.system1": "⚡ Système 1 (rapide) : {1}",
+				"menu.agent.system2": "🧠 Système 2 (réfléchi) : {1}",
+				"menu.agent.disabled_apps": "Applications exclues du mode automatique ({1})"
+			},
+			"off": "Désactivé",
+			"systems": {
+				"system1": {
+					"off": "⚡ Système 1 (rapide) : Désactivé",
+					"cerebras": "⚡ Système 1 (rapide) : Cerebras",
+					"literal_native": "⚡ Système 1 (rapide) : Native% && {1}"
+				},
+				"system2": {
+					"off": "🧠 Système 2 (réfléchi) : Désactivé",
+					"cerebras": "🧠 Système 2 (réfléchi) : Cerebras",
+					"literal_native": "🧠 Système 2 (réfléchi) : Native% && {1}"
+				}
+			},
+			"apps": {
+				"0": "Applications exclues du mode automatique (0)",
+				"2": "Applications exclues du mode automatique (2)",
+				"1234": "Applications exclues du mode automatique (1234)"
+			}
+		},
+		"it": {
+			"locale_blob_sha256": "1c076f54452bc97ed4a07983e4e3ced9d6d4b2c631fe5b2c9ba81b6ce51c489a",
+			"formats": {
+				"menu.agent.system1": "⚡ Sistema 1 (veloce): {1}",
+				"menu.agent.system2": "🧠 Sistema 2 (ponderato): {1}",
+				"menu.agent.disabled_apps": "App escluse dalla modalità automatica ({1})"
+			},
+			"off": "Disattivato",
+			"systems": {
+				"system1": {
+					"off": "⚡ Sistema 1 (veloce): Disattivato",
+					"cerebras": "⚡ Sistema 1 (veloce): Cerebras",
+					"literal_native": "⚡ Sistema 1 (veloce): Native% && {1}"
+				},
+				"system2": {
+					"off": "🧠 Sistema 2 (ponderato): Disattivato",
+					"cerebras": "🧠 Sistema 2 (ponderato): Cerebras",
+					"literal_native": "🧠 Sistema 2 (ponderato): Native% && {1}"
+				}
+			},
+			"apps": {
+				"0": "App escluse dalla modalità automatica (0)",
+				"2": "App escluse dalla modalità automatica (2)",
+				"1234": "App escluse dalla modalità automatica (1234)"
+			}
+		},
+		"nl": {
+			"locale_blob_sha256": "d74e21d9698e435dbb21e5791e0a818e551893800c1d05a493a885caddb9cec0",
+			"formats": {
+				"menu.agent.system1": "⚡ Systeem 1 (snel): {1}",
+				"menu.agent.system2": "🧠 Systeem 2 (grondig): {1}",
+				"menu.agent.disabled_apps": "Apps uitgesloten van de automatische modus ({1})"
+			},
+			"off": "Uit",
+			"systems": {
+				"system1": {
+					"off": "⚡ Systeem 1 (snel): Uit",
+					"cerebras": "⚡ Systeem 1 (snel): Cerebras",
+					"literal_native": "⚡ Systeem 1 (snel): Native% && {1}"
+				},
+				"system2": {
+					"off": "🧠 Systeem 2 (grondig): Uit",
+					"cerebras": "🧠 Systeem 2 (grondig): Cerebras",
+					"literal_native": "🧠 Systeem 2 (grondig): Native% && {1}"
+				}
+			},
+			"apps": {
+				"0": "Apps uitgesloten van de automatische modus (0)",
+				"2": "Apps uitgesloten van de automatische modus (2)",
+				"1234": "Apps uitgesloten van de automatische modus (1234)"
+			}
+		},
+		"no": {
+			"locale_blob_sha256": "8b71d8dd65215d74e0e8529953342ba0e2b5ae550f09064c1d76ff75457d65a0",
+			"formats": {
+				"menu.agent.system1": "⚡ System 1 (raskt): {1}",
+				"menu.agent.system2": "🧠 System 2 (grundig): {1}",
+				"menu.agent.disabled_apps": "Apper utelatt fra automatisk modus ({1})"
+			},
+			"off": "Av",
+			"systems": {
+				"system1": {
+					"off": "⚡ System 1 (raskt): Av",
+					"cerebras": "⚡ System 1 (raskt): Cerebras",
+					"literal_native": "⚡ System 1 (raskt): Native% && {1}"
+				},
+				"system2": {
+					"off": "🧠 System 2 (grundig): Av",
+					"cerebras": "🧠 System 2 (grundig): Cerebras",
+					"literal_native": "🧠 System 2 (grundig): Native% && {1}"
+				}
+			},
+			"apps": {
+				"0": "Apper utelatt fra automatisk modus (0)",
+				"2": "Apper utelatt fra automatisk modus (2)",
+				"1234": "Apper utelatt fra automatisk modus (1234)"
+			}
+		},
+		"pl": {
+			"locale_blob_sha256": "cdc9d3e034d093031ee12e8862b303152ae99110f09611a8e4975da9be30b9b4",
+			"formats": {
+				"menu.agent.system1": "⚡ System 1 (szybki): {1}",
+				"menu.agent.system2": "🧠 System 2 (dokładny): {1}",
+				"menu.agent.disabled_apps": "Aplikacje wykluczone z trybu automatycznego ({1})"
+			},
+			"off": "Wyłączony",
+			"systems": {
+				"system1": {
+					"off": "⚡ System 1 (szybki): Wyłączony",
+					"cerebras": "⚡ System 1 (szybki): Cerebras",
+					"literal_native": "⚡ System 1 (szybki): Native% && {1}"
+				},
+				"system2": {
+					"off": "🧠 System 2 (dokładny): Wyłączony",
+					"cerebras": "🧠 System 2 (dokładny): Cerebras",
+					"literal_native": "🧠 System 2 (dokładny): Native% && {1}"
+				}
+			},
+			"apps": {
+				"0": "Aplikacje wykluczone z trybu automatycznego (0)",
+				"2": "Aplikacje wykluczone z trybu automatycznego (2)",
+				"1234": "Aplikacje wykluczone z trybu automatycznego (1234)"
+			}
+		},
+		"pt": {
+			"locale_blob_sha256": "d71613700f06e9eb4a3734cbcc62f7dbc12a542499398271d45085aa43e9d100",
+			"formats": {
+				"menu.agent.system1": "⚡ Sistema 1 (rápido): {1}",
+				"menu.agent.system2": "🧠 Sistema 2 (ponderado): {1}",
+				"menu.agent.disabled_apps": "Aplicações excluídas do modo automático ({1})"
+			},
+			"off": "Desativado",
+			"systems": {
+				"system1": {
+					"off": "⚡ Sistema 1 (rápido): Desativado",
+					"cerebras": "⚡ Sistema 1 (rápido): Cerebras",
+					"literal_native": "⚡ Sistema 1 (rápido): Native% && {1}"
+				},
+				"system2": {
+					"off": "🧠 Sistema 2 (ponderado): Desativado",
+					"cerebras": "🧠 Sistema 2 (ponderado): Cerebras",
+					"literal_native": "🧠 Sistema 2 (ponderado): Native% && {1}"
+				}
+			},
+			"apps": {
+				"0": "Aplicações excluídas do modo automático (0)",
+				"2": "Aplicações excluídas do modo automático (2)",
+				"1234": "Aplicações excluídas do modo automático (1234)"
+			}
+		},
+		"sv": {
+			"locale_blob_sha256": "f940f543e2085aab6b69250efac2bb35449bccc95dea058cba810b30907ab401",
+			"formats": {
+				"menu.agent.system1": "⚡ System 1 (snabbt): {1}",
+				"menu.agent.system2": "🧠 System 2 (eftertänksamt): {1}",
+				"menu.agent.disabled_apps": "Appar som undantas från automatiskt läge ({1})"
+			},
+			"off": "Av",
+			"systems": {
+				"system1": {
+					"off": "⚡ System 1 (snabbt): Av",
+					"cerebras": "⚡ System 1 (snabbt): Cerebras",
+					"literal_native": "⚡ System 1 (snabbt): Native% && {1}"
+				},
+				"system2": {
+					"off": "🧠 System 2 (eftertänksamt): Av",
+					"cerebras": "🧠 System 2 (eftertänksamt): Cerebras",
+					"literal_native": "🧠 System 2 (eftertänksamt): Native% && {1}"
+				}
+			},
+			"apps": {
+				"0": "Appar som undantas från automatiskt läge (0)",
+				"2": "Appar som undantas från automatiskt läge (2)",
+				"1234": "Appar som undantas från automatiskt läge (1234)"
+			}
+		},
+		"tr": {
+			"locale_blob_sha256": "8f9ab7b044c1758fc6fd26a7bb27ea2cbf43f4c3bec1346e96f97645fd6c58a9",
+			"formats": {
+				"menu.agent.system1": "⚡ Sistem 1 (hızlı): {1}",
+				"menu.agent.system2": "🧠 Sistem 2 (düşünceli): {1}",
+				"menu.agent.disabled_apps": "Otomatik moddan hariç tutulan uygulamalar ({1})"
+			},
+			"off": "Kapalı",
+			"systems": {
+				"system1": {
+					"off": "⚡ Sistem 1 (hızlı): Kapalı",
+					"cerebras": "⚡ Sistem 1 (hızlı): Cerebras",
+					"literal_native": "⚡ Sistem 1 (hızlı): Native% && {1}"
+				},
+				"system2": {
+					"off": "🧠 Sistem 2 (düşünceli): Kapalı",
+					"cerebras": "🧠 Sistem 2 (düşünceli): Cerebras",
+					"literal_native": "🧠 Sistem 2 (düşünceli): Native% && {1}"
+				}
+			},
+			"apps": {
+				"0": "Otomatik moddan hariç tutulan uygulamalar (0)",
+				"2": "Otomatik moddan hariç tutulan uygulamalar (2)",
+				"1234": "Otomatik moddan hariç tutulan uygulamalar (1234)"
+			}
+		},
+		"cs": {
+			"locale_blob_sha256": "b3cf8c1a949b285ea31ebce9830b2423f2763c9c70a3e542ddd7f46a002f048b",
+			"formats": {
+				"menu.agent.system1": "⚡ Systém 1 (rychlý): {1}",
+				"menu.agent.system2": "🧠 Systém 2 (důkladný): {1}",
+				"menu.agent.disabled_apps": "Aplikace vyloučené z automatického režimu ({1})"
+			},
+			"off": "Vypnuto",
+			"systems": {
+				"system1": {
+					"off": "⚡ Systém 1 (rychlý): Vypnuto",
+					"cerebras": "⚡ Systém 1 (rychlý): Cerebras",
+					"literal_native": "⚡ Systém 1 (rychlý): Native% && {1}"
+				},
+				"system2": {
+					"off": "🧠 Systém 2 (důkladný): Vypnuto",
+					"cerebras": "🧠 Systém 2 (důkladný): Cerebras",
+					"literal_native": "🧠 Systém 2 (důkladný): Native% && {1}"
+				}
+			},
+			"apps": {
+				"0": "Aplikace vyloučené z automatického režimu (0)",
+				"2": "Aplikace vyloučené z automatického režimu (2)",
+				"1234": "Aplikace vyloučené z automatického režimu (1234)"
+			}
+		},
+		"ru": {
+			"locale_blob_sha256": "1cf9dbdd495cce3c2bbe2f0ffddd09ca3062f3bfa113a2ed35d621a282a3dd2e",
+			"formats": {
+				"menu.agent.system1": "⚡ Система 1 (быстрая): {1}",
+				"menu.agent.system2": "🧠 Система 2 (вдумчивая): {1}",
+				"menu.agent.disabled_apps": "Приложения, исключённые из автоматического режима ({1})"
+			},
+			"off": "Выключено",
+			"systems": {
+				"system1": {
+					"off": "⚡ Система 1 (быстрая): Выключено",
+					"cerebras": "⚡ Система 1 (быстрая): Cerebras",
+					"literal_native": "⚡ Система 1 (быстрая): Native% && {1}"
+				},
+				"system2": {
+					"off": "🧠 Система 2 (вдумчивая): Выключено",
+					"cerebras": "🧠 Система 2 (вдумчивая): Cerebras",
+					"literal_native": "🧠 Система 2 (вдумчивая): Native% && {1}"
+				}
+			},
+			"apps": {
+				"0": "Приложения, исключённые из автоматического режима (0)",
+				"2": "Приложения, исключённые из автоматического режима (2)",
+				"1234": "Приложения, исключённые из автоматического режима (1234)"
+			}
+		},
+		"uk": {
+			"locale_blob_sha256": "b61ae60f8e65a6a0f63da2dbd5c4375b2d3ca0424848f2f369716c0471a9d3d9",
+			"formats": {
+				"menu.agent.system1": "⚡ Система 1 (швидка): {1}",
+				"menu.agent.system2": "🧠 Система 2 (вдумлива): {1}",
+				"menu.agent.disabled_apps": "Застосунки, виключені з автоматичного режиму ({1})"
+			},
+			"off": "Вимкнено",
+			"systems": {
+				"system1": {
+					"off": "⚡ Система 1 (швидка): Вимкнено",
+					"cerebras": "⚡ Система 1 (швидка): Cerebras",
+					"literal_native": "⚡ Система 1 (швидка): Native% && {1}"
+				},
+				"system2": {
+					"off": "🧠 Система 2 (вдумлива): Вимкнено",
+					"cerebras": "🧠 Система 2 (вдумлива): Cerebras",
+					"literal_native": "🧠 Система 2 (вдумлива): Native% && {1}"
+				}
+			},
+			"apps": {
+				"0": "Застосунки, виключені з автоматичного режиму (0)",
+				"2": "Застосунки, виключені з автоматичного режиму (2)",
+				"1234": "Застосунки, виключені з автоматичного режиму (1234)"
+			}
+		},
+		"he": {
+			"locale_blob_sha256": "86fbc4d0d7bdcbaf4c2b5fd4dc78b8067a4c4e7bfcd0883dad9ce4d5b612aadd",
+			"formats": {
+				"menu.agent.system1": "⚡ מערכת 1 (מהירה): {1}",
+				"menu.agent.system2": "🧠 מערכת 2 (מעמיקה): {1}",
+				"menu.agent.disabled_apps": "יישומים שהוחרגו מהמצב האוטומטי ({1})"
+			},
+			"off": "כבוי",
+			"systems": {
+				"system1": {
+					"off": "⚡ מערכת 1 (מהירה): כבוי",
+					"cerebras": "⚡ מערכת 1 (מהירה): Cerebras",
+					"literal_native": "⚡ מערכת 1 (מהירה): Native% && {1}"
+				},
+				"system2": {
+					"off": "🧠 מערכת 2 (מעמיקה): כבוי",
+					"cerebras": "🧠 מערכת 2 (מעמיקה): Cerebras",
+					"literal_native": "🧠 מערכת 2 (מעמיקה): Native% && {1}"
+				}
+			},
+			"apps": {
+				"0": "יישומים שהוחרגו מהמצב האוטומטי (0)",
+				"2": "יישומים שהוחרגו מהמצב האוטומטי (2)",
+				"1234": "יישומים שהוחרגו מהמצב האוטומטי (1234)"
+			}
+		},
+		"ar": {
+			"locale_blob_sha256": "fe571a55ecb339ba73a4a295ce8f73d2d3d61c61f3fc6470f70576d458bf7165",
+			"formats": {
+				"menu.agent.system1": "⚡ النظام 1 (سريع): {1}",
+				"menu.agent.system2": "🧠 النظام 2 (متأنٍّ): {1}",
+				"menu.agent.disabled_apps": "التطبيقات المستبعدة من الوضع التلقائي ({1})"
+			},
+			"off": "معطّل",
+			"systems": {
+				"system1": {
+					"off": "⚡ النظام 1 (سريع): معطّل",
+					"cerebras": "⚡ النظام 1 (سريع): Cerebras",
+					"literal_native": "⚡ النظام 1 (سريع): Native% && {1}"
+				},
+				"system2": {
+					"off": "🧠 النظام 2 (متأنٍّ): معطّل",
+					"cerebras": "🧠 النظام 2 (متأنٍّ): Cerebras",
+					"literal_native": "🧠 النظام 2 (متأنٍّ): Native% && {1}"
+				}
+			},
+			"apps": {
+				"0": "التطبيقات المستبعدة من الوضع التلقائي (0)",
+				"2": "التطبيقات المستبعدة من الوضع التلقائي (2)",
+				"1234": "التطبيقات المستبعدة من الوضع التلقائي (1234)"
+			}
+		},
+		"hi": {
+			"locale_blob_sha256": "809706ba6db13f3c46d281e70023730dfe672017be81fb085da5d68a88262100",
+			"formats": {
+				"menu.agent.system1": "⚡ सिस्टम 1 (तेज़): {1}",
+				"menu.agent.system2": "🧠 सिस्टम 2 (विचारशील): {1}",
+				"menu.agent.disabled_apps": "स्वचालित मोड से बाहर रखे ऐप ({1})"
+			},
+			"off": "बंद",
+			"systems": {
+				"system1": {
+					"off": "⚡ सिस्टम 1 (तेज़): बंद",
+					"cerebras": "⚡ सिस्टम 1 (तेज़): Cerebras",
+					"literal_native": "⚡ सिस्टम 1 (तेज़): Native% && {1}"
+				},
+				"system2": {
+					"off": "🧠 सिस्टम 2 (विचारशील): बंद",
+					"cerebras": "🧠 सिस्टम 2 (विचारशील): Cerebras",
+					"literal_native": "🧠 सिस्टम 2 (विचारशील): Native% && {1}"
+				}
+			},
+			"apps": {
+				"0": "स्वचालित मोड से बाहर रखे ऐप (0)",
+				"2": "स्वचालित मोड से बाहर रखे ऐप (2)",
+				"1234": "स्वचालित मोड से बाहर रखे ऐप (1234)"
+			}
+		},
+		"zh": {
+			"locale_blob_sha256": "356eb058ca1f6bc3a392b43a4b87b919c0c3f1c6c122a33c40e76b312828dd85",
+			"formats": {
+				"menu.agent.system1": "⚡ 系统 1（快速）：{1}",
+				"menu.agent.system2": "🧠 系统 2（深思）：{1}",
+				"menu.agent.disabled_apps": "从自动模式中排除的应用（{1}）"
+			},
+			"off": "关闭",
+			"systems": {
+				"system1": {
+					"off": "⚡ 系统 1（快速）：关闭",
+					"cerebras": "⚡ 系统 1（快速）：Cerebras",
+					"literal_native": "⚡ 系统 1（快速）：Native% && {1}"
+				},
+				"system2": {
+					"off": "🧠 系统 2（深思）：关闭",
+					"cerebras": "🧠 系统 2（深思）：Cerebras",
+					"literal_native": "🧠 系统 2（深思）：Native% && {1}"
+				}
+			},
+			"apps": {
+				"0": "从自动模式中排除的应用（0）",
+				"2": "从自动模式中排除的应用（2）",
+				"1234": "从自动模式中排除的应用（1234）"
+			}
+		},
+		"ja": {
+			"locale_blob_sha256": "d0cef33d7a558b21862c446cef0a6b09679733573d4a6ca12e0f114ac535e30c",
+			"formats": {
+				"menu.agent.system1": "⚡ システム1（高速）：{1}",
+				"menu.agent.system2": "🧠 システム2（熟考）：{1}",
+				"menu.agent.disabled_apps": "自動モードから除外するアプリ（{1}）"
+			},
+			"off": "オフ",
+			"systems": {
+				"system1": {
+					"off": "⚡ システム1（高速）：オフ",
+					"cerebras": "⚡ システム1（高速）：Cerebras",
+					"literal_native": "⚡ システム1（高速）：Native% && {1}"
+				},
+				"system2": {
+					"off": "🧠 システム2（熟考）：オフ",
+					"cerebras": "🧠 システム2（熟考）：Cerebras",
+					"literal_native": "🧠 システム2（熟考）：Native% && {1}"
+				}
+			},
+			"apps": {
+				"0": "自動モードから除外するアプリ（0）",
+				"2": "自動モードから除外するアプリ（2）",
+				"1234": "自動モードから除外するアプリ（1234）"
+			}
+		},
+		"ko": {
+			"locale_blob_sha256": "d7842962f4195ca78bf144b197410c428b39d116a39ae03a1d5220073daea1d1",
+			"formats": {
+				"menu.agent.system1": "⚡ 시스템 1 (빠름): {1}",
+				"menu.agent.system2": "🧠 시스템 2 (신중함): {1}",
+				"menu.agent.disabled_apps": "자동 모드에서 제외된 앱 ({1})"
+			},
+			"off": "꺼짐",
+			"systems": {
+				"system1": {
+					"off": "⚡ 시스템 1 (빠름): 꺼짐",
+					"cerebras": "⚡ 시스템 1 (빠름): Cerebras",
+					"literal_native": "⚡ 시스템 1 (빠름): Native% && {1}"
+				},
+				"system2": {
+					"off": "🧠 시스템 2 (신중함): 꺼짐",
+					"cerebras": "🧠 시스템 2 (신중함): Cerebras",
+					"literal_native": "🧠 시스템 2 (신중함): Native% && {1}"
+				}
+			},
+			"apps": {
+				"0": "자동 모드에서 제외된 앱 (0)",
+				"2": "자동 모드에서 제외된 앱 (2)",
+				"1234": "자동 모드에서 제외된 앱 (1234)"
+			}
+		}
+	}
+}

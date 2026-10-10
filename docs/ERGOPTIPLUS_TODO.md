@@ -6210,6 +6210,18 @@ required the actual captured Linux renderer owner. macOS Brew packaging and two
 Windows network subjects remain failed; dependent Windows E2E/package/install
 and macOS install jobs are skipped. Installed physical acceptance is unexecuted.
 
+The Windows Agent System1/System2 parents now consume the same declared fixed
+caption frames as Linux, with literal native backend labels and finished native
+children retained. The disabled-applications command uses a Windows-only shared
+declaration and its existing picker callback. All 21 original locale projections
+and counts 0/2/1234 remain in an independently captured original-source corpus;
+all prior 466 native assertions and 47 registrations remain byte-exact. Genuine
+menu generation and the whole manifest/parity source controls pass. The actual
+allocation census remains 22 Windows/6 macOS/4 Linux. Complete local checks pass:
+407 JavaScript checks, 18,158 macOS modeled assertions and 12,997 Linux assertions.
+Windows native execution and installed acceptance remain pending; these results
+do not close items 54, 16 or 38.
+
 - [ ] Execute the existing native per-key command/caption/state/refusal cases and review the still-native Windows menu sites against the actual census (currently 82). Move remaining fixed policy/data to shared declarations without hiding rows or weakening the scanner.
 - [ ] Prepared shared menu packets in docs/handovers/2026-10-04-config-menus are unapplied. Verify their recorded dependencies/preimages, regenerate owner artifacts and qualify all affected drivers after any shared change.
 
@@ -8493,6 +8505,11 @@ and the complete Linux package/install verdict. Its JS frame consumer assertion
 required the actual captured Linux renderer owner. macOS Brew packaging and two
 Windows network subjects remain failed; dependent Windows E2E/package/install
 and macOS install jobs are skipped. Installed physical acceptance is unexecuted.
+
+The Windows Agent fixed-caption migration uses canonical shared declarations
+without changing backend/model/save/picker owners or the 21 prior captions. See
+item 54 for the original-source corpus and actual local qualification. The
+22/6/4 allocation census and native/installed acceptance keep item 81 open.
 
 - [ ] Continue the remaining Windows menu families using shared templates and the item54 census. canonicalHoldOptions is already shared; do not cosmetically reimplement it.
 - [ ] After every Windows push, cancel automatic runs on its exact SHA. Use manual ci.yml with windows for Windows-only changes, or all affected OS lanes for shared changes; let manual runs finish and record native/E2E/package/install outcomes independently.

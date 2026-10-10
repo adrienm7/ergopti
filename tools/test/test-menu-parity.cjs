@@ -1465,6 +1465,13 @@ OPENS_SUBMENU.agent_disabled_apps = [
 		native_sources: { linux: 'linux/ui/menu/agent_rows.lua' }
 	}
 ];
+// The actual Windows dynamic slot publishes the declared picker command.
+OPENS_SUBMENU.agent_disabled_apps.push({
+	menu: 'agent_windows_disabled_apps_command',
+	platforms: ['ahk'],
+	kind: 'compose',
+	native_sources: { ahk: 'windows/ui/menu/menu_llm/menu_agent.ahk' }
+});
 OPENS_SUBMENU.agent_disabled_app_records = {
 	menu: 'agent_linux_disabled_app_remove',
 	platforms: ['linux'],
@@ -1479,9 +1486,12 @@ for (const system of ['system1', 'system2']) {
 		...(Array.isArray(OPENS_SUBMENU[key]) ? OPENS_SUBMENU[key] : [OPENS_SUBMENU[key]]),
 		{
 			menu: 'agent_linux_' + system + '_frame',
-			platforms: ['linux'],
+			platforms: ['linux', 'ahk'],
 			kind: 'compose',
-			native_sources: { linux: 'linux/ui/menu/agent_rows.lua' }
+			native_sources: {
+				linux: 'linux/ui/menu/agent_rows.lua',
+				ahk: 'windows/ui/menu/menu_llm/menu_agent.ahk'
+			}
 		},
 		{
 			menu: 'agent_linux_system_children',
