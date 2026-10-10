@@ -497,8 +497,27 @@ helpers.describe("tap-hold manager: the daemon's action executor", function()
 		local block = src:sub(start, (src:find("\n\t})", start, true) or #src))
 		local reset = block:match("on_text_injected%s*=%s*function%b()(.-)\n\t\tend,")
 		helpers.assert_true(reset ~= nil, "the daemon must hand the manager on_text_injected")
-		helpers.assert_true(reset:find("engine:reset()", 1, true) ~= nil and reset:find("_undoable = nil", 1, true) ~= nil,
+		helpers.assert_true(reset:find("engine:reset(false)", 1, true) ~= nil and reset:find("_undoable = nil", 1, true) ~= nil,
 			"it must drop the hotstring buffer and the undoable expansion")
+	end)
+
+
+	helpers.it("preserves unknown start authority through the actual one-shot callback (one-shot-injected-text)", function()
+		local src = daemon_source()
+		local start = assert(src:find("TapHold.init({", 1, true))
+		local block = src:sub(start, assert(src:find("\n\t})", start, true)))
+		local body = assert(block:match("on_text_injected%s*=%s*function%b()(.-)\n\t\tend,"))
+		local compile = loadstring or load
+		local factory = assert(compile("local engine = ...; local _undoable = {}; return function() " .. body
+			.. " end, function() return _undoable end", "=owned-one-shot-callback"))
+		local engine = require("hotstring_engine").new({})
+		engine:on_char("x")
+		local callback, undoable = factory(engine)
+		helpers.assert_true(undoable() ~= nil, "the original undoable record is present")
+		callback()
+		helpers.assert_eq(engine:current_buffer(), "", "the real callback clears stale text")
+		helpers.assert_eq(engine:buffer_starts_at_word_boundary(), false, "injected output cannot invent word-start authority")
+		helpers.assert_nil(undoable(), "the real callback clears the original undoable record")
 	end)
 
 	helpers.it("binds the tap-hold executor to the catalogue once, at init", function()

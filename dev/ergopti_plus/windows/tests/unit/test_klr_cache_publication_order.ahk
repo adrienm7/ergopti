@@ -68,9 +68,14 @@ _KLRCPO_OlderWorkerCannotRegressImage(InvalidPeerKey := "") {
 }
 Test("KLR cache: older worker cannot replace newer image (klr-cache-publication-order)",
 	_KLRDC_CheckTeardown.Bind(_KLRCPO_OlderWorkerCannotRegressImage))
-for Key in ["format_version", "walker_timings", "payload"]
-	Test("KLR cache: invalid peer " . Key . " permits rebuild (klr-cache-publication-order)",
-		_KLRDC_CheckTeardown.Bind(_KLRCPO_OlderWorkerCannotRegressImage.Bind(Key)))
+/** Registers vectors without publishing a global loop variable. */
+_KLRCPO_RegisterInvalidPeerCases() {
+	local Key
+	for Key in ["format_version", "walker_timings", "payload"]
+		Test("KLR cache: invalid peer " . Key . " permits rebuild (klr-cache-publication-order)",
+			_KLRDC_CheckTeardown.Bind(_KLRCPO_OlderWorkerCannotRegressImage.Bind(Key)))
+}
+_KLRCPO_RegisterInvalidPeerCases()
 
 _KLRCPO_GuardContentionAndRelease() {
 	_KLRDC_EnsureSharedDir()

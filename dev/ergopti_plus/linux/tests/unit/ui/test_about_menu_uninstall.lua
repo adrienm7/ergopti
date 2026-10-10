@@ -49,6 +49,7 @@ local function build(quits, source_run, startup, paused)
 	startup = startup or { enabled = false, toggles = 0, changes = 0 }
 	local previous_startup = package.loaded["ui.menu.start_at_login"]
 	package.loaded["ui.menu.start_at_login"] = {
+		command_available = function() return true end,
 		enabled = function() return startup.enabled end,
 		toggle = function()
 			startup.toggles = startup.toggles + 1
@@ -246,6 +247,7 @@ local function with_about_parent(code, options, body)
 		end }
 		package.loaded["infra.installation"] = { is_source_run = function() return options.source_run == true end }
 		package.loaded["ui.menu.start_at_login"] = {
+			command_available = function() return options.startup_available ~= false end,
 			enabled = function() state.startup_reads = state.startup_reads + 1; return state.enabled end,
 			toggle = function() state.toggles = state.toggles + 1; state.enabled = not state.enabled; return true end,
 		}
@@ -407,6 +409,23 @@ helpers.describe("Linux actual About whole parent", function()
 			helpers.assert_nil(row.fn)
 			helpers.assert_eq(#state.removals, 0)
 			helpers.assert_eq(state.quits, 0)
+		end)
+	end)
+end)
+
+helpers.describe("Linux About startup command ownership", function()
+	helpers.it("keeps a foreign startup command greyed without mutation (about-startup-command-owner)", function()
+		with_about_parent("en", { startup_available = false }, function(items, state, labels)
+			local parent = about_parent_at(items, labels["menu.about.title"])
+			helpers.assert_type(parent, "table")
+			local startup = parent.menu[#parent.menu - 1]
+			helpers.assert_eq(startup.disabled, true)
+			helpers.assert_nil(startup.fn)
+			helpers.assert_eq(startup.title, labels["menu.global.start_at_login"] .. " — "
+				.. reason_head(labels["menu.about.startup_other_command_reason"]))
+			helpers.assert_eq(state.toggles, 0)
+			helpers.assert_eq(state.changed, 0)
+			helpers.assert_eq(#state.removals, 0)
 		end)
 	end)
 end)

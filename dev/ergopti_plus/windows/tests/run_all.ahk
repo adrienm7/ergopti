@@ -576,6 +576,11 @@ _LogBootProgress("loading LLM modules")
 #Include ../modules/llm/api_common.ahk
 #Include ../modules/llm/api_token_crypto.ahk
 #Include unit/test_llm_api_common.ahk
+#Include ../modules/llm/ollama_install_files_port.ahk
+#Include ../modules/llm/ollama_runtime_owner.ahk
+#Include ../modules/llm/ollama_deps_checker.ahk
+; Preserve the prior ready test baseline while receiving the real state getter.
+_LLM_Deps_State := "ready"
 #Include ../modules/llm/api_ollama.ahk
 #Include ../modules/llm/remote_formats.ahk
 #Include ..\..\_shared\modules\llm\local_server_auth.ahk
@@ -1102,6 +1107,7 @@ _LogBootProgress("keylogger modules + tests included")
 #Include unit/test_managed_network_windows_actions.ahk
 #Include unit/test_managed_terminal_failure.ahk
 #Include unit/test_system_proxy_retirement.ahk
+#Include unit/test_network_pac_source_contract.ahk
 #Include unit/test_managed_routes_native.ahk
 #Include unit/test_managed_remote_transport.ahk
 #Include unit/test_updater_managed_transport.ahk
@@ -2026,6 +2032,8 @@ _LogBootProgress("keylogger modules + tests included")
 #Include unit/test_shell_runner_legacy_state_machine.ahk
 #Include unit/test_shell_runner_multiline_arg.ahk
 #Include unit/test_shell_runner_tree_owned.ahk
+#Include unit/test_ollama_install_files_port.ahk
+#Include unit/test_ollama_runtime_owner.ahk
 #Include unit/test_run_program_actions.ahk
 #Include unit/test_shell_runner_launch_cleanup.ahk
 #Include unit/test_shell_runner_native_argv.ahk

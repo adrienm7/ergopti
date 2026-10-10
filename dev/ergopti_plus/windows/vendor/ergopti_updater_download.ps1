@@ -336,7 +336,8 @@ function Invoke-ErgoptiUpdaterCurlDownload {
         [Uri]$Destination, [string]$NewExe, [int]$TimeoutMs, [hashtable]$State,
         [scriptblock]$ResolveRoutes, [int]$DeadlineMs, [int64]$StartedTick,
         [int64]$AuthenticatedSize, [string]$PolicyPath, [string]$DefaultsPath,
-        [scriptblock]$ReadEnvironment = $null
+        [scriptblock]$ReadEnvironment = $null,
+        [scriptblock]$OpenDestination = $null
     )
     if ($AuthenticatedSize -le 0 -or $AuthenticatedSize -gt [int]::MaxValue -or
         $null -eq $ResolveRoutes -or $TimeoutMs -le 0) {
@@ -361,6 +362,7 @@ function Invoke-ErgoptiUpdaterCurlDownload {
     $Engine = $null
     $Input = $null
     $Output = $null
+    $OutputOwner = $null
     $Answer = @{ child_quiesced = $false }
     try {
         $null = Get-ErgoptiUpdaterRemainingMilliseconds $StartedTick $DeadlineMs $State
@@ -517,8 +519,13 @@ function Invoke-ErgoptiUpdaterCurlDownload {
         $Input = [IO.File]::Open($Parameters.response_path, [IO.FileMode]::Open, [IO.FileAccess]::Read, [IO.FileShare]::None)
         if ($Input.Length -ne $AuthenticatedSize) { $State.Reason = 'verify'; throw 'Captured artifact size changed.' }
         $State.Stage = 'file_create'
+        if ($null -eq $OpenDestination) {
         $Output = [IO.File]::Open($NewExe, [IO.FileMode]::CreateNew, [IO.FileAccess]::Write, [IO.FileShare]::None)
+        } else {
+            $OutputOwner = Open-ErgoptiOwnedArtifactOutput $OpenDestination $NewExe $AuthenticatedSize ([ref]$Output)
+        }
         $State.StagedExecutableOwned = $true
+        if ($null -ne $OutputOwner) { Assert-ErgoptiOwnedArtifactOutputCurrent $OutputOwner }
         $Bytes = New-Object byte[] 65536
         $Copied = [int64]0
         while ($true) {
@@ -533,7 +540,9 @@ function Invoke-ErgoptiUpdaterCurlDownload {
         }
         if ($Copied -ne $AuthenticatedSize) { $State.Reason = 'verify'; throw 'Artifact copy size mismatch.' }
         $State.Stage = 'file_write'
+        if ($null -ne $OutputOwner) { Assert-ErgoptiOwnedArtifactOutputCurrent $OutputOwner }
         $Output.Flush($true)
+        if ($null -ne $OutputOwner) { Assert-ErgoptiOwnedArtifactOutputCurrent $OutputOwner }
         $null = $Engine.GetRemainingBudget()
         $Output.Dispose(); $Output = $null
         $State.Stage = 'file_read'
@@ -561,5 +570,34 @@ function Invoke-ErgoptiUpdaterCurlDownload {
             # parent's Job must close before it publishes a retry or successor.
             throw [InvalidOperationException]::new('Artifact resources have unacknowledged retirement.')
         }
+    }
+}
+
+# An explicit acquisition owner durably records its file identity before bytes.
+# The returned stream is adopted before validation so refusal cannot hide it.
+function Open-ErgoptiOwnedArtifactOutput {
+    param([scriptblock]$Factory, [string]$Path, [int64]$AuthenticatedSize, [ref]$Output)
+    $Owner = & $Factory $Path $AuthenticatedSize
+    if ($Owner -isnot [hashtable] -or -not $Owner.ContainsKey('stream') -or
+        $Owner.stream -isnot [IO.Stream]) {
+        throw [ArgumentException]::new('Owned artifact output capability was refused.')
+    }
+    $Output.Value = $Owner.stream
+    if (-not $Owner.stream.CanWrite -or -not $Owner.stream.CanSeek -or
+        $Owner.stream.Position -ne 0 -or $Owner.stream.Length -ne 0 -or
+        -not $Owner.ContainsKey('identity') -or $Owner.identity -isnot [string] -or
+        $Owner.identity -cnotmatch '^[0-9a-f]{8}:[0-9a-f]{16}\z' -or
+        -not $Owner.ContainsKey('is_current') -or $Owner.is_current -isnot [scriptblock]) {
+        throw [ArgumentException]::new('Captured artifact output authority was refused.')
+    }
+    Assert-ErgoptiOwnedArtifactOutputCurrent $Owner
+    return $Owner
+}
+
+function Assert-ErgoptiOwnedArtifactOutputCurrent {
+    param([hashtable]$Owner)
+    $Current = & $Owner.is_current $Owner
+    if ($Current -isnot [bool] -or -not $Current) {
+        throw [InvalidOperationException]::new('Exact artifact output authority was withdrawn.')
     }
 }

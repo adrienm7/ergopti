@@ -39,7 +39,9 @@ global _MMD_InfoCalls   := 0       ; LLM_GetModelInfo call count (catalogue-buil
 global _LLM_Menu  := Map("backend", "ollama", "model", "Qwen3.5-2B", "enabled", false)
 
 ; --- Dependency stubs (must exist at load: AHK resolves calls then) ---
-t(key)                       => key
+; Inert captions require actual translations; raw key echoes are refused.
+global _MMD_Locale := JsonParse(FileRead(_SharedDir . "\data\locales\en.json", "UTF-8"))
+t(key)                       => _MMD_Locale.Get(key, key)
 RegisterMenuItem(m, l, cb*)  => m.Add(l, cb.Length ? cb[1] : (*) => 0)
 LLM_Deps_IsReady()           => _MMD_DepsReady
 _LLM_DefaultFor(k, d := "")  => d
@@ -203,5 +205,33 @@ _MMD_BrowserReadinessUsesActualRenderer() {
 }
 Test("model menu: actual shared renderer preserves unavailable browser refusal",
 	_MMD_BrowserReadinessUsesActualRenderer)
+
+; Caption admission remains strict even in this isolated catalogue fixture.
+_MMD_BackendCaptionsUseActualLocale() {
+	global _MMD_Locale
+	for BackendId, Brand in Map("ollama", "Ollama 🦙", "api", "API 🌐") {
+		Key := "menu.llm.backend_" . BackendId . "_suffix"
+		Expected := _MMD_Locale[Key]
+		Assert(Expected != Key && Expected != "", "the canonical locale owns a translated backend suffix")
+		AssertEqual(Expected, t(Key), "the isolated translator reads the actual canonical locale")
+		AssertEqual(Brand . " — " . Expected, _LLM_Menu_BackendOptionLabel(BackendId),
+			"the real renderer admits the native brand with its declared translated suffix")
+		try {
+			_MMD_Locale[Key] := Key
+			Threw := false
+			try _LLM_Menu_BackendOptionLabel(BackendId)
+			catch Error as Err {
+				AssertEqual("Declared backend option caption was refused.", Err.Message,
+					"an untranslated inert suffix keeps its exact admission refusal")
+				Threw := true
+			}
+			AssertTrue(Threw, "a raw caption key must not be admitted as translated text")
+		} finally _MMD_Locale[Key] := Expected
+		AssertEqual(Brand . " — " . Expected, _LLM_Menu_BackendOptionLabel(BackendId),
+			"restoring the exact owned suffix restores caption admission")
+	}
+}
+Test("model menu: backend captions require actual canonical locale and retain raw-key refusal",
+	_MMD_BackendCaptionsUseActualLocale)
 
 RunTests()

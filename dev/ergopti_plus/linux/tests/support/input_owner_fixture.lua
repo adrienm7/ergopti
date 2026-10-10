@@ -10,7 +10,7 @@ local h = require("tests.helpers")
 --- @param body function Receives the controlled consumer session.
 function M.with_session(options, body)
 	options = options or {}
-	local names = { "ffi", "adapters.evdev_reader", "adapters.uinput_writer", "adapters.keyboard_hook",
+	local names = { "ffi", "infra.monotonic", "adapters.evdev_reader", "adapters.uinput_writer", "adapters.keyboard_hook",
 		"adapters.xkb_capture", "modules.hotstrings.device_finder", "platform.remap.tap_hold_engine",
 		"platform.remap.key_combination_engine", "modules.shortcuts.key_combinations", "infra.manifest_reader" }
 	local saved = {}; for _, name in ipairs(names) do saved[name] = { package.loaded[name] } end
@@ -23,7 +23,16 @@ function M.with_session(options, body)
 		file:write("controlled input-owner source\n"); file:close()
 		paths[id], queues[path] = path, {}
 	end
-	local s = { rows = {}, captures = {}, paths = paths, acquisitions = 0, held = {} }
+	local s = { rows = {}, captures = {}, paths = paths, acquisitions = 0, held = {}, clock_ms = 0 }
+	-- Event stamps and idle ticks belong to this controlled transport, not real
+	-- source-reader wall time spent parsing or writing the fixture config.
+	package.loaded["infra.monotonic"] = {
+		now_ms = function() return s.clock_ms end,
+		now_sec = function() return s.clock_ms / 1000 end,
+		resolution_ms = function() return 0 end,
+		has_hires = function() return true end,
+		backend = function() return "controlled-input-owner-clock" end,
+	}
 	for _, path in pairs(paths) do s.held[path] = {} end
 	function s.descriptor(id) for fd, path in pairs(descriptors) do if path == paths[id] then return fd end end end
 	local symbols = {
@@ -209,13 +218,20 @@ function M.with_session(options, body)
 		assert(s.hook.isRunning())
 		s.broker = require("adapters.modifier_broker").for_channel(s.writer)
 		function s.edge(id, code, value, at_ms)
+			s.clock_ms = math.max(s.clock_ms, at_ms)
 			queues[paths[id]][#queues[paths[id]] + 1] = Input.encode(Input.EV_KEY, code, value, nil, at_ms * 1000)
 			s.hook.pump()
 		end
 		-- Encodes a fresh controlled event into the original Reader queue. This
 		-- test-only port grants no native descriptor or physical qualification.
 		function s.event(id,kind,code,value,at_ms)
+			s.clock_ms = math.max(s.clock_ms, at_ms)
 			queues[paths[id]][#queues[paths[id]]+1]=Input.encode(kind,code,value,nil,at_ms*1000)
+			s.hook.pump()
+		end
+		--- Advances owned idle time without fabricating a physical input event.
+		function s.pump_at(at_ms)
+			s.clock_ms = math.max(s.clock_ms, at_ms)
 			s.hook.pump()
 		end
 		function s.pair()

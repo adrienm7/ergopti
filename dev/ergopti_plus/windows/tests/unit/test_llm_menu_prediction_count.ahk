@@ -127,8 +127,13 @@ _LLMPC_GenerationBoundary(Key) {
 			_CTC_ReleaseMenu(Native)
 	}
 }
-for Key in ["count", "context", "words"]
-	Test("generation boundaries: authentic numeric owner " . Key, _LLMPC_GenerationBoundary.Bind(Key))
+/** Registers vectors without publishing a global loop variable. */
+_LLMPC_RegisterGenerationBoundaryCases() {
+	local Key
+	for Key in ["count", "context", "words"]
+		Test("generation boundaries: authentic numeric owner " . Key, _LLMPC_GenerationBoundary.Bind(Key))
+}
+_LLMPC_RegisterGenerationBoundaryCases()
 
 
 /** Retains the hand numeric order while each true complete frame is withdrawn. */
@@ -182,9 +187,14 @@ _LLMPC_CompleteGenerationFrame(Section) {
 	}
 	Assert(_LLM_Menu_GenerationRows() is Array, "the repaired physical declaration is usable")
 }
-for Section in ["llm_generation_count_control", "llm_generation_context_controls", "llm_generation_word_controls",
-	"llm_generation_temperature_controls", "llm_native_numeric_reset"]
-	Test("complete generation frame: actual native numeric owner " . Section, _LLMPC_CompleteGenerationFrame.Bind(Section))
+/** Registers complete frames without publishing a global loop variable. */
+_LLMPC_RegisterCompleteGenerationFrames() {
+	local Section
+	for Section in ["llm_generation_count_control", "llm_generation_context_controls", "llm_generation_word_controls",
+		"llm_generation_temperature_controls", "llm_native_numeric_reset"]
+		Test("complete generation frame: actual native numeric owner " . Section, _LLMPC_CompleteGenerationFrame.Bind(Section))
+}
+_LLMPC_RegisterCompleteGenerationFrames()
 
 
 ; Exercise the exact new fixture scope through real declaration admission/refusal.

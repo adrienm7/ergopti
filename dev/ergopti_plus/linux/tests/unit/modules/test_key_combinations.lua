@@ -1294,6 +1294,60 @@ helpers.describe("same-device third slot through original production consumers (
 		local out={}; for _, row in ipairs(s.rows) do out[#out+1]=row[1]..":"..row[2] end
 		return table.concat(out," ")
 	end
+	local function with_adversarial_clock(body)
+		local previous = package.loaded["infra.monotonic"]
+		local reads, now = 0, 0
+		local external = {
+			now_ms = function() reads = reads + 1; now = now + 150; return now end,
+			now_sec = function() return now / 1000 end,
+			resolution_ms = function() return 0 end,
+			has_hires = function() return true end,
+			backend = function() return "adversarial-fixture-clock" end,
+		}
+		package.loaded["infra.monotonic"] = external
+		local ok, failure = pcall(body)
+		local restored = package.loaded["infra.monotonic"] == external
+		package.loaded["infra.monotonic"] = previous
+		if not ok then error(failure, 0) end
+		helpers.assert_true(restored, "fixture restores the exact inherited clock owner")
+		helpers.assert_eq(reads, 0, "controlled input never borrows host elapsed time")
+	end
+	helpers.it("(input-owner-clock) keeps original third-slot capture under expensive host reads", function()
+		with_adversarial_clock(function()
+			with_chord({}, function(s)
+				s.edge("a", 58, 1, 1000)
+				helpers.assert_eq(native_rows(s), "", "first press cannot expire on host wall time")
+				s.edge("a", 15, 1, 1010)
+				helpers.assert_eq(s.actions, {{ "copy", "combination__tab_then_caps_lock" }})
+				s.edge("a", 15, 0, 1011); s.edge("a", 58, 0, 1012)
+				helpers.assert_eq(native_rows(s), "")
+			end)
+		end)
+	end)
+	helpers.it("(input-owner-clock) retains exact guard revocation before any standalone output", function()
+		with_adversarial_clock(function()
+			with_chord({}, function(s)
+				s.edge("a", 58, 1, 1000)
+				s.bytes = s.bytes:gsub("simultaneous_threshold_ms = 100", "simultaneous_threshold_ms = 101")
+				s.edge("a", 15, 1, 1010)
+				helpers.assert_eq(s.actions, {})
+				helpers.assert_eq(native_rows(s):find("29:1", 1, true), nil)
+				s.edge("a", 15, 0, 1011); s.edge("a", 58, 0, 1012)
+			end)
+		end)
+	end)
+	helpers.it("(input-owner-clock) expires only when owned idle time passes the third-slot deadline", function()
+		with_chord({}, function(s)
+			s.edge("a", 58, 1, 1000)
+			s.pump_at(1100)
+			helpers.assert_eq(native_rows(s), "", "equality remains inside the positive delay")
+			s.pump_at(1101)
+			helpers.assert_eq(native_rows(s), "29:1", "the genuine idle pump expires after the deadline")
+			s.edge("a", 58, 0, 1401)
+			helpers.assert_eq(native_rows(s), "29:1 29:0")
+			helpers.assert_eq(s.actions, {})
+		end)
+	end)
 	for _,order in ipairs({{58,15},{15,58}}) do
 		helpers.it("consumes both original presses symmetrically "..order[1],function()
 			with_chord({},function(s)
@@ -1842,4 +1896,71 @@ helpers.describe("original managed saved configuration enrollment (controlled tr
    if not ok then error(err,0) end
   end)
  end)
+end)
+
+helpers.describe("relative-loader simultaneous source admission (controlled transport)", function()
+	local Fixture = require("tests.support.input_owner_fixture")
+	local function bytes(path)
+		local file = assert(io.open(path, "rb"))
+		local source = assert(file:read("*a")); assert(file:close())
+		return source
+	end
+	local function session(kind, body)
+		local names = { "modules.shortcuts.key_combinations", "platform.remap.tap_hold_manager" }
+		local saved, preloads = {}, {}
+		for _, name in ipairs(names) do saved[name], preloads[name] = package.loaded[name], package.preload[name] end
+		local native_hs = rawget(_G, "hs")
+		-- This models loader coordinates only. Real ModuleSource compares the
+		-- exact original Manager callback; no positive authentication predicate
+		-- or native source/output authority is replaced by this directory port.
+		rawset(_G, "hs", { fs = { currentDir = function()
+			return kind ~= "unanchored" and "/controlled-normal-loader" or nil
+		end } })
+		for _, name in ipairs(names) do
+			local relative = name:gsub("%.", "/") .. ".lua"
+			local source = bytes(helpers.driver_root() .. "/" .. relative)
+			local coordinate = "@./" .. relative
+			if kind == "foreign" and name == "platform.remap.tap_hold_manager" then coordinate = "@./foreign/" .. relative end
+			if kind == "wrong-anchor" and name == "platform.remap.tap_hold_manager" then coordinate = "@/different-loader-root/" .. relative end
+			package.preload[name] = function()
+				return assert((loadstring or load)(source, coordinate))()
+			end
+		end
+		local ok, failure = pcall(function()
+			Fixture.with_manager_session({ before_manager = function(s)
+				s.bytes = '[mod_combos]\nsimultaneous_threshold_ms = 87\nsymmetric = true\n[mod_combos.config.tab_then_caps_lock]\ncombo = "copy"\n'
+			end }, function(s)
+				assert(s.manager.set_enabled(false), "only standalone tap-holds are disabled")
+				s.rows = {}
+				body(s)
+			end)
+		end)
+		for _, name in ipairs(names) do package.loaded[name], package.preload[name] = saved[name], preloads[name] end
+		rawset(_G, "hs", native_hs)
+		if not ok then error(failure, 0) end
+	end
+	for _, order in ipairs({ {58,15}, {15,58} }) do
+		helpers.it("(relative-loader) retains both original presses before Copy " .. order[1], function()
+			session("original", function(s)
+				helpers.assert_eq(debug.getinfo(s.manager.managed_pair_options_current, "S").source, "@./platform/remap/tap_hold_manager.lua")
+				s.edge("a", order[1], 1, 1000)
+				helpers.assert_eq(s.rows, {}, "first physical edge remains buffered")
+				s.edge("a", order[2], 1, 1010)
+				helpers.assert_eq(s.actions, {{"copy", "combination__tab_then_caps_lock"}})
+				s.edge("a", order[2], 0, 1011); s.edge("a", order[1], 0, 1012)
+				helpers.assert_eq(s.rows, {}, "both physical lifetimes are consumed exactly once")
+			end)
+		end)
+	end
+	for _, kind in ipairs({ "foreign", "unanchored", "wrong-anchor" }) do
+		helpers.it("(relative-loader) refuses " .. kind .. " Manager source without pending custody", function()
+			session(kind, function(s)
+				s.edge("a", 58, 1, 1000)
+				helpers.assert_eq(s.rows, {{58,1}}, "untrusted loader source cannot suppress the original edge")
+				s.edge("a", 15, 1, 1010); s.edge("a", 15, 0, 1011); s.edge("a", 58, 0, 1012)
+				helpers.assert_eq(s.actions, {}, "refused first source cannot dispatch a simultaneous action")
+				helpers.assert_eq(s.rows, {{58,1},{15,1},{15,0},{58,0}})
+			end)
+		end)
+	end
 end)

@@ -10,4 +10,14 @@ enum ManagedNetworkBootstrapPolicy {
 	static let maximumProxyBytes = 65536
 	static let maximumCertificateBytes = 16777216
 	static let maximumCertificateFiles = 1024
+	static let maximumPACSourceBytes = 1048576
+	static let maximumPACRedirects = 50
+	static let pacSourceRoute = "direct"
+	static let pacSourceCredentials = "native-default"
+	static let pacSourceCredentialScope = "initial_authority"
+	static let pacSourceSchemes = ["http","https"]
+	static let pacSourceStatus = 200
+	static let pacSourceEncodings = ["utf-8","utf-8-bom","utf-16le-bom","utf-16be-bom"]
+	static let pacSourceStrictDecoding = true
+	static let pacSourceForbidsDowngrade = true
 }
