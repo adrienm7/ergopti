@@ -20,6 +20,25 @@ function validateBoundary() {
 	return policy;
 }
 function unwrap(code, protocol) {
+	if (protocol.embedded === true) {
+		assert.equal(
+			code.split(protocol.prefix).length,
+			2,
+			'unknown or weakened embedded scope admission'
+		);
+		assert.equal(protocol.suffix, '', 'unknown embedded scope refusal');
+		let full = code.replace(protocol.prefix, '');
+		for (const edit of protocol.edits) {
+			assert.equal(
+				full.split(edit.before).length,
+				edit.count + 1,
+				'embedded full-default binding must remain'
+			);
+			full = full.split(edit.before).join(edit.after);
+		}
+		assert.ok(full.trim(), 'the retained embedded command must remain nonempty');
+		return full;
+	}
 	assert.ok(code.startsWith(protocol.prefix), 'unknown or weakened scoped command admission');
 	assert.ok(code.endsWith(protocol.suffix), 'unknown or weakened scoped command refusal');
 	let full = code.slice(protocol.prefix.length, -protocol.suffix.length);
@@ -67,27 +86,21 @@ function projectScopedSteps(text, rel) {
 				protocol = contract.protocols[slot.protocol];
 			assert.equal(policy.scopes[protocol.scope].path, rel, 'scope and workflow owner must agree');
 			if (slot.owner_job !== undefined) {
-				assert.equal(
-					protocol.scope,
-					'macos-native-http',
-					'only the reviewed native-wire duplicate has a sibling owner'
-				);
-				assert.equal(job.id, 'package-macos', 'native-wire duplicate job must remain');
-				assert.equal(
-					step.name,
-					'Receive actual managed HTTP native clients',
-					'native-wire duplicate step must remain'
-				);
-				assert.equal(
-					slot.owner_job,
-					'managed-ollama-native',
-					'native-wire original owner must remain'
-				);
-				assert.equal(
-					slot.owner_step,
-					'Receive actual independent managed HTTP native clients',
-					'native-wire original step must remain'
-				);
+				const siblings = {
+					'Receive actual managed HTTP native clients': [
+						'macos-native-http',
+						'Receive actual independent managed HTTP native clients'
+					],
+					'Run Swift launcher tests': [
+						'macos-native-pac',
+						'Qualify actual native PAC and WPAD XCTest controls'
+					]
+				};
+				assert.equal(job.id, 'package-macos', 'reviewed duplicate job must remain');
+				assert.ok(Object.hasOwn(siblings, step.name), 'unknown duplicate scoped owner');
+				assert.equal(protocol.scope, siblings[step.name][0], 'duplicate scope family must remain');
+				assert.equal(slot.owner_job, 'managed-ollama-native', 'original scope owner must remain');
+				assert.equal(slot.owner_step, siblings[step.name][1], 'original scope step must remain');
 				assert.equal(
 					policy.scopes[protocol.scope].args[1],
 					slot.owner_step,

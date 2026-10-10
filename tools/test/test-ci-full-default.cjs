@@ -3,6 +3,8 @@
 /** Raw full-default controls; source models never qualify skipped native work. */
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
+const { spawnSync } = require('node:child_process');
+const { bashExecutable } = require('../lib/git-bash.cjs');
 const Full = require('./ci-full-default.cjs');
 const Raw = require('./ci-pipeline.cjs');
 const Policy = require('../ci/dev-release-qualification.cjs');
@@ -514,6 +516,109 @@ check(
 		assert.equal(Object.keys(stable.scopes).length, 13);
 	}
 );
+check(
+	'package Swift duplicate scopes only the existing PAC classes and preserves the full body',
+	() => {
+		const original = source.find((entry) => entry.rel === MAC);
+		const job = Raw.jobsOfText(original.text, MAC).find((entry) => entry.id === 'package-macos');
+		const code = Raw.runOf(Raw.step(job.body, 'Run Swift launcher tests')).join('\n');
+		assert.ok(
+			code.includes(
+				'node tools/ci/dev-release-qualification.cjs --scope macos-native-pac --receipt "$pac_receipt"'
+			)
+		);
+		assert.ok(code.includes('elif [ "$mode" = full ]; then\n    :'));
+		assert.ok(code.includes('--pac-skip-pattern "$pac_receipt"'));
+		assert.equal(code.split(' --pac-qualification-receipt "$pac_receipt"').length, 3);
+		const full = Full.runOf(Full.step(Full.job('package-macos'), 'Run Swift launcher tests')).join(
+			'\n'
+		);
+		assert.ok(
+			full.includes(
+				'script -q /dev/null swift test --package-path static/ergopti_plus/macos/launcher --scratch-path "$RUNNER_TEMP/swift-launcher-ci" 2>&1 | tee "$xctest_log"'
+			)
+		);
+		assert.ok(full.includes('if ! grep -Fq "Test Suite \'All tests\' passed" "$xctest_log"; then'));
+		assert.ok(
+			full.includes(
+				'node tools/diagnostics/tis_evidence_transport.cjs "$ERGOPTI_TIS_EVIDENCE_DIR" "$ERGOPTI_TIS_EVIDENCE_SESSION"'
+			)
+		);
+		for (const removed of [
+			'--pac-skip-pattern',
+			'--pac-qualification-receipt',
+			'pac_skip_args',
+			'swift_root_suite'
+		])
+			assert.equal(full.includes(removed), false, removed);
+		assert.equal(Scoped.contract.slots.length, 162);
+		const retained = Raw.step(job.body, 'Retain scoped native Brew qualification receipt');
+		assert.ok(
+			retained.includes(
+				'${{ runner.temp }}/swift-launcher-evidence/native-pac-package-qualification.json'
+			)
+		);
+		assert.equal(Raw.stepField(retained, 'if'), '${{ always() }}');
+	}
+);
+check('embedded Swift admission refuses omitted collector binding or changed source gate', () => {
+	const original = source.find((entry) => entry.rel === MAC);
+	const job = Raw.jobsOfText(original.text, MAC).find((entry) => entry.id === 'package-macos');
+	const step = Raw.step(job.body, 'Run Swift launcher tests');
+	const receiptOption = ' --pac-qualification-receipt "$pac_receipt"';
+	const missing = step.replace(receiptOption, '');
+	assert.notEqual(missing, step);
+	assert.throws(() => Full.fromFiles(changed(MAC, step, missing)), /binding/);
+	const changedGate = step.replace('--pac-skip-pattern', '--pac-skip-patterx');
+	assert.notEqual(changedGate, step);
+	assert.throws(() => Full.fromFiles(changed(MAC, step, changedGate)), /admission/);
+});
+check('Swift PAC arguments preserve empty and selected arrays under nounset', () => {
+	const original = source.find((entry) => entry.rel === MAC);
+	const job = Raw.jobsOfText(original.text, MAC).find((entry) => entry.id === 'package-macos');
+	const code = Raw.runOf(Raw.step(job.body, 'Run Swift launcher tests')).join('\n');
+	const safe = '${pac_skip_args[@]+"${pac_skip_args[@]}"}';
+	assert.ok(code.includes(' ' + safe + ' 2>&1 | tee "$xctest_log"'));
+	assert.equal(code.includes(' "${pac_skip_args[@]}" 2>&1'), false);
+	const invocation = code
+		.split('\n')
+		.find((line) => line.startsWith('script -q '))
+		.split(' 2>&1 | tee ')[0];
+	const pattern =
+		'^ErgoptiPlusTests[.](?:ManagedHTTPWorkerTests|ManagedHTTPWireTests|ManagedHTTPWPADWireTests)/';
+	const expected = [
+		'-q',
+		'/dev/null',
+		'swift',
+		'test',
+		'--package-path',
+		'static/ergopti_plus/macos/launcher',
+		'--scratch-path',
+		'/owned path/swift-launcher-ci'
+	];
+	for (const deferred of [false, true]) {
+		const shell =
+			'set -euo pipefail\nRUNNER_TEMP="/owned path"\n' +
+			'script() { printf "%s\\0" "$@"; }\n' +
+			(deferred ? 'pac_skip_args=(--skip "$1")\n' : 'pac_skip_args=()\n') +
+			invocation;
+		const result = spawnSync(
+			bashExecutable(),
+			['--noprofile', '--norc', '-c', shell, 'owned-argv', pattern],
+			{ encoding: 'utf8' }
+		);
+		assert.equal(result.error, undefined);
+		assert.equal(result.status, 0, result.stderr);
+		assert.equal(result.stderr, '');
+		assert.deepEqual(
+			result.stdout.split('\0').slice(0, -1),
+			deferred ? [...expected, '--skip', pattern] : expected
+		);
+	}
+	const unsafe = code.replace(safe, '"${pac_skip_args[@]}"');
+	assert.notEqual(unsafe, code);
+	assert.throws(() => Full.fromFiles(changed(MAC, safe, '"${pac_skip_args[@]}"')), /binding/);
+});
 console.log(
 	`PASS: raw full-default and retired-route source controls=${passed}; native execution UNRUN.`
 );
