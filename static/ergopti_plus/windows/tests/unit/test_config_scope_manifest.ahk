@@ -577,6 +577,7 @@ _ScopeObsoleteFreshRepair() {
 		Receipt := ConfigScopeApply("keyboard_layout", "clear", Map(), Fixture.options)
 		AssertEqual("pending", Receipt["status"])
 		Expected := '[layout]`n[private]`n"literal.dot" = { keep = [1, "x"], date = 1979-05-27 }`n'
+		Expected := _CMJFixtureCurrentSource(Expected)
 		Actual := TOML_ParseDocument(FSReadUtf8Exact(Fixture.path))
 		Assert(Actual["layout"] is Map && Actual["layout"].Count == 0,
 			"fresh valid values clear despite stale boot warnings, retaining the existing explicit empty header")

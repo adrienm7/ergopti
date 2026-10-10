@@ -2757,6 +2757,8 @@ Shared shortcut scope planning now filters only proved neutral deletions beneath
 
 Windows scopes classify a freshly captured strict source through the existing canonical decoder and obsolete-key owner, then admit only neutral deletion intents beneath proved obsolete scalar/array parents. Nonneutral or ancestor collisions refuse before backup/runtime publication. The candidate is built from the same captured source through existing build-only admission, drift and late session fences. Eighteen registered native controls retain the original full test prefix; native execution is pending.
 
+The four Windows scope fixtures now author current-schema source before genuine boot or stamp their subsequent owned source once. They preserve semantic metadata, strict write permission, pending/refusal and exact rollback assertions; one existing durable-write assertion now uses the same intended payload from its genuine current fixture. These source corrections address fixture prerequisites implicated in the eleven failures of manual run 38019750684: 10,908 planned, 1,905 executed, 1,894 passed, 11 failed and 9,003 unexecuted before the unchanged 22-minute watchdog. All four repairs remain native UNRUN. The next exact-source Windows CI must qualify the existing scope cases and complete the original suite; item 5 remains partial.
+
 - [~] **7.** Complete W2: seven-page first-run opt-in wizard, per-category
   recommended choices, consistent WebView behavior and genuine translations in
   21 locales. Current source implements the seven-page declaration, native
@@ -4905,6 +4907,8 @@ restores the original caller object, every field and runtime definedness through
 normal and throwing exits. All original user-file protection assertions remain;
 the independent joined-discovery assertion is unchanged. Native qualification
 of this isolation correction is still pending.
+
+Manual Windows run 38019750684 passed the four ordinary full-save families and the genuine 34-store publication/rollback case, but ended incomplete with 1,894 passes, 11 failures and 9,003 unexecuted subjects at the unchanged 22-minute watchdog. The capacity case measured 142,033.737 ms for publication and 123,130.867 ms for refusal; these phases locate cost without proving an optimization. The newly registered genuine captured-registry diagnostic requires 32 accepted calls, actual native timing, zero Count-getter observer effects, exact repair and unchanged target bytes in the next Windows CI. It remains native UNRUN and requires no physical device. The original 34-store assertions and all nine acquired-read temporal controls still require complete execution; full unit, E2E, fresh startup, packaging/install and separate installed-device acceptance remain open. Count, prototype and key-index proposals remain on HOLD; no production change, cached admission, timeout relaxation or fabricated acknowledgement is included. Item 42 and transversal items 16/38 remain partial.
 
 - [~] **43.** A Mac upgraded from a pre-lease release could not deploy (dev.149:
   « Merge aborted: 25 ambiguous legacy ErgoptiPlus rules … matches the

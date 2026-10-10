@@ -248,8 +248,8 @@ _HSCS_ExtensionPackOwnedOwner(Enabled, Removed := false) {
 		Fixture.options["reload"] := Launch
 		Fixture.options["roots"] := (*) => Available ? [Root] : []
 		try {
-			Fixture.source := _CMJFixtureCurrentSource(Fixture.source)
 			Assert(FSWriteDurable(Fixture.path, Fixture.source))
+			AssertTrue(ConfigSchemaCanPrepareWrite(Fixture.path), "the actual appended pack configuration keeps exactly one schema stamp and the genuine native boot owner")
 			Rows := _HS_ExtensionScopeCommandRows("sample", Fixture.options)
 			AssertEqual(2, Rows.Length)
 			Action := Rows[Enabled ? 1 : 2]["action"]
