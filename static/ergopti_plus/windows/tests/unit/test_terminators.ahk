@@ -633,8 +633,11 @@ _HTR_Operation() {
 }
 
 _HTR_WalLifecycle(Refuse) {
-	Fixture := _ScopeOwnerFixture()
-	Assert(FSWriteDurable(Fixture.path, _HTR_Source()))
+	; The actual journal classifies the same intended current source before boot.
+	OriginalBody := _HTR_Source()
+	Fixture := _ScopeOwnerFixture(OriginalBody)
+	Source := Fixture.source
+	Assert(FSWriteDurable(Fixture.path, Source))
 	Bundle := 0, OnSuccess := 0, OnRefused := 0, Calls := 0
 	Launch(Success, Borrowed, Refused) {
 		Bundle := Borrowed, OnSuccess := Success, OnRefused := Refused
@@ -643,6 +646,8 @@ _HTR_WalLifecycle(Refuse) {
 	}
 	Fixture.options["reload"] := Launch
 	try {
+		AssertEqual(OriginalBody, SubStr(Source, InStr(Source, "`n") + 1),
+			"current positive fixture metadata preserves every original record/foreign byte")
 		Receipt := HotstringsTerminatorRecordsEdit(_HTR_Operation(), Fixture.options)
 		AssertEqual(1, Calls, "actual durable publication must reach the reload admission")
 		AssertEqual("pending", Receipt["status"], "durable write is not a runtime acknowledgement")
@@ -651,11 +656,11 @@ _HTR_WalLifecycle(Refuse) {
 		if Refuse {
 			OnRefused.Call("controlled refusal")
 			AssertEqual("refused", Receipt["status"])
-			AssertEqual(_HTR_Source(), FSReadUtf8Exact(Fixture.path), "the genuine rollback must restore all original bytes")
+			AssertEqual(Source, FSReadUtf8Exact(Fixture.path), "the genuine rollback must restore all original bytes")
 			Receipt := HotstringsTerminatorRecordsEdit(_HTR_Operation(), Fixture.options)
 			AssertEqual("pending", Receipt["status"], "settled refusal permits one new admitted retry")
 			OnRefused.Call("controlled second refusal")
-			AssertEqual(_HTR_Source(), FSReadUtf8Exact(Fixture.path))
+			AssertEqual(Source, FSReadUtf8Exact(Fixture.path))
 		} else {
 			OnSuccess.Call()
 			AssertEqual("committed", Receipt["status"], "only the actual replacement callback acknowledges runtime completion")
