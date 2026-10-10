@@ -597,3 +597,111 @@ _LSCJ_LastSourceCannotReplaceTicket() {
 Test("local job final fence: last source boundary preserves logical refusal", _LSCJ_LastSourceCannotReplaceTicket)
 
 
+
+
+
+; ================================================
+; ================================================
+; ======= 5/ Batched Job Target Resolution =======
+; ================================================
+; ================================================
+
+_LSCJ_EntriesBound(Fixture, Ids, Source) {
+	if !Fixture.SourceCurrent(Source)
+		return false
+	Entries := Map()
+	for Id in Ids
+		Entries[Id] := Fixture.Entry(Id)
+	return Fixture.SourceCurrent(Source) ? Map("source", Source, "entries", Entries) : false
+}
+
+_LSCJ_EntryBound(Fixture, Id, Source) {
+	if !Fixture.SourceCurrent(Source)
+		return false
+	Entry := Fixture.Entry(Id)
+	return Fixture.SourceCurrent(Source) ? Entry : false
+}
+
+_LSCJ_BatchedTarget(Mode) {
+	Fixture := _LSO_Fixture()
+	try {
+		Fixture.Native.Options["entry_bound"] := _LSCJ_EntryBound.Bind(Fixture)
+		Fixture.Native.Options["entries_bound"] := _LSCJ_EntriesBound.Bind(Fixture)
+		Fixture.SourceChecks := 0
+		Fixture.DefineProp("SourceCurrent", {Call: _LSO_CountSourceCurrent})
+		AssertTrue(Fixture.Native.Rescan())
+		Fixture.SourceChecks := 0
+		if Mode == "entry_drift"
+			Fixture.OnEntry := () => Fixture.Drift("old-key")
+		Current := Fixture.Native._CurrentJob(Fixture.Native.Jobs["lmstudio"])
+		if Mode == "live" {
+			AssertTrue(Current)
+			AssertEqual(3, Fixture.SourceChecks, "the typed target batch and final claim need three full checks")
+		} else {
+			AssertFalse(Current, "a mutation during the real entry port cannot bless the target")
+			AssertTrue(Fixture.SourceChecks >= 2)
+		}
+		AssertEqual(0, Fixture.Published.Length)
+	} finally Fixture.Dispose()
+}
+Test("local job batch: typed target read removes one duplicate full fence", _LSCJ_BatchedTarget.Bind("live"))
+Test("local job batch: entry mutation retains whole source refusal", _LSCJ_BatchedTarget.Bind("entry_drift"))
+
+_LSCJ_ManagedFactory(Fixture, Owner) {
+	State := _ManagedCurlControlState()
+	Request := CurlAsyncRequest(Map("spawn", _ManagedCurlControlSpawn.Bind(State)))
+	State["request"] := Request
+	Fixture.ManagedStates.Push(State)
+	Fixture.Requests.Push(Request)
+	return Request
+}
+
+_LSCJ_ActualManagedBranch(Mode) {
+	Fixture := _LSO_Fixture()
+	try {
+		Fixture.ManagedStates := []
+		Fixture.Transport.Options.Delete("request")
+		Fixture.Transport.Options["clock"] := (*) => A_TickCount
+		Fixture.Transport.DefineProp("_NativeRequest", {Call: _LSCJ_ManagedFactory.Bind(Fixture)})
+		Fixture.Native.Options["entry_bound"] := _LSCJ_EntryBound.Bind(Fixture)
+		Fixture.Native.Options["entries_bound"] := _LSCJ_EntriesBound.Bind(Fixture)
+		AssertTrue(Fixture.Native.Rescan())
+		AssertEqual(1, Fixture.ManagedStates.Length)
+		State := Fixture.ManagedStates[1], Request := State["request"]
+		AssertFalse(Fixture.Transport.Options.Has("request"), "the production managed-routing branch must remain active")
+		AssertTrue(Request.ManagedRouting && Request.ManagedTransport)
+		AssertEqual(1, State["spawns"])
+		AssertEqual(1, State["starts"])
+		AssertContains(State["executable"], "powershell.exe")
+		AssertEqual(Fixture.Transport.Options["timeout_ms"], Request.DeadlineTimeout)
+		AssertEqual(Request.DeadlineStart, State["input"]["started_tick"])
+		AssertFalse(Request.ManagedPayloadPublished)
+		SetTimer(Request.ManagedAdmissionFn, 0)
+		_ManagedCurlControlAck(State)
+		if Mode == "replaced"
+			Fixture.Drift("old-key")
+		Request._PollManagedAdmission()
+		if Mode == "live" {
+			AssertTrue(Request.ManagedPayloadPublished, "only the actual managed admission may publish provider input")
+			Published := JsonParse(FileRead(State["directory"] . "transport.json", "UTF-8"))
+			AssertEqual(Request.CleanupDebtId, Published["request_id"])
+		} else {
+			AssertTrue(Request.Aborted)
+			AssertFalse(Request.ManagedPayloadPublished)
+			AssertFalse(FileExist(State["directory"] . "transport.json"))
+			AssertTrue(State["terminates"].Length > 0, "source refusal must retire the exact controlled Job")
+		}
+	} finally {
+		try {
+			if Fixture.Transport.HasOwnProp("_NativeRequest")
+				Fixture.Transport.DeleteProp("_NativeRequest")
+			Fixture.Dispose()
+		} finally {
+			for State in Fixture.ManagedStates
+				_ManagedCurlControlRelease(State)
+		}
+	}
+}
+Test("local job managed: production routing and native admission path stay mandatory", _LSCJ_ActualManagedBranch.Bind("live"))
+Test("local job managed: replaced source refuses queued managed payload", _LSCJ_ActualManagedBranch.Bind("replaced"))
+

@@ -77,6 +77,13 @@ class LocalServersOwner extends _LocalServersTimerNativeAdapter {
 		if !(Server is Map)
 			return false
 		Entry := this._Entry(Id, Source?)
+		return this._TargetFromEntry(Id, Server, Entry)
+	}
+
+	/** Pure target projection; its caller retains source and final claim ownership. */
+	_TargetFromEntry(Id, Server, Entry) {
+		if !(Server is Map)
+			return false
 		if Entry is Map {
 			if !(Entry.Get("Id", 0) is String) || !(Entry.Get("Provider", "") == Id)
 					|| !(Entry.Get("BaseUrl", 0) is String) || !(Entry.Get("Token", 0) is String)
@@ -247,9 +254,21 @@ class LocalServersOwner extends _LocalServersTimerNativeAdapter {
 		Ticket := Job["ticket"]
 		Valid := Ticket.Call()
 		if !((Valid is Integer) && Valid == true) || !this._Admitted()
-				|| !this._True("source_current", Job["source"])
 			return false
-		Target := this._Target(Job["id"], Job["source"])
+		if this.Options.Has("entries_bound") {
+			; The existing native batch owner fences private resolution before and
+			; after. The independent final Current below remains mandatory.
+			Batch := this._Call("entries_bound", [Job["id"]], Job["source"])
+			if !(Batch is Map) || Batch.Get("source", 0) != Job["source"]
+					|| !(Batch.Get("entries", 0) is Map) || Batch["entries"].Count != 1
+					|| !Batch["entries"].Has(Job["id"])
+				return false
+			Target := this._TargetFromEntry(Job["id"], this.Servers.Get(Job["id"], 0), Batch["entries"][Job["id"]])
+		} else {
+			if !this._True("source_current", Job["source"])
+				return false
+			Target := this._Target(Job["id"], Job["source"])
+		}
 		if !this._SameTarget(Job["target"], Target)
 			return false
 		if !this._Admitted()
