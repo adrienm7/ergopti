@@ -1255,8 +1255,10 @@ ScriptInformation["MagicKeySourceOverridesEmulation"] := _MagicKeySource["overri
 LoggerInfo("ErgoptiPlus", "Magic-key source: {1} ({2}).", _MagicKeySource["scan"], _MagicKeySource["origin"])
 
 BootProfile_StageEnd("magic key source", _MagicKeySource["origin"])
-if ConfigFullStateCanPersist() {
-	if !_ConfigQueueFullSave(CONFIG_FULL_SAVE_BOOT_DELAY_MS, 0, false)
+; This canonicalizer is optional once a terminal transition owns the old boot.
+; Recheck after refusal because schema admission and queue setup can yield.
+if !_ConfigWriteTerminalIsActive() && ConfigFullStateCanPersist() {
+	if !_ConfigQueueFullSave(CONFIG_FULL_SAVE_BOOT_DELAY_MS, 0, false) && !_ConfigWriteTerminalIsActive()
 		ConfigReportPersistenceFailure("the boot full-configuration save wake-up")
 }
 
