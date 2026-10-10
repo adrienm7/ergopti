@@ -344,6 +344,7 @@ func managedHTTPFailure(_ error: NSError) -> String {
 /// No trust evaluation, certificate text or private NSError payload is acquired.
 func managedHTTPTLSDiagnostic(_ error: NSError, additionalAnchorCount: Int) -> [String: Any] {
 	precondition(additionalAnchorCount >= 0)
+	let cfNetworkDomain = kCFErrorDomainCFNetwork as String
 	var native = error
 	var seen = Set<ObjectIdentifier>()
 	var causes: [[String: Any]] = []
@@ -355,7 +356,7 @@ func managedHTTPTLSDiagnostic(_ error: NSError, additionalAnchorCount: Int) -> [
 		switch native.domain {
 		case NSURLErrorDomain: domain = "url"
 		case NSOSStatusErrorDomain: domain = "security"
-		case kCFErrorDomainCFNetwork as String: domain = "cfnetwork"
+		case cfNetworkDomain: domain = "cfnetwork"
 		case NSPOSIXErrorDomain: domain = "posix"
 		default: domain = "other"
 		}
