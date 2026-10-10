@@ -82,10 +82,7 @@ local Logger             = require("infra.logger")
 -- Admit canonical privacy before any dependency can publish an error or path.
 do
 	local admitted = pcall(function()
-		local file = assert(io.open(logger_shared_root .. "/modules/diagnostics/redaction.json", "rb"))
-		local read_ok, raw = pcall(file.read, file, "*a")
-		local close_ok, closed = pcall(file.close, file)
-		assert(read_ok and type(raw) == "string" and close_ok and closed == true)
+		local raw = require("adapters.boot_journal").read_privacy_policy(logger_shared_root)
 		Logger.initialize_privacy(raw)
 	end)
 	if not admitted then
