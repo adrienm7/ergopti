@@ -2371,6 +2371,35 @@ jobs:
           fi
         timeout-minutes: 3
 
+      # Non-input C qualification uses the original exact full-family owner.
+      # This separate native receipt does not qualify the deferred E2E suite.
+      - name: Qualify three actual XI2 property cookies
+        id: native_xi2_cookies
+        if: ${{ !cancelled() }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo python3 "$GITHUB_WORKSPACE/tools/ci/ubuntu_apt.py" -y --no-install-recommends gcc libx11-dev libxi-dev xvfb
+          set +e
+          python3 static/ergopti_plus/linux/tests/hardware/run_xi2_property_cookies.py "$RUNNER_TEMP/linux-xi2-property-cookies" 2>&1 | tee "$RUNNER_TEMP/linux-xi2-property-cookies.log"
+          xi2_pipeline_status=("${PIPESTATUS[@]}")
+          set -e
+          if [ "${#xi2_pipeline_status[@]}" -ne 2 ]; then exit 1; fi
+          if [ "${xi2_pipeline_status[0]}" -ne 0 ]; then exit "${xi2_pipeline_status[0]}"; fi
+          exit "${xi2_pipeline_status[1]}"
+        timeout-minutes: 5
+
+      - name: Retain actual XI2 property-cookie evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-xi2-property-cookies-${{ github.sha }}-${{ github.run_attempt }}
+          retention-days: 7
+          path: |
+            ${{ runner.temp }}/linux-xi2-property-cookies
+            ${{ runner.temp }}/linux-xi2-property-cookies.log
+          if-no-files-found: error
+
       # A real X server and WM qualify logical RandR placement and input focus.
       # Physical displays and evdev source-generation receipts remain separate.
       - name: Qualify actual cursor-display window switching

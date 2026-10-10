@@ -31,6 +31,7 @@
 		"test:manifest-parity": "node ./tools/test/test-manifest-parity.cjs",
 		"test:defaults-single-source": "node ./tools/test/test-defaults-single-source.cjs",
 		"test:linux-feature-parity": "node ./tools/test/test-linux-feature-parity.cjs",
+		"test:linux-xi2-cookie-ci-contract": "node ./tools/test/test-linux-xi2-cookie-ci-contract.cjs",
 		"test:llm-legacy-basic-prompt-single-source": "node ./tools/test/test-llm-legacy-basic-prompt-single-source.cjs",
 		"test:keycode-data-js-parity": "node ./tools/test/test-keycode-data-js-parity.cjs",
 		"test:physical-keys-registry": "node ./tools/test/test-physical-keys-registry.cjs",
