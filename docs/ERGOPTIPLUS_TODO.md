@@ -6044,6 +6044,22 @@ cancellation owners are unchanged. Items 54 and 81 remain partial.
       open. macOS system trust and explicit proxy relays are integrated, while
       opaque-client full-URL PAC/WPAD/fallback/redirect routing remains CODE.
 
+2026-10-10 selected-release network continuation. The actual Lua caller now
+binds its selected archive to a typed native download request. Without an
+explicit HTTPS/all-proxy route, the staging shell uses the admitted bundled
+managed receiver; explicit routes preserve the original curl/bypass behavior.
+Exclusive stage creation refuses collisions, and the original digest,
+extraction, version, signature and READY checks remain intact. The registered
+caller module passes22 tests. The independent frozen shell corpus passes50
+portable controls; the exact predecessor passes6 and fails44 with the same
+expectations. These recording ports do not qualify actual packaged PAC/WPAD,
+redirects or rollback. Normal-suite enrollment of that shell corpus remains
+CODE: the proposed timeout wrapper could strand descendants and delete their
+inputs, so that addendum is retained unapplied. Executed-image/ABA admission,
+private destination identity, complete cancellation/tree closure and translated
+native failure-class projection also remain CODE under items16/38. Item62
+stays open.
+
 2026-10-10 MLX managed admission continuation. The actual generated downloader
 already installs the bundled per-request managed HTTP transport. Its launcher
 now admits that receiver instead of refusing PAC/WPAD through the opaque-client
