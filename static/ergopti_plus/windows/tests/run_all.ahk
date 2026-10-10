@@ -576,6 +576,9 @@ _LogBootProgress("loading LLM modules")
 #Include ../modules/llm/api_common.ahk
 #Include ../modules/llm/api_token_crypto.ahk
 #Include unit/test_llm_api_common.ahk
+#Include ../modules/llm/ollama_deps_checker.ahk
+; Preserve the prior ready test baseline while receiving the real state getter.
+_LLM_Deps_State := "ready"
 #Include ../modules/llm/api_ollama.ahk
 #Include ../modules/llm/remote_formats.ahk
 #Include ..\..\_shared\modules\llm\local_server_auth.ahk
