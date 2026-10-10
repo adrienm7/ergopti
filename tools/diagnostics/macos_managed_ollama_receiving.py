@@ -424,6 +424,7 @@ class Receiver:
             "LoopbackListenerCompatibility.h",
             "OwnedImageAliasCompatibility.h",
             "OwnedSuspendedImageCompatibility.h",
+            "OwnedListenerEventCompatibility.h",
         ):
             relative = (
                 "static/ergopti_plus/macos/launcher/Sources/CPOSIXCompatibility/include/" + name

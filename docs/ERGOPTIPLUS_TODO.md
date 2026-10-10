@@ -6537,6 +6537,14 @@ producer/catalogue27/staging also pass. Actual model receiving, packaging,
 installation and Release are skipped. PAC/HTTP and Homebrew remain failed
 independently. Items36/62 and the false production guard remain open.
 
+2026-10-10 standalone native compiler header closure. Both actual receiver
+recipes now copy all six headers imported by the native umbrella, including
+OwnedListenerEventCompatibility.h. All26 original portable compiler/registry
+controls pass with exact copied-header and retained-source assertions. Native
+compilation and model receiving on the corrected recipe remain pending; the
+compiler exception from the preceding failed prepare was not recovered. No
+native success or item62 completion is inferred from portable receiving.
+
 2026-10-10 actual model receiving dependency. The original native build has
 one fixed step identity; model create/pull/inference/retirement runs only after
 that exact build succeeds and cancellation is absent. Earlier independent
