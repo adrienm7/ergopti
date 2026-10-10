@@ -40,8 +40,16 @@ _CPC_LineConsumesResult(Lines, Index) {
 		"i)^\s*(?:try\s+return\b|return\b|if\b|else\s+if\b)")
 		return true
 	if !RegExMatch(Line,
-		"i)^\s*(?:try\s+)?([A-Za-z_][A-Za-z0-9_]*)\s*:=", &Assignment)
-		return false
+		"i)^\s*(?:try\s+)?([A-Za-z_][A-Za-z0-9_]*)\s*:=", &Assignment) {
+		; Only the adjacent, assigned native dispatch pair is a continuation.
+		; The existing scan below must still find consumption of that same result.
+		if Index <= 1 || !RegExMatch(Line,
+			'^\s*:\s*TOML_BatchWrite\(Path,\s*Updates,\s*\[\],\s*NativeAdmission\)\s*$')
+			return false
+		if !RegExMatch(Lines[Index - 1],
+			'^\s*([A-Za-z_][A-Za-z0-9_]*)\s*:=\s*IsConfiguration\s*\?\s*TOML_ConfigBatchWrite\(Path,\s*Updates,\s*\[\],\s*NativeAdmission\)\s*$', &Assignment)
+			return false
+	}
 	; Assignment is consumption only when the status is actually tested. Merely
 	; renaming a discarded result must not satisfy this class guard.
 	loop Min(20, Lines.Length - Index) {
@@ -739,3 +747,29 @@ _CPC_FullSnapshotRetainsSourcePolicyAndStrictAck() {
 
 }
 Test("AHK-15-persistence: actual full snapshot retains shared source policy and exact native ACK", _CPC_FullSnapshotRetainsSourcePolicyAndStrictAck)
+
+
+_CPC_NativeTernaryRequiresTestedStatus() {
+	Body := _StripFullLineComments(_DriverFuncBody("_ConfigInvokeCommitWriter"))
+	Assert(Body != "", "the native writer dispatch must be readable")
+	Lines := StrSplit(Body, "`n", "`r"), Calls := 0
+	for Index, Line in Lines {
+		if !RegExMatch(Line, '^\s*:\s*TOML_BatchWrite\(')
+			continue
+		Calls += 1
+		AssertTrue(_CPC_LineConsumesResult(Lines, Index), "both actual assigned native branches consume the same status")
+		Unchecked := StrSplit(StrReplace(Body, "if !((Written is Integer) && Written == 1)", "if true"), "`n", "`r")
+		AssertFalse(_CPC_LineConsumesResult(Unchecked, Index), "omitting the real result check refuses the continuation")
+		OtherStatus := Lines.Clone()
+		OtherStatus[Index - 1] := StrReplace(OtherStatus[Index - 1], "Written :=", "Ignored :=")
+		AssertFalse(_CPC_LineConsumesResult(OtherStatus, Index), "checking another variable cannot acknowledge this branch")
+		Commented := Lines.Clone()
+		Commented[Index - 1] := "; " . Commented[Index - 1]
+		AssertFalse(_CPC_LineConsumesResult(Commented, Index), "a commented assignment grants no result owner")
+		Unqualified := Lines.Clone()
+		Unqualified[Index] := StrReplace(Line, ", NativeAdmission)", ")")
+		AssertFalse(_CPC_LineConsumesResult(Unqualified, Index), "an unreviewed continuation is not silently admitted")
+	}
+	AssertEqual(2, Calls, "the two actual guarded and default native dispatch branches remain enrolled")
+}
+Test("AHK-15-persistence: adjacent native ternary branches retain tested result ownership", _CPC_NativeTernaryRequiresTestedStatus)
