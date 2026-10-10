@@ -264,8 +264,8 @@ TrayMenuFrameNative(Operation, Target := false, Handle := 0) {
 		BuiltIn := BuiltInGetter.Call(NativeDll)
 		if !HeldLive() || !BuiltIn
 			return false
-		Name := NameGetter.Call(NativeDll)
-		return HeldLive() && Name == "DllCall" && NativeClass == Menu
+		NativeDllName := NameGetter.Call(NativeDll)
+		return HeldLive() && NativeDllName == "DllCall" && NativeClass == Menu
 	}
 	if Operation == "capture" {
 		if NativeClass != Menu || !(Target is NativeClass) || ObjGetBase(Target) != NativeClass.Prototype

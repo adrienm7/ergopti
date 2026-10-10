@@ -3057,6 +3057,6 @@ _MR_FrameNativeConstructorCurrent(Constructor) {
 	BuiltIn := BuiltInGetter.Call(NativeFactory)
 	if !SourceLive() || !BuiltIn
 		return false
-	Name := NameGetter.Call(NativeFactory)
-	return SourceLive() && Name == "Menu.Call"
+	NativeFactoryName := NameGetter.Call(NativeFactory)
+	return SourceLive() && NativeFactoryName == "Menu.Call"
 }

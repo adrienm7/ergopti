@@ -6054,6 +6054,11 @@ console.log(
 			['native cleanup foreign', 'DeleteMethod.Call(Target)', 'Target.Delete()'],
 			['native cleanup redirected', 'if Operation == "release" {', 'if Operation == "foreign" {'],
 			[
+				'native metadata result clobbered by the held guard',
+				'NativeDllName := NameGetter.Call(NativeDll)\n\t\treturn HeldLive() && NativeDllName == "DllCall" && NativeClass == Menu',
+				'Name := NameGetter.Call(NativeDll)\n\t\treturn HeldLive() && Name == "DllCall" && NativeClass == Menu'
+			],
+			[
 				'native reflective port assigned',
 				'throw ValueError("Unknown owned native menu operation")',
 				'throw ValueError("Unknown owned native menu operation")\n\tTrayMenuFrameNative := Foreign.Native'
@@ -6119,6 +6124,38 @@ console.log(
 			physicalPersonalFrameDataPublication(foreign, menu.personal_shortcuts_frame, entry),
 			false,
 			'foreign native path cannot borrow authority'
+		);
+	}
+	// The genuine constructor guard cannot overwrite its observed intrinsic name.
+	{
+		const nativeFile = 'windows/infra/manifest_menu.ahk';
+		const original = physicalPersonalSources[nativeFile];
+		const before = '\tSourceLive() {\n\t\tif Constructor != NativeClass';
+		const after =
+			'\tSourceLive() {\n\t\tNativeFactoryName := "foreign"\n\t\tif Constructor != NativeClass';
+		assert.equal(original.split(before).length - 1, 1, 'actual constructor closure preimage');
+		const changed = original.replace(before, after);
+		assert.notEqual(changed, original);
+		assert.equal(changed.split(after).length - 1, 1, 'unique genuine constructor clobber anchor');
+		assert.equal(
+			physicalPersonalFrameDataPublication(
+				{ ...physicalPersonalSources, [nativeFile]: changed },
+				menu.personal_shortcuts_frame,
+				entry
+			),
+			false,
+			'a genuine nested constructor write cannot replace the intrinsic name'
+		);
+		const repaired = changed.replace(after, before);
+		assert.equal(repaired, original, 'exact genuine constructor clobber inverse');
+		assert.equal(
+			physicalPersonalFrameDataPublication(
+				{ ...physicalPersonalSources, [nativeFile]: repaired },
+				menu.personal_shortcuts_frame,
+				entry
+			),
+			true,
+			'actual intrinsic constructor result custody repaired'
 		);
 	}
 	function publishedPersonalFrame(text) {
