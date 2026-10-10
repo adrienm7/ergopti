@@ -10805,6 +10805,24 @@ fixture URL. Its trust restoration also times out, and that native cause remains
 unproved. Neither failure is covered by the three approved scopes. No v1.0.1
 release has been published at this checkpoint.
 
+The catalogue preparation and inherited release-context defects now have local
+fixes with causal regressions. The complete release fixture passes against the
+hosted main environment. Linux E2E and 16 of 17 installation scenarios pass on
+the preceding source; the remaining RPM `--help` check fails privacy admission.
+Its nonlogin container supplies HOME without USER/LOGNAME. The corrected check
+supplies the actual `id -un` identity and refuses failed or empty queries before
+launch. The complete recording-shell test passes, while native Fedora receiving
+remains mandatory. The exact original private admission failure is not exposed
+by the redacted log.
+
+- [ ] Receive the later `dev` tranche through `d92a72d5c7a575a4a22edead078a15e1d113ebfc`
+      after the current patch candidate. It adds foreground daemon ownership and
+      source migration across 104 files beyond the already integrated `9e370a3926`
+      baseline. Its handover retains native model/trust qualification gaps and
+      contains no trust-removal correction. Preserve the catalogue projection,
+      separate primary/cleanup failures, and exact release-policy boundaries
+      when composing the incoming native listener headers and workflow changes.
+
 - [ ] Measure and reduce repeated source-authority validation in the Windows
       menu transaction without weakening ownership checks. The current capacity
       fixture took 111,742 ms for apply and 96,690 ms for refusal, while its 32
