@@ -65,6 +65,7 @@ class WireFixture:
         self.keychain = self.root / "owned.keychain-db"
         self.ca = self.root / "ca.pem"
         self.trust_attempted = False
+        self.trust_removal_deadline = None
         self.trust_query_executable = None
         self.authorization_observation = False
         self.command_file_debt = []
@@ -452,12 +453,6 @@ class WireFixture:
                 ]
             )
         elif self.trust_attempted:
-            # Observation, acquisition and physical query settlement all consume
-            # the original removal budget. Neither refusal nor retry renews it.
-            deadline = time.monotonic() + 15
-            self._observe_admin_trust(deadline)
-            if self.authorization_observation:
-                self._observe_admin_authorization(deadline)
             arguments = [
                 "/usr/bin/sudo",
                 "-n",
@@ -466,6 +461,20 @@ class WireFixture:
                 "-d",
                 str(self.ca),
             ]
+            # Observation, acquisition and physical query settlement all consume
+            # one retained removal budget. Exhaustion cannot acquire a retry or
+            # erase the original native failure observation and cleanup debt.
+            if self.trust_removal_deadline is None:
+                self.trust_removal_deadline = time.monotonic() + 15
+            else:
+                if time.monotonic() >= self.trust_removal_deadline:
+                    if self.command_fact is None:
+                        self.command_fact = {"phase": "deadline", "status": None}
+                    raise subprocess.TimeoutExpired(arguments, 15)
+            deadline = self.trust_removal_deadline
+            self._observe_admin_trust(deadline)
+            if self.authorization_observation:
+                self._observe_admin_authorization(deadline)
             if time.monotonic() >= deadline:
                 self.command_fact = {"phase": "deadline", "status": None}
                 raise subprocess.TimeoutExpired(arguments, 15)
@@ -485,6 +494,7 @@ class WireFixture:
                         self.command_fact = removal_fact
                 raise
             self.trust_attempted = False
+            self.trust_removal_deadline = None
 
     @staticmethod
     def _admin_trust_fact(raw):

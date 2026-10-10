@@ -856,7 +856,7 @@ function checkNativeQualificationBody(modules) {
 	assert.ok(sections.changelog && sections.downloads && sections.intro && sections.footer);
 	assert.throws(
 		() =>
-			buildCiBody(selected, CHANGELOG_MD, releaseBodyScript(), new Date('2026-10-10T00:00:00Z')),
+			buildCiBody(selected, CHANGELOG_MD, releaseBodyScript(), new Date('2026-10-10T02:00:00Z')),
 		/not authorized/
 	);
 	assert.throws(
@@ -948,7 +948,7 @@ function checkUnsignedQualificationBody(modules) {
 				env,
 				CHANGELOG_MD,
 				releaseBodyScript(),
-				new Date('2026-10-10T00:00:00Z'),
+				new Date('2026-10-10T02:00:00Z'),
 				fixture
 			),
 		/not admitted/

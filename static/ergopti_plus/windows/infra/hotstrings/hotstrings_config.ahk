@@ -95,3 +95,4 @@ global _HSResolveGen := 0
 #Include ../config_write_lease.ahk
 #Include hotstrings_io.ahk
 #Include hotstrings_catalogue.ahk
+#Include terminator_records.ahk

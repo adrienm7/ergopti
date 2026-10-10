@@ -12,6 +12,10 @@ const configuration = JSON.parse(fs.readFileSync(policy.POLICY_PATH, 'utf8'));
 const fullDefault = require('./ci-full-default.cjs');
 const workflow = fullDefault.file('.github/workflows/ci-macos.yml');
 const caller = fullDefault.file('.github/workflows/ci.yml');
+// Wrapper assertions inspect validated raw source, independently of full-branch projection.
+const rawWorkflow = fullDefault
+	.rawFiles()
+	.find((entry) => entry.rel === '.github/workflows/ci-macos.yml').text;
 const packageSource = fs.readFileSync(
 	path.join(ROOT, 'static/ergopti_plus/macos/launcher/Package.swift'),
 	'utf8'
@@ -130,6 +134,8 @@ const PAC_STEP_NAME = 'Qualify actual native PAC and WPAD XCTest controls';
 const PAC_FILTER =
 	"--filter 'ManagedHTTPWorkerTests|ManagedHTTPWireTests|ManagedHTTPWPADWireTests'";
 const PAC_STEP_SOURCE =
+	'      - name: Qualify actual native PAC and WPAD XCTest controls\n        if: ${{ !cancelled() }}\n        shell: bash\n        run: |\n          set -euo pipefail\n          test -n "$ERGOPTI_NATIVE_HTTP_PYTHON"\n          test -x "$ERGOPTI_NATIVE_HTTP_PYTHON"\n          transcript="$ERGOPTI_OLLAMA_BUILD_ROOT/native-pac-xctest.log"\n          set +e\n          swift test --package-path static/ergopti_plus/macos/launcher \\\n            --scratch-path "$ERGOPTI_OLLAMA_BUILD_ROOT/swift" \\\n            --filter \'ManagedHTTPWorkerTests|ManagedHTTPWireTests|ManagedHTTPWPADWireTests\' 2>&1 | tee "$transcript"\n          pac_statuses=("${PIPESTATUS[@]}")\n          set -e\n          node tools/diagnostics/managed_http_pac_xctest_evidence.cjs "$transcript" "${pac_statuses[0]}" "${pac_statuses[1]}" "$ERGOPTI_OLLAMA_BUILD_ROOT/native-pac-verdict.json"\n        timeout-minutes: 10\n';
+const PAC_RAW_STEP_SOURCE =
 	'      - name: Qualify actual native PAC and WPAD XCTest controls\n        if: ${{ !cancelled() }}\n        shell: bash\n        run: |\n          set -euo pipefail\n          receipt="$RUNNER_TEMP/stable-macos-native-pac-${{ matrix.architecture }}.json"\n          mkdir -p "$(dirname "$receipt")"\n          node tools/ci/dev-release-qualification.cjs --scope macos-native-pac --receipt "$receipt"\n          mode="$(node tools/ci/dev-release-qualification.cjs --scope macos-native-pac --validate-scope-receipt "$receipt")"\n          if [ "$mode" = deferred ]; then\n              echo "[DEFERRED] macos-native-pac: qualified=false; original command not executed."\n          elif [ "$mode" = full ]; then\n              set -euo pipefail\n              test -n "$ERGOPTI_NATIVE_HTTP_PYTHON"\n              test -x "$ERGOPTI_NATIVE_HTTP_PYTHON"\n              transcript="$ERGOPTI_OLLAMA_BUILD_ROOT/native-pac-xctest.log"\n              set +e\n              swift test --package-path static/ergopti_plus/macos/launcher \\\n                --scratch-path "$ERGOPTI_OLLAMA_BUILD_ROOT/swift" \\\n                --filter \'ManagedHTTPWorkerTests|ManagedHTTPWireTests|ManagedHTTPWPADWireTests\' 2>&1 | tee "$transcript"\n              pac_statuses=("${PIPESTATUS[@]}")\n              set -e\n              node tools/diagnostics/managed_http_pac_xctest_evidence.cjs "$transcript" "${pac_statuses[0]}" "${pac_statuses[1]}" "$ERGOPTI_OLLAMA_BUILD_ROOT/native-pac-verdict.json"\n          else\n              echo "Invalid command qualification disposition" >&2\n              exit 1\n          fi\n        timeout-minutes: 10\n\n';
 function admitNativePacSelector(mac) {
 	if (mac.split(PAC_FILTER).length !== 2) return null;
@@ -143,7 +149,11 @@ function admitNativePacSelector(mac) {
 			/^      - name: Qualify actual native PAC and WPAD XCTest controls\n[\s\S]*?(?=^      - |(?![\s\S]))/gm
 		)
 	];
-	if (steps.length !== 1 || steps[0][0] !== PAC_STEP_SOURCE || job.split(PAC_FILTER).length !== 2)
+	if (
+		steps.length !== 1 ||
+		steps[0][0].replace(/\n+$/, '\n') !== PAC_STEP_SOURCE ||
+		job.split(PAC_FILTER).length !== 2
+	)
 		return null;
 	const before = job.indexOf(`      - name: ${SDK_STEP_NAME}\n`);
 	const after = job.indexOf(
@@ -185,6 +195,33 @@ function admitNativeSourceSelector(mac) {
 	return admitItem36Selector(mac.slice(0, position) + mac.slice(position + SOURCE_FILTER.length));
 }
 
+function admitRawNativePacSelector(mac) {
+	if (mac.split(PAC_RAW_STEP_SOURCE).length !== 2) return null;
+	const projected = admitRawWorkflow(mac);
+	return projected === null ? null : admitNativePacSelector(projected);
+}
+function admitRawNativeSdkSelector(mac) {
+	if (mac.split(PAC_RAW_STEP_SOURCE).length !== 2) return null;
+	const projected = admitRawWorkflow(mac);
+	return projected === null ? null : admitNativeSdkSelector(projected);
+}
+// The same strict owner admits every retained wrapper, including the package
+// PAC arguments. A malformed wrapper refuses before any selector is inspected.
+function admitRawWorkflow(mac) {
+	try {
+		return fullDefault
+			.fromFiles(
+				fullDefault
+					.rawFiles()
+					.map((file) =>
+						file.rel === '.github/workflows/ci-macos.yml' ? { ...file, text: mac } : file
+					)
+			)
+			.file('.github/workflows/ci-macos.yml');
+	} catch {
+		return null;
+	}
+}
 // Admit only the additional manual diagnostic selector and its exact source owner.
 const ITEM36_FILTER =
 	"--filter 'ReleaseArchiveStagingTests|SparkleArchiveUpdateAcceptanceTests|HomebrewArchiveAcceptanceTests|HomebrewAutomationConsentTests'";
@@ -950,6 +987,15 @@ check('source cohort must precede PAC receiving', () => {
 });
 
 // The approved receipt wrapper retains the strict full command and an explicit refusal.
+check('raw PAC wrapper and projected full source agree', () => {
+	assert.notEqual(admitRawNativeSdkSelector(rawWorkflow), null);
+	assert.notEqual(admitNativeSdkSelector(workflow), null);
+	const optionalArguments = '${pac_skip_args[@]+"${pac_skip_args[@]}"}';
+	assert.equal(rawWorkflow.split(optionalArguments).length, 2);
+	const changed = rawWorkflow.replace(optionalArguments, '"${pac_skip_args[@]}"');
+	assert.notEqual(changed, rawWorkflow);
+	assert.equal(admitRawNativeSdkSelector(changed), null);
+});
 for (const [name, from, to] of [
 	['PAC policy scope', '--scope macos-native-pac --receipt', '--scope macos-native-http --receipt'],
 	[
@@ -973,16 +1019,16 @@ for (const [name, from, to] of [
 	['PAC capture command status', '"${pac_statuses[1]}"', '"0"']
 ])
 	check(name, () => {
-		assert.ok(PAC_STEP_SOURCE.includes(from));
-		assert.ok(workflow.includes(PAC_STEP_SOURCE));
-		const changed = workflow.replace(PAC_STEP_SOURCE, PAC_STEP_SOURCE.replace(from, to));
-		assert.notEqual(changed, workflow);
-		assert.equal(admitNativeSdkSelector(changed), null);
+		assert.ok(PAC_RAW_STEP_SOURCE.includes(from));
+		assert.ok(rawWorkflow.includes(PAC_RAW_STEP_SOURCE));
+		const changed = rawWorkflow.replace(PAC_RAW_STEP_SOURCE, PAC_RAW_STEP_SOURCE.replace(from, to));
+		assert.notEqual(changed, rawWorkflow);
+		assert.equal(admitRawNativeSdkSelector(changed), null);
 	});
 
-assert.equal(passed, 78);
+assert.equal(passed, 79);
 console.log(
-	'PASS: Mac qualification deferral source/typed-receipt controls=78; Swift/native execution unqualified.'
+	'PASS: Mac qualification deferral source/typed-receipt controls=79; Swift/native execution unqualified.'
 );
 
 require('./test-item36-native-qualification.cjs')({
@@ -992,7 +1038,7 @@ require('./test-item36-native-qualification.cjs')({
 });
 
 require('./test-macos-native-pac-qualification.cjs')({
-	workflow,
-	admitNativePacSelector,
+	workflow: rawWorkflow,
+	admitNativePacSelector: admitRawNativePacSelector,
 	PAC_FILTER
 });

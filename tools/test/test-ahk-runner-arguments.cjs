@@ -28,6 +28,8 @@ assert.doesNotMatch(
 );
 assert.match(admission, /A_Args/, 'the probe must execute the real native argument parser');
 
+require('./support/ahk-registration-ownership.cjs');
+
 if (process.platform !== 'win32') {
 	console.log('[SKIP] native AHK runner arguments require Windows');
 	process.exit(0);
