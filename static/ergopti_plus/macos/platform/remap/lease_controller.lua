@@ -449,14 +449,16 @@ end
 --- @param arguments string[] Exact native helper arguments.
 --- @param on_done function Task completion callback.
 --- @param on_chunk function|nil Streaming callback.
+--- @param retain_final_stream boolean|nil Final receipts for the persistent worker only.
 --- @return table|nil handle Unstarted task handle.
 --- @return string|nil error_message Current identity failure.
-local function spawn_current_helper(arguments, on_done, on_chunk)
+local function spawn_current_helper(arguments, on_done, on_chunk, retain_final_stream)
 	local helper_path, helper_error, environment = LeaseHelper.resolve()
 	_state.helper_path = helper_path
 	_state.helper_error = helper_error
 	if not helper_path then return nil, helper_error end
-	return ShellRunner.spawn(helper_path, arguments, on_done, on_chunk, environment), nil
+	return ShellRunner.spawn(helper_path, arguments, on_done, on_chunk, environment,
+		nil, nil, nil, retain_final_stream), nil
 end
 
 --- Settles every logical operation retained by one failed generation.
@@ -1786,7 +1788,8 @@ local function start_generation(initial_paused, on_done)
 					generation.token, stderr_chunk:gsub("%s+$", ""))
 			end
 			return true
-		end
+		end,
+		true
 	)
 	if not handle then
 		reject_unlaunched_generation(generation,

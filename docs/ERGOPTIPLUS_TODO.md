@@ -3422,6 +3422,17 @@ Windows PC acceptance, delegated to the maintainer:
   the native permission dialog (once per launch, after the Accessibility dialog,
   closed automatically on approval; not while Tap-Holds are off, where the
   banner stays). Integrated; verify on a Mac.
+  The existing lease worker now explicitly owns its bounded final task stream.
+  A legal final suffix may settle the retained protocol after physical task
+  completion; refused acquisition, a foreign start acknowledgement and explicit
+  disposal cannot reopen delivery. The ordinary task lifetime and owned
+  retirement protocol keep their existing authorities and deadlines. Independent
+  Root-source receiving passes 49 adapter cases and eight composed controller
+  cases, preserving all 29 original adapter cases. Removing the disposal fence
+  reproduces four failures; removing the caller role reproduces three, retaining
+  the original two-failure prediction discrepancy. These Lua controls model
+  native task callbacks and do not qualify native task execution, device input,
+  initial PONG/READY/exit-73 recovery or the complete release pipeline.
 - [~] **30.** Physical magic-key setting on all three OSes: one
   `hotstrings.magic_key_source` (a KeyboardEvent.code, `auto` by default),
   config schema v5 migrating every spelling of the Windows
