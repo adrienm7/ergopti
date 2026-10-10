@@ -31,6 +31,46 @@ maintainer's ten-hour v1.0.1 follow-up: maximum verified fixes and restoration
 of full CI. The v1.0.0 qualification and unsigned exceptions do not authorize
 either exception for v1.0.1. Groups 2, 4 and 7 and item 133 remain open.
 
+### v1.0.1 integration receiving
+
+The isolated integration branch has received `dev` through `591d59a942`.
+The merge retains both histories and the complete test union: 179 Homebrew
+controls and 55 native HTTP controls. `main` remains the published v1.0.0.
+
+[CI 38018626491](https://github.com/adrienm7/ergopti/actions/runs/38018626491)
+completed on `cb5ad8f3d2`: Linux unit tests passed 12,743 cases; Windows passed
+10,758 of 10,763, including all 32 Group 2 terminator cases. Four Windows
+fixture failures have local corrections with causal regression receiving.
+The remaining native file-filter timeout has more precise diagnostics; its
+cause remains open. Linux expansion and diagnostic-label fixtures also have
+local corrections. Four simultaneous-input observation failures remain open;
+new failure output retains the actual event rows without changing the oracle.
+
+[CI 38019831532](https://github.com/adrienm7/ergopti/actions/runs/38019831532)
+completed on `591d59a942`: macOS passed 17,957 unit cases and failed eleven.
+The three MLX runtime fixtures, seven dynamic-hotstring boundary fixtures and
+one pending-model continuation fixture now pass focused inert receiving with
+their original assertions preserved and causal inverses failing. Native macOS
+receiving of these corrections is still required. The cold MLX check passed;
+native trust activation and the Homebrew positive control still timed out.
+
+The earlier full local source gate passed formatting and AHK encoding, with
+395 of 407 JavaScript checks passing. The combined receiving also passed
+formatting and encoding, but JavaScript passed 394 of 407: the twelve earlier
+failures remain and the native file-filter source guard still expected the
+previous diagnostic output. The corrected guard now passes its full focused
+suite, retains the original semantic error, and adds eight diagnostic-removal
+mutations. Full native CI qualification remains required; these receipts do
+not constitute a green complete gate and renew no release exception.
+
+Current Windows Notepad 11.2607.14.0 receiving passed all six actual HSE/LLM
+caller scenarios through the production DLL. All 280 source dependencies and
+the DLL remained unchanged; the sender exited naturally, stderr was empty,
+and both owned Notepad processes were retired. The receipt retains 55 AHK
+variable-shadowing warnings. This controlled synthetic-document prerequisite
+does not qualify physical default triggers, navigation, concurrent typing, or
+the full focus/document/retirement matrix; Group 7 remains open.
+
 ### Stable preparation history
 
 The original October 9 publication deadline was missed. After midnight Paris,
