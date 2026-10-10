@@ -84,6 +84,20 @@ check('a dev tag renders the dev cask, a semver tag the stable one', () => {
 	assert.match(stable.text, /^  version "1\.2\.3"$/m);
 });
 
+check('every released cask declares the minimum macOS as an unquoted symbol', () => {
+	const publication = require('../build/macos-release-publication.cjs');
+	for (const tag of ['v0.0.0-dev.142', 'v1.2.3']) {
+		for (const archive of publication.bindings()) {
+			const cask = Cask.renderCask(tag, SHA, archive.name);
+			const dependencies = cask.text
+				.split('\n')
+				.filter((line) => line.trimStart().startsWith('depends_on macos:'));
+			assert.deepStrictEqual(dependencies, [`  depends_on macos: ${Cask.MINIMUM_MACOS}`]);
+			assert.match(dependencies[0], /^  depends_on macos: :[a-z][a-z0-9_]*$/);
+		}
+	}
+});
+
 check('each channel cask conflicts with every other channel cask', () => {
 	const tokens = Cask.caskChannels().map((entry) => entry.token);
 	for (const cask of [dev, stable]) {
