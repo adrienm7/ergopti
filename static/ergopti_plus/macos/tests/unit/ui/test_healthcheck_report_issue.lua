@@ -35,8 +35,10 @@ end
 --- The documents a host works from, read from their single sources.
 --- @return table
 local function documents()
+	local schema = shared_json("modules/diagnostics/schema.json")
+	schema.export_strings = shared_json("data/locales/en.json")
 	return {
-		schema     = shared_json("modules/diagnostics/schema.json"),
+		schema     = schema,
 		templates  = shared_json("modules/diagnostics/issue_templates.json"),
 		redaction  = shared_json("modules/diagnostics/redaction.json"),
 		repository = shared_json("modules/updater/defaults.json").github,
@@ -142,11 +144,11 @@ helpers.describe("healthcheck page actions (report-bug-flow)", function()
 		helpers.assert_eq(result.ok, true)
 		helpers.assert_eq(#calls.copy, 1)
 		helpers.assert_eq(calls.copy[1], approved_text(false))
-		helpers.assert_eq(result.path, nil, "a report names no file")
+		helpers.assert_eq(result.path, calls.reveal[1], "the complete local attachment is returned")
 
 		local url = calls.open_url[1]
-		helpers.assert_eq(query_value(url, "diagnostics"), calls.copy[1],
-			"the form's diagnostics field is the report the clipboard holds")
+		helpers.assert_eq(query_value(url, "diagnostics"), Share.document(host_snapshot(false), documents().schema, "ignored locale").summary,
+			"the form receives only the short English attachment summary")
 		helpers.assert_eq(query_value(url, "os"), "macos")
 		local repo = documents().repository
 		local prefix = "https://github.com/" .. repo.owner .. "/" .. repo.repo .. "/issues/new?template=bug_report.yml&"
@@ -159,12 +161,12 @@ helpers.describe("healthcheck page actions (report-bug-flow)", function()
 	-- The report used to be saved and revealed in Finder too: the reveal
 	-- finished after the browser opened, so Finder took the focus from the
 	-- form (report-focus)
-	helpers.it("report saves nothing, reveals nothing and opens the browser last (report-focus)", function()
+	helpers.it("report saves its attachment and opens the browser last (report-focus)", function()
 		local _, calls = perform({ action = "report", text = REPORT, fields = { driver = "macos" } })
-		helpers.assert_eq(#calls.save, 0, "a report saves no file")
-		helpers.assert_eq(#calls.reveal, 0, "a report reveals nothing in Finder")
+		helpers.assert_eq(#calls.save, 1, "a report saves the complete local attachment")
+		helpers.assert_eq(#calls.reveal, 1, "the attachment is revealed before the browser")
 		helpers.assert_eq(#calls.open, 0, "a report opens no folder")
-		helpers.assert_eq(calls.order, { "copy", "open_url" }, "the browser opens last, after the clipboard")
+		helpers.assert_eq(calls.order, { "copy", "save", "reveal", "open_url" }, "the browser opens last, after the clipboard and local attachment")
 	end)
 
 	helpers.it("report cuts a long report in the URL and keeps it whole in the clipboard (report-bug-flow)", function()
@@ -177,10 +179,9 @@ helpers.describe("healthcheck page actions (report-bug-flow)", function()
 		helpers.assert_true(#url <= templates.max_url_bytes, "the URL fits its budget")
 		helpers.assert_eq(query_value(url, "version"), "2.4.0", "the identity fields survive the cut")
 		local prefilled = query_value(url, "diagnostics")
-		local marker = templates.truncation_marker
-		helpers.assert_eq(prefilled:sub(-#marker), marker, "the cut report ends with the truncation marker")
-		local kept = prefilled:sub(1, #prefilled - #marker)
-		helpers.assert_eq(calls.copy[1]:sub(1, #kept), kept, "the prefill is the start of the copied report")
+		helpers.assert_eq(prefilled, Share.document(host_snapshot(true), documents().schema, "ignored locale").summary, "long output never expands the issue form")
+		helpers.assert_true(#url < 1200, "the editable URL stays short independently of report length")
+		helpers.assert_eq(calls.save[1].text, calls.copy[1], "the saved attachment preserves the whole report")
 	end)
 
 	helpers.it("report stops before the browser when the clipboard refuses (report-bug-flow)", function()
@@ -297,7 +298,7 @@ helpers.describe("closed diagnostic sharing corpus", function()
 			end
 			local readable = document.text:match("^(.-)```json")
 			for _, id in ipairs({ "versions", "hardware", "system", "input", "ai", "permissions", "issues" }) do
-				assert(readable:find("## " .. require("infra.i18n").get("healthcheck.section." .. id), 1, true), "readable section omitted")
+				assert(readable:find("## " .. config.schema.export_strings["healthcheck.section." .. id], 1, true), "readable section omitted")
 			end
 			assert(readable:find("| probes.appleevent_transport.native_status | -1744 |", 1, true))
 			assert(readable:find("| probes.appleevent_transport.cleanup | pending |", 1, true))
@@ -306,5 +307,30 @@ helpers.describe("closed diagnostic sharing corpus", function()
 			helpers.assert_eq(document.snapshot.probes.appleevent_transport.cleanup, "pending")
 			helpers.assert_eq(document.snapshot.probes.appleevent_transport.native_status, -1744)
 		end
+	end)
+end)
+
+helpers.describe("English attachment export boundaries", function()
+	helpers.it("does not consult localized labels or copy free private fields", function()
+		local config = documents()
+		local doc = Share.document(host_snapshot(false), config.schema, "LOCALIZED-EXPORT-CANARY")
+		helpers.assert_true(not doc.text:find("LOCALIZED-EXPORT-CANARY", 1, true))
+		helpers.assert_contains(doc.text, config.schema.export_strings[config.schema.share_policy.notice_key])
+		helpers.assert_true(not doc.text:find(HOME, 1, true))
+	end)
+	helpers.it("retains clipboard and refuses browser when attachment save fails", function()
+		local result, calls = perform({ action = "report", text = REPORT, fields = {} },
+			function(overrides) overrides.save = function() return nil, "inert write refusal" end end)
+		helpers.assert_eq(result.ok, false)
+		helpers.assert_eq(#calls.copy, 1)
+		helpers.assert_eq(#calls.reveal, 0)
+		helpers.assert_eq(#calls.open_url, 0)
+	end)
+	helpers.it("browser refusal never claims successful report after saving attachment", function()
+		local result, calls = perform({ action = "report", text = REPORT, fields = {} },
+			function(overrides) overrides.open_url = function() return false end end)
+		helpers.assert_eq(result.ok, false)
+		helpers.assert_eq(#calls.save, 1)
+		helpers.assert_eq(calls.save[1].text, calls.copy[1])
 	end)
 end)

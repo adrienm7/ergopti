@@ -144,16 +144,18 @@ _THPA_ReportPrefillsTheReport() {
 	Fields := Map("version", "2.1.0", "os", "Windows 11 (C:\Users\JDoe)", "driver", "windows")
 	Outcome := _THPA_Perform(Map("action", "report", "text", "report at C:\Users\JDoe\boom",
 		"fields", Fields), _THPA_Paths(), HealthCheck_Config(), _THPA_Effects(Calls))
+	Document := _THPA_Approved()
 	AssertTrue(Outcome["ok"])
-	AssertEqual(2, Calls.Length, _THPA_Join(Calls))
-	AssertEqual("copy:" . _THPA_Approved()["text"], Calls[1])
-	AssertTrue(InStr(Calls[2], "open_url:https://github.com/") = 1, Calls[2])
-	AssertTrue(InStr(Calls[2], "template=bug_report.yml") > 0, Calls[2])
-	AssertEqual(IssueLink_PercentEncode(_THPA_Approved()["text"]), _THPA_QueryValue(Calls[2], "diagnostics"),
-		"the form's diagnostics field is the report the clipboard holds")
-	AssertEqual(IssueLink_PercentEncode("windows"), _THPA_QueryValue(Calls[2], "os"))
-	AssertTrue(InStr(Calls[2], "JDoe") = 0, "the prefilled fields must be redacted: " . Calls[2])
-	AssertFalse(Outcome.Has("path"), "a report names no file")
+	AssertEqual(4, Calls.Length, _THPA_Join(Calls))
+	AssertEqual("copy:" . Document["text"], Calls[1])
+	AssertEqual("save:" . Outcome["path"] . ":" . Document["text"], Calls[2])
+	AssertEqual("reveal:" . Outcome["path"], Calls[3])
+	AssertTrue(InStr(Calls[4], "open_url:https://github.com/") = 1, Calls[4])
+	AssertTrue(InStr(Calls[4], "template=bug_report.yml") > 0, Calls[4])
+	AssertEqual(IssueLink_PercentEncode(Document["summary"]), _THPA_QueryValue(Calls[4], "diagnostics"),
+		"Only the short English attachment summary reaches the editable form")
+	AssertEqual(IssueLink_PercentEncode("windows"), _THPA_QueryValue(Calls[4], "os"))
+	AssertTrue(InStr(Calls[4], "JDoe") = 0, "The form carries no private fields")
 }
 Test("Diagnostics page: report copies, then opens the bug form with the whole report (report-bug-flow)",
 	_THPA_ReportPrefillsTheReport)
@@ -165,14 +167,11 @@ _THPA_ReportSavesNothing() {
 	Outcome := _THPA_Perform(Map("action", "report", "text", "report", "fields",
 		Map("driver", "windows")), _THPA_Paths(), HealthCheck_Config(), _THPA_Effects(Calls))
 	AssertTrue(Outcome["ok"])
-	for Call in Calls
-		AssertTrue(InStr(Call, "save:") != 1 && InStr(Call, "reveal:") != 1 && InStr(Call, "open:") != 1
-			&& InStr(Call, "notify:") != 1, "a report saves, selects and notifies nothing: " . _THPA_Join(Calls))
-	AssertEqual(2, Calls.Length, _THPA_Join(Calls))
-	AssertTrue(InStr(Calls[1], "copy:") = 1 && InStr(Calls[2], "open_url:") = 1,
-		"the browser must open last, after the clipboard: " . _THPA_Join(Calls))
+	AssertEqual(4, Calls.Length)
+	for Index, Kind in ["copy:", "save:", "reveal:", "open_url:"]
+		AssertEqual(1, InStr(Calls[Index], Kind), "The browser opens last after the complete local attachment")
 }
-Test("Diagnostics page: report saves nothing and opens the browser last (report-focus)", _THPA_ReportSavesNothing)
+Test("Diagnostics page: report saves its attachment and opens the browser last (report-focus)", _THPA_ReportSavesNothing)
 
 _THPA_ReportCutsALongReport() {
 	Calls := []
@@ -180,24 +179,19 @@ _THPA_ReportCutsALongReport() {
 	Loop 2000
 		Long .= "line of diagnostics é`n"
 	Config := HealthCheck_Config()
-	Templates := Config["templates"]
 	Outcome := _THPA_Perform(Map("action", "report", "text", Long, "fields",
 		Map("version", "2.1.0", "driver", "windows")), _THPA_Paths(), Config, _THPA_Effects(Calls))
 	AssertTrue(Outcome["ok"])
-	Long := _THPA_Approved(true)["text"]
-	AssertEqual("copy:" . Long, Calls[1], "the clipboard keeps the whole approved report")
-	Url := SubStr(Calls[2], StrLen("open_url:") + 1)
-	AssertTrue(StrLen(Url) <= Templates["max_url_bytes"], "the URL fits its budget: " . StrLen(Url))
-	AssertEqual("2.1.0", _THPA_QueryValue(Url, "version"), "the identity fields survive the cut")
-	Prefilled := _THPA_QueryValue(Url, "diagnostics")
-	Marker := IssueLink_PercentEncode(Templates["truncation_marker"])
-	AssertEqual(Marker, SubStr(Prefilled, -StrLen(Marker)), "the cut report ends with the truncation marker")
-	Kept := SubStr(Prefilled, 1, StrLen(Prefilled) - StrLen(Marker))
-	AssertTrue(StrLen(Kept) > 0, "the cut keeps the start of the report")
-	AssertEqual(Kept, SubStr(IssueLink_PercentEncode(Long), 1, StrLen(Kept)),
-		"the prefill is the start of the copied report")
+	Document := _THPA_Approved(true)
+	Assert(StrLen(Document["text"]) > Config["templates"]["max_url_bytes"], "The real report exceeds the URL budget")
+	AssertEqual("copy:" . Document["text"], Calls[1], "The clipboard preserves the complete report")
+	AssertEqual("save:" . Outcome["path"] . ":" . Document["text"], Calls[2], "The local attachment is complete")
+	Url := SubStr(Calls[4], StrLen("open_url:") + 1)
+	AssertTrue(StrLen(Url) < 1200 && StrLen(Url) <= Config["templates"]["max_url_bytes"], "The form URL stays short")
+	AssertEqual("2.1.0", _THPA_QueryValue(Url, "version"), "The identity fields remain available")
+	AssertEqual(IssueLink_PercentEncode(Document["summary"]), _THPA_QueryValue(Url, "diagnostics"))
 }
-Test("Diagnostics page: report cuts a long report in the URL, whole in the clipboard (report-bug-flow)",
+Test("Diagnostics page: report keeps a long attachment out of the editable URL (report-bug-flow)",
 	_THPA_ReportCutsALongReport)
 
 _THPA_ReportStopsOnRefusedClipboard() {
@@ -287,7 +281,7 @@ _THPA_SharingVectors() {
 			AssertFalse(InStr(Document["text"], Canary), "sharing corpus leaked " . Vector["name"])
 		Readable := StrSplit(Document["text"], Chr(96) . Chr(96) . Chr(96) . "json")[1]
 		for Id in ["versions", "hardware", "system", "input", "ai", "permissions", "issues"]
-			AssertContains(Readable, "## " . t("healthcheck.section." . Id))
+			AssertContains(Readable, "## " . Config["schema"]["export_strings"]["healthcheck.section." . Id])
 		AssertContains(Readable, "| probes.appleevent_transport.native_status | -1744 |")
 		AssertContains(Readable, "| probes.appleevent_transport.cleanup | pending |")
 		AssertContains(Readable, "| retired_probes.1.probes.appleevent_transport.cleanup | unknown |")
@@ -312,3 +306,27 @@ _THPA_SharingVectors() {
 	}
 }
 Test("Diagnostics sharing: synthetic three-driver corpus excludes private fields", _THPA_SharingVectors)
+
+_THPA_EnglishExport() {
+	Config := HealthCheck_Config()
+	Document := _THPA_Approved()
+	AssertContains(Document["text"], Config["schema"]["export_strings"][Config["schema"]["share_policy"]["notice_key"]])
+	AssertContains(Document["text"], "## " . Config["schema"]["export_strings"]["healthcheck.section.versions"])
+	AssertFalse(InStr(Document["text"], "private fixture text"))
+}
+Test("Diagnostics export: canonical English labels independent of UI locale (english-attachment)", _THPA_EnglishExport)
+
+_THPA_AttachmentSaveRefuses() {
+	Calls := []
+	Effects := _THPA_Effects(Calls)
+	Effects["save"] := (*) => _THPA_RefuseAttachmentWrite()
+	Outcome := _THPA_Perform(Map("action", "report", "text", "report", "fields", Map()),
+		_THPA_Paths(), HealthCheck_Config(), Effects)
+	AssertFalse(Outcome["ok"])
+	AssertEqual(1, Calls.Length, "A refused attachment must stop before reveal and browser")
+	AssertContains(Calls[1], "copy:")
+}
+_THPA_RefuseAttachmentWrite() {
+	throw Error("inert attachment write refusal")
+}
+Test("Diagnostics export: write refusal prevents issue form (english-attachment)", _THPA_AttachmentSaveRefuses)
