@@ -1616,7 +1616,10 @@ function assertUpdaterEvidence(step) {
 	assert.strictEqual(pipeline.stepField(step, 'uses'), 'actions/upload-artifact@v4');
 	assert.strictEqual(pipeline.stepField(step, 'continue-on-error'), null);
 	assert.match(step, /^          name: linux-updater-live-diagnostics$/m);
-	assert.match(step, /^          path: \$\{\{ runner\.temp \}\}\/linux-updater-live$/m);
+	assert.match(
+		step,
+		/^          path: \|\n            \$\{\{ runner\.temp \}\}\/linux-updater-live\n            \$\{\{ runner\.temp \}\}\/stable-linux-e2e-suite\.json\n          if-no-files-found: error$/m
+	);
 	assert.match(step, /^          if-no-files-found: error$/m);
 }
 assertUpdaterEvidence(updaterEvidence);
@@ -1633,6 +1636,19 @@ assert.throws(() =>
 		updaterEvidence.replace('if-no-files-found: error', 'if-no-files-found: ignore')
 	)
 );
+for (const [before, after] of [
+	['${{ runner.temp }}/linux-updater-live', '${{ runner.temp }}/unrelated'],
+	['${{ runner.temp }}/stable-linux-e2e-suite.json', '${{ runner.temp }}/unrelated.json'],
+	['            ${{ runner.temp }}/stable-linux-e2e-suite.json\n', ''],
+	[
+		'          if-no-files-found: error',
+		'            ${{ runner.temp }}/extra\n          if-no-files-found: error'
+	]
+]) {
+	const changed = updaterEvidence.replace(before, after);
+	assert.notStrictEqual(changed, updaterEvidence, 'each artifact mutation must alter its own step');
+	assert.throws(() => assertUpdaterEvidence(changed));
+}
 assert.ok(
 	pipeline.job('e2e-linux').indexOf(updaterStep) <
 		pipeline.job('e2e-linux').indexOf(updaterEvidence)
