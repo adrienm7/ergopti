@@ -155,6 +155,9 @@ require("test.configuration_parent_contract").register(helpers, configuration_pa
 	assert(require("json").decode(configuration_parent_raw)), "linux")
 
 
+
+
+
 -- =========================================
 -- =========================================
 -- ======= 3/ Locale callback redraw =======
