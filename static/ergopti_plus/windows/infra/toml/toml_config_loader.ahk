@@ -869,12 +869,12 @@ ApplyConfigToml(Features, FilePath, &RejectedOverrides := 0,
 	}
 	if UnknownKeys > 0 {
 		try LoggerWarn("TomlConfigLoader",
-			"Ignored {1} unused configuration key(s) in '{2}' ({3}); they are offered for cleanup.",
+			"Ignored {1} unused configuration key(s) in '{2}' ({3}); they remain untouched.",
 			UnknownKeys, FilePath, UnknownNames)
 	}
 	if OutdatedEntries.Count > 0 {
 		try LoggerWarn("TomlConfigLoader",
-			"Ignored {1} outdated configuration value(s) in '{2}' ({3}): this build no longer accepts them, so their settings keep the manifest value; they are offered for cleanup.",
+			"Ignored {1} outdated configuration value(s) in '{2}' ({3}): this build no longer accepts them, so their settings keep the manifest value; they remain untouched.",
 			OutdatedEntries.Count, FilePath, OutdatedNames)
 	}
 	if RejectedOverrides {
