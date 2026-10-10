@@ -6058,6 +6058,22 @@ cancellation owners are unchanged. Items 54 and 81 remain partial.
       open. macOS system trust and explicit proxy relays are integrated, while
       opaque-client full-URL PAC/WPAD/fallback/redirect routing remains CODE.
 
+2026-10-10 selected-release corpus enrollment continuation. The normal awaited
+JS check retains all61 original controls and runs the independently frozen50
+shell cases through the existing Linux command phase or Darwin guardian.
+Inputs remain under one private root until actual child/owner closure, capture
+retirement and strict source/receipt admission; failures retain them. All50
+cases pass with genuine Linux process ownership, without native macOS network
+credit. Linux TERM/INT cancellation receiving passes: observed helpers are retired,
+inputs remain and no passing corpus receipt is emitted. Selected formatting
+passes; JS402/406 retains the same four failures as the executed baseline.
+Genuine Darwin capability, corpus and cancellation qualification are pending.
+Windows explicitly reports this POSIX macOS-shell corpus as unexecuted, retaining
+its original61 controls and gaining no50-case credit. Darwin ownership covers
+inherited process groups; escaped sessions, immediate parent-death cancellation
+and source ABA are not proved. Those limits and the remaining product network
+and installed acceptance requirements keep item62 and transversal16/38 open.
+
 2026-10-10 native-wire diagnostic framing continuation. The fixture now writes
 its fixed restoration-failure diagnostic to stderr, preserving the single
 structured stdout result. All52 portable receiving tests pass; the new actual
