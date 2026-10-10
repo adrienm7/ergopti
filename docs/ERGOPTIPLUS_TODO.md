@@ -8241,6 +8241,15 @@ Mac native step. Reviewed workflow preparations and exact source recovery are in
 shared custody, original-clock event/caller/cleanup CODE and genuine native
 acceptance remain required. No item is removed or qualified by these receipts.
 
+The retained-image test now preserves bounded diagnostics when its original
+five-second profile deadline fails. After the unchanged exact-peer terminate/wait,
+one nonblocking read captures at most 4096 bytes; only complete fixed native
+receipts are projected. Diagnostic EOF/close facts grant no descendant or
+namespace authority, and diagnostic refusal preserves the original deadline
+failure. All eighteen test methods in the file and the surrounding SDK41 cohort
+remain unchanged. The stage observed after termination can describe cancellation
+or cleanup; it does not prove the pre-timeout cause. Native receiving is pending.
+
 - [~] **63.** Provide shared screen-brightness up/down actions on all three
   drivers, including supported keyboard and wheel layers. Implemented: the
   translated catalogue, Windows bounded Job-owned WMI worker with complete

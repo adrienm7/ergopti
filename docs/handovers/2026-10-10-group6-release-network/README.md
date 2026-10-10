@@ -29,6 +29,15 @@ missing new contracts in each suite. Two causal mutants fail the exact resource
 acquisition/retained-child assertions; the fixture retires their actual children.
 These are controlled native frames, not genuine Darwin listener acceptance.
 
+The retained-image receiver also preserves diagnostics at its unchanged
+five-second profile deadline. It reads at most4096 bytes once, nonblocking,
+after the original exact-peer termination/wait and projects only complete fixed
+native receipts. All eighteen methods and assertions in that file stay intact;
+SDK41 is the surrounding cohort. Diagnostic refusal preserves the original
+deadline error. Post-termination stage/errno/exit can describe induced cleanup,
+and pipe EOF/close is not descendant or namespace retirement authority. Native
+compilation and this diagnostic branch's actual receiving remain pending.
+
 Selected verification on that source executes format, JS and macOS Lua in
 sequence. Formatting and 17,971 Lua assertions across 1,562 modules pass. The
 first full JS run has404PASS/3FAIL: two copies run out of overlay space, and the
