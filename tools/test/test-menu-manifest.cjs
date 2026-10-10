@@ -13515,6 +13515,17 @@ console.log(
 		{ type: 'dynamic', id: 'agent_system2', i18n: 'menu.agent.system2' },
 		{ type: '---' }
 	];
+	const receivedPrefix = originalPrefix.flatMap((row) =>
+		row.type === 'dynamic'
+			? [
+					{ ...row, platforms: ['hs', 'linux'], unavailable: 'hide' },
+					{ ...row, type: 'list', platforms: ['ahk'], unavailable: 'hide' }
+				]
+			: [row]
+	);
+	const windowsPrefix = receivedPrefix.filter(
+		(row) => !row.platforms || row.platforms.includes('ahk')
+	);
 	const originalApps = {
 		type: 'dynamic',
 		id: 'agent_disabled_apps',
@@ -13532,7 +13543,7 @@ console.log(
 	assert.deepEqual(
 		manifest[apps],
 		[
-			...originalPrefix,
+			...receivedPrefix,
 			{ ...originalApps, platforms: ['hs', 'linux'], unavailable: 'hide' },
 			appsCommand
 		],
@@ -13548,7 +13559,7 @@ console.log(
 		);
 	assert.deepEqual(
 		manifest[apps].filter((row) => !row.platforms || row.platforms.includes('ahk')),
-		[...originalPrefix, appsCommand],
+		[...windowsPrefix, appsCommand],
 		'Windows receives one final command at the original apps position'
 	);
 	const renderer = readFileSync(
@@ -13793,5 +13804,73 @@ console.log(
 	}
 	console.log(
 		'Windows model parent: compiled two-scalar caption declaration preserves the independent 21-locale health projections; native receiving remains separately required.'
+	);
+}
+
+// Windows System groups are pure list DATA; native placement belongs to Build.
+{
+	const assert = require('node:assert/strict');
+	const manifest = JSON.parse(readFileSync(MENU_PATH, 'utf8'));
+	const source = readFileSync(
+		resolve(SHARED, '../windows/ui/menu/menu_llm/menu_agent.ahk'),
+		'utf8'
+	);
+	const renderer = readFileSync(resolve(SHARED, '../windows/infra/manifest_menu.ahk'), 'utf8');
+	const { scriptTokens } = require('../lib/script-source.cjs');
+	const executable = scriptTokens(source, '.ahk');
+	assert.equal(
+		executable.filter(
+			(token) => token.kind === 'identifier' && /^MenuRenderer_Append/i.test(token.value)
+		).length,
+		0,
+		'the actual System producer cannot acquire a native append destination'
+	);
+	for (const system of ['agent_system1', 'agent_system2']) {
+		const visible = manifest.agent_menu.filter(
+			(row) => row.id === system && (!row.platforms || row.platforms.includes('ahk'))
+		);
+		assert.deepEqual(
+			visible,
+			[
+				{
+					type: 'list',
+					id: system,
+					i18n: 'menu.agent.' + system.slice(6),
+					platforms: ['ahk'],
+					unavailable: 'hide'
+				}
+			],
+			'one current Windows list declaration owns ' + system
+		);
+		for (const platform of ['hs', 'linux'])
+			assert.deepEqual(
+				manifest.agent_menu
+					.filter(
+						(row) => row.id === system && (!row.platforms || row.platforms.includes(platform))
+					)
+					.map(({ platforms, unavailable, ...row }) => row),
+				[{ type: 'dynamic', id: system, i18n: 'menu.agent.' + system.slice(6) }],
+				platform + ': original System dynamic ownership remains exact'
+			);
+	}
+	assert.equal(
+		source.split('_LLM_Agent_MenuSystemRows(Key) {').length - 1,
+		1,
+		'the actual one-argument DATA provider has one genuine definition'
+	);
+	assert.equal(
+		source.includes('_LLM_Agent_MenuSystemSlot'),
+		false,
+		'the retired target-writing System handler has no remaining source owner'
+	);
+	assert.equal(
+		renderer.includes('Rows := (ListProviders[Id])()'),
+		true,
+		'the existing central renderer invokes the actual registered DATA supplier'
+	);
+	assert.equal(
+		renderer.includes('Added := _MR_RenderRows(Result, Rows, Id, 1)'),
+		true,
+		'the genuine receiving uses the same native row materializer as former AppendRows'
 	);
 }

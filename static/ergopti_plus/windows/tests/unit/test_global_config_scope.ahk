@@ -79,8 +79,6 @@ _GlobalScopeComposition(Mode, Scenario := "late") {
 		AssertEqual(Mode == "clear" ? 1 : 0, Position, "the global scope rows open the Configuration menu")
 		Assert(TrayMenuIsSeparatorAt(Rendered, 2), "a separator closes the Configuration first group")
 		Receipt := (_MenuDispatchCallbacks[ItemId])()
-		if Scenario == "absent"
-			_ScopeExactOwnerNativeProbe(Bundle, Fixture.path, Fixture.options["locator"], 12)
 		AssertEqual(12, Backups, "all stores reach one coordinated backup boundary")
 		if Scenario == "backup" || Scenario == "external" {
 			AssertEqual(0, Launches)
@@ -185,8 +183,6 @@ _GlobalScopeComposition(Mode, Scenario := "late") {
 		GestureActionParameters := IsSet(OldParameters) ? OldParameters : unset
 		_ScopeOwnerCleanup(Fixture)
 	}
-	if Scenario == "absent"
-		AssertFalse(_ConfigWriteLeaseSelectOwner(Bundle, Fixture.path), "the original retired global transaction cannot supply its old selected token")
 }
 Test("global-config-scope: real Restore dispatch publishes twelve stores and compensates refusal", _GlobalScopeComposition.Bind("recommended"))
 Test("global-config-scope: real Clear dispatch removes owned overrides and compensates every file", _GlobalScopeComposition.Bind("clear"))

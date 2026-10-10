@@ -4375,11 +4375,29 @@ type = "---"
 type = "dynamic"
 id = "agent_system1"
 i18n = "menu.agent.system1"
+platforms = ["hs", "linux"]
+unavailable = "hide"
+
+[[menu.agent_menu]]
+type = "list"
+id = "agent_system1"
+i18n = "menu.agent.system1"
+platforms = ["ahk"]
+unavailable = "hide"
 
 [[menu.agent_menu]]
 type = "dynamic"
 id = "agent_system2"
 i18n = "menu.agent.system2"
+platforms = ["hs", "linux"]
+unavailable = "hide"
+
+[[menu.agent_menu]]
+type = "list"
+id = "agent_system2"
+i18n = "menu.agent.system2"
+platforms = ["ahk"]
+unavailable = "hide"
 
 [[menu.agent_menu]]
 type = "---"

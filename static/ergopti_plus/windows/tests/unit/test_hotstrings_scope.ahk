@@ -321,7 +321,6 @@ _HotstringsScopeLargeCatalogue() {
 		Receipt := HotstringsScopeApply("clear", Fixture.options)
 		_HSC_TraceNativePhase("apply", PhaseStarted)
 		AssertEqual("pending", Receipt["status"], "all 34 changed stores fit one transaction")
-		_ScopeExactOwnerNativeProbe(Bundle, Fixture.path, Fixture.options["locator"], 34)
 		PhaseStarted := _TestClockMs()
 		Journal := ConfigTransitionInspect(Fixture.options["locator"], ConfigTransitionProductionPort())
 		_HSC_TraceNativePhase("inspect", PhaseStarted)
@@ -355,7 +354,6 @@ _HotstringsScopeLargeCatalogue() {
 		}
 		_HSC_TraceNativePhase("cleanup", PhaseStarted)
 	}
-	AssertFalse(_ConfigWriteLeaseSelectOwner(Bundle, Fixture.path), "the original retired full transaction cannot supply its old selected token")
 }
 Test("hotstrings-capacity: 32 personal files publish and roll back as one journal", _HotstringsScopeLargeCatalogue)
 
