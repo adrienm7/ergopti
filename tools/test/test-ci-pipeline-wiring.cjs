@@ -194,6 +194,18 @@ const MACOS_NATIVE_STEP_CONDITIONS = [
 	[
 		MACOS_BOX,
 		'managed-ollama-native',
+		'Qualify actual selected number-row Carbon XCTest controls',
+		NOT_CANCELLED
+	],
+	[
+		MACOS_BOX,
+		'managed-ollama-native',
+		'Retain selected number-row Carbon XCTest diagnostics',
+		'always()'
+	],
+	[
+		MACOS_BOX,
+		'managed-ollama-native',
 		'Retain selected-release native ownership receiving',
 		'always()'
 	],
@@ -329,6 +341,8 @@ const STEP_CONDITIONS = [
 		'Upload failed unit log',
 		"${{ failure() && !cancelled() && steps.linux_unit.outcome == 'failure' }}"
 	],
+	[LINUX_BOX, 'e2e-linux', 'Qualify three actual XI2 property cookies', NOT_CANCELLED],
+	[LINUX_BOX, 'e2e-linux', 'Retain actual XI2 property-cookie evidence', 'always()'],
 	[LINUX_BOX, 'e2e-linux', 'Qualify genuine Nix installed runtime', NOT_CANCELLED],
 	[LINUX_BOX, 'test-linux', 'Run manual official runtime and model acceptance', MANUAL_RUNTIME_IF],
 	[
@@ -4564,6 +4578,94 @@ assert.ok(
 );
 assert.match(siteWorkflow, /cp -r build\/\. "\$GHP"\//, 'main deploy retains built static assets');
 assert.match(siteWorkflow, /cp -r build\/\. "\$GHP\/\$DEPLOY_DIR\/"/, 'dev deploy remains scoped');
+
+// Current read-only number-row cohort is mandatory independently of full package prerequisites.
+const NUMBER_ROW_NATIVE_STEP =
+	'      - name: Qualify actual selected number-row Carbon XCTest controls\n        if: ${{ !cancelled() }}\n        shell: bash\n        run: |\n          set -euo pipefail\n          evidence="$RUNNER_TEMP/number-row-source-evidence"\n          mkdir "$evidence"\n          transcript="$evidence/number-row-xctest.log"\n          source="static/ergopti_plus/macos/launcher/Tests/ErgoptiPlusTests/NumberRowSourceProbeTests.swift"\n          producer="static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/NumberRowSourceProbe.swift"\n          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"\n          git show "$GITHUB_SHA:$source" | cmp - "$source"\n          git show "$GITHUB_SHA:$producer" | cmp - "$producer"\n          cp "$source" "$evidence/NumberRowSourceProbeTests.swift"\n          cp "$producer" "$evidence/NumberRowSourceProbe.swift"\n          printf \'%s\\n\' "$GITHUB_SHA" > "$evidence/tested-sha.txt"\n          export ERGOPTI_TIS_EVIDENCE_DIR="$(mktemp -d "$evidence/tis-session.XXXXXX")"\n          export ERGOPTI_TIS_EVIDENCE_SESSION="$(node -e \'process.stdout.write(require("node:crypto").randomBytes(32).toString("hex"))\')"\n          set +e\n          script -q /dev/null swift test --package-path static/ergopti_plus/macos/launcher \\\n            --scratch-path "$ERGOPTI_OLLAMA_BUILD_ROOT/swift" \\\n            --filter \'(^|[.])NumberRowSourceProbeTests([/.]|$)\' 2>&1 | tee "$transcript"\n          number_row_statuses=("${PIPESTATUS[@]}")\n          set -e\n          test "${#number_row_statuses[@]}" -eq 2\n          set +e\n          python3 tools/diagnostics/keyboard_geometry_xctest_receipt.py \\\n            --class NumberRowSourceProbeTests --source "$evidence/NumberRowSourceProbeTests.swift" \\\n            --log "$transcript" --receipt "$evidence/number-row-verdict.json" \\\n            --test-exit "${number_row_statuses[0]}" --capture-exit "${number_row_statuses[1]}"\n          number_row_receipt_status=$?\n          node - "$evidence/number-row-verdict.json" "$ERGOPTI_TIS_EVIDENCE_DIR" "$ERGOPTI_TIS_EVIDENCE_SESSION" <<\'NODE\'\n          const fs = require(\'node:fs\');\n          const transport = require(\'./tools/diagnostics/tis_evidence_transport.cjs\');\n          const receipt = JSON.parse(fs.readFileSync(process.argv[2], \'utf8\'));\n          if (!receipt.passed || receipt.scope !== \'NumberRowSourceProbeTests\' || receipt.expected_count !== 12 || receipt.received_count !== 12) throw new Error(\'exact twelve-case number-row receiving refused\');\n          const session = transport.validate(process.argv[3], process.argv[4]);\n          const expectedSources = {\n            testActualSelectedUSPlainAndShiftUseUnchangedIndependentExpectations: \'com.apple.keylayout.US\',\n            testActualFrenchDeadStateDoesNotLeakIntoNextPositionOrSuccessor: \'com.apple.keylayout.French\',\n            testFrozenNativeLayoutIsAlignedDetachedFromControlledMutableStorage: \'com.apple.keylayout.US\',\n            testActualUSCapsMaskChangesAnIndependentLetterExpectation: \'com.apple.keylayout.US\',\n            testActualCarbonCapsDomainsPreserveNativeModifierAndDeadStateABI: \'com.apple.keylayout.French\',\n            testActualLayoutRefusesChangedSourceTypeDataOrUnavailableFinalRead: \'com.apple.keylayout.US\',\n            testActualFrozenProbeRefusesChangedFinalBytesOnSamePrivateDataObject: \'com.apple.keylayout.US\'\n          };\n          const expected = Object.keys(expectedSources).sort();\n          const observed = session.receipts.map((row) => {\n            if (row.test.state !== \'present\' || row.omittedEvents !== 0) throw new Error(\'native diagnostic identity refused\');\n            const match = /^(?:(?:\\w+\\.)?NumberRowSourceProbeTests\\.|-\\[(?:\\w+\\.)?NumberRowSourceProbeTests )(test\\w+)(?:\\])?:(com\\.apple\\.keylayout\\.(?:US|French))$/.exec(row.test.value);\n            if (!match || !Object.hasOwn(expectedSources, match[1]) || match[2] !== expectedSources[match[1]]) throw new Error(\'foreign native method fixture\');\n            const captures = row.events.filter((event) => event.phase === \'original.capture\');\n            if (captures.length !== 1 || captures[0].original?.id?.state !== \'present\' || typeof captures[0].original.id.value !== \'string\' || captures[0].original.id.value.length === 0) throw new Error(\'captured original source unavailable\');\n            const originalID = captures[0].original.id.value;\n            for (const phase of [\'restore.inner.after\', \'restore.outer.after\']) {\n              const events = row.events.filter((event) => event.phase === phase);\n              if (events.length !== 1 || events[0].status !== 0) throw new Error(\'native source restoration refused\');\n              if (events[0].original?.id?.state !== \'present\' || events[0].original.id.value !== originalID || events[0].current?.id?.state !== \'present\' || events[0].current.id.value !== originalID) throw new Error(\'sampled selected source restoration refused\');\n            }\n            return match[1];\n          }).sort();\n          if (!session.complete || JSON.stringify(observed) !== JSON.stringify(expected)) throw new Error(\'exact seven native diagnostic closures refused\');\n          NODE\n          number_row_tis_status=$?\n          set -e\n          cmp "$source" "$evidence/NumberRowSourceProbeTests.swift"\n          cmp "$producer" "$evidence/NumberRowSourceProbe.swift"\n          test "$number_row_receipt_status" -eq 0\n          test "$number_row_tis_status" -eq 0\n        timeout-minutes: 10\n';
+const NUMBER_ROW_NATIVE_RETENTION =
+	'      - name: Retain selected number-row Carbon XCTest diagnostics\n        if: always()\n        uses: actions/upload-artifact@v4\n        with:\n          name: number-row-carbon-${{ matrix.architecture }}-${{ github.run_id }}-${{ github.run_attempt }}\n          if-no-files-found: error\n          retention-days: 7\n          path: |\n            ${{ runner.temp }}/number-row-source-evidence/number-row-xctest.log\n            ${{ runner.temp }}/number-row-source-evidence/number-row-verdict.json\n            ${{ runner.temp }}/number-row-source-evidence/tested-sha.txt\n            ${{ runner.temp }}/number-row-source-evidence/NumberRowSourceProbe.swift\n            ${{ runner.temp }}/number-row-source-evidence/NumberRowSourceProbeTests.swift\n            ${{ runner.temp }}/number-row-source-evidence/tis-session.*/start.json\n            ${{ runner.temp }}/number-row-source-evidence/tis-session.*/manifest.json\n            ${{ runner.temp }}/number-row-source-evidence/tis-session.*/record-*.dat\n            ${{ runner.temp }}/number-row-source-evidence/tis-session.*/refusal.json\n';
+function numberRowNativeReceivingProblems(files) {
+	const mac = files.find((entry) => entry.rel === MACOS_BOX)?.text ?? '';
+	const jobs = [
+		...mac.matchAll(/^  managed-ollama-native:\n[\s\S]*?(?=^  [A-Za-z][\w-]*:|(?![\s\S]))/gm)
+	];
+	if (jobs.length !== 1) return ['number-row native owner job missing or duplicated'];
+	const job = jobs[0][0];
+	const problems = [];
+	for (const [label, step] of [
+		['cohort', NUMBER_ROW_NATIVE_STEP],
+		['retention', NUMBER_ROW_NATIVE_RETENTION]
+	]) {
+		if (mac.split(step).length !== 2 || job.split(step).length !== 2)
+			problems.push('number-row exact mandatory ' + label);
+	}
+	const sdk = job.indexOf('      - name: Retain independent native SDK XCTest diagnostics\n');
+	const selected = job.indexOf(NUMBER_ROW_NATIVE_STEP);
+	const retained = job.indexOf(NUMBER_ROW_NATIVE_RETENTION);
+	const next = job.indexOf(
+		'      - name: Qualify actual native PAC source ownership XCTest controls\n'
+	);
+	if (sdk < 0 || selected <= sdk || retained <= selected || next <= retained)
+		problems.push('number-row bounded early SDK receiving order');
+	return problems;
+}
+errors.push(...numberRowNativeReceivingProblems(pipeline.files()));
+mustCatch(
+	'missing selected native cohort',
+	MACOS_BOX,
+	NUMBER_ROW_NATIVE_STEP,
+	'',
+	numberRowNativeReceivingProblems
+);
+for (const [label, before, after] of [
+	[
+		'partial or foreign selected class',
+		'NumberRowSourceProbeTests([/.]|$)',
+		'KeyboardSourceProbeTests([/.]|$)'
+	],
+	['missing actual receipt judge', 'keyboard_geometry_xctest_receipt.py', 'missing_receipt.py'],
+	['captured native process status substituted', '${number_row_statuses[0]}', '0'],
+	[
+		'different registered source accepted',
+		'--source "$evidence/NumberRowSourceProbeTests.swift"',
+		'--source "$evidence/foreign.swift"'
+	],
+	[
+		'twelve native cases weakened',
+		'receipt.expected_count !== 12',
+		'receipt.expected_count !== 11'
+	],
+	['native source restoration not checked', "['restore.inner.after', 'restore.outer.after']", '[]'],
+	[
+		'capture failure forgiven',
+		'test "$number_row_receipt_status" -eq 0',
+		': "$number_row_receipt_status"'
+	]
+]) {
+	mustCatch(
+		label,
+		MACOS_BOX,
+		NUMBER_ROW_NATIVE_STEP,
+		NUMBER_ROW_NATIVE_STEP.replace(before, after),
+		numberRowNativeReceivingProblems
+	);
+}
+for (const [label, before, after] of [
+	['skipped retention', 'if: always()', 'if: false'],
+	[
+		'missing native raw log retention',
+		'            ${{ runner.temp }}/number-row-source-evidence/number-row-xctest.log\n',
+		''
+	]
+]) {
+	mustCatch(
+		label,
+		MACOS_BOX,
+		NUMBER_ROW_NATIVE_RETENTION,
+		NUMBER_ROW_NATIVE_RETENTION.replace(before, after),
+		numberRowNativeReceivingProblems
+	);
+}
 
 // The Darwin receiver is mandatory raw work, never a deferred qualification alias.
 {
