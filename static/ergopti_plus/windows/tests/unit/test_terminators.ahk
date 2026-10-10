@@ -962,20 +962,33 @@ Test("terminator-boot: real loader receipt retains the admitted generation after
 
 _HTRB_RefusedGeneration(ReadRefusal) {
 	global _HotstringsTerminatorRecords, _ConfigBootRejectedOverrides, _ConfigBootReadFailed
-	Fixture := _ScopeOwnerFixture()
+	Fixture := _ScopeOwnerFixture(), ReadLock := 0
 	try {
 		InvalidSource := 'hotstrings = [unterminated`n'
 		Assert(FSWriteDurable(Fixture.path, InvalidSource))
 		BootSnapshot := { Source: "foreign preexisting output" }
-		RejectedPath := ReadRefusal ? Fixture.directory : Fixture.path
+		if ReadRefusal {
+			ReadLock := FileOpen(Fixture.path, "r-rwd")
+			Assert(ReadLock is File, "the native read refusal requires an acquired exclusive file lock")
+		}
+		RejectedPath := Fixture.path
 		AssertEqual(-1, ApplyBootConfigToml(Map(), RejectedPath, &BootSnapshot))
 		AssertEqual(0, BootSnapshot, "the real refusal must clear an earlier output receipt")
 		AssertFalse(HotstringsTerminatorRecordsInitBoot(BootSnapshot))
 		AssertEqual(0, _HotstringsTerminatorRecords, "no empty record initialization may hide a refused load")
 		AssertEqual("!", HotstringsGetWordDelimiters())
 		AssertTrue(ReadRefusal ? _ConfigBootReadFailed : _ConfigBootRejectedOverrides > 0)
+		if ReadLock is File {
+			ReadLock.Close()
+			ReadLock := 0
+		}
 		AssertEqual(InvalidSource, FSReadUtf8Exact(Fixture.path), "refusal cannot migrate or erase source bytes")
-	} finally _ScopeOwnerCleanup(Fixture)
+	} finally {
+		try {
+			if ReadLock is File
+				ReadLock.Close()
+		} finally _ScopeOwnerCleanup(Fixture)
+	}
 }
 Test("terminator-boot: semantic refusal preserves source protection without publishing an empty owner",
 	_HTRB_WithBoot.Bind(_HTRB_RefusedGeneration.Bind(false)))
