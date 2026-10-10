@@ -310,8 +310,8 @@ helpers.describe("diagnostics bridge (linux): sharing preview admission", functi
 	end)
 end)
 
-helpers.describe("diagnostics bridge template-only report", function()
-	helpers.it("completes the actual attachment before opening a form without query defaults", function()
+helpers.describe("diagnostics bridge stable-metadata report", function()
+	helpers.it("completes the actual attachment before opening a form without editable query defaults", function()
 		with_bridge({ logs_dir = HOME .. "/.local/state/ergopti_plus" }, function(bridge, context)
 			local ready = bridge.on_message("ready", {}, page(context))
 			local exported = bridge.on_message({ action = "export_snapshot", export_sequence = 77 }, {}, page(context))
@@ -336,7 +336,8 @@ helpers.describe("diagnostics bridge template-only report", function()
 				helpers.assert_true(calls[1]:find("mkdir -p", 1, true) == 1)
 				helpers.assert_eq(calls[2], "write")
 				local repo = bridge.config().repository
-				local url = "https://github.com/" .. repo.owner .. "/" .. repo.repo .. "/issues/new?template=bug_report.yml"
+				local stable = require("healthcheck.share").document(exported.snapshot, bridge.config().schema, "ignored").fields
+				local url = require("diagnostics.issue_link").build_url(bridge.config().templates, repo, "bug", stable)
 				helpers.assert_eq(calls[4], "xdg-open " .. string.format("%q", url) .. " >/dev/null 2>&1 &")
 			end, debug.traceback)
 			fs.write, package.loaded["adapters.shell_runner"] = old_write, old_shell

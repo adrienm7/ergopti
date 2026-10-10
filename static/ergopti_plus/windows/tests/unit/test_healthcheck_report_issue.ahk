@@ -154,7 +154,7 @@ _THPA_ReportPrefillsTheReport() {
 	AssertTrue(InStr(Calls[4], "template=bug_report.yml") > 0, Calls[4])
 	AssertEqual("", _THPA_QueryValue(Calls[4], "diagnostics"),
 		"No query default can reset an edit in the form")
-	AssertEqual("", _THPA_QueryValue(Calls[4], "os"))
+	AssertEqual("windows", _THPA_QueryValue(Calls[4], "os"))
 	AssertTrue(InStr(Calls[4], "JDoe") = 0, "The form carries no private fields")
 }
 Test("Diagnostics page: report copies, then opens the bug form with the whole report (report-bug-flow)",
@@ -188,7 +188,7 @@ _THPA_ReportCutsALongReport() {
 	AssertEqual("save:" . Outcome["path"] . ":" . Document["text"], Calls[2], "The local attachment is complete")
 	Url := SubStr(Calls[4], StrLen("open_url:") + 1)
 	AssertTrue(StrLen(Url) < 1200 && StrLen(Url) <= Config["templates"]["max_url_bytes"], "The form URL stays short")
-	AssertEqual("", _THPA_QueryValue(Url, "version"), "Identity stays in the local attachment")
+	AssertEqual("2.1.0", _THPA_QueryValue(Url, "version"), "Only validated host identity is prefilled")
 	AssertEqual("", _THPA_QueryValue(Url, "diagnostics"))
 }
 Test("Diagnostics page: report keeps a long attachment out of the editable URL (report-bug-flow)",
@@ -335,15 +335,17 @@ _THPA_TemplateOnlyReport() {
 	Calls := [], Config := HealthCheck_Config()
 	Document := _THPA_Approved(false)
 	Outcome := _THPA_Perform(Map("action", "report", "text", "report",
-		"fields", Map("diagnostics", "private query text", "version", "2.1.0", "os", "private host", "driver", "foreign")),
+		"fields", Map("diagnostics", "private query text", "title", "PRIVATE_TITLE", "description", "PRIVATE_DESCRIPTION", "reproduction", "PRIVATE_REPRODUCTION", "version", "9.9.9", "os", "private host", "driver", "foreign")),
 		_THPA_Paths(), Config, _THPA_Effects(Calls))
 	AssertEqual(true, Outcome["ok"])
 	Repo := Config["repository"]
-	AssertEqual("open_url:https://github.com/" . Repo["owner"] . "/" . Repo["repo"] . "/issues/new?template=bug_report.yml", Calls[4])
+	AssertEqual("open_url:https://github.com/" . Repo["owner"] . "/" . Repo["repo"] . "/issues/new?template=bug_report.yml&version=2.1.0&os=windows&driver=windows", Calls[4])
+	for Id in ["title", "description", "reproduction", "diagnostics", "architecture"]
+		AssertEqual("", _THPA_QueryValue(Calls[4], Id), "Editable and undeclared fields stay out of the URL")
 	AssertEqual("copy:" . Document["text"], Calls[1])
 	AssertEqual("save:" . Outcome["path"] . ":" . Document["text"], Calls[2])
 }
-Test("Diagnostics template-only report URL preserves complete local output", _THPA_TemplateOnlyReport)
+Test("Diagnostics stable host metadata URL preserves complete local output", _THPA_TemplateOnlyReport)
 
 _THPA_PageObservations() {
 	global _HC_Session, _HC_ResetDone

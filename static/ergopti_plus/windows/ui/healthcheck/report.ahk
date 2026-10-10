@@ -15,8 +15,8 @@
 ;    policy. Free text, paths and unknown fields are excluded regardless of
 ;    the page or details checkbox. Only approved technical content leaves.
 ; 2. The clipboard and attachment hold the complete approved report.
-;    GitHub receives only the template selection, without query defaults
-;    that could reset edits. The browser opens after attachment reveal.
+;    GitHub receives stable host version, OS and driver metadata. Editable
+;    fields stay out of the URL; the browser opens after attachment reveal.
 ; 3. Paths come from the snapshot the host collected, by field id; a folder
 ;    that does not exist yet is created before it is opened; a file that does
 ;    not exist yet (today's errors file before the day's first warning) is
@@ -413,20 +413,23 @@ _HCReport_SaveAndReveal(Effects, Paths, Name, Text) {
 	return Path
 }
 
-; Reports on GitHub: copies the full report, then opens the bug form with that
-; same report prefilled. Nothing is saved and nothing is selected: the browser
-; opening is the last side effect, so the form keeps the focus.
-; @param Action {Map} { text, fields } The page's text and identity fields.
-; @throws {Error} When the clipboard or the browser refuses.
+; Reports on GitHub: copies and saves the complete approved report, then
+; reveals its local attachment before opening the bug form with stable host
+; version, OS and driver fields. Editable fields stay outside the URL; the
+; browser opens last and no attachment is uploaded automatically.
+; @param Action {Map} Host-approved report text and technical identity fields.
+; @throws {Error} When clipboard, attachment completion or browser opening refuses.
 _HCReport_Report(Effects, Config, Action, Rules, Context, Paths) {
 	Text := Action["text"]
-	; First, and whole: the link may cut the report to fit GitHub's budget
+	; Copy the complete reviewed report independently of its short metadata URL
 	if !Effects["copy"].Call(Text)
 		throw Error("The clipboard refused the report.")
 	; The complete reviewed document stays in a local attachment, never the URL.
 	Path := _HCReport_SaveAndReveal(Effects, Paths, Action["name"], Text)
 	Fields := Map()
-	; Query defaults can reset edits in GitHub; only select the template.
+	; Only the host-derived technical identity is stable enough to prefill.
+	for Id in ["version", "os", "driver"]
+		Fields[Id] := Action["fields"][Id]
 	ReportField := Config["templates"]["templates"]["bug"]["report_field"]
 	if !(ReportField is String) || ReportField == ""
 		throw Error("The bug template names no report field.")
