@@ -64,6 +64,7 @@ local function run_action(responses)
 		package.loaded["ui.menu.menu_utils"] = {}
 		local NativeManifestMenu = require("infra.manifest_menu")
 		package.loaded["infra.manifest_menu"] = {
+			group_receiver = NativeManifestMenu.group_receiver,
 			template_rows = NativeManifestMenu.template_rows,
 			build = function(_, _, _, _, _, providers)
 				return providers.wrap_symbols_menu()

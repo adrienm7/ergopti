@@ -10,8 +10,9 @@ _ScopeShortcutsCase(Mode, FromManifest := false) {
 	OldFeatures := IsSet(Features) ? Features : unset, OldKeyboard := IsSet(KeyboardShortcutAssignments) ? KeyboardShortcutAssignments : unset, OldCache := IsSet(_IniCache) ? _IniCache : unset
 	OldDefaults := IsSet(KEYBOARD_SHORTCUT_DEFAULTS) ? KEYBOARD_SHORTCUT_DEFAULTS : unset
 	OldParameters := IsSet(GestureActionParameters) ? GestureActionParameters : unset
-	Fixture := _ScopeOwnerFixture()
 	Source := '[shortcuts.personal]`n"custom tool" = true`nunknown_user = true`n[shortcuts.keyboard]`nwin_b = "open_url"`nwin_cc = "open_url"`n[category_enabled]`nshortcuts = true`n[llm]`nenabled = true`n[action_parameters]`nkeyboard__win_b__open_url = "https://keyboard.test"`nscript__pause__open_url = "https://script.test"`ntap_key__grave__open_url = "https://tap.test"`ngesture__tap_4__open_url = "https://gesture.test"`ntap_hold__space__open_url = "https://hold.test"`nunknown_user = "keep"`n'
+	Fixture := _ScopeOwnerFixture(Source)
+	Source := Fixture.source
 	Assert(FSWriteDurable(Fixture.path, Source))
 	Bundle := 0, Refusal := 0
 	Launch(_Success, Borrowed, Refused) {

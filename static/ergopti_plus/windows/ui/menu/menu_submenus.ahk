@@ -59,7 +59,7 @@ InitSubMenus() {
 				for _, SecId in SectionsOrder {
 					if (SecId == "-") {
 						if !_PrevWasSep {
-							Rows.Push(Map("separator", true))
+							Rows.Push(_HS_DeclaredSectionBoundary())
 							_PrevWasSep := true
 						}
 						continue
@@ -214,7 +214,7 @@ _BuildDynamicHotstringsSubmenu(Options := unset) {
 	Rows := []
 	for _, V1Id in _DYNAMIC_HOTSTRINGS_ORDER {
 		if (V1Id == "-") {
-			Rows.Push(Map("separator", true))
+			Rows.Push(_HS_DeclaredSectionBoundary())
 			continue
 		}
 		if !_LegacyDynamicHotstringsKeyMap.Has(V1Id) {
@@ -246,6 +246,18 @@ _BuildDynamicHotstringsSubmenu(Options := unset) {
 	}
 	return _HS_CategoryMenu("DynamicHotstrings", "", Rows,
 		(_Targets, Enabled) => HotstringsDynamicScopeApply(Enabled, Options))
+}
+
+/**
+ * Reads the shared boundary before a detached hotstring tree is published.
+ * @returns {Map} The admitted inert separator.
+ */
+_HS_DeclaredSectionBoundary() {
+	Rows := MenuRenderer_TemplateRows("hotstrings_parameter_boundary", Map(), Map(), Map())
+	if !(Rows is Array) || Rows.Length != 1 || !(Rows[1] is Map)
+			|| !Rows[1].Get("separator", false) || Rows[1].Has("action") || Rows[1].Has("submenu")
+		throw Error("Declared hotstring section boundary was refused.")
+	return Rows[1]
 }
 
 ; Sum hotstring entries for a flat category (Autocorrection, Rolls, …)

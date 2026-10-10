@@ -27,6 +27,7 @@
 
 local helpers = require("tests.helpers")
 local ManifestFixture = require("tests.support.manifest_menu_fixture")
+local native_hotstrings_caption = nil
 
 -- The title key each top-level row draws, so a rendered row can be named by the
 -- manifest id it stands for. An id the manifest declares for macOS and this
@@ -173,7 +174,7 @@ local function native_language_provider()
 		native.init()
 		assert(type(native.build_language_menu_items) == "function", "actual native locale provider exists")
 		assert(#native.get_sorted_locales() == 21, "actual generated locale catalogue is complete")
-		return native.build_language_menu_items
+		return native.build_language_menu_items, native.get
 	end)
 end
 
@@ -183,37 +184,64 @@ end
 --- @return table rows Rendered top-level rows, the title badge removed.
 --- @return table lines Recorded warnings and errors.
 local function render_root(manifest_text, paused, command_actions)
-	local language_provider = native_language_provider()
+	local language_provider, caption = native_language_provider()
+	native_hotstrings_caption = caption
 	local lines = {}
 	local rendered = ManifestFixture.with_manifest(manifest_text, recording_logger(lines), function()
+		-- The renderer retains this actual dependency table; the next native loader
+		-- replaces the public cache entry with another controlled i18n cohort.
+		local renderer_captions = require("infra.i18n")
 		local builder = helpers.load_with_stubs("ui.menu.builder")
-		require("infra.i18n").build_language_menu_items = language_provider
-		local build = function(key) return { build = function() return stub_row(key) end } end
-		local mods = {
-			keyboard_layout = build("menu.layout.title"),
-			hotstrings      = {},
-			keylogger       = build("menu.metrics.title"),
-			shortcuts       = build("menu.shortcuts.title"),
-			tap_holds       = build("menu.tapholds.title"),
-			gestures        = build("menu.gestures.title"),
-			apps            = build("menu.apps.title"),
-			about           = build("menu.about.title"),
-		}
-		local ctx = {
-			paused         = paused == true,
-			config         = { log_level = 2 },
-			hotfiles       = {},
-			state          = { hotstrings = {} },
-			save_prefs     = function() return true end,
-			updateMenu     = function() end,
-			notify_feature = function() end,
-			llm_handler    = {
-				build_item = function() return stub_row("menu.llm.title") end,
-				build_agent_item = function() return stub_row("menu.agent.title") end,
-			},
-		}
-		local actions = command_actions or setmetatable({}, { __index = function() return function() end end })
-		return builder.generate(ctx, mods, actions)
+		local captions = require("infra.i18n")
+		local previous_get, previous_language = captions.get, captions.build_language_menu_items
+		local previous_renderer_get = renderer_captions.get
+		-- The typed parent consumes its real translated base. Other controlled
+		-- captions stay the original key model used by lifecycle assertions.
+		captions.get = function(key)
+			if key == "menu.hotstrings.title" then return caption(key) end
+			return previous_get(key)
+		end
+		renderer_captions.get = function(key)
+			if key == "menu.hotstrings.title" then return caption(key) end
+			return previous_renderer_get(key)
+		end
+		captions.build_language_menu_items = language_provider
+		local outcome = table.pack(pcall(function()
+			local build = function(key) return { build = function() return stub_row(key) end } end
+			local mods = {
+				keyboard_layout = build("menu.layout.title"),
+				hotstrings      = {},
+				keylogger       = build("menu.metrics.title"),
+				shortcuts       = build("menu.shortcuts.title"),
+				tap_holds       = build("menu.tapholds.title"),
+				gestures        = build("menu.gestures.title"),
+				apps            = build("menu.apps.title"),
+				about           = build("menu.about.title"),
+			}
+			local ctx = {
+				paused         = paused == true,
+				config         = { log_level = 2 },
+				hotfiles       = {},
+				state          = { hotstrings = {} },
+				save_prefs     = function() return true end,
+				updateMenu     = function() end,
+				notify_feature = function() end,
+				llm_handler    = {
+					build_item = function() return stub_row("menu.llm.title") end,
+					build_agent_item = function() return stub_row("menu.agent.title") end,
+				},
+			}
+			local actions = command_actions or setmetatable({}, { __index = function() return function() end end })
+			return builder.generate(ctx, mods, actions)
+		end))
+		renderer_captions.get = previous_renderer_get
+		captions.get, captions.build_language_menu_items = previous_get, previous_language
+		helpers.assert_eq(rawget(renderer_captions, "get"), previous_renderer_get,
+			"the actual renderer's retained caption owner is restored on every scenario exit")
+		helpers.assert_eq(rawget(captions, "get"), previous_get,
+			"the actual native builder's replacement caption owner is restored on every scenario exit")
+		if not outcome[1] then error(outcome[2], 0) end
+		return table.unpack(outcome, 2, outcome.n)
 	end)
 	helpers.assert_true(type(rendered) == "table" and #rendered > 2, "Builder.generate drew no tray")
 	-- The title badge is an image row prepended after the render, with its own
@@ -244,7 +272,11 @@ local function id_of(row)
 	local title = without_symbol(tostring(row.title))
 	local i18n = require("infra.i18n")
 	for id, key in pairs(TITLE_KEYS) do
-		for _, expected in ipairs({ key, without_symbol(i18n.get(key)) }) do
+		local captions = {key, without_symbol(i18n.get(key))}
+		if id == "hotstrings" and type(native_hotstrings_caption) == "function" then
+			captions[#captions + 1] = without_symbol(native_hotstrings_caption(key))
+		end
+		for _, expected in ipairs(captions) do
 			-- The Hotstrings title carries its live count: « ⚡ Hotstrings (123) ».
 			if title == expected or title:sub(1, #expected + 2) == expected .. " (" then return id end
 			if id == "agent" and row.disabled == true and row.fn == nil and row.menu == nil then
@@ -459,4 +491,133 @@ helpers.describe("Agent-only disabled macOS root composition", function()
 		local root = assert(require("json").decode(read_manifest_text()))
 		require("test.agent_menu_root").assert_disabled_root(helpers, "hs", source, root.top_level)
 	end)
+end)
+
+
+--- Retains the existing whole-root fixture and its real cached native builder.
+--- Component state doubles are the same collaborators as the original drift gate.
+--- @param body function Receives the actual build, facade and logger.
+local function with_native_separator_root(body)
+	local language_provider = native_language_provider()
+	local lines, logger = {}, nil
+	logger = recording_logger(lines)
+	return ManifestFixture.with_manifest(read_manifest_text(), logger, function(renderer)
+		local builder = helpers.load_with_stubs("ui.menu.builder")
+		require("infra.i18n").build_language_menu_items = language_provider
+		local component = function(key) return {build = function() return stub_row(key) end} end
+		local mods = {
+			keyboard_layout = component("menu.layout.title"), hotstrings = {},
+			keylogger = component("menu.metrics.title"), shortcuts = component("menu.shortcuts.title"),
+			tap_holds = component("menu.tapholds.title"), gestures = component("menu.gestures.title"),
+			apps = component("menu.apps.title"), about = component("menu.about.title"),
+		}
+		local ctx = {paused = false, config = {log_level = 2}, hotfiles = {}, state = {hotstrings = {}},
+			save_prefs = function() return true end, updateMenu = function() end, notify_feature = function() end,
+			llm_handler = {build_item = function() return stub_row("menu.llm.title") end,
+				build_agent_item = function() return stub_row("menu.agent.title") end}}
+		local actions = setmetatable({}, {__index = function() return function() end end})
+		return body(function() return builder.generate(ctx, mods, actions) end, renderer, logger)
+	end)
+end
+
+helpers.describe("actual native top-level boundary facade custody (declared-top-level-separator-native)", function()
+	local mutations = {
+		["module withdrawn"] = function(_, hits) rawset(package.loaded, "infra.manifest_menu", nil) end,
+		["foreign module"] = function(_, hits)
+			rawset(package.loaded, "infra.manifest_menu", setmetatable({}, {__index = function() hits[1] = hits[1] + 1 end}))
+		end,
+		["factory withdrawn"] = function(renderer, hits)
+			rawset(renderer, "top_level_separator_receiver", function() hits[1] = hits[1] + 1; return {} end)
+		end,
+		["normalizer withdrawn"] = function(renderer, hits)
+			rawset(renderer, "render_rows", function() hits[1] = hits[1] + 1; return {} end)
+		end,
+		["array reader withdrawn"] = function(renderer, hits)
+			rawset(renderer, "get_array", function() hits[1] = hits[1] + 1; return {} end)
+		end,
+		["root reader withdrawn"] = function(renderer, hits)
+			rawset(renderer, "get_root", function() hits[1] = hits[1] + 1; return {} end)
+		end,
+	}
+	for name, mutate in pairs(mutations) do
+		for _, cached in ipairs({false, true}) do
+			local subject, change, prime = name, mutate, cached
+			helpers.it((prime and "cached" or "first") .. " actual builder refuses " .. subject .. " (declared-top-level-separator-native)", function()
+				with_native_separator_root(function(build, renderer)
+					local saved = {}; for _, key in ipairs({"top_level_separator_receiver", "render_rows", "get_array", "get_root"}) do saved[key] = rawget(renderer, key) end
+					local modules, prior, hits = package.loaded, rawget(package.loaded, "infra.manifest_menu"), {0}
+					local ok, detail = xpcall(function()
+						if prime then helpers.assert_true(#build() > 2, "the real root primes the actual cache") end
+						change(renderer, hits); helpers.assert_eq(#build(), 0, "the actual native root refuses publication")
+						helpers.assert_eq(hits[1], 0, "no withdrawn facade function or observer may run")
+					end, debug.traceback)
+					for key, value in pairs(saved) do rawset(renderer, key, value) end
+					rawset(modules, "infra.manifest_menu", prior)
+					if not ok then error(detail, 0) end
+					helpers.assert_true(#build() > 2, "the same actual builder and cache recover after exact repair")
+					helpers.assert_eq(hits[1], 0); helpers.assert_true(rawequal(rawget(modules, "infra.manifest_menu"), prior))
+				end)
+			end)
+		end
+	end
+	for _, name in ipairs({"module withdrawn", "foreign module", "factory withdrawn", "normalizer withdrawn"}) do
+		local subject, change = name, mutations[name]
+		helpers.it("actual child completion refuses " .. subject .. " and preserves its cached source (declared-top-level-separator-native)", function()
+			with_native_separator_root(function(build, renderer, logger)
+				local owner, normalize, original_build = rawget(renderer, "top_level_separator_receiver"), rawget(renderer, "render_rows"), logger.build
+				local modules, prior, hits, child_calls = package.loaded, rawget(package.loaded, "infra.manifest_menu"), {0}, 0
+				local ok, detail = xpcall(function()
+					helpers.assert_true(#build() > 2, "the actual root admits its complete cached source")
+					logger.build = function(module, label, fn, arg)
+						local rows = original_build(module, label, fn, arg)
+						if label == "keyboard_layout.build" then child_calls = child_calls + 1; change(renderer, hits) end
+						return rows
+					end
+					helpers.assert_eq(#build(), 0, "the child ran but the changed owner cannot publish")
+					helpers.assert_eq(child_calls, 1, "the original actual child producer completed exactly once")
+					helpers.assert_eq(hits[1], 0); helpers.assert_eq(#build(), 0, "the retained actual cache also refuses")
+				end, debug.traceback)
+				logger.build = original_build
+				rawset(renderer, "top_level_separator_receiver", owner); rawset(renderer, "render_rows", normalize)
+				rawset(modules, "infra.manifest_menu", prior)
+				if not ok then error(detail, 0) end
+				helpers.assert_true(#build() > 2, "the same admitted actual cache survives exact restoration")
+				helpers.assert_eq(hits[1], 0)
+			end)
+		end)
+	end
+end)
+
+
+helpers.describe("actual cached top-level source custody (declared-top-level-separator-native)", function()
+	local mutations = {
+		["source withdrawn"] = function(root) rawset(root, "top_level", nil) end,
+		["foreign source"] = function(root, _, hits)
+			rawset(root, "top_level", setmetatable({}, {__index = function() hits[1] = hits[1] + 1 end}))
+		end,
+		["same boundary gains observer"] = function(_, rows, hits)
+			setmetatable(rows[4], {__index = function() hits[1] = hits[1] + 1 end})
+		end,
+	}
+	for name, mutate in pairs(mutations) do
+		local subject, change = name, mutate
+		helpers.it("the actual primed native cache refuses " .. subject .. " and reopens after exact source repair (declared-top-level-separator-native)", function()
+			with_native_separator_root(function(build, renderer)
+				local root = renderer.get_root(); local rows, hits = rawget(root, "top_level"), {0}
+				local boundary = rawget(rows, 4); local previous_meta = getmetatable(boundary)
+				local ok, detail = xpcall(function()
+					helpers.assert_true(#build() > 2, "the actual native root primes its canonical source cache")
+					change(root, rows, hits)
+					helpers.assert_eq(#build(), 0, "the genuine retained cache refuses the withdrawn source")
+					helpers.assert_eq(hits[1], 0, "foreign source observers receive no admission or publication credit")
+				end, debug.traceback)
+				rawset(root, "top_level", rows); setmetatable(boundary, previous_meta)
+				if not ok then error(detail, 0) end
+				helpers.assert_true(rawequal(rawget(root, "top_level"), rows))
+				helpers.assert_true(rawequal(rawget(rows, 4), boundary))
+				helpers.assert_true(#build() > 2, "the same original cache reopens only after exact source repair")
+				helpers.assert_eq(hits[1], 0)
+			end)
+		end)
+	end
 end)

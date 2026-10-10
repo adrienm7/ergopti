@@ -86,7 +86,8 @@ const EXPECTED_TARGETS = [
 	'static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/LoggerTopics.generated.swift',
 	'static/ergopti_plus/macos/_generated/locale_table.lua',
 	'static/ergopti_plus/linux/_generated/locale_table.lua',
-	'static/ergopti_plus/windows/_generated/locale_table.ahk'
+	'static/ergopti_plus/windows/_generated/locale_table.ahk',
+	'static/ergopti_plus/_shared/modules/menu/startup_tray_projection.ahk'
 ];
 
 // ── Snapshot ────────────────────────────────────────────────────────────────

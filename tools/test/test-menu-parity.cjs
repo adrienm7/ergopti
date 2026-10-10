@@ -2039,25 +2039,25 @@ const {
 			'local ManifestMenu = require("foreign.renderer")'
 		],
 		['return ManifestMenu.get_root()', 'return {}'],
-		['for _, entry in ipairs(data.top_level) do', 'for _, entry in ipairs({}) do'],
+		['for _, entry in ipairs(declared) do', 'for _, entry in ipairs({}) do'],
 		['::continue::', '::foreign_continue::'],
 		[
 			'local ok_b, llm_item = pcall(ctx.llm_handler.build_item)',
 			'local ok_b, llm_item = true, nil'
 		],
 		['return llm_item and { llm_item } or {}', 'return {}'],
-		['for _, row in ipairs(builders[id]() or {}) do', 'for _, row in ipairs({}) do'],
-		['local rendered = ManifestMenu.render_rows(items, "top_level")', 'local rendered = {}']
+		['for _, row in ipairs(children) do', 'for _, row in ipairs({}) do'],
+		['local rendered = separator_render(items, "top_level")', 'local rendered = {}']
 	];
 	callerControls.push(
 		[
-			'local projected = { id = entry.id, greyed_when_paused = entry.greyed_when_paused == true }',
-			'local projected = { id = "foreign", greyed_when_paused = entry.greyed_when_paused == true }'
+			'local projected = { id = entry.id, greyed_when_paused = entry.greyed_when_paused == true, declared_entry = entry }',
+			'local projected = { id = "foreign", greyed_when_paused = entry.greyed_when_paused == true, declared_entry = entry }'
 		],
 		['table.insert(result, projected)', 'table.insert(result, {})'],
 		[
-			'local projected = { id = entry.id, greyed_when_paused = entry.greyed_when_paused == true }\n\t\tif entry.disabled == true then',
-			'local projected = { id = entry.id, greyed_when_paused = entry.greyed_when_paused == true }\n\t\tif false then'
+			'local projected = { id = entry.id, greyed_when_paused = entry.greyed_when_paused == true, declared_entry = entry }\n\t\tif entry.disabled == true then',
+			'local projected = { id = entry.id, greyed_when_paused = entry.greyed_when_paused == true, declared_entry = entry }\n\t\tif false then'
 		],
 		[
 			'projected.disabled, projected.i18n, projected.reason_key = true, entry.i18n, entry.reason_key',
@@ -2125,12 +2125,12 @@ const {
 	);
 	// The upstream disabled-row projection preserves the actual binding; the
 	// prior direct append remains a supported, independently recorded source form.
-	const projection = `		local projected = { id = entry.id, greyed_when_paused = entry.greyed_when_paused == true }
+	const projection = `		local projected = { id = entry.id, greyed_when_paused = entry.greyed_when_paused == true, declared_entry = entry }
 		if entry.disabled == true then
 			projected.disabled, projected.i18n, projected.reason_key = true, entry.i18n, entry.reason_key
 		end
 		table.insert(result, projected)`;
-	const historicalProjection = `		table.insert(result, { id = entry.id, greyed_when_paused = entry.greyed_when_paused == true })`;
+	const historicalProjection = `		table.insert(result, { id = entry.id, greyed_when_paused = entry.greyed_when_paused == true, declared_entry = entry })`;
 	assert.equal(builder.split(projection).length - 1, 1, 'exact current projected-row preimage');
 	assert.equal(
 		credits(source, builder.replace(projection, historicalProjection)),
@@ -2210,6 +2210,60 @@ const {
 		true,
 		'comments and formatting do not replace executable authority'
 	);
+	const declaredCustodyControls = [
+		['local _dl_item = nil', 'do local rendered = {} return rendered end\nlocal _dl_item = nil'],
+		['local _dl_item = nil', 'rendered = {}\nlocal _dl_item = nil'],
+		['local _dl_item = nil', 'if true then rendered = {} end\nlocal _dl_item = nil'],
+		[
+			'local function separator_facade_current()',
+			'local function foreign_separator_facade_current()'
+		],
+		[
+			'local separator_render = type(ManifestMenu) == "table" and rawget(ManifestMenu, "render_rows")',
+			'local separator_render = type(ManifestMenu) == "table" and rawget(ManifestMenu, "render_rows")\nseparator_facade_current = function() return true end'
+		],
+		['local receive, declared = separator_factory()', 'local receive, declared = ForeignFactory()'],
+		[
+			'local separator_render = type(ManifestMenu) == "table" and rawget(ManifestMenu, "render_rows")',
+			'local separator_render = Foreign.render_rows'
+		],
+		['rawget(separator_modules, "infra.manifest_menu") == ManifestMenu', 'true'],
+		['rawget(ManifestMenu, "top_level_separator_receiver") == separator_factory', 'true'],
+		['local children = builders[id]() or {}', 'local children = {}'],
+		[
+			'local children = builders[id]() or {}',
+			'local children = builders[id]() or {}\nchildren = {}'
+		],
+		[
+			'if not separator_facade_current() or not receive("current") then return {} end',
+			'if false then return {} end'
+		],
+		[
+			'if not separator_facade_current() or type(_top_level_separator_receiver) ~= "function"',
+			'if type(_top_level_separator_receiver) ~= "function"'
+		],
+		[
+			'local rendered = separator_render(items, "top_level")',
+			'local rendered = separator_render({}, "top_level")'
+		]
+	];
+	for (const [before, after] of declaredCustodyControls) {
+		assert.equal(
+			builder.split(before).length - 1,
+			1,
+			'exact retained facade/result custody preimage'
+		);
+		assert.equal(
+			credits(source, builder.replace(before, after)),
+			false,
+			'withdrawn actual declared source, facade or completed child refuses parent ownership'
+		);
+		assert.equal(
+			credits(),
+			true,
+			'exact original declared custody inverse restores parent ownership'
+		);
+	}
 	assert.equal(credits(), true, 'exact source repair restores the genuine live parent');
 }
 
@@ -2888,12 +2942,12 @@ function publishesIncludedCommands(source, extension, section, declarations, pla
 	// The live badge root uses the same exact owner projection policy as the IA parent.
 	const builder = sources['macos/ui/menu/builder.lua'];
 	const withBuilder = (candidate) => admits({ ...sources, 'macos/ui/menu/builder.lua': candidate });
-	const projection = `		local projected = { id = entry.id, greyed_when_paused = entry.greyed_when_paused == true }
+	const projection = `		local projected = { id = entry.id, greyed_when_paused = entry.greyed_when_paused == true, declared_entry = entry }
 		if entry.disabled == true then
 			projected.disabled, projected.i18n, projected.reason_key = true, entry.i18n, entry.reason_key
 		end
 		table.insert(result, projected)`;
-	const historicalProjection = `		table.insert(result, { id = entry.id, greyed_when_paused = entry.greyed_when_paused == true })`;
+	const historicalProjection = `		table.insert(result, { id = entry.id, greyed_when_paused = entry.greyed_when_paused == true, declared_entry = entry })`;
 	assert.equal(
 		builder.split(projection).length - 1,
 		1,
@@ -2969,7 +3023,35 @@ function publishesIncludedCommands(source, extension, section, declarations, pla
 		assert.equal(withBuilder(candidate), false, reason);
 		assert.equal(withBuilder(builder), true, reason + ': genuine source inverse restores');
 	}
-	for (const control of controls) {
+	// Original independent obligations and expected refusals remain immutable. Only the
+	// current executable coordinates follow the already reviewed retained native route.
+	const forwardBadgeSourceControl = (control) => {
+		if (
+			control.path === 'macos/ui/menu/menu_llm/init.lua' &&
+			control.reason === 'actual finished native download callback disconnected'
+		) {
+			return { ...control, before: 'return item', after: 'item.fn = function() end\nreturn item' };
+		}
+		if (control.path !== 'macos/ui/menu/builder.lua') return control;
+		const forward = (text) =>
+			text
+				.replaceAll('local data = load_manifest()', 'local receive, declared = separator_factory()')
+				.replaceAll('data = { top_level = {} }', 'declared = {}')
+				.replaceAll('data, ignored = { top_level = {} }, nil', 'declared, ignored = {}, nil')
+				.replaceAll('ipairs(data.top_level)', 'ipairs(declared)')
+				.replaceAll('ipairs(data.unrelated_root)', 'ipairs({})')
+				.replaceAll(
+					'_top_level_cache = result',
+					'_top_level_cache, _top_level_separator_receiver = result, receive'
+				)
+				.replaceAll('ManifestMenu.render_rows', 'separator_render')
+				.replaceAll(
+					'greyed_when_paused = entry.greyed_when_paused == true }',
+					'greyed_when_paused = entry.greyed_when_paused == true, declared_entry = entry }'
+				);
+		return { ...control, before: forward(control.before), after: forward(control.after) };
+	};
+	for (const control of controls.map(forwardBadgeSourceControl)) {
 		const source = sources[control.path];
 		assert.equal(
 			source.split(control.before).length - 1,
@@ -2979,6 +3061,45 @@ function publishesIncludedCommands(source, extension, section, declarations, pla
 		const changed = source.replace(control.before, control.after);
 		assert.notEqual(changed, source, control.reason + ': source was actually changed');
 		assert.equal(admits({ ...sources, [control.path]: changed }), false, control.reason);
+	}
+	const declaredRootControls = [
+		[
+			'rawget(ManifestMenu, "top_level_separator_receiver")',
+			'rawget(ManifestMenu, "foreign_receiver")',
+			'declared root owner withdrawn'
+		],
+		[
+			'rawget(separator_modules, "infra.manifest_menu") == ManifestMenu',
+			'true',
+			'declared root module custody withdrawn'
+		],
+		[
+			'local receive, declared = separator_factory()',
+			'local receive, declared = separator_factory()\n declared = {}',
+			'actual declared source replaced'
+		],
+		[
+			'local children = builders[id]() or {}',
+			'local children = {}',
+			'actual declared native children discarded'
+		],
+		[
+			'local _dl_item = nil',
+			'do local rendered = {} return rendered end\n local _dl_item = nil',
+			'scoped foreign native root returned after admission'
+		]
+	];
+	for (const [before, after, reason] of declaredRootControls) {
+		// Both raw facade capture and equality intentionally read the same member.
+		assert.equal(
+			builder.split(before).length - 1,
+			reason === 'declared root owner withdrawn' ? 2 : 1,
+			reason + ': genuine source coordinates'
+		);
+		const candidate = builder.replaceAll(before, after);
+		assert.notEqual(candidate, builder, reason + ': source actually changes');
+		assert.equal(withBuilder(candidate), false, reason);
+		assert.equal(withBuilder(builder), true, reason + ': genuine inverse');
 	}
 	for (const file of sourceFiles) {
 		assert.equal(admits({ ...sources, [file]: '' }), false, 'missing physical route owner');
@@ -3052,6 +3173,241 @@ function publishesIncludedCommands(source, extension, section, declarations, pla
 		errors.push(
 			'top_level/native badge: physical root composition refused; declaration remains unreachable'
 		);
+	}
+}
+
+// Additive source-only fragment for existing test-menu-parity.cjs and
+// test-menu-category-coverage.cjs; UNRUN. Original controls remain unchanged.
+// Loader belongs in tools/lib/menu-native-startup-binding.cjs, exported there.
+// It reads actual installed sources/artifact; no generated expected artifact.
+{
+	const assert = require('node:assert/strict');
+	const { nativeStartupRows, startupInputs } = require('../lib/menu-native-startup-binding.cjs');
+	const startup = startupInputs(ROOT, manifest);
+	const expected = [
+		manifest.tray_startup_suspend[0],
+		manifest.top_level.find((row) => row.id === 'reload' && row.platforms?.includes('ahk')),
+		manifest.top_level.find((row) => row.id === 'quit' && row.platforms?.includes('ahk')),
+		manifest.tray_startup_inert_frame[0]
+	];
+	assert(expected.every(Boolean), 'actual startup declaration identities exist');
+	const admitted = () => nativeStartupRows(startup, 'ahk');
+	assert.deepEqual(
+		[...admitted()],
+		expected,
+		'actual canonical generator/include/callee/typed result/native publication route'
+	);
+	assert.equal(nativeStartupRows(startup, 'hs').size, 0, 'Windows startup is not a macOS route');
+	assert.equal(nativeStartupRows(startup, 'linux').size, 0, 'Windows startup is not a Linux route');
+	function mutateSource(key, before, after) {
+		assert.equal(
+			startup.sources[key].split(before).length - 1,
+			1,
+			'owned negative control has exactly one genuine source preimage'
+		);
+		return {
+			...startup,
+			sources: { ...startup.sources, [key]: startup.sources[key].replace(before, after) }
+		};
+	}
+	const helper = 'windows/infra/tray_bootstrap.ahk';
+	const entry = 'windows/ErgoptiPlus.ahk';
+	const dispatcher = 'windows/infra/menu_dispatcher.ahk';
+	const controls = [
+		[
+			'withdraw native include',
+			mutateSource(
+				helper,
+				'#Include ../../_shared/modules/menu/startup_tray_projection.ahk',
+				'; #Include ../../_shared/modules/menu/startup_tray_projection.ahk'
+			)
+		],
+		[
+			'quoted include decoy',
+			mutateSource(
+				helper,
+				'#Include ../../_shared/modules/menu/startup_tray_projection.ahk',
+				'QuotedInclude := "#Include ../../_shared/modules/menu/startup_tray_projection.ahk"'
+			)
+		],
+		[
+			'dead cold default call',
+			mutateSource(entry, '_InstallSafeBootstrapTray()', 'if false\n\t_InstallSafeBootstrapTray()')
+		],
+		[
+			'replace genuine callee',
+			mutateSource(
+				helper,
+				'Authority := SharedStartupTrayProjection(_I18nLocale)',
+				'Authority := OtherStartupProjection(_I18nLocale)'
+			)
+		],
+		['discard typed result', mutateSource(helper, 'return Prepared', 'return []')],
+		['AHK return line split', mutateSource(helper, 'return Prepared', 'return\nPrepared')],
+		[
+			'substitute callback ownership',
+			mutateSource(helper, 'Callback: Commands[CommandId]', 'Callback: Commands["quit"]')
+		],
+		[
+			'substitute native row transport',
+			mutateSource(
+				helper,
+				'Register.Call(MenuObj, Row.Label, Row.Callback)',
+				'Register.Call(MenuObj, Row.Label, _TrayBootstrapNoOp)'
+			)
+		],
+		[
+			'lose disabled inert publication',
+			mutateSource(helper, 'MenuObj.Disable(Label)', '; MenuObj.Disable(Label)')
+		],
+		[
+			'different native menu receiver',
+			mutateSource(
+				dispatcher,
+				'MenuObj.Add(ItemName, Wrapper)',
+				'A_TrayMenu.Add(ItemName, Wrapper)'
+			)
+		],
+		[
+			'shadow shared projection',
+			{
+				...startup,
+				sources: {
+					...startup.sources,
+					[entry]: startup.sources[entry] + '\nSharedStartupTrayProjection := (*) => Map()\n'
+				}
+			}
+		],
+		[
+			'duplicate producer definition',
+			{
+				...startup,
+				sources: {
+					...startup.sources,
+					[helper]:
+						startup.sources[helper] +
+						'\n_TrayBootstrapProjectedRows(Surface, Commands) { return [] }\n'
+				}
+			}
+		],
+		[
+			'invent readiness',
+			mutateSource(helper, 'return Prepared', '_DriverReady := true\n\treturn Prepared')
+		],
+		['missing generated owner', { ...startup, generated: '' }],
+		[
+			'changed generated native DATA',
+			{ ...startup, generated: startup.generated + '\nExtraStartupAuthority := true\n' }
+		]
+	];
+	const generatorControls = [
+		[
+			'withdraw actual import',
+			"import startupProjection from '../lib/codegen-startup-tray.cjs';",
+			"// import startupProjection from '../lib/codegen-startup-tray.cjs';"
+		],
+		[
+			'dead generator statement',
+			'const startupAhk = startupProjection.render(parsed.menu, startupPolicy, startupLocales);',
+			'if (false) { const startupAhk = startupProjection.render(parsed.menu, startupPolicy, startupLocales); }'
+		],
+		[
+			'foreign source policy',
+			"shared('modules/menu/startup_tray.toml')",
+			"shared('modules/menu/foreign.toml')"
+		],
+		[
+			'foreign output owner',
+			"shared('modules/menu/startup_tray_projection.ahk')",
+			"shared('modules/menu/foreign.ahk')"
+		],
+		[
+			'fake produced result',
+			'startupProjection.render(parsed.menu, startupPolicy, startupLocales)',
+			"'fake projection'"
+		],
+		[
+			'quoted callee decoy',
+			'const startupAhk = startupProjection.render(parsed.menu, startupPolicy, startupLocales);',
+			'const startupAhk = "startupProjection.render(parsed.menu, startupPolicy, startupLocales)";'
+		]
+	];
+	for (const [name, before, after] of generatorControls) {
+		assert.equal(
+			startup.generator.split(before).length - 1,
+			1,
+			name + ' genuine generator preimage'
+		);
+		controls.push([name, { ...startup, generator: startup.generator.replace(before, after) }]);
+	}
+	const capabilities = require('../lib/codegen-startup-tray.cjs');
+	assert.doesNotThrow(() =>
+		capabilities.validateCommandCapabilities(
+			capabilities.resolveRows(startup.manifest, startup.policy.commands, 'command')
+		)
+	);
+	for (const command of ['foreign', 'suspend']) {
+		const changedCommands = structuredClone(startup.manifest);
+		const reload = changedCommands.top_level.find(
+			(row) => row.id === 'reload' && row.platforms?.includes('ahk')
+		);
+		assert(reload, 'genuine Windows canonical Reload owner exists');
+		reload.command = command;
+		assert.throws(
+			() =>
+				capabilities.validateCommandCapabilities(
+					capabilities.resolveRows(changedCommands, startup.policy.commands, 'command')
+				),
+			'the actual resolved canonical capability data must refuse before generated drift'
+		);
+		controls.push([
+			'actual resolved capability ' + command + ' must refuse',
+			{ ...startup, manifest: changedCommands }
+		]);
+	}
+	const withdrawn = structuredClone(startup.manifest);
+	withdrawn.tray_startup_inert_frame = [];
+	controls.push(['canonical source withdrawn', { ...startup, manifest: withdrawn }]);
+	const reordered = structuredClone(startup.policy);
+	reordered.commands.rows.reverse();
+	controls.push(['foreign startup source order', { ...startup, policy: reordered }]);
+	for (const [name, candidate] of controls)
+		assert.equal(nativeStartupRows(candidate, 'ahk').size, 0, name + ' must refuse ownership');
+	const decoys = {
+		...startup,
+		sources: {
+			...startup.sources,
+			[helper]: startup.sources[helper] + '\n; return []\nDecoy := "return []"\n'
+		},
+		generator: startup.generator + '\n// startupAhk = fake;\n'
+	};
+	assert.deepEqual(
+		[...nativeStartupRows(decoys, 'ahk')],
+		expected,
+		'unrelated quoted/comment decoys do not create or withdraw genuine route ownership'
+	);
+	assert.deepEqual(
+		[...admitted()],
+		expected,
+		'source controls never mutate the actual source owner'
+	);
+}
+
+// Actual cold executable entrypoints compose this separate recovery root.
+// This is not a clicked submenu or an invented OPENS_SUBMENU parent identity.
+{
+	const proof = require('../lib/menu-native-startup-binding.cjs');
+	const startup = proof.startupInputs(ROOT, manifest);
+	const owned = proof.nativeStartupRows(startup, 'ahk');
+	for (const section of ['tray_startup_suspend', 'tray_startup_inert_frame']) {
+		const rows = manifest[section];
+		if (!Array.isArray(rows) || rows.length === 0 || !rows.every((row) => owned.has(row))) {
+			errors.push(`cold Windows startup: physical ownership refused for ${section}`);
+			continue;
+		}
+		reachableOn[section] = combineMenuVisibility(PLATFORMS, reachableOn[section], ['ahk']);
+		openedBy[section] = 'actual ErgoptiPlus.ahk cold/recovery root entrypoint';
+		reachedByKinds[section] = { ahk: new Set(['compose']) };
 	}
 }
 
@@ -3184,6 +3540,39 @@ const { nativeLinuxAiParentPublication } = require('../lib/menu-native-llm-paren
 			assert.equal(withBuilder(builder), true, reason + ': actual inverse restores');
 		}
 
+		for (const [before, after, reason] of [
+			[
+				'local declared = ManifestMenu.get_array("top_level")',
+				'local declared = {}',
+				'canonical declared root replaced'
+			],
+			[
+				'not rawequal(declared, source_rows)',
+				'false',
+				'declared source identity refusal withdrawn'
+			],
+			[
+				'rawget(separator_modules, "infra.manifest_menu") == ManifestMenu',
+				'true',
+				'actual module custody withdrawn'
+			],
+			[
+				'local rendered = separator_render(rows, "top_level")',
+				'local rendered = separator_render({}, "top_level")',
+				'finished native root discarded'
+			],
+			[
+				'receive_separator("linux_quit_last")',
+				'receive_separator("foreign_boundary")',
+				'Quit-last declared boundary disconnected'
+			],
+			['getmetatable(ManifestMenu) == nil', 'true', 'facade metatable refusal withdrawn']
+		]) {
+			assert.equal(builder.split(before).length - 1, 1, reason + ': actual source preimage');
+			assert.equal(withBuilder(builder.replace(before, after)), false, reason);
+			assert.equal(withBuilder(builder), true, reason + ': genuine source inverse');
+		}
+
 		assert.equal(admits(linuxAiSources, manifest, 'hs'), false);
 		for (const file of Object.keys(linuxAiSources)) {
 			assert.equal(
@@ -3243,8 +3632,8 @@ const { nativeLinuxAiParentPublication } = require('../lib/menu-native-llm-paren
 			['linux/ui/menu/menu_builder.lua', 'rows[#rows + 1] = build(ctx)', 'build(ctx)'],
 			[
 				'linux/ui/menu/menu_builder.lua',
-				'return ManifestMenu.render_rows(rows, "top_level")',
-				'return {}'
+				'local rendered = separator_render(rows, "top_level")',
+				'local rendered = {}'
 			],
 			[
 				'linux/ui/menu/ai_parent.lua',
@@ -3610,11 +3999,613 @@ const { nativeLinuxAiParentPublication } = require('../lib/menu-native-llm-paren
 	}
 }
 
+// Fixed native parent obligations retain the original state and absence contracts.
+{
+	const assert = require('node:assert/strict');
+	const proof = require('../lib/menu-native-llm-parent-binding.cjs');
+	const macFile = 'macos/ui/menu/builder.lua';
+	const layoutFile = 'macos/ui/menu/menu_keyboard_layout.lua';
+	const linuxFile = 'linux/ui/menu/menu_builder.lua';
+	const mac = fs.readFileSync(path.join(SP, macFile), 'utf8');
+	const layout = fs.readFileSync(path.join(SP, layoutFile), 'utf8');
+	const linux = fs.readFileSync(path.join(SP, linuxFile), 'utf8');
+	const admitsMac = (source) => proof.nativeMacLayoutTopLevelPublication(source, layout, manifest);
+	const admitsLinux = (source) => proof.nativeLinuxTapHoldAbsentPublication(source, manifest);
+	assert.equal(
+		admitsMac(mac),
+		true,
+		'actual canonical Layout parent consumes its native absence reader'
+	);
+	assert.equal(
+		admitsLinux(linux),
+		true,
+		'actual missing TapHold engine publishes its declared inert leaf'
+	);
+	const mutate = (source, before, after) => {
+		assert.equal(
+			source.split(before).length - 1,
+			1,
+			'actual fixed parent mutation has one source owner'
+		);
+		return source.replace(before, after);
+	};
+	assert.equal(
+		admitsMac(
+			mutate(
+				mac,
+				'local builders = {',
+				'local unrelated = { module_rows, other = 1, collect }\nlocal builders = {'
+			)
+		),
+		true,
+		'constructor data reads do not shadow the genuine fixed native parent functions'
+	);
+	for (const [before, after] of [
+		[
+			'ManifestMenu.group_receiver("top_level", "keyboard_layout")',
+			'ManifestMenu.group_receiver("top_level", "shortcuts")'
+		],
+		[
+			'if not receive then return {} end\n\t\t\tlocal rows = module_rows("keyboard_layout")',
+			'if false then return {} end\n\t\t\tlocal rows = module_rows("keyboard_layout")'
+		],
+		['layout_enabled = function() return nil end', 'layout_enabled = function() return false end'],
+		[
+			'local parent = receive(submenu, { layout_enabled',
+			'local parent = receive({}, { layout_enabled'
+		],
+		['return collect(key .. ".build", mod.build, arg or ctx)', 'return {}'],
+		[
+			'local result = Logger.build(LOG, label, fn, arg)',
+			'local result = { label = "Foreign", submenu = {} }'
+		],
+		[
+			'local builders = {',
+			'local function module_rows(ignored) return { {submenu = {}} } end\nlocal builders = {'
+		],
+		[
+			'local builders = {',
+			'local function collect(ignored) return { {submenu = {}} } end\nlocal builders = {'
+		],
+		['local builders = {', 'local module_rows\nlocal builders = {'],
+		[
+			'for _, entry in ipairs(load_top_level()) do',
+			'builders.keyboard_layout = function() return {} end\nfor _, entry in ipairs(load_top_level()) do'
+		],
+		[
+			'for _, entry in ipairs(load_top_level()) do',
+			'builders["keyboard_layout"] = function() return {} end\nfor _, entry in ipairs(load_top_level()) do'
+		],
+		[
+			'for _, entry in ipairs(load_top_level()) do',
+			'local builders = {}\nfor _, entry in ipairs(load_top_level()) do'
+		],
+		[
+			'for _, entry in ipairs(load_top_level()) do',
+			'builders = {}\nfor _, entry in ipairs(load_top_level()) do'
+		],
+		[
+			'for _, entry in ipairs(load_top_level()) do',
+			'local unused = builders\nfor _, entry in ipairs(load_top_level()) do'
+		],
+		[
+			'local children = builders[id]() or {}',
+			'builders.keyboard_layout = function() return {} end\nlocal children = builders[id]() or {}'
+		],
+		[
+			'\n\t}\n\n\tlocal items = {}\n\tfor _, entry in ipairs(load_top_level()) do',
+			'\n\t\tkeyboard_layout = function(ignored) return {} end,\n\t}\n\n\tlocal items = {}\n\tfor _, entry in ipairs(load_top_level()) do'
+		],
+		['local builders = {', 'local ignored, module_rows\nlocal builders = {'],
+		[
+			'local builders = {',
+			'module_rows, Foreign.slot = function() return { {submenu = {}} } end, nil\nlocal builders = {'
+		],
+		[
+			'local builders = {',
+			'module_rows, Foreign[1] = function() return {} end, nil\nlocal builders = {'
+		],
+		[
+			'local builders = {',
+			'module_rows, (Foreign).slot = function() return {} end, nil\nlocal builders = {'
+		],
+		[
+			'local builders = {',
+			'module_rows, Factory().slot = function() return {} end, nil\nlocal builders = {'
+		],
+		[
+			'local builders = {',
+			'local function unrelated(module_rows) return {} end\nlocal builders = {'
+		],
+		[
+			'local builders = {',
+			'for ignored, module_rows in pairs({}) do break end\nlocal builders = {'
+		],
+		['local builders = {', 'local ignored, collect\nlocal builders = {'],
+		[
+			'local builders = {',
+			'collect, Foreign.slot = function() return { {submenu = {}} } end, nil\nlocal builders = {'
+		],
+		[
+			'local builders = {',
+			'collect, Foreign[1] = function() return {} end, nil\nlocal builders = {'
+		],
+		[
+			'local builders = {',
+			'collect, (Foreign).slot = function() return {} end, nil\nlocal builders = {'
+		],
+		[
+			'local builders = {',
+			'collect, Factory().slot = function() return {} end, nil\nlocal builders = {'
+		],
+		['local builders = {', 'local function unrelated(collect) return {} end\nlocal builders = {'],
+		['local builders = {', 'for ignored, collect in pairs({}) do break end\nlocal builders = {'],
+		[
+			'local builders = {',
+			'module_rows, ignored = function() return {} end, nil\nlocal builders = {'
+		],
+		[
+			'return parent and { parent } or {}\n\t\tend,\n\t\t["hotstrings"]',
+			'return {}\n\t\tend,\n\t\t["hotstrings"]'
+		]
+	])
+		assert.equal(
+			admitsMac(mutate(mac, before, after)),
+			false,
+			'genuine Layout receiving route: ' + before
+		);
+	for (const [before, after] of [
+		[
+			'ManifestMenu.template_rows("linux_tap_holds_absent_parent", {}, {}, {})',
+			'ManifestMenu.template_rows("linux_hotstrings_absent_rows", {}, {}, {})'
+		],
+		[
+			'if not declared or #declared ~= 1 then return nil end\n\t\treturn declared[1]',
+			'if false then return nil end\n\t\treturn declared[1]'
+		],
+		['return declared[1]\n\tend\n\tlocal Writer', 'return {}\n\tend\n\tlocal Writer'],
+		['["tap_holds"]       = _build_tap_holds,', '["tap_holds"]       = _build_shortcuts,'],
+		['local rendered = separator_render(rows, "top_level")', 'local rendered = {}']
+	])
+		assert.equal(
+			admitsLinux(mutate(linux, before, after)),
+			false,
+			'genuine inert leaf transport: ' + before
+		);
+	assert.equal(
+		proof.nativeMacLayoutTopLevelPublication(mac, layout, { ...manifest, top_level: {} }),
+		false,
+		'a malformed canonical top-level source cannot supply a native parent'
+	);
+	const missing = { ...manifest };
+	delete missing.linux_tap_holds_absent_parent;
+	assert.equal(
+		proof.nativeLinuxTapHoldAbsentPublication(linux, missing),
+		false,
+		'withdrawn absent declaration has no native publication credit'
+	);
+	const foreign = {
+		...manifest,
+		linux_tap_holds_absent_parent: [
+			{ ...manifest.linux_tap_holds_absent_parent[0], type: 'group', rows: [] }
+		]
+	};
+	assert.equal(
+		proof.nativeLinuxTapHoldAbsentPublication(linux, foreign),
+		false,
+		'the absent inert leaf cannot become an empty submenu'
+	);
+	// This is the physical root's compose branch, not a fictitious clickable parent.
+	if (admitsLinux(linux)) {
+		const section = 'linux_tap_holds_absent_parent';
+		reachableOn[section] = combineMenuVisibility(PLATFORMS, reachableOn[section], ['linux']);
+		openedBy[section] = 'actual missing-engine TapHold branch in Linux native tray root';
+		reachedByKinds[section] = { linux: new Set(['compose']) };
+	}
+}
+
+// The physical Linux root composes both header branches before its captured final render.
+// These are actual native root frames, not fictitious clicked submenu parents.
+{
+	const assert = require('node:assert/strict');
+	const { nativeLinuxHeaderPublication } = require('../lib/menu-native-llm-parent-binding.cjs');
+	const source = linuxAiSources['linux/ui/menu/menu_builder.lua'];
+	const admits = (candidate = source, declarations = manifest, platform = 'linux') =>
+		nativeLinuxHeaderPublication(candidate, declarations, platform);
+	assert.equal(admits(), true, 'actual physical Linux root retains both guarded header frames');
+	for (const platform of ['hs', 'ahk', 'Linux', undefined]) {
+		assert.equal(
+			nativeLinuxHeaderPublication(source, manifest, platform),
+			false,
+			'header publication belongs only to the actual Linux root'
+		);
+	}
+	for (const [reason, change] of [
+		[
+			'missing canonical top-level root',
+			(declarations) => {
+				delete declarations.top_level;
+			}
+		],
+		[
+			'empty canonical top-level root',
+			(declarations) => {
+				declarations.top_level = [];
+			}
+		],
+		[
+			'missing actual top-level record identity',
+			(declarations) => {
+				declarations.top_level = [{}];
+			}
+		],
+		[
+			'repeated actual top-level record',
+			(declarations) => {
+				declarations.top_level.push(declarations.top_level[0]);
+			}
+		],
+		[
+			'non-data root array getter',
+			(declarations) => {
+				Object.defineProperty(declarations.top_level, '0', {
+					get() {
+						throw new Error('root getter');
+					}
+				});
+			}
+		],
+		[
+			'non-data root declaration getter',
+			(declarations) => {
+				Object.defineProperty(declarations, 'top_level', {
+					get() {
+						throw new Error('root getter');
+					}
+				});
+			}
+		],
+		[
+			'non-data frame getter',
+			(declarations) => {
+				Object.defineProperty(declarations, 'linux_tray_active_header', {
+					get() {
+						throw new Error('frame getter');
+					}
+				});
+			}
+		],
+		[
+			'non-data frame row getter',
+			(declarations) => {
+				Object.defineProperty(declarations.linux_tray_active_header, '0', {
+					get() {
+						throw new Error('row getter');
+					}
+				});
+			}
+		],
+		[
+			'non-data caption getter',
+			(declarations) => {
+				Object.defineProperty(declarations.linux_tray_active_header[0], 'i18n', {
+					get() {
+						throw new Error('caption getter');
+					}
+				});
+			}
+		],
+		[
+			'non-data platform getter',
+			(declarations) => {
+				Object.defineProperty(declarations.linux_tray_paused_header[0].platforms, '0', {
+					get() {
+						throw new Error('platform getter');
+					}
+				});
+			}
+		],
+		[
+			'custom frame record prototype',
+			(declarations) => {
+				Object.setPrototypeOf(declarations.linux_tray_paused_header[0], { foreign: true });
+			}
+		],
+		[
+			'extra frame array property',
+			(declarations) => {
+				declarations.linux_tray_active_header.foreign = true;
+			}
+		]
+	]) {
+		const declarations = structuredClone(manifest);
+		change(declarations);
+		assert.equal(admits(source, declarations), false, reason + ': native plain root refuses');
+		assert.equal(admits(), true, reason + ': genuine inverse retained');
+	}
+	for (const section of ['linux_tray_active_header', 'linux_tray_paused_header']) {
+		for (const [reason, change] of [
+			[
+				'missing frame',
+				(root) => {
+					delete root[section];
+				}
+			],
+			[
+				'empty frame',
+				(root) => {
+					root[section] = [];
+				}
+			],
+			[
+				'duplicate frame',
+				(root) => {
+					root[section].push({ ...root[section][0] });
+				}
+			],
+			[
+				'foreign kind',
+				(root) => {
+					root[section][0].type = 'group';
+				}
+			],
+			[
+				'foreign identity',
+				(root) => {
+					root[section][0].id = 'foreign_header';
+				}
+			],
+			[
+				'missing caption',
+				(root) => {
+					root[section][0].i18n = '';
+				}
+			],
+			[
+				'foreign reader',
+				(root) => {
+					root[section][0].caption_getter = 'foreign_version';
+				}
+			],
+			[
+				'foreign caption recipe',
+				(root) => {
+					root[section][0].caption_layout = 'suffix';
+				}
+			],
+			[
+				'foreign caption joiner',
+				(root) => {
+					root[section][0].caption_joiner = ':';
+				}
+			],
+			[
+				'foreign platform',
+				(root) => {
+					root[section][0].platforms = ['hs'];
+				}
+			],
+			[
+				'foreign availability',
+				(root) => {
+					root[section][0].unavailable = 'disable';
+				}
+			],
+			[
+				'invented submenu',
+				(root) => {
+					root[section][0].rows = [];
+				}
+			]
+		]) {
+			const declarations = structuredClone(manifest);
+			change(declarations);
+			assert.notDeepEqual(declarations, manifest, section + ': ' + reason + ' changed source');
+			assert.equal(admits(source, declarations), false, section + ': ' + reason + ' refuses');
+			assert.equal(admits(), true, section + ': ' + reason + ' genuine inverse retained');
+		}
+	}
+	for (const [before, after, reason] of [
+		['function M.build(ctx)', 'function M.foreign(ctx)', 'withdrawn genuine root export'],
+		[
+			'local header, header_current = _build_header(ctx)',
+			'local header, header_current = Foreign.header(ctx)',
+			'disconnected physical header consumer'
+		],
+		[
+			'local rendered = separator_render(rows, "top_level")',
+			'local rendered = rows',
+			'withdrawn captured native render'
+		],
+		[
+			'or not header_current() then return {} end\n\treturn rendered',
+			'then return {} end\n\treturn rendered',
+			'withdrawn final physical header receipt'
+		]
+	]) {
+		assert.equal(source.split(before).length - 1, 1, reason + ': actual unique coordinate');
+		const candidate = source.replace(before, after);
+		assert.notEqual(candidate, source, reason + ': actual source changed');
+		assert.equal(candidate.replace(after, before), source, reason + ': exact source inverse');
+		assert.equal(admits(candidate), false, reason + ': physical ownership refuses');
+		assert.equal(admits(), true, reason + ': genuine inverse retained');
+	}
+	if (admits()) {
+		for (const section of ['linux_tray_active_header', 'linux_tray_paused_header']) {
+			reachableOn[section] = combineMenuVisibility(PLATFORMS, reachableOn[section], ['linux']);
+			openedBy[section] = 'actual guarded Linux header branch in the exported native tray root';
+			reachedByKinds[section] = { linux: new Set(['compose']) };
+		}
+	}
+}
+
 // Physical withdrawal controls prevent graph entries from becoming decorative orphan exemptions.
 {
 	const assert = require('node:assert/strict');
 	const controls = require('./fixtures/hotstring-language-owner-counterexamples.cjs')(SP, manifest);
 	assert(controls > 100, 'actual source/declaration refusal controls must all execute');
+}
+
+// The editor is composed into existing category providers, not opened as a submenu.
+// This credits only the reviewed leaf and immediate transport, not a whole native parent.
+const personalInfoProviders = {
+	hs: { id: 'hotstring_categories_standard', file: 'macos/ui/menu/menu_hotstrings.lua' },
+	linux: { id: 'hotstring_categories_dynamic', file: 'linux/ui/menu/menu_builder.lua' }
+};
+const personalInfoSources = Object.fromEntries(
+	Object.entries(personalInfoProviders).map(([platform, { file }]) => [
+		platform,
+		fs.readFileSync(path.join(SP, file), 'utf8')
+	])
+);
+
+/** Requires the actual guarded producer and its one typed command declaration. */
+function personalInfoProviderComposition(source, declarations, platform) {
+	if (!Object.hasOwn(personalInfoProviders, platform)) return false;
+	const section = 'personal_info_editor_frame',
+		key = 'personal_info_editor_open';
+	const rows = declarations?.[section];
+	if (!Array.isArray(rows) || rows.length !== 1) return false;
+	const row = rows[0];
+	if (
+		!row ||
+		typeof row !== 'object' ||
+		Array.isArray(row) ||
+		Object.keys(row).length !== 5 ||
+		!['type', 'id', 'i18n', 'platforms', 'unavailable'].every((name) => Object.hasOwn(row, name)) ||
+		row.type !== 'command' ||
+		row.id !== key ||
+		row.i18n !== 'menu.shortcuts.edit_personal_info' ||
+		row.unavailable !== 'hide' ||
+		!Array.isArray(row.platforms) ||
+		row.platforms.length !== 2 ||
+		row.platforms[0] !== 'hs' ||
+		row.platforms[1] !== 'linux'
+	)
+		return false;
+	const parents = declarations.hotstrings_menu;
+	const matches = Array.isArray(parents)
+		? parents.filter((parent) => parent.id === personalInfoProviders[platform].id)
+		: [];
+	if (matches.length !== 1 || matches[0].type !== 'list' || !visibleOn(matches[0], platform))
+		return false;
+	const proof = require('../lib/menu-native-personal-info-binding.cjs');
+	if (proof.retainedPersonalInfoTemplateCallOffset(source, platform) < 0) return false;
+	return require('../lib/menu-template-binding.cjs').nativeTemplateBinding(
+		source,
+		'.lua',
+		section,
+		key,
+		1,
+		[{ src: source }],
+		declarations,
+		platform
+	);
+}
+
+{
+	const assert = require('node:assert/strict');
+	for (const [platform, source] of Object.entries(personalInfoSources)) {
+		const admits = (candidate = source, declarations = manifest, owner = platform) =>
+			personalInfoProviderComposition(candidate, declarations, owner);
+		assert.equal(admits(), true, platform + ': actual guarded editor provider composition');
+		assert.equal(
+			admits(source, manifest, platform === 'hs' ? 'linux' : 'hs'),
+			false,
+			'another driver cannot borrow the actual typed producer'
+		);
+		for (const candidate of ['', JSON.stringify(source), '--[=[\n' + source + '\n]=]'])
+			assert.equal(admits(candidate), false, 'missing, quoted or comment-only producer');
+		for (const [before, after, reason] of [
+			['local renderer = ManifestMenu', 'local renderer = Foreign', 'foreign native facade'],
+			[
+				'local root, source = root_owner(), array_owner("personal_info_editor_frame")',
+				'local root, source = root_owner(), array_owner("foreign_frame")',
+				'foreign source getter'
+			],
+			[
+				'local editor = template("personal_info_editor_frame", {',
+				'local editor = template("foreign_frame", {',
+				'foreign actual template call'
+			],
+			[
+				'personal_info_editor_open = function()',
+				'foreign_command = function()',
+				'foreign callback key'
+			],
+			[
+				'local function personal_info_editor_source()',
+				'local _ENV = Foreign\nlocal function personal_info_editor_source()',
+				'withdrawn lexical namespace'
+			],
+			[
+				platform === 'hs' ? 'items[#items + 1] = row' : 'if valid then sub[1] = row end',
+				platform === 'hs' ? 'items[#items + 1] = {}' : 'if valid then sub[1] = {} end',
+				'actual returned command discarded'
+			]
+		]) {
+			assert.equal(source.split(before).length - 1, 1, reason + ': exact genuine coordinate');
+			const candidate = source.replace(before, after);
+			assert.notEqual(candidate, source, reason + ': actual source changes');
+			assert.equal(admits(candidate), false, reason);
+			assert.equal(admits(), true, reason + ': genuine inverse');
+		}
+		for (const alter of [
+			(declarations) => {
+				delete declarations.personal_info_editor_frame;
+			},
+			(declarations) => {
+				declarations.personal_info_editor_frame = [];
+			},
+			(declarations) => {
+				declarations.personal_info_editor_frame[0].id = 'foreign_command';
+			},
+			(declarations) => {
+				declarations.personal_info_editor_frame[0].type = 'group';
+			},
+			(declarations) => {
+				declarations.personal_info_editor_frame[0].platforms = ['ahk'];
+			},
+			(declarations) => {
+				declarations.personal_info_editor_frame[0].i18n = 'foreign_caption';
+			},
+			(declarations) => {
+				declarations.personal_info_editor_frame[0].rows = [];
+			},
+			(declarations) => {
+				declarations.hotstrings_menu = declarations.hotstrings_menu.filter(
+					(parent) => parent.id !== personalInfoProviders[platform].id
+				);
+			},
+			(declarations) => {
+				declarations.hotstrings_menu.push(
+					declarations.hotstrings_menu.find(
+						(parent) => parent.id === personalInfoProviders[platform].id
+					)
+				);
+			},
+			(declarations) => {
+				declarations.hotstrings_menu.find(
+					(parent) => parent.id === personalInfoProviders[platform].id
+				).platforms = ['ahk'];
+			}
+		]) {
+			const declarations = structuredClone(manifest);
+			alter(declarations);
+			assert.equal(
+				admits(source, declarations),
+				false,
+				'withdrawn or foreign actual declaration/parent'
+			);
+			assert.equal(admits(), true, 'declaration controls preserve actual canonical inputs');
+		}
+	}
+	for (const platform of ['ahk', 'HS', '', undefined])
+		assert.equal(
+			personalInfoProviderComposition(personalInfoSources.hs, manifest, platform),
+			false,
+			'only the actual two Lua producer platforms have composition evidence'
+		);
 }
 
 // Iterated to a fixed point rather than walked once: the graph is shallow today
@@ -3627,6 +4618,29 @@ for (let pass = 0; pass < MENU_KEYS.length + 1; pass += 1) {
 		const parentVisibility = reachableOn[menuKey];
 		if (!parentVisibility) continue;
 		for (const row of manifest[menuKey]) {
+			// Only the actual reachable category list can transport this declared command.
+			if (menuKey === 'hotstrings_menu' && row.type === 'list') {
+				for (const [platform, provider] of Object.entries(personalInfoProviders)) {
+					if (
+						row.id !== provider.id ||
+						!parentVisibility.includes(platform) ||
+						!visibleOn(row, platform) ||
+						!personalInfoProviderComposition(personalInfoSources[platform], manifest, platform)
+					)
+						continue;
+					const target = 'personal_info_editor_frame';
+					const before = (reachableOn[target] || []).join(',');
+					const combined = combineMenuVisibility(PLATFORMS, reachableOn[target], [platform]);
+					if (before !== combined.join(',')) {
+						reachableOn[target] = combined;
+						changed = true;
+					}
+					openedBy[target] = `${menuKey}/${row.id}/actual guarded editor producer`;
+					if (!reachedByKinds[target]) reachedByKinds[target] = {};
+					if (!reachedByKinds[target][platform]) reachedByKinds[target][platform] = new Set();
+					reachedByKinds[target][platform].add('compose');
+				}
+			}
 			const published = row.type === 'include' ? row.section : OPENS_SUBMENU[row.id];
 			if (!published) continue;
 			// One provider can publish multiple independently declared children.
@@ -4286,6 +5300,65 @@ for (const platform of PLATFORMS) {
 }
 
 // ==================================================
+// The actual Linux root retains both canonical header frames through final rendering.
+{
+	const assert = require('node:assert/strict');
+	const headerRoot =
+		require('../lib/menu-native-llm-parent-binding.cjs').declaredLinuxTopLevelPublication;
+	const headerSource = fs.readFileSync(path.join(SP, 'linux/ui/menu/menu_builder.lua'), 'utf8');
+	assert.equal(headerRoot(headerSource), true, 'actual complete shared header root is admitted');
+	for (const [before, after, reason] of [
+		[
+			'local header_template = type(ManifestMenu) == "table" and rawget(ManifestMenu, "template_rows")',
+			'local header_template = Foreign.template_rows',
+			'foreign header projection owner'
+		],
+		[
+			'local header_command = type(ManifestMenu) == "table" and rawget(ManifestMenu, "command_row")',
+			'local header_command = Foreign.command_row',
+			'foreign header command owner'
+		],
+		[
+			'local header, header_current = _build_header(ctx)',
+			'local header, header_current = Foreign.header(ctx)',
+			'disconnected actual header consumer'
+		],
+		[
+			'if not header or type(header_current) ~= "function" or not header_current() then return {} end',
+			'if false then return {} end',
+			'withdrawn initial header receipt'
+		],
+		[
+			'or not header_current() then return {} end\n\treturn rendered',
+			'then return {} end\n\treturn rendered',
+			'withdrawn post-render header receipt'
+		],
+		[
+			'local function header_facade_current()',
+			'local function header_facade_current() local header_template = Foreign.template_rows',
+			'shadowed actual header function'
+		],
+		[
+			'local function _build_header(ctx)',
+			'local function _build_header(ctx) header_template, Foreign.slot = function() return {} end, nil',
+			'complex header-owner rebind'
+		],
+		[
+			'local function _build_header(ctx)',
+			'local function _build_header(ctx) local ignored, header_command',
+			'bare comma header-owner shadow'
+		]
+	]) {
+		assert.equal(headerSource.split(before).length - 1, 1, reason + ': unique actual coordinate');
+		assert.equal(
+			headerRoot(headerSource.replace(before, after)),
+			false,
+			reason + ': genuine source refuses'
+		);
+		assert.equal(headerRoot(headerSource), true, reason + ': genuine inverse remains admitted');
+	}
+}
+
 // ==================================================
 // ======= 8/ Report ================================
 // ==================================================
@@ -5700,7 +6773,12 @@ function languageParentSource(source, driver) {
 				)
 			)
 				return false;
-			if (!hasStatement(publicOwner, 'return ManifestMenu.render_rows(rows, "top_level")'))
+			if (
+				!hasStatement(publicOwner, 'return ManifestMenu.render_rows(rows, "top_level")') &&
+				!require('../lib/menu-native-llm-parent-binding.cjs').declaredLinuxTopLevelPublication(
+					source
+				)
+			)
 				return false;
 			const tokens = scriptTokens(publicOwner, '.lua');
 			const binding = scriptTokens('["about"] = _build_about', '.lua');
@@ -5721,7 +6799,7 @@ function languageParentSource(source, driver) {
 		true,
 		'the actual registered public native About route consumes its true canonical parent'
 	);
-	for (const [before, after, reason] of [
+	for (let [before, after, reason] of [
 		[
 			'return ManifestMenu.group_row("top_level", "about", rows, render_ctx.state_getters)',
 			'return Foreign.group_row("top_level", "about", rows, render_ctx.state_getters)',
@@ -5763,8 +6841,71 @@ function languageParentSource(source, driver) {
 			'missing actual native rendering boundary'
 		]
 	]) {
+		// Preserve the original case oracle while moving its live subject to the actual receiver.
+		if (
+			reason === 'missing actual native rendering boundary' &&
+			source.includes('local rendered = separator_render(rows, "top_level")')
+		) {
+			before = 'local rendered = separator_render(rows, "top_level")';
+			after = 'local rendered = rows';
+		}
 		assert.equal(source.split(before).length - 1, 1, reason + ': exact source preimage');
 		assert.equal(admits(source.replace(before, after)), false, reason);
+		assert.notEqual(
+			source.replace(before, after),
+			source,
+			reason + ': genuine source actually changes'
+		);
+		assert.equal(admits(source), true, reason + ': unchanged genuine inverse');
+	}
+	const rootProof =
+		require('../lib/menu-native-llm-parent-binding.cjs').declaredLinuxTopLevelPublication;
+	assert.equal(
+		rootProof(source),
+		true,
+		'the actual captured Linux root has its retained source and renderer'
+	);
+	for (const [before, after, reason] of [
+		[
+			'local separator_render = type(ManifestMenu) == "table" and rawget(ManifestMenu, "render_rows")',
+			'local separator_render = Foreign.render_rows',
+			'foreign captured root renderer'
+		],
+		[
+			'local separator_factory = type(ManifestMenu) == "table" and rawget(ManifestMenu, "top_level_separator_receiver")',
+			'local separator_factory = Foreign.receiver',
+			'foreign captured source receiver'
+		],
+		['getmetatable(ManifestMenu) == nil', 'true', 'withdrawn genuine facade metatable refusal'],
+		[
+			'local declared = ManifestMenu.get_array("top_level")',
+			'local declared = {}',
+			'withdrawn current canonical root array'
+		],
+		[
+			'or type(declared) ~= "table" or not rawequal(declared, source_rows) then',
+			'or type(declared) ~= "table" then',
+			'withdrawn exact receiver source identity'
+		],
+		[
+			'local rendered = separator_render(rows, "top_level")',
+			'local rendered = separator_render({}, "top_level")',
+			'completed native children discarded'
+		],
+		['return rendered', 'return rows', 'actual captured native result discarded'],
+		[
+			'function M.build(ctx)',
+			'function M.build(ctx)\n local separator_render = Foreign.render_rows',
+			'public receiving function shadows captured native renderer'
+		]
+	]) {
+		assert.equal(source.split(before).length - 1, 1, reason + ': unique actual source coordinate');
+		const candidate = source.replace(before, after);
+		assert.notEqual(candidate, source, reason + ': actual source changes');
+		assert.equal(rootProof(candidate), false, reason + ': genuine root projection refuses');
+		assert.equal(admits(candidate), false, reason + ': About publication refuses');
+		assert.equal(rootProof(source), true, reason + ': original current root remains admitted');
+		assert.equal(admits(source), true, reason + ': original About route remains admitted');
 	}
 	assert.equal(admits(JSON.stringify(source)), false, 'quoted native source is data');
 	assert.equal(admits('--[=[\n' + source + '\n]=]'), false, 'comment-only native source is data');
