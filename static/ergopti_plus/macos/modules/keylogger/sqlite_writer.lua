@@ -584,7 +584,7 @@ function M.init(deps)
 	_device_obj = deps.device_obj
 	_device_id  = deps.device_id
 	_initialized = true
-	Logger.success(LOG, "Initialized (device %s).", _device_id:sub(1, 8) .. "…")
+	Logger.success(LOG, "Initialized.")
 end
 
 

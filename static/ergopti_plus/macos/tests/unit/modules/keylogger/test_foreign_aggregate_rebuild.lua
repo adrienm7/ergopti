@@ -74,3 +74,65 @@ helpers.describe("keylogger: foreign sync rebuilds UI aggregate partitions", fun
 			"fresh SQLite caches must seed the aggregate-cache revision key")
 	end)
 end)
+
+
+helpers.describe("keylogger-device-log-privacy", function()
+	for _, phase in ipairs({ "clear", "replay" }) do
+		helpers.it("keylogger-device-log-privacy: " .. phase .. " refusal keeps its error without logging the device prefix", function()
+			helpers.with_stub_scope({
+				"infra.logger", "modules.keylogger.log_manager", "modules.keylogger.sqlite_writer",
+				"modules.keylogger.aggregator", "modules.keylogger.rotation", "modules.keylogger.export",
+				"keylogger.metrics", "adapters.file_system", "adapters.timer_scheduler",
+			}, function()
+				local messages, queries = {}, {}
+				local identity = "private-foreign-device"
+				local logger = helpers.make_logger_stub()
+				logger.error = function(_, format, ...) messages[#messages + 1] = string.format(format, ...) end
+				package.loaded["infra.logger"] = logger
+				local db = {}
+				function db:exec(sql)
+					queries[#queries + 1] = sql
+					if phase == "clear" and sql:find("DELETE FROM", 1, true) then return 1 end
+					return 0
+				end
+				function db:errmsg() return "owned database refusal" end
+				function db:nrows(sql)
+					queries[#queries + 1] = sql
+					if phase == "replay" and sql:find("SELECT ts, app, title", 1, true) then
+						error("owned replay refusal", 0)
+					end
+					return function() return nil end
+				end
+				package.loaded["modules.keylogger.sqlite_writer"] = { get_db = function() return db end }
+				package.loaded["modules.keylogger.aggregator"] = {
+					get_ngram_ctx = function() return {} end,
+					set_device_id = function() end, reset_ngram_ctx = function() end,
+					reset_batch = function() end, set_ngram_ctx = function() end,
+				}
+				package.loaded["modules.keylogger.rotation"] = { read_new_entries = function() return {}, 0, "eof" end }
+				local applied, calls = nil, 0
+				package.loaded["modules.keylogger.export"] = {
+					sync_foreign_data_sql = function(callback)
+						calls = calls + 1
+						applied = callback(identity)
+						return {}
+					end,
+				}
+				local manager = helpers.load_with_stubs("modules.keylogger.log_manager")
+				manager.ingest_once()
+				helpers.assert_eq(calls, 1)
+				helpers.assert_eq(applied, false)
+				helpers.assert_eq(#messages, 1)
+				if phase == "clear" then
+					helpers.assert_eq(messages[1]:sub(1, #"Cannot clear derived device rows: "), "Cannot clear derived device rows: ")
+					helpers.assert_contains(messages[1], "owned database refusal.")
+				else
+					helpers.assert_eq(messages[1], "Device aggregate recovery failed: owned replay refusal.")
+				end
+				helpers.assert_nil(messages[1]:find(identity:sub(1, 8), 1, true))
+				helpers.assert_contains(table.concat(queries), "device_id='" .. identity .. "'")
+				if phase == "clear" then helpers.assert_contains(table.concat(queries), "ROLLBACK;") end
+			end)
+		end)
+	end
+end)
