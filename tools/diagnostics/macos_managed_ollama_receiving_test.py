@@ -474,5 +474,102 @@ class ActualPeerReceiving(unittest.TestCase):
         self.assertNotIn("FindProxyForURL(url, host) { return", pac)
 
 
+class TerminalFailureObservationControls(unittest.TestCase):
+    """Exercise the real CLI catches and receipt writer with recording owners."""
+
+    def receive(self, primary=None, cleanup=None):
+        with tempfile.TemporaryDirectory() as directory:
+            output = Path(directory)
+            owner = SimpleNamespace(
+                stage="prepare",
+                output=output,
+                receipt={
+                    "version": 1,
+                    "profile": "pac-inline",
+                    "success": False,
+                    "private_children_retired": False,
+                    "native_trust_restored": False,
+                },
+                run=Mock(side_effect=primary),
+                close=Mock(side_effect=cleanup),
+            )
+            arguments = [
+                "receiving",
+                "--archive",
+                "private-archive",
+                "--catalogue",
+                "private-catalogue",
+                "--launcher",
+                "private-launcher",
+                "--framework",
+                "private-framework",
+                "--output",
+                str(output),
+                "--profile",
+                "pac-inline",
+            ]
+            with (
+                patch.object(RECEIVING.sys, "argv", arguments),
+                patch.object(RECEIVING.sys, "platform", "darwin"),
+                patch.object(RECEIVING, "Receiver", return_value=owner),
+            ):
+                status = RECEIVING.main()
+            owner.run.assert_called_once_with()
+            owner.close.assert_called_once_with()
+            return status, (output / "native-receiving.json").read_text()
+
+    def test_primary_and_cleanup_failure_retain_both_closed_facts(self):
+        status, raw = self.receive(
+            RuntimeError("actual_archive_name"), OSError("private-path/token")
+        )
+        value = json.loads(raw)
+        self.assertEqual(status, 1)
+        self.assertFalse(value["success"])
+        self.assertEqual(value["reason"], "native_receiving_cleanup_failed")
+        self.assertEqual(value["failed_stage"], "prepare")
+        self.assertEqual(
+            value["primary_failure"],
+            {"exception_class": "RuntimeError", "code": "actual_archive_name"},
+        )
+        self.assertEqual(value["cleanup_failure"], {"exception_class": "OSError", "code": None})
+        self.assertFalse(value["native_trust_restored"])
+        self.assertNotIn("private-path", raw)
+        self.assertNotIn("token", raw)
+
+    def test_cleanup_only_failure_never_claims_success_or_primary_failure(self):
+        class PrivateExceptionName(Exception):
+            pass
+
+        status, raw = self.receive(cleanup=PrivateExceptionName("https://private.invalid/secret"))
+        value = json.loads(raw)
+        self.assertEqual(status, 1)
+        self.assertFalse(value["success"])
+        self.assertEqual(value["reason"], "native_receiving_cleanup_failed")
+        self.assertEqual(value["cleanup_failure"], {"exception_class": "unknown", "code": None})
+        self.assertNotIn("primary_failure", value)
+        self.assertNotIn("failed_stage", value)
+        self.assertNotIn("private.invalid", raw)
+        self.assertNotIn("PrivateExceptionName", raw)
+
+    def test_success_and_primary_only_failure_preserve_original_outcomes(self):
+        status, raw = self.receive()
+        value = json.loads(raw)
+        self.assertEqual(status, 0)
+        self.assertTrue(value["success"])
+        self.assertEqual(value["reason"], "complete")
+        self.assertNotIn("primary_failure", value)
+        self.assertNotIn("cleanup_failure", value)
+        status, raw = self.receive(primary=FileNotFoundError("private-input-name"))
+        value = json.loads(raw)
+        self.assertEqual(status, 1)
+        self.assertFalse(value["success"])
+        self.assertEqual(value["reason"], "native_receiving_failed")
+        self.assertEqual(
+            value["primary_failure"], {"exception_class": "FileNotFoundError", "code": None}
+        )
+        self.assertNotIn("cleanup_failure", value)
+        self.assertNotIn("private-input-name", raw)
+
+
 if __name__ == "__main__":
     unittest.main()

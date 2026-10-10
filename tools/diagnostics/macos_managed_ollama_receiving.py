@@ -945,6 +945,96 @@ class Receiver:
         shutil.rmtree(self.work)
 
 
+def _failure_observation(error):
+    """Preserve closed failure facts without private paths, output or traceback."""
+    public_classes = {
+        "RuntimeError",
+        "RuntimeRefusal",
+        "MissingReleaseCatalogue",
+        "BootstrapFailure",
+        "FixtureFailure",
+        "TimeoutExpired",
+        "CalledProcessError",
+        "FileNotFoundError",
+        "PermissionError",
+        "OSError",
+        "ValueError",
+        "TypeError",
+        "KeyError",
+        "ImportError",
+        "AttributeError",
+        "AssertionError",
+        "JSONDecodeError",
+    }
+    public_codes = {
+        "independent_gguf_vector",
+        "actual_full_query_reached_origin",
+        "http_exit_is_not_daemon_ack",
+        "actual_daemon_version",
+        "identity",
+        "source",
+        "actual_native_command",
+        "actual_owned_daemon_listener",
+        "actual_pull_success",
+        "native_receiving_input_changed",
+        "publish",
+        "unavailable",
+        "actual_origin_and_proxy_sockets_retired",
+        "actual_retained_source_identity",
+        "actual_archive_name",
+        "session",
+        "actual_daemon_retirement",
+        "actual_native_inference",
+        "actual_receiver_duplicate_prepare",
+        "actual_pull_retired",
+        "architecture",
+        "archive",
+        "peer_model_not_ready",
+        "signature",
+        "digest",
+        "actual_model_bytes",
+        "capability",
+        "compatibility_source_copy",
+        "actual_daemon_readiness",
+        "deadline",
+        "connect",
+        "actual_listener_worker_changed",
+        "exact_manifest_publication",
+        "actual_daemon_retirement_acknowledgement",
+        "actual_receiver_start_state",
+        "actual_model_layer",
+        "actual_cancelled_body",
+        "actual_acquired_daemon_listener",
+        "actual_created_blob",
+        "actual_daemon_start",
+        "actual_full_url_route_selection",
+        "actual_cancelled_tls_peer_closed",
+        "exact_blob_publication",
+        "actual_operation_retirement",
+        "actual_retained_source_bytes",
+        "cancel_does_not_publish_partial_model",
+        "actual_source_close_debt",
+        "genuine_macos_required",
+        "native_receiving_source_changed",
+        "protocol",
+        "runtime",
+        "actual_source_admission_deadline",
+        "cancelled",
+        "actual_cancelled_operation_retired",
+        "metadata",
+        "missing-catalogue",
+        "native_command_retirement",
+        "actual_created_manifest",
+        "empty_default_receiving_store",
+    }
+    observed = type(error).__name__
+    code = error.args[0] if len(error.args) == 1 and type(error.args[0]) is str else None
+    return {
+        "exception_class": observed if observed in public_classes else "unknown",
+        "code": code if code in public_codes else None,
+    }
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--archive", type=Path, required=True)
@@ -962,13 +1052,15 @@ def main():
     failure = None
     try:
         owner.run()
-    except BaseException:
+    except BaseException as error:
         failure = "native_receiving_failed"
         owner.receipt["failed_stage"] = owner.stage
+        owner.receipt["primary_failure"] = _failure_observation(error)
     try:
         owner.close()
-    except BaseException:
+    except BaseException as error:
         failure = "native_receiving_cleanup_failed"
+        owner.receipt["cleanup_failure"] = _failure_observation(error)
     owner.receipt["success"] = failure is None
     owner.receipt["reason"] = failure or "complete"
     with (owner.output / "native-receiving.json").open("x", encoding="utf-8") as output:
