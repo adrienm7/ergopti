@@ -65,6 +65,8 @@ end
 --- @param ctx table Context containing state, updateMenu, save_prefs, etc.
 --- @return table|nil The menu definition table.
 function M.build(ctx)
+	local receive = ManifestMenu.group_receiver("top_level", "gestures")
+	if not receive then return nil end
 	local gestures = ctx.gestures
 	if not gestures then return nil end
 
@@ -201,11 +203,6 @@ function M.build(ctx)
 		return true
 	end
 
-	local item = {
-		label    = i18n.get("menu.gestures.title"),
-		checked  = state.gestures or nil,
-		disabled = paused or nil,
-	}
 
 
 
@@ -254,7 +251,6 @@ function M.build(ctx)
 		end
 		ActionPicker.open({
 			title   = slot_label(slot),
-			label   = i18n.get("dialog.action_picker.label"),
 			current = current or "none",
 			items   = items,
 			send_vocabulary   = editor.send_vocabulary,
@@ -520,7 +516,8 @@ function M.build(ctx)
 	render_ctx.commands["system_gesture_settings"] = gestures.open_system_gestures
 
 	local gm = ManifestMenu.build("gestures_menu", "Gestures", dyn_handlers, nil, render_ctx, providers)
-	item.submenu = gm
+	local item = receive(gm, { gestures_enabled = function() return state.gestures or nil end })
+	if item then item.disabled = paused or nil end
 	return item
 end
 

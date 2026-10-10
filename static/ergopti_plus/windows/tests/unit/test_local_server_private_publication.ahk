@@ -67,10 +67,18 @@ class _LSP_World {
 			_LLM_Menu["api_entry_id"] := "native-active"
 			this.OldMenu := _LLM_Menu
 			this.OldFeatures := Features
-			this.Port := ConfigTransitionProductionPort()
+			; These explicit interception callbacks belong to a detached custom
+			; fixture, never the genuine singleton native port's authority.
+			NativePort := ConfigTransitionProductionPort()
+			_LSP_AssertOriginalNativePort(NativePort)
+			this.Port := NativePort.Clone()
+			AssertFalse(ConfigTransitionProductionPort(this.Port, "known"),
+				"the intercepted fixture copy was never issued native authority")
+			AssertFalse(ConfigTransitionProductionPort(this.Port))
 			this.Port["read"] := ObjBindMethod(this, "Read")
 			this.Port["move_replace"] := ObjBindMethod(this, "MoveReplace")
 			this.Port["delete"] := ObjBindMethod(this, "Delete")
+			_LSP_AssertOriginalNativePort(NativePort)
 			Owned := IsSet(Options) ? Options.Clone() : Map()
 			Owned["port"] := this.Port
 			Owned["acquire"] := _LMT_Acquire
@@ -380,8 +388,12 @@ _LSP_AbsentAndUnreadable(World) {
 	Receipt := World.Owner.Capture()
 	AssertTrue(Receipt is LLM_Menu_ApiPrivateSourceReceipt, "classified absence is honest empty native authority")
 	AssertFalse(World.Owner.Entry("lmstudio"))
-	Unreadable := ConfigTransitionProductionPort()
+	NativePort := ConfigTransitionProductionPort()
+	Unreadable := NativePort.Clone()
+	AssertFalse(ConfigTransitionProductionPort(Unreadable, "known"),
+		"an unreadable custom callback copy was never issued native authority")
 	Unreadable["exists"] := (*) => "unknown"
+	_LSP_AssertOriginalNativePort(NativePort)
 	Owner := LLM_Menu_ApiPrivateSourceOwner(Map("port", Unreadable))
 	AssertFalse(Owner.Capture(), "existence refusal must not be interpreted as absent")
 }
@@ -1320,3 +1332,19 @@ _LSER_LegacyPortContract(Fixture, Observed) {
 }
 Test("Receipt entry: absent bound port preserves the legacy one-argument contract (receipt-entry-authority)",
 	_LSER_WithJoin.Bind(_LSER_LegacyPortContract))
+
+
+; Handwritten original callback expectations remain independent of the fixture
+; interceptors. Real issued port withdrawal controls stay in the native unit.
+_LSP_AssertOriginalNativePort(NativePort) {
+	Expected := Map("exists", FSStrictExists, "read", FSReadUtf8Exact,
+		"read_bounded", FSReadUtf8ExactBounded, "write_create_durable", FSWriteCreateDurable,
+		"move_create", FSAtomicMoveCreate, "move_replace", FSAtomicMoveReplace,
+		"delete", FSDeleteStrict, "hash", CryptoSha256)
+	AssertEqual(8, Expected.Count)
+	AssertEqual(8, NativePort.Count, "custom fixture callbacks cannot contaminate the actual native class")
+	AssertTrue(ConfigTransitionProductionPort(NativePort), "the original genuine canonical owner remains admitted")
+	AssertTrue(ConfigTransitionProductionPort() == NativePort, "interception never rotates or repairs native authority")
+	for Method, Callback in Expected
+		AssertTrue(NativePort[Method] == Callback, "original native callback identity remains exact: " . Method)
+}

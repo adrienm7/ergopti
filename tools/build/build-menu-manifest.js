@@ -34,6 +34,7 @@ import { runInNewContext } from 'vm';
 import sharedPaths from '../lib/paths.cjs';
 import menuAvailability from '../lib/menu-row-availability.cjs';
 import { createRequire } from 'node:module';
+import startupProjection from '../lib/codegen-startup-tray.cjs';
 import { validateTiming } from '../../static/ergopti_plus/_shared/modules/updater/schedule.js';
 
 const require = createRequire(import.meta.url);
@@ -378,9 +379,20 @@ function build() {
 	validateGreyedRows(parsed.menu);
 	validateChildTemplates(parsed.menu);
 	validateProviderStatus(parsed.menu);
+	// Validate the complete immutable recovery projection before either output write.
+	const startupPolicy = parseToml(readFileSync(shared('modules/menu/startup_tray.toml'), 'utf8'));
+	const startupCodes = JSON.parse(readFileSync(shared('data/locale_order.json'), 'utf8')).order;
+	const startupLocales = Object.fromEntries(
+		startupCodes.map((code) => [
+			code,
+			JSON.parse(readFileSync(shared(`data/locales/${code}.json`), 'utf8'))
+		])
+	);
+	const startupAhk = startupProjection.render(parsed.menu, startupPolicy, startupLocales);
 	const out = { ...HEADER, ...parsed.menu };
 	const json = JSON.stringify(out, null, '\t') + '\n';
 	writeFileSync(OUT_PATH, json, 'utf8');
+	writeFileSync(shared('modules/menu/startup_tray_projection.ahk'), startupAhk, 'utf8');
 	console.log(
 		`build-menu-manifest: wrote ${OUT_PATH} (${Object.keys(parsed.menu).length} top-level keys).`
 	);

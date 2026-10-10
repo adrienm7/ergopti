@@ -31,13 +31,14 @@ local function load_menu_fixture(shortcuts, enabled, options)
 	}
 	package.loaded["infra.i18n"] = {
 		get = function(key) return key end,
+		section = function(key) return key end,
 		decorate_section = function(value) return value end,
 	}
 	package.loaded["ui.menu.menu_utils"] = {}
 	-- The switch is the command registered for the manifest's shortcuts_toggle
 	-- row, captured where the menu hands it to the renderer.
 	local render_ctx = nil
-	package.loaded["infra.manifest_menu"] = { build = function(_, _, _, _, ctx)
+	package.loaded["infra.manifest_menu"] = { group_receiver = require("tests.support.declared_menu_parent_fixture").new().group_receiver, build = function(_, _, _, _, ctx)
 		render_ctx = ctx
 		return {}
 	end }

@@ -1122,12 +1122,6 @@ local function legacy_rules_rows(karabiner)
 	})
 end
 
---- Constructs the existing Tap-Holds provider parent for either runtime intent.
---- @return table parent Existing provider row, completed by its native caller.
-local function tap_holds_parent()
-	return { label = i18n.get("menu.tapholds.title") }
-end
-
 --- Builds the Tap-holds row and its submenu.
 ---
 --- `tap_holds_menu` in the shared manifest owns the structural sequence, the
@@ -1150,6 +1144,8 @@ function M.build(ctx)
 		return nil
 	end
 
+	local receive = ManifestMenu.group_receiver("top_level", "tap_holds")
+	if not receive then return nil end
 	if not RemapSwitch.is_shared_runtime(karabiner) then
 		local rows = RemapSwitch.runtime_rows(karabiner)
 		if not rows then return nil end
@@ -1160,9 +1156,8 @@ function M.build(ctx)
 			}, {})
 			if clear then rows[#rows + 1] = clear end
 		end
-		local parent = tap_holds_parent()
-		parent.submenu = ManifestMenu.render_rows(rows, "karabiner_runtime_status")
-		return parent
+		local children = ManifestMenu.render_rows(rows, "karabiner_runtime_status")
+		return receive(children, { tapholds_enabled = function() return nil end })
 	end
 
 	local enabled = karabiner.get_enabled()
@@ -1222,10 +1217,8 @@ function M.build(ctx)
 	-- `submenu`, not `items`: ManifestMenu.build returns rows it has ALREADY
 	-- materialised. Handed over as `items`, the tray render dropped every one of
 	-- them and the submenu opened empty on the real menu bar.
-	local parent = tap_holds_parent()
-	parent.checked = tap_holds_on or nil
-	parent.submenu = ManifestMenu.build("tap_holds_menu", "TapHolds", nil, nil, render_ctx, providers)
-	return parent
+	local children = ManifestMenu.build("tap_holds_menu", "TapHolds", nil, nil, render_ctx, providers)
+	return receive(children, { tapholds_enabled = function() return tap_holds_on or nil end })
 end
 
 --- Switches the Tap-Holds feature, persists it, then redeploys the rules.

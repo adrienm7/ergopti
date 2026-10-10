@@ -929,6 +929,144 @@ function luaFunctionBinding(graph, name) {
 }
 
 /** Checks the actual complete Lua data/control graph through native parent and public registration. */
+/** A retained genuine feature receiver carries the exact completed native child. */
+function luaDeclaredHotstringsParent(native, source, child, platform) {
+	const receive = luaLocal(native, 'receive');
+	if (
+		receive.writes.length ||
+		bindings(source, '.lua', 'receive').length !== 1 ||
+		(!luaCall(receive.value, 'ManifestMenu', 'group_receiver') &&
+			!(
+				platform === 'linux' &&
+				receive.value?.type === 'binary' &&
+				receive.value.op === 'and' &&
+				luaCall(receive.value.right, 'ManifestMenu', 'group_receiver')
+			))
+	)
+		return false;
+	const captured = platform === 'linux' ? receive.value.right : receive.value;
+	if (
+		captured.args.length !== 2 ||
+		captured.args[0]?.value !== 'top_level' ||
+		captured.args[1]?.value !== 'hotstrings' ||
+		!luaCanonical(captured.callee.object.binding)
+	)
+		return false;
+	const shape = (text) => scriptTokens(text, '.lua').map((t) => [t.kind, t.value]);
+	if (platform === 'hs') {
+		const parent = luaLocal(native, 'parent');
+		return (
+			luaRetained(native, parent) &&
+			luaCall(parent.value, 'receive') &&
+			parent.value.callee.binding === receive &&
+			luaSame(parent.value.args[0], child) &&
+			route(source, '.lua', [
+				['local receive = ManifestMenu.group_receiver("top_level", "hotstrings")'],
+				['if not receive then return {} end'],
+				['local hotstrings_menu = {}'],
+				[
+					'local parent = receive(hotstrings_menu, { hotstrings_enabled = function() return master_on or nil end, hotstrings_parent_total = function() return grand_total end, hotstrings_parent_count_present = function() return grand_has_count end })'
+				],
+				['return parent and { parent } or {}']
+			]) &&
+			isDeepStrictEqual(
+				shape(source).slice(-shape('return parent and { parent } or {}').length),
+				shape('return parent and { parent } or {}')
+			)
+		);
+	}
+	const terminal =
+		'return receive(items, { hotstrings_enabled = function() return _hotstrings_on(ctx) end, hotstrings_parent_total = function() return grand_total end, hotstrings_parent_count_present = function() return true end })';
+	return (
+		route(source, '.lua', [
+			['local receive = ManifestMenu and ManifestMenu.group_receiver("top_level", "hotstrings")'],
+			['if not receive then return nil end'],
+			['local items = _manifest_hotstring_rows(ctx, config)'],
+			[terminal]
+		]) && isDeepStrictEqual(shape(source).slice(-shape(terminal).length), shape(terminal))
+	);
+}
+
+/** The actual Linux root keeps its imported raw facade and receiving cohort around all children. */
+function luaDeclaredLinuxRoot(source, topGraph) {
+	const expectedFacade = `return type(ManifestMenu) == "table" and getmetatable(ManifestMenu) == nil
+		and rawget(package, "loaded") == separator_modules
+		and rawget(separator_modules, "infra.manifest_menu") == ManifestMenu
+		and type(separator_factory) == "function" and rawget(ManifestMenu, "top_level_separator_receiver") == separator_factory
+		and type(separator_render) == "function" and rawget(ManifestMenu, "render_rows") == separator_render
+		and type(separator_array) == "function" and rawget(ManifestMenu, "get_array") == separator_array
+		and type(separator_root) == "function" and rawget(ManifestMenu, "get_root") == separator_root`;
+	const shape = (text) => scriptTokens(text, '.lua').map((t) => [t.kind, t.value]);
+	if (
+		!isDeepStrictEqual(
+			shape(owner(source, 'local function separator_facade_current()', '.lua')),
+			shape(expectedFacade)
+		) ||
+		bindings(source, '.lua', 'separator_facade_current').length
+	)
+		return false;
+	for (const [name, value] of [
+		['separator_modules', 'package.loaded'],
+		[
+			'separator_factory',
+			'type(ManifestMenu) == "table" and rawget(ManifestMenu, "top_level_separator_receiver")'
+		],
+		['separator_render', 'type(ManifestMenu) == "table" and rawget(ManifestMenu, "render_rows")'],
+		['separator_array', 'type(ManifestMenu) == "table" and rawget(ManifestMenu, "get_array")'],
+		['separator_root', 'type(ManifestMenu) == "table" and rawget(ManifestMenu, "get_root")']
+	])
+		if (
+			ranges(source, 'local ' + name + ' = ' + value, '.lua').length !== 1 ||
+			bindings(source, '.lua', name).length !== 1
+		)
+			return false;
+	const top = owner(source, 'function M.build(ctx)', '.lua');
+	const capture = `if not separator_facade_current() then return {} end
+		local declared = ManifestMenu.get_array("top_level")
+		if not separator_facade_current() then return {} end
+		local receive_separator, source_rows = separator_factory()
+		if not separator_facade_current() or type(receive_separator) ~= "function"
+			or type(declared) ~= "table" or not rawequal(declared, source_rows) then
+			Logger.error(LOG, "The canonical top-level boundary source is unavailable.")
+			return {}
+		end`;
+	const finish = `if not separator_facade_current() or not receive_separator("current") then return {} end
+		local rendered = separator_render(rows, "top_level")
+		if not separator_facade_current() or not receive_separator("current") then return {} end
+		return rendered`;
+	const headerCapture = ranges(top, 'local header, header_current = _build_header(ctx)', '.lua');
+	const withHeader =
+		headerCapture.length === 1 &&
+		require('./menu-native-llm-parent-binding.cjs').declaredLinuxTopLevelPublication(source);
+	const terminal = withHeader
+		? finish.replaceAll(
+				'not receive_separator("current") then',
+				'not receive_separator("current") or not header_current() then'
+			)
+		: finish;
+	return (
+		['declared', 'receive_separator', 'source_rows', 'rendered'].every(
+			(name) => luaLocal(topGraph, name).writes.length === 0
+		) &&
+		route(top, '.lua', [
+			[capture],
+			['for _, row in ipairs(declared) do'],
+			[
+				'if not separator_facade_current() or not receive_separator("current") then return {} end if type(row) == "table" then',
+				1
+			],
+			['local build = builders[id]', 3],
+			['rows[#rows + 1] = build(ctx)', 4],
+			[
+				'if not separator_facade_current() or not receive_separator("current") then return {} end end if quit_row then',
+				1
+			],
+			[terminal]
+		]) &&
+		isDeepStrictEqual(shape(top).slice(-shape(terminal).length), shape(terminal))
+	);
+}
+
 function luaHotstringGraph(sources, platform) {
 	const source = sources[files[platform][0]],
 		moduleGraph = luaGraph(source);
@@ -976,7 +1114,15 @@ function luaHotstringGraph(sources, platform) {
 			!luaCall(items.value, '_manifest_hotstring_rows') ||
 			items.value.callee.binding !== producer ||
 			producer.writes.length ||
-			!luaReturnBinding(native, items, 'submenu')
+			!(
+				luaReturnBinding(native, items, 'submenu') ||
+				luaDeclaredHotstringsParent(
+					native,
+					owner(sources[files.linux[0]], 'local function _build_hotstrings(ctx)', '.lua'),
+					items,
+					'linux'
+				)
+			)
 		)
 			return false;
 		const top = luaOwnerGraph(moduleGraph, luaPhysicalFunction(moduleGraph, 'M.build'));
@@ -1014,8 +1160,15 @@ function luaHotstringGraph(sources, platform) {
 		);
 		return (
 			rowWrites.length === 1 &&
-			rendered.length === 1 &&
-			top.nodes.some((n) => n.type === 'return' && n.live && n.values.includes(rendered[0])) &&
+			((rendered.length === 1 &&
+				top.nodes.some((n) => n.type === 'return' && n.live && n.values.includes(rendered[0]))) ||
+				(luaDeclaredLinuxRoot(sources[files.linux[0]], top) &&
+					top.nodes.some(
+						(n) =>
+							luaCall(n, 'separator_render') &&
+							luaSame(n.args[0], rows) &&
+							n.args[1]?.value === 'top_level'
+					))) &&
 			luaRendererGraph(native) &&
 			luaRendererGraph(top)
 		);
@@ -1090,7 +1243,16 @@ function luaHotstringGraph(sources, platform) {
 				luaField(f.value, 'submenu').some((p) => luaSame(p.value, menu))
 			)
 	);
-	if (output.length !== 1) return false;
+	if (
+		output.length !== 1 &&
+		!luaDeclaredHotstringsParent(
+			native,
+			owner(sources[files.hs[0]], 'local function build_hotstrings_rows(ctx, menu_mods)', '.lua'),
+			menu,
+			'hs'
+		)
+	)
+		return false;
 	const top = luaOwnerGraph(moduleGraph, luaPhysicalFunction(moduleGraph, 'M.generate'));
 	const builders = luaLocal(top, 'builders'),
 		registration = luaField(builders.value, 'hotstrings');
@@ -1114,7 +1276,13 @@ function luaHotstringGraph(sources, platform) {
 	if (
 		!luaRetained(top, items, true) ||
 		!luaRetained(top, root, true) ||
-		!luaCall(root.value, 'ManifestMenu', 'render_rows') ||
+		!(
+			luaCall(root.value, 'ManifestMenu', 'render_rows') ||
+			(luaCall(root.value, 'separator_render') &&
+				require('./menu-native-llm-parent-binding.cjs').declaredMacTopLevelPublication(
+					sources[files.hs[0]]
+				))
+		) ||
 		!luaSame(root.value.args[0], items) ||
 		!luaReturnBinding(top, root)
 	)
@@ -1184,6 +1352,79 @@ function hotstringScopePublication(source, platform, manifest) {
 }
 
 /** Admits only an actual registered language producer and its completed canonical frame. */
+/** Retains the completed native Hotstrings child through its declared parent receiver.
+ * The finite publication helper checks the row's exact native child identity before
+ * AddFeature, propagates the declared checked state and disposes a refused child.
+ */
+function ahkDeclaredHotstringsTransport(stage, consumer) {
+	const capture = 'Receiver := MenuRenderer_GroupReceiver("top_level", "hotstrings")';
+	const publish =
+		'_MI_StageDeclaredFeature(Receiver, HotstringsMenu, Map("hotstrings_enabled", () => HotstringsAllEnabled, "hotstrings_parent_total", () => HotstringsTotal, "hotstrings_parent_count_present", () => true), true)';
+	const prefix = scriptTokens(
+		capture +
+			`
+		if !Receiver
+			throw Error("The declared hotstrings feature parent was refused before native construction.")`,
+		'.ahk'
+	);
+	const initial = scriptTokens(stage, '.ahk').slice(0, prefix.length);
+	if (
+		!isDeepStrictEqual(
+			initial.map((t) => [t.kind, t.value]),
+			prefix.map((t) => [t.kind, t.value])
+		)
+	)
+		return false;
+	if (
+		!route(stage, '.ahk', [
+			[capture],
+			['HotstringsMenu := MenuRenderer_Build("hotstrings_menu"'],
+			[publish]
+		]) ||
+		!retainedChild(stage, '.ahk', 'Receiver', capture, publish, 0) ||
+		!retainedChild(
+			stage,
+			'.ahk',
+			'HotstringsMenu',
+			'HotstringsMenu := MenuRenderer_Build("hotstrings_menu"',
+			publish,
+			0
+		) ||
+		!route(stage, '.ahk', [
+			[
+				`if !Receiver
+			throw Error("The declared hotstrings feature parent was refused before native construction.")`
+			]
+		])
+	)
+		return false;
+	const actual = owner(
+		consumer,
+		'_MI_StageDeclaredFeature(Receiver, Child, Getters, DisposeOnRefusal := false) {',
+		'.ahk'
+	);
+	const expected = `
+		Published := false
+		try {
+			Row := Receiver.Call(Child, Getters)
+			if !(Row is Map) || Row.Get("submenu", false) != Child
+				throw Error("The canonical feature parent changed during native construction.")
+			TrayMenuStage_AddFeature(Row["label"], Child)
+			Published := true
+			if Row.Get("checked", false)
+				TrayMenuStage_Check(Row["label"])
+			return true
+		} finally {
+			if DisposeOnRefusal && !Published {
+				try Child.Delete()
+				finally MenuDispatcher_PruneMenu(Child)
+			}
+		}
+	`;
+	const shape = (text) => scriptTokens(text, '.ahk').map((token) => [token.kind, token.value]);
+	return isDeepStrictEqual(shape(actual), shape(expected));
+}
+
 function hotstringLanguagePublication(sources, manifest, platform, target) {
 	try {
 		if (!files[platform] || !Object.hasOwn(declarations, target)) return false;
@@ -1210,17 +1451,17 @@ function hotstringLanguagePublication(sources, manifest, platform, target) {
 		if (platform === 'ahk') {
 			const language = owner(source, '_HS_LanguageRows() {', '.ahk');
 			const stage = owner(sources[consumerFile], '_MI_StageHotstrings() {', '.ahk');
-			if (
-				!retainedChild(
+			const directTransport =
+				retainedChild(
 					stage,
 					'.ahk',
 					'HotstringsMenu',
 					'HotstringsMenu := MenuRenderer_Build("hotstrings_menu"',
 					'TrayMenuStage_AddFeature(HotstringsMenuTitle, HotstringsMenu)',
 					0
-				) ||
-				!route(stage, '.ahk', [['TrayMenuStage_AddFeature(HotstringsMenuTitle, HotstringsMenu)']])
-			)
+				) &&
+				route(stage, '.ahk', [['TrayMenuStage_AddFeature(HotstringsMenuTitle, HotstringsMenu)']]);
+			if (!directTransport && !ahkDeclaredHotstringsTransport(stage, sources[consumerFile]))
 				return false;
 			// Bind the real assigned symbol, including the separately owned reserved-name repair.
 			const tokens = scriptTokens(language, '.ahk'),

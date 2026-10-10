@@ -74,12 +74,14 @@ local function exercise_shortcut_transaction(save_mode, mutation_mode, refuse_in
 		}
 		package.loaded["infra.i18n"] = {
 			get = function(key) return key end,
+			section = function(key) return key end,
 			decorate_section = function(value) return value end,
 		}
 		package.loaded["ui.menu.menu_utils"] = {}
 		-- The built-in Ctrl rows reach the tray inside the keyboard-slot Ctrl
 		-- group; hand them straight back as the Shortcuts submenu.
 		package.loaded["infra.manifest_menu"] = {
+			group_receiver = require("tests.support.declared_menu_parent_fixture").new().group_receiver,
 			build = function(_, _, _, _, _, lists)
 				return lists.keyboard_slots()
 			end,
@@ -232,6 +234,7 @@ local function exercise_gesture_transaction(save_mode, target, mutation_mode)
 			i18n = package.loaded["infra.i18n"], logger = helpers.make_logger_stub(),
 		}))
 		package.loaded["infra.manifest_menu"] = {
+			group_receiver = renderer.group_receiver,
 			template_rows = renderer.template_rows,
 			get_root = function()
 				return { gesture_slots = { ["2"] = { "swipe_2_left" } } }

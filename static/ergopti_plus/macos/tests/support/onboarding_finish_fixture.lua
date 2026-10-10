@@ -34,6 +34,8 @@ local MODULE_NAMES = {
 	"platform.remap.nav_layer",
 	"ui.menu.menu_paths",
 	"ui.onboarding",
+	"onboarding_publication",
+	"config_file_inverse",
 }
 
 -- Where the doubled path resolver puts the remap settings.
@@ -87,9 +89,29 @@ function M.with_migration_reader(scenario)
 	return result
 end
 
+--- Reconstructs genuine schema/writer owners without changing native boot.
+--- The canonical FileSystem issuer must grant its own admitted ports.
+--- @param scenario function Actual host Finish replay.
+--- @return any result
+local function with_native_configuration_context(scenario)
+	local saved_migration = package.loaded["config_migrate"]
+	local saved_writer = package.loaded["toml_codec.writer"]
+	package.loaded["config_migrate"] = nil
+	package.loaded["toml_codec.writer"] = nil
+	local called, result = xpcall(scenario, debug.traceback)
+	package.loaded["config_migrate"] = saved_migration
+	package.loaded["toml_codec.writer"] = saved_writer
+	if not called then error(result, 0) end
+	return result
+end
+
 --- Runs one finish message through the production handler.
 --- @param opts table `{ answers, locale = "true"|"false"|"nil"|"throw",
 ---   write = "true"|"false"|"nil"|"throw", read = function(path)|nil,
+---   native_writer = function(path, rows, source)|nil, native_files = table|nil,
+---   prepare_destination = function(path)|nil (generic receiving replay only),
+---   canonical_files = table|nil, config_path = string|nil (actual canonical
+---   native provider with real scratch bytes and unchanged boot),
 ---   remap = { initialized, running, hold_import, import_ok, save_ok, report }|nil,
 ---   reload = "accepted"|"refused"|nil, menu_paths = table|nil,
 ---   layer = "fail"|nil }`. The navigation layer file is recorded in
@@ -134,15 +156,21 @@ function M.with_finish(opts, scenario)
 		end,
 	}, { __index = RealNavLayer })
 	package.loaded["infra.logger"] = setmetatable({}, { __index = function() return noop end })
-	package.loaded["infra.paths"] = { shared = function() return "/virtual/shared" end }
+	package.loaded["infra.paths"] = { shared = opts.canonical_files and helpers.shared
+		or function() return "/virtual/shared" end }
 	package.loaded["infra.text_utils"] = { applescript_format = string.format }
 	package.loaded["infra.toml.codec"] = { decode = function() return {} end }
-	package.loaded["adapters.file_system"] = {
+	package.loaded["adapters.file_system"] = opts.canonical_files or {
 		read_with_status = opts.read or function() return nil, "absent" end,
 	}
+	-- Additional actual inverse ports let receipt tests drive the shared writer.
+	for name, method in pairs(opts.native_files or {}) do
+		package.loaded["adapters.file_system"][name] = method
+	end
 	package.loaded["infra.toml.writer"] = {
-		batch_write = function(path, rows)
+		batch_write = function(path, rows, expected_source)
 			state.writes[#state.writes + 1] = { path = path, rows = rows }
+			if type(opts.native_writer) == "function" then return opts.native_writer(path, rows, expected_source) end
 			local mode = opts.write or "true"
 			if mode == "throw" then error("disk on fire") end
 			if mode == "nil" then return nil end
@@ -229,17 +257,46 @@ function M.with_finish(opts, scenario)
 			return mode == "true"
 		end,
 	}
-	local ok, err = xpcall(M.with_migration_reader, debug.traceback, function()
+	local context = opts.canonical_files and with_native_configuration_context or M.with_migration_reader
+	local ok, err = xpcall(context, debug.traceback, function()
+		if opts.canonical_files then
+			assert(opts.prepare_destination == nil, "native Finish must keep its actual boot preparation")
+			if opts.fresh_writer_after_inverse then
+				state.previous_shared_writer = require("toml_codec.writer")
+				state.retained_inverse_module = require("config_file_inverse")
+				package.loaded["toml_codec.writer"] = nil
+				state.current_shared_writer = require("toml_codec.writer")
+				helpers.assert_true(not rawequal(state.previous_shared_writer, state.current_shared_writer),
+					"the canonical host must use a genuinely reloaded shared writer")
+				helpers.assert_eq(package.loaded["config_file_inverse"], state.retained_inverse_module,
+					"the genuine inverse module remains cached from the prior helper cohort")
+			end
+			package.loaded["infra.toml.writer"] = nil
+			require("infra.toml.writer")
+		end
 		local onboarding = require("ui.onboarding")
-		require("tests.support.onboarding_shared_data").install()
+		if not opts.canonical_files then require("tests.support.onboarding_shared_data").install() end
 		local handle_message = named_upvalue(onboarding.run, "handle_message")
 		helpers.assert_type(handle_message, "function",
 			"the fixture must drive the production onboarding message handler")
+		if type(opts.prepare_destination) == "function" then
+			-- Generic exact-byte receiving controls need no migration. This seam
+			-- installs no configuration journal, native issuer or READY receipt.
+			-- Native configuration admission must be qualified separately.
+			local commit = named_upvalue(handle_message, "commit")
+			helpers.assert_type(commit, "function", "the real Finish dispatch must own commit")
+			local commit_owned = named_upvalue(commit, "commit_owned")
+			helpers.assert_type(commit_owned, "function", "the real claimed Finish must own its commit body")
+			local _, prepare_index = named_upvalue(commit_owned, "prepare_destination")
+			helpers.assert_not_nil(prepare_index, "the generic control must replace only destination preparation")
+			debug.setupvalue(commit_owned, prepare_index, opts.prepare_destination)
+		end
 		local _, config_path_index = named_upvalue(onboarding.run, "_config_path")
 		helpers.assert_not_nil(config_path_index,
 			"the fixture must assign the real commit destination upvalue")
-		debug.setupvalue(onboarding.run, config_path_index, "/virtual/onboarding-config.toml")
-		if opts.answers ~= nil then handle_message({ action = "finish", answers = opts.answers }) end
+		debug.setupvalue(onboarding.run, config_path_index, opts.config_path or "/virtual/onboarding-config.toml")
+		state.finish = function(answers) return handle_message({ action = "finish", answers = answers }) end
+		if opts.answers ~= nil then state.finish(opts.answers) end
 		scenario(state, onboarding)
 	end)
 	for _, name in ipairs(MODULE_NAMES) do package.loaded[name] = saved[name] end

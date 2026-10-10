@@ -17,6 +17,86 @@ assert.ok(
 	args.length === 0 || (args.length === 1 && args[0] === '--windows-file-port'),
 	'Unknown managed Ollama receiving selector.'
 );
+function receiveWindowsComponentShellSetup() {
+	const YAML = require('yaml');
+	const workflow = YAML.parse(
+		fs.readFileSync(path.resolve(__dirname, '../../.github/workflows/ci-windows.yml'), 'utf8')
+	);
+	const steps = workflow.jobs['test-ahk'].steps.filter(
+		(step) => step.name === 'Receive managed Ollama file component'
+	);
+	assert.equal(steps.length, 1, 'The component has one actual PowerShell receiving owner.');
+	assert.equal(steps[0].shell, 'pwsh');
+	const owned = fs.mkdtempSync(path.join(os.tmpdir(), 'ergopti-component-shell-'));
+	const source = path.join(owned, 'workflow-run.ps1');
+	const control = path.join(owned, 'receive-setup.ps1');
+	fs.writeFileSync(source, steps[0].run);
+	// Parse the real workflow body and execute only its directory/module expressions.
+	// The native31 command remains uncalled; this closes the pre-launch prerequisite.
+	fs.writeFileSync(
+		control,
+		String.raw`param([string] $Source)
+$ErrorActionPreference = 'Stop'
+$tokens = $null; $errors = $null
+$ast = [Management.Automation.Language.Parser]::ParseFile($Source, [ref]$tokens, [ref]$errors)
+if ($errors.Count -ne 0) { throw 'Actual component body must parse.' }
+$right = 'Join-Path $env:SystemRoot ''System32/WindowsPowerShell/v1.0'''
+$setup = @($ast.EndBlock.Statements | Where-Object {
+    $_ -is [Management.Automation.Language.AssignmentStatementAst] -and $_.Right.Extent.Text -ceq $right
+})
+if ($setup.Count -ne 1) { throw 'Actual top-level runtime directory assignment is missing.' }
+$directoryVariable = $setup[0].Left.Extent.Text
+$moduleAssignments = @($ast.FindAll({ param($node)
+    $node -is [Management.Automation.Language.AssignmentStatementAst] -and
+    $node.Left.Extent.Text -ceq '$env:PSModulePath' -and
+    $node.Right.Extent.Text.StartsWith('(Join-Path ' + $directoryVariable + ' ')
+}, $true))
+$commands = @($ast.FindAll({ param($node)
+    $node -is [Management.Automation.Language.CommandAst] -and
+    $node.InvocationOperator -eq [Management.Automation.Language.TokenKind]::Ampersand -and
+    $node.CommandElements[0].Extent.Text -ceq ('"' + $directoryVariable + '/powershell.exe"')
+}, $true))
+if ($moduleAssignments.Count -ne 1 -or $commands.Count -ne 1) { throw 'Runtime directory authority is not forwarded exactly.' }
+$probe = @'
+param($ExpectedDirectory, $ExpectedModules, $ExpectedExecutable)
+$ErrorActionPreference = 'Stop'
+$capturedAutomaticDirectory = $PSHOME
+$oldModulePath = $env:PSModulePath
+'@ + "\n" + $setup[0].Extent.Text + "\n" + $moduleAssignments[0].Extent.Text + "\n" +
+    '$observedDirectory = ' + $directoryVariable + "\n" +
+    '$observedExecutable = ' + $commands[0].CommandElements[0].Extent.Text + "\n" + @'
+if ($observedDirectory -cne $ExpectedDirectory) { throw 'Native PS5 directory binding differs.' }
+if (-not $env:PSModulePath.StartsWith($ExpectedModules + ';')) { throw 'Native PS5 modules are not selected first.' }
+if ($observedExecutable -cne $ExpectedExecutable) { throw 'Native executable binding differs.' }
+if ($PSHOME -cne $capturedAutomaticDirectory) { throw 'The interpreter automatic directory was changed.' }
+Write-Output 'COMPONENT-SHELL-SETUP PASS native_calls=0'
+'@
+$expected = Join-Path $env:SystemRoot 'System32/WindowsPowerShell/v1.0'
+$previousModules = $env:PSModulePath
+try {
+    & ([ScriptBlock]::Create($probe)) $expected (Join-Path $expected 'Modules') "$expected/powershell.exe"
+} finally { $env:PSModulePath = $previousModules }
+`
+			.replace(/\\\$/g, '$')
+			.replace(/\\n/g, '\n')
+	);
+	const result = spawnSync(
+		'pwsh.exe',
+		['-NoLogo', '-NoProfile', '-NonInteractive', '-File', control, source],
+		{
+			encoding: 'utf8',
+			timeout: 15000,
+			windowsHide: true
+		}
+	);
+	assert.equal(result.error, undefined, `PowerShell setup control must start; retained ${owned}`);
+	assert.equal(result.signal, null, `PowerShell setup control must retire; retained ${owned}`);
+	assert.equal(result.status, 0, result.stderr || result.stdout);
+	assert.equal(result.stderr, '');
+	assert.equal(result.stdout.replace(/\r\n/g, '\n'), 'COMPONENT-SHELL-SETUP PASS native_calls=0\n');
+	process.stdout.write(result.stdout);
+}
+
 function receiveFileFixtureProducer() {
 	const fixtures = path.resolve(
 		__dirname,
@@ -199,6 +279,7 @@ function receiveWindowsRuntimeHandoff() {
 	process.stdout.write(stdout);
 	process.stdout.write('WINDOWS-RUNTIME-HANDOFF models=9 native_runtime=false http=false\n');
 }
+if (process.platform === 'win32') receiveWindowsComponentShellSetup();
 receiveFileFixtureProducer();
 if (args.length === 1) {
 	receiveWindowsFilePort();
@@ -217,7 +298,7 @@ const cases = [
 if (process.platform !== 'win32') {
 	// Real files and CLI; modeled host admission grants no native macOS credit.
 	cases.push(['tools/test/macos_managed_ollama_catalogue_refusal_test.py', 12]);
-	cases.push(['tools/test/macos_native_ollama_api_test.py', 8]);
+	cases.push(['tools/test/macos_native_ollama_api_test.py', 20]);
 	cases.push(['tools/test/macos_native_http_receiving_facts_test.py', 55]);
 	cases.push(['tools/test/macos_managed_ollama_explicit_stream_test.py', 6]);
 	cases.push(['tools/diagnostics/macos_managed_ollama_receiving_test.py', 16]);
@@ -241,7 +322,7 @@ if (process.platform !== 'win32') {
 	cases.push(['tools/diagnostics/macos_trusted_native_guardian_test.py', 10]);
 	cases.push(['tools/diagnostics/macos_guardian_retirement_order_test.py', 6]);
 	cases.push(['tools/diagnostics/macos_ollama_daemon_authority_test.py', 14]);
-	cases.push(['tools/diagnostics/macos_managed_ollama_serve_test.py', 14]);
+	cases.push(['tools/diagnostics/macos_managed_ollama_serve_test.py', 35]);
 	cases.push(['tools/diagnostics/macos_ollama_daemon_authority_reader_test.py', 13]);
 	cases.push(['tools/diagnostics/macos_native_wire_swift_dependencies_test.py', 10]);
 	// Preserve the original 37 controls and add seven atomic-result receiving laws.
