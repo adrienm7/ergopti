@@ -1,0 +1,58 @@
+{
+	"source_base": "ac4f1f1a52e70eb8fbd1798bf521b8c1daaa5012",
+	"native_execution": 0,
+	"cohorts": [
+		{
+			"class": "KarabinerLeaseWorkerTests",
+			"count": 146
+		},
+		{
+			"class": "LeaseDiagnosticNextObservationTests",
+			"count": 19
+		}
+	],
+	"total": 165,
+	"corpus_sha256": "2775bca2baf42b72eb74fc599f9828bcfe886d577fdf172d4edf0758187a351f",
+	"producer_script_sha256": "65b1219778b95b4e1c15754b9d41c68ee629b0c029681690f7c7a508d20763b1",
+	"sources": [
+		{
+			"path": "static/ergopti_plus/macos/launcher/Tests/ErgoptiPlusTests/RemapLeaseWorkerTests.swift",
+			"sha256": "304a9a2ee155697ef0e0af7008d71637452f1d435ee030f11ced301d0f829e7d",
+			"bytes": 286873,
+			"genuine_cb728_whole_equal": true,
+			"corpus_count": 146
+		},
+		{
+			"path": "static/ergopti_plus/macos/launcher/Tests/ErgoptiPlusTests/LeaseDiagnosticNextObservationTests.swift",
+			"sha256": "9b1ed32c136eaa4e95ddbf72fbb888fecc40384c45b1a4c46bab80b4aad1d7f8",
+			"bytes": 20466,
+			"genuine_cb728_whole_equal": true,
+			"corpus_count": 19
+		},
+		{
+			"path": "static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/RemapLeaseWorker.swift",
+			"sha256": "bcd3a4fca57654b3a420bf79490accc836ab40c20a969ec0a5cbdd7191a150bd",
+			"bytes": 123181,
+			"genuine_cb728_whole_equal": true,
+			"corpus_count": 0
+		},
+		{
+			"path": "static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/RemapLeaseDiagnosticStore.swift",
+			"sha256": "5d9fc200d107f7602cd706847770b753c24c7dd2a05edb7406678acdcca26819",
+			"bytes": 14934,
+			"genuine_cb728_whole_equal": true,
+			"corpus_count": 0
+		},
+		{
+			"path": "static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/RemapLeaseGuardian.swift",
+			"sha256": "26b613cf32cb95e890f97f0c43dd502a53af2a07f2bfef3f0b6d1a11230a0905",
+			"bytes": 79664,
+			"genuine_cb728_whole_equal": true,
+			"corpus_count": 0
+		}
+	],
+	"generic_parser_current_sha256": "40a132da1865f656183942acdf8cbbd132b2f3036be364dfb7068a2d6b4bc190",
+	"generic_parser_model_sha256": "40a132da1865f656183942acdf8cbbd132b2f3036be364dfb7068a2d6b4bc190",
+	"generic_parser_changed_by_proposal": false,
+	"requirement": "At eventual execution, begin/judge must bind the committed whole compiler input inventory, exact tested SHA and runtime architecture; five pins alone do not qualify a build."
+}

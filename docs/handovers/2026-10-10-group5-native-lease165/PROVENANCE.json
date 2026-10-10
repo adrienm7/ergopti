@@ -1,0 +1,16 @@
+{
+	"prior_source_base": "cb728e95a85eadfad7d364ec16f9a20cc22f949c",
+	"prior_source_manifest_sha256": "82d8a771ea173db0480bed567e94193bcf66f2f7ed0c566251ef67fdafe9b6a4",
+	"prior_source_patch_sha256": "1d052ebe74b9fd81428b2019de5ec689a3d6859227c22b88efa1a3501362203c",
+	"independent_prior_source_review_sha256": "5d06ed94ae34ac573b72c322f7e08677012f4e06d608c67c9c3281d7250b88f6",
+	"actual_software_receiving_sha256": "ee3f0acf253153d3ce290ffa0ceef52973b2d19c83cc7e79cb30e4997e2e4987",
+	"independent_actual_software_review_sha256": "7eaa549ded5cfa5a193699a54ebcfd0bb33d63e1ac91a326511034dd06d677ef",
+	"independent_native_pin_review_sha256": "65ba46a3a93be55b3b2543e1a54f9602cf4e9e6312c5623061d98b910af7f1f8",
+	"frozen_child_status_vectors_sha256": "f68493c78a9bae503b389ccdfcb62a7a2d620ec4aa8ae049d298e068496d4736",
+	"frozen_child_status_addendum_sha256": "8f3729109f58723f90ea9ef5b5d4d7902a4feec71952852a4cfc7198e6a32c4e",
+	"historical_native_roster_sha256": "2775bca2baf42b72eb74fc599f9828bcfe886d577fdf172d4edf0758187a351f",
+	"producer_script_sha256": "65b1219778b95b4e1c15754b9d41c68ee629b0c029681690f7c7a508d20763b1",
+	"ownership_notice": "https://github.com/adrienm7/ergopti/issues/86#issuecomment-6098082135",
+	"context_adaptation_source_sha256": "42184d356e12ea40e23db55b69af100efdcc581486fe5edf5ca0e51f42f87ddb",
+	"privacy": "No raw logs, local machine addresses, personal configurations, credentials, input values or archived user records included."
+}

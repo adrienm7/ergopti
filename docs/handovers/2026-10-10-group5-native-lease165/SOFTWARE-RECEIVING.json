@@ -1,0 +1,64 @@
+{
+	"verdict": "INDEPENDENT_ACTUAL_SOFTWARE_RECEIVING_CLEAR",
+	"receiving_sha256": "ee3f0acf253153d3ce290ffa0ceef52973b2d19c83cc7e79cb30e4997e2e4987",
+	"census_sha256": "8641c12f7dff08c6ef83dbd884b27f9e235a212622a89b74a46ddf3ca6207022",
+	"subjects_verified": 189,
+	"source_inputs_verified": 8,
+	"closure_paths": [
+		"tools/diagnostics/lease165_xctest_evidence.cjs",
+		"tools/diagnostics/swift_xctest_evidence.cjs",
+		"tools/test/test-lease165-xctest-evidence.cjs",
+		"tools/test/fixtures/lease165-native-xctest-corpus.json"
+	],
+	"original_parser_sha256": "40a132da1865f656183942acdf8cbbd132b2f3036be364dfb7068a2d6b4bc190",
+	"original_corpus_sha256": "2775bca2baf42b72eb74fc599f9828bcfe886d577fdf172d4edf0758187a351f",
+	"original38_named_prefix_exact": true,
+	"combined_actual": [
+		{
+			"view": "BEFORE38",
+			"pass": 38,
+			"fail": 0,
+			"skip": 0,
+			"exit": 0,
+			"raw_stdout_sha256": "4cec71cbff5616571fd073e853988c7a07fa3d08e520514e184ec68d506ebf80"
+		},
+		{
+			"view": "AFTER57",
+			"pass": 57,
+			"fail": 0,
+			"skip": 0,
+			"exit": 0,
+			"raw_stdout_sha256": "2f699c4c32e0c9e6ae2dda492e7ac3f426bed8f5ba0b656b1113327c4adeb5b3"
+		}
+	],
+	"individual_actual": [
+		{
+			"view": "BEFORE38",
+			"pass": 7,
+			"fail": 12,
+			"verdict_absence_count": 1,
+			"all_original_prediction_outcomes_exact": true
+		},
+		{
+			"view": "AFTER57",
+			"pass": 19,
+			"fail": 0,
+			"verdict_absence_count": 12,
+			"all_original_prediction_outcomes_exact": true
+		}
+	],
+	"individual_driver_read": true,
+	"public_cli_driver_sha256": "31fb26dc78428092041c3d9372bce64665413f508376c0985510fdad6094113a",
+	"frozen_semantic_expectations_unchanged": true,
+	"raw_exit_and_notice_verdict_checks_exact": true,
+	"absent_verdict_null_distinct": true,
+	"review_execution": "Read-only bytes/JSON/regex; no suite or native execution",
+	"limitations": [
+		"Fixed modeled165 transcript and controlled Git source inventory, not actual Swift execution.",
+		"Foreign owner tested through disclosed process.getuid()+1 public-UID port model, not actual foreign UID ownership.",
+		"Original38 source semantics preserved; final setup-only fixture receiving previously independently reviewed, no assertions regenerated.",
+		"Census excludes controlled .git implementation metadata explicitly; source/evidence/candidate identities retained.",
+		"Native architectures, BSD wrapper production invocation and installed framework behavior remain UNRUN.",
+		"No cause73 or whole native package qualification."
+	]
+}

@@ -1,0 +1,1509 @@
+diff --git a/.github/workflows/ci-macos.yml b/.github/workflows/ci-macos.yml
+--- a/.github/workflows/ci-macos.yml
++++ b/.github/workflows/ci-macos.yml
+@@ -57,6 +57,85 @@
+   ERGOPTI_DEV_RELEASE_VERSION: ${{ inputs.version }}
+ 
+ jobs:
++  # Independent manual receiving; never full-package or installed qualification.
++  lease165-native:
++    name: 'Lease native 165 (${{ matrix.architecture }})'
++    if: ${{ (github.event_name == 'workflow_dispatch' && !inputs.release) }}
++    strategy:
++      fail-fast: false
++      matrix:
++        include:
++          - runner: macos-15
++            architecture: arm64
++          - runner: macos-15-intel
++            architecture: x86_64
++    runs-on: ${{ matrix.runner }}
++    timeout-minutes: 25
++    steps:
++      - uses: actions/checkout@v4
++        with:
++          ref: ${{ github.sha }}
++      - uses: actions/setup-node@v4
++        with:
++          node-version-file: '.node-version'
++      - name: Receive exact native lease worker and next-observation cohorts
++        shell: bash
++        env:
++          LEASE_EXPECTED_ARCH: ${{ matrix.architecture }}
++          SWIFT_BACKTRACE: enable=yes
++        run: |
++          set -euo pipefail
++          umask 077
++          test -z "${ERGOPTI_DEV_QUALIFICATION_PROFILE:-}"
++          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
++          lease_actual_arch="$(uname -m)"
++          test "$lease_actual_arch" = "$LEASE_EXPECTED_ARCH"
++          evidence="$RUNNER_TEMP/lease165-native-evidence"
++          mkdir -m 700 "$evidence"
++          transcript="$evidence/lease165-xctest.log"
++          source_receipt="$evidence/lease165-source.json"
++          node tools/diagnostics/lease165_xctest_evidence.cjs begin \
++            "$GITHUB_SHA" "$LEASE_EXPECTED_ARCH" "$lease_actual_arch" "$source_receipt"
++          child_status_receipt="$evidence/lease165-swift-child-status.txt"
++          child_script="$evidence/lease165-swift-child.sh"
++          test ! -e "$child_status_receipt" && test ! -L "$child_status_receipt"
++          set -C
++          cat > "$child_script" <<'LEASE165_SWIFT_CHILD'
++          set -uo pipefail
++          umask 077
++          test ! -e "$2" && test ! -L "$2" || exit 1
++          set +e
++          swift test --package-path static/ergopti_plus/macos/launcher \
++            --scratch-path "$1" \
++            --filter 'KarabinerLeaseWorkerTests|LeaseDiagnosticNextObservationTests'
++          lease_child_status=$?
++          set -eC
++          printf '%s\n' "$lease_child_status" > "$2"
++          exit "$lease_child_status"
++          LEASE165_SWIFT_CHILD
++          set +e
++          script -q /dev/null /bin/bash "$child_script" \
++            "$RUNNER_TEMP/lease165-swift-ci" "$child_status_receipt" 2>&1 | tee "$transcript"
++          lease_statuses=("${PIPESTATUS[@]}")
++          set -e
++          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
++          lease_actual_arch="$(uname -m)"
++          node tools/diagnostics/lease165_xctest_evidence.cjs judge \
++            "$transcript" "${lease_statuses[0]}" "${lease_statuses[1]}" \
++            "$GITHUB_SHA" "$LEASE_EXPECTED_ARCH" "$lease_actual_arch" "$source_receipt" \
++            "$evidence/lease165-verdict.json"
++      - name: Retain scoped native lease evidence
++        if: always()
++        uses: actions/upload-artifact@v4
++        with:
++          name: lease165-native-${{ matrix.architecture }}-${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}
++          retention-days: 7
++          if-no-files-found: warn
++          path: |
++            ${{ runner.temp }}/lease165-native-evidence/lease165-xctest.log
++            ${{ runner.temp }}/lease165-native-evidence/lease165-*.json
++            ${{ runner.temp }}/lease165-native-evidence/lease165-swift-child-status.txt
++
+   # Manual item 36 diagnosis is independent of managed HTTP/runtime acceptance.
+   # Its scoped result never replaces Package, installed launch or physical checks.
+   item36-native:
+diff --git a/tools/diagnostics/lease165_xctest_evidence.cjs b/tools/diagnostics/lease165_xctest_evidence.cjs
+new file mode 100644
+--- /dev/null
++++ b/tools/diagnostics/lease165_xctest_evidence.cjs
+@@ -0,0 +1,380 @@
++// tools/diagnostics/lease165_xctest_evidence.cjs
++'use strict';
++
++/** Only the two historical lease cohorts; never full-package qualification. */
++const fs = require('node:fs');
++const path = require('node:path');
++const crypto = require('node:crypto');
++const { execFileSync } = require('node:child_process');
++const { cleanTranscript } = require('./swift_xctest_evidence.cjs');
++const CORPUS = require('../test/fixtures/lease165-native-xctest-corpus.json');
++const COHORTS = Object.freeze(
++	CORPUS.cohorts.map((cohort) =>
++		Object.freeze({
++			className: cohort.class_name,
++			source: cohort.source,
++			names: Object.freeze([...cohort.names])
++		})
++	)
++);
++const NAMES = Object.freeze(COHORTS.flatMap((cohort) => cohort.names));
++const EXPECTED = 165;
++if (
++	CORPUS.expected_count !== EXPECTED ||
++	COHORTS.length !== 2 ||
++	NAMES.length !== EXPECTED ||
++	new Set(NAMES).size !== EXPECTED ||
++	COHORTS[0].className !== 'KarabinerLeaseWorkerTests' ||
++	COHORTS[0].names.length !== 146 ||
++	COHORTS[1].className !== 'LeaseDiagnosticNextObservationTests' ||
++	COHORTS[1].names.length !== 19
++)
++	throw new Error('Lease cohort inventory refused.');
++
++function status(value) {
++	if (!/^(?:0|[1-9][0-9]{0,2})$/.test(String(value)) || Number(value) > 255)
++		throw new Error('Lease pipeline status refused.');
++	return Number(value);
++}
++
++/** One serial Selected tests root with both complete, originally named cohorts. */
++function evaluate(text, swiftStatus, teeStatus) {
++	const swift = status(swiftStatus),
++		tee = status(teeStatus);
++	const errors = [];
++	const reject = (label) => {
++		if (!errors.includes(label)) errors.push(label);
++	};
++	let root = 'before',
++		bundle = 'before',
++		suite = null,
++		active = null,
++		summary = null;
++	const suites = new Set(),
++		starts = new Set(),
++		terminals = new Set(),
++		passed = new Set();
++	const cohorts = new Map(COHORTS.map((cohort) => [cohort.className, cohort]));
++	for (const line of cleanTranscript(text).split('\n')) {
++		if (!line.trim()) continue;
++		if (summary !== null) {
++			const count =
++				/^\s*Executed (0|[1-9][0-9]*) tests?, with (0|[1-9][0-9]*) failures? \((0|[1-9][0-9]*) unexpected\) in (?:0|[1-9][0-9]*)(?:\.[0-9]+)? \((?:0|[1-9][0-9]*)(?:\.[0-9]+)?\) seconds?\s*$/.exec(
++					line
++				);
++			const expected = cohorts.has(summary) ? cohorts.get(summary).names.length : EXPECTED;
++			if (!count || Number(count[1]) !== expected || count[2] !== '0' || count[3] !== '0')
++				reject('summary');
++			if (summary === 'root') root = 'after';
++			if (summary === 'bundle') bundle = 'after';
++			summary = null;
++			continue;
++		}
++		const opening =
++			/^Test Suite '([^']+)' started at [0-9]{4}-[0-9]{2}-[0-9]{2} [0-9]{2}:[0-9]{2}:[0-9]{2}\.[0-9]{3}\.$/.exec(
++				line
++			);
++		const closing =
++			/^Test Suite '([^']+)' (passed|failed) at [0-9]{4}-[0-9]{2}-[0-9]{2} [0-9]{2}:[0-9]{2}:[0-9]{2}\.[0-9]{3}\.$/.exec(
++				line
++			);
++		const starting = /^Test Case '([^']+)' started\.$/.exec(line);
++		const terminal =
++			/^Test Case '([^']+)' (passed|failed|skipped) \((?:0|[1-9][0-9]*)(?:\.[0-9]+)? seconds?\)\.$/.exec(
++				line
++			);
++		if (opening) {
++			if (opening[1] === 'Selected tests') {
++				if (root !== 'before' || bundle !== 'before' || suite !== null || active !== null)
++					reject('root');
++				root = 'running';
++			} else if (opening[1] === 'ErgoptiPlusPackageTests.xctest') {
++				if (root !== 'running' || bundle !== 'before' || suite !== null || active !== null)
++					reject('bundle');
++				bundle = 'running';
++			} else if (cohorts.has(opening[1])) {
++				if (
++					root !== 'running' ||
++					bundle !== 'running' ||
++					suite !== null ||
++					active !== null ||
++					suites.has(opening[1])
++				)
++					reject('suite');
++				suite = opening[1];
++				suites.add(suite);
++			} else reject('foreign-suite');
++		} else if (closing) {
++			if (closing[2] !== 'passed') reject('failed-suite');
++			if (closing[1] === 'Selected tests') {
++				if (
++					root !== 'running' ||
++					bundle !== 'after' ||
++					suite !== null ||
++					active !== null ||
++					suites.size !== 2
++				)
++					reject('root');
++				root = 'summary';
++				summary = 'root';
++			} else if (closing[1] === 'ErgoptiPlusPackageTests.xctest') {
++				if (
++					root !== 'running' ||
++					bundle !== 'running' ||
++					suite !== null ||
++					active !== null ||
++					suites.size !== 2
++				)
++					reject('bundle');
++				bundle = 'summary';
++				summary = 'bundle';
++			} else if (suite === closing[1]) {
++				if (root !== 'running' || bundle !== 'running' || active !== null) reject('suite');
++				const names = cohorts.get(suite).names;
++				if (names.some((name) => !starts.has(name) || !passed.has(name)))
++					reject('incomplete-suite');
++				summary = suite;
++				suite = null;
++			} else reject('foreign-suite');
++		} else if (starting) {
++			if (
++				root !== 'running' ||
++				bundle !== 'running' ||
++				suite === null ||
++				active !== null ||
++				!cohorts.get(suite)?.names.includes(starting[1]) ||
++				starts.has(starting[1])
++			)
++				reject('start');
++			starts.add(starting[1]);
++			active = starting[1];
++		} else if (terminal) {
++			if (
++				root !== 'running' ||
++				bundle !== 'running' ||
++				suite === null ||
++				active !== terminal[1] ||
++				!cohorts.get(suite)?.names.includes(terminal[1]) ||
++				terminals.has(terminal[1])
++			)
++				reject('terminal');
++			if (terminal[2] !== 'passed') reject('failed-or-skipped-case');
++			else passed.add(terminal[1]);
++			terminals.add(terminal[1]);
++			active = null;
++		} else if (/^\s*Test (Suite|Case) |^\s*Executed |(?:^|: )(?:fatal )?error: /.test(line))
++			reject('unadmitted-test-frame');
++	}
++	if (
++		root !== 'after' ||
++		bundle !== 'after' ||
++		suite !== null ||
++		active !== null ||
++		summary !== null ||
++		suites.size !== 2 ||
++		starts.size !== EXPECTED ||
++		terminals.size !== EXPECTED ||
++		passed.size !== EXPECTED ||
++		NAMES.some((name) => !starts.has(name) || !passed.has(name))
++	)
++		reject('incomplete');
++	if (swift !== 0 || tee !== 0) reject('pipeline');
++	return {
++		schema: 1,
++		scope: 'lease165-native-only',
++		complete: errors.length === 0,
++		full_package_qualified: false,
++		expected: EXPECTED,
++		completed: NAMES.filter((name) => terminals.has(name)).length,
++		passed: NAMES.filter((name) => passed.has(name)).length,
++		swift_status: swift,
++		capture_status: tee,
++		errors
++	};
++}
++
++/** Finite held regular-file bytes, excluding atime from the currentness cut. */
++function readBoundedRegular(file, maximum) {
++	const fd = fs.openSync(
++		file,
++		fs.constants.O_RDONLY | fs.constants.O_NOFOLLOW | fs.constants.O_NONBLOCK
++	);
++	try {
++		const before = fs.fstatSync(fd, { bigint: true }),
++			named = fs.lstatSync(file, { bigint: true });
++		const same = (a, b) =>
++			['dev', 'ino', 'mode', 'uid', 'gid', 'nlink', 'size', 'mtimeNs', 'ctimeNs'].every(
++				(key) => a[key] === b[key]
++			);
++		if (
++			!before.isFile() ||
++			before.size > BigInt(maximum) ||
++			before.nlink !== 1n ||
++			!same(before, named)
++		)
++			throw new Error('Lease capture refused.');
++		const bytes = Buffer.alloc(Number(before.size));
++		let offset = 0;
++		while (offset < bytes.length) {
++			const count = fs.readSync(fd, bytes, offset, bytes.length - offset, null);
++			if (count <= 0) throw new Error('Lease capture incomplete.');
++			offset += count;
++		}
++		if (
++			!same(before, fs.fstatSync(fd, { bigint: true })) ||
++			!same(before, fs.lstatSync(file, { bigint: true }))
++		)
++			throw new Error('Lease capture changed.');
++		return bytes;
++	} finally {
++		fs.closeSync(fd);
++	}
++}
++
++/** Only the exact owned shell's canonical direct child status, never a default. */
++function readChildStatus(file) {
++	const before = fs.lstatSync(file, { bigint: true });
++	if (
++		!before.isFile() ||
++		before.uid !== BigInt(process.getuid()) ||
++		(before.mode & 0o7777n) !== 0o600n ||
++		before.nlink !== 1n ||
++		before.size < 2n ||
++		before.size > 4n
++	)
++		throw new Error('Lease child status ownership refused.');
++	const raw = readBoundedRegular(file, 4);
++	const after = fs.lstatSync(file, { bigint: true });
++	if (
++		!['dev', 'ino', 'mode', 'uid', 'gid', 'nlink', 'size', 'mtimeNs', 'ctimeNs'].every(
++			(key) => before[key] === after[key]
++		)
++	)
++		throw new Error('Lease child status changed.');
++	const text = new TextDecoder('utf-8', { fatal: true }).decode(raw);
++	const parsed = /^(?:0|[1-9][0-9]{0,2})\n$/.exec(text);
++	if (!parsed || parsed[0] !== text || Number(text) > 255)
++		throw new Error('Lease child status encoding refused.');
++	return Number(text);
++}
++
++/** Bind actual checkout, native architecture and all implicit launcher inputs. */
++function sourceReceipt(repository, candidate, expectedArch, actualArch) {
++	if (
++		!/^[0-9a-f]{40}$/.test(candidate) ||
++		!['arm64', 'x86_64'].includes(expectedArch) ||
++		actualArch !== expectedArch ||
++		{ arm64: 'arm64', x86_64: 'x64' }[actualArch] !== process.arch
++	)
++		throw new Error('Lease source or architecture refused.');
++	const git = (args) =>
++		execFileSync('git', args, {
++			cwd: repository,
++			encoding: 'utf8',
++			stdio: ['ignore', 'pipe', 'pipe']
++		});
++	if (git(['rev-parse', 'HEAD']).trim() !== candidate) throw new Error('Lease candidate changed.');
++	git(['diff', '--exit-code', 'HEAD', '--']);
++	const launcher = 'static/ergopti_plus/macos/launcher';
++	const implicit = git([
++		'ls-files',
++		'--others',
++		'-z',
++		'--',
++		`${launcher}/Sources`,
++		`${launcher}/Tests`
++	])
++		.split('\0')
++		.filter(Boolean);
++	const alternate = git(['ls-files', '--others', '-z', '--', launcher])
++		.split('\0')
++		.filter((file) => /^Package(?:@swift-[0-9.]+)?\.swift$/.test(file.slice(launcher.length + 1)));
++	if (implicit.length || alternate.length) throw new Error('Unbound lease compiler input.');
++	const files = git([
++		'ls-files',
++		'-z',
++		'--',
++		launcher,
++		'tools/diagnostics',
++		'tools/test/fixtures/lease165-native-xctest-corpus.json'
++	])
++		.split('\0')
++		.filter(Boolean)
++		.sort();
++	if (!files.length) throw new Error('Lease inventory unavailable.');
++	const sources = {};
++	for (const relative of files)
++		sources[relative] = crypto
++			.createHash('sha256')
++			.update(readBoundedRegular(path.join(repository, relative), 16777216))
++			.digest('hex');
++	for (const cohort of COHORTS) {
++		if (!Object.hasOwn(sources, cohort.source)) throw new Error('Lease test source missing.');
++		const actual = [
++			...new TextDecoder('utf-8', { fatal: true })
++				.decode(readBoundedRegular(path.join(repository, cohort.source), 16777216))
++				.matchAll(/\bfunc (test\w+)\(/g)
++		].map((match) => `-[ErgoptiPlusTests.${cohort.className} ${match[1]}]`);
++		if (JSON.stringify(actual.sort()) !== JSON.stringify([...cohort.names].sort()))
++			throw new Error('Lease method inventory differs.');
++	}
++	return { schema: 1, scope: 'lease165-native-only', candidate, architecture: actualArch, sources };
++}
++
++function main(args, repository = path.resolve(__dirname, '../..')) {
++	try {
++		if (args.length === 5 && args[0] === 'begin') {
++			const childStatusFile = path.join(path.dirname(args[4]), 'lease165-swift-child-status.txt');
++			try {
++				fs.lstatSync(childStatusFile);
++				throw new Error('Lease child status already exists.');
++			} catch (error) {
++				if (error.code !== 'ENOENT') throw error;
++			}
++			const receipt = sourceReceipt(repository, args[1], args[2], args[3]);
++			fs.writeFileSync(args[4], JSON.stringify(receipt, null, '\t') + '\n', {
++				flag: 'wx',
++				mode: 0o600
++			});
++			return 0;
++		}
++		if (args.length !== 9 || args[0] !== 'judge') throw new Error('Lease arguments refused.');
++		const before = JSON.parse(
++			new TextDecoder('utf-8', { fatal: true }).decode(readBoundedRegular(args[7], 1048576))
++		);
++		const after = sourceReceipt(repository, args[4], args[5], args[6]);
++		if (JSON.stringify(before) !== JSON.stringify(after)) throw new Error('Lease source changed.');
++		const wrapperStatus = status(args[2]);
++		const childStatus = readChildStatus(
++			path.join(path.dirname(args[7]), 'lease165-swift-child-status.txt')
++		);
++		const receipt = {
++			...evaluate(
++				new TextDecoder('utf-8', { fatal: true }).decode(readBoundedRegular(args[1], 16777216)),
++				childStatus,
++				args[3]
++			),
++			wrapper_status: wrapperStatus,
++			source: after
++		};
++		if (wrapperStatus !== 0) {
++			receipt.complete = false;
++			receipt.errors.push('wrapper-pipeline');
++		}
++		fs.writeFileSync(args[8], JSON.stringify(receipt, null, '\t') + '\n', {
++			flag: 'wx',
++			mode: 0o600
++		});
++		console.log(
++			`::notice title=Scoped lease native receiving::complete=${receipt.complete} passed=${receipt.passed} expected=165 full_package_qualified=false swift_status=${receipt.swift_status} wrapper_status=${receipt.wrapper_status} capture_status=${receipt.capture_status} candidate=${after.candidate} architecture=${after.architecture}`
++		);
++		return receipt.complete ? 0 : 1;
++	} catch {
++		console.error(
++			'::error::Scoped lease native receiving refused; full package remains unqualified.'
++		);
++		return 1;
++	}
++}
++module.exports = { COHORTS, NAMES, evaluate, readBoundedRegular, sourceReceipt, main };
++if (require.main === module) process.exitCode = main(process.argv.slice(2));
+diff --git a/tools/test/ci-full-default.cjs b/tools/test/ci-full-default.cjs
+--- a/tools/test/ci-full-default.cjs
++++ b/tools/test/ci-full-default.cjs
+@@ -31,6 +31,11 @@
+ 		'.github/workflows/ci-macos.yml',
+ 		'item36-native',
+ 		"${{ github.event_name == 'workflow_dispatch' && !inputs.release }}"
++	],
++	[
++		'.github/workflows/ci-macos.yml',
++		'lease165-native',
++		"${{ (github.event_name == 'workflow_dispatch' && !inputs.release) }}"
+ 	],
+ 	['.github/workflows/ci-macos.yml', 'managed-ollama-native', null],
+ 	['.github/workflows/ci-macos.yml', 'test-hs', null],
+diff --git a/tools/test/fixtures/lease165-native-xctest-corpus.json b/tools/test/fixtures/lease165-native-xctest-corpus.json
+new file mode 100644
+--- /dev/null
++++ b/tools/test/fixtures/lease165-native-xctest-corpus.json
+@@ -0,0 +1,193 @@
++{
++	"schema": 1,
++	"scope": "lease165-native-only",
++	"historical_run": 37979226215,
++	"historical_sha": "a9e8b1722164347d56989a483675ec660063bffb",
++	"historical_cleaned_transcript_sha256": "5a0b0fd5f83a1d701e3912562e6db1f25705bf8d28390a5481c455e03a633dc7",
++	"expected_count": 165,
++	"cohorts": [
++		{
++			"class_name": "KarabinerLeaseWorkerTests",
++			"source": "static/ergopti_plus/macos/launcher/Tests/ErgoptiPlusTests/RemapLeaseWorkerTests.swift",
++			"names": [
++				"-[ErgoptiPlusTests.KarabinerLeaseWorkerTests testAllLeaseRolesAreHandledBeforeApplicationBootstrap]",
++				"-[ErgoptiPlusTests.KarabinerLeaseWorkerTests testAuthenticatedOuterFencesDirectlyWhenReplacementSpawnerStaysUnavailable]",
++				"-[ErgoptiPlusTests.KarabinerLeaseWorkerTests testBoundaryPollRetriesInterruptedCallsWithinFixedZeroDelayBudget]",
++				"-[ErgoptiPlusTests.KarabinerLeaseWorkerTests testBoundedLineDecoderRejectsLineFlood]",
++				"-[ErgoptiPlusTests.KarabinerLeaseWorkerTests testBoundedLineDecoderRejectsOversizeAndMalformedUTF8]",
++				"-[ErgoptiPlusTests.KarabinerLeaseWorkerTests testChildReapingPreparationRestoresWaitpidOwnership]",
++				"-[ErgoptiPlusTests.KarabinerLeaseWorkerTests testChildTimeoutFencesAndNeverPublishesReady]",
++				"-[ErgoptiPlusTests.KarabinerLeaseWorkerTests testCLIChildResetsInheritedHUPToDefault]",
++				"-[ErgoptiPlusTests.KarabinerLeaseWorkerTests testCLICloseActionFailureRefusesSpawn]",
++				"-[ErgoptiPlusTests.KarabinerLeaseWorkerTests testCLIDiagnosticDrainBoundsEachTurnUnderContinuousOutput]",
++				"-[ErgoptiPlusTests.KarabinerLeaseWorkerTests testCLIFileActionInitializationPreservesReturnedError]",
++				"-[ErgoptiPlusTests.KarabinerLeaseWorkerTests testCLILargeDiagnosticOutputCannotDeadlockBeforeExit]",
++				"-[ErgoptiPlusTests.KarabinerLeaseWorkerTests testCLIRequiresCompletelyEmptyDiagnosticsForSuccess]",
++				"-[ErgoptiPlusTests.KarabinerLeaseWorkerTests testDetachedWorkerStopsAfterBoundedDirectFenceSpawnFailures]",
++				"-[ErgoptiPlusTests.KarabinerLeaseWorkerTests testEOFAfterReadyFencesTheGeneration]",
++				"-[ErgoptiPlusTests.KarabinerLeaseWorkerTests testEOFBeforeActivationFencesWithoutReady]",
++				"-[ErgoptiPlusTests.KarabinerLeaseWorkerTests testEOFDuringActivationFencesWithoutFalseReady]",
++				"-[ErgoptiPlusTests.KarabinerLeaseWorkerTests testEOFDuringFenceRetriesUntilTwoConsecutiveFinalWrites]",
++				"-[ErgoptiPlusTests.KarabinerLeaseWorkerTests testEOFDuringHeartbeatFencesWithoutHeartbeatAck]",
++				"-[ErgoptiPlusTests.KarabinerLeaseWorkerTests testEOFDuringPauseFencesWithoutFalsePausedAck]",
++				"-[ErgoptiPlusTests.KarabinerLeaseWorkerTests testFencedThenExitedInnerRetiresDescendantsBeforeReap]",
++				"-[ErgoptiPlusTests.KarabinerLeaseWorkerTests testFencedThenStoppedInnerIsKilledAndReapedWithinBound]",
++				"-[ErgoptiPlusTests.KarabinerLeaseWorkerTests testFenceTransportBoundsPermanentSpawnFailuresAndReportsFirstFailureOnce]",
++				"-[ErgoptiPlusTests.KarabinerLeaseWorkerTests testGuardianAcknowledgementDurabilityLockIsTokenLocal]",
++				"-[ErgoptiPlusTests.KarabinerLeaseWorkerTests testGuardianAcknowledgementRollsBackAfterPostRenameDirectorySyncFailure]",
++				"-[ErgoptiPlusTests.KarabinerLeaseWorkerTests testGuardianCannotPublishDrainingBetweenRevalidationAndLiveAcknowledgement]",
++				"-[ErgoptiPlusTests.KarabinerLeaseWorkerTests testGuardianDrainsReplacedRecordsDirectoryBeforeRestart]",
++				"-[ErgoptiPlusTests.KarabinerLeaseWorkerTests testGuardianFencesAbandonedRecord]",
++				"-[ErgoptiPlusTests.KarabinerLeaseWorkerTests testGuardianFencesExternallyUnlinkedLiveRecord]",
++				"-[ErgoptiPlusTests.KarabinerLeaseWorkerTests testGuardianFencesLiveOwnerAfterSIGKILL]",
++				"-[ErgoptiPlusTests.KarabinerLeaseWorkerTests testGuardianFencesRetirementFromDifferentRecordNonce]",
++				"-[ErgoptiPlusTests.KarabinerLeaseWorkerTests testGuardianLeavesPersonalKarabinerProcesses]",
++				"-[ErgoptiPlusTests.KarabinerLeaseWorkerTests testGuardianLossDoesNotOutrankStopSameParentBatch]",
++				"-[ErgoptiPlusTests.KarabinerLeaseWorkerTests testGuardianPermanentDrainErrorFencesUntilExactGateCanBeTaken]",
++				"-[ErgoptiPlusTests.KarabinerLeaseWorkerTests testGuardianPresenceProbesDoNotImpersonateGuardian]",
++				"-[ErgoptiPlusTests.KarabinerLeaseWorkerTests testGuardianProcessRemainsAliveAfterStartup]",
++				"-[ErgoptiPlusTests.KarabinerLeaseWorkerTests testGuardianRefusesActivationBeforeArmed]",
++				"-[ErgoptiPlusTests.KarabinerLeaseWorkerTests testGuardianRegistrationCollisionPreservesExistingRecordAndAcknowledgement]",
++				"-[ErgoptiPlusTests.KarabinerLeaseWorkerTests testGuardianRegistrationPublishesLockedDurableRecordBeforeArmed]",
++				"-[ErgoptiPlusTests.KarabinerLeaseWorkerTests testGuardianRegistrationRefusesApprovalLostDuringArmHandshake]",
++				"-[ErgoptiPlusTests.KarabinerLeaseWorkerTests testGuardianRegistrationRefusesUnapprovedActivationBeforePublication]",
++				"-[ErgoptiPlusTests.KarabinerLeaseWorkerTests testGuardianRegistrationRevokesAuthorizationFromLiveTransport]",
++				"-[ErgoptiPlusTests.KarabinerLeaseWorkerTests testGuardianRestartFencesOrphanedAcknowledgementAfterRecordLoss]",
++				"-[ErgoptiPlusTests.KarabinerLeaseWorkerTests testGuardianRestartPrioritizesAcknowledgedRecordsBeyondUnarmedCap]",
++				"-[ErgoptiPlusTests.KarabinerLeaseWorkerTests testGuardianRestartRecoversStaleAcknowledgementTemporary]",
++				"-[ErgoptiPlusTests.KarabinerLeaseWorkerTests testGuardianSettingsInvocationRequiresExactLauncherIdentity]",
++				"-[ErgoptiPlusTests.KarabinerLeaseWorkerTests testGuardianSkipsExplicitlyRetiredRecord]",
++				"-[ErgoptiPlusTests.KarabinerLeaseWorkerTests testGuardianStartupRejectsExclusiveGuardianOwner]",
++				"-[ErgoptiPlusTests.KarabinerLeaseWorkerTests testGuardianStartupWaitsOutSharedPresenceProbe]",
++				"-[ErgoptiPlusTests.KarabinerLeaseWorkerTests testGuardianStatusInvocationRequiresExactLauncherIdentity]",
++				"-[ErgoptiPlusTests.KarabinerLeaseWorkerTests testGuardianTerminationCannotFenceBeforeArmedActivationCompletes]",
++				"-[ErgoptiPlusTests.KarabinerLeaseWorkerTests testGuardianTerminationFencesLockedActiveRecordBeforeExit]",
++				"-[ErgoptiPlusTests.KarabinerLeaseWorkerTests testGuardianTerminationWaitsForPostReadyLiveTransportAcknowledgement]",
++				"-[ErgoptiPlusTests.KarabinerLeaseWorkerTests testHeadlessDispatchAndHelperExportAreOrderedBeforeSideEffects]",
++				"-[ErgoptiPlusTests.KarabinerLeaseWorkerTests testIdentityRejectsEverySharedKarabinerProcessFamily]",
++				"-[ErgoptiPlusTests.KarabinerLeaseWorkerTests testIdentityRejectsMismatchedNamesAndUnboundedHeartbeat]",
++				"-[ErgoptiPlusTests.KarabinerLeaseWorkerTests testInnerBoundaryEINTRPreservesSingleBufferedFailureDiagnostic]",
++				"-[ErgoptiPlusTests.KarabinerLeaseWorkerTests testInnerHUPOutranksBufferedReadyAcknowledgement]",
++				"-[ErgoptiPlusTests.KarabinerLeaseWorkerTests testInnerInvocationRejectsAReplacedLauncherVnode]",
++				"-[ErgoptiPlusTests.KarabinerLeaseWorkerTests testInnerLossDuringStopJoinsReplacementFenceBeforeStoppedAck]",
++				"-[ErgoptiPlusTests.KarabinerLeaseWorkerTests testInnerLossRequiresReplacementFenceBeforeFinish]",
++				"-[ErgoptiPlusTests.KarabinerLeaseWorkerTests testInnerProcessGroupOwnershipCannotRaceOrOutliveReap]",
++				"-[ErgoptiPlusTests.KarabinerLeaseWorkerTests testInnerSilenceDeadlineAcceptsHealthyHeartbeatCycles]",
++				"-[ErgoptiPlusTests.KarabinerLeaseWorkerTests testInnerSilenceDeadlineDrainsBoundaryCommandBeforeFencing]",
++				"-[ErgoptiPlusTests.KarabinerLeaseWorkerTests testInnerSpawnerCloseActionFailureRefusesEverySpawnPosition]",
++				"-[ErgoptiPlusTests.KarabinerLeaseWorkerTests testInnerSpawnerKillsRacingReplacementBeforeUserSpaceExecution]",
++				"-[ErgoptiPlusTests.KarabinerLeaseWorkerTests testInnerSpawnerRevalidatesExecutableBeforeEverySpawn]",
++				"-[ErgoptiPlusTests.KarabinerLeaseWorkerTests testKilledInnerGroupReapsOrphanAndPreservesSharedProcessSiblings]",
++				"-[ErgoptiPlusTests.KarabinerLeaseWorkerTests testLateOrphanModeWriteIsAbsorbedByMonotoneTombstone]",
++				"-[ErgoptiPlusTests.KarabinerLeaseWorkerTests testLauncherExecutableFileIdentityMatchesLstat]",
++				"-[ErgoptiPlusTests.KarabinerLeaseWorkerTests testLeaseExecutableIdentityParsesCanonicalEnvironment]",
++				"-[ErgoptiPlusTests.KarabinerLeaseWorkerTests testLegacyRegistrationPreservesAlreadyRunningGuardian]",
++				"-[ErgoptiPlusTests.KarabinerLeaseWorkerTests testLegacyRegistrationReplacesStaleExecutablePathBeforeReady]",
++				"-[ErgoptiPlusTests.KarabinerLeaseWorkerTests testLivePayloadNeverMentionsRevokedAndFenceRepeatsIdentically]",
++				"-[ErgoptiPlusTests.KarabinerLeaseWorkerTests testModernGuardianActivationAuthorizationFailsClosed]",
++				"-[ErgoptiPlusTests.KarabinerLeaseWorkerTests testModernGuardianObservationNeverRegistersAndRequiresExactHealth]",
++				"-[ErgoptiPlusTests.KarabinerLeaseWorkerTests testModernGuardianObservationRechecksAuthorizationAfterHealth]",
++				"-[ErgoptiPlusTests.KarabinerLeaseWorkerTests testModernGuardianRegistrationNeverBypassesUserDenial]",
++				"-[ErgoptiPlusTests.KarabinerLeaseWorkerTests testModernGuardianRegistrationRetriesNotFoundOnce]",
++				"-[ErgoptiPlusTests.KarabinerLeaseWorkerTests testModernGuardianSettingsOpenOnlyForCurrentApprovalRequirement]",
++				"-[ErgoptiPlusTests.KarabinerLeaseWorkerTests testOuterCoalescesRapidPauseResumeBehindOneInFlightWrite]",
++				"-[ErgoptiPlusTests.KarabinerLeaseWorkerTests testOuterIdempotentModeAckCannotOutrankSameBatchInnerHUP]",
++				"-[ErgoptiPlusTests.KarabinerLeaseWorkerTests testOuterNeverManufacturesHeartbeatDuringContinuouslyReadableParentInput]",
++				"-[ErgoptiPlusTests.KarabinerLeaseWorkerTests testOuterPublishesSequencedPingFailureWithoutInventingAcknowledgement]",
++				"-[ErgoptiPlusTests.KarabinerLeaseWorkerTests testOuterRejectsEveryNonExactPingSequence]",
++				"-[ErgoptiPlusTests.KarabinerLeaseWorkerTests testOuterRetiresLiveWriterBeforeReleasingGuardianDrainGate]",
++				"-[ErgoptiPlusTests.KarabinerLeaseWorkerTests testOuterRevalidatesGuardianAfterLiveTransportBeforePublishingReady]",
++				"-[ErgoptiPlusTests.KarabinerLeaseWorkerTests testOuterRuntimeDeadlineKillsStoppedInnerGroupBeforeReplacementFence]",
++				"-[ErgoptiPlusTests.KarabinerLeaseWorkerTests testOuterSerializesPublicPingAndQueuedModeByExactSequence]",
++				"-[ErgoptiPlusTests.KarabinerLeaseWorkerTests testOwnedGroupConfinementPreventsLateOrphanAfterCoreReset]",
++				"-[ErgoptiPlusTests.KarabinerLeaseWorkerTests testParentEOFAfterPublicPingOutranksItsLatePong]",
++				"-[ErgoptiPlusTests.KarabinerLeaseWorkerTests testPendingInnerAcknowledgementOutranksCommandDeadline]",
++				"-[ErgoptiPlusTests.KarabinerLeaseWorkerTests testPreparedInnerControlDescriptorClosesAcrossCLIExec]",
++				"-[ErgoptiPlusTests.KarabinerLeaseWorkerTests testPrivateBoundaryEINTRStillLetsClosureOutrankBufferedSet]",
++				"-[ErgoptiPlusTests.KarabinerLeaseWorkerTests testPrivateCommandDeadlinesExpireBeforePublicReadyBudget]",
++				"-[ErgoptiPlusTests.KarabinerLeaseWorkerTests testPrivateHeartbeatProtocolRequiresCanonicalSequence]",
++				"-[ErgoptiPlusTests.KarabinerLeaseWorkerTests testPrivatePeerClosureOutranksBufferedSet]",
++				"-[ErgoptiPlusTests.KarabinerLeaseWorkerTests testPublicStopAfterPingOutranksItsLatePong]",
++				"-[ErgoptiPlusTests.KarabinerLeaseWorkerTests testPublicTerminalBatchNeverForwardsBufferedPause]",
++				"-[ErgoptiPlusTests.KarabinerLeaseWorkerTests testRapidPauseResumeNeverOverlapsCLIChildren]",
++				"-[ErgoptiPlusTests.KarabinerLeaseWorkerTests testRegistrationCannotArmFromPostRenameDirectorySyncFailure]",
++				"-[ErgoptiPlusTests.KarabinerLeaseWorkerTests testRegistrationStillRecognizesHealthyGuardianAfterActivationCompletes]",
++				"-[ErgoptiPlusTests.KarabinerLeaseWorkerTests testReplacementGuardianWaitsForPriorGenerationTransportGate]",
++				"-[ErgoptiPlusTests.KarabinerLeaseWorkerTests testReservedSocketEndpointsStayAboveEveryFileActionTarget]",
++				"-[ErgoptiPlusTests.KarabinerLeaseWorkerTests testReservedSocketsStayAboveFD3WhenLowDescriptorsAreClosed]",
++				"-[ErgoptiPlusTests.KarabinerLeaseWorkerTests testRetainedDiagnosticDirectoryReplacementAfterCapturedReadRefused]",
++				"-[ErgoptiPlusTests.KarabinerLeaseWorkerTests testRetainedDiagnosticDispatcherRejectsPathOverrideBeforeBootstrap]",
++				"-[ErgoptiPlusTests.KarabinerLeaseWorkerTests testRetainedDiagnosticEnvelopeClosedMetadataAndBound]",
++				"-[ErgoptiPlusTests.KarabinerLeaseWorkerTests testRetainedDiagnosticFIFORefusedBeforeContentRead]",
++				"-[ErgoptiPlusTests.KarabinerLeaseWorkerTests testRetainedDiagnosticFileReplacementAfterCapturedReadRefused]",
++				"-[ErgoptiPlusTests.KarabinerLeaseWorkerTests testRetainedDiagnosticHardlinkRecordRefusedWithoutMutation]",
++				"-[ErgoptiPlusTests.KarabinerLeaseWorkerTests testRetainedDiagnosticInitialDirectoryAliasRefused]",
++				"-[ErgoptiPlusTests.KarabinerLeaseWorkerTests testRetainedDiagnosticLateAncestorAliasRefused]",
++				"-[ErgoptiPlusTests.KarabinerLeaseWorkerTests testRetainedDiagnosticMissingDirectoryDoesNotCreate]",
++				"-[ErgoptiPlusTests.KarabinerLeaseWorkerTests testRetainedDiagnosticOversizeRefusedBeforeContentRead]",
++				"-[ErgoptiPlusTests.KarabinerLeaseWorkerTests testRetainedDiagnosticPrivateRecordsAndAtomicReplacement]",
++				"-[ErgoptiPlusTests.KarabinerLeaseWorkerTests testRetainedDiagnosticPublicRecordRefusedWithoutChmod]",
++				"-[ErgoptiPlusTests.KarabinerLeaseWorkerTests testRetainedDiagnosticSymlinkRecordRefusedWithoutTargetMutation]",
++				"-[ErgoptiPlusTests.KarabinerLeaseWorkerTests testRetainedDiagnosticTrueParentAliasPreservingLeafInodesRefused]",
++				"-[ErgoptiPlusTests.KarabinerLeaseWorkerTests testRetainedDiagnosticUnknownPIIFieldsNeverExport]",
++				"-[ErgoptiPlusTests.KarabinerLeaseWorkerTests testRetainedDiagnosticWriterRefusesUnownedShapeWithoutMutation]",
++				"-[ErgoptiPlusTests.KarabinerLeaseWorkerTests testRetainedDiagnosticWrongRoleFilenameRefused]",
++				"-[ErgoptiPlusTests.KarabinerLeaseWorkerTests testRetainedGuardianCallbackRefusesReplacementUntilActualOwnerRelease]",
++				"-[ErgoptiPlusTests.KarabinerLeaseWorkerTests testSiblingProgressWitnessRejectsStoppedExistingProcess]",
++				"-[ErgoptiPlusTests.KarabinerLeaseWorkerTests testStopDuringActivationPreemptsBeforeFence]",
++				"-[ErgoptiPlusTests.KarabinerLeaseWorkerTests testStoppedOuterWithPendingHammerspoonEOFTriggersInnerSilenceFence]",
++				"-[ErgoptiPlusTests.KarabinerLeaseWorkerTests testTerminalDiagnosticAcceptedStopRemainsQuiet]",
++				"-[ErgoptiPlusTests.KarabinerLeaseWorkerTests testTerminalDiagnosticExhaustedFenceDoesNotClaimRecovery]",
++				"-[ErgoptiPlusTests.KarabinerLeaseWorkerTests testTerminalDiagnosticInnerFormattingMatchesIndependentFrozenGrammar]",
++				"-[ErgoptiPlusTests.KarabinerLeaseWorkerTests testTerminalDiagnosticNativeAcceptedStopOrEOFRemainsQuiet]",
++				"-[ErgoptiPlusTests.KarabinerLeaseWorkerTests testTerminalDiagnosticNativeDeadlineRetainsFirstSnapshotAfterGuardianRetirement]",
++				"-[ErgoptiPlusTests.KarabinerLeaseWorkerTests testTerminalDiagnosticNativeDeadlineWaitsForBothFencesAndRetirement]",
++				"-[ErgoptiPlusTests.KarabinerLeaseWorkerTests testTerminalDiagnosticNativeFailed73SnapshotsBeforeTerminalMutation]",
++				"-[ErgoptiPlusTests.KarabinerLeaseWorkerTests testTerminalDiagnosticNativeGuardianLossIsDistinctBeforeBothFences]",
++				"-[ErgoptiPlusTests.KarabinerLeaseWorkerTests testTerminalDiagnosticNativePrivateEOFWaitsForBothFencesAndRetirement]",
++				"-[ErgoptiPlusTests.KarabinerLeaseWorkerTests testTerminalDiagnosticNativeUnexpectedAckSnapshotsBeforeStateMutation]",
++				"-[ErgoptiPlusTests.KarabinerLeaseWorkerTests testTerminalDiagnosticOuterFormattingOmitsHeartbeatSequenceAndRawFailure]",
++				"-[ErgoptiPlusTests.KarabinerLeaseWorkerTests testTerminalDiagnosticOuterSilenceFollowsBothOriginalFenceTransports]",
++				"-[ErgoptiPlusTests.KarabinerLeaseWorkerTests testTerminalDiagnosticPeerClosureRemainsDistinctAndFollowsFence]",
++				"-[ErgoptiPlusTests.KarabinerLeaseWorkerTests testTerminalDiagnosticTypedCLIFailurePreservesActivationResultAfterFence]",
++				"-[ErgoptiPlusTests.KarabinerLeaseWorkerTests testTerminalExportPositiveIndependentLiteralAndTypedSnapshotRoundTrip]",
++				"-[ErgoptiPlusTests.KarabinerLeaseWorkerTests testTerminalExportRejectsIndependentEncodingEmptyAndSuffixVectors]",
++				"-[ErgoptiPlusTests.KarabinerLeaseWorkerTests testTerminalExportRejectsIndependentPIIUnknownTypeMissingAndSizeVectors]",
++				"-[ErgoptiPlusTests.KarabinerLeaseWorkerTests testUnrelatedSiblingSurvivesEveryDirectChildPreemption]",
++				"-[ErgoptiPlusTests.KarabinerLeaseWorkerTests testUnrelatedSiblingSurvivesInnerLossReplacementFence]",
++				"-[ErgoptiPlusTests.KarabinerLeaseWorkerTests testWorkerIdentityUsesOneModeAndOneTombstone]"
++			],
++			"native_historical_passed": 140,
++			"native_historical_failed": 6,
++			"native_historical_skipped": 0
++		},
++		{
++			"class_name": "LeaseDiagnosticNextObservationTests",
++			"source": "static/ergopti_plus/macos/launcher/Tests/ErgoptiPlusTests/LeaseDiagnosticNextObservationTests.swift",
++			"names": [
++				"-[ErgoptiPlusTests.LeaseDiagnosticNextObservationTests testAbsentRoleAndEmptyBaselinePermitOneNewRecord]",
++				"-[ErgoptiPlusTests.LeaseDiagnosticNextObservationTests testAliasedAndUnsupportedCandidatesAreNotReadOrRepaired]",
++				"-[ErgoptiPlusTests.LeaseDiagnosticNextObservationTests testArmedAndObservedOutputFailuresDoNotRetryOrResample]",
++				"-[ErgoptiPlusTests.LeaseDiagnosticNextObservationTests testArmedCallbackAndReadTimeConsumeDeadline]",
++				"-[ErgoptiPlusTests.LeaseDiagnosticNextObservationTests testAtomicIdenticalPublicationChangesVnodeAndIsObserved]",
++				"-[ErgoptiPlusTests.LeaseDiagnosticNextObservationTests testBaselineReadCompletesBeforeArmingAndDoesNotPollOnEmissionFailure]",
++				"-[ErgoptiPlusTests.LeaseDiagnosticNextObservationTests testBothNewRolesStillExportExactlyOneObservedRole]",
++				"-[ErgoptiPlusTests.LeaseDiagnosticNextObservationTests testChangedFieldsOnSameVnodeNeverBecomeNew]",
++				"-[ErgoptiPlusTests.LeaseDiagnosticNextObservationTests testFileReplacementAfterReadRejectsThatCut]",
++				"-[ErgoptiPlusTests.LeaseDiagnosticNextObservationTests testFirstTypedFailureIsNotReplacedDuringFinalEmission]",
++				"-[ErgoptiPlusTests.LeaseDiagnosticNextObservationTests testFramesAreClosedAndInvalidArgvRefusesBeforeEffects]",
++				"-[ErgoptiPlusTests.LeaseDiagnosticNextObservationTests testInvalidBaselineRefusesArmingWithoutRepair]",
++				"-[ErgoptiPlusTests.LeaseDiagnosticNextObservationTests testInvalidNewRecordsNeverLatchAndLaterValidCanRecover]",
++				"-[ErgoptiPlusTests.LeaseDiagnosticNextObservationTests testMissingAndNonprivateBaselineAreNotCreatedOrRepaired]",
++				"-[ErgoptiPlusTests.LeaseDiagnosticNextObservationTests testNamespaceReplacementAndAncestorAliasRefuseReadCut]",
++				"-[ErgoptiPlusTests.LeaseDiagnosticNextObservationTests testSleepIsCappedToRemainingDeadline]",
++				"-[ErgoptiPlusTests.LeaseDiagnosticNextObservationTests testStalledBackwardsAndNonfiniteClocksAreFinite]",
++				"-[ErgoptiPlusTests.LeaseDiagnosticNextObservationTests testTrueAncestorAliasPreservesLeafIdentitiesButRefusesPublication]",
++				"-[ErgoptiPlusTests.LeaseDiagnosticNextObservationTests testUnchangedOneAndTwoRolesNeverBecomeNew]"
++			],
++			"native_historical_passed": 3,
++			"native_historical_failed": 16,
++			"native_historical_skipped": 0
++		}
++	]
++}
+diff --git a/tools/test/run-js-suite.cjs b/tools/test/run-js-suite.cjs
+--- a/tools/test/run-js-suite.cjs
++++ b/tools/test/run-js-suite.cjs
+@@ -30,6 +30,12 @@
+ 
+ // Each check mirrors a CI "Validate ·" step. command/args are run from ROOT.
+ const CHECKS = [
++	{
++		name: 'manual native lease receiving retains exact 165 historical identities and source custody',
++		cmd: process.execPath,
++		args: ['tools/test/test-lease165-xctest-evidence.cjs'],
++		repro: 'node tools/test/test-lease165-xctest-evidence.cjs'
++	},
+ 	{
+ 		name: 'macOS native PAC and WPAD qualification requires all twelve original cases',
+ 		cmd: process.execPath,
+diff --git a/tools/test/test-ci-pipeline-wiring.cjs b/tools/test/test-ci-pipeline-wiring.cjs
+--- a/tools/test/test-ci-pipeline-wiring.cjs
++++ b/tools/test/test-ci-pipeline-wiring.cjs
+@@ -354,6 +354,7 @@
+ ];
+ 
+ const STEP_CONDITIONS = [
++	[MACOS_BOX, 'lease165-native', 'Retain scoped native lease evidence', 'always()'],
+ 	...WINDOWS_FILE_RETENTION.map((owner) => [WINDOWS_BOX, 'test-ahk', owner.name, owner.condition]),
+ 	...MACOS_NATIVE_STEP_CONDITIONS,
+ 	...scoped.contract.retained_steps.map((owner) => [
+@@ -1172,6 +1173,7 @@
+ 		const exposed =
+ 			rel === MACOS_BOX
+ 				? [
++						'lease165-native',
+ 						'item36-native',
+ 						'managed-ollama-native',
+ 						...sequence.slice(0, 2),
+@@ -1214,6 +1216,19 @@
+ 			}
+ 		}
+ 		if (rel === MACOS_BOX) {
++			const lease = jobs.find((candidate) => candidate.id === 'lease165-native');
++			if (
++				!lease ||
++				pipeline.needsOf(lease.body).length !== 0 ||
++				pipeline.field(lease.body, 'if') !==
++					"${{ (github.event_name == 'workflow_dispatch' && !inputs.release) }}" ||
++				['continue-on-error', 'outputs', 'secrets'].some(
++					(key) => pipeline.field(lease.body, key) !== null
++				)
++			)
++				problems.push(
++					'lease165-native must retain exact independent fatal manual nonrelease receiving'
++				);
+ 			const scoped = jobs.find((candidate) => candidate.id === 'item36-native');
+ 			if (
+ 				!scoped ||
+@@ -1258,6 +1273,7 @@
+ 			.map((candidate) => candidate.id);
+ 		if (rel === MACOS_BOX) {
+ 			const expectedEntries = [
++				'lease165-native',
+ 				'item36-native',
+ 				'managed-ollama-native',
+ 				'test-hs',
+@@ -1273,7 +1289,8 @@
+ 				`${rel} must have exactly one entry job, which needs no job of its file; got [${entries.join(', ')}]`
+ 			);
+ 		}
+-		const expectedExits = rel === MACOS_BOX ? ['item36-native', 'macos-ok'] : [sequence[4]];
++		const expectedExits =
++			rel === MACOS_BOX ? ['lease165-native', 'item36-native', 'macos-ok'] : [sequence[4]];
+ 		if (
+ 			rel === MACOS_BOX
+ 				? JSON.stringify(exits) !== JSON.stringify(expectedExits)
+@@ -1348,6 +1365,26 @@
+ 		'  item36-native:\n',
+ 		'  item36-native:\n    outputs:\n      assets: fake\n'
+ 	]
++])
++	mustCatch(what, MACOS_BOX, from, to, graphProblems);
++for (const [what, from, to] of [
++	['missing lease165 node', '  lease165-native:\n', '  missing-lease165-native:\n'],
++	[
++		'coupled lease165 entry',
++		'  lease165-native:\n',
++		'  lease165-native:\n    needs: package-macos\n'
++	],
++	[
++		'forgiven lease165 failure',
++		'  lease165-native:\n',
++		'  lease165-native:\n    continue-on-error: true\n'
++	],
++	[
++		'foreign lease165 output',
++		'  lease165-native:\n',
++		'  lease165-native:\n    outputs:\n      assets: fake\n'
++	],
++	['foreign lease165 secret', '  lease165-native:\n', '  lease165-native:\n    secrets: inherit\n']
+ ])
+ 	mustCatch(what, MACOS_BOX, from, to, graphProblems);
+ errors.push(...graphProblems(pipeline.files()));
+diff --git a/tools/test/test-lease165-xctest-evidence.cjs b/tools/test/test-lease165-xctest-evidence.cjs
+new file mode 100644
+--- /dev/null
++++ b/tools/test/test-lease165-xctest-evidence.cjs
+@@ -0,0 +1,479 @@
++// tools/test/test-lease165-xctest-evidence.cjs
++'use strict';
++
++/** Modeled receiver controls, with historical identities; no native execution. */
++const assert = require('node:assert/strict');
++const fs = require('node:fs');
++const path = require('node:path');
++const os = require('node:os');
++const { execFileSync, spawnSync } = require('node:child_process');
++const reader = require('../diagnostics/lease165_xctest_evidence.cjs');
++const full = require('../diagnostics/swift_xctest_evidence.cjs');
++const corpus = require('./fixtures/lease165-native-xctest-corpus.json');
++const stamp = '2026-10-09 19:49:09.845.';
++const summary = (count) =>
++	` Executed ${count} tests, with 0 failures (0 unexpected) in 1.000 (1.001) seconds`;
++const opening = (name) => `Test Case '${name}' started.`;
++const terminal = (name) => `Test Case '${name}' passed (0.001 seconds).`;
++const lines = [
++	`Test Suite 'Selected tests' started at ${stamp}`,
++	`Test Suite 'ErgoptiPlusPackageTests.xctest' started at ${stamp}`
++];
++for (const cohort of corpus.cohorts) {
++	lines.push(`Test Suite '${cohort.class_name}' started at ${stamp}`);
++	for (const name of cohort.names) lines.push(opening(name), terminal(name));
++	lines.push(`Test Suite '${cohort.class_name}' passed at ${stamp}`, summary(cohort.names.length));
++}
++lines.push(
++	`Test Suite 'ErgoptiPlusPackageTests.xctest' passed at ${stamp}`,
++	summary(165),
++	`Test Suite 'Selected tests' passed at ${stamp}`,
++	summary(165)
++);
++const valid = lines.join('\n') + '\n';
++const first = corpus.cohorts[0].names[0];
++let passed = 0;
++const check = (label, action) => {
++	action();
++	passed++;
++	console.log(`PASS ${label}`);
++};
++const refuses = (text, swift = 0, tee = 0) => {
++	let verdict;
++	try {
++		verdict = reader.evaluate(text, swift, tee);
++	} catch {
++		return;
++	}
++	assert.equal(verdict.complete, false);
++	assert.equal(verdict.full_package_qualified, false);
++};
++check('closed selected success', () => {
++	const result = reader.evaluate(valid, 0, 0);
++	assert.equal(result.complete, true);
++	assert.equal(result.passed, 165);
++	assert.equal(result.completed, 165);
++	assert.equal(result.full_package_qualified, false);
++});
++// This closed independent fixture fails with the original full-package reader.
++check('original full-package reader stays strict', () =>
++	assert.notEqual(full.evaluate(valid, 0, 0).exit_status, 0)
++);
++check('historical original failures refused', () => {
++	// Original actual run was failing; this fixed historical native identity failed.
++	const failed =
++		'-[ErgoptiPlusTests.KarabinerLeaseWorkerTests testRetainedDiagnosticPrivateRecordsAndAtomicReplacement]';
++	assert.ok(corpus.cohorts[0].names.includes(failed));
++	refuses(valid.replace(terminal(failed), terminal(failed).replace('passed', 'failed')));
++});
++check('full root refused', () => refuses(valid.replaceAll("'Selected tests'", "'All tests'")));
++check('zero tests refused', () =>
++	refuses(
++		`Test Suite 'Selected tests' started at ${stamp}\nTest Suite 'Selected tests' passed at ${stamp}\n${summary(0)}\n`
++	)
++);
++check('missing terminal refused', () => refuses(valid.replace(terminal(first) + '\n', '')));
++check('skip refused', () =>
++	refuses(valid.replace(terminal(first), terminal(first).replace('passed', 'skipped')))
++);
++check('case failure refused', () =>
++	refuses(valid.replace(terminal(first), terminal(first).replace('passed', 'failed')))
++);
++check('duplicate identity refused', () =>
++	refuses(
++		valid.replace(terminal(first), terminal(first) + '\n' + opening(first) + '\n' + terminal(first))
++	)
++);
++check('foreign identity refused', () =>
++	refuses(valid.replaceAll(first, '-[ErgoptiPlusTests.KarabinerLeaseWorkerTests testForeign]'))
++);
++check('wrong count refused', () => refuses(valid.replace(summary(146), summary(145))));
++check('failed suite refused', () =>
++	refuses(
++		valid.replace(
++			`Test Suite 'KarabinerLeaseWorkerTests' passed`,
++			`Test Suite 'KarabinerLeaseWorkerTests' failed`
++		)
++	)
++);
++check('missing root close refused', () =>
++	refuses(valid.replace(`Test Suite 'Selected tests' passed at ${stamp}\n${summary(165)}\n`, ''))
++);
++check('malformed summary refused', () =>
++	refuses(valid.replace(summary(146), summary(146) + ' private suffix'))
++);
++check('out of order close refused', () =>
++	refuses(
++		valid.replace(
++			`Test Suite 'KarabinerLeaseWorkerTests' passed`,
++			`Test Suite 'Selected tests' passed`
++		)
++	)
++);
++check('terminal outside suite refused', () => refuses(terminal(first) + '\n' + valid));
++check('swift nonzero refused', () => refuses(valid, 1, 0));
++check('capture nonzero refused', () => refuses(valid, 0, 1));
++check('invalid status refused', () => refuses(valid, '00', 0));
++check('extra test frame refused', () => refuses(valid + "Test Case 'foreign' unsupported\n"));
++check('PTY normalization retains exact frames', () =>
++	assert.equal(
++		reader.evaluate('\x1b[32m' + valid.replaceAll('\n', '\r\n') + '\x1b[0m', 0, 0).complete,
++		true
++	)
++);
++check('bundle missing refused', () =>
++	refuses(valid.replace(`Test Suite 'ErgoptiPlusPackageTests.xctest' started at ${stamp}\n`, ''))
++);
++check('foreign suite refused', () =>
++	refuses(
++		valid.replace("Test Suite 'KarabinerLeaseWorkerTests' started", "Test Suite 'Foreign' started")
++	)
++);
++check('root summary wrong count refused', () =>
++	refuses(valid.slice(0, valid.lastIndexOf(summary(165))) + summary(164) + '\n')
++);
++check('elapsed malformed refused', () =>
++	refuses(valid.replace('in 1.000 (1.001) seconds', 'in -1.000 (1.001) seconds'))
++);
++check('fatal compile error refused', () => refuses('fatal error: build failed\n' + valid));
++
++// Windows lacks getuid and POSIX0600; project only the exact private modeled leaf/FD.
++// Real file kind, identity, link count, size and time cuts are never changed.
++const modeledReceiptBootstrap = (leaf, requestedMode = 0o600) => {
++	if (process.platform !== 'win32') return '';
++	assert.ok([0o600, 0o644].includes(requestedMode));
++	return `
++const modelFs = require('node:fs');
++const modelPath = require('node:path');
++const modelLeaf = ${JSON.stringify(leaf)};
++const modelMode = ${requestedMode};
++const modelUid = 1000;
++process.getuid = () => modelUid;
++const modelDescriptors = new Set();
++const actualOpen = modelFs.openSync;
++const actualClose = modelFs.closeSync;
++const actualLstat = modelFs.lstatSync;
++const actualFstat = modelFs.fstatSync;
++const ownsLeaf = (file) => typeof file === 'string' && modelPath.resolve(file) === modelLeaf;
++const observed = (record) => {
++	if (record.isFile()) {
++		if (typeof record.uid === 'bigint') {
++			record.uid = BigInt(modelUid);
++			record.mode = (record.mode & ~0o7777n) | BigInt(modelMode);
++		} else {
++			record.uid = modelUid;
++			record.mode = (record.mode & ~0o7777) | modelMode;
++		}
++	}
++	return record;
++};
++modelFs.openSync = (file, ...args) => {
++	const fd = actualOpen(file, ...args);
++	if (ownsLeaf(file)) modelDescriptors.add(fd);
++	return fd;
++};
++modelFs.closeSync = (fd) => { modelDescriptors.delete(fd); return actualClose(fd); };
++modelFs.lstatSync = (file, ...args) => {
++	const record = actualLstat(file, ...args);
++	return ownsLeaf(file) ? observed(record) : record;
++};
++modelFs.fstatSync = (fd, ...args) => {
++	const record = actualFstat(fd, ...args);
++	return modelDescriptors.has(fd) ? observed(record) : record;
++};
++`;
++};
++let unavailableFileOperations = 0;
++const checkReceiptOperation = (label, action) => {
++	try {
++		action();
++	} catch (error) {
++		if (process.platform !== 'win32' || !['EPERM', 'EACCES', 'ENOTSUP'].includes(error.code))
++			throw error;
++		unavailableFileOperations++;
++		console.log(`SKIP ${label}: host file operation unavailable; no native ownership proof.`);
++		return;
++	}
++	passed++;
++	console.log(`PASS ${label}`);
++};
++
++const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'lease165-receiver-controls-'));
++try {
++	const git = (args) =>
++		execFileSync('git', args, {
++			cwd: scratch,
++			encoding: 'utf8',
++			stdio: ['ignore', 'pipe', 'pipe']
++		});
++	git(['init', '-q']);
++	const put = (relative, text) => {
++		const file = path.join(scratch, relative);
++		fs.mkdirSync(path.dirname(file), { recursive: true });
++		fs.writeFileSync(file, text);
++		return file;
++	};
++	for (const cohort of corpus.cohorts)
++		put(
++			cohort.source,
++			cohort.names.map((name) => `func ${/ (test\w+)\]$/.exec(name)[1]}() {}`).join('\n') + '\n'
++		);
++	put(
++		'static/ergopti_plus/macos/launcher/Package.swift',
++		'// Controlled source inventory fixture; never native readiness.\n'
++	);
++	put('tools/test/fixtures/lease165-native-xctest-corpus.json', JSON.stringify(corpus) + '\n');
++	put(
++		'static/ergopti_plus/macos/launcher/Sources/Fixture/bytes.bin',
++		Buffer.from([255, 0, 192, 10])
++	);
++	git(['add', '.']);
++	git([
++		'-c',
++		'user.name=Receiver fixture',
++		'-c',
++		'user.email=fixture@example.invalid',
++		'commit',
++		'-qm',
++		'Controlled receiver source fixture'
++	]);
++	const sha = git(['rev-parse', 'HEAD']).trim();
++	const arch = process.arch === 'arm64' ? 'arm64' : 'x86_64';
++	const initial = reader.sourceReceipt(scratch, sha, arch, arch);
++	const log = put('evidence/selected.log', valid);
++	const before = path.join(scratch, 'evidence/before.json'),
++		verdict = path.join(scratch, 'evidence/verdict.json');
++	check('source receipt binds raw nonUTF8 bytes', () =>
++		assert.equal(
++			initial.sources['static/ergopti_plus/macos/launcher/Sources/Fixture/bytes.bin'],
++			require('node:crypto')
++				.createHash('sha256')
++				.update(Buffer.from([255, 0, 192, 10]))
++				.digest('hex')
++		)
++	);
++	check('wrong commit refused', () =>
++		assert.throws(() => reader.sourceReceipt(scratch, '0'.repeat(40), arch, arch))
++	);
++	check('wrong architecture refused', () =>
++		assert.throws(() =>
++			reader.sourceReceipt(scratch, sha, arch, arch === 'arm64' ? 'x86_64' : 'arm64')
++		)
++	);
++	check('wrong source method set refused', () => {
++		const file = path.join(scratch, corpus.cohorts[0].source),
++			original = fs.readFileSync(file);
++		fs.writeFileSync(file, Buffer.concat([original, Buffer.from('\nfunc testForeign() {}\n')]));
++		git(['add', corpus.cohorts[0].source]);
++		git([
++			'-c',
++			'user.name=Receiver fixture',
++			'-c',
++			'user.email=fixture@example.invalid',
++			'commit',
++			'-qm',
++			'Malformed method model'
++		]);
++		assert.throws(() =>
++			reader.sourceReceipt(scratch, git(['rev-parse', 'HEAD']).trim(), arch, arch)
++		);
++		fs.writeFileSync(file, original);
++		git(['add', corpus.cohorts[0].source]);
++		git([
++			'-c',
++			'user.name=Receiver fixture',
++			'-c',
++			'user.email=fixture@example.invalid',
++			'commit',
++			'-qm',
++			'Restore controlled method model'
++		]);
++	});
++	const candidate = git(['rev-parse', 'HEAD']).trim();
++	const command = (args, receiptMode = 0o600) =>
++		spawnSync(
++			process.execPath,
++			[
++				'-e',
++				modeledReceiptBootstrap(
++					path.join(scratch, 'evidence/lease165-swift-child-status.txt'),
++					receiptMode
++				) +
++					'process.exitCode = require(process.argv[1]).main(process.argv.slice(3), process.argv[2]);',
++				path.resolve(__dirname, '../diagnostics/lease165_xctest_evidence.cjs'),
++				scratch,
++				...args
++			],
++			{ encoding: 'utf8', timeout: 10000 }
++		);
++	check('actual CLI begin and judge source-held model', () => {
++		const begun = command(['begin', candidate, arch, arch, before]);
++		assert.equal(begun.status, 0, begun.stderr);
++		assert.equal(begun.stdout, '');
++		// Modeled child status preparation only; never a native Swift execution receipt.
++		fs.writeFileSync(path.join(scratch, 'evidence/lease165-swift-child-status.txt'), '0\n', {
++			flag: 'wx',
++			mode: 0o600
++		});
++		const judged = command(['judge', log, '0', '0', candidate, arch, arch, before, verdict]);
++		assert.equal(judged.status, 0, judged.stderr);
++		const receipt = JSON.parse(fs.readFileSync(verdict, 'utf8'));
++		assert.equal(receipt.complete, true);
++		assert.equal(receipt.full_package_qualified, false);
++		assert.equal(receipt.source.candidate, candidate);
++		assert.equal(receipt.passed, 165);
++	});
++	check('changed source receipt refused', () => {
++		const changed = path.join(scratch, 'evidence/changed.json');
++		const record = JSON.parse(fs.readFileSync(before, 'utf8'));
++		record.sources['static/ergopti_plus/macos/launcher/Package.swift'] = '0'.repeat(64);
++		fs.writeFileSync(changed, JSON.stringify(record));
++		const result = command([
++			'judge',
++			log,
++			'0',
++			'0',
++			candidate,
++			arch,
++			arch,
++			changed,
++			path.join(scratch, 'evidence/changed-verdict.json')
++		]);
++		assert.equal(result.status, 1);
++		assert.equal(result.stdout, '');
++		assert.ok(!fs.existsSync(path.join(scratch, 'evidence/changed-verdict.json')));
++	});
++	check('untracked implicit compiler input refused', () => {
++		const file = put(
++			'static/ergopti_plus/macos/launcher/Sources/Fixture/foreign.swift',
++			'// foreign\n'
++		);
++		assert.throws(() => reader.sourceReceipt(scratch, candidate, arch, arch));
++		fs.unlinkSync(file);
++	});
++	checkReceiptOperation('symlink capture refused', () => {
++		const link = path.join(scratch, 'evidence/alias.log');
++		fs.symlinkSync(log, link);
++		assert.throws(() => reader.readBoundedRegular(link, 16777216));
++	});
++	check('oversize capture refused', () => assert.throws(() => reader.readBoundedRegular(log, 1)));
++	checkReceiptOperation('hardlink capture refused', () => {
++		const link = path.join(scratch, 'evidence/hard.log');
++		fs.linkSync(log, link);
++		assert.throws(() => reader.readBoundedRegular(log, 16777216));
++		fs.unlinkSync(link);
++	});
++	check('exclusive verdict ownership preserved', () => {
++		const result = command(['judge', log, '0', '0', candidate, arch, arch, before, verdict]);
++		assert.equal(result.status, 1);
++	});
++	check('actual CLI nonzero pipeline remains refused', () => {
++		const file = path.join(scratch, 'evidence/failure.json');
++		const result = command(['judge', log, '1', '0', candidate, arch, arch, before, file]);
++		assert.equal(result.status, 1);
++		assert.equal(JSON.parse(fs.readFileSync(file, 'utf8')).complete, false);
++	});
++	// Fixed independent BEFORE requirements; all status files below are software models.
++	const directStatusFile = path.join(scratch, 'evidence/lease165-swift-child-status.txt');
++	const directVectors = [
++		['complete165_child0_wrapper0_capture0', 'regular', '0\n', '0', '0', 'valid', true],
++		['complete165_child1_wrapper0', 'regular', '1\n', '0', '0', 'valid', false],
++		['complete165_child_missing', 'absent', null, '0', '0', 'valid', false],
++		['complete165_child_nonnumeric', 'regular', 'not-a-status\n', '0', '0', 'valid', false],
++		['complete165_child_out_of_range', 'regular', '256\n', '0', '0', 'valid', false],
++		['complete165_child_noncanonical', 'regular', '00\n', '0', '0', 'valid', false],
++		['complete165_child_extra_content', 'regular', '0\n1\n', '0', '0', 'valid', false],
++		['complete165_child_symlink', 'symlink', '0\n', '0', '0', 'valid', false],
++		['complete165_child_hardlink', 'hardlink', '0\n', '0', '0', 'valid', false],
++		['complete165_child_foreign_owner', 'foreign-uid-port', '0\n', '0', '0', 'valid', false],
++		['complete165_child0_wrapper1', 'regular', '0\n', '1', '0', 'valid', false],
++		['complete165_child0_capture1', 'regular', '0\n', '0', '1', 'valid', false],
++		['incomplete165_child0', 'regular', '0\n', '0', '0', 'incomplete', false],
++		['failed_case_child0', 'regular', '0\n', '0', '0', 'failed', false],
++		['skipped_case_child0', 'regular', '0\n', '0', '0', 'skipped', false],
++		['changed_source_child0', 'regular', '0\n', '0', '0', 'changed', false],
++		['complete165_child_empty_receipt', 'regular', '', '0', '0', 'valid', false],
++		['complete165_child_no_final_lf', 'regular', '0', '0', '0', 'valid', false],
++		['complete165_child_permissive_mode', 'mode0644', '0\n', '0', '0', 'valid', false]
++	];
++	assert.equal(directVectors.length, 19);
++	for (const [name, kind, bytes, wrapper, capture, shape, expected] of directVectors) {
++		checkReceiptOperation(`direct child frozen requirement ${name}`, () => {
++			try {
++				fs.unlinkSync(directStatusFile);
++			} catch (error) {
++				if (error.code !== 'ENOENT') throw error;
++			}
++			const target = path.join(scratch, `evidence/${name}-target.txt`);
++			if (kind === 'symlink') {
++				fs.writeFileSync(target, bytes, { flag: 'wx', mode: 0o600 });
++				fs.symlinkSync(target, directStatusFile);
++			} else if (kind !== 'absent') {
++				fs.writeFileSync(directStatusFile, bytes, { flag: 'wx', mode: 0o600 });
++				if (kind === 'hardlink') fs.linkSync(directStatusFile, target);
++				if (kind === 'mode0644') fs.chmodSync(directStatusFile, 0o644);
++			}
++			let text = valid;
++			if (shape === 'incomplete') text = valid.replace(terminal(first) + '\n', '');
++			if (shape === 'failed')
++				text = valid.replace(terminal(first), terminal(first).replace('passed', 'failed'));
++			if (shape === 'skipped')
++				text = valid.replace(terminal(first), terminal(first).replace('passed', 'skipped'));
++			const vectorLog = put(`evidence/${name}.log`, text);
++			const vectorVerdict = path.join(scratch, `evidence/${name}.json`);
++			const args = [
++				'judge',
++				vectorLog,
++				wrapper,
++				capture,
++				candidate,
++				arch,
++				arch,
++				shape === 'changed' ? path.join(scratch, 'evidence/changed.json') : before,
++				vectorVerdict
++			];
++			// No chown or native authority: model only the public current-UID port.
++			const result =
++				kind === 'foreign-uid-port'
++					? spawnSync(
++							process.execPath,
++							[
++								'-e',
++								modeledReceiptBootstrap(directStatusFile) +
++									'const actualUid = process.getuid(); process.getuid = () => actualUid + 1; process.exitCode = require(process.argv[1]).main(process.argv.slice(3), process.argv[2]);',
++								path.resolve(__dirname, '../diagnostics/lease165_xctest_evidence.cjs'),
++								scratch,
++								...args
++							],
++							{ encoding: 'utf8', timeout: 10000 }
++						)
++					: command(args, kind === 'mode0644' ? 0o644 : 0o600);
++			assert.equal(result.status, expected ? 0 : 1, result.stderr);
++			if (fs.existsSync(vectorVerdict)) {
++				const record = JSON.parse(fs.readFileSync(vectorVerdict, 'utf8'));
++				assert.equal(record.complete, expected);
++				assert.equal(record.full_package_qualified, false);
++				assert.equal(record.swift_status, Number(bytes));
++				assert.equal(record.wrapper_status, Number(wrapper));
++				assert.equal(record.capture_status, Number(capture));
++			} else {
++				assert.equal(expected, false);
++				assert.equal(result.stdout, '');
++			}
++			if (fs.existsSync(target)) fs.unlinkSync(target);
++			// Restore the modeled old38 setup for the next vector without a success override.
++			try {
++				fs.unlinkSync(directStatusFile);
++			} catch (error) {
++				if (error.code !== 'ENOENT') throw error;
++			}
++			fs.writeFileSync(directStatusFile, '0\n', { flag: 'wx', mode: 0o600 });
++		});
++	}
++} finally {
++	fs.rmSync(scratch, { recursive: true, force: true });
++}
++console.log(`Lease165 receiver controls: ${passed} passed, 0 failed; native execution unrun.`);
++console.log(
++	`Receipt host models: Windows UID/mode=${process.platform === 'win32'}; file operations skipped=${unavailableFileOperations}; native ownership unavailable on Windows.`
++);
+diff --git a/tools/test/test-macos-dev-qualification-deferral.cjs b/tools/test/test-macos-dev-qualification-deferral.cjs
+--- a/tools/test/test-macos-dev-qualification-deferral.cjs
++++ b/tools/test/test-macos-dev-qualification-deferral.cjs
+@@ -302,9 +302,24 @@
+ 	const retention = job.indexOf('      - name: Retain scoped item 36 native diagnostics\n');
+ 	if (archive < 0 || archive >= observation || retention <= observation) return null;
+ 	const position = jobs[0].index + observation + PERMISSION_STEP_SOURCE.indexOf(PERMISSION_FILTER);
+-	return mac.slice(0, position) + mac.slice(position + PERMISSION_FILTER.length);
++	return admitLease165Selector(
++		mac.slice(0, position) + mac.slice(position + PERMISSION_FILTER.length)
++	);
+ }
+ 
++// Strip only the exact independently admitted manual job, never arbitrary filters.
++function admitLease165Selector(mac) {
++	const jobs = fullDefault
++		.jobsOfText(mac, '.github/workflows/ci-macos.yml')
++		.filter((job) => job.id === 'lease165-native');
++	if (
++		jobs.length !== 1 ||
++		require('node:crypto').createHash('sha256').update(jobs[0].body.trimEnd()).digest('hex') !==
++			'724f6560de5871aa08d5cb1287657a1a760aedc8aa30bdcdfabce0bd2adf2352'
++	)
++		return null;
++	return mac.replace(jobs[0].body, '');
++}
+ function sourceProblems(pkg, mac, rootCaller) {
+ 	const errors = consentSourceProblems(brewSource, consentSource, pkg);
+ 	const requireText = (value, token, name) => {
+@@ -1026,6 +1041,56 @@
+ 		assert.equal(admitRawNativeSdkSelector(changed), null);
+ 	});
+ 
++const lease165Job = fullDefault
++	.jobsOfText(workflow, '.github/workflows/ci-macos.yml')
++	.find((job) => job.id === 'lease165-native');
++assert.ok(lease165Job);
++assert.notEqual(admitLease165Selector(workflow), null);
++let lease165Supplement = 1;
++for (const [old, next] of [
++	['    steps:', '    continue-on-error: true\n    steps:'],
++	['architecture: x86_64', 'architecture: arm64'],
++	['          lease_statuses=("${PIPESTATUS[@]}")', '          lease_statuses=(0 0)'],
++	[
++		"--filter 'KarabinerLeaseWorkerTests|LeaseDiagnosticNextObservationTests'",
++		"--filter 'LeaseDiagnosticNextObservationTests'"
++	],
++	[
++		"--filter 'KarabinerLeaseWorkerTests|LeaseDiagnosticNextObservationTests'",
++		"--filter 'KarabinerLeaseWorkerTests|LeaseDiagnosticNextObservationTests|Foreign'"
++	],
++	['    runs-on: ${{ matrix.runner }}', '    runs-on: macos-latest'],
++	["github.event_name == 'workflow_dispatch'", "github.event_name == 'push'"],
++	["github.event_name == 'workflow_dispatch'", "github.event_name == 'pull_request'"],
++	['!inputs.release', 'inputs.release']
++]) {
++	assert.ok(lease165Job.body.includes(old));
++	const changed = workflow.replace(lease165Job.body, lease165Job.body.replace(old, next));
++	assert.equal(admitLease165Selector(changed), null);
++	assert.ok(sourceProblems(packageSource, changed, caller).includes('no-other-exclusion'));
++	lease165Supplement++;
++}
++assert.equal(
++	admitLease165Selector(workflow.replace('  lease165-native:', '  foreign-native:')),
++	null
++);
++lease165Supplement++;
++assert.equal(
++	admitLease165Selector(
++		workflow.replace(lease165Job.body, lease165Job.body + '\n' + lease165Job.body)
++	),
++	null
++);
++lease165Supplement++;
++assert.ok(
++	sourceProblems(packageSource, workflow + '\n# --filter foreign\n', caller).includes(
++		'no-other-exclusion'
++	)
++);
++lease165Supplement++;
++assert.equal(lease165Supplement, 13);
++console.log('PASS: manual lease165 exact-job selector controls=13; native execution unrun.');
++
+ assert.equal(passed, 79);
+ console.log(
+ 	'PASS: Mac qualification deferral source/typed-receipt controls=79; Swift/native execution unqualified.'
+diff --git a/tools/test/test-macos-swift-launcher-ci.cjs b/tools/test/test-macos-swift-launcher-ci.cjs
+--- a/tools/test/test-macos-swift-launcher-ci.cjs
++++ b/tools/test/test-macos-swift-launcher-ci.cjs
+@@ -553,6 +553,94 @@
+ 	'package-linux':
+ 		"${{ !cancelled() && (needs.e2e-linux.result == 'success' || (github.event_name == 'workflow_dispatch' && needs.e2e-linux.result == 'failure')) }}"
+ };
++// Exact independent manual receiver; no wildcard inventory or condition exception.
++const MANUAL_LEASE165_JOB = [
++	"    name: 'Lease native 165 (${{ matrix.architecture }})'",
++	"    if: ${{ (github.event_name == 'workflow_dispatch' && !inputs.release) }}",
++	'    strategy:',
++	'      fail-fast: false',
++	'      matrix:',
++	'        include:',
++	'          - runner: macos-15',
++	'            architecture: arm64',
++	'          - runner: macos-15-intel',
++	'            architecture: x86_64',
++	'    runs-on: ${{ matrix.runner }}',
++	'    timeout-minutes: 25',
++	'    steps:',
++	'      - uses: actions/checkout@v4',
++	'        with:',
++	'          ref: ${{ github.sha }}',
++	'      - uses: actions/setup-node@v4',
++	'        with:',
++	"          node-version-file: '.node-version'",
++	'      - name: Receive exact native lease worker and next-observation cohorts',
++	'        shell: bash',
++	'        env:',
++	'          LEASE_EXPECTED_ARCH: ${{ matrix.architecture }}',
++	'          SWIFT_BACKTRACE: enable=yes',
++	'        run: |',
++	'          set -euo pipefail',
++	'          umask 077',
++	'          test -z "${ERGOPTI_DEV_QUALIFICATION_PROFILE:-}"',
++	'          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"',
++	'          lease_actual_arch="$(uname -m)"',
++	'          test "$lease_actual_arch" = "$LEASE_EXPECTED_ARCH"',
++	'          evidence="$RUNNER_TEMP/lease165-native-evidence"',
++	'          mkdir -m 700 "$evidence"',
++	'          transcript="$evidence/lease165-xctest.log"',
++	'          source_receipt="$evidence/lease165-source.json"',
++	'          node tools/diagnostics/lease165_xctest_evidence.cjs begin \\',
++	'            "$GITHUB_SHA" "$LEASE_EXPECTED_ARCH" "$lease_actual_arch" "$source_receipt"',
++	'          child_status_receipt="$evidence/lease165-swift-child-status.txt"',
++	'          child_script="$evidence/lease165-swift-child.sh"',
++	'          test ! -e "$child_status_receipt" && test ! -L "$child_status_receipt"',
++	'          set -C',
++	'          cat > "$child_script" <<\'LEASE165_SWIFT_CHILD\'',
++	'          set -uo pipefail',
++	'          umask 077',
++	'          test ! -e "$2" && test ! -L "$2" || exit 1',
++	'          set +e',
++	'          swift test --package-path static/ergopti_plus/macos/launcher \\',
++	'            --scratch-path "$1" \\',
++	"            --filter 'KarabinerLeaseWorkerTests|LeaseDiagnosticNextObservationTests'",
++	'          lease_child_status=$?',
++	'          set -eC',
++	'          printf \'%s\\n\' "$lease_child_status" > "$2"',
++	'          exit "$lease_child_status"',
++	'          LEASE165_SWIFT_CHILD',
++	'          set +e',
++	'          script -q /dev/null /bin/bash "$child_script" \\',
++	'            "$RUNNER_TEMP/lease165-swift-ci" "$child_status_receipt" 2>&1 | tee "$transcript"',
++	'          lease_statuses=("${PIPESTATUS[@]}")',
++	'          set -e',
++	'          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"',
++	'          lease_actual_arch="$(uname -m)"',
++	'          node tools/diagnostics/lease165_xctest_evidence.cjs judge \\',
++	'            "$transcript" "${lease_statuses[0]}" "${lease_statuses[1]}" \\',
++	'            "$GITHUB_SHA" "$LEASE_EXPECTED_ARCH" "$lease_actual_arch" "$source_receipt" \\',
++	'            "$evidence/lease165-verdict.json"',
++	'      - name: Retain scoped native lease evidence',
++	'        if: always()',
++	'        uses: actions/upload-artifact@v4',
++	'        with:',
++	'          name: lease165-native-${{ matrix.architecture }}-${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}',
++	'          retention-days: 7',
++	'          if-no-files-found: warn',
++	'          path: |',
++	'            ${{ runner.temp }}/lease165-native-evidence/lease165-xctest.log',
++	'            ${{ runner.temp }}/lease165-native-evidence/lease165-*.json',
++	'            ${{ runner.temp }}/lease165-native-evidence/lease165-swift-child-status.txt'
++].join('\n');
++function isManualLease165(job, rel) {
++	return (
++		rel === MACOS_BOX &&
++		job.id === 'lease165-native' &&
++		pipeline.field(job.body, 'if') ===
++			"${{ (github.event_name == 'workflow_dispatch' && !inputs.release) }}" &&
++		job.body.trimEnd() === MANUAL_LEASE165_JOB
++	);
++}
+ for (const rel of Object.values(BOX_FILES)) {
+ 	for (const boxJob of pipeline.jobs(rel)) {
+ 		const condition = pipeline.field(boxJob.body, 'if');
+@@ -561,7 +649,10 @@
+ 			boxJob.id === 'item36-native' &&
+ 			condition === "${{ github.event_name == 'workflow_dispatch' && !inputs.release }}";
+ 		check(
+-			condition === null || ALLOWED_JOB_IFS[boxJob.id] === condition || manualArchiveQualification,
++			condition === null ||
++				ALLOWED_JOB_IFS[boxJob.id] === condition ||
++				manualArchiveQualification ||
++				isManualLease165(boxJob, rel),
+ 			`${rel}: job \`${boxJob.id}\` has job-level \`if: ${condition}\`; only ` +
+ 				`${Object.entries(ALLOWED_JOB_IFS)
+ 					.map(([id, value]) => `${id} (${value})`)
+@@ -573,6 +664,41 @@
+ 		);
+ 	}
+ }
++const manualLease165Job = pipeline.jobs(MACOS_BOX).filter((job) => job.id === 'lease165-native');
++check(
++	manualLease165Job.length === 1 && isManualLease165(manualLease165Job[0], MACOS_BOX),
++	'exact independent manual lease165 receiving job'
++);
++for (const [old, next] of [
++	["github.event_name == 'workflow_dispatch' && !inputs.release", "github.event_name == 'push'"],
++	["github.event_name == 'workflow_dispatch'", "github.event_name == 'pull_request'"],
++	['!inputs.release', 'inputs.release'],
++	['    timeout-minutes: 25', '    timeout-minutes: 26'],
++	['architecture: x86_64', 'architecture: arm64'],
++	['          lease_statuses=("${PIPESTATUS[@]}")', '          lease_statuses=(0 0)'],
++	[
++		"--filter 'KarabinerLeaseWorkerTests|LeaseDiagnosticNextObservationTests'",
++		"--filter 'LeaseDiagnosticNextObservationTests'"
++	],
++	['    steps:', '    continue-on-error: true\n    steps:']
++]) {
++	check(MANUAL_LEASE165_JOB.includes(old), 'lease165 mutation has an actual preimage');
++	check(
++		!isManualLease165(
++			{ id: 'lease165-native', body: MANUAL_LEASE165_JOB.replace(old, next) },
++			MACOS_BOX
++		),
++		'lease165 changed scope, architecture, status, count or failure authority refuses'
++	);
++}
++check(
++	!isManualLease165({ id: 'foreign-native', body: MANUAL_LEASE165_JOB }, MACOS_BOX),
++	'foreign manual job identity refuses'
++);
++check(
++	!isManualLease165({ id: 'lease165-native', body: MANUAL_LEASE165_JOB }, BOX_FILES.windows),
++	'foreign lane receiver refuses'
++);
+ for (const [id, condition] of Object.entries(ALLOWED_JOB_IFS)) {
+ 	check(
+ 		pipeline.field(pipeline.job(id), 'if') === condition,

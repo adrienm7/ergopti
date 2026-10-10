@@ -1,0 +1,257 @@
+{
+	"source_base": "ac4f1f1a52e70eb8fbd1798bf521b8c1daaa5012",
+	"nine_owned_paths": [
+		{
+			"path": ".github/workflows/ci-macos.yml",
+			"role": "manual-only ARM/Intel independent sibling, reusable caller already depends on Validate",
+			"pre_sha256": "060c1b405b44b6cbfac2d363773426011922998200373b2229e2b38005488fca",
+			"pre_bytes": 95922,
+			"post_sha256": "74a58f42128158864d39056fc80de77a7c0d713a087b0bb3489c1b31ebc47bfc",
+			"post_bytes": 99393,
+			"owned_cut_count": 1,
+			"inverse_whole_current_preimage": true
+		},
+		{
+			"path": "tools/diagnostics/lease165_xctest_evidence.cjs",
+			"role": "strict selected165/source/architecture/underlying child+wrapper/capture receipt admission",
+			"pre_sha256": null,
+			"pre_bytes": null,
+			"post_sha256": "f9033789e2f86861a5df411140537a4cc696195dce00b03c4324f85fcfac0a00",
+			"post_bytes": 12852,
+			"owned_cut_count": 0,
+			"inverse_whole_current_preimage": true
+		},
+		{
+			"path": "tools/test/ci-full-default.cjs",
+			"role": "exact new-job inventory and bounded semantics enrollment",
+			"pre_sha256": "9b2b524b00274e164330472d1bf7fa688ca5dc16bfc9d6bc58eda7947a115ae8",
+			"pre_bytes": 13622,
+			"post_sha256": "97e509cb76388e72570ddb0c78cc819f845f4f8662e2a322faf28425a054395a",
+			"post_bytes": 13759,
+			"owned_cut_count": 1,
+			"inverse_whole_current_preimage": true
+		},
+		{
+			"path": "tools/test/fixtures/lease165-native-xctest-corpus.json",
+			"role": "unchanged independent historical146+19 method roster",
+			"pre_sha256": null,
+			"pre_bytes": null,
+			"post_sha256": "2775bca2baf42b72eb74fc599f9828bcfe886d577fdf172d4edf0758187a351f",
+			"post_bytes": 19134,
+			"owned_cut_count": 0,
+			"inverse_whole_current_preimage": true
+		},
+		{
+			"path": "tools/test/run-js-suite.cjs",
+			"role": "exact new-job inventory and bounded semantics enrollment",
+			"pre_sha256": "d7bac08ef0de6e1fd431514f2199690f5c0d9273cce70b42bfaee1ecd5288bdf",
+			"pre_bytes": 98134,
+			"post_sha256": "ad11523e88162b5e7727e4191a0174647ba8d1ec78dbb82ef95d6d9c3b7fe607",
+			"post_bytes": 98385,
+			"owned_cut_count": 1,
+			"inverse_whole_current_preimage": true
+		},
+		{
+			"path": "tools/test/test-ci-pipeline-wiring.cjs",
+			"role": "exact new-job inventory and bounded semantics enrollment",
+			"pre_sha256": "9d4d09b33b60d96d04ddbbbd60d377d4f0f0706aa393a8eb38108971ca81f174",
+			"pre_bytes": 191687,
+			"post_sha256": "53a3619ddf1ffffaf7cf43efb26bee0eb8eab00d929e8eb73430c042e6e0b745",
+			"post_bytes": 192968,
+			"owned_cut_count": 6,
+			"inverse_whole_current_preimage": true
+		},
+		{
+			"path": "tools/test/test-lease165-xctest-evidence.cjs",
+			"role": "unchanged historical38 assertions with setup-only stricter receipt plus frozen19 negatives",
+			"pre_sha256": null,
+			"pre_bytes": null,
+			"post_sha256": "ae321617a8d97e8e2e402dead8722473c07d3433a4240815f422d0b75226bc69",
+			"post_bytes": 18775,
+			"owned_cut_count": 0,
+			"inverse_whole_current_preimage": true
+		},
+		{
+			"path": "tools/test/test-macos-dev-qualification-deferral.cjs",
+			"role": "exact new-job inventory and bounded semantics enrollment",
+			"pre_sha256": "85497fa12b844e61eef7576223bc462a869bbdaddc4eb9862f708d216f327d47",
+			"pre_bytes": 45213,
+			"post_sha256": "2687541832d873c369af17ffd1d8e05a6f559bd5f37d2da0c47a288ef50c7e1f",
+			"post_bytes": 47664,
+			"owned_cut_count": 3,
+			"inverse_whole_current_preimage": true
+		},
+		{
+			"path": "tools/test/test-macos-swift-launcher-ci.cjs",
+			"role": "exact new-job inventory and bounded semantics enrollment",
+			"pre_sha256": "b34add0cbdad9885962b857b30becdc72b530e9555ebfb2e67d3c2d47d1516f3",
+			"pre_bytes": 56223,
+			"post_sha256": "6cc4be9c755cd948180bedece66703ba266e6573b37386d7851a49e890a804e4",
+			"post_bytes": 61810,
+			"owned_cut_count": 3,
+			"inverse_whole_current_preimage": true
+		}
+	],
+	"contexts": [
+		{
+			"path": ".github/workflows/ci-macos.yml",
+			"old_hunk_line": 60,
+			"exact_context_matches_before": 1,
+			"adaptation": null,
+			"old_context_sha256": "270cd8cb795702464747e7f247aa682b366f29b1edac8f0c96562031e0be242f",
+			"old_cut_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"new_cut_sha256": "241845e0f73998e8d28f7af9c29f1be0e1fb71cb28c3072f4f5fbf94680cf9ee"
+		},
+		{
+			"path": "tools/test/ci-full-default.cjs",
+			"old_hunk_line": 34,
+			"exact_context_matches_before": 1,
+			"adaptation": null,
+			"old_context_sha256": "c39dd7a56efb31b4498a9c01900d387e45b7da0385f1374cb86b2555027f1794",
+			"old_cut_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"new_cut_sha256": "24b1fa6b133050aceccb4ef02cabeb1efc8df6bbb4c9afbf1ef0e58863529eaa"
+		},
+		{
+			"path": "tools/test/run-js-suite.cjs",
+			"old_hunk_line": 33,
+			"exact_context_matches_before": 1,
+			"adaptation": null,
+			"old_context_sha256": "211ba3285f1f3b4f83f10cb49f5b3734176bf813dab74601f39b813b6d987678",
+			"old_cut_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"new_cut_sha256": "b54930d088c8f8e0d8a70e5ad2e65e73a833deb54cebb4b5a08da6faabbb4cf2"
+		},
+		{
+			"path": "tools/test/test-ci-pipeline-wiring.cjs",
+			"old_hunk_line": 336,
+			"exact_context_matches_before": 0,
+			"adaptation": "Windows-retention context only; identical lease row follows STEP_CONDITIONS opening, before preserved WINDOWS_FILE_RETENTION spread.",
+			"old_context_sha256": "99c1598247c3140028f82ede7aa6cbcd9b6f90139cb6b668d5ed0aef86194946",
+			"old_cut_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"new_cut_sha256": "9c7a1f5f9b115b36362289ee28df28fcc3623df3d4d0b4a22617a098972fa1ab"
+		},
+		{
+			"path": "tools/test/test-ci-pipeline-wiring.cjs",
+			"old_hunk_line": 1153,
+			"exact_context_matches_before": 1,
+			"adaptation": null,
+			"old_context_sha256": "dc8662cffe2f74033c1725416236f11027f9f692e7951af8ab0efce48fcd00d2",
+			"old_cut_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"new_cut_sha256": "7eda57fb51e8c52e8042a93d8092c45eb837dc0fe4d48dca6fdb1f7020fb4f12"
+		},
+		{
+			"path": "tools/test/test-ci-pipeline-wiring.cjs",
+			"old_hunk_line": 1195,
+			"exact_context_matches_before": 1,
+			"adaptation": null,
+			"old_context_sha256": "56d809d2e0450ef9cd26580512c12f5e47d6771347406c66e453b2a051422ab0",
+			"old_cut_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"new_cut_sha256": "d00ba92dc0e5b6c5bc5e4292d10dc436567452a6e54285e34d10824eb35dbd2a"
+		},
+		{
+			"path": "tools/test/test-ci-pipeline-wiring.cjs",
+			"old_hunk_line": 1239,
+			"exact_context_matches_before": 1,
+			"adaptation": null,
+			"old_context_sha256": "3c89590d4c45924e00dec023346018f854452cebb7682f01dbd7492e84aadf77",
+			"old_cut_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"new_cut_sha256": "e15a71781c21160d4ddb316faf00ff1890974f57b2af810a43656b6c7fabdc3b"
+		},
+		{
+			"path": "tools/test/test-ci-pipeline-wiring.cjs",
+			"old_hunk_line": 1254,
+			"exact_context_matches_before": 1,
+			"adaptation": null,
+			"old_context_sha256": "13bf974995d32d4f0e6b8f36808176882228dd2dc2d4958d058c9824c2bd8163",
+			"old_cut_sha256": "206bd7c2071b304219a75cfe3fb5994e8b7d9f9eeef888486818add7be203608",
+			"new_cut_sha256": "ab30fc8964c4fd51a2f1ed611025a3490766d76c354b33600a89e889e2d3c132"
+		},
+		{
+			"path": "tools/test/test-ci-pipeline-wiring.cjs",
+			"old_hunk_line": 1329,
+			"exact_context_matches_before": 1,
+			"adaptation": null,
+			"old_context_sha256": "aab8580a9aa1cd213cbf84cea1fda4b845a6e3941ea8ad210805544464394a95",
+			"old_cut_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"new_cut_sha256": "4cdbcb674ce8976de7635f990a298b622b46d906e5614049a693e3f5d8db7cad"
+		},
+		{
+			"path": "tools/test/test-macos-dev-qualification-deferral.cjs",
+			"old_hunk_line": 305,
+			"exact_context_matches_before": 1,
+			"adaptation": null,
+			"old_context_sha256": "82f391320d4ec8e33c34bf7730a0e5525de1c4018684b7cf71e17487b384a658",
+			"old_cut_sha256": "039bd2cd406c6d652aed239e268f970456862fa505c78efe5bc7ed1eb815cf9e",
+			"new_cut_sha256": "df6386b267ad684c7550bcd51ae73163b45c661856ee9b366412f8a091bae830"
+		},
+		{
+			"path": "tools/test/test-macos-dev-qualification-deferral.cjs",
+			"old_hunk_line": 308,
+			"exact_context_matches_before": 1,
+			"adaptation": null,
+			"old_context_sha256": "1f58e243bb39ef720980ca8b538af562f6811c23d41b92724cfff4d360d063b5",
+			"old_cut_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"new_cut_sha256": "ec85a0cadd83d7a06786a975bdd2c1a2d01e13d98fe341f67cc6a54fd7e269dd"
+		},
+		{
+			"path": "tools/test/test-macos-dev-qualification-deferral.cjs",
+			"old_hunk_line": 1029,
+			"exact_context_matches_before": 1,
+			"adaptation": null,
+			"old_context_sha256": "00a69a0f6d171e31a0d412db701cbcaeba54ac626eb4e0192cab587a894efdb3",
+			"old_cut_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"new_cut_sha256": "abc680b6fbbe1b0e33dda44be2609214ffe13811760f70f102c65c4b68b57e25"
+		},
+		{
+			"path": "tools/test/test-macos-swift-launcher-ci.cjs",
+			"old_hunk_line": 556,
+			"exact_context_matches_before": 1,
+			"adaptation": null,
+			"old_context_sha256": "8deb1d79806d79a9446f3a814de9b0c56c4310a7eb97876805822c8179ac1d44",
+			"old_cut_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"new_cut_sha256": "5e1c15dd32d0f2ea9e98b91afee8b3e5ca4d0ee692ebeee1861aca52cee43475"
+		},
+		{
+			"path": "tools/test/test-macos-swift-launcher-ci.cjs",
+			"old_hunk_line": 564,
+			"exact_context_matches_before": 1,
+			"adaptation": null,
+			"old_context_sha256": "572ed2252a2d4e9ffbc934e96e338033db189c313584e6e8dd6464b1aad299d1",
+			"old_cut_sha256": "278ff2372b47e31d4884e7b2ed04f76c0b2163f11ac5acbc84254559e90ff524",
+			"new_cut_sha256": "3b47d1c9c857f2a63c31aff98b42b8f830e4fc25a3d3d6b75215e54275b22893"
+		},
+		{
+			"path": "tools/test/test-macos-swift-launcher-ci.cjs",
+			"old_hunk_line": 576,
+			"exact_context_matches_before": 1,
+			"adaptation": null,
+			"old_context_sha256": "a2b00d1cccdb7560c13e69ae6b58fe4314ea48c5cf3325b5ffc7bdae4c3458d7",
+			"old_cut_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"new_cut_sha256": "1a100c797555124956cef7691a1b42a811ec20026ce0236dd97024dfa776295a"
+		}
+	],
+	"exact_context_cuts": 14,
+	"total_opcode_cuts": 15,
+	"unified_diff_hunks": 17,
+	"windows_retention_context_adaptation": 1,
+	"whole_current_preimages_restored_by_exact_inverse": true,
+	"new_files_absent_from_base": true,
+	"original_workflow_outside_added_sibling_whole": true,
+	"original_guard_assertions_and_mutations_outside_exact_cuts_whole": true,
+	"producer_script_whole": true,
+	"historical_corpus_whole": true,
+	"generic_parser_untouched": true,
+	"suite_execution": 0,
+	"native_execution": 0,
+	"canonical_writes": 0,
+	"ref_changes": 0,
+	"adaptation_review": "PENDING independent current-source review; prior software receiving does not execute current guard postimages.",
+	"independent_git_apply_on_disposable_six_preimage_tree": {
+		"forward_check_exit": 0,
+		"forward_exit": 0,
+		"nine_postimages_exact": true,
+		"reverse_check_exit": 0,
+		"reverse_exit": 0,
+		"six_preimages_whole_new_three_absent": true,
+		"tree_disposed": true
+	}
+}
