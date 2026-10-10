@@ -51,11 +51,11 @@ Test("meta priority-baseline: DRIVER_BASELINE_PRIORITY_CLASS is declared exactly
 ; ==========================================================
 ; ==========================================================
 
-_PBSS_CheckRestoreSite(FuncName) {
+_PBSS_CheckRestoreSite(FuncName, PriorityCall := "ProcessSetPriority") {
 	Body := _DriverFuncBody(FuncName)
 	Assert(Body != "", FuncName . " must exist in the driver source")
-	Assert(InStr(Body, "ProcessSetPriority(DRIVER_BASELINE_PRIORITY_CLASS)") > 0,
-		FuncName . " must restore priority via `ProcessSetPriority(DRIVER_BASELINE_PRIORITY_CLASS)` — a hardcoded "
+	Assert(InStr(Body, PriorityCall . "(DRIVER_BASELINE_PRIORITY_CLASS)") > 0,
+		FuncName . " must restore priority via " . PriorityCall . "(DRIVER_BASELINE_PRIORITY_CLASS); a hardcoded "
 		. "literal would silently diverge from the boot-time boost class again (driver-baseline-priority-reverted-to-normal)")
 	Assert(InStr(Body, 'ProcessSetPriority("Normal")') = 0,
 		FuncName . " must NOT restore via the literal `ProcessSetPriority(" . Chr(34) . "Normal" . Chr(34) . ")` — "
@@ -64,7 +64,20 @@ _PBSS_CheckRestoreSite(FuncName) {
 }
 
 _PBSS_LlmDepsFailRestoresBaseline() {
-	_PBSS_CheckRestoreSite("LLM_Deps_Fail")
+	Body := _DriverFuncBody("LLM_Deps_Fail")
+	Assert(Body != "", "the real dependency failure caller must remain source-visible")
+	Assert(InStr(Body,
+		"return _LLM_Deps_PublishFailure(msg, on_failed, captured_epoch, ProcessSetPriority)", true) > 0,
+		"failure must pass its actual process-priority capability to the publication owner")
+	Assert(InStr(Body, 'ProcessSetPriority("Normal")', true) = 0,
+		"the failure caller cannot reset a hardcoded priority before delegation")
+	_PBSS_CheckRestoreSite("_LLM_Deps_PublishFailure", "PriorityFn.Call")
+	Publisher := _DriverFuncBody("_LLM_Deps_PublishFailure")
+	Assert(InStr(Publisher, "if !HasMethod(PriorityFn, " . Chr(34) . "Call" . Chr(34) . ")", true) > 0
+		&& InStr(Publisher, "PriorityFn := ProcessSetPriority", true) > 0,
+		"the same real publication owner retains the actual default process-priority capability")
+	Assert(InStr(Publisher, 'PriorityFn.Call("Normal")', true) = 0,
+		"the capability-owned restore cannot replace the shared baseline with a literal")
 }
 Test("meta priority-baseline: LLM_Deps_Fail restores via DRIVER_BASELINE_PRIORITY_CLASS, not a Normal literal", _PBSS_LlmDepsFailRestoresBaseline)
 
