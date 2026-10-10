@@ -677,6 +677,21 @@ local function handle_key(event_obj)
 		and type(_script_control.is_paused) == "function"
 		and _script_control.is_paused()
 		then
+			-- Observed physical releases retire their old hold even while telemetry
+			-- is paused. A new paused press has no usable timestamp: retain only
+			-- its crossing-release marker until that exact key releases.
+			if evt_type == hs.eventtap.event.types.flagsChanged then
+				local keycode = event_obj:getKeyCode()
+				local flags = event_obj:getFlags() or {}
+				if MODIFIER_KEYCODES[keycode] then
+					if CoreState.modifier_down_at[keycode] ~= nil then
+						CoreState.modifier_down_at[keycode] = nil
+					else
+						CoreState.modifier_suppressed_releases[keycode] = true
+					end
+				end
+				CoreState.prev_flags = flags
+			end
 			LogManager.flush_buffer()
 			return
 		end
@@ -2283,12 +2298,10 @@ end
 --- @return boolean True when the context was re-synchronised.
 function M.resync_context()
 	return _physical_lifecycle.run("resync", function()
-		-- A modifier held across the pause never received its release: handle_key returns
-		-- at the pause guard, so the keyUp that would clear modifier_down_at never ran.
-		-- The stale down-timestamp would then be misread as a fresh press on the next
-		-- flagsChanged, inverting press/release and logging a hold that never happened.
-		-- An unmatched down carries no usable duration, so discard it.
-		CoreState.modifier_down_at = {}
+		-- Paused releases already retired their own timestamps. Only keys still
+		-- held cross this boundary; cancel their entire duration and suppress the
+		-- next release without swallowing a later fresh press.
+		if settle_physical_modifiers() ~= true then return false end
 		local ok, res = pcall(ContextTracker.resync_context)
 		if not ok then
 			Logger.error(LOG, "resync_context() failed: %s.", tostring(res))

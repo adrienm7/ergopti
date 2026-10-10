@@ -371,3 +371,205 @@ helpers.describe("HS-274 held modifier source settlement (wp3)", function()
 		helpers.assert_true(rawequal(package.loaded["modules.keylogger.physical_accounting_mode"], previous_mode))
 	end)
 end)
+
+helpers.describe("HS-274 held modifier pause settlement (wp3)", function()
+	local sides = { 54, 55, 56, 60, 58, 61, 59, 62, 63 }
+	local side_flags = {
+		[54] = "cmd", [55] = "cmd", [56] = "shift", [60] = "shift",
+		[58] = "alt", [61] = "alt", [59] = "ctrl", [62] = "ctrl", [63] = "fn",
+	}
+	local function held_flags(keycode) return { [side_flags[keycode]] = true } end
+
+	--- Runs the existing accounting fixture with the real keylogger lifecycle.
+	--- Only the native watchers and the context refresh result are existing doubles.
+	--- @param body function Scenario receiving physical events and pause controls.
+	local function with_pause(body)
+		Accounting.run(function(scenario)
+			local previous_caffeinate = _G.hs.caffeinate
+			_G.hs.caffeinate = { watcher = { new = function()
+				return {
+					start = function(self) return self end,
+					stop = function(self) return self end,
+				}
+			end } }
+			local keylogger = package.loaded["modules.keylogger.init"]
+			local paused = false
+			local control = { is_paused = function() return paused end }
+			local called, failure = xpcall(function()
+				scenario.state.is_enabled = false
+				helpers.assert_eq(keylogger.start(control), true)
+				for _, timer in ipairs(_G.hs.timer.__timers) do
+					if timer.delay == 0 and timer.running then timer:fire() end
+				end
+				scenario.state.is_secure_field = false
+				package.loaded["modules.keylogger.context_tracker"].resync_context = function() return true end
+				local function pause() paused = true end
+				local function resume()
+					-- ScriptControl performs this refresh before its final pause-state commit.
+					helpers.assert_eq(paused, true)
+					helpers.assert_eq(keylogger.resync_context(), true)
+					paused = false
+				end
+				body(scenario, pause, resume)
+			end, debug.traceback)
+			local stopped, stop_result = pcall(keylogger.stop)
+			_G.hs.caffeinate = previous_caffeinate
+			if not called then error(failure, 0) end
+			helpers.assert_eq(stopped, true)
+			helpers.assert_eq(stop_result, true)
+		end)
+	end
+
+	--- Checks the complete action/keycode sequence without borrowing hold timing.
+	--- @param scenario table Existing accounting scenario.
+	--- @param expected table Literal ordered action/keycode pairs.
+	local function assert_events(scenario, expected)
+		local actual = {}
+		for _, event in ipairs(scenario.system_events) do
+			actual[#actual + 1] = { event.action, event.keycode }
+		end
+		helpers.assert_eq(actual, expected)
+	end
+
+	--- Proves that the next allowed press is a press and its release is a hold.
+	--- @param scenario table Existing accounting scenario.
+	--- @param keycode number Physical modifier side.
+	--- @param previous number Number of earlier credited events.
+	local function fresh_pair(scenario, keycode, previous)
+		scenario.flags_changed(keycode, held_flags(keycode))
+		helpers.assert_eq(#scenario.system_events, previous + 1)
+		helpers.assert_eq(scenario.system_events[previous + 1].action, "modifier_press")
+		helpers.assert_eq(scenario.system_events[previous + 1].keycode, keycode)
+		scenario.flags_changed(keycode, {})
+		helpers.assert_eq(#scenario.system_events, previous + 2)
+		helpers.assert_eq(scenario.system_events[previous + 2].action, "modifier_hold")
+		helpers.assert_eq(scenario.system_events[previous + 2].keycode, keycode)
+		helpers.assert_eq(scenario.state.modifier_down_at[keycode], nil)
+		helpers.assert_eq(scenario.state.modifier_suppressed_releases[keycode], nil)
+	end
+
+	for _, keycode in ipairs(sides) do
+		helpers.it("(wp3-pause) suppresses an existing hold across resume for side " .. keycode, function()
+			with_pause(function(scenario, pause, resume)
+				scenario.flags_changed(keycode, held_flags(keycode))
+				helpers.assert_eq(#scenario.system_events, 1)
+				pause()
+				resume()
+				helpers.assert_eq(scenario.state.modifier_down_at[keycode], nil)
+				helpers.assert_eq(scenario.state.modifier_suppressed_releases[keycode], true)
+				scenario.flags_changed(keycode, {})
+				helpers.assert_eq(#scenario.system_events, 1, "crossing release emits neither press nor hold")
+				fresh_pair(scenario, keycode, 1)
+				assert_events(scenario, {
+					{ "modifier_press", keycode }, { "modifier_press", keycode }, { "modifier_hold", keycode },
+				})
+			end)
+		end)
+
+		helpers.it("(wp3-pause) retires an observed release before resume for side " .. keycode, function()
+			with_pause(function(scenario, pause, resume)
+				scenario.flags_changed(keycode, held_flags(keycode))
+				pause()
+				scenario.flags_changed(keycode, {})
+				helpers.assert_eq(#scenario.system_events, 1, "paused release produces no telemetry")
+				helpers.assert_eq(scenario.state.modifier_down_at[keycode], nil)
+				helpers.assert_eq(scenario.state.modifier_suppressed_releases[keycode], nil)
+				resume()
+				fresh_pair(scenario, keycode, 1)
+				assert_events(scenario, {
+					{ "modifier_press", keycode }, { "modifier_press", keycode }, { "modifier_hold", keycode },
+				})
+			end)
+		end)
+
+		helpers.it("(wp3-pause) cancels a new paused hold across resume for side " .. keycode, function()
+			with_pause(function(scenario, pause, resume)
+				pause()
+				scenario.flags_changed(keycode, held_flags(keycode))
+				helpers.assert_eq(#scenario.system_events, 0)
+				helpers.assert_eq(scenario.state.modifier_down_at[keycode], nil)
+				resume()
+				helpers.assert_eq(scenario.state.modifier_suppressed_releases[keycode], true)
+				scenario.flags_changed(keycode, {})
+				helpers.assert_eq(#scenario.system_events, 0, "release cannot invent the excluded press")
+				fresh_pair(scenario, keycode, 0)
+				assert_events(scenario, { { "modifier_press", keycode }, { "modifier_hold", keycode } })
+			end)
+		end)
+
+		helpers.it("(wp3-pause) forgets a complete excluded pair for side " .. keycode, function()
+			with_pause(function(scenario, pause, resume)
+				pause()
+				scenario.flags_changed(keycode, held_flags(keycode))
+				scenario.flags_changed(keycode, {})
+				helpers.assert_eq(#scenario.system_events, 0)
+				helpers.assert_eq(scenario.state.modifier_down_at[keycode], nil)
+				helpers.assert_eq(scenario.state.modifier_suppressed_releases[keycode], nil)
+				resume()
+				fresh_pair(scenario, keycode, 0)
+				assert_events(scenario, { { "modifier_press", keycode }, { "modifier_hold", keycode } })
+			end)
+		end)
+
+		helpers.it("(wp3-pause) separates a paused release and new press for side " .. keycode, function()
+			with_pause(function(scenario, pause, resume)
+				scenario.flags_changed(keycode, held_flags(keycode))
+				pause()
+				scenario.flags_changed(keycode, {})
+				helpers.assert_eq(scenario.state.modifier_down_at[keycode], nil)
+				scenario.flags_changed(keycode, held_flags(keycode))
+				helpers.assert_eq(#scenario.system_events, 1)
+				helpers.assert_eq(scenario.state.modifier_down_at[keycode], nil)
+				resume()
+				scenario.flags_changed(keycode, {})
+				helpers.assert_eq(#scenario.system_events, 1)
+				fresh_pair(scenario, keycode, 1)
+				assert_events(scenario, {
+					{ "modifier_press", keycode }, { "modifier_press", keycode }, { "modifier_hold", keycode },
+				})
+			end)
+		end)
+	end
+
+	helpers.it("(wp3-pause) cancels both Command sides without a shared-flag inference", function()
+		with_pause(function(scenario, pause, resume)
+			scenario.flags_changed(55, { cmd = true })
+			pause()
+			scenario.flags_changed(54, { cmd = true })
+			helpers.assert_eq(#scenario.system_events, 1)
+			resume()
+			scenario.flags_changed(55, { cmd = true })
+			helpers.assert_eq(#scenario.system_events, 1)
+			scenario.flags_changed(54, {})
+			helpers.assert_eq(#scenario.system_events, 1)
+			helpers.assert_eq(scenario.state.modifier_down_at, {})
+			helpers.assert_eq(scenario.state.modifier_suppressed_releases, {})
+			fresh_pair(scenario, 55, 1)
+			assert_events(scenario, {
+				{ "modifier_press", 55 }, { "modifier_press", 55 }, { "modifier_hold", 55 },
+			})
+		end)
+	end)
+
+	helpers.it("(wp3-pause) retires only the released Command side before resume", function()
+		with_pause(function(scenario, pause, resume)
+			scenario.flags_changed(54, { cmd = true })
+			scenario.flags_changed(55, { cmd = true })
+			pause()
+			scenario.flags_changed(55, { cmd = true })
+			helpers.assert_eq(#scenario.system_events, 2)
+			helpers.assert_eq(scenario.state.modifier_down_at[55], nil)
+			helpers.assert_true(type(scenario.state.modifier_down_at[54]) == "number")
+			resume()
+			helpers.assert_eq(scenario.state.modifier_suppressed_releases[55], nil)
+			helpers.assert_eq(scenario.state.modifier_suppressed_releases[54], true)
+			scenario.flags_changed(54, {})
+			helpers.assert_eq(#scenario.system_events, 2)
+			fresh_pair(scenario, 55, 2)
+			assert_events(scenario, {
+				{ "modifier_press", 54 }, { "modifier_press", 55 },
+				{ "modifier_press", 55 }, { "modifier_hold", 55 },
+			})
+		end)
+	end)
+end)

@@ -3944,6 +3944,24 @@ guards, assertions or deadlines. These changes are not native execution proof.
 
 WP3 prerequisite: the actual macOS physical accounting owner now requires exact held-modifier settlement before accepting source transitions. The keylogger retires each crossing physical release without emitting an orphan hold or a new press, including pause and secure-context crossings; ordinary legacy and collision behavior remains unchanged. Existing native fixture parents restore their settlement child through the scoped cache owner, while normal production stop/restart retains the same CoreState. Portable focused tests pass (32 held-key cases, 24 policy cases, 3 legacy collision cases, 23 existing cache-scope cases, and 9 unchanged alias configuration/privacy cases); the original real gap-release source fails all eight side-key cases. This does not enable a producer or headless mode, alter transport/baseline versions, or complete WP3/WP4/native acceptance. Full root and hosted macOS qualification remain required.
 
+WP3 pause/resume receiving now preserves observed per-key modifier state while
+telemetry is paused. A release during pause retires its old hold; a new paused
+press retains only its crossing-release marker. Resume cancels the entire held
+duration and suppresses the corresponding release, preserving the next fresh
+press. Left/right modifiers and Fn use their physical keycodes. The unchanged
+ScriptControl caller refreshes context before committing the unpaused state;
+its existing best-effort resync does not become a successful-resume guarantee.
+Forty-seven independently frozen additive cases run through the actual keylogger
+callback with native/context doubles. Lua5.4 receiving changes 41PASS/38FAIL
+before to79PASS/0FAIL after; the original32 cases remain passed. Omitting paused
+bookkeeping gives50PASS/29FAIL; omitting resume settlement gives68PASS/11FAIL.
+A separate LuaJIT attempt ends with79 fixture wrapper failures on the existing
+Lua5.4-only table.pack helper. Callbacks may have run, but their results remain
+unqualified; its three subsequent variants are unrun. This does not
+activate an owned producer, finish WP3/TODO31 or correct watchdog exit73.
+Native event taps, installed-source accounting and physical acceptance remain
+required; privacy-transition callback coverage is separate.
+
 WP3 remains partial. An explicitly initialized, dormant physical-capture session
 owner now composes the real accounting policy, delivery receiver and transport.
 It verifies the caller's pinned executable requirement asynchronously, waits for

@@ -152,3 +152,23 @@ is retained. Test ownership is pending; no native execution is claimed. On the
 maintainer's Windows PC, replay the existing Configuration order test, then run
 the final unit, E2E, packaging and installation prerequisites. The separate
 Callback timer-inventory refusal is unchanged and needs its existing owner.
+
+## Observed modifier pause and resume
+
+WP3 pause/resume receiving now preserves observed per-key modifier state while
+telemetry is paused. A release during pause retires its old hold; a new paused
+press retains only its crossing-release marker. Resume cancels the entire held
+duration and suppresses the corresponding release, preserving the next fresh
+press. Left/right modifiers and Fn use their physical keycodes. The unchanged
+ScriptControl caller refreshes context before committing the unpaused state;
+its existing best-effort resync does not become a successful-resume guarantee.
+Forty-seven independently frozen additive cases run through the actual keylogger
+callback with native/context doubles. Lua5.4 receiving changes 41PASS/38FAIL
+before to79PASS/0FAIL after; the original32 cases remain passed. Omitting paused
+bookkeeping gives50PASS/29FAIL; omitting resume settlement gives68PASS/11FAIL.
+A separate LuaJIT attempt ends with79 fixture wrapper failures on the existing
+Lua5.4-only table.pack helper. Callbacks may have run, but their results remain
+unqualified; its three subsequent variants are unrun. This does not
+activate an owned producer, finish WP3/TODO31 or correct watchdog exit73.
+Native event taps, installed-source accounting and physical acceptance remain
+required; privacy-transition callback coverage is separate.
