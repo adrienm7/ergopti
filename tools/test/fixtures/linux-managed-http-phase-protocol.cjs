@@ -34,67 +34,107 @@ for (const invalid of [
 	passed++;
 }
 
+// Only the modeled child receipt receives POSIX facts on Windows. Actual file
+// kind, size, links and descriptor lifetime stay native; this is not ACL proof.
+function modelReceiptFacts(work) {
+	if (process.platform !== 'win32') return () => {};
+	const originalStat = fs.lstatSync;
+	const originalUid = Object.getOwnPropertyDescriptor(process, 'getuid');
+	const receipt = path.resolve(work, '01.owner/closed.json');
+	const uid = originalStat(work, { bigint: true }).uid;
+	Object.defineProperty(process, 'getuid', {
+		value: () => Number(uid),
+		configurable: true,
+		writable: true
+	});
+	fs.lstatSync = function (filename, options) {
+		const fact = originalStat.call(fs, filename, options);
+		if (
+			typeof filename !== 'string' ||
+			path.resolve(filename) !== receipt ||
+			options?.bigint !== true
+		)
+			return fact;
+		const modeled = Object.create(fact);
+		Object.defineProperties(modeled, {
+			uid: { value: uid },
+			mode: { value: (fact.mode & ~511n) | 384n }
+		});
+		return modeled;
+	};
+	return () => {
+		fs.lstatSync = originalStat;
+		if (originalUid) Object.defineProperty(process, 'getuid', originalUid);
+		else delete process.getuid;
+	};
+}
+
 async function model(name, action) {
 	const work = fs.mkdtempSync(path.join(os.tmpdir(), 'ergopti-phase-protocol-model-'));
 	fs.chmodSync(work, 0o700);
-	let native,
-		options,
-		now = 0n,
-		kills = 0;
-	const spawnChild = (command, args, config) => {
-		assert.equal(command, 'python3');
-		options = config;
-		native = new EventEmitter();
-		native.pid = 12345;
-		native.exitCode = null;
-		native.signalCode = null;
-		native.kill = (signal) => {
-			assert.equal(signal, 'SIGTERM');
-			kills++;
-			return true;
+	const restoreFacts = modelReceiptFacts(work);
+	try {
+		let native,
+			options,
+			now = 0n,
+			kills = 0;
+		const spawnChild = (command, args, config) => {
+			assert.equal(command, 'python3');
+			options = config;
+			native = new EventEmitter();
+			native.pid = 12345;
+			native.exitCode = null;
+			native.signalCode = null;
+			native.kill = (signal) => {
+				assert.equal(signal, 'SIGTERM');
+				kills++;
+				return true;
+			};
+			setImmediate(() => native.emit('spawn'));
+			return native;
 		};
-		setImmediate(() => native.emit('spawn'));
-		return native;
-	};
-	const started = ownPhase({
-		command: '/MODELED/cc',
-		args: [],
-		env: {},
-		cwd: work,
-		work,
-		label: '01',
-		worker: '/MODELED/worker.py',
-		owner: '/MODELED/owner.py',
-		ownerSha: '0'.repeat(64),
-		kind: 'command',
-		budgetMs: 30,
-		gateDeadline: 1000000000n,
-		clock: () => now,
-		graceMs: 5,
-		spawnChild
-	});
-	await new Promise(setImmediate);
-	function finish(status, receipt = { ...golden, status }) {
-		if (receipt)
-			fs.writeFileSync(path.join(work, '01.owner/closed.json'), JSON.stringify(receipt), {
-				flag: 'wx',
-				mode: 0o600
-			});
-		native.exitCode = status;
-		native.emit('close', status, null);
+		const started = ownPhase({
+			command: '/MODELED/cc',
+			args: [],
+			env: {},
+			cwd: work,
+			work,
+			label: '01',
+			worker: '/MODELED/worker.py',
+			owner: '/MODELED/owner.py',
+			ownerSha: '0'.repeat(64),
+			kind: 'command',
+			budgetMs: 30,
+			gateDeadline: 1000000000n,
+			clock: () => now,
+			graceMs: 5,
+			spawnChild
+		});
+		await new Promise(setImmediate);
+		function finish(status, receipt = { ...golden, status }) {
+			if (receipt)
+				fs.writeFileSync(path.join(work, '01.owner/closed.json'), JSON.stringify(receipt), {
+					flag: 'wx',
+					mode: 0o600
+				});
+			native.exitCode = status;
+			native.emit('close', status, null);
+		}
+		await action({
+			started,
+			finish,
+			setTime: (value) => {
+				now = value;
+			},
+			kills: () => kills,
+			fds: () => options.stdio.slice(1)
+		});
+		fs.rmSync(work, { recursive: true }); // Models have acknowledged their exact fake child/real sink closure.
+		passed++;
+		console.log('MODEL PASS ' + name);
+	} finally {
+		restoreFacts();
 	}
-	await action({
-		started,
-		finish,
-		setTime: (value) => {
-			now = value;
-		},
-		kills: () => kills,
-		fds: () => options.stdio.slice(1)
-	});
-	fs.rmSync(work, { recursive: true }); // Models have acknowledged their exact fake child/real sink closure.
-	passed++;
-	console.log('MODEL PASS ' + name);
 }
 
 (async () => {
