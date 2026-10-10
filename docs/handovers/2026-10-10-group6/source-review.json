@@ -1,0 +1,66 @@
+{
+	"schema": 1,
+	"result": "ACK_READ_ONLY_DURABLE_PARTIAL_HANDOVER_NO_BLOCKING_FACTUAL_ERROR",
+	"directory": "/workspace/ergopti/docs/handovers/2026-10-10-group6",
+	"manifest_sha256": "68d8f3bdcbe8fe4aeb58d91e09fc7f6dae9103e46c7503e6ec256a182d841b91",
+	"readme_sha256": "c1119e1e9bed78a1ff2593d617279d4ca5c5fae308675293a73c3ae716adef5d",
+	"snapshot_candidate": "1576dce4a7cead68d252829a4e1c461e08e7130f",
+	"archives": {
+		"brew-capability-r3.tar.gz": {
+			"sha256": "350b39cb56880ff4c72037af443cc7b9436b6a0385c93a0087571a6024821751",
+			"bytes": 226776,
+			"regular_member_count": 19,
+			"safe_regular_unique_relative_members": true,
+			"no_file_parent_collisions": true,
+			"nested_member_hashes_verified": 0,
+			"total_regular_bytes": 1657723
+		},
+		"catalogue-r6-receiving.tar.gz": {
+			"sha256": "68809b99b8bcce54ac2f38d7710ad66198b7e92d07efcc8f41c7c0fcfe2bdc84",
+			"bytes": 135168,
+			"regular_member_count": 67,
+			"safe_regular_unique_relative_members": true,
+			"no_file_parent_collisions": true,
+			"nested_member_hashes_verified": 66,
+			"total_regular_bytes": 623717
+		},
+		"followup-source-preparations.tar.gz": {
+			"sha256": "f682122fc6ca2a132c50ba16e19db9dc2425119cfbb1de5b088bf65b76792c6d",
+			"bytes": 183926,
+			"regular_member_count": 42,
+			"safe_regular_unique_relative_members": true,
+			"no_file_parent_collisions": true,
+			"nested_member_hashes_verified": 41,
+			"total_regular_bytes": 760401
+		},
+		"original-preparations.tar.gz": {
+			"sha256": "507be224c1cfe686148b53e216de44abfc6d5814cb69ff93465e59742ecc3281",
+			"bytes": 633118,
+			"regular_member_count": 67,
+			"safe_regular_unique_relative_members": true,
+			"no_file_parent_collisions": true,
+			"nested_member_hashes_verified": 0,
+			"total_regular_bytes": 3756483
+		},
+		"receiving-source-preparations.tar.gz": {
+			"sha256": "691e966ea11fcbc07cb19acaf5599f8e3dfd9eb34244794deef2f95ae441efdb",
+			"bytes": 207330,
+			"regular_member_count": 101,
+			"safe_regular_unique_relative_members": true,
+			"no_file_parent_collisions": true,
+			"nested_member_hashes_verified": 100,
+			"total_regular_bytes": 960618
+		}
+	},
+	"total_regular_members": 296,
+	"source_and_selected_receipt_copies_exact": true,
+	"native_failing_scope_and_local_not_green_counts_supported": true,
+	"TODO36_62_and_transversal16_38_open_item22_excluded_preserved": true,
+	"blocking_factual_errors": [],
+	"limits": [
+		"No extraction/application, target execution, suite/formatter or repository/index/ref/CI modifications by reviewer.",
+		"Archive hashes bind historical source and typed receipt bytes, not fresh native qualification or adoption authority. Historical absolute locators remain provenance only.",
+		"Final local JS402/406 and HS17957/17968 explicitly fail; genuine old native14 stays12pass/2fail per architecture, native catalogue/macOS50/serving/migration/package/installation not qualified.",
+		"Root doc gates and integration/authentication/ownership remain separate; no publication or workflow-adoption authorization from this source review."
+	]
+}
