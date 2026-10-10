@@ -21,7 +21,7 @@ const POLICY = parseClosedJson(
 );
 const RECEIPT = 'windows-signing-qualification.json';
 const QUOTE =
-	'ok pour release pour le moment pas de signature. et mets en todo de faire avec signpath foundation';
+	"non signé et fais en v1.0.1 car très peu de vraies features c'est surtout des fix non?";
 function refuse() {
 	throw new Error('Unsigned stable Windows signature exception is not admitted.');
 }
@@ -55,19 +55,19 @@ function validatePolicy(value) {
 	]);
 	if (
 		value.schema !== 1 ||
-		value.id !== 'stable-v1-20261009-windows-unsigned' ||
+		value.id !== 'stable-v101-20261010-windows-unsigned' ||
 		typeof value.authorized !== 'boolean' ||
-		value.authorization_date !== '2026-10-09' ||
+		value.authorization_date !== '2026-10-10' ||
 		value.authorization_quote !== QUOTE ||
-		value.expires_at !== '2026-10-10T02:00:00Z' ||
+		value.expires_at !== '2026-10-11T07:00:00Z' ||
 		value.repository !== 'adrienm7/ergopti' ||
 		value.event_name !== 'push' ||
 		value.ref !== 'refs/heads/main' ||
 		value.release !== true ||
 		value.prerelease !== 'false' ||
 		value.channel !== 'main' ||
-		value.tag !== 'v1.0.0' ||
-		value.version !== '1.0.0' ||
+		value.tag !== 'v1.0.1' ||
+		value.version !== '1.0.1' ||
 		value.purpose !== 'windows-authenticode-only' ||
 		value.qualified !== false
 	)
@@ -123,7 +123,7 @@ function receipt(context, source, checkout, sha256, now = new Date(), policy = P
 		sha256,
 		signature: 'NotSigned',
 		qualified: false,
-		tests: 'mandatory-outside-published-native-desktop-scope'
+		tests: 'mandatory'
 	};
 }
 function validateReceipt(
@@ -155,9 +155,9 @@ function notice(source) {
 	return (
 		'WINDOWS AUTHENTICODE UNSIGNED / qualified:false (source ' +
 		source +
-		'): ErgoptiPlus.exe has no Windows code-signing certificate for this v1.0.0 release. ' +
-		'All Windows checks outside the separately published native-desktop scope, source and asset integrity checks remain mandatory. ' +
-		'Windows may show an unknown-publisher warning. [Signature evidence](https://github.com/adrienm7/ergopti/releases/download/v1.0.0/windows-signing-qualification.json). ' +
+		'): ErgoptiPlus.exe has no Windows code-signing certificate for this v1.0.1 release. ' +
+		'All tests, build, package, source and asset integrity, and installation checks remain mandatory. ' +
+		'Windows may show an unknown-publisher warning. [Signature evidence](https://github.com/adrienm7/ergopti/releases/download/v1.0.1/windows-signing-qualification.json). ' +
 		'Future signing requires SignPath Foundation enrollment and qualified GitHub integration.'
 	);
 }

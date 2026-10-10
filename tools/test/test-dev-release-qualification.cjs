@@ -812,7 +812,7 @@ async function simulate(context, status = 0, entries = fixtures, afterFamilySign
 	);
 }
 
-// Windows signature permission is distinct from the three native test deferrals.
+// One-candidate signature permission never defers any tests.
 {
 	const Signing = require('../ci/windows-stable-signing.cjs');
 	const context = {
@@ -823,13 +823,18 @@ async function simulate(context, status = 0, entries = fixtures, afterFamilySign
 		release: true,
 		prerelease: 'false',
 		channel: 'main',
-		tag: 'v1.0.0',
-		version: '1.0.0'
+		tag: 'v1.0.1',
+		version: '1.0.1'
 	};
 	const source = 'a'.repeat(40),
 		hash = 'b'.repeat(64),
-		clock = new Date('2026-10-10T01:59:59.999Z');
-	Signing.admit(context, source, source, clock);
+		clock = new Date('2026-10-11T06:59:59.999Z');
+	const proposed = { ...Signing.POLICY, authorized: true };
+	assert.equal(typeof Signing.POLICY.authorized, 'boolean');
+	if (!Signing.POLICY.authorized)
+		assert.throws(() => Signing.admit(context, source, source, clock));
+	else Signing.admit(context, source, source, clock);
+	Signing.admit(context, source, source, clock, proposed);
 	Signing.requireFreshUnsigned('true');
 	for (const value of ['false', undefined, '', true]) {
 		assert.throws(() => Signing.requireFreshUnsigned(value));
@@ -842,37 +847,56 @@ async function simulate(context, status = 0, entries = fixtures, afterFamilySign
 		{ release: false },
 		{ prerelease: 'true' },
 		{ channel: 'dev' },
-		{ tag: 'v1.0.1' },
-		{ version: '1.0.1' },
+		{ tag: 'v1.0.0' },
+		{ version: '1.0.0' },
 		{ repository: 'foreign/repository' }
 	]) {
-		assert.throws(() => Signing.admit({ ...context, ...patch }, source, source, clock));
+		assert.throws(() => Signing.admit({ ...context, ...patch }, source, source, clock, proposed));
 	}
-	assert.throws(() => Signing.admit(context, source, 'c'.repeat(40), clock));
-	assert.throws(() => Signing.admit(context, 'A'.repeat(40), 'A'.repeat(40), clock));
-	assert.throws(() => Signing.admit(context, source, source, new Date('2026-10-10T02:00:00Z')));
-	assert.throws(() => Signing.admit(context, source, source, new Date('invalid')));
+	assert.throws(() => Signing.admit(context, source, 'c'.repeat(40), clock, proposed));
+	assert.throws(() => Signing.admit(context, 'A'.repeat(40), 'A'.repeat(40), clock, proposed));
+	assert.throws(() =>
+		Signing.admit(context, source, source, new Date('2026-10-11T07:00:00Z'), proposed)
+	);
+	assert.throws(() => Signing.admit(context, source, source, new Date('invalid'), proposed));
 	assert.throws(() =>
 		Signing.admit(context, source, source, clock, { ...Signing.POLICY, authorized: false })
 	);
-	const value = Signing.receipt(context, source, source, hash, clock);
-	Signing.validateReceipt(value, context, source, source, hash, clock);
+	const value = Signing.receipt(context, source, source, hash, clock, proposed);
+	Signing.validateReceipt(value, context, source, source, hash, clock, proposed);
 	for (const patch of [
 		{ signature: 'Valid' },
 		{ qualified: true },
 		{ tests: 'deferred' },
 		{ source_sha: 'c'.repeat(40) },
 		{ sha256: 'd'.repeat(64) },
-		{ tag: 'v1.0.1' },
+		{ tag: 'v1.0.2' },
 		{ artifact: 'foreign.exe' },
 		{ extra: true }
 	]) {
 		assert.throws(() =>
-			Signing.validateReceipt({ ...value, ...patch }, context, source, source, hash, clock)
+			Signing.validateReceipt(
+				{ ...value, ...patch },
+				context,
+				source,
+				source,
+				hash,
+				clock,
+				proposed
+			)
 		);
 	}
 	assert(Signing.notice(source).includes('UNSIGNED / qualified:false'));
 	assert(Signing.notice(source).includes('SignPath Foundation'));
+	assert.equal(value.tests, 'mandatory');
+	assert(Signing.notice(source).includes('v1.0.1/windows-signing-qualification.json'));
+	assert(Signing.notice(source).includes('All tests, build, package'));
+	assert.throws(() =>
+		Signing.admit({ ...context, tag: 'v1.0.2', version: '1.0.2' }, source, source, clock, proposed)
+	);
+	assert.throws(() =>
+		Signing.admit(context, source, source, new Date('2026-10-09T23:59:59.999Z'), proposed)
+	);
 	console.log('[OK] one-candidate unsigned signature permission and source-bound receipt guards.');
 }
 
