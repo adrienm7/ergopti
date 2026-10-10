@@ -466,3 +466,103 @@ _MSC_ReloadWaitsForConfigWrite(Owner, State) {
 }
 Test("menu startup: early reload retains configuration transaction deferral (startup-menu-reload-write)",
 	(*) => _MSC_WithOwner(_MSC_ReloadWaitsForConfigWrite))
+
+
+
+
+
+_MSC_RepeatableToggleJoinsOnlyExactRegistration(Owner, State) {
+	global _MenuDispatchTokens, _SuspendPending
+	ItemId := 987653, Token := 23456
+	HadToken := _MenuDispatchTokens.Has(ItemId)
+	SavedToken := _MenuDispatchTokens.Get(ItemId, 0)
+	Callback := (*) => State.Calls.Push("toggle")
+	Toggle := MenuStartupRepeatableToggleCommand("llm_toggle", Callback)
+	try {
+		_MenuDispatchTokens[ItemId] := Token
+		Registration := {ItemId: ItemId, Token: Token}
+		AssertTrue(Owner.Retain(Toggle, [], Registration))
+		AcceptedAt := Owner.Pending[1].AcceptedAt
+		AssertTrue(Owner.Retain(Toggle, [], Registration))
+		AssertEqual(1, Owner.Pending.Length, "unchanged early toggle presentation retains one intent")
+		AssertEqual(AcceptedAt, Owner.Pending[1].AcceptedAt, "joining does not renew the accepted intent")
+		Owner.Retain((*) => State.Calls.Push("first"), [])
+		Owner.Retain((*) => State.Calls.Push("second"), [])
+		AssertEqual(3, Owner.Pending.Length, "ordinary commands preserve their independent FIFO")
+		AssertEqual(0, State.Calls.Length, "joining never bypasses startup readiness")
+		State.Ready := true
+		Owner.NotifyReady()
+		State.Timers[1].Call()
+		AssertEqual(3, State.Calls.Length)
+		AssertEqual("toggle", State.Calls[1])
+		AssertEqual("first", State.Calls[2])
+		AssertEqual("second", State.Calls[3])
+		Owner.Released := false
+		Owner.Retain(Toggle, [], Registration)
+		_MenuDispatchTokens[ItemId] := Token + 1
+		Owner.Retain(Toggle, [], {ItemId: ItemId, Token: Token + 1})
+		AssertEqual(2, Owner.Pending.Length, "refreshed registration cannot join the retired intent")
+		Owner.NotifyReady()
+		State.Timers[2].Call()
+		AssertEqual(4, State.Calls.Length, "only the independently current registration runs")
+		Owner.Released := false
+		Owner.Retain(Toggle, [], {ItemId: ItemId, Token: Token + 1})
+		_SuspendPending := true
+		Owner.NotifyReady()
+		State.Timers[3].Call()
+		AssertEqual(4, State.Calls.Length, "pending pause still refuses the marked selection")
+		_SuspendPending := false
+		Owner.Released := false
+		Owner.Retain(Toggle, [], {ItemId: ItemId, Token: Token + 1})
+		Owner.NotifyReady()
+		Owner.Cancel()
+		State.Timers[4].Call()
+		AssertEqual(4, State.Calls.Length, "cancellation still retires a joined intent")
+	} finally {
+		if HadToken
+			_MenuDispatchTokens[ItemId] := SavedToken
+		else if _MenuDispatchTokens.Has(ItemId)
+			_MenuDispatchTokens.Delete(ItemId)
+	}
+}
+Test("menu startup: explicit AI toggle joins repeated clicks without changing generic FIFO (startup-llm-toggle-coalescence)",
+	(*) => _MSC_WithOwner(_MSC_RepeatableToggleJoinsOnlyExactRegistration))
+
+_MSC_RepeatableToggleRequiresExactCallback(Owner, State) {
+	Callback := (*) => 0
+	OtherCallback := (*) => 0
+	Registration := {ItemId: 987652, Token: 34567}
+	Owner.Retain(MenuStartupRepeatableToggleCommand("llm_toggle", Callback), [], Registration)
+	Owner.Retain(MenuStartupRepeatableToggleCommand("llm_toggle", OtherCallback), [], Registration)
+	Owner.Retain(Callback, [], Registration)
+	Owner.Retain(Callback, [], Registration)
+	AssertEqual(4, Owner.Pending.Length, "different callbacks and unmarked commands never join")
+	Owner.Cancel()
+}
+Test("menu startup: repeat policy requires the same declared callback (startup-llm-toggle-coalescence)",
+	(*) => _MSC_WithOwner(_MSC_RepeatableToggleRequiresExactCallback))
+
+_MSC_RendererDeclaresOnlyAIRepeatPolicy() {
+	global _MenuDispatchCallbacks, _MenuDispatchOwnerHandles
+	NativeMenu := Menu(), Callback := (*) => 0
+	try {
+		Item := _MR_FindItemById("llm_menu", "llm_toggle")
+		AssertTrue(Item is Map, "the declared AI switch must exist")
+		AssertEqual(1, _MR_RenderToggle(NativeMenu, Item, "llm_menu",
+			Map("llm_toggle", Callback), Map("llm_enabled", (*) => false, "llm_toggle_ready", (*) => true)))
+		ItemId := _MenuItemIdAtPosition(NativeMenu, 0)
+		Action := _MenuDispatchCallbacks[ItemId]
+		AssertTrue(Action is MenuStartupRepeatableToggleCommand,
+			"the actual renderer must explicitly declare the startup repeat policy")
+		AssertEqual("llm_toggle", Action.Id)
+		AssertTrue(Action.Callback == Callback, "the policy retains the exact registered callback")
+		AssertFalse(Action is MenuStartupSafeCommand, "repeat policy cannot bypass startup readiness")
+	} finally {
+		NativeMenu.Delete()
+		MenuDispatcher_PruneMenu(NativeMenu)
+		if _MenuDispatchOwnerHandles.Has(NativeMenu.Handle)
+			_MenuDispatchOwnerHandles.Delete(NativeMenu.Handle)
+	}
+}
+Test("menu startup: actual renderer declares AI toggle repeat policy (startup-llm-toggle-coalescence)",
+	_MSC_RendererDeclaresOnlyAIRepeatPolicy)
