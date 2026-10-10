@@ -6,7 +6,7 @@
 --- What the diagnostics page's buttons do on this machine once
 --- healthcheck.actions accepted them: copy the report, save it as a Markdown
 --- file under the logs folder and reveal it, report it on GitHub (copy it,
---- then open the bug form with the report prefilled), open a folder or a
+--- then save a reviewed local attachment and open the short bug form), open a folder or a
 --- settings page. Also the Debug menu's "Report a bug", which opens the
 --- diagnostics window at its preview, and "Suggest a feature".
 ---
@@ -14,9 +14,9 @@
 --- 1. Shared output is rebuilt from the host snapshot through a closed typed
 ---    policy. Free text, paths and unknown fields are excluded regardless of
 ---    the page or details checkbox. Only approved technical content leaves.
---- 2. GitHub answers 414 a little above 8 KB, so the issue link cuts a long
----    report to its budget; the clipboard holds it whole. A report saves no
----    file and reveals nothing: Finder would take the focus from the form.
+--- 2. The clipboard and local attachment hold the complete approved report.
+---    GitHub receives a short editable English summary; the browser opens
+---    after attachment completion and reveal, without an automatic upload.
 --- 3. Paths come from the snapshot the host collected, by field id; a folder
 ---    that does not exist yet is created before it is opened; a file that does
 ---    not exist yet (today's errors file before the day's first warning) is
@@ -81,8 +81,9 @@ local DEFAULT_EFFECTS = {
 		local fh, err = io.open(path, "wb")
 		if not fh then return nil, tostring(err) end
 		local ok, write_err = fh:write(text)
-		fh:close()
+		local closed, close_err = fh:close()
 		if not ok then return nil, tostring(write_err) end
+		if not closed then return nil, tostring(close_err) end
 		return path
 	end,
 	make_dir = make_dir,
