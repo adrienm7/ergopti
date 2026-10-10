@@ -78,6 +78,8 @@ local _pending_karabiner_ready_token  = nil
 local _karabiner_ready_notify_epoch   = 0
 local _karabiner_ready_timer_cleanup  = {}
 local _lease_status_error_logged      = false
+-- This private receipt owns notification timers only, never stock processes.
+local _notification_retirement = { timer_owner = hs.timer, timer_after = hs.timer.doAfter }
 
 --- Single source of truth for the boot-readiness setting consumed below.
 M.HS_BOOT_READY_SETTING_KEY = "hs_boot_ready_v1"
@@ -228,7 +230,8 @@ local function stop_ready_timers(timers)
 				error("invalid timer handle")
 			end
 			if type(entry.timer.stop) ~= "function" then error("timer stop method unavailable") end
-			entry.timer:stop()
+			local stopped = entry.timer:stop()
+			if stopped == false then error("timer stop refused") end
 		end)
 		if not ok then
 			all_stopped = false
@@ -440,6 +443,7 @@ end
 
 --- Queues the user-facing ready notification after a successful lease READY.
 function M.notify_ready()
+	_notification_retirement.completed = nil
 	local token = active_lease_token()
 	if not token then
 		Logger.debug(LOG, "Karabiner ready notification ignored — no active exact lease.")
@@ -450,6 +454,7 @@ end
 
 --- Flushes a ready notification deferred until root boot completion.
 function M.flush_pending_ready_notification()
+	_notification_retirement.completed = nil
 	if not _pending_karabiner_ready_notify or not is_hs_boot_ready() then return end
 	local token = _pending_karabiner_ready_token
 	Logger.debug(LOG, "Flushing pending Karabiner ready notification…")
@@ -463,7 +468,9 @@ end
 --- the epoch makes their callbacks inert immediately.
 --- @return boolean all_stopped
 function M.stop()
+	_notification_retirement.completed = nil
 	_karabiner_ready_notify_epoch = _karabiner_ready_notify_epoch + 1
+	local retiring_epoch = _karabiner_ready_notify_epoch
 	local notify_timer = _karabiner_ready_notify_timer
 	local retry_timer = _karabiner_ready_retry_timer
 	_karabiner_ready_notify_timer = nil
@@ -473,7 +480,51 @@ function M.stop()
 	local timers_to_stop = {}
 	append_ready_timer(timers_to_stop, notify_timer, "delay")
 	append_ready_timer(timers_to_stop, retry_timer, "retry")
-	return stop_ready_timers(timers_to_stop)
+	local stopped = stop_ready_timers(timers_to_stop)
+	if stopped and _karabiner_ready_notify_epoch == retiring_epoch
+		and _karabiner_ready_notify_timer == nil and _karabiner_ready_retry_timer == nil
+		and _pending_karabiner_ready_notify == false and _pending_karabiner_ready_token == nil
+		and #_karabiner_ready_timer_cleanup == 0 then
+		_notification_retirement.completed = { epoch = retiring_epoch }
+	end
+	return stopped
 end
+
+
+--- Retains only this owner's exact completed notification-timer teardown.
+--- It grants no receiver STOPPED, stock-process or physical-capture authority.
+--- @return table|nil receipt Immutable current/revoke ports, absent on cleanup debt.
+function M.notification_teardown_admission()
+	local record = _notification_retirement.completed
+	if record == nil then return nil end
+	local active = true
+	local function current()
+		if not active then return false end
+		local live = rawget(package.loaded, "platform.remap.ke_lifecycle") == M
+			and rawget(M, "notification_teardown_admission") == _notification_retirement.issuer
+			and rawget(M, "stop") == _notification_retirement.stop
+			and rawget(M, "notify_ready") == _notification_retirement.notify
+			and rawget(M, "flush_pending_ready_notification") == _notification_retirement.flush
+			and hs.timer == _notification_retirement.timer_owner
+			and rawget(_notification_retirement.timer_owner, "doAfter") == _notification_retirement.timer_after
+			and _notification_retirement.completed == record
+			and _karabiner_ready_notify_epoch == record.epoch
+			and _karabiner_ready_notify_timer == nil and _karabiner_ready_retry_timer == nil
+			and _pending_karabiner_ready_notify == false and _pending_karabiner_ready_token == nil
+			and #_karabiner_ready_timer_cleanup == 0
+		if not live then active = false end
+		return live
+	end
+	if not current() then return nil end
+	local methods = { current = current, revoke = function() active = false; return true end }
+	return setmetatable({}, { __index = methods,
+		__newindex = function() error("Notification teardown admission is immutable", 2) end,
+		__metatable = false })
+end
+
+_notification_retirement.issuer = M.notification_teardown_admission
+_notification_retirement.stop = M.stop
+_notification_retirement.notify = M.notify_ready
+_notification_retirement.flush = M.flush_pending_ready_notification
 
 return M

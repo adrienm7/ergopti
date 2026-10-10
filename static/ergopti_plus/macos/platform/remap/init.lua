@@ -3665,6 +3665,137 @@ function M.runtime_not_acquired()
 end
 
 
+-- Retain this private receipt under an existing lifetime owner: the monolith
+-- already uses Lua's full module-local limit. No public state can forge it.
+_legacy_cleanup_offered.runtime_recovery = {}
+-- Preserve the actual no-acquisition implementation independently of its export.
+_legacy_cleanup_offered.runtime_recovery.not_acquired = M.runtime_not_acquired
+_legacy_cleanup_offered.runtime_recovery.bind = function()
+	local recovery = _legacy_cleanup_offered.runtime_recovery
+	local identity = require("module_source_identity")
+	local sibling, same = identity.sibling, identity.same
+	local directory = require("module_source_directory").capture()
+	local source = debug.getinfo(1, "S").source
+	local function genuine(fn, file)
+		if type(fn) ~= "function" then return false end
+		local expected = sibling(source, "macos/platform/remap/init.lua",
+			"macos/platform/remap/" .. file, directory)
+		return same(debug.getinfo(fn, "S").source, expected, directory)
+	end
+	local initialized, status, stop = rawget(LeaseController, "is_initialized"),
+		rawget(LeaseController, "status"), rawget(LeaseController, "stop")
+	local watcher_stop, watcher_start, watcher_issuer = rawget(Watchers, "stop_input_source_watcher"),
+		rawget(Watchers, "start_input_source_watcher"), rawget(Watchers, "inert_remap_teardown_admission")
+	local watcher_factory = rawget(Watchers, "inert_teardown_ports")
+	local watcher_origin = false
+	if genuine(watcher_factory, "watchers.lua") then
+		local called, owner, original_issuer = pcall(watcher_factory)
+		watcher_origin = called and owner == Watchers and original_issuer == watcher_issuer
+	end
+	local local_ports = {
+		{ "modules.keylogger.kc_bridge", KcBridge, "clear_managed_set" },
+		{ "adapters.hotkey_registrar", Registrar, "unbind" },
+		{ "platform.remap.ke_variables", KeVariables, "clear_recovery_observer" },
+	}
+	for _, port in ipairs(local_ports) do
+		port[4] = type(port[2]) == "table" and rawget(port[2], port[3]) or nil
+	end
+	local consumer_ports = {}
+	for _, name in ipairs({ "stop_gesture_watcher", "stop_alt_tab_apps_tracker", "start_gesture_watcher",
+		"start_cycle_windows_hotkey", "start_alt_tab_windows_hotkey", "start_alt_tab_monitor_hotkey",
+		"start_alt_tab_apps_hotkey" }) do consumer_ports[name] = rawget(Watchers, name) end
+	local lifecycle_stop, lifecycle_notify, lifecycle_flush, lifecycle_issuer = rawget(KeLifecycle, "stop"),
+		rawget(KeLifecycle, "notify_ready"), rawget(KeLifecycle, "flush_pending_ready_notification"),
+		rawget(KeLifecycle, "notification_teardown_admission")
+	recovery.capture = function()
+		local function current()
+			for _, port in ipairs(local_ports) do
+				if rawget(package.loaded, port[1]) ~= port[2] or type(port[2]) ~= "table"
+					or rawget(port[2], port[3]) ~= port[4] then return false end
+			end
+			for name, port in pairs(consumer_ports) do
+				if rawget(Watchers, name) ~= port or not genuine(port, "watchers.lua") then return false end
+			end
+			return rawget(package.loaded, "platform.remap") == M
+				and rawget(package.loaded, "platform.remap.onboarding") == nil
+				and rawget(M, "runtime_recovery_admission") == recovery.issuer
+				and rawget(M, "teardown_local") == recovery.teardown
+				and rawget(M, "stop_lease") == recovery.stop_lease
+				and rawget(M, "runtime_not_acquired") == recovery.not_acquired
+				and rawget(package.loaded, "platform.remap.lease_controller") == LeaseController
+				and rawget(LeaseController, "is_initialized") == initialized
+				and rawget(LeaseController, "status") == status and rawget(LeaseController, "stop") == stop
+				and genuine(initialized, "lease_controller.lua") and genuine(status, "lease_controller.lua")
+				and genuine(stop, "lease_controller.lua")
+				and watcher_origin and rawget(package.loaded, "platform.remap.watchers") == Watchers
+				and rawget(Watchers, "inert_teardown_ports") == watcher_factory
+				and rawget(Watchers, "stop_input_source_watcher") == watcher_stop
+				and rawget(Watchers, "start_input_source_watcher") == watcher_start
+				and rawget(Watchers, "inert_remap_teardown_admission") == watcher_issuer
+				and genuine(watcher_stop, "watchers.lua") and genuine(watcher_start, "watchers.lua")
+				and genuine(watcher_issuer, "watchers.lua")
+				and rawget(package.loaded, "platform.remap.ke_lifecycle") == KeLifecycle
+				and rawget(KeLifecycle, "stop") == lifecycle_stop and rawget(KeLifecycle, "notify_ready") == lifecycle_notify
+				and rawget(KeLifecycle, "flush_pending_ready_notification") == lifecycle_flush
+				and rawget(KeLifecycle, "notification_teardown_admission") == lifecycle_issuer
+				and genuine(lifecycle_stop, "ke_lifecycle.lua") and genuine(lifecycle_notify, "ke_lifecycle.lua")
+				and genuine(lifecycle_flush, "ke_lifecycle.lua") and genuine(lifecycle_issuer, "ke_lifecycle.lua")
+		end
+		if not current() then return nil end
+		return { current = current, watcher_issuer = watcher_issuer, lifecycle_issuer = lifecycle_issuer }
+	end
+end
+_legacy_cleanup_offered.runtime_recovery.bind()
+_legacy_cleanup_offered.runtime_recovery.bind = nil
+
+--- Captures one completed inert-local teardown without granting runtime readiness.
+--- This revocable capability admits only preference recovery; file publication
+--- and controlled reload remain separately owned and acknowledged operations.
+--- @return table|nil admission Immutable current/revoke ports, or absent evidence.
+function M.runtime_recovery_admission()
+	local record = _legacy_cleanup_offered.runtime_recovery.completed
+	if type(record) ~= "table" then return nil end
+	local active = true
+	local absent = _legacy_cleanup_offered.runtime_recovery.not_acquired
+	local function invariant()
+		return active and _legacy_cleanup_offered.runtime_recovery.completed == record
+			and rawget(package.loaded, "platform.remap") == M
+			and _state == record.state and _lifecycle_epoch == record.epoch
+			and _lease_user_intent_revision == record.intent
+			and _state.runtime == "owned" and _state.runtime_unavailable_reason == "runtime-unavailable"
+			and _state.runtime_custody == record.custody
+			and _bulk_settings_transaction == nil and _enabled_transition == nil and _enabled_preflight == nil
+			and _running == false and _shutdown_requested == true
+			and _state.watcher == nil and _state.hotkey_cycle_windows == nil
+			and _state.hotkey_alt_tab_windows == nil and _state.hotkey_alt_tab_apps == nil
+			and _state.hotkey_alt_tab_monitor == nil and _lease_inputs_tainted == false
+			and #_gesture_cleanup_backlog == 0 and #_hotkey_cleanup_backlog == 0
+			and _wake_watcher == nil and _wake_watcher_committed == false
+			and _layout_rebuild_timer == nil and _wizard_timer == nil and _wizard_timer_committed == false
+			and _ke_variables_recovery_observer == nil and _pending_layout_refresh == nil
+			and _deferred_layout_regeneration == nil and _guardian_regeneration_wait == nil
+			and _lease_recovery == nil and #_lease_recovery_timer_cleanup_backlog == 0
+			and #_lease_recovery_probe_cleanup_backlog == 0
+			and record.binding.current() == true
+			and record.watcher_current() == true and record.lifecycle_current() == true
+			and rawget(M, "runtime_not_acquired") == absent
+	end
+	local function current()
+		if not invariant() then active = false; return false end
+		local called, unacquired = pcall(absent)
+		if not called or unacquired ~= true or not invariant() then active = false; return false end
+		return true
+	end
+	if not current() then return nil end
+	local methods = { current = current, revoke = function() active = false; return true end }
+	return setmetatable({}, {
+		__index = methods,
+		__newindex = function() error("Runtime recovery admission is immutable", 2) end,
+		__metatable = false,
+	})
+end
+
+
 --- The remap guardian's state for the diagnostics permissions table, read
 --- from memory without any native observation or side effect.
 --- @return string state `ready`, `requires_approval`, `unavailable`,
@@ -6955,6 +7086,9 @@ end
 --- disabled hotkey with an unfenced Karabiner generation.
 --- @return boolean stopped True only when every local resource was released.
 function M.teardown_local()
+	_legacy_cleanup_offered.runtime_recovery.completed = nil
+	local recovery_state = _state
+	local recovery_binding = _legacy_cleanup_offered.runtime_recovery.capture()
 	_legacy_cleanup_offered.parser_refusal_attempt = nil
 	local custody = _state and _state.runtime_custody
 	if custody and not custody.current() then return false end
@@ -7009,6 +7143,21 @@ function M.teardown_local()
 		Logger.error(LOG, "Exact lease is fenced but local Karabiner teardown failed: %s.",
 			tostring(teardown_result))
 		return false
+	end
+	-- Completion belongs to this exact local teardown, not matching booleans later.
+	if _state == recovery_state and _state ~= nil and _state.runtime == "owned"
+		and _state.runtime_unavailable_reason == "runtime-unavailable" and custody ~= nil
+		and recovery_binding ~= nil and recovery_binding.current() == true then
+		local watcher_ok, watcher = pcall(recovery_binding.watcher_issuer)
+		local lifecycle_ok, lifecycle = pcall(recovery_binding.lifecycle_issuer)
+		local watcher_current = watcher_ok and type(watcher) == "table" and watcher.current
+		local lifecycle_current = lifecycle_ok and type(lifecycle) == "table" and lifecycle.current
+		if type(watcher_current) == "function" and type(lifecycle_current) == "function"
+			and watcher_current() == true and lifecycle_current() == true and recovery_binding.current() == true then
+			_legacy_cleanup_offered.runtime_recovery.completed = { state = _state, custody = custody,
+				epoch = _lifecycle_epoch, intent = _lease_user_intent_revision, binding = recovery_binding,
+				watcher_current = watcher_current, lifecycle_current = lifecycle_current }
+		end
 	end
 	return true
 end
@@ -7183,5 +7332,10 @@ function M.stop()
 	_legacy_cleanup_offered.confirmation_generation = _legacy_cleanup_offered.confirmation_generation + 1
 	return M.shutdown("hammerspoon_stop")
 end
+
+-- Bind exact public ports only after the genuine definitions exist.
+_legacy_cleanup_offered.runtime_recovery.issuer = M.runtime_recovery_admission
+_legacy_cleanup_offered.runtime_recovery.teardown = M.teardown_local
+_legacy_cleanup_offered.runtime_recovery.stop_lease = M.stop_lease
 
 return M

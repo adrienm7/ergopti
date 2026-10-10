@@ -3616,6 +3616,14 @@ and restoration/debt assertions remain mandatory.
   decision; initial-press attribution follows the delegated routine decisions.
   Production history wiring, bounded recovery and controlled shutdown remain
   incomplete; every new hold prerequisite still needs native acceptance.
+  Reviewed recovery prerequisites now retain genuine native document/publication
+  ports and a completed inert-local witness. The normal Hammerspoon runner
+  receives 79 new controls; original 30/26 and migration 199/publication 16 remain
+  unchanged and pass in portable receiving. A same-byte successor inode is
+  preserved during compensation. The menu transaction is still held for four
+  independent role/async-abort regressions; no command or owned runtime is
+  activated. Native installed, reload and physical qualification remain unrun.
+  TODO 31 and transverse items 16/38 remain open.
   About 30-40 agent-days plus maintainer
   hardware time.
 

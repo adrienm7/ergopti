@@ -138,6 +138,13 @@ local _input_source_callback_owned = false
 -- Every installed callback captures this generation. A native watcher/timer
 -- whose stop fails remains physically live but becomes logically inert at once.
 local _input_source_watcher_gen = 0
+-- Only this owner can retain an operation-specific completed local stop.
+local _input_source_retirement = {
+	consumer_revision = 0,
+	broker_subscribe = rawget(InputSourceBroker, "subscribe"),
+	broker_unsubscribe = rawget(InputSourceBroker, "unsubscribe"),
+	timer_cancel = rawget(TimerScheduler, "cancel"),
+}
 
 -- Monotonic timestamp of the last CapsWord subprocess check.
 local _capsword_last_check_ns = 0
@@ -566,6 +573,11 @@ end
 --- @param lease_token string Exact active generation token.
 --- @return hs.eventtap|nil The running eventtap watcher instance.
 function M.start_gesture_watcher(gestures_engine, lease_token)
+	-- Exported consumer handles are outside this inert-only recovery witness.
+	-- Invalidate before even a refused acquisition can call an external port.
+	_input_source_retirement.consumer_revision = _input_source_retirement.consumer_revision + 1
+	_input_source_retirement.gesture_completed = nil
+	_input_source_retirement.app_completed = nil
 	local scoped_name, scope_err = LeaseContract.runtime_variable_name("capsword", lease_token)
 	if not scoped_name then
 		Logger.error(LOG, "CapsWord watcher refused — %s.", tostring(scope_err))
@@ -683,6 +695,7 @@ end
 --- Stops every CapsWord pointer resource owned by this remap generation.
 --- @param watcher table|nil Eventtap returned by start_gesture_watcher().
 function M.stop_gesture_watcher(watcher)
+	_input_source_retirement.gesture_completed = nil
 	_capsword_watcher_gen = _capsword_watcher_gen + 1
 	_capsword_gen = _capsword_gen + 1
 	_capsword_check_pending = false
@@ -755,6 +768,9 @@ function M.stop_gesture_watcher(watcher)
 	end
 	if all_stopped then
 		Logger.debug(LOG, "Trackpad CapsWord resources stopped with the Ergopti lease.")
+		if watcher == nil and _input_source_retirement.consumer_revision == 0 then
+			_input_source_retirement.gesture_completed = { generation = _capsword_watcher_gen, probe = _capsword_gen }
+		end
 	end
 	return all_stopped
 end
@@ -960,6 +976,7 @@ local function retry_input_source_cleanup_before_start()
 end
 
 function M.start_input_source_watcher(on_change)
+	_input_source_retirement.completed = nil
 	Logger.trace(LOG, "Registering input source watcher…")
 
 	-- A failed stop may leave any one of these exact native capabilities alive.
@@ -1213,8 +1230,10 @@ end
 --- Clears the hs.keycodes.inputSourceChanged callback, cancels the poll timer,
 --- and cancels any pending debounced rebuild.
 function M.stop_input_source_watcher()
+	_input_source_retirement.completed = nil
 	Logger.trace(LOG, "Stopping input source watcher…")
 	_input_source_watcher_gen = _input_source_watcher_gen + 1
+	local retiring_generation = _input_source_watcher_gen
 	_layout_poll_committed = false
 	local all_stopped = true
 	if _input_source_callback_owned then
@@ -1284,6 +1303,10 @@ function M.stop_input_source_watcher()
 		_layout_poll_termination_pending = false
 	end
 	if all_stopped then Logger.done(LOG, "Input source watcher stopped.") end
+	if all_stopped and _input_source_watcher_gen == retiring_generation
+		and not has_input_source_cleanup_debt() and _layout_poll_committed == false then
+		_input_source_retirement.completed = { generation = retiring_generation, read_generation = _layout_read_generation }
+	end
 	return all_stopped
 end
 
@@ -1507,12 +1530,22 @@ end
 
 --- @return string|nil Registrar handle for the bare F17 binding.
 function M.start_cycle_windows_hotkey()
+	-- Exported consumer handles are outside this inert-only recovery witness.
+	-- Invalidate before even a refused acquisition can call an external port.
+	_input_source_retirement.consumer_revision = _input_source_retirement.consumer_revision + 1
+	_input_source_retirement.gesture_completed = nil
+	_input_source_retirement.app_completed = nil
 	return bind_f17(KEYCODE_F17_NAME, "cycle-windows", cycle_windows_in_app)
 end
 
 --- Registers Shift+F17 as "global previous window".
 --- @return string|nil Registrar handle.
 function M.start_alt_tab_windows_hotkey()
+	-- Exported consumer handles are outside this inert-only recovery witness.
+	-- Invalidate before even a refused acquisition can call an external port.
+	_input_source_retirement.consumer_revision = _input_source_retirement.consumer_revision + 1
+	_input_source_retirement.gesture_completed = nil
+	_input_source_retirement.app_completed = nil
 	return bind_f17(MOD_SHIFT .. "+" .. KEYCODE_F17_NAME, "Alt+Tab windows", focus_previous_window_global)
 end
 
@@ -1524,20 +1557,36 @@ end
 --- nothing recording it. Both behaviours are now bindable on both.
 --- @return string|nil Registrar handle.
 function M.start_alt_tab_monitor_hotkey()
+	-- Exported consumer handles are outside this inert-only recovery witness.
+	-- Invalidate before even a refused acquisition can call an external port.
+	_input_source_retirement.consumer_revision = _input_source_retirement.consumer_revision + 1
+	_input_source_retirement.gesture_completed = nil
+	_input_source_retirement.app_completed = nil
 	return bind_f17(MOD_CTRL .. "+" .. KEYCODE_F17_NAME, "per-screen window", focus_previous_window_on_screen)
 end
 
 --- Registers Option+F17 as "direct previous app".
 --- @return string|nil Registrar handle.
 function M.start_alt_tab_apps_hotkey()
+	-- Exported consumer handles are outside this inert-only recovery witness.
+	-- Invalidate before even a refused acquisition can call an external port.
+	_input_source_retirement.consumer_revision = _input_source_retirement.consumer_revision + 1
+	_input_source_retirement.gesture_completed = nil
+	_input_source_retirement.app_completed = nil
 	if not ensure_app_switch_watcher() then return nil end
 	return bind_f17(MOD_ALT .. "+" .. KEYCODE_F17_NAME, "Alt+Tab apps", focus_previous_app_direct)
 end
 
 --- Stops the internal app-switch watcher used by Alt+Tab app-previous.
 function M.stop_alt_tab_apps_tracker()
+	_input_source_retirement.app_completed = nil
 	_app_switch_watcher_gen = _app_switch_watcher_gen + 1
-	if not _app_switch_watcher then return true end
+	if not _app_switch_watcher then
+		if _input_source_retirement.consumer_revision == 0 then
+			_input_source_retirement.app_completed = { generation = _app_switch_watcher_gen }
+		end
+		return true
+	end
 	_app_switch_watcher_active = false
 	local watcher = _app_switch_watcher
 	if not stop_native_watcher(watcher, "App-switch watcher") then return false end
@@ -1550,5 +1599,102 @@ function M.stop_alt_tab_apps_tracker()
 	end
 	return true
 end
+
+
+--- Retains only this owner's exact completed input-source teardown generation.
+--- It grants no physical-capture retirement or lease/start authority.
+--- @return table|nil receipt Immutable current/revoke ports, absent on cleanup debt.
+function M.input_source_teardown_admission()
+	local record = _input_source_retirement.completed
+	if record == nil then return nil end
+	local active = true
+	local function current()
+		if not active then return false end
+		local live = rawget(package.loaded, "platform.remap.watchers") == M
+			and rawget(M, "input_source_teardown_admission") == _input_source_retirement.issuer
+			and rawget(M, "stop_input_source_watcher") == _input_source_retirement.stop
+			and rawget(M, "start_input_source_watcher") == _input_source_retirement.start
+			and rawget(package.loaded, "adapters.input_source_broker") == InputSourceBroker
+			and rawget(InputSourceBroker, "subscribe") == _input_source_retirement.broker_subscribe
+			and rawget(InputSourceBroker, "unsubscribe") == _input_source_retirement.broker_unsubscribe
+			and rawget(package.loaded, "adapters.timer_scheduler") == TimerScheduler
+			and rawget(TimerScheduler, "cancel") == _input_source_retirement.timer_cancel
+			and _input_source_retirement.completed == record
+			and _input_source_watcher_gen == record.generation
+			and _layout_read_generation == record.read_generation
+			and _layout_poll_committed == false and not has_input_source_cleanup_debt()
+		if not live then active = false end
+		return live
+	end
+	if not current() then return nil end
+	local methods = { current = current, revoke = function() active = false; return true end }
+	return setmetatable({}, { __index = methods,
+		__newindex = function() error("Input-source teardown admission is immutable", 2) end,
+		__metatable = false })
+end
+
+--- Retains only an inert lifetime that never exported a gesture or F17 consumer.
+--- A consumer start attempt permanently refuses this narrow recovery route until
+--- reload; it cannot prove retirement of a handle held by another caller.
+--- @return table|nil receipt Immutable current/revoke ports after actual stops.
+function M.inert_remap_teardown_admission()
+	if rawget(M, "input_source_teardown_admission") ~= _input_source_retirement.issuer then return nil end
+	local input = _input_source_retirement.issuer()
+	local gesture, app = _input_source_retirement.gesture_completed, _input_source_retirement.app_completed
+	if input == nil or gesture == nil or app == nil then return nil end
+	local input_current, active = input.current, true
+	local function current()
+		if not active then return false end
+		local live = rawget(M, "input_source_teardown_admission") == _input_source_retirement.issuer
+			and input_current() == true
+			and rawget(M, "inert_remap_teardown_admission") == _input_source_retirement.consumer_issuer
+			and rawget(M, "inert_teardown_ports") == _input_source_retirement.consumer_factory
+			and rawget(M, "stop_gesture_watcher") == _input_source_retirement.gesture_stop
+			and rawget(M, "stop_alt_tab_apps_tracker") == _input_source_retirement.app_stop
+			and _input_source_retirement.consumer_revision == 0
+			and _input_source_retirement.gesture_completed == gesture
+			and _input_source_retirement.app_completed == app
+			and _capsword_watcher_gen == gesture.generation and _capsword_gen == gesture.probe
+			and _app_switch_watcher_gen == app.generation
+			and _capsword_check_pending == false and _capsword_probe_watchdog == nil
+			and _capsword_led_timer == nil and _capsword_listener_owned == false
+			and _gestures_engine == nil and next(_active_tasks) == nil
+			and #_capsword_timer_cleanup_backlog == 0 and #_capsword_watcher_backlog == 0
+			and _app_switch_watcher == nil and _app_switch_watcher_active == false
+		for name, port in pairs(_input_source_retirement.consumer_starts) do
+			if rawget(M, name) ~= port then live = false end
+		end
+		if not live then active = false end
+		return live
+	end
+	if not current() then return nil end
+	local methods = { current = current, revoke = function() active = false; return true end }
+	return setmetatable({}, { __index = methods,
+		__newindex = function() error("Inert remap teardown admission is immutable", 2) end,
+		__metatable = false })
+end
+
+_input_source_retirement.consumer_issuer = M.inert_remap_teardown_admission
+_input_source_retirement.gesture_stop = M.stop_gesture_watcher
+_input_source_retirement.app_stop = M.stop_alt_tab_apps_tracker
+_input_source_retirement.consumer_starts = {
+	start_gesture_watcher = M.start_gesture_watcher,
+	start_cycle_windows_hotkey = M.start_cycle_windows_hotkey,
+	start_alt_tab_windows_hotkey = M.start_alt_tab_windows_hotkey,
+	start_alt_tab_monitor_hotkey = M.start_alt_tab_monitor_hotkey,
+	start_alt_tab_apps_hotkey = M.start_alt_tab_apps_hotkey,
+}
+
+_input_source_retirement.issuer = M.input_source_teardown_admission
+_input_source_retirement.start = M.start_input_source_watcher
+_input_source_retirement.stop = M.stop_input_source_watcher
+
+--- Returns the original native inert witness issuer retained by this module.
+--- @return table owner Exact loaded native Watchers module.
+--- @return function issuer Original full inert consumer witness, never input-only.
+function M.inert_teardown_ports()
+	return M, _input_source_retirement.consumer_issuer
+end
+_input_source_retirement.consumer_factory = M.inert_teardown_ports
 
 return M

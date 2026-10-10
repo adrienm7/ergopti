@@ -142,6 +142,45 @@ do
 	parser_refusal.decoder_canonical = type(parser_refusal.decoder) == "function"
 		and identity.same(debug.getinfo(parser_refusal.decoder, "S").source, expected, directory)
 end
+-- This bounded preference writer retains the original native constructor ports.
+-- The ordinary three-argument save path is intentionally independent of this owner.
+parser_refusal.runtime_publication = { factory = rawget(FileSystem, "configuration_ports"),
+	view = rawget(FileSystem, "publication_receipt_view"),
+	codec_factory = rawget(TomlCodec, "document_ports"),
+	encoder = rawget(TomlCodec, "encode"), shaped_encoder = rawget(TomlCodec, "encode_with_shapes") }
+do
+	local owner = parser_refusal.runtime_publication
+	local identity = require("module_source_identity")
+	local directory = require("module_source_directory").capture()
+	local expected = identity.sibling(debug.getinfo(1, "S").source,
+		"macos/platform/remap/config.lua", "macos/adapters/file_system.lua", directory)
+	local expected_codec = identity.sibling(debug.getinfo(1, "S").source,
+		"macos/platform/remap/config.lua", "_shared/lua/toml_codec/codec.lua", directory)
+	owner.codec_canonical = type(owner.codec_factory) == "function"
+		and identity.same(debug.getinfo(owner.codec_factory, "S").source, expected_codec, directory)
+	if owner.codec_canonical then
+		local called
+		called, owner.codec, owner.decoder, owner.original_encoder, owner.original_shaped_encoder = pcall(owner.codec_factory)
+		owner.codec_canonical = called and owner.codec == TomlCodec
+			and owner.decoder == parser_refusal.decoder
+			and owner.encoder == owner.original_encoder and owner.shaped_encoder == owner.original_shaped_encoder
+			and type(owner.decoder) == "function" and type(owner.encoder) == "function"
+			and type(owner.shaped_encoder) == "function"
+	end
+	owner.canonical = type(owner.factory) == "function"
+		and identity.same(debug.getinfo(owner.factory, "S").source, expected, directory)
+		and type(owner.view) == "function"
+		and identity.same(debug.getinfo(owner.view, "S").source, expected, directory)
+	if owner.canonical then
+		local called
+		called, owner.native, owner.reader, owner.writer, owner.publisher, owner.remover,
+			owner.admitted_remover, owner.exact_remover, owner.delete, owner.original_view = pcall(owner.factory)
+		owner.canonical = called and owner.native == FileSystem and owner.view == owner.original_view
+			and type(owner.reader) == "function"
+			and type(owner.publisher) == "function" and type(owner.remover) == "function"
+			and type(owner.admitted_remover) == "function" and type(owner.exact_remover) == "function"
+	end
+end
 local function parser_refusal_current()
 	return parser_refusal.decoder_canonical and rawget(package.loaded, "platform.remap.config") == M
 		and rawget(package.loaded, "infra.toml.codec") == TomlCodec
@@ -149,6 +188,146 @@ local function parser_refusal_current()
 		and rawget(M, "_load_toml_file") == parser_refusal.loader
 		and rawget(TomlCodec, "decode_with_shapes") == parser_refusal.decoder
 		and rawget(M, "parser_refusal_factory") == parser_refusal.factory
+end
+
+--- Pure currentness of the exact native ports used by admitted publication/inverse.
+--- @return boolean current Original native and parser owners still published.
+local function runtime_publication_current()
+	local owner = parser_refusal.runtime_publication
+	return owner.canonical and owner.codec_canonical and parser_refusal_current()
+		and rawget(package.loaded, "adapters.file_system") == FileSystem
+		and rawget(FileSystem, "configuration_ports") == owner.factory
+		and rawget(FileSystem, "read_with_status") == owner.reader
+		and rawget(FileSystem, "write_if_unchanged_admitted") == owner.publisher
+		and rawget(FileSystem, "remove_if_unchanged") == owner.remover
+		and rawget(FileSystem, "remove_if_unchanged_admitted") == owner.admitted_remover
+		and rawget(FileSystem, "remove_exact") == owner.exact_remover
+		and rawget(FileSystem, "publication_receipt_view") == owner.view
+		and rawget(TomlCodec, "document_ports") == owner.codec_factory
+		and rawget(TomlCodec, "decode_with_shapes") == owner.decoder
+		and rawget(TomlCodec, "encode") == owner.encoder
+		and rawget(TomlCodec, "encode_with_shapes") == owner.shaped_encoder
+		and rawget(M, "save_runtime") == owner.save
+end
+
+--- Reads only through the retained original native and document constructor ports.
+--- No dynamic loader, decoder or encoder may execute before refusal.
+local function load_runtime_admitted(path)
+	if not runtime_publication_current() then return nil, "runtime-admission-refused" end
+	local owner = parser_refusal.runtime_publication
+	local called, raw, status = pcall(owner.reader, path)
+	if not called or not runtime_publication_current() then return nil, "runtime-admission-refused" end
+	if status == "absent" then return nil, "absent", { path = path, status = "absent" } end
+	if status ~= "ok" or type(raw) ~= "string" then return nil, "read_error" end
+	local decoded, document, shapes = pcall(owner.decoder, raw)
+	if not runtime_publication_current() then return nil, "runtime-admission-refused" end
+	if not decoded or type(document) ~= "table" then return nil, "parse_error" end
+	return document, nil, { path = path, status = "ok", content = raw }, shapes
+end
+
+--- Retains one actual native publisher receipt and an exact admitted inverse.
+--- A later writer is never restored over. Unknown effects remain pending.
+--- @param path string Exact native settings destination.
+--- @param candidate string Complete encoded preference candidate.
+--- @param source table Captured classified original bytes.
+--- @param admission function Pure final logical publication admission.
+--- @return boolean saved Actual native publication and release acknowledgement.
+--- @return string|nil reason Closed refusal category.
+--- @return table|nil receipt Immutable pending and admitted inverse methods.
+local function publish_runtime_admitted(path, candidate, source, admission)
+	local native = parser_refusal.runtime_publication
+	if type(admission) ~= "function" or not runtime_publication_current() then
+		return false, "runtime-publication-owner-refused"
+	end
+	local diagnostic = function() end -- Closed per-operation owner: never raw paths/content.
+	local alive = true
+	local function admitted(callback)
+		if not alive or not runtime_publication_current() then alive = false; return false end
+		local called, accepted = pcall(callback)
+		if not called or accepted ~= true then return false end
+		if not runtime_publication_current() then alive = false; return false end
+		return true
+	end
+	local called, written, detail, publication = pcall(native.publisher, path, candidate, source,
+		diagnostic, function() return admitted(admission) end)
+	local viewed, view = pcall(native.view, publication, path, source, candidate, diagnostic)
+	view = viewed and type(view) == "table" and view or nil
+	-- Authentic native refusal without an effect/cleanup receipt is a no-effect refusal.
+	-- Exceptions and missing receipts after a positive ACK retain unknown-effect debt.
+	if called and written ~= true and publication == nil then
+		return false, "runtime-publication-refused"
+	end
+	local state = { pending = true, native = publication, view = view,
+		inverse = nil, inverse_view = nil, removed = nil, unknown = not called or view == nil }
+	local methods = {}
+	local receipt = setmetatable({}, { __index = methods,
+		__newindex = function() error("runtime publication receipts are immutable", 2) end,
+		__metatable = false })
+	local function settled(owner)
+		if type(owner) ~= "table" then return false end
+		local ok, result = pcall(owner.is_settled)
+		if not ok or result ~= true then
+			local retried, released = pcall(owner.retry)
+			if not retried or released ~= true then return false end
+			ok, result = pcall(owner.is_settled)
+		end
+		return ok and result == true
+	end
+	local function matches(owner)
+		local ok, result = pcall(owner.matches_source)
+		return ok and result == true and runtime_publication_current()
+	end
+	--- @return boolean pending Publication or inverse custody remains retained.
+	function methods.pending() return state.pending end
+	--- Retries only this operation's exact inverse under the caller's retained owner.
+	--- @param inverse_admission function Pure current global writer/reload abort admission.
+	--- @return boolean restored Exact physical inverse and native release settled.
+	function methods.retry_restore(inverse_admission)
+		if not state.pending then return true end
+		if type(inverse_admission) ~= "function" or not runtime_publication_current()
+			or state.unknown then return false end
+		if state.removed ~= nil then
+			if not settled(state.removed) or not matches(state.removed) then return false end
+			if rawget(state.removed, "removed") == true then state.pending = false; return true end
+			state.removed = nil
+		end
+		if state.inverse ~= nil then
+			if not settled(state.inverse) or not matches(state.inverse) then return false end
+			if state.inverse_view.published == true or state.inverse_view.unchanged == true then
+				state.pending = false; return true
+			end
+			state.inverse, state.inverse_view = nil, nil
+		end
+		if not settled(state.native) or not matches(state.native) then return false end
+		if state.view.published ~= true then state.pending = false; return true end
+		if source.status == "ok" then
+			local expected = { status = "ok", content = candidate }
+			local ok, restored, reason, inverse = pcall(native.publisher, path, source.content, expected,
+				diagnostic, function() return admitted(inverse_admission) and matches(state.native) end)
+			local read_ok, inverse_view = pcall(native.view, inverse, path, expected, source.content, diagnostic)
+			if read_ok and type(inverse_view) == "table" then
+				state.inverse, state.inverse_view = inverse, inverse_view
+				if restored == true and settled(inverse) and matches(inverse)
+					and (inverse_view.published == true or inverse_view.unchanged == true) then
+					state.pending = false; return true
+				end
+			elseif not ok or restored == true or inverse ~= nil then state.unknown = true end
+			return false
+		end
+		local expected = { status = "ok", content = candidate }
+		local ok, removed, reason, removal = pcall(native.admitted_remover, path, expected,
+			diagnostic, function() return admitted(inverse_admission) and matches(state.native) end)
+		if ok and type(removal) == "table" then
+			state.removed = removal
+			if removed == true and settled(removal) and matches(removal)
+				and rawget(removal, "removed") == true then state.pending = false; return true end
+		elseif not ok or removed == true or removal ~= nil then state.unknown = true end
+		return false
+	end
+	if called and written == true and view ~= nil and runtime_publication_current()
+		and settled(publication) and matches(publication)
+		and (view.published == true or view.unchanged == true) then return true, nil, receipt end
+	return false, "runtime-publication-retained", receipt
 end
 
 --- Load a TOML user-config file.
@@ -776,11 +955,15 @@ end
 --- @param payload string Complete source-bound candidate.
 --- @param source string|nil Exact admitted source bytes.
 --- @param source_status string Classified source status.
+--- @param admission function|nil Exact logical admission at final native publication.
 --- @return boolean saved Actual conditional publication result.
 --- @return string|nil reason Publication refusal.
 --- @return table|nil receipt Exact candidate and retained native cleanup.
-local function publish_config_candidate(user_config_path, payload, source, source_status)
+local function publish_config_candidate(user_config_path, payload, source, source_status, admission)
 	local publication_source = { status = source_status, content = source }
+	if admission ~= nil then
+		return publish_runtime_admitted(user_config_path, payload, publication_source, admission)
+	end
 	local write_ok, written, detail, retry_cleanup = pcall(FileSystem.write_if_unchanged,
 		user_config_path, payload, publication_source)
 	local receipt = { path = user_config_path, source = publication_source, candidate = payload, verify_absence = true }
@@ -1015,10 +1198,13 @@ end
 --- @param value string Requested value from the shared declaration.
 --- @param user_config_path string Exact native configuration route.
 --- @param expected_source table Same-read path, status and raw source receipt.
+--- @param admission function|nil Exact logical admission at final native publication.
 --- @return boolean saved Actual conditional publication result.
 --- @return string|nil reason Refusal or retained publication failure.
---- @return table|nil receipt Exact candidate and retained native cleanup.
-function M.save_runtime(value, user_config_path, expected_source)
+--- @return table|nil receipt Ordinary exact summary or admitted opaque inverse owner.
+function M.save_runtime(value, user_config_path, expected_source, admission)
+	if admission ~= nil and not runtime_publication_current() then return false, "runtime-admission-refused" end
+	if admission ~= nil and type(admission) ~= "function" then return false, "runtime-admission-refused" end
 	-- Capture displayed-source custody before any declaration, read or log port.
 	-- A caller still owns its receipt and may change it during those callbacks.
 	local expected_path, expected_status, expected_content
@@ -1041,7 +1227,13 @@ function M.save_runtime(value, user_config_path, expected_source)
 		Logger.error(LOG, "Runtime selector publication refused an invalid candidate or source receipt.")
 		return false
 	end
-	local document, reason, source, shapes = M._load_toml_file(user_config_path)
+	local document, reason, source, shapes
+	if admission ~= nil then
+		if not runtime_publication_current() then return false, "runtime-admission-refused" end
+		document, reason, source, shapes = load_runtime_admitted(user_config_path)
+	else
+		document, reason, source, shapes = M._load_toml_file(user_config_path)
+	end
 	if not source or source.path ~= expected_path or source.status ~= expected_status
 		or source.content ~= expected_content or (not document and reason ~= "absent") then
 		Logger.error(LOG, "Runtime selector publication refused an unsafe or changed native source.")
@@ -1053,6 +1245,7 @@ function M.save_runtime(value, user_config_path, expected_source)
 		Logger.error(LOG, "Runtime selector publication refused a scalar or array Karabiner parent.")
 		return false
 	end
+	if admission ~= nil and not runtime_publication_current() then return false, "runtime-admission-refused" end
 	local ok, payload = pcall(function()
 		if value ~= setting.default then
 			section = section or {}
@@ -1062,19 +1255,26 @@ function M.save_runtime(value, user_config_path, expected_source)
 			section.runtime = nil
 			if next(section) == nil then document[INTEGRATION_SECTION] = nil end
 		end
+		if admission ~= nil then
+			local owner = parser_refusal.runtime_publication
+			if shapes then return owner.shaped_encoder(document, shapes) end
+			return owner.encoder(document)
+		end
 		if shapes then return TomlCodec.encode_with_shapes(document, shapes) end
 		return TomlCodec.encode(document)
 	end)
+	if admission ~= nil and not runtime_publication_current() then return false, "runtime-admission-refused" end
 	if not ok or type(payload) ~= "string" then
 		Logger.error(LOG, "Runtime selector candidate could not be encoded; settings were preserved.")
 		return false
 	end
-	return publish_config_candidate(user_config_path, payload, expected_content, expected_status)
+	return publish_config_candidate(user_config_path, payload, expected_content, expected_status, admission)
 end
 
 
 -- Bind the original declarations only after both public functions exist.
 parser_refusal.reader, parser_refusal.loader = M.load_user_config, M._load_toml_file
+parser_refusal.runtime_publication.save = M.save_runtime
 local function qualify_parser_refusal(proof)
 	local attempt = parser_refusal.attempt
 	if not parser_refusal_current() or type(proof) ~= "table" or attempt == nil

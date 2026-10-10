@@ -2393,6 +2393,8 @@ local configuration_reader, configuration_writer, configuration_publisher =
 local configuration_remover, configuration_admitted_remover, configuration_exact_remover, configuration_delete =
 	rawget(M, "remove_if_unchanged"), rawget(M, "remove_if_unchanged_admitted"), rawget(M, "remove_exact"), rawget(M, "delete")
 
+local configuration_receipt_view = rawget(M, "publication_receipt_view")
+
 --- Returns this initializer's actual native method identities without IO.
 --- Public export replacement cannot change these captured values. Consumers
 --- still own loader-origin, raw live-export and source/publication admission.
@@ -2404,9 +2406,11 @@ local configuration_remover, configuration_admitted_remover, configuration_exact
 --- @return function|nil admitted_remover
 --- @return function|nil exact_remover
 --- @return function delete
+--- @return function receipt_view Original opaque publication issuer viewer.
 function M.configuration_ports()
 	return M, configuration_reader, configuration_writer, configuration_publisher,
-		configuration_remover, configuration_admitted_remover, configuration_exact_remover, configuration_delete
+		configuration_remover, configuration_admitted_remover, configuration_exact_remover, configuration_delete,
+		configuration_receipt_view
 end
 
 return M

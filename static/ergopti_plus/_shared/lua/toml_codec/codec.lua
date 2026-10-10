@@ -1117,4 +1117,14 @@ function M.decode_with_shapes(content)
 	return document, shapes
 end
 
+-- Retain whole-document roles at actual module construction. Advertised exports
+-- may later change; callers can bind this tuple without treating source metadata
+-- or parameter counts as proof of an encoder's document role.
+do
+	local decoder, encoder, shaped_encoder = M.decode_with_shapes, M.encode, M.encode_with_shapes
+	function M.document_ports()
+		return M, decoder, encoder, shaped_encoder
+	end
+end
+
 return M
