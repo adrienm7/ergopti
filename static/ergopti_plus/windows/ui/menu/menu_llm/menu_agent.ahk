@@ -38,11 +38,10 @@
 LLM_Agent_MenuBuild() {
 	return MenuRenderer_Build("agent_menu", "Agent", Map(
 		"agent_system1", _LLM_Agent_MenuSystemSlot.Bind("agent_system1"),
-		"agent_system2", _LLM_Agent_MenuSystemSlot.Bind("agent_system2"),
-		"agent_disabled_apps", _LLM_Agent_MenuAppsSlot), "", Map(),
-		Map("agent_mode", _LLM_Agent_MenuSetMode),
+		"agent_system2", _LLM_Agent_MenuSystemSlot.Bind("agent_system2")), "", Map(),
+		Map("agent_mode", _LLM_Agent_MenuSetMode, "agent_disabled_apps", (*) => LLM_Agent_OpenAppPicker()),
 		Map("llm.agent_mode", () => LLM_Agent_Setting("agent_mode"),
-			"agent_mode_ready", () => true))
+			"agent_mode_ready", () => true, "agent_disabled_apps_count", _LLM_Agent_MenuDisabledAppsCount))
 }
 
 ; Dynamic slot agent_system1 or agent_system2: its row and its backends.
@@ -52,12 +51,6 @@ _LLM_Agent_MenuSystemSlot(Key, Target, CategoryName) {
 		MenuRenderer_AppendRows(Target, "agent_menu", Key, [Row])
 }
 
-; Dynamic slot agent_disabled_apps: the application picker.
-_LLM_Agent_MenuAppsSlot(Target, CategoryName) {
-	Row := _LLM_Agent_AppsRow()
-	if Row is Map
-		MenuRenderer_AppendRows(Target, "agent_menu", "agent_disabled_apps", [Row])
-}
 
 
 
@@ -142,14 +135,29 @@ _LLM_Agent_MenuSystemIsOff(Key) {
 }
 
 /**
- * The excluded applications row, with their count.
- * @returns {Map}
+ * Projects the excluded-applications command from its current main-menu authority.
+ * @returns {Map|false} The declared native data row, or refused ownership.
  */
 _LLM_Agent_AppsRow() {
-	Rows := MenuRenderer_TemplateRows("agent_windows_disabled_apps_command",
+	return MenuRenderer_CommandRow("agent_menu", "agent_disabled_apps",
 		Map("agent_disabled_apps", (*) => LLM_Agent_OpenAppPicker()),
-		Map("agent_disabled_apps_count", (*) => "" . LLM_Agent_Setting("agent_disabled_apps").Length), Map())
-	return (Rows is Array) && Rows.Length == 1 && (Rows[1] is Map) ? Rows[1] : false
+		Map("agent_disabled_apps_count", _LLM_Agent_MenuDisabledAppsCount))
+}
+
+/**
+ * Supplies the original apps count as native data; the shared command owns its caption.
+ * @returns {String|false} The actual plain-array count, or refused native state.
+ */
+_LLM_Agent_MenuDisabledAppsCount() {
+	Reader := LLM_Agent_Setting
+	if Object.Prototype.HasOwnProp.Call(Reader, "Call")
+		return false
+	Apps := Reader.Call("agent_disabled_apps")
+	if Object.Prototype.HasOwnProp.Call(Reader, "Call") || !(Apps is Array) || ObjGetBase(Apps) != Array.Prototype
+		return false
+	for Name in ObjOwnProps(Apps)
+		return false
+	return "" . Apps.Length
 }
 
 

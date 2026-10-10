@@ -1466,13 +1466,6 @@ OPENS_SUBMENU.agent_disabled_apps = [
 		native_sources: { linux: 'linux/ui/menu/agent_rows.lua' }
 	}
 ];
-// The actual Windows dynamic slot publishes the declared picker command.
-OPENS_SUBMENU.agent_disabled_apps.push({
-	menu: 'agent_windows_disabled_apps_command',
-	platforms: ['ahk'],
-	kind: 'compose',
-	native_sources: { ahk: 'windows/ui/menu/menu_llm/menu_agent.ahk' }
-});
 OPENS_SUBMENU.agent_disabled_app_records = {
 	menu: 'agent_linux_disabled_app_remove',
 	platforms: ['linux'],
@@ -1690,6 +1683,41 @@ for (const [driver, method] of [
 const errors = [];
 
 const manifest = JSON.parse(fs.readFileSync(MANIFEST, 'utf8'));
+
+// Windows owns a leaf command in the actual Build; Lua retains genuine submenus.
+{
+	const assert = require('node:assert/strict');
+	const { nativeBuildCommandBinding } = require('../lib/menu-template-binding.cjs');
+	const source = fs.readFileSync(path.join(SP, 'windows/ui/menu/menu_llm/menu_agent.ahk'), 'utf8');
+	const renderer = fs.readFileSync(path.join(SP, 'windows/infra/manifest_menu.ahk'), 'utf8');
+	for (const [key, port] of [
+		['agent_disabled_apps', 1],
+		['agent_disabled_apps_count', 2]
+	])
+		assert.equal(
+			nativeBuildCommandBinding(
+				source,
+				'LLM_Agent_MenuBuild',
+				'agent_menu',
+				key,
+				port,
+				[{ src: source }, { src: renderer }],
+				manifest
+			),
+			true,
+			key + ': actual returned Windows Build port'
+		);
+	assert.deepEqual(
+		OPENS_SUBMENU.agent_disabled_apps.map(({ menu, platforms }) => ({ menu, platforms })),
+		[
+			{ menu: 'agent_excluded_apps_frame', platforms: ['hs'] },
+			{ menu: 'agent_linux_disabled_apps_frame', platforms: ['linux'] },
+			{ menu: 'agent_linux_disabled_apps_children', platforms: ['linux'] }
+		],
+		'only the retired Windows dynamic composition leaves the original Lua graph'
+	);
+}
+
 const MENU_KEYS = Object.keys(manifest).filter((k) => Array.isArray(manifest[k]));
 
 for (const [driver, relative] of [
