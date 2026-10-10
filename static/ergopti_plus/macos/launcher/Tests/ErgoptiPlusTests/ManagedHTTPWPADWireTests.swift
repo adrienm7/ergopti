@@ -66,6 +66,20 @@ final class ManagedHTTPWPADWireTests: XCTestCase {
 		XCTAssertEqual(try fixture.command(["command": "trust", "enabled": true])["trusted"] as? Bool, true)
 		for path in ["/alpha?case=one", "/beta?case=two"] {
 			let result = try execute(path, metadata: metadata)
+			if result.0 != 0 {
+				// Inspect the original completed request only; never echo unknown frame data.
+				var label = "unknown"
+				if result.1.filter({ $0.0 == 67 }).count == 1,
+					let last = result.1.last, last.0 == 67, last.1.count <= 65_536,
+					let fields = (try? JSONSerialization.jsonObject(with: last.1)) as? [String: Any],
+					let version = fields["version"] as? NSNumber,
+					CFGetTypeID(version) != CFBooleanGetTypeID(), version.doubleValue == 1,
+					let reason = fields["reason"] as? String,
+					["complete", "deadline", "cancelled", "offline", "certificate", "connect", "proxy", "unavailable"].contains(reason) {
+					label = reason
+				}
+				print("# native_http_wpad_failure reason=\(label)")
+			}
 			XCTAssertEqual(result.0, 0)
 			XCTAssertEqual(result.2, 1)
 			XCTAssertEqual(try terminal(result.1)["success"] as? Bool, true)

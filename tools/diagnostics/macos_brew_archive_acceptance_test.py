@@ -5646,5 +5646,491 @@ int main(void) {
             self.assertEqual(result.stderr, "")
 
 
+class TimeoutEvidenceUnavailableFixture:
+    """Closed test sentinel: actual capability refusal, never positive publication credit."""
+
+    __slots__ = ()
+
+    @staticmethod
+    def packet():
+        return {
+            "schema": 1,
+            "scope": "timeout-evidence-fixture",
+            "capability": "O_NOFOLLOW",
+            "status": "capability-refused",
+            "positive_publication": "UNEXECUTED",
+            "child_acquisitions": 0,
+            "evidence_files_created": 0,
+        }
+
+
+def timeout_evidence_unavailable_fixture(case, world):
+    """A declared negative receipt cannot silently substitute for a positive port."""
+    if type(world) is not TimeoutEvidenceUnavailableFixture:
+        return False
+    packet = world.packet()
+    case.assertEqual(
+        packet,
+        {
+            "schema": 1,
+            "scope": "timeout-evidence-fixture",
+            "capability": "O_NOFOLLOW",
+            "status": "capability-refused",
+            "positive_publication": "UNEXECUTED",
+            "child_acquisitions": 0,
+            "evidence_files_created": 0,
+        },
+    )
+    for key in ("schema", "child_acquisitions", "evidence_files_created"):
+        case.assertIs(type(packet[key]), int)
+    for key in ("scope", "capability", "status", "positive_publication"):
+        case.assertIs(type(packet[key]), str)
+    case.assertFalse(hasattr(probe.os, "O_NOFOLLOW"))
+    print(
+        "UNEXECUTED positive-publication: O_NOFOLLOW unavailable; native capability refusal verified"
+    )
+    return True
+
+
+class FirstCommandTimeoutControls(unittest.TestCase):
+    """Actual private publication plus modeled reservation port; no native timeout credit."""
+
+    @staticmethod
+    def fact():
+        return {
+            "schema": 1,
+            "command": "consent-observer",
+            "stage": "exit-wait",
+            "budget_seconds": 0.12345678901234568,
+            "request_deadline_ns": 40_000_000_000,
+            "started_ns": 11_000_000_000,
+            "expired_ns": 14_000_000_000,
+            "spent_ns": 3_000_000_000,
+        }
+
+    @contextmanager
+    def world(self):
+        with (
+            TemporaryDirectory() as directory,
+            patch.object(probe, "NativeProcessGroups") as native_groups,
+        ):
+            root = Path(directory)
+            evidence_root = root / "evidence"
+            evidence_root.mkdir(mode=0o700)
+            writer = PhaseEvidenceControls().evidence(evidence_root)
+            if writer is None:
+                self.assertFalse(hasattr(probe.os, "O_NOFOLLOW"))
+                self.assertEqual(list(evidence_root.iterdir()), [])
+                native_groups.assert_not_called()
+                yield TimeoutEvidenceUnavailableFixture()
+                return
+            owner = probe.Children(root, evidence=writer)
+            clock = [10_000_000_000]
+            acquired, retired, waits = [], [], []
+            failure = [None]
+
+            def acquire(arguments, native, register, **options):
+                process = Mock(pid=73136 + len(acquired), returncode=None)
+                group = SimpleNamespace(
+                    process=process, reaped=False, observe_exit=Mock(return_value=None)
+                )
+
+                def wait(timeout):
+                    waits.append((process, timeout))
+                    clock[0] = 14_000_000_000
+                    if failure[0] is not None:
+                        raise failure[0]
+                    raise subprocess.TimeoutExpired("PRIVATE_COMMAND_NOT_FOR_EXPORT", timeout)
+
+                def settle():
+                    retired.append(process)
+                    process.returncode = -15
+                    group.reaped = True
+                    return True
+
+                group.wait_for_exit, group.settle = wait, settle
+                register(group)
+                acquired.append(process)
+                return group
+
+            try:
+                with (
+                    patch.object(probe, "acquire_owned", side_effect=acquire),
+                    patch.object(probe.time, "monotonic_ns", side_effect=lambda: clock[0]),
+                ):
+                    yield owner, writer, evidence_root, clock, acquired, retired, waits, failure
+            finally:
+                writer.close()
+
+    def test_strict_typed_schema_refuses_private_forged_and_nonfinite_facts(self):
+        independent = self.fact()
+        admitted = probe._validate_command_timeout(independent)
+        self.assertEqual(admitted, independent)
+        self.assertIsNot(admitted, independent)
+        self.assertEqual(
+            json.loads(json.dumps(admitted))["budget_seconds"], independent["budget_seconds"]
+        )
+        faults = [
+            ("schema", True),
+            ("schema", 2),
+            ("command", "PRIVATE_COMMAND"),
+            ("command", 1),
+            ("stage", "PRIVATE_STAGE"),
+            ("stage", True),
+            ("budget_seconds", True),
+            ("budget_seconds", 0),
+            ("budget_seconds", -1),
+            ("budget_seconds", 181),
+            ("budget_seconds", float("nan")),
+            ("budget_seconds", float("inf")),
+            ("budget_seconds", "PRIVATE_BUDGET"),
+            ("request_deadline_ns", True),
+            ("request_deadline_ns", 0),
+            ("request_deadline_ns", -1),
+            ("request_deadline_ns", 2**64),
+            ("request_deadline_ns", float("nan")),
+            ("started_ns", True),
+            ("started_ns", -1),
+            ("started_ns", 2**64),
+            ("expired_ns", 10_000_000_000),
+            ("expired_ns", None),
+            ("expired_ns", 2**64),
+            ("spent_ns", 2_999_999_999),
+            ("spent_ns", True),
+            ("spent_ns", -1),
+            ("spent_ns", 2**64),
+        ]
+        for key, value in faults:
+            packet = self.fact()
+            packet[key] = value
+            with self.subTest(key=key, value=repr(value)), self.assertRaises(probe.AdmissionError):
+                probe._validate_command_timeout(packet)
+        for change in ("extra", "missing", "subclass", "request-without-deadline"):
+            packet = self.fact()
+            if change == "extra":
+                packet["argv"] = ["PRIVATE_ARGV"]
+            elif change == "missing":
+                del packet["stage"]
+            elif change == "subclass":
+                packet = type("ForeignTimeoutDict", (dict,), {})(packet)
+            else:
+                packet.update(command="permission-request", request_deadline_ns=None)
+            with self.subTest(change=change), self.assertRaises(probe.AdmissionError):
+                probe._validate_command_timeout(packet)
+        packet = self.fact()
+        packet["request_deadline_ns"] = None
+        self.assertIsNone(probe._validate_command_timeout(packet)["request_deadline_ns"])
+
+    def test_first_fact_survives_omitted_history_later_timeout_and_final_closure(self):
+        with self.world() as timeout_world:
+            if timeout_evidence_unavailable_fixture(self, timeout_world):
+                return
+            (_, writer, evidence_root, _, _, _, _, _) = timeout_world
+            for index in range(258):
+                self.assertTrue(writer.record("initial-" + str(index)))
+            first = self.fact()
+            self.assertTrue(writer.retain_timeout(first))
+            first["command"] = "other"  # Caller mutation cannot rewrite the retained snapshot.
+            second = self.fact()
+            second.update(command="permission-request", stage="ui-observer", budget_seconds=30)
+            self.assertTrue(writer.retain_timeout(second))
+            self.assertTrue(writer.retain_timeout(second))
+            for phase, status, closed in (
+                ("command.end", "refused", False),
+                ("cleanup.begin", "pending", False),
+                ("cleanup.closed", "accepted", True),
+                ("candidate.failed", "refused", True),
+            ):
+                self.assertTrue(writer.record(phase, status=status, closed=closed))
+                latest = json.loads((evidence_root / "checkpoint.json").read_bytes())
+                self.assertEqual(latest["first_timeout"], self.fact())
+                self.assertEqual(latest["ownership_closed"], closed)
+                self.assertEqual(latest["cases"], {})
+                self.assertGreater(latest["history_omitted"], 0)
+                self.assertLessEqual(len(json.dumps(latest).encode()), 4096)
+            self.assertEqual(len(list(evidence_root.glob("phase-*.json"))), 256)
+            self.assertTrue(
+                all(
+                    "first_timeout" not in json.loads(p.read_bytes())
+                    for p in evidence_root.glob("phase-*.json")
+                )
+            )
+
+    def test_forged_replacement_cannot_overwrite_first_or_publish_a_private_payload(self):
+        with self.world() as timeout_world:
+            if timeout_evidence_unavailable_fixture(self, timeout_world):
+                return
+            (_, writer, evidence_root, _, _, _, _, _) = timeout_world
+            self.assertTrue(writer.retain_timeout(self.fact()))
+            before = (evidence_root / "checkpoint.json").read_bytes()
+            forged = self.fact()
+            forged["private_path"] = "PRIVATE_PATH"
+            self.assertFalse(writer.retain_timeout(forged))
+            self.assertTrue(writer.failed)
+            self.assertEqual((evidence_root / "checkpoint.json").read_bytes(), before)
+            self.assertEqual(writer.first_timeout, self.fact())
+            writer.first_timeout["spent_ns"] = -1
+            self.assertFalse(writer.record("cleanup.closed", status="accepted", closed=True))
+            self.assertEqual((evidence_root / "checkpoint.json").read_bytes(), before)
+            self.assertNotIn(b"PRIVATE", before)
+
+    def test_writer_missing_new_member_preserves_legacy_projection_before_first_fact(self):
+        with self.world() as timeout_world:
+            if timeout_evidence_unavailable_fixture(self, timeout_world):
+                return
+            (_, writer, evidence_root, _, _, _, _, _) = timeout_world
+            del writer.first_timeout
+            self.assertTrue(writer.record("candidate.begin"))
+            packet = json.loads((evidence_root / "checkpoint.json").read_bytes())
+            self.assertNotIn("first_timeout", packet)
+            self.assertTrue(writer.retain_timeout(self.fact()))
+            self.assertEqual(
+                json.loads((evidence_root / "checkpoint.json").read_bytes())["first_timeout"],
+                self.fact(),
+            )
+
+    def test_generic_exit_wait_keeps_supplied_float_budget_and_opaque_deadline_null(self):
+        with self.world() as timeout_world:
+            # Receiving case: old591 reaches its real timeout + final checkpoint,
+            # then fails an observation assertion, without calling any new API.
+            if timeout_evidence_unavailable_fixture(self, timeout_world):
+                return
+            (owner, writer, evidence_root, _, acquired, retired, waits, _) = timeout_world
+            for index in range(258):
+                self.assertTrue(writer.record("pre-timeout-" + str(index)))
+            foreign = owner.root / "foreign" / "native-appleevent-consent"
+            with self.assertRaisesRegex(
+                probe.AdmissionError, "^Owned native command exceeded deadline$"
+            ):
+                owner.run([str(foreign), "PRIVATE_ARGUMENT"], timeout=0.12345678901234568)
+            self.assertEqual(waits, [(acquired[0], 0.12345678901234568)])
+            self.assertEqual(retired, acquired)
+            self.assertTrue(owner.groups[acquired[0]].reaped)
+            self.assertEqual(owner.active, [])
+            self.assertEqual(owner.debt, [])
+            self.assertTrue(writer.record("candidate.failed", status="refused", closed=True))
+            final = json.loads((evidence_root / "checkpoint.json").read_bytes())
+            self.assertEqual(final["phase"], "candidate.failed")
+            self.assertTrue(final["ownership_closed"])
+            self.assertGreater(final["history_omitted"], 0)
+            self.assertEqual(len(list(evidence_root.glob("phase-*.json"))), 256)
+            self.assertEqual(final["cases"], {})
+            expected = {
+                "schema": 1,
+                "command": "other",
+                "stage": "exit-wait",
+                "budget_seconds": 0.12345678901234568,
+                "request_deadline_ns": None,
+                "started_ns": 10_000_000_000,
+                "expired_ns": 14_000_000_000,
+                "spent_ns": 4_000_000_000,
+            }
+            self.assertEqual(final.get("first_timeout"), expected)
+            self.assertNotIn("PRIVATE", (evidence_root / "checkpoint.json").read_text())
+
+    def test_nested_consent_observer_timeout_keeps_first_identity_parent_deadline_and_exact_cleanup(
+        self,
+    ):
+        with self.world() as timeout_world:
+            if timeout_evidence_unavailable_fixture(self, timeout_world):
+                return
+            (owner, writer, evidence_root, clock, acquired, retired, waits, _) = timeout_world
+            request = probe.OwnedAutomationRequest(["owned", "permission-request"], 30)
+            original = []
+
+            def callback(process, deadline):
+                self.assertIs(process, acquired[0])
+                self.assertEqual(deadline, 40)
+                clock[0] = 11_000_000_000
+                try:
+                    owner.run(
+                        [str(owner.root / "native-appleevent-consent"), "PRIVATE_UI_NAMES"],
+                        timeout=3,
+                        check=False,
+                    )
+                except probe.AdmissionError as primary:
+                    original.append(primary)
+                    raise
+
+            with self.assertRaises(probe.AdmissionError) as caught:
+                owner.run(request, timeout=30, after_start=callback)
+            self.assertIs(caught.exception, original[0])
+            self.assertEqual(str(caught.exception), "Owned native command exceeded deadline")
+            self.assertEqual(waits, [(acquired[1], 3)])
+            self.assertEqual(retired, [acquired[1], acquired[0]])
+            self.assertTrue(all(owner.groups[p].reaped for p in acquired))
+            self.assertEqual(owner.active, [])
+            self.assertEqual(owner.debt, [])
+            self.assertIsNone(owner._timeout_request_deadline_ns)
+            expected = self.fact()
+            expected["budget_seconds"] = 3
+            self.assertEqual(writer.first_timeout, expected)
+            self.assertTrue(writer.record("candidate.failed", status="refused", closed=True))
+            self.assertEqual(
+                json.loads((evidence_root / "checkpoint.json").read_bytes())["first_timeout"],
+                expected,
+            )
+            self.assertNotIn("PRIVATE", (evidence_root / "checkpoint.json").read_text())
+
+    def test_request_readiness_timeout_preserves_original_deadline_and_retires_its_private_file(
+        self,
+    ):
+        with self.world() as timeout_world:
+            if timeout_evidence_unavailable_fixture(self, timeout_world):
+                return
+            (owner, writer, _, _, acquired, retired, waits, _) = timeout_world
+            request = probe.OwnedAutomationRequest(["owned", "permission-request"], 30)
+            request.readiness_nonce = "11111111-2222-3333-4444-555555555555"
+            callback = Mock()
+            with patch.object(
+                probe.OwnedAutomationReadiness,
+                "wait",
+                side_effect=subprocess.TimeoutExpired("PRIVATE_READINESS", 30),
+            ):
+                with self.assertRaisesRegex(
+                    probe.AdmissionError, "^Owned native command exceeded deadline$"
+                ):
+                    owner.run(request, timeout=30, after_start=callback)
+            callback.assert_not_called()
+            self.assertEqual(waits, [])
+            self.assertEqual(retired, acquired)
+            self.assertEqual(owner.active, [])
+            self.assertEqual(owner.debt, [])
+            self.assertIsNone(request.readiness)
+            self.assertEqual(list(owner.root.glob("automation-ready-*")), [])
+            self.assertEqual(writer.first_timeout["command"], "permission-request")
+            self.assertEqual(writer.first_timeout["stage"], "readiness")
+            self.assertEqual(writer.first_timeout["request_deadline_ns"], 40_000_000_000)
+            self.assertEqual(request.deadline_ns, 40_000_000_000)
+            self.assertEqual(writer.first_timeout["budget_seconds"], 30)
+
+    def test_raw_ui_callback_timeout_labels_actual_stage_without_claiming_permission_entry(self):
+        with self.world() as timeout_world:
+            if timeout_evidence_unavailable_fixture(self, timeout_world):
+                return
+            (owner, writer, _, _, acquired, retired, waits, _) = timeout_world
+            request = probe.OwnedAutomationRequest(["owned", "permission-request"], 30)
+            callback = Mock(side_effect=subprocess.TimeoutExpired("PRIVATE_CALLBACK", 30))
+            with self.assertRaisesRegex(
+                probe.AdmissionError, "^Owned native command exceeded deadline$"
+            ):
+                owner.run(request, timeout=30, after_start=callback)
+            callback.assert_called_once_with(acquired[0], 40)
+            self.assertEqual(waits, [])
+            self.assertEqual(retired, acquired)
+            self.assertEqual(owner.active, [])
+            self.assertEqual(owner.debt, [])
+            self.assertEqual(writer.first_timeout["command"], "permission-request")
+            self.assertEqual(writer.first_timeout["stage"], "ui-observer")
+            self.assertEqual(writer.first_timeout["request_deadline_ns"], 40_000_000_000)
+            self.assertEqual(writer.first_timeout["spent_ns"], 0)
+            self.assertIsNone(owner._timeout_request_deadline_ns)
+
+    def test_optional_publication_fault_or_signal_cannot_replace_timeout_primary_or_skip_retirement(
+        self,
+    ):
+        for secondary in (
+            OSError("PRIVATE_PUBLICATION"),
+            process_owner.OwnedProcessInterrupted("PRIVATE_DIAGNOSTIC_SIGNAL"),
+        ):
+            with (
+                self.subTest(secondary=type(secondary).__name__),
+                self.world() as timeout_world,
+            ):
+                if timeout_evidence_unavailable_fixture(self, timeout_world):
+                    return
+                (owner, writer, _, _, acquired, retired, _, _) = timeout_world
+                with patch.object(writer, "retain_timeout", side_effect=secondary):
+                    with self.assertRaisesRegex(
+                        probe.AdmissionError, "^Owned native command exceeded deadline$"
+                    ):
+                        owner.run(["owned"], timeout=3)
+                self.assertEqual(retired, acquired)
+                self.assertEqual(owner.active, [])
+                self.assertEqual(owner.debt, [])
+                self.assertIsNone(writer.first_timeout)
+
+    def test_original_cancellation_remains_same_primary_and_never_claims_a_timeout(self):
+        with self.world() as timeout_world:
+            if timeout_evidence_unavailable_fixture(self, timeout_world):
+                return
+            (owner, writer, _, _, acquired, retired, _, failure) = timeout_world
+            original = process_owner.OwnedProcessInterrupted("ORIGINAL_CANCELLATION")
+            failure[0] = original
+            with self.assertRaises(process_owner.OwnedProcessInterrupted) as caught:
+                owner.run(["owned"], timeout=3)
+            self.assertIs(caught.exception, original)
+            self.assertEqual(retired, acquired)
+            self.assertEqual(owner.active, [])
+            self.assertEqual(owner.debt, [])
+            self.assertIsNone(writer.first_timeout)
+
+
+class GenericCallbackTimeoutStageControls(unittest.TestCase):
+    """Keep the literal existing deadline/callback/wait sequence and its stage facts."""
+
+    world = FirstCommandTimeoutControls.world
+
+    def test_generic_callback_failure_preserves_callback_arguments_and_ui_stage(self):
+        with self.world() as timeout_world:
+            if timeout_evidence_unavailable_fixture(self, timeout_world):
+                return
+            (owner, writer, _, _, acquired, retired, waits, _) = timeout_world
+            callback = Mock(side_effect=subprocess.TimeoutExpired("PRIVATE_CALLBACK", 3))
+            with patch.object(probe.time, "monotonic", return_value=20):
+                with self.assertRaisesRegex(
+                    probe.AdmissionError, "^Owned native command exceeded deadline$"
+                ):
+                    owner.run(["owned"], timeout=3, after_start=callback)
+            callback.assert_called_once_with(acquired[0], 23)
+            self.assertEqual(waits, [])
+            self.assertEqual(retired, acquired)
+            self.assertEqual(owner.active, [])
+            self.assertEqual(owner.debt, [])
+            self.assertEqual(writer.first_timeout["command"], "other")
+            self.assertEqual(writer.first_timeout["stage"], "ui-observer")
+            self.assertEqual(writer.first_timeout["budget_seconds"], 3)
+            self.assertIsNone(writer.first_timeout["request_deadline_ns"])
+            self.assertEqual(writer.first_timeout["spent_ns"], 0)
+
+
+class TimeoutEvidenceMissingCapabilityControls(unittest.TestCase):
+    """Forced real constructor refusal; positive publication remains explicitly unexecuted."""
+
+    world = FirstCommandTimeoutControls.world
+
+    def test_actual_missing_nofollow_refuses_before_child_acquisition_and_emits_closed_unexecuted_receipt(
+        self,
+    ):
+        present = hasattr(probe.os, "O_NOFOLLOW")
+        original = getattr(probe.os, "O_NOFOLLOW", None)
+        native_constructor = probe.PhaseEvidence
+        try:
+            if present:
+                del probe.os.O_NOFOLLOW
+            with (
+                patch.object(probe, "PhaseEvidence", wraps=native_constructor) as constructors,
+                patch.object(probe, "Children", wraps=probe.Children) as children,
+                patch.object(probe, "acquire_owned") as acquire,
+                patch.object(probe.sys, "stdout", new_callable=io.StringIO) as output,
+            ):
+                with self.world() as unavailable:
+                    self.assertIs(type(unavailable), TimeoutEvidenceUnavailableFixture)
+                    self.assertTrue(timeout_evidence_unavailable_fixture(self, unavailable))
+                    self.assertEqual(unavailable.packet()["positive_publication"], "UNEXECUTED")
+                    constructors.assert_called_once()
+                    self.assertEqual(list(Path(constructors.call_args.args[0]).iterdir()), [])
+                    children.assert_not_called()
+                    acquire.assert_not_called()
+                self.assertEqual(
+                    output.getvalue(),
+                    "UNEXECUTED positive-publication: O_NOFOLLOW unavailable; native capability refusal verified\n",
+                )
+        finally:
+            if present:
+                probe.os.O_NOFOLLOW = original
+        self.assertEqual(hasattr(probe.os, "O_NOFOLLOW"), present)
+
+
 if __name__ == "__main__":
     unittest.main()
