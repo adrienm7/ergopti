@@ -1011,6 +1011,7 @@
 	"menu.apps.encrypt_desc": "Chiffrer des fichiers et dossiers",
 	"menu.apps.no_apps": "Aucune application trouvée",
 	"menu.apps.title": "🛠️ Applications",
+	"menu.builder.active_brand": "Ergopti",
 	"menu.builder.title": "Ergopti+",
 	"menu.builder.title_paused": "Ergopti+ ⏸",
 	"menu.debug.console": "Console",

@@ -1011,6 +1011,7 @@
 	"menu.apps.encrypt_desc": "Encrypt files and folders",
 	"menu.apps.no_apps": "No applications found",
 	"menu.apps.title": "🛠️ Applications",
+	"menu.builder.active_brand": "Ergopti",
 	"menu.builder.title": "Ergopti+",
 	"menu.builder.title_paused": "Ergopti+ ⏸",
 	"menu.debug.console": "Console",

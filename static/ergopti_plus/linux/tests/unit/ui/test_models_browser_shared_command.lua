@@ -32,8 +32,18 @@ local function with_browser(callback)
 		package.loaded["infra.paths"] = { shared = function(relative)
 			return driver .. "/../_shared/" .. relative
 		end }
+		-- Supply only the unrelated header prerequisite from the shipped English catalogue.
+		local header_file = assert(io.open(driver .. "/../_shared/data/locales/en.json", "rb"))
+		local header_raw = header_file:read("*a")
+		assert(header_file:close())
+		local header_labels = assert(require("json").decode(assert(header_raw)))
+		local header_brand = assert(header_labels["menu.builder.active_brand"])
+		assert(type(header_brand) == "string" and header_brand ~= "" and header_brand ~= "menu.builder.active_brand")
 		package.loaded["infra.i18n"] = {
-			get = function(key) return key end,
+			get = function(key)
+				if key == "menu.builder.active_brand" then return header_brand end
+				return key
+			end,
 			section = function(key) return key end,
 		}
 		package.loaded["infra.manifest_menu"] = nil
