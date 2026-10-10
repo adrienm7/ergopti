@@ -372,7 +372,9 @@ _TestHC_NativeSnapshotText() {
 		_I18nCacheLoaded := true
 		Snapshot := Map("driver", "windows", "generated_at", "2026-10-09T09:10:36Z", "sections", Map())
 		Text := _HC_NativeSnapshotText(Snapshot)
-		AssertContains(Text, "Only approved technical facts are shared")
+		Config := HealthCheck_Config()
+		AssertContains(Text, Config["schema"]["export_strings"][Config["schema"]["share_policy"]["notice_key"]],
+			"Native fallback uses canonical English without consulting the UI notice override.")
 		AssertContains(Text, "driver-suites: not_run")
 		AssertContains(Text, "page-model-checks: not_collected")
 		AssertContains(Text, '"driver":"windows"')

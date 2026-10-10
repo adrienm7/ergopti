@@ -146,6 +146,9 @@ function loadPage() {
 const schema = JSON.parse(
 	fs.readFileSync(path.join(SHARED, 'modules', 'diagnostics', 'schema.json'), 'utf8')
 );
+schema.export_strings = JSON.parse(
+	fs.readFileSync(path.join(SHARED, 'data/locales/en.json'), 'utf8')
+);
 const redaction = JSON.parse(
 	fs.readFileSync(path.join(SHARED, 'modules', 'diagnostics', 'redaction.json'), 'utf8')
 );

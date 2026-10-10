@@ -241,8 +241,14 @@ end
 --- @return table { schema, templates, redaction, repository }
 function M.load_config(shared)
 	local defaults = read_json(shared("modules/updater/defaults.json"))
+	local schema = M.load_schema(shared("modules/diagnostics/schema.json"))
+	-- Sharing has one fixed language without changing the active UI locale.
+	schema.export_strings = {}
+	for key, value in pairs(read_json(shared("data/locales/en.json"))) do
+		if key:sub(1, 12) == "healthcheck." then schema.export_strings[key] = value end
+	end
 	return {
-		schema     = M.load_schema(shared("modules/diagnostics/schema.json")),
+		schema     = schema,
 		templates  = read_json(shared("modules/diagnostics/issue_templates.json")),
 		redaction  = read_json(shared("modules/diagnostics/redaction.json")),
 		repository = defaults.github,

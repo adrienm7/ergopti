@@ -8,27 +8,26 @@
 # each one must exist there (tools/test/test-issue-templates.cjs).
 
 name: Bug report
-description: Something in ErgoptiPlus does not work as expected. / Quelque chose ne fonctionne pas comme prévu.
+description: Something in ErgoptiPlus does not work as expected.
 title: '[Bug] '
 labels: ['bug']
 body:
   - type: markdown
     attributes:
       value: |
-        Thank you for reporting a problem. ErgoptiPlus's Debug > Report a bug fills in the version, the system and the diagnostics, and copies the full diagnostics to your clipboard in case they had to be shortened here.
-        Merci de signaler ce problème. Débogage > Signaler un bug remplit la version, le système et le diagnostic, et copie le diagnostic complet dans le presse-papiers au cas où il aurait dû être raccourci ici.
+        Describe the problem in your own words. Debug > Report a bug saves a reviewed diagnostic file locally. Attach that file here; the app never uploads it automatically.
   - type: textarea
     id: what_happened
     attributes:
       label: What happened?
-      description: What you did, what you expected, and what happened instead. / Ce que vous avez fait, ce que vous attendiez et ce qui s'est passé.
+      description: What you did, what you expected, and what happened instead.
     validations:
       required: true
   - type: textarea
     id: steps
     attributes:
       label: Steps to reproduce
-      description: The shortest sequence that shows the problem. / La suite d'actions la plus courte qui montre le problème.
+      description: The shortest sequence that shows the problem.
       placeholder: |
         1.
         2.
@@ -39,7 +38,7 @@ body:
     id: version
     attributes:
       label: ErgoptiPlus version
-      description: Shown in the About submenu. / Affichée dans le sous-menu À propos.
+      description: Shown in the About submenu.
     validations:
       required: true
   - type: input
@@ -60,13 +59,13 @@ body:
     id: diagnostics
     attributes:
       label: Diagnostics
-      description: Filled in by Debug > Report a bug. If it ends with […], replace it with the full diagnostics from your clipboard (Ctrl+V or Cmd+V). The home folder, the account name and tokens are already removed. / Rempli par Débogage > Signaler un bug. S'il se termine par […], remplacez-le par le diagnostic complet du presse-papiers. Le dossier personnel, le nom du compte et les jetons sont déjà retirés.
+      description: A short technical summary is prefilled. Attach the saved diagnostic file here after reviewing it; keep this field editable and add relevant observations.
     validations:
       required: false
   - type: checkboxes
     id: consent
     attributes:
-      label: Before submitting / Avant d'envoyer
+      label: Before submitting
       options:
-        - label: I checked that what I share contains nothing I do not want to publish. / J'ai vérifié que ce que je partage ne contient rien que je ne veuille pas publier.
+        - label: I reviewed the text and attachments and removed information I do not want to publish.
           required: true
