@@ -390,3 +390,79 @@ _MSC_DisjointLifecycleSource(Mode) {
 }
 for Mode in ["hidden-first", "native-first"]
 	Test("menu startup: disjoint native lifecycle captions " . Mode . " (native-visible-lookup)", _MSC_DisjointLifecycleSource.Bind(Mode))
+
+
+_MSC_ReloadDuringStalledStartup(Owner, State) {
+	global _TrayStartupCommands
+	_TrayStartupCommands := TrayStartupCommands(() => State.Ready,
+		(Id) => State.Calls.Push(Id), (Fn, Delay) => State.Timers.Push(Fn))
+	Safe := MenuStartupSafeCommand(MenuStartupLifecycleDispatch.Bind("reload", (*) => _MSC_UnexpectedLifecycleCommand("reload")))
+	AssertTrue(MenuCommandRun(Safe, [], 0, () => false))
+	AssertEqual("reload", _TrayStartupCommands.Pending)
+	AssertEqual(0, Owner.Pending.Length, "the ordinary feature queue does not own recovery")
+	AssertEqual(1, State.Timers.Length, "a stalled startup still schedules its retained reload intent")
+	AssertEqual(0, State.Calls.Length, "menu acceptance is not reload completion")
+	AssertFalse(State.Ready)
+	AssertTrue(State.Timers[1].Call(), "the guarded command owner receives reload before input readiness")
+	AssertEqual(1, State.Calls.Length)
+	AssertEqual("reload", State.Calls[1])
+	AssertEqual("", _TrayStartupCommands.Pending)
+	AssertFalse(State.Timers[1].Call(), "the retained command dispatches once")
+	AssertEqual(1, State.Calls.Length)
+	AssertFalse(State.Ready, "recovery must not fabricate input readiness")
+}
+Test("menu startup: reload recovers before input readiness through its ordinary owner (startup-menu-reload)",
+	(*) => _MSC_WithOwner(_MSC_ReloadDuringStalledStartup))
+
+_MSC_ReloadRetiredBeforeDelivery(Owner, State) {
+	global _TrayStartupCommands
+	_TrayStartupCommands := TrayStartupCommands(() => State.Ready,
+		(Id) => State.Calls.Push(Id), (Fn, Delay) => State.Timers.Push(Fn))
+	AssertTrue(MenuStartupLifecycleDispatch("reload", (*) => _MSC_UnexpectedLifecycleCommand("reload")))
+	AssertEqual(1, State.Timers.Length)
+	_TrayStartupCommands.Retire()
+	AssertFalse(State.Timers[1].Call())
+	AssertFalse(_TrayStartupCommands.Request("reload"))
+	AssertEqual(0, State.Calls.Length, "retired command ownership cannot restart the driver")
+}
+Test("menu startup: retired early reload refuses delivery without lifecycle effects (startup-menu-reload-retire)",
+	(*) => _MSC_WithOwner(_MSC_ReloadRetiredBeforeDelivery))
+
+_MSC_ReloadRespectsEarlierIntent(Owner, State) {
+	global _TrayStartupCommands
+	for Earlier in ["suspend", "quit"] {
+		_TrayStartupCommands := TrayStartupCommands(() => State.Ready,
+			(Id) => State.Calls.Push(Id), (Fn, Delay) => State.Timers.Push(Fn))
+		AssertTrue(_TrayStartupCommands.Request(Earlier))
+		AssertFalse(_TrayStartupCommands.Request("reload"), "recovery cannot replace an accepted lifecycle intent")
+		AssertEqual(Earlier, _TrayStartupCommands.Pending)
+		AssertFalse(_TrayStartupCommands.Dispatch())
+		AssertEqual(0, State.Timers.Length, "pause and quit retain their existing readiness requirement")
+		_TrayStartupCommands.Retire()
+	}
+	AssertEqual(0, State.Calls.Length)
+}
+Test("menu startup: recovery reload preserves pending pause quit and readiness ownership (startup-menu-reload-priority)",
+	(*) => _MSC_WithOwner(_MSC_ReloadRespectsEarlierIntent))
+
+_MSC_ReloadWaitsForConfigWrite(Owner, State) {
+	global _TrayStartupCommands
+	Busy := true, Retries := []
+	_TrayStartupCommands := TrayStartupCommands(() => State.Ready,
+		(Id) => State.Calls.Push(Id), (Fn, Delay) => State.Timers.Push(Fn))
+	Safe := MenuStartupSafeCommand(MenuStartupLifecycleDispatch.Bind("reload", (*) => _MSC_UnexpectedLifecycleCommand("reload")))
+	AssertEqual("", MenuCommandRun(Safe, [], 0, () => Busy, (Fn, Delay) => Retries.Push(Fn)))
+	AssertEqual(1, Retries.Length, "the existing configuration write keeps ordinary command deferral")
+	AssertEqual("", _TrayStartupCommands.Pending)
+	AssertEqual(0, State.Timers.Length)
+	Busy := false
+	Retries[1].Call()
+	AssertEqual("reload", _TrayStartupCommands.Pending)
+	AssertEqual(1, State.Timers.Length)
+	AssertEqual(0, State.Calls.Length)
+	State.Timers[1].Call()
+	AssertEqual(1, State.Calls.Length)
+	AssertEqual("reload", State.Calls[1])
+}
+Test("menu startup: early reload retains configuration transaction deferral (startup-menu-reload-write)",
+	(*) => _MSC_WithOwner(_MSC_ReloadWaitsForConfigWrite))
