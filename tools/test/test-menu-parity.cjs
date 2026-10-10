@@ -5017,7 +5017,8 @@ function personalFrameSources() {
 		[
 			'windows/ui/menu/menu_shortcuts.ahk',
 			'windows/ui/menu/menu_init.ahk',
-			'windows/infra/manifest_menu.ahk'
+			'windows/infra/manifest_menu.ahk',
+			'windows/adapters/tray_menu.ahk'
 		].map((file) => [file, fs.readFileSync(path.join(SP, file), 'utf8')])
 	);
 }
@@ -5026,7 +5027,8 @@ function personalFrameEdgePublication(edge, sources, definition, row, platform) 
 	const files = [
 		'windows/ui/menu/menu_shortcuts.ahk',
 		'windows/ui/menu/menu_init.ahk',
-		'windows/infra/manifest_menu.ahk'
+		'windows/infra/manifest_menu.ahk',
+		'windows/adapters/tray_menu.ahk'
 	];
 	if (
 		platform !== 'ahk' ||
@@ -5043,13 +5045,13 @@ function personalFrameEdgePublication(edge, sources, definition, row, platform) 
 	)
 		return false;
 	return require('../lib/menu-native-personal-shortcuts-binding.cjs').personalFrameDataPublication(
-		files.map((file) => sources[file]).join('\n'),
+		sources,
 		definition,
 		row
 	);
 }
 
-// The new proof mode is closed to its actual three native sources and graph owner.
+// The proof mode is closed to its actual four native sources and graph owner.
 {
 	const assert = require('node:assert/strict');
 	const edge = OPENS_SUBMENU.personal_shortcuts;
