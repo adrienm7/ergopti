@@ -1020,6 +1020,7 @@ class WireFixture:
             print(
                 "# native_http_restoration_failure "
                 + json.dumps({"version": 1, "operation": operation, **fact}, sort_keys=True),
+                file=sys.stderr,
                 flush=True,
             )
         except (OSError, ValueError):

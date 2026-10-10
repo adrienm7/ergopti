@@ -533,7 +533,7 @@ class NativeHTTPStageReceiptTests(unittest.TestCase):
     def test07RestorationReceiptPrintFailureNeverReplacesOriginalException(self):
         owner = WIRE.WireFixture.__new__(WIRE.WireFixture)
         owner.command_fact = {"phase": "exit", "status": 1}
-        with contextlib.redirect_stdout(io.StringIO()) as output:
+        with contextlib.redirect_stderr(io.StringIO()) as output:
             owner._report_restoration_failure("trust")
         self.assertEqual(
             json.loads(output.getvalue().removeprefix("# native_http_restoration_failure ")),
@@ -544,7 +544,7 @@ class NativeHTTPStageReceiptTests(unittest.TestCase):
                 owner._report_restoration_failure("trust")
         output = io.StringIO()
         output.close()
-        with contextlib.redirect_stdout(output):
+        with contextlib.redirect_stderr(output):
             owner._report_restoration_failure("trust")
         primary = RuntimeError("controlled restoration refusal")
 
@@ -564,6 +564,39 @@ class NativeHTTPStageReceiptTests(unittest.TestCase):
             with self.assertRaises(RuntimeError) as refusal:
                 CLIENT.RealNativeClientReceiving.tearDownClass.__func__(fixture_owner)
         self.assertIs(refusal.exception, primary)
+
+    def test07bRestorationProducerPreservesActualJSONResponseStream(self):
+        owner = WIRE.WireFixture.__new__(WIRE.WireFixture)
+        for operation, fact, expected in (
+            (
+                "trust",
+                {"phase": "exit", "status": 1},
+                {"version": 1, "operation": "trust", "phase": "exit", "status": 1},
+            ),
+            (
+                "keychain",
+                None,
+                {"version": 1, "operation": "keychain", "phase": "unknown", "status": None},
+            ),
+        ):
+            with self.subTest(operation=operation):
+                owner.command_fact = fact
+                response = '{"version": 1, "trusted": true}\n'
+                output = io.StringIO()
+                errors = io.StringIO()
+                with contextlib.redirect_stdout(output), contextlib.redirect_stderr(errors):
+                    print(response, end="")
+                    owner._report_restoration_failure(operation)
+                self.assertEqual(output.getvalue(), response)
+                self.assertEqual(json.loads(output.getvalue()), {"version": 1, "trusted": True})
+                lines = errors.getvalue().splitlines()
+                self.assertEqual(len(lines), 1)
+                self.assertTrue(lines[0].startswith("# native_http_restoration_failure "))
+                self.assertEqual(
+                    json.loads(lines[0].removeprefix("# native_http_restoration_failure ")),
+                    expected,
+                )
+                self.assertIs(owner.command_fact, fact)
 
     def test08ActualRetiredChildReportsAllClosedInternalLabelsWithinOriginalBound(self):
         labels = (
