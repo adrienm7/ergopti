@@ -838,6 +838,23 @@ _SMB_FrameFullBuildIntoTarget(Target, Provider) {
 ; the deferred-separator state. It does not create a command, provider or fixture owner.
 _SMB_FrameBuildPreflushAndRefusal() {
 	global _PersonalShortcutsRegistry, _MenuPopulationBuilding, _MenuPopulationPublished
+	global KeyboardShortcutAssignments
+	HadKeyboard := IsSet(KeyboardShortcutAssignments)
+	SavedKeyboard := HadKeyboard ? KeyboardShortcutAssignments : false
+	TeardownPrimary := false
+	RestoreKeyboardInventory() {
+		global KeyboardShortcutAssignments
+		if HadKeyboard
+			KeyboardShortcutAssignments := SavedKeyboard
+		else
+			KeyboardShortcutAssignments := unset
+	}
+	VerifyKeyboardInventory() {
+		global KeyboardShortcutAssignments
+		AssertEqual(HadKeyboard, IsSet(KeyboardShortcutAssignments), "the actual boot inventory retains its original presence after native teardown")
+		if HadKeyboard
+			AssertTrue(KeyboardShortcutAssignments == SavedKeyboard, "the exact original keyboard inventory owner is restored")
+	}
 	SavedRegistry := IsSet(_PersonalShortcutsRegistry) ? _PersonalShortcutsRegistry : unset
 	SavedBuilding := _MenuPopulationBuilding, SavedPublished := _MenuPopulationPublished
 	Root := _MR_GetManifestRoot(), Definition := _MR_GetMenuDef("shortcuts_menu")
@@ -848,6 +865,12 @@ _SMB_FrameBuildPreflushAndRefusal() {
 	Assert(ScriptPosition > 0, "the genuine previous declaration must exist")
 	ScriptRow := Definition[ScriptPosition]
 	try {
+		; run_all omits feature_state boot globals. Keep the real full keyboard
+		; provider and populate its actual inventory from canonical shipped defaults.
+		KeyboardShortcutAssignments := Map()
+		for Entry in ManifestFeaturesForSection("shortcuts.keyboard")
+			KeyboardShortcutAssignments[Entry["id"]] := ManifestDefaultFor(Entry["path"])
+		AssertTrue(KeyboardSlotRows() is Array, "the genuine preceding keyboard provider receives its boot-owned inventory")
 		_MenuPopulationBuilding := false, _MenuPopulationPublished := false
 		_PersonalShortcutsRegistry := Map()
 		Definition[ScriptPosition] := Map("type", "---")
@@ -868,6 +891,10 @@ _SMB_FrameBuildPreflushAndRefusal() {
 				try Result := _SMB_FrameFullBuildIntoTarget(Native, _SMB_FrameBindCaseObserver(ObservePersonal, Mode))
 				catch as Failure
 					Caught := Failure
+				; Surface any genuine prerequisite failure before the DATA observer,
+				; instead of replacing its native diagnostic with a secondary count error.
+				if Caught && Seen["calls"] == 0
+					throw Caught
 				AssertEqual(1, Seen["calls"], "the full renderer reaches the registered DATA mode")
 				if Mode == "refuse" {
 					Assert(Caught is Error, "a withdrawn current frame refuses the genuine Build")
@@ -885,11 +912,17 @@ _SMB_FrameBuildPreflushAndRefusal() {
 				_CTC_ReleaseMenu(Native)
 			}
 		}
+	} catch as Failure {
+		TeardownPrimary := Failure
+		throw Failure
 	} finally {
-		Definition[ScriptPosition] := ScriptRow
-		Root["personal_shortcuts_frame"] := Frame
-		_PersonalShortcutsRegistry := IsSet(SavedRegistry) ? SavedRegistry : unset
-		_MenuPopulationBuilding := SavedBuilding, _MenuPopulationPublished := SavedPublished
+		_SMB_FrameRunAllCleanup(TeardownPrimary,
+			() => Definition[ScriptPosition] := ScriptRow,
+			() => Root["personal_shortcuts_frame"] := Frame,
+			() => _PersonalShortcutsRegistry := IsSet(SavedRegistry) ? SavedRegistry : unset,
+			() => _MenuPopulationBuilding := SavedBuilding,
+			() => _MenuPopulationPublished := SavedPublished,
+			RestoreKeyboardInventory, VerifyKeyboardInventory)
 	}
 }
 Test("personal DATA frame: actual full Build intercepts before separator flush on skip/refusal", _SMB_FrameBuildPreflushAndRefusal)

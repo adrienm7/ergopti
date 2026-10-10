@@ -6636,6 +6636,11 @@ German captions through genuine persistence and initialization; all 32
 presentation subjects pass. This is not installed Hammerspoon/WebKit, packaging
 or physical-device acceptance.
 
+The actual Windows personal-DATA Preflush fixture now prepares its genuine
+keyboard boot inventory through the existing manifest defaults and restores
+the exact prior global presence. All 254 prior assertions and 17 subjects remain.
+Corrected native execution is pending; production admission is unchanged.
+
 - [ ] **62.** Downloads on managed company networks: system trust and
       system proxy for every download child (Ollama installation/server/pull,
       updater/rollback and remote AI), with translated certificate/proxy/blocked/
@@ -8954,6 +8959,10 @@ Final selected gates pass 408 JS, 18,224 portable macOS and 13,017 Linux unit
 tests. One additive saved-locale initialization control retains all original
 31 subjects and passes the complete focused 32-subject replay. Native
 boot/WebKit, packaging and installed-device acceptance remain pending.
+
+The personal-DATA Preflush fixture now owns and restores the genuine keyboard
+boot inventory required by the complete native builder. Original assertions
+remain mandatory; corrected Windows execution is pending.
 
 - [~] **88.** **Partial: native prediction tooltip appearance.** Shared
   llm-line-style policy and the unchanged independent line corpus retain grey
