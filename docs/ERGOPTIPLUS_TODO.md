@@ -6650,6 +6650,12 @@ keyboard boot inventory through the existing manifest defaults and restores
 the exact prior global presence. All 254 prior assertions and 17 subjects remain.
 Corrected native execution is pending; production admission is unchanged.
 
+The genuine Linux language callback redraws the authoritative locale after
+accepted and refused persistence. Real GTK and filesystem-denial before/after
+receiving preserves all 21 original captions and disposes owned native resources.
+The 25 focused unit tests pass; physical panel and installed daemon acceptance
+remain separate.
+
 - [ ] **62.** Downloads on managed company networks: system trust and
       system proxy for every download child (Ollama installation/server/pull,
       updater/rollback and remote AI), with translated certificate/proxy/blocked/
@@ -8972,6 +8978,10 @@ boot/WebKit, packaging and installed-device acceptance remain pending.
 The personal-DATA Preflush fixture now owns and restores the genuine keyboard
 boot inventory required by the complete native builder. Original assertions
 remain mandatory; corrected Windows execution is pending.
+
+Real GTK before/after receiving qualifies language redraw after persistence
+refusal and acceptance; all 21 original captions remain. This targeted native
+observation does not qualify Wayland or physical input.
 
 - [~] **88.** **Partial: native prediction tooltip appearance.** Shared
   llm-line-style policy and the unchanged independent line corpus retain grey
