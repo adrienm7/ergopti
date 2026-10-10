@@ -6604,6 +6604,21 @@ unexecuted in this run; correct that adapter refusal before native admission.
 The corrected source selected gates pass all 408 JS checks, format and encoding
 with 7,621 inputs, index and HEAD unchanged.
 
+Manual run 38075743820 executes all 11,109 Windows unit subjects: 10,611 pass
+and 498 fail. The corrected root metadata passes all twelve subjects; original
+Agent flags pass three, model captions pass thirty and provider captions pass
+twenty-two. The personal cohort still has eight pass and nine fail. Its first
+class-accessor fault restores a descriptor by merging fields, leaving its own
+hostile Get field alongside the original Call; later subjects inherit that
+withdrawn constructor. The reviewed fixture successor replaces the complete descriptor by deletion
+and redefinition, measures exact presence/fields/identity, and attempts every
+owned cleanup while retaining the original primary failure. All seventeen
+subjects, 245 original assertion lines, eight constructor faults and thirteen
+port faults remain; production guards and independent corpus are unchanged.
+Corrected native execution remains pending. Whole CI reports seven jobs
+succeeded, nine failed and nine skipped; Release is skipped. Unit coverage does
+not qualify the skipped Windows E2E, packaging or installation.
+
 The macOS fixed keyboard-slot selector now requests one genuine shared app
 presentation for both existing producer sites. The canonical registry and
 generated policy own the original title/prompt keys; one authenticated factory
@@ -8906,6 +8921,21 @@ regression/inverse controls and repeated real intrinsic checks are added.
 The constructor result is separately named without claiming its localized
 for-loop was a second observed defect. Corrected native execution is pending. The local selected source gates pass 408 JS
 checks plus format and encoding with exact unchanged inputs.
+
+Manual run 38075743820 executes all 11,109 Windows unit subjects: 10,611 pass
+and 498 fail. The corrected root metadata passes all twelve subjects; original
+Agent flags pass three, model captions pass thirty and provider captions pass
+twenty-two. The personal cohort still has eight pass and nine fail. Its first
+class-accessor fault restores a descriptor by merging fields, leaving its own
+hostile Get field alongside the original Call; later subjects inherit that
+withdrawn constructor. The reviewed fixture successor replaces the complete descriptor by deletion
+and redefinition, measures exact presence/fields/identity, and attempts every
+owned cleanup while retaining the original primary failure. All seventeen
+subjects, 245 original assertion lines, eight constructor faults and thirteen
+port faults remain; production guards and independent corpus are unchanged.
+Corrected native execution remains pending. Whole CI reports seven jobs
+succeeded, nine failed and nine skipped; Release is skipped. Unit coverage does
+not qualify the skipped Windows E2E, packaging or installation.
 
 The fixed macOS keyboard-slot picker context is received through the genuine
 shared app registry, generated policy and authenticated factory receipt. Both

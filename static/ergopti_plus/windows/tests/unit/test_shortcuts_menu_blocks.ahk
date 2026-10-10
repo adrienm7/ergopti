@@ -556,6 +556,7 @@ _SMB_FrameDataLateStageLifecycle() {
 				throw Primary
 			return Result
 		}
+		TeardownPrimary := false
 		try {
 			_MenuPopulationBuilding := Owner
 			OriginalFill.Call(Owner, Foreign, Rows, "personal_shortcuts_frame", 2)
@@ -618,31 +619,32 @@ _SMB_FrameDataLateStageLifecycle() {
 			if Object.Prototype.HasOwnProp.Call(Foreign, "Add")
 				Foreign.DeleteProp("Add")
 			_MenuDispatchCallbacks := HeldCallbacks
-			MenuPopulation.Prototype.DefineProp("Fill", FillDesc)
+			_SMB_FrameRestoreOwnDescriptor(MenuPopulation.Prototype, "Fill", true, FillDesc)
+			_SMB_FrameAssertOwnDescriptor(MenuPopulation.Prototype, "Fill", true, FillDesc)
 			Receipts := [_MR_ReasonedGroupSnapshot(Frames), _MR_ReasonedGroupSnapshot(Handlers),
 				_MR_ReasonedGroupSnapshot(Providers)]
 			AssertEqual(1, MenuRenderer_AppendFrameData(Native, "shortcuts_menu", "personal_shortcuts",
 				Binding, , , &Admitted, Receipts), "real native repair uses the original population owner")
 			AssertTrue(Admitted)
+		} catch as Failure {
+			TeardownPrimary := Failure
+			throw Failure
 		} finally {
-			_MenuDispatchCallbacks := HeldCallbacks
-			MenuPopulation.Prototype.DefineProp("Fill", FillDesc)
-			Root["personal_shortcuts_frame"] := Frame
-			if Object.Prototype.HasOwnProp.Call(Callback, "Call")
-				Callback.DeleteProp("Call")
-			if Stage.Has("child")
-				for Name in ["Handle", "Add"]
-					if Object.Prototype.HasOwnProp.Call(Stage["child"], Name)
-						Stage["child"].DeleteProp(Name)
-			if Object.Prototype.HasOwnProp.Call(Foreign, "Add")
-				Foreign.DeleteProp("Add")
-			Owner.Stop()
-			_CTC_ReleaseMenu(Native)
-			_CTC_ReleaseMenu(Foreign)
-			if Stage.Has("child")
-				_CTC_ReleaseMenu(Stage["child"])
-			Owner.Pending.Clear()
-			_MenuPopulationBuilding := Previous
+			_SMB_FrameRunAllCleanup(TeardownPrimary,
+				() => _MenuDispatchCallbacks := HeldCallbacks,
+				() => _SMB_FrameRestoreOwnDescriptor(MenuPopulation.Prototype, "Fill", true, FillDesc),
+				() => Root["personal_shortcuts_frame"] := Frame,
+				() => _SMB_FrameRestoreOwnDescriptor(Callback, "Call", false, false),
+				() => Stage.Has("child") ? _SMB_FrameRestoreOwnDescriptor(Stage["child"], "Handle", false, false) : false,
+				() => Stage.Has("child") ? _SMB_FrameRestoreOwnDescriptor(Stage["child"], "Add", false, false) : false,
+				() => _SMB_FrameRestoreOwnDescriptor(Foreign, "Add", false, false),
+				() => Owner.Stop(),
+				() => _CTC_ReleaseMenu(Native),
+				() => _CTC_ReleaseMenu(Foreign),
+				() => Stage.Has("child") ? _CTC_ReleaseMenu(Stage["child"]) : false,
+				() => Owner.Pending.Clear(),
+				() => _MenuPopulationBuilding := Previous,
+				() => _SMB_FrameAssertOwnDescriptor(MenuPopulation.Prototype, "Fill", true, FillDesc))
 		}
 	}
 }
@@ -908,15 +910,21 @@ _SMB_FrameNativeConstructorRefusal() {
 	AssertEqual("Menu.Call", OriginalName.Call(Factory), "the genuine Menu constructor retains its intrinsic name")
 	AssertTrue(OriginalBuiltIn.Call(DllCall), "the different-constructor control uses a real alternative builtin")
 	PreviousCritical := Critical("On")
+	TeardownPrimary := false
 	try {
 		_MenuPopulationBuilding := false
 		for Fault in ["class lambda", "class other builtin", "class accessor", "factory Call",
 			"factory Name", "factory IsBuiltIn", "intrinsic Name getter", "intrinsic IsBuiltIn getter"]
 			_SMB_FrameNativeConstructorFault(Fault, Corpus, Factory)
+	} catch as Failure {
+		TeardownPrimary := Failure
+		throw Failure
 	} finally {
-		Object.Prototype.DefineProp.Call(Menu, "Call", OriginalCall)
-		_MenuPopulationBuilding := SavedBuilding
-		Critical(PreviousCritical)
+		_SMB_FrameRunAllCleanup(TeardownPrimary,
+			() => _SMB_FrameRestoreOwnDescriptor(Menu, "Call", true, OriginalCall),
+			() => _MenuPopulationBuilding := SavedBuilding,
+			() => Critical(PreviousCritical),
+			() => _SMB_FrameAssertOwnDescriptor(Menu, "Call", true, OriginalCall))
 	}
 }
 
@@ -954,15 +962,23 @@ _SMB_FrameNativeConstructorFault(Fault, Corpus, Factory) {
 	}
 	HadProperty := Object.Prototype.HasOwnProp.Call(Owner, Name)
 	SavedDescriptor := HadProperty ? Object.Prototype.GetOwnPropDesc.Call(Owner, Name) : false
+	TeardownPrimary := false
 	try {
 		Object.Prototype.DefineProp.Call(Owner, Name, Replacement)
+		if Fault == "class accessor" {
+			WithdrawnDescriptor := Object.Prototype.GetOwnPropDesc.Call(Owner, Name)
+			AssertTrue(Object.Prototype.HasOwnProp.Call(WithdrawnDescriptor, "Get"),
+				"the real native class fault installed an actual hostile getter")
+			AssertTrue(WithdrawnDescriptor.Get == Replacement.Get,
+				"the accessor descriptor retains its exact observer without executing it")
+			AssertTrue(Object.Prototype.HasOwnProp.Call(WithdrawnDescriptor, "Call") && WithdrawnDescriptor.Call == Factory,
+				"the actual DefineProp API merges Get while retaining the original native Call")
+		}
 		try Refused := MenuRenderer_AppendFrameData(Native, "shortcuts_menu", "personal_shortcuts", Binding, , , &Admitted)
 		finally {
-			if HadProperty
-				Object.Prototype.DefineProp.Call(Owner, Name, SavedDescriptor)
-			else if Object.Prototype.HasOwnProp.Call(Owner, Name)
-				Object.Prototype.DeleteProp.Call(Owner, Name)
+			_SMB_FrameRestoreOwnDescriptor(Owner, Name, HadProperty, SavedDescriptor)
 		}
+		_SMB_FrameAssertOwnDescriptor(Owner, Name, HadProperty, SavedDescriptor)
 		AssertEqual(0, Refused, Fault . ": the real receiver refuses the withdrawn native factory cohort")
 		AssertFalse(Admitted, Fault . ": constructor withdrawal cannot be acknowledged as an intentional skip")
 		AssertEqual(0, Calls["provider"], Fault . ": refusal precedes actual DATA provider execution")
@@ -970,6 +986,8 @@ _SMB_FrameNativeConstructorFault(Fault, Corpus, Factory) {
 		AssertTrue(_MR_FrameNativeImageEqual(Before, _MR_FrameDestinationSnapshot(Native)),
 			Fault . ": actual retained destination flags, callbacks and child handles remain unchanged")
 		AssertEqual(1, TrayMenuItemCount(Native))
+		AssertTrue(_MR_FrameNativeConstructorCurrent(Menu),
+			Fault . ": exact saved descriptor fields restore genuine constructor admission")
 		AssertEqual(1, MenuRenderer_AppendFrameData(Native, "shortcuts_menu", "personal_shortcuts", Binding, , , &Admitted),
 			Fault . ": exact original descriptor/presence repair restores the real native constructor")
 		AssertTrue(Admitted)
@@ -988,12 +1006,15 @@ _SMB_FrameNativeConstructorFault(Fault, Corpus, Factory) {
 				"the repaired real child retains the original actual callback")
 		}
 		AssertEqual(0, Calls["actions"], "refusal, actual constructor repair and publication never invoke DATA actions")
+	} catch as Failure {
+		TeardownPrimary := Failure
+		throw Failure
 	} finally {
-		if HadProperty
-			Object.Prototype.DefineProp.Call(Owner, Name, SavedDescriptor)
-		else if Object.Prototype.HasOwnProp.Call(Owner, Name)
-			Object.Prototype.DeleteProp.Call(Owner, Name)
-		_CTC_ReleaseMenu(Native)
+		_SMB_FrameRunAllCleanup(TeardownPrimary,
+			() => _SMB_FrameRestoreOwnDescriptor(Owner, Name, HadProperty, SavedDescriptor),
+			() => _CTC_ReleaseMenu(Native),
+			() => _SMB_FrameAssertOwnDescriptor(Owner, Name, HadProperty, SavedDescriptor),
+			() => AssertTrue(_MR_FrameNativeConstructorCurrent(Menu), "native teardown preserves the exact repaired constructor cohort"))
 	}
 }
 
@@ -1057,10 +1078,7 @@ _SMB_FrameNativePortFault(Fault, Corpus) {
 	RestoreFault() {
 		if !DescriptorOwner
 			return
-		if HadDescriptor
-			Object.Prototype.DefineProp.Call(DescriptorOwner, DescriptorName, SavedDescriptor)
-		else if Object.Prototype.HasOwnProp.Call(DescriptorOwner, DescriptorName)
-			Object.Prototype.DeleteProp.Call(DescriptorOwner, DescriptorName)
+		_SMB_FrameRestoreOwnDescriptor(DescriptorOwner, DescriptorName, HadDescriptor, SavedDescriptor)
 	}
 	Withdraw(CurrentFault, Child := false) {
 		if CurrentFault == "after registry" {
@@ -1107,6 +1125,7 @@ _SMB_FrameNativePortFault(Fault, Corpus) {
 		Withdraw(CurrentFault, Child)
 		return Result
 	}
+	TeardownPrimary := false
 	try {
 		_MenuPopulationBuilding := Population
 		OriginalFill.Call(Population, Foreign, Rows, "personal_shortcuts_frame", 2)
@@ -1140,7 +1159,10 @@ _SMB_FrameNativePortFault(Fault, Corpus) {
 			Caught := Failure
 		; Restore before observing native state so no test assertion invokes a poisoned DLL.
 		RestoreFault()
-		MenuPopulation.Prototype.DefineProp("Fill", FillDescriptor)
+		_SMB_FrameRestoreOwnDescriptor(MenuPopulation.Prototype, "Fill", true, FillDescriptor)
+		if DescriptorOwner
+			_SMB_FrameAssertOwnDescriptor(DescriptorOwner, DescriptorName, HadDescriptor, SavedDescriptor)
+		_SMB_FrameAssertOwnDescriptor(MenuPopulation.Prototype, "Fill", true, FillDescriptor)
 		Residue := Fault == "after adapter Call" || Fault == "after dll Call"
 		if Fault == "after primary"
 			Assert(Caught == Primary, "the actual primary failure object survives native retirement unchanged")
@@ -1212,16 +1234,65 @@ _SMB_FrameNativePortFault(Fault, Corpus) {
 		}
 		AssertEqual(0, Calls["foreign"])
 		AssertEqual(0, Calls["actions"])
+	} catch as Failure {
+		TeardownPrimary := Failure
+		throw Failure
 	} finally {
-		RestoreFault()
-		MenuPopulation.Prototype.DefineProp("Fill", FillDescriptor)
-		_MenuDispatchCallbacks := HeldRegistries[1]
-		Population.Stop()
-		Population.Pending.Clear()
-		_MenuPopulationBuilding := SavedBuilding
-		if Stage.Has("child")
-			_CTC_ReleaseMenu(Stage["child"])
-		_CTC_ReleaseMenu(Native)
-		_CTC_ReleaseMenu(Foreign)
+		_SMB_FrameRunAllCleanup(TeardownPrimary,
+			RestoreFault,
+			() => _SMB_FrameRestoreOwnDescriptor(MenuPopulation.Prototype, "Fill", true, FillDescriptor),
+			() => _MenuDispatchCallbacks := HeldRegistries[1],
+			() => Population.Stop(),
+			() => Population.Pending.Clear(),
+			() => _MenuPopulationBuilding := SavedBuilding,
+			() => Stage.Has("child") ? _CTC_ReleaseMenu(Stage["child"]) : false,
+			() => _CTC_ReleaseMenu(Native),
+			() => _CTC_ReleaseMenu(Foreign),
+			() => DescriptorOwner ? _SMB_FrameAssertOwnDescriptor(DescriptorOwner, DescriptorName, HadDescriptor, SavedDescriptor) : false,
+			() => _SMB_FrameAssertOwnDescriptor(MenuPopulation.Prototype, "Fill", true, FillDescriptor))
 	}
+}
+
+; DefineProp updates only supplied dynamic fields. Exact repair first removes the
+; withdrawn own property, then reinstates the saved descriptor and verifies it.
+_SMB_FrameRestoreOwnDescriptor(Owner, Name, HadProperty, SavedDescriptor) {
+	if Object.Prototype.HasOwnProp.Call(Owner, Name)
+		Object.Prototype.DeleteProp.Call(Owner, Name)
+	if HadProperty
+		Object.Prototype.DefineProp.Call(Owner, Name, SavedDescriptor)
+}
+
+_SMB_FrameAssertOwnDescriptor(Owner, Name, HadProperty, SavedDescriptor) {
+	AssertEqual(HadProperty, Object.Prototype.HasOwnProp.Call(Owner, Name),
+		"native fixture repair restores exact own-property presence")
+	if !HadProperty
+		return
+	ActualDescriptor := Object.Prototype.GetOwnPropDesc.Call(Owner, Name)
+	ExpectedCount := 0, ActualCount := 0
+	for Field, Expected in ObjOwnProps(SavedDescriptor) {
+		ExpectedCount += 1
+		AssertTrue(Object.Prototype.HasOwnProp.Call(ActualDescriptor, Field),
+			"native fixture repair retains each original descriptor field")
+		AssertTrue(ActualDescriptor.%Field% == Expected,
+			"native fixture repair retains exact original getter, setter, method or value identity")
+	}
+	for Field in ObjOwnProps(ActualDescriptor)
+		ActualCount += 1
+	AssertEqual(ExpectedCount, ActualCount,
+		"native fixture repair removes all omitted hostile descriptor fields")
+}
+
+; Test-owned teardown invokes every genuine cleanup operation, even after a failed
+; verification or restore. It never reads or replaces a pending primary Error.
+_SMB_FrameRunAllCleanup(OriginalFailure, Cleanup*) {
+	CleanupFailure := false
+	for Operation in Cleanup {
+		try Operation.Call()
+		catch as Failure {
+			if !CleanupFailure
+				CleanupFailure := Failure
+		}
+	}
+	if !OriginalFailure && CleanupFailure
+		throw CleanupFailure
 }
