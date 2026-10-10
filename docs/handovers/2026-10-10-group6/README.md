@@ -250,10 +250,13 @@ conditions and owned44-count changes. Caller integration is still CODE.
   guardian-owned TERM/INT receiving on both Darwin architectures. Full native
   routing, production packaging and installed operation remain independent
   qualifications; the literal corpus does not establish them.
-- Windows: retain the existing native failures and packaged artifact NTLM/SSPI
-  integration steps in TODO62. The maintainer will perform physical Windows
-  receiving. Corporate proxy/authentication/certificate and real desktop
-  acceptance on all three OS remain independent device qualifications.
+- Windows: authenticated updater artifacts already use the owned curl
+  transport selected in `self_update.ahk`, with CONNECT discovery and NTLM
+  selection in `vendor/ergopti_updater_download.ps1`. Retain the existing native
+  failures; genuine Windows NTLM/SSPI authentication, physical retirement,
+  packaging and installation qualification remain pending. Corporate proxy,
+  certificate and real desktop acceptance on all three OS remain independent
+  device qualifications. TODO36 and TODO62 remain open.
 
 The seven-commit integration already includes the coordinated caller changes
 and genuine labels in all 21 locales; do not reopen them from this handover's
@@ -542,7 +545,7 @@ exception. Create/pull/inference, later profiles and package/install remain
 unrun or unqualified. Success carries no failure fields. The false production
 qualification guard and every model/package/install requirement stay intact.
 
-## Daily logging R6 receiving and pending native enrollment
+## Daily logging R6 receiving and native enrollment
 
 The reviewed daily-logging R6 preparation passes 34 actual portable Python
 controls. The same corpus against the original owner/serve passes all 28 old
@@ -575,19 +578,38 @@ six original owner inputs, Node/specification and original capture identities re
 exact. This is model/source and actual Git/CLI evidence only. The receiving
 receipt SHA-256 is
 `0e80bb1798dd2bdbd518ff1dd6c92482d13ea4cf753ebb79025cbdf517c14a77`.
-The complete canonical R6 selected gate remains pending; append its outcomes
-only after terminal receiving.
+The complete canonical R6 selected run finishes on 2026-10-10 with exit 0.
+Formatting passes; all 409 JS checks pass; Mac Lua records 1,569 modules,
+18,347 passes and zero failures; Mac E2E records 101 passes, zero failures and
+one original skip. Swift compilation is deferred on Linux; Windows and Linux
+driver suites are not selected for this macOS runtime tranche. The original
+HEAD, index and all eleven preflight source bindings remain exact. Preserve
+every earlier failed or unfinished receipt separately. The terminal receipt
+SHA-256 is
+`7d8f29a3ccaae6a4d08a1057a281f2212ddd21a4d07d72aca7433f83e3f6726c`;
+the original raw output SHA-256 is
+`ffa6e6c50c014ea99231edd9a1aea79805998a4ee0ac3562eafd7137fbadbb65`.
+Runtime commit `49b4e7c29` is published; normal merge `08eaabf29` receives
+current Dev `c4180d8d` without changing the nine runtime sources or any foreign
+TODO block. These local outcomes do not qualify native packaging, installation,
+trust/PAC or managed model operation.
 
-The proposed native enrollment is SDK 49 plus seven daily cases and 42 original
+The reviewed native enrollment is SDK 49 plus seven daily cases and 42 original
 logger cases. None of these native extension cohorts has executed. The new
 seven-case source includes a mapped-shell/original-guardian/stdio/sink
 composition; source enrollment cannot qualify that composition or packaged
 Ollama logging. Group 5 released the bounded product source window in
 [6102079783](https://github.com/adrienm7/ergopti/issues/86#issuecomment-6102079783).
-The separate CI writer custody request
-[6102114078](https://github.com/adrienm7/ergopti/issues/86#issuecomment-6102114078)
-remains pending. Preserve the original native budgets and all original SDK/logger assertions;
-append actual native outcomes only after custody and exact-source receiving.
+Coordination notice
+[6102523619](https://github.com/adrienm7/ergopti/issues/86#issuecomment-6102523619)
+clarifies continuation on the existing G6-owned SDK spans under the user's
+independent-branch authorization and independently proved published non-overlap.
+It supersedes our conservative wait-for-release wording without inferring any
+Group 5 grant from silence. No foreign checkout or active workflow changes.
+The exact five reviewed and formatted CI/tool paths are now applied on our
+branch; their selected format/JS gate remains pending. Preserve Group 5's
+lease165 and all original SDK/logger assertions, fatal checks and budgets.
+Append native outcomes only after the future exact-source manual receiving.
 
 The current packaged bootstrap and HuggingFace routes already consume their
 native per-request adapters. Launcher/device/inode authority is inherited by
