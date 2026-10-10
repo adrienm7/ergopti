@@ -873,3 +873,37 @@ _LSPD_ArmRefusal() {
 	} finally Fixture.Dispose()
 }
 Test("local nonblocking discovery: timer arm refusal cannot publish queued success", _LSPD_ArmRefusal)
+
+
+_LSPD_CoalescenceSource() {
+	Fixture := _LSPD_Fixture()
+	try {
+		Fixture.Panel.Rows()
+		Prior := Fixture.Panel.Discovery
+		AssertTrue(Prior is Map)
+		AssertTrue(Fixture.Panel._QueueDiscovery(Prior["source"]))
+		AssertTrue(Fixture.Panel.Discovery == Prior, "unchanged source coalesces the exact retained callback")
+		AssertTrue(FSWriteDurable(Fixture.World.ApiPath, Fixture.World.ApiImage "`n"))
+		Fresh := Fixture.World.Owner.Capture()
+		AssertTrue(IsObject(Fresh) && Fixture.World.Owner.Current(Fresh))
+		AssertTrue(Fixture.Panel._QueueDiscovery(Fresh))
+		Next := Fixture.Panel.Discovery
+		AssertTrue(Next is Map && Next != Prior, "new admitted image replaces an obsolete source intent")
+		AssertTrue(Next["source"] == Fresh)
+		AssertFalse(Fixture.Panel.RepairRecords.Has(ObjPtr(Prior)))
+		AssertFalse(Fixture.RepairTimers.Has(ObjPtr(Prior["timer"])))
+		Fixture.Panel._RepairTick(Prior)
+		AssertTrue(Fixture.Panel.Discovery == Next, "old callback cannot retire its replacement")
+		AssertEqual(0, Fixture.RescanCalls)
+		global _DriverReady
+		_DriverReady := true
+		Fixture.Panel._RepairTick(Next)
+		AssertEqual(1, Fixture.RescanCalls)
+		AssertEqual(1, Fixture.Publications.Length)
+		AssertEqual(0, Fixture.Panel.RepairRecords.Count)
+	} finally {
+		AssertTrue(FSWriteDurable(Fixture.World.ApiPath, Fixture.World.ApiImage))
+		Fixture.Dispose()
+	}
+}
+Test("local nonblocking discovery: coalescence retains the admitted source image", _LSPD_CoalescenceSource)

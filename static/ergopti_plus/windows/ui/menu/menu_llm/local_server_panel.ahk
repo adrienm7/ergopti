@@ -548,15 +548,21 @@ class LLM_LocalServerPanel {
 		if !this.Source.Current(Source)
 			return false
 		Prior := this.Discovery
-		if Prior is Map && !this._DiscoveryCurrent(Prior) {
+		; Coalescence must retain a source that is still admitted, not only
+		; the matching RAM epochs. Source checks may yield to a successor.
+		PriorCurrent := Prior is Map && this._DiscoveryCurrent(Prior)
+			&& this.Source.Current(Prior["source"]) && this._DiscoveryCurrent(Prior)
+		if Prior is Map && !PriorCurrent {
 			this._DropRepair(Prior)
 			if !this.Source.Current(Source)
 				return false
 		}
 		PreviousCritical := Critical("On")
 		try {
-			if this.Discovery is Map && this._DiscoveryCurrent(this.Discovery) {
-				Record := this.Discovery
+			if this.Discovery is Map {
+				if this.Discovery != Prior || !PriorCurrent || !this._DiscoveryCurrent(Prior)
+					return false
+				Record := Prior
 			} else {
 			global _LifecycleLatestTransition, _LLM_Menu_ApiPrivateAuthorityGeneration
 			State := _LLM_Menu_ApiPrivateLifecycleState()
