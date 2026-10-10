@@ -482,6 +482,7 @@
 		"test:macos-guardian-signature-flags": "node ./tools/test/test-macos-guardian-signature-flags.cjs",
 		"test:managed-ollama-protocol": "node ./tools/test/test-managed-ollama-protocol.cjs",
 		"test:macos-managed-ollama-catalogue": "node ./tools/test/test-macos-managed-ollama-catalogue.cjs",
+		"test:macos-release-stage-native-receiving-controls": "node ./tools/test/test-macos-release-stage-native-receiving.cjs",
 		"test:dev-release-qualification": "node ./tools/test/test-dev-release-qualification.cjs",
 		"test:macos-launch-qualification": "node ./tools/test/test-macos-launch-qualification.cjs",
 		"test:macos-launch-qualification-lifetime": "node ./tools/test/test-macos-launch-qualification-lifetime.cjs"
