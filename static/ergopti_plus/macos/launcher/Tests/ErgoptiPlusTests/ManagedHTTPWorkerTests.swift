@@ -91,6 +91,13 @@ final class ManagedHTTPWorkerTests: XCTestCase {
 			XCTAssertFalse(rendered.contains("https://"))
 			XCTAssertFalse(rendered.contains(NSLocalizedDescriptionKey))
 		}
+		let cfNetwork = managedHTTPTLSDiagnostic(NSError(domain: kCFErrorDomainCFNetwork as String,
+			code: NSURLErrorServerCertificateUntrusted, userInfo: privateData), additionalAnchorCount: 0)
+		let cfCause = try XCTUnwrap((cfNetwork["causes"] as? [[String: Any]])?.first)
+		XCTAssertEqual(cfCause["domain"] as? String, "cfnetwork")
+		XCTAssertEqual(cfCause["code"] as? Int, NSURLErrorServerCertificateUntrusted)
+		XCTAssertEqual(cfCause["kind"] as? String, "unknown")
+		XCTAssertEqual(cfNetwork["chain_termination"] as? String, "complete")
 		let foreign = managedHTTPTLSDiagnostic(NSError(domain: "reserved-private-domain", code: 123456,
 			userInfo: privateData), additionalAnchorCount: 2)
 		XCTAssertEqual(foreign["trust_mode"] as? String, "added_anchors")
@@ -118,7 +125,7 @@ final class ManagedHTTPWorkerTests: XCTestCase {
 		let bounded = managedHTTPTLSDiagnostic(deep, additionalAnchorCount: 0)
 		XCTAssertEqual(bounded["chain_termination"] as? String, "depth")
 		XCTAssertEqual((bounded["causes"] as? [[String: Any]])?.count, 8)
-		for observation in [foreign, invalidCode, malformed, cycle, bounded] {
+		for observation in [cfNetwork, foreign, invalidCode, malformed, cycle, bounded] {
 			XCTAssertEqual(Set(observation.keys), Set(["version", "trust_mode", "additional_anchor_count", "causes", "chain_termination"]))
 			let bytes = try JSONSerialization.data(withJSONObject: observation)
 			XCTAssertLessThan(bytes.count, 4096)
