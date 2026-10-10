@@ -800,3 +800,19 @@ helpers.describe("menu_keyboard_slots: admission precedes real source reads", fu
 		end)
 	end
 end)
+
+helpers.describe("keyboard slot selection declared presentation", function()
+	it("delivers the real fixed slot picker context without caller-owned captions", function()
+		local ui, shortcuts, picker = fresh()
+		local ctx = make_ctx()
+		local rows = ui.provide_rows(ctx, nil)
+		physical_rows(rows, shortcuts)[1].items[#physical_rows(rows, shortcuts)[1].items].action()
+		helpers.assert_eq(#picker.opened, 1)
+		local opts = picker.opened[1].opts
+		helpers.assert_eq(opts.presentation_id, "keyboard_slot_selection")
+		helpers.assert_nil(opts.title)
+		helpers.assert_nil(opts.label)
+		helpers.assert_eq(opts.current, "none")
+		helpers.assert_type(picker.opened[1].confirm, "function")
+	end)
+end)

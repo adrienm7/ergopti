@@ -6604,6 +6604,19 @@ unexecuted in this run; correct that adapter refusal before native admission.
 The corrected source selected gates pass all 408 JS checks, format and encoding
 with 7,621 inputs, index and HEAD unchanged.
 
+The macOS fixed keyboard-slot selector now requests one genuine shared app
+presentation for both existing producer sites. The canonical registry and
+generated policy own the original title/prompt keys; one authenticated factory
+receipt supplies both page strings and native caption before replacing a live
+picker. The existing dynamic editing caption and provider/cancel/confirmation
+transactions remain. Independent source review and private portable receiving
+pass 67 tests, including all 21 original languages and exact fixture cleanup;
+they do not establish native WebKit. The real generator retains identical AHK
+and Swift outputs. Canonical focused tests pass 31 presentation and 36 menu
+subjects; the initial wrong-working-directory failure is retained separately.
+The canonical GUI title audit passes. Full selected gates and native
+qualification are pending.
+
 - [ ] **62.** Downloads on managed company networks: system trust and
       system proxy for every download child (Ollama installation/server/pull,
       updater/rollback and remote AI), with translated certificate/proxy/blocked/
@@ -8893,6 +8906,18 @@ regression/inverse controls and repeated real intrinsic checks are added.
 The constructor result is separately named without claiming its localized
 for-loop was a second observed defect. Corrected native execution is pending. The local selected source gates pass 408 JS
 checks plus format and encoding with exact unchanged inputs.
+
+The fixed macOS keyboard-slot picker context is received through the genuine
+shared app registry, generated policy and authenticated factory receipt. Both
+original producer sites preserve all 21 independent title/prompt values and
+existing picker transactions. Private actual portable receiving passes 67/0;
+the authentic generator leaves AHK/Swift outputs unchanged. Original raw corpus
+capture remains retained independently; repository formatting must preserve its
+parsed values exactly, with an exact parsed-equality formatting receipt.
+Canonical focused tests pass 31 presentation and 36 menu subjects plus the GUI
+title audit; the first menu attempt used the wrong working directory and failed.
+Full selected, native boot/WebKit, packaging and installed-device acceptance
+remain pending.
 
 - [~] **88.** **Partial: native prediction tooltip appearance.** Shared
   llm-line-style policy and the unchanged independent line corpus retain grey
