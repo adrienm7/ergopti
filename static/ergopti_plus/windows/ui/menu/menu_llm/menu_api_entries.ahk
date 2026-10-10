@@ -1355,9 +1355,15 @@ class LLM_Menu_ApiPrivateSourceOwner {
 	}
 
 	_AdmitNonCritical() {
-		global _LLM_Menu_Loaded, _LifecycleLatestTransition
 		if A_IsSuspended || !ConfigFullStateCanPersist()
-				|| !IsSet(_LLM_Menu_Loaded) || !_LLM_Menu_Loaded
+			return false
+		return this._AdmitContextNonCritical()
+	}
+
+	; This context fence grants no schema or source permission by itself.
+	_AdmitContextNonCritical() {
+		global _LLM_Menu_Loaded, _LifecycleLatestTransition
+		if A_IsSuspended || !IsSet(_LLM_Menu_Loaded) || !_LLM_Menu_Loaded
 				|| ReloadTerminalHandoffActive()
 				|| _LLM_Menu_ApiPrivateLifecycleState()["attempt"] != 0
 			return false
@@ -1803,7 +1809,17 @@ class LLM_Menu_ApiPrivateSourceOwner {
 		if !(Llm is Map) || !(Llm.Get("models", 0) is Map)
 				|| !(Llm["models"].Get("selected", 0) == Held["backend"])
 			return false
-		return this.Admit() && Features == Held["features"] && _LLM_Menu == Held["menu"]
+		return this.Admit() && this._NativeContextCurrent(Held)
+	}
+
+	_NativeContextCurrent(Held) {
+		global ConfigurationFile, _PathsFile, Features, _LLM_Menu
+		global LLM_API_PROVIDERS, LLM_LOCAL_API_SERVERS, LLM_Defaults
+		Llm := Features.Get("llm", 0)
+		if !(Llm is Map) || !(Llm.Get("models", 0) is Map)
+				|| !(Llm["models"].Get("selected", 0) == Held["backend"])
+			return false
+		return this._AdmitContextNonCritical() && Features == Held["features"] && _LLM_Menu == Held["menu"]
 			&& ConfigurationFile == Held["config_path"] && _PathsFile == Held["locator"]
 			&& _LLM_Menu_ApiEntriesPath() == Held["api_path"]
 			&& LLM_API_PROVIDERS == Held["providers"] && LLM_LOCAL_API_SERVERS == Held["servers"]
@@ -1824,12 +1840,14 @@ class LLM_Menu_ApiPrivateSourceOwner {
 		; Classified second reads fence mutations during snapshot/hash/decrypt. This
 		; is current-at-check authority; the WAL owns the final expected-image claim.
 		Images := IsSet(Expected) ? Expected : Held
+		if !this._NativeCurrent(Held)
+			return false
 		loop 2 {
-			if !this._NativeCurrent(Held)
+			if !this._NativeContextCurrent(Held)
 				return false
 			for Key in ["config", "api"] {
 				Observed := this._Snapshot(Held[Key . "_path"])
-				if !(Observed is Map) || !this._NativeCurrent(Held)
+				if !(Observed is Map) || !this._NativeContextCurrent(Held)
 						|| !_ConfigTransitionSnapshotMatches(Observed, Images[Key]["present"], Images[Key]["hash"])
 					return false
 			}
