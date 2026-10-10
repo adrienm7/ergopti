@@ -4894,6 +4894,18 @@ restores the genuine callback first, attempts every existing cleanup, and
 preserves the primary error. This does not qualify the separate WAL lifecycle
 subjects or close full-source publication and installed acceptance requirements.
 
+The Windows custom-terminator record editor now appends a missing parent table
+after retained source, preserving bare root schema metadata and foreign values.
+Its former prepend changed their semantic owner and refused the actual current
+WAL candidate before reload. Four additive regressions cover independent root
+owners, record metadata, BOM and a missing final newline; every original
+assertion and WAL ACK/refusal subject remains unchanged. Bounded source review
+passes, but final-source Windows native unit/E2E, packaging/install and device
+acceptance remain pending. The previous run completed 1,940 of 11,112 planned
+subjects (1,932 passed, eight failed) before its unchanged watchdog: both WAL
+subjects failed and all 14 gesture/Tap-Hold targets were unexecuted. This slice
+does not close item 42 or transversal items 16/38.
+
 Four ordinary Windows full-save fixture families now declare the shipped
 schema 12, rather than obsolete schema 11 that prevented their genuine boot.
 Only eight handwritten schema numbers change; all semantic byte/tree
