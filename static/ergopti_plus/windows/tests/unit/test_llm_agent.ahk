@@ -2085,3 +2085,108 @@ _LAG_WindowsProviderFrameRefusal() {
 }
 Test("LLM agent: shared Windows provider declaration refusal and repair (agent-windows-provider-captions)",
 	_LAG_WindowsProviderFrameRefusal)
+
+
+; Observe the original applications leaf before promoting its dynamic route.
+_LAG_OriginalAppsNativeFlags(HostState) {
+	AssertTrue(HostState == "paused" || HostState == "off" || HostState == "operational",
+		"the original native observation has an explicit host state")
+	Corpus := _LAG_WindowsProviderCaptionCorpus()
+	_LAG_Run(_LAG_Menu("action", Corpus["backend"], Corpus["backend"], HostState != "off"),
+		_LTN_Screen(""), _Body.Bind(HostState, Corpus))
+	_Body(HostState, Corpus, Fx, Lines, Sent) {
+		_LAG_WithModelCaptionLocale("fr", _Read.Bind(HostState, Corpus, Fx))
+		_Read(HostState, Corpus, Fx) {
+			global _LLM_Menu, _MenuDispatchCallbacks, _MenuDispatchTokens, _MenuDispatchOwnerHandles
+			global AppPicker_Show
+			SavedSuspend := A_IsSuspended, PickerOwner := AppPicker_Show
+			Owned := [], PickerCalls := []
+			try {
+				Suspend(HostState == "paused")
+				AssertEqual(HostState == "paused", A_IsSuspended ? true : false,
+					"the host's real suspension state is established")
+				AssertEqual(HostState != "off", _LLM_Menu["enabled"] ? true : false,
+					"the actual prediction-menu switch establishes the off state")
+				AssertEqual(HostState != "off", _LLM_Menu_BackendIsReadyForUse() ? true : false,
+					"the unchanged native readiness reader admits the actual selected API entry")
+				AssertEqual("action", LLM_Agent_Setting("agent_mode"),
+					"the separately owned Agent mode stays fixed across host states")
+				for Count in Corpus["counts"]
+					_LAG_ObserveOriginalAppsNativeFlags(HostState, Count, Corpus, Owned, PickerCalls)
+				AssertEqual(3, PickerCalls.Length, "each actual native apps callback reaches the picker boundary once")
+				AssertEqual(0, Fx.Commits.Length, "observing the original leaf acknowledges no configuration writes")
+				AssertEqual(0, Fx.Rebuilds, "the original observations do not request a tray rebuild")
+				AssertEqual(0, Fx.Remote.Length, "the original menu observation starts no remote Agent request")
+				AssertEqual(0, Fx.Ollama.Length, "the original menu observation starts no local Agent request")
+				AssertEqual(0, Fx.Predictions.Length, "native readiness is read without a prediction request")
+			} finally {
+				AppPicker_Show := PickerOwner
+				for Built in Owned
+					_CTC_ReleaseMenu(Built)
+				Suspend(SavedSuspend)
+			}
+		}
+	}
+}
+
+; Count is a helper parameter: no assertion captures an AHK loop variable.
+_LAG_ObserveOriginalAppsNativeFlags(HostState, Count, Corpus, Owned, PickerCalls) {
+	global _LLM_Menu, _MenuDispatchCallbacks, _MenuDispatchTokens, _MenuDispatchOwnerHandles
+	global AppPicker_Show
+	Apps := []
+	Loop Count
+		Apps.Push("app" . A_Index . ".exe")
+	_LLM_Menu["agent_disabled_apps"] := Apps
+	Built := LLM_Agent_MenuBuild()
+	Owned.Push(Built)
+	AssertTrue(Built is Menu, HostState . ": the unchanged Agent builder returns a real native menu")
+	AssertEqual(6, TrayMenuItemCount(Built), HostState . ": original mode, two systems, separators and apps order")
+	AssertTrue(DllCall("GetSubMenu", "ptr", Built.Handle, "int", 0, "ptr") != 0,
+		HostState . ": the original mode submenu stays first")
+	AssertTrue((DllCall("GetMenuState", "ptr", Built.Handle, "uint", 1, "uint", 0x400, "uint") & 0x800) != 0,
+		HostState . ": the original separator follows the mode")
+	AssertEqual(Corpus["locales"]["fr"]["systems"]["system1"]["cerebras"], _CTC_LabelAt(Built, 2))
+	AssertEqual(Corpus["locales"]["fr"]["systems"]["system2"]["cerebras"], _CTC_LabelAt(Built, 3))
+	AssertTrue(DllCall("GetSubMenu", "ptr", Built.Handle, "int", 2, "ptr") != 0)
+	AssertTrue(DllCall("GetSubMenu", "ptr", Built.Handle, "int", 3, "ptr") != 0)
+	AssertTrue((DllCall("GetMenuState", "ptr", Built.Handle, "uint", 4, "uint", 0x400, "uint") & 0x800) != 0,
+		HostState . ": the original separator immediately precedes the apps command")
+	AssertEqual(Corpus["locales"]["fr"]["apps"]["" . Count], _CTC_LabelAt(Built, 5),
+		HostState . ": the native apps count caption matches the untouched independent original corpus")
+	AssertEqual(0, DllCall("GetSubMenu", "ptr", Built.Handle, "int", 5, "ptr"),
+		HostState . ": apps is an actual leaf, so its flags have no submenu-count high byte")
+	Flags := DllCall("GetMenuState", "ptr", Built.Handle, "uint", 5, "uint", 0x400, "uint")
+	AssertTrue(Flags != 0xFFFFFFFF, HostState . ": GetMenuState actually acquired the apps leaf")
+	AssertEqual(0, Flags,
+		HostState . ": original apps leaf is enabled, unchecked, non-default and not a separator")
+	CommandId := DllCall("GetMenuItemID", "ptr", Built.Handle, "int", 5, "uint")
+	AssertTrue(CommandId != 0 && CommandId != 0xFFFFFFFF, "the actual apps leaf has a native command id")
+	AssertTrue(_MenuDispatchCallbacks.Has(CommandId), "the original leaf has an actual dispatcher callback")
+	AssertTrue(_MenuDispatchTokens.Has(CommandId), "the actual registration retains its dispatcher token")
+	AssertTrue(_MenuDispatchOwnerHandles.Has(Built.Handle), "the dispatcher retains the actual native menu owner")
+	AssertTrue(_MenuDispatchCallbacks[CommandId] is Func, "the original native apps callback is callable")
+
+	; All flags above came from the unchanged native builder. Only the GUI boundary
+	; is observed below, through the actual callback and LLM_Agent_OpenAppPicker.
+	PickerOwner := AppPicker_Show, Before := PickerCalls.Length
+	try {
+		AppPicker_Show := (Options) => PickerCalls.Push(Options)
+		_MenuDispatchCallbacks[CommandId].Call()
+		AssertEqual(Before + 1, PickerCalls.Length, "one actual apps callback opens its original picker boundary")
+		Options := PickerCalls[PickerCalls.Length]
+		AssertTrue(Options is Map)
+		AssertEqual("agent:disabled_apps", Options["owner"], "the callback reaches the Agent apps picker owner")
+		AssertEqual(Corpus["locales"]["fr"]["apps"]["" . Count], Options["title"],
+			"the real picker entry preserves the original independent count caption")
+		AssertTrue(Options["initial"] == Apps, "the real picker entry receives the actual native settings list")
+		AssertTrue(Options["on_save"] == LLM_Agent_OnAppPickerSave,
+			"the original dispatcher callback reaches the genuine Agent save callback")
+	} finally AppPicker_Show := PickerOwner
+}
+
+Test("LLM agent: original native apps flags while paused (agent-apps-original-native-flags)",
+	_LAG_OriginalAppsNativeFlags.Bind("paused"))
+Test("LLM agent: original native apps flags with prediction off (agent-apps-original-native-flags)",
+	_LAG_OriginalAppsNativeFlags.Bind("off"))
+Test("LLM agent: original native apps flags with operational prediction (agent-apps-original-native-flags)",
+	_LAG_OriginalAppsNativeFlags.Bind("operational"))

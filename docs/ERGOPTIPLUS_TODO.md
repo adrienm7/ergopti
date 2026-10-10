@@ -6532,8 +6532,31 @@ and two positive Boolean-AND controls. The direct manifest test passed after
 correcting the proof's ampersand and held-index read classification; native code
 was unchanged by that correction. Generic publication guards are unchanged.
 The owning generators produced one real census reduction to
-21/5/4. Selected local gates, corrected Windows execution, packaging, installation
-and device acceptance remain pending; no parent item is completed by this cut.
+21/5/4. Published source `db556c2d5` passes all 408 selected JS checks,
+formatting and AHK encoding with unchanged source/index snapshots. The first
+selected run failed only the generated-file index precondition; that failed
+receipt is retained. Manual Windows run 38068021487 tests the identical source
+tree on `4b4370d716387035f7268d6d01ffecd328a537c1` and completed with Release
+skipped. The full Windows unit manifest executed all 11,101 subjects: 10,603
+passed and 498 failed. The personal module executed 15: eight passed and seven
+failed, including one original registration subject and six additions. Several
+refuse before their provider/Fill observation; the full production subject also
+fails on a missing boot-owned keyboard-map fixture. These are unresolved own
+failures, not qualification. Model30 and Agent-provider22 remain passing.
+Windows E2E, packaging and installation were skipped; device acceptance is
+unexecuted. Correct this source before integrating the personal DATA slice.
+
+Two genuine failures in integrated Windows execution came from retired direct-
+staging assumptions in the root-menu meta tests. Their source proofs now retain
+the complete five actual declared builders and reached coordinator, original
+nine registrations, independent 21-language corpus, 21 mutation inverses and
+five foreign-origin refusals. Three added subjects exercise actual Win32 child
+images, state and late withdrawal, including the genuine borrowed-child root
+builders. Separately, three original Agent excluded-apps subjects observe nine
+actual native leaf flag cases before any migration of that command. Provider
+policy and native production remain unchanged. These six additions are source-
+reviewed, not locally AHK-executed; fresh Windows qualification is required.
+No parent item is completed by these cuts.
 
 - [ ] **62.** Downloads on managed company networks: system trust and
       system proxy for every download child (Ollama installation/server/pull,
@@ -8781,7 +8804,18 @@ other census sites rather than hiding their allocations or retaining unused
 native helpers as proof. The next small candidate is the Windows Agent excluded-
 apps command; observe its original native flags first and retain declaration,
 count-getter and callback ownership across actual reads. Its source remains
-unchanged here. Items 54, 81, 16 and 38 stay open.
+unchanged here. Three newly authored original native subjects cover paused,
+off and operational states with zero, two and 1,234 excluded apps; their nine
+flag observations remain unexecuted until Windows CI. Root meta-test source
+proofs also follow the actual five declared builders without admitting opaque
+helpers or mutating borrowed children. The original nine registrations remain,
+and three real receiving subjects are added. Personal DATA source has passed
+all 408 selected JS checks, format and encoding; exact-tree manual Windows
+run 38068021487 completed with eight personal subjects passing and seven
+failing out of 15. The full unit run is complete at 10,603 passed / 498 failed,
+with Windows E2E/package/install skipped and Release skipped. Pre-provider
+refusal and full-production fixture dependencies require correction before
+this cut is qualified. Items 54, 81, 16 and 38 stay open.
 
 - [~] **88.** **Partial: native prediction tooltip appearance.** Shared
   llm-line-style policy and the unchanged independent line corpus retain grey
