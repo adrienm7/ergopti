@@ -128,8 +128,37 @@ def debug_certificate_failure_projection(source):
     return source.replace(diagnostic, original, 1)
 
 
+# Exact approved passive TLS observation; the immutable historical pin still
+# protects every unrelated release byte after both complete spans are inverted.
+TLS_FAILURE_DIAGNOSTIC_INVERSE = (
+    (
+        '/// Projects only closed native status facts from the already completed request.\n/// No trust evaluation, certificate text or private NSError payload is acquired.\nfunc managedHTTPTLSDiagnostic(_ error: NSError, additionalAnchorCount: Int) -> [String: Any] {\n\tprecondition(additionalAnchorCount >= 0)\n\tlet cfNetworkDomain = kCFErrorDomainCFNetwork as String\n\tvar native = error\n\tvar seen = Set<ObjectIdentifier>()\n\tvar causes: [[String: Any]] = []\n\tvar termination = "complete"\n\twhile true {\n\t\tguard seen.insert(ObjectIdentifier(native)).inserted else { termination = "cycle"; break }\n\t\tguard causes.count < 8 else { termination = "depth"; break }\n\t\tlet domain: String\n\t\tswitch native.domain {\n\t\tcase NSURLErrorDomain: domain = "url"\n\t\tcase NSOSStatusErrorDomain: domain = "security"\n\t\tcase cfNetworkDomain: domain = "cfnetwork"\n\t\tcase NSPOSIXErrorDomain: domain = "posix"\n\t\tdefault: domain = "other"\n\t\t}\n\t\tlet code = domain == "other" ? nil : Int32(exactly: native.code)\n\t\tvar kind = "unknown"\n\t\tif domain == "security", let code {\n\t\t\tswitch code {\n\t\t\tcase errSSLHostNameMismatch: kind = "hostname_mismatch"\n\t\t\tcase errSSLCertExpired: kind = "certificate_expired"\n\t\t\tcase errSSLCertNotYetValid: kind = "certificate_not_yet_valid"\n\t\t\tcase errSSLUnknownRootCert: kind = "unknown_root"\n\t\t\tcase errSSLXCertChainInvalid: kind = "certificate_chain_invalid"\n\t\t\tdefault: break\n\t\t\t}\n\t\t} else if domain == "url", let code {\n\t\t\tswitch Int(code) {\n\t\t\tcase NSURLErrorServerCertificateUntrusted: kind = "certificate_untrusted"\n\t\t\tcase NSURLErrorServerCertificateHasBadDate: kind = "certificate_date_invalid"\n\t\t\tcase NSURLErrorServerCertificateNotYetValid: kind = "certificate_not_yet_valid"\n\t\t\tcase NSURLErrorServerCertificateHasUnknownRoot: kind = "unknown_root"\n\t\t\tdefault: break\n\t\t\t}\n\t\t}\n\t\tvar cause: [String: Any] = ["domain": domain, "code": NSNull(), "kind": kind]\n\t\tif let code { cause["code"] = Int(code) }\n\t\tcauses.append(cause)\n\t\tguard let underlying = native.userInfo[NSUnderlyingErrorKey] else { break }\n\t\tguard let next = underlying as? NSError else { termination = "unavailable"; break }\n\t\tnative = next\n\t}\n\treturn ["version": 1, "trust_mode": additionalAnchorCount == 0 ? "native_default" : "added_anchors",\n\t\t"additional_anchor_count": additionalAnchorCount, "causes": causes, "chain_termination": termination]\n}\n\n',
+        "",
+    ),
+    (
+        '\t\t#if DEBUG\n\t\tif failure == "certificate", let error = error as NSError?,\n\t\t\tlet bytes = try? JSONSerialization.data(withJSONObject:\n\t\t\t\tmanagedHTTPTLSDiagnostic(error, additionalAnchorCount: certificates.count), options: [.sortedKeys]),\n\t\t\tlet text = String(data: bytes, encoding: .utf8) {\n\t\t\t_ = fputs("# native_http_tls_failure \\(text)\\n", stderr)\n\t\t}\n\t\t#endif\n',
+        "",
+    ),
+)
+
+
+def tls_failure_diagnostic_projection(source):
+    """Accept an absent observation or its two exact complete reviewed spans."""
+    marker = "func managedHTTPTLSDiagnostic("
+    if marker not in source and "# native_http_tls_failure " not in source:
+        return source
+    if source.count(marker) != 1 or any(
+        source.count(new) != 1 for new, _ in TLS_FAILURE_DIAGNOSTIC_INVERSE
+    ):
+        raise ValueError("TLS diagnostic enrollment refused")
+    for new, old in TLS_FAILURE_DIAGNOSTIC_INVERSE:
+        source = source.replace(new, old, 1)
+    return source
+
+
 def historical_pac_ownership_projection(source):
     """Accept the exact legacy source or the complete approved ownership repair."""
+    source = tls_failure_diagnostic_projection(source)
     source = debug_certificate_failure_projection(source)
     source = pac_source_acquisition_projection(source)
     if hashlib.sha256(source.encode("utf-8")).hexdigest() == HISTORICAL_HTTP_RELEASE_SHA256:
@@ -1891,6 +1920,15 @@ class HistoricalPACOwnershipProjectionTests(unittest.TestCase):
                     self.assertIn(before, candidate)
                     with self.assertRaises(ValueError):
                         historical_pac_ownership_projection(candidate.replace(before, after, 1))
+
+        # Reject every partial, duplicate or altered approved diagnostic span;
+        # an unrelated release mutation still reaches the original whole pin.
+        for new, old in TLS_FAILURE_DIAGNOSTIC_INVERSE:
+            self.assertEqual(source.count(new), 1)
+            for replacement in (old, new + new, new + "// unapproved\n"):
+                with self.subTest(diagnostic=new[:80], replacement=replacement[:80]):
+                    with self.assertRaises(ValueError):
+                        historical_pac_ownership_projection(source.replace(new, replacement, 1))
 
 
 class PACSourceAcquisitionProjectionTests(unittest.TestCase):
