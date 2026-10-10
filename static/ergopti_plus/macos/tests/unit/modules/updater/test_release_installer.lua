@@ -388,3 +388,55 @@ helpers.describe("release_installer: declared archive preference and historical 
 		helpers.assert_eq(#calls, 2, "invalid formats never dispatch native work")
 	end)
 end)
+
+helpers.describe("release_installer: the native stage request", function()
+	local Installer = fresh_installer()
+	Installer._getenv = function(name)
+		if name == "ERGOPTI_LAUNCHER_EXECUTABLE" then return "/Applications/ErgoptiPlus.app/Contents/MacOS/ErgoptiPlus" end
+		if name == "TMPDIR" then return "/private/tmp/user" end
+	end
+
+	helpers.it("binds a bounded request to the original arguments and child environment", function()
+		local captured
+		Installer._spawn = function(executable, args, on_done, on_chunk, environment)
+			captured = { executable = executable, args = args, on_chunk = on_chunk, environment = environment }
+			return { start = function() return true end }
+		end
+		local asset = { tag = TAG, version = "0.0.0-dev.139", url = URL, digest = DIGEST, format = "tar.xz" }
+		helpers.assert_true(Installer.stage(asset, function() end))
+		helpers.assert_eq(captured.executable, "/bin/sh")
+		helpers.assert_nil(captured.on_chunk)
+		local raw = captured.environment.ERGOPTI_RELEASE_STAGE_REQUEST
+		helpers.assert_true(type(raw) == "string" and #raw < 65536)
+		local request = require("adapters.json_codec").decode(raw)
+		helpers.assert_eq(request.version, 1)
+		helpers.assert_eq(request.url, URL)
+		helpers.assert_eq(request.sha256, DIGEST)
+		helpers.assert_eq(request.output, captured.args[6] .. "/release.tar.xz")
+		helpers.assert_eq(request.timeout_ms, 900000)
+		local count = 0
+		for _ in pairs(request) do count = count + 1 end
+		helpers.assert_eq(count, 5)
+		helpers.assert_eq(asset.format, "tar.xz")
+	end)
+	helpers.it("refuses failed or oversized serialization before native acquisition", function()
+		local Codec = require("adapters.json_codec")
+		local original = Codec.encode
+		local calls = 0
+		Installer._spawn = function() calls = calls + 1; return nil end
+		for _, encode in ipairs({
+			function() return nil, "authored serialization refusal" end,
+			function() return string.rep("x", 65536), nil end,
+			function() return "", nil end,
+		}) do
+			Codec.encode = encode
+			local ok, dispatched = pcall(Installer.stage,
+				{ tag = TAG, version = "0.0.0-dev.139", url = URL, digest = DIGEST, format = "zip" }, function() end)
+			Codec.encode = original
+			helpers.assert_true(ok)
+			helpers.assert_eq(dispatched, false)
+		end
+		helpers.assert_eq(calls, 0)
+	end)
+
+end)

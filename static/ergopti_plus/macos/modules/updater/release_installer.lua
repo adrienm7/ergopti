@@ -181,6 +181,14 @@ function M.stage(asset, done)
 		return false
 	end
 	local stage_dir = (tmp:gsub("/+$", "")) .. "/ergopti-release-install-" .. os.date("!%Y%m%d-%H%M%S")
+	-- Keep JSON release data out of shell source and bind the native request to
+	-- this exact stage, using the existing per-child environment override.
+	local request, request_err = JsonCodec.encode({ version = 1, url = asset.url, sha256 = asset.digest,
+		output = stage_dir .. "/release." .. asset.format, timeout_ms = 900000 })
+	if request_err ~= nil or type(request) ~= "string" or request == "" or #request >= 65536 then
+		Logger.error(LOG, "Cannot encode the chosen release download request.")
+		return false
+	end
 	Logger.start(LOG, "Downloading and verifying %s into %s…", asset.tag, stage_dir)
 	local handle = M._spawn("/bin/sh", { "-c", M.STAGE_SCRIPT, "stage", asset.url, asset.digest,
 		stage_dir, asset.version, app, asset.format, APP_NAME }, function(exit_code, stdout, stderr)
@@ -196,7 +204,7 @@ function M.stage(asset, done)
 		local detail = string.format("exit %s: %s", tostring(exit_code), (tostring(stderr or ""):gsub("%s+$", "")))
 		Logger.error(LOG, "Release %s refused at the %s (%s).", asset.tag, stage, detail)
 		done(nil, stage, detail)
-	end)
+	end, nil, { ERGOPTI_RELEASE_STAGE_REQUEST = request })
 	return type(handle) == "table" and handle.start() == true
 end
 
