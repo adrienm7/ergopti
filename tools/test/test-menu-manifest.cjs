@@ -5920,7 +5920,9 @@ console.log(
 {
 	const assert = require('node:assert/strict');
 	const { scriptTokens } = require('../lib/script-source.cjs');
-	const { publishesMenuTemplate } = require('../lib/menu-shared-delegation.cjs');
+	const {
+		personalFrameDataPublication
+	} = require('../lib/menu-native-personal-shortcuts-binding.cjs');
 	const expected = JSON.parse(
 		readFileSync(resolve(SHARED, 'tests/corpus/menus/personal_shortcuts_frame.json'), 'utf8')
 	);
@@ -5936,7 +5938,10 @@ console.log(
 	assert.equal(expected.absent_registry_count, 0);
 	assert.equal(expected.empty_registry_count, 0);
 	assert.equal(expected.populated_frame_count, 2);
-	const source = readFileSync(resolve(SHARED, '../windows/ui/menu/menu_init.ahk'), 'utf8');
+	const source = ['ui/menu/menu_shortcuts.ahk', 'ui/menu/menu_init.ahk', 'infra/manifest_menu.ahk']
+		.map((file) => readFileSync(resolve(SHARED, '../windows', file), 'utf8'))
+		.join('\n');
+	const entry = menu.shortcuts_menu.find((row) => row.id === 'personal_shortcuts');
 	function publishedPersonalFrame(text) {
 		const tokens = scriptTokens(text, '.ahk');
 		let level = 0;
@@ -5945,44 +5950,52 @@ console.log(
 			const token = tokens[index];
 			if (
 				level === 0 &&
-				text.slice(text.lastIndexOf('\n', token.start - 1) + 1, token.start).trim() === '' &&
-				!(
-					tokens[index - 1]?.kind === 'identifier' &&
-					['if', 'else', 'while', 'for', 'catch', 'try'].includes(tokens[index - 1]?.value)
-				) &&
 				token.kind === 'identifier' &&
-				token.value === '_AppendPersonalShortcutsSubmenuIfAny' &&
+				['_personalshortcutrows', 'menurenderer_appendframedata'].includes(
+					token.value.toLowerCase()
+				) &&
+				text.slice(text.lastIndexOf('\n', token.start - 1) + 1, token.start).trim() === '' &&
 				tokens[index + 1]?.kind === 'symbol' &&
-				tokens[index + 1]?.value === '(' &&
-				tokens[index + 2]?.kind === 'identifier' &&
-				tokens[index + 2]?.value === 'ShortcutsMenu' &&
-				tokens[index + 3]?.kind === 'symbol' &&
-				tokens[index + 3]?.value === ')' &&
-				tokens[index + 4]?.kind === 'symbol' &&
-				tokens[index + 4]?.value === '{'
+				tokens[index + 1].value === '('
 			) {
-				let depth = 1,
-					end = index + 5;
-				for (; end < tokens.length && depth > 0; end += 1) {
-					if (tokens[end].kind === 'symbol' && tokens[end].value === '{') depth += 1;
-					if (tokens[end].kind === 'symbol' && tokens[end].value === '}') depth -= 1;
+				let parameters = 1,
+					opening = index + 2;
+				for (; opening < tokens.length && parameters; opening += 1) {
+					if (tokens[opening].kind !== 'symbol') continue;
+					if (tokens[opening].value === '(') parameters += 1;
+					if (tokens[opening].value === ')') parameters -= 1;
 				}
-				if (depth === 0) bodies.push(text.slice(tokens[index + 4].end, tokens[end - 1].start));
+				if (!parameters && tokens[opening]?.kind === 'symbol' && tokens[opening].value === '{') {
+					let depth = 1,
+						end = opening + 1;
+					for (; end < tokens.length && depth; end += 1) {
+						if (tokens[end].kind !== 'symbol') continue;
+						if (tokens[end].value === '{') depth += 1;
+						if (tokens[end].value === '}') depth -= 1;
+					}
+					if (!depth)
+						bodies.push({
+							name: token.value.toLowerCase(),
+							body: text.slice(tokens[opening].end, tokens[end - 1].start)
+						});
+				}
 			}
 			if (token.kind === 'symbol' && token.value === '{') level += 1;
 			if (token.kind === 'symbol' && token.value === '}') level -= 1;
 		}
-		assert.equal(bodies.length, 1, 'one actual top-level personal registry owner');
-		const body = bodies[0];
+		assert.equal(
+			bodies.filter((body) => body.name === '_personalshortcutrows').length,
+			1,
+			'one actual top-level personal registry owner'
+		);
+		const body = bodies.find((body) => body.name === 'menurenderer_appendframedata')?.body || '';
 		const actual = scriptTokens(body, '.ahk');
 		function exactSequence(fragment) {
 			const expected = scriptTokens(fragment, '.ahk');
 			return actual.some(
 				(token, start) =>
 					body.slice(body.lastIndexOf('\n', token.start - 1) + 1, token.start).trim() === '' &&
-					!(
-						actual[start - 1]?.kind === 'symbol' && ['.', ':'].includes(actual[start - 1]?.value)
-					) &&
+					!(actual[start - 1]?.kind === 'symbol' && ['.', ':'].includes(actual[start - 1].value)) &&
 					expected.every(
 						(token, offset) =>
 							actual[start + offset]?.kind === token.kind &&
@@ -5991,20 +6004,17 @@ console.log(
 			);
 		}
 		assert.ok(
-			exactSequence(
-				'FrameRows := MenuRenderer_TemplateRows("personal_shortcuts_frame", Map(), Map(), Map("personal_shortcuts_registered", PersonalRows))'
-			),
+			exactSequence('Rows := TemplateOwner.Call(FrameKey, Map(), Map(), Map(ChildId, Data))'),
 			'actual native child lexical kinds'
 		);
 		assert.ok(
 			exactSequence(
-				'if !(FrameRows is Array) return 0 MenuRenderer_AppendTemplate(ShortcutsMenu, "personal_shortcuts_frame", Map(), Map(), Map("personal_shortcuts_registered", PersonalRows))'
+				'if !RowsReceipt || !DestinationLive() return 0 for Leaf in Data LeafCallbacks.Push(Leaf["action"]) Child := NativeConstructor.Call()'
 			),
 			'actual refusal and publication lexical kinds'
 		);
-
 		assert.ok(
-			publishesMenuTemplate(body, '.ahk', expected.section),
+			personalFrameDataPublication(text, expected.rows, entry),
 			'actual personal frame publication'
 		);
 		const sequence = scriptTokens(body, '.ahk')
@@ -6012,21 +6022,33 @@ console.log(
 			.join('|');
 		assert.ok(
 			sequence.includes(
-				'FrameRows|:=|MenuRenderer_TemplateRows|(|personal_shortcuts_frame|,|Map|(|)|,|Map|(|)|,|Map|(|personal_shortcuts_registered|,|PersonalRows|)|)'
+				'Rows|:=|TemplateOwner|.|Call|(|FrameKey|,|Map|(|)|,|Map|(|)|,|Map|(|ChildId|,|Data|)|)'
 			),
 			'actual original native child array binding'
 		);
 		assert.ok(
 			sequence.includes(
-				'if|!|(|FrameRows|is|Array|)|return|0|MenuRenderer_AppendTemplate|(|ShortcutsMenu|,|personal_shortcuts_frame|,|Map|(|)|,|Map|(|)|,|Map|(|personal_shortcuts_registered|,|PersonalRows|)|)'
+				'if|!|RowsReceipt|||||!|DestinationLive|(|)|return|0|for|Leaf|in|Data|LeafCallbacks|.|Push|(|Leaf|[|action|]|)|Child|:=|NativeConstructor|.|Call|(|)'
 			),
 			'refusal precedes actual publication'
 		);
 	}
 	publishedPersonalFrame(source);
+	const actualBooleanCalls = [
+		'&& ImageOwner.Call(Destination, Now)',
+		'&& StageOwner.Call(NowStage, Data, Population is MenuPopulation)'
+	];
+	for (const actualBooleanCall of actualBooleanCalls) {
+		assert.equal(source.split(actualBooleanCall).length - 1, 1);
+		const spacedCall = actualBooleanCall.replace('&& ', '&&    ');
+		const spacedBooleanCall = source.replace(actualBooleanCall, spacedCall);
+		assert.notEqual(spacedBooleanCall, source);
+		publishedPersonalFrame(spacedBooleanCall);
+		assert.equal(spacedBooleanCall.replace(spacedCall, actualBooleanCall), source);
+	}
 	const foreignAssignment = source.replace(
-		'FrameRows := MenuRenderer_TemplateRows',
-		'Foreign.FrameRows := MenuRenderer_TemplateRows'
+		'Rows := TemplateOwner.Call',
+		'Foreign.Rows := TemplateOwner.Call'
 	);
 	assert.notEqual(foreignAssignment, source);
 	assert.throws(
@@ -6035,20 +6057,14 @@ console.log(
 		'a receiver property cannot own the local frame array'
 	);
 
-	const conditional = source.replace(
-		'_AppendPersonalShortcutsSubmenuIfAny(ShortcutsMenu) {',
-		'if _AppendPersonalShortcutsSubmenuIfAny(ShortcutsMenu) {'
-	);
+	const conditional = source.replace('_PersonalShortcutRows() {', 'if _PersonalShortcutRows() {');
 	assert.notEqual(conditional, source);
 	assert.throws(
 		() => publishedPersonalFrame(conditional),
 		/actual/,
 		'a conditional call is not the owning definition'
 	);
-	const quotedChild = source.replace(
-		'Map("personal_shortcuts_registered", PersonalRows)',
-		'Map("personal_shortcuts_registered", "PersonalRows")'
-	);
+	const quotedChild = source.replace('Map(ChildId, Data)', 'Map(ChildId, "Data")');
 	assert.notEqual(quotedChild, source);
 	assert.throws(
 		() => publishedPersonalFrame(quotedChild),
@@ -6056,13 +6072,16 @@ console.log(
 		'a string cannot be the native child array'
 	);
 	const braceLiteral = source.replace(
-		'FrameRows := MenuRenderer_TemplateRows',
-		'BraceCaption := "{"\n\tFrameRows := MenuRenderer_TemplateRows'
+		'Rows := TemplateOwner.Call',
+		'BraceCaption := "{"\n\tRows := TemplateOwner.Call'
 	);
 	assert.notEqual(braceLiteral, source);
 	publishedPersonalFrame(braceLiteral);
 
-	const needle = 'MenuRenderer_TemplateRows("' + expected.section + '"';
+	const needle =
+		'DeclaredFrames := Map("personal_shortcuts", Map(\n\t\t"manifest_key", "' +
+		expected.section +
+		'"';
 	assert.equal(source.split(needle).length, 2);
 	for (const replacement of [
 		'Foreign.' + needle,
@@ -6075,6 +6094,323 @@ console.log(
 	}
 	const dataOnly = '; no actual owner\nValue := "\n(\n' + source + '\n)"';
 	assert.throws(() => publishedPersonalFrame(dataOnly), /actual/);
+	// Each mutation withdraws an actual live authority edge, then restores exact source.
+	function actualFrameMutation(before, after, reason) {
+		assert.equal(source.split(before).length - 1, 1, `${reason}: actual unique preimage`);
+		const withdrawn = source.replace(before, after);
+		assert.notEqual(withdrawn, source, `${reason}: genuine source changed`);
+		assert.equal(personalFrameDataPublication(withdrawn, expected.rows, entry), false, reason);
+		assert.equal(withdrawn.replace(after, before), source, `${reason}: exact inverse`);
+		assert.equal(
+			personalFrameDataPublication(withdrawn.replace(after, before), expected.rows, entry),
+			true,
+			`${reason}: real authority restored`
+		);
+	}
+	for (const [before, after, reason] of [
+		...actualBooleanCalls.flatMap((call) =>
+			['& ', '& & ', '&&& ', '&& &'].map((operator) => [
+				call,
+				call.replace('&& ', operator),
+				`a standalone or malformed ampersand cannot borrow the retained callable: ${operator}${call}`
+			])
+		),
+		[
+			'|| Root[ManifestKey] != Definition || Root[FrameKey] != Frame\n\t\t\t|| (IsSet(ExpectedDefinition)',
+			'|| Root[ManifestKey] != Definition || Root[Foreign.FrameKey] != Frame\n\t\t\t|| (IsSet(ExpectedDefinition)',
+			'a foreign member cannot become the held frame key'
+		],
+		[
+			'|| Root[ManifestKey] != Definition || Root[FrameKey] != Frame\n\t\t\t|| (IsSet(ExpectedDefinition)',
+			'|| Root[ManifestKey] != Definition || ForeignRoot[FrameKey] != Frame\n\t\t\t|| (IsSet(ExpectedDefinition)',
+			'a foreign index cannot borrow the genuine held root key read'
+		],
+		[
+			'|| !Rows[Rows.Length].Has("items") || Rows[Rows.Length]["items"] != Data',
+			'|| !Rows[Foreign.Rows.Length].Has("items") || Rows[Rows.Length]["items"] != Data',
+			'a foreign Array bound cannot borrow the held rows self-index read'
+		],
+		[
+			'"manifest_key", "personal_shortcuts_frame"',
+			'"manifest_key", "unowned_frame"',
+			'actual registration names its owned frame'
+		],
+		[
+			'"children_id", "personal_shortcuts_registered"',
+			'"children_id", "foreign_children"',
+			'actual registration names its owned children'
+		],
+		[
+			'"provider", _PersonalShortcutRows',
+			'"provider", "_PersonalShortcutRows"',
+			'the retained DATA provider is a Func rather than a caption'
+		],
+		[
+			'"provider", _PersonalShortcutRows',
+			'"provider", Foreign._PersonalShortcutRows',
+			'a member cannot borrow the canonical DATA producer'
+		],
+		[
+			'"provider", _PersonalShortcutRows',
+			'"provider", _PersonalShortcutRows, "other", 0',
+			'the declared frame binding has closed fields'
+		],
+		[
+			'Getters, , , DeclaredFrames)',
+			'Getters, , , Map())',
+			'actual optional Build argument carries the genuine registration'
+		],
+		[
+			'_PersonalShortcutRows() {',
+			'_PersonalShortcutRows(TargetMenu) {',
+			'pure DATA producer receives no native destination'
+		],
+		[
+			'Row := MenuRowWithLabel("shortcuts.personal." . Name, Label, "Shortcuts")',
+			'Row := Foreign.MenuRowWithLabel("shortcuts.personal." . Name, Label, "Shortcuts")',
+			'the DATA collector uses the actual callback row constructor'
+		],
+		[
+			'PersonalRows := []\n\tfor _, Name in Names',
+			'PersonalRows := Menu()\n\tfor _, Name in Names',
+			'the pure producer returns DATA rather than a finished native Menu'
+		],
+		[
+			'\treturn PersonalRows\n}\n',
+			'\treturn "PersonalRows"\n}\n',
+			'the actual pure producer return retains its collected Array'
+		],
+		[
+			'FrameDataOwner.Call(Result, ManifestKey, Id, DeclaredFrames[Id], MenuDef, Item, &FrameAdmitted, [FrameBindings, HandlersReceipt, ProvidersReceipt])',
+			'FrameDataOwner.Call(Result, ManifestKey, Id, DeclaredFrames[Id], MenuDef, Item, &FrameAdmitted, [])',
+			'the actual receiving call retains all authentic Build registration receipts'
+		],
+		[
+			'if !FrameAdmitted\n\t\t\t\tthrow Error("Declared frame DATA was refused before publication")',
+			'if false\n\t\t\t\tthrow Error("Declared frame DATA was refused before publication")',
+			'declared DATA refusal cannot fall through to pending separator effects'
+		],
+		[
+			'Data := Provider.Call()',
+			'Data := Provider.Call(TargetMenu)',
+			'the native receiving call cannot give its destination to the pure producer'
+		],
+		[
+			'Data := Provider.Call()',
+			'Data := Foreign.Provider.Call()',
+			'a foreign member cannot become the held DATA producer'
+		],
+		[
+			'Data := Provider.Call()',
+			'Data := "Provider.Call()"',
+			'a caption cannot stand in for the actual DATA call'
+		],
+		[
+			'Data := Provider.Call()',
+			'if false {\n\t\tData := Provider.Call()\n\t\t}',
+			'a nested dormant producer is not the live DATA stage'
+		],
+		[
+			'Rows := TemplateOwner.Call(FrameKey, Map(), Map(), Map(ChildId, Data))',
+			'Rows := TemplateOwner.Call(FrameKey, Map(), Map(), Map(ChildId, ForeignData))',
+			'the actual frame projection retains the collected child DATA'
+		],
+		[
+			'RowsReceipt := SnapshotOwner.Call(Rows)',
+			'RowsReceipt := SnapshotOwner.Call(Data)',
+			'the actual completed parent projection retains its own receipt'
+		],
+		[
+			'if !RowsReceipt || !DestinationLive()\n\t\t\treturn 0\n\t\tfor Leaf in Data\n\t\t\tLeafCallbacks.Push(Leaf["action"])\n\t\tChild := NativeConstructor.Call()',
+			'if !RowsReceipt || false\n\t\t\treturn 0\n\t\tfor Leaf in Data\n\t\t\tLeafCallbacks.Push(Leaf["action"])\n\t\tChild := NativeConstructor.Call()',
+			'whole projected frame refusal precedes child allocation'
+		],
+		[
+			'Child := NativeConstructor.Call()',
+			'Child := Foreign.NativeConstructor.Call()',
+			'the staged child is received from the held genuine native constructor'
+		],
+		[
+			'FillOwner.Call(Population, Child, Data, FrameKey, 2)',
+			'FillOwner.Call(Population, Child, ForeignData, FrameKey, 2)',
+			'the population stage receives the actual collected DATA'
+		],
+		[
+			'Parent := Rows[Rows.Length], Label := StrReplace(Parent["label"], "&", "&&")',
+			'Parent := ForeignRows[ForeignRows.Length], Label := StrReplace(Parent["label"], "&", "&&")',
+			'the native parent is the actual returned projected group'
+		],
+		[
+			'NativeMethods["Add"].Call(Target, Label, Child)',
+			'NativeMethods["Add"].Call(Target, Label, ForeignChild)',
+			'actual target publication retains the completed child'
+		],
+		[
+			'if !CurrentOwner.Call(RegistrationsReceipt)\n\t\t\t\t\treturn false',
+			'if false\n\t\t\t\t\treturn false',
+			'late live-source admission retains genuine registration container custody'
+		],
+		[
+			'Frames[EntryId] != Binding',
+			'Frames[EntryId] != ForeignBinding',
+			'late source admission binds the original real Build frame registration'
+		],
+		[
+			'Data := Provider.Call()',
+			'Provider.Call := Foreign\n\t\tData := Provider.Call()',
+			'held provider callable cannot acquire an own Call override'
+		],
+		[
+			'Data := Provider.Call()',
+			'Provider := Foreign\n\t\tData := Provider.Call()',
+			'held provider cannot be reassigned before actual collection'
+		],
+		[
+			'Data := Provider.Call()',
+			'Data := Provider.Call()\n\t\tTemplateOwner := Foreign',
+			'held template owner cannot be rebound after actual collection'
+		],
+		[
+			'\n\tOriginalCritical := Critical("On")\n\tOwnersLive()',
+			'\n\tOriginalCritical := Critical("On")\n\treturn 0\n\tOwnersLive()',
+			'an entry return cannot make the native receiving stages dead witnesses'
+		],
+		[
+			'\n\t}\n\ttry {\n\t\tif !OwnersLive() || Type(ManifestKey)',
+			'\n\t}\n\treturn 0\n\ttry {\n\t\tif !OwnersLive() || Type(ManifestKey)',
+			'a receiver return before main admission cannot borrow later publication witnesses'
+		],
+		[
+			'\n\tstatic FrameDataOwner := MenuRenderer_AppendFrameData',
+			'\n\treturn Result\n\tstatic FrameDataOwner := MenuRenderer_AppendFrameData',
+			'a Build return before frame receipt capture cannot borrow later registration witnesses'
+		],
+		[
+			'\n\tstatic FrameDataOwner := MenuRenderer_AppendFrameData',
+			'\n\tthrow Error("early refusal")\n\tstatic FrameDataOwner := MenuRenderer_AppendFrameData',
+			'an unconditional Build refusal cannot make later frame witnesses live'
+		],
+		[
+			'\n\t\tFrameKey := Binding["manifest_key"]',
+			'\n\t\treturn 0\n\t\tFrameKey := Binding["manifest_key"]',
+			'a precollection return cannot borrow the later collected DATA witness'
+		],
+		[
+			'\n\t\tParent := Rows[Rows.Length]',
+			'\n\t\treturn 0\n\t\tParent := Rows[Rows.Length]',
+			'a post-stage return cannot borrow the later completed parent witness'
+		],
+		[
+			'\n\t\tPublicationLive() {',
+			'\n\t\treturn 0\n\t\tPublicationLive() {',
+			'a completed-parent return cannot borrow later native operation witnesses'
+		],
+		[
+			'\n\tStartCount := Before.Length\n\ttry {',
+			'\n\tStartCount := Before.Length\n\treturn 0\n\ttry {',
+			'an internal operation entry return cannot borrow later native Add witnesses'
+		],
+		[
+			'\n\t\tNativeMethods["Add"].Call(Target, Label, Child)',
+			'\n\t\treturn 0\n\t\tNativeMethods["Add"].Call(Target, Label, Child)',
+			'an internal operation return cannot borrow its later native child Add witness'
+		],
+		[
+			'Added := PublishOwner.Call(TargetMenu, Child, Rows, Label, Destination, NativeMethods,',
+			'Added := PublishOwner.Call(TargetMenu, ForeignChild, Rows, Label, Destination, NativeMethods,',
+			'the actual internal publication operation receives the retained completed child'
+		],
+		[
+			'[PublishOwner, _MR_FramePublish]',
+			'[PublishOwner, Foreign]',
+			'the held publication operation keeps its genuine current native owner'
+		],
+		[
+			'StageOwner.Call(StageReceipt, Data, Population is MenuPopulation)',
+			'StageOwner.Call(StageReceipt, ForeignData, Population is MenuPopulation)',
+			'actual staged native callback admission retains collected DATA identity'
+		],
+		[
+			'if Type(Child) != "Integer" || Child != 0 {\n\t\t\t\tif !(Child is Menu)',
+			'if false {\n\t\t\t\tif !(Child is Menu)',
+			'the actual staged native child cannot bypass own-handle and method admission'
+		],
+		[
+			'if Object.Prototype.HasOwnProp.Call(Child, Name)\n\t\t\t\t\t\treturn false',
+			'if false\n\t\t\t\t\t\treturn false',
+			'the actual staged child cannot borrow source authority after method withdrawal'
+		],
+		[
+			'PendingEntry := PendingOwner.Call(Pending, Child, ChildHandle)\n\t\t} else',
+			'PendingEntry := PendingOwner.Call(Pending, Child, ForeignHandle)\n\t\t} else',
+			'staging retains the captured genuine child handle for pending custody'
+		],
+		[
+			'!(Row[1] == Expected[Index][1]) || Row[4] != 0',
+			'Row[1] != Expected[Index][1] || Row[4] != 0',
+			'staged captions retain exact case under the actual native image admission'
+		]
+	])
+		actualFrameMutation(before, after, reason);
+	for (const appended of [
+		'\n_PersonalShortcutRows := Foreign\n',
+		'\nMenuRenderer_AppendFrameData := Foreign\n',
+		'\nAlias := _PersonalShortcutRows\n',
+		'\nMenu := Foreign\n',
+		'\nMap := Foreign\n',
+		'\nMenuRowWithLabel := Foreign\n',
+		'\nAlias := MenuRowWithLabel\n',
+		'\n_MR_FramePublish := Foreign\n'
+	]) {
+		assert.equal(
+			personalFrameDataPublication(source + appended, expected.rows, entry),
+			false,
+			'module assignment or alias cannot own the canonical personal DATA route'
+		);
+	}
+	const duplicateProvider = '\n_PersonalShortcutRows() { return 0 }\n';
+	assert.equal(
+		personalFrameDataPublication(source + duplicateProvider, expected.rows, entry),
+		false,
+		'duplicate module DATA owners refuse the frame route'
+	);
+	assert.equal(
+		personalFrameDataPublication(source, expected.rows, { ...entry, type: 'dynamic' }),
+		false,
+		'a dynamic parent cannot borrow the strict declared DATA mode'
+	);
+	assert.equal(
+		personalFrameDataPublication(source, expected.rows, { ...entry, platforms: ['hs'] }),
+		false,
+		'personal native DATA proof requires its actual Windows owner'
+	);
+	assert.equal(
+		personalFrameDataPublication(source, expected.rows, { ...entry, id: 'foreign_personal' }),
+		false,
+		'a foreign row cannot borrow the personal registration'
+	);
+	assert.equal(
+		personalFrameDataPublication(
+			source,
+			expected.rows.map((row) => ({ ...row, platforms: ['hs'] })),
+			entry
+		),
+		false,
+		'foreign frame platform declarations cannot receive Windows DATA'
+	);
+	const renamedProvider = source.replace(/_PersonalShortcutRows\(\) \{[\s\S]*?\n\}/, (body) =>
+		body.replace(/\b(Names|PersonalRows|Name|Desc|Label|Row)\b/g, (name) => 'PersonalData' + name)
+	);
+	assert.notEqual(renamedProvider, source);
+	publishedPersonalFrame(renamedProvider);
+	const renamedRegistration = source.replace(/_BuildShortcutsSubmenu\(\) \{[\s\S]*?\n\}/, (body) =>
+		body.replace(
+			/\b(DynHandlers|DeclaredFrames|ListProviders|Commands|Getters|GroupBuilders)\b/g,
+			(name) => 'PersonalFrame' + name
+		)
+	);
+	assert.notEqual(renamedRegistration, source);
+	publishedPersonalFrame(renamedRegistration);
 	for (const file of readdirSync(LOCALES_DIR).filter((name) => name.endsWith('.json'))) {
 		const locale = JSON.parse(readFileSync(resolve(LOCALES_DIR, file), 'utf8'));
 		assert.equal(typeof locale['menu.shortcuts.personal'], 'string');

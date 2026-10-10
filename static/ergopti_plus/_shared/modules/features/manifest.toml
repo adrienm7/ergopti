@@ -4813,7 +4813,7 @@ i18n = "menu.shortcuts.script_shortcuts"
 checked_when = ["script_control_enabled"]
 
 [[menu.shortcuts_menu]]
-type = "dynamic"
+type = "list"
 id = "personal_shortcuts"
 # AHK-only (mirrors wrap_symbols_menu above): the Windows driver maintains a
 # structured personal_shortcuts.ahk registry it can walk to list each
