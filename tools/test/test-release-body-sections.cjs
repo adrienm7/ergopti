@@ -884,11 +884,11 @@ function checkNativeQualificationBody(modules) {
 }
 
 function checkUnsignedQualificationBody(modules) {
-	const now = new Date('2026-10-09T21:00:00Z');
+	const now = new Date('2026-10-10T10:00:00Z');
 	const env = {
 		...CI_ENV,
-		TAG: 'v1.0.0',
-		VERSION: '1.0.0',
+		TAG: 'v1.0.1',
+		VERSION: '1.0.1',
 		GITHUB_ACTIONS: 'true',
 		GITHUB_EVENT_NAME: 'push',
 		GITHUB_REF: 'refs/heads/main',
@@ -896,8 +896,8 @@ function checkUnsignedQualificationBody(modules) {
 		ERGOPTI_DEV_RELEASE_RELEASE: 'true',
 		ERGOPTI_DEV_RELEASE_PRERELEASE: 'false',
 		ERGOPTI_DEV_RELEASE_CHANNEL: 'main',
-		ERGOPTI_DEV_RELEASE_TAG: 'v1.0.0',
-		ERGOPTI_DEV_RELEASE_VERSION: '1.0.0',
+		ERGOPTI_DEV_RELEASE_TAG: 'v1.0.1',
+		ERGOPTI_DEV_RELEASE_VERSION: '1.0.1',
 		ERGOPTI_WINDOWS_CREATE_RELEASE: 'true'
 	};
 	const image = Buffer.from('independent unsigned fixture bytes, not an executable');
@@ -948,7 +948,7 @@ function checkUnsignedQualificationBody(modules) {
 				env,
 				CHANGELOG_MD,
 				releaseBodyScript(),
-				new Date('2026-10-10T02:00:00Z'),
+				new Date('2026-10-11T07:00:00Z'),
 				fixture
 			),
 		/not admitted/

@@ -777,7 +777,7 @@ jobs:
               if ($LASTEXITCODE -ne 0) { throw "Stable Windows releases require every signing secret." }
               [IO.File]::WriteAllText("${{ github.workspace }}\static\ergopti_plus\windows\windows-signing-qualification.json",
                   ($receipt -join "`n") + "`n", [Text.UTF8Encoding]::new($false))
-              Write-Warning "Publishing the explicitly authorized unsigned v1.0.0 artifact with public signature disclosure."
+              Write-Warning "Publishing the explicitly authorized unsigned v1.0.1 artifact with public signature disclosure; all tests remain mandatory."
               exit 0
           }
           if ($missing.Count -gt 0) {
