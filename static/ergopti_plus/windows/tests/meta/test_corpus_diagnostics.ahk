@@ -188,10 +188,7 @@ _TCD_AssertAction(Expected, Actual, Id) {
 	for Key, Value in Expected {
 		Assert(Actual.Has(Key), Id . ': the action lacks ' . Key)
 		if (Value is Map) {
-			Assert(Actual[Key] is Map, Id . ': ' . Key . ' must be a Map')
-			for SubKey, SubValue in Value
-				AssertEqual(SubValue, Actual[Key].Get(SubKey, ''), Id . ': ' . Key . '.' . SubKey)
-			AssertEqual(Value.Count, Actual[Key].Count, Id . ': ' . Key . ' carries extra keys')
+			_TCD_AssertAction(Value, Actual[Key], Id . ': ' . Key)
 		} else {
 			AssertEqual(Value, Actual[Key], Id . ': ' . Key)
 		}
@@ -216,6 +213,19 @@ _TCD_PageActions() {
 }
 
 Test('corpus:diagnostics: page action vectors (page-actions-corpus)', _TCD_PageActions)
+
+; Page observations contain nested result maps whose identities differ after parsing.
+_TCD_NestedActionValues() {
+	Expected := Map('observations', Map('results', Map('redaction', Map('state', 'PASS', 'ms', 0))))
+	Equal := Map('observations', Map('results', Map('redaction', Map('ms', 0, 'state', 'PASS'))))
+	_TCD_AssertAction(Expected, Equal, 'nested values with independent identities')
+	for Invalid in [Map('state', 'FAIL', 'ms', 0), Map('state', 'PASS'), Map('state', 'PASS', 'ms', 0, 'extra', 1)] {
+		Actual := Map('observations', Map('results', Map('redaction', Invalid)))
+		AssertThrows(_TCD_AssertAction.Bind(Expected, Actual, 'nested mismatch'), 'nested mismatches must fail')
+	}
+}
+
+Test('corpus:diagnostics: compare nested action values exactly (page-actions-nested-values)', _TCD_NestedActionValues)
 
 
 

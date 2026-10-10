@@ -54,7 +54,1313 @@
 					}
 				]
 			}
-		]
+		],
+		"diagnostic_checks": {
+			"items": [
+				{
+					"id": "schema_fields",
+					"label": "healthcheck.deep_tests.schema",
+					"scope": "diagnostics-model"
+				},
+				{
+					"id": "probe_inventory",
+					"label": "healthcheck.deep_tests.probe_inventory",
+					"scope": "diagnostics-model"
+				},
+				{
+					"id": "redaction",
+					"label": "healthcheck.deep_tests.redaction",
+					"scope": "synthetic-export"
+				},
+				{
+					"id": "driver_suites",
+					"label": "healthcheck.deep_tests.ci_suites",
+					"scope": "isolated-suite",
+					"reason": "not_embedded"
+				},
+				{
+					"id": "install_reload_profile",
+					"label": "healthcheck.deep_tests.ci_suites",
+					"scope": "isolated-suite",
+					"reason": "isolated_environment_required"
+				}
+			],
+			"redaction_vector": {
+				"context": {
+					"home": "/diagnostics-user",
+					"user": "diagnostics-user",
+					"case_insensitive": false
+				},
+				"input": "location /diagnostics-user/config; account diagnostics-user; api_key=diagnostic_key_123456789",
+				"expected": "location ~/config; account <user>; api_key=<secret>"
+			}
+		},
+		"share_policy": {
+			"version": 1,
+			"notice_key": "healthcheck.export.privacy_notice",
+			"projection": {
+				"kind": "object",
+				"fields": {
+					"schema_version": {
+						"kind": "integer"
+					},
+					"driver": {
+						"kind": "enum",
+						"values": ["windows", "macos", "linux"]
+					},
+					"generated_at": {
+						"kind": "utc"
+					},
+					"detailed": {
+						"kind": "boolean"
+					},
+					"extensive": {
+						"kind": "boolean"
+					},
+					"sections": {
+						"kind": "object",
+						"fields": {
+							"hardware": {
+								"kind": "object",
+								"fields": {
+									"cpu_cores": {
+										"kind": "number"
+									},
+									"ram_total": {
+										"kind": "number"
+									},
+									"arch": {
+										"kind": "enum",
+										"values": [
+											"arm64",
+											"aarch64",
+											"x86_64",
+											"x64",
+											"amd64",
+											"x86",
+											"i386",
+											"unknown"
+										]
+									}
+								}
+							},
+							"system": {
+								"kind": "object",
+								"fields": {
+									"ram_free": {
+										"kind": "number"
+									},
+									"disk_free": {
+										"kind": "number"
+									},
+									"cpu_usage": {
+										"kind": "number"
+									},
+									"process_cpu": {
+										"kind": "number"
+									},
+									"process_memory": {
+										"kind": "number"
+									},
+									"uptime": {
+										"kind": "number"
+									},
+									"elevated": {
+										"kind": "boolean"
+									},
+									"os": {
+										"kind": "runtime",
+										"prefixes": [
+											"macOS ",
+											"Windows ",
+											"Ubuntu ",
+											"Fedora Linux ",
+											"Debian GNU/Linux ",
+											"Alpine Linux ",
+											"openSUSE Leap "
+										],
+										"suffixes": [""]
+									}
+								}
+							},
+							"input": {
+								"kind": "object",
+								"fields": {
+									"paused": {
+										"kind": "boolean"
+									},
+									"shift": {
+										"kind": "boolean"
+									},
+									"ctrl": {
+										"kind": "boolean"
+									},
+									"alt": {
+										"kind": "boolean"
+									},
+									"altgr": {
+										"kind": "boolean"
+									},
+									"meta": {
+										"kind": "boolean"
+									},
+									"caps_lock": {
+										"kind": "boolean"
+									},
+									"kanata_running": {
+										"kind": "boolean"
+									},
+									"keymap_resolved": {
+										"kind": "boolean"
+									},
+									"remap_phase": {
+										"kind": "enum",
+										"values": [
+											"idle",
+											"prepared",
+											"starting",
+											"running",
+											"paused",
+											"stopping",
+											"failed",
+											"fenced",
+											"unknown"
+										],
+										"default": "unknown"
+									}
+								}
+							},
+							"ai": {
+								"kind": "object",
+								"fields": {
+									"ai_enabled": {
+										"kind": "boolean"
+									},
+									"ai_backend": {
+										"kind": "enum",
+										"values": ["ollama", "mlx", "disabled", "unknown"],
+										"default": "unknown"
+									}
+								}
+							},
+							"issues": {
+								"kind": "object",
+								"fields": {
+									"warn_count": {
+										"kind": "number"
+									},
+									"err_count": {
+										"kind": "number"
+									}
+								}
+							},
+							"developer": {
+								"kind": "object",
+								"fields": {
+									"ring_lines": {
+										"kind": "number"
+									},
+									"phase_a_ms": {
+										"kind": "number"
+									}
+								}
+							},
+							"versions": {
+								"kind": "object",
+								"fields": {
+									"ergopti_version": {
+										"kind": "version"
+									},
+									"runtime": {
+										"kind": "runtime",
+										"prefixes": ["Hammerspoon ", "AutoHotkey ", "LuaJIT ", "Lua ", ""],
+										"suffixes": [" 64-bit", " 32-bit", ""]
+									},
+									"karabiner": {
+										"kind": "version"
+									},
+									"webview": {
+										"kind": "version"
+									},
+									"kanata": {
+										"kind": "version"
+									},
+									"commit": {
+										"kind": "commit"
+									},
+									"channel": {
+										"kind": "enum",
+										"values": ["dev", "main", "stable", "beta", "unknown"]
+									}
+								}
+							},
+							"permissions": {
+								"kind": "object",
+								"fields": {
+									"items": {
+										"kind": "array",
+										"item": {
+											"kind": "object",
+											"fields": {
+												"id": {
+													"kind": "enum",
+													"values": [
+														"accessibility",
+														"input_devices",
+														"input_monitoring",
+														"login_items",
+														"screen_recording",
+														"uinput"
+													]
+												},
+												"state": {
+													"kind": "enum",
+													"values": ["granted", "denied", "unknown", "unsupported", "not_required"],
+													"default": "unknown"
+												}
+											}
+										}
+									}
+								}
+							}
+						}
+					},
+					"probes": {
+						"kind": "object",
+						"fields": {
+							"github_api": {
+								"kind": "object",
+								"fields": {
+									"state": {
+										"kind": "enum",
+										"values": [
+											"pending",
+											"ok",
+											"error",
+											"timeout",
+											"disabled",
+											"unsupported",
+											"not_run",
+											"cancelled",
+											"unknown"
+										],
+										"default": "unknown"
+									},
+									"cleanup": {
+										"kind": "enum",
+										"values": ["pending", "settled", "unknown"],
+										"default": "unknown"
+									},
+									"ms": {
+										"kind": "number"
+									},
+									"native_status": {
+										"kind": "integer",
+										"minimum": -2147483648,
+										"maximum": 2147483647
+									},
+									"source_sha256": {
+										"kind": "hash"
+									},
+									"runtime_source_sha256": {
+										"kind": "hash"
+									},
+									"receiver_source_sha256": {
+										"kind": "hash"
+									},
+									"sender_source_sha256": {
+										"kind": "hash"
+									},
+									"sender_context": {
+										"kind": "enum",
+										"values": ["driver_spawned_osascript"]
+									},
+									"qualification_scope": {
+										"kind": "enum",
+										"values": ["local_runtime_nonce"]
+									},
+									"detail": {
+										"kind": "enum",
+										"values": [
+											"probe_busy",
+											"cleanup_debt",
+											"clock_refused",
+											"deadline_expired",
+											"unsupported",
+											"opt_in_required",
+											"not_embedded",
+											"isolated_environment_required",
+											"cancelled",
+											"native_refused",
+											"invalid_frame",
+											"transport_refused"
+										]
+									},
+									"runtime_pid": {
+										"kind": "integer",
+										"minimum": 1,
+										"maximum": 2147483647
+									}
+								}
+							},
+							"ai_health": {
+								"kind": "object",
+								"fields": {
+									"state": {
+										"kind": "enum",
+										"values": [
+											"pending",
+											"ok",
+											"error",
+											"timeout",
+											"disabled",
+											"unsupported",
+											"not_run",
+											"cancelled",
+											"unknown"
+										],
+										"default": "unknown"
+									},
+									"cleanup": {
+										"kind": "enum",
+										"values": ["pending", "settled", "unknown"],
+										"default": "unknown"
+									},
+									"ms": {
+										"kind": "number"
+									},
+									"native_status": {
+										"kind": "integer",
+										"minimum": -2147483648,
+										"maximum": 2147483647
+									},
+									"source_sha256": {
+										"kind": "hash"
+									},
+									"runtime_source_sha256": {
+										"kind": "hash"
+									},
+									"receiver_source_sha256": {
+										"kind": "hash"
+									},
+									"sender_source_sha256": {
+										"kind": "hash"
+									},
+									"sender_context": {
+										"kind": "enum",
+										"values": ["driver_spawned_osascript"]
+									},
+									"qualification_scope": {
+										"kind": "enum",
+										"values": ["local_runtime_nonce"]
+									},
+									"detail": {
+										"kind": "enum",
+										"values": [
+											"probe_busy",
+											"cleanup_debt",
+											"clock_refused",
+											"deadline_expired",
+											"unsupported",
+											"opt_in_required",
+											"not_embedded",
+											"isolated_environment_required",
+											"cancelled",
+											"native_refused",
+											"invalid_frame",
+											"transport_refused"
+										]
+									},
+									"runtime_pid": {
+										"kind": "integer",
+										"minimum": 1,
+										"maximum": 2147483647
+									}
+								}
+							},
+							"system_details": {
+								"kind": "object",
+								"fields": {
+									"state": {
+										"kind": "enum",
+										"values": [
+											"pending",
+											"ok",
+											"error",
+											"timeout",
+											"disabled",
+											"unsupported",
+											"not_run",
+											"cancelled",
+											"unknown"
+										],
+										"default": "unknown"
+									},
+									"cleanup": {
+										"kind": "enum",
+										"values": ["pending", "settled", "unknown"],
+										"default": "unknown"
+									},
+									"ms": {
+										"kind": "number"
+									},
+									"native_status": {
+										"kind": "integer",
+										"minimum": -2147483648,
+										"maximum": 2147483647
+									},
+									"source_sha256": {
+										"kind": "hash"
+									},
+									"runtime_source_sha256": {
+										"kind": "hash"
+									},
+									"receiver_source_sha256": {
+										"kind": "hash"
+									},
+									"sender_source_sha256": {
+										"kind": "hash"
+									},
+									"sender_context": {
+										"kind": "enum",
+										"values": ["driver_spawned_osascript"]
+									},
+									"qualification_scope": {
+										"kind": "enum",
+										"values": ["local_runtime_nonce"]
+									},
+									"detail": {
+										"kind": "enum",
+										"values": [
+											"probe_busy",
+											"cleanup_debt",
+											"clock_refused",
+											"deadline_expired",
+											"unsupported",
+											"opt_in_required",
+											"not_embedded",
+											"isolated_environment_required",
+											"cancelled",
+											"native_refused",
+											"invalid_frame",
+											"transport_refused"
+										]
+									},
+									"runtime_pid": {
+										"kind": "integer",
+										"minimum": 1,
+										"maximum": 2147483647
+									}
+								}
+							},
+							"cpu_load": {
+								"kind": "object",
+								"fields": {
+									"state": {
+										"kind": "enum",
+										"values": [
+											"pending",
+											"ok",
+											"error",
+											"timeout",
+											"disabled",
+											"unsupported",
+											"not_run",
+											"cancelled",
+											"unknown"
+										],
+										"default": "unknown"
+									},
+									"cleanup": {
+										"kind": "enum",
+										"values": ["pending", "settled", "unknown"],
+										"default": "unknown"
+									},
+									"ms": {
+										"kind": "number"
+									},
+									"native_status": {
+										"kind": "integer",
+										"minimum": -2147483648,
+										"maximum": 2147483647
+									},
+									"source_sha256": {
+										"kind": "hash"
+									},
+									"runtime_source_sha256": {
+										"kind": "hash"
+									},
+									"receiver_source_sha256": {
+										"kind": "hash"
+									},
+									"sender_source_sha256": {
+										"kind": "hash"
+									},
+									"sender_context": {
+										"kind": "enum",
+										"values": ["driver_spawned_osascript"]
+									},
+									"qualification_scope": {
+										"kind": "enum",
+										"values": ["local_runtime_nonce"]
+									},
+									"detail": {
+										"kind": "enum",
+										"values": [
+											"probe_busy",
+											"cleanup_debt",
+											"clock_refused",
+											"deadline_expired",
+											"unsupported",
+											"opt_in_required",
+											"not_embedded",
+											"isolated_environment_required",
+											"cancelled",
+											"native_refused",
+											"invalid_frame",
+											"transport_refused"
+										]
+									},
+									"runtime_pid": {
+										"kind": "integer",
+										"minimum": 1,
+										"maximum": 2147483647
+									}
+								}
+							},
+							"bluetooth": {
+								"kind": "object",
+								"fields": {
+									"state": {
+										"kind": "enum",
+										"values": [
+											"pending",
+											"ok",
+											"error",
+											"timeout",
+											"disabled",
+											"unsupported",
+											"not_run",
+											"cancelled",
+											"unknown"
+										],
+										"default": "unknown"
+									},
+									"cleanup": {
+										"kind": "enum",
+										"values": ["pending", "settled", "unknown"],
+										"default": "unknown"
+									},
+									"ms": {
+										"kind": "number"
+									},
+									"native_status": {
+										"kind": "integer",
+										"minimum": -2147483648,
+										"maximum": 2147483647
+									},
+									"source_sha256": {
+										"kind": "hash"
+									},
+									"runtime_source_sha256": {
+										"kind": "hash"
+									},
+									"receiver_source_sha256": {
+										"kind": "hash"
+									},
+									"sender_source_sha256": {
+										"kind": "hash"
+									},
+									"sender_context": {
+										"kind": "enum",
+										"values": ["driver_spawned_osascript"]
+									},
+									"qualification_scope": {
+										"kind": "enum",
+										"values": ["local_runtime_nonce"]
+									},
+									"detail": {
+										"kind": "enum",
+										"values": [
+											"probe_busy",
+											"cleanup_debt",
+											"clock_refused",
+											"deadline_expired",
+											"unsupported",
+											"opt_in_required",
+											"not_embedded",
+											"isolated_environment_required",
+											"cancelled",
+											"native_refused",
+											"invalid_frame",
+											"transport_refused"
+										]
+									},
+									"runtime_pid": {
+										"kind": "integer",
+										"minimum": 1,
+										"maximum": 2147483647
+									}
+								}
+							},
+							"appleevent_transport": {
+								"kind": "object",
+								"fields": {
+									"state": {
+										"kind": "enum",
+										"values": [
+											"pending",
+											"ok",
+											"error",
+											"timeout",
+											"disabled",
+											"unsupported",
+											"not_run",
+											"cancelled",
+											"unknown"
+										],
+										"default": "unknown"
+									},
+									"cleanup": {
+										"kind": "enum",
+										"values": ["pending", "settled", "unknown"],
+										"default": "unknown"
+									},
+									"ms": {
+										"kind": "number"
+									},
+									"native_status": {
+										"kind": "integer",
+										"minimum": -2147483648,
+										"maximum": 2147483647
+									},
+									"source_sha256": {
+										"kind": "hash"
+									},
+									"runtime_source_sha256": {
+										"kind": "hash"
+									},
+									"receiver_source_sha256": {
+										"kind": "hash"
+									},
+									"sender_source_sha256": {
+										"kind": "hash"
+									},
+									"sender_context": {
+										"kind": "enum",
+										"values": ["driver_spawned_osascript"]
+									},
+									"qualification_scope": {
+										"kind": "enum",
+										"values": ["local_runtime_nonce"]
+									},
+									"detail": {
+										"kind": "enum",
+										"values": [
+											"probe_busy",
+											"cleanup_debt",
+											"clock_refused",
+											"deadline_expired",
+											"unsupported",
+											"opt_in_required",
+											"not_embedded",
+											"isolated_environment_required",
+											"cancelled",
+											"native_refused",
+											"invalid_frame",
+											"transport_refused"
+										]
+									},
+									"runtime_pid": {
+										"kind": "integer",
+										"minimum": 1,
+										"maximum": 2147483647
+									}
+								}
+							}
+						}
+					},
+					"retired_probes": {
+						"kind": "array",
+						"item": {
+							"kind": "object",
+							"fields": {
+								"probes": {
+									"kind": "object",
+									"fields": {
+										"github_api": {
+											"kind": "object",
+											"fields": {
+												"state": {
+													"kind": "enum",
+													"values": [
+														"pending",
+														"ok",
+														"error",
+														"timeout",
+														"disabled",
+														"unsupported",
+														"not_run",
+														"cancelled",
+														"unknown"
+													],
+													"default": "unknown"
+												},
+												"cleanup": {
+													"kind": "enum",
+													"values": ["pending", "settled", "unknown"],
+													"default": "unknown"
+												},
+												"ms": {
+													"kind": "number"
+												},
+												"native_status": {
+													"kind": "integer",
+													"minimum": -2147483648,
+													"maximum": 2147483647
+												},
+												"source_sha256": {
+													"kind": "hash"
+												},
+												"runtime_source_sha256": {
+													"kind": "hash"
+												},
+												"receiver_source_sha256": {
+													"kind": "hash"
+												},
+												"sender_source_sha256": {
+													"kind": "hash"
+												},
+												"sender_context": {
+													"kind": "enum",
+													"values": ["driver_spawned_osascript"]
+												},
+												"qualification_scope": {
+													"kind": "enum",
+													"values": ["local_runtime_nonce"]
+												},
+												"detail": {
+													"kind": "enum",
+													"values": [
+														"probe_busy",
+														"cleanup_debt",
+														"clock_refused",
+														"deadline_expired",
+														"unsupported",
+														"opt_in_required",
+														"not_embedded",
+														"isolated_environment_required",
+														"cancelled",
+														"native_refused",
+														"invalid_frame",
+														"transport_refused"
+													]
+												},
+												"runtime_pid": {
+													"kind": "integer",
+													"minimum": 1,
+													"maximum": 2147483647
+												}
+											}
+										},
+										"ai_health": {
+											"kind": "object",
+											"fields": {
+												"state": {
+													"kind": "enum",
+													"values": [
+														"pending",
+														"ok",
+														"error",
+														"timeout",
+														"disabled",
+														"unsupported",
+														"not_run",
+														"cancelled",
+														"unknown"
+													],
+													"default": "unknown"
+												},
+												"cleanup": {
+													"kind": "enum",
+													"values": ["pending", "settled", "unknown"],
+													"default": "unknown"
+												},
+												"ms": {
+													"kind": "number"
+												},
+												"native_status": {
+													"kind": "integer",
+													"minimum": -2147483648,
+													"maximum": 2147483647
+												},
+												"source_sha256": {
+													"kind": "hash"
+												},
+												"runtime_source_sha256": {
+													"kind": "hash"
+												},
+												"receiver_source_sha256": {
+													"kind": "hash"
+												},
+												"sender_source_sha256": {
+													"kind": "hash"
+												},
+												"sender_context": {
+													"kind": "enum",
+													"values": ["driver_spawned_osascript"]
+												},
+												"qualification_scope": {
+													"kind": "enum",
+													"values": ["local_runtime_nonce"]
+												},
+												"detail": {
+													"kind": "enum",
+													"values": [
+														"probe_busy",
+														"cleanup_debt",
+														"clock_refused",
+														"deadline_expired",
+														"unsupported",
+														"opt_in_required",
+														"not_embedded",
+														"isolated_environment_required",
+														"cancelled",
+														"native_refused",
+														"invalid_frame",
+														"transport_refused"
+													]
+												},
+												"runtime_pid": {
+													"kind": "integer",
+													"minimum": 1,
+													"maximum": 2147483647
+												}
+											}
+										},
+										"system_details": {
+											"kind": "object",
+											"fields": {
+												"state": {
+													"kind": "enum",
+													"values": [
+														"pending",
+														"ok",
+														"error",
+														"timeout",
+														"disabled",
+														"unsupported",
+														"not_run",
+														"cancelled",
+														"unknown"
+													],
+													"default": "unknown"
+												},
+												"cleanup": {
+													"kind": "enum",
+													"values": ["pending", "settled", "unknown"],
+													"default": "unknown"
+												},
+												"ms": {
+													"kind": "number"
+												},
+												"native_status": {
+													"kind": "integer",
+													"minimum": -2147483648,
+													"maximum": 2147483647
+												},
+												"source_sha256": {
+													"kind": "hash"
+												},
+												"runtime_source_sha256": {
+													"kind": "hash"
+												},
+												"receiver_source_sha256": {
+													"kind": "hash"
+												},
+												"sender_source_sha256": {
+													"kind": "hash"
+												},
+												"sender_context": {
+													"kind": "enum",
+													"values": ["driver_spawned_osascript"]
+												},
+												"qualification_scope": {
+													"kind": "enum",
+													"values": ["local_runtime_nonce"]
+												},
+												"detail": {
+													"kind": "enum",
+													"values": [
+														"probe_busy",
+														"cleanup_debt",
+														"clock_refused",
+														"deadline_expired",
+														"unsupported",
+														"opt_in_required",
+														"not_embedded",
+														"isolated_environment_required",
+														"cancelled",
+														"native_refused",
+														"invalid_frame",
+														"transport_refused"
+													]
+												},
+												"runtime_pid": {
+													"kind": "integer",
+													"minimum": 1,
+													"maximum": 2147483647
+												}
+											}
+										},
+										"cpu_load": {
+											"kind": "object",
+											"fields": {
+												"state": {
+													"kind": "enum",
+													"values": [
+														"pending",
+														"ok",
+														"error",
+														"timeout",
+														"disabled",
+														"unsupported",
+														"not_run",
+														"cancelled",
+														"unknown"
+													],
+													"default": "unknown"
+												},
+												"cleanup": {
+													"kind": "enum",
+													"values": ["pending", "settled", "unknown"],
+													"default": "unknown"
+												},
+												"ms": {
+													"kind": "number"
+												},
+												"native_status": {
+													"kind": "integer",
+													"minimum": -2147483648,
+													"maximum": 2147483647
+												},
+												"source_sha256": {
+													"kind": "hash"
+												},
+												"runtime_source_sha256": {
+													"kind": "hash"
+												},
+												"receiver_source_sha256": {
+													"kind": "hash"
+												},
+												"sender_source_sha256": {
+													"kind": "hash"
+												},
+												"sender_context": {
+													"kind": "enum",
+													"values": ["driver_spawned_osascript"]
+												},
+												"qualification_scope": {
+													"kind": "enum",
+													"values": ["local_runtime_nonce"]
+												},
+												"detail": {
+													"kind": "enum",
+													"values": [
+														"probe_busy",
+														"cleanup_debt",
+														"clock_refused",
+														"deadline_expired",
+														"unsupported",
+														"opt_in_required",
+														"not_embedded",
+														"isolated_environment_required",
+														"cancelled",
+														"native_refused",
+														"invalid_frame",
+														"transport_refused"
+													]
+												},
+												"runtime_pid": {
+													"kind": "integer",
+													"minimum": 1,
+													"maximum": 2147483647
+												}
+											}
+										},
+										"bluetooth": {
+											"kind": "object",
+											"fields": {
+												"state": {
+													"kind": "enum",
+													"values": [
+														"pending",
+														"ok",
+														"error",
+														"timeout",
+														"disabled",
+														"unsupported",
+														"not_run",
+														"cancelled",
+														"unknown"
+													],
+													"default": "unknown"
+												},
+												"cleanup": {
+													"kind": "enum",
+													"values": ["pending", "settled", "unknown"],
+													"default": "unknown"
+												},
+												"ms": {
+													"kind": "number"
+												},
+												"native_status": {
+													"kind": "integer",
+													"minimum": -2147483648,
+													"maximum": 2147483647
+												},
+												"source_sha256": {
+													"kind": "hash"
+												},
+												"runtime_source_sha256": {
+													"kind": "hash"
+												},
+												"receiver_source_sha256": {
+													"kind": "hash"
+												},
+												"sender_source_sha256": {
+													"kind": "hash"
+												},
+												"sender_context": {
+													"kind": "enum",
+													"values": ["driver_spawned_osascript"]
+												},
+												"qualification_scope": {
+													"kind": "enum",
+													"values": ["local_runtime_nonce"]
+												},
+												"detail": {
+													"kind": "enum",
+													"values": [
+														"probe_busy",
+														"cleanup_debt",
+														"clock_refused",
+														"deadline_expired",
+														"unsupported",
+														"opt_in_required",
+														"not_embedded",
+														"isolated_environment_required",
+														"cancelled",
+														"native_refused",
+														"invalid_frame",
+														"transport_refused"
+													]
+												},
+												"runtime_pid": {
+													"kind": "integer",
+													"minimum": 1,
+													"maximum": 2147483647
+												}
+											}
+										},
+										"appleevent_transport": {
+											"kind": "object",
+											"fields": {
+												"state": {
+													"kind": "enum",
+													"values": [
+														"pending",
+														"ok",
+														"error",
+														"timeout",
+														"disabled",
+														"unsupported",
+														"not_run",
+														"cancelled",
+														"unknown"
+													],
+													"default": "unknown"
+												},
+												"cleanup": {
+													"kind": "enum",
+													"values": ["pending", "settled", "unknown"],
+													"default": "unknown"
+												},
+												"ms": {
+													"kind": "number"
+												},
+												"native_status": {
+													"kind": "integer",
+													"minimum": -2147483648,
+													"maximum": 2147483647
+												},
+												"source_sha256": {
+													"kind": "hash"
+												},
+												"runtime_source_sha256": {
+													"kind": "hash"
+												},
+												"receiver_source_sha256": {
+													"kind": "hash"
+												},
+												"sender_source_sha256": {
+													"kind": "hash"
+												},
+												"sender_context": {
+													"kind": "enum",
+													"values": ["driver_spawned_osascript"]
+												},
+												"qualification_scope": {
+													"kind": "enum",
+													"values": ["local_runtime_nonce"]
+												},
+												"detail": {
+													"kind": "enum",
+													"values": [
+														"probe_busy",
+														"cleanup_debt",
+														"clock_refused",
+														"deadline_expired",
+														"unsupported",
+														"opt_in_required",
+														"not_embedded",
+														"isolated_environment_required",
+														"cancelled",
+														"native_refused",
+														"invalid_frame",
+														"transport_refused"
+													]
+												},
+												"runtime_pid": {
+													"kind": "integer",
+													"minimum": 1,
+													"maximum": 2147483647
+												}
+											}
+										}
+									}
+								}
+							}
+						}
+					},
+					"page_check_observations": {
+						"kind": "object",
+						"fields": {
+							"source": {
+								"kind": "enum",
+								"values": ["installed_page_reported"]
+							},
+							"qualification": {
+								"kind": "enum",
+								"values": ["unqualified"]
+							},
+							"results": {
+								"kind": "object",
+								"fields": {
+									"schema_fields": {
+										"kind": "object",
+										"fields": {
+											"scope": {
+												"kind": "enum",
+												"values": ["diagnostics-model"]
+											},
+											"state": {
+												"kind": "enum",
+												"values": ["pending", "ok", "error", "not_run", "cancelled"]
+											},
+											"reason": {
+												"kind": "enum",
+												"values": ["opt_in_required", "invalid_diagnostic_model"]
+											},
+											"ms": {
+												"kind": "integer",
+												"minimum": 0
+											}
+										}
+									},
+									"probe_inventory": {
+										"kind": "object",
+										"fields": {
+											"scope": {
+												"kind": "enum",
+												"values": ["diagnostics-model"]
+											},
+											"state": {
+												"kind": "enum",
+												"values": ["pending", "ok", "error", "not_run", "cancelled"]
+											},
+											"reason": {
+												"kind": "enum",
+												"values": ["opt_in_required", "invalid_diagnostic_model"]
+											},
+											"ms": {
+												"kind": "integer",
+												"minimum": 0
+											}
+										}
+									},
+									"redaction": {
+										"kind": "object",
+										"fields": {
+											"scope": {
+												"kind": "enum",
+												"values": ["synthetic-export"]
+											},
+											"state": {
+												"kind": "enum",
+												"values": ["pending", "ok", "error", "not_run", "cancelled"]
+											},
+											"reason": {
+												"kind": "enum",
+												"values": ["opt_in_required", "invalid_diagnostic_model"]
+											},
+											"ms": {
+												"kind": "integer",
+												"minimum": 0
+											}
+										}
+									},
+									"driver_suites": {
+										"kind": "object",
+										"fields": {
+											"scope": {
+												"kind": "enum",
+												"values": ["isolated-suite"]
+											},
+											"state": {
+												"kind": "enum",
+												"values": ["not_run"]
+											},
+											"reason": {
+												"kind": "enum",
+												"values": ["not_embedded"]
+											}
+										}
+									},
+									"install_reload_profile": {
+										"kind": "object",
+										"fields": {
+											"scope": {
+												"kind": "enum",
+												"values": ["isolated-suite"]
+											},
+											"state": {
+												"kind": "enum",
+												"values": ["not_run"]
+											},
+											"reason": {
+												"kind": "enum",
+												"values": ["isolated_environment_required"]
+											}
+										}
+									}
+								}
+							}
+						}
+					}
+				}
+			}
+		}
 	},
 	"templates": {
 		"templates": {
@@ -657,6 +1963,267 @@
 				"export_sequence": 9007199254740992
 			},
 			"error": "bad_export_sequence"
+		},
+		{
+			"message": {
+				"action": "export_snapshot",
+				"export_sequence": 1,
+				"generated_at": "2026-10-10T08:00:00Z",
+				"snapshot_revision": 1,
+				"page_checks": {
+					"schema_fields": {
+						"state": "ok",
+						"scope": "diagnostics-model",
+						"ms": 3
+					},
+					"probe_inventory": {
+						"state": "ok",
+						"scope": "diagnostics-model",
+						"ms": 3
+					},
+					"redaction": {
+						"state": "ok",
+						"scope": "synthetic-export",
+						"ms": 3
+					},
+					"driver_suites": {
+						"state": "not_run",
+						"scope": "isolated-suite",
+						"reason": "not_embedded"
+					},
+					"install_reload_profile": {
+						"state": "not_run",
+						"scope": "isolated-suite",
+						"reason": "isolated_environment_required"
+					}
+				}
+			},
+			"expected": {
+				"action": "export_snapshot",
+				"export_sequence": 1,
+				"generated_at": "2026-10-10T08:00:00Z",
+				"snapshot_revision": 1,
+				"page_check_observations": {
+					"source": "installed_page_reported",
+					"qualification": "unqualified",
+					"results": {
+						"schema_fields": {
+							"state": "ok",
+							"scope": "diagnostics-model",
+							"ms": 3
+						},
+						"probe_inventory": {
+							"state": "ok",
+							"scope": "diagnostics-model",
+							"ms": 3
+						},
+						"redaction": {
+							"state": "ok",
+							"scope": "synthetic-export",
+							"ms": 3
+						},
+						"driver_suites": {
+							"state": "not_run",
+							"scope": "isolated-suite",
+							"reason": "not_embedded"
+						},
+						"install_reload_profile": {
+							"state": "not_run",
+							"scope": "isolated-suite",
+							"reason": "isolated_environment_required"
+						}
+					}
+				}
+			},
+			"driver": "macos",
+			"id": "export captures closed installed-page observations"
+		},
+		{
+			"driver": "macos",
+			"message": {
+				"action": "export_snapshot",
+				"export_sequence": 1,
+				"generated_at": "2026-10-10T08:00:00Z",
+				"snapshot_revision": 1,
+				"page_checks": {
+					"schema_fields": {
+						"state": "ok",
+						"scope": "diagnostics-model",
+						"ms": 3,
+						"text": "PRIVATE_SENTINEL"
+					},
+					"probe_inventory": {
+						"state": "ok",
+						"scope": "diagnostics-model",
+						"ms": 3
+					},
+					"redaction": {
+						"state": "ok",
+						"scope": "synthetic-export",
+						"ms": 3
+					},
+					"driver_suites": {
+						"state": "not_run",
+						"scope": "isolated-suite",
+						"reason": "not_embedded"
+					},
+					"install_reload_profile": {
+						"state": "not_run",
+						"scope": "isolated-suite",
+						"reason": "isolated_environment_required"
+					}
+				}
+			},
+			"error": "bad_page_checks",
+			"id": "export refuses unknown free field"
+		},
+		{
+			"driver": "macos",
+			"message": {
+				"action": "export_snapshot",
+				"export_sequence": 1,
+				"generated_at": "2026-10-10T08:00:00Z",
+				"snapshot_revision": 1,
+				"page_checks": {
+					"schema_fields": {
+						"state": "ok",
+						"scope": "diagnostics-model",
+						"ms": 3
+					},
+					"probe_inventory": {
+						"state": "ok",
+						"scope": "diagnostics-model",
+						"ms": 3
+					},
+					"redaction": {
+						"state": "ok",
+						"scope": "synthetic-export",
+						"ms": 3
+					},
+					"driver_suites": {
+						"state": "ok",
+						"scope": "isolated-suite",
+						"reason": "not_embedded",
+						"ms": 3
+					},
+					"install_reload_profile": {
+						"state": "not_run",
+						"scope": "isolated-suite",
+						"reason": "isolated_environment_required"
+					}
+				}
+			},
+			"error": "bad_page_checks",
+			"id": "export refuses forged suite pass"
+		},
+		{
+			"driver": "macos",
+			"message": {
+				"action": "export_snapshot",
+				"export_sequence": 1,
+				"generated_at": "2026-10-10T08:00:00Z",
+				"snapshot_revision": 1,
+				"page_checks": {
+					"schema_fields": {
+						"state": "ok",
+						"scope": "native",
+						"ms": 3
+					},
+					"probe_inventory": {
+						"state": "ok",
+						"scope": "diagnostics-model",
+						"ms": 3
+					},
+					"redaction": {
+						"state": "ok",
+						"scope": "synthetic-export",
+						"ms": 3
+					},
+					"driver_suites": {
+						"state": "not_run",
+						"scope": "isolated-suite",
+						"reason": "not_embedded"
+					},
+					"install_reload_profile": {
+						"state": "not_run",
+						"scope": "isolated-suite",
+						"reason": "isolated_environment_required"
+					}
+				}
+			},
+			"error": "bad_page_checks",
+			"id": "export refuses wrong scope"
+		},
+		{
+			"driver": "macos",
+			"message": {
+				"action": "export_snapshot",
+				"export_sequence": 1,
+				"generated_at": "2026-10-10T08:00:00Z",
+				"snapshot_revision": 1,
+				"page_checks": {
+					"schema_fields": {
+						"state": "ok",
+						"scope": "diagnostics-model",
+						"ms": 3
+					},
+					"probe_inventory": {
+						"state": "ok",
+						"scope": "diagnostics-model",
+						"ms": 3
+					},
+					"driver_suites": {
+						"state": "not_run",
+						"scope": "isolated-suite",
+						"reason": "not_embedded"
+					},
+					"install_reload_profile": {
+						"state": "not_run",
+						"scope": "isolated-suite",
+						"reason": "isolated_environment_required"
+					}
+				}
+			},
+			"error": "bad_page_checks",
+			"id": "export refuses missing known row"
+		},
+		{
+			"driver": "macos",
+			"message": {
+				"action": "export_snapshot",
+				"export_sequence": 1,
+				"generated_at": "2026-10-10T08:00:00Z",
+				"snapshot_revision": 1,
+				"page_checks": {
+					"schema_fields": {
+						"state": "ok",
+						"scope": "diagnostics-model",
+						"ms": 3
+					},
+					"probe_inventory": {
+						"state": "ok",
+						"scope": "diagnostics-model",
+						"ms": 3
+					},
+					"redaction": {
+						"state": "ok",
+						"scope": "synthetic-export",
+						"ms": -1
+					},
+					"driver_suites": {
+						"state": "not_run",
+						"scope": "isolated-suite",
+						"reason": "not_embedded"
+					},
+					"install_reload_profile": {
+						"state": "not_run",
+						"scope": "isolated-suite",
+						"reason": "isolated_environment_required"
+					}
+				}
+			},
+			"error": "bad_page_checks",
+			"id": "export refuses negative duration"
 		}
 	]
 }
