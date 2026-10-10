@@ -167,16 +167,26 @@ LLM_Menu_CommitMutation(Context, MutateFn, ApplyFn := 0, WriterFn := 0,
 		NotifyFn := 0, AcquireFn := 0, SettleFn := 0, CollectFn := 0,
 		PrepareFn := 0, PublishFn := 0) {
 	PreviousCritical := Critical("Off")
-	try return _LLM_Menu_CommitMutationNonCritical(Context, MutateFn, ApplyFn,
-		WriterFn, NotifyFn, AcquireFn, SettleFn, CollectFn, PrepareFn,
-		PublishFn)
-	finally Critical(PreviousCritical)
+	MutationStarted := _LLM_Menu_ObservationBegin("mutation-return")
+	MutationResult := "not-confirmed"
+	try {
+		MutationResult := _LLM_Menu_CommitMutationNonCritical(Context, MutateFn, ApplyFn,
+			WriterFn, NotifyFn, AcquireFn, SettleFn, CollectFn, PrepareFn,
+			PublishFn)
+		return MutationResult
+	} finally {
+		try _LLM_Menu_ObservationEnd("mutation-return", MutationStarted, MutationResult)
+		finally Critical(PreviousCritical)
+	}
 }
 
 _LLM_Menu_CommitMutationNonCritical(Context, MutateFn, ApplyFn, WriterFn,
 		NotifyFn, AcquireFn, SettleFn, CollectFn, PrepareFn, PublishFn) {
 	global ConfigurationFile, Features, _LLM_Menu
-	if !ConfigFullStateCanPersist()
+	AdmissionStarted := _LLM_Menu_ObservationBegin("schema-admission")
+	Admitted := ConfigFullStateCanPersist()
+	_LLM_Menu_ObservationEnd("schema-admission", AdmissionStarted, Admitted)
+	if !Admitted
 		return ConfigReportPersistenceFailure(Context, NotifyFn,
 			"the boot configuration was not completely loaded")
 	if !(Context is String) || Context == "" || !HasMethod(MutateFn, "Call")
@@ -191,6 +201,7 @@ _LLM_Menu_CommitMutationNonCritical(Context, MutateFn, ApplyFn, WriterFn,
 		return ConfigReportPersistenceFailure(Context, NotifyFn,
 			"the live LLM configuration state is not initialized")
 	}
+	BundleStarted := _LLM_Menu_ObservationBegin("bundle-admission")
 	try Bundle := HasMethod(AcquireFn, "Call")
 		? AcquireFn.Call([ConfigurationFile])
 		: ConfigWriteAcquireLifecycleBundle([ConfigurationFile])
@@ -198,6 +209,7 @@ _LLM_Menu_CommitMutationNonCritical(Context, MutateFn, ApplyFn, WriterFn,
 		return ConfigReportPersistenceFailure(Context, NotifyFn,
 			"terminal configuration admission raised: " . Err.Message)
 	}
+	_LLM_Menu_ObservationEnd("bundle-admission", BundleStarted, Bundle is Object)
 	if !(Bundle is Object) {
 		return ConfigReportPersistenceFailure(Context, NotifyFn,
 			"another configuration transaction owns the global barrier")
@@ -206,19 +218,23 @@ _LLM_Menu_CommitMutationNonCritical(Context, MutateFn, ApplyFn, WriterFn,
 	PreparedProfileOwner := 0
 	ProfileOwnerCommitted := false
 	try {
+		SettleStarted := _LLM_Menu_ObservationBegin("pending-settlement")
 		try Settled := HasMethod(SettleFn, "Call")
 			? SettleFn.Call(Bundle) : _ConfigFullSaveSettleTerminal(Bundle)
 		catch as Err {
 			return ConfigReportPersistenceFailure(Context, NotifyFn,
 				"pending full-save settlement raised: " . Err.Message)
 		}
+		_LLM_Menu_ObservationEnd("pending-settlement", SettleStarted, Settled)
 		if !((Settled is Integer) && Settled == 1) {
 			return ConfigReportPersistenceFailure(Context, NotifyFn,
 				"an older accepted full save could not be made durable")
 		}
 
+		CloneStarted := _LLM_Menu_ObservationBegin("candidate-clone")
 		CandidateFeatures := LLM_Menu_DeepClone(Features)
 		CandidateMenu := LLM_Menu_DeepClone(_LLM_Menu)
+		_LLM_Menu_ObservationEnd("candidate-clone", CloneStarted, true)
 		try Mutated := MutateFn.Call(CandidateMenu)
 		catch as Err {
 			return ConfigReportPersistenceFailure(Context, NotifyFn,
@@ -242,6 +258,7 @@ _LLM_Menu_CommitMutationNonCritical(Context, MutateFn, ApplyFn, WriterFn,
 			return ConfigReportPersistenceFailure(Context, NotifyFn,
 				"profile hotkey owner preparation was refused")
 		}
+		CollectStarted := _LLM_Menu_ObservationBegin("candidate-collector")
 		try Updates := HasMethod(CollectFn, "Call")
 			? CollectFn.Call(CandidateFeatures, CandidateMenu)
 			: _ConfigCollectFullSaveUpdates(CandidateFeatures, CandidateMenu)
@@ -249,6 +266,7 @@ _LLM_Menu_CommitMutationNonCritical(Context, MutateFn, ApplyFn, WriterFn,
 			return ConfigReportPersistenceFailure(Context, NotifyFn,
 				"candidate serialization raised: " . Err.Message)
 		}
+		_LLM_Menu_ObservationEnd("candidate-collector", CollectStarted, Updates is Array)
 		if !(Updates is Array) {
 			return ConfigReportPersistenceFailure(Context, NotifyFn,
 				"candidate serialization returned no update batch")
@@ -269,9 +287,14 @@ _LLM_Menu_CommitMutationNonCritical(Context, MutateFn, ApplyFn, WriterFn,
 			return ConfigReportPersistenceFailure(Context, NotifyFn,
 				"the terminal bundle does not own config.toml")
 		}
+		DurableStarted := _LLM_Menu_ObservationBegin("durable-writer")
 		if !ConfigCommitBorrowedUpdates(OwnerToken, ConfigurationFile, Updates,
-				Context, WriterFn, NotifyFn)
+				Context, WriterFn, NotifyFn) {
+			_LLM_Menu_ObservationEnd("durable-writer", DurableStarted, false)
 			return false
+		}
+		_LLM_Menu_ObservationEnd("durable-writer", DurableStarted, true)
+		PublishStarted := _LLM_Menu_ObservationBegin("live-publication")
 		try {
 			PreviousCritical := Critical("On")
 			try {
@@ -291,6 +314,7 @@ _LLM_Menu_CommitMutationNonCritical(Context, MutateFn, ApplyFn, WriterFn,
 				"config.toml is durable but live publication raised: "
 				. Err.Message, false)
 		}
+		_LLM_Menu_ObservationEnd("live-publication", PublishStarted, Published)
 		if !((Published is Integer) && Published == 1) {
 			if PreparedProfileOwner.Get("changed", false)
 				_LLM_NavEventOwnerQuarantine(
@@ -299,12 +323,14 @@ _LLM_Menu_CommitMutationNonCritical(Context, MutateFn, ApplyFn, WriterFn,
 				"config.toml is durable but live publication was refused", false)
 		}
 		if HasMethod(ApplyFn, "Call") {
+			ApplyStarted := _LLM_Menu_ObservationBegin("live-application")
 			try Applied := ApplyFn.Call(CandidateMenu)
 			catch as Err {
 				return ConfigReportPersistenceFailure(Context, NotifyFn,
 					"config.toml is durable but live application raised: "
 					. Err.Message, false)
 			}
+			_LLM_Menu_ObservationEnd("live-application", ApplyStarted, Applied)
 			if !((Applied is Integer) && Applied == 1) {
 				return ConfigReportPersistenceFailure(Context, NotifyFn,
 					"config.toml is durable but live application was refused", false)
@@ -668,4 +694,24 @@ _LLM_Menu_RefuseRetainedApiCandidate(Context, Bundle, Port, NotifyFn, &ReleaseBu
 	ReleaseBundle := false
 	ConfigTransitionRetainBarrier(Bundle)
 	return _LLM_Menu_ReportApiTransitionFailure(Context, RolledBack, NotifyFn, false)
+}
+
+
+
+
+
+/** Records a closed stage through the normal buffered INFO path, without forced disk I/O. */
+_LLM_Menu_ObservationBegin(Stage) {
+	Started := A_TickCount
+	try LoggerInfo("LLMObservation." Stage ".enter", "LLM stage entered.")
+	return Started
+}
+
+/** Completes the observation, not an authorization or a durable-success claim. */
+_LLM_Menu_ObservationEnd(Stage, Started, Result) {
+	Status := ((Result is Integer) && (Result == 1 || Result == 0))
+		? (Result == 1 ? "confirmed" : "refused")
+		: ((Result is String) && Result == "reentrant-refusal" ? "reentrant-refusal" : "not-confirmed")
+	try LoggerInfo("LLMObservation." Stage ".returned", "LLM stage returned (status={1}, elapsed_ms={2}).",
+		Status, TickElapsed(Started))
 }
