@@ -214,8 +214,7 @@ local function add_binding_to(prefix, ctx)
 	end
 
 	ActionPicker.open({
-		title   = i18n.get("dialog.keyboard_shortcut.title_prefix"),
-		label   = i18n.get("dialog.keyboard_shortcut.prompt"),
+		presentation_id = "keyboard_slot_selection",
 		current = NONE_ID,
 		items   = items,
 	}, function(slot_id)
