@@ -268,6 +268,7 @@ _HotstringsScopeProductionInventory() {
 Test("hotstrings-scope: production discovery inventories fresh personal and canonical extension identities", _HotstringsScopeProductionInventory)
 
 _HotstringsScopeLargeCatalogue() {
+	PhaseStarted := _TestClockMs()
 	Fixture := _HotstringsScopeFixture(32)
 	Bundle := 0, Refusal := 0
 	Launch(_Success, Borrowed, Refused) {
@@ -277,27 +278,43 @@ _HotstringsScopeLargeCatalogue() {
 	}
 	Fixture.options["reload"] := Launch
 	try {
+		_HSC_TraceNativePhase("fixture", PhaseStarted)
+		PhaseStarted := _TestClockMs()
 		Receipt := HotstringsScopeApply("clear", Fixture.options)
+		_HSC_TraceNativePhase("apply", PhaseStarted)
 		AssertEqual("pending", Receipt["status"], "all 34 changed stores fit one transaction")
+		PhaseStarted := _TestClockMs()
 		Journal := ConfigTransitionInspect(Fixture.options["locator"], ConfigTransitionProductionPort())
+		_HSC_TraceNativePhase("inspect", PhaseStarted)
 		Assert(ConfigTransitionResultIs(Journal, "ready"))
 		AssertEqual(34, Journal["record"]["targets"].Length)
 		AssertEqual(34, Receipt["backups"].Length)
+		PhaseStarted := _TestClockMs()
 		for Path in Fixture.personal {
 			Assert(!InStr(FSReadUtf8Exact(Path), "delay = 2.5"))
 			AssertContains(FSReadUtf8Exact(Path), '"abc" = "replacement"')
 			Assert(!_ConfigWriteLeaseTryAcquire(Path, "concurrent-editor"))
 		}
+		_HSC_TraceNativePhase("verify_pending", PhaseStarted)
+		PhaseStarted := _TestClockMs()
 		Refusal.Call("replacement refused")
+		_HSC_TraceNativePhase("refusal", PhaseStarted)
+		PhaseStarted := _TestClockMs()
 		AssertEqual("refused", Receipt["status"])
 		AssertEqual(Fixture.source, FSReadUtf8Exact(Fixture.path))
 		AssertEqual(Fixture.overrideSource, FSReadUtf8Exact(Fixture.overrides))
 		for Path in Fixture.personal
 			AssertEqual(Fixture.personalSource, FSReadUtf8Exact(Path))
+		_HSC_TraceNativePhase("verify_rollback", PhaseStarted)
 	} finally {
-		if Bundle is Object
-			_ConfigWriteTerminalRelease(Bundle)
-		_ScopeOwnerCleanup(Fixture)
+		try {
+			PhaseStarted := _TestClockMs()
+		} finally {
+			if Bundle is Object
+				_ConfigWriteTerminalRelease(Bundle)
+			_ScopeOwnerCleanup(Fixture)
+		}
+		_HSC_TraceNativePhase("cleanup", PhaseStarted)
 	}
 }
 Test("hotstrings-capacity: 32 personal files publish and roll back as one journal", _HotstringsScopeLargeCatalogue)
@@ -400,3 +417,13 @@ _HotstringsScopeMeasuredDelayRoundTrip(SelectedFamily) {
 for _hsScopeFamily in ["names", "abbreviations", "technical_terms"]
 	Test("hotstrings-scope: recommended delays differ from clear and restore exact stores on refusal — " . _hsScopeFamily,
 		_HotstringsScopeMeasuredDelayRoundTrip.Bind(_hsScopeFamily))
+
+
+; Native phase timing for the unchanged capacity subject. The real test clock
+; and owned TAP reporter supply observations; no source, path or credentials
+; are emitted, and no callback, admission or deadline is replaced.
+_HSC_TraceNativePhase(Phase, Started) {
+	Elapsed := _TestClockMs() - Started
+	_TestPrint("# group1-capacity-native-phase: phase=" . Phase
+		. ";duration_ms=" . Format("{:.3f}", Elapsed))
+}
