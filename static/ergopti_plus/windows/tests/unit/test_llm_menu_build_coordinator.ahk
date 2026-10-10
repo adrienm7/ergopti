@@ -166,3 +166,62 @@ Test("llm menu coordinator: Suspend between admission and drain retains request 
 	_LMBCO_SuspendBetweenAdmissionAndDrainRetainsRequest)
 Test("llm menu coordinator: thrown build is reported and retained (ahk-010-menu-build-coordinator)",
 	_LMBCO_ThrownBuildIsReportedAndRetained)
+
+
+
+
+
+_LMBCO_ObservationLine(Lines, Line) {
+	if InStr(Line, "[LLMBuildObservation.")
+		Lines.Push(Line)
+}
+
+_LMBCO_ClosedBuildObservation() {
+	global _LOGGER_TEST_SINK, _LOGGER_INFO_ENABLED, _LOGGER_FLUSH_ACTIVE
+	global _LOGGER_FORCE_FLUSH_PENDING, _LOGGER_PENDING, _LOGGER_PENDING_ERRORS
+	global _LOGGER_REPEAT_ENABLED, _LOGGER_DEDUP_KEY, _LOGGER_DEDUP_LEVEL, _LOGGER_DEDUP_COUNT
+	global _LastErrTime, LOGGER_RING_BUFFER, LOGGER_RING_CURSOR, _LOGGER_SUB_PENDING
+	Saved := [_LOGGER_TEST_SINK, _LOGGER_INFO_ENABLED, _LOGGER_FLUSH_ACTIVE,
+		_LOGGER_FORCE_FLUSH_PENDING, _LOGGER_PENDING, _LOGGER_PENDING_ERRORS,
+		_LOGGER_REPEAT_ENABLED, _LOGGER_DEDUP_KEY, _LOGGER_DEDUP_LEVEL, _LOGGER_DEDUP_COUNT,
+		_LastErrTime, LOGGER_RING_BUFFER, LOGGER_RING_CURSOR, _LOGGER_SUB_PENDING]
+	Lines := [], State := Map("suspended", false, "builds", 0)
+	Coordinator := LLMMenuBuildCoordinator(_LMBCO_BuildCount.Bind(State),
+		_LMBCO_IsSuspended.Bind(State))
+	try {
+		_LOGGER_TEST_SINK := _LMBCO_ObservationLine.Bind(Lines)
+		_LOGGER_INFO_ENABLED := true, _LOGGER_REPEAT_ENABLED := false
+		; The real logger records metadata without admitting a file append.
+		_LOGGER_FLUSH_ACTIVE := true, _LOGGER_FORCE_FLUSH_PENDING := false
+		_LOGGER_PENDING := [], _LOGGER_PENDING_ERRORS := []
+		_LOGGER_DEDUP_KEY := "", _LOGGER_DEDUP_LEVEL := "INFO", _LOGGER_DEDUP_COUNT := 0
+		_LastErrTime := 0, LOGGER_RING_BUFFER := [], LOGGER_RING_CURSOR := 0
+		_LOGGER_SUB_PENDING := Map()
+		AssertTrue(Coordinator.Request("toggle_committed"))
+		AssertTrue(Coordinator.Request("private-build-reason-sentinel"))
+		AssertEqual(2, State["builds"], "observation must preserve actual build execution")
+		AssertEqual(2, Coordinator.PublishedGeneration)
+		AssertFalse(Coordinator.Active)
+		AssertEqual(2, Lines.Length)
+		AssertContains(Lines[1], "[LLMBuildObservation.toggle_committed] Build entered; generation=1.")
+		AssertContains(Lines[2], "[LLMBuildObservation.other] Build entered; generation=2.")
+		for Line in Lines {
+			AssertContains(Line, "[INFO]")
+			AssertFalse(InStr(Line, "private-build-reason-sentinel"))
+		}
+		for InvalidGeneration in [0, -1, "1", 1.5]
+			Coordinator._ObserveBuild("toggle_committed", InvalidGeneration)
+		AssertEqual(2, Lines.Length, "non-positive or non-integer generation must not be published")
+		AssertFalse(_LOGGER_FORCE_FLUSH_PENDING, "informational observation must not request recursive forced flush")
+	} finally {
+		_LOGGER_TEST_SINK := Saved[1], _LOGGER_INFO_ENABLED := Saved[2]
+		_LOGGER_FLUSH_ACTIVE := Saved[3], _LOGGER_FORCE_FLUSH_PENDING := Saved[4]
+		_LOGGER_PENDING := Saved[5], _LOGGER_PENDING_ERRORS := Saved[6]
+		_LOGGER_REPEAT_ENABLED := Saved[7]
+		_LOGGER_DEDUP_KEY := Saved[8], _LOGGER_DEDUP_LEVEL := Saved[9], _LOGGER_DEDUP_COUNT := Saved[10]
+		_LastErrTime := Saved[11], LOGGER_RING_BUFFER := Saved[12], LOGGER_RING_CURSOR := Saved[13]
+		_LOGGER_SUB_PENDING := Saved[14]
+	}
+}
+Test("llm menu coordinator: real requests emit only closed buffered metadata (llm-build-reason-observation)",
+	_LMBCO_ClosedBuildObservation)
