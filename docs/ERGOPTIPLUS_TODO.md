@@ -6761,9 +6761,25 @@ controls, with zero failures, skips or unknown outcomes. Its original command
 owner physically closes with exit 0, no signal/error and `retained=false`;
 source, Node, specification and original capture identities remain exact. This
 is portable model/source and actual Git/CLI evidence, not native qualification.
-The complete canonical R6 selected gate remains pending. Native SDK 49 plus
-seven daily cases and 42 original logger cases remain unexecuted for this extension. CI writer
-custody request 6102114078 awaits Group 5; product window 6102079783 is released.
+The complete canonical R6 selected run finishes on 2026-10-10 with exit 0.
+Formatting passes; all 409 JS checks pass; Mac Lua records 1,569 modules,
+18,347 passes and zero failures; Mac E2E records 101 passes, zero failures and
+one original skip. Swift compilation is deferred on Linux; Windows and Linux
+driver suites are not selected for this macOS runtime tranche. The original
+HEAD, index and all eleven preflight source bindings remain exact. The terminal
+receipt SHA-256 is
+`7d8f29a3ccaae6a4d08a1057a281f2212ddd21a4d07d72aca7433f83e3f6726c`.
+Runtime commit `49b4e7c29` is published; normal merge `08eaabf29` receives
+current Dev `c4180d8d` while retaining all nine runtime bytes, the complete
+owned TODO62 block and every other current Dev TODO block.
+
+The reviewed native enrollment adds separately judged seven daily cases and
+42 unchanged logger cases after SDK49, within its original ten-minute step.
+Native execution of these extension cohorts remains unrun; selected CI/tools
+validation and exact-SHA manual macOS receiving follow. Coordination notice
+6102523619 clarifies the existing own-branch SDK ownership and proved published
+non-overlap; it does not infer a Group 5 grant from silence. Preserve Group 5's
+lease165, live workflow and checkout, and every original assertion and budget.
 The production qualification guard stays false; items 36/62 and transverse
 16/38 remain open.
 

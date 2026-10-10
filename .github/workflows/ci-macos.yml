@@ -367,6 +367,30 @@ jobs:
           grep -Fq "Test Suite 'ManagedNetworkBootstrapTests' passed" "$transcript"
           test "$(grep -Fc 'Executed 6 tests, with 0 failures' "$transcript")" -eq 1
           grep -Fq 'Executed 49 tests, with 0 failures' "$transcript"
+          # Independent logging cohort; historical49 above supplies no seven-case credit.
+          log_transcript="$ERGOPTI_OLLAMA_BUILD_ROOT/daily-log-native-xctest.log"
+          log_source="$ERGOPTI_OLLAMA_BUILD_ROOT/daily-log-native-source.json"
+          node tools/diagnostics/native_daemon_log_xctest_evidence.cjs begin "$GITHUB_SHA" "$GITHUB_RUN_ID" "$GITHUB_RUN_ATTEMPT" "$ERGOPTI_OLLAMA_EXPECTED_ARCHITECTURE" "$log_source"
+          set +e
+          swift test --package-path static/ergopti_plus/macos/launcher \
+            --scratch-path "$ERGOPTI_OLLAMA_BUILD_ROOT/swift" \
+            --filter '(^|[.])SuspendedImageLogCaptureTests([/.]|$)' 2>&1 | tee "$log_transcript"
+          log_statuses=("${PIPESTATUS[@]}")
+          set -e
+          test "${#log_statuses[@]}" -eq 2
+          node tools/diagnostics/native_daemon_log_xctest_evidence.cjs judge "$log_transcript" "${log_statuses[0]}" "${log_statuses[1]}" "$GITHUB_SHA" "$GITHUB_RUN_ID" "$GITHUB_RUN_ATTEMPT" "$ERGOPTI_OLLAMA_EXPECTED_ARCHITECTURE" "$log_source" "$ERGOPTI_OLLAMA_BUILD_ROOT/daily-log-native-verdict.json"
+          # Unchanged original logger29+directory13; neither SDK49 nor daily-log7 supplies this credit.
+          logger_transcript="$ERGOPTI_OLLAMA_BUILD_ROOT/logger-original-42-xctest.log"
+          logger_source="$ERGOPTI_OLLAMA_BUILD_ROOT/logger-original-42-source.json"
+          node tools/diagnostics/native_logger_regression_xctest_evidence.cjs begin "$GITHUB_SHA" "$GITHUB_RUN_ID" "$GITHUB_RUN_ATTEMPT" "$ERGOPTI_OLLAMA_EXPECTED_ARCHITECTURE" "$logger_source"
+          set +e
+          swift test --package-path static/ergopti_plus/macos/launcher \
+            --scratch-path "$ERGOPTI_OLLAMA_BUILD_ROOT/swift" \
+            --filter '(^|[.])(LoggerDatagramWorkerTests|OwnedLogDirectoryTests)([/.]|$)' 2>&1 | tee "$logger_transcript"
+          logger_statuses=("${PIPESTATUS[@]}")
+          set -e
+          test "${#logger_statuses[@]}" -eq 2
+          node tools/diagnostics/native_logger_regression_xctest_evidence.cjs judge "$logger_transcript" "${logger_statuses[0]}" "${logger_statuses[1]}" "$GITHUB_SHA" "$GITHUB_RUN_ID" "$GITHUB_RUN_ATTEMPT" "$ERGOPTI_OLLAMA_EXPECTED_ARCHITECTURE" "$logger_source" "$ERGOPTI_OLLAMA_BUILD_ROOT/logger-original-42-verdict.json"
         timeout-minutes: 10
       - name: Retain independent native SDK XCTest diagnostics
         if: always()
@@ -376,7 +400,14 @@ jobs:
           name: managed-ollama-sdk-xctest-${{ matrix.architecture }}-${{ github.run_id }}
           if-no-files-found: warn
           retention-days: 7
-          path: ${{ env.ERGOPTI_OLLAMA_BUILD_ROOT }}/listener-xctest.log
+          path: |
+            ${{ env.ERGOPTI_OLLAMA_BUILD_ROOT }}/listener-xctest.log
+            ${{ env.ERGOPTI_OLLAMA_BUILD_ROOT }}/daily-log-native-xctest.log
+            ${{ env.ERGOPTI_OLLAMA_BUILD_ROOT }}/daily-log-native-source.json
+            ${{ env.ERGOPTI_OLLAMA_BUILD_ROOT }}/daily-log-native-verdict.json
+            ${{ env.ERGOPTI_OLLAMA_BUILD_ROOT }}/logger-original-42-xctest.log
+            ${{ env.ERGOPTI_OLLAMA_BUILD_ROOT }}/logger-original-42-source.json
+            ${{ env.ERGOPTI_OLLAMA_BUILD_ROOT }}/logger-original-42-verdict.json
       - name: Qualify actual selected number-row Carbon XCTest controls
         if: ${{ !cancelled() }}
         shell: bash
@@ -676,6 +707,12 @@ jobs:
             ${{ env.ERGOPTI_OLLAMA_BUILD_ROOT }}/public-inputs.json
             ${{ env.ERGOPTI_OLLAMA_BUILD_ROOT }}/official-input-receipt.json
             ${{ env.ERGOPTI_OLLAMA_BUILD_ROOT }}/listener-xctest.log
+            ${{ env.ERGOPTI_OLLAMA_BUILD_ROOT }}/daily-log-native-xctest.log
+            ${{ env.ERGOPTI_OLLAMA_BUILD_ROOT }}/daily-log-native-source.json
+            ${{ env.ERGOPTI_OLLAMA_BUILD_ROOT }}/daily-log-native-verdict.json
+            ${{ env.ERGOPTI_OLLAMA_BUILD_ROOT }}/logger-original-42-xctest.log
+            ${{ env.ERGOPTI_OLLAMA_BUILD_ROOT }}/logger-original-42-source.json
+            ${{ env.ERGOPTI_OLLAMA_BUILD_ROOT }}/logger-original-42-verdict.json
             ${{ env.ERGOPTI_OLLAMA_BUILD_ROOT }}/assets
             ${{ env.ERGOPTI_OLLAMA_BUILD_ROOT }}/staged
             ${{ env.ERGOPTI_OLLAMA_BUILD_ROOT }}/receiving/*/native-receiving.json
