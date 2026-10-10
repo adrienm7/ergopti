@@ -6523,6 +6523,17 @@ still require Windows validation; the historical full suite remains failed.
       open. macOS system trust and explicit proxy relays are integrated, while
       opaque-client full-URL PAC/WPAD/fallback/redirect routing remains CODE.
 
+2026-10-10 actual model receiving dependency. The original native build has
+one fixed step identity; model create/pull/inference/retirement runs only after
+that exact build succeeds and cancellation is absent. Earlier independent
+PAC/HTTP failures remain fatal. Original receiver profiles, clocks, catalogue
+admission, qualification scope, uploads and Release conditions are unchanged.
+Sixteen causal source mutations cover missing/foreign/duplicate producer,
+order, weakened dependency and forgiven receiving. Focused pipeline controls
+pass; complete selected local and exact hosted qualification are recorded in
+the group6 handover. This enrollment does not complete item62 or grant native
+production qualification.
+
 2026-10-10 listener-bound startup event preparation. The pinned native producer
 connects to its guardian's private Unix listener immediately before the original
 HTTP Serve call. The guardian requires the original mapped peer, exact nonce and

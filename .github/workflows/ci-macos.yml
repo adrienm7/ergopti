@@ -512,6 +512,7 @@ jobs:
           PY
       - name: Build and admit the actual native source asset
         if: ${{ !cancelled() }}
+        id: ollama-native-build
         shell: bash
         run: |
           set -euo pipefail
@@ -535,6 +536,7 @@ jobs:
               --output "$ERGOPTI_OLLAMA_CATALOGUE"
           } 2>&1 | tee "$RUNNER_TEMP/managed-ollama-producer-build.log"
       - name: Receive actual native model create, pull, inference and retirement
+        if: ${{ !cancelled() && steps.ollama-native-build.outcome == 'success' }}
         shell: bash
         run: |
           set -euo pipefail
