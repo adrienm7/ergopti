@@ -199,7 +199,7 @@ LLM_Deps_DoCheck(default_model, captured_epoch, on_ready?, on_failed?, show_ui?)
 	return true
 }
 
-_LLM_Deps_DoCheck_Result(running, t_start, captured_epoch, default_model, on_ready?, on_failed?, show_ui?) {
+_LLM_Deps_DoCheck_Result(running, t_start, captured_epoch, default_model, on_ready?, on_failed?, show_ui?, InstallerFn := 0) {
 	global _LLM_Deps_Checking, _LLM_Deps_State, _LLM_Deps_Epoch
 	; AHK-14: discard stale callbacks from preempted checks. When Cancel() or a
 	; second CheckAndInstall bumps the epoch, any in-flight curl callback fires
@@ -228,7 +228,8 @@ _LLM_Deps_DoCheck_Result(running, t_start, captured_epoch, default_model, on_rea
 	}
 
 	LoggerInfo("LLM", "Ollama not running — launching installer…")
-	LLM_Deps_RunInstaller(default_model, captured_epoch, on_ready?, on_failed?)
+	Installer := HasMethod(InstallerFn, "Call") ? InstallerFn : LLM_Deps_RunInstaller
+	return Installer.Call(default_model, captured_epoch, on_ready?, on_failed?)
 }
 
 
@@ -336,11 +337,18 @@ _LLM_Deps_CancelInstallerOwner(ExpectedOwner := 0) {
 	return Terminated
 }
 
-LLM_Deps_RunInstaller(model, captured_epoch, on_ready?, on_failed?) {
+LLM_Deps_RunInstaller(model, captured_epoch, on_ready?, on_failed?, Port := 0) {
 	global _LLM_Deps_PollTimer, _LLM_Deps_Checking, _LLM_Deps_Epoch
 	global _LLM_Deps_InstallerOwner
 	if captured_epoch != _LLM_Deps_Epoch
 		return false
+	PriorityFn := _LLM_CurlArtifactPortFn(Port, "priority", ProcessSetPriority)
+	; Failed cancellation retains the predecessor; no successor may acquire work.
+	if IsObject(_LLM_Deps_InstallerOwner) {
+		LoggerError("LLM", "Installer acquisition refused because the exact predecessor remains owned.")
+		_LLM_Deps_PublishFailure(t("ollama.deps_failed"), on_failed?, captured_epoch, PriorityFn)
+		return false
+	}
 
 	; Boost AHK's own priority BEFORE we kick the installer off. Any heavy
 	; download — winget, the browser's download manager, the OllamaSetup
@@ -349,18 +357,20 @@ LLM_Deps_RunInstaller(model, captured_epoch, on_ready?, on_failed?) {
 	; OnChar callbacks and characters get silently dropped from the
 	; user's typing. Pinning AHK to High keeps the keyboard responsive
 	; even when the OS is otherwise saturated.
-	try ProcessSetPriority("High")
+	try PriorityFn.Call("High")
 
 	; A prior ``where winget`` RunWait blocked the menu action on AHK's sole
 	; thread. Check the local app alias without spawning a process, then retain
 	; the exact asynchronous process-tree owner for its whole lifetime.
 	WingetPath := EnvGet("LOCALAPPDATA") . "\Microsoft\WindowsApps\winget.exe"
-	winget_available := FileExist(WingetPath) != ""
+	AvailableFn := _LLM_CurlArtifactPortFn(Port, "available", (*) => FileExist(WingetPath) != "")
+	winget_available := AvailableFn.Call()
 	LoggerInfo("LLM", "Handing off to winget install Ollama.Ollama (BelowNormal priority)…")
 	if winget_available {
 		try {
 			Owner := Map("task", 0, "state", "starting")
-			Task := ShellRunner_SpawnTreeOwned(WingetPath, [
+			SpawnFn := _LLM_CurlArtifactPortFn(Port, "spawn", ShellRunner_SpawnTreeOwned)
+			Task := SpawnFn.Call(WingetPath, [
 				"install", "--id", "Ollama.Ollama", "-e",
 				"--accept-package-agreements", "--accept-source-agreements"
 			], _LLM_Deps_OnInstallerTerminal.Bind(Owner), , , 0, false)
@@ -374,7 +384,6 @@ LLM_Deps_RunInstaller(model, captured_epoch, on_ready?, on_failed?) {
 				Critical(PreviousCritical)
 			}
 			if !Task.start() {
-				_LLM_Deps_RetireInstallerOwner(Owner)
 				throw Error("exact installer process tree did not start")
 			}
 			PreviousCritical := Critical("On")
@@ -387,7 +396,11 @@ LLM_Deps_RunInstaller(model, captured_epoch, on_ready?, on_failed?) {
 			LoggerInfo("LLM", "winget command launched under exact tree ownership.")
 		} catch as err {
 			if IsSet(Owner) && IsObject(Owner)
-				_LLM_Deps_CancelInstallerOwner(Owner)
+					&& !_LLM_Deps_CancelInstallerOwner(Owner) {
+				LoggerError("LLM", "Installer launch failed and exact cancellation was not acknowledged; ownership was retained.")
+				_LLM_Deps_PublishFailure(t("ollama.deps_failed"), on_failed?, captured_epoch, PriorityFn)
+				return false
+			}
 			LoggerInfo("LLM", "winget is unavailable; opening browser fallback: " err.Message ".")
 			winget_available := false
 		}
@@ -396,7 +409,8 @@ LLM_Deps_RunInstaller(model, captured_epoch, on_ready?, on_failed?) {
 	if !winget_available {
 		LoggerInfo("LLM", "Opening https://ollama.com/download in the default browser.")
 		try {
-			Run('https://ollama.com/download')
+			RunFn := _LLM_CurlArtifactPortFn(Port, "run", Run)
+			RunFn.Call('https://ollama.com/download')
 		} catch as err {
 			LoggerError("LLM", "Could not open the download page: " err.Message ".")
 			LLM_Deps_Fail(t("menu.llm.deps_download_page_failed"),
@@ -406,7 +420,8 @@ LLM_Deps_RunInstaller(model, captured_epoch, on_ready?, on_failed?) {
 		; Surface a tray tip so the user knows what to do — without it,
 		; the browser opening out of nowhere can feel disconnected from
 		; their click in the menu.
-		try TrayTip("Ergopti — IA", t("llm.deps.browser_install_tip"), 0x1)
+		TipFn := _LLM_CurlArtifactPortFn(Port, "tip", TrayTip)
+		try TipFn.Call("Ergopti — IA", t("llm.deps.browser_install_tip"), 0x1)
 	}
 
 	; Poll the daemon every 3 s. When it answers, fire on_ready.
@@ -416,7 +431,9 @@ LLM_Deps_RunInstaller(model, captured_epoch, on_ready?, on_failed?) {
 	global _LLM_Deps_PollStartTick := A_TickCount
 	_LLM_Deps_PollTimer := () => LLM_Deps_PollServerReady(
 		on_ready?, on_failed?, captured_epoch)
-	SetTimer(_LLM_Deps_PollTimer, 3000)
+	TimerFn := _LLM_CurlArtifactPortFn(Port, "timer", SetTimer)
+	TimerFn.Call(_LLM_Deps_PollTimer, 3000)
+	return true
 }
 
 /**
@@ -537,6 +554,14 @@ LLM_Deps_Fail(msg, on_failed, captured_epoch := 0) {
 		return false
 	if !_LLM_Deps_CancelInstallerOwner()
 		LoggerError("LLM", "Dependency failure could not confirm installer-tree termination; ownership was retained.")
+	return _LLM_Deps_PublishFailure(msg, on_failed, captured_epoch, ProcessSetPriority)
+}
+
+; Failure publication must not retry cancellation or discard a retained owner.
+_LLM_Deps_PublishFailure(msg, on_failed?, captured_epoch := 0, PriorityFn := 0) {
+	global _LLM_Deps_State, _LLM_Deps_FailureMessage, _LLM_Deps_Checking, _LLM_Deps_Epoch, DRIVER_BASELINE_PRIORITY_CLASS
+	if captured_epoch && captured_epoch != _LLM_Deps_Epoch
+		return false
 	LoggerError("LLM", "Deps failure: " msg)
 	_LLM_Deps_State          := "failed"
 	_LLM_Deps_FailureMessage := msg
@@ -545,7 +570,9 @@ LLM_Deps_Fail(msg, on_failed, captured_epoch := 0) {
 	; boosted to High. Mirror of the same restore in LLM_Deps_Cancel. MUST use
 	; the shared constant, not a hardcoded "Normal" literal
 	; (driver-baseline-priority-reverted-to-normal).
-	try ProcessSetPriority(DRIVER_BASELINE_PRIORITY_CLASS)
+	if !HasMethod(PriorityFn, "Call")
+		PriorityFn := ProcessSetPriority
+	try PriorityFn.Call(DRIVER_BASELINE_PRIORITY_CLASS)
 	if IsSet(on_failed)
 		on_failed(msg)
 	return true
