@@ -470,3 +470,68 @@ _LSO_ReporterFailureStillReplaysLatestCreator() {
 	} finally Fixture.Dispose()
 }
 Test("local server composition: reporting failure releases and replays the latest creator", _LSO_ReporterFailureStillReplaysLatestCreator)
+
+
+
+
+
+; ===========================================
+; ===========================================
+; ======= 3/ Active Queue Observation =======
+; ===========================================
+; ===========================================
+
+_LSO_CountSourceCurrent(Fixture, Source) {
+	Fixture.SourceChecks += 1
+	return _LSO_Fixture.Prototype.SourceCurrent.Call(Fixture, Source)
+}
+
+_LSO_ActivePendingObserver() {
+	Fixture := _LSO_Fixture()
+	try {
+		Fixture.SourceChecks := 0
+		Fixture.DefineProp("SourceCurrent", {Call: _LSO_CountSourceCurrent})
+		AssertTrue(Fixture.Native.Rescan())
+		Job := Fixture.Native.Jobs["lmstudio"]
+		AssertEqual("active", Job["phase"])
+		AssertTrue(Fixture.Transport.HasPending("lmstudio"))
+		Fixture.SourceChecks := 0
+		Fixture.Native._Tick(Job)
+		AssertEqual(0, Fixture.SourceChecks, "a pending queue observation must not duplicate the transport's source reads")
+		AssertEqual(1, Fixture.QueueTimers.Count, "the exact settlement observer remains armed")
+		AssertEqual(1, Fixture.Requests.Length, "the observer acquires no successor request")
+		Fixture.Drift()
+		Fixture.Transport.RetryPending()
+		AssertTrue(Fixture.SourceChecks > 0, "the real transport must still check and refuse the changed source")
+		AssertFalse(Fixture.Transport.HasPending("lmstudio"))
+		Fixture.Native.RetryPending()
+		AssertFalse(Fixture.Native.Controller.IsSweeping())
+		AssertEqual(0, Fixture.Native.Jobs.Count)
+		AssertEqual(0, Fixture.QueueTimers.Count)
+		AssertEqual(0, Fixture.Published.Length, "changed-source retirement cannot publish a cache")
+	} finally Fixture.Dispose()
+}
+Test("local active observer: pending tick delegates source cancellation to actual transport", _LSO_ActivePendingObserver)
+
+_LSO_ActivePendingCheapFence(Kind) {
+	Fixture := _LSO_Fixture()
+	try {
+		AssertTrue(Fixture.Native.Rescan())
+		Job := Fixture.Native.Jobs["lmstudio"]
+		switch Kind {
+			case "closed": Fixture.Native.Closed := true
+			case "configuration": Fixture.Native.ConfigurationGeneration += 1
+			case "rescan": Fixture.Native.RescanGeneration += 1
+			case "ticket": Fixture.Native.Controller.Invalidate()
+		}
+		Fixture.Native._Tick(Job)
+		AssertEqual(0, Fixture.Native.Jobs.Count, "a cheap ownership refusal must still retire the exact job")
+		AssertFalse(Fixture.Transport.HasPending("lmstudio"))
+		AssertTrue(Fixture.Children[1].Terminations > 0, "refusal must request exact physical child retirement")
+		AssertEqual(0, Fixture.QueueTimers.Count)
+		AssertEqual(0, Fixture.Published.Length)
+	} finally Fixture.Dispose()
+}
+for Kind in ["closed", "configuration", "rescan", "ticket"]
+	Test("local active observer: pending tick retains " Kind " refusal", _LSO_ActivePendingCheapFence.Bind(Kind))
+

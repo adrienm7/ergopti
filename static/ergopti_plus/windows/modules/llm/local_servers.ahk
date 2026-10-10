@@ -267,6 +267,18 @@ class LocalServersOwner extends _LocalServersTimerNativeAdapter {
 		finally Critical(PreviousCritical)
 	}
 
+	/** Checks only this queue observer's exact ownership; grants no source authority. */
+	_PendingJobCurrent(Job) {
+		Ticket := Job["ticket"]
+		Valid := Ticket.Call()
+		PreviousCritical := Critical("On")
+		try return (Valid is Integer) && Valid == true && this._OwnsJob(Job)
+			&& Job["phase"] == "active" && !this.Closed && !A_IsSuspended
+			&& Job["configuration"] == this.ConfigurationGeneration
+			&& Job["sweep"]["intent"] == this.RescanGeneration
+		finally Critical(PreviousCritical)
+	}
+
 	_Tick(Job) {
 		PreviousCritical := Critical("Off")
 		try return this._TickNonCritical(Job)
@@ -289,6 +301,12 @@ class LocalServersOwner extends _LocalServersTimerNativeAdapter {
 				this._DropJob(Job)
 				return
 			}
+			; Models owns live request source cancellation and its final delivery
+			; fence. This queue observer has no effect while a retained request in
+			; this provider slot is pending; duplicate source reads can starve the creator.
+			if Job["phase"] == "active" && this.Models.HasPending(Job["id"])
+					&& this._PendingJobCurrent(Job)
+				return
 			if !this._CurrentJob(Job) {
 				this._InvalidateSweep(Job["sweep"])
 				return
