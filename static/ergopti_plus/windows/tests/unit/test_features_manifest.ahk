@@ -1562,7 +1562,7 @@ _FMS_FullSavePreservesOutdatedAndUnknown(Path) {
 	}
 }
 _FMS_FullSaveUsesSemanticReadWithoutCleanup() {
-	_FMS_WithSource("fullsave", '_meta.schema_version = 11`nhotstrings.trigger_char = "@"`n[shortcuts]`nscreen = 2 # outdated, retained`n[future]`nold = "retain" # user data`n',
+	_FMS_WithSource("fullsave", '_meta.schema_version = 12`nhotstrings.trigger_char = "@"`n[shortcuts]`nscreen = 2 # outdated, retained`n[future]`nold = "retain" # user data`n',
 		_FMS_FullSavePreservesOutdatedAndUnknown)
 }
 Test("configuration snapshot: actual full save retains outdated and unknown scalar records (config-semantic-snapshot)",
@@ -1932,7 +1932,7 @@ _FMS_FullSaveChangedInlineSource(Path) {
 	Runtime := _CFGFS_CaptureRuntime(), Coordinator := _ConfigFullSaveCoordinator()
 	Target := ManifestBuildFeaturesMap()
 	; A nondefault target exercises a durable leaf; the default 0.5 is sparse.
-	Expected := Chr(0xFEFF) . '_meta.schema_version = 11`nhotstrings.trigger_char = "@"`nhotstrings.autocorrection = {names = {enabled = "true", time_activation_seconds = 0.75, future = "retain"}}`n[future]`nold = "retain" # user data`n'
+	Expected := Chr(0xFEFF) . '_meta.schema_version = 12`nhotstrings.trigger_char = "@"`nhotstrings.autocorrection = {names = {enabled = "true", time_activation_seconds = 0.75, future = "retain"}}`n[future]`nold = "retain" # user data`n'
 	try {
 		_CFGFS_Prepare(Path)
 		_ConfigBootRejectedOverrides := 0
@@ -1974,7 +1974,7 @@ _FMS_FullSaveChangedInlineSource(Path) {
 	}
 }
 _FMS_FullSaveChangedInlineAndRestart() {
-	_FMS_WithSource("fullsave_inline_changed", '_meta.schema_version = 11`nhotstrings.trigger_char = "@"`nhotstrings.autocorrection = {names = {enabled = "true", time_activation_seconds = 0.25, future = "retain"}}`n[future]`nold = "retain" # user data`n',
+	_FMS_WithSource("fullsave_inline_changed", '_meta.schema_version = 12`nhotstrings.trigger_char = "@"`nhotstrings.autocorrection = {names = {enabled = "true", time_activation_seconds = 0.25, future = "retain"}}`n[future]`nold = "retain" # user data`n',
 		_FMS_FullSaveChangedInlineSource)
 }
 Test("configuration snapshot: actual full save changes an inline leaf and survives fresh native bootstrap (config-full-semantic-successor)",
@@ -2052,7 +2052,7 @@ _FMS_RemovedCapsPreservedUntilCleanup(Path) {
 	}
 }
 _FMS_RemovedCapsDoNotAcquireKnownOwnership() {
-	_FMS_WithSource("removed_caps", '_meta.schema_version = 11`n[hotstrings.autocorrection.names]`nenabled = true`ntime_activation_seconds = 0.25`n[hotstrings.autocorrection.caps]`nenabled = true`ntime_activation_seconds = 0.125`n',
+	_FMS_WithSource("removed_caps", '_meta.schema_version = 12`n[hotstrings.autocorrection.names]`nenabled = true`ntime_activation_seconds = 0.25`n[hotstrings.autocorrection.caps]`nenabled = true`ntime_activation_seconds = 0.125`n',
 		_FMS_RemovedCapsPreservedUntilCleanup)
 }
 Test("configuration snapshot: removed caps stays runtime unread and is preserved until explicit cleanup (config-current-feature-owner)",
@@ -2142,7 +2142,7 @@ _FMS_ConfigExactCollectedSubtree(Target) {
 _FMS_ConfigExactNameFullSave(Path, Fixture) {
 	global _ConfigBootRejectedOverrides, _ConfigBootOutdatedEntries
 	Runtime := _CFGFS_CaptureRuntime(), Coordinator := _ConfigFullSaveCoordinator()
-	Original := '_meta.schema_version = 11`n' . _FMS_ConfigExactNameSource(Fixture)
+	Original := '_meta.schema_version = 12`n' . _FMS_ConfigExactNameSource(Fixture)
 	Target := ManifestBuildFeaturesMap()
 	try {
 		_CFGFS_Prepare(Path)
@@ -2155,7 +2155,7 @@ _FMS_ConfigExactNameFullSave(Path, Fixture) {
 		AssertEqual(Original, FSRead(Path), "a collected semantic no-op retains the complete handwritten source")
 		Target["hotstrings"]["personal"][Fixture.name]["enabled"] := false
 		AssertEqual(CONFIG_SAVE_OK, SaveFullConfig(0, (*) => true, true, 0, Collector))
-		ExpectedSource := "_meta.schema_version = 11`n# private exact-name source`n" . Fixture.header . "`n"
+		ExpectedSource := "_meta.schema_version = 12`n# private exact-name source`n" . Fixture.header . "`n"
 			. "time_activation_seconds = 0.125`n"
 			. '# keep source trivia`n[future]`n"literal.dot" = { rows = [[1, "x"]], count = 9223372036854775807 }`n'
 		AssertEqual(ExpectedSource, FSRead(Path), "only the explicitly cleared leaf is removed")
@@ -2164,7 +2164,7 @@ _FMS_ConfigExactNameFullSave(Path, Fixture) {
 		Personal[Fixture.name] := Map("time_activation_seconds", 0.125)
 		_FMS_AssertExactTree(Map("hotstrings", Map("personal", Personal),
 			"future", Map("literal.dot", Map("rows", [[1, "x"]], "count", 9223372036854775807)),
-			"_meta", Map("schema_version", 11)),
+			"_meta", Map("schema_version", 12)),
 			TOML_ParseDocument(FSRead(Path)))
 		Reloaded := ManifestBuildFeaturesMap()
 		AssertEqual(1, ApplyConfigToml(Reloaded, Path), "the genuine reload reader keeps the exact remaining owner")
@@ -2180,7 +2180,7 @@ _FMS_ConfigExactNameFullSave(Path, Fixture) {
 }
 _FMS_ConfigFullSaveKeepsExactNames() {
 	for Index, Fixture in _FMS_ConfigExactNameFixtures()
-		_FMS_WithSource("fullsave_name_" . Index, '_meta.schema_version = 11`n' . _FMS_ConfigExactNameSource(Fixture),
+		_FMS_WithSource("fullsave_name_" . Index, '_meta.schema_version = 12`n' . _FMS_ConfigExactNameSource(Fixture),
 			_FMS_ConfigExactNameFullSave.Bind(, Fixture))
 }
 Test("configuration snapshot: real full-save publication and reload preserve exact semantic names (config-full-state-exact-path)",
