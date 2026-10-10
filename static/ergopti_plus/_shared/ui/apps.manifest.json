@@ -25,7 +25,14 @@
 			"height": 560,
 			"min_width": 360,
 			"min_height": 360,
-			"vhost": "ergopti.actionpicker"
+			"vhost": "ergopti.actionpicker",
+			"presentations": {
+				"keyboard_slot_selection": {
+					"title_key": "dialog.keyboard_shortcut.title_prefix",
+					"label_key": "dialog.keyboard_shortcut.prompt",
+					"platforms": ["hs"]
+				}
+			}
 		},
 		"changelog": {
 			"title_key": "changelog_window.window_title",

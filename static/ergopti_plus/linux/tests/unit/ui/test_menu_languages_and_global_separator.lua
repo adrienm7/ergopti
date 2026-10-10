@@ -153,3 +153,130 @@ local configuration_parent_raw = configuration_parent_file:read("*a")
 configuration_parent_file:close()
 require("test.configuration_parent_contract").register(helpers, configuration_parent_fixture,
 	assert(require("json").decode(configuration_parent_raw)), "linux")
+
+
+
+
+
+-- =========================================
+-- =========================================
+-- ======= 3/ Locale callback redraw =======
+-- =========================================
+-- =========================================
+
+--- Reads a named capture from the actual production closure without replacing it.
+--- @param callback function Loaded production function.
+--- @param wanted string Original capture identity.
+--- @return any value Actual captured owner or data.
+local function language_callback_capture(callback, wanted)
+	for index = 1, 80 do
+		local name, value = debug.getupvalue(callback, index)
+		if name == nil then break end
+		if name == wanted then return value end
+	end
+	error("Actual language callback capture is missing: " .. wanted)
+end
+
+--- Replays the actual locale producer with genuine runtime and storage owners.
+--- The owned runtime gate gives a real refusal without changing durable settings;
+--- actual native IO refusal is separately qualified through the GTK receiving probe.
+--- @param body function Original callback and checked-state assertions.
+local function language_callback_fixture(body)
+	local previous, original_safe = {}, rawget(_G, "i18n_safe")
+	for name, value in pairs(package.loaded) do previous[name] = value end
+	for _, name in ipairs({ "locale.core", "infra.locale", "infra.i18n", "infra.manifest_menu", "ui.menu.menu_builder" }) do
+		rawset(package.loaded, name, nil)
+	end
+	local native, scope_held = nil, false
+	local owner = { pending = function() return false end }
+	local completed, failure = xpcall(function()
+		native = require("infra.i18n")
+		native.init()
+		local builder, renderer = require("ui.menu.menu_builder"), require("infra.manifest_menu")
+		local producer = language_callback_capture(builder.build, "_build_language")
+		local production_source = debug.getinfo(builder.build, "S").source
+		helpers.assert_eq(debug.getinfo(producer, "S").source, production_source,
+			"the actual loaded MenuBuilder must own the language producer")
+		helpers.assert_true(production_source:find("/ui/menu/menu_builder.lua", 1, true) ~= nil)
+		local file = assert(io.open(require("infra.paths").shared("tests/corpus/menus/language_parent.json"), "rb"))
+		local raw = assert(file:read("*a"))
+		assert(file:close())
+		local corpus = assert(require("json").decode(raw))
+		helpers.assert_eq(#corpus.locales, 21, "the existing independent original corpus remains complete")
+		local context, observed = {}, { redraws = 0 }
+		local function publish()
+			local declared = assert(producer(context), "the actual language producer refused")
+			local rows = renderer.render_rows({ declared }, "top_level")
+			helpers.assert_eq(#rows, 1)
+			helpers.assert_eq(#rows[1].menu, #corpus.locales)
+			for index, expected in ipairs(corpus.locales) do
+				local row = rows[1].menu[index]
+				helpers.assert_eq(row.title, expected.linux, "original ordered caption " .. expected.code)
+				helpers.assert_eq(row.checked, expected.code == native.get_locale(), "actual checked state " .. expected.code)
+				helpers.assert_eq(debug.getinfo(row.fn, "S").source, production_source,
+					"each locale action must be the actual original production callback")
+				helpers.assert_eq(language_callback_capture(row.fn, "cap"), expected.code)
+			end
+			observed.rows = rows[1].menu
+			return observed.rows
+		end
+		context.on_menu_changed = function()
+			observed.redraws = observed.redraws + 1
+			publish()
+		end
+		local function claim()
+			assert(not scope_held, "the fixture must own exactly one runtime token")
+			local acquired = native.scope_acquire(owner)
+			scope_held = acquired == true
+			helpers.assert_true(scope_held, "the genuine locale runtime owner must acquire the actual gate")
+		end
+		body(native, publish, observed, claim)
+	end, function(value) return value end)
+	local cleanup_errors = {}
+	local function clean(label, callback)
+		local okay, detail = pcall(callback)
+		if not okay then cleanup_errors[#cleanup_errors + 1] = label .. ": " .. tostring(detail) end
+	end
+	if scope_held then clean("exact locale token", function() assert(native.scope_release(owner) == true) end) end
+	clean("module cache", function()
+		for name in pairs(package.loaded) do if previous[name] == nil then rawset(package.loaded, name, nil) end end
+		for name, value in pairs(previous) do rawset(package.loaded, name, value) end
+	end)
+	clean("original locale helper", function() rawset(_G, "i18n_safe", original_safe) end)
+	for _, detail in ipairs(cleanup_errors) do io.stderr:write("LANGUAGE FIXTURE CLEANUP: " .. detail .. "\n") end
+	if not completed then error(failure, 0) end
+	if #cleanup_errors > 0 then error(table.concat(cleanup_errors, "; "), 0) end
+end
+
+helpers.describe("Linux locale callback authoritative redraw", function()
+	helpers.it("redraws the unchanged original21 image when the genuine runtime owner refuses", function()
+		language_callback_fixture(function(native, publish, observed, claim)
+			local before = native.get_locale()
+			local rows, refused = publish(), nil
+			for _, row in ipairs(rows) do
+				if language_callback_capture(row.fn, "cap") ~= before then refused = row; break end
+			end
+			assert(refused, "an actual inactive original locale is required")
+			claim()
+			helpers.assert_eq(refused.fn(), false, "the actual setter refusal must remain a false result")
+			helpers.assert_eq(native.get_locale(), before)
+			helpers.assert_eq(observed.redraws, 1, "a refused native activation still requests its authoritative image")
+			helpers.assert_true(observed.rows ~= rows, "the actual producer supplies a new current row image")
+			publish()
+		end)
+	end)
+
+	helpers.it("preserves the legitimate unchanged-locale ACK and redraws its actual checked image", function()
+		language_callback_fixture(function(native, publish, observed)
+			local before, selected = native.get_locale(), nil
+			for _, row in ipairs(publish()) do
+				if language_callback_capture(row.fn, "cap") == before then selected = row; break end
+			end
+			assert(selected, "the actual original selected locale is required")
+			helpers.assert_eq(selected.fn(), true, "the unchanged-locale setter ACK must remain true")
+			helpers.assert_eq(observed.redraws, 1)
+			helpers.assert_eq(native.get_locale(), before)
+			publish()
+		end)
+	end)
+end)
