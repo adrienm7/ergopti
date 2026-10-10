@@ -340,6 +340,56 @@ func managedHTTPFailure(_ error: NSError) -> String {
 	}
 }
 
+/// Projects only closed native status facts from the already completed request.
+/// No trust evaluation, certificate text or private NSError payload is acquired.
+func managedHTTPTLSDiagnostic(_ error: NSError, additionalAnchorCount: Int) -> [String: Any] {
+	precondition(additionalAnchorCount >= 0)
+	var native = error
+	var seen = Set<ObjectIdentifier>()
+	var causes: [[String: Any]] = []
+	var termination = "complete"
+	while true {
+		guard seen.insert(ObjectIdentifier(native)).inserted else { termination = "cycle"; break }
+		guard causes.count < 8 else { termination = "depth"; break }
+		let domain: String
+		switch native.domain {
+		case NSURLErrorDomain: domain = "url"
+		case NSOSStatusErrorDomain: domain = "security"
+		case kCFErrorDomainCFNetwork as String: domain = "cfnetwork"
+		case NSPOSIXErrorDomain: domain = "posix"
+		default: domain = "other"
+		}
+		let code = domain == "other" ? nil : Int32(exactly: native.code)
+		var kind = "unknown"
+		if domain == "security", let code {
+			switch code {
+			case errSSLHostNameMismatch: kind = "hostname_mismatch"
+			case errSSLCertExpired: kind = "certificate_expired"
+			case errSSLCertNotYetValid: kind = "certificate_not_yet_valid"
+			case errSSLUnknownRootCert: kind = "unknown_root"
+			case errSSLXCertChainInvalid: kind = "certificate_chain_invalid"
+			default: break
+			}
+		} else if domain == "url", let code {
+			switch Int(code) {
+			case NSURLErrorServerCertificateUntrusted: kind = "certificate_untrusted"
+			case NSURLErrorServerCertificateHasBadDate: kind = "certificate_date_invalid"
+			case NSURLErrorServerCertificateNotYetValid: kind = "certificate_not_yet_valid"
+			case NSURLErrorServerCertificateHasUnknownRoot: kind = "unknown_root"
+			default: break
+			}
+		}
+		var cause: [String: Any] = ["domain": domain, "code": NSNull(), "kind": kind]
+		if let code { cause["code"] = Int(code) }
+		causes.append(cause)
+		guard let underlying = native.userInfo[NSUnderlyingErrorKey] else { break }
+		guard let next = underlying as? NSError else { termination = "unavailable"; break }
+		native = next
+	}
+	return ["version": 1, "trust_mode": additionalAnchorCount == 0 ? "native_default" : "added_anchors",
+		"additional_anchor_count": additionalAnchorCount, "causes": causes, "chain_termination": termination]
+}
+
 private final class ManagedHTTPSession: NSObject, URLSessionDataDelegate, @unchecked Sendable {
 	private let completion = DispatchSemaphore(value: 0)
 	private var session: URLSession?
@@ -454,6 +504,14 @@ private final class ManagedHTTPSession: NSObject, URLSessionDataDelegate, @unche
 
 	func urlSession(_ session: URLSession, task: URLSessionTask, didCompleteWithError error: Error?) {
 		if failure == nil, let error { failure = managedHTTPFailure(error as NSError) }
+		#if DEBUG
+		if failure == "certificate", let error = error as NSError?,
+			let bytes = try? JSONSerialization.data(withJSONObject:
+				managedHTTPTLSDiagnostic(error, additionalAnchorCount: certificates.count), options: [.sortedKeys]),
+			let text = String(data: bytes, encoding: .utf8) {
+			_ = fputs("# native_http_tls_failure \(text)\n", stderr)
+		}
+		#endif
 		if let error = error as NSError?, error.domain == NSURLErrorDomain,
 			error.code == NSURLErrorUserAuthenticationRequired, proxyAuthenticationObserved { failure = "proxy" }
 		if let error {
