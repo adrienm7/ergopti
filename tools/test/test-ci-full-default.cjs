@@ -256,6 +256,8 @@ for (const lane of ['macos', 'windows', 'linux']) {
 		});
 }
 for (const [rel, id, name] of [
+	[MAC, 'managed-ollama-native', 'Qualify actual selected number-row Carbon XCTest controls'],
+	[MAC, 'managed-ollama-native', 'Retain selected number-row Carbon XCTest diagnostics'],
 	[MAC, 'item36-native', 'Observe the actual no-prompt SDK permission API independently'],
 	[MAC, 'managed-ollama-native', 'Qualify actual SDK accepted-owner and deadline XCTest controls'],
 	[MAC, 'managed-ollama-native', 'Qualify actual native PAC and WPAD XCTest controls'],
