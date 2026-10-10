@@ -8744,6 +8744,14 @@ late-marker order; native Mac capture ordering remains unqualified. CI notices
 retain closed process/capture statuses and refusal codes without changing
 observation admission, worker retirement or deadlines.
 
+The original-clock HealthCheck fixture now binds the independently recorded
+pre-watchdog clock and advances it during registration, instead of comparing
+with a later wall-clock read. All thirteen original cases remain; the other
+twelve bodies are byte-exact. Controlled Lua5.4 reproduces old12/1 and new13/0;
+late-clock, zero and timeout forwarding refuse, and exact clock/scheduler
+restoration is observed on errors. The real probe source is unchanged; this
+adds no native AppleEvent, SDK transport or catalogue qualification.
+
 - [~] **107.** Expose native, digits-direct and symbols-direct number-row
   policy, with acknowledged legacy Windows-Boolean migration and unrelated data
   preservation. Implemented: shared choices and schema9-to-10 migration, current
