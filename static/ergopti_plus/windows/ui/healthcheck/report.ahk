@@ -94,6 +94,51 @@ _HCShare_Project(Value, Rule, &Present) {
 	return 0
 }
 
+/** Classifies known technical messages without exporting their text or claiming cause. */
+HealthCheck_RecentErrorFacts(Entries, Source, Schema) {
+	Observed := Entries is Array, Events := [], Count := 0, Specs := Schema["recent_error_facts"]
+	if Observed {
+		for Index, Entry in Entries {
+			Count += 1
+			First := Entry is String ? StrSplit(Entry, ["`r", "`n"])[1] : ""
+			Start := InStr(First, Specs["owner_prefix"], true)
+			Marker := Start ? InStr(First, Specs["failure_marker"], true, Start + StrLen(Specs["owner_prefix"])) : 0
+			Reason := Marker ? SubStr(First, Marker + StrLen(Specs["failure_marker"])) : ""
+			for Rule in Specs["rules"] {
+				Event := 0, Candidate := Reason
+				if Rule.Has("message_prefix") {
+					Position := InStr(First, Rule["message_prefix"], true)
+					Candidate := Position ? SubStr(First, Position) : ""
+					if Rule.Has("number_marker") {
+						NumberAt := InStr(Candidate, Rule["number_marker"], true, StrLen(Rule["message_prefix"]) + 1)
+						Candidate := NumberAt ? SubStr(Candidate, NumberAt) : ""
+					}
+				}
+				if Rule.Has("literal") && Candidate == Rule["literal"]
+					Event := Map("entry_index", Index, "code", Rule["code"])
+				else if Rule.Has("prefix") && SubStr(Candidate, 1, StrLen(Rule["prefix"])) == Rule["prefix"] {
+					Value := SubStr(Candidate, StrLen(Rule["prefix"]) + 1)
+					if Rule["suffix"] != "" {
+						Finish := InStr(Value, Rule["suffix"], true)
+						Value := Finish ? SubStr(Value, 1, Finish - 1) : ""
+					}
+					if StrLen(Value) <= 11 && Value != "-0" && RegExMatch(Value, "^-?(?:0|[1-9]\d*)$") {
+						ValueNumber := _HCShare_Project(Number(Value), Map("kind", "integer", "minimum", Rule["minimum"], "maximum", Rule["maximum"]), &Present)
+						if Present
+							Event := Map("entry_index", Index, "code", Rule["code"], Rule["field"], ValueNumber)
+					}
+				}
+				if Event is Map {
+					Events.Push(Event)
+					break
+				}
+			}
+		}
+	}
+	return Map("observed", Observed, "source", Source == "errors_file" || Source == "ring" ? Source : "unavailable",
+		"qualification", "log_observation_only", "examined_entries", Count, "excluded_entries", Count - Events.Length, "events", Events)
+}
+
 /** Returns a detached technical projection; unknown fields cannot be shared. */
 HealthCheck_ShareSnapshot(Snapshot, Schema) {
 	Policy := Schema.Get("share_policy", 0)
@@ -102,7 +147,12 @@ HealthCheck_ShareSnapshot(Snapshot, Schema) {
 	Driver := Snapshot.Get("driver", "")
 	if !(Driver == "windows" || Driver == "macos" || Driver == "linux")
 		throw Error("The diagnostic sharing identity is unavailable.")
-	return _HCShare_Project(Snapshot, Policy["projection"], &Present)
+	Safe := _HCShare_Project(Snapshot, Policy["projection"], &Present)
+	Sections := Snapshot.Get("sections", 0)
+	Issues := Sections is Map ? Sections.Get("issues", 0) : 0
+	if Issues is Map
+		Safe["sections"]["issues"]["recent_error_facts"] := HealthCheck_RecentErrorFacts(Issues.Get("recent", 0), Issues.Get("recent_source", "unavailable"), Schema)
+	return Safe
 }
 
 /** Rebuilds only schema-owned installed-page records, without native authority. */
