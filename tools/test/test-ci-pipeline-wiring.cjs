@@ -335,6 +335,8 @@ const STEP_CONDITIONS = [
 		'Upload failed unit log',
 		"${{ failure() && !cancelled() && steps.linux_unit.outcome == 'failure' }}"
 	],
+	[LINUX_BOX, 'e2e-linux', 'Qualify three actual XI2 property cookies', NOT_CANCELLED],
+	[LINUX_BOX, 'e2e-linux', 'Retain actual XI2 property-cookie evidence', 'always()'],
 	[LINUX_BOX, 'e2e-linux', 'Qualify genuine Nix installed runtime', NOT_CANCELLED],
 	[LINUX_BOX, 'test-linux', 'Run manual official runtime and model acceptance', MANUAL_RUNTIME_IF],
 	[
