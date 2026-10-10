@@ -535,14 +535,27 @@ class _LMT_ApiPhysicalPublicationFault {
 	ObserveNativeRefusal() {
 		static Sequence := 0
 		AssertTrue(this.Handle != 0)
+		; CreateFile specifies the exact sharing error; rename promises only failure.
+		DeleteHandle := DllCall("kernel32\CreateFileW", "Str", this.ApiPath,
+			"UInt", 0x00010000, "UInt", 7, "Ptr", 0, "UInt", 3,
+			"UInt", 0x80, "Ptr", 0, "Ptr")
+		DeleteError := A_LastError
+		if DeleteHandle != -1 {
+			if !DllCall("kernel32\CloseHandle", "Ptr", DeleteHandle, "Int")
+				throw OSError(A_LastError, A_ThisFunc, "Cannot close the unexpected delete-access probe.")
+		}
+		AssertEqual(-1, DeleteHandle, "The same held target must deny actual delete access")
+		AssertEqual(32, DeleteError,
+			"The incompatible native delete-access request must report a sharing violation")
 		ProbePath := this.ApiPath . ".physical-fault-" . A_ScriptHwnd . "-" . ++Sequence
 		if FSWriteCreateDurable(ProbePath, '[{"Id":"api_probe"}]') != 1
 			throw Error("Cannot acquire the owned native replacement probe stage.")
 		try {
 			Moved := FSAtomicMoveReplace(ProbePath, this.ApiPath, &MoveError)
 			AssertFalse(Moved)
-			AssertEqual(32, MoveError,
-				"the real second target must refuse native replacement with a sharing violation")
+			AssertTrue(MoveError is Integer && MoveError > 0,
+				"The actual native replacement refusal must retain its nonzero error receipt")
+			_TestPrint("# api-native-fault delete_access_error=" . DeleteError . " move_error=" . MoveError)
 			AssertEqual(this.OldApi, FSReadUtf8Exact(this.ApiPath))
 			this.NativeRefusals += 1
 		} finally {
