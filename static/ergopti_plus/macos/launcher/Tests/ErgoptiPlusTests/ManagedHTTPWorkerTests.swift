@@ -83,7 +83,7 @@ final class ManagedHTTPWorkerTests: XCTestCase {
 			XCTAssertEqual(causes.last?["domain"] as? String, "security")
 			XCTAssertEqual(causes.last?["code"] as? Int, Int(status))
 			XCTAssertEqual(causes.last?["kind"] as? String, expected)
-			for cause in causes { XCTAssertEqual(Set(cause.keys), Set(["domain", "code", "kind"])) }
+			for cause in causes { XCTAssertEqual(Set(cause.keys), Set(["domain", "code", "kind", "stream_domain", "stream_code"])) }
 			let bytes = try JSONSerialization.data(withJSONObject: observation, options: [.sortedKeys])
 			let rendered = String(decoding: bytes, as: UTF8.self)
 			XCTAssertLessThan(bytes.count, 4096)
@@ -98,6 +98,21 @@ final class ManagedHTTPWorkerTests: XCTestCase {
 		XCTAssertEqual(cfCause["code"] as? Int, NSURLErrorServerCertificateUntrusted)
 		XCTAssertEqual(cfCause["kind"] as? String, "unknown")
 		XCTAssertEqual(cfNetwork["chain_termination"] as? String, "complete")
+		let streamVectors: [([String: Any], Int?, Int?)] = [
+			(["_kCFStreamErrorDomainKey": 3, "_kCFStreamErrorCodeKey": -9813], 3, -9813),
+			([String: Any](), nil, nil),
+			(["_kCFStreamErrorDomainKey": true, "_kCFStreamErrorCodeKey": "reserved"], nil, nil),
+			(["_kCFStreamErrorDomainKey": 3.5, "_kCFStreamErrorCodeKey": Int.max], nil, nil)
+		]
+		for (fields, expectedDomain, expectedCode) in streamVectors {
+			let observed = managedHTTPTLSDiagnostic(NSError(domain: NSURLErrorDomain,
+				code: NSURLErrorServerCertificateUntrusted, userInfo: fields), additionalAnchorCount: 0)
+			let cause = try XCTUnwrap((observed["causes"] as? [[String: Any]])?.first)
+			XCTAssertEqual(cause["stream_domain"] as? Int, expectedDomain)
+			XCTAssertEqual(cause["stream_code"] as? Int, expectedCode)
+			if expectedDomain == nil { XCTAssertTrue(cause["stream_domain"] is NSNull) }
+			if expectedCode == nil { XCTAssertTrue(cause["stream_code"] is NSNull) }
+		}
 		let foreign = managedHTTPTLSDiagnostic(NSError(domain: "reserved-private-domain", code: 123456,
 			userInfo: privateData), additionalAnchorCount: 2)
 		XCTAssertEqual(foreign["trust_mode"] as? String, "added_anchors")

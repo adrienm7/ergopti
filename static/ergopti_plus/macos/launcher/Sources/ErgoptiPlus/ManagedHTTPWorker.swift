@@ -382,6 +382,17 @@ func managedHTTPTLSDiagnostic(_ error: NSError, additionalAnchorCount: Int) -> [
 		}
 		var cause: [String: Any] = ["domain": domain, "code": NSNull(), "kind": kind]
 		if let code { cause["code"] = Int(code) }
+		// These optional integers were delivered with the completed NSError.
+		// No SecTrust getter may trigger a new evaluation for this observation.
+		cause["stream_domain"] = NSNull()
+		cause["stream_code"] = NSNull()
+		if domain == "url" || domain == "cfnetwork" {
+			for (field, key) in [("stream_domain", "_kCFStreamErrorDomainKey"), ("stream_code", "_kCFStreamErrorCodeKey")] {
+				if let value = native.userInfo[key] as? NSNumber,
+					CFGetTypeID(value) != CFBooleanGetTypeID(),
+					let integer = Int32(exactly: value.doubleValue) { cause[field] = Int(integer) }
+			}
+		}
 		causes.append(cause)
 		guard let underlying = native.userInfo[NSUnderlyingErrorKey] else { break }
 		guard let next = underlying as? NSError else { termination = "unavailable"; break }
