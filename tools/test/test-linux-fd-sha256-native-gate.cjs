@@ -10,6 +10,7 @@
  */
 'use strict';
 const assert = require('node:assert/strict');
+const { assertLinuxQualifiedRun } = require('./ci-linux-qualified-run.cjs');
 const path = require('node:path');
 const { run, receipt, readCount } = require('./run-linux-fd-sha256-native.cjs');
 
@@ -250,7 +251,7 @@ assert.equal(Pipeline.stepField(step, 'if'), '${{ !cancelled() }}');
 assert.equal(Pipeline.stepField(step, 'continue-on-error'), null);
 assert.equal(Pipeline.stepField(step, 'working-directory'), null);
 assert.equal(Pipeline.stepField(step, 'timeout-minutes'), '3');
-assert.deepEqual(Pipeline.runOf(step), [
+assertLinuxQualifiedRun(Pipeline.runOf(step), [
 	'set -euo pipefail',
 	'npm run --silent test:linux:fd-sha256-native | tee "$RUNNER_TEMP/linux-fd-sha256-native.log"'
 ]);
