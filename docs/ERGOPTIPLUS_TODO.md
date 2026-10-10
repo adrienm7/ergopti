@@ -10179,6 +10179,15 @@ Carbon classification, physical keys or installed release qualification.
   Causal native variants, launcher CLI and installed receiving remain unrun.
   This component result does not enable forced digits/symbols or input delivery.
 
+  A later exact-source run, 38086232014 at 3c2a4bbb1, again passes all twelve
+  native cases on each architecture with zero failures or skips. Its genuine
+  retained artifacts are now received: seven US/French TIS rows on arm64 and
+  seven on amd64 pass the unchanged transport decoder, source-image checks,
+  retained-file census and original inner/outer restoration observations.
+  The earlier artifact-download refusals remain historical evidence. This
+  read-only receiving does not qualify physical keys, launcher CLI, installed
+  application launch or the forced digit/symbol runtime owner.
+
   Remaining software: implement native-HKL forced-symbol and Linux/macOS forced
   digit/symbol owners with joint current input/source/modifier/output provenance;
   reconstruct/review lost runtime preparation. Never fall back from a refused
