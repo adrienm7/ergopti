@@ -252,10 +252,12 @@ class LocalServersOwner extends _LocalServersTimerNativeAdapter {
 		Target := this._Target(Job["id"], Job["source"])
 		if !this._SameTarget(Job["target"], Target)
 			return false
-		if !this._Admitted() || !this._True("source_current", Job["source"])
+		if !this._Admitted()
 			return false
 		Valid := Ticket.Call()
-		if !((Valid is Integer) && Valid == true)
+		; A ticket callback can reenter source replacement. Its result must not
+		; follow the last full source fence before the identity-only claim.
+		if !((Valid is Integer) && Valid == true) || !this._True("source_current", Job["source"])
 			return false
 		; Logical/source admission is current-at-check. The shared Settle
 		; remains the final logical publication claim; only native slot state
@@ -264,6 +266,7 @@ class LocalServersOwner extends _LocalServersTimerNativeAdapter {
 		try return this._OwnsJob(Job) && Job["phase"] != "cancelled" && !this.Closed && !A_IsSuspended
 			&& Job["configuration"] == this.ConfigurationGeneration
 			&& Job["sweep"]["intent"] == this.RescanGeneration
+			&& Job["sweep"]["generation"] == this.Controller.Generation
 		finally Critical(PreviousCritical)
 	}
 
