@@ -3813,6 +3813,27 @@ the complete three-OS checkpoint remain pending.
 - [ ] **36.** Packaging remainder (the former item 21): macOS release archive as
       `.tar.xz` (verify Sparkle, the Homebrew cask and CI install first).
 
+2026-10-10 first Homebrew timeout diagnostic continuation. The helper retains
+the first typed command timeout in subsequent checkpoints, including after the
+256-record history cap and final cleanup. Fixed command/stage enums distinguish
+the requester, its owned consent observer and other commands; original wait
+budgets and proven request deadlines are observed without changing scheduling.
+Raw arguments, paths and exception payloads are excluded. The original timeout
+error and reservation retirement remain unchanged. All178 predecessor test
+bodies are preserved with twelve additional portable controls. The causal control
+fails on the predecessor at the missing final timeout observation and passes
+on the candidate. All190 portable controls and the owning Homebrew checks pass.
+The new missing-capability control proves the actual no-follow refusal before
+child acquisition; incapable-host positive publication remains explicitly
+UNEXECUTED. Selected formatting passes; JS402/406 retains the same four
+failures as the executed baseline. Native qualification remains pending;
+this diagnostic does not grant consent, qualify Brew6 or complete item36.
+Manual38027004065 on4e9f92fdc executes24PASS/1FAIL of the original25 archive
+cases. The failure is the original thirty-second owned Automation prompt
+deadline, not a typed command timeout; first_timeout is correctly absent.
+The owner closes with no debt; Brew6 and final package/install remain
+unexecuted or skipped. The prompt failure's cause remains unproved.
+
 2026-10-10 Homebrew unrelated-window scope continuation. The observer now
 excludes only a completely inspected, bounded window of the expected OS-agent
 PID with neither owned sender nor receiver identity. Partial identities,
@@ -6057,6 +6078,61 @@ cancellation owners are unchanged. Items 54 and 81 remain partial.
       Complete native, package, installation and enterprise acceptance remains
       open. macOS system trust and explicit proxy relays are integrated, while
       opaque-client full-URL PAC/WPAD/fallback/redirect routing remains CODE.
+
+2026-10-10 missing managed Ollama catalogue diagnostic continuation. The
+original fixed release-catalogue read now retains FileNotFoundError as the
+cause of a typed refusal; the original install, verify and create-session CLI
+actions return the fixed OLLAMA_MANAGED_CATALOGUE_MISSING marker with exit78.
+Missing contracts, permission and directory errors, malformed or empty
+catalogues and unsupported hosts keep their original generic refusal. Twelve
+additional controls are enrolled in the existing POSIX protocol check, with
+every predecessor case unchanged. Independent review and two serial owned
+receiving runs execute the same twelve cases: predecessor7PASS/5 assertion
+FAIL, candidate12PASS/0FAIL, both0ERROR/0SKIP with physical command closure and
+no retained debt. Reads, nonroot permissions and CLI execution are real Linux;
+Darwin architecture admission is explicitly modeled. These controls grant no
+native macOS, installation, activation or complete migration credit. Shared
+consent consumption, authenticated READY/RETIRED integration, active request
+retirement and qualified native serving remain CODE; item62 stays open.
+The test payload and HOME now use their actual canonical owned temporary
+root. Genuine POSIX alias receiving reproduces6PASS/6FAIL with the old test
+path bookkeeping and12PASS with the corrected bookkeeping; ordinary receiving
+also passes12. Every test body and assertion is preserved, and all three
+command owners acknowledge physical closure with no debt. This repairs the
+test's read counters on /tmp and /var aliases without native macOS credit.
+
+2026-10-10 WPAD failed-request diagnostic continuation. A failed positive
+native WPAD request now reports only a fixed terminal-reason label from its
+already completed, uniquely terminated and bounded frame collection; malformed
+or unknown observations report unknown. It adds no request, trust mutation,
+clock, retry or cleanup action. The complete original source is restored by
+removing the single insertion, and all original assertions and14 native cases
+remain intact. Independent source review and selected formatting pass. Selected
+JS402/406 and macOS stub17,957/17,968 retain the same four and eleven failures,
+respectively, as the executed predecessor. Portable transcript admission
+does not execute this inline Swift projection. Manual38027004065 on4e9f92fdc
+compiles it on Intel and ARM; each original14-case cohort reports12PASS/2FAIL
+with two fixed certificate observations. Separate PAC-source10 and SDK41
+controls pass on each architecture. The complete run fails:3 successful,
+7 failed and7 skipped jobs, including skipped packaging, installation and
+Release. Actual Darwin50 corpus receiving remains unexecuted. No primary
+PAC/WPAD or trust failure is claimed repaired, and item62 stays open.
+
+2026-10-10 selected-release corpus enrollment continuation. The normal awaited
+JS check retains all61 original controls and runs the independently frozen50
+shell cases through the existing Linux command phase or Darwin guardian.
+Inputs remain under one private root until actual child/owner closure, capture
+retirement and strict source/receipt admission; failures retain them. All50
+cases pass with genuine Linux process ownership, without native macOS network
+credit. Linux TERM/INT cancellation receiving passes: observed helpers are retired,
+inputs remain and no passing corpus receipt is emitted. Selected formatting
+passes; JS402/406 retains the same four failures as the executed baseline.
+Genuine Darwin capability, corpus and cancellation qualification are pending.
+Windows explicitly reports this POSIX macOS-shell corpus as unexecuted, retaining
+its original61 controls and gaining no50-case credit. Darwin ownership covers
+inherited process groups; escaped sessions, immediate parent-death cancellation
+and source ABA are not proved. Those limits and the remaining product network
+and installed acceptance requirements keep item62 and transversal16/38 open.
 
 2026-10-10 native-wire diagnostic framing continuation. The fixture now writes
 its fixed restoration-failure diagnostic to stderr, preserving the single
