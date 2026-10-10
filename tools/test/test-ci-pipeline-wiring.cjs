@@ -275,7 +275,29 @@ const MACOS_NATIVE_STEP_CONDITIONS = [
 	[MACOS_BOX, 'cold-bootstrap-native', 'Retain official cold Ollama receipt only', 'always()'],
 	[MACOS_BOX, 'cold-bootstrap-native', 'Retain native cold bootstrap evidence', 'always()']
 ];
+const WINDOWS_FILE_RETENTION = [
+	{
+		name: 'Retain managed Ollama file component evidence',
+		condition: 'always()',
+		artifact:
+			'windows-ollama-file-component-${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}',
+		paths: ['${{ runner.temp }}/windows-ollama-file-component/']
+	},
+	{
+		name: 'Retain exact managed Ollama file roots',
+		condition:
+			"${{ always() && env.ERGOPTI_FILE_COMPONENT_TEST_ROOT != '' && env.ERGOPTI_FILE_COMPONENT_SOURCE_ROOT != '' }}",
+		artifact:
+			'windows-ollama-file-roots-${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}',
+		paths: [
+			'${{ env.ERGOPTI_FILE_COMPONENT_TEST_ROOT }}/',
+			'${{ env.ERGOPTI_FILE_COMPONENT_SOURCE_ROOT }}/'
+		]
+	}
+];
+
 const STEP_CONDITIONS = [
+	...WINDOWS_FILE_RETENTION.map((owner) => [WINDOWS_BOX, 'test-ahk', owner.name, owner.condition]),
 	...MACOS_NATIVE_STEP_CONDITIONS,
 	...scoped.contract.retained_steps.map((owner) => [
 		owner.file,
@@ -1630,6 +1652,141 @@ function stepProblems(files) {
 		problems.push(`STEP_CONDITIONS lists ${key}, which the pipeline no longer has`);
 	return problems;
 }
+
+const WINDOWS_FILE_RECEIVER_LINES = [
+	'node "$root/tools/test/test-managed-ollama-protocol.cjs" --windows-file-port 1> $modelsOut 2> $modelsErr',
+	'& "$psHome/powershell.exe" -NoLogo -NoProfile -NonInteractive -File "$root/static/ergopti_plus/windows/tests/unit/test_ollama_install_files.ps1" 1> $out 2> $err',
+	'if ($modelsExit -ne 0) { throw "File component source models refused (exit $modelsExit)." }',
+	'if ($nativeExit -ne 0 -or $stderr.Length -ne 0 -or'
+];
+
+// These two uploads retain failed component evidence; they do not admit
+// skipping the actual file-component receiver or a conditional Windows lane.
+function windowsFileRetentionProblems(files) {
+	const steps = files
+		.filter((entry) => entry.rel === WINDOWS_BOX)
+		.flatMap((entry) => pipeline.jobsOfText(entry.text, entry.rel))
+		.filter((job) => job.id === 'test-ahk')
+		.flatMap((job) => pipeline.steps(job.body));
+	const problems = [];
+	const receivers = steps.filter((step) => step.name === 'Receive managed Ollama file component');
+	const script = receivers.length === 1 ? pipeline.runOf(receivers[0].body).join('\n') : '';
+	// This closed receiver uses ordinary statements. Multiline comments/strings
+	// cannot witness execution; reject their unsupported delimiters locally.
+	const commands = /<#|#>|@["']|["']@/.test(script)
+		? []
+		: receivers.length === 1
+			? logicalLines(receivers[0].body)
+			: [];
+	if (
+		receivers.length !== 1 ||
+		pipeline.stepField(receivers[0].body, 'if') !== null ||
+		!WINDOWS_FILE_RECEIVER_LINES.every((command) => commands.includes(command))
+	)
+		problems.push('managed Ollama file component receiver and both failing exits remain mandatory');
+	for (const owner of WINDOWS_FILE_RETENTION) {
+		const found = steps.filter((step) => step.name === owner.name);
+		if (found.length !== 1) {
+			problems.push(`${owner.name} must exist once in test-ahk`);
+			continue;
+		}
+		const expected =
+			`      - name: ${owner.name}\n` +
+			`        if: ${owner.condition}\n` +
+			'        uses: actions/upload-artifact@v4\n' +
+			'        with:\n' +
+			`          name: ${owner.artifact}\n` +
+			'          path: |\n' +
+			owner.paths.map((item) => `            ${item}\n`).join('') +
+			'          if-no-files-found: error';
+		if (found[0].body.replace(/\n+$/, '') !== expected)
+			problems.push(
+				`${owner.name} must retain its exact condition, upload action, source-bound name and paths`
+			);
+	}
+	return problems;
+}
+
+errors.push(...windowsFileRetentionProblems(pipeline.files()));
+for (const owner of WINDOWS_FILE_RETENTION) {
+	const head = `      - name: ${owner.name}\n`;
+	for (const changed of ['', 'false', 'success()', '${{ always() && false }}'])
+		mustCatch(
+			`managed component retention condition ${owner.name}: ${changed || '(none)'}`,
+			WINDOWS_BOX,
+			head + `        if: ${owner.condition}\n`,
+			head + (changed ? `        if: ${changed}\n` : ''),
+			stepProblems
+		);
+	const actual = pipeline.step(pipeline.job('test-ahk'), owner.name);
+	for (const [description, from, to] of [
+		['missing step', actual, ''],
+		['renamed step', owner.name, 'Unowned managed component evidence'],
+		['different action', 'actions/upload-artifact@v4', 'actions/upload-artifact@v3'],
+		['missing evidence allowed', 'if-no-files-found: error', 'if-no-files-found: warn'],
+		['unbound artifact', owner.artifact, 'unbound-component-evidence'],
+		...owner.paths.map((item) => ['missing root', `            ${item}\n`, ''])
+	])
+		mustCatch(
+			`${owner.name}: ${description}`,
+			WINDOWS_BOX,
+			actual,
+			actual.replace(from, () => to),
+			windowsFileRetentionProblems
+		);
+}
+const componentHead = '      - name: Receive managed Ollama file component\n';
+for (const condition of ['false', 'success()', 'inputs.release'])
+	mustCatch(
+		`managed file component receiver cannot be conditional: ${condition}`,
+		WINDOWS_BOX,
+		componentHead,
+		componentHead + `        if: ${condition}\n`,
+		windowsFileRetentionProblems
+	);
+const componentBody = pipeline.step(
+	pipeline.job('test-ahk'),
+	'Receive managed Ollama file component'
+);
+for (const command of [
+	'test-managed-ollama-protocol.cjs" --windows-file-port',
+	'tests/unit/test_ollama_install_files.ps1"',
+	'if ($modelsExit -ne 0)',
+	'if ($nativeExit -ne 0 -or $stderr.Length -ne 0 -or'
+])
+	mustCatch(
+		`missing mandatory component receiver boundary: ${command}`,
+		WINDOWS_BOX,
+		componentBody,
+		componentBody.replace(command, '# omitted boundary'),
+		windowsFileRetentionProblems
+	);
+
+// A retained literal in a PowerShell comment is not an executed receiver.
+for (const command of WINDOWS_FILE_RECEIVER_LINES)
+	mustCatch(
+		`commented mandatory component boundary: ${command}`,
+		WINDOWS_BOX,
+		componentBody,
+		componentBody.replace(command, '# ' + command),
+		windowsFileRetentionProblems
+	);
+
+// Multiline comments and literal here-string payloads are not active receivers.
+for (const [opening, closing] of [
+	['<#', '#>'],
+	["$unused = @'", "'@"]
+])
+	mustCatch(
+		'inactive multiline component receiver',
+		WINDOWS_BOX,
+		componentBody,
+		componentBody.replace('        run: |\n', '        run: |\n          ' + opening + '\n') +
+			'          ' +
+			closing +
+			'\n',
+		windowsFileRetentionProblems
+	);
 
 // Source compilation belongs only to the checkout-install rows. A broader or
 // omitted condition could run package acquisition for an archive-only subject.
