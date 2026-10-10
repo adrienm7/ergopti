@@ -1,0 +1,146 @@
+{
+	"format": "SOURCE_ONLY_INACTIVE_REGULAR_FILES",
+	"members": [
+		{
+			"name": "HANDOVER.md.txt",
+			"sha256": "3bddea748b76acdb4a93e442312f8b576a403093bbca242f211abc2a35bf7fda",
+			"bytes": 6836
+		},
+		{
+			"name": "build_capsule.py.txt",
+			"sha256": "47cdc5cebe37d788098a1a5e8d5d31166664ab53204418636f961a874ee47f5b",
+			"bytes": 8783
+		},
+		{
+			"name": "current-source-pins.json.txt",
+			"sha256": "1967fdaa1a113c1edb1be87142584995f6ad1fdaeb74488826424fa02db1bab5",
+			"bytes": 1047
+		},
+		{
+			"name": "metadata_collector_review/review.json.txt",
+			"sha256": "11b645a295bffeb7bf01ea39cabc195d9a9ac9185690a9783867659d64b71e1b",
+			"bytes": 10107
+		},
+		{
+			"name": "metadata_complete_patch/complete.patch",
+			"sha256": "f53d24402cfd4bf9e785cffe246f9cec59eb2ebd999c8b45668b37feb4e61e07",
+			"bytes": 73578
+		},
+		{
+			"name": "metadata_complete_pre/tools/test/run-js-suite.cjs.txt",
+			"sha256": "f45840d4d8dbc8919fc54a0a52a37078e14daca6c7ea11a14a38fb18fc1210a8",
+			"bytes": 98213
+		},
+		{
+			"name": "metadata_complete_pre/tools/test/test-ci-pipeline-wiring.cjs.txt",
+			"sha256": "9848e19351f305fbc0a0583e14108ec63f8391db608dc680882ccf3d6f5146a7",
+			"bytes": 186328
+		},
+		{
+			"name": "metadata_complete_pre/workflow/workflows/ci-macos.yml.txt",
+			"sha256": "eea985e13254a7fdf8ad5aee5e630db0e2cc1f1dd75fd0194c2511a2a27a2f82",
+			"bytes": 99355
+		},
+		{
+			"name": "metadata_complete_receipt/receipt.json.txt",
+			"sha256": "be648865a694ca4e4f3519c2d66c3c22ddd6f98c3ac507d218f9404d3afae79a",
+			"bytes": 10727
+		},
+		{
+			"name": "metadata_formatted_receiving/receipt.json.txt",
+			"sha256": "19168f8cf2ffb49ddbe266d06bb13323dafc1eea7b725545e37a5c252d59259a",
+			"bytes": 563
+		},
+		{
+			"name": "metadata_guard_review/review.json.txt",
+			"sha256": "ae92daf9c68908ffb6f318c7ac87175db7dcb5183058f729cb1438e3919da66d",
+			"bytes": 5633
+		},
+		{
+			"name": "metadata_restore_patch/restore-owned-nine.patch",
+			"sha256": "910325c23500281ccacf7621d42f33ede75d8a9fb42bede5e0fbbc6f49f0ad83",
+			"bytes": 72254
+		},
+		{
+			"name": "metadata_restore_receipt/receipt.json.txt",
+			"sha256": "138444b1a0b02c1bc55c7eac96210190681b20a62bbe71dd199f5b2137ac74d3",
+			"bytes": 2538
+		},
+		{
+			"name": "metadata_workflow_review/review.json.txt",
+			"sha256": "a3c2b527d6c0c6500a54b28f090d16dc8060bd0c282112f740014654e016ab33",
+			"bytes": 3299
+		},
+		{
+			"name": "packaging-plan.json.txt",
+			"sha256": "3d7ed53a9d24a0a81df77dc8442b83bc661f308a41e0e75a8ef6ad9fd5cbb447",
+			"bytes": 15943
+		},
+		{
+			"name": "references.json.txt",
+			"sha256": "aa5a4fd2cd6fbf35889508c5e36bdf057ec21a03ae58709f7a3135cdd4d352b7",
+			"bytes": 6001
+		},
+		{
+			"name": "xi2_enrollment_patch/enrollment.patch",
+			"sha256": "37e5e23659170bd427b8b6a8d3b5ec41590464d95f9e0c1eab49af9de9e12f59",
+			"bytes": 18826
+		},
+		{
+			"name": "xi2_enrollment_pre/tools/test/ci-full-default.cjs.txt",
+			"sha256": "679e9b2033478fa6250dd9997b8206129611d75c581696393586e9f4df798b63",
+			"bytes": 14725
+		},
+		{
+			"name": "xi2_enrollment_pre/tools/test/test-ci-pipeline-wiring.cjs.txt",
+			"sha256": "9848e19351f305fbc0a0583e14108ec63f8391db608dc680882ccf3d6f5146a7",
+			"bytes": 186328
+		},
+		{
+			"name": "xi2_enrollment_pre/tools/test/test-linux-ci-evidence.cjs.txt",
+			"sha256": "3c5afab3b3913f1e38c75b07393ffce3911f81fb0483e5cbfaade84fe2346438",
+			"bytes": 92281
+		},
+		{
+			"name": "xi2_enrollment_pre/tools/test/test-linux-xi2-cookie-ci-contract.cjs.txt",
+			"sha256": "11e634d31ca5da240be6c58e9332f3b75ee8abc54f7bb886b930c387d2d62f19",
+			"bytes": 12263
+		},
+		{
+			"name": "xi2_enrollment_pre/workflow/workflows/ci-linux.yml.txt",
+			"sha256": "31edc58ae28939cdc9e8fddb118fcdcc9ccba5973e0f4e8be1699fe681023509",
+			"bytes": 240894
+		},
+		{
+			"name": "xi2_enrollment_receipt/receipt.json.txt",
+			"sha256": "a7a8c6c1bc8c0de2df5a2649a1714f7cee7100095af45e9277b00f4656cd5d46",
+			"bytes": 3818
+		},
+		{
+			"name": "xi2_enrollment_review/review.json.txt",
+			"sha256": "1f56930fedb760dbfd8518560cc292cbdf94437d63d139c3f61397b88777d229",
+			"bytes": 2460
+		},
+		{
+			"name": "xi2_source_patch/five-source.patch",
+			"sha256": "f81f72609e4aa7b1bc477d5d84ede9bbd3b88a91e2b03f4574683b6109dff761",
+			"bytes": 57017
+		},
+		{
+			"name": "xi2_source_pre/probe.lua.txt",
+			"sha256": "6efcf4ac0b2ef59f5a61765c5cbae71f1518961268bb82131ed66943ac08c609",
+			"bytes": 29092
+		},
+		{
+			"name": "xi2_source_receipt/receipt.json.txt",
+			"sha256": "ae932c159f196a9ca234a37d597940fb919bc2c940cd4fa6cfcb0915a22aa7a1",
+			"bytes": 8937
+		},
+		{
+			"name": "xi2_source_review/review.json.txt",
+			"sha256": "431a8726163f37bd5ab11564aeb63be274d1ed801f81c0a523e448499fcb8816",
+			"bytes": 7829
+		}
+	],
+	"exclusions": "No raw logs, dictionaries, configurations, native binaries or runtime projections"
+}
