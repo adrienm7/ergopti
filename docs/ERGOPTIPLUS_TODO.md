@@ -9949,9 +9949,9 @@ and installation qualification are still required.
   starts no application, sends no AppleEvent and grants no catalogue, TCC or
   invocation authority. Native Swift build, installed-target resolution and
   metadata receiving remain UNRUN. The end-only native CI and pipeline
-  enrollment hunks await the shared-source writer window; their exact
-  preparation is retained separately and is not integrated. The planned
-  manual-only native matrix step follows all original job steps and cannot
+  enrollment now request a separate manual-only observer on both native
+  architectures. Exact source/architecture checks and compiler/capture exits
+  remain mandatory. The matrix step follows all original job steps and cannot
   suppress or waive their failures. Raw dictionary artifacts remain private.
   Unresolved-target refusals and requested dictionary-key semantics cannot
   identify the existing discovery stall or establish consent. Item106 remains
