@@ -95,7 +95,7 @@ function receiveWindowsFilePort() {
 	for (const [script, count] of [
 		['windows_ollama_file_validation_test.ps1', 13],
 		['windows_ollama_file_publication_test.ps1', 4],
-		['windows_ollama_file_default_paths_test.ps1', 4],
+		['windows_ollama_file_default_paths_test.ps1', 8],
 		['windows_ollama_file_final_close_test.ps1', 1]
 	]) {
 		const result = spawnSync(
@@ -149,8 +149,8 @@ function receiveWindowsFilePort() {
 		models += count;
 		process.stdout.write(stdout);
 	}
-	assert.equal(models, 22, 'All source-bound Windows model controls must be received.');
-	process.stdout.write('WINDOWS-FILE-PORT models=22 native=false acquisition=false\n');
+	assert.equal(models, 26, 'All source-bound Windows model controls must be received.');
+	process.stdout.write('WINDOWS-FILE-PORT models=26 native=false acquisition=false\n');
 }
 function receiveWindowsRuntimeHandoff() {
 	assert.equal(
