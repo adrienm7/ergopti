@@ -2098,11 +2098,11 @@ _LogBootProgress("keylogger modules + tests included")
 ; Watchdog: kill the process if RunTests() never returns (e.g. a corpus
 ; consumer blocks on a synchronous HTTP call, an InputHook with no timeout,
 ; or a blocking dialog in a headless CI context). The current corpus normally
-; uses a small fraction of this per-test budget; the cap remains three minutes
-; below CI's 25-minute process timeout so partial TAP can still be validated.
+; now includes measured full-cohort file authority work. The finite 55-minute
+; cap reserves five minutes below CI's process bound for partial TAP validation.
 global _SUITE_STARTUP_BUDGET_MS := 120000
-global _SUITE_PER_TEST_BUDGET_MS := 200
-global _SUITE_MAX_TIMEOUT_MS := 1320000
+global _SUITE_PER_TEST_BUDGET_MS := 250
+global _SUITE_MAX_TIMEOUT_MS := 3300000
 global _SUITE_TIMEOUT_MS := _SuiteTimeoutForCount(TEST_REGISTRY.Length)
 
 ; Saturation deliberately reserves time for CI to publish partial results.

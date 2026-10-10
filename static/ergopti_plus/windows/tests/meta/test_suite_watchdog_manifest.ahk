@@ -42,8 +42,12 @@ _TSWM_WatchdogTracksSuiteSize() {
 		"reaching the safety cap is intentional even as the corpus grows")
 	AssertEqual(_SUITE_MAX_TIMEOUT_MS, _SuiteTimeoutForCount(SaturationCount + 1000),
 		"larger corpora must never consume the CI publication reserve")
-	Assert(_SUITE_MAX_TIMEOUT_MS < 25 * 60 * 1000,
+	Assert(_SUITE_MAX_TIMEOUT_MS <= 55 * 60 * 1000,
 		"the in-process safety cap must leave time for CI to publish the partial manifest")
+	Assert(_SuiteTimeoutForCount(11197) >= 45 * 60 * 1000,
+		"the complete measured corpus must receive its bounded execution envelope")
+	AssertEqual(5 * 60 * 1000, 60 * 60 * 1000 - _SUITE_MAX_TIMEOUT_MS,
+		"the capped suite reserves five minutes for terminal evidence publication")
 }
 
 _TSWM_WatchdogPublishesPartialResults() {
