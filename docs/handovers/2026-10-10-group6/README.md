@@ -461,3 +461,71 @@ Those Brew scenarios remain unrun; packaging/install remain skipped. No source
 repair or general hosted-platform incapability is proved. Qualify the exact
 normal consent pair in the unchanged budget on a logged-in Mac if this session
 cannot supply it, then run the full strict Homebrew route. Item36 stays open.
+
+## Partial integration and preserved native failures
+
+Dev `d92a72d5c7a575a4a22edead078a15e1d113ebfc` integrates the exact `f6318`
+source tree without squash. Its seven atomic commits are `f103568f7`,
+`544976fa5`, `39424e21e`, `7f5fe4784`, `513fa096b`, `109147bb4` and
+`a8d2b4519`. Final selected local verification exits 0: formatting and 409 JS
+controls, Mac 18347/0 with 1569 modules, Mac E2E 101 with one original skip,
+Linux 13037/0 with 520 modules and Linux E2E 193/0. Swift compilation remains
+deferred on this Linux host.
+
+Exact candidate manual 38079685751 finishes 6 successful, 6 failed, 5 skipped
+and 0 cancelled jobs; Release is skipped. Both real Darwin architectures pass
+SDK 49, Python 77, Go 54, source PAC 10 and catalogue 27. PAC/WPAD has 12 passing
+and two failing cases per architecture. ARM has 14 total failure observations,
+including two unexpected exceptions; Intel has four, including two unexpected
+exceptions. These are not 14 failed cases. Independent HTTP fails at the
+original 15-second owned add-trust command deadline, before request dispatch,
+then refuses trust restoration. The genuine model producer/catalogue builds,
+and preparation reaches trust addition after compilation and signing. Its
+initial exception remains unknown because the old collector discards it;
+cleanup refuses with native trust unsettled. Create/pull/inference and the
+remaining profiles are unrun. Complete packaging and installation are skipped.
+
+Archive receiving remains 24/25, with Sparkle 15, archive 8 and consent parser 1
+passing. Homebrew refuses the original owned Automation window deadline before
+nonce controls or installation scenarios; the exact helper/parent owners close.
+The cold Ollama caller installs and physically closes, then the validator refuses
+its missing `daemon_validation` field. The client-only path no longer calls the
+fixture's daemon stub, which was the only initializer of that field. Group 5
+owns the receiving correction; later archive/signature assertions remain unrun.
+
+Official integrated manual
+[38081991583](https://github.com/adrienm7/ergopti/actions/runs/38081991583)
+tests exact `d92a72d5` with `os_lanes=macos` and no Release. The owned lock is
+`0bdb0d5b628a0935296100bd6130af32f750ea73`; only its owner releases it after
+the whole result. Automatic push 38081968269 is cancelled. The official result
+is pending and cannot be inferred from the candidate's partial passes.
+
+## Independent primary and cleanup diagnostics
+
+The model receiver now exports separate closed-code `primary_failure` and
+`cleanup_failure` facts, with a fixed entered preparation checkpoint. This
+repairs lost diagnostic evidence, not native trust. Original fatal reason
+precedence and exit status, complete run/close bodies, all budgets and original
+command arguments/return values remain. Only exact admitted exception classes,
+fixed refusal codes and bounded OS categories are projected. Messages, command
+arguments, private paths and foreign exception properties remain excluded.
+The same 23-test corpus against the exact previous receiver passes all 16
+original tests and one unchanged success case; six new methods error because
+the diagnostics are missing. The owned replay exits 1 with no retained process
+debt. This causal comparison is portable evidence only, not native model
+qualification. Its receipt is retained separately from the current 23/23 run.
+
+All 16 old portable tests remain; all 23 current tests pass, including the
+original compiler exception and its retained qualification owner. Exact native
+replay remains required. Success carries no failure fields. The false production
+qualification guard and model and package/install requirements stay intact.
+
+The separately frozen daily-logging R6 and native seven-case enrollment are
+SOURCE-only preparations, not integrated or executed functionality. The new
+seven-case cohort includes an actual mapped-shell/original-guardian/stdio/sink
+composition; it does not qualify packaged Ollama logging. Original 49 must
+replay after the helper extension. Shared Group 5 product/workflow writer
+coordination remains outstanding. Current preparations are also copied under
+`/workspace/scratch`; no new-container or publication retention is claimed for
+private local files. TODO 36/62 remain open and no item is removed by this
+partial delivery.
