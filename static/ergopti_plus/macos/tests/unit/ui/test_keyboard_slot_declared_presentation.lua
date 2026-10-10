@@ -313,3 +313,66 @@ helpers.describe("keyboard slot presentation fixture retirement", function()
 		helpers.assert_nil(repeating_handle.timer)
 	end)
 end)
+
+helpers.describe("keyboard slot presentation saved-locale initialization", function()
+	helpers.it("keeps genuine factory owners through persisted locale initialization and receives the original captions", function()
+		local retained_state
+		local cleanup_failures = {}
+		fixture(function(state, builder, _, locale, _, open, ready, core, i18n)
+			retained_state = state
+			local original = assert(corpus.locales.de)
+			local Storage = require("adapters.storage")
+			local translate_owner = i18n.get
+			local locale_get_owner, locale_current_owner = locale.get, locale.current_locale
+			local core_get_owner, core_current_owner = core.get, core.current_locale
+			helpers.assert_eq(i18n.get_locale(), "fr")
+			helpers.assert_eq(locale.current_locale(), "fr")
+			local before = builder.prepare_app_presentation("action_picker", "keyboard_slot_selection")
+			helpers.assert_type(before, "table")
+			helpers.assert_eq(builder.presentation_current(before), true)
+			helpers.assert_eq(state.creates, 0)
+
+			-- Seed the real saved setting, then use root boot's backend wiring and initializer.
+			helpers.assert_eq(i18n.persist_locale("de"), true)
+			helpers.assert_eq(Storage.get("i18n_locale"), "de")
+			helpers.assert_eq(i18n.get_locale(), "fr", "persistence alone must not change the active locale")
+			i18n.set_locale_injector(function(code) locale.set_locale(code) end)
+			i18n.init()
+			helpers.assert_eq(i18n.get_locale(), "de")
+			helpers.assert_eq(locale.current_locale(), "de")
+			helpers.assert_eq(core.current_locale(), "de")
+			for name, owner in pairs({ ["infra.i18n"] = i18n, ["infra.locale"] = locale, ["locale.core"] = core }) do
+				helpers.assert_true(rawequal(package.loaded[name], owner), "initialization must retain " .. name)
+			end
+			helpers.assert_eq(i18n.get, translate_owner)
+			helpers.assert_eq(locale.get, locale_get_owner)
+			helpers.assert_eq(locale.current_locale, locale_current_owner)
+			helpers.assert_eq(core.get, core_get_owner)
+			helpers.assert_eq(core.current_locale, core_current_owner)
+			helpers.assert_eq(builder.presentation_current(before), false, "the former French receipt must become stale")
+			local after = builder.prepare_app_presentation("action_picker", "keyboard_slot_selection")
+			helpers.assert_type(after, "table")
+			helpers.assert_eq(builder.presentation_current(after), true)
+			local title, label = builder.presentation_fields(after)
+			helpers.assert_eq(title, original.original_page_title)
+			helpers.assert_eq(label, original.original_page_label)
+			helpers.assert_eq(state.creates, 0)
+
+			helpers.assert_true(open())
+			helpers.assert_eq(state.creates, 1)
+			helpers.assert_eq(state.views[1].captions[1], original.original_native_caption_source_projection)
+			ready()
+			local payload = state.payloads[#state.payloads]
+			helpers.assert_eq(payload.title, original.original_page_title)
+			helpers.assert_eq(payload.label, original.original_page_label)
+			helpers.assert_eq(payload.current, "none")
+			helpers.assert_eq(state.confirmations, 0)
+			helpers.assert_eq(builder.presentation_current(after), true)
+			state.views[1].on_navigation("didFinishNavigation", state.views[1])
+			helpers.assert_true(state.scheduler.activeCount() > 0)
+		end, cleanup_failures)
+		helpers.assert_eq(#cleanup_failures, 0)
+		helpers.assert_eq(retained_state.views[1].deletes, 1)
+		helpers.assert_eq(retained_state.scheduler.activeCount(), 0)
+	end)
+end)
