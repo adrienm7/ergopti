@@ -5342,5 +5342,267 @@ int main(void) {
         self.assertNotIn("admit_sender_foreground_request", body)
 
 
+class IndependentWindowDiscoveryScopeControls(unittest.TestCase):
+    """Compiled CF/AX interface port; these controls grant no native UI or consent credit."""
+
+    def test_actual_scope_core_and_original_dispatch_keep_unknown_and_owned_refusals(self):
+        source = Path(probe.__file__).with_name("native_appleevent_consent.m").read_text()
+        begin = source.index("enum OwnedWindowScope {")
+        end = source.index("// Passive traversal of only the retained refused window.", begin)
+        body = source[begin:end]
+        clock_begin = body.index("static bool scope_before_deadline(void) {")
+        clock_end = body.index("static AXError scope_copy_attribute(", clock_begin)
+        body = body[:clock_begin] + body[clock_end:]
+        self.assertNotIn("AXUIElementSetMessagingTimeout", body)
+        self.assertNotIn("AXUIElementPerformAction", body)
+        self.assertNotIn("factIdentity", body)
+        anchor = "                if (!inspect_window(window, sender, receiver, buttons, &targetSeen, &senderSeen, &denySeen, agentIndex)) {"
+        original_begin = source.index(anchor)
+        original_end = source.index("                if (!targetSeen) continue;", original_begin)
+        legacy = source[original_begin:original_end]
+        scope_begin = source.rindex(
+            "                enum OwnedWindowScope scope =", 0, original_begin
+        )
+        scoped = source[scope_begin:original_end]
+        scoped = scoped.replace("(__bridge CFStringRef)", "").replace(
+            "application.processIdentifier", "31337"
+        )
+        port = r"""#include <stdbool.h>
+#include <stdint.h>
+#include <stddef.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <sys/types.h>
+typedef long CFIndex;
+typedef int AXError;
+struct Object;
+typedef struct Object *CFTypeRef;
+typedef struct Object *AXUIElementRef;
+typedef struct Object *CFStringRef;
+typedef struct Object *CFArrayRef;
+struct Object {
+    int kind;
+    const char *text;
+    CFIndex length;
+    pid_t pid;
+    AXError pid_error, role_error, value_error, children_error;
+    struct Object *role, *value, *children;
+    struct Object **items;
+    CFIndex count;
+};
+struct CFRange { CFIndex location, length; };
+enum { TYPE_AX=1, TYPE_STRING=2, TYPE_ARRAY=3, TYPE_OTHER=4 };
+enum { kAXErrorSuccess=0, kAXErrorCannotComplete=-25204,
+       kAXErrorAttributeUnsupported=-25205, kAXErrorNoValue=-25212,
+       kAXErrorInvalidUIElement=-25202 };
+static const CFIndex kCFNotFound=-1;
+static struct Object role_key={.kind=TYPE_STRING,.text="AXRole"};
+static struct Object value_key={.kind=TYPE_STRING,.text="AXValue"};
+static struct Object children_key={.kind=TYPE_STRING,.text="AXChildren"};
+static struct Object static_role={.kind=TYPE_STRING,.text="AXStaticText"};
+#define kAXRoleAttribute (&role_key)
+#define kAXValueAttribute (&value_key)
+#define kAXChildrenAttribute (&children_key)
+#define kAXStaticTextRole (&static_role)
+static struct Object scope_window_role={.kind=TYPE_STRING,.text="AXWindow"};
+#define kAXWindowRole (&scope_window_role)
+static int references=0, deadline_calls=0, expire_after=-1;
+static double remaining=1;
+static bool scope_before_deadline(void) {
+    deadline_calls++;
+    return remaining>0 && remaining<=3 && (expire_after<0 || deadline_calls<=expire_after);
+}
+static int CFGetTypeID(CFTypeRef value) { return value->kind; }
+static int AXUIElementGetTypeID(void) { return TYPE_AX; }
+static int CFStringGetTypeID(void) { return TYPE_STRING; }
+static int CFArrayGetTypeID(void) { return TYPE_ARRAY; }
+static CFTypeRef CFRetain(CFTypeRef value) { references++; return value; }
+static void CFRelease(CFTypeRef value) { if (value==NULL) abort(); references--; }
+static CFIndex CFStringGetLength(CFStringRef value) { return value->length ? value->length : (CFIndex)strlen(value->text); }
+static bool CFEqual(CFTypeRef first, CFTypeRef second) {
+    return first->kind==TYPE_STRING && second->kind==TYPE_STRING && strcmp(first->text,second->text)==0;
+}
+static struct CFRange CFStringFind(CFStringRef value, CFStringRef needle, unsigned flags) {
+    (void)flags;
+    const char *found=strstr(value->text,needle->text);
+    return (struct CFRange){found ? (CFIndex)(found-value->text) : kCFNotFound, 0};
+}
+static CFIndex CFArrayGetCount(CFArrayRef value) { return value->count; }
+static CFTypeRef CFArrayGetValueAtIndex(CFArrayRef value, CFIndex index) { return value->items[index]; }
+static AXError AXUIElementGetPid(AXUIElementRef value,pid_t *pid) {
+    *pid=value->pid;
+    return value->pid_error;
+}
+static AXError AXUIElementCopyAttributeValue(AXUIElementRef value,CFStringRef key,CFTypeRef *result) {
+    AXError status;
+    if (key==kAXRoleAttribute) { *result=value->role; status=value->role_error; }
+    else if (key==kAXValueAttribute) { *result=value->value; status=value->value_error; }
+    else if (key==kAXChildrenAttribute) { *result=value->children; status=value->children_error; }
+    else abort();
+    if (*result!=NULL) CFRetain(*result);
+    return status;
+}
+"""
+        cases = r"""static struct Object sender_name={.kind=TYPE_STRING,.text="Owned AppleEvent sender 11111111-2222-3333-4444-555555555555"};
+static struct Object receiver_name={.kind=TYPE_STRING,.text="Owned AppleEvent receiver 11111111-2222-3333-4444-555555555555"};
+static struct Object window_role={.kind=TYPE_STRING,.text="AXWindow"};
+static struct Object button_role={.kind=TYPE_STRING,.text="AXButton"};
+static struct Object other={.kind=TYPE_OTHER};
+static int run_case(int which) {
+    struct Object root={.kind=TYPE_AX,.pid=31337,.role=&window_role};
+    struct Object sender={.kind=TYPE_AX,.pid=31337,.role=&static_role,.value=&sender_name};
+    struct Object receiver={.kind=TYPE_AX,.pid=31337,.role=&static_role,.value=&receiver_name};
+    struct Object button={.kind=TYPE_AX,.pid=31337,.role=&button_role};
+    struct Object extra[6];
+    for (int index=0;index<6;index++) extra[index]=(struct Object){.kind=TYPE_AX,.pid=31337,.role=&button_role};
+    struct Object *items[257]={&sender,&receiver};
+    struct Object array={.kind=TYPE_ARRAY,.items=items,.count=2};
+    struct Object bad_text={.kind=TYPE_STRING,.text="unrelated",.length=4097};
+    root.children=&array;
+    remaining=1;expire_after=-1;deadline_calls=0;references=0;
+    int expected=OwnedWindowScopeRefused;
+    switch(which) {
+        case 0: /* Complete unrelated seven-node graph, including an untitled button. */
+            for(int index=0;index<6;index++)items[index]=&extra[index];
+            array.count=6;expected=OwnedWindowScopeUnrelated;break;
+        case 1: expected=OwnedWindowScopeCandidate;break;
+        case 2: array.count=1;break;
+        case 3: items[0]=&receiver;array.count=1;break;
+        case 4: root.role_error=kAXErrorCannotComplete;break;
+        case 5: root.role=&other;break;
+        case 6: root.role=&bad_text;break;
+        case 7: sender.value=NULL;sender.value_error=kAXErrorNoValue;break;
+        case 8: sender.value=&other;break;
+        case 9: sender.value=&bad_text;break;
+        case 10: root.children=NULL;root.children_error=kAXErrorNoValue;expected=OwnedWindowScopeUnrelated;break;
+        case 11: root.children=NULL;root.children_error=kAXErrorAttributeUnsupported;expected=OwnedWindowScopeUnrelated;break;
+        case 12: root.children=NULL;root.children_error=kAXErrorCannotComplete;break;
+        case 13: root.children=NULL;root.children_error=kAXErrorInvalidUIElement;break;
+        case 14: root.children=&other;break;
+        case 15: items[0]=&other;break;
+        case 16: sender.pid=31338;break;
+        case 17: root.pid_error=kAXErrorInvalidUIElement;break;
+        case 18: array.count=257;break;
+        case 19: {
+            struct Object *nested_items[2]={&sender,&receiver};
+            struct Object nested={.kind=TYPE_ARRAY,.items=nested_items,.count=2};
+            button.children=&nested;
+            for(int index=0;index<256;index++)items[index]=&button;
+            array.count=256;
+            int got=discover_window_scope(&root,&sender_name,&receiver_name,31337);
+            return got==expected && references==0 ? 0 : 3;
+        }
+        case 20: items[0]=&root;array.count=1;break;
+        case 21: remaining=0;break;
+        case 22: remaining=4;break;
+        case 23: expire_after=3;break;
+        case 24: items[0]=&other;items[1]=&sender;items[2]=&receiver;array.count=3;break;
+        case 25: root.children=NULL;root.role=&button_role;break;
+        case 26: sender.children=NULL;sender.children_error=kAXErrorNoValue;expected=OwnedWindowScopeCandidate;break;
+        case 27: sender.children=NULL;sender.children_error=kAXErrorAttributeUnsupported;expected=OwnedWindowScopeCandidate;break;
+        case 28: root.children=NULL;expire_after=7;break; /* Final clock check. */
+        case 29: root.children=NULL;expire_after=4;break; /* Read completes after deadline. */
+        case 30: root.pid=31338;break;
+        case 31: items[0]=NULL;break;
+        case 32: root.children_error=kAXErrorNoValue;break; /* Nonnull/error is ambiguous. */
+        case 33: root.role_error=kAXErrorAttributeUnsupported;break;
+        case 34: sender.value_error=kAXErrorCannotComplete;break;
+        default: return 2;
+    }
+    int got=discover_window_scope(&root,&sender_name,&receiver_name,31337);
+    return got==expected && references==0 ? 0 : 3;
+}
+"""
+        selector = r"""
+static int inspector_calls=0;
+static bool inspector_answer=false;
+#define YES true
+static bool inspect_window(AXUIElementRef window, CFStringRef sender, CFStringRef receiver,
+    void *buttons, bool *targetSeen, bool *senderSeen, bool *denySeen, int agentIndex) {
+    (void)window;(void)sender;(void)receiver;(void)buttons;
+    (void)targetSeen;(void)senderSeen;(void)denySeen;(void)agentIndex;
+    inspector_calls++;
+    return inspector_answer;
+}
+static int legacy_dispatch(AXUIElementRef window) {
+    CFStringRef sender=&sender_name,receiver=&receiver_name;
+    void *buttons=NULL;
+    bool targetSeen=false,senderSeen=false,denySeen=false,observationRefused=false;
+    int agentIndex=0;
+    do {
+LEGACY_FRAGMENT
+    } while(false);
+    return observationRefused ? 1 : 0;
+}
+static int scoped_dispatch(AXUIElementRef window) {
+    CFStringRef sender=&sender_name,receiver=&receiver_name;
+    void *buttons=NULL;
+    bool targetSeen=false,senderSeen=false,denySeen=false,observationRefused=false;
+    int agentIndex=0;
+    do {
+SCOPED_FRAGMENT
+    } while(false);
+    return observationRefused ? 1 : 0;
+}
+static int selector_case(int which) {
+    struct Object root={.kind=TYPE_AX,.pid=31337,.role=&window_role};
+    struct Object sender={.kind=TYPE_AX,.pid=31337,.role=&static_role,.value=&sender_name};
+    struct Object receiver={.kind=TYPE_AX,.pid=31337,.role=&static_role,.value=&receiver_name};
+    struct Object *items[2]={&sender,&receiver};
+    struct Object array={.kind=TYPE_ARRAY,.items=items,.count=2};
+    remaining=1;expire_after=-1;deadline_calls=0;references=0;
+    inspector_calls=0;inspector_answer=false;
+    int expected=1,calls=0,got;
+    switch(which) {
+        case 0: /* Actual old call order cannot exclude a malformed unrelated window. */
+            got=legacy_dispatch(&root);calls=1;break;
+        case 1: /* Independent complete zero-identity census can exclude only this scope. */
+            got=scoped_dispatch(&root);expected=0;break;
+        case 2: /* Both private names still require the unchanged failing inspector. */
+            root.children=&array;got=scoped_dispatch(&root);calls=1;break;
+        case 3: /* Partial private identity remains refusal. */
+            root.children=&array;array.count=1;got=scoped_dispatch(&root);break;
+        case 4: /* Unknown traversal remains refusal, with no inspector/action credit. */
+            root.children_error=kAXErrorCannotComplete;got=scoped_dispatch(&root);break;
+        case 5: /* A candidate can progress only through the existing inspector. */
+            root.children=&array;inspector_answer=true;
+            got=scoped_dispatch(&root);expected=0;calls=1;break;
+        default:return 2;
+    }
+    return got==expected && inspector_calls==calls && references==0 ? 0 : 4;
+}
+int main(void) {
+    for(int index=0;index<35;index++)if(run_case(index)!=0) {
+        fprintf(stderr,"scope_case=%d\n",index);return 3;
+    }
+    for(int index=0;index<6;index++)if(selector_case(index)!=0) {
+        fprintf(stderr,"selector_case=%d\n",index);return 4;
+    }
+    puts("window_scope_controls=35; selector_controls=6");
+    return 0;
+}
+"""
+        selector = selector.replace("LEGACY_FRAGMENT", legacy).replace("SCOPED_FRAGMENT", scoped)
+        compiler = probe.shutil.which("cc")
+        self.assertIsNotNone(
+            compiler, "An actual C compiler is required for the explicit CF/AX interface port"
+        )
+        with TemporaryDirectory() as directory:
+            model, binary = Path(directory) / "model.c", Path(directory) / "model"
+            model.write_text(port + body + cases + selector)
+            built = subprocess.run(
+                [compiler, "-std=c11", "-Wall", "-Werror", str(model), "-o", str(binary)],
+                capture_output=True,
+                text=True,
+                timeout=30,
+            )
+            self.assertEqual(built.returncode, 0, built.stderr)
+            result = subprocess.run([str(binary)], capture_output=True, text=True, timeout=5)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertEqual(result.stdout, "window_scope_controls=35; selector_controls=6\n")
+            self.assertEqual(result.stderr, "")
+
+
 if __name__ == "__main__":
     unittest.main()
