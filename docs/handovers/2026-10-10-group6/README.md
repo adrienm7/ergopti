@@ -302,3 +302,25 @@ Leave the manual run until terminal, record failures/skips honestly, then releas
 the owned lock. Release/Publish must remain skipped. Delete only the owned
 feature branch after confirming its commits are integrated and recording this
 partial delivery's remaining work.
+
+## Actual model receiving prerequisite
+
+The original native build now has the unique `ollama-native-build` step identity.
+Its original model receiver requires that exact outcome to be successful and
+cancellation to be absent. The build's unchanged pipefail body includes genuine
+source production, catalogue acceptance and staging. The original full/deferred
+qualification receipt, three network profiles, clocks and physical-retirement
+checks remain intact. Earlier PAC/HTTP failures are still fatal; packaging,
+qualified uploads and Release keep their original predicates.
+
+Independent source review conserves all three complete preimages and the original
+shell bodies. Sixteen additional handwritten guard mutations reject missing or
+foreign identity, duplicates, producer order, weaker dependency conditions and
+forgiven receiving. Focused pipeline controls pass. Selected local verification executes407 passing JS checks and one unchanged
+protected-temporary-root failure; the exact uninstall fixture passes under its
+existing non-Git temporary root. Initial formatting fails on the two new guard
+files; the repository formatter fixes them, all five changed paths pass the
+format check, and the complete focused pipeline guard passes again. A new exact
+manual macOS run remains required before native qualification.
+TODO36/62 remain open, including actual native SDK/network and installed-device
+acceptance; the production guard is unchanged and false.

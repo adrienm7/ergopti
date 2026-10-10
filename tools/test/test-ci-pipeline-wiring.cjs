@@ -207,6 +207,12 @@ const MACOS_NATIVE_STEP_CONDITIONS = [
 	[
 		MACOS_BOX,
 		'managed-ollama-native',
+		'Receive actual native model create, pull, inference and retirement',
+		"${{ !cancelled() && steps.ollama-native-build.outcome == 'success' }}"
+	],
+	[
+		MACOS_BOX,
+		'managed-ollama-native',
 		'Retain selected-release native ownership receiving',
 		'always()'
 	],
@@ -4695,6 +4701,88 @@ for (const name of [
 	assert.throws(
 		() => pipeline.validateRaw(swallowed),
 		/\[ci-full-default\].*failure must remain fatal/
+	);
+}
+
+// Model receiving owns one successful producer, independently of earlier refusals.
+{
+	const files = pipeline.rawFiles();
+	const source = files.find((file) => file.rel === MACOS_BOX);
+	const jobs = pipeline
+		.jobsOfText(source.text, MACOS_BOX)
+		.filter((job) => job.id === 'managed-ollama-native');
+	assert.equal(jobs.length, 1, 'one current native model receiving job');
+	const owner = jobs[0];
+	const buildName = 'Build and admit the actual native source asset';
+	const modelName = 'Receive actual native model create, pull, inference and retirement';
+	const build = pipeline.step(owner.body, buildName);
+	const model = pipeline.step(owner.body, modelName);
+	const id = '        id: ollama-native-build\n';
+	const condition =
+		"        if: ${{ !cancelled() && steps.ollama-native-build.outcome == 'success' }}\n";
+	assert.doesNotThrow(() => pipeline.validateRaw(files));
+	function refuses(label, before, after, pattern) {
+		assert.equal(owner.body.split(before).length - 1, 1, label + ': exact current owner span');
+		const changed = owner.body.replace(before, () => after);
+		assert.notEqual(changed, owner.body, label + ': real source mutation');
+		const mutated = files.map((file) =>
+			file.rel === MACOS_BOX
+				? { ...file, text: file.text.replace(owner.body, () => changed) }
+				: file
+		);
+		assert.throws(() => pipeline.validateRaw(mutated), pattern, label);
+	}
+	for (const [label, replacement, pattern] of [
+		['missing producer id', '', /native producer exact build id/],
+		[
+			'foreign producer id',
+			'        id: unrelated-native-build\n',
+			/native producer exact build id/
+		],
+		['duplicate producer id field', id + id, /step key 'id'.*appears 2 times/]
+	])
+		refuses(label, id.trimEnd(), replacement.trimEnd(), pattern);
+	refuses('missing producer step', build, '', /no step named/);
+	refuses(
+		'renamed producer step',
+		build,
+		build.replace(buildName, 'Omitted native source build'),
+		/no step named/
+	);
+	refuses(
+		'producer id stolen by model receiver',
+		model,
+		model.replace(`      - name: ${modelName}\n`, `      - name: ${modelName}\n${id}`),
+		/native producer unique build id/
+	);
+	const together = build + '\n' + model;
+	refuses(
+		'receiver precedes producer',
+		together,
+		model + '\n' + build,
+		/native producer precedes model receiving/
+	);
+	for (const changed of [
+		'',
+		'success()',
+		'always()',
+		'${{ !cancelled() }}',
+		"${{ !cancelled() && steps.ollama-native-build.outcome != 'failure' }}",
+		"${{ !cancelled() && steps.ollama-native-build.conclusion == 'success' }}",
+		"${{ !cancelled() && steps.unrelated-native-build.outcome == 'success' }}",
+		"${{ !cancelled() && steps.ollama-native-build.outcome == 'success' && matrix.architecture == 'arm64' }}"
+	])
+		refuses(
+			`model dependency condition ${changed || '(missing)'}`,
+			condition.trimEnd(),
+			changed ? `        if: ${changed}` : '',
+			/full step condition/
+		);
+	refuses(
+		'forgiven model receiving',
+		model,
+		model.replace(condition, condition + '        continue-on-error: true\n'),
+		/failure must remain fatal/
 	);
 }
 
