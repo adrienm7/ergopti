@@ -14,6 +14,7 @@ local Profiles  = require("modules.llm.profiles")
 local ApiOllama = require("modules.llm.api_ollama")
 local ApiMlx    = require("modules.llm.api_mlx")
 local ApiRemote = require("modules.llm.api_remote")
+local RuntimeChoice = require("core.llm.ollama_runtime_choice")
 local OllamaBinary = require("modules.llm.ollama_binary")
 local Logger    = require("infra.logger")
 local Paths     = require("infra.paths")
@@ -199,7 +200,11 @@ local deferred_profile_warmup_cleanup_pending
 --- @return string|nil reason Why nothing is started, when not admitted.
 local function ollama_start_admitted()
 	if CoreState.runtime_llm_enabled ~= true then return false, "the AI is off" end
-	if OllamaBinary.resolve() == nil then return false, "Ollama is not installed" end
+	local source_path, _, source_kind = OllamaBinary.resolve()
+	if source_path == nil then return false, "Ollama is not installed" end
+	if RuntimeChoice.classify(source_kind) ~= "native" then
+		return false, "The selected Ollama service is managed outside Ergopti"
+	end
 	return true, nil
 end
 
