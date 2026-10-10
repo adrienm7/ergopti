@@ -3,17 +3,23 @@
 --- ==============================================================================
 --- MODULE: Ollama Daemon Pause Ownership Regression
 --- DESCRIPTION:
---- Drives the real Ollama controller through ScriptControl while stale-process
---- tasks, launch timers, and unpublished serve tasks are still native-owned.
+--- Drives the real Ollama controller through ScriptControl while one foreground
+--- serve owner and the original post-RESUMED staging timers are still owned.
+--- Historical case names remain stable; kill/readiness-delay targets are rehomed
+--- to the accepted foreground protocol, never represented by fake task aliases.
 --- Refusal and reordered-terminal cases prove PAUSED cannot be published over a
 --- live startup pipeline and that only pre-pause intent is restored afterward.
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
+local nonce_counter = 41000
 
 --- Loads real ScriptControl and ApiOllama over exact observable native doubles.
 --- @return table fixture
 local function load_fixture()
+	nonce_counter = nonce_counter + 1
+	local nonce = string.format("%032x", nonce_counter)
+	local function frame(role) return "ERGOPTI_MANAGED_DAEMON_V1 " .. nonce .. " " .. role .. "\n" end
 	local scheduler = { handles = {}, cancel_mode = "true", cancel_calls = {} }
 	local hooks = {}
 
@@ -70,55 +76,71 @@ local function load_fixture()
 	end
 
 	local shell = {
-		tasks = {},
-		terminate_mode = "true",
-		kill_start_hook = nil,
-		serve_start_hook = nil,
-		start_modes = { kill = "true", serve = "true" },
-		complete_during_start = {},
+		tasks = {}, terminate_mode = "true", start_mode = "true",
+		start_hook = nil, complete_during_start = false, active_on_start = true,
 	}
-	function shell.spawn(_, args, on_done)
-		local kind = tostring(args and args[2]):find("pkill", 1, true) and "kill" or "serve"
+	function shell.spawn(executable, args, on_done, on_chunk, environment, private, owned)
+		helpers.assert_eq(executable, "/bin/sh")
+		helpers.assert_eq(args[1], "-c")
+		helpers.assert_eq(args[2], "exec /fixture/native-owner --caller-nonce '" .. nonce .. "' --owned-stdin")
+		helpers.assert_eq(args[2]:find("pkill", 1, true), nil)
+		helpers.assert_eq(args[2]:find("nohup", 1, true), nil)
+		helpers.assert_eq(type(on_chunk), "function")
+		helpers.assert_eq(private, true)
+		helpers.assert_eq(owned, true)
 		local task = {
-			kind = kind,
-			start_calls = 0,
-			terminate_calls = 0,
-			completion_calls = 0,
+			kind = "serve", start_calls = 0, terminate_calls = 0, completion_calls = 0,
+			attempted = false, settled = false, observers = {}, active = false, ready = false,
 		}
+		function task.isSettled() return task.settled end
+		function task.wasStartAttempted() return task.attempted end
+		function task.onSettled(observer)
+			if task.settled then observer() else task.observers[#task.observers + 1] = observer end
+			return true
+		end
+		function task.emit(value) on_chunk(task, value, "") end
+		function task.publish_ready()
+			helpers.assert_true(task.active, "READY input follows this exact task's ACTIVE input")
+			helpers.assert_eq(task.ready, false)
+			task.ready = true
+			task.emit(frame("READY"))
+		end
 		function task.complete()
 			task.completion_calls = task.completion_calls + 1
-			on_done(0, "", "")
+			if task.settled then on_done(task.ready and 0 or 78, "", ""); return end
+			task.settled = true
+			-- Fixed fixture wire inputs, independent of any parser output. Before
+			-- READY only the original refusal status78 is admitted by this protocol.
+			local status = task.ready and 0 or 78
+			on_done(status, frame("RETIRED " .. tostring(status)), "")
+			local pending = task.observers; task.observers = {}
+			for _, observer in ipairs(pending) do observer() end
 		end
 		function task.start()
 			task.start_calls = task.start_calls + 1
-			local hook = nil
-			if kind == "kill" then
-				hook = shell.kill_start_hook
-			else
-				hook = shell.serve_start_hook
-			end
-			if type(hook) == "function" then
-				if kind == "kill" then shell.kill_start_hook = nil else shell.serve_start_hook = nil end
-				shell.start_hook_result = hook(task)
-			end
-			if shell.complete_during_start[kind] == true then task.complete() end
-			local mode = shell.start_modes[kind]
-			if mode == "throw" then error(kind .. " start exploded") end
-			if mode == "false" then return false end
-			if mode == "nil" then return nil end
+			task.attempted = true
+			if shell.active_on_start then task.active = true; task.emit(frame("ACTIVE")) end
+			local hook = shell.start_hook; shell.start_hook = nil
+			if type(hook) == "function" then shell.start_hook_result = hook(task) end
+			if shell.complete_during_start then task.complete() end
+			if shell.start_mode == "throw" then error("serve start exploded") end
+			if shell.start_mode == "false" then return false end
+			if shell.start_mode == "nil" then return nil end
 			return true
 		end
 		function task.terminate()
 			task.terminate_calls = task.terminate_calls + 1
 			local mode = shell.terminate_mode
-			if mode:find("^sync_", 1, false) then
-				task.complete()
-				mode = mode:gsub("^sync_", "")
-			end
+			if mode:find("^sync_", 1, false) then task.complete(); mode = mode:gsub("^sync_", "") end
 			if mode == "throw" then error("task terminate exploded") end
 			if mode == "false" then return false, "refused" end
 			if mode == "nil" then return nil end
 			if mode == "pending" then return true, "pending" end
+			if not task.attempted then
+				task.settled = true
+				local pending = task.observers; task.observers = {}
+				for _, observer in ipairs(pending) do observer() end
+			else task.complete() end
 			return true, "settled"
 		end
 		shell.tasks[#shell.tasks + 1] = task
@@ -133,6 +155,7 @@ local function load_fixture()
 			return {
 				cancel = function() return true end,
 				isActive = function() return false end,
+				isSettled = function() return true end,
 				get = function() return true end,
 				post = function() return true end,
 				onSettled = function(observer) observer(); return true end,
@@ -147,10 +170,14 @@ local function load_fixture()
 		decode = function() return {} end,
 	}
 	package.loaded["modules.llm.ollama_binary"] = {
-		resolve = function() return "/fixture/ollama" end,
+		resolve = function() return "/fixture/ollama", nil, "native_managed" end,
 	}
 	package.loaded["modules.llm.ollama_server_command"] = {
-		build = function() return "exec /fixture/ollama serve" end,
+		build = function(_, _, _, kind, caller_nonce)
+			helpers.assert_eq(kind, "native_managed")
+			helpers.assert_eq(caller_nonce, nonce)
+			return "exec /fixture/native-owner --caller-nonce '" .. nonce .. "' --owned-stdin"
+		end,
 	}
 	package.loaded["modules.llm.progressive_reveal"] = {}
 	package.loaded["modules.llm.parser"] = {}
@@ -166,7 +193,11 @@ local function load_fixture()
 	}
 	package.loaded["modules.shortcuts.script_control"] = nil
 	package.loaded["modules.llm.api_ollama"] = nil
-	local api = helpers.load_with_stubs("modules.llm.api_ollama")
+	local hs_overrides = {
+		host = { uuid = function() return nonce:sub(1, 8) .. "-" .. nonce:sub(9, 12) .. "-"
+			.. nonce:sub(13, 16) .. "-" .. nonce:sub(17, 20) .. "-" .. nonce:sub(21, 32) end },
+	}
+	local api = helpers.load_with_stubs("modules.llm.api_ollama", hs_overrides)
 
 	package.loaded["modules.llm.api_ollama"] = api
 	package.loaded["modules.llm.api_mlx"] = {
@@ -213,13 +244,14 @@ local function load_fixture()
 	package.loaded["ui.wpm.wpm_widget"] = { is_running = function() return false end }
 	package.loaded["platform.remap.onboarding"] = { stop = function() return true end }
 	package.loaded["ui.tooltip"] = { hide_forced = function() return true end }
-	local script_control = helpers.load_with_stubs("modules.shortcuts.script_control")
+	local script_control = helpers.load_with_stubs("modules.shortcuts.script_control", hs_overrides)
 	return {
 		api = api,
 		hooks = hooks,
 		script_control = script_control,
 		scheduler = scheduler,
 		shell = shell,
+		frame = frame,
 	}
 end
 
@@ -229,20 +261,27 @@ helpers.describe("HS-012 Ollama daemon-start pause ownership", function()
 		helpers.assert_eq(fixture.api.startup_idle(), true)
 		helpers.assert_eq(#fixture.shell.tasks, 0, "the admission query must be read-only")
 		helpers.assert_true(fixture.api.ensure_running())
+		local original = fixture.shell.tasks[1]
+		helpers.assert_eq(#fixture.shell.tasks, 1)
+		helpers.assert_eq(#fixture.scheduler.handles, 0, "start acceptance must not invent a readiness timer")
 		helpers.assert_eq(fixture.api.startup_idle(), false)
-		fixture.shell.tasks[1].complete()
-		helpers.assert_eq(fixture.api.startup_idle(), false)
-		fixture.scheduler.handles[1].fire()
+		local ready = fixture.frame("READY")
+		original.emit(ready:sub(1, #ready - 1))
+		helpers.assert_eq(fixture.api.startup_idle(), false, "partial READY cannot publish")
+		original.ready = true
+		original.emit("\n")
 		helpers.assert_eq(fixture.api.startup_idle(), true,
 			"an acknowledged published daemon permits readonly admission without terminating it")
-		helpers.assert_eq(fixture.shell.tasks[2].terminate_calls, 0)
+		helpers.assert_eq(original.terminate_calls, 0)
+		helpers.assert_eq(fixture.api.migration_idle(), false, "READY does not retire foreground custody")
+		original.complete()
+		helpers.assert_true(fixture.api.migration_idle())
 	end)
 
 	for _, mode in ipairs({ "false", "nil", "throw" }) do
 		helpers.it("keeps readonly startup admission closed after failed acquisition and terminate " .. mode, function()
 			local fixture = load_fixture()
-			fixture.shell.start_modes.kill = "false"
-			fixture.shell.terminate_mode = mode
+			fixture.shell.start_mode, fixture.shell.terminate_mode = "false", mode
 			local settlements = {}
 			helpers.assert_eq(fixture.api.ensure_running({
 				is_authorized = function() return true end,
@@ -252,11 +291,14 @@ helpers.describe("HS-012 Ollama daemon-start pause ownership", function()
 			helpers.assert_eq(settlements[1][1], false,
 				"a terminal refusal does not itself acknowledge native cleanup")
 			helpers.assert_eq(fixture.api.startup_idle(), false)
-			local calls = fixture.shell.tasks[1].terminate_calls
+			local original = fixture.shell.tasks[1]
+			local calls = original.terminate_calls
 			helpers.assert_eq(fixture.api.startup_idle(), false)
-			helpers.assert_eq(fixture.shell.tasks[1].terminate_calls, calls,
+			helpers.assert_eq(original.terminate_calls, calls,
 				"readonly admission must not retry or mutate the owned native task")
-			fixture.shell.tasks[1].complete()
+			helpers.assert_eq(#fixture.shell.tasks, 1)
+			helpers.assert_eq(#fixture.scheduler.handles, 0)
+			original.complete()
 			helpers.assert_eq(fixture.api.startup_idle(), true)
 			helpers.assert_eq(#settlements, 1)
 			helpers.assert_eq(#fixture.shell.tasks, 1)
@@ -264,10 +306,9 @@ helpers.describe("HS-012 Ollama daemon-start pause ownership", function()
 	end
 
 	helpers.it("keeps kill-task start owned until a reentrant PAUSE can retry", function()
+		-- Historical kill-stage name now exercises the sole native start boundary.
 		local fixture = load_fixture()
-		fixture.shell.kill_start_hook = function()
-			return fixture.script_control.pause_all()
-		end
+		fixture.shell.start_hook = function() return fixture.script_control.pause_all() end
 		helpers.assert_eq(fixture.api.ensure_running(), false,
 			"the outer start must reject a candidate superseded while start was on-stack")
 		helpers.assert_true(fixture.shell.start_hook_result)
@@ -275,46 +316,58 @@ helpers.describe("HS-012 Ollama daemon-start pause ownership", function()
 		helpers.assert_true(fixture.script_control.is_pause_transition_pending(),
 			"PAUSED cannot publish from inside the native start boundary")
 		helpers.assert_eq(fixture.shell.tasks[1].terminate_calls, 1,
-			"the outer unwind must settle the exact kill task once")
+			"the outer unwind must settle the exact foreground task once")
+		helpers.assert_eq(#fixture.shell.tasks, 1)
 		helpers.assert_true(fixture.script_control.pause_all())
 		helpers.assert_true(fixture.script_control.is_paused())
 	end)
 
 	helpers.it("keeps launch-timer acquisition owned until a reentrant PAUSE can retry", function()
+		-- Native READY delivery replaces the deliberately removed readiness timer.
 		local fixture = load_fixture()
-		helpers.assert_true(fixture.api.ensure_running())
-		fixture.scheduler.after_hook = function()
-			return fixture.script_control.pause_all()
-		end
-		fixture.shell.tasks[1].complete()
-		local launch_timer = fixture.scheduler.handles[1]
-		helpers.assert_true(fixture.scheduler.after_hook_result)
-		helpers.assert_eq(fixture.script_control.is_paused(), false)
-		helpers.assert_true(fixture.script_control.is_pause_transition_pending(),
-			"the unreturned TimerScheduler.after frame must keep PAUSE pending")
-		helpers.assert_eq(launch_timer.timer, nil,
-			"the stale launch candidate must be compensated exactly after unwind")
-		helpers.assert_eq(#fixture.shell.tasks, 1,
-			"no serve task may be constructed from the stale timer transaction")
+		local armed, pause_result = false, nil
+		local settlements = {}
+		helpers.assert_true(fixture.api.ensure_running({
+			is_authorized = function()
+				if armed then armed = false; pause_result = fixture.script_control.pause_all() end
+				return true
+			end,
+			on_settled = function(value) settlements[#settlements + 1] = value end,
+		}))
+		armed = true
+		local original = fixture.shell.tasks[1]
+		original.publish_ready()
+		helpers.assert_true(pause_result)
+		helpers.assert_eq(#settlements, 1)
+		helpers.assert_eq(settlements[1], false, "stale native READY cannot publish readiness under PAUSE")
+		helpers.assert_eq(#fixture.shell.tasks, 1)
+		helpers.assert_eq(#fixture.scheduler.handles, 0, "native READY cannot create a delay owner")
+		local paused_verdict
+		helpers.assert_true(fixture.api.ensure_running({
+			is_authorized = function() return true end,
+			on_settled = function(value) paused_verdict = value end,
+		}))
+		helpers.assert_eq(paused_verdict, false,
+			"a READY callback superseded by PAUSE cannot republish its retired owner")
 		helpers.assert_true(fixture.script_control.pause_all())
 		helpers.assert_true(fixture.script_control.is_paused())
 	end)
 
 	helpers.it("keeps serve-task start owned until a reentrant PAUSE can retry", function()
 		local fixture = load_fixture()
-		fixture.shell.serve_start_hook = function()
+		fixture.shell.start_hook = function(task)
+			helpers.assert_true(task.active, "this branch has already delivered ACTIVE")
 			return fixture.script_control.pause_all()
 		end
-		helpers.assert_true(fixture.api.ensure_running())
-		fixture.shell.tasks[1].complete()
-		fixture.scheduler.handles[1].fire()
-		local serve_task = fixture.shell.tasks[2]
+		helpers.assert_eq(fixture.api.ensure_running(), false)
+		local original = fixture.shell.tasks[1]
 		helpers.assert_true(fixture.shell.start_hook_result)
 		helpers.assert_eq(fixture.script_control.is_paused(), false)
 		helpers.assert_true(fixture.script_control.is_pause_transition_pending(),
 			"PAUSED cannot publish while serve start can still activate natively")
-		helpers.assert_eq(serve_task.terminate_calls, 1,
+		helpers.assert_eq(original.terminate_calls, 1,
 			"the outer unwind must settle the exact serve candidate")
+		helpers.assert_eq(#fixture.shell.tasks, 1)
 		helpers.assert_true(fixture.script_control.pause_all())
 		helpers.assert_true(fixture.script_control.is_paused())
 	end)
@@ -324,34 +377,29 @@ helpers.describe("HS-012 Ollama daemon-start pause ownership", function()
 			helpers.it("does not resurrect a synchronously completed " .. kind
 				.. " task after start " .. mode, function()
 				local fixture = load_fixture()
-				fixture.shell.terminate_mode = "throw"
-				fixture.shell.start_modes[kind] = mode
-				fixture.shell.complete_during_start[kind] = true
-				if kind == "kill" then
-					helpers.assert_eq(fixture.api.ensure_running(), false)
-					local terminal_task = fixture.shell.tasks[1]
-					helpers.assert_eq(terminal_task.start_calls, 1)
-					helpers.assert_eq(terminal_task.completion_calls, 1,
-						"positive control must complete the exact refused task synchronously")
-					helpers.assert_eq(terminal_task.terminate_calls, 0,
-						"a terminal callback must retire the task without synthetic termination")
-
-					fixture.shell.start_modes[kind] = "true"
-					fixture.shell.complete_during_start[kind] = false
-					helpers.assert_true(fixture.api.ensure_running(),
-						"a settled predecessor must admit a later successful acquisition")
-					helpers.assert_eq(#fixture.shell.tasks, 2)
-					helpers.assert_true(fixture.shell.tasks[2] ~= terminal_task,
-						"the retry must own a distinct native task identity")
-					helpers.assert_eq(fixture.shell.tasks[2].start_calls, 1)
-				else
-					helpers.assert_true(fixture.api.ensure_running())
-					fixture.shell.tasks[1].complete()
-					fixture.scheduler.handles[1].fire()
-					helpers.assert_true(fixture.api.ensure_running(),
-						"a completed refused serve start must leave no retained sibling fence")
-					helpers.assert_eq(#fixture.shell.tasks, 3)
-				end
+				fixture.shell.terminate_mode, fixture.shell.start_mode = "throw", mode
+				-- Preserve both receiving families: before ACTIVE vs after ACTIVE.
+				fixture.shell.active_on_start = kind == "serve"
+				fixture.shell.complete_during_start = true
+				helpers.assert_eq(fixture.api.ensure_running(), false)
+				local terminal_task = fixture.shell.tasks[1]
+				helpers.assert_eq(terminal_task.kind, "serve")
+				helpers.assert_eq(terminal_task.start_calls, 1)
+				helpers.assert_eq(terminal_task.completion_calls, 1,
+					"positive control completes the exact refused task synchronously")
+				helpers.assert_eq(terminal_task.terminate_calls, 0,
+					"RETIRED plus physical completion retires without synthetic termination")
+				helpers.assert_true(fixture.api.startup_idle())
+				helpers.assert_eq(#fixture.scheduler.handles, 0)
+				fixture.shell.start_mode, fixture.shell.complete_during_start = "true", false
+				fixture.shell.active_on_start = true
+				helpers.assert_true(fixture.api.ensure_running(),
+					"a settled predecessor must admit a later successful acquisition")
+				helpers.assert_eq(#fixture.shell.tasks, 2, "one new foreground owner follows exact old retirement")
+				helpers.assert_true(fixture.shell.tasks[2] ~= terminal_task)
+				helpers.assert_eq(fixture.shell.tasks[2].start_calls, 1)
+				helpers.assert_eq(#fixture.scheduler.handles, 0)
+				fixture.shell.tasks[2].complete()
 			end)
 		end
 	end
@@ -361,36 +409,28 @@ helpers.describe("HS-012 Ollama daemon-start pause ownership", function()
 			local fixture = load_fixture()
 			helpers.assert_true(fixture.api.ensure_running())
 			local stale_task = fixture.shell.tasks[1]
-			helpers.assert_eq(stale_task.kind, "kill")
+			helpers.assert_eq(stale_task.kind, "serve", "stale debt is the exact owned foreground task")
 			fixture.shell.terminate_mode = mode
-			helpers.assert_true(fixture.script_control.pause_all(),
-				"pause_all returns drain admission, not the synchronous nested commit verdict")
+			helpers.assert_true(fixture.script_control.pause_all())
 			helpers.assert_eq(fixture.script_control.is_paused(), false)
-			helpers.assert_true(fixture.script_control.is_pause_transition_pending(),
-				"the refused kill and inverse must remain visible as exact transition debt")
-			helpers.assert_eq(stale_task.terminate_calls, 2,
-				"pause and its inverse must both retry the same stale-process task")
-			helpers.assert_eq(#fixture.scheduler.handles, 0,
-				"a fenced kill completion may not pre-arm a launch timer")
-
+			helpers.assert_true(fixture.script_control.is_pause_transition_pending())
+			helpers.assert_eq(stale_task.terminate_calls, 2, "pause and inverse retry the same original owner")
+			helpers.assert_eq(#fixture.scheduler.handles, 0)
+			helpers.assert_eq(#fixture.shell.tasks, 1)
 			stale_task.complete()
-			helpers.assert_eq(#fixture.scheduler.handles, 1,
-				"exact task settlement must stage one ACTIVE rollback restoration")
+			helpers.assert_eq(#fixture.scheduler.handles, 1, "exact settlement stages ACTIVE rollback restoration")
 			stale_task.complete()
-			helpers.assert_eq(#fixture.scheduler.handles, 1,
-				"duplicate task completion must remain inert")
-
+			helpers.assert_eq(#fixture.scheduler.handles, 1, "duplicate terminal delivery cannot stage a sibling")
 			fixture.shell.terminate_mode = "true"
 			helpers.assert_true(fixture.script_control.pause_all())
 			helpers.assert_true(fixture.script_control.is_paused())
-			helpers.assert_eq(fixture.script_control.is_pause_transition_pending(), false)
 			helpers.assert_true(fixture.script_control.resume_all())
 			helpers.assert_eq(#fixture.scheduler.handles, 2)
 			fixture.scheduler.handles[2].fire()
-			helpers.assert_eq(#fixture.shell.tasks, 2,
-				"resume must restore exactly one pre-pause daemon-start intent")
-			helpers.assert_true(fixture.shell.tasks[2] ~= stale_task,
-				"the resumed pipeline must never recycle the terminal predecessor identity")
+			helpers.assert_eq(#fixture.shell.tasks, 2, "resume restores one distinct foreground owner only")
+			helpers.assert_true(fixture.shell.tasks[2] ~= stale_task)
+			helpers.assert_eq(fixture.shell.tasks[2].kind, "serve")
+			fixture.shell.tasks[2].complete()
 		end)
 	end
 
@@ -398,156 +438,160 @@ helpers.describe("HS-012 Ollama daemon-start pause ownership", function()
 		helpers.it("accepts synchronous kill settlement before outer " .. mode, function()
 			local fixture = load_fixture()
 			helpers.assert_true(fixture.api.ensure_running())
+			local original = fixture.shell.tasks[1]
 			fixture.shell.terminate_mode = mode
 			helpers.assert_true(fixture.script_control.pause_all())
 			helpers.assert_true(fixture.script_control.is_paused())
-			helpers.assert_eq(#fixture.scheduler.handles, 0,
-				"a synchronous stale-process terminal may not schedule launch under PAUSED")
-			fixture.shell.tasks[1].complete()
 			helpers.assert_eq(#fixture.scheduler.handles, 0)
+			helpers.assert_true(original.settled)
+			original.complete()
+			helpers.assert_eq(#fixture.scheduler.handles, 0, "duplicate retirement under PAUSED remains inert")
 			helpers.assert_true(fixture.script_control.resume_all())
 			helpers.assert_eq(#fixture.scheduler.handles, 1)
+			helpers.assert_eq(#fixture.shell.tasks, 1, "resume acceptance cannot prelaunch a sibling")
+			fixture.scheduler.handles[1].fire()
+			helpers.assert_eq(#fixture.shell.tasks, 2)
+			fixture.shell.tasks[2].complete()
 		end)
 	end
 
 	for _, mode in ipairs({ "false", "nil", "throw" }) do
 		helpers.it("waits for a due launch timer whose stop returns " .. mode, function()
+			-- This is the existing post-RESUMED intent timer, never a readiness timer.
 			local fixture = load_fixture()
 			helpers.assert_true(fixture.api.ensure_running())
-			fixture.shell.tasks[1].complete()
+			local original = fixture.shell.tasks[1]
+			helpers.assert_true(fixture.script_control.pause_all())
+			helpers.assert_true(original.settled)
+			helpers.assert_true(fixture.script_control.resume_all())
 			local launch_timer = fixture.scheduler.handles[1]
 			fixture.scheduler.cancel_mode = mode
-			helpers.assert_true(fixture.script_control.pause_all(),
-				"pause_all returns drain admission even when the nested timer join refuses")
+			helpers.assert_true(fixture.script_control.pause_all())
 			helpers.assert_eq(fixture.script_control.is_paused(), false)
-			helpers.assert_true(fixture.script_control.is_pause_transition_pending(),
-				"the exact launch timer and inverse debt must keep publication pending")
-			helpers.assert_eq(#fixture.scheduler.cancel_calls, 2,
-				"pause and rollback must each retry the launch timer")
+			helpers.assert_true(fixture.script_control.is_pause_transition_pending())
+			helpers.assert_eq(#fixture.scheduler.cancel_calls, 2)
 			helpers.assert_true(fixture.scheduler.cancel_calls[1] == launch_timer
-				and fixture.scheduler.cancel_calls[2] == launch_timer,
-				"both cleanup attempts must retain the same timer identity")
+				and fixture.scheduler.cancel_calls[2] == launch_timer)
 			launch_timer.fire()
-			helpers.assert_eq(#fixture.shell.tasks, 1,
-				"a due timer with live native ownership may not spawn serve")
 			launch_timer.fire()
-			helpers.assert_eq(#fixture.shell.tasks, 1)
+			helpers.assert_eq(#fixture.shell.tasks, 1, "due timer debt cannot start any new foreground owner")
 			helpers.assert_true(fixture.scheduler.cancel_calls[3] == launch_timer
-				and fixture.scheduler.cancel_calls[4] == launch_timer,
-				"repeated native delivery may only retry the retained timer")
-
+				and fixture.scheduler.cancel_calls[4] == launch_timer)
 			fixture.scheduler.cancel_mode = "true"
 			launch_timer.fire()
-			helpers.assert_eq(launch_timer.timer, nil,
-				"the fifth identity-matched stop must be exact terminal proof")
-			helpers.assert_eq(#fixture.shell.tasks, 1,
-				"stale settlement may restore intent but never run the old launch body")
+			helpers.assert_eq(launch_timer.timer, nil)
+			helpers.assert_eq(#fixture.shell.tasks, 1, "stale settlement cannot execute the old timer body")
+			helpers.assert_true(fixture.script_control.pause_all())
+			helpers.assert_true(fixture.script_control.is_paused())
+			helpers.assert_true(fixture.script_control.resume_all())
 			helpers.assert_eq(#fixture.scheduler.handles, 2)
 			launch_timer.fire()
-			helpers.assert_eq(#fixture.scheduler.handles, 2,
-				"duplicate native delivery must not stage a sibling")
+			helpers.assert_eq(#fixture.scheduler.handles, 2)
+			fixture.scheduler.handles[2].fire()
+			helpers.assert_eq(#fixture.shell.tasks, 2)
+			fixture.shell.tasks[2].complete()
 		end)
 	end
 
 	for _, mode in ipairs({ "false", "nil", "throw" }) do
 		helpers.it("fences an unpublished serve task after terminate " .. mode, function()
 			local fixture = load_fixture()
-			local pause_result = nil
-			fixture.shell.serve_start_hook = function()
+			local pause_result
+			fixture.shell.start_hook = function()
 				fixture.shell.terminate_mode = mode
 				pause_result = fixture.script_control.pause_all()
 			end
-			helpers.assert_true(fixture.api.ensure_running())
-			fixture.shell.tasks[1].complete()
-			fixture.scheduler.handles[1].fire()
-			local serve_task = fixture.shell.tasks[2]
-			helpers.assert_true(pause_result,
-				"pause_all returns drain admission even when the nested serve join refuses")
+			helpers.assert_eq(fixture.api.ensure_running(), false)
+			local serve_task = fixture.shell.tasks[1]
+			helpers.assert_true(pause_result)
 			helpers.assert_eq(fixture.script_control.is_paused(), false)
-			helpers.assert_true(fixture.script_control.is_pause_transition_pending(),
-				"the unpublished serve task must remain exact transition debt")
-			helpers.assert_eq(serve_task.terminate_calls, 1,
-				"the nested PAUSE must leave termination to the exact outer unwind")
-			helpers.assert_eq(fixture.api.ensure_running(), false,
-				"a sibling daemon start must remain fenced while that task is live")
-			helpers.assert_eq(#fixture.shell.tasks, 2,
-				"cleanup retry may not construct a sibling serve or kill task")
-			helpers.assert_true(fixture.shell.tasks[2] == serve_task,
-				"the cleanup ledger must retain the original serve identity")
-			helpers.assert_eq(serve_task.terminate_calls, 2,
-				"the sibling refusal must retry that same exact task")
+			helpers.assert_true(fixture.script_control.is_pause_transition_pending())
+			helpers.assert_eq(serve_task.terminate_calls, 1, "outer unwind alone attempts original termination")
+			helpers.assert_eq(fixture.api.ensure_running(), false)
+			helpers.assert_eq(#fixture.shell.tasks, 1, "a cleanup retry cannot construct any sibling")
+			helpers.assert_true(fixture.shell.tasks[1] == serve_task)
+			helpers.assert_eq(serve_task.terminate_calls, 2)
 			serve_task.complete()
 			helpers.assert_eq(serve_task.completion_calls, 1)
-			helpers.assert_eq(#fixture.scheduler.handles, 2)
+			helpers.assert_eq(#fixture.scheduler.handles, 1)
 			serve_task.complete()
-			helpers.assert_eq(serve_task.completion_calls, 2,
-				"duplicate native terminal delivery is observable but logically inert")
-			helpers.assert_eq(#fixture.scheduler.handles, 2)
+			helpers.assert_eq(serve_task.completion_calls, 2)
+			helpers.assert_eq(#fixture.scheduler.handles, 1)
+			fixture.shell.terminate_mode = "true"
+			helpers.assert_true(fixture.script_control.pause_all())
+			helpers.assert_true(fixture.script_control.is_paused())
 		end)
 	end
 
 	for _, mode in ipairs({ "sync_false", "sync_nil", "sync_throw" }) do
 		helpers.it("accepts synchronous serve settlement before outer " .. mode, function()
 			local fixture = load_fixture()
-			local pause_result = nil
-			fixture.shell.serve_start_hook = function()
+			local pause_result
+			fixture.shell.start_hook = function()
 				fixture.shell.terminate_mode = mode
 				pause_result = fixture.script_control.pause_all()
 			end
-			helpers.assert_true(fixture.api.ensure_running())
-			fixture.shell.tasks[1].complete()
-			fixture.scheduler.handles[1].fire()
-			helpers.assert_true(pause_result,
-				"pause_all accepts the drain while native start keeps publication pending")
+			helpers.assert_eq(fixture.api.ensure_running(), false)
+			helpers.assert_true(pause_result)
 			helpers.assert_eq(fixture.script_control.is_paused(), false)
 			helpers.assert_true(fixture.script_control.is_pause_transition_pending())
-			helpers.assert_true(fixture.script_control.pause_all(),
-				"a retry after the start frame unwinds may publish PAUSED")
+			helpers.assert_eq(#fixture.shell.tasks, 1)
+			helpers.assert_true(fixture.shell.tasks[1].settled)
+			helpers.assert_true(fixture.script_control.pause_all())
 			helpers.assert_true(fixture.script_control.is_paused())
-		local handles_before_resume = #fixture.scheduler.handles
+			local handles_before_resume = #fixture.scheduler.handles
 			helpers.assert_true(fixture.script_control.resume_all())
 			helpers.assert_eq(#fixture.scheduler.handles, handles_before_resume + 1)
+			fixture.scheduler.handles[#fixture.scheduler.handles].fire()
+			helpers.assert_eq(#fixture.shell.tasks, 2)
+			fixture.shell.tasks[2].complete()
 		end)
 	end
 
 	helpers.it("does not terminate or restore an already-published daemon", function()
 		local fixture = load_fixture()
 		helpers.assert_true(fixture.api.ensure_running())
-		fixture.shell.tasks[1].complete()
-		fixture.scheduler.handles[1].fire()
-		local published_serve = fixture.shell.tasks[2]
+		local published_serve = fixture.shell.tasks[1]
+		published_serve.publish_ready()
+		helpers.assert_true(fixture.api.startup_idle())
 		helpers.assert_true(fixture.script_control.pause_all())
 		helpers.assert_eq(published_serve.terminate_calls, 0)
 		helpers.assert_true(fixture.script_control.resume_all())
-		helpers.assert_eq(#fixture.shell.tasks, 2,
-			"pause must not invent restore intent for a published daemon")
+		helpers.assert_eq(#fixture.shell.tasks, 1, "pause cannot invent another foreground owner")
+		helpers.assert_eq(#fixture.scheduler.handles, 0, "published daemon owes no restoration timer")
+		published_serve.complete()
 	end)
 
 	helpers.it("stages ensure_running calls made after PAUSED", function()
 		local fixture = load_fixture()
 		helpers.assert_true(fixture.script_control.pause_all())
 		helpers.assert_true(fixture.api.ensure_running())
-		helpers.assert_eq(#fixture.shell.tasks, 0,
-			"a backend setter under PAUSED may not construct the kill task")
+		helpers.assert_eq(#fixture.shell.tasks, 0)
 		helpers.assert_true(fixture.script_control.resume_all())
 		helpers.assert_eq(#fixture.scheduler.handles, 1)
+		helpers.assert_eq(#fixture.shell.tasks, 0, "only actual post-RESUMED delivery acquires a task")
 		fixture.scheduler.handles[1].fire()
 		helpers.assert_eq(#fixture.shell.tasks, 1)
+		helpers.assert_eq(#fixture.scheduler.handles, 1, "native start adds no readiness timer")
+		helpers.assert_eq(fixture.api.startup_idle(), false)
+		fixture.shell.tasks[1].publish_ready()
+		helpers.assert_true(fixture.api.startup_idle())
+		fixture.shell.tasks[1].complete()
 	end)
 
 	helpers.it("fences sibling ensure_running during the pause transaction", function()
 		local fixture = load_fixture()
 		fixture.hooks.remote_pause = function()
-			helpers.assert_eq(fixture.script_control.is_paused(), false,
-				"the sibling must exercise the window before PAUSED is published")
+			helpers.assert_eq(fixture.script_control.is_paused(), false)
 			helpers.assert_true(fixture.api.ensure_running())
 		end
 		helpers.assert_true(fixture.script_control.pause_all())
-		helpers.assert_eq(#fixture.shell.tasks, 0,
-			"a later pause owner may not construct an Ollama startup sibling")
+		helpers.assert_eq(#fixture.shell.tasks, 0)
 		helpers.assert_true(fixture.script_control.resume_all())
-		helpers.assert_eq(#fixture.scheduler.handles, 1,
-			"the fenced acquisition intent must be restored exactly once")
+		helpers.assert_eq(#fixture.scheduler.handles, 1, "restore exactly one fenced acquisition intent")
+		fixture.scheduler.handles[1].fire()
+		helpers.assert_eq(#fixture.shell.tasks, 1)
+		fixture.shell.tasks[1].complete()
 	end)
 end)
 

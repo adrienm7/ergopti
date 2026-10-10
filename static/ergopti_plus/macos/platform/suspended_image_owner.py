@@ -220,6 +220,7 @@ class SuspendedImageOwner:
         self.process = None
         self.image_ready = False
         self.active = False
+        self.listener_bound = False
         self.physically_retired = False
         self.listener = None
         self._retired = None
@@ -319,6 +320,15 @@ class SuspendedImageOwner:
         self._send(b"ACTIVATE\n", self._startup_deadline)
         self._wait(lambda: self.active, self._startup_deadline)
 
+    def wait_listener_bound(self):
+        if self.request.get("listener_event") is not True or not self.active:
+            raise ImageRefusal("state")
+        self.recheck_source()
+        self._wait(lambda: self.listener_bound, self._startup_deadline)
+        self.recheck_source()
+        if self._retirement_started or not self.active or self.physically_retired:
+            raise ImageRefusal("state")
+
     def _send(self, data, deadline):
         offset = 0
         while offset < len(data):
@@ -369,6 +379,18 @@ class SuspendedImageOwner:
                 if not self.image_ready or self.active or self._retirement_started:
                     raise ImageRefusal("protocol")
                 self.active = True
+            elif role == "LISTENER_BOUND" and len(fields) == 3:
+                name = Path(self.request["session_path"]).name
+                if (
+                    self.request.get("listener_event") is not True
+                    or not self.active
+                    or self.listener_bound
+                    or self._retirement_started
+                    or fields[2] != name.removeprefix("daemon-").removesuffix(".json")
+                ):
+                    raise ImageRefusal("protocol")
+                self.progress()
+                self.listener_bound = True
             elif role == "PENDING" and len(fields) == 3:
                 decimal(fields[2], 2**31 - 1)
                 self._retirement_started = True

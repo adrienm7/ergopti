@@ -71,6 +71,12 @@ helpers.describe("llm-configuration-scope", function()
 		local original_resolve = binary.resolve
 		binary.resolve = function() return "/Applications/Ollama.app/Contents/Resources/ollama", nil, binary.SOURCE_APP end
 		local ok, err = xpcall(function()
+			-- An external installation stays selectable without daemon authority.
+			helpers.assert_true(core.set_backend("ollama"))
+			helpers.assert_eq(core.get_backend(), "ollama")
+			helpers.assert_eq(starts(), 0)
+			-- Only the classified native owner supplies the explicit startup fixture.
+			binary.resolve = function() return "/fixture/native/ollama", nil, binary.SOURCE_NATIVE_MANAGED end
 			helpers.assert_true(core.set_backend("ollama"))
 			helpers.assert_eq(starts(), 1)
 		end, debug.traceback)

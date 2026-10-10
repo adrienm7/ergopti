@@ -11,4 +11,7 @@
 int ergopti_owned_suspended_image_validate(ergopti_owned_program *owner,
 	const char *executable, int alias_descriptor, uint64_t device, uint64_t inode,
 	uint32_t remaining_ms, ergopti_listener_identity *identity);
+int ergopti_owned_active_image_validate(ergopti_owned_program *owner,
+ const char *executable, int alias_descriptor, uint64_t device, uint64_t inode,
+ uint32_t remaining_ms, ergopti_listener_identity *identity);
 #endif

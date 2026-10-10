@@ -23,9 +23,52 @@ PRODUCER = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(PRODUCER)
 CONTRACT = json.loads((ROOT / PRODUCER.RUNTIME_CONTRACT).read_text(encoding="utf-8"))
 POLICY = CONTRACT["native_http_go_test_policy"]
-# The four Darwin-only identities are already in the independently frozen policy.
+# These literal identities belong to the frozen pre-event Linux receipt, not current policy.
 REQUIRED = [
-    name for name in POLICY["required_passes"] if not name.startswith("TestBootstrapDarwin")
+    "TestPrivateHMACFrozenIndependentVectorBindsAuthorityPathAndBody",
+    "TestPrivateAdmissionRequiresExactSecretAndLoopback",
+    "TestPrivateAdmissionDoesNotDiscloseUnqualifiedDaemon",
+    "TestPrivateSessionRejectsDuplicateNullAndMalformedIdentity",
+    "TestOwnedPullRetirementWaitsForPhysicalNativeAndBackgroundOwners",
+    "TestOrdinaryPullAndPrivateForeignSessionStaySeparate",
+    "TestBootstrapIndependentHMACVectorAndImmutableSnapshot",
+    "TestBootstrapSignedProtocolRefusals",
+    "TestBootstrapPreservesCustomStoreWithoutMigration",
+    "TestBootstrapRealPrivateFDAndNamespaceRefusals",
+    "TestBootstrapNativeWorkerGetsOnlyPrivateCertificates",
+    "TestBootstrapCertificateTrustIsScopedAndPreservesOriginal",
+    "TestBootstrapCertificateDirectoryAndMalformedRefusals",
+    "TestBootstrapExplicitProxyUsesActualScopedTLSAnchor",
+    "TestFullURLPrivateHeadersAndPhysicalCompletion",
+    "TestWireFailuresCannotPublishFinalBytes/truncated",
+    "TestWireFailuresCannotPublishFinalBytes/false-terminal",
+    "TestWireFailuresCannotPublishFinalBytes/wrong-exit",
+    "TestWireFailuresCannotPublishFinalBytes/late-bytes",
+    "TestWireFailuresCannotPublishFinalBytes/null-terminal",
+    "TestWireFailuresCannotPublishFinalBytes/duplicate",
+    "TestWireFailuresCannotPublishFinalBytes/invalid-header",
+    "TestWireFailuresCannotPublishFinalBytes",
+    "TestHeadVerifiesTerminalBeforeHeaders/complete",
+    "TestHeadVerifiesTerminalBeforeHeaders/wrong-exit",
+    "TestHeadVerifiesTerminalBeforeHeaders",
+    "TestGoRedirectPolicyRetainsFullURLAndStripsForeignAuth",
+    "TestCancellationAndConcurrentClosePhysicallyRetirePeer/stall-header",
+    "TestCancellationAndConcurrentClosePhysicallyRetirePeer/cancel-body",
+    "TestCancellationAndConcurrentClosePhysicallyRetirePeer/stall-body",
+    "TestCancellationAndConcurrentClosePhysicallyRetirePeer",
+    "TestBypassIndependentVectors",
+    "TestIdleDeadlinePhysicallyRetiresPeer",
+    "TestUnknownLengthRequiresTerminalAndExactEOF",
+    "TestClientErrorPrivacyRetainsContextCause",
+    "TestManagedRedirectStrictAuthorityAndDowngrade/https://origin.example/blob?q=two",
+    "TestManagedRedirectStrictAuthorityAndDowngrade/https://origin.example:443/blob?q=two",
+    "TestManagedRedirectStrictAuthorityAndDowngrade/https://origin.example:444/blob?q=two",
+    "TestManagedRedirectStrictAuthorityAndDowngrade/https://asset.origin.example/blob?q=two",
+    "TestManagedRedirectStrictAuthorityAndDowngrade/https://foreign.example/blob?q=two",
+    "TestManagedRedirectStrictAuthorityAndDowngrade/http://origin.example/blob?q=two",
+    "TestManagedRedirectStrictAuthorityAndDowngrade",
+    "TestManagedRedirectKeepsOriginalVeto",
+    "TestManagedRedirectReturnToOriginDoesNotRestoreHeaderOrJarSecrets",
 ]
 FROZEN = ROOT / "tools/test/fixtures/managed-ollama-go/linux-44.jsonl"
 PACKAGE = "ergopti/nativehttp"
@@ -61,6 +104,30 @@ class NativeGoEvidenceTests(unittest.TestCase):
     def testLinuxReceiptCannotQualifyRequiredDarwin48(self):
         with self.assertRaises(ValueError):
             self.receive(required=POLICY["required_passes"])
+
+    def testFrozenLinux44CannotQualifySixAddedListenerEventIdentities(self):
+        required = [
+            "TestListenerEventRealUnixFrameHalfCloseAndGuardianEOF",
+            "TestListenerEventForeignPortCannotAcquireUnixConnection",
+            "TestListenerEventMissingSessionCannotAcquireUnixConnection",
+            "TestListenerEventForeignGuardianCannotReceiveAnyFrame",
+            "TestListenerEventUnexpectedGuardianByteCannotPermitServe",
+            "TestListenerEventRepeatedPublicationCannotCreateSuccessor",
+        ]
+        self.assertEqual(
+            [name for name in POLICY["required_passes"] if name.startswith("TestListenerEvent")],
+            required,
+        )
+        observed = {
+            event["Test"]
+            for event in self.events
+            if event.get("Action") == "pass" and "Test" in event
+        }
+        self.assertTrue(observed.isdisjoint(required))
+        for name in required:
+            with self.subTest(identity=name):
+                with self.assertRaises(ValueError):
+                    self.receive(required=REQUIRED + [name])
 
     def testMissingSubjectPassRefused(self):
         events = [

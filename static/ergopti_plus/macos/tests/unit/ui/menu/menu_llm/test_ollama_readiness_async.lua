@@ -3,7 +3,7 @@
 -- =============================================================================
 -- MODULE: Asynchronous Ollama Readiness Regression
 -- DESCRIPTION:
--- Proves that readiness and daemon restart shell work is owned asynchronously,
+-- Proves that readiness and delegated native daemon work is owned asynchronously,
 -- generation-fenced, and terminal exactly once without blocking the Lua runloop.
 -- Also proves that a requirement request receives every terminal from the real
 -- pull continuation that it dispatches.
@@ -11,11 +11,54 @@
 
 local helpers = require("tests.helpers")
 
+-- These ports load the actual API, daemon lifecycle and shared fixed-frame
+-- receiver. Only their original physical task is controlled; manager probes,
+-- retry timers and descendant ownership remain the fixture's existing ports.
+-- This is source/model receiving, not native daemon or API authentication.
+local Foreground = assert(loadfile(helpers.driver_root()
+	.. "../../../tools/test/fixtures/managed_ollama_foreground_ports.lua"))()
+-- Match the original manager's literal loopback probe port; no native endpoint
+-- or daemon traffic is synthesized by these controlled task ports.
+Foreground.PORT = 11434
+local source_root = helpers.driver_root() .. "../../.."
+
+local function foreground_fixture(options)
+	local previous_path = package.path
+	local ok, daemon = xpcall(function()
+		return Foreground.new(source_root, source_root, options)
+	end, debug.traceback)
+	package.path = previous_path
+	if not ok then error(daemon, 0) end
+	return daemon
+end
+
+local function publish_daemon_ready(daemon)
+	local task = assert(daemon.tasks[1])
+	helpers.assert_true(task.owned)
+	helpers.assert_true(task.private)
+	helpers.assert_eq(daemon.calls[1][4], "native_managed",
+		"the actual API must classify the admitted foreground source before launch")
+	helpers.assert_eq(task.settled, false)
+	task.emit("ERGOPTI_MANAGED_DAEMON_V1 " .. Foreground.NONCE .. " ACTIVE\n")
+	task.emit("ERGOPTI_MANAGED_DAEMON_V1 " .. Foreground.NONCE .. " READY\n")
+	helpers.assert_eq(task.settled, false,
+		"READY publishes readiness while the original foreground lifetime stays owned")
+end
+
+local function retire_daemon(daemon, status, before_completion)
+	local task = assert(daemon.tasks[1])
+	task.emit("ERGOPTI_MANAGED_DAEMON_V1 " .. Foreground.NONCE
+		.. " RETIRED " .. tostring(status) .. "\n")
+	if before_completion then before_completion() end
+	task.complete(status, "", "")
+end
+
 local MODULES = {
 	"infra.logger",
 	"infra.notifications",
 	"infra.i18n",
 	"infra.text_utils",
+	"modules.llm.api_ollama",
 	"modules.llm.ollama_binary",
 	"modules.llm.ollama_server_command",
 	"modules.llm.network_env",
@@ -377,6 +420,19 @@ local function with_fixture(spec, body)
 			urlevent = {openURL = function() return true end},
 		}
 
+		local daemon = foreground_fixture({
+			start = function(task)
+				if spec.daemon_start_result == false then
+					-- A refused start may retain partial native acquisition. The
+					-- attempted original task stays unsettled until RETIRED78 plus
+					-- its exact physical completion; start false is no closure ACK.
+					return false
+				end
+				return true
+			end,
+		})
+		package.loaded["modules.llm.api_ollama"] = daemon.api
+
 		-- Own the genuine methods with an independently read native policy path.
 		-- The fixture's other cached adapter doubles cannot select a fake policy.
 		local native_root = helpers.driver_root():gsub("\\", "/")
@@ -414,6 +470,7 @@ local function with_fixture(spec, body)
 
 		body({
 			manager = manager,
+			daemon = daemon,
 			spawns = spawns,
 			timers = timers,
 			native_tasks = native_tasks,
@@ -504,24 +561,25 @@ helpers.describe("HS-025 Ollama readiness is asynchronous and generation-owned",
 			end, {is_current = function() return current end})
 
 			fixture.spawns[1].complete(28, "", "timeout")
-			helpers.assert_eq(#fixture.spawns, 2)
-			helpers.assert_eq(fixture.spawns[2].executable, "/bin/bash")
-			helpers.assert_eq(fixture.spawns[2].args[1], "-c",
-				"the shared restart must not run user login-profile startup")
+			helpers.assert_eq(#fixture.spawns, 1)
+			helpers.assert_eq(#fixture.daemon.tasks, 1)
+			helpers.assert_eq(fixture.daemon.tasks[1].executable, "/bin/sh")
+			helpers.assert_eq(fixture.daemon.tasks[1].arguments[1], "-c",
+				"the native foreground owner must not run user login-profile startup")
 			helpers.assert_eq(#fixture.timers, 0)
-			fixture.spawns[2].complete(0, "", "")
+			publish_daemon_ready(fixture.daemon)
 			helpers.assert_eq(#fixture.timers, 1)
 			helpers.assert_eq(fixture.timers[1].delay, 0.5)
-			helpers.assert_eq(#fixture.spawns, 2,
+			helpers.assert_eq(#fixture.spawns, 1,
 				"retry work cannot run inline from the daemon completion")
 
 			fixture.timers[1].fire()
-			helpers.assert_eq(#fixture.spawns, 3)
+			helpers.assert_eq(#fixture.spawns, 2)
 			current = false
-			fixture.spawns[3].complete(0, '{"version":"late"}', "")
+			fixture.spawns[2].complete(0, '{"version":"late"}', "")
 			helpers.assert_eq(cancellations, {"stale"})
 			helpers.assert_eq(#fixture.native_tasks, 0)
-			fixture.spawns[3].complete(0, '{"version":"duplicate"}', "")
+			fixture.spawns[2].complete(0, '{"version":"duplicate"}', "")
 			helpers.assert_eq(cancellations, {"stale"})
 			helpers.assert_eq(fixture.synchronous_exec_calls(), 0)
 	end)
@@ -576,9 +634,9 @@ helpers.describe("HS-025 Ollama readiness is asynchronous and generation-owned",
 				cancellations[#cancellations + 1] = reason
 			end, {is_current = function() return true end})
 			fixture.spawns[1].complete(28, "", "timeout")
-			fixture.spawns[2].complete(0, "", "")
+			publish_daemon_ready(fixture.daemon)
 			helpers.assert_eq(cancellations, {"retry_timer_refused"})
-			helpers.assert_eq(#fixture.spawns, 2,
+			helpers.assert_eq(#fixture.spawns, 1,
 				"a refused timer cannot burst the next readiness probe inline")
 			helpers.assert_eq(fixture.synchronous_exec_calls(), 0)
 		end)
@@ -595,8 +653,9 @@ helpers.describe("HS-025 Ollama readiness is asynchronous and generation-owned",
 			helpers.assert_eq(accepted_a, true)
 
 			fixture.spawns[1].complete(28, "", "timeout")
-			helpers.assert_eq(#fixture.spawns, 2)
-			helpers.assert_eq(fixture.spawns[2].executable, "/bin/bash")
+			helpers.assert_eq(#fixture.spawns, 1)
+			helpers.assert_eq(#fixture.daemon.tasks, 1)
+			helpers.assert_eq(fixture.daemon.tasks[1].executable, "/bin/sh")
 			generation = 2
 			local accepted_b = fixture.manager.check_requirements("B", function()
 				b_successes = b_successes + 1
@@ -605,51 +664,52 @@ helpers.describe("HS-025 Ollama readiness is asynchronous and generation-owned",
 			end, {is_current = function() return generation == 2 end})
 
 			helpers.assert_eq(accepted_b, true)
-			helpers.assert_eq(#fixture.spawns, 2,
+			helpers.assert_eq(#fixture.spawns, 1,
 				"a joined waiter must adopt the exact daemon owner instead of probing or restarting again")
-			fixture.spawns[2].complete(0, "", "")
+			publish_daemon_ready(fixture.daemon)
 			helpers.assert_eq(a_cancellations, {"stale"})
 			helpers.assert_eq(b_cancellations, {})
 			helpers.assert_eq(#fixture.timers, 1)
-			fixture.spawns[2].complete(0, "", "duplicate")
+			-- Repeat the original physical observation with the same complete READY
+			-- state; it cannot republish business readiness or create a new timer.
+			for _, observer in ipairs(fixture.daemon.tasks[1].observers) do observer() end
 			helpers.assert_eq(#fixture.timers, 1,
 				"a duplicate restart completion cannot allocate a second retry owner")
 			helpers.assert_eq(a_cancellations, {"stale"})
 
 			fixture.timers[1].fire()
-			helpers.assert_eq(#fixture.spawns, 3)
-			fixture.spawns[3].complete(0, '{"version":"ready"}', "")
+			helpers.assert_eq(#fixture.spawns, 2)
+			fixture.spawns[2].complete(0, '{"version":"ready"}', "")
 			helpers.assert_eq(#fixture.native_tasks, 1)
 			fixture.native_tasks[1].on_done(0, "NAME ID\nB fixture\n", "")
 			helpers.assert_eq(#fixture.http_callbacks, 1)
 			fixture.http_callbacks[1].callback(200, "{}", {})
 			fixture.http_callbacks[1].callback(200, "duplicate", {})
-			fixture.spawns[3].complete(0, '{"version":"duplicate"}', "")
+			fixture.spawns[2].complete(0, '{"version":"duplicate"}', "")
 
 			helpers.assert_eq(b_successes, 1,
 				"the current joined waiter must publish one outer success after duplicate completions")
 			helpers.assert_eq(b_cancellations, {})
 			helpers.assert_eq(a_cancellations, {"stale"})
-			local restart_count = 0
-			for _, spawn in ipairs(fixture.spawns) do
-				if spawn.executable == "/bin/bash" then restart_count = restart_count + 1 end
-			end
+			local restart_count = #fixture.daemon.tasks
 			helpers.assert_eq(restart_count, 1,
 				"rapid A-to-B replacement must retain one shared daemon restart capability")
 		end)
 	end)
 
 	helpers.it("HS-025 settles restart start refusal and nonzero completion exactly once", function()
-		with_fixture({start_results = {true, false}}, function(fixture)
+		with_fixture({daemon_start_result = false}, function(fixture)
 			local cancellations = {}
 			fixture.manager.check_requirements("demo", function() end, function(reason)
 				cancellations[#cancellations + 1] = reason
 			end, {is_current = function() return true end})
 			fixture.spawns[1].complete(28, "", "timeout")
-			helpers.assert_eq(cancellations, {"restart_task_start_refused"})
+			helpers.assert_eq(cancellations, {"server task start"})
+			helpers.assert_eq(fixture.daemon.tasks[1].settled, false,
+				"start refusal retains the exact partial foreground transport")
 			helpers.assert_eq(#fixture.timers, 0)
-			fixture.spawns[2].complete(0, "", "")
-			helpers.assert_eq(cancellations, {"restart_task_start_refused"},
+			retire_daemon(fixture.daemon, 78)
+			helpers.assert_eq(cancellations, {"server task start"},
 				"a completion delivered after start refusal must remain inert")
 		end)
 
@@ -660,14 +720,42 @@ helpers.describe("HS-025 Ollama readiness is asynchronous and generation-owned",
 				details[#details + 1] = detail
 			end, {is_current = function() return true end})
 			fixture.spawns[1].complete(28, "", "timeout")
-			fixture.spawns[2].complete(7, "", "restart failed")
-			fixture.spawns[2].complete(0, "", "duplicate")
+			-- The native protocol permits only the authentic refusal status78
+			-- before READY; arbitrary exit7 without that receipt is retained debt.
+			retire_daemon(fixture.daemon, 78, function()
+				helpers.assert_eq(cancellations, {},
+					"RETIRED alone cannot deliver the native terminal before physical settlement")
+				helpers.assert_eq(#fixture.timers, 0)
+				helpers.assert_eq(fixture.daemon.tasks[1].settled, false)
+			end)
+			fixture.daemon.tasks[1].complete(78, "", "duplicate")
 			-- A failed restart leaves nothing at the endpoint: one reason for every
 			-- caller (llm-enable-unreachable-local), the step that gave up as detail
 			helpers.assert_eq(cancellations, {require("modules.llm.ollama_endpoint").UNREACHABLE})
 			helpers.assert_eq(details, {"restart_failed"})
 			helpers.assert_eq(#fixture.timers, 0,
 				"a failed restart cannot schedule readiness work from a duplicate completion")
+		end)
+		with_fixture({}, function(fixture)
+			local cancellations = {}
+			fixture.manager.check_requirements("demo", function() end, function(reason)
+				cancellations[#cancellations + 1] = reason
+			end, {is_current = function() return true end})
+			fixture.spawns[1].complete(28, "", "timeout")
+			-- Preserve the original nonzero7 input independently: exit alone
+			-- cannot certify a new native lifecycle that omitted RETIRED.
+			fixture.daemon.tasks[1].complete(7, "", "native exit without receipt")
+			helpers.assert_eq(cancellations, {"native lifecycle receipt unsettled"})
+			helpers.assert_eq(#fixture.timers, 0)
+			helpers.assert_eq(fixture.daemon.tasks[1].settled, true,
+				"transport exit is observed but the native retirement receipt is absent")
+			local refused = {}
+			helpers.assert_eq(fixture.manager.check_requirements("next", function() end,
+				function(reason) refused[#refused + 1] = reason end,
+				{is_current = function() return true end}), false)
+			helpers.assert_eq(refused, {"prior_operation_unsettled"})
+			helpers.assert_eq(#fixture.daemon.tasks, 1,
+				"a physical exit cannot replace the missing native retirement authority")
 		end)
 	end)
 
@@ -779,6 +867,8 @@ helpers.describe("HS-025 Ollama readiness is asynchronous and generation-owned",
 			local shell_tasks = {}
 			local native_timers = {}
 			local model_tasks = {}
+			local daemon = foreground_fixture({})
+			package.loaded["modules.llm.api_ollama"] = daemon.api
 
 			package.loaded["infra.logger"] = helpers.make_logger_stub()
 			package.loaded["infra.notifications"] = {notify = function() return true end}
@@ -875,16 +965,16 @@ helpers.describe("HS-025 Ollama readiness is asynchronous and generation-owned",
 			helpers.assert_eq(#shell_tasks, 1)
 			helpers.assert_eq(shell_tasks[1].executable, "/usr/bin/curl")
 			shell_tasks[1]:complete(28, "", "timeout")
-			helpers.assert_eq(#shell_tasks, 2)
-			helpers.assert_eq(shell_tasks[2].executable, "/bin/bash")
-			shell_tasks[2]:complete(0, "", "")
+			helpers.assert_eq(#shell_tasks, 1)
+			helpers.assert_eq(#daemon.tasks, 1)
+			publish_daemon_ready(daemon)
 			helpers.assert_eq(#native_timers, 1)
 			helpers.assert_eq(native_timers[1]:running(), true)
 			native_timers[1]:fire()
 			helpers.assert_eq(native_timers[1]:running(), false,
 				"the real TimerScheduler must settle its exact native retry handle before delivery")
-			helpers.assert_eq(#shell_tasks, 3)
-			shell_tasks[3]:complete(0, '{"version":"ready"}', "")
+			helpers.assert_eq(#shell_tasks, 2)
+			shell_tasks[2]:complete(0, '{"version":"ready"}', "")
 			helpers.assert_eq(#model_tasks, 1)
 		end, debug.traceback)
 
@@ -1031,7 +1121,7 @@ helpers.describe("A silent Ollama is one reason, told once (llm-enable-unreachab
 					details[#details + 1] = detail
 				end, {is_current = function() return true end, reports_unreachable = true})
 				fixture.spawns[1].complete(7, "", "connection refused")
-				fixture.spawns[2].complete(0, "", "")
+				publish_daemon_ready(fixture.daemon)
 				for _ = 1, 30 do
 					local timer = fixture.timers[#fixture.timers]
 					timer.fire()
@@ -1049,7 +1139,7 @@ helpers.describe("A silent Ollama is one reason, told once (llm-enable-unreachab
 			fixture.manager.check_requirements("demo", function() end, function() end,
 				{is_current = function() return true end})
 			fixture.spawns[1].complete(7, "", "connection refused")
-			fixture.spawns[2].complete(7, "", "restart failed")
+			retire_daemon(fixture.daemon, 78)
 			helpers.assert_eq(failure_notices(fixture), 1, "nobody else tells the user")
 		end)
 	end)
