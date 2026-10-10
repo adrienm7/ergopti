@@ -835,6 +835,9 @@ check(
 		valid.replace("Test Suite 'Selected tests' passed at 2026-10-09 00:00:01.\n" + summary, ''),
 		valid + marker + '-1744\n'
 	];
+	// The original native case passed, but its sole marker arrived after the suite terminal.
+	// Keep that observed order refused even when neither process nor capture failed.
+	badTranscripts.push(valid.replace(marker + '-1744\n', '') + marker + '-600\n');
 	for (const code of ['-0', '01', '+1', '1.0', 'true', '2147483648', '-2147483649', '-1744 extra'])
 		badTranscripts.push(transcript(code));
 	for (const bad of badTranscripts) assert.equal(sdk.evaluate(bad, 0, 0).complete, false);
@@ -858,7 +861,13 @@ check(
 			'operation: "fixture"'
 		],
 		['guard packet["observation"] as? String == "native-returned"', 'guard true'],
-		['let code = try XCTUnwrap(Int32(exactly: status.int64Value))', 'let code: Int32 = -1744']
+		['let code = try XCTUnwrap(Int32(exactly: status.int64Value))', 'let code: Int32 = -1744'],
+		[
+			'try FileHandle.standardError.write(contentsOf: Data(observation.utf8))',
+			'print(observation)'
+		],
+		['FileHandle.standardError.write', 'FileHandle.standardOutput.write'],
+		['nonce=19 osstatus=\\(code)\\n"', 'nonce=19 osstatus=\\(code)"']
 	])
 		assert.throws(() => sdk.validateNativeSources(test.replace(before, after), worker));
 	assert.throws(() =>
