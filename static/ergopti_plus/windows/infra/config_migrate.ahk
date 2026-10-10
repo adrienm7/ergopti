@@ -1104,11 +1104,20 @@ ConfigMigrateBoot(FilePath, Request := "boot", Candidate := unset, OwnerBundle :
 			return "failed"
 		if !Image.present
 			return "fresh-missing"
+		; Only deterministic parsing/classification is reused. Every caller still
+		; reads its genuine source and rechecks live registry/owner admission.
+		if Row.HasOwnProp("classification_image")
+				&& StrCompare(Image.source, Row.classification_image.source, true) == 0
+			return Row.classification_image.classification
 		try {
-			return Native.classify.Call(Native.decode.Call(Image.source), Row.registry_shadow, &Version)
+			Classification := Native.classify.Call(Native.decode.Call(Image.source), Row.registry_shadow, &Version)
 		} catch {
 			return "failed"
 		}
+		if Classification == "current" || Classification == "migrate" || Classification == "newer"
+				|| Classification == "invalid" || Classification == "unsupported"
+			Row.classification_image := { source: Image.source, classification: Classification }
+		return Classification
 	}
 
 	if !(Request is String) || !(Request == "boot" || Request == "prepare" || Request == "prepare_owned"
