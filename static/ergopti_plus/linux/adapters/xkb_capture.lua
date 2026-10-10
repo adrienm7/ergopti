@@ -892,39 +892,49 @@ end
 --- @return string|nil error
 function M.direct_sources(codes)
 	if not _session then return nil, "XKB capture state is not ready" end
-	if type(codes) ~= "table" then return nil, "direct source codes are required" end
-	local count, seen, expected = 0, {}, {}
+	if type(codes) ~= "table" or getmetatable(codes) ~= nil then return nil, "direct source codes are required" end
+	local count, seen, expected, snapshot = 0, {}, {}, {}
 	for key, code in pairs(codes) do
 		if type(key) ~= "number" or key % 1 ~= 0 or key < 1 or key > #codes
 			or type(code) ~= "number" or code < 1 or code > UINPUT_KEY_MAX or code % 1 ~= 0 or seen[code] then
 			return nil, "invalid direct source codes"
 		end
-		seen[code], expected[key], count = true, code, count + 1
+		seen[code], expected[key], snapshot[key], count = true, code, code, count + 1
 	end
 	if count ~= #codes then return nil, "direct source codes must be dense" end
 	if type(_backend.direct_sources) ~= "function" then return nil, "the capture backend cannot prove direct sources" end
+	-- The validated intent survives caller changes; native callbacks receive only its separate copy.
 	local session, backend, raw_map = _session, _backend, _keymap_text
+	local enumerate, getter, native_map, groups = backend.direct_sources, backend.source_group, session.identity, session.groups
+	local function original_owner()
+		return _session == session and _backend == backend and _keymap_text == raw_map
+			and backend.direct_sources == enumerate and backend.source_group == getter
+			and session.identity == native_map and session.groups == groups
+	end
+	local function exact_request()
+		if getmetatable(snapshot) ~= nil then return false end
+		local found = 0
+		for index, code in pairs(snapshot) do
+			if expected[index] ~= code then return false end
+			found = found + 1
+		end
+		return found == count
+	end
 	local generation, detail = source_identity()
 	if not generation then return nil, detail end
-	if _session ~= session or _backend ~= backend or _keymap_text ~= raw_map then
-		return nil, "direct-source-changed"
-	end
-	local group, native_map = _source_group, session.identity
-	local snapshot = {}; for index, code in ipairs(expected) do snapshot[index] = code end
-	local ok, rows, err = pcall(backend.direct_sources, session, snapshot, group)
+	if not original_owner() then return nil, "direct-source-changed" end
+	local group = _source_group
+	local ok, rows, err = pcall(enumerate, session, snapshot, group)
 	if not ok then return nil, tostring(rows) end
 	if type(rows) ~= "table" then return nil, err or "the capture backend returned no direct sources" end
+	-- Do not invoke a getter installed by enumeration or its request validation.
+	if not original_owner() then return nil, "direct-source-changed" end
+	if not exact_request() then return nil, "direct-source-invalid-response" end
 	local after_generation = source_identity()
-	if _session ~= session or _backend ~= backend or _keymap_text ~= raw_map
-		or after_generation ~= generation or _source_group ~= group or session.identity ~= native_map then
+	if not original_owner() or after_generation ~= generation or _source_group ~= group then
 		return nil, "direct-source-changed"
 	end
-	local snapshot_count = 0
-	for index, code in pairs(snapshot) do
-		if expected[index] ~= code then return nil, "direct-source-invalid-response" end
-		snapshot_count = snapshot_count + 1
-	end
-	if snapshot_count ~= count then return nil, "direct-source-invalid-response" end
+	if not exact_request() then return nil, "direct-source-invalid-response" end
 	return rows
 end
 
@@ -935,36 +945,60 @@ end
 --- @return table|nil receipt Native map/source identity and ordered levels.
 --- @return string|nil reason Closed refusal category.
 function M.number_row_levels(codes)
-	if not _session or type(codes) ~= "table" or #codes ~= 10
+	if not _session or type(codes) ~= "table" or getmetatable(codes) ~= nil or #codes ~= 10
 		or type(_backend.number_row_levels) ~= "function" then return nil, "number-row-source-unavailable" end
-	local count, seen = 0, {}
+	local count, seen, expected, requested = 0, {}, {}, {}
 	for key, code in pairs(codes) do
 		if type(key) ~= "number" or key % 1 ~= 0 or key < 1 or key > 10
 			or type(code) ~= "number" or code % 1 ~= 0 or code < 1 or code > UINPUT_KEY_MAX
 			or seen[code] then return nil, "number-row-invalid-positions" end
-		count, seen[code] = count + 1, true
+		count, seen[code], expected[key], requested[key] = count + 1, true, code, code
 	end
 	if count ~= 10 then return nil, "number-row-invalid-positions" end
+	-- The expected positions precede every callback and never reach native callbacks.
+	local function exact_positions(values)
+		if type(values) ~= "table" or getmetatable(values) ~= nil or #values ~= 10 then return false end
+		local found = 0
+		for key, code in pairs(values) do
+			if expected[key] ~= code then return false end
+			found = found + 1
+		end
+		return found == 10
+	end
+	local session, backend, raw_map = _session, _backend, _keymap_text
+	local enumerate, getter, validate = backend.number_row_levels, backend.source_group, NumberRow.levels
+	local function original_owner()
+		return _session == session and _backend == backend and _keymap_text == raw_map
+			and backend.number_row_levels == enumerate and backend.source_group == getter and NumberRow.levels == validate
+			and exact_positions(codes) and exact_positions(requested)
+	end
 	local generation = source_identity()
 	if not generation then return nil, "number-row-native-source-unverified" end
-	local session, backend, group, raw_map = _session, _backend, _source_group, _keymap_text
-	local groups = session.groups
+	if not original_owner() then return nil, "number-row-native-source-changed" end
+	local group, groups, map = _source_group, session.groups, session.identity
 	if type(groups) ~= "number" or groups % 1 ~= 0 or groups < 1 or groups > 32 then return nil, "number-row-native-groups-unavailable" end
-	local map = session.identity
 	if type(map) ~= "string" or map == "" then return nil, "number-row-native-map-unavailable" end
-	local called, rows = pcall(backend.number_row_levels, session, codes, group)
-	local after_generation = source_identity()
-	if not called or type(rows) ~= "table" or _session ~= session or _backend ~= backend
-		or after_generation ~= generation or _source_group ~= group or _keymap_text ~= raw_map
+	local called, rows = pcall(enumerate, session, requested, group)
+	-- Reject a replaced source getter before calling it for the final observation.
+	if not called or type(rows) ~= "table" or not original_owner()
 		or session.identity ~= map or session.groups ~= groups then
 		return nil, "number-row-native-source-changed"
 	end
-	local levels = NumberRow.levels("linux", rows, codes)
-	if not levels then return nil, "number-row-native-levels-refused" end
+	local after_generation = source_identity()
+	if not original_owner() or after_generation ~= generation or _source_group ~= group
+		or session.identity ~= map or session.groups ~= groups then
+		return nil, "number-row-native-source-changed"
+	end
+	local validated, levels = pcall(validate, "linux", rows, expected)
+	if not validated or not levels then return nil, "number-row-native-levels-refused" end
+	if not original_owner() or session.identity ~= map or session.groups ~= groups
+		or _source_generation ~= generation or _source_group ~= group then
+		return nil, "number-row-native-source-changed"
+	end
 	local capability = setmetatable({}, { __newindex = function() error("native row receipts are immutable", 2) end, __metatable = false })
-	local exact_codes = {}; for index, code in ipairs(codes) do exact_codes[index] = code end
 	number_row_receipts[capability] = { generation = generation, group = group, keymap = map, raw_map = raw_map,
-		session = session, backend = backend, groups = groups, levels = levels, codes = exact_codes }
+		session = session, backend = backend, groups = groups, levels = levels, codes = expected,
+		enumerate = enumerate, getter = getter, validate = validate }
 	return capability
 end
 
@@ -972,12 +1006,29 @@ end
 --- Returned action descriptors are detached; callers cannot mutate retained proof.
 function M.number_row_view(capability, codes)
 	local owned = number_row_receipts[capability]
-	if not owned then return nil end
+	if not owned or owned.revoked or type(codes) ~= "table" or getmetatable(codes) ~= nil or #codes ~= 10 then return nil end
+	local function refuse()
+		owned.revoked = true
+		return nil
+	end
+	local function original_owner()
+		return owned.session == _session and owned.backend == _backend
+			and owned.raw_map == _keymap_text and owned.keymap == owned.session.identity
+			and owned.session.groups == owned.groups
+			and owned.backend.number_row_levels == owned.enumerate and owned.backend.source_group == owned.getter
+			and NumberRow.levels == owned.validate
+	end
+	if not original_owner() then return refuse() end
 	local generation = source_identity()
-	if owned.session ~= _session or owned.backend ~= _backend
-		or owned.raw_map ~= _keymap_text or owned.keymap ~= owned.session.identity or owned.generation ~= generation
-		or owned.group ~= _source_group or owned.session.groups ~= owned.groups or type(codes) ~= "table" or #codes ~= 10 then return nil end
-	for index, code in ipairs(owned.codes) do if codes[index] ~= code then return nil end end
+	if not original_owner() or owned.generation ~= generation or owned.group ~= _source_group then return refuse() end
+	-- A source callback may alter the query; invalid caller data retires no source.
+	if type(codes) ~= "table" or getmetatable(codes) ~= nil or #codes ~= 10 then return nil end
+	local count = 0
+	for index, code in pairs(codes) do
+		if owned.codes[index] ~= code then return nil end
+		count = count + 1
+	end
+	if count ~= 10 then return nil end
 	local function copy(value)
 		if type(value) ~= "table" then return value end
 		local result = {}; for key, child in pairs(value) do result[key] = copy(child) end; return result

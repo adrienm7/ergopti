@@ -9420,6 +9420,20 @@ Carbon classification, physical keys or installed release qualification.
   French/US probes; the independent ten-key and dead-key refusal expectations
   remain exact. That run does not qualify the 32-bit native variant.
 
+  The existing Linux read-only number-row producer now preserves the requested
+  positions before native callbacks and retains its exact acquisition functions
+  and shared validator. Mutated positions, replaced methods and source reentry
+  refuse; an observed lost owner stays retired, while an invalid caller query
+  preserves an intact receipt. All five original cases remain unchanged, with
+  28 additive producer cases. Controlled actual-producer replay on both Lua
+  ABIs changes 4 passes/24 failures to 28 passes/0 failures; nine independent
+  omissions fail causally.
+  This grants no forced-mode or input/output authority. On the joined sources,
+  the Linux suite passes 12,776/0, E2E 193/0 and the actual X11 source fixture 53/0;
+  formatting passes 364 checks. JS retains the same 406/1 result as the baseline:
+  two missing Windows workflow retention conditions, outside this change.
+  Native Linux CI and physical number-row input remain unqualified here.
+
   Remaining software: implement native-HKL forced-symbol and Linux/macOS forced
   digit/symbol owners with joint current input/source/modifier/output provenance;
   reconstruct/review lost runtime preparation. Never fall back from a refused
@@ -9462,6 +9476,19 @@ Carbon classification, physical keys or installed release qualification.
   nine independent omissions fail on both ABIs. These observed identity
   barriers do not establish a native source epoch or unseen ABA transition.
   Actual TIS/GUI, packaging and installed qualification remain pending.
+
+  The Linux direct-source producer now retains its original native enumerator,
+  source getter, map and group-count witnesses before callbacks. A foreign fact
+  issuer refuses even when the original source generation remains current;
+  request metatables refuse before their readers run. Validated positions still
+  survive caller mutation. All original tests and eight callback-currency cases
+  remain unchanged, with 15 additive cases. Controlled actual-producer replay
+  changes 5 passes/10 failures to 15 passes/0 failures on both Lua ABIs; nine
+  independent omissions fail causally. This grants no input/output authority.
+  Joined-source validation passes Linux 12,791/0, E2E 193/0 and the actual X11
+  source fixture 53/0. Formatting passes 364 checks. JS retains the baseline
+  406/1 result from the two missing Windows retention workflow conditions.
+  Native Linux CI and physical editor-key delivery remain unqualified here.
 
   Remaining software: finish live effective-source retargeting, collisions
   against every owner and current modifier/output custody without overriding
