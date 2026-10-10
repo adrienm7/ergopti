@@ -224,6 +224,7 @@ function repository(name, branch) {
 		'.github/ci/stable_windows_signing_exception.json',
 		'.github/ci/dev_release_qualification_exceptions.json',
 		'.github/ci/stable_release_qualification_exception.json',
+		'.github/ci/stable_v101_macos_native_qualification_exception.json',
 		'tools/build/publish-verified-release.cjs',
 		'tools/build/macos-release-publication.cjs',
 		'tools/build/macos-release-archives.cjs',
@@ -886,6 +887,7 @@ function preflight(
 		'.github/ci/stable_windows_signing_exception.json',
 		'.github/ci/dev_release_qualification_exceptions.json',
 		'.github/ci/stable_release_qualification_exception.json',
+		'.github/ci/stable_v101_macos_native_qualification_exception.json',
 		'static/ergopti_plus/_shared/ui/update_channels.js',
 		'static/ergopti_plus/_shared/modules/updater/defaults.json',
 		'static/ergopti_plus/_shared/modules/updater/channels.json'
