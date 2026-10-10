@@ -7941,6 +7941,18 @@ interrupted the JS guardian; its missing final closure receipt remains
 unqualified. These separate passes do not turn the whole selected suite green.
 No assertion, original command or independent expected corpus is weakened.
 
+The native managed Ollama serve owner now supports optional caller-bound
+ACTIVE and RETIRED stdout records. ACTIVE follows the original mapped-image
+handshake and same-session authority publication; it does not grant socket/API
+readiness. RETIRED requires the original physical retirement and namespace
+cleanup acknowledgement; uncertain closure emits no terminal receipt. The
+production qualification guard remains false. Twenty-three actual POSIX
+process/file controls pass, preserving all fourteen original cases and adding
+nine publisher controls. Native signing, catalogue and daemon status are
+controlled fixtures, not macOS qualification. Shared migration consent,
+authenticated readiness, Lua lifecycle consumption and retained serve cleanup
+authority remain software work; items 62, 16 and 38 remain open.
+
 - [~] **63.** Provide shared screen-brightness up/down actions on all three
   drivers, including supported keyboard and wheel layers. Implemented: the
   translated catalogue, Windows bounded Job-owned WMI worker with complete
