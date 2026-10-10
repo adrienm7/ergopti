@@ -384,3 +384,30 @@ _THPA_PageObservations() {
 	AssertFalse(HealthCheck_PageChecks(Rows, Config["schema"]))
 }
 Test("Diagnostics export: retained page observations remain unqualified and current", _THPA_PageObservations)
+
+_THPA_RecentErrorFacts() {
+	global _SharedDir
+	Config := HealthCheck_Config()
+	Corpus := JsonParse(FileRead(_SharedDir . "\tests\corpus\healthcheck\recent_error_fact_vectors.json", "UTF-8"))
+	for Vector in Corpus["vectors"] {
+		Snapshot := Vector["snapshot"], Original := _HC_ValueToJson(Snapshot)
+		Doc := HealthCheck_ShareDocument(Snapshot, Config["schema"])
+		AssertEqual(_HC_ValueToJson(Vector["expected"]), _HC_ValueToJson(Doc["snapshot"]["sections"]["issues"]["recent_error_facts"]))
+		for Canary in Corpus["canaries"]
+			AssertFalse(InStr(Doc["text"], Canary), Canary)
+		AssertContains(Doc["text"], "lease_watchdog_exit")
+		AssertContains(Doc["text"], "log_observation_only")
+		for ActionName in ["copy", "save", "report"] {
+			Calls := []
+			Outcome := HealthCheck_PerformAction(Map("action", ActionName, "text", Doc["text"], "name", Doc["name"], "fields", Map()),
+				_THPA_Paths(), Config, _THPA_Effects(Calls), Snapshot)
+			AssertTrue(Outcome["ok"], "The real report sink receives the retained fact snapshot")
+			for Call in Calls
+				for Canary in Corpus["canaries"]
+					if Canary != "https://" || !InStr(Call, "open_url:https://github.com/")
+						AssertFalse(InStr(Call, Canary), Canary)
+		}
+		AssertEqual(Original, _HC_ValueToJson(Snapshot))
+	}
+}
+Test("Diagnostics export: closed recent error observations exclude private text", _THPA_RecentErrorFacts)

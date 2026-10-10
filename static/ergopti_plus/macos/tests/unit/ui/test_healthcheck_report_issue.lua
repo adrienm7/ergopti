@@ -416,3 +416,35 @@ helpers.describe("retained installed-page observations", function()
 		helpers.assert_eq(Share.page_checks(rows, config.schema), nil)
 	end)
 end)
+
+helpers.describe("closed recent error facts", function()
+	helpers.it("keeps observed technical failure codes and excludes every private message", function()
+		local config = documents()
+		local corpus = shared_json("tests/corpus/healthcheck/recent_error_fact_vectors.json")
+		for _, vector in ipairs(corpus.vectors) do
+			local original = Json.encode(vector.snapshot)
+			local doc = Share.document(vector.snapshot, config.schema, "PRIVATE_LOCALE")
+			helpers.assert_eq(doc.snapshot.sections.issues.recent_error_facts, vector.expected)
+			for _, canary in ipairs(corpus.canaries) do
+				helpers.assert_true(not doc.text:find(canary, 1, true), canary)
+			end
+			helpers.assert_contains(doc.text, "lease_watchdog_exit")
+			helpers.assert_contains(doc.text, "log_observation_only")
+			for _, action in ipairs({ "copy", "save", "report" }) do
+				local Report, calls, overrides = load_report()
+				local outcome = Report.perform({ action = action, text = doc.text, name = doc.name, fields = {} },
+					paths(), config, Report.redaction_context(overrides), overrides, vector.snapshot)
+				helpers.assert_eq(outcome.ok, true, "the real report sink receives the retained fact snapshot")
+				if action ~= "save" then helpers.assert_eq(calls.copy[1], doc.text) end
+				if action ~= "copy" then helpers.assert_eq(calls.save[1].text, doc.text) end
+				for _, canary in ipairs(corpus.canaries) do
+					-- The fixed public GitHub scheme is intentional; private identities remain forbidden.
+					if canary ~= "https://" then
+						for _, url in ipairs(calls.open_url) do helpers.assert_true(not url:find(canary, 1, true), canary) end
+					end
+				end
+			end
+			helpers.assert_eq(Json.encode(vector.snapshot), original)
+		end
+	end)
+end)
