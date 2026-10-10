@@ -3286,6 +3286,7 @@
 	"menu.global.karabiner_runtime": "Karabiner-körmiljö",
 	"menu.global.karabiner_runtime.owned": "Körmiljö hanterad av Ergopti",
 	"menu.global.karabiner_runtime.shared": "Delad Karabiner",
+	"menu.global.runtime_recover_shared": "Återgå till delad körmiljö",
 	"menu.global.karabiner_runtime_unavailable": "Hanterad körmiljö otillgänglig: en verifierad installation krävs.",
 	"menu.metrics.physical_source": "Källa för fysisk inmatningshistorik",
 	"menu.metrics.physical_source.ledger": "Tangentlogg",

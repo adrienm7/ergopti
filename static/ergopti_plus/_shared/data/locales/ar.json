@@ -3286,6 +3286,7 @@
 	"menu.global.karabiner_runtime": "محرك Karabiner",
 	"menu.global.karabiner_runtime.owned": "محرك تديره Ergopti",
 	"menu.global.karabiner_runtime.shared": "Karabiner مشترك",
+	"menu.global.runtime_recover_shared": "العودة إلى بيئة التشغيل المشتركة",
 	"menu.global.karabiner_runtime_unavailable": "المحرك المُدار غير متاح: يلزم تثبيت تم التحقق منه.",
 	"menu.metrics.physical_source": "مصدر سجل الإدخال الفعلي",
 	"menu.metrics.physical_source.ledger": "سجل المفاتيح",

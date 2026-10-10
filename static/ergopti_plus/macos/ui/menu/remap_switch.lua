@@ -221,11 +221,18 @@ end
 --- @return table commands
 --- @return table state_getters
 --- @return table providers
-function M.rows(karabiner, update_menu)
+function M.rows(karabiner, update_menu, recover_shared_runtime, can_recover_shared_runtime)
 	return {
+		["karabiner_runtime_recover_shared"] = function()
+			if type(recover_shared_runtime) ~= "function" then return false end
+			return recover_shared_runtime() == true
+		end,
 		["karabiner_integration"] = function() return M.toggle(karabiner, update_menu) end,
 		["remove_from_karabiner"] = function() return M.remove(karabiner, update_menu) end,
 	}, {
+		["karabiner_owned_runtime_recovery_available"] = function()
+			return type(can_recover_shared_runtime) == "function" and can_recover_shared_runtime() == true
+		end,
 		["karabiner_integration_enabled"] = function() return M.is_enabled(karabiner) end,
 		["karabiner_shared_runtime_selected"] = function() return M.is_shared_runtime(karabiner) end,
 	}, {

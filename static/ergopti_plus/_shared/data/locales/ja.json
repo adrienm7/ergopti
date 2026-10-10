@@ -3286,6 +3286,7 @@
 	"menu.global.karabiner_runtime": "Karabinerランタイム",
 	"menu.global.karabiner_runtime.owned": "Ergopti管理のランタイム",
 	"menu.global.karabiner_runtime.shared": "共有Karabiner",
+	"menu.global.runtime_recover_shared": "共有ランタイムに戻る",
 	"menu.global.karabiner_runtime_unavailable": "管理ランタイムは利用できません：検証済みのインストールが必要です。",
 	"menu.metrics.physical_source": "物理入力履歴の取得元",
 	"menu.metrics.physical_source.ledger": "キー記録",

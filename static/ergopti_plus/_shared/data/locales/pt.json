@@ -3286,6 +3286,7 @@
 	"menu.global.karabiner_runtime": "Ambiente de execução do Karabiner",
 	"menu.global.karabiner_runtime.owned": "Ambiente gerenciado pelo Ergopti",
 	"menu.global.karabiner_runtime.shared": "Karabiner compartilhado",
+	"menu.global.runtime_recover_shared": "Voltar ao motor compartilhado",
 	"menu.global.karabiner_runtime_unavailable": "Ambiente gerenciado indisponível: é necessária uma instalação verificada.",
 	"menu.metrics.physical_source": "Fonte do histórico físico",
 	"menu.metrics.physical_source.ledger": "Registro de teclas",

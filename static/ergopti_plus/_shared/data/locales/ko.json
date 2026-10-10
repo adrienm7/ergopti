@@ -3286,6 +3286,7 @@
 	"menu.global.karabiner_runtime": "Karabiner 런타임",
 	"menu.global.karabiner_runtime.owned": "Ergopti 관리 런타임",
 	"menu.global.karabiner_runtime.shared": "공유 Karabiner",
+	"menu.global.runtime_recover_shared": "공유 런타임으로 돌아가기",
 	"menu.global.karabiner_runtime_unavailable": "관리 런타임 사용 불가: 검증된 설치가 필요합니다.",
 	"menu.metrics.physical_source": "물리 입력 기록의 출처",
 	"menu.metrics.physical_source.ledger": "키 기록",

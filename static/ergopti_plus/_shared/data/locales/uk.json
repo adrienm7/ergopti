@@ -3286,6 +3286,7 @@
 	"menu.global.karabiner_runtime": "Середовище виконання Karabiner",
 	"menu.global.karabiner_runtime.owned": "Середовище під керуванням Ergopti",
 	"menu.global.karabiner_runtime.shared": "Спільний Karabiner",
+	"menu.global.runtime_recover_shared": "Повернутися до спільного середовища виконання",
 	"menu.global.karabiner_runtime_unavailable": "Кероване середовище недоступне: потрібне перевірене встановлення.",
 	"menu.metrics.physical_source": "Джерело історії фізичного введення",
 	"menu.metrics.physical_source.ledger": "Журнал клавіш",

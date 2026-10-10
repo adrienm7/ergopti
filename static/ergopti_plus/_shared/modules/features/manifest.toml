@@ -4529,6 +4529,15 @@ status_rows.unavailable = [
 ]
 
 [[menu.configuration_menu]]
+type = "command"
+id = "karabiner_runtime_recover_shared"
+i18n = "menu.global.runtime_recover_shared"
+platforms = ["hs"]
+reason_key = "platform_reason.remap_engine_is_per_driver"
+disabled_when = ["karabiner_owned_runtime_recovery_available"]
+disabled_reason_key = "healthcheck.state.unavailable"
+
+[[menu.configuration_menu]]
 type = "check"
 id = "karabiner_integration"
 i18n = "menu.global.karabiner_integration"

@@ -3286,6 +3286,7 @@
 	"menu.global.karabiner_runtime": "Karabiner-Laufzeit",
 	"menu.global.karabiner_runtime.owned": "Von Ergopti verwaltete Laufzeit",
 	"menu.global.karabiner_runtime.shared": "Gemeinsames Karabiner",
+	"menu.global.runtime_recover_shared": "Zur gemeinsamen Laufzeit zurückkehren",
 	"menu.global.karabiner_runtime_unavailable": "Verwaltete Laufzeit nicht verfügbar: eine überprüfte Installation ist erforderlich.",
 	"menu.metrics.physical_source": "Quelle des physischen Eingabeverlaufs",
 	"menu.metrics.physical_source.ledger": "Tastenprotokoll",

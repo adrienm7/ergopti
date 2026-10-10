@@ -211,6 +211,7 @@ helpers.describe("configuration submenu (macOS): « Ergopti uses Karabiner »", 
 				"menu.global.config_folder",
 				"menu.global.setup_wizard",
 				"menu.global.karabiner_runtime.shared",
+				"menu.global.runtime_recover_shared — healthcheck.state.unavailable",
 				"menu.global.karabiner_integration",
 				"menu.global.remove_from_karabiner",
 			}, ", "))

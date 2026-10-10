@@ -3286,6 +3286,7 @@
 	"menu.global.karabiner_runtime": "סביבת ריצה של Karabiner",
 	"menu.global.karabiner_runtime.owned": "סביבת ריצה בניהול Ergopti",
 	"menu.global.karabiner_runtime.shared": "Karabiner משותף",
+	"menu.global.runtime_recover_shared": "חזרה לסביבת ההרצה המשותפת",
 	"menu.global.karabiner_runtime_unavailable": "סביבת הריצה המנוהלת אינה זמינה: נדרשת התקנה מאומתת.",
 	"menu.metrics.physical_source": "מקור היסטוריית הקלט הפיזי",
 	"menu.metrics.physical_source.ledger": "יומן מקשים",

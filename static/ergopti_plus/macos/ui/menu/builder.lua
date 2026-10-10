@@ -765,7 +765,7 @@ function M.generate(ctx, menu_mods, actions)
 			local switch_providers = {}
 			if type(ctx.karabiner) == "table" then
 				local switch_commands, switch_getters, providers = require("ui.menu.remap_switch")
-					.rows(ctx.karabiner, ctx.updateMenu)
+					.rows(ctx.karabiner, ctx.updateMenu, ctx.recover_shared_runtime, ctx.can_recover_shared_runtime)
 				for id, fn in pairs(switch_commands) do cfg_ctx.commands[id] = fn end
 				for id, fn in pairs(switch_getters) do cfg_ctx.state_getters[id] = fn end
 				switch_providers = providers

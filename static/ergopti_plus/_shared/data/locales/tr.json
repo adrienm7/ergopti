@@ -3286,6 +3286,7 @@
 	"menu.global.karabiner_runtime": "Karabiner çalışma zamanı",
 	"menu.global.karabiner_runtime.owned": "Ergopti tarafından yönetilen çalışma zamanı",
 	"menu.global.karabiner_runtime.shared": "Paylaşılan Karabiner",
+	"menu.global.runtime_recover_shared": "Paylaşılan çalışma ortamına dön",
 	"menu.global.karabiner_runtime_unavailable": "Yönetilen çalışma zamanı kullanılamıyor: doğrulanmış bir kurulum gerekiyor.",
 	"menu.metrics.physical_source": "Fiziksel giriş geçmişinin kaynağı",
 	"menu.metrics.physical_source.ledger": "Tuş günlüğü",

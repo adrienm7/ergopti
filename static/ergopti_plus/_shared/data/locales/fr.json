@@ -3286,6 +3286,7 @@
 	"menu.global.karabiner_runtime": "Runtime Karabiner",
 	"menu.global.karabiner_runtime.owned": "Runtime géré par Ergopti",
 	"menu.global.karabiner_runtime.shared": "Karabiner partagé",
+	"menu.global.runtime_recover_shared": "Revenir au moteur partagé",
 	"menu.global.karabiner_runtime_unavailable": "Runtime géré indisponible : une installation vérifiée est requise.",
 	"menu.metrics.physical_source": "Source de l’historique physique",
 	"menu.metrics.physical_source.ledger": "Journal des touches",

@@ -3286,6 +3286,7 @@
 	"menu.global.karabiner_runtime": "Среда выполнения Karabiner",
 	"menu.global.karabiner_runtime.owned": "Среда под управлением Ergopti",
 	"menu.global.karabiner_runtime.shared": "Общий Karabiner",
+	"menu.global.runtime_recover_shared": "Вернуться к общей среде выполнения",
 	"menu.global.karabiner_runtime_unavailable": "Управляемая среда недоступна: требуется проверенная установка.",
 	"menu.metrics.physical_source": "Источник истории физического ввода",
 	"menu.metrics.physical_source.ledger": "Журнал клавиш",

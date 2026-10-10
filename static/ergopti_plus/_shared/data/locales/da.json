@@ -3286,6 +3286,7 @@
 	"menu.global.karabiner_runtime": "Karabiner-kørselsmiljø",
 	"menu.global.karabiner_runtime.owned": "Kørselsmiljø administreret af Ergopti",
 	"menu.global.karabiner_runtime.shared": "Delt Karabiner",
+	"menu.global.runtime_recover_shared": "Vend tilbage til det delte kørselsmiljø",
 	"menu.global.karabiner_runtime_unavailable": "Administreret kørselsmiljø utilgængeligt: en verificeret installation kræves.",
 	"menu.metrics.physical_source": "Kilde til fysisk inputhistorik",
 	"menu.metrics.physical_source.ledger": "Tastelog",

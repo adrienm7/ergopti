@@ -3286,6 +3286,7 @@
 	"menu.global.karabiner_runtime": "Karabiner-runtime",
 	"menu.global.karabiner_runtime.owned": "Door Ergopti beheerde runtime",
 	"menu.global.karabiner_runtime.shared": "Gedeelde Karabiner",
+	"menu.global.runtime_recover_shared": "Terug naar de gedeelde runtime",
 	"menu.global.karabiner_runtime_unavailable": "Beheerde runtime niet beschikbaar: een geverifieerde installatie is vereist.",
 	"menu.metrics.physical_source": "Bron van fysieke invoergeschiedenis",
 	"menu.metrics.physical_source.ledger": "Toetsenlogboek",

@@ -2056,4 +2056,28 @@ function M.status()
 	}
 end
 
+--- Retains original controller roles and a pure absent-state observation.
+--- Ordinary status remains a diagnostic/cleanup operation and is not a paint
+--- getter. An allocated controller owner always refuses this bounded admission.
+--- @return table owner Original native controller.
+--- @return function initialized Original initialization query.
+--- @return function status Original diagnostic query, never invoked by current.
+--- @return function stop Original exact-fence stop.
+--- @return function init Original initialization owner.
+--- @return function current Pure uninitialized, token-free currentness.
+do
+	local initialized, status, stop, init = M.is_initialized, M.status, M.stop, M.init
+	local factory
+	local function current()
+		return _state == nil and rawget(package.loaded, "platform.remap.lease_controller") == M
+			and rawget(M, "uninitialized_recovery_ports") == factory
+			and rawget(M, "is_initialized") == initialized and rawget(M, "status") == status
+			and rawget(M, "stop") == stop and rawget(M, "init") == init
+	end
+	factory = function()
+		return M, initialized, status, stop, init, current
+	end
+	M.uninitialized_recovery_ports = factory
+end
+
 return M

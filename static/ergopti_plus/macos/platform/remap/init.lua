@@ -3654,6 +3654,13 @@ end
 function M.runtime_not_acquired()
 	local custody = _state and _state.runtime_custody
 	if not custody or not custody.current() then return false end
+	local native_current = _legacy_cleanup_offered.runtime_recovery.native_uninitialized_current
+	if type(native_current) == "function" then
+		local native = native_current(custody)
+		-- Native absent-state custody requires its original pure producer. The
+		-- ordinary diagnostic branch remains only for external modeled custody.
+		if native ~= nil then return native == true end
+	end
 	local ok, initialized = pcall(custody.is_initialized)
 	if not ok or initialized ~= false or not custody.current() then return false end
 	local status_ok, phase, snapshot = pcall(custody.status)
@@ -7116,26 +7123,37 @@ function M.teardown_local()
 			return false
 		end
 	end
-	local status_ok, phase, snapshot = xpcall(custody and custody.status or LeaseController.status, debug.traceback)
-	if custody and (not custody.current() or type(snapshot) ~= "table"
-		or rawget(snapshot, "phase") ~= phase or rawget(snapshot, "token") ~= nil) then return false end
-	if not status_ok then
-		Logger.error(LOG, "Cannot verify the exact lease before local teardown: %s.", tostring(phase))
-		return false
-	end
-	if phase ~= "idle" and phase ~= "uninitialized" then
-		Logger.error(LOG, "Refusing local Karabiner teardown while exact lease phase is '%s'.",
-			tostring(phase))
-		return false
+	local native_current = _legacy_cleanup_offered.runtime_recovery.native_uninitialized_current
+	local native_inert = custody ~= nil and initialized_before == false
+		and type(native_current) == "function" and native_current(custody) == true
+	-- A genuine nil-state receipt is absence evidence, not a diagnostic phase
+	-- acknowledgement. Initialized owners keep their original exact phase fence.
+	if not native_inert then
+		local status_ok, phase, snapshot = xpcall(custody and custody.status or LeaseController.status, debug.traceback)
+		if custody and (not custody.current() or type(snapshot) ~= "table"
+			or rawget(snapshot, "phase") ~= phase or rawget(snapshot, "token") ~= nil) then return false end
+		if not status_ok then
+			Logger.error(LOG, "Cannot verify the exact lease before local teardown: %s.", tostring(phase))
+			return false
+		end
+		if phase ~= "idle" and phase ~= "uninitialized" then
+			Logger.error(LOG, "Refusing local Karabiner teardown while exact lease phase is '%s'.",
+				tostring(phase))
+			return false
+		end
 	end
 	if custody and not custody.current() then return false end
 	local teardown_ok, teardown_result = xpcall(stop_local_resources, debug.traceback)
 	if custody then
 		if not custody.current() then return false end
-		local final_ok, final_phase, final_snapshot = pcall(custody.status)
-		if not final_ok or not custody.current() or (final_phase ~= "idle" and final_phase ~= "uninitialized")
-			or type(final_snapshot) ~= "table" or rawget(final_snapshot, "phase") ~= final_phase
-			or rawget(final_snapshot, "token") ~= nil then return false end
+		if native_inert then
+			if native_current(custody) ~= true then return false end
+		else
+			local final_ok, final_phase, final_snapshot = pcall(custody.status)
+			if not final_ok or not custody.current() or (final_phase ~= "idle" and final_phase ~= "uninitialized")
+				or type(final_snapshot) ~= "table" or rawget(final_snapshot, "phase") ~= final_phase
+				or rawget(final_snapshot, "token") ~= nil then return false end
+		end
 		local initialized_ok, initialized = pcall(custody.is_initialized)
 		if not initialized_ok or initialized ~= initialized_before or not custody.current() then return false end
 	end
@@ -7337,5 +7355,65 @@ end
 _legacy_cleanup_offered.runtime_recovery.issuer = M.runtime_recovery_admission
 _legacy_cleanup_offered.runtime_recovery.teardown = M.teardown_local
 _legacy_cleanup_offered.runtime_recovery.stop_lease = M.stop_lease
+
+-- Original operation roles are retained at actual module construction. This
+-- pre-retirement admission performs no teardown and grants no runtime readiness.
+_legacy_cleanup_offered.runtime_recovery.ports = (function(recovery, runtime, reason)
+	local factory
+	local lease_factory = rawget(LeaseController, "uninitialized_recovery_ports")
+	local lease_current
+	local identity = require("module_source_identity")
+	local directory = require("module_source_directory").capture()
+	local source = debug.getinfo(1, "S").source
+	local expected = identity.sibling(source, "macos/platform/remap/init.lua",
+		"macos/platform/remap/lease_controller.lua", directory)
+	if type(lease_factory) == "function"
+		and identity.same(debug.getinfo(lease_factory, "S").source, expected, directory) then
+		local called, owner, initialized, status, stop, init, pure = pcall(lease_factory)
+		if called and owner == LeaseController and initialized == rawget(owner, "is_initialized")
+			and status == rawget(owner, "status") and stop == rawget(owner, "stop")
+			and init == rawget(owner, "init") and type(pure) == "function" then lease_current = pure end
+	end
+	local function current()
+		if rawget(package.loaded, "platform.remap") ~= M
+			or rawget(M, "runtime_recovery_ports") ~= factory
+			or rawget(M, "get_runtime") ~= runtime
+			or rawget(M, "runtime_unavailable_reason") ~= reason then return false end
+		local custody = _state and _state.runtime_custody
+		if custody == nil or custody.current() ~= true
+			or type(lease_current) ~= "function"
+			or rawget(LeaseController, "uninitialized_recovery_ports") ~= lease_factory then return false end
+		local binding = recovery.capture()
+		if binding == nil or binding.current() ~= true then return false end
+		-- The original native private state is the absence evidence. Diagnostic
+		-- status() may log or perform cleanup, so rendering must never call it.
+		local called, unacquired = pcall(lease_current)
+		return called and unacquired == true and custody.current() == true and binding.current() == true
+			and rawget(LeaseController, "uninitialized_recovery_ports") == lease_factory
+			and rawget(M, "runtime_recovery_ports") == factory
+			and rawget(M, "get_runtime") == runtime
+			and rawget(M, "runtime_unavailable_reason") == reason
+	end
+	-- Source classification never grants authority: it only prevents native
+	-- custody from falling back to diagnostic status when its producer is absent.
+	-- The retained original current closure supplies every positive admission.
+	recovery.native_uninitialized_current = function(custody)
+		if type(custody) ~= "table" or type(custody.status) ~= "function"
+			or not identity.same(debug.getinfo(custody.status, "S").source, expected, directory) then return nil end
+		if custody.current() ~= true or type(lease_current) ~= "function"
+			or rawget(package.loaded, "platform.remap.lease_controller") ~= LeaseController
+			or rawget(LeaseController, "uninitialized_recovery_ports") ~= lease_factory then return false end
+		local called, absent = pcall(lease_current)
+		return called and absent == true and custody.current() == true
+			and rawget(package.loaded, "platform.remap.lease_controller") == LeaseController
+			and rawget(LeaseController, "uninitialized_recovery_ports") == lease_factory
+	end
+	factory = function()
+		return M, recovery.stop_lease, recovery.teardown, recovery.issuer,
+			recovery.not_acquired, runtime, reason, current
+	end
+	return factory
+end)(_legacy_cleanup_offered.runtime_recovery, M.get_runtime, M.runtime_unavailable_reason)
+M.runtime_recovery_ports = _legacy_cleanup_offered.runtime_recovery.ports
 
 return M

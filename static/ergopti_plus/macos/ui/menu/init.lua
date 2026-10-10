@@ -1456,6 +1456,225 @@ function M.start(base_dir, hotfiles, gestures, keymap, dynamic_hotstrings, modul
 		update_checks            = update_checks,
 	}
 
+	-- BEGIN bounded owned-runtime preference recovery
+	do
+		local karabiner = type(karabiner) == "table" and karabiner or nil
+		-- This scope is created with the actual private global owner, never an
+		-- injected public writer. Menu rebuilding retains these two closures.
+		local files = require("adapters.file_system")
+		local config = require("platform.remap.config")
+		local identity = require("module_source_identity")
+		local directory = require("module_source_directory").capture()
+		local origin = debug.getinfo(1, "S").source
+		local function native(fn, relative)
+			return type(fn) == "function" and identity.same(debug.getinfo(fn, "S").source,
+				identity.sibling(origin, "macos/ui/menu/init.lua", relative, directory), directory)
+		end
+		local exclusive = type(global_actions_owner) == "table" and global_actions_owner.run_exclusive
+		local reload, terminal_pending = TerminationCoordinator.request_reload_owned, TerminationCoordinator.is_pending
+		local path_reader = MenuPaths.get
+		local path = path_reader("KarabinerConfigPath")
+		local factory = rawget(files, "configuration_ports")
+		local read, file_origin
+		if native(factory, "macos/adapters/file_system.lua") then
+			local called, owner, original_reader = pcall(factory)
+			file_origin = called and owner == files and original_reader == rawget(files, "read_with_status")
+			read = original_reader
+		end
+		local runtime, reason, absent = karabiner and karabiner.get_runtime,
+			karabiner and karabiner.runtime_unavailable_reason, karabiner and karabiner.runtime_not_acquired
+		local stop, teardown, issuer = karabiner and karabiner.stop_lease,
+			karabiner and karabiner.teardown_local, karabiner and karabiner.runtime_recovery_admission
+		local save = rawget(config, "save_runtime")
+		local config_factory, remap_factory = rawget(config, "parser_refusal_factory"), karabiner and rawget(karabiner, "runtime_recovery_ports")
+		local terminal_factory = rawget(TerminationCoordinator, "owned_reload_ports")
+		local config_origin, remap_origin, terminal_origin, publication_current, remap_current
+		if native(config_factory, "macos/platform/remap/config.lua") then
+			local ports = table.pack(pcall(config_factory))
+			config_origin = ports[1] == true and ports[2] == config and ports[8] == save and type(ports[9]) == "function"
+			publication_current = ports[9]
+		end
+		if native(remap_factory, "macos/platform/remap/init.lua") then
+			local ports = table.pack(pcall(remap_factory))
+			remap_origin = ports[1] == true and ports[2] == karabiner and ports[3] == stop and ports[4] == teardown
+				and ports[5] == issuer and ports[6] == absent and ports[7] == runtime and ports[8] == reason
+				and type(ports[9]) == "function"
+			remap_current = ports[9]
+		end
+		if native(terminal_factory, "macos/infra/termination_coordinator.lua") then
+			local called, owner, original_reload, original_pending = pcall(terminal_factory)
+			terminal_origin = called and owner == TerminationCoordinator and original_reload == reload and original_pending == terminal_pending
+		end
+		local displayed, active, exclusive_entry, compensating = nil, nil, false, false
+		local function binding()
+			if type(global_actions_owner) ~= "table" or config_origin ~= true
+				or remap_origin ~= true or terminal_origin ~= true then return false end
+			if rawget(config, "parser_refusal_factory") ~= config_factory
+				or rawget(karabiner, "runtime_recovery_ports") ~= remap_factory
+				or rawget(TerminationCoordinator, "owned_reload_ports") ~= terminal_factory then return false end
+			local publication_ok, admitted_publication = pcall(publication_current)
+			local remap_ok, admitted_remap = pcall(remap_current)
+			return publication_ok and admitted_publication == true and remap_ok and admitted_remap == true and file_origin == true and type(path) == "string" and path ~= ""
+				and rawget(package.loaded, "platform.remap") == karabiner
+				and rawget(package.loaded, "platform.remap.config") == config
+				and rawget(package.loaded, "adapters.file_system") == files
+				and rawget(package.loaded, "infra.termination_coordinator") == TerminationCoordinator
+				and rawget(files, "configuration_ports") == factory and rawget(files, "read_with_status") == read
+				and rawget(config, "save_runtime") == save
+				and rawget(global_actions_owner, "run_exclusive") == exclusive
+				and rawget(TerminationCoordinator, "request_reload_owned") == reload
+				and rawget(TerminationCoordinator, "is_pending") == terminal_pending
+				and rawget(MenuPaths, "get") == path_reader
+				and rawget(karabiner, "get_runtime") == runtime
+				and rawget(karabiner, "runtime_unavailable_reason") == reason
+				and rawget(karabiner, "runtime_not_acquired") == absent
+				and rawget(karabiner, "stop_lease") == stop and rawget(karabiner, "teardown_local") == teardown
+				and rawget(karabiner, "runtime_recovery_admission") == issuer
+				and native(exclusive, "macos/ui/menu/global_actions_transaction.lua")
+				and native(reload, "macos/infra/termination_coordinator.lua")
+				and native(terminal_pending, "macos/infra/termination_coordinator.lua")
+				and native(save, "macos/platform/remap/config.lua")
+				and native(stop, "macos/platform/remap/init.lua") and native(teardown, "macos/platform/remap/init.lua")
+				and native(issuer, "macos/platform/remap/init.lua")
+		end
+		local function owned_current()
+			if not binding() then return false end
+			local route_ok, route = pcall(path_reader, "KarabinerConfigPath")
+			local intent_ok, intent = pcall(runtime)
+			local reason_ok, unavailable = pcall(reason)
+			return route_ok and route == path and intent_ok and intent == "owned"
+				and reason_ok and unavailable == "runtime-unavailable" and binding()
+		end
+		local function quiet()
+			if not owned_current() then return false end
+			local checked, pending = pcall(terminal_pending)
+			return checked and pending == false and owned_current()
+		end
+		local function current(record)
+			if active ~= record or not quiet() or type(record.capability) ~= "table" then return false end
+			local called, admitted = pcall(record.capability.current)
+			return called and admitted == true and active == record and owned_current()
+		end
+		local function retire(record)
+			if active ~= record or not quiet() then return false end
+			local checked, unacquired = pcall(absent)
+			if not checked or unacquired ~= true or not owned_current() then return false end
+			local acknowledged, duplicate, stopped = false, false, false
+			local called, accepted = pcall(stop, function(ok, detail)
+				if acknowledged then duplicate = true; return end
+				acknowledged = true
+				stopped = ok == true and detail == "runtime-not-acquired"
+			end)
+			if not called or accepted ~= true or not acknowledged or duplicate or not stopped or not quiet() then return false end
+			local done, retired = pcall(teardown)
+			if not done or retired ~= true or not quiet() then return false end
+			local issued, capability = pcall(issuer)
+			if not issued or type(capability) ~= "table" then return false end
+			record.capability = capability
+			return current(record)
+		end
+		local function restore(record)
+			if compensating or active ~= record or not current(record) then return false end
+			if record.receipt == nil then
+				-- A genuine save that returned false without any receipt never entered
+				-- its native publisher. Uncertain/raised effects remain retained.
+				if record.unknown then return false end
+				active = nil
+				return true
+			end
+			compensating = true
+			record.phase = "compensating"
+			local called, restored = pcall(record.inverse, function()
+				return compensating and record.phase == "compensating" and current(record)
+			end)
+			local inspected, pending = pcall(record.pending)
+			compensating = false
+			if called and restored == true and inspected and pending == false and active == record then
+				active = nil
+				return true
+			end
+			record.phase = "debt"
+			return false
+		end
+		local scope = {
+			-- Pure reads also remain safe after synchronous logger finalization.
+			pending = function() return active ~= nil end,
+			retry_restore = function()
+				local record = active
+				if record == nil then return true end
+				if not exclusive_entry or record.accepted or record.phase == "handoff" then return false end
+				if record.receipt == nil and not record.unknown and not current(record) then
+					if not retire(record) then return false end
+				end
+				return restore(record)
+			end,
+		}
+		ctx.can_recover_shared_runtime = function()
+			if not owned_current() then return false end
+			if active ~= nil then return active.accepted ~= true and active.phase ~= "handoff" end
+			local called, bytes, status = pcall(read, path)
+			if not called or status ~= "ok" or type(bytes) ~= "string" or not owned_current() then return false end
+			displayed = { path = path, status = status, content = bytes }
+			return true
+		end
+		ctx.recover_shared_runtime = function()
+			if exclusive_entry or active ~= nil and (active.accepted == true or active.phase == "handoff") then return false end
+			if not owned_current() then return false end
+			local retry_only = active ~= nil
+			if not retry_only and displayed == nil then return false end
+			local record = active or { source = { path = displayed.path, status = displayed.status, content = displayed.content }, phase = "reserved" }
+			local entered = false
+			exclusive_entry = true
+			local call_ok, result = pcall(exclusive, "Karabiner runtime recovery", function()
+				entered = true
+				if retry_only then return active == nil end
+				-- The original owner settles its previous retained token first.
+				active = record
+				if not retire(record) then record.phase = "local-debt"; return false end
+				record.phase = "publishing"
+				local wrote, saved, detail, receipt = pcall(save, "shared", path, record.source, function()
+					return exclusive_entry and record.phase == "publishing" and current(record)
+				end)
+				if type(receipt) == "table" and type(receipt.pending) == "function" and type(receipt.retry_restore) == "function" then
+					record.receipt, record.pending, record.inverse = receipt, receipt.pending, receipt.retry_restore
+				else
+					record.unknown = not wrote or saved ~= false
+					record.phase = "local-debt"
+					return false
+				end
+				if not wrote or saved ~= true then record.phase = "debt"; return false end
+				if not current(record) then record.phase = "debt"; return false end
+				record.phase = "handoff"
+				local aborted = false
+				local requested, accepted = pcall(reload, "karabiner_runtime_shared_recovery", function()
+					aborted = true
+					record.accepted = false
+					record.phase = "aborting"
+					restore(record)
+				end)
+				if requested and accepted == true then
+					-- Only local bookkeeping follows acceptance, never a logger,
+					-- refresh, writer release or inverse through a finalized VM.
+					record.accepted = true
+					return true
+				end
+				if not aborted and active == record then
+					record.phase = "debt"
+					-- A false/raised request alone is not an inverse admission.
+					if requested and accepted == false and current(record) then restore(record) end
+				end
+				return false
+			end, scope)
+			exclusive_entry = false
+			if not entered and not retry_only and active == record then active = nil end
+			-- run_exclusive returns false while our exact scope remains pending,
+			-- including successful async handoff. Do not treat that as refusal.
+			if record.accepted == true then return true end
+			return call_ok and result == true
+		end
+	end
+	-- END bounded owned-runtime preference recovery
+
 	-- updateMenu refreshes the menubar icon and re-wires script_control extras,
 	-- then marks the cached menu tree dirty so the NEXT open reflects the change.
 	-- It does NOT rebuild synchronously — the rebuild happens lazily, once, on the

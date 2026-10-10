@@ -1294,7 +1294,8 @@ end
 --- @return function qualify
 parser_refusal.factory = function()
 	return M, parser_refusal.reader, parser_refusal.loader, parser_refusal.decoder,
-		parser_refusal_current, qualify_parser_refusal
+		parser_refusal_current, qualify_parser_refusal,
+		parser_refusal.runtime_publication.save, runtime_publication_current
 end
 M.parser_refusal_factory = parser_refusal.factory
 

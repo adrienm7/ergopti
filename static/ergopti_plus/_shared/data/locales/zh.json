@@ -3286,6 +3286,7 @@
 	"menu.global.karabiner_runtime": "Karabiner运行时",
 	"menu.global.karabiner_runtime.owned": "Ergopti管理的运行时",
 	"menu.global.karabiner_runtime.shared": "共享Karabiner",
+	"menu.global.runtime_recover_shared": "返回共享运行环境",
 	"menu.global.karabiner_runtime_unavailable": "管理的运行时不可用：需要已验证的安装。",
 	"menu.metrics.physical_source": "物理输入历史来源",
 	"menu.metrics.physical_source.ledger": "按键记录",

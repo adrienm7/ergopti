@@ -1,58 +1,69 @@
 <!-- docs/handovers/2026-10-10-group5-runtime-recovery/README.md -->
 
-# Bounded unavailable runtime recovery prerequisites
+# Bounded unavailable runtime preference recovery
 
-These prerequisites retain one exact native publication owner and one completed
-inert local teardown witness. They do not expose a menu command, activate the
-owned runtime, claim receiver STOPPED, complete a reload, or fix watchdog exit73.
+The configuration menu offers an explicit return from the unavailable owned
+Karabiner runtime to the shared runtime. Its action label is translated
+in all 21 languages and refuses the command unless the original native
+configuration, controller, local teardown, publication and reload owners remain
+current. Windows and Linux omit this macOS-specific choice through the shared
+platform policy.
 
-The native configuration admission uses the original filesystem constructor,
-its ninth receipt viewer, and the original TOML whole-document constructor.
-Existing generic codec bodies and the first eight filesystem ports remain
-unchanged. Conditional compensation checks the original publication identity
-under the inverse lock; a same-byte successor inode remains untouched. Unknown
-effects and failed release remain pending.
+Rendering performs pure absence checks. It does not initialize the controller,
+invoke diagnostic status, stop a process or suppress an error. A click uses the
+existing private global transaction, confirms that no native lease was acquired,
+finishes the inert local teardown and publishes the exact displayed preference
+under the original native document owner. Only the retained owned reload request
+can hand off the transaction. Acceptance is not proof of completed reload.
 
-The local witness requires the genuine uninitialized controller and completed
-native owner teardown. A lifetime that entered a gesture/F17 consumer, or loaded
-onboarding without a private absence witness, remains refused until reload.
-This conservative capability does not prove universal physical input retirement.
+Unknown effects, failed inverse publication, changed roles and a same-byte
+successor inode remain refused or retain compensation debt. A lifetime that
+entered a gesture/F17 consumer, or loaded onboarding without a private absence
+witness, remains refused until reload. This is a preference recovery operation,
+not universal physical input retirement, production owned-runtime activation or
+a correction of watchdog exit73.
 
 ## Portable receiving
 
-The registered tests use the normal Hammerspoon runner and explicit disposable
-host ports. Seventy-nine new controls pass on the six reviewed source successors
-and fail on their original preimages. The original 30 runtime and 26 selector
-controls remain unchanged and pass before and after. Existing migration (199) and
-publication-receipt (16) controls also pass in both contexts. The original document
-port tuple passes three controls on Lua5.4 and LuaJIT. These are portable source
-results, not installed Darwin, hardware, packaging or process-reload evidence.
+The prerequisite tranche added 79 controls using the normal Hammerspoon runner.
+Original runtime/selector controls (30/26), migration (199) and publication
+receipts (16) remain unchanged. The pure document-port tuple passes three
+controls on Lua5.4 and LuaJIT. The original generic codec bodies and first eight
+filesystem ports remain unchanged.
 
-Canonical change-scoped verification completed with a failing overall verdict:
+The finite menu successor receives 34 new controls. Its actual Menu.start
+constructor uses the private global owner rather than an injected writer.
+Independent causal tests cover same-file role substitution, reload abort
+semantics, asynchronous handoff, withdrawn controller absence evidence, inert
+rendering and refused recovery while compensation debt remains. The original
+controller diagnostic and logging bodies are unchanged.
 
-- Formatting passed. JavaScript passed 404 of 408 checks. Three failures match
-  the independently reproduced current Dev CI-policy baseline; the fourth
-  exposed two new rejection assertions that checked only `pcall` status.
-- The receipt test now preserves both expected false results and additionally
-  checks the complete immutable-error reason, original inverse identity and
-  exact restored bytes. Its eight portable controls pass; two causal mutations
-  fail. The complete unchanged false-green scanner now passes with zero
-  occurrences. Follow-up JavaScript receiving passes 405 of 408 checks and
-  retains only the three reproduced Dev CI-policy failures.
-- Hammerspoon units passed 19,372 cases with 13 failures; Linux units passed
-  12,722 cases with 22 failures. Both ordered failure-name lists match the
-  retained prior receiving exactly. The 79 newly registered cases pass.
-- Hammerspoon E2E passed 67 of 101 cases, failed 34 and separately skipped one
-  host-specific scenario. The boot fixture lacks the geometry environment;
-  its owner is preparing the assertion-preserving receiving repair. Linux E2E
-  passed 175 of 189 cases and failed 14 terminator cases, also reported by
-  other groups. These are failing suites, not qualified E2E results.
+One original private click adapter incorrectly queried status after the actual
+native controller reported uninitialized. Its original failing receipt remains
+retained. A separate receiver copies the exact original root no-generation
+function body and preserves every assertion and all bytes outside the adapter.
+This authentic receiver distinguishes nine source-side premature diagnostic
+calls from the additional fixture call; the source correction eliminates those
+nine calls without weakening the zero-error assertion.
 
-The additional LuaJIT receipt cohort fails before its test bodies because the
-existing shared test helper calls unavailable `table.pack`. Only the three
-pure document-port controls have successful receipts on both Lua runtimes.
-Darwin execution, native compilation, packaging, installation and physical
-input are unrun for this tranche.
+Canonical generation uses the original manifest and menu generators. Only the
+new command and its caption change their shared menu output; the six generated
+driver feature/configuration artifacts remain unchanged.
 
-The command, its shared declaration and native receiving remain separate
-unfinished work. TODO 31 and transverse items 16/38 remain open.
+The first complete selected pass preserved format and virtual E2E101/101, but
+exposed 41 new assertion failures: absent optional controllers, the drawn caption
+and the new row expectation. Those receipts remain retained. The bounded
+constructor now rejects missing controllers and a refused private global owner;
+eight new controls and four unchanged Quit controls pass. The original locale
+22, configuration26 and complete-tray10 controls pass with their original
+assertions and one explicit added disabled-row expectation. No original caption
+or locale assertion is relaxed. The complete corrected selected pass receives
+format461 and virtual E2E101/101. Units finish at19,408 passed/11 failed, preserving
+exactly the original remaining failure names; JavaScript finishes at405 passed/3
+failed, preserving the three original workflow findings. All 41 new failures are
+resolved. The overall gate remains red, and no native acceptance follows from
+these portable receipts.
+
+Native installed Hammerspoon, actual Darwin filesystem locking, process reload,
+architecture, packaging, installation and physical input remain unrun for this
+tranche. TODO31 and transverse items16/38 remain open.

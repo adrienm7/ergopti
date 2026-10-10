@@ -3286,6 +3286,7 @@
 	"menu.global.karabiner_runtime": "Karabiner रनटाइम",
 	"menu.global.karabiner_runtime.owned": "Ergopti द्वारा प्रबंधित रनटाइम",
 	"menu.global.karabiner_runtime.shared": "साझा Karabiner",
+	"menu.global.runtime_recover_shared": "साझा रनटाइम पर वापस जाएँ",
 	"menu.global.karabiner_runtime_unavailable": "प्रबंधित रनटाइम उपलब्ध नहीं: सत्यापित स्थापना आवश्यक है।",
 	"menu.metrics.physical_source": "भौतिक इनपुट इतिहास का स्रोत",
 	"menu.metrics.physical_source.ledger": "कुंजी लेखा",

@@ -3286,6 +3286,7 @@
 	"menu.global.karabiner_runtime": "Środowisko wykonawcze Karabiner",
 	"menu.global.karabiner_runtime.owned": "Środowisko zarządzane przez Ergopti",
 	"menu.global.karabiner_runtime.shared": "Współdzielony Karabiner",
+	"menu.global.runtime_recover_shared": "Wróć do współdzielonego środowiska",
 	"menu.global.karabiner_runtime_unavailable": "Zarządzane środowisko niedostępne: wymagana jest zweryfikowana instalacja.",
 	"menu.metrics.physical_source": "Źródło historii wejścia fizycznego",
 	"menu.metrics.physical_source.ledger": "Rejestr klawiszy",

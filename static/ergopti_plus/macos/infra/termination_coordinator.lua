@@ -763,4 +763,13 @@ function M.request_user_exit(reason)
 	})
 end
 
+-- Retain the owned reload's abort semantics independently of advertised
+-- mutable exports. No ordinary reload, terminal admission or teardown body changes.
+do
+	local owned_reload, pending = M.request_reload_owned, M.is_pending
+	function M.owned_reload_ports()
+		return M, owned_reload, pending
+	end
+end
+
 return M

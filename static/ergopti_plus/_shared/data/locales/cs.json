@@ -3286,6 +3286,7 @@
 	"menu.global.karabiner_runtime": "Běhové prostředí Karabiner",
 	"menu.global.karabiner_runtime.owned": "Běhové prostředí spravované Ergopti",
 	"menu.global.karabiner_runtime.shared": "Sdílený Karabiner",
+	"menu.global.runtime_recover_shared": "Vrátit se ke sdílenému prostředí",
 	"menu.global.karabiner_runtime_unavailable": "Spravované prostředí není dostupné: je vyžadována ověřená instalace.",
 	"menu.metrics.physical_source": "Zdroj historie fyzického vstupu",
 	"menu.metrics.physical_source.ledger": "Záznam kláves",

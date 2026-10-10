@@ -3286,6 +3286,7 @@
 	"menu.global.karabiner_runtime": "Karabiner runtime",
 	"menu.global.karabiner_runtime.owned": "Ergopti-owned runtime",
 	"menu.global.karabiner_runtime.shared": "Shared Karabiner",
+	"menu.global.runtime_recover_shared": "Return to shared runtime",
 	"menu.global.karabiner_runtime_unavailable": "Owned runtime unavailable: a verified installation is required.",
 	"menu.metrics.physical_source": "Physical history source",
 	"menu.metrics.physical_source.ledger": "Key ledger",

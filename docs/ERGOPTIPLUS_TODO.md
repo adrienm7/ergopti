@@ -3616,14 +3616,19 @@ and restoration/debt assertions remain mandatory.
   decision; initial-press attribution follows the delegated routine decisions.
   Production history wiring, bounded recovery and controlled shutdown remain
   incomplete; every new hold prerequisite still needs native acceptance.
-  Reviewed recovery prerequisites now retain genuine native document/publication
-  ports and a completed inert-local witness. The normal Hammerspoon runner
-  receives 79 new controls; original 30/26 and migration 199/publication 16 remain
-  unchanged and pass in portable receiving. A same-byte successor inode is
-  preserved during compensation. The menu transaction is still held for four
-  independent role/async-abort regressions; no command or owned runtime is
-  activated. Native installed, reload and physical qualification remain unrun.
-  TODO 31 and transverse items 16/38 remain open.
+  Reviewed recovery prerequisites retain genuine native document/publication
+  ports and a completed inert-local witness. The explicit configuration command
+  now offers the unavailable owned runtime a bounded return to shared mode,
+  with a translated action in all 21 languages and the original private owner.
+  Rendering is inert; withdrawn roles, unavailable absence evidence, changed
+  source identity and unknown compensation remain refused or retain debt.
+  Independent normal receiving passes 79 prerequisite and 34 new menu controls,
+  with original 30/26 and migration 199/publication 16 preserved. Actual corrected
+  units finish 19,408/11 and virtual E2E101/101; the eleven previous unit failures
+  and three workflow findings remain, with no new menu failure. Reload request
+  acceptance is not completed reload; no owned runtime or exit73 fix is claimed.
+  Native installed, reload and physical qualification remain unrun. TODO31 and
+  transverse items16/38 remain open.
   About 30-40 agent-days plus maintainer
   hardware time.
 
