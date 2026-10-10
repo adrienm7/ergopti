@@ -3645,6 +3645,15 @@ and restoration/debt assertions remain mandatory.
   separate SDK control; it does not execute these165 cases or production
   retention/next-record APIs. Final corrected receiving remains pending.
   The user lease exit73 cause, installed reload and physical input stay unproved.
+  An inactive receiving packet preserves the reviewed manual-only ARM/Intel
+  165-case proposal and the autonomous four-Swift diagnostics on current Dev.
+  Shared CI ownership and final native receiving remain required; original
+  full-package, installed, release and unknown-filter guards stay mandatory.
+  Windows-PC steps: receive the independently ordered Configuration corpus's
+  two new macOS declaration IDs; replay its existing named Windows test; then
+  qualify the final native unit, E2E, package and installation lanes. The separate
+  Callback timer-inventory refusal still needs its owner; no Windows success
+  follows from the saved patch or source review. See the Group5 recovery handover.
   TODO31 and transverse items16/38 remain open.
   About 30-40 agent-days plus maintainer
   hardware time.

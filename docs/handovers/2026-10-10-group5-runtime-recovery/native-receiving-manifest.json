@@ -1,0 +1,373 @@
+{
+	"schema": 1,
+	"published_feature": "bead4033d88b1f71a2ea219c7d4d6e504c7407b4",
+	"current_dev": "591d59a942780465bca95956dc3cc9b2e960fa9e",
+	"adoption": "INACTIVE_PREPARATION",
+	"manual_ci": "HOLD: six shared ownership hunks; source review clear, native unrun",
+	"diagnostic4": "source-only standalone; receiving in exact integration context unrun",
+	"windows_menu": "HOLD: test ownership; native Windows unrun",
+	"cause_exit73": "UNKNOWN",
+	"archive": {
+		"path": "native-receiving-preparation.tar.gz",
+		"bytes": 545475,
+		"sha256": "9d1c570da3fa424539f6c03d62410275d188f264aabfc118a9254049e6f2c6ba",
+		"members": 71
+	},
+	"members": [
+		{
+			"path": "diagnostic4/MANIFEST.json",
+			"bytes": 7854,
+			"sha256": "77ddf510cf571b9a76db5433073699981954cc09b03b5f72bc800ae827cd87f8"
+		},
+		{
+			"path": "diagnostic4/README.md",
+			"bytes": 2403,
+			"sha256": "11faaca40a55bc58c4a049ca802e21b556697ee30669e93133e94bb80d4c34ed"
+		},
+		{
+			"path": "diagnostic4/SOURCE-CONSERVATION.json",
+			"bytes": 5772,
+			"sha256": "65cf0ff07b585c4d0d0c105a44870f7c75bdec3c702bc7ae5873e1fa527012c6"
+		},
+		{
+			"path": "diagnostic4/exact-reviewed-identity-three.patch",
+			"bytes": 3484,
+			"sha256": "5d68781adff51fb2afb3f450b559f571e5440915d93f76c5addb22a028dc6fd0"
+		},
+		{
+			"path": "diagnostic4/four-test-body-inverse-zlvd1ve1/BODY-RECEIPT.json",
+			"bytes": 546,
+			"sha256": "73f8f49c6026e3c9e9fb5bfa8c2fcb466ce3363040c82ccaf01fbc3533e464ee"
+		},
+		{
+			"path": "diagnostic4/original-handover-manifest.json",
+			"bytes": 3388,
+			"sha256": "c2b43d9c0e349c6046dadf840b1a00cfda435dac943eadda40d31d352e1f5565"
+		},
+		{
+			"path": "diagnostic4/original-standalone-e896.patch",
+			"bytes": 127193,
+			"sha256": "c9bc69a370cf446b4fb8a7d8e350c63d815cfda28a989aebf0b096b15079f90f"
+		},
+		{
+			"path": "diagnostic4/postimages/static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/RemapLeaseDiagnosticStore.swift",
+			"bytes": 14934,
+			"sha256": "5d9fc200d107f7602cd706847770b753c24c7dd2a05edb7406678acdcca26819"
+		},
+		{
+			"path": "diagnostic4/postimages/static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/RemapLeaseWorker.swift",
+			"bytes": 123181,
+			"sha256": "bcd3a4fca57654b3a420bf79490accc836ab40c20a969ec0a5cbdd7191a150bd"
+		},
+		{
+			"path": "diagnostic4/postimages/static/ergopti_plus/macos/launcher/Tests/ErgoptiPlusTests/LeaseDiagnosticNextObservationTests.swift",
+			"bytes": 20466,
+			"sha256": "9b1ed32c136eaa4e95ddbf72fbb888fecc40384c45b1a4c46bab80b4aad1d7f8"
+		},
+		{
+			"path": "diagnostic4/postimages/static/ergopti_plus/macos/launcher/Tests/ErgoptiPlusTests/RemapLeaseWorkerTests.swift",
+			"bytes": 286873,
+			"sha256": "304a9a2ee155697ef0e0af7008d71637452f1d435ee030f11ced301d0f829e7d"
+		},
+		{
+			"path": "diagnostic4/standalone-dev591-diagnostic4.patch",
+			"bytes": 127663,
+			"sha256": "2c5a1058c3f2e8e7e19d7c324211ad83ba1ca81569080d9e857f08a117da3570"
+		},
+		{
+			"path": "manual-ci/ADDITIVE-EVENT-CONTROLS-BEFORE.json",
+			"bytes": 321,
+			"sha256": "78c73749005f4b8697da259516d82a5ccd19501ef86f4d85163dd3bffc665f84"
+		},
+		{
+			"path": "manual-ci/ADDITIVE-JOB.txt",
+			"bytes": 2725,
+			"sha256": "1000d6eb6f0c7f7271230f8b14fbc3fc8609e1443ea6f84e3a37c2d6517d8f9e"
+		},
+		{
+			"path": "manual-ci/BASELINE-GUARDS.json",
+			"bytes": 105,
+			"sha256": "3ef26d7aec31f4d49d947c8a04180e65de4f91b8cfa1f5481b451f6ad4a85838"
+		},
+		{
+			"path": "manual-ci/BASELINE-PIPELINE-WIRING.log",
+			"bytes": 6078,
+			"sha256": "67050bb1a585a8d66f5f6fdc61e416148e56739c499497d0bf8dcfca05c1358f"
+		},
+		{
+			"path": "manual-ci/BASELINE-SWIFT-GUARD.log",
+			"bytes": 415,
+			"sha256": "85cb7807e73237d80fa3e609f79267c5f94eac80d1afb697ebc5d6abe117ca80"
+		},
+		{
+			"path": "manual-ci/BEFORE/.github/workflows/ci-macos.yml",
+			"bytes": 93825,
+			"sha256": "68b82c83daa98ddd87c2f5c4a46c7f513a61f166f94f306869852c8542d393d5"
+		},
+		{
+			"path": "manual-ci/BEFORE/tools/test/ci-full-default.cjs",
+			"bytes": 13369,
+			"sha256": "ed5abefccf4916c71a4303c1ba9b354498e2a83355099d58ccdfe0fa8e56e690"
+		},
+		{
+			"path": "manual-ci/BEFORE/tools/test/run-js-suite.cjs",
+			"bytes": 97931,
+			"sha256": "6219442a7e87965f6cfa36a3eab1fe30c98bd9ca9f6d4b09f7171d4b07e5bba8"
+		},
+		{
+			"path": "manual-ci/BEFORE/tools/test/test-ci-pipeline-wiring.cjs",
+			"bytes": 179907,
+			"sha256": "b0f053493d3b99cbb5988717561dcffb39d87fa7aa5f5f455df869759acfec1b"
+		},
+		{
+			"path": "manual-ci/BEFORE/tools/test/test-macos-dev-qualification-deferral.cjs",
+			"bytes": 42581,
+			"sha256": "715dcaf276c73681a3ee427e77d97c61b8e4b265837ad1c4b2a0a2fad5acefc5"
+		},
+		{
+			"path": "manual-ci/BEFORE/tools/test/test-macos-swift-launcher-ci.cjs",
+			"bytes": 56223,
+			"sha256": "b34add0cbdad9885962b857b30becdc72b530e9555ebfb2e67d3c2d47d1516f3"
+		},
+		{
+			"path": "manual-ci/CANDIDATE.patch",
+			"bytes": 60229,
+			"sha256": "ff873cf12686d1184b32ae389c790135cb4271e57d2929e68a9d9a16b3282e86"
+		},
+		{
+			"path": "manual-ci/CONTEXT-INPUT-PINS.json",
+			"bytes": 246903,
+			"sha256": "4dd07d520f309a4c09ea3e626fb2db0a664e0eb4e1749c49d8683ef5f57cff0b"
+		},
+		{
+			"path": "manual-ci/CONTROLS-FROZEN-BEFORE.json",
+			"bytes": 845,
+			"sha256": "b12f59bcd25e6c5f8fb8a029b41f7a4a15ab707369112c75a70f0fe40931c844"
+		},
+		{
+			"path": "manual-ci/ENROLLED-PIPELINE-WIRING-PREREQUISITES.log",
+			"bytes": 3802,
+			"sha256": "40a0b12b4c7dad3a484de6bc5e465e9cc90cd53d24bb642f93213ed2f52b2b7d"
+		},
+		{
+			"path": "manual-ci/ENROLLED-PIPELINE-WIRING.log",
+			"bytes": 946,
+			"sha256": "cacc576019d9519510fc4be46c0bd46896fd8ff572d0d47c95109d471718103c"
+		},
+		{
+			"path": "manual-ci/ENROLLED-PIPELINE.log",
+			"bytes": 82,
+			"sha256": "a5deae51df439bc00e2db247c92727fee3ccccad46381988c6b39b074b28ba60"
+		},
+		{
+			"path": "manual-ci/ENROLLED-SWIFT-GUARD.log",
+			"bytes": 415,
+			"sha256": "85cb7807e73237d80fa3e609f79267c5f94eac80d1afb697ebc5d6abe117ca80"
+		},
+		{
+			"path": "manual-ci/FINAL-test-ci-pipeline-wiring.log",
+			"bytes": 6156,
+			"sha256": "d6be8c28ee39206e8fe88e0c9557791af882ff32483b8a6880378d1cbb423b2f"
+		},
+		{
+			"path": "manual-ci/FINAL-test-ci-pipeline.log",
+			"bytes": 82,
+			"sha256": "a5deae51df439bc00e2db247c92727fee3ccccad46381988c6b39b074b28ba60"
+		},
+		{
+			"path": "manual-ci/FINAL-test-lease165-xctest-evidence.log",
+			"bytes": 1324,
+			"sha256": "d5cce9414d14f7f2b8fed267989a0059ae7c0b206a55eb4d569b796ff0de91ae"
+		},
+		{
+			"path": "manual-ci/FINAL-test-macos-swift-launcher-ci.log",
+			"bytes": 415,
+			"sha256": "85cb7807e73237d80fa3e609f79267c5f94eac80d1afb697ebc5d6abe117ca80"
+		},
+		{
+			"path": "manual-ci/GUARD-ENROLLMENT-FROZEN-JOB.txt",
+			"bytes": 2624,
+			"sha256": "4da3349d01a3f4469b5760c79f6dcc84ff41512be6dd7bec451835ad29fca5fb"
+		},
+		{
+			"path": "manual-ci/GUARD-SUCCESSOR-FROZEN-JOB.txt",
+			"bytes": 2626,
+			"sha256": "a7faf93cf0aa260dcc12f626ab73586dae64464a8a670849397bfc1b1e2db550"
+		},
+		{
+			"path": "manual-ci/HISTORICAL-FAILURE-REFUSAL.json",
+			"bytes": 327,
+			"sha256": "af996e2f5888dcaacbcb163e095eb184aa8d0064488bad6cccec85f3d186f6e6"
+		},
+		{
+			"path": "manual-ci/HISTORICAL-IDENTITIES-FROZEN.json",
+			"bytes": 2874,
+			"sha256": "482b5de03a3e4853b7dc37041d341c635c453b7f4854eac48220afb94ef6939d"
+		},
+		{
+			"path": "manual-ci/HISTORICAL-TWO-COHORTS.log",
+			"bytes": 74904,
+			"sha256": "16156d9304925221418db60394f81603957116c58ea28ab2f529d8f1cdeb72cc"
+		},
+		{
+			"path": "manual-ci/MANIFEST.json",
+			"bytes": 9170,
+			"sha256": "35ae92c7fe939cfbf1fe1297f01236f59aeb6376aa5c2c10a28e38a93cca9536"
+		},
+		{
+			"path": "manual-ci/MODELED-SELECTED-SUCCESS.log",
+			"bytes": 44516,
+			"sha256": "2a0783426018d8b66e78833b79d280d3f236f52dc4683358ce2d910a5177d603"
+		},
+		{
+			"path": "manual-ci/MUTANT-1.log",
+			"bytes": 1734,
+			"sha256": "398c00b6e235c75b2f9a05307cc2e3180c50f93d2223845f99e9dc22669861f6"
+		},
+		{
+			"path": "manual-ci/MUTANT-2.log",
+			"bytes": 2076,
+			"sha256": "59743d9c5496ebb877b2a3fcdcfef398db2a6080df0a4927abf54105f4a36de3"
+		},
+		{
+			"path": "manual-ci/MUTANT-3.log",
+			"bytes": 1289,
+			"sha256": "2276cd22f518f3207c9a22c5b67206012284db2b1b8664af185efac11292937b"
+		},
+		{
+			"path": "manual-ci/MUTANT-RECEIPTS.json",
+			"bytes": 1397,
+			"sha256": "c7533ebe895e977f624c0ca44ddd2a00344ced6c3a7bc0dfe8767276c6f45f2e"
+		},
+		{
+			"path": "manual-ci/ORIGINAL-19-FINDINGS.json",
+			"bytes": 3346,
+			"sha256": "cd8650b19912b9556a5dba412c249642cc132046a6ac641dc4188f4c5cdd1c29"
+		},
+		{
+			"path": "manual-ci/ORIGINAL-PIPELINE-WIRING.log",
+			"bytes": 1226,
+			"sha256": "51ed6cddd958efc990c3aab3f1572706844ba200a10fe0e5769623cd641eb420"
+		},
+		{
+			"path": "manual-ci/ORIGINAL-PIPELINE.log",
+			"bytes": 82,
+			"sha256": "a5deae51df439bc00e2db247c92727fee3ccccad46381988c6b39b074b28ba60"
+		},
+		{
+			"path": "manual-ci/ORIGINAL-REFUSAL-AND-SCOPED-MODEL.json",
+			"bytes": 22555,
+			"sha256": "fa5d44ab73ebd90ce30cb0f85f4269b280b9df497c264819d8d5ba35ce8f3a4b"
+		},
+		{
+			"path": "manual-ci/ORIGINAL-SWIFT-GUARD.log",
+			"bytes": 1226,
+			"sha256": "51ed6cddd958efc990c3aab3f1572706844ba200a10fe0e5769623cd641eb420"
+		},
+		{
+			"path": "manual-ci/QUALIFICATION.json",
+			"bytes": 2374,
+			"sha256": "46b6c4f84a7208c0ad10863f0f7e008d814964fc8f9b2b4988f1f6c771b41428"
+		},
+		{
+			"path": "manual-ci/RECEIVER-CONTROLS.log",
+			"bytes": 1324,
+			"sha256": "d5cce9414d14f7f2b8fed267989a0059ae7c0b206a55eb4d569b796ff0de91ae"
+		},
+		{
+			"path": "manual-ci/REVIEW.md",
+			"bytes": 4465,
+			"sha256": "2f8378db01b3e80ea4146c57c815ed8b2dc9a09d71554a2ecc5c1e41126cfcc1"
+		},
+		{
+			"path": "manual-ci/SOURCE-INVENTORY.json",
+			"bytes": 2610,
+			"sha256": "63bc46815f659657eb0e3699c71ab274efc3d4057aefba107856d1c67a8acc0d"
+		},
+		{
+			"path": "manual-ci/SOURCE/.github/workflows/ci-macos.yml",
+			"bytes": 96552,
+			"sha256": "afa8e003520d5433a38c2819c46df45648902597081e2e96d8d2618b572dd3f5"
+		},
+		{
+			"path": "manual-ci/SOURCE/tools/diagnostics/lease165_xctest_evidence.cjs",
+			"bytes": 11199,
+			"sha256": "b813c10feda08ac145bd0180ac9ce9e43a1ae7b74e8127672c7f60aee0b078d2"
+		},
+		{
+			"path": "manual-ci/SOURCE/tools/test/ci-full-default.cjs",
+			"bytes": 13506,
+			"sha256": "794f651eeca237e31ac348240bc7a3448a315d20613f7077d6b90f10302a7bae"
+		},
+		{
+			"path": "manual-ci/SOURCE/tools/test/fixtures/lease165-native-xctest-corpus.json",
+			"bytes": 19134,
+			"sha256": "2775bca2baf42b72eb74fc599f9828bcfe886d577fdf172d4edf0758187a351f"
+		},
+		{
+			"path": "manual-ci/SOURCE/tools/test/run-js-suite.cjs",
+			"bytes": 98182,
+			"sha256": "5d0a06ae3f9b44fec7933d71070c3c6d016b5b86f11b2bb9ab949a21677afd24"
+		},
+		{
+			"path": "manual-ci/SOURCE/tools/test/test-ci-pipeline-wiring.cjs",
+			"bytes": 181188,
+			"sha256": "f2976b39f639d397cc055766dae74b34b233ae8a751e5668a945ac3f3e71a453"
+		},
+		{
+			"path": "manual-ci/SOURCE/tools/test/test-lease165-xctest-evidence.cjs",
+			"bytes": 11401,
+			"sha256": "254b9d41c1e9dec02b13f568497420841bf81c5737e310b474c328314467ad92"
+		},
+		{
+			"path": "manual-ci/SOURCE/tools/test/test-macos-dev-qualification-deferral.cjs",
+			"bytes": 45032,
+			"sha256": "b44b0a72c13f0754928327063de22ef5b2e1bcf3319bc9e585164efd7c0397a8"
+		},
+		{
+			"path": "manual-ci/SOURCE/tools/test/test-macos-swift-launcher-ci.cjs",
+			"bytes": 60994,
+			"sha256": "861cfa656a14c8ee97fde2f88d1d1a10fd0332c2e42aa48b966ea525f943ccb7"
+		},
+		{
+			"path": "manual-ci/WHOLE-INVERSE-PROOF.json",
+			"bytes": 1048,
+			"sha256": "5ffc44751fe9106684de30fdf104a60e7cf32ce1310e9d4916e24eaf25646c4b"
+		},
+		{
+			"path": "windows-menu/CENSUS.json",
+			"bytes": 678,
+			"sha256": "b933ae267c55ca2f7a9f9f7f4bdd9ebe380a40605a33f106e65ed3f0fa73e3d6"
+		},
+		{
+			"path": "windows-menu/DECLARATION.toml",
+			"bytes": 285710,
+			"sha256": "1a88c899db616831bc2009b26e39ba39b15cfa6789938e8ff6382b18dc505285"
+		},
+		{
+			"path": "windows-menu/README.md",
+			"bytes": 761,
+			"sha256": "64cdadf7d66070ebdf4dfca39f730e00aa705f344866efe5c822f22f8de87f9f"
+		},
+		{
+			"path": "windows-menu/REVIEW.json",
+			"bytes": 2586,
+			"sha256": "1e6a83f66dd84d825877ef33877083b3a8b5216f2cd33f87c413abef85b35157"
+		},
+		{
+			"path": "windows-menu/TWO-IDS.patch",
+			"bytes": 839,
+			"sha256": "726a9bd4e7c935cc40a16cb1933d0d04d9d67cd66677281d8c930383946e8d9e"
+		},
+		{
+			"path": "windows-menu/before/static/ergopti_plus/windows/tests/unit/test_menu_languages_and_global_separator.ahk",
+			"bytes": 10207,
+			"sha256": "2c8ba2d94c2b4cc0efa25dfeb70555702dc652ab9172212b9297f28a7a7c14b8"
+		},
+		{
+			"path": "windows-menu/proposed/static/ergopti_plus/windows/tests/unit/test_menu_languages_and_global_separator.ahk",
+			"bytes": 10274,
+			"sha256": "1af4f7bee7d6bc3160484452e0586ac36ed6ecb6bfb80b8f893943c061ecbb1f"
+		}
+	]
+}

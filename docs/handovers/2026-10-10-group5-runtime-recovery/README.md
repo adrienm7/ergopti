@@ -121,3 +121,34 @@ canonical retention/next-record APIs. Packaging, installation and release jobs
 are skipped in the overall failed run; no release is published. Native receiving
 of the corrected store remains pending. This correction qualifies neither the
 user's watchdog exit73 cause nor physical input, readiness or retirement.
+
+## Inactive receiving preparation
+
+The [manifest](native-receiving-manifest.json) pins every member of
+[native-receiving-preparation.tar.gz](native-receiving-preparation.tar.gz).
+Extract only into an owned temporary directory; never over the checkout.
+These are inactive preparations, not integrated code or native qualification.
+
+`diagnostic4/` receives the original four-Swift diagnostic packet onto genuine
+current Dev591d59a, followed only by the three reviewed identity corrections
+published as bead4033d. Combined application/inversion restores all preimages;
+all146 worker and19 observer bodies and original assertions are preserved.
+It imports no additional feature owner. Native receiving in the exact integration
+context remains unrun, and the user's exit73 cause remains unknown.
+
+`manual-ci/` preserves the nine-path proposal for a manual non-release ARM/Intel
+job and strict historical165 collector. Independent source review is clear.
+Six existing shared files need coordinated ownership before adoption; three
+new files are scoped collector, corpus and registered controls. The original
+generic reader, package/profile/release behavior, budgets and mutations remain
+whole. The new job is independently guarded and never replaces the full-package
+verdict. Portable38 controls pass, with original78/65/82 and separate negative
+controls preserved. The original19 pipeline findings remain unchanged; the
+overall pipeline guard still fails. Native ARM/Intel165 execution is unrun.
+
+`windows-menu/` preserves a handwritten two-ID insertion into the original
+ordered Configuration declaration oracle. Every old ID, assertion, BOM and LF
+is retained. Test ownership is pending; no native execution is claimed. On the
+maintainer's Windows PC, replay the existing Configuration order test, then run
+the final unit, E2E, packaging and installation prerequisites. The separate
+Callback timer-inventory refusal is unchanged and needs its existing owner.
