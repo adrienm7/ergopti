@@ -1382,7 +1382,7 @@
 			]
 		},
 		{
-			"type": "dynamic",
+			"type": "list",
 			"id": "personal_shortcuts",
 			"platforms": [
 				"ahk"
