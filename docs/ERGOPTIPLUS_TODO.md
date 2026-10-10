@@ -6537,6 +6537,30 @@ still require Windows validation; the historical full suite remains failed.
       open. macOS system trust and explicit proxy relays are integrated, while
       opaque-client full-URL PAC/WPAD/fallback/redirect routing remains CODE.
 
+2026-10-10 partial integration and native failure observations. Seven atomic
+commits are integrated without squash in Dev `d92a72d5`. The final selected
+local gates pass formatting, 409 JS controls, Mac 18347/0 across 1569 modules,
+Mac E2E 101 with one original skip, Linux 13037/0 across 520 modules and Linux
+E2E 193/0. Exact candidate manual 38079685751 on `f6318` finishes 6 successful,
+6 failed and 5 skipped jobs; Release is skipped. Both Darwin architectures
+pass SDK 49, Python 77, genuine Go 54, source PAC 10 and catalogue 27. PAC/WPAD
+passes 12 of 14 cases on each architecture; two fail. Independent HTTP fails
+before request dispatch at the original 15-second add-trust command deadline.
+The model receiver reaches trust addition after compilation/signing, but its
+initial exception is discarded and native trust cleanup remains unsettled.
+Model stages and package/install remain unqualified. Official integrated
+manual 38081991583 on exact `d92a72d5` is running; its verdict is separate.
+
+The model diagnostic now retains independent closed-code primary and cleanup
+facts and a fixed preparation checkpoint. Original fatal status, reason
+precedence, owner run/close order and all clocks remain unchanged. Raw exception
+messages, arguments, paths and foreign subclass properties are excluded.
+All 16 original portable controls remain and all 23 candidate controls pass;
+actual native replay is still required. Daily daemon logging remains a reviewed,
+unexecuted preparation, with a separate seven-case native enrollment awaiting
+shared writer coordination. The production qualification guard stays false;
+items 36/62 and transverse 16/38 remain open.
+
 2026-10-10 final canonical caller receiving. Selected format366 passes;
 Mac controlled unit18327/0 across1569 modules, Mac E2E101 with one original
 skip, Linux unit13017/0 across520 modules and Linux E2E193/0 pass. The whole
