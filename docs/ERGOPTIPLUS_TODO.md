@@ -5167,9 +5167,61 @@ integrated, then publish one grouped release.
 
 - [~] **54.** Every menu is declared in the shared menu manifest, never in
   driver code. The ratchet `npm run test:native-menu-rows` counts the rows
-  drivers still build (current baseline: Windows 23, macOS 18, Linux 19, each
+  drivers still build (current baseline: Windows 22, macOS 7, Linux 6, each
   site listed in tools/test/native-menu-rows-baseline.json); migrate them to
-  zero. Each OS-limited row declares `unavailable = "hide"` (not
+  zero. The current received menu slices declare five fixed feature parents,
+  top-level separator placement, deferred Windows language children and
+  immutable translated Windows startup rows through shared source owners.
+  The macOS download command consumes its existing declared frame. All 31
+  registered generators complete; the genuine census falls to 22/7/6.
+  The actual TOML parser produces null-prototype records; the startup compiler
+  admits those data records while retaining custom-prototype refusals.
+  Private targeted menu hosts pass 28 macOS, 4 and 289 Linux cases on each
+  Lua runtime, and 43 macOS download cases; the genuine download predecessor
+  fails exactly six new controls. Whole final-source gates, Windows execution
+  and installed/physical acceptance remain pending; these counts do not close
+  items 54, 81, 16 or 38.
+  Genuine current positive fixture dependencies now execute 382 passing
+  macOS tests across 24 complete registered modules, and 471 passing Linux
+  tests on each of Lua 5.4 and LuaJIT. A retired internal macOS path-menu
+  constructor had no executable callers; removing it reduces the actual
+  macOS census from nine to eight without changing the native editor owner.
+  The actual shared Hotstrings source-route check passes for all three
+  drivers. Before the personal-information leaf, the complete actual
+  menu-manifest target passes, retaining the imported-owner, nested callback
+  and constructor-data controls. The
+  actual parity gate passes its native LLM route controls, then reports two
+  unresolved Linux submenu/macOS state-reader declarations. Original
+  assertions remain. These targeted receipts are not a passing full
+  suite or installed-device acceptance.
+  The existing personal-information editor leaf now consumes a shared
+  declared frame on macOS and Linux; all 21 prior captions and the Windows
+  native button remain unchanged. Its retained native opener checks source
+  ownership before scheduling and before queued delivery. Genuine generation
+  completes, and the nonincreasing census is 22/7/6. After correcting the genuine
+  native row positions and isolating the actual Hotstrings constructor, complete
+  receiving modules pass 44/0 on macOS and 69/0 on each Linux runtime. Loading
+  the preserved original production into the same complete registered hosts
+  yields 37/7 and 63/6 respectively: all 13 new cases detect the original gap,
+  while prior cases remain passing. The initial 38/6 and 68/1 failed receipts
+  are retained. These software-host results do not establish physical-device,
+  packaging, or complete final-source acceptance.
+  The current complete manifest and whole-tree parity targets now pass.
+  The source proofs preserve genuine provider composition and the guarded
+  Linux root publication; original withdrawal controls remain effective.
+  The preceding manifest/parity failures are retained as failed evidence.
+  Actual selected final-source software hosts execute 18,119 passing and
+  11 failing macOS unit tests, and 12,837 passing and 22 failing Linux unit
+  tests. Virtual macOS E2E passes 101 with one host skip; Linux E2E passes
+  175 and fails 14. After the two-file About source-proof correction, JS
+  retains four failures: the precommit domain drift against the unchanged
+  Git source and three workflow guards requiring their owners. Formatting
+  passes; local AHK unit, parse and E2E execution is unavailable and skipped.
+  All pinned inputs remain unchanged during these actual runs. These results
+  are not full-suite, native macOS, packaging, installation or physical-device
+  acceptance. Native CI and the outstanding fixture/workflow repairs remain
+  required; items 54, 81, 16 and 38 stay partial.
+  Each OS-limited row declares `unavailable = "hide"` (not
   applicable) or `"grey"` (not yet ported, with its reason); classify the
   existing rows during the migration (proposal in the menu-first-group
   report: most hide; greyed: Linux edit_shortcuts, Linux key
@@ -7848,9 +7900,9 @@ is committed; one request is one commit with its regression test.
 
 - [~] **81.** The maintainer asks to treat item 54 now (every menu row is
   declared in the shared manifest, none built in a driver's folder):
-  Windows 23, macOS 18 and Linux 19 rows are still built by the
+  Windows 22, macOS 7 and Linux 6 rows are still built by the
   drivers (`tools/test/native-menu-rows-baseline.json`). The current census
-  was regenerated on 2026-10-09. The sites are of four kinds, and three need the
+  was regenerated by its owning generator on 2026-10-10. The sites are of four kinds, and three need the
   manifest to say more than it can today:
   (a) rows a `dynamic` entry leaves to the driver (Windows `register`,
   `append` and `add`: the WPM widget rows of Metrics, the AI menus):

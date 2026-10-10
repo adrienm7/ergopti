@@ -330,6 +330,177 @@ Test("tray bootstrap: early clicks use the actual native root (tray-native-2026-
 Test("tray bootstrap: invalid label is complete-or-absent (ahk-009-tray-bootstrap-publication)",
 	_TBPT_InvalidLabelCannotPartiallyPublish)
 Test("tray bootstrap: pre-i18n default truthfully says Starting (ahk-009-tray-bootstrap-publication)",
-	_TBPT_DefaultLabelTruthfullySignalsStartup)
+	_TBSF_WithLocale.Bind("en", _TBPT_DefaultLabelTruthfullySignalsStartup))
 Test("tray bootstrap: failed detached build retains bootstrap until complete root (ahk-009-tray-bootstrap-publication)",
 	_TBPT_BuildFailureRetainsBootstrapUntilCompletePublish)
+
+_TBSF_WithLocale(Code, Body) {
+	global _SharedDir, _I18nLocale, _I18nCache, _I18nCacheLoaded, _I18nCacheEn,
+		_I18nCacheEnLoaded, _I18nCacheFr, _I18nCacheFrLoaded, _I18nFallbacksWarmed
+	Saved := [_I18nLocale, _I18nCache, _I18nCacheLoaded, _I18nCacheEn,
+		_I18nCacheEnLoaded, _I18nCacheFr, _I18nCacheFrLoaded, _I18nFallbacksWarmed]
+	try {
+		_I18nLocale := Code
+		_I18nCache := JsonParse(FileRead(_SharedDir . "\data\locales\" . Code . ".json", "UTF-8"))
+		_I18nCacheLoaded := true
+		_I18nCacheEn := JsonParse(FileRead(_SharedDir . "\data\locales\en.json", "UTF-8"))
+		_I18nCacheEnLoaded := true
+		_I18nCacheFr := JsonParse(FileRead(_SharedDir . "\data\locales\fr.json", "UTF-8"))
+		_I18nCacheFrLoaded := true
+		_I18nFallbacksWarmed := true
+		return Body.Call()
+	} finally {
+		_I18nLocale := Saved[1], _I18nCache := Saved[2], _I18nCacheLoaded := Saved[3]
+		_I18nCacheEn := Saved[4], _I18nCacheEnLoaded := Saved[5]
+		_I18nCacheFr := Saved[6], _I18nCacheFrLoaded := Saved[7], _I18nFallbacksWarmed := Saved[8]
+	}
+}
+
+/** Gives the real registration owner isolated state and restores every ledger. */
+_TBSF_WithDispatcher(Body) {
+	global _MenuDispatchCallbacks, _MenuDispatchLastFire, _MenuDispatcherEpoch,
+		_MenuDispatchTokens, _MenuDispatchTokenCounter, _MenuDispatchClickSequences,
+		_MenuDispatchOwnerHandles
+	Saved := [_MenuDispatchCallbacks, _MenuDispatchLastFire, _MenuDispatcherEpoch,
+		_MenuDispatchTokens, _MenuDispatchTokenCounter, _MenuDispatchClickSequences,
+		_MenuDispatchOwnerHandles]
+	try {
+		_MenuDispatchCallbacks := Map(), _MenuDispatchLastFire := Map()
+		_MenuDispatchTokens := Map(), _MenuDispatchClickSequences := Map()
+		_MenuDispatchOwnerHandles := Map()
+		return Body.Call()
+	} finally {
+		_MenuDispatchCallbacks := Saved[1], _MenuDispatchLastFire := Saved[2]
+		_MenuDispatcherEpoch := Saved[3], _MenuDispatchTokens := Saved[4]
+		_MenuDispatchTokenCounter := Saved[5], _MenuDispatchClickSequences := Saved[6]
+		_MenuDispatchOwnerHandles := Saved[7]
+	}
+}
+
+_TBSF_NativeLabelAt(NativeMenu, Index) {
+	Text := Buffer(2048, 0)
+	Read := DllCall("GetMenuStringW", "ptr", NativeMenu.Handle, "uint", Index,
+		"ptr", Text, "int", 1024, "uint", 0x400)
+	AssertTrue(Read > 0, "the genuine Win32 startup label receipt must exist")
+	return StrGet(Text, "UTF-16")
+}
+
+
+_TBPI_FrozenCaptions() {
+	global _SharedDir
+	Corpus := JsonParse(FileRead(_SharedDir . "\tests\corpus\menus\startup_bootstrap_captions.json", "UTF-8"))
+	AssertEqual(21, Corpus["expected"].Count)
+	for Code, Vector in Corpus["expected"]
+		_TBSF_WithLocale(Code, _TBSF_WithDispatcher.Bind(_TBPI_FrozenCaptionsBody.Bind(Vector)))
+}
+
+_TBPI_FrozenCaptionsBody(Vector) {
+	global _MenuDispatchCallbacks
+	Native := Menu(), Intent := []
+	try {
+		AssertTrue(_InstallNativeStartupTray((Id, *) => Intent.Push(Id), Native))
+		AssertEqual(3, TrayMenuItemCount(Native))
+		for Index, Expected in Vector["commands"] {
+			AssertEqual(Expected, _TBSF_NativeLabelAt(Native, Index - 1))
+			Flags := DllCall("GetMenuState", "ptr", Native.Handle, "uint", Index - 1, "uint", 0x400, "uint")
+			Assert(Flags != 0xFFFFFFFF)
+			AssertEqual(0, Flags & 0x13)
+			ItemId := DllCall("GetMenuItemID", "ptr", Native.Handle, "int", Index - 1, "uint")
+			AssertTrue(_MenuDispatchCallbacks.Has(ItemId))
+			Callback := _MenuDispatchCallbacks[ItemId]
+			AssertTrue(Callback is MenuStartupSafeCommand)
+			Callback.Call()
+			AssertEqual(["suspend", "reload", "quit"][Index], Intent[Index])
+		}
+		AssertEqual(3, Intent.Length)
+		AssertTrue(_InstallSafeBootstrapTray(, Native))
+		AssertEqual(1, TrayMenuItemCount(Native))
+		AssertEqual(Vector["inert"], _TBSF_NativeLabelAt(Native, 0))
+		Flags := DllCall("GetMenuState", "ptr", Native.Handle, "uint", 0, "uint", 0x400, "uint")
+		Assert(Flags != 0xFFFFFFFF && (Flags & 0x3) != 0)
+	} finally {
+		Native.Delete()
+		MenuDispatcher_PruneMenu(Native)
+	}
+}
+
+/** Real source unavailability cannot retire compiled emergency command ownership. */
+_TBPI_UnavailableLiveSource() {
+	return _TBSF_WithLocale("en", _TBPI_UnavailableLiveSourceBody)
+}
+
+_TBPI_UnavailableLiveSourceBody() {
+	global _SharedDir, _MM_MANIFEST_ROOT_CACHE
+	SavedDir := _SharedDir, SavedRoot := _MM_MANIFEST_ROOT_CACHE
+	CanonicalBytes := FileRead(_SharedDir . "\modules\menu\menu_manifest.json", "UTF-8")
+	Private := A_Temp . "\ergopti-startup-authority-" . A_TickCount
+	DirCreate(Private . "\modules\menu")
+	try {
+		_SharedDir := Private
+		for Kind in ["missing", "empty", "malformed", "read-locked"] {
+			FilePath := Private . "\modules\menu\menu_manifest.json"
+			if FileExist(FilePath)
+				FileDelete(FilePath)
+			if Kind != "missing"
+				FileAppend(Kind == "empty" ? "" : Kind == "read-locked" ? CanonicalBytes : "{invalid-json", FilePath, "UTF-8")
+			Lock := 0
+			try {
+				if Kind == "read-locked" {
+					Lock := DllCall("CreateFileW", "str", FilePath, "uint", 0x80000000,
+						"uint", 0, "ptr", 0, "uint", 3, "uint", 0x80, "ptr", 0, "ptr")
+					Assert(Lock != 0 && Lock != -1, "actual exclusive read owner must exist")
+				}
+				_MM_MANIFEST_ROOT_CACHE := false
+				AssertFalse(_MM_GetManifestRoot(), "actual live loader must refuse " . Kind)
+				_TBSF_WithDispatcher(_TBPI_UnavailableNativeBody)
+				AssertFalse(_MM_MANIFEST_ROOT_CACHE,
+					"startup recovery must not invent successful live-manifest admission")
+			} finally {
+				if Lock != 0 && Lock != -1
+					AssertEqual(1, DllCall("CloseHandle", "ptr", Lock), "exact native read owner must retire")
+			}
+		}
+	} finally {
+		_SharedDir := SavedDir, _MM_MANIFEST_ROOT_CACHE := SavedRoot
+		DirDelete(Private, true)
+	}
+}
+
+_TBPI_UnavailableNativeBody() {
+	Native := Menu(), Intent := []
+	try {
+		AssertTrue(_InstallNativeStartupTray((Id, *) => Intent.Push(Id), Native))
+		AssertEqual(3, TrayMenuItemCount(Native))
+		AssertEqual("⏸︎ Suspend", _TBSF_NativeLabelAt(Native, 0))
+		AssertEqual("🔄 Reload", _TBSF_NativeLabelAt(Native, 1))
+		AssertEqual("⏹ Quit", _TBSF_NativeLabelAt(Native, 2))
+	} finally {
+		Native.Delete()
+		MenuDispatcher_PruneMenu(Native)
+	}
+}
+
+/** Withdraw the genuine normal source and prove recovery is not its admission. */
+_TBPI_NormalWithdrawalIsSeparate() {
+	Root := _MM_GetManifestRoot()
+	AssertTrue(Root is Map && Root.Has("top_level"))
+	Original := Root["top_level"], Withdrawn := []
+	for Row in Original {
+		if !(Row is Map) || Row.Get("id", "") != "reload" || !_MR_IsForAhk(Row)
+			Withdrawn.Push(Row)
+	}
+	try {
+		Root["top_level"] := Withdrawn
+		AssertFalse(MenuRenderer_CommandRow("top_level", "reload", Map("reload", (*) => true)),
+			"present withdrawn normal command must refuse, never use recovery as its result")
+		_TBSF_WithLocale("en", _TBSF_WithDispatcher.Bind(_TBPI_UnavailableNativeBody))
+		AssertFalse(MenuRenderer_CommandRow("top_level", "reload", Map("reload", (*) => true)),
+			"actual recovery publication cannot manufacture the missing live source")
+	} finally Root["top_level"] := Original
+	AssertTrue(MenuRenderer_CommandRow("top_level", "reload", Map("reload", (*) => true)) is Map,
+		"exact normal source repair restores its own admission")
+}
+
+Test("startup immutable authority: genuine21caption/native callback receipts", _TBPI_FrozenCaptions)
+Test("startup immutable authority: actual missing locked empty malformed live sources retain emergency root", _TBPI_UnavailableLiveSource)
+Test("startup immutable authority: normal source withdrawal refuses independently of recovery", _TBPI_NormalWithdrawalIsSeparate)

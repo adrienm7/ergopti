@@ -352,6 +352,7 @@ local function with_file_command(body, change_label)
 	local saved = package.loaded["infra.manifest_menu"]
 	local ok, err = xpcall(function()
 		local path = require("infra.paths").shared("modules/menu/menu_manifest.json")
+		local native_captions = require("infra.i18n")
 		local renderer = assert(require("menu.renderer").new({
 			platform = "linux", manifest_path = function() return path end,
 			json_decode = function(bytes)
@@ -359,7 +360,12 @@ local function with_file_command(body, change_label)
 				if change_label then document.hotstring_file_commands[1].i18n = "fixture.category.file.command" end
 				return document
 			end,
-			i18n = { get = function(key) return key end, section = function(key) return key end },
+			i18n = { get = function(key)
+				-- The counted canonical parent requires its genuine translated caption;
+				-- the file-command assertions retain their independent key labels.
+				if key == "menu.hotstrings.title" then return native_captions.get(key) end
+				return key
+			end, section = function(key) return key end },
 			logger = require("logger.shim"),
 		}))
 		package.loaded["infra.manifest_menu"] = renderer

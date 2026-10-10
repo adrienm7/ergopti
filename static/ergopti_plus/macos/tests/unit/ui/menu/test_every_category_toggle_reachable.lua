@@ -20,6 +20,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
+local CaptionFixture = require("tests.support.hotstrings_parent_caption_fixture")
 
 -- The menu modules ui/menu/init.lua loads, under the keys Builder.generate reads.
 local MENU_MODULES = {
@@ -127,7 +128,8 @@ local function build_tray(on, extra)
 	end
 	package.loaded["infra.logger"] = spy
 
-	local builder = helpers.load_with_stubs("ui.menu.builder")
+	helpers.load_with_stubs("ui.menu.builder")
+	CaptionFixture.install(require("infra.i18n"))
 	-- The provider rows the builders hand the renderer, before it drops what no
 	-- tray can use: an action on a row that opens a submenu is lost there.
 	local ManifestMenu = require("infra.manifest_menu")
@@ -184,6 +186,9 @@ local function build_tray(on, extra)
 	}
 	for key, value in pairs(extra or {}) do ctx[key] = value end
 	local actions = setmetatable({}, { __index = function() return function() end end })
+	-- The observing renderer port is installed before its actual native consumer imports it.
+	package.loaded["ui.menu.builder"] = nil
+	local builder = require("ui.menu.builder")
 	local ok, tray = pcall(builder.generate, ctx, mods, actions)
 	ManifestMenu.render_rows = render_rows
 	package.loaded["infra.logger"] = nil
@@ -219,7 +224,7 @@ local function top_row(tray, key)
 end
 
 
-helpers.describe("the real macOS tray: every category switch is reachable", function()
+helpers.describe("the real macOS tray: every category switch is reachable", CaptionFixture.scoped(function()
 
 	for _, posture in ipairs({ true, false }) do
 		helpers.it("opens each feature submenu with its switch, ticked " .. tostring(posture), function()
@@ -365,4 +370,4 @@ helpers.describe("the real macOS tray: every category switch is reachable", func
 		end)
 	end
 
-end)
+end))

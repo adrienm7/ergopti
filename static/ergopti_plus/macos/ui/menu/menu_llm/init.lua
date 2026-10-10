@@ -1994,7 +1994,54 @@ local function create_menu(deps)
 				)
 				if not is_active then return nil end
 				local _dw = package.loaded["ui.download_window"]
-				local rows = ManifestMenu.template_rows("llm_download_shortcut_frame", {
+				local renderer = rawget(package.loaded, "infra.manifest_menu")
+				if type(renderer) ~= "table" or getmetatable(renderer) ~= nil then return nil end
+				local template_owner, render_owner = rawget(renderer, "template_rows"), rawget(renderer, "render_rows")
+				local root_owner, array_owner = rawget(renderer, "get_root"), rawget(renderer, "get_array")
+				if type(template_owner) ~= "function" or type(render_owner) ~= "function"
+					or type(root_owner) ~= "function" or type(array_owner) ~= "function" then return nil end
+				local function renderer_live()
+					return rawequal(rawget(package.loaded, "infra.manifest_menu"), renderer)
+						and getmetatable(renderer) == nil
+						and rawequal(rawget(renderer, "template_rows"), template_owner)
+						and rawequal(rawget(renderer, "render_rows"), render_owner)
+						and rawequal(rawget(renderer, "get_root"), root_owner)
+						and rawequal(rawget(renderer, "get_array"), array_owner)
+				end
+				local root = root_owner()
+				local source = array_owner("llm_download_shortcut_frame")
+				if not renderer_live() or type(root) ~= "table" or getmetatable(root) ~= nil
+					or type(source) ~= "table" or getmetatable(source) ~= nil
+					or not rawequal(rawget(root, "llm_download_shortcut_frame"), source)
+					or next(source) ~= 1 or next(source, 1) ~= nil then return nil end
+				local declaration = rawget(source, 1)
+				if type(declaration) ~= "table" or getmetatable(declaration) ~= nil then return nil end
+				local fields, platforms, platform_fields = {}, rawget(declaration, "platforms"), {}
+				if type(platforms) ~= "table" or getmetatable(platforms) ~= nil then return nil end
+				for field, value in next, declaration do
+					if type(field) ~= "string" or (field ~= "platforms" and type(value) ~= "string"
+						and type(value) ~= "boolean" and type(value) ~= "number") then return nil end
+					fields[field] = value
+				end
+				for field, value in next, platforms do
+					if type(value) ~= "string" then return nil end
+					platform_fields[field] = value
+				end
+				local function source_live()
+					if not renderer_live() then return false end
+					local current_root, current_source = root_owner(), array_owner("llm_download_shortcut_frame")
+					if not renderer_live() or not rawequal(current_root, root) or not rawequal(current_source, source)
+						or getmetatable(root) ~= nil or getmetatable(source) ~= nil or getmetatable(declaration) ~= nil
+						or not rawequal(rawget(root, "llm_download_shortcut_frame"), source)
+						or not rawequal(rawget(source, 1), declaration) or next(source) ~= 1 or next(source, 1) ~= nil
+						or getmetatable(platforms) ~= nil then return false end
+					for field, value in next, fields do if not rawequal(rawget(declaration, field), value) then return false end end
+					for field in next, declaration do if rawget(fields, field) == nil then return false end end
+					for field, value in next, platform_fields do if rawget(platforms, field) ~= value then return false end end
+					for field in next, platforms do if rawget(platform_fields, field) == nil then return false end end
+					return true
+				end
+				local rows = template_owner("llm_download_shortcut_frame", {
 					["llm_download_shortcut"] = function()
 								if _dw and type(_dw.focus) == "function" then
 										pcall(_dw.focus)
@@ -2004,9 +2051,22 @@ local function create_menu(deps)
 								end
 						end,
 				}, {}, {})
-				if type(rows) ~= "table" or #rows ~= 1 or type(rows[1].action) ~= "function" then return nil end
-				local row = rows[1]
-				return { title = row.label, fn = row.action }
+				if not source_live() or type(rows) ~= "table" or getmetatable(rows) ~= nil
+					or next(rows) ~= 1 or next(rows, 1) ~= nil then return nil end
+				local row = rawget(rows, 1)
+				if type(row) ~= "table" or getmetatable(row) ~= nil or type(rawget(row, "action")) ~= "function"
+					or type(rawget(row, "label")) ~= "string" or rawget(row, "label") == "" then return nil end
+				local action, label, disabled = rawget(row, "action"), rawget(row, "label"), rawget(row, "disabled")
+				local rendered = render_owner(rows, "llm_download_shortcut_frame")
+				if not source_live() or type(rendered) ~= "table" or getmetatable(rendered) ~= nil
+					or next(rendered) ~= 1 or next(rendered, 1) ~= nil then return nil end
+				local item = rawget(rendered, 1)
+				if type(item) ~= "table" or getmetatable(item) ~= nil or rawget(item, "title") ~= label
+					or not rawequal(rawget(item, "fn"), action) or rawget(item, "disabled") ~= (disabled or nil) then return nil end
+				for field in next, item do
+					if field ~= "title" and field ~= "fn" and field ~= "disabled" then return nil end
+				end
+				return item
 		end
 
 		local scope_runtime = require("ui.menu.menu_llm.scope_runtime").new({

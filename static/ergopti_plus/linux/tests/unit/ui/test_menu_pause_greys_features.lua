@@ -130,22 +130,17 @@ helpers.describe("tray (linux): a pause greys every feature row", function()
 		local marked = 0
 		local moved = {}
 		for index, row in ipairs(shipped) do
-			local copy = {}
-			for key, value in pairs(row) do copy[key] = value end
-			if copy.greyed_when_paused == true then marked = marked + 1 end
-			if copy.id == "metrics" then copy.greyed_when_paused = nil end
-			if copy.id == "language" then copy.greyed_when_paused = true end
-			moved[index] = copy
+			moved[index] = { row = row, greyed_when_paused = row.greyed_when_paused }
+			if row.greyed_when_paused == true then marked = marked + 1 end
 		end
 		helpers.assert_true(marked >= 7,
 			"the manifest must mark the feature rows a pause greys, got " .. marked)
-		local original = ManifestMenu.get_array
-		ManifestMenu.get_array = function(key)
-			if key == "top_level" then return moved end
-			return original(key)
+		for _, entry in ipairs(moved) do
+			if entry.row.id == "metrics" then entry.row.greyed_when_paused = nil end
+			if entry.row.id == "language" then entry.row.greyed_when_paused = true end
 		end
 		local ok, items = pcall(build, true)
-		ManifestMenu.get_array = original
+		for _, entry in ipairs(moved) do entry.row.greyed_when_paused = entry.greyed_when_paused end
 		helpers.assert_true(ok, "the tray must build: " .. tostring(items))
 		local metrics = row_for(items, "menu.metrics.title")
 		local language = row_for(items, "menu.global.language")

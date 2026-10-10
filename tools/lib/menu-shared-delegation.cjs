@@ -283,6 +283,16 @@ function combineMenuVisibility(platforms, previous, incoming) {
 
 /** Credits executable native template calls, never comments, strings or declarations. */
 function publishesMenuTemplate(source, extension, section) {
+	if (extension === '.lua' && section === 'personal_info_editor_frame')
+		return require('./menu-native-personal-info-binding.cjs').retainedPersonalInfoProjection(
+			source
+		);
+	if (
+		extension === '.lua' &&
+		section === 'llm_download_shortcut_frame' &&
+		require('./menu-native-download-binding.cjs').retainedNativeDownloadProjection(source)
+	)
+		return true;
 	const tokens = scriptTokens(source, extension);
 	return tokens.some((token, i) => {
 		if (token.kind !== 'identifier' || tokens[i - 1]?.value === 'function') return false;

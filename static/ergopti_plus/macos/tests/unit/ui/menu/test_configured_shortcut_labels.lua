@@ -67,6 +67,7 @@ helpers.describe("configured shortcut row labels", function()
 				-- are its provider's.
 				local actual_manifest = require("infra.manifest_menu")
 				package.loaded["infra.manifest_menu"] = {
+					group_receiver = actual_manifest.group_receiver,
 					template_rows = actual_manifest.template_rows,
 					build = function(key, _, _, groups, _, providers)
 						if key == "shortcuts_menu" then return groups.script_control() end

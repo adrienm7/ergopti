@@ -16,6 +16,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
+local CaptionFixture = require("tests.support.hotstrings_parent_caption_fixture")
 
 local function make_actions()
 	return {
@@ -48,8 +49,11 @@ local function find_row(rows, title)
 end
 
 helpers.describe("hotstring whole-tree commands: provider actions reach clicks", function()
-	helpers.it("executes both provider actions through the rendered menu", function()
-		local builder = helpers.load_with_stubs("ui.menu.builder")
+	helpers.it("executes both provider actions through the rendered menu", CaptionFixture.scoped(function()
+		local translator = helpers.load_with_stubs("infra.i18n")
+		CaptionFixture.install(translator)
+		package.loaded["ui.menu.builder"] = nil
+		local builder = require("ui.menu.builder")
 		local fired = {}
 		local ctx = {
 			config       = { log_level = 2 },
@@ -85,7 +89,7 @@ helpers.describe("hotstring whole-tree commands: provider actions reach clicks",
 		helpers.assert_eq(table.concat(fired, ","), "switch",
 			"clicking the rendered checkbox must execute the provider callback; "
 				.. "an empty fallback function is a silent user-visible no-op")
-	end)
+	end))
 
 	helpers.it("the real provider updates every applicable section exactly once", function()
 		local hotstrings = helpers.load_with_stubs("ui.menu.menu_hotstrings")

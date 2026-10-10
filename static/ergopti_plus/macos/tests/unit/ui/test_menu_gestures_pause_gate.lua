@@ -63,11 +63,11 @@ local function with_toggle_fixture(previous, options, body)
 	package.loaded["infra.dialog_util"] = {
 		block_alert = function() return "button.activate" end,
 	}
-	package.loaded["infra.i18n"] = { get = function(key) return key end }
+	package.loaded["infra.i18n"] = { get = function(key) return key end, section = function(key) return key end }
 	-- The switch is the command registered for the manifest's gestures_toggle
 	-- row, captured where the menu hands it to the renderer.
 	local render_ctx = nil
-	package.loaded["infra.manifest_menu"] = { build = function(_, _, _, _, ctx)
+	package.loaded["infra.manifest_menu"] = { group_receiver = require("tests.support.declared_menu_parent_fixture").new().group_receiver, build = function(_, _, _, _, ctx)
 		render_ctx = ctx
 		return {}
 	end }

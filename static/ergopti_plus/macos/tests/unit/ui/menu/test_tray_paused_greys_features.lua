@@ -13,6 +13,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
+local CaptionFixture = require("tests.support.hotstrings_parent_caption_fixture")
 local LayoutFixture = require("tests.support.layout_legacy_caption_fixture")
 
 local MENU_MODULES = {
@@ -83,9 +84,12 @@ local function build_tray(paused)
 	require("tests.support.llm_count_menu_fixture")(function(llm_menu)
 		llm_item = llm_menu.build_item()
 	end)
-	local builder = helpers.load_with_stubs("ui.menu.builder")
+	helpers.load_with_stubs("ui.menu.builder")
 	local i18n = require("infra.i18n")
+	CaptionFixture.install(i18n)
 	LayoutFixture.install(i18n)
+	package.loaded["ui.menu.builder"] = nil
+	local builder = require("ui.menu.builder")
 	i18n.build_language_menu_items = function()
 		return { { label = "Français", checked = true, action = function() end } }
 	end

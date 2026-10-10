@@ -103,7 +103,10 @@ const GENERATORS = [
 	},
 	{
 		script: 'build/build-menu-manifest.js',
-		outputs: ['static/ergopti_plus/_shared/modules/menu/menu_manifest.json']
+		outputs: [
+			'static/ergopti_plus/_shared/modules/menu/menu_manifest.json',
+			'static/ergopti_plus/_shared/modules/menu/startup_tray_projection.ahk'
+		]
 	},
 	{
 		script: 'build/gen-metrics-category-aliases.cjs',

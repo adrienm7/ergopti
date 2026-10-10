@@ -1,0 +1,173 @@
+'use strict';
+
+// Owner: the canonical build-menu-manifest generator.
+// The generated AHK is a shared immutable startup projection, never a native
+// fallback catalogue and never runtime admission of an unreadable live root.
+const crypto = require('node:crypto');
+const { validateChildTemplates, validateMenuAvailability } = require('./menu-row-availability.cjs');
+const SOURCE = 'static/ergopti_plus/_shared/modules/menu/startup_tray.toml';
+const OUTPUT = 'static/ergopti_plus/_shared/modules/menu/startup_tray_projection.ahk';
+function refuse() {
+	throw new Error('Canonical startup projection refused.');
+}
+function record(value, fields) {
+	if (
+		!value ||
+		typeof value !== 'object' ||
+		Array.isArray(value) ||
+		(Object.getPrototypeOf(value) !== Object.prototype && Object.getPrototypeOf(value) !== null) ||
+		Object.keys(value).some((key) => !fields.includes(key))
+	)
+		refuse();
+}
+function text(value) {
+	if (
+		typeof value !== 'string' ||
+		value === '' ||
+		/[\x00-\x1f\x7f]/.test(value) ||
+		!value.isWellFormed()
+	)
+		refuse();
+	return value;
+}
+function literal(value) {
+	return '"' + text(value).replaceAll('`', '``').replaceAll('"', '`"') + '"';
+}
+function visible(row) {
+	return row.platforms === undefined || row.platforms.includes('ahk');
+}
+/** Resolve each actual platform-visible canonical record, preserving declared order. */
+function resolveRows(menu, source, kind) {
+	record(source, ['rows']);
+	if (!Array.isArray(source.rows) || source.rows.length === 0) refuse();
+	const result = [],
+		ids = new Set();
+	for (const reference of source.rows) {
+		record(reference, ['section', 'id']);
+		text(reference.section);
+		text(reference.id);
+		const section = menu[reference.section];
+		if (!Array.isArray(section)) refuse();
+		const selected = section.filter((row) => row && row.id === reference.id && visible(row));
+		if (selected.length !== 1) refuse();
+		const row = selected[0];
+		// A recovery leaf cannot inherit configuration readiness, feature state,
+		// children, arbitrary caption formatting or an unqualified mutation port.
+		record(row, ['type', 'id', 'command', 'i18n', 'platforms', 'unavailable']);
+		if (
+			row.type !== kind ||
+			!visible(row) ||
+			(row.unavailable !== undefined && row.unavailable !== 'hide')
+		)
+			refuse();
+		if (kind === 'label' && row.command !== undefined) refuse();
+		text(row.id);
+		text(row.i18n);
+		const command = kind === 'command' ? text(row.command || row.id) : '';
+		if (ids.has(row.id)) refuse();
+		ids.add(row.id);
+		result.push({
+			type: kind,
+			id: row.id,
+			command,
+			key: row.i18n,
+			section: reference.section,
+			sourceId: reference.id
+		});
+	}
+	return result;
+}
+/** Admit the complete native capability inventory from resolved canonical rows. */
+function validateCommandCapabilities(rows) {
+	const supported = new Set(['suspend', 'reload', 'quit']);
+	if (
+		!Array.isArray(rows) ||
+		rows.length !== supported.size ||
+		rows.some((row) => !supported.has(row.command)) ||
+		new Set(rows.map((row) => row.command)).size !== supported.size
+	)
+		refuse();
+}
+/** Emit data/canonical provenance only; callbacks and native publication stay native. */
+function render(menu, policy, locales) {
+	record(policy, ['commands', 'inert', 'captions']);
+	record(policy.captions, ['fallback_locale']);
+	text(policy.captions.fallback_locale);
+	validateMenuAvailability(menu);
+	validateChildTemplates(menu, (key) => locales.en[key]);
+	const commands = resolveRows(menu, policy.commands, 'command');
+	validateCommandCapabilities(commands);
+	const inert = resolveRows(menu, policy.inert, 'label');
+	if (inert.length !== 1) refuse();
+	const codes = Object.keys(locales).sort();
+	if (codes.length !== 21 || !codes.includes(policy.captions.fallback_locale)) refuse();
+	const data = {};
+	for (const code of codes) {
+		if (!/^[a-z]{2}$/.test(code)) refuse();
+		const locale = locales[code];
+		if (!locale || typeof locale !== 'object' || Array.isArray(locale)) refuse();
+		const labels = new Set();
+		data[code] = {};
+		for (const [name, rows] of Object.entries({ commands, inert })) {
+			data[code][name] = rows.map((row) => {
+				if (!Object.hasOwn(locale, row.key)) refuse();
+				const label = text(locale[row.key]);
+				if (name === 'commands' && labels.has(label)) refuse();
+				labels.add(label);
+				return { ...row, label };
+			});
+		}
+	}
+	const authority = crypto
+		.createHash('sha256')
+		.update(JSON.stringify({ policy, commands, inert, data }))
+		.digest('hex');
+	const row = (value) =>
+		'Map("type", ' +
+		literal(value.type) +
+		', "id", ' +
+		literal(value.id) +
+		', "command", ' +
+		(value.command === '' ? '""' : literal(value.command)) +
+		', "label", ' +
+		literal(value.label) +
+		', "section", ' +
+		literal(value.section) +
+		', "source_id", ' +
+		literal(value.sourceId) +
+		')';
+	const lines = [
+		'; _shared/modules/menu/startup_tray_projection.ahk',
+		'; GENERATED by the canonical menu generator. Do not edit by hand.',
+		'; Immutable startup/recovery authority only; never configuration or feature readiness.',
+		'#Requires AutoHotkey v2.0',
+		'',
+		'SharedStartupTrayProjection(Locale) {',
+		'\tif Type(Locale) != "String"',
+		'\t\tthrow TypeError("Startup locale must be a string")',
+		'\tswitch Locale {'
+	];
+	for (const code of codes) {
+		lines.push('\t\tcase ' + literal(code) + ':');
+		lines.push(
+			'\t\t\treturn Map("authority", "compiled-startup", "source_sha256", "' +
+				authority +
+				'", "locale", ' +
+				literal(code) +
+				', "commands", [' +
+				data[code].commands.map(row).join(', ') +
+				'], "inert", [' +
+				data[code].inert.map(row).join(', ') +
+				'])'
+		);
+	}
+	lines.push(
+		'\t\tdefault:',
+		'\t\t\treturn SharedStartupTrayProjection(' + literal(policy.captions.fallback_locale) + ')',
+		'\t}',
+		'}',
+		''
+	);
+	return '\ufeff' + lines.join('\n');
+}
+module.exports = { SOURCE, OUTPUT, resolveRows, validateCommandCapabilities, render };

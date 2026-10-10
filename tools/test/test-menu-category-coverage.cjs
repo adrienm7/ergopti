@@ -1355,6 +1355,228 @@ const canonicalCaption = (key) => (Object.hasOwn(english, key) ? english[key] : 
 	}
 }
 
+// Additive source-only fragment for existing test-menu-parity.cjs and
+// test-menu-category-coverage.cjs; UNRUN. Original controls remain unchanged.
+// Loader belongs in tools/lib/menu-native-startup-binding.cjs, exported there.
+// It reads actual installed sources/artifact; no generated expected artifact.
+{
+	const assert = require('node:assert/strict');
+	const { nativeStartupRows, startupInputs } = require('../lib/menu-native-startup-binding.cjs');
+	const startup = startupInputs(ROOT, manifest);
+	const expected = [
+		manifest.tray_startup_suspend[0],
+		manifest.top_level.find((row) => row.id === 'reload' && row.platforms?.includes('ahk')),
+		manifest.top_level.find((row) => row.id === 'quit' && row.platforms?.includes('ahk')),
+		manifest.tray_startup_inert_frame[0]
+	];
+	assert(expected.every(Boolean), 'actual startup declaration identities exist');
+	const admitted = () => nativeStartupRows(startup, 'ahk');
+	assert.deepEqual(
+		[...admitted()],
+		expected,
+		'actual canonical generator/include/callee/typed result/native publication route'
+	);
+	assert.equal(nativeStartupRows(startup, 'hs').size, 0, 'Windows startup is not a macOS route');
+	assert.equal(nativeStartupRows(startup, 'linux').size, 0, 'Windows startup is not a Linux route');
+	function mutateSource(key, before, after) {
+		assert.equal(
+			startup.sources[key].split(before).length - 1,
+			1,
+			'owned negative control has exactly one genuine source preimage'
+		);
+		return {
+			...startup,
+			sources: { ...startup.sources, [key]: startup.sources[key].replace(before, after) }
+		};
+	}
+	const helper = 'windows/infra/tray_bootstrap.ahk';
+	const entry = 'windows/ErgoptiPlus.ahk';
+	const dispatcher = 'windows/infra/menu_dispatcher.ahk';
+	const controls = [
+		[
+			'withdraw native include',
+			mutateSource(
+				helper,
+				'#Include ../../_shared/modules/menu/startup_tray_projection.ahk',
+				'; #Include ../../_shared/modules/menu/startup_tray_projection.ahk'
+			)
+		],
+		[
+			'quoted include decoy',
+			mutateSource(
+				helper,
+				'#Include ../../_shared/modules/menu/startup_tray_projection.ahk',
+				'QuotedInclude := "#Include ../../_shared/modules/menu/startup_tray_projection.ahk"'
+			)
+		],
+		[
+			'dead cold default call',
+			mutateSource(entry, '_InstallSafeBootstrapTray()', 'if false\n\t_InstallSafeBootstrapTray()')
+		],
+		[
+			'replace genuine callee',
+			mutateSource(
+				helper,
+				'Authority := SharedStartupTrayProjection(_I18nLocale)',
+				'Authority := OtherStartupProjection(_I18nLocale)'
+			)
+		],
+		['discard typed result', mutateSource(helper, 'return Prepared', 'return []')],
+		['AHK return line split', mutateSource(helper, 'return Prepared', 'return\nPrepared')],
+		[
+			'substitute callback ownership',
+			mutateSource(helper, 'Callback: Commands[CommandId]', 'Callback: Commands["quit"]')
+		],
+		[
+			'substitute native row transport',
+			mutateSource(
+				helper,
+				'Register.Call(MenuObj, Row.Label, Row.Callback)',
+				'Register.Call(MenuObj, Row.Label, _TrayBootstrapNoOp)'
+			)
+		],
+		[
+			'lose disabled inert publication',
+			mutateSource(helper, 'MenuObj.Disable(Label)', '; MenuObj.Disable(Label)')
+		],
+		[
+			'different native menu receiver',
+			mutateSource(
+				dispatcher,
+				'MenuObj.Add(ItemName, Wrapper)',
+				'A_TrayMenu.Add(ItemName, Wrapper)'
+			)
+		],
+		[
+			'shadow shared projection',
+			{
+				...startup,
+				sources: {
+					...startup.sources,
+					[entry]: startup.sources[entry] + '\nSharedStartupTrayProjection := (*) => Map()\n'
+				}
+			}
+		],
+		[
+			'duplicate producer definition',
+			{
+				...startup,
+				sources: {
+					...startup.sources,
+					[helper]:
+						startup.sources[helper] +
+						'\n_TrayBootstrapProjectedRows(Surface, Commands) { return [] }\n'
+				}
+			}
+		],
+		[
+			'invent readiness',
+			mutateSource(helper, 'return Prepared', '_DriverReady := true\n\treturn Prepared')
+		],
+		['missing generated owner', { ...startup, generated: '' }],
+		[
+			'changed generated native DATA',
+			{ ...startup, generated: startup.generated + '\nExtraStartupAuthority := true\n' }
+		]
+	];
+	const generatorControls = [
+		[
+			'withdraw actual import',
+			"import startupProjection from '../lib/codegen-startup-tray.cjs';",
+			"// import startupProjection from '../lib/codegen-startup-tray.cjs';"
+		],
+		[
+			'dead generator statement',
+			'const startupAhk = startupProjection.render(parsed.menu, startupPolicy, startupLocales);',
+			'if (false) { const startupAhk = startupProjection.render(parsed.menu, startupPolicy, startupLocales); }'
+		],
+		[
+			'foreign source policy',
+			"shared('modules/menu/startup_tray.toml')",
+			"shared('modules/menu/foreign.toml')"
+		],
+		[
+			'foreign output owner',
+			"shared('modules/menu/startup_tray_projection.ahk')",
+			"shared('modules/menu/foreign.ahk')"
+		],
+		[
+			'fake produced result',
+			'startupProjection.render(parsed.menu, startupPolicy, startupLocales)',
+			"'fake projection'"
+		],
+		[
+			'quoted callee decoy',
+			'const startupAhk = startupProjection.render(parsed.menu, startupPolicy, startupLocales);',
+			'const startupAhk = "startupProjection.render(parsed.menu, startupPolicy, startupLocales)";'
+		]
+	];
+	for (const [name, before, after] of generatorControls) {
+		assert.equal(
+			startup.generator.split(before).length - 1,
+			1,
+			name + ' genuine generator preimage'
+		);
+		controls.push([name, { ...startup, generator: startup.generator.replace(before, after) }]);
+	}
+	const capabilities = require('../lib/codegen-startup-tray.cjs');
+	assert.doesNotThrow(() =>
+		capabilities.validateCommandCapabilities(
+			capabilities.resolveRows(startup.manifest, startup.policy.commands, 'command')
+		)
+	);
+	for (const command of ['foreign', 'suspend']) {
+		const changedCommands = structuredClone(startup.manifest);
+		const reload = changedCommands.top_level.find(
+			(row) => row.id === 'reload' && row.platforms?.includes('ahk')
+		);
+		assert(reload, 'genuine Windows canonical Reload owner exists');
+		reload.command = command;
+		assert.throws(
+			() =>
+				capabilities.validateCommandCapabilities(
+					capabilities.resolveRows(changedCommands, startup.policy.commands, 'command')
+				),
+			'the actual resolved canonical capability data must refuse before generated drift'
+		);
+		controls.push([
+			'actual resolved capability ' + command + ' must refuse',
+			{ ...startup, manifest: changedCommands }
+		]);
+	}
+	const withdrawn = structuredClone(startup.manifest);
+	withdrawn.tray_startup_inert_frame = [];
+	controls.push(['canonical source withdrawn', { ...startup, manifest: withdrawn }]);
+	const reordered = structuredClone(startup.policy);
+	reordered.commands.rows.reverse();
+	controls.push(['foreign startup source order', { ...startup, policy: reordered }]);
+	for (const [name, candidate] of controls)
+		assert.equal(nativeStartupRows(candidate, 'ahk').size, 0, name + ' must refuse ownership');
+	const decoys = {
+		...startup,
+		sources: {
+			...startup.sources,
+			[helper]: startup.sources[helper] + '\n; return []\nDecoy := "return []"\n'
+		},
+		generator: startup.generator + '\n// startupAhk = fake;\n'
+	};
+	assert.deepEqual(
+		[...nativeStartupRows(decoys, 'ahk')],
+		expected,
+		'unrelated quoted/comment decoys do not create or withdraw genuine route ownership'
+	);
+	assert.deepEqual(
+		[...admitted()],
+		expected,
+		'source controls never mutate the actual source owner'
+	);
+}
+
+const startupOwnedRows = require('../lib/menu-native-startup-binding.cjs').nativeStartupRows(
+	require('../lib/menu-native-startup-binding.cjs').startupInputs(ROOT, manifest),
+	'ahk'
+);
+
 const reachedInert = Object.fromEntries(
 	PLATFORMS.map((platform) => [
 		platform,
@@ -1380,6 +1602,7 @@ for (const [key, list] of Object.entries(manifest)) {
 			(r) =>
 				!src[p].text.includes(r.id) &&
 				!reachedInert[p].has(r) &&
+				!(p === 'ahk' && startupOwnedRows.has(r)) &&
 				!src[p].nativeSources.some((native) =>
 					nativeLayoutRowOwnership(
 						native.src,

@@ -242,7 +242,15 @@ const includeConsumerAvailable = sources.some(({ src }) => {
 });
 // New include edges start only at literal driver readers. The historical
 // suffix convention remains below, but an orphan group cannot seed new edges.
-const directlyReadSections = sections.filter((section) => readersOf(section).length > 0);
+// Immutable recovery sections are read through their genuine compiler/include/native
+// publication route. The closed route rejects a missing or substituted owner;
+// section names alone, policy text and uninstalled generated declarations earn nothing.
+const { startupInputs, startupReaderSections } = require('../lib/menu-native-startup-binding.cjs');
+const startup = startupInputs(ROOT, manifest);
+const startupSections = new Set(startupReaderSections(startup));
+const directlyReadSections = sections.filter(
+	(section) => readersOf(section).length > 0 || startupSections.has(section)
+);
 let reachableIncludes = new Set(directlyReadSections);
 try {
 	reachableIncludes = includedSections(manifest, directlyReadSections, includeConsumerAvailable);
@@ -253,6 +261,88 @@ try {
 // These independent graph controls retain rejection of orphan declarations,
 // including mutually referring orphans and declarations without a live reader.
 const assert = require('node:assert/strict');
+assert(
+	startupSections.has('tray_startup_suspend'),
+	'actual cold command section has a complete reader'
+);
+assert(
+	startupSections.has('tray_startup_inert_frame'),
+	'actual inert section has a complete reader'
+);
+for (const key of Object.keys(startup.sources)) {
+	assert.deepEqual(
+		startupReaderSections({ ...startup, sources: { ...startup.sources, [key]: '' } }),
+		[],
+		'withdrawn actual native route cannot read a compiled section'
+	);
+}
+assert.deepEqual(
+	startupReaderSections({ ...startup, generated: '' }),
+	[],
+	'absent actual compiled artifact cannot read a section'
+);
+assert.deepEqual(
+	startupReaderSections({ ...startup, generator: '' }),
+	[],
+	'absent actual compiler cannot read a section'
+);
+const nullPolicy = require('smol-toml').parse(
+	fs.readFileSync(path.join(DRIVERS, '_shared', 'modules', 'menu', 'startup_tray.toml'), 'utf8')
+);
+assert.deepEqual(
+	startupReaderSections({ ...startup, policy: nullPolicy }),
+	[...startupSections],
+	'actual parser null records retain the same native reader'
+);
+assert.deepEqual(
+	startupReaderSections({ ...startup, policy: JSON.parse(JSON.stringify(nullPolicy)) }),
+	[...startupSections],
+	'plain policy records retain the same native reader'
+);
+for (const policy of [
+	Object.assign(Object.create({ foreign: true }), nullPolicy),
+	{ ...nullPolicy, unknown: true },
+	{ ...nullPolicy, commands: Object.assign(Object.create({ foreign: true }), nullPolicy.commands) }
+])
+	assert.deepEqual(
+		startupReaderSections({ ...startup, policy }),
+		[],
+		'foreign or unknown policy refuses'
+	);
+let policyReads = 0;
+const indirectPolicy = { ...nullPolicy };
+Object.defineProperty(indirectPolicy, 'commands', {
+	enumerable: true,
+	get() {
+		policyReads++;
+		return nullPolicy.commands;
+	}
+});
+assert.deepEqual(
+	startupReaderSections({ ...startup, policy: indirectPolicy }),
+	[],
+	'indirect policy refuses'
+);
+assert.equal(policyReads, 0, 'refused policy getters are never invoked');
+for (const makeSparse of [
+	(rows) => {
+		rows.length += 1;
+	},
+	(rows) => {
+		delete rows[1];
+	}
+]) {
+	const policy = JSON.parse(JSON.stringify(nullPolicy));
+	makeSparse(policy.commands.rows);
+	assert.deepEqual(
+		startupReaderSections({ ...startup, policy }),
+		[],
+		'sparse or trailing policy holes cannot acquire a reader by normalization'
+	);
+}
+for (const inputs of [null, {}, { manifest: null }, { manifest: [] }])
+	assert.deepEqual(startupReaderSections(inputs), [], 'missing manifest refuses reader credit');
+
 const probeMenu = {
 	root: [{ type: 'include', section: 'child' }],
 	child: [{ type: 'include', section: 'leaf' }],

@@ -3826,27 +3826,48 @@ french_magickey = "FrenchMagicKey"
 # Every driver presents the same Tap-Holds row. Linux runs them inside its
 # daemon; the native engine is an implementation detail of each driver.
 [[menu.top_level]]
+type = "group"
 id = "tap_holds"
+i18n = "menu.tapholds.title"
+rows = []
+checked_when = ["tapholds_enabled"]
 greyed_when_paused = true
 
 [[menu.top_level]]
+type = "group"
 id = "shortcuts"
+i18n = "menu.shortcuts.title"
+rows = []
+checked_when = ["shortcuts_enabled"]
 greyed_when_paused = true
 
 [[menu.top_level]]
+type = "group"
 id = "gestures"
+i18n = "menu.gestures.title"
+rows = []
+checked_when = ["gestures_enabled"]
 greyed_when_paused = true
 
 [[menu.top_level]]
 id = "---"
 
 [[menu.top_level]]
+type = "group"
 id = "keyboard_layout"
+i18n = "menu.layout.title"
+rows = []
+checked_when = ["layout_enabled"]
 greyed_when_paused = true
 
 [[menu.top_level]]
+type = "group"
 id = "hotstrings"
+i18n = "menu.hotstrings.title"
+rows = []
+checked_when = ["hotstrings_enabled"]
 greyed_when_paused = true
+caption_count_policy = { value_getter = "hotstrings_parent_total", present_getter = "hotstrings_parent_count_present", visibility = { ahk = "always", hs = "available", linux = "positive" }, style = { ahk = "space", hs = "space", linux = "decimal" }, format = "%s (%s)", maximum = 9007199254740991 }
 
 [[menu.top_level]]
 type = "group"
@@ -9178,6 +9199,14 @@ i18n = "menu.layout.title"
 platforms = ["hs"]
 unavailable = "hide"
 
+# A missing Tap-Holds engine retains its visible disabled leaf, without a fictitious child.
+[[menu.linux_tap_holds_absent_parent]]
+type = "label"
+id = "tap_holds_absent_parent"
+i18n = "menu.tapholds.title"
+platforms = ["linux"]
+unavailable = "hide"
+
 # Linux Agent excluded-app data retains its actual settings and dialog owners.
 [[menu.agent_linux_disabled_apps_frame]]
 type = "group"
@@ -9474,5 +9503,30 @@ caption_source = "native"
 caption_getter = "hotstring_language_name"
 caption_count_getter = "hotstring_language_count"
 caption_count_format = "%s (%s)"
+platforms = ["hs", "linux"]
+unavailable = "hide"
+
+# Only the previously native suspend caption and inert cold status need new
+# declarations. Existing top_level Reload/Quit are reused by source identity.
+[[menu.tray_startup_suspend]]
+type = "command"
+id = "suspend"
+i18n = "menu.global.suspend"
+platforms = ["ahk"]
+unavailable = "hide"
+
+[[menu.tray_startup_inert_frame]]
+type = "label"
+id = "startup_inert_status"
+i18n = "menu.global.startup_bootstrap"
+platforms = ["ahk"]
+unavailable = "hide"
+
+# The two Lua dynamic-category providers retain their native editor callbacks.
+# Windows retains its separate boot-order injection; this owns only these leaves.
+[[menu.personal_info_editor_frame]]
+type = "command"
+id = "personal_info_editor_open"
+i18n = "menu.shortcuts.edit_personal_info"
 platforms = ["hs", "linux"]
 unavailable = "hide"
