@@ -8840,10 +8840,10 @@ mandatory.
   boundary, adds 38 necessary saved-route omission controls, and still
   refuses public OneShot recommendations and CapsWord. The initial selected
   run failed only the obsolete blanket source assertion; the reviewed
-  stronger contract and complete JS rerun close that failure. Native saved-
-  Manager route execution remains unrun. Existing kernel132 exercises the direct OneShot callback,
-  so it is prerequisite regression proof only. The picker stays closed
-  until a genuine saved-configuration Manager supplement is qualified.
+  stronger contract and complete JS rerun close that failure. At that checkpoint,
+  native saved-Manager route execution was unrun; the hosted supplement below
+  now supplies separate saved-configuration evidence. Existing kernel132 tests
+  the direct OneShot callback. The picker stays closed pending its complete joins.
 
   The persistent Caps Word software tranche now uses the original cold
   native semantic constructor and separate physical input and output occurrence
@@ -8901,8 +8901,10 @@ mandatory.
   through the actual Manager and configuration publisher. Its registered
   guard preserves the original modifier cases, budgets and workflow envelope.
   This container lacks /dev/uinput and /dev/input: the real wrapper refuses
-  with exit 2 and zero scenarios/resources. Native execution is UNRUN;
-  hosted kernel CI and physical receiving remain required.
+  with exit 2 and zero scenarios/resources. Hosted CI38075470794 on
+  9e370a392 passes all 54 real-kernel saved-configuration checks across four
+  scenarios, following 132 input-owner and 81 modifier-custody checks. These
+  are controlled virtual keyboards; physical receiving remains unqualified.
 
   Current-Dev CI receiving preserves both original real-kernel prerequisites,
   their exact status/retirement enclosure and the saved-configuration subreaper
@@ -8910,9 +8912,12 @@ mandatory.
   context bindings preserve the qualification source; the six-minute deadline
   is unchanged. Eighteen workflow and twenty-three custody-envelope mutations
   are refused, including every original inverse. These portable controls grant
-  no new kernel execution or physical proof. The broader incoming pipeline
-  still has separate qualification/upload contract failures; the original Linux
-  cancellation assertions remain intact pending workflow-owner resolution.
+  no new kernel execution or physical proof. The original Linux cancellation
+  assertions remain intact. CI38075470794 qualifies 34 virtual X11 window cases
+  plus five native family cases and one external recovery. Its live daemon still
+  receives first-trigger "adn " instead of "ADN "; the cause remains unproved.
+  Linux packaging and its Flatpak/tarball component launches pass, while all
+  17 planned installed-matrix scenarios are unrun (one skipped placeholder job).
 
   The separately prepared XI2 borrowed-cookie consumer passes all 43 controlled
   cases on each Lua ABI, using the real probe and logger with modeled FFI ports.
@@ -8921,8 +8926,8 @@ mandatory.
   proves a genuine cookie or input/output delivery. The original full-family
   native supervisor refuses before allocation because this container does not
   expose `/proc/self/task/<pid>/children`, even with approved execution. Keep
-  that admission unchanged and qualify the three original native property
-  cookies in Linux CI. Runtime registry, actual FFI/cdata, installed provider
+  that admission unchanged; hosted native receiving is recorded below.
+  Runtime registry, actual FFI/cdata, installed provider
   closure and shared enrollment remain held software/native work. Exact sources,
   refusals and receiving reviews are saved in
   `handovers/2026-10-10-group3-native-preparations/`.
@@ -8939,8 +8944,12 @@ mandatory.
   attempt passes all 21 source controls and observes all three selector
   refusals, with exact input pins and raw statuses; this does not qualify C
   compilation or native property cookies.
-  Actual native cookies, Lua FFI/cdata and installed provider closure remain
-  unqualified here; registry enrollment and input/output authority stay held.
+  CI38075470794 now passes all three actual C/libXi property-cookie cases:
+  created, modified and deleted. Their guarded terminal receipt requires
+  fetched=freed=published=3, display closure and exact family/server retirement.
+  This non-input Xvfb experiment grants no native capture epoch or physical
+  input/output authority. Lua FFI/cdata, installed provider closure and runtime
+  registry enrollment remain unqualified; shared input/output authority stays held.
   Preserve the container's original preallocation refusal and keep items
   16 and 38 open for complete CI and physical-device acceptance.
 
@@ -9706,8 +9715,14 @@ Carbon classification, physical keys or installed release qualification.
   selector chain: all 79 prior controls and blanket foreign-exclusion checks
   remain, with 30 additional controls. The three serial portable targets pass
   (193 default controls, the complete wiring guard and 15 focused controls).
-  Actual SDK, launcher CLI and installed receiving are still unrun; these
-  read-only prerequisites do not enable forced digits/symbols or input delivery.
+  The selected Carbon component has since compiled and executed on arm64 and
+  amd64 in manual run 38075470794/attempt 1 at 9e370a392: each passed all twelve
+  cases with zero failures and zero skips. Successful strict CI steps also
+  require seven exact TIS method/layout receipts and inner/outer source
+  restoration. Those raw diagnostic artifacts remain unread because both
+  retained downloads failed; the gates passed, without direct artifact receiving.
+  Causal native variants, launcher CLI and installed receiving remain unrun.
+  This component result does not enable forced digits/symbols or input delivery.
 
   Remaining software: implement native-HKL forced-symbol and Linux/macOS forced
   digit/symbol owners with joint current input/source/modifier/output provenance;
