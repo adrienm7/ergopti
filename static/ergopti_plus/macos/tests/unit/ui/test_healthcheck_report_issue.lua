@@ -334,3 +334,47 @@ helpers.describe("English attachment export boundaries", function()
 		helpers.assert_eq(calls.save[1].text, calls.copy[1])
 	end)
 end)
+
+helpers.describe("default attachment completion", function()
+	helpers.it("requires write and close acknowledgement before reveal or browser", function()
+		for _, refusal in ipairs({ "none", "write", "close", "both" }) do
+			local config = documents()
+			local snapshot = host_snapshot(false)
+			local doc = Share.document(snapshot, config.schema, "ignored")
+			local Report, calls, overrides = load_report()
+			overrides.save = nil -- Exercise the actual production default, not an effect replacement.
+			local original_open = io.open
+			local original_attributes = hs.fs.attributes
+			local writes, closes = 0, 0
+			hs.fs.attributes = function() return "directory" end
+			io.open = function(_, mode)
+				assert(mode == "wb", "only the attachment write is admitted")
+				return {
+					write = function(_, text)
+						writes = writes + 1
+						assert(text == doc.text, "the complete approved text reaches the real save owner")
+						if refusal == "write" or refusal == "both" then return nil, "write-refused" end
+						return true
+					end,
+					close = function()
+						closes = closes + 1
+						if refusal == "close" or refusal == "both" then return nil, "close-refused" end
+						return true
+					end,
+				}
+			end
+			local ok, err = xpcall(function()
+				local result = Report.perform({ action = "report", text = doc.text, fields = {} },
+					paths(), config, Report.redaction_context(overrides), overrides, snapshot)
+				helpers.assert_eq(result.ok, refusal == "none")
+				helpers.assert_eq(writes, 1)
+				helpers.assert_eq(closes, 1, "a failed write still closes its exact file")
+				helpers.assert_eq(#calls.reveal, refusal == "none" and 1 or 0)
+				helpers.assert_eq(#calls.open_url, refusal == "none" and 1 or 0)
+			end, debug.traceback)
+			io.open = original_open
+			hs.fs.attributes = original_attributes
+			if not ok then error(err, 0) end
+		end
+	end)
+end)
