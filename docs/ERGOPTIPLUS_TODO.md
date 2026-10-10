@@ -56,6 +56,25 @@ and retains nine passing shutdown controls. Native macOS remains unqualified.
 Existing raw logs, unrelated sinks and arbitrary free-form content are not
 certified anonymous by these changes.
 
+[CI 38045831306](https://github.com/adrienm7/ergopti/actions/runs/38045831306)
+completed with failures on `b6801d2fbe`: Core passed 403 of 407 checks;
+Windows stopped at a reserved PowerShell variable before native component
+receiving; Linux and macOS retained stale English-export fixtures. Nine
+atomic corrections now preserve all original assertions, restore canonical
+privacy IO ownership, fix the controlled PAC worker admission race, and
+retain the latest validated Automation UI observation. Focused receiving
+passes. The complete local pipeline guard remains blocked by Windows symlink
+privilege; it is not counted as passed. The interrupted earlier source gate
+also remains nonqualifying.
+
+[CI 38048288963](https://github.com/adrienm7/ergopti/actions/runs/38048288963)
+is receiving these corrections on `0b1f937f66` with every OS lane enabled.
+No v1.0.1 release has been published. Native cold MLX passed on the preceding
+candidate, but the macOS Automation and PAC/TLS failures remain unresolved.
+The observed TLS code `-1202` does not identify the underlying rejection;
+additional bounded diagnostic evidence is being implemented without changing
+trust policy. Groups 2, 4 and 7 and the complete release gate remain open.
+
 [CI 38025215348](https://github.com/adrienm7/ergopti/actions/runs/38025215348)
 on `de812ab633` has completed Core JavaScript, Linux units, macOS units,
 macOS stubbed E2E and native cold MLX successfully. Windows units completed
@@ -144,10 +163,10 @@ new complete JavaScript pass. Five atomic local commits retain the relative
 Linux loader correction, macOS fixture stderr, Windows checker enrollment,
 owned downloader output and coherent Ollama components. Native CI is next.
 
-Current Windows Notepad 11.2607.14.0 receiving passed all six actual HSE/LLM
-caller scenarios through the production DLL. All 280 source dependencies and
+Windows Notepad 11.2607.14.0 receiving on `0b1f937f66` passed all six actual HSE/LLM
+caller scenarios through the production DLL. All 283 source dependencies and
 the DLL remained unchanged; the sender exited naturally, stderr was empty,
-and both owned Notepad processes were retired. The receipt retains 55 AHK
+and both owned Notepad processes were retired. The receipt retains 56 AHK
 variable-shadowing warnings. This controlled synthetic-document prerequisite
 does not qualify physical default triggers, navigation, concurrent typing, or
 the full focus/document/retirement matrix; Group 7 remains open.
